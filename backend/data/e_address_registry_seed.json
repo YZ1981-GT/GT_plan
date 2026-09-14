@@ -1,0 +1,152 @@
+{
+  "description": "E 类货币资金循环 audit-sheet 底稿关键坐标注册（OnlyOffice 地址名称落位）",
+  "version": "1.0.0",
+  "cycle": "E",
+  "entries": [
+    {
+      "wp_code": "E1-3",
+      "sheet_name": "银行存款明细表",
+      "coordinates": [
+        {"cell_address": "F99", "description": "银行存款合计-期末余额", "purpose": "balance_verification"},
+        {"cell_address": "G99", "description": "银行存款合计-期初余额", "purpose": "balance_verification"}
+      ]
+    },
+    {
+      "wp_code": "E1-4",
+      "sheet_name": "其他货币资金明细表",
+      "coordinates": [
+        {"cell_address": "E50", "description": "其他货币资金合计-期末余额", "purpose": "balance_verification"},
+        {"cell_address": "F50", "description": "其他货币资金合计-期初余额", "purpose": "balance_verification"}
+      ]
+    },
+    {
+      "wp_code": "E1-5",
+      "sheet_name": "银行存款余额调节表",
+      "coordinates": [
+        {"cell_address": "D20", "description": "企业账面调节后余额", "purpose": "reconciliation_result"},
+        {"cell_address": "D40", "description": "银行对账单调节后余额", "purpose": "reconciliation_result"},
+        {"cell_address": "B5", "description": "企业账面余额", "purpose": "balance_verification"},
+        {"cell_address": "B25", "description": "银行对账单余额", "purpose": "balance_verification"}
+      ]
+    },
+    {
+      "wp_code": "E1-9",
+      "sheet_name": "利息测算",
+      "coordinates": [
+        {"cell_address": "G30", "description": "测算利息合计", "purpose": "interest_calculation"},
+        {"cell_address": "H30", "description": "实际利息收入合计", "purpose": "interest_calculation"},
+        {"cell_address": "I30", "description": "利息差异金额", "purpose": "interest_difference"},
+        {"cell_address": "J30", "description": "差异原因/结论", "purpose": "conclusion"}
+      ]
+    },
+    {
+      "wp_code": "E1-14",
+      "sheet_name": "货币资金分析程序（一）",
+      "coordinates": [
+        {"cell_address": "B30", "description": "分析程序结论", "purpose": "conclusion"},
+        {"cell_address": "C10", "description": "货币资金余额变动率", "purpose": "ratio_analysis"},
+        {"cell_address": "C15", "description": "货币资金占总资产比例", "purpose": "ratio_analysis"}
+      ]
+    },
+    {
+      "wp_code": "E1-15",
+      "sheet_name": "货币资金分析程序（二）",
+      "coordinates": [
+        {"cell_address": "B25", "description": "分析程序结论", "purpose": "conclusion"},
+        {"cell_address": "C8", "description": "利息收入与存款匹配分析", "purpose": "ratio_analysis"}
+      ]
+    },
+    {
+      "wp_code": "E1-18",
+      "sheet_name": "货币资金检查（一）",
+      "coordinates": [
+        {"cell_address": "B20", "description": "检查结论-银行对账单核实", "purpose": "conclusion"}
+      ]
+    },
+    {
+      "wp_code": "E1-19",
+      "sheet_name": "货币资金检查（二）",
+      "coordinates": [
+        {"cell_address": "B20", "description": "检查结论-大额收支核实", "purpose": "conclusion"}
+      ]
+    },
+    {
+      "wp_code": "E1-20",
+      "sheet_name": "货币资金检查（三）",
+      "coordinates": [
+        {"cell_address": "B20", "description": "检查结论-期后收支核实", "purpose": "conclusion"}
+      ]
+    },
+    {
+      "wp_code": "E1-21",
+      "sheet_name": "货币资金检查（四）",
+      "coordinates": [
+        {"cell_address": "B20", "description": "检查结论-库存现金盘点", "purpose": "conclusion"}
+      ]
+    },
+    {
+      "wp_code": "E1-22",
+      "sheet_name": "货币资金检查（五）",
+      "coordinates": [
+        {"cell_address": "B20", "description": "检查结论-受限资金核实", "purpose": "conclusion"}
+      ]
+    },
+    {
+      "wp_code": "E1-23",
+      "sheet_name": "货币资金检查（六）",
+      "coordinates": [
+        {"cell_address": "B20", "description": "检查结论-银行账户完整性", "purpose": "conclusion"}
+      ]
+    },
+    {
+      "wp_code": "E1-26",
+      "sheet_name": "IPO舞弊应对（一）",
+      "coordinates": [
+        {"cell_address": "B15", "description": "IPO货币资金真实性检查结论", "purpose": "conclusion"},
+        {"cell_address": "B30", "description": "舞弊风险应对结论", "purpose": "conclusion"}
+      ]
+    },
+    {
+      "wp_code": "E1-27",
+      "sheet_name": "IPO舞弊应对（二）",
+      "coordinates": [
+        {"cell_address": "B15", "description": "IPO大额资金流水检查结论", "purpose": "conclusion"}
+      ]
+    },
+    {
+      "wp_code": "E1-28",
+      "sheet_name": "IPO舞弊应对（三）",
+      "coordinates": [
+        {"cell_address": "B15", "description": "IPO银行账户完整性核查结论", "purpose": "conclusion"}
+      ]
+    },
+    {
+      "wp_code": "E1-29",
+      "sheet_name": "IPO舞弊应对（四）",
+      "coordinates": [
+        {"cell_address": "B15", "description": "IPO资金归集与划转检查结论", "purpose": "conclusion"}
+      ]
+    },
+    {
+      "wp_code": "E1-30",
+      "sheet_name": "IPO舞弊应对（五）",
+      "coordinates": [
+        {"cell_address": "B15", "description": "IPO关联方资金往来检查结论", "purpose": "conclusion"}
+      ]
+    },
+    {
+      "wp_code": "E1-31",
+      "sheet_name": "IPO舞弊应对（六）",
+      "coordinates": [
+        {"cell_address": "B15", "description": "IPO期后资金异常变动检查结论", "purpose": "conclusion"}
+      ]
+    },
+    {
+      "wp_code": "E1-32",
+      "sheet_name": "IPO舞弊应对（七）",
+      "coordinates": [
+        {"cell_address": "B15", "description": "IPO体外资金循环检查结论", "purpose": "conclusion"}
+      ]
+    }
+  ]
+}

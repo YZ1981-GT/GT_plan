@@ -1,0 +1,43 @@
+{
+  "_comment": "OfficeCLI 版本锁 + 官方 SHA256。install.ps1 / install.sh 按此文件下载校验，二进制不入库。",
+  "_source_repo": "https://github.com/iOfficeAI/OfficeCLI",
+  "_warning": "务必只用 iOfficeAI/OfficeCLI。存在多个同名仿冒/镜像仓库；officecli/officecli 是另一个产品（需 hosted trial + 外部 LLM endpoint，会联网），不可混用。",
+  "_license": "Apache-2.0（依赖仅 DocumentFormat.OpenXml / System.CommandLine / .NET Runtime，均 MIT）",
+  "version": "v1.0.142",
+  "release_url_template": "https://github.com/iOfficeAI/OfficeCLI/releases/download/{version}/{asset}",
+  "checksums_asset": "SHA256SUMS",
+  "assets": {
+    "win-x64": {
+      "asset": "officecli-win-x64.exe",
+      "sha256": "676e0acee691288968a31b9832299ad05599e83140e801c382b6fc4509622fe2"
+    },
+    "win-arm64": {
+      "asset": "officecli-win-arm64.exe",
+      "sha256": "0926428513e15f2d1c6eb726a07b141f7f31d60360226daa7526e518213d3578"
+    },
+    "linux-x64": {
+      "asset": "officecli-linux-x64",
+      "sha256": "f78563abc13cf70dcd420644019d2f11dc36ea2957ac738613a6911d652b5541"
+    },
+    "linux-arm64": {
+      "asset": "officecli-linux-arm64",
+      "sha256": "260cdccd27f2e25902e9436e5e971c0ca5348ae3d36a54a3fbd794c452ba13f7"
+    },
+    "linux-alpine-x64": {
+      "asset": "officecli-linux-alpine-x64",
+      "sha256": "e0f9aa822c79ca49ce14724adb20e6a3483f263db6fbb69a6a303e4f59a84346"
+    },
+    "linux-alpine-arm64": {
+      "asset": "officecli-linux-alpine-arm64",
+      "sha256": "4c47ae4ce1047baa81e586d99149428874cb4eecc110928ff4684c885d029ba3"
+    },
+    "mac-x64": {
+      "asset": "officecli-mac-x64",
+      "sha256": "d2d27d8203ec8fc178a6a55eb4ce0ca63696e4ceddb7f85eab359da77f343a91"
+    },
+    "mac-arm64": {
+      "asset": "officecli-mac-arm64",
+      "sha256": "684ce214bb8d750003d521eea044a9199bcbdb870817dba5d3191b35715ea38c"
+    }
+  }
+}

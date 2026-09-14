@@ -1,0 +1,208 @@
+{
+  "contract": {
+    "canonical_sha256": "bdd2f6494185777ce429ea04940510bcf6cf59c4f8a837c48251a4b4dfc86007",
+    "contract_id": "d2.receivable_detail",
+    "editable_field_count": 36,
+    "field_count": 39,
+    "protected_field_count": 3
+  },
+  "note": "结构性事实 only —— 刻意不含任何业务值（客户名称 / 金额 / 备注）。真实载荷是审计客户的应收账款明细，不入库到仓库；判据在 test_task41_d2_large_json_pilot_pg.py 里从 public.checklist_responses 现取现比。",
+  "other_items": {
+    "bytes": {
+      "D2-adj-aging-custom-bands": 93,
+      "D2-adj-aging-mode": 2,
+      "D2-analysis-aging-struct-rows": 1126,
+      "D2-analysis-debit-recon": 537,
+      "D2-analysis-top10": 589,
+      "D2-bd-aging-rows": 1344,
+      "D2-bd-custom-groups": 151,
+      "D2-bd-customer-rows": 373,
+      "D2-bd-individual-rows": 691,
+      "D2-detail-audit-note": 1656,
+      "D2-ecl-discount-rows": 2,
+      "D2-ecl-migration-matrix": 783,
+      "D2-ecl-single-rows": 2,
+      "D2-factoring-rows": 179,
+      "D2-pledge-rows": 2,
+      "D2-related-party-rows": 435,
+      "D2-review-session-20260723061229": 263,
+      "D2-review-session-20260725073119": 261,
+      "D2-vc-conclusion": 0,
+      "D2-voucher-params": 91,
+      "D2-voucher-samples": 332,
+      "D2-writeoff-reversal-rows": 2,
+      "D2-writeoff-writeoff-rows": 2
+    },
+    "count": 23,
+    "item_ids": [
+      "D2-adj-aging-custom-bands",
+      "D2-adj-aging-mode",
+      "D2-analysis-aging-struct-rows",
+      "D2-analysis-debit-recon",
+      "D2-analysis-top10",
+      "D2-bd-aging-rows",
+      "D2-bd-custom-groups",
+      "D2-bd-customer-rows",
+      "D2-bd-individual-rows",
+      "D2-detail-audit-note",
+      "D2-ecl-discount-rows",
+      "D2-ecl-migration-matrix",
+      "D2-ecl-single-rows",
+      "D2-factoring-rows",
+      "D2-pledge-rows",
+      "D2-related-party-rows",
+      "D2-review-session-20260723061229",
+      "D2-review-session-20260725073119",
+      "D2-vc-conclusion",
+      "D2-voucher-params",
+      "D2-voucher-samples",
+      "D2-writeoff-reversal-rows",
+      "D2-writeoff-writeoff-rows"
+    ]
+  },
+  "shape": {
+    "aging_group_keys": {
+      "agingAudited": [
+        "over5",
+        "within1",
+        "y1to2",
+        "y2to3",
+        "y3to4",
+        "y4to5"
+      ],
+      "agingCurrent": [
+        "over5",
+        "within1",
+        "y1to2",
+        "y2to3",
+        "y3to4",
+        "y4to5"
+      ],
+      "agingPrior": [
+        "over5",
+        "within1",
+        "y1to2",
+        "y2to3",
+        "y3to4",
+        "y4to5"
+      ]
+    },
+    "distinct_row_ids": 1260,
+    "key_types": {
+      "agingAudited": [
+        "dict"
+      ],
+      "agingCurrent": [
+        "dict"
+      ],
+      "agingPrior": [
+        "dict"
+      ],
+      "companyCode": [
+        "str"
+      ],
+      "creditOccurrence": [
+        "float",
+        "int"
+      ],
+      "creditRiskClassification": [
+        "str"
+      ],
+      "currentAje": [
+        "int"
+      ],
+      "currentAudited": [
+        "float",
+        "int"
+      ],
+      "currentRje": [
+        "int"
+      ],
+      "currentUnadjusted": [
+        "float",
+        "int"
+      ],
+      "customerName": [
+        "str"
+      ],
+      "debitOccurrence": [
+        "float",
+        "int"
+      ],
+      "endBalance": [
+        "float",
+        "int"
+      ],
+      "groupName": [
+        "str"
+      ],
+      "isConfirmation": [
+        "bool"
+      ],
+      "postPayment": [
+        "int"
+      ],
+      "priorAje": [
+        "int"
+      ],
+      "priorAudited": [
+        "float",
+        "int"
+      ],
+      "priorRje": [
+        "int"
+      ],
+      "priorUnadjusted": [
+        "float",
+        "int"
+      ],
+      "reclassification": [
+        "int"
+      ],
+      "relationType": [
+        "str"
+      ],
+      "remark": [
+        "str"
+      ],
+      "rowId": [
+        "str"
+      ],
+      "seq": [
+        "int"
+      ]
+    },
+    "keys_per_row": 25,
+    "leaves_per_row": 40,
+    "managed_fields_per_row": 39,
+    "non_empty_counts": {
+      "creditOccurrence": 1131,
+      "currentAudited": 750,
+      "currentUnadjusted": 750,
+      "customerName": 1260,
+      "debitOccurrence": 1093,
+      "endBalance": 750,
+      "priorAudited": 751,
+      "priorUnadjusted": 751,
+      "relationType": 1260,
+      "rowId": 1260,
+      "seq": 1260
+    },
+    "row_count": 1260,
+    "total_stable_fields": 49140
+  },
+  "sizes": {
+    "d2_item_count": 24,
+    "payload_bytes": 906239,
+    "payload_kib": 885.0,
+    "payload_mib": 0.864,
+    "payload_sha256": "6c5d6d4c33f0b1393a59612c9dc3a7c3b42348bbb5ce5c60b4153aa40215950e",
+    "total_remark_bytes": 915155
+  },
+  "source": {
+    "access": "read_only",
+    "store_item_id": "D2-detail-rows",
+    "table": "public.checklist_responses",
+    "wp_id": "e2c95d10-181d-4549-8910-d5ab5bc5edd1"
+  }
+}

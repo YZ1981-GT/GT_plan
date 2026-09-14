@@ -1,0 +1,92 @@
+# A10-2.yaml — 与治理层的沟通记录
+# 基于 a7_a15_xlsx_audit.json X-A10-2 深读结果
+# componentType: d-form-confirmation（2 sheet：参与人+议题 / 风险表）
+
+wp_code: A10-2
+template_path: backend/wp_templates/A/A10-2 与治理层的沟通记录.xlsx
+template_version: v2025-R5
+
+sheets:
+  # ─── Sheet 1：沟通记录（参与人+议题）─────────────────────────────────────
+  communication_record:
+    form_type: confirmation
+    title: 与治理层沟通记录
+    fields:
+      - field: meeting_date
+        label: 沟通日期
+        type: date
+      - field: meeting_form
+        label: 沟通方式
+        type: enum
+        options: [面谈, 书面, 电话, 会议]
+      - field: governance_members
+        label: 治理层出席人员
+        type: textarea
+      - field: audit_team_members
+        label: 项目组出席人员
+        type: textarea
+    dynamic_table:
+      start_row: 9
+      end_row: dynamic
+      header_row: 8
+      add_row_button: true
+      max_rows: 30
+      columns:
+        seq:
+          field: seq
+          type: text
+          label: 序号
+          width: 60
+        topic:
+          field: topic
+          type: textarea
+          label: 沟通议题
+          width: 250
+        governance_response:
+          field: governance_response
+          type: textarea
+          label: 治理层回应
+          width: 250
+        conclusion:
+          field: conclusion
+          type: textarea
+          label: 结论与后续措施
+          width: 200
+
+  # ─── Sheet 2：风险表（5 列）─────────────────────────────────────────────
+  risk_table:
+    form_type: table
+    title: 审计中发现的重大风险事项
+    dynamic_table:
+      start_row: 10
+      end_row: dynamic
+      header_row: 9
+      add_row_button: true
+      max_rows: 20
+      columns:
+        seq:
+          field: seq
+          type: text
+          label: 序号
+          width: 50
+        risk_description:
+          field: risk_description
+          type: textarea
+          label: 风险事项描述
+          width: 200
+        risk_response:
+          field: risk_response
+          type: textarea
+          label: 审计应对
+          width: 180
+        risk_conclusion:
+          field: risk_conclusion
+          type: textarea
+          label: 结论
+          width: 160
+        index_ref:
+          field: index_ref
+          type: text
+          label: 索引号
+          width: 90
+          render_hint: index_chip

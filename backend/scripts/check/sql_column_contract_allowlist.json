@@ -1,0 +1,24 @@
+{
+  "_comment": "已知误报或特殊情况，格式: table.column（全小写）。每条须注明原因，修复后删除。",
+  "allowed_references": [
+    "information_schema.columns",
+    "information_schema.table_name",
+    "information_schema.column_name",
+    "information_schema.table_schema",
+    "pg_catalog.pg_type",
+    "pg_type.typname",
+    "pg_enum.enumlabel",
+    "procedure_instances.working_paper_id",
+    "procedure_instances.trim_category",
+    "procedure_instances.trim_status",
+    "procedure_instances.trim_evidence_refs",
+    "procedure_instances.name",
+    "disclosure_notes.is_key_disclosure",
+    "disclosure_notes.source_cells",
+    "disclosure_notes.title"
+  ],
+  "_debt_notes": {
+    "procedure_instances.*": "QC-19/20 程序裁剪治理，schema 从未建，try/except 守卫不会 500",
+    "disclosure_notes.*": "QC-26 附注关键披露来源映射，列不存在，运行时列存在性检查守卫"
+  }
+}

@@ -1,0 +1,65 @@
+# S20 营业收入扣除情况核查 — 专属渲染 schema
+# component_type: s20-revenue-deduction
+# Template: S20 营业收入扣除情况核查底稿202504.xlsx
+# 单 sheet 多区段底稿，整册统一路由到 GtS20RevenueDeduction
+
+wp_code: S20
+wp_name: 营业收入扣除情况核查
+component_type: s20-revenue-deduction
+template_path: backend/wp_templates/S/S20 营业收入扣除情况核查底稿202504.xlsx
+template_version: v2025-R5
+applicable_standards: [listed_standalone, listed_consolidated]
+
+# 整册专属组件（单 sheet，无内部 tab 分发）
+whole_workbook_dedicated: true
+
+sheets:
+  - sheet_name: 营业收入扣除情况核查
+    internal_type: single-sheet-multi-segment
+    description: 单 sheet 多区段 — 营业收入扣除项目汇总与明细
+    has_formulas: true
+    formula_count: 22
+    segments:
+      - name: 核查目标
+        row_range: "5-6"
+        description: 方法论上下文（红字→琥珀块）
+
+      - name: 扣非净利润判断
+        row_range: "8-12"
+        description: 判断适用条件
+
+      - name: 营收扣除汇总
+        row_range: "14-31"
+        description: 核心公式区（营收/扣除合计/占比/扣除后）
+
+      - name: 与主营业务无关收入明细
+        row_range: "34-50"
+        description: 动态明细行（可增删）
+        dynamic_rows: true
+
+      - name: 不具备商业实质收入明细
+        row_range: "52-63"
+        description: 动态明细行（可增删）
+        dynamic_rows: true
+
+      - name: 其他核查事项
+        row_range: "65-78"
+        description: 附加说明区
+
+# 公式引擎元数据
+formula_engine:
+  name: useS20FormulaEngine
+  type: pure_function
+  functions:
+    - calcRevenueDeduction: |
+        revenue = SUM(main_business) + SUM(other_business)
+        deduction_total = unrelated_revenue + no_substance_revenue
+        deduction_ratio = deduction_total / revenue (revenue≠0)
+        revenue_after_deduction = revenue - deduction_total
+  zero_protection:
+    - "revenue=0 → ratio 不可计算"
+
+# 双列对比
+dual_period:
+  current_year: "C列（本年审定）"
+  prior_year: "D列（上年追溯调整后）"

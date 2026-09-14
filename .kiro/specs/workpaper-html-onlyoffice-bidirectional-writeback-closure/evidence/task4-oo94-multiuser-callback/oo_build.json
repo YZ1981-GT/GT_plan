@@ -1,0 +1,27 @@
+{
+  "captured_at_utc": "2026-08-24T15:00:43.025476+00:00",
+  "container": "audit-onlyoffice",
+  "dpkg_onlyoffice_documentserver": "ii  onlyoffice-documentserver 9.4.0-129    amd64        Online editors for text docs, spreadsheets, presentations, PDFs, and PDF forms.",
+  "docker_image": "onlyoffice/documentserver:latest|sha256:e3da62a847b9a5d51a11f73cfea1d9c13c3be3809614490d4edddcf01dcf919b",
+  "web_apps_build_from_editor_iframe": "9.4.0-17bd46f468bf1ff77e010159b8920986 (?_dc=9.4.0-129)",
+  "callback_history_serverVersion": "9.4.0",
+  "healthcheck_endpoint": "http://localhost:8080/healthcheck -> true",
+  "info_endpoint": "http://localhost:8080/info/info.json -> HTTP 403 Forbidden (受保护，不作为 build 判据)",
+  "jwt": {
+    "JWT_ENABLED": true,
+    "inbox_header": "Authorization",
+    "inbox_inBody": false,
+    "outbox_header": "Authorization",
+    "outbox_inBody": false,
+    "browser_token": true
+  },
+  "externalRequest_defaults": {
+    "directIfIn.jwtToken": true,
+    "action.blockPrivateIP": true,
+    "note": "document.url/callbackUrl 因来自 JWT 签名 config 被视作 direct，绕过 blockPrivateIP，故容器可拉取 host.docker.internal 私网地址"
+  },
+  "request_filtering_agent_defaults": {
+    "allowPrivateIPAddress": false,
+    "allowMetaIPAddress": false
+  }
+}

@@ -1,0 +1,1520 @@
+{
+  "all_passed": true,
+  "artifact": "task14_whole_folder_correctness_summary",
+  "command": "HYPOTHESIS_PROFILE=correctness python -m pytest tests/procedure_delegation_visibility/ --junitxml=evidence/artifacts/task14/task14_whole_folder_correctness_junit.xml --hypothesis-show-statistics",
+  "description": "Deterministic (timing-free) summary of the whole-folder correctness run; byte-reproducible by CI command HYPOTHESIS_PROFILE=correctness pytest tests/procedure_delegation_visibility/.",
+  "suite": "tests/procedure_delegation_visibility",
+  "testcases": [
+    {
+      "id": "tests.procedure_delegation_visibility.test_delegation_transaction::test_binding_conflict_rejects",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_delegation_transaction::test_concurrent_reassignment_serialized",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_delegation_transaction::test_crash_recovery_outbox_persisted",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_delegation_transaction::test_cross_cycle_default_reject",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_delegation_transaction::test_epoch_and_outbox_atomic",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_delegation_transaction::test_layers_never_overwrite",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_delegation_transaction::test_lead_clear_preserves_row_tasks",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_delegation_transaction::test_lead_two_layer_same_person",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_delegation_transaction::test_mapping_invalid_rejects",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_delegation_transaction::test_projection_not_written_with_row_staff",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_delegation_transaction::test_request_id_idempotent",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_delegation_transaction::test_revocation_does_not_shrink_scope",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_delegation_transaction::test_row_clear_preserves_other_role_and_lead",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_delegation_transaction::test_scope_expansion_requires_reason_and_unions",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_delegation_transaction::test_sequential_reassignment_consistency",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_delegation_transaction_pbt::test_pbt_epoch_monotonic_and_atomic",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_delegation_transaction_pbt::test_pbt_layers_never_overwrite",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_delegation_transaction_pbt::test_pbt_mapping_transaction_invariants",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_delegation_transaction_pbt::test_pbt_scope_expansion_atomic",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_editor_security.TestCallbackPreconditions::test_action_mismatch",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_editor_security.TestCallbackPreconditions::test_all_pass",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_editor_security.TestCallbackPreconditions::test_readonly_token_rejected",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_editor_security.TestCallbackPreconditions::test_revoked_session_not_delegated",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_editor_security.TestCallbackPreconditions::test_stale_epoch",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_editor_security.TestCallbackPreconditions::test_version_conflict",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_editor_security.TestClaimsBinding::test_all_bound_keys_match",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_editor_security.TestClaimsBinding::test_missing_expected_key_skipped",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_editor_security.TestClaimsBinding::test_none_claim_rejected",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_editor_security.TestEditorTokenPBT::test_tampered_wp_always_rejected",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_editor_security.TestEditorTokenPBT::test_valid_token_roundtrip",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_editor_security.TestEditorTokenValidation::test_bad_signature_fail_closed",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_editor_security.TestEditorTokenValidation::test_cross_resource_replay_claim_mismatch[action]",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_editor_security.TestEditorTokenValidation::test_cross_resource_replay_claim_mismatch[project_id]",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_editor_security.TestEditorTokenValidation::test_cross_resource_replay_claim_mismatch[sheet_name]",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_editor_security.TestEditorTokenValidation::test_cross_resource_replay_claim_mismatch[version]",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_editor_security.TestEditorTokenValidation::test_cross_resource_replay_claim_mismatch[wp_code]",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_editor_security.TestEditorTokenValidation::test_cross_resource_replay_claim_mismatch[wp_id]",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_editor_security.TestEditorTokenValidation::test_empty_claim_fail_closed",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_editor_security.TestEditorTokenValidation::test_empty_token_fail_closed",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_editor_security.TestEditorTokenValidation::test_expired_token_fail_closed",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_editor_security.TestEditorTokenValidation::test_jti_required_non_empty",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_editor_security.TestEditorTokenValidation::test_missing_claim_fail_closed",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_editor_security.TestEditorTokenValidation::test_missing_secret_fail_closed",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_editor_security.TestEditorTokenValidation::test_read_write_action_sets_disjoint",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_editor_security.TestEditorTokenValidation::test_readonly_token_rejected_for_write",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_editor_security.TestEditorTokenValidation::test_sign_and_validate_roundtrip",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_editor_security.TestEditorTokenValidation::test_sign_requires_secret",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_editor_security.TestEditorTokenValidation::test_signed_token_carries_all_required_claims",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_editor_security.TestEditorTokenValidation::test_version_conflict_via_claim_binding",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_editor_security.TestEditorTokenValidation::test_write_token_allowed_for_write",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_editor_security.TestFrozenJwtLifetime::test_lifetime_config_id_stable",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_editor_security.TestFrozenJwtLifetime::test_lifetime_is_finite_positive",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_editor_security.TestGateSignedTokenIntegration::test_signed_token_cross_resource_replay_denied",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_editor_security.TestGateSignedTokenIntegration::test_signed_token_editor_config_allow",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_editor_security.TestGateSignedTokenIntegration::test_signed_token_expired_denied",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_editor_security.TestGateSignedTokenIntegration::test_signed_token_secret_missing_denied",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_editor_security.TestGateSignedTokenIntegration::test_signed_token_version_conflict_denied",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_editor_security.TestUserCanWrite::test_truth_table[False-False-False-False]",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_editor_security.TestUserCanWrite::test_truth_table[False-True-True-False]",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_editor_security.TestUserCanWrite::test_truth_table[True-False-True-False]",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_editor_security.TestUserCanWrite::test_truth_table[True-True-False-False]",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_editor_security.TestUserCanWrite::test_truth_table[True-True-True-True]",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_procedure_wp_resolver.TestProperty4ProcedureBindingUniqueOrReject::test_unique_or_reject_no_mutation",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_procedure_wp_resolver.TestProperty7RowOnlySheetMapping::test_sheet_name_maps_unique_or_rejects",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_procedure_wp_resolver.TestResolverExamples::test_cross_project_wp_index_rejected",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_procedure_wp_resolver.TestResolverExamples::test_multiple_candidates_rejected",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_procedure_wp_resolver.TestResolverExamples::test_multiple_sources_agree",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_procedure_wp_resolver.TestResolverExamples::test_no_mutation_on_conflict",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_procedure_wp_resolver.TestResolverExamples::test_no_source_rejected",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_procedure_wp_resolver.TestResolverExamples::test_procedure_instance_by_wp_code",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_procedure_wp_resolver.TestResolverExamples::test_procedure_instance_by_wp_id",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_procedure_wp_resolver.TestResolverExamples::test_procedure_row_task_source_resolves",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_procedure_wp_resolver.TestResolverExamples::test_sheet_key_only_rejected_global",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_procedure_wp_resolver.TestResolverExamples::test_sheet_name_only_rejected_global",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_procedure_wp_resolver.TestResolverExamples::test_source_disagreement_rejected",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_procedure_wp_resolver.TestResolverExamples::test_wp_code_source_resolves",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_procedure_wp_resolver.TestResolverExamples::test_wp_id_source_resolves",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_procedure_wp_resolver.TestResolverExamples::test_wp_index_source_resolves",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_procedure_wp_resolver.TestResolverExamples::test_zero_candidate_rejected",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_procedure_wp_resolver.TestSheetCatalogExamples::test_checklist_item_ambiguous_rejected",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_procedure_wp_resolver.TestSheetCatalogExamples::test_checklist_item_direct_hit",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_procedure_wp_resolver.TestSheetCatalogExamples::test_resolve_row_task",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_procedure_wp_resolver.TestSheetCatalogExamples::test_resolve_sheet_key_membership",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_procedure_wp_resolver.TestSheetCatalogExamples::test_resolve_sheet_name_ambiguous_rejected",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_procedure_wp_resolver.TestSheetCatalogExamples::test_resolve_sheet_name_unique",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_procedure_wp_resolver.TestSheetCatalogExamples::test_resolve_sheet_name_whitespace_insensitive",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_procedure_wp_resolver.TestSheetCatalogExamples::test_resolve_sheet_name_zero_rejected",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_procedure_wp_resolver.TestSheetCatalogExamples::test_row_task_cross_index_rejected_not_whole_wp",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_role_classifier.TestClassificationExamples::test_admin_ignores_scope_even_with_project_user_scope",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_role_classifier.TestClassificationExamples::test_assignment_role_not_in_allowed_set_is_restricted",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_role_classifier.TestClassificationExamples::test_duplicate_active_staff_is_restricted",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_role_classifier.TestClassificationExamples::test_inactive_assignment_is_restricted",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_role_classifier.TestClassificationExamples::test_missing_project_user_is_restricted",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_role_classifier.TestClassificationExamples::test_supervisor_happy_path_with_scope",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_role_classifier.TestFailClosedUnit::test_admin_short_circuits_without_query",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_role_classifier.TestFailClosedUnit::test_query_failure_non_admin_is_restricted_empty_scope",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_role_classifier.TestFailClosedUnit::test_unknown_role_non_admin_restricted",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_role_classifier.TestProperty1ClassificationUniqueFailClosed::test_classification_matrix",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_staff_user_mapping.TestMappingInvariantExamples::test_ambiguous_reverse_rejected",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_staff_user_mapping.TestMappingInvariantExamples::test_cross_project_rejected",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_staff_user_mapping.TestMappingInvariantExamples::test_empty_staff_rejected",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_staff_user_mapping.TestMappingInvariantExamples::test_field_equality_never_implies_same_person",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_staff_user_mapping.TestMappingInvariantExamples::test_inactive_staff_rejected",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_staff_user_mapping.TestMappingInvariantExamples::test_is_same_natural_person_uses_mapping",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_staff_user_mapping.TestMappingInvariantExamples::test_staff_without_user_rejected",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_staff_user_mapping.TestMappingInvariantExamples::test_unique_active_mapping_accepted",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_staff_user_mapping.TestProperty2StaffUserMapping::test_mapping_accepts_only_unique_active_bidirectional",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_task10_entry_gate.TestAssociateMultiResource::test_associate_allow_lead_same_project",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_task10_entry_gate.TestAssociateMultiResource::test_associate_assignee_denied",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_task10_entry_gate.TestAssociateMultiResource::test_associate_cross_project_denied",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_task10_entry_gate.TestAssociateMultiResource::test_associate_missing_attachment_404",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_task10_entry_gate.TestAttachmentWpLinkIsolation::test_download_linked_invisible_wp_denied",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_task10_entry_gate.TestAttachmentWpLinkIsolation::test_download_linked_visible_wp_allows",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_task10_entry_gate.TestAttachmentWpLinkIsolation::test_unlinked_attachment_returns_none",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_task10_entry_gate.TestBulkGate::test_preflight_allows_visible",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_task10_entry_gate.TestBulkGate::test_preflight_atomic_deny_on_invisible",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_task10_entry_gate.TestBulkGate::test_visible_filter_includes_only_visible",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_task10_entry_gate.TestWorkerRegateAfterRevocation::test_worker_preflight_rejects_after_revocation",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_task10_entry_gate::test_associate_endpoint_real_app_allow",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_task13_epoch_cache_rate_profile.TestInvalidationDispatcherThroughRedis::test_publish_pending_cursor_skips_already_published",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_task13_epoch_cache_rate_profile.TestInvalidationDispatcherThroughRedis::test_publish_pending_fans_out_and_invalidates_local",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_task13_epoch_cache_rate_profile.TestInvalidationDispatcherThroughRedis::test_subscriber_invalidates_on_published_message",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_task13_epoch_cache_rate_profile.TestObservabilityMetrics::test_error_allow_and_reason_distribution",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_task13_epoch_cache_rate_profile.TestObservabilityMetrics::test_measure_records_latency_and_p95",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_task13_epoch_cache_rate_profile.TestObservabilityMetrics::test_percentile_nearest_rank",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_task13_epoch_cache_rate_profile.TestObservabilityMetrics::test_query_count_tracks_no_n1",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_task13_epoch_cache_rate_profile.TestProperty18EpochCache::test_cache_key_includes_epoch_and_hits",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_task13_epoch_cache_rate_profile.TestProperty18EpochCache::test_epoch_bump_within_ttl_then_converges_after_ttl",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_task13_epoch_cache_rate_profile.TestProperty18EpochCache::test_epoch_unavailable_fails_closed_no_stale",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_task13_epoch_cache_rate_profile.TestProperty18EpochCache::test_redis_invalidate_converges_immediately",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_task13_epoch_cache_rate_profile.TestProperty18ThroughGate::test_gate_epoch_cache_immediate_invalidate_denies",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_task13_epoch_cache_rate_profile.TestProperty18ThroughGate::test_gate_with_epoch_cache_allows_then_denies_after_revoke",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_task13_epoch_cache_rate_profile.TestProperty19RateLimitProfile::test_activated_limiter_within_threshold_then_429_with_retry_after",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_task13_epoch_cache_rate_profile.TestProperty19RateLimitProfile::test_freeze_requires_matching_performance_version",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_task13_epoch_cache_rate_profile.TestProperty19RateLimitProfile::test_freeze_requires_positive_thresholds",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_task13_epoch_cache_rate_profile.TestProperty19RateLimitProfile::test_freeze_requires_some_threshold",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_task13_epoch_cache_rate_profile.TestProperty19RateLimitProfile::test_frozen_profile_activates_and_references_capacity_hash",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_task13_epoch_cache_rate_profile.TestProperty19RateLimitProfile::test_measurement_limiter_never_limits_when_inert",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_task13_epoch_cache_rate_profile.TestProperty19RateLimitProfile::test_measurement_only_profile_is_inert_no_thresholds",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_task13_epoch_cache_rate_profile.TestProperty19RateLimitProfile::test_unfrozen_thresholds_stay_inert",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_task13_epoch_cache_rate_profile.TestProperty19ResourceIndependent429::test_activated_profile_429_before_resource_resolution",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_task13_epoch_cache_rate_profile.TestProperty19ResourceIndependent429::test_measurement_default_never_limits_through_gate",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_task13_epoch_cache_rate_profile::test_dispatcher_degrades_when_redis_unavailable",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_task13_epoch_cache_rate_profile::test_handle_invalidation_message_parses_channel_and_invalidates",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_task13_epoch_cache_rate_profile::test_invalidation_channel_is_per_project",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_task13_epoch_cache_rate_profile::test_subscriber_returns_immediately_when_redis_unavailable",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_task14_pbt_profiles::test_profiles_registered_and_correctness_ge_100",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_task14_pbt_profiles::test_prompt_to_design_mapping_is_complete",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_task14_pbt_profiles::test_property_matrix_covers_p1_to_p20_and_files_exist",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_task14_pbt_profiles::test_same_source_batch_runs_both_tiers",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_task14_property_gaps::test_p10_binding_claim_conflict_fail_closed",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_task14_property_gaps::test_p12_audit_failure_never_changes_contract",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_task14_property_gaps::test_p15_display_and_client_identity_never_authorize",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_task14_property_gaps::test_p16_ledger_bidirectional_and_no_fake_pass",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_task14_property_gaps::test_p18_revocation_converges_no_stale_allow",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_task14_property_gaps::test_p19_profile_activation_requires_capacity_evidence",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_task14_property_gaps::test_p20_evidence_append_only_hash_complete",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_task14_property_gaps::test_p9_reviewer_whitelist_only",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_task14_property_gaps::test_zzz_pbt_coverage_report_and_valid_example_counts",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_task15_full_entry_integration.TestCrashBeforePublishNoStaleAllow::test_epoch_and_outbox_block_stale_allow_when_publish_crashes",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_task15_full_entry_integration.TestCrashBeforePublishNoStaleAllow::test_within_window_still_allows_bounded_staleness",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_task15_full_entry_integration.TestEntryFamilyWire404RealApp::test_ai_nonexistent_404",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_task15_full_entry_integration.TestEntryFamilyWire404RealApp::test_ai_out_of_scope_404",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_task15_full_entry_integration.TestEntryFamilyWire404RealApp::test_checklist_out_of_scope_404",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_task15_full_entry_integration.TestEntryFamilyWire404RealApp::test_dedicated_nonexistent_404",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_task15_full_entry_integration.TestEntryFamilyWire404RealApp::test_dedicated_out_of_scope_404",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_task15_full_entry_integration.TestEntryFamilyWire404RealApp::test_file_export_out_of_scope_404",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_task15_full_entry_integration.TestEntryFamilyWire404RealApp::test_parsed_data_nonexistent_404",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_task15_full_entry_integration.TestEntryFamilyWire404RealApp::test_parsed_data_out_of_scope_blocked",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_task15_full_entry_integration.TestEntryFamilyWire404RealApp::test_procedure_task_out_of_scope_404",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_task15_full_entry_integration.TestEntryFamilyWire404RealApp::test_render_config_cross_project_404",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_task15_full_entry_integration.TestEntryFamilyWire404RealApp::test_render_config_nonexistent_404",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_task15_full_entry_integration.TestEntryFamilyWire404RealApp::test_render_config_out_of_scope_404",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_task15_full_entry_integration.TestEntryFamilyWire404RealApp::test_status_nonexistent_404",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_task15_full_entry_integration.TestEntryFamilyWire404RealApp::test_version_list_out_of_scope_404",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_task15_full_entry_integration.TestExplainAndQueryCount::test_explain_plans_and_no_n1_artifact",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_task15_full_entry_integration.TestSecurityRegressions::test_bulk_preflight_atomic_deny_before_side_effect",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_task15_full_entry_integration.TestSecurityRegressions::test_callback_regate_rejects_after_revocation",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_task15_full_entry_integration.TestSecurityRegressions::test_delegation_reject_writes_nothing",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_task15_full_entry_integration.TestSecurityRegressions::test_no_side_effect_before_denial",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_task15_full_entry_integration.TestSecurityRegressions::test_outbox_write_failure_keeps_404",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_task15_full_entry_integration.TestSecurityRegressions::test_outbox_write_failure_keeps_429",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_task15_full_entry_integration.TestSecurityRegressions::test_two_layer_history_scope_epoch_atomic_commit",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_task15_full_entry_integration.TestSheetVersionTokenDimensions::test_all_dimensions_identical_wire_body",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_task15_full_entry_integration.TestSheetVersionTokenDimensions::test_editor_token_claim_mismatch_wire_404",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_task15_full_entry_integration.TestSheetVersionTokenDimensions::test_historical_version_wire_404",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_task15_full_entry_integration.TestSheetVersionTokenDimensions::test_row_only_unmapped_sheet_wire_404",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_task15_full_entry_integration.TestSheetVersionTokenDimensions::test_unmapped_sheet_wire_404",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_task15_integration_explain.TestBulkPreflightAtomic::test_preflight_atomic_deny_on_any_invisible",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_task15_integration_explain.TestCallbackAfterRevocation::test_callback_preconditions_reject_revoked_session",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_task15_integration_explain.TestCallbackAfterRevocation::test_callback_regate_rejects_after_revocation",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_task15_integration_explain.TestCrashRecoveryNoStaleAllow::test_persistent_epoch_blocks_stale_allow_without_publish",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_task15_integration_explain.TestEntryFamilyGateSweep::test_each_family_allow_deny_cross",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_task15_integration_explain.TestExplainAndQueryCount::test_explain_analyze_buffers_grants_union",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_task15_integration_explain.TestExplainAndQueryCount::test_gate_resolution_query_count_constant",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_task15_integration_explain.TestExplainAndQueryCount::test_grants_list_query_count_constant",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_task15_integration_explain.TestNoSideEffectBeforeDenial::test_denied_put_persists_nothing",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_task15_integration_explain.TestNoSideEffectBeforeDenial::test_gate_write_denial_is_uniform_404_before_mutation",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_task15_integration_explain.TestOutboxFailureContractStable::test_deny_outbox_failure_still_404_with_alert",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_task15_integration_explain.TestOutboxFailureContractStable::test_rate_limit_outbox_failure_still_429",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_task15_integration_explain.TestTwoLayerScopeEpochAtomic::test_invalid_mapping_rolls_back_no_writes",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_task15_integration_explain.TestTwoLayerScopeEpochAtomic::test_lead_scope_expansion_all_writes_atomic",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_task15_integration_explain.TestUniformWire404AllReasons::test_all_five_reasons_identical_wire",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_task15_integration_explain.TestUniformWire404AllReasons::test_real_app_route_level_reasons_identical_404",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_task16_coverage_guard::test_ast_gate_detection_ignores_comments_and_strings",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_task16_coverage_guard::test_bare_handler_not_gated",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_task16_coverage_guard::test_deferred_editor_allowlist_mechanism_exists",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_task16_coverage_guard::test_dynamic_add_api_route_gate_detected",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_task16_coverage_guard::test_fake_native_authz_without_native_hook_blocks",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_task16_coverage_guard::test_fake_pass_when_ledger_claims_gated_but_code_bare",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_task16_coverage_guard::test_indirect_wrapper_gate_detected",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_task16_coverage_guard::test_missing_live_route_blocks",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_task16_coverage_guard::test_native_authz_ledger_entries_have_native_dependency",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_task16_coverage_guard::test_new_duplicate_registration_blocks_but_known_allowlisted",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_task16_coverage_guard::test_new_nonhttp_callable_absent_from_ledger_blocks",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_task16_coverage_guard::test_no_drift_on_committed_ledger",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_task16_coverage_guard::test_no_unmigrated_wp_bound_entries_remain",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_task16_coverage_guard::test_not_applicable_allowlist_is_non_wp_or_project_level",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_task16_coverage_guard::test_reconcile_is_idempotent",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_task16_coverage_guard::test_stale_ledger_route_blocks",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_task16_coverage_guard::test_wp_bound_worker_fake_gated_without_regate_blocks",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_task9_core_route_gate::test_ai_generate_allow_lead_passes_gate",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_task9_core_route_gate::test_ai_generate_deny_not_delegated",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_task9_core_route_gate::test_ai_generate_nonexistent_404",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_task9_core_route_gate::test_checklist_get_allow_lead",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_task9_core_route_gate::test_checklist_get_deny_not_delegated",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_task9_core_route_gate::test_checklist_get_nonexistent_404",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_task9_core_route_gate::test_checklist_put_allow_admin",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_task9_core_route_gate::test_checklist_put_deny_admin_nonexistent_wp",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_task9_core_route_gate::test_detail_allow_lead",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_task9_core_route_gate::test_detail_cross_project_denied",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_task9_core_route_gate::test_detail_deny_not_delegated",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_task9_core_route_gate::test_parsed_data_allow_admin",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_task9_core_route_gate::test_parsed_data_deny_admin_nonexistent_wp",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_task9_core_route_gate::test_render_config_allow_lead_passes_gate",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_task9_core_route_gate::test_render_config_cross_project_denied",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_task9_core_route_gate::test_render_config_deny_not_delegated",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_task9_core_route_gate::test_version_detail_allow_lead_passes_gate",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_task9_core_route_gate::test_version_detail_deny_not_delegated",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_task9_core_route_gate::test_version_list_allow_lead",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_task9_core_route_gate::test_version_list_cross_project_denied",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_task9_core_route_gate::test_version_list_deny_not_delegated",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_task9_core_route_gate::test_version_rollback_allow_admin_passes_gate",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_task9_core_route_gate::test_version_rollback_cross_project_denied",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_task9_core_route_gate::test_version_rollback_deny_not_delegated",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_task9_dedicated_route_gate::test_all_dedicated_routes_have_gate_dependency",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_task9_dedicated_route_gate::test_dedicated_classifier_by_method",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_task9_dedicated_route_gate::test_h1_depreciation_calc_deny_admin_nonexistent_wp",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_task9_dedicated_route_gate::test_h1_depreciation_calc_deny_not_delegated",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_task9_dedicated_route_gate::test_k1_ai_generate_allow_lead",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_task9_dedicated_route_gate::test_k1_ai_generate_deny_not_delegated",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_task9_dedicated_route_gate::test_l2_accrual_check_allow_lead",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_task9_dedicated_route_gate::test_l2_accrual_check_deny_not_delegated",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_task9_dedicated_route_gate::test_l2_accrual_check_nonexistent_404",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_task9_dedicated_route_gate::test_l2_export_data_allow_lead",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_task9_dedicated_route_gate::test_l2_export_data_deny_not_delegated",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_task9_dedicated_route_gate::test_m1_dividend_calculation_allow_lead",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_task9_dedicated_route_gate::test_m1_dividend_calculation_deny_not_delegated",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_task9_dedicated_route_gate::test_m1_validate_formulas_allow_admin",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_task9_dedicated_route_gate::test_m1_validate_formulas_deny_not_delegated",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_task9_dedicated_route_gate::test_m1_validate_formulas_nonexistent_404",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_task9_dedicated_route_gate::test_n2_contract_ocr_deny_not_delegated",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_task9_dedicated_route_gate::test_n2_contract_ocr_nonexistent_404",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_task9_more_route_gate::test_html_allow_lead_passes_gate",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_task9_more_route_gate::test_html_cross_project_denied",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_task9_more_route_gate::test_html_deny_not_delegated",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_task9_more_route_gate::test_procedure_conversation_allow_assignee_passes_gate",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_task9_more_route_gate::test_procedure_conversation_deny_outsider",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_task9_more_route_gate::test_procedure_detail_allow_assignee",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_task9_more_route_gate::test_procedure_detail_cross_project_denied",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_task9_more_route_gate::test_procedure_detail_deny_outsider",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_task9_more_route_gate::test_status_allow_admin_real_transition",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_task9_more_route_gate::test_status_deny_admin_nonexistent_wp",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_task9_more_route_gate::test_status_deny_not_delegated",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_task9_more_route_gate::test_storage_versions_allow_lead_passes_gate",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_task9_more_route_gate::test_storage_versions_deny_not_delegated",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_task9_more_route_gate::test_tb_writeback_deny_admin_nonexistent_wp",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_task9_more_route_gate::test_tb_writeback_deny_not_delegated",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_task9_more_route_gate::test_version_compare_deny_not_delegated",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_task9_more_route_gate::test_version_create_allow_lead_passes_gate",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_task9_more_route_gate::test_version_create_deny_not_delegated",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_task9_more_route_gate::test_version_search_allow_lead",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_task9_more_route_gate::test_version_search_deny_not_delegated",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_task9_more_route_gate::test_version_search_nonexistent_404",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_v113_schema_contract.TestV113MigrationStatic::test_append_only_orm_has_no_updated_at",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_v113_schema_contract.TestV113MigrationStatic::test_append_only_triggers_declared",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_v113_schema_contract.TestV113MigrationStatic::test_epoch_column_is_bigint",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_v113_schema_contract.TestV113MigrationStatic::test_idempotent_guards_present",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_v113_schema_contract.TestV113MigrationStatic::test_invalidation_change_type_check",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_v113_schema_contract.TestV113MigrationStatic::test_migration_and_rollback_files_exist",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_v113_schema_contract.TestV113MigrationStatic::test_migration_head_rescanned_next_free_version",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_v113_schema_contract.TestV113MigrationStatic::test_no_sensitive_columns_declared",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_v113_schema_contract.TestV113MigrationStatic::test_orm_models_registered",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_v113_schema_contract.TestV113MigrationStatic::test_reason_enum_check_has_all_values_incl_rate_limited",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_v113_schema_contract.TestV113MigrationStatic::test_rollback_only_drops_v113_objects",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_v113_schema_contract.TestV113PgContract::test_append_only_triggers_block_update_and_delete",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_v113_schema_contract.TestV113PgContract::test_apply_is_idempotent_and_tables_exist",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_v113_schema_contract.TestV113PgContract::test_epoch_and_invalidation_columns",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_v113_schema_contract.TestV113PgContract::test_history_columns_and_fk",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_v113_schema_contract.TestV113PgContract::test_orm_db_zero_drift_for_task2_scope",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_v113_schema_contract.TestV113PgContract::test_outbox_tables_are_append_only",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_v113_schema_contract.TestV113PgContract::test_policy_epoch_monotonic_and_atomic_increment",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_v113_schema_contract.TestV113PgContract::test_reason_check_rejects_unknown_and_accepts_rate_limited",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_v113_schema_contract.TestV113PgContract::test_rollback_r113_transactional",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_v113_schema_contract.TestV113PgContract::test_security_outbox_columns_and_reason_check",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_visibility_query.TestGrantExamples::test_admin_all_project_ignores_scope",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_visibility_query.TestGrantExamples::test_assignee_grant_only_mapped_sheet",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_visibility_query.TestGrantExamples::test_cancelled_task_excluded",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_visibility_query.TestGrantExamples::test_cross_project_wp_excluded",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_visibility_query.TestGrantExamples::test_empty_scope_no_fallback",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_visibility_query.TestGrantExamples::test_history_lead_all_pages_readonly",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_visibility_query.TestGrantExamples::test_history_out_of_scope_excluded",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_visibility_query.TestGrantExamples::test_history_row_snapshot_sheet_readonly",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_visibility_query.TestGrantExamples::test_lead_grant_all_pages",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_visibility_query.TestGrantExamples::test_multi_identity_union_same_wp",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_visibility_query.TestGrantExamples::test_nullable_wp_still_counted",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_visibility_query.TestGrantExamples::test_reviewer_grant_mapped_sheet",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_visibility_query.TestGrantExamples::test_supervisor_scope_grant",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_visibility_query.TestNoPerWorkpaperN1::test_query_count_constant_regardless_of_wp_count",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_visibility_query.TestProperty5FixedSetFormula::test_visible_equals_delegated_union_history_intersect_scope",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_visibility_query.TestProperty6HistoryImmutableAfterRebind::test_history_attribution_unchanged_by_rebind",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_visibility_query.TestProperty7PageVisibilityAndHistoryReadonly::test_history_grants_are_readonly",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_visibility_query.TestProperty7PageVisibilityAndHistoryReadonly::test_row_only_page_isolation",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_visibility_query.TestProperty8OneKnownKindPerGrant::test_each_grant_single_registered_kind",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_workpaper_list_query.TestListExamples::test_admin_sees_all_ignoring_scope",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_workpaper_list_query.TestListExamples::test_business_filter_index_status",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_workpaper_list_query.TestListExamples::test_dedupe_by_wp_index_multi_identity",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_workpaper_list_query.TestListExamples::test_empty_visible_set_two_empty_stat_dicts",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_workpaper_list_query.TestListExamples::test_nullable_wp_counted",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_workpaper_list_query.TestListExamples::test_pagination_slices",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_workpaper_list_query.TestListExamples::test_payload_only_five_top_level_fields",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_workpaper_list_query.TestListExamples::test_stable_sort_nulls_last_and_wp_index_tiebreak",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_workpaper_list_query.TestListExamples::test_stable_sort_wp_code_asc",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_workpaper_list_query.TestListExamples::test_stats_split_index_and_file",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_workpaper_list_query.TestListParamsValidation::test_bool_page_rejected",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_workpaper_list_query.TestListParamsValidation::test_non_positive_page_rejected[-100]",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_workpaper_list_query.TestListParamsValidation::test_non_positive_page_rejected[-1]",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_workpaper_list_query.TestListParamsValidation::test_non_positive_page_rejected[0]",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_workpaper_list_query.TestListParamsValidation::test_offset_computation",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_workpaper_list_query.TestListParamsValidation::test_page_size_out_of_range_rejected[-1]",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_workpaper_list_query.TestListParamsValidation::test_page_size_out_of_range_rejected[0]",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_workpaper_list_query.TestListParamsValidation::test_page_size_out_of_range_rejected[101]",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_workpaper_list_query.TestListParamsValidation::test_page_size_out_of_range_rejected[9999]",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_workpaper_list_query.TestListParamsValidation::test_unregistered_sort_dir_rejected",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_workpaper_list_query.TestListParamsValidation::test_unregistered_sort_rejected",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_workpaper_list_query.TestListParamsValidation::test_valid_defaults",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_workpaper_list_query.TestProperty14OrderedPipeline::test_pipeline_invariants",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_workpaper_list_query.TestProperty15DisplayNeverAuthorizes::test_authorization_only_from_server_context",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_workpaper_list_query.TestProperty15DisplayNeverAuthorizes::test_illegal_params_reject_before_any_query",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_workpaper_list_query.TestTwoViewIdentityBoundary::test_my_lead_ignores_history_only",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_workpaper_list_query.TestTwoViewIdentityBoundary::test_my_lead_only_lead_not_assignee",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_workpaper_list_query.TestTwoViewIdentityBoundary::test_my_lead_reuses_pagination_stats_contract",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_wp_bound_gate.TestProperty10BindingClaimConflict::test_client_wp_index_mismatch",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_wp_bound_gate.TestProperty10BindingClaimConflict::test_cross_project_via_wrong_declared_project",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_wp_bound_gate.TestProperty10BindingClaimConflict::test_historical_version_denied",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_wp_bound_gate.TestProperty10BindingClaimConflict::test_nonexistent_resource_not_found",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_wp_bound_gate.TestProperty10BindingClaimConflict::test_token_claim_mismatch",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_wp_bound_gate.TestProperty10BindingClaimConflict::test_unmapped_sheet_denied",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_wp_bound_gate.TestProperty11PBTUniformNotFound::test_deny_always_404_fixed_body",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_wp_bound_gate.TestProperty11RateLimitAndUniformNotFound::test_all_deny_reasons_identical_wire_body",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_wp_bound_gate.TestProperty11RateLimitAndUniformNotFound::test_rate_limit_before_resource_resolution",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_wp_bound_gate.TestProperty12AuditFailureContractStable::test_deny_404_stable_when_outbox_fails",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_wp_bound_gate.TestProperty12AuditFailureContractStable::test_rate_limit_429_stable_when_outbox_fails",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_wp_bound_gate.TestProperty8GrantMatrixUnion::test_assignee_content_mutation_allowed_on_mapped_sheet",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_wp_bound_gate.TestProperty8GrantMatrixUnion::test_lead_read_all_pages",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_wp_bound_gate.TestProperty8GrantMatrixUnion::test_multi_identity_union_read",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_wp_bound_gate.TestProperty8GrantMatrixUnion::test_no_dimension_splice_assignee_cannot_borrow_lead_action",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_wp_bound_gate.TestProperty9ReviewerWhitelist::test_reviewer_can_read",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_wp_bound_gate.TestProperty9ReviewerWhitelist::test_reviewer_changes_requested_requires_reason",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_wp_bound_gate.TestProperty9ReviewerWhitelist::test_reviewer_generic_mutations_denied[attachment.associate-attach_associate-POST-none-none]",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_wp_bound_gate.TestProperty9ReviewerWhitelist::test_reviewer_generic_mutations_denied[editor.file_write-editor_write-POST-none-none]",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_wp_bound_gate.TestProperty9ReviewerWhitelist::test_reviewer_generic_mutations_denied[version.restore-version_restore-POST-none-none]",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_wp_bound_gate.TestProperty9ReviewerWhitelist::test_reviewer_generic_mutations_denied[workpaper.checklist_save-save_checklist-PUT-none-none]",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_wp_bound_gate.TestProperty9ReviewerWhitelist::test_reviewer_generic_mutations_denied[workpaper.parsed_data_write-save_parsed_data-PUT-none-none]",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_wp_bound_gate.TestProperty9ReviewerWhitelist::test_reviewer_generic_mutations_denied[workpaper.status_transition-status_transition-POST-submitted-reviewed]",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests.procedure_delegation_visibility.test_wp_bound_gate.TestProperty9ReviewerWhitelist::test_reviewer_transition_reviewed_allowed",
+      "outcome": "passed"
+    }
+  ],
+  "totals": {
+    "errors": 0,
+    "failures": 0,
+    "passed": 376,
+    "skipped": 0,
+    "tests": 376
+  }
+}

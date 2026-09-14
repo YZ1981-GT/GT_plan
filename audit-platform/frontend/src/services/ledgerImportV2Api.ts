@@ -38,9 +38,9 @@ export interface RawExtraFieldsResult {
 }
 
 export const ledgerImportV2Api = {
-  /** 预检：上传文件并返回识别结果（大文件多文件场景超时 5 分钟） */
+  /** 预检：上传文件并返回识别结果（大文件多文件场景超时 10 分钟） */
   detect: (pid: string, formData: FormData) =>
-    api.post(ledger.import.base(pid) + '/detect', formData, { timeout: 300000 }),
+    api.post(ledger.import.base(pid) + '/detect', formData, { timeout: 600000, _silent: true } as any),
 
   /** 提交导入作业 */
   submit: (pid: string, body: SubmitBody) =>

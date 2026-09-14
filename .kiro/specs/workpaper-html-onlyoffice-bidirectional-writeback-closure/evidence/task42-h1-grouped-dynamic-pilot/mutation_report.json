@@ -1,0 +1,2005 @@
+[
+  {
+    "id": "M01",
+    "side": "be",
+    "want": "test_task42_h1_grouped_dynamic_pilot.py::TestAuthoritativeTemplate::test_template_bytes_are_unchanged",
+    "why": "模板字节哨兵改一位后仍绿 ⇒ 「backend/wp_templates 运行时只读」无人把守，后面每个 definition digest 都会对着一份错模板算出来",
+    "verdict": "RED",
+    "summary": "36 failed, 121 passed, 19 errors in 15.21s",
+    "added": [
+      "test_task42_h1_grouped_dynamic_pilot.py::TestAuthoritativeTemplate::test_template_bytes_are_unchanged",
+      "test_task42_h1_grouped_dynamic_pilot.py::TestAuthoritativeTemplate::test_template_formula_cells_ship_without_cached_values",
+      "test_task42_h1_grouped_dynamic_pilot.py::TestAuthoritativeTemplate::test_template_sentinel_rejects_a_mutated_workbook",
+      "test_task42_h1_grouped_dynamic_pilot.py::TestBaselineExtractOnTheRealTemplate::test_baseline_extract_reads_back_every_managed_field",
+      "test_task42_h1_grouped_dynamic_pilot.py::TestBaselineExtractOnTheRealTemplate::test_formula_columns_are_read_with_their_formula_text",
+      "test_task42_h1_grouped_dynamic_pilot.py::TestBaselineExtractOnTheRealTemplate::test_instrumentation_produces_all_four_carriers",
+      "test_task42_h1_grouped_dynamic_pilot.py::TestBaselineExtractOnTheRealTemplate::test_managed_sheet_structure_aspect_covers_the_style_sources",
+      "test_task42_h1_grouped_dynamic_pilot.py::TestBaselineExtractOnTheRealTemplate::test_shared_strings_zero_is_a_workbook_fact_not_an_empty_judgement",
+      "test_task42_h1_grouped_dynamic_pilot.py::TestBaselineExtractOnTheRealTemplate::test_unmanaged_region_coverage_is_not_empty",
+      "test_task42_h1_grouped_dynamic_pilot.py::TestContractIsGroundedInTheTemplate::test_disk_contract_matches_the_source_of_truth",
+      "test_task42_h1_grouped_dynamic_pilot.py::TestContractIsGroundedInTheTemplate::test_footer_anchor_never_hardcodes_a_row",
+      "test_task42_h1_grouped_dynamic_pilot.py::TestContractIsGroundedInTheTemplate::test_header_rows_is_three_and_is_the_schema_upper_bound",
+      "test_task42_h1_grouped_dynamic_pilot.py::TestContractIsGroundedInTheTemplate::test_mutated_contract_payload_is_rejected",
+      "test_task42_h1_grouped_dynamic_pilot.py::TestContractIsGroundedInTheTemplate::test_positional_row_identity_is_refused",
+      "test_task42_h1_grouped_dynamic_pilot.py::TestContractIsGroundedInTheTemplate::test_uuid_column_sits_right_of_the_managed_business_columns",
+      "test_task42_h1_grouped_dynamic_pilot.py::TestProperty22ColumnIdentityIsDecoupledFromLabel::test_no_dynamic_columns_are_declared_for_this_entry",
+      "test_task42_h1_grouped_dynamic_pilot.py::TestProperty23And66StructuralOperations::test_appending_onto_the_footer_row_is_reported_by_the_unmanaged_gate",
+      "test_task42_h1_grouped_dynamic_pilot.py::TestProperty23And66StructuralOperations::test_copied_row_duplicate_identity_is_a_structural_conflict",
+      "test_task42_h1_grouped_dynamic_pilot.py::TestProperty23And66StructuralOperations::test_footer_anchor_drift_is_detected",
+      "test_task42_h1_grouped_dynamic_pilot.py::TestProperty23And66StructuralOperations::test_footer_formula_range_still_covers_the_managed_rows",
+      "test_task42_h1_grouped_dynamic_pilot.py::TestProperty23And66StructuralOperations::test_lost_row_identity_is_a_retention_failure",
+      "test_task42_h1_grouped_dynamic_pilot.py::TestProperty23And66StructuralOperations::test_new_row_gets_minted_identity_never_reusing_the_deleted_one",
+      "test_task42_h1_grouped_dynamic_pilot.py::TestProperty23And66StructuralOperations::test_reorder_keeps_values_attached_to_identity",
+      "test_task42_h1_grouped_dynamic_pilot.py::TestProperty23And66StructuralOperations::test_row_insert_is_not_a_retention_failure",
+      "test_task42_h1_grouped_dynamic_pilot.py::TestProperty23And66StructuralOperations::test_structural_insert_beyond_the_skeleton_fails_closed",
+      "test_task42_h1_grouped_dynamic_pilot.py::TestPublishDagIsOneWay::test_contract_payload_references_both_and_no_bundle",
+      "test_task42_h1_grouped_dynamic_pilot.py::TestPublishDagIsOneWay::test_instrumentation_declares_no_disproved_anchor",
+      "test_task42_h1_grouped_dynamic_pilot.py::TestPublishDagIsOneWay::test_instrumentation_payload_references_template_only",
+      "test_task42_h1_grouped_dynamic_pilot.py::TestPublishDagIsOneWay::test_pilot_does_not_reuse_another_pilot_definition_identity",
+      "test_task42_h1_grouped_dynamic_pilot.py::TestPublishDagIsOneWay::test_template_payload_has_no_self_or_forward_reference",
+      "test_task42_h1_grouped_dynamic_pilot.py::TestUpstreamRelsAndNamespaceDefectsAreFixed::test_authoritative_template_writes_target_before_id",
+      "test_task42_h1_grouped_dynamic_pilot.py::TestUpstreamRelsAndNamespaceDefectsAreFixed::test_footer_marker_is_found_through_the_decoder",
+      "test_task42_h1_grouped_dynamic_pilot.py::TestUpstreamRelsAndNamespaceDefectsAreFixed::test_inline_strings_use_numeric_character_references",
+      "test_task42_h1_grouped_dynamic_pilot.py::TestUpstreamRelsAndNamespaceDefectsAreFixed::test_instrumented_workbook_and_sheet_xml_are_well_formed",
+      "test_task42_h1_grouped_dynamic_pilot.py::TestUpstreamRelsAndNamespaceDefectsAreFixed::test_old_id_before_target_regex_would_have_failed",
+      "test_task42_h1_grouped_dynamic_pilot.py::TestUpstreamRelsAndNamespaceDefectsAreFixed::test_workbook_root_does_not_declare_the_relationship_namespace",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_authority_template_is_untouched",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_black_box_scenarios_are_unverifiable",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_bundle_is_non_null_and_all_children_are_approved",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_bundle_slot_digests_match_the_published_definitions",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_download_only_scenario_has_zero_operation_and_application",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_every_required_scenario_has_a_persisted_row",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_every_scenario_row_binds_a_published_trace_bundle",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_four_definitions_and_one_bundle_are_published",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_no_entity_is_reused_across_scenarios",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_no_phase_crashed_during_collection",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_ordinals_are_dense_and_unique",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_pilot_class_stays_unverifiable_after_this_run",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_plan_uses_this_pilot_bundle_and_derives_a_non_empty_set",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_property25_and_26_really_ran_on_this_contract",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_required_digest_is_not_another_pilots",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_reused_entity_is_refused_at_write_time",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_run_is_not_verified_without_real_onlyoffice",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_run_row_freezes_this_pilot_identity",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_upstream_gap_scenarios_are_failed_not_unverifiable"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task42_h1_grouped_dynamic_pilot.py::TestAuthoritativeTemplate::test_template_bytes_are_unchanged",
+      "test_task42_h1_grouped_dynamic_pilot.py::TestContractIsGroundedInTheTemplate::test_disk_contract_matches_the_source_of_truth"
+    ],
+    "added_files": [
+      "test_task42_h1_grouped_dynamic_pilot.py",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py"
+    ],
+    "restored": true,
+    "seconds": 18.4
+  },
+  {
+    "id": "M02",
+    "side": "be",
+    "want": "test_task42_h1_grouped_dynamic_pilot.py::TestAuthoritativeTemplate::test_template_sentinel_rejects_a_mutated_workbook",
+    "why": "哨兵比对被短路 ⇒ 模板被运行时改写不再抛，静默按新字节继续发布（fail-open 掩盖接线错误的形态）",
+    "verdict": "RED",
+    "summary": "1 failed, 175 passed in 42.23s",
+    "added": [
+      "test_task42_h1_grouped_dynamic_pilot.py::TestAuthoritativeTemplate::test_template_sentinel_rejects_a_mutated_workbook"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task42_h1_grouped_dynamic_pilot.py::TestAuthoritativeTemplate::test_template_sentinel_rejects_a_mutated_workbook"
+    ],
+    "added_files": [
+      "test_task42_h1_grouped_dynamic_pilot.py"
+    ],
+    "restored": true,
+    "seconds": 45.6
+  },
+  {
+    "id": "M03",
+    "side": "be",
+    "want": "test_task42_h1_grouped_dynamic_pilot.py::TestFrozenEntrySelection::test_entry_is_frozen_from_the_source_backed_manifest",
+    "why": "pilot 类边界改成 simple_checklist 后 entry 不在候选里却仍绿 ⇒ 「类边界由 harness 判定」退化成本模块自己声明（Property 49 的分母失守）",
+    "verdict": "RED",
+    "summary": "4 failed, 172 passed in 42.36s",
+    "added": [
+      "test_task42_h1_grouped_dynamic_pilot.py::TestFrozenEntrySelection::test_entry_is_frozen_from_the_source_backed_manifest",
+      "test_task42_h1_grouped_dynamic_pilot.py::TestFrozenEntrySelection::test_selection_fails_closed_on_parent_duplicate",
+      "test_task42_h1_grouped_dynamic_pilot.py::TestFrozenEntrySelection::test_selection_fails_closed_on_wp_code_drift",
+      "test_task42_h1_grouped_dynamic_pilot.py::TestFrozenEntrySelection::test_selection_fails_closed_when_the_render_schema_points_elsewhere"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task42_h1_grouped_dynamic_pilot.py::TestFrozenEntrySelection::test_entry_is_frozen_from_the_source_backed_manifest"
+    ],
+    "added_files": [
+      "test_task42_h1_grouped_dynamic_pilot.py"
+    ],
+    "restored": true,
+    "seconds": 45.8
+  },
+  {
+    "id": "M04",
+    "side": "be",
+    "want": "test_task42_h1_grouped_dynamic_pilot.py::TestFrozenEntrySelection::test_selection_fails_closed_on_parent_duplicate",
+    "why": "parent_duplicate 不再被拒 ⇒ 43 条重复入口都能拿到自己的 adapter，同一 OO room 会被两个 adapter 各写一遍（AC 12.1「每个独立 entry」）",
+    "verdict": "RED",
+    "summary": "1 failed, 175 passed in 43.98s",
+    "added": [
+      "test_task42_h1_grouped_dynamic_pilot.py::TestFrozenEntrySelection::test_selection_fails_closed_on_parent_duplicate"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task42_h1_grouped_dynamic_pilot.py::TestFrozenEntrySelection::test_selection_fails_closed_on_parent_duplicate"
+    ],
+    "added_files": [
+      "test_task42_h1_grouped_dynamic_pilot.py"
+    ],
+    "restored": true,
+    "seconds": 47.3
+  },
+  {
+    "id": "M05",
+    "side": "be",
+    "want": "test_task42_h1_grouped_dynamic_pilot.py::TestFrozenEntrySelection::test_selection_fails_closed_on_wp_code_drift",
+    "why": "matcher 域与 entry 的 wp_code 不再双向锁死 ⇒ 宿主新增/删掉一个 wp_code 后 matcher 会漏匹配或越界匹配，而 registry 的重叠判据看不出来",
+    "verdict": "RED",
+    "summary": "1 failed, 175 passed in 44.13s",
+    "added": [
+      "test_task42_h1_grouped_dynamic_pilot.py::TestFrozenEntrySelection::test_selection_fails_closed_on_wp_code_drift"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task42_h1_grouped_dynamic_pilot.py::TestFrozenEntrySelection::test_selection_fails_closed_on_wp_code_drift"
+    ],
+    "added_files": [
+      "test_task42_h1_grouped_dynamic_pilot.py"
+    ],
+    "restored": true,
+    "seconds": 47.7
+  },
+  {
+    "id": "M06",
+    "side": "be",
+    "want": "test_task42_h1_grouped_dynamic_pilot.py::TestFrozenEntrySelection::test_name_extraction_judgement_fails_closed_when_the_code_is_real",
+    "why": "「H1F 不在索引 wp_code 值域里」这一条被短路 ⇒ 哪天 H1F 真成了 wp_code，本 pilot 仍按「名字提取产物」处置，而那时零回退判据必须换成精确唯一形态",
+    "verdict": "RED",
+    "summary": "1 failed, 175 passed in 44.04s",
+    "added": [
+      "test_task42_h1_grouped_dynamic_pilot.py::TestFrozenEntrySelection::test_name_extraction_judgement_fails_closed_when_the_code_is_real"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task42_h1_grouped_dynamic_pilot.py::TestFrozenEntrySelection::test_name_extraction_judgement_fails_closed_when_the_code_is_real"
+    ],
+    "added_files": [
+      "test_task42_h1_grouped_dynamic_pilot.py"
+    ],
+    "restored": true,
+    "seconds": 47.6
+  },
+  {
+    "id": "M07",
+    "side": "be",
+    "want": "test_task42_h1_grouped_dynamic_pilot.py::TestFrozenEntrySelection::test_name_extraction_judgement_fails_closed_on_a_filename_prefix",
+    "why": "前缀判据被短路 ⇒ 出现 `H1F*.xlsx` 后 `find_template_file_any` 的前缀回退分支变可达，「零回退 = 根本没有回退」不再成立，契约 source_ref 可能指向别的底稿",
+    "verdict": "RED",
+    "summary": "1 failed, 175 passed in 44.40s",
+    "added": [
+      "test_task42_h1_grouped_dynamic_pilot.py::TestFrozenEntrySelection::test_name_extraction_judgement_fails_closed_on_a_filename_prefix"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task42_h1_grouped_dynamic_pilot.py::TestFrozenEntrySelection::test_name_extraction_judgement_fails_closed_on_a_filename_prefix"
+    ],
+    "added_files": [
+      "test_task42_h1_grouped_dynamic_pilot.py"
+    ],
+    "restored": true,
+    "seconds": 47.9
+  },
+  {
+    "id": "M08",
+    "side": "be",
+    "want": "test_task42_h1_grouped_dynamic_pilot.py::TestFrozenEntrySelection::test_name_extraction_judgement_fails_closed_on_a_different_host",
+    "why": "「生成器正则能复现 H1F」这一条被短路 ⇒ 宿主改名后推导前提失效却仍放行，本 pilot 的第 2 条必要条件整体失去依据",
+    "verdict": "RED",
+    "summary": "1 failed, 175 passed in 44.05s",
+    "added": [
+      "test_task42_h1_grouped_dynamic_pilot.py::TestFrozenEntrySelection::test_name_extraction_judgement_fails_closed_on_a_different_host"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task42_h1_grouped_dynamic_pilot.py::TestFrozenEntrySelection::test_name_extraction_judgement_fails_closed_on_a_different_host"
+    ],
+    "added_files": [
+      "test_task42_h1_grouped_dynamic_pilot.py"
+    ],
+    "restored": true,
+    "seconds": 47.6
+  },
+  {
+    "id": "M09",
+    "side": "be",
+    "want": "test_task42_h1_grouped_dynamic_pilot.py::TestFrozenEntrySelection::test_fallback_judgement_fails_closed_on_a_non_empty_resolution",
+    "why": "零回退判据被短路 ⇒ H1F 一旦解析到某份工作簿，契约的 25 个 source_ref 会指向另一份底稿的单元格而无人发现（本 spec 已付两次学费的形态）",
+    "verdict": "RED",
+    "summary": "1 failed, 175 passed in 44.00s",
+    "added": [
+      "test_task42_h1_grouped_dynamic_pilot.py::TestFrozenEntrySelection::test_fallback_judgement_fails_closed_on_a_non_empty_resolution"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task42_h1_grouped_dynamic_pilot.py::TestFrozenEntrySelection::test_fallback_judgement_fails_closed_on_a_non_empty_resolution"
+    ],
+    "added_files": [
+      "test_task42_h1_grouped_dynamic_pilot.py"
+    ],
+    "restored": true,
+    "seconds": 47.6
+  },
+  {
+    "id": "M10",
+    "side": "be",
+    "want": "test_task42_h1_grouped_dynamic_pilot.py::TestFrozenEntrySelection::test_fallback_judgement_fails_closed_on_a_non_unique_family_row",
+    "why": "码族「精确唯一」被短路 ⇒ 索引里出现两份 H1 工作簿时 find_template_file 会挑一份，契约的 source_ref 失去唯一归属",
+    "verdict": "RED",
+    "summary": "1 failed, 175 passed in 44.04s",
+    "added": [
+      "test_task42_h1_grouped_dynamic_pilot.py::TestFrozenEntrySelection::test_fallback_judgement_fails_closed_on_a_non_unique_family_row"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task42_h1_grouped_dynamic_pilot.py::TestFrozenEntrySelection::test_fallback_judgement_fails_closed_on_a_non_unique_family_row"
+    ],
+    "added_files": [
+      "test_task42_h1_grouped_dynamic_pilot.py"
+    ],
+    "restored": true,
+    "seconds": 47.6
+  },
+  {
+    "id": "M11",
+    "side": "be",
+    "want": "test_task42_h1_grouped_dynamic_pilot.py::TestFrozenEntrySelection::test_render_schema_wp_code_must_stay_inside_the_code_family",
+    "why": "配置真源的码族判据被短路 ⇒ `H1-1.yaml` 改成任意 wp_code 都放行，「权威模板由配置唯一声明」失守",
+    "verdict": "RED",
+    "summary": "1 failed, 175 passed in 44.23s",
+    "added": [
+      "test_task42_h1_grouped_dynamic_pilot.py::TestFrozenEntrySelection::test_render_schema_wp_code_must_stay_inside_the_code_family"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task42_h1_grouped_dynamic_pilot.py::TestFrozenEntrySelection::test_render_schema_wp_code_must_stay_inside_the_code_family"
+    ],
+    "added_files": [
+      "test_task42_h1_grouped_dynamic_pilot.py"
+    ],
+    "restored": true,
+    "seconds": 47.8
+  },
+  {
+    "id": "M12",
+    "side": "be",
+    "want": "test_task42_h1_grouped_dynamic_pilot.py::TestFrozenEntrySelection::test_selection_fails_closed_when_the_render_schema_points_elsewhere",
+    "why": "配置声明的 template_path 与冻结模板的一致性被短路 ⇒ 配置指到 H6 固定资产清理也照发契约，等于「据另一份底稿建契约」",
+    "verdict": "RED",
+    "summary": "1 failed, 175 passed in 44.05s",
+    "added": [
+      "test_task42_h1_grouped_dynamic_pilot.py::TestFrozenEntrySelection::test_selection_fails_closed_when_the_render_schema_points_elsewhere"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task42_h1_grouped_dynamic_pilot.py::TestFrozenEntrySelection::test_selection_fails_closed_when_the_render_schema_points_elsewhere"
+    ],
+    "added_files": [
+      "test_task42_h1_grouped_dynamic_pilot.py"
+    ],
+    "restored": true,
+    "seconds": 47.6
+  },
+  {
+    "id": "M13",
+    "side": "be",
+    "want": "test_task42_h1_grouped_dynamic_pilot.py::TestFrozenEntrySelection::test_selection_fails_closed_when_the_entry_disappears",
+    "why": "entry 消失时用空壳兜底 ⇒ 宿主挂载点已删掉，契约却继续按旧单元格发布（fail-open 掩盖接线错误）",
+    "verdict": "RED",
+    "summary": "1 failed, 175 passed in 43.80s",
+    "added": [
+      "test_task42_h1_grouped_dynamic_pilot.py::TestFrozenEntrySelection::test_selection_fails_closed_when_the_entry_disappears"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task42_h1_grouped_dynamic_pilot.py::TestFrozenEntrySelection::test_selection_fails_closed_when_the_entry_disappears"
+    ],
+    "added_files": [
+      "test_task42_h1_grouped_dynamic_pilot.py"
+    ],
+    "restored": true,
+    "seconds": 47.3
+  },
+  {
+    "id": "M14",
+    "side": "be",
+    "want": "test_task42_h1_grouped_dynamic_pilot.py::TestContractIsGroundedInTheTemplate::test_group_spans_match_the_real_merged_ranges",
+    "why": "组的列跨度少一列（O 掉出 `减少情况`）后仍绿 ⇒ 组声明与源 xlsx 行 10 的真实横向 merge 脱钩，审计师看到的分组与契约表达的分组不是一回事",
+    "verdict": "RED",
+    "summary": "21 failed, 155 passed in 39.69s",
+    "added": [
+      "test_task42_h1_grouped_dynamic_pilot.py::TestContractIsGroundedInTheTemplate::test_disk_contract_matches_the_source_of_truth",
+      "test_task42_h1_grouped_dynamic_pilot.py::TestContractIsGroundedInTheTemplate::test_group_spans_match_the_real_merged_ranges",
+      "test_task42_h1_grouped_dynamic_pilot.py::TestProperty22ColumnIdentityIsDecoupledFromLabel::test_no_dynamic_columns_are_declared_for_this_entry",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_black_box_scenarios_are_unverifiable",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_bundle_is_non_null_and_all_children_are_approved",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_bundle_slot_digests_match_the_published_definitions",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_download_only_scenario_has_zero_operation_and_application",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_every_required_scenario_has_a_persisted_row",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_every_scenario_row_binds_a_published_trace_bundle",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_four_definitions_and_one_bundle_are_published",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_no_entity_is_reused_across_scenarios",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_no_phase_crashed_during_collection",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_ordinals_are_dense_and_unique",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_pilot_class_stays_unverifiable_after_this_run",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_plan_uses_this_pilot_bundle_and_derives_a_non_empty_set",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_property25_and_26_really_ran_on_this_contract",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_required_digest_is_not_another_pilots",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_reused_entity_is_refused_at_write_time",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_run_is_not_verified_without_real_onlyoffice",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_run_row_freezes_this_pilot_identity",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_upstream_gap_scenarios_are_failed_not_unverifiable"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task42_h1_grouped_dynamic_pilot.py::TestContractIsGroundedInTheTemplate::test_disk_contract_matches_the_source_of_truth",
+      "test_task42_h1_grouped_dynamic_pilot.py::TestContractIsGroundedInTheTemplate::test_group_spans_match_the_real_merged_ranges"
+    ],
+    "added_files": [
+      "test_task42_h1_grouped_dynamic_pilot.py",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py"
+    ],
+    "restored": true,
+    "seconds": 43.2
+  },
+  {
+    "id": "M15",
+    "side": "be",
+    "want": "test_task42_h1_grouped_dynamic_pilot.py::TestContractIsGroundedInTheTemplate::test_mid_spans_match_the_real_merged_ranges",
+    "why": "中层列跨度少一列后仍绿 ⇒ 三级表头的第二级与源 xlsx 行 11 的 merge 脱钩，`L 净值` 会丢掉它的中层归属（三级退化成二级而无人发现）",
+    "verdict": "RED",
+    "summary": "21 failed, 155 passed in 39.67s",
+    "added": [
+      "test_task42_h1_grouped_dynamic_pilot.py::TestContractIsGroundedInTheTemplate::test_disk_contract_matches_the_source_of_truth",
+      "test_task42_h1_grouped_dynamic_pilot.py::TestContractIsGroundedInTheTemplate::test_mid_spans_match_the_real_merged_ranges",
+      "test_task42_h1_grouped_dynamic_pilot.py::TestProperty22ColumnIdentityIsDecoupledFromLabel::test_no_dynamic_columns_are_declared_for_this_entry",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_black_box_scenarios_are_unverifiable",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_bundle_is_non_null_and_all_children_are_approved",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_bundle_slot_digests_match_the_published_definitions",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_download_only_scenario_has_zero_operation_and_application",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_every_required_scenario_has_a_persisted_row",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_every_scenario_row_binds_a_published_trace_bundle",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_four_definitions_and_one_bundle_are_published",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_no_entity_is_reused_across_scenarios",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_no_phase_crashed_during_collection",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_ordinals_are_dense_and_unique",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_pilot_class_stays_unverifiable_after_this_run",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_plan_uses_this_pilot_bundle_and_derives_a_non_empty_set",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_property25_and_26_really_ran_on_this_contract",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_required_digest_is_not_another_pilots",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_reused_entity_is_refused_at_write_time",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_run_is_not_verified_without_real_onlyoffice",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_run_row_freezes_this_pilot_identity",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_upstream_gap_scenarios_are_failed_not_unverifiable"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task42_h1_grouped_dynamic_pilot.py::TestContractIsGroundedInTheTemplate::test_disk_contract_matches_the_source_of_truth",
+      "test_task42_h1_grouped_dynamic_pilot.py::TestContractIsGroundedInTheTemplate::test_mid_spans_match_the_real_merged_ranges"
+    ],
+    "added_files": [
+      "test_task42_h1_grouped_dynamic_pilot.py",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py"
+    ],
+    "restored": true,
+    "seconds": 43.1
+  },
+  {
+    "id": "M16",
+    "side": "be",
+    "want": "test_task42_h1_grouped_dynamic_pilot.py::TestContractIsGroundedInTheTemplate::test_header_rows_is_three_and_is_the_schema_upper_bound",
+    "why": "`header_rows` 从三行推导改成写死 2 ⇒ 契约宣称两级表头而源表是三级，OO 侧按两级解析会把行 12 的叶子当数据行",
+    "verdict": "RED",
+    "summary": "21 failed, 155 passed in 38.37s",
+    "added": [
+      "test_task42_h1_grouped_dynamic_pilot.py::TestContractIsGroundedInTheTemplate::test_disk_contract_matches_the_source_of_truth",
+      "test_task42_h1_grouped_dynamic_pilot.py::TestContractIsGroundedInTheTemplate::test_header_rows_is_three_and_is_the_schema_upper_bound",
+      "test_task42_h1_grouped_dynamic_pilot.py::TestProperty22ColumnIdentityIsDecoupledFromLabel::test_no_dynamic_columns_are_declared_for_this_entry",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_black_box_scenarios_are_unverifiable",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_bundle_is_non_null_and_all_children_are_approved",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_bundle_slot_digests_match_the_published_definitions",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_download_only_scenario_has_zero_operation_and_application",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_every_required_scenario_has_a_persisted_row",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_every_scenario_row_binds_a_published_trace_bundle",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_four_definitions_and_one_bundle_are_published",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_no_entity_is_reused_across_scenarios",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_no_phase_crashed_during_collection",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_ordinals_are_dense_and_unique",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_pilot_class_stays_unverifiable_after_this_run",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_plan_uses_this_pilot_bundle_and_derives_a_non_empty_set",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_property25_and_26_really_ran_on_this_contract",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_required_digest_is_not_another_pilots",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_reused_entity_is_refused_at_write_time",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_run_is_not_verified_without_real_onlyoffice",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_run_row_freezes_this_pilot_identity",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_upstream_gap_scenarios_are_failed_not_unverifiable"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task42_h1_grouped_dynamic_pilot.py::TestContractIsGroundedInTheTemplate::test_disk_contract_matches_the_source_of_truth",
+      "test_task42_h1_grouped_dynamic_pilot.py::TestContractIsGroundedInTheTemplate::test_header_rows_is_three_and_is_the_schema_upper_bound"
+    ],
+    "added_files": [
+      "test_task42_h1_grouped_dynamic_pilot.py",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py"
+    ],
+    "restored": true,
+    "seconds": 41.8
+  },
+  {
+    "id": "M17",
+    "side": "be",
+    "want": "test_task42_h1_grouped_dynamic_pilot.py::TestContractIsGroundedInTheTemplate::test_every_mid_header_matches_the_real_cell_text",
+    "why": "「中层锚点与叶子锚点同格时不重复声明」被短路 ⇒ `O11:O12` 那种纵向合并会同时被算成 mid 与 leaf，「三级」名义上成立而实际只有两级（自欺式层级）",
+    "verdict": "RED",
+    "summary": "24 failed, 152 passed in 33.73s",
+    "added": [
+      "test_task42_h1_grouped_dynamic_pilot.py::TestContractIsGroundedInTheTemplate::test_disk_contract_matches_the_source_of_truth",
+      "test_task42_h1_grouped_dynamic_pilot.py::TestContractIsGroundedInTheTemplate::test_footer_anchor_never_hardcodes_a_row",
+      "test_task42_h1_grouped_dynamic_pilot.py::TestContractIsGroundedInTheTemplate::test_header_rows_is_three_and_is_the_schema_upper_bound",
+      "test_task42_h1_grouped_dynamic_pilot.py::TestContractIsGroundedInTheTemplate::test_mutated_contract_payload_is_rejected",
+      "test_task42_h1_grouped_dynamic_pilot.py::TestContractIsGroundedInTheTemplate::test_positional_row_identity_is_refused",
+      "test_task42_h1_grouped_dynamic_pilot.py::TestProperty22ColumnIdentityIsDecoupledFromLabel::test_no_dynamic_columns_are_declared_for_this_entry",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_black_box_scenarios_are_unverifiable",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_bundle_is_non_null_and_all_children_are_approved",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_bundle_slot_digests_match_the_published_definitions",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_download_only_scenario_has_zero_operation_and_application",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_every_required_scenario_has_a_persisted_row",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_every_scenario_row_binds_a_published_trace_bundle",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_four_definitions_and_one_bundle_are_published",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_no_entity_is_reused_across_scenarios",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_no_phase_crashed_during_collection",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_ordinals_are_dense_and_unique",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_pilot_class_stays_unverifiable_after_this_run",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_plan_uses_this_pilot_bundle_and_derives_a_non_empty_set",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_property25_and_26_really_ran_on_this_contract",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_required_digest_is_not_another_pilots",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_reused_entity_is_refused_at_write_time",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_run_is_not_verified_without_real_onlyoffice",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_run_row_freezes_this_pilot_identity",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_upstream_gap_scenarios_are_failed_not_unverifiable"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task42_h1_grouped_dynamic_pilot.py::TestContractIsGroundedInTheTemplate::test_disk_contract_matches_the_source_of_truth"
+    ],
+    "added_files": [
+      "test_task42_h1_grouped_dynamic_pilot.py",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py"
+    ],
+    "restored": true,
+    "seconds": 37.2
+  },
+  {
+    "id": "M18",
+    "side": "be",
+    "want": "test_task42_h1_grouped_dynamic_pilot.py::TestProperty22ColumnIdentityIsDecoupledFromLabel::test_frontend_row_shape_covers_every_declared_json_path",
+    "why": "json 路径拼错一个字母后仍绿 ⇒ 三源锁死的第二源（前端 `DisposalRow`）失效，该字段在真实载荷上永远取 None 而 extract 只当它 MISSING（静默丢数据）",
+    "verdict": "RED",
+    "summary": "24 failed, 152 passed in 39.18s",
+    "added": [
+      "test_task42_h1_grouped_dynamic_pilot.py::TestContractIsGroundedInTheTemplate::test_disk_contract_matches_the_source_of_truth",
+      "test_task42_h1_grouped_dynamic_pilot.py::TestProperty22ColumnIdentityIsDecoupledFromLabel::test_frontend_row_shape_covers_every_declared_json_path",
+      "test_task42_h1_grouped_dynamic_pilot.py::TestProperty22ColumnIdentityIsDecoupledFromLabel::test_no_dynamic_columns_are_declared_for_this_entry",
+      "test_task42_h1_grouped_dynamic_pilot.py::TestProperty27DeleteUpdateDoesNotOverwriteTheWholeTable::test_different_field_merge_and_same_field_conflict_really_run",
+      "test_task42_h1_grouped_dynamic_pilot.py::TestProperty27DeleteUpdateDoesNotOverwriteTheWholeTable::test_only_the_touched_row_conflicts",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_black_box_scenarios_are_unverifiable",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_bundle_is_non_null_and_all_children_are_approved",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_bundle_slot_digests_match_the_published_definitions",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_download_only_scenario_has_zero_operation_and_application",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_every_required_scenario_has_a_persisted_row",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_every_scenario_row_binds_a_published_trace_bundle",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_four_definitions_and_one_bundle_are_published",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_no_entity_is_reused_across_scenarios",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_no_phase_crashed_during_collection",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_ordinals_are_dense_and_unique",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_pilot_class_stays_unverifiable_after_this_run",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_plan_uses_this_pilot_bundle_and_derives_a_non_empty_set",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_property25_and_26_really_ran_on_this_contract",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_property27_only_the_touched_row_conflicts",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_required_digest_is_not_another_pilots",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_reused_entity_is_refused_at_write_time",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_run_is_not_verified_without_real_onlyoffice",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_run_row_freezes_this_pilot_identity",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_upstream_gap_scenarios_are_failed_not_unverifiable"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task42_h1_grouped_dynamic_pilot.py::TestContractIsGroundedInTheTemplate::test_disk_contract_matches_the_source_of_truth",
+      "test_task42_h1_grouped_dynamic_pilot.py::TestProperty22ColumnIdentityIsDecoupledFromLabel::test_frontend_row_shape_covers_every_declared_json_path"
+    ],
+    "added_files": [
+      "test_task42_h1_grouped_dynamic_pilot.py",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py"
+    ],
+    "restored": true,
+    "seconds": 42.5
+  },
+  {
+    "id": "M19",
+    "side": "be",
+    "want": "test_task42_h1_grouped_dynamic_pilot.py::TestContractIsGroundedInTheTemplate::test_every_leaf_header_matches_the_real_cell_text",
+    "why": "叶子表头文本自拟后仍绿 ⇒ `header_source_ref` 指向的单元格与声明的 label 脱钩，契约变成「据常识造表」（Requirement 6.1 明令禁止）",
+    "verdict": "RED",
+    "summary": "20 failed, 156 passed in 37.99s",
+    "added": [
+      "test_task42_h1_grouped_dynamic_pilot.py::TestContractIsGroundedInTheTemplate::test_disk_contract_matches_the_source_of_truth",
+      "test_task42_h1_grouped_dynamic_pilot.py::TestProperty22ColumnIdentityIsDecoupledFromLabel::test_no_dynamic_columns_are_declared_for_this_entry",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_black_box_scenarios_are_unverifiable",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_bundle_is_non_null_and_all_children_are_approved",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_bundle_slot_digests_match_the_published_definitions",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_download_only_scenario_has_zero_operation_and_application",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_every_required_scenario_has_a_persisted_row",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_every_scenario_row_binds_a_published_trace_bundle",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_four_definitions_and_one_bundle_are_published",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_no_entity_is_reused_across_scenarios",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_no_phase_crashed_during_collection",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_ordinals_are_dense_and_unique",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_pilot_class_stays_unverifiable_after_this_run",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_plan_uses_this_pilot_bundle_and_derives_a_non_empty_set",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_property25_and_26_really_ran_on_this_contract",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_required_digest_is_not_another_pilots",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_reused_entity_is_refused_at_write_time",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_run_is_not_verified_without_real_onlyoffice",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_run_row_freezes_this_pilot_identity",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_upstream_gap_scenarios_are_failed_not_unverifiable"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task42_h1_grouped_dynamic_pilot.py::TestContractIsGroundedInTheTemplate::test_disk_contract_matches_the_source_of_truth"
+    ],
+    "added_files": [
+      "test_task42_h1_grouped_dynamic_pilot.py",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py"
+    ],
+    "restored": true,
+    "seconds": 41.2
+  },
+  {
+    "id": "M20",
+    "side": "be",
+    "want": "test_task42_h1_grouped_dynamic_pilot.py::TestContractIsGroundedInTheTemplate::test_two_formula_columns_are_really_formulas_in_the_template",
+    "why": "公式模板少一项后仍绿 ⇒ 逐行公式比对退化成不比对，模板改了公式（或契约抄错）都察觉不到，而受保护格的还原基线正来自它",
+    "verdict": "RED",
+    "summary": "2 failed, 174 passed in 41.90s",
+    "added": [
+      "test_task42_h1_grouped_dynamic_pilot.py::TestBaselineExtractOnTheRealTemplate::test_formula_columns_are_read_with_their_formula_text",
+      "test_task42_h1_grouped_dynamic_pilot.py::TestContractIsGroundedInTheTemplate::test_two_formula_columns_are_really_formulas_in_the_template"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task42_h1_grouped_dynamic_pilot.py::TestContractIsGroundedInTheTemplate::test_two_formula_columns_are_really_formulas_in_the_template"
+    ],
+    "added_files": [
+      "test_task42_h1_grouped_dynamic_pilot.py"
+    ],
+    "restored": true,
+    "seconds": 45.1
+  },
+  {
+    "id": "M21",
+    "side": "be",
+    "want": "test_task42_h1_grouped_dynamic_pilot.py::TestContractIsGroundedInTheTemplate::test_footer_marker_is_the_real_cell_text",
+    "why": "footer marker 与源 xlsx 的 `A28` 文本脱钩后仍绿 ⇒ 运行时定位不到 footer，materialize 的「footer 是否下移」与「SUM 区间是否覆盖受管行」两道门全部失效",
+    "verdict": "RED",
+    "summary": "27 failed, 149 passed in 36.78s",
+    "added": [
+      "test_task42_h1_grouped_dynamic_pilot.py::TestContractIsGroundedInTheTemplate::test_disk_contract_matches_the_source_of_truth",
+      "test_task42_h1_grouped_dynamic_pilot.py::TestContractIsGroundedInTheTemplate::test_footer_anchor_never_hardcodes_a_row",
+      "test_task42_h1_grouped_dynamic_pilot.py::TestContractIsGroundedInTheTemplate::test_footer_marker_is_the_real_cell_text",
+      "test_task42_h1_grouped_dynamic_pilot.py::TestProperty22ColumnIdentityIsDecoupledFromLabel::test_no_dynamic_columns_are_declared_for_this_entry",
+      "test_task42_h1_grouped_dynamic_pilot.py::TestProperty23And66StructuralOperations::test_appending_onto_the_footer_row_is_reported_by_the_unmanaged_gate",
+      "test_task42_h1_grouped_dynamic_pilot.py::TestProperty23And66StructuralOperations::test_footer_anchor_drift_is_detected",
+      "test_task42_h1_grouped_dynamic_pilot.py::TestSkeletonRowPolicy::test_template_skeleton_row_count_is_derived_from_the_source",
+      "test_task42_h1_grouped_dynamic_pilot.py::TestUpstreamRelsAndNamespaceDefectsAreFixed::test_inline_strings_use_numeric_character_references",
+      "test_task42_h1_grouped_dynamic_pilot.py::TestUpstreamRelsAndNamespaceDefectsAreFixed::test_numeric_character_references_are_decoded",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_black_box_scenarios_are_unverifiable",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_bundle_is_non_null_and_all_children_are_approved",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_bundle_slot_digests_match_the_published_definitions",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_download_only_scenario_has_zero_operation_and_application",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_every_required_scenario_has_a_persisted_row",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_every_scenario_row_binds_a_published_trace_bundle",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_four_definitions_and_one_bundle_are_published",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_no_entity_is_reused_across_scenarios",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_no_phase_crashed_during_collection",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_ordinals_are_dense_and_unique",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_pilot_class_stays_unverifiable_after_this_run",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_plan_uses_this_pilot_bundle_and_derives_a_non_empty_set",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_property25_and_26_really_ran_on_this_contract",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_required_digest_is_not_another_pilots",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_reused_entity_is_refused_at_write_time",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_run_is_not_verified_without_real_onlyoffice",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_run_row_freezes_this_pilot_identity",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_upstream_gap_scenarios_are_failed_not_unverifiable"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task42_h1_grouped_dynamic_pilot.py::TestContractIsGroundedInTheTemplate::test_disk_contract_matches_the_source_of_truth",
+      "test_task42_h1_grouped_dynamic_pilot.py::TestContractIsGroundedInTheTemplate::test_footer_marker_is_the_real_cell_text"
+    ],
+    "added_files": [
+      "test_task42_h1_grouped_dynamic_pilot.py",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py"
+    ],
+    "restored": true,
+    "seconds": 40.0
+  },
+  {
+    "id": "M22",
+    "side": "be",
+    "want": "test_task42_h1_grouped_dynamic_pilot.py::TestContractIsGroundedInTheTemplate::test_unmanaged_below_footer_cells_are_the_real_contents",
+    "why": "未管理区域里那条**跨 sheet** 公式被换成常量后仍绿 ⇒ 「插删行不得动未管理区域」的关键形态（跨 sheet 引用）从判据里消失",
+    "verdict": "RED",
+    "summary": "21 failed, 155 passed in 38.00s",
+    "added": [
+      "test_task42_h1_grouped_dynamic_pilot.py::TestContractIsGroundedInTheTemplate::test_disk_contract_matches_the_source_of_truth",
+      "test_task42_h1_grouped_dynamic_pilot.py::TestContractIsGroundedInTheTemplate::test_unmanaged_below_footer_cells_are_the_real_contents",
+      "test_task42_h1_grouped_dynamic_pilot.py::TestProperty22ColumnIdentityIsDecoupledFromLabel::test_no_dynamic_columns_are_declared_for_this_entry",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_black_box_scenarios_are_unverifiable",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_bundle_is_non_null_and_all_children_are_approved",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_bundle_slot_digests_match_the_published_definitions",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_download_only_scenario_has_zero_operation_and_application",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_every_required_scenario_has_a_persisted_row",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_every_scenario_row_binds_a_published_trace_bundle",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_four_definitions_and_one_bundle_are_published",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_no_entity_is_reused_across_scenarios",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_no_phase_crashed_during_collection",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_ordinals_are_dense_and_unique",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_pilot_class_stays_unverifiable_after_this_run",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_plan_uses_this_pilot_bundle_and_derives_a_non_empty_set",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_property25_and_26_really_ran_on_this_contract",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_required_digest_is_not_another_pilots",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_reused_entity_is_refused_at_write_time",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_run_is_not_verified_without_real_onlyoffice",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_run_row_freezes_this_pilot_identity",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_upstream_gap_scenarios_are_failed_not_unverifiable"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task42_h1_grouped_dynamic_pilot.py::TestContractIsGroundedInTheTemplate::test_disk_contract_matches_the_source_of_truth",
+      "test_task42_h1_grouped_dynamic_pilot.py::TestContractIsGroundedInTheTemplate::test_unmanaged_below_footer_cells_are_the_real_contents"
+    ],
+    "added_files": [
+      "test_task42_h1_grouped_dynamic_pilot.py",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py"
+    ],
+    "restored": true,
+    "seconds": 41.1
+  },
+  {
+    "id": "M23",
+    "side": "be",
+    "want": "test_task42_h1_grouped_dynamic_pilot.py::TestProperty22ColumnIdentityIsDecoupledFromLabel::test_stable_key_builder_is_the_only_assembly_point",
+    "why": "stable key 的唯一拼装处被改形后仍绿 ⇒ 「键里只有 column_key、没有 label」这条结构性保证退化成偶然（Property 22 的核心）",
+    "verdict": "RED",
+    "summary": "36 failed, 134 passed, 6 errors in 37.45s",
+    "added": [
+      "test_task42_h1_grouped_dynamic_pilot.py::TestBaselineExtractOnTheRealTemplate::test_formula_columns_are_read_with_their_formula_text",
+      "test_task42_h1_grouped_dynamic_pilot.py::TestContractIsGroundedInTheTemplate::test_disk_contract_matches_the_source_of_truth",
+      "test_task42_h1_grouped_dynamic_pilot.py::TestProperty22ColumnIdentityIsDecoupledFromLabel::test_no_dynamic_columns_are_declared_for_this_entry",
+      "test_task42_h1_grouped_dynamic_pilot.py::TestProperty22ColumnIdentityIsDecoupledFromLabel::test_stable_key_builder_is_the_only_assembly_point",
+      "test_task42_h1_grouped_dynamic_pilot.py::TestProperty23And66StructuralOperations::test_appending_onto_the_footer_row_is_reported_by_the_unmanaged_gate",
+      "test_task42_h1_grouped_dynamic_pilot.py::TestProperty23And66StructuralOperations::test_new_row_gets_minted_identity_never_reusing_the_deleted_one",
+      "test_task42_h1_grouped_dynamic_pilot.py::TestProperty23And66StructuralOperations::test_reorder_keeps_values_attached_to_identity",
+      "test_task42_h1_grouped_dynamic_pilot.py::TestProperty23And66StructuralOperations::test_row_insert_is_not_a_retention_failure",
+      "test_task42_h1_grouped_dynamic_pilot.py::TestProperty23And66StructuralOperations::test_structural_insert_beyond_the_skeleton_fails_closed",
+      "test_task42_h1_grouped_dynamic_pilot.py::TestProperty27DeleteUpdateDoesNotOverwriteTheWholeTable::test_different_field_merge_and_same_field_conflict_really_run",
+      "test_task42_h1_grouped_dynamic_pilot.py::TestProperty27DeleteUpdateDoesNotOverwriteTheWholeTable::test_every_other_row_and_field_merges_normally",
+      "test_task42_h1_grouped_dynamic_pilot.py::TestProperty27DeleteUpdateDoesNotOverwriteTheWholeTable::test_only_the_touched_row_conflicts",
+      "test_task42_h1_grouped_dynamic_pilot.py::TestProperty27DeleteUpdateDoesNotOverwriteTheWholeTable::test_reorder_alone_is_not_a_whole_table_overwrite",
+      "test_task42_h1_grouped_dynamic_pilot.py::TestStorePayloadSplit::test_bytes_and_text_and_parsed_inputs_agree",
+      "test_task42_h1_grouped_dynamic_pilot.py::TestStorePayloadSplit::test_row_and_field_budgets_are_wired_into_the_split",
+      "test_task42_h1_grouped_dynamic_pilot.py::TestStorePayloadSplit::test_row_identity_comes_from_the_payload_not_the_index",
+      "test_task42_h1_grouped_dynamic_pilot.py::TestStorePayloadSplit::test_split_uses_the_contract_as_the_spec_source",
+      "test_task42_h1_grouped_dynamic_pilot.py::TestStorePayloadSplit::test_split_yields_one_field_per_column_per_row",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_black_box_scenarios_are_unverifiable",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_bundle_is_non_null_and_all_children_are_approved",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_bundle_slot_digests_match_the_published_definitions",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_download_only_scenario_has_zero_operation_and_application",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_every_required_scenario_has_a_persisted_row",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_every_scenario_row_binds_a_published_trace_bundle",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_four_definitions_and_one_bundle_are_published",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_no_entity_is_reused_across_scenarios",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_no_phase_crashed_during_collection",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_ordinals_are_dense_and_unique",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_pilot_class_stays_unverifiable_after_this_run",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_plan_uses_this_pilot_bundle_and_derives_a_non_empty_set",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_projection_splits_into_one_field_per_column_per_row",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_property22_duplicate_labels_do_not_collide",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_property25_and_26_really_ran_on_this_contract",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_property27_every_other_row_merges_normally",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_property27_only_the_touched_row_conflicts",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_reorder_is_not_a_whole_table_overwrite",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_required_digest_is_not_another_pilots",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_reused_entity_is_refused_at_write_time",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_run_is_not_verified_without_real_onlyoffice",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_run_row_freezes_this_pilot_identity",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_skeleton_policy_is_max_seed_one",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_upstream_gap_scenarios_are_failed_not_unverifiable"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task42_h1_grouped_dynamic_pilot.py::TestContractIsGroundedInTheTemplate::test_disk_contract_matches_the_source_of_truth",
+      "test_task42_h1_grouped_dynamic_pilot.py::TestProperty22ColumnIdentityIsDecoupledFromLabel::test_stable_key_builder_is_the_only_assembly_point"
+    ],
+    "added_files": [
+      "test_task42_h1_grouped_dynamic_pilot.py",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py"
+    ],
+    "restored": true,
+    "seconds": 40.6
+  },
+  {
+    "id": "M24",
+    "side": "be",
+    "want": "test_task42_h1_grouped_dynamic_pilot.py::TestProperty22ColumnIdentityIsDecoupledFromLabel::test_stable_keys_stay_distinct_despite_duplicate_labels",
+    "why": "让两个 `日期/编号` 列共用同一个 column_key（撞键）⇒ 若仍绿，Property 22 的「重复 label 不发生键冲突」就没有判据；本表 7 列共用 3 个 label，正是 H7 那条「key 不能用 label 会撞键」学费的复现场景",
+    "verdict": "RED",
+    "summary": "24 failed, 152 passed in 46.46s",
+    "added": [
+      "test_task42_h1_grouped_dynamic_pilot.py::TestContractIsGroundedInTheTemplate::test_disk_contract_matches_the_source_of_truth",
+      "test_task42_h1_grouped_dynamic_pilot.py::TestProperty22ColumnIdentityIsDecoupledFromLabel::test_no_dynamic_columns_are_declared_for_this_entry",
+      "test_task42_h1_grouped_dynamic_pilot.py::TestProperty22ColumnIdentityIsDecoupledFromLabel::test_renaming_a_header_label_does_not_change_any_stable_key",
+      "test_task42_h1_grouped_dynamic_pilot.py::TestStorePayloadSplit::test_split_yields_one_field_per_column_per_row",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_black_box_scenarios_are_unverifiable",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_bundle_is_non_null_and_all_children_are_approved",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_bundle_slot_digests_match_the_published_definitions",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_download_only_scenario_has_zero_operation_and_application",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_every_required_scenario_has_a_persisted_row",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_every_scenario_row_binds_a_published_trace_bundle",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_four_definitions_and_one_bundle_are_published",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_no_entity_is_reused_across_scenarios",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_no_phase_crashed_during_collection",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_ordinals_are_dense_and_unique",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_pilot_class_stays_unverifiable_after_this_run",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_plan_uses_this_pilot_bundle_and_derives_a_non_empty_set",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_projection_splits_into_one_field_per_column_per_row",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_property22_duplicate_labels_do_not_collide",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_property25_and_26_really_ran_on_this_contract",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_required_digest_is_not_another_pilots",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_reused_entity_is_refused_at_write_time",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_run_is_not_verified_without_real_onlyoffice",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_run_row_freezes_this_pilot_identity",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_upstream_gap_scenarios_are_failed_not_unverifiable"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task42_h1_grouped_dynamic_pilot.py::TestContractIsGroundedInTheTemplate::test_disk_contract_matches_the_source_of_truth"
+    ],
+    "added_files": [
+      "test_task42_h1_grouped_dynamic_pilot.py",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py"
+    ],
+    "restored": true,
+    "seconds": 49.9
+  },
+  {
+    "id": "M25",
+    "side": "be",
+    "want": "test_task42_h1_grouped_dynamic_pilot.py::TestProperty22ColumnIdentityIsDecoupledFromLabel::test_no_dynamic_columns_are_declared_for_this_entry",
+    "why": "凭空给本表声明 `dynamic_columns` ⇒ 本表列是固定的 A..Z，`{slot}_{seq}` 是 G7 那种按公司横向展开的形态；无来源自造结构若仍绿，Requirement 6.1 在契约结构层面失守。🔴 用单行 replace 而不是 insert 整段函数：`insert` 把 new 放在 anchor **之后**，在 new 里重复函数头会留下一个空体的函数 ⇒ IndentationError ⇒ collection error ⇒ 被误判成 WRONG-TEST（首轮实测）",
+    "verdict": "RED",
+    "summary": "20 failed, 156 passed in 40.33s",
+    "added": [
+      "test_task42_h1_grouped_dynamic_pilot.py::TestContractIsGroundedInTheTemplate::test_disk_contract_matches_the_source_of_truth",
+      "test_task42_h1_grouped_dynamic_pilot.py::TestProperty22ColumnIdentityIsDecoupledFromLabel::test_no_dynamic_columns_are_declared_for_this_entry",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_black_box_scenarios_are_unverifiable",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_bundle_is_non_null_and_all_children_are_approved",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_bundle_slot_digests_match_the_published_definitions",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_download_only_scenario_has_zero_operation_and_application",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_every_required_scenario_has_a_persisted_row",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_every_scenario_row_binds_a_published_trace_bundle",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_four_definitions_and_one_bundle_are_published",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_no_entity_is_reused_across_scenarios",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_no_phase_crashed_during_collection",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_ordinals_are_dense_and_unique",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_pilot_class_stays_unverifiable_after_this_run",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_plan_uses_this_pilot_bundle_and_derives_a_non_empty_set",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_property25_and_26_really_ran_on_this_contract",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_required_digest_is_not_another_pilots",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_reused_entity_is_refused_at_write_time",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_run_is_not_verified_without_real_onlyoffice",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_run_row_freezes_this_pilot_identity",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_upstream_gap_scenarios_are_failed_not_unverifiable"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task42_h1_grouped_dynamic_pilot.py::TestContractIsGroundedInTheTemplate::test_disk_contract_matches_the_source_of_truth",
+      "test_task42_h1_grouped_dynamic_pilot.py::TestProperty22ColumnIdentityIsDecoupledFromLabel::test_no_dynamic_columns_are_declared_for_this_entry"
+    ],
+    "added_files": [
+      "test_task42_h1_grouped_dynamic_pilot.py",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py"
+    ],
+    "restored": true,
+    "seconds": 44.1
+  },
+  {
+    "id": "M26",
+    "side": "be",
+    "want": "test_task42_h1_grouped_dynamic_pilot.py::TestContractIsGroundedInTheTemplate::test_enum_value_domains_come_from_the_real_data_validations",
+    "why": "类别枚举值域多塞一项后仍绿 ⇒ 三源锁死的第三源（模板 DV ↔ 前端 `H1_2_CATEGORY_OPTIONS`）失效，OO 侧可以选一个前端不认的值",
+    "verdict": "RED",
+    "summary": "22 failed, 154 passed in 41.21s",
+    "added": [
+      "test_task42_h1_grouped_dynamic_pilot.py::TestContractIsGroundedInTheTemplate::test_disk_contract_matches_the_source_of_truth",
+      "test_task42_h1_grouped_dynamic_pilot.py::TestContractIsGroundedInTheTemplate::test_enum_value_domains_come_from_the_real_data_validations",
+      "test_task42_h1_grouped_dynamic_pilot.py::TestProperty22ColumnIdentityIsDecoupledFromLabel::test_category_domain_matches_the_frontend_truth_source",
+      "test_task42_h1_grouped_dynamic_pilot.py::TestProperty22ColumnIdentityIsDecoupledFromLabel::test_no_dynamic_columns_are_declared_for_this_entry",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_black_box_scenarios_are_unverifiable",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_bundle_is_non_null_and_all_children_are_approved",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_bundle_slot_digests_match_the_published_definitions",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_download_only_scenario_has_zero_operation_and_application",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_every_required_scenario_has_a_persisted_row",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_every_scenario_row_binds_a_published_trace_bundle",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_four_definitions_and_one_bundle_are_published",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_no_entity_is_reused_across_scenarios",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_no_phase_crashed_during_collection",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_ordinals_are_dense_and_unique",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_pilot_class_stays_unverifiable_after_this_run",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_plan_uses_this_pilot_bundle_and_derives_a_non_empty_set",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_property25_and_26_really_ran_on_this_contract",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_required_digest_is_not_another_pilots",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_reused_entity_is_refused_at_write_time",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_run_is_not_verified_without_real_onlyoffice",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_run_row_freezes_this_pilot_identity",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_upstream_gap_scenarios_are_failed_not_unverifiable"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task42_h1_grouped_dynamic_pilot.py::TestContractIsGroundedInTheTemplate::test_disk_contract_matches_the_source_of_truth",
+      "test_task42_h1_grouped_dynamic_pilot.py::TestContractIsGroundedInTheTemplate::test_enum_value_domains_come_from_the_real_data_validations",
+      "test_task42_h1_grouped_dynamic_pilot.py::TestProperty22ColumnIdentityIsDecoupledFromLabel::test_category_domain_matches_the_frontend_truth_source"
+    ],
+    "added_files": [
+      "test_task42_h1_grouped_dynamic_pilot.py",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py"
+    ],
+    "restored": true,
+    "seconds": 44.8
+  },
+  {
+    "id": "M27",
+    "side": "be",
+    "want": "test_task42_h1_grouped_dynamic_pilot.py::TestSkeletonRowPolicy::test_skeleton_row_count_is_max_seed_one",
+    "why": "`max(seed,1)` 变成 `max(seed,15)` ⇒ seed=0 时预置 15 行空占位，会被下游推成占位披露行（平台铁律「动态区骨架行数禁写死」正是为这条形态定的）",
+    "verdict": "RED",
+    "summary": "3 failed, 173 passed in 44.22s",
+    "added": [
+      "test_task42_h1_grouped_dynamic_pilot.py::TestSkeletonRowPolicy::test_skeleton_row_count_is_max_seed_one",
+      "test_task42_h1_grouped_dynamic_pilot.py::TestSkeletonRowPolicy::test_zero_seed_does_not_yield_the_template_skeleton",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_skeleton_policy_is_max_seed_one"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task42_h1_grouped_dynamic_pilot.py::TestSkeletonRowPolicy::test_skeleton_row_count_is_max_seed_one",
+      "test_task42_h1_grouped_dynamic_pilot.py::TestSkeletonRowPolicy::test_zero_seed_does_not_yield_the_template_skeleton",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_skeleton_policy_is_max_seed_one"
+    ],
+    "added_files": [
+      "test_task42_h1_grouped_dynamic_pilot.py",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py"
+    ],
+    "restored": true,
+    "seconds": 47.8
+  },
+  {
+    "id": "M28",
+    "side": "be",
+    "want": "test_task42_h1_grouped_dynamic_pilot.py::TestSkeletonRowPolicy::test_skeleton_row_count_is_the_only_row_arithmetic",
+    "why": "行区间上界改成写死的常量加法 ⇒ 「骨架行数只由 skeleton_row_count 决定」退化，以后改策略会漏掉这一处（本 spec 反复付学费的「第二处真源」形态）",
+    "verdict": "RED",
+    "summary": "1 failed, 175 passed in 44.04s",
+    "added": [
+      "test_task42_h1_grouped_dynamic_pilot.py::TestSkeletonRowPolicy::test_skeleton_row_count_is_the_only_row_arithmetic"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task42_h1_grouped_dynamic_pilot.py::TestSkeletonRowPolicy::test_skeleton_row_count_is_the_only_row_arithmetic"
+    ],
+    "added_files": [
+      "test_task42_h1_grouped_dynamic_pilot.py"
+    ],
+    "restored": true,
+    "seconds": 47.7
+  },
+  {
+    "id": "M29",
+    "side": "be",
+    "want": "test_task42_h1_grouped_dynamic_pilot.py::TestSkeletonRowPolicy::test_contract_declares_the_policy_not_a_hardcoded_count",
+    "why": "契约里登记的骨架策略被改掉后仍绿 ⇒ 「策略而不是行数」这条声明没有判据，下游读契约的人会以为骨架是模板固定的",
+    "verdict": "RED",
+    "summary": "20 failed, 156 passed in 39.78s",
+    "added": [
+      "test_task42_h1_grouped_dynamic_pilot.py::TestContractIsGroundedInTheTemplate::test_disk_contract_matches_the_source_of_truth",
+      "test_task42_h1_grouped_dynamic_pilot.py::TestProperty22ColumnIdentityIsDecoupledFromLabel::test_no_dynamic_columns_are_declared_for_this_entry",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_black_box_scenarios_are_unverifiable",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_bundle_is_non_null_and_all_children_are_approved",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_bundle_slot_digests_match_the_published_definitions",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_download_only_scenario_has_zero_operation_and_application",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_every_required_scenario_has_a_persisted_row",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_every_scenario_row_binds_a_published_trace_bundle",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_four_definitions_and_one_bundle_are_published",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_no_entity_is_reused_across_scenarios",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_no_phase_crashed_during_collection",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_ordinals_are_dense_and_unique",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_pilot_class_stays_unverifiable_after_this_run",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_plan_uses_this_pilot_bundle_and_derives_a_non_empty_set",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_property25_and_26_really_ran_on_this_contract",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_required_digest_is_not_another_pilots",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_reused_entity_is_refused_at_write_time",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_run_is_not_verified_without_real_onlyoffice",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_run_row_freezes_this_pilot_identity",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_upstream_gap_scenarios_are_failed_not_unverifiable"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task42_h1_grouped_dynamic_pilot.py::TestContractIsGroundedInTheTemplate::test_disk_contract_matches_the_source_of_truth"
+    ],
+    "added_files": [
+      "test_task42_h1_grouped_dynamic_pilot.py",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py"
+    ],
+    "restored": true,
+    "seconds": 43.3
+  },
+  {
+    "id": "M30",
+    "side": "be",
+    "want": "test_task42_h1_grouped_dynamic_pilot.py::TestContractIsGroundedInTheTemplate::test_disk_contract_matches_the_source_of_truth",
+    "why": "只改磁盘契约不改代码 ⇒ 双向锁死必须打红；单向锁（只验「磁盘能被 parse 接受」）会让这种漂移悄悄通过",
+    "verdict": "RED",
+    "summary": "21 failed, 155 passed in 38.68s",
+    "added": [
+      "test_task42_h1_grouped_dynamic_pilot.py::TestContractIsGroundedInTheTemplate::test_disk_contract_matches_the_source_of_truth",
+      "test_task42_h1_grouped_dynamic_pilot.py::TestContractIsGroundedInTheTemplate::test_header_rows_is_three_and_is_the_schema_upper_bound",
+      "test_task42_h1_grouped_dynamic_pilot.py::TestProperty22ColumnIdentityIsDecoupledFromLabel::test_no_dynamic_columns_are_declared_for_this_entry",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_black_box_scenarios_are_unverifiable",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_bundle_is_non_null_and_all_children_are_approved",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_bundle_slot_digests_match_the_published_definitions",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_download_only_scenario_has_zero_operation_and_application",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_every_required_scenario_has_a_persisted_row",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_every_scenario_row_binds_a_published_trace_bundle",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_four_definitions_and_one_bundle_are_published",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_no_entity_is_reused_across_scenarios",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_no_phase_crashed_during_collection",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_ordinals_are_dense_and_unique",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_pilot_class_stays_unverifiable_after_this_run",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_plan_uses_this_pilot_bundle_and_derives_a_non_empty_set",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_property25_and_26_really_ran_on_this_contract",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_required_digest_is_not_another_pilots",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_reused_entity_is_refused_at_write_time",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_run_is_not_verified_without_real_onlyoffice",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_run_row_freezes_this_pilot_identity",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_upstream_gap_scenarios_are_failed_not_unverifiable"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task42_h1_grouped_dynamic_pilot.py::TestContractIsGroundedInTheTemplate::test_disk_contract_matches_the_source_of_truth",
+      "test_task42_h1_grouped_dynamic_pilot.py::TestContractIsGroundedInTheTemplate::test_header_rows_is_three_and_is_the_schema_upper_bound"
+    ],
+    "added_files": [
+      "test_task42_h1_grouped_dynamic_pilot.py",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py"
+    ],
+    "restored": true,
+    "seconds": 42.1
+  },
+  {
+    "id": "M31",
+    "side": "be",
+    "want": "test_task42_h1_grouped_dynamic_pilot.py::TestContractIsGroundedInTheTemplate::test_disk_contract_matches_the_source_of_truth",
+    "why": "只改磁盘契约里一个 column_key ⇒ 双向锁死必须打红（25 个字段形态雷同，作用域自证保证改到的确实是 net_value 这一条）",
+    "verdict": "RED",
+    "summary": "22 failed, 154 passed in 39.61s",
+    "added": [
+      "test_task42_h1_grouped_dynamic_pilot.py::TestContractIsGroundedInTheTemplate::test_disk_contract_matches_the_source_of_truth",
+      "test_task42_h1_grouped_dynamic_pilot.py::TestContractIsGroundedInTheTemplate::test_every_mid_header_matches_the_real_cell_text",
+      "test_task42_h1_grouped_dynamic_pilot.py::TestProductionWiring::test_disk_contract_is_lf_and_byte_stable",
+      "test_task42_h1_grouped_dynamic_pilot.py::TestProperty22ColumnIdentityIsDecoupledFromLabel::test_no_dynamic_columns_are_declared_for_this_entry",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_black_box_scenarios_are_unverifiable",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_bundle_is_non_null_and_all_children_are_approved",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_bundle_slot_digests_match_the_published_definitions",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_download_only_scenario_has_zero_operation_and_application",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_every_required_scenario_has_a_persisted_row",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_every_scenario_row_binds_a_published_trace_bundle",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_four_definitions_and_one_bundle_are_published",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_no_entity_is_reused_across_scenarios",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_no_phase_crashed_during_collection",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_ordinals_are_dense_and_unique",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_pilot_class_stays_unverifiable_after_this_run",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_plan_uses_this_pilot_bundle_and_derives_a_non_empty_set",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_property25_and_26_really_ran_on_this_contract",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_required_digest_is_not_another_pilots",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_reused_entity_is_refused_at_write_time",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_run_is_not_verified_without_real_onlyoffice",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_run_row_freezes_this_pilot_identity",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_upstream_gap_scenarios_are_failed_not_unverifiable"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task42_h1_grouped_dynamic_pilot.py::TestContractIsGroundedInTheTemplate::test_disk_contract_matches_the_source_of_truth"
+    ],
+    "added_files": [
+      "test_task42_h1_grouped_dynamic_pilot.py",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py"
+    ],
+    "restored": true,
+    "seconds": 43.1
+  },
+  {
+    "id": "M32",
+    "side": "be",
+    "want": "test_task42_h1_grouped_dynamic_pilot.py::TestContractIsGroundedInTheTemplate::test_disk_contract_matches_the_source_of_truth",
+    "why": "删除策略被改后仍绿 ⇒ 动态行的删除语义（tombstone vs reject）可以在磁盘上被单方面改写，而 merge 的 delete/update 判定正依赖它",
+    "verdict": "RED",
+    "summary": "22 failed, 154 passed in 39.47s",
+    "added": [
+      "test_task42_h1_grouped_dynamic_pilot.py::TestContractIsGroundedInTheTemplate::test_disk_contract_matches_the_source_of_truth",
+      "test_task42_h1_grouped_dynamic_pilot.py::TestProductionWiring::test_disk_contract_is_lf_and_byte_stable",
+      "test_task42_h1_grouped_dynamic_pilot.py::TestProperty22ColumnIdentityIsDecoupledFromLabel::test_no_dynamic_columns_are_declared_for_this_entry",
+      "test_task42_h1_grouped_dynamic_pilot.py::TestProperty23And66StructuralOperations::test_new_row_gets_minted_identity_never_reusing_the_deleted_one",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_black_box_scenarios_are_unverifiable",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_bundle_is_non_null_and_all_children_are_approved",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_bundle_slot_digests_match_the_published_definitions",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_download_only_scenario_has_zero_operation_and_application",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_every_required_scenario_has_a_persisted_row",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_every_scenario_row_binds_a_published_trace_bundle",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_four_definitions_and_one_bundle_are_published",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_no_entity_is_reused_across_scenarios",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_no_phase_crashed_during_collection",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_ordinals_are_dense_and_unique",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_pilot_class_stays_unverifiable_after_this_run",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_plan_uses_this_pilot_bundle_and_derives_a_non_empty_set",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_property25_and_26_really_ran_on_this_contract",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_required_digest_is_not_another_pilots",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_reused_entity_is_refused_at_write_time",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_run_is_not_verified_without_real_onlyoffice",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_run_row_freezes_this_pilot_identity",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_upstream_gap_scenarios_are_failed_not_unverifiable"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task42_h1_grouped_dynamic_pilot.py::TestContractIsGroundedInTheTemplate::test_disk_contract_matches_the_source_of_truth"
+    ],
+    "added_files": [
+      "test_task42_h1_grouped_dynamic_pilot.py",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py"
+    ],
+    "restored": true,
+    "seconds": 42.9
+  },
+  {
+    "id": "M33",
+    "side": "be",
+    "want": "test_task42_h1_grouped_dynamic_pilot_pg.py::test_contract_declares_the_observed_emptiness",
+    "why": "「参考库里这条 item 为空」这条**观测登记**被改掉后仍绿 ⇒ 合成行 oracle 失去书面理由，将来真实数据出现时没人知道该改回真实载荷",
+    "verdict": "RED",
+    "summary": "22 failed, 154 passed in 39.65s",
+    "added": [
+      "test_task42_h1_grouped_dynamic_pilot.py::TestContractIsGroundedInTheTemplate::test_disk_contract_matches_the_source_of_truth",
+      "test_task42_h1_grouped_dynamic_pilot.py::TestProductionWiring::test_disk_contract_is_lf_and_byte_stable",
+      "test_task42_h1_grouped_dynamic_pilot.py::TestProperty22ColumnIdentityIsDecoupledFromLabel::test_no_dynamic_columns_are_declared_for_this_entry",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_black_box_scenarios_are_unverifiable",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_bundle_is_non_null_and_all_children_are_approved",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_bundle_slot_digests_match_the_published_definitions",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_contract_declares_the_observed_emptiness",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_download_only_scenario_has_zero_operation_and_application",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_every_required_scenario_has_a_persisted_row",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_every_scenario_row_binds_a_published_trace_bundle",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_four_definitions_and_one_bundle_are_published",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_no_entity_is_reused_across_scenarios",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_no_phase_crashed_during_collection",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_ordinals_are_dense_and_unique",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_pilot_class_stays_unverifiable_after_this_run",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_plan_uses_this_pilot_bundle_and_derives_a_non_empty_set",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_property25_and_26_really_ran_on_this_contract",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_required_digest_is_not_another_pilots",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_reused_entity_is_refused_at_write_time",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_run_is_not_verified_without_real_onlyoffice",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_run_row_freezes_this_pilot_identity",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_upstream_gap_scenarios_are_failed_not_unverifiable"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task42_h1_grouped_dynamic_pilot.py::TestContractIsGroundedInTheTemplate::test_disk_contract_matches_the_source_of_truth",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_contract_declares_the_observed_emptiness"
+    ],
+    "added_files": [
+      "test_task42_h1_grouped_dynamic_pilot.py",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py"
+    ],
+    "restored": true,
+    "seconds": 43.1
+  },
+  {
+    "id": "M34",
+    "side": "be",
+    "want": "test_task42_h1_grouped_dynamic_pilot.py::TestStorePayloadSplit::test_missing_row_identity_fails_closed",
+    "why": "缺 `rowId` 不再 fail closed ⇒ 行身份会静默退回 None，下游按位置对齐（Requirement 6.5 / Property 23 明令禁止的形态）",
+    "verdict": "RED",
+    "summary": "2 failed, 174 passed in 44.49s",
+    "added": [
+      "test_task42_h1_grouped_dynamic_pilot.py::TestStorePayloadSplit::test_failure_kinds_are_reachable_and_mutually_distinct",
+      "test_task42_h1_grouped_dynamic_pilot.py::TestStorePayloadSplit::test_missing_row_identity_fails_closed"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task42_h1_grouped_dynamic_pilot.py::TestStorePayloadSplit::test_failure_kinds_are_reachable_and_mutually_distinct",
+      "test_task42_h1_grouped_dynamic_pilot.py::TestStorePayloadSplit::test_missing_row_identity_fails_closed"
+    ],
+    "added_files": [
+      "test_task42_h1_grouped_dynamic_pilot.py"
+    ],
+    "restored": true,
+    "seconds": 48.0
+  },
+  {
+    "id": "M35",
+    "side": "be",
+    "want": "test_task42_h1_grouped_dynamic_pilot.py::TestStorePayloadSplit::test_duplicate_row_identity_fails_closed",
+    "why": "重复行身份不再 fail closed ⇒ 复制行产生的重复 UUID 被静默合并成一行（Requirement 6.15）",
+    "verdict": "RED",
+    "summary": "2 failed, 174 passed in 44.34s",
+    "added": [
+      "test_task42_h1_grouped_dynamic_pilot.py::TestStorePayloadSplit::test_duplicate_row_identity_fails_closed",
+      "test_task42_h1_grouped_dynamic_pilot.py::TestStorePayloadSplit::test_failure_kinds_are_reachable_and_mutually_distinct"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task42_h1_grouped_dynamic_pilot.py::TestStorePayloadSplit::test_duplicate_row_identity_fails_closed",
+      "test_task42_h1_grouped_dynamic_pilot.py::TestStorePayloadSplit::test_failure_kinds_are_reachable_and_mutually_distinct"
+    ],
+    "added_files": [
+      "test_task42_h1_grouped_dynamic_pilot.py"
+    ],
+    "restored": true,
+    "seconds": 47.8
+  },
+  {
+    "id": "M36",
+    "side": "be",
+    "want": "test_task42_h1_grouped_dynamic_pilot.py::TestStorePayloadSplit::test_non_array_payload_fails_closed",
+    "why": "载荷不是数组时不再 fail closed ⇒ 整张表被存成别的形态时静默当成零行（表面上「同步成功但什么都没变」）",
+    "verdict": "RED",
+    "summary": "2 failed, 174 passed in 44.49s",
+    "added": [
+      "test_task42_h1_grouped_dynamic_pilot.py::TestStorePayloadSplit::test_failure_kinds_are_reachable_and_mutually_distinct",
+      "test_task42_h1_grouped_dynamic_pilot.py::TestStorePayloadSplit::test_non_array_payload_fails_closed"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task42_h1_grouped_dynamic_pilot.py::TestStorePayloadSplit::test_failure_kinds_are_reachable_and_mutually_distinct",
+      "test_task42_h1_grouped_dynamic_pilot.py::TestStorePayloadSplit::test_non_array_payload_fails_closed"
+    ],
+    "added_files": [
+      "test_task42_h1_grouped_dynamic_pilot.py"
+    ],
+    "restored": true,
+    "seconds": 48.0
+  },
+  {
+    "id": "M37",
+    "side": "be",
+    "want": "test_task42_h1_grouped_dynamic_pilot.py::TestStorePayloadSplit::test_failure_kinds_are_reachable_and_mutually_distinct",
+    "why": "「载荷坏了」与「选型漂移」共用同一个 error_code ⇒ 较早的分支永久不可分辨（本 spec 已实测 3 次的假绿形态：共享错误码让分支永久 GREEN）",
+    "verdict": "RED",
+    "summary": "1 failed, 175 passed in 44.47s",
+    "added": [
+      "test_task42_h1_grouped_dynamic_pilot.py::TestStorePayloadSplit::test_failure_kinds_are_reachable_and_mutually_distinct"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task42_h1_grouped_dynamic_pilot.py::TestStorePayloadSplit::test_failure_kinds_are_reachable_and_mutually_distinct"
+    ],
+    "added_files": [
+      "test_task42_h1_grouped_dynamic_pilot.py"
+    ],
+    "restored": true,
+    "seconds": 48.0
+  },
+  {
+    "id": "M38",
+    "side": "be",
+    "want": "test_task42_h1_grouped_dynamic_pilot.py::TestStorePayloadSplit::test_split_uses_the_contract_as_the_spec_source",
+    "why": "spec 不再从契约取 ⇒ 写错一个 column_key 不会立刻炸，而是静默产出一个契约里没有的字段（additive 死代码 + 类型信息全错）",
+    "verdict": "RED",
+    "summary": "10 failed, 160 passed, 6 errors in 44.68s",
+    "added": [
+      "test_task42_h1_grouped_dynamic_pilot.py::TestProperty27DeleteUpdateDoesNotOverwriteTheWholeTable::test_different_field_merge_and_same_field_conflict_really_run",
+      "test_task42_h1_grouped_dynamic_pilot.py::TestProperty27DeleteUpdateDoesNotOverwriteTheWholeTable::test_every_other_row_and_field_merges_normally",
+      "test_task42_h1_grouped_dynamic_pilot.py::TestProperty27DeleteUpdateDoesNotOverwriteTheWholeTable::test_only_the_touched_row_conflicts",
+      "test_task42_h1_grouped_dynamic_pilot.py::TestProperty27DeleteUpdateDoesNotOverwriteTheWholeTable::test_reorder_alone_is_not_a_whole_table_overwrite",
+      "test_task42_h1_grouped_dynamic_pilot.py::TestStorePayloadSplit::test_bytes_and_text_and_parsed_inputs_agree",
+      "test_task42_h1_grouped_dynamic_pilot.py::TestStorePayloadSplit::test_row_and_field_budgets_are_wired_into_the_split",
+      "test_task42_h1_grouped_dynamic_pilot.py::TestStorePayloadSplit::test_row_identity_comes_from_the_payload_not_the_index",
+      "test_task42_h1_grouped_dynamic_pilot.py::TestStorePayloadSplit::test_split_uses_the_contract_as_the_spec_source",
+      "test_task42_h1_grouped_dynamic_pilot.py::TestStorePayloadSplit::test_split_yields_one_field_per_column_per_row",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_no_phase_crashed_during_collection",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_projection_splits_into_one_field_per_column_per_row",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_property22_duplicate_labels_do_not_collide",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_property27_every_other_row_merges_normally",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_property27_only_the_touched_row_conflicts",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_reorder_is_not_a_whole_table_overwrite",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_skeleton_policy_is_max_seed_one"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task42_h1_grouped_dynamic_pilot.py::TestStorePayloadSplit::test_split_uses_the_contract_as_the_spec_source"
+    ],
+    "added_files": [
+      "test_task42_h1_grouped_dynamic_pilot.py",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py"
+    ],
+    "restored": true,
+    "seconds": 48.2
+  },
+  {
+    "id": "M39",
+    "side": "be",
+    "want": "test_task42_h1_grouped_dynamic_pilot.py::TestStorePayloadSplit::test_row_and_field_budgets_are_wired_into_the_split",
+    "why": "行预算不再喂给 `StreamingProjectionBudget` ⇒ Property 60 的「大文件 fail visible」在拆分路径上整段失效，越界时静默继续吃内存",
+    "verdict": "RED",
+    "summary": "1 failed, 175 passed in 45.41s",
+    "added": [
+      "test_task42_h1_grouped_dynamic_pilot.py::TestStorePayloadSplit::test_row_and_field_budgets_are_wired_into_the_split"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task42_h1_grouped_dynamic_pilot.py::TestStorePayloadSplit::test_row_and_field_budgets_are_wired_into_the_split"
+    ],
+    "added_files": [
+      "test_task42_h1_grouped_dynamic_pilot.py"
+    ],
+    "restored": true,
+    "seconds": 49.2
+  },
+  {
+    "id": "M40",
+    "side": "be",
+    "want": "test_task42_h1_grouped_dynamic_pilot.py::TestContractIsGroundedInTheTemplate::test_uuid_column_sits_right_of_the_managed_business_columns",
+    "why": "UUID 列挪到 `AA` ⇒ 那一格有可见注解（`检查的关键证据和要素…`），隐藏该列会藏掉它（Requirement 6.13「不得改变业务公式/标签」）",
+    "verdict": "RED",
+    "summary": "28 failed, 142 passed, 6 errors in 41.43s",
+    "added": [
+      "test_task42_h1_grouped_dynamic_pilot.py::TestBaselineExtractOnTheRealTemplate::test_baseline_extract_reads_back_every_managed_field",
+      "test_task42_h1_grouped_dynamic_pilot.py::TestBaselineExtractOnTheRealTemplate::test_formula_columns_are_read_with_their_formula_text",
+      "test_task42_h1_grouped_dynamic_pilot.py::TestBaselineExtractOnTheRealTemplate::test_instrumentation_produces_all_four_carriers",
+      "test_task42_h1_grouped_dynamic_pilot.py::TestContractIsGroundedInTheTemplate::test_disk_contract_matches_the_source_of_truth",
+      "test_task42_h1_grouped_dynamic_pilot.py::TestContractIsGroundedInTheTemplate::test_uuid_column_sits_right_of_the_managed_business_columns",
+      "test_task42_h1_grouped_dynamic_pilot.py::TestProperty22ColumnIdentityIsDecoupledFromLabel::test_no_dynamic_columns_are_declared_for_this_entry",
+      "test_task42_h1_grouped_dynamic_pilot.py::TestProperty23And66StructuralOperations::test_appending_onto_the_footer_row_is_reported_by_the_unmanaged_gate",
+      "test_task42_h1_grouped_dynamic_pilot.py::TestProperty23And66StructuralOperations::test_copied_row_duplicate_identity_is_a_structural_conflict",
+      "test_task42_h1_grouped_dynamic_pilot.py::TestProperty23And66StructuralOperations::test_footer_anchor_drift_is_detected",
+      "test_task42_h1_grouped_dynamic_pilot.py::TestProperty23And66StructuralOperations::test_footer_formula_range_still_covers_the_managed_rows",
+      "test_task42_h1_grouped_dynamic_pilot.py::TestProperty23And66StructuralOperations::test_new_row_gets_minted_identity_never_reusing_the_deleted_one",
+      "test_task42_h1_grouped_dynamic_pilot.py::TestProperty23And66StructuralOperations::test_reorder_keeps_values_attached_to_identity",
+      "test_task42_h1_grouped_dynamic_pilot.py::TestProperty23And66StructuralOperations::test_row_insert_is_not_a_retention_failure",
+      "test_task42_h1_grouped_dynamic_pilot.py::TestProperty23And66StructuralOperations::test_structural_insert_beyond_the_skeleton_fails_closed",
+      "test_task42_h1_grouped_dynamic_pilot.py::TestPublishDagIsOneWay::test_contract_payload_references_both_and_no_bundle",
+      "test_task42_h1_grouped_dynamic_pilot.py::TestUpstreamRelsAndNamespaceDefectsAreFixed::test_footer_marker_is_found_through_the_decoder",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_black_box_scenarios_are_unverifiable",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_bundle_is_non_null_and_all_children_are_approved",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_bundle_slot_digests_match_the_published_definitions",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_download_only_scenario_has_zero_operation_and_application",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_every_required_scenario_has_a_persisted_row",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_every_scenario_row_binds_a_published_trace_bundle",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_four_definitions_and_one_bundle_are_published",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_no_entity_is_reused_across_scenarios",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_no_phase_crashed_during_collection",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_ordinals_are_dense_and_unique",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_pilot_class_stays_unverifiable_after_this_run",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_plan_uses_this_pilot_bundle_and_derives_a_non_empty_set",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_property25_and_26_really_ran_on_this_contract",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_required_digest_is_not_another_pilots",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_reused_entity_is_refused_at_write_time",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_run_is_not_verified_without_real_onlyoffice",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_run_row_freezes_this_pilot_identity",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_upstream_gap_scenarios_are_failed_not_unverifiable"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task42_h1_grouped_dynamic_pilot.py::TestBaselineExtractOnTheRealTemplate::test_instrumentation_produces_all_four_carriers",
+      "test_task42_h1_grouped_dynamic_pilot.py::TestContractIsGroundedInTheTemplate::test_disk_contract_matches_the_source_of_truth",
+      "test_task42_h1_grouped_dynamic_pilot.py::TestContractIsGroundedInTheTemplate::test_uuid_column_sits_right_of_the_managed_business_columns"
+    ],
+    "added_files": [
+      "test_task42_h1_grouped_dynamic_pilot.py",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py"
+    ],
+    "restored": true,
+    "seconds": 45.0
+  },
+  {
+    "id": "M41",
+    "side": "be",
+    "want": "test_task42_h1_grouped_dynamic_pilot.py::TestContractIsGroundedInTheTemplate::test_column_letters_are_a_to_z_minus_the_placeholder",
+    "why": "受管最后一列缩到 W ⇒ Table 圈不住 `Y 索引号` / `Z 是否异常` 两列，它们的字段解析会落到 Table 之外（受管矩形与契约声明脱钩）",
+    "verdict": "RED",
+    "summary": "24 failed, 152 passed in 41.39s",
+    "added": [
+      "test_task42_h1_grouped_dynamic_pilot.py::TestContractIsGroundedInTheTemplate::test_column_letters_are_a_to_z_minus_the_placeholder",
+      "test_task42_h1_grouped_dynamic_pilot.py::TestContractIsGroundedInTheTemplate::test_disk_contract_matches_the_source_of_truth",
+      "test_task42_h1_grouped_dynamic_pilot.py::TestContractIsGroundedInTheTemplate::test_uuid_column_sits_right_of_the_managed_business_columns",
+      "test_task42_h1_grouped_dynamic_pilot.py::TestProperty22ColumnIdentityIsDecoupledFromLabel::test_no_dynamic_columns_are_declared_for_this_entry",
+      "test_task42_h1_grouped_dynamic_pilot.py::TestPublishDagIsOneWay::test_contract_payload_references_both_and_no_bundle",
+      "test_task42_h1_grouped_dynamic_pilot.py::TestSkeletonRowPolicy::test_uuid_column_left_of_managed_columns_is_refused",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_black_box_scenarios_are_unverifiable",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_bundle_is_non_null_and_all_children_are_approved",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_bundle_slot_digests_match_the_published_definitions",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_download_only_scenario_has_zero_operation_and_application",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_every_required_scenario_has_a_persisted_row",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_every_scenario_row_binds_a_published_trace_bundle",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_four_definitions_and_one_bundle_are_published",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_no_entity_is_reused_across_scenarios",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_no_phase_crashed_during_collection",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_ordinals_are_dense_and_unique",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_pilot_class_stays_unverifiable_after_this_run",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_plan_uses_this_pilot_bundle_and_derives_a_non_empty_set",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_property25_and_26_really_ran_on_this_contract",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_required_digest_is_not_another_pilots",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_reused_entity_is_refused_at_write_time",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_run_is_not_verified_without_real_onlyoffice",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_run_row_freezes_this_pilot_identity",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_upstream_gap_scenarios_are_failed_not_unverifiable"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task42_h1_grouped_dynamic_pilot.py::TestContractIsGroundedInTheTemplate::test_column_letters_are_a_to_z_minus_the_placeholder",
+      "test_task42_h1_grouped_dynamic_pilot.py::TestContractIsGroundedInTheTemplate::test_disk_contract_matches_the_source_of_truth"
+    ],
+    "added_files": [
+      "test_task42_h1_grouped_dynamic_pilot.py",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py"
+    ],
+    "restored": true,
+    "seconds": 45.1
+  },
+  {
+    "id": "M42",
+    "side": "be",
+    "want": "test_task42_h1_grouped_dynamic_pilot.py::TestContractIsGroundedInTheTemplate::test_column_letters_are_a_to_z_minus_the_placeholder",
+    "why": "占位列指到 `Y 索引号` ⇒ 一个有业务语义的列被当成占位而不声明，同时真占位列 `X`（表头 `……`）反被当成业务列 —— 正是 Requirement 6.1「禁止无来源自造字段」两侧同时失守",
+    "verdict": "RED",
+    "summary": "21 failed, 155 passed in 41.12s",
+    "added": [
+      "test_task42_h1_grouped_dynamic_pilot.py::TestContractIsGroundedInTheTemplate::test_column_letters_are_a_to_z_minus_the_placeholder",
+      "test_task42_h1_grouped_dynamic_pilot.py::TestContractIsGroundedInTheTemplate::test_disk_contract_matches_the_source_of_truth",
+      "test_task42_h1_grouped_dynamic_pilot.py::TestProperty22ColumnIdentityIsDecoupledFromLabel::test_no_dynamic_columns_are_declared_for_this_entry",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_black_box_scenarios_are_unverifiable",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_bundle_is_non_null_and_all_children_are_approved",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_bundle_slot_digests_match_the_published_definitions",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_download_only_scenario_has_zero_operation_and_application",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_every_required_scenario_has_a_persisted_row",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_every_scenario_row_binds_a_published_trace_bundle",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_four_definitions_and_one_bundle_are_published",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_no_entity_is_reused_across_scenarios",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_no_phase_crashed_during_collection",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_ordinals_are_dense_and_unique",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_pilot_class_stays_unverifiable_after_this_run",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_plan_uses_this_pilot_bundle_and_derives_a_non_empty_set",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_property25_and_26_really_ran_on_this_contract",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_required_digest_is_not_another_pilots",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_reused_entity_is_refused_at_write_time",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_run_is_not_verified_without_real_onlyoffice",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_run_row_freezes_this_pilot_identity",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_upstream_gap_scenarios_are_failed_not_unverifiable"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task42_h1_grouped_dynamic_pilot.py::TestContractIsGroundedInTheTemplate::test_column_letters_are_a_to_z_minus_the_placeholder",
+      "test_task42_h1_grouped_dynamic_pilot.py::TestContractIsGroundedInTheTemplate::test_disk_contract_matches_the_source_of_truth"
+    ],
+    "added_files": [
+      "test_task42_h1_grouped_dynamic_pilot.py",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py"
+    ],
+    "restored": true,
+    "seconds": 44.8
+  },
+  {
+    "id": "M43",
+    "side": "be",
+    "want": "test_task42_h1_grouped_dynamic_pilot.py::TestUpstreamRelsAndNamespaceDefectsAreFixed::test_sheet_part_resolution_is_attribute_order_independent",
+    "why": "rels 解析退回「Id 必须排在 Target 之前」⇒ 369 个权威模板里 10 个（含 Task 40 的 B60 与 Task 43 的 G7）整份不可注入。这条缺陷此前潜伏，正是本任务在真实数据上撞出来的",
+    "verdict": "RED",
+    "summary": "2 failed, 155 passed, 19 errors in 42.43s",
+    "added": [
+      "test_task42_h1_grouped_dynamic_pilot.py::TestAuthoritativeTemplate::test_template_formula_cells_ship_without_cached_values",
+      "test_task42_h1_grouped_dynamic_pilot.py::TestBaselineExtractOnTheRealTemplate::test_baseline_extract_reads_back_every_managed_field",
+      "test_task42_h1_grouped_dynamic_pilot.py::TestBaselineExtractOnTheRealTemplate::test_formula_columns_are_read_with_their_formula_text",
+      "test_task42_h1_grouped_dynamic_pilot.py::TestBaselineExtractOnTheRealTemplate::test_instrumentation_produces_all_four_carriers",
+      "test_task42_h1_grouped_dynamic_pilot.py::TestBaselineExtractOnTheRealTemplate::test_managed_sheet_structure_aspect_covers_the_style_sources",
+      "test_task42_h1_grouped_dynamic_pilot.py::TestBaselineExtractOnTheRealTemplate::test_shared_strings_zero_is_a_workbook_fact_not_an_empty_judgement",
+      "test_task42_h1_grouped_dynamic_pilot.py::TestBaselineExtractOnTheRealTemplate::test_unmanaged_region_coverage_is_not_empty",
+      "test_task42_h1_grouped_dynamic_pilot.py::TestProperty23And66StructuralOperations::test_appending_onto_the_footer_row_is_reported_by_the_unmanaged_gate",
+      "test_task42_h1_grouped_dynamic_pilot.py::TestProperty23And66StructuralOperations::test_copied_row_duplicate_identity_is_a_structural_conflict",
+      "test_task42_h1_grouped_dynamic_pilot.py::TestProperty23And66StructuralOperations::test_footer_anchor_drift_is_detected",
+      "test_task42_h1_grouped_dynamic_pilot.py::TestProperty23And66StructuralOperations::test_footer_formula_range_still_covers_the_managed_rows",
+      "test_task42_h1_grouped_dynamic_pilot.py::TestProperty23And66StructuralOperations::test_lost_row_identity_is_a_retention_failure",
+      "test_task42_h1_grouped_dynamic_pilot.py::TestProperty23And66StructuralOperations::test_new_row_gets_minted_identity_never_reusing_the_deleted_one",
+      "test_task42_h1_grouped_dynamic_pilot.py::TestProperty23And66StructuralOperations::test_reorder_keeps_values_attached_to_identity",
+      "test_task42_h1_grouped_dynamic_pilot.py::TestProperty23And66StructuralOperations::test_row_insert_is_not_a_retention_failure",
+      "test_task42_h1_grouped_dynamic_pilot.py::TestProperty23And66StructuralOperations::test_structural_insert_beyond_the_skeleton_fails_closed",
+      "test_task42_h1_grouped_dynamic_pilot.py::TestUpstreamRelsAndNamespaceDefectsAreFixed::test_footer_marker_is_found_through_the_decoder",
+      "test_task42_h1_grouped_dynamic_pilot.py::TestUpstreamRelsAndNamespaceDefectsAreFixed::test_inline_strings_use_numeric_character_references",
+      "test_task42_h1_grouped_dynamic_pilot.py::TestUpstreamRelsAndNamespaceDefectsAreFixed::test_instrumented_workbook_and_sheet_xml_are_well_formed",
+      "test_task42_h1_grouped_dynamic_pilot.py::TestUpstreamRelsAndNamespaceDefectsAreFixed::test_old_id_before_target_regex_would_have_failed",
+      "test_task42_h1_grouped_dynamic_pilot.py::TestUpstreamRelsAndNamespaceDefectsAreFixed::test_sheet_part_resolution_is_attribute_order_independent"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task42_h1_grouped_dynamic_pilot.py::TestBaselineExtractOnTheRealTemplate::test_instrumentation_produces_all_four_carriers",
+      "test_task42_h1_grouped_dynamic_pilot.py::TestUpstreamRelsAndNamespaceDefectsAreFixed::test_old_id_before_target_regex_would_have_failed",
+      "test_task42_h1_grouped_dynamic_pilot.py::TestUpstreamRelsAndNamespaceDefectsAreFixed::test_sheet_part_resolution_is_attribute_order_independent"
+    ],
+    "added_files": [
+      "test_task42_h1_grouped_dynamic_pilot.py"
+    ],
+    "restored": true,
+    "seconds": 46.2
+  },
+  {
+    "id": "M44",
+    "side": "be",
+    "want": "test_task42_h1_grouped_dynamic_pilot.py::TestUpstreamRelsAndNamespaceDefectsAreFixed::test_instrumented_workbook_and_sheet_xml_are_well_formed",
+    "why": "注入的 `<sheet>` 退回「不带 xmlns:r」⇒ 根元素不声明该前缀的工作簿产出未绑定前缀的 workbook.xml，`ET.fromstring` 抛 unbound prefix，identity_inventory 全线不可用",
+    "verdict": "RED",
+    "summary": "2 failed, 161 passed, 13 errors in 44.33s",
+    "added": [
+      "test_task42_h1_grouped_dynamic_pilot.py::TestBaselineExtractOnTheRealTemplate::test_baseline_extract_reads_back_every_managed_field",
+      "test_task42_h1_grouped_dynamic_pilot.py::TestBaselineExtractOnTheRealTemplate::test_formula_columns_are_read_with_their_formula_text",
+      "test_task42_h1_grouped_dynamic_pilot.py::TestBaselineExtractOnTheRealTemplate::test_instrumentation_produces_all_four_carriers",
+      "test_task42_h1_grouped_dynamic_pilot.py::TestBaselineExtractOnTheRealTemplate::test_unmanaged_region_coverage_is_not_empty",
+      "test_task42_h1_grouped_dynamic_pilot.py::TestProperty23And66StructuralOperations::test_appending_onto_the_footer_row_is_reported_by_the_unmanaged_gate",
+      "test_task42_h1_grouped_dynamic_pilot.py::TestProperty23And66StructuralOperations::test_copied_row_duplicate_identity_is_a_structural_conflict",
+      "test_task42_h1_grouped_dynamic_pilot.py::TestProperty23And66StructuralOperations::test_footer_anchor_drift_is_detected",
+      "test_task42_h1_grouped_dynamic_pilot.py::TestProperty23And66StructuralOperations::test_footer_formula_range_still_covers_the_managed_rows",
+      "test_task42_h1_grouped_dynamic_pilot.py::TestProperty23And66StructuralOperations::test_lost_row_identity_is_a_retention_failure",
+      "test_task42_h1_grouped_dynamic_pilot.py::TestProperty23And66StructuralOperations::test_new_row_gets_minted_identity_never_reusing_the_deleted_one",
+      "test_task42_h1_grouped_dynamic_pilot.py::TestProperty23And66StructuralOperations::test_reorder_keeps_values_attached_to_identity",
+      "test_task42_h1_grouped_dynamic_pilot.py::TestProperty23And66StructuralOperations::test_row_insert_is_not_a_retention_failure",
+      "test_task42_h1_grouped_dynamic_pilot.py::TestProperty23And66StructuralOperations::test_structural_insert_beyond_the_skeleton_fails_closed",
+      "test_task42_h1_grouped_dynamic_pilot.py::TestUpstreamRelsAndNamespaceDefectsAreFixed::test_footer_marker_is_found_through_the_decoder",
+      "test_task42_h1_grouped_dynamic_pilot.py::TestUpstreamRelsAndNamespaceDefectsAreFixed::test_instrumented_workbook_and_sheet_xml_are_well_formed"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task42_h1_grouped_dynamic_pilot.py::TestBaselineExtractOnTheRealTemplate::test_instrumentation_produces_all_four_carriers",
+      "test_task42_h1_grouped_dynamic_pilot.py::TestUpstreamRelsAndNamespaceDefectsAreFixed::test_instrumented_workbook_and_sheet_xml_are_well_formed"
+    ],
+    "added_files": [
+      "test_task42_h1_grouped_dynamic_pilot.py"
+    ],
+    "restored": true,
+    "seconds": 48.2
+  },
+  {
+    "id": "M45",
+    "side": "be",
+    "want": "test_task42_h1_grouped_dynamic_pilot.py::TestUpstreamRelsAndNamespaceDefectsAreFixed::test_instrumented_workbook_and_sheet_xml_are_well_formed",
+    "why": "注入的 `<tableParts>` 退回「不带 xmlns:r」⇒ 受管 sheet XML 未绑定前缀，`_parse_tables` 抛 unbound prefix（与 M44 是同源缺陷的另一半，故各自一条）",
+    "verdict": "RED",
+    "summary": "3 failed, 160 passed, 13 errors in 44.94s",
+    "added": [
+      "test_task42_h1_grouped_dynamic_pilot.py::TestBaselineExtractOnTheRealTemplate::test_baseline_extract_reads_back_every_managed_field",
+      "test_task42_h1_grouped_dynamic_pilot.py::TestBaselineExtractOnTheRealTemplate::test_formula_columns_are_read_with_their_formula_text",
+      "test_task42_h1_grouped_dynamic_pilot.py::TestBaselineExtractOnTheRealTemplate::test_instrumentation_produces_all_four_carriers",
+      "test_task42_h1_grouped_dynamic_pilot.py::TestBaselineExtractOnTheRealTemplate::test_unmanaged_region_coverage_is_not_empty",
+      "test_task42_h1_grouped_dynamic_pilot.py::TestProperty23And66StructuralOperations::test_appending_onto_the_footer_row_is_reported_by_the_unmanaged_gate",
+      "test_task42_h1_grouped_dynamic_pilot.py::TestProperty23And66StructuralOperations::test_copied_row_duplicate_identity_is_a_structural_conflict",
+      "test_task42_h1_grouped_dynamic_pilot.py::TestProperty23And66StructuralOperations::test_footer_anchor_drift_is_detected",
+      "test_task42_h1_grouped_dynamic_pilot.py::TestProperty23And66StructuralOperations::test_footer_formula_range_still_covers_the_managed_rows",
+      "test_task42_h1_grouped_dynamic_pilot.py::TestProperty23And66StructuralOperations::test_lost_row_identity_is_a_retention_failure",
+      "test_task42_h1_grouped_dynamic_pilot.py::TestProperty23And66StructuralOperations::test_new_row_gets_minted_identity_never_reusing_the_deleted_one",
+      "test_task42_h1_grouped_dynamic_pilot.py::TestProperty23And66StructuralOperations::test_reorder_keeps_values_attached_to_identity",
+      "test_task42_h1_grouped_dynamic_pilot.py::TestProperty23And66StructuralOperations::test_row_insert_is_not_a_retention_failure",
+      "test_task42_h1_grouped_dynamic_pilot.py::TestProperty23And66StructuralOperations::test_structural_insert_beyond_the_skeleton_fails_closed",
+      "test_task42_h1_grouped_dynamic_pilot.py::TestUpstreamRelsAndNamespaceDefectsAreFixed::test_footer_marker_is_found_through_the_decoder",
+      "test_task42_h1_grouped_dynamic_pilot.py::TestUpstreamRelsAndNamespaceDefectsAreFixed::test_instrumented_workbook_and_sheet_xml_are_well_formed",
+      "test_task42_h1_grouped_dynamic_pilot.py::TestUpstreamRelsAndNamespaceDefectsAreFixed::test_namespace_is_not_added_when_the_root_already_declares_it"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task42_h1_grouped_dynamic_pilot.py::TestBaselineExtractOnTheRealTemplate::test_instrumentation_produces_all_four_carriers",
+      "test_task42_h1_grouped_dynamic_pilot.py::TestUpstreamRelsAndNamespaceDefectsAreFixed::test_instrumented_workbook_and_sheet_xml_are_well_formed"
+    ],
+    "added_files": [
+      "test_task42_h1_grouped_dynamic_pilot.py"
+    ],
+    "restored": true,
+    "seconds": 49.0
+  },
+  {
+    "id": "M46",
+    "side": "be",
+    "want": "test_task42_h1_grouped_dynamic_pilot.py::TestUpstreamRelsAndNamespaceDefectsAreFixed::test_namespace_is_not_added_when_the_root_already_declares_it",
+    "why": "改成**无条件**加 xmlns:r ⇒ 另外 358 个工作簿的注入字节都会变，从而改掉 Task 40/41 已冻结的 structure hash；「只在缺失时补」这条约束若无判据，下一个人很容易顺手改成无条件",
+    "verdict": "RED",
+    "summary": "1 failed, 175 passed in 48.85s",
+    "added": [
+      "test_task42_h1_grouped_dynamic_pilot.py::TestUpstreamRelsAndNamespaceDefectsAreFixed::test_namespace_is_not_added_when_the_root_already_declares_it"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task42_h1_grouped_dynamic_pilot.py::TestUpstreamRelsAndNamespaceDefectsAreFixed::test_namespace_is_not_added_when_the_root_already_declares_it"
+    ],
+    "added_files": [
+      "test_task42_h1_grouped_dynamic_pilot.py"
+    ],
+    "restored": true,
+    "seconds": 52.8
+  },
+  {
+    "id": "M47",
+    "side": "be",
+    "want": "test_task42_h1_grouped_dynamic_pilot.py::TestUpstreamRelsAndNamespaceDefectsAreFixed::test_numeric_character_references_are_decoded",
+    "why": "数字字符引用解码被摘掉 ⇒ 10 个权威模板（把中文写成 `&#21512;&#35745;`）的 footer marker 定位不到，`assert_footer_anchor_stable` 抛 FooterAnchorDriftError，materialize 与「SUM 区间覆盖受管行」两道门全线不可用",
+    "verdict": "RED",
+    "summary": "4 failed, 172 passed in 48.66s",
+    "added": [
+      "test_task42_h1_grouped_dynamic_pilot.py::TestProperty23And66StructuralOperations::test_footer_formula_range_still_covers_the_managed_rows",
+      "test_task42_h1_grouped_dynamic_pilot.py::TestProperty23And66StructuralOperations::test_structural_insert_beyond_the_skeleton_fails_closed",
+      "test_task42_h1_grouped_dynamic_pilot.py::TestUpstreamRelsAndNamespaceDefectsAreFixed::test_footer_marker_is_found_through_the_decoder",
+      "test_task42_h1_grouped_dynamic_pilot.py::TestUpstreamRelsAndNamespaceDefectsAreFixed::test_numeric_character_references_are_decoded"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task42_h1_grouped_dynamic_pilot.py::TestProperty23And66StructuralOperations::test_footer_formula_range_still_covers_the_managed_rows",
+      "test_task42_h1_grouped_dynamic_pilot.py::TestUpstreamRelsAndNamespaceDefectsAreFixed::test_footer_marker_is_found_through_the_decoder",
+      "test_task42_h1_grouped_dynamic_pilot.py::TestUpstreamRelsAndNamespaceDefectsAreFixed::test_numeric_character_references_are_decoded"
+    ],
+    "added_files": [
+      "test_task42_h1_grouped_dynamic_pilot.py"
+    ],
+    "restored": true,
+    "seconds": 52.7
+  },
+  {
+    "id": "M48",
+    "side": "be",
+    "want": "test_task42_h1_grouped_dynamic_pilot.py::TestUpstreamRelsAndNamespaceDefectsAreFixed::test_numeric_character_references_are_decoded",
+    "why": "非法码位不再原样保留 ⇒ `&#0;` / `&#1114112;` 会抛 ValueError 或产出 NUL 字符；「静默丢字符比留下引用更难查」这条决定失去判据",
+    "verdict": "RED",
+    "summary": "1 failed, 175 passed in 48.63s",
+    "added": [
+      "test_task42_h1_grouped_dynamic_pilot.py::TestUpstreamRelsAndNamespaceDefectsAreFixed::test_numeric_character_references_are_decoded"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task42_h1_grouped_dynamic_pilot.py::TestUpstreamRelsAndNamespaceDefectsAreFixed::test_numeric_character_references_are_decoded"
+    ],
+    "added_files": [
+      "test_task42_h1_grouped_dynamic_pilot.py"
+    ],
+    "restored": true,
+    "seconds": 52.7
+  },
+  {
+    "id": "M49",
+    "side": "be",
+    "want": "test_task42_h1_grouped_dynamic_pilot.py::TestOrderingGate::test_capability_is_not_enabled_before_finalize",
+    "why": "顺序门被短路 ⇒ finalize 还没做就宣称 capability 已启用，而 registry 里一个 adapter 都没有（伪双向）",
+    "verdict": "RED",
+    "summary": "1 failed, 175 passed in 49.16s",
+    "added": [
+      "test_task42_h1_grouped_dynamic_pilot.py::TestOrderingGate::test_capability_is_not_enabled_before_finalize"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task42_h1_grouped_dynamic_pilot.py::TestOrderingGate::test_capability_is_not_enabled_before_finalize"
+    ],
+    "added_files": [
+      "test_task42_h1_grouped_dynamic_pilot.py"
+    ],
+    "restored": true,
+    "seconds": 53.1
+  },
+  {
+    "id": "M50",
+    "side": "be",
+    "want": "test_task42_h1_grouped_dynamic_pilot.py::TestOrderingGate::test_capability_predicate_agrees_with_the_ordering_gate",
+    "why": "顺序门只看 capability 不看 adapter_id ⇒ manifest 可以把本 entry 指到别的 pilot 的 adapter_id 而照样放行（跨 entry 复用 identity 的入口）",
+    "verdict": "RED",
+    "summary": "1 failed, 175 passed in 48.33s",
+    "added": [
+      "test_task42_h1_grouped_dynamic_pilot.py::TestOrderingGate::test_capability_predicate_agrees_with_the_ordering_gate"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task42_h1_grouped_dynamic_pilot.py::TestOrderingGate::test_capability_predicate_agrees_with_the_ordering_gate"
+    ],
+    "added_files": [
+      "test_task42_h1_grouped_dynamic_pilot.py"
+    ],
+    "restored": true,
+    "seconds": 52.3
+  },
+  {
+    "id": "M51",
+    "side": "be",
+    "want": "test_task42_h1_grouped_dynamic_pilot.py::TestOrderingGate::test_capability_predicate_agrees_with_the_ordering_gate",
+    "why": "窄类型换成宽 `except Exception` ⇒ manifest 读不出来这类**真故障**会被吞成「未启用」（本 spec 最贵的 fail-open 形态）",
+    "verdict": "RED",
+    "summary": "1 failed, 175 passed in 48.74s",
+    "added": [
+      "test_task42_h1_grouped_dynamic_pilot.py::TestOrderingGate::test_capability_predicate_agrees_with_the_ordering_gate"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task42_h1_grouped_dynamic_pilot.py::TestOrderingGate::test_capability_predicate_agrees_with_the_ordering_gate"
+    ],
+    "added_files": [
+      "test_task42_h1_grouped_dynamic_pilot.py"
+    ],
+    "restored": true,
+    "seconds": 52.7
+  },
+  {
+    "id": "M52",
+    "side": "be",
+    "want": "test_task42_h1_grouped_dynamic_pilot.py::TestUpstreamDebtsAreVisibleFacts::test_resolve_published_definitions_never_returns_none",
+    "why": "找不到 identity 载体时返回 None ⇒ 上游把「缺观测器」表现成「这个 entry 没有身份」，一路静默走到「注册一个没有 identity binding 的 adapter」（fail-open 掩盖接线错误）",
+    "verdict": "RED",
+    "summary": "1 failed, 175 passed in 46.53s",
+    "added": [
+      "test_task42_h1_grouped_dynamic_pilot.py::TestUpstreamDebtsAreVisibleFacts::test_resolve_published_definitions_never_returns_none"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task42_h1_grouped_dynamic_pilot.py::TestUpstreamDebtsAreVisibleFacts::test_resolve_published_definitions_never_returns_none"
+    ],
+    "added_files": [
+      "test_task42_h1_grouped_dynamic_pilot.py"
+    ],
+    "restored": true,
+    "seconds": 50.3
+  },
+  {
+    "id": "M53",
+    "side": "be",
+    "want": "test_task42_h1_grouped_dynamic_pilot.py::TestProductionWiring::test_both_production_paths_go_through_the_bidirectional_contract_lock",
+    "why": "发布路径绕过双向锁改成直接 load ⇒ 磁盘契约与现算 payload 漂移时照样发布，而契约里的 digest 一旦与真实 definition payload 脱钩，`assert_contract_identity_frozen` 只是在比两个都错的值。🔴 用 scope+offset 相对定位：这行在两个生产入口各出现一次",
+    "verdict": "RED",
+    "summary": "1 failed, 175 passed in 44.47s",
+    "added": [
+      "test_task42_h1_grouped_dynamic_pilot.py::TestProductionWiring::test_both_production_paths_go_through_the_bidirectional_contract_lock"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task42_h1_grouped_dynamic_pilot.py::TestProductionWiring::test_both_production_paths_go_through_the_bidirectional_contract_lock"
+    ],
+    "added_files": [
+      "test_task42_h1_grouped_dynamic_pilot.py"
+    ],
+    "restored": true,
+    "seconds": 48.2
+  },
+  {
+    "id": "M54",
+    "side": "be",
+    "want": "test_task42_h1_grouped_dynamic_pilot.py::TestOrderingGate::test_attach_is_a_no_op_before_enablement_and_never_raises",
+    "why": "接线路径不再检查 capability ⇒ 未启用时也会去读库（session=None 直接炸），把「这个 entry 今天不是双向 pilot」变成 500",
+    "verdict": "RED",
+    "summary": "1 failed, 175 passed in 45.89s",
+    "added": [
+      "test_task42_h1_grouped_dynamic_pilot.py::TestOrderingGate::test_attach_is_a_no_op_before_enablement_and_never_raises"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task42_h1_grouped_dynamic_pilot.py::TestOrderingGate::test_attach_is_a_no_op_before_enablement_and_never_raises"
+    ],
+    "added_files": [
+      "test_task42_h1_grouped_dynamic_pilot.py"
+    ],
+    "restored": true,
+    "seconds": 49.6
+  },
+  {
+    "id": "M55",
+    "side": "be",
+    "want": "test_task42_h1_grouped_dynamic_pilot.py::TestProductionWiring::test_router_calls_the_h1_attach_on_both_paths",
+    "why": "第一个生产接线点（`_registration` 前）被摘掉 ⇒ HTML 侧开 OO 时解析不到本 pilot 的 adapter，形成半接线（另一半仍在 callback 路径上）",
+    "verdict": "RED",
+    "summary": "1 failed, 175 passed in 45.57s",
+    "added": [
+      "test_task42_h1_grouped_dynamic_pilot.py::TestProductionWiring::test_router_calls_the_h1_attach_on_both_paths"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task42_h1_grouped_dynamic_pilot.py::TestProductionWiring::test_router_calls_the_h1_attach_on_both_paths"
+    ],
+    "added_files": [
+      "test_task42_h1_grouped_dynamic_pilot.py"
+    ],
+    "restored": true,
+    "seconds": 49.2
+  },
+  {
+    "id": "M56",
+    "side": "be",
+    "want": "test_task42_h1_grouped_dynamic_pilot.py::TestProductionWiring::test_router_calls_the_h1_attach_on_both_paths",
+    "why": "第二个生产接线点（callback 后 apply）被摘掉 ⇒「OO 回写却找不到 adapter」，durable incoming 静默丢弃",
+    "verdict": "RED",
+    "summary": "1 failed, 175 passed in 46.15s",
+    "added": [
+      "test_task42_h1_grouped_dynamic_pilot.py::TestProductionWiring::test_router_calls_the_h1_attach_on_both_paths"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task42_h1_grouped_dynamic_pilot.py::TestProductionWiring::test_router_calls_the_h1_attach_on_both_paths"
+    ],
+    "added_files": [
+      "test_task42_h1_grouped_dynamic_pilot.py"
+    ],
+    "restored": true,
+    "seconds": 49.8
+  },
+  {
+    "id": "M57",
+    "side": "be",
+    "want": "test_task42_h1_grouped_dynamic_pilot.py::TestContractIsGroundedInTheTemplate::test_contract_is_registered_in_the_delivery_ledger",
+    "why": "交付登记表里的 contract_id 拼错 ⇒ 契约目录边界判据（登记 ↔ `available_contract_ids()` 双向等值）失效，等于「有人绕过 pilot 门放了个契约」不再被发现",
+    "verdict": "RED",
+    "summary": "2 failed, 174 passed in 45.58s",
+    "added": [
+      "test_task42_h1_grouped_dynamic_pilot.py::TestContractIsGroundedInTheTemplate::test_contract_is_registered_in_the_delivery_ledger",
+      "test_task42_h1_grouped_dynamic_pilot.py::TestOrderingGate::test_ledger_records_adapter_not_registered_yet"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task42_h1_grouped_dynamic_pilot.py::TestContractIsGroundedInTheTemplate::test_contract_is_registered_in_the_delivery_ledger",
+      "test_task42_h1_grouped_dynamic_pilot.py::TestOrderingGate::test_ledger_records_adapter_not_registered_yet"
+    ],
+    "added_files": [
+      "test_task42_h1_grouped_dynamic_pilot.py"
+    ],
+    "restored": true,
+    "seconds": 49.4
+  },
+  {
+    "id": "M58",
+    "side": "be",
+    "want": "test_task42_h1_grouped_dynamic_pilot.py::TestOrderingGate::test_ledger_records_adapter_not_registered_yet",
+    "why": "登记表宣称 adapter 已注册 ⇒「顺序未过」这一事实被抹掉，收口报告会把契约孤儿算成已接线。🔴 用 scope+offset：这行在三个 pilot 的登记里各出现一次",
+    "verdict": "RED",
+    "summary": "2 failed, 174 passed in 44.21s",
+    "added": [
+      "test_task42_h1_grouped_dynamic_pilot.py::TestContractIsGroundedInTheTemplate::test_contract_is_registered_in_the_delivery_ledger",
+      "test_task42_h1_grouped_dynamic_pilot.py::TestOrderingGate::test_ledger_records_adapter_not_registered_yet"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task42_h1_grouped_dynamic_pilot.py::TestOrderingGate::test_ledger_records_adapter_not_registered_yet"
+    ],
+    "added_files": [
+      "test_task42_h1_grouped_dynamic_pilot.py"
+    ],
+    "restored": true,
+    "seconds": 47.8
+  },
+  {
+    "id": "M59",
+    "side": "be",
+    "want": "test_task42_h1_grouped_dynamic_pilot.py::TestUpstreamDebtsAreVisibleFacts::test_dynamic_debt_is_retracted_when_upstream_fixes_the_gate",
+    "why": "「上游修好就抛错提醒撤销登记」的反向自检被短路 ⇒ 缺口修好后欠账登记永远留着，Property 22/23/27 也永远落在 merge 家族而不回到自己的场景",
+    "verdict": "RED",
+    "summary": "1 failed, 175 passed in 46.56s",
+    "added": [
+      "test_task42_h1_grouped_dynamic_pilot.py::TestUpstreamDebtsAreVisibleFacts::test_dynamic_debt_is_retracted_when_upstream_fixes_the_gate"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task42_h1_grouped_dynamic_pilot.py::TestUpstreamDebtsAreVisibleFacts::test_dynamic_debt_is_retracted_when_upstream_fixes_the_gate"
+    ],
+    "added_files": [
+      "test_task42_h1_grouped_dynamic_pilot.py"
+    ],
+    "restored": true,
+    "seconds": 50.5
+  },
+  {
+    "id": "M60",
+    "side": "be",
+    "want": "test_task42_h1_grouped_dynamic_pilot.py::TestUpstreamDebtsAreVisibleFacts::test_four_debts_are_registered_and_mutually_distinct",
+    "why": "四级表头欠账的文案不再以 `Task 42 欠账` 起始 ⇒ 「四条欠账各自独立可辨」的集合基数与前缀判据必须打红，否则合并/删除欠账时无人发现。🔴 首轮写的是 `Final[str] = \"\" + (`，而空串拼接是**恒等**⇒ 什么都没改，判 GREEN 是对的（无效变异，脚本缺陷不是守卫缺陷）",
+    "verdict": "RED",
+    "summary": "1 failed, 175 passed in 43.74s",
+    "added": [
+      "test_task42_h1_grouped_dynamic_pilot.py::TestUpstreamDebtsAreVisibleFacts::test_four_debts_are_registered_and_mutually_distinct"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task42_h1_grouped_dynamic_pilot.py::TestUpstreamDebtsAreVisibleFacts::test_four_debts_are_registered_and_mutually_distinct"
+    ],
+    "added_files": [
+      "test_task42_h1_grouped_dynamic_pilot.py"
+    ],
+    "restored": true,
+    "seconds": 47.3
+  },
+  {
+    "id": "M61",
+    "side": "be",
+    "want": "test_task42_h1_grouped_dynamic_pilot.py::TestUpstreamDebtsAreVisibleFacts::test_disposal_method_enum_domain_split_is_a_measured_fact",
+    "why": "把模板 DV 值域**改成前端口径**（自造映射）⇒ 正是 Requirement 6.1 禁止的「无来源自造字段」：契约的 enum_source_ref 指向模板 DV 单元格，值域却成了业务口径，OO 写回的值会静默改变审计含义",
+    "verdict": "RED",
+    "summary": "22 failed, 154 passed in 39.98s",
+    "added": [
+      "test_task42_h1_grouped_dynamic_pilot.py::TestContractIsGroundedInTheTemplate::test_disk_contract_matches_the_source_of_truth",
+      "test_task42_h1_grouped_dynamic_pilot.py::TestContractIsGroundedInTheTemplate::test_enum_value_domains_come_from_the_real_data_validations",
+      "test_task42_h1_grouped_dynamic_pilot.py::TestProperty22ColumnIdentityIsDecoupledFromLabel::test_no_dynamic_columns_are_declared_for_this_entry",
+      "test_task42_h1_grouped_dynamic_pilot.py::TestUpstreamDebtsAreVisibleFacts::test_disposal_method_enum_domain_split_is_a_measured_fact",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_black_box_scenarios_are_unverifiable",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_bundle_is_non_null_and_all_children_are_approved",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_bundle_slot_digests_match_the_published_definitions",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_download_only_scenario_has_zero_operation_and_application",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_every_required_scenario_has_a_persisted_row",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_every_scenario_row_binds_a_published_trace_bundle",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_four_definitions_and_one_bundle_are_published",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_no_entity_is_reused_across_scenarios",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_no_phase_crashed_during_collection",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_ordinals_are_dense_and_unique",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_pilot_class_stays_unverifiable_after_this_run",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_plan_uses_this_pilot_bundle_and_derives_a_non_empty_set",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_property25_and_26_really_ran_on_this_contract",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_required_digest_is_not_another_pilots",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_reused_entity_is_refused_at_write_time",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_run_is_not_verified_without_real_onlyoffice",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_run_row_freezes_this_pilot_identity",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_upstream_gap_scenarios_are_failed_not_unverifiable"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task42_h1_grouped_dynamic_pilot.py::TestContractIsGroundedInTheTemplate::test_disk_contract_matches_the_source_of_truth",
+      "test_task42_h1_grouped_dynamic_pilot.py::TestContractIsGroundedInTheTemplate::test_enum_value_domains_come_from_the_real_data_validations",
+      "test_task42_h1_grouped_dynamic_pilot.py::TestUpstreamDebtsAreVisibleFacts::test_disposal_method_enum_domain_split_is_a_measured_fact"
+    ],
+    "added_files": [
+      "test_task42_h1_grouped_dynamic_pilot.py",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py"
+    ],
+    "restored": true,
+    "seconds": 43.4
+  },
+  {
+    "id": "M62",
+    "side": "be",
+    "want": "test_task42_h1_grouped_dynamic_pilot.py::TestUpstreamDebtsAreVisibleFacts::test_contract_never_invents_a_domain_mapping",
+    "why": "往契约里塞一个 `出售→处置` 的自造映射 ⇒ Requirement 6.1 的反向判据若失效，「不为绕开缺口自造映射」这条决定就只是注释。🔴 `new` 里**不**重复 `if` 头 —— `insert` 会把它放在 anchor 之后，重复一次就留下空体 if ⇒ IndentationError（首轮实测判 WRONG-TEST）",
+    "verdict": "RED",
+    "summary": "20 failed, 156 passed in 41.39s",
+    "added": [
+      "test_task42_h1_grouped_dynamic_pilot.py::TestContractIsGroundedInTheTemplate::test_disk_contract_matches_the_source_of_truth",
+      "test_task42_h1_grouped_dynamic_pilot.py::TestProperty22ColumnIdentityIsDecoupledFromLabel::test_no_dynamic_columns_are_declared_for_this_entry",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_black_box_scenarios_are_unverifiable",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_bundle_is_non_null_and_all_children_are_approved",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_bundle_slot_digests_match_the_published_definitions",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_download_only_scenario_has_zero_operation_and_application",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_every_required_scenario_has_a_persisted_row",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_every_scenario_row_binds_a_published_trace_bundle",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_four_definitions_and_one_bundle_are_published",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_no_entity_is_reused_across_scenarios",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_no_phase_crashed_during_collection",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_ordinals_are_dense_and_unique",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_pilot_class_stays_unverifiable_after_this_run",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_plan_uses_this_pilot_bundle_and_derives_a_non_empty_set",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_property25_and_26_really_ran_on_this_contract",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_required_digest_is_not_another_pilots",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_reused_entity_is_refused_at_write_time",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_run_is_not_verified_without_real_onlyoffice",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_run_row_freezes_this_pilot_identity",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_upstream_gap_scenarios_are_failed_not_unverifiable"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task42_h1_grouped_dynamic_pilot.py::TestContractIsGroundedInTheTemplate::test_disk_contract_matches_the_source_of_truth"
+    ],
+    "added_files": [
+      "test_task42_h1_grouped_dynamic_pilot.py",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py"
+    ],
+    "restored": true,
+    "seconds": 45.0
+  },
+  {
+    "id": "M63",
+    "side": "be",
+    "want": "test_task42_h1_grouped_dynamic_pilot.py::TestContractIsGroundedInTheTemplate::test_unmanaged_below_footer_cells_are_the_real_contents",
+    "why": "列外注解的登记文本被截短后仍绿 ⇒ 「未管理区域的真实内容」这份清单与源 xlsx 脱钩，而它正是「UUID 列为何取 AB 而非 AA」的依据",
+    "verdict": "RED",
+    "summary": "21 failed, 155 passed in 41.19s",
+    "added": [
+      "test_task42_h1_grouped_dynamic_pilot.py::TestContractIsGroundedInTheTemplate::test_disk_contract_matches_the_source_of_truth",
+      "test_task42_h1_grouped_dynamic_pilot.py::TestContractIsGroundedInTheTemplate::test_unmanaged_below_footer_cells_are_the_real_contents",
+      "test_task42_h1_grouped_dynamic_pilot.py::TestProperty22ColumnIdentityIsDecoupledFromLabel::test_no_dynamic_columns_are_declared_for_this_entry",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_black_box_scenarios_are_unverifiable",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_bundle_is_non_null_and_all_children_are_approved",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_bundle_slot_digests_match_the_published_definitions",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_download_only_scenario_has_zero_operation_and_application",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_every_required_scenario_has_a_persisted_row",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_every_scenario_row_binds_a_published_trace_bundle",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_four_definitions_and_one_bundle_are_published",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_no_entity_is_reused_across_scenarios",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_no_phase_crashed_during_collection",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_ordinals_are_dense_and_unique",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_pilot_class_stays_unverifiable_after_this_run",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_plan_uses_this_pilot_bundle_and_derives_a_non_empty_set",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_property25_and_26_really_ran_on_this_contract",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_required_digest_is_not_another_pilots",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_reused_entity_is_refused_at_write_time",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_run_is_not_verified_without_real_onlyoffice",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_run_row_freezes_this_pilot_identity",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_upstream_gap_scenarios_are_failed_not_unverifiable"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task42_h1_grouped_dynamic_pilot.py::TestContractIsGroundedInTheTemplate::test_disk_contract_matches_the_source_of_truth",
+      "test_task42_h1_grouped_dynamic_pilot.py::TestContractIsGroundedInTheTemplate::test_unmanaged_below_footer_cells_are_the_real_contents"
+    ],
+    "added_files": [
+      "test_task42_h1_grouped_dynamic_pilot.py",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py"
+    ],
+    "restored": true,
+    "seconds": 44.7
+  },
+  {
+    "id": "M64",
+    "side": "be",
+    "want": "test_task42_h1_grouped_dynamic_pilot.py::TestBaselineExtractOnTheRealTemplate::test_managed_sheet_structure_aspect_covers_the_style_sources",
+    "why": "样式源登记里条件格式数目被改后仍绿 ⇒ 「样式源」这一段变成自由文本，而 `managed_sheet_structure` aspect 的覆盖面正靠它对账",
+    "verdict": "RED",
+    "summary": "20 failed, 156 passed in 41.19s",
+    "added": [
+      "test_task42_h1_grouped_dynamic_pilot.py::TestContractIsGroundedInTheTemplate::test_disk_contract_matches_the_source_of_truth",
+      "test_task42_h1_grouped_dynamic_pilot.py::TestProperty22ColumnIdentityIsDecoupledFromLabel::test_no_dynamic_columns_are_declared_for_this_entry",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_black_box_scenarios_are_unverifiable",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_bundle_is_non_null_and_all_children_are_approved",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_bundle_slot_digests_match_the_published_definitions",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_download_only_scenario_has_zero_operation_and_application",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_every_required_scenario_has_a_persisted_row",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_every_scenario_row_binds_a_published_trace_bundle",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_four_definitions_and_one_bundle_are_published",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_no_entity_is_reused_across_scenarios",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_no_phase_crashed_during_collection",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_ordinals_are_dense_and_unique",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_pilot_class_stays_unverifiable_after_this_run",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_plan_uses_this_pilot_bundle_and_derives_a_non_empty_set",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_property25_and_26_really_ran_on_this_contract",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_required_digest_is_not_another_pilots",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_reused_entity_is_refused_at_write_time",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_run_is_not_verified_without_real_onlyoffice",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_run_row_freezes_this_pilot_identity",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py::test_upstream_gap_scenarios_are_failed_not_unverifiable"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task42_h1_grouped_dynamic_pilot.py::TestContractIsGroundedInTheTemplate::test_disk_contract_matches_the_source_of_truth"
+    ],
+    "added_files": [
+      "test_task42_h1_grouped_dynamic_pilot.py",
+      "test_task42_h1_grouped_dynamic_pilot_pg.py"
+    ],
+    "restored": true,
+    "seconds": 44.7
+  }
+]

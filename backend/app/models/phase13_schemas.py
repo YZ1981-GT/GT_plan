@@ -8,7 +8,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import date, datetime
 from typing import Any
 from uuid import UUID
 
@@ -152,3 +152,288 @@ class FullPackageRequest(BaseModel):
     """全套导出请求"""
     year: int
     template_type: str | None = None
+
+
+class FullDeliverablesRequest(BaseModel):
+    """一键生成全套交付件请求（job_type=full_deliverables，design §14）。
+
+    steps 默认 ``financial_reports → financial_reports_unadjusted → disclosure_notes → report_body``；
+    optional_sections 为 None 时由执行器按 OPT 默认优先级链解析（无弹窗自动 confirm）。
+    """
+    year: int
+    template_variant: str = "simple"
+    steps: list[str] | None = None
+    optional_sections: dict[str, bool] | None = None
+
+
+# ===================================================================
+# 交付件管理中心 (deliverable-center)
+# ===================================================================
+
+class DeliverableDTOSchema(BaseModel):
+    """交付物列表 DTO"""
+    task_id: UUID
+    project_id: UUID
+    doc_type: str
+    status: str
+    file_name: str | None = None
+    version_no: int
+    file_size: int | None = None
+    exporter_name: str | None = None
+    exported_at: datetime | None = None
+    template_type: str | None = None
+    selected_sections: list | None = None
+    #: 能力标志（spec deliverable-lineage-wiring-… 需求 6.5）：单一真源 =
+    #: app.services.deliverable_capabilities；前端据此门控回填/刷新入口，
+    #: 禁止前端再写一份 doc_type 白名单（双真源改一处另一处不红）。
+    supports_writeback: bool = False
+    supports_section_refresh: bool = False
+    #: 报表差异告警（需求 10.3）：列表行即可见，判定由后端 should_block_confirm
+    #: 唯一入口给出；前端只渲染，不得自己写 `if drift_report:`。
+    drift_blocked: bool = False
+    drift_reason: str | None = None
+
+
+class DeliverableListResponse(BaseModel):
+    items: list[DeliverableDTOSchema] = []
+    grouped: dict[str, list[DeliverableDTOSchema]] = {}
+
+
+class DeliverableVersionSchema(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    word_export_task_id: UUID
+    version_no: int
+    file_path: str | None = None
+    html_path: str | None = None
+    file_size: int | None = None
+    created_by: UUID
+    created_at: datetime | None = None
+    selected_sections: list | None = None
+    created_via: str | None = None
+    # ↓ spec deliverable-lineage-wiring-… 需求 11.1/11.2 + 10.3（全部 additive）
+    #: 实际编辑人（V142 `edited_by`）；OO 路径下 `created_by` 只是回调处理占位。
+    edited_by: UUID | None = None
+    edited_at: datetime | None = None
+    edited_by_name: str | None = None
+    #: 该版绑定的试算表快照短标识来源（完整 hash，前端截短显示）
+    bound_tb_hash: str | None = None
+    #: 三态：True=已过期 / False=最新 / None=未知（任一侧 hash 缺失，不得当 False）
+    is_stale: bool | None = None
+    #: 报表手工改动差异检测结果（三态见 financial_report_drift_service）
+    drift_report: dict | None = None
+    #: 由 should_block_confirm 唯一入口判定，前端不得自己写 `if drift_report:`
+    drift_blocked: bool = False
+    drift_reason: str | None = None
+
+
+class VersionCompareRequest(BaseModel):
+    version_a: int
+    version_b: int
+
+
+class VersionCompareResponse(BaseModel):
+    version_a: int
+    version_b: int
+    exported_at_diff: dict | None = None
+    file_size_diff: dict | None = None
+    selected_sections_diff: dict | None = None
+
+
+class ReportBodyLoadTemplateRequest(BaseModel):
+    opinion_type: str
+    company_type: str = "non_listed"
+    include_emphasis: bool = False
+
+
+class ReportBodyRenderRequest(BaseModel):
+    year: int
+    opinion_type: str
+    company_type: str = "non_listed"
+    is_pie: bool = False
+    include_emphasis: bool = False
+    selected_sections: list[str] | None = None
+    prior_period_info: str | None = None
+
+
+class ReportBodyRenderResponse(BaseModel):
+    task_id: UUID
+    version_no: int
+    download_url: str
+    html_preview: str
+    platform_persist_failed: bool = False
+    report_body_json: dict | None = None
+    validation_warning: str | None = None
+
+
+# -------------------------------------------------------------------
+# 报告正文两阶段 API（audit-report-template-integration Phase 2 / design §11）
+# preview（不落库交付件，写 fill_preview_sessions）+ confirm（入库 + 版本递增）
+# -------------------------------------------------------------------
+
+class ReportBodyPreviewRequest(BaseModel):
+    """report-body/preview 请求（design §11）。"""
+    year: int
+    opinion_type: str
+    company_subtype: str | None = None
+    template_variant: str = "simple"
+
+
+class OptionalSectionSchema(BaseModel):
+    """preview 返回的单个可选段落（OPT 块）视图。"""
+    section_id: str
+    description: str
+    preview: str
+    default_keep: bool
+    group: str
+
+
+class ReportBodyPreviewResponse(BaseModel):
+    """report-body/preview 响应（design §11）。"""
+    preview_session_id: UUID
+    optional_sections: list[OptionalSectionSchema] = []
+    missing_fields: list[str] = []
+    template_version: str
+    company_subtype_resolved: str
+
+
+class ReportBodyConfirmRequest(BaseModel):
+    """report-body/confirm 请求（design §11）。"""
+    year: int
+    preview_session_id: UUID
+    optional_sections: dict[str, bool] = {}
+
+
+class ReportBodyConfirmResponse(BaseModel):
+    """report-body/confirm 响应（与现有 ReportBodyRenderResponse 形状兼容，design §11）。"""
+    task_id: UUID
+    version_no: int
+    download_url: str
+    report_body_json: dict
+    validation_warning: str | None = None
+
+
+class DeliverableExportRequest(BaseModel):
+    year: int
+    template_type: str = "soe"
+    selected_sections: list[str] | None = None
+    report_types: list[str] | None = None
+    # 灰度开关：附注导出模式 None=跟随 settings.USE_TEMPLATE_FILL_SERVICE；
+    # 显式 "template" / "programmatic" 覆盖（task 10.4）
+    mode: str | None = None
+    # 财务报表取数口径：audited（审定，默认）| unadjusted（未审）
+    data_mode: str = "audited"
+
+
+class DeliverableExportResponse(BaseModel):
+    task_id: UUID
+    version_no: int
+    download_url: str
+    platform_persist_failed: bool = False
+    file_name: str | None = None
+    # 附注联动复盘 P1-3：出具前软闸门提示（不阻断导出，仅提醒）——
+    # 例如「N 个章节有对应底稿披露表但从未同步到附注」「M 个章节存在校验错误」。
+    warnings: list[str] = []
+
+
+class CompletenessResponse(BaseModel):
+    passed: bool
+    missing_doc_types: list[str] = []
+    missing_financial_reports: list[str] = []
+    has_confirmed: bool = False
+    trio_consistent: bool = True
+    trio_message: str | None = None
+    # ↓ 需求 11.3/11.4（additive）：三列对照 + 指出滞后类别 + 重新生成入口
+    trio_tb_hashes: dict[str, str | None] = {}
+    trio_lagging: list[str] = []
+    trio_majority_tb_hash: str | None = None
+    trio_ambiguous: bool = False
+    warnings: list[str] = []
+
+
+class SnapshotStaleResponse(BaseModel):
+    stale: bool
+    bound_tb_hash: str | None = None
+    current_tb_hash: str | None = None
+    message: str | None = None
+
+
+class DeliverableSignRequest(BaseModel):
+    sign_type: str = Field(..., description="项目合伙人 / 复核合伙人")
+    year: int
+
+
+class DeliverableSignResponse(BaseModel):
+    task_id: UUID
+    status: str
+    signed_by: UUID
+    signed_at: datetime | None = None
+    sign_type: str | None = None
+
+
+class ReportDateComplianceRequest(BaseModel):
+    year: int
+    report_date: date
+
+
+class ReportDateComplianceResponse(BaseModel):
+    compliant: bool
+    requires_confirmation: bool = False
+    warnings: list[str] = []
+    floor_date: str | None = None
+
+
+class OnlyOfficeHealthResponse(BaseModel):
+    available: bool
+    enabled: bool
+    message: str | None = None
+
+
+class DeliverableApprovalRejectRequest(BaseModel):
+    reason: str
+
+
+class DeliverableApprovalResponse(BaseModel):
+    task_id: UUID
+    status: str
+    approval_by: UUID | None = None
+    approval_at: datetime | None = None
+    reject_reason: str | None = None
+
+
+class DeliverableArchiveRequest(BaseModel):
+    year: int
+    force: bool = False
+
+
+class DeliverableArchiveResponse(BaseModel):
+    archived_count: int
+
+
+class DeliverableUnarchiveRequest(BaseModel):
+    reason: str
+
+
+class IntegrityVerifyResponse(BaseModel):
+    valid: bool
+    tampered_versions: list[int] = []
+    checked_count: int = 0
+    message: str | None = None
+
+
+class DeliverablePackageRequest(BaseModel):
+    year: int
+    ignore_incomplete: bool = False
+
+
+class DeliverablePackageResponse(BaseModel):
+    job_id: UUID
+    warnings: list[str] = []
+
+
+class OnlyOfficeConfigResponse(BaseModel):
+    config: dict
+    token: str
+    mode: str
+    documentType: str

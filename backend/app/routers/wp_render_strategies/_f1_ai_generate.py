@@ -1,0 +1,281 @@
+"""F1 预付账款 — AI 辅助生成端点
+
+POST /api/workpapers/{wp_id}/f1/ai-generate
+Body: { section: string, existingContent: string, relatedContext: object }
+
+支持 sections:
+- adj-change-analysis: 审定表变动分析
+- adj-conclusion: 审定表结论
+- analysis-note: 分析程序说明（兼容）
+- analysis-balance-note / analysis-debit-note / analysis-credit-note / analysis-supplier-note: F1-4 分块说明
+- analysis-conclusion: F1-4 审计结论
+- longterm-reason: 长期挂账原因/审计说明
+- longterm-conclusion: F1-5 审计结论
+- related-party-note: F1-6 关联方审计说明
+- related-party-conclusion: F1-6 关联方审计结论
+- comprehensive-note: F1-7 审计说明（抽样与三表核查）
+- comprehensive-conclusion: F1-7 审计结论
+- detail-prior-linkage: 明细表期初与上年报核对
+- detail-fluctuation: 明细表重大变动原因
+- detail-over1year: 明细表超1年预付款说明
+- detail-conclusion: 明细表审计结论
+"""
+
+from __future__ import annotations
+
+import logging
+from typing import Any
+
+from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.core.config import settings
+from app.core.database import get_db
+from app.deps import get_current_user
+from app.models.core import User
+from app.services.llm_client import chat_completion
+
+logger = logging.getLogger(__name__)
+
+router = APIRouter(tags=["f1-ai"])
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Request / Response
+# ═══════════════════════════════════════════════════════════════════════════════
+
+
+class F1AiGenerateRequest(BaseModel):
+    section: str
+    existingContent: str = ""
+    relatedContext: dict[str, Any] = {}
+
+
+class F1AiGenerateResponse(BaseModel):
+    content: str
+    sources: list[str] = []
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 支持的 section 及 prompt 模板
+# ═══════════════════════════════════════════════════════════════════════════════
+
+_SUPPORTED_SECTIONS = {
+    "adj-change-analysis",
+    "adj-conclusion",
+    "analysis-note",
+    "analysis-balance-note",
+    "analysis-debit-note",
+    "analysis-credit-note",
+    "analysis-supplier-note",
+    "analysis-conclusion",
+    "longterm-reason",
+    "longterm-conclusion",
+    "related-party-note",
+    "related-party-conclusion",
+    "comprehensive-note",
+    "comprehensive-conclusion",
+    "detail-prior-linkage",
+    "detail-fluctuation",
+    "detail-over1year",
+    "detail-conclusion",
+    # 附注披露（上市 五、7 / 国企 八、7）三个说明文本域 × 两变体
+    # spec: .kiro/specs/f-cycle-disclosure-parity/ R9
+    "listed-note-aging",
+    "listed-note-over1",
+    "listed-note-top5",
+    "soe-note-aging",
+    "soe-note-over1",
+    "soe-note-top5",
+}
+
+_SYSTEM_PROMPT = """你是一位资深注册会计师（CPA），正在协助编制审计底稿 F1《预付账款》。
+你需要根据提供的底稿数据和审计准则要求，生成专业、简洁、可直接使用的审计文本。
+
+科目特征：1123 预付账款，借方科目/资产类。核心公式：期末=期初+借方-贷方。
+核心关注：预付款项真实性、长期挂款追踪、关联方交易定价公允性、期后到货验证、供应商集中度。
+
+输出要求：
+- 语言：中文
+- 风格：审计专业用语，客观陈述事实和结论
+- 如需引用具体数据但无法获取，使用 [待填] 占位
+- 直接输出正文内容，不要输出标题
+- 简洁明了，适合审计底稿使用"""
+
+_SECTION_PROMPTS: dict[str, str] = {
+    "adj-change-analysis": "请生成F1-1审定表的'预付账款变动分析'，基于期初期末数据变动和主要供应商变动情况。",
+    "adj-conclusion": "请生成F1-1审定表的审计结论，综合审计程序结果对预付账款余额真实性/完整性/列报给出结论。",
+    "analysis-note": "请基于F1-4分析程序结果（余额/借贷发生额/大额供应商），生成分析性复核审计说明。",
+    "analysis-balance-note": "请生成F1-4「预付款项余额分析」审计说明，评价余额结构（存货/费用/工程固定资产/其他）及占存货比重是否合理。",
+    "analysis-debit-note": "请生成F1-4「借方发生额分析」审计说明，评价新增预付结构及与存货采购金额的勾稽关系。",
+    "analysis-credit-note": "请生成F1-4「贷方发生额分析」审计说明，评价转销路径；对大额收回款项关注合理性与关联方资金占用。",
+    "analysis-supplier-note": "请生成F1-4「大额供应商期末余额分析」审计说明，评价商业合理性、交易真实性、账龄及期后结算。",
+    "analysis-conclusion": "请生成F1-4实质性分析审计结论（A未见异常 / B除重大调整外未见异常 / C存在重大未调整或范围受限），并简要陈述依据。",
+    "longterm-reason": "请生成F1-5账龄1年及以上大额预付检查的审计说明，归纳未结转原因分类、减值与重分类考虑、期后消化情况。",
+    "longterm-conclusion": "请生成F1-5审计结论（A未见异常 / B除重大调整外未见异常 / C存在重大未调整或范围受限），并简要陈述依据。",
+    "related-party-note": "请生成F1-6关联方预付账款审计说明，评价交易真实性、商业实质、定价公允性、是否存在资金占用及披露充分性。",
+    "related-party-conclusion": "请生成F1-6关联方及交易检查审计结论（A未见异常 / B除重大调整外未见异常 / C存在重大未调整或范围受限），并简要陈述依据。",
+    "comprehensive-note": "请生成F1-7预付账款检查表审计说明，结合抽样方法、借方（审批/回单/合同）、贷方与期后（入库/发票）核查结果及检查比例进行评价。",
+    "comprehensive-conclusion": "请生成F1-7预付账款检查审计结论（A未见异常 / B除重大调整外未见异常 / C存在重大未调整或范围受限），并简要陈述依据。",
+    "detail-prior-linkage": "请生成F1-2明细表审计说明(1)：期初审定余额与上年审计报告/附注披露的勾稽核对说明，如有差异说明原因。",
+    "detail-fluctuation": "请生成F1-2明细表审计说明(2)：预付账款本期重大增减变动原因分析（结合主要供应商、款项性质、项目进度）。",
+    "detail-over1year": "请生成F1-2明细表审计说明(3)：账龄超过1年的预付款款项性质、未结转/未收回原因及后续处理计划。",
+    "detail-conclusion": "请生成F1-2明细表审计结论（可选A未见异常 / B除重大调整外未见异常 / C存在重大未调整或范围受限不可确认），并简要陈述依据。",
+    # ── 附注披露说明（spec f-cycle-disclosure-parity R9）────────────────────
+    # 口径以源模板「F1 预付账款.xlsx」两个披露 sheet 为准；只许依据传入数据，
+    # 不得虚构合同、结算安排、供应商信息等未取得的证据。
+    "listed-note-aging": (
+        "请生成上市公司附注「（1）预付款项按账龄披露」的说明文字。"
+        "依据传入的各账龄段期末余额与占比、上年年末余额与占比、小计、"
+        "减值准备及合计，说明账龄结构与本期变动，并对 1 年以上占比较高的情形"
+        "提示未及时结算风险。只能依据传入数据，不得虚构合同或结算安排。"
+    ),
+    "listed-note-over1": (
+        "请生成上市公司附注「（2）账龄超过1年的重要预付款项」的说明文字。"
+        "按源模板要求说明账龄超过 1 年的重要预付款项未及时结算的原因、"
+        "对方单位情况、减值准备计提考虑及后续处理计划。"
+        "逐户原因以传入的明细为准，不得虚构未取得的沟通记录或合同条款。"
+    ),
+    "listed-note-top5": (
+        "请生成上市公司附注「（3）按预付对象归集的预付款项期末余额前五名单位情况」"
+        "的说明文字。依据传入的前五名单位期末余额及占预付款项期末余额合计数的比例，"
+        "说明集中度、主要预付内容及商业合理性。"
+        "不得虚构传入数据以外的单位名称、合同或交易背景。"
+    ),
+    "soe-note-aging": (
+        "请生成国有企业附注「（1）预付款项按账龄列示」的说明文字。"
+        "依据传入的各账龄段期末余额与期初余额、占比、小计与合计，"
+        "说明账龄结构及本期变动，并按国资监管要求提示长期挂账情形。"
+        "只能依据传入数据，不得虚构结算安排或管理层说明。"
+    ),
+    "soe-note-over1": (
+        "请生成国有企业附注「（2）账龄超过1年的大额预付款项」的说明文字。"
+        "按源模板列项（债权单位、债务单位、期末余额、账龄、未结算的原因）"
+        "说明大额长期挂账的成因、责任单位及清理计划。"
+        "逐户内容以传入明细为准，不得虚构未取得的证据。"
+    ),
+    "soe-note-top5": (
+        "请生成国有企业附注「（3）按欠款方归集的期末余额前五名的预付款项情况」"
+        "的说明文字。依据传入的前五名债务人名称、账面余额、占预付款项合计的比例"
+        "及减值准备，说明集中度与回款/结转安排。"
+        "不得虚构传入数据以外的单位名称或交易背景。"
+    ),
+}
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 端点
+# ═══════════════════════════════════════════════════════════════════════════════
+
+
+@router.post("/api/workpapers/{wp_id}/f1/ai-generate")
+async def f1_ai_generate(
+    wp_id: str,
+    body: F1AiGenerateRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> F1AiGenerateResponse:
+    """F1 预付账款 AI 辅助生成"""
+
+    if not getattr(settings, "WP_AI_SERVICE_ENABLED", True):
+        raise HTTPException(503, "AI 服务未启用")
+
+    if body.section not in _SUPPORTED_SECTIONS:
+        raise HTTPException(
+            400,
+            f"不支持的 section: {body.section}。支持: {sorted(_SUPPORTED_SECTIONS)}",
+        )
+
+    # 1. 加载项目上下文
+    project_context = await _load_project_context(wp_id, db)
+
+    # 2. 构造 user prompt
+    user_prompt = _build_user_prompt(
+        section=body.section,
+        existing_content=body.existingContent,
+        related_context=body.relatedContext,
+        project_context=project_context,
+    )
+
+    # 3. 调用 LLM
+    messages = [
+        {"role": "system", "content": _SYSTEM_PROMPT},
+        {"role": "user", "content": user_prompt},
+    ]
+
+    result = await chat_completion(
+        messages=messages,
+        temperature=0.3,
+        max_tokens=2000,
+    )
+
+    if isinstance(result, str) and result.startswith("["):
+        return F1AiGenerateResponse(content="", sources=[])
+
+    return F1AiGenerateResponse(content=result, sources=[])
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 辅助函数
+# ═══════════════════════════════════════════════════════════════════════════════
+
+
+def _build_user_prompt(
+    section: str,
+    existing_content: str,
+    related_context: dict[str, Any],
+    project_context: dict,
+) -> str:
+    parts: list[str] = []
+
+    section_guidance = _SECTION_PROMPTS.get(section, "请生成审计底稿文本。")
+    parts.append(f"## 任务\n{section_guidance}\n")
+
+    ctx_lines = []
+    if project_context.get("client_name"):
+        ctx_lines.append(f"客户名称：{project_context['client_name']}")
+    if project_context.get("audit_year"):
+        ctx_lines.append(f"审计年度：{project_context['audit_year']}年")
+    if project_context.get("business_category"):
+        ctx_lines.append(f"业务类别：{project_context['business_category']}")
+    if ctx_lines:
+        parts.append("## 项目信息\n" + "\n".join(ctx_lines) + "\n")
+
+    if related_context:
+        ctx_str = "\n".join(f"- {k}: {v}" for k, v in related_context.items() if v)
+        if ctx_str:
+            parts.append(f"## 底稿数据\n{ctx_str}\n")
+
+    if existing_content:
+        parts.append(f"## 已有内容（请补充完善）\n{existing_content[:2000]}\n")
+        parts.append("请基于以上信息补充完善已有内容。保留合理部分，纠正不当表述。")
+    else:
+        parts.append("请根据以上信息生成专业初稿。")
+
+    return "\n".join(parts)
+
+
+async def _load_project_context(wp_id: str, db: AsyncSession) -> dict:
+    """从 working_paper → project 获取上下文"""
+    import sqlalchemy as sa
+
+    ctx: dict = {"client_name": "", "audit_year": "", "business_category": ""}
+    try:
+        result = await db.execute(
+            sa.text("""
+                SELECT p.client_name, p.audit_year, p.business_category
+                FROM working_paper wp
+                JOIN projects p ON wp.project_id = p.id
+                WHERE wp.id = :wp_id
+            """),
+            {"wp_id": wp_id},
+        )
+        row = result.fetchone()
+        if row:
+            ctx["client_name"] = row.client_name or ""
+            ctx["audit_year"] = str(row.audit_year) if row.audit_year else ""
+            ctx["business_category"] = row.business_category or ""
+    except Exception as e:
+        logger.warning("F1 AI: project context 加载失败: %s", e)
+    return ctx

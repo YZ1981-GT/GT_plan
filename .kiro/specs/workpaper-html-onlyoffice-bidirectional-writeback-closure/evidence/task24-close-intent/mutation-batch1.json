@@ -1,0 +1,501 @@
+[
+  {
+    "id": "M01",
+    "side": "be",
+    "want": "test_task24_close_intent.py::test_leader_is_highest_sequence_even_when_it_is_neither_first_nor_last_inserted",
+    "why": "取最小而非最大 ⇒ leader 与 AC 4.10「最高 (intent_sequence,id)」相反。离线判据用的是**判别性**输入（最高 sequence 既非首插入、非末插入、且 id 最小），所以 min 必然选到另一条；同时服务层双记账会与仓储分叉，真库场景一并打红",
+    "verdict": "RED",
+    "summary": "69 failed, 111 passed in 16.55s",
+    "added": [
+      "test_task24_close_intent.py::test_equal_sequence_falls_back_to_highest_id",
+      "test_task24_close_intent.py::test_leader_is_highest_sequence_even_when_it_is_neither_first_nor_last_inserted",
+      "test_task24_close_intent.py::test_leader_is_invariant_under_input_order_permutations",
+      "test_task24_close_intent.py::test_stale_leader_yields_successor_by_the_same_comparator",
+      "test_task24_close_intent_pg.py::test_capture_is_created_when_predecessor_terminal_precedes_second_close[terminal_before__both]",
+      "test_task24_close_intent_pg.py::test_capture_is_created_when_predecessor_terminal_precedes_second_close[terminal_before__created_reversed]",
+      "test_task24_close_intent_pg.py::test_capture_is_created_when_predecessor_terminal_precedes_second_close[terminal_before__none]",
+      "test_task24_close_intent_pg.py::test_capture_is_created_when_predecessor_terminal_precedes_second_close[terminal_before__sequence_reversed]",
+      "test_task24_close_intent_pg.py::test_capture_scenario_yields_exactly_one_close_capture[deterministic_leader_discriminating]",
+      "test_task24_close_intent_pg.py::test_capture_scenario_yields_exactly_one_close_capture[order_ab__both]",
+      "test_task24_close_intent_pg.py::test_capture_scenario_yields_exactly_one_close_capture[order_ab__created_reversed]",
+      "test_task24_close_intent_pg.py::test_capture_scenario_yields_exactly_one_close_capture[order_ab__none]",
+      "test_task24_close_intent_pg.py::test_capture_scenario_yields_exactly_one_close_capture[order_ab__sequence_reversed]",
+      "test_task24_close_intent_pg.py::test_capture_scenario_yields_exactly_one_close_capture[order_ba__both]",
+      "test_task24_close_intent_pg.py::test_capture_scenario_yields_exactly_one_close_capture[order_ba__created_reversed]",
+      "test_task24_close_intent_pg.py::test_capture_scenario_yields_exactly_one_close_capture[order_ba__none]",
+      "test_task24_close_intent_pg.py::test_capture_scenario_yields_exactly_one_close_capture[order_ba__sequence_reversed]",
+      "test_task24_close_intent_pg.py::test_capture_scenario_yields_exactly_one_close_capture[terminal_before__both]",
+      "test_task24_close_intent_pg.py::test_capture_scenario_yields_exactly_one_close_capture[terminal_before__created_reversed]",
+      "test_task24_close_intent_pg.py::test_capture_scenario_yields_exactly_one_close_capture[terminal_before__none]",
+      "test_task24_close_intent_pg.py::test_capture_scenario_yields_exactly_one_close_capture[terminal_before__sequence_reversed]",
+      "test_task24_close_intent_pg.py::test_concurrent_closes_still_yield_exactly_one_capture",
+      "test_task24_close_intent_pg.py::test_created_at_does_not_decide_the_leader[order_ab__created_reversed]",
+      "test_task24_close_intent_pg.py::test_created_at_does_not_decide_the_leader[order_ab__sequence_reversed]",
+      "test_task24_close_intent_pg.py::test_created_at_does_not_decide_the_leader[order_ba__created_reversed]",
+      "test_task24_close_intent_pg.py::test_created_at_does_not_decide_the_leader[order_ba__sequence_reversed]",
+      "test_task24_close_intent_pg.py::test_database_forbids_equal_intent_sequences_so_id_tiebreak_is_defensive_only",
+      "test_task24_close_intent_pg.py::test_deterministic_leader_is_neither_first_inserted_nor_latest_created_at",
+      "test_task24_close_intent_pg.py::test_every_scenario_produced_a_measurement",
+      "test_task24_close_intent_pg.py::test_first_closer_gets_a_predecessor_and_last_closer_does_not[order_ab__both]",
+      "test_task24_close_intent_pg.py::test_first_closer_gets_a_predecessor_and_last_closer_does_not[order_ab__created_reversed]",
+      "test_task24_close_intent_pg.py::test_first_closer_gets_a_predecessor_and_last_closer_does_not[order_ab__none]",
+      "test_task24_close_intent_pg.py::test_first_closer_gets_a_predecessor_and_last_closer_does_not[order_ab__sequence_reversed]",
+      "test_task24_close_intent_pg.py::test_first_closer_gets_a_predecessor_and_last_closer_does_not[order_ba__both]",
+      "test_task24_close_intent_pg.py::test_first_closer_gets_a_predecessor_and_last_closer_does_not[order_ba__created_reversed]",
+      "test_task24_close_intent_pg.py::test_first_closer_gets_a_predecessor_and_last_closer_does_not[order_ba__none]",
+      "test_task24_close_intent_pg.py::test_first_closer_gets_a_predecessor_and_last_closer_does_not[order_ba__sequence_reversed]",
+      "test_task24_close_intent_pg.py::test_leader_disqualified_before_promotion_yields_a_legitimate_successor[expired]",
+      "test_task24_close_intent_pg.py::test_leader_disqualified_before_promotion_yields_a_legitimate_successor[revoked]",
+      "test_task24_close_intent_pg.py::test_leader_is_the_highest_sequence_id_in_every_scenario[deterministic_leader_discriminating]",
+      "test_task24_close_intent_pg.py::test_leader_is_the_highest_sequence_id_in_every_scenario[order_ab__both]",
+      "test_task24_close_intent_pg.py::test_leader_is_the_highest_sequence_id_in_every_scenario[order_ab__created_reversed]",
+      "test_task24_close_intent_pg.py::test_leader_is_the_highest_sequence_id_in_every_scenario[order_ab__none]",
+      "test_task24_close_intent_pg.py::test_leader_is_the_highest_sequence_id_in_every_scenario[order_ab__sequence_reversed]",
+      "test_task24_close_intent_pg.py::test_leader_is_the_highest_sequence_id_in_every_scenario[order_ba__both]",
+      "test_task24_close_intent_pg.py::test_leader_is_the_highest_sequence_id_in_every_scenario[order_ba__created_reversed]",
+      "test_task24_close_intent_pg.py::test_leader_is_the_highest_sequence_id_in_every_scenario[order_ba__none]",
+      "test_task24_close_intent_pg.py::test_leader_is_the_highest_sequence_id_in_every_scenario[order_ba__sequence_reversed]",
+      "test_task24_close_intent_pg.py::test_no_capture_before_predecessors_are_terminal[order_ab__both]",
+      "test_task24_close_intent_pg.py::test_no_capture_before_predecessors_are_terminal[order_ab__created_reversed]",
+      "test_task24_close_intent_pg.py::test_no_capture_before_predecessors_are_terminal[order_ab__none]",
+      "test_task24_close_intent_pg.py::test_no_capture_before_predecessors_are_terminal[order_ab__sequence_reversed]",
+      "test_task24_close_intent_pg.py::test_no_phase_crashed_during_collection",
+      "test_task24_close_intent_pg.py::test_perturbation_after_promotion_never_changes_the_leader[terminal_before__both]",
+      "test_task24_close_intent_pg.py::test_perturbation_after_promotion_never_changes_the_leader[terminal_before__created_reversed]",
+      "test_task24_close_intent_pg.py::test_perturbation_after_promotion_never_changes_the_leader[terminal_before__none]",
+      "test_task24_close_intent_pg.py::test_perturbation_after_promotion_never_changes_the_leader[terminal_before__sequence_reversed]",
+      "test_task24_close_intent_pg.py::test_reconciler_is_reentrant_without_a_second_capture[order_ab__both]",
+      "test_task24_close_intent_pg.py::test_reconciler_is_reentrant_without_a_second_capture[order_ab__created_reversed]",
+      "test_task24_close_intent_pg.py::test_reconciler_is_reentrant_without_a_second_capture[order_ab__none]",
+      "test_task24_close_intent_pg.py::test_reconciler_is_reentrant_without_a_second_capture[order_ab__sequence_reversed]",
+      "test_task24_close_intent_pg.py::test_reconciler_is_reentrant_without_a_second_capture[order_ba__both]",
+      "test_task24_close_intent_pg.py::test_reconciler_is_reentrant_without_a_second_capture[order_ba__created_reversed]",
+      "test_task24_close_intent_pg.py::test_reconciler_is_reentrant_without_a_second_capture[order_ba__none]",
+      "test_task24_close_intent_pg.py::test_reconciler_is_reentrant_without_a_second_capture[order_ba__sequence_reversed]",
+      "test_task24_close_intent_pg.py::test_reconciler_is_reentrant_without_a_second_capture[terminal_before__both]",
+      "test_task24_close_intent_pg.py::test_reconciler_is_reentrant_without_a_second_capture[terminal_before__created_reversed]",
+      "test_task24_close_intent_pg.py::test_reconciler_is_reentrant_without_a_second_capture[terminal_before__none]",
+      "test_task24_close_intent_pg.py::test_reconciler_is_reentrant_without_a_second_capture[terminal_before__sequence_reversed]"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task24_close_intent.py::test_leader_is_highest_sequence_even_when_it_is_neither_first_nor_last_inserted",
+      "test_task24_close_intent.py::test_leader_is_invariant_under_input_order_permutations",
+      "test_task24_close_intent_pg.py::test_no_phase_crashed_during_collection"
+    ],
+    "added_files": [
+      "test_task24_close_intent.py",
+      "test_task24_close_intent_pg.py"
+    ],
+    "restored": true,
+    "seconds": 19.2
+  },
+  {
+    "id": "M02",
+    "side": "be",
+    "want": "test_task24_close_intent.py::test_leader_is_highest_sequence_even_when_it_is_neither_first_nor_last_inserted",
+    "why": "排序键丢掉 sequence、只按 id ⇒ 与「按插入序」「按 sequence」全部脱钩。判别性输入里最高 sequence 那条的 id 是**最小**的，所以这条必然选错",
+    "verdict": "RED",
+    "summary": "56 failed, 124 passed in 17.90s",
+    "added": [
+      "test_task24_close_intent.py::test_leader_is_highest_sequence_even_when_it_is_neither_first_nor_last_inserted",
+      "test_task24_close_intent.py::test_leader_is_invariant_under_input_order_permutations",
+      "test_task24_close_intent.py::test_stale_leader_yields_successor_by_the_same_comparator",
+      "test_task24_close_intent_pg.py::test_capture_is_created_when_predecessor_terminal_precedes_second_close[terminal_before__created_reversed]",
+      "test_task24_close_intent_pg.py::test_capture_is_created_when_predecessor_terminal_precedes_second_close[terminal_before__sequence_reversed]",
+      "test_task24_close_intent_pg.py::test_capture_scenario_yields_exactly_one_close_capture[deterministic_leader_discriminating]",
+      "test_task24_close_intent_pg.py::test_capture_scenario_yields_exactly_one_close_capture[order_ab__both]",
+      "test_task24_close_intent_pg.py::test_capture_scenario_yields_exactly_one_close_capture[order_ab__created_reversed]",
+      "test_task24_close_intent_pg.py::test_capture_scenario_yields_exactly_one_close_capture[order_ab__none]",
+      "test_task24_close_intent_pg.py::test_capture_scenario_yields_exactly_one_close_capture[order_ab__sequence_reversed]",
+      "test_task24_close_intent_pg.py::test_capture_scenario_yields_exactly_one_close_capture[order_ba__both]",
+      "test_task24_close_intent_pg.py::test_capture_scenario_yields_exactly_one_close_capture[order_ba__created_reversed]",
+      "test_task24_close_intent_pg.py::test_capture_scenario_yields_exactly_one_close_capture[order_ba__sequence_reversed]",
+      "test_task24_close_intent_pg.py::test_capture_scenario_yields_exactly_one_close_capture[terminal_before__created_reversed]",
+      "test_task24_close_intent_pg.py::test_capture_scenario_yields_exactly_one_close_capture[terminal_before__sequence_reversed]",
+      "test_task24_close_intent_pg.py::test_concurrent_closes_still_yield_exactly_one_capture",
+      "test_task24_close_intent_pg.py::test_created_at_does_not_decide_the_leader[order_ab__created_reversed]",
+      "test_task24_close_intent_pg.py::test_created_at_does_not_decide_the_leader[order_ab__sequence_reversed]",
+      "test_task24_close_intent_pg.py::test_created_at_does_not_decide_the_leader[order_ba__created_reversed]",
+      "test_task24_close_intent_pg.py::test_created_at_does_not_decide_the_leader[order_ba__sequence_reversed]",
+      "test_task24_close_intent_pg.py::test_database_forbids_equal_intent_sequences_so_id_tiebreak_is_defensive_only",
+      "test_task24_close_intent_pg.py::test_deterministic_leader_is_neither_first_inserted_nor_latest_created_at",
+      "test_task24_close_intent_pg.py::test_every_scenario_produced_a_measurement",
+      "test_task24_close_intent_pg.py::test_first_closer_gets_a_predecessor_and_last_closer_does_not[order_ab__both]",
+      "test_task24_close_intent_pg.py::test_first_closer_gets_a_predecessor_and_last_closer_does_not[order_ab__created_reversed]",
+      "test_task24_close_intent_pg.py::test_first_closer_gets_a_predecessor_and_last_closer_does_not[order_ab__none]",
+      "test_task24_close_intent_pg.py::test_first_closer_gets_a_predecessor_and_last_closer_does_not[order_ab__sequence_reversed]",
+      "test_task24_close_intent_pg.py::test_first_closer_gets_a_predecessor_and_last_closer_does_not[order_ba__both]",
+      "test_task24_close_intent_pg.py::test_first_closer_gets_a_predecessor_and_last_closer_does_not[order_ba__created_reversed]",
+      "test_task24_close_intent_pg.py::test_first_closer_gets_a_predecessor_and_last_closer_does_not[order_ba__sequence_reversed]",
+      "test_task24_close_intent_pg.py::test_leader_disqualified_before_promotion_yields_a_legitimate_successor[expired]",
+      "test_task24_close_intent_pg.py::test_leader_disqualified_before_promotion_yields_a_legitimate_successor[revoked]",
+      "test_task24_close_intent_pg.py::test_leader_is_the_highest_sequence_id_in_every_scenario[deterministic_leader_discriminating]",
+      "test_task24_close_intent_pg.py::test_leader_is_the_highest_sequence_id_in_every_scenario[order_ab__both]",
+      "test_task24_close_intent_pg.py::test_leader_is_the_highest_sequence_id_in_every_scenario[order_ab__created_reversed]",
+      "test_task24_close_intent_pg.py::test_leader_is_the_highest_sequence_id_in_every_scenario[order_ab__none]",
+      "test_task24_close_intent_pg.py::test_leader_is_the_highest_sequence_id_in_every_scenario[order_ab__sequence_reversed]",
+      "test_task24_close_intent_pg.py::test_leader_is_the_highest_sequence_id_in_every_scenario[order_ba__both]",
+      "test_task24_close_intent_pg.py::test_leader_is_the_highest_sequence_id_in_every_scenario[order_ba__created_reversed]",
+      "test_task24_close_intent_pg.py::test_leader_is_the_highest_sequence_id_in_every_scenario[order_ba__sequence_reversed]",
+      "test_task24_close_intent_pg.py::test_no_capture_before_predecessors_are_terminal[order_ab__both]",
+      "test_task24_close_intent_pg.py::test_no_capture_before_predecessors_are_terminal[order_ab__created_reversed]",
+      "test_task24_close_intent_pg.py::test_no_capture_before_predecessors_are_terminal[order_ab__none]",
+      "test_task24_close_intent_pg.py::test_no_capture_before_predecessors_are_terminal[order_ab__sequence_reversed]",
+      "test_task24_close_intent_pg.py::test_no_phase_crashed_during_collection",
+      "test_task24_close_intent_pg.py::test_perturbation_after_promotion_never_changes_the_leader[terminal_before__created_reversed]",
+      "test_task24_close_intent_pg.py::test_perturbation_after_promotion_never_changes_the_leader[terminal_before__sequence_reversed]",
+      "test_task24_close_intent_pg.py::test_reconciler_is_reentrant_without_a_second_capture[order_ab__both]",
+      "test_task24_close_intent_pg.py::test_reconciler_is_reentrant_without_a_second_capture[order_ab__created_reversed]",
+      "test_task24_close_intent_pg.py::test_reconciler_is_reentrant_without_a_second_capture[order_ab__none]",
+      "test_task24_close_intent_pg.py::test_reconciler_is_reentrant_without_a_second_capture[order_ab__sequence_reversed]",
+      "test_task24_close_intent_pg.py::test_reconciler_is_reentrant_without_a_second_capture[order_ba__both]",
+      "test_task24_close_intent_pg.py::test_reconciler_is_reentrant_without_a_second_capture[order_ba__created_reversed]",
+      "test_task24_close_intent_pg.py::test_reconciler_is_reentrant_without_a_second_capture[order_ba__sequence_reversed]",
+      "test_task24_close_intent_pg.py::test_reconciler_is_reentrant_without_a_second_capture[terminal_before__created_reversed]",
+      "test_task24_close_intent_pg.py::test_reconciler_is_reentrant_without_a_second_capture[terminal_before__sequence_reversed]"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task24_close_intent.py::test_leader_is_highest_sequence_even_when_it_is_neither_first_nor_last_inserted"
+    ],
+    "added_files": [
+      "test_task24_close_intent.py",
+      "test_task24_close_intent_pg.py"
+    ],
+    "restored": true,
+    "seconds": 20.5
+  },
+  {
+    "id": "M03",
+    "side": "be",
+    "want": "test_task24_close_intent.py::test_equal_sequence_falls_back_to_highest_id",
+    "why": "R01 回归：丢掉 id tiebreak。真库有 `uq_wpoci_sequence UNIQUE (room,generation,intent_sequence)`，同 sequence **不可达**，所以这条只能被离线合成输入抓到 —— 它正是「id tiebreak 是防御性确定性」这一结论的判据",
+    "verdict": "RED",
+    "summary": "1 failed, 179 passed in 20.75s",
+    "added": [
+      "test_task24_close_intent.py::test_equal_sequence_falls_back_to_highest_id"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task24_close_intent.py::test_equal_sequence_falls_back_to_highest_id"
+    ],
+    "added_files": [
+      "test_task24_close_intent.py"
+    ],
+    "restored": true,
+    "seconds": 23.3
+  },
+  {
+    "id": "M04",
+    "side": "be",
+    "want": "test_task24_close_intent.py::test_eligibility_has_one_independent_branch_per_disqualifier[revoked]",
+    "why": "被撤销的 participant 仍算合格 ⇒ 撤权用户可以当 leader 并提交其内容（AC 4.10 / 10.10）。四条失格判据必须逐条变异：合成一条 `all([...])` 时删掉任一条都会被其余遮蔽",
+    "verdict": "RED",
+    "summary": "3 failed, 177 passed in 20.72s",
+    "added": [
+      "test_task24_close_intent.py::test_eligibility_has_one_independent_branch_per_disqualifier[revoked]",
+      "test_task24_close_intent.py::test_no_successor_is_distinct_from_no_intents_at_all",
+      "test_task24_close_intent.py::test_stale_leader_yields_successor_by_the_same_comparator"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task24_close_intent.py::test_eligibility_has_one_independent_branch_per_disqualifier[revoked]"
+    ],
+    "added_files": [
+      "test_task24_close_intent.py"
+    ],
+    "restored": true,
+    "seconds": 23.4
+  },
+  {
+    "id": "M05",
+    "side": "be",
+    "want": "test_task24_close_intent.py::test_eligibility_has_one_independent_branch_per_disqualifier[expired]",
+    "why": "lease 已过期仍算合格 ⇒ 过期会话可当 leader。与 M04 分开：两者共用一条判据时，删掉任一个都会被另一个遮蔽",
+    "verdict": "RED",
+    "summary": "4 failed, 176 passed in 20.64s",
+    "added": [
+      "test_task24_close_intent.py::test_eligibility_has_one_independent_branch_per_disqualifier[expired]",
+      "test_task24_close_intent_pg.py::test_every_scenario_produced_a_measurement",
+      "test_task24_close_intent_pg.py::test_leader_disqualified_before_promotion_yields_a_legitimate_successor[expired]",
+      "test_task24_close_intent_pg.py::test_no_phase_crashed_during_collection"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task24_close_intent.py::test_eligibility_has_one_independent_branch_per_disqualifier[expired]",
+      "test_task24_close_intent_pg.py::test_leader_disqualified_before_promotion_yields_a_legitimate_successor[expired]"
+    ],
+    "added_files": [
+      "test_task24_close_intent.py",
+      "test_task24_close_intent_pg.py"
+    ],
+    "restored": true,
+    "seconds": 23.4
+  },
+  {
+    "id": "M06",
+    "side": "be",
+    "want": "test_task24_close_intent.py::test_eligibility_has_one_independent_branch_per_disqualifier[still_active]",
+    "why": "仍 active（或已 left）的 participant 也算合格 ⇒ 没关闭的人被选成 leader，它的编辑还没结束就被 close-capture 冻结",
+    "verdict": "RED",
+    "summary": "2 failed, 178 passed in 20.71s",
+    "added": [
+      "test_task24_close_intent.py::test_eligibility_has_one_independent_branch_per_disqualifier[left]",
+      "test_task24_close_intent.py::test_eligibility_has_one_independent_branch_per_disqualifier[still_active]"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task24_close_intent.py::test_eligibility_has_one_independent_branch_per_disqualifier[left]",
+      "test_task24_close_intent.py::test_eligibility_has_one_independent_branch_per_disqualifier[still_active]"
+    ],
+    "added_files": [
+      "test_task24_close_intent.py"
+    ],
+    "restored": true,
+    "seconds": 23.3
+  },
+  {
+    "id": "M07",
+    "side": "be",
+    "want": "test_task24_close_intent.py::test_eligibility_has_one_independent_branch_per_disqualifier[terminal_intent]",
+    "why": "已终结的 intent（含 `authorization_stale`）也算合格 ⇒ 已审计失格的 intent 会被重新选成 successor，`authorization_stale` 形同虚设",
+    "verdict": "RED",
+    "summary": "2 failed, 178 passed in 21.38s",
+    "added": [
+      "test_task24_close_intent.py::test_eligibility_has_one_independent_branch_per_disqualifier[promoted_intent]",
+      "test_task24_close_intent.py::test_eligibility_has_one_independent_branch_per_disqualifier[terminal_intent]"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task24_close_intent.py::test_eligibility_has_one_independent_branch_per_disqualifier[promoted_intent]",
+      "test_task24_close_intent.py::test_eligibility_has_one_independent_branch_per_disqualifier[terminal_intent]"
+    ],
+    "added_files": [
+      "test_task24_close_intent.py"
+    ],
+    "restored": true,
+    "seconds": 24.3
+  },
+  {
+    "id": "M08",
+    "side": "be",
+    "want": "test_task24_close_intent.py::test_promoted_short_circuit_precedes_staleness_check",
+    "why": "R02 回归：去掉 promoted 幂等短路 ⇒ 已 promotion 的 leader 失格后会被重新选 successor，违反 AC 10.10『promotion 后授权失效只能走 recovery，不得接任再造第二 capture』。真库侧由「promotion 后扰动不换 leader」打红",
+    "verdict": "RED",
+    "summary": "77 failed, 103 passed in 20.44s",
+    "added": [
+      "test_task24_close_intent.py::test_promoted_short_circuit_precedes_staleness_check",
+      "test_task24_close_intent_pg.py::test_capture_is_created_when_predecessor_terminal_precedes_second_close[terminal_before__both]",
+      "test_task24_close_intent_pg.py::test_capture_is_created_when_predecessor_terminal_precedes_second_close[terminal_before__created_reversed]",
+      "test_task24_close_intent_pg.py::test_capture_is_created_when_predecessor_terminal_precedes_second_close[terminal_before__none]",
+      "test_task24_close_intent_pg.py::test_capture_is_created_when_predecessor_terminal_precedes_second_close[terminal_before__sequence_reversed]",
+      "test_task24_close_intent_pg.py::test_capture_scenario_yields_exactly_one_close_capture[deterministic_leader_discriminating]",
+      "test_task24_close_intent_pg.py::test_capture_scenario_yields_exactly_one_close_capture[order_ab__both]",
+      "test_task24_close_intent_pg.py::test_capture_scenario_yields_exactly_one_close_capture[order_ab__created_reversed]",
+      "test_task24_close_intent_pg.py::test_capture_scenario_yields_exactly_one_close_capture[order_ab__none]",
+      "test_task24_close_intent_pg.py::test_capture_scenario_yields_exactly_one_close_capture[order_ab__sequence_reversed]",
+      "test_task24_close_intent_pg.py::test_capture_scenario_yields_exactly_one_close_capture[order_ba__both]",
+      "test_task24_close_intent_pg.py::test_capture_scenario_yields_exactly_one_close_capture[order_ba__created_reversed]",
+      "test_task24_close_intent_pg.py::test_capture_scenario_yields_exactly_one_close_capture[order_ba__none]",
+      "test_task24_close_intent_pg.py::test_capture_scenario_yields_exactly_one_close_capture[order_ba__sequence_reversed]",
+      "test_task24_close_intent_pg.py::test_capture_scenario_yields_exactly_one_close_capture[single__both]",
+      "test_task24_close_intent_pg.py::test_capture_scenario_yields_exactly_one_close_capture[single__created_reversed]",
+      "test_task24_close_intent_pg.py::test_capture_scenario_yields_exactly_one_close_capture[single__none]",
+      "test_task24_close_intent_pg.py::test_capture_scenario_yields_exactly_one_close_capture[single__sequence_reversed]",
+      "test_task24_close_intent_pg.py::test_capture_scenario_yields_exactly_one_close_capture[terminal_before__both]",
+      "test_task24_close_intent_pg.py::test_capture_scenario_yields_exactly_one_close_capture[terminal_before__created_reversed]",
+      "test_task24_close_intent_pg.py::test_capture_scenario_yields_exactly_one_close_capture[terminal_before__none]",
+      "test_task24_close_intent_pg.py::test_capture_scenario_yields_exactly_one_close_capture[terminal_before__sequence_reversed]",
+      "test_task24_close_intent_pg.py::test_created_at_does_not_decide_the_leader[order_ab__created_reversed]",
+      "test_task24_close_intent_pg.py::test_created_at_does_not_decide_the_leader[order_ab__sequence_reversed]",
+      "test_task24_close_intent_pg.py::test_created_at_does_not_decide_the_leader[order_ba__created_reversed]",
+      "test_task24_close_intent_pg.py::test_created_at_does_not_decide_the_leader[order_ba__sequence_reversed]",
+      "test_task24_close_intent_pg.py::test_deterministic_leader_is_neither_first_inserted_nor_latest_created_at",
+      "test_task24_close_intent_pg.py::test_every_scenario_produced_a_measurement",
+      "test_task24_close_intent_pg.py::test_first_closer_gets_a_predecessor_and_last_closer_does_not[order_ab__both]",
+      "test_task24_close_intent_pg.py::test_first_closer_gets_a_predecessor_and_last_closer_does_not[order_ab__created_reversed]",
+      "test_task24_close_intent_pg.py::test_first_closer_gets_a_predecessor_and_last_closer_does_not[order_ab__none]",
+      "test_task24_close_intent_pg.py::test_first_closer_gets_a_predecessor_and_last_closer_does_not[order_ab__sequence_reversed]",
+      "test_task24_close_intent_pg.py::test_first_closer_gets_a_predecessor_and_last_closer_does_not[order_ba__both]",
+      "test_task24_close_intent_pg.py::test_first_closer_gets_a_predecessor_and_last_closer_does_not[order_ba__created_reversed]",
+      "test_task24_close_intent_pg.py::test_first_closer_gets_a_predecessor_and_last_closer_does_not[order_ba__none]",
+      "test_task24_close_intent_pg.py::test_first_closer_gets_a_predecessor_and_last_closer_does_not[order_ba__sequence_reversed]",
+      "test_task24_close_intent_pg.py::test_leader_disqualified_before_promotion_yields_a_legitimate_successor[expired]",
+      "test_task24_close_intent_pg.py::test_leader_disqualified_before_promotion_yields_a_legitimate_successor[revoked]",
+      "test_task24_close_intent_pg.py::test_leader_is_the_highest_sequence_id_in_every_scenario[deterministic_leader_discriminating]",
+      "test_task24_close_intent_pg.py::test_leader_is_the_highest_sequence_id_in_every_scenario[order_ab__both]",
+      "test_task24_close_intent_pg.py::test_leader_is_the_highest_sequence_id_in_every_scenario[order_ab__created_reversed]",
+      "test_task24_close_intent_pg.py::test_leader_is_the_highest_sequence_id_in_every_scenario[order_ab__none]",
+      "test_task24_close_intent_pg.py::test_leader_is_the_highest_sequence_id_in_every_scenario[order_ab__sequence_reversed]",
+      "test_task24_close_intent_pg.py::test_leader_is_the_highest_sequence_id_in_every_scenario[order_ba__both]",
+      "test_task24_close_intent_pg.py::test_leader_is_the_highest_sequence_id_in_every_scenario[order_ba__created_reversed]",
+      "test_task24_close_intent_pg.py::test_leader_is_the_highest_sequence_id_in_every_scenario[order_ba__none]",
+      "test_task24_close_intent_pg.py::test_leader_is_the_highest_sequence_id_in_every_scenario[order_ba__sequence_reversed]",
+      "test_task24_close_intent_pg.py::test_leader_is_the_highest_sequence_id_in_every_scenario[single__both]",
+      "test_task24_close_intent_pg.py::test_leader_is_the_highest_sequence_id_in_every_scenario[single__created_reversed]",
+      "test_task24_close_intent_pg.py::test_leader_is_the_highest_sequence_id_in_every_scenario[single__none]",
+      "test_task24_close_intent_pg.py::test_leader_is_the_highest_sequence_id_in_every_scenario[single__sequence_reversed]",
+      "test_task24_close_intent_pg.py::test_no_capture_before_predecessors_are_terminal[order_ab__both]",
+      "test_task24_close_intent_pg.py::test_no_capture_before_predecessors_are_terminal[order_ab__created_reversed]",
+      "test_task24_close_intent_pg.py::test_no_capture_before_predecessors_are_terminal[order_ab__none]",
+      "test_task24_close_intent_pg.py::test_no_capture_before_predecessors_are_terminal[order_ab__sequence_reversed]",
+      "test_task24_close_intent_pg.py::test_no_phase_crashed_during_collection",
+      "test_task24_close_intent_pg.py::test_perturbation_after_promotion_never_changes_the_leader[terminal_before__both]",
+      "test_task24_close_intent_pg.py::test_perturbation_after_promotion_never_changes_the_leader[terminal_before__created_reversed]",
+      "test_task24_close_intent_pg.py::test_perturbation_after_promotion_never_changes_the_leader[terminal_before__none]",
+      "test_task24_close_intent_pg.py::test_perturbation_after_promotion_never_changes_the_leader[terminal_before__sequence_reversed]",
+      "test_task24_close_intent_pg.py::test_reconciler_is_reentrant_without_a_second_capture[order_ab__both]",
+      "test_task24_close_intent_pg.py::test_reconciler_is_reentrant_without_a_second_capture[order_ab__created_reversed]",
+      "test_task24_close_intent_pg.py::test_reconciler_is_reentrant_without_a_second_capture[order_ab__none]",
+      "test_task24_close_intent_pg.py::test_reconciler_is_reentrant_without_a_second_capture[order_ab__sequence_reversed]",
+      "test_task24_close_intent_pg.py::test_reconciler_is_reentrant_without_a_second_capture[order_ba__both]",
+      "test_task24_close_intent_pg.py::test_reconciler_is_reentrant_without_a_second_capture[order_ba__created_reversed]",
+      "test_task24_close_intent_pg.py::test_reconciler_is_reentrant_without_a_second_capture[order_ba__none]",
+      "test_task24_close_intent_pg.py::test_reconciler_is_reentrant_without_a_second_capture[order_ba__sequence_reversed]",
+      "test_task24_close_intent_pg.py::test_reconciler_is_reentrant_without_a_second_capture[single__both]",
+      "test_task24_close_intent_pg.py::test_reconciler_is_reentrant_without_a_second_capture[single__created_reversed]",
+      "test_task24_close_intent_pg.py::test_reconciler_is_reentrant_without_a_second_capture[single__none]",
+      "test_task24_close_intent_pg.py::test_reconciler_is_reentrant_without_a_second_capture[single__sequence_reversed]",
+      "test_task24_close_intent_pg.py::test_reconciler_is_reentrant_without_a_second_capture[terminal_before__both]",
+      "test_task24_close_intent_pg.py::test_reconciler_is_reentrant_without_a_second_capture[terminal_before__created_reversed]",
+      "test_task24_close_intent_pg.py::test_reconciler_is_reentrant_without_a_second_capture[terminal_before__none]",
+      "test_task24_close_intent_pg.py::test_reconciler_is_reentrant_without_a_second_capture[terminal_before__sequence_reversed]",
+      "test_task24_close_intent_pg.py::test_single_close_needs_no_predecessor"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task24_close_intent.py::test_promoted_short_circuit_precedes_staleness_check",
+      "test_task24_close_intent_pg.py::test_perturbation_after_promotion_never_changes_the_leader[terminal_before__both]",
+      "test_task24_close_intent_pg.py::test_perturbation_after_promotion_never_changes_the_leader[terminal_before__created_reversed]",
+      "test_task24_close_intent_pg.py::test_perturbation_after_promotion_never_changes_the_leader[terminal_before__none]",
+      "test_task24_close_intent_pg.py::test_perturbation_after_promotion_never_changes_the_leader[terminal_before__sequence_reversed]"
+    ],
+    "added_files": [
+      "test_task24_close_intent.py",
+      "test_task24_close_intent_pg.py"
+    ],
+    "restored": true,
+    "seconds": 23.4
+  },
+  {
+    "id": "M09",
+    "side": "be",
+    "want": "test_task24_close_intent.py::test_no_successor_is_distinct_from_no_intents_at_all",
+    "why": "「一条 intent 都没有」被当成「全部失格」⇒ 还没有人关闭的 room 也会被supersede 成 recovery_required。两者都返回 leader=None，只断言 leader 为空的判据分不开它们",
+    "verdict": "RED",
+    "summary": "1 failed, 179 passed in 22.25s",
+    "added": [
+      "test_task24_close_intent.py::test_no_successor_is_distinct_from_no_intents_at_all"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task24_close_intent.py::test_no_successor_is_distinct_from_no_intents_at_all"
+    ],
+    "added_files": [
+      "test_task24_close_intent.py"
+    ],
+    "restored": true,
+    "seconds": 25.2
+  },
+  {
+    "id": "M10",
+    "side": "be",
+    "want": "test_task24_close_intent.py::test_leader_mismatch_raises_arbitration_error",
+    "why": "服务边界不再比对 leader ⇒ 仓储 comparator 被改动时无人报警。这条与 M11/M12 一起证明三项比对各自有效",
+    "verdict": "RED",
+    "summary": "1 failed, 179 passed in 22.23s",
+    "added": [
+      "test_task24_close_intent.py::test_leader_mismatch_raises_arbitration_error"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task24_close_intent.py::test_leader_mismatch_raises_arbitration_error"
+    ],
+    "added_files": [
+      "test_task24_close_intent.py"
+    ],
+    "restored": true,
+    "seconds": 25.3
+  },
+  {
+    "id": "M11",
+    "side": "be",
+    "want": "test_task24_close_intent.py::test_no_successor_mismatch_raises_accounting_error",
+    "why": "`no_successor` 记账不再比对 ⇒ 「有 successor 却走 supersede」不可见",
+    "verdict": "RED",
+    "summary": "1 failed, 179 passed in 22.17s",
+    "added": [
+      "test_task24_close_intent.py::test_no_successor_mismatch_raises_accounting_error"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task24_close_intent.py::test_no_successor_mismatch_raises_accounting_error"
+    ],
+    "added_files": [
+      "test_task24_close_intent.py"
+    ],
+    "restored": true,
+    "seconds": 25.2
+  },
+  {
+    "id": "M12",
+    "side": "be",
+    "want": "test_task24_close_intent.py::test_missing_authorization_stale_raises_accounting_error",
+    "why": "`authorization_stale` 记账不再比对 ⇒ 漏写审计不可见。🔴 该条与 M10 必须打红**不同**的测试：首轮若把两类分歧合成一个异常类型，本条会被 M10 的断言遮蔽而判 GREEN（Task 22 M04/M10、Task 23 M25 同形态）",
+    "verdict": "RED",
+    "summary": "1 failed, 179 passed in 22.36s",
+    "added": [
+      "test_task24_close_intent.py::test_missing_authorization_stale_raises_accounting_error"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task24_close_intent.py::test_missing_authorization_stale_raises_accounting_error"
+    ],
+    "added_files": [
+      "test_task24_close_intent.py"
+    ],
+    "restored": true,
+    "seconds": 25.4
+  },
+  {
+    "id": "M13",
+    "side": "be",
+    "want": "test_task24_close_intent.py::test_close_intent_refusals_are_pairwise_disjoint",
+    "why": "R04 回归：让 accounting 成为 arbitration 的子类 ⇒ `pytest.raises(CloseLeaderArbitrationError)` 会顺手吃掉 accounting，「漏写 stale」永久不可分辨。本 spec 已为这个形态付过三次代价",
+    "verdict": "RED",
+    "summary": "1 failed, 179 passed in 22.16s",
+    "added": [
+      "test_task24_close_intent.py::test_close_intent_refusals_are_pairwise_disjoint"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task24_close_intent.py::test_close_intent_refusals_are_pairwise_disjoint"
+    ],
+    "added_files": [
+      "test_task24_close_intent.py"
+    ],
+    "restored": true,
+    "seconds": 25.1
+  },
+  {
+    "id": "M14",
+    "side": "be",
+    "want": "test_task24_close_intent.py::test_open_capture_states_are_locked_to_the_sql_index",
+    "why": "R05 回归：把 open 状态集合改成手抄的第三份常量 ⇒ 与 V151 的 `uq_wpfr_open_close_capture` WHERE 子句漂移，`accepted/correlated` 状态的第二条 capture 数不到。此前**没有任何守卫**比较过 SQL 与 Python 两侧",
+    "verdict": "RED",
+    "summary": "1 failed, 179 passed in 22.48s",
+    "added": [
+      "test_task24_close_intent.py::test_open_capture_states_are_locked_to_the_sql_index"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task24_close_intent.py::test_open_capture_states_are_locked_to_the_sql_index"
+    ],
+    "added_files": [
+      "test_task24_close_intent.py"
+    ],
+    "restored": true,
+    "seconds": 25.5
+  }
+]

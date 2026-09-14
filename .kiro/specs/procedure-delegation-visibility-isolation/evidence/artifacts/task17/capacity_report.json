@@ -1,0 +1,25 @@
+{
+  "content_hash": "e1a4a4fadb69c6d2f940a6a6c11c3159d55895680cdde6d7323d04a1b8ad8372",
+  "performance_profile_version": "perf-6000-visibility-v1",
+  "results": {
+    "achieved_inflight_concurrency": 48,
+    "derived_thresholds": {
+      "per_family": 63,
+      "per_project": 689,
+      "per_user": 15
+    },
+    "error_allow": 0,
+    "error_rate": 0.0,
+    "extrapolation_basis": "p95 measured under connection-pool saturation (the security-critical serialization point); literal 6000 simultaneous clients NOT run on dev box; achieved 48 in-flight over 1500 requests is the largest honest representative concurrency on this host",
+    "gate_p95_seconds": 0.078626,
+    "gate_samples": 1383,
+    "list_p95_seconds": 0.123466,
+    "list_samples": 117,
+    "max_query_count": 0,
+    "methodology": "in-process real services (resolve_wp_binding_and_access / WorkpaperListQueryService) against real PostgreSQL audit_platform; closed-loop bounded in-flight concurrency",
+    "target_concurrency": 6000,
+    "threshold_derivation": "per_family=ceil(tput/11*1.0*2.0); per_user=ceil(tput/48*1.0*2.0); per_project=ceil(tput*1.0*2.0)",
+    "throughput_rps": 344.07,
+    "total_requests": 1500
+  }
+}

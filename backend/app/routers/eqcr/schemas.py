@@ -133,6 +133,10 @@ class RelatedPartyCreate(BaseModel):
     name: str = Field(..., min_length=1, max_length=200, description="关联方名称")
     relation_type: str = Field(..., description="关系类型")
     is_controlled_by_same_party: bool = Field(False, description="是否同一控制")
+    detail: dict[str, Any] | None = Field(
+        None,
+        description="描述性字段（企业类型/注册地/法人代表/业务性质/注册资本/持股比例%）",
+    )
 
 
 class RelatedPartyUpdate(BaseModel):
@@ -141,6 +145,7 @@ class RelatedPartyUpdate(BaseModel):
     name: str | None = Field(None, min_length=1, max_length=200)
     relation_type: str | None = Field(None)
     is_controlled_by_same_party: bool | None = Field(None)
+    detail: dict[str, Any] | None = Field(None)
 
 
 class RelatedPartyTransactionCreate(BaseModel):

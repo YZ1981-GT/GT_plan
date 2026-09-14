@@ -131,11 +131,17 @@ _RAW_HEADER_ALIASES: dict[str, list[str]] = {
     # 科目
     "account_code": ["科目编码", "科目代码", "账户编码", "科目编号", "Account Code"],
     "account_name": ["科目名称", "科目全名", "账户名称", "Account Name"],
-    # 期初
-    "opening_balance": ["年初余额", "期初余额"],
-    "opening_debit": ["年初借方", "期初借方", "期初借方余额"],
-    "opening_credit": ["年初贷方", "期初贷方", "期初贷方余额"],
-    # 本期发生额
+    # 期初（月度维度）；「年初余额」净额单列无独立年度净额字段，按 R1.5 并入 opening_balance
+    "opening_balance": ["期初余额", "年初余额"],
+    "opening_debit": ["期初借方", "期初借方余额"],
+    "opening_credit": ["期初贷方", "期初贷方余额"],
+    # 年初（年度维度）
+    "year_opening_debit": ["年初借方", "年初借方余额"],
+    "year_opening_credit": ["年初贷方", "年初贷方余额"],
+    # 本年累计（年度维度）
+    "year_debit": ["本年累计借方", "累计借方"],
+    "year_credit": ["本年累计贷方", "累计贷方"],
+    # 本期发生额（月度维度）
     "debit_amount": [
         "借方金额", "本期借方", "借方发生额", "借方本期",
         "借方本期发生额", "本期借方发生额", "借方", "Debit", "DR",
@@ -314,7 +320,11 @@ def _detect_by_sheet_name(sheet_name: str) -> tuple[TableType, int, dict]:
 
 # 负向信号
 _NEGATIVE_SIGNALS: dict[TableType, set[str]] = {
-    "balance": {"voucher_date", "voucher_no"},
+    # aux_type/aux_code 存在强指示辅助余额表：年度语义改造后 balance 关键列可由
+    # opening_balance/debit_amount/credit_amount 经替代满足（6/6）且月度列进入 balance
+    # RECOMMENDED 抬高 bonus，会盖过 aux_balance；故把 aux 维度列作为 balance 负向信号，
+    # 使含 aux_type/aux_code 的表回归判定为 aux_balance（不影响无 aux 列的普通余额表）。
+    "balance": {"voucher_date", "voucher_no", "aux_type", "aux_code"},
     "ledger": {"opening_balance", "closing_balance"},
     "aux_balance": {"voucher_date", "voucher_no"},
     "aux_ledger": {"opening_balance", "closing_balance"},
@@ -331,9 +341,10 @@ _MIN_LEVENSHTEIN_LEN = 4
 # _default 用于 group 单独出现时的映射。
 
 _MERGED_HEADER_MAPPING: dict[str, dict[str, str]] = {
+    # 年初余额（年度维度）→ year_opening_*；_default 无独立年度净额字段，落 opening_balance（R1.8）
     "年初余额": {
-        "借方金额": "opening_debit", "贷方金额": "opening_credit",
-        "借方": "opening_debit", "贷方": "opening_credit",
+        "借方金额": "year_opening_debit", "贷方金额": "year_opening_credit",
+        "借方": "year_opening_debit", "贷方": "year_opening_credit",
         "_default": "opening_balance",
     },
     "期初余额": {
@@ -351,15 +362,16 @@ _MERGED_HEADER_MAPPING: dict[str, dict[str, str]] = {
         "借方": "debit_amount", "贷方": "credit_amount",
         "_default": "debit_amount",
     },
+    # 本年累计 / 累计发生额（年度维度）→ year_debit/year_credit
     "本年累计": {
-        "借方金额": "debit_amount", "贷方金额": "credit_amount",
-        "借方": "debit_amount", "贷方": "credit_amount",
-        "_default": "debit_amount",
+        "借方金额": "year_debit", "贷方金额": "year_credit",
+        "借方": "year_debit", "贷方": "year_credit",
+        "_default": "year_debit",
     },
     "累计发生额": {
-        "借方金额": "debit_amount", "贷方金额": "credit_amount",
-        "借方": "debit_amount", "贷方": "credit_amount",
-        "_default": "debit_amount",
+        "借方金额": "year_debit", "贷方金额": "year_credit",
+        "借方": "year_debit", "贷方": "year_credit",
+        "_default": "year_debit",
     },
 }
 
@@ -527,9 +539,19 @@ def _score_table_type(
 
 
 # 内置 alternatives 映射（JSON 规则中也有，这里作为兜底）
+# 组合型（含 "+"）：重构净额需各半齐备，_alt_to_key 会提升为 key。
+# 单字段（月度兜底）：年度关键列可由月度列替代满足识别，但 _alt_to_key 不提升
+#   （月度列保持 recommended，避免同时含年度+月度列时月度列被迫必填，见 R3.2/R3.3）。
 _BUILTIN_ALTERNATIVES: dict[str, list[str]] = {
     "opening_balance": ["opening_debit+opening_credit"],
     "closing_balance": ["closing_debit+closing_credit"],
+    # 年初借/贷（年度关键列）可由 期初分列 或 期初净额 满足识别（月度兜底）；
+    # opening_balance（净额）纳入替代仅用于识别打分，保证经典"净额+发生额"余额表
+    # 仍识别为 balance（R5.2 零回归，不被误判为 aux_balance）；单字段替代不提升 tier。
+    "year_opening_debit": ["opening_debit", "opening_balance"],
+    "year_opening_credit": ["opening_credit", "opening_balance"],
+    "year_debit": ["debit_amount"],
+    "year_credit": ["credit_amount"],
 }
 
 
@@ -640,6 +662,11 @@ def _detect_by_headers(
     _alt_to_key: set[str] = set()
     for key_col in KEY_COLUMNS.get(winning_type, set()):
         for alt_group in _get_alternatives(winning_type, key_col):
+            # 仅组合型替代（含 "+"，如 closing_debit+closing_credit 重构净额需两半齐备）
+            # 提升为 key；单字段替代（月度兜底，如 year_opening_debit←opening_debit）
+            # 不提升，月度列保持 recommended（R3.2/R3.3）。
+            if "+" not in alt_group:
+                continue
             for alt_field in alt_group.split("+"):
                 _alt_to_key.add(alt_field)
 

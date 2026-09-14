@@ -1,0 +1,55 @@
+{
+  "_note": "候选骨架示例。review_status=candidate 会被 contracts.parse_contract 拒绝：generator 只产候选，人工审核后改成 reviewed 才能注册生产 adapter。文件名以 `_` 开头，不参与 available_contract_ids() 的生产清册。此处的 digest 全是占位，不指向任何真实 definition。",
+  "schema_version": "contract-definition:v1",
+  "contract_id": "example.candidate",
+  "semantic_version": "0.0.0-candidate",
+  "review_status": "candidate",
+  "document_type": "xlsx",
+  "template_definition_sha256": "0000000000000000000000000000000000000000000000000000000000000001",
+  "instrumentation_definition_sha256": "0000000000000000000000000000000000000000000000000000000000000002",
+  "template": {
+    "relative_path": "X/Example.xlsx",
+    "template_sha256": "0000000000000000000000000000000000000000000000000000000000000003",
+    "normalized_structure_hash": "0000000000000000000000000000000000000000000000000000000000000004"
+  },
+  "identity_carriers": ["hidden_sheet", "defined_name", "excel_table", "hidden_uuid_column"],
+  "sheets": [
+    {
+      "sheet_key": "example",
+      "excel_name": "示例表",
+      "locator": {"anchor": "defined_name_ref"},
+      "tables": [
+        {
+          "table_key": "items",
+          "anchor": "A7",
+          "header_rows": 2,
+          "row_identity": {"kind": "field", "json_pointer": "/rows/*/rowUuid"},
+          "delete_policy": "tombstone",
+          "dynamic_columns": {"identity": "{slot}_{seq}", "source_ref": "源xlsx!B6:Z6"},
+          "footer_anchor": {"marker": "合计", "search_column": "A"},
+          "formula_mask": ["I8:I200"],
+          "fields": [
+            {
+              "stable_field_key": "items/{row_uuid}/closing_amount",
+              "json_pointer": "/rows/{row_uuid}/closingAmount",
+              "column_key": "closing_amount",
+              "cell": {"column": "H", "row_from": "row_identity"},
+              "mode": "editable",
+              "value_type": "amount",
+              "source_ref": "源xlsx!H8"
+            },
+            {
+              "stable_field_key": "items/{row_uuid}/subtotal",
+              "json_pointer": "/rows/{row_uuid}/subtotal",
+              "column_key": "subtotal",
+              "cell": {"column": "I", "row_from": "row_identity"},
+              "mode": "formula",
+              "value_type": "amount",
+              "source_ref": "源xlsx!I8"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

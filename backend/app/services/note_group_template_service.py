@@ -50,8 +50,17 @@ class NoteGroupTemplateService:
         # 获取当前项目附注结构
         result = await self._db.execute(
             text("""
-                SELECT section_code, title, layer, sort_order, content,
-                       table_data, validation_status
+                -- disclosure_notes 的真实列名：section_id / section_title /
+                -- text_content / level（原写 section_code / title / content / layer
+                -- 全部不存在 ⇒ 本查询从未成功执行过）。用别名保持模板里的键名不变。
+                -- validation_status 该表无此维度（校验结果在独立表
+                -- note_validation_results），故不再选取；模板消费方按缺键处理。
+                SELECT section_id   AS section_code,
+                       section_title AS title,
+                       level        AS layer,
+                       sort_order,
+                       text_content AS content,
+                       table_data
                 FROM disclosure_notes
                 WHERE project_id = :pid AND year = :year
                 ORDER BY sort_order
@@ -199,8 +208,9 @@ class NoteGroupTemplateService:
         # 检查是否已存在
         result = await self._db.execute(
             text("""
+                -- 列真名 section_id（无 section_code），绑定参数名保持 :code
                 SELECT id FROM disclosure_notes
-                WHERE project_id = :pid AND section_code = :code
+                WHERE project_id = :pid AND section_id = :code
                 LIMIT 1
             """),
             {"pid": str(project_id), "code": section_code},
@@ -211,9 +221,10 @@ class NoteGroupTemplateService:
             # 保留数据，仅更新结构字段
             await self._db.execute(
                 text("""
+                    -- 列真名：section_id / level（原 section_code / layer 不存在）
                     UPDATE disclosure_notes
-                    SET sort_order = :sort_order, layer = :layer
-                    WHERE project_id = :pid AND section_code = :code
+                    SET sort_order = :sort_order, level = :layer
+                    WHERE project_id = :pid AND section_id = :code
                 """),
                 {
                     "pid": str(project_id),
@@ -226,11 +237,12 @@ class NoteGroupTemplateService:
             # 完全覆盖
             await self._db.execute(
                 text("""
+                    -- 列真名：section_title / text_content / level / section_id
                     UPDATE disclosure_notes
-                    SET title = :title, content = :content,
+                    SET section_title = :title, text_content = :content,
                         table_data = :table_data, sort_order = :sort_order,
-                        layer = :layer
-                    WHERE project_id = :pid AND section_code = :code
+                        level = :layer
+                    WHERE project_id = :pid AND section_id = :code
                 """),
                 {
                     "pid": str(project_id),

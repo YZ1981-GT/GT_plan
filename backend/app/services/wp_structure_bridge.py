@@ -378,8 +378,8 @@ def get_workpaper_structure(
             else:
                 with open(structure_path, "r", encoding="utf-8") as f:
                     return json.load(f)
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning("读取 structure.json 缓存失败，将重建 %s: %s", file_path, e)
 
     # 重新生成
     return generate_structure_for_workpaper(
@@ -446,15 +446,23 @@ async def batch_generate_structures(
 # 5. 底稿地址注册到 address_registry
 # ═══════════════════════════════════════════
 
-def get_workpaper_addresses(
+async def get_workpaper_addresses(
     file_path: str,
     wp_code: str,
     project_id: str = "",
     year: int = 0,
+    db=None,
+    wp_id: str = "",
 ) -> list[dict]:
     """从底稿 structure.json 提取可引用的地址坐标
 
     返回格式与 address_registry.AddressEntry 兼容。
+
+    Req 21.2：在产出 legacy AddressEntry-兼容条目的同时，additively 把 WP 域坐标
+    登记进 ACNR L3 runtime（custom_flat profile，同 Req 12.1 模式），使 structure
+    派生的格可被 full_resolve 命中；legacy 产出始终保留（strangler-fig）。
+    登记为可选：仅当 db + wp_id + project_id 均可用时执行；单批失败仅 warning + continue，
+    绝不影响 legacy 地址返回。
     """
     from app.services.address_registry import build_uri, build_jump_route
 
@@ -474,7 +482,7 @@ def get_workpaper_addresses(
 
             # 有公式的单元格注册为可引用地址
             addr = cell.get("address", f"{_col_letter(ci)}{ri + 1}")
-            uri = build_uri("wp", wp_code, cell=addr)
+            uri = build_uri("wp", wp_code, path=addr)
             addresses.append({
                 "uri": uri,
                 "domain": "wp",
@@ -487,6 +495,38 @@ def get_workpaper_addresses(
                 "wp_code": wp_code,
                 "tags": ["底稿", wp_code],
             })
+
+    # ── Req 21.2: additive ACNR L3 runtime 登记（保留 legacy 产出）──────────────
+    if db is not None and wp_id and project_id and addresses:
+        try:
+            from app.services.acnr.runtime import register_custom
+
+            custom_cells = [
+                {
+                    "cell_address": a["cell"],
+                    "wp_code": wp_code,
+                    "semantic_label": a.get("label", ""),
+                }
+                for a in addresses
+                if a.get("cell")
+            ]
+            if custom_cells:
+                await register_custom(
+                    db,
+                    str(project_id),
+                    str(wp_id),
+                    custom_cells,
+                    addr_profile="custom_flat",
+                )
+        except Exception as exc:
+            # 单 wp 登记失败仅 warning + continue（Req 12.4 / 21.2），legacy 产出保留
+            logger.warning(
+                "wp_structure_bridge: ACNR register_custom 失败 wp_code=%s wp_id=%s: %s "
+                "(legacy AddressEntry 产出已保留)",
+                wp_code,
+                wp_id,
+                exc,
+            )
 
     return addresses
 

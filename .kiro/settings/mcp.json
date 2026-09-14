@@ -1,8 +1,40 @@
 {
   "mcpServers": {
+    "codegraph": {
+      "type": "stdio",
+      "command": "npx",
+      "args": [
+        "-y",
+        "@colbymchenry/codegraph",
+        "serve",
+        "--mcp",
+        "--no-watch",
+        "--path",
+        "D:/GT_plan"
+      ],
+      "env": {
+        "NODE_OPTIONS": "--max-old-space-size=512"
+      },
+      "disabled": false,
+      "autoApprove": [
+        "codegraph_search",
+        "codegraph_context",
+        "codegraph_trace",
+        "codegraph_callers",
+        "codegraph_callees",
+        "codegraph_impact",
+        "codegraph_node",
+        "codegraph_explore",
+        "codegraph_files",
+        "codegraph_status"
+      ]
+    },
     "playwright": {
       "command": "npx",
-      "args": ["-y", "@playwright/mcp@latest"],
+      "args": [
+        "-y",
+        "@playwright/mcp@latest"
+      ],
       "env": {},
       "disabled": false,
       "autoApprove": [
@@ -25,7 +57,102 @@
         "browser_drag",
         "browser_hover",
         "browser_file_upload",
-        "browser_fill_form"
+        "browser_fill_form",
+        "browser_network_request",
+        "browser_run_code_unsafe",
+        "browser_find"
+      ]
+    },
+    "postgres": {
+      "command": "docker",
+      "args": [
+        "run",
+        "-i",
+        "--rm",
+        "-e",
+        "DATABASE_URI",
+        "crystaldba/postgres-mcp",
+        "--access-mode=restricted"
+      ],
+      "env": {
+        "DATABASE_URI": "postgresql://postgres:postgres@host.docker.internal:5432/audit_platform"
+      },
+      "disabled": false,
+      "autoApprove": [
+        "list_schemas",
+        "list_objects",
+        "execute_sql",
+        "explain_query",
+        "analyze_db_health",
+        "get_object_details"
+      ]
+    },
+    "github": {
+      "command": "docker",
+      "args": [
+        "run",
+        "-i",
+        "--rm",
+        "-e",
+        "GITHUB_PERSONAL_ACCESS_TOKEN",
+        "-e",
+        "GITHUB_TOOLSETS",
+        "ghcr.io/github/github-mcp-server:latest"
+      ],
+      "envFile": "D:/GT_plan/.cursor/mcp.env",
+      "disabled": false,
+      "autoApprove": [
+        "get_file_contents",
+        "get_latest_release",
+        "get_file_contents",
+        "search_code"
+      ]
+    },
+    "gt-plan": {
+      "command": "D:/GT_plan/.venv/Scripts/python.exe",
+      "args": [
+        "D:/GT_plan/tools/gt-plan-mcp/server.py"
+      ],
+      "env": {
+        "GT_PLAN_ROOT": "D:/GT_plan"
+      },
+      "disabled": false,
+      "autoApprove": [
+        "wp_lookup",
+        "spec_status",
+        "spec_list_active",
+        "migration_status",
+        "index_summary"
+      ]
+    },
+    "docker": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "mcp-docker-server"
+      ],
+      "disabled": false,
+      "autoApprove": [
+        "list_containers",
+        "container_logs",
+        "container_stats",
+        "list_images",
+        "exec_command",
+        "restart_container"
+      ]
+    },
+    "context7": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@upstash/context7-mcp"
+      ],
+      "envFile": "D:/GT_plan/.cursor/mcp.env",
+      "disabled": false,
+      "autoApprove": [
+        "resolve-library-id",
+        "query-docs",
+        "get-library-docs"
       ]
     }
   }

@@ -28,6 +28,9 @@ from app.services.doc_ai_context_builder import (
     Citation,
 )
 
+# Task 1 起端点先过 ResourceAccessResolver；宿主放行替身的唯一真源见该模块 docstring。
+from ._ai_chat_host_stub import patch_ai_host_authorization
+
 
 # ---------------------------------------------------------------------------
 # Shared strategies
@@ -135,54 +138,53 @@ class TestD2PermissionIsolationProperty:
         num_project_group_allowed,
         num_project_group_denied,
     ):
-        """D2: 对任意权限组合，_user_has_access 正确隔离无权文档
+        """D2: 对任意权限组合，公共 KnowledgeAccessPolicy 正确隔离无权文档
+
+        判定真源已从 ``ContextBuilder._user_has_access`` 收敛到公共
+        ``KnowledgeAccessPolicy``（Feature dsh-agent-panel-integration Task 1 / Req 2.1）。
 
         **Validates: Requirements 5.1**
         """
         from app.models.knowledge_models import KnowledgeAccessLevel
+        from app.services.knowledge_access_policy import (
+            KnowledgeAccessPolicy,
+            KnowledgeAccessSubject,
+            KnowledgeResource,
+        )
 
         user_id = uuid4()
         allowed_project = uuid4()
-        user_project_ids = [allowed_project]
+        subject = KnowledgeAccessSubject(
+            user_id=user_id, project_ids=frozenset({allowed_project})
+        )
+
+        def _can_read(level, project_ids, created_by) -> bool:
+            return KnowledgeAccessPolicy.can_read(
+                subject, KnowledgeResource.of_row(level, project_ids, created_by)
+            )
 
         # public 文档 — 所有人可访问
         for _ in range(num_public):
-            assert ContextBuilder._user_has_access(
-                KnowledgeAccessLevel.public, None, None, user_id, user_project_ids
-            ) is True
+            assert _can_read(KnowledgeAccessLevel.public, None, None) is True
 
         # private 文档（用户是创建者）— 可访问
         for _ in range(num_private_owned):
-            assert ContextBuilder._user_has_access(
-                KnowledgeAccessLevel.private, None, user_id, user_id, user_project_ids
-            ) is True
+            assert _can_read(KnowledgeAccessLevel.private, None, user_id) is True
 
         # private 文档（他人创建）— 不可访问
         for _ in range(num_private_other):
-            other_user = uuid4()
-            assert ContextBuilder._user_has_access(
-                KnowledgeAccessLevel.private, None, other_user, user_id, user_project_ids
-            ) is False
+            assert _can_read(KnowledgeAccessLevel.private, None, uuid4()) is False
 
         # project_group 文档（用户属于允许项目）— 可访问
         for _ in range(num_project_group_allowed):
-            assert ContextBuilder._user_has_access(
-                KnowledgeAccessLevel.project_group,
-                [str(allowed_project)],
-                None,
-                user_id,
-                user_project_ids,
+            assert _can_read(
+                KnowledgeAccessLevel.project_group, [str(allowed_project)], None
             ) is True
 
         # project_group 文档（用户不属于允许项目）— 不可访问
         for _ in range(num_project_group_denied):
-            other_project = uuid4()
-            assert ContextBuilder._user_has_access(
-                KnowledgeAccessLevel.project_group,
-                [str(other_project)],
-                None,
-                user_id,
-                user_project_ids,
+            assert _can_read(
+                KnowledgeAccessLevel.project_group, [str(uuid4())], None
             ) is False
 
 
@@ -231,10 +233,20 @@ class TestD3CitationTraceabilityProperty:
 
 
 class TestD4ConfirmGateProperty:
-    """D4 属性 PBT：AI 生成内容回写前必经 AIContentMustBeConfirmedRule（pending 状态）
+    """D4 属性 PBT：AI 生成内容回写前必经确认流，且**正文不可由客户端提供**
 
     **Validates: Requirements 2.4, 5.1**
-    属性 D4: 确认流门禁 — adopt 端点对任意有效 AdoptRequest 都调用 wrap_ai_output_with_log 且返回 pending
+    属性 D4: 确认流门禁。
+
+    Task 7（dsh-agent-panel-integration Req 8.1/8.6）改变了 D4 的成立方式：正文不再
+    随请求提交，而由服务端按 message ID 读库。因此这里的属性也随之变为
+    "**对任意**客户端试图夹带的正文/置信度/项目断言，请求契约都拒绝"——
+    这比原来的"任意 content 都返回 pending"更贴近 D4 要防的事（AI 内容不可伪造）。
+
+    正文侧的行为（写进 ``ai_content_log`` 的必须是库里那条消息、失败必回滚）在
+    ``backend/tests/dsh_agent_panel/test_task7_adopt_fail_closed.py`` 的真实
+    PostgreSQL 上守卫 —— 在 mock DB 上重演会把读消息/收据/存在性核验全部替身掉，
+    那样的"通过"只证明替身自己一致。
     """
 
     @given(
@@ -245,57 +257,31 @@ class TestD4ConfirmGateProperty:
         confidence=st.floats(min_value=0.0, max_value=1.0, allow_nan=False),
     )
     @settings(max_examples=12)
-    def test_d4_adopt_always_calls_wrap_with_pending(
+    def test_d4_adopt_request_never_accepts_client_supplied_content(
         self, content, doc_type, confidence
     ):
-        """D4: 对任意有效 AdoptRequest，adopt 端点必调用 wrap_ai_output_with_log
-        且返回 confirm_action='pending'
+        """D4: 对任意 (正文, 宿主类型, 置信度)，采纳请求都拒绝客户端夹带的正文。
 
         **Validates: Requirements 2.4, 5.1**
         """
-        import asyncio
-        from app.routers.doc_ai_chat import adopt_ai_content, AdoptRequest
+        from pydantic import ValidationError
+        from app.routers.doc_ai_chat import AdoptHostRef, AdoptRequest
 
-        project_id = uuid4()
-        doc_id = uuid4()
-
-        req = AdoptRequest(
-            content=content,
-            project_id=str(project_id),
-            doc_type=doc_type,
-            doc_id=str(doc_id),
-            confidence=confidence,
-        )
-
-        mock_db = _mock_db()
-        mock_user = MagicMock()
-        mock_user.id = uuid4()
-
-        mock_wrap_result = {
-            "id": str(uuid4()),
-            "ai_content_log_id": str(uuid4()),
-            "confirm_action": "pending",
-            "content_hash": "a" * 64,
-            "content": content,
+        legit = {
+            "message_id": uuid4(),
+            "host": AdoptHostRef(type=doc_type, id=str(uuid4())),
+            "idempotency_key": uuid4(),
         }
+        # 合法契约始终可构造（避免"全都拒绝"式的假绿）
+        parsed = AdoptRequest(**legit)
+        assert parsed.host.type == doc_type
+        assert not hasattr(parsed, "content")
 
-        with patch(
-            "app.services.wp_ai_service.wrap_ai_output_with_log",
-            new_callable=AsyncMock,
-            return_value=mock_wrap_result,
-        ) as mock_wrap:
-            result = asyncio.run(
-                adopt_ai_content(req, db=mock_db, current_user=mock_user)
-            )
-
-            # D4 核心断言：wrap_ai_output_with_log 必须被调用
-            mock_wrap.assert_called_once()
-
-            # D4 核心断言：返回 pending 状态
-            assert result["confirm_action"] == "pending", (
-                f"D4 violated: confirm_action={result['confirm_action']}, expected 'pending'"
-            )
-            assert result["ai_content_log_id"] is not None, (
-                "D4 violated: ai_content_log_id is None"
-            )
-            assert result["success"] is True
+        for smuggled in (
+            {"content": content},
+            {"confidence": confidence},
+            {"content": content, "confidence": confidence},
+            {"doc_type": doc_type, "doc_id": str(uuid4())},
+        ):
+            with pytest.raises(ValidationError):
+                AdoptRequest(**{**legit, **smuggled})

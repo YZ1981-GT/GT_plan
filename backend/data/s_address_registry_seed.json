@@ -1,0 +1,69 @@
+{
+  "cycle": "S",
+  "description": "S 类专项循环 address_registry 坐标注册（仅 audit-sheet 类型底稿）",
+  "entries": [
+    {
+      "wp_code": "S15",
+      "wp_name": "每股收益和净资产收益率",
+      "sheet_name": "每股收益",
+      "coordinates": [
+        {
+          "purpose": "basic_eps",
+          "cell_ref": "D8",
+          "label": "基本每股收益",
+          "data_type": "decimal",
+          "unit": "元/股"
+        },
+        {
+          "purpose": "diluted_eps",
+          "cell_ref": "D12",
+          "label": "稀释每股收益",
+          "data_type": "decimal",
+          "unit": "元/股"
+        },
+        {
+          "purpose": "weighted_avg_roe",
+          "cell_ref": "D16",
+          "label": "加权平均净资产收益率",
+          "data_type": "percentage",
+          "unit": "%"
+        },
+        {
+          "purpose": "net_profit",
+          "cell_ref": "C8",
+          "label": "归属于普通股东的净利润",
+          "data_type": "decimal",
+          "unit": "元"
+        },
+        {
+          "purpose": "weighted_avg_shares",
+          "cell_ref": "C12",
+          "label": "加权平均普通股股数",
+          "data_type": "integer",
+          "unit": "股"
+        }
+      ]
+    },
+    {
+      "wp_code": "S17",
+      "wp_name": "非经常性损益",
+      "sheet_name": "非经常性损益",
+      "coordinates": [
+        {
+          "purpose": "non_recurring_total",
+          "cell_ref": "E30",
+          "label": "非经常性损益合计",
+          "data_type": "decimal",
+          "unit": "元"
+        },
+        {
+          "purpose": "adjusted_net_profit",
+          "cell_ref": "E35",
+          "label": "扣除非经常性损益后的净利润",
+          "data_type": "decimal",
+          "unit": "元"
+        }
+      ]
+    }
+  ]
+}

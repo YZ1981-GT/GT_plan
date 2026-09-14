@@ -1,0 +1,185 @@
+[
+  {
+    "id": "F01",
+    "side": "fe",
+    "want": "两个 variant 的种子 id 序列逐项相等",
+    "why": "把 variant 编进行身份 —— 于是「仅人民币」种下的行在「人民币及外币」Tab 里全部认不出来，两版共用持久化键会让行翻倍或错位。只测金额守恒的守卫放行这一形态",
+    "verdict": "RED",
+    "summary": "25/27 passed, numFailedTestSuites=2",
+    "added": [
+      "Property 23 ①：stable field key 与 variant 解耦 id 里不出现 variant 名（身份绑 variant 会让切表后行全部错位）",
+      "Property 23 ①：stable field key 与 variant 解耦 🔴 两个 variant 的种子 id 序列逐项相等（权威模板里 identity 列 A..D 两版相同）"
+    ],
+    "gone": [],
+    "hit": [
+      "Property 23 ①：stable field key 与 variant 解耦 🔴 两个 variant 的种子 id 序列逐项相等（权威模板里 identity 列 A..D 两版相同）"
+    ],
+    "added_files": [
+      "e1SyncEntryRowIdentity.spec.ts"
+    ],
+    "restored": true,
+    "seconds": 2.9
+  },
+  {
+    "id": "F02",
+    "side": "fe",
+    "want": "id 由账号派生",
+    "why": "把行身份换成「已用条数」= 事实上的数组下标 —— Requirement 6.5 的原始禁令。单次往返内下标自洽，所以只有跨删/增/重排的身份判据能抓到",
+    "verdict": "RED",
+    "summary": "24/27 passed, numFailedTestSuites=2",
+    "added": [
+      "Property 23 ①：stable field key 与 variant 解耦 同账号重复出现时以后缀去重，不改用下标（seed 内 id 唯一）",
+      "Property 23 ①：stable field key 与 variant 解耦 🔴 id 由账号派生：每行 id 必须含自己的账号，且不等于任何下标形态",
+      "Property 23 ①：stable field key 与 variant 解耦 🔴 打乱账户输入顺序后，每个账户仍拿到同一个 id（身份不随位置漂移）"
+    ],
+    "gone": [],
+    "hit": [
+      "Property 23 ①：stable field key 与 variant 解耦 🔴 id 由账号派生：每行 id 必须含自己的账号，且不等于任何下标形态"
+    ],
+    "added_files": [
+      "e1SyncEntryRowIdentity.spec.ts"
+    ],
+    "restored": true,
+    "seconds": 3.1
+  },
+  {
+    "id": "F03",
+    "side": "fe",
+    "want": "与 E1-3 不撞键",
+    "why": "让 E1-10 与 E1-3 共用 id 命名空间 —— 两张表的种子会互相覆盖（平台已登记的「行 id 撞键让两种口径互相覆盖」形态）",
+    "verdict": "RED",
+    "summary": "26/27 passed, numFailedTestSuites=2",
+    "added": [
+      "Property 23 ④：E1-10 账户清单行身份 🔴 与 E1-3 不撞键（两张表的行 id 命名空间必须分开）"
+    ],
+    "gone": [],
+    "hit": [
+      "Property 23 ④：E1-10 账户清单行身份 🔴 与 E1-3 不撞键（两张表的行 id 命名空间必须分开）"
+    ],
+    "added_files": [
+      "e1SyncEntryRowIdentity.spec.ts"
+    ],
+    "restored": true,
+    "seconds": 3.0
+  },
+  {
+    "id": "F04",
+    "side": "fe",
+    "want": "删中间一行再新增，新行 id 不等于任何已删 id",
+    "why": "删除改成按位置切首行 —— 用户点第 2 行的删除按钮却删掉第 1 行。断言「行数少了 1」的判据会放行它，必须断言「被删的那个 id 不在了」",
+    "verdict": "RED",
+    "summary": "26/27 passed, numFailedTestSuites=2",
+    "added": [
+      "Property 23 ③：删除后再新增不复用旧 id，原行数据不串到新行 🔴 删中间一行再新增，新行 id 不等于任何已删 id"
+    ],
+    "gone": [],
+    "hit": [
+      "Property 23 ③：删除后再新增不复用旧 id，原行数据不串到新行 🔴 删中间一行再新增，新行 id 不等于任何已删 id"
+    ],
+    "added_files": [
+      "e1SyncEntryRowIdentity.spec.ts"
+    ],
+    "restored": true,
+    "seconds": 3.1
+  },
+  {
+    "id": "F05",
+    "side": "fe",
+    "want": "updateCell 按 id 定位而非下标",
+    "why": "改格改成恒改第一行 —— 删行后下标与 id 不再对应，审计师在末行录的数会落到首行。必须同时断言「目标行改了」与「其它行没被改」",
+    "verdict": "RED",
+    "summary": "26/27 passed, numFailedTestSuites=2",
+    "added": [
+      "Property 23 ③：删除后再新增不复用旧 id，原行数据不串到新行 🔴 updateCell 按 id 定位而非下标：删首行后改末行仍改到正确的行"
+    ],
+    "gone": [],
+    "hit": [
+      "Property 23 ③：删除后再新增不复用旧 id，原行数据不串到新行 🔴 updateCell 按 id 定位而非下标：删首行后改末行仍改到正确的行"
+    ],
+    "added_files": [
+      "e1SyncEntryRowIdentity.spec.ts"
+    ],
+    "restored": true,
+    "seconds": 3.0
+  },
+  {
+    "id": "F06",
+    "side": "fe",
+    "want": "新增行的 id 不是「当前行数」这类下标派生值",
+    "why": "新增行的 id 变成「当前行数」—— 再删再增就会复用已删身份（Property 23 原文禁止的「旧 row_uuid 复用」）。身份宽度与非下标性都要断言",
+    "verdict": "RED",
+    "summary": "26/27 passed, numFailedTestSuites=2",
+    "added": [
+      "Property 23 ③：删除后再新增不复用旧 id，原行数据不串到新行 🔴 新增行的 id 不是「当前行数」这类下标派生值"
+    ],
+    "gone": [],
+    "hit": [
+      "Property 23 ③：删除后再新增不复用旧 id，原行数据不串到新行 🔴 新增行的 id 不是「当前行数」这类下标派生值"
+    ],
+    "added_files": [
+      "e1SyncEntryRowIdentity.spec.ts"
+    ],
+    "restored": true,
+    "seconds": 3.0
+  },
+  {
+    "id": "F07",
+    "side": "fe",
+    "want": "rmb 种子被 multi Tab 消费时，本位币账户的身份与金额同时保住",
+    "why": "恢复抹零缺陷本体 —— 本条是「防 variant 切换抹零」在身份守卫里的回归支点：身份保住而金额被抹成 0 时，界面显示的是一排 `-`，比取不到更坏",
+    "verdict": "RED",
+    "summary": "26/27 passed, numFailedTestSuites=2",
+    "added": [
+      "Property 23 ②：种子的 variant 与消费它的 Tab 的 variant 串联 🔴 rmb 种子被 multi Tab 消费时，本位币账户的身份与金额同时保住（抹零回归支点）"
+    ],
+    "gone": [],
+    "hit": [
+      "Property 23 ②：种子的 variant 与消费它的 Tab 的 variant 串联 🔴 rmb 种子被 multi Tab 消费时，本位币账户的身份与金额同时保住（抹零回归支点）"
+    ],
+    "added_files": [
+      "e1SyncEntryRowIdentity.spec.ts"
+    ],
+    "restored": true,
+    "seconds": 3.1
+  },
+  {
+    "id": "F08",
+    "side": "fe",
+    "want": "运行时切 variant 后行 id 不变",
+    "why": "切 variant 时按下标重建身份 —— 与平台已登记的「resolveRestrictedRows 按数组下标重算 id 覆盖稳定序号」同型：删后再增会复用已删序号、历史备注串到新行",
+    "verdict": "RED",
+    "summary": "26/27 passed, numFailedTestSuites=2",
+    "added": [
+      "Property 23 ②：种子的 variant 与消费它的 Tab 的 variant 串联 🔴 运行时切 variant 后行 id 不变（切表不得重建身份）"
+    ],
+    "gone": [],
+    "hit": [
+      "Property 23 ②：种子的 variant 与消费它的 Tab 的 variant 串联 🔴 运行时切 variant 后行 id 不变（切表不得重建身份）"
+    ],
+    "added_files": [
+      "e1SyncEntryRowIdentity.spec.ts"
+    ],
+    "restored": true,
+    "seconds": 3.0
+  },
+  {
+    "id": "F09",
+    "side": "fe",
+    "want": "extractG1SheetCode 把 E1-5",
+    "why": "BP-4 的 characterization 必须可 falsify：改掉那条分支后本节应打红，提示复核者「缺陷已变化，去更新 slice 的 blocking_preconditions[BP-4]」。characterization 若不可 falsify，就退化成把错值当基线锁死",
+    "verdict": "RED",
+    "summary": "26/27 passed, numFailedTestSuites=2",
+    "added": [
+      "BP-4 characterization：E1 复用 G1 sheet 解析器（修好后本节应打红并更新 slice） 实况：extractG1SheetCode 把 E1-5「调整分录汇总」归一进 G1 命名空间（返回 G1-3）"
+    ],
+    "gone": [],
+    "hit": [
+      "BP-4 characterization：E1 复用 G1 sheet 解析器（修好后本节应打红并更新 slice） 实况：extractG1SheetCode 把 E1-5「调整分录汇总」归一进 G1 命名空间（返回 G1-3）"
+    ],
+    "added_files": [
+      "e1SyncEntryRowIdentity.spec.ts"
+    ],
+    "restored": true,
+    "seconds": 3.2
+  }
+]

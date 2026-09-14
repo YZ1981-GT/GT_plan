@@ -21,7 +21,7 @@ export function useNoteSectionNumbering(projectId: () => string, year: () => num
     try {
       const resp: any = await api.get(
         `/api/disclosure-notes/${projectId()}/${year()}/section-numbers`,
-        { params: { scope: scope || state.value.scope } }
+        { params: { scope: scope || state.value.scope }, _silent: true } as any
       )
       state.value.renderedNumbers = resp || {}
     } catch {

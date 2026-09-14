@@ -1,0 +1,95 @@
+# C21-1.yaml — IT审计发现汇总表
+# componentType: d-form-table
+# Requirements: G4-3 IT 审计发现汇总
+
+wp_code: C21-1
+template_version: v2025-R5
+description: |
+  汇总所有 IT 审计发现，统一管理和跟踪 IT 控制缺陷。
+  C22 步骤结论为"无效"时自动创建待填写的发现记录。
+
+sheets:
+  IT审计发现汇总表:
+    component_type: d-form-table
+    form_type: table
+    title: IT审计发现汇总表
+    description: 汇总 C22/C26 测试中发现的 IT 控制问题。
+
+    dynamic_table:
+      add_row_button: true
+      max_rows: 50
+      columns:
+        finding_no:
+          field: finding_no
+          type: text
+          label: 发现编号
+          width: 90
+          auto_increment: true
+          hint: "自动递增：IT-001, IT-002..."
+        source_wp:
+          field: source_wp
+          type: text
+          label: 来源底稿
+          width: 100
+          render_hint: ref_chip
+        control_area:
+          field: control_area
+          type: enum
+          label: 控制领域
+          width: 100
+          dict_source: control_area_dict
+        description:
+          field: description
+          type: textarea
+          label: 发现描述
+          width: 250
+        risk_level:
+          field: risk_level
+          type: enum
+          label: 风险等级
+          width: 90
+          dict_source: risk_level_dict
+          render_hint: risk_badge
+        management_reply:
+          field: management_reply
+          type: textarea
+          label: 管理层回复
+          width: 200
+        remediation_status:
+          field: remediation_status
+          type: enum
+          label: 整改状态
+          width: 100
+          dict_source: remediation_status_dict
+          render_hint: risk_badge
+
+    dictionaries:
+      control_area_dict:
+        - value: SA
+          label: 安全管理
+        - value: PE
+          label: 程序变更
+        - value: PM
+          label: 程序开发
+        - value: NS
+          label: 网络安全
+      risk_level_dict:
+        - value: high
+          label: 高
+          color: red
+        - value: medium
+          label: 中
+          color: yellow
+        - value: low
+          label: 低
+          color: green
+      remediation_status_dict:
+        - value: remediated
+          label: 已整改
+          color: green
+        - value: in_progress
+          label: 整改中
+          color: yellow
+        - value: not_remediated
+          label: 未整改
+          color: red

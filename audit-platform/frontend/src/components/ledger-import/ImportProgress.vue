@@ -41,15 +41,24 @@
 
     <!-- 操作按钮 -->
     <div class="step-actions">
-      <el-button
+      <el-tooltip
         v-if="!isFinished"
-        aria-label="放到后台继续"
-        type="primary"
-        plain
-        @click="onMoveToBackground"
+        :disabled="canMoveToBackground"
+        content="数据写入数据库后才可放到后台，请稍候..."
+        placement="top"
       >
-        放到后台继续
-      </el-button>
+        <span>
+          <el-button
+            aria-label="放到后台继续"
+            type="primary"
+            plain
+            :disabled="!canMoveToBackground"
+            @click="onMoveToBackground"
+          >
+            {{ canMoveToBackground ? '放到后台继续' : '准备中，请稍候…' }}
+          </el-button>
+        </span>
+      </el-tooltip>
       <el-button
         v-if="!isFinished"
         type="danger"
@@ -94,6 +103,7 @@
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { Loading, CircleCheck, CircleClose } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { useSSEReconnect } from '@/composables/useSSEReconnect'
 
 // ─── Props & Emits ──────────────────────────────────────────────────────────
 
@@ -121,11 +131,13 @@ interface PhaseInfo {
 interface SSEMessage {
   phase: string
   percent?: number
+  status?: string
   file?: string
   sheet?: string
   rows?: number
   message?: string
   dataset_id?: string
+  result?: unknown
   error?: string
 }
 
@@ -137,7 +149,6 @@ const statusMessage = ref('准备中...')
 const currentFile = ref('')
 const isFinished = ref(false)
 const isSuccess = ref(false)
-let eventSource: EventSource | null = null
 
 const phases = ref<PhaseInfo[]>([
   { key: 'uploading', label: '上传', percent: 100, completed: true },
@@ -166,28 +177,64 @@ const progressStatus = computed(() => {
   return undefined
 })
 
-// ─── SSE Subscription ───────────────────────────────────────────────────────
+// 是否可安全"放到后台继续"——必须到达"写入"阶段后（解析/校验阶段中断风险高）
+const PHASE_ORDER = ['uploading', 'parsing', 'validating', 'writing', 'activating']
+const bgTimeoutElapsed = ref(false)
+let bgTimeoutTimer: ReturnType<typeof setTimeout> | null = null
+const canMoveToBackground = computed(() => {
+  const idx = PHASE_ORDER.indexOf(currentPhase.value)
+  // 写入阶段(idx>=3)或已完成才允许后台化；
+  // 兜底：挂载超过 30s 仍未推到 writing（单 worker 阻塞 SSE）也放开——
+  // 后台化本质只关 SSE 不影响后端继续跑，不会丢数据
+  return idx >= 3 || isFinished.value || bgTimeoutElapsed.value
+})
 
-function connectSSE() {
-  const url = `/api/projects/${props.projectId}/ledger-import/jobs/${props.jobId}/stream`
-  eventSource = new EventSource(url)
+// ─── SSE via useSSEReconnect ────────────────────────────────────────────────
 
-  eventSource.onmessage = (event) => {
-    try {
-      const data: SSEMessage = JSON.parse(event.data)
-      handleSSEMessage(data)
-    } catch {
-      // ignore parse errors
+const { connected, reconnecting, gaveUp, close: closeSSE } = useSSEReconnect({
+  url: () => `/api/projects/${props.projectId}/ledger-import/jobs/${props.jobId}/stream`,
+  onMessage: handleSSEMessage,
+  pollFallback: async () => {
+    const { api } = await import('@/services/apiProxy')
+    const job: any = await api.get(
+      `/api/projects/${props.projectId}/ledger-import/jobs/${props.jobId}`,
+      { _silent: true } as any
+    )
+    const status = job?.status
+    if (status === 'completed') {
+      isFinished.value = true
+      isSuccess.value = true
+      statusMessage.value = '导入完成'
+      currentFile.value = ''
+      phases.value.forEach(p => { p.percent = 100; p.completed = true })
+      totalPercent.value = 100
+      return 'completed'
     }
-  }
-
-  eventSource.onerror = () => {
-    // SSE 断开，可能是完成或网络问题
-    if (!isFinished.value) {
-      statusMessage.value = '连接中断，正在重试...'
+    if (status === 'failed' || status === 'timed_out' || status === 'canceled') {
+      isFinished.value = true
+      isSuccess.value = false
+      statusMessage.value = job?.error_message || job?.message || '导入失败'
+      emit('failed')
+      return 'failed'
     }
-  }
-}
+    // 仍在进行中：同步一次进度
+    if (typeof job?.progress_pct === 'number') {
+      totalPercent.value = job.progress_pct
+    }
+    if (job?.progress_message) {
+      statusMessage.value = job.progress_message
+    }
+    return 'running'
+  },
+  maxAttempts: 30,
+  backoffMs: 2000,
+  onReconnecting: () => {
+    statusMessage.value = '正在同步进度...'
+  },
+  onGaveUp: () => {
+    statusMessage.value = '连接中断，请稍候或点"放到后台继续"'
+  },
+})
 
 function handleSSEMessage(data: SSEMessage) {
   // 映射后端 phase 到前端 phase key（bootstrap/queued/pending 都归入 parsing）
@@ -217,8 +264,8 @@ function handleSSEMessage(data: SSEMessage) {
   const total = phases.value.reduce((sum, p) => sum + p.percent, 0)
   totalPercent.value = Math.round(total / phases.value.length)
 
-  // 完成
-  if (data.phase === 'completed') {
+  // 完成（后端可能用 phase:"completed" 或 status:"completed" 表示）
+  if (data.phase === 'completed' || data.status === 'completed') {
     isFinished.value = true
     isSuccess.value = true
     statusMessage.value = '导入完成'
@@ -228,20 +275,19 @@ function handleSSEMessage(data: SSEMessage) {
     closeSSE()
   }
 
-  // 失败
-  if (data.phase === 'failed' || data.error) {
+  // 失败（phase/status/error 任一指示失败）
+  if (
+    data.phase === 'failed' ||
+    data.status === 'failed' ||
+    data.status === 'timed_out' ||
+    data.status === 'canceled' ||
+    data.error
+  ) {
     isFinished.value = true
     isSuccess.value = false
-    statusMessage.value = data.error || '导入失败'
+    statusMessage.value = data.error || data.message || '导入失败'
     closeSSE()
     emit('failed')
-  }
-}
-
-function closeSSE() {
-  if (eventSource) {
-    eventSource.close()
-    eventSource = null
   }
 }
 
@@ -273,14 +319,15 @@ function onMoveToBackground() {
   emit('background')
 }
 
-// ─── Lifecycle ──────────────────────────────────────────────────────────────
-
+// 导入进行期间抑制全局超时弹窗（后端 worker 被大文件占用，其他请求超时属正常）
 onMounted(() => {
-  connectSSE()
+  ;(globalThis as any).__suppressTimeoutToast = true
+  // 兜底：30s 后即使 SSE 未推到 writing（单 worker 阻塞）也允许"放到后台继续"
+  bgTimeoutTimer = setTimeout(() => { bgTimeoutElapsed.value = true }, 30000)
 })
-
 onUnmounted(() => {
-  closeSSE()
+  ;(globalThis as any).__suppressTimeoutToast = false
+  if (bgTimeoutTimer) clearTimeout(bgTimeoutTimer)
 })
 </script>
 

@@ -101,7 +101,13 @@ class NoteDataLockService:
         # 收集附注数据
         note_result = await self._db.execute(
             text("""
-                SELECT section_code, title, content, table_data
+                -- 真实列名：section_id / section_title / text_content
+                -- （原 section_code / title / content 全不存在）；
+                -- 用别名保持快照里的键名不变。
+                SELECT section_id    AS section_code,
+                       section_title AS title,
+                       text_content  AS content,
+                       table_data
                 FROM disclosure_notes
                 WHERE project_id = :pid AND year = :year
                 ORDER BY sort_order

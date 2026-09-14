@@ -1,0 +1,466 @@
+{
+  "measured_at": "2026-09-12",
+  "tool": "openpyxl data_only=False",
+  "template_path": "backend/wp_templates/D/D4 收入底稿.xlsx",
+  "template_sha256": "b8fb92d4c22cd5d639e415403a12cb61650639153f136a5330c930b880167b5f",
+  "managed_sheet": "其他业务收入明细表D4-3",
+  "dimensions": "A1:N40",
+  "header_rows": [
+    11,
+    12
+  ],
+  "first_data_row": 13,
+  "last_data_row": 19,
+  "footer_row": 20,
+  "footer_marker_exact": "合计",
+  "footer_marker_codepoints": [
+    "0x5408",
+    "0x8ba1"
+  ],
+  "band_R10_R21": {
+    "R11": [
+      "项目",
+      "本期数",
+      null,
+      null,
+      null,
+      null,
+      "上期数",
+      null,
+      null,
+      null,
+      null,
+      "本期数比上期增加（减少）",
+      null,
+      "备注"
+    ],
+    "R12": [
+      null,
+      "本期未审数",
+      "账项调整",
+      "重分类调整",
+      "本期审定数",
+      "结构比",
+      "上期未审数",
+      "账项调整",
+      "重分类调整",
+      "上期审定额",
+      "结构比",
+      "变动额",
+      "变动率",
+      null
+    ],
+    "R13": [
+      "出租固定资产",
+      null,
+      null,
+      null,
+      "=B13+C13+D13",
+      "=IF(E13=0,0,E13/$E$20)",
+      null,
+      null,
+      null,
+      "=G13+H13+I13",
+      "=IF(J13=0,0,J13/$J$20)",
+      "=E13-J13",
+      "=IF(AND(J13=0,L13=0),0,IF(AND(J13=0,L13>0),1,L13/J13))",
+      null
+    ],
+    "R14": [
+      "出租无形资产",
+      null,
+      null,
+      null,
+      "=B14+C14+D14",
+      "=IF(E14=0,0,E14/$E$20)",
+      null,
+      null,
+      null,
+      "=G14+H14+I14",
+      "=IF(J14=0,0,J14/$J$20)",
+      "=E14-J14",
+      "=IF(AND(J14=0,L14=0),0,IF(AND(J14=0,L14>0),1,L14/J14))",
+      null
+    ],
+    "R15": [
+      "出租包装物和商品",
+      null,
+      null,
+      null,
+      "=B15+C15+D15",
+      "=IF(E15=0,0,E15/$E$20)",
+      null,
+      null,
+      null,
+      "=G15+H15+I15",
+      "=IF(J15=0,0,J15/$J$20)",
+      "=E15-J15",
+      "=IF(AND(J15=0,L15=0),0,IF(AND(J15=0,L15>0),1,L15/J15))",
+      null
+    ],
+    "R16": [
+      "销售材料",
+      null,
+      null,
+      null,
+      "=B16+C16+D16",
+      "=IF(E16=0,0,E16/$E$20)",
+      null,
+      null,
+      null,
+      "=G16+H16+I16",
+      "=IF(J16=0,0,J16/$J$20)",
+      "=E16-J16",
+      "=IF(AND(J16=0,L16=0),0,IF(AND(J16=0,L16>0),1,L16/J16))",
+      null
+    ],
+    "R17": [
+      "用材料进行非货币性交换",
+      null,
+      null,
+      null,
+      "=B17+C17+D17",
+      "=IF(E17=0,0,E17/$E$20)",
+      null,
+      null,
+      null,
+      "=G17+H17+I17",
+      "=IF(J17=0,0,J17/$J$20)",
+      "=E17-J17",
+      "=IF(AND(J17=0,L17=0),0,IF(AND(J17=0,L17>0),1,L17/J17))",
+      null
+    ],
+    "R18": [
+      "投资性房地产租金收入",
+      null,
+      null,
+      null,
+      "=B18+C18+D18",
+      "=IF(E18=0,0,E18/$E$20)",
+      null,
+      null,
+      null,
+      "=G18+H18+I18",
+      "=IF(J18=0,0,J18/$J$20)",
+      "=E18-J18",
+      "=IF(AND(J18=0,L18=0),0,IF(AND(J18=0,L18>0),1,L18/J18))",
+      null
+    ],
+    "R19": [
+      "……",
+      null,
+      null,
+      null,
+      "=B19+C19+D19",
+      "=IF(E19=0,0,E19/$E$20)",
+      null,
+      null,
+      null,
+      "=G19+H19+I19",
+      "=IF(J19=0,0,J19/$J$20)",
+      "=E19-J19",
+      "=IF(AND(J19=0,L19=0),0,IF(AND(J19=0,L19>0),1,L19/J19))",
+      null
+    ],
+    "R20": [
+      "合计",
+      "=SUM(B13:B19)",
+      "=SUM(C13:C19)",
+      "=SUM(D13:D19)",
+      "=SUM(E13:E19)",
+      "=IF(E20=0,0,E20/$E$20)",
+      "=SUM(G13:G19)",
+      "=SUM(H13:H19)",
+      "=SUM(I13:I19)",
+      "=SUM(J13:J19)",
+      "=IF(J20=0,0,J20/$J$20)",
+      "=E20-J20",
+      "=IF(AND(J20=0,L20=0),0,IF(AND(J20=0,L20>0),1,L20/J20))",
+      null
+    ],
+    "R21": [
+      "三、审计说明：",
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null
+    ]
+  },
+  "formula_count_sample": 54,
+  "external_bracket_formulas": 0,
+  "sample_formulas": [
+    {
+      "cell": "E13",
+      "f": "=B13+C13+D13"
+    },
+    {
+      "cell": "F13",
+      "f": "=IF(E13=0,0,E13/$E$20)"
+    },
+    {
+      "cell": "J13",
+      "f": "=G13+H13+I13"
+    },
+    {
+      "cell": "K13",
+      "f": "=IF(J13=0,0,J13/$J$20)"
+    },
+    {
+      "cell": "L13",
+      "f": "=E13-J13"
+    },
+    {
+      "cell": "M13",
+      "f": "=IF(AND(J13=0,L13=0),0,IF(AND(J13=0,L13>0),1,L13/J13))"
+    },
+    {
+      "cell": "E14",
+      "f": "=B14+C14+D14"
+    },
+    {
+      "cell": "F14",
+      "f": "=IF(E14=0,0,E14/$E$20)"
+    },
+    {
+      "cell": "J14",
+      "f": "=G14+H14+I14"
+    },
+    {
+      "cell": "K14",
+      "f": "=IF(J14=0,0,J14/$J$20)"
+    },
+    {
+      "cell": "L14",
+      "f": "=E14-J14"
+    },
+    {
+      "cell": "M14",
+      "f": "=IF(AND(J14=0,L14=0),0,IF(AND(J14=0,L14>0),1,L14/J14))"
+    },
+    {
+      "cell": "E15",
+      "f": "=B15+C15+D15"
+    },
+    {
+      "cell": "F15",
+      "f": "=IF(E15=0,0,E15/$E$20)"
+    },
+    {
+      "cell": "J15",
+      "f": "=G15+H15+I15"
+    },
+    {
+      "cell": "K15",
+      "f": "=IF(J15=0,0,J15/$J$20)"
+    },
+    {
+      "cell": "L15",
+      "f": "=E15-J15"
+    },
+    {
+      "cell": "M15",
+      "f": "=IF(AND(J15=0,L15=0),0,IF(AND(J15=0,L15>0),1,L15/J15))"
+    },
+    {
+      "cell": "E16",
+      "f": "=B16+C16+D16"
+    },
+    {
+      "cell": "F16",
+      "f": "=IF(E16=0,0,E16/$E$20)"
+    }
+  ],
+  "merged_ranges": [
+    "A1:N1",
+    "A2:N2",
+    "G11:K11",
+    "B11:E11",
+    "A11:A12",
+    "N11:N12"
+  ],
+  "field_map": [
+    {
+      "col": "A",
+      "r12": "项目",
+      "mode": "editable",
+      "store_key": "item",
+      "value_type": "text",
+      "contract": true
+    },
+    {
+      "col": "B",
+      "r12": "本期未审数",
+      "mode": "editable",
+      "store_key": "currentUnadjusted",
+      "value_type": "amount",
+      "contract": true
+    },
+    {
+      "col": "C",
+      "r12": "账项调整",
+      "mode": "editable",
+      "store_key": "currentAdjustment",
+      "value_type": "amount",
+      "contract": true
+    },
+    {
+      "col": "D",
+      "r12": "重分类调整",
+      "mode": "mask_or_zero",
+      "store_key": null,
+      "value_type": "amount",
+      "contract": false,
+      "note": "HTML store 无此字段；不进契约，materialize 写 0 / extract 丢弃"
+    },
+    {
+      "col": "E",
+      "r12": "本期审定数",
+      "mode": "formula",
+      "store_key": null,
+      "value_type": "amount",
+      "contract": false
+    },
+    {
+      "col": "F",
+      "r12": "结构比",
+      "mode": "formula",
+      "store_key": null,
+      "value_type": "ratio",
+      "contract": false
+    },
+    {
+      "col": "G",
+      "r12": "上期未审数",
+      "mode": "editable",
+      "store_key": "priorUnadjusted",
+      "value_type": "amount",
+      "contract": true
+    },
+    {
+      "col": "H",
+      "r12": "账项调整",
+      "mode": "editable",
+      "store_key": "priorAdjustment",
+      "value_type": "amount",
+      "contract": true
+    },
+    {
+      "col": "I",
+      "r12": "重分类调整",
+      "mode": "mask_or_zero",
+      "store_key": null,
+      "value_type": "amount",
+      "contract": false,
+      "note": "同 D"
+    },
+    {
+      "col": "J",
+      "r12": "上期审定额",
+      "mode": "formula",
+      "store_key": null,
+      "value_type": "amount",
+      "contract": false
+    },
+    {
+      "col": "K",
+      "r12": "结构比",
+      "mode": "formula",
+      "store_key": null,
+      "value_type": "ratio",
+      "contract": false
+    },
+    {
+      "col": "L",
+      "r12": "变动额",
+      "mode": "formula",
+      "store_key": null,
+      "value_type": "amount",
+      "contract": false
+    },
+    {
+      "col": "M",
+      "r12": "变动率",
+      "mode": "formula",
+      "store_key": null,
+      "value_type": "ratio",
+      "contract": false
+    },
+    {
+      "col": "N",
+      "r11": "备注",
+      "mode": "editable",
+      "store_key": "remark",
+      "value_type": "text",
+      "contract": true
+    }
+  ],
+  "contract_field_count": 6,
+  "store_item_id": "D4-3-rows",
+  "frontend_composable": "useD4OtherRevenue.ts / StoredOtherRow",
+  "reclass_decision": "D/I 不进契约、不进 HTML store；materialize 填 0；extract 忽略",
+  "digest_payload": {
+    "managed_sheet": "其他业务收入明细表D4-3",
+    "header_rows": [
+      11,
+      12
+    ],
+    "first_data_row": 13,
+    "last_data_row": 19,
+    "footer_row": 20,
+    "footer_marker_exact": "合计",
+    "contract_fields": [
+      {
+        "col": "A",
+        "store_key": "item",
+        "value_type": "text"
+      },
+      {
+        "col": "B",
+        "store_key": "currentUnadjusted",
+        "value_type": "amount"
+      },
+      {
+        "col": "C",
+        "store_key": "currentAdjustment",
+        "value_type": "amount"
+      },
+      {
+        "col": "G",
+        "store_key": "priorUnadjusted",
+        "value_type": "amount"
+      },
+      {
+        "col": "H",
+        "store_key": "priorAdjustment",
+        "value_type": "amount"
+      },
+      {
+        "col": "N",
+        "store_key": "remark",
+        "value_type": "text"
+      }
+    ],
+    "mask_cols": [
+      "D",
+      "E",
+      "F",
+      "I",
+      "J",
+      "K",
+      "L",
+      "M"
+    ],
+    "template_sha256": "b8fb92d4c22cd5d639e415403a12cb61650639153f136a5330c930b880167b5f"
+  },
+  "mapping_digest": "b3186632300c84d14c4c9c3c947cbff0cdcaaf807ce2e5f9848d42195513637f",
+  "architecture_note": "同一 entry 只能挂一个 adapter（registry）；D4-3 必须扩进 d4.revenue_detail 第二 sheets[] / sheet_key=d43-managed，宿主按 currentSheet 切换 sheetKey"
+}

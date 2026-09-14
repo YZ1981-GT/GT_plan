@@ -1,0 +1,111 @@
+{
+  "generated_by": "backend/scripts/_mutation_kit/span.py::run_cli",
+  "mode": "run",
+  "pytest_args": [
+    "backend/tests/workpaper_sync/test_task26_oo_to_html.py",
+    "backend/tests/workpaper_sync/test_task26_oo_to_html_pg.py",
+    "backend/tests/workpaper_sync/test_task14_merge_conflicts.py",
+    "backend/tests/workpaper_sync/test_task15_content_mutation.py",
+    "-q",
+    "--tb=no",
+    "-rf",
+    "-p",
+    "no:randomly"
+  ],
+  "tally": {
+    "RED": 4
+  },
+  "mutations": [
+    {
+      "id": "D01",
+      "path": "backend/app/services/workpaper_sync/oo_to_html.py",
+      "want": "test_task26_oo_to_html_pg.py::TestReapplyIsRefused::test_second_apply_is_refused_with_its_own_error_code",
+      "why": "缺陷②的精确复现（修前形态：`FrozenApplicationIdentity.state` 被逐列冻结却**从未被消费**）。修前真库实测：对已 `applied` 的 application 再调一次 `apply_durable_incoming` **一次异常都不抛** —— `APPLICATION_EDGES[applied]` 是空集，于是 `_walk_application` 的「到不了这一站就跳过」把整条 pipeline 静默跳过，`_advance_application` 又在 `from == to` 时提前返回；Task 15 照常提交，revision 0→1→2、`content_version_count` 3、第二份 published result representation 落库、`application.result_revision` 被原地改写成 2、application/operation timeline 零新增 event。违反 AC 4.3「同一 frozen application 才能应用一次」、AC 8.12 的一对一绑定与 Property 65 的「identity 不可原地改写」",
+      "verdict": "RED",
+      "summary": "2 failed, 462 passed in 51.02s",
+      "added": [
+        "test_task26_oo_to_html_pg.py::TestReapplyIsRefused::test_refusal_happens_before_any_adapter_or_probe_call",
+        "test_task26_oo_to_html_pg.py::TestReapplyIsRefused::test_second_apply_is_refused_with_its_own_error_code"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task26_oo_to_html_pg.py::TestReapplyIsRefused::test_refusal_happens_before_any_adapter_or_probe_call",
+        "test_task26_oo_to_html_pg.py::TestReapplyIsRefused::test_second_apply_is_refused_with_its_own_error_code"
+      ],
+      "added_files": [
+        "test_task26_oo_to_html_pg.py"
+      ],
+      "restored": true,
+      "restored_sha256": "a59b045bbda18f06c2b3168007ea132946da0f1f4f5887dfcb6655a6050fe1cf",
+      "seconds": 55.1
+    },
+    {
+      "id": "D02",
+      "path": "backend/app/services/workpaper_sync/oo_to_html.py",
+      "want": "test_task26_oo_to_html.py::TestApplyStateAdmission::test_every_inadmissible_state_is_refused_with_its_own_code[refresh_required]",
+      "why": "把 `refresh_required` 从「已应用过」误归到「已作废」。刻意保持 partition 成立（否则 import 期的双向锁死会先抛，全文件变 collection error ⇒ 归因不唯一）。两类后续动作完全不同：`refresh_required` 的内容**已经落库**，前端要做的是重开编辑器确认新基线；`superseded/authorization_stale` 的内容根本没落库，只能走 supersede/recovery。共用一个 error_code 时前端无从分辨",
+      "verdict": "RED",
+      "summary": "1 failed, 463 passed in 51.20s",
+      "added": [
+        "test_task26_oo_to_html.py::TestApplyStateAdmission::test_every_inadmissible_state_is_refused_with_its_own_code[refresh_required]"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task26_oo_to_html.py::TestApplyStateAdmission::test_every_inadmissible_state_is_refused_with_its_own_code[refresh_required]"
+      ],
+      "added_files": [
+        "test_task26_oo_to_html.py"
+      ],
+      "restored": true,
+      "restored_sha256": "a59b045bbda18f06c2b3168007ea132946da0f1f4f5887dfcb6655a6050fe1cf",
+      "seconds": 54.7
+    },
+    {
+      "id": "D03",
+      "path": "backend/app/services/workpaper_sync/oo_to_html.py",
+      "want": "test_task26_oo_to_html_pg.py::TestCloseCaptureEligibilityFence::test_epoch_advance_after_promotion_blocks_the_commit",
+      "why": "缺陷①的精确复现（修前形态：`if int(observed.close_leader_eligibility_epoch) < 0`）。`room.close_leader_eligibility_epoch` 是 bigint、server_default 0、全仓库唯一写入点只做 `+1`（`repository.reconcile_close_intents`）⇒ **永远非负** ⇒ `EligibilityEpochAdvancedError` provably-dead，而 `compared` 返回值里却报着 `close_leader_eligibility_epoch`，向调用方宣称「eligibility 已重验」。修前 S17 的结果是 `applied`：leader 在 promotion 之后失格，内容照样提交（AC 10.10 末句要求它进 authorization_stale）",
+      "verdict": "RED",
+      "summary": "4 failed, 460 passed in 51.00s",
+      "added": [
+        "test_task26_oo_to_html.py::TestFinalAuthorizationFence::test_each_branch_rejects_independently[close_capture_eligibility_advanced]",
+        "test_task26_oo_to_html_pg.py::TestCloseCaptureEligibilityFence::test_epoch_advance_after_promotion_blocks_the_commit",
+        "test_task26_oo_to_html_pg.py::TestCloseCaptureEligibilityFence::test_generation_is_superseded_so_the_close_is_not_blocked_forever",
+        "test_task26_oo_to_html_pg.py::TestCloseCaptureEligibilityFence::test_nothing_committed_when_eligibility_advanced"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task26_oo_to_html.py::TestFinalAuthorizationFence::test_each_branch_rejects_independently[close_capture_eligibility_advanced]",
+        "test_task26_oo_to_html_pg.py::TestCloseCaptureEligibilityFence::test_epoch_advance_after_promotion_blocks_the_commit"
+      ],
+      "added_files": [
+        "test_task26_oo_to_html.py",
+        "test_task26_oo_to_html_pg.py"
+      ],
+      "restored": true,
+      "restored_sha256": "a59b045bbda18f06c2b3168007ea132946da0f1f4f5887dfcb6655a6050fe1cf",
+      "seconds": 54.6
+    },
+    {
+      "id": "D04",
+      "path": "backend/app/services/workpaper_sync/oo_to_html.py",
+      "want": "test_task26_oo_to_html.py::TestFinalAuthorizationFence::test_each_branch_rejects_independently[close_capture_eligibility_unproven]",
+      "why": "「无从证明 leader 曾合法」与「曾合法但已失效」必须分型。短路前者后 `int(None)` 抛 `TypeError` —— 第三种、不可诊断的失败形态（fence 的 `except FinalFenceError` 接不住它，落到通用 `except Exception` ⇒ 结果从 `authorization_stale` 变成 `error`，于是撤权 application 进了普通 retry 队列）。这正是 `assert_published_digest_was_approved` 当初分型的同一理由",
+      "verdict": "RED",
+      "summary": "1 failed, 463 passed in 50.70s",
+      "added": [
+        "test_task26_oo_to_html.py::TestFinalAuthorizationFence::test_each_branch_rejects_independently[close_capture_eligibility_unproven]"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task26_oo_to_html.py::TestFinalAuthorizationFence::test_each_branch_rejects_independently[close_capture_eligibility_unproven]"
+      ],
+      "added_files": [
+        "test_task26_oo_to_html.py"
+      ],
+      "restored": true,
+      "restored_sha256": "a59b045bbda18f06c2b3168007ea132946da0f1f4f5887dfcb6655a6050fe1cf",
+      "seconds": 54.2
+    }
+  ]
+}

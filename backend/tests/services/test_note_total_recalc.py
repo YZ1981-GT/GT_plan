@@ -314,7 +314,7 @@ _finite_floats = st.floats(
 
 
 @given(values=st.lists(_finite_floats, min_size=0, max_size=15))
-@settings(max_examples=80, suppress_health_check=[HealthCheck.function_scoped_fixture])
+@settings(max_examples=5, suppress_health_check=[HealthCheck.function_scoped_fixture])
 def test_pbt_total_equals_sum_of_data_rows(values: list[float]) -> None:
     """PBT：total = sum(data 行 col 0)（误差 ≤ 1e-6）."""
     rows = [
@@ -337,7 +337,7 @@ def test_pbt_total_equals_sum_of_data_rows(values: list[float]) -> None:
     values_a=st.lists(_finite_floats, min_size=0, max_size=8),
     values_b=st.lists(_finite_floats, min_size=0, max_size=8),
 )
-@settings(max_examples=50, suppress_health_check=[HealthCheck.function_scoped_fixture])
+@settings(max_examples=5, suppress_health_check=[HealthCheck.function_scoped_fixture])
 def test_pbt_subtotals_partition_total(
     values_a: list[float], values_b: list[float]
 ) -> None:

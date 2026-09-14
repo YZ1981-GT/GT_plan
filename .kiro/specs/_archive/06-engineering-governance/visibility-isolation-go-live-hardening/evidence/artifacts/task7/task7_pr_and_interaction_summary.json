@@ -1,0 +1,133 @@
+{
+  "dependency_interaction": {
+    "clean_head_baseline": {
+      "counts": {
+        "error": 2,
+        "failed": 55,
+        "passed": 170,
+        "skipped": 7,
+        "warning": 1
+      }
+    },
+    "conclusion": "This delivery introduces 0 NEW regressions in the dependency spec. The failing-node set is identical between clean HEAD and this delivery; all failures are the pre-existing service_identities create_all failures. The delivery adds 5 extra PASSING collected tests (the notification spec's untracked test_p35_current_revision_pbt.py present in the working tree), which is not staged in this delivery.",
+    "dependency_spec": "procedure-delegation-notification",
+    "failing_node_set_identical": true,
+    "method": "Ran the dependency suite against (a) this delivery in the working tree and (b) a clean HEAD git worktree (detached 69a52b56, no delivery changes), then compared failing-node sets.",
+    "new_failing_nodes_count": 0,
+    "new_failing_nodes_introduced_by_delivery": [],
+    "nodes_failing_at_head_but_not_under_delivery": [],
+    "pre_existing_failing_nodes": [
+      "tests/procedure_delegation/test_procedure_delegation.py::TestP11SelectorEquivalence::test_cycle_workpaper_row_expand_equivalent",
+      "tests/procedure_delegation/test_procedure_delegation.py::TestP15SameAssigneeNoop::test_first_assign_and_reassign_bump_version_and_clear_ack",
+      "tests/procedure_delegation/test_procedure_delegation.py::TestP15SameAssigneeNoop::test_reject_on_conflict_default_atomic_zero_write",
+      "tests/procedure_delegation/test_procedure_delegation.py::TestP15SameAssigneeNoop::test_same_assignee_is_business_noop",
+      "tests/procedure_delegation/test_procedure_delegation.py::TestPgDelegation::test_best_effort_partial_and_shared_batch_id",
+      "tests/procedure_delegation/test_procedure_delegation.py::TestPgDelegation::test_one_time_consume_and_idempotent",
+      "tests/procedure_delegation/test_procedure_materialization.py::TestP6OverlayZeroWrite::test_overlay_read_is_domain_zero_write",
+      "tests/procedure_delegation/test_procedure_materialization.py::TestP7UnmaterializedOverlay::test_overlay_marks_unmaterialized_and_creates_no_task",
+      "tests/procedure_delegation/test_procedure_materialization.py::TestP7UnmaterializedOverlay::test_program_row_overlay_marks_unmaterialized",
+      "tests/procedure_delegation/test_procedure_reconcile.py::TestPgReconcile::test_alias_match_migrates",
+      "tests/procedure_delegation/test_procedure_reconcile.py::TestPgReconcile::test_content_match_migrates_revision_preserves_workflow",
+      "tests/procedure_delegation/test_procedure_review_service.py::TestP17ReviewerFallback::test_duplicate_primary_manager_is_reviewer_missing",
+      "tests/procedure_delegation/test_procedure_review_service.py::TestP17ReviewerFallback::test_duplicate_wp_reviewer_mapping_falls_through_not_first",
+      "tests/procedure_delegation/test_procedure_review_service.py::TestP17ReviewerFallback::test_explicit_reviewer_wins",
+      "tests/procedure_delegation/test_procedure_review_service.py::TestP17ReviewerFallback::test_resolver_is_deterministic",
+      "tests/procedure_delegation/test_procedure_review_service.py::TestP17ReviewerFallback::test_reviewer_missing_when_nothing_resolves",
+      "tests/procedure_delegation/test_procedure_review_service.py::TestP17ReviewerFallback::test_wp_reviewer_maps_to_unique_project_staff",
+      "tests/procedure_delegation/test_procedure_review_service.py::TestP18FirstLevelReviewDoesNotTouchHigherReview::test_review_leaves_workingpaper_higher_review_unchanged",
+      "tests/procedure_delegation/test_procedure_review_service.py::TestP25IssueTicketGate::test_create_or_reuse_does_not_duplicate_open_ticket",
+      "tests/procedure_delegation/test_procedure_review_service.py::TestP25IssueTicketGate::test_open_issue_blocks_review_close_unblocks",
+      "tests/procedure_delegation/test_procedure_review_service.py::TestP26HistoryParticipantReadonly::test_history_participant_readonly_and_union_authz",
+      "tests/procedure_delegation/test_procedure_review_service.py::TestP26HistoryParticipantReadonly::test_history_readonly_not_notified_but_current_participants_are",
+      "tests/procedure_delegation/test_procedure_review_service.py::TestPgMultiRoundReview::test_multi_round_reject_reply_close_resubmit_pass",
+      "tests/procedure_delegation/test_procedure_task_query.py::TestP28DeepLinkAndProjectBoundary::test_detail_cross_project_returns_none",
+      "tests/procedure_delegation/test_procedure_task_query.py::TestP28DeepLinkAndProjectBoundary::test_detail_deeplink_keys_present_no_program_no_fallback",
+      "tests/procedure_delegation/test_procedure_task_query.py::TestQuerySchemaAndPagination::test_cross_project_isolation_in_list",
+      "tests/procedure_delegation/test_procedure_task_query.py::TestQuerySchemaAndPagination::test_empty_when_no_active_staff",
+      "tests/procedure_delegation/test_procedure_task_query.py::TestQuerySchemaAndPagination::test_overdue_only_filter",
+      "tests/procedure_delegation/test_procedure_task_query.py::TestQuerySchemaAndPagination::test_pagination_paging",
+      "tests/procedure_delegation/test_procedure_task_query.py::TestQuerySchemaAndPagination::test_result_schema_complete",
+      "tests/procedure_delegation/test_procedure_task_query.py::TestQuerySchemaAndPagination::test_role_filter_assignee_vs_reviewer",
+      "tests/procedure_delegation/test_procedure_transition_service.py::TestP19StateMachineClosure::test_assigned_cannot_start_without_ack",
+      "tests/procedure_delegation/test_procedure_transition_service.py::TestP19StateMachineClosure::test_cancelled_cannot_assign",
+      "tests/procedure_delegation/test_procedure_transition_service.py::TestP19StateMachineClosure::test_non_reviewer_cannot_review",
+      "tests/procedure_delegation/test_procedure_transition_service.py::TestP19StateMachineClosure::test_random_sequence_only_valid_states",
+      "tests/procedure_delegation/test_procedure_transition_service.py::TestP19StateMachineClosure::test_review_blocked_by_open_issue",
+      "tests/procedure_delegation/test_procedure_transition_service.py::TestP19StateMachineClosure::test_review_reviewer_missing_blocked",
+      "tests/procedure_delegation/test_procedure_transition_service.py::TestP20AssignmentVersionAck::test_assign_increments_version_and_clears_ack",
+      "tests/procedure_delegation/test_procedure_transition_service.py::TestP20AssignmentVersionAck::test_duplicate_ack_same_version_is_noop",
+      "tests/procedure_delegation/test_procedure_transition_service.py::TestP20AssignmentVersionAck::test_reassign_same_person_noop",
+      "tests/procedure_delegation/test_procedure_transition_service.py::TestP20AssignmentVersionAck::test_restore_executor_requires_new_version_ack",
+      "tests/procedure_delegation/test_procedure_transition_service.py::TestP21AuditCompleteness::test_each_success_writes_one_history_and_one_outbox",
+      "tests/procedure_delegation/test_procedure_transition_service.py::TestP33OptimisticLock::test_stale_lock_version_rejected",
+      "tests/procedure_delegation/test_procedure_transition_service.py::TestPgTransition::test_concurrent_same_version_max_one_success",
+      "tests/procedure_delegation/test_procedure_trim_service.py::TestP10SchemeAppliedReal::test_legacy_uuid_key_migration_conflict_409",
+      "tests/procedure_delegation/test_procedure_trim_service.py::TestP10SchemeAppliedReal::test_no_change_applied_zero",
+      "tests/procedure_delegation/test_procedure_trim_service.py::TestP10SchemeAppliedReal::test_one_time_consume_idempotent",
+      "tests/procedure_delegation/test_procedure_trim_service.py::TestP10SchemeAppliedReal::test_row_scheme_applies_real_changes",
+      "tests/procedure_delegation/test_procedure_trim_service.py::TestP10SchemeAppliedReal::test_scope_scheme_sets_status_and_cascades",
+      "tests/procedure_delegation/test_procedure_trim_service.py::TestP10SchemeAppliedReal::test_version_change_after_preview_409",
+      "tests/procedure_delegation/test_procedure_trim_service.py::TestP9TrimWorkflowOrthogonal::test_cancel_requires_reason",
+      "tests/procedure_delegation/test_procedure_trim_service.py::TestP9TrimWorkflowOrthogonal::test_cancel_reviewed_rejected",
+      "tests/procedure_delegation/test_procedure_trim_service.py::TestP9TrimWorkflowOrthogonal::test_not_applicable_cancels_and_restore_reopens",
+      "tests/procedure_delegation/test_procedure_trim_service.py::TestP9TrimWorkflowOrthogonal::test_reopen_requires_cancelled_state",
+      "tests/procedure_delegation/test_procedure_trim_service.py::TestPgTrimScheme::test_row_scheme_apply_and_version_conflict",
+      "tests/procedure_delegation/test_wave1_baseline.py::TestRenderConfigZeroDomainWriteBaseline::test_read_only_observation_is_domain_zero_write",
+      "tests/procedure_delegation/test_wave1_baseline.py::TestRenderConfigZeroDomainWriteBaseline::test_v105_tables_present_in_live_db"
+    ],
+    "pre_existing_failing_nodes_count": 57,
+    "root_cause_of_pre_existing_failures": "sqlalchemy.exc.NoReferencedTableError: FK 'attachments.actor_service_identity_id' could not find table 'service_identities' during Base.metadata.create_all — the documented pre-existing service_identities create_all failure (evidence_governance FK target not registered in these tests' metadata). Independent of the visibility delivery.",
+    "tests_dir": "backend/tests/procedure_delegation",
+    "working_tree_with_delivery": {
+      "counts": {
+        "error": 2,
+        "failed": 55,
+        "passed": 175,
+        "skipped": 7,
+        "warning": 1
+      }
+    }
+  },
+  "git_delivery": {
+    "base_branch": "work/2026-05-30-wp-specs",
+    "branch": "pr/visibility-isolation-go-live-hardening",
+    "commit_sha": "6ac477b120ffbdab95e10d39fb6d99c351c22b11",
+    "direct_push_to_main_or_master": false,
+    "excluded_from_stage": [
+      ".kiro/specs/procedure-delegation-notification/tasks.md (dependency spec, not this delivery)",
+      "backend/tests/procedure_delegation/test_p35_current_revision_pbt.py (notification spec test)",
+      "backend/_append_task14_run.py / _dump_na.py / _probe.py / _t15_append_run.py (scratch)",
+      "backend/test-results/ (test output)",
+      "repro_whole.txt / repro_whole.xml / repro_wholefolder.txt / stab1.xml / stab2.xml (scratch)"
+    ],
+    "pushed": true,
+    "remote_tracking": "origin/pr/visibility-isolation-go-live-hardening",
+    "repo": "YZ1981-GT/GT_plan",
+    "staged_files_count": 221,
+    "staged_scope": "wp_visibility services, app/security, gated routers + router_registry, V113/R113 migrations, invalidation worker, both visibility spec docs+evidence, visibility tests (procedure_delegation_visibility/security/visibility_go_live_hardening), frontend visibility (composables/utils/views/services/e2e), config edits (config.py/main.py/wopi.py/conftest.py/governance-checks.yml/INDEX.md/memory.md)"
+  },
+  "pull_request": {
+    "compare_url": "https://github.com/YZ1981-GT/GT_plan/compare/work/2026-05-30-wp-specs...pr/visibility-isolation-go-live-hardening?expand=1",
+    "exact_gh_command": "gh pr create --repo YZ1981-GT/GT_plan --base work/2026-05-30-wp-specs --head pr/visibility-isolation-go-live-hardening --title \"feat(wp-visibility): fail-closed isolation + go-live hardening\" --body-file .kiro/specs/visibility-isolation-go-live-hardening/evidence/artifacts/task7/pr_body.md",
+    "github_suggested_url": "https://github.com/YZ1981-GT/GT_plan/pull/new/pr/visibility-isolation-go-live-hardening",
+    "pr_body_artifact": "evidence/artifacts/task7/pr_body.md",
+    "reason": "gh CLI installed (v2.87.3) but not authenticated (no logged-in host; GH_TOKEN/GITHUB_TOKEN unset). Interactive `gh auth login` not run. No PR number fabricated (honest GAP).",
+    "status": "environment_blocked"
+  },
+  "requirements": [
+    "6.1",
+    "6.2",
+    "6.3",
+    "6.4",
+    "6.5",
+    "6.6",
+    "6.7",
+    "6.8"
+  ],
+  "secret_scan": {
+    "note": "4 pattern hits are synthetic TEST fixture literals in test files (secret=\"other-secret\", _SECRET=\"task2-go-live-enforce-secret\", secret=\"a-totally-different-secret\") verifying JWT signature-mismatch; not real secrets. No .env / private key / real token staged.",
+    "real_credential_hits": 0,
+    "suspicious_filenames": "NONE"
+  },
+  "task": "7. PR 提交与依赖 spec 交互验证（R6）"
+}

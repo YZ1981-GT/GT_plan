@@ -1,0 +1,31 @@
+{
+  "contractId": "G-RAIL",
+  "contractVersion": "1.0",
+  "producerSpec": "workpaper-guidance-content-closure",
+  "producerTask": 15,
+  "consumers": ["workpaper-page-formula-toolbar-closure:F11"],
+  "adapterModule": "audit-platform/frontend/src/shell/guidance/guidanceRailAdapter.ts",
+  "capabilities": [
+    "visibility",
+    "disabledReason",
+    "location",
+    "guidanceVersion",
+    "hasDraft",
+    "open",
+    "close"
+  ],
+  "nonCapabilities": [
+    "dom_placement",
+    "fixed_top_right_zindex",
+    "shell_content_inset",
+    "multi_open_arbitration"
+  ],
+  "behavior": {
+    "incompleteLocation": "return_null_do_not_mount",
+    "unknownMajor": "return_null_do_not_mount",
+    "closePreserveDraft": "keep_draft_buffer",
+    "closeDiscardDraft": "invoke_discardDraft_then_close"
+  },
+  "recordedAt": "2026-09-08T00:00:00Z",
+  "verdict": "PASS"
+}

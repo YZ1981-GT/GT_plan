@@ -1,0 +1,126 @@
+# B51.yaml — 舞弊三因素分析
+# componentType: d-form-table
+# Requirements: G7 舞弊分析 — 三因素=动机/机会/态度 列+评分
+# Design: §1.1 B51 → d-form-table
+
+wp_code: B51
+template_path: backend/wp_templates/B/B51 舞弊风险因素（三因素分析）.xlsx
+template_version: v2025-R5
+
+sheets:
+  舞弊三因素分析:
+    component_type: d-form-table
+    form_type: table
+    title: 舞弊风险因素—三因素分析
+    description: |
+      按"舞弊三角"框架（动机/压力、机会、态度/借口）分析舞弊风险因素，
+      对各因素进行评分，汇总舞弊风险等级。
+
+    fields:
+      - field: entity_name
+        label: 被审计单位
+        type: text
+        source: project.client_name
+        readonly: true
+      - field: industry_factors
+        label: 行业特定舞弊因素
+        type: textarea
+        hint: 从 B10 行业理解联动获取
+        auto_data_source: b10_industry_fraud_factors
+
+    sections:
+      - id: motive
+        label: 动机/压力（Motive/Pressure）
+      - id: opportunity
+        label: 机会（Opportunity）
+      - id: attitude
+        label: 态度/借口（Attitude/Rationalization）
+
+    dynamic_table:
+      start_row: 7
+      end_row: dynamic
+      header_row: 6
+      add_row_button: true
+      max_rows: 40
+      columns:
+        seq:
+          field: seq
+          type: number
+          label: 序号
+          width: 50
+        factor_category:
+          field: factor_category
+          type: enum
+          label: 因素类别
+          width: 120
+          dict_source: factor_category_dict
+        factor_description:
+          field: factor_description
+          type: textarea
+          label: 因素描述
+          width: 250
+        existence:
+          field: existence
+          type: enum
+          label: 是否存在
+          width: 90
+          dict_source: existence_dict
+        severity:
+          field: severity
+          type: enum
+          label: 严重程度
+          width: 100
+          dict_source: severity_dict
+          render_hint: risk_badge
+        evaluation:
+          field: evaluation
+          type: textarea
+          label: 评价说明
+          width: 200
+        reference:
+          field: reference
+          type: text
+          label: 参考索引
+          width: 100
+          render: index_chip
+
+    dictionaries:
+      factor_category_dict:
+        - value: motive
+          label: 动机/压力
+        - value: opportunity
+          label: 机会
+        - value: attitude
+          label: 态度/借口
+      existence_dict:
+        - value: "yes"
+          label: 存在
+        - value: "no"
+          label: 不存在
+        - value: uncertain
+          label: 不确定
+      severity_dict:
+        - value: high
+          label: 高
+          color: red
+        - value: medium
+          label: 中
+          color: yellow
+        - value: low
+          label: 低
+          color: green
+
+    conclusion:
+      mode: composite
+      audit_explanation_field:
+        name: audit_explanation
+        label: 舞弊风险因素综合分析
+        type: textarea
+      overall_conclusion_field:
+        name: overall_conclusion
+        label: 舞弊风险整体评估
+        type: enum
+        enum:
+          - { value: high_risk, label: 舞弊风险高—需实施专项应对程序 }
+          - { value: medium_risk, label: 舞弊风险中等—保持职业怀疑 }
+          - { value: low_risk, label: 舞弊风险低—常规关注 }

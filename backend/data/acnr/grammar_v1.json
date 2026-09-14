@@ -1,0 +1,164 @@
+{
+  "version": "1",
+  "description": "ACNR L0 grammar frozen at M0. Single source of truth for five-domain URI profiles, WP()/PREV() arity metadata & lossless round-trip rules, the 11 index namespaces (+ Layer 1-4) bidirectional mapping table, and the single STANDARD_WP_CODE_RE constant. Consumers (formula lib / advanced-query lib / index lib / note lib) resolve() against this grammar.",
+  "constants": {
+    "STANDARD_WP_CODE_RE": "^[A-S]\\d"
+  },
+  "uri_profiles": {
+    "standard": {
+      "domain": "wp",
+      "pattern": "wp://{parent}/{sheet_name}#{cell}",
+      "formula": "WP(parent, sheet_name, cell|semantic)",
+      "wp_arity": [2, 3],
+      "notes": "标准多 Tab 底稿；WP 第一参=parent_wp_code（如 D2），第二参=sheet_name，第三参=cell|semantic。"
+    },
+    "custom_flat": {
+      "domain": "wp",
+      "pattern": "wp://{wp_code}/{cell}",
+      "formula": "WP(wp_code, cell)",
+      "wp_arity": [2],
+      "notes": "CUST / 单 sheet 自定义底稿；RuntimeCellEntry 自定义格采用此 profile。任一 entry_type 允许覆盖采用 custom_flat 或 standard。"
+    },
+    "tb": {
+      "pattern": "tb://{code}#{column}",
+      "formula": "TB",
+      "arity": [1, 2],
+      "notes": "非 wp 域，既有五域语法不变，经 V1 动态 build 出口解析。"
+    },
+    "report": {
+      "pattern": "report://{code}#{row}",
+      "formula": "ROW",
+      "arity": [1, 2],
+      "notes": "非 wp 域，既有五域语法不变，经 V1 动态 build 出口解析。"
+    },
+    "note": {
+      "pattern": "note://{note_code}",
+      "formula": "NOTE",
+      "arity": [1, 3],
+      "notes": "非 wp 域，既有五域语法不变；note 子域坐标 addr_id 形态 note/{note_code}/{row_key}。"
+    },
+    "aux": {
+      "pattern": "aux://{code}#{dim}",
+      "formula": "AUX",
+      "arity": [1, 2],
+      "notes": "非 wp 域，既有五域语法不变，经 V1 动态 build 出口解析。"
+    }
+  },
+  "functions": {
+    "WP": {
+      "arities": [2, 3],
+      "third_arg": "semantic_or_cell",
+      "roundtrip": true,
+      "notes": "2 参 (custom_flat) 与 3 参 (standard) 并存；formula_ref_to_uri() 保留第三参（语义名不丢弃），无损往返。"
+    },
+    "PREV": {
+      "arities": [2, 3],
+      "third_arg": "semantic_or_cell",
+      "roundtrip": true,
+      "notes": "上期取数；与 WP() 相同的 2 参与 3 参并存及互转规则。"
+    }
+  },
+  "index_namespaces": {
+    "wp": {
+      "layer": 3,
+      "internal": true,
+      "uri": "wp://{parent}/{sheet_name}",
+      "formula": null,
+      "addr_id": "{parent}/{sheet_code}",
+      "entry_type": "sheet",
+      "example": { "index_ref": "wp:D2-2", "uri": "wp://D2/明细表D2-2", "addr_id": "D2/D2-2" },
+      "notes": "parent=D2；sheet 级 addr_id 无坐标后缀。"
+    },
+    "sheet": {
+      "layer": 2,
+      "internal": true,
+      "uri": "wp://{parent}/{sheet_name}",
+      "formula": null,
+      "addr_id": "{parent}/{sheet_code}",
+      "entry_type": "sheet",
+      "example": { "index_ref": "sheet:D2-2", "uri": "wp://D2/明细表D2-2", "addr_id": "D2/D2-2" },
+      "notes": "同 addr_id 不同 entry_type（与 wp 命名空间共享 addr_id）。"
+    },
+    "cell": {
+      "layer": 1,
+      "internal": true,
+      "separator": "!",
+      "uri": "wp://{parent}/{sheet_name}#{cell}",
+      "formula": "WP('{parent}','{sheet_name}','{cell}')",
+      "addr_id": "{parent}/{sheet_code}/{cell}",
+      "entry_type": "cell",
+      "example": { "index_ref": "cell:D2-2!E100", "uri": "wp://D2/明细表D2-2#E100", "addr_id": "D2/D2-2/E100" },
+      "notes": "`!` 分隔 sheet_code 与 cell（R11.3）。"
+    },
+    "TB": {
+      "layer": 4,
+      "internal": true,
+      "domain": "tb",
+      "delegated_to": "v1",
+      "default_column": "审定数",
+      "uri": "tb://{code}#{column}",
+      "formula": "TB('{code}','{column}')",
+      "addr_id": null,
+      "example": { "index_ref": "TB:1001", "uri": "tb://1001#审定数", "formula": "TB('1001','审定数')" },
+      "notes": "非 wp 域，默认列=审定数；index 语法 TB:1001 与公式 TB('1001','审定数') 经 resolve() 解析到同一目标（R11.2）。"
+    },
+    "Note": {
+      "layer": 4,
+      "internal": true,
+      "domain": "note",
+      "uri": "note://{note_code}",
+      "formula": "NOTE('{note_code}')",
+      "addr_id": "note/{note_code}/{row_key}",
+      "example": { "index_ref": "Note:五、3", "uri": "note://五、3", "formula": "NOTE('五、3')" },
+      "notes": "附注锚点；note 子域 addr_id 形态 note/{note_code}/{row_key}。"
+    },
+    "Adj": {
+      "layer": 4,
+      "internal": false,
+      "exists": true,
+      "external_module": true,
+      "addr_id": "Adj/{target}",
+      "notes": "外部模块（审计调整分录）；首期只登记不解析物理格（R11.4）。"
+    },
+    "Att": {
+      "layer": 4,
+      "internal": false,
+      "exists": true,
+      "external_module": true,
+      "addr_id": "Att/{target}",
+      "notes": "外部模块（附件）；首期只登记不解析物理格（R11.4）。"
+    },
+    "EQCR": {
+      "layer": 4,
+      "internal": false,
+      "exists": true,
+      "external_module": true,
+      "addr_id": "EQCR/{target}",
+      "notes": "外部模块（项目质量控制复核）；首期只登记不解析物理格（R11.4）。"
+    },
+    "Calc": {
+      "layer": 4,
+      "internal": false,
+      "exists": true,
+      "external_module": true,
+      "addr_id": "Calc/{target}",
+      "notes": "外部模块（计算/测算）；首期只登记不解析物理格（R11.4）。"
+    },
+    "Sample": {
+      "layer": 4,
+      "internal": false,
+      "exists": true,
+      "external_module": true,
+      "addr_id": "Sample/{target}",
+      "notes": "外部模块（抽样）；首期只登记不解析物理格（R11.4）。"
+    },
+    "Confirm": {
+      "layer": 4,
+      "internal": false,
+      "exists": true,
+      "external_module": true,
+      "addr_id": "Confirm/{target}",
+      "notes": "外部模块（函证）；首期只登记不解析物理格（R11.4）。"
+    }
+  }
+}

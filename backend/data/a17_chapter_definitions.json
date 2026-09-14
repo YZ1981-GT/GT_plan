@@ -1,0 +1,130 @@
+[
+  {
+    "id": "A17-1-ch01",
+    "seq": 1,
+    "title": "审计业务约定范围及执行情况",
+    "guidance": "简述业务约定书主要条款、审计范围及重大变更情况（CAS 1111）。",
+    "data_source": { "type": "auto", "sources": ["project_info", "B1", "B5"], "ready": true },
+    "required": true
+  },
+  {
+    "id": "A17-1-ch02",
+    "seq": 2,
+    "title": "独立性",
+    "guidance": "记录项目组独立性声明签署情况及违反独立性的事项处理（CAS 1121）。",
+    "data_source": { "type": "auto", "sources": ["A17-7", "A10-1"], "ready": "partial" },
+    "required": true
+  },
+  {
+    "id": "A17-1-ch03",
+    "seq": 3,
+    "title": "对审计计划的更新和修改",
+    "guidance": "说明总体审计策略及具体审计计划的重大修改原因和结果（CAS 1201/1211）。",
+    "data_source": { "type": "auto", "sources": ["B40", "B50", "B60"], "ready": false },
+    "required": true
+  },
+  {
+    "id": "A17-1-ch04",
+    "seq": 4,
+    "title": "需合伙人关注事项",
+    "guidance": "列示需要项目合伙人特别关注或决策的重大职业判断事项。",
+    "data_source": { "type": "auto", "sources": ["procedure_table_A17_seq1", "cycle_summaries"], "ready": false },
+    "required": true
+  },
+  {
+    "id": "A17-1-ch05",
+    "seq": 5,
+    "title": "业务咨询记录及专业意见分歧解决情况",
+    "guidance": "记录重大会计或审计事项的咨询过程及项目组内分歧解决结论（CAS 1121）。",
+    "data_source": { "type": "auto", "sources": ["A17-3", "A17-3-1", "A17-4"], "ready": "partial" },
+    "required": true
+  },
+  {
+    "id": "A17-1-ch06",
+    "seq": 6,
+    "title": "对重大错报风险的应对措施执行情况",
+    "guidance": "汇总识别的重大错报风险及对应的进一步审计程序执行结果（CAS 1301/1311）。",
+    "data_source": { "type": "auto", "sources": ["B40"], "ready": false },
+    "required": true
+  },
+  {
+    "id": "A17-1-ch07",
+    "seq": 7,
+    "title": "利用专家的工作",
+    "guidance": "说明是否利用专家工作及对专家能力、客观性的评价（CAS 1421）。",
+    "data_source": { "type": "manual", "sources": [], "ready": null },
+    "required": true
+  },
+  {
+    "id": "A17-1-ch08",
+    "seq": 8,
+    "title": "已审财务报表分析",
+    "guidance": "概述已审财务报表整体分析性复核的主要发现和结论（CAS 1313）。",
+    "data_source": { "type": "auto", "sources": ["A1-13", "A1-14"], "ready": "partial" },
+    "required": true
+  },
+  {
+    "id": "A17-1-ch09",
+    "seq": 9,
+    "title": "对关联方及关联方交易的结论",
+    "guidance": "记录关联方识别、交易审计结论及是否存在未识别关联方（CAS 1323）。",
+    "data_source": { "type": "auto", "sources": ["A7", "A7-1"], "ready": "partial" },
+    "required": true
+  },
+  {
+    "id": "A17-1-ch10",
+    "seq": 10,
+    "title": "基于持续经营假设的考虑",
+    "guidance": "评估管理层持续经营假设的适当性及是否存在重大不确定性（CAS 1324）。",
+    "data_source": { "type": "auto", "sources": ["A15", "A15-1"], "ready": "partial" },
+    "required": true
+  },
+  {
+    "id": "A17-1-ch11",
+    "seq": 11,
+    "title": "对期后事项形成的结论",
+    "guidance": "说明截至审计报告日期后事项审计程序及结论（CAS 1332）。",
+    "data_source": { "type": "auto", "sources": ["A11", "A11-1"], "ready": "partial" },
+    "required": true
+  },
+  {
+    "id": "A17-1-ch12",
+    "seq": 12,
+    "title": "拟在审计报告中沟通的关键审计事项",
+    "guidance": "列示拟沟通的 KAM 事项摘要，引用 A17-2-1 详细底稿（CAS 1504）。",
+    "data_source": { "type": "auto", "sources": ["A17-2-1"], "ready": false },
+    "required": true
+  },
+  {
+    "id": "A17-1-ch13",
+    "seq": 13,
+    "title": "其他信息",
+    "guidance": "记录对年报中其他信息的阅读及是否存在重大不一致或重大错报（CAS 1521）。",
+    "data_source": { "type": "auto", "sources": ["A8", "A8-2"], "ready": "partial" },
+    "required": true
+  },
+  {
+    "id": "A17-1-ch14",
+    "seq": 14,
+    "title": "财务报表审计结论",
+    "guidance": "说明拟出具审计意见的类型及形成该意见的依据。",
+    "data_source": { "type": "auto", "sources": ["audit_opinion"], "ready": "partial" },
+    "required": true
+  },
+  {
+    "id": "A17-1-ch15",
+    "seq": 15,
+    "title": "其他特殊考虑事项",
+    "guidance": "记录舞弊线索、违反法规及其他需特别关注事项（CAS 1141/1142）。",
+    "data_source": { "type": "auto", "sources": ["A13", "A14", "issue_tickets"], "ready": "partial" },
+    "required": true
+  },
+  {
+    "id": "A17-1-ch16",
+    "seq": 16,
+    "title": "提请下年度审计关注事项",
+    "guidance": "列示本年度审计中需下年度团队关注的遗留事项或持续风险。",
+    "data_source": { "type": "manual", "sources": [], "ready": null },
+    "required": true
+  }
+]

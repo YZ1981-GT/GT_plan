@@ -19,6 +19,12 @@ from uuid import UUID, uuid4
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.services.workpaper_sync.content_mutation import ROLLBACK, html_only_entry_id
+from app.services.workpaper_sync.entry_profile import Capability
+from app.services.workpaper_sync.writer_migration import (
+    RESTORE_SCHEMA_VERSION_FALLBACK,
+    build_content_mutation_service_writer,
+)
 from app.services.wp_template_diff_service import TemplateDiff
 
 logger = logging.getLogger(__name__)
@@ -167,15 +173,62 @@ class WpMigrationService:
     # 回滚
     # ------------------------------------------------------------------
 
+    async def _load_restore_scope(self, wp_id: UUID) -> tuple[UUID, str | None] | None:
+        """回滚的 scope 身份：`(project_id, wp_code)`。
+
+        `project_id` 是 content version / artifact 的 scope 键（V151 的 scope index 与
+        artifact 目录都按它分区），`wp_code` 是 `entry_id` 的稳定业务身份。两者都不在
+        `wp_migration_snapshots` 里，所以必须从 `working_paper` 反查；查不到（已删除）
+        时返回 `None`，让调用方与「快照不存在」用同一个 falsy oracle。
+        """
+        row = (await self.db.execute(sa.text("""
+            SELECT wp.project_id AS project_id, wi.wp_code AS wp_code
+            FROM working_paper wp
+            LEFT JOIN wp_index wi ON wi.id = wp.wp_index_id
+            WHERE wp.id = :wid AND wp.is_deleted = false
+        """), {"wid": str(wp_id)})).first()
+        if row is None:
+            return None
+        project_id = row.project_id
+        return (
+            project_id if isinstance(project_id, UUID) else UUID(str(project_id)),
+            row.wp_code,
+        )
+
     async def rollback(self, wp_id: UUID, snapshot_id: UUID) -> bool:
         """回滚到指定快照
+
+        🔴 Task 19（workpaper-html-onlyoffice-bidirectional-writeback-closure /
+        Requirement 2.2、9.11、Property 61）：本方法**不再**是一条自闭环写路径。
+
+        改造前它 `UPDATE working_paper SET parsed_data = ...` 然后 `flush()` 就完事 ——
+        既不推进任何版本，也不留 immutable content version。后果不是「少记一笔」而是
+        **回滚对所有版本消费者不可见**：编辑器 base、OO doc_key、前端 `v{n}`、附注同步
+        的 stale 判定全部看不出内容已经换了一份，于是继续按旧 base 提交，把刚回滚掉的
+        内容再写回去。
+
+        改造后 `parsed_data` 的写入与 `content_revision` 的推进落在**同一个**事务里，
+        唯一提交出口是 `ContentMutationService.commit_html_projection()`。选 projection
+        lane 而不是 authoritative-bytes lane 的理由很直接：这条路径恢复的是
+        `working_paper.parsed_data`（结构化 projection 本体），手上没有任何 OOXML 字节
+        可发布成 representation；硬造一个空白 xlsx 正是 Requirement 3.9 禁止的。
+
+        `capability=single_html` 是**本调用点的声明**（不在装配层写死，否则
+        `HtmlOnlyCommitPlan` 那道拒绝就成了不可达分支）。若这个底稿其实已经接上 OO 并
+        发布过 representation，`commit_html_projection` 会按数据库事实二次拒绝 —— 背着
+        权威 OOXML 恢复它的 JSON 投影正是 Requirement 2.11 禁止的形态，必须 fail closed
+        而不是静默让两边分叉。
 
         Args:
             wp_id: 底稿 ID
             snapshot_id: 快照 ID
 
         Returns:
-            是否成功
+            是否成功（快照或底稿不存在 ⇒ False）
+
+        Raises:
+            RevisionConflictError: 并发保存导致 CAS 命中 0 行 —— 调用方必须重取快照再试，
+                不能当成「回滚成功」。
         """
         row = (await self.db.execute(sa.text("""
             SELECT parsed_data_snapshot FROM wp_migration_snapshots
@@ -190,6 +243,17 @@ class WpMigrationService:
         if isinstance(snapshot_data, str):
             snapshot_data = json.loads(snapshot_data)
 
+        scope = await self._load_restore_scope(wp_id)
+        if scope is None:
+            logger.warning("底稿不存在或已删除，拒绝回滚: wp=%s", wp_id)
+            return False
+        project_id, wp_code = scope
+
+        # 统一入口装配 + 读**本次回滚前**的 business revision。真正的并发裁决是
+        # `commit_html_projection` 事务内的 CAS；这里只是把期望值冻结下来。
+        writer = build_content_mutation_service_writer(self.db)
+        expected_revision = await writer.current_revision(wp_id)
+
         await self.db.execute(sa.text("""
             UPDATE working_paper SET parsed_data = :data, updated_at = :ts
             WHERE id = :wid
@@ -198,9 +262,29 @@ class WpMigrationService:
             "wid": str(wp_id),
             "ts": datetime.now(timezone.utc),
         })
-        await self.db.flush()
 
-        logger.info("回滚完成: wp=%s → snapshot=%s", wp_id, snapshot_id)
+        # 本方法自己**没有** commit、没有版本赋值。`parsed_data` 的 UPDATE 与
+        # content version / revision / outbox 同生共死（Requirement 13.1）。
+        receipt = await writer.commit_projection(
+            project_id=project_id,
+            wp_id=wp_id,
+            entry_id=html_only_entry_id(wp_code=wp_code, wp_id=wp_id),
+            capability=Capability.single_html,
+            html_data=(snapshot_data or {}).get("html_data") or {},
+            expected_revision=expected_revision,
+            source=ROLLBACK,
+            schema_version=str(
+                (snapshot_data or {}).get("schema_version")
+                or RESTORE_SCHEMA_VERSION_FALLBACK
+            ),
+            trigger="template_migration_rollback",
+        )
+        await writer.publish_committed_events(receipt)
+
+        logger.info(
+            "回滚完成: wp=%s → snapshot=%s content_revision=%s content_version=%s",
+            wp_id, snapshot_id, receipt.revision, receipt.content_version_id,
+        )
         return True
 
     # ------------------------------------------------------------------

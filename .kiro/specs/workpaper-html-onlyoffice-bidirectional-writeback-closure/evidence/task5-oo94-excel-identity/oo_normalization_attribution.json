@@ -1,0 +1,200 @@
+{
+  "generated_at": "2026-08-24T16:59:47.989373+00:00",
+  "doc": "k11",
+  "inputs": {
+    "pristine": {
+      "file": "staging/k11_before.xlsx",
+      "sha256": "dc0e5434b7c8e345913864ce524ad30a0a3729b5655627f3c30bce52294a9190"
+    },
+    "instrumented": {
+      "file": "staging/k11_instrumented.xlsx",
+      "sha256": "4408f116e37ba6a0dc1860802ecee31c169a6e938688d526cf922cc2b3acad22"
+    },
+    "oo_pristine": {
+      "file": "artifacts/k11_baseline_cb02_status6.xlsx",
+      "sha256": "adfffcd4c073b7440f2c30fbadc237879e7b2f80bcb268c8b33b526e2bd74003"
+    },
+    "oo_instrumented": {
+      "file": "artifacts/k11_edit_cb02_status6.xlsx",
+      "sha256": "45844defd27e179a1dfd86add9e7746633335923ef095953374bd07385a8124f"
+    }
+  },
+  "cases": {
+    "case_A_instrumentation_only": {
+      "before": "pristine",
+      "after": "instrumented",
+      "aspect_verdicts": {
+        "visible_sheets": true,
+        "business_values": true,
+        "formulas": true,
+        "styles": true,
+        "merges": true,
+        "protected_parts": true
+      },
+      "diff_counts": {
+        "visible_sheets": null,
+        "business_values": 0,
+        "formulas": 0,
+        "styles": 0,
+        "merges": 0,
+        "protected_parts": 0
+      },
+      "style_first_diffs": [],
+      "protected_first_diffs": [],
+      "value_first_diffs": [],
+      "collection_errors": {
+        "pristine": [],
+        "instrumented": []
+      }
+    },
+    "case_B_pristine_through_oo": {
+      "before": "pristine",
+      "after": "oo_pristine",
+      "aspect_verdicts": {
+        "visible_sheets": true,
+        "business_values": false,
+        "formulas": true,
+        "styles": false,
+        "merges": true,
+        "protected_parts": false
+      },
+      "diff_counts": {
+        "visible_sheets": null,
+        "business_values": 1,
+        "formulas": 0,
+        "styles": 487,
+        "merges": 0,
+        "protected_parts": 1
+      },
+      "style_first_diffs": [
+        {
+          "sheet": "底稿目录",
+          "coord": "A2",
+          "pristine": "nf=General|font=Arial Narrow,10.0,0,0,none|fill=solid,indexed:14,indexed:64|align=justify,center,1|border=None,None,None,None",
+          "oo_pristine": "nf=General|font=Arial Narrow,10.0,0,0,none|fill=solid,indexed:6,rgb:00000000|align=justify,center,1|border=None,None,None,None"
+        },
+        {
+          "sheet": "底稿目录",
+          "coord": "A3",
+          "pristine": "nf=General|font=Arial Narrow,10.0,0,0,none|fill=solid,indexed:14,indexed:64|align=justify,center,1|border=None,None,None,None",
+          "oo_pristine": "nf=General|font=Arial Narrow,10.0,0,0,none|fill=solid,indexed:6,rgb:00000000|align=justify,center,1|border=None,None,None,None"
+        },
+        {
+          "sheet": "底稿目录",
+          "coord": "A4",
+          "pristine": "nf=General|font=宋体,10.0,0,0,none|fill=solid,indexed:14,indexed:64|align=justify,center,1|border=None,None,None,None",
+          "oo_pristine": "nf=General|font=宋体,10.0,0,0,none|fill=solid,indexed:6,rgb:00000000|align=justify,center,1|border=None,None,None,None"
+        },
+        {
+          "sheet": "底稿目录",
+          "coord": "A5",
+          "pristine": "nf=General|font=宋体,10.0,0,0,none|fill=solid,indexed:14,indexed:64|align=justify,center,1|border=None,None,None,None",
+          "oo_pristine": "nf=General|font=宋体,10.0,0,0,none|fill=solid,indexed:6,rgb:00000000|align=justify,center,1|border=None,None,None,None"
+        },
+        {
+          "sheet": "底稿目录",
+          "coord": "A6",
+          "pristine": "nf=General|font=宋体,10.0,0,0,none|fill=solid,indexed:14,indexed:64|align=justify,center,1|border=None,None,None,None",
+          "oo_pristine": "nf=General|font=宋体,10.0,0,0,none|fill=solid,indexed:6,rgb:00000000|align=justify,center,1|border=None,None,None,None"
+        }
+      ],
+      "protected_first_diffs": [
+        {
+          "category": "drawing",
+          "part": "xl/drawings/vmlDrawing1.vml",
+          "pristine": "bde53bd086252aba111fe888e1ebc67e852ebdd528b16fe3d341cf025e4bab9e",
+          "oo_pristine": "c2de3f4def34d083172bf5dca31e0bb48c36ab3403110b3d137c163aba9b3de0"
+        }
+      ],
+      "value_first_diffs": [
+        {
+          "sheet": "审定表K11-1",
+          "coord": "J7",
+          "pristine": null,
+          "oo_pristine": "'GT-EDIT-J7'"
+        }
+      ],
+      "collection_errors": {
+        "pristine": [],
+        "oo_pristine": []
+      }
+    },
+    "case_C_instrumented_through_oo": {
+      "before": "instrumented",
+      "after": "oo_instrumented",
+      "aspect_verdicts": {
+        "visible_sheets": true,
+        "business_values": false,
+        "formulas": true,
+        "styles": false,
+        "merges": true,
+        "protected_parts": false
+      },
+      "diff_counts": {
+        "visible_sheets": null,
+        "business_values": 1,
+        "formulas": 0,
+        "styles": 487,
+        "merges": 0,
+        "protected_parts": 1
+      },
+      "style_first_diffs": [
+        {
+          "sheet": "底稿目录",
+          "coord": "A2",
+          "instrumented": "nf=General|font=Arial Narrow,10.0,0,0,none|fill=solid,indexed:14,indexed:64|align=justify,center,1|border=None,None,None,None",
+          "oo_instrumented": "nf=General|font=Arial Narrow,10.0,0,0,none|fill=solid,indexed:6,rgb:00000000|align=justify,center,1|border=None,None,None,None"
+        },
+        {
+          "sheet": "底稿目录",
+          "coord": "A3",
+          "instrumented": "nf=General|font=Arial Narrow,10.0,0,0,none|fill=solid,indexed:14,indexed:64|align=justify,center,1|border=None,None,None,None",
+          "oo_instrumented": "nf=General|font=Arial Narrow,10.0,0,0,none|fill=solid,indexed:6,rgb:00000000|align=justify,center,1|border=None,None,None,None"
+        },
+        {
+          "sheet": "底稿目录",
+          "coord": "A4",
+          "instrumented": "nf=General|font=宋体,10.0,0,0,none|fill=solid,indexed:14,indexed:64|align=justify,center,1|border=None,None,None,None",
+          "oo_instrumented": "nf=General|font=宋体,10.0,0,0,none|fill=solid,indexed:6,rgb:00000000|align=justify,center,1|border=None,None,None,None"
+        },
+        {
+          "sheet": "底稿目录",
+          "coord": "A5",
+          "instrumented": "nf=General|font=宋体,10.0,0,0,none|fill=solid,indexed:14,indexed:64|align=justify,center,1|border=None,None,None,None",
+          "oo_instrumented": "nf=General|font=宋体,10.0,0,0,none|fill=solid,indexed:6,rgb:00000000|align=justify,center,1|border=None,None,None,None"
+        },
+        {
+          "sheet": "底稿目录",
+          "coord": "A6",
+          "instrumented": "nf=General|font=宋体,10.0,0,0,none|fill=solid,indexed:14,indexed:64|align=justify,center,1|border=None,None,None,None",
+          "oo_instrumented": "nf=General|font=宋体,10.0,0,0,none|fill=solid,indexed:6,rgb:00000000|align=justify,center,1|border=None,None,None,None"
+        }
+      ],
+      "protected_first_diffs": [
+        {
+          "category": "drawing",
+          "part": "xl/drawings/vmlDrawing1.vml",
+          "instrumented": "bde53bd086252aba111fe888e1ebc67e852ebdd528b16fe3d341cf025e4bab9e",
+          "oo_instrumented": "e36a39e1e8a6080ee90cc6858dab5d2c13e1ca3fea23435fe6bb3083eab125fe"
+        }
+      ],
+      "value_first_diffs": [
+        {
+          "sheet": "审定表K11-1",
+          "coord": "J7",
+          "instrumented": null,
+          "oo_instrumented": "'GT-EDIT-J7'"
+        }
+      ],
+      "collection_errors": {
+        "instrumented": [],
+        "oo_instrumented": []
+      }
+    }
+  },
+  "conclusion": {
+    "instrumentation_contributes_zero_diffs": true,
+    "oo_normalization_identical_with_and_without_instrumentation": true,
+    "meaning": "A 全零且 B==C ⇒ OO 往返的全部差异由 OO 自身重序列化造成，instrumentation 贡献为 0。"
+  }
+}

@@ -127,6 +127,40 @@
         <!-- EQCR 独立复核工作台入口（partner/admin 可见，Round 5） -->
         <slot name="nav-eqcr" />
 
+        <!-- AI 助手快捷入口 -->
+        <el-tooltip :content="showDshPanel ? '关闭 AI 助手' : '打开 AI 助手'" placement="bottom">
+          <el-badge :value="dshUnreadCount" :hidden="dshUnreadCount === 0 || showDshPanel" :max="99" class="gt-dsh-badge">
+            <button
+              class="gt-topbar-btn"
+              :class="{ 'gt-topbar-btn--active': showDshPanel }"
+              type="button"
+              :aria-label="showDshPanel ? '关闭 AI 助手' : '打开 AI 助手'"
+              :aria-expanded="showDshPanel"
+              aria-controls="dsh-panel-region"
+              @click="showDshPanel = !showDshPanel"
+            >
+              <el-icon :size="18"><ChatDotSquare /></el-icon>
+            </button>
+          </el-badge>
+        </el-tooltip>
+
+        <!-- formula-toolbar Task 5: primary outlet — AI 后、金额单位快捷前 -->
+        <WorkpaperPrimaryCapabilitiesHost
+          host-instance-id="three-column-primary"
+          :owner-epoch="pageCapabilitiesOwnerEpoch"
+        >
+          <template #page-capabilities-primary>
+            <slot name="page-capabilities-primary" />
+          </template>
+        </WorkpaperPrimaryCapabilitiesHost>
+
+        <!-- 金额单位快捷（保证 AI → ƒx outlet → 金额单位 顺序） -->
+        <el-tooltip content="金额单位" placement="bottom">
+          <div class="gt-topbar-btn" title="金额单位" aria-label="金额单位">
+            <span class="gt-topbar-text-icon">{{ amountUnitShortLabel }}</span>
+          </div>
+        </el-tooltip>
+
         <!-- Phase 3 F4: 暗色模式切换按钮 -->
         <el-tooltip :content="isDark ? '切换到浅色模式' : '切换到暗色模式'" placement="bottom">
           <div class="gt-topbar-btn gt-theme-toggle" @click="toggleTheme">
@@ -179,72 +213,28 @@
               </span>
             </transition>
           </div>
-        </nav>
-        <div class="gt-sidebar-bottom">
-          <!-- 工具簇（按职能分组，扁平不折叠便于一击即达）-->
-          <div class="gt-sidebar-tools-title" v-if="!sidebarCollapsed">工具</div>
-
-          <!-- 知识 -->
-          <div class="gt-tool-group-label" v-if="!sidebarCollapsed">📚 知识</div>
-          <div class="gt-nav-item gt-nav-item--tool" :class="{ 'gt-nav-item--active': route.path.startsWith('/knowledge') }" @click="router.push('/knowledge')" title="知识库">
-            <el-icon :size="18"><Reading /></el-icon>
-            <transition name="gt-fade">
-              <span v-if="!sidebarCollapsed" class="gt-nav-label">知识库</span>
-            </transition>
-          </div>
-          <div class="gt-nav-item gt-nav-item--tool" :class="{ 'gt-nav-item--active': activeToolPath === '/private-storage' }" @click="router.push('/private-storage')" title="私人库">
-            <el-icon :size="18"><Suitcase /></el-icon>
-            <transition name="gt-fade">
-              <span v-if="!sidebarCollapsed" class="gt-nav-label">私人库</span>
-            </transition>
-          </div>
-          <div class="gt-nav-item gt-nav-item--tool" :class="{ 'gt-nav-item--active': activeToolPath === '/settings/report-format' }" @click="router.push('/settings/report-format')" title="排版模板">
-            <el-icon :size="18"><Document /></el-icon>
-            <transition name="gt-fade">
-              <span v-if="!sidebarCollapsed" class="gt-nav-label">排版模板</span>
-            </transition>
-          </div>
-
-          <!-- AI -->
-          <div class="gt-tool-group-label" v-if="!sidebarCollapsed">🤖 AI</div>
-          <div class="gt-nav-item gt-nav-item--tool" :class="{ 'gt-nav-item--active': activeToolPath === '/settings/ai-models' }" @click="router.push('/settings/ai-models')" title="AI 模型">
-            <el-icon :size="18"><Cpu /></el-icon>
-            <transition name="gt-fade">
-              <span v-if="!sidebarCollapsed" class="gt-nav-label">AI 模型</span>
-            </transition>
-          </div>
-          <div class="gt-nav-item gt-nav-item--tool" @click="showFormulaManager = true" title="公式管理">
-            <span class="gt-tool-text-icon" style="font-style:italic;font-weight:700">ƒx</span>
+          <!-- 公式管理（弹窗触发，非路由） -->
+          <div class="gt-nav-item" @click="onOpenFormulaEvent()" title="公式管理">
+            <span class="gt-tool-text-icon" style="font-style:italic;font-weight:700;width:20px;text-align:center;display:inline-block">ƒx</span>
             <transition name="gt-fade">
               <span v-if="!sidebarCollapsed" class="gt-nav-label">公式管理</span>
             </transition>
           </div>
-
-          <!-- 查询 -->
-          <div class="gt-tool-group-label" v-if="!sidebarCollapsed">🔎 查询</div>
-          <div class="gt-nav-item gt-nav-item--tool" @click="showCustomQuery = true" title="高级查询">
-            <el-icon :size="18"><Search /></el-icon>
+          <!-- 高级查询（弹窗触发，非路由） -->
+          <div class="gt-nav-item" @click="showCustomQuery = true" title="高级查询">
+            <el-icon :size="20"><Search /></el-icon>
             <transition name="gt-fade">
               <span v-if="!sidebarCollapsed" class="gt-nav-label">高级查询</span>
             </transition>
           </div>
-
-          <!-- 反馈 -->
-          <div class="gt-tool-group-label" v-if="!sidebarCollapsed">💬 反馈</div>
-          <div class="gt-nav-item gt-nav-item--tool" :class="{ 'gt-nav-item--active': activeToolPath === '/forum' }" @click="router.push('/forum')" title="吐槽求助">
-            <el-icon :size="18"><ChatDotSquare /></el-icon>
-            <transition name="gt-fade">
-              <span v-if="!sidebarCollapsed" class="gt-nav-label">吐槽求助</span>
-            </transition>
-          </div>
-
+          <!-- 收起 -->
           <div class="gt-nav-item" @click="sidebarCollapsed = !sidebarCollapsed" title="折叠">
-            <el-icon :size="18"><DArrowLeft v-if="!sidebarCollapsed" /><DArrowRight v-else /></el-icon>
+            <el-icon :size="20"><DArrowLeft v-if="!sidebarCollapsed" /><DArrowRight v-else /></el-icon>
             <transition name="gt-fade">
               <span v-if="!sidebarCollapsed" class="gt-nav-label">收起</span>
             </transition>
           </div>
-        </div>
+        </nav>
       </aside>
 
       <!-- 左侧拖拽分隔线（始终显示，用于调整左侧栏宽度） -->
@@ -318,16 +308,31 @@
           <router-view name="detail" />
         </slot>
       </section>
+
+      <!-- AI 助手面板（dsh） -->
+      <DshPanel v-model="showDshPanel" @message-count="onDshMessageCount" />
     </div>
 
     <!-- 全局公式管理弹窗 -->
     <FormulaManagerDialog
       v-model="showFormulaManager"
       :rows="[]"
-      :project-id="currentProjectId"
-      :year="currentYear"
+      :project-id="formulaContext?.projectId ?? currentProjectId"
+      :year="formulaContext?.year ?? currentYear"
+      :scope="formulaContext?.scope ?? (formulaContext?.wpId ? 'workpaper' : 'report')"
+      :wp-id="formulaContext?.wpId"
+      :wp-code="formulaContext?.wpCode"
+      :sheet-name="formulaContext?.sheetName"
+      :host-sheet-codes="formulaContext?.sheetCodes"
       @saved="onFormulaSaved"
       @applied="onFormulaApplied"
+    />
+
+    <!-- 全局一键刷新弹窗（formula-runtime-convergence Task 16） -->
+    <GtRefreshScopeDialog
+      :project-id="currentProjectId"
+      :year="currentYear"
+      @refresh-complete="onRefreshComplete"
     />
 
     <!-- 全局自定义查询弹窗 -->
@@ -345,7 +350,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch, provide } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { useDisplayPrefsStore } from '@/stores/displayPrefs'
@@ -361,12 +366,16 @@ import {
   Search,
 } from '@element-plus/icons-vue'
 import FormulaManagerDialog from '@/components/formula/FormulaManagerDialog.vue'
+import GtRefreshScopeDialog from '@/components/formula/GtRefreshScopeDialog.vue'
 import CustomQueryDialog from '@/components/query/CustomQueryDialog.vue'
 import ShortcutHelpDialog from '@/components/common/ShortcutHelpDialog.vue'
-import { eventBus, type SyncEventPayload } from '@/utils/eventBus'
+import DshPanel from '@/components/ai/DshPanel.vue'
+import WorkpaperPrimaryCapabilitiesHost from '@/shell/formula/WorkpaperPrimaryCapabilitiesHost.vue'
+import { legacyPayloadToPartialCommand } from '@/shell/formula/openFormulaManagerCommand'
+import { DSH_ASSIST_BRIDGE_KEY, type DshAssistBridge } from '@/shell/formula/dshAssistBridge'
+import { eventBus, type SyncEventPayload, type OpenFormulaManagerPayload } from '@/utils/eventBus'
 import { operationHistory } from '@/utils/operationHistory'
-import { createSSE, type SSEConnection } from '@/utils/sse'
-import { events as eventPaths } from '@/services/apiPaths'
+import { subscribeProjectEvent, WILDCARD_EVENT, type ProjectEventSubscription } from '@/services/sse/projectEventStream'
 import DegradedBanner from '@/components/DegradedBanner.vue'
 
 const route = useRoute()
@@ -374,6 +383,24 @@ const router = useRouter()
 const authStore = useAuthStore()
 const displayPrefs = useDisplayPrefsStore()
 const { isDark, toggle: toggleTheme } = useTheme()
+
+/** formula-toolbar Task 5 — primary outlet owner epoch (bumped on workpaper route change). */
+const pageCapabilitiesOwnerEpoch = ref(1)
+const amountUnitShortLabel = computed(() => {
+  const unit = displayPrefs.amountUnit
+  if (unit === 'wan') return '万'
+  if (unit === 'qian') return '千'
+  return '元'
+})
+
+watch(
+  () => route.path,
+  (path) => {
+    if (path.includes('/workpapers') || path.includes('/workpaper')) {
+      pageCapabilitiesOwnerEpoch.value += 1
+    }
+  },
+)
 
 // ── Props ──
 const props = defineProps<{
@@ -392,11 +419,14 @@ const FALLBACK_NAV = [
   { key: 'workhours', label: '工时', icon: Timer, path: '/work-hours', maturity: 'production', roles: ['admin', 'partner', 'manager', 'auditor', 'eqcr'] },
   { key: 'mgmt-dashboard', label: '看板', icon: DataAnalysis, path: '/dashboard/management', maturity: 'production', roles: ['admin', 'partner', 'manager'] },
   { key: 'consolidation', label: '合并', icon: Connection, path: '/consolidation', maturity: 'production', roles: ['admin', 'partner', 'manager'] },
-  { key: 'confirmation', label: '函证', icon: Stamp, path: '/confirmation', maturity: 'developing', roles: null },
+  { key: 'confirmation', label: '函证', icon: Stamp, path: '/confirmation', maturity: 'production', roles: null },
   { key: 'archive', label: '归档', icon: Box, path: '/archive', maturity: 'production', roles: ['admin', 'partner', 'manager'] },
   { key: 'attachments', label: '附件', icon: Paperclip, path: '/attachments', maturity: 'production', roles: ['admin', 'partner', 'manager', 'auditor'] },
   { key: 'template-library', label: '模板库', icon: Document, path: '/template-library', maturity: 'production', roles: ['admin', 'partner', 'manager', 'auditor', 'qc'] },
   { key: 'users', label: '账号权限', icon: UserFilled, path: '/settings/users', maturity: 'production', roles: ['admin'] },
+  { key: 'knowledge', label: '知识库', icon: Reading, path: '/knowledge', maturity: 'production', roles: null },
+  { key: 'private-storage', label: '私人库', icon: Suitcase, path: '/private-storage', maturity: 'production', roles: null },
+  { key: 'ai-models', label: 'AI 模型', icon: Cpu, path: '/settings/ai-models', maturity: 'production', roles: ['admin', 'partner', 'manager'] },
 ]
 
 /**
@@ -416,7 +446,41 @@ function buildNavForRole(nav: typeof FALLBACK_NAV, role: string) {
     })
 }
 
-const navItems = computed(() => buildNavForRole(FALLBACK_NAV, roleStore.effectiveRole || 'auditor'))
+// ── 合并菜单条件显示（group-tree-architecture Task 17.1） ──
+// 是否存在 report_scope='consolidated' 的合并项目。
+// 决策：projectStore 是单项目上下文 store，projectOptions 仅含 {id,name} 无 report_scope，
+// 无法干净派生，故采用首次轻量 API 调用并缓存结果（任务明确允许"首次 API 调用缓存结果"）。
+// fail-open：查询失败时默认显示菜单，避免瞬时错误隐藏有效功能。
+const hasConsolidatedProjects = ref(false)
+let consolidatedChecked = false
+
+async function checkConsolidatedProjects() {
+  if (consolidatedChecked) return
+  consolidatedChecked = true
+  try {
+    // GET /api/projects/tree?scope=consolidated → {trees, independents}
+    // 存在合并项目的判定：trees 非空（每棵树根为 ultimate 合并项目）或 independents 中有合并项目
+    // 不传 validateStatus：非 2xx 响应抛错 → 进 catch 走 fail-open 显示菜单
+    const data: any = await api.get('/api/projects/tree', {
+      params: { scope: 'consolidated' },
+    })
+    const trees = Array.isArray(data?.trees) ? data.trees : []
+    const independents = Array.isArray(data?.independents) ? data.independents : []
+    hasConsolidatedProjects.value = trees.length > 0 || independents.length > 0
+  } catch {
+    // fail-open：异常时显示菜单
+    hasConsolidatedProjects.value = true
+  }
+}
+
+const navItems = computed(() => {
+  const items = buildNavForRole(FALLBACK_NAV, roleStore.effectiveRole || 'auditor')
+  // 无合并项目时隐藏"合并"菜单（保留角色过滤）
+  if (!hasConsolidatedProjects.value) {
+    return items.filter(item => item.key !== 'consolidation')
+  }
+  return items
+})
 
 const activeNav = computed(() => {
   const p = route.path
@@ -462,11 +526,29 @@ const sidebarCollapsed = ref(false)
 const sidebarWidth = ref(220)
 const middleWidth = ref(340)
 const middleCollapsed = ref(false)
+const showDshPanel = ref(false)
+const dshUnreadCount = ref(0)
+
+const dshAssistBridge: DshAssistBridge = {
+  isOpen: showDshPanel,
+  open: () => {
+    showDshPanel.value = true
+  },
+  close: (_options: { preserveDraft: boolean }) => {
+    showDshPanel.value = false
+  },
+}
+provide(DSH_ASSIST_BRIDGE_KEY, dshAssistBridge)
+
+function onDshMessageCount(count: number) {
+  dshUnreadCount.value = count
+}
 const catalogWidth = ref(280)
 const catalogCollapsed = ref(false)
 const fourColumnMode = ref(false)
 const fullscreen = ref(false)
 const showFormulaManager = ref(false)
+const formulaContext = ref<OpenFormulaManagerPayload>()
 const showCustomQuery = ref(false)
 const customQueryInitialTab = ref<'basic' | 'advanced'>('basic')
 const customQueryInitialSource = ref<string | undefined>(undefined)
@@ -724,11 +806,19 @@ async function pollImportQueue() {
 function navigateToImport() {
   const pid = bgImportStatus.value?.projectId || trackedProjectId.value || route.params.projectId
   if (!pid) return
-  // 跳转到导入历史页面（能看到当前 job 进度），而非账表查询页面
+  // 如果当前在项目列表页（概览面板可见），滚动到进度面板区域
+  const progressPanel = document.querySelector('.gt-import-progress-panel')
+  if (progressPanel) {
+    progressPanel.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    // 闪烁高亮提示
+    progressPanel.classList.add('gt-import-progress-panel--highlight')
+    setTimeout(() => progressPanel.classList.remove('gt-import-progress-panel--highlight'), 1500)
+    return
+  }
+  // 否则跳转到导入历史页面
   const targetPath = `/projects/${pid}/ledger/import-history`
   const currentPath = route.path
   if (currentPath === targetPath) {
-    // 已在目标页，强制刷新
     router.replace({ path: targetPath, query: { ...route.query, t: String(Date.now()) } })
   } else {
     router.push({ path: targetPath })
@@ -768,36 +858,36 @@ async function handleLogout() {
 }
 
 // ── SSE 全局连接 ──
-let sseConnection: SSEConnection | null = null
+let sseSub: ProjectEventSubscription | null = null
 
 function connectSSE(projectId: string) {
-  // 关闭旧连接
-  if (sseConnection) {
-    sseConnection.close()
-    sseConnection = null
+  // 切项目先退订旧的（避免连接泄漏）
+  if (sseSub) {
+    sseSub.close()
+    sseSub = null
   }
   if (!projectId) return
 
-  const url = eventPaths.stream(projectId)
-  sseConnection = createSSE(url, { maxRetries: 5, retryInterval: 3000 })
-
-  sseConnection.onOpen(() => {
-    eventBus.emit('sse:connected')
-  })
-
-  sseConnection.onMessage((data, _event) => {
-    if (!data || !data.event_type) return
-    const payload = data as SyncEventPayload
-    if (payload.event_type === 'sync.failed') {
-      eventBus.emit('sse:sync-failed', payload)
-    } else {
-      eventBus.emit('sse:sync-event', payload)
-    }
-  })
-
-  sseConnection.onError(() => {
-    eventBus.emit('sse:disconnected')
-  })
+  // 迁移到项目事件流单例总线（frontend-sse-connection-consolidation）：
+  // 订阅通配 '*' 保持原 typed 事件 catch-all 语义（按 data.event_type 分流到 mitt sse:*）；
+  // 共享连接去重（每项目一条 SSE），断线重连/退避由总线（createSSE）统一负责。
+  sseSub = subscribeProjectEvent(
+    projectId,
+    WILDCARD_EVENT,
+    (data) => {
+      const d = data as SyncEventPayload | null
+      if (!d || !d.event_type) return
+      if (d.event_type === 'sync.failed') {
+        eventBus.emit('sse:sync-failed', d)
+      } else {
+        eventBus.emit('sse:sync-event', d)
+      }
+    },
+    {
+      onReconnect: () => eventBus.emit('sse:connected'),
+      onDegraded: () => eventBus.emit('sse:disconnected'),
+    },
+  )
 }
 
 // 监听项目切换，自动重连 SSE
@@ -806,12 +896,16 @@ watch(() => route.params.projectId, (newId) => {
 }, { immediate: true })
 
 // 监听子组件打开公式管理的自定义事件
-function onOpenFormulaEvent(payload: { nodeKey?: string }) {
-  showFormulaManager.value = true
-  if (payload?.nodeKey) {
-    // 存储到 sessionStorage 供 FormulaManagerDialog 读取
-    sessionStorage.setItem('gt-formula-target-node', payload.nodeKey)
+function onOpenFormulaEvent(payload?: OpenFormulaManagerPayload) {
+  formulaContext.value = payload?.wpId ? { ...payload } : undefined
+  sessionStorage.removeItem('gt-formula-target-node')
+  // Task 6: EventBus remains a thin adapter; nodeKey is migration metadata only.
+  // Page entry must open FormulaManagerDialog (never FormulaEditDialog).
+  const meta = legacyPayloadToPartialCommand(payload ?? {})
+  if (meta.legacyNodeKey) {
+    sessionStorage.setItem('gt-formula-target-node', meta.legacyNodeKey)
   }
+  showFormulaManager.value = true
 }
 
 /** 监听全局打开自定义查询事件（如 Dashboard 快捷操作 / 模板页触发） */
@@ -827,6 +921,11 @@ function onFormulaSaved() {
 }
 function onFormulaApplied() {
   eventBus.emit('formula-changed', { action: 'applied' })
+}
+
+// 全局刷新成功/部分成功后触发数据重载（formula-runtime-convergence Task 16）
+function onRefreshComplete(_result: unknown) {
+  eventBus.emit('formula-changed', { action: 'refreshed' })
 }
 
 function onSwitchFourCol(payload: { tab?: string }) {
@@ -847,6 +946,7 @@ function onShortcutUndo() {
 
 onMounted(() => {
   loadPrefs()
+  checkConsolidatedProjects()
   document.addEventListener('keydown', onKeydown)
   eventBus.on('open-formula-manager', onOpenFormulaEvent)
   eventBus.on('open-custom-query', onOpenCustomQueryEvent)
@@ -868,8 +968,8 @@ onUnmounted(() => {
   eventBus.off('shortcut:undo', onShortcutUndo)
   document.removeEventListener('touchend', onTouchEnd)
   if (importPollTimer) { clearInterval(importPollTimer); importPollTimer = null }
-  // 关闭 SSE 连接
-  if (sseConnection) { sseConnection.close(); sseConnection = null }
+  // 关闭 SSE 订阅
+  if (sseSub) { sseSub.close(); sseSub = null }
 })
 </script>
 
@@ -932,11 +1032,17 @@ onUnmounted(() => {
   align-items: center;
   justify-content: center;
   border-radius: 8px;
+  border: none;
+  background: transparent;
+  padding: 0;
+  font-family: inherit;
   color: rgba(255, 255, 255, 0.9);
   font-size: var(--gt-font-size-sm);
   transition: background 0.15s ease;
 }
 .gt-topbar-btn:hover { background: rgba(255, 255, 255, 0.12); }
+.gt-topbar-btn--active { background: rgba(255, 255, 255, 0.2); color: #fff; }
+.gt-dsh-badge :deep(.el-badge__content) { top: 2px; right: 4px; }
 .gt-theme-toggle {
   font-size: 16px;
 }
@@ -1074,11 +1180,16 @@ onUnmounted(() => {
 .gt-maturity-dev { background: var(--gt-color-border-light); color: var(--gt-color-info); }
 
 .gt-sidebar-bottom {
-  border-top: 1px solid var(--gt-color-border-light);
   padding: var(--gt-space-1);
-  flex-shrink: 0; /* 工具区不被压缩，主导航区滚动 */
-  max-height: 45vh; /* 窗口极小时工具区也不能占满，留空间给主导航 */
+  flex-shrink: 0;
+  max-height: 45vh;
   overflow-y: auto;
+}
+.gt-sidebar-divider {
+  height: 1px;
+  background: var(--gt-color-border-purple-light, #d8b8ee);
+  margin: 8px 12px;
+  opacity: 0.6;
 }
 
 /* 工具簇（侧栏底部） */
@@ -1333,5 +1444,14 @@ onUnmounted(() => {
 .gt-dp-row :deep(.el-radio-button__inner) {
   padding: 4px 10px;
   font-size: var(--gt-font-size-xs);
+}
+
+/* 进度面板高亮闪烁 */
+:deep(.gt-import-progress-panel--highlight) {
+  animation: gt-progress-highlight 1.5s ease;
+}
+@keyframes gt-progress-highlight {
+  0%, 100% { box-shadow: none; }
+  25%, 75% { box-shadow: 0 0 0 3px var(--gt-color-primary, #4b2d77); }
 }
 </style>

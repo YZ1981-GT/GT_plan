@@ -62,7 +62,7 @@
       <el-table-column prop="row_number" label="序号" width="100" align="center" />
       <el-table-column prop="row_code" label="行次编码" width="120">
         <template #default="{ row }">
-          <span class="rce-code">{{ row.row_code }}</span>
+          <span :class="['rce-code', { 'rce-code--new': row._isNew }]">{{ row.row_code }}</span>
         </template>
       </el-table-column>
       <el-table-column label="项目名称" min-width="320">
@@ -176,10 +176,35 @@ function onSelectionChange(selection: any[]) {
   selectedRows.value = selection
 }
 
+// 报表类型→行次编码前缀映射
+const REPORT_TYPE_PREFIX: Record<string, string> = {
+  balance_sheet: 'BS',
+  income_statement: 'IS',
+  cash_flow_statement: 'CFS',
+  equity_statement: 'EQ',
+  cash_flow_supplement: 'CFSS',
+  impairment_provision: 'IMP',
+}
+
+function _nextRowCode(): string {
+  const prefix = REPORT_TYPE_PREFIX[selectedReportType.value] || 'NEW'
+  // 从当前行列表中提取该前缀的最大序号
+  let maxNum = 0
+  const re = new RegExp(`^${prefix}-(\\d+)$`)
+  for (const r of rows.value) {
+    const m = r.row_code?.match(re)
+    if (m) {
+      const n = parseInt(m[1], 10)
+      if (n > maxNum) maxNum = n
+    }
+  }
+  return `${prefix}-${String(maxNum + 1).padStart(3, '0')}`
+}
+
 function _makeNewRow(number: number) {
   return {
     id: null,
-    row_code: `NEW-${String(number).padStart(3, '0')}`,
+    row_code: _nextRowCode(),
     row_number: number,
     row_name: '新行',
     indent_level: 1,
@@ -313,6 +338,14 @@ onMounted(loadConfig)
   font-variant-numeric: tabular-nums;
   color: var(--gt-color-teal);
   white-space: nowrap;
+}
+.rce-code--new {
+  color: var(--el-color-primary);
+  font-weight: 600;
+  border: 1px dashed var(--el-color-primary);
+  border-radius: 3px;
+  padding: 1px 6px;
+  background: color-mix(in srgb, var(--el-color-primary) 8%, transparent);
 }
 .rce-name-cell {
   display: flex;

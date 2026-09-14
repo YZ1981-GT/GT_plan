@@ -98,27 +98,42 @@ class ImportOrchestrator:
     ) -> LedgerDetectionResult:
         """Detect from file paths — 支持 600MB+ 大文件，不全量读入内存。
 
-        与 detect() 逻辑完全相同，区别仅在于输入是文件路径而非 bytes。
-        CSV 只读前 64KB，xlsx 用 openpyxl 流式读取。
-
-        Args:
-            file_paths: List of file absolute/relative paths.
-            year_override: User-specified year.
-            adapter_hint: User-specified adapter id.
-
-        Returns:
-            LedgerDetectionResult (same as detect()).
+        多文件并行探测（ThreadPoolExecutor），大幅加速多文件场景。
+        CSV 只读前 64KB，xlsx 用 openpyxl 流式读前 20 行。
         """
         import os
+        from concurrent.futures import ThreadPoolExecutor, as_completed
 
         upload_token = str(uuid.uuid4())
         file_detections: list[FileDetection] = []
         all_errors: list[Any] = []
 
-        # Step 1: Detect each file from path
-        for path in file_paths:
+        # 并行探测（openpyxl 读前 20 行是 IO-bound，适合多线程）
+        max_workers = min(4, len(file_paths)) or 1
+
+        def _detect_one(path: str) -> FileDetection:
             filename = os.path.basename(path)
-            fd = detect_file_from_path(path, filename)
+            return detect_file_from_path(path, filename)
+
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            futures = {executor.submit(_detect_one, p): i for i, p in enumerate(file_paths)}
+            results: list[tuple[int, FileDetection]] = []
+            for future in as_completed(futures):
+                idx = futures[future]
+                try:
+                    fd = future.result()
+                except Exception as exc:
+                    fd = FileDetection(
+                        file_name=os.path.basename(file_paths[idx]),
+                        file_size_bytes=0,
+                        file_type="xlsx",
+                        errors=[{"code": "DETECT_ERROR", "message": str(exc)}],
+                    )
+                results.append((idx, fd))
+
+        # 按原始顺序排列
+        results.sort(key=lambda x: x[0])
+        for _idx, fd in results:
             file_detections.append(fd)
             all_errors.extend(fd.errors)
 
@@ -255,6 +270,29 @@ class ImportOrchestrator:
             JobStatus,
         )
         from sqlalchemy import select as _sa_select
+
+        # 并发护栏：同一 project+year 已有未结束作业时，拒绝重复提交，
+        # 防止多个导入作业堆叠（截图实测 4 个作业并存→数据重复累加风险）。
+        # 未结束 = pending/queued/running/validating/writing/activating。
+        _active_statuses = [
+            JobStatus.pending, JobStatus.queued, JobStatus.running,
+            JobStatus.validating, JobStatus.writing, JobStatus.activating,
+        ]
+        existing_active = (await db.execute(
+            _sa_select(ImportJob.id, ImportJob.status)
+            .where(
+                ImportJob.project_id == project_id,
+                ImportJob.year == year,
+                ImportJob.status.in_(_active_statuses),
+            )
+            .limit(1)
+        )).first()
+        if existing_active is not None:
+            raise ValueError(
+                f"项目 {year} 年度已有进行中的导入作业"
+                f"（job={existing_active[0]} status={existing_active[1].value}），"
+                f"请等待其完成或先取消后再提交"
+            )
 
         # 查是否已存在 artifact（detect 阶段通过 create_bundle 创建）
         existing_stmt = _sa_select(ImportArtifact).where(

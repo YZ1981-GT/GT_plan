@@ -164,13 +164,13 @@ async function handleConfirm() {
 .form-hint {
   margin-left: 8px;
   color: var(--el-text-color-secondary);
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 .method-desc {
   padding: 8px 12px;
   background: var(--el-fill-color-light);
   border-radius: 4px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   color: var(--el-text-color-secondary);
 }
 </style>

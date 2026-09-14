@@ -1,0 +1,111 @@
+{
+  "mode": "apply",
+  "binding_constraint": "BP-61-1",
+  "lane": {
+    "lane_id": "offline_upload",
+    "authority_model": "opaque_single_onlyoffice",
+    "entry_id_source": "wp_id",
+    "writer_ref": "app.services.wp_download_service::WpUploadService.upload_file",
+    "document_type": "dynamic",
+    "instrumentation_required": false
+  },
+  "template": {
+    "contract_logical_id": "d2.receivable_detail",
+    "contract_definition_sha256": "bdd2f6494185777ce429ea04940510bcf6cf59c4f8a837c48251a4b4dfc86007",
+    "wp_code": "D2",
+    "authority_root": "backend/wp_templates",
+    "relative_path": "D/D2-1至D2-4  应收账款- 审定表明细表（Leap-常规程序）.xlsx",
+    "template_sha256": "31e7992ba1e83952620e1777d108b46f7e7817dcdc9484c07f079f1dd3af0afa",
+    "absolute_path": "D:\\GT_plan\\backend\\wp_templates\\D\\D2-1至D2-4  应收账款- 审定表明细表（Leap-常规程序）.xlsx",
+    "payload_bytes": 123162
+  },
+  "target": {
+    "project_id": "fce6120d-c22f-47e9-8358-ec8d59ae0239",
+    "wp_id": "017624e2-cd7e-4641-bd99-db7c1f1f5f7e",
+    "wp_code": "D2",
+    "project_name": "proj_478827f6",
+    "client_name": "测试客户",
+    "project_status": "created",
+    "project_workpaper_count": 1,
+    "content_revision": 0
+  },
+  "entry_id": "opaque-017624e2-cd7e-4641-bd99-db7c1f1f5f7e",
+  "expected_revision": 0,
+  "before": {
+    "counts": {
+      "working_paper_sync_entry_state": 0,
+      "working_paper_content_version": 0,
+      "working_paper_content_representation": 0,
+      "working_paper_artifact": 19,
+      "working_paper_sync_definition_artifact": 14,
+      "working_paper_sync_definition_bundle": 5,
+      "working_paper_representation_upgrade_candidate": 0,
+      "working_paper_oo_room": 0,
+      "working_paper_content_application": 0
+    },
+    "business_rows_touched": []
+  },
+  "after": {
+    "counts": {
+      "working_paper_sync_entry_state": 1,
+      "working_paper_content_version": 1,
+      "working_paper_content_representation": 1,
+      "working_paper_artifact": 20,
+      "working_paper_sync_definition_artifact": 14,
+      "working_paper_sync_definition_bundle": 5,
+      "working_paper_representation_upgrade_candidate": 0,
+      "working_paper_oo_room": 0,
+      "working_paper_content_application": 0
+    },
+    "business_rows_touched": [
+      {
+        "wp_id": "017624e2-cd7e-4641-bd99-db7c1f1f5f7e",
+        "client_name": "测试客户",
+        "content_revision": 1,
+        "has_current_content_version": true,
+        "is_fixture_client": true
+      }
+    ]
+  },
+  "receipt": {
+    "wp_id": "017624e2-cd7e-4641-bd99-db7c1f1f5f7e",
+    "entry_id": "opaque-017624e2-cd7e-4641-bd99-db7c1f1f5f7e",
+    "content_version_id": "33450e8a-d4a5-4353-be7a-6a6296f5f945",
+    "revision": 1,
+    "representation_id": "f9b29813-63d4-4e8c-9d23-dca9df60fac9",
+    "representation_generation": 1,
+    "artifact_sha256": "31e7992ba1e83952620e1777d108b46f7e7817dcdc9484c07f079f1dd3af0afa",
+    "projection_sha256": null,
+    "definition_bundle_id": "6d09d6b7-1a61-4992-a7fd-c9e89b2336e4",
+    "definition_bundle_sha256": "c8c4494821ddee3b378f9f7af17853ff7004cace0d1a995d689bc827f922dd8b",
+    "authority_model": "opaque_single_onlyoffice",
+    "operation_id": null,
+    "replayed": false,
+    "requires_client_refresh": false,
+    "commit_count": 1,
+    "transaction_ids": [
+      "3618180"
+    ]
+  },
+  "verification": {
+    "checks": {
+      "representation_supply_now_nonzero": true,
+      "content_version_created": true,
+      "entry_pointer_created": true,
+      "representation_created": true,
+      "artifact_row_added": true,
+      "no_untouched_table_moved": true,
+      "only_fixture_business_row_touched": true,
+      "fixture_row_is_the_target": true,
+      "fixture_revision_is_one": true,
+      "fixture_has_current_content_version": true,
+      "receipt_revision_is_one": true,
+      "receipt_generation_is_one": true,
+      "receipt_commit_count_is_one": true,
+      "receipt_single_transaction": true
+    },
+    "failed": [],
+    "non_fixture_business_rows": []
+  },
+  "errors": []
+}

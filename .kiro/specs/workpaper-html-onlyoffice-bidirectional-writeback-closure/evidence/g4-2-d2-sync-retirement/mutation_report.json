@@ -1,0 +1,136 @@
+{
+  "work_package": "G4-2",
+  "declared_count": 10,
+  "executed_count": 10,
+  "verdicts": {
+    "RED": 10
+  },
+  "rows": [
+    {
+      "id": "M01",
+      "name": "后端 legacy router 复活（模块可导入 + 路由回来 + 相位变 partial）",
+      "verdict": "RED",
+      "detail": "预期测试打红（本轮共 5 条红）",
+      "expect_test": "test_legacy_router_module_is_not_importable",
+      "failed_tests": [
+        "test_legacy_router_module_is_not_importable",
+        "test_no_production_source_uses_the_retired_endpoint",
+        "test_no_route_declares_a_d2_sync_path",
+        "test_overall_gate_is_green",
+        "test_phase_is_post_delete"
+      ],
+      "restored_byte_identical": true
+    },
+    {
+      "id": "M02",
+      "name": "前端 legacy 桥文件复活",
+      "verdict": "RED",
+      "detail": "预期测试打红（本轮共 4 条红）",
+      "expect_test": "test_legacy_frontend_bridge_file_is_gone",
+      "failed_tests": [
+        "test_legacy_frontend_bridge_file_is_gone",
+        "test_no_production_source_uses_the_retired_endpoint",
+        "test_overall_gate_is_green",
+        "test_phase_is_post_delete"
+      ],
+      "restored_byte_identical": true
+    },
+    {
+      "id": "M03",
+      "name": "后端生产模块重新把 d2-sync 当端点字面量用",
+      "verdict": "RED",
+      "detail": "预期测试打红（本轮共 2 条红）",
+      "expect_test": "test_no_production_source_uses_the_retired_endpoint",
+      "failed_tests": [
+        "test_no_production_source_uses_the_retired_endpoint",
+        "test_overall_gate_is_green"
+      ],
+      "restored_byte_identical": true
+    },
+    {
+      "id": "M04",
+      "name": "registry 重新绑定 d2_sync",
+      "verdict": "RED",
+      "detail": "预期测试打红（本轮共 2 条红）",
+      "expect_test": "test_no_route_declares_a_d2_sync_path",
+      "failed_tests": [
+        "test_no_route_declares_a_d2_sync_path",
+        "test_overall_gate_is_green"
+      ],
+      "restored_byte_identical": true
+    },
+    {
+      "id": "M05",
+      "name": "把仍在被统一路径消费的桥一起删掉（删过头）",
+      "verdict": "RED",
+      "detail": "预期测试打红（本轮共 2 条红）",
+      "expect_test": "test_reusable_bridge_is_retained_not_collateral_damage",
+      "failed_tests": [
+        "test_overall_gate_is_green",
+        "test_reusable_bridge_is_retained_not_collateral_damage"
+      ],
+      "restored_byte_identical": true
+    },
+    {
+      "id": "M06",
+      "name": "拆掉缺陷 A 反向锁的顺序断言",
+      "verdict": "RED",
+      "detail": "预期测试打红（本轮共 2 条红）",
+      "expect_test": "test_replacement_surface_still_covers_what_legacy_covered",
+      "failed_tests": [
+        "test_overall_gate_is_green",
+        "test_replacement_surface_still_covers_what_legacy_covered"
+      ],
+      "restored_byte_identical": true
+    },
+    {
+      "id": "M07",
+      "name": "去掉 G4-0a fail-closed 的必填端点判断",
+      "verdict": "RED",
+      "detail": "预期测试打红（本轮共 2 条红）",
+      "expect_test": "test_replacement_surface_still_covers_what_legacy_covered",
+      "failed_tests": [
+        "test_overall_gate_is_green",
+        "test_replacement_surface_still_covers_what_legacy_covered"
+      ],
+      "restored_byte_identical": true
+    },
+    {
+      "id": "M08",
+      "name": "打断一处防复活负向断言（宿主不得调 legacy 桥）",
+      "verdict": "RED",
+      "detail": "预期测试打红（本轮共 2 条红）",
+      "expect_test": "test_anti_revival_negative_assertions_are_all_alive",
+      "failed_tests": [
+        "test_anti_revival_negative_assertions_are_all_alive",
+        "test_overall_gate_is_green"
+      ],
+      "restored_byte_identical": true
+    },
+    {
+      "id": "M09",
+      "name": "只掏空 D2 分支的 store 合并绑定（错绑成别的 pilot 的同名函数）",
+      "verdict": "RED",
+      "detail": "预期测试打红（本轮共 1 条红）",
+      "expect_test": "test_d2_branch_of_the_store_mirror_binds_this_bridge",
+      "failed_tests": [
+        "test_d2_branch_of_the_store_mirror_binds_this_bridge"
+      ],
+      "restored_byte_identical": true
+    },
+    {
+      "id": "M10",
+      "name": "掏空**全部** store 合并绑定（通用接线反向锁）",
+      "verdict": "RED",
+      "detail": "预期测试打红（本轮共 2 条红）",
+      "expect_test": "test_unified_oo_to_html_really_wires_the_merge_function",
+      "failed_tests": [
+        "test_d2_branch_of_the_store_mirror_binds_this_bridge",
+        "test_unified_oo_to_html_really_wires_the_merge_function"
+      ],
+      "restored_byte_identical": true
+    }
+  ],
+  "restore_drift": [],
+  "mutbak_leftovers": []
+}

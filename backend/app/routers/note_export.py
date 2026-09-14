@@ -19,6 +19,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_db
 from app.deps import get_current_user
 from app.models.core import Project, User
+from app.services.formula_management.delivery_export import (
+    content_disposition_attachment,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -60,14 +63,19 @@ async def export_word(
     # Generate Word document
     from app.services.note_word_exporter import NoteWordExporter
 
+    from app.services.note_section_catalog import normalize_report_scope
+
     exporter = NoteWordExporter(db)
     try:
         output = await exporter.export(
             project_id=project_id,
             year=body.year,
             template_type=body.template_type,
+            report_scope=normalize_report_scope(project.report_scope),
             sections=body.sections,
             skip_empty=body.skip_empty,
+            # 交付导出（Req 18.1/18.3）：公式解析为静态值兜底守卫
+            flatten_formulas=True,
         )
     except Exception as e:
         logger.exception("Word export failed for project %s", project_id)
@@ -76,12 +84,16 @@ async def export_word(
     # Build filename per 致同 naming convention
     company_short = _get_company_short_name(project)
     filename = sanitize_export_filename(f"{company_short}_{body.year}年度财务报表附注.docx")
+    # 中文文件名 RFC5987 编码（Req 18.5，复用交付导出统一 helper）
+    disposition = content_disposition_attachment(
+        filename, ascii_fallback="note_export.docx"
+    )
 
     return StreamingResponse(
         output,
         media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
         headers={
-            "Content-Disposition": f'attachment; filename="{filename}"',
+            "Content-Disposition": disposition,
             "Content-Type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
         },
     )

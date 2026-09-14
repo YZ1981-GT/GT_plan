@@ -1,0 +1,25 @@
+{
+  "task": 15,
+  "recordedAt": "2026-09-13T05:48:22.911442+00:00",
+  "cases": [
+    {
+      "id": "T15-M01-second-formula-dialog",
+      "verdict": "RED",
+      "returncode": 1,
+      "tail": "s not iterable\u001b[39m\n\u001b[36m \u001b[2m\u276f\u001b[22m buildWorkpaperHostInventory src/shell/formula/workpaperHostInventory.ts:\u001b[2m267:21\u001b[22m\u001b[39m\n    \u001b[90m265| \u001b[39m  \u001b[35mconst\u001b[39m entries\u001b[33m:\u001b[39m \u001b[33mWorkpaperHostCapabilityRecord\u001b[39m[] \u001b[33m=\u001b[39m []\n    \u001b[90m266| \u001b[39m\n    \u001b[90m267| \u001b[39m  \u001b[35mfor\u001b[39m (\u001b[35mconst\u001b[39m reg \u001b[35mof\u001b[39m \u001b[33mREGISTRY_LIST\u001b[39m) {\n    \u001b[90m   | \u001b[39m                    \u001b[31m^\u001b[39m\n    \u001b[90m268| \u001b[39m    const evidenceState: EvidenceState = observed.has(reg.componentTyp\u2026\n    \u001b[90m269| \u001b[39m      \u001b[33m?\u001b[39m \u001b[32m'observed'\u001b[39m\n\u001b[90m \u001b[2m\u276f\u001b[22m runFullInventoryGate src/shell/formula/fullInventoryGate.ts:\u001b[2m351:24\u001b[22m\u001b[39m\n\u001b[90m \u001b[2m\u276f\u001b[22m src/shell/formula/__tests__/fullInventoryGate.spec.ts:\u001b[2m26:18\u001b[22m\u001b[39m\n\n\u001b[31m\u001b[2m\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af[1/1]\u23af\u001b[22m\u001b[39m\n\n"
+    },
+    {
+      "id": "T15-M02-null-inventory-digest",
+      "verdict": "RED",
+      "returncode": 1,
+      "tail": "s not iterable\u001b[39m\n\u001b[36m \u001b[2m\u276f\u001b[22m buildWorkpaperHostInventory src/shell/formula/workpaperHostInventory.ts:\u001b[2m267:21\u001b[22m\u001b[39m\n    \u001b[90m265| \u001b[39m  \u001b[35mconst\u001b[39m entries\u001b[33m:\u001b[39m \u001b[33mWorkpaperHostCapabilityRecord\u001b[39m[] \u001b[33m=\u001b[39m []\n    \u001b[90m266| \u001b[39m\n    \u001b[90m267| \u001b[39m  \u001b[35mfor\u001b[39m (\u001b[35mconst\u001b[39m reg \u001b[35mof\u001b[39m \u001b[33mREGISTRY_LIST\u001b[39m) {\n    \u001b[90m   | \u001b[39m                    \u001b[31m^\u001b[39m\n    \u001b[90m268| \u001b[39m    const evidenceState: EvidenceState = observed.has(reg.componentTyp\u2026\n    \u001b[90m269| \u001b[39m      \u001b[33m?\u001b[39m \u001b[32m'observed'\u001b[39m\n\u001b[90m \u001b[2m\u276f\u001b[22m runFullInventoryGate src/shell/formula/fullInventoryGate.ts:\u001b[2m351:24\u001b[22m\u001b[39m\n\u001b[90m \u001b[2m\u276f\u001b[22m src/shell/formula/__tests__/fullInventoryGate.spec.ts:\u001b[2m26:18\u001b[22m\u001b[39m\n\n\u001b[31m\u001b[2m\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af[1/1]\u23af\u001b[22m\u001b[39m\n\n"
+    },
+    {
+      "id": "T15-M03-break-grid-exemption",
+      "verdict": "RED",
+      "returncode": 1,
+      "tail": "s not iterable\u001b[39m\n\u001b[36m \u001b[2m\u276f\u001b[22m buildWorkpaperHostInventory src/shell/formula/workpaperHostInventory.ts:\u001b[2m267:21\u001b[22m\u001b[39m\n    \u001b[90m265| \u001b[39m  \u001b[35mconst\u001b[39m entries\u001b[33m:\u001b[39m \u001b[33mWorkpaperHostCapabilityRecord\u001b[39m[] \u001b[33m=\u001b[39m []\n    \u001b[90m266| \u001b[39m\n    \u001b[90m267| \u001b[39m  \u001b[35mfor\u001b[39m (\u001b[35mconst\u001b[39m reg \u001b[35mof\u001b[39m \u001b[33mREGISTRY_LIST\u001b[39m) {\n    \u001b[90m   | \u001b[39m                    \u001b[31m^\u001b[39m\n    \u001b[90m268| \u001b[39m    const evidenceState: EvidenceState = observed.has(reg.componentTyp\u2026\n    \u001b[90m269| \u001b[39m      \u001b[33m?\u001b[39m \u001b[32m'observed'\u001b[39m\n\u001b[90m \u001b[2m\u276f\u001b[22m runFullInventoryGate src/shell/formula/fullInventoryGate.ts:\u001b[2m351:24\u001b[22m\u001b[39m\n\u001b[90m \u001b[2m\u276f\u001b[22m src/shell/formula/__tests__/fullInventoryGate.spec.ts:\u001b[2m26:18\u001b[22m\u001b[39m\n\n\u001b[31m\u001b[2m\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af[1/1]\u23af\u001b[22m\u001b[39m\n\n"
+    }
+  ],
+  "allRed": true
+}

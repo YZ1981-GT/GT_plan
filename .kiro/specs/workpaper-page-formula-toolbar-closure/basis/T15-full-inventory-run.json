@@ -1,0 +1,193 @@
+{
+  "gateVersion": "1.0",
+  "contractId": "F-SHELL",
+  "contractVersion": "1.0",
+  "generatedAt": "2026-09-09T00:30:00.000Z",
+  "runId": "t15-full-inventory-2026-09-09",
+  "overall": "PASS",
+  "blockers": [],
+  "inventoryDigest": "cb788c0c01b286f7af07e7c7e680eda4db41c89a16fb9fba27dd6a46a7e9301e",
+  "digests": {
+    "entries": "375690c9e63f128c293bf6475ded2c1ea0fb2f0a018c87d162c05092acc95272",
+    "duplicates": "bf05369e533b0193a8fffa568af4b6ba60b834b07d6638eb03d0df5e999d2c7c",
+    "exclusions": "e0a779702afc38c58bf471a7eca1bb52f76ed2b8c18e5f3e6d6d877fd4be9f44",
+    "run": "cb788c0c01b286f7af07e7c7e680eda4db41c89a16fb9fba27dd6a46a7e9301e"
+  },
+  "entryCount": 216,
+  "domainExclusionCount": 6,
+  "domainExclusions": [
+    {
+      "relativePath": "views/TrialBalance.vue",
+      "ownerSpec": "trial-balance",
+      "reason": "TB domain formula UX — not workpaper-route shell"
+    },
+    {
+      "relativePath": "views/ReportView.vue",
+      "ownerSpec": "report",
+      "reason": "Report domain formula UX — not workpaper-route shell"
+    },
+    {
+      "relativePath": "views/DisclosureEditor.vue",
+      "ownerSpec": "disclosure-notes",
+      "reason": "Note/disclosure domain formula UX — not workpaper-route shell"
+    },
+    {
+      "relativePath": "views/ReportConfigEditor.vue",
+      "ownerSpec": "report-config",
+      "reason": "Report-config domain — not workpaper-route shell"
+    },
+    {
+      "relativePath": "views/ReportConfigBaselineTab.vue",
+      "ownerSpec": "report-config",
+      "reason": "Report-config domain — not workpaper-route shell"
+    },
+    {
+      "relativePath": "views/AuditReportEditor.vue",
+      "ownerSpec": "audit-report",
+      "reason": "Audit-report domain — not workpaper-route shell"
+    }
+  ],
+  "outletBaseline": {
+    "primarySlotName": "page-capabilities-primary",
+    "compatibilitySlotName": "page-capabilities-compatibility",
+    "cssClassNotSlot": "gt-wp-toolbar__right",
+    "primaryNamedOutletMounted": false,
+    "compatibilityNamedOutletMounted": false
+  },
+  "hostAdjudications": [
+    {
+      "host": "html",
+      "status": "reachable",
+      "wp_code": "B50-1",
+      "wp_id": "68b35347-4e3a-43aa-a91d-c611149df9d2"
+    },
+    {
+      "host": "univer",
+      "status": "reachable",
+      "wp_code": "A1-13",
+      "wp_id": "085ae719-d662-4e93-a282-a03c407cf871"
+    },
+    {
+      "host": "onlyoffice",
+      "status": "reachable",
+      "wp_code": "A14-4",
+      "wp_id": "342e8635-0a43-4c9a-b656-b1d7c879ef66"
+    },
+    {
+      "host": "grid",
+      "status": "exempted",
+      "exemption": {
+        "host": "grid",
+        "status": "exempted",
+        "owner": "workpaper-page-formula-toolbar-closure",
+        "reasonCode": "grid_host_absent_from_registry_and_project_inventory",
+        "expiresAt": "2026-12-31T23:59:59Z",
+        "sourceDigest": "sha256:t15-grid-absent-registry-2026-09-09",
+        "denominator": true,
+        "notes": "Denominator retains grid. No editable_grid / host=grid componentType in renderer registry or T14 project inventory. Shell must show BLOCKED (not fake DOM) if a grid host appears later without adapter.",
+        "recordedAt": "2026-09-09T00:00:00Z"
+      },
+      "reason": "grid_host_absent_from_registry_and_project_inventory"
+    },
+    {
+      "host": "word",
+      "status": "reachable",
+      "wp_code": "A26-1",
+      "wp_id": "94a6056e-d533-4965-ae4e-bce9641d9342"
+    }
+  ],
+  "duplicates": {
+    "rawCount": 15,
+    "forbiddenCount": 0,
+    "byKindForbidden": {},
+    "shellOwned": [
+      {
+        "kind": "ai-review-panel",
+        "path": "components/workpaper/review/GtWpAiReviewToolbar.vue",
+        "reason": "canonical AI review toolbar"
+      },
+      {
+        "kind": "guidance-rail",
+        "path": "components/workpaper/WpGuidancePanel.vue",
+        "reason": "G-RAIL panel body"
+      },
+      {
+        "kind": "ai-assist",
+        "path": "layouts/ThreeColumnLayout.vue",
+        "reason": "DSH assist carrier owner"
+      },
+      {
+        "kind": "formula-entry",
+        "path": "layouts/ThreeColumnLayout.vue",
+        "reason": "unique FormulaManagerDialog owner on workpaper route"
+      },
+      {
+        "kind": "guidance-rail",
+        "path": "views/WorkpaperEditor.vue",
+        "reason": "shell mounts WpGuidancePanel under WorkpaperCapabilityShell"
+      }
+    ],
+    "allowedDelegates": [
+      {
+        "kind": "human-review",
+        "path": "components/workpaper/GtD1NotesReceivable.vue",
+        "reason": "GtWpReviewRail self-suppresses under WORKPAPER_SHELL_ACTIVE_KEY"
+      },
+      {
+        "kind": "human-review",
+        "path": "components/workpaper/GtD2AccountsReceivable.vue",
+        "reason": "GtWpReviewRail self-suppresses under WORKPAPER_SHELL_ACTIVE_KEY"
+      },
+      {
+        "kind": "human-review",
+        "path": "components/workpaper/GtD3PrepaidAccounts.vue",
+        "reason": "GtWpReviewRail self-suppresses under WORKPAPER_SHELL_ACTIVE_KEY"
+      },
+      {
+        "kind": "human-review",
+        "path": "components/workpaper/GtD4OperatingRevenue.vue",
+        "reason": "GtWpReviewRail self-suppresses under WORKPAPER_SHELL_ACTIVE_KEY"
+      },
+      {
+        "kind": "human-review",
+        "path": "components/workpaper/GtD5ReceivablesFinancing.vue",
+        "reason": "GtWpReviewRail self-suppresses under WORKPAPER_SHELL_ACTIVE_KEY"
+      },
+      {
+        "kind": "human-review",
+        "path": "components/workpaper/GtD6ContractAssets.vue",
+        "reason": "GtWpReviewRail self-suppresses under WORKPAPER_SHELL_ACTIVE_KEY"
+      },
+      {
+        "kind": "human-review",
+        "path": "components/workpaper/GtD7ContractLiabilities.vue",
+        "reason": "GtWpReviewRail self-suppresses under WORKPAPER_SHELL_ACTIVE_KEY"
+      },
+      {
+        "kind": "formula-entry",
+        "path": "components/workpaper/GtE1MonetaryFund.vue",
+        "reason": "emits/references FormulaManager without mounting a second dialog"
+      },
+      {
+        "kind": "ai-review-panel",
+        "path": "components/workpaper/GtWpRenderer.vue",
+        "reason": "mounts canonical GtWpAiReviewToolbar only"
+      },
+      {
+        "kind": "formula-entry",
+        "path": "components/workpaper/GtWpRenderer.vue",
+        "reason": "emits/references FormulaManager without mounting a second dialog"
+      }
+    ],
+    "forbidden": []
+  },
+  "legacyFindings": [],
+  "staleEvidence": [],
+  "spellingGuards": {
+    "workoberKeyTypos": []
+  },
+  "browserImportGuards": {
+    "cryptoStaticImports": []
+  },
+  "evidenceSha256": "b696f9039f8a7c5bd36d3b51ac1dd3a71dcdb3d2918a954f51515a3a49b786fa"
+}

@@ -113,6 +113,12 @@ class KnowledgeDocument(Base):
         PG_UUID(as_uuid=True), nullable=True
     )
 
+    # V116: 索引状态追踪
+    index_status: Mapped[str | None] = mapped_column(
+        String(30), server_default=text("'pending'"), nullable=True
+    )
+    index_error: Mapped[str | None] = mapped_column(Text, nullable=True)
+
     __table_args__ = (
         Index("idx_knowledge_documents_folder", "folder_id"),
         Index("idx_knowledge_documents_name", "name"),

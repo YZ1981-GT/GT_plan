@@ -190,10 +190,19 @@ export interface EqcrGoingConcernIndicator {
   notes: string | null
 }
 
+export interface EqcrA15Reference {
+  ready: boolean
+  source_wp: string[]
+  summary_text?: string | null
+  conclusion?: string | null
+  reason?: string | null
+}
+
 export interface EqcrGoingConcernData {
   current_evaluation: EqcrGoingConcernEvaluation | null
   prior_evaluations: EqcrGoingConcernEvaluation[]
   indicators: EqcrGoingConcernIndicator[]
+  a15_1_reference?: EqcrA15Reference | null
 }
 
 /** 审计意见 Tab 数据 */

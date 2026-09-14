@@ -9,6 +9,7 @@
 
 from uuid import UUID
 
+import sqlalchemy as sa
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 

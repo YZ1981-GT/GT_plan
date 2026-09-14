@@ -1,0 +1,110 @@
+[
+  {
+    "id": "M01",
+    "side": "fe",
+    "want": "四步顺序被真实调用序列锁死",
+    "why": "把 prop 改名 ⇒ 父传的 `descriptor` 变成一个**不存在的 prop**，Vue 静默丢掉它，组件读到 undefined。Volar/vitest/get_diagnostics 三层全绿，只有真的看「DocEditor 有没有被构造」才能证伪。AC 11.12 点名的就是这个形态",
+    "verdict": "RED",
+    "summary": "12/38 passed, numFailedTestSuites=8",
+    "added": [
+      "crash 回调进入恢复流程而非普通重试 claim 之前 recoveryCase 事件不得携带 operation id，三实体全空",
+      "crash 回调进入恢复流程而非普通重试 已确认房间内的编辑器异常 ⇒ 服务端列出恢复项 ⇒ 渲染恢复区、不渲染重试",
+      "crash 回调进入恢复流程而非普通重试 服务端列不出可认领项 ⇒ 显式失败，既不渲染恢复区也不退化成重试",
+      "crash 回调进入恢复流程而非普通重试 确认之前的编辑器异常不进恢复流程（转换表里没有那条出边）",
+      "descriptor → DocEditor mount → onDocumentReady → confirm → oo_editing ready 不等于可保存：ready 已触发但 confirm 未返回时保存仍 fail visible",
+      "descriptor → DocEditor mount → onDocumentReady → confirm → oo_editing 只读 participant（forcesave_unlocked=false）确认后仍不得渲染可编辑编辑器",
+      "descriptor → DocEditor mount → onDocumentReady → confirm → oo_editing 四步顺序被真实调用序列锁死，且每一步的 DOM 各不相同",
+      "descriptor 是唯一 config 来源 config 打开了编辑器侧 forcesave 时拒绝挂载（AC 4.1 的孤儿 callback 源）",
+      "descriptor 是唯一 config 来源 整个打开流程零 HTTP：DocEditor config 逐字来自 descriptor，只多容器三键",
+      "暴露的 API 与七个事件各有真实触发路径 conflict 终态与 applied 终态可分辨（不得都显示成完成）",
+      "暴露的 API 与七个事件各有真实触发路径 forceSave() 真发 forcesave 并 emit saveRequested（带 requested operation id）",
+      "暴露的 API 与七个事件各有真实触发路径 getSyncState() 逐项来自桥，不自己维护第二份状态",
+      "暴露的 API 与七个事件各有真实触发路径 incomingDurable / terminal 由桥的真实状态推进触发，且不伪造 incoming 摘要",
+      "暴露的 API 与七个事件各有真实触发路径 onDocumentStateChange 真实触发 dirty，并让离开被阻断（AC 4.8）",
+      "暴露的 API 与七个事件各有真实触发路径 点击保存按钮走同一条路径（按钮不是装饰）",
+      "确认失败不得留下一个还在编辑的编辑器 confirm 409 ⇒ 销毁编辑器、撤掉保存入口、状态条粘住失败",
+      "确认失败不得留下一个还在编辑的编辑器 确认失败后再卸载（销毁成功）也不得把状态条洗回成功文案",
+      "重挂与 DocsAPI 载入 DocEditor 构造抛错 ⇒ 不得上报「已挂载」，且失败可见",
+      "重挂与 DocsAPI 载入 prop 未给时回落部署期环境变量（`VITE_ONLYOFFICE_URL`）",
+      "重挂与 DocsAPI 载入 同一 descriptor 重复下发不重复挂载（幂等）",
+      "重挂与 DocsAPI 载入 在编辑中被换掉 descriptor 身份 ⇒ 显式失败，不静默替换编辑器",
+      "重挂与 DocsAPI 载入 新代际重开：旧编辑器被销毁、新 descriptor 重新挂载并重新 confirm",
+      "重挂与 DocsAPI 载入 未注入 loader 时按 documentServerUrl 载入 api.js（不是第二份 config）",
+      "重挂与 DocsAPI 载入 没有服务地址也没有 loader ⇒ 显式失败，不停在「正在打开」",
+      "零消费方判决（本组必须放在文件末尾） 组件声明的 emit 集合逐字等于本文件真正触发过的集合",
+      "零消费方判决（本组必须放在文件末尾） 组件声明的 prop 集合逐字等于本文件真正驱动过的集合"
+    ],
+    "gone": [],
+    "hit": [
+      "descriptor → DocEditor mount → onDocumentReady → confirm → oo_editing 四步顺序被真实调用序列锁死，且每一步的 DOM 各不相同",
+      "零消费方判决（本组必须放在文件末尾） 组件声明的 prop 集合逐字等于本文件真正驱动过的集合"
+    ],
+    "added_files": [
+      "WorkpaperSyncEditorHost.spec.ts"
+    ],
+    "restored": true,
+    "seconds": 3.1
+  },
+  {
+    "id": "M02",
+    "side": "fe",
+    "want": "组件声明的 prop 集合逐字等于本文件真正驱动过的集合",
+    "why": "加一个**没人传**的 prop ⇒ 死 prop。它不会让任何行为判据变红，只有「声明集合逐字等于驱动集合」这条正面判决能抓住 —— 而那正是 Task 31 抓出 7 个死导出的同一形态在组件里的样子",
+    "verdict": "RED",
+    "summary": "37/38 passed, numFailedTestSuites=2",
+    "added": [
+      "零消费方判决（本组必须放在文件末尾） 组件声明的 prop 集合逐字等于本文件真正驱动过的集合"
+    ],
+    "gone": [],
+    "hit": [
+      "零消费方判决（本组必须放在文件末尾） 组件声明的 prop 集合逐字等于本文件真正驱动过的集合"
+    ],
+    "added_files": [
+      "WorkpaperSyncEditorHost.spec.ts"
+    ],
+    "restored": true,
+    "seconds": 3.1
+  },
+  {
+    "id": "M03",
+    "side": "fe",
+    "want": "组件声明的 emit 集合逐字等于本文件真正触发过的集合",
+    "why": "声明一个**永不触发**的 emit（design 的事件表里就写着 `fallback: []`，而宿主没有任何合法触发路径）⇒ 零消费方。AC 11.5 明文「不得只 emit fallback」，声明了却不触发同样是死代码",
+    "verdict": "RED",
+    "summary": "37/38 passed, numFailedTestSuites=2",
+    "added": [
+      "零消费方判决（本组必须放在文件末尾） 组件声明的 emit 集合逐字等于本文件真正触发过的集合"
+    ],
+    "gone": [],
+    "hit": [
+      "零消费方判决（本组必须放在文件末尾） 组件声明的 emit 集合逐字等于本文件真正触发过的集合"
+    ],
+    "added_files": [
+      "WorkpaperSyncEditorHost.spec.ts"
+    ],
+    "restored": true,
+    "seconds": 3.2
+  },
+  {
+    "id": "M04",
+    "side": "fe",
+    "want": "onDocumentStateChange 真实触发 dirty",
+    "why": "删掉 dirty 的唯一触发 ⇒ 声明的事件失去真实触发路径。页面拿不到脏标记，AC 4.8 的离开阻断在 UI 层就没了依据。两条判据必须同时红",
+    "verdict": "RED",
+    "summary": "36/38 passed, numFailedTestSuites=3",
+    "added": [
+      "暴露的 API 与七个事件各有真实触发路径 onDocumentStateChange 真实触发 dirty，并让离开被阻断（AC 4.8）",
+      "零消费方判决（本组必须放在文件末尾） 组件声明的 emit 集合逐字等于本文件真正触发过的集合"
+    ],
+    "gone": [],
+    "hit": [
+      "暴露的 API 与七个事件各有真实触发路径 onDocumentStateChange 真实触发 dirty，并让离开被阻断（AC 4.8）",
+      "零消费方判决（本组必须放在文件末尾） 组件声明的 emit 集合逐字等于本文件真正触发过的集合"
+    ],
+    "added_files": [
+      "WorkpaperSyncEditorHost.spec.ts"
+    ],
+    "restored": true,
+    "seconds": 3.0
+  }
+]

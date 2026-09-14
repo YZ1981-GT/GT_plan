@@ -1,0 +1,709 @@
+[
+  {
+    "id": "M01",
+    "side": "be",
+    "want": "test_sheet_id_anchor_is_disproven_by_evidence",
+    "why": "把已被 15/15 artifact 证伪的 sheetId 锚点改成 passed —— 这是本任务最贵的一条反向锁；若守卫放过，Task 17 就会拿一个每次保存都被 OO 重编号的值当 identity 锚点",
+    "verdict": "RED",
+    "summary": "3 failed, 28 passed in 0.75s",
+    "added": [
+      "test_workpaper_excel_identity_carrier_contract.py::test_downstream_gate_lists_exactly_the_passed_items",
+      "test_workpaper_excel_identity_carrier_contract.py::test_every_carrier_and_anchor_has_machine_readable_verdict",
+      "test_workpaper_excel_identity_carrier_contract.py::test_sheet_id_anchor_is_disproven_by_evidence"
+    ],
+    "gone": [],
+    "hit": [
+      "test_workpaper_excel_identity_carrier_contract.py::test_downstream_gate_lists_exactly_the_passed_items",
+      "test_workpaper_excel_identity_carrier_contract.py::test_every_carrier_and_anchor_has_machine_readable_verdict",
+      "test_workpaper_excel_identity_carrier_contract.py::test_sheet_id_anchor_is_disproven_by_evidence"
+    ],
+    "added_files": [
+      "test_workpaper_excel_identity_carrier_contract.py"
+    ],
+    "restored": true,
+    "seconds": 3.5
+  },
+  {
+    "id": "M02",
+    "side": "be",
+    "want": "test_sheet_id_anchor_is_disproven_by_evidence",
+    "why": "证伪计数从实测 0 谎报成 15；守卫必须从 operation_matrix 重新数而不是采信契约数字",
+    "verdict": "RED",
+    "summary": "1 failed, 30 passed in 0.75s",
+    "added": [
+      "test_workpaper_excel_identity_carrier_contract.py::test_sheet_id_anchor_is_disproven_by_evidence"
+    ],
+    "gone": [],
+    "hit": [
+      "test_workpaper_excel_identity_carrier_contract.py::test_sheet_id_anchor_is_disproven_by_evidence"
+    ],
+    "added_files": [
+      "test_workpaper_excel_identity_carrier_contract.py"
+    ],
+    "restored": true,
+    "seconds": 3.5
+  },
+  {
+    "id": "M03",
+    "side": "be",
+    "want": "test_sheet_display_name_anchor_is_disproven_by_evidence",
+    "why": "谎称 sheet 展示名在改名后仍可解析；实测 rename_sheet artifact 的 sheet_name 候选是 resolvable=false，改名后按名定位必然失败",
+    "verdict": "RED",
+    "summary": "1 failed, 30 passed in 0.75s",
+    "added": [
+      "test_workpaper_excel_identity_carrier_contract.py::test_sheet_display_name_anchor_is_disproven_by_evidence"
+    ],
+    "gone": [],
+    "hit": [
+      "test_workpaper_excel_identity_carrier_contract.py::test_sheet_display_name_anchor_is_disproven_by_evidence"
+    ],
+    "added_files": [
+      "test_workpaper_excel_identity_carrier_contract.py"
+    ],
+    "restored": true,
+    "seconds": 3.5
+  },
+  {
+    "id": "M04",
+    "side": "be",
+    "want": "test_sheet_id_anchor_is_disproven_by_evidence",
+    "why": "手改「OO 重编号后的 sheetId 映射」表；守卫按 artifact 的 sheet 顺序反算 1..N，手填一份好看的映射必须被拦",
+    "verdict": "RED",
+    "summary": "1 failed, 30 passed in 0.75s",
+    "added": [
+      "test_workpaper_excel_identity_carrier_contract.py::test_sheet_id_anchor_is_disproven_by_evidence"
+    ],
+    "gone": [],
+    "hit": [
+      "test_workpaper_excel_identity_carrier_contract.py::test_sheet_id_anchor_is_disproven_by_evidence"
+    ],
+    "added_files": [
+      "test_workpaper_excel_identity_carrier_contract.py"
+    ],
+    "restored": true,
+    "seconds": 3.5
+  },
+  {
+    "id": "M05",
+    "side": "be",
+    "want": "test_every_carrier_and_anchor_has_machine_readable_verdict",
+    "why": "让准入布尔与 probe_verdict 脱钩（passed 却不许进 Task 17）—— 两处各写一份就会出现「读 verdict 的代码放行、读布尔的代码拦住」的分叉",
+    "verdict": "RED",
+    "summary": "1 failed, 30 passed in 0.75s",
+    "added": [
+      "test_workpaper_excel_identity_carrier_contract.py::test_every_carrier_and_anchor_has_machine_readable_verdict"
+    ],
+    "gone": [],
+    "hit": [
+      "test_workpaper_excel_identity_carrier_contract.py::test_every_carrier_and_anchor_has_machine_readable_verdict"
+    ],
+    "added_files": [
+      "test_workpaper_excel_identity_carrier_contract.py"
+    ],
+    "restored": true,
+    "seconds": 3.6
+  },
+  {
+    "id": "M06",
+    "side": "be",
+    "want": "test_not_covered_items_are_never_marked_passed",
+    "why": "把 pivot 的 not_covered 改成 passed —— 351 个真实模板里 0 个含 pivot 部件，没有任何实证；「推理冒充实证」正是 Task 5 明令禁止的",
+    "verdict": "RED",
+    "summary": "2 failed, 29 passed in 0.82s",
+    "added": [
+      "test_workpaper_excel_identity_carrier_contract.py::test_not_covered_items_are_never_marked_passed",
+      "test_workpaper_excel_identity_carrier_contract.py::test_population_scan_backs_the_not_covered_claims"
+    ],
+    "gone": [],
+    "hit": [
+      "test_workpaper_excel_identity_carrier_contract.py::test_not_covered_items_are_never_marked_passed",
+      "test_workpaper_excel_identity_carrier_contract.py::test_population_scan_backs_the_not_covered_claims"
+    ],
+    "added_files": [
+      "test_workpaper_excel_identity_carrier_contract.py"
+    ],
+    "restored": true,
+    "seconds": 3.7
+  },
+  {
+    "id": "M07",
+    "side": "be",
+    "want": "test_requirement_6_15_classifications_are_backed_by_evidence",
+    "why": "「用户在 OO 内手工删除 identity 列」未实操，只有结构投影判据；标 passed 会让Requirement 6.15 的拒绝分支缺实测却被当成已验证",
+    "verdict": "RED",
+    "summary": "1 failed, 30 passed in 0.77s",
+    "added": [
+      "test_workpaper_excel_identity_carrier_contract.py::test_requirement_6_15_classifications_are_backed_by_evidence"
+    ],
+    "gone": [],
+    "hit": [
+      "test_workpaper_excel_identity_carrier_contract.py::test_requirement_6_15_classifications_are_backed_by_evidence"
+    ],
+    "added_files": [
+      "test_workpaper_excel_identity_carrier_contract.py"
+    ],
+    "restored": true,
+    "seconds": 3.5
+  },
+  {
+    "id": "M08",
+    "side": "be",
+    "want": "test_per_operation_uuid_expectations_match_evidence",
+    "why": "抹掉 paste 造出的重复 UUID 期望 —— 这是 Requirement 6.15「复制行产生重复 UUID→ 结构冲突」唯一的实证，抹掉后该分支就没有判据了",
+    "verdict": "RED",
+    "summary": "1 failed, 30 passed in 0.76s",
+    "added": [
+      "test_workpaper_excel_identity_carrier_contract.py::test_per_operation_uuid_expectations_match_evidence"
+    ],
+    "gone": [],
+    "hit": [
+      "test_workpaper_excel_identity_carrier_contract.py::test_per_operation_uuid_expectations_match_evidence"
+    ],
+    "added_files": [
+      "test_workpaper_excel_identity_carrier_contract.py"
+    ],
+    "restored": true,
+    "seconds": 3.5
+  },
+  {
+    "id": "M09",
+    "side": "be",
+    "want": "test_per_operation_uuid_expectations_match_evidence",
+    "why": "把「新增行无 UUID」的判据改成 0 —— 该判据 = Table ref 覆盖行数 − 非空 UUID 数，守卫必须自己从 ref 算，不能采信契约数字",
+    "verdict": "RED",
+    "summary": "1 failed, 30 passed in 0.75s",
+    "added": [
+      "test_workpaper_excel_identity_carrier_contract.py::test_per_operation_uuid_expectations_match_evidence"
+    ],
+    "gone": [],
+    "hit": [
+      "test_workpaper_excel_identity_carrier_contract.py::test_per_operation_uuid_expectations_match_evidence"
+    ],
+    "added_files": [
+      "test_workpaper_excel_identity_carrier_contract.py"
+    ],
+    "restored": true,
+    "seconds": 3.5
+  },
+  {
+    "id": "M10",
+    "side": "be",
+    "want": "test_per_operation_uuid_expectations_match_evidence",
+    "why": "抹掉删除行导致的缺失 UUID —— 若守卫只看个数（18）就会放过，必须逐 UUID 值比对",
+    "verdict": "RED",
+    "summary": "1 failed, 30 passed in 0.75s",
+    "added": [
+      "test_workpaper_excel_identity_carrier_contract.py::test_per_operation_uuid_expectations_match_evidence"
+    ],
+    "gone": [],
+    "hit": [
+      "test_workpaper_excel_identity_carrier_contract.py::test_per_operation_uuid_expectations_match_evidence"
+    ],
+    "added_files": [
+      "test_workpaper_excel_identity_carrier_contract.py"
+    ],
+    "restored": true,
+    "seconds": 3.5
+  },
+  {
+    "id": "M11",
+    "side": "be",
+    "want": "test_excel_table_carrier_verdict_matches_evidence",
+    "why": "改 Table ref 随插行扩张的声明；守卫按 edit/insert_row 两个 artifact 的实测 ref 反算，手填的箭头两端必须都能对上",
+    "verdict": "RED",
+    "summary": "1 failed, 30 passed in 0.75s",
+    "added": [
+      "test_workpaper_excel_identity_carrier_contract.py::test_excel_table_carrier_verdict_matches_evidence"
+    ],
+    "gone": [],
+    "hit": [
+      "test_workpaper_excel_identity_carrier_contract.py::test_excel_table_carrier_verdict_matches_evidence"
+    ],
+    "added_files": [
+      "test_workpaper_excel_identity_carrier_contract.py"
+    ],
+    "restored": true,
+    "seconds": 3.5
+  },
+  {
+    "id": "M12",
+    "side": "be",
+    "want": "test_sort_moves_uuids_with_their_rows",
+    "why": "把排序取证的行号→UUID 映射改回未排序形态 —— 排序判据是「映射改变且集合不变」，手填一份「没变」的映射必须被 artifact 实测打红",
+    "verdict": "RED",
+    "summary": "1 failed, 30 passed in 0.75s",
+    "added": [
+      "test_workpaper_excel_identity_carrier_contract.py::test_sort_moves_uuids_with_their_rows"
+    ],
+    "gone": [],
+    "hit": [
+      "test_workpaper_excel_identity_carrier_contract.py::test_sort_moves_uuids_with_their_rows"
+    ],
+    "added_files": [
+      "test_workpaper_excel_identity_carrier_contract.py"
+    ],
+    "restored": true,
+    "seconds": 3.5
+  },
+  {
+    "id": "M13",
+    "side": "be",
+    "want": "test_defined_name_carrier_verdict_matches_evidence",
+    "why": "GT defined name 个数谎报成 5（实测 4）；守卫必须从每个 artifact 的实测 count 反算",
+    "verdict": "RED",
+    "summary": "1 failed, 30 passed in 0.75s",
+    "added": [
+      "test_workpaper_excel_identity_carrier_contract.py::test_defined_name_carrier_verdict_matches_evidence"
+    ],
+    "gone": [],
+    "hit": [
+      "test_workpaper_excel_identity_carrier_contract.py::test_defined_name_carrier_verdict_matches_evidence"
+    ],
+    "added_files": [
+      "test_workpaper_excel_identity_carrier_contract.py"
+    ],
+    "restored": true,
+    "seconds": 3.5
+  },
+  {
+    "id": "M14",
+    "side": "be",
+    "want": "test_instrumentation_is_strictly_visible_equivalent",
+    "why": "谎称 instrumentation 造成了 1 处业务值差异 —— Requirement 6.17 的严格等价必须由 instrumentation_report 的 diff_count 逐项支撑，不接受契约自述",
+    "verdict": "RED",
+    "summary": "1 failed, 30 passed in 0.76s",
+    "added": [
+      "test_workpaper_excel_identity_carrier_contract.py::test_instrumentation_is_strictly_visible_equivalent"
+    ],
+    "gone": [],
+    "hit": [
+      "test_workpaper_excel_identity_carrier_contract.py::test_instrumentation_is_strictly_visible_equivalent"
+    ],
+    "added_files": [
+      "test_workpaper_excel_identity_carrier_contract.py"
+    ],
+    "restored": true,
+    "seconds": 3.5
+  },
+  {
+    "id": "M15",
+    "side": "be",
+    "want": "test_oo_normalization_is_attributed_to_oo_not_instrumentation",
+    "why": "把控制组 B 的 styles 规模抹成 0，会让「OO 归一化与 instrumentation 无关」的归因结论失去数量支撑（B==C 是该结论的全部依据）",
+    "verdict": "RED",
+    "summary": "1 failed, 30 passed in 0.75s",
+    "added": [
+      "test_workpaper_excel_identity_carrier_contract.py::test_oo_normalization_is_attributed_to_oo_not_instrumentation"
+    ],
+    "gone": [],
+    "hit": [
+      "test_workpaper_excel_identity_carrier_contract.py::test_oo_normalization_is_attributed_to_oo_not_instrumentation"
+    ],
+    "added_files": [
+      "test_workpaper_excel_identity_carrier_contract.py"
+    ],
+    "restored": true,
+    "seconds": 3.5
+  },
+  {
+    "id": "M16",
+    "side": "be",
+    "want": "test_oo_roundtrip_is_not_claimed_byte_equivalent",
+    "why": "谎称字体替换（宋体→Calibri）只在 instrumentation 后出现 —— 与控制组 B 的实测直接矛盾，会把一个部署层问题错记成 instrumentation 的副作用",
+    "verdict": "RED",
+    "summary": "1 failed, 30 passed in 0.74s",
+    "added": [
+      "test_workpaper_excel_identity_carrier_contract.py::test_oo_roundtrip_is_not_claimed_byte_equivalent"
+    ],
+    "gone": [],
+    "hit": [
+      "test_workpaper_excel_identity_carrier_contract.py::test_oo_roundtrip_is_not_claimed_byte_equivalent"
+    ],
+    "added_files": [
+      "test_workpaper_excel_identity_carrier_contract.py"
+    ],
+    "restored": true,
+    "seconds": 3.5
+  },
+  {
+    "id": "M17",
+    "side": "be",
+    "want": "test_oo_roundtrip_is_not_claimed_byte_equivalent",
+    "why": "把 OO 往返宣称成字节等价 —— 下游若按字节口径判等值，每次 OO 保存都会误判成结构漂移（chart/drawing 部件字节必被重写）",
+    "verdict": "RED",
+    "summary": "1 failed, 30 passed in 0.74s",
+    "added": [
+      "test_workpaper_excel_identity_carrier_contract.py::test_oo_roundtrip_is_not_claimed_byte_equivalent"
+    ],
+    "gone": [],
+    "hit": [
+      "test_workpaper_excel_identity_carrier_contract.py::test_oo_roundtrip_is_not_claimed_byte_equivalent"
+    ],
+    "added_files": [
+      "test_workpaper_excel_identity_carrier_contract.py"
+    ],
+    "restored": true,
+    "seconds": 3.5
+  },
+  {
+    "id": "M18",
+    "side": "be",
+    "want": "test_copy_has_no_artifact_because_oo_refused_forcesave",
+    "why": "copy 那一格「无 artifact」的唯一支撑是 Command Service 实测返回 error 4；改成 0 就等于把覆盖缺口说成正常结果",
+    "verdict": "RED",
+    "summary": "1 failed, 30 passed in 0.74s",
+    "added": [
+      "test_workpaper_excel_identity_carrier_contract.py::test_copy_has_no_artifact_because_oo_refused_forcesave"
+    ],
+    "gone": [],
+    "hit": [
+      "test_workpaper_excel_identity_carrier_contract.py::test_copy_has_no_artifact_because_oo_refused_forcesave"
+    ],
+    "added_files": [
+      "test_workpaper_excel_identity_carrier_contract.py"
+    ],
+    "restored": true,
+    "seconds": 3.5
+  },
+  {
+    "id": "M19",
+    "side": "be",
+    "want": "test_declared_operations_all_have_real_oo_evidence",
+    "why": "谎称 copy 产出了 artifact，而 evidence 里没有 —— 声明有 artifact 却查不到，正是「某操作其实没测」的伪装形态",
+    "verdict": "RED",
+    "summary": "1 failed, 30 passed in 0.75s",
+    "added": [
+      "test_workpaper_excel_identity_carrier_contract.py::test_declared_operations_all_have_real_oo_evidence"
+    ],
+    "gone": [],
+    "hit": [
+      "test_workpaper_excel_identity_carrier_contract.py::test_declared_operations_all_have_real_oo_evidence"
+    ],
+    "added_files": [
+      "test_workpaper_excel_identity_carrier_contract.py"
+    ],
+    "restored": true,
+    "seconds": 3.5
+  },
+  {
+    "id": "M20",
+    "side": "be",
+    "want": "test_download_covers_both_serialisation_paths",
+    "why": "download 覆盖 callback status 2 与编辑器下载两条独立序列化路径，结论翻成 false 却仍标 passed，会让下游以为下载路径有载体丢失风险而绕开",
+    "verdict": "RED",
+    "summary": "1 failed, 30 passed in 0.75s",
+    "added": [
+      "test_workpaper_excel_identity_carrier_contract.py::test_download_covers_both_serialisation_paths"
+    ],
+    "gone": [],
+    "hit": [
+      "test_workpaper_excel_identity_carrier_contract.py::test_download_covers_both_serialisation_paths"
+    ],
+    "added_files": [
+      "test_workpaper_excel_identity_carrier_contract.py"
+    ],
+    "restored": true,
+    "seconds": 3.5
+  },
+  {
+    "id": "M21",
+    "side": "be",
+    "want": "test_c24_partial_operation_coverage_is_declared",
+    "why": "清空 C24 的未覆盖操作声明 = 把「只跑了 4 个操作」伪装成全覆盖；Task 5 要求未覆盖必须如实记录",
+    "verdict": "RED",
+    "summary": "1 failed, 30 passed in 0.76s",
+    "added": [
+      "test_workpaper_excel_identity_carrier_contract.py::test_c24_partial_operation_coverage_is_declared"
+    ],
+    "gone": [],
+    "hit": [
+      "test_workpaper_excel_identity_carrier_contract.py::test_c24_partial_operation_coverage_is_declared"
+    ],
+    "added_files": [
+      "test_workpaper_excel_identity_carrier_contract.py"
+    ],
+    "restored": true,
+    "seconds": 3.5
+  },
+  {
+    "id": "M22",
+    "side": "be",
+    "want": "test_probed_templates_are_platform_authoritative_and_unmodified",
+    "why": "改契约记录的源模板 sha256 —— 它必须与开工/收工两次实测都一致，否则「探针用的就是权威模板且没改过它」这条无法复核",
+    "verdict": "RED",
+    "summary": "1 failed, 30 passed in 0.74s",
+    "added": [
+      "test_workpaper_excel_identity_carrier_contract.py::test_probed_templates_are_platform_authoritative_and_unmodified"
+    ],
+    "gone": [],
+    "hit": [
+      "test_workpaper_excel_identity_carrier_contract.py::test_probed_templates_are_platform_authoritative_and_unmodified"
+    ],
+    "added_files": [
+      "test_workpaper_excel_identity_carrier_contract.py"
+    ],
+    "restored": true,
+    "seconds": 3.5
+  },
+  {
+    "id": "M23",
+    "side": "be",
+    "want": "test_population_scan_backs_the_not_covered_claims",
+    "why": "谎称总体里有 7 个含 pivot 的模板 —— pivot 判 not_covered 的理由就是「0 个」，数字一改理由就不成立，必须同时重新裁决",
+    "verdict": "RED",
+    "summary": "1 failed, 30 passed in 0.75s",
+    "added": [
+      "test_workpaper_excel_identity_carrier_contract.py::test_population_scan_backs_the_not_covered_claims"
+    ],
+    "gone": [],
+    "hit": [
+      "test_workpaper_excel_identity_carrier_contract.py::test_population_scan_backs_the_not_covered_claims"
+    ],
+    "added_files": [
+      "test_workpaper_excel_identity_carrier_contract.py"
+    ],
+    "restored": true,
+    "seconds": 3.7
+  },
+  {
+    "id": "M24",
+    "side": "be",
+    "want": "test_property_66_gate_is_registered",
+    "why": "从 Property 66 登记里删掉「sheetId 被证伪」——「任一缺失阻断 engine gate」的阻断对象正是它，删掉就等于 Property 66 少了一半结论",
+    "verdict": "RED",
+    "summary": "1 failed, 30 passed in 0.74s",
+    "added": [
+      "test_workpaper_excel_identity_carrier_contract.py::test_property_66_gate_is_registered"
+    ],
+    "gone": [],
+    "hit": [
+      "test_workpaper_excel_identity_carrier_contract.py::test_property_66_gate_is_registered"
+    ],
+    "added_files": [
+      "test_workpaper_excel_identity_carrier_contract.py"
+    ],
+    "restored": true,
+    "seconds": 3.5
+  },
+  {
+    "id": "M25",
+    "side": "be",
+    "want": "test_sheet_id_anchor_is_disproven_by_evidence",
+    "why": "让 k11/edit 那条实证的 sheetId 锚点变成成立 —— 若 OO 行为真的变了，契约的 failed 裁决必须重新做；守卫不能只信契约一侧",
+    "verdict": "RED",
+    "summary": "1 failed, 30 passed in 0.74s",
+    "added": [
+      "test_workpaper_excel_identity_carrier_contract.py::test_sheet_id_anchor_is_disproven_by_evidence"
+    ],
+    "gone": [],
+    "hit": [
+      "test_workpaper_excel_identity_carrier_contract.py::test_sheet_id_anchor_is_disproven_by_evidence"
+    ],
+    "added_files": [
+      "test_workpaper_excel_identity_carrier_contract.py"
+    ],
+    "restored": true,
+    "seconds": 3.5
+  },
+  {
+    "id": "M26",
+    "side": "be",
+    "want": "test_hidden_sheet_carrier_verdict_matches_evidence",
+    "why": "抹掉 k11/edit 实证里 `_GT_SYNC` 的存在 —— hidden_sheet 的 passed 裁决必须由每个 artifact 的 present 反算，一处为假即不能维持 passed",
+    "verdict": "RED",
+    "summary": "1 failed, 30 passed in 0.75s",
+    "added": [
+      "test_workpaper_excel_identity_carrier_contract.py::test_hidden_sheet_carrier_verdict_matches_evidence"
+    ],
+    "gone": [],
+    "hit": [
+      "test_workpaper_excel_identity_carrier_contract.py::test_hidden_sheet_carrier_verdict_matches_evidence"
+    ],
+    "added_files": [
+      "test_workpaper_excel_identity_carrier_contract.py"
+    ],
+    "restored": true,
+    "seconds": 3.6
+  },
+  {
+    "id": "M27",
+    "side": "be",
+    "want": "test_no_collection_errors_anywhere",
+    "why": "🔴 禁止 fail-open 的判据：采集异常必须打红。若守卫只看 carriers 字段而不看collection_errors，「采集器坏了」就会和「载体确实在」得到同一个绿色结论",
+    "verdict": "RED",
+    "summary": "1 failed, 30 passed in 0.75s",
+    "added": [
+      "test_workpaper_excel_identity_carrier_contract.py::test_no_collection_errors_anywhere"
+    ],
+    "gone": [],
+    "hit": [
+      "test_workpaper_excel_identity_carrier_contract.py::test_no_collection_errors_anywhere"
+    ],
+    "added_files": [
+      "test_workpaper_excel_identity_carrier_contract.py"
+    ],
+    "restored": true,
+    "seconds": 3.5
+  },
+  {
+    "id": "M28",
+    "side": "be",
+    "want": "test_instrumentation_is_strictly_visible_equivalent",
+    "why": "让 K11 的 instrumentation 等价报告出现一个 false aspect —— Requirement 6.17 的严格等价必须逐 aspect 校验，只看顶层 `equivalent` 会漏",
+    "verdict": "RED",
+    "summary": "1 failed, 30 passed in 0.75s",
+    "added": [
+      "test_workpaper_excel_identity_carrier_contract.py::test_instrumentation_is_strictly_visible_equivalent"
+    ],
+    "gone": [],
+    "hit": [
+      "test_workpaper_excel_identity_carrier_contract.py::test_instrumentation_is_strictly_visible_equivalent"
+    ],
+    "added_files": [
+      "test_workpaper_excel_identity_carrier_contract.py"
+    ],
+    "restored": true,
+    "seconds": 3.5
+  },
+  {
+    "id": "M29",
+    "side": "be",
+    "want": "test_oo_normalization_is_attributed_to_oo_not_instrumentation",
+    "why": "翻转归因结论 —— 若 instrumentation 真有贡献，「OO 往返差异与 instrumentation 无关」这条就不成立，契约的 oo_roundtrip 小节必须重写",
+    "verdict": "RED",
+    "summary": "1 failed, 30 passed in 0.74s",
+    "added": [
+      "test_workpaper_excel_identity_carrier_contract.py::test_oo_normalization_is_attributed_to_oo_not_instrumentation"
+    ],
+    "gone": [],
+    "hit": [
+      "test_workpaper_excel_identity_carrier_contract.py::test_oo_normalization_is_attributed_to_oo_not_instrumentation"
+    ],
+    "added_files": [
+      "test_workpaper_excel_identity_carrier_contract.py"
+    ],
+    "restored": true,
+    "seconds": 3.5
+  },
+  {
+    "id": "M30",
+    "side": "be",
+    "want": "test_probed_templates_are_platform_authoritative_and_unmodified",
+    "why": "模拟收工时发现权威模板 sha256 已漂移 —— `backend/wp_templates/` 被改动是本任务的红线，守卫必须把 before/after 两次快照都比一遍",
+    "verdict": "RED",
+    "summary": "1 failed, 30 passed in 0.79s",
+    "added": [
+      "test_workpaper_excel_identity_carrier_contract.py::test_probed_templates_are_platform_authoritative_and_unmodified"
+    ],
+    "gone": [],
+    "hit": [
+      "test_workpaper_excel_identity_carrier_contract.py::test_probed_templates_are_platform_authoritative_and_unmodified"
+    ],
+    "added_files": [
+      "test_workpaper_excel_identity_carrier_contract.py"
+    ],
+    "restored": true,
+    "seconds": 3.6
+  },
+  {
+    "id": "M31",
+    "side": "be",
+    "want": "test_defined_name_ref_auto_tracks_sheet_rename",
+    "why": "让改名后的 defined name ref 停留在旧 sheet 名 —— defined name 能当锚点的全部理由就是 OO 会自动改写 ref；不改写它就和 sheet 展示名一样不可用",
+    "verdict": "RED",
+    "summary": "1 failed, 30 passed in 0.75s",
+    "added": [
+      "test_workpaper_excel_identity_carrier_contract.py::test_defined_name_ref_auto_tracks_sheet_rename"
+    ],
+    "gone": [],
+    "hit": [
+      "test_workpaper_excel_identity_carrier_contract.py::test_defined_name_ref_auto_tracks_sheet_rename"
+    ],
+    "added_files": [
+      "test_workpaper_excel_identity_carrier_contract.py"
+    ],
+    "restored": true,
+    "seconds": 3.5
+  },
+  {
+    "id": "M32",
+    "side": "be",
+    "want": "test_excel_table_is_the_surviving_anchor_after_rename",
+    "why": "让改名后 Table 路径也定位不到 UUID —— 那就意味着三条锚点全废、没有任何可用定位方式，Table 载体的 passed 裁决必须改 failed",
+    "verdict": "RED",
+    "summary": "1 failed, 30 passed in 0.75s",
+    "added": [
+      "test_workpaper_excel_identity_carrier_contract.py::test_excel_table_is_the_surviving_anchor_after_rename"
+    ],
+    "gone": [],
+    "hit": [
+      "test_workpaper_excel_identity_carrier_contract.py::test_excel_table_is_the_surviving_anchor_after_rename"
+    ],
+    "added_files": [
+      "test_workpaper_excel_identity_carrier_contract.py"
+    ],
+    "restored": true,
+    "seconds": 3.5
+  },
+  {
+    "id": "M33",
+    "side": "be",
+    "want": "test_protected_parts_count_never_decreases_through_oo",
+    "why": "让 C24 的 chart 部件数掉到 0 —— Requirement 6.17 的受保护部件判据是「计数不减少」，chart 归零必须打红（C24 是全平台唯一含 chart 的模板，丢了就无从取证）",
+    "verdict": "RED",
+    "summary": "1 failed, 30 passed in 0.75s",
+    "added": [
+      "test_workpaper_excel_identity_carrier_contract.py::test_protected_parts_count_never_decreases_through_oo"
+    ],
+    "gone": [],
+    "hit": [
+      "test_workpaper_excel_identity_carrier_contract.py::test_protected_parts_count_never_decreases_through_oo"
+    ],
+    "added_files": [
+      "test_workpaper_excel_identity_carrier_contract.py"
+    ],
+    "restored": true,
+    "seconds": 3.5
+  },
+  {
+    "id": "M34",
+    "side": "be",
+    "want": "test_sort_moves_uuids_with_their_rows",
+    "why": "把排序后第 7 行的 UUID 改成排序前的值 —— 制造重复 UUID 并让契约声明的排序映射对不上；验证「UUID 随行迁移」不是靠个数、而是靠逐行映射判定",
+    "verdict": "RED",
+    "summary": "1 failed, 30 passed in 0.74s",
+    "added": [
+      "test_workpaper_excel_identity_carrier_contract.py::test_sort_moves_uuids_with_their_rows"
+    ],
+    "gone": [],
+    "hit": [
+      "test_workpaper_excel_identity_carrier_contract.py::test_sort_moves_uuids_with_their_rows"
+    ],
+    "added_files": [
+      "test_workpaper_excel_identity_carrier_contract.py"
+    ],
+    "restored": true,
+    "seconds": 3.5
+  },
+  {
+    "id": "M35",
+    "side": "be",
+    "want": "test_instrumentation_adds_nothing_beyond_the_declared_whitelist",
+    "why": "毁掉负对照：谎称 instrumentation **之前**模板就自带 `_GT_SYNC`。若守卫不看注入前快照，就无法区分「载体是我注入的」与「模板本来就有」，整个 instrumentation 等价结论都失去意义",
+    "verdict": "RED",
+    "summary": "2 failed, 29 passed in 0.74s",
+    "added": [
+      "test_workpaper_excel_identity_carrier_contract.py::test_instrumentation_adds_nothing_beyond_the_declared_whitelist",
+      "test_workpaper_excel_identity_carrier_contract.py::test_negative_control_is_field_specific"
+    ],
+    "gone": [],
+    "hit": [
+      "test_workpaper_excel_identity_carrier_contract.py::test_instrumentation_adds_nothing_beyond_the_declared_whitelist"
+    ],
+    "added_files": [
+      "test_workpaper_excel_identity_carrier_contract.py"
+    ],
+    "restored": true,
+    "seconds": 3.5
+  }
+]

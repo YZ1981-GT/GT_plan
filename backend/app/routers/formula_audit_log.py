@@ -209,10 +209,12 @@ async def rollback_formula(
     row_id = None
     try:
         result = await db.execute(text("""
+            -- report_config 是**全局**报表行模板表（报表科目映射真源），
+            -- 无 project_id 列 —— 按 row_code 定位即可，不做项目维度过滤。
             SELECT id, formula FROM report_config
-            WHERE project_id = :pid AND row_code = :rc
+            WHERE row_code = :rc AND is_deleted = false
             LIMIT 1
-        """), {"pid": project_id, "rc": body.row_code})
+        """), {"rc": body.row_code})
         row = result.fetchone()
         if row:
             row_id = row[0]

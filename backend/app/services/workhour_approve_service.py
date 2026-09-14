@@ -1,9 +1,9 @@
-"""工时批量审批服务 — Round 2 需求 7
+"""工时批量审批服务 — 统一操作 work_hour_entries（V117 迁移后唯一真源）
 
 POST /api/workhours/batch-approve
 - 幂等键头 Idempotency-Key + Redis 5 分钟防重
-- 状态流转 confirmed→approved 或 confirmed→draft（退回附原因）
-- SOD 守卫：审批人 ≠ 被审批人
+- 状态流转 submitted→approved 或 submitted→draft+rejected_reason（退回）
+- SOD 守卫：审批人 ≠ 被审批人（通过 user_id 判断）
 - 发通知 workhour_approved / workhour_rejected
 """
 
@@ -17,7 +17,7 @@ from typing import Literal, Optional
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.staff_models import StaffMember, WorkHour
+from app.models.workhour_entry_models import WorkHourEntry
 from app.services.notification_service import NotificationService
 from app.services.notification_types import WORKHOUR_APPROVED, WORKHOUR_REJECTED
 
@@ -61,13 +61,9 @@ class WorkHourApproveService:
                 )
                 return cached_result
 
-        # 2. 获取审批人对应的 staff_id
-        approver_staff_id = await self._get_staff_id(db, approver_user_id)
-
-        # 3. 查询所有目标工时记录
-        stmt = sa.select(WorkHour).where(
-            WorkHour.id.in_(hour_ids),
-            WorkHour.is_deleted == False,  # noqa: E712
+        # 2. 查询所有目标工时条目（work_hour_entries）
+        stmt = sa.select(WorkHourEntry).where(
+            WorkHourEntry.id.in_(hour_ids),
         )
         result = await db.execute(stmt)
         records = list(result.scalars().all())
@@ -82,23 +78,23 @@ class WorkHourApproveService:
         notif_service = NotificationService(db)
 
         for hour_id in hour_ids:
-            wh = record_map.get(hour_id)
+            entry = record_map.get(hour_id)
 
             # 记录不存在
-            if wh is None:
+            if entry is None:
                 failed.append({"id": str(hour_id), "reason": "记录不存在"})
                 continue
 
-            # 状态不是 confirmed，不能审批
-            if wh.status != "confirmed":
+            # 状态不是 submitted，不能审批
+            if entry.status != "submitted":
                 failed.append({
                     "id": str(hour_id),
-                    "reason": f"状态为 {wh.status}，仅 confirmed 状态可审批",
+                    "reason": f"状态为 {entry.status}，仅 submitted 状态可审批",
                 })
                 continue
 
-            # SOD 守卫：审批人 ≠ 被审批人
-            if approver_staff_id and wh.staff_id == approver_staff_id:
+            # SOD 守卫：审批人 ≠ 被审批人（通过 user_id）
+            if entry.user_id == approver_user_id:
                 failed.append({
                     "id": str(hour_id),
                     "reason": "审批人不能审批自己的工时（SOD 冲突）",
@@ -106,50 +102,48 @@ class WorkHourApproveService:
                 continue
 
             # 执行状态流转
+            now = datetime.now(timezone.utc)
             if action == "approve":
-                wh.status = "approved"
+                entry.status = "approved"
+                entry.approved_by = approver_user_id
+                entry.approved_at = now
                 approved_count += 1
 
                 # 发通知给员工
-                staff_user_id = await self._get_user_id_by_staff(db, wh.staff_id)
-                if staff_user_id:
-                    await notif_service.send_notification(
-                        user_id=staff_user_id,
-                        notification_type=WORKHOUR_APPROVED,
-                        title="工时已批准",
-                        content=f"您 {wh.work_date} 提交的 {float(wh.hours)} 小时工时已被批准",
-                        metadata={
-                            "object_type": "work_hour",
-                            "object_id": str(wh.id),
-                            "date": str(wh.work_date),
-                            "hours": str(float(wh.hours)),
-                        },
-                    )
+                await notif_service.send_notification(
+                    user_id=entry.user_id,
+                    notification_type=WORKHOUR_APPROVED,
+                    title="工时已批准",
+                    content=f"您 {entry.date} 提交的 {float(entry.hours)} 小时工时已被批准",
+                    metadata={
+                        "object_type": "work_hour_entry",
+                        "object_id": str(entry.id),
+                        "date": str(entry.date),
+                        "hours": str(float(entry.hours)),
+                    },
+                )
             else:
-                # reject → 退回到 draft
-                wh.status = "draft"
+                # reject → 退回到 draft + 记录原因
+                entry.status = "draft"
+                entry.rejected_reason = reason or "未提供原因"
                 rejected_count += 1
 
-                # 发通知给员工（附原因）
-                staff_user_id = await self._get_user_id_by_staff(db, wh.staff_id)
-                reject_reason = reason or "未提供原因"
-                if staff_user_id:
-                    await notif_service.send_notification(
-                        user_id=staff_user_id,
-                        notification_type=WORKHOUR_REJECTED,
-                        title="工时已退回",
-                        content=(
-                            f"您 {wh.work_date} 提交的 {float(wh.hours)} 小时工时已被退回，"
-                            f"原因：{reject_reason}"
-                        ),
-                        metadata={
-                            "object_type": "work_hour",
-                            "object_id": str(wh.id),
-                            "date": str(wh.work_date),
-                            "hours": str(float(wh.hours)),
-                            "reason": reject_reason,
-                        },
-                    )
+                await notif_service.send_notification(
+                    user_id=entry.user_id,
+                    notification_type=WORKHOUR_REJECTED,
+                    title="工时已退回",
+                    content=(
+                        f"您 {entry.date} 提交的 {float(entry.hours)} 小时工时已被退回，"
+                        f"原因：{reason or '未提供原因'}"
+                    ),
+                    metadata={
+                        "object_type": "work_hour_entry",
+                        "object_id": str(entry.id),
+                        "date": str(entry.date),
+                        "hours": str(float(entry.hours)),
+                        "reason": reason or "未提供原因",
+                    },
+                )
 
         await db.commit()
 
@@ -164,28 +158,6 @@ class WorkHourApproveService:
             await self._set_idempotency(idempotency_key, result_data)
 
         return result_data
-
-    async def _get_staff_id(
-        self, db: AsyncSession, user_id: uuid.UUID
-    ) -> uuid.UUID | None:
-        """通过 user_id 查找对应的 staff_id。"""
-        stmt = sa.select(StaffMember.id).where(
-            StaffMember.user_id == user_id,
-            StaffMember.is_deleted == False,  # noqa: E712
-        )
-        result = await db.execute(stmt)
-        return result.scalar_one_or_none()
-
-    async def _get_user_id_by_staff(
-        self, db: AsyncSession, staff_id: uuid.UUID
-    ) -> uuid.UUID | None:
-        """通过 staff_id 查找对应的 user_id（用于发通知）。"""
-        stmt = sa.select(StaffMember.user_id).where(
-            StaffMember.id == staff_id,
-            StaffMember.is_deleted == False,  # noqa: E712
-        )
-        result = await db.execute(stmt)
-        return result.scalar_one_or_none()
 
     async def _check_idempotency(self, key: str) -> dict | None:
         """检查幂等键是否已存在（Redis）。

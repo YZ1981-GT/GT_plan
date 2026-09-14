@@ -1,0 +1,103 @@
+# B50-4.yaml — 风险汇总表：特别风险
+# componentType: d-form-table + render_hint: risk_level
+# Requirements: G7 风险评估汇总
+# Design: §1.2 风险汇总=d-form-table+risk_level+条件着色
+
+wp_code: B50-4
+template_path: backend/wp_templates/B/B50-4 风险汇总表（特别风险）.xlsx
+template_version: v2025-R5
+
+sheets:
+  特别风险:
+    component_type: d-form-table
+    form_type: table
+    title: 特别风险汇总
+    description: 汇总需要特别考虑的风险，包括舞弊风险及其他特别风险
+
+    fields:
+      - field: entity_name
+        label: 被审计单位
+        type: text
+        source: project.client_name
+        readonly: true
+      - field: assessment_date
+        label: 评估日期
+        type: date
+        format: 'YYYY-MM-DD'
+
+    dynamic_table:
+      start_row: 5
+      end_row: dynamic
+      header_row: 4
+      add_row_button: true
+      max_rows: 30
+      columns:
+        seq:
+          field: seq
+          type: number
+          label: 序号
+          width: 50
+        risk_type:
+          field: risk_type
+          type: enum
+          label: 风险类型
+          width: 100
+          dict_source: risk_type_dict
+        risk_description:
+          field: risk_description
+          type: textarea
+          label: 风险描述
+          width: 250
+        related_assertion:
+          field: related_assertion
+          type: text
+          label: 相关认定
+          width: 120
+        risk_level:
+          field: risk_level
+          type: enum
+          label: 风险等级
+          width: 90
+          dict_source: risk_level_dict
+          render_hint: risk_level
+        response_strategy:
+          field: response_strategy
+          type: textarea
+          label: 应对策略
+          width: 220
+        reference:
+          field: reference
+          type: text
+          label: 参考索引
+          width: 100
+          render: index_chip
+
+    dictionaries:
+      risk_level_dict:
+        - value: high
+          label: 高
+          color: red
+        - value: medium
+          label: 中
+          color: yellow
+        - value: low
+          label: 低
+          color: green
+      risk_type_dict:
+        - value: fraud
+          label: 舞弊风险
+        - value: significant
+          label: 特别风险
+        - value: management_override
+          label: 管理层凌驾
+
+    conclusion:
+      mode: composite
+      audit_explanation_field:
+        name: audit_explanation
+        label: 审计说明
+        type: textarea
+      overall_conclusion_field:
+        name: overall_conclusion
+        label: 特别风险汇总结论
+        type: textarea

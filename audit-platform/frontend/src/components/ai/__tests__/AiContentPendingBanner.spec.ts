@@ -41,7 +41,7 @@ describe('AiContentPendingBanner', () => {
       props: { projectId: 'p1' },
     })
     await flushPromises()
-    expect(mockGet).toHaveBeenCalledWith('/api/projects/p1/ai-content/pending')
+    expect(mockGet).toHaveBeenCalledWith('/api/projects/p1/ai-content/pending', { _silent: true })
     expect(wrapper.find('.gt-ai-pending-banner').exists()).toBe(false)
   })
 

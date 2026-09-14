@@ -1,0 +1,117 @@
+{
+  "spec": "dsh-agent-panel-integration",
+  "purpose": "假绿守卫修复的变异检验记录（12 条，四态判定全 RED）",
+  "runner": "backend/scripts/diagnose/mutate_dsh_agent_panel_guards.py",
+  "reproduce": [
+    "python backend/scripts/diagnose/mutate_dsh_agent_panel_guards.py --check-anchors",
+    "python backend/scripts/diagnose/mutate_dsh_agent_panel_guards.py --pick \"假绿修复\" --only be --out tmp_be.json",
+    "python backend/scripts/diagnose/mutate_dsh_agent_panel_guards.py --pick \"假绿修复\" --only fe --out tmp_fe.json"
+  ],
+  "tally": {
+    "RED": 12,
+    "GREEN": 0,
+    "MISS": 0,
+    "WRONG": 0
+  },
+  "outcomes": [
+    {
+      "name": "[假绿修复] as_dict 二次转义 label（P34-A）",
+      "verdict": "RED",
+      "detail": "新增失败 1 条，含预期「passes_untrusted_label_through_unmodified」",
+      "new_fails": [
+        "backend\\tests\\dsh_agent_panel\\test_task24_phase_b_guards.py::TestProperty34UntrustedDataBoundary::test_manifest_entry_passes_untrusted_label_through_unmodified"
+      ]
+    },
+    {
+      "name": "[假绿修复] as_dict 静默截断 label（P34-A）",
+      "verdict": "RED",
+      "detail": "新增失败 1 条，含预期「passes_untrusted_label_through_unmodified」",
+      "new_fails": [
+        "backend\\tests\\dsh_agent_panel\\test_task24_phase_b_guards.py::TestProperty34UntrustedDataBoundary::test_manifest_entry_passes_untrusted_label_through_unmodified"
+      ]
+    },
+    {
+      "name": "[假绿修复] 恢复 extra_scopes 消费路径（P14-A）",
+      "verdict": "RED",
+      "detail": "新增失败 1 条，含预期「test_no_extra_scopes_consumption_in_ai_chat_package」",
+      "new_fails": [
+        "backend\\tests\\dsh_agent_panel\\test_task24_phase_b_guards.py::TestProperty14ExtraScopesRemoved::test_no_extra_scopes_consumption_in_ai_chat_package"
+      ]
+    },
+    {
+      "name": "[假绿修复] 拒绝名单移除 extra_scopes（P14-D）",
+      "verdict": "RED",
+      "detail": "新增失败 2 条，含预期「test_client_submitted_extra_scopes_is_rejected」",
+      "new_fails": [
+        "backend\\tests\\dsh_agent_panel\\test_task24_phase_b_guards.py::TestProperty14ExtraScopesRemoved::test_client_submitted_extra_scopes_is_rejected",
+        "backend\\tests\\dsh_agent_panel\\test_task24_phase_b_guards.py::TestProperty14ExtraScopesRemoved::test_only_run_contract_deny_list_holds_the_literal"
+      ]
+    },
+    {
+      "name": "[假绿修复] useSanitize ALLOWED_ATTR 放宽 on*（FE-P34-A）",
+      "verdict": "RED",
+      "detail": "新增失败 1 条，含预期「事件属性挂在」",
+      "new_fails": [
+        "Phase B Gate Guards Property 34: 不可信 HTML 走真实 sanitizer 事件属性挂在**允许标签**上时仍被剥离，安全正文与 href 保留"
+      ]
+    },
+    {
+      "name": "[假绿修复] canEnable 去掉 workpaper 判定（FE-P23-A）",
+      "verdict": "RED",
+      "detail": "新增失败 3 条，含预期「开关 disabled」",
+      "new_fails": [
+        "Phase B Gate Guards Property 23: 复核模式只在 workpaper 宿主可用 knowledge_doc 宿主：开关 disabled 且 DOM 给出中文原因",
+        "Phase B Gate Guards Property 23: 复核模式只在 workpaper 宿主可用 宿主从 workpaper 切到非 workpaper：复核模式自动关闭",
+        "Phase B Gate Guards Property 23: 复核模式只在 workpaper 宿主可用 每种非 workpaper 宿主给出各自可区分的中文原因"
+      ]
+    },
+    {
+      "name": "[假绿修复] handleToggle 不触发 fetchPreview（FE-P23-B）",
+      "verdict": "RED",
+      "detail": "新增失败 1 条，含预期「切换后真的去取复核模板」",
+      "new_fails": [
+        "Phase B Gate Guards Property 23: 复核模式只在 workpaper 宿主可用 workpaper 宿主：开关可用，切换后真的去取复核模板"
+      ]
+    },
+    {
+      "name": "[假绿修复] 删除宿主切换自动关闭（FE-P23-C）",
+      "verdict": "RED",
+      "detail": "新增失败 1 条，含预期「自动关闭」",
+      "new_fails": [
+        "Phase B Gate Guards Property 23: 复核模式只在 workpaper 宿主可用 宿主从 workpaper 切到非 workpaper：复核模式自动关闭"
+      ]
+    },
+    {
+      "name": "[假绿修复] disabledReason 塌缩兜底文案（FE-P23-D）",
+      "verdict": "RED",
+      "detail": "新增失败 1 条，含预期「可区分的中文原因」",
+      "new_fails": [
+        "Phase B Gate Guards Property 23: 复核模式只在 workpaper 宿主可用 每种非 workpaper 宿主给出各自可区分的中文原因"
+      ]
+    },
+    {
+      "name": "[假绿修复] 每次 saveAsNote 都换新 key（FE-P21-A）",
+      "verdict": "RED",
+      "detail": "新增失败 1 条，含预期「复用同一 idempotency_key」",
+      "new_fails": [
+        "Phase B Gate Guards Property 21: 笔记转存幂等键 失败后重试复用同一 idempotency_key；新的选择意图换新 key"
+      ]
+    },
+    {
+      "name": "[假绿修复] 选择变化不重置 key（FE-P21-B）",
+      "verdict": "RED",
+      "detail": "新增失败 1 条，含预期「复用同一 idempotency_key」",
+      "new_fails": [
+        "Phase B Gate Guards Property 21: 笔记转存幂等键 失败后重试复用同一 idempotency_key；新的选择意图换新 key"
+      ]
+    },
+    {
+      "name": "[假绿修复] manifest 只渲染 included（FE-P12-A）",
+      "verdict": "RED",
+      "detail": "新增失败 1 条，含预期「各自渲染并计入中文摘要」",
+      "new_fails": [
+        "Phase B Gate Guards Property 12: Context Manifest 四态真渲染 included/trimmed/denied/unavailable 各自渲染并计入中文摘要"
+      ]
+    }
+  ]
+}

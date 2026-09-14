@@ -22,6 +22,9 @@ _SLOW_REQUEST_MS = 3000
 # 不记录的路径前缀
 _SKIP_PATHS = ("/api/health", "/api/events/stream", "/docs", "/openapi.json")
 
+# 预期可能超过慢请求阈值的路径（LLM/健康探测），仅记 debug 不打 WARNING
+_EXPECTED_SLOW_PATH_MARKERS = ("/ai-generate", "/api/ai/health", "/api/ai/chat")
+
 
 class ObservabilityMiddleware(BaseHTTPMiddleware):
     """采集请求指标，输出结构化日志"""
@@ -47,7 +50,10 @@ class ObservabilityMiddleware(BaseHTTPMiddleware):
         }
 
         if duration_ms > _SLOW_REQUEST_MS:
-            logger.warning("SLOW_REQUEST %s", log_data)
+            if any(m in path for m in _EXPECTED_SLOW_PATH_MARKERS):
+                logger.debug("SLOW_OK %s", log_data)
+            else:
+                logger.warning("SLOW_REQUEST %s", log_data)
         elif response.status_code >= 500:
             logger.error("SERVER_ERROR %s", log_data)
         elif response.status_code >= 400:

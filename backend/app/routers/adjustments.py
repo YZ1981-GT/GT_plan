@@ -25,7 +25,7 @@ from app.core.bulk_operations import BulkRequest, bulk_execute
 from app.core.database import get_db
 from app.core.field_selection import parse_fields, BLOCKED_FIELDS
 from app.core.pagination import PaginationParams
-from app.deps import get_current_user, check_consol_lock, require_project_access, get_user_scope_cycles
+from app.deps import get_current_user, check_consol_lock, require_project_access, require_operation, get_user_scope_cycles
 from app.models.core import User
 from app.models.audit_platform_models import (
     Adjustment,
@@ -35,23 +35,283 @@ from app.models.audit_platform_models import (
 )
 from app.models.audit_platform_schemas import (
     AccountOption,
+    AdjustmentCollaborationAssignRequest,
+    AdjustmentCollaborationContributeRequest,
+    AdjustmentCollaborationRejectRequest,
     AdjustmentCreate,
     AdjustmentSummary,
+    AdjustmentSyncRequest,
     AdjustmentUpdate,
     ReviewStatusChange,
     WPAdjustmentSummary,
 )
 from app.services.adjustment_service import AdjustmentService
+from app.services.adjustment_sync_service import AdjustmentSyncService, AdjustmentSyncError
+from app.services.adjustment_collaboration_service import (
+    AdjustmentCollaborationService,
+    CollaborationError,
+)
 from app.services.adjustment_impact_service import preview_impact as preview_impact_service
+from app.services.formula_management.delivery_export import content_disposition_attachment
 from app.services.mapping_service import get_codes_by_cycles
 from app.services.misstatement_service import UnadjustedMisstatementService
 
 logger = logging.getLogger(__name__)
 
+
+# ---------------------------------------------------------------------------
+# 「新调整到达→按科目反查底稿负责人→推通知」 helper
+# ---------------------------------------------------------------------------
+
+async def _notify_affected_wp_assignees(
+    db: AsyncSession,
+    project_id: UUID,
+    data: "AdjustmentSyncRequest",
+    adjustment_no: str,
+    sender_user_id: UUID,
+) -> None:
+    """底稿同步新分录后，按 line_items 科目反查其他底稿负责人推通知。
+
+    best-effort：任何异常静默跳过不阻断。
+    """
+    import json
+    from pathlib import Path
+    from app.models.core import WorkingPaper, WpIndex
+    from app.services.notification_service import NotificationService
+
+    # 1. 加载科目→wp_code 映射（复用 procedure_trim_account_map + wp_account_mapping）
+    code_to_wp: dict[str, str] = {}
+    try:
+        trim_map_path = Path(__file__).resolve().parent.parent / "data" / "procedure_trim_account_map.json"
+        if trim_map_path.exists():
+            raw = json.loads(trim_map_path.read_text(encoding="utf-8"))
+            for wp_code, codes in raw.get("map", {}).items():
+                for c in codes:
+                    code_to_wp.setdefault(c, wp_code)
+        # 补充 wp_account_mapping
+        mapping_path = Path(__file__).resolve().parent.parent / "data" / "wp_account_mapping.json"
+        if mapping_path.exists():
+            mapping_data = json.loads(mapping_path.read_text(encoding="utf-8"))
+            for entry in (mapping_data.get("mappings") or mapping_data if isinstance(mapping_data, list) else []):
+                wp_code = entry.get("wp_code", "")
+                for c in (entry.get("account_codes") or []):
+                    code_to_wp.setdefault(c, wp_code)
+    except Exception:
+        return  # 映射文件缺失则跳过
+
+    # 2. 从 line_items 科目码反查受影响的 wp_code（排除源底稿自己）
+    source_wp_code = (data.source_wp_code or "").upper()
+    affected_wp_codes: set[str] = set()
+    for li in data.line_items:
+        code = (li.standard_account_code or "").strip()
+        if not code:
+            continue
+        # 精确匹配
+        if code in code_to_wp:
+            affected_wp_codes.add(code_to_wp[code])
+        else:
+            # 前缀匹配（1122→D2 if mapping has 1122）
+            for mapped_code, wp in code_to_wp.items():
+                if code.startswith(mapped_code) or mapped_code.startswith(code):
+                    affected_wp_codes.add(wp)
+                    break
+
+    # 去掉源底稿自己（如 K9 同步不提示 K9 自己）
+    source_base = source_wp_code.split("-")[0] if source_wp_code else ""
+    affected_wp_codes.discard(source_base)
+    affected_wp_codes.discard(source_wp_code)
+    if not affected_wp_codes:
+        return
+
+    # 3. 查这些 wp_code 的 working_paper.assigned_to（底稿负责人）
+    q = (
+        sa.select(WpIndex.wp_code, WorkingPaper.assigned_to)
+        .join(WorkingPaper, WorkingPaper.wp_index_id == WpIndex.id)
+        .where(
+            WpIndex.project_id == project_id,
+            WpIndex.wp_code.in_(list(affected_wp_codes)),
+            WorkingPaper.is_deleted == sa.false(),
+            WorkingPaper.assigned_to.isnot(None),
+        )
+    )
+    rows = (await db.execute(q)).all()
+    if not rows:
+        return
+
+    # 4. 去重+排除发送者自己
+    assignee_wp_map: dict[UUID, list[str]] = {}
+    for wp_code, assignee_id in rows:
+        if assignee_id and assignee_id != sender_user_id:
+            assignee_wp_map.setdefault(assignee_id, []).append(wp_code)
+
+    if not assignee_wp_map:
+        return
+
+    # 5. 推通知
+    ns = NotificationService(db)
+    for user_id, wp_codes in assignee_wp_map.items():
+        codes_str = "、".join(sorted(set(wp_codes))[:5])
+        await ns.send_notification(
+            user_id=user_id,
+            notification_type="adjustment_sync_arrived",
+            title=f"新调整分录 {adjustment_no} 涉及你负责的底稿",
+            content=f"来自 {source_wp_code or '未知'} 的调整分录涉及科目属于底稿 {codes_str}，建议在审定表中带入该调整。",
+            metadata={
+                "project_id": str(project_id),
+                "adjustment_no": adjustment_no,
+                "affected_wp_codes": list(set(wp_codes)),
+                "source_wp_code": source_wp_code,
+            },
+        )
+    try:
+        await db.commit()
+    except Exception:
+        await db.rollback()
+
+
+# ---------------------------------------------------------------------------
+# 协作确认后回写源底稿（P1-6）
+# ---------------------------------------------------------------------------
+
+async def _writeback_to_source_workpaper(
+    db: AsyncSession,
+    project_id: UUID,
+    entry_group_id: UUID,
+    source_ref: str,
+) -> None:
+    """协作 confirm 后，把集中登记最新明细行写回源底稿的 checklist_responses。
+
+    source_ref 格式: '{wp_id}:{item_id}'。写回 item_id 对应的 remark 字段（JSON 数组）。
+    best-effort，失败不阻断。
+    """
+    from app.models.audit_platform_models import AdjustmentEntry, ChecklistResponse
+
+    if not source_ref or ":" not in source_ref:
+        return
+    wp_id_str, item_id = source_ref.split(":", 1)
+    try:
+        wp_id = UUID(wp_id_str)
+    except ValueError:
+        return
+
+    # 读取最新明细行
+    q = (
+        sa.select(AdjustmentEntry)
+        .where(
+            AdjustmentEntry.entry_group_id == entry_group_id,
+            AdjustmentEntry.is_deleted == sa.false(),
+        )
+        .order_by(AdjustmentEntry.line_no)
+    )
+    entries = (await db.execute(q)).scalars().all()
+    if not entries:
+        return
+
+    import json
+    # 构建底稿侧 JSON 行（对齐底稿 composable 的行模型）
+    rows = []
+    for e in entries:
+        rows.append({
+            "index": e.line_no,
+            "description": "",
+            "category": "",
+            "reportItem": "",
+            "accountName": e.account_name or "",
+            "noteItem": "",
+            "type": "AJE",  # 简化，底稿侧按 activeType 筛选
+            "debitAmount": float(e.debit_amount or 0),
+            "creditAmount": float(e.credit_amount or 0),
+            "standard_account_code": e.standard_account_code or "",
+            "refIndex": "",
+            "remark": "",
+        })
+    json_str = json.dumps(rows, ensure_ascii=False)
+
+    # 查找底稿项目 ID
+    from app.models.core import WorkingPaper
+    wp_row = (await db.execute(
+        sa.select(WorkingPaper.project_id).where(WorkingPaper.id == wp_id)
+    )).scalar_one_or_none()
+    if not wp_row:
+        return
+
+    # Upsert checklist_responses
+    existing = (await db.execute(
+        sa.select(ChecklistResponse).where(
+            ChecklistResponse.wp_id == wp_id,
+            ChecklistResponse.item_id == item_id,
+        )
+    )).scalar_one_or_none()
+
+    if existing:
+        existing.remark = json_str
+    else:
+        new_resp = ChecklistResponse(
+            wp_id=wp_id,
+            item_id=item_id,
+            project_id=project_id,
+            remark=json_str,
+        )
+        db.add(new_resp)
+    await db.flush()
+
+
 router = APIRouter(
     prefix="/api/projects/{project_id}/adjustments",
     tags=["adjustments"],
 )
+
+
+async def _enrich_adjustment_list(db: AsyncSession, project_id: UUID, items: list[dict]) -> None:
+    """批量附加 creator_name + has_active_collaboration（P2 视图/筛选，fail-open 不阻断列表）。"""
+    from app.models.audit_platform_models import AdjustmentCollaboration
+    from app.models.staff_models import StaffMember
+    from app.services.adjustment_collaboration_service import ACTIVE_STATUSES
+
+    def _as_uuid(v):
+        try:
+            return UUID(str(v))
+        except Exception:
+            return None
+
+    group_ids = [g for g in (_as_uuid(it.get("entry_group_id")) for it in items) if g]
+    creator_raw = {it.get("created_by") for it in items if it.get("created_by")}
+    creator_ids = [g for g in (_as_uuid(c) for c in creator_raw) if g]
+
+    active_groups: set[str] = set()
+    if group_ids:
+        r = await db.execute(
+            sa.select(AdjustmentCollaboration.entry_group_id).where(
+                AdjustmentCollaboration.project_id == project_id,
+                AdjustmentCollaboration.entry_group_id.in_(group_ids),
+                AdjustmentCollaboration.status.in_(list(ACTIVE_STATUSES)),
+                AdjustmentCollaboration.is_deleted == sa.false(),
+            )
+        )
+        active_groups = {str(x) for x in r.scalars().all()}
+
+    name_map: dict[str, str] = {}
+    if creator_ids:
+        sr = await db.execute(
+            sa.select(StaffMember.user_id, StaffMember.staff_name).where(
+                StaffMember.user_id.in_(creator_ids),
+                StaffMember.is_deleted == sa.false(),
+            )
+        )
+        for uid, sname in sr.all():
+            if sname:
+                name_map[str(uid)] = sname
+        ur = await db.execute(
+            sa.select(User.id, User.username).where(User.id.in_(creator_ids))
+        )
+        for uid, uname in ur.all():
+            name_map.setdefault(str(uid), uname)
+
+    for it in items:
+        gid = it.get("entry_group_id")
+        it["has_active_collaboration"] = bool(gid and str(gid) in active_groups)
+        cb = it.get("created_by")
+        it["creator_name"] = name_map.get(str(cb)) if cb else None
 
 
 @router.get("")
@@ -60,17 +320,19 @@ async def list_adjustments(
     year: int = Query(...),
     adjustment_type: AdjustmentType | None = Query(None),
     review_status: ReviewStatus | None = Query(None),
+    origin: str | None = Query(None, description="来源筛选：manual（手工，含历史）/ workpaper（底稿汇聚）"),
     fields: str | None = Query(None, description="逗号分隔的字段名，如 id,adjustment_no,description"),
     pagination: PaginationParams = Depends(),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_project_access("readonly")),
 ):
-    """分录列表（支持 type/status 筛选，需项目成员权限）"""
+    """分录列表（支持 type/status/origin 筛选，需项目成员权限）"""
     svc = AdjustmentService(db)
     result = await svc.list_entries(
         project_id, year,
         adjustment_type=adjustment_type,
         review_status=review_status,
+        origin=origin,
         page=pagination.page, page_size=pagination.page_size,
     )
 
@@ -91,6 +353,13 @@ async def list_adjustments(
     except Exception:
         pass  # scope filtering failure should not block the response
 
+    # P2 增强：批量附加 creator_name（按人分组）+ has_active_collaboration（协作中筛选），fail-open
+    if isinstance(result, dict) and result.get("items"):
+        try:
+            await _enrich_adjustment_list(db, project_id, result["items"])
+        except Exception:
+            pass
+
     # 字段选择：过滤返回字段（仅过滤 items 内的字段，保留分页元数据）
     requested_fields = parse_fields(fields)
     if requested_fields is not None and isinstance(result, dict) and "items" in result:
@@ -110,7 +379,7 @@ async def create_adjustment(
     data: AdjustmentCreate,
     batch_mode: bool = Query(False, description="批量模式：暂不触发重算事件"),
     db: AsyncSession = Depends(get_db),
-    user=Depends(require_project_access("edit")),
+    user=Depends(require_operation("wp:edit")),
     _lock_check=Depends(check_consol_lock),
 ):
     """创建调整分录（合并锁定期间禁止，需编辑权限）"""
@@ -121,6 +390,251 @@ async def create_adjustment(
         return result.model_dump()
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.post("/sync-from-workpaper")
+async def sync_from_workpaper(
+    project_id: UUID,
+    data: AdjustmentSyncRequest,
+    db: AsyncSession = Depends(get_db),
+    user=Depends(require_operation("wp:edit")),
+    _lock_check=Depends(check_consol_lock),
+):
+    """底稿调整分录组 → 集中式登记（幂等 by source_ref，origin='workpaper'）。
+
+    - UNBALANCED / UNRESOLVED_ACCOUNTS → 400
+    - APPROVED_LOCKED → 409（已复核通过，需先撤回）
+    - 不触发 recalc（workpaper origin 已由审定表 writeback 体现于 audited_amount）
+    """
+    svc = AdjustmentSyncService(db)
+    try:
+        result = await svc.sync_from_workpaper(project_id, data, user.id)
+        await db.commit()
+        # P0-1: 同步成功后 SSE 广播，让大厅在线用户实时感知新分录到达
+        try:
+            from app.core.event_bus import event_bus
+            event_bus.broadcast_raw(
+                f"projects:{project_id}",
+                "adjustment:sync-arrived",
+                {"project_id": str(project_id), "source_wp_code": data.source_wp_code or "", "adjustment_no": result.adjustment_no},
+            )
+        except Exception:
+            pass  # best-effort，不阻断响应
+        # 「新调整到达→按科目反查底稿负责人→推通知」
+        try:
+            await _notify_affected_wp_assignees(
+                db, project_id, data, result.adjustment_no, user.id
+            )
+        except Exception:
+            pass  # best-effort
+        return result.model_dump()
+    except AdjustmentSyncError as e:
+        if e.code in ("APPROVED_LOCKED", "COLLABORATION_LOCKED"):
+            raise HTTPException(status_code=409, detail={
+                "error_code": e.code, "message": str(e), "detail": e.detail,
+            })
+        raise HTTPException(status_code=400, detail={
+            "error_code": e.code, "message": str(e), "detail": e.detail,
+        })
+
+
+# ---------------------------------------------------------------------------
+# 调整分录协作接力（adjustment-collaboration-and-propagation）
+# ---------------------------------------------------------------------------
+
+
+def _collab_http(e: CollaborationError) -> HTTPException:
+    """CollaborationError → HTTPException（409 锁定类 / 403 权限类 / 400 其余）。"""
+    if e.code in ("APPROVED_LOCKED",):
+        code = 409
+    elif e.code in ("NOT_ASSIGNEE", "NOT_PARTICIPANT", "NOT_PROJECT_MEMBER"):
+        code = 403
+    elif e.code in ("GROUP_NOT_FOUND", "COLLAB_NOT_FOUND"):
+        code = 404
+    else:
+        code = 400
+    return HTTPException(status_code=code, detail={
+        "error_code": e.code, "message": str(e), "detail": e.detail,
+    })
+
+
+@router.get("/collaboration/inbox")
+async def collaboration_inbox(
+    project_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_project_access("readonly")),
+):
+    """被指派人待办：当前用户在该项目下的活跃协作。"""
+    svc = AdjustmentCollaborationService(db)
+    rows = await svc.list_inbox(project_id, current_user.id)
+    return [
+        {
+            "id": str(r.id),
+            "entry_group_id": str(r.entry_group_id),
+            "status": r.status,
+            "round": r.round,
+            "initiator_id": str(r.initiator_id),
+            "note": r.note,
+            "updated_at": r.updated_at.isoformat() if r.updated_at else None,
+        }
+        for r in rows
+    ]
+
+
+@router.post("/{entry_group_id}/collaboration/assign")
+async def collaboration_assign(
+    project_id: UUID,
+    entry_group_id: UUID,
+    data: AdjustmentCollaborationAssignRequest,
+    db: AsyncSession = Depends(get_db),
+    user=Depends(require_project_access("edit")),
+):
+    """转派/重派分录组给项目成员补充+确认。"""
+    svc = AdjustmentCollaborationService(db)
+    try:
+        result = await svc.assign(
+            project_id,
+            entry_group_id=entry_group_id,
+            assignee_id=data.assignee_id,
+            initiator_id=user.id,
+            year=data.year,
+            note=data.note,
+        )
+        await db.commit()
+        return result.model_dump()
+    except CollaborationError as e:
+        raise _collab_http(e)
+
+
+@router.get("/{entry_group_id}/collaboration")
+async def get_group_collaboration(
+    project_id: UUID,
+    entry_group_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_project_access("readonly")),
+):
+    """分录组当前协作 + 事件时间线。"""
+    svc = AdjustmentCollaborationService(db)
+    latest = await svc.get_latest_by_group(project_id, entry_group_id)
+    if latest is None:
+        return {"collaboration": None, "timeline": []}
+    timeline = await svc.get_timeline(latest.id)
+    return {
+        "collaboration": {
+            "id": str(latest.id),
+            "entry_group_id": str(latest.entry_group_id),
+            "status": latest.status,
+            "round": latest.round,
+            "initiator_id": str(latest.initiator_id),
+            "assignee_id": str(latest.assignee_id),
+            "note": latest.note,
+            "rejection_reason": latest.rejection_reason,
+        },
+        "timeline": [
+            {
+                "id": str(ev.id),
+                "event_type": ev.event_type,
+                "actor_id": str(ev.actor_id),
+                "payload": ev.payload,
+                "created_at": ev.created_at.isoformat() if ev.created_at else None,
+            }
+            for ev in timeline
+        ],
+    }
+
+
+@router.post("/collaboration/{collaboration_id}/acknowledge")
+async def collaboration_acknowledge(
+    project_id: UUID,
+    collaboration_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    user=Depends(require_project_access("edit")),
+):
+    svc = AdjustmentCollaborationService(db)
+    try:
+        result = await svc.acknowledge(project_id, collaboration_id, user.id)
+        await db.commit()
+        return result.model_dump()
+    except CollaborationError as e:
+        raise _collab_http(e)
+
+
+@router.post("/collaboration/{collaboration_id}/contribute")
+async def collaboration_contribute(
+    project_id: UUID,
+    collaboration_id: UUID,
+    data: AdjustmentCollaborationContributeRequest,
+    db: AsyncSession = Depends(get_db),
+    user=Depends(require_project_access("edit")),
+    _lock_check=Depends(check_consol_lock),
+):
+    svc = AdjustmentCollaborationService(db)
+    try:
+        result = await svc.contribute(
+            project_id, collaboration_id, user.id, data.line_items, data.note
+        )
+        await db.commit()
+        return result.model_dump()
+    except CollaborationError as e:
+        raise _collab_http(e)
+
+
+@router.post("/collaboration/{collaboration_id}/confirm")
+async def collaboration_confirm(
+    project_id: UUID,
+    collaboration_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    user=Depends(require_project_access("edit")),
+):
+    svc = AdjustmentCollaborationService(db)
+    try:
+        result = await svc.confirm(project_id, collaboration_id, user.id)
+        await db.commit()
+        # P1-6: 协作确认后回写源底稿 checklist_responses（best-effort）
+        try:
+            entry_group_id = result.entry_group_id if hasattr(result, 'entry_group_id') else None
+            source_ref = result.source_ref if hasattr(result, 'source_ref') else None
+            if entry_group_id and source_ref:
+                await _writeback_to_source_workpaper(db, project_id, entry_group_id, source_ref)
+                await db.commit()
+        except Exception:
+            try:
+                await db.rollback()
+            except Exception:
+                pass
+        return result.model_dump()
+    except CollaborationError as e:
+        raise _collab_http(e)
+
+
+@router.post("/collaboration/{collaboration_id}/reject")
+async def collaboration_reject(
+    project_id: UUID,
+    collaboration_id: UUID,
+    data: AdjustmentCollaborationRejectRequest,
+    db: AsyncSession = Depends(get_db),
+    user=Depends(require_project_access("edit")),
+):
+    svc = AdjustmentCollaborationService(db)
+    try:
+        result = await svc.reject(project_id, collaboration_id, user.id, data.reason)
+        await db.commit()
+        return result.model_dump()
+    except CollaborationError as e:
+        raise _collab_http(e)
+
+
+@router.get("/by-source-ref")
+async def get_adjustment_by_source_ref(
+    project_id: UUID,
+    source_ref: str = Query(..., description="底稿溯源键 {wp_id}:{item_id}"),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_project_access("readonly")),
+):
+    """回流：按 source_ref 返回集中登记复核状态（供底稿侧只读展示）。"""
+    svc = AdjustmentSyncService(db)
+    status = await svc.get_status_by_source_ref(project_id, source_ref)
+    return status or {}
 
 
 @router.post("/batch-commit")
@@ -277,6 +791,16 @@ async def review_adjustment(
             project_id, entry_group_id, change, user.id
         )
         await db.commit()
+        # P0-4: 复核状态变更后 SSE 广播，让底稿侧实时回流 + 大厅其他用户感知
+        try:
+            from app.core.event_bus import event_bus
+            event_bus.broadcast_raw(
+                f"projects:{project_id}",
+                "adjustment:review-changed",
+                {"project_id": str(project_id), "entry_group_id": str(entry_group_id), "new_status": change.status},
+            )
+        except Exception:
+            pass  # best-effort
         return {"message": "状态变更成功"}
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -523,7 +1047,12 @@ async def export_adjustment_summary(
     return StreamingResponse(
         buf,
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        headers={"Content-Disposition": f"attachment; filename=adjustment_summary_{year}.xlsx"},
+        headers={
+            "Content-Disposition": content_disposition_attachment(
+                f"审计调整汇总表_{year}.xlsx",
+                ascii_fallback=f"adjustment_summary_{year}.xlsx",
+            )
+        },
     )
 
 
@@ -1020,7 +1549,10 @@ async def export_adjustment_template(
         buf,
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         headers={
-            "Content-Disposition": f"attachment; filename=adjustment_template_{template_type}_{year}.xlsx"
+            "Content-Disposition": content_disposition_attachment(
+                f"调整分录导入模板_{template_label}_{year}.xlsx",
+                ascii_fallback=f"adjustment_template_{template_type}_{year}.xlsx",
+            )
         },
     )
 
@@ -1049,7 +1581,8 @@ def _adj_to_dict(adj) -> dict:
 def _write_adj_sheet(ws, entries, adj_type: str):
     from openpyxl.styles import Font, Alignment, PatternFill
 
-    headers = ["编号", "摘要", "科目编码", "科目名称", "借方金额", "贷方金额"]
+    # #4/#5: 导出增加「调整目的」「所属循环」「协作状态」列
+    headers = ["编号", "类型", "摘要", "科目编码", "科目名称", "借方金额", "贷方金额", "来源", "所属循环", "协作状态"]
     header_fill = PatternFill(start_color="F4F0FA", end_color="F4F0FA", fill_type="solid")
     header_font = Font(bold=True, size=11)
 
@@ -1059,47 +1592,101 @@ def _write_adj_sheet(ws, entries, adj_type: str):
         cell.font = header_font
         cell.alignment = Alignment(horizontal="center")
 
+    def _origin_label(a: dict) -> str:
+        """来源标签：底稿 {wp_code} / 手工。wp_code 从 source_ref item_id 前缀派生。"""
+        if (a.get("origin") or "manual") != "workpaper":
+            return "手工"
+        ref = a.get("source_ref") or ""
+        item_id = ref.split(":", 1)[1] if ":" in ref else ""
+        import re as _re
+        m = _re.match(r"[A-Z]\d+(?:-\d+)?", item_id)
+        return f"底稿 {m.group(0)}" if m else "底稿"
+
+    def _derive_cycle(a: dict) -> str:
+        """#4: 从 source_ref/来源科目推导所属循环（D/E/F/G/H/I/J/K/L/M/N）。"""
+        ref = a.get("source_ref") or ""
+        item_id = ref.split(":", 1)[1] if ":" in ref else ""
+        import re as _re
+        m = _re.match(r"([A-Z])", item_id)
+        if m:
+            return m.group(1)
+        # 从 line_items 首个科目码前缀推导
+        items = a.get("line_items") or []
+        if items:
+            code = (items[0].get("standard_account_code") or "")[:2]
+            # 1xxx=资产(D~I) 2xxx=负债(L~K) 4xxx=权益(M) 5/6xxx=损益(K/N)
+            if code.startswith("1"):
+                return "D~I"
+            elif code.startswith("2"):
+                return "K~L"
+            elif code.startswith("4"):
+                return "M"
+            elif code.startswith(("5", "6")):
+                return "K~N"
+        return ""
+
+    def _collab_label(a: dict) -> str:
+        """#5: 协作状态文案。"""
+        if a.get("has_active_collaboration"):
+            return "协作中"
+        return ""
+
     row_idx = 2
     for adj in entries:
         if isinstance(adj, dict) and "line_items" in adj:
+            origin_label = _origin_label(adj)
+            cycle_label = _derive_cycle(adj)
+            collab_label = _collab_label(adj)
             # 分录组模式：每个 line_item 一行
             line_items = adj.get("line_items", [])
             if not line_items:
                 # 无明细行时输出汇总行
                 ws.cell(row=row_idx, column=1, value=adj.get("adjustment_no", ""))
-                ws.cell(row=row_idx, column=2, value=adj.get("description", ""))
-                ws.cell(row=row_idx, column=3, value="")
+                ws.cell(row=row_idx, column=2, value=adj_type)
+                ws.cell(row=row_idx, column=3, value=adj.get("description", ""))
                 ws.cell(row=row_idx, column=4, value="")
-                ws.cell(row=row_idx, column=5, value=float(adj.get("total_debit") or 0))
-                ws.cell(row=row_idx, column=6, value=float(adj.get("total_credit") or 0))
+                ws.cell(row=row_idx, column=5, value="")
+                ws.cell(row=row_idx, column=6, value=float(adj.get("total_debit") or 0))
+                ws.cell(row=row_idx, column=7, value=float(adj.get("total_credit") or 0))
+                ws.cell(row=row_idx, column=8, value=origin_label)
+                ws.cell(row=row_idx, column=9, value=cycle_label)
+                ws.cell(row=row_idx, column=10, value=collab_label)
                 row_idx += 1
             else:
                 for li in line_items:
                     ws.cell(row=row_idx, column=1, value=adj.get("adjustment_no", ""))
-                    ws.cell(row=row_idx, column=2, value=adj.get("description", ""))
-                    ws.cell(row=row_idx, column=3, value=li.get("standard_account_code", ""))
-                    ws.cell(row=row_idx, column=4, value=li.get("account_name", ""))
-                    ws.cell(row=row_idx, column=5, value=float(li.get("debit_amount") or 0))
-                    ws.cell(row=row_idx, column=6, value=float(li.get("credit_amount") or 0))
+                    ws.cell(row=row_idx, column=2, value=adj_type)
+                    ws.cell(row=row_idx, column=3, value=adj.get("description", ""))
+                    ws.cell(row=row_idx, column=4, value=li.get("standard_account_code", ""))
+                    ws.cell(row=row_idx, column=5, value=li.get("account_name", ""))
+                    ws.cell(row=row_idx, column=6, value=float(li.get("debit_amount") or 0))
+                    ws.cell(row=row_idx, column=7, value=float(li.get("credit_amount") or 0))
+                    ws.cell(row=row_idx, column=8, value=origin_label)
+                    ws.cell(row=row_idx, column=9, value=cycle_label)
+                    ws.cell(row=row_idx, column=10, value=collab_label)
                     row_idx += 1
         else:
             # 扁平模式兼容
             d = _adj_to_dict(adj)
             ws.cell(row=row_idx, column=1, value=d["adjustment_no"])
-            ws.cell(row=row_idx, column=2, value=d["description"])
-            ws.cell(row=row_idx, column=3, value=d["account_code"])
-            ws.cell(row=row_idx, column=4, value=d["account_name"])
-            ws.cell(row=row_idx, column=5, value=float(d["debit_amount"] or 0))
-            ws.cell(row=row_idx, column=6, value=float(d["credit_amount"] or 0))
+            ws.cell(row=row_idx, column=2, value=adj_type)
+            ws.cell(row=row_idx, column=3, value=d["description"])
+            ws.cell(row=row_idx, column=4, value=d["account_code"])
+            ws.cell(row=row_idx, column=5, value=d["account_name"])
+            ws.cell(row=row_idx, column=6, value=float(d["debit_amount"] or 0))
+            ws.cell(row=row_idx, column=7, value=float(d["credit_amount"] or 0))
+            ws.cell(row=row_idx, column=8, value=_origin_label(d) if isinstance(d, dict) else "手工")
             row_idx += 1
 
     # 列宽
     ws.column_dimensions["A"].width = 14
-    ws.column_dimensions["B"].width = 30
-    ws.column_dimensions["C"].width = 14
-    ws.column_dimensions["D"].width = 20
-    ws.column_dimensions["E"].width = 16
+    ws.column_dimensions["B"].width = 8
+    ws.column_dimensions["C"].width = 30
+    ws.column_dimensions["D"].width = 14
+    ws.column_dimensions["E"].width = 20
     ws.column_dimensions["F"].width = 16
+    ws.column_dimensions["G"].width = 16
+    ws.column_dimensions["H"].width = 14
 
 
 # R10 Spec B / Sprint 3.2.3 — 调整分录组关联底稿

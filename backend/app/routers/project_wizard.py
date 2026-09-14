@@ -3,6 +3,9 @@
 Validates: Requirements 1.1-1.8
 """
 
+import json
+import logging
+from datetime import datetime, timezone
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -21,66 +24,31 @@ from app.models.audit_platform_schemas import (
 )
 from app.models.core import Project, User
 from app.services import project_wizard_service
+from app.services.project_audit_year import resolve_project_audit_year
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/projects", tags=["projects"])
 
 
 def _extract_project_audit_year(project: Project) -> int | None:
-    """提取项目审计年度，兜底优先级（防止 wizard_state 未填齐导致 null）：
-
-    1. wizard_state.steps.basic_info.data.audit_year (主要来源，向导走完时填)
-    2. project.audit_period_start.year（创建时填的审计期间起）
-    3. project.name 末尾的 _YYYY 后缀（命名约定 `{客户}_{年度}`）
-    返回值始终 > 2000。
-    """
-    wizard_state = project.wizard_state or {}
-    basic_info = (
-        wizard_state.get("steps", {}).get("basic_info", {}).get("data")
-        or wizard_state.get("basic_info", {}).get("data")
-        or {}
-    )
-    raw_year = basic_info.get("audit_year") or basic_info.get("year")
-    if raw_year:
-        try:
-            audit_year = int(raw_year)
-            if audit_year > 2000:
-                return audit_year
-        except (TypeError, ValueError):
-            pass
-
-    # 兜底 1：审计期间起始年
-    if project.audit_period_start:
-        try:
-            y = project.audit_period_start.year
-            if y > 2000:
-                return y
-        except (AttributeError, TypeError):
-            pass
-
-    # 兜底 2：项目名末尾 _YYYY 后缀
-    if project.name:
-        import re
-        m = re.search(r'_(\d{4})$', project.name)
-        if m:
-            try:
-                y = int(m.group(1))
-                if y > 2000:
-                    return y
-            except ValueError:
-                pass
-
-    return None
+    """提取项目审计年度（委托 project_audit_year 通用规则）。"""
+    return resolve_project_audit_year(project)
 
 
 def _to_project_response(project: Project) -> ProjectCreateResponse:
+    audit_year = resolve_project_audit_year(project)
     return ProjectCreateResponse(
         id=project.id,
         name=project.name,
         client_name=project.client_name,
-        audit_year=_extract_project_audit_year(project),
+        short_name=project.short_name,
+        company_code=project.company_code,
+        audit_year=audit_year,
         project_type=project.project_type.value if project.project_type else None,
         status=project.status.value,
         template_type=project.template_type,
+        company_subtype=project.company_subtype,
         report_scope=project.report_scope,
         parent_project_id=project.parent_project_id,
         consol_level=project.consol_level or 1,
@@ -140,7 +108,7 @@ async def list_projects_with_progress(
       - due_date   = (audit_year+1)-04-30（典型审计报告截止）
       - overall_progress = sum(已完成 wp count) / sum(wp count) * 100
         已完成 = WorkingPaper.status in (locked, archived)；空集时为 0
-      - partner_name / manager_name = JOIN users.display_name
+      - partner_name / manager_name = JOIN users.username
 
     单次 SQL 聚合（项目数 N）+ 单次 SQL 取 wp 进度（GROUP BY project_id）+ 单次 users JOIN，
     总计 3 次 IO，不会随 N 退化。
@@ -198,16 +166,16 @@ async def list_projects_with_progress(
         for row in progress_rows
     }
 
-    # 3. 一次性取 partner/manager display_name
+    # 3. 一次性取 partner/manager 名称（users 表无 display_name 列，用 username）
     user_ids = {p.partner_id for p in projects if p.partner_id} | {p.manager_id for p in projects if p.manager_id}
     name_map: dict = {}
     if user_ids:
         from app.models.core import User as UserModel
         user_rows = (await db.execute(
-            select(UserModel.id, UserModel.display_name, UserModel.username).where(UserModel.id.in_(list(user_ids)))
+            select(UserModel.id, UserModel.username).where(UserModel.id.in_(list(user_ids)))
         )).all()
-        for uid, dname, uname in user_rows:
-            name_map[uid] = dname or uname
+        for uid, uname in user_rows:
+            name_map[uid] = uname
 
     # 4. 组装
     out: list[dict] = []
@@ -384,6 +352,306 @@ async def attach_subsidiaries(
         _emit_scope_changed(project_id, _extract_project_audit_year(parent))
 
     return [_to_project_response(c) for c in attached]
+
+
+# ---------------------------------------------------------------------------
+# Phase 2 增强（group-tree-architecture Task 15.2 / 16.1）：
+#   PATCH /api/projects/{project_id}/parent-code  — 调整上级企业代码（拖拽调层级）
+#   GET   /api/projects/{project_id}/parent-code-history — 层级变更历史（读 app_audit_log）
+# ---------------------------------------------------------------------------
+
+
+class UpdateParentCodeRequest(BaseModel):
+    """调整 parent_company_code 请求。
+
+    parent_company_code 为 None 或空串 → 脱挂到顶层（指向最终控制方根或独立）。
+    """
+    parent_company_code: str | None = None
+
+
+class UpdateParentCodeResponse(BaseModel):
+    id: str
+    parent_company_code: str | None
+    parent_project_id: str | None
+
+
+async def _would_form_cycle(
+    db: AsyncSession,
+    project: Project,
+    new_parent_code: str,
+) -> bool:
+    """后端二次校验：将 project.parent_company_code 设为 new_parent_code 是否形成循环。
+
+    从 new_parent_code 出发，沿 parent_company_code → company_code 链向上遍历
+    （限定同一 ultimate 分组、未删除项目）。若遍历途中遇到 project 自身的
+    company_code → 形成循环（project 成为自己的祖先），返回 True。
+
+    带 visited 集合防止遍历途中已存在的环导致死循环。
+    parent 指向不存在的代码 → 链断裂（脱挂），不算循环，返回 False。
+    """
+    from sqlalchemy import select
+
+    own_code = (project.company_code or "").strip()
+    target_code = (new_parent_code or "").strip()
+    if not target_code:
+        return False
+    # 自己当自己的上级 → 直接判循环
+    if own_code and target_code == own_code:
+        return True
+    if not own_code:
+        # 自身无 company_code，无法成为任何节点的祖先 → 不可能循环
+        return False
+
+    # 同一 ultimate 分组内的候选项目（按 company_code 索引）
+    ultimate = (project.ultimate_company_code or "").strip()
+    stmt = select(Project).where(Project.is_deleted == False)  # noqa: E712
+    if ultimate:
+        stmt = stmt.where(Project.ultimate_company_code == ultimate)
+    res = await db.execute(stmt)
+    by_code: dict[str, Project] = {}
+    for p in res.scalars().all():
+        c = (p.company_code or "").strip()
+        if c and c not in by_code:
+            by_code[c] = p
+
+    visited: set[str] = set()
+    current_code = target_code
+    while current_code:
+        if current_code == own_code:
+            return True  # 走回自身 → 循环
+        if current_code in visited:
+            return False  # 已存在的环（不含自身），链终止
+        visited.add(current_code)
+        node = by_code.get(current_code)
+        if node is None:
+            return False  # 链断裂（指向不存在企业）→ 脱挂，无循环
+        current_code = (node.parent_company_code or "").strip()
+    return False
+
+
+@router.patch("/{project_id}/parent-code", response_model=UpdateParentCodeResponse)
+async def update_parent_code(
+    project_id: UUID,
+    body: UpdateParentCodeRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> UpdateParentCodeResponse:
+    """调整项目的上级企业代码（parent_company_code）。
+
+    用于树形拖拽调整层级（Task 15）。后端二次校验循环引用（Task 15.2），
+    并将变更写入 app_audit_log（who/when/old/new，Task 16.1）。
+
+    - parent_company_code 为空/None → 脱挂到顶层。
+    - 设为自身 company_code 或形成循环 → 400 拒绝。
+    - 同步解析 parent_project_id（匹配同 ultimate 内 company_code 的项目；
+      找不到则置 None，与批量导入脱挂行为一致）。
+    - 审计日志写入失败不阻断主更新（try/except 吞，仅告警）。
+    """
+    project = await db.get(Project, project_id)
+    if project is None or project.is_deleted:
+        raise HTTPException(status_code=404, detail="项目不存在")
+
+    old_value = project.parent_company_code
+    new_value = (body.parent_company_code or "").strip() or None
+
+    # 后端二次校验：循环引用
+    if new_value is not None:
+        own_code = (project.company_code or "").strip()
+        if own_code and new_value == own_code:
+            raise HTTPException(status_code=400, detail="不能将项目的上级设为自身")
+        if await _would_form_cycle(db, project, new_value):
+            raise HTTPException(
+                status_code=400, detail="该调整会形成循环引用（项目成为自己的祖先）"
+            )
+
+    # 更新 parent_company_code
+    project.parent_company_code = new_value
+
+    # 同步解析 parent_project_id（与批量导入解析逻辑一致：匹配同 ultimate 内 company_code）
+    new_parent_project_id = None
+    if new_value is not None:
+        from sqlalchemy import select
+
+        stmt = select(Project).where(
+            Project.company_code == new_value,
+            Project.is_deleted == False,  # noqa: E712
+            Project.id != project.id,
+        )
+        ultimate = (project.ultimate_company_code or "").strip()
+        if ultimate:
+            stmt = stmt.where(Project.ultimate_company_code == ultimate)
+        res = await db.execute(stmt)
+        candidates = res.scalars().all()
+        target = None
+        if candidates:
+            # 优先同年度
+            ay = project.audit_year
+            if ay is not None:
+                for c in candidates:
+                    if c.audit_year == ay:
+                        target = c
+                        break
+            target = target or candidates[0]
+        if target is not None:
+            new_parent_project_id = target.id
+    project.parent_project_id = new_parent_project_id
+
+    # Task 16.1：写 app_audit_log（who/when/old/new）。失败不阻断主更新。
+    try:
+        from sqlalchemy import text
+
+        details = {"old": old_value, "new": new_value}
+        await db.execute(
+            text(
+                "INSERT INTO app_audit_log "
+                "(id, user_id, action, resource_type, resource_id, details, created_at) "
+                "VALUES (gen_random_uuid(), :user_id, :action, :resource_type, "
+                ":resource_id, CAST(:details AS jsonb), :now)"
+            ),
+            {
+                "user_id": str(current_user.id),
+                "action": "project.parent_code.change",
+                "resource_type": "project",
+                "resource_id": str(project_id),
+                "details": json.dumps(details, ensure_ascii=False),
+                "now": datetime.now(timezone.utc),
+            },
+        )
+    except Exception as exc:  # noqa: BLE001
+        # app_audit_log 是 PG 专用表（gen_random_uuid/::jsonb），SQLite 测试会失败，
+        # 审计日志写入失败不应阻断主更新。
+        logger.warning("parent_company_code 变更审计日志写入失败: %s", exc)
+
+    await db.commit()
+    await db.refresh(project)
+
+    return UpdateParentCodeResponse(
+        id=str(project.id),
+        parent_company_code=project.parent_company_code,
+        parent_project_id=str(project.parent_project_id) if project.parent_project_id else None,
+    )
+
+
+class ParentCodeHistoryEntry(BaseModel):
+    user_id: str | None
+    created_at: str | None
+    old: str | None
+    new: str | None
+
+
+@router.get("/{project_id}/parent-code-history", response_model=list[ParentCodeHistoryEntry])
+async def get_parent_code_history(
+    project_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> list[ParentCodeHistoryEntry]:
+    """查询项目的上级企业代码变更历史（读 app_audit_log，Task 16.1 读侧）。
+
+    供前端"查看层级变更历史"右键菜单接入。表/数据缺失时返回空列表（容错）。
+    """
+    entries: list[ParentCodeHistoryEntry] = []
+    try:
+        from sqlalchemy import text
+
+        rows = await db.execute(
+            text(
+                "SELECT user_id, created_at, details FROM app_audit_log "
+                "WHERE action = :action AND resource_id = :rid "
+                "ORDER BY created_at DESC"
+            ),
+            {"action": "project.parent_code.change", "rid": str(project_id)},
+        )
+        for user_id, created_at, details in rows.all():
+            old_v = None
+            new_v = None
+            if isinstance(details, dict):
+                old_v = details.get("old")
+                new_v = details.get("new")
+            elif isinstance(details, str):
+                try:
+                    parsed = json.loads(details)
+                    old_v = parsed.get("old")
+                    new_v = parsed.get("new")
+                except (ValueError, AttributeError):
+                    pass
+            entries.append(ParentCodeHistoryEntry(
+                user_id=str(user_id) if user_id is not None else None,
+                created_at=created_at.isoformat() if hasattr(created_at, "isoformat") else (
+                    str(created_at) if created_at is not None else None
+                ),
+                old=old_v,
+                new=new_v,
+            ))
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("读取 parent_company_code 变更历史失败: %s", exc)
+        return []
+    return entries
+
+
+class TemplateRecommendationResponse(BaseModel):
+    """企业子类型推荐响应（需求 7.6 + 14.3 回填）。"""
+    subtype: str | None
+    confidence: str
+    candidates: list[str]
+    matched_rules: list[str]
+    source: str
+    # 需求 1.7/1.8/14.3：项目当前已保存的企业子类型（用户手动设置时优先）
+    current_subtype: str | None = None
+    # 需求 1.7 ③：为空/未确认时前端展示「待确认企业子类型」非阻断横幅
+    needs_confirmation: bool = False
+
+
+@router.get(
+    "/{project_id}/template-recommendation",
+    response_model=TemplateRecommendationResponse,
+)
+async def get_template_recommendation(
+    project_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> TemplateRecommendationResponse:
+    """根据项目属性推荐企业子类型（模板 A/B/C/D）。
+
+    从 Project 行提取属性（applicable_standard_v2.entity_type / scenario /
+    template_type / report_scope / 公司名）喂给 MatchingRulesService。
+    规则推荐优先于 listed/non_listed fallback（需求 7.7）。
+    需求 1.7/1.8/14.3：返回 current_subtype（项目已保存值，用户手动优先）+
+    needs_confirmation（为空时引导前端展示「待确认企业子类型」横幅）。
+
+    Validates: Requirements 1.4, 1.7, 1.8, 7.2, 7.5, 7.6, 7.7
+    """
+    from app.services.matching_rules_service import (
+        backfill_company_subtype,
+        recommend_company_subtype,
+    )
+
+    project = await db.get(Project, project_id)
+    if project is None or project.is_deleted:
+        raise HTTPException(status_code=404, detail="项目不存在")
+
+    # fallback 推断依赖 company_type（listed/non_listed），从模板/准则属性派生
+    project_attrs = {
+        "entity_type": (project.applicable_standard_v2 or {}).get("entity_type"),
+        "scope": (project.applicable_standard_v2 or {}).get("scope"),
+        "scenario": project.scenario,
+        "template_type": project.template_type,
+        "report_scope": project.report_scope,
+        "company_name": project.name,
+        "client_name": project.client_name,
+        "applicable_standard_v2": project.applicable_standard_v2,
+    }
+    result = recommend_company_subtype(project_attrs)
+    backfill = backfill_company_subtype(
+        project_attrs, existing_subtype=project.company_subtype
+    )
+    return TemplateRecommendationResponse(
+        **result.to_dict(),
+        current_subtype=project.company_subtype,
+        needs_confirmation=backfill.needs_confirmation,
+    )
+
+
+@router.get("/{project_id}/wizard", response_model=WizardState)
 async def get_wizard_state(
     project_id: UUID,
     db: AsyncSession = Depends(get_db),
@@ -459,16 +727,17 @@ async def delete_project(
     project_id: UUID,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
-    _token: None = Depends(require_confirmation_token),
 ):
-    """软删除单个项目（需二次密码确认）"""
+    """软删除单个项目（前端已有二次确认弹窗，仅 admin/partner/manager 可操作）"""
+    from fastapi import HTTPException
+    if current_user.role.value not in ("admin", "partner", "manager"):
+        raise HTTPException(status_code=403, detail="权限不足，仅管理员/合伙人/项目经理可删除项目")
     from sqlalchemy import select
     result = await db.execute(
         select(Project).where(Project.id == project_id, Project.is_deleted == False)  # noqa: E712
     )
     project = result.scalar_one_or_none()
     if not project:
-        from fastapi import HTTPException
         raise HTTPException(status_code=404, detail="项目不存在")
     project.is_deleted = True
     await db.commit()
@@ -480,9 +749,11 @@ async def batch_delete_projects(
     body: BatchDeleteRequest,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
-    _token: None = Depends(require_confirmation_token),
 ):
-    """批量软删除项目（需二次密码确认）"""
+    """批量软删除项目（前端已有二次确认弹窗，仅 admin/partner/manager 可操作）"""
+    from fastapi import HTTPException
+    if current_user.role.value not in ("admin", "partner", "manager"):
+        raise HTTPException(status_code=403, detail="权限不足，仅管理员/合伙人/项目经理可删除项目")
     from sqlalchemy import select, update
     count = 0
     for pid in body.project_ids:

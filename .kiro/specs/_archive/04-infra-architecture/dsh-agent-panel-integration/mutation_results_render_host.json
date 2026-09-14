@@ -1,0 +1,60 @@
+[
+  {
+    "name": "[渲染宿主] 删掉 ChatMentionPicker 模板标签保留 import（M36）",
+    "verdict": "RED",
+    "detail": "新增失败 2 条，含预期「面板 template 里真的渲染」",
+    "new_fails": [
+      "PlatformAiChatPanel 必须挂载 Task 15 的两个组件 面板 template 里真的渲染 <ChatMentionPicker>",
+      "渲染宿主可达性：src/components/ai 下 Chat*/Platform*/Dsh* 全部组件 ChatMentionPicker 至少有一个宿主真的把它当标签/注册项使用（只 import 不用也是死代码）"
+    ]
+  },
+  {
+    "name": "[渲染宿主] 删掉 ChatContextInspector 模板标签保留 import（M37）",
+    "verdict": "RED",
+    "detail": "新增失败 2 条，含预期「面板 template 里真的渲染」",
+    "new_fails": [
+      "PlatformAiChatPanel 必须挂载 Task 15 的两个组件 面板 template 里真的渲染 <ChatContextInspector>",
+      "渲染宿主可达性：src/components/ai 下 Chat*/Platform*/Dsh* 全部组件 ChatContextInspector 至少有一个宿主真的把它当标签/注册项使用（只 import 不用也是死代码）"
+    ]
+  },
+  {
+    "name": "[渲染宿主] @ 触发链断开（watch(draft) 不开 picker）（M38）",
+    "verdict": "RED",
+    "detail": "新增失败 4 条，含预期「输入 @ 唤出 mention picker」",
+    "new_fails": [
+      "@ 触发链（Req 5.1） @ 词中间带关键词时保持打开（用户正在挑资源）",
+      "@ 触发链（Req 5.1） Escape 关闭 picker 且不冒泡（否则 DshPanel 会把整个面板关掉）",
+      "@ 触发链（Req 5.1） 点击输入区之外关闭 picker，点 picker 内部不关",
+      "@ 触发链（Req 5.1） 输入 @ 唤出 mention picker；清掉 @ 后自动关闭"
+    ]
+  },
+  {
+    "name": "[渲染宿主] handleSend 丢弃已选 mention（M39）",
+    "verdict": "RED",
+    "detail": "新增失败 2 条，含预期「已选引用出现在 mentions 里」",
+    "new_fails": [
+      "Req 5.5 / Property 12：mention 真的进入 POST /runs 请求体 发送后本轮引用清空，不会悄悄跟到下一轮",
+      "Req 5.5 / Property 12：mention 真的进入 POST /runs 请求体 已选引用出现在 mentions 里，且只含 type + 稳定 ID"
+    ]
+  },
+  {
+    "name": "[渲染宿主] buildExtrasPayload 不写 mentions 键（M40）",
+    "verdict": "RED",
+    "detail": "新增失败 2 条，含预期「已选引用出现在 mentions 里」",
+    "new_fails": [
+      "Req 5.5 / Property 12：mention 真的进入 POST /runs 请求体 发送后本轮引用清空，不会悄悄跟到下一轮",
+      "Req 5.5 / Property 12：mention 真的进入 POST /runs 请求体 已选引用出现在 mentions 里，且只含 type + 稳定 ID"
+    ]
+  },
+  {
+    "name": "[渲染宿主] normalizeContextManifest 投影恒空（M41）",
+    "verdict": "RED",
+    "detail": "新增失败 4 条，含预期「服务端分组 manifest 被投影后逐条渲染」",
+    "new_fails": [
+      "Property 12：Context Inspector 消费 context_ready 的 manifest native engine 的 char_estimate 口径也能读出（两套 engine 形状不同）",
+      "Property 12：Context Inspector 消费 context_ready 的 manifest 投影不发明 jump_route（服务端没给就是 null，前端不许自己拼路由 — Req 5.9）",
+      "Property 12：Context Inspector 消费 context_ready 的 manifest 投影不吞条目：未登记的分组键也落进结果（decision 退化为 unavailable）",
+      "Property 12：Context Inspector 消费 context_ready 的 manifest 服务端分组 manifest 被投影后逐条渲染（included/trimmed/denied/unavailable）"
+    ]
+  }
+]

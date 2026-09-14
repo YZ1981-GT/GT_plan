@@ -1,0 +1,246 @@
+{
+  "generated_by": "backend/scripts/_mutation_kit/span.py::run_cli",
+  "mode": "run",
+  "pytest_args": [
+    "backend/tests/workpaper_sync/test_task26_oo_to_html.py",
+    "backend/tests/workpaper_sync/test_task26_oo_to_html_pg.py",
+    "backend/tests/workpaper_sync/test_task14_merge_conflicts.py",
+    "backend/tests/workpaper_sync/test_task15_content_mutation.py",
+    "-q",
+    "--tb=no",
+    "-rf",
+    "-p",
+    "no:randomly"
+  ],
+  "tally": {
+    "RED": 9
+  },
+  "mutations": [
+    {
+      "id": "M40",
+      "path": "backend/app/services/workpaper_sync/merge.py",
+      "want": "test_task14_merge_conflicts.py::TestTask14ScopeBoundary::test_merge_domain_consumers_match_the_retirement_registry_exactly",
+      "why": "编排层声明「经由 retention.py 落库」⇒ 唯一 commit 边界的反查失效。`commits_through` 正是「coordinator 允许跑 merge 但不得自己 commit」这条不变量的载体（Property 61）；它若指向任意模块，边界就只剩注释",
+      "verdict": "RED",
+      "summary": "2 failed, 489 passed in 48.51s",
+      "added": [
+        "test_task14_merge_conflicts.py::TestTask14ScopeBoundary::test_merge_domain_consumers_match_the_retirement_registry_exactly",
+        "test_task15_content_mutation.py::TestTask15ScopeBoundary::test_merge_domain_deferral_is_retired"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task14_merge_conflicts.py::TestTask14ScopeBoundary::test_merge_domain_consumers_match_the_retirement_registry_exactly"
+      ],
+      "added_files": [
+        "test_task14_merge_conflicts.py",
+        "test_task15_content_mutation.py"
+      ],
+      "restored": true,
+      "restored_sha256": "8e0c6a9601951ea1c964ff9fa1b37c0ddda7ff762e67ae50e526d3cb65afe29d",
+      "seconds": 51.8
+    },
+    {
+      "id": "N06",
+      "path": "backend/app/services/workpaper_sync/merge.py",
+      "want": "test_task15_content_mutation.py::TestTask15ScopeBoundary::test_merge_domain_deferral_is_retired",
+      "why": "Task 26 这条消费方不再声明「经 content_mutation 落库」⇒ 编排层可以自己 commit，Property 61 的唯一 commit 边界只剩注释。这正是归因型判据比旧版 `len(retired) == 1` 强的地方：旧版对「新增一条不经 commit 边界的消费方」只会报 `2 == 1`，说不出问题在哪；新版直接点出是哪个模块、缺了什么",
+      "verdict": "RED",
+      "summary": "1 failed, 490 passed in 48.75s",
+      "added": [
+        "test_task15_content_mutation.py::TestTask15ScopeBoundary::test_merge_domain_deferral_is_retired"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task15_content_mutation.py::TestTask15ScopeBoundary::test_merge_domain_deferral_is_retired"
+      ],
+      "added_files": [
+        "test_task15_content_mutation.py"
+      ],
+      "restored": true,
+      "restored_sha256": "8e0c6a9601951ea1c964ff9fa1b37c0ddda7ff762e67ae50e526d3cb65afe29d",
+      "seconds": 52.0
+    },
+    {
+      "id": "D09",
+      "path": "backend/app/services/workpaper_sync/oo_to_html.py",
+      "want": "test_task26_oo_to_html.py::TestManualAdjudicationIsWired::test_settle_branches_are_the_single_decision_point",
+      "why": "绕过唯一决策点、直接发布未收敛快照 ⇒ 缺陷④的 (b) 半原样复活。真库侧同时红：落库 projection digest 变成 `merge.merged` 的那个，于是「审计师点了取 incoming，落库的是 current」",
+      "verdict": "RED",
+      "summary": "5 failed, 486 passed in 48.56s",
+      "added": [
+        "test_task26_oo_to_html.py::TestManualAdjudicationIsWired::test_settle_branches_are_the_single_decision_point",
+        "test_task26_oo_to_html_pg.py::TestManualAdjudicationIsAppliedOnRealDb::test_call_with_resolutions_succeeds",
+        "test_task26_oo_to_html_pg.py::TestManualAdjudicationIsAppliedOnRealDb::test_conflict_resolution_is_its_own_source_bucket",
+        "test_task26_oo_to_html_pg.py::TestManualAdjudicationIsAppliedOnRealDb::test_pointers_advanced_exactly_once",
+        "test_task26_oo_to_html_pg.py::TestManualAdjudicationIsAppliedOnRealDb::test_the_published_projection_is_the_folded_one_not_merge_merged"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task26_oo_to_html.py::TestManualAdjudicationIsWired::test_settle_branches_are_the_single_decision_point",
+        "test_task26_oo_to_html_pg.py::TestManualAdjudicationIsAppliedOnRealDb::test_the_published_projection_is_the_folded_one_not_merge_merged"
+      ],
+      "added_files": [
+        "test_task26_oo_to_html.py",
+        "test_task26_oo_to_html_pg.py"
+      ],
+      "restored": true,
+      "restored_sha256": "df8f55c9e72a28cef3e5e1a1f14126bf808464f96662548b9e54e73f57e5f704",
+      "seconds": 51.8
+    },
+    {
+      "id": "D10",
+      "path": "backend/app/services/workpaper_sync/merge.py",
+      "want": "test_task26_oo_to_html.py::TestManualAdjudicationIsWired::test_adjudication_is_folded_not_discarded",
+      "why": "折叠函数本体：覆盖率照常校验，但裁决**一条都不落进 values** ⇒ 返回的就是`merged` 的等价物。与 D09 分层：D09 打的是**调用点**（绕过决策点），本条打的是**判据体**（决策点在、但它不干活）。行为上两者都只表现为「落库值是 current」，因此必须各自可证伪",
+      "verdict": "RED",
+      "summary": "8 failed, 483 passed in 48.81s",
+      "added": [
+        "test_task14_merge_conflicts.py::TestProperty26SameFieldDifferentValues::test_resolution_can_pick_either_side_or_a_manual_value",
+        "test_task14_merge_conflicts.py::TestProperty27DeleteUpdate::test_resolving_delete_update_as_delete_removes_the_whole_row",
+        "test_task14_merge_conflicts.py::TestProperty27DeleteUpdate::test_resolving_delete_update_as_keep_current_retains_the_row",
+        "test_task15_content_mutation.py::TestConflictGate::test_resolved_merge_passes",
+        "test_task15_content_mutation.py::TestConflictGate::test_unfolded_projection_is_rejected_even_with_full_coverage",
+        "test_task26_oo_to_html.py::TestManualAdjudicationIsWired::test_adjudication_is_folded_not_discarded",
+        "test_task26_oo_to_html_pg.py::TestManualAdjudicationIsAppliedOnRealDb::test_adjudicated_value_really_differs_from_merge_merged",
+        "test_task26_oo_to_html_pg.py::TestManualAdjudicationIsAppliedOnRealDb::test_the_published_projection_is_the_folded_one_not_merge_merged"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task26_oo_to_html.py::TestManualAdjudicationIsWired::test_adjudication_is_folded_not_discarded",
+        "test_task26_oo_to_html_pg.py::TestManualAdjudicationIsAppliedOnRealDb::test_the_published_projection_is_the_folded_one_not_merge_merged"
+      ],
+      "added_files": [
+        "test_task14_merge_conflicts.py",
+        "test_task15_content_mutation.py",
+        "test_task26_oo_to_html.py",
+        "test_task26_oo_to_html_pg.py"
+      ],
+      "restored": true,
+      "restored_sha256": "8e0c6a9601951ea1c964ff9fa1b37c0ddda7ff762e67ae50e526d3cb65afe29d",
+      "seconds": 52.1
+    },
+    {
+      "id": "D11",
+      "path": "backend/app/services/workpaper_sync/oo_to_html.py",
+      "want": "test_task26_oo_to_html.py::TestManualAdjudicationIsWired::test_resolutions_reach_the_commit_boundary",
+      "why": "裁决不再交到唯一 commit 边界 ⇒ Task 15 的**独立重算**（第二把锁）恒不触发：它只在 `resolution_choices` 非空时才校验折叠。**行为完全不变** —— 这正是「第二把锁被悄悄摘掉」的形态，只有形态判据会红。本条取代了旧 D11（闸门位置判据），因为闸门本身已随接线撤除",
+      "verdict": "RED",
+      "summary": "5 failed, 486 passed in 48.70s",
+      "added": [
+        "test_task26_oo_to_html.py::TestManualAdjudicationIsWired::test_resolutions_reach_the_commit_boundary",
+        "test_task26_oo_to_html_pg.py::TestManualAdjudicationIsAppliedOnRealDb::test_call_with_resolutions_succeeds",
+        "test_task26_oo_to_html_pg.py::TestManualAdjudicationIsAppliedOnRealDb::test_conflict_resolution_is_its_own_source_bucket",
+        "test_task26_oo_to_html_pg.py::TestManualAdjudicationIsAppliedOnRealDb::test_pointers_advanced_exactly_once",
+        "test_task26_oo_to_html_pg.py::TestManualAdjudicationIsAppliedOnRealDb::test_the_published_projection_is_the_folded_one_not_merge_merged"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task26_oo_to_html.py::TestManualAdjudicationIsWired::test_resolutions_reach_the_commit_boundary"
+      ],
+      "added_files": [
+        "test_task26_oo_to_html.py",
+        "test_task26_oo_to_html_pg.py"
+      ],
+      "restored": true,
+      "restored_sha256": "df8f55c9e72a28cef3e5e1a1f14126bf808464f96662548b9e54e73f57e5f704",
+      "seconds": 52.0
+    },
+    {
+      "id": "D12",
+      "path": "backend/app/services/workpaper_sync/oo_to_html.py",
+      "want": "test_task26_oo_to_html.py::TestManualAdjudicationIsWired::test_retirement_registration_is_complete",
+      "why": "「登记 ↔ 事实」双向锁死的**第一个方向**：接线在、登记却退回 deferred ⇒ 下一个人核对欠账时会以为它还没还，可能再加一道 fail-closed 闸把 resolve 端点整条掐死。同时打红 AST 侧那条（它断言 `intended_status == 'retired'`）",
+      "verdict": "RED",
+      "summary": "1 failed, 490 passed in 48.48s",
+      "added": [
+        "test_task26_oo_to_html.py::TestManualAdjudicationIsWired::test_coordinator_really_imports_and_calls_apply_resolutions"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task26_oo_to_html.py::TestManualAdjudicationIsWired::test_coordinator_really_imports_and_calls_apply_resolutions"
+      ],
+      "added_files": [
+        "test_task26_oo_to_html.py"
+      ],
+      "restored": true,
+      "restored_sha256": "df8f55c9e72a28cef3e5e1a1f14126bf808464f96662548b9e54e73f57e5f704",
+      "seconds": 51.7
+    },
+    {
+      "id": "D13",
+      "path": "backend/app/services/workpaper_sync/oo_to_html.py",
+      "want": "test_task26_oo_to_html.py::TestManualAdjudicationIsWired::test_coordinator_really_imports_and_calls_apply_resolutions",
+      "why": "双向锁死的**第二个方向**：登记写着 retired 而接线消失（`apply_resolutions` 既不在 imported 也不在 called）。与 D12 反向，两条都打同一批守卫但断言消息里的`imported=`/`called=` 列表可区分。🔴 判据必须走 AST：docstring 里逐处解释接线来历时逐字写着这个符号名，子串匹配版本首轮实测直接假红",
+      "verdict": "RED",
+      "summary": "7 failed, 484 passed in 48.47s",
+      "added": [
+        "test_task26_oo_to_html.py::TestManualAdjudicationIsWired::test_adjudication_is_folded_not_discarded",
+        "test_task26_oo_to_html.py::TestManualAdjudicationIsWired::test_coordinator_really_imports_and_calls_apply_resolutions",
+        "test_task26_oo_to_html.py::TestManualAdjudicationIsWired::test_retirement_registration_is_complete",
+        "test_task26_oo_to_html_pg.py::TestManualAdjudicationIsAppliedOnRealDb::test_call_with_resolutions_succeeds",
+        "test_task26_oo_to_html_pg.py::TestManualAdjudicationIsAppliedOnRealDb::test_conflict_resolution_is_its_own_source_bucket",
+        "test_task26_oo_to_html_pg.py::TestManualAdjudicationIsAppliedOnRealDb::test_pointers_advanced_exactly_once",
+        "test_task26_oo_to_html_pg.py::TestManualAdjudicationIsAppliedOnRealDb::test_the_published_projection_is_the_folded_one_not_merge_merged"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task26_oo_to_html.py::TestManualAdjudicationIsWired::test_coordinator_really_imports_and_calls_apply_resolutions"
+      ],
+      "added_files": [
+        "test_task26_oo_to_html.py",
+        "test_task26_oo_to_html_pg.py"
+      ],
+      "restored": true,
+      "restored_sha256": "df8f55c9e72a28cef3e5e1a1f14126bf808464f96662548b9e54e73f57e5f704",
+      "seconds": 51.9
+    },
+    {
+      "id": "D14",
+      "path": "backend/app/services/workpaper_sync/oo_to_html.py",
+      "want": "test_task26_oo_to_html.py::TestManualAdjudicationIsWired::test_entry_dispatch_routes_adjudication_away_from_conflict_branch",
+      "why": "缺陷④的 (a) 半反向复活：分派不再看裁决 ⇒ 带裁决的调用被登记成「仍有冲突」并冻结指针，resolve 端点整条失效（审计师提交裁决后什么都没发生）。真库侧同时红：带裁决的调用不再 applied",
+      "verdict": "RED",
+      "summary": "5 failed, 486 passed in 48.37s",
+      "added": [
+        "test_task26_oo_to_html.py::TestManualAdjudicationIsWired::test_entry_dispatch_routes_adjudication_away_from_conflict_branch",
+        "test_task26_oo_to_html_pg.py::TestManualAdjudicationIsAppliedOnRealDb::test_call_with_resolutions_succeeds",
+        "test_task26_oo_to_html_pg.py::TestManualAdjudicationIsAppliedOnRealDb::test_conflict_resolution_is_its_own_source_bucket",
+        "test_task26_oo_to_html_pg.py::TestManualAdjudicationIsAppliedOnRealDb::test_pointers_advanced_exactly_once",
+        "test_task26_oo_to_html_pg.py::TestManualAdjudicationIsAppliedOnRealDb::test_the_published_projection_is_the_folded_one_not_merge_merged"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task26_oo_to_html.py::TestManualAdjudicationIsWired::test_entry_dispatch_routes_adjudication_away_from_conflict_branch",
+        "test_task26_oo_to_html_pg.py::TestManualAdjudicationIsAppliedOnRealDb::test_call_with_resolutions_succeeds"
+      ],
+      "added_files": [
+        "test_task26_oo_to_html.py",
+        "test_task26_oo_to_html_pg.py"
+      ],
+      "restored": true,
+      "restored_sha256": "df8f55c9e72a28cef3e5e1a1f14126bf808464f96662548b9e54e73f57e5f704",
+      "seconds": 51.7
+    },
+    {
+      "id": "D15",
+      "path": "backend/app/services/workpaper_sync/oo_to_html.py",
+      "want": "test_task26_oo_to_html.py::TestManualAdjudicationIsWired::test_the_fail_closed_gate_did_not_come_back",
+      "why": "回退判据：把 Task 26 的 fail-closed 闸门函数重新加回来。只加定义、不加调用，因此**行为完全不变** —— 而登记里保留的 `retired_fail_closed_gate` 字段让「闸门又回来了」有一个机器可核对的锚点。没有这条，Task 27 的接线被「先加回闸门、再逐步接上调用」这种半回退悄悄撤销时没人会发现",
+      "verdict": "RED",
+      "summary": "1 failed, 490 passed in 48.47s",
+      "added": [
+        "test_task26_oo_to_html.py::TestManualAdjudicationIsWired::test_the_fail_closed_gate_did_not_come_back"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task26_oo_to_html.py::TestManualAdjudicationIsWired::test_the_fail_closed_gate_did_not_come_back"
+      ],
+      "added_files": [
+        "test_task26_oo_to_html.py"
+      ],
+      "restored": true,
+      "restored_sha256": "df8f55c9e72a28cef3e5e1a1f14126bf808464f96662548b9e54e73f57e5f704",
+      "seconds": 51.8
+    }
+  ]
+}

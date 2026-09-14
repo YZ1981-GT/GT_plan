@@ -6,6 +6,23 @@
     width="800px"
     :close-on-click-modal="false"
   >
+    <!-- 使用说明 -->
+    <el-alert type="info" :closable="true" show-icon style="margin-bottom: 16px;">
+      <template #title>
+        <span style="font-weight: 600;">使用说明</span>
+      </template>
+      <template #default>
+        <div style="font-size: 12px; line-height: 1.8; color: var(--gt-color-text-secondary);">
+          <p style="margin: 0;">集团基线用于统一管理同集团下各子企业的附注模板结构。</p>
+          <ul style="margin: 4px 0 0; padding-left: 16px;">
+            <li><b>应用基线</b>：从已有基线导入章节结构到当前项目，本地已修改的章节不会被覆盖</li>
+            <li><b>保存为基线</b>：将当前项目的附注章节结构保存为基线，供其他子企业项目引用</li>
+            <li><b>版本对比</b>：对比两个基线版本之间的章节差异（新增/删除/修改）</li>
+          </ul>
+        </div>
+      </template>
+    </el-alert>
+
     <el-tabs v-model="activeTab">
       <!-- Tab 1: 应用基线 -->
       <el-tab-pane label="应用基线" name="apply">
@@ -141,7 +158,7 @@ watch(visible, (v) => {
 
 async function loadBaselines() {
   try {
-    const resp: any = await api.get('/api/group-note-baselines')
+    const resp: any = await api.get('/api/group-note-baselines', { _silent: true } as any)
     baselines.value = resp || []
   } catch {
     baselines.value = []

@@ -1,0 +1,29 @@
+flowchart LR
+    ADJU["E1-1 审定表"]
+    AGGE["E1-adj-total-{code}<br/>期末审定"]
+    AGGO["E1-adj-total-{code}-opening<br/>期初审定"]
+    BANK["E1-3 受限资金字段"]
+
+    subgraph DISC["E1TabDisclosure"]
+        L["上市：单表 货币资金<br/>项目/期末/上年年末"]
+        S["国企：主表 + 受限制货币资金明细<br/>项目/期末/期初/受限原因"]
+        TXT["说明文字 _note_texts"]
+    end
+
+    SYNC["POST sync-from-workpaper<br/>sub_table_data + columns + year"]
+    DB["disclosure_notes<br/>table_data + _sub_table_columns"]
+    PROJ["note_sub_table_projector<br/>投影 _tables"]
+    NM["附注模块 五、1 / 八、1"]
+    FX["外币性质货币资金<br/>按模板归属 五、81（未并入）"]
+
+    ADJU --> AGGE --> L
+    ADJU --> AGGO -->|期初预填，手工覆盖优先| S
+    AGGE --> S
+    BANK -->|受限资金| S
+    L --> SYNC
+    S --> SYNC
+    TXT --> SYNC
+    SYNC --> DB --> PROJ --> NM
+    NM -.->|正向跳转 精确匹配 五、1 / 八、1| DISC
+    DISC -.->|反向 ?section=五、1&noteTemplate=listed| NM
+    FX -.->|不进 五、1| NM

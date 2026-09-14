@@ -1,0 +1,2194 @@
+{
+  "measured_at": "2026-09-12",
+  "template_path": "backend/wp_templates/D/D4 收入底稿.xlsx",
+  "authority": "openpyxl_expanded_shared_formulas",
+  "totals": {
+    "external_bracket": 0,
+    "internal": 951,
+    "total_f": 951
+  },
+  "zip_level_f_tag_masters": {
+    "external_bracket_f_text": 0,
+    "internal_f_text": 168,
+    "empty_shared_or_selfclose": 220
+  },
+  "external_link_parts": [],
+  "external_link_part_count": 0,
+  "managed_sheet": "主营业务收入明细表D4-2",
+  "managed_N_column_internal_formulas": [
+    {
+      "cell": "N12",
+      "formula": "=SUM(B12:M12)"
+    },
+    {
+      "cell": "N13",
+      "formula": "=SUM(B13:M13)"
+    },
+    {
+      "cell": "N14",
+      "formula": "=SUM(B14:M14)"
+    },
+    {
+      "cell": "N15",
+      "formula": "=SUM(B15:M15)"
+    },
+    {
+      "cell": "N16",
+      "formula": "=SUM(B16:M16)"
+    },
+    {
+      "cell": "N17",
+      "formula": "=SUM(B17:M17)"
+    },
+    {
+      "cell": "N18",
+      "formula": "=SUM(B18:M18)"
+    },
+    {
+      "cell": "N19",
+      "formula": "=SUM(B19:M19)"
+    },
+    {
+      "cell": "N20",
+      "formula": "=SUM(B20:M20)"
+    },
+    {
+      "cell": "N21",
+      "formula": "=SUM(B21:M21)"
+    },
+    {
+      "cell": "N22",
+      "formula": "=SUM(B22:M22)"
+    },
+    {
+      "cell": "N23",
+      "formula": "=SUM(B23:M23)"
+    },
+    {
+      "cell": "N24",
+      "formula": "=SUM(N12:N23)"
+    },
+    {
+      "cell": "N25",
+      "formula": "=IF($N$24=0,0,N24/$N$24)"
+    }
+  ],
+  "managed_N12_N23_sum_formulas": [
+    {
+      "cell": "N12",
+      "formula": "=SUM(B12:M12)"
+    },
+    {
+      "cell": "N13",
+      "formula": "=SUM(B13:M13)"
+    },
+    {
+      "cell": "N14",
+      "formula": "=SUM(B14:M14)"
+    },
+    {
+      "cell": "N15",
+      "formula": "=SUM(B15:M15)"
+    },
+    {
+      "cell": "N16",
+      "formula": "=SUM(B16:M16)"
+    },
+    {
+      "cell": "N17",
+      "formula": "=SUM(B17:M17)"
+    },
+    {
+      "cell": "N18",
+      "formula": "=SUM(B18:M18)"
+    },
+    {
+      "cell": "N19",
+      "formula": "=SUM(B19:M19)"
+    },
+    {
+      "cell": "N20",
+      "formula": "=SUM(B20:M20)"
+    },
+    {
+      "cell": "N21",
+      "formula": "=SUM(B21:M21)"
+    },
+    {
+      "cell": "N22",
+      "formula": "=SUM(B22:M22)"
+    },
+    {
+      "cell": "N23",
+      "formula": "=SUM(B23:M23)"
+    }
+  ],
+  "managed_N_data_rows_all_internal": true,
+  "managed_N_data_rows_are_sum_bm": true,
+  "by_sheet": [
+    {
+      "sheet": "底稿目录",
+      "external_bracket_count": 0,
+      "internal_count": 0,
+      "external_bracket_cells": [],
+      "internal_sample": [],
+      "internal_truncated": false
+    },
+    {
+      "sheet": "营业收入审计程序表D4A",
+      "external_bracket_count": 0,
+      "internal_count": 0,
+      "external_bracket_cells": [],
+      "internal_sample": [],
+      "internal_truncated": false
+    },
+    {
+      "sheet": "营业收入审定表D4-1",
+      "external_bracket_count": 0,
+      "internal_count": 42,
+      "external_bracket_cells": [],
+      "internal_sample": [
+        {
+          "cell": "E8",
+          "formula": "=SUM(B8:D8)"
+        },
+        {
+          "cell": "I8",
+          "formula": "=SUM(F8:H8)"
+        },
+        {
+          "cell": "E9",
+          "formula": "=SUM(B9:D9)"
+        },
+        {
+          "cell": "I9",
+          "formula": "=SUM(F9:H9)"
+        },
+        {
+          "cell": "E10",
+          "formula": "=SUM(B10:D10)"
+        },
+        {
+          "cell": "I10",
+          "formula": "=SUM(F10:H10)"
+        },
+        {
+          "cell": "E11",
+          "formula": "=SUM(B11:D11)"
+        },
+        {
+          "cell": "I11",
+          "formula": "=SUM(F11:H11)"
+        },
+        {
+          "cell": "B12",
+          "formula": "=SUM(B8:B11)"
+        },
+        {
+          "cell": "C12",
+          "formula": "=SUM(C8:C11)"
+        },
+        {
+          "cell": "D12",
+          "formula": "=SUM(D8:D11)"
+        },
+        {
+          "cell": "E12",
+          "formula": "=B12+C12+D12"
+        },
+        {
+          "cell": "F12",
+          "formula": "=SUM(F8:F11)"
+        },
+        {
+          "cell": "G12",
+          "formula": "=SUM(G8:G11)"
+        },
+        {
+          "cell": "H12",
+          "formula": "=SUM(H8:H11)"
+        },
+        {
+          "cell": "I12",
+          "formula": "=SUM(I8:I11)"
+        },
+        {
+          "cell": "E14",
+          "formula": "=SUM(B14:D14)"
+        },
+        {
+          "cell": "I14",
+          "formula": "=SUM(F14:H14)"
+        },
+        {
+          "cell": "E15",
+          "formula": "=SUM(B15:D15)"
+        },
+        {
+          "cell": "I15",
+          "formula": "=SUM(F15:H15)"
+        },
+        {
+          "cell": "E16",
+          "formula": "=SUM(B16:D16)"
+        },
+        {
+          "cell": "I16",
+          "formula": "=SUM(F16:H16)"
+        },
+        {
+          "cell": "E17",
+          "formula": "=SUM(B17:D17)"
+        },
+        {
+          "cell": "I17",
+          "formula": "=SUM(F17:H17)"
+        },
+        {
+          "cell": "B18",
+          "formula": "=SUM(B14:B17)"
+        },
+        {
+          "cell": "C18",
+          "formula": "=SUM(C14:C17)"
+        },
+        {
+          "cell": "D18",
+          "formula": "=SUM(D14:D17)"
+        },
+        {
+          "cell": "E18",
+          "formula": "=SUM(E14:E17)"
+        },
+        {
+          "cell": "F18",
+          "formula": "=SUM(F14:F17)"
+        },
+        {
+          "cell": "G18",
+          "formula": "=SUM(G14:G17)"
+        }
+      ],
+      "internal_truncated": true
+    },
+    {
+      "sheet": "附注披露信息（上市公司）",
+      "external_bracket_count": 0,
+      "internal_count": 34,
+      "external_bracket_cells": [],
+      "internal_sample": [
+        {
+          "cell": "B12",
+          "formula": "=SUM(B10:B11)"
+        },
+        {
+          "cell": "C12",
+          "formula": "=SUM(C10:C11)"
+        },
+        {
+          "cell": "D12",
+          "formula": "=SUM(D10:D11)"
+        },
+        {
+          "cell": "E12",
+          "formula": "=SUM(E10:E11)"
+        },
+        {
+          "cell": "B29",
+          "formula": "=SUM(B24:B28)-B24-B25-B26"
+        },
+        {
+          "cell": "C29",
+          "formula": "=SUM(C24:C28)-C24-C25-C26"
+        },
+        {
+          "cell": "D29",
+          "formula": "=SUM(D24:D28)-D24-D25-D26"
+        },
+        {
+          "cell": "E29",
+          "formula": "=SUM(E24:E28)-E24-E25-E26"
+        },
+        {
+          "cell": "B33",
+          "formula": "=SUM(B31:B32)"
+        },
+        {
+          "cell": "C33",
+          "formula": "=SUM(C31:C32)"
+        },
+        {
+          "cell": "D33",
+          "formula": "=SUM(D31:D32)"
+        },
+        {
+          "cell": "E33",
+          "formula": "=SUM(E31:E32)"
+        },
+        {
+          "cell": "B34",
+          "formula": "=B29+B33"
+        },
+        {
+          "cell": "C34",
+          "formula": "=C29+C33"
+        },
+        {
+          "cell": "D34",
+          "formula": "=D29+D33"
+        },
+        {
+          "cell": "E34",
+          "formula": "=E29+E33"
+        },
+        {
+          "cell": "B43",
+          "formula": "=B40+B39+B38"
+        },
+        {
+          "cell": "C43",
+          "formula": "=C40+C39+C38"
+        },
+        {
+          "cell": "D43",
+          "formula": "=D40+D39+D38"
+        },
+        {
+          "cell": "E43",
+          "formula": "=E40+E39+E38"
+        },
+        {
+          "cell": "B48",
+          "formula": "=SUM(B49:B51)"
+        },
+        {
+          "cell": "C48",
+          "formula": "=SUM(C49:C51)"
+        },
+        {
+          "cell": "F48",
+          "formula": "=SUM(F49:F51)"
+        },
+        {
+          "cell": "I48",
+          "formula": "=SUM(I49:I51)"
+        },
+        {
+          "cell": "B52",
+          "formula": "=SUM(B53:B55)"
+        },
+        {
+          "cell": "C52",
+          "formula": "=SUM(C53:C55)"
+        },
+        {
+          "cell": "F52",
+          "formula": "=SUM(F53:F55)"
+        },
+        {
+          "cell": "I52",
+          "formula": "=SUM(I53:I55)"
+        },
+        {
+          "cell": "B56",
+          "formula": "=B52+B48"
+        },
+        {
+          "cell": "C56",
+          "formula": "=C52+C48"
+        }
+      ],
+      "internal_truncated": true
+    },
+    {
+      "sheet": "附注披露信息（国企）",
+      "external_bracket_count": 0,
+      "internal_count": 32,
+      "external_bracket_cells": [],
+      "internal_sample": [
+        {
+          "cell": "B11",
+          "formula": "=SUM(B9:B10)"
+        },
+        {
+          "cell": "C11",
+          "formula": "=SUM(C9:C10)"
+        },
+        {
+          "cell": "D11",
+          "formula": "=SUM(D9:D10)"
+        },
+        {
+          "cell": "E11",
+          "formula": "=SUM(E9:E10)"
+        },
+        {
+          "cell": "B23",
+          "formula": "=B20+B21+B22"
+        },
+        {
+          "cell": "C23",
+          "formula": "=C20+C21+C22"
+        },
+        {
+          "cell": "D23",
+          "formula": "=D20+D21+D22"
+        },
+        {
+          "cell": "E23",
+          "formula": "=E20+E21+E22"
+        },
+        {
+          "cell": "B27",
+          "formula": "=B25+B26"
+        },
+        {
+          "cell": "C27",
+          "formula": "=C25+C26"
+        },
+        {
+          "cell": "D27",
+          "formula": "=D25+D26"
+        },
+        {
+          "cell": "E27",
+          "formula": "=E25+E26"
+        },
+        {
+          "cell": "B28",
+          "formula": "=B23+B27"
+        },
+        {
+          "cell": "C28",
+          "formula": "=C23+C27"
+        },
+        {
+          "cell": "D28",
+          "formula": "=D23+D27"
+        },
+        {
+          "cell": "E28",
+          "formula": "=E23+E27"
+        },
+        {
+          "cell": "B36",
+          "formula": "=B32+B33+B34"
+        },
+        {
+          "cell": "C36",
+          "formula": "=C32+C33+C34"
+        },
+        {
+          "cell": "D36",
+          "formula": "=D32+D33+D34"
+        },
+        {
+          "cell": "E36",
+          "formula": "=E32+E33+E34"
+        },
+        {
+          "cell": "B41",
+          "formula": "=SUM(B42:B44)"
+        },
+        {
+          "cell": "C41",
+          "formula": "=SUM(C42:C44)"
+        },
+        {
+          "cell": "F41",
+          "formula": "=SUM(F42:F44)"
+        },
+        {
+          "cell": "I41",
+          "formula": "=SUM(I42:I44)"
+        },
+        {
+          "cell": "B45",
+          "formula": "=SUM(B46:B48)"
+        },
+        {
+          "cell": "C45",
+          "formula": "=SUM(C46:C48)"
+        },
+        {
+          "cell": "F45",
+          "formula": "=SUM(F46:F48)"
+        },
+        {
+          "cell": "I45",
+          "formula": "=SUM(I46:I48)"
+        },
+        {
+          "cell": "B49",
+          "formula": "=B45+B41"
+        },
+        {
+          "cell": "C49",
+          "formula": "=C45+C41"
+        }
+      ],
+      "internal_truncated": true
+    },
+    {
+      "sheet": "主营业务收入明细表D4-2",
+      "external_bracket_count": 0,
+      "internal_count": 93,
+      "external_bracket_cells": [],
+      "internal_sample": [
+        {
+          "cell": "N12",
+          "formula": "=SUM(B12:M12)"
+        },
+        {
+          "cell": "P12",
+          "formula": "=N12+O12"
+        },
+        {
+          "cell": "S12",
+          "formula": "=Q12+R12"
+        },
+        {
+          "cell": "T12",
+          "formula": "=IF(AND(Q12=0,N12=0),0,IF(AND(Q12=0,N12>0),1,(N12-Q12)/Q12))"
+        },
+        {
+          "cell": "U12",
+          "formula": "=IF(AND(S12=0,P12=0),0,IF(AND(S12=0,P12>0),1,(P12-S12)/S12))"
+        },
+        {
+          "cell": "N13",
+          "formula": "=SUM(B13:M13)"
+        },
+        {
+          "cell": "P13",
+          "formula": "=N13+O13"
+        },
+        {
+          "cell": "S13",
+          "formula": "=Q13+R13"
+        },
+        {
+          "cell": "T13",
+          "formula": "=IF(AND(Q13=0,N13=0),0,IF(AND(Q13=0,N13>0),1,(N13-Q13)/Q13))"
+        },
+        {
+          "cell": "U13",
+          "formula": "=IF(AND(S13=0,P13=0),0,IF(AND(S13=0,P13>0),1,(P13-S13)/S13))"
+        },
+        {
+          "cell": "N14",
+          "formula": "=SUM(B14:M14)"
+        },
+        {
+          "cell": "P14",
+          "formula": "=N14+O14"
+        },
+        {
+          "cell": "S14",
+          "formula": "=Q14+R14"
+        },
+        {
+          "cell": "T14",
+          "formula": "=IF(AND(Q14=0,N14=0),0,IF(AND(Q14=0,N14>0),1,(N14-Q14)/Q14))"
+        },
+        {
+          "cell": "U14",
+          "formula": "=IF(AND(S14=0,P14=0),0,IF(AND(S14=0,P14>0),1,(P14-S14)/S14))"
+        },
+        {
+          "cell": "N15",
+          "formula": "=SUM(B15:M15)"
+        },
+        {
+          "cell": "P15",
+          "formula": "=N15+O15"
+        },
+        {
+          "cell": "S15",
+          "formula": "=Q15+R15"
+        },
+        {
+          "cell": "T15",
+          "formula": "=IF(AND(Q15=0,N15=0),0,IF(AND(Q15=0,N15>0),1,(N15-Q15)/Q15))"
+        },
+        {
+          "cell": "U15",
+          "formula": "=IF(AND(S15=0,P15=0),0,IF(AND(S15=0,P15>0),1,(P15-S15)/S15))"
+        },
+        {
+          "cell": "N16",
+          "formula": "=SUM(B16:M16)"
+        },
+        {
+          "cell": "P16",
+          "formula": "=N16+O16"
+        },
+        {
+          "cell": "S16",
+          "formula": "=Q16+R16"
+        },
+        {
+          "cell": "T16",
+          "formula": "=IF(AND(Q16=0,N16=0),0,IF(AND(Q16=0,N16>0),1,(N16-Q16)/Q16))"
+        },
+        {
+          "cell": "U16",
+          "formula": "=IF(AND(S16=0,P16=0),0,IF(AND(S16=0,P16>0),1,(P16-S16)/S16))"
+        },
+        {
+          "cell": "N17",
+          "formula": "=SUM(B17:M17)"
+        },
+        {
+          "cell": "P17",
+          "formula": "=N17+O17"
+        },
+        {
+          "cell": "S17",
+          "formula": "=Q17+R17"
+        },
+        {
+          "cell": "T17",
+          "formula": "=IF(AND(Q17=0,N17=0),0,IF(AND(Q17=0,N17>0),1,(N17-Q17)/Q17))"
+        },
+        {
+          "cell": "U17",
+          "formula": "=IF(AND(S17=0,P17=0),0,IF(AND(S17=0,P17>0),1,(P17-S17)/S17))"
+        }
+      ],
+      "internal_truncated": true
+    },
+    {
+      "sheet": "其他业务收入明细表D4-3",
+      "external_bracket_count": 0,
+      "internal_count": 54,
+      "external_bracket_cells": [],
+      "internal_sample": [
+        {
+          "cell": "E13",
+          "formula": "=B13+C13+D13"
+        },
+        {
+          "cell": "F13",
+          "formula": "=IF(E13=0,0,E13/$E$20)"
+        },
+        {
+          "cell": "J13",
+          "formula": "=G13+H13+I13"
+        },
+        {
+          "cell": "K13",
+          "formula": "=IF(J13=0,0,J13/$J$20)"
+        },
+        {
+          "cell": "L13",
+          "formula": "=E13-J13"
+        },
+        {
+          "cell": "M13",
+          "formula": "=IF(AND(J13=0,L13=0),0,IF(AND(J13=0,L13>0),1,L13/J13))"
+        },
+        {
+          "cell": "E14",
+          "formula": "=B14+C14+D14"
+        },
+        {
+          "cell": "F14",
+          "formula": "=IF(E14=0,0,E14/$E$20)"
+        },
+        {
+          "cell": "J14",
+          "formula": "=G14+H14+I14"
+        },
+        {
+          "cell": "K14",
+          "formula": "=IF(J14=0,0,J14/$J$20)"
+        },
+        {
+          "cell": "L14",
+          "formula": "=E14-J14"
+        },
+        {
+          "cell": "M14",
+          "formula": "=IF(AND(J14=0,L14=0),0,IF(AND(J14=0,L14>0),1,L14/J14))"
+        },
+        {
+          "cell": "E15",
+          "formula": "=B15+C15+D15"
+        },
+        {
+          "cell": "F15",
+          "formula": "=IF(E15=0,0,E15/$E$20)"
+        },
+        {
+          "cell": "J15",
+          "formula": "=G15+H15+I15"
+        },
+        {
+          "cell": "K15",
+          "formula": "=IF(J15=0,0,J15/$J$20)"
+        },
+        {
+          "cell": "L15",
+          "formula": "=E15-J15"
+        },
+        {
+          "cell": "M15",
+          "formula": "=IF(AND(J15=0,L15=0),0,IF(AND(J15=0,L15>0),1,L15/J15))"
+        },
+        {
+          "cell": "E16",
+          "formula": "=B16+C16+D16"
+        },
+        {
+          "cell": "F16",
+          "formula": "=IF(E16=0,0,E16/$E$20)"
+        },
+        {
+          "cell": "J16",
+          "formula": "=G16+H16+I16"
+        },
+        {
+          "cell": "K16",
+          "formula": "=IF(J16=0,0,J16/$J$20)"
+        },
+        {
+          "cell": "L16",
+          "formula": "=E16-J16"
+        },
+        {
+          "cell": "M16",
+          "formula": "=IF(AND(J16=0,L16=0),0,IF(AND(J16=0,L16>0),1,L16/J16))"
+        },
+        {
+          "cell": "E17",
+          "formula": "=B17+C17+D17"
+        },
+        {
+          "cell": "F17",
+          "formula": "=IF(E17=0,0,E17/$E$20)"
+        },
+        {
+          "cell": "J17",
+          "formula": "=G17+H17+I17"
+        },
+        {
+          "cell": "K17",
+          "formula": "=IF(J17=0,0,J17/$J$20)"
+        },
+        {
+          "cell": "L17",
+          "formula": "=E17-J17"
+        },
+        {
+          "cell": "M17",
+          "formula": "=IF(AND(J17=0,L17=0),0,IF(AND(J17=0,L17>0),1,L17/J17))"
+        }
+      ],
+      "internal_truncated": true
+    },
+    {
+      "sheet": "营业收入调整分录汇总D4-4",
+      "external_bracket_count": 0,
+      "internal_count": 0,
+      "external_bracket_cells": [],
+      "internal_sample": [],
+      "internal_truncated": false
+    },
+    {
+      "sheet": "营业收入会计政策检查D4-5",
+      "external_bracket_count": 0,
+      "internal_count": 0,
+      "external_bracket_cells": [],
+      "internal_sample": [],
+      "internal_truncated": false
+    },
+    {
+      "sheet": "底稿目录 (2)",
+      "external_bracket_count": 0,
+      "internal_count": 0,
+      "external_bracket_cells": [],
+      "internal_sample": [],
+      "internal_truncated": false
+    },
+    {
+      "sheet": "重要指标分析D4-6",
+      "external_bracket_count": 0,
+      "internal_count": 24,
+      "external_bracket_cells": [],
+      "internal_sample": [
+        {
+          "cell": "D13",
+          "formula": "=IF(C13=0,0,(B13-C13)/C13)"
+        },
+        {
+          "cell": "G13",
+          "formula": "=IF(F13=0,0,(B13-F13)/F13)"
+        },
+        {
+          "cell": "D14",
+          "formula": "=IF(C14=0,0,(B14-C14)/C14)"
+        },
+        {
+          "cell": "G14",
+          "formula": "=IF(F14=0,0,(B14-F14)/F14)"
+        },
+        {
+          "cell": "D15",
+          "formula": "=IF(C15=0,0,(B15-C15)/C15)"
+        },
+        {
+          "cell": "G15",
+          "formula": "=IF(F15=0,0,(B15-F15)/F15)"
+        },
+        {
+          "cell": "D16",
+          "formula": "=IF(C16=0,0,(B16-C16)/C16)"
+        },
+        {
+          "cell": "G16",
+          "formula": "=IF(F16=0,0,(B16-F16)/F16)"
+        },
+        {
+          "cell": "D17",
+          "formula": "=IF(C17=0,0,(B17-C17)/C17)"
+        },
+        {
+          "cell": "G17",
+          "formula": "=IF(F17=0,0,(B17-F17)/F17)"
+        },
+        {
+          "cell": "D18",
+          "formula": "=IF(C18=0,0,(B18-C18)/C18)"
+        },
+        {
+          "cell": "G18",
+          "formula": "=IF(F18=0,0,(B18-F18)/F18)"
+        },
+        {
+          "cell": "D19",
+          "formula": "=IF(C19=0,0,(B19-C19)/C19)"
+        },
+        {
+          "cell": "G19",
+          "formula": "=IF(F19=0,0,(B19-F19)/F19)"
+        },
+        {
+          "cell": "D20",
+          "formula": "=IF(C20=0,0,(B20-C20)/C20)"
+        },
+        {
+          "cell": "G20",
+          "formula": "=IF(F20=0,0,(B20-F20)/F20)"
+        },
+        {
+          "cell": "D21",
+          "formula": "=IF(C21=0,0,(B21-C21)/C21)"
+        },
+        {
+          "cell": "G21",
+          "formula": "=IF(F21=0,0,(B21-F21)/F21)"
+        },
+        {
+          "cell": "D22",
+          "formula": "=IF(C22=0,0,(B22-C22)/C22)"
+        },
+        {
+          "cell": "G22",
+          "formula": "=IF(F22=0,0,(B22-F22)/F22)"
+        },
+        {
+          "cell": "D23",
+          "formula": "=IF(C23=0,0,(B23-C23)/C23)"
+        },
+        {
+          "cell": "G23",
+          "formula": "=IF(F23=0,0,(B23-F23)/F23)"
+        },
+        {
+          "cell": "D24",
+          "formula": "=IF(C24=0,0,(B24-C24)/C24)"
+        },
+        {
+          "cell": "G24",
+          "formula": "=IF(F24=0,0,(B24-F24)/F24)"
+        }
+      ],
+      "internal_truncated": false
+    },
+    {
+      "sheet": "毛利率分析表D4-7",
+      "external_bracket_count": 0,
+      "internal_count": 144,
+      "external_bracket_cells": [],
+      "internal_sample": [
+        {
+          "cell": "N12",
+          "formula": "=SUM(B12:M12)"
+        },
+        {
+          "cell": "P12",
+          "formula": "=(N12-O12)/O12"
+        },
+        {
+          "cell": "N13",
+          "formula": "=SUM(B13:M13)"
+        },
+        {
+          "cell": "P13",
+          "formula": "=(N13-O13)/O13"
+        },
+        {
+          "cell": "B14",
+          "formula": "=B12-B13"
+        },
+        {
+          "cell": "C14",
+          "formula": "=C12-C13"
+        },
+        {
+          "cell": "D14",
+          "formula": "=D12-D13"
+        },
+        {
+          "cell": "E14",
+          "formula": "=E12-E13"
+        },
+        {
+          "cell": "F14",
+          "formula": "=F12-F13"
+        },
+        {
+          "cell": "G14",
+          "formula": "=G12-G13"
+        },
+        {
+          "cell": "H14",
+          "formula": "=H12-H13"
+        },
+        {
+          "cell": "I14",
+          "formula": "=I12-I13"
+        },
+        {
+          "cell": "J14",
+          "formula": "=J12-J13"
+        },
+        {
+          "cell": "K14",
+          "formula": "=K12-K13"
+        },
+        {
+          "cell": "L14",
+          "formula": "=L12-L13"
+        },
+        {
+          "cell": "M14",
+          "formula": "=M12-M13"
+        },
+        {
+          "cell": "N14",
+          "formula": "=N12-N13"
+        },
+        {
+          "cell": "O14",
+          "formula": "=O12-O13"
+        },
+        {
+          "cell": "P14",
+          "formula": "=(N14-O14)/O14"
+        },
+        {
+          "cell": "B15",
+          "formula": "=B14/B12"
+        },
+        {
+          "cell": "C15",
+          "formula": "=C14/C12"
+        },
+        {
+          "cell": "D15",
+          "formula": "=D14/D12"
+        },
+        {
+          "cell": "E15",
+          "formula": "=E14/E12"
+        },
+        {
+          "cell": "F15",
+          "formula": "=F14/F12"
+        },
+        {
+          "cell": "G15",
+          "formula": "=G14/G12"
+        },
+        {
+          "cell": "H15",
+          "formula": "=H14/H12"
+        },
+        {
+          "cell": "I15",
+          "formula": "=I14/I12"
+        },
+        {
+          "cell": "J15",
+          "formula": "=J14/J12"
+        },
+        {
+          "cell": "K15",
+          "formula": "=K14/K12"
+        },
+        {
+          "cell": "L15",
+          "formula": "=L14/L12"
+        }
+      ],
+      "internal_truncated": true
+    },
+    {
+      "sheet": "重要产品毛利分析D4-8",
+      "external_bracket_count": 0,
+      "internal_count": 172,
+      "external_bracket_cells": [],
+      "internal_sample": [
+        {
+          "cell": "H16",
+          "formula": "=D16-G16"
+        },
+        {
+          "cell": "I16",
+          "formula": "=IF(D16=0,0,H16/D16)"
+        },
+        {
+          "cell": "P16",
+          "formula": "=L16-O16"
+        },
+        {
+          "cell": "Q16",
+          "formula": "=IF(L16=0,0,P16/L16)"
+        },
+        {
+          "cell": "R16",
+          "formula": "=(C16-K16)/K16"
+        },
+        {
+          "cell": "S16",
+          "formula": "=(F16-N16)/N16"
+        },
+        {
+          "cell": "T16",
+          "formula": "=(D16-L16)/L16"
+        },
+        {
+          "cell": "U16",
+          "formula": "=(G16-O16)/O16"
+        },
+        {
+          "cell": "V16",
+          "formula": "=(H16-P16)/P16"
+        },
+        {
+          "cell": "W16",
+          "formula": "=I16-Q16"
+        },
+        {
+          "cell": "H17",
+          "formula": "=D17-G17"
+        },
+        {
+          "cell": "I17",
+          "formula": "=IF(D17=0,0,H17/D17)"
+        },
+        {
+          "cell": "P17",
+          "formula": "=L17-O17"
+        },
+        {
+          "cell": "Q17",
+          "formula": "=IF(L17=0,0,P17/L17)"
+        },
+        {
+          "cell": "R17",
+          "formula": "=(C17-K17)/K17"
+        },
+        {
+          "cell": "S17",
+          "formula": "=(F17-N17)/N17"
+        },
+        {
+          "cell": "T17",
+          "formula": "=(D17-L17)/L17"
+        },
+        {
+          "cell": "U17",
+          "formula": "=(G17-O17)/O17"
+        },
+        {
+          "cell": "V17",
+          "formula": "=(H17-P17)/P17"
+        },
+        {
+          "cell": "W17",
+          "formula": "=I17-Q17"
+        },
+        {
+          "cell": "H18",
+          "formula": "=D18-G18"
+        },
+        {
+          "cell": "I18",
+          "formula": "=IF(D18=0,0,H18/D18)"
+        },
+        {
+          "cell": "P18",
+          "formula": "=L18-O18"
+        },
+        {
+          "cell": "Q18",
+          "formula": "=IF(L18=0,0,P18/L18)"
+        },
+        {
+          "cell": "R18",
+          "formula": "=(C18-K18)/K18"
+        },
+        {
+          "cell": "S18",
+          "formula": "=(F18-N18)/N18"
+        },
+        {
+          "cell": "T18",
+          "formula": "=(D18-L18)/L18"
+        },
+        {
+          "cell": "U18",
+          "formula": "=(G18-O18)/O18"
+        },
+        {
+          "cell": "V18",
+          "formula": "=(H18-P18)/P18"
+        },
+        {
+          "cell": "W18",
+          "formula": "=I18-Q18"
+        }
+      ],
+      "internal_truncated": true
+    },
+    {
+      "sheet": "重要客户结构分析D4-9",
+      "external_bracket_count": 0,
+      "internal_count": 48,
+      "external_bracket_cells": [],
+      "internal_sample": [
+        {
+          "cell": "D13",
+          "formula": "=IF(C13=0,0,C13/$C$24)"
+        },
+        {
+          "cell": "F13",
+          "formula": "=IF(E13=0,0,E13/$E$24)"
+        },
+        {
+          "cell": "D14",
+          "formula": "=IF(C14=0,0,C14/$C$24)"
+        },
+        {
+          "cell": "F14",
+          "formula": "=IF(E14=0,0,E14/$E$24)"
+        },
+        {
+          "cell": "D15",
+          "formula": "=IF(C15=0,0,C15/$C$24)"
+        },
+        {
+          "cell": "F15",
+          "formula": "=IF(E15=0,0,E15/$E$24)"
+        },
+        {
+          "cell": "D16",
+          "formula": "=IF(C16=0,0,C16/$C$24)"
+        },
+        {
+          "cell": "F16",
+          "formula": "=IF(E16=0,0,E16/$E$24)"
+        },
+        {
+          "cell": "D17",
+          "formula": "=IF(C17=0,0,C17/$C$24)"
+        },
+        {
+          "cell": "F17",
+          "formula": "=IF(E17=0,0,E17/$E$24)"
+        },
+        {
+          "cell": "D18",
+          "formula": "=IF(C18=0,0,C18/$C$24)"
+        },
+        {
+          "cell": "F18",
+          "formula": "=IF(E18=0,0,E18/$E$24)"
+        },
+        {
+          "cell": "D19",
+          "formula": "=IF(C19=0,0,C19/$C$24)"
+        },
+        {
+          "cell": "F19",
+          "formula": "=IF(E19=0,0,E19/$E$24)"
+        },
+        {
+          "cell": "D20",
+          "formula": "=IF(C20=0,0,C20/$C$24)"
+        },
+        {
+          "cell": "F20",
+          "formula": "=IF(E20=0,0,E20/$E$24)"
+        },
+        {
+          "cell": "D21",
+          "formula": "=IF(C21=0,0,C21/$C$24)"
+        },
+        {
+          "cell": "F21",
+          "formula": "=IF(E21=0,0,E21/$E$24)"
+        },
+        {
+          "cell": "D22",
+          "formula": "=IF(C22=0,0,C22/$C$24)"
+        },
+        {
+          "cell": "F22",
+          "formula": "=IF(E22=0,0,E22/$E$24)"
+        },
+        {
+          "cell": "C23",
+          "formula": "=SUM(C13:C22)"
+        },
+        {
+          "cell": "D23",
+          "formula": "=IF(C23=0,0,C23/$C$24)"
+        },
+        {
+          "cell": "E23",
+          "formula": "=SUM(E13:E22)"
+        },
+        {
+          "cell": "F23",
+          "formula": "=IF(E23=0,0,E23/$E$24)"
+        },
+        {
+          "cell": "D27",
+          "formula": "=IF(C27=0,0,C27/$C$38)"
+        },
+        {
+          "cell": "F27",
+          "formula": "=IF(E27=0,0,E27/$E$38)"
+        },
+        {
+          "cell": "D28",
+          "formula": "=IF(C28=0,0,C28/$C$38)"
+        },
+        {
+          "cell": "F28",
+          "formula": "=IF(E28=0,0,E28/$E$38)"
+        },
+        {
+          "cell": "D29",
+          "formula": "=IF(C29=0,0,C29/$C$38)"
+        },
+        {
+          "cell": "F29",
+          "formula": "=IF(E29=0,0,E29/$E$38)"
+        }
+      ],
+      "internal_truncated": true
+    },
+    {
+      "sheet": "重要客户销售价格分析D4-10",
+      "external_bracket_count": 0,
+      "internal_count": 84,
+      "external_bracket_cells": [],
+      "internal_sample": [
+        {
+          "cell": "E13",
+          "formula": "=IF(D13=0,0,D13/$D$34)"
+        },
+        {
+          "cell": "G13",
+          "formula": "=IF(F13=0,0,F13/$F$34)"
+        },
+        {
+          "cell": "J13",
+          "formula": "=IF(AND(I13=0,H13=0),0,IF(AND(I13=0,H13>0),1,(H13-I13)/I13))"
+        },
+        {
+          "cell": "M13",
+          "formula": "=IF(AND(L13=0,H13=0),0,IF(AND(L13=0,H13>0),1,(H13-L13)/L13))"
+        },
+        {
+          "cell": "E14",
+          "formula": "=IF(D14=0,0,D14/$D$34)"
+        },
+        {
+          "cell": "G14",
+          "formula": "=IF(F14=0,0,F14/$F$34)"
+        },
+        {
+          "cell": "J14",
+          "formula": "=IF(AND(I14=0,H14=0),0,IF(AND(I14=0,H14>0),1,(H14-I14)/I14))"
+        },
+        {
+          "cell": "M14",
+          "formula": "=IF(AND(L14=0,H14=0),0,IF(AND(L14=0,H14>0),1,(H14-L14)/L14))"
+        },
+        {
+          "cell": "E15",
+          "formula": "=IF(D15=0,0,D15/$D$34)"
+        },
+        {
+          "cell": "G15",
+          "formula": "=IF(F15=0,0,F15/$F$34)"
+        },
+        {
+          "cell": "J15",
+          "formula": "=IF(AND(I15=0,H15=0),0,IF(AND(I15=0,H15>0),1,(H15-I15)/I15))"
+        },
+        {
+          "cell": "M15",
+          "formula": "=IF(AND(L15=0,H15=0),0,IF(AND(L15=0,H15>0),1,(H15-L15)/L15))"
+        },
+        {
+          "cell": "E16",
+          "formula": "=IF(D16=0,0,D16/$D$34)"
+        },
+        {
+          "cell": "G16",
+          "formula": "=IF(F16=0,0,F16/$F$34)"
+        },
+        {
+          "cell": "J16",
+          "formula": "=IF(AND(I16=0,H16=0),0,IF(AND(I16=0,H16>0),1,(H16-I16)/I16))"
+        },
+        {
+          "cell": "M16",
+          "formula": "=IF(AND(L16=0,H16=0),0,IF(AND(L16=0,H16>0),1,(H16-L16)/L16))"
+        },
+        {
+          "cell": "E17",
+          "formula": "=IF(D17=0,0,D17/$D$34)"
+        },
+        {
+          "cell": "G17",
+          "formula": "=IF(F17=0,0,F17/$F$34)"
+        },
+        {
+          "cell": "J17",
+          "formula": "=IF(AND(I17=0,H17=0),0,IF(AND(I17=0,H17>0),1,(H17-I17)/I17))"
+        },
+        {
+          "cell": "M17",
+          "formula": "=IF(AND(L17=0,H17=0),0,IF(AND(L17=0,H17>0),1,(H17-L17)/L17))"
+        },
+        {
+          "cell": "E18",
+          "formula": "=IF(D18=0,0,D18/$D$34)"
+        },
+        {
+          "cell": "G18",
+          "formula": "=IF(F18=0,0,F18/$F$34)"
+        },
+        {
+          "cell": "J18",
+          "formula": "=IF(AND(I18=0,H18=0),0,IF(AND(I18=0,H18>0),1,(H18-I18)/I18))"
+        },
+        {
+          "cell": "M18",
+          "formula": "=IF(AND(L18=0,H18=0),0,IF(AND(L18=0,H18>0),1,(H18-L18)/L18))"
+        },
+        {
+          "cell": "E19",
+          "formula": "=IF(D19=0,0,D19/$D$34)"
+        },
+        {
+          "cell": "G19",
+          "formula": "=IF(F19=0,0,F19/$F$34)"
+        },
+        {
+          "cell": "J19",
+          "formula": "=IF(AND(I19=0,H19=0),0,IF(AND(I19=0,H19>0),1,(H19-I19)/I19))"
+        },
+        {
+          "cell": "M19",
+          "formula": "=IF(AND(L19=0,H19=0),0,IF(AND(L19=0,H19>0),1,(H19-L19)/L19))"
+        },
+        {
+          "cell": "E20",
+          "formula": "=IF(D20=0,0,D20/$D$34)"
+        },
+        {
+          "cell": "G20",
+          "formula": "=IF(F20=0,0,F20/$F$34)"
+        }
+      ],
+      "internal_truncated": true
+    },
+    {
+      "sheet": "产品销售价格分析D4-11",
+      "external_bracket_count": 0,
+      "internal_count": 0,
+      "external_bracket_cells": [],
+      "internal_sample": [],
+      "internal_truncated": false
+    },
+    {
+      "sheet": "合同检查表D4-12",
+      "external_bracket_count": 0,
+      "internal_count": 0,
+      "external_bracket_cells": [],
+      "internal_sample": [],
+      "internal_truncated": false
+    },
+    {
+      "sheet": "底稿目录 (3)",
+      "external_bracket_count": 0,
+      "internal_count": 0,
+      "external_bracket_cells": [],
+      "internal_sample": [],
+      "internal_truncated": false
+    },
+    {
+      "sheet": "营业收入账面金额与ERP系统核对记录D4-13",
+      "external_bracket_count": 0,
+      "internal_count": 0,
+      "external_bracket_cells": [],
+      "internal_sample": [],
+      "internal_truncated": false
+    },
+    {
+      "sheet": "营业收入发生检查表D4-14",
+      "external_bracket_count": 0,
+      "internal_count": 4,
+      "external_bracket_cells": [],
+      "internal_sample": [
+        {
+          "cell": "G37",
+          "formula": "=SUM(G15:G36)"
+        },
+        {
+          "cell": "X37",
+          "formula": "=SUM(X15:X36)"
+        },
+        {
+          "cell": "AF37",
+          "formula": "=SUM(AF15:AF36)"
+        },
+        {
+          "cell": "G39",
+          "formula": "=G37/G38"
+        }
+      ],
+      "internal_truncated": false
+    },
+    {
+      "sheet": "营业收入完整性检查表D4-15",
+      "external_bracket_count": 0,
+      "internal_count": 0,
+      "external_bracket_cells": [],
+      "internal_sample": [],
+      "internal_truncated": false
+    },
+    {
+      "sheet": "出口收入电子口岸系统核对D4-16",
+      "external_bracket_count": 0,
+      "internal_count": 2,
+      "external_bracket_cells": [],
+      "internal_sample": [
+        {
+          "cell": "D13",
+          "formula": "=C13-A13"
+        },
+        {
+          "cell": "I13",
+          "formula": "=H13-F13"
+        }
+      ],
+      "internal_truncated": false
+    },
+    {
+      "sheet": "营业收入截止测试（账到单据）D4-17",
+      "external_bracket_count": 0,
+      "internal_count": 0,
+      "external_bracket_cells": [],
+      "internal_sample": [],
+      "internal_truncated": false
+    },
+    {
+      "sheet": "营业收入截止测试（单据到账）D4-18",
+      "external_bracket_count": 0,
+      "internal_count": 0,
+      "external_bracket_cells": [],
+      "internal_sample": [],
+      "internal_truncated": false
+    },
+    {
+      "sheet": "销售折扣与折让检查D4-19",
+      "external_bracket_count": 0,
+      "internal_count": 0,
+      "external_bracket_cells": [],
+      "internal_sample": [],
+      "internal_truncated": false
+    },
+    {
+      "sheet": "销售退货检查表 D4-20",
+      "external_bracket_count": 0,
+      "internal_count": 15,
+      "external_bracket_cells": [],
+      "internal_sample": [
+        {
+          "cell": "D15",
+          "formula": "=B15/C15"
+        },
+        {
+          "cell": "G15",
+          "formula": "=E15/F15"
+        },
+        {
+          "cell": "D16",
+          "formula": "=B16/C16"
+        },
+        {
+          "cell": "G16",
+          "formula": "=E16/F16"
+        },
+        {
+          "cell": "B17",
+          "formula": "=B16+B15"
+        },
+        {
+          "cell": "C17",
+          "formula": "=C16+C15"
+        },
+        {
+          "cell": "D17",
+          "formula": "=B17/C17"
+        },
+        {
+          "cell": "E17",
+          "formula": "=E16+E15"
+        },
+        {
+          "cell": "F17",
+          "formula": "=F16+F15"
+        },
+        {
+          "cell": "G17",
+          "formula": "=E17/F17"
+        },
+        {
+          "cell": "D25",
+          "formula": "=B25*C25"
+        },
+        {
+          "cell": "D26",
+          "formula": "=B26*C26"
+        },
+        {
+          "cell": "D27",
+          "formula": "=B27*C27"
+        },
+        {
+          "cell": "D28",
+          "formula": "=B28*C28"
+        },
+        {
+          "cell": "D29",
+          "formula": "=B29*C29"
+        }
+      ],
+      "internal_truncated": false
+    },
+    {
+      "sheet": "关联方销售情况及价格分析D4-21",
+      "external_bracket_count": 0,
+      "internal_count": 30,
+      "external_bracket_cells": [],
+      "internal_sample": [
+        {
+          "cell": "I16",
+          "formula": "=(G16-H16)/H16"
+        },
+        {
+          "cell": "K16",
+          "formula": "=(G16-J16)/J16"
+        },
+        {
+          "cell": "I17",
+          "formula": "=(G17-H17)/H17"
+        },
+        {
+          "cell": "K17",
+          "formula": "=(G17-J17)/J17"
+        },
+        {
+          "cell": "I18",
+          "formula": "=(G18-H18)/H18"
+        },
+        {
+          "cell": "K18",
+          "formula": "=(G18-J18)/J18"
+        },
+        {
+          "cell": "I19",
+          "formula": "=(G19-H19)/H19"
+        },
+        {
+          "cell": "K19",
+          "formula": "=(G19-J19)/J19"
+        },
+        {
+          "cell": "I20",
+          "formula": "=(G20-H20)/H20"
+        },
+        {
+          "cell": "K20",
+          "formula": "=(G20-J20)/J20"
+        },
+        {
+          "cell": "I21",
+          "formula": "=(G21-H21)/H21"
+        },
+        {
+          "cell": "K21",
+          "formula": "=(G21-J21)/J21"
+        },
+        {
+          "cell": "I22",
+          "formula": "=(G22-H22)/H22"
+        },
+        {
+          "cell": "K22",
+          "formula": "=(G22-J22)/J22"
+        },
+        {
+          "cell": "I23",
+          "formula": "=(G23-H23)/H23"
+        },
+        {
+          "cell": "K23",
+          "formula": "=(G23-J23)/J23"
+        },
+        {
+          "cell": "I24",
+          "formula": "=(G24-H24)/H24"
+        },
+        {
+          "cell": "K24",
+          "formula": "=(G24-J24)/J24"
+        },
+        {
+          "cell": "I25",
+          "formula": "=(G25-H25)/H25"
+        },
+        {
+          "cell": "K25",
+          "formula": "=(G25-J25)/J25"
+        },
+        {
+          "cell": "I26",
+          "formula": "=(G26-H26)/H26"
+        },
+        {
+          "cell": "K26",
+          "formula": "=(G26-J26)/J26"
+        },
+        {
+          "cell": "I27",
+          "formula": "=(G27-H27)/H27"
+        },
+        {
+          "cell": "K27",
+          "formula": "=(G27-J27)/J27"
+        },
+        {
+          "cell": "I28",
+          "formula": "=(G28-H28)/H28"
+        },
+        {
+          "cell": "K28",
+          "formula": "=(G28-J28)/J28"
+        },
+        {
+          "cell": "I29",
+          "formula": "=(G29-H29)/H29"
+        },
+        {
+          "cell": "K29",
+          "formula": "=(G29-J29)/J29"
+        },
+        {
+          "cell": "I30",
+          "formula": "=(G30-H30)/H30"
+        },
+        {
+          "cell": "K30",
+          "formula": "=(G30-J30)/J30"
+        }
+      ],
+      "internal_truncated": false
+    },
+    {
+      "sheet": "底稿目录 (4)",
+      "external_bracket_count": 0,
+      "internal_count": 0,
+      "external_bracket_cells": [],
+      "internal_sample": [],
+      "internal_truncated": false
+    },
+    {
+      "sheet": "程序表D4-22A",
+      "external_bracket_count": 0,
+      "internal_count": 0,
+      "external_bracket_cells": [],
+      "internal_sample": [],
+      "internal_truncated": false
+    },
+    {
+      "sheet": "重要指标分析表D4-22",
+      "external_bracket_count": 0,
+      "internal_count": 0,
+      "external_bracket_cells": [],
+      "internal_sample": [],
+      "internal_truncated": false
+    },
+    {
+      "sheet": "收入与开具发票金额比较分析D4-23",
+      "external_bracket_count": 0,
+      "internal_count": 45,
+      "external_bracket_cells": [],
+      "internal_sample": [
+        {
+          "cell": "D12",
+          "formula": "=B12+C12"
+        },
+        {
+          "cell": "I12",
+          "formula": "=E12+G12"
+        },
+        {
+          "cell": "J12",
+          "formula": "=D12-I12"
+        },
+        {
+          "cell": "D13",
+          "formula": "=B13+C13"
+        },
+        {
+          "cell": "I13",
+          "formula": "=E13+G13"
+        },
+        {
+          "cell": "J13",
+          "formula": "=D13-I13"
+        },
+        {
+          "cell": "D14",
+          "formula": "=B14+C14"
+        },
+        {
+          "cell": "I14",
+          "formula": "=E14+G14"
+        },
+        {
+          "cell": "J14",
+          "formula": "=D14-I14"
+        },
+        {
+          "cell": "D15",
+          "formula": "=B15+C15"
+        },
+        {
+          "cell": "I15",
+          "formula": "=E15+G15"
+        },
+        {
+          "cell": "J15",
+          "formula": "=D15-I15"
+        },
+        {
+          "cell": "D16",
+          "formula": "=B16+C16"
+        },
+        {
+          "cell": "I16",
+          "formula": "=E16+G16"
+        },
+        {
+          "cell": "J16",
+          "formula": "=D16-I16"
+        },
+        {
+          "cell": "D17",
+          "formula": "=B17+C17"
+        },
+        {
+          "cell": "I17",
+          "formula": "=E17+G17"
+        },
+        {
+          "cell": "J17",
+          "formula": "=D17-I17"
+        },
+        {
+          "cell": "D18",
+          "formula": "=B18+C18"
+        },
+        {
+          "cell": "I18",
+          "formula": "=E18+G18"
+        },
+        {
+          "cell": "J18",
+          "formula": "=D18-I18"
+        },
+        {
+          "cell": "D19",
+          "formula": "=B19+C19"
+        },
+        {
+          "cell": "I19",
+          "formula": "=E19+G19"
+        },
+        {
+          "cell": "J19",
+          "formula": "=D19-I19"
+        },
+        {
+          "cell": "D20",
+          "formula": "=B20+C20"
+        },
+        {
+          "cell": "I20",
+          "formula": "=E20+G20"
+        },
+        {
+          "cell": "J20",
+          "formula": "=D20-I20"
+        },
+        {
+          "cell": "D21",
+          "formula": "=B21+C21"
+        },
+        {
+          "cell": "I21",
+          "formula": "=E21+G21"
+        },
+        {
+          "cell": "J21",
+          "formula": "=D21-I21"
+        }
+      ],
+      "internal_truncated": true
+    },
+    {
+      "sheet": "第三方回款检查D4-24",
+      "external_bracket_count": 0,
+      "internal_count": 0,
+      "external_bracket_cells": [],
+      "internal_sample": [],
+      "internal_truncated": false
+    },
+    {
+      "sheet": "经销商检查D4-25",
+      "external_bracket_count": 0,
+      "internal_count": 0,
+      "external_bracket_cells": [],
+      "internal_sample": [],
+      "internal_truncated": false
+    },
+    {
+      "sheet": "境外销售收入检查D4-26",
+      "external_bracket_count": 0,
+      "internal_count": 0,
+      "external_bracket_cells": [],
+      "internal_sample": [],
+      "internal_truncated": false
+    },
+    {
+      "sheet": "识别未披露的关联方D4-27",
+      "external_bracket_count": 0,
+      "internal_count": 2,
+      "external_bracket_cells": [],
+      "internal_sample": [
+        {
+          "cell": "M15",
+          "formula": "=SUM(C15:L15)"
+        },
+        {
+          "cell": "M16",
+          "formula": "=SUM(C16:L16)"
+        }
+      ],
+      "internal_truncated": false
+    },
+    {
+      "sheet": "客户信息核查清单D4-28",
+      "external_bracket_count": 0,
+      "internal_count": 0,
+      "external_bracket_cells": [],
+      "internal_sample": [],
+      "internal_truncated": false
+    },
+    {
+      "sheet": "客户信息检查表D4-29",
+      "external_bracket_count": 0,
+      "internal_count": 0,
+      "external_bracket_cells": [],
+      "internal_sample": [],
+      "internal_truncated": false
+    },
+    {
+      "sheet": "客户访谈记录汇总表D4-30",
+      "external_bracket_count": 0,
+      "internal_count": 0,
+      "external_bracket_cells": [],
+      "internal_sample": [],
+      "internal_truncated": false
+    },
+    {
+      "sheet": "客户访谈记录 D4-31",
+      "external_bracket_count": 0,
+      "internal_count": 0,
+      "external_bracket_cells": [],
+      "internal_sample": [],
+      "internal_truncated": false
+    },
+    {
+      "sheet": "访谈记录与核对示例",
+      "external_bracket_count": 0,
+      "internal_count": 0,
+      "external_bracket_cells": [],
+      "internal_sample": [],
+      "internal_truncated": false
+    },
+    {
+      "sheet": "客户、供应商等资金流水检查D4-32",
+      "external_bracket_count": 0,
+      "internal_count": 0,
+      "external_bracket_cells": [],
+      "internal_sample": [],
+      "internal_truncated": false
+    },
+    {
+      "sheet": "底稿目录 (5)",
+      "external_bracket_count": 0,
+      "internal_count": 0,
+      "external_bracket_cells": [],
+      "internal_sample": [],
+      "internal_truncated": false
+    },
+    {
+      "sheet": "其他业务毛利率分析表D4-33",
+      "external_bracket_count": 0,
+      "internal_count": 114,
+      "external_bracket_cells": [],
+      "internal_sample": [
+        {
+          "cell": "B12",
+          "formula": "=E12+H12+K12"
+        },
+        {
+          "cell": "C12",
+          "formula": "=F12+I12+L12"
+        },
+        {
+          "cell": "D12",
+          "formula": "=(B12-C12)/B12"
+        },
+        {
+          "cell": "G12",
+          "formula": "=(E12-F12)/E12"
+        },
+        {
+          "cell": "J12",
+          "formula": "=(H12-I12)/H12"
+        },
+        {
+          "cell": "M12",
+          "formula": "=(K12-L12)/K12"
+        },
+        {
+          "cell": "B13",
+          "formula": "=E13+H13+K13"
+        },
+        {
+          "cell": "C13",
+          "formula": "=F13+I13+L13"
+        },
+        {
+          "cell": "D13",
+          "formula": "=(B13-C13)/B13"
+        },
+        {
+          "cell": "G13",
+          "formula": "=(E13-F13)/E13"
+        },
+        {
+          "cell": "J13",
+          "formula": "=(H13-I13)/H13"
+        },
+        {
+          "cell": "M13",
+          "formula": "=(K13-L13)/K13"
+        },
+        {
+          "cell": "B14",
+          "formula": "=E14+H14+K14"
+        },
+        {
+          "cell": "C14",
+          "formula": "=F14+I14+L14"
+        },
+        {
+          "cell": "D14",
+          "formula": "=(B14-C14)/B14"
+        },
+        {
+          "cell": "G14",
+          "formula": "=(E14-F14)/E14"
+        },
+        {
+          "cell": "J14",
+          "formula": "=(H14-I14)/H14"
+        },
+        {
+          "cell": "M14",
+          "formula": "=(K14-L14)/K14"
+        },
+        {
+          "cell": "B15",
+          "formula": "=E15+H15+K15"
+        },
+        {
+          "cell": "C15",
+          "formula": "=F15+I15+L15"
+        },
+        {
+          "cell": "D15",
+          "formula": "=(B15-C15)/B15"
+        },
+        {
+          "cell": "G15",
+          "formula": "=(E15-F15)/E15"
+        },
+        {
+          "cell": "J15",
+          "formula": "=(H15-I15)/H15"
+        },
+        {
+          "cell": "M15",
+          "formula": "=(K15-L15)/K15"
+        },
+        {
+          "cell": "B16",
+          "formula": "=E16+H16+K16"
+        },
+        {
+          "cell": "C16",
+          "formula": "=F16+I16+L16"
+        },
+        {
+          "cell": "D16",
+          "formula": "=(B16-C16)/B16"
+        },
+        {
+          "cell": "G16",
+          "formula": "=(E16-F16)/E16"
+        },
+        {
+          "cell": "J16",
+          "formula": "=(H16-I16)/H16"
+        },
+        {
+          "cell": "M16",
+          "formula": "=(K16-L16)/K16"
+        }
+      ],
+      "internal_truncated": true
+    },
+    {
+      "sheet": "其他业务收入合同测算表D4-34",
+      "external_bracket_count": 0,
+      "internal_count": 10,
+      "external_bracket_cells": [],
+      "internal_sample": [
+        {
+          "cell": "J13",
+          "formula": "=H13-I13"
+        },
+        {
+          "cell": "J14",
+          "formula": "=H14-I14"
+        },
+        {
+          "cell": "J15",
+          "formula": "=H15-I15"
+        },
+        {
+          "cell": "J16",
+          "formula": "=H16-I16"
+        },
+        {
+          "cell": "J17",
+          "formula": "=H17-I17"
+        },
+        {
+          "cell": "J20",
+          "formula": "=H20-I20"
+        },
+        {
+          "cell": "J21",
+          "formula": "=H21-I21"
+        },
+        {
+          "cell": "J22",
+          "formula": "=H22-I22"
+        },
+        {
+          "cell": "J23",
+          "formula": "=H23-I23"
+        },
+        {
+          "cell": "J24",
+          "formula": "=H24-I24"
+        }
+      ],
+      "internal_truncated": false
+    },
+    {
+      "sheet": "其他业务收入检查表D4-35",
+      "external_bracket_count": 0,
+      "internal_count": 2,
+      "external_bracket_cells": [],
+      "internal_sample": [
+        {
+          "cell": "F26",
+          "formula": "=SUM(F15:F25)"
+        },
+        {
+          "cell": "F28",
+          "formula": "=F26/F27"
+        }
+      ],
+      "internal_truncated": false
+    },
+    {
+      "sheet": "其他业务收入截止性测试D4-36",
+      "external_bracket_count": 0,
+      "internal_count": 0,
+      "external_bracket_cells": [],
+      "internal_sample": [],
+      "internal_truncated": false
+    }
+  ],
+  "classification_rule": "openpyxl 展开后：formula text contains [n] => external_bracket (sanitize 删 <f> 保 <v>); else internal (含 shared SUM(B:M)，逐字节保留)。zip 级 shared 空引用继承 master 分类，不得按空 <f/> 误删。"
+}

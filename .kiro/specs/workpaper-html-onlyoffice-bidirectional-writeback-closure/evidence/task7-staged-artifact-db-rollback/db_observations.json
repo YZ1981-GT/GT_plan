@@ -1,0 +1,470 @@
+{
+  "meta": {
+    "schema": "tmp_task7_probe_2e922c226dc4",
+    "database": "audit_platform",
+    "server_version": "PostgreSQL 16.14 (Debian 16.14-1.pgdg12+1) on x86_64-pc-linux-gnu, compiled by gcc (Debian 12.2.0-14+deb12u1) 12.2.0, 64-bit",
+    "baseline": {
+      "resolver": [
+        {
+          "artifact_sha256": "5a5ae459a566df1a360eeeaf9791aa5d980aded47d43f273e91e1113a1cdef70",
+          "relative_path": "storage/0baed696-cd9e-4eea-9faa-d7a6cab48ab6/workpapers/.versions/500916fb-ae4e-4352-876d-b8d618006c95/representations/A31.sheet1/000000001-5a5ae459a566.xlsx",
+          "artifact_state": "published",
+          "generation": 1,
+          "revision": 1
+        }
+      ],
+      "counts": {
+        "working_paper_artifact": 1,
+        "working_paper_content_version": 1,
+        "working_paper_content_representation": 1,
+        "working_paper_sync_entry_state": 1,
+        "working_paper_artifact_gc_audit": 0
+      },
+      "old_artifact_sha256": "5a5ae459a566df1a360eeeaf9791aa5d980aded47d43f273e91e1113a1cdef70",
+      "old_artifact_exists_on_disk": true
+    },
+    "sql_log_total": 134
+  },
+  "cases": {
+    "db1": {
+      "case_id": "db1",
+      "title": "scratch schema 建 artifact/version/representation/entry_state/gc_audit 等价结构",
+      "status": "ok",
+      "started_at": "2026-08-24T16:35:54.745015+00:00",
+      "finished_at": "2026-08-24T16:35:54.745015+00:00",
+      "schema": "tmp_task7_probe_2e922c226dc4",
+      "schema_is_scratch": true,
+      "tables": [
+        "working_paper_artifact",
+        "working_paper_content_version",
+        "working_paper_content_representation",
+        "working_paper_sync_entry_state",
+        "working_paper_artifact_gc_audit"
+      ],
+      "trigger": "trg_wpcr_artifact_published",
+      "business_tables_touched": [],
+      "db_phase_wp_id": "500916fb-ae4e-4352-876d-b8d618006c95",
+      "db_phase_project_id": "0baed696-cd9e-4eea-9faa-d7a6cab48ab6"
+    },
+    "db2": {
+      "case_id": "db2",
+      "title": "publish 到磁盘后 DB rollback：pointer/revision/representation 不变、文件仍在",
+      "status": "ok",
+      "started_at": "2026-08-24T16:35:54.943127+00:00",
+      "finished_at": "2026-08-24T16:35:54.943127+00:00",
+      "cases": {
+        "injected_exception": {
+          "failure": {
+            "failure_kind": "python_exception",
+            "exc_type": "_InjectedFailure",
+            "message": "outbox enqueue failed after pointer update"
+          },
+          "published_file_sha256": "4d039f1415027a19d625b22486e5c5d74f78b9a65382156a2ca96b1f648adf27",
+          "published_file_relative_path": "storage/0baed696-cd9e-4eea-9faa-d7a6cab48ab6/workpapers/.versions/500916fb-ae4e-4352-876d-b8d618006c95/representations/A31.sheet1/000000002-4d039f141502.xlsx",
+          "file_survived_db_rollback": true,
+          "file_sha_on_disk_after_rollback": "4d039f1415027a19d625b22486e5c5d74f78b9a65382156a2ca96b1f648adf27",
+          "artifact_rows_for_new_sha": 0,
+          "pointer_generation": 1,
+          "pointer_representation_is_old": true,
+          "resolver_rows": [
+            {
+              "artifact_sha256": "5a5ae459a566df1a360eeeaf9791aa5d980aded47d43f273e91e1113a1cdef70",
+              "relative_path": "storage/0baed696-cd9e-4eea-9faa-d7a6cab48ab6/workpapers/.versions/500916fb-ae4e-4352-876d-b8d618006c95/representations/A31.sheet1/000000001-5a5ae459a566.xlsx",
+              "artifact_state": "published",
+              "generation": 1,
+              "revision": 1
+            }
+          ],
+          "resolver_returns_old_artifact_only": true,
+          "counts_after": {
+            "working_paper_artifact": 1,
+            "working_paper_content_version": 1,
+            "working_paper_content_representation": 1,
+            "working_paper_sync_entry_state": 1,
+            "working_paper_artifact_gc_audit": 0
+          },
+          "counts_equal_baseline": true
+        },
+        "constraint_violation": {
+          "failure": {
+            "failure_kind": "db_constraint",
+            "exc_type": "IntegrityError",
+            "pgcode": "23505",
+            "message": "(sqlalchemy.dialects.postgresql.asyncpg.IntegrityError) <class 'asyncpg.exceptions.UniqueViolationError'>: duplicate key value violates unique constraint \"uq_wpcv_revision\"\nDETAIL:  Key (wp_id, revision)=(500916fb-ae4e-4352-876d-b8d618006c95, 2) already exists.\n[SQL: INSERT INTO tmp_task7_probe_2e92"
+          },
+          "published_file_sha256": "25df2a8091433a0c7821387061736f664aaa48ebe45302391f99a4e5f47a6c70",
+          "published_file_relative_path": "storage/0baed696-cd9e-4eea-9faa-d7a6cab48ab6/workpapers/.versions/500916fb-ae4e-4352-876d-b8d618006c95/representations/A31.sheet1/000000002-25df2a809143.xlsx",
+          "file_survived_db_rollback": true,
+          "file_sha_on_disk_after_rollback": "25df2a8091433a0c7821387061736f664aaa48ebe45302391f99a4e5f47a6c70",
+          "artifact_rows_for_new_sha": 0,
+          "pointer_generation": 1,
+          "pointer_representation_is_old": true,
+          "resolver_rows": [
+            {
+              "artifact_sha256": "5a5ae459a566df1a360eeeaf9791aa5d980aded47d43f273e91e1113a1cdef70",
+              "relative_path": "storage/0baed696-cd9e-4eea-9faa-d7a6cab48ab6/workpapers/.versions/500916fb-ae4e-4352-876d-b8d618006c95/representations/A31.sheet1/000000001-5a5ae459a566.xlsx",
+              "artifact_state": "published",
+              "generation": 1,
+              "revision": 1
+            }
+          ],
+          "resolver_returns_old_artifact_only": true,
+          "counts_after": {
+            "working_paper_artifact": 1,
+            "working_paper_content_version": 1,
+            "working_paper_content_representation": 1,
+            "working_paper_sync_entry_state": 1,
+            "working_paper_artifact_gc_audit": 0
+          },
+          "counts_equal_baseline": true
+        }
+      },
+      "all_cases_pointer_unchanged": true,
+      "all_cases_file_survived": true,
+      "all_cases_invisible_to_resolver": true,
+      "filesystem_participates_in_db_transaction": false,
+      "conclusion": "DB ROLLBACK 不回滚已 publish 的文件 ⇒ 文件系统与 PostgreSQL 不是同一事务；失败只留下不可见 orphan"
+    },
+    "db3": {
+      "case_id": "db3",
+      "title": "representation 不得引用 candidate / incoming / orphan artifact（trigger 实测）",
+      "status": "ok",
+      "started_at": "2026-08-24T16:35:55.020291+00:00",
+      "finished_at": "2026-08-24T16:35:55.020291+00:00",
+      "cases": {
+        "upgrade_candidate": {
+          "artifact_kind": "upgrade_candidate",
+          "artifact_state": "candidate",
+          "rejected": true,
+          "exc_type": "IntegrityError",
+          "pgcode": "23514",
+          "message": "(sqlalchemy.dialects.postgresql.asyncpg.IntegrityError) <class 'asyncpg.exceptions.CheckViolationError'>: representation must reference a published canonical artifact (kind=upgrade_candidate, state=candidate)\n[SQL: INSERT INTO tmp_task7_pro"
+        },
+        "incoming_durable": {
+          "artifact_kind": "incoming",
+          "artifact_state": "durable",
+          "rejected": true,
+          "exc_type": "IntegrityError",
+          "pgcode": "23514",
+          "message": "(sqlalchemy.dialects.postgresql.asyncpg.IntegrityError) <class 'asyncpg.exceptions.CheckViolationError'>: representation must reference a published canonical artifact (kind=incoming, state=durable)\n[SQL: INSERT INTO tmp_task7_probe_2e922c22"
+        },
+        "canonical_orphan": {
+          "artifact_kind": "canonical",
+          "artifact_state": "orphan",
+          "rejected": true,
+          "exc_type": "IntegrityError",
+          "pgcode": "23514",
+          "message": "(sqlalchemy.dialects.postgresql.asyncpg.IntegrityError) <class 'asyncpg.exceptions.CheckViolationError'>: representation must reference a published canonical artifact (kind=canonical, state=orphan)\n[SQL: INSERT INTO tmp_task7_probe_2e922c22"
+        }
+      },
+      "all_rejected": true,
+      "candidate_never_resolvable": true,
+      "incoming_never_published_or_current": true
+    },
+    "db4": {
+      "case_id": "db4",
+      "title": "reconciliation 标 orphan（磁盘无 DB row / DB row 无引用两种形态）",
+      "status": "ok",
+      "started_at": "2026-08-24T16:35:55.124756+00:00",
+      "finished_at": "2026-08-24T16:35:55.124756+00:00",
+      "reconciliation": {
+        "disk_files": 4,
+        "referenced_sha_count": 1,
+        "registered_new_orphans": [
+          "25df2a8091433a0c7821387061736f664aaa48ebe45302391f99a4e5f47a6c70",
+          "4d039f1415027a19d625b22486e5c5d74f78b9a65382156a2ca96b1f648adf27"
+        ],
+        "marked_existing_as_orphan": [
+          "97adbcd75eee7c279b84dfa1b20b74c834d9ec230e6477bbee7ade9d966dc07a"
+        ]
+      },
+      "orphan_rows": [
+        {
+          "sha256": "25df2a8091433a0c7821387061736f664aaa48ebe45302391f99a4e5f47a6c70",
+          "state": "orphan",
+          "relative_path": "storage/0baed696-cd9e-4eea-9faa-d7a6cab48ab6/workpapers/.versions/500916fb-ae4e-4352-876d-b8d618006c95/representations/A31.sheet1/000000002-25df2a809143.xlsx",
+          "orphaned_at_present": true
+        },
+        {
+          "sha256": "4d039f1415027a19d625b22486e5c5d74f78b9a65382156a2ca96b1f648adf27",
+          "state": "orphan",
+          "relative_path": "storage/0baed696-cd9e-4eea-9faa-d7a6cab48ab6/workpapers/.versions/500916fb-ae4e-4352-876d-b8d618006c95/representations/A31.sheet1/000000002-4d039f141502.xlsx",
+          "orphaned_at_present": true
+        },
+        {
+          "sha256": "97adbcd75eee7c279b84dfa1b20b74c834d9ec230e6477bbee7ade9d966dc07a",
+          "state": "orphan",
+          "relative_path": "storage/0baed696-cd9e-4eea-9faa-d7a6cab48ab6/workpapers/.versions/500916fb-ae4e-4352-876d-b8d618006c95/representations/A31.sheet1/000000003-97adbcd75eee.xlsx",
+          "orphaned_at_present": true
+        }
+      ],
+      "orphan_count": 3,
+      "precommitted_row_marked_orphan": true,
+      "unregistered_disk_file_registered_as_orphan": true,
+      "resolver_after_reconcile": [
+        {
+          "artifact_sha256": "5a5ae459a566df1a360eeeaf9791aa5d980aded47d43f273e91e1113a1cdef70",
+          "relative_path": "storage/0baed696-cd9e-4eea-9faa-d7a6cab48ab6/workpapers/.versions/500916fb-ae4e-4352-876d-b8d618006c95/representations/A31.sheet1/000000001-5a5ae459a566.xlsx",
+          "artifact_state": "published",
+          "generation": 1,
+          "revision": 1
+        }
+      ],
+      "resolver_still_only_old_artifact": true
+    },
+    "db5": {
+      "case_id": "db5",
+      "title": "RetentionPolicy/GC：grace 前 retain、grace 后二次确认无引用才删、引用重现/legal hold 保留",
+      "status": "ok",
+      "started_at": "2026-08-24T16:35:55.295307+00:00",
+      "finished_at": "2026-08-24T16:35:55.295307+00:00",
+      "policy": {
+        "policy_version": "workpaper-sync-retention:v1",
+        "classes": {
+          "canonical_orphan": {
+            "grace_seconds": 86400,
+            "legal_hold": false
+          },
+          "upgrade_candidate": {
+            "grace_seconds": 43200,
+            "legal_hold": false
+          },
+          "incoming": {
+            "grace_seconds": 604800,
+            "legal_hold": false
+          },
+          "legal_hold_canonical": {
+            "grace_seconds": 86400,
+            "legal_hold": true
+          }
+        }
+      },
+      "dry_run_before_grace": [
+        {
+          "sha256": "25df2a8091433a0c7821387061736f664aaa48ebe45302391f99a4e5f47a6c70",
+          "retention_class": "canonical_orphan",
+          "decision": "retain",
+          "reason": "grace_not_elapsed",
+          "dry_run": true,
+          "file_removed": null,
+          "relative_path": "storage/0baed696-cd9e-4eea-9faa-d7a6cab48ab6/workpapers/.versions/500916fb-ae4e-4352-876d-b8d618006c95/representations/A31.sheet1/000000002-25df2a809143.xlsx"
+        },
+        {
+          "sha256": "4d039f1415027a19d625b22486e5c5d74f78b9a65382156a2ca96b1f648adf27",
+          "retention_class": "canonical_orphan",
+          "decision": "retain",
+          "reason": "grace_not_elapsed",
+          "dry_run": true,
+          "file_removed": null,
+          "relative_path": "storage/0baed696-cd9e-4eea-9faa-d7a6cab48ab6/workpapers/.versions/500916fb-ae4e-4352-876d-b8d618006c95/representations/A31.sheet1/000000002-4d039f141502.xlsx"
+        },
+        {
+          "sha256": "97adbcd75eee7c279b84dfa1b20b74c834d9ec230e6477bbee7ade9d966dc07a",
+          "retention_class": "canonical_orphan",
+          "decision": "retain",
+          "reason": "grace_not_elapsed",
+          "dry_run": true,
+          "file_removed": null,
+          "relative_path": "storage/0baed696-cd9e-4eea-9faa-d7a6cab48ab6/workpapers/.versions/500916fb-ae4e-4352-876d-b8d618006c95/representations/A31.sheet1/000000003-97adbcd75eee.xlsx"
+        }
+      ],
+      "dry_run_before_grace_all_retained": true,
+      "dry_run_before_grace_reason_set": [
+        "grace_not_elapsed"
+      ],
+      "files_present_after_dry_run_before_grace": {
+        "25df2a8091433a0c7821387061736f664aaa48ebe45302391f99a4e5f47a6c70": true,
+        "4d039f1415027a19d625b22486e5c5d74f78b9a65382156a2ca96b1f648adf27": true,
+        "97adbcd75eee7c279b84dfa1b20b74c834d9ec230e6477bbee7ade9d966dc07a": true
+      },
+      "dry_run_after_grace": [
+        {
+          "sha256": "25df2a8091433a0c7821387061736f664aaa48ebe45302391f99a4e5f47a6c70",
+          "retention_class": "canonical_orphan",
+          "decision": "delete",
+          "reason": "grace_elapsed_and_unreferenced",
+          "dry_run": true,
+          "file_removed": null,
+          "relative_path": "storage/0baed696-cd9e-4eea-9faa-d7a6cab48ab6/workpapers/.versions/500916fb-ae4e-4352-876d-b8d618006c95/representations/A31.sheet1/000000002-25df2a809143.xlsx"
+        },
+        {
+          "sha256": "4d039f1415027a19d625b22486e5c5d74f78b9a65382156a2ca96b1f648adf27",
+          "retention_class": "canonical_orphan",
+          "decision": "delete",
+          "reason": "grace_elapsed_and_unreferenced",
+          "dry_run": true,
+          "file_removed": null,
+          "relative_path": "storage/0baed696-cd9e-4eea-9faa-d7a6cab48ab6/workpapers/.versions/500916fb-ae4e-4352-876d-b8d618006c95/representations/A31.sheet1/000000002-4d039f141502.xlsx"
+        },
+        {
+          "sha256": "54b979f66b384534db4c91002c753d58c9695cca4c4572d79d46f8bef1e6bb7e",
+          "retention_class": "canonical_orphan",
+          "decision": "retain",
+          "reason": "reference_found_on_recheck",
+          "dry_run": true,
+          "file_removed": null,
+          "relative_path": "storage/0baed696-cd9e-4eea-9faa-d7a6cab48ab6/workpapers/.versions/500916fb-ae4e-4352-876d-b8d618006c95/representations/A31.sheet1/000000005-54b979f66b38.xlsx"
+        },
+        {
+          "sha256": "78bcd09faa911fcfbf2aa39f558d713d89fab3a181d7209fa4e19399e59a7e87",
+          "retention_class": "legal_hold_canonical",
+          "decision": "retain",
+          "reason": "legal_hold",
+          "dry_run": true,
+          "file_removed": null,
+          "relative_path": "storage/0baed696-cd9e-4eea-9faa-d7a6cab48ab6/workpapers/.versions/500916fb-ae4e-4352-876d-b8d618006c95/representations/A31.sheet1/000000004-78bcd09faa91.xlsx"
+        },
+        {
+          "sha256": "97adbcd75eee7c279b84dfa1b20b74c834d9ec230e6477bbee7ade9d966dc07a",
+          "retention_class": "canonical_orphan",
+          "decision": "delete",
+          "reason": "grace_elapsed_and_unreferenced",
+          "dry_run": true,
+          "file_removed": null,
+          "relative_path": "storage/0baed696-cd9e-4eea-9faa-d7a6cab48ab6/workpapers/.versions/500916fb-ae4e-4352-876d-b8d618006c95/representations/A31.sheet1/000000003-97adbcd75eee.xlsx"
+        }
+      ],
+      "files_present_after_dry_run_after_grace": {
+        "25df2a8091433a0c7821387061736f664aaa48ebe45302391f99a4e5f47a6c70": true,
+        "4d039f1415027a19d625b22486e5c5d74f78b9a65382156a2ca96b1f648adf27": true,
+        "54b979f66b384534db4c91002c753d58c9695cca4c4572d79d46f8bef1e6bb7e": true,
+        "78bcd09faa911fcfbf2aa39f558d713d89fab3a181d7209fa4e19399e59a7e87": true,
+        "97adbcd75eee7c279b84dfa1b20b74c834d9ec230e6477bbee7ade9d966dc07a": true
+      },
+      "dry_run_never_deletes": true,
+      "applied": [
+        {
+          "sha256": "25df2a8091433a0c7821387061736f664aaa48ebe45302391f99a4e5f47a6c70",
+          "retention_class": "canonical_orphan",
+          "decision": "delete",
+          "reason": "grace_elapsed_and_unreferenced",
+          "dry_run": false,
+          "file_removed": true,
+          "relative_path": "storage/0baed696-cd9e-4eea-9faa-d7a6cab48ab6/workpapers/.versions/500916fb-ae4e-4352-876d-b8d618006c95/representations/A31.sheet1/000000002-25df2a809143.xlsx"
+        },
+        {
+          "sha256": "4d039f1415027a19d625b22486e5c5d74f78b9a65382156a2ca96b1f648adf27",
+          "retention_class": "canonical_orphan",
+          "decision": "delete",
+          "reason": "grace_elapsed_and_unreferenced",
+          "dry_run": false,
+          "file_removed": true,
+          "relative_path": "storage/0baed696-cd9e-4eea-9faa-d7a6cab48ab6/workpapers/.versions/500916fb-ae4e-4352-876d-b8d618006c95/representations/A31.sheet1/000000002-4d039f141502.xlsx"
+        },
+        {
+          "sha256": "54b979f66b384534db4c91002c753d58c9695cca4c4572d79d46f8bef1e6bb7e",
+          "retention_class": "canonical_orphan",
+          "decision": "retain",
+          "reason": "reference_found_on_recheck",
+          "dry_run": false,
+          "file_removed": null,
+          "relative_path": "storage/0baed696-cd9e-4eea-9faa-d7a6cab48ab6/workpapers/.versions/500916fb-ae4e-4352-876d-b8d618006c95/representations/A31.sheet1/000000005-54b979f66b38.xlsx"
+        },
+        {
+          "sha256": "78bcd09faa911fcfbf2aa39f558d713d89fab3a181d7209fa4e19399e59a7e87",
+          "retention_class": "legal_hold_canonical",
+          "decision": "retain",
+          "reason": "legal_hold",
+          "dry_run": false,
+          "file_removed": null,
+          "relative_path": "storage/0baed696-cd9e-4eea-9faa-d7a6cab48ab6/workpapers/.versions/500916fb-ae4e-4352-876d-b8d618006c95/representations/A31.sheet1/000000004-78bcd09faa91.xlsx"
+        },
+        {
+          "sha256": "97adbcd75eee7c279b84dfa1b20b74c834d9ec230e6477bbee7ade9d966dc07a",
+          "retention_class": "canonical_orphan",
+          "decision": "delete",
+          "reason": "grace_elapsed_and_unreferenced",
+          "dry_run": false,
+          "file_removed": true,
+          "relative_path": "storage/0baed696-cd9e-4eea-9faa-d7a6cab48ab6/workpapers/.versions/500916fb-ae4e-4352-876d-b8d618006c95/representations/A31.sheet1/000000003-97adbcd75eee.xlsx"
+        }
+      ],
+      "files_present_after_apply": {
+        "25df2a8091433a0c7821387061736f664aaa48ebe45302391f99a4e5f47a6c70": false,
+        "4d039f1415027a19d625b22486e5c5d74f78b9a65382156a2ca96b1f648adf27": false,
+        "54b979f66b384534db4c91002c753d58c9695cca4c4572d79d46f8bef1e6bb7e": true,
+        "78bcd09faa911fcfbf2aa39f558d713d89fab3a181d7209fa4e19399e59a7e87": true,
+        "97adbcd75eee7c279b84dfa1b20b74c834d9ec230e6477bbee7ade9d966dc07a": false
+      },
+      "legal_hold_sha256": "78bcd09faa911fcfbf2aa39f558d713d89fab3a181d7209fa4e19399e59a7e87",
+      "legal_hold_retained": true,
+      "legal_hold_file_present": true,
+      "reappearing_sha256": "54b979f66b384534db4c91002c753d58c9695cca4c4572d79d46f8bef1e6bb7e",
+      "reappearing_retained_on_recheck": true,
+      "reappearing_file_present": true,
+      "deleted_sha256": [
+        "25df2a8091433a0c7821387061736f664aaa48ebe45302391f99a4e5f47a6c70",
+        "4d039f1415027a19d625b22486e5c5d74f78b9a65382156a2ca96b1f648adf27",
+        "97adbcd75eee7c279b84dfa1b20b74c834d9ec230e6477bbee7ade9d966dc07a"
+      ],
+      "deleted_files_gone": true,
+      "audit_rows": [
+        {
+          "dry_run": false,
+          "decision": "delete",
+          "reason": "grace_elapsed_and_unreferenced",
+          "n": 3
+        },
+        {
+          "dry_run": false,
+          "decision": "retain",
+          "reason": "legal_hold",
+          "n": 1
+        },
+        {
+          "dry_run": false,
+          "decision": "retain",
+          "reason": "reference_found_on_recheck",
+          "n": 1
+        },
+        {
+          "dry_run": true,
+          "decision": "delete",
+          "reason": "grace_elapsed_and_unreferenced",
+          "n": 3
+        },
+        {
+          "dry_run": true,
+          "decision": "retain",
+          "reason": "grace_not_elapsed",
+          "n": 3
+        },
+        {
+          "dry_run": true,
+          "decision": "retain",
+          "reason": "legal_hold",
+          "n": 1
+        },
+        {
+          "dry_run": true,
+          "decision": "retain",
+          "reason": "reference_found_on_recheck",
+          "n": 1
+        }
+      ],
+      "resolver_after_gc": [
+        {
+          "artifact_sha256": "5a5ae459a566df1a360eeeaf9791aa5d980aded47d43f273e91e1113a1cdef70",
+          "relative_path": "storage/0baed696-cd9e-4eea-9faa-d7a6cab48ab6/workpapers/.versions/500916fb-ae4e-4352-876d-b8d618006c95/representations/A31.sheet1/000000001-5a5ae459a566.xlsx",
+          "artifact_state": "published",
+          "generation": 1,
+          "revision": 1
+        }
+      ],
+      "resolver_unaffected_by_gc": true
+    },
+    "db6": {
+      "case_id": "db6",
+      "title": "DB commit 不会创造文件：pointer 指向缺失 artifact 在物理上可能 ⇒ 必须 publish-then-commit",
+      "status": "ok",
+      "started_at": "2026-08-24T16:35:55.351894+00:00",
+      "finished_at": "2026-08-24T16:35:55.351894+00:00",
+      "committed_relative_path": "storage/0baed696-cd9e-4eea-9faa-d7a6cab48ab6/workpapers/.versions/141bb38d-c027-4268-9abe-756773eea76a/representations/A31.sheet1/000000001-deadbeefdead.xlsx",
+      "file_exists_on_disk": false,
+      "resolver_returns_row": 1,
+      "resolver_row_path_missing_on_disk": true,
+      "half_success_state_is_physically_possible": true,
+      "protocol_consequence": "artifact 必须先 durable/publish 且校验通过，DB 短事务才可发布 pointer；顺序反了就会产生 pointer 指向缺失 artifact 的半成功态"
+    }
+  }
+}

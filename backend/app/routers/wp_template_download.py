@@ -97,6 +97,312 @@ async def download_template_by_code(
     )
 
 
+@router.get("/{wp_code}/prefilled-download")
+async def download_template_prefilled(
+    project_id: str,
+    wp_code: str,
+    include_responses: bool = False,
+    include_guidance: bool = False,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_project_access("readonly")),
+):
+    """下载预填充后的 docx 模板（替换公司名/年度/事务所等占位符）
+
+    占位符格式（中文模板常见）：
+    - ××公司 / ABC公司 / XX公司 → 替换为 client_name
+    - 202X年 / 201X年 → 替换为审计年度
+    - XX、XX（两名签字注册会计师）→ 保留不替换（需手动填写）
+    """
+    import shutil
+    import tempfile
+    from uuid import UUID
+
+    # 1. 找到模板文件
+    all_files = find_all_template_files(wp_code)
+    if not all_files:
+        single = find_template_file_any(wp_code)
+        if single:
+            all_files = [single]
+    docx_files = [f for f in (all_files or []) if f.suffix.lower() == '.docx']
+    if not docx_files:
+        raise HTTPException(status_code=404, detail=f"docx 模板不存在: {wp_code}")
+
+    template_path = docx_files[0]
+
+    # 2. 获取项目信息
+    from app.models.core import Project
+    import sqlalchemy as sa
+    proj = (await db.execute(
+        sa.select(Project).where(Project.id == UUID(project_id))
+    )).scalar_one_or_none()
+
+    client_name = (proj.client_name if proj else "") or "XX公司"
+    audit_year = ""
+    if proj and proj.audit_period_end:
+        audit_year = str(proj.audit_period_end.year)
+    else:
+        audit_year = "202X"
+
+    # 3. 复制到临时文件并替换占位符
+    try:
+        from docx import Document
+    except ImportError:
+        # python-docx 不可用，直接返回原始文件
+        from urllib.parse import quote
+        filename = template_path.name
+        utf8_name = quote(filename, safe="")
+        return FileResponse(
+            str(template_path),
+            media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            headers={"Content-Disposition": f'attachment; filename*=UTF-8\'\'{utf8_name}'},
+        )
+
+    tmp_dir = tempfile.mkdtemp(prefix="wp_prefill_")
+    tmp_path = Path(tmp_dir) / template_path.name
+    shutil.copy2(template_path, tmp_path)
+
+    doc = Document(str(tmp_path))
+
+    # A18-1：替换抬头 + 注入 A17 小结（plus / E18）
+    if wp_code.upper() == "A18-1":
+        from app.services.a18_summary_generator import enrich_a18_1_document
+
+        await enrich_a18_1_document(
+            doc,
+            db,
+            UUID(project_id),
+            client_name,
+            audit_year,
+        )
+        doc.save(str(tmp_path))
+        from urllib.parse import quote
+        filename = template_path.name
+        utf8_name = quote(filename, safe="")
+        return FileResponse(
+            str(tmp_path),
+            media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            headers={"Content-Disposition": f'attachment; filename*=UTF-8\'\'{utf8_name}'},
+            background=None,
+        )
+
+    # 占位符替换映射
+    replacements = {
+        "××公司": client_name,
+        "ABC公司": client_name,
+        "XX公司": client_name,
+        "202X": audit_year,
+        "201X": str(int(audit_year) - 1) if audit_year.isdigit() else "201X",
+    }
+
+    # B3-1 独立性声明书：预填项目组成员名单
+    if wp_code.upper() == "B3-1":
+        try:
+            member_rows = (
+                await db.execute(
+                    text(
+                        # project_assignments 的角色列真名是 `role`（无 role_type）
+                        "SELECT sm.name FROM staff_members sm "
+                        "JOIN project_assignments pa ON pa.staff_id = sm.id "
+                        "WHERE pa.project_id = :pid ORDER BY pa.role, sm.name"
+                    ),
+                    {"pid": project_id},
+                )
+            ).scalars().all()
+            team_names = "、".join(member_rows) if member_rows else ""
+            if team_names:
+                replacements["{{团队成员名单}}"] = team_names
+        except Exception as exc:
+            logger.warning("B3-1 prefill team members failed: %s", exc)
+
+    replaced = False
+    for para in doc.paragraphs:
+        for key, val in replacements.items():
+            if key in para.text:
+                for run in para.runs:
+                    if key in run.text:
+                        run.text = run.text.replace(key, val)
+                        replaced = True
+
+    for table in doc.tables:
+        for row in table.rows:
+            for cell in row.cells:
+                for para in cell.paragraphs:
+                    for key, val in replacements.items():
+                        if key in para.text:
+                            for run in para.runs:
+                                if key in run.text:
+                                    run.text = run.text.replace(key, val)
+                                    replaced = True
+
+    if replaced:
+        doc.save(str(tmp_path))
+
+    # ─── include_responses: 合并 checklist_responses 占位符值 ─────────────
+    if include_responses:
+        from app.services.wp_docx_template_parser import parse_template, _NEW_PLACEHOLDER_RE
+
+        prefix = f"wt-{wp_code}-"
+        try:
+            result = await db.execute(
+                text(
+                    "SELECT item_id, conclusion, remark "
+                    "FROM checklist_responses "
+                    "WHERE project_id = :pid AND item_id LIKE :prefix"
+                ),
+                {"pid": project_id, "prefix": f"{prefix}%"},
+            )
+            response_map: dict[str, str] = {}
+            for row in result.fetchall():
+                field_id = row.item_id[len(prefix):]
+                value = row.conclusion or row.remark or ""
+                if value:
+                    response_map[field_id] = value
+        except Exception as exc:
+            logger.warning("prefilled-download: checklist_responses 查询失败: %s", exc)
+            response_map = {}
+
+        if response_map:
+            # 解析模板获取占位符→field_id 映射
+            structure = parse_template(str(tmp_path))
+            # 构建 pattern→value 替换映射
+            pattern_to_value: dict[str, str] = {}
+            for placeholder in structure.placeholders:
+                if placeholder.field_id in response_map:
+                    pattern_to_value[placeholder.pattern] = response_map[placeholder.field_id]
+
+            if pattern_to_value:
+                # 重新加载文档（可能已被上面的 basic replacements 修改过）
+                doc = Document(str(tmp_path))
+                responses_replaced = False
+
+                # 替换段落中的占位符（保留 run 格式）
+                for para in doc.paragraphs:
+                    for pattern, value in pattern_to_value.items():
+                        if pattern in para.text:
+                            for run in para.runs:
+                                if pattern in run.text:
+                                    run.text = run.text.replace(pattern, value)
+                                    responses_replaced = True
+
+                # 替换表格中的占位符（保留 run 格式）
+                for table in doc.tables:
+                    for row in table.rows:
+                        for cell in row.cells:
+                            for para in cell.paragraphs:
+                                for pattern, value in pattern_to_value.items():
+                                    if pattern in para.text:
+                                        for run in para.runs:
+                                            if pattern in run.text:
+                                                run.text = run.text.replace(pattern, value)
+                                                responses_replaced = True
+
+                if responses_replaced:
+                    doc.save(str(tmp_path))
+
+    # ─── include_guidance: 注入蓝色斜体说明注释 ──────────────────────────
+    if include_guidance:
+        from docx import Document as _DocDocument
+        from docx.shared import Pt, RGBColor
+
+        from app.services.wp_docx_template_parser import parse_template as _parse_tpl
+
+        # 加载 guidance JSON（如有）
+        guidance_path = DATA_DIR / "wp_guidance" / f"{wp_code}.json"
+        guidance_data: dict = {}
+        if guidance_path.exists():
+            try:
+                with open(guidance_path, "r", encoding="utf-8") as gf:
+                    guidance_data = json.load(gf)
+            except (OSError, json.JSONDecodeError) as exc:
+                logger.warning("include_guidance: 加载 guidance 失败 %s: %s", wp_code, exc)
+
+        # 解析当前文档获取占位符
+        structure = _parse_tpl(str(tmp_path))
+
+        # 构建 field_id→annotation 文本映射
+        guidance_annotations: dict[str, str] = {}
+        for placeholder in structure.placeholders:
+            # 默认使用 label + data_type
+            annotation = f"【说明: {placeholder.label}"
+            if placeholder.data_type == "date":
+                annotation += "，格式: YYYY年MM月DD日"
+            elif placeholder.data_type == "number":
+                annotation += "，填写数字"
+            annotation += "】"
+            guidance_annotations[placeholder.pattern] = annotation
+
+        # 如有 guidance JSON，在注解末尾追加章节摘要供参考
+        if guidance_data and guidance_data.get("sections"):
+            # 尝试为每个占位符提供更详尽的说明（整体注释已足够）
+            pass  # 字段级 guidance 暂用 label+data_type；sections 作为文档末尾整体提示
+
+        # 注入注释到 docx
+        doc = _DocDocument(str(tmp_path))
+        guidance_injected = False
+
+        def _inject_guidance_in_paragraph(para, annotations_map: dict[str, str]) -> bool:
+            """在段落中找到占位符后追加蓝色斜体注释 run."""
+            injected = False
+            for pattern, annotation_text in annotations_map.items():
+                if pattern in para.text:
+                    # 在段落末尾追加注释 run
+                    run = para.add_run(f" {annotation_text}")
+                    run.font.italic = True
+                    run.font.color.rgb = RGBColor(0x00, 0x70, 0xC0)
+                    run.font.size = Pt(9)
+                    injected = True
+            return injected
+
+        for para in doc.paragraphs:
+            if _inject_guidance_in_paragraph(para, guidance_annotations):
+                guidance_injected = True
+
+        for table in doc.tables:
+            for row in table.rows:
+                for cell in row.cells:
+                    for para in cell.paragraphs:
+                        if _inject_guidance_in_paragraph(para, guidance_annotations):
+                            guidance_injected = True
+
+        # 如有 guidance JSON sections，在文档末尾附加编制指引概要
+        if guidance_data and guidance_data.get("sections"):
+            doc.add_paragraph()  # 空行分隔
+            heading_run = doc.add_paragraph().add_run("── 模板编制指引 ──")
+            heading_run.font.italic = True
+            heading_run.font.color.rgb = RGBColor(0x00, 0x70, 0xC0)
+            heading_run.font.size = Pt(10)
+            for section in guidance_data["sections"]:
+                sec_title = section.get("title") or section.get("heading") or ""
+                sec_content = section.get("content") or ""
+                if sec_title:
+                    title_para = doc.add_paragraph()
+                    title_run = title_para.add_run(sec_title)
+                    title_run.font.bold = True
+                    title_run.font.italic = True
+                    title_run.font.color.rgb = RGBColor(0x00, 0x70, 0xC0)
+                    title_run.font.size = Pt(9)
+                if sec_content:
+                    content_para = doc.add_paragraph()
+                    content_run = content_para.add_run(sec_content)
+                    content_run.font.italic = True
+                    content_run.font.color.rgb = RGBColor(0x00, 0x70, 0xC0)
+                    content_run.font.size = Pt(9)
+            guidance_injected = True
+
+        if guidance_injected:
+            doc.save(str(tmp_path))
+
+    from urllib.parse import quote
+    filename = template_path.name
+    utf8_name = quote(filename, safe="")
+    return FileResponse(
+        str(tmp_path),
+        media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        headers={"Content-Disposition": f'attachment; filename*=UTF-8\'\'{utf8_name}'},
+        background=None,
+    )
+
+
 @router.get("/list")
 async def list_all_templates(
     project_id: str,
@@ -439,11 +745,16 @@ async def preview_template_as_pdf(
             logger.warning("[TPL_PREVIEW] cache write failed: %s", e)
         cache_status = "miss"
 
+    # 中文文件名需 RFC5987 编码（HTTP 头按 latin-1，直接放中文会 UnicodeEncodeError）
+    from urllib.parse import quote as _quote
+    _stem = f"{src_path.stem}.pdf"
+    _ascii_stem = _stem.encode("ascii", "ignore").decode() or "preview.pdf"
+    _disposition = f"inline; filename=\"{_ascii_stem}\"; filename*=UTF-8''{_quote(_stem, safe='')}"
     return Response(
         content=pdf_bytes,
         media_type="application/pdf",
         headers={
-            "Content-Disposition": f'inline; filename="{src_path.stem}.pdf"',
+            "Content-Disposition": _disposition,
             "X-Preview-Cache": cache_status,
         },
     )

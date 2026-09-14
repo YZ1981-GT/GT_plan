@@ -1,0 +1,70 @@
+{
+  "description": "L 类筹资循环 audit-sheet 底稿关键坐标注册（OnlyOffice 地址名称落位）",
+  "version": "1.0.0",
+  "cycle": "L",
+  "entries": [
+    {
+      "wp_code": "L1-3",
+      "sheet_name": "短期借款利息测算",
+      "coordinates": [
+        {"cell_address": "E20", "description": "利息合计（本金×利率×天数/360）", "purpose": "interest_calculation"},
+        {"cell_address": "F20", "description": "账面已计提利息", "purpose": "interest_calculation"},
+        {"cell_address": "G20", "description": "利息差异", "purpose": "interest_variance"}
+      ]
+    },
+    {
+      "wp_code": "L3-3",
+      "sheet_name": "长期借款利息测算",
+      "coordinates": [
+        {"cell_address": "E25", "description": "利息合计（本金×利率×天数/360）", "purpose": "interest_calculation"},
+        {"cell_address": "F25", "description": "账面已计提利息", "purpose": "interest_calculation"},
+        {"cell_address": "G25", "description": "利息差异", "purpose": "interest_variance"}
+      ]
+    },
+    {
+      "wp_code": "L4-3",
+      "sheet_name": "实际利率计算",
+      "coordinates": [
+        {"cell_address": "C8", "description": "面值", "purpose": "irr_calculation"},
+        {"cell_address": "D8", "description": "票面利率", "purpose": "irr_calculation"},
+        {"cell_address": "E8", "description": "发行价", "purpose": "irr_calculation"},
+        {"cell_address": "F8", "description": "实际利率（IRR）", "purpose": "irr_result"},
+        {"cell_address": "G8", "description": "期限（年）", "purpose": "irr_calculation"}
+      ]
+    },
+    {
+      "wp_code": "L4-4",
+      "sheet_name": "摊余成本摊销表",
+      "coordinates": [
+        {"cell_address": "C10", "description": "期初摊余成本", "purpose": "amortization"},
+        {"cell_address": "D10", "description": "实际利息（期初×实际利率）", "purpose": "amortization"},
+        {"cell_address": "E10", "description": "票面利息（面值×票面利率）", "purpose": "amortization"},
+        {"cell_address": "F10", "description": "摊销额（实际利息-票面利息）", "purpose": "amortization"},
+        {"cell_address": "G10", "description": "期末摊余成本", "purpose": "amortization_result"}
+      ]
+    },
+    {
+      "wp_code": "L8-3",
+      "sheet_name": "利息费用测算",
+      "coordinates": [
+        {"cell_address": "C15", "description": "短期借款利息（来自L1-3）", "purpose": "interest_summary"},
+        {"cell_address": "D15", "description": "长期借款利息（来自L3-3）", "purpose": "interest_summary"},
+        {"cell_address": "E15", "description": "应付债券利息（来自L4-5）", "purpose": "interest_summary"},
+        {"cell_address": "F15", "description": "利息费用合计", "purpose": "interest_total"},
+        {"cell_address": "G15", "description": "账面利息支出", "purpose": "interest_summary"},
+        {"cell_address": "H15", "description": "差异", "purpose": "interest_variance"}
+      ]
+    },
+    {
+      "wp_code": "L8-5",
+      "sheet_name": "汇兑损益测算",
+      "coordinates": [
+        {"cell_address": "C12", "description": "外币余额", "purpose": "exchange_calculation"},
+        {"cell_address": "D12", "description": "记账汇率", "purpose": "exchange_calculation"},
+        {"cell_address": "E12", "description": "期末汇率", "purpose": "exchange_calculation"},
+        {"cell_address": "F12", "description": "汇兑损益（(期末-记账)×外币）", "purpose": "exchange_result"},
+        {"cell_address": "G12", "description": "汇兑损益合计", "purpose": "exchange_total"}
+      ]
+    }
+  ]
+}

@@ -1,0 +1,98 @@
+{
+  "inventoryVersion": "1.0",
+  "generatedAt": "2026-09-08T12:00:00.000Z",
+  "runId": "dup-run",
+  "entryCount": 216,
+  "duplicateCount": 15,
+  "domainExclusionCount": 6,
+  "outletBaseline": {
+    "primarySlotName": "page-capabilities-primary",
+    "compatibilitySlotName": "page-capabilities-compatibility",
+    "cssClassNotSlot": "gt-wp-toolbar__right",
+    "primaryNamedOutletMounted": false,
+    "compatibilityNamedOutletMounted": false
+  },
+  "digests": {
+    "entries": "375690c9e63f128c293bf6475ded2c1ea0fb2f0a018c87d162c05092acc95272",
+    "duplicates": "bf05369e533b0193a8fffa568af4b6ba60b834b07d6638eb03d0df5e999d2c7c",
+    "exclusions": "e0a779702afc38c58bf471a7eca1bb52f76ed2b8c18e5f3e6d6d877fd4be9f44",
+    "run": "aacceba9d4a8dfa0187883821374b1c1738d1b496b9d38ba4158827200e5ad74"
+  },
+  "sampleDuplicates": [
+    {
+      "kind": "ai-assist",
+      "relativePath": "layouts/ThreeColumnLayout.vue",
+      "detail": "AI assist / DSH panel entry"
+    },
+    {
+      "kind": "ai-review-panel",
+      "relativePath": "components/workpaper/GtWpRenderer.vue",
+      "detail": "AI review panel mount"
+    },
+    {
+      "kind": "ai-review-panel",
+      "relativePath": "components/workpaper/review/GtWpAiReviewToolbar.vue",
+      "detail": "AI review panel mount"
+    },
+    {
+      "kind": "formula-entry",
+      "relativePath": "components/workpaper/GtE1MonetaryFund.vue",
+      "detail": "formula manager entry"
+    },
+    {
+      "kind": "formula-entry",
+      "relativePath": "components/workpaper/GtWpRenderer.vue",
+      "detail": "formula manager entry"
+    },
+    {
+      "kind": "formula-entry",
+      "relativePath": "layouts/ThreeColumnLayout.vue",
+      "detail": "formula manager entry"
+    },
+    {
+      "kind": "guidance-rail",
+      "relativePath": "components/workpaper/WpGuidancePanel.vue",
+      "detail": "guidance rail / panel"
+    },
+    {
+      "kind": "guidance-rail",
+      "relativePath": "views/WorkpaperEditor.vue",
+      "detail": "guidance rail / panel"
+    },
+    {
+      "kind": "human-review",
+      "relativePath": "components/workpaper/GtD1NotesReceivable.vue",
+      "detail": "human / workpaper review panel"
+    },
+    {
+      "kind": "human-review",
+      "relativePath": "components/workpaper/GtD2AccountsReceivable.vue",
+      "detail": "human / workpaper review panel"
+    },
+    {
+      "kind": "human-review",
+      "relativePath": "components/workpaper/GtD3PrepaidAccounts.vue",
+      "detail": "human / workpaper review panel"
+    },
+    {
+      "kind": "human-review",
+      "relativePath": "components/workpaper/GtD4OperatingRevenue.vue",
+      "detail": "human / workpaper review panel"
+    },
+    {
+      "kind": "human-review",
+      "relativePath": "components/workpaper/GtD5ReceivablesFinancing.vue",
+      "detail": "human / workpaper review panel"
+    },
+    {
+      "kind": "human-review",
+      "relativePath": "components/workpaper/GtD6ContractAssets.vue",
+      "detail": "human / workpaper review panel"
+    },
+    {
+      "kind": "human-review",
+      "relativePath": "components/workpaper/GtD7ContractLiabilities.vue",
+      "detail": "human / workpaper review panel"
+    }
+  ]
+}

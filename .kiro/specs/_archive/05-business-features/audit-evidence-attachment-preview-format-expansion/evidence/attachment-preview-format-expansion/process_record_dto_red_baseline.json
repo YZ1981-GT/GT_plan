@@ -1,0 +1,14 @@
+{
+  "service": "backend/app/services/process_record_service.py",
+  "method": "AttachmentLinkService.get_workpaper_attachments",
+  "sql_projection_today": ["id", "file_name", "file_size", "file_type", "created_at", "ocr_status", "ocr_text"],
+  "missing_fields_red": [],
+  "ocr_fields_projected": true,
+  "orm_columns_exist": true,
+  "note": "Task 13 已把既有 ocr_status/ocr_text 列加入 process-record 只读投影；不改模型/迁移/OCR 写入。",
+  "tabpanel_misname_fact": {
+    "maps_file_type_to": "type_hint",
+    "was": "mime_type",
+    "note": "Task 13 一次性重命名，无第二字段 fallback"
+  }
+}

@@ -1,0 +1,111 @@
+{
+  "task": 19,
+  "recordedAt": "2026-09-09T06:45:00+00:00",
+  "purpose": "clean-checkout tracked gate — recommended git add groups (no commit until explicit user ask)",
+  "cleanCheckoutGate": "BLOCKED_until_commit",
+  "includeGroups": [
+    {
+      "id": "spec",
+      "paths": [
+        ".kiro/specs/workpaper-guidance-content-closure/",
+        ".kiro/specs/INDEX.md"
+      ]
+    },
+    {
+      "id": "ci",
+      "paths": [
+        ".github/workflows/governance-checks.yml"
+      ],
+      "note": "wgcc-guidance-backend-guards / wgcc-guidance-frontend-guards; file may also contain unrelated job diffs"
+    },
+    {
+      "id": "backend-data",
+      "paths": [
+        "backend/data/guidance/",
+        "backend/data/wp_guidance/"
+      ]
+    },
+    {
+      "id": "backend-code",
+      "paths": [
+        "backend/app/services/guidance*.py",
+        "backend/app/services/project_guidance_supplement_service.py",
+        "backend/app/services/wp_guidance_service.py",
+        "backend/app/models/guidance_handoff_ack_models.py",
+        "backend/app/models/guidance_publication_models.py",
+        "backend/app/routers/wp_guidance_chat.py",
+        "backend/migrations/V156__guidance_publication_lifecycle.sql",
+        "backend/migrations/V157__guidance_handoff_consumer_ack.sql"
+      ],
+      "note": "includes delete of guidance_cache.py if present"
+    },
+    {
+      "id": "backend-scripts-tests",
+      "paths": [
+        "backend/scripts/diagnose/mutate_guidance_*.py",
+        "backend/scripts/diagnose/run_guidance_task17_mutations.py",
+        "backend/scripts/diagnose/diagnose_guidance_coverage.py",
+        "backend/scripts/fix/emit_c1_catalog_milestone.py",
+        "backend/scripts/fix/emit_ghandoff_consumer_evidence.py",
+        "backend/scripts/fix/emit_t7_migration_workcards.py",
+        "backend/scripts/fix/migrate_guidance_canonical_schema.py",
+        "backend/scripts/ops/emit_g22_x_handoff_consumer_verdict.py",
+        "backend/tests/test_guidance*.py",
+        "backend/tests/test_wp_guidance*.py",
+        "backend/tests/test_gc0_reverse_dup_scan.py"
+      ]
+    },
+    {
+      "id": "frontend-guidance",
+      "paths": [
+        "audit-platform/frontend/src/shared/contracts/gc0/",
+        "audit-platform/frontend/src/shell/guidance/",
+        "audit-platform/frontend/e2e/workpaper-guidance-fshell.spec.ts",
+        "audit-platform/frontend/src/composables/htmlStableContextEmitter.ts",
+        "audit-platform/frontend/src/composables/sheetUidProjection.ts",
+        "audit-platform/frontend/src/stores/guidancePanelStore.ts",
+        "audit-platform/frontend/src/components/workpaper/guidance/",
+        "audit-platform/frontend/src/components/workpaper/WpGuidancePanel.vue",
+        "audit-platform/frontend/src/components/workpaper/guidance/GuidanceTabContent.vue",
+        "audit-platform/frontend/src/components/ai/DshPanel.vue",
+        "audit-platform/frontend/src/components/ai/__tests__/DshPanelGuidanceContext.spec.ts",
+        "audit-platform/frontend/src/components/workpaper/__tests__/WpGuidancePanel.spec.ts",
+        "audit-platform/frontend/src/components/workpaper/__tests__/WpDecisionTracePanel.spec.ts"
+      ]
+    },
+    {
+      "id": "frontend-host-wiring",
+      "paths": [
+        "audit-platform/frontend/src/components/workpaper/GtWpRenderer.vue",
+        "audit-platform/frontend/src/components/workpaper/GtWpReviewRail.vue",
+        "audit-platform/frontend/src/components/workpaper/WorkpaperSidePanel.vue",
+        "audit-platform/frontend/src/composables/useWpRenderer.ts",
+        "audit-platform/frontend/src/views/workpaper/WorkpaperEditor.vue"
+      ],
+      "note": "include related host composable/spec diffs that emit guidance context"
+    },
+    {
+      "id": "fshell-ci-dependency",
+      "paths": [
+        "audit-platform/frontend/src/shell/formula/rightRailArbiter.ts",
+        "audit-platform/frontend/src/shell/formula/__tests__/rightRailArbiter.spec.ts"
+      ],
+      "note": "required for wgcc-guidance-frontend-guards import graph; not full formula archive"
+    }
+  ],
+  "excludeGroups": [
+    ".codegraph/",
+    "daemon.log",
+    ".kiro/specs/workpaper-page-formula-toolbar-closure/",
+    ".kiro/specs/custom-workpaper-template-ingestion-and-sync-closure/",
+    "backend/app/services/custom_template_ingestion/",
+    "backend/migrations/V158__project_workbook*",
+    "audit-platform/frontend/e2e/workpaper-formula-toolbar-shell.spec.ts",
+    "backend/scripts/diagnose/mutate_formula_*",
+    "backend/scripts/diagnose/mutate_custom_ingestion_*"
+  ],
+  "notes": [
+    "Tracking alone can pass T19 clean-checkout; does not green T7/T21/T22/T23",
+    "Do not commit until user explicitly asks"
+  ]
+}

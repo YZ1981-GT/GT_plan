@@ -1,0 +1,61 @@
+{
+  "captured_at": "2026-09-12T15:53:19.278498+00:00",
+  "entry_id": "xlsx/gt-d4-operating-revenue",
+  "wp_id": "b3ab3c46-828f-4f48-950e-aee9bbdc923f",
+  "room_id": "59121da3-8c3e-450f-a83d-bf1135466a94",
+  "marker": "g5d4228488",
+  "operation": {
+    "id": "4170b4fb-e156-42a9-8215-3ed51e2f76af",
+    "state": "applied",
+    "application_id": "0ad22af9-3bca-4216-b0a7-a63fa5fa4f0d",
+    "direction": "oo_to_html",
+    "room_id": "59121da3-8c3e-450f-a83d-bf1135466a94",
+    "error_code": null,
+    "created_at": "2026-09-12T15:50:40.190454+00:00",
+    "application_bound_at": "2026-09-12T15:50:42.947420+00:00",
+    "finished_at": null
+  },
+  "application": {
+    "id": "0ad22af9-3bca-4216-b0a7-a63fa5fa4f0d",
+    "state": "applied",
+    "result_revision": 12,
+    "adapter_id": "d4.revenue_detail",
+    "definition_bundle_id": "c40dd9e2-0a15-46d4-a7ab-3793924a409a",
+    "result_representation_id": "5c31ddf9-29a4-48cb-8b26-25f3c44ee088",
+    "created_at": "2026-09-12T15:50:42.947420+00:00",
+    "finished_at": "2026-09-12T15:51:08.310764+00:00"
+  },
+  "content_version": {
+    "id": "f35d50f0-f18c-42be-904d-affda65c0829",
+    "revision": 12,
+    "source": "onlyoffice",
+    "operation_id": "4170b4fb-e156-42a9-8215-3ed51e2f76af",
+    "created_at": "2026-09-12T15:51:03.235208+00:00"
+  },
+  "published_identity": {
+    "representation_id": "5c31ddf9-29a4-48cb-8b26-25f3c44ee088",
+    "generation": 1,
+    "bundle_id": "c40dd9e2-0a15-46d4-a7ab-3793924a409a",
+    "projection_sha256": "31c40bea3b5b113810196843c9e906482136a3f5a4f502230436da6da1aecea9",
+    "revision": 12,
+    "source": "onlyoffice"
+  },
+  "store_mirror": {
+    "marker_in_store": true,
+    "marker_row": {
+      "rowId": "GTROW-D42-0012",
+      "product": "g5d4228488",
+      "months_len": 12,
+      "months_is_list": true
+    },
+    "months_array_len_12": true,
+    "row_count": 8
+  },
+  "predicates": {
+    "application_applied": true,
+    "store_has_marker_and_months_array": true,
+    "content_version_onlyoffice_op_match": true,
+    "operation_applied": true,
+    "cross_check_op_id": true
+  }
+}

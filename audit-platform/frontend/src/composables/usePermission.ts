@@ -112,17 +112,28 @@ export const ROLE_PERMISSIONS: Record<string, string[]> = {
 /**
  * 权限检查 composable
  *
+ * @deprecated 请迁移到 `usePermissionMatrix()`，该 composable 使用统一权限矩阵。
+ * `usePermission()` 使用前端硬编码角色映射，与后端权限矩阵可能不同步。
+ * 迁移指南：将 `can('project:edit')` 替换为 `usePermissionMatrix().can('wp:edit')` 等操作码。
+ *
  * 优先使用后端下发的 user.permissions 列表（/api/users/me 返回），
  * 后端列表不可用时回退到前端硬编码的 ROLE_PERMISSIONS。
  *
  * @example
  * ```ts
+ * // ❌ 旧用法（即将移除）
  * const { can, canAny } = usePermission()
- * if (can('adjustment:delete')) { ... }
- * if (canAny('project:edit', 'project:create')) { ... }
+ * // ✅ 新用法
+ * const { can } = usePermissionMatrix()
  * ```
  */
 export function usePermission() {
+  if (import.meta.env.DEV) {
+    console.warn(
+      '[DEPRECATED] usePermission() 已废弃，请迁移到 usePermissionMatrix()。' +
+      ' 详见 docs/reference/project-context-migration-inventory.md'
+    )
+  }
   const authStore = useAuthStore()
 
   /** 原始角色字符串（可能含别名） */

@@ -19,6 +19,35 @@
     <!-- 顶部覆盖率仪表盘 -->
     <FormulaCoverageChart ref="coverageChartRef" />
 
+    <!-- 通用 vs 自定义 框架条（公式预设库入口，template-library-formula-preset-custom） -->
+    <div class="gt-ftab-preset-bar">
+      <div class="gt-ftab-preset-info">
+        <el-icon class="gt-ftab-preset-icon"><MagicStick /></el-icon>
+        <div class="gt-ftab-preset-text">
+          <span class="gt-ftab-preset-title">公式预设库</span>
+          <span class="gt-ftab-preset-desc">
+            <el-tag size="small" type="info" effect="light" round>通用</el-tag>
+            平台通用预设公式（所有企业通用、只读）
+            <el-divider direction="vertical" />
+            <el-tag size="small" type="warning" effect="light" round>自定义</el-tag>
+            自定义预设在通用基线之上新增（平台级共享，隔离存储；{{ canEditPreset ? '可新增/编辑' : '仅授权角色可编辑' }}）
+          </span>
+        </div>
+      </div>
+      <el-button type="primary" plain size="default" @click="presetDialogVisible = true">
+        🧮 公式预设库
+      </el-button>
+    </div>
+
+    <!-- 公式预设库弹窗（说明文档 + 通用/自定义浏览编辑，Req 25 + 自定义写入） -->
+    <GtFormulaPresetDialog
+      ref="presetDialogRef"
+      v-model="presetDialogVisible"
+      scope="workpaper"
+      :can-edit="canEditPreset"
+      @edit-formula="onSaveCustomPreset"
+    />
+
     <!-- 子 Tab 区 -->
     <div class="gt-ftab-body">
       <el-tabs v-model="activeSubTab" class="gt-ftab-tabs">
@@ -70,6 +99,39 @@
               共 <span class="gt-amt">{{ prefillTotalCells }}</span> 个公式单元格 /
               <span class="gt-amt">{{ prefillTotalMappings }}</span> 个映射
             </span>
+          </div>
+
+          <!-- ACNR 地址坐标名称库迁移 Ledger（Req 24.3/24.4）─── -->
+          <div class="gt-ftab-acnr-ledger">
+            <span class="gt-ftab-acnr-ledger-label">
+              <el-icon><Connection /></el-icon>ACNR 引用归一化：
+            </span>
+            <el-tag type="success" size="small" effect="light" round>
+              已迁移 <span class="gt-amt">{{ acnrMigrated }}</span>
+            </el-tag>
+            <el-tag type="warning" size="small" effect="light" round>
+              待迁移 <span class="gt-amt">{{ acnrPending }}</span>
+            </el-tag>
+            <el-progress
+              :percentage="acnrCoveragePercent"
+              :stroke-width="10"
+              :color="acnrCoveragePercent >= 80 ? '#67c23a' : acnrCoveragePercent >= 40 ? '#e6a23c' : '#f56c6c'"
+              class="gt-ftab-acnr-progress"
+            />
+            <el-tooltip
+              v-if="acnrPendingFunctions.length"
+              placement="top"
+            >
+              <template #content>
+                <div>待迁移函数（无 ACNR grammar_v1 等价，增量迁移）：</div>
+                <div v-for="f in acnrPendingFunctions" :key="f.name" class="gt-ftab-invalid-ref">
+                  {{ f.name }}() × {{ f.count }}
+                </div>
+              </template>
+              <el-tag type="info" size="small" effect="plain" round>
+                待迁移函数 ×{{ acnrPendingFunctions.length }}
+              </el-tag>
+            </el-tooltip>
           </div>
 
           <!-- 工具栏 ─── -->
@@ -124,6 +186,34 @@
                         >
                           {{ cell.formula_type }}
                         </el-tag>
+                      </template>
+                    </el-table-column>
+                    <el-table-column label="ACNR 引用" min-width="260">
+                      <template #default="{ row: cell }">
+                        <el-tag
+                          :type="cell.acnr_status === 'migrated' ? 'success' : 'warning'"
+                          size="small"
+                          effect="light"
+                        >
+                          {{ cell.acnr_status === 'migrated' ? '已迁移' : '待迁移' }}
+                        </el-tag>
+                        <el-tooltip
+                          v-if="cell.formula_ref"
+                          placement="top"
+                          :content="`ACNR formula_ref：${cell.formula_ref}${cell.acnr_status !== 'migrated' ? '（无 ACNR grammar_v1 等价，待迁移）' : ''}`"
+                        >
+                          <code class="gt-ftab-formula-code gt-ftab-acnr-ref">{{ cell.formula_ref }}</code>
+                        </el-tooltip>
+                        <el-button
+                          v-if="cell.acnr_status === 'migrated' && cell.formula_ref"
+                          link
+                          type="primary"
+                          size="small"
+                          class="gt-ftab-acnr-resolve"
+                          @click="resolveCandidate(cell.formula_ref)"
+                        >
+                          校验
+                        </el-button>
                       </template>
                     </el-table-column>
                     <el-table-column prop="description" label="说明" min-width="240" show-overflow-tooltip />
@@ -373,7 +463,8 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue'
-import { Coin, PieChart, Link, Search } from '@element-plus/icons-vue'
+import { Coin, PieChart, Link, Search, Connection, MagicStick } from '@element-plus/icons-vue'
+import { ElMessage } from 'element-plus'
 import { api } from '@/services/apiProxy'
 import {
   templateLibraryMgmt as P_tlm,
@@ -381,7 +472,49 @@ import {
 } from '@/services/apiPaths'
 import { handleApiError } from '@/utils/errorHandler'
 import { useTemplateLibrarySource } from '@/composables/useTemplateLibrarySource'
+import { useAcnr } from '@/services/acnr/useAcnr'
+import { useAuthStore } from '@/stores/auth'
+import { useFormulaImportExport } from '@/composables/useFormulaImportExport'
 import FormulaCoverageChart from '@/components/template-library/FormulaCoverageChart.vue'
+import GtFormulaPresetDialog from '@/components/formula/GtFormulaPresetDialog.vue'
+
+// ─── 公式预设库（通用 vs 自定义）─────────────────────────────────────────────
+const authStore = useAuthStore()
+// 权限门控（D7 ADR，与 ReportConfigTab/SeedLoaderPanel 一致）：admin/partner 可编辑自定义预设
+const canEditPreset = computed(() => {
+  const role = authStore.user?.role || ''
+  return role === 'admin' || role === 'partner'
+})
+const presetDialogVisible = ref(false)
+const presetDialogRef = ref<InstanceType<typeof GtFormulaPresetDialog> | null>(null)
+const { saveCustomPreset } = useFormulaImportExport()
+
+/** 弹窗内保存自定义公式 → 持久化到平台级 formula_custom_presets.json（隔离于 seed）。 */
+async function onSaveCustomPreset(payload: {
+  page_key: string
+  formula_type: 'auto_calc' | 'logic_check' | 'reasonability'
+  target_cell: string
+  expression: string
+  refs?: unknown[]
+  issue_description?: string
+  hint_text?: string
+}) {
+  const res = await saveCustomPreset({
+    page_key: payload.page_key,
+    target_cell: payload.target_cell,
+    expression: payload.expression,
+    formula_type: payload.formula_type,
+    refs: payload.refs,
+    description: payload.issue_description || payload.hint_text || '',
+  })
+  if (res) {
+    // 持久化成功后刷新弹窗当前页预设列表（复用弹窗 selectPage 拉取）
+    await presetDialogRef.value?.reloadCurrentPage()
+  }
+}
+
+// ─── ACNR 选址器（Req 24.2：候选地址经 useAcnr） ───
+const { resolveFormula } = useAcnr()
 
 // ─── D13 ADR：只读源统一文案管理 ───
 const { getReadonlyHint, getReadonlyBadgeText } = useTemplateLibrarySource()
@@ -400,6 +533,10 @@ interface PrefillCell {
   formula: string
   formula_type: string
   description?: string
+  // ACNR 归一化引用（后端 /prefill-formulas 标注，Req 24.1/24.4）
+  formula_ref?: string | null
+  acnr_status?: 'migrated' | 'pending'
+  acnr_reason?: string
 }
 
 interface PrefillMapping {
@@ -461,6 +598,48 @@ async function loadFormulaTypeDistribution() {
     }
   } catch {
     formulaTypeBadges.value = []
+  }
+}
+
+// ─── ACNR 迁移 Ledger（Req 24.3/24.4）─────────────────────────────────────────
+const acnrMigrated = ref(0)
+const acnrPending = ref(0)
+const acnrCoveragePercent = ref(0)
+const acnrPendingFunctions = ref<Array<{ name: string; count: number }>>([])
+
+async function loadAcnrMigrationLedger() {
+  try {
+    const data = await api.get(P_tlm.formulaAcnrMigration)
+    acnrMigrated.value = Number(data?.migrated ?? 0)
+    acnrPending.value = Number(data?.pending ?? 0)
+    acnrCoveragePercent.value = Number(data?.coverage_percent ?? 0)
+    const pf = (data?.pending_functions || {}) as Record<string, number>
+    acnrPendingFunctions.value = Object.entries(pf)
+      .map(([name, count]) => ({ name, count: Number(count) }))
+      .sort((a, b) => b.count - a.count)
+  } catch {
+    acnrMigrated.value = 0
+    acnrPending.value = 0
+    acnrCoveragePercent.value = 0
+    acnrPendingFunctions.value = []
+  }
+}
+
+// 候选地址经 useAcnr 校验（Req 24.2：模板库候选地址走 ACNR full_resolve）
+async function resolveCandidate(formulaRef?: string | null) {
+  if (!formulaRef) return
+  const res = await resolveFormula(formulaRef)
+  if (res.found) {
+    ElMessage.success(
+      `ACNR 解析成功：${res.semantic_label || res.addr_id || formulaRef}`,
+    )
+  } else if (res.candidates && res.candidates.length) {
+    ElMessage.warning(
+      `未精确命中，候选地址 ${res.candidates.length} 个：` +
+        res.candidates.slice(0, 3).map(c => c.display_label).join('、'),
+    )
+  } else {
+    ElMessage.error(`ACNR 无法解析该引用：${formulaRef}`)
   }
 }
 
@@ -766,6 +945,7 @@ onMounted(async () => {
     loadPrefillFormulas(),
     loadFormulaTypeDistribution(),
     loadCrossWpReferences(),
+    loadAcnrMigrationLedger(),
   ])
 })
 </script>
@@ -777,6 +957,47 @@ onMounted(async () => {
   gap: 16px;
   height: 100%;
   min-height: 0;
+}
+
+/* ─── 通用 vs 自定义 框架条 ─── */
+.gt-ftab-preset-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 16px;
+  background: var(--gt-color-primary-bg, #f5f2fa);
+  border: 1px solid var(--gt-color-border-lighter, #ebeef5);
+  border-left: 3px solid var(--gt-color-primary, #7b5ea7);
+  border-radius: 8px;
+  flex-shrink: 0;
+}
+.gt-ftab-preset-info {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+.gt-ftab-preset-icon {
+  font-size: 20px;
+  color: var(--gt-color-primary, #7b5ea7);
+  flex-shrink: 0;
+}
+.gt-ftab-preset-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.gt-ftab-preset-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--gt-color-text-primary, #303133);
+}
+.gt-ftab-preset-desc {
+  font-size: 12px;
+  color: var(--gt-color-text-regular, #606266);
+  line-height: 1.6;
 }
 
 /* ─── 子 Tab 区 ─── */
@@ -851,6 +1072,38 @@ onMounted(async () => {
   margin-left: auto;
   font-size: var(--gt-font-size-xs);
   color: var(--gt-color-text-regular);
+}
+
+/* ─── ACNR 迁移 Ledger ─── */
+.gt-ftab-acnr-ledger {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+  padding: 8px 12px;
+  background: var(--gt-bg-info, #f0f9ff);
+  border-radius: 6px;
+  border-left: 3px solid var(--gt-color-teal, #409eff);
+}
+.gt-ftab-acnr-ledger-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: var(--gt-font-size-xs);
+  color: var(--gt-color-info);
+  font-weight: 500;
+}
+.gt-ftab-acnr-progress {
+  flex: 1;
+  min-width: 160px;
+  max-width: 320px;
+}
+.gt-ftab-acnr-ref {
+  margin-left: 6px;
+}
+.gt-ftab-acnr-resolve {
+  margin-left: 6px;
 }
 .gt-ftab-type-tag {
   border: 1px solid transparent;

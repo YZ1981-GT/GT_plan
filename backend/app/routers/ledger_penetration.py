@@ -101,6 +101,30 @@ async def get_opening_balance(
     return {"opening_balance": float(opening), "account_code": account_code}
 
 
+@router.get("/entries-all")
+async def get_all_ledger_entries(
+    project_id: UUID,
+    year: int = Query(...),
+    date_from: str | None = None,
+    date_to: str | None = None,
+    page: int = 1,
+    page_size: int = Query(2000, ge=1, le=5000),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_project_access("readonly")),
+):
+    """全量序时账分录（不限科目）— 供 C24 会计分录细节测试四表联动
+
+    返回当年全部分录（分页，最大 5000/页）。字段：
+    voucher_date, voucher_no, account_code, account_name, debit_amount, credit_amount,
+    summary, preparer/poster/reviewer（如表中有）。
+    """
+    svc = _svc(db, None)
+    return await svc.get_all_ledger_entries(
+        project_id, year, date_from=date_from, date_to=date_to,
+        page=page, page_size=page_size,
+    )
+
+
 @router.get("/entries/{account_code}")
 async def get_ledger_entries(
     project_id: UUID,
@@ -122,8 +146,9 @@ async def get_ledger_entries(
     否则使用传统 OFFSET 分页。
     """
     svc = _svc(db, None)
-    # 优先使用游标分页（首次请求不传 cursor 也走游标分页，用 limit 控制条数）
-    if cursor is not None or limit != 100:
+    # 默认走游标分页（keyset）；仅 page>1 且无 cursor/limit 覆盖时保留 legacy OFFSET
+    # （OFFSET 只返原始分录，不含运行余额；前端全量拉取后本地算余额，不能按页切片）
+    if cursor is not None or limit != 100 or page <= 1:
         return await svc.get_ledger_entries_cursor(
             project_id, year, account_code,
             cursor=cursor, limit=limit,
@@ -145,6 +170,140 @@ async def get_voucher_entries(
     """凭证分录明细（按凭证号穿透）"""
     svc = _svc(db, None)
     return await svc.get_voucher_entries(project_id, year, voucher_no)
+
+
+# ---------------------------------------------------------------------------
+# 抽样凭证（抽凭联动）
+# ---------------------------------------------------------------------------
+from pydantic import BaseModel as _BaseModel  # noqa: E402
+
+
+class _SampleVoucherRequest(_BaseModel):
+    year: int
+    voucher_no: str
+    account_code: str | None = None
+    sampling_record_id: UUID | None = None
+    working_paper_id: UUID | None = None
+    source: str | None = None  # 来源标识（如 "C24"），用于追溯抽样来源
+    note: str | None = None
+
+
+@router.post("/sample-voucher")
+async def sample_voucher(
+    project_id: UUID,
+    body: _SampleVoucherRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_project_access("edit")),
+):
+    """抽中本凭证：记录到抽样凭证清单（抽凭联动）。
+
+    同项目+年度+凭证号去重（已抽则更新，未抽则新增，含软删恢复）。
+    """
+    import sqlalchemy as sa
+    from app.models.workpaper_models import SampledVoucher
+
+    # 查是否已存在（含软删）
+    existing = await db.execute(
+        sa.select(SampledVoucher).where(
+            SampledVoucher.project_id == project_id,
+            SampledVoucher.year == body.year,
+            SampledVoucher.voucher_no == body.voucher_no,
+        )
+    )
+    row = existing.scalar_one_or_none()
+    if row is not None:
+        # 已存在 → 复活/更新
+        row.is_deleted = False
+        row.account_code = body.account_code or row.account_code
+        row.sampling_record_id = body.sampling_record_id or row.sampling_record_id
+        row.working_paper_id = body.working_paper_id or row.working_paper_id
+        if body.note:
+            row.note = body.note
+        row.sampled_by = current_user.id
+        await db.commit()
+        return {"id": str(row.id), "voucher_no": row.voucher_no, "status": "updated"}
+
+    new_row = SampledVoucher(
+        project_id=project_id,
+        year=body.year,
+        voucher_no=body.voucher_no,
+        account_code=body.account_code,
+        sampling_record_id=body.sampling_record_id,
+        working_paper_id=body.working_paper_id,
+        note=body.note or (f"source:{body.source}" if body.source else None),
+        sampled_by=current_user.id,
+    )
+    db.add(new_row)
+    await db.commit()
+    await db.refresh(new_row)
+    return {"id": str(new_row.id), "voucher_no": new_row.voucher_no, "status": "created"}
+
+
+@router.get("/sampled-vouchers")
+async def list_sampled_vouchers(
+    project_id: UUID,
+    year: int = Query(...),
+    working_paper_id: UUID | None = Query(
+        None, description="按目标底稿过滤（挂凭到底稿联动，底稿凭证检查拉取自己挂入的凭证）"
+    ),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_project_access("readonly")),
+):
+    """抽样凭证清单。
+
+    可选 ``working_paper_id`` 过滤：底稿的凭证检查表据此只拉取「挂凭到底稿」挂到
+    自己的凭证（与序时账手工挂凭联动）。
+    """
+    import sqlalchemy as sa
+    from app.models.workpaper_models import SampledVoucher
+
+    conds = [
+        SampledVoucher.project_id == project_id,
+        SampledVoucher.year == year,
+        SampledVoucher.is_deleted == sa.false(),
+    ]
+    if working_paper_id is not None:
+        conds.append(SampledVoucher.working_paper_id == working_paper_id)
+
+    result = await db.execute(
+        sa.select(SampledVoucher).where(*conds).order_by(SampledVoucher.sampled_at.desc())
+    )
+    rows = result.scalars().all()
+    return {
+        "items": [
+            {
+                "id": str(r.id),
+                "voucher_no": r.voucher_no,
+                "account_code": r.account_code,
+                "sampling_record_id": str(r.sampling_record_id) if r.sampling_record_id else None,
+                "working_paper_id": str(r.working_paper_id) if r.working_paper_id else None,
+                "note": r.note,
+                "sampled_at": r.sampled_at.isoformat() if r.sampled_at else None,
+            }
+            for r in rows
+        ],
+        "total": len(rows),
+    }
+
+
+@router.delete("/sampled-vouchers/{sampled_id}")
+async def delete_sampled_voucher(
+    project_id: UUID,
+    sampled_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_project_access("edit")),
+):
+    """取消抽样（软删）"""
+    import sqlalchemy as sa
+    from app.models.workpaper_models import SampledVoucher
+
+    await db.execute(
+        sa.update(SampledVoucher)
+        .where(SampledVoucher.id == sampled_id, SampledVoucher.project_id == project_id)
+        .values(is_deleted=True)
+    )
+    await db.commit()
+    return {"status": "deleted", "id": str(sampled_id)}
 
 
 @router.get("/aux-balance-summary")
@@ -174,6 +333,7 @@ async def get_aux_balance_summary(
             pass
 
     # 维度类型列表（含各类型的记录数）
+    # 注意：tb_aux_balance_summary 的列名是 dim_type（非 tb_aux_balance 的 aux_type）
     r = await db.execute(sa.text("""
         SELECT dim_type, SUM(record_count) as total_records, COUNT(*) as group_count
         FROM tb_aux_balance_summary
@@ -296,7 +456,7 @@ async def get_aux_balance_detail(
 
     where = [
         await get_active_filter(db, tbl, project_id, year),
-        tbl.c.account_code == account_code,
+        tbl.c.account_code.like(account_code + '%') if '.' not in account_code else tbl.c.account_code == account_code,
         tbl.c.aux_type == dim_type,
     ]
     if aux_code:
@@ -355,7 +515,7 @@ async def get_aux_ledger_entries(
 ):
     """辅助明细账（按辅助维度穿透）— 支持游标分页和传统分页"""
     svc = _svc(db, None)
-    if cursor is not None:
+    if cursor is not None or limit != 100 or page <= 1:
         return await svc.get_aux_ledger_entries_cursor(
             project_id, year, account_code,
             cursor=cursor, limit=limit,
@@ -506,11 +666,13 @@ async def get_available_years(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_project_access("readonly")),
 ):
-    """获取该项目有数据的年度列表"""
+    """获取该项目有数据的年度列表 + 同客户其他项目有数据的年份（供年度切换参考）"""
     import sqlalchemy as sa
     from app.models.dataset_models import DatasetStatus, LedgerDataset
     from app.models.audit_platform_models import TbBalance
+    from app.models.core import Project
 
+    # 本项目有数据的年份
     dataset_result = await db.execute(
         sa.select(sa.distinct(LedgerDataset.year))
         .where(
@@ -520,17 +682,50 @@ async def get_available_years(
         .order_by(LedgerDataset.year.desc())
     )
     dataset_years = [row[0] for row in dataset_result.fetchall()]
-    if dataset_years:
-        return {"years": dataset_years}
 
-    tbl = TbBalance.__table__
-    result = await db.execute(
-        sa.select(sa.distinct(tbl.c.year))
-        .where(tbl.c.project_id == project_id, tbl.c.is_deleted == sa.false())
-        .order_by(tbl.c.year.desc())
-    )
-    years = [row[0] for row in result.fetchall()]
-    return {"years": years}
+    if not dataset_years:
+        tbl = TbBalance.__table__
+        result = await db.execute(
+            sa.select(sa.distinct(tbl.c.year))
+            .where(tbl.c.project_id == project_id, tbl.c.is_deleted == sa.false())
+            .order_by(tbl.c.year.desc())
+        )
+        dataset_years = [row[0] for row in result.fetchall()]
+
+    # 同客户其他项目有数据的年份（跨项目年份发现）
+    sibling_years: list[dict] = []
+    try:
+        # 取当前项目的客户名
+        proj_r = await db.execute(
+            sa.select(Project.client_name).where(Project.id == project_id)
+        )
+        client_name = proj_r.scalar_one_or_none()
+        if client_name:
+            # 查同客户其他项目
+            sibling_r = await db.execute(
+                sa.select(Project.id, Project.name, LedgerDataset.year)
+                .join(LedgerDataset, LedgerDataset.project_id == Project.id)
+                .where(
+                    Project.client_name == client_name,
+                    Project.id != project_id,
+                    LedgerDataset.status == DatasetStatus.active,
+                )
+                .distinct()
+                .order_by(LedgerDataset.year.desc())
+            )
+            for row in sibling_r.fetchall():
+                sibling_years.append({
+                    "year": row[2],
+                    "project_id": str(row[0]),
+                    "project_name": row[1],
+                })
+    except Exception:
+        pass  # 跨项目发现是增强功能，失败不影响核心
+
+    return {
+        "years": dataset_years,
+        "sibling_years": sibling_years,
+    }
 
 
 @router.get("/stats")
@@ -615,18 +810,31 @@ async def export_ledger_excel(
         where.append(tbl.c.voucher_date <= date_to)
     stmt = (
         sa.select(tbl.c.voucher_date, tbl.c.voucher_no, tbl.c.summary,
-                   tbl.c.debit_amount, tbl.c.credit_amount, tbl.c.counterpart_account)
+                   tbl.c.debit_amount, tbl.c.credit_amount, tbl.c.counterpart_account,
+                   tbl.c.raw_extra)
         .where(*where).order_by(tbl.c.voucher_date, tbl.c.voucher_no)
     )
     result = await db.execute(stmt)
-    rows = result.fetchall()
+    # raw_extra 展开为 extra_fields（过滤 _ 前缀系统标记），与前端/查询口径一致
+    from app.services.ledger_penetration_service import _attach_extra_fields
+    rows = _attach_extra_fields([dict(r._mapping) for r in result.fetchall()])
+
+    # 本次导出所有行的 extra_fields 键并集（保持首次出现顺序）
+    extra_cols: list[str] = []
+    _seen_extra: set = set()
+    for r in rows:
+        for k in r["extra_fields"]:
+            if k not in _seen_extra:
+                _seen_extra.add(k)
+                extra_cols.append(k)
 
     wb = openpyxl.Workbook()
     ws = wb.active
     acct_label = account_code.replace('*', '')
     ws.title = f"序时账_{acct_label}"
 
-    headers = ["日期", "凭证号", "摘要", "借方", "贷方", "余额", "对方科目"]
+    # 固定列 + raw_extra 业务额外列（并集为空则与原导出完全一致，零回归）
+    headers = ["日期", "凭证号", "摘要", "借方", "贷方", "余额", "对方科目"] + extra_cols
     header_font = Font(bold=True)
     header_fill = PatternFill(start_color="F0ECF7", end_color="F0ECF7", fill_type="solid")
     for col, h in enumerate(headers, 1):
@@ -654,11 +862,11 @@ async def export_ledger_excel(
     excel_row = 3
 
     for row in rows:
-        vd = row[0]
+        vd = row["voucher_date"]
         vd_str = vd.isoformat() if hasattr(vd, 'isoformat') else str(vd or '')
         month = vd_str[:7]
-        d = float(row[3] or 0)
-        c = float(row[4] or 0)
+        d = float(row["debit_amount"] or 0)
+        c = float(row["credit_amount"] or 0)
         balance += d - c
         month_debit += d
         month_credit += c
@@ -681,12 +889,18 @@ async def export_ledger_excel(
             last_month = month
 
         ws.cell(excel_row, 1, vd_str)
-        ws.cell(excel_row, 2, row[1])
-        ws.cell(excel_row, 3, row[2])
+        ws.cell(excel_row, 2, row["voucher_no"])
+        ws.cell(excel_row, 3, row["summary"])
         ws.cell(excel_row, 4, d if d else None)
         ws.cell(excel_row, 5, c if c else None)
         ws.cell(excel_row, 6, balance)
-        ws.cell(excel_row, 7, row[5])
+        ws.cell(excel_row, 7, row["counterpart_account"])
+        # 对方科目列之后按额外列顺序写入 extra_fields（缺失写空）
+        for offset, k in enumerate(extra_cols):
+            val = row["extra_fields"].get(k, "")
+            if isinstance(val, (dict, list)):
+                val = str(val)
+            ws.cell(excel_row, 8 + offset, val)
         excel_row += 1
 
     # 最后一个月的小计
@@ -699,7 +913,7 @@ async def export_ledger_excel(
             ws.cell(excel_row, col).font = subtotal_font
             ws.cell(excel_row, col).fill = subtotal_fill
 
-    widths = [12, 12, 30, 16, 16, 16, 16]
+    widths = [12, 12, 30, 16, 16, 16, 16] + [18] * len(extra_cols)
     for col, w in enumerate(widths, 1):
         ws.column_dimensions[openpyxl.utils.get_column_letter(col)].width = w
 
@@ -1242,6 +1456,7 @@ async def get_balance_tree(
             bal_tbl.c.debit_amount, bal_tbl.c.credit_amount,
             bal_tbl.c.closing_balance, bal_tbl.c.closing_debit, bal_tbl.c.closing_credit,
             bal_tbl.c.currency_code, bal_tbl.c.raw_extra,
+            bal_tbl.c.opening_direction, bal_tbl.c.closing_direction,
         )
         .where(*bal_where)
         .order_by(bal_tbl.c.account_code)
@@ -1367,6 +1582,8 @@ async def get_balance_tree(
             "closing_debit": float(r[10]) if r[10] is not None else None,
             "closing_credit": float(r[11]) if r[11] is not None else None,
             "currency_code": r[12],
+            "opening_direction": r[14],
+            "closing_direction": r[15],
             "aggregated_from_aux": aggregated,
             "aux_row_count": aux_row_count,
             "aux_types": list(_type_sums.keys()),

@@ -1,7 +1,7 @@
 {
   "version": "1.0.0",
-  "is_mock": true,
-  "description": "SOE vs Listed template section diff (auto-generated from template JSONs)",
+  "is_mock": false,
+  "description": "SOE vs Listed template section diff — auto-generated from note_template_{soe,listed}.json via app.services.note_template_diff.compute_diff_from_templates. Do not hand-edit; rerun scripts/gen/generate_note_soe_listed_diff.py.",
   "common_sections": [
     {
       "section_title": "一年内到期的非流动负债",
@@ -12,6 +12,11 @@
       "section_title": "一年内到期的非流动资产",
       "soe_section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-yi-nian-nei-dao-qi-de-fei-liu-dong-zi-chan",
       "listed_section_id": "chapter-05-he-bing-cai-wu-bao-biao-xiang-mu-zhu-shi-yi-nian-nei-dao-qi-de-fei-liu-dong-zi-chan"
+    },
+    {
+      "section_title": "一般风险准备",
+      "soe_section_id": "chapter-08-cai-wu-bao-biao-xiang-mu-zhu-shi-yi-ban-feng-xian-zhun-bei",
+      "listed_section_id": "chapter-05-he-bing-cai-wu-bao-biao-xiang-mu-zhu-shi-yi-ban-feng-xian-zhun-bei"
     },
     {
       "section_title": "专项储备",
@@ -290,7 +295,7 @@
     },
     {
       "section_title": "投资收益",
-      "soe_section_id": "chapter-12-gu-fen-zhi-fu-tou-zi-shou-yi",
+      "soe_section_id": "chapter-12-mu-gong-si-cai-wu-bao-biao-de-zhu-yao-xiang-mu-fu-zhu-tou-zi-shou-yi",
       "listed_section_id": "chapter-05-he-bing-cai-wu-bao-biao-xiang-mu-zhu-shi-tou-zi-shou-yi"
     },
     {
@@ -325,7 +330,7 @@
     },
     {
       "section_title": "现金流量表补充资料",
-      "soe_section_id": "chapter-12-gu-fen-zhi-fu-xian-jin-liu-liang-biao-bu-chong-zi-liao",
+      "soe_section_id": "chapter-12-mu-gong-si-cai-wu-bao-biao-de-zhu-yao-xiang-mu-fu-zhu-xian-jin-liu-liang-biao-bu-cho",
       "listed_section_id": "chapter-05-he-bing-cai-wu-bao-biao-xiang-mu-zhu-shi-xian-jin-liu-liang-biao-bu-chong-zi-liao"
     },
     {
@@ -405,7 +410,7 @@
     },
     {
       "section_title": "营业收入与营业成本",
-      "soe_section_id": "chapter-12-gu-fen-zhi-fu-ying-ye-shou-ru-yu-ying-ye-cheng-ben",
+      "soe_section_id": "chapter-12-mu-gong-si-cai-wu-bao-biao-de-zhu-yao-xiang-mu-fu-zhu-ying-ye-shou-ru-yu-ying-ye-che",
       "listed_section_id": "chapter-16-mu-gong-si-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-ying-ye-shou-ru-yu-ying-ye-cheng"
     },
     {
@@ -688,6 +693,10 @@
       "title": "母公司直接或通过其他子公司间接拥有被投资单位半数以上的表决权但未能对其形成控制的"
     },
     {
+      "section_id": "chapter-12-mu-gong-si-cai-wu-bao-biao-de-zhu-yao-xiang-mu-fu-zhu",
+      "title": "母公司财务报表的主要项目附注"
+    },
+    {
       "section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-mei-gu-shou-yi",
       "title": "每股收益"
     },
@@ -777,10 +786,6 @@
     }
   ],
   "listed_only_sections": [
-    {
-      "section_id": "chapter-05-he-bing-cai-wu-bao-biao-xiang-mu-zhu-shi-yi-ban-feng-xian-zhun-bei",
-      "title": "一般风险准备"
-    },
     {
       "section_id": "chapter-12-gu-fen-zhi-fu-yi-quan-yi-jie-suan-de-gu-fen-zhi-fu-qing-kuang",
       "title": "以权益结算的股份支付情况"
@@ -1092,6 +1097,20 @@
       "field_mapping": null
     },
     {
+      "section_title": "一般风险准备",
+      "soe_section_id": "chapter-08-cai-wu-bao-biao-xiang-mu-zhu-shi-yi-ban-feng-xian-zhun-bei",
+      "listed_section_id": "chapter-05-he-bing-cai-wu-bao-biao-xiang-mu-zhu-shi-yi-ban-feng-xian-zhun-bei",
+      "soe_format": {
+        "content_type": "table",
+        "table_count": 1
+      },
+      "listed_format": {
+        "content_type": "text",
+        "table_count": 1
+      },
+      "field_mapping": null
+    },
+    {
       "section_title": "主要税种及税率",
       "soe_section_id": "chapter-06-shui-xiang-zhu-yao-shui-zhong-ji-shui-lv",
       "listed_section_id": "chapter-04-shui-xiang-zhu-yao-shui-zhong-ji-shui-lv",
@@ -1120,15 +1139,15 @@
       "field_mapping": null
     },
     {
-      "section_title": "借款费用",
-      "soe_section_id": "chapter-04-zhong-yao-kuai-ji-zheng-ce-kuai-ji-gu-ji-jie-kuan-fei-yong",
-      "listed_section_id": "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-jie-kuan-fei-yong",
+      "section_title": "使用权资产",
+      "soe_section_id": "chapter-04-zhong-yao-kuai-ji-zheng-ce-kuai-ji-gu-ji-shi-yong-quan-zi-chan",
+      "listed_section_id": "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-shi-yong-quan-zi-chan",
       "soe_format": {
-        "content_type": "mixed",
-        "table_count": 1
+        "content_type": "text",
+        "table_count": 0
       },
       "listed_format": {
-        "content_type": "text",
+        "content_type": "mixed",
         "table_count": 0
       },
       "field_mapping": null
@@ -1223,11 +1242,11 @@
       "listed_section_id": "chapter-05-he-bing-cai-wu-bao-biao-xiang-mu-zhu-shi-qi-ta-ying-shou-kuan",
       "soe_format": {
         "content_type": "mixed",
-        "table_count": 15
+        "table_count": 19
       },
       "listed_format": {
         "content_type": "mixed",
-        "table_count": 18
+        "table_count": 21
       },
       "field_mapping": null
     },
@@ -1316,16 +1335,16 @@
       "field_mapping": null
     },
     {
-      "section_title": "在建工程",
-      "soe_section_id": "chapter-04-zhong-yao-kuai-ji-zheng-ce-kuai-ji-gu-ji-zai-jian-gong-cheng",
-      "listed_section_id": "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-zai-jian-gong-cheng",
+      "section_title": "固定资产",
+      "soe_section_id": "chapter-04-zhong-yao-kuai-ji-zheng-ce-kuai-ji-gu-ji-gu-ding-zi-chan",
+      "listed_section_id": "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-gu-ding-zi-chan",
       "soe_format": {
-        "content_type": "mixed",
+        "content_type": "text",
         "table_count": 1
       },
       "listed_format": {
-        "content_type": "text",
-        "table_count": 0
+        "content_type": "mixed",
+        "table_count": 1
       },
       "field_mapping": null
     },
@@ -1334,8 +1353,8 @@
       "soe_section_id": "chapter-04-zhong-yao-kuai-ji-zheng-ce-kuai-ji-gu-ji-ying-fu-zhai-quan",
       "listed_section_id": "chapter-05-he-bing-cai-wu-bao-biao-xiang-mu-zhu-shi-ying-fu-zhai-quan",
       "soe_format": {
-        "content_type": "mixed",
-        "table_count": 1
+        "content_type": "text",
+        "table_count": 0
       },
       "listed_format": {
         "content_type": "mixed",
@@ -1377,11 +1396,11 @@
       "listed_section_id": "chapter-05-he-bing-cai-wu-bao-biao-xiang-mu-zhu-shi-ying-shou-zhang-kuan",
       "soe_format": {
         "content_type": "mixed",
-        "table_count": 11
+        "table_count": 13
       },
       "listed_format": {
         "content_type": "mixed",
-        "table_count": 15
+        "table_count": 17
       },
       "field_mapping": null
     },
@@ -1415,7 +1434,7 @@
     },
     {
       "section_title": "投资收益",
-      "soe_section_id": "chapter-12-gu-fen-zhi-fu-tou-zi-shou-yi",
+      "soe_section_id": "chapter-12-mu-gong-si-cai-wu-bao-biao-de-zhu-yao-xiang-mu-fu-zhu-tou-zi-shou-yi",
       "listed_section_id": "chapter-05-he-bing-cai-wu-bao-biao-xiang-mu-zhu-shi-tou-zi-shou-yi",
       "soe_format": {
         "content_type": "mixed",
@@ -1428,8 +1447,22 @@
       "field_mapping": null
     },
     {
+      "section_title": "无形资产",
+      "soe_section_id": "chapter-04-zhong-yao-kuai-ji-zheng-ce-kuai-ji-gu-ji-wu-xing-zi-chan",
+      "listed_section_id": "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-wu-xing-zi-chan",
+      "soe_format": {
+        "content_type": "text",
+        "table_count": 0
+      },
+      "listed_format": {
+        "content_type": "mixed",
+        "table_count": 2
+      },
+      "field_mapping": null
+    },
+    {
       "section_title": "现金流量表补充资料",
-      "soe_section_id": "chapter-12-gu-fen-zhi-fu-xian-jin-liu-liang-biao-bu-chong-zi-liao",
+      "soe_section_id": "chapter-12-mu-gong-si-cai-wu-bao-biao-de-zhu-yao-xiang-mu-fu-zhu-xian-jin-liu-liang-biao-bu-cho",
       "listed_section_id": "chapter-05-he-bing-cai-wu-bao-biao-xiang-mu-zhu-shi-xian-jin-liu-liang-biao-bu-chong-zi-liao",
       "soe_format": {
         "content_type": "mixed",
@@ -1442,8 +1475,22 @@
       "field_mapping": null
     },
     {
+      "section_title": "生物资产",
+      "soe_section_id": "chapter-04-zhong-yao-kuai-ji-zheng-ce-kuai-ji-gu-ji-sheng-wu-zi-chan",
+      "listed_section_id": "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-sheng-wu-zi-chan",
+      "soe_format": {
+        "content_type": "text",
+        "table_count": 1
+      },
+      "listed_format": {
+        "content_type": "mixed",
+        "table_count": 1
+      },
+      "field_mapping": null
+    },
+    {
       "section_title": "营业收入与营业成本",
-      "soe_section_id": "chapter-12-gu-fen-zhi-fu-ying-ye-shou-ru-yu-ying-ye-cheng-ben",
+      "soe_section_id": "chapter-12-mu-gong-si-cai-wu-bao-biao-de-zhu-yao-xiang-mu-fu-zhu-ying-ye-shou-ru-yu-ying-ye-che",
       "listed_section_id": "chapter-16-mu-gong-si-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-ying-ye-shou-ru-yu-ying-ye-cheng",
       "soe_format": {
         "content_type": "mixed",
@@ -1452,20 +1499,6 @@
       "listed_format": {
         "content_type": "mixed",
         "table_count": 6
-      },
-      "field_mapping": null
-    },
-    {
-      "section_title": "货币资金",
-      "soe_section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-huo-bi-zi-jin",
-      "listed_section_id": "chapter-05-he-bing-cai-wu-bao-biao-xiang-mu-zhu-shi-huo-bi-zi-jin",
-      "soe_format": {
-        "content_type": "mixed",
-        "table_count": 2
-      },
-      "listed_format": {
-        "content_type": "mixed",
-        "table_count": 1
       },
       "field_mapping": null
     },
@@ -1498,6 +1531,20 @@
       "field_mapping": null
     },
     {
+      "section_title": "长期应付职工薪酬",
+      "soe_section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-chang-qi-ying-fu-zhi-gong-xin-chou",
+      "listed_section_id": "chapter-05-he-bing-cai-wu-bao-biao-xiang-mu-zhu-shi-chang-qi-ying-fu-zhi-gong-xin-chou",
+      "soe_format": {
+        "content_type": "mixed",
+        "table_count": 6
+      },
+      "listed_format": {
+        "content_type": "mixed",
+        "table_count": 8
+      },
+      "field_mapping": null
+    },
+    {
       "section_title": "长期应收款",
       "soe_section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-chang-qi-ying-shou-kuan",
       "listed_section_id": "chapter-05-he-bing-cai-wu-bao-biao-xiang-mu-zhu-shi-chang-qi-ying-shou-kuan",
@@ -1507,7 +1554,35 @@
       },
       "listed_format": {
         "content_type": "mixed",
-        "table_count": 12
+        "table_count": 8
+      },
+      "field_mapping": null
+    },
+    {
+      "section_title": "长期待摊费用",
+      "soe_section_id": "chapter-04-zhong-yao-kuai-ji-zheng-ce-kuai-ji-gu-ji-chang-qi-dai-tan-fei-yong",
+      "listed_section_id": "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-chang-qi-dai-tan-fei-yong",
+      "soe_format": {
+        "content_type": "text",
+        "table_count": 0
+      },
+      "listed_format": {
+        "content_type": "mixed",
+        "table_count": 1
+      },
+      "field_mapping": null
+    },
+    {
+      "section_title": "长期股权投资",
+      "soe_section_id": "chapter-04-zhong-yao-kuai-ji-zheng-ce-kuai-ji-gu-ji-chang-qi-gu-quan-tou-zi",
+      "listed_section_id": "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-chang-qi-gu-quan-tou-zi",
+      "soe_format": {
+        "content_type": "text",
+        "table_count": 0
+      },
+      "listed_format": {
+        "content_type": "mixed",
+        "table_count": 1
       },
       "field_mapping": null
     },
@@ -1522,6 +1597,20 @@
       "listed_format": {
         "content_type": "mixed",
         "table_count": 3
+      },
+      "field_mapping": null
+    },
+    {
+      "section_title": "预计负债",
+      "soe_section_id": "chapter-04-zhong-yao-kuai-ji-zheng-ce-kuai-ji-gu-ji-yu-ji-fu-zhai",
+      "listed_section_id": "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-yu-ji-fu-zhai",
+      "soe_format": {
+        "content_type": "text",
+        "table_count": 0
+      },
+      "listed_format": {
+        "content_type": "mixed",
+        "table_count": 1
       },
       "field_mapping": null
     }

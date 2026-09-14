@@ -18,10 +18,24 @@
 
 <template>
   <div class="gt-b-index">
-    <!-- ─── 编制信息区 ─── -->
-    <div class="gt-b-index__preparation">
+    <!-- ─── 编制信息区（可折叠） ─── -->
+    <div class="gt-b-index__preparation" :class="{ 'is-collapsed': prepCollapsed }">
+      <div class="gt-b-index__preparation-bar" @click="prepCollapsed = !prepCollapsed">
+        <span class="gt-b-index__preparation-title">编制信息</span>
+        <span v-if="prepCollapsed" class="gt-b-index__preparation-summary">{{ prepSummary }}</span>
+        <span v-if="indexNo" class="gt-b-index__preparation-index">索引号：{{ indexNo }}</span>
+        <el-button
+          class="gt-b-index__preparation-toggle"
+          link
+          type="primary"
+          size="small"
+          @click.stop="prepCollapsed = !prepCollapsed"
+        >
+          {{ prepCollapsed ? '展开' : '收起' }}
+        </el-button>
+      </div>
       <el-descriptions
-        title="编制信息"
+        v-show="!prepCollapsed"
         :column="2"
         border
         size="default"
@@ -44,115 +58,92 @@
         <el-descriptions-item label="复核日期">
           {{ preparationInfo.review_date || '—' }}
         </el-descriptions-item>
-        <el-descriptions-item label="会计期间" :span="2">
-          {{ preparationInfo.accounting_period || '—' }}
-        </el-descriptions-item>
       </el-descriptions>
     </div>
 
-    <!-- ─── 索引导航表 ─── -->
-    <div class="gt-b-index__navigation">
+    <!-- ─── E1 货币资金：跨表结论口径卡片（追加于底稿架构上方，不改动既有架构树/循环网格） ─── -->
+    <E1TabDirectory
+      v-if="isE1Series"
+      :wp-id="wpId"
+      :available-sheets="htmlData?.navigation_rows"
+      @navigate="handleNavigate"
+    />
+
+    <!-- ─── D~N 各科目：通用目录卡（复核+编制/使用手册+进度+跨表结论口径，追加于底稿架构上方） ─── -->
+    <GtCycleDirectoryCard
+      v-if="showCycleDirCard"
+      :wp-id="wpId"
+      :wp-code="currentWpCode"
+      :available-sheets="htmlData?.navigation_rows"
+      @navigate="handleNavigate"
+    />
+
+    <!-- ─── B60 总体审计策略专属组件（章节结构化 + 子底稿双模式/结构化 + 工时表切页） ─── -->
+    <GtB60Bundle
+      v-if="isB60Series"
+      :project-id="projectId"
+      :wp-id="wpId"
+      :sub-wp-id-map="b60SubWpIdMap"
+      @navigate-sheet="handleB60Navigate"
+    />
+
+    <!-- ─── 底稿架构导航（流程图，取代表格式索引导航） ─── -->
+    <div v-else class="gt-b-index__navigation">
       <div class="gt-b-index__navigation-header">
-        <h4 class="gt-b-index__navigation-title">索引导航</h4>
-        <div v-if="!readonly" class="gt-b-index__navigation-actions">
-          <!-- Sprint 4 Task 17.9: 底稿架构折叠按钮 -->
-          <el-button text size="small" @click="archTreeExpanded = !archTreeExpanded" title="底稿架构">
-            🏗️ {{ archTreeExpanded ? '收起' : '底稿架构' }}
-          </el-button>
-          <el-button
-            v-if="selectedRows.length > 0"
-            size="small"
-            type="warning"
-            @click="batchToggleNoPrint"
-          >
-            批量切换"无需打印" ({{ selectedRows.length }})
-          </el-button>
-        </div>
+        <h4 class="gt-b-index__navigation-title">底稿架构</h4>
+        <span class="gt-b-index__navigation-hint">点击程序卡片可跳转至对应底稿</span>
       </div>
 
-      <!-- Sprint 4 Task 17.9: 底稿架构树 -->
       <GtBArchitectureTree
-        v-if="wpId && projectId"
         :wp-id="wpId"
         :project-id="projectId"
-        :expanded="archTreeExpanded"
+        :active-sheet="sheetName"
         :html-data="htmlData"
+        @navigate="handleNavigate"
       />
+    </div>
 
-      <el-table
-        ref="tableRef"
-        :data="navigationRows"
-        border
-        row-key="seq"
-        @selection-change="handleSelectionChange"
-        class="gt-b-index__table"
-      >
-        <!-- 多选列（非只读时显示） -->
-        <el-table-column
-          v-if="!readonly"
-          type="selection"
-          width="40"
-        />
-
-        <!-- 序号 -->
-        <el-table-column
-          label="序号"
-          prop="seq"
-          width="60"
-          align="center"
-          resizable
-        />
-
-        <!-- 内容 -->
-        <el-table-column
-          label="内容"
-          prop="content"
-          min-width="280"
-          resizable
-        />
-
-        <!-- 索引号（GtIndexChip 渲染） -->
-        <el-table-column
-          label="索引号"
-          min-width="160"
-          resizable
+    <!-- ─── 循环底稿目录（跨底稿，同审计循环全部底稿） ─── -->
+    <div v-if="cycleWorkpapers.length > 0" class="gt-b-index__cycle">
+      <div class="gt-b-index__cycle-header">
+        <h4 class="gt-b-index__cycle-title">本循环底稿目录</h4>
+        <span class="gt-b-index__cycle-hint">点击可跳转至同循环其他底稿（灰色表示尚未生成）</span>
+      </div>
+      <div class="gt-b-index__cycle-grid">
+        <div
+          v-for="wp in cycleWorkpapers"
+          :key="wp.wp_code"
+          class="gt-b-index__cycle-card"
+          :class="{
+            'is-current': wp.is_current,
+            'is-disabled': !wp.wp_id,
+          }"
+          @click="onCycleCardClick(wp)"
         >
-          <template #default="{ row }">
-            <GtIndexChip
-              v-if="row.index_ref"
-              :value="row.index_ref"
-              @click="handleIndexChipClick(row.index_ref)"
-            />
-            <span v-else class="gt-b-index__empty-ref">—</span>
-          </template>
-        </el-table-column>
-
-        <!-- 无需打印 -->
-        <el-table-column
-          label="无需打印"
-          width="100"
-          align="center"
-          resizable
-        >
-          <template #default="{ row }">
-            <el-switch
-              v-model="row.no_print"
-              :disabled="readonly"
+          <div class="gt-b-index__cycle-card-top">
+            <span class="gt-b-index__cycle-code">{{ wp.wp_code }}</span>
+            <el-tag
+              v-if="wp.is_current"
               size="small"
-              @change="handleNoPrintChange(row)"
-            />
-          </template>
-        </el-table-column>
-      </el-table>
+              effect="plain"
+              class="gt-b-index__cycle-current-tag"
+            >当前</el-tag>
+          </div>
+          <span class="gt-b-index__cycle-name" :title="wp.wp_name">{{ wp.wp_name }}</span>
+        </div>
+      </div>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, onBeforeUnmount } from 'vue'
-import { useRoute } from 'vue-router'
-import GtIndexChip from '@/components/workpaper/GtIndexChip.vue'
+import { ref, computed, watch, onBeforeUnmount, defineAsyncComponent } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import GtBArchitectureTree from '@/components/workpaper/GtBArchitectureTree.vue'
+
+const GtB60Bundle = defineAsyncComponent(() => import('./b60/GtB60Bundle.vue'))
+const E1TabDirectory = defineAsyncComponent(() => import('./e1/E1TabDirectory.vue'))
+const GtCycleDirectoryCard = defineAsyncComponent(() => import('./GtCycleDirectoryCard.vue'))
 
 // ─── Types ───
 interface NavigationRow {
@@ -172,6 +163,15 @@ export interface BIndexSchema {
 interface BIndexHtmlData {
   preparation_info: Record<string, string>
   navigation_rows: NavigationRow[]
+  cycle_workpapers?: CycleWorkpaper[]
+}
+
+interface CycleWorkpaper {
+  wp_code: string
+  wp_name: string
+  wp_id: string | null
+  status: string
+  is_current: boolean
 }
 
 // ─── Props / Emits ───
@@ -181,8 +181,11 @@ const props = withDefaults(defineProps<{
   schema: BIndexSchema
   htmlData: BIndexHtmlData
   readonly?: boolean
+  /** 当前底稿编码（由 GtWpRenderer 透传，用于 B60 系列多文件识别） */
+  wpCode?: string
 }>(), {
   readonly: false,
+  wpCode: '',
 })
 
 const emit = defineEmits<{
@@ -193,14 +196,69 @@ const emit = defineEmits<{
 
 // ─── State ───
 const route = useRoute()
+const router = useRouter()
 const preparationInfo = ref<Record<string, string>>({})
 const navigationRows = ref<NavigationRow[]>([])
-const selectedRows = ref<NavigationRow[]>([])
-const tableRef = ref<any>(null)
-
-// Sprint 4 Task 17.9: 底稿架构树展开状态
-const archTreeExpanded = ref(false)
 const projectId = computed(() => (route.params.projectId as string) || '')
+
+// 循环底稿目录（跨底稿）——同审计循环全部底稿，点击 router.push 跳转
+const cycleWorkpapers = computed<CycleWorkpaper[]>(
+  () => props.htmlData?.cycle_workpapers ?? [],
+)
+
+// ─── B60 系列多文件识别 ───
+// 当前底稿编码：优先用 props.wpCode，回退到 cycleWorkpapers 中 is_current 项
+const currentWpCode = computed<string>(() => {
+  if (props.wpCode) return props.wpCode
+  const cur = cycleWorkpapers.value.find((w) => w.is_current)
+  return cur?.wp_code || ''
+})
+// B60「总体审计策略及具体审计计划」是多文件底稿（1 xlsx + 9 docx）
+const isB60Series = computed<boolean>(() => currentWpCode.value === 'B60')
+// E1 货币资金：目录页在底稿架构上方追加「跨表结论口径」卡片
+const isE1Series = computed<boolean>(() => currentWpCode.value === 'E1')
+// D~N 各科目：目录页在底稿架构上方追加通用「目录卡（复核+手册+进度+跨表结论口径）」
+// （E1 用专属 E1TabDirectory；K 循环走专属 GtK{n} 不经 GtBIndex；A/B/C 规划类不加）
+const CYCLE_DIR_CARD_LETTERS = new Set(['D', 'F', 'G', 'H', 'I', 'J', 'L', 'M', 'N'])
+const showCycleDirCard = computed<boolean>(() => {
+  const code = currentWpCode.value || ''
+  if (isE1Series.value || isB60Series.value) return false
+  const m = /^([A-N])\d+$/.exec(code)
+  return !!m && CYCLE_DIR_CARD_LETTERS.has(m[1])
+})
+// B60-* 子底稿 wp_id 映射（从 cycle_workpapers 派生，供 GtB60Bundle 在线编辑取子底稿 wp）
+const b60SubWpIdMap = computed<Record<string, string>>(() => {
+  const map: Record<string, string> = {}
+  for (const wp of cycleWorkpapers.value) {
+    const code = wp.wp_code || ''
+    if (wp.wp_id && (code.startsWith('B60-') || /^B60[A-D]$/.test(code))) {
+      map[code] = wp.wp_id
+    }
+  }
+  return map
+})
+// 从 navigation_rows 提取工时表（B60-1）真实 sheet 名，供 GtB60Bundle 工时表切页
+const worktimeSheetName = computed<string>(() => {
+  const rows = props.htmlData?.navigation_rows ?? []
+  const hit = rows.find(
+    (r) => (r.index_ref || '').startsWith('B60-1') || String(r.content || '').includes('工时'),
+  )
+  return hit?.content || ''
+})
+
+// 编制信息折叠状态（默认展开）；收起时在标题栏显示概要
+const prepCollapsed = ref(false)
+// 索引号置于标题栏右上角常显（取代表内单独的索引号行）
+const indexNo = computed(() => {
+  const v = preparationInfo.value.index_no
+  return v != null && String(v).trim() !== '' ? String(v) : ''
+})
+const prepSummary = computed(() => {
+  const parts = [preparationInfo.value.entity_name, preparationInfo.value.index_no].filter(
+    (p) => p != null && String(p).trim() !== '',
+  )
+  return parts.length ? parts.join(' · ') : '—'
+})
 
 // Auto-save debounce
 let saveTimer: ReturnType<typeof setTimeout> | null = null
@@ -227,37 +285,30 @@ watch(() => props.htmlData, () => {
 }, { deep: true })
 
 // ─── Methods ───
-function handleSelectionChange(selection: NavigationRow[]) {
-  selectedRows.value = selection
+function handleNavigate(sheetName: string) {
+  // 架构图节点点击 → 冒泡给父组件切换 sheet
+  emit('jump-to-section', sheetName)
 }
 
-function handleNoPrintChange(_row: NavigationRow) {
-  debounceSave()
-}
-
-function batchToggleNoPrint() {
-  // Toggle: if any selected row has no_print=false, set all to true; otherwise set all to false
-  const anyNotMarked = selectedRows.value.some(r => !r.no_print)
-  const targetValue = anyNotMarked
-
-  selectedRows.value.forEach(selected => {
-    const idx = navigationRows.value.findIndex(r => r.seq === selected.seq)
-    if (idx >= 0) {
-      navigationRows.value[idx].no_print = targetValue
-    }
-  })
-
-  // Clear selection
-  selectedRows.value = []
-  if (tableRef.value) {
-    tableRef.value.clearSelection()
+// GtB60Bundle 的工时表切页：B60-1 → 映射到 render-config 已渲染的真实工时表 sheet 名
+function handleB60Navigate(sheetName: string) {
+  if (sheetName && sheetName.startsWith('B60-1') && worktimeSheetName.value) {
+    handleNavigate(worktimeSheetName.value)
+  } else {
+    handleNavigate(sheetName)
   }
-
-  debounceSave()
 }
 
-function handleIndexChipClick(indexRef: string) {
-  emit('jump-to-section', indexRef)
+function onCycleCardClick(wp: CycleWorkpaper) {
+  // 跨底稿跳转：同循环其他底稿用 router.push 打开对应 WorkpaperEditor。
+  // wp_id 为空（底稿未生成文件）→ 不可跳转。当前底稿 → 不重复跳。
+  if (!wp.wp_id || wp.is_current) return
+  const pid = projectId.value
+  if (!pid) return
+  router.push({
+    name: 'WorkpaperEditor',
+    params: { projectId: pid, wpId: wp.wp_id },
+  })
 }
 
 function debounceSave() {
@@ -288,6 +339,60 @@ onBeforeUnmount(() => {
 
 .gt-b-index__preparation {
   margin-bottom: 24px;
+  border: 1px solid var(--gt-color-border-purple-light, #d8b8ee);
+  border-radius: 6px;
+  background: var(--gt-color-primary-bg, #f4f0fa);
+  overflow: hidden;
+}
+.gt-b-index__preparation.is-collapsed {
+  min-height: 36px;
+}
+.gt-b-index__preparation-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  cursor: pointer;
+  user-select: none;
+}
+.gt-b-index__preparation-title {
+  font-weight: 600;
+  font-size: var(--wp-font-size, 13px);
+  color: var(--gt-color-primary, #4b2d77);
+}
+.gt-b-index__preparation-summary {
+  flex: 1;
+  font-size: 12px;
+  color: var(--gt-color-text-secondary, #606266);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* 索引号常显于标题栏右上角（取代表内单独索引号行）；用 margin-left:auto 顶到右侧、紧邻收起按钮 */
+.gt-b-index__preparation-index {
+  margin-left: auto;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--gt-color-primary, #4b2d77);
+  white-space: nowrap;
+}
+/* 概要已占据 flex:1 时，索引号紧随其后即可，无需再 auto 顶（避免双 auto 冲突） */
+.gt-b-index__preparation-summary ~ .gt-b-index__preparation-index {
+  margin-left: 8px;
+}
+.gt-b-index__preparation-toggle {
+  margin-left: 8px;
+}
+/* el-descriptions 嵌入折叠容器：去掉自身外边距，留出内边距 */
+.gt-b-index__preparation :deep(.el-descriptions) {
+  padding: 0 12px 10px;
+}
+.gt-b-index__preparation :deep(.el-descriptions__label) {
+  color: var(--gt-color-primary, #4b2d77);
+  background: var(--gt-color-primary-bg, #f4f0fa);
+}
+.gt-b-index__preparation :deep(.gt-b-index__preparation-toggle.el-button.is-link) {
+  color: var(--gt-color-primary, #4b2d77);
 }
 
 .gt-b-index__navigation {
@@ -296,8 +401,8 @@ onBeforeUnmount(() => {
 
 .gt-b-index__navigation-header {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
   margin-bottom: 12px;
 }
 
@@ -308,16 +413,95 @@ onBeforeUnmount(() => {
   color: var(--gt-color-text-primary, #303133);
 }
 
-.gt-b-index__navigation-actions {
-  display: flex;
-  gap: 8px;
-}
-
-.gt-b-index__table {
-  width: 100%;
-}
-
-.gt-b-index__empty-ref {
+.gt-b-index__navigation-hint {
+  font-size: 12px;
   color: var(--gt-color-text-tertiary, #909399);
+}
+
+/* ─── 循环底稿目录（跨底稿） ─── */
+.gt-b-index__cycle {
+  margin-top: 28px;
+}
+.gt-b-index__cycle-header {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.gt-b-index__cycle-title {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--gt-color-text-primary, #303133);
+}
+.gt-b-index__cycle-hint {
+  font-size: 12px;
+  color: var(--gt-color-text-tertiary, #909399);
+}
+.gt-b-index__cycle-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 10px;
+}
+.gt-b-index__cycle-card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 12px;
+  border: 1px solid var(--gt-color-border-purple, #e8e4f0);
+  border-radius: 8px;
+  background: var(--gt-color-bg-white, #fff);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.gt-b-index__cycle-card:hover {
+  border-color: var(--gt-color-primary, #4b2d77);
+  box-shadow: 0 2px 8px rgba(75, 45, 119, 0.12);
+  transform: translateY(-2px);
+}
+.gt-b-index__cycle-card.is-current {
+  border-color: var(--gt-color-primary, #4b2d77);
+  background: var(--gt-color-primary-bg, #f4f0fa);
+  box-shadow: 0 0 0 1px var(--gt-color-primary, #4b2d77);
+  cursor: default;
+}
+.gt-b-index__cycle-card.is-disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.gt-b-index__cycle-card.is-disabled:hover {
+  border-color: var(--gt-color-border-purple, #e8e4f0);
+  box-shadow: none;
+  transform: none;
+}
+.gt-b-index__cycle-card-top {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.gt-b-index__cycle-code {
+  font-size: var(--wp-font-size, 13px);
+  font-weight: 700;
+  color: var(--gt-color-primary, #4b2d77);
+}
+.gt-b-index__cycle-current-tag {
+  margin-left: auto;
+}
+.gt-b-index__cycle-card :deep(.gt-b-index__cycle-current-tag.el-tag) {
+  --el-tag-bg-color: var(--gt-color-primary-bg, #f4f0fa);
+  --el-tag-border-color: var(--gt-color-border-purple-light, #d8b8ee);
+  --el-tag-text-color: var(--gt-color-primary, #4b2d77);
+  background-color: var(--gt-color-primary-bg, #f4f0fa) !important;
+  border-color: var(--gt-color-border-purple-light, #d8b8ee) !important;
+  color: var(--gt-color-primary, #4b2d77) !important;
+}
+.gt-b-index__cycle-name {
+  font-size: var(--wp-font-size, 13px);
+  line-height: 1.4;
+  color: var(--gt-color-text-primary, #303133);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 </style>

@@ -1,0 +1,173 @@
+{
+  "schema_version": "contract-definition:v1",
+  "contract_id": "f2.stocktake.plan",
+  "semantic_version": "1.0.0",
+  "review_status": "reviewed",
+  "document_type": "docx",
+  "template": {
+    "relative_path": "F/F2-22 存货监盘计划.docx",
+    "template_sha256": "f19aa64a9daa01022231d91f43d342a4ae973088dbd42b58459ad65c206662ba",
+    "normalized_structure_hash": "27b722592ba5eb8b7ed46aa56754fd15d10fd53460049827edea578c44e9ce6b"
+  },
+  "template_definition_sha256": "eaedaadc428fe2fdba14a513124f2c1bb48fbd94bd081d3493eb732404b28cea",
+  "instrumentation_definition_sha256": "ce184f6be66627840af9b70bdd0da56009e8ead4384db459ed2b6d6677b6005f",
+  "identity_carriers": [
+    "field_sdt_block",
+    "field_sdt_inline"
+  ],
+  "fields": [
+    {
+      "stable_field_key": "plan/entity_name",
+      "json_pointer": "/entityName",
+      "mode": "editable",
+      "value_type": "text",
+      "source_ref": "F2-22!p01+04:${entityName}",
+      "sdt_tag": "gt:field:f2.stocktake.plan:plan/entity_name",
+      "instances": "many"
+    },
+    {
+      "stable_field_key": "plan/audit_year",
+      "json_pointer": "/auditYear",
+      "mode": "editable",
+      "value_type": "integer",
+      "source_ref": "F2-22!p02:${auditYear}",
+      "sdt_tag": "gt:field:f2.stocktake.plan:plan/audit_year",
+      "instances": "one"
+    },
+    {
+      "stable_field_key": "plan/bs_date",
+      "json_pointer": "/bsDate",
+      "mode": "editable",
+      "value_type": "date",
+      "source_ref": "F2-22!p04:${bsDate}",
+      "sdt_tag": "gt:field:f2.stocktake.plan:plan/bs_date",
+      "instances": "one"
+    },
+    {
+      "stable_field_key": "plan/purpose",
+      "json_pointer": "/purpose",
+      "mode": "editable",
+      "value_type": "text",
+      "source_ref": "F2-22!p06:${purpose}",
+      "sdt_tag": "gt:field:f2.stocktake.plan:plan/purpose",
+      "instances": "one"
+    },
+    {
+      "stable_field_key": "plan/scope",
+      "json_pointer": "/scope",
+      "mode": "editable",
+      "value_type": "text",
+      "source_ref": "F2-22!p08:${scope}",
+      "sdt_tag": "gt:field:f2.stocktake.plan:plan/scope",
+      "instances": "one"
+    },
+    {
+      "stable_field_key": "plan/warehouses",
+      "json_pointer": "/warehouses",
+      "mode": "editable",
+      "value_type": "text",
+      "source_ref": "F2-22!p10:${warehouses}",
+      "sdt_tag": "gt:block:f2.stocktake.plan:plan/warehouses",
+      "instances": "one"
+    },
+    {
+      "stable_field_key": "plan/count_date",
+      "json_pointer": "/countDate",
+      "mode": "editable",
+      "value_type": "text",
+      "source_ref": "F2-22!p12:${countDate}",
+      "sdt_tag": "gt:field:f2.stocktake.plan:plan/count_date",
+      "instances": "one"
+    },
+    {
+      "stable_field_key": "plan/auditors",
+      "json_pointer": "/auditors",
+      "mode": "editable",
+      "value_type": "text",
+      "source_ref": "F2-22!p14:${auditors}",
+      "sdt_tag": "gt:field:f2.stocktake.plan:plan/auditors",
+      "instances": "one"
+    },
+    {
+      "stable_field_key": "plan/client_staff",
+      "json_pointer": "/clientStaff",
+      "mode": "editable",
+      "value_type": "text",
+      "source_ref": "F2-22!p15:${clientStaff}",
+      "sdt_tag": "gt:field:f2.stocktake.plan:plan/client_staff",
+      "instances": "one"
+    },
+    {
+      "stable_field_key": "plan/assignment",
+      "json_pointer": "/assignment",
+      "mode": "editable",
+      "value_type": "text",
+      "source_ref": "F2-22!p17:${assignment}",
+      "sdt_tag": "gt:field:f2.stocktake.plan:plan/assignment",
+      "instances": "one"
+    },
+    {
+      "stable_field_key": "plan/prep",
+      "json_pointer": "/prep",
+      "mode": "editable",
+      "value_type": "text",
+      "source_ref": "F2-22!p19:${prep}",
+      "sdt_tag": "gt:field:f2.stocktake.plan:plan/prep",
+      "instances": "one"
+    },
+    {
+      "stable_field_key": "plan/inventory_composition",
+      "json_pointer": "/inventoryComposition",
+      "mode": "editable",
+      "value_type": "text",
+      "source_ref": "F2-22!p21:${inventoryComposition}",
+      "sdt_tag": "gt:field:f2.stocktake.plan:plan/inventory_composition",
+      "instances": "one"
+    },
+    {
+      "stable_field_key": "plan/count_method",
+      "json_pointer": "/countMethod",
+      "mode": "editable",
+      "value_type": "text",
+      "source_ref": "F2-22!p23:${countMethod}",
+      "sdt_tag": "gt:field:f2.stocktake.plan:plan/count_method",
+      "instances": "one"
+    },
+    {
+      "stable_field_key": "plan/requirements",
+      "json_pointer": "/requirements",
+      "mode": "editable",
+      "value_type": "text",
+      "source_ref": "F2-22!p26:${requirements}",
+      "sdt_tag": "gt:field:f2.stocktake.plan:plan/requirements",
+      "instances": "one"
+    },
+    {
+      "stable_field_key": "plan/special_notes",
+      "json_pointer": "/specialNotes",
+      "mode": "editable",
+      "value_type": "text",
+      "source_ref": "F2-22!p28:${specialNotes}",
+      "sdt_tag": "gt:field:f2.stocktake.plan:plan/special_notes",
+      "instances": "one"
+    },
+    {
+      "stable_field_key": "plan/team_name",
+      "json_pointer": "/teamName",
+      "mode": "editable",
+      "value_type": "text",
+      "source_ref": "F2-22!p31:${teamName}",
+      "sdt_tag": "gt:field:f2.stocktake.plan:plan/team_name",
+      "instances": "one"
+    },
+    {
+      "stable_field_key": "plan/plan_date",
+      "json_pointer": "/planDate",
+      "mode": "editable",
+      "value_type": "date",
+      "source_ref": "F2-22!p32:${planDate}",
+      "sdt_tag": "gt:field:f2.stocktake.plan:plan/plan_date",
+      "instances": "one"
+    }
+  ]
+}

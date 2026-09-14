@@ -1,0 +1,77 @@
+# S3 会计政策变更、前期差错、估计变更 — 专属渲染 schema
+# component_type: s3-policy-change
+# Template: S3 会计政策变更、前期差错会计、估计变更2020.xlsx
+# 整册统一路由到 GtS3PolicyChange，前端按 sheetName v-if 分发
+
+wp_code: S3
+wp_name: 会计政策变更、前期差错、估计变更
+component_type: s3-policy-change
+template_path: backend/wp_templates/S/S3 会计政策变更、前期差错会计、估计变更2020.xlsx
+template_version: v2025-R5
+applicable_standards: [soe_standalone, listed_standalone, soe_consolidated, listed_consolidated]
+
+# 整册专属组件：前端按 sheetName v-if 分发
+whole_workbook_dedicated: true
+
+sheets:
+  - sheet_name: 审定表
+    internal_type: sheet-adjudication
+    description: 会计政策/估计变更及前期差错审定表
+    has_formulas: true
+    formula_count: 4
+
+  - sheet_name: 会计政策变更和前期差错更正S3-1
+    internal_type: sheet-policy-change
+    description: 会计政策变更事项和前期差错更正审计程序
+    has_formulas: true
+    formula_count: 4
+
+  - sheet_name: 会计估计变更审计程序S3-2
+    internal_type: sheet-estimate-change
+    description: 会计估计变更审计程序表
+    has_formulas: true
+    formula_count: 4
+
+  - sheet_name: 首次执行新金融工具准则的调整S3-4
+    internal_type: sheet-ifrs9-adjust
+    description: IFRS9/CAS22 首次执行调整表（新旧科目对照+差异）
+    has_formulas: true
+    formula_count: 41
+
+  - sheet_name: 首次执行新收入准则的调整S3-6
+    internal_type: sheet-ifrs15-adjust
+    description: IFRS15/CAS14 首次执行调整表
+    has_formulas: true
+    formula_count: 4
+
+  - sheet_name: 首次执行新租赁准则的调整S3-8
+    internal_type: sheet-ifrs16-adjust
+    description: IFRS16/CAS21 首次执行调整（使用权资产+租赁负债初始确认）
+    has_formulas: true
+    formula_count: 6
+
+  - sheet_name: 简化的追溯调整法（1）S3-9
+    internal_type: sheet-simplified-retro-1
+    description: 简化追溯调整法 — 折现计算核心（剩余年限+现值折现因子+条件公式）
+    has_formulas: true
+    formula_count: 137
+
+  - sheet_name: 简化的追溯调整法（2）S3-10
+    internal_type: sheet-simplified-retro-2
+    description: 简化追溯调整法变体 — 增加分期计算（月份比例）
+    has_formulas: true
+    formula_count: 132
+
+# 跳过的 sheet（不纳入专属组件）
+skip_sheets:
+  - 表头（请先填写）
+  - "参考-简化的追溯调整法（首次执行日）"
+
+# 公式引擎元数据
+formula_engine:
+  name: useS3AdjustmentEngine
+  type: pure_function
+  sub_engines:
+    - ifrs9_adjust: "G{r} = F{r} - D{r}"
+    - ifrs16_adjust: "F55 = F53 - F54; F63 = F56+F57+F58-F59-F60-F61-F62"
+    - simplified_retro: "H{r} = 1/(1+$H$10)^G{r}; I{r} = B{r} * H{r}"

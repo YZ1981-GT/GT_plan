@@ -55,6 +55,11 @@ async def list_notifications(
             "related_object_id": str(n.related_object_id) if n.related_object_id else None,
             "is_read": n.is_read,
             "created_at": n.created_at.isoformat() if n.created_at else None,
+            # procedure-delegation-notification / Task 11：metadata 驱动跳转（不从中文 content
+            # 解析路由，Req 10.8）；event_id 供前端 SSE/去重与聚合摘要跳转。
+            "event_id": n.event_id,
+            "dedup_key": n.dedup_key,
+            "metadata": n.notification_metadata,
         }
         for n in notifications
     ]

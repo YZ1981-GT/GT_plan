@@ -31,10 +31,88 @@ logger = logging.getLogger(__name__)
 
 
 class TrimReasonCode(str, Enum):
+    """裁剪理由码（**粗裁与细裁共用的唯一真源**）。
+
+    spec: procedure-trimming-and-delegation-intelligence — Task 12
+    Requirements: 8.1 / 8.2 / 8.3 / 8.7
+    守卫: ``backend/tests/procedure_trim/test_trim_reason_codes.py``
+          + 前端 ``composables/__tests__/trimReasonCodes.spec.ts``（读本文件源码交叉锁死）
+
+    ═══ 为什么两层裁剪必须共用同一个枚举 ═══
+
+    改造前平台有两套互不相通的理由体系：
+
+    - **细裁**（``procedure_trim_engine``，行级）用本枚举，落 ``parsed_data.trimming_metadata``；
+    - **粗裁**（``procedure_trim_service``，scope 级）只有 ``skip_reason`` **自由文本**，
+      内容由前端拼串（``智能裁剪：D2 科目在试算表中无数据……``）。
+
+    后果是「按理由码做全项目统计」只能覆盖细裁那一半 —— 而粗裁恰恰是裁剪的主链
+    （``ProcedureTrimming.vue`` 的保存粗裁 / 智能裁剪 / 跨循环批量全走它）。质控与
+    EQCR 想问「本项目因金额低于重要性而裁掉的程序共多少、合计金额多少」时，
+    自由文本无法聚合，只能逐张点开看。
+
+    故本枚举 additive 扩四个取值供粗裁使用，两层从此同源；``skip_reason``
+    **保留并继续承载人类可读理由文本**（存量记录只有它，R8.4 要求原文照显）。
+
+    ═══ 新增四值的语义边界 ═══
+
+    前三个由 ``procedureTrimDecision.decideTrim`` 自动产出，边界即该内核的档位：
+
+    - ``NO_DATA``：科目/循环在试算平衡表无数据 —— **事实判断**，可自动裁剪。
+    - ``BELOW_TRIVIAL``：余额低于明显微小错报临界值 —— **职业判断**，只产建议。
+    - ``BELOW_MATERIALITY``：余额低于实际执行重要性 —— 同上，且须过汇总闸。
+
+    第四个由人工选择，内核永不产出：
+
+    - ``COVERED_ELSEWHERE``：相关认定已由其他底稿覆盖（对应前端既有常用理由
+      「相关认定已在其他底稿覆盖」）。它是**认定层面的覆盖判断**，系统无从推断
+      哪张底稿覆盖了哪个认定，故不自动化。
+
+    ═══ 🔴 既有四值一字不动 ═══
+
+    ``NO_RELATED_BUSINESS`` / ``LOW_RISK_ASSESSMENT`` / ``CONTROL_TEST_EFFECTIVE``
+    / ``OTHER`` 已被 ``wp_procedure_trim`` 路由、细裁历史数据与 3 个测试文件消费。
+    枚举值改名会让存量 ``trimming_metadata`` 里的理由码读不回来（pydantic 校验失败），
+    故只做加法。守卫钉死这四值逐字存在。
+    """
+
+    # ── 既有四值（细裁，人工选择；勿改名勿删）──────────────────────────────
     NO_RELATED_BUSINESS = "no_related_business"
     LOW_RISK_ASSESSMENT = "low_risk_assessment"
     CONTROL_TEST_EFFECTIVE = "control_test_effective"
     OTHER = "other"
+
+    # ── Task 12 新增（粗裁三维判据；前三个由决策内核自动产出）──────────────
+    NO_DATA = "no_data"
+    BELOW_TRIVIAL = "below_trivial"
+    BELOW_MATERIALITY = "below_materiality"
+    COVERED_ELSEWHERE = "covered_elsewhere"
+
+
+#: 由 ``procedureTrimDecision.decideTrim`` 自动产出的理由码。
+#:
+#: 🔴 ``COVERED_ELSEWHERE`` 刻意不在其中 —— 它需要「哪张底稿覆盖了哪个认定」这一
+#: 认定层面的人工判断，系统无从推断。把它纳入会让自动裁剪产出一个无法追溯依据的
+#: 理由码。守卫双向锁死该集合（既断言三个在内，也断言 ``covered_elsewhere``
+#: 与既有四个人工值不在内）。
+DECISION_KERNEL_REASON_CODES: frozenset[TrimReasonCode] = frozenset(
+    {
+        TrimReasonCode.NO_DATA,
+        TrimReasonCode.BELOW_TRIVIAL,
+        TrimReasonCode.BELOW_MATERIALITY,
+    }
+)
+
+#: 重要性维度产出的理由码（汇总闸只计这两个，见前端 ``trimAggregateGate``）。
+#:
+#: 🔴 不含 ``NO_DATA``：它是事实判断类自动裁剪，金额恒 0 或极小，纳入汇总只增噪声，
+#: 会把闸门推向恒亮进而被当误报关掉。
+MATERIALITY_REASON_CODES: frozenset[TrimReasonCode] = frozenset(
+    {
+        TrimReasonCode.BELOW_TRIVIAL,
+        TrimReasonCode.BELOW_MATERIALITY,
+    }
+)
 
 
 class ProcedureTrimRequest(BaseModel):

@@ -1,0 +1,2009 @@
+{
+  "source_file": "D:\\GT_plan\\数据\\致同通用审计程序及底稿模板（2025年修订）\\1.致同审计程序及底稿模板（2025年）\\4.风险应对-实质性程序（D-N）\\L 债务循环\\L7 其他非流动负债.xlsx",
+  "account_code": "2801",
+  "account_name": "其他非流动负债",
+  "account_direction": "贷方/负债类",
+  "formula_rule": "期末=期初+贷方-借方",
+  "sheet_count": 8,
+  "sheet_names": [
+    "底稿目录",
+    "其他非流动负债实质性程序表L7A",
+    "审定表L7-1",
+    "附注披露信息（上市公司）",
+    "附注披露信息(国企)",
+    "明细表L7-2",
+    "调整分录汇总L7-3",
+    "其他非流动负债检查表L7-4"
+  ],
+  "sheets": {
+    "底稿目录": {
+      "title": "底稿目录",
+      "dimensions": "A1:G20",
+      "max_row": 20,
+      "max_column": 7,
+      "merged_cells": [
+        "A14:A16",
+        "A17:A19",
+        "A10:A13"
+      ],
+      "header_rows": [
+        [
+          "底稿开列时，可先在以下单元格填写有关内容，以便其他底稿引用有关数据：",
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          "被审计单位：",
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          "截止日：202X年12月31日",
+          null,
+          null,
+          "序号",
+          "内容",
+          "索引号",
+          null
+        ],
+        [
+          "编制人：",
+          null,
+          null,
+          1,
+          "其他非流动负债实质性程序表",
+          "L7A",
+          null
+        ],
+        [
+          "编制日期：",
+          null,
+          null,
+          2,
+          "其他非流动负债审定表",
+          "L7-1",
+          null
+        ]
+      ],
+      "formula_count": 2,
+      "formulas": [
+        {
+          "cell": "E9",
+          "formula": "='调整分录汇总L7-3'!A2"
+        },
+        {
+          "cell": "E10",
+          "formula": "='其他非流动负债检查表L7-4'!A2"
+        }
+      ],
+      "detected_header_row": 3,
+      "columns": [
+        {
+          "col_letter": "A",
+          "col_index": 1,
+          "header": "截止日：202X年12月31日"
+        },
+        {
+          "col_letter": "D",
+          "col_index": 4,
+          "header": "序号"
+        },
+        {
+          "col_letter": "E",
+          "col_index": 5,
+          "header": "内容"
+        },
+        {
+          "col_letter": "F",
+          "col_index": 6,
+          "header": "索引号"
+        }
+      ],
+      "sample_data_rows": [
+        {
+          "row": 4,
+          "data": {
+            "A": "编制人：",
+            "D": "1",
+            "E": "其他非流动负债实质性程序表",
+            "F": "L7A"
+          }
+        },
+        {
+          "row": 5,
+          "data": {
+            "A": "编制日期：",
+            "D": "2",
+            "E": "其他非流动负债审定表",
+            "F": "L7-1"
+          }
+        },
+        {
+          "row": 6,
+          "data": {
+            "A": "复核人：",
+            "D": "3",
+            "E": "其他非流动负债附注披露（上市公司）信息核对表",
+            "G": "无需打印"
+          }
+        }
+      ]
+    },
+    "其他非流动负债实质性程序表L7A": {
+      "title": "其他非流动负债实质性程序表L7A",
+      "dimensions": "A1:M22",
+      "max_row": 22,
+      "max_column": 13,
+      "merged_cells": [
+        "G10:I10",
+        "G13:I13",
+        "A12:F12",
+        "A2:I2",
+        "A8:F8",
+        "B15:B16",
+        "A10:F10",
+        "A13:F13",
+        "A9:F9",
+        "G9:I9",
+        "G12:I12",
+        "G11:I11",
+        "A11:F11",
+        "D15:H15",
+        "A15:A16",
+        "A1:I1",
+        "G8:I8",
+        "C15:C16",
+        "I15:I16"
+      ],
+      "header_rows": [
+        [
+          "致同会计师事务所",
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          "其他非流动负债实质性程序",
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          "=底稿目录!A2",
+          null,
+          "=底稿目录!A4",
+          null,
+          "=底稿目录!A5",
+          null,
+          null,
+          "索引号：",
+          "=底稿目录!F4",
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          "=底稿目录!A3",
+          null,
+          "=底稿目录!A6",
+          null,
+          "=底稿目录!A7",
+          null,
+          null,
+          "页  次：",
+          null,
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          "一、本账户涉及的科目",
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      ],
+      "formula_count": 7,
+      "formulas": [
+        {
+          "cell": "A3",
+          "formula": "=底稿目录!A2"
+        },
+        {
+          "cell": "C3",
+          "formula": "=底稿目录!A4"
+        },
+        {
+          "cell": "E3",
+          "formula": "=底稿目录!A5"
+        },
+        {
+          "cell": "I3",
+          "formula": "=底稿目录!F4"
+        },
+        {
+          "cell": "A4",
+          "formula": "=底稿目录!A3"
+        },
+        {
+          "cell": "C4",
+          "formula": "=底稿目录!A6"
+        },
+        {
+          "cell": "E4",
+          "formula": "=底稿目录!A7"
+        }
+      ],
+      "detected_header_row": 3,
+      "columns": [
+        {
+          "col_letter": "A",
+          "col_index": 1,
+          "header": "=底稿目录!A2"
+        },
+        {
+          "col_letter": "C",
+          "col_index": 3,
+          "header": "=底稿目录!A4"
+        },
+        {
+          "col_letter": "E",
+          "col_index": 5,
+          "header": "=底稿目录!A5"
+        },
+        {
+          "col_letter": "H",
+          "col_index": 8,
+          "header": "索引号："
+        },
+        {
+          "col_letter": "I",
+          "col_index": 9,
+          "header": "=底稿目录!F4"
+        }
+      ],
+      "sample_data_rows": [
+        {
+          "row": 4,
+          "data": {
+            "A": "[FORMULA] =底稿目录!A3",
+            "C": "[FORMULA] =底稿目录!A6",
+            "E": "[FORMULA] =底稿目录!A7",
+            "H": "页  次："
+          }
+        },
+        {
+          "row": 5,
+          "data": {
+            "A": "一、本账户涉及的科目"
+          }
+        },
+        {
+          "row": 6,
+          "data": {
+            "A": "其他非流动负债"
+          }
+        }
+      ]
+    },
+    "审定表L7-1": {
+      "title": "审定表L7-1",
+      "dimensions": "A1:L18",
+      "max_row": 18,
+      "max_column": 12,
+      "merged_cells": [
+        "A5:A6",
+        "J5:K5",
+        "A2:K2",
+        "B5:E5",
+        "F5:I5",
+        "A1:K1"
+      ],
+      "header_rows": [
+        [
+          "致同会计师事务所",
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          "其他非流动负债审定表",
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          "=底稿目录!A2",
+          null,
+          null,
+          null,
+          "=底稿目录!A4",
+          null,
+          null,
+          "=底稿目录!A5",
+          null,
+          "索引号：",
+          "=底稿目录!F5",
+          null
+        ],
+        [
+          "=底稿目录!A3",
+          null,
+          null,
+          null,
+          "=底稿目录!A6",
+          null,
+          null,
+          "=底稿目录!A7",
+          null,
+          "页次：",
+          null,
+          null
+        ],
+        [
+          "项 目",
+          "期初数",
+          null,
+          null,
+          null,
+          "期末数",
+          null,
+          null,
+          null,
+          "本期审定数与上期\n审定数的比较",
+          null,
+          null
+        ]
+      ],
+      "formula_count": 74,
+      "formulas": [
+        {
+          "cell": "A3",
+          "formula": "=底稿目录!A2"
+        },
+        {
+          "cell": "E3",
+          "formula": "=底稿目录!A4"
+        },
+        {
+          "cell": "H3",
+          "formula": "=底稿目录!A5"
+        },
+        {
+          "cell": "K3",
+          "formula": "=底稿目录!F5"
+        },
+        {
+          "cell": "A4",
+          "formula": "=底稿目录!A3"
+        },
+        {
+          "cell": "E4",
+          "formula": "=底稿目录!A6"
+        },
+        {
+          "cell": "H4",
+          "formula": "=底稿目录!A7"
+        },
+        {
+          "cell": "A7",
+          "formula": "='明细表L7-2'!A12"
+        },
+        {
+          "cell": "B7",
+          "formula": "='明细表L7-2'!B12"
+        },
+        {
+          "cell": "C7",
+          "formula": "='明细表L7-2'!F12"
+        },
+        {
+          "cell": "D7",
+          "formula": "='明细表L7-2'!G12"
+        },
+        {
+          "cell": "E7",
+          "formula": "=B7+C7+D7"
+        },
+        {
+          "cell": "F7",
+          "formula": "='明细表L7-2'!E12"
+        },
+        {
+          "cell": "G7",
+          "formula": "='明细表L7-2'!F12+'明细表L7-2'!H12-'明细表L7-2'!I12"
+        },
+        {
+          "cell": "H7",
+          "formula": "='明细表L7-2'!G12+'明细表L7-2'!J12-'明细表L7-2'!K12"
+        },
+        {
+          "cell": "I7",
+          "formula": "=F7+G7+H7"
+        },
+        {
+          "cell": "J7",
+          "formula": "=I7-E7"
+        },
+        {
+          "cell": "K7",
+          "formula": "=IF(AND(E7=0,J7=0),0,IF(AND(E7=0,J7>0),1,J7/E7))"
+        },
+        {
+          "cell": "A8",
+          "formula": "='明细表L7-2'!A13"
+        },
+        {
+          "cell": "B8",
+          "formula": "='明细表L7-2'!B13"
+        },
+        {
+          "cell": "C8",
+          "formula": "='明细表L7-2'!F13"
+        },
+        {
+          "cell": "D8",
+          "formula": "='明细表L7-2'!G13"
+        },
+        {
+          "cell": "E8",
+          "formula": "=B8+C8+D8"
+        },
+        {
+          "cell": "F8",
+          "formula": "='明细表L7-2'!E13"
+        },
+        {
+          "cell": "G8",
+          "formula": "='明细表L7-2'!F13+'明细表L7-2'!H13-'明细表L7-2'!I13"
+        },
+        {
+          "cell": "H8",
+          "formula": "='明细表L7-2'!G13+'明细表L7-2'!J13-'明细表L7-2'!K13"
+        },
+        {
+          "cell": "I8",
+          "formula": "=F8+G8+H8"
+        },
+        {
+          "cell": "J8",
+          "formula": "=I8-E8"
+        },
+        {
+          "cell": "K8",
+          "formula": "=IF(AND(E8=0,J8=0),0,IF(AND(E8=0,J8>0),1,J8/E8))"
+        },
+        {
+          "cell": "A9",
+          "formula": "='明细表L7-2'!A14"
+        },
+        {
+          "cell": "B9",
+          "formula": "='明细表L7-2'!B14"
+        },
+        {
+          "cell": "C9",
+          "formula": "='明细表L7-2'!F14"
+        },
+        {
+          "cell": "D9",
+          "formula": "='明细表L7-2'!G14"
+        },
+        {
+          "cell": "E9",
+          "formula": "=B9+C9+D9"
+        },
+        {
+          "cell": "F9",
+          "formula": "='明细表L7-2'!E14"
+        },
+        {
+          "cell": "G9",
+          "formula": "='明细表L7-2'!F14+'明细表L7-2'!H14-'明细表L7-2'!I14"
+        },
+        {
+          "cell": "H9",
+          "formula": "='明细表L7-2'!G14+'明细表L7-2'!J14-'明细表L7-2'!K14"
+        },
+        {
+          "cell": "I9",
+          "formula": "=F9+G9+H9"
+        },
+        {
+          "cell": "J9",
+          "formula": "=I9-E9"
+        },
+        {
+          "cell": "K9",
+          "formula": "=IF(AND(E9=0,J9=0),0,IF(AND(E9=0,J9>0),1,J9/E9))"
+        },
+        {
+          "cell": "A10",
+          "formula": "='明细表L7-2'!A15"
+        },
+        {
+          "cell": "B10",
+          "formula": "='明细表L7-2'!B15"
+        },
+        {
+          "cell": "C10",
+          "formula": "='明细表L7-2'!F15"
+        },
+        {
+          "cell": "D10",
+          "formula": "='明细表L7-2'!G15"
+        },
+        {
+          "cell": "E10",
+          "formula": "=B10+C10+D10"
+        },
+        {
+          "cell": "F10",
+          "formula": "='明细表L7-2'!E15"
+        },
+        {
+          "cell": "G10",
+          "formula": "='明细表L7-2'!F15+'明细表L7-2'!H15-'明细表L7-2'!I15"
+        },
+        {
+          "cell": "H10",
+          "formula": "='明细表L7-2'!G15+'明细表L7-2'!J15-'明细表L7-2'!K15"
+        },
+        {
+          "cell": "I10",
+          "formula": "=F10+G10+H10"
+        },
+        {
+          "cell": "J10",
+          "formula": "=I10-E10"
+        },
+        {
+          "cell": "K10",
+          "formula": "=IF(AND(E10=0,J10=0),0,IF(AND(E10=0,J10>0),1,J10/E10))"
+        },
+        {
+          "cell": "A11",
+          "formula": "='明细表L7-2'!A16"
+        },
+        {
+          "cell": "B11",
+          "formula": "='明细表L7-2'!B16"
+        },
+        {
+          "cell": "C11",
+          "formula": "='明细表L7-2'!F16"
+        },
+        {
+          "cell": "D11",
+          "formula": "='明细表L7-2'!G16"
+        },
+        {
+          "cell": "E11",
+          "formula": "=B11+C11+D11"
+        },
+        {
+          "cell": "F11",
+          "formula": "='明细表L7-2'!E16"
+        },
+        {
+          "cell": "G11",
+          "formula": "='明细表L7-2'!F16+'明细表L7-2'!H16-'明细表L7-2'!I16"
+        },
+        {
+          "cell": "H11",
+          "formula": "='明细表L7-2'!G16+'明细表L7-2'!J16-'明细表L7-2'!K16"
+        },
+        {
+          "cell": "I11",
+          "formula": "=F11+G11+H11"
+        },
+        {
+          "cell": "J11",
+          "formula": "=I11-E11"
+        },
+        {
+          "cell": "K11",
+          "formula": "=IF(AND(E11=0,J11=0),0,IF(AND(E11=0,J11>0),1,J11/E11))"
+        },
+        {
+          "cell": "B12",
+          "formula": "=SUM(B7:B11)"
+        },
+        {
+          "cell": "C12",
+          "formula": "=SUM(C7:C11)"
+        },
+        {
+          "cell": "D12",
+          "formula": "=SUM(D7:D11)"
+        },
+        {
+          "cell": "E12",
+          "formula": "=SUM(E7:E11)"
+        },
+        {
+          "cell": "F12",
+          "formula": "=SUM(F7:F11)"
+        },
+        {
+          "cell": "G12",
+          "formula": "=SUM(G7:G11)"
+        },
+        {
+          "cell": "H12",
+          "formula": "=SUM(H7:H11)"
+        },
+        {
+          "cell": "I12",
+          "formula": "=SUM(I7:I11)"
+        },
+        {
+          "cell": "J12",
+          "formula": "=SUM(J7:J11)"
+        },
+        {
+          "cell": "K12",
+          "formula": "=IF(AND(E12=0,J12=0),0,IF(AND(E12=0,J12>0),1,J12/E12))"
+        },
+        {
+          "cell": "E15",
+          "formula": "=E12-E14"
+        },
+        {
+          "cell": "I15",
+          "formula": "=I12-I14"
+        }
+      ],
+      "detected_header_row": 3,
+      "columns": [
+        {
+          "col_letter": "A",
+          "col_index": 1,
+          "header": "=底稿目录!A2"
+        },
+        {
+          "col_letter": "E",
+          "col_index": 5,
+          "header": "=底稿目录!A4"
+        },
+        {
+          "col_letter": "H",
+          "col_index": 8,
+          "header": "=底稿目录!A5"
+        },
+        {
+          "col_letter": "J",
+          "col_index": 10,
+          "header": "索引号："
+        },
+        {
+          "col_letter": "K",
+          "col_index": 11,
+          "header": "=底稿目录!F5"
+        }
+      ],
+      "sample_data_rows": [
+        {
+          "row": 4,
+          "data": {
+            "A": "[FORMULA] =底稿目录!A3",
+            "E": "[FORMULA] =底稿目录!A6",
+            "H": "[FORMULA] =底稿目录!A7",
+            "J": "页次："
+          }
+        },
+        {
+          "row": 5,
+          "data": {
+            "A": "项 目",
+            "B": "期初数",
+            "F": "期末数",
+            "J": "本期审定数与上期\n审定数的比较"
+          }
+        },
+        {
+          "row": 6,
+          "data": {
+            "B": "未审数",
+            "C": "账项调整",
+            "D": "重分类调整",
+            "E": "审定数",
+            "F": "未审数",
+            "G": "账项调整",
+            "H": "重分类调整",
+            "I": "审定数",
+            "J": "变动额",
+            "K": "变动率"
+          }
+        }
+      ]
+    },
+    "附注披露信息（上市公司）": {
+      "title": "附注披露信息（上市公司）",
+      "dimensions": "A1:G12",
+      "max_row": 12,
+      "max_column": 7,
+      "merged_cells": [
+        "A1:D1",
+        "A2:D2"
+      ],
+      "header_rows": [
+        [
+          "致同会计师事务所",
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          "其他非流动负债附注披露信息",
+          null,
+          null,
+          null,
+          "返回目录",
+          null,
+          null
+        ],
+        [
+          "=底稿目录!A2",
+          "=底稿目录!A4",
+          "=底稿目录!A5",
+          "索引号：",
+          null,
+          null,
+          null
+        ],
+        [
+          "=底稿目录!A3",
+          "=底稿目录!A6",
+          "=底稿目录!A7",
+          "页次：",
+          null,
+          null,
+          null
+        ],
+        [
+          "其他非流动负债",
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      ],
+      "formula_count": 23,
+      "formulas": [
+        {
+          "cell": "A3",
+          "formula": "=底稿目录!A2"
+        },
+        {
+          "cell": "B3",
+          "formula": "=底稿目录!A4"
+        },
+        {
+          "cell": "C3",
+          "formula": "=底稿目录!A5"
+        },
+        {
+          "cell": "A4",
+          "formula": "=底稿目录!A3"
+        },
+        {
+          "cell": "B4",
+          "formula": "=底稿目录!A6"
+        },
+        {
+          "cell": "C4",
+          "formula": "=底稿目录!A7"
+        },
+        {
+          "cell": "A7",
+          "formula": "='明细表L7-2'!A12"
+        },
+        {
+          "cell": "B7",
+          "formula": "='明细表L7-2'!O12"
+        },
+        {
+          "cell": "C7",
+          "formula": "='明细表L7-2'!L12"
+        },
+        {
+          "cell": "A8",
+          "formula": "='明细表L7-2'!A13"
+        },
+        {
+          "cell": "B8",
+          "formula": "='明细表L7-2'!O13"
+        },
+        {
+          "cell": "C8",
+          "formula": "='明细表L7-2'!L13"
+        },
+        {
+          "cell": "A9",
+          "formula": "='明细表L7-2'!A14"
+        },
+        {
+          "cell": "B9",
+          "formula": "='明细表L7-2'!O14"
+        },
+        {
+          "cell": "C9",
+          "formula": "='明细表L7-2'!L14"
+        },
+        {
+          "cell": "A10",
+          "formula": "='明细表L7-2'!A15"
+        },
+        {
+          "cell": "B10",
+          "formula": "='明细表L7-2'!O15"
+        },
+        {
+          "cell": "C10",
+          "formula": "='明细表L7-2'!L15"
+        },
+        {
+          "cell": "A11",
+          "formula": "='明细表L7-2'!A16"
+        },
+        {
+          "cell": "B11",
+          "formula": "='明细表L7-2'!O16"
+        },
+        {
+          "cell": "C11",
+          "formula": "='明细表L7-2'!L16"
+        },
+        {
+          "cell": "B12",
+          "formula": "=SUM(B7:B11)"
+        },
+        {
+          "cell": "C12",
+          "formula": "=SUM(C7:C11)"
+        }
+      ],
+      "detected_header_row": 3,
+      "columns": [
+        {
+          "col_letter": "A",
+          "col_index": 1,
+          "header": "=底稿目录!A2"
+        },
+        {
+          "col_letter": "B",
+          "col_index": 2,
+          "header": "=底稿目录!A4"
+        },
+        {
+          "col_letter": "C",
+          "col_index": 3,
+          "header": "=底稿目录!A5"
+        },
+        {
+          "col_letter": "D",
+          "col_index": 4,
+          "header": "索引号："
+        }
+      ],
+      "sample_data_rows": [
+        {
+          "row": 4,
+          "data": {
+            "A": "[FORMULA] =底稿目录!A3",
+            "B": "[FORMULA] =底稿目录!A6",
+            "C": "[FORMULA] =底稿目录!A7",
+            "D": "页次："
+          }
+        },
+        {
+          "row": 5,
+          "data": {
+            "A": "其他非流动负债"
+          }
+        },
+        {
+          "row": 6,
+          "data": {
+            "A": "项  目",
+            "B": "期末数",
+            "C": "上年年末数"
+          }
+        }
+      ]
+    },
+    "附注披露信息(国企)": {
+      "title": "附注披露信息(国企)",
+      "dimensions": "A1:G12",
+      "max_row": 12,
+      "max_column": 7,
+      "merged_cells": [
+        "A1:D1",
+        "A2:D2"
+      ],
+      "header_rows": [
+        [
+          "致同会计师事务所",
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          "其他非流动负债附注披露信息",
+          null,
+          null,
+          null,
+          "返回目录",
+          null,
+          null
+        ],
+        [
+          "=底稿目录!A2",
+          "=底稿目录!A4",
+          "=底稿目录!A5",
+          "索引号：",
+          null,
+          null,
+          null
+        ],
+        [
+          "=底稿目录!A3",
+          "=底稿目录!A6",
+          "=底稿目录!A7",
+          "页次：",
+          null,
+          null,
+          null
+        ],
+        [
+          "其他非流动负债",
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      ],
+      "formula_count": 23,
+      "formulas": [
+        {
+          "cell": "A3",
+          "formula": "=底稿目录!A2"
+        },
+        {
+          "cell": "B3",
+          "formula": "=底稿目录!A4"
+        },
+        {
+          "cell": "C3",
+          "formula": "=底稿目录!A5"
+        },
+        {
+          "cell": "A4",
+          "formula": "=底稿目录!A3"
+        },
+        {
+          "cell": "B4",
+          "formula": "=底稿目录!A6"
+        },
+        {
+          "cell": "C4",
+          "formula": "=底稿目录!A7"
+        },
+        {
+          "cell": "A7",
+          "formula": "='明细表L7-2'!A12"
+        },
+        {
+          "cell": "B7",
+          "formula": "='明细表L7-2'!L12"
+        },
+        {
+          "cell": "C7",
+          "formula": "='明细表L7-2'!O12"
+        },
+        {
+          "cell": "A8",
+          "formula": "='明细表L7-2'!A13"
+        },
+        {
+          "cell": "B8",
+          "formula": "='明细表L7-2'!L13"
+        },
+        {
+          "cell": "C8",
+          "formula": "='明细表L7-2'!O13"
+        },
+        {
+          "cell": "A9",
+          "formula": "='明细表L7-2'!A14"
+        },
+        {
+          "cell": "B9",
+          "formula": "='明细表L7-2'!L14"
+        },
+        {
+          "cell": "C9",
+          "formula": "='明细表L7-2'!O14"
+        },
+        {
+          "cell": "A10",
+          "formula": "='明细表L7-2'!A15"
+        },
+        {
+          "cell": "B10",
+          "formula": "='明细表L7-2'!L15"
+        },
+        {
+          "cell": "C10",
+          "formula": "='明细表L7-2'!O15"
+        },
+        {
+          "cell": "A11",
+          "formula": "='明细表L7-2'!A16"
+        },
+        {
+          "cell": "B11",
+          "formula": "='明细表L7-2'!L16"
+        },
+        {
+          "cell": "C11",
+          "formula": "='明细表L7-2'!O16"
+        },
+        {
+          "cell": "B12",
+          "formula": "=SUM(B7:B11)"
+        },
+        {
+          "cell": "C12",
+          "formula": "=SUM(C7:C11)"
+        }
+      ],
+      "detected_header_row": 3,
+      "columns": [
+        {
+          "col_letter": "A",
+          "col_index": 1,
+          "header": "=底稿目录!A2"
+        },
+        {
+          "col_letter": "B",
+          "col_index": 2,
+          "header": "=底稿目录!A4"
+        },
+        {
+          "col_letter": "C",
+          "col_index": 3,
+          "header": "=底稿目录!A5"
+        },
+        {
+          "col_letter": "D",
+          "col_index": 4,
+          "header": "索引号："
+        }
+      ],
+      "sample_data_rows": [
+        {
+          "row": 4,
+          "data": {
+            "A": "[FORMULA] =底稿目录!A3",
+            "B": "[FORMULA] =底稿目录!A6",
+            "C": "[FORMULA] =底稿目录!A7",
+            "D": "页次："
+          }
+        },
+        {
+          "row": 5,
+          "data": {
+            "A": "其他非流动负债"
+          }
+        },
+        {
+          "row": 6,
+          "data": {
+            "A": "项目",
+            "B": "年初余额",
+            "C": "期末余额"
+          }
+        }
+      ]
+    },
+    "明细表L7-2": {
+      "title": "明细表L7-2",
+      "dimensions": "A1:AA25",
+      "max_row": 25,
+      "max_column": 27,
+      "merged_cells": [
+        "P10:P11",
+        "Q10:Q11",
+        "F10:G10",
+        "A2:R2",
+        "H10:I10",
+        "J10:K10",
+        "A10:A11",
+        "A1:R1",
+        "A24:J24",
+        "L10:O10",
+        "B10:E10",
+        "A25:J25",
+        "R10:R11"
+      ],
+      "header_rows": [
+        [
+          "致同会计师事务所",
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          "其他非流动负债明细表",
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          "=底稿目录!A2",
+          null,
+          null,
+          null,
+          null,
+          "=底稿目录!A4",
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          "=底稿目录!A5",
+          null,
+          null,
+          null,
+          "索引号：",
+          "=底稿目录!F8",
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          "=底稿目录!A3",
+          null,
+          null,
+          null,
+          null,
+          "=底稿目录!A6",
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          "=底稿目录!A7",
+          null,
+          null,
+          null,
+          "页次：",
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          "一、审计目标:",
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      ],
+      "formula_count": 46,
+      "formulas": [
+        {
+          "cell": "A3",
+          "formula": "=底稿目录!A2"
+        },
+        {
+          "cell": "F3",
+          "formula": "=底稿目录!A4"
+        },
+        {
+          "cell": "M3",
+          "formula": "=底稿目录!A5"
+        },
+        {
+          "cell": "R3",
+          "formula": "=底稿目录!F8"
+        },
+        {
+          "cell": "A4",
+          "formula": "=底稿目录!A3"
+        },
+        {
+          "cell": "F4",
+          "formula": "=底稿目录!A6"
+        },
+        {
+          "cell": "M4",
+          "formula": "=底稿目录!A7"
+        },
+        {
+          "cell": "E12",
+          "formula": "=B12+C12-D12"
+        },
+        {
+          "cell": "L12",
+          "formula": "=B12+F12+G12"
+        },
+        {
+          "cell": "M12",
+          "formula": "=C12+H12+J12"
+        },
+        {
+          "cell": "N12",
+          "formula": "=D12+I12+K12"
+        },
+        {
+          "cell": "O12",
+          "formula": "=L12+M12-N12"
+        },
+        {
+          "cell": "E13",
+          "formula": "=B13+C13-D13"
+        },
+        {
+          "cell": "L13",
+          "formula": "=B13+F13+G13"
+        },
+        {
+          "cell": "M13",
+          "formula": "=C13+H13+J13"
+        },
+        {
+          "cell": "N13",
+          "formula": "=D13+I13+K13"
+        },
+        {
+          "cell": "O13",
+          "formula": "=L13+M13-N13"
+        },
+        {
+          "cell": "E14",
+          "formula": "=B14+C14-D14"
+        },
+        {
+          "cell": "L14",
+          "formula": "=B14+F14+G14"
+        },
+        {
+          "cell": "M14",
+          "formula": "=C14+H14+J14"
+        },
+        {
+          "cell": "N14",
+          "formula": "=D14+I14+K14"
+        },
+        {
+          "cell": "O14",
+          "formula": "=L14+M14-N14"
+        },
+        {
+          "cell": "E15",
+          "formula": "=B15+C15-D15"
+        },
+        {
+          "cell": "L15",
+          "formula": "=B15+F15+G15"
+        },
+        {
+          "cell": "M15",
+          "formula": "=C15+H15+J15"
+        },
+        {
+          "cell": "N15",
+          "formula": "=D15+I15+K15"
+        },
+        {
+          "cell": "O15",
+          "formula": "=L15+M15-N15"
+        },
+        {
+          "cell": "E16",
+          "formula": "=B16+C16-D16"
+        },
+        {
+          "cell": "L16",
+          "formula": "=B16+F16+G16"
+        },
+        {
+          "cell": "M16",
+          "formula": "=C16+H16+J16"
+        },
+        {
+          "cell": "N16",
+          "formula": "=D16+I16+K16"
+        },
+        {
+          "cell": "O16",
+          "formula": "=L16+M16-N16"
+        },
+        {
+          "cell": "B17",
+          "formula": "=SUM(B12:B16)"
+        },
+        {
+          "cell": "C17",
+          "formula": "=SUM(C12:C16)"
+        },
+        {
+          "cell": "D17",
+          "formula": "=SUM(D12:D16)"
+        },
+        {
+          "cell": "E17",
+          "formula": "=SUM(E12:E16)"
+        },
+        {
+          "cell": "F17",
+          "formula": "=SUM(F12:F16)"
+        },
+        {
+          "cell": "G17",
+          "formula": "=SUM(G12:G16)"
+        },
+        {
+          "cell": "H17",
+          "formula": "=SUM(H12:H16)"
+        },
+        {
+          "cell": "I17",
+          "formula": "=SUM(I12:I16)"
+        },
+        {
+          "cell": "J17",
+          "formula": "=SUM(J12:J16)"
+        },
+        {
+          "cell": "K17",
+          "formula": "=SUM(K12:K16)"
+        },
+        {
+          "cell": "L17",
+          "formula": "=SUM(L12:L16)"
+        },
+        {
+          "cell": "M17",
+          "formula": "=SUM(M12:M16)"
+        },
+        {
+          "cell": "N17",
+          "formula": "=SUM(N12:N16)"
+        },
+        {
+          "cell": "O17",
+          "formula": "=SUM(O12:O16)"
+        }
+      ],
+      "detected_header_row": 3,
+      "columns": [
+        {
+          "col_letter": "A",
+          "col_index": 1,
+          "header": "=底稿目录!A2"
+        },
+        {
+          "col_letter": "F",
+          "col_index": 6,
+          "header": "=底稿目录!A4"
+        },
+        {
+          "col_letter": "M",
+          "col_index": 13,
+          "header": "=底稿目录!A5"
+        },
+        {
+          "col_letter": "Q",
+          "col_index": 17,
+          "header": "索引号："
+        },
+        {
+          "col_letter": "R",
+          "col_index": 18,
+          "header": "=底稿目录!F8"
+        }
+      ],
+      "sample_data_rows": [
+        {
+          "row": 4,
+          "data": {
+            "A": "[FORMULA] =底稿目录!A3",
+            "F": "[FORMULA] =底稿目录!A6",
+            "M": "[FORMULA] =底稿目录!A7",
+            "Q": "页次："
+          }
+        },
+        {
+          "row": 5,
+          "data": {
+            "A": "一、审计目标:"
+          }
+        },
+        {
+          "row": 6,
+          "data": {
+            "A": "1.资产负债表中记录的其他非流动负债是存在的，且已记录于恰当的账户；2.所有应记录的其他非流动负债均已记录，所有应当包括在财务报表中的相关披露均已包括"
+          }
+        }
+      ]
+    },
+    "调整分录汇总L7-3": {
+      "title": "调整分录汇总L7-3",
+      "dimensions": "A1:K24",
+      "max_row": 24,
+      "max_column": 11,
+      "merged_cells": [
+        "A22:J22",
+        "A1:J1",
+        "A24:J24",
+        "A2:J2"
+      ],
+      "header_rows": [
+        [
+          "致同会计师事务所",
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          "其他非流动负债调整分录汇总表",
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          "=底稿目录!A2",
+          null,
+          null,
+          "=底稿目录!A4",
+          null,
+          null,
+          "=底稿目录!A5",
+          null,
+          "索引：",
+          "=底稿目录!F9",
+          null
+        ],
+        [
+          "=底稿目录!A3",
+          null,
+          null,
+          "=底稿目录!A6",
+          null,
+          null,
+          "=底稿目录!A7",
+          null,
+          "页次：",
+          null,
+          null
+        ],
+        [
+          "调整事项说明",
+          "类别（报表调整/账项调整/其他）",
+          "报表项目",
+          "科目名称",
+          "附注项目",
+          "……",
+          "借方调整金额",
+          "贷方调整金额",
+          "索引",
+          "备注",
+          null
+        ]
+      ],
+      "formula_count": 7,
+      "formulas": [
+        {
+          "cell": "A3",
+          "formula": "=底稿目录!A2"
+        },
+        {
+          "cell": "D3",
+          "formula": "=底稿目录!A4"
+        },
+        {
+          "cell": "G3",
+          "formula": "=底稿目录!A5"
+        },
+        {
+          "cell": "J3",
+          "formula": "=底稿目录!F9"
+        },
+        {
+          "cell": "A4",
+          "formula": "=底稿目录!A3"
+        },
+        {
+          "cell": "D4",
+          "formula": "=底稿目录!A6"
+        },
+        {
+          "cell": "G4",
+          "formula": "=底稿目录!A7"
+        }
+      ],
+      "detected_header_row": 3,
+      "columns": [
+        {
+          "col_letter": "A",
+          "col_index": 1,
+          "header": "=底稿目录!A2"
+        },
+        {
+          "col_letter": "D",
+          "col_index": 4,
+          "header": "=底稿目录!A4"
+        },
+        {
+          "col_letter": "G",
+          "col_index": 7,
+          "header": "=底稿目录!A5"
+        },
+        {
+          "col_letter": "I",
+          "col_index": 9,
+          "header": "索引："
+        },
+        {
+          "col_letter": "J",
+          "col_index": 10,
+          "header": "=底稿目录!F9"
+        }
+      ],
+      "sample_data_rows": [
+        {
+          "row": 4,
+          "data": {
+            "A": "[FORMULA] =底稿目录!A3",
+            "D": "[FORMULA] =底稿目录!A6",
+            "G": "[FORMULA] =底稿目录!A7",
+            "I": "页次："
+          }
+        },
+        {
+          "row": 5,
+          "data": {
+            "A": "调整事项说明",
+            "B": "类别（报表调整/账项调整/其他）",
+            "C": "报表项目",
+            "D": "科目名称",
+            "E": "附注项目",
+            "F": "……",
+            "G": "借方调整金额",
+            "H": "贷方调整金额",
+            "I": "索引",
+            "J": "备注"
+          }
+        }
+      ]
+    },
+    "其他非流动负债检查表L7-4": {
+      "title": "其他非流动负债检查表L7-4",
+      "dimensions": "A1:V33",
+      "max_row": 33,
+      "max_column": 22,
+      "merged_cells": [
+        "P10:P11",
+        "N10:N11",
+        "O10:O11",
+        "A23:C23",
+        "A1:P1",
+        "A22:C22",
+        "I10:M10",
+        "A24:C24",
+        "C5:P5",
+        "H10:H11",
+        "A10:G10",
+        "A2:P2"
+      ],
+      "header_rows": [
+        [
+          "致同会计师事务所",
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          "其他非流动负债检查表",
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          "=底稿目录!A2",
+          null,
+          null,
+          "=底稿目录!A4",
+          null,
+          null,
+          null,
+          "=底稿目录!A5",
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          "索引号：",
+          "=底稿目录!F10",
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          "=底稿目录!A3",
+          null,
+          null,
+          "=底稿目录!A6",
+          null,
+          null,
+          null,
+          "=底稿目录!A7",
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          "页次：",
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          "一、审计目标:",
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      ],
+      "formula_count": 13,
+      "formulas": [
+        {
+          "cell": "A3",
+          "formula": "=底稿目录!A2"
+        },
+        {
+          "cell": "D3",
+          "formula": "=底稿目录!A4"
+        },
+        {
+          "cell": "H3",
+          "formula": "=底稿目录!A5"
+        },
+        {
+          "cell": "P3",
+          "formula": "=底稿目录!F10"
+        },
+        {
+          "cell": "A4",
+          "formula": "=底稿目录!A3"
+        },
+        {
+          "cell": "D4",
+          "formula": "=底稿目录!A6"
+        },
+        {
+          "cell": "H4",
+          "formula": "=底稿目录!A7"
+        },
+        {
+          "cell": "F22",
+          "formula": "=SUM(F12:F21)"
+        },
+        {
+          "cell": "G22",
+          "formula": "=SUM(G12:G21)"
+        },
+        {
+          "cell": "F23",
+          "formula": "='明细表L7-2'!N17"
+        },
+        {
+          "cell": "G23",
+          "formula": "='明细表L7-2'!M17"
+        },
+        {
+          "cell": "F24",
+          "formula": "=F22/F23"
+        },
+        {
+          "cell": "G24",
+          "formula": "=G22/G23"
+        }
+      ],
+      "detected_header_row": 3,
+      "columns": [
+        {
+          "col_letter": "A",
+          "col_index": 1,
+          "header": "=底稿目录!A2"
+        },
+        {
+          "col_letter": "D",
+          "col_index": 4,
+          "header": "=底稿目录!A4"
+        },
+        {
+          "col_letter": "H",
+          "col_index": 8,
+          "header": "=底稿目录!A5"
+        },
+        {
+          "col_letter": "O",
+          "col_index": 15,
+          "header": "索引号："
+        },
+        {
+          "col_letter": "P",
+          "col_index": 16,
+          "header": "=底稿目录!F10"
+        }
+      ],
+      "sample_data_rows": [
+        {
+          "row": 4,
+          "data": {
+            "A": "[FORMULA] =底稿目录!A3",
+            "D": "[FORMULA] =底稿目录!A6",
+            "H": "[FORMULA] =底稿目录!A7",
+            "O": "页次："
+          }
+        },
+        {
+          "row": 5,
+          "data": {
+            "A": "一、审计目标:"
+          }
+        },
+        {
+          "row": 6,
+          "data": {
+            "A": "1.资产负债表中记录的其他非流动负债是存在的，且已经记录在恰当的账户中；     2.记录的其他非流动负债由被审计单位拥有或控制；"
+          }
+        }
+      ]
+    }
+  },
+  "total_formula_count": 195,
+  "confirmation_l7_1": {
+    "sheet_name": "审定表L7-1",
+    "formula_count": 74,
+    "expected_formulas": 72,
+    "match": false,
+    "dimensions": "18×12",
+    "note": "审定表L7-1结构确认"
+  },
+  "confirmation_l7_2": {
+    "sheet_name": "明细表L7-2",
+    "formula_count": 46,
+    "dimensions": "25×27",
+    "columns_count": 5,
+    "note": "明细表L7-2结构确认"
+  }
+}

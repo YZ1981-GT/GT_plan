@@ -1,0 +1,46 @@
+<unknown>:1: SyntaxWarning: invalid escape sequence '\%'
+<unknown>:1: SyntaxWarning: invalid escape sequence '\%'
+backend/tests/integration/test_render_pipeline_e2e.py  <- data:D2A.yaml
+backend/tests/scripts/test_check_wp_semantic_schema.py  <- data:D2A.yaml
+backend/tests/test_d1_d2_inventory.py  <- data:D2A.yaml
+backend/tests/test_formula_engine_parse_roundtrip.py  <- symbols:FORMULA_TEMPLATES
+backend/tests/test_workpaper_sync_legacy_baseline.py  <- data:workpaper_sync_entry_manifest.json
+backend/tests/test_workpaper_sync_manifest_contract.py  <- data:workpaper_sync_entry_manifest.json
+backend/tests/test_workpaper_writer_inventory.py  <- data:check_workpaper_writer_revision_gate.py,generate_workpaper_writer_inventory.py,workpaper_writer_domain_overlay.json
+backend/tests/test_wp_render_schema_service.py  <- data:D2A.yaml
+backend/tests/test_xlsx_export_roundtrip.py  <- data:D2A.yaml
+backend/tests/workpaper_sync/test_task12_canonical_resolver.py  <- data:generate_workpaper_resolver_migration_matrix.py,workpaper_resolver_migration_matrix.json,workpaper_writer_inventory.json
+backend/tests/workpaper_sync/test_task13_contract_registry.py  <- import:registry, import:contracts, symbols:DELIVERED_PER_ENTRY_CONTRACTS,available_contract_ids, data:workpaper_sync_contracts,workpaper_sync_entry_manifest.json
+backend/tests/workpaper_sync/test_task14_merge_conflicts.py  <- import:contracts
+backend/tests/workpaper_sync/test_task15_content_mutation.py  <- import:contracts, data:generate_workpaper_writer_inventory.py
+backend/tests/workpaper_sync/test_task15_content_mutation_pg.py  <- import:contracts
+backend/tests/workpaper_sync/test_task20_writer_gate.py  <- data:check_workpaper_writer_revision_gate.py,generate_workpaper_writer_inventory.py,workpaper_writer_domain_overlay.json
+backend/tests/workpaper_sync/test_task25_materialize_coordinator.py  <- import:contracts
+backend/tests/workpaper_sync/test_task25_materialize_coordinator_pg.py  <- import:contracts
+backend/tests/workpaper_sync/test_task26_oo_to_html.py  <- import:contracts
+backend/tests/workpaper_sync/test_task26_oo_to_html_pg.py  <- import:contracts
+backend/tests/workpaper_sync/test_task27_conflict_resolution_pg.py  <- import:contracts
+backend/tests/workpaper_sync/test_task28_sync_router.py  <- import:wp_sync_router
+backend/tests/workpaper_sync/test_task28_sync_router_pg.py  <- import:wp_sync_router
+backend/tests/workpaper_sync/test_task29_timeline_evidence.py  <- import:wp_sync_router, import:evidence, symbols:DYNAMIC_SCENARIOS
+backend/tests/workpaper_sync/test_task29_timeline_evidence_pg.py  <- import:evidence
+backend/tests/workpaper_sync/test_task30_closure_gate.py  <- import:evidence, data:check_workpaper_writer_revision_gate.py,generate_workpaper_writer_inventory.py,workpaper_resolver_migration_matrix.json
+backend/tests/workpaper_sync/test_task31_frontend_contract.py  <- import:wp_sync_router
+backend/tests/workpaper_sync/test_task35_content_event_refresh.py  <- import:contracts
+backend/tests/workpaper_sync/test_task35_content_event_refresh_pg.py  <- test-import-closure
+backend/tests/workpaper_sync/test_task36_excel_entry_gate.py  <- import:registry, import:contracts, data:workpaper_sync_contracts
+backend/tests/workpaper_sync/test_task37_excel_extract.py  <- import:registry, import:contracts, symbols:MANAGED_SHEET,StreamingProjectionBudget,read_projection_sidecar,rows_per_chunk
+backend/tests/workpaper_sync/test_task38_excel_materialize.py  <- import:registry, import:contracts, symbols:MANAGED_SHEET
+backend/tests/workpaper_sync/test_task38_excel_materialize_pg.py  <- import:contracts, symbols:MANAGED_SHEET
+backend/tests/workpaper_sync/test_task39_pilot_harness.py  <- import:contracts, import:pilot_harness, import:evidence, symbols:DYNAMIC_SCENARIOS
+backend/tests/workpaper_sync/test_task39_pilot_harness_pg.py  <- import:pilot_harness, import:evidence
+backend/tests/workpaper_sync/test_task40_simple_checklist_pilot.py  <- import:registry, import:contracts, import:pilot_harness, import:evidence, symbols:AUTHORITY_MODEL,DELIVERED_PER_ENTRY_CONTRACTS,FOOTER_MARKER,FORMULA_MASK, data:generate_workpaper_writer_inventory.py,workpaper_sync_entry_manifest.json,workpaper_writer_domain_overlay.json
+backend/tests/workpaper_sync/test_task40_simple_checklist_pilot_pg.py  <- import:pilot_harness, import:evidence, symbols:PILOT_ADAPTER_ID,PILOT_ENTRY_ID,ROWS_TABLE_KEY,authority_model_payload
+backend/tests/workpaper_sync/test_task41_d2_large_json_pilot.py  <- import:pilot_d2_large_json, import:registry, import:contracts, import:pilot_harness, import:evidence, symbols:AGING_GROUPS,AGING_SEGMENTS,AUTHORITY_MODEL,DELIVERED_PER_ENTRY_CONTRACTS, data:D2A.yaml,generate_pilot_d2_large_json_contract.py,generate_workpaper_writer_inventory.py
+backend/tests/workpaper_sync/test_task41_d2_large_json_pilot_pg.py  <- import:pilot_d2_large_json, import:pilot_harness, import:evidence, symbols:AUTHORITY_MODEL,MANAGED_FIELD_SPECS,MANAGED_SHEET,PILOT_ADAPTER_ID
+backend/tests/workpaper_sync/test_task59_word_candidate_pg.py  <- test-import-closure
+backend/tests/workpaper_sync/test_task59_word_sdt_engine.py  <- import:contracts
+backend/tests/workpaper_sync/test_task73_entry_profile_manifest.py  <- import:registry, data:workpaper_sync_entry_manifest.json
+
+辐射面：41 个测试文件（AST 级 import/符号引用/生成物文件名 + 测试模块 import 闭包）
+分母参考：backend/tests 下共 2300 个测试文件

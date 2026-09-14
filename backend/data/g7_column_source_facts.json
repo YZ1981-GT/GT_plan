@@ -1,0 +1,1657 @@
+{
+  "_meta": {
+    "note": "派生投影，非真源。真源 = backend/wp_templates/G/G7 长期股权投资.xlsx；本文件由 backend/scripts/diagnose/diagnose_g7_column_alignment.py --emit-facts 生成，并由 backend/tests/four_table/test_g7_column_source_facts.py 钉死「与实时 openpyxl 读取逐字相等」。禁止手改。",
+    "generated_from": "backend/wp_templates/G/G7 长期股权投资.xlsx",
+    "generated_at": "2026-08-12T15:01:30+00:00",
+    "source_sha256": "6bf9e2ebcdf50a1c4a32f8733353dd1de994e7dc483232ad43680043577c3335",
+    "sheet_names": [
+      "附注披露信息（上市公司）",
+      "附注披露信息（国企）"
+    ],
+    "two_level_rule": "横向合并（跨度>=2、值非空、起始列在标签列右侧）= 父表头",
+    "dynamic_group_rule": "值为空的横向合并 = 动态列占位（源模板留给审计师填被投资单位名），记作 '<DYNAMIC:c<锚列>>'。**按锚列区分身份**，否则相邻同名占位会被运行段压缩误并成一段（3 个跨 2 → 1 个跨 6）。消费方比对时对该占位只校验 (start, span) 不校验名字。",
+    "index_key": "(variant, noteSectionId, tableName) 三元组",
+    "label_header_kind_rule": "标签列表头语义三态，**一处登记两端消费**（后端 CORNER_TITLE_EXEMPTIONS 是唯一真源，前端读本字段不得另抄一份判定）：\n  * 'name'   = 源 xlsx 给了行标识列名（含纵向合并的单一名、以及真纵向拆分列名如 '结构化主体'+'类型'）⇒ `label_header` 可直接逐字比对；\n  * 'corner' = **转角标题**：标签列两行文字各自标注**表头行本身**（上行放公司名、下行放日期/期间），源 xlsx **未给行标识列名** ⇒ `label_header` 是拼接出的**幻影**，禁止用它比对；平台按数据行语义取`seed_label`（实测为「项目」）。\n  * 与 'name' 的区分靠**语义**（两者结构完全同形）⇒ 只能登记 + stale 检测，不可由结构判据自动判。",
+    "single_slot_exemption_rule": "源模板占位形态（单槽）豁免，**一处登记两端消费**（后端 SOURCE_PLACEHOLDER_SINGLE_SLOT 是唯一真源，前端读表级 `single_slot_exemption` 字段，不得另抄一份表名清单）：\n  这 4 张合营表源侧确有「空白跨 2 合并」暗示多个实体槽，但**同表另两组合并的叶子行全空** ⇒ 源模板自身只填了 1 槽，与联营表填满 3 槽不同构。\n  平台按**单槽 flat** 实现（标签列 + 2 个数据列，不声明 group）⇒ 运行时「无分组」与源侧「1 段动态占位跨 2」的差异是**已裁决豁免**，不是待修偏差。\n  🔴 消费方须豁免的维度 = `exempt_kinds`（仅 flat / group）；其余维度照常比对。\n  🔴 stale 检测在后端 `_sc_single_slot_still_single()`：源侧段数一旦不再是 1（源 xlsx 把叶子填满多槽）即打红，提醒**重新裁决**而非继续豁免。"
+  },
+  "listed": {
+    "七、1": {
+      "企业集团的构成": {
+        "label_header": "子公司名称",
+        "label_header_parts": [
+          "子公司名称"
+        ],
+        "label_header_raw": "子公司名称",
+        "label_header_parts_raw": [
+          "子公司名称"
+        ],
+        "label_xlsx_span": 1,
+        "label_header_kind": "name",
+        "is_two_level": true,
+        "level_count": 2,
+        "source_rows": "A28:G29",
+        "columns": [
+          {
+            "label": "主要经营地",
+            "group": null
+          },
+          {
+            "label": "注册地",
+            "group": null
+          },
+          {
+            "label": "业务性质",
+            "group": null
+          },
+          {
+            "label": "直接",
+            "group": "持股比例%"
+          },
+          {
+            "label": "间接",
+            "group": "持股比例%"
+          },
+          {
+            "label": "取得方式",
+            "group": null
+          }
+        ]
+      },
+      "其他不重要合营企业和联营企业的汇总财务信息": {
+        "label_header": "项目",
+        "label_header_parts": [
+          "项目"
+        ],
+        "label_header_raw": "项  目",
+        "label_header_parts_raw": [
+          "项  目"
+        ],
+        "label_xlsx_span": 1,
+        "label_header_kind": "name",
+        "is_two_level": false,
+        "level_count": 1,
+        "source_rows": "A200:C200",
+        "columns": [
+          {
+            "label": "期末数/本期发生额",
+            "group": null
+          },
+          {
+            "label": "期初数/上期发生额",
+            "group": null
+          }
+        ]
+      },
+      "对合营企业或联营企业发生超额亏损的分担额": {
+        "label_header": "被投资单位名称",
+        "label_header_parts": [
+          "被投资单位名称"
+        ],
+        "label_header_raw": "被投资单位名称",
+        "label_header_parts_raw": [
+          "被投资单位名称"
+        ],
+        "label_xlsx_span": 1,
+        "label_header_kind": "name",
+        "is_two_level": false,
+        "level_count": 1,
+        "source_rows": "A221:D221",
+        "columns": [
+          {
+            "label": "前期累积未确认的损失份额",
+            "group": null
+          },
+          {
+            "label": "本期未确认的损失份额（或本期实现净利润的分享额）",
+            "group": null
+          },
+          {
+            "label": "本期末累积未确认的损失份额",
+            "group": null
+          }
+        ]
+      },
+      "未丧失控制权的所有者权益份额变动影响": {
+        "label_header": "项目",
+        "label_header_parts": [
+          "项目"
+        ],
+        "label_header_raw": "项  目",
+        "label_header_parts_raw": [
+          "项  目"
+        ],
+        "label_xlsx_span": 1,
+        "label_header_kind": "name",
+        "is_two_level": false,
+        "level_count": 1,
+        "source_rows": "A96:G96",
+        "columns": [
+          {
+            "label": "公司1",
+            "group": null
+          },
+          {
+            "label": "公司2",
+            "group": null
+          },
+          {
+            "label": "公司3",
+            "group": null
+          },
+          {
+            "label": "公司4",
+            "group": null
+          },
+          {
+            "label": "公司5",
+            "group": null
+          },
+          {
+            "label": "公司6",
+            "group": null
+          }
+        ]
+      },
+      "续（1）": {
+        "label_header": "子公司名称",
+        "label_header_parts": [
+          "子公司名称"
+        ],
+        "label_header_raw": "子公司名称",
+        "label_header_parts_raw": [
+          "子公司名称"
+        ],
+        "label_xlsx_span": 1,
+        "label_header_kind": "name",
+        "is_two_level": true,
+        "level_count": 2,
+        "source_rows": "A66:G67",
+        "columns": [
+          {
+            "label": "流动资产",
+            "group": "期初数"
+          },
+          {
+            "label": "非流动资产",
+            "group": "期初数"
+          },
+          {
+            "label": "资产合计",
+            "group": "期初数"
+          },
+          {
+            "label": "流动负债",
+            "group": "期初数"
+          },
+          {
+            "label": "非流动负债",
+            "group": "期初数"
+          },
+          {
+            "label": "负债合计",
+            "group": "期初数"
+          }
+        ]
+      },
+      "续（2）": {
+        "label_header": "子公司名称",
+        "label_header_parts": [
+          "子公司名称"
+        ],
+        "label_header_raw": "子公司名称",
+        "label_header_parts_raw": [
+          "子公司名称"
+        ],
+        "label_xlsx_span": 1,
+        "label_header_kind": "name",
+        "is_two_level": true,
+        "level_count": 2,
+        "source_rows": "A74:I75",
+        "columns": [
+          {
+            "label": "营业收入",
+            "group": "本期发生额"
+          },
+          {
+            "label": "净利润",
+            "group": "本期发生额"
+          },
+          {
+            "label": "综合收益总额",
+            "group": "本期发生额"
+          },
+          {
+            "label": "经营活动现金流量",
+            "group": "本期发生额"
+          },
+          {
+            "label": "营业收入",
+            "group": "上期发生额"
+          },
+          {
+            "label": "净利润",
+            "group": "上期发生额"
+          },
+          {
+            "label": "综合收益总额",
+            "group": "上期发生额"
+          },
+          {
+            "label": "经营活动现金流量",
+            "group": "上期发生额"
+          }
+        ]
+      },
+      "续：重要合营企业本期及上期经营成果": {
+        "label_header": "项目",
+        "label_header_parts": [
+          "项目"
+        ],
+        "label_header_raw": "项  目",
+        "label_header_parts_raw": [
+          "项  目"
+        ],
+        "label_xlsx_span": 1,
+        "label_header_kind": "name",
+        "is_two_level": true,
+        "level_count": 2,
+        "source_rows": "A153:C154",
+        "columns": [
+          {
+            "label": "本期发生额",
+            "group": "<DYNAMIC:c2>"
+          },
+          {
+            "label": "上期发生额",
+            "group": "<DYNAMIC:c2>"
+          }
+        ],
+        "single_slot_exemption": {
+          "exempt_kinds": [
+            "flat",
+            "group"
+          ],
+          "source_ref": "A153:C154",
+          "source_text": "A153:A154='项  目'；B153:C153 空白合并；B154='本期发生额' C154='上期发生额'；D153:E153 与 F153:G153 亦为空白合并但 D154~G154 全空",
+          "basis": [
+            "源侧 D/E、F/G（soe 为 E/F、G/H）合并的叶子行为空 ⇒ 源模板只填了 1 个实体槽",
+            "seed 与运行时**两侧独立**都判 flat + 2 数据列（两个独立实现结论一致）",
+            "改成动态多实体属**结构性变更**，超出本 spec R1 明列的 6 张 A 类表",
+            "父表头是**实体名**、源 xlsx 留空 ⇒ 无从裁决，改了就是臆造（违「宁缺勿造」）"
+          ],
+          "platform_intent": "按单槽 flat 实现：标签列「项目」+ 本期发生额 / 上期发生额 两个数据列，不声明 group",
+          "expected_source_runs": 1
+        }
+      },
+      "续：重要联营企业本期及上期经营成果": {
+        "label_header": "项目",
+        "label_header_parts": [
+          "项目"
+        ],
+        "label_header_raw": "项  目",
+        "label_header_parts_raw": [
+          "项  目"
+        ],
+        "label_xlsx_span": 1,
+        "label_header_kind": "name",
+        "is_two_level": true,
+        "level_count": 2,
+        "source_rows": "A189:G190",
+        "columns": [
+          {
+            "label": "本期发生额",
+            "group": "<DYNAMIC:c2>"
+          },
+          {
+            "label": "上期发生额",
+            "group": "<DYNAMIC:c2>"
+          },
+          {
+            "label": "本期发生额",
+            "group": "<DYNAMIC:c4>"
+          },
+          {
+            "label": "上期发生额",
+            "group": "<DYNAMIC:c4>"
+          },
+          {
+            "label": "本期发生额",
+            "group": "<DYNAMIC:c6>"
+          },
+          {
+            "label": "上期发生额",
+            "group": "<DYNAMIC:c6>"
+          }
+        ]
+      },
+      "重要合营企业主要财务信息": {
+        "label_header": "项目",
+        "label_header_parts": [
+          "项目"
+        ],
+        "label_header_raw": "项 目",
+        "label_header_parts_raw": [
+          "项 目"
+        ],
+        "label_xlsx_span": 1,
+        "label_header_kind": "name",
+        "is_two_level": true,
+        "level_count": 2,
+        "source_rows": "A132:C133",
+        "columns": [
+          {
+            "label": "期末数",
+            "group": "<DYNAMIC:c2>"
+          },
+          {
+            "label": "期初数",
+            "group": "<DYNAMIC:c2>"
+          }
+        ],
+        "single_slot_exemption": {
+          "exempt_kinds": [
+            "flat",
+            "group"
+          ],
+          "source_ref": "A132:C133",
+          "source_text": "A132:A133='项 目'；B132:C132 空白合并；B133='期末数' C133='期初数'；D132:E132 与 F132:G132 亦为空白合并但 D133~G133 全空",
+          "basis": [
+            "源侧 D/E、F/G（soe 为 E/F、G/H）合并的叶子行为空 ⇒ 源模板只填了 1 个实体槽",
+            "seed 与运行时**两侧独立**都判 flat + 2 数据列（两个独立实现结论一致）",
+            "改成动态多实体属**结构性变更**，超出本 spec R1 明列的 6 张 A 类表",
+            "父表头是**实体名**、源 xlsx 留空 ⇒ 无从裁决，改了就是臆造（违「宁缺勿造」）"
+          ],
+          "platform_intent": "按单槽 flat 实现：标签列「项目」+ 期末数 / 期初数 两个数据列，不声明 group",
+          "expected_source_runs": 1
+        }
+      },
+      "重要的共同经营": {
+        "label_header": "共同经营名称",
+        "label_header_parts": [
+          "共同经营名称"
+        ],
+        "label_header_raw": "共同经营名称",
+        "label_header_parts_raw": [
+          "共同经营名称"
+        ],
+        "label_xlsx_span": 1,
+        "label_header_kind": "name",
+        "is_two_level": true,
+        "level_count": 2,
+        "source_rows": "A235:F236",
+        "columns": [
+          {
+            "label": "主要经营地",
+            "group": null
+          },
+          {
+            "label": "注册地",
+            "group": null
+          },
+          {
+            "label": "业务性质",
+            "group": null
+          },
+          {
+            "label": "直接",
+            "group": "持股比例/享有的份额(%)"
+          },
+          {
+            "label": "间接",
+            "group": "持股比例/享有的份额(%)"
+          }
+        ]
+      },
+      "重要的合营企业或联营企业": {
+        "label_header": "合营企业或联营企业名称",
+        "label_header_parts": [
+          "合营企业或联营企业名称"
+        ],
+        "label_header_raw": "合营企业或联营企业名称",
+        "label_header_parts_raw": [
+          "合营企业或联营企业名称"
+        ],
+        "label_xlsx_span": 1,
+        "label_header_kind": "name",
+        "is_two_level": true,
+        "level_count": 2,
+        "source_rows": "A111:G112",
+        "columns": [
+          {
+            "label": "主要经营地",
+            "group": null
+          },
+          {
+            "label": "注册地",
+            "group": null
+          },
+          {
+            "label": "业务性质",
+            "group": null
+          },
+          {
+            "label": "直接",
+            "group": "持股比例(%)"
+          },
+          {
+            "label": "间接",
+            "group": "持股比例(%)"
+          },
+          {
+            "label": "对合营企业或联营企业投资的会计处理方法",
+            "group": null
+          }
+        ]
+      },
+      "重要的非全资子公司": {
+        "label_header": "子公司名称",
+        "label_header_parts": [
+          "子公司名称"
+        ],
+        "label_header_raw": "子公司名称",
+        "label_header_parts_raw": [
+          "子公司名称"
+        ],
+        "label_xlsx_span": 1,
+        "label_header_kind": "name",
+        "is_two_level": false,
+        "level_count": 1,
+        "source_rows": "A49:E49",
+        "columns": [
+          {
+            "label": "少数股东持股比例%",
+            "group": null
+          },
+          {
+            "label": "本期归属于少数股东的损益",
+            "group": null
+          },
+          {
+            "label": "本期向少数股东宣告分派的股利",
+            "group": null
+          },
+          {
+            "label": "期末少数股东权益余额",
+            "group": null
+          }
+        ]
+      },
+      "重要联营企业主要财务信息": {
+        "label_header": "项目",
+        "label_header_parts": [
+          "项目"
+        ],
+        "label_header_raw": "项 目",
+        "label_header_parts_raw": [
+          "项 目"
+        ],
+        "label_xlsx_span": 1,
+        "label_header_kind": "name",
+        "is_two_level": true,
+        "level_count": 2,
+        "source_rows": "A169:G170",
+        "columns": [
+          {
+            "label": "期末数",
+            "group": "<DYNAMIC:c2>"
+          },
+          {
+            "label": "期初数",
+            "group": "<DYNAMIC:c2>"
+          },
+          {
+            "label": "期末数",
+            "group": "<DYNAMIC:c4>"
+          },
+          {
+            "label": "期初数",
+            "group": "<DYNAMIC:c4>"
+          },
+          {
+            "label": "期末数",
+            "group": "<DYNAMIC:c6>"
+          },
+          {
+            "label": "期初数",
+            "group": "<DYNAMIC:c6>"
+          }
+        ]
+      },
+      "重要非全资子公司主要财务信息—期末数": {
+        "label_header": "子公司名称",
+        "label_header_parts": [
+          "子公司名称"
+        ],
+        "label_header_raw": "子公司名称",
+        "label_header_parts_raw": [
+          "子公司名称"
+        ],
+        "label_xlsx_span": 1,
+        "label_header_kind": "name",
+        "is_two_level": true,
+        "level_count": 2,
+        "source_rows": "A58:G59",
+        "columns": [
+          {
+            "label": "流动资产",
+            "group": "期末数"
+          },
+          {
+            "label": "非流动资产",
+            "group": "期末数"
+          },
+          {
+            "label": "资产合计",
+            "group": "期末数"
+          },
+          {
+            "label": "流动负债",
+            "group": "期末数"
+          },
+          {
+            "label": "非流动负债",
+            "group": "期末数"
+          },
+          {
+            "label": "负债合计",
+            "group": "期末数"
+          }
+        ]
+      }
+    },
+    "五、18": {
+      "长期股权投资": {
+        "label_header": "被投资单位",
+        "label_header_parts": [
+          "被投资单位"
+        ],
+        "label_header_raw": "被投资单位",
+        "label_header_parts_raw": [
+          "被投资单位"
+        ],
+        "label_xlsx_span": 1,
+        "label_header_kind": "name",
+        "is_two_level": true,
+        "level_count": 2,
+        "source_rows": "A8:M11",
+        "columns": [
+          {
+            "label": "期初余额（账面价值）",
+            "group": null
+          },
+          {
+            "label": "减值准备期初余额",
+            "group": null
+          },
+          {
+            "label": "追加/新增投资",
+            "group": "本期增减变动"
+          },
+          {
+            "label": "减少投资",
+            "group": "本期增减变动"
+          },
+          {
+            "label": "权益法下确认的投资损益",
+            "group": "本期增减变动"
+          },
+          {
+            "label": "其他综合收益调整",
+            "group": "本期增减变动"
+          },
+          {
+            "label": "其他权益变动",
+            "group": "本期增减变动"
+          },
+          {
+            "label": "宣告发放现金股利或利润",
+            "group": "本期增减变动"
+          },
+          {
+            "label": "计提减值准备",
+            "group": "本期增减变动"
+          },
+          {
+            "label": "其他",
+            "group": "本期增减变动"
+          },
+          {
+            "label": "期末余额（账面价值）",
+            "group": null
+          },
+          {
+            "label": "减值准备期末余额",
+            "group": null
+          }
+        ]
+      }
+    }
+  },
+  "soe": {
+    "七、本期不再纳入合并": {
+      "原子公司的基本情况": {
+        "label_header": "序号",
+        "label_header_parts": [
+          "序号"
+        ],
+        "label_header_raw": "序号",
+        "label_header_parts_raw": [
+          "序号"
+        ],
+        "label_xlsx_span": 1,
+        "label_header_kind": "name",
+        "is_two_level": false,
+        "level_count": 1,
+        "source_rows": "A78:G78",
+        "columns": [
+          {
+            "label": "企业名称",
+            "group": null
+          },
+          {
+            "label": "注册地",
+            "group": null
+          },
+          {
+            "label": "业务性质",
+            "group": null
+          },
+          {
+            "label": "持股比例（%）",
+            "group": null
+          },
+          {
+            "label": "表决权比例（%）",
+            "group": null
+          },
+          {
+            "label": "本期不再成为子公司的原因",
+            "group": null
+          }
+        ]
+      },
+      "本期出售的子公司出售日的经营成果": {
+        "label_header": "公司名称期间",
+        "label_header_parts": [
+          "公司名称",
+          "期间"
+        ],
+        "label_header_raw": "公司名称期间",
+        "label_header_parts_raw": [
+          "公司名称",
+          "期间"
+        ],
+        "label_xlsx_span": 2,
+        "label_header_kind": "corner",
+        "is_two_level": true,
+        "level_count": 2,
+        "source_rows": "A98:L99",
+        "columns": [
+          {
+            "label": "本年年初-出售日",
+            "group": "A公司"
+          },
+          {
+            "label": "上年发生额",
+            "group": "A公司"
+          },
+          {
+            "label": "本年年初-出售日",
+            "group": "B公司"
+          },
+          {
+            "label": "上年发生额",
+            "group": "B公司"
+          },
+          {
+            "label": "本年年初-出售日",
+            "group": "C公司"
+          },
+          {
+            "label": "上年发生额",
+            "group": "C公司"
+          },
+          {
+            "label": "本年年初-出售日",
+            "group": "D公司"
+          },
+          {
+            "label": "上年发生额",
+            "group": "D公司"
+          },
+          {
+            "label": "本年年初-出售日",
+            "group": "E公司"
+          },
+          {
+            "label": "上年发生额",
+            "group": "E公司"
+          }
+        ],
+        "label_header_seed": "项目",
+        "label_header_corner_basis": {
+          "source_ref": "A98:B98='公司名称' / A99:B99='期间'（各自横向合并 A:B，无纵向合并）",
+          "row_titled": [
+            "行98 放 A公司~E公司",
+            "行99 放 本年年初-出售日 / 上年发生额"
+          ],
+          "data_row_samples": [
+            "营业收入",
+            "营业成本"
+          ],
+          "platform_intent": "标签列 label 取「项目」（源 xlsx 未给行标识列名，按数据行语义定）"
+        }
+      },
+      "本期出售的子公司出售日的财务状况": {
+        "label_header": "公司名称截止日期",
+        "label_header_parts": [
+          "公司名称",
+          "截止日期"
+        ],
+        "label_header_raw": "公司名称截止日期",
+        "label_header_parts_raw": [
+          "公司名称",
+          "截止日期"
+        ],
+        "label_xlsx_span": 2,
+        "label_header_kind": "corner",
+        "is_two_level": true,
+        "level_count": 2,
+        "source_rows": "A87:F88",
+        "columns": [
+          {
+            "label": "出售日",
+            "group": "公司1"
+          },
+          {
+            "label": "期初余额",
+            "group": "公司1"
+          },
+          {
+            "label": "出售日",
+            "group": "公司2"
+          },
+          {
+            "label": "期初余额",
+            "group": "公司2"
+          }
+        ],
+        "label_header_seed": "项目",
+        "label_header_corner_basis": {
+          "source_ref": "A87:B87='公司名称' / A88:B88='截止日期'（各自横向合并 A:B，无纵向合并）",
+          "row_titled": [
+            "行87 放 公司1 / 公司2",
+            "行88 放 出售日 / 期初余额"
+          ],
+          "data_row_samples": [
+            "流动资产",
+            "长期股权投资"
+          ],
+          "platform_intent": "标签列 label 取「项目」（源 xlsx 未给行标识列名，按数据行语义定）"
+        }
+      }
+    },
+    "七、本期发生的同一控": {
+      "本期发生的同一控制下企业合并情况": {
+        "label_header": "公司名称",
+        "label_header_parts": [
+          "公司名称"
+        ],
+        "label_header_raw": "公司名称",
+        "label_header_parts_raw": [
+          "公司名称"
+        ],
+        "label_xlsx_span": 2,
+        "label_header_kind": "name",
+        "is_two_level": true,
+        "level_count": 2,
+        "source_rows": "A122:J123",
+        "columns": [
+          {
+            "label": "合并日",
+            "group": null
+          },
+          {
+            "label": "账面净资产",
+            "group": null
+          },
+          {
+            "label": "交易对价",
+            "group": null
+          },
+          {
+            "label": "实际控制人",
+            "group": null
+          },
+          {
+            "label": "收入",
+            "group": "本年初至合并日的相关情况"
+          },
+          {
+            "label": "净利润",
+            "group": "本年初至合并日的相关情况"
+          },
+          {
+            "label": "现金净增加额",
+            "group": "本年初至合并日的相关情况"
+          },
+          {
+            "label": "经营活动现金流量净额",
+            "group": "本年初至合并日的相关情况"
+          }
+        ]
+      }
+    },
+    "七、本期发生的吸收合": {
+      "本期发生的吸收合并": {
+        "label_header": "吸收合并的类型",
+        "label_header_parts": [
+          "吸收合并的类型"
+        ],
+        "label_header_raw": "吸收合并的类型",
+        "label_header_parts_raw": [
+          "吸收合并的类型"
+        ],
+        "label_xlsx_span": 2,
+        "label_header_kind": "name",
+        "is_two_level": true,
+        "level_count": 2,
+        "source_rows": "A139:F140",
+        "columns": [
+          {
+            "label": "项目",
+            "group": "并入的主要资产"
+          },
+          {
+            "label": "金额",
+            "group": "并入的主要资产"
+          },
+          {
+            "label": "项目",
+            "group": "并入的主要负债"
+          },
+          {
+            "label": "金额",
+            "group": "并入的主要负债"
+          }
+        ]
+      }
+    },
+    "七、本期发生的非同一": {
+      "本期发生的非同一控制下企业合并情况": {
+        "label_header": "被购买方名称",
+        "label_header_parts": [
+          "被购买方名称"
+        ],
+        "label_header_raw": "被购买方名称",
+        "label_header_parts_raw": [
+          "被购买方名称"
+        ],
+        "label_xlsx_span": 1,
+        "label_header_kind": "name",
+        "is_two_level": true,
+        "level_count": 3,
+        "source_rows": "A129:M131",
+        "columns": [
+          {
+            "label": "购买日",
+            "group": null
+          },
+          {
+            "label": "购买日的确定依据",
+            "group": null
+          },
+          {
+            "label": "购买日前持有被购买方权益比例",
+            "group": null
+          },
+          {
+            "label": "形成合并时持有的被购买方权益比例（不含合并后的股权增减）",
+            "group": null
+          },
+          {
+            "label": "账面净资产总额",
+            "group": "购买日被购买方"
+          },
+          {
+            "label": "可辨认净资产公允价值总额金额",
+            "group": "购买日被购买方"
+          },
+          {
+            "label": "可辨认净资产公允价值总额确定方法",
+            "group": "购买日被购买方"
+          },
+          {
+            "label": "交易对价",
+            "group": null
+          },
+          {
+            "label": "形成商誉",
+            "group": null
+          },
+          {
+            "label": "购买日至期末被购买方的收入",
+            "group": null
+          },
+          {
+            "label": "购买日至期末被购买方的净利润",
+            "group": null
+          },
+          {
+            "label": "购买日至期末被购买方的现金流量",
+            "group": null
+          }
+        ]
+      }
+    },
+    "七、本期新纳入合并范": {
+      "本期新纳入合并范围的主体": {
+        "label_header": "公司名称",
+        "label_header_parts": [
+          "公司名称"
+        ],
+        "label_header_raw": "公司名称",
+        "label_header_parts_raw": [
+          "公司名称"
+        ],
+        "label_xlsx_span": 2,
+        "label_header_kind": "name",
+        "is_two_level": false,
+        "level_count": 1,
+        "source_rows": "A109:D109",
+        "columns": [
+          {
+            "label": "期末净资产",
+            "group": null
+          },
+          {
+            "label": "本期净利润",
+            "group": null
+          }
+        ]
+      }
+    },
+    "七、本期纳入合并报表": {
+      "本期纳入合并报表范围的子公司基本情况": {
+        "label_header": "序号",
+        "label_header_parts": [
+          "序号"
+        ],
+        "label_header_raw": "序号",
+        "label_header_parts_raw": [
+          "序号"
+        ],
+        "label_xlsx_span": 1,
+        "label_header_kind": "name",
+        "is_two_level": false,
+        "level_count": 1,
+        "source_rows": "A9:M9",
+        "columns": [
+          {
+            "label": "企业名称",
+            "group": null
+          },
+          {
+            "label": "级次",
+            "group": null
+          },
+          {
+            "label": "企业类型",
+            "group": null
+          },
+          {
+            "label": "注册地",
+            "group": null
+          },
+          {
+            "label": "主要经营地",
+            "group": null
+          },
+          {
+            "label": "业务性质",
+            "group": null
+          },
+          {
+            "label": "实收资本",
+            "group": null
+          },
+          {
+            "label": "认缴持股比例（%）",
+            "group": null
+          },
+          {
+            "label": "实缴持股比例（%）",
+            "group": null
+          },
+          {
+            "label": "享有的表决权（%）",
+            "group": null
+          },
+          {
+            "label": "投资额",
+            "group": null
+          },
+          {
+            "label": "取得方式",
+            "group": null
+          }
+        ]
+      }
+    },
+    "七、母公司在子公司的": {
+      "母公司在子公司的所有者权益份额发生变化的情况": {
+        "label_header": "项目",
+        "label_header_parts": [
+          "项目"
+        ],
+        "label_header_raw": "项  目",
+        "label_header_parts_raw": [
+          "项  目"
+        ],
+        "label_xlsx_span": 2,
+        "label_header_kind": "name",
+        "is_two_level": false,
+        "level_count": 1,
+        "source_rows": "A187:E187",
+        "columns": [
+          {
+            "label": "公司1",
+            "group": null
+          },
+          {
+            "label": "公司2",
+            "group": null
+          },
+          {
+            "label": "公司3",
+            "group": null
+          }
+        ]
+      }
+    },
+    "七、母公司拥有被投资": {
+      "母公司拥有被投资单位表决权不足半数但能对被投资单位形成控制的原因": {
+        "label_header": "序号",
+        "label_header_parts": [
+          "序号"
+        ],
+        "label_header_raw": "序号",
+        "label_header_parts_raw": [
+          "序号"
+        ],
+        "label_xlsx_span": 1,
+        "label_header_kind": "name",
+        "is_two_level": false,
+        "level_count": 1,
+        "source_rows": "A25:H25",
+        "columns": [
+          {
+            "label": "企业名称",
+            "group": null
+          },
+          {
+            "label": "认缴持股比例（%）",
+            "group": null
+          },
+          {
+            "label": "享有的表决权",
+            "group": null
+          },
+          {
+            "label": "注册资本",
+            "group": null
+          },
+          {
+            "label": "投资额",
+            "group": null
+          },
+          {
+            "label": "级次",
+            "group": null
+          },
+          {
+            "label": "纳入合并范围原因",
+            "group": null
+          }
+        ]
+      }
+    },
+    "七、母公司直接或通过": {
+      "母公司直接或通过其他子公司间接拥有被投资单位半数以上的表决权但未能对其形成控制的原因": {
+        "label_header": "序号",
+        "label_header_parts": [
+          "序号"
+        ],
+        "label_header_raw": "序号",
+        "label_header_parts_raw": [
+          "序号"
+        ],
+        "label_xlsx_span": 1,
+        "label_header_kind": "name",
+        "is_two_level": false,
+        "level_count": 1,
+        "source_rows": "A37:H37",
+        "columns": [
+          {
+            "label": "企业名称",
+            "group": null
+          },
+          {
+            "label": "认缴持股比例（%）",
+            "group": null
+          },
+          {
+            "label": "享有的表决权",
+            "group": null
+          },
+          {
+            "label": "注册资本",
+            "group": null
+          },
+          {
+            "label": "投资额",
+            "group": null
+          },
+          {
+            "label": "级次",
+            "group": null
+          },
+          {
+            "label": "未纳入合并范围原因",
+            "group": null
+          }
+        ]
+      }
+    },
+    "七、重要非全资子公司": {
+      "主要财务信息": {
+        "label_header": "项目",
+        "label_header_parts": [
+          "项目"
+        ],
+        "label_header_raw": "项  目",
+        "label_header_parts_raw": [
+          "项  目"
+        ],
+        "label_xlsx_span": 2,
+        "label_header_kind": "name",
+        "is_two_level": true,
+        "level_count": 2,
+        "source_rows": "A62:L63",
+        "columns": [
+          {
+            "label": "期末数/本期发生额",
+            "group": "<DYNAMIC:c3>"
+          },
+          {
+            "label": "期初数/上期发生额",
+            "group": "<DYNAMIC:c3>"
+          },
+          {
+            "label": "期末数/本期发生额",
+            "group": "<DYNAMIC:c5>"
+          },
+          {
+            "label": "期初数/上期发生额",
+            "group": "<DYNAMIC:c5>"
+          },
+          {
+            "label": "期末数/本期发生额",
+            "group": "<DYNAMIC:c7>"
+          },
+          {
+            "label": "期初数/上期发生额",
+            "group": "<DYNAMIC:c7>"
+          },
+          {
+            "label": "期末数/本期发生额",
+            "group": "<DYNAMIC:c9>"
+          },
+          {
+            "label": "期初数/上期发生额",
+            "group": "<DYNAMIC:c9>"
+          },
+          {
+            "label": "期末数/本期发生额",
+            "group": "<DYNAMIC:c11>"
+          },
+          {
+            "label": "期初数/上期发生额",
+            "group": "<DYNAMIC:c11>"
+          }
+        ]
+      },
+      "少数股东": {
+        "label_header": "序号",
+        "label_header_parts": [
+          "序号"
+        ],
+        "label_header_raw": "序号",
+        "label_header_parts_raw": [
+          "序号"
+        ],
+        "label_xlsx_span": 1,
+        "label_header_kind": "name",
+        "is_two_level": false,
+        "level_count": 1,
+        "source_rows": "A55:F55",
+        "columns": [
+          {
+            "label": "企业名称",
+            "group": null
+          },
+          {
+            "label": "少数股东持股比例",
+            "group": null
+          },
+          {
+            "label": "当期归属于少数股东的损益",
+            "group": null
+          },
+          {
+            "label": "当期向少数股东支付的股利",
+            "group": null
+          },
+          {
+            "label": "期末累计少数股东权益",
+            "group": null
+          }
+        ]
+      }
+    },
+    "八、18": {
+      "②对合营企业或联营企业发生超额亏损的分担额": {
+        "label_header": "被投资单位名称",
+        "label_header_parts": [
+          "被投资单位名称"
+        ],
+        "label_header_raw": "被投资单位名称",
+        "label_header_parts_raw": [
+          "被投资单位名称"
+        ],
+        "label_xlsx_span": 2,
+        "label_header_kind": "name",
+        "is_two_level": false,
+        "level_count": 1,
+        "source_rows": "A301:E301",
+        "columns": [
+          {
+            "label": "前期累积未确认的损失份额",
+            "group": null
+          },
+          {
+            "label": "本期未确认的损失份额（或本期实现净利润的分享额）",
+            "group": null
+          },
+          {
+            "label": "本期末累积未确认的损失份额",
+            "group": null
+          }
+        ]
+      },
+      "不重要合营企业和联营企业的汇总信息": {
+        "label_header": "项目",
+        "label_header_parts": [
+          "项目"
+        ],
+        "label_header_raw": "项  目",
+        "label_header_parts_raw": [
+          "项  目"
+        ],
+        "label_xlsx_span": 2,
+        "label_header_kind": "name",
+        "is_two_level": false,
+        "level_count": 1,
+        "source_rows": "A280:D280",
+        "columns": [
+          {
+            "label": "本期数",
+            "group": null
+          },
+          {
+            "label": "上期数",
+            "group": null
+          }
+        ]
+      },
+      "结构化主体权益的账面价值和最大损失敞口": {
+        "label_header": "项目",
+        "label_header_parts": [
+          "项目"
+        ],
+        "label_header_raw": "项目",
+        "label_header_parts_raw": [
+          "项目"
+        ],
+        "label_xlsx_span": 1,
+        "label_header_kind": "name",
+        "is_two_level": true,
+        "level_count": 2,
+        "source_rows": "A323:G324",
+        "columns": [
+          {
+            "label": "规模",
+            "group": "发起"
+          },
+          {
+            "label": "账面价值",
+            "group": "期末数"
+          },
+          {
+            "label": "最大损失敞口",
+            "group": "期末数"
+          },
+          {
+            "label": "账面价值",
+            "group": "期初数"
+          },
+          {
+            "label": "最大损失敞口",
+            "group": "期初数"
+          },
+          {
+            "label": "列报项目",
+            "group": null
+          }
+        ]
+      },
+      "结构化主体获得收益及转移资产情况": {
+        "label_header": "结构化主体类型",
+        "label_header_parts": [
+          "结构化主体",
+          "类型"
+        ],
+        "label_header_raw": "结构化主体类型",
+        "label_header_parts_raw": [
+          "结构化主体",
+          "类型"
+        ],
+        "label_xlsx_span": 1,
+        "label_header_kind": "name",
+        "is_two_level": true,
+        "level_count": 2,
+        "source_rows": "A340:E341",
+        "columns": [
+          {
+            "label": "服务收费",
+            "group": "当期从结构化主体获得的收益"
+          },
+          {
+            "label": "向结构化主体出售资产的利得（损失）",
+            "group": "当期从结构化主体获得的收益"
+          },
+          {
+            "label": "合计",
+            "group": "当期从结构化主体获得的收益"
+          },
+          {
+            "label": "当期向结构化主体转移资产账面价值",
+            "group": null
+          }
+        ]
+      },
+      "续：重要合营企业本期及上期经营成果": {
+        "label_header": "项目",
+        "label_header_parts": [
+          "项目"
+        ],
+        "label_header_raw": "项  目",
+        "label_header_parts_raw": [
+          "项  目"
+        ],
+        "label_xlsx_span": 2,
+        "label_header_kind": "name",
+        "is_two_level": true,
+        "level_count": 2,
+        "source_rows": "A243:D244",
+        "columns": [
+          {
+            "label": "本期发生额",
+            "group": "<DYNAMIC:c3>"
+          },
+          {
+            "label": "上期发生额",
+            "group": "<DYNAMIC:c3>"
+          }
+        ],
+        "single_slot_exemption": {
+          "exempt_kinds": [
+            "flat",
+            "group"
+          ],
+          "source_ref": "A243:D244",
+          "source_text": "A243:B244='项  目'（标签列跨 2 xlsx 列）；C243:D243 空白合并；C244='本期发生额' D244='上期发生额'；E243:F243 与 G243:H243 亦为空白合并但 E244~H244 全空",
+          "basis": [
+            "源侧 D/E、F/G（soe 为 E/F、G/H）合并的叶子行为空 ⇒ 源模板只填了 1 个实体槽",
+            "seed 与运行时**两侧独立**都判 flat + 2 数据列（两个独立实现结论一致）",
+            "改成动态多实体属**结构性变更**，超出本 spec R1 明列的 6 张 A 类表",
+            "父表头是**实体名**、源 xlsx 留空 ⇒ 无从裁决，改了就是臆造（违「宁缺勿造」）"
+          ],
+          "platform_intent": "按单槽 flat 实现：标签列「项目」+ 本期发生额 / 上期发生额 两个数据列，不声明 group",
+          "expected_source_runs": 1
+        }
+      },
+      "续：重要联营企业本期及上期经营成果": {
+        "label_header": "项目",
+        "label_header_parts": [
+          "项目"
+        ],
+        "label_header_raw": "项  目",
+        "label_header_parts_raw": [
+          "项  目"
+        ],
+        "label_xlsx_span": 2,
+        "label_header_kind": "name",
+        "is_two_level": true,
+        "level_count": 2,
+        "source_rows": "A271:H272",
+        "columns": [
+          {
+            "label": "本期发生额",
+            "group": "<DYNAMIC:c3>"
+          },
+          {
+            "label": "上期发生额",
+            "group": "<DYNAMIC:c3>"
+          },
+          {
+            "label": "本期发生额",
+            "group": "<DYNAMIC:c5>"
+          },
+          {
+            "label": "上期发生额",
+            "group": "<DYNAMIC:c5>"
+          },
+          {
+            "label": "本期发生额",
+            "group": "<DYNAMIC:c7>"
+          },
+          {
+            "label": "上期发生额",
+            "group": "<DYNAMIC:c7>"
+          }
+        ]
+      },
+      "重要合营企业的主要财务信息（划分为持有待售的除外）": {
+        "label_header": "项目",
+        "label_header_parts": [
+          "项目"
+        ],
+        "label_header_raw": "项 目",
+        "label_header_parts_raw": [
+          "项 目"
+        ],
+        "label_xlsx_span": 2,
+        "label_header_kind": "name",
+        "is_two_level": true,
+        "level_count": 2,
+        "source_rows": "A229:D230",
+        "columns": [
+          {
+            "label": "期末数",
+            "group": "<DYNAMIC:c3>"
+          },
+          {
+            "label": "期初数",
+            "group": "<DYNAMIC:c3>"
+          }
+        ],
+        "single_slot_exemption": {
+          "exempt_kinds": [
+            "flat",
+            "group"
+          ],
+          "source_ref": "A229:D230",
+          "source_text": "A229:B230='项 目'（标签列跨 2 xlsx 列）；C229:D229 空白合并；C230='期末数' D230='期初数'；E229:F229 与 G229:H229 亦为空白合并但 E230~H230 全空",
+          "basis": [
+            "源侧 D/E、F/G（soe 为 E/F、G/H）合并的叶子行为空 ⇒ 源模板只填了 1 个实体槽",
+            "seed 与运行时**两侧独立**都判 flat + 2 数据列（两个独立实现结论一致）",
+            "改成动态多实体属**结构性变更**，超出本 spec R1 明列的 6 张 A 类表",
+            "父表头是**实体名**、源 xlsx 留空 ⇒ 无从裁决，改了就是臆造（违「宁缺勿造」）"
+          ],
+          "platform_intent": "按单槽 flat 实现：标签列「项目」+ 期末数 / 期初数 两个数据列，不声明 group",
+          "expected_source_runs": 1
+        }
+      },
+      "重要联营企业的主要财务信息": {
+        "label_header": "项目",
+        "label_header_parts": [
+          "项目"
+        ],
+        "label_header_raw": "项  目",
+        "label_header_parts_raw": [
+          "项  目"
+        ],
+        "label_xlsx_span": 2,
+        "label_header_kind": "name",
+        "is_two_level": true,
+        "level_count": 2,
+        "source_rows": "A257:H258",
+        "columns": [
+          {
+            "label": "期末数",
+            "group": "<DYNAMIC:c3>"
+          },
+          {
+            "label": "期初数",
+            "group": "<DYNAMIC:c3>"
+          },
+          {
+            "label": "期末数",
+            "group": "<DYNAMIC:c5>"
+          },
+          {
+            "label": "期初数",
+            "group": "<DYNAMIC:c5>"
+          },
+          {
+            "label": "期末数",
+            "group": "<DYNAMIC:c7>"
+          },
+          {
+            "label": "期初数",
+            "group": "<DYNAMIC:c7>"
+          }
+        ]
+      },
+      "长期股权投资分类": {
+        "label_header": "项目",
+        "label_header_parts": [
+          "项目"
+        ],
+        "label_header_raw": "项  目",
+        "label_header_parts_raw": [
+          "项  目"
+        ],
+        "label_xlsx_span": 2,
+        "label_header_kind": "name",
+        "is_two_level": false,
+        "level_count": 1,
+        "source_rows": "A202:F202",
+        "columns": [
+          {
+            "label": "年初余额",
+            "group": null
+          },
+          {
+            "label": "本期增加",
+            "group": null
+          },
+          {
+            "label": "本期减少",
+            "group": null
+          },
+          {
+            "label": "期末余额",
+            "group": null
+          }
+        ]
+      },
+      "长期股权投资明细": {
+        "label_header": "被投资单位",
+        "label_header_parts": [
+          "被投资单位"
+        ],
+        "label_header_raw": "被投资单位",
+        "label_header_parts_raw": [
+          "被投资单位"
+        ],
+        "label_xlsx_span": 1,
+        "label_header_kind": "name",
+        "is_two_level": true,
+        "level_count": 2,
+        "source_rows": "A210:M211",
+        "columns": [
+          {
+            "label": "投资成本",
+            "group": null
+          },
+          {
+            "label": "期初余额",
+            "group": null
+          },
+          {
+            "label": "追加投资",
+            "group": "本期增减变动"
+          },
+          {
+            "label": "减少投资",
+            "group": "本期增减变动"
+          },
+          {
+            "label": "权益法下确认的投资损益",
+            "group": "本期增减变动"
+          },
+          {
+            "label": "其他综合收益调整",
+            "group": "本期增减变动"
+          },
+          {
+            "label": "其他权益变动",
+            "group": "本期增减变动"
+          },
+          {
+            "label": "宣告发放现金股利或利润",
+            "group": "本期增减变动"
+          },
+          {
+            "label": "计提减值准备",
+            "group": "本期增减变动"
+          },
+          {
+            "label": "其他",
+            "group": "本期增减变动"
+          },
+          {
+            "label": "期末余额",
+            "group": null
+          },
+          {
+            "label": "减值准备期末余额",
+            "group": null
+          }
+        ]
+      }
+    }
+  }
+}

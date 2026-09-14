@@ -1,0 +1,520 @@
+{
+  "task": "0.1 openpyxl脚本读取K10其他收益.xlsx全部10 sheet",
+  "source": "d:\\GT_plan\\基础数据\\致同通用审计程序及底稿模板（2025年修订）\\1.致同审计程序及底稿模板（2025年）\\4.风险应对-实质性程序（D-N）\\K 管理循环\\K10 其他收益.xlsx",
+  "confirmation": {
+    "K10-1_审定表": {
+      "total_formulas": 71,
+      "header_ref_formulas": 7,
+      "business_formulas": 64,
+      "task_expected": 69,
+      "actual_vs_expected": "总71=表头7+业务64; 期望69介于总71和业务64之间",
+      "note": "实际公式数以openpyxl实读为准，期望值69为初步估算"
+    },
+    "K10-2_明细表": {
+      "total_formulas": 27,
+      "header_ref_formulas": 7,
+      "business_formulas": 20,
+      "task_expected": 11,
+      "actual_vs_expected": "总27=表头7+业务20; 期望11可能仅统计合计行",
+      "note": "实际公式数以openpyxl实读为准，期望值11为初步估算"
+    },
+    "total_sheets": 11,
+    "valid_sheets": 10,
+    "valid_sheet_names": [
+      "底稿目录",
+      "实质性程序表K10A",
+      "审定表K10-1",
+      "附注披露信息（上市公司）",
+      "附注披露信息（国企）",
+      "明细表K10-2",
+      "调整分录汇总K10-3",
+      "政府补助核对表K10-4",
+      "应收政府补助检查表K10-5",
+      "其他收益检查表K10-6"
+    ],
+    "total_formulas": 246,
+    "total_business_formulas": 183,
+    "双源输入确认": {
+      "损益类科目": "6117其他收益",
+      "取数规则": "发生额（贷方发生-借方发生），从tb_ledger取",
+      "关键sheet": "审定表K10-1(64业务公式)+政府补助核对K10-4(54业务公式)",
+      "10有效sheet": true,
+      "公式驱动核心": "审定=未审+AJE+RJE; 发生额审定数=贷方-借方; 补助合计=直接+递延"
+    }
+  },
+  "sheet_details": [
+    {
+      "index": 0,
+      "sheet_name": "底稿目录",
+      "max_row": 19,
+      "max_column": 8,
+      "non_empty_rows": 14,
+      "header_row": 3,
+      "column_names": [
+        "会计期间：202X年度",
+        "序号",
+        "内容",
+        "索引号",
+        "备注"
+      ],
+      "column_count": 5,
+      "formula_total": 0,
+      "formula_header_ref": 0,
+      "formula_business": 0,
+      "sample_business_formulas": []
+    },
+    {
+      "index": 1,
+      "sheet_name": "实质性程序表K10A",
+      "max_row": 26,
+      "max_column": 10,
+      "non_empty_rows": 26,
+      "header_row": 3,
+      "column_names": [
+        "=底稿目录!A2",
+        "=底稿目录!A4",
+        "=底稿目录!A5",
+        "索引号：",
+        "=底稿目录!F4"
+      ],
+      "column_count": 5,
+      "formula_total": 7,
+      "formula_header_ref": 7,
+      "formula_business": 0,
+      "sample_business_formulas": []
+    },
+    {
+      "index": 2,
+      "sheet_name": "审定表K10-1",
+      "max_row": 27,
+      "max_column": 11,
+      "non_empty_rows": 20,
+      "header_row": 5,
+      "column_names": [
+        "项目（产生其他收益的来源）",
+        "本期未审数",
+        "审计调整",
+        "重分类调整",
+        "本期审定数",
+        "索引号",
+        "上期未审数",
+        "审计调整",
+        "重分类调整",
+        "上期审定数",
+        "备注"
+      ],
+      "column_count": 11,
+      "formula_total": 71,
+      "formula_header_ref": 7,
+      "formula_business": 64,
+      "sample_business_formulas": [
+        {
+          "cell": "A6",
+          "formula": "='明细表K10-2'!A11"
+        },
+        {
+          "cell": "B6",
+          "formula": "='明细表K10-2'!D11"
+        },
+        {
+          "cell": "C6",
+          "formula": "='明细表K10-2'!E11"
+        },
+        {
+          "cell": "D6",
+          "formula": "='明细表K10-2'!F11"
+        },
+        {
+          "cell": "E6",
+          "formula": "=B6+C6+D6"
+        },
+        {
+          "cell": "G6",
+          "formula": "='明细表K10-2'!H11"
+        },
+        {
+          "cell": "H6",
+          "formula": "='明细表K10-2'!I11"
+        },
+        {
+          "cell": "I6",
+          "formula": "='明细表K10-2'!J11"
+        },
+        {
+          "cell": "J6",
+          "formula": "=G6+H6+I6"
+        },
+        {
+          "cell": "A7",
+          "formula": "='明细表K10-2'!A12"
+        }
+      ]
+    },
+    {
+      "index": 3,
+      "sheet_name": "附注披露信息（上市公司）",
+      "max_row": 38,
+      "max_column": 17,
+      "non_empty_rows": 17,
+      "header_row": 3,
+      "column_names": [
+        "=底稿目录!A2",
+        "=底稿目录!A4",
+        "=底稿目录!A5",
+        "索引号：",
+        "=底稿目录!F6"
+      ],
+      "column_count": 5,
+      "formula_total": 27,
+      "formula_header_ref": 7,
+      "formula_business": 20,
+      "sample_business_formulas": [
+        {
+          "cell": "A8",
+          "formula": "='明细表K10-2'!A11"
+        },
+        {
+          "cell": "B8",
+          "formula": "='明细表K10-2'!G11"
+        },
+        {
+          "cell": "C8",
+          "formula": "='明细表K10-2'!K11"
+        },
+        {
+          "cell": "A9",
+          "formula": "='明细表K10-2'!A12"
+        },
+        {
+          "cell": "B9",
+          "formula": "='明细表K10-2'!G12"
+        },
+        {
+          "cell": "C9",
+          "formula": "='明细表K10-2'!K12"
+        },
+        {
+          "cell": "A10",
+          "formula": "='明细表K10-2'!A13"
+        },
+        {
+          "cell": "B10",
+          "formula": "='明细表K10-2'!G13"
+        },
+        {
+          "cell": "C10",
+          "formula": "='明细表K10-2'!K13"
+        },
+        {
+          "cell": "A11",
+          "formula": "='明细表K10-2'!A14"
+        }
+      ]
+    },
+    {
+      "index": 4,
+      "sheet_name": "附注披露信息（国企）",
+      "max_row": 17,
+      "max_column": 6,
+      "non_empty_rows": 15,
+      "header_row": 3,
+      "column_names": [
+        "=底稿目录!A2",
+        "=底稿目录!A4",
+        "=底稿目录!A5",
+        "索引号：",
+        "=底稿目录!F7"
+      ],
+      "column_count": 5,
+      "formula_total": 27,
+      "formula_header_ref": 7,
+      "formula_business": 20,
+      "sample_business_formulas": [
+        {
+          "cell": "A8",
+          "formula": "='明细表K10-2'!A11"
+        },
+        {
+          "cell": "B8",
+          "formula": "='明细表K10-2'!G11"
+        },
+        {
+          "cell": "C8",
+          "formula": "='明细表K10-2'!K11"
+        },
+        {
+          "cell": "A9",
+          "formula": "='明细表K10-2'!A12"
+        },
+        {
+          "cell": "B9",
+          "formula": "='明细表K10-2'!G12"
+        },
+        {
+          "cell": "C9",
+          "formula": "='明细表K10-2'!K12"
+        },
+        {
+          "cell": "A10",
+          "formula": "='明细表K10-2'!A13"
+        },
+        {
+          "cell": "B10",
+          "formula": "='明细表K10-2'!G13"
+        },
+        {
+          "cell": "C10",
+          "formula": "='明细表K10-2'!K13"
+        },
+        {
+          "cell": "A11",
+          "formula": "='明细表K10-2'!A14"
+        }
+      ]
+    },
+    {
+      "index": 5,
+      "sheet_name": "明细表K10-2",
+      "max_row": 43,
+      "max_column": 12,
+      "non_empty_rows": 23,
+      "header_row": 9,
+      "column_names": [
+        "项目（产生其他收益的来源）",
+        "类型",
+        "判断依据",
+        "本期未审数",
+        "本期审计调整",
+        "期末审定数",
+        "上年同期未审数",
+        "上年同期审计调整",
+        "上年同期审定数",
+        "文件索引号"
+      ],
+      "column_count": 10,
+      "formula_total": 27,
+      "formula_header_ref": 7,
+      "formula_business": 20,
+      "sample_business_formulas": [
+        {
+          "cell": "G11",
+          "formula": "=D11+E11+F11"
+        },
+        {
+          "cell": "K11",
+          "formula": "=H11+I11+J11"
+        },
+        {
+          "cell": "G12",
+          "formula": "=D12+E12+F12"
+        },
+        {
+          "cell": "K12",
+          "formula": "=H12+I12+J12"
+        },
+        {
+          "cell": "G13",
+          "formula": "=D13+E13+F13"
+        },
+        {
+          "cell": "K13",
+          "formula": "=H13+I13+J13"
+        },
+        {
+          "cell": "G14",
+          "formula": "=D14+E14+F14"
+        },
+        {
+          "cell": "K14",
+          "formula": "=H14+I14+J14"
+        },
+        {
+          "cell": "G15",
+          "formula": "=D15+E15+F15"
+        },
+        {
+          "cell": "K15",
+          "formula": "=H15+I15+J15"
+        }
+      ]
+    },
+    {
+      "index": 6,
+      "sheet_name": "调整分录汇总K10-3",
+      "max_row": 25,
+      "max_column": 10,
+      "non_empty_rows": 6,
+      "header_row": 5,
+      "column_names": [
+        "调整事项说明",
+        "类别（报表调整/账项调整/其他）",
+        "报表项目",
+        "科目名称",
+        "附注项目",
+        "……",
+        "借方调整金额",
+        "贷方调整金额",
+        "索引",
+        "备注"
+      ],
+      "column_count": 10,
+      "formula_total": 7,
+      "formula_header_ref": 7,
+      "formula_business": 0,
+      "sample_business_formulas": []
+    },
+    {
+      "index": 7,
+      "sheet_name": "政府补助核对表K10-4",
+      "max_row": 36,
+      "max_column": 19,
+      "non_empty_rows": 34,
+      "header_row": 10,
+      "column_names": [
+        "开始日",
+        "结束日",
+        "直接冲减当期成本费用/相关资产账面价值",
+        "直接计入当期其他收益金额",
+        "直接计入当期营业外收入金额",
+        "本期新增计入递延收益",
+        "期初递延收益余额",
+        "摊销冲减当期成本费用/相关资产账面价值",
+        "摊销结转至当期其他收益金额",
+        "摊销结转至当期营业外收入金额",
+        "本期返还",
+        "其他转出",
+        "期末递延收益余额"
+      ],
+      "column_count": 13,
+      "formula_total": 61,
+      "formula_header_ref": 7,
+      "formula_business": 54,
+      "sample_business_formulas": [
+        {
+          "cell": "P12",
+          "formula": "=I12+J12-K12-L12-M12-N12-O12"
+        },
+        {
+          "cell": "P13",
+          "formula": "=I13+J13-K13-L13-M13-N13-O13"
+        },
+        {
+          "cell": "P14",
+          "formula": "=I14+J14-K14-L14-M14-N14-O14"
+        },
+        {
+          "cell": "P15",
+          "formula": "=I15+J15-K15-L15-M15-N15-O15"
+        },
+        {
+          "cell": "B16",
+          "formula": "=SUM(B12:B15)"
+        },
+        {
+          "cell": "F16",
+          "formula": "=SUM(F12:F15)"
+        },
+        {
+          "cell": "G16",
+          "formula": "=SUM(G12:G15)"
+        },
+        {
+          "cell": "H16",
+          "formula": "=SUM(H12:H15)"
+        },
+        {
+          "cell": "I16",
+          "formula": "=SUM(I12:I15)"
+        },
+        {
+          "cell": "J16",
+          "formula": "=SUM(J12:J15)"
+        }
+      ]
+    },
+    {
+      "index": 8,
+      "sheet_name": "应收政府补助检查表K10-5",
+      "max_row": 37,
+      "max_column": 10,
+      "non_empty_rows": 22,
+      "header_row": 9,
+      "column_names": [
+        "政府补助项目名称",
+        "应收政府补助未审金额",
+        "应收政府补助审定金额",
+        "账龄",
+        "政府补助的发文单位",
+        "预计收取的时间及依据",
+        "政府补助文件索引号",
+        "是否满足政府补助确认条件"
+      ],
+      "column_count": 8,
+      "formula_total": 9,
+      "formula_header_ref": 7,
+      "formula_business": 2,
+      "sample_business_formulas": [
+        {
+          "cell": "B15",
+          "formula": "=SUM(B10:B14)"
+        },
+        {
+          "cell": "C15",
+          "formula": "=SUM(C10:C14)"
+        }
+      ]
+    },
+    {
+      "index": 9,
+      "sheet_name": "其他收益检查表K10-6",
+      "max_row": 83,
+      "max_column": 18,
+      "non_empty_rows": 22,
+      "header_row": 10,
+      "column_names": [
+        "其他收益项目",
+        "记账凭证",
+        "支持性文件",
+        "核对内容",
+        "索引号",
+        "是否异常",
+        "备注说明"
+      ],
+      "column_count": 7,
+      "formula_total": 10,
+      "formula_header_ref": 7,
+      "formula_business": 3,
+      "sample_business_formulas": [
+        {
+          "cell": "G22",
+          "formula": "=SUM(G12:G21)"
+        },
+        {
+          "cell": "G23",
+          "formula": "='明细表K10-2'!G17"
+        },
+        {
+          "cell": "G24",
+          "formula": "=G22/G23"
+        }
+      ]
+    },
+    {
+      "index": 10,
+      "sheet_name": "GT_Custom",
+      "max_row": 8,
+      "max_column": 2,
+      "non_empty_rows": 8,
+      "header_row": 1,
+      "column_names": [
+        "C1",
+        "Custom 1"
+      ],
+      "column_count": 2,
+      "formula_total": 0,
+      "formula_header_ref": 0,
+      "formula_business": 0,
+      "sample_business_formulas": []
+    }
+  ]
+}

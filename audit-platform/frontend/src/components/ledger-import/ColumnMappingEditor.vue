@@ -37,6 +37,18 @@
             {{ keyMappings.filter(m => m.mappedField).length }}/{{ keyMappings.length }} 已映射
           </el-tag>
         </div>
+        <!-- 关键列缺失警告 -->
+        <el-alert
+          v-if="missingKeyColumns.length > 0"
+          type="error"
+          :closable="false"
+          show-icon
+          style="margin-bottom: 12px"
+        >
+          <template #title>
+            <span>缺失关键列：{{ missingKeyColumns.map(m => m.column_header).join('、') }}。请为这些列选择标准字段后才能确认导入。</span>
+          </template>
+        </el-alert>
         <div class="mapping-rows">
           <div
             v-for="mapping in keyMappings"
@@ -68,6 +80,14 @@
             <el-tag v-if="mapping.autoAppliedFromHistory" size="small" type="warning" effect="plain" class="history-badge">
               🕒 上次映射
             </el-tag>
+            <!-- 样本值展示 -->
+            <span v-if="mapping.sampleValues.length > 0" class="sample-values">
+              <el-tooltip :content="'样本值：' + mapping.sampleValues.join(' | ')" placement="top">
+                <el-tag size="small" type="info" effect="plain">
+                  {{ mapping.sampleValues[0] }}{{ mapping.sampleValues.length > 1 ? '…' : '' }}
+                </el-tag>
+              </el-tooltip>
+            </span>
           </div>
         </div>
       </div>
@@ -208,7 +228,9 @@ import { ref, computed, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { Right } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
-import type { SheetDetection, LedgerDetectionResult, ConfirmedMapping } from './LedgerImportDialog.vue'
+import type { SheetDetection, LedgerDetectionResult } from './LedgerImportDialog.vue'
+import type { ConfirmedMapping } from '@/types/ledger-import'
+import { generateSheetKey } from '@/types/ledger-import'
 import { handleApiError } from '@/utils/errorHandler'
 
 // ─── Props & Emits ──────────────────────────────────────────────────────────
@@ -234,6 +256,7 @@ interface MappingRow {
   mappedField: string | null
   autoAppliedFromHistory: boolean
   historyMappingId: string | null
+  sampleValues: string[]
 }
 
 interface StandardField {
@@ -252,38 +275,52 @@ const referenceProjects = ref<Array<{ id: string; name: string }>>([])
 const loadingProjects = ref(false)
 const importingMapping = ref(false)
 
+// 🔴 `useRoute()` 用 `inject`，**只能在 setup 顶层同步调用**。历史实现写在
+// `getCurrentProjectId()` 函数体里 → prop 为空走回退分支时 inject 拿不到 route →
+// `route.params` 上 TypeError，**回退逻辑实际是死的**（J1/H8 同款缺陷，2026-07-30 由
+// `check_setup_scoped_composables.py` 静态扫出）。
+const currentRoute = useRoute()
+
 /** 获取当前项目 ID（优先 prop，回退路由参数） */
 function getCurrentProjectId(): string {
   if (props.projectId) return props.projectId
-  const route = useRoute()
-  return (route.params.projectId as string) || ''
+  return (currentRoute.params.projectId as string) || ''
 }
 
 // ─── Standard Fields ────────────────────────────────────────────────────────
 
+// 标准字段选项（value/label 与后端 smart_import_engine.FIELD_LABELS 单一真源对齐，
+// 否则后端自动映射出的字段键在前端下拉框无匹配项 → el-select 回退显示英文原值）
 const availableStandardFields: StandardField[] = [
   { value: 'account_code', label: '科目编码' },
   { value: 'account_name', label: '科目名称' },
+  { value: 'company_code', label: '组织编码' },
   { value: 'opening_balance', label: '期初余额' },
   { value: 'opening_debit', label: '期初借方' },
   { value: 'opening_credit', label: '期初贷方' },
+  { value: 'year_opening_debit', label: '年初借方' },
+  { value: 'year_opening_credit', label: '年初贷方' },
   { value: 'closing_balance', label: '期末余额' },
   { value: 'closing_debit', label: '期末借方' },
   { value: 'closing_credit', label: '期末贷方' },
   { value: 'debit_amount', label: '借方发生额' },
   { value: 'credit_amount', label: '贷方发生额' },
+  { value: 'year_debit', label: '本年累计借方' },
+  { value: 'year_credit', label: '本年累计贷方' },
   { value: 'voucher_date', label: '凭证日期' },
   { value: 'voucher_no', label: '凭证号' },
   { value: 'voucher_type', label: '凭证类型' },
+  { value: 'accounting_period', label: '会计期间' },
   { value: 'summary', label: '摘要' },
   { value: 'preparer', label: '制单人' },
   { value: 'currency_code', label: '币种' },
-  { value: 'level', label: '级次' },
+  { value: 'level', label: '科目级次' },
+  { value: 'aux_dimensions', label: '核算维度' },
   { value: 'aux_type', label: '辅助类型' },
   { value: 'aux_code', label: '辅助编码' },
   { value: 'aux_name', label: '辅助名称' },
   { value: 'amount', label: '金额' },
-  { value: 'direction', label: '方向' },
+  { value: 'direction', label: '借贷方向' },
   { value: 'entry_seq', label: '分录序号' },
 ]
 
@@ -315,6 +352,11 @@ const allKeyColumnsMapped = computed(() =>
   keyMappings.value.every(m => !!m.mappedField)
 )
 
+/** 缺失关键列列表（用于展示阻断原因） */
+const missingKeyColumns = computed(() =>
+  keyMappings.value.filter(m => !m.mappedField)
+)
+
 // 8.36: Check if any mappings were auto-applied from history
 const hasHistoryMappings = computed(() =>
   currentMappings.value.some(m => m.autoAppliedFromHistory)
@@ -343,15 +385,28 @@ function isFieldUsed(fieldValue: string, excludeColIdx: number): boolean {
 function initMappings() {
   const map = new Map<number, MappingRow[]>()
   props.sheets.forEach((sheet, idx) => {
-    const rows: MappingRow[] = sheet.column_mappings.map(col => ({
-      column_index: col.column_index,
-      column_header: col.column_header,
-      column_tier: col.column_tier,
-      confidence: col.confidence,
-      mappedField: col.standard_field,
-      autoAppliedFromHistory: !!(col as any).auto_applied_from_history,
-      historyMappingId: (col as any).history_mapping_id || null,
-    }))
+    // Extract sample values from preview_rows (skip header row, take first 3 data rows)
+    const previewData = sheet.preview_rows?.slice(1, 4) || []
+    const rows: MappingRow[] = sheet.column_mappings.map(col => {
+      // Collect sample values for this column from preview data
+      const samples: string[] = []
+      for (const row of previewData) {
+        const val = row[col.column_index]
+        if (val && val.trim()) {
+          samples.push(val.trim())
+        }
+      }
+      return {
+        column_index: col.column_index,
+        column_header: col.column_header,
+        column_tier: col.column_tier,
+        confidence: col.confidence,
+        mappedField: col.standard_field,
+        autoAppliedFromHistory: !!(col as any).auto_applied_from_history,
+        historyMappingId: (col as any).history_mapping_id || null,
+        sampleValues: samples.slice(0, 3),
+      }
+    })
     map.set(idx, rows)
   })
   sheetMappings.value = map
@@ -360,18 +415,26 @@ function initMappings() {
 function onConfirm() {
   const mappings: ConfirmedMapping[] = props.sheets.map((sheet, idx) => {
     const rows = sheetMappings.value.get(idx) || []
-    const columnMapping: Record<string, string> = {}
+    const mappingEntries: { column_index: number; original_header: string; canonical_header: string; standard_field: string }[] = []
     for (const row of rows) {
       if (row.mappedField) {
-        columnMapping[String(row.column_index)] = row.mappedField
+        mappingEntries.push({
+          column_index: row.column_index,
+          original_header: row.column_header || '',
+          canonical_header: row.column_header || '',
+          standard_field: row.mappedField,
+        })
       }
     }
+    const sheetKey = generateSheetKey(sheet.file_name, sheet.sheet_name)
     return {
-      file: sheet.file_name,
-      sheet: sheet.sheet_name,
-      table_type: sheet.table_type,
-      column_mapping: columnMapping,
-      aux_dimension_columns: sheet.aux_dimension_columns,
+      sheet_key: sheetKey,
+      file_name: sheet.file_name,
+      sheet_name: sheet.sheet_name,
+      table_type: sheet.table_type as ConfirmedMapping['table_type'],
+      mapping_entries: mappingEntries,
+      aux_dimension_columns: sheet.aux_dimension_columns || [],
+      confirmed_by_user: true,
     }
   })
   emit('confirm', mappings)
@@ -457,6 +520,7 @@ watch(showImportMappingDialog, async (visible) => {
   padding: 8px 12px;
   border-radius: 4px;
   background: var(--el-fill-color-lighter);
+  flex-wrap: wrap;
 }
 
 .mapping-row.missing {
@@ -466,6 +530,7 @@ watch(showImportMappingDialog, async (visible) => {
 
 .original-col {
   min-width: 120px;
+  flex-shrink: 0;
   font-size: var(--gt-font-size-sm);
   font-weight: 500;
 }
@@ -475,7 +540,8 @@ watch(showImportMappingDialog, async (visible) => {
 }
 
 .field-select {
-  width: 200px;
+  width: 240px;
+  flex-shrink: 0;
 }
 
 .extra-info {
@@ -505,5 +571,22 @@ watch(showImportMappingDialog, async (visible) => {
 
 .history-apply-bar {
   margin-bottom: 16px;
+}
+
+.sample-values {
+  margin-left: auto;
+  font-size: var(--gt-font-size-xs);
+  max-width: 340px;
+  overflow: hidden;
+}
+
+.sample-values :deep(.el-tag) {
+  max-width: 100%;
+}
+
+.sample-values :deep(.el-tag__content) {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 </style>

@@ -161,7 +161,7 @@ function getTimelineType(action: string): 'primary' | 'success' | 'warning' | 'd
 }
 
 .gt-cell-history__item {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 
 .gt-cell-history__user {

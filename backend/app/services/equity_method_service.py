@@ -42,6 +42,16 @@ class EquityMethodInput:
     recoverable_amount: Optional[Decimal] = None  # 可收回金额（用于减值测试）
     accumulated_impairment: Decimal = Decimal("0")  # 累计已计提减值
 
+    # CAS2 §44：实质上构成净投资的其他长期权益（与 G7-16 口径对齐）
+    long_term_receivable: Decimal = Decimal("0")  # 长期应收款等
+    other_long_term_equity: Decimal = Decimal("0")  # 其他实质长期权益
+    estimated_liability: Decimal = Decimal("0")  # 预计负债（额外义务）
+
+    # 可选：直接承接 G7-16 备查结果（不参与计算，仅回传核对）
+    g716_unrecognized_loss: Optional[Decimal] = None
+    g716_current_change: Optional[Decimal] = None
+    g716_excess_loss: Optional[Decimal] = None
+
 
 @dataclass
 class EquityMethodResult:
@@ -67,6 +77,12 @@ class EquityMethodResult:
     # 5. 超额亏损
     excess_loss: Decimal = Decimal("0")  # 超额亏损（未确认的投资损失）
     is_excess_loss: bool = False  # 是否存在超额亏损
+    # 可吸收亏损的长期权益合计（账面+长应收+其他权益+预计负债）
+    long_term_interest_capacity: Decimal = Decimal("0")
+    # G7-16 备查回传（若输入提供）
+    g716_unrecognized_loss: Optional[Decimal] = None
+    g716_current_change: Optional[Decimal] = None
+    g716_excess_loss: Optional[Decimal] = None
 
     # 6. 投资成本差额
     goodwill: Decimal = Decimal("0")  # 商誉（投资成本 > 享有份额）
@@ -85,11 +101,62 @@ def _round2(val: Decimal) -> Decimal:
     return val.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
 
 
+def calc_long_term_interest_capacity(
+    investment_book: Decimal,
+    long_term_receivable: Decimal = Decimal("0"),
+    other_long_term_equity: Decimal = Decimal("0"),
+    estimated_liability: Decimal = Decimal("0"),
+) -> Decimal:
+    """CAS2 §44：可吸收超额亏损的长期权益合计（与 G7-16 totalLongTermEquity 对齐）。"""
+    return _round2(
+        max(Decimal("0"), investment_book)
+        + max(Decimal("0"), long_term_receivable)
+        + max(Decimal("0"), other_long_term_equity)
+        + max(Decimal("0"), estimated_liability)
+    )
+
+
+def calc_cas2_excess_loss(
+    cumulative_loss: Decimal,
+    investment_book: Decimal,
+    long_term_receivable: Decimal = Decimal("0"),
+    other_long_term_equity: Decimal = Decimal("0"),
+    estimated_liability: Decimal = Decimal("0"),
+) -> dict:
+    """
+    与 G7-16 公式对齐的超额亏损测算（备查口径）。
+
+    excess = MAX(0, cumulative_loss - capacity)
+    瀑布冲减：投资→长应收→其他权益（预计负债不自动确认）。
+    """
+    capacity = calc_long_term_interest_capacity(
+        investment_book, long_term_receivable, other_long_term_equity, estimated_liability,
+    )
+    excess = _round2(max(Decimal("0"), cumulative_loss - capacity))
+    remaining = excess
+    reduce_investment = _round2(min(remaining, max(Decimal("0"), investment_book)))
+    remaining = _round2(remaining - reduce_investment)
+    reduce_lt_receivable = _round2(min(remaining, max(Decimal("0"), long_term_receivable)))
+    remaining = _round2(remaining - reduce_lt_receivable)
+    reduce_other = _round2(min(remaining, max(Decimal("0"), other_long_term_equity)))
+    remaining = _round2(remaining - reduce_other)
+    return {
+        "capacity": capacity,
+        "excess_loss": excess,
+        "reduce_investment": reduce_investment,
+        "reduce_long_term_receivable": reduce_lt_receivable,
+        "reduce_other_equity": reduce_other,
+        "recognize_estimated_liability": Decimal("0"),
+        "unrecognized_loss": remaining,
+    }
+
+
 def calculate_equity_method(inp: EquityMethodInput) -> EquityMethodResult:
     """
     执行模拟权益法完整计算
 
     按照 CAS 2 长期股权投资准则，依次处理 6 项调整。
+    超额亏损吸收能力含长期应收等实质净投资（与 G7-16 对齐）。
     """
     result = EquityMethodResult(
         subsidiary_code=inp.subsidiary_code,
@@ -151,19 +218,57 @@ def calculate_equity_method(inp: EquityMethodInput) -> EquityMethodResult:
     # ── 1. 投资收益确认 ──
     raw_income = _round2(result.adjusted_net_profit * ratio)
 
-    # ── 5. 超额亏损处理 ──
-    # 如果投资收益为负（亏损），检查是否超过账面价值
-    book_before_income = inp.opening_book_value
+    # ── 5. 超额亏损处理（CAS2 §44：可吸收范围含实质长期权益） ──
+    capacity = calc_long_term_interest_capacity(
+        inp.opening_book_value,
+        inp.long_term_receivable,
+        inp.other_long_term_equity,
+        inp.estimated_liability,
+    )
+    result.long_term_interest_capacity = capacity
     if raw_income < 0:
-        max_loss = book_before_income  # 最多亏到账面价值为零
+        max_loss = capacity  # 最多亏到长期权益合计为零
         if abs(raw_income) > max_loss:
             result.is_excess_loss = True
             result.excess_loss = _round2(abs(raw_income) - max_loss)
-            result.investment_income = _round2(-max_loss)  # 只确认到账面价值为零
+            result.investment_income = _round2(-max_loss) if max_loss > 0 else Decimal("0")
+            entries.append({
+                "description": (
+                    "超额亏损未确认部分（备查；长期权益已吸收至零，"
+                    f"容量={capacity}，未确认={result.excess_loss}）"
+                ),
+                "debit_account": "",
+                "debit_amount": "0",
+                "credit_account": "",
+                "credit_amount": "0",
+                "memo_only": True,
+                "unrecognized_loss": str(result.excess_loss),
+            })
         else:
             result.investment_income = raw_income
     else:
         result.investment_income = raw_income
+
+    # G7-16 备查回传
+    result.g716_unrecognized_loss = inp.g716_unrecognized_loss
+    result.g716_current_change = inp.g716_current_change
+    result.g716_excess_loss = inp.g716_excess_loss
+    if (
+        inp.g716_unrecognized_loss is not None
+        and result.is_excess_loss
+        and abs(result.excess_loss - inp.g716_unrecognized_loss) > Decimal("0.05")
+    ):
+        entries.append({
+            "description": (
+                f"提示：本期计算未确认超额 {result.excess_loss} 与 G7-16 备查 "
+                f"{inp.g716_unrecognized_loss} 存在差异，请复核"
+            ),
+            "debit_account": "",
+            "debit_amount": "0",
+            "credit_account": "",
+            "credit_amount": "0",
+            "memo_only": True,
+        })
 
     if result.investment_income != 0:
         if result.investment_income > 0:

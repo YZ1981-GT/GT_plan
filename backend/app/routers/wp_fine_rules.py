@@ -129,8 +129,10 @@ async def fine_extract(
         flag_modified(wp, "parsed_data")
         await db.flush()
         await db.commit()
-    except Exception:
-        pass  # 持久化失败不阻断返回
+        # NOTE: touch_wp_registry 已由 ACNR events.on_workpaper_saved 统一处理（R23.1/R23.2）
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).warning("fine_rules 持久化失败不阻断返回: %s", e)
 
     return data
 

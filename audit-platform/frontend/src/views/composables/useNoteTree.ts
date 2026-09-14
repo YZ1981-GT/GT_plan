@@ -1,0 +1,464 @@
+/**
+ * useNoteTree — 附注章节树加载、拖拽排序、节点选中相关逻辑
+ *
+ * 从 DisclosureEditor.vue 抽取，保持原有语义不变。
+ */
+import { ref, computed, type Ref, type ComputedRef } from 'vue'
+import { ElMessage } from 'element-plus'
+import { getDisclosureNoteTree, type DisclosureNoteTreeItem } from '@/services/auditPlatformApi'
+import { api } from '@/services/apiProxy'
+import { useAcnr } from '@/services/acnr/useAcnr'
+import { withLoading } from '@/composables/useLoading'
+import { handleApiError } from '@/utils/errorHandler'
+
+export interface TreeNode {
+  id: string
+  label: string
+  data?: any
+  children?: TreeNode[]
+  isGroup?: boolean
+  /**
+   * ACNR NOTE-domain index reference for leaf (real note) nodes, e.g. `note:{note_section}`.
+   * Additive metadata only — group/chapter nodes (isGroup) do NOT carry an indexRef.
+   * Consumers resolve this via `useAcnr().resolveIndex(indexRef)` for chip/jump.
+   * Req 17.1
+   */
+  indexRef?: string
+  /**
+   * 校验状态圆点（P0-2）：从后端 findings 计数派生。
+   * - 'error'：有 error 级 findings
+   * - 'warning'：仅 warning 级
+   * - 'clean'：校验已跑且 0 findings
+   * - 'unchecked'：尚未校验（无 findings 数据）
+   */
+  validationStatus?: 'error' | 'warning' | 'clean' | 'unchecked'
+}
+
+export interface UseNoteTreeOptions {
+  projectId: ComputedRef<string> | Ref<string>
+  year: ComputedRef<number> | Ref<number>
+  templateType: Ref<string>
+  isEqcrRole: ComputedRef<boolean>
+  /** Called after fetchTree succeeds to refresh section numbering */
+  onTreeLoaded?: () => void
+}
+
+export interface UseNoteTreeReturn {
+  noteList: Ref<DisclosureNoteTreeItem[]>
+  treeLoading: Ref<boolean>
+  treeSearch: Ref<string>
+  noteTreeRef: Ref<any>
+  treeViewMode: Ref<'tree' | 'flat'>
+  treeData: ComputedRef<TreeNode[]>
+  filteredTreeData: ComputedRef<TreeNode[]>
+  flatNoteList: ComputedRef<DisclosureNoteTreeItem[]>
+  fetchTree: () => Promise<void>
+  /**
+   * 解析附注节点索引（`note:{note_section}`）为 jump_route（Req 17.2）。
+   * 命中返回 jump_route；未命中（found=false / 错误 / 空 indexRef）返回 null，
+   * 调用方回退到现有 note 导航（不改动既有导航行为）。
+   */
+  resolveNoteIndexRoute: (indexRef?: string) => Promise<string | null>
+  allowTreeDrop: (draggingNode: any, dropNode: any, type: 'prev' | 'next' | 'inner') => boolean
+  onTreeNodeDrop: (draggingNode: any, dropNode: any, dropType: 'before' | 'after' | 'inner', _evt: DragEvent) => Promise<void>
+  expandAll: () => void
+  collapseAll: () => void
+}
+
+// ─── 树分组常量 ─────────────────────────────────────────────────────────────────
+
+const CHAPTER_GROUPS = [
+  { prefix: '一' },
+  { prefix: '二' },
+  { prefix: '三' },
+  { prefix: '四' },
+  { prefix: '五' },
+  { prefix: '六' },
+  { prefix: '七' },
+  { prefix: '八' },
+  { prefix: '九' },
+  { prefix: '十' },
+  { prefix: '十一' },
+  { prefix: '十二' },
+  { prefix: '十三' },
+  { prefix: '十四' },
+  { prefix: '十五' },
+  { prefix: '十六' },
+  { prefix: '十七' },
+]
+
+// 国企版14章标题
+const SOE_LABELS: Record<string, string> = {
+  '一': '公司基本情况', '二': '财务报表编制基础', '三': '遵循企业会计准则的声明',
+  '四': '重要会计政策、会计估计', '五': '会计政策变更及差错更正', '六': '税项',
+  '七': '企业合并及合并财务报表', '八': '财务报表主要项目注释',
+  '九': '或有事项', '十': '资产负债表日后事项', '十一': '关联方关系及其交易',
+  '十二': '母公司财务报表附注', '十三': '其他披露内容', '十四': '财务报表之批准',
+}
+// 上市版17章标题
+const LISTED_LABELS: Record<string, string> = {
+  '一': '公司基本情况', '二': '财务报表的编制基础', '三': '重要会计政策及会计估计',
+  '四': '税项', '五': '合并财务报表项目附注', '六': '研发支出',
+  '七': '在其他主体中的权益', '八': '政府补助', '九': '金融工具风险管理',
+  '十': '公允价值', '十一': '关联方及关联交易', '十二': '股份支付',
+  '十三': '承诺及或有事项', '十四': '资产负债表日后事项', '十五': '其他重要事项',
+  '十六': '公司财务报表主要项目注释', '十七': '补充资料',
+}
+
+// ─── 主表注释章内分组（资产/负债/权益/损益/其他） ────────────────────────────
+//
+// 🔴 区间必须按模板变体分别定义：上市版（五、N）与国企版（八、N）的章节顺序不同，
+// 用同一套区间会把资产类章节误归到「损益类」等父节点下。
+// 下列边界取自 `backend/data/note_template_{listed,soe}.json` 的 section_number/
+// section_title 实证（不臆造）：
+//   listed：1 货币资金…32 所有权或使用权受到限制的资产 | 33 短期借款…52 其他非流动负债
+//           | 53 股本…61 未分配利润 | 62 营业收入和营业成本…70 净敞口套期收益
+//           | 71 现金流量表补充资料…74 租赁
+//   soe   ：1 货币资金…32 其他非流动资产 | 33 短期借款…57 其他非流动负债
+//           | 58 实收资本…63 未分配利润 | 64 营业收入、营业成本…78 所得税费用
+//           | 79 归属于母公司所有者的其他综合收益…93 所有权和使用权受到限制的资产
+// 末组为 catch-all（上界极大），保证项目自建/超模板编号的章节不会在分组时丢失。
+interface SectionGroupDef {
+  key: string
+  label: string
+  range: [number, number]
+}
+
+const LISTED_SECTION_GROUPS: SectionGroupDef[] = [
+  { key: 'asset', label: '流动资产 + 非流动资产', range: [1, 32] },
+  { key: 'liability', label: '流动负债 + 非流动负债', range: [33, 52] },
+  { key: 'equity', label: '所有者权益', range: [53, 61] },
+  { key: 'income', label: '损益类', range: [62, 70] },
+  { key: 'other', label: '其他项目注释', range: [71, 74] },
+  { key: 'disclosure', label: '补充披露事项', range: [75, 9999] },
+]
+
+const SOE_SECTION_GROUPS: SectionGroupDef[] = [
+  { key: 'asset', label: '流动资产 + 非流动资产', range: [1, 32] },
+  { key: 'liability', label: '流动负债 + 非流动负债', range: [33, 57] },
+  { key: 'equity', label: '所有者权益', range: [58, 63] },
+  { key: 'income', label: '损益类', range: [64, 78] },
+  { key: 'other', label: '其他项目注释', range: [79, 93] },
+  { key: 'disclosure', label: '补充披露事项', range: [94, 9999] },
+]
+
+/** 按模板变体取主表注释章的分组定义（默认国企版，与 SOE_LABELS 缺省一致）。 */
+function sectionGroupsFor(templateType: string): SectionGroupDef[] {
+  return templateType === 'listed' ? LISTED_SECTION_GROUPS : SOE_SECTION_GROUPS
+}
+
+/**
+ * 解析 `五、29` / `八、45` 的章节序号；无法解析返回 null。
+ * 形如 `五、12·1` 取前段数字（保持既有行为）。
+ */
+function parseSectionOrdinal(noteSection: string, prefix: string): number | null {
+  const raw = (noteSection || '').replace(prefix, '')
+  const m = raw.match(/^\d+/)
+  if (!m) return null
+  const num = parseInt(m[0], 10)
+  return Number.isFinite(num) ? num : null
+}
+
+// 会计政策分组关键词
+const POLICY_GROUPS: Record<string, { label: string; keywords: string[] }> = {
+  'basic': { label: '基础政策', keywords: ['会计期间', '记账本位币', '记账基础', '现金及现金等价物', '公允价值', '营业周期', '遵循'] },
+  'consolidation': { label: '合并与合营', keywords: ['企业合并', '合并财务报表', '合营安排', '同一控制', '非同一控制', '控制的判断', '子公司'] },
+  'financial': { label: '金融工具与外币', keywords: ['金融工具', '套期', '外币', '应付债券', '优先股', '永续债', '资产证券化'] },
+  'asset': { label: '资产类政策', keywords: ['存货', '长期股权', '投资性房地产', '固定资产', '在建工程', '生物资产', '油气资产', '使用权资产', '无形资产', '研究开发', '长期待摊', '资产减值', '借款费用', '商誉'] },
+  'liability_income': { label: '负债与收入', keywords: ['职工薪酬', '股份支付', '预计负债', '收入', '合同成本', '合同履约', '政府补助', '递延所得税', '安全生产', '应付债券'] },
+  'lease_other': { label: '租赁与其他', keywords: ['租赁', '持有待售', '终止经营'] },
+}
+
+// 企业合并分组关键词
+const MERGE_GROUPS: Record<string, { label: string; keywords: string[] }> = {
+  'scope': { label: '合并范围', keywords: ['纳入合并', '不再纳入', '新纳入', '子公司基本'] },
+  'control': { label: '控制与表决权', keywords: ['表决权不足', '直接或通过', '非全资', '所有者权益份额'] },
+  'transaction': { label: '合并交易', keywords: ['同一控制下企业合并', '非同一控制下企业合并', '吸收合并'] },
+  'restriction': { label: '限制与结构化主体', keywords: ['重大限制', '结构化主体', '转移资金'] },
+}
+
+// 关联方分组关键词
+const RELATED_GROUPS: Record<string, { label: string; keywords: string[] }> = {
+  'party': { label: '关联方情况', keywords: ['母公司', '子公司情况', '合营企业', '联营企业', '其他关联方'] },
+  'transaction': { label: '关联交易', keywords: ['关联交易', '应收应付'] },
+}
+
+// ─── 通用分组函数 ────────────────────────────────────────────────────────────────
+
+/**
+ * 构建叶子 TreeNode（真实附注节点）。
+ * 在原 `{ id, label, data }` 基础上 additive 附加 `indexRef = note:{note_section}`（Req 17.1）
+ * 及 `validationStatus`（P0-2 校验圆点）。
+ * 不改变 id/label/data，故树结构/分组/拖拽行为保持不变（Req 17.3）。
+ */
+function makeNoteLeaf(n: DisclosureNoteTreeItem): TreeNode {
+  let validationStatus: TreeNode['validationStatus']
+  if (n.findings) {
+    if (n.findings.error > 0) validationStatus = 'error'
+    else if (n.findings.warning > 0) validationStatus = 'warning'
+    else validationStatus = 'clean'
+  } else {
+    validationStatus = 'unchecked'
+  }
+  return { id: n.id, label: n.section_title, data: n, indexRef: `note:${n.note_section}`, validationStatus }
+}
+
+function buildGroupedChildren(
+  items: DisclosureNoteTreeItem[],
+  groups: Record<string, { label: string; keywords: string[] }>,
+  idPrefix: string,
+): TreeNode[] {
+  const children: TreeNode[] = []
+  const used = new Set<string>()
+  for (const [gk, gv] of Object.entries(groups)) {
+    const matched = items.filter(n => gv.keywords.some(kw => (n.section_title || '').includes(kw)))
+    if (matched.length) {
+      matched.forEach(n => used.add(n.id))
+      children.push({
+        id: `${idPrefix}_${gk}`, label: gv.label, isGroup: true,
+        children: matched.map(makeNoteLeaf),
+      })
+    }
+  }
+  const ungrouped = items.filter(n => !used.has(n.id))
+  if (ungrouped.length) {
+    children.push({
+      id: `${idPrefix}_other`, label: '其他', isGroup: true,
+      children: ungrouped.map(makeNoteLeaf),
+    })
+  }
+  return children
+}
+
+// ─── Composable 主体 ─────────────────────────────────────────────────────────────
+
+export function useNoteTree(options: UseNoteTreeOptions): UseNoteTreeReturn {
+  const { projectId, year, templateType, isEqcrRole, onTreeLoaded } = options
+
+  // ─── Reactive state ─────────────────────────────────────────────────────────
+  const noteList = ref<DisclosureNoteTreeItem[]>([])
+  const treeLoading = ref(false)
+  const treeSearch = ref('')
+  const noteTreeRef = ref<any>(null)
+  const treeViewMode = ref<'tree' | 'flat'>('tree')
+
+  // ─── fetchTree ──────────────────────────────────────────────────────────────
+  const fetchTree = withLoading(treeLoading, async () => {
+    try {
+      noteList.value = await getDisclosureNoteTree(projectId.value, year.value)
+      // C.3.11: 刷新章节序号
+      onTreeLoaded?.()
+    }
+    catch { noteList.value = [] }
+  })
+
+  // ─── 树形结构计算 ───────────────────────────────────────────────────────────
+  const treeData = computed<TreeNode[]>(() => {
+    const notes = noteList.value
+    if (!notes.length) return []
+
+    const result: TreeNode[] = []
+
+    for (const ch of CHAPTER_GROUPS) {
+      const prefix = ch.prefix + '、'
+      const items = notes.filter(n => n.note_section.startsWith(prefix))
+      if (!items.length) continue  // 空章节不显示
+
+      // 动态获取章节标题（根据模板类型）
+      const labels = templateType.value === 'listed' ? LISTED_LABELS : SOE_LABELS
+      const chLabel = `${ch.prefix}、${labels[ch.prefix] || items[0]?.section_title || ''}`
+
+      // 会计政策（国企四/上市三）：直接按模板顺序平铺，不分大类
+      if ((ch.prefix === '三' || ch.prefix === '四') && items.length > 10) {
+        result.push({
+          id: `chapter_${ch.prefix}`, label: `${chLabel}（${items.length}）`, isGroup: true,
+          children: items.map(makeNoteLeaf),
+        })
+
+      // 报表注释（国企八/上市五）：按资产/负债/权益/损益分组
+      } else if ((ch.prefix === '五' || ch.prefix === '八') && items.length > 10) {
+        // 按变体区间归组；每个节点恰好落入一个父节点，未匹配区间（含编号不可解析）
+        // 一律归入最后一组 catch-all，避免节点在分组时静默丢失。
+        const groupDefs = sectionGroupsFor(templateType.value)
+        const buckets = new Map<string, DisclosureNoteTreeItem[]>()
+        const fallbackKey = groupDefs[groupDefs.length - 1].key
+        for (const n of items) {
+          const num = parseSectionOrdinal(n.note_section, prefix)
+          const hit = num === null
+            ? undefined
+            : groupDefs.find(g => num >= g.range[0] && num <= g.range[1])
+          const key = hit?.key ?? fallbackKey
+          const list = buckets.get(key)
+          if (list) list.push(n)
+          else buckets.set(key, [n])
+        }
+        const subChildren: TreeNode[] = []
+        for (const gInfo of groupDefs) {
+          const matched = buckets.get(gInfo.key)
+          if (matched?.length) {
+            subChildren.push({
+              id: `group_${ch.prefix}_${gInfo.key}`, label: gInfo.label, isGroup: true,
+              children: matched.map(makeNoteLeaf),
+            })
+          }
+        }
+        result.push({ id: `chapter_${ch.prefix}`, label: `${chLabel}（${items.length}）`, isGroup: true, children: subChildren })
+
+      // 企业合并（国企七）：>5个子章节时分组
+      } else if (ch.prefix === '七' && items.length > 5) {
+        result.push({
+          id: `chapter_${ch.prefix}`, label: `${chLabel}（${items.length}）`, isGroup: true,
+          children: buildGroupedChildren(items, MERGE_GROUPS, 'ch7'),
+        })
+
+      // 关联方（国企十一/上市十一）：>3个子章节时分组
+      } else if (ch.prefix === '十一' && items.length > 3) {
+        result.push({
+          id: `chapter_${ch.prefix}`, label: `${chLabel}（${items.length}）`, isGroup: true,
+          children: buildGroupedChildren(items, RELATED_GROUPS, 'ch11'),
+        })
+
+      // 其他章节：直接平铺
+      } else {
+        result.push({
+          id: `chapter_${ch.prefix}`,
+          label: items.length > 3 ? `${chLabel}（${items.length}）` : chLabel,
+          isGroup: true,
+          children: items.map(makeNoteLeaf),
+        })
+      }
+    }
+
+    return result
+  })
+
+  const filteredTreeData = computed(() => {
+    const kw = treeSearch.value.toLowerCase()
+    if (!kw) return treeData.value
+    // 搜索时展平到叶子节点过滤
+    return treeData.value.map(group => {
+      if (!group.children?.length) return group
+      const filtered = group.children.map(child => {
+        if (child.children) {
+          // 二级分组
+          const subFiltered = child.children.filter(n =>
+            (n.label || '').toLowerCase().includes(kw) || (n.data?.account_name || '').toLowerCase().includes(kw)
+          )
+          return subFiltered.length ? { ...child, children: subFiltered } : null
+        }
+        // 叶子节点
+        return (child.label || '').toLowerCase().includes(kw) || (child.data?.account_name || '').toLowerCase().includes(kw) ? child : null
+      }).filter(Boolean) as TreeNode[]
+      return filtered.length ? { ...group, children: filtered } : null
+    }).filter(Boolean) as TreeNode[]
+  })
+
+  // ─── 平铺视图数据 ──────────────────────────────────────────────────────────
+  const flatNoteList = computed(() => {
+    const kw = treeSearch.value.toLowerCase()
+    let list = noteList.value
+
+    // 过滤掉「裸章节父节点」（如"一"/"二"/"三"）——它们与子节点（如"一、1"/"二、1"）
+    // 标题相同，平铺视图会产生视觉重复。判定：note_section 不含"、"且存在以
+    // 该 prefix+"、" 开头的子章节。
+    const sectionSet = new Set(list.map(n => n.note_section))
+    list = list.filter(n => {
+      const sec = n.note_section || ''
+      if (sec.includes('、')) return true  // 子章节保留
+      // 裸章节：看是否有以 sec+"、" 开头的子节点
+      const hasChildren = list.some(other => other.note_section.startsWith(sec + '、'))
+      return !hasChildren  // 有子节点的裸章节排除
+    })
+
+    if (kw) {
+      list = list.filter(n => (n.section_title || '').toLowerCase().includes(kw) || (n.note_section || '').toLowerCase().includes(kw))
+    }
+    return list
+  })
+
+  // ─── ACNR NOTE 索引解析（Req 17.2 / 17.4） ──────────────────────────────────
+  const acnr = useAcnr()
+
+  /**
+   * 将附注节点的 indexRef（`note:{note_section}`）经 ACNR resolveIndex 解析为 jump_route。
+   * NOTE 域走 full_resolve V1 delegation，无需预登记 L1 catalog（Req 17.4）。
+   * 命中 → 返回 jump_route；unresolved（found=false / 无 jump_route / 空 indexRef / 异常）
+   * → 返回 null，调用方回退现有 note 导航（Req 17.2）。
+   */
+  async function resolveNoteIndexRoute(indexRef?: string): Promise<string | null> {
+    if (!indexRef) return null
+    try {
+      const res = await acnr.resolveIndex(indexRef)
+      return res.found && res.jump_route ? res.jump_route : null
+    } catch {
+      return null
+    }
+  }
+
+  // ─── 树节点展开/收起 ───────────────────────────────────────────────────────
+  function expandAll() {
+    const tree = noteTreeRef.value
+    if (!tree) return
+    const nodes = tree.store?.nodesMap
+    if (nodes) {
+      Object.values(nodes).forEach((node: any) => { node.expanded = true })
+    }
+  }
+
+  function collapseAll() {
+    const tree = noteTreeRef.value
+    if (!tree) return
+    const nodes = tree.store?.nodesMap
+    if (nodes) {
+      Object.values(nodes).forEach((node: any) => { node.expanded = false })
+    }
+  }
+
+  // ─── 拖拽排序 ──────────────────────────────────────────────────────────────
+  function allowTreeDrop(draggingNode: any, dropNode: any, type: 'prev' | 'next' | 'inner'): boolean {
+    // 不允许拖入分组节点（仅同级排序）
+    if (type === 'inner') return false
+    // 不允许拖到章节分组（isGroup）下方
+    if (dropNode.data?.isGroup) return false
+    // 必须同 parent
+    return draggingNode.parent?.data === dropNode.parent?.data
+  }
+
+  async function onTreeNodeDrop(draggingNode: any, dropNode: any, dropType: 'before' | 'after' | 'inner', _evt: DragEvent) {
+    if (dropType === 'inner') return
+    const sectionId = draggingNode.data?.data?.note_section
+    const targetId = dropNode.data?.data?.note_section
+    if (!sectionId || !targetId) return
+
+    try {
+      await api.put(
+        `/api/disclosure-notes/${projectId.value}/${year.value}/sections/${sectionId}/move`,
+        { target_section_id: targetId, position: dropType }
+      )
+      ElMessage.success('章节排序已更新')
+      // 刷新树以及章节序号
+      await fetchTree()
+    } catch (e: any) {
+      handleApiError(e, '排序')
+      // 刷新还原
+      await fetchTree()
+    }
+  }
+
+  return {
+    noteList,
+    treeLoading,
+    treeSearch,
+    noteTreeRef,
+    treeViewMode,
+    treeData,
+    filteredTreeData,
+    flatNoteList,
+    fetchTree,
+    resolveNoteIndexRoute,
+    allowTreeDrop,
+    onTreeNodeDrop,
+    expandAll,
+    collapseAll,
+  }
+}

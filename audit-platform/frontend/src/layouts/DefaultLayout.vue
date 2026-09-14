@@ -90,7 +90,7 @@
           v-if="staleCount > 0"
           :stale-count="staleCount"
           @recalc="onRecalcStale"
-          @detail="$router.push(`/projects/${route.params.projectId}/workpapers?filter=stale`)"
+          @detail="onShowStaleDetail"
         />
         <router-view v-slot="{ Component, route: viewRoute }">
           <ErrorBoundary :key="viewRoute.fullPath">
@@ -108,7 +108,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, watch, provide } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import ThreeColumnLayout from './ThreeColumnLayout.vue'
 import MiddleProjectList from '@/components/layout/MiddleProjectList.vue'
@@ -128,8 +128,8 @@ import { initGlobalBackspace } from '@/composables/useNavigationStack'
 import { handleApiError } from '@/utils/errorHandler'
 import { useRoleContextStore } from '@/stores/roleContext'
 import { useProjectStore } from '@/stores/project'
-import { getProject } from '@/services/auditPlatformApi'
 import { getGlobalReviewInbox } from '@/services/pmApi'
+import { eventBus } from '@/utils/eventBus'
 
 const route = useRoute()
 const router = useRouter()
@@ -151,6 +151,9 @@ const fourCol = ref(false)
 const activeCatalog = ref('reports')
 const selectedCatalogItem = ref<any>(null)
 
+// 四栏模式状态 provide 给子路由组件（DisclosureEditor 用于隐藏内置树）
+provide('isFourColumnMode', fourCol)
+
 // 复核收件箱 badge
 const pendingReviewCount = ref(0)
 let badgeTimer: ReturnType<typeof setInterval> | null = null
@@ -167,6 +170,22 @@ async function loadStaleCount() {
   } catch { staleCount.value = 0 }
 }
 
+/**
+ * 「查看详情」→ 底稿列表的「仅看待重算」视图。
+ *
+ * 必须带 view=list（筛选栏只在列表视图渲染）+ year（WorkpaperList.currentYear 读
+ * route.query.year，漏传会退到当前自然年导致跨年度串数据）。
+ */
+function onShowStaleDetail() {
+  const pid = route.params.projectId as string
+  if (!pid) return
+  const year = projectStore.year || Number(route.query.year) || new Date().getFullYear() - 1
+  router.push({
+    path: `/projects/${pid}/workpapers`,
+    query: { view: 'list', filter: 'stale', year: String(year) },
+  })
+}
+
 async function onRecalcStale() {
   const pid = route.params.projectId as string
   if (!pid) return
@@ -174,11 +193,18 @@ async function onRecalcStale() {
   // 漏传会爆 422 "[{type:missing,loc:[query,year],msg:Field required}]"
   const year = projectStore.year || Number(route.query.year) || new Date().getFullYear() - 1
   try {
-    await import('@/services/apiProxy').then(m =>
+    const resp: any = await import('@/services/apiProxy').then(m =>
       m.api.post(`/api/projects/${pid}/trial-balance/recalc`, undefined, { params: { year } })
     )
-    staleCount.value = 0
-    ElMessage.success('已触发全量重算')
+    // 以后端返回的 stale 收敛结果为准复查计数，不再乐观置 0
+    // （置 0 只是把横条藏到下次刷新，用户会以为重算没生效）
+    await loadStaleCount()
+    const kept = Number(resp?.stale_resolution?.kept_stale ?? 0)
+    if (kept > 0) {
+      ElMessage.warning(`重算完成，仍有 ${kept} 张底稿正文已保存需手工刷新（点「查看详情」）`)
+    } else {
+      ElMessage.success('重算完成，过期数据已同步')
+    }
   } catch (err: any) {
     handleApiError(err, '全量重算')
   }
@@ -267,10 +293,12 @@ const catalogTitle = computed(() => {
 // 浏览模式：首页/项目列表/其他一级模块（非具体项目子页面和新建向导）
 // 全宽模式路径（不显示中间栏项目列表）
 const FULLWIDTH_PATHS = [
-  '/', '/projects/new', '/recycle-bin', '/forum', '/private-storage',
+  '/', '/projects/new', '/projects/full', '/recycle-bin', '/forum', '/private-storage',
   '/knowledge', '/consolidation', '/attachments', '/confirmation',
   '/archive', '/work-hours',
   '/template-library', '/custom-query',
+  // procedure-delegation-notification / Task 12：跨项目"我的程序任务"全宽独立页
+  '/my-procedures',
 ]
 const FULLWIDTH_PREFIXES = ['/extension/', '/settings', '/dashboard/', '/eqcr/']
 
@@ -310,17 +338,64 @@ function onViewChange(mode: 'three' | 'four') {
   fourCol.value = mode === 'four'
 }
 
+// ─── Task 3.4: tabToRoute 辅助函数 ─────────────────────────────────────────
+function tabToRoute(tab: string): string {
+  const map: Record<string, string> = {
+    reports: 'financial-reports',
+    notes: 'disclosure-notes',
+    workpapers: 'workpapers',
+    trial_balance: 'trial-balance',
+  }
+  return map[tab] || 'disclosure-notes'
+}
+
+// ─── Task 3.2: handleProjectSwitch ──────────────────────────────────────────
+async function handleProjectSwitch(item: { project_id: string; year?: number }) {
+  const targetId = item.project_id
+  if (targetId === route.params.projectId) return  // 同项目不操作
+
+  const year = item.year || projectStore.year
+  const activeTab = activeCatalog.value
+  const subRoute = tabToRoute(activeTab)
+
+  try {
+    await router.push({
+      path: `/projects/${targetId}/${subRoute}`,
+      query: { year: String(year) }
+    })
+  } catch (err: any) {
+    ElMessage.error('项目切换失败：' + (err.message || '未知错误'))
+  }
+}
+
+// ─── Task 3.3: handleNoteNavigation ─────────────────────────────────────────
+function handleNoteNavigation(item: { code: string }) {
+  const pid = route.params.projectId as string
+  const isOnNotesPage = route.name === 'DisclosureNotes'
+
+  if (isOnNotesPage) {
+    // 已在附注编辑器页面，通过 eventBus 通知 DisclosureEditor 直接导航
+    eventBus.emit('catalog:note-select', { noteSection: item.code })
+  } else {
+    // 不在附注页面，路由导航并附带 section query
+    router.push({
+      path: `/projects/${pid}/disclosure-notes`,
+      query: { ...route.query, section: item.code }
+    })
+  }
+}
+
+// ─── Task 3.1: onCatalogSelect 按 type 分发 ────────────────────────────────
 function onCatalogSelect(item: any) {
-  // 处理项目切换
   if (item?.type === 'switch_project' && item.project_id) {
-    // 从项目列表中找到目标项目并切换（静态导入，避免动态 import 无意义开销）
-    getProject(item.project_id).then((proj: any) => {
-      if (proj) {
-        selectedProject.value = proj
-      }
-    }).catch(() => {})
+    handleProjectSwitch(item)
     return
   }
+  if (item?.type === 'note') {
+    handleNoteNavigation(item)
+    return
+  }
+  // 其他类型（report/workpaper/trial_balance）保持现有行为
   selectedCatalogItem.value = item
 }
 </script>

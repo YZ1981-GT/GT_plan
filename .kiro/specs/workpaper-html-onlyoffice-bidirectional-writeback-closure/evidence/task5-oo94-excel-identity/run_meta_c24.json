@@ -1,0 +1,29 @@
+{
+  "probe": "task5-oo94-excel-identity",
+  "doc": "c24",
+  "started_at": "2026-08-24T16:35:15.369371+00:00",
+  "oo_url_from_host": "http://localhost:8080",
+  "host_for_oo": "host.docker.internal",
+  "probe_port": 9993,
+  "doc_key": "t5c241787589315",
+  "template_rel": "backend/wp_templates/C/C24 会计分录 - 细节测试.xlsx",
+  "staged_sha256": "f20757001e1d4a46973bd9dc828e147141d679eda70280c8a80f31ac165f96e6",
+  "operations": [
+    "baseline",
+    "edit",
+    "insert_row",
+    "delete_row",
+    "sort",
+    "copy",
+    "paste",
+    "rename_sheet",
+    "forcesave",
+    "download",
+    "reopen"
+  ],
+  "oo_secret_ref": "sha256:61babf80965111e647799bc8",
+  "oo_build_endpoints": {
+    "healthcheck": "true",
+    "info": "ERROR HTTPError: HTTP Error 403: Forbidden"
+  }
+}

@@ -27,9 +27,42 @@ pytest-asyncio
 fakeredis
 aiosqlite
 hypothesis==6.152.4
+sqlglot>=27  # 裸 SQL 列级契约测试静态解析（test_raw_sql_schema_contract）
 ruff==0.11.12
 jsonpath-ng
 pypinyin
 locust
 python-docx
+PyMuPDF>=1.23
+docxtpl>=0.18.0
+instructor>=1.5,<2
+openai>=1.0,<2
+schemathesis>=3.36,<4
+bm25s
+jieba>=0.42
+opentelemetry-api>=1.20,<2
+opentelemetry-sdk>=1.20,<2
+opentelemetry-instrumentation-fastapi>=0.41b0,<1
+opentelemetry-instrumentation-asyncpg>=0.41b0,<1
+opentelemetry-instrumentation-redis>=0.41b0,<1
+opentelemetry-instrumentation-httpx>=0.41b0,<1
+opentelemetry-exporter-otlp>=1.20,<2
+sqlfluff
 prometheus_client==0.25.0
+markitdown[all]==0.1.6  # 多格式文档→Markdown（知识库 RAG 输入，本地纯 Python 无远端）
+pyzipper==0.3.6  # AES-256 encrypted ZIP for password-protected bulk export
+psycopg2-binary==2.9.11  # 同步驱动：scripts/seed/init_tables.py 把 URL 的 +asyncpg
+# 换成 +psycopg2 后用同步 create_engine 建表（create_all）。
+# 🔴 静态 import 扫描抓不到它 —— SQLAlchemy 是**按方言动态 import** 驱动的
+#    （postgresql/psycopg2.py::import_dbapi），源码里没有一处直接 `import psycopg2`。
+#    所以「扫 import 与 requirements 对账」这类检查对驱动类依赖结构性失效，
+#    只有真在干净环境跑一次才暴露。CI 上表现为
+#    `ModuleNotFoundError: No module named 'psycopg2'`。
+pgvector==0.4.2  # KnowledgeIndex.embedding_vec = mapped_column(Vector(1024)) 的硬依赖
+# 🔴 曾遗漏在此文件外：app/models/ai_models.py 对它做了
+#    `try: from pgvector.sqlalchemy import Vector / except ImportError: Vector = None`
+#    的 fail-open 兜底，于是「依赖没装」不会在 import 处报错，而是推迟到类定义时
+#    抛 `TypeError: 'NoneType' object is not callable`（指向 mapped_column 那一行，
+#    完全看不出是缺包）。CI 上 `python scripts/seed/init_tables.py` 因此整步失败，
+#    连带 dsh-agent-panel-backend / -mcp-data 两个 job 挂在 Bootstrap schema。
+#    本地环境早已装了它，所以这个缺失只在 clean checkout 暴露。

@@ -17,7 +17,7 @@ from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.deps import get_current_user
+from app.deps import get_current_user, require_operation
 from app.models.core import User
 from app.routers.password_confirm import require_confirmation_token
 from app.services.sign_service import SignService
@@ -40,6 +40,7 @@ class SignRequest(BaseModel):
 async def sign_document(
     body: SignRequest,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_operation("report:sign")),
     _token: None = Depends(require_confirmation_token),
 ):
     """签署文档（需二次密码确认）"""

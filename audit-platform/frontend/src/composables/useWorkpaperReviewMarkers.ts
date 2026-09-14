@@ -91,12 +91,12 @@ export function useWorkpaperReviewMarkers(opts: UseWorkpaperReviewMarkersOptions
     }
 
     // 3) 关联工单：listIssues 不支持按 source_ref_id 筛选，拉全量 source=review_comment
-    //    前端按 source_ref_id 建映射。page_size=500 够覆盖中大型项目。
+    //    前端按 source_ref_id 建映射。page_size=200 为后端允许最大值。
     try {
       const result: any = await listIssues({
         project_id: opts.projectId(),
         source: 'review_comment',
-        page_size: 500,
+        page_size: 200,
       })
       const items: ReviewMarkerTicket[] = Array.isArray(result?.items) ? result.items : []
       state.ticketsByReviewId.clear()

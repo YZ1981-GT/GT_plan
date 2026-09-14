@@ -1,0 +1,771 @@
+[
+  {
+    "id": "M01",
+    "side": "fe",
+    "want": "四步顺序被真实调用序列锁死",
+    "why": "把 prop 改名 ⇒ 父传的 `descriptor` 变成一个**不存在的 prop**，Vue 静默丢掉它，组件读到 undefined。Volar/vitest/get_diagnostics 三层全绿，只有真的看「DocEditor 有没有被构造」才能证伪。AC 11.12 点名的就是这个形态",
+    "verdict": "RED",
+    "summary": "12/38 passed, numFailedTestSuites=8",
+    "added": [
+      "crash 回调进入恢复流程而非普通重试 claim 之前 recoveryCase 事件不得携带 operation id，三实体全空",
+      "crash 回调进入恢复流程而非普通重试 已确认房间内的编辑器异常 ⇒ 服务端列出恢复项 ⇒ 渲染恢复区、不渲染重试",
+      "crash 回调进入恢复流程而非普通重试 服务端列不出可认领项 ⇒ 显式失败，既不渲染恢复区也不退化成重试",
+      "crash 回调进入恢复流程而非普通重试 确认之前的编辑器异常不进恢复流程（转换表里没有那条出边）",
+      "descriptor → DocEditor mount → onDocumentReady → confirm → oo_editing ready 不等于可保存：ready 已触发但 confirm 未返回时保存仍 fail visible",
+      "descriptor → DocEditor mount → onDocumentReady → confirm → oo_editing 只读 participant（forcesave_unlocked=false）确认后仍不得渲染可编辑编辑器",
+      "descriptor → DocEditor mount → onDocumentReady → confirm → oo_editing 四步顺序被真实调用序列锁死，且每一步的 DOM 各不相同",
+      "descriptor 是唯一 config 来源 config 打开了编辑器侧 forcesave 时拒绝挂载（AC 4.1 的孤儿 callback 源）",
+      "descriptor 是唯一 config 来源 整个打开流程零 HTTP：DocEditor config 逐字来自 descriptor，只多容器三键",
+      "暴露的 API 与七个事件各有真实触发路径 conflict 终态与 applied 终态可分辨（不得都显示成完成）",
+      "暴露的 API 与七个事件各有真实触发路径 forceSave() 真发 forcesave 并 emit saveRequested（带 requested operation id）",
+      "暴露的 API 与七个事件各有真实触发路径 getSyncState() 逐项来自桥，不自己维护第二份状态",
+      "暴露的 API 与七个事件各有真实触发路径 incomingDurable / terminal 由桥的真实状态推进触发，且不伪造 incoming 摘要",
+      "暴露的 API 与七个事件各有真实触发路径 onDocumentStateChange 真实触发 dirty，并让离开被阻断（AC 4.8）",
+      "暴露的 API 与七个事件各有真实触发路径 点击保存按钮走同一条路径（按钮不是装饰）",
+      "确认失败不得留下一个还在编辑的编辑器 confirm 409 ⇒ 销毁编辑器、撤掉保存入口、状态条粘住失败",
+      "确认失败不得留下一个还在编辑的编辑器 确认失败后再卸载（销毁成功）也不得把状态条洗回成功文案",
+      "重挂与 DocsAPI 载入 DocEditor 构造抛错 ⇒ 不得上报「已挂载」，且失败可见",
+      "重挂与 DocsAPI 载入 prop 未给时回落部署期环境变量（`VITE_ONLYOFFICE_URL`）",
+      "重挂与 DocsAPI 载入 同一 descriptor 重复下发不重复挂载（幂等）",
+      "重挂与 DocsAPI 载入 在编辑中被换掉 descriptor 身份 ⇒ 显式失败，不静默替换编辑器",
+      "重挂与 DocsAPI 载入 新代际重开：旧编辑器被销毁、新 descriptor 重新挂载并重新 confirm",
+      "重挂与 DocsAPI 载入 未注入 loader 时按 documentServerUrl 载入 api.js（不是第二份 config）",
+      "重挂与 DocsAPI 载入 没有服务地址也没有 loader ⇒ 显式失败，不停在「正在打开」",
+      "零消费方判决（本组必须放在文件末尾） 组件声明的 emit 集合逐字等于本文件真正触发过的集合",
+      "零消费方判决（本组必须放在文件末尾） 组件声明的 prop 集合逐字等于本文件真正驱动过的集合"
+    ],
+    "gone": [],
+    "hit": [
+      "descriptor → DocEditor mount → onDocumentReady → confirm → oo_editing 四步顺序被真实调用序列锁死，且每一步的 DOM 各不相同",
+      "零消费方判决（本组必须放在文件末尾） 组件声明的 prop 集合逐字等于本文件真正驱动过的集合"
+    ],
+    "added_files": [
+      "WorkpaperSyncEditorHost.spec.ts"
+    ],
+    "restored": true,
+    "seconds": 3.1
+  },
+  {
+    "id": "M02",
+    "side": "fe",
+    "want": "组件声明的 prop 集合逐字等于本文件真正驱动过的集合",
+    "why": "加一个**没人传**的 prop ⇒ 死 prop。它不会让任何行为判据变红，只有「声明集合逐字等于驱动集合」这条正面判决能抓住 —— 而那正是 Task 31 抓出 7 个死导出的同一形态在组件里的样子",
+    "verdict": "RED",
+    "summary": "37/38 passed, numFailedTestSuites=2",
+    "added": [
+      "零消费方判决（本组必须放在文件末尾） 组件声明的 prop 集合逐字等于本文件真正驱动过的集合"
+    ],
+    "gone": [],
+    "hit": [
+      "零消费方判决（本组必须放在文件末尾） 组件声明的 prop 集合逐字等于本文件真正驱动过的集合"
+    ],
+    "added_files": [
+      "WorkpaperSyncEditorHost.spec.ts"
+    ],
+    "restored": true,
+    "seconds": 3.1
+  },
+  {
+    "id": "M03",
+    "side": "fe",
+    "want": "组件声明的 emit 集合逐字等于本文件真正触发过的集合",
+    "why": "声明一个**永不触发**的 emit（design 的事件表里就写着 `fallback: []`，而宿主没有任何合法触发路径）⇒ 零消费方。AC 11.5 明文「不得只 emit fallback」，声明了却不触发同样是死代码",
+    "verdict": "RED",
+    "summary": "37/38 passed, numFailedTestSuites=2",
+    "added": [
+      "零消费方判决（本组必须放在文件末尾） 组件声明的 emit 集合逐字等于本文件真正触发过的集合"
+    ],
+    "gone": [],
+    "hit": [
+      "零消费方判决（本组必须放在文件末尾） 组件声明的 emit 集合逐字等于本文件真正触发过的集合"
+    ],
+    "added_files": [
+      "WorkpaperSyncEditorHost.spec.ts"
+    ],
+    "restored": true,
+    "seconds": 3.2
+  },
+  {
+    "id": "M04",
+    "side": "fe",
+    "want": "onDocumentStateChange 真实触发 dirty",
+    "why": "删掉 dirty 的唯一触发 ⇒ 声明的事件失去真实触发路径。页面拿不到脏标记，AC 4.8 的离开阻断在 UI 层就没了依据。两条判据必须同时红",
+    "verdict": "RED",
+    "summary": "36/38 passed, numFailedTestSuites=3",
+    "added": [
+      "暴露的 API 与七个事件各有真实触发路径 onDocumentStateChange 真实触发 dirty，并让离开被阻断（AC 4.8）",
+      "零消费方判决（本组必须放在文件末尾） 组件声明的 emit 集合逐字等于本文件真正触发过的集合"
+    ],
+    "gone": [],
+    "hit": [
+      "暴露的 API 与七个事件各有真实触发路径 onDocumentStateChange 真实触发 dirty，并让离开被阻断（AC 4.8）",
+      "零消费方判决（本组必须放在文件末尾） 组件声明的 emit 集合逐字等于本文件真正触发过的集合"
+    ],
+    "added_files": [
+      "WorkpaperSyncEditorHost.spec.ts"
+    ],
+    "restored": true,
+    "seconds": 3.0
+  },
+  {
+    "id": "M05",
+    "side": "fe",
+    "want": "四步顺序被真实调用序列锁死",
+    "why": "保存钮改成「编辑器在就能点」⇒ ready（甚至 mount）之后立刻可保存，而服务端确认还没回来。Property 11 后半明文：确认成功前不得 forcesave",
+    "verdict": "RED",
+    "summary": "36/38 passed, numFailedTestSuites=2",
+    "added": [
+      "descriptor → DocEditor mount → onDocumentReady → confirm → oo_editing ready 不等于可保存：ready 已触发但 confirm 未返回时保存仍 fail visible",
+      "descriptor → DocEditor mount → onDocumentReady → confirm → oo_editing 四步顺序被真实调用序列锁死，且每一步的 DOM 各不相同"
+    ],
+    "gone": [],
+    "hit": [
+      "descriptor → DocEditor mount → onDocumentReady → confirm → oo_editing ready 不等于可保存：ready 已触发但 confirm 未返回时保存仍 fail visible",
+      "descriptor → DocEditor mount → onDocumentReady → confirm → oo_editing 四步顺序被真实调用序列锁死，且每一步的 DOM 各不相同"
+    ],
+    "added_files": [
+      "WorkpaperSyncEditorHost.spec.ts"
+    ],
+    "restored": true,
+    "seconds": 3.1
+  },
+  {
+    "id": "M06",
+    "side": "fe",
+    "want": "ready 不等于可保存",
+    "why": "拆掉 `forceSave()` 的确认门 ⇒ 程序化调用直接落到桥。桥自己也会拒，但走的是不写 `lastError` 的 `refuse()` ⇒ 状态条什么都不变、宿主也不可见。判据断言的是**具体码**，故 `if (false)` 这类「门看起来还关着」的形态照样红",
+    "verdict": "RED",
+    "summary": "37/38 passed, numFailedTestSuites=2",
+    "added": [
+      "descriptor → DocEditor mount → onDocumentReady → confirm → oo_editing ready 不等于可保存：ready 已触发但 confirm 未返回时保存仍 fail visible"
+    ],
+    "gone": [],
+    "hit": [
+      "descriptor → DocEditor mount → onDocumentReady → confirm → oo_editing ready 不等于可保存：ready 已触发但 confirm 未返回时保存仍 fail visible"
+    ],
+    "added_files": [
+      "WorkpaperSyncEditorHost.spec.ts"
+    ],
+    "restored": true,
+    "seconds": 3.2
+  },
+  {
+    "id": "M07",
+    "side": "fe",
+    "want": "四步顺序被真实调用序列锁死",
+    "why": "撤掉确认前的遮罩 ⇒ 用户在服务端还没确认身份时就看见一个「可以编辑」的界面，在里面输入的内容没有任何 room 基线兜底",
+    "verdict": "RED",
+    "summary": "36/38 passed, numFailedTestSuites=2",
+    "added": [
+      "descriptor → DocEditor mount → onDocumentReady → confirm → oo_editing ready 不等于可保存：ready 已触发但 confirm 未返回时保存仍 fail visible",
+      "descriptor → DocEditor mount → onDocumentReady → confirm → oo_editing 四步顺序被真实调用序列锁死，且每一步的 DOM 各不相同"
+    ],
+    "gone": [],
+    "hit": [
+      "descriptor → DocEditor mount → onDocumentReady → confirm → oo_editing ready 不等于可保存：ready 已触发但 confirm 未返回时保存仍 fail visible",
+      "descriptor → DocEditor mount → onDocumentReady → confirm → oo_editing 四步顺序被真实调用序列锁死，且每一步的 DOM 各不相同"
+    ],
+    "added_files": [
+      "WorkpaperSyncEditorHost.spec.ts"
+    ],
+    "restored": true,
+    "seconds": 3.2
+  },
+  {
+    "id": "M08",
+    "side": "fe",
+    "want": "confirm 409 ⇒ 销毁编辑器、撤掉保存入口、状态条粘住失败",
+    "why": "编辑器渲染不再看 mode ⇒ 桥因 stale identity 回到 HTML 之后，DOM 里仍留着一个可编辑的编辑器。这是本任务最贵的假绿：状态机是对的，界面是错的",
+    "verdict": "RED",
+    "summary": "36/38 passed, numFailedTestSuites=3",
+    "added": [
+      "descriptor → DocEditor mount → onDocumentReady → confirm → oo_editing 只读 participant（forcesave_unlocked=false）确认后仍不得渲染可编辑编辑器",
+      "确认失败不得留下一个还在编辑的编辑器 confirm 409 ⇒ 销毁编辑器、撤掉保存入口、状态条粘住失败"
+    ],
+    "gone": [],
+    "hit": [
+      "descriptor → DocEditor mount → onDocumentReady → confirm → oo_editing 只读 participant（forcesave_unlocked=false）确认后仍不得渲染可编辑编辑器",
+      "确认失败不得留下一个还在编辑的编辑器 confirm 409 ⇒ 销毁编辑器、撤掉保存入口、状态条粘住失败"
+    ],
+    "added_files": [
+      "WorkpaperSyncEditorHost.spec.ts"
+    ],
+    "restored": true,
+    "seconds": 3.2
+  },
+  {
+    "id": "M09",
+    "side": "fe",
+    "want": "confirm 409 ⇒ 销毁编辑器、撤掉保存入口、状态条粘住失败",
+    "why": "mode 离开 oo 时不销毁编辑器 ⇒ iframe 还活着、还连着旧 doc_key，用户的后续编辑会打到一个服务端已经不认的代际上",
+    "verdict": "RED",
+    "summary": "36/38 passed, numFailedTestSuites=3",
+    "added": [
+      "确认失败不得留下一个还在编辑的编辑器 confirm 409 ⇒ 销毁编辑器、撤掉保存入口、状态条粘住失败",
+      "重挂与 DocsAPI 载入 新代际重开：旧编辑器被销毁、新 descriptor 重新挂载并重新 confirm"
+    ],
+    "gone": [],
+    "hit": [
+      "确认失败不得留下一个还在编辑的编辑器 confirm 409 ⇒ 销毁编辑器、撤掉保存入口、状态条粘住失败"
+    ],
+    "added_files": [
+      "WorkpaperSyncEditorHost.spec.ts"
+    ],
+    "restored": true,
+    "seconds": 3.1
+  },
+  {
+    "id": "M10",
+    "side": "fe",
+    "want": "confirm 409 ⇒ 销毁编辑器、撤掉保存入口、状态条粘住失败",
+    "why": "确认失败被吞 ⇒ 宿主不 emit error、不显示原因。桥那边虽然记住了，但页面级消费方（Task 34 的状态条之外的宿主自身反馈）什么都不知道",
+    "verdict": "RED",
+    "summary": "37/38 passed, numFailedTestSuites=2",
+    "added": [
+      "确认失败不得留下一个还在编辑的编辑器 confirm 409 ⇒ 销毁编辑器、撤掉保存入口、状态条粘住失败"
+    ],
+    "gone": [],
+    "hit": [
+      "确认失败不得留下一个还在编辑的编辑器 confirm 409 ⇒ 销毁编辑器、撤掉保存入口、状态条粘住失败"
+    ],
+    "added_files": [
+      "WorkpaperSyncEditorHost.spec.ts"
+    ],
+    "restored": true,
+    "seconds": 3.4
+  },
+  {
+    "id": "M11",
+    "side": "fe",
+    "want": "confirm 409 ⇒ 销毁编辑器、撤掉保存入口、状态条粘住失败",
+    "why": "状态条改成自己编一句成功文案 ⇒ 一次真失败之后仍显示「同步成功」。AC 11.10 / Property 48 明令禁止；文案真源只能是桥",
+    "verdict": "RED",
+    "summary": "27/38 passed, numFailedTestSuites=6",
+    "added": [
+      "descriptor → DocEditor mount → onDocumentReady → confirm → oo_editing 只读 participant（forcesave_unlocked=false）确认后仍不得渲染可编辑编辑器",
+      "descriptor → DocEditor mount → onDocumentReady → confirm → oo_editing 四步顺序被真实调用序列锁死，且每一步的 DOM 各不相同",
+      "descriptor 是唯一 config 来源 config 打开了编辑器侧 forcesave 时拒绝挂载（AC 4.1 的孤儿 callback 源）",
+      "暴露的 API 与七个事件各有真实触发路径 conflict 终态与 applied 终态可分辨（不得都显示成完成）",
+      "暴露的 API 与七个事件各有真实触发路径 getSyncState() 逐项来自桥，不自己维护第二份状态",
+      "暴露的 API 与七个事件各有真实触发路径 incomingDurable / terminal 由桥的真实状态推进触发，且不伪造 incoming 摘要",
+      "确认失败不得留下一个还在编辑的编辑器 confirm 409 ⇒ 销毁编辑器、撤掉保存入口、状态条粘住失败",
+      "确认失败不得留下一个还在编辑的编辑器 确认失败后再卸载（销毁成功）也不得把状态条洗回成功文案",
+      "重挂与 DocsAPI 载入 DocEditor 构造抛错 ⇒ 不得上报「已挂载」，且失败可见",
+      "重挂与 DocsAPI 载入 在编辑中被换掉 descriptor 身份 ⇒ 显式失败，不静默替换编辑器",
+      "重挂与 DocsAPI 载入 没有服务地址也没有 loader ⇒ 显式失败，不停在「正在打开」"
+    ],
+    "gone": [],
+    "hit": [
+      "descriptor → DocEditor mount → onDocumentReady → confirm → oo_editing 四步顺序被真实调用序列锁死，且每一步的 DOM 各不相同",
+      "确认失败不得留下一个还在编辑的编辑器 confirm 409 ⇒ 销毁编辑器、撤掉保存入口、状态条粘住失败",
+      "确认失败不得留下一个还在编辑的编辑器 确认失败后再卸载（销毁成功）也不得把状态条洗回成功文案"
+    ],
+    "added_files": [
+      "WorkpaperSyncEditorHost.spec.ts"
+    ],
+    "restored": true,
+    "seconds": 3.1
+  },
+  {
+    "id": "M12",
+    "side": "fe",
+    "want": "claim 之前 recoveryCase 事件不得携带 operation id，三实体全空",
+    "why": "claim 之前就给 recovery case 编一个 operation id ⇒ UI 会显示「已有回写任务」，用户据此去点普通重试，而服务端那边三实体一个都还不存在（AC 5.8）",
+    "verdict": "RED",
+    "summary": "37/38 passed, numFailedTestSuites=2",
+    "added": [
+      "crash 回调进入恢复流程而非普通重试 claim 之前 recoveryCase 事件不得携带 operation id，三实体全空"
+    ],
+    "gone": [],
+    "hit": [
+      "crash 回调进入恢复流程而非普通重试 claim 之前 recoveryCase 事件不得携带 operation id，三实体全空"
+    ],
+    "added_files": [
+      "WorkpaperSyncEditorHost.spec.ts"
+    ],
+    "restored": true,
+    "seconds": 3.0
+  },
+  {
+    "id": "M13",
+    "side": "fe",
+    "want": "已确认房间内的编辑器异常 ⇒ 服务端列出恢复项 ⇒ 渲染恢复区、不渲染重试",
+    "why": "普通 operation 重试的门全开 ⇒ recovery 期间也显示「重试回写」。AC 5.8 末句明文：nullable operation 的 recovery case 不得进入普通 retry",
+    "verdict": "RED",
+    "summary": "36/38 passed, numFailedTestSuites=2",
+    "added": [
+      "crash 回调进入恢复流程而非普通重试 已确认房间内的编辑器异常 ⇒ 服务端列出恢复项 ⇒ 渲染恢复区、不渲染重试",
+      "crash 回调进入恢复流程而非普通重试 服务端列不出可认领项 ⇒ 显式失败，既不渲染恢复区也不退化成重试"
+    ],
+    "gone": [],
+    "hit": [
+      "crash 回调进入恢复流程而非普通重试 已确认房间内的编辑器异常 ⇒ 服务端列出恢复项 ⇒ 渲染恢复区、不渲染重试",
+      "crash 回调进入恢复流程而非普通重试 服务端列不出可认领项 ⇒ 显式失败，既不渲染恢复区也不退化成重试"
+    ],
+    "added_files": [
+      "WorkpaperSyncEditorHost.spec.ts"
+    ],
+    "restored": true,
+    "seconds": 3.0
+  },
+  {
+    "id": "M14",
+    "side": "fe",
+    "want": "服务端列不出可认领项 ⇒ 显式失败，既不渲染恢复区也不退化成重试",
+    "why": "服务端列不出可认领项时静默返回 ⇒ 编辑器崩了、恢复项也没有，界面却什么都不说。这类静默是「宿主自造 recovery case」的反面，同样不可接受",
+    "verdict": "RED",
+    "summary": "37/38 passed, numFailedTestSuites=2",
+    "added": [
+      "crash 回调进入恢复流程而非普通重试 服务端列不出可认领项 ⇒ 显式失败，既不渲染恢复区也不退化成重试"
+    ],
+    "gone": [],
+    "hit": [
+      "crash 回调进入恢复流程而非普通重试 服务端列不出可认领项 ⇒ 显式失败，既不渲染恢复区也不退化成重试"
+    ],
+    "added_files": [
+      "WorkpaperSyncEditorHost.spec.ts"
+    ],
+    "restored": true,
+    "seconds": 3.1
+  },
+  {
+    "id": "M15",
+    "side": "fe",
+    "want": "已确认房间内的编辑器异常 ⇒ 服务端列出恢复项 ⇒ 渲染恢复区、不渲染重试",
+    "why": "recovery list 带错 room 身份 ⇒ 服务端按另一个 room 授权与列举。AC 10.6 要求 list 必须带**显式** room_id/generation，而 doc_key 与 room_id 都是字符串，形态判据分不出来",
+    "verdict": "RED",
+    "summary": "37/38 passed, numFailedTestSuites=2",
+    "added": [
+      "crash 回调进入恢复流程而非普通重试 已确认房间内的编辑器异常 ⇒ 服务端列出恢复项 ⇒ 渲染恢复区、不渲染重试"
+    ],
+    "gone": [],
+    "hit": [
+      "crash 回调进入恢复流程而非普通重试 已确认房间内的编辑器异常 ⇒ 服务端列出恢复项 ⇒ 渲染恢复区、不渲染重试"
+    ],
+    "added_files": [
+      "WorkpaperSyncEditorHost.spec.ts"
+    ],
+    "restored": true,
+    "seconds": 3.2
+  },
+  {
+    "id": "M16",
+    "side": "fe",
+    "want": "确认之前的编辑器异常不进恢复流程",
+    "why": "确认之前的编辑器异常也去查恢复项 ⇒ `recovery_case_observed` 在`descriptor_mounted` 上没有出边，桥会抛非法转换；而那时服务端根本还没有unmatched delivery。转换表是唯一判据，宿主必须照表分流",
+    "verdict": "RED",
+    "summary": "37/38 passed, numFailedTestSuites=2",
+    "added": [
+      "crash 回调进入恢复流程而非普通重试 确认之前的编辑器异常不进恢复流程（转换表里没有那条出边）"
+    ],
+    "gone": [],
+    "hit": [
+      "crash 回调进入恢复流程而非普通重试 确认之前的编辑器异常不进恢复流程（转换表里没有那条出边）"
+    ],
+    "added_files": [
+      "WorkpaperSyncEditorHost.spec.ts"
+    ],
+    "restored": true,
+    "seconds": 3.2
+  },
+  {
+    "id": "M17",
+    "side": "fe",
+    "want": "DocEditor config 逐字来自 descriptor",
+    "why": "宿主自己往 config 里塞一个 token ⇒ 第二份 config 的入口。包含式判据（descriptor 的键都在）对它全绿，只有**等值**判据能抓住",
+    "verdict": "RED",
+    "summary": "37/38 passed, numFailedTestSuites=2",
+    "added": [
+      "descriptor 是唯一 config 来源 整个打开流程零 HTTP：DocEditor config 逐字来自 descriptor，只多容器三键"
+    ],
+    "gone": [],
+    "hit": [
+      "descriptor 是唯一 config 来源 整个打开流程零 HTTP：DocEditor config 逐字来自 descriptor，只多容器三键"
+    ],
+    "added_files": [
+      "WorkpaperSyncEditorHost.spec.ts"
+    ],
+    "restored": true,
+    "seconds": 3.1
+  },
+  {
+    "id": "M18",
+    "side": "fe",
+    "want": "DocEditor config 逐字来自 descriptor",
+    "why": "削掉判据的分母常量。它同时证明那条判据**不是**自证式的 —— 若判据是拿常量跟常量比（把被验证的常量当期望值），这条变异会全绿",
+    "verdict": "RED",
+    "summary": "37/38 passed, numFailedTestSuites=2",
+    "added": [
+      "descriptor 是唯一 config 来源 整个打开流程零 HTTP：DocEditor config 逐字来自 descriptor，只多容器三键"
+    ],
+    "gone": [],
+    "hit": [
+      "descriptor 是唯一 config 来源 整个打开流程零 HTTP：DocEditor config 逐字来自 descriptor，只多容器三键"
+    ],
+    "added_files": [
+      "WorkpaperSyncEditorHost.spec.ts"
+    ],
+    "restored": true,
+    "seconds": 3.2
+  },
+  {
+    "id": "M19",
+    "side": "fe",
+    "want": "config 打开了编辑器侧 forcesave 时拒绝挂载",
+    "why": "编辑器侧自动保存的门失效 ⇒ OO 自己发 forcesave，产生**没有 frozen request** 的孤儿 callback，只能进 recovery case（AC 4.1 明令禁止把它当保存完成）",
+    "verdict": "RED",
+    "summary": "37/38 passed, numFailedTestSuites=2",
+    "added": [
+      "descriptor 是唯一 config 来源 config 打开了编辑器侧 forcesave 时拒绝挂载（AC 4.1 的孤儿 callback 源）"
+    ],
+    "gone": [],
+    "hit": [
+      "descriptor 是唯一 config 来源 config 打开了编辑器侧 forcesave 时拒绝挂载（AC 4.1 的孤儿 callback 源）"
+    ],
+    "added_files": [
+      "WorkpaperSyncEditorHost.spec.ts"
+    ],
+    "restored": true,
+    "seconds": 3.0
+  },
+  {
+    "id": "M20",
+    "side": "fe",
+    "want": "buildDocEditorConfig 对缺 document 段的 config fail closed",
+    "why": "缺 document 段照挂 ⇒ DocEditor 拿不到 key/url，界面停在空白 iframe，而「config 非空」这条上游校验只看 config 整体不空",
+    "verdict": "RED",
+    "summary": "37/38 passed, numFailedTestSuites=2",
+    "added": [
+      "descriptor 是唯一 config 来源 buildDocEditorConfig 对缺 document 段的 config fail closed"
+    ],
+    "gone": [],
+    "hit": [
+      "descriptor 是唯一 config 来源 buildDocEditorConfig 对缺 document 段的 config fail closed"
+    ],
+    "added_files": [
+      "WorkpaperSyncEditorHost.spec.ts"
+    ],
+    "restored": true,
+    "seconds": 3.2
+  },
+  {
+    "id": "M21",
+    "side": "fe",
+    "want": "新代际重开：旧编辑器被销毁、新 descriptor 重新挂载并重新 confirm",
+    "why": "不等一次渲染就构造 DocEditor ⇒ placeholder 容器还没带上新 id 进 DOM，OnlyOffice 静默什么都不做、用户只看到空白（legacy 的真实故障形态）。🔴 首轮实测判定 WRONG-TEST：**首次**挂载碰不到这条 —— 紧随其后的 `await docsApiLoader()` 恰好也让出一个微任务，Vue 的渲染 flush 在那时已经跑完。真正需要它的是**重挂**（容器 id 变了但旧 id 还在 DOM 上），故 want 指向重开判据；把 want 改指过来比强行给首挂判据编一条时序断言诚实",
+    "verdict": "RED",
+    "summary": "37/38 passed, numFailedTestSuites=2",
+    "added": [
+      "重挂与 DocsAPI 载入 新代际重开：旧编辑器被销毁、新 descriptor 重新挂载并重新 confirm"
+    ],
+    "gone": [],
+    "hit": [
+      "重挂与 DocsAPI 载入 新代际重开：旧编辑器被销毁、新 descriptor 重新挂载并重新 confirm"
+    ],
+    "added_files": [
+      "WorkpaperSyncEditorHost.spec.ts"
+    ],
+    "restored": true,
+    "seconds": 3.2
+  },
+  {
+    "id": "M22",
+    "side": "fe",
+    "want": "四步顺序被真实调用序列锁死",
+    "why": "传给 DocEditor 的容器 id 与模板渲染出来的那个漂开一格 ⇒ 编辑器找不到容器。`GtOnlyOfficeSheet` 的注释里记着同一个坑（computed+Date.now() 每次求值都变），判据必须用 `getElementById` 真查一次",
+    "verdict": "RED",
+    "summary": "36/38 passed, numFailedTestSuites=3",
+    "added": [
+      "descriptor → DocEditor mount → onDocumentReady → confirm → oo_editing 四步顺序被真实调用序列锁死，且每一步的 DOM 各不相同",
+      "重挂与 DocsAPI 载入 新代际重开：旧编辑器被销毁、新 descriptor 重新挂载并重新 confirm"
+    ],
+    "gone": [],
+    "hit": [
+      "descriptor → DocEditor mount → onDocumentReady → confirm → oo_editing 四步顺序被真实调用序列锁死，且每一步的 DOM 各不相同"
+    ],
+    "added_files": [
+      "WorkpaperSyncEditorHost.spec.ts"
+    ],
+    "restored": true,
+    "seconds": 3.1
+  },
+  {
+    "id": "M23",
+    "side": "fe",
+    "want": "DocEditor 构造抛错 ⇒ 不得上报「已挂载」，且失败可见",
+    "why": "构造抛错却上报「已挂载」= 伪造挂载。桥于是进 `descriptor_mounted` 并等一个永远不会来的 `onDocumentReady`，用户卡在「等待文档就绪」",
+    "verdict": "RED",
+    "summary": "37/38 passed, numFailedTestSuites=2",
+    "added": [
+      "重挂与 DocsAPI 载入 DocEditor 构造抛错 ⇒ 不得上报「已挂载」，且失败可见"
+    ],
+    "gone": [],
+    "hit": [
+      "重挂与 DocsAPI 载入 DocEditor 构造抛错 ⇒ 不得上报「已挂载」，且失败可见"
+    ],
+    "added_files": [
+      "WorkpaperSyncEditorHost.spec.ts"
+    ],
+    "restored": true,
+    "seconds": 3.1
+  },
+  {
+    "id": "M24",
+    "side": "fe",
+    "want": "同一 descriptor 重复下发不重复挂载",
+    "why": "同一 descriptor 每次下发都重挂 ⇒ 父组件任何一次无关重渲染都会重建 iframe，用户正在编辑的内容被丢掉，桥还会多收一次 `editor_mounted`",
+    "verdict": "RED",
+    "summary": "37/38 passed, numFailedTestSuites=2",
+    "added": [
+      "重挂与 DocsAPI 载入 同一 descriptor 重复下发不重复挂载（幂等）"
+    ],
+    "gone": [],
+    "hit": [
+      "重挂与 DocsAPI 载入 同一 descriptor 重复下发不重复挂载（幂等）"
+    ],
+    "added_files": [
+      "WorkpaperSyncEditorHost.spec.ts"
+    ],
+    "restored": true,
+    "seconds": 3.0
+  },
+  {
+    "id": "M25",
+    "side": "fe",
+    "want": "未注入 loader 时按 documentServerUrl 载入 api.js",
+    "why": "显式 prop 被忽略、只认环境变量 ⇒ `documentServerUrl` 成为死 prop。本仓库 `.env` 里那个值恰好非空，所以「载入成功」照旧成立 —— 只有断言**实际 script src** 才能抓住",
+    "verdict": "RED",
+    "summary": "37/38 passed, numFailedTestSuites=2",
+    "added": [
+      "重挂与 DocsAPI 载入 未注入 loader 时按 documentServerUrl 载入 api.js（不是第二份 config）"
+    ],
+    "gone": [],
+    "hit": [
+      "重挂与 DocsAPI 载入 未注入 loader 时按 documentServerUrl 载入 api.js（不是第二份 config）"
+    ],
+    "added_files": [
+      "WorkpaperSyncEditorHost.spec.ts"
+    ],
+    "restored": true,
+    "seconds": 3.0
+  },
+  {
+    "id": "M26",
+    "side": "fe",
+    "want": "没有服务地址也没有 loader ⇒ 显式失败，不停在「正在打开」",
+    "why": "上报口不记 sticky error ⇒ 状态是 `error` 但文案退回状态表的「同步失败」，真实原因（没配服务地址 / 内核构造失败）丢失，也不再优先于后续状态文案",
+    "verdict": "RED",
+    "summary": "33/38 passed, numFailedTestSuites=3",
+    "added": [
+      "descriptor 是唯一 config 来源 config 打开了编辑器侧 forcesave 时拒绝挂载（AC 4.1 的孤儿 callback 源）",
+      "重挂与 DocsAPI 载入 DocEditor 构造抛错 ⇒ 不得上报「已挂载」，且失败可见",
+      "重挂与 DocsAPI 载入 在编辑中被换掉 descriptor 身份 ⇒ 显式失败，不静默替换编辑器",
+      "重挂与 DocsAPI 载入 宿主上报口在终态下不抛，且仍然记住失败（sticky）",
+      "重挂与 DocsAPI 载入 没有服务地址也没有 loader ⇒ 显式失败，不停在「正在打开」"
+    ],
+    "gone": [],
+    "hit": [
+      "重挂与 DocsAPI 载入 DocEditor 构造抛错 ⇒ 不得上报「已挂载」，且失败可见",
+      "重挂与 DocsAPI 载入 宿主上报口在终态下不抛，且仍然记住失败（sticky）",
+      "重挂与 DocsAPI 载入 没有服务地址也没有 loader ⇒ 显式失败，不停在「正在打开」"
+    ],
+    "added_files": [
+      "WorkpaperSyncEditorHost.spec.ts"
+    ],
+    "restored": true,
+    "seconds": 3.0
+  },
+  {
+    "id": "M27",
+    "side": "fe",
+    "want": "没有服务地址也没有 loader ⇒ 显式失败，不停在「正在打开」",
+    "why": "上报口只记错不推状态 ⇒ 桥永远停在 `oo_loading`（它在 `WP_BRIDGE_IN_FLIGHT_STATES` 里）：状态条显示进度、离开被阻断、而编辑器其实根本没挂上。这就是本任务修掉的那个 fail-open 形态",
+    "verdict": "RED",
+    "summary": "32/38 passed, numFailedTestSuites=4",
+    "added": [
+      "crash 回调进入恢复流程而非普通重试 服务端列不出可认领项 ⇒ 显式失败，既不渲染恢复区也不退化成重试",
+      "crash 回调进入恢复流程而非普通重试 确认之前的编辑器异常不进恢复流程（转换表里没有那条出边）",
+      "descriptor 是唯一 config 来源 config 打开了编辑器侧 forcesave 时拒绝挂载（AC 4.1 的孤儿 callback 源）",
+      "重挂与 DocsAPI 载入 DocEditor 构造抛错 ⇒ 不得上报「已挂载」，且失败可见",
+      "重挂与 DocsAPI 载入 在编辑中被换掉 descriptor 身份 ⇒ 显式失败，不静默替换编辑器",
+      "重挂与 DocsAPI 载入 没有服务地址也没有 loader ⇒ 显式失败，不停在「正在打开」"
+    ],
+    "gone": [],
+    "hit": [
+      "descriptor 是唯一 config 来源 config 打开了编辑器侧 forcesave 时拒绝挂载（AC 4.1 的孤儿 callback 源）",
+      "重挂与 DocsAPI 载入 DocEditor 构造抛错 ⇒ 不得上报「已挂载」，且失败可见",
+      "重挂与 DocsAPI 载入 没有服务地址也没有 loader ⇒ 显式失败，不停在「正在打开」"
+    ],
+    "added_files": [
+      "WorkpaperSyncEditorHost.spec.ts"
+    ],
+    "restored": true,
+    "seconds": 3.0
+  },
+  {
+    "id": "M28",
+    "side": "fe",
+    "want": "incomingDurable / terminal 由桥的真实状态推进触发，且不伪造 incoming 摘要",
+    "why": "拿 descriptor 的（materialize **出去**那份）artifact 摘要充当回传 incoming 的摘要⇒ 「回来的文件就是我发出去的那份」这个结论凭空成立。operation 投影里没有 incoming digest 是已登记缺口，缺就得是 null",
+    "verdict": "RED",
+    "summary": "37/38 passed, numFailedTestSuites=2",
+    "added": [
+      "暴露的 API 与七个事件各有真实触发路径 incomingDurable / terminal 由桥的真实状态推进触发，且不伪造 incoming 摘要"
+    ],
+    "gone": [],
+    "hit": [
+      "暴露的 API 与七个事件各有真实触发路径 incomingDurable / terminal 由桥的真实状态推进触发，且不伪造 incoming 摘要"
+    ],
+    "added_files": [
+      "WorkpaperSyncEditorHost.spec.ts"
+    ],
+    "restored": true,
+    "seconds": 3.1
+  },
+  {
+    "id": "M29",
+    "side": "fe",
+    "want": "conflict 终态与 applied 终态可分辨",
+    "why": "三个终态压成 applied ⇒ 冲突与需重载都被报成「结构化回写完成」。AC 11.3 要求四类文案分别表达，不得统一显示成功",
+    "verdict": "RED",
+    "summary": "37/38 passed, numFailedTestSuites=2",
+    "added": [
+      "暴露的 API 与七个事件各有真实触发路径 conflict 终态与 applied 终态可分辨（不得都显示成完成）"
+    ],
+    "gone": [],
+    "hit": [
+      "暴露的 API 与七个事件各有真实触发路径 conflict 终态与 applied 终态可分辨（不得都显示成完成）"
+    ],
+    "added_files": [
+      "WorkpaperSyncEditorHost.spec.ts"
+    ],
+    "restored": true,
+    "seconds": 3.0
+  },
+  {
+    "id": "M30",
+    "side": "fe",
+    "want": "forceSave() 真发 forcesave 并 emit saveRequested",
+    "why": "保存受理后不 emit ⇒ 页面拿不到 requested operation id，后续所有按 operation 的查询/重试都没有入口（声明的事件成了死代码）",
+    "verdict": "RED",
+    "summary": "35/38 passed, numFailedTestSuites=3",
+    "added": [
+      "暴露的 API 与七个事件各有真实触发路径 forceSave() 真发 forcesave 并 emit saveRequested（带 requested operation id）",
+      "暴露的 API 与七个事件各有真实触发路径 点击保存按钮走同一条路径（按钮不是装饰）",
+      "零消费方判决（本组必须放在文件末尾） 组件声明的 emit 集合逐字等于本文件真正触发过的集合"
+    ],
+    "gone": [],
+    "hit": [
+      "暴露的 API 与七个事件各有真实触发路径 forceSave() 真发 forcesave 并 emit saveRequested（带 requested operation id）",
+      "暴露的 API 与七个事件各有真实触发路径 点击保存按钮走同一条路径（按钮不是装饰）",
+      "零消费方判决（本组必须放在文件末尾） 组件声明的 emit 集合逐字等于本文件真正触发过的集合"
+    ],
+    "added_files": [
+      "WorkpaperSyncEditorHost.spec.ts"
+    ],
+    "restored": true,
+    "seconds": 3.0
+  },
+  {
+    "id": "M31",
+    "side": "fe",
+    "want": "getSyncState() 逐项来自桥",
+    "why": "`getSyncState()` 自己编一份门控结论 ⇒ 第二份状态真源。调用方据此显示保存可用，而桥那边其实已经在等回传",
+    "verdict": "RED",
+    "summary": "37/38 passed, numFailedTestSuites=2",
+    "added": [
+      "暴露的 API 与七个事件各有真实触发路径 getSyncState() 逐项来自桥，不自己维护第二份状态"
+    ],
+    "gone": [],
+    "hit": [
+      "暴露的 API 与七个事件各有真实触发路径 getSyncState() 逐项来自桥，不自己维护第二份状态"
+    ],
+    "added_files": [
+      "WorkpaperSyncEditorHost.spec.ts"
+    ],
+    "restored": true,
+    "seconds": 3.0
+  },
+  {
+    "id": "M32",
+    "side": "fe",
+    "want": "dirty 只认 data===true",
+    "why": "dirty 判定放宽成真值判断 ⇒ OO 传 `{data:'saved'}` 之类的字符串也被读成脏，离开阻断会在没有任何未保存修改时把用户困住",
+    "verdict": "RED",
+    "summary": "37/38 passed, numFailedTestSuites=2",
+    "added": [
+      "编辑器回调取码归一 dirty 只认 data===true（undefined / 字符串都不算脏）"
+    ],
+    "gone": [],
+    "hit": [
+      "编辑器回调取码归一 dirty 只认 data===true（undefined / 字符串都不算脏）"
+    ],
+    "added_files": [
+      "WorkpaperSyncEditorHost.spec.ts"
+    ],
+    "restored": true,
+    "seconds": 3.0
+  },
+  {
+    "id": "M33",
+    "side": "fe",
+    "want": "编辑器回调取码归一",
+    "why": "取不到码时回空串 ⇒ 下游 `classifySyncFailure` 会因空码抛契约错误，一次真实的编辑器异常变成一个看不懂的内部错误",
+    "verdict": "RED",
+    "summary": "36/38 passed, numFailedTestSuites=2",
+    "added": [
+      "编辑器回调取码归一 undefined → 码 editor_error_unknown / 文案 editor_error_unknown",
+      "编辑器回调取码归一 {} → 码 editor_error_unknown / 文案 editor_error_unknown"
+    ],
+    "gone": [],
+    "hit": [
+      "编辑器回调取码归一 undefined → 码 editor_error_unknown / 文案 editor_error_unknown",
+      "编辑器回调取码归一 {} → 码 editor_error_unknown / 文案 editor_error_unknown"
+    ],
+    "added_files": [
+      "WorkpaperSyncEditorHost.spec.ts"
+    ],
+    "restored": true,
+    "seconds": 3.1
+  },
+  {
+    "id": "M34",
+    "side": "fe",
+    "want": "未登记的宿主失败码被换成显式的「码未登记」",
+    "why": "未登记的失败码不再被拦 ⇒ UI 直接显示一个裸英文标识符，AC 11.6 要求阻断原因对当前用户可读",
+    "verdict": "RED",
+    "summary": "37/38 passed, numFailedTestSuites=2",
+    "added": [
+      "编辑器回调取码归一 未登记的宿主失败码被换成显式的「码未登记」，不显示裸标识符"
+    ],
+    "gone": [],
+    "hit": [
+      "编辑器回调取码归一 未登记的宿主失败码被换成显式的「码未登记」，不显示裸标识符"
+    ],
+    "added_files": [
+      "WorkpaperSyncEditorHost.spec.ts"
+    ],
+    "restored": true,
+    "seconds": 3.0
+  },
+  {
+    "id": "M35",
+    "side": "fe",
+    "want": "在编辑中被换掉 descriptor 身份 ⇒ 显式失败，不静默替换编辑器",
+    "why": "挂载身份不把 representation 代际算进去 ⇒ 只差 representation 的一次替换被当成同一份 descriptor 吞掉，编辑器仍指着旧 representation 而没人知道。`mountedKey` 少一项就是少一次重开",
+    "verdict": "RED",
+    "summary": "37/38 passed, numFailedTestSuites=2",
+    "added": [
+      "重挂与 DocsAPI 载入 在编辑中被换掉 descriptor 身份 ⇒ 显式失败，不静默替换编辑器"
+    ],
+    "gone": [],
+    "hit": [
+      "重挂与 DocsAPI 载入 在编辑中被换掉 descriptor 身份 ⇒ 显式失败，不静默替换编辑器"
+    ],
+    "added_files": [
+      "WorkpaperSyncEditorHost.spec.ts"
+    ],
+    "restored": true,
+    "seconds": 3.0
+  }
+]

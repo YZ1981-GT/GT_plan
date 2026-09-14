@@ -196,6 +196,11 @@ async def detect_files(
     response["estimated_duration_seconds"] = estimate_duration_seconds(total_rows_estimate)
     response["size_bucket"] = estimate_duration_bucket(total_rows_estimate)
 
+    # 缓存 total_rows_estimate 到 bundle manifest，submit 复用避免重新 detect（优化点）
+    LedgerImportUploadService.cache_detection_meta(
+        project_id, upload_token, total_rows_estimate
+    )
+
     # F42 / design D30 / Sprint 7.9 + 10.42：规模异常警告（零行 / 异常规模）
     # 前端收到 warnings 后必须引导用户点"强制继续"才能调 /submit 时传
     # force_submit=True；否则 submit 会被 SCALE_WARNING_BLOCKED 拦截。
@@ -246,15 +251,21 @@ async def submit_import(
         file_entries = []
 
     if file_entries:
-        detection = ImportOrchestrator.detect_from_paths(
-            [str(path) for _name, path in file_entries]
+        # 优化：优先读 detect 阶段缓存的 total_rows_estimate，避免重新 detect 整个 bundle
+        total_rows_estimate = LedgerImportUploadService.get_cached_total_rows(
+            project_id, body.upload_token
         )
-        total_rows_estimate = sum(
-            s.row_count_estimate
-            for fd in detection.files
-            for s in fd.sheets
-            if s.table_type != "unknown"
-        )
+        if total_rows_estimate is None:
+            # 缓存缺失（旧 bundle / detect 未缓存）→ 回退重算
+            detection = ImportOrchestrator.detect_from_paths(
+                [str(path) for _name, path in file_entries]
+            )
+            total_rows_estimate = sum(
+                s.row_count_estimate
+                for fd in detection.files
+                for s in fd.sheets
+                if s.table_type != "unknown"
+            )
         scale_warnings = await check_scale_warnings(
             {"total_rows_estimate": total_rows_estimate}, project_id, db
         )
@@ -289,18 +300,22 @@ async def submit_import(
         )
         # apply_incremental 内部已 commit
 
-    result = await ImportOrchestrator.submit(
-        db,
-        upload_token=body.upload_token,
-        project_id=project_id,
-        year=body.year,
-        confirmed_mappings=body.confirmed_mappings,
-        file_manifest=[],  # Files already stored via upload_token
-        storage_uri=f"local:///tmp/uploads/{body.upload_token}",
-        force_activate=body.force_activate,
-        created_by=current_user.id,
-        adapter_id=body.adapter_id,
-    )
+    try:
+        result = await ImportOrchestrator.submit(
+            db,
+            upload_token=body.upload_token,
+            project_id=project_id,
+            year=body.year,
+            confirmed_mappings=body.confirmed_mappings,
+            file_manifest=[],  # Files already stored via upload_token
+            storage_uri=f"local:///tmp/uploads/{body.upload_token}",
+            force_activate=body.force_activate,
+            created_by=current_user.id,
+            adapter_id=body.adapter_id,
+        )
+    except ValueError as exc:
+        # 并发护栏：同 project+year 已有进行中作业 → 409 冲突
+        raise HTTPException(status_code=409, detail=str(exc))
 
     # F42 / Sprint 7.10：把 force_submit 持久化到 ImportJob（审计轨迹）
     if body.force_submit:
@@ -333,6 +348,22 @@ async def submit_import(
 # ---------------------------------------------------------------------------
 # GET /jobs/{job_id}/stream (Task 44)
 # ---------------------------------------------------------------------------
+
+
+async def _sse_generator_with_registry(job_id: UUID):
+    """Wrap _sse_generator with SSE registry for graceful drain."""
+    from app.core.sse_registry import sse_registry
+
+    conn = sse_registry.register()
+    try:
+        async for chunk in _sse_generator(job_id):
+            if conn.is_closed:
+                # Server is draining, stop sending
+                yield f"event: server_draining\ndata: {{}}\n\n"
+                break
+            yield chunk
+    finally:
+        sse_registry.unregister(conn)
 
 
 async def _sse_generator(job_id: UUID):
@@ -382,9 +413,10 @@ async def stream_job_progress(
 
     Polls ImportJob every 2 seconds and emits progress events.
     Stops when job reaches a terminal status (completed/failed/canceled).
+    Registered with sse_registry for graceful drain during rolling updates.
     """
     return StreamingResponse(
-        _sse_generator(job_id),
+        _sse_generator_with_registry(job_id),
         media_type="text/event-stream",
         headers={
             "Cache-Control": "no-cache",

@@ -1,0 +1,38 @@
+flowchart LR
+    TB["trial_balance 2205"]
+    LEDGER["tb_ledger 2205<br/>resolver d7_ledger_analysis<br/>借/贷 by counterparty"]
+    AGING["useAgingConfig D7<br/>2-period nested"]
+
+    subgraph D7["D7 合同负债（负债贷方）"]
+        ADJU["D7TabAdjudication D7-1<br/>性质维度 + 账龄维度"]
+        DET["D7TabDetail D7-2<br/>nested agingPrior/agingAudited"]
+        ADJ["D7TabAdjustment"]
+        ANA["D7TabAnalysis<br/>+ useD7D4Reconcile"]
+        LT["D7TabLongTerm<br/>处理结论枚举"]
+        RP["D7TabRelatedParty"]
+        VC["D7TabVoucherCheck"]
+        DISC["D7TabDisclosure 五、39 / 八、39"]
+    end
+
+    D4["D4 营业收入"]
+    K12["K12 营业外收入"]
+    OTHP["其他应付款（重分类）"]
+    A13["A13 未更正错报"]
+    NOTE["附注"]
+    ENGINE["GtVoucherSamplingEngine 2205"]
+
+    AGING --> DET
+    AGING --> ADJU
+    LEDGER -->|从序时账导入| DET
+    DET -->|按性质/账龄聚合| ADJU
+    ADJ -->|AJE/RJE| ADJU
+    ADJU -->|writeback 2205| TB
+    ADJU -->|substantive:adjudicated| DISC
+    DISC -->|accountCode 2205 + sectionIds| NOTE
+    ADJU -->|借方减少=结转收入<br/>1% 容差勾稽| ANA
+    ANA <-.->|D4 收入审定| D4
+    LT -->|应确认收入| D4
+    LT -->|应转营业外收入| K12
+    LT -->|应退回| OTHP
+    VC -->|异常/跨期| A13
+    ENGINE --> VC

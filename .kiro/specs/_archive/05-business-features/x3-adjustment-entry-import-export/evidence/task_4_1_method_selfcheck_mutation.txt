@@ -1,0 +1,83 @@
+任务 4.1（后半收尾）—— `attach_shape_a_routes` 注册自检加固「HTTP 方法维」的变异检验实证
+
+改动：注册自检由「只比 path 集合」改为「(路径, 声明方法集) 有序清单双向比对」，
+      并加 `_declared_methods` 归一化（剔掉自动派生的 HEAD / OPTIONS；剔完为空则保留原样，
+      不许把「一个业务方法都没声明」静默当成通过）。
+被测文件：backend/app/routers/wp_render_strategies/_x3_adjustment_import_export.py
+  改后 size=88087  md5=0d1a284a06f9808a29e185013e9908fa  CRLF=1817  LF-only=0
+  改前（后半交付态）size=84678  md5=aa199afa503693a6b57284b43e0356b8
+
+🔴 判据形态说明：全库没有任何测试调用 `attach_shape_a_routes`（判据面两个文件只 import 模块、
+   不建路由）⇒ 该自检今天的唯一判据是「真跑一次看它抛不抛」。故四态判读落在**行为探针**上；
+   pytest 判据面的 227 passed 仅证明「无连带回归」，不构成对本自检的覆盖（见 MUT-A 那段：
+   变异后 pytest 仍 227 passed / 新增红 0）。该覆盖缺口的收口建议见 tasks.md 任务 4.1 后半实录。
+
+四态判读结果：
+  MUT-A      RED —— 任务点名那条：export-data 的 `@router.post` → `@router.get`，被自检拒收
+  MUT-A-PRE  缺口确证 —— 自检回退成「只比 path」+ 同一 GET 变异 ⇒ 放过；且旧自检对 5 种形态全部放过
+  MUT-B      判据通道隔离 —— `_declared_methods` 恒返 {POST}（方法维哑化）⇒ 方法类红全部消失，
+             只剩「同路径重复注册」那条仍红 ⇒ 证明方法类红确实来自方法维、不是别的维度蒙对
+
+生成时间：2026-08-14T09:51:57
+
+==============================================================================
+
+==============================================================================
+被测文件 backend\app\routers\wp_render_strategies\_x3_adjustment_import_export.py
+  size=88087  md5=0d1a284a06f9808a29e185013e9908fa  CRLF=1817 / LF-only=0
+==============================================================================
+CONTROL 行为探针：
+  ATTACH           OK                       [POST /api/workpapers/{wp_id}/m8/export-data, POST /api/workpapers/{wp_id}/m8/export-template, POST /api/workp
+  SYNTH-POST       OK                       [POST /api/workpapers/{wp_id}/m8/export-data, POST /api/workpapers/{wp_id}/m8/export-template, POST /api/workp
+  SYNTH-GET        RAISE:X3ContractError    形态 A 路由注册结果与预期不一致（路径 + HTTP 方法双向比对）: 实得 [GET /api/workpapers/{wp_id}/m8/export-data, POST /api/workpapers/{wp_
+  SYNTH-AUTO       OK                       [POST /api/workpapers/{wp_id}/m8/export-data, POST /api/workpapers/{wp_id}/m8/export-template, POST /api/workp
+  SYNTH-HEADONLY   RAISE:X3ContractError    形态 A 路由注册结果与预期不一致（路径 + HTTP 方法双向比对）: 实得 [HEAD /api/workpapers/{wp_id}/m8/export-data, POST /api/workpapers/{wp
+  SYNTH-BOTH       RAISE:X3ContractError    形态 A 路由注册结果与预期不一致（路径 + HTTP 方法双向比对）: 实得 [GET/POST /api/workpapers/{wp_id}/m8/export-data, POST /api/workpapers
+  SYNTH-DUP        RAISE:X3ContractError    形态 A 路由注册结果与预期不一致（路径 + HTTP 方法双向比对）: 实得 [POST /api/workpapers/{wp_id}/m8/export-data, POST /api/workpapers/{wp
+CONTROL 判据面 pytest: 227 passed / 0 failed / 0 error / 5 skipped
+==============================================================================
+[MUT-A] 任务点名那条：export-data 的 `@router.post` → `@router.get`（post-fix 自检）
+    锚点命中 1 处：'    @router.post(f"/api/workpapers/{{wp_id}}/{api_prefix}/{_SUFFIX_DATA}")'
+  *ATTACH           RAISE:X3ContractError    形态 A 路由注册结果与预期不一致（路径 + HTTP 方法双向比对）: 实得 [GET /api/workpapers/{wp_id}/m8/export-data, POST /api/workpapers/{wp_
+   SYNTH-POST       OK                       [POST /api/workpapers/{wp_id}/m8/export-data, POST /api/workpapers/{wp_id}/m8/export-template, POST /api/workp
+   SYNTH-GET        RAISE:X3ContractError    形态 A 路由注册结果与预期不一致（路径 + HTTP 方法双向比对）: 实得 [GET /api/workpapers/{wp_id}/m8/export-data, POST /api/workpapers/{wp_
+   SYNTH-AUTO       OK                       [POST /api/workpapers/{wp_id}/m8/export-data, POST /api/workpapers/{wp_id}/m8/export-template, POST /api/workp
+   SYNTH-HEADONLY   RAISE:X3ContractError    形态 A 路由注册结果与预期不一致（路径 + HTTP 方法双向比对）: 实得 [HEAD /api/workpapers/{wp_id}/m8/export-data, POST /api/workpapers/{wp
+   SYNTH-BOTH       RAISE:X3ContractError    形态 A 路由注册结果与预期不一致（路径 + HTTP 方法双向比对）: 实得 [GET/POST /api/workpapers/{wp_id}/m8/export-data, POST /api/workpapers
+   SYNTH-DUP        RAISE:X3ContractError    形态 A 路由注册结果与预期不一致（路径 + HTTP 方法双向比对）: 实得 [POST /api/workpapers/{wp_id}/m8/export-data, POST /api/workpapers/{wp
+  pytest 判据面: 227 passed / 0 failed / 0 error / 5 skipped；新增红 []
+  => RED（按期望通道命中）
+  还原 OK md5=0d1a284a06f9808a29e185013e9908fa
+==============================================================================
+[MUT-A-PRE] 对照组：自检回退成「只比 path」+ 同一 GET 变异 ⇒ 必须被放过（证明缺口真实存在）；顺带量化旧自检漏掉的形态数（5 条 RAISE 全部转 OK）
+    锚点命中 1 处：'    # 注册自检：**路径 + HTTP 方法**双向比对（只比路径抓不住 `@router.post` → `@router.get`'
+    锚点命中 1 处：'    @router.post(f"/api/workpapers/{{wp_id}}/{api_prefix}/{_SUFFIX_DATA}")'
+  *ATTACH           OK                       [GET /api/workpapers/{wp_id}/m8/export-data, POST /api/workpapers/{wp_id}/m8/export-template, POST /api/workpa
+   SYNTH-POST       OK                       [POST /api/workpapers/{wp_id}/m8/export-data, POST /api/workpapers/{wp_id}/m8/export-template, POST /api/workp
+  *SYNTH-GET        OK                       [GET /api/workpapers/{wp_id}/m8/export-data, POST /api/workpapers/{wp_id}/m8/export-template, POST /api/workpa
+   SYNTH-AUTO       OK                       [POST /api/workpapers/{wp_id}/m8/export-data, POST /api/workpapers/{wp_id}/m8/export-template, POST /api/workp
+  *SYNTH-HEADONLY   OK                       [HEAD /api/workpapers/{wp_id}/m8/export-data, POST /api/workpapers/{wp_id}/m8/export-template, POST /api/workp
+  *SYNTH-BOTH       OK                       [GET/POST /api/workpapers/{wp_id}/m8/export-data, POST /api/workpapers/{wp_id}/m8/export-template, POST /api/w
+  *SYNTH-DUP        OK                       [POST /api/workpapers/{wp_id}/m8/export-data, POST /api/workpapers/{wp_id}/m8/export-template, POST /api/workp
+  => PASS（按期望放过）
+  还原 OK md5=0d1a284a06f9808a29e185013e9908fa
+==============================================================================
+[MUT-B] 补充：`_declared_methods` 恒返 {POST}（归一化写坏的最贵形态）⇒ 方法维哑化
+    锚点命中 1 处：'    raw = frozenset(str(m).upper() for m in (getattr(route, "methods", Non'
+   ATTACH           OK                       [POST /api/workpapers/{wp_id}/m8/export-data, POST /api/workpapers/{wp_id}/m8/export-template, POST /api/workp
+   SYNTH-POST       OK                       [POST /api/workpapers/{wp_id}/m8/export-data, POST /api/workpapers/{wp_id}/m8/export-template, POST /api/workp
+  *SYNTH-GET        OK                       [POST /api/workpapers/{wp_id}/m8/export-data, POST /api/workpapers/{wp_id}/m8/export-template, POST /api/workp
+   SYNTH-AUTO       OK                       [POST /api/workpapers/{wp_id}/m8/export-data, POST /api/workpapers/{wp_id}/m8/export-template, POST /api/workp
+  *SYNTH-HEADONLY   OK                       [POST /api/workpapers/{wp_id}/m8/export-data, POST /api/workpapers/{wp_id}/m8/export-template, POST /api/workp
+  *SYNTH-BOTH       OK                       [POST /api/workpapers/{wp_id}/m8/export-data, POST /api/workpapers/{wp_id}/m8/export-template, POST /api/workp
+   SYNTH-DUP        RAISE:X3ContractError    形态 A 路由注册结果与预期不一致（路径 + HTTP 方法双向比对）: 实得 [POST /api/workpapers/{wp_id}/m8/export-data, POST /api/workpapers/{wp
+  => PASS（按期望放过）
+  还原 OK md5=0d1a284a06f9808a29e185013e9908fa
+==============================================================================
+POST-RESTORE 探针与 CONTROL 一致: True
+POST-RESTORE pytest: 227 passed / 0 failed / 0 error / 5 skipped；失败集 == 基线: True
+POST-RESTORE md5: 0d1a284a06f9808a29e185013e9908fa == 0d1a284a06f9808a29e185013e9908fa -> True
+==============================================================================
+  MUT-A        RED（按期望通道命中）
+  MUT-A-PRE    PASS（按期望放过）
+  MUT-B        PASS（按期望放过）

@@ -2,48 +2,22 @@
  * ProjectGanttChart 工具函数（M-1）
  *
  * 提取为独立模块以便单元测试导入（Vue SFC `<script setup>` 不支持 `export`）。
+ * 循环色板取自 constants/cyclePalette.ts 单一真源。
  */
 
-/** 循环字母 → 颜色（与 PartnerProjectDashboard / CycleProgressRing 协调） */
-export const CYCLE_COLOR_MAP: Record<string, string> = {
-  D: '#409EFF', // 蓝 — 销售收入
-  E: '#13C2C2', // 青 — 货币资金
-  F: '#67C23A', // 绿 — 采购存货
-  G: '#722ED1', // 紫 — 投资
-  H: '#F56C6C', // 橙红 — 固定资产
-  I: '#FAAD14', // 金黄 — 无形资产
-  J: '#EB2F96', // 玫红 — 职工薪酬
-  K: '#909399', // 灰 — 管理费用
-  L: '#531DAB', // 深紫 — 筹资
-  M: '#8B572A', // 棕 — 权益
-  N: '#A8071A', // 暗红 — 税费
-  other: '#C0C4CC',
-}
+import { CYCLE_PALETTE, cycleColor } from '@/constants/cyclePalette'
+
+/** 循环字母 → 颜色（从统一真源 re-export，保持现有 import 不破坏） */
+export const CYCLE_COLOR_MAP: Record<string, string> = { ...CYCLE_PALETTE }
+
+// re-export cycleColor 保持现有导出名
+export { cycleColor }
 
 /** 循环字母 → 中文名（图例用） */
 export const CYCLE_NAME_MAP: Record<string, string> = {
-  D: '销售收入',
-  E: '货币资金',
-  F: '采购存货',
-  G: '投资',
-  H: '固定资产',
-  I: '无形资产',
-  J: '职工薪酬',
-  K: '管理费用',
-  L: '筹资',
-  M: '权益',
-  N: '税费',
-  other: '其他',
-}
-
-/**
- * 取循环颜色：未知/null/空 → CYCLE_COLOR_MAP.other
- * 大小写不敏感
- */
-export function cycleColor(cycle: string | null | undefined): string {
-  if (!cycle) return CYCLE_COLOR_MAP.other
-  const key = String(cycle).toUpperCase()
-  return CYCLE_COLOR_MAP[key] ?? CYCLE_COLOR_MAP.other
+  D: '销售收入', E: '货币资金', F: '采购存货', G: '投资',
+  H: '固定资产', I: '无形资产', J: '职工薪酬', K: '管理费用',
+  L: '筹资', M: '权益', N: '税费', other: '其他',
 }
 
 /**

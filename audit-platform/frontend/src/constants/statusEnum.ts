@@ -20,6 +20,16 @@ export const WP_STATUS = {
   ARCHIVED: 'archived',
 } as const
 
+/** 初稿标记状态（DraftMarker.state，formula-management-library V100） */
+export const DRAFT_MARKER_STATE = {
+  /** 一键刷新自动生成、尚未经人工复核 */
+  DRAFT: 'draft',
+  /** 已被人工编辑介入 */
+  HUMAN_EDITED: 'human_edited',
+  /** 已审定 */
+  AUDITED: 'audited',
+} as const
+
 /** 底稿复核状态（WpReviewStatus） */
 export const WP_REVIEW_STATUS = {
   PENDING: 'pending',
@@ -226,6 +236,7 @@ export type AnnotationStatus = typeof ANNOTATION_STATUS[keyof typeof ANNOTATION_
 export type IndependenceStatus = typeof INDEPENDENCE_STATUS[keyof typeof INDEPENDENCE_STATUS]
 export type IssueSource = typeof ISSUE_SOURCE[keyof typeof ISSUE_SOURCE]
 export type ProcedureExecutionStatus = typeof PROCEDURE_EXECUTION_STATUS[keyof typeof PROCEDURE_EXECUTION_STATUS]
+export type DraftMarkerState = typeof DRAFT_MARKER_STATE[keyof typeof DRAFT_MARKER_STATE]
 
 // ─── 中文 label 映射（Req 8.4.4 + Req 13 中文化前置） ───
 // 与后端 system_dicts._DICTS 保持一致，前端 dictStore 优先从后端加载，

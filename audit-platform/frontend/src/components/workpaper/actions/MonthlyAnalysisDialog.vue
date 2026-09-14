@@ -105,7 +105,7 @@ async function handleConfirm() {
   padding: 8px 12px;
   background: var(--el-fill-color-light);
   border-radius: 4px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   color: var(--el-text-color-secondary);
 }
 </style>

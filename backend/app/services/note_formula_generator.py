@@ -311,11 +311,79 @@ def _topological_sort_formulas(formulas: dict[str, dict], rows: list[dict]) -> l
     return sorted_result
 
 
+# ─────────────────────────────────────────────────────────────────────────────
+# Task 9.1（Req 17.2/17.6）：附注执行器与 ACNR full_resolve 对齐
+#   - 跨表 REPORT/TB/NOTE 域引用经 resolve_ref（复用 formula_management/engine.py
+#     的 ACNR full_resolve 封装，fail-open：解析器故障不阻断执行）建立 canonical
+#     addr_id 身份（Req 17.2 / Property 8）。
+#   - 附注单元的稳定 addr_id（NOTE 域）供合并附注 reaggregate 后按 addr_id 精准刷新
+#     受影响单元（Req 17.6），与统一寻址体系（note:{section}）一致，可溯源。
+# ─────────────────────────────────────────────────────────────────────────────
+
+# 仅 REPORT/TB/NOTE 三域 token（本任务对齐范围；PRIOR/AGING/WP 保持既有本地解析）。
+_CROSS_REF_TOKEN_RE = None  # 惰性编译，见 _extract_cross_ref_tokens
+
+
+def _note_cell_addr_id(note_section: str, row_idx: int, col_idx: int) -> str:
+    """附注单元的稳定 addr_id（NOTE 域标识）。
+
+    与 ConsolNoteTab / useNoteTree 的 ``note:{section}`` 寻址一致，附加 ``!{row}:{col}``
+    定位到单元格，供 reaggregate 后按 addr_id 精准刷新与来源溯源（Req 17.6）。
+    仅作标识用途，不参与求值。
+    """
+    return f"note:{note_section}!{row_idx}:{col_idx}"
+
+
+def _extract_cross_ref_tokens(expression: Any) -> list[str]:
+    """抽取表达式中的 REPORT/TB/NOTE 跨表引用 token（Req 17.2 对齐范围）。"""
+    global _CROSS_REF_TOKEN_RE
+    if not expression or not isinstance(expression, str):
+        return []
+    if _CROSS_REF_TOKEN_RE is None:
+        import re as _re
+
+        _CROSS_REF_TOKEN_RE = _re.compile(r"(?:REPORT|TB|NOTE)\([^)]*\)")
+    return _CROSS_REF_TOKEN_RE.findall(expression)
+
+
+async def _resolve_cross_refs_via_acnr(
+    expression: Any,
+    project_id: UUID,
+    db: AsyncSession,
+) -> dict[str, str]:
+    """对表达式中的 REPORT/TB/NOTE 跨表引用逐条经 ACNR full_resolve 解析（Req 17.2）。
+
+    复用 ``formula_management.engine.resolve_ref``（封装 ACNR full_resolve，fail-open）。
+    返回 ``{token: canonical_addr_id}``（仅命中项）；解析器故障或未命中不阻断执行、
+    亦不影响本地取数求值（求值仍走 cross_data，与 engine.py 语义一致：解析仅建立
+    canonical 引用身份）。
+    """
+    tokens = _extract_cross_ref_tokens(expression)
+    if not tokens:
+        return {}
+    # 惰性导入避免潜在循环依赖，并便于测试打桩。
+    from app.services.formula_management.engine import resolve_ref
+
+    resolved: dict[str, str] = {}
+    pid = str(project_id) if project_id is not None else None
+    for token in tokens:
+        # resolve_ref 自身 fail-open（内部已捕获异常返回降级结果），此处再兜底一层。
+        try:
+            rr = await resolve_ref(formula_ref=token, project_id=pid, db=db)
+        except Exception:  # noqa: BLE001 — 对齐 fail-open：解析器故障不阻断执行
+            continue
+        if getattr(rr, "found", False) and getattr(rr, "addr_id", None):
+            resolved[token] = rr.addr_id
+    return resolved
+
+
 async def execute_note_formulas(
     db: AsyncSession,
     project_id: UUID,
     year: int,
     note_section: str,
+    *,
+    affected_addr_ids: set[str] | None = None,
 ) -> dict[str, Any]:
     """执行附注表格中的自动运算公式，回填计算结果。
 
@@ -328,10 +396,17 @@ async def execute_note_formulas(
     2. 从 _formulas 中读取公式定义
     3. 预加载跨表数据（报表/试算表/其他附注）
     4. 按依赖顺序执行公式
-    5. 将计算结果写回 table_data.rows[].values[]
-    6. 只更新 mode=auto 的单元格
+    5. 跨表 REPORT/TB/NOTE 引用经 ACNR full_resolve 建立 canonical addr_id 身份（Req 17.2）
+    6. 将计算结果写回 table_data.rows[].values[]
+    7. 只更新 mode=auto 的单元格（Req 17.1）
+    8. 记录 evaluated_at + 单元 addr_id（Req 17.5）
 
-    Returns: {"executed": N, "updated": M}
+    Args:
+        affected_addr_ids: 合并附注 reaggregate 后按 addr_id 精准刷新受影响单元时传入
+            （Req 17.6）；为 None（默认）时刷新全部 auto 单元，保持既有全量语义不变。
+            元素为 ``_note_cell_addr_id`` 形式（``note:{section}!{row}:{col}``）。
+
+    Returns: {"executed": N, "updated": M, "results": [...], "anomalies": [...]}
     """
     result_q = await db.execute(
         sa.select(DisclosureNote).where(
@@ -380,15 +455,30 @@ async def execute_note_formulas(
         values = row.get("values") or []
         cell_modes = row.get("_cell_modes") or {}
 
-        # 只更新 auto 模式的单元格
+        # 只更新 auto 模式的单元格（Req 17.1）
         mode = cell_modes.get(str(col_idx), "auto")
         if mode != "auto":
+            continue
+
+        # 单元的稳定 addr_id（NOTE 域）——供溯源与 reaggregate 精准刷新（Req 17.6）。
+        cell_addr_id = _note_cell_addr_id(note_section, row_idx, col_idx)
+
+        # reaggregate 精准刷新：仅刷新受影响单元；未命中集合的单元跳过（Req 17.6）。
+        if affected_addr_ids is not None and cell_addr_id not in affected_addr_ids:
             continue
 
         # 执行公式
         formula_type = formula_def.get("type")
         expression = formula_def.get("expression", "")
         calc_value = None
+
+        # 跨表 REPORT/TB/NOTE 域引用经 ACNR full_resolve 建立 canonical 身份（Req 17.2）。
+        # fail-open：解析仅建立引用身份、不改变本地取数求值路径（cross_data）。
+        # 表内公式（vertical_sum/horizontal_balance/book_value）无跨表引用，跳过以省开销。
+        if formula_type not in ("vertical_sum", "horizontal_balance", "book_value"):
+            resolved_refs = await _resolve_cross_refs_via_acnr(expression, project_id, db)
+            if resolved_refs:
+                formula_def["resolved_refs"] = resolved_refs
 
         if formula_type == "vertical_sum":
             calc_value = _exec_vertical_sum(rows, expression, col_idx)
@@ -410,6 +500,9 @@ async def execute_note_formulas(
             updated += 1
             # Sprint 1.5 Task 1.5.4：仅在公式实际执行成功时写 evaluated_at（ISO 时间戳）
             formula_def["evaluated_at"] = datetime.now(timezone.utc).isoformat()
+            # Task 9.1（Req 17.5）：记录单元 addr_id，供 Formula_Source_Tooltip 溯源
+            # 与 reaggregate 精准刷新（Req 17.6）对齐同一寻址身份。
+            formula_def["addr_id"] = cell_addr_id
             # binding_id 字段如果原 dict 没有则补 None 占位，确保 schema 一致
             formula_def.setdefault("binding_id", None)
             exec_results.append({

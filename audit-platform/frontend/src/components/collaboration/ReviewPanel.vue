@@ -72,6 +72,22 @@
       </el-timeline>
     </div>
 
+    <!-- 复核对话导出记录 -->
+    <div v-if="reviewDialogRecords.length > 0" class="timeline-section">
+      <div class="section-title">复核对话记录</div>
+      <el-timeline>
+        <el-timeline-item
+          v-for="rec in reviewDialogRecords"
+          :key="rec.item_id"
+          :timestamp="rec.exported_at"
+          color="#409eff"
+        >
+          <p class="timeline-level">复核对话导出</p>
+          <p class="timeline-comment">{{ rec.value }}</p>
+        </el-timeline-item>
+      </el-timeline>
+    </div>
+
     <!-- 新建复核意见对话框 -->
     <el-dialog append-to-body v-model="createDialogVisible" title="新建复核意见" width="500px">
       <el-form ref="reviewFormRef" :model="reviewForm" :rules="reviewRules" label-width="100px">
@@ -125,6 +141,7 @@ import { ElMessage } from 'element-plus'
 import { handleApiError } from '@/utils/errorHandler'
 import { reviewApi } from '@/services/collaborationApi'
 import { rules } from '@/utils/formRules'
+import http from '@/utils/http'
 
 interface ReviewRecord {
   id: string
@@ -145,6 +162,7 @@ const props = defineProps<{
 }>()
 
 const reviews = ref<ReviewRecord[]>([])
+const reviewDialogRecords = ref<{ item_id: string; value: string; exported_at: string }[]>([])
 const createDialogVisible = ref(false)
 const replyDialogVisible = ref(false)
 const selectedReview = ref<ReviewRecord | null>(null)
@@ -243,6 +261,30 @@ async function loadReviews() {
   }
 }
 
+async function loadReviewDialogRecords() {
+  try {
+    const res = await http.get(`/api/workpapers/${props.workpaperId}/checklist-responses`, {
+      _silent: true,
+    } as any)
+    const items: any[] = Array.isArray(res?.data?.data) ? res.data.data : (Array.isArray(res?.data) ? res.data : [])
+    // Filter items with review-record pattern in item_id
+    reviewDialogRecords.value = items
+      .filter((item: any) => item.item_id && /review-record/.test(item.item_id))
+      .map((item: any) => {
+        let exportedAt = ''
+        try {
+          const meta = JSON.parse(item.remark || '{}')
+          exportedAt = meta.exported_at ? formatDate(meta.exported_at) : ''
+        } catch { /* ignore */ }
+        return {
+          item_id: item.item_id,
+          value: item.value || item.conclusion || '',
+          exported_at: exportedAt || formatDate(item.created_at || ''),
+        }
+      })
+  } catch { /* silent */ }
+}
+
 function openCreateDialog() {
   reviewForm.value = { review_level: 2, comments: '' }
   createDialogVisible.value = true
@@ -292,6 +334,7 @@ async function submitReply() {
 
 onMounted(() => {
   loadReviews()
+  loadReviewDialogRecords()
 })
 </script>
 

@@ -1,0 +1,1370 @@
+[
+  {
+    "id": "M01",
+    "side": "be",
+    "want": "test_task17_excel_instrumentation.py::TestCarrierGateIsFailClosed::test_each_carrier_verdict_downgrade_is_independently_fail_closed",
+    "why": "契约的 `gate_for_downstream_tasks.allowed_carriers` 与逐 carrier `probe_verdict` 不再互锁 ⇒ 只改一侧即可悄悄放行未过真实 OO 探针的载体。这正是 Task 5 契约 loader_rule 明文禁止的降级路径",
+    "verdict": "RED",
+    "summary": "4 failed, 128 passed in 37.46s",
+    "added": [
+      "test_task17_excel_instrumentation.py::TestCarrierGateIsFailClosed::test_each_carrier_verdict_downgrade_is_independently_fail_closed[defined_name]",
+      "test_task17_excel_instrumentation.py::TestCarrierGateIsFailClosed::test_each_carrier_verdict_downgrade_is_independently_fail_closed[excel_table]",
+      "test_task17_excel_instrumentation.py::TestCarrierGateIsFailClosed::test_each_carrier_verdict_downgrade_is_independently_fail_closed[hidden_sheet]",
+      "test_task17_excel_instrumentation.py::TestCarrierGateIsFailClosed::test_each_carrier_verdict_downgrade_is_independently_fail_closed[hidden_uuid_column]"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task17_excel_instrumentation.py::TestCarrierGateIsFailClosed::test_each_carrier_verdict_downgrade_is_independently_fail_closed[defined_name]",
+      "test_task17_excel_instrumentation.py::TestCarrierGateIsFailClosed::test_each_carrier_verdict_downgrade_is_independently_fail_closed[excel_table]",
+      "test_task17_excel_instrumentation.py::TestCarrierGateIsFailClosed::test_each_carrier_verdict_downgrade_is_independently_fail_closed[hidden_sheet]",
+      "test_task17_excel_instrumentation.py::TestCarrierGateIsFailClosed::test_each_carrier_verdict_downgrade_is_independently_fail_closed[hidden_uuid_column]"
+    ],
+    "added_files": [
+      "test_task17_excel_instrumentation.py"
+    ],
+    "restored": true,
+    "seconds": 41.1
+  },
+  {
+    "id": "M02",
+    "side": "be",
+    "want": "test_task17_excel_instrumentation.py::TestCarrierGateIsFailClosed::test_emptying_forbidden_anchors_is_fail_closed",
+    "why": "空集判据是三条集合相等判据之外**唯一**能拦住「两侧一起改成没有禁用锚点」的门。Task 5 已证伪 sheet_id 与 sheet 展示名，forbidden 恒非空",
+    "verdict": "RED",
+    "summary": "1 failed, 131 passed in 36.32s",
+    "added": [
+      "test_task17_excel_instrumentation.py::TestCarrierGateIsFailClosed::test_emptying_forbidden_anchors_is_fail_closed"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task17_excel_instrumentation.py::TestCarrierGateIsFailClosed::test_emptying_forbidden_anchors_is_fail_closed"
+    ],
+    "added_files": [
+      "test_task17_excel_instrumentation.py"
+    ],
+    "restored": true,
+    "seconds": 39.8
+  },
+  {
+    "id": "M03",
+    "side": "be",
+    "want": "test_task17_excel_instrumentation.py::TestCarrierGateIsFailClosed::test_allowed_sets_are_reverse_computed_from_probe_verdicts",
+    "why": "allowed_anchors 不再由逐条裁决反算 ⇒ 被证伪的 sheet_id / sheet_display_name 混进 passed 集合。carriers 侧四个全 passed，去掉过滤器是空操作（无效变异），所以只能在 anchors 侧做这条检验",
+    "verdict": "RED",
+    "summary": "34 failed, 44 passed, 54 errors in 7.36s",
+    "added": [
+      "test_task17_excel_instrumentation.py::TestBusinessSheetExclusion::test_production_sheet_enumerator_excludes_metadata_sheet",
+      "test_task17_excel_instrumentation.py::TestBusinessSheetExclusion::test_univer_snapshot_excludes_metadata_sheet",
+      "test_task17_excel_instrumentation.py::TestCandidateOnlyRepository::test_double_wrapping_is_idempotent",
+      "test_task17_excel_instrumentation.py::TestCandidateOnlyRepository::test_upgrader_wraps_a_bare_repository_unconditionally",
+      "test_task17_excel_instrumentation.py::TestCarrierGateIsFailClosed::test_a_consistently_retracted_carrier_blocks_the_engine_gate[defined_name]",
+      "test_task17_excel_instrumentation.py::TestCarrierGateIsFailClosed::test_a_consistently_retracted_carrier_blocks_the_engine_gate[excel_table]",
+      "test_task17_excel_instrumentation.py::TestCarrierGateIsFailClosed::test_a_consistently_retracted_carrier_blocks_the_engine_gate[hidden_sheet]",
+      "test_task17_excel_instrumentation.py::TestCarrierGateIsFailClosed::test_a_consistently_retracted_carrier_blocks_the_engine_gate[hidden_uuid_column]",
+      "test_task17_excel_instrumentation.py::TestCarrierGateIsFailClosed::test_allowed_sets_are_reverse_computed_from_probe_verdicts",
+      "test_task17_excel_instrumentation.py::TestCarrierGateIsFailClosed::test_disproved_anchor_gets_its_own_exception_type[sheet_display_name]",
+      "test_task17_excel_instrumentation.py::TestCarrierGateIsFailClosed::test_disproved_anchor_gets_its_own_exception_type[sheet_id]",
+      "test_task17_excel_instrumentation.py::TestCarrierGateIsFailClosed::test_required_hidden_sheet_keys_come_from_the_contract",
+      "test_task17_excel_instrumentation.py::TestCarrierGateIsFailClosed::test_unknown_anchor_is_rejected_but_not_as_disproved",
+      "test_task17_excel_instrumentation.py::TestIdentityReadback::test_gt_sync_has_no_runtime_binding_key",
+      "test_task17_excel_instrumentation.py::TestIdentityReadback::test_readback_rejects_dangling_table_part",
+      "test_task17_excel_instrumentation.py::TestIdentityReadback::test_readback_rejects_missing_defined_names",
+      "test_task17_excel_instrumentation.py::TestIdentityReadback::test_readback_rejects_missing_table",
+      "test_task17_excel_instrumentation.py::TestIdentityReadback::test_row_uuids_are_pregenerated_literals[c24]",
+      "test_task17_excel_instrumentation.py::TestIdentityReadback::test_row_uuids_are_pregenerated_literals[k11]",
+      "test_task17_excel_instrumentation.py::TestIdentityReadback::test_sheet_resolution_only_uses_the_probed_anchor[c24]",
+      "test_task17_excel_instrumentation.py::TestIdentityReadback::test_sheet_resolution_only_uses_the_probed_anchor[k11]",
+      "test_task17_excel_instrumentation.py::TestIdentityReadback::test_table_header_row_count_is_zero",
+      "test_task17_excel_instrumentation.py::TestInstrumentationPayload::test_backward_reference_key_is_rejected[bundle_sha256]",
+      "test_task17_excel_instrumentation.py::TestInstrumentationPayload::test_backward_reference_key_is_rejected[contract_definition_sha256]",
+      "test_task17_excel_instrumentation.py::TestInstrumentationPayload::test_backward_reference_key_is_rejected[definition_bundle_sha256]",
+      "test_task17_excel_instrumentation.py::TestInstrumentationPayload::test_nested_self_reference_is_also_rejected",
+      "test_task17_excel_instrumentation.py::TestInstrumentationPayload::test_no_locator_uses_a_disproved_anchor",
+      "test_task17_excel_instrumentation.py::TestInstrumentationPayload::test_payload_carries_no_sheet_id_or_display_name_as_identity",
+      "test_task17_excel_instrumentation.py::TestInstrumentationPayload::test_payload_declares_runtime_binding_as_finalize_only",
+      "test_task17_excel_instrumentation.py::TestInstrumentationPayload::test_payload_passes_task12_validator",
+      "test_task17_excel_instrumentation.py::TestInstrumentationPayload::test_requesting_a_disproved_anchor_is_rejected",
+      "test_task17_excel_instrumentation.py::TestInstrumentationPayload::test_row_uuid_disposition_matches_contract_classification",
+      "test_task17_excel_instrumentation.py::TestInstrumentationPayload::test_self_reference_key_is_rejected[definition_artifact_id]",
+      "test_task17_excel_instrumentation.py::TestInstrumentationPayload::test_self_reference_key_is_rejected[id]",
+      "test_task17_excel_instrumentation.py::TestInstrumentationPayload::test_self_reference_key_is_rejected[sha256]",
+      "test_task17_excel_instrumentation.py::TestInstrumentationPayload::test_template_outside_authority_root_is_rejected",
+      "test_task17_excel_instrumentation.py::TestInstrumentationPayload::test_template_payload_pins_the_authority_root",
+      "test_task17_excel_instrumentation.py::TestProbeEvidenceStaleness::test_missing_evidence_file_is_stale_not_skipped",
+      "test_task17_excel_instrumentation.py::TestProbeEvidenceStaleness::test_tier_b_digest_drift_makes_the_gate_stale",
+      "test_task17_excel_instrumentation.py::TestProbeEvidenceStaleness::test_tier_b_evidence_is_fresh",
+      "test_task17_excel_instrumentation.py::TestRequirement615Dispositions::test_deleted_identity_column_is_detectable_and_fails_closed",
+      "test_task17_excel_instrumentation.py::TestRequirement615Dispositions::test_deleted_row_uuid_is_never_reused",
+      "test_task17_excel_instrumentation.py::TestRequirement615Dispositions::test_duplicate_uuid_from_copy_is_detectable",
+      "test_task17_excel_instrumentation.py::TestRequirement615Dispositions::test_new_row_without_uuid_is_detectable",
+      "test_task17_excel_instrumentation.py::TestVisibleEquivalenceOnRealTemplates::test_all_six_aspects_are_equivalent[c24]",
+      "test_task17_excel_instrumentation.py::TestVisibleEquivalenceOnRealTemplates::test_all_six_aspects_are_equivalent[k11]",
+      "test_task17_excel_instrumentation.py::TestVisibleEquivalenceOnRealTemplates::test_authority_templates_are_untouched",
+      "test_task17_excel_instrumentation.py::TestVisibleEquivalenceOnRealTemplates::test_chart_bearing_template_keeps_protected_parts_byte_identical",
+      "test_task17_excel_instrumentation.py::TestVisibleEquivalenceOnRealTemplates::test_equivalence_is_falsifiable",
+      "test_task17_excel_instrumentation.py::TestVisibleEquivalenceOnRealTemplates::test_managed_row_range_outside_the_sheet_fails_closed",
+      "test_task17_excel_instrumentation.py::TestVisibleEquivalenceOnRealTemplates::test_metadata_sheet_is_hidden_and_out_of_business_enumeration",
+      "test_task17_excel_instrumentation.py::TestVisibleEquivalenceOnRealTemplates::test_no_collection_errors",
+      "test_task17_excel_instrumentation.py::TestVisibleEquivalenceOnRealTemplates::test_only_the_whitelisted_four_additions_appear[c24]",
+      "test_task17_excel_instrumentation.py::TestVisibleEquivalenceOnRealTemplates::test_only_the_whitelisted_four_additions_appear[k11]",
+      "test_task17_excel_instrumentation.py::TestVisibleEquivalenceOnRealTemplates::test_reinstrumenting_an_instrumented_artifact_is_rejected",
+      "test_task17_excel_instrumentation.py::TestVisibleEquivalenceOnRealTemplates::test_the_aspects_are_not_vacuously_equal",
+      "test_task17_excel_instrumentation_pg.py::TestAuthorityTemplatesAreReadOnly::test_gate_identity_is_recorded_for_stale_policy",
+      "test_task17_excel_instrumentation_pg.py::TestAuthorityTemplatesAreReadOnly::test_templates_are_byte_identical_after_the_whole_run",
+      "test_task17_excel_instrumentation_pg.py::TestAwaitingContractIsTerminalForThisTask::test_candidate_state_is_awaiting_contract",
+      "test_task17_excel_instrumentation_pg.py::TestAwaitingContractIsTerminalForThisTask::test_contract_and_bundle_targets_are_null_not_forged",
+      "test_task17_excel_instrumentation_pg.py::TestAwaitingContractIsTerminalForThisTask::test_equivalence_and_rollback_evidence_are_recorded",
+      "test_task17_excel_instrumentation_pg.py::TestAwaitingContractIsTerminalForThisTask::test_finalize_is_rejected_and_says_contract_is_missing",
+      "test_task17_excel_instrumentation_pg.py::TestAwaitingContractIsTerminalForThisTask::test_frozen_children_are_the_two_this_task_may_publish",
+      "test_task17_excel_instrumentation_pg.py::TestCandidateArtifactIsIsolated::test_artifact_lives_in_the_candidate_namespace",
+      "test_task17_excel_instrumentation_pg.py::TestCandidateArtifactIsIsolated::test_artifact_row_is_candidate_kind_and_state",
+      "test_task17_excel_instrumentation_pg.py::TestCandidateArtifactIsIsolated::test_forbidden_methods_are_unreachable_on_a_real_repository",
+      "test_task17_excel_instrumentation_pg.py::TestCandidateArtifactIsIsolated::test_passthrough_still_works",
+      "test_task17_excel_instrumentation_pg.py::TestCandidateArtifactIsIsolated::test_rejected_calls_left_the_database_untouched",
+      "test_task17_excel_instrumentation_pg.py::TestCandidateChangesNothingCurrent::test_content_revision_is_unchanged",
+      "test_task17_excel_instrumentation_pg.py::TestCandidateChangesNothingCurrent::test_current_content_version_is_unchanged",
+      "test_task17_excel_instrumentation_pg.py::TestCandidateChangesNothingCurrent::test_entry_pointer_is_unchanged",
+      "test_task17_excel_instrumentation_pg.py::TestCandidateChangesNothingCurrent::test_exactly_one_candidate_was_registered",
+      "test_task17_excel_instrumentation_pg.py::TestCandidateChangesNothingCurrent::test_existing_rows_were_never_rewritten",
+      "test_task17_excel_instrumentation_pg.py::TestCandidateChangesNothingCurrent::test_no_new_representation_or_content_version",
+      "test_task17_excel_instrumentation_pg.py::TestCandidateChangesNothingCurrent::test_outcome_matches_the_database",
+      "test_task17_excel_instrumentation_pg.py::TestCandidateIsNotResolvable::test_all_ten_intents_are_declared",
+      "test_task17_excel_instrumentation_pg.py::TestCandidateIsNotResolvable::test_candidate_id_appears_nowhere_but_its_own_row",
+      "test_task17_excel_instrumentation_pg.py::TestCandidateIsNotResolvable::test_candidate_is_not_consumable_for_every_intent",
+      "test_task17_excel_instrumentation_pg.py::TestCandidateIsNotResolvable::test_candidate_is_registered_in_scope_index_only_as_candidate",
+      "test_task17_excel_instrumentation_pg.py::TestCandidateIsNotResolvable::test_current_resolution_still_returns_the_old_generation",
+      "test_task17_excel_instrumentation_pg.py::TestCandidateIsNotResolvable::test_resolving_by_candidate_id_fails_for_every_intent",
+      "test_task17_excel_instrumentation_pg.py::TestCandidateIsNotResolvable::test_staged_artifact_never_becomes_a_representation_substrate",
+      "test_task17_excel_instrumentation_pg.py::TestDefinitionDeltaIsExactlyTemplateAndInstrumentation::test_baseline_had_a_real_approved_bundle",
+      "test_task17_excel_instrumentation_pg.py::TestDefinitionDeltaIsExactlyTemplateAndInstrumentation::test_instrumentation_payload_has_no_backward_reference",
+      "test_task17_excel_instrumentation_pg.py::TestDefinitionDeltaIsExactlyTemplateAndInstrumentation::test_only_two_definition_rows_were_added",
+      "test_task17_excel_instrumentation_pg.py::TestDefinitionDeltaIsExactlyTemplateAndInstrumentation::test_publish_dag_rejects_instrumentation_before_template",
+      "test_task17_excel_instrumentation_pg.py::TestHarness::test_baseline_world_is_meaningful",
+      "test_task17_excel_instrumentation_pg.py::TestHarness::test_no_harness_errors"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task17_excel_instrumentation.py::TestCarrierGateIsFailClosed::test_allowed_sets_are_reverse_computed_from_probe_verdicts"
+    ],
+    "added_files": [
+      "test_task17_excel_instrumentation.py",
+      "test_task17_excel_instrumentation_pg.py"
+    ],
+    "restored": true,
+    "seconds": 10.5
+  },
+  {
+    "id": "M04",
+    "side": "be",
+    "want": "test_task17_excel_instrumentation.py::TestCarrierGateIsFailClosed::test_disproved_anchor_gets_its_own_exception_type",
+    "why": "短路 forbidden 分支后 allowed 分支会顶上来抛通用 `CarrierGateError` ⇒ 行为看似仍拒绝，但拒绝理由不再指出「已被实证证伪」。异常类型分家就是为了让这条短路可被 falsify（Task 12/13/14/15 连续踩过共用类型的坑）",
+    "verdict": "RED",
+    "summary": "3 failed, 129 passed in 35.12s",
+    "added": [
+      "test_task17_excel_instrumentation.py::TestCarrierGateIsFailClosed::test_disproved_anchor_gets_its_own_exception_type[sheet_display_name]",
+      "test_task17_excel_instrumentation.py::TestCarrierGateIsFailClosed::test_disproved_anchor_gets_its_own_exception_type[sheet_id]",
+      "test_task17_excel_instrumentation.py::TestInstrumentationPayload::test_requesting_a_disproved_anchor_is_rejected"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task17_excel_instrumentation.py::TestCarrierGateIsFailClosed::test_disproved_anchor_gets_its_own_exception_type[sheet_display_name]",
+      "test_task17_excel_instrumentation.py::TestCarrierGateIsFailClosed::test_disproved_anchor_gets_its_own_exception_type[sheet_id]"
+    ],
+    "added_files": [
+      "test_task17_excel_instrumentation.py"
+    ],
+    "restored": true,
+    "seconds": 38.7
+  },
+  {
+    "id": "M05",
+    "side": "be",
+    "want": "test_task17_excel_instrumentation.py::TestCarrierGateIsFailClosed::test_a_consistently_retracted_carrier_blocks_the_engine_gate",
+    "why": "Property 66 的后半句「任一缺失阻断 engine gate」的**唯一**落点。首轮变异实测这条改成 pass 后全绿（既有守卫都被 load() 的集合相等判据拦在前面），因此补了一条一致撤回载体的场景",
+    "verdict": "RED",
+    "summary": "4 failed, 128 passed in 34.40s",
+    "added": [
+      "test_task17_excel_instrumentation.py::TestCarrierGateIsFailClosed::test_a_consistently_retracted_carrier_blocks_the_engine_gate[defined_name]",
+      "test_task17_excel_instrumentation.py::TestCarrierGateIsFailClosed::test_a_consistently_retracted_carrier_blocks_the_engine_gate[excel_table]",
+      "test_task17_excel_instrumentation.py::TestCarrierGateIsFailClosed::test_a_consistently_retracted_carrier_blocks_the_engine_gate[hidden_sheet]",
+      "test_task17_excel_instrumentation.py::TestCarrierGateIsFailClosed::test_a_consistently_retracted_carrier_blocks_the_engine_gate[hidden_uuid_column]"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task17_excel_instrumentation.py::TestCarrierGateIsFailClosed::test_a_consistently_retracted_carrier_blocks_the_engine_gate[defined_name]",
+      "test_task17_excel_instrumentation.py::TestCarrierGateIsFailClosed::test_a_consistently_retracted_carrier_blocks_the_engine_gate[excel_table]",
+      "test_task17_excel_instrumentation.py::TestCarrierGateIsFailClosed::test_a_consistently_retracted_carrier_blocks_the_engine_gate[hidden_sheet]",
+      "test_task17_excel_instrumentation.py::TestCarrierGateIsFailClosed::test_a_consistently_retracted_carrier_blocks_the_engine_gate[hidden_uuid_column]"
+    ],
+    "added_files": [
+      "test_task17_excel_instrumentation.py"
+    ],
+    "restored": true,
+    "seconds": 38.5
+  },
+  {
+    "id": "M06",
+    "side": "be",
+    "want": "test_task17_excel_instrumentation.py::TestProbeEvidenceStaleness::test_contract_byte_drift_makes_the_gate_stale",
+    "why": "契约本体/`excel_structure_fingerprint` 变了仍按旧裁决 instrumentation ⇒ Property 71 的第 1、3 项 invalidate_on 失效",
+    "verdict": "RED",
+    "summary": "1 failed, 131 passed in 35.17s",
+    "added": [
+      "test_task17_excel_instrumentation.py::TestProbeEvidenceStaleness::test_contract_byte_drift_makes_the_gate_stale"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task17_excel_instrumentation.py::TestProbeEvidenceStaleness::test_contract_byte_drift_makes_the_gate_stale"
+    ],
+    "added_files": [
+      "test_task17_excel_instrumentation.py"
+    ],
+    "restored": true,
+    "seconds": 38.6
+  },
+  {
+    "id": "M07",
+    "side": "be",
+    "want": "test_task17_excel_instrumentation.py::TestProbeEvidenceStaleness::test_probed_template_drift_makes_the_gate_stale",
+    "why": "探针取证用的那两份权威模板换了内容，载体裁决与等价基线本应整体失效；短路后会拿旧实证去 instrumentation 一份结构已变的模板",
+    "verdict": "RED",
+    "summary": "1 failed, 131 passed in 35.31s",
+    "added": [
+      "test_task17_excel_instrumentation.py::TestProbeEvidenceStaleness::test_probed_template_drift_makes_the_gate_stale"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task17_excel_instrumentation.py::TestProbeEvidenceStaleness::test_probed_template_drift_makes_the_gate_stale"
+    ],
+    "added_files": [
+      "test_task17_excel_instrumentation.py"
+    ],
+    "restored": true,
+    "seconds": 38.6
+  },
+  {
+    "id": "M08",
+    "side": "be",
+    "want": "test_task17_excel_instrumentation.py::TestProbeEvidenceStaleness::test_missing_evidence_file_is_stale_not_skipped",
+    "why": "evidence 不在了却继续放行 = 把「实证没了」伪装成「无需检查」。缺文件必须判 stale 而不是 skip（Requirement 14.16）",
+    "verdict": "RED",
+    "summary": "1 failed, 131 passed in 35.13s",
+    "added": [
+      "test_task17_excel_instrumentation.py::TestProbeEvidenceStaleness::test_missing_evidence_file_is_stale_not_skipped"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task17_excel_instrumentation.py::TestProbeEvidenceStaleness::test_missing_evidence_file_is_stale_not_skipped"
+    ],
+    "added_files": [
+      "test_task17_excel_instrumentation.py"
+    ],
+    "restored": true,
+    "seconds": 38.5
+  },
+  {
+    "id": "M09",
+    "side": "be",
+    "want": "test_task17_excel_instrumentation.py::TestProbeEvidenceStaleness::test_tier_b_digest_drift_makes_the_gate_stale",
+    "why": "probe 脚本 / operation_matrix / instrumentation_report 内容变了仍算新鲜 ⇒ 旧 test run 不会 stale。首轮变异实测这条改成 pass 后全绿（既有守卫只走「文件不存在」那条分支），因此补了内容漂移场景",
+    "verdict": "RED",
+    "summary": "1 failed, 131 passed in 35.14s",
+    "added": [
+      "test_task17_excel_instrumentation.py::TestProbeEvidenceStaleness::test_tier_b_digest_drift_makes_the_gate_stale"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task17_excel_instrumentation.py::TestProbeEvidenceStaleness::test_tier_b_digest_drift_makes_the_gate_stale"
+    ],
+    "added_files": [
+      "test_task17_excel_instrumentation.py"
+    ],
+    "restored": true,
+    "seconds": 38.5
+  },
+  {
+    "id": "M10",
+    "side": "be",
+    "want": "test_task17_excel_instrumentation.py::TestInstrumentationPayload::test_template_outside_authority_root_is_rejected",
+    "why": "`PathBoundaryError` 不是 `InstrumentationError` 子类（实测 mro 已确认）⇒ 参考副本路径与 `..` 逃逸会抛一个调用方 fail-closed 分支接不住的类型，Requirement 9.1 的拒绝语义断在半路",
+    "verdict": "RED",
+    "summary": "1 failed, 131 passed in 34.99s",
+    "added": [
+      "test_task17_excel_instrumentation.py::TestInstrumentationPayload::test_template_outside_authority_root_is_rejected"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task17_excel_instrumentation.py::TestInstrumentationPayload::test_template_outside_authority_root_is_rejected"
+    ],
+    "added_files": [
+      "test_task17_excel_instrumentation.py"
+    ],
+    "restored": true,
+    "seconds": 38.5
+  },
+  {
+    "id": "M11",
+    "side": "be",
+    "want": "test_task17_excel_instrumentation.py::TestInstrumentationPayload::test_payload_passes_task12_validator",
+    "why": "instrumentation payload 里出现 bundle digest = 发布 DAG 反向引用（Task 13 明文禁止）。刻意用**注入坏输入**而不是删掉 `validate_instrumentation_payload` 调用：删调用在合法 payload 上行为不变，是无效变异",
+    "verdict": "RED",
+    "summary": "30 failed, 90 passed, 12 errors in 34.15s",
+    "added": [
+      "test_task17_excel_instrumentation.py::TestInstrumentationPayload::test_backward_reference_key_is_rejected[bundle_sha256]",
+      "test_task17_excel_instrumentation.py::TestInstrumentationPayload::test_backward_reference_key_is_rejected[contract_definition_sha256]",
+      "test_task17_excel_instrumentation.py::TestInstrumentationPayload::test_backward_reference_key_is_rejected[definition_bundle_sha256]",
+      "test_task17_excel_instrumentation.py::TestInstrumentationPayload::test_nested_self_reference_is_also_rejected",
+      "test_task17_excel_instrumentation.py::TestInstrumentationPayload::test_no_locator_uses_a_disproved_anchor",
+      "test_task17_excel_instrumentation.py::TestInstrumentationPayload::test_payload_carries_no_sheet_id_or_display_name_as_identity",
+      "test_task17_excel_instrumentation.py::TestInstrumentationPayload::test_payload_declares_runtime_binding_as_finalize_only",
+      "test_task17_excel_instrumentation.py::TestInstrumentationPayload::test_payload_passes_task12_validator",
+      "test_task17_excel_instrumentation.py::TestInstrumentationPayload::test_row_uuid_disposition_matches_contract_classification",
+      "test_task17_excel_instrumentation.py::TestInstrumentationPayload::test_self_reference_key_is_rejected[definition_artifact_id]",
+      "test_task17_excel_instrumentation.py::TestInstrumentationPayload::test_self_reference_key_is_rejected[id]",
+      "test_task17_excel_instrumentation.py::TestInstrumentationPayload::test_self_reference_key_is_rejected[sha256]",
+      "test_task17_excel_instrumentation_pg.py::TestAuthorityTemplatesAreReadOnly::test_templates_are_byte_identical_after_the_whole_run",
+      "test_task17_excel_instrumentation_pg.py::TestAwaitingContractIsTerminalForThisTask::test_candidate_state_is_awaiting_contract",
+      "test_task17_excel_instrumentation_pg.py::TestAwaitingContractIsTerminalForThisTask::test_contract_and_bundle_targets_are_null_not_forged",
+      "test_task17_excel_instrumentation_pg.py::TestAwaitingContractIsTerminalForThisTask::test_equivalence_and_rollback_evidence_are_recorded",
+      "test_task17_excel_instrumentation_pg.py::TestAwaitingContractIsTerminalForThisTask::test_finalize_is_rejected_and_says_contract_is_missing",
+      "test_task17_excel_instrumentation_pg.py::TestAwaitingContractIsTerminalForThisTask::test_frozen_children_are_the_two_this_task_may_publish",
+      "test_task17_excel_instrumentation_pg.py::TestCandidateArtifactIsIsolated::test_artifact_lives_in_the_candidate_namespace",
+      "test_task17_excel_instrumentation_pg.py::TestCandidateArtifactIsIsolated::test_artifact_row_is_candidate_kind_and_state",
+      "test_task17_excel_instrumentation_pg.py::TestCandidateArtifactIsIsolated::test_forbidden_methods_are_unreachable_on_a_real_repository",
+      "test_task17_excel_instrumentation_pg.py::TestCandidateArtifactIsIsolated::test_passthrough_still_works",
+      "test_task17_excel_instrumentation_pg.py::TestCandidateArtifactIsIsolated::test_rejected_calls_left_the_database_untouched",
+      "test_task17_excel_instrumentation_pg.py::TestCandidateChangesNothingCurrent::test_content_revision_is_unchanged",
+      "test_task17_excel_instrumentation_pg.py::TestCandidateChangesNothingCurrent::test_current_content_version_is_unchanged",
+      "test_task17_excel_instrumentation_pg.py::TestCandidateChangesNothingCurrent::test_entry_pointer_is_unchanged",
+      "test_task17_excel_instrumentation_pg.py::TestCandidateChangesNothingCurrent::test_exactly_one_candidate_was_registered",
+      "test_task17_excel_instrumentation_pg.py::TestCandidateChangesNothingCurrent::test_existing_rows_were_never_rewritten",
+      "test_task17_excel_instrumentation_pg.py::TestCandidateChangesNothingCurrent::test_no_new_representation_or_content_version",
+      "test_task17_excel_instrumentation_pg.py::TestCandidateChangesNothingCurrent::test_outcome_matches_the_database",
+      "test_task17_excel_instrumentation_pg.py::TestCandidateIsNotResolvable::test_all_ten_intents_are_declared",
+      "test_task17_excel_instrumentation_pg.py::TestCandidateIsNotResolvable::test_candidate_id_appears_nowhere_but_its_own_row",
+      "test_task17_excel_instrumentation_pg.py::TestCandidateIsNotResolvable::test_candidate_is_not_consumable_for_every_intent",
+      "test_task17_excel_instrumentation_pg.py::TestCandidateIsNotResolvable::test_candidate_is_registered_in_scope_index_only_as_candidate",
+      "test_task17_excel_instrumentation_pg.py::TestCandidateIsNotResolvable::test_current_resolution_still_returns_the_old_generation",
+      "test_task17_excel_instrumentation_pg.py::TestCandidateIsNotResolvable::test_resolving_by_candidate_id_fails_for_every_intent",
+      "test_task17_excel_instrumentation_pg.py::TestCandidateIsNotResolvable::test_staged_artifact_never_becomes_a_representation_substrate",
+      "test_task17_excel_instrumentation_pg.py::TestDefinitionDeltaIsExactlyTemplateAndInstrumentation::test_instrumentation_payload_has_no_backward_reference",
+      "test_task17_excel_instrumentation_pg.py::TestDefinitionDeltaIsExactlyTemplateAndInstrumentation::test_only_two_definition_rows_were_added",
+      "test_task17_excel_instrumentation_pg.py::TestDefinitionDeltaIsExactlyTemplateAndInstrumentation::test_publish_dag_rejects_instrumentation_before_template",
+      "test_task17_excel_instrumentation_pg.py::TestHarness::test_baseline_world_is_meaningful",
+      "test_task17_excel_instrumentation_pg.py::TestHarness::test_no_harness_errors"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task17_excel_instrumentation.py::TestInstrumentationPayload::test_payload_passes_task12_validator"
+    ],
+    "added_files": [
+      "test_task17_excel_instrumentation.py",
+      "test_task17_excel_instrumentation_pg.py"
+    ],
+    "restored": true,
+    "seconds": 38.2
+  },
+  {
+    "id": "M12",
+    "side": "be",
+    "want": "test_task17_excel_instrumentation.py::TestInstrumentationPayload::test_no_locator_uses_a_disproved_anchor",
+    "why": "受管 sheet 的 locator 改用 sheet 展示名 ⇒ 用户改名后 identity 直接失联（Task 5 实测改名场景）。判据必须是**结构式**逐 locator 检查，全文 grep 会被 payload 里那份给下游 loader 的黑名单字段误伤",
+    "verdict": "RED",
+    "summary": "30 failed, 90 passed, 12 errors in 34.68s",
+    "added": [
+      "test_task17_excel_instrumentation.py::TestInstrumentationPayload::test_backward_reference_key_is_rejected[bundle_sha256]",
+      "test_task17_excel_instrumentation.py::TestInstrumentationPayload::test_backward_reference_key_is_rejected[contract_definition_sha256]",
+      "test_task17_excel_instrumentation.py::TestInstrumentationPayload::test_backward_reference_key_is_rejected[definition_bundle_sha256]",
+      "test_task17_excel_instrumentation.py::TestInstrumentationPayload::test_nested_self_reference_is_also_rejected",
+      "test_task17_excel_instrumentation.py::TestInstrumentationPayload::test_no_locator_uses_a_disproved_anchor",
+      "test_task17_excel_instrumentation.py::TestInstrumentationPayload::test_payload_carries_no_sheet_id_or_display_name_as_identity",
+      "test_task17_excel_instrumentation.py::TestInstrumentationPayload::test_payload_declares_runtime_binding_as_finalize_only",
+      "test_task17_excel_instrumentation.py::TestInstrumentationPayload::test_payload_passes_task12_validator",
+      "test_task17_excel_instrumentation.py::TestInstrumentationPayload::test_row_uuid_disposition_matches_contract_classification",
+      "test_task17_excel_instrumentation.py::TestInstrumentationPayload::test_self_reference_key_is_rejected[definition_artifact_id]",
+      "test_task17_excel_instrumentation.py::TestInstrumentationPayload::test_self_reference_key_is_rejected[id]",
+      "test_task17_excel_instrumentation.py::TestInstrumentationPayload::test_self_reference_key_is_rejected[sha256]",
+      "test_task17_excel_instrumentation_pg.py::TestAuthorityTemplatesAreReadOnly::test_templates_are_byte_identical_after_the_whole_run",
+      "test_task17_excel_instrumentation_pg.py::TestAwaitingContractIsTerminalForThisTask::test_candidate_state_is_awaiting_contract",
+      "test_task17_excel_instrumentation_pg.py::TestAwaitingContractIsTerminalForThisTask::test_contract_and_bundle_targets_are_null_not_forged",
+      "test_task17_excel_instrumentation_pg.py::TestAwaitingContractIsTerminalForThisTask::test_equivalence_and_rollback_evidence_are_recorded",
+      "test_task17_excel_instrumentation_pg.py::TestAwaitingContractIsTerminalForThisTask::test_finalize_is_rejected_and_says_contract_is_missing",
+      "test_task17_excel_instrumentation_pg.py::TestAwaitingContractIsTerminalForThisTask::test_frozen_children_are_the_two_this_task_may_publish",
+      "test_task17_excel_instrumentation_pg.py::TestCandidateArtifactIsIsolated::test_artifact_lives_in_the_candidate_namespace",
+      "test_task17_excel_instrumentation_pg.py::TestCandidateArtifactIsIsolated::test_artifact_row_is_candidate_kind_and_state",
+      "test_task17_excel_instrumentation_pg.py::TestCandidateArtifactIsIsolated::test_forbidden_methods_are_unreachable_on_a_real_repository",
+      "test_task17_excel_instrumentation_pg.py::TestCandidateArtifactIsIsolated::test_passthrough_still_works",
+      "test_task17_excel_instrumentation_pg.py::TestCandidateArtifactIsIsolated::test_rejected_calls_left_the_database_untouched",
+      "test_task17_excel_instrumentation_pg.py::TestCandidateChangesNothingCurrent::test_content_revision_is_unchanged",
+      "test_task17_excel_instrumentation_pg.py::TestCandidateChangesNothingCurrent::test_current_content_version_is_unchanged",
+      "test_task17_excel_instrumentation_pg.py::TestCandidateChangesNothingCurrent::test_entry_pointer_is_unchanged",
+      "test_task17_excel_instrumentation_pg.py::TestCandidateChangesNothingCurrent::test_exactly_one_candidate_was_registered",
+      "test_task17_excel_instrumentation_pg.py::TestCandidateChangesNothingCurrent::test_existing_rows_were_never_rewritten",
+      "test_task17_excel_instrumentation_pg.py::TestCandidateChangesNothingCurrent::test_no_new_representation_or_content_version",
+      "test_task17_excel_instrumentation_pg.py::TestCandidateChangesNothingCurrent::test_outcome_matches_the_database",
+      "test_task17_excel_instrumentation_pg.py::TestCandidateIsNotResolvable::test_all_ten_intents_are_declared",
+      "test_task17_excel_instrumentation_pg.py::TestCandidateIsNotResolvable::test_candidate_id_appears_nowhere_but_its_own_row",
+      "test_task17_excel_instrumentation_pg.py::TestCandidateIsNotResolvable::test_candidate_is_not_consumable_for_every_intent",
+      "test_task17_excel_instrumentation_pg.py::TestCandidateIsNotResolvable::test_candidate_is_registered_in_scope_index_only_as_candidate",
+      "test_task17_excel_instrumentation_pg.py::TestCandidateIsNotResolvable::test_current_resolution_still_returns_the_old_generation",
+      "test_task17_excel_instrumentation_pg.py::TestCandidateIsNotResolvable::test_resolving_by_candidate_id_fails_for_every_intent",
+      "test_task17_excel_instrumentation_pg.py::TestCandidateIsNotResolvable::test_staged_artifact_never_becomes_a_representation_substrate",
+      "test_task17_excel_instrumentation_pg.py::TestDefinitionDeltaIsExactlyTemplateAndInstrumentation::test_instrumentation_payload_has_no_backward_reference",
+      "test_task17_excel_instrumentation_pg.py::TestDefinitionDeltaIsExactlyTemplateAndInstrumentation::test_only_two_definition_rows_were_added",
+      "test_task17_excel_instrumentation_pg.py::TestDefinitionDeltaIsExactlyTemplateAndInstrumentation::test_publish_dag_rejects_instrumentation_before_template",
+      "test_task17_excel_instrumentation_pg.py::TestHarness::test_baseline_world_is_meaningful",
+      "test_task17_excel_instrumentation_pg.py::TestHarness::test_no_harness_errors"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task17_excel_instrumentation.py::TestInstrumentationPayload::test_no_locator_uses_a_disproved_anchor",
+      "test_task17_excel_instrumentation.py::TestInstrumentationPayload::test_payload_carries_no_sheet_id_or_display_name_as_identity"
+    ],
+    "added_files": [
+      "test_task17_excel_instrumentation.py",
+      "test_task17_excel_instrumentation_pg.py"
+    ],
+    "restored": true,
+    "seconds": 38.7
+  },
+  {
+    "id": "M13",
+    "side": "be",
+    "want": "test_task17_excel_instrumentation.py::TestInstrumentationPayload::test_template_payload_pins_the_authority_root",
+    "why": "template definition 声明的权威源换成**已落后的参考副本** ⇒ 下游按参考副本复现 instrumentation，与运行时真模板不一致（Requirement 9.1）",
+    "verdict": "RED",
+    "summary": "1 failed, 131 passed in 34.60s",
+    "added": [
+      "test_task17_excel_instrumentation.py::TestInstrumentationPayload::test_template_payload_pins_the_authority_root"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task17_excel_instrumentation.py::TestInstrumentationPayload::test_template_payload_pins_the_authority_root"
+    ],
+    "added_files": [
+      "test_task17_excel_instrumentation.py"
+    ],
+    "restored": true,
+    "seconds": 38.0
+  },
+  {
+    "id": "M14",
+    "side": "be",
+    "want": "test_task17_excel_instrumentation.py::TestInstrumentationPayload::test_payload_declares_runtime_binding_as_finalize_only",
+    "why": "runtime binding 键集少一个 ⇒ instrumentation 阶段可以合法预写 bundle digest，candidate 看起来已绑定 bundle。design 要求五个 digest 全部只在 finalize 写入",
+    "verdict": "RED",
+    "summary": "1 failed, 130 passed in 35.67s",
+    "added": [
+      "test_task17_excel_instrumentation.py::TestInstrumentationPayload::test_payload_declares_runtime_binding_as_finalize_only"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task17_excel_instrumentation.py::TestInstrumentationPayload::test_payload_declares_runtime_binding_as_finalize_only"
+    ],
+    "added_files": [
+      "test_task17_excel_instrumentation.py"
+    ],
+    "restored": true,
+    "seconds": 39.2
+  },
+  {
+    "id": "M15",
+    "side": "be",
+    "want": "test_task17_excel_instrumentation.py::TestInstrumentationPayload::test_row_uuid_disposition_matches_contract_classification",
+    "why": "用户删掉 identity 列后改成「静默分配新 ID」= 按位置猜行身份，与 Task 5 契约`requirement_6_15_classification` 裁决的「拒绝」相反（Requirement 6.15）",
+    "verdict": "RED",
+    "summary": "1 failed, 131 passed in 35.63s",
+    "added": [
+      "test_task17_excel_instrumentation.py::TestInstrumentationPayload::test_row_uuid_disposition_matches_contract_classification"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task17_excel_instrumentation.py::TestInstrumentationPayload::test_row_uuid_disposition_matches_contract_classification"
+    ],
+    "added_files": [
+      "test_task17_excel_instrumentation.py"
+    ],
+    "restored": true,
+    "seconds": 39.1
+  },
+  {
+    "id": "M16",
+    "side": "be",
+    "want": "test_task17_excel_instrumentation.py::TestIdentityReadback::test_table_header_row_count_is_zero",
+    "why": "`headerRowCount=1` 会把业务两级合并表头的第一行当成 Table 表头行 ⇒ 受管行区域整体错位一行，且 Excel 可能改写该行样式（可见结构被动）",
+    "verdict": "RED",
+    "summary": "29 failed, 77 passed, 26 errors in 8.51s",
+    "added": [
+      "test_task17_excel_instrumentation.py::TestBusinessSheetExclusion::test_production_sheet_enumerator_excludes_metadata_sheet",
+      "test_task17_excel_instrumentation.py::TestBusinessSheetExclusion::test_univer_snapshot_excludes_metadata_sheet",
+      "test_task17_excel_instrumentation.py::TestIdentityReadback::test_gt_sync_has_no_runtime_binding_key",
+      "test_task17_excel_instrumentation.py::TestIdentityReadback::test_readback_rejects_dangling_table_part",
+      "test_task17_excel_instrumentation.py::TestIdentityReadback::test_readback_rejects_missing_defined_names",
+      "test_task17_excel_instrumentation.py::TestIdentityReadback::test_readback_rejects_missing_table",
+      "test_task17_excel_instrumentation.py::TestIdentityReadback::test_row_uuids_are_pregenerated_literals[c24]",
+      "test_task17_excel_instrumentation.py::TestIdentityReadback::test_row_uuids_are_pregenerated_literals[k11]",
+      "test_task17_excel_instrumentation.py::TestIdentityReadback::test_sheet_resolution_only_uses_the_probed_anchor[c24]",
+      "test_task17_excel_instrumentation.py::TestIdentityReadback::test_sheet_resolution_only_uses_the_probed_anchor[k11]",
+      "test_task17_excel_instrumentation.py::TestIdentityReadback::test_table_header_row_count_is_zero",
+      "test_task17_excel_instrumentation.py::TestRequirement615Dispositions::test_deleted_identity_column_is_detectable_and_fails_closed",
+      "test_task17_excel_instrumentation.py::TestRequirement615Dispositions::test_deleted_row_uuid_is_never_reused",
+      "test_task17_excel_instrumentation.py::TestRequirement615Dispositions::test_duplicate_uuid_from_copy_is_detectable",
+      "test_task17_excel_instrumentation.py::TestRequirement615Dispositions::test_new_row_without_uuid_is_detectable",
+      "test_task17_excel_instrumentation.py::TestVisibleEquivalenceOnRealTemplates::test_all_six_aspects_are_equivalent[c24]",
+      "test_task17_excel_instrumentation.py::TestVisibleEquivalenceOnRealTemplates::test_all_six_aspects_are_equivalent[k11]",
+      "test_task17_excel_instrumentation.py::TestVisibleEquivalenceOnRealTemplates::test_authority_templates_are_untouched",
+      "test_task17_excel_instrumentation.py::TestVisibleEquivalenceOnRealTemplates::test_chart_bearing_template_keeps_protected_parts_byte_identical",
+      "test_task17_excel_instrumentation.py::TestVisibleEquivalenceOnRealTemplates::test_equivalence_is_falsifiable",
+      "test_task17_excel_instrumentation.py::TestVisibleEquivalenceOnRealTemplates::test_metadata_sheet_is_hidden_and_out_of_business_enumeration",
+      "test_task17_excel_instrumentation.py::TestVisibleEquivalenceOnRealTemplates::test_no_collection_errors",
+      "test_task17_excel_instrumentation.py::TestVisibleEquivalenceOnRealTemplates::test_only_the_whitelisted_four_additions_appear[c24]",
+      "test_task17_excel_instrumentation.py::TestVisibleEquivalenceOnRealTemplates::test_only_the_whitelisted_four_additions_appear[k11]",
+      "test_task17_excel_instrumentation.py::TestVisibleEquivalenceOnRealTemplates::test_reinstrumenting_an_instrumented_artifact_is_rejected",
+      "test_task17_excel_instrumentation.py::TestVisibleEquivalenceOnRealTemplates::test_the_aspects_are_not_vacuously_equal",
+      "test_task17_excel_instrumentation_pg.py::TestAuthorityTemplatesAreReadOnly::test_templates_are_byte_identical_after_the_whole_run",
+      "test_task17_excel_instrumentation_pg.py::TestAwaitingContractIsTerminalForThisTask::test_candidate_state_is_awaiting_contract",
+      "test_task17_excel_instrumentation_pg.py::TestAwaitingContractIsTerminalForThisTask::test_contract_and_bundle_targets_are_null_not_forged",
+      "test_task17_excel_instrumentation_pg.py::TestAwaitingContractIsTerminalForThisTask::test_equivalence_and_rollback_evidence_are_recorded",
+      "test_task17_excel_instrumentation_pg.py::TestAwaitingContractIsTerminalForThisTask::test_finalize_is_rejected_and_says_contract_is_missing",
+      "test_task17_excel_instrumentation_pg.py::TestAwaitingContractIsTerminalForThisTask::test_frozen_children_are_the_two_this_task_may_publish",
+      "test_task17_excel_instrumentation_pg.py::TestCandidateArtifactIsIsolated::test_artifact_lives_in_the_candidate_namespace",
+      "test_task17_excel_instrumentation_pg.py::TestCandidateArtifactIsIsolated::test_artifact_row_is_candidate_kind_and_state",
+      "test_task17_excel_instrumentation_pg.py::TestCandidateArtifactIsIsolated::test_forbidden_methods_are_unreachable_on_a_real_repository",
+      "test_task17_excel_instrumentation_pg.py::TestCandidateArtifactIsIsolated::test_passthrough_still_works",
+      "test_task17_excel_instrumentation_pg.py::TestCandidateArtifactIsIsolated::test_rejected_calls_left_the_database_untouched",
+      "test_task17_excel_instrumentation_pg.py::TestCandidateChangesNothingCurrent::test_content_revision_is_unchanged",
+      "test_task17_excel_instrumentation_pg.py::TestCandidateChangesNothingCurrent::test_current_content_version_is_unchanged",
+      "test_task17_excel_instrumentation_pg.py::TestCandidateChangesNothingCurrent::test_entry_pointer_is_unchanged",
+      "test_task17_excel_instrumentation_pg.py::TestCandidateChangesNothingCurrent::test_exactly_one_candidate_was_registered",
+      "test_task17_excel_instrumentation_pg.py::TestCandidateChangesNothingCurrent::test_existing_rows_were_never_rewritten",
+      "test_task17_excel_instrumentation_pg.py::TestCandidateChangesNothingCurrent::test_no_new_representation_or_content_version",
+      "test_task17_excel_instrumentation_pg.py::TestCandidateChangesNothingCurrent::test_outcome_matches_the_database",
+      "test_task17_excel_instrumentation_pg.py::TestCandidateIsNotResolvable::test_all_ten_intents_are_declared",
+      "test_task17_excel_instrumentation_pg.py::TestCandidateIsNotResolvable::test_candidate_id_appears_nowhere_but_its_own_row",
+      "test_task17_excel_instrumentation_pg.py::TestCandidateIsNotResolvable::test_candidate_is_not_consumable_for_every_intent",
+      "test_task17_excel_instrumentation_pg.py::TestCandidateIsNotResolvable::test_candidate_is_registered_in_scope_index_only_as_candidate",
+      "test_task17_excel_instrumentation_pg.py::TestCandidateIsNotResolvable::test_current_resolution_still_returns_the_old_generation",
+      "test_task17_excel_instrumentation_pg.py::TestCandidateIsNotResolvable::test_resolving_by_candidate_id_fails_for_every_intent",
+      "test_task17_excel_instrumentation_pg.py::TestCandidateIsNotResolvable::test_staged_artifact_never_becomes_a_representation_substrate",
+      "test_task17_excel_instrumentation_pg.py::TestDefinitionDeltaIsExactlyTemplateAndInstrumentation::test_instrumentation_payload_has_no_backward_reference",
+      "test_task17_excel_instrumentation_pg.py::TestDefinitionDeltaIsExactlyTemplateAndInstrumentation::test_only_two_definition_rows_were_added",
+      "test_task17_excel_instrumentation_pg.py::TestHarness::test_baseline_world_is_meaningful",
+      "test_task17_excel_instrumentation_pg.py::TestHarness::test_no_harness_errors"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task17_excel_instrumentation.py::TestIdentityReadback::test_table_header_row_count_is_zero"
+    ],
+    "added_files": [
+      "test_task17_excel_instrumentation.py",
+      "test_task17_excel_instrumentation_pg.py"
+    ],
+    "restored": true,
+    "seconds": 11.8
+  },
+  {
+    "id": "M17",
+    "side": "be",
+    "want": "test_task17_excel_instrumentation.py::TestIdentityReadback::test_row_uuids_are_pregenerated_literals",
+    "why": "UUID 列不再隐藏 ⇒ 审计师会在底稿里看到一列 `GTROW-K11-0007` 之类的内部标识，Requirement 6.13 的「不改变可见业务内容」被破坏",
+    "verdict": "RED",
+    "summary": "29 failed, 77 passed, 26 errors in 8.46s",
+    "added": [
+      "test_task17_excel_instrumentation.py::TestBusinessSheetExclusion::test_production_sheet_enumerator_excludes_metadata_sheet",
+      "test_task17_excel_instrumentation.py::TestBusinessSheetExclusion::test_univer_snapshot_excludes_metadata_sheet",
+      "test_task17_excel_instrumentation.py::TestIdentityReadback::test_gt_sync_has_no_runtime_binding_key",
+      "test_task17_excel_instrumentation.py::TestIdentityReadback::test_readback_rejects_dangling_table_part",
+      "test_task17_excel_instrumentation.py::TestIdentityReadback::test_readback_rejects_missing_defined_names",
+      "test_task17_excel_instrumentation.py::TestIdentityReadback::test_readback_rejects_missing_table",
+      "test_task17_excel_instrumentation.py::TestIdentityReadback::test_row_uuids_are_pregenerated_literals[c24]",
+      "test_task17_excel_instrumentation.py::TestIdentityReadback::test_row_uuids_are_pregenerated_literals[k11]",
+      "test_task17_excel_instrumentation.py::TestIdentityReadback::test_sheet_resolution_only_uses_the_probed_anchor[c24]",
+      "test_task17_excel_instrumentation.py::TestIdentityReadback::test_sheet_resolution_only_uses_the_probed_anchor[k11]",
+      "test_task17_excel_instrumentation.py::TestIdentityReadback::test_table_header_row_count_is_zero",
+      "test_task17_excel_instrumentation.py::TestRequirement615Dispositions::test_deleted_identity_column_is_detectable_and_fails_closed",
+      "test_task17_excel_instrumentation.py::TestRequirement615Dispositions::test_deleted_row_uuid_is_never_reused",
+      "test_task17_excel_instrumentation.py::TestRequirement615Dispositions::test_duplicate_uuid_from_copy_is_detectable",
+      "test_task17_excel_instrumentation.py::TestRequirement615Dispositions::test_new_row_without_uuid_is_detectable",
+      "test_task17_excel_instrumentation.py::TestVisibleEquivalenceOnRealTemplates::test_all_six_aspects_are_equivalent[c24]",
+      "test_task17_excel_instrumentation.py::TestVisibleEquivalenceOnRealTemplates::test_all_six_aspects_are_equivalent[k11]",
+      "test_task17_excel_instrumentation.py::TestVisibleEquivalenceOnRealTemplates::test_authority_templates_are_untouched",
+      "test_task17_excel_instrumentation.py::TestVisibleEquivalenceOnRealTemplates::test_chart_bearing_template_keeps_protected_parts_byte_identical",
+      "test_task17_excel_instrumentation.py::TestVisibleEquivalenceOnRealTemplates::test_equivalence_is_falsifiable",
+      "test_task17_excel_instrumentation.py::TestVisibleEquivalenceOnRealTemplates::test_metadata_sheet_is_hidden_and_out_of_business_enumeration",
+      "test_task17_excel_instrumentation.py::TestVisibleEquivalenceOnRealTemplates::test_no_collection_errors",
+      "test_task17_excel_instrumentation.py::TestVisibleEquivalenceOnRealTemplates::test_only_the_whitelisted_four_additions_appear[c24]",
+      "test_task17_excel_instrumentation.py::TestVisibleEquivalenceOnRealTemplates::test_only_the_whitelisted_four_additions_appear[k11]",
+      "test_task17_excel_instrumentation.py::TestVisibleEquivalenceOnRealTemplates::test_reinstrumenting_an_instrumented_artifact_is_rejected",
+      "test_task17_excel_instrumentation.py::TestVisibleEquivalenceOnRealTemplates::test_the_aspects_are_not_vacuously_equal",
+      "test_task17_excel_instrumentation_pg.py::TestAuthorityTemplatesAreReadOnly::test_templates_are_byte_identical_after_the_whole_run",
+      "test_task17_excel_instrumentation_pg.py::TestAwaitingContractIsTerminalForThisTask::test_candidate_state_is_awaiting_contract",
+      "test_task17_excel_instrumentation_pg.py::TestAwaitingContractIsTerminalForThisTask::test_contract_and_bundle_targets_are_null_not_forged",
+      "test_task17_excel_instrumentation_pg.py::TestAwaitingContractIsTerminalForThisTask::test_equivalence_and_rollback_evidence_are_recorded",
+      "test_task17_excel_instrumentation_pg.py::TestAwaitingContractIsTerminalForThisTask::test_finalize_is_rejected_and_says_contract_is_missing",
+      "test_task17_excel_instrumentation_pg.py::TestAwaitingContractIsTerminalForThisTask::test_frozen_children_are_the_two_this_task_may_publish",
+      "test_task17_excel_instrumentation_pg.py::TestCandidateArtifactIsIsolated::test_artifact_lives_in_the_candidate_namespace",
+      "test_task17_excel_instrumentation_pg.py::TestCandidateArtifactIsIsolated::test_artifact_row_is_candidate_kind_and_state",
+      "test_task17_excel_instrumentation_pg.py::TestCandidateArtifactIsIsolated::test_forbidden_methods_are_unreachable_on_a_real_repository",
+      "test_task17_excel_instrumentation_pg.py::TestCandidateArtifactIsIsolated::test_passthrough_still_works",
+      "test_task17_excel_instrumentation_pg.py::TestCandidateArtifactIsIsolated::test_rejected_calls_left_the_database_untouched",
+      "test_task17_excel_instrumentation_pg.py::TestCandidateChangesNothingCurrent::test_content_revision_is_unchanged",
+      "test_task17_excel_instrumentation_pg.py::TestCandidateChangesNothingCurrent::test_current_content_version_is_unchanged",
+      "test_task17_excel_instrumentation_pg.py::TestCandidateChangesNothingCurrent::test_entry_pointer_is_unchanged",
+      "test_task17_excel_instrumentation_pg.py::TestCandidateChangesNothingCurrent::test_exactly_one_candidate_was_registered",
+      "test_task17_excel_instrumentation_pg.py::TestCandidateChangesNothingCurrent::test_existing_rows_were_never_rewritten",
+      "test_task17_excel_instrumentation_pg.py::TestCandidateChangesNothingCurrent::test_no_new_representation_or_content_version",
+      "test_task17_excel_instrumentation_pg.py::TestCandidateChangesNothingCurrent::test_outcome_matches_the_database",
+      "test_task17_excel_instrumentation_pg.py::TestCandidateIsNotResolvable::test_all_ten_intents_are_declared",
+      "test_task17_excel_instrumentation_pg.py::TestCandidateIsNotResolvable::test_candidate_id_appears_nowhere_but_its_own_row",
+      "test_task17_excel_instrumentation_pg.py::TestCandidateIsNotResolvable::test_candidate_is_not_consumable_for_every_intent",
+      "test_task17_excel_instrumentation_pg.py::TestCandidateIsNotResolvable::test_candidate_is_registered_in_scope_index_only_as_candidate",
+      "test_task17_excel_instrumentation_pg.py::TestCandidateIsNotResolvable::test_current_resolution_still_returns_the_old_generation",
+      "test_task17_excel_instrumentation_pg.py::TestCandidateIsNotResolvable::test_resolving_by_candidate_id_fails_for_every_intent",
+      "test_task17_excel_instrumentation_pg.py::TestCandidateIsNotResolvable::test_staged_artifact_never_becomes_a_representation_substrate",
+      "test_task17_excel_instrumentation_pg.py::TestDefinitionDeltaIsExactlyTemplateAndInstrumentation::test_instrumentation_payload_has_no_backward_reference",
+      "test_task17_excel_instrumentation_pg.py::TestDefinitionDeltaIsExactlyTemplateAndInstrumentation::test_only_two_definition_rows_were_added",
+      "test_task17_excel_instrumentation_pg.py::TestHarness::test_baseline_world_is_meaningful",
+      "test_task17_excel_instrumentation_pg.py::TestHarness::test_no_harness_errors"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task17_excel_instrumentation.py::TestIdentityReadback::test_row_uuids_are_pregenerated_literals[c24]",
+      "test_task17_excel_instrumentation.py::TestIdentityReadback::test_row_uuids_are_pregenerated_literals[k11]",
+      "test_task17_excel_instrumentation.py::TestVisibleEquivalenceOnRealTemplates::test_no_collection_errors"
+    ],
+    "added_files": [
+      "test_task17_excel_instrumentation.py",
+      "test_task17_excel_instrumentation_pg.py"
+    ],
+    "restored": true,
+    "seconds": 11.8
+  },
+  {
+    "id": "M18",
+    "side": "be",
+    "want": "test_task17_excel_instrumentation.py::TestVisibleEquivalenceOnRealTemplates::test_metadata_sheet_is_hidden_and_out_of_business_enumeration",
+    "why": "`_GT_SYNC` 变成可见 sheet ⇒ OO 标签栏与全部业务枚举都会多出一张审计师无法解释的表，可见 sheet 集合也不再等价（Requirement 6.17）",
+    "verdict": "RED",
+    "summary": "29 failed, 77 passed, 26 errors in 7.88s",
+    "added": [
+      "test_task17_excel_instrumentation.py::TestBusinessSheetExclusion::test_production_sheet_enumerator_excludes_metadata_sheet",
+      "test_task17_excel_instrumentation.py::TestBusinessSheetExclusion::test_univer_snapshot_excludes_metadata_sheet",
+      "test_task17_excel_instrumentation.py::TestIdentityReadback::test_gt_sync_has_no_runtime_binding_key",
+      "test_task17_excel_instrumentation.py::TestIdentityReadback::test_readback_rejects_dangling_table_part",
+      "test_task17_excel_instrumentation.py::TestIdentityReadback::test_readback_rejects_missing_defined_names",
+      "test_task17_excel_instrumentation.py::TestIdentityReadback::test_readback_rejects_missing_table",
+      "test_task17_excel_instrumentation.py::TestIdentityReadback::test_row_uuids_are_pregenerated_literals[c24]",
+      "test_task17_excel_instrumentation.py::TestIdentityReadback::test_row_uuids_are_pregenerated_literals[k11]",
+      "test_task17_excel_instrumentation.py::TestIdentityReadback::test_sheet_resolution_only_uses_the_probed_anchor[c24]",
+      "test_task17_excel_instrumentation.py::TestIdentityReadback::test_sheet_resolution_only_uses_the_probed_anchor[k11]",
+      "test_task17_excel_instrumentation.py::TestIdentityReadback::test_table_header_row_count_is_zero",
+      "test_task17_excel_instrumentation.py::TestRequirement615Dispositions::test_deleted_identity_column_is_detectable_and_fails_closed",
+      "test_task17_excel_instrumentation.py::TestRequirement615Dispositions::test_deleted_row_uuid_is_never_reused",
+      "test_task17_excel_instrumentation.py::TestRequirement615Dispositions::test_duplicate_uuid_from_copy_is_detectable",
+      "test_task17_excel_instrumentation.py::TestRequirement615Dispositions::test_new_row_without_uuid_is_detectable",
+      "test_task17_excel_instrumentation.py::TestVisibleEquivalenceOnRealTemplates::test_all_six_aspects_are_equivalent[c24]",
+      "test_task17_excel_instrumentation.py::TestVisibleEquivalenceOnRealTemplates::test_all_six_aspects_are_equivalent[k11]",
+      "test_task17_excel_instrumentation.py::TestVisibleEquivalenceOnRealTemplates::test_authority_templates_are_untouched",
+      "test_task17_excel_instrumentation.py::TestVisibleEquivalenceOnRealTemplates::test_chart_bearing_template_keeps_protected_parts_byte_identical",
+      "test_task17_excel_instrumentation.py::TestVisibleEquivalenceOnRealTemplates::test_equivalence_is_falsifiable",
+      "test_task17_excel_instrumentation.py::TestVisibleEquivalenceOnRealTemplates::test_metadata_sheet_is_hidden_and_out_of_business_enumeration",
+      "test_task17_excel_instrumentation.py::TestVisibleEquivalenceOnRealTemplates::test_no_collection_errors",
+      "test_task17_excel_instrumentation.py::TestVisibleEquivalenceOnRealTemplates::test_only_the_whitelisted_four_additions_appear[c24]",
+      "test_task17_excel_instrumentation.py::TestVisibleEquivalenceOnRealTemplates::test_only_the_whitelisted_four_additions_appear[k11]",
+      "test_task17_excel_instrumentation.py::TestVisibleEquivalenceOnRealTemplates::test_reinstrumenting_an_instrumented_artifact_is_rejected",
+      "test_task17_excel_instrumentation.py::TestVisibleEquivalenceOnRealTemplates::test_the_aspects_are_not_vacuously_equal",
+      "test_task17_excel_instrumentation_pg.py::TestAuthorityTemplatesAreReadOnly::test_templates_are_byte_identical_after_the_whole_run",
+      "test_task17_excel_instrumentation_pg.py::TestAwaitingContractIsTerminalForThisTask::test_candidate_state_is_awaiting_contract",
+      "test_task17_excel_instrumentation_pg.py::TestAwaitingContractIsTerminalForThisTask::test_contract_and_bundle_targets_are_null_not_forged",
+      "test_task17_excel_instrumentation_pg.py::TestAwaitingContractIsTerminalForThisTask::test_equivalence_and_rollback_evidence_are_recorded",
+      "test_task17_excel_instrumentation_pg.py::TestAwaitingContractIsTerminalForThisTask::test_finalize_is_rejected_and_says_contract_is_missing",
+      "test_task17_excel_instrumentation_pg.py::TestAwaitingContractIsTerminalForThisTask::test_frozen_children_are_the_two_this_task_may_publish",
+      "test_task17_excel_instrumentation_pg.py::TestCandidateArtifactIsIsolated::test_artifact_lives_in_the_candidate_namespace",
+      "test_task17_excel_instrumentation_pg.py::TestCandidateArtifactIsIsolated::test_artifact_row_is_candidate_kind_and_state",
+      "test_task17_excel_instrumentation_pg.py::TestCandidateArtifactIsIsolated::test_forbidden_methods_are_unreachable_on_a_real_repository",
+      "test_task17_excel_instrumentation_pg.py::TestCandidateArtifactIsIsolated::test_passthrough_still_works",
+      "test_task17_excel_instrumentation_pg.py::TestCandidateArtifactIsIsolated::test_rejected_calls_left_the_database_untouched",
+      "test_task17_excel_instrumentation_pg.py::TestCandidateChangesNothingCurrent::test_content_revision_is_unchanged",
+      "test_task17_excel_instrumentation_pg.py::TestCandidateChangesNothingCurrent::test_current_content_version_is_unchanged",
+      "test_task17_excel_instrumentation_pg.py::TestCandidateChangesNothingCurrent::test_entry_pointer_is_unchanged",
+      "test_task17_excel_instrumentation_pg.py::TestCandidateChangesNothingCurrent::test_exactly_one_candidate_was_registered",
+      "test_task17_excel_instrumentation_pg.py::TestCandidateChangesNothingCurrent::test_existing_rows_were_never_rewritten",
+      "test_task17_excel_instrumentation_pg.py::TestCandidateChangesNothingCurrent::test_no_new_representation_or_content_version",
+      "test_task17_excel_instrumentation_pg.py::TestCandidateChangesNothingCurrent::test_outcome_matches_the_database",
+      "test_task17_excel_instrumentation_pg.py::TestCandidateIsNotResolvable::test_all_ten_intents_are_declared",
+      "test_task17_excel_instrumentation_pg.py::TestCandidateIsNotResolvable::test_candidate_id_appears_nowhere_but_its_own_row",
+      "test_task17_excel_instrumentation_pg.py::TestCandidateIsNotResolvable::test_candidate_is_not_consumable_for_every_intent",
+      "test_task17_excel_instrumentation_pg.py::TestCandidateIsNotResolvable::test_candidate_is_registered_in_scope_index_only_as_candidate",
+      "test_task17_excel_instrumentation_pg.py::TestCandidateIsNotResolvable::test_current_resolution_still_returns_the_old_generation",
+      "test_task17_excel_instrumentation_pg.py::TestCandidateIsNotResolvable::test_resolving_by_candidate_id_fails_for_every_intent",
+      "test_task17_excel_instrumentation_pg.py::TestCandidateIsNotResolvable::test_staged_artifact_never_becomes_a_representation_substrate",
+      "test_task17_excel_instrumentation_pg.py::TestDefinitionDeltaIsExactlyTemplateAndInstrumentation::test_instrumentation_payload_has_no_backward_reference",
+      "test_task17_excel_instrumentation_pg.py::TestDefinitionDeltaIsExactlyTemplateAndInstrumentation::test_only_two_definition_rows_were_added",
+      "test_task17_excel_instrumentation_pg.py::TestHarness::test_baseline_world_is_meaningful",
+      "test_task17_excel_instrumentation_pg.py::TestHarness::test_no_harness_errors"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task17_excel_instrumentation.py::TestVisibleEquivalenceOnRealTemplates::test_metadata_sheet_is_hidden_and_out_of_business_enumeration",
+      "test_task17_excel_instrumentation.py::TestVisibleEquivalenceOnRealTemplates::test_no_collection_errors"
+    ],
+    "added_files": [
+      "test_task17_excel_instrumentation.py",
+      "test_task17_excel_instrumentation_pg.py"
+    ],
+    "restored": true,
+    "seconds": 11.2
+  },
+  {
+    "id": "M19",
+    "side": "be",
+    "want": "test_task17_excel_instrumentation.py::TestIdentityReadback::test_gt_sync_has_no_runtime_binding_key",
+    "why": "instrumentation 阶段就往 `_GT_SYNC` 写 bundle digest ⇒ contract / bundle / authority model 此刻根本不存在，写占位值会让 candidate 看起来已绑定 bundle。这条同时检验 `assert_no_runtime_binding` 的**调用点**是活的",
+    "verdict": "RED",
+    "summary": "30 failed, 76 passed, 26 errors in 7.75s",
+    "added": [
+      "test_task17_excel_instrumentation.py::TestBusinessSheetExclusion::test_production_sheet_enumerator_excludes_metadata_sheet",
+      "test_task17_excel_instrumentation.py::TestBusinessSheetExclusion::test_univer_snapshot_excludes_metadata_sheet",
+      "test_task17_excel_instrumentation.py::TestIdentityReadback::test_gt_sync_has_no_runtime_binding_key",
+      "test_task17_excel_instrumentation.py::TestIdentityReadback::test_readback_rejects_dangling_table_part",
+      "test_task17_excel_instrumentation.py::TestIdentityReadback::test_readback_rejects_missing_defined_names",
+      "test_task17_excel_instrumentation.py::TestIdentityReadback::test_readback_rejects_missing_table",
+      "test_task17_excel_instrumentation.py::TestIdentityReadback::test_row_uuids_are_pregenerated_literals[c24]",
+      "test_task17_excel_instrumentation.py::TestIdentityReadback::test_row_uuids_are_pregenerated_literals[k11]",
+      "test_task17_excel_instrumentation.py::TestIdentityReadback::test_sheet_resolution_only_uses_the_probed_anchor[c24]",
+      "test_task17_excel_instrumentation.py::TestIdentityReadback::test_sheet_resolution_only_uses_the_probed_anchor[k11]",
+      "test_task17_excel_instrumentation.py::TestIdentityReadback::test_table_header_row_count_is_zero",
+      "test_task17_excel_instrumentation.py::TestRequirement615Dispositions::test_deleted_identity_column_is_detectable_and_fails_closed",
+      "test_task17_excel_instrumentation.py::TestRequirement615Dispositions::test_deleted_row_uuid_is_never_reused",
+      "test_task17_excel_instrumentation.py::TestRequirement615Dispositions::test_duplicate_uuid_from_copy_is_detectable",
+      "test_task17_excel_instrumentation.py::TestRequirement615Dispositions::test_new_row_without_uuid_is_detectable",
+      "test_task17_excel_instrumentation.py::TestVisibleEquivalenceOnRealTemplates::test_all_six_aspects_are_equivalent[c24]",
+      "test_task17_excel_instrumentation.py::TestVisibleEquivalenceOnRealTemplates::test_all_six_aspects_are_equivalent[k11]",
+      "test_task17_excel_instrumentation.py::TestVisibleEquivalenceOnRealTemplates::test_authority_templates_are_untouched",
+      "test_task17_excel_instrumentation.py::TestVisibleEquivalenceOnRealTemplates::test_chart_bearing_template_keeps_protected_parts_byte_identical",
+      "test_task17_excel_instrumentation.py::TestVisibleEquivalenceOnRealTemplates::test_equivalence_is_falsifiable",
+      "test_task17_excel_instrumentation.py::TestVisibleEquivalenceOnRealTemplates::test_managed_row_range_outside_the_sheet_fails_closed",
+      "test_task17_excel_instrumentation.py::TestVisibleEquivalenceOnRealTemplates::test_metadata_sheet_is_hidden_and_out_of_business_enumeration",
+      "test_task17_excel_instrumentation.py::TestVisibleEquivalenceOnRealTemplates::test_no_collection_errors",
+      "test_task17_excel_instrumentation.py::TestVisibleEquivalenceOnRealTemplates::test_only_the_whitelisted_four_additions_appear[c24]",
+      "test_task17_excel_instrumentation.py::TestVisibleEquivalenceOnRealTemplates::test_only_the_whitelisted_four_additions_appear[k11]",
+      "test_task17_excel_instrumentation.py::TestVisibleEquivalenceOnRealTemplates::test_reinstrumenting_an_instrumented_artifact_is_rejected",
+      "test_task17_excel_instrumentation.py::TestVisibleEquivalenceOnRealTemplates::test_the_aspects_are_not_vacuously_equal",
+      "test_task17_excel_instrumentation_pg.py::TestAuthorityTemplatesAreReadOnly::test_templates_are_byte_identical_after_the_whole_run",
+      "test_task17_excel_instrumentation_pg.py::TestAwaitingContractIsTerminalForThisTask::test_candidate_state_is_awaiting_contract",
+      "test_task17_excel_instrumentation_pg.py::TestAwaitingContractIsTerminalForThisTask::test_contract_and_bundle_targets_are_null_not_forged",
+      "test_task17_excel_instrumentation_pg.py::TestAwaitingContractIsTerminalForThisTask::test_equivalence_and_rollback_evidence_are_recorded",
+      "test_task17_excel_instrumentation_pg.py::TestAwaitingContractIsTerminalForThisTask::test_finalize_is_rejected_and_says_contract_is_missing",
+      "test_task17_excel_instrumentation_pg.py::TestAwaitingContractIsTerminalForThisTask::test_frozen_children_are_the_two_this_task_may_publish",
+      "test_task17_excel_instrumentation_pg.py::TestCandidateArtifactIsIsolated::test_artifact_lives_in_the_candidate_namespace",
+      "test_task17_excel_instrumentation_pg.py::TestCandidateArtifactIsIsolated::test_artifact_row_is_candidate_kind_and_state",
+      "test_task17_excel_instrumentation_pg.py::TestCandidateArtifactIsIsolated::test_forbidden_methods_are_unreachable_on_a_real_repository",
+      "test_task17_excel_instrumentation_pg.py::TestCandidateArtifactIsIsolated::test_passthrough_still_works",
+      "test_task17_excel_instrumentation_pg.py::TestCandidateArtifactIsIsolated::test_rejected_calls_left_the_database_untouched",
+      "test_task17_excel_instrumentation_pg.py::TestCandidateChangesNothingCurrent::test_content_revision_is_unchanged",
+      "test_task17_excel_instrumentation_pg.py::TestCandidateChangesNothingCurrent::test_current_content_version_is_unchanged",
+      "test_task17_excel_instrumentation_pg.py::TestCandidateChangesNothingCurrent::test_entry_pointer_is_unchanged",
+      "test_task17_excel_instrumentation_pg.py::TestCandidateChangesNothingCurrent::test_exactly_one_candidate_was_registered",
+      "test_task17_excel_instrumentation_pg.py::TestCandidateChangesNothingCurrent::test_existing_rows_were_never_rewritten",
+      "test_task17_excel_instrumentation_pg.py::TestCandidateChangesNothingCurrent::test_no_new_representation_or_content_version",
+      "test_task17_excel_instrumentation_pg.py::TestCandidateChangesNothingCurrent::test_outcome_matches_the_database",
+      "test_task17_excel_instrumentation_pg.py::TestCandidateIsNotResolvable::test_all_ten_intents_are_declared",
+      "test_task17_excel_instrumentation_pg.py::TestCandidateIsNotResolvable::test_candidate_id_appears_nowhere_but_its_own_row",
+      "test_task17_excel_instrumentation_pg.py::TestCandidateIsNotResolvable::test_candidate_is_not_consumable_for_every_intent",
+      "test_task17_excel_instrumentation_pg.py::TestCandidateIsNotResolvable::test_candidate_is_registered_in_scope_index_only_as_candidate",
+      "test_task17_excel_instrumentation_pg.py::TestCandidateIsNotResolvable::test_current_resolution_still_returns_the_old_generation",
+      "test_task17_excel_instrumentation_pg.py::TestCandidateIsNotResolvable::test_resolving_by_candidate_id_fails_for_every_intent",
+      "test_task17_excel_instrumentation_pg.py::TestCandidateIsNotResolvable::test_staged_artifact_never_becomes_a_representation_substrate",
+      "test_task17_excel_instrumentation_pg.py::TestDefinitionDeltaIsExactlyTemplateAndInstrumentation::test_instrumentation_payload_has_no_backward_reference",
+      "test_task17_excel_instrumentation_pg.py::TestDefinitionDeltaIsExactlyTemplateAndInstrumentation::test_only_two_definition_rows_were_added",
+      "test_task17_excel_instrumentation_pg.py::TestHarness::test_baseline_world_is_meaningful",
+      "test_task17_excel_instrumentation_pg.py::TestHarness::test_no_harness_errors"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task17_excel_instrumentation.py::TestIdentityReadback::test_gt_sync_has_no_runtime_binding_key",
+      "test_task17_excel_instrumentation.py::TestVisibleEquivalenceOnRealTemplates::test_no_collection_errors"
+    ],
+    "added_files": [
+      "test_task17_excel_instrumentation.py",
+      "test_task17_excel_instrumentation_pg.py"
+    ],
+    "restored": true,
+    "seconds": 11.0
+  },
+  {
+    "id": "M20",
+    "side": "be",
+    "want": "test_task17_excel_instrumentation.py::TestVisibleEquivalenceOnRealTemplates::test_equivalence_is_falsifiable",
+    "why": "可见等价判定短路 ⇒ 破坏业务单元格的 instrumentation 照样进 candidate。Requirement 6.17 的六个 aspect 比对全部作废",
+    "verdict": "RED",
+    "summary": "1 failed, 131 passed in 35.71s",
+    "added": [
+      "test_task17_excel_instrumentation.py::TestVisibleEquivalenceOnRealTemplates::test_equivalence_is_falsifiable"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task17_excel_instrumentation.py::TestVisibleEquivalenceOnRealTemplates::test_equivalence_is_falsifiable"
+    ],
+    "added_files": [
+      "test_task17_excel_instrumentation.py"
+    ],
+    "restored": true,
+    "seconds": 39.3
+  },
+  {
+    "id": "M21",
+    "side": "be",
+    "want": "test_task17_excel_instrumentation.py::TestVisibleEquivalenceOnRealTemplates::test_reinstrumenting_an_instrumented_artifact_is_rejected",
+    "why": "已 instrumented 的 artifact 再注入一次 ⇒ 两套 defined name / 两个 Table / 两列 UUID，行身份出现二义，下游 extract 无法判定哪套是权威",
+    "verdict": "RED",
+    "summary": "1 failed, 131 passed in 34.06s",
+    "added": [
+      "test_task17_excel_instrumentation.py::TestVisibleEquivalenceOnRealTemplates::test_reinstrumenting_an_instrumented_artifact_is_rejected"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task17_excel_instrumentation.py::TestVisibleEquivalenceOnRealTemplates::test_reinstrumenting_an_instrumented_artifact_is_rejected"
+    ],
+    "added_files": [
+      "test_task17_excel_instrumentation.py"
+    ],
+    "restored": true,
+    "seconds": 37.3
+  },
+  {
+    "id": "M22",
+    "side": "be",
+    "want": "test_task17_excel_instrumentation.py::TestVisibleEquivalenceOnRealTemplates::test_managed_row_range_outside_the_sheet_fails_closed",
+    "why": "声明的受管行区间超出模板实际结构时不再报出「找不到第 N 行」，而是在 None 上崩成 AttributeError ⇒ 调用方的 fail-closed 分支接不住（Requirement 6.10 要求结构漂移在写入前失败并指出位置）",
+    "verdict": "RED",
+    "summary": "1 failed, 131 passed in 33.59s",
+    "added": [
+      "test_task17_excel_instrumentation.py::TestVisibleEquivalenceOnRealTemplates::test_managed_row_range_outside_the_sheet_fails_closed"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task17_excel_instrumentation.py::TestVisibleEquivalenceOnRealTemplates::test_managed_row_range_outside_the_sheet_fails_closed"
+    ],
+    "added_files": [
+      "test_task17_excel_instrumentation.py"
+    ],
+    "restored": true,
+    "seconds": 36.9
+  },
+  {
+    "id": "M23",
+    "side": "be",
+    "want": "test_task17_excel_instrumentation.py::TestIdentityReadback::test_sheet_resolution_only_uses_the_probed_anchor",
+    "why": "反读一旦传 `uuid_sheet_name`，`sheet_resolution_candidates` 里就多出 `sheet_name` 这条被 Task 5 证伪的路径（OO 允许用户改名）。判据是**结构**：生产反读结构上不可能退化到它，而不是「记得别传」",
+    "verdict": "RED",
+    "summary": "29 failed, 77 passed, 26 errors in 8.32s",
+    "added": [
+      "test_task17_excel_instrumentation.py::TestBusinessSheetExclusion::test_production_sheet_enumerator_excludes_metadata_sheet",
+      "test_task17_excel_instrumentation.py::TestBusinessSheetExclusion::test_univer_snapshot_excludes_metadata_sheet",
+      "test_task17_excel_instrumentation.py::TestIdentityReadback::test_gt_sync_has_no_runtime_binding_key",
+      "test_task17_excel_instrumentation.py::TestIdentityReadback::test_readback_rejects_dangling_table_part",
+      "test_task17_excel_instrumentation.py::TestIdentityReadback::test_readback_rejects_missing_defined_names",
+      "test_task17_excel_instrumentation.py::TestIdentityReadback::test_readback_rejects_missing_table",
+      "test_task17_excel_instrumentation.py::TestIdentityReadback::test_row_uuids_are_pregenerated_literals[c24]",
+      "test_task17_excel_instrumentation.py::TestIdentityReadback::test_row_uuids_are_pregenerated_literals[k11]",
+      "test_task17_excel_instrumentation.py::TestIdentityReadback::test_sheet_resolution_only_uses_the_probed_anchor[c24]",
+      "test_task17_excel_instrumentation.py::TestIdentityReadback::test_sheet_resolution_only_uses_the_probed_anchor[k11]",
+      "test_task17_excel_instrumentation.py::TestIdentityReadback::test_table_header_row_count_is_zero",
+      "test_task17_excel_instrumentation.py::TestRequirement615Dispositions::test_deleted_identity_column_is_detectable_and_fails_closed",
+      "test_task17_excel_instrumentation.py::TestRequirement615Dispositions::test_deleted_row_uuid_is_never_reused",
+      "test_task17_excel_instrumentation.py::TestRequirement615Dispositions::test_duplicate_uuid_from_copy_is_detectable",
+      "test_task17_excel_instrumentation.py::TestRequirement615Dispositions::test_new_row_without_uuid_is_detectable",
+      "test_task17_excel_instrumentation.py::TestVisibleEquivalenceOnRealTemplates::test_all_six_aspects_are_equivalent[c24]",
+      "test_task17_excel_instrumentation.py::TestVisibleEquivalenceOnRealTemplates::test_all_six_aspects_are_equivalent[k11]",
+      "test_task17_excel_instrumentation.py::TestVisibleEquivalenceOnRealTemplates::test_authority_templates_are_untouched",
+      "test_task17_excel_instrumentation.py::TestVisibleEquivalenceOnRealTemplates::test_chart_bearing_template_keeps_protected_parts_byte_identical",
+      "test_task17_excel_instrumentation.py::TestVisibleEquivalenceOnRealTemplates::test_equivalence_is_falsifiable",
+      "test_task17_excel_instrumentation.py::TestVisibleEquivalenceOnRealTemplates::test_metadata_sheet_is_hidden_and_out_of_business_enumeration",
+      "test_task17_excel_instrumentation.py::TestVisibleEquivalenceOnRealTemplates::test_no_collection_errors",
+      "test_task17_excel_instrumentation.py::TestVisibleEquivalenceOnRealTemplates::test_only_the_whitelisted_four_additions_appear[c24]",
+      "test_task17_excel_instrumentation.py::TestVisibleEquivalenceOnRealTemplates::test_only_the_whitelisted_four_additions_appear[k11]",
+      "test_task17_excel_instrumentation.py::TestVisibleEquivalenceOnRealTemplates::test_reinstrumenting_an_instrumented_artifact_is_rejected",
+      "test_task17_excel_instrumentation.py::TestVisibleEquivalenceOnRealTemplates::test_the_aspects_are_not_vacuously_equal",
+      "test_task17_excel_instrumentation_pg.py::TestAuthorityTemplatesAreReadOnly::test_templates_are_byte_identical_after_the_whole_run",
+      "test_task17_excel_instrumentation_pg.py::TestAwaitingContractIsTerminalForThisTask::test_candidate_state_is_awaiting_contract",
+      "test_task17_excel_instrumentation_pg.py::TestAwaitingContractIsTerminalForThisTask::test_contract_and_bundle_targets_are_null_not_forged",
+      "test_task17_excel_instrumentation_pg.py::TestAwaitingContractIsTerminalForThisTask::test_equivalence_and_rollback_evidence_are_recorded",
+      "test_task17_excel_instrumentation_pg.py::TestAwaitingContractIsTerminalForThisTask::test_finalize_is_rejected_and_says_contract_is_missing",
+      "test_task17_excel_instrumentation_pg.py::TestAwaitingContractIsTerminalForThisTask::test_frozen_children_are_the_two_this_task_may_publish",
+      "test_task17_excel_instrumentation_pg.py::TestCandidateArtifactIsIsolated::test_artifact_lives_in_the_candidate_namespace",
+      "test_task17_excel_instrumentation_pg.py::TestCandidateArtifactIsIsolated::test_artifact_row_is_candidate_kind_and_state",
+      "test_task17_excel_instrumentation_pg.py::TestCandidateArtifactIsIsolated::test_forbidden_methods_are_unreachable_on_a_real_repository",
+      "test_task17_excel_instrumentation_pg.py::TestCandidateArtifactIsIsolated::test_passthrough_still_works",
+      "test_task17_excel_instrumentation_pg.py::TestCandidateArtifactIsIsolated::test_rejected_calls_left_the_database_untouched",
+      "test_task17_excel_instrumentation_pg.py::TestCandidateChangesNothingCurrent::test_content_revision_is_unchanged",
+      "test_task17_excel_instrumentation_pg.py::TestCandidateChangesNothingCurrent::test_current_content_version_is_unchanged",
+      "test_task17_excel_instrumentation_pg.py::TestCandidateChangesNothingCurrent::test_entry_pointer_is_unchanged",
+      "test_task17_excel_instrumentation_pg.py::TestCandidateChangesNothingCurrent::test_exactly_one_candidate_was_registered",
+      "test_task17_excel_instrumentation_pg.py::TestCandidateChangesNothingCurrent::test_existing_rows_were_never_rewritten",
+      "test_task17_excel_instrumentation_pg.py::TestCandidateChangesNothingCurrent::test_no_new_representation_or_content_version",
+      "test_task17_excel_instrumentation_pg.py::TestCandidateChangesNothingCurrent::test_outcome_matches_the_database",
+      "test_task17_excel_instrumentation_pg.py::TestCandidateIsNotResolvable::test_all_ten_intents_are_declared",
+      "test_task17_excel_instrumentation_pg.py::TestCandidateIsNotResolvable::test_candidate_id_appears_nowhere_but_its_own_row",
+      "test_task17_excel_instrumentation_pg.py::TestCandidateIsNotResolvable::test_candidate_is_not_consumable_for_every_intent",
+      "test_task17_excel_instrumentation_pg.py::TestCandidateIsNotResolvable::test_candidate_is_registered_in_scope_index_only_as_candidate",
+      "test_task17_excel_instrumentation_pg.py::TestCandidateIsNotResolvable::test_current_resolution_still_returns_the_old_generation",
+      "test_task17_excel_instrumentation_pg.py::TestCandidateIsNotResolvable::test_resolving_by_candidate_id_fails_for_every_intent",
+      "test_task17_excel_instrumentation_pg.py::TestCandidateIsNotResolvable::test_staged_artifact_never_becomes_a_representation_substrate",
+      "test_task17_excel_instrumentation_pg.py::TestDefinitionDeltaIsExactlyTemplateAndInstrumentation::test_instrumentation_payload_has_no_backward_reference",
+      "test_task17_excel_instrumentation_pg.py::TestDefinitionDeltaIsExactlyTemplateAndInstrumentation::test_only_two_definition_rows_were_added",
+      "test_task17_excel_instrumentation_pg.py::TestHarness::test_baseline_world_is_meaningful",
+      "test_task17_excel_instrumentation_pg.py::TestHarness::test_no_harness_errors"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task17_excel_instrumentation.py::TestIdentityReadback::test_sheet_resolution_only_uses_the_probed_anchor[c24]",
+      "test_task17_excel_instrumentation.py::TestIdentityReadback::test_sheet_resolution_only_uses_the_probed_anchor[k11]"
+    ],
+    "added_files": [
+      "test_task17_excel_instrumentation.py",
+      "test_task17_excel_instrumentation_pg.py"
+    ],
+    "restored": true,
+    "seconds": 11.6
+  },
+  {
+    "id": "M24",
+    "side": "be",
+    "want": "test_task17_excel_instrumentation.py::TestRequirement615Dispositions::test_deleted_identity_column_is_detectable_and_fails_closed",
+    "why": "「用户删掉整列 UUID」会掉进下一条锚点分支，被报成 ForbiddenAnchorError（锚点用错）⇒ 错误原因指错地方，真正的锚点误用分支变得不可分辨。这检验的是**判据顺序**：语义分类在前、锚点校验在后",
+    "verdict": "RED",
+    "summary": "1 failed, 131 passed in 35.10s",
+    "added": [
+      "test_task17_excel_instrumentation.py::TestRequirement615Dispositions::test_deleted_identity_column_is_detectable_and_fails_closed"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task17_excel_instrumentation.py::TestRequirement615Dispositions::test_deleted_identity_column_is_detectable_and_fails_closed"
+    ],
+    "added_files": [
+      "test_task17_excel_instrumentation.py"
+    ],
+    "restored": true,
+    "seconds": 38.5
+  },
+  {
+    "id": "M25",
+    "side": "be",
+    "want": "test_task17_excel_instrumentation.py::TestIdentityReadback::test_readback_rejects_dangling_table_part",
+    "why": "`identity_inventory` 采集失败时异常穿透 ⇒ 调用方按「未知异常」处理，而不是「identity 反读失败」。fail-open 的镜像形态：结构损坏被读成别的原因",
+    "verdict": "RED",
+    "summary": "1 failed, 131 passed in 35.12s",
+    "added": [
+      "test_task17_excel_instrumentation.py::TestIdentityReadback::test_readback_rejects_dangling_table_part"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task17_excel_instrumentation.py::TestIdentityReadback::test_readback_rejects_dangling_table_part"
+    ],
+    "added_files": [
+      "test_task17_excel_instrumentation.py"
+    ],
+    "restored": true,
+    "seconds": 38.4
+  },
+  {
+    "id": "M26",
+    "side": "be",
+    "want": "test_task17_excel_instrumentation.py::TestBusinessSheetExclusion::test_production_sheet_enumerator_excludes_metadata_sheet",
+    "why": "`list_sheet_names` 是模板 diff / 程序表抽取 / 审定表抽取 / 细则引擎 / 通用处理器 / 裁决导出六处业务枚举的共同入口。落在 **calamine** 分支上是因为本机`python_calamine` 已安装、生产实际走它；只改 openpyxl 兜底分支会假 GREEN",
+    "verdict": "RED",
+    "summary": "1 failed, 131 passed in 35.22s",
+    "added": [
+      "test_task17_excel_instrumentation.py::TestBusinessSheetExclusion::test_production_sheet_enumerator_excludes_metadata_sheet"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task17_excel_instrumentation.py::TestBusinessSheetExclusion::test_production_sheet_enumerator_excludes_metadata_sheet"
+    ],
+    "added_files": [
+      "test_task17_excel_instrumentation.py"
+    ],
+    "restored": true,
+    "seconds": 38.8
+  },
+  {
+    "id": "M27",
+    "side": "be",
+    "want": "test_task17_excel_instrumentation.py::TestBusinessSheetExclusion::test_univer_snapshot_excludes_metadata_sheet",
+    "why": "Univer 快照逐 sheet 转换时不再排除 ⇒ 编辑器标签栏多出 `_GT_SYNC`。OO 自己不显示隐藏 sheet，但平台自建的 Univer 快照会",
+    "verdict": "RED",
+    "summary": "1 failed, 131 passed in 34.96s",
+    "added": [
+      "test_task17_excel_instrumentation.py::TestBusinessSheetExclusion::test_univer_snapshot_excludes_metadata_sheet"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task17_excel_instrumentation.py::TestBusinessSheetExclusion::test_univer_snapshot_excludes_metadata_sheet"
+    ],
+    "added_files": [
+      "test_task17_excel_instrumentation.py"
+    ],
+    "restored": true,
+    "seconds": 39.2
+  },
+  {
+    "id": "M28",
+    "side": "be",
+    "want": "test_task17_excel_instrumentation.py::TestBusinessSheetExclusion::test_offline_import_meta_sheet_is_not_swept_up",
+    "why": "排除名单**越界**收进离线导入自有的 `_meta_` ⇒ `wp_offline_import_service` / `note_offline_import_service` 的「枚举不到 `_meta_` 就拒绝导入」前置全线失效。范围判据必须双向可 falsify：只测「`_GT_SYNC` 被排除」的话顺手扩张不会被发现",
+    "verdict": "RED",
+    "summary": "2 failed, 130 passed in 35.10s",
+    "added": [
+      "test_task17_excel_instrumentation.py::TestBusinessSheetExclusion::test_offline_import_meta_sheet_is_not_swept_up",
+      "test_task17_excel_instrumentation.py::TestBusinessSheetExclusion::test_policy_reuses_the_single_source_sheet_name"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task17_excel_instrumentation.py::TestBusinessSheetExclusion::test_offline_import_meta_sheet_is_not_swept_up",
+      "test_task17_excel_instrumentation.py::TestBusinessSheetExclusion::test_policy_reuses_the_single_source_sheet_name"
+    ],
+    "added_files": [
+      "test_task17_excel_instrumentation.py"
+    ],
+    "restored": true,
+    "seconds": 39.3
+  },
+  {
+    "id": "M29",
+    "side": "be",
+    "want": "test_task17_excel_instrumentation.py::TestBusinessSheetExclusion::test_exclusion_preserves_order",
+    "why": "过滤时重排序 ⇒ 多处业务代码按「第一个 sheet」取默认表（`read_sheet_values(sheet_name=None)`），静默换表且不报错",
+    "verdict": "WRONG-TEST",
+    "summary": "2 failed, 130 passed in 34.35s",
+    "added": [
+      "test_task17_excel_instrumentation.py::TestBusinessSheetExclusion::test_production_sheet_enumerator_excludes_metadata_sheet",
+      "test_task17_excel_instrumentation.py::TestBusinessSheetExclusion::test_univer_snapshot_excludes_metadata_sheet"
+    ],
+    "gone": [],
+    "hit": [],
+    "added_files": [
+      "test_task17_excel_instrumentation.py"
+    ],
+    "restored": true,
+    "seconds": 38.5
+  },
+  {
+    "id": "M30",
+    "side": "be",
+    "want": "test_task17_excel_instrumentation.py::TestCandidateOnlyRepository::test_forbidden_set_covers_representation_pointer_finalize_and_revision",
+    "why": "`create_representation` 从禁用面漏出 ⇒ 本任务可以直接发布 published representation，Property 67 的「先 candidate」承诺失去可执行判据",
+    "verdict": "RED",
+    "summary": "4 failed, 128 passed in 35.12s",
+    "added": [
+      "test_task17_excel_instrumentation.py::TestCandidateOnlyRepository::test_each_forbidden_method_is_unreachable[create_representation]",
+      "test_task17_excel_instrumentation.py::TestCandidateOnlyRepository::test_forbidden_set_covers_representation_pointer_finalize_and_revision",
+      "test_task17_excel_instrumentation.py::TestCandidateOnlyRepository::test_upgrader_wraps_a_bare_repository_unconditionally",
+      "test_task17_excel_instrumentation_pg.py::TestCandidateArtifactIsIsolated::test_forbidden_methods_are_unreachable_on_a_real_repository"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task17_excel_instrumentation.py::TestCandidateOnlyRepository::test_forbidden_set_covers_representation_pointer_finalize_and_revision",
+      "test_task17_excel_instrumentation_pg.py::TestCandidateArtifactIsIsolated::test_forbidden_methods_are_unreachable_on_a_real_repository"
+    ],
+    "added_files": [
+      "test_task17_excel_instrumentation.py",
+      "test_task17_excel_instrumentation_pg.py"
+    ],
+    "restored": true,
+    "seconds": 38.5
+  },
+  {
+    "id": "M31",
+    "side": "be",
+    "want": "test_task17_excel_instrumentation.py::TestCandidateOnlyRepository::test_forbidden_set_covers_representation_pointer_finalize_and_revision",
+    "why": "revision 域三件套不再被禁 ⇒ 纯 instrumentation 可以递增 content revision（Requirement 2.1 明文禁止）。取并集而不是手抄清单，正是为了让 Task 15 那边新增 writer 时这里不会漏；短路它即回到手抄语义",
+    "verdict": "RED",
+    "summary": "4 failed, 128 passed in 34.83s",
+    "added": [
+      "test_task17_excel_instrumentation.py::TestCandidateOnlyRepository::test_each_forbidden_method_is_unreachable[bump_content_revision]",
+      "test_task17_excel_instrumentation.py::TestCandidateOnlyRepository::test_each_forbidden_method_is_unreachable[create_content_version]",
+      "test_task17_excel_instrumentation.py::TestCandidateOnlyRepository::test_each_forbidden_method_is_unreachable[set_current_content_version]",
+      "test_task17_excel_instrumentation.py::TestCandidateOnlyRepository::test_forbidden_set_covers_representation_pointer_finalize_and_revision"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task17_excel_instrumentation.py::TestCandidateOnlyRepository::test_forbidden_set_covers_representation_pointer_finalize_and_revision"
+    ],
+    "added_files": [
+      "test_task17_excel_instrumentation.py"
+    ],
+    "restored": true,
+    "seconds": 38.2
+  },
+  {
+    "id": "M32",
+    "side": "be",
+    "want": "test_task17_excel_instrumentation.py::TestCandidateOnlyRepository::test_each_forbidden_method_is_unreachable",
+    "why": "门面退化成纯透传 ⇒ 「不得发布 representation / 切 pointer / finalize / 推进 revision」四条否定式承诺同时失去判据。禁令做成门面而不是「本模块没写那段代码」的全部意义就在这里",
+    "verdict": "RED",
+    "summary": "8 failed, 124 passed in 35.07s",
+    "added": [
+      "test_task17_excel_instrumentation.py::TestCandidateOnlyRepository::test_each_forbidden_method_is_unreachable[bump_content_revision]",
+      "test_task17_excel_instrumentation.py::TestCandidateOnlyRepository::test_each_forbidden_method_is_unreachable[create_content_version]",
+      "test_task17_excel_instrumentation.py::TestCandidateOnlyRepository::test_each_forbidden_method_is_unreachable[create_representation]",
+      "test_task17_excel_instrumentation.py::TestCandidateOnlyRepository::test_each_forbidden_method_is_unreachable[finalize_candidate]",
+      "test_task17_excel_instrumentation.py::TestCandidateOnlyRepository::test_each_forbidden_method_is_unreachable[set_current_content_version]",
+      "test_task17_excel_instrumentation.py::TestCandidateOnlyRepository::test_each_forbidden_method_is_unreachable[set_entry_pointer]",
+      "test_task17_excel_instrumentation.py::TestCandidateOnlyRepository::test_upgrader_wraps_a_bare_repository_unconditionally",
+      "test_task17_excel_instrumentation_pg.py::TestCandidateArtifactIsIsolated::test_forbidden_methods_are_unreachable_on_a_real_repository"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task17_excel_instrumentation.py::TestCandidateOnlyRepository::test_each_forbidden_method_is_unreachable[bump_content_revision]",
+      "test_task17_excel_instrumentation.py::TestCandidateOnlyRepository::test_each_forbidden_method_is_unreachable[create_content_version]",
+      "test_task17_excel_instrumentation.py::TestCandidateOnlyRepository::test_each_forbidden_method_is_unreachable[create_representation]",
+      "test_task17_excel_instrumentation.py::TestCandidateOnlyRepository::test_each_forbidden_method_is_unreachable[finalize_candidate]",
+      "test_task17_excel_instrumentation.py::TestCandidateOnlyRepository::test_each_forbidden_method_is_unreachable[set_current_content_version]",
+      "test_task17_excel_instrumentation.py::TestCandidateOnlyRepository::test_each_forbidden_method_is_unreachable[set_entry_pointer]",
+      "test_task17_excel_instrumentation_pg.py::TestCandidateArtifactIsIsolated::test_forbidden_methods_are_unreachable_on_a_real_repository"
+    ],
+    "added_files": [
+      "test_task17_excel_instrumentation.py",
+      "test_task17_excel_instrumentation_pg.py"
+    ],
+    "restored": true,
+    "seconds": 38.6
+  },
+  {
+    "id": "M33",
+    "side": "be",
+    "want": "test_task17_excel_instrumentation.py::TestCandidateOnlyRepository::test_upgrader_wraps_a_bare_repository_unconditionally",
+    "why": "调用方传裸 repository 时 upgrader 直接拿到全部写入面 ⇒ 门面形同虚设，而单测若只用已包装的门面则完全看不出来",
+    "verdict": "RED",
+    "summary": "2 failed, 130 passed in 35.08s",
+    "added": [
+      "test_task17_excel_instrumentation.py::TestCandidateOnlyRepository::test_upgrader_wraps_a_bare_repository_unconditionally",
+      "test_task17_excel_instrumentation_pg.py::TestCandidateArtifactIsIsolated::test_forbidden_methods_are_unreachable_on_a_real_repository"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task17_excel_instrumentation.py::TestCandidateOnlyRepository::test_upgrader_wraps_a_bare_repository_unconditionally"
+    ],
+    "added_files": [
+      "test_task17_excel_instrumentation.py",
+      "test_task17_excel_instrumentation_pg.py"
+    ],
+    "restored": true,
+    "seconds": 38.5
+  },
+  {
+    "id": "M34",
+    "side": "be",
+    "want": "test_task17_excel_instrumentation.py::TestCandidateNonCurrencyAssertions::test_revision_advance_only",
+    "why": "四条非当前性断言逐条短路，用来证明每个合取项都有只违反它自己的场景（Task 15 复盘第 2 条）。这条对应 Requirement 2.1 的 content revision",
+    "verdict": "RED",
+    "summary": "1 failed, 131 passed in 34.40s",
+    "added": [
+      "test_task17_excel_instrumentation.py::TestCandidateNonCurrencyAssertions::test_revision_advance_only"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task17_excel_instrumentation.py::TestCandidateNonCurrencyAssertions::test_revision_advance_only"
+    ],
+    "added_files": [
+      "test_task17_excel_instrumentation.py"
+    ],
+    "restored": true,
+    "seconds": 37.8
+  },
+  {
+    "id": "M35",
+    "side": "be",
+    "want": "test_task17_excel_instrumentation.py::TestCandidateNonCurrencyAssertions::test_pointer_move_only",
+    "why": "candidate 阶段切了 entry pointer 也不报 ⇒ candidate 直接变成 current，Property 67 的「不得暴露为 current」失去判据",
+    "verdict": "RED",
+    "summary": "1 failed, 131 passed in 34.72s",
+    "added": [
+      "test_task17_excel_instrumentation.py::TestCandidateNonCurrencyAssertions::test_pointer_move_only"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task17_excel_instrumentation.py::TestCandidateNonCurrencyAssertions::test_pointer_move_only"
+    ],
+    "added_files": [
+      "test_task17_excel_instrumentation.py"
+    ],
+    "restored": true,
+    "seconds": 38.2
+  },
+  {
+    "id": "M36",
+    "side": "be",
+    "want": "test_task17_excel_instrumentation.py::TestCandidateNonCurrencyAssertions::test_representation_created_only",
+    "why": "新增了 representation 行也算通过 ⇒ 越过 `template → instrumentation → contract → bundle → representation` 的最后一段",
+    "verdict": "RED",
+    "summary": "1 failed, 131 passed in 34.93s",
+    "added": [
+      "test_task17_excel_instrumentation.py::TestCandidateNonCurrencyAssertions::test_representation_created_only"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task17_excel_instrumentation.py::TestCandidateNonCurrencyAssertions::test_representation_created_only"
+    ],
+    "added_files": [
+      "test_task17_excel_instrumentation.py"
+    ],
+    "restored": true,
+    "seconds": 38.3
+  },
+  {
+    "id": "M37",
+    "side": "be",
+    "want": "test_task17_excel_instrumentation.py::TestCandidateNonCurrencyAssertions::test_forbidden_state_only",
+    "why": "`ready` / `finalized` 也被当成本阶段合法状态 ⇒ 缺 approved bundle 与 compatibility 校验的 candidate 会显得可 finalize（Requirement 6.18）",
+    "verdict": "RED",
+    "summary": "3 failed, 129 passed in 34.75s",
+    "added": [
+      "test_task17_excel_instrumentation.py::TestCandidateNonCurrencyAssertions::test_forbidden_state_only[finalized]",
+      "test_task17_excel_instrumentation.py::TestCandidateNonCurrencyAssertions::test_forbidden_state_only[ready]",
+      "test_task17_excel_instrumentation.py::TestCandidateNonCurrencyAssertions::test_forbidden_state_only[rejected]"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task17_excel_instrumentation.py::TestCandidateNonCurrencyAssertions::test_forbidden_state_only[finalized]",
+      "test_task17_excel_instrumentation.py::TestCandidateNonCurrencyAssertions::test_forbidden_state_only[ready]",
+      "test_task17_excel_instrumentation.py::TestCandidateNonCurrencyAssertions::test_forbidden_state_only[rejected]"
+    ],
+    "added_files": [
+      "test_task17_excel_instrumentation.py"
+    ],
+    "restored": true,
+    "seconds": 38.1
+  },
+  {
+    "id": "M38",
+    "side": "be",
+    "want": "test_task17_excel_instrumentation.py::TestCandidateNonCurrencyAssertions::test_forged_contract_target_only",
+    "why": "candidate 带上 per-entry contract target ⇒ 本任务伪造了只能由 Task 36 与 Tasks 40–57 人工审核发布的 approved child",
+    "verdict": "RED",
+    "summary": "1 failed, 131 passed in 34.67s",
+    "added": [
+      "test_task17_excel_instrumentation.py::TestCandidateNonCurrencyAssertions::test_forged_contract_target_only"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task17_excel_instrumentation.py::TestCandidateNonCurrencyAssertions::test_forged_contract_target_only"
+    ],
+    "added_files": [
+      "test_task17_excel_instrumentation.py"
+    ],
+    "restored": true,
+    "seconds": 38.0
+  },
+  {
+    "id": "M39",
+    "side": "be",
+    "want": "test_task17_excel_instrumentation.py::TestCandidateNonCurrencyAssertions::test_forged_bundle_target_only",
+    "why": "candidate 带上 definition bundle target ⇒ 伪造 approved bundle，`RepresentationService.finalize_candidate()` 的前置校验被绕开",
+    "verdict": "RED",
+    "summary": "1 failed, 131 passed in 34.87s",
+    "added": [
+      "test_task17_excel_instrumentation.py::TestCandidateNonCurrencyAssertions::test_forged_bundle_target_only"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task17_excel_instrumentation.py::TestCandidateNonCurrencyAssertions::test_forged_bundle_target_only"
+    ],
+    "added_files": [
+      "test_task17_excel_instrumentation.py"
+    ],
+    "restored": true,
+    "seconds": 38.2
+  },
+  {
+    "id": "M40",
+    "side": "be",
+    "want": "test_task17_excel_instrumentation_pg.py::TestAwaitingContractIsTerminalForThisTask::test_candidate_state_is_awaiting_contract",
+    "why": "缺 approved contract/bundle 却把 candidate 写成 `ready` ⇒ 下游会认为 compatibility 已通过、可直接 finalize。`awaiting_contract` 是本任务的终态",
+    "verdict": "RED",
+    "summary": "29 failed, 103 passed in 34.46s",
+    "added": [
+      "test_task17_excel_instrumentation_pg.py::TestAuthorityTemplatesAreReadOnly::test_templates_are_byte_identical_after_the_whole_run",
+      "test_task17_excel_instrumentation_pg.py::TestAwaitingContractIsTerminalForThisTask::test_candidate_state_is_awaiting_contract",
+      "test_task17_excel_instrumentation_pg.py::TestAwaitingContractIsTerminalForThisTask::test_contract_and_bundle_targets_are_null_not_forged",
+      "test_task17_excel_instrumentation_pg.py::TestAwaitingContractIsTerminalForThisTask::test_equivalence_and_rollback_evidence_are_recorded",
+      "test_task17_excel_instrumentation_pg.py::TestAwaitingContractIsTerminalForThisTask::test_finalize_is_rejected_and_says_contract_is_missing",
+      "test_task17_excel_instrumentation_pg.py::TestAwaitingContractIsTerminalForThisTask::test_frozen_children_are_the_two_this_task_may_publish",
+      "test_task17_excel_instrumentation_pg.py::TestCandidateArtifactIsIsolated::test_artifact_lives_in_the_candidate_namespace",
+      "test_task17_excel_instrumentation_pg.py::TestCandidateArtifactIsIsolated::test_artifact_row_is_candidate_kind_and_state",
+      "test_task17_excel_instrumentation_pg.py::TestCandidateArtifactIsIsolated::test_forbidden_methods_are_unreachable_on_a_real_repository",
+      "test_task17_excel_instrumentation_pg.py::TestCandidateArtifactIsIsolated::test_passthrough_still_works",
+      "test_task17_excel_instrumentation_pg.py::TestCandidateArtifactIsIsolated::test_rejected_calls_left_the_database_untouched",
+      "test_task17_excel_instrumentation_pg.py::TestCandidateChangesNothingCurrent::test_content_revision_is_unchanged",
+      "test_task17_excel_instrumentation_pg.py::TestCandidateChangesNothingCurrent::test_current_content_version_is_unchanged",
+      "test_task17_excel_instrumentation_pg.py::TestCandidateChangesNothingCurrent::test_entry_pointer_is_unchanged",
+      "test_task17_excel_instrumentation_pg.py::TestCandidateChangesNothingCurrent::test_exactly_one_candidate_was_registered",
+      "test_task17_excel_instrumentation_pg.py::TestCandidateChangesNothingCurrent::test_existing_rows_were_never_rewritten",
+      "test_task17_excel_instrumentation_pg.py::TestCandidateChangesNothingCurrent::test_no_new_representation_or_content_version",
+      "test_task17_excel_instrumentation_pg.py::TestCandidateChangesNothingCurrent::test_outcome_matches_the_database",
+      "test_task17_excel_instrumentation_pg.py::TestCandidateIsNotResolvable::test_all_ten_intents_are_declared",
+      "test_task17_excel_instrumentation_pg.py::TestCandidateIsNotResolvable::test_candidate_id_appears_nowhere_but_its_own_row",
+      "test_task17_excel_instrumentation_pg.py::TestCandidateIsNotResolvable::test_candidate_is_not_consumable_for_every_intent",
+      "test_task17_excel_instrumentation_pg.py::TestCandidateIsNotResolvable::test_candidate_is_registered_in_scope_index_only_as_candidate",
+      "test_task17_excel_instrumentation_pg.py::TestCandidateIsNotResolvable::test_current_resolution_still_returns_the_old_generation",
+      "test_task17_excel_instrumentation_pg.py::TestCandidateIsNotResolvable::test_resolving_by_candidate_id_fails_for_every_intent",
+      "test_task17_excel_instrumentation_pg.py::TestCandidateIsNotResolvable::test_staged_artifact_never_becomes_a_representation_substrate",
+      "test_task17_excel_instrumentation_pg.py::TestDefinitionDeltaIsExactlyTemplateAndInstrumentation::test_instrumentation_payload_has_no_backward_reference",
+      "test_task17_excel_instrumentation_pg.py::TestDefinitionDeltaIsExactlyTemplateAndInstrumentation::test_only_two_definition_rows_were_added",
+      "test_task17_excel_instrumentation_pg.py::TestHarness::test_baseline_world_is_meaningful",
+      "test_task17_excel_instrumentation_pg.py::TestHarness::test_no_harness_errors"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task17_excel_instrumentation_pg.py::TestAwaitingContractIsTerminalForThisTask::test_candidate_state_is_awaiting_contract",
+      "test_task17_excel_instrumentation_pg.py::TestHarness::test_no_harness_errors"
+    ],
+    "added_files": [
+      "test_task17_excel_instrumentation_pg.py"
+    ],
+    "restored": true,
+    "seconds": 37.9
+  },
+  {
+    "id": "M41",
+    "side": "be",
+    "want": "test_task17_excel_instrumentation_pg.py::TestHarness::test_no_harness_errors",
+    "why": "往 candidate 行真写一个 target contract（拿 template definition 冒充）⇒ 落库形态上就伪造了 approved child。判据落在**数据库里的那一行**，不是 outcome 自报值",
+    "verdict": "RED",
+    "summary": "2 failed, 130 passed in 35.00s",
+    "added": [
+      "test_task17_excel_instrumentation_pg.py::TestAwaitingContractIsTerminalForThisTask::test_contract_and_bundle_targets_are_null_not_forged",
+      "test_task17_excel_instrumentation_pg.py::TestAwaitingContractIsTerminalForThisTask::test_finalize_is_rejected_and_says_contract_is_missing"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task17_excel_instrumentation_pg.py::TestAwaitingContractIsTerminalForThisTask::test_contract_and_bundle_targets_are_null_not_forged"
+    ],
+    "added_files": [
+      "test_task17_excel_instrumentation_pg.py"
+    ],
+    "restored": true,
+    "seconds": 38.3
+  },
+  {
+    "id": "M42",
+    "side": "be",
+    "want": "test_task17_excel_instrumentation_pg.py::TestCandidateChangesNothingCurrent::test_outcome_matches_the_database",
+    "why": "pointer 快照恒查不到行 ⇒ before/after 都是 None、`pointer_unchanged` 恒真，「我没动 pointer」变成空集恒真。这检验的是 `_snapshot` 真的量到了那一行（假绿第③源：把空值当基线锁死）",
+    "verdict": "RED",
+    "summary": "1 failed, 131 passed in 33.76s",
+    "added": [
+      "test_task17_excel_instrumentation_pg.py::TestCandidateChangesNothingCurrent::test_outcome_matches_the_database"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task17_excel_instrumentation_pg.py::TestCandidateChangesNothingCurrent::test_outcome_matches_the_database"
+    ],
+    "added_files": [
+      "test_task17_excel_instrumentation_pg.py"
+    ],
+    "restored": true,
+    "seconds": 37.4
+  }
+]

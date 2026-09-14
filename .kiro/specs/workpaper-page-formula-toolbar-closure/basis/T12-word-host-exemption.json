@@ -1,0 +1,12 @@
+{
+  "host": "word",
+  "status": "exempted",
+  "owner": "workpaper-page-formula-toolbar-closure",
+  "reasonCode": "word_host_not_reachable_in_ci",
+  "expiresAt": "2026-12-31T23:59:59Z",
+  "sourceDigest": "sha256:pending-word-playwright-harness",
+  "denominator": true,
+  "notes": "SUPERSEDED by T14 live Word (A26-1). Kept for history; do not treat as active blocker.",
+  "recordedAt": "2026-09-08T00:00:00Z",
+  "supersededBy": "T14-playwright host-matrix word=A26-1 reachable"
+}

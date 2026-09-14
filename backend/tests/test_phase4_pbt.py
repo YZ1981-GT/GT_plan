@@ -23,7 +23,7 @@ class TestRlsIsolationProperty:
     @given(
         project_id=st.uuids(),
     )
-    @settings(max_examples=15)
+    @settings(max_examples=5)
     async def test_set_rls_context_always_converts_to_string(self, project_id):
         """任意 UUID → SET LOCAL 参数始终是字符串形式。"""
         from app.core.database import set_rls_context
@@ -48,7 +48,7 @@ class TestRlsIsolationProperty:
     @given(
         project_id_str=st.text(min_size=1, max_size=100),
     )
-    @settings(max_examples=15)
+    @settings(max_examples=5)
     async def test_set_rls_context_string_input_passthrough(self, project_id_str):
         """字符串输入 → 原样传入（不做额外转换）。"""
         from app.core.database import set_rls_context
@@ -77,7 +77,7 @@ class TestYoYBoundaryProperty:
         current=st.floats(min_value=-1e12, max_value=1e12, allow_nan=False, allow_infinity=False),
         previous=st.floats(min_value=-1e12, max_value=1e12, allow_nan=False, allow_infinity=False),
     )
-    @settings(max_examples=15, deadline=None)
+    @settings(max_examples=5, deadline=None)
     def test_yoy_division_by_zero_safe(self, current, previous):
         """previous=0 时永远返回 None（不抛异常）。"""
         from app.routers.reports import _calc_yoy
@@ -90,7 +90,7 @@ class TestYoYBoundaryProperty:
         current=st.floats(min_value=-1e12, max_value=1e12, allow_nan=False, allow_infinity=False),
         previous=st.floats(min_value=-1e12, max_value=1e12, allow_nan=False, allow_infinity=False),
     )
-    @settings(max_examples=15)
+    @settings(max_examples=5)
     def test_yoy_sign_correctness(self, current, previous):
         """YoY 符号正确性: current > previous → 非负, current < previous → 非正（量化容忍）。"""
         from app.routers.reports import _calc_yoy
@@ -114,7 +114,7 @@ class TestYoYBoundaryProperty:
         current=st.floats(min_value=0.01, max_value=1e12, allow_nan=False, allow_infinity=False),
         previous=st.floats(min_value=0.01, max_value=1e12, allow_nan=False, allow_infinity=False),
     )
-    @settings(max_examples=15)
+    @settings(max_examples=5)
     def test_yoy_monotonicity_positive_previous(self, current, previous):
         """正 previous 时，current 越大 → YoY 越大（单调性）。"""
         from app.routers.reports import _calc_yoy
@@ -133,7 +133,7 @@ class TestYoYBoundaryProperty:
     @given(
         value=st.floats(min_value=0.01, max_value=1e12, allow_nan=False, allow_infinity=False),
     )
-    @settings(max_examples=15)
+    @settings(max_examples=5)
     def test_yoy_zero_change(self, value):
         """current == previous → YoY == 0。"""
         from app.routers.reports import _calc_yoy

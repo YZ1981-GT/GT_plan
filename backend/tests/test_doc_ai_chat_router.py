@@ -17,6 +17,9 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 import pytest_asyncio
 
+# Task 1 起端点先过 ResourceAccessResolver；宿主放行替身的唯一真源见该模块 docstring。
+from ._ai_chat_host_stub import allow_ai_host  # noqa: F401
+
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
@@ -48,169 +51,140 @@ def mock_db():
 # ---------------------------------------------------------------------------
 
 
+def _adopt_request(**overrides):
+    """Task 7 契约的最小合法 adopt 请求（无 content 字段可传）。"""
+    from app.routers.doc_ai_chat import AdoptHostRef, AdoptRequest
+
+    payload = {
+        "message_id": uuid.uuid4(),
+        "host": AdoptHostRef(type="workpaper", id=str(uuid.uuid4())),
+        "idempotency_key": uuid.uuid4(),
+    }
+    payload.update(overrides)
+    return AdoptRequest(**payload)
+
+
 class TestAdoptEndpoint:
-    """POST /api/ai-chat/adopt — D4 确认流门禁测试"""
+    """POST /api/ai-chat/adopt — 路由层契约与失败映射（Task 7）
+
+    ⚠️ 采纳的**下游行为**（服务端权威正文、收据幂等、``ai_content_log`` 写入失败回滚、
+    哈希链审计）自 Task 7 起是真正 DB 绑定的能力，判据落在
+    ``backend/tests/dsh_agent_panel/test_task7_adopt_fail_closed.py`` 的真实 PostgreSQL
+    上。本类只保留**不需要数据库**就能真实执行的三件事：请求契约、授权前置、失败映射。
+    在 ``AsyncMock`` 数据库上重演确认流写入需要把读消息/收据/存在性核验全部替身掉，
+    那样的"通过"只证明替身自己一致，是典型假绿。
+    """
+
+    def test_adopt_request_rejects_client_content_and_requires_server_ids(self):
+        """请求体不接受客户端正文，且必须带服务端 message ID + 幂等键。
+
+        Feature dsh-agent-panel-integration Req 8.1：采纳引用 message ID，不把客户端
+        正文当权威来源。旧契约的 ``content`` / ``confidence`` 字段是本 Task 修掉的缺陷。
+        """
+        from pydantic import ValidationError
+        from app.routers.doc_ai_chat import AdoptRequest
+
+        assert "content" not in AdoptRequest.model_fields
+        assert "confidence" not in AdoptRequest.model_fields
+
+        _adopt_request()  # 新契约可构造
+
+        with pytest.raises(ValidationError):
+            _adopt_request(content="浏览器伪造的 AI 正文")
+        with pytest.raises(ValidationError):
+            _adopt_request(confidence=0.99)
 
     @pytest.mark.asyncio
-    async def test_adopt_calls_wrap_ai_output_with_log(self, mock_db, mock_user):
-        """D4: adopt 必须调用 wrap_ai_output_with_log 写入 ai_content_log"""
-        from app.routers.doc_ai_chat import adopt_ai_content, AdoptRequest
+    async def test_adopt_invalid_project_id_is_non_enumerable_404(self, mock_db, mock_user):
+        """无效 project 断言返回不可枚举 404（授权前置，且先于任何写入）
 
-        project_id = uuid.uuid4()
-        doc_id = uuid.uuid4()
+        Feature dsh-agent-panel-integration Req 2.5：无权与不存在对外使用同一响应语义，
+        非法标识也不得通过状态码差异被枚举。
+        """
+        from app.routers.doc_ai_chat import AdoptHostRef, adopt_ai_content
+        from app.services.wp_visibility.denial import EXTERNAL_NOT_FOUND_DETAIL
 
-        req = AdoptRequest(
-            content="AI 生成的审计结论：余额变动合理",
-            project_id=str(project_id),
-            doc_type="workpaper",
-            doc_id=str(doc_id),
-            target_cell="E5",
-            confidence=0.9,
+        req = _adopt_request(
+            host=AdoptHostRef(
+                type="workpaper", id=str(uuid.uuid4()), project_id="not-a-uuid"
+            )
         )
 
-        mock_wrap_result = {
-            "id": str(uuid.uuid4()),
-            "ai_content_log_id": str(uuid.uuid4()),
-            "confirm_action": "pending",
-            "content_hash": "a" * 64,
-            "content": req.content,
-        }
+        with patch(
+            "app.routers.doc_ai_chat.adopt_message", new_callable=AsyncMock
+        ) as adopt_service:
+            with pytest.raises(Exception) as exc_info:
+                await adopt_ai_content(req, db=mock_db, current_user=mock_user)
+        assert exc_info.value.status_code == 404
+        assert exc_info.value.detail == EXTERNAL_NOT_FOUND_DETAIL
+        adopt_service.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_adopt_success_reports_confirm_flow_and_pending(
+        self, mock_db, mock_user, allow_ai_host
+    ):
+        """服务层给出有效 log ID 时，响应为 pending + "已进入确认流"。"""
+        from app.routers.doc_ai_chat import adopt_ai_content
+        from app.services.ai_chat.adopt import ADOPT_CONFIRM_FLOW_MESSAGE, AdoptOutcome
+
+        log_id = uuid.uuid4()
+        message_id = uuid.uuid4()
+        outcome = AdoptOutcome(
+            ai_content_log_id=log_id,
+            content_hash="a" * 64,
+            message_id=message_id,
+            receipt_id=uuid.uuid4(),
+            idempotent_replay=False,
+        )
+        req = _adopt_request(message_id=message_id)
 
         with patch(
-            "app.services.wp_ai_service.wrap_ai_output_with_log",
+            "app.routers.doc_ai_chat.adopt_message",
             new_callable=AsyncMock,
-            return_value=mock_wrap_result,
-        ):
+            return_value=outcome,
+        ) as adopt_service:
             result = await adopt_ai_content(req, db=mock_db, current_user=mock_user)
 
         assert result["success"] is True
         assert result["confirm_action"] == "pending"
-        assert result["ai_content_log_id"] is not None
+        assert result["ai_content_log_id"] == str(log_id)
+        assert result["message"] == ADOPT_CONFIRM_FLOW_MESSAGE
+        # 服务层拿到的是**服务端** message ID 与幂等键，没有任何正文字段
+        kwargs = adopt_service.call_args.kwargs
+        assert kwargs["message_id"] == message_id
+        assert kwargs["idempotency_key"] == req.idempotency_key
+        assert "content" not in kwargs
 
     @pytest.mark.asyncio
-    async def test_adopt_returns_pending_status(self, mock_db, mock_user):
-        """D4: adopt 返回 confirm_action='pending'（未确认状态）"""
-        from app.routers.doc_ai_chat import adopt_ai_content, AdoptRequest
+    async def test_adopt_log_failure_maps_to_typed_non_success_response(
+        self, mock_db, mock_user, allow_ai_host
+    ):
+        """服务层报 ``adopt_log_failed`` ⇒ 503 + typed code，绝不返回成功文案。
 
-        project_id = uuid.uuid4()
-        doc_id = uuid.uuid4()
-
-        req = AdoptRequest(
-            content="测试内容",
-            project_id=str(project_id),
-            doc_type="workpaper",
-            doc_id=str(doc_id),
+        Property 33：下游故障不产生假成功。
+        """
+        from fastapi import HTTPException
+        from app.routers.doc_ai_chat import adopt_ai_content
+        from app.services.ai_chat.adopt import (
+            ADOPT_ERROR_MESSAGE,
+            ADOPT_LOG_FAILED,
+            AdoptFailed,
         )
 
-        mock_wrap_result = {
-            "id": str(uuid.uuid4()),
-            "ai_content_log_id": str(uuid.uuid4()),
-            "confirm_action": "pending",
-            "content_hash": "b" * 64,
-            "content": "测试内容",
-        }
-
         with patch(
-            "app.services.wp_ai_service.wrap_ai_output_with_log",
+            "app.routers.doc_ai_chat.adopt_message",
             new_callable=AsyncMock,
-            return_value=mock_wrap_result,
+            side_effect=AdoptFailed(ADOPT_LOG_FAILED, "注入：日志写入失败"),
         ):
-            result = await adopt_ai_content(req, db=mock_db, current_user=mock_user)
+            with pytest.raises(HTTPException) as exc_info:
+                await adopt_ai_content(req=_adopt_request(), db=mock_db, current_user=mock_user)
 
-        assert result["confirm_action"] == "pending"
-        assert "ai_content_log_id" in result
-
-    @pytest.mark.asyncio
-    async def test_adopt_passes_all_required_params_to_wrap(self, mock_db, mock_user):
-        """D4: adopt 传递 5 个必要参数给 wrap_ai_output_with_log（触发写 ai_content_log）"""
-        from app.routers.doc_ai_chat import adopt_ai_content, AdoptRequest
-
-        project_id = uuid.uuid4()
-        doc_id = uuid.uuid4()
-
-        req = AdoptRequest(
-            content="AI 分析结论",
-            project_id=str(project_id),
-            doc_type="knowledge_doc",
-            doc_id=str(doc_id),
-            target_field="conclusion",
-            confidence=0.88,
-        )
-
-        mock_wrap_result = {
-            "id": str(uuid.uuid4()),
-            "ai_content_log_id": str(uuid.uuid4()),
-            "confirm_action": "pending",
-            "content_hash": "c" * 64,
-        }
-
-        with patch(
-            "app.services.wp_ai_service.wrap_ai_output_with_log",
-            new_callable=AsyncMock,
-            return_value=mock_wrap_result,
-        ) as mock_wrap:
-            result = await adopt_ai_content(req, db=mock_db, current_user=mock_user)
-
-            # 验证 wrap_ai_output_with_log 被调用且传递了 5 个必要参数
-            mock_wrap.assert_called_once()
-            call_kwargs = mock_wrap.call_args.kwargs
-
-            # D4 关键：5 参齐全才会写 ai_content_log
-            assert call_kwargs["db"] is mock_db
-            assert call_kwargs["project_id"] == project_id
-            assert call_kwargs["user_id"] == mock_user.id
-            assert call_kwargs["instance_type"] == "knowledge_doc"
-            assert call_kwargs["instance_id"] == doc_id
-            assert call_kwargs["content"] == "AI 分析结论"
-            assert call_kwargs["confidence"] == 0.88
-            assert call_kwargs["target_field"] == "conclusion"
-
-    @pytest.mark.asyncio
-    async def test_adopt_invalid_project_id_returns_400(self, mock_db, mock_user):
-        """无效 project_id 返回 400"""
-        from app.routers.doc_ai_chat import adopt_ai_content, AdoptRequest
-
-        req = AdoptRequest(
-            content="test",
-            project_id="not-a-uuid",
-            doc_type="workpaper",
-            doc_id=str(uuid.uuid4()),
-        )
-
-        with pytest.raises(Exception) as exc_info:
-            await adopt_ai_content(req, db=mock_db, current_user=mock_user)
-        # HTTPException with 400
-        assert exc_info.value.status_code == 400
-
-    @pytest.mark.asyncio
-    async def test_adopt_commits_db_after_wrap(self, mock_db, mock_user):
-        """adopt 在 wrap 成功后 commit DB"""
-        from app.routers.doc_ai_chat import adopt_ai_content, AdoptRequest
-
-        project_id = uuid.uuid4()
-        doc_id = uuid.uuid4()
-
-        req = AdoptRequest(
-            content="内容",
-            project_id=str(project_id),
-            doc_type="workpaper",
-            doc_id=str(doc_id),
-        )
-
-        mock_wrap_result = {
-            "ai_content_log_id": str(uuid.uuid4()),
-            "confirm_action": "pending",
-            "content_hash": "d" * 64,
-        }
-
-        with patch(
-            "app.services.wp_ai_service.wrap_ai_output_with_log",
-            new_callable=AsyncMock,
-            return_value=mock_wrap_result,
-        ):
-            await adopt_ai_content(req, db=mock_db, current_user=mock_user)
-
-        mock_db.commit.assert_called_once()
+        assert exc_info.value.status_code == 503
+        assert exc_info.value.detail["code"] == ADOPT_LOG_FAILED
+        assert exc_info.value.detail["message"] == ADOPT_ERROR_MESSAGE[ADOPT_LOG_FAILED]
+        assert "已进入确认流" not in exc_info.value.detail["message"]
+        # 内部异常细节不外泄（Req 12.5）
+        assert "注入" not in str(exc_info.value.detail)
 
 
 # ---------------------------------------------------------------------------
@@ -222,37 +196,75 @@ class TestHistoryEndpoint:
     """GET /api/ai-chat/doc/{doc_type}/{doc_id}/history"""
 
     @pytest.mark.asyncio
-    async def test_get_empty_history(self, mock_user):
-        """无历史时返回空列表"""
-        from app.routers.doc_ai_chat import get_chat_history, _chat_history
+    async def test_get_empty_history(self, mock_db, mock_user, allow_ai_host):
+        """无历史时返回空列表（历史来自 doc_chat_persistence，非内存字典）"""
+        from app.routers.doc_ai_chat import get_chat_history
 
-        # 清空历史
-        _chat_history.clear()
-
-        result = await get_chat_history("workpaper", str(uuid.uuid4()), current_user=mock_user)
+        with patch(
+            "app.services.doc_chat_persistence.get_history",
+            new_callable=AsyncMock,
+            return_value=[],
+        ):
+            result = await get_chat_history(
+                "workpaper",
+                str(uuid.uuid4()),
+                str(uuid.uuid4()),
+                db=mock_db,
+                current_user=mock_user,
+            )
         assert result["messages"] == []
         assert result["total"] == 0
 
     @pytest.mark.asyncio
-    async def test_get_existing_history(self, mock_user):
-        """有历史时返回消息列表"""
-        from app.routers.doc_ai_chat import get_chat_history, _chat_history, _history_key
+    async def test_get_existing_history(self, mock_db, mock_user, allow_ai_host):
+        """有历史时按服务端顺序返回消息列表"""
+        from app.routers.doc_ai_chat import get_chat_history
 
-        doc_id = str(uuid.uuid4())
-        key = _history_key("workpaper", doc_id, mock_user.id)
-
-        _chat_history[key] = [
+        stored = [
             {"role": "user", "content": "什么是审计抽样？"},
             {"role": "assistant", "content": "审计抽样是..."},
         ]
-
-        result = await get_chat_history("workpaper", doc_id, current_user=mock_user)
+        with patch(
+            "app.services.doc_chat_persistence.get_history",
+            new_callable=AsyncMock,
+            return_value=stored,
+        ) as mock_history:
+            result = await get_chat_history(
+                "workpaper",
+                str(uuid.uuid4()),
+                str(uuid.uuid4()),
+                db=mock_db,
+                current_user=mock_user,
+            )
         assert result["total"] == 2
         assert result["messages"][0]["role"] == "user"
         assert result["messages"][1]["role"] == "assistant"
+        # 服务端按当前用户 scope 取历史，不接受客户端传入的 user 身份
+        assert mock_history.call_args.args[3] == mock_user.id
 
-        # 清理
-        _chat_history.clear()
+    @pytest.mark.asyncio
+    async def test_history_denied_before_reading_messages(self, mock_db, mock_user):
+        """无权宿主：拒绝先于任何历史消息读取（Req 2.1/2.4）"""
+        from app.routers.doc_ai_chat import get_chat_history
+        from app.services.ai_chat.contracts import AccessDecision
+        from app.services.wp_visibility.denial import ExternalNotFound
+
+        async def _deny(db, current_user, **kwargs):
+            raise ExternalNotFound()
+
+        with patch("app.routers.doc_ai_chat._authorize_doc_host", _deny), patch(
+            "app.services.doc_chat_persistence.get_history", new_callable=AsyncMock
+        ) as mock_history:
+            with pytest.raises(ExternalNotFound):
+                await get_chat_history(
+                    "workpaper",
+                    str(uuid.uuid4()),
+                    str(uuid.uuid4()),
+                    db=mock_db,
+                    current_user=mock_user,
+                )
+        mock_history.assert_not_called()
+        assert AccessDecision is not None  # 契约模块可导入（防止 import 漂移静默失效）
 
 
 # ---------------------------------------------------------------------------
@@ -264,7 +276,7 @@ class TestDocAiChatEndpoint:
     """POST /api/ai-chat/doc/{doc_type}/{doc_id} — streaming"""
 
     @pytest.mark.asyncio
-    async def test_chat_returns_streaming_response(self, mock_db, mock_user):
+    async def test_chat_returns_streaming_response(self, mock_db, mock_user, allow_ai_host):
         """对话端点返回 StreamingResponse"""
         from fastapi.responses import StreamingResponse
         from app.routers.doc_ai_chat import doc_ai_chat, DocChatRequest
@@ -297,9 +309,10 @@ class TestDocAiChatEndpoint:
         assert result.media_type == "text/event-stream"
 
     @pytest.mark.asyncio
-    async def test_chat_invalid_project_id_returns_400(self, mock_db, mock_user):
-        """无效 project_id 返回 400"""
+    async def test_chat_invalid_project_id_is_non_enumerable_404(self, mock_db, mock_user):
+        """无效 project_id 返回不可枚举 404（Req 2.5）"""
         from app.routers.doc_ai_chat import doc_ai_chat, DocChatRequest
+        from app.services.wp_visibility.denial import EXTERNAL_NOT_FOUND_DETAIL
 
         req = DocChatRequest(
             query="测试",
@@ -309,7 +322,8 @@ class TestDocAiChatEndpoint:
 
         with pytest.raises(Exception) as exc_info:
             await doc_ai_chat("workpaper", str(uuid.uuid4()), req, db=mock_db, current_user=mock_user)
-        assert exc_info.value.status_code == 400
+        assert exc_info.value.status_code == 404
+        assert exc_info.value.detail == EXTERNAL_NOT_FOUND_DETAIL
 
 
 # ---------------------------------------------------------------------------

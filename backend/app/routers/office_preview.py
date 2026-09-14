@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import hashlib
 import logging
+import os
 import shutil
 import subprocess
 import tempfile
@@ -55,11 +56,10 @@ def _resolve_cache_dir() -> Path:
     优先环境变量 OFFICE_PREVIEW_CACHE_DIR，
     否则 settings.STORAGE_ROOT / preview_cache。
     """
-    import os
+    storage_root = Path(settings.STORAGE_ROOT)
     env_dir = os.environ.get("OFFICE_PREVIEW_CACHE_DIR")
     if env_dir:
         return Path(env_dir)
-    storage_root = Path(settings.STORAGE_ROOT)
     return storage_root / "preview_cache"
 
 
@@ -207,9 +207,23 @@ async def preview_office_as_pdf(
         raise HTTPException(status_code=404, detail="附件不存在")
 
     await _ensure_project_access(db, current_user, UUID(att["project_id"]), "readonly")
+    # Wp_Bound_Gate 附件可见性隔离（Task 4 / R3 leak_risk → gated，additive；项目级授权之上再收紧）：
+    # 附件绑定底稿时要求当前用户对至少一个关联底稿可见，全部不可见 → 404；未绑定 → 放行。
+    from app.services.wp_visibility.entry_integration import (
+        enforce_attachment_wp_visibility,
+    )
 
+    await enforce_attachment_wp_visibility(
+        db, current_user, attachment_id=attachment_id,
+        action="attach_read", method="GET", entrypoint="attachment.read",
+    )
+
+    # C3：att["file_path"] 已投影为 opaque locator，转 PDF 预览的本地读取须取真实路径。
+    raw = await svc.get_raw_storage(attachment_id)
+    if not raw:
+        raise HTTPException(status_code=404, detail="附件不存在")
     file_name = att.get("file_name") or ""
-    file_path = att.get("file_path") or ""
+    file_path = raw.get("file_path") or ""
     ext = Path(file_name).suffix.lower()
 
     if ext not in OFFICE_EXTENSIONS:
@@ -263,11 +277,16 @@ async def preview_office_as_pdf(
         except OSError as e:
             logger.warning("[OFFICE_PREVIEW] cache write failed: %s", e)
 
+    # 中文文件名需 RFC5987 编码（HTTP 头按 latin-1，直接放中文会 UnicodeEncodeError）
+    from urllib.parse import quote as _quote
+    _stem = f"{src_path.stem}.pdf"
+    _ascii_stem = _stem.encode("ascii", "ignore").decode() or "preview.pdf"
+    _disposition = f"inline; filename=\"{_ascii_stem}\"; filename*=UTF-8''{_quote(_stem, safe='')}"
     return Response(
         content=pdf_bytes,
         media_type="application/pdf",
         headers={
-            "Content-Disposition": f'inline; filename="{src_path.stem}.pdf"',
+            "Content-Disposition": _disposition,
             "X-Preview-Cache": "hit" if cache_path.exists() else "miss",
         },
     )

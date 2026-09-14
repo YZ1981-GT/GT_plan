@@ -92,6 +92,7 @@ import { ref, computed, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { api } from '@/services/apiProxy'
 import { handleApiError } from '@/utils/errorHandler'
+import { useDisplayPrefsStore } from '@/stores/displayPrefs'
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -123,9 +124,11 @@ function ratingTagType(rating: string): 'success' | 'warning' | 'info' | 'primar
   }
 }
 
+const prefs = useDisplayPrefsStore()
+
 function formatAmount(amount: number | null): string {
   if (amount == null) return '—'
-  return amount.toLocaleString('zh-CN', { style: 'currency', currency: 'CNY' })
+  return prefs.fmt(amount)
 }
 
 const maxAmount = computed(() => {

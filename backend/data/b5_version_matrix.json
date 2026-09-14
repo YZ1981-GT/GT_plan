@@ -1,0 +1,19 @@
+{
+  "description": "B5 业务约定书版本推荐矩阵 — 按 business_category 自动推荐适用的约定书版本",
+  "main_versions": [
+    {"code": "B5-2", "label": "上市公司审计", "match": {"business_category": ["A1"]}, "confidence": "high"},
+    {"code": "B5-4", "label": "IPO审计", "match": {"business_category": ["A2"]}, "confidence": "high"},
+    {"code": "B5-6", "label": "IPO季度审阅", "match": {"signals": ["ipo_quarterly_review"]}, "confidence": "high"},
+    {"code": "B5-7", "label": "新三板", "match": {"business_category": ["B1"]}, "confidence": "high"},
+    {"code": "B5-8", "label": "企业债", "match": {"business_category": ["B2"]}, "confidence": "high"},
+    {"code": "B5-3", "label": "国有企业审计", "match": {"signals": ["state_owned_enterprise"]}, "confidence": "medium"},
+    {"code": "B5-5", "label": "内部控制审计", "match": {"signals": ["integrated_audit"]}, "confidence": "medium"},
+    {"code": "B5-9", "label": "医院审计", "match": {"signals": ["hospital_audit"]}, "confidence": "medium"},
+    {"code": "B5-1", "label": "一般财报审计（通用）", "match": {"default": true}, "confidence": "high"}
+  ],
+  "supplement": {
+    "code": "B5附件",
+    "label": "数据分级确认函",
+    "match": {"signals": ["data_classification_required"]}
+  }
+}

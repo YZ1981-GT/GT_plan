@@ -23,7 +23,14 @@
     <Transition name="gt-fade">
       <div v-if="uploading" class="gt-attachment-dropzone-uploading">
         <el-icon class="is-loading"><Loading /></el-icon>
-        <span>正在上传附件...</span>
+        <span>正在上传附件...{{ uploadProgress > 0 ? ` ${uploadProgress}%` : '' }}</span>
+        <el-progress
+          v-if="uploadProgress > 0"
+          :percentage="uploadProgress"
+          :show-text="false"
+          :stroke-width="3"
+          style="width: 80px; margin-left: 8px"
+        />
       </div>
     </Transition>
 
@@ -60,6 +67,8 @@ const emit = defineEmits<{
   (e: 'link-created', payload: AttachmentLinkResult): void
   /** 上传失败 */
   (e: 'upload-error', error: string): void
+  /** OCR 识别完成，需要用户确认（防幻觉） */
+  (e: 'ocr-ready', payload: { attachmentId: string; fileName: string; fileType: string; ocrText: string; confidence?: number }): void
 }>()
 
 // ─── 常量 ───
@@ -77,6 +86,7 @@ const ALLOWED_EXTENSIONS = ['.jpg', '.jpeg', '.png', '.gif', '.pdf', '.doc', '.d
 // ─── 状态 ───
 const isDragOver = ref(false)
 const uploading = ref(false)
+const uploadProgress = ref(0)
 let dragLeaveTimer: ReturnType<typeof setTimeout> | null = null
 
 // ─── 拖拽事件处理 ───
@@ -138,13 +148,16 @@ async function processFile(file: File) {
 
   // 3. 上传
   uploading.value = true
+  uploadProgress.value = 0
   try {
     const formData = new FormData()
     formData.append('file', file)
     formData.append('attachment_type', 'evidence')
     formData.append('reference_type', 'workpaper')
 
-    const uploadResult = await uploadAttachment(props.projectId, formData)
+    const uploadResult = await uploadAttachment(props.projectId, formData, (percent) => {
+      uploadProgress.value = percent
+    })
     const attachmentId = uploadResult?.id || uploadResult?.attachment_id
 
     if (!attachmentId) {
@@ -158,12 +171,24 @@ async function processFile(file: File) {
       message: `附件 "${file.name}" 已上传并关联到底稿${props.currentCellRef ? ` (${props.currentCellRef})` : ''}`,
       duration: 3000,
     })
+
+    // 5. 如果返回了 OCR 结果，通知父组件弹出确认弹窗
+    if (uploadResult?.ocr_text || uploadResult?.ocr_status === 'completed') {
+      emit('ocr-ready', {
+        attachmentId,
+        fileName: file.name,
+        fileType: uploadResult?.file_type || '',
+        ocrText: uploadResult?.ocr_text || '',
+        confidence: uploadResult?.ocr_confidence,
+      })
+    }
   } catch (err: any) {
     const msg = err?.response?.data?.detail || err?.message || '上传失败'
     handleApiError(err, '附件上传失败')
     emit('upload-error', msg)
   } finally {
     uploading.value = false
+    uploadProgress.value = 0
   }
 }
 

@@ -1,0 +1,69 @@
+{
+  "spec": "dsh-agent-panel-integration",
+  "scope": "FrontendReferenceIntegrity 守卫（P0 收口新增）",
+  "guard_file": "src/__tests__/FrontendReferenceIntegrity.spec.ts",
+  "total": 6,
+  "red": 6,
+  "results": [
+    {
+      "id": "MR1",
+      "desc": "删掉 /ai-chat 路由声明（复刻 AC 1.5 的原始缺陷形态）",
+      "file": "src/router/index.ts",
+      "expect_test": "AC 1.5：新窗口聊天路由 /ai-chat 已注册",
+      "verdict": "RED",
+      "failed_tests": [
+        "AC 1.5：新窗口聊天路由 /ai-chat 已注册"
+      ]
+    },
+    {
+      "id": "MR2",
+      "desc": "让 catch-all 参与匹配（判据恒真的核心形态）",
+      "file": "src/__tests__/_helpers/frontendSourceScan.ts",
+      "expect_test": "判据自检：catch-all 不得参与匹配",
+      "verdict": "RED",
+      "failed_tests": [
+        "判据自检：catch-all 不得参与匹配"
+      ]
+    },
+    {
+      "id": "MR3",
+      "desc": "把已修好的导航目标改回不存在的路由",
+      "file": "src/views/ManagementDashboard.vue",
+      "expect_test": "所有写死的站内导航目标都能匹配到非 catch-all 路由",
+      "verdict": "RED",
+      "failed_tests": [
+        "所有写死的站内导航目标都能匹配到非 catch-all 路由"
+      ]
+    },
+    {
+      "id": "MR4",
+      "desc": "stripJsComments 换成朴素正则（会截断 'https://x'）",
+      "file": "src/__tests__/_helpers/frontendSourceScan.ts",
+      "expect_test": "判据自检：stripJsComments 不得截断含 // 的字符串",
+      "verdict": "RED",
+      "failed_tests": [
+        "判据自检：stripJsComments 不得截断含 // 的字符串"
+      ]
+    },
+    {
+      "id": "MR5",
+      "desc": "把一个生产 import 改成不存在的路径（复刻 import 深度错）",
+      "file": "src/components/workpaper/confirmation/diffReconcile/GtConfirmationDiffReconcile.vue",
+      "expect_test": "不存在未登记的坏 import",
+      "verdict": "RED",
+      "failed_tests": [
+        "不存在未登记的坏 import"
+      ]
+    },
+    {
+      "id": "MR6",
+      "desc": "路径匹配放宽成前缀式（段数不等也算匹配）",
+      "file": "src/__tests__/_helpers/frontendSourceScan.ts",
+      "expect_test": "判据自检：动态段匹配任意单段，段数必须相等",
+      "verdict": "RED",
+      "failed_tests": [
+        "判据自检：动态段匹配任意单段，段数必须相等"
+      ]
+    }
+  ]
+}

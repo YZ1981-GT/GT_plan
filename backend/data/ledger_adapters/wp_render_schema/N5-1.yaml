@@ -1,0 +1,68 @@
+# backend/data/wp_render_schema/N5-1.yaml
+# 所得税费用审定表 — d-form-table 渲染 schema
+# Requirements: §5（N5 所得税费用，当期+递延=合计）
+# Design: §3 审定表标准字段（单行公式：当期所得税+递延所得税=所得税费用合计）
+# Template: N5 所得税费用.xlsx
+
+wp_code: N5-1
+wp_name: 所得税费用审定表
+component_type: d-form-table
+template_path: backend/wp_templates/N/N5 所得税费用.xlsx
+template_version: v2025-R5
+applicable_standards: [soe_standalone, listed_standalone, soe_consolidated, listed_consolidated]
+related_accounts:
+  - code: '6801'
+    name: 所得税费用
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 审定表 — 单行公式型（当期所得税+递延所得税=合计）
+# ═══════════════════════════════════════════════════════════════════════════════
+
+dynamic_rows: false
+
+sections:
+  - name: 所得税费用构成
+    row_type: single_formula
+    fields:
+      - { field: current_income_tax, label: 当期所得税费用, type: number }
+      - { field: deferred_income_tax, label: 递延所得税费用, type: number }
+      - { field: total_income_tax, label: 所得税费用合计, type: number, formula: "current_income_tax + deferred_income_tax" }
+      - { field: unadjusted_amount, label: 未审金额, type: number, auto_source: trial_balance.unadjusted_amount }
+      - { field: aje_debit, label: 审计调整借方, type: number }
+      - { field: aje_credit, label: 审计调整贷方, type: number }
+      - { field: rje_debit, label: 重分类调整借方, type: number }
+      - { field: rje_credit, label: 重分类调整贷方, type: number }
+      - { field: audited_amount, label: 审定金额, type: number, formula: "unadjusted_amount + aje_debit - aje_credit + rje_debit - rje_credit" }
+      - { field: variance_amount, label: 审定与公式差异, type: number, formula: "audited_amount - total_income_tax" }
+      - { field: variance_note, label: 差异说明, type: textarea }
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 联动配置
+# ═══════════════════════════════════════════════════════════════════════════════
+
+writeback:
+  target: trial_balance.audited_amount
+  trigger: WORKPAPER_SAVED
+  handler: _on_d_audit_determination_saved
+  match_pattern: "^[D-N]\\d+-1$"
+  key_field: account_code
+  value_field: audited_amount
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 跨底稿引用
+# ═══════════════════════════════════════════════════════════════════════════════
+
+cross_refs:
+  - ref_id: CW-N5-1-001
+    target_wp: N5-3
+    target_field: 所得税计算表
+    description: '审定表 → N5-3 所得税计算表核对当期所得税'
+    severity: required
+    direction: outbound
+
+  - ref_id: CW-N5-1-002
+    target_wp: N5-6
+    target_field: 递延所得税联动
+    description: '审定表 ← N5-6 递延所得税联动读取递延税变动'
+    severity: required
+    direction: inbound

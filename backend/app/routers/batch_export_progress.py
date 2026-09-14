@@ -22,6 +22,9 @@ from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.core.database import get_db
 from app.deps import get_current_user, require_project_access
 from app.models.core import User
 from app.services.export_progress_service import export_progress_service
@@ -67,6 +70,7 @@ class ExportTaskStatus(BaseModel):
 async def batch_export_async(
     project_id: UUID,
     body: BatchExportAsyncRequest,
+    db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_project_access("readonly")),
 ) -> BatchExportAsyncResponse:
     """触发批量导出任务，立即返回 task_id；ZIP 通过后台异步生成。
@@ -77,10 +81,20 @@ async def batch_export_async(
     if not body.wp_ids:
         raise HTTPException(status_code=400, detail="wp_ids 不能为空")
 
+    # Wp_Bound_Gate（Task 4 / R3）：调度后台打包前预过滤可见集（make_bulk_visible_filter）；
+    # 不可见/跨项目/未委派/scope 外底稿静默剔除，后台 worker 仅打包可见集。
+    from app.services.wp_visibility.entry_integration import make_bulk_visible_filter
+
+    _visible = make_bulk_visible_filter(
+        db, current_user, entrypoint="workpaper.detail", action="read_detail",
+        method="GET", entry_family="export",
+    )
+    visible_wp_ids = [wid for wid in body.wp_ids if await _visible(wid, None)]
+
     task = export_progress_service.create_task(
         project_id=str(project_id),
         user_id=str(current_user.id),
-        wp_ids=body.wp_ids,
+        wp_ids=visible_wp_ids,
     )
     return BatchExportAsyncResponse(
         task_id=task.task_id,

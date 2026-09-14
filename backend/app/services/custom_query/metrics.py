@@ -48,24 +48,7 @@ def inc_snapshot_missing(wp_code: str) -> None:
     logger.warning("snapshot_missing: wp_code=%s, 走 LibreOffice 兜底", wp_code)
 
 
-# ─── Simple Event Bus ────────────────────────────────────────────────────────
-
-
-class _EventBus:
-    """简单事件总线，用于 cross-ref:updated 等内部事件通知。"""
-
-    def __init__(self):
-        self._listeners: dict[str, list] = {}
-
-    def on(self, event_name: str, callback):
-        self._listeners.setdefault(event_name, []).append(callback)
-
-    def emit(self, event_name: str, payload: dict | None = None):
-        for cb in self._listeners.get(event_name, []):
-            try:
-                cb(payload)
-            except Exception as e:
-                logger.warning("event_bus emit error [%s]: %s", event_name, e)
-
-
-event_bus = _EventBus()
+# ─── 孤立 EventBus 已删除 ────────────────────────────────────────────────────
+# snapshot_writer 现使用主 event_bus (app.services.event_bus) 通过 orchestrator 发布事件。
+# 保留此注释便于追溯：原 _EventBus 类和 event_bus 实例在此处，
+# 迁移至 WorkpaperSaveOrchestrator 后不再需要。

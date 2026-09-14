@@ -9,6 +9,8 @@ export const projects = {
   listWithProgress: '/api/projects/list-with-progress',
   detail: (id: string) => `/api/projects/${id}`,
   wizard: (id: string) => `/api/projects/${id}/wizard`,
+  // audit-report-template-integration 需求 7.6：企业子类型推荐
+  templateRecommendation: (id: string) => `/api/projects/${id}/template-recommendation`,
   childCompanies: (id: string) => `/api/projects/${id}/child-companies`,
   // Phase 3 需求 5.1：配置合并范围（把已有单体项目挂为子公司）
   availableSubsidiaries: (id: string) => `/api/projects/${id}/available-subsidiaries`,

@@ -25,6 +25,7 @@
       <!-- 分类 Tab -->
       <el-tabs v-model="activeTab" class="notif-tabs" @tab-change="onTabChange">
         <el-tab-pane label="全部" name="all" />
+        <el-tab-pane label="程序任务" name="procedure" />
         <el-tab-pane label="复核" name="review" />
         <el-tab-pane label="导入" name="import" />
         <el-tab-pane label="系统" name="system" />
@@ -39,7 +40,7 @@
           :key="n.id"
           class="notif-item"
           :class="{ unread: !n.is_read }"
-          @click="handleRead(n)"
+          @click="handleClick(n)"
         >
           <div class="notif-icon-wrap">
             <el-icon :color="iconColor(n.notification_type)" :size="16">
@@ -64,13 +65,16 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
+import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { Bell, Warning, CircleCheckFilled, InfoFilled } from '@element-plus/icons-vue'
 import { notificationApi } from '@/services/collaborationApi'
 import { useCollaborationStore } from '@/stores/collaboration'
+import { getNotificationJumpRoute } from '@/services/notificationTypes'
 import { handleApiError } from '@/utils/errorHandler'
 
 const collaborationStore = useCollaborationStore()
+const router = useRouter()
 
 const popoverVisible = ref(false)
 const notifications = ref<any[]>([])
@@ -84,9 +88,17 @@ const CATEGORY_MAP: Record<string, string[]> = {
   system: ['SYSTEM', 'AUDIT', 'DEFAULT'],
 }
 
+/** 程序行任务通知：类型以 procedure_task. 前缀或 procedure_review_message（Task 11）。 */
+function isProcedureNotif(type: string): boolean {
+  return !!type && (type.startsWith('procedure_task.') || type === 'procedure_review_message')
+}
+
 /** 按分类过滤通知 */
 const filteredNotifications = computed(() => {
   if (activeTab.value === 'all') return notifications.value
+  if (activeTab.value === 'procedure') {
+    return notifications.value.filter(n => isProcedureNotif(n.notification_type))
+  }
   const types = CATEGORY_MAP[activeTab.value] || []
   return notifications.value.filter(n => types.includes(n.notification_type))
 })
@@ -143,14 +155,26 @@ async function fetchUnreadCount() {
   }
 }
 
-async function handleRead(n: any) {
-  if (n.is_read) return
-  try {
-    await notificationApi.markRead(n.id)
-    n.is_read = true
-    unreadCount.value = Math.max(0, unreadCount.value - 1)
-  } catch (e) {
-    handleApiError(e, '标记已读')
+/**
+ * 点击通知：未读则标记已读，随后按 metadata 驱动跳转（Task 11 / Req 10.8）。
+ * 已读与未读点击 **均可跳转**（深链由 metadata 决定，不解析中文 content）。
+ */
+async function handleClick(n: any) {
+  if (!n.is_read) {
+    try {
+      await notificationApi.markRead(n.id)
+      n.is_read = true
+      unreadCount.value = Math.max(0, unreadCount.value - 1)
+    } catch (e) {
+      handleApiError(e, '标记已读')
+    }
+  }
+  const route = getNotificationJumpRoute(n.notification_type, n.metadata)
+  if (route) {
+    popoverVisible.value = false
+    try {
+      await router.push(route)
+    } catch { /* 导航被取消（重复路由等）忽略 */ }
   }
 }
 

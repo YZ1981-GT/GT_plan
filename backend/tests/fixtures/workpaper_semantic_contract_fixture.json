@@ -1,0 +1,70 @@
+{
+  "_description": "前后端语义契约类型一致性 fixture。后端测试生成/验证此文件，前端测试读取并对比。",
+  "SheetContentType": [
+    "control_panel",
+    "audit_sheet",
+    "detail_table",
+    "analysis",
+    "procedure",
+    "control_understanding",
+    "control_test",
+    "confirmation_summary",
+    "disclosure",
+    "adjustment",
+    "conclusion",
+    "legacy",
+    "unknown"
+  ],
+  "FieldSourceType": [
+    "trial_balance",
+    "formula",
+    "manual",
+    "linked",
+    "ai_generated"
+  ],
+  "StalePolicy": [
+    "refresh_on_tb_updated",
+    "refresh_on_report_regen",
+    "manual_refresh",
+    "none"
+  ],
+  "ProgramStatus": [
+    "not_started",
+    "in_progress",
+    "completed",
+    "reviewed",
+    "rejected"
+  ],
+  "ReviewStatus": [
+    "pending",
+    "approved",
+    "rejected"
+  ],
+  "FieldSourceContract_fields": [
+    "field_id",
+    "label",
+    "source_type",
+    "source_ref",
+    "editable",
+    "override_allowed",
+    "requires_confirmation",
+    "traceable",
+    "stale_policy"
+  ],
+  "ProgramStatusContract_fields": [
+    "project_id",
+    "account_package_id",
+    "program_code",
+    "sheet_name",
+    "applicable",
+    "status",
+    "evidence_refs",
+    "conclusion",
+    "review_status",
+    "not_applicable_reason",
+    "updated_by",
+    "updated_at",
+    "reviewer",
+    "reviewed_at"
+  ]
+}

@@ -1,0 +1,563 @@
+﻿<template>
+  <div class="d4-operating-revenue">
+    <!-- 加载状态 -->
+    <div v-if="isLoading" class="loading-container">
+      <el-skeleton :rows="8" animated />
+    </div>
+
+    <!-- 根据外层 GtWpRenderer 传入的 sheetName 分发到对应子组件 -->
+    <template v-else>
+      <div v-if="showModeToolbar && !isD4DedicatedSyncSheet" class="d4-mode-toolbar">
+        <el-segmented v-model="renderMode" :options="renderModeOptions" size="small" :disabled="isD4DetailSheet && syncBusy" />
+        <el-tag v-if="!isD4DetailSheet && !isD4DedicatedSyncSheet && !dualMode.ooAvailable.value" size="small" type="warning">OO不可用</el-tag>
+        <GtEntrySyncCapabilityNotice v-if="!isD4DedicatedSyncSheet" entry-id="xlsx/gt-d4-operating-revenue" />
+      </div>
+
+      <!-- D4-2 由外层统一桥接；D4-5 与 IPO/舞弊子表由自身组件管理双向模式。 -->
+      <WorkpaperSyncEditorHost
+        v-if="renderMode === 'onlyoffice' && isD4DetailSheet"
+        ref="syncEditorHostRef"
+        :descriptor="syncOoDescriptor"
+        :bridge="syncBridge"
+      />
+
+      <GtOnlyOfficeSheet
+        v-else-if="renderMode === 'onlyoffice' && !isD4DedicatedSyncSheet && currentSheet !== 'D4-5'"
+        :key="ooSheetName"
+        :wp-id="props.wpId"
+        :sheet-name="ooSheetName"
+        :project-id="props.projectId"
+        :readonly="isReadonly"
+        @fallback="onOoFallback"
+      />
+
+      <template v-else>
+      <!-- D4 主sheet (fallback) -->
+      <D4TabIndex
+        v-if="currentSheet === 'D4' || currentSheet === 'skip'"
+        :wp-id="props.wpId"
+        :project-id="props.projectId"
+        :all-responses="allResponses"
+        :is-readonly="isReadonly"
+        :ipo-group-visible="crossSheet.ipoGroupVisible.value"
+        :has-export-business="crossSheet.hasExportBusiness.value"
+        :available-sheets="availableSheets"
+      />
+      <!-- 程序表 D4A -->
+      <D4TabProcedure
+        v-else-if="currentSheet === 'D4A' || currentSheet === '应收口径'"
+        :wp-id="props.wpId"
+        :project-id="props.projectId"
+        :html-data="props.htmlData"
+        :is-readonly="isReadonly"
+      />
+      <!-- D4-1 审定表 -->
+      <D4TabAdjudication v-else-if="currentSheet === 'D4-1'" :wp-id="props.wpId" :project-id="props.projectId" :all-responses="allResponses" :is-readonly="isReadonly" :html-data="props.htmlData" />
+      <!-- D4-2 主营明细 -->
+      <D4TabRevenueDetail v-else-if="currentSheet === 'D4-2'" :wp-id="props.wpId" :project-id="props.projectId" :all-responses="allResponses" :is-readonly="isReadonly" />
+      <!-- D4-3 其他明细 -->
+      <D4TabOtherRevenue v-else-if="currentSheet === 'D4-3'" :wp-id="props.wpId" :project-id="props.projectId" :all-responses="allResponses" :is-readonly="isReadonly" />
+      <!-- D4-4 调整分录 -->
+      <D4TabAdjustment v-else-if="currentSheet === 'D4-4'" :wp-id="props.wpId" :project-id="props.projectId" :all-responses="allResponses" :is-readonly="isReadonly" />
+      <!-- D4-5 政策检查 -->
+      <D4TabPolicyCheck v-else-if="currentSheet === 'D4-5'" :wp-id="props.wpId" :project-id="props.projectId" :all-responses="allResponses" :is-readonly="isReadonly" />
+      <!-- D4-6 ~ D4-11 分析程序 -->
+      <D4TabIndicator v-else-if="currentSheet === 'D4-6'" :wp-id="props.wpId" :project-id="props.projectId" :all-responses="allResponses" :is-readonly="isReadonly" />
+      <D4TabMarginMonthly v-else-if="currentSheet === 'D4-7'" :wp-id="props.wpId" :project-id="props.projectId" :all-responses="allResponses" :is-readonly="isReadonly" />
+      <D4TabProductMargin v-else-if="currentSheet === 'D4-8'" :wp-id="props.wpId" :project-id="props.projectId" :all-responses="allResponses" :is-readonly="isReadonly" />
+      <D4TabCustomerStructure v-else-if="currentSheet === 'D4-9'" :wp-id="props.wpId" :project-id="props.projectId" :all-responses="allResponses" :is-readonly="isReadonly" />
+      <D4TabCustomerPrice v-else-if="currentSheet === 'D4-10'" :wp-id="props.wpId" :project-id="props.projectId" :all-responses="allResponses" :is-readonly="isReadonly" />
+      <D4TabProductPrice v-else-if="currentSheet === 'D4-11'" :wp-id="props.wpId" :project-id="props.projectId" :all-responses="allResponses" :is-readonly="isReadonly" />
+      <!-- D4-12 ~ D4-20 检查程序 -->
+      <D4TabContract v-else-if="currentSheet === 'D4-12'" :wp-id="props.wpId" :project-id="props.projectId" :all-responses="allResponses" :is-readonly="isReadonly" />
+      <D4TabErpCheck v-else-if="currentSheet === 'D4-13'" :wp-id="props.wpId" :project-id="props.projectId" :all-responses="allResponses" :is-readonly="isReadonly" />
+      <D4TabOccurrence v-else-if="currentSheet === 'D4-14'" :wp-id="props.wpId" :project-id="props.projectId" :all-responses="allResponses" :is-readonly="isReadonly" />
+      <D4TabCompleteness v-else-if="currentSheet === 'D4-15'" :wp-id="props.wpId" :project-id="props.projectId" :all-responses="allResponses" :is-readonly="isReadonly" />
+      <D4TabExport v-else-if="currentSheet === 'D4-16'" :wp-id="props.wpId" :project-id="props.projectId" :all-responses="allResponses" :is-readonly="isReadonly" />
+      <D4TabCutoffForward v-else-if="currentSheet === 'D4-17'" :wp-id="props.wpId" :project-id="props.projectId" :all-responses="allResponses" :is-readonly="isReadonly" />
+      <D4TabCutoffBackward v-else-if="currentSheet === 'D4-18'" :wp-id="props.wpId" :project-id="props.projectId" :all-responses="allResponses" :is-readonly="isReadonly" />
+      <D4TabDiscount v-else-if="currentSheet === 'D4-19'" :wp-id="props.wpId" :project-id="props.projectId" :all-responses="allResponses" :is-readonly="isReadonly" />
+      <D4TabReturn v-else-if="currentSheet === 'D4-20'" :wp-id="props.wpId" :project-id="props.projectId" :all-responses="allResponses" :is-readonly="isReadonly" />
+      <!-- D4-21 关联方 -->
+      <D4TabRelatedPrice v-else-if="currentSheet === 'D4-21'" :wp-id="props.wpId" :project-id="props.projectId" :all-responses="allResponses" :is-readonly="isReadonly" />
+      <!-- D4-22 ~ D4-32 IPO/舞弊 -->
+      <D4TabIpoProcedure
+        v-else-if="currentSheet === 'D4-22A'"
+        :wp-id="props.wpId"
+        :project-id="props.projectId"
+        :is-readonly="isReadonly"
+      />
+      <D4TabIpoIndicator v-else-if="currentSheet === 'D4-22'" :wp-id="props.wpId" :project-id="props.projectId" :all-responses="allResponses" :is-readonly="isReadonly" />
+      <D4TabInvoiceCompare v-else-if="currentSheet === 'D4-23'" :wp-id="props.wpId" :project-id="props.projectId" :all-responses="allResponses" :is-readonly="isReadonly" />
+      <D4TabThirdParty v-else-if="currentSheet === 'D4-24'" :wp-id="props.wpId" :project-id="props.projectId" :all-responses="allResponses" :is-readonly="isReadonly" />
+      <D4TabDealer v-else-if="currentSheet === 'D4-25'" :wp-id="props.wpId" :project-id="props.projectId" :all-responses="allResponses" :is-readonly="isReadonly" />
+      <D4TabOverseas v-else-if="currentSheet === 'D4-26'" :wp-id="props.wpId" :project-id="props.projectId" :all-responses="allResponses" :is-readonly="isReadonly" />
+      <D4TabUndisclosedRp v-else-if="currentSheet === 'D4-27'" :wp-id="props.wpId" :project-id="props.projectId" :all-responses="allResponses" :is-readonly="isReadonly" />
+      <D4TabCustomerChecklist v-else-if="currentSheet === 'D4-28'" :wp-id="props.wpId" :project-id="props.projectId" :all-responses="allResponses" :is-readonly="isReadonly" />
+      <D4TabCustomerDetail v-else-if="currentSheet === 'D4-29'" :wp-id="props.wpId" :project-id="props.projectId" :all-responses="allResponses" :is-readonly="isReadonly" />
+      <D4TabInterviewSummary v-else-if="currentSheet === 'D4-30'" :wp-id="props.wpId" :project-id="props.projectId" :all-responses="allResponses" :is-readonly="isReadonly" />
+      <D4TabInterviewDetail v-else-if="currentSheet === 'D4-31'" :wp-id="props.wpId" :project-id="props.projectId" :all-responses="allResponses" :is-readonly="isReadonly" />
+      <D4TabInterviewTemplate v-else-if="currentSheet === 'D4-31T'" :wp-id="props.wpId" :project-id="props.projectId" :all-responses="allResponses" :is-readonly="isReadonly" />
+      <D4TabFundFlow v-else-if="currentSheet === 'D4-32'" :wp-id="props.wpId" :project-id="props.projectId" :all-responses="allResponses" :is-readonly="isReadonly" />
+      <!-- D4-33 ~ D4-36 其他收入 -->
+      <D4TabOtherMargin v-else-if="currentSheet === 'D4-33'" :wp-id="props.wpId" :project-id="props.projectId" :all-responses="allResponses" :is-readonly="isReadonly" />
+      <D4TabOtherContract v-else-if="currentSheet === 'D4-34'" :wp-id="props.wpId" :project-id="props.projectId" :all-responses="allResponses" :is-readonly="isReadonly" />
+      <D4TabOtherCheck v-else-if="currentSheet === 'D4-35'" :wp-id="props.wpId" :project-id="props.projectId" :all-responses="allResponses" :is-readonly="isReadonly" />
+      <D4TabOtherCutoff v-else-if="currentSheet === 'D4-36'" :wp-id="props.wpId" :project-id="props.projectId" :all-responses="allResponses" :is-readonly="isReadonly" />
+      <!-- 附注（上市/国企） -->
+      <D4TabDisclosureListed v-else-if="currentSheet === '附注上市'" :wp-id="props.wpId" :project-id="props.projectId" :all-responses="allResponses" :is-readonly="isReadonly" :html-data="props.htmlData" :applicable-standards="applicableStandards" />
+      <D4TabDisclosureSoe v-else-if="currentSheet === '附注国企'" :wp-id="props.wpId" :project-id="props.projectId" :all-responses="allResponses" :is-readonly="isReadonly" :html-data="props.htmlData" :applicable-standards="applicableStandards" />
+      <!-- Fallback: 未匹配的 sheetName 默认显示目录 -->
+      <D4TabIndex
+        v-else
+        :wp-id="props.wpId"
+        :project-id="props.projectId"
+        :all-responses="allResponses"
+        :is-readonly="isReadonly"
+        :ipo-group-visible="crossSheet.ipoGroupVisible.value"
+        :has-export-business="crossSheet.hasExportBusiness.value"
+        :available-sheets="availableSheets"
+      />
+      </template>
+    </template>
+
+    <GtWpReviewRail
+      v-if="!isLoading && renderMode !== 'onlyoffice'"
+      :section-id="d4ReviewSection.id"
+      :section-label="d4ReviewSection.label"
+    />
+    <!-- 复核对话与版本链 Host 由 Runtime Boundary(GtWpRenderer) 统一挂载 -->
+  </div>
+</template>
+
+<script setup lang="ts">
+/**
+ * GtD4OperatingRevenue.vue — D4 营业收入底稿主入口
+ *
+ * 由外层 GtWpRenderer 的 sheet 目录行控制当前显示的 sheet。
+ * 组件接收 sheetName prop，按 v-if 分发到对应子组件。
+ * 不再使用内部 el-tabs（避免双层 Tab 问题）。
+ *
+ * 科目覆盖：6001 主营业务收入 + 6051 其他业务收入（损益类/贷方科目）
+ * IPO/舞弊组可见性由 business_category 字段控制。
+ * selfLoad: 当 htmlData 为 null 时自行调 render-config 加载数据。
+ */
+import { ref, computed, onMounted, onBeforeUnmount, provide, toRef, inject, defineAsyncComponent } from 'vue'
+import { useD4FormData, type ChecklistResponse } from './composables/useD4FormData'
+// 注：D4_MAIN_REVENUE_STANDARD / D4_OTHER_REVENUE_STANDARD 原仅用于已移除的
+//     handleD4Writeback 孤儿监听器（spec tb-writeback-explicit-publish-gate Task 17 批C），一并移除 import。
+import { useD4CrossSheet } from './composables/useD4CrossSheet'
+import { useD4PriceWriteback } from './composables/useD4PriceWriteback'
+import { resolveCycleReviewSection } from './composables/cycleReviewSectionMap'
+import GtWpReviewRail from './GtWpReviewRail.vue'
+import { useWorkpaperEntryInjections } from './composables/useWorkpaperEntryInjections'
+import { WorkpaperRuntimeContextKey } from './composables/useWorkpaperScaffold'
+import { useD4ReviewThreads } from './composables/useD4ReviewThreads'
+import { useD4EntryDualMode, type D4RenderMode } from './composables/useD4EntryDualMode'
+import { isSkipWorkpaperSheet } from './composables/workpaperSkipSheets'
+import { useHostApplicableStandards } from './composables/hostApplicableStandards'
+import GtOnlyOfficeSheet from './GtOnlyOfficeSheet.vue'
+import GtEntrySyncCapabilityNotice from './sync/GtEntrySyncCapabilityNotice.vue'
+// G5-1 Phase 5 D4 canary：D4-2 明细走统一双向路径（descriptor → WorkpaperSyncEditorHost）；
+// 其余 40+ sheet 仍走 useD4EntryDualMode。
+import { useWorkpaperSyncBridge, WP_BRIDGE_IN_FLIGHT_STATES } from './sync/useWorkpaperSyncBridge'
+import { readStoreProjection } from './sync/workpaperSyncApi'
+import { capabilityForEntry } from './sync/workpaperSyncCapability'
+import WorkpaperSyncEditorHost from './sync/WorkpaperSyncEditorHost.vue'
+
+// ─── Lazy-loaded child components ────────────────────────────────────────────
+
+// Core
+import D4TabIndex from './d4/core/D4TabIndex.vue'
+import D4TabProcedure from './d4/core/D4TabProcedure.vue'
+const D4TabAdjudication = defineAsyncComponent(() => import('./d4/core/D4TabAdjudication.vue'))
+const D4TabRevenueDetail = defineAsyncComponent(() => import('./d4/core/D4TabRevenueDetail.vue'))
+const D4TabOtherRevenue = defineAsyncComponent(() => import('./d4/core/D4TabOtherRevenue.vue'))
+const D4TabAdjustment = defineAsyncComponent(() => import('./d4/core/D4TabAdjustment.vue'))
+const D4TabDisclosureListed = defineAsyncComponent(() => import('./d4/core/D4TabDisclosureListed.vue'))
+const D4TabDisclosureSoe = defineAsyncComponent(() => import('./d4/core/D4TabDisclosureSoe.vue'))
+
+// Policy
+const D4TabPolicyCheck = defineAsyncComponent(() => import('./d4/policy/D4TabPolicyCheck.vue'))
+
+// Analysis
+const D4TabIndicator = defineAsyncComponent(() => import('./d4/analysis/D4TabIndicator.vue'))
+const D4TabMarginMonthly = defineAsyncComponent(() => import('./d4/analysis/D4TabMarginMonthly.vue'))
+const D4TabProductMargin = defineAsyncComponent(() => import('./d4/analysis/D4TabProductMargin.vue'))
+const D4TabCustomerStructure = defineAsyncComponent(() => import('./d4/analysis/D4TabCustomerStructure.vue'))
+const D4TabCustomerPrice = defineAsyncComponent(() => import('./d4/analysis/D4TabCustomerPrice.vue'))
+const D4TabProductPrice = defineAsyncComponent(() => import('./d4/analysis/D4TabProductPrice.vue'))
+
+// Inspection
+const D4TabContract = defineAsyncComponent(() => import('./d4/inspection/D4TabContract.vue'))
+const D4TabErpCheck = defineAsyncComponent(() => import('./d4/inspection/D4TabErpCheck.vue'))
+const D4TabOccurrence = defineAsyncComponent(() => import('./d4/inspection/D4TabOccurrence.vue'))
+const D4TabCompleteness = defineAsyncComponent(() => import('./d4/inspection/D4TabCompleteness.vue'))
+const D4TabExport = defineAsyncComponent(() => import('./d4/inspection/D4TabExport.vue'))
+const D4TabCutoffForward = defineAsyncComponent(() => import('./d4/inspection/D4TabCutoffForward.vue'))
+const D4TabCutoffBackward = defineAsyncComponent(() => import('./d4/inspection/D4TabCutoffBackward.vue'))
+const D4TabDiscount = defineAsyncComponent(() => import('./d4/inspection/D4TabDiscount.vue'))
+const D4TabReturn = defineAsyncComponent(() => import('./d4/inspection/D4TabReturn.vue'))
+
+// Related
+const D4TabRelatedPrice = defineAsyncComponent(() => import('./d4/related/D4TabRelatedPrice.vue'))
+
+// IPO
+const D4TabIpoProcedure = defineAsyncComponent(() => import('./d4/ipo/D4TabIpoProcedure.vue'))
+const D4TabIpoIndicator = defineAsyncComponent(() => import('./d4/ipo/D4TabIpoIndicator.vue'))
+const D4TabInvoiceCompare = defineAsyncComponent(() => import('./d4/ipo/D4TabInvoiceCompare.vue'))
+const D4TabThirdParty = defineAsyncComponent(() => import('./d4/ipo/D4TabThirdParty.vue'))
+const D4TabDealer = defineAsyncComponent(() => import('./d4/ipo/D4TabDealer.vue'))
+const D4TabOverseas = defineAsyncComponent(() => import('./d4/ipo/D4TabOverseas.vue'))
+const D4TabUndisclosedRp = defineAsyncComponent(() => import('./d4/ipo/D4TabUndisclosedRp.vue'))
+const D4TabCustomerChecklist = defineAsyncComponent(() => import('./d4/ipo/D4TabCustomerChecklist.vue'))
+const D4TabCustomerDetail = defineAsyncComponent(() => import('./d4/ipo/D4TabCustomerDetail.vue'))
+const D4TabInterviewSummary = defineAsyncComponent(() => import('./d4/ipo/D4TabInterviewSummary.vue'))
+const D4TabInterviewDetail = defineAsyncComponent(() => import('./d4/ipo/D4TabInterviewDetail.vue'))
+const D4TabInterviewTemplate = defineAsyncComponent(() => import('./d4/ipo/D4TabInterviewTemplate.vue'))
+const D4TabFundFlow = defineAsyncComponent(() => import('./d4/ipo/D4TabFundFlow.vue'))
+
+// Other
+const D4TabOtherMargin = defineAsyncComponent(() => import('./d4/other/D4TabOtherMargin.vue'))
+const D4TabOtherContract = defineAsyncComponent(() => import('./d4/other/D4TabOtherContract.vue'))
+const D4TabOtherCheck = defineAsyncComponent(() => import('./d4/other/D4TabOtherCheck.vue'))
+const D4TabOtherCutoff = defineAsyncComponent(() => import('./d4/other/D4TabOtherCutoff.vue'))
+
+// ─── Props / Emits ───────────────────────────────────────────────────────────
+
+const props = defineProps<{
+  wpId: string
+  projectId: string
+  wpCode?: string
+  sheetName?: string
+  year?: number
+  htmlData?: any
+  readonly?: boolean
+}>()
+
+const emit = defineEmits<{
+  (e: 'save'): void
+  (e: 'completed'): void
+  (e: 'jump-to-section', sheetName: string): void
+}>()
+
+// ─── Composables ─────────────────────────────────────────────────────────────
+
+const isReadonly = computed(() => !!props.readonly)
+
+/**
+ * 适用准则：htmlData > runtime context（scaffold 从 render-config 顶层注入）。
+ * 🔴 setup 顶层调用（内部 `inject`）。
+ */
+const applicableStandards = useHostApplicableStandards({
+  htmlData: () => props.htmlData,
+})
+
+const formData = useD4FormData({
+  wpId: toRef(props, 'wpId'),
+  projectId: toRef(props, 'projectId'),
+})
+const { flushPendingSave } = formData
+provide('d4SaveItems', async (items: ChecklistResponse[]) => {
+  await formData.saveBatch(items.map(item => ({
+    itemId: item.item_id,
+    data: { conclusion: item.conclusion ?? null, remark: item.remark ?? null },
+  })))
+})
+
+// 直接传 Ref<Map>，禁止 computed(() => map.value) —— 否则子表 watch remark 丢响应，
+// OO→HTML 镜像后的新行（如 GTROW）不会进 D4TabRevenueDetail DOM。
+const allResponses = formData.allResponses
+
+const crossSheet = useD4CrossSheet({
+  allResponses: formData.allResponses,
+  projectContext: formData.projectContext,
+})
+
+// 🔴 价格分析 / 审定表派生联动：子表 inject('d4CrossSheet')；无 provide 则导入按钮永久「上游未就绪」。
+provide('d4CrossSheet', crossSheet)
+
+// 🔴 方案 C 接收端必须挂在宿主生命周期内，否则 d4:price-abnormal 又成「发了无人听」。
+useD4PriceWriteback({
+  allResponses: formData.allResponses,
+  onPersist: (item) => {
+    window.dispatchEvent(new CustomEvent('d4:save-items', { detail: { items: [item] } }))
+  },
+})
+
+// ─── Runtime Boundary：版本链/复核由 GtWpRenderer 统一提供，不再本地重复接线 ───
+const runtime = inject(WorkpaperRuntimeContextKey, null)
+const versionTrailRef = runtime?.version.versionTrailRef ?? ref<{ openDrawer: () => void } | null>(null)
+const openVersionHistory = runtime?.version.openVersionHistory ?? (() => undefined)
+const scheduleAutoSnapshot = runtime?.version.scheduleAutoSnapshot ?? (() => undefined)
+
+// ─── State ───────────────────────────────────────────────────────────────────
+
+const isLoading = ref(true)
+
+/**
+ * 当前激活的 sheet（由外层 GtWpRenderer 通过 sheetName prop 控制）。
+ * GtWpRenderer 传入的是完整 sheet_name（如"营业收入审定表D4-1"），
+ * 需要提取末尾的编码部分（D4-1）来匹配子组件。
+ */
+const currentSheet = computed(() => {
+  const name = props.sheetName || 'D4'
+  if (isSkipWorkpaperSheet(name)) return 'skip'
+  if (name.includes('访谈记录与核对')) return 'D4-31T'
+  // 提取末尾的D4编码（D4/D4A/D4-1/D4-22A等格式）
+  const match = name.match(/D4(?:-\d+)?[A-Z]?$|D4$|D0-5$/)
+  if (match) return match[0]
+  // 附注特殊匹配
+  if (name.includes('上市')) return '附注上市'
+  if (name.includes('国企') || name.includes('国有')) return '附注国企'
+  return name
+})
+
+const d4ReviewSection = computed(() => resolveCycleReviewSection('D4', currentSheet.value))
+
+const availableSheets = computed(() =>
+  props.htmlData?.sheets ?? props.htmlData?.render_config?.sheets ?? [],
+)
+
+const wpIdRefForReview = toRef(props, 'wpId')
+
+const { getThreadDot, getRowDot } = useD4ReviewThreads(wpIdRefForReview)
+provide('getThreadDot', getThreadDot)
+provide('getRowDot', getRowDot)
+provide('d4VersionTrailRef', versionTrailRef)
+provide('d4OpenVersionHistory', openVersionHistory)
+
+// ─── 审计年度：供子表取数（序时账导入/附注TB刷新）统一使用，避免硬编码"当前年-1" ───
+const d4AuditYear = computed<number>(() => {
+  if (props.year && props.year > 0) return props.year
+  const end = formData.projectContext.value?.audit_period_end
+  if (end) {
+    const y = parseInt(String(end).slice(0, 4), 10)
+    if (y > 0) return y
+  }
+  return new Date().getFullYear() - 1
+})
+provide('d4AuditYear', d4AuditYear)
+
+// 子 Tab 导入 xlsx 成功后主动重载 allResponses（否则界面停留在旧值）。
+// selfLoad → formData.loadAll() 刷新 formData.allResponses（子表 watch 的同一 Map 引用）。
+provide('reloadWorkpaperData', selfLoad)
+
+useWorkpaperEntryInjections({
+  onJumpToSection: (sheetLabel) => emit('jump-to-section', sheetLabel),
+  reloadFn: () => formData.loadAll(),
+})
+
+const KNOWN_HTML_SHEETS = new Set([
+  'D4', 'D4A', 'D4-1', 'D4-2', 'D4-3', 'D4-4', 'D4-5', 'D4-6', 'D4-7', 'D4-8', 'D4-9', 'D4-10', 'D4-11',
+  'D4-12', 'D4-13', 'D4-14', 'D4-15', 'D4-16', 'D4-17', 'D4-18', 'D4-19', 'D4-20', 'D4-21',
+  'D4-22A', 'D4-22', 'D4-23', 'D4-24', 'D4-25', 'D4-26', 'D4-27', 'D4-28', 'D4-29', 'D4-30', 'D4-31', 'D4-31T', 'D4-32',
+  'D4-33', 'D4-34', 'D4-35', 'D4-36', '附注上市', '附注国企',
+])
+
+const showModeToolbar = computed(() =>
+  currentSheet.value !== 'skip'
+  && currentSheet.value !== 'D4'
+  && currentSheet.value !== 'D4-5' // D4-5 政策检查：tab 内自管 dualMode / sync host
+  && KNOWN_HTML_SHEETS.has(currentSheet.value),
+)
+
+const dualMode = useD4EntryDualMode({
+  wpId: toRef(props, 'wpId'),
+  currentSheet,
+  availableSheets,
+  reloadAllResponses: () => formData.loadAll(),
+})
+
+const ooSheetName = computed(() =>
+  dualMode.resolveOoSheetName() || props.sheetName || 'D4-1',
+)
+
+// ─── G5-1 D4-2/D4-3 canary：useWorkpaperSyncBridge + store-projection flush ────────
+const D4_SYNC_ENTRY_ID = 'xlsx/gt-d4-operating-revenue'
+const D4_SHEET_KEY_BY_CODE: Record<string, string> = {
+  'D4-2': 'd42-managed',
+  'D4-3': 'd43-managed',
+  'D4-6': 'd46-managed',
+  'D4-7': 'd47-managed',
+  'D4-30': 'd4-30-managed',
+  'D4-31': 'd4-31-managed',
+  'D4-32': 'd4-32-managed',
+}
+const isD4DetailSheet = computed(() => currentSheet.value != null && currentSheet.value in D4_SHEET_KEY_BY_CODE)
+const isD4DedicatedSyncSheet = computed(() => ['D4-5', 'D4-29', 'D4-30', 'D4-31', 'D4-32'].includes(currentSheet.value || ''))
+const syncSwitching = ref(false)
+const syncEditorHostRef = ref<{ forceSave: () => Promise<{ operationId: string }> } | null>(null)
+const syncEntryId = ref(D4_SYNC_ENTRY_ID)
+const syncSheetKey = computed(() => D4_SHEET_KEY_BY_CODE[currentSheet.value] || 'd42-managed')
+const syncBridge = useWorkpaperSyncBridge({
+  entryId: syncEntryId,
+  wpId: toRef(props, 'wpId'),
+  projectId: toRef(props, 'projectId'),
+  sheetKey: syncSheetKey,
+  capability: capabilityForEntry(D4_SYNC_ENTRY_ID),
+  flushHtml: async () => {
+    await flushPendingSave()
+    const sheetKey = D4_SHEET_KEY_BY_CODE[currentSheet.value] || 'd42-managed'
+    const snap = await readStoreProjection({
+      projectId: props.projectId,
+      wpId: props.wpId,
+      entryId: D4_SYNC_ENTRY_ID,
+    })
+    return {
+      expectedRevision: snap.expectedRevision,
+      projection: snap.projection,
+      sheetKey,
+    }
+  },
+  reloadHtml: async (_minimumRevision: number) => {
+    await formData.loadAll()
+  },
+})
+const syncOoDescriptor = computed(() => syncBridge.descriptor.value)
+const syncBusy = computed(
+  () =>
+    syncSwitching.value
+    || (WP_BRIDGE_IN_FLIGHT_STATES as readonly string[]).includes(String(syncBridge.state.value)),
+)
+
+// renderMode / 切换：D4-2 走 syncBridge，其余 sheet 沿用 useD4EntryDualMode。
+const renderMode = computed({
+  get: (): D4RenderMode =>
+    isD4DetailSheet.value
+      ? (syncBridge.mode.value === 'oo' ? 'onlyoffice' : 'html')
+      : dualMode.mode.value,
+  set: (v: D4RenderMode) => {
+    if (isD4DetailSheet.value) void switchRenderMode(v)
+    else void dualMode.switchMode(v)
+  },
+})
+
+const renderModeOptions = computed(() => [
+  { label: '结构化视图', value: 'html' as const },
+  {
+    label: '在线编辑',
+    value: 'onlyoffice' as const,
+    disabled: isD4DetailSheet.value ? isReadonly.value : !dualMode.ooAvailable.value,
+  },
+])
+
+async function switchRenderMode(target: D4RenderMode): Promise<void> {
+  if (target === renderMode.value) return
+  if (target === 'onlyoffice') {
+    if (!isD4DetailSheet.value) return
+    syncSwitching.value = true
+    try {
+      await syncBridge.switchToOnlyOffice()
+    } catch {
+      // lastError / feedback 已由桥写入；保持 html
+    } finally {
+      syncSwitching.value = false
+    }
+    return
+  }
+  if (syncBridge.mode.value !== 'oo') {
+    syncBridge.persistMode('html')
+    return
+  }
+  syncSwitching.value = true
+  try {
+    if (String(syncBridge.state.value) === 'applied') {
+      await syncBridge.reloadAfterApplied()
+    } else if (syncBridge.canForcesave.value && syncEditorHostRef.value) {
+      await syncEditorHostRef.value.forceSave()
+    } else {
+      syncBridge.persistMode('html')
+    }
+  } catch {
+    // 保持 OO；错误在桥上
+  } finally {
+    syncSwitching.value = false
+  }
+}
+
+function onOoFallback(): void {
+  void dualMode.switchMode('html')
+}
+
+async function saveImmediateBatch(
+  items: Array<{ item_id: string; conclusion: string | null; remark: string | null }>,
+): Promise<void> {
+  await formData.saveBatch(items.map(item => ({
+    itemId: item.item_id,
+    data: { conclusion: item.conclusion, remark: item.remark },
+  })))
+  scheduleAutoSnapshot()
+}
+
+
+
+// ─── selfLoad ────────────────────────────────────────────────────────────────
+
+async function selfLoad() {
+  if (props.htmlData?.projectContext) {
+    formData.projectContext.value = props.htmlData.projectContext
+  }
+
+  // htmlData 有无都要拉 checklist：OO→HTML 镜像写在 D4-2-rows，跳过 load 会让明细表「共 0 行」
+  try {
+    await formData.loadAll()
+  } catch (err) {
+    console.warn('[GtD4OperatingRevenue] selfLoad failed:', err)
+  } finally {
+    isLoading.value = false
+  }
+}
+
+// ─── 子表持久化：监听 d4:save-items → 经 formData 直接 PUT 落库 ────────────────
+// 修复：此前主入口无监听器，所有经 window event 保存的子表数据从不落库。
+// 各子 composable flushSave 发 CustomEvent('d4:save-items', {items:[{item_id,conclusion,remark}]})。
+
+async function handleD4SaveItems(e: Event): Promise<void> {
+  const items = (e as CustomEvent<{ items: ChecklistResponse[] }>).detail?.items
+  if (!Array.isArray(items) || items.length === 0) return
+  await formData.saveBatch(
+    items
+      .filter(it => it && it.item_id)
+      .map(it => ({
+        itemId: it.item_id,
+        data: { conclusion: it.conclusion ?? null, remark: it.remark ?? null },
+      })),
+  )
+  scheduleAutoSnapshot()
+}
+
+// ─── 审定表 TB 回写：已移除孤儿监听器（spec tb-writeback-explicit-publish-gate Task 17 批C） ──
+// 原 handleD4Writeback 监听 window 'd4:writeback-trial-balance' → formData.writebackTrialBalance
+// 落库 trial_balance。但 M1（D4-1 改造）已从 useD4Adjudication.publishAdjudicated 移除该
+// dispatch，全仓已无 dispatcher ⇒ 此监听器 + useD4FormData.writebackTrialBalance 均为孤儿死代码
+// （grep 实证 0 dispatcher / 0 其他消费）。TB 回写走显式发布门 publish-to-tb（D4-1 已改造）。
+
+// ─── Lifecycle ───────────────────────────────────────────────────────────────
+
+onMounted(() => {
+  window.addEventListener('d4:save-items', handleD4SaveItems)
+  selfLoad()
+})
+
+onBeforeUnmount(() => {
+  window.removeEventListener('d4:save-items', handleD4SaveItems)
+})
+</script>
+
+<style scoped>
+.d4-operating-revenue {
+  padding: 12px;
+}
+
+.loading-container {
+  padding: 24px;
+}
+
+.d4-mode-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+</style>

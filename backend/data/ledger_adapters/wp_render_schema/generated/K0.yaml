@@ -1,0 +1,53 @@
+# K0.yaml
+# K0 管理循环函证 — render schema
+# 复用D0共享函证组件 + 新建K0-5/K0-6替代程序
+
+wp_code: K0
+template_path: backend/wp_templates/K/K0 管理循环函证.xlsx
+template_version: v2025-R5
+applicable_standards:
+- soe_standalone
+- listed_standalone
+- soe_consolidated
+- listed_consolidated
+
+sheets:
+  底稿目录:
+    component_type: b-index
+    class_code: B-底稿目录
+
+  函证程序表K0A:
+    component_type: a-program-console
+    class_code: A-程序表
+
+  函证结果汇总表K0-1:
+    component_type: confirmation-summary
+    class_code: D-函证
+
+  核实被函证单位信息K0-2:
+    component_type: confirmation-entity-verify
+    class_code: D-函证
+
+  跟函函证过程控制K0-3:
+    component_type: confirmation-followup
+    class_code: D-函证
+
+  函证差异调节表K0-4:
+    component_type: confirmation-diff-reconcile
+    class_code: D-检查表
+
+  其他应收款替代程序K0-5:
+    component_type: confirmation-alternative-k05
+    class_code: A-替代程序
+
+  其他应付款替代程序K0-6:
+    component_type: confirmation-alternative-k06
+    class_code: A-替代程序
+
+  邮件传真回函可靠性验证K0-7:
+    component_type: confirmation-reliability
+    class_code: D-函证
+
+  函证程序舞弊风险评价表K0-8:
+    component_type: confirmation-fraud-risk
+    class_code: D-函证

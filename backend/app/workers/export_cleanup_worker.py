@@ -6,6 +6,7 @@
 - 复用 sla_worker 同款心跳模式（30s 写一次）+ 业务检查间隔（3600s）
 - 清理逻辑委托给 ``ExportProgressService.cleanup_expired(max_age_hours)``
 - 通过 env 变量 ``EXPORT_CLEANUP_MAX_AGE_HOURS`` 调整保留时长（默认 24h）
+- 多副本下通过 leader lock 确保仅一个副本执行清理（心跳仍全副本写）
 
 Validates: requirements.md §三 C-3 配套 + MT-8 文件管理
 """
@@ -64,6 +65,21 @@ async def run(stop_event: asyncio.Event) -> None:
         elapsed = loop_count * HEARTBEAT_INTERVAL_SECONDS
 
         if elapsed >= CLEANUP_INTERVAL_SECONDS:
+            # Leader lock: only one replica should execute cleanup
+            from app.workers._leader_lock import try_acquire_leadership
+
+            if not await try_acquire_leadership("export_cleanup_worker", ttl_ms=90_000):
+                # Not the leader this round, skip cleanup
+                loop_count = 0
+                try:
+                    await asyncio.wait_for(
+                        stop_event.wait(),
+                        timeout=HEARTBEAT_INTERVAL_SECONDS,
+                    )
+                except asyncio.TimeoutError:
+                    pass
+                continue
+
             try:
                 from app.services.export_progress_service import (
                     export_progress_service,

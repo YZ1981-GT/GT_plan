@@ -1,0 +1,212 @@
+{
+  "generated_by": "backend/scripts/diagnose/mutate_task4_callback_contract_guards.py",
+  "test_files": [
+    "backend/tests/test_workpaper_callback_state_contract.py",
+    "backend/tests/test_workpaper_callback_download_security.py"
+  ],
+  "baseline_all_green": true,
+  "tally": {
+    "RED": 14,
+    "GREEN": 1
+  },
+  "mutations": [
+    {
+      "id": 1,
+      "label": "真值表 schema_version 漂移",
+      "file": "backend/data/onlyoffice_callback_state_contract.json",
+      "expect_tests": [
+        "test_contract_is_versioned_and_complete"
+      ],
+      "result": "RED",
+      "failed_tests": [
+        "test_contract_is_versioned_and_complete"
+      ],
+      "note": ""
+    },
+    {
+      "id": 2,
+      "label": "status 6 声明 userdata 恒有（实证是 optional）",
+      "file": "backend/data/onlyoffice_callback_state_contract.json",
+      "expect_tests": [
+        "test_url_and_userdata_presence_match_real_payloads"
+      ],
+      "result": "RED",
+      "failed_tests": [
+        "test_url_and_userdata_presence_match_real_payloads"
+      ],
+      "note": ""
+    },
+    {
+      "id": 3,
+      "label": "status 2 谎报未实证",
+      "file": "backend/data/onlyoffice_callback_state_contract.json",
+      "expect_tests": [
+        "test_observed_statuses_match_real_probe",
+        "test_observed_counts_and_body_fields_match_real_payloads"
+      ],
+      "result": "RED",
+      "failed_tests": [
+        "test_observed_counts_and_body_fields_match_real_payloads",
+        "test_observed_statuses_match_real_probe"
+      ],
+      "note": ""
+    },
+    {
+      "id": 4,
+      "label": "status 6 observed_count 与实证不符",
+      "file": "backend/data/onlyoffice_callback_state_contract.json",
+      "expect_tests": [
+        "test_observed_counts_and_body_fields_match_real_payloads"
+      ],
+      "result": "RED",
+      "failed_tests": [
+        "test_observed_counts_and_body_fields_match_real_payloads"
+      ],
+      "note": ""
+    },
+    {
+      "id": 5,
+      "label": "撤销结论改成 participant-bound",
+      "file": "backend/data/onlyoffice_callback_state_contract.json",
+      "expect_tests": [
+        "test_participant_bound_authorization_is_refused",
+        "test_revoked_user_contribution_is_not_dropped_from_aggregate"
+      ],
+      "result": "RED",
+      "failed_tests": [
+        "test_participant_bound_authorization_is_refused",
+        "test_revoked_user_contribution_is_not_dropped_from_aggregate"
+      ],
+      "note": ""
+    },
+    {
+      "id": 6,
+      "label": "谎称 OO 会重发被拒 callback",
+      "file": "backend/data/onlyoffice_callback_state_contract.json",
+      "expect_tests": [
+        "test_oo_does_not_redeliver_rejected_callbacks"
+      ],
+      "result": "RED",
+      "failed_tests": [
+        "test_oo_does_not_redeliver_rejected_callbacks"
+      ],
+      "note": ""
+    },
+    {
+      "id": 7,
+      "label": "Command Service error=4 谎称会有 callback",
+      "file": "backend/data/onlyoffice_callback_state_contract.json",
+      "expect_tests": [
+        "test_command_service_return_codes_match_real_calls"
+      ],
+      "result": "RED",
+      "failed_tests": [
+        "test_command_service_return_codes_match_real_calls"
+      ],
+      "note": ""
+    },
+    {
+      "id": 8,
+      "label": "下载策略放开重定向",
+      "file": "backend/data/onlyoffice_callback_state_contract.json",
+      "expect_tests": [
+        "test_download_security_policy_is_versioned_and_strict"
+      ],
+      "result": "RED",
+      "failed_tests": [
+        "test_download_security_policy_is_versioned_and_strict"
+      ],
+      "note": ""
+    },
+    {
+      "id": 9,
+      "label": "application key 混入 callback_status",
+      "file": "backend/data/onlyoffice_callback_state_contract.json",
+      "expect_tests": [
+        "test_application_key_excludes_status_and_arrival_pointer"
+      ],
+      "result": "RED",
+      "failed_tests": [
+        "test_application_key_excludes_status_and_arrival_pointer"
+      ],
+      "note": ""
+    },
+    {
+      "id": 10,
+      "label": "in-flight grace 超过 callback 等待超时",
+      "file": "backend/data/onlyoffice_callback_state_contract.json",
+      "expect_tests": [
+        "test_timers_cover_timeout_grace_and_ttl"
+      ],
+      "result": "RED",
+      "failed_tests": [
+        "test_timers_cover_timeout_grace_and_ttl"
+      ],
+      "note": ""
+    },
+    {
+      "id": 11,
+      "label": "claim schema 版本与 cbv 约束脱钩",
+      "file": "backend/data/onlyoffice_callback_state_contract.json",
+      "expect_tests": [
+        "test_jwt_claim_schema_is_versioned_and_url_bound"
+      ],
+      "result": "RED",
+      "failed_tests": [
+        "test_jwt_claim_schema_is_versioned_and_url_bound"
+      ],
+      "note": ""
+    },
+    {
+      "id": 12,
+      "label": "安全 gap 清单被削空",
+      "file": "backend/data/onlyoffice_callback_state_contract.json",
+      "expect_tests": [],
+      "result": "GREEN",
+      "failed_tests": [],
+      "note": "只加一条无害项，期望 GREEN（清单长度校验只挡削减）；用于确认判据方向正确"
+    },
+    {
+      "id": 13,
+      "label": "evidence 篡改：抹掉撤销用户在后续 artifact 的贡献",
+      "file": ".kiro/specs/workpaper-html-onlyoffice-bidirectional-writeback-closure/evidence/task4-oo94-multiuser-callback/callbacks.jsonl",
+      "expect_tests": [
+        "test_revoked_user_contribution_is_not_dropped_from_aggregate",
+        "test_forcesave_artifact_aggregates_other_participant_edits"
+      ],
+      "result": "RED",
+      "failed_tests": [
+        "test_forcesave_artifact_aggregates_other_participant_edits",
+        "test_revoked_user_contribution_is_not_dropped_from_aggregate"
+      ],
+      "note": "anchor 多处命中时脚本按 replace_all 处理（见 allow_multi）"
+    },
+    {
+      "id": 14,
+      "label": "生产下载 timeout 漂移",
+      "file": "backend/app/routers/wp_onlyoffice_router.py",
+      "expect_tests": [
+        "test_production_download_profile_is_unchanged"
+      ],
+      "result": "RED",
+      "failed_tests": [
+        "test_production_download_profile_is_unchanged",
+        "test_production_has_single_undifferentiated_timeout"
+      ],
+      "note": ""
+    },
+    {
+      "id": 15,
+      "label": "生产 claim_version 不再传 None",
+      "file": "backend/app/routers/wp_onlyoffice_router.py",
+      "expect_tests": [
+        "test_production_passes_claim_version_none"
+      ],
+      "result": "RED",
+      "failed_tests": [
+        "test_production_passes_claim_version_none"
+      ],
+      "note": ""
+    }
+  ]
+}

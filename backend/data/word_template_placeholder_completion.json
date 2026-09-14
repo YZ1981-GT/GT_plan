@@ -1,0 +1,395 @@
+{
+ "schema_version": "word-placeholder-completion:v1",
+ "generated_by": "backend/scripts/gen/generate_word_placeholder_completion_list.py",
+ "why": "BP-20：9 个 B 子码的权威 DOCX 里 ${token} 现算共 0 个；字段身份由 wp_docx_template_parser 的 legacy 正则 `××` + 出现顺序派生 ⇒ 位置一变字段全错位，per-entry contract 发不出去。解除需模板编制方为每个 ×× 指定稳定字段名。",
+ "legacy_pattern": "××",
+ "target_form": "${field_name} 或 ${field_name:标签}",
+ "parser_ref": "app/services/wp_docx_template_parser.py::_NEW_PLACEHOLDER_RE",
+ "carriers": [
+  {
+   "wp_code": "B18-3-1",
+   "relative_path": "B/B18-3-1 利用内部审计人员为审计提供直接协助的书面协议（适用于企业设立内部审计部门或职能岗位）.docx",
+   "exists": true,
+   "sha256": "e4d6049437774d2e49babf542ade99e7cb3734ea04b6d4b093781b46ba42d9de",
+   "size_bytes": 47732,
+   "paragraph_count": 63,
+   "table_count": 0,
+   "dollar_token_count": 0,
+   "slot_count": 1,
+   "unrecognized_single_x_count": 0,
+   "unrecognized_single_x_lines": [],
+   "note": "",
+   "slots": [
+    {
+     "seq": 1,
+     "derived_field_id": "placeholder_generic",
+     "derived_label": "待填内容",
+     "data_type": "text",
+     "location": "段落 #45",
+     "location_raw": {
+      "paragraph_index": 45
+     },
+     "context": "（2）提交【××】仲裁委员会仲裁。",
+     "suggested_name": "arbitration_commission",
+     "suggested_label": "仲裁委员会名称",
+     "confirmed_name": null,
+     "confirmed_label": null,
+     "business_meaning": null
+    }
+   ]
+  },
+  {
+   "wp_code": "B18-3-2",
+   "relative_path": "B/B18-3-2 利用内部审计人员为审计提供直接协助的书面协议（适用于内部审计职能外包）.docx",
+   "exists": true,
+   "sha256": "af2b4e63b3a10c7fb406ba2b7ce00202d178ea9f2f0ee7daf32d5aa83a993485",
+   "size_bytes": 49722,
+   "paragraph_count": 71,
+   "table_count": 0,
+   "dollar_token_count": 0,
+   "slot_count": 1,
+   "unrecognized_single_x_count": 0,
+   "unrecognized_single_x_lines": [],
+   "note": "",
+   "slots": [
+    {
+     "seq": 1,
+     "derived_field_id": "placeholder_generic",
+     "derived_label": "待填内容",
+     "data_type": "text",
+     "location": "段落 #48",
+     "location_raw": {
+      "paragraph_index": 48
+     },
+     "context": "（2）提交【××】仲裁委员会仲裁。",
+     "suggested_name": "arbitration_commission",
+     "suggested_label": "仲裁委员会名称",
+     "confirmed_name": null,
+     "confirmed_label": null,
+     "business_meaning": null
+    }
+   ]
+  },
+  {
+   "wp_code": "B2-1",
+   "relative_path": "B/B2-1 向被审计单位发出的沟通函副本（就业务承接事项）.docx",
+   "exists": true,
+   "sha256": "8f7cb5f36d2625c7041e810a678f3573efde6713e38a014831136b644b88ae5d",
+   "size_bytes": 20825,
+   "paragraph_count": 13,
+   "table_count": 1,
+   "dollar_token_count": 0,
+   "slot_count": 2,
+   "unrecognized_single_x_count": 2,
+   "unrecognized_single_x_lines": [
+    "【20××】年【×】月【×】日"
+   ],
+   "note": "",
+   "slots": [
+    {
+     "seq": 1,
+     "derived_field_id": "placeholder_generic",
+     "derived_label": "待填内容",
+     "data_type": "textarea",
+     "location": "段落 #1",
+     "location_raw": {
+      "paragraph_index": 1
+     },
+     "context": "贵公司拟聘本所执行【20【××】】年度财务报表审计业务，按照《中国注册会计师审计准则第1153号——前任注册会计师与后任注册…",
+     "suggested_name": "fiscal_year_yy",
+     "suggested_label": "会计年度（20 之后两位）",
+     "confirmed_name": null,
+     "confirmed_label": null,
+     "business_meaning": null
+    },
+    {
+     "seq": 2,
+     "derived_field_id": "placeholder_generic_2",
+     "derived_label": "待填内容",
+     "data_type": "text",
+     "location": "段落 #12",
+     "location_raw": {
+      "paragraph_index": 12
+     },
+     "context": "【20【××】】年【×】月【×】日",
+     "suggested_name": "sign_date_yy",
+     "suggested_label": "签署日期的年份（20 之后两位）",
+     "confirmed_name": null,
+     "confirmed_label": null,
+     "business_meaning": null
+    }
+   ]
+  },
+  {
+   "wp_code": "B2-11",
+   "relative_path": "B/B2-11 与前任注册会计师的沟通函（就沪深交易所涉及复核时的重要事项）.docx",
+   "exists": true,
+   "sha256": "d765d548abe2a5f0c41acaeacbacd25318744b6185cff18a927bcb9e76b26202",
+   "size_bytes": 22254,
+   "paragraph_count": 22,
+   "table_count": 1,
+   "dollar_token_count": 0,
+   "slot_count": 1,
+   "unrecognized_single_x_count": 2,
+   "unrecognized_single_x_lines": [
+    "【20××】年【×】月【×】日"
+   ],
+   "note": "",
+   "slots": [
+    {
+     "seq": 1,
+     "derived_field_id": "placeholder_generic",
+     "derived_label": "待填内容",
+     "data_type": "text",
+     "location": "段落 #21",
+     "location_raw": {
+      "paragraph_index": 21
+     },
+     "context": "【20【××】】年【×】月【×】日",
+     "suggested_name": "sign_date_yy",
+     "suggested_label": "签署日期的年份（20 之后两位）",
+     "confirmed_name": null,
+     "confirmed_label": null,
+     "business_meaning": null
+    }
+   ]
+  },
+  {
+   "wp_code": "B2-3",
+   "relative_path": "B/B2-3 与前任注册会计师的沟通函副本（就业务承接事项，第一封沟通函）.docx",
+   "exists": true,
+   "sha256": "6dd3df4a529968573f9e0f6b20c95bb1c5dc28769978f0aeb12c30fd2161659b",
+   "size_bytes": 22705,
+   "paragraph_count": 29,
+   "table_count": 1,
+   "dollar_token_count": 0,
+   "slot_count": 1,
+   "unrecognized_single_x_count": 2,
+   "unrecognized_single_x_lines": [
+    "【20××】年【×】月【×】日"
+   ],
+   "note": "",
+   "slots": [
+    {
+     "seq": 1,
+     "derived_field_id": "placeholder_generic",
+     "derived_label": "待填内容",
+     "data_type": "text",
+     "location": "段落 #28",
+     "location_raw": {
+      "paragraph_index": 28
+     },
+     "context": "【20【××】】年【×】月【×】日",
+     "suggested_name": "sign_date_yy",
+     "suggested_label": "签署日期的年份（20 之后两位）",
+     "confirmed_name": null,
+     "confirmed_label": null,
+     "business_meaning": null
+    }
+   ]
+  },
+  {
+   "wp_code": "B2-3",
+   "relative_path": "B/B2-3 与前任注册会计师的沟通函副本（就业务承接事项，第二封沟通函）.docx",
+   "exists": true,
+   "sha256": "365829d7d037211344dd694610b54fbb1a6fe4aa9e8f97b5c4fd1eb8d49d15cd",
+   "size_bytes": 21275,
+   "paragraph_count": 14,
+   "table_count": 1,
+   "dollar_token_count": 0,
+   "slot_count": 1,
+   "unrecognized_single_x_count": 2,
+   "unrecognized_single_x_lines": [
+    "【20××】年【×】月【×】日"
+   ],
+   "note": "",
+   "slots": [
+    {
+     "seq": 1,
+     "derived_field_id": "placeholder_generic",
+     "derived_label": "待填内容",
+     "data_type": "text",
+     "location": "段落 #13",
+     "location_raw": {
+      "paragraph_index": 13
+     },
+     "context": "【20【××】】年【×】月【×】日",
+     "suggested_name": "sign_date_yy",
+     "suggested_label": "签署日期的年份（20 之后两位）",
+     "confirmed_name": null,
+     "confirmed_label": null,
+     "business_meaning": null
+    }
+   ]
+  },
+  {
+   "wp_code": "B2-6",
+   "relative_path": "B/B2-6 向被审计单位发出的沟通函副本（就底稿使用事项）.docx",
+   "exists": true,
+   "sha256": "8ac7d9a137c8d5f82208636318b7c0c4b6fcdc7bce6f105af23dc33b25509387",
+   "size_bytes": 21110,
+   "paragraph_count": 14,
+   "table_count": 1,
+   "dollar_token_count": 0,
+   "slot_count": 4,
+   "unrecognized_single_x_count": 2,
+   "unrecognized_single_x_lines": [
+    "【20××】年【×】月【×】日"
+   ],
+   "note": "",
+   "slots": [
+    {
+     "seq": 1,
+     "derived_field_id": "placeholder_generic",
+     "derived_label": "待填内容",
+     "data_type": "textarea",
+     "location": "段落 #1",
+     "location_raw": {
+      "paragraph_index": 1
+     },
+     "context": "贵公司聘请本所执行【20【××】】年度财务报表审计业务，按照《中国注册会计师审计准则第1331号——首次审计业务涉及的期初余…",
+     "suggested_name": "fiscal_year_yy",
+     "suggested_label": "会计年度（20 之后两位）",
+     "confirmed_name": null,
+     "confirmed_label": null,
+     "business_meaning": null
+    },
+    {
+     "seq": 2,
+     "derived_field_id": "placeholder_generic_2",
+     "derived_label": "待填内容",
+     "data_type": "textarea",
+     "location": "段落 #1",
+     "location_raw": {
+      "paragraph_index": 1
+     },
+     "context": "…《中国注册会计师审计准则第1331号——首次审计业务涉及的期初余额》的要求，本所应针对【20【××】】年度财务报表的期初余额获取充分、适当的审计证据。因此，本所需要查阅前任注册会计师A会计师事…",
+     "suggested_name": "fiscal_year_yy",
+     "suggested_label": "会计年度（20 之后两位）",
+     "confirmed_name": null,
+     "confirmed_label": null,
+     "business_meaning": null
+    },
+    {
+     "seq": 3,
+     "derived_field_id": "placeholder_generic_3",
+     "derived_label": "待填内容",
+     "data_type": "textarea",
+     "location": "段落 #1",
+     "location_raw": {
+      "paragraph_index": 1
+     },
+     "context": "…稿。请贵公司同意本所查阅A会计师事务所的审计工作底稿，并授权A会计师事务所将其对贵公司【20【××】】年度财务报表审计的相关工作底稿提供给本所，以供本所查阅。",
+     "suggested_name": "fiscal_year_yy",
+     "suggested_label": "会计年度（20 之后两位）",
+     "confirmed_name": null,
+     "confirmed_label": null,
+     "business_meaning": null
+    },
+    {
+     "seq": 4,
+     "derived_field_id": "placeholder_generic_4",
+     "derived_label": "待填内容",
+     "data_type": "text",
+     "location": "段落 #13",
+     "location_raw": {
+      "paragraph_index": 13
+     },
+     "context": "【20【××】】年【×】月【×】日",
+     "suggested_name": "sign_date_yy",
+     "suggested_label": "签署日期的年份（20 之后两位）",
+     "confirmed_name": null,
+     "confirmed_label": null,
+     "business_meaning": null
+    }
+   ]
+  },
+  {
+   "wp_code": "B2-8",
+   "relative_path": "B/B2-8 与前任注册会计师的沟通函副本（就底稿查阅事项）.docx",
+   "exists": true,
+   "sha256": "178bac9df44838fded1b661994b4dc5bcc39af735765b23d0675450f4dc070db",
+   "size_bytes": 19730,
+   "paragraph_count": 12,
+   "table_count": 1,
+   "dollar_token_count": 0,
+   "slot_count": 1,
+   "unrecognized_single_x_count": 2,
+   "unrecognized_single_x_lines": [
+    "【20××】年【×】月【×】日"
+   ],
+   "note": "",
+   "slots": [
+    {
+     "seq": 1,
+     "derived_field_id": "placeholder_generic",
+     "derived_label": "待填内容",
+     "data_type": "text",
+     "location": "段落 #11",
+     "location_raw": {
+      "paragraph_index": 11
+     },
+     "context": "【20【××】】年【×】月【×】日",
+     "suggested_name": "sign_date_yy",
+     "suggested_label": "签署日期的年份（20 之后两位）",
+     "confirmed_name": null,
+     "confirmed_label": null,
+     "business_meaning": null
+    }
+   ]
+  },
+  {
+   "wp_code": "B40-1",
+   "relative_path": "B/B40-1 项目组讨论备忘录.docx",
+   "exists": true,
+   "sha256": "b706152690fe9055bda155452ada8f7d0710c1a00f255bec66d01123e39789b4",
+   "size_bytes": 47353,
+   "paragraph_count": 3,
+   "table_count": 2,
+   "dollar_token_count": 0,
+   "slot_count": 0,
+   "unrecognized_single_x_count": 0,
+   "unrecognized_single_x_lines": [],
+   "note": "⚠ 解析器现算 0 个占位符 —— 该模板结构化岛为空集，需模板编制方确认是否本就无需填写位",
+   "slots": []
+  },
+  {
+   "wp_code": "B40-2",
+   "relative_path": "B/B40-2 对SCOT+的完整性进行再评估.docx",
+   "exists": true,
+   "sha256": "8ab087fe48de52a042f411da32e1dcaaa5b800a1b99bc53c9d408939a9b56b76",
+   "size_bytes": 46847,
+   "paragraph_count": 5,
+   "table_count": 2,
+   "dollar_token_count": 0,
+   "slot_count": 0,
+   "unrecognized_single_x_count": 0,
+   "unrecognized_single_x_lines": [],
+   "note": "⚠ 解析器现算 0 个占位符 —— 该模板结构化岛为空集，需模板编制方确认是否本就无需填写位",
+   "slots": []
+  },
+  {
+   "wp_code": "S33-REV",
+   "relative_path": "",
+   "exists": false,
+   "sha256": "",
+   "size_bytes": 0,
+   "paragraph_count": 0,
+   "table_count": 0,
+   "dollar_token_count": 0,
+   "slot_count": 0,
+   "unrecognized_single_x_count": 0,
+   "unrecognized_single_x_lines": [],
+   "note": "🔴 该 entry 无自有 docx 载体（裁决为 template_missing）—— 需模板编制方确认是否应有模板",
+   "slots": []
+  }
+ ],
+ "stats": {
+  "carrier_count": 11,
+  "missing_carrier_count": 1,
+  "zero_slot_carrier_count": 2,
+  "slot_total": 12,
+  "dollar_token_total": 0,
+  "unrecognized_single_x_total": 12
+ }
+}

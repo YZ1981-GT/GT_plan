@@ -39,6 +39,8 @@ Validates: Requirements R1.2 验收 6/7/8/9
 from __future__ import annotations
 
 import logging
+import re
+import warnings
 from datetime import date
 from decimal import Decimal
 from typing import Any
@@ -644,19 +646,247 @@ async def _get_wp_parsed_data(
 
 
 # ---------------------------------------------------------------------------
-# 6) formula — 表内单元格引用（Sprint 1.5 实现，1.4 stub）
+# 6) formula — 表内单元格引用（sum / report / aging / prior_year_note）
+#    Spec: disclosure-note-formula-and-report-sync Wave1 (2.1)
+#    Reqs: 1.1 / 1.2 / 1.3 / 1.4 / 8.3 / 8.4
 # ---------------------------------------------------------------------------
+
+
+def _formula_enabled(*, formula_on: bool | None = None) -> bool:
+    """灰度开关（默认 False = 保持 stub 行为，逐字节零回归）.
+
+    若 `formula_on` 由上游入口（generate_notes）预解析后传入，直接使用，避免逐格查库。
+    否则回退读全局 settings（向后兼容旧调用路径）。
+    """
+    if formula_on is not None:
+        return formula_on
+    try:
+        from app.core.config import settings
+
+        return bool(getattr(settings, "DISCLOSURE_NOTE_FORMULA_ENABLED", False))
+    except Exception:  # pragma: no cover — 配置不可用时安全降级为关闭
+        return False
+
+
+def _resolve_row_col(binding: dict[str, Any]) -> tuple[int, int] | None:
+    """从 binding 解析单元格 (row_idx, col_idx)（0-based）.
+
+    支持两种写法：
+      - ``cell``: "R2C2"（1-based Excel 风格，转 0-based）
+      - ``row`` + ``col``: 整数（0-based，直接用）
+    非法 / 缺失 → None。
+    """
+    cell = binding.get("cell")
+    if isinstance(cell, str):
+        m = re.fullmatch(r"\s*[Rr](\d+)[Cc](\d+)\s*", cell)
+        if m:
+            return (int(m.group(1)) - 1, int(m.group(2)) - 1)
+    row = binding.get("row")
+    col = binding.get("col")
+    if isinstance(row, int) and isinstance(col, int) and row >= 0 and col >= 0:
+        return (row, col)
+    return None
+
+
+def _select_table(table_data: Any, table_index: int) -> dict[str, Any] | None:
+    """按 table_index 选表：多表取 ``_tables[i]``，单表取自身."""
+    if not isinstance(table_data, dict):
+        return None
+    tables = table_data.get("_tables")
+    if isinstance(tables, list) and tables:
+        if 0 <= table_index < len(tables) and isinstance(tables[table_index], dict):
+            return tables[table_index]
+        return None
+    return table_data
+
+
+def _cell_value_from_table(table_data: Any, binding: dict[str, Any]) -> float | None:
+    """从 table_data 按 (table_index + cell 坐标) 反查单元格数值.
+
+    table_data 结构：``{rows: [{values: [...]}, ...]}`` 或 ``{_tables: [...]}``。
+    坐标越界 / 表越界 / 非数值 → None。
+    """
+    table_index = binding.get("table_index")
+    if not isinstance(table_index, int) or table_index < 0:
+        table_index = 0
+    tbl = _select_table(table_data, table_index)
+    if not isinstance(tbl, dict):
+        return None
+    coord = _resolve_row_col(binding)
+    if coord is None:
+        return None
+    r, c = coord
+    rows = tbl.get("rows")
+    if not isinstance(rows, list) or not (0 <= r < len(rows)):
+        return None
+    row = rows[r]
+    if not isinstance(row, dict):
+        return None
+    vals = row.get("values")
+    if not isinstance(vals, list) or not (0 <= c < len(vals)):
+        return None
+    return _to_float(vals[c])
+
+
+def _current_cell_value(ctx: dict[str, Any], coord: str) -> float | None:
+    """取当前表某坐标数值.
+
+    优先 ``ctx["cell_values"]``（{coord: value}，由 NoteFormulaEvaluator 预填）；
+    回退从 ``ctx["table_data"]`` 按坐标反查。
+    """
+    cv = ctx.get("cell_values")
+    if isinstance(cv, dict) and coord in cv:
+        return _to_float(cv.get(coord))
+    td = ctx.get("table_data")
+    if isinstance(td, dict):
+        return _cell_value_from_table(
+            td, {"cell": coord, "table_index": ctx.get("table_index", 0)}
+        )
+    return None
+
+
+async def _resolve_formula_sum(
+    binding: dict[str, Any],
+    ctx: dict[str, Any],
+) -> float | None:
+    """SUM：对 binding.cells 指定的同表坐标求和 — 复用既有 evaluate_formula 内核.
+
+    构造 ``ROW('c1') + ROW('c2') + ...`` 交由 ``formula_parse_utils.evaluate_formula``
+    求值（不新造求值器，满足 Req1.2 / Property4）。缺任一坐标值 → 跳过该项；
+    全部缺失 → None。
+    """
+    cells = binding.get("cells")
+    if not isinstance(cells, list) or not cells:
+        return None
+
+    row_values: dict[str, Decimal] = {}
+    terms: list[str] = []
+    for c in cells:
+        # 项写法：str（原样，视为 '+'）或 {"cell": str, "sign": "+"|"-"}
+        # —— 带符号扩展（Req9.1/9.2），纯字符串写法逐字节保留原行为。
+        if isinstance(c, str):
+            coord, sign = c, "+"
+        elif isinstance(c, dict):
+            coord = c.get("cell")
+            sign = c.get("sign") or "+"
+            if not isinstance(coord, str) or sign not in ("+", "-"):
+                continue
+        else:
+            continue
+        if not coord:
+            continue
+        v = _current_cell_value(ctx, coord)
+        if v is None:
+            continue
+        row_values[coord] = Decimal(str(v))
+        ref = f"ROW('{coord}')"
+        if not terms:
+            terms.append(ref if sign == "+" else f"-{ref}")
+        else:
+            terms.append(f"{sign} {ref}")
+    if not terms:
+        return None
+
+    formula = " ".join(terms)
+    from app.services.formula_parse_utils import evaluate_formula
+
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", DeprecationWarning)
+        result = await evaluate_formula(
+            formula,
+            ctx.get("db"),
+            ctx.get("project_id"),
+            ctx.get("year"),
+            row_values=row_values,
+        )
+    if not isinstance(result, dict):
+        return None
+    return _to_float(result.get("value"))
+
+
+def _resolve_formula_report(
+    binding: dict[str, Any],
+    ctx: dict[str, Any],
+) -> float | None:
+    """REPORT：按 row_code 取 ``ctx.report_data[row_code]``（current_period_amount）.
+
+    row_code 不存在 / report_data 缺失 → None（Req1.3 / Property3）。
+    """
+    row_code = binding.get("row_code")
+    if not isinstance(row_code, str) or not row_code:
+        return None
+    report_data = ctx.get("report_data")
+    if not isinstance(report_data, dict):
+        return None
+    if row_code not in report_data:
+        return None
+    return _to_float(report_data.get(row_code))
+
+
+def _resolve_formula_aging(
+    binding: dict[str, Any],
+    ctx: dict[str, Any],
+) -> float | None:
+    """AGING：按账龄段取 ``ctx.aging_data[band]``（复用既有账龄配置聚合结果）.
+
+    ctx 无账龄数据 / 段缺失 → None（不新造账龄引擎）。
+    """
+    aging_data = ctx.get("aging_data")
+    if not isinstance(aging_data, dict) or not aging_data:
+        return None
+    band = binding.get("band") or binding.get("bucket")
+    if not isinstance(band, str) or not band:
+        return None
+    if band not in aging_data:
+        return None
+    return _to_float(aging_data.get(band))
 
 
 async def resolve_formula(
     binding: dict[str, Any],
     ctx: dict[str, Any],
 ) -> Any:
-    """表内公式引用 stub.
+    """表内公式引用求值（sum / report / aging / prior_year_note）.
 
-    Sprint 1.5 落地真实表达式求值（PRIOR / AGING 等）；本任务 1.4 仅返 None
-    确保接口签名稳定 + 不抛错。caller 拿到 None 走 manual placeholder。
+    按 ``binding.source`` 装配数据后委托既有公式内核
+    （``formula_parse_utils.evaluate_formula``）—— 不新造求值器（Design 决策1）。
+
+    - ``source=='sum'``：对 binding.cells 同表坐标求和（走 evaluate_formula）
+    - ``source=='report'``：按 row_code 取 ctx.report_data[row_code]
+    - ``source=='aging'``：按账龄段取 ctx.aging_data[band]
+    - ``source=='prior_year_note'``：委托 resolve_prior_year_note
+
+    灰度：``DISCLOSURE_NOTE_FORMULA_ENABLED`` 默认 False 时保持 stub 行为返 None
+    （零回归，Req8.3/8.4）。任一异常 / 缺数据 → None（fail-open，Req1.4，不抛到调用方）。
     """
+    if not isinstance(binding, dict):
+        return None
+    if not _formula_enabled():
+        return None
+
+    source = binding.get("source")
+    # 子类型分派（spec disclosure-note-formula-data-population 决策 3）：
+    # binding 写 ``source='formula'``（已在 VALID_SOURCES / json valid_sources 内，
+    # 不新增枚举值）+ ``formula_kind='sum'|'report'|'aging'|'prior_year_note'``。
+    # 旧写法（``source`` 直接是 sum/report/aging）逐字节保留，向后兼容。
+    kind = binding.get("formula_kind") or binding.get("kind") or source
+    try:
+        if kind == "sum":
+            return await _resolve_formula_sum(binding, ctx)
+        if kind == "report":
+            return _resolve_formula_report(binding, ctx)
+        if kind == "aging":
+            return _resolve_formula_aging(binding, ctx)
+        if kind == "prior_year_note":
+            return await resolve_prior_year_note(binding, ctx)
+    except Exception as err:
+        logger.warning(
+            "resolve_formula source=%s kind=%s raised %s; returning None (fail-open)",
+            source,
+            kind,
+            err,
+        )
+        return None
     return None
 
 
@@ -672,38 +902,80 @@ async def resolve_prior_year_note(
     """从 ctx["_prior_notes_cache"] 取上年附注 — 不重复 SQL.
 
     binding 字段：
-      - section:       str             指定章节号（覆盖 default — caller 一般留空让 caller 自传）
-      - field:         str             "value" / "text" — 决定取数 vs 取文本
-      - account_codes: 暂不使用（上年值按 section + table 单元格定位）
+      - section / note_section: str    指定章节号（缺则回退 ctx["section_number"]）
+      - field:         str             "value" / "text" — 取单元格数值 vs 取文本
+      - cell / row+col: 坐标（value 模式用）
+      - table_index:   int             多表定位（value 模式，默认 0）
 
-    缓存结构（disclosure_engine._preload_data_for_notes 写入）：
-      ctx["_prior_notes_cache"][note_section] = text_content (str)
+    缓存结构（disclosure_engine._preload_data_for_notes 写入）现为：
+      ctx["_prior_notes_cache"][note_section] = {"text": str|None, "table": dict|None}
+    **向后兼容旧扁平字符串缓存** ``{note_section: text_content (str)}``。
 
-    R1.2 验收 9：上年无数据时静默返回 None — 不阻塞.
+    - field=='text'（历史行为，不受开关约束、不回归）：返回上年文本；
+      dict 缓存取 .text、旧扁平缓存直接返回字符串。
+    - field=='value'：按 section + 坐标(+table_index) 从上年 table 反查单元格金额；
+      仅新 dict 缓存 + 开关开启时生效；无表 / 坐标不存在 / 旧扁平缓存 → 走期初余额回退。
+
+    value 模式回退：上年年末余额 = 本年期初余额（会计恒等式），当无上年附注单元格
+    数据时，按 binding.account_codes 从试算表期初余额（trial_balance opening）取数
+    —— 数据源回退（非公式），不受 DISCLOSURE_NOTE_FORMULA_ENABLED 约束；无科目码
+    （手工行）保持 None 原行为。
+
+    上年无数据且无科目码一律静默返回 None — 不阻塞（Req2.2）。
     """
-    cache = ctx.get("_prior_notes_cache") or {}
-    if not cache:
-        return None
+    field = binding.get("field") or "value"
 
     section = binding.get("section") or binding.get("note_section")
     if not isinstance(section, str) or not section:
-        # 没指定章节 — 调用方应该传 section_number 进 ctx
-        # 这里兜底：拿 ctx["section_number"]
         section = ctx.get("section_number")
-        if not isinstance(section, str) or not section:
-            return None
+    cache = ctx.get("_prior_notes_cache") or {}
+    raw = cache.get(section) if isinstance(section, str) and section else None
 
-    raw = cache.get(section)
-    if raw is None:
+    if field == "text":
+        # 兼容旧扁平字符串缓存 + 新 dict 缓存（text 模式不回归、不受开关约束）
+        if isinstance(raw, str):
+            return raw
+        if isinstance(raw, dict):
+            t = raw.get("text")
+            return t if isinstance(t, str) else None
         return None
 
-    # 暂时缓存的是 text_content；field == "text" 直接返回，
-    # field == "value" 还没法精确反查（上年单元格级值）→ 返 None 占位
-    field = binding.get("field") or "value"
-    if field == "text":
-        return raw if isinstance(raw, str) else None
-    # value 模式：暂无单元格级反查，返 None 让 caller 走 manual placeholder
-    return None
+    # value 模式：优先上年附注单元格反查（新行为，受开关控制 = 关闭时零回归 Req8.3/8.4）
+    if _formula_enabled() and isinstance(raw, dict):
+        prior_val = _cell_value_from_table(raw.get("table"), binding)
+        if prior_val is not None:
+            return prior_val
+
+    # 回退：上年年末余额 = 本年期初余额 = 试算表期初余额（trial_balance opening）
+    return _opening_balance_from_tb(binding, ctx)
+
+
+def _opening_balance_from_tb(
+    binding: dict[str, Any],
+    ctx: dict[str, Any],
+) -> float | None:
+    """上年年末余额 = 本年期初余额：按 account_codes 从 ctx['_tb_cache'] 汇总期初余额.
+
+    数据源回退（非公式），供 resolve_prior_year_note 在无上年附注单元格数据时使用。
+    无科目码 / 缓存未预热 / 无命中 → None（保持手工行原行为）。
+    """
+    codes = _safe_account_codes(binding)
+    if not codes:
+        return None
+    tb_cache = ctx.get("_tb_cache") or {}
+    if not tb_cache:
+        return None
+    values: list[float] = []
+    for code in codes:
+        entry = tb_cache.get(code)
+        if not isinstance(entry, dict):
+            continue
+        v = _to_float(entry.get("opening"))
+        if v is not None:
+            values.append(v)
+    if not values:
+        return None
+    return _aggregate(values, binding.get("agg") or "sum")
 
 
 # ---------------------------------------------------------------------------

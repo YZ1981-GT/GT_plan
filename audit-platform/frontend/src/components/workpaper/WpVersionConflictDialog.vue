@@ -134,7 +134,7 @@ function handleCancel() {
 }
 
 .wp-version-conflict__hint {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   color: var(--el-text-color-secondary);
 }
 

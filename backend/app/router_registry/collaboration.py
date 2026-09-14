@@ -69,9 +69,33 @@ def register_collaboration_routers(app: FastAPI) -> None:
     from app.routers.forum import router as forum_router
     from app.routers.independence import router as independence_router
 
+    # procedure-delegation-notification / Task 4：程序行任务显式物化 API
+    from app.routers.procedure_row_tasks import router as procedure_row_tasks_router
+    # procedure-delegation-notification / Task 5：模板 reconcile preview/apply API
+    from app.routers.procedure_reconcile import router as procedure_reconcile_router
+    # procedure-delegation-notification / Task 6：两层裁剪与方案 preview/apply API
+    from app.routers.procedure_trim import router as procedure_trim_router
+    # procedure-delegation-notification / Task 8：三粒度委派 preview/apply API
+    from app.routers.procedure_delegations import router as procedure_delegations_router
+    # procedure-mainline-convergence：底稿主编语义 API（替代旧 /procedures/assign）
+    from app.routers.workpaper_leads import router as workpaper_leads_router
+    # procedure-delegation-notification / Task 12：程序行任务查询 API（项目级 + 跨项目 + 详情，纯读）
+    from app.routers.procedure_task_query import (
+        project_query_router as procedure_task_query_router,
+        my_query_router as procedure_my_tasks_router,
+    )
+    # procedure-delegation-notification / Task 13：程序行一级复核 API（对话 / 消息 / 关闭问题单）
+    from app.routers.procedure_review import router as procedure_review_router
+    # procedure-delegation-notification / Task 10：投递 dead-letter 列表/指标/replay API
+    from app.routers.procedure_delivery import router as procedure_delivery_router
+
     for r in [staff_router, assign_router, wh_router, wh_list_router, dash_router,
               pmd_router, qcd_router, pd_router, rc2_router, proc_router,
-              se_router, forum_router, independence_router]:
+              se_router, forum_router, independence_router, procedure_row_tasks_router,
+              procedure_reconcile_router, procedure_trim_router, procedure_delegations_router,
+              workpaper_leads_router,
+              procedure_task_query_router, procedure_my_tasks_router,
+              procedure_delivery_router, procedure_review_router]:
         app.include_router(r, tags=["团队与看板"])
 
     # 角色AI辅助
@@ -104,27 +128,37 @@ def register_collaboration_routers(app: FastAPI) -> None:
               export_integrity_router]:
         app.include_router(r, prefix="/api", tags=["取证与版本链"])
 
+    # Task 16 CROSS-CUTTING-WP-GATE：含 {wp_id} 的横切 router 统一附加 dedicated_wp_gate（安全 no-op）。
+    from app.routers._wp_gate import include_router_with_wp_gate as _inc_wp_gate
+
     # ═══ §12. 协作管理（PBC 清单 / 函证管理） ═══
     from app.routers.pbc import router as pbc_router
     from app.routers.confirmations import router as confirmations_router
 
-    app.include_router(pbc_router, prefix="/api", tags=["PBC清单"])
+    _inc_wp_gate(app, pbc_router, prefix="/api", tags=["PBC清单"])
     app.include_router(confirmations_router, prefix="/api", tags=["函证管理"])
+
+    # ═══ §12a. 分发记录（cross-workpaper-dispatch-persistence） ═══
+    from app.routers.dispatch_records import router as dispatch_records_router
+    app.include_router(dispatch_records_router, tags=["分发记录"])
 
     # ═══ §12b. 原始凭证 LLM 识别 ═══
     from app.routers.wp_document_recognize import router as doc_recognize_router
     app.include_router(doc_recognize_router, prefix="/api", tags=["原始凭证识别"])
 
+    # ═══ §12c. 通用编辑锁（global-refinement-v5-closure 能力域 C） ═══
+    from app.routers.editing_locks import router as editing_locks_router
+    app.include_router(editing_locks_router, tags=["editing-locks"])
+
     # ═══ §13. Round 4：审计助理增强 ═══
     from app.routers.workpaper_requirements import router as wpreq_router
     from app.routers.workpaper_prior_year import router as wppy_router
     from app.routers.workpaper_html_preview import router as wphp_router
-    from app.routers.editing_lock import router as editlock_router
     from app.routers.ocr_fields import router as ocrf_router
     from app.routers.penetrate_by_amount import router as pba_router
 
-    for r in [wpreq_router, wppy_router, wphp_router, editlock_router, ocrf_router, pba_router]:
-        app.include_router(r, tags=["审计助理(R4)"])
+    for r in [wpreq_router, wppy_router, wphp_router, ocrf_router, pba_router]:
+        _inc_wp_gate(app, r, tags=["审计助理(R4)"])
 
     # ═══ §14. Round 5：EQCR 工作台 ═══
     from app.routers.eqcr import router as eqcr_router
@@ -241,6 +275,10 @@ def register_collaboration_routers(app: FastAPI) -> None:
     from app.routers.project_permissions import router as project_permissions_router
     app.include_router(project_permissions_router, tags=["project-permissions"])
 
+    # ═══ §101b. P0-4: 权限矩阵 API ═══
+    from app.routers.permission_matrix import router as permission_matrix_router
+    app.include_router(permission_matrix_router, tags=["permission-matrix"])
+
     # ═══ §102. Phase 6 F5: 待回复批注聚合 ═══
     from app.routers.my_reviews import router as my_reviews_router
     app.include_router(my_reviews_router, tags=["my-reviews"])
@@ -297,6 +335,14 @@ def register_collaboration_routers(app: FastAPI) -> None:
     from app.routers.partner_urgency import router as partner_urgency_router
     app.include_router(partner_urgency_router, tags=["partner-urgency"])
 
+    # ═══ §120. P1: 角色作业台 ═══
+    from app.routers.role_workbench import router as role_workbench_router
+    app.include_router(role_workbench_router, tags=["role-workbench"])
+
+    # ═══ §121. P2: 临时授权 ═══
+    from app.routers.temporary_grants import router as temporary_grants_router
+    app.include_router(temporary_grants_router, tags=["temporary-grants"])
+
     # ═══ §116. proposal-remaining-18 C-3: 批量导出 SSE 进度推送 ═══
     from app.routers.batch_export_progress import (
         router as batch_export_progress_router,
@@ -304,3 +350,11 @@ def register_collaboration_routers(app: FastAPI) -> None:
     )
     app.include_router(batch_export_progress_router, tags=["batch-export-progress"])
     app.include_router(batch_export_download_router, tags=["batch-export-progress"])
+
+    # ═══ §125. 复核对话 ═══
+    from app.routers.review_dialog import router as review_dialog_router
+    _inc_wp_gate(app, review_dialog_router, tags=["review-dialog"])
+
+    # ═══ §130. 底稿版本链（workpaper-version-trail） ═══
+    from app.routers.version_trail import router as version_trail_router
+    app.include_router(version_trail_router, tags=["version-trail"])

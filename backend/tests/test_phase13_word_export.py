@@ -641,7 +641,9 @@ class TestPhase13Models:
         assert "generating" in VALID_STATUS_TRANSITIONS["draft"]
         assert "signed" in VALID_STATUS_TRANSITIONS["confirmed"]
         assert "editing" in VALID_STATUS_TRANSITIONS["confirmed"]
-        assert VALID_STATUS_TRANSITIONS["signed"] == []
+        assert "archived" in VALID_STATUS_TRANSITIONS["signed"]
+        assert "confirmed" in VALID_STATUS_TRANSITIONS["archived"]
+        assert "pending_approval" in VALID_STATUS_TRANSITIONS["editing"]
 
     def test_word_export_doc_type_enum(self):
         """文档类型枚举"""

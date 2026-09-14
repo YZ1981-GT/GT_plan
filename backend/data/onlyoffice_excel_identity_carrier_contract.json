@@ -1,0 +1,495 @@
+{
+  "contract_id": "onlyoffice_excel_identity_carrier_contract",
+  "schema_version": 1,
+  "spec": "workpaper-html-onlyoffice-bidirectional-writeback-closure",
+  "task": "5",
+  "status": "probe_only",
+  "purpose": "真实 OnlyOffice 9.4 Excel identity 载体黑盒探针的版本化真值表（单一真源）。Task 5 只裁决「哪些载体/锚点经真实 OO 往返仍成立」，不建 Excel engine；Task 17/36/37 的 loader 必须 fail-closed 读本文件的 probe_verdict。",
+  "authoritative_notes": [
+    "本文件是 Excel identity 载体裁决的唯一真源。Task 17/36/37 不得在代码里另写一份「哪些载体可用」的判断。",
+    "`probe_verdict=passed` 的每一条都必须能从 evidence 目录的 operation_matrix.json / instrumentation_report.json 重新算出；guard 测试按 evidence 反向校验，不接受手填。",
+    "`probe_verdict ∈ {failed, not_covered}` 的载体/锚点 SHALL NOT 进入 Task 17（instrumentation definition）、Task 36（per-entry contract/bundle loader）或 Task 37；loader 见到这两个值必须 fail closed。",
+    "Requirement 6.16 的门只由本文件与其 evidence 共同构成；OO build、模板 sha256、runner 或 evidence 任一变化即按 stale policy 失效并重跑探针。"
+  ],
+  "verdict_enum": {
+    "passed": "该载体/锚点在**声明的全部操作**上均满足期望 identity inventory，可进入 Task 17/36/37",
+    "partial": "部分操作通过、部分未覆盖或降级；只能在契约明确列出的操作子集内使用，且必须显式声明未覆盖项",
+    "failed": "已被实证证伪，禁止进入 Task 17/36/37，也不得作为 fallback",
+    "not_covered": "本次探针未覆盖（无真实模板 / 无法在真实 OO 上构造）；禁止按推理当作通过"
+  },
+  "evidence": {
+    "dir": ".kiro/specs/workpaper-html-onlyoffice-bidirectional-writeback-closure/evidence/task5-oo94-excel-identity",
+    "findings": "findings.md",
+    "instrumentation_report": "instrumentation_report.json",
+    "operation_matrix": "operation_matrix.json",
+    "raw_callbacks": "callbacks.jsonl",
+    "raw_commands": "commands.jsonl",
+    "build": "oo_build.json",
+    "source_sha_before": "source_template_sha_before.json",
+    "source_sha_after": "source_template_sha_after.json",
+    "attribution_report": "oo_normalization_attribution.json",
+    "mutation_report": "mutation_report.json",
+    "screenshots": "screenshots",
+    "probe_script": "backend/scripts/diagnose/probe_oo94_excel_identity.py",
+    "reusable_module": "backend/app/services/excel_structure_fingerprint.py",
+    "mutation_script": "backend/scripts/diagnose/mutate_task5_excel_identity_guards.py",
+    "onlyoffice_build": "9.4.0-129",
+    "browser": "Playwright Chromium (chrome-devtools/playwright MCP)，OO web-apps 由容器同 build 提供",
+    "probe_port": 9993,
+    "captured_at_utc": "2026-08-24T16:55:00Z",
+    "scenario": "两份平台自有真实模板复制到 staging 后 zip 级注入三类载体，在真实 OO 9.4.0-129 容器内经编辑/插行/删行/排序/复制/粘贴/sheet 改名/forcesave/下载/重开逐操作取回 artifact，逐 artifact 重采 OOXML 结构指纹与 identity inventory。"
+  },
+  "templates_probed": [
+    {
+      "template_id": "K11",
+      "template_rel": "backend/wp_templates/K/K11 资产减值损失.xlsx",
+      "template_sha256": "dc0e5434b7c8e345913864ce524ad30a0a3729b5655627f3c30bce52294a9190",
+      "instrumented_sha256": "4408f116e37ba6a0dc1860802ecee31c169a6e938688d526cf922cc2b3acad22",
+      "carriers_injected": ["hidden_sheet", "defined_name", "excel_table", "hidden_uuid_column"],
+      "managed_sheet_at_instrumentation": "审定表K11-1",
+      "managed_range": "A7:L25",
+      "footer_row": 26,
+      "row_uuid_column": "N",
+      "row_uuid_count": 19,
+      "managed_table": "GT_K11_1_ROWS",
+      "managed_table_ref": "A7:N25",
+      "operations_covered": [
+        "edit", "insert_row", "delete_row", "sort", "copy", "paste",
+        "rename_sheet", "forcesave", "download", "reopen"
+      ],
+      "why_chosen": "7 sheet / 450 公式 / 54 merge / 1 drawing / 无 external link；审定表 K11-1 有 A7:A25 跨表引用动态行 + A26 SUM footer，是 Requirement 6.3/6.5/6.9 的真实形态。"
+    },
+    {
+      "template_id": "C24",
+      "template_rel": "backend/wp_templates/C/C24 会计分录 - 细节测试.xlsx",
+      "template_sha256": "b70229f48c13a635595b13f74aa199cb2d96ed1106a1661a66cecb7e6e87d5c6",
+      "instrumented_sha256": "ca0a744993a7e40a8c3013dcdb7a0a726c02d30adc01f42ef5ba29d51beaa9d1",
+      "carriers_injected": ["hidden_sheet", "defined_name", "hidden_uuid_column"],
+      "managed_sheet_at_instrumentation": "C24-0汇总表",
+      "managed_range": "A8:H20",
+      "footer_row": 21,
+      "row_uuid_column": "N",
+      "row_uuid_count": 13,
+      "managed_table": null,
+      "managed_table_ref": null,
+      "operations_covered": ["edit", "forcesave", "download", "reopen"],
+      "operations_not_covered": ["insert_row", "delete_row", "sort", "copy", "paste", "rename_sheet"],
+      "operations_not_covered_reason": "该文档只用于取证 drawing/chart/media 部件在 instrumentation 与 OO 往返下的存活；结构编辑矩阵由 K11 承担，避免在 137813 单元格 / 21671 公式的 workbook 上重复十操作。",
+      "why_chosen": "全平台 351 个 xlsx 模板中**唯一**含 chart 部件者（8 chart / 3 drawing / 1 media / 1 既有 Excel Table），是 Requirement 6.17「drawing/chart/pivot 等受保护部件」的唯一真实样本。"
+    }
+  ],
+  "template_population_scan": {
+    "scanned_root": "backend/wp_templates",
+    "xlsx_total": 351,
+    "fingerprint_failures": 0,
+    "with_chart_parts": 1,
+    "with_pivot_parts": 0,
+    "with_vba": 0,
+    "with_drawing_parts": 182,
+    "with_media_parts": 50,
+    "with_external_links": 162,
+    "with_existing_excel_table": 1,
+    "with_existing_defined_names": 344,
+    "note": "pivot/VBA 判定为 not_covered 的**依据**就是这里：真实模板总体中 0 个含 pivotTable/pivotCache/vbaProject 部件，无法用平台自有模板构造真实证据。"
+  },
+  "carriers": [
+    {
+      "carrier": "hidden_sheet",
+      "display": "hidden `_GT_SYNC` metadata sheet",
+      "probe_verdict": "passed",
+      "may_enter_task_17_36_37": true,
+      "design_pass_condition": "sheet/ID/保护和业务部件均保留（design §Identity probe 决策门）",
+      "observed": {
+        "present_in_all_oo_artifacts": true,
+        "state_stays_hidden": true,
+        "required_keys_missing_anywhere": 0,
+        "excluded_from_business_sheet_enumeration": true,
+        "key_value_pairs_k11": 15,
+        "key_value_pairs_c24": 13
+      },
+      "required_keys": [
+        "GT_SYNC_SCHEMA_VERSION",
+        "GT_IDENTITY_SCHEMA_VERSION",
+        "GT_INSTRUMENTATION_VERSION",
+        "GT_TEMPLATE_ID",
+        "GT_TEMPLATE_SHA256",
+        "GT_MANAGED_SHEET_ID",
+        "GT_ROW_UUID_COLUMN"
+      ],
+      "usage_rules": [
+        "可承载 instrumentation/identity schema 版本、已发布 template digest 与受管区域声明。",
+        "业务 importer、sheet 枚举与导入导出必须显式排除该 sheet（Requirement 6.17 后半句）。",
+        "🔴 其中的 `GT_MANAGED_SHEET_ID` **不可**作为运行时定位锚点（见 anchors.sheet_id 的 failed 裁决）；保留该键只作 instrumentation 时刻的审计线索。"
+      ],
+      "notes": [
+        "OO 9.4 未把该 sheet 取消隐藏、未重命名、未删除，也未改动其 A/B 两列内容（16 个 artifact 全部命中）。",
+        "OO 侧 sheet 标签栏不显示该 sheet，审计师不可见（截图证据见 findings.md）。"
+      ]
+    },
+    {
+      "carrier": "defined_name",
+      "display": "workbook 级 + sheet-local defined names（`GT_` 前缀）",
+      "probe_verdict": "passed",
+      "may_enter_task_17_36_37": true,
+      "design_pass_condition": "名称与目标关系稳定，无自动重命名漂移（design §Identity probe 决策门）",
+      "observed": {
+        "gt_names_missing_anywhere": 0,
+        "gt_name_count": 4,
+        "workbook_scope_survives": true,
+        "sheet_local_scope_survives": true,
+        "ref_auto_rewritten_on_sheet_rename": true,
+        "ref_target_relation_stable": true,
+        "oo_added_own_names": ["Print_Titles"],
+        "oo_added_own_names_doc": "c24"
+      },
+      "expected_names": [
+        "GT_MANAGED_REGION_{template_id}",
+        "GT_FOOTER_ANCHOR_{template_id}",
+        "GT_SYNC_ANCHOR_{template_id}",
+        "GT_ROW_UUID_RANGE_{template_id}"
+      ],
+      "usage_rules": [
+        "defined name 是**唯一**经实证可在 sheet 展示名变化后仍指向正确目标的 sheet 级锚点：OO 把 ref 里的 sheet 名同步改写成新名。",
+        "读取时必须按 `GT_` 前缀过滤，**不得**按 defined name 总数判定：OO 会追加自己的 `Print_Titles` 等内建名（C24 实测 39→41）。",
+        "sheet-local defined name 的 `localSheetId` 是 tab 序号，OO 会随 sheet 顺序变化重写；不得把 `localSheetId` 数值当持久 identity。"
+      ],
+      "notes": [
+        "改名实测：`GT_MANAGED_REGION_K11` 从 `'审定表K11-1'!$A$7:$L$25` 自动变为 `'审定表K11-1改名后'!$A$7:$L$25`，四条 GT 名称全部同步且无一丢失。",
+        "指向隐藏 sheet 的 `GT_SYNC_ANCHOR_K11` = `_GT_SYNC!$A$1` 在全部 artifact 中保持不变。"
+      ]
+    },
+    {
+      "carrier": "excel_table",
+      "display": "Excel Table（`xl/tables/tableN.xml`，`headerRowCount=0`）",
+      "probe_verdict": "passed",
+      "may_enter_task_17_36_37": true,
+      "design_pass_condition": "原行 ID 稳定；空/重复 ID 可判定（design §Identity probe 决策门）",
+      "observed": {
+        "header_row_count_zero_accepted_by_oo": true,
+        "table_present_in_all_k11_artifacts": true,
+        "table_display_name_stable": "GT_K11_1_ROWS",
+        "ref_expands_on_row_insert": "A7:N25 -> A7:N26",
+        "ref_restored_on_row_delete": "A7:N26 -> A7:N25",
+        "survives_sheet_rename": true,
+        "survives_editor_download_and_reopen": true,
+        "recognised_in_oo_ui": true,
+        "recognised_in_oo_ui_evidence": "OO 名称框在选中受管区域时显示 `GT_K11_1_ROWS`，功能区出现「表格设计」选项卡（截图）",
+        "applies_visible_table_style_overlay": false
+      },
+      "usage_rules": [
+        "`headerRowCount=0` 是刻意选择：业务模板的两级合并表头无法充当 Table 表头行，置 0 可在**不改任何可见单元格**的前提下建立受管行区域。",
+        "Table 的 sheet 归属由部件关系维护，OO 改 sheet 名后仍正确 ⇒ Table 是 sheet 改名后可用的第二个锚点。",
+        "Table `ref` 会随插删行自动伸缩，因此 `ref` 行数 − row UUID 个数 = OO 内新增且尚无 UUID 的行数，这是 Requirement 6.15「分配新 ID」的判据。",
+        "`tableStyleInfo` 必须不带 `name` 且 stripes 全 0，否则会给业务区域叠加可见表格样式。"
+      ],
+      "notes": [
+        "本载体的价值不只是行身份：它是 sheet 改名后 UUID 列**唯一**仍能定位的路径（sheet_id 与 sheet_name 两条路径此时都失效）。",
+        "C24 未注入 Table ⇒ 该文档在 sheet 改名场景下会没有可用锚点；这也是「Table 载体对生产是必需项而非可选项」的实证理由。"
+      ]
+    },
+    {
+      "carrier": "hidden_uuid_column",
+      "display": "隐藏稳定 row UUID 列（预生成字面量）",
+      "probe_verdict": "passed",
+      "may_enter_task_17_36_37": true,
+      "design_pass_condition": "原行 ID 稳定；空/重复 ID 可判定",
+      "observed": {
+        "column_stays_hidden_in_all_artifacts": true,
+        "uuid_travels_with_row_under_sort": true,
+        "uuid_shifts_with_row_under_insert": true,
+        "deleted_row_uuid_disappears_and_is_never_reused": true,
+        "inserted_row_has_no_uuid": true,
+        "paste_creates_detectable_duplicate_uuid": true,
+        "paste_overwrites_target_row_uuid": true
+      },
+      "per_operation_expectations": [
+        {"op": "edit", "row_uuid_count": 19, "distinct": 19, "duplicates": [], "missing": [], "rows_without_uuid": 0},
+        {"op": "insert_row", "row_uuid_count": 19, "distinct": 19, "duplicates": [], "missing": [], "rows_without_uuid": 1},
+        {"op": "delete_row", "row_uuid_count": 18, "distinct": 18, "duplicates": [], "missing": ["GTROW-K11-0012"], "rows_without_uuid": 1},
+        {"op": "sort", "row_uuid_count": 18, "distinct": 18, "duplicates": [], "missing": ["GTROW-K11-0012"], "rows_without_uuid": 1},
+        {"op": "paste", "row_uuid_count": 18, "distinct": 17, "duplicates": ["GTROW-K11-0018"], "missing": ["GTROW-K11-0012", "GTROW-K11-0016"], "rows_without_uuid": 1},
+        {"op": "rename_sheet", "row_uuid_count": 18, "distinct": 17, "duplicates": ["GTROW-K11-0018"], "missing": ["GTROW-K11-0012", "GTROW-K11-0016"], "rows_without_uuid": 1},
+        {"op": "forcesave", "row_uuid_count": 18, "distinct": 17, "duplicates": ["GTROW-K11-0018"], "missing": ["GTROW-K11-0012", "GTROW-K11-0016"], "rows_without_uuid": 1},
+        {"op": "download", "row_uuid_count": 18, "distinct": 17, "duplicates": ["GTROW-K11-0018"], "missing": ["GTROW-K11-0012", "GTROW-K11-0016"], "rows_without_uuid": 1},
+        {"op": "reopen", "row_uuid_count": 18, "distinct": 17, "duplicates": ["GTROW-K11-0018"], "missing": ["GTROW-K11-0012", "GTROW-K11-0016"], "rows_without_uuid": 1}
+      ],
+      "sort_reorder_evidence": {
+        "before": {"7": "GTROW-K11-0007", "8": "GTROW-K11-0008", "9": "GTROW-K11-0009"},
+        "after": {"7": "GTROW-K11-0014", "8": "GTROW-K11-0018", "9": "GTROW-K11-0020"},
+        "meaning": "排序后行号→UUID 映射整体改变且集合不变 ⇒ UUID 随业务行迁移，而不是留在原行号上。"
+      },
+      "requirement_6_15_classification": {
+        "empty_uuid_on_new_row": {
+          "detectable": true,
+          "detector": "Table ref 覆盖行数 − 该列非空 UUID 个数 > 0",
+          "contract_action": "分配新 ID"
+        },
+        "duplicate_uuid_from_copy": {
+          "detectable": true,
+          "detector": "同列出现重复 UUID 值",
+          "contract_action": "结构冲突（除特定表声明可安全拆分）"
+        },
+        "user_deleted_identity_column": {
+          "detectable": true,
+          "detector": "row_uuid_count == 0 且 Table ref 仍覆盖数据行",
+          "contract_action": "拒绝",
+          "probe_verdict": "not_covered",
+          "not_covered_reason": "本次未在真实 OO 内手工删除隐藏 UUID 列；判据来自采集器的结构投影而非实测操作。"
+        },
+        "reuse_of_deleted_uuid": {
+          "observed": false,
+          "meaning": "被删除行的 UUID 未被 OO 复用到任何其它行（Requirement 6.15 的「不得复用已删除 UUID」在 OO 侧不会被自动违反）。"
+        }
+      },
+      "usage_rules": [
+        "UUID 必须是预生成字面量，不得用可重算公式（否则插删行会让 OO 重算出新值）。",
+        "读取时必须**全列扫描**而不是按固定行范围：插删行会整体位移，固定范围会把位移误判成丢失。",
+        "空 UUID / 重复 UUID / 全列为空三种形态必须按 requirement_6_15_classification 分类处置，不得静默猜测。"
+      ]
+    }
+  ],
+  "anchors": [
+    {
+      "anchor": "sheet_id",
+      "display": "workbook.xml 的 `<sheet sheetId=...>`",
+      "probe_verdict": "failed",
+      "may_enter_task_17_36_37": false,
+      "disproof": {
+        "instrumented_sheet_ids": {
+          "底稿目录": "6",
+          "实质性程序表 K11A": "7",
+          "审定表K11-1": "1",
+          "附注披露信息（上市公司）": "10",
+          "附注披露信息（国企）": "9",
+          "明细表K11-2": "4",
+          "调整分录汇总K11-3": "8",
+          "_GT_SYNC": "11"
+        },
+        "after_any_oo_save_sheet_ids": {
+          "底稿目录": "1",
+          "实质性程序表 K11A": "2",
+          "审定表K11-1": "3",
+          "附注披露信息（上市公司）": "4",
+          "附注披露信息（国企）": "5",
+          "明细表K11-2": "6",
+          "调整分录汇总K11-3": "7",
+          "_GT_SYNC": "8"
+        },
+        "sheet_id_anchor_holds_in_oo_artifacts": 0,
+        "oo_artifacts_checked": 15,
+        "consequence": "OO 9.4 每次保存都按 tab 顺序把 sheetId 重编号为 1..N ⇒ `sheetId` 退化成「当前 tab 位置」，sheet 顺序变化即漂移。以 `GT_MANAGED_SHEET_ID=1` 定位会解析到 `底稿目录`（完全另一张 sheet），实测 row_uuid_count=0。",
+        "first_failing_operation": "edit",
+        "first_failing_operation_note": "仅打开 + 改一格 + forcesave 即已重编号，与任何结构编辑无关"
+      },
+      "forbidden": [
+        "把 sheetId 写进 instrumentation manifest 或 `_GT_SYNC` 当运行时定位锚点",
+        "把 sheetId 混入 contract 的 sheet_key",
+        "在 sheetId 解析不到时静默 fallback 到 sheet 展示名或 table（会把锚点失效掩盖成定位成功）"
+      ]
+    },
+    {
+      "anchor": "sheet_display_name",
+      "display": "sheet 展示名",
+      "probe_verdict": "failed",
+      "may_enter_task_17_36_37": false,
+      "disproof": {
+        "renamed_from": "审定表K11-1",
+        "renamed_to": "审定表K11-1改名后",
+        "resolvable_after_rename": false,
+        "consequence": "Requirement 6.14 本就禁止依赖展示名；实证确认改名后按名定位直接解析失败（row_uuid_count=0）。"
+      },
+      "forbidden": ["按 sheet 展示名或中文 label 定位受管区域"]
+    },
+    {
+      "anchor": "defined_name_ref",
+      "display": "`GT_*` defined name 的 ref",
+      "probe_verdict": "passed",
+      "may_enter_task_17_36_37": true,
+      "proof": {
+        "resolvable_in_all_oo_artifacts": true,
+        "auto_tracks_sheet_rename": true,
+        "example_after_rename": "'审定表K11-1改名后'!$A$7:$L$25"
+      },
+      "usage_rules": [
+        "这是 Task 17/36/37 定位受管 sheet/区域的**首选**锚点。",
+        "ref 的行列坐标不随插删行自动伸缩（与 Table ref 不同）⇒ 区域边界要用 Table ref，sheet 归属用 defined name。"
+      ]
+    },
+    {
+      "anchor": "excel_table_sheet_association",
+      "display": "Excel Table 部件与 sheet 的关系",
+      "probe_verdict": "passed",
+      "may_enter_task_17_36_37": true,
+      "proof": {
+        "resolvable_after_sheet_rename": true,
+        "ref_tracks_row_insert_delete": true
+      },
+      "usage_rules": ["受管行区域边界的首选锚点；与 defined_name_ref 互为交叉校验。"]
+    }
+  ],
+  "operation_matrix_declared": [
+    "edit", "insert_row", "delete_row", "sort", "copy", "paste",
+    "rename_sheet", "forcesave", "download", "reopen"
+  ],
+  "operation_notes": {
+    "copy": {
+      "artifact_produced": false,
+      "probe_verdict": "passed",
+      "reason": "纯复制不改文档 ⇒ Command Service `c=forcesave` 返回 error 4（自上次保存无新变更），OO 不产生 artifact。identity 因此不可能变化；复制的真实影响由 `paste` 一格取证（实测产生可检出的重复 UUID）。",
+      "command_service_error": 4
+    },
+    "forcesave": {
+      "artifact_produced": true,
+      "mechanism_note": "本矩阵全部 6 个结构操作都是靠 `c=forcesave` 取回 artifact，因此 forcesave 既是独立一格也是其它格的取证机制。",
+      "consecutive_forcesave_without_changes": 4,
+      "consecutive_forcesave_note": "紧接着再发一次 forcesave 返回 error 4（与 Task 4 契约的 command_service.return_codes 一致）。"
+    },
+    "download": {
+      "artifact_produced": true,
+      "paths_covered": [
+        "callback status 2（关闭编辑器触发的最终保存）",
+        "编辑器「文件 → 下载为 → XLSX」（浏览器下载，**不经 callback**，独立序列化路径）"
+      ],
+      "both_paths_preserve_all_carriers": true
+    },
+    "reopen": {
+      "artifact_produced": true,
+      "procedure": "关闭编辑器 → 用上一轮 status 2 artifact 作宿主文档 → 新 doc_key 全新 OO 会话打开 → 再编辑 → forcesave",
+      "carriers_after_reopen": "hidden_sheet / defined_name / excel_table / hidden_uuid_column 全部保留"
+    },
+    "rename_sheet": {
+      "artifact_produced": true,
+      "is_key_cell": true,
+      "outcome": "hidden_sheet 与 defined_name 不受影响（defined name ref 自动改写）；sheet_id 与 sheet_display_name 两条定位路径同时失效；excel_table 路径仍可定位 ⇒ 载体保留、锚点部分证伪。"
+    }
+  },
+  "visible_equivalence": {
+    "requirement": "6.17",
+    "policy": "strict",
+    "aspects": ["visible_sheets", "business_values", "formulas", "styles", "merges", "protected_parts"],
+    "instrumentation_time": {
+      "scope": "源模板 vs instrumented（未过 OO）",
+      "verdict": "equivalent",
+      "k11_diff_counts": {"business_values": 0, "formulas": 0, "styles": 0, "merges": 0, "protected_parts": 0},
+      "c24_diff_counts": {"business_values": 0, "formulas": 0, "styles": 0, "merges": 0, "protected_parts": 0},
+      "allowed_additions": [
+        "hidden `_GT_SYNC` sheet（业务 sheet 枚举显式排除）",
+        "`GT_` 前缀 defined names",
+        "受管 sheet 上一列隐藏 row UUID 列（Requirement 6.13 明确允许）",
+        "`headerRowCount=0` 的 Excel Table 部件（不占用任何可见单元格）"
+      ],
+      "conclusion": "Requirement 6.17 的 instrumentation 等价要求**严格通过**：可见 sheet、业务值、公式、样式、merge、drawing/chart/media 部件 byte 级全等。"
+    },
+    "oo_roundtrip": {
+      "scope": "instrumented vs 过 OO 一次的 artifact",
+      "verdict": "not_byte_equivalent_by_design",
+      "attribution_control": {
+        "case_A_instrumentation_only": {"business_values": 0, "formulas": 0, "styles": 0, "merges": 0, "protected_parts": 0},
+        "case_B_pristine_through_oo": {"business_values": 1, "formulas": 0, "styles": 487, "merges": 0, "protected_parts": 1},
+        "case_C_instrumented_through_oo": {"business_values": 1, "formulas": 0, "styles": 487, "merges": 0, "protected_parts": 1},
+        "conclusion": "B 与 C 逐项相等、A 全零 ⇒ OO 往返的全部差异都由 OO 自身重序列化造成，instrumentation 贡献为 0。这条控制组是「instrumentation 没有破坏文档」的实证（而非归因推理）。"
+      },
+      "oo_normalizations_observed": [
+        {
+          "kind": "fill_color_palette_remap",
+          "detail": "fgColor `indexed:14` → `indexed:6`、bgColor `indexed:64` → `rgb:00000000`",
+          "k11_affected_cells": 487,
+          "k11_total_styled_cells": 767,
+          "occurs_without_instrumentation": true
+        },
+        {
+          "kind": "font_substitution",
+          "detail": "`宋体` → `Calibri`（容器内未安装宋体）",
+          "doc": "c24",
+          "occurs_without_instrumentation": true,
+          "impact": "中文底稿的可见字体会变，属 OO 部署问题（容器字体），需在部署层解决而非 instrumentation 层"
+        },
+        {
+          "kind": "formula_whitespace_normalization",
+          "detail": "含换行/缩进的长公式被压平",
+          "c24_affected_formulas": 10535,
+          "c24_total_formulas": 21671,
+          "k11_affected_formulas": 0,
+          "note": "K11 的 450 个公式 0 处改动 ⇒ 只影响源模板里带换行排版的公式"
+        },
+        {
+          "kind": "protected_part_reserialization",
+          "detail": "chart/drawing/vml 部件字节全部重写；部件**数量**保持（8 chart / 1 media 不变），C24 多出 1 个 drawing 部件",
+          "k11_protected_part_diffs": 1,
+          "c24_protected_part_diffs": 9
+        },
+        {
+          "kind": "defined_name_addition",
+          "detail": "OO 追加自己的 `Print_Titles`（C24 39→41）"
+        }
+      ],
+      "consequence_for_task_17_36_37": [
+        "Requirement 6.11/8.10 的往返等值只能按**语义/受管字段**比对，不得按 protected part 字节或全量 style 指纹判等 —— 否则每次 OO 保存都会误判为结构漂移。",
+        "受保护部件的判据固定为「部件名集合与计数不减少」+「业务值/merge/受管公式等值」，不是字节 digest。",
+        "OO 会追加自有 defined name ⇒ identity 读取必须按 `GT_` 前缀过滤而非总数比对。"
+      ]
+    },
+    "not_covered": [
+      {
+        "aspect": "pivot_table",
+        "probe_verdict": "not_covered",
+        "reason": "`backend/wp_templates` 全量 351 个 xlsx 中 0 个含 `xl/pivotTables/` 或 `xl/pivotCache/` 部件（实扫），没有平台自有真实模板可用于取证。",
+        "blocking": "Task 17/36/37 若要处理含 pivot 的 custom/user-upload xlsx，必须先补一次带 pivot 的真实 OO 探针；本任务不得代为宣称通过。"
+      },
+      {
+        "aspect": "vba_macro",
+        "probe_verdict": "not_covered",
+        "reason": "全量模板 0 个含 `xl/vbaProject.bin`（无 xlsm 模板）。"
+      },
+      {
+        "aspect": "external_link_workbooks",
+        "probe_verdict": "not_covered",
+        "reason": "162 个模板含 `xl/externalLinks/`，但本次两份探针文档均刻意选了无外链者（避免 OO 弹外链提示干扰操作矩阵）⇒ 外链在 OO 往返下的行为未取证。"
+      },
+      {
+        "aspect": "conditional_formatting_and_data_validation",
+        "probe_verdict": "not_covered",
+        "reason": "openpyxl 读 C24 时对 `Data Validation extension` 与 `Conditional Formatting extension` 发出 UserWarning 并丢弃 ⇒ 采集器当前不覆盖这两类部件，不能对其等价性下结论。"
+      },
+      {
+        "aspect": "user_deletes_hidden_identity_column_in_oo",
+        "probe_verdict": "not_covered",
+        "reason": "未在真实 OO 内手工取消隐藏并删除 UUID 列；该异常形态的处置分类只有结构投影判据，无实测。"
+      },
+      {
+        "aspect": "concurrent_multi_user_structural_edits",
+        "probe_verdict": "not_covered",
+        "reason": "Task 5 是单用户 identity 探针；多人同 room 语义由 Task 4 承担，二者的交叉（一人排序另一人插行）未取证。"
+      }
+    ]
+  },
+  "gate_for_downstream_tasks": {
+    "task_17_instrumentation_definition": {
+      "allowed_carriers": ["hidden_sheet", "defined_name", "excel_table", "hidden_uuid_column"],
+      "allowed_anchors": ["defined_name_ref", "excel_table_sheet_association"],
+      "forbidden_anchors": ["sheet_id", "sheet_display_name"],
+      "loader_rule": "读本契约时必须按 carrier/anchor 逐条检查 `probe_verdict`；见到 failed/not_covered 即 fail closed 并指出首个不合格 carrier/anchor，不得降级使用。"
+    },
+    "task_36_37_contract_bundle_loader": {
+      "rule": "per-entry contract 的 sheet_key 只能由 `defined_name_ref` 与 `excel_table_sheet_association` 组成；table_key 用 Table displayName；row identity 用隐藏 UUID 列的字面量值。",
+      "equivalence_rule": "往返校验按 visible_equivalence.oo_roundtrip.consequence_for_task_17_36_37 的语义口径，不用字节口径。"
+    },
+    "stale_policy": {
+      "invalidate_on": [
+        "OnlyOffice build 变化（当前 9.4.0-129）",
+        "两份源模板任一 sha256 变化",
+        "probe 脚本或 `excel_structure_fingerprint` 模块变化",
+        "evidence 目录中 operation_matrix.json / instrumentation_report.json 变化"
+      ],
+      "action": "重跑探针并重新裁决 probe_verdict；不得沿用旧裁决放行 engine 建设。"
+    }
+  },
+  "requirements_covered": ["6.13", "6.14", "6.15", "6.16", "6.17", "14.5", "14.16"],
+  "requirements_partially_covered": {
+    "6.20": "extract 的「instrumented stable identity 首选、原生结构锚点次选、两者皆无 fail closed」中，本任务只证明了 identity 载体与锚点的可用性；fail-closed 的生产实现由 Task 36/37 承接。",
+    "14.5": "本任务覆盖 instrumentation identity 与动态行增删重排复制；动态公司列、两级表头、公式保护、footer 下移与结构漂移拒绝属 Wave 4 pilot（Task 40-45）范围，未在此取证。"
+  },
+  "properties_gated": {
+    "66": "Excel identity 经真实 OO 往返保留 —— 三类载体在 10 个操作上的 identity inventory 期望由 carriers[].per_operation_expectations 与 operation_matrix.json 双向互锁；sheet_id 锚点被证伪并固定为 failed，阻断以它为前提的 engine 建设。"
+  }
+}

@@ -1,0 +1,132 @@
+{
+  "schema_version": 1,
+  "review_status": "reviewed",
+  "spec": "workpaper-html-onlyoffice-bidirectional-writeback-closure",
+  "task": "Wave 0 Task 8",
+  "purpose": "Adjudication only. The AC range, the oracle family name and the free-text Evidence type column are parsed verbatim from design.md '## Acceptance Oracle Matrix'; the covering tasks, independent verification pairs and Design oracle properties are derived by backend/scripts/gen/generate_workpaper_ac_coverage_matrix.py from the three spec documents. The single human judgement recorded here is which closed evidence_classes the design's free-text evidence description resolves to. This is NOT an exemption surface: the schema has no field for AC ids or defect codes, unknown keys are refused, and design_evidence_text is compared verbatim against design.md so a drifting row fails the generator instead of silently keeping a stale adjudication.",
+  "adjudications": {
+    "ManifestCoverageOracle": {
+      "design_evidence_text": "manifest/profile digest + DOM/registry report",
+      "evidence_classes": [
+        "source_ast_inventory",
+        "contract_interlock",
+        "dom_projection"
+      ],
+      "note": "The manifest is produced by an AST scan of mounts/editability/room wiring (source_ast_inventory) and is pinned by a source digest that fails closed when the scan and the stored file disagree (contract_interlock). R1 additionally claims UI-visible facts - switch visibility, closure counts - which only a rendered component can prove, so a mounted DOM/registry report is required (dom_projection). A string-level scan of the host files is explicitly not sufficient evidence for this family."
+    },
+    "ContentRevisionOracle": {
+      "design_evidence_text": "DB transaction trace + writer/bundle/representation matrix",
+      "evidence_classes": [
+        "db_integration",
+        "source_ast_inventory",
+        "contract_interlock"
+      ],
+      "note": "One business commit versus representation generation is a transaction-boundary claim; only a real PostgreSQL run can show the commit points, the allowed state edges and the rollback behaviour (db_integration). 'Every writer enters the single revision domain' is a whole-call-graph claim answered by the Task 3 writer inventory (source_ast_inventory), and the bundle/representation matrix is pinned by digests (contract_interlock)."
+    },
+    "HtmlToOoProtocolOracle": {
+      "design_evidence_text": "operation timeline + artifact/bundle hashes",
+      "evidence_classes": [
+        "db_integration",
+        "filesystem_artifact",
+        "contract_interlock"
+      ],
+      "note": "The blocking materialize protocol is judged by persisted operation timeline rows (db_integration) plus the published artifact bytes on disk - staged, fsynced, content-addressed, atomically replaced (filesystem_artifact). The approved-bundle precondition is a digest comparison (contract_interlock). A 200 response is never evidence here: Task 7 already showed the filesystem and the database are not one transaction."
+    },
+    "ForcesaveLifecycleOracle": {
+      "design_evidence_text": "request/operation/application + callback/recovery timelines",
+      "evidence_classes": [
+        "db_integration",
+        "real_onlyoffice_browser",
+        "capacity_fault"
+      ],
+      "note": "Composite forcesave idempotency, effective-sequence folding and exactly-one close arbitration are database uniqueness/ordering claims (db_integration). Which callbacks OnlyOffice 9.4 actually emits, in which order, with which userdata cannot be asserted from documentation - Task 4 fixed that by real two-user observation (real_onlyoffice_browser). Crash, timeout and interleaved-terminal branches only appear under injected failure (capacity_fault)."
+    },
+    "CallbackSafetyOracle": {
+      "design_evidence_text": "security/delivery/application/recovery + DB/artifact snapshots",
+      "evidence_classes": [
+        "security_trace",
+        "db_integration",
+        "filesystem_artifact"
+      ],
+      "note": "Claim binding, SSRF, DNS rebinding, redirect and stream-limit refusals are call-order and refusal-stage claims, so the evidence is an authorization/download trace (security_trace). Delivery-versus-application dedup and the durable-only application constraint are DB-level (db_integration), and the quarantined branch is proven by the artifact files that must stay download-only and never become durable (filesystem_artifact). AC 5.12 forbids a broad except from degrading a parse failure into success, which means the trace has to record the error stage rather than an empty result."
+    },
+    "ExcelContractIdentityOracle": {
+      "design_evidence_text": "workbook identity inventory + bundle/projections",
+      "evidence_classes": [
+        "filesystem_artifact",
+        "contract_interlock",
+        "real_onlyoffice_browser"
+      ],
+      "note": "Identity survival is a property of the real xlsx bytes, so the inventory is taken from the workbook zip (filesystem_artifact) and compared against the immutable contract/bundle digests (contract_interlock). Property 66 requires the roundtrip to pass through a real OnlyOffice 9.4 edit/insert/delete/sort/copy/paste cycle, because a library-only roundtrip cannot show what the editor rewrites (real_onlyoffice_browser)."
+    },
+    "WordSdtOracle": {
+      "design_evidence_text": "DOCX tag inventory + bundle/projection diff",
+      "evidence_classes": [
+        "filesystem_artifact",
+        "contract_interlock",
+        "real_onlyoffice_browser"
+      ],
+      "note": "Same shape as the Excel family, on the DOCX package: tag/row-UUID inventory from the file (filesystem_artifact), approved bundle and projection diff by digest (contract_interlock), and Property 33's cross-run/multi-instance/insert-delete retention only holds if a real editor produced the file (real_onlyoffice_browser). Paragraph or regex fallback is refused, so the inventory is the whole judgement."
+    },
+    "MergeRematerializeOracle": {
+      "design_evidence_text": "conflict records + before/after artifacts",
+      "evidence_classes": [
+        "db_integration",
+        "filesystem_artifact"
+      ],
+      "note": "Field-level three-way merge outcomes are judged from the persisted conflict rows and the fences they carry (db_integration), and the canonical rematerialize-then-extract equality is judged from the before/after artifact bytes (filesystem_artifact). Committing merged JSON is not evidence: R8 requires merged != incoming to force refresh/reopen, which only the rematerialized artifact can show."
+    },
+    "TemplateResolverOracle": {
+      "design_evidence_text": "resolver matrix + definition/bundle/upgrade report",
+      "evidence_classes": [
+        "source_ast_inventory",
+        "contract_interlock",
+        "filesystem_artifact"
+      ],
+      "note": "'A single canonical resolver on every path' is a call-graph claim, so the resolver matrix comes from the AST inventory (source_ast_inventory). Immutable definition DAG drift and candidate-versus-published separation are digest comparisons (contract_interlock). Path safety and the shared-template isolation claim are about real files under the authoritative template root (filesystem_artifact)."
+    },
+    "AuthorizationConcurrencyOracle": {
+      "design_evidence_text": "scope-index/auth call trace + recovery/lock/contributor traces",
+      "evidence_classes": [
+        "security_trace",
+        "db_integration"
+      ],
+      "note": "R10 is almost entirely about ordering: scope index read before any business resource, uniform 404/403 staging, no timing disclosure, replay after revocation. Only a recorded call trace can judge order (security_trace). Row locks, generation rotation, tombstones and contributor rows are database facts (db_integration). A test that merely asserts a 403 status code cannot distinguish 'refused before the read' from 'read then refused'."
+    },
+    "FrontendBridgeOracle": {
+      "design_evidence_text": "mounted DOM test + browser network trace",
+      "evidence_classes": [
+        "dom_projection",
+        "real_onlyoffice_browser"
+      ],
+      "note": "A declared prop, a registered component or an imported bridge proves nothing until something renders it, so the evidence is a mounted DOM assertion (dom_projection). The descriptor/bridge ordering and the 'failure not covered by success wording' claim are user-visible, which needs the real browser plus its network trace (real_onlyoffice_browser). This family is the one where a passing unit suite is most likely to hide a structurally dead declaration."
+    },
+    "EntryEvidenceOracle": {
+      "design_evidence_text": "immutable evidence projection + manifest/profile counts",
+      "evidence_classes": [
+        "db_integration",
+        "source_ast_inventory",
+        "contract_interlock"
+      ],
+      "note": "Per-entry acceptance is settled by persisted test-run/scenario rows recomputed server-side (db_integration). The required scenario set is derived from the source-backed manifest profile rather than hand-listed (source_ast_inventory), and reuse across entries or scenarios is refused by bundle/profile digests (contract_interlock). Wave 0 constraint 4 forbids a pilot or a single operation from standing in for per-entry acceptance, so a count comparison is part of the evidence."
+    },
+    "TimelineOutboxOracle": {
+      "design_evidence_text": "outbox/event timeline + observability report",
+      "evidence_classes": [
+        "db_integration",
+        "capacity_fault"
+      ],
+      "note": "Publish-after-commit, append-only transitions and full replay payloads are transactional and append-only claims over real rows (db_integration). Retention, redaction, DLQ and alert rules only become observable when the failure they exist for is injected (capacity_fault)."
+    },
+    "VerificationCapacityOracle": {
+      "design_evidence_text": "test-run/trace bundles + capacity/fault report",
+      "evidence_classes": [
+        "mutation_four_state",
+        "real_onlyoffice_browser",
+        "capacity_fault",
+        "db_integration"
+      ],
+      "note": "R14 is the meta family. AC 14.7 makes RED/GREEN/ANCHOR-MISS/WRONG-TEST mutation the evidence for every guard (mutation_four_state); 14.5/14.16 require real OnlyOffice 9.4 runs and forbid claiming an unexecuted probe (real_onlyoffice_browser); 14.10-14.12 fix a capacity profile and fault-injection matrix (capacity_fault); and the test-run/trace bundles the report cites are persisted rows recomputed server-side (db_integration)."
+    }
+  }
+}

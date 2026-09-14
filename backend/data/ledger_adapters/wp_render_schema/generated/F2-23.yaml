@@ -1,0 +1,96 @@
+# F2-23 存货监盘小结 — audit-sheet 预设结构
+# 提供默认表头和示例行，让审计助理打开即有框架可填
+wp_code: F2-23
+component_type: audit-sheet
+title: 存货监盘小结
+audit_rows:
+  - id: header-overview
+    item: 监盘概况
+    bold: true
+    isSection: true
+  - id: r1
+    item: 监盘日期
+    indent: 1
+  - id: r2
+    item: 监盘地点
+    indent: 1
+  - id: r3
+    item: 监盘人员
+    indent: 1
+  - id: r4
+    item: 被审计单位陪同人员
+    indent: 1
+  - id: header-scope
+    item: 监盘范围与覆盖率
+    bold: true
+    isSection: true
+  - id: r5
+    item: 盘点存货总金额
+    indent: 1
+  - id: r6
+    item: 抽盘金额/覆盖率
+    indent: 1
+  - id: r7
+    item: 盘点表编号范围
+    indent: 1
+  - id: header-result
+    item: 监盘结果
+    bold: true
+    isSection: true
+  - id: r8
+    item: 盘盈数量/金额
+    indent: 1
+  - id: r9
+    item: 盘亏数量/金额
+    indent: 1
+  - id: r10
+    item: 差异率
+    indent: 1
+  - id: r11
+    item: 差异原因分析
+    indent: 1
+  - id: header-observation
+    item: 监盘观察事项
+    bold: true
+    isSection: true
+  - id: r12
+    item: 存货存放状态（整洁/混乱/潮湿等）
+    indent: 1
+  - id: r13
+    item: 是否发现呆滞/毁损/过期存货
+    indent: 1
+  - id: r14
+    item: 是否存在代管/代销/质押存货
+    indent: 1
+  - id: r15
+    item: 盘点组织是否规范（人员/流程/记录）
+    indent: 1
+  - id: header-cutoff
+    item: 截止测试
+    bold: true
+    isSection: true
+  - id: r16
+    item: 最后入库单号
+    indent: 1
+  - id: r17
+    item: 最后出库单号
+    indent: 1
+  - id: r18
+    item: 截止时点有无异常出入库
+    indent: 1
+  - id: header-conclusion
+    item: 总结与后续
+    bold: true
+    isSection: true
+  - id: r19
+    item: 监盘总体结论
+    indent: 1
+  - id: r20
+    item: 需进一步跟进事项
+    indent: 1
+  - id: r21
+    item: 是否影响审计意见
+    indent: 1
+audit_sections:
+  notes_label: 补充说明
+  conclusion_label: 监盘小结结论

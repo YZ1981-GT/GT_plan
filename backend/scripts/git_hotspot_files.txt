@@ -1,3 +1,0 @@
-.kiro/steering/memory.md
-.kiro/specs/INDEX.md
-backend/scripts/file_size_whitelist.txt

@@ -1,0 +1,149 @@
+# C23.yaml — 会计分录控制测试
+# componentType: d-form-table（3 sheets）
+# Requirements: G5-1 会计分录控制测试
+
+wp_code: C23
+template_version: v2025-R5
+description: |
+  测试会计分录录入和审批的控制，评估管理层凌驾风险的控制应对措施。
+  包含：程序表 + 有权录入人员清单测试 + 分录控制测试记录。
+
+sheets:
+  程序表:
+    component_type: d-form-table
+    form_type: procedure
+    title: 会计分录控制测试程序表
+    description: 记录会计分录控制测试的审计程序执行情况。
+
+    dynamic_table:
+      add_row_button: true
+      max_rows: 20
+      columns:
+        seq:
+          field: seq
+          type: number
+          label: 序号
+          width: 60
+        procedure:
+          field: procedure
+          type: textarea
+          label: 程序
+          width: 300
+        executor:
+          field: executor
+          type: text
+          label: 执行人
+          width: 80
+        result:
+          field: result
+          type: textarea
+          label: 结果
+          width: 200
+        ref_index:
+          field: ref_index
+          type: text
+          label: 索引号
+          width: 100
+          render_hint: ref_chip
+
+  有权录入人员清单测试:
+    component_type: d-form-table
+    form_type: table
+    title: 有权录入人员清单测试
+    description: 验证会计分录录入人员的权限范围和职责分离情况。
+
+    dynamic_table:
+      add_row_button: true
+      max_rows: 50
+      columns:
+        name:
+          field: name
+          type: text
+          label: 姓名
+          width: 90
+        position:
+          field: position
+          type: text
+          label: 职务
+          width: 100
+        entry_scope:
+          field: entry_scope
+          type: textarea
+          label: 录入权限范围
+          width: 200
+        approval_scope:
+          field: approval_scope
+          type: textarea
+          label: 审批权限
+          width: 200
+        segregation:
+          field: segregation
+          type: enum
+          label: 职责分离
+          width: 90
+          dict_source: yes_no_dict
+        conclusion:
+          field: conclusion
+          type: textarea
+          label: 测试结论
+          width: 150
+
+    dictionaries:
+      yes_no_dict:
+        - value: "yes"
+          label: 是
+        - value: "no"
+          label: 否
+
+  分录控制测试记录:
+    component_type: d-form-table
+    form_type: table
+    title: 分录控制测试记录
+    description: 逐步骤记录分录控制测试过程。
+
+    dynamic_table:
+      add_row_button: true
+      max_rows: 100
+      columns:
+        step_no:
+          field: step_no
+          type: text
+          label: 步骤编号
+          width: 80
+        control_description:
+          field: control_description
+          type: textarea
+          label: 控制描述
+          width: 200
+        test_method:
+          field: test_method
+          type: textarea
+          label: 测试方法
+          width: 200
+        sample_description:
+          field: sample_description
+          type: textarea
+          label: 样本描述
+          width: 200
+        test_result:
+          field: test_result
+          type: enum
+          label: 测试结果
+          width: 90
+          dict_source: test_result_dict
+          render_hint: risk_badge
+        deviation_note:
+          field: deviation_note
+          type: textarea
+          label: 偏差说明
+          width: 200
+          visible_when: "test_result=='deviation'"
+
+    dictionaries:
+      test_result_dict:
+        - value: pass
+          label: 通过
+          color: green
+        - value: deviation
+          label: 偏差
+          color: red

@@ -2,6 +2,7 @@ import { defineStore } from 'pinia'
 import axios from 'axios'
 import http from '@/utils/http'
 import { API } from '@/services/apiPaths'
+import { clearOnLogout } from '@/utils/aiChatCacheCleanup'
 
 /**
  * 认证专用 axios 实例（不带 auth 拦截器，避免循环依赖）。
@@ -89,6 +90,8 @@ export const useAuthStore = defineStore('auth', {
       sessionStorage.removeItem('token')
       sessionStorage.removeItem('refreshToken')
       sessionStorage.removeItem('user')
+      // Task 10: 清理 AI 聊天敏感缓存
+      clearOnLogout()
     },
 
     async refreshAccessToken() {

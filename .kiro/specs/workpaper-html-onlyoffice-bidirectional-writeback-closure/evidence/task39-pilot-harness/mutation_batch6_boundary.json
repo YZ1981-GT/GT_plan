@@ -1,0 +1,22 @@
+[
+  {
+    "id": "M68",
+    "side": "be",
+    "want": "test_task15_content_mutation.py::TestTask15ScopeBoundary::test_merge_domain_deferral_is_retired",
+    "why": "harness 一旦 import `content_mutation`，它就从「只读 merge 消费方」变成潜在的第二个内容写入边界（Property 61）。本任务把 Task 15 的判据从「必须声明 commits_through」扩成「要么声明、要么由 AST 证明零写入面」，这条变异证明新分支**真的**在拦人 —— 否则那个允许分支就是一句放宽",
+    "verdict": "RED",
+    "summary": "1 failed, 117 passed in 11.07s",
+    "added": [
+      "test_task15_content_mutation.py::TestTask15ScopeBoundary::test_merge_domain_deferral_is_retired"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task15_content_mutation.py::TestTask15ScopeBoundary::test_merge_domain_deferral_is_retired"
+    ],
+    "added_files": [
+      "test_task15_content_mutation.py"
+    ],
+    "restored": true,
+    "seconds": 14.6
+  }
+]

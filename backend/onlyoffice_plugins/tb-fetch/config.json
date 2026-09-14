@@ -1,0 +1,22 @@
+{
+  "name": "TB 取数",
+  "guid": "asc.{B2C3D4E5-2222-3333-4444-TBFETCHPLU01}",
+  "version": "1.0.0",
+  "minVersion": "9.4.0",
+  "variations": [
+    {
+      "description": "选中单元格右键从 TB 取数，调用后端 auto_data_resolvers API 回填值",
+      "url": "index.html",
+      "icons": ["resources/icons/icon.png", "resources/icons/icon@2x.png"],
+      "isViewer": false,
+      "EditorsSupport": ["cell"],
+      "isVisual": false,
+      "isModal": false,
+      "isInsideMode": false,
+      "initDataType": "none",
+      "initData": "",
+      "buttons": [],
+      "events": ["onContextMenuClick"]
+    }
+  ]
+}

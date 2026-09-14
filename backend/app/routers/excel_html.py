@@ -285,6 +285,7 @@ async def confirm_as_template(
 async def sync_from_onlyoffice(
     project_id: UUID,
     file_stem: str,
+    db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     """编辑器保存后同步 structure.json（向后兼容端点）
@@ -293,6 +294,34 @@ async def sync_from_onlyoffice(
     调用此接口重新解析 Excel 更新 structure.json（保留取数规则绑定）。
     注：底稿编辑已迁移至 Univer，此端点保留向后兼容。
     """
+    # Wp_Bound_Gate（Task 4 / R3）：file_stem 通常即 wp_code；解析到底稿后、在重新解析
+    # 并写入 structure.json / HTML 底稿正文之前 enforce_wp_gate(save_parsed_data) 校验
+    # 可见性+写权限；不可见/跨项目/未委派/scope 外 → ExternalNotFound(404)，先于任何副作用。
+    import sqlalchemy as sa
+
+    from app.models.workpaper_models import WorkingPaper, WpIndex
+    from app.routers._wp_gate import enforce_wp_gate
+
+    _wp_id = (
+        await db.execute(
+            sa.select(WorkingPaper.id)
+            .join(WpIndex, WorkingPaper.wp_index_id == WpIndex.id)
+            .where(
+                WorkingPaper.project_id == project_id,
+                WpIndex.wp_code == file_stem,
+                WorkingPaper.is_deleted == sa.false(),
+            )
+            .limit(1)
+        )
+    ).scalar_one_or_none()
+    if _wp_id is not None:
+        await enforce_wp_gate(
+            db, current_user,
+            entrypoint="workpaper.parsed_data_write", action="save_parsed_data",
+            method="POST", wp_id=_wp_id, project_id=project_id, entry_family="file",
+            route_name="/api/projects/{project_id}/excel-html/sync-from-onlyoffice/{file_stem}",
+        )
+
     project_dir = Path("storage") / "projects" / str(project_id) / "excel_html"
     excel_path = project_dir / f"{file_stem}.xlsx"
     structure_path = project_dir / f"{file_stem}.structure.json"

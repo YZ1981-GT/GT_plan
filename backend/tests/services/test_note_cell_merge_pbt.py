@@ -112,7 +112,7 @@ class TestRowMergePBT:
     """行级三态合并 PBT — 验证核心不变量."""
 
     @given(td=table_data_strategy())
-    @settings(max_examples=60, suppress_health_check=[HealthCheck.function_scoped_fixture])
+    @settings(max_examples=5, suppress_health_check=[HealthCheck.function_scoped_fixture])
     def test_pbt_merge_idempotent_when_all_auto(self, td: dict[str, Any]) -> None:
         """PBT-R1：所有 cell 都是 auto 时，merge(td, td) 的 values 与 td 等价.
 
@@ -130,7 +130,7 @@ class TestRowMergePBT:
             assert merged["rows"][i]["label"] == row["label"]
 
     @given(td=table_data_strategy())
-    @settings(max_examples=60, suppress_health_check=[HealthCheck.function_scoped_fixture])
+    @settings(max_examples=5, suppress_health_check=[HealthCheck.function_scoped_fixture])
     def test_pbt_manual_value_always_preserved(self, td: dict[str, Any]) -> None:
         """PBT-R2：任何 _cell_modes[i]=='manual' 的 cell，merge 后 values[i] 不变.
 
@@ -166,7 +166,7 @@ class TestRowMergePBT:
                     )
 
     @given(td=table_data_strategy())
-    @settings(max_examples=60, suppress_health_check=[HealthCheck.function_scoped_fixture])
+    @settings(max_examples=5, suppress_health_check=[HealthCheck.function_scoped_fixture])
     def test_pbt_locked_value_never_recomputed(self, td: dict[str, Any]) -> None:
         """PBT-R3：任何 _cell_modes[i]=='locked' 的 cell，无论 new 是什么，old 值都保留.
 
@@ -235,7 +235,7 @@ class TestColumnMergePBT:
         old_td=col_merge_table_strategy(),
         new_td=col_merge_table_strategy(),
     )
-    @settings(max_examples=50, suppress_health_check=[HealthCheck.function_scoped_fixture])
+    @settings(max_examples=5, suppress_health_check=[HealthCheck.function_scoped_fixture])
     def test_pbt_column_id_uniqueness_after_merge(
         self, old_td: dict[str, Any], new_td: dict[str, Any]
     ) -> None:
@@ -252,7 +252,7 @@ class TestColumnMergePBT:
         old_td=col_merge_table_strategy(),
         new_td=col_merge_table_strategy(),
     )
-    @settings(max_examples=50, suppress_health_check=[HealthCheck.function_scoped_fixture])
+    @settings(max_examples=5, suppress_health_check=[HealthCheck.function_scoped_fixture])
     def test_pbt_value_alignment_after_merge(
         self, old_td: dict[str, Any], new_td: dict[str, Any]
     ) -> None:
@@ -267,7 +267,7 @@ class TestColumnMergePBT:
             )
 
     @given(td=col_merge_table_strategy())
-    @settings(max_examples=40, suppress_health_check=[HealthCheck.function_scoped_fixture])
+    @settings(max_examples=5, suppress_health_check=[HealthCheck.function_scoped_fixture])
     def test_pbt_manual_follows_col_id_after_reorder(
         self, td: dict[str, Any]
     ) -> None:

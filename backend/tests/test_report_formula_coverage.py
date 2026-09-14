@@ -159,12 +159,31 @@ class TestBSSpecialCoverage:
     """Validate BS special formula coverage meets 80%+ target."""
 
     def test_bs_has_minimum_entries(self):
-        """BS special should have at least 70 entries for 80%+ coverage."""
-        # With ~129 BS rows in soe_standalone, we need ~80% = ~103 rows covered.
-        # Special table + CAS + fallback should cover this.
-        # The special table alone should have 70+ entries.
-        assert len(_BS_SPECIAL) >= 70, (
-            f"BS special has only {len(_BS_SPECIAL)} entries, need >= 70"
+        """BS special 覆盖规模须达标（原 70 门槛，用真源调和派生行移除）。
+
+        🔴 report-config-account-code-integrity（V138 / filler-mirror）已把 6 个
+        **无单一会计科目**的派生行（一年内到期的非流动资产/负债、其他流动资产/负债、
+        衍生金融负债、少数股东权益）从 `_BS_SPECIAL` **正确移除** —— 它们此前填的是
+        错码/无效码（1503/1901/2102/2502/2301/4201 中的错用），属「假覆盖」；移除后由
+        `fill_all_formulas` 的派生行拦截门统一处理、report_config.formula 保持 NULL。
+
+        故门槛判据改为「special 条目 + 被正确移除的 BS 派生行 ≥ 70」——
+        证明**覆盖能力未退化**（只是把假覆盖换成正确拦截），并用真源常量交叉锁死
+        防门槛被随意下调；另设 special 表本身下限 65 防真实退化。
+        """
+        from app.services.four_table.report_config_account_names import (
+            DERIVED_ROW_NAMES_WITHOUT_ACCOUNT,
+        )
+
+        # 「商誉减值准备」属减值准备表（_IMP_SPECIAL），不计入 BS
+        bs_derived_removed = DERIVED_ROW_NAMES_WITHOUT_ACCOUNT - {"商誉减值准备"}
+        effective = len(_BS_SPECIAL) + len(bs_derived_removed)
+        assert effective >= 70, (
+            f"BS special {len(_BS_SPECIAL)} + 正确移除的派生行 "
+            f"{len(bs_derived_removed)} = {effective}，覆盖规模退化（需 >= 70）"
+        )
+        assert len(_BS_SPECIAL) >= 65, (
+            f"BS special 仅 {len(_BS_SPECIAL)} 条 —— 疑似真实退化（下限 65）"
         )
 
     def test_bs_covers_core_accounts(self):

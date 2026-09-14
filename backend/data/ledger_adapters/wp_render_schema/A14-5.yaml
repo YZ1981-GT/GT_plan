@@ -1,0 +1,79 @@
+# A14-5.yaml — 与其他缺陷一同进行评价（T3 汇总评价）
+# 基于 a7_a15_xlsx_audit.json X-A14-5 深读结果
+# componentType: d-form-table
+# applicable_categories: ["A","B"]（整合审计场景）
+
+wp_code: A14-5
+template_path: backend/wp_templates/A/A14-5 与其他缺陷一同进行评价.xlsx
+template_version: v2025-R5
+
+sheets:
+  main:
+    form_type: table
+    title: 与其他缺陷一同进行评价（T3 汇总）
+    fields:
+      - field: combined_eval_rationale
+        label: 合并评价依据
+        type: textarea
+      - field: combined_eval_result
+        label: 合并评价结果
+        type: enum
+        options: [重大缺陷, 重要缺陷, 一般缺陷, 无需调整]
+    dynamic_table:
+      start_row: 7
+      end_row: dynamic
+      header_row: 6
+      add_row_button: true
+      max_rows: 30
+      columns:
+        seq:
+          field: seq
+          type: text
+          label: 序号
+          width: 50
+        source_deficiency:
+          field: source_deficiency
+          type: textarea
+          label: 来源缺陷
+          width: 180
+        source_wp:
+          field: source_wp
+          type: text
+          label: 来源底稿
+          width: 90
+          render_hint: index_chip
+        individual_level:
+          field: individual_level
+          type: enum
+          label: 单独认定
+          width: 90
+          dict_source: level_dict
+        combined_level:
+          field: combined_level
+          type: enum
+          label: 合并认定
+          width: 90
+          dict_source: level_dict
+        remarks:
+          field: remarks
+          type: textarea
+          label: 备注
+          width: 160
+    dictionaries:
+      level_dict:
+        - value: major
+          label: 重大缺陷
+        - value: significant
+          label: 重要缺陷
+        - value: general
+          label: 一般缺陷
+    conclusion:
+      mode: composite
+      audit_explanation_field:
+        name: audit_explanation
+        label: 审计说明
+        type: textarea
+      overall_conclusion_field:
+        name: overall_conclusion
+        label: 结论
+        type: textarea

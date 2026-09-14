@@ -28,7 +28,7 @@ import { useDisplayPrefsStore } from '@/stores/displayPrefs'
 import CommentTooltip from '@/components/common/CommentTooltip.vue'
 import type { CellComment } from '@/composables/useCellComments'
 import { toDecimal } from '@/utils/decimal'
-import { AMOUNT_UNITS } from '@/utils/formatters'
+import { AMOUNT_UNITS, type AmountUnit } from '@/utils/formatters'
 
 const props = withDefaults(
   defineProps<{
@@ -40,11 +40,17 @@ const props = withDefaults(
     comment?: CellComment | null
     /** 上期金额（用于变动高亮对比） */
     priorValue?: number | string | null
+    /**
+     * 模块级单位覆盖（传入则忽略全局 displayPrefs.amountUnit，不污染全局偏好）。
+     * 用于附注等以「元」为惯例的财务报表呈现场景。
+     */
+    unit?: AmountUnit
   }>(),
   {
     clickable: false,
     comment: undefined,
     priorValue: undefined,
+    unit: undefined,
   },
 )
 
@@ -93,7 +99,8 @@ const formattedDisplay = computed<string>(() => {
   if (d === null) return '-'
   if (d.isZero() && !displayPrefs.showZero) return '-'
 
-  const unitCfg = AMOUNT_UNITS[displayPrefs.amountUnit] ?? AMOUNT_UNITS.yuan
+  const effectiveUnit = props.unit ?? displayPrefs.amountUnit
+  const unitCfg = AMOUNT_UNITS[effectiveUnit] ?? AMOUNT_UNITS.yuan
   // Decimal 除法替代 n / cfg.divisor 的浮点除法
   const converted = d.dividedBy(unitCfg.divisor)
   const rounded = converted.toDecimalPlaces(displayPrefs.decimals, Decimal.ROUND_HALF_UP)
@@ -150,8 +157,7 @@ function handleClick() {
   padding: 2px 8px;
   color: var(--gt-color-text-regular);
   display: inline-block;
-  border-radius: var(--gt-radius-sm, 4px);
-  transition: all 0.15s ease;
+  transition: color 0.15s ease;
 }
 
 .gt-amount-cell--clickable {
@@ -162,7 +168,6 @@ function handleClick() {
 
 .gt-amount-cell--clickable:hover {
   color: var(--gt-color-primary, #4b2d77);
-  background: var(--gt-color-primary-bg, #f4f0fa);
 }
 </style>
 
@@ -173,7 +178,7 @@ function handleClick() {
 }
 
 .gt-amount--highlight {
-  background: var(--gt-color-wheat-light) !important;
-  border-radius: 3px;
+  color: var(--gt-color-primary) !important;
+  font-weight: 600;
 }
 </style>

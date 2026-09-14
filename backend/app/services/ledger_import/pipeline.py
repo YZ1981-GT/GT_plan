@@ -264,7 +264,7 @@ async def execute_pipeline(
     from app.services.dataset_service import DatasetService
     from app.services.smart_import_engine import rebuild_aux_balance_summary
 
-    from .converter import convert_balance_rows, convert_ledger_rows
+    from .converter import convert_balance_rows, convert_balance_rows_v2, convert_ledger_rows, convert_ledger_rows_v2
     from .detector import detect_file_from_path
     from .identifier import identify
     from .parsers.csv_parser import iter_csv_rows_from_path
@@ -538,6 +538,8 @@ async def execute_pipeline(
             chunk_count = 0
             balance_cleaned_accumulated: list[dict] = []
             is_balance_sheet = sheet.table_type in ("balance", "aux_balance")
+            # 百万行优化：余额表分批写入阈值（避免全量累积 OOM）
+            BALANCE_FLUSH_THRESHOLD = 100_000
 
             # B3 诊断：把 for 循环展开成 while 以便测纯解析耗时
             _parse_iter = iter(row_iter)
@@ -580,9 +582,23 @@ async def execute_pipeline(
 
                 if is_balance_sheet:
                     balance_cleaned_accumulated.extend(cleaned)
+                    # 余额表有跨行聚合逻辑（同 account_code 去重合并），
+                    # 不能分批 flush（否则同科目跨批会产生重复主表行）。
+                    # 实际余额表通常 < 5 万行，全量累积不会 OOM。
+                    if len(balance_cleaned_accumulated) >= BALANCE_FLUSH_THRESHOLD:
+                        logger.warning(
+                            "Pipeline %s balance sheet accumulated %d rows (exceeds %d threshold). "
+                            "Balance tables cannot be flushed in batches due to cross-row aggregation. "
+                            "Memory usage may be elevated.",
+                            job_id, len(balance_cleaned_accumulated), BALANCE_FLUSH_THRESHOLD,
+                        )
                 elif sheet.table_type in ("ledger", "aux_ledger"):
                     _t = _time.time()
-                    ledger, aux_ledger, _stats = convert_ledger_rows(cleaned)
+                    ledger_result_v2 = convert_ledger_rows_v2(cleaned)
+                    ledger = ledger_result_v2.rows
+                    aux_ledger = ledger_result_v2.aux_rows
+                    # 合并 v2 warnings 到 all_findings
+                    all_findings.extend(ledger_result_v2.warnings)
                     _t_convert += _time.time() - _t
                     _t = _time.time()
                     await _insert(TbLedger, ledger)
@@ -618,7 +634,11 @@ async def execute_pipeline(
             # Balance sheet 累积完毕，统一 convert + 写入
             if is_balance_sheet and balance_cleaned_accumulated:
                 _t = _time.time()
-                bal, aux_bal = convert_balance_rows(balance_cleaned_accumulated)
+                result_v2 = convert_balance_rows_v2(balance_cleaned_accumulated)
+                bal = result_v2.rows
+                aux_bal = result_v2.aux_rows
+                # 合并 v2 warnings 到 all_findings
+                all_findings.extend(result_v2.warnings)
                 _t_convert += _time.time() - _t
                 logger.info(
                     "Pipeline %s balance sheet %s: cleaned=%d dedup→balance=%d aux=%d",

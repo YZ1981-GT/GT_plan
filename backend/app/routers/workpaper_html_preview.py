@@ -106,7 +106,7 @@ async def get_workpaper_html_preview(
     wp_id: UUID,
     mask: bool = Query(False, description="是否启用脱敏"),
     db: AsyncSession = Depends(get_db),
-    _user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
 ):
     """获取底稿 HTML 预览（只读，移动端使用）
 
@@ -114,6 +114,17 @@ async def get_workpaper_html_preview(
     若 parsed_data 无 structure，则从 file_path 解析 xlsx 文件。
     支持 ?mask=true 对敏感数据（金额/客户名/身份证号）进行脱敏。
     """
+    from app.routers._wp_gate import enforce_wp_gate
+
+    # Wp_Bound_Gate：读取底稿 HTML 正文之前完成授权判定（Req 8.5 / html 入口族）。
+    # read_html 只读族；History_Only 仅当前版本可读、越权/不存在统一 404（gate 服务统一处理）。
+    await enforce_wp_gate(
+        db, current_user,
+        entrypoint="workpaper.html", action="read_html", method="GET",
+        wp_id=wp_id, project_id=project_id, entry_family="html",
+        route_name="/api/projects/{project_id}/workpapers/{wp_id}/html",
+    )
+
     # 查询底稿
     stmt = select(WorkingPaper).where(
         WorkingPaper.id == wp_id,

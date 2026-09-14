@@ -273,10 +273,92 @@ async def activate_dataset(
     )
 
 
+def prepare_rows_from_normalized_mapping(
+    raw_rows: list[dict[str, Any]],
+    mapping_entries: list[dict[str, Any]],
+) -> tuple[list[dict[str, Any]], list[LedgerImportError]]:
+    """Pipeline 消费规范化 DTO：按 column_index 取原始列值。
+
+    见 design §4.1 / Task 5.5 + 5.6：
+    - pipeline 只消费 NormalizedMappingDTO 的 mapping_entries[]
+    - 按 column_index 从原始行取值（原始行为 list 或 按 canonical_header 索引的 dict）
+    - canonical_header 作为 raw_extra key（保证唯一，重复原始表头不覆盖）
+
+    Args:
+        raw_rows: 原始行列表。每行为 dict，key 为 canonical_header 或 column_index。
+                  如果 key 是整数则按 column_index 取值；如果 key 是字符串则按
+                  canonical_header 取值。
+        mapping_entries: NormalizedMappingDTO.mapping_entries 的 dict 表示。
+                        每条包含 column_index, original_header, canonical_header, standard_field。
+
+    Returns:
+        (transformed_rows, warnings)
+        - 每个 transformed row 有 standard_field key + 可选 'raw_extra' key
+        - raw_extra 使用 canonical_header 作为 key（保证唯一，重复表头不覆盖）
+    """
+    transformed: list[dict[str, Any]] = []
+    warnings: list[LedgerImportError] = []
+
+    # 建立 canonical_header → standard_field 索引
+    mapped_canonical_headers: set[str] = set()
+    canonical_to_std: dict[str, str] = {}
+    for entry in mapping_entries:
+        ch = entry["canonical_header"]
+        mapped_canonical_headers.add(ch)
+        canonical_to_std[ch] = entry["standard_field"]
+
+    # 识别所有 canonical headers（排序按 column_index 保持稳定）
+    sorted_entries = sorted(mapping_entries, key=lambda e: e["column_index"])
+    all_canonical_headers = [e["canonical_header"] for e in sorted_entries]
+
+    for raw_row in raw_rows:
+        std_row: dict[str, Any] = {}
+
+        # 按 mapping_entries 取值
+        for entry in mapping_entries:
+            col_idx = entry["column_index"]
+            canonical = entry["canonical_header"]
+            std_field = entry["standard_field"]
+
+            # 尝试按 canonical_header key 取值（dict row）
+            val = raw_row.get(canonical)
+            if val is None and isinstance(col_idx, int):
+                # 备选：按 column_index 取值（list-like row 转 dict 时 key 可能是 int）
+                val = raw_row.get(col_idx)
+
+            # 多对一处理：首个非空值保留
+            existing = std_row.get(std_field)
+            existing_str = str(existing).strip() if existing is not None else ""
+            val_str = str(val).strip() if val is not None else ""
+
+            if not existing_str:
+                std_row[std_field] = val
+            # 后续非空值忽略（简化版本，pipeline 阶段不做 discarded 保留）
+
+        # raw_extra：使用 canonical_header 作为 key（保证唯一，不覆盖）
+        extra: dict[str, Any] = {}
+        for key in raw_row:
+            # 只保留未映射到 standard_field 的列
+            if key not in mapped_canonical_headers:
+                value = raw_row[key]
+                if value is not None and str(value).strip():
+                    extra[str(key)] = value
+
+        if extra:
+            std_row["raw_extra"] = _sanitize_raw_extra(extra)
+        else:
+            std_row["raw_extra"] = None
+
+        transformed.append(std_row)
+
+    return transformed, warnings
+
+
 __all__ = [
     "write_chunk",
     "build_raw_extra",
     "prepare_rows_with_raw_extra",
+    "prepare_rows_from_normalized_mapping",
     "activate_dataset",
     "clear_project_year",
     "bulk_insert_staged",
@@ -431,6 +513,11 @@ async def bulk_insert_staged(
             "bulk_insert_staged → table=%s rows=%d dataset=%s chunk=%d",
             table_model.__tablename__, len(rows), dataset_id, chunk_size,
         )
+        # 百万行优化：大批量 INSERT 触发索引更新时受益于更大 work_mem
+        try:
+            await db.execute(sa.text("SET LOCAL work_mem = '128MB'"))
+        except Exception:
+            pass  # 非致命
         for i in range(0, len(rows), chunk_size):
             batch = rows[i:i + chunk_size]
             records = []
@@ -452,6 +539,9 @@ async def bulk_insert_staged(
                 # currency_code 默认 CNY
                 if "currency_code" in valid_cols and not rec.get("currency_code"):
                     rec["currency_code"] = "CNY"
+                # tenant_id NOT NULL 兜底（与 bulk_copy_staged 一致，防御性显式注入）
+                if "tenant_id" in valid_cols and not rec.get("tenant_id"):
+                    rec["tenant_id"] = "default"
                 # raw_extra JSONB 安全序列化：datetime/date/Decimal 等非 JSON 原生类型转 str
                 if "raw_extra" in rec and rec["raw_extra"] is not None:
                     rec["raw_extra"] = _sanitize_raw_extra(rec["raw_extra"])
@@ -527,6 +617,7 @@ async def bulk_copy_staged(
     idx_updated = col_index.get("updated_at")
     idx_company = col_index.get("company_code")
     idx_currency = col_index.get("currency_code")
+    idx_tenant = col_index.get("tenant_id")
 
     num_cols = len(valid_col_names)
 
@@ -563,6 +654,8 @@ async def bulk_copy_staged(
             row_list[idx_company] = default_company_code
         if idx_currency is not None and not row_list[idx_currency]:
             row_list[idx_currency] = "CNY"
+        if idx_tenant is not None and not row_list[idx_tenant]:
+            row_list[idx_tenant] = "default"
 
         # JSONB 列：B3-F 优化——跳过 _sanitize_raw_extra 递归，直接 json.dumps(default=)
         # _json_default 在编码时现场处理 datetime/Decimal 等非标类型，免去递归构造中间 dict。
@@ -584,6 +677,14 @@ async def bulk_copy_staged(
         asyncpg_conn = await raw_conn.get_raw_connection()
         driver_conn = asyncpg_conn.driver_connection  # type: ignore[attr-defined]
         table_name = table_model.__tablename__
+
+        # 百万行优化：大批量 COPY 前临时提升 work_mem（事务级，不影响其他连接）
+        # 注：COPY 本身是二进制流灌入不走 SQL 解析器，work_mem 主要帮助
+        # COPY 完成后 PG 更新索引时的排序内存。对有多索引的表（如 tb_ledger 5 个索引）有效。
+        try:
+            await driver_conn.execute("SET LOCAL work_mem = '128MB'")
+        except Exception:
+            pass  # 非致命：SQLite/旧 PG 版本可能不支持
 
         await driver_conn.copy_records_to_table(
             table_name,

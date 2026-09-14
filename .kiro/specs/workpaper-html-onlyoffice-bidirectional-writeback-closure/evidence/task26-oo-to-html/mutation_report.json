@@ -1,0 +1,1334 @@
+{
+  "generated_by": "backend/scripts/_mutation_kit/span.py::run_cli",
+  "mode": "run",
+  "pytest_args": [
+    "backend/tests/workpaper_sync/test_task26_oo_to_html.py",
+    "backend/tests/workpaper_sync/test_task26_oo_to_html_pg.py",
+    "backend/tests/workpaper_sync/test_task14_merge_conflicts.py",
+    "backend/tests/workpaper_sync/test_task15_content_mutation.py",
+    "-q",
+    "--tb=no",
+    "-rf",
+    "-p",
+    "no:randomly"
+  ],
+  "tally": {
+    "RED": 56
+  },
+  "mutations": [
+    {
+      "id": "M01",
+      "path": "backend/app/services/workpaper_sync/oo_to_html.py",
+      "want": "test_task26_oo_to_html.py::TestSubstrateAdmission::test_every_forbidden_origin_is_rejected[room_pointer]",
+      "why": "不再校验 substrate 来源 ⇒ callback 到达时的 room pointer / registry alias / upgrade candidate / operation path 都能当 substrate（AC 4.3 明令禁止）。四种形态各自参数化，删掉判据时四条同时红",
+      "verdict": "RED",
+      "summary": "4 failed, 427 passed in 47.74s",
+      "added": [
+        "test_task26_oo_to_html.py::TestSubstrateAdmission::test_every_forbidden_origin_is_rejected[operation_path]",
+        "test_task26_oo_to_html.py::TestSubstrateAdmission::test_every_forbidden_origin_is_rejected[registry_alias]",
+        "test_task26_oo_to_html.py::TestSubstrateAdmission::test_every_forbidden_origin_is_rejected[room_pointer]",
+        "test_task26_oo_to_html.py::TestSubstrateAdmission::test_every_forbidden_origin_is_rejected[upgrade_candidate]"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task26_oo_to_html.py::TestSubstrateAdmission::test_every_forbidden_origin_is_rejected[operation_path]",
+        "test_task26_oo_to_html.py::TestSubstrateAdmission::test_every_forbidden_origin_is_rejected[registry_alias]",
+        "test_task26_oo_to_html.py::TestSubstrateAdmission::test_every_forbidden_origin_is_rejected[room_pointer]",
+        "test_task26_oo_to_html.py::TestSubstrateAdmission::test_every_forbidden_origin_is_rejected[upgrade_candidate]"
+      ],
+      "added_files": [
+        "test_task26_oo_to_html.py"
+      ],
+      "restored": true,
+      "restored_sha256": "6af3cfbf4f3fe61c65c1d1a47db3cc44573169f43cc4b77cbda1810a37704ffc",
+      "seconds": 51.2
+    },
+    {
+      "id": "M02",
+      "path": "backend/app/services/workpaper_sync/oo_to_html.py",
+      "want": "test_task26_oo_to_html.py::TestSubstrateAdmission::test_legal_origin_but_different_artifact_id_is_rejected",
+      "why": "只查「声明的来源」不查「事实上取到的是不是那一个」⇒ 从 room pointer 查到一个 artifact 再把 origin 写成 application_incoming_fk 就能过关。与 M01 分开：声明是意图，id 相等才是事实",
+      "verdict": "RED",
+      "summary": "1 failed, 430 passed in 47.75s",
+      "added": [
+        "test_task26_oo_to_html.py::TestSubstrateAdmission::test_legal_origin_but_different_artifact_id_is_rejected"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task26_oo_to_html.py::TestSubstrateAdmission::test_legal_origin_but_different_artifact_id_is_rejected"
+      ],
+      "added_files": [
+        "test_task26_oo_to_html.py"
+      ],
+      "restored": true,
+      "restored_sha256": "6af3cfbf4f3fe61c65c1d1a47db3cc44573169f43cc4b77cbda1810a37704ffc",
+      "seconds": 51.2
+    },
+    {
+      "id": "M03",
+      "path": "backend/app/services/workpaper_sync/oo_to_html.py",
+      "want": "test_task26_oo_to_html.py::TestSubstrateAdmission::test_quarantined_is_rejected_with_coordinator_specific_type",
+      "why": "coordinator 入口不再拒绝 quarantined ⇒ 三层拒绝少一层。真库侧同时红：PG 守卫断言 `open_substrate` 报的是 coordinator 自己的 error_code",
+      "verdict": "RED",
+      "summary": "3 failed, 428 passed in 47.52s",
+      "added": [
+        "test_task26_oo_to_html.py::TestSubstrateAdmission::test_quarantined_is_rejected_with_coordinator_specific_type",
+        "test_task26_oo_to_html_pg.py::TestQuarantinedThreeLayerRefusal::test_coordinator_entry_layer_refuses_with_its_own_code",
+        "test_task26_oo_to_html_pg.py::TestQuarantinedThreeLayerRefusal::test_coordinator_layer_is_not_shadowed_by_the_db_layer"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task26_oo_to_html.py::TestSubstrateAdmission::test_quarantined_is_rejected_with_coordinator_specific_type",
+        "test_task26_oo_to_html_pg.py::TestQuarantinedThreeLayerRefusal::test_coordinator_layer_is_not_shadowed_by_the_db_layer"
+      ],
+      "added_files": [
+        "test_task26_oo_to_html.py",
+        "test_task26_oo_to_html_pg.py"
+      ],
+      "restored": true,
+      "restored_sha256": "6af3cfbf4f3fe61c65c1d1a47db3cc44573169f43cc4b77cbda1810a37704ffc",
+      "seconds": 51.0
+    },
+    {
+      "id": "M04",
+      "path": "backend/app/services/workpaper_sync/oo_to_html.py",
+      "want": "test_task26_oo_to_html.py::TestSubstrateAdmission::test_non_incoming_kind_is_rejected",
+      "why": "不再要求 substrate 是 incoming ⇒ published representation 也能被当 OO→HTML 的只读基底，于是「客户端刚回写的字节」与「服务器现状」混成一份",
+      "verdict": "RED",
+      "summary": "1 failed, 430 passed in 47.67s",
+      "added": [
+        "test_task26_oo_to_html.py::TestSubstrateAdmission::test_non_incoming_kind_is_rejected"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task26_oo_to_html.py::TestSubstrateAdmission::test_non_incoming_kind_is_rejected"
+      ],
+      "added_files": [
+        "test_task26_oo_to_html.py"
+      ],
+      "restored": true,
+      "restored_sha256": "6af3cfbf4f3fe61c65c1d1a47db3cc44573169f43cc4b77cbda1810a37704ffc",
+      "seconds": 51.1
+    },
+    {
+      "id": "M05",
+      "path": "backend/app/services/workpaper_sync/oo_to_html.py",
+      "want": "test_task26_oo_to_html.py::TestSubstrateAdmission::test_durable_state_without_durable_at_is_rejected",
+      "why": "只看 state 不看 `durable_at` ⇒ 半写入态（state 已改而 durable fact 未落）也能进 engine。AC 5.4 明确 ownership 只以 immutable `durable_at` 判定",
+      "verdict": "RED",
+      "summary": "1 failed, 430 passed in 47.17s",
+      "added": [
+        "test_task26_oo_to_html.py::TestSubstrateAdmission::test_durable_state_without_durable_at_is_rejected"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task26_oo_to_html.py::TestSubstrateAdmission::test_durable_state_without_durable_at_is_rejected"
+      ],
+      "added_files": [
+        "test_task26_oo_to_html.py"
+      ],
+      "restored": true,
+      "restored_sha256": "6af3cfbf4f3fe61c65c1d1a47db3cc44573169f43cc4b77cbda1810a37704ffc",
+      "seconds": 50.6
+    },
+    {
+      "id": "M06",
+      "path": "backend/app/services/workpaper_sync/oo_to_html.py",
+      "want": "test_task26_oo_to_html.py::TestSubstrateAdmission::test_incoming_with_published_at_is_rejected",
+      "why": "不再拒绝带 `published_at` 的 incoming ⇒ 「有人试过晋升它」这条痕迹被忽略（Property 65：incoming 永不 published/current/resolver-visible）",
+      "verdict": "RED",
+      "summary": "1 failed, 430 passed in 47.70s",
+      "added": [
+        "test_task26_oo_to_html.py::TestSubstrateAdmission::test_incoming_with_published_at_is_rejected"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task26_oo_to_html.py::TestSubstrateAdmission::test_incoming_with_published_at_is_rejected"
+      ],
+      "added_files": [
+        "test_task26_oo_to_html.py"
+      ],
+      "restored": true,
+      "restored_sha256": "6af3cfbf4f3fe61c65c1d1a47db3cc44573169f43cc4b77cbda1810a37704ffc",
+      "seconds": 51.1
+    },
+    {
+      "id": "M07",
+      "path": "backend/app/services/workpaper_sync/oo_to_html.py",
+      "want": "test_task26_oo_to_html.py::TestQuarantineWhitelist::test_whitelist_is_exactly_the_three_allowed_actions",
+      "why": "白名单被悄悄加一项 `release` ⇒ Requirement 5.6「永不 release、永不转 durable」被放开。白名单必须与需求原文三项逐字锁死",
+      "verdict": "RED",
+      "summary": "2 failed, 430 passed in 47.32s",
+      "added": [
+        "test_task26_oo_to_html.py::TestQuarantineWhitelist::test_everything_else_is_refused[release]",
+        "test_task26_oo_to_html.py::TestQuarantineWhitelist::test_whitelist_is_exactly_the_three_allowed_actions"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task26_oo_to_html.py::TestQuarantineWhitelist::test_everything_else_is_refused[release]",
+        "test_task26_oo_to_html.py::TestQuarantineWhitelist::test_whitelist_is_exactly_the_three_allowed_actions"
+      ],
+      "added_files": [
+        "test_task26_oo_to_html.py"
+      ],
+      "restored": true,
+      "restored_sha256": "6af3cfbf4f3fe61c65c1d1a47db3cc44573169f43cc4b77cbda1810a37704ffc",
+      "seconds": 50.8
+    },
+    {
+      "id": "M08",
+      "path": "backend/app/services/workpaper_sync/oo_to_html.py",
+      "want": "test_task26_oo_to_html.py::TestApprovedContractChild::test_typed_null_marker_contract_slot_fails_immediately",
+      "why": "typed null marker 冒充 per-entry contract 时不再失败 ⇒ projection-based result 会在没有 approved contract 的情况下发布（AC 8.12 末句）",
+      "verdict": "RED",
+      "summary": "1 failed, 430 passed in 47.35s",
+      "added": [
+        "test_task26_oo_to_html.py::TestApprovedContractChild::test_typed_null_marker_contract_slot_fails_immediately"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task26_oo_to_html.py::TestApprovedContractChild::test_typed_null_marker_contract_slot_fails_immediately"
+      ],
+      "added_files": [
+        "test_task26_oo_to_html.py"
+      ],
+      "restored": true,
+      "restored_sha256": "6af3cfbf4f3fe61c65c1d1a47db3cc44573169f43cc4b77cbda1810a37704ffc",
+      "seconds": 50.8
+    },
+    {
+      "id": "M09",
+      "path": "backend/app/services/workpaper_sync/oo_to_html.py",
+      "want": "test_task26_oo_to_html.py::TestApprovedContractChild::test_typed_null_marker_contract_slot_fails_immediately",
+      "why": "把适用范围反过来 ⇒ custom/opaque 入口（contract slot 本就该是 typed null marker）恒失败，而 projection-based 的真正判据被跳过。两侧都必须钉住，否则「对所有 authority model 都要求 approved contract」会反过来违反 Requirement 6.19",
+      "verdict": "RED",
+      "summary": "3 failed, 428 passed in 47.32s",
+      "added": [
+        "test_task26_oo_to_html.py::TestApprovedContractChild::test_custom_authority_model_is_out_of_scope_and_passes",
+        "test_task26_oo_to_html.py::TestApprovedContractChild::test_missing_contract_slot_fails",
+        "test_task26_oo_to_html.py::TestApprovedContractChild::test_typed_null_marker_contract_slot_fails_immediately"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task26_oo_to_html.py::TestApprovedContractChild::test_custom_authority_model_is_out_of_scope_and_passes",
+        "test_task26_oo_to_html.py::TestApprovedContractChild::test_typed_null_marker_contract_slot_fails_immediately"
+      ],
+      "added_files": [
+        "test_task26_oo_to_html.py"
+      ],
+      "restored": true,
+      "restored_sha256": "6af3cfbf4f3fe61c65c1d1a47db3cc44573169f43cc4b77cbda1810a37704ffc",
+      "seconds": 50.8
+    },
+    {
+      "id": "M10",
+      "path": "backend/app/services/workpaper_sync/oo_to_html.py",
+      "want": "test_task26_oo_to_html.py::TestFinalAuthorizationFence::test_each_branch_rejects_independently[project_revoked]",
+      "why": "打开后撤销 project 可见性仍放行 ⇒ Property 43 的第一条直接失效。真库两个 fence 场景一并红",
+      "verdict": "RED",
+      "summary": "10 failed, 421 passed in 47.47s",
+      "added": [
+        "test_task26_oo_to_html.py::TestFinalAuthorizationFence::test_each_branch_rejects_independently[project_revoked]",
+        "test_task26_oo_to_html.py::TestFinalAuthorizationFence::test_fence_ordering_puts_visibility_before_generation",
+        "test_task26_oo_to_html_pg.py::TestFinalAuthorizationFence::test_application_and_operation_are_authorization_stale_not_error[fence_before_publish]",
+        "test_task26_oo_to_html_pg.py::TestFinalAuthorizationFence::test_application_and_operation_are_authorization_stale_not_error[fence_before_write]",
+        "test_task26_oo_to_html_pg.py::TestFinalAuthorizationFence::test_each_revocation_shape_blocks_the_commit[revoked_before_publish]",
+        "test_task26_oo_to_html_pg.py::TestFinalAuthorizationFence::test_each_revocation_shape_blocks_the_commit[revoked_before_write]",
+        "test_task26_oo_to_html_pg.py::TestFinalAuthorizationFence::test_nothing_committed_on_fence_failure[fence_before_publish]",
+        "test_task26_oo_to_html_pg.py::TestFinalAuthorizationFence::test_nothing_committed_on_fence_failure[fence_before_write]",
+        "test_task26_oo_to_html_pg.py::TestFinalAuthorizationFence::test_publish_fence_fires_before_any_file_is_published",
+        "test_task26_oo_to_html_pg.py::TestFinalAuthorizationFence::test_write_fence_fires_after_publish_and_before_revision_bump"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task26_oo_to_html.py::TestFinalAuthorizationFence::test_each_branch_rejects_independently[project_revoked]",
+        "test_task26_oo_to_html_pg.py::TestFinalAuthorizationFence::test_each_revocation_shape_blocks_the_commit[revoked_before_publish]",
+        "test_task26_oo_to_html_pg.py::TestFinalAuthorizationFence::test_each_revocation_shape_blocks_the_commit[revoked_before_write]"
+      ],
+      "added_files": [
+        "test_task26_oo_to_html.py",
+        "test_task26_oo_to_html_pg.py"
+      ],
+      "restored": true,
+      "restored_sha256": "6af3cfbf4f3fe61c65c1d1a47db3cc44573169f43cc4b77cbda1810a37704ffc",
+      "seconds": 50.9
+    },
+    {
+      "id": "M11",
+      "path": "backend/app/services/workpaper_sync/oo_to_html.py",
+      "want": "test_task26_oo_to_html.py::TestFinalAuthorizationFence::test_each_branch_rejects_independently[workflow_locked]",
+      "why": "复核锁定/归档后仍可提交内容。与 M10 分开：合成一条 `all([...])` 时删掉任一条都会被其余遮蔽",
+      "verdict": "RED",
+      "summary": "1 failed, 430 passed in 44.74s",
+      "added": [
+        "test_task26_oo_to_html.py::TestFinalAuthorizationFence::test_each_branch_rejects_independently[workflow_locked]"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task26_oo_to_html.py::TestFinalAuthorizationFence::test_each_branch_rejects_independently[workflow_locked]"
+      ],
+      "added_files": [
+        "test_task26_oo_to_html.py"
+      ],
+      "restored": true,
+      "restored_sha256": "6af3cfbf4f3fe61c65c1d1a47db3cc44573169f43cc4b77cbda1810a37704ffc",
+      "seconds": 48.0
+    },
+    {
+      "id": "M12",
+      "path": "backend/app/services/workpaper_sync/oo_to_html.py",
+      "want": "test_task26_oo_to_html.py::TestFinalAuthorizationFence::test_each_branch_rejects_independently[generation_superseded]",
+      "why": "generation 已 supersede 的旧 application 仍可提交 ⇒ 撤销 writer 后旋转 generation 这条保护形同虚设（AC 2.8 / 4.7）",
+      "verdict": "RED",
+      "summary": "1 failed, 430 passed in 44.96s",
+      "added": [
+        "test_task26_oo_to_html.py::TestFinalAuthorizationFence::test_each_branch_rejects_independently[generation_superseded]"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task26_oo_to_html.py::TestFinalAuthorizationFence::test_each_branch_rejects_independently[generation_superseded]"
+      ],
+      "added_files": [
+        "test_task26_oo_to_html.py"
+      ],
+      "restored": true,
+      "restored_sha256": "6af3cfbf4f3fe61c65c1d1a47db3cc44573169f43cc4b77cbda1810a37704ffc",
+      "seconds": 48.2
+    },
+    {
+      "id": "M13",
+      "path": "backend/app/services/workpaper_sync/oo_to_html.py",
+      "want": "test_task26_oo_to_html.py::TestFinalAuthorizationFence::test_each_branch_rejects_independently[write_fence_advanced]",
+      "why": "write fence 提升后旧会话仍可提交 ⇒ 「期间有 participant 被撤销」的内容会被合进去（AC 10.10）",
+      "verdict": "RED",
+      "summary": "1 failed, 430 passed in 45.23s",
+      "added": [
+        "test_task26_oo_to_html.py::TestFinalAuthorizationFence::test_each_branch_rejects_independently[write_fence_advanced]"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task26_oo_to_html.py::TestFinalAuthorizationFence::test_each_branch_rejects_independently[write_fence_advanced]"
+      ],
+      "added_files": [
+        "test_task26_oo_to_html.py"
+      ],
+      "restored": true,
+      "restored_sha256": "6af3cfbf4f3fe61c65c1d1a47db3cc44573169f43cc4b77cbda1810a37704ffc",
+      "seconds": 48.4
+    },
+    {
+      "id": "M14",
+      "path": "backend/app/services/workpaper_sync/oo_to_html.py",
+      "want": "test_task26_oo_to_html.py::TestFinalAuthorizationFence::test_frozen_side_null_initiator_has_its_own_error_code",
+      "why": "frozen 侧 null initiator 放行 ⇒ system/route identity 冒充用户授权（AC 10.10 明令禁止）。首轮实测判 GREEN：它与 observed 侧共用 `InitiatorMissingError`，删掉后被后者遮蔽 ⇒ 已拆成 `FrozenInitiatorMissingError` + 独立 error_code",
+      "verdict": "RED",
+      "summary": "1 failed, 430 passed in 45.27s",
+      "added": [
+        "test_task26_oo_to_html.py::TestFinalAuthorizationFence::test_frozen_side_null_initiator_has_its_own_error_code"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task26_oo_to_html.py::TestFinalAuthorizationFence::test_frozen_side_null_initiator_has_its_own_error_code"
+      ],
+      "added_files": [
+        "test_task26_oo_to_html.py"
+      ],
+      "restored": true,
+      "restored_sha256": "6af3cfbf4f3fe61c65c1d1a47db3cc44573169f43cc4b77cbda1810a37704ffc",
+      "seconds": 48.5
+    },
+    {
+      "id": "M15",
+      "path": "backend/app/services/workpaper_sync/oo_to_html.py",
+      "want": "test_task26_oo_to_html.py::TestFinalAuthorizationFence::test_each_branch_rejects_independently[initiator_replaced]",
+      "why": "换了个人当 initiator 也放行 ⇒ 冻结的发起人身份可被替换。与 M14 分开：「没有人」与「换了人」是两条独立判据",
+      "verdict": "RED",
+      "summary": "1 failed, 430 passed in 46.50s",
+      "added": [
+        "test_task26_oo_to_html.py::TestFinalAuthorizationFence::test_each_branch_rejects_independently[initiator_replaced]"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task26_oo_to_html.py::TestFinalAuthorizationFence::test_each_branch_rejects_independently[initiator_replaced]"
+      ],
+      "added_files": [
+        "test_task26_oo_to_html.py"
+      ],
+      "restored": true,
+      "restored_sha256": "6af3cfbf4f3fe61c65c1d1a47db3cc44573169f43cc4b77cbda1810a37704ffc",
+      "seconds": 49.8
+    },
+    {
+      "id": "M16",
+      "path": "backend/app/services/workpaper_sync/oo_to_html.py",
+      "want": "test_task26_oo_to_html.py::TestFinalAuthorizationFence::test_each_branch_rejects_independently[permission_epoch_changed]",
+      "why": "initiator 的权限 epoch 变了仍放行 ⇒ 降权用户的编辑照样落库",
+      "verdict": "RED",
+      "summary": "1 failed, 430 passed in 47.02s",
+      "added": [
+        "test_task26_oo_to_html.py::TestFinalAuthorizationFence::test_each_branch_rejects_independently[permission_epoch_changed]"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task26_oo_to_html.py::TestFinalAuthorizationFence::test_each_branch_rejects_independently[permission_epoch_changed]"
+      ],
+      "added_files": [
+        "test_task26_oo_to_html.py"
+      ],
+      "restored": true,
+      "restored_sha256": "6af3cfbf4f3fe61c65c1d1a47db3cc44573169f43cc4b77cbda1810a37704ffc",
+      "seconds": 50.4
+    },
+    {
+      "id": "M17",
+      "path": "backend/app/services/workpaper_sync/oo_to_html.py",
+      "want": "test_task26_oo_to_html.py::TestFinalAuthorizationFence::test_each_branch_rejects_independently[initiator_revoked]",
+      "why": "被撤销/过期/离开的 participant 仍可为本次 application 背书。真库 S12 一并红",
+      "verdict": "RED",
+      "summary": "3 failed, 428 passed in 47.31s",
+      "added": [
+        "test_task26_oo_to_html.py::TestFinalAuthorizationFence::test_each_branch_rejects_independently[initiator_expired]",
+        "test_task26_oo_to_html.py::TestFinalAuthorizationFence::test_each_branch_rejects_independently[initiator_revoked]",
+        "test_task26_oo_to_html_pg.py::TestFinalAuthorizationFence::test_each_revocation_shape_blocks_the_commit[initiator_revoked]"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task26_oo_to_html.py::TestFinalAuthorizationFence::test_each_branch_rejects_independently[initiator_revoked]",
+        "test_task26_oo_to_html_pg.py::TestFinalAuthorizationFence::test_each_revocation_shape_blocks_the_commit[initiator_revoked]"
+      ],
+      "added_files": [
+        "test_task26_oo_to_html.py",
+        "test_task26_oo_to_html_pg.py"
+      ],
+      "restored": true,
+      "restored_sha256": "6af3cfbf4f3fe61c65c1d1a47db3cc44573169f43cc4b77cbda1810a37704ffc",
+      "seconds": 50.8
+    },
+    {
+      "id": "M18",
+      "path": "backend/app/services/workpaper_sync/oo_to_html.py",
+      "want": "test_task26_oo_to_html.py::TestFinalAuthorizationFence::test_closing_initiator_is_still_live",
+      "why": "把 `closing` 从合法 initiator 状态里剔除 ⇒ clean close 的 predecessor forcesave 恒失败（AC 4.10 要求 intent 创建时把 participant 原子转 `closing`，此后它的 forcesave 才回调）。这是「加严也是缺陷」的一类",
+      "verdict": "RED",
+      "summary": "1 failed, 430 passed in 47.28s",
+      "added": [
+        "test_task26_oo_to_html.py::TestFinalAuthorizationFence::test_closing_initiator_is_still_live"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task26_oo_to_html.py::TestFinalAuthorizationFence::test_closing_initiator_is_still_live"
+      ],
+      "added_files": [
+        "test_task26_oo_to_html.py"
+      ],
+      "restored": true,
+      "restored_sha256": "6af3cfbf4f3fe61c65c1d1a47db3cc44573169f43cc4b77cbda1810a37704ffc",
+      "seconds": 50.7
+    },
+    {
+      "id": "M19",
+      "path": "backend/app/services/workpaper_sync/oo_to_html.py",
+      "want": "test_task26_oo_to_html.py::TestFinalAuthorizationFence::test_each_branch_rejects_independently[contributor_drift]",
+      "why": "contributor 集合在期间变化（有人被撤销）仍放行 ⇒ 归属无法判定却照样提交（AC 10.10 点名 contributor snapshot）",
+      "verdict": "RED",
+      "summary": "3 failed, 428 passed in 47.85s",
+      "added": [
+        "test_task26_oo_to_html.py::TestFinalAuthorizationFence::test_each_branch_rejects_independently[contributor_drift]",
+        "test_task26_oo_to_html_pg.py::TestContributorSnapshotIsRecomputed::test_contributor_revocation_blocks_the_commit",
+        "test_task26_oo_to_html_pg.py::TestContributorSnapshotIsRecomputed::test_nothing_committed"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task26_oo_to_html.py::TestFinalAuthorizationFence::test_each_branch_rejects_independently[contributor_drift]"
+      ],
+      "added_files": [
+        "test_task26_oo_to_html.py",
+        "test_task26_oo_to_html_pg.py"
+      ],
+      "restored": true,
+      "restored_sha256": "6af3cfbf4f3fe61c65c1d1a47db3cc44573169f43cc4b77cbda1810a37704ffc",
+      "seconds": 51.3
+    },
+    {
+      "id": "M20",
+      "path": "backend/app/services/workpaper_sync/oo_to_html.py",
+      "want": "test_task26_oo_to_html.py::TestFinalAuthorizationFence::test_each_branch_rejects_independently[bundle_replaced_id]",
+      "why": "current approved bundle 被换成另一个 approved bundle 仍放行 ⇒ 历史 application 会按新 bundle 发布（Property 43 点名这一种）。真库 S11 一并红",
+      "verdict": "RED",
+      "summary": "1 failed, 430 passed in 47.35s",
+      "added": [
+        "test_task26_oo_to_html.py::TestFinalAuthorizationFence::test_each_branch_rejects_independently[bundle_replaced_id]"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task26_oo_to_html.py::TestFinalAuthorizationFence::test_each_branch_rejects_independently[bundle_replaced_id]"
+      ],
+      "added_files": [
+        "test_task26_oo_to_html.py"
+      ],
+      "restored": true,
+      "restored_sha256": "6af3cfbf4f3fe61c65c1d1a47db3cc44573169f43cc4b77cbda1810a37704ffc",
+      "seconds": 50.8
+    },
+    {
+      "id": "M21",
+      "path": "backend/app/services/workpaper_sync/oo_to_html.py",
+      "want": "test_task26_oo_to_html.py::TestFinalAuthorizationFence::test_matching_facts_pass_and_report_every_compared_item",
+      "why": "`compared` 序列本身是判据（AC 10.10 逐项列举）。只断言「抛了 FinalFenceError」时，删掉其中九条守卫照常绿 —— 剩下那条会顶上来。本条证明项名与顺序真的被钉住",
+      "verdict": "RED",
+      "summary": "1 failed, 430 passed in 47.65s",
+      "added": [
+        "test_task26_oo_to_html.py::TestFinalAuthorizationFence::test_matching_facts_pass_and_report_every_compared_item"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task26_oo_to_html.py::TestFinalAuthorizationFence::test_matching_facts_pass_and_report_every_compared_item"
+      ],
+      "added_files": [
+        "test_task26_oo_to_html.py"
+      ],
+      "restored": true,
+      "restored_sha256": "6af3cfbf4f3fe61c65c1d1a47db3cc44573169f43cc4b77cbda1810a37704ffc",
+      "seconds": 51.1
+    },
+    {
+      "id": "M22",
+      "path": "backend/app/services/workpaper_sync/oo_to_html.py",
+      "want": "test_task26_oo_to_html.py::TestSettlementDigestPair::test_managed_equal_reports_equality_to_room_service",
+      "why": "把裁决口径从 Task 14 的 managed 比较换成整份 digest 字节比较 ⇒ Word 底稿的 `word_only` 字段一变就判 refresh，于是 Task 15 的 `_advance_room`（用 `requires_client_refresh`）与 Task 21 的 `settle_client_baseline` 给出**两个**结论，出现「服务端没标 refresh 而 room 标了」的半状态",
+      "verdict": "RED",
+      "summary": "1 failed, 430 passed in 47.31s",
+      "added": [
+        "test_task26_oo_to_html.py::TestSettlementDigestPair::test_managed_equal_reports_equality_to_room_service"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task26_oo_to_html.py::TestSettlementDigestPair::test_managed_equal_reports_equality_to_room_service"
+      ],
+      "added_files": [
+        "test_task26_oo_to_html.py"
+      ],
+      "restored": true,
+      "restored_sha256": "6af3cfbf4f3fe61c65c1d1a47db3cc44573169f43cc4b77cbda1810a37704ffc",
+      "seconds": 50.7
+    },
+    {
+      "id": "M23",
+      "path": "backend/app/services/workpaper_sync/oo_to_html.py",
+      "want": "test_task26_oo_to_html.py::TestSettlementDigestPair::test_managed_equal_reports_equality_to_room_service",
+      "why": "等值裁决时不再如实告知 `settle_client_baseline`「两侧相同」⇒ 受管字段完全等值的 Word 底稿也会被判 refresh-required，编辑器被无谓地强制重开",
+      "verdict": "RED",
+      "summary": "1 failed, 430 passed in 47.37s",
+      "added": [
+        "test_task26_oo_to_html.py::TestSettlementDigestPair::test_managed_equal_reports_equality_to_room_service"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task26_oo_to_html.py::TestSettlementDigestPair::test_managed_equal_reports_equality_to_room_service"
+      ],
+      "added_files": [
+        "test_task26_oo_to_html.py"
+      ],
+      "restored": true,
+      "restored_sha256": "6af3cfbf4f3fe61c65c1d1a47db3cc44573169f43cc4b77cbda1810a37704ffc",
+      "seconds": 50.9
+    },
+    {
+      "id": "M24",
+      "path": "backend/app/services/workpaper_sync/oo_to_html.py",
+      "want": "test_task26_oo_to_html_pg.py::TestRefreshRequired::test_room_is_refresh_required_and_superseded",
+      "why": "merged ≠ incoming 时不再 supersede generation ⇒ AC 4.11「supersede/reopen 后再接受下一次 request」失效，live OO 会拿旧 incoming 把服务器合并值回退掉",
+      "verdict": "RED",
+      "summary": "1 failed, 430 passed in 47.49s",
+      "added": [
+        "test_task26_oo_to_html_pg.py::TestRefreshRequired::test_room_is_refresh_required_and_superseded"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task26_oo_to_html_pg.py::TestRefreshRequired::test_room_is_refresh_required_and_superseded"
+      ],
+      "added_files": [
+        "test_task26_oo_to_html_pg.py"
+      ],
+      "restored": true,
+      "restored_sha256": "6af3cfbf4f3fe61c65c1d1a47db3cc44573169f43cc4b77cbda1810a37704ffc",
+      "seconds": 51.0
+    },
+    {
+      "id": "M25",
+      "path": "backend/app/services/workpaper_sync/oo_to_html.py",
+      "want": "test_task26_oo_to_html_pg.py::TestRefreshRequired::test_server_last_applied_advances_but_client_confirmed_does_not",
+      "why": "把 client-confirmed 推进结果写死为 True ⇒ 服务器结果被冒充成「编辑器已确认基线」（Property 62 的核心禁令）",
+      "verdict": "RED",
+      "summary": "1 failed, 430 passed in 47.35s",
+      "added": [
+        "test_task26_oo_to_html_pg.py::TestRefreshRequired::test_server_last_applied_advances_but_client_confirmed_does_not"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task26_oo_to_html_pg.py::TestRefreshRequired::test_server_last_applied_advances_but_client_confirmed_does_not"
+      ],
+      "added_files": [
+        "test_task26_oo_to_html_pg.py"
+      ],
+      "restored": true,
+      "restored_sha256": "6af3cfbf4f3fe61c65c1d1a47db3cc44573169f43cc4b77cbda1810a37704ffc",
+      "seconds": 50.8
+    },
+    {
+      "id": "M26",
+      "path": "backend/app/services/workpaper_sync/content_mutation.py",
+      "want": "test_task26_oo_to_html_pg.py::TestRefreshRequired::test_application_and_operation_are_refresh_required",
+      "why": "同事务落 application 结果时把 `requires_client_refresh` 写死 False ⇒ merged ≠ incoming 的 application 会被记成 `applied`，编辑器再也收不到「需重开确认新基线」（AC 4.12 要求四态分别可见）",
+      "verdict": "RED",
+      "summary": "1 failed, 430 passed in 47.62s",
+      "added": [
+        "test_task26_oo_to_html_pg.py::TestRefreshRequired::test_application_and_operation_are_refresh_required"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task26_oo_to_html_pg.py::TestRefreshRequired::test_application_and_operation_are_refresh_required"
+      ],
+      "added_files": [
+        "test_task26_oo_to_html_pg.py"
+      ],
+      "restored": true,
+      "restored_sha256": "75709272057665c6abf4a00f037ff1f6bb4a1a19010904c6fc2ae79ce57fd575",
+      "seconds": 51.1
+    },
+    {
+      "id": "M27",
+      "path": "backend/app/services/workpaper_sync/content_mutation.py",
+      "want": "test_task26_oo_to_html.py::TestCommitFenceHookWiring::test_before_publish_is_called_between_unmanaged_check_and_publish",
+      "why": "删掉 publish 前的 fence 挂点 ⇒ fence 名存实亡（artifact 直接进入不可变 `.versions` 命名空间，回滚只能留 orphan），而所有终态断言照常通过。这是本任务最贵的一类缺陷：撤权后的内容会被发布出去",
+      "verdict": "RED",
+      "summary": "34 failed, 397 passed in 47.36s",
+      "added": [
+        "test_task26_oo_to_html.py::TestCommitFenceHookWiring::test_before_publish_is_called_between_unmanaged_check_and_publish",
+        "test_task26_oo_to_html_pg.py::TestAppliedHappyPath::test_application_and_operation_reached_applied_terminal",
+        "test_task26_oo_to_html_pg.py::TestAppliedHappyPath::test_both_fences_ran_and_in_order",
+        "test_task26_oo_to_html_pg.py::TestAppliedHappyPath::test_business_revision_advanced_exactly_once",
+        "test_task26_oo_to_html_pg.py::TestAppliedHappyPath::test_entry_pointer_moved_to_the_new_result_representation",
+        "test_task26_oo_to_html_pg.py::TestAppliedHappyPath::test_outbox_row_written_in_the_same_transaction",
+        "test_task26_oo_to_html_pg.py::TestAppliedHappyPath::test_p14_reload_floor_equals_application_result_revision",
+        "test_task26_oo_to_html_pg.py::TestAppliedHappyPath::test_p25_incoming_field_change_was_auto_merged",
+        "test_task26_oo_to_html_pg.py::TestAppliedHappyPath::test_p62_both_baselines_advance_when_merged_equals_incoming",
+        "test_task26_oo_to_html_pg.py::TestAppliedHappyPath::test_p65_incoming_is_never_promoted",
+        "test_task26_oo_to_html_pg.py::TestAppliedHappyPath::test_p65_merged_projection_digest_equals_published_projection_artifact",
+        "test_task26_oo_to_html_pg.py::TestAppliedHappyPath::test_p65_result_representation_bundle_equals_frozen_bundle",
+        "test_task26_oo_to_html_pg.py::TestAppliedHappyPath::test_probe_actually_executed_twice",
+        "test_task26_oo_to_html_pg.py::TestAppliedHappyPath::test_result_is_applied",
+        "test_task26_oo_to_html_pg.py::TestContributorSnapshotIsRecomputed::test_contributor_revocation_blocks_the_commit",
+        "test_task26_oo_to_html_pg.py::TestDurablePostFailureAndRetry::test_p38_retry_succeeds_and_produces_exactly_one_revision",
+        "test_task26_oo_to_html_pg.py::TestFinalAuthorizationFence::test_application_and_operation_are_authorization_stale_not_error[bundle_swap]",
+        "test_task26_oo_to_html_pg.py::TestFinalAuthorizationFence::test_application_and_operation_are_authorization_stale_not_error[fence_before_publish]",
+        "test_task26_oo_to_html_pg.py::TestFinalAuthorizationFence::test_application_and_operation_are_authorization_stale_not_error[fence_before_write]",
+        "test_task26_oo_to_html_pg.py::TestFinalAuthorizationFence::test_application_and_operation_are_authorization_stale_not_error[initiator_revoked]",
+        "test_task26_oo_to_html_pg.py::TestFinalAuthorizationFence::test_each_revocation_shape_blocks_the_commit[bundle_replaced]",
+        "test_task26_oo_to_html_pg.py::TestFinalAuthorizationFence::test_each_revocation_shape_blocks_the_commit[initiator_revoked]",
+        "test_task26_oo_to_html_pg.py::TestFinalAuthorizationFence::test_each_revocation_shape_blocks_the_commit[revoked_before_publish]",
+        "test_task26_oo_to_html_pg.py::TestFinalAuthorizationFence::test_each_revocation_shape_blocks_the_commit[revoked_before_write]",
+        "test_task26_oo_to_html_pg.py::TestFinalAuthorizationFence::test_publish_fence_fires_before_any_file_is_published",
+        "test_task26_oo_to_html_pg.py::TestFinalAuthorizationFence::test_write_fence_fires_after_publish_and_before_revision_bump",
+        "test_task26_oo_to_html_pg.py::TestPreBindAndProbe::test_broken_probe_fails_visibly_and_commits_nothing",
+        "test_task26_oo_to_html_pg.py::TestPreBindAndProbe::test_incomplete_probe_response_is_refused_not_treated_as_allowed",
+        "test_task26_oo_to_html_pg.py::TestRefreshRequired::test_application_and_operation_are_refresh_required",
+        "test_task26_oo_to_html_pg.py::TestRefreshRequired::test_next_forcesave_is_rejected",
+        "test_task26_oo_to_html_pg.py::TestRefreshRequired::test_result_is_refresh_required",
+        "test_task26_oo_to_html_pg.py::TestRefreshRequired::test_result_revision_still_bound_for_audit",
+        "test_task26_oo_to_html_pg.py::TestRefreshRequired::test_room_is_refresh_required_and_superseded",
+        "test_task26_oo_to_html_pg.py::TestRefreshRequired::test_server_last_applied_advances_but_client_confirmed_does_not"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task26_oo_to_html.py::TestCommitFenceHookWiring::test_before_publish_is_called_between_unmanaged_check_and_publish",
+        "test_task26_oo_to_html_pg.py::TestAppliedHappyPath::test_both_fences_ran_and_in_order",
+        "test_task26_oo_to_html_pg.py::TestFinalAuthorizationFence::test_publish_fence_fires_before_any_file_is_published"
+      ],
+      "added_files": [
+        "test_task26_oo_to_html.py",
+        "test_task26_oo_to_html_pg.py"
+      ],
+      "restored": true,
+      "restored_sha256": "75709272057665c6abf4a00f037ff1f6bb4a1a19010904c6fc2ae79ce57fd575",
+      "seconds": 50.8
+    },
+    {
+      "id": "M28",
+      "path": "backend/app/services/workpaper_sync/content_mutation.py",
+      "want": "test_task26_oo_to_html.py::TestCommitFenceHookWiring::test_before_write_is_called_after_lock_and_before_any_write",
+      "why": "删掉写库前的 fence ⇒ OO→HTML 只剩一道 fence。它与第一道不是冗余：中间隔着 `publish_representation`（可能几十 MB 的文件 IO），撤权完全可能落在那段时间里。真库判据：探针必须被调两次",
+      "verdict": "RED",
+      "summary": "7 failed, 424 passed in 46.93s",
+      "added": [
+        "test_task26_oo_to_html.py::TestCommitFenceHookWiring::test_before_write_is_called_after_lock_and_before_any_write",
+        "test_task26_oo_to_html_pg.py::TestAppliedHappyPath::test_both_fences_ran_and_in_order",
+        "test_task26_oo_to_html_pg.py::TestAppliedHappyPath::test_probe_actually_executed_twice",
+        "test_task26_oo_to_html_pg.py::TestFinalAuthorizationFence::test_application_and_operation_are_authorization_stale_not_error[fence_before_write]",
+        "test_task26_oo_to_html_pg.py::TestFinalAuthorizationFence::test_each_revocation_shape_blocks_the_commit[revoked_before_write]",
+        "test_task26_oo_to_html_pg.py::TestFinalAuthorizationFence::test_nothing_committed_on_fence_failure[fence_before_write]",
+        "test_task26_oo_to_html_pg.py::TestFinalAuthorizationFence::test_write_fence_fires_after_publish_and_before_revision_bump"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task26_oo_to_html.py::TestCommitFenceHookWiring::test_before_write_is_called_after_lock_and_before_any_write",
+        "test_task26_oo_to_html_pg.py::TestAppliedHappyPath::test_probe_actually_executed_twice",
+        "test_task26_oo_to_html_pg.py::TestFinalAuthorizationFence::test_write_fence_fires_after_publish_and_before_revision_bump"
+      ],
+      "added_files": [
+        "test_task26_oo_to_html.py",
+        "test_task26_oo_to_html_pg.py"
+      ],
+      "restored": true,
+      "restored_sha256": "75709272057665c6abf4a00f037ff1f6bb4a1a19010904c6fc2ae79ce57fd575",
+      "seconds": 50.3
+    },
+    {
+      "id": "M29",
+      "path": "backend/app/services/workpaper_sync/content_mutation.py",
+      "want": "test_task26_oo_to_html_pg.py::TestAppliedHappyPath::test_application_and_operation_reached_applied_terminal",
+      "why": "application result 与 operation timeline 不再与 pointer/outbox 同事务落库 ⇒ 出现「pointer 已发布而 application 还停在 rematerializing」的半成功态（AC 8.12 / 10.11 要求同一事务）",
+      "verdict": "RED",
+      "summary": "10 failed, 421 passed in 45.28s",
+      "added": [
+        "test_task26_oo_to_html_pg.py::TestAppliedHappyPath::test_application_and_operation_reached_applied_terminal",
+        "test_task26_oo_to_html_pg.py::TestAppliedHappyPath::test_entry_pointer_moved_to_the_new_result_representation",
+        "test_task26_oo_to_html_pg.py::TestAppliedHappyPath::test_p14_reload_floor_equals_application_result_revision",
+        "test_task26_oo_to_html_pg.py::TestAppliedHappyPath::test_p65_incoming_is_never_promoted",
+        "test_task26_oo_to_html_pg.py::TestAppliedHappyPath::test_p65_merged_projection_digest_equals_published_projection_artifact",
+        "test_task26_oo_to_html_pg.py::TestAppliedHappyPath::test_p65_result_artifact_digest_matches_representation_and_application",
+        "test_task26_oo_to_html_pg.py::TestAppliedHappyPath::test_p65_result_representation_bundle_equals_frozen_bundle",
+        "test_task26_oo_to_html_pg.py::TestDurablePostFailureAndRetry::test_p38_retry_succeeds_and_produces_exactly_one_revision",
+        "test_task26_oo_to_html_pg.py::TestRefreshRequired::test_application_and_operation_are_refresh_required",
+        "test_task26_oo_to_html_pg.py::TestRefreshRequired::test_result_revision_still_bound_for_audit"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task26_oo_to_html_pg.py::TestAppliedHappyPath::test_application_and_operation_reached_applied_terminal",
+        "test_task26_oo_to_html_pg.py::TestAppliedHappyPath::test_p65_merged_projection_digest_equals_published_projection_artifact"
+      ],
+      "added_files": [
+        "test_task26_oo_to_html_pg.py"
+      ],
+      "restored": true,
+      "restored_sha256": "75709272057665c6abf4a00f037ff1f6bb4a1a19010904c6fc2ae79ce57fd575",
+      "seconds": 48.5
+    },
+    {
+      "id": "M30",
+      "path": "backend/app/services/workpaper_sync/oo_to_html.py",
+      "want": "test_task26_oo_to_html.py::TestStructuralPredicates::test_fence_callbacks_assert_trace_order_as_their_first_statement",
+      "why": "publish 前不再断言「三方 extract 与 merge 真的发生过」⇒ 「只 extract 了 incoming 就直接发布」这条缺陷（base/current 没读 ⇒ 三方 merge 退化成整表覆盖）不再被拦。首轮实测判 GREEN：该断言在 happy path 上恒不触发，运行期观察不到 ⇒ 已补形态判据 `assert_fence_callbacks_assert_order_first()`",
+      "verdict": "RED",
+      "summary": "1 failed, 430 passed in 45.11s",
+      "added": [
+        "test_task26_oo_to_html.py::TestStructuralPredicates::test_fence_callbacks_assert_trace_order_as_their_first_statement"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task26_oo_to_html.py::TestStructuralPredicates::test_fence_callbacks_assert_trace_order_as_their_first_statement"
+      ],
+      "added_files": [
+        "test_task26_oo_to_html.py"
+      ],
+      "restored": true,
+      "restored_sha256": "6af3cfbf4f3fe61c65c1d1a47db3cc44573169f43cc4b77cbda1810a37704ffc",
+      "seconds": 48.3
+    },
+    {
+      "id": "M31",
+      "path": "backend/app/services/workpaper_sync/oo_to_html.py",
+      "want": "test_task26_oo_to_html.py::TestApplyJournal::test_write_fence_must_come_after_publish_fence",
+      "why": "不再要求「写库前的 fence 晚于 publish 前的 fence」⇒ 两道 fence 可以对调，于是「先写库再验授权」在轨迹上合法",
+      "verdict": "RED",
+      "summary": "1 failed, 430 passed in 45.07s",
+      "added": [
+        "test_task26_oo_to_html.py::TestApplyJournal::test_write_fence_must_come_after_publish_fence"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task26_oo_to_html.py::TestApplyJournal::test_write_fence_must_come_after_publish_fence"
+      ],
+      "added_files": [
+        "test_task26_oo_to_html.py"
+      ],
+      "restored": true,
+      "restored_sha256": "6af3cfbf4f3fe61c65c1d1a47db3cc44573169f43cc4b77cbda1810a37704ffc",
+      "seconds": 48.3
+    },
+    {
+      "id": "M32",
+      "path": "backend/app/services/workpaper_sync/oo_to_html.py",
+      "want": "test_task26_oo_to_html.py::TestApplyJournal::test_conflict_forbids_any_later_publish_or_commit",
+      "why": "冲突已登记却仍走到 publish/commit 时不再打红 ⇒ AC 8.11「未裁决冲突不得提交内容、指针一律不动」失去轨迹侧保护",
+      "verdict": "RED",
+      "summary": "1 failed, 430 passed in 44.95s",
+      "added": [
+        "test_task26_oo_to_html.py::TestApplyJournal::test_conflict_forbids_any_later_publish_or_commit"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task26_oo_to_html.py::TestApplyJournal::test_conflict_forbids_any_later_publish_or_commit"
+      ],
+      "added_files": [
+        "test_task26_oo_to_html.py"
+      ],
+      "restored": true,
+      "restored_sha256": "6af3cfbf4f3fe61c65c1d1a47db3cc44573169f43cc4b77cbda1810a37704ffc",
+      "seconds": 48.2
+    },
+    {
+      "id": "M33",
+      "path": "backend/app/services/workpaper_sync/oo_to_html.py",
+      "want": "test_task26_oo_to_html.py::TestIncomingRowUnchanged::test_every_drift_shape_is_detected[published_at_set]",
+      "why": "commit 后不再核对 incoming 的 `published_at` 仍为空 ⇒ 「incoming 被复制标记为 published/current」这条禁令失去判据（Property 65）。首轮实测判 GREEN：这条在 happy path 上恒不触发 ⇒ 已把 `_assert_incoming_untouched` 的五条判据抽成模块级纯函数 `assert_incoming_row_unchanged` 并逐条参数化喂",
+      "verdict": "RED",
+      "summary": "1 failed, 430 passed in 46.81s",
+      "added": [
+        "test_task26_oo_to_html.py::TestIncomingRowUnchanged::test_every_drift_shape_is_detected[published_at_set]"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task26_oo_to_html.py::TestIncomingRowUnchanged::test_every_drift_shape_is_detected[published_at_set]"
+      ],
+      "added_files": [
+        "test_task26_oo_to_html.py"
+      ],
+      "restored": true,
+      "restored_sha256": "6af3cfbf4f3fe61c65c1d1a47db3cc44573169f43cc4b77cbda1810a37704ffc",
+      "seconds": 50.1
+    },
+    {
+      "id": "M33B",
+      "path": "backend/app/services/workpaper_sync/oo_to_html.py",
+      "want": "test_task26_oo_to_html.py::TestIncomingRowUnchanged::test_every_drift_shape_is_detected[promoted_state]",
+      "why": "incoming 的 state 被改成 published 也不再打红 ⇒ 「原地晋升」这条最直接的形态失去判据。与 M33 分开：五条 drift 判据合成一条时删掉任一条都会被其余遮蔽",
+      "verdict": "RED",
+      "summary": "1 failed, 430 passed in 47.43s",
+      "added": [
+        "test_task26_oo_to_html.py::TestIncomingRowUnchanged::test_every_drift_shape_is_detected[promoted_state]"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task26_oo_to_html.py::TestIncomingRowUnchanged::test_every_drift_shape_is_detected[promoted_state]"
+      ],
+      "added_files": [
+        "test_task26_oo_to_html.py"
+      ],
+      "restored": true,
+      "restored_sha256": "6af3cfbf4f3fe61c65c1d1a47db3cc44573169f43cc4b77cbda1810a37704ffc",
+      "seconds": 50.8
+    },
+    {
+      "id": "M34",
+      "path": "backend/app/services/workpaper_sync/oo_to_html.py",
+      "want": "test_task26_oo_to_html.py::TestPublishedDigestWasApproved::test_swapped_digest_is_detected",
+      "why": "不再比对「落库的 artifact digest」与「fence 放行的那一份」⇒ publish 与 fence 之间被偷换也检不出来（AC 8.10 的 artifact/bundle digest 重验）。首轮实测判 GREEN（happy path 恒相等）⇒ 已抽成纯函数 `assert_published_digest_was_approved`",
+      "verdict": "RED",
+      "summary": "1 failed, 430 passed in 47.55s",
+      "added": [
+        "test_task26_oo_to_html.py::TestPublishedDigestWasApproved::test_swapped_digest_is_detected"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task26_oo_to_html.py::TestPublishedDigestWasApproved::test_swapped_digest_is_detected"
+      ],
+      "added_files": [
+        "test_task26_oo_to_html.py"
+      ],
+      "restored": true,
+      "restored_sha256": "6af3cfbf4f3fe61c65c1d1a47db3cc44573169f43cc4b77cbda1810a37704ffc",
+      "seconds": 51.0
+    },
+    {
+      "id": "M34B",
+      "path": "backend/app/services/workpaper_sync/oo_to_html.py",
+      "want": "test_task26_oo_to_html.py::TestPublishedDigestWasApproved::test_missing_approval_is_an_order_violation_not_a_digest_mismatch",
+      "why": "「fence 根本没跑过」与「digest 被偷换」共用一条判据 ⇒ 前者会退化成 `None.strip()` 的 AttributeError（第三种、不可诊断的失败）。两条必须分型",
+      "verdict": "RED",
+      "summary": "1 failed, 430 passed in 47.36s",
+      "added": [
+        "test_task26_oo_to_html.py::TestPublishedDigestWasApproved::test_missing_approval_is_an_order_violation_not_a_digest_mismatch"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task26_oo_to_html.py::TestPublishedDigestWasApproved::test_missing_approval_is_an_order_violation_not_a_digest_mismatch"
+      ],
+      "added_files": [
+        "test_task26_oo_to_html.py"
+      ],
+      "restored": true,
+      "restored_sha256": "6af3cfbf4f3fe61c65c1d1a47db3cc44573169f43cc4b77cbda1810a37704ffc",
+      "seconds": 51.0
+    },
+    {
+      "id": "M35",
+      "path": "backend/app/services/workpaper_sync/oo_to_html.py",
+      "want": "test_task26_oo_to_html.py::TestCanonicalFencePointsAt::test_desynchronized_fence_is_detected[fence_points_elsewhere]",
+      "why": "不再核对 room canonical fence 指向本次 application ⇒ 出现「server 已推进、canonical fence 还指着上一个 application」的中间态，而 Task 27 的 resolve 先比 canonical application identity，读到它会把合法 resolve 判成 stale（AC 10.11）。首轮实测判 GREEN（happy path 恒相等）⇒ 已抽成纯函数",
+      "verdict": "RED",
+      "summary": "2 failed, 429 passed in 47.48s",
+      "added": [
+        "test_task26_oo_to_html.py::TestCanonicalFencePointsAt::test_desynchronized_fence_is_detected[fence_never_advanced]",
+        "test_task26_oo_to_html.py::TestCanonicalFencePointsAt::test_desynchronized_fence_is_detected[fence_points_elsewhere]"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task26_oo_to_html.py::TestCanonicalFencePointsAt::test_desynchronized_fence_is_detected[fence_never_advanced]",
+        "test_task26_oo_to_html.py::TestCanonicalFencePointsAt::test_desynchronized_fence_is_detected[fence_points_elsewhere]"
+      ],
+      "added_files": [
+        "test_task26_oo_to_html.py"
+      ],
+      "restored": true,
+      "restored_sha256": "6af3cfbf4f3fe61c65c1d1a47db3cc44573169f43cc4b77cbda1810a37704ffc",
+      "seconds": 50.9
+    },
+    {
+      "id": "M36",
+      "path": "backend/app/services/workpaper_sync/oo_to_html.py",
+      "want": "test_task26_oo_to_html_pg.py::TestAppliedHappyPath::test_application_and_operation_reached_applied_terminal",
+      "why": "application 不再经 `applying` ⇒ `rematerializing → applied` 是非法边，整条 applied 路径在真库上崩掉。用它证明 state 机不是装饰",
+      "verdict": "RED",
+      "summary": "13 failed, 418 passed in 47.76s",
+      "added": [
+        "test_task26_oo_to_html_pg.py::TestAppliedHappyPath::test_application_and_operation_reached_applied_terminal",
+        "test_task26_oo_to_html_pg.py::TestAppliedHappyPath::test_both_fences_ran_and_in_order",
+        "test_task26_oo_to_html_pg.py::TestAppliedHappyPath::test_business_revision_advanced_exactly_once",
+        "test_task26_oo_to_html_pg.py::TestAppliedHappyPath::test_entry_pointer_moved_to_the_new_result_representation",
+        "test_task26_oo_to_html_pg.py::TestAppliedHappyPath::test_outbox_row_written_in_the_same_transaction",
+        "test_task26_oo_to_html_pg.py::TestAppliedHappyPath::test_p14_reload_floor_equals_application_result_revision",
+        "test_task26_oo_to_html_pg.py::TestAppliedHappyPath::test_p25_incoming_field_change_was_auto_merged",
+        "test_task26_oo_to_html_pg.py::TestAppliedHappyPath::test_p62_both_baselines_advance_when_merged_equals_incoming",
+        "test_task26_oo_to_html_pg.py::TestAppliedHappyPath::test_p65_incoming_is_never_promoted",
+        "test_task26_oo_to_html_pg.py::TestAppliedHappyPath::test_p65_merged_projection_digest_equals_published_projection_artifact",
+        "test_task26_oo_to_html_pg.py::TestAppliedHappyPath::test_p65_result_representation_bundle_equals_frozen_bundle",
+        "test_task26_oo_to_html_pg.py::TestAppliedHappyPath::test_result_is_applied",
+        "test_task26_oo_to_html_pg.py::TestDurablePostFailureAndRetry::test_p38_retry_succeeds_and_produces_exactly_one_revision"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task26_oo_to_html_pg.py::TestAppliedHappyPath::test_application_and_operation_reached_applied_terminal"
+      ],
+      "added_files": [
+        "test_task26_oo_to_html_pg.py"
+      ],
+      "restored": true,
+      "restored_sha256": "6af3cfbf4f3fe61c65c1d1a47db3cc44573169f43cc4b77cbda1810a37704ffc",
+      "seconds": 51.2
+    },
+    {
+      "id": "M37",
+      "path": "backend/app/services/workpaper_sync/oo_to_html.py",
+      "want": "test_task26_oo_to_html_pg.py::TestPreBindAndProbe::test_broken_probe_fails_visibly_and_commits_nothing",
+      "why": "探针异常被吞成「无此限制」⇒ 接线错误（函数名写错、列名写错、单参调用 async 签名）表现成授权通过，而 Volar/vitest/get_diagnostics/HEAD-swap 四层全绿（Requirement 5.12 点名禁止这种降级）。离线的 AST 判据同时红",
+      "verdict": "RED",
+      "summary": "2 failed, 429 passed in 47.41s",
+      "added": [
+        "test_task26_oo_to_html.py::TestNoFailOpen::test_coordinator_source_has_no_bare_warning_swallow",
+        "test_task26_oo_to_html_pg.py::TestPreBindAndProbe::test_broken_probe_fails_visibly_and_commits_nothing"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task26_oo_to_html.py::TestNoFailOpen::test_coordinator_source_has_no_bare_warning_swallow",
+        "test_task26_oo_to_html_pg.py::TestPreBindAndProbe::test_broken_probe_fails_visibly_and_commits_nothing"
+      ],
+      "added_files": [
+        "test_task26_oo_to_html.py",
+        "test_task26_oo_to_html_pg.py"
+      ],
+      "restored": true,
+      "restored_sha256": "6af3cfbf4f3fe61c65c1d1a47db3cc44573169f43cc4b77cbda1810a37704ffc",
+      "seconds": 50.8
+    },
+    {
+      "id": "M38",
+      "path": "backend/app/services/workpaper_sync/oo_to_html.py",
+      "want": "test_task26_oo_to_html_pg.py::TestPreBindAndProbe::test_incomplete_probe_response_is_refused_not_treated_as_allowed",
+      "why": "探针返回值缺字段时不再拒绝 ⇒ 「缺字段视为放行」这条经典 fail-open 复活。首轮实测判 GREEN：当时唯一的探针场景是「抛异常」，走不到这条 ⇒ 已补 S14 `probe_incomplete`（探针正常返回但少 `project_visible` 键）",
+      "verdict": "RED",
+      "summary": "1 failed, 430 passed in 47.22s",
+      "added": [
+        "test_task26_oo_to_html_pg.py::TestPreBindAndProbe::test_incomplete_probe_response_is_refused_not_treated_as_allowed"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task26_oo_to_html_pg.py::TestPreBindAndProbe::test_incomplete_probe_response_is_refused_not_treated_as_allowed"
+      ],
+      "added_files": [
+        "test_task26_oo_to_html_pg.py"
+      ],
+      "restored": true,
+      "restored_sha256": "6af3cfbf4f3fe61c65c1d1a47db3cc44573169f43cc4b77cbda1810a37704ffc",
+      "seconds": 50.6
+    },
+    {
+      "id": "C01",
+      "path": "backend/app/services/workpaper_sync/oo_to_html.py",
+      "want": "*",
+      "why": "对照项：只改诊断文案、不动任何判据 ⇒ 预期 GREEN。用它证明本脚本不会把「改了字符串」误判成 RED（否则全 RED 的报告说明不了任何事）",
+      "verdict": "RED",
+      "summary": "431 passed in 47.68s",
+      "added": [],
+      "gone": [],
+      "hit": [],
+      "added_files": [],
+      "restored": true,
+      "restored_sha256": "6af3cfbf4f3fe61c65c1d1a47db3cc44573169f43cc4b77cbda1810a37704ffc",
+      "seconds": 51.2
+    },
+    {
+      "id": "C02",
+      "path": "backend/app/services/workpaper_sync/oo_to_html.py",
+      "want": "*",
+      "why": "对照项：`list()` 与 `[]` 等价 ⇒ 预期 GREEN。第二条对照落在 fence 函数体内部，证明「在被测函数里改一行也不会自动变红」",
+      "verdict": "RED",
+      "summary": "431 passed in 47.41s",
+      "added": [],
+      "gone": [],
+      "hit": [],
+      "added_files": [],
+      "restored": true,
+      "restored_sha256": "6af3cfbf4f3fe61c65c1d1a47db3cc44573169f43cc4b77cbda1810a37704ffc",
+      "seconds": 50.8
+    },
+    {
+      "id": "R01",
+      "path": "backend/app/services/workpaper_sync/conflicts.py",
+      "want": "test_task26_oo_to_html_pg.py::TestConflictLeavesEverythingUntouched::test_p27_only_the_touched_row_conflicts",
+      "why": "R01 回归：`ValueEnvelope.to_jsonb()` 不再过 `json_safe` ⇒ 任何 amount/date 字段的同字段异值冲突在算 `ConflictSet.digest`（AC 8.5 的 `conflict_set_digest`）时直接 `TypeError: Object of type Decimal is not JSON serializable`。本任务在真库上实测抓到 —— D2 应收账款的行金额冲突整条路径崩溃，而 Task 14 的离线守卫只用文本值，全绿",
+      "verdict": "RED",
+      "summary": "1 failed, 430 passed in 47.45s",
+      "added": [
+        "test_task26_oo_to_html_pg.py::TestConflictLeavesEverythingUntouched::test_p27_only_the_touched_row_conflicts"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task26_oo_to_html_pg.py::TestConflictLeavesEverythingUntouched::test_p27_only_the_touched_row_conflicts"
+      ],
+      "added_files": [
+        "test_task26_oo_to_html_pg.py"
+      ],
+      "restored": true,
+      "restored_sha256": "c5713cfc60da320654ff91d849b91d2ca7741b1a96c37c31a203c8ed6afe0a80",
+      "seconds": 50.9
+    },
+    {
+      "id": "R02",
+      "path": "backend/app/services/workpaper_sync/oo_to_html.py",
+      "want": "test_task26_oo_to_html_pg.py::TestDurablePostFailureAndRetry::test_p38_retry_succeeds_and_produces_exactly_one_revision",
+      "why": "R02 回归：pipeline 不再「从当前状态可达的第一站进入」而是直写整条 ⇒ retry 时撞 `error → validating` 非法边（`APPLICATION_EDGES` 没有这条），于是 Property 38「durable incoming 可无 forcesave 重试」在真库上根本不成立。首次执行照常绿，只有 retry 场景暴露",
+      "verdict": "RED",
+      "summary": "2 failed, 429 passed in 47.87s",
+      "added": [
+        "test_task26_oo_to_html_pg.py::TestDurablePostFailureAndRetry::test_p38_retry_appends_to_the_same_timeline",
+        "test_task26_oo_to_html_pg.py::TestDurablePostFailureAndRetry::test_p38_retry_succeeds_and_produces_exactly_one_revision"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task26_oo_to_html_pg.py::TestDurablePostFailureAndRetry::test_p38_retry_appends_to_the_same_timeline",
+        "test_task26_oo_to_html_pg.py::TestDurablePostFailureAndRetry::test_p38_retry_succeeds_and_produces_exactly_one_revision"
+      ],
+      "added_files": [
+        "test_task26_oo_to_html_pg.py"
+      ],
+      "restored": true,
+      "restored_sha256": "6af3cfbf4f3fe61c65c1d1a47db3cc44573169f43cc4b77cbda1810a37704ffc",
+      "seconds": 51.3
+    },
+    {
+      "id": "R03",
+      "path": "backend/app/services/workpaper_sync/oo_to_html.py",
+      "want": "test_task26_oo_to_html_pg.py::TestQuarantinedThreeLayerRefusal::test_coordinator_layer_is_not_shadowed_by_the_db_layer",
+      "why": "R03 回归：把 coordinator 的 substrate 准入排到 `assert_incoming_durable` **之后** ⇒ DB 层先抛 `QuarantinedIncomingError`，本层的 quarantine 分支变成 provably-dead，「删掉 coordinator 这一层」在变异检验里判 GREEN。首轮实测正是如此",
+      "verdict": "RED",
+      "summary": "1 failed, 430 passed in 47.53s",
+      "added": [
+        "test_task26_oo_to_html_pg.py::TestQuarantinedThreeLayerRefusal::test_coordinator_layer_is_not_shadowed_by_the_db_layer"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task26_oo_to_html_pg.py::TestQuarantinedThreeLayerRefusal::test_coordinator_layer_is_not_shadowed_by_the_db_layer"
+      ],
+      "added_files": [
+        "test_task26_oo_to_html_pg.py"
+      ],
+      "restored": true,
+      "restored_sha256": "6af3cfbf4f3fe61c65c1d1a47db3cc44573169f43cc4b77cbda1810a37704ffc",
+      "seconds": 50.9
+    },
+    {
+      "id": "R04",
+      "path": "backend/app/services/workpaper_sync/oo_to_html.py",
+      "want": "test_task26_oo_to_html_pg.py::TestContributorSnapshotIsRecomputed::test_contributor_revocation_blocks_the_commit",
+      "why": "R04 回归：`_observed_contributor_digest` 退回「读冻结值再跟自己比」的重言式 ⇒ 无论谁被撤销两边永远相等，contributor 重验 provably-dead。首轮实测判 GREEN：当时的判别输入是「撤销 initiator」，那会先在 `initiator_state` 那条失败、走不到 contributor 比对 ⇒ 已补 S15 `contributor_revoked`（initiator 保持 active，只撤销另一位 contributor，于是十条 fence 里只有 contributor digest 那条不等值）",
+      "verdict": "RED",
+      "summary": "2 failed, 429 passed in 46.70s",
+      "added": [
+        "test_task26_oo_to_html_pg.py::TestContributorSnapshotIsRecomputed::test_contributor_revocation_blocks_the_commit",
+        "test_task26_oo_to_html_pg.py::TestContributorSnapshotIsRecomputed::test_nothing_committed"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task26_oo_to_html_pg.py::TestContributorSnapshotIsRecomputed::test_contributor_revocation_blocks_the_commit"
+      ],
+      "added_files": [
+        "test_task26_oo_to_html_pg.py"
+      ],
+      "restored": true,
+      "restored_sha256": "6af3cfbf4f3fe61c65c1d1a47db3cc44573169f43cc4b77cbda1810a37704ffc",
+      "seconds": 50.0
+    },
+    {
+      "id": "M39",
+      "path": "backend/app/services/workpaper_sync/merge.py",
+      "want": "test_task14_merge_conflicts.py::TestTask14ScopeBoundary::test_merge_domain_consumers_match_the_retirement_registry_exactly",
+      "why": "退役登记声明的 merge 消费方与事实脱钩（登记成 `resolution.py`，实际是 `oo_to_html.py`）⇒ 「登记表 ↔ 事实双向等值」这条判据必须打红。本条同时覆盖三种偏离里的两种：出现未登记的消费方 + 登记了却不消费。Task 26 把这条判据从「恰一个消费方」升级为双向锁死，因此必须有一条变异证明升级后的版本仍可证伪（否则升级就等于放宽）",
+      "verdict": "RED",
+      "summary": "1 failed, 430 passed in 53.64s",
+      "added": [
+        "test_task14_merge_conflicts.py::TestTask14ScopeBoundary::test_merge_domain_consumers_match_the_retirement_registry_exactly"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task14_merge_conflicts.py::TestTask14ScopeBoundary::test_merge_domain_consumers_match_the_retirement_registry_exactly"
+      ],
+      "added_files": [
+        "test_task14_merge_conflicts.py"
+      ],
+      "restored": true,
+      "restored_sha256": "54428bdf03872232168c1c8ede565d3434c62f87e18db278038afbda721f8d94",
+      "seconds": 56.9
+    },
+    {
+      "id": "M40",
+      "path": "backend/app/services/workpaper_sync/merge.py",
+      "want": "test_task14_merge_conflicts.py::TestTask14ScopeBoundary::test_merge_domain_consumers_match_the_retirement_registry_exactly",
+      "why": "编排层声明「经由 retention.py 落库」⇒ 唯一 commit 边界的反查失效。`commits_through` 正是「coordinator 允许跑 merge 但不得自己 commit」这条不变量的载体（Property 61）；它若指向任意模块，边界就只剩注释",
+      "verdict": "RED",
+      "summary": "2 failed, 429 passed in 45.00s",
+      "added": [
+        "test_task14_merge_conflicts.py::TestTask14ScopeBoundary::test_merge_domain_consumers_match_the_retirement_registry_exactly",
+        "test_task15_content_mutation.py::TestTask15ScopeBoundary::test_merge_domain_deferral_is_retired"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task14_merge_conflicts.py::TestTask14ScopeBoundary::test_merge_domain_consumers_match_the_retirement_registry_exactly"
+      ],
+      "added_files": [
+        "test_task14_merge_conflicts.py",
+        "test_task15_content_mutation.py"
+      ],
+      "restored": true,
+      "restored_sha256": "54428bdf03872232168c1c8ede565d3434c62f87e18db278038afbda721f8d94",
+      "seconds": 48.2
+    },
+    {
+      "id": "R05",
+      "path": "backend/app/services/workpaper_sync/oo_to_html.py",
+      "want": "test_task26_oo_to_html.py::TestStructuralPredicates::test_command_service_symbol_list_is_matched_as_whole_identifier",
+      "why": "R05 回归：判据退回子串包含 ⇒ 本模块自己的 `next_forcesave_allowed` 与 `assert_no_command_service_reference` 都含被禁子串，判据恒红。恒红的守卫和恒绿一样没用 —— 下一个人会直接把它删掉",
+      "verdict": "RED",
+      "summary": "2 failed, 429 passed in 45.00s",
+      "added": [
+        "test_task26_oo_to_html.py::TestStructuralPredicates::test_command_service_symbol_list_is_matched_as_whole_identifier",
+        "test_task26_oo_to_html.py::TestStructuralPredicates::test_module_never_references_command_service"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task26_oo_to_html.py::TestStructuralPredicates::test_command_service_symbol_list_is_matched_as_whole_identifier",
+        "test_task26_oo_to_html.py::TestStructuralPredicates::test_module_never_references_command_service"
+      ],
+      "added_files": [
+        "test_task26_oo_to_html.py"
+      ],
+      "restored": true,
+      "restored_sha256": "6af3cfbf4f3fe61c65c1d1a47db3cc44573169f43cc4b77cbda1810a37704ffc",
+      "seconds": 48.2
+    },
+    {
+      "id": "N01",
+      "path": "backend/app/services/workpaper_sync/oo_to_html.py",
+      "want": "test_task26_oo_to_html_pg.py::TestDurablePostFailureAndRetry::test_p19_application_and_operation_are_retryable_error",
+      "why": "P19：durable 后 extract 失败必须落**可重试**的 `error`，而不是 `authorization_stale`。两者混同的后果很具体 —— `authorization_stale` 只能走 supersede/recovery，于是「durable incoming 可无 forcesave 重试」（P38）在真库上直接失效。刻意只改 application 侧、不改 operation 侧：`logical_result_code` 与 `result` 都取自 `result` 形参、不受本条影响，因此打红的只能是 `app_state` 那条断言，归因唯一。这也是「两个终态共用一条赋值」这类缺陷的最小复现",
+      "verdict": "RED",
+      "summary": "5 failed, 426 passed in 45.20s",
+      "added": [
+        "test_task26_oo_to_html_pg.py::TestDurablePostFailureAndRetry::test_p19_application_and_operation_are_retryable_error",
+        "test_task26_oo_to_html_pg.py::TestDurablePostFailureAndRetry::test_p38_retry_appends_to_the_same_timeline",
+        "test_task26_oo_to_html_pg.py::TestDurablePostFailureAndRetry::test_p38_retry_succeeds_and_produces_exactly_one_revision",
+        "test_task26_oo_to_html_pg.py::TestDurablePostFailureAndRetry::test_unmanaged_region_drift_blocks_publication",
+        "test_task26_oo_to_html_pg.py::TestPreBindAndProbe::test_broken_probe_fails_visibly_and_commits_nothing"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task26_oo_to_html_pg.py::TestDurablePostFailureAndRetry::test_p19_application_and_operation_are_retryable_error"
+      ],
+      "added_files": [
+        "test_task26_oo_to_html_pg.py"
+      ],
+      "restored": true,
+      "restored_sha256": "6af3cfbf4f3fe61c65c1d1a47db3cc44573169f43cc4b77cbda1810a37704ffc",
+      "seconds": 48.5
+    },
+    {
+      "id": "N02",
+      "path": "backend/app/services/workpaper_sync/merge.py",
+      "want": "test_task26_oo_to_html.py::TestThreeWayMergeSemantics::test_p26_same_field_three_values_conflicts_and_keeps_all_three",
+      "why": "P26：同字段三值冲突时 `merged` 必须 hold 在 **current**。改成 hold incoming 后 `conflict_count` 仍为 1、三值仍完整 —— 只有「merged 是什么」这一条会红，而它恰恰是最危险的那条：未裁决的 merged 若已经是 incoming，上层任何「无冲突就提交 merged」的分支都会把未裁决冲突当成 incoming 获胜提交（AC 6.8 明确三方规则不选边）。锚点带 `merged = Projection(` 尾随上下文，因为 `_put(merged_values, locator, c)` 在 continue 分支里另有多处",
+      "verdict": "RED",
+      "summary": "5 failed, 426 passed in 50.15s",
+      "added": [
+        "test_task14_merge_conflicts.py::TestProperty25And26Hypothesis::test_property_same_field_three_values_never_auto_picks_a_side",
+        "test_task14_merge_conflicts.py::TestProperty26SameFieldDifferentValues::test_three_values_are_complete_and_neither_side_applied",
+        "test_task14_merge_conflicts.py::TestThreeWayTruthTable::test_never_last_write_wins",
+        "test_task14_merge_conflicts.py::TestThreeWayTruthTable::test_row[10-20-30-conflict_value-20]",
+        "test_task26_oo_to_html.py::TestThreeWayMergeSemantics::test_p26_same_field_three_values_conflicts_and_keeps_all_three"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task26_oo_to_html.py::TestThreeWayMergeSemantics::test_p26_same_field_three_values_conflicts_and_keeps_all_three"
+      ],
+      "added_files": [
+        "test_task14_merge_conflicts.py",
+        "test_task26_oo_to_html.py"
+      ],
+      "restored": true,
+      "restored_sha256": "54428bdf03872232168c1c8ede565d3434c62f87e18db278038afbda721f8d94",
+      "seconds": 53.5
+    },
+    {
+      "id": "N03",
+      "path": "backend/app/services/workpaper_sync/content_mutation.py",
+      "want": "test_task26_oo_to_html.py::TestRoundtripEquivalence::test_dropped_managed_field_is_detected_by_the_platform_predicate",
+      "why": "P29/AC 6.11：materialize **漏写**一个受管字段必须被平台判据抓到。与 N04 分成两条，因为两个分支抛的是**同一个** `RoundtripEquivalenceError` —— 合成一条变异时靠前的 `missing` 分支被短路后，靠后的 `values_equal` 分支会顶上来抛同一类型，守卫看不出差别而判 GREEN（本 spec 已为「两分支共用 error_code」付过三次代价）。逐条短路才能证明两个分支各自都不是 provably-dead",
+      "verdict": "RED",
+      "summary": "4 failed, 427 passed in 47.38s",
+      "added": [
+        "test_task15_content_mutation.py::TestRoundtripEquivalence::test_missing_managed_field_is_rejected",
+        "test_task15_content_mutation.py::TestRoundtripEquivalence::test_three_failure_reasons_have_distinct_messages",
+        "test_task15_content_mutation.py::TestStageAndVerifyWithRealFiles::test_roundtrip_gap_blocks_before_any_db_write",
+        "test_task26_oo_to_html.py::TestRoundtripEquivalence::test_dropped_managed_field_is_detected_by_the_platform_predicate"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task26_oo_to_html.py::TestRoundtripEquivalence::test_dropped_managed_field_is_detected_by_the_platform_predicate"
+      ],
+      "added_files": [
+        "test_task15_content_mutation.py",
+        "test_task26_oo_to_html.py"
+      ],
+      "restored": true,
+      "restored_sha256": "75709272057665c6abf4a00f037ff1f6bb4a1a19010904c6fc2ae79ce57fd575",
+      "seconds": 50.8
+    },
+    {
+      "id": "N04",
+      "path": "backend/app/services/workpaper_sync/content_mutation.py",
+      "want": "test_task26_oo_to_html.py::TestRoundtripEquivalence::test_corrupted_value_is_detected",
+      "why": "P29/AC 6.11：受管字段反读**值被改**必须抓到（字段集合齐全、值不等值）。这条与 N03 互不遮蔽：N03 的判别输入少一个字段、本条的判别输入字段集合完整，因此短路本条时 `missing`/`extra` 两条都不触发，只有本条会红。同时它钉死「比较口径复用 `merge.values_equal`」—— 换成 `==` 会让 Decimal('1') 与 Decimal('1.00')、CRLF 与 LF 判不等值",
+      "verdict": "RED",
+      "summary": "4 failed, 427 passed in 47.47s",
+      "added": [
+        "test_task15_content_mutation.py::TestRoundtripEquivalence::test_illegal_numeric_representation_is_not_silently_equal",
+        "test_task15_content_mutation.py::TestRoundtripEquivalence::test_three_failure_reasons_have_distinct_messages",
+        "test_task15_content_mutation.py::TestRoundtripEquivalence::test_value_drift_is_rejected",
+        "test_task26_oo_to_html.py::TestRoundtripEquivalence::test_corrupted_value_is_detected"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task26_oo_to_html.py::TestRoundtripEquivalence::test_corrupted_value_is_detected"
+      ],
+      "added_files": [
+        "test_task15_content_mutation.py",
+        "test_task26_oo_to_html.py"
+      ],
+      "restored": true,
+      "restored_sha256": "75709272057665c6abf4a00f037ff1f6bb4a1a19010904c6fc2ae79ce57fd575",
+      "seconds": 50.9
+    },
+    {
+      "id": "N05",
+      "path": "backend/app/services/workpaper_sync/content_mutation.py",
+      "want": "test_task26_oo_to_html_pg.py::TestAppliedHappyPath::test_p65_incoming_is_never_promoted",
+      "why": "P65/AC 8.10：证明 `test_p65_incoming_is_never_promoted` 里**新补的**四条断言（result artifact 与 incoming 非同一行 / 不在 `.incoming/` 下 / kind 非 incoming / state=published）不是重言式。上一版这里写的是 `assert result_rep_artifact_sha != incoming_sha or True` —— `X or True` 结构上永真，等于把 Property 65 最贵的那半句「不得复制后标记为 published/current」整条放空。本变异把 result representation 的 artifact **行**标成 `incoming` kind，sha256 一字不变，因此只有新断言会红、归因唯一。🔴 首版锚在 `artifacts.py::_publish` 的 `kind=ArtifactKind.canonical`，实测 GREEN：那里只决定返回的 `PublishedArtifact` 值对象，**DB 行的 kind/state 是 `content_mutation` 这里另写一遍的**（同一事实两处声明）。GREEN 当时不是守卫缺陷而是变异无效 —— 记在这里，免得下一个人据此去放宽断言",
+      "verdict": "RED",
+      "summary": "19 failed, 412 passed in 47.29s",
+      "added": [
+        "test_task26_oo_to_html_pg.py::TestAppliedHappyPath::test_application_and_operation_reached_applied_terminal",
+        "test_task26_oo_to_html_pg.py::TestAppliedHappyPath::test_both_fences_ran_and_in_order",
+        "test_task26_oo_to_html_pg.py::TestAppliedHappyPath::test_business_revision_advanced_exactly_once",
+        "test_task26_oo_to_html_pg.py::TestAppliedHappyPath::test_entry_pointer_moved_to_the_new_result_representation",
+        "test_task26_oo_to_html_pg.py::TestAppliedHappyPath::test_outbox_row_written_in_the_same_transaction",
+        "test_task26_oo_to_html_pg.py::TestAppliedHappyPath::test_p14_reload_floor_equals_application_result_revision",
+        "test_task26_oo_to_html_pg.py::TestAppliedHappyPath::test_p25_incoming_field_change_was_auto_merged",
+        "test_task26_oo_to_html_pg.py::TestAppliedHappyPath::test_p62_both_baselines_advance_when_merged_equals_incoming",
+        "test_task26_oo_to_html_pg.py::TestAppliedHappyPath::test_p65_incoming_is_never_promoted",
+        "test_task26_oo_to_html_pg.py::TestAppliedHappyPath::test_p65_merged_projection_digest_equals_published_projection_artifact",
+        "test_task26_oo_to_html_pg.py::TestAppliedHappyPath::test_p65_result_representation_bundle_equals_frozen_bundle",
+        "test_task26_oo_to_html_pg.py::TestAppliedHappyPath::test_result_is_applied",
+        "test_task26_oo_to_html_pg.py::TestDurablePostFailureAndRetry::test_p38_retry_succeeds_and_produces_exactly_one_revision",
+        "test_task26_oo_to_html_pg.py::TestRefreshRequired::test_application_and_operation_are_refresh_required",
+        "test_task26_oo_to_html_pg.py::TestRefreshRequired::test_next_forcesave_is_rejected",
+        "test_task26_oo_to_html_pg.py::TestRefreshRequired::test_result_is_refresh_required",
+        "test_task26_oo_to_html_pg.py::TestRefreshRequired::test_result_revision_still_bound_for_audit",
+        "test_task26_oo_to_html_pg.py::TestRefreshRequired::test_room_is_refresh_required_and_superseded",
+        "test_task26_oo_to_html_pg.py::TestRefreshRequired::test_server_last_applied_advances_but_client_confirmed_does_not"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task26_oo_to_html_pg.py::TestAppliedHappyPath::test_p65_incoming_is_never_promoted"
+      ],
+      "added_files": [
+        "test_task26_oo_to_html_pg.py"
+      ],
+      "restored": true,
+      "restored_sha256": "75709272057665c6abf4a00f037ff1f6bb4a1a19010904c6fc2ae79ce57fd575",
+      "seconds": 50.7
+    },
+    {
+      "id": "N06",
+      "path": "backend/app/services/workpaper_sync/merge.py",
+      "want": "test_task15_content_mutation.py::TestTask15ScopeBoundary::test_merge_domain_deferral_is_retired",
+      "why": "Task 26 这条消费方不再声明「经 content_mutation 落库」⇒ 编排层可以自己 commit，Property 61 的唯一 commit 边界只剩注释。这正是归因型判据比旧版 `len(retired) == 1` 强的地方：旧版对「新增一条不经 commit 边界的消费方」只会报 `2 == 1`，说不出问题在哪；新版直接点出是哪个模块、缺了什么",
+      "verdict": "RED",
+      "summary": "1 failed, 430 passed in 47.33s",
+      "added": [
+        "test_task15_content_mutation.py::TestTask15ScopeBoundary::test_merge_domain_deferral_is_retired"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task15_content_mutation.py::TestTask15ScopeBoundary::test_merge_domain_deferral_is_retired"
+      ],
+      "added_files": [
+        "test_task15_content_mutation.py"
+      ],
+      "restored": true,
+      "restored_sha256": "54428bdf03872232168c1c8ede565d3434c62f87e18db278038afbda721f8d94",
+      "seconds": 50.8
+    },
+    {
+      "id": "N07",
+      "path": "backend/app/services/workpaper_sync/merge.py",
+      "want": "test_task15_content_mutation.py::TestTask15ScopeBoundary::test_merge_domain_deferral_is_retired",
+      "why": "Task 15 自己那条登记指错模块 ⇒ 「退役登记指向本任务的模块」这句话失效。与 N06 分开：N06 打的是**其他**消费方的 `commits_through`，本条打的是**我自己那条**的归属。两条共用一个断言块时，靠前的失败会遮蔽靠后的，于是分别短路才能证明两段各自都有牙",
+      "verdict": "RED",
+      "summary": "2 failed, 429 passed in 47.88s",
+      "added": [
+        "test_task14_merge_conflicts.py::TestTask14ScopeBoundary::test_merge_domain_consumers_match_the_retirement_registry_exactly",
+        "test_task15_content_mutation.py::TestTask15ScopeBoundary::test_merge_domain_deferral_is_retired"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task15_content_mutation.py::TestTask15ScopeBoundary::test_merge_domain_deferral_is_retired"
+      ],
+      "added_files": [
+        "test_task14_merge_conflicts.py",
+        "test_task15_content_mutation.py"
+      ],
+      "restored": true,
+      "restored_sha256": "54428bdf03872232168c1c8ede565d3434c62f87e18db278038afbda721f8d94",
+      "seconds": 51.4
+    }
+  ]
+}

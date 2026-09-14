@@ -258,7 +258,9 @@ async def _maybe_apply_samples_to_workpaper(
 
     try:
         wp_uuid = UUID(wp_id)
-    except Exception:
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).debug("wp_id 非法 UUID %r: %s", wp_id, e)
         return None
 
     res = await db.execute(sa.select(WorkingPaper).where(WorkingPaper.id == wp_uuid))
@@ -282,4 +284,7 @@ async def _maybe_apply_samples_to_workpaper(
     wp.parsed_data = pd
     await db.flush()
     await db.commit()
+    from app.services.wp_parsed_data_service import touch_after_parsed_data_commit
+
+    await touch_after_parsed_data_commit(wp, source="wp_f2_valuation")
     return payload.apply_to_sheet

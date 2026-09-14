@@ -54,6 +54,16 @@ class UpgradeBaselineRequest(BaseModel):
 # ---------------------------------------------------------------------------
 
 
+@router.get("/api/group-note-baselines")
+async def list_baselines(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """List all available group note baselines."""
+    svc = GroupNoteBaselineService(db)
+    return await svc.list_baselines()
+
+
 @router.post("/api/group-note-baselines")
 async def save_baseline(
     body: SaveBaselineRequest,

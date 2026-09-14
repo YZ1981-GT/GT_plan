@@ -1,0 +1,17 @@
+{
+  "backend/tests/workpaper_sync/test_task11_artifact_repository.py": {
+    "summary": "47 passed in 3.27s",
+    "returncode": 0,
+    "seconds": 6.3
+  },
+  "backend/tests/workpaper_sync/test_task11_retention_orphan_pg.py": {
+    "summary": "12 passed in 8.03s",
+    "returncode": 0,
+    "seconds": 11.3
+  },
+  "combined": {
+    "summary": "59 passed in 10.94s",
+    "returncode": 0,
+    "seconds": 14.3
+  }
+}

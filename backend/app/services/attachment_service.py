@@ -26,6 +26,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
 from app.models.attachment_models import Attachment, AttachmentWorkingPaper
+from app.services.attachment_locator import project_attachment_locator
 
 
 class AttachmentService:
@@ -105,6 +106,16 @@ class AttachmentService:
         )
         self.db.add(attachment)
         await self.db.flush()
+        # 替换（version>1，即产生了新版本）→ 发出治理失效信号，令下游可标记 stale。
+        # 首版上传（version==1）不发（无被替换的旧版本/无下游依赖）。
+        if version > 1:
+            await self._emit_version_replaced_signal(
+                new_att=attachment,
+                previous_version_id=prev_id,
+                actor=created_by,
+                project_id=project_id,
+                anchor_id=prev_id,
+            )
         return self._to_dict(attachment)
 
     async def upload_attachment_file(
@@ -132,14 +143,20 @@ class AttachmentService:
             use_paperless = self.primary_storage == "paperless" and self.paperless_enabled()
             if use_paperless:
                 update_task(task_id, TaskStatus.processing)
-                # 自动重试：Paperless 上传失败时重试 1 次
-                paperless_document_id = await self.upload_to_paperless(temp_path.as_posix(), metadata)
-                if paperless_document_id is None:
-                    import asyncio
-                    logger.warning("Paperless upload failed, retrying in 2s...")
-                    update_task(task_id, TaskStatus.retrying)
-                    await asyncio.sleep(2)
+                # #5: 指数退避重试（最多 3 次：2s/4s/8s）
+                paperless_document_id = None
+                max_retries = 3
+                for attempt in range(max_retries + 1):
                     paperless_document_id = await self.upload_to_paperless(temp_path.as_posix(), metadata)
+                    if paperless_document_id is not None:
+                        break
+                    if attempt < max_retries:
+                        import asyncio
+                        delay = 2 ** (attempt + 1)  # 2s, 4s, 8s
+                        logger.warning("Paperless upload failed (attempt %d/%d), retrying in %ds...", attempt + 1, max_retries + 1, delay)
+                        update_task(task_id, TaskStatus.retrying)
+                        await asyncio.sleep(delay)
+
                 if paperless_document_id is not None:
                     update_task(task_id, TaskStatus.success, result={"paperless_id": paperless_document_id})
                     return await self.create_attachment(
@@ -225,12 +242,40 @@ class AttachmentService:
         return [self._to_dict(a) for a in result.scalars().all()]
 
     async def get_attachment(self, attachment_id: UUID) -> dict | None:
-        """附件详情"""
+        """附件详情（对外序列化：file_path 已投影为 opaque locator，见 _to_dict）"""
         result = await self.db.execute(
             sa.select(Attachment).where(Attachment.id == attachment_id, Attachment.is_deleted == sa.false())
         )
         a = result.scalar_one_or_none()
         return self._to_dict(a) if a else None
+
+    async def get_raw_storage(self, attachment_id: UUID) -> dict | None:
+        """内部真实存储位置解析（C3 例外通道）。
+
+        ``_to_dict`` 的 ``file_path`` 对外已脱敏为 opaque locator，故受控下载/预览等
+        **内部字节读取** 不能再依赖序列化 dict，必须经本方法拿真实 ``storage_type`` +
+        ``file_path``（真实本地路径或 ``paperless://`` key）。本方法结果 **仅供服务端内部
+        读取**，绝不进入对外响应。
+        """
+        result = await self.db.execute(
+            sa.select(Attachment).where(
+                Attachment.id == attachment_id, Attachment.is_deleted == sa.false()
+            )
+        )
+        a = result.scalar_one_or_none()
+        if a is None:
+            return None
+        return {
+            "id": str(a.id),
+            "project_id": str(a.project_id),
+            "file_name": a.file_name,
+            "file_size": a.file_size,
+            "file_type": a.file_type,
+            "storage_type": a.storage_type,
+            "paperless_document_id": a.paperless_document_id,
+            # 真实存储位置 —— 内部读取专用，禁止对外序列化。
+            "file_path": a.file_path,
+        }
 
     async def update_ocr_status(
         self, attachment_id: UUID, status: str, ocr_text: str | None = None,
@@ -252,22 +297,60 @@ class AttachmentService:
     # 关联底稿
     # ------------------------------------------------------------------
 
-    async def associate_with_wp(
-        self, attachment_id: UUID, wp_id: UUID,
+    async def ensure_wp_link(
+        self, attachment_id: UUID, wp_id: UUID, *,
         association_type: str = "evidence",
         notes: str | None = None,
         created_by: UUID | None = None,
     ) -> dict:
-        """关联附件到底稿"""
-        link = AttachmentWorkingPaper(
-            attachment_id=attachment_id,
-            wp_id=wp_id,
-            association_type=association_type,
-            notes=notes,
-            created_by=created_by,
-        )
-        self.db.add(link)
-        await self.db.flush()
+        """幂等关联附件到底稿（权威关联真源 upsert，绝不产生重复 (att, wp) 行）。
+
+        spec: attachment-workpaper-linkage-convergence（C1 权威关联收敛层）。
+
+        先查 (attachment_id, wp_id) 是否已存在链行：
+        - 存在 → 返回既有链行；传入非空 ``association_type`` / 非 None ``notes`` 时更新之
+          （last-write-wins；不覆盖为空/None）。绝不再 INSERT 新行。
+        - 不存在 → INSERT 新链行。
+
+        返回结构与 :meth:`associate_with_wp` 一致
+        （id / attachment_id / wp_id / association_type / notes）。
+
+        应用层「先查后插」是幂等主防线；V133 的 ``uq_awp_attachment_wp`` 唯一索引
+        为并发竞态的 DB 级兜底。
+        """
+        existing = (
+            await self.db.execute(
+                sa.select(AttachmentWorkingPaper)
+                .where(
+                    AttachmentWorkingPaper.attachment_id == attachment_id,
+                    AttachmentWorkingPaper.wp_id == wp_id,
+                )
+                .order_by(
+                    AttachmentWorkingPaper.created_at.asc(),
+                    AttachmentWorkingPaper.id.asc(),
+                )
+            )
+        ).scalars().first()
+
+        if existing is not None:
+            # 更新非空字段（不把既有值覆盖为空/None）
+            if association_type:
+                existing.association_type = association_type
+            if notes is not None:
+                existing.notes = notes
+            await self.db.flush()
+            link = existing
+        else:
+            link = AttachmentWorkingPaper(
+                attachment_id=attachment_id,
+                wp_id=wp_id,
+                association_type=association_type or "evidence",
+                notes=notes,
+                created_by=created_by,
+            )
+            self.db.add(link)
+            await self.db.flush()
+
         return {
             "id": str(link.id),
             "attachment_id": str(link.attachment_id),
@@ -276,15 +359,274 @@ class AttachmentService:
             "notes": link.notes,
         }
 
-    async def get_wp_attachments(self, wp_id: UUID) -> list[dict]:
-        """获取底稿关联的附件"""
-        stmt = (
-            sa.select(Attachment)
-            .join(AttachmentWorkingPaper, AttachmentWorkingPaper.attachment_id == Attachment.id)
-            .where(AttachmentWorkingPaper.wp_id == wp_id, Attachment.is_deleted == sa.false())
+    async def associate_with_wp(
+        self, attachment_id: UUID, wp_id: UUID,
+        association_type: str = "evidence",
+        notes: str | None = None,
+        created_by: UUID | None = None,
+    ) -> dict:
+        """关联附件到底稿（委托幂等 :meth:`ensure_wp_link`，去重）。
+
+        签名与返回结构保持不变；Wave 0 起同一 (attachment_id, wp_id) 连续调用不再
+        产生重复链行（历史无去重 → 每次 INSERT，现改为幂等 upsert）。
+
+        对称双写 ``reference_*``（1:1 last-write-wins，与 linkAttachment 对齐旧消费者）；
+        reference 写入失败 fail-open，不阻断权威链表结果。
+        """
+        link = await self.ensure_wp_link(
+            attachment_id,
+            wp_id,
+            association_type=association_type,
+            notes=notes,
+            created_by=created_by,
         )
-        result = await self.db.execute(stmt)
-        return [self._to_dict(a) for a in result.scalars().all()]
+        try:
+            await self.db.execute(
+                sa.update(Attachment)
+                .where(Attachment.id == attachment_id)
+                .values(reference_type="working_paper", reference_id=wp_id)
+            )
+            await self.db.flush()
+        except Exception:
+            from app.services.attachment_wp_fail_open import log_awp_fail_open
+
+            log_awp_fail_open(
+                "awp_associate_reference_fail_open",
+                attachment_id=attachment_id,
+                wp_id=wp_id,
+            )
+        return link
+
+    async def get_wp_attachments(self, wp_id: UUID) -> dict:
+        """获取底稿关联附件的统一反查视图（envelope）。
+
+        权威链表 ∪ reference 关联 ∪ 函证只读（best-effort），按 attachment.id 去重；
+        多来源合并 ``sources``，主 ``source`` 优先级：
+        associated > referenced > confirmation。
+
+        返回 ``{ "items": [ ... ] }``；行内保留既有 ``_to_dict`` 字段，并 additive
+        ``source`` / ``sources`` / ``association_type``（仅链表有值；其余来源为 null）。
+
+        spec: attachment-workpaper-linkage-convergence Task 2.2 / 3.1
+        """
+        by_id: dict[str, dict] = {}
+
+        # 1) 权威链表
+        link_stmt = (
+            sa.select(Attachment, AttachmentWorkingPaper.association_type)
+            .join(
+                AttachmentWorkingPaper,
+                AttachmentWorkingPaper.attachment_id == Attachment.id,
+            )
+            .where(
+                AttachmentWorkingPaper.wp_id == wp_id,
+                Attachment.is_deleted == sa.false(),
+            )
+        )
+        link_rows = (await self.db.execute(link_stmt)).all()
+        for att, assoc_type in link_rows:
+            row = self._to_dict(att)
+            row["source"] = "associated"
+            row["sources"] = ["associated"]
+            row["association_type"] = assoc_type
+            by_id[row["id"]] = row
+
+        # 2) reference 关联（兼容路径）
+        ref_stmt = (
+            sa.select(Attachment)
+            .where(
+                Attachment.reference_type == "working_paper",
+                Attachment.reference_id == wp_id,
+                Attachment.is_deleted == sa.false(),
+            )
+        )
+        ref_atts = (await self.db.execute(ref_stmt)).scalars().all()
+        for att in ref_atts:
+            aid = str(att.id)
+            existing = by_id.get(aid)
+            if existing is not None:
+                if "referenced" not in existing["sources"]:
+                    existing["sources"].append("referenced")
+                continue
+            row = self._to_dict(att)
+            row["source"] = "referenced"
+            row["sources"] = ["referenced"]
+            row["association_type"] = None
+            by_id[aid] = row
+
+        # 3) 函证只读纳入（wp → confirmations → confirmation_attachment_link）
+        # fail-open：异常跳过，仍返回链表 + reference
+        try:
+            from app.models.confirmation_models import (
+                Confirmation,
+                ConfirmationAttachmentLink,
+            )
+
+            conf_stmt = (
+                sa.select(Attachment)
+                .join(
+                    ConfirmationAttachmentLink,
+                    ConfirmationAttachmentLink.attachment_id == Attachment.id,
+                )
+                .join(
+                    Confirmation,
+                    Confirmation.id == ConfirmationAttachmentLink.confirmation_id,
+                )
+                .where(
+                    Confirmation.wp_id == wp_id,
+                    Attachment.is_deleted == sa.false(),
+                )
+            )
+            conf_atts = (await self.db.execute(conf_stmt)).scalars().unique().all()
+            for att in conf_atts:
+                aid = str(att.id)
+                existing = by_id.get(aid)
+                if existing is not None:
+                    if "confirmation" not in existing["sources"]:
+                        existing["sources"].append("confirmation")
+                    continue
+                row = self._to_dict(att)
+                row["source"] = "confirmation"
+                row["sources"] = ["confirmation"]
+                row["association_type"] = None
+                by_id[aid] = row
+        except Exception:
+            from app.services.attachment_wp_fail_open import log_awp_fail_open
+
+            log_awp_fail_open(
+                "awp_confirmation_lookup_fail_open",
+                wp_id=wp_id,
+            )
+
+        items = list(by_id.values())
+        result: dict = {"items": items}
+
+        # 一次取 wp 元数据，供证据声明 + stale 共用（减一次 WorkingPaper 往返）
+        wp_meta = await self._resolve_wp_meta(wp_id)
+
+        # Req4：证据类型声明（无声明不附加键；失败 fail-open）
+        try:
+            from app.services.workpaper_evidence_requirements import (
+                build_evidence_requirements,
+            )
+
+            ev_req = build_evidence_requirements(
+                wp_meta.get("wp_code") if wp_meta else None,
+                items,
+            )
+            if ev_req is not None:
+                result["evidence_requirements"] = ev_req
+        except Exception:
+            from app.services.attachment_wp_fail_open import log_awp_fail_open
+
+            log_awp_fail_open(
+                "awp_evidence_requirements_fail_open",
+                wp_id=wp_id,
+            )
+
+        # Req6：stale 失效前置（失败 omit；无失效也返回 has_stale=false 供前端门控）
+        try:
+            from app.services.workpaper_attachment_stale import build_stale_info
+
+            att_ids = [str(it.get("id")) for it in items if it.get("id")]
+            stale = await build_stale_info(
+                self.db,
+                wp_id=wp_id,
+                attachment_ids=att_ids,
+                wp_meta=wp_meta,
+            )
+            if stale is not None:
+                result["stale_info"] = stale
+        except Exception:
+            from app.services.attachment_wp_fail_open import log_awp_fail_open
+
+            log_awp_fail_open(
+                "awp_stale_fail_open",
+                wp_id=wp_id,
+            )
+
+        return result
+
+    async def _resolve_wp_meta(self, wp_id: UUID) -> dict | None:
+        """一次查出 wp_code / project_id / prefill_stale / audit_year；失败 None。"""
+        try:
+            from app.models.core import Project
+            from app.models.workpaper_models import WorkingPaper, WpIndex
+
+            row = (
+                await self.db.execute(
+                    sa.select(
+                        WpIndex.wp_code,
+                        WorkingPaper.project_id,
+                        WorkingPaper.prefill_stale,
+                        Project.audit_year,
+                    )
+                    .join(WorkingPaper, WorkingPaper.wp_index_id == WpIndex.id)
+                    .join(Project, Project.id == WorkingPaper.project_id)
+                    .where(WorkingPaper.id == wp_id)
+                )
+            ).first()
+            if row is None:
+                return None
+            return {
+                "wp_code": str(row[0]) if row[0] else None,
+                "project_id": row[1],
+                "prefill_stale": bool(row[2]),
+                "audit_year": row[3],
+            }
+        except Exception:
+            from app.services.attachment_wp_fail_open import log_awp_fail_open
+
+            log_awp_fail_open("awp_resolve_wp_meta_fail_open", wp_id=wp_id)
+            return None
+
+    async def _resolve_wp_code(self, wp_id: UUID) -> str | None:
+        """从 working_paper → wp_index 解析 wp_code；失败返回 None。"""
+        meta = await self._resolve_wp_meta(wp_id)
+        return meta.get("wp_code") if meta else None
+
+    async def unlink_wp_attachment(self, wp_id: UUID, attachment_id: UUID) -> dict:
+        """解除附件与底稿的关联（权威链表硬删 + 同步清空 matching reference）。
+
+        - 删除 ``attachment_working_paper`` 中 (attachment_id, wp_id) 链行（若无则跳过）。
+        - 若该附件 ``reference_type=='working_paper'`` 且 ``reference_id==wp_id``，置空。
+        - 不删附件本身；不改函证 ``confirmation_attachment_link``。
+        - 幂等：无关联时仍返回 ok（no-op 200）。
+
+        spec: attachment-workpaper-linkage-convergence Task 4.1 / Property 5
+        """
+        del_result = await self.db.execute(
+            sa.delete(AttachmentWorkingPaper).where(
+                AttachmentWorkingPaper.attachment_id == attachment_id,
+                AttachmentWorkingPaper.wp_id == wp_id,
+            )
+        )
+        link_removed = int(del_result.rowcount or 0)
+
+        ref_cleared = False
+        att = (
+            await self.db.execute(
+                sa.select(Attachment).where(
+                    Attachment.id == attachment_id,
+                    Attachment.is_deleted == sa.false(),
+                )
+            )
+        ).scalar_one_or_none()
+        if (
+            att is not None
+            and att.reference_type == "working_paper"
+            and att.reference_id == wp_id
+        ):
+            att.reference_type = None
+            att.reference_id = None
+            ref_cleared = True
+            await self.db.flush()
+
+        return {
+            "ok": True,
+            "link_removed": link_removed,
+            "reference_cleared": ref_cleared,
+        }
 
     async def get_latest_reference_attachment(
         self,
@@ -490,8 +832,24 @@ class AttachmentService:
         r"(?:致|to)[：:\s]*(.{2,30}?)(?:\n|$)",
     ]
 
+    #: 未治理启发式抽取的响应标记（P2-⑤）：正则抽取的金额/日期/主体是 **辅助线索**，
+    #: 未经 AI-gate / citation 治理，**必须经人工确认后** 才能进入任何正式底稿/结论。
+    _HEURISTIC_GOVERNANCE_MARKER: dict = {
+        "governed": False,
+        "requires_human_confirmation": True,
+        "note": (
+            "启发式正则抽取，仅供参考线索；未经 AI-gate/citation 治理。"
+            "在进入任何正式底稿或函证结论前必须由具备权限的人工核对确认。"
+        ),
+    }
+
     async def extract_confirmation_reply(self, attachment_id: UUID) -> dict:
-        """从函证回函中提取关键信息"""
+        """从函证回函中提取关键信息（启发式辅助，非治理结论）。
+
+        返回值恒含 ``governed=False`` / ``requires_human_confirmation=True`` 标记：本方法用正则
+        从 OCR 文本抽取金额/日期/主体，是 **辅助线索** 而非正式结论；其输出未经 AI-gate 治理，
+        若要进入正式底稿/函证结论必须先由人工核对确认（P2-⑤）。抽取算法本身不变。
+        """
         import re
 
         result = await self.db.execute(
@@ -510,6 +868,7 @@ class AttachmentService:
                 "reply_entity": None,
                 "confidence": "low",
                 "message": "OCR 文本为空，请先完成 OCR 识别",
+                **self._HEURISTIC_GOVERNANCE_MARKER,
             }
 
         reply_amount = None
@@ -548,6 +907,7 @@ class AttachmentService:
             "reply_entity": reply_entity,
             "confidence": confidence,
             "message": f"提取到 {found_count}/3 个字段",
+            **self._HEURISTIC_GOVERNANCE_MARKER,
         }
 
     # ------------------------------------------------------------------
@@ -636,7 +996,12 @@ class AttachmentService:
             "id": str(a.id),
             "project_id": str(a.project_id),
             "file_name": a.file_name,
-            "file_path": a.file_path,
+            # C3 opaque-locator（R1/R14 §6.1）：对外只投影为受控下载 URL 或 paperless://
+            # scheme，绝不泄露绝对路径/原始 local storage key。真实路径的内部读取须走
+            # get_raw_storage()，不得依赖此序列化值。兼容窗口内保留 file_path 键。
+            "file_path": project_attachment_locator(
+                a.id, storage_type=a.storage_type, storage_key=a.file_path
+            ),
             "file_type": a.file_type,
             "file_size": a.file_size,
             "attachment_type": a.attachment_type,
@@ -659,6 +1024,154 @@ class AttachmentService:
     # AT-3 版本管理（spec proposal-remaining-18 task 5.3）
     # ──────────────────────────────────────────────────────────────────────
 
+    def _dialect_name(self) -> str:
+        """探测底层方言名（``postgresql`` / ``sqlite`` / ...）；失败返回空串。"""
+        bind = None
+        try:
+            bind = self.db.get_bind()
+        except Exception:
+            bind = getattr(self.db, "bind", None)
+        try:
+            return bind.dialect.name if bind is not None else ""
+        except Exception:
+            return ""
+
+    def _is_postgres(self) -> bool:
+        return self._dialect_name() == "postgresql"
+
+    async def _lock_version_chain(
+        self,
+        project_id: UUID,
+        file_name: str,
+        reference_id: UUID | None,
+        reference_type: str | None,
+    ) -> None:
+        """在读取 ``max(version)`` 之前对逻辑版本链取父作用域锁（治理契约 R2/§5.1）。
+
+        治理路径（``AttachmentVersionManager.replace_version``）对稳定的 ``attachments``
+        父行取 ``SELECT ... FOR UPDATE`` 作为序列化点，读取 ``MAX(version_no)`` 再 +1。
+
+        legacy 是**行式版本模型**（``attachments`` 表一行一个版本），没有稳定的父行；且
+        对"当前最新行"取 ``FOR UPDATE`` **无法**阻止重复版本号 —— 两个并发事务各自锁住同
+        一个旧的最新行、都算出 ``max+1``，各自插入的新最大行对对方是幻读，锁不到。因此这里
+        采用 **chain 级 ``pg_advisory_xact_lock``** 作为逻辑父锁：它以链身份
+        ``(project_id, file_name, reference_id, reference_type)`` 为键把同一条链上的所有并发
+        replace 串行化（也覆盖首版创建竞态），事务结束自动释放，等价于治理层对父行的
+        ``FOR UPDATE`` 序列化点。此外再对现有链行取一次 ``FOR UPDATE`` 行锁，显式"锁定现有
+        版本链行"，与 R2/§5.1 措辞对齐。
+
+        仅在 PostgreSQL 生效；SQLite 等单元测试方言为 no-op（并发正确性由真实 PG16 集成
+        测试验证）。
+        """
+        if not self._is_postgres():
+            return
+        # (1) 逻辑父锁：以链身份为键的 advisory 事务锁（串行化点）。
+        chain_key = "attachment_version_chain|{}|{}|{}|{}".format(
+            project_id, file_name, reference_id, reference_type
+        )
+        await self.db.execute(
+            sa.text("SELECT pg_advisory_xact_lock(hashtextextended(:k, 0))"),
+            {"k": chain_key},
+        )
+        # (2) 显式对现有链行取 FOR UPDATE 行锁（对齐 §5.1 "锁定现有版本链行"）。
+        lock_stmt = sa.select(Attachment.id).where(
+            Attachment.project_id == project_id,
+            Attachment.file_name == file_name,
+            Attachment.is_deleted == sa.false(),
+        )
+        if reference_id is not None:
+            lock_stmt = lock_stmt.where(Attachment.reference_id == reference_id)
+        else:
+            lock_stmt = lock_stmt.where(Attachment.reference_id.is_(None))
+        if reference_type is not None:
+            lock_stmt = lock_stmt.where(Attachment.reference_type == reference_type)
+        else:
+            lock_stmt = lock_stmt.where(Attachment.reference_type.is_(None))
+        await self.db.execute(lock_stmt.with_for_update())
+
+    async def _has_governance_version_chain(self, anchor_id: UUID | None) -> bool:
+        """该附件是否已存在治理 ``AttachmentVersion`` 链（守卫用）。"""
+        if anchor_id is None or not self._is_postgres():
+            return False
+        try:
+            row = await self.db.execute(
+                sa.text(
+                    "SELECT 1 FROM attachment_versions WHERE attachment_id = :aid LIMIT 1"
+                ),
+                {"aid": str(anchor_id)},
+            )
+            return row.scalar() is not None
+        except Exception:
+            # 治理表在部分环境尚未建立 —— 视为无治理链。
+            return False
+
+    async def _emit_version_replaced_signal(
+        self,
+        *,
+        new_att: Attachment,
+        previous_version_id: UUID | None,
+        actor: UUID | None,
+        project_id: UUID,
+        anchor_id: UUID | None,
+    ) -> None:
+        """发出与治理 replace 相同的失效信号（``attachment.version_replaced`` outbox 事件）。
+
+        令下游可被标记 stale（R9.1）。**复用治理既有 outbox 事件，不新造事件类型**。
+
+        守卫（§4.3/双版本模型收敛）：legacy 路径**绝不**写 ``attachment_versions``
+        （治理不可变表）——即使该附件已存在治理链，也只镜像失效信号（使两条链经同一信号
+        保持一致），不创建分叉的治理版本行。完整委派（改由治理 version manager 生成版本）
+        因需要 content_hash / ActorContext / idempotency / capability 等 legacy 调用方不提供
+        的输入、会破坏向后兼容，故本次延后。
+
+        仅在 PostgreSQL + 有明确 actor 时发出；只 ``flush`` 不 ``commit``（与业务变更同事务，
+        对齐治理 outbox 语义）。best-effort：治理表缺失时记 warning 不阻断 legacy 回滚/替换。
+        """
+        if actor is None or not self._is_postgres():
+            return
+        try:
+            from app.services.evidence_governance.frozen_contracts import ActorContext
+            from app.services.evidence_governance.outbox import (
+                OutboxService,
+                derive_event_id,
+            )
+        except Exception:  # pragma: no cover - 治理模块不可用时降级
+            return
+        try:
+            actor_ctx = ActorContext.for_user(actor)
+        except Exception:
+            return
+        governed = await self._has_governance_version_chain(anchor_id)
+        event_type = "attachment.version_replaced"
+        event_id = derive_event_id(
+            command_root_id=new_att.id, event_type=event_type, seq=0
+        )
+        payload = {
+            "attachment_id": str(new_att.id),
+            # legacy 行式版本：版本即行本身，new_version_id 用新行 id。
+            "new_version_id": str(new_att.id),
+            "new_version_no": new_att.version,
+            "previous_version_id": (
+                str(previous_version_id) if previous_version_id else None
+            ),
+            "content_hash": None,
+            "origin": "legacy_attachment_service",
+            "governed_chain_present": governed,
+        }
+        try:
+            await OutboxService(self.db).enqueue(
+                project_id=project_id,
+                audit_year=getattr(new_att, "audit_year", None),
+                event_id=event_id,
+                event_type=event_type,
+                payload=payload,
+                actor=actor_ctx,
+            )
+        except Exception:  # pragma: no cover - 信号 best-effort，不阻断主流程
+            logger.warning(
+                "legacy attachment stale signal enqueue failed", exc_info=True
+            )
+
     async def _resolve_version_chain(
         self,
         project_id: UUID,
@@ -671,7 +1184,13 @@ class AttachmentService:
         同 (project_id, reference_id, reference_type, file_name) 已有记录时，
         新 version = max(version) + 1，previous_version_id 指向当前最新版本。
         否则 version=1, previous_version_id=None。
+
+        并发安全：读取 ``max(version)`` **之前**先对逻辑版本链取父作用域锁
+        （``_lock_version_chain``），使并发 legacy replace 无法算出重复版本号。
         """
+        # 父作用域锁 —— 必须先于 max(version) 读取（治理契约 R2/§5.1）。
+        await self._lock_version_chain(project_id, file_name, reference_id, reference_type)
+
         stmt = (
             sa.select(Attachment)
             .where(
@@ -830,9 +1349,16 @@ class AttachmentService:
                 "必须提供 (attachment_id, version_id) 或 (project_id, file_name, target_version)"
             )
 
+        # 锁定链的锚点（用于治理链存在性检查）：契约 1 用 entry，契约 2 用 target。
+        anchor_id = target.id
+
         new_version, prev_id = await self._resolve_version_chain(
             project_id, file_name, reference_id, reference_type
         )
+        # 回滚 = 追加一条 version=N+1 的**新行**，复制 target 的元数据。
+        # 不可变性守卫：**只 INSERT 新行，绝不 UPDATE 任何历史行的 file_path/字节/
+        # created_by**；target 及所有旧版本回滚后保持逐字节不变（治理 §4.3 / P4）。
+        # actor 必须落库（治理要求：新记录须有明确责任主体）。
         new_att = Attachment(
             project_id=project_id,
             file_name=target.file_name,
@@ -852,4 +1378,14 @@ class AttachmentService:
         )
         self.db.add(new_att)
         await self.db.flush()
+        # 治理一致性：回滚创建了新版本 → 发出与治理 replace 相同的失效信号
+        # （attachment.version_replaced），令下游可标记 stale；若该附件已有治理
+        # AttachmentVersion 链则镜像信号 + 守卫（不创建分叉的治理版本行）。
+        await self._emit_version_replaced_signal(
+            new_att=new_att,
+            previous_version_id=prev_id,
+            actor=actor,
+            project_id=project_id,
+            anchor_id=anchor_id,
+        )
         return self._to_dict(new_att)

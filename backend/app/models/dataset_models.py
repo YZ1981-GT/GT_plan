@@ -227,6 +227,10 @@ class ImportJob(Base):
     created_by: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("users.id"), nullable=True
     )
+    # V092: 跨 worker 取消信号
+    cancel_requested: Mapped[bool] = mapped_column(
+        sa.Boolean, server_default=text("false"), nullable=False
+    )
     # F22 / Sprint 5.9: 接管链路记录
     # 格式: [{"user_id": "A", "action": "create", "at": "..."}, ...]
     creator_chain: Mapped[list | None] = mapped_column(

@@ -8,28 +8,33 @@
           <div class="gt-detail-section">
             <div class="gt-title-row">
               <h3 class="gt-detail-title">{{ project.name }}</h3>
-              <el-button size="small" type="primary" @click="editProject">
-                <el-icon><Edit /></el-icon> 编辑
-              </el-button>
+              <div class="gt-title-row__actions">
+                <el-button size="small" @click="openPlatformGuide" style="background: rgba(255,255,255,.95); color: var(--el-color-primary); border-color: var(--el-color-primary-light-5);">
+                  📖 使用手册
+                </el-button>
+                <el-button size="small" type="primary" @click="editProject">
+                  <el-icon><Edit /></el-icon> 编辑
+                </el-button>
+              </div>
             </div>
             <el-descriptions :column="2" border size="small">
               <el-descriptions-item label="客户名称">{{ project.client_name || '-' }}</el-descriptions-item>
               <el-descriptions-item label="项目类型">
                 <el-tag size="small">{{ typeLabel(project.project_type) }}</el-tag>
               </el-descriptions-item>
-              <el-descriptions-item label="当前状态">
-                <GtStatusTag dict-key="project_status" :value="project.status" />
-                <span v-if="project.status === 'planning'" class="gt-status-hint">
-                  — 请先导入账套数据，完成后状态将自动推进
-                </span>
-                <span v-else-if="project.status === 'created'" class="gt-status-hint">
-                  — 新建项目，请开始配置
-                </span>
-              </el-descriptions-item>
+              <el-descriptions-item label="公司简称">{{ project.short_name || '-' }}</el-descriptions-item>
               <el-descriptions-item label="报表准则">
                 <el-tag :type="project.template_type === 'soe' ? 'warning' : 'primary'" size="small">
                   {{ project.template_type === 'soe' ? '国企版' : project.template_type === 'listed' ? '上市版' : '未设置' }}
                 </el-tag>
+              </el-descriptions-item>
+              <el-descriptions-item label="报表范围">
+                <el-tag :type="project.report_scope === 'consolidated' ? 'success' : 'info'" size="small">
+                  {{ project.report_scope === 'consolidated' ? '合并报表' : '单体报表' }}
+                </el-tag>
+              </el-descriptions-item>
+              <el-descriptions-item label="项目状态">
+                <GtStatusTag dict-key="project_status" :value="project.status" />
               </el-descriptions-item>
               <el-descriptions-item label="企业代码">{{ project.company_code || project.client_code || '-' }}</el-descriptions-item>
               <el-descriptions-item label="创建时间">{{ formatDate(project.created_at) }}</el-descriptions-item>
@@ -40,6 +45,23 @@
                 </el-link>
               </el-descriptions-item>
             </el-descriptions>
+
+            <!-- 当前阶段引导：项目所处阶段 + 下一步该做什么 + 底稿完成率一眼可见 -->
+            <div class="gt-stage-guide">
+              <div class="gt-stage-guide__main">
+                <el-icon class="gt-stage-guide__icon" color="var(--gt-color-primary)"><Guide /></el-icon>
+                <span class="gt-stage-guide__text">{{ statusTooltip }}</span>
+              </div>
+              <div v-if="metrics.wpRate !== null" class="gt-stage-guide__progress">
+                <span class="gt-stage-guide__progress-label">底稿完成率</span>
+                <el-progress
+                  :percentage="metrics.wpRate"
+                  :stroke-width="8"
+                  :color="metrics.wpRate >= 100 ? 'var(--gt-color-success)' : 'var(--gt-color-primary)'"
+                  style="flex: 1"
+                />
+              </div>
+            </div>
 
             <!-- 配置缺失提示 -->
             <el-alert
@@ -61,227 +83,500 @@
           <div class="gt-detail-section">
             <div class="gt-workflow-hint">
               <span class="gt-workflow-hint-label">建议流程：</span>
-              <span class="gt-workflow-step">① 导入</span>
-              <span class="gt-workflow-arrow">→</span>
-              <span class="gt-workflow-step">② 映射</span>
-              <span class="gt-workflow-arrow">→</span>
-              <span class="gt-workflow-step">③ 底稿</span>
-              <span class="gt-workflow-arrow">→</span>
-              <span class="gt-workflow-step">④ 报表</span>
-              <span class="gt-workflow-arrow">→</span>
-              <span class="gt-workflow-step">⑤ 附注</span>
+              <template v-for="(step, si) in workflowSteps" :key="step.key">
+                <span
+                  class="gt-workflow-step"
+                  :class="{
+                    'gt-workflow-step--done': si < currentStageIndex,
+                    'gt-workflow-step--current': si === currentStageIndex,
+                  }"
+                >
+                  <span class="gt-workflow-step__mark">{{ si < currentStageIndex ? '✓' : ['①', '②', '③', '④', '⑤'][si] }}</span>
+                  {{ step.label }}
+                </span>
+                <span v-if="si < workflowSteps.length - 1" class="gt-workflow-arrow">→</span>
+              </template>
             </div>
             <div class="gt-quick-tip">
               💡 提示：首次使用请按建议流程操作。先导入账套数据，完成科目映射后系统自动生成试算表，再依次编制底稿、生成报表和附注。
             </div>
-            <div class="gt-quick-grid">
-              <!-- 第一行：核心流程（按建议流程顺序） -->
-              <el-tooltip content="上传企业导出的科目余额表、序时账等文件" placement="top">
-                <div class="gt-quick-btn" @click="goToLedgerImport()">
-                  <el-icon :size="20" color="var(--gt-color-primary-dark)"><Upload /></el-icon>
-                  <span>账套导入</span>
-                </div>
-              </el-tooltip>
-              <el-tooltip content="查看试算表（需先导入数据+科目映射）" placement="top">
-                <div class="gt-quick-btn" @click="goTo('trial-balance')">
-                  <el-icon :size="20" color="var(--gt-color-primary)"><DataLine /></el-icon>
-                  <span>试算表</span>
-                </div>
-              </el-tooltip>
-              <el-tooltip content="录入审计调整分录（AJE）和重分类调整（RJE）" placement="top">
-                <div class="gt-quick-btn" @click="goTo('adjustments')">
-                  <el-icon :size="20" color="var(--gt-color-teal)"><Edit /></el-icon>
-                  <span>调整分录</span>
-                </div>
-              </el-tooltip>
-              <el-tooltip content="查看和编辑审计底稿（需先生成底稿）" placement="top">
-                <div class="gt-quick-btn" @click="goTo('workpapers')">
-                  <el-icon :size="20" color="var(--gt-color-primary-light)"><Document /></el-icon>
-                  <span>底稿</span>
-                </div>
-              </el-tooltip>
-              <el-tooltip content="查看财务报表（需先导入数据并生成报表）" placement="top">
-                <div class="gt-quick-btn" @click="goTo('reports')">
-                  <el-icon :size="20" color="var(--gt-color-success)"><TrendCharts /></el-icon>
-                  <span>报表</span>
-                </div>
-              </el-tooltip>
-              <el-tooltip content="编辑附注章节（需先选择模板并生成附注）" placement="top">
-                <div class="gt-quick-btn" @click="goTo('disclosure-notes')">
-                  <el-icon :size="20" color="var(--gt-color-wheat)"><Notebook /></el-icon>
-                  <span>附注</span>
-                </div>
-              </el-tooltip>
-              <!-- 第二行：辅助功能 -->
-              <el-tooltip content="设置整体重要性水平、实际执行重要性和明显微小错报" placement="top">
-                <div class="gt-quick-btn" @click="goTo('materiality')">
-                  <el-icon :size="20" color="var(--gt-color-coral)"><Aim /></el-icon>
-                  <span>重要性</span>
-                </div>
-              </el-tooltip>
-              <el-tooltip content="执行审计检查清单" placement="top">
-                <div class="gt-quick-btn" @click="goTo('audit-checks')">
-                  <el-icon :size="20" color="var(--gt-color-success)"><CircleCheck /></el-icon>
-                  <span>审计检查</span>
-                </div>
-              </el-tooltip>
-              <el-tooltip content="查询科目余额、序时账、辅助余额等四表数据" placement="top">
-                <div class="gt-quick-btn" @click="goTo('ledger')">
-                  <el-icon :size="20" color="var(--gt-color-primary-dark)"><Search /></el-icon>
-                  <span>查账</span>
-                </div>
-              </el-tooltip>
-              <el-tooltip content="清除卡住的导入任务，释放导入锁" placement="top">
-                <div class="gt-quick-btn gt-quick-btn--danger" @click="handleResetImport">
-                  <el-icon :size="20" color="#f56c6c"><RefreshRight /></el-icon>
-                  <span>重置</span>
-                </div>
-              </el-tooltip>
-              <el-tooltip content="一键创建当年项目（继承上年配置）" placement="top">
-                <div class="gt-quick-btn" @click="onCreateNextYear">
-                  <el-icon :size="20" color="var(--gt-color-success)"><CopyDocument /></el-icon>
-                  <span>创建下年</span>
-                </div>
-              </el-tooltip>
-              <el-tooltip content="为项目分配团队成员" placement="top">
-                <div class="gt-quick-btn" @click="showTeamAssign = true">
-                  <el-icon :size="20" color="var(--gt-color-primary)"><User /></el-icon>
-                  <span>人员委派</span>
-                </div>
-              </el-tooltip>
-              <div
-                v-if="project.report_scope === 'consolidated'"
-                class="gt-quick-btn"
-                @click="goTo('workpaper-summary')"
-              >
-                <el-icon :size="20" color="var(--gt-color-teal)"><Grid /></el-icon>
-                <span>底稿汇总</span>
+            <!-- 核心流程（按建议流程顺序，随项目阶段高亮"下一步"） -->
+            <div class="gt-quick-group">
+              <div class="gt-quick-group__label">核心流程</div>
+              <div class="gt-quick-grid">
+                <el-tooltip content="上传企业导出的科目余额表、序时账等文件" placement="top">
+                  <div class="gt-quick-btn" :class="{ 'gt-quick-btn--recommended': recommendedAction === 'import' }" @click="goToLedgerImport()">
+                    <span v-if="recommendedAction === 'import'" class="gt-quick-btn__badge">下一步</span>
+                    <el-icon :size="20" color="var(--gt-color-primary-dark)"><Upload /></el-icon>
+                    <span>账套导入</span>
+                  </div>
+                </el-tooltip>
+                <el-tooltip content="查看试算表（需先导入数据+科目映射）" placement="top">
+                  <div class="gt-quick-btn" @click="goTo('trial-balance')">
+                    <el-icon :size="20" color="var(--gt-color-primary)"><DataLine /></el-icon>
+                    <span>试算表</span>
+                  </div>
+                </el-tooltip>
+                <el-tooltip content="录入审计调整分录（AJE）和重分类调整（RJE）" placement="top">
+                  <div class="gt-quick-btn" @click="goTo('adjustments')">
+                    <el-icon :size="20" color="var(--gt-color-teal)"><Edit /></el-icon>
+                    <span>调整分录</span>
+                  </div>
+                </el-tooltip>
+                <el-tooltip content="查看和编辑审计底稿（需先生成底稿）" placement="top">
+                  <div class="gt-quick-btn" :class="{ 'gt-quick-btn--recommended': recommendedAction === 'workpapers' }" @click="goTo('workpapers', { view: 'lifecycle' })">
+                    <span v-if="recommendedAction === 'workpapers'" class="gt-quick-btn__badge">下一步</span>
+                    <el-icon :size="20" color="var(--gt-color-primary-light)"><Document /></el-icon>
+                    <span>底稿</span>
+                  </div>
+                </el-tooltip>
+                <el-tooltip content="查看财务报表（需先导入数据并生成报表）" placement="top">
+                  <div class="gt-quick-btn" :class="{ 'gt-quick-btn--recommended': recommendedAction === 'reports' }" @click="goTo('reports')">
+                    <span v-if="recommendedAction === 'reports'" class="gt-quick-btn__badge">下一步</span>
+                    <el-icon :size="20" color="var(--gt-color-success)"><TrendCharts /></el-icon>
+                    <span>报表</span>
+                  </div>
+                </el-tooltip>
+                <el-tooltip content="编辑附注章节（需先选择模板并生成附注）" placement="top">
+                  <div class="gt-quick-btn" :class="{ 'gt-quick-btn--recommended': recommendedAction === 'disclosure-notes' }" @click="goTo('disclosure-notes')">
+                    <span v-if="recommendedAction === 'disclosure-notes'" class="gt-quick-btn__badge">下一步</span>
+                    <el-icon :size="20" color="var(--gt-color-wheat)"><Notebook /></el-icon>
+                    <span>附注</span>
+                  </div>
+                </el-tooltip>
+              </div>
+            </div>
+
+            <!-- 辅助工具 -->
+            <div class="gt-quick-group">
+              <div class="gt-quick-group__label">辅助工具</div>
+              <div class="gt-quick-grid">
+                <el-tooltip content="设置整体重要性水平、实际执行重要性和明显微小错报" placement="top">
+                  <div class="gt-quick-btn" @click="goTo('materiality')">
+                    <el-icon :size="20" color="var(--gt-color-coral)"><Aim /></el-icon>
+                    <span>重要性</span>
+                  </div>
+                </el-tooltip>
+                <el-tooltip content="执行审计检查清单" placement="top">
+                  <div class="gt-quick-btn" @click="goTo('audit-checks')">
+                    <el-icon :size="20" color="var(--gt-color-success)"><CircleCheck /></el-icon>
+                    <span>审计检查</span>
+                  </div>
+                </el-tooltip>
+                <el-tooltip content="查询科目余额、序时账、辅助余额等四表数据" placement="top">
+                  <div class="gt-quick-btn" @click="goTo('ledger')">
+                    <el-icon :size="20" color="var(--gt-color-primary-dark)"><Search /></el-icon>
+                    <span>查账</span>
+                  </div>
+                </el-tooltip>
+                <el-tooltip content="交付件管理中心：导出、版本、预览、审批、归档" placement="top">
+                  <div class="gt-quick-btn" @click="goTo('deliverable-center')">
+                    <el-icon :size="20" color="var(--gt-color-primary-dark)"><Finished /></el-icon>
+                    <span>交付物</span>
+                  </div>
+                </el-tooltip>
+                <el-tooltip v-if="project.report_scope === 'consolidated'" content="合并底稿汇总" placement="top">
+                  <div class="gt-quick-btn" @click="goTo('workpaper-summary')">
+                    <el-icon :size="20" color="var(--gt-color-teal)"><Grid /></el-icon>
+                    <span>底稿汇总</span>
+                  </div>
+                </el-tooltip>
+              </div>
+            </div>
+
+            <!-- 项目管理（含危险操作，置于末尾） -->
+            <div class="gt-quick-group">
+              <div class="gt-quick-group__label">项目管理</div>
+              <div class="gt-quick-grid">
+                <el-tooltip content="为项目分配团队成员" placement="top">
+                  <div class="gt-quick-btn" @click="showTeamAssign = true">
+                    <el-icon :size="20" color="var(--gt-color-primary)"><User /></el-icon>
+                    <span>人员委派</span>
+                  </div>
+                </el-tooltip>
+                <el-tooltip content="一键创建当年项目（继承上年配置）" placement="top">
+                  <div class="gt-quick-btn" @click="onCreateNextYear">
+                    <el-icon :size="20" color="var(--gt-color-success)"><CopyDocument /></el-icon>
+                    <span>创建下年</span>
+                  </div>
+                </el-tooltip>
+                <el-tooltip content="清除卡住的导入任务，释放导入锁（谨慎操作）" placement="top">
+                  <div class="gt-quick-btn gt-quick-btn--danger" @click="handleResetImport">
+                    <el-icon :size="20" color="#f56c6c"><RefreshRight /></el-icon>
+                    <span>重置</span>
+                  </div>
+                </el-tooltip>
               </div>
             </div>
           </div>
-        </el-tab-pane>
 
-        <!-- 关键指标 -->
-        <el-tab-pane label="指标" name="metrics">
-          <div class="gt-metrics-grid">
-            <div class="gt-metric-card">
-              <span class="gt-metric-value">-</span>
-              <span class="gt-metric-label">底稿完成率</span>
-            </div>
-            <div class="gt-metric-card">
-              <span class="gt-metric-value">-</span>
-              <span class="gt-metric-label">复核完成率</span>
-            </div>
-            <div class="gt-metric-card">
-              <span class="gt-metric-value">-</span>
-              <span class="gt-metric-label">AJE数量</span>
-            </div>
-            <div class="gt-metric-card">
-              <span class="gt-metric-value">-</span>
-              <span class="gt-metric-label">RJE数量</span>
+          <!-- 导入进度实时面板 -->
+          <div v-if="importStatus" class="gt-detail-section gt-import-progress-panel">
+            <h4 class="gt-import-progress-panel__title">
+              <el-icon :size="16" color="var(--gt-color-primary)"><Loading /></el-icon>
+              导入进度
+            </h4>
+            <div class="gt-import-progress-panel__card">
+              <div class="gt-import-progress-panel__header">
+                <el-tag :type="importPhaseTagType" size="small">{{ importPhaseLabel }}</el-tag>
+                <span class="gt-import-progress-panel__pct">{{ importStatus.progress }}%</span>
+              </div>
+              <el-progress
+                :percentage="importStatus.progress"
+                :stroke-width="10"
+                :color="importPhaseColor"
+                style="margin: 8px 0"
+              />
+              <div class="gt-import-progress-panel__message">{{ importStatus.message }}</div>
+              <div v-if="importStatus.eta" class="gt-import-progress-panel__eta">
+                预计剩余：{{ importStatus.eta }}
+              </div>
             </div>
           </div>
-          <p class="gt-placeholder-text">指标数据将在选择项目后加载</p>
+
         </el-tab-pane>
 
-        <!-- 底稿索引 -->
+        <!-- 项目看板（指标 + 团队 + 底稿分配） -->
+        <el-tab-pane label="指标" name="metrics" lazy>
+          <div v-if="metricsLoading" class="gt-board-loading">
+            <el-skeleton :rows="6" animated />
+          </div>
+          <template v-else>
+            <!-- 顶部指标卡片 3×2 -->
+            <div class="gt-board-cards">
+              <div class="gt-board-card" @dblclick="goTo('workpapers')">
+                <div class="gt-board-card__icon" style="background: var(--gt-color-primary-bg)">📋</div>
+                <div class="gt-board-card__body">
+                  <span class="gt-board-card__value">{{ metrics.wpRate !== null ? metrics.wpRate + '%' : '-' }}</span>
+                  <span class="gt-board-card__label">底稿完成率</span>
+                </div>
+                <el-progress v-if="metrics.wpRate !== null" :percentage="metrics.wpRate" :stroke-width="3" :show-text="false" color="var(--gt-color-primary)" class="gt-board-card__bar" />
+              </div>
+              <div class="gt-board-card" @dblclick="goTo('workpapers')">
+                <div class="gt-board-card__icon" style="background: #e8f8f5">✅</div>
+                <div class="gt-board-card__body">
+                  <span class="gt-board-card__value">{{ metrics.reviewRate !== null ? metrics.reviewRate + '%' : '-' }}</span>
+                  <span class="gt-board-card__label">复核完成率</span>
+                </div>
+                <el-progress v-if="metrics.reviewRate !== null" :percentage="metrics.reviewRate" :stroke-width="3" :show-text="false" color="var(--gt-color-teal)" class="gt-board-card__bar" />
+              </div>
+              <div class="gt-board-card" @dblclick="goTo('adjustments')">
+                <div class="gt-board-card__icon" style="background: #fff3e0">📝</div>
+                <div class="gt-board-card__body">
+                  <span class="gt-board-card__value" style="color: var(--gt-color-teal)">{{ metrics.ajeCount ?? '-' }}</span>
+                  <span class="gt-board-card__label">审计调整</span>
+                </div>
+              </div>
+              <div class="gt-board-card" @dblclick="goTo('adjustments')">
+                <div class="gt-board-card__icon" style="background: #fef3e2">🔄</div>
+                <div class="gt-board-card__body">
+                  <span class="gt-board-card__value" style="color: var(--gt-color-wheat)">{{ metrics.rjeCount ?? '-' }}</span>
+                  <span class="gt-board-card__label">重分类调整</span>
+                </div>
+              </div>
+              <div class="gt-board-card" @dblclick="goTo('audit-checks')">
+                <div class="gt-board-card__icon" style="background: #fde8e8">⚠️</div>
+                <div class="gt-board-card__body">
+                  <span class="gt-board-card__value" :style="{ color: (metrics.openIssues ?? 0) > 0 ? 'var(--gt-color-coral)' : '' }">{{ metrics.openIssues ?? '-' }}</span>
+                  <span class="gt-board-card__label">未决问题</span>
+                </div>
+              </div>
+              <div class="gt-board-card" @dblclick="goTo('workpapers')">
+                <div class="gt-board-card__icon" style="background: #fde8e8">🕐</div>
+                <div class="gt-board-card__body">
+                  <span class="gt-board-card__value" :style="{ color: (metrics.staleCount ?? 0) > 0 ? 'var(--gt-color-coral)' : '' }">{{ metrics.staleCount ?? '-' }}</span>
+                  <span class="gt-board-card__label">数据过期</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- 财务数据概览 -->
+            <div class="gt-board-section">
+              <h4 class="gt-board-section__title">💰 财务分析指标</h4>
+              <div class="gt-fa">
+                <div v-for="(cat, ci) in finCategories" :key="cat.key" class="gt-fa__card" :style="{ animationDelay: ci * 0.08 + 's' }">
+                  <div class="gt-fa__header" :class="`gt-fa__header--${cat.key}`">
+                    <span class="gt-fa__header-icon">{{ cat.icon }}</span>
+                    <span>{{ cat.label }}</span>
+                  </div>
+                  <div class="gt-fa__body">
+                    <el-tooltip
+                      v-for="item in cat.items"
+                      :key="item.label"
+                      :content="`${item.label} = ${item.formula}`"
+                      placement="top"
+                      :show-after="300"
+                    >
+                      <div class="gt-fa__row" @dblclick="item.link && goTo(item.link)">
+                        <span class="gt-fa__label">{{ item.label }}</span>
+                        <span class="gt-fa__value" :class="{ 'gt-fa__value--negative': item.negative, 'gt-fa__value--link': item.link }">
+                          {{ item.display }}
+                        </span>
+                      </div>
+                    </el-tooltip>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- 团队成员 & 工时 -->
+            <div class="gt-board-section">
+              <h4 class="gt-board-section__title">👥 项目团队与工时</h4>
+              <el-table v-if="teamMembers.length" :data="teamMembers" size="small" stripe :max-height="200">
+                <el-table-column prop="staff_name" label="姓名" width="90" />
+                <el-table-column prop="role_label" label="角色" width="80">
+                  <template #default="{ row }">
+                    <el-tag size="small" :type="row.role === 'preparer' ? undefined : row.role === 'reviewer' ? 'success' : 'info'">
+                      {{ row.role_label }}
+                    </el-tag>
+                  </template>
+                </el-table-column>
+                <el-table-column label="工时(h)" width="70" align="right">
+                  <template #default="{ row }">{{ row.total_hours ?? '-' }}</template>
+                </el-table-column>
+                <el-table-column label="分配底稿" width="80" align="right">
+                  <template #default="{ row }">{{ row.assigned_wp ?? '-' }}</template>
+                </el-table-column>
+                <el-table-column label="已完成" width="70" align="right">
+                  <template #default="{ row }">{{ row.completed_wp ?? '-' }}</template>
+                </el-table-column>
+                <el-table-column label="完成率" min-width="100">
+                  <template #default="{ row }">
+                    <el-progress
+                      v-if="row.assigned_wp"
+                      :percentage="row.assigned_wp ? Math.round((row.completed_wp || 0) / row.assigned_wp * 100) : 0"
+                      :stroke-width="8"
+                      color="var(--gt-color-primary)"
+                    />
+                    <span v-else style="color: var(--gt-color-text-placeholder)">-</span>
+                  </template>
+                </el-table-column>
+              </el-table>
+              <div v-else class="gt-board-empty-hint">暂无团队成员，请先进行人员委派</div>
+            </div>
+
+            <!-- 空态 -->
+            <div v-if="!metrics.wpRate && !metrics.ajeCount && !metrics.rjeCount && !teamMembers.length" class="gt-board-empty">
+              <el-empty :image-size="60" description="暂无数据，导入账套并分配人员后将自动显示" />
+            </div>
+          </template>
+        </el-tab-pane>
+
+        <!-- 底稿索引 + 分配详情 -->
         <el-tab-pane label="底稿" name="workpapers" lazy>
-          <div v-if="wpTree.length" class="gt-wp-tree">
-            <el-tree :data="wpTree" :props="{ label: 'label', children: 'children' }" default-expand-all>
-              <template #default="{ data }">
-                <span class="gt-wp-node">
-                  <span>{{ data.label }}</span>
-                  <el-tag v-if="data.count" size="small" type="info">{{ data.count }}</el-tag>
-                </span>
-              </template>
-            </el-tree>
+          <!-- 循环完成度进度条 -->
+          <div class="gt-board-section">
+            <h4 class="gt-board-section__title">📊 审计流程底稿完成度</h4>
+            <!-- 流程步骤条 -->
+            <div class="gt-flow">
+              <div
+                v-for="(stage, si) in cycleStages"
+                :key="stage.label"
+                class="gt-flow__step"
+              >
+                <div class="gt-flow__node" :class="`gt-flow__node--s${si}`">
+                  <span class="gt-flow__step-num">{{ si + 1 }}</span>
+                  <span class="gt-flow__step-label">{{ stage.label }}</span>
+                  <span class="gt-flow__step-pct">{{ stage.pct }}%</span>
+                </div>
+                <div v-if="si < cycleStages.length - 1" class="gt-flow__connector">
+                  <span class="gt-flow__arrow">→</span>
+                </div>
+              </div>
+            </div>
+            <!-- 各阶段展开明细 -->
+            <div class="gt-flow-detail">
+              <div
+                v-for="(stage, si) in cycleStages"
+                :key="stage.label"
+                class="gt-flow-detail__group"
+                :class="{ 'gt-flow-detail__group--wide': stage.items.length > 3 }"
+              >
+                <div class="gt-flow-detail__header" :class="`gt-flow-detail__header--s${si}`">
+                  {{ stage.label }}
+                  <span class="gt-flow-detail__summary">{{ stage.done }}/{{ stage.total }}</span>
+                </div>
+                <div class="gt-flow-detail__items" :class="{ 'gt-flow-detail__items--grid': stage.items.length > 3 }">
+                  <el-tooltip
+                    v-for="item in stage.items"
+                    :key="item.code"
+                    :content="`${item.code} ${item.name}：已完成 ${item.done}/${item.total}，双击查看底稿`"
+                    placement="top"
+                    :show-after="200"
+                  >
+                    <div class="gt-flow-detail__row" @dblclick="goTo(`workpapers?cycle=${item.code}`)">
+                      <span class="gt-flow-detail__code">{{ item.code }}</span>
+                      <span class="gt-flow-detail__name">{{ item.name }}</span>
+                      <el-progress
+                        :percentage="item.pct"
+                        :stroke-width="8"
+                        :show-text="false"
+                        color="var(--gt-color-primary)"
+                        class="gt-flow-detail__bar"
+                      />
+                      <span class="gt-flow-detail__stat">{{ item.done }}/{{ item.total }}</span>
+                    </div>
+                  </el-tooltip>
+                  <div v-if="!stage.items.length" class="gt-flow-detail__empty">暂无底稿</div>
+                </div>
+              </div>
+            </div>
           </div>
-          <el-empty v-else description="暂无底稿索引" :image-size="60">
-            <el-button size="small" type="primary" @click="goTo('workpapers')">查看底稿</el-button>
-          </el-empty>
-        </el-tab-pane>
 
-        <!-- 试算表预览 -->
-        <el-tab-pane label="试算表" name="trial-balance" lazy>
-          <el-table v-if="trialBalanceRows.length" :data="trialBalanceRows" size="small" stripe max-height="400">
-            <el-table-column prop="standard_account_code" label="科目" width="100" />
-            <el-table-column prop="account_name" label="名称" min-width="140" />
-            <el-table-column label="未审数" width="110" align="right">
-              <template #default="{ row }">{{ fmtAmt(row.unadjusted_amount) }}</template>
-            </el-table-column>
-            <el-table-column label="审定数" width="110" align="right">
-              <template #default="{ row }">{{ fmtAmt(row.audited_amount) }}</template>
-            </el-table-column>
-          </el-table>
-          <el-empty v-else description="暂无试算表数据" :image-size="60">
-            <el-button size="small" type="primary" @click="goTo('trial-balance')">查看试算表</el-button>
-          </el-empty>
+          <!-- 底稿明细表（编制人/复核人/状态） -->
+          <div class="gt-board-section">
+            <h4 class="gt-board-section__title">📋 底稿分配明细</h4>
+            <div v-if="wpDetailLoading" style="padding: 12px 0"><el-skeleton :rows="4" animated /></div>
+            <el-table v-else-if="wpDetailList.length" :data="wpDetailList" size="small" stripe :max-height="360" style="width: 100%" class="gt-compact-table gt-tb-font-md">
+              <el-table-column prop="wp_code" label="编号" width="80" sortable />
+              <el-table-column prop="wp_name" label="底稿名称" min-width="140" show-overflow-tooltip />
+              <el-table-column prop="cycle" label="循环" width="50" align="center" />
+              <el-table-column prop="preparer_name" label="编制人" width="80">
+                <template #default="{ row }">{{ row.preparer_name || '-' }}</template>
+              </el-table-column>
+              <el-table-column prop="reviewer_name" label="复核人" width="80">
+                <template #default="{ row }">{{ row.reviewer_name || '-' }}</template>
+              </el-table-column>
+              <el-table-column prop="status" label="状态" width="80" align="center">
+                <template #default="{ row }">
+                  <el-tag size="small" :type="wpStatusType(row.status)">{{ wpStatusLabel(row.status) }}</el-tag>
+                </template>
+              </el-table-column>
+            </el-table>
+            <el-empty v-else description="暂无底稿数据" :image-size="50">
+              <el-button size="small" type="primary" @click="goTo('workpapers')">查看底稿</el-button>
+            </el-empty>
+          </div>
+
+          <!-- 人员汇总统计 -->
+          <div v-if="wpStaffSummary.length" class="gt-board-section">
+            <h4 class="gt-board-section__title">👤 人员负责汇总</h4>
+            <el-table :data="wpStaffSummary" size="small" :max-height="200">
+              <el-table-column prop="name" label="姓名" width="90" />
+              <el-table-column prop="as_preparer" label="编制(负责)" width="90" align="center" />
+              <el-table-column prop="prepared_done" label="编制(完成)" width="90" align="center" />
+              <el-table-column prop="as_reviewer" label="复核(负责)" width="90" align="center" />
+              <el-table-column prop="reviewed_done" label="复核(完成)" width="90" align="center" />
+              <el-table-column label="编制完成率" min-width="100">
+                <template #default="{ row }">
+                  <el-progress
+                    v-if="row.as_preparer"
+                    :percentage="Math.round((row.prepared_done / row.as_preparer) * 100)"
+                    :stroke-width="8"
+                    color="var(--gt-color-primary)"
+                  />
+                  <span v-else>-</span>
+                </template>
+              </el-table-column>
+            </el-table>
+          </div>
+
         </el-tab-pane>
 
         <!-- 报表预览 -->
         <el-tab-pane label="报表" name="reports" lazy>
           <div class="gt-report-links">
-            <div class="gt-report-card" @click="goTo('reports')">
-              <el-icon :size="24" color="var(--gt-color-primary)"><DataLine /></el-icon>
-              <span>资产负债表</span>
-            </div>
-            <div class="gt-report-card" @click="goTo('reports')">
-              <el-icon :size="24" color="var(--gt-color-teal)"><TrendCharts /></el-icon>
-              <span>利润表</span>
-            </div>
-            <div class="gt-report-card" @click="goTo('reports')">
-              <el-icon :size="24" color="var(--gt-color-success)"><Coin /></el-icon>
-              <span>现金流量表</span>
-            </div>
-            <div class="gt-report-card" @click="goTo('reports')">
-              <el-icon :size="24" color="var(--gt-color-wheat)"><PieChart /></el-icon>
-              <span>权益变动表</span>
+            <div
+              v-for="(rpt, ri) in reportList"
+              :key="rpt.type"
+              class="gt-report-card"
+              :style="{ animationDelay: ri * 0.06 + 's' }"
+              @dblclick="goTo(`reports?type=${rpt.type}`)"
+            >
+              <span class="gt-report-card__icon">{{ rpt.icon }}</span>
+              <span class="gt-report-card__name">{{ rpt.label }}</span>
             </div>
           </div>
-        </el-tab-pane>
-
-        <!-- 查账（穿透查询） -->
-        <el-tab-pane label="查账" name="ledger" lazy>
-          <div class="gt-ledger-entry">
-            <el-icon :size="40" color="var(--gt-color-primary)"><Search /></el-icon>
-            <h4 style="margin: 12px 0 8px; color: var(--gt-color-text)">账证联动查询</h4>
-            <p style="color: var(--gt-color-text-secondary); font-size: var(--gt-font-size-sm); margin-bottom: 16px; text-align: center">
-              建项后可先独立导入账套数据，再从科目余额表逐级穿透到序时账、凭证、辅助账
-            </p>
-            <el-button type="primary" @click="goToLedgerImport()">
-              <el-icon><Upload /></el-icon> 账套导入
-            </el-button>
-            <el-button @click="goTo('ledger')">
-              <el-icon><Search /></el-icon> 进入查账
-            </el-button>
-          </div>
+          <div class="gt-report-hint">双击报表卡片跳转查看</div>
         </el-tab-pane>
 
         <!-- 附件管理 -->
         <el-tab-pane label="附件" name="attachments" lazy>
-          <div class="gt-attachment-section">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px">
-              <h4 style="margin: 0; color: var(--gt-color-text)">项目附件</h4>
-              <el-button type="primary" size="small" @click="goTo('attachments')">
-                <el-icon><Paperclip /></el-icon> 管理附件
+          <div class="gt-att">
+            <!-- 已上传附件按循环分组卡片 -->
+            <div class="gt-att__header">
+              <h4 class="gt-att__title">📎 项目附件</h4>
+              <el-button type="primary" size="small" @click="showAttUpload = true">
+                + 新增附件
               </el-button>
             </div>
-            <el-table v-if="attachmentList.length" :data="attachmentList" size="small" stripe max-height="300">
-              <el-table-column prop="file_name" label="文件名" min-width="180" show-overflow-tooltip />
-              <el-table-column prop="file_type" label="类型" width="80" />
-              <el-table-column prop="attachment_type" label="分类" width="80">
-                <template #default="{ row }">
-                  <el-tag size="small">{{ attachTypeLabel(row.attachment_type) }}</el-tag>
-                </template>
-              </el-table-column>
-              <el-table-column label="大小" width="80">
-                <template #default="{ row }">{{ formatSize(row.file_size) }}</template>
-              </el-table-column>
-            </el-table>
-            <el-empty v-else description="暂无附件" :image-size="50">
-              <el-button size="small" type="primary" @click="goTo('attachments')">上传附件</el-button>
+
+            <!-- 附件卡片网格 -->
+            <div v-if="attachmentList.length" class="gt-att__grid">
+              <div
+                v-for="(att, ai) in attachmentList"
+                :key="att.id || ai"
+                class="gt-att__card"
+                :style="{ animationDelay: ai * 0.05 + 's' }"
+                @dblclick="goTo('attachments')"
+              >
+                <span class="gt-att__card-icon">{{ attFileIcon(att.file_type) }}</span>
+                <div class="gt-att__card-body">
+                  <span class="gt-att__card-name">{{ att.file_name }}</span>
+                  <span class="gt-att__card-meta">
+                    <el-tag size="small" type="info">{{ attachTypeLabel(att.attachment_type) }}</el-tag>
+                    <span>{{ formatSize(att.file_size) }}</span>
+                  </span>
+                </div>
+                <span v-if="att.wp_code" class="gt-att__card-wp">{{ att.wp_code }}</span>
+              </div>
+            </div>
+            <el-empty v-else :image-size="80" description="">
+              <template #description>
+                <div style="text-align: center; line-height: 1.8">
+                  <p style="font-size: 14px; color: var(--gt-color-text-secondary); margin: 0">暂无附件</p>
+                  <p style="font-size: 12px; color: var(--gt-color-text-placeholder); margin: 4px 0 0">
+                    上传后将按循环和科目分组展示，支持关联底稿快速查阅
+                  </p>
+                </div>
+              </template>
+              <el-button type="primary" size="small" @click="showAttUpload = true">+ 上传第一个附件</el-button>
             </el-empty>
           </div>
+
+          <!-- 新增附件弹窗 -->
+          <el-dialog v-model="showAttUpload" title="新增附件" width="600px" append-to-body destroy-on-close>
+            <el-form label-width="80px" size="default">
+              <el-form-item label="关联底稿">
+                <el-select v-model="attForm.wpCode" filterable clearable placeholder="选择关联底稿（可选）" style="width: 100%">
+                  <el-option
+                    v-for="wp in attWpOptions"
+                    :key="wp.value"
+                    :label="wp.label"
+                    :value="wp.value"
+                  />
+                </el-select>
+              </el-form-item>
+              <el-form-item label="附件分类">
+                <el-select v-model="attForm.type" placeholder="选择分类" style="width: 100%">
+                  <el-option label="通用" value="general" />
+                  <el-option label="底稿" value="workpaper" />
+                  <el-option label="函证" value="confirmation" />
+                  <el-option label="合同" value="contract" />
+                  <el-option label="证据" value="evidence" />
+                  <el-option label="报告" value="report" />
+                </el-select>
+              </el-form-item>
+              <el-form-item label="上传文件">
+                <el-upload
+                  action=""
+                  :auto-upload="false"
+                  :limit="5"
+                  :on-change="onAttFileChange"
+                  multiple
+                  drag
+                >
+                  <div style="padding: 20px 0; color: var(--gt-color-text-secondary); font-size: 13px">
+                    拖拽文件到此处或点击选择
+                  </div>
+                </el-upload>
+              </el-form-item>
+            </el-form>
+            <template #footer>
+              <el-button @click="showAttUpload = false">取消</el-button>
+              <el-button type="primary" @click="submitAttachment">确认上传</el-button>
+            </template>
+          </el-dialog>
         </el-tab-pane>
       </el-tabs>
     </template>
@@ -300,63 +595,144 @@
         <el-button @click="showTeamAssign = false">关闭</el-button>
       </template>
     </el-dialog>
+
+    <!-- 平台使用手册 -->
+    <PlatformUserGuideDialog ref="platformGuideRef" />
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, watch, computed } from 'vue'
+import { ref, watch, computed, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import {
-  DataLine, Edit, Document, TrendCharts, Notebook, Aim, Coin, PieChart, Search, Grid, Paperclip, CopyDocument, Upload, RefreshRight, User, CircleCheck,
+  DataLine, Edit, Document, TrendCharts, Notebook, Aim, Search, Grid, Paperclip, CopyDocument, Upload, RefreshRight, User, CircleCheck, Finished, Loading, Guide,
 } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { confirmForceReset, confirmDangerous } from '@/utils/confirm'
 import { api } from '@/services/apiProxy'
-import { projects as P_proj, trialBalance as P_tb, attachments as P_att, accountChart as P_ac, gtCoding as P_gtc } from '@/services/apiPaths'
-import { fmtAmount } from '@/utils/formatters'
+import { projects as P_proj, attachments as P_att, accountChart as P_ac, adjustments as P_adj } from '@/services/apiPaths'
 import { handleApiError } from '@/utils/errorHandler'
 import TeamAssignmentStep from '@/components/wizard/TeamAssignmentStep.vue'
 import GtStatusTag from '@/components/common/GtStatusTag.vue'
+import PlatformUserGuideDialog from '@/components/layout/PlatformUserGuideDialog.vue'
 import { useNavigationStack } from '@/composables/useNavigationStack'
+import { useDisplayPrefsStore } from '@/stores/displayPrefs'
 
 const props = defineProps<{ project: any | null }>()
 const router = useRouter()
 const { push: navPush } = useNavigationStack()
+const prefs = useDisplayPrefsStore()
 const activeTab = ref('overview')
 const showTeamAssign = ref(false)
+const showAttUpload = ref(false)
+const platformGuideRef = ref<InstanceType<typeof PlatformUserGuideDialog> | null>(null)
+const attForm = ref({ wpCode: '', type: 'general' })
+const attFiles = ref<any[]>([])
+const attWpOptions = ref<{ label: string; value: string }[]>([])
 const projectYear = computed(() => Number(props.project?.audit_year) || new Date().getFullYear())
 
-// 底稿索引树
-const wpTree = ref<any[]>([])
-// 试算表预览
-const trialBalanceRows = ref<any[]>([])
+function openPlatformGuide() {
+  platformGuideRef.value?.open()
+}
+
+// 项目状态悬停提示（当前阶段 + 后续步骤）
+const statusTooltip = computed(() => {
+  const s = props.project?.status || 'created'
+  const tips: Record<string, string> = {
+    created: '【新建】项目刚创建，下一步：导入账套数据（科目余额表+序时账）',
+    planning: '【计划中】已建项，下一步：①导入账套 ②完成科目映射 → 系统自动生成试算表并推进到执行阶段',
+    execution: '【执行中】账套已导入，当前：①编制审计底稿 ②录入调整分录 ③执行审计程序',
+    completion: '【完成阶段】底稿基本完成，当前：①生成财务报表 ②复核底稿 ③处理未决问题',
+    reporting: '【报告阶段】报表已生成，当前：①编辑附注 ②出具审计报告 ③合伙人签发',
+    archived: '【已归档】项目已完成并归档，所有底稿和报告已锁定',
+  }
+  return tips[s] || s
+})
+
+// 建议流程 5 步（导入→映射→底稿→报表→附注）
+const workflowSteps = [
+  { key: 'import', label: '导入' },
+  { key: 'map', label: '映射' },
+  { key: 'wp', label: '底稿' },
+  { key: 'report', label: '报表' },
+  { key: 'note', label: '附注' },
+]
+// 项目状态 → 流程条当前步索引（0=导入 … 4=附注，5=全完成/已归档）
+const currentStageIndex = computed(() => {
+  const s = props.project?.status || 'created'
+  const map: Record<string, number> = {
+    created: 0, planning: 1, execution: 2, completion: 3, reporting: 4, archived: 5,
+  }
+  return map[s] ?? 0
+})
+// 项目状态 → 快捷区推荐"下一步"按钮 key（用于高亮 + 下一步角标）
+const recommendedAction = computed(() => {
+  const s = props.project?.status || 'created'
+  const map: Record<string, string> = {
+    created: 'import', planning: 'import', execution: 'workpapers',
+    completion: 'reports', reporting: 'disclosure-notes', archived: '',
+  }
+  return map[s] ?? 'import'
+})
+
 // 附件列表
 const attachmentList = ref<any[]>([])
 
+// 指标数据
+const metricsLoading = ref(false)
+const metrics = ref<{
+  wpRate: number | null
+  reviewRate: number | null
+  ajeCount: number | null
+  rjeCount: number | null
+  openIssues: number | null
+  staleCount: number | null
+  byCycle: Record<string, any> | null
+  aProcedureProgress: { total_items: number; completed_items: number; rate: number } | null
+}>({
+  wpRate: null, reviewRate: null, ajeCount: null, rjeCount: null,
+  openIssues: null, staleCount: null, byCycle: null, aProcedureProgress: null,
+})
+
+// 团队成员（带工时和底稿分配）
+const teamMembers = ref<any[]>([])
+
+// 底稿明细
+const wpDetailLoading = ref(false)
+const wpDetailList = ref<any[]>([])
+const wpStaffSummary = ref<any[]>([])
+
+// 财务数据
+const financialData = ref<{
+  loaded: boolean
+  totalAssets: number | null
+  totalLiabilities: number | null
+  totalEquity: number | null
+  revenue: number | null
+  netProfit: number | null
+  debtRatio: number | null
+  grossMargin: number | null
+  netMargin: number | null
+  roe: number | null
+  assetTurnover: number | null
+  receivableTurnover: number | null
+  inventoryTurnover: number | null
+  currentRatio: number | null
+  quickRatio: number | null
+  revenueGrowth: number | null
+  profitGrowth: number | null
+  assetGrowth: number | null
+}>({
+  loaded: false, totalAssets: null, totalLiabilities: null, totalEquity: null,
+  revenue: null, netProfit: null, debtRatio: null,
+  grossMargin: null, netMargin: null, roe: null,
+  assetTurnover: null, receivableTurnover: null, inventoryTurnover: null,
+  currentRatio: null, quickRatio: null,
+  revenueGrowth: null, profitGrowth: null, assetGrowth: null,
+})
 // 选中项目变化时加载数据
 watch(() => props.project?.id, async (newId) => {
-  if (!newId) { wpTree.value = []; trialBalanceRows.value = []; return }
-  // 加载底稿索引树（致同编码体系，静默失败）
-  try {
-    const raw = await api.get(P_gtc.list, { validateStatus: (s: number) => s < 600 })
-    const tree = raw?.data ?? raw ?? []
-    wpTree.value = Array.isArray(tree) ? tree.map((group: any) => ({
-      label: group.label,
-      count: group.children?.length || 0,
-      children: (group.children || []).map((c: any) => ({
-        label: `${c.code_range} ${c.cycle_name}`,
-      })),
-    })) : []
-  } catch { wpTree.value = [] }
-  // 加载试算表预览（前20行，静默失败）
-  try {
-    const raw = await api.get(P_tb.get(newId), {
-      params: { year: projectYear.value },
-      validateStatus: (s: number) => s < 600,
-    })
-    const rows = raw?.data ?? raw ?? []
-    trialBalanceRows.value = Array.isArray(rows) ? rows.slice(0, 20) : []
-  } catch { trialBalanceRows.value = [] }
+  if (!newId) { return }
   // 加载附件列表（前10条，静默失败）
   try {
     const raw = await api.get(P_att.list(newId), {
@@ -370,13 +746,184 @@ watch(() => props.project?.id, async (newId) => {
       attachmentList.value = []
     }
   } catch { attachmentList.value = [] }
+  // 加载指标数据（多源并发，各自降级）
+  metricsLoading.value = true
+  try {
+    const [wpRes, adjRes, dashRes, staleRes, teamRes, hoursRes] = await Promise.allSettled([
+      api.get(`/api/projects/${newId}/workpapers/progress`, { validateStatus: (s: number) => s < 600 }),
+      api.get(P_adj.summary(newId), { params: { year: projectYear.value }, validateStatus: (s: number) => s < 600 }),
+      api.get(`/api/projects/${newId}/dashboard/summary`, { validateStatus: (s: number) => s < 600 }),
+      api.get(`/api/projects/${newId}/stale-summary`, { validateStatus: (s: number) => s < 600 }),
+      api.get(`/api/projects/${newId}/assignments`, { validateStatus: (s: number) => s < 600 }),
+      api.get(`/api/projects/${newId}/work-hours`, { validateStatus: (s: number) => s < 600 }),
+    ])
+    const wp = wpRes.status === 'fulfilled' ? wpRes.value : null
+    const adj = adjRes.status === 'fulfilled' ? adjRes.value : null
+    const dash = dashRes.status === 'fulfilled' ? dashRes.value : null
+    const stale = staleRes.status === 'fulfilled' ? staleRes.value : null
+    const team = teamRes.status === 'fulfilled' ? teamRes.value : null
+    const hours = hoursRes.status === 'fulfilled' ? hoursRes.value : null
+    metrics.value = {
+      wpRate: wp?.rate ?? null,
+      reviewRate: dash?.review_completion_rate ?? null,
+      ajeCount: adj?.aje_count ?? null,
+      rjeCount: adj?.rje_count ?? null,
+      openIssues: dash?.open_reviews?.total ?? null,
+      staleCount: stale?.stale_count ?? null,
+      byCycle: wp?.by_cycle ?? null,
+      aProcedureProgress: wp?.a_procedure_progress ?? null,
+    }
+    // 合并团队成员 + 工时
+    const roleMap: Record<string, string> = { preparer: '编制', reviewer: '复核', partner: '合伙人', manager: '经理', assistant: '助理' }
+    const rawTeam = Array.isArray(team) ? team : (team?.items ?? team?.data ?? [])
+    const rawHours = Array.isArray(hours) ? hours : (hours?.items ?? hours?.data ?? [])
+    // 构建工时映射 (staff_id -> total_hours)
+    const hoursMap = new Map<string, number>()
+    for (const h of rawHours) {
+      const key = h.staff_id || h.user_id
+      if (key) hoursMap.set(key, (hoursMap.get(key) || 0) + (h.total_hours || h.hours || 0))
+    }
+    // 从 wp progress 的 by_staff 提取底稿分配（如果有的话）
+    const wpByStaff = wp?.by_staff || {}
+    teamMembers.value = rawTeam.map((m: any) => {
+      const staffId = m.staff_id || m.user_id || m.id
+      const staffWp = wpByStaff[staffId]
+      return {
+        staff_name: m.staff_name || m.name || m.display_name || '-',
+        role: m.role || m.assignment_role || 'assistant',
+        role_label: roleMap[m.role || m.assignment_role || ''] || m.role || '成员',
+        total_hours: hoursMap.get(staffId) ?? (m.total_hours || null),
+        assigned_wp: staffWp?.total ?? m.assigned_count ?? null,
+        completed_wp: staffWp?.completed ?? m.completed_count ?? null,
+      }
+    })
+  } catch {
+    metrics.value = { wpRate: null, reviewRate: null, ajeCount: null, rjeCount: null, openIssues: null, staleCount: null, byCycle: null, aProcedureProgress: null }
+    teamMembers.value = []
+  } finally {
+    metricsLoading.value = false
+  }
+  // 加载财务数据（从报表端点获取资产负债表+利润表关键指标，计算四大类比率）
+  try {
+    const year = projectYear.value
+    const [bsRes, isRes] = await Promise.allSettled([
+      api.get(`/api/reports/${newId}/${year}/balance_sheet`, { validateStatus: (s: number) => s < 600 }),
+      api.get(`/api/reports/${newId}/${year}/income_statement`, { validateStatus: (s: number) => s < 600 }),
+    ])
+    const bs = bsRes.status === 'fulfilled' ? bsRes.value : null
+    const is_ = isRes.status === 'fulfilled' ? isRes.value : null
+    const bsRows = Array.isArray(bs) ? bs : (bs?.rows ?? bs?.data ?? [])
+    const isRows = Array.isArray(is_) ? is_ : (is_?.rows ?? is_?.data ?? [])
+    const findRow = (rows: any[], codes: string[]) => {
+      for (const code of codes) {
+        const row = rows.find((r: any) => r.row_code === code || r.line_code === code || r.code === code)
+        if (row) return row.current_period_amount ?? row.audited_amount ?? row.amount ?? null
+      }
+      return null
+    }
+    // 基础数据
+    const totalAssets = findRow(bsRows, ['assets_total', 'ASSETS_TOTAL', '资产合计', 'total_assets'])
+    const totalLiabilities = findRow(bsRows, ['liabilities_total', 'LIABILITIES_TOTAL', '负债合计', 'total_liabilities'])
+    const totalEquity = findRow(bsRows, ['equity_total', 'EQUITY_TOTAL', '所有者权益合计', 'total_equity', 'owners_equity_total'])
+    const currentAssets = findRow(bsRows, ['current_assets_total', 'CURRENT_ASSETS_TOTAL', '流动资产合计', 'total_current_assets'])
+    const currentLiabilities = findRow(bsRows, ['current_liabilities_total', 'CURRENT_LIABILITIES_TOTAL', '流动负债合计', 'total_current_liabilities'])
+    const inventory = findRow(bsRows, ['inventory', 'INVENTORY', '存货', 'inventories'])
+    const receivables = findRow(bsRows, ['accounts_receivable', 'ACCOUNTS_RECEIVABLE', '应收账款', 'trade_receivables'])
+    const revenue = findRow(isRows, ['revenue', 'REVENUE', '营业收入', 'operating_revenue', 'total_revenue'])
+    const costOfSales = findRow(isRows, ['cost_of_sales', 'COST_OF_SALES', '营业成本', 'operating_cost', 'cost_of_revenue'])
+    const netProfit = findRow(isRows, ['net_profit', 'NET_PROFIT', '净利润', 'net_income'])
+    const hasData = totalAssets !== null || revenue !== null
+    // 计算比率（安全除法）
+    const safeDiv = (a: number | null, b: number | null) => (a !== null && b !== null && b !== 0) ? a / b : null
+    const pct = (v: number | null) => v !== null ? Math.round(v * 10000) / 100 : null
+    const grossProfit = (revenue !== null && costOfSales !== null) ? revenue - costOfSales : null
+    financialData.value = {
+      loaded: hasData,
+      totalAssets,
+      totalLiabilities,
+      totalEquity,
+      revenue,
+      netProfit,
+      // 盈利能力
+      grossMargin: pct(safeDiv(grossProfit, revenue)),
+      netMargin: pct(safeDiv(netProfit, revenue)),
+      roe: pct(safeDiv(netProfit, totalEquity)),
+      // 偿债能力
+      debtRatio: pct(safeDiv(totalLiabilities, totalAssets)),
+      currentRatio: safeDiv(currentAssets, currentLiabilities) !== null ? Math.round(safeDiv(currentAssets, currentLiabilities)! * 100) / 100 : null,
+      quickRatio: (currentAssets !== null && inventory !== null && currentLiabilities !== null && currentLiabilities !== 0) ? Math.round((currentAssets - inventory) / currentLiabilities * 100) / 100 : null,
+      // 运营能力
+      assetTurnover: safeDiv(revenue, totalAssets) !== null ? Math.round(safeDiv(revenue, totalAssets)! * 100) / 100 : null,
+      receivableTurnover: safeDiv(revenue, receivables) !== null ? Math.round(safeDiv(revenue, receivables)! * 100) / 100 : null,
+      inventoryTurnover: safeDiv(costOfSales, inventory) !== null ? Math.round(safeDiv(costOfSales, inventory)! * 100) / 100 : null,
+      // 成长能力（需要上期数据，当前暂不可用，标 null）
+      revenueGrowth: null,
+      profitGrowth: null,
+      assetGrowth: null,
+    }
+  } catch {
+    financialData.value = {
+      loaded: false, totalAssets: null, totalLiabilities: null, totalEquity: null,
+      revenue: null, netProfit: null, debtRatio: null,
+      grossMargin: null, netMargin: null, roe: null,
+      assetTurnover: null, receivableTurnover: null, inventoryTurnover: null,
+      currentRatio: null, quickRatio: null,
+      revenueGrowth: null, profitGrowth: null, assetGrowth: null,
+    }
+  }
+  // 加载底稿明细（编制人/复核人/状态）
+  wpDetailLoading.value = true
+  try {
+    const wpListRaw = await api.get(`/api/projects/${newId}/working-papers-kanban`, { validateStatus: (s: number) => s < 600 })
+    // working-papers-kanban 返回 { kanban: {not_started/in_progress/under_review/completed: [...]}, stats }，
+    // 非数组也非 items/data。需把 4 个状态列拍平成一个底稿列表。
+    let list: any[]
+    if (Array.isArray(wpListRaw)) {
+      list = wpListRaw
+    } else if (wpListRaw?.kanban && typeof wpListRaw.kanban === 'object') {
+      list = Object.values(wpListRaw.kanban).flat() as any[]
+    } else {
+      list = wpListRaw?.items ?? wpListRaw?.data ?? []
+    }
+    wpDetailList.value = list.map((item: any) => ({
+      wp_code: item.wp_code || item.code || '-',
+      wp_name: item.wp_name || item.name || '-',
+      cycle: item.audit_cycle || item.cycle || (item.wp_code || '').charAt(0) || '-',
+      preparer_name: item.preparer_name || item.assigned_to_name || '-',
+      reviewer_name: item.reviewer_name || '-',
+      status: item.status || item.wp_status || 'draft',
+    })).sort((a: any, b: any) => wpCodeCompare(a.wp_code, b.wp_code))
+    // 汇总人员统计
+    const staffMap = new Map<string, { name: string; as_preparer: number; prepared_done: number; as_reviewer: number; reviewed_done: number }>()
+    const doneStatuses = new Set(['prepared', 'reviewed', 'archived', 'completed', 'signed_off'])
+    for (const wp of wpDetailList.value) {
+      if (wp.preparer_name && wp.preparer_name !== '-') {
+        if (!staffMap.has(wp.preparer_name)) staffMap.set(wp.preparer_name, { name: wp.preparer_name, as_preparer: 0, prepared_done: 0, as_reviewer: 0, reviewed_done: 0 })
+        const s = staffMap.get(wp.preparer_name)!
+        s.as_preparer++
+        if (doneStatuses.has(wp.status)) s.prepared_done++
+      }
+      if (wp.reviewer_name && wp.reviewer_name !== '-') {
+        if (!staffMap.has(wp.reviewer_name)) staffMap.set(wp.reviewer_name, { name: wp.reviewer_name, as_preparer: 0, prepared_done: 0, as_reviewer: 0, reviewed_done: 0 })
+        const s = staffMap.get(wp.reviewer_name)!
+        s.as_reviewer++
+        if (doneStatuses.has(wp.status)) s.reviewed_done++
+      }
+    }
+    wpStaffSummary.value = [...staffMap.values()]
+  } catch {
+    wpDetailList.value = []
+    wpStaffSummary.value = []
+  } finally {
+    wpDetailLoading.value = false
+  }
 }, { immediate: true })
 
-function goTo(page: string) {
+function goTo(page: string, extraQuery?: Record<string, string>) {
   if (!props.project) return
   router.push({
     path: `/projects/${props.project.id}/${page}`,
-    query: { year: String(projectYear.value) },
+    query: { year: String(projectYear.value), ...extraQuery },
   })
 }
 
@@ -399,24 +946,8 @@ function goToParentConsol() {
 
 async function goToLedgerImport() {
   if (!props.project) return
-  const { showGuide } = await import('@/composables/useWorkflowGuide')
-  const ok = await showGuide(
-    'ledger_import',
-    '📥 账套数据导入',
-    `<div style="line-height:1.8;font-size: var(--gt-font-size-sm)">
-      <p>将导入企业财务数据到当前项目。</p>
-      <p style="color: var(--gt-color-info);font-size: var(--gt-font-size-xs);margin-top:6px">请确认以下准备工作：</p>
-      <ul style="padding-left:18px;margin:4px 0">
-        <li><span style="color: var(--gt-color-wheat)">⚠</span> 已准备好企业导出的 Excel 或 CSV 文件</li>
-        <li><span style="color: var(--gt-color-wheat)">⚠</span> 文件应包含：科目余额表（必需）、序时账（建议）</li>
-        <li><span style="color: var(--gt-color-wheat)">⚠</span> 确认文件中的年度与当前项目年度一致</li>
-      </ul>
-      <p style="color: var(--gt-color-info);font-size: var(--gt-font-size-xs);margin-top:6px">💡 支持多 Sheet 的 Excel 文件，系统会自动识别各表类型</p>
-    </div>`,
-    '前往导入',
-  )
-  if (!ok) return
-  router.push({ path: `/projects/${props.project.id}/ledger`, query: { import: '1' } })
+  // 直接跳导入页面（不做 async 数据检查以保持用户手势链，否则浏览器会阻止文件选择器弹出）
+  router.push({ path: `/projects/${props.project.id}/ledger-import` })
 }
 
 async function handleResetImport() {
@@ -460,7 +991,6 @@ async function onCreateNextYear() {
   }
 }
 
-const fmtAmt = fmtAmount
 
 function typeLabel(t: string) {
   const m: Record<string, string> = { annual: '年度审计', special: '专项审计', ipo: 'IPO审计', internal_control: '内控审计' }
@@ -479,12 +1009,290 @@ function attachTypeLabel(t: string) {
   return m[t] || t || '通用'
 }
 
+function wpStatusLabel(s: string) {
+  // 自然排序：letter 前缀 + 数字段 + 可选后缀（A1 < A2 < A5 < A10 < A13 < A21）。
+  return _wpStatusLabelImpl(s)
+}
+
+/** 底稿编号自然排序比较器：拆 letter/number/suffix 三段，数字段按数值比。 */
+function wpCodeCompare(a: string, b: string): number {
+  const parse = (code: string) => {
+    const m = /^([A-Za-z]+)(\d+)?(.*)$/.exec((code || '').trim())
+    if (!m) return { letter: code || '', num: Number.MAX_SAFE_INTEGER, rest: '' }
+    return { letter: m[1] || '', num: m[2] ? parseInt(m[2], 10) : -1, rest: m[3] || '' }
+  }
+  const pa = parse(a)
+  const pb = parse(b)
+  if (pa.letter !== pb.letter) return pa.letter.localeCompare(pb.letter)
+  if (pa.num !== pb.num) return pa.num - pb.num
+  return pa.rest.localeCompare(pb.rest)
+}
+
+function _wpStatusLabelImpl(s: string) {
+  const m: Record<string, string> = {
+    draft: '草稿', in_progress: '进行中', prepared: '已编制',
+    reviewed: '已复核', archived: '已归档', completed: '已完成',
+    signed_off: '已签发',
+  }
+  return m[s] || s || '草稿'
+}
+
+function wpStatusType(s: string): 'success' | 'warning' | 'info' | 'danger' | undefined {
+  if (s === 'reviewed' || s === 'archived' || s === 'completed' || s === 'signed_off') return 'success'
+  if (s === 'prepared') return undefined
+  if (s === 'in_progress') return 'warning'
+  return 'info'
+}
+
+function fmtFinance(val: number | null): string {
+  if (val === null || val === undefined) return '-'
+  return prefs.fmt(val)
+}
+
+function fmtPct(val: number | null): string {
+  if (val === null || val === undefined) return '-'
+  return val.toFixed(2) + '%'
+}
+
+function fmtTimes(val: number | null): string {
+  if (val === null || val === undefined) return '-'
+  return val.toFixed(2) + ' 次'
+}
+
+// 按循环标准顺序排列（A~N + S）+ 中文名称
+const CYCLE_ORDER = 'Q B C D E F G H I J K L M N S A'.split(' ')
+const CYCLE_NAMES: Record<string, string> = {
+  Q: '业务约定与计划', A: '审计总结与报告', B: '承接/计划/了解', C: '控制测试', D: '销售与收入',
+  E: '货币资金', F: '采购与存货', G: '投资', H: '固定资产',
+  I: '无形资产', J: '职工薪酬', K: '管理费用', L: '筹资',
+  M: '股东权益', N: '税费', S: '专项',
+}
+const sortedCycles = computed(() => {
+  const raw = metrics.value.byCycle
+  if (!raw) return []
+  return CYCLE_ORDER
+    .filter(code => raw[code])
+    .map(code => {
+      const v = raw[code]
+      const done = (v.prepared || 0) + (v.reviewed || 0) + (v.archived || 0)
+      // A 循环：如果有程序级进度数据（从 FieldOverrideService 聚合），优先展示
+      if (code === 'A' && metrics.value.aProcedureProgress?.total_items) {
+        const ap = metrics.value.aProcedureProgress
+        return { code, name: CYCLE_NAMES[code] || code, done: ap.completed_items, total: ap.total_items, pct: Math.round(ap.rate) }
+      }
+      return { code, name: CYCLE_NAMES[code] || code, done, total: v.total || 0, pct: v.total ? Math.round(done / v.total * 100) : 0 }
+    })
+})
+
+// 按审计流程4阶段分组（致同体系：B=承接计划与了解, C=控制测试, D~S=实质性, A=完成）
+// 注：B 循环同时包含立项承接（B1A/B1B/B2/B3）和计划了解（B10~B60）底稿，不可按字母级拆分
+const cycleStages = computed(() => {
+  const items = sortedCycles.value
+  const stages = [
+    { label: '承接与计划', codes: ['Q', 'B'] },
+    { label: '控制测试', codes: ['C'] },
+    { label: '实质性程序', codes: ['D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'S'] },
+    { label: '完成与报告', codes: ['A'] },
+  ]
+  return stages.map(s => {
+    const matched = items.filter(i => s.codes.includes(i.code))
+    const done = matched.reduce((sum, i) => sum + i.done, 0)
+    const total = matched.reduce((sum, i) => sum + i.total, 0)
+    return { label: s.label, items: matched, done, total, pct: total ? Math.round(done / total * 100) : 0 }
+  })
+})
+
+// 报表列表（基于 FinancialReportType 枚举，资产减值准备表仅国企版）
+const reportList = computed(() => {
+  const base = [
+    { type: 'balance_sheet', label: '资产负债表', icon: '📊' },
+    { type: 'income_statement', label: '利润表', icon: '📈' },
+    { type: 'cash_flow_statement', label: '现金流量表', icon: '💰' },
+    { type: 'equity_statement', label: '所有者权益变动表', icon: '📋' },
+    { type: 'cash_flow_supplement', label: '现金流量表补充资料', icon: '📑' },
+  ]
+  if (props.project?.template_type === 'soe') {
+    base.push({ type: 'impairment_provision', label: '资产减值准备表', icon: '🛡️' })
+  }
+  return base
+})
+
+// 四大类财务指标（每类 5 个，含 tooltip 公式和跳转链接）
+const finCategories = computed(() => {
+  const d = financialData.value
+  return [
+    {
+      key: 'profit', label: '盈利能力', icon: '📈',
+      items: [
+        { label: '营业收入', display: fmtFinance(d.revenue), formula: '主营业务收入 + 其他业务收入', link: 'reports', negative: false },
+        { label: '净利润', display: fmtFinance(d.netProfit), formula: '利润总额 − 所得税费用', link: 'reports', negative: (d.netProfit ?? 0) < 0 },
+        { label: '毛利率', display: fmtPct(d.grossMargin), formula: '(营业收入 − 营业成本) ÷ 营业收入 × 100%', link: '', negative: false },
+        { label: '净利率', display: fmtPct(d.netMargin), formula: '净利润 ÷ 营业收入 × 100%', link: '', negative: false },
+        { label: '净资产收益率', display: fmtPct(d.roe), formula: '净利润 ÷ 所有者权益 × 100%（ROE）', link: '', negative: false },
+      ],
+    },
+    {
+      key: 'ops', label: '运营能力', icon: '⚙️',
+      items: [
+        { label: '总资产周转率', display: fmtTimes(d.assetTurnover), formula: '营业收入 ÷ 平均资产总额', link: '', negative: false },
+        { label: '应收账款周转率', display: fmtTimes(d.receivableTurnover), formula: '营业收入 ÷ 平均应收账款余额', link: 'trial-balance', negative: false },
+        { label: '存货周转率', display: fmtTimes(d.inventoryTurnover), formula: '营业成本 ÷ 平均存货余额', link: 'trial-balance', negative: false },
+        { label: '应收账款周转天数', display: d.receivableTurnover ? (365 / d.receivableTurnover).toFixed(0) + ' 天' : '-', formula: '365 ÷ 应收账款周转率', link: '', negative: false },
+        { label: '存货周转天数', display: d.inventoryTurnover ? (365 / d.inventoryTurnover).toFixed(0) + ' 天' : '-', formula: '365 ÷ 存货周转率', link: '', negative: false },
+      ],
+    },
+    {
+      key: 'debt', label: '偿债能力', icon: '🛡️',
+      items: [
+        { label: '资产总额', display: fmtFinance(d.totalAssets), formula: '流动资产 + 非流动资产', link: 'trial-balance', negative: false },
+        { label: '负债总额', display: fmtFinance(d.totalLiabilities), formula: '流动负债 + 非流动负债', link: 'trial-balance', negative: false },
+        { label: '资产负债率', display: fmtPct(d.debtRatio), formula: '负债总额 ÷ 资产总额 × 100%', link: '', negative: false },
+        { label: '流动比率', display: d.currentRatio !== null ? d.currentRatio.toFixed(2) : '-', formula: '流动资产 ÷ 流动负债（≥2 为优）', link: '', negative: false },
+        { label: '速动比率', display: d.quickRatio !== null ? d.quickRatio.toFixed(2) : '-', formula: '(流动资产 − 存货) ÷ 流动负债（≥1 为优）', link: '', negative: false },
+      ],
+    },
+    {
+      key: 'growth', label: '成长能力', icon: '🚀',
+      items: [
+        { label: '营收增长率', display: fmtPct(d.revenueGrowth), formula: '(本期营收 − 上期营收) ÷ 上期营收 × 100%', link: '', negative: false },
+        { label: '净利润增长率', display: fmtPct(d.profitGrowth), formula: '(本期净利润 − 上期净利润) ÷ |上期净利润| × 100%', link: '', negative: false },
+        { label: '总资产增长率', display: fmtPct(d.assetGrowth), formula: '(期末资产 − 期初资产) ÷ 期初资产 × 100%', link: '', negative: false },
+        { label: '所有者权益', display: fmtFinance(d.totalEquity), formula: '资产总额 − 负债总额', link: 'trial-balance', negative: false },
+        { label: '资本积累率', display: '-', formula: '(期末权益 − 期初权益) ÷ 期初权益 × 100%（需上期数据）', link: '', negative: false },
+      ],
+    },
+  ]
+})
+
 function formatSize(bytes: number) {
   if (!bytes) return '-'
   if (bytes < 1024) return bytes + 'B'
   if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + 'KB'
   return (bytes / 1024 / 1024).toFixed(1) + 'MB'
 }
+
+function attFileIcon(type: string): string {
+  if (!type) return '📄'
+  const t = type.toLowerCase()
+  if (t.includes('pdf')) return '📕'
+  if (t.includes('xls') || t.includes('csv')) return '📗'
+  if (t.includes('doc')) return '📘'
+  if (t.includes('ppt')) return '📙'
+  if (t.includes('img') || t.includes('jpg') || t.includes('png')) return '🖼️'
+  return '📄'
+}
+
+function onAttFileChange(file: any) {
+  attFiles.value.push(file)
+}
+
+async function submitAttachment() {
+  if (!props.project?.id) return
+  // TODO: 实际上传逻辑（POST /api/projects/{pid}/attachments）
+  ElMessage.success('附件上传成功（功能开发中）')
+  showAttUpload.value = false
+  attForm.value = { wpCode: '', type: 'general' }
+  attFiles.value = []
+}
+
+// 弹窗打开时加载底稿索引
+watch(showAttUpload, async (open) => {
+  if (!open || !props.project?.id) return
+  if (attWpOptions.value.length) return // 已加载过
+  try {
+    const raw = await api.get(`/api/projects/${props.project.id}/wp-index`, { validateStatus: (s: number) => s < 600 })
+    const list = Array.isArray(raw) ? raw : (raw?.items ?? raw?.data ?? [])
+    attWpOptions.value = list.map((item: any) => ({
+      label: `${item.wp_code || item.code || ''} ${item.wp_name || item.name || ''}`.trim(),
+      value: item.wp_code || item.code || item.id || '',
+    })).filter((o: any) => o.value)
+  } catch {
+    // 降级用 wpDetailList
+    attWpOptions.value = wpDetailList.value.map(wp => ({
+      label: `${wp.wp_code} ${wp.wp_name}`,
+      value: wp.wp_code,
+    }))
+  }
+})
+
+// ===== 导入进度实时轮询 =====
+interface ImportStatusInfo {
+  progress: number
+  phase: string
+  message: string
+  eta: string
+}
+const importStatus = ref<ImportStatusInfo | null>(null)
+let importPollTimer: ReturnType<typeof setInterval> | null = null
+
+const IMPORT_PHASE_LABEL: Record<string, string> = {
+  bootstrap: '启动', parsing: '解析', validating: '校验',
+  writing: '写入', activating: '激活', completed: '完成',
+  failed: '失败', canceled: '已取消', pending: '排队', queued: '排队',
+}
+const IMPORT_PHASE_COLORS: Record<string, string> = {
+  bootstrap: '#909399', queued: '#909399', pending: '#909399',
+  parsing: '#409eff', validating: '#e6a23c',
+  writing: 'var(--gt-color-primary)', activating: '#67c23a',
+}
+
+const importPhaseLabel = computed(() => {
+  if (!importStatus.value) return ''
+  return IMPORT_PHASE_LABEL[importStatus.value.phase] || importStatus.value.phase
+})
+const importPhaseColor = computed(() => {
+  if (!importStatus.value) return '#409eff'
+  return IMPORT_PHASE_COLORS[importStatus.value.phase] || '#409eff'
+})
+const importPhaseTagType = computed<'success' | 'warning' | 'info' | 'danger' | undefined>(() => {
+  if (!importStatus.value) return 'info'
+  const p = importStatus.value.phase
+  if (p === 'activating') return 'success'
+  if (p === 'validating') return 'warning'
+  if (p === 'failed') return 'danger'
+  if (p === 'writing') return undefined
+  return 'info'
+})
+
+async function pollImportStatus() {
+  const pid = props.project?.id
+  if (!pid) { importStatus.value = null; return }
+  try {
+    const data: any = await api.get(
+      `/api/projects/${pid}/ledger-import/active-job`,
+      { validateStatus: (s: number) => s < 600 },
+    )
+    if (data && data.status === 'processing') {
+      const phase = data.phase || data.current_phase || 'writing'
+      const pct = data.progress ?? 0
+      const msg = data.message || `${IMPORT_PHASE_LABEL[phase] || phase}中`
+      const eta = data.estimated_remaining_seconds as number | null | undefined
+      const etaText = typeof eta === 'number' && eta > 0 && eta <= 3600
+        ? (eta < 60 ? `约 ${eta} 秒` : `约 ${Math.round(eta / 60)} 分钟`)
+        : ''
+      importStatus.value = { progress: pct, phase, message: msg, eta: etaText }
+    } else {
+      importStatus.value = null
+    }
+  } catch {
+    importStatus.value = null
+  }
+}
+
+function startImportPoll() {
+  stopImportPoll()
+  pollImportStatus()
+  importPollTimer = setInterval(pollImportStatus, 5000)
+}
+function stopImportPoll() {
+  if (importPollTimer) { clearInterval(importPollTimer); importPollTimer = null }
+}
+
+watch(() => props.project?.id, (newId) => {
+  if (newId) { startImportPoll() } else { stopImportPoll(); importStatus.value = null }
+}, { immediate: true })
+
+onUnmounted(() => { stopImportPoll() })
 </script>
 
 <style scoped>
@@ -509,6 +1317,9 @@ function formatSize(bytes: number) {
   margin-bottom: var(--gt-space-3);
 }
 .gt-title-row .gt-detail-title { margin-bottom: 0; }
+.gt-title-row__actions {
+  display: flex; align-items: center; gap: 8px;
+}
 .gt-section-label {
   font-size: var(--gt-font-size-sm); font-weight: 600;
   color: var(--gt-color-text-secondary); margin-bottom: var(--gt-space-2);
@@ -537,6 +1348,7 @@ function formatSize(bytes: number) {
   background: var(--gt-color-bg); border-radius: 6px; border-left: 3px solid var(--gt-color-primary);
 }
 .gt-quick-btn {
+  position: relative;
   display: flex; flex-direction: column; align-items: center; gap: 4px;
   padding: var(--gt-space-3); border-radius: var(--gt-radius-sm);
   cursor: pointer; transition: all var(--gt-transition-fast);
@@ -548,54 +1360,354 @@ function formatSize(bytes: number) {
   border-color: var(--gt-color-primary-lighter);
   color: var(--gt-color-primary);
 }
-
-.gt-metrics-grid {
-  display: grid; grid-template-columns: repeat(2, 1fr); gap: var(--gt-space-3);
+.gt-quick-btn--danger:hover {
+  background: #fef0f0;
+  border-color: #fbc4c4;
+  color: #f56c6c;
 }
-.gt-metric-card {
-  text-align: center; padding: var(--gt-space-4);
-  background: var(--gt-color-bg); border-radius: var(--gt-radius-sm);
-}
-.gt-metric-value {
-  display: block; font-size: var(--gt-font-size-2xl); font-weight: 700;
+/* 推荐"下一步"按钮：紫色描边 + 轻脉冲，引导新手 */
+.gt-quick-btn--recommended {
+  border-color: var(--gt-color-primary);
+  background: var(--gt-color-primary-bg);
   color: var(--gt-color-primary);
+  box-shadow: 0 0 0 1px var(--gt-color-primary-lighter);
+  animation: gt-recommend-pulse 2s ease-in-out infinite;
 }
-.gt-metric-label {
-  display: block; font-size: var(--gt-font-size-xs);
+@keyframes gt-recommend-pulse {
+  0%, 100% { box-shadow: 0 0 0 1px var(--gt-color-primary-lighter); }
+  50% { box-shadow: 0 0 0 3px var(--gt-color-primary-bg); }
+}
+.gt-quick-btn__badge {
+  position: absolute; top: -7px; right: -6px;
+  background: var(--gt-color-primary); color: #fff;
+  font-size: 10px; line-height: 1; padding: 2px 5px;
+  border-radius: 8px; white-space: nowrap;
+  box-shadow: 0 1px 3px rgba(75, 45, 119, 0.3);
+}
+
+/* 快捷入口分组 */
+.gt-quick-group { margin-bottom: var(--gt-space-3); }
+.gt-quick-group__label {
+  font-size: var(--gt-font-size-xs); font-weight: 600;
+  color: var(--gt-color-text-tertiary); margin-bottom: 6px;
+  padding-left: 2px; letter-spacing: 0.5px;
+}
+
+/* 当前阶段引导条 */
+.gt-stage-guide {
+  margin-top: 10px; padding: 10px 12px;
+  background: linear-gradient(135deg, #f5f0ff 0%, #faf8fd 100%);
+  border-radius: 8px; border: 1px solid var(--gt-color-border-purple, #e5d9f5);
+}
+.gt-stage-guide__main {
+  display: flex; align-items: flex-start; gap: 6px;
+  font-size: var(--gt-font-size-xs); line-height: 1.6;
+  color: var(--gt-color-primary-dark);
+}
+.gt-stage-guide__icon { margin-top: 2px; flex-shrink: 0; }
+.gt-stage-guide__text { flex: 1; }
+.gt-stage-guide__progress {
+  display: flex; align-items: center; gap: 8px; margin-top: 8px;
+}
+.gt-stage-guide__progress-label {
+  font-size: var(--gt-font-size-xs); color: var(--gt-color-text-secondary);
+  white-space: nowrap; font-weight: 600;
+}
+
+/* 流程步骤：已完成 / 当前 高亮 */
+.gt-workflow-step__mark { font-weight: 700; margin-right: 1px; }
+.gt-workflow-step--done {
+  background: #e8f8f5; border-color: var(--gt-color-teal, #2db89a);
+  color: var(--gt-color-teal, #2db89a);
+}
+.gt-workflow-step--current {
+  background: var(--gt-color-primary); border-color: var(--gt-color-primary);
+  color: #fff; font-weight: 700;
+}
+
+.gt-board-loading { padding: var(--gt-space-6) 0; }
+.gt-board-empty { padding: var(--gt-space-4) 0; }
+.gt-board-empty-hint {
+  font-size: var(--gt-font-size-sm); color: var(--gt-color-text-tertiary);
+  text-align: center; padding: var(--gt-space-4) 0;
+}
+
+/* 指标卡片 */
+.gt-board-cards {
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px;
+  margin-bottom: var(--gt-space-4);
+}
+.gt-board-card {
+  position: relative; overflow: hidden;
+  display: flex; align-items: center; gap: 10px;
+  padding: 12px 14px; border-radius: 10px;
+  background: var(--gt-color-bg-white, #fff);
+  border: 1px solid var(--gt-color-border-light, #ebeef5);
+  transition: transform 0.2s, box-shadow 0.2s, border-color 0.2s;
+  cursor: pointer;
+  animation: gt-card-pop 0.4s ease-out both;
+}
+.gt-board-card:nth-child(1) { animation-delay: 0s; }
+.gt-board-card:nth-child(2) { animation-delay: 0.06s; }
+.gt-board-card:nth-child(3) { animation-delay: 0.12s; }
+.gt-board-card:nth-child(4) { animation-delay: 0.18s; }
+.gt-board-card:nth-child(5) { animation-delay: 0.24s; }
+.gt-board-card:nth-child(6) { animation-delay: 0.3s; }
+@keyframes gt-card-pop {
+  from { opacity: 0; transform: scale(0.92) translateY(8px); }
+  to { opacity: 1; transform: scale(1) translateY(0); }
+}
+.gt-board-card:hover {
+  transform: translateY(-3px) scale(1.02);
+  box-shadow: 0 6px 20px rgba(75, 45, 119, 0.12);
+  border-color: var(--gt-color-primary-lighter, #a78bca);
+}
+.gt-board-card:active {
+  transform: scale(0.97);
+  transition-duration: 0.08s;
+}
+.gt-board-card__icon {
+  width: 36px; height: 36px; border-radius: 8px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 18px; flex-shrink: 0;
+}
+.gt-board-card__body { flex: 1; min-width: 0; }
+.gt-board-card__value {
+  display: block; font-size: 18px; font-weight: 700;
+  color: var(--gt-color-primary); line-height: 1.2;
+}
+.gt-board-card__label {
+  display: block; font-size: 11px;
   color: var(--gt-color-text-secondary); margin-top: 2px;
 }
-
-.gt-placeholder-text {
-  color: var(--gt-color-text-tertiary); font-size: var(--gt-font-size-sm);
-  text-align: center; padding: var(--gt-space-8) 0;
+.gt-board-card__bar {
+  position: absolute; bottom: 0; left: 0; right: 0;
 }
+
+/* Section */
+.gt-board-section { margin-bottom: var(--gt-space-4); }
+.gt-board-section__title {
+  font-size: var(--gt-font-size-sm); font-weight: 600;
+  color: var(--gt-color-primary-dark); margin-bottom: 10px;
+}
+
+/* 审计流程图 */
+.gt-flow {
+  display: flex; align-items: center; justify-content: center;
+  padding: 12px 0; margin-bottom: 14px;
+  background: linear-gradient(135deg, #f9f7fc 0%, #fff 100%);
+  border-radius: 10px; border: 1px solid var(--gt-color-border-light);
+}
+.gt-flow__step { display: flex; align-items: center; }
+.gt-flow__node {
+  display: flex; flex-direction: column; align-items: center; gap: 2px;
+  padding: 8px 14px; border-radius: 8px;
+  transition: transform 0.2s, box-shadow 0.2s;
+  min-width: 72px;
+}
+.gt-flow__node:hover { transform: scale(1.05); box-shadow: 0 2px 8px rgba(75,45,119,0.12); }
+.gt-flow__node--s0 { background: var(--gt-color-primary); color: #fff; }
+.gt-flow__node--s1 { background: #e67e22; color: #fff; }
+.gt-flow__node--s2 { background: #8e44ad; color: #fff; }
+.gt-flow__node--s3 { background: #27ae60; color: #fff; }
+.gt-flow__step-num { font-size: 10px; opacity: 0.8; }
+.gt-flow__step-label { font-size: 11px; font-weight: 700; white-space: nowrap; }
+.gt-flow__step-pct { font-size: 13px; font-weight: 800; }
+.gt-flow__connector { padding: 0 4px; }
+.gt-flow__arrow { font-size: 14px; color: var(--gt-color-primary-lighter); }
+
+/* 流程明细展开 */
+.gt-flow-detail {
+  display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px;
+}
+.gt-flow-detail__group {
+  border-radius: 8px; overflow: hidden;
+  border: 1px solid var(--gt-color-border-light);
+}
+.gt-flow-detail__group--wide {
+  grid-column: 1 / -1;
+}
+.gt-flow-detail__header {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 6px 12px; font-size: 11px; font-weight: 700; color: #fff;
+}
+.gt-flow-detail__header--s0 { background: var(--gt-color-primary); }
+.gt-flow-detail__header--s1 { background: #e67e22; }
+.gt-flow-detail__header--s2 { background: #8e44ad; }
+.gt-flow-detail__header--s3 { background: #27ae60; }
+.gt-flow-detail__summary { font-weight: 400; opacity: 0.9; }
+.gt-flow-detail__items { padding: 4px 0; background: #fff; }
+.gt-flow-detail__items--grid {
+  display: grid; grid-template-columns: repeat(2, 1fr);
+}
+.gt-flow-detail__row {
+  display: flex; align-items: center; gap: 6px;
+  padding: 5px 12px; font-size: 12px; cursor: pointer;
+  transition: background 0.15s;
+}
+.gt-flow-detail__row:hover { background: var(--gt-color-primary-bg, #f4f0fa); }
+.gt-flow-detail__code { font-weight: 700; color: var(--gt-color-primary); min-width: 14px; }
+.gt-flow-detail__name { color: var(--gt-color-text-secondary); min-width: 56px; font-size: 11px; }
+.gt-flow-detail__bar { flex: 1; min-width: 30px; }
+.gt-flow-detail__stat {
+  font-size: 11px; font-weight: 600; color: var(--gt-color-primary-dark);
+  min-width: 30px; text-align: right; font-variant-numeric: tabular-nums;
+}
+.gt-flow-detail__empty {
+  padding: 8px 12px; font-size: 11px; color: var(--gt-color-text-placeholder);
+  text-align: center;
+}
+
+/* 财务分析指标（致同紫体系 + 动画） */
+.gt-fa {
+  display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px;
+}
+.gt-fa__card {
+  border-radius: 10px; overflow: hidden;
+  border: 1px solid var(--gt-color-border-light);
+  animation: gt-fa-slide-in 0.4s ease-out both;
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+.gt-fa__card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 16px rgba(75, 45, 119, 0.1);
+}
+@keyframes gt-fa-slide-in {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.gt-fa__header {
+  display: flex; align-items: center; gap: 6px;
+  padding: 9px 14px; font-size: 12px; font-weight: 700; color: #fff;
+}
+.gt-fa__header-icon { font-size: 14px; }
+.gt-fa__header--profit { background: linear-gradient(135deg, var(--gt-color-primary-dark, #3a1f5e), var(--gt-color-primary, #4b2d77)); }
+.gt-fa__header--ops { background: linear-gradient(135deg, #1a6b5c, var(--gt-color-teal, #2db89a)); }
+.gt-fa__header--debt { background: linear-gradient(135deg, #7c2d2d, var(--gt-color-coral, #e74c3c)); }
+.gt-fa__header--growth { background: linear-gradient(135deg, #8b5e0b, #e6a817); }
+.gt-fa__body { padding: 6px 0; background: #fff; }
+.gt-fa__row {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 7px 14px; font-size: 12px; cursor: default;
+  transition: background 0.15s;
+}
+.gt-fa__row:hover { background: var(--gt-color-primary-bg, #f4f0fa); }
+.gt-fa__label { color: var(--gt-color-text-secondary); }
+.gt-fa__value {
+  font-weight: 600; color: var(--gt-color-primary-dark);
+  font-variant-numeric: tabular-nums;
+}
+.gt-fa__value--negative { color: var(--gt-color-coral); }
+.gt-fa__value--link {
+  color: var(--gt-color-primary); cursor: pointer;
+  text-decoration: underline dotted; text-underline-offset: 2px;
+}
+.gt-fa__value--link:hover { color: var(--gt-color-primary-dark); }
 
 .gt-empty-state {
   flex: 1; display: flex; align-items: center; justify-content: center;
 }
 
-/* 底稿索引树 */
-.gt-wp-tree { padding: var(--gt-space-2) 0; }
-.gt-wp-node { display: flex; align-items: center; gap: var(--gt-space-2); }
-
 /* 报表卡片 */
-.gt-report-links { display: grid; grid-template-columns: repeat(2, 1fr); gap: var(--gt-space-3); }
+.gt-report-links { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
 .gt-report-card {
-  display: flex; flex-direction: column; align-items: center; gap: var(--gt-space-2);
-  padding: var(--gt-space-4); border-radius: var(--gt-radius-md);
+  display: flex; flex-direction: column; align-items: center; gap: 8px;
+  padding: 20px 12px; border-radius: 10px;
   border: 1px solid var(--gt-color-border-light); cursor: pointer;
-  transition: all var(--gt-transition-fast); font-size: var(--gt-font-size-sm);
-  color: var(--gt-color-text-secondary);
+  transition: transform 0.2s, box-shadow 0.2s, border-color 0.2s;
+  font-size: var(--gt-font-size-sm); color: var(--gt-color-text-secondary);
+  animation: gt-card-pop 0.4s ease-out both;
 }
 .gt-report-card:hover {
+  transform: translateY(-3px) scale(1.03);
   border-color: var(--gt-color-primary-lighter);
   background: var(--gt-color-primary-bg);
   color: var(--gt-color-primary);
+  box-shadow: 0 6px 16px rgba(75, 45, 119, 0.1);
+}
+.gt-report-card:active { transform: scale(0.96); transition-duration: 0.08s; }
+.gt-report-card__icon { font-size: 28px; }
+.gt-report-card__name { font-weight: 600; text-align: center; }
+.gt-report-hint {
+  text-align: center; font-size: 11px; color: var(--gt-color-text-placeholder);
+  margin-top: 10px;
 }
 
-/* 查账入口 */
-.gt-ledger-entry {
-  display: flex; flex-direction: column; align-items: center;
-  justify-content: center; padding: var(--gt-space-8) var(--gt-space-4);
+/* 附件区 */
+.gt-att__header {
+  display: flex; justify-content: space-between; align-items: center;
+  margin-bottom: 14px;
+}
+.gt-att__title { margin: 0; font-size: var(--gt-font-size-sm); font-weight: 700; color: var(--gt-color-primary-dark); }
+.gt-att__grid {
+  display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px;
+}
+.gt-att__card {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 14px; border-radius: 8px;
+  border: 1px solid var(--gt-color-border-light);
+  cursor: pointer; transition: transform 0.2s, box-shadow 0.2s, border-color 0.2s;
+  animation: gt-card-pop 0.4s ease-out both;
+}
+.gt-att__card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(75,45,119,0.08);
+  border-color: var(--gt-color-primary-lighter);
+}
+.gt-att__card-icon { font-size: 24px; flex-shrink: 0; }
+.gt-att__card-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.gt-att__card-name {
+  font-size: 12px; font-weight: 600; color: var(--gt-color-text-primary);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.gt-att__card-meta { display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--gt-color-text-secondary); }
+.gt-att__card-wp {
+  font-size: 10px; font-weight: 700; color: var(--gt-color-primary);
+  background: var(--gt-color-primary-bg); padding: 2px 6px; border-radius: 4px;
+  white-space: nowrap;
+}
+
+/* 导入进度面板 */
+.gt-import-progress-panel {
+  margin-top: var(--gt-space-4);
+  padding: var(--gt-space-3) var(--gt-space-4);
+  border: 1px solid var(--gt-color-border-purple-light, #d8b8ee);
+  border-radius: 8px;
+  background: var(--gt-color-primary-bg, #f4f0fa);
+}
+.gt-import-progress-panel__title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0 0 8px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--gt-color-primary, #4b2d77);
+}
+.gt-import-progress-panel__card {
+  padding: 10px 12px;
+  background: #fff;
+  border-radius: 6px;
+  border: 1px solid var(--gt-color-border-light, #eee);
+}
+.gt-import-progress-panel__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.gt-import-progress-panel__pct {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--gt-color-primary, #4b2d77);
+}
+.gt-import-progress-panel__message {
+  font-size: 12px;
+  color: var(--gt-color-text-secondary, #666);
+  margin-top: 4px;
+}
+.gt-import-progress-panel__eta {
+  font-size: 12px;
+  color: var(--gt-color-text-tertiary, #999);
+  margin-top: 2px;
 }
 </style>

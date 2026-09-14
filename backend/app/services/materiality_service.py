@@ -51,6 +51,10 @@ class MaterialityService:
             "plus": [AccountCategory.asset],
             "minus": [AccountCategory.liability],
         },
+        "total_expense": {
+            "type": "accounts",
+            "names": ["营业成本", "主营业务成本", "税金及附加", "销售费用", "管理费用", "财务费用"],
+        },
     }
 
     def __init__(self, db: AsyncSession):
@@ -247,6 +251,68 @@ class MaterialityService:
             return total_plus - total_minus
 
         raise ValueError(f"未知的映射类型: {mapping['type']}")
+
+    # ------------------------------------------------------------------
+    # 15.2b auto_populate_benchmark_with_trend (三年趋势 + calc_basis)
+    # ------------------------------------------------------------------
+    async def auto_populate_benchmark_with_trend(
+        self,
+        project_id: UUID,
+        year: int,
+        benchmark_type: str,
+        calc_basis: str = "unadjusted",
+        company_code: str = "001",
+    ) -> dict:
+        """从试算表自动取基准金额 + 三年趋势数据
+
+        Returns dict with:
+        - benchmark_type, benchmark_amount (按 calc_basis 确定的最终基准)
+        - current_year, prior_year_1, prior_year_2 (三年原始值)
+        - calc_basis (实际使用的计算基础)
+        """
+        if calc_basis == "forecast":
+            # 预测模式无自动数据源，返回空提示手工
+            return {
+                "benchmark_type": benchmark_type,
+                "benchmark_amount": None,
+                "current_year": None,
+                "prior_year_1": None,
+                "prior_year_2": None,
+                "calc_basis": "forecast",
+                "hint": "请手工填入本年预测数",
+            }
+
+        # 取三年数据
+        current = await self.auto_populate_benchmark(project_id, year, benchmark_type, company_code)
+        try:
+            prior1 = await self.auto_populate_benchmark(project_id, year - 1, benchmark_type, company_code)
+        except Exception:
+            prior1 = None
+        try:
+            prior2 = await self.auto_populate_benchmark(project_id, year - 2, benchmark_type, company_code)
+        except Exception:
+            prior2 = None
+
+        # 按 calc_basis 确定最终基准金额
+        if calc_basis == "average_3y":
+            values = [v for v in [current, prior1, prior2] if v is not None and v != 0]
+            if values:
+                benchmark_amount = sum(values, Decimal("0")) / Decimal(str(len(values)))
+                benchmark_amount = benchmark_amount.quantize(Decimal("0.01"))
+            else:
+                benchmark_amount = current
+        else:
+            # unadjusted (默认): 使用当年值
+            benchmark_amount = current
+
+        return {
+            "benchmark_type": benchmark_type,
+            "benchmark_amount": str(benchmark_amount),
+            "current_year": str(current) if current is not None else None,
+            "prior_year_1": str(prior1) if prior1 is not None else None,
+            "prior_year_2": str(prior2) if prior2 is not None else None,
+            "calc_basis": calc_basis,
+        }
 
     # ------------------------------------------------------------------
     # 15.3 override + get_change_history

@@ -1,0 +1,23 @@
+{
+  "application": {
+    "id": "42b56464-8003-4458-b741-f6458410a258",
+    "result_revision": 6,
+    "state": "applied"
+  },
+  "captured_at": "2026-09-11T05:49:59.966773+00:00",
+  "content_version": {
+    "id": "1cff341c-e6e8-4512-9256-c4030bff3156",
+    "operation_id": "628f44bf-a809-4a29-bdc7-9331b9b18426",
+    "revision": 6,
+    "source": "onlyoffice"
+  },
+  "entry_id": "xlsx/gt-h1-fixed-assets",
+  "operation": {
+    "application_id": "42b56464-8003-4458-b741-f6458410a258",
+    "id": "628f44bf-a809-4a29-bdc7-9331b9b18426",
+    "state": "applied"
+  },
+  "room_id": "de3df2bf-a25f-4bfc-bf36-b09f7f95d75f",
+  "run_id": "g4-1-pilots-positive-runtime-v1",
+  "wp_id": "c71b7c54-6868-4fb9-9e14-083034f57815"
+}

@@ -1,0 +1,6238 @@
+{
+  "source_file": "d:\\GT_plan\\基础数据\\致同通用审计程序及底稿模板（2025年修订）\\1.致同审计程序及底稿模板（2025年）\\4.风险应对-实质性程序（D-N）\\H 固定资产循环\\H2 在建工程.xlsx",
+  "total_sheets": 21,
+  "sheet_names": [
+    "底稿目录",
+    "在建工程实质性程序表H2A",
+    "审定表H2-1",
+    "附注披露信息（上市公司）",
+    "附注披露信息（国有企业）",
+    "明细表H2-2",
+    "调整分录汇总H2-3",
+    "分析表H2-4",
+    "转固时点检查表H2-5",
+    "在建工程审核记录H2-6",
+    "工程造价比较表H2-7",
+    "增加检查表H2-8",
+    "减少检查表H2-9",
+    "利息资本化测算表（无专门借款）H2-10",
+    "利息资本化测算表（有专门借款）H2-11",
+    "监盘计划H2-12",
+    "盘点检查表H2-13",
+    "监盘小结H2-14",
+    "减值测算表H2-15",
+    "可收回金额测试表H2-16",
+    "关联交易检查表H2-17"
+  ],
+  "expected_sheet_count": 21,
+  "sheets_match_expected": true,
+  "sheets": [
+    {
+      "sheet_name": "底稿目录",
+      "max_row": 24,
+      "max_column": 8,
+      "column_count": 8,
+      "merged_ranges": [
+        "A14:A16",
+        "A17:A19",
+        "A10:A13"
+      ],
+      "headers": [
+        {
+          "row": 1,
+          "cells": [
+            {
+              "col": "A",
+              "col_idx": 1,
+              "value": "底稿开列时，可先在以下单元格填写有关内容，以便其他底稿引用有关数据："
+            }
+          ]
+        },
+        {
+          "row": 2,
+          "cells": [
+            {
+              "col": "A",
+              "col_idx": 1,
+              "value": "被审计单位："
+            }
+          ]
+        },
+        {
+          "row": 3,
+          "cells": [
+            {
+              "col": "A",
+              "col_idx": 1,
+              "value": "截止日：202X年12月31日"
+            },
+            {
+              "col": "D",
+              "col_idx": 4,
+              "value": "序号"
+            },
+            {
+              "col": "E",
+              "col_idx": 5,
+              "value": "内容"
+            },
+            {
+              "col": "F",
+              "col_idx": 6,
+              "value": "索引号"
+            },
+            {
+              "col": "G",
+              "col_idx": 7,
+              "value": "备注"
+            }
+          ]
+        }
+      ],
+      "formula_cells": [
+        {
+          "cell": "D6",
+          "formula": "=D5+1"
+        },
+        {
+          "cell": "D7",
+          "formula": "=D6+1"
+        },
+        {
+          "cell": "D8",
+          "formula": "=D7+1"
+        },
+        {
+          "cell": "D9",
+          "formula": "=D8+1"
+        },
+        {
+          "cell": "D10",
+          "formula": "=D9+1"
+        },
+        {
+          "cell": "D11",
+          "formula": "=D10+1"
+        },
+        {
+          "cell": "D12",
+          "formula": "=D11+1"
+        },
+        {
+          "cell": "D13",
+          "formula": "=D12+1"
+        },
+        {
+          "cell": "D14",
+          "formula": "=D13+1"
+        },
+        {
+          "cell": "D15",
+          "formula": "=D14+1"
+        },
+        {
+          "cell": "D16",
+          "formula": "=D15+1"
+        },
+        {
+          "cell": "D17",
+          "formula": "=D16+1"
+        },
+        {
+          "cell": "D18",
+          "formula": "=D17+1"
+        },
+        {
+          "cell": "D19",
+          "formula": "=D18+1"
+        },
+        {
+          "cell": "D20",
+          "formula": "=D19+1"
+        },
+        {
+          "cell": "D21",
+          "formula": "=D20+1"
+        },
+        {
+          "cell": "D22",
+          "formula": "=D21+1"
+        },
+        {
+          "cell": "D23",
+          "formula": "=D22+1"
+        }
+      ],
+      "data_types": {
+        "s": 55,
+        "n": 119,
+        "f": 18
+      },
+      "sample_data": [
+        {
+          "row": 4,
+          "cells": [
+            {
+              "col": "A",
+              "value": "编制人：",
+              "type": "s"
+            },
+            {
+              "col": "E",
+              "value": "在建工程实质性程序表",
+              "type": "s"
+            },
+            {
+              "col": "F",
+              "value": "H2A",
+              "type": "s"
+            }
+          ]
+        },
+        {
+          "row": 5,
+          "cells": [
+            {
+              "col": "A",
+              "value": "复核人：",
+              "type": "s"
+            },
+            {
+              "col": "D",
+              "value": "1",
+              "type": "n"
+            },
+            {
+              "col": "E",
+              "value": "审定表",
+              "type": "s"
+            },
+            {
+              "col": "F",
+              "value": "H2-1",
+              "type": "s"
+            }
+          ]
+        },
+        {
+          "row": 6,
+          "cells": [
+            {
+              "col": "A",
+              "value": "编制日期：",
+              "type": "s"
+            },
+            {
+              "col": "D",
+              "value": "=D5+1",
+              "type": "f"
+            },
+            {
+              "col": "E",
+              "value": "附注披露信息（上市公司）",
+              "type": "s"
+            },
+            {
+              "col": "G",
+              "value": "无需打印",
+              "type": "s"
+            }
+          ]
+        },
+        {
+          "row": 7,
+          "cells": [
+            {
+              "col": "A",
+              "value": "复核日期：",
+              "type": "s"
+            },
+            {
+              "col": "D",
+              "value": "=D6+1",
+              "type": "f"
+            },
+            {
+              "col": "E",
+              "value": "附注披露信息（国有企业）",
+              "type": "s"
+            },
+            {
+              "col": "G",
+              "value": "无需打印",
+              "type": "s"
+            }
+          ]
+        },
+        {
+          "row": 8,
+          "cells": [
+            {
+              "col": "D",
+              "value": "=D7+1",
+              "type": "f"
+            },
+            {
+              "col": "E",
+              "value": "明细表",
+              "type": "s"
+            },
+            {
+              "col": "F",
+              "value": "H2-2",
+              "type": "s"
+            }
+          ]
+        }
+      ],
+      "formula_count": 18
+    },
+    {
+      "sheet_name": "在建工程实质性程序表H2A",
+      "max_row": 36,
+      "max_column": 12,
+      "column_count": 12,
+      "merged_ranges": [
+        "G10:I10",
+        "G13:I13",
+        "A12:F12",
+        "A2:I2",
+        "A8:F8",
+        "B15:B16",
+        "A10:F10",
+        "A13:F13",
+        "J18:L18",
+        "A9:F9",
+        "A5:B5",
+        "G9:I9",
+        "A14:B14",
+        "G12:I12",
+        "G11:I11",
+        "A11:F11",
+        "D15:H15",
+        "A1:I1",
+        "G8:I8",
+        "A15:A16",
+        "C15:C16",
+        "I15:I16"
+      ],
+      "headers": [
+        {
+          "row": 1,
+          "cells": [
+            {
+              "col": "A",
+              "col_idx": 1,
+              "value": "致同会计师事务所"
+            }
+          ]
+        },
+        {
+          "row": 2,
+          "cells": [
+            {
+              "col": "A",
+              "col_idx": 1,
+              "value": "在建工程及减值准备实质性程序表"
+            }
+          ]
+        },
+        {
+          "row": 3,
+          "cells": [
+            {
+              "col": "A",
+              "col_idx": 1,
+              "value": "=底稿目录!A2"
+            },
+            {
+              "col": "C",
+              "col_idx": 3,
+              "value": "=底稿目录!A4"
+            },
+            {
+              "col": "F",
+              "col_idx": 6,
+              "value": "=底稿目录!A6"
+            },
+            {
+              "col": "H",
+              "col_idx": 8,
+              "value": "索引号："
+            },
+            {
+              "col": "I",
+              "col_idx": 9,
+              "value": "H2A"
+            }
+          ]
+        }
+      ],
+      "formula_cells": [
+        {
+          "cell": "A3",
+          "formula": "=底稿目录!A2"
+        },
+        {
+          "cell": "C3",
+          "formula": "=底稿目录!A4"
+        },
+        {
+          "cell": "F3",
+          "formula": "=底稿目录!A6"
+        },
+        {
+          "cell": "A4",
+          "formula": "=底稿目录!A3"
+        },
+        {
+          "cell": "C4",
+          "formula": "=底稿目录!A5"
+        },
+        {
+          "cell": "F4",
+          "formula": "=底稿目录!A7"
+        }
+      ],
+      "data_types": {
+        "s": 151,
+        "n": 275,
+        "f": 6
+      },
+      "sample_data": [
+        {
+          "row": 4,
+          "cells": [
+            {
+              "col": "A",
+              "value": "=底稿目录!A3",
+              "type": "f"
+            },
+            {
+              "col": "C",
+              "value": "=底稿目录!A5",
+              "type": "f"
+            },
+            {
+              "col": "F",
+              "value": "=底稿目录!A7",
+              "type": "f"
+            },
+            {
+              "col": "H",
+              "value": "页  次：",
+              "type": "s"
+            }
+          ]
+        },
+        {
+          "row": 5,
+          "cells": [
+            {
+              "col": "A",
+              "value": "一、本账户涉及的科目",
+              "type": "s"
+            }
+          ]
+        },
+        {
+          "row": 6,
+          "cells": [
+            {
+              "col": "A",
+              "value": "在建工程、减值准备",
+              "type": "s"
+            }
+          ]
+        },
+        {
+          "row": 7,
+          "cells": [
+            {
+              "col": "A",
+              "value": "二、审计目标与认定的对应关系",
+              "type": "s"
+            }
+          ]
+        },
+        {
+          "row": 8,
+          "cells": [
+            {
+              "col": "A",
+              "value": "审计目标",
+              "type": "s"
+            },
+            {
+              "col": "G",
+              "value": "财务报表的认定　",
+              "type": "s"
+            }
+          ]
+        }
+      ],
+      "formula_count": 6
+    },
+    {
+      "sheet_name": "审定表H2-1",
+      "max_row": 84,
+      "max_column": 12,
+      "column_count": 12,
+      "merged_ranges": [
+        "A5:A6",
+        "B5:D5",
+        "J5:K5",
+        "E5:G5",
+        "A2:K2",
+        "H5:I5",
+        "A1:K1"
+      ],
+      "headers": [
+        {
+          "row": 1,
+          "cells": [
+            {
+              "col": "A",
+              "col_idx": 1,
+              "value": "致同会计师事务所"
+            }
+          ]
+        },
+        {
+          "row": 2,
+          "cells": [
+            {
+              "col": "A",
+              "col_idx": 1,
+              "value": "在建工程及减值准备审定表"
+            }
+          ]
+        },
+        {
+          "row": 3,
+          "cells": [
+            {
+              "col": "A",
+              "col_idx": 1,
+              "value": "=底稿目录!A2"
+            },
+            {
+              "col": "D",
+              "col_idx": 4,
+              "value": "=底稿目录!A4"
+            },
+            {
+              "col": "H",
+              "col_idx": 8,
+              "value": "=底稿目录!A6"
+            },
+            {
+              "col": "J",
+              "col_idx": 10,
+              "value": "索引号："
+            },
+            {
+              "col": "K",
+              "col_idx": 11,
+              "value": "H2-1"
+            }
+          ]
+        }
+      ],
+      "formula_cells": [
+        {
+          "cell": "A3",
+          "formula": "=底稿目录!A2"
+        },
+        {
+          "cell": "D3",
+          "formula": "=底稿目录!A4"
+        },
+        {
+          "cell": "H3",
+          "formula": "=底稿目录!A6"
+        },
+        {
+          "cell": "A4",
+          "formula": "=底稿目录!A3"
+        },
+        {
+          "cell": "D4",
+          "formula": "=底稿目录!A5"
+        },
+        {
+          "cell": "H4",
+          "formula": "=底稿目录!A7"
+        },
+        {
+          "cell": "A8",
+          "formula": "='明细表H2-2'!A13"
+        },
+        {
+          "cell": "B8",
+          "formula": "='明细表H2-2'!J13"
+        },
+        {
+          "cell": "C8",
+          "formula": "='明细表H2-2'!S13"
+        },
+        {
+          "cell": "D8",
+          "formula": "=B8+C8"
+        },
+        {
+          "cell": "E8",
+          "formula": "='明细表H2-2'!Q13"
+        },
+        {
+          "cell": "F8",
+          "formula": "='明细表H2-2'!S13+'明细表H2-2'!U13-'明细表H2-2'!W13-'明细表H2-2'!X13"
+        },
+        {
+          "cell": "G8",
+          "formula": "=E8+F8"
+        },
+        {
+          "cell": "H8",
+          "formula": "=E8-B8"
+        },
+        {
+          "cell": "I8",
+          "formula": "=IF(AND(B8=0,H8=0),0,IF(AND(B8=0,H8>0),1,H8/B8))"
+        },
+        {
+          "cell": "J8",
+          "formula": "=G8-D8"
+        },
+        {
+          "cell": "K8",
+          "formula": "=IF(AND(D8=0,J8=0),0,IF(AND(D8=0,J8>0),1,J8/D8))"
+        },
+        {
+          "cell": "A9",
+          "formula": "='明细表H2-2'!A14"
+        },
+        {
+          "cell": "B9",
+          "formula": "='明细表H2-2'!J14"
+        },
+        {
+          "cell": "C9",
+          "formula": "='明细表H2-2'!S14"
+        },
+        {
+          "cell": "D9",
+          "formula": "=B9+C9"
+        },
+        {
+          "cell": "E9",
+          "formula": "='明细表H2-2'!Q14"
+        },
+        {
+          "cell": "F9",
+          "formula": "='明细表H2-2'!S14+'明细表H2-2'!U14-'明细表H2-2'!W14-'明细表H2-2'!X14"
+        },
+        {
+          "cell": "G9",
+          "formula": "=E9+F9"
+        },
+        {
+          "cell": "H9",
+          "formula": "=E9-B9"
+        },
+        {
+          "cell": "I9",
+          "formula": "=IF(AND(B9=0,H9=0),0,IF(AND(B9=0,H9>0),1,H9/B9))"
+        },
+        {
+          "cell": "J9",
+          "formula": "=G9-D9"
+        },
+        {
+          "cell": "K9",
+          "formula": "=IF(AND(D9=0,J9=0),0,IF(AND(D9=0,J9>0),1,J9/D9))"
+        },
+        {
+          "cell": "A10",
+          "formula": "='明细表H2-2'!A15"
+        },
+        {
+          "cell": "B10",
+          "formula": "='明细表H2-2'!J15"
+        },
+        {
+          "cell": "C10",
+          "formula": "='明细表H2-2'!S15"
+        },
+        {
+          "cell": "D10",
+          "formula": "=B10+C10"
+        },
+        {
+          "cell": "E10",
+          "formula": "='明细表H2-2'!Q15"
+        },
+        {
+          "cell": "F10",
+          "formula": "='明细表H2-2'!S15+'明细表H2-2'!U15-'明细表H2-2'!W15-'明细表H2-2'!X15"
+        },
+        {
+          "cell": "G10",
+          "formula": "=E10+F10"
+        },
+        {
+          "cell": "H10",
+          "formula": "=E10-B10"
+        },
+        {
+          "cell": "I10",
+          "formula": "=IF(AND(B10=0,H10=0),0,IF(AND(B10=0,H10>0),1,H10/B10))"
+        },
+        {
+          "cell": "J10",
+          "formula": "=G10-D10"
+        },
+        {
+          "cell": "K10",
+          "formula": "=IF(AND(D10=0,J10=0),0,IF(AND(D10=0,J10>0),1,J10/D10))"
+        },
+        {
+          "cell": "A11",
+          "formula": "='明细表H2-2'!A16"
+        },
+        {
+          "cell": "B11",
+          "formula": "='明细表H2-2'!J16"
+        },
+        {
+          "cell": "C11",
+          "formula": "='明细表H2-2'!S16"
+        },
+        {
+          "cell": "D11",
+          "formula": "=B11+C11"
+        },
+        {
+          "cell": "E11",
+          "formula": "='明细表H2-2'!Q16"
+        },
+        {
+          "cell": "F11",
+          "formula": "='明细表H2-2'!S16+'明细表H2-2'!U16-'明细表H2-2'!W16-'明细表H2-2'!X16"
+        },
+        {
+          "cell": "G11",
+          "formula": "=E11+F11"
+        },
+        {
+          "cell": "H11",
+          "formula": "=E11-B11"
+        },
+        {
+          "cell": "I11",
+          "formula": "=IF(AND(B11=0,H11=0),0,IF(AND(B11=0,H11>0),1,H11/B11))"
+        },
+        {
+          "cell": "J11",
+          "formula": "=G11-D11"
+        },
+        {
+          "cell": "K11",
+          "formula": "=IF(AND(D11=0,J11=0),0,IF(AND(D11=0,J11>0),1,J11/D11))"
+        },
+        {
+          "cell": "A12",
+          "formula": "='明细表H2-2'!A17"
+        },
+        {
+          "cell": "B12",
+          "formula": "='明细表H2-2'!J17"
+        },
+        {
+          "cell": "C12",
+          "formula": "='明细表H2-2'!S17"
+        },
+        {
+          "cell": "D12",
+          "formula": "=B12+C12"
+        },
+        {
+          "cell": "E12",
+          "formula": "='明细表H2-2'!Q17"
+        },
+        {
+          "cell": "F12",
+          "formula": "='明细表H2-2'!S17+'明细表H2-2'!U17-'明细表H2-2'!W17-'明细表H2-2'!X17"
+        },
+        {
+          "cell": "G12",
+          "formula": "=E12+F12"
+        },
+        {
+          "cell": "H12",
+          "formula": "=E12-B12"
+        },
+        {
+          "cell": "I12",
+          "formula": "=IF(AND(B12=0,H12=0),0,IF(AND(B12=0,H12>0),1,H12/B12))"
+        },
+        {
+          "cell": "J12",
+          "formula": "=G12-D12"
+        },
+        {
+          "cell": "K12",
+          "formula": "=IF(AND(D12=0,J12=0),0,IF(AND(D12=0,J12>0),1,J12/D12))"
+        },
+        {
+          "cell": "A13",
+          "formula": "='明细表H2-2'!A18"
+        },
+        {
+          "cell": "B13",
+          "formula": "='明细表H2-2'!J18"
+        },
+        {
+          "cell": "C13",
+          "formula": "='明细表H2-2'!S18"
+        },
+        {
+          "cell": "D13",
+          "formula": "=B13+C13"
+        },
+        {
+          "cell": "E13",
+          "formula": "='明细表H2-2'!Q18"
+        },
+        {
+          "cell": "F13",
+          "formula": "='明细表H2-2'!S18+'明细表H2-2'!U18-'明细表H2-2'!W18-'明细表H2-2'!X18"
+        },
+        {
+          "cell": "G13",
+          "formula": "=E13+F13"
+        },
+        {
+          "cell": "H13",
+          "formula": "=E13-B13"
+        },
+        {
+          "cell": "I13",
+          "formula": "=IF(AND(B13=0,H13=0),0,IF(AND(B13=0,H13>0),1,H13/B13))"
+        },
+        {
+          "cell": "J13",
+          "formula": "=G13-D13"
+        },
+        {
+          "cell": "K13",
+          "formula": "=IF(AND(D13=0,J13=0),0,IF(AND(D13=0,J13>0),1,J13/D13))"
+        },
+        {
+          "cell": "A14",
+          "formula": "='明细表H2-2'!A19"
+        },
+        {
+          "cell": "B14",
+          "formula": "='明细表H2-2'!J19"
+        },
+        {
+          "cell": "C14",
+          "formula": "='明细表H2-2'!S19"
+        },
+        {
+          "cell": "D14",
+          "formula": "=B14+C14"
+        },
+        {
+          "cell": "E14",
+          "formula": "='明细表H2-2'!Q19"
+        },
+        {
+          "cell": "F14",
+          "formula": "='明细表H2-2'!S19+'明细表H2-2'!U19-'明细表H2-2'!W19-'明细表H2-2'!X19"
+        },
+        {
+          "cell": "G14",
+          "formula": "=E14+F14"
+        },
+        {
+          "cell": "H14",
+          "formula": "=E14-B14"
+        },
+        {
+          "cell": "I14",
+          "formula": "=IF(AND(B14=0,H14=0),0,IF(AND(B14=0,H14>0),1,H14/B14))"
+        },
+        {
+          "cell": "J14",
+          "formula": "=G14-D14"
+        },
+        {
+          "cell": "K14",
+          "formula": "=IF(AND(D14=0,J14=0),0,IF(AND(D14=0,J14>0),1,J14/D14))"
+        },
+        {
+          "cell": "A15",
+          "formula": "='明细表H2-2'!A20"
+        },
+        {
+          "cell": "B15",
+          "formula": "='明细表H2-2'!J20"
+        },
+        {
+          "cell": "C15",
+          "formula": "='明细表H2-2'!S20"
+        },
+        {
+          "cell": "D15",
+          "formula": "=B15+C15"
+        },
+        {
+          "cell": "E15",
+          "formula": "='明细表H2-2'!Q20"
+        },
+        {
+          "cell": "F15",
+          "formula": "='明细表H2-2'!S20+'明细表H2-2'!U20-'明细表H2-2'!W20-'明细表H2-2'!X20"
+        },
+        {
+          "cell": "G15",
+          "formula": "=E15+F15"
+        },
+        {
+          "cell": "H15",
+          "formula": "=E15-B15"
+        },
+        {
+          "cell": "I15",
+          "formula": "=IF(AND(B15=0,H15=0),0,IF(AND(B15=0,H15>0),1,H15/B15))"
+        },
+        {
+          "cell": "J15",
+          "formula": "=G15-D15"
+        },
+        {
+          "cell": "K15",
+          "formula": "=IF(AND(D15=0,J15=0),0,IF(AND(D15=0,J15>0),1,J15/D15))"
+        },
+        {
+          "cell": "B16",
+          "formula": "=SUM(B8:B15)"
+        },
+        {
+          "cell": "C16",
+          "formula": "=SUM(C8:C15)"
+        },
+        {
+          "cell": "D16",
+          "formula": "=SUM(D8:D15)"
+        },
+        {
+          "cell": "E16",
+          "formula": "=SUM(E8:E15)"
+        },
+        {
+          "cell": "F16",
+          "formula": "=SUM(F8:F15)"
+        },
+        {
+          "cell": "G16",
+          "formula": "=SUM(G8:G15)"
+        }
+      ],
+      "data_types": {
+        "s": 68,
+        "n": 633,
+        "f": 307
+      },
+      "sample_data": [
+        {
+          "row": 4,
+          "cells": [
+            {
+              "col": "A",
+              "value": "=底稿目录!A3",
+              "type": "f"
+            },
+            {
+              "col": "D",
+              "value": "=底稿目录!A5",
+              "type": "f"
+            },
+            {
+              "col": "H",
+              "value": "=底稿目录!A7",
+              "type": "f"
+            },
+            {
+              "col": "J",
+              "value": "页  次：",
+              "type": "s"
+            }
+          ]
+        },
+        {
+          "row": 5,
+          "cells": [
+            {
+              "col": "A",
+              "value": "项目",
+              "type": "s"
+            },
+            {
+              "col": "B",
+              "value": "期初数",
+              "type": "s"
+            },
+            {
+              "col": "E",
+              "value": "期末数",
+              "type": "s"
+            },
+            {
+              "col": "H",
+              "value": "本期未审数与上期\n未审数的比较",
+              "type": "s"
+            },
+            {
+              "col": "J",
+              "value": "本期审定数与上期\n审定数的比较",
+              "type": "s"
+            }
+          ]
+        },
+        {
+          "row": 6,
+          "cells": [
+            {
+              "col": "B",
+              "value": "未审数",
+              "type": "s"
+            },
+            {
+              "col": "C",
+              "value": "账项调整",
+              "type": "s"
+            },
+            {
+              "col": "D",
+              "value": "审定数",
+              "type": "s"
+            },
+            {
+              "col": "E",
+              "value": "未审数",
+              "type": "s"
+            },
+            {
+              "col": "F",
+              "value": "账项调整",
+              "type": "s"
+            },
+            {
+              "col": "G",
+              "value": "审定数",
+              "type": "s"
+            },
+            {
+              "col": "H",
+              "value": "变动额",
+              "type": "s"
+            },
+            {
+              "col": "I",
+              "value": "变动率",
+              "type": "s"
+            },
+            {
+              "col": "J",
+              "value": "变动额",
+              "type": "s"
+            },
+            {
+              "col": "K",
+              "value": "变动率",
+              "type": "s"
+            }
+          ]
+        },
+        {
+          "row": 7,
+          "cells": [
+            {
+              "col": "A",
+              "value": "一、在建工程原值",
+              "type": "s"
+            }
+          ]
+        },
+        {
+          "row": 8,
+          "cells": [
+            {
+              "col": "A",
+              "value": "='明细表H2-2'!A13",
+              "type": "f"
+            },
+            {
+              "col": "B",
+              "value": "='明细表H2-2'!J13",
+              "type": "f"
+            },
+            {
+              "col": "C",
+              "value": "='明细表H2-2'!S13",
+              "type": "f"
+            },
+            {
+              "col": "D",
+              "value": "=B8+C8",
+              "type": "f"
+            },
+            {
+              "col": "E",
+              "value": "='明细表H2-2'!Q13",
+              "type": "f"
+            },
+            {
+              "col": "F",
+              "value": "='明细表H2-2'!S13+'明细表H2-2'!U13-'明细表H2-2'!W13-'明细表H2-2'!X13",
+              "type": "f"
+            },
+            {
+              "col": "G",
+              "value": "=E8+F8",
+              "type": "f"
+            },
+            {
+              "col": "H",
+              "value": "=E8-B8",
+              "type": "f"
+            },
+            {
+              "col": "I",
+              "value": "=IF(AND(B8=0,H8=0),0,IF(AND(B8=0,H8>0),1,H8/B8))",
+              "type": "f"
+            },
+            {
+              "col": "J",
+              "value": "=G8-D8",
+              "type": "f"
+            },
+            {
+              "col": "K",
+              "value": "=IF(AND(D8=0,J8=0),0,IF(AND(D8=0,J8>0),1,J8/D8))",
+              "type": "f"
+            }
+          ]
+        }
+      ],
+      "formula_count": 307
+    },
+    {
+      "sheet_name": "附注披露信息（上市公司）",
+      "max_row": 57,
+      "max_column": 256,
+      "column_count": 256,
+      "merged_ranges": [
+        "E22:E24",
+        "D22:D24",
+        "I22:I24",
+        "G22:G24",
+        "A2:I2",
+        "E13:G13",
+        "A47:I47",
+        "A13:A14",
+        "A46:I46",
+        "A1:I1",
+        "B13:D13",
+        "C22:C24",
+        "A22:A24",
+        "B22:B24"
+      ],
+      "headers": [
+        {
+          "row": 1,
+          "cells": [
+            {
+              "col": "A",
+              "col_idx": 1,
+              "value": "致同会计师事务所"
+            }
+          ]
+        },
+        {
+          "row": 2,
+          "cells": [
+            {
+              "col": "A",
+              "col_idx": 1,
+              "value": "附注披露信息（上市公司）"
+            }
+          ]
+        },
+        {
+          "row": 3,
+          "cells": [
+            {
+              "col": "A",
+              "col_idx": 1,
+              "value": "=底稿目录!A2"
+            },
+            {
+              "col": "C",
+              "col_idx": 3,
+              "value": "=底稿目录!A4"
+            },
+            {
+              "col": "F",
+              "col_idx": 6,
+              "value": "=底稿目录!A6"
+            },
+            {
+              "col": "H",
+              "col_idx": 8,
+              "value": "索引号："
+            },
+            {
+              "col": "J",
+              "col_idx": 10,
+              "value": "返回目录"
+            }
+          ]
+        }
+      ],
+      "formula_cells": [
+        {
+          "cell": "A3",
+          "formula": "=底稿目录!A2"
+        },
+        {
+          "cell": "C3",
+          "formula": "=底稿目录!A4"
+        },
+        {
+          "cell": "F3",
+          "formula": "=底稿目录!A6"
+        },
+        {
+          "cell": "A4",
+          "formula": "=底稿目录!A3"
+        },
+        {
+          "cell": "C4",
+          "formula": "=底稿目录!A5"
+        },
+        {
+          "cell": "F4",
+          "formula": "=底稿目录!A7"
+        }
+      ],
+      "data_types": {
+        "s": 98,
+        "n": 14488,
+        "f": 6
+      },
+      "sample_data": [
+        {
+          "row": 4,
+          "cells": [
+            {
+              "col": "A",
+              "value": "=底稿目录!A3",
+              "type": "f"
+            },
+            {
+              "col": "C",
+              "value": "=底稿目录!A5",
+              "type": "f"
+            },
+            {
+              "col": "F",
+              "value": "=底稿目录!A7",
+              "type": "f"
+            },
+            {
+              "col": "H",
+              "value": "页  次：",
+              "type": "s"
+            }
+          ]
+        },
+        {
+          "row": 6,
+          "cells": [
+            {
+              "col": "A",
+              "value": "23、在建工程",
+              "type": "s"
+            }
+          ]
+        },
+        {
+          "row": 7,
+          "cells": [
+            {
+              "col": "A",
+              "value": "项  目",
+              "type": "s"
+            },
+            {
+              "col": "B",
+              "value": "期末余额",
+              "type": "s"
+            },
+            {
+              "col": "C",
+              "value": "上年年末余额",
+              "type": "s"
+            }
+          ]
+        },
+        {
+          "row": 8,
+          "cells": [
+            {
+              "col": "A",
+              "value": "在建工程",
+              "type": "s"
+            }
+          ]
+        },
+        {
+          "row": 9,
+          "cells": [
+            {
+              "col": "A",
+              "value": "工程物资",
+              "type": "s"
+            }
+          ]
+        }
+      ],
+      "formula_count": 6
+    },
+    {
+      "sheet_name": "附注披露信息（国有企业）",
+      "max_row": 47,
+      "max_column": 255,
+      "column_count": 255,
+      "merged_ranges": [
+        "B14:D14",
+        "A1:M1",
+        "E14:G14",
+        "E7:G7",
+        "A25:A26",
+        "C25:C26",
+        "A7:A8",
+        "B25:B26",
+        "B7:D7",
+        "A2:M2",
+        "A14:A15"
+      ],
+      "headers": [
+        {
+          "row": 1,
+          "cells": [
+            {
+              "col": "A",
+              "col_idx": 1,
+              "value": "致同会计师事务所"
+            }
+          ]
+        },
+        {
+          "row": 2,
+          "cells": [
+            {
+              "col": "A",
+              "col_idx": 1,
+              "value": "附注披露信息（国有企业）"
+            }
+          ]
+        },
+        {
+          "row": 3,
+          "cells": [
+            {
+              "col": "A",
+              "col_idx": 1,
+              "value": "=底稿目录!A2"
+            },
+            {
+              "col": "E",
+              "col_idx": 5,
+              "value": "=底稿目录!A4"
+            },
+            {
+              "col": "H",
+              "col_idx": 8,
+              "value": "=底稿目录!A6"
+            },
+            {
+              "col": "L",
+              "col_idx": 12,
+              "value": "索引号："
+            },
+            {
+              "col": "N",
+              "col_idx": 14,
+              "value": "返回目录"
+            }
+          ]
+        }
+      ],
+      "formula_cells": [
+        {
+          "cell": "A3",
+          "formula": "=底稿目录!A2"
+        },
+        {
+          "cell": "E3",
+          "formula": "=底稿目录!A4"
+        },
+        {
+          "cell": "H3",
+          "formula": "=底稿目录!A6"
+        },
+        {
+          "cell": "A4",
+          "formula": "=底稿目录!A3"
+        },
+        {
+          "cell": "E4",
+          "formula": "=底稿目录!A5"
+        },
+        {
+          "cell": "H4",
+          "formula": "=底稿目录!A7"
+        }
+      ],
+      "data_types": {
+        "s": 69,
+        "n": 11910,
+        "f": 6
+      },
+      "sample_data": [
+        {
+          "row": 4,
+          "cells": [
+            {
+              "col": "A",
+              "value": "=底稿目录!A3",
+              "type": "f"
+            },
+            {
+              "col": "E",
+              "value": "=底稿目录!A5",
+              "type": "f"
+            },
+            {
+              "col": "H",
+              "value": "=底稿目录!A7",
+              "type": "f"
+            },
+            {
+              "col": "L",
+              "value": "页  次：",
+              "type": "s"
+            }
+          ]
+        },
+        {
+          "row": 6,
+          "cells": [
+            {
+              "col": "A",
+              "value": "23、在建工程",
+              "type": "s"
+            }
+          ]
+        },
+        {
+          "row": 7,
+          "cells": [
+            {
+              "col": "A",
+              "value": "项  目",
+              "type": "s"
+            },
+            {
+              "col": "B",
+              "value": "期末余额",
+              "type": "s"
+            },
+            {
+              "col": "E",
+              "value": "期初余额",
+              "type": "s"
+            }
+          ]
+        },
+        {
+          "row": 8,
+          "cells": [
+            {
+              "col": "B",
+              "value": "账面余额",
+              "type": "s"
+            },
+            {
+              "col": "C",
+              "value": "减值准备",
+              "type": "s"
+            },
+            {
+              "col": "D",
+              "value": "账面价值",
+              "type": "s"
+            },
+            {
+              "col": "E",
+              "value": "账面余额",
+              "type": "s"
+            },
+            {
+              "col": "F",
+              "value": "减值准备",
+              "type": "s"
+            },
+            {
+              "col": "G",
+              "value": "账面价值",
+              "type": "s"
+            }
+          ]
+        },
+        {
+          "row": 9,
+          "cells": [
+            {
+              "col": "A",
+              "value": "在建工程",
+              "type": "s"
+            }
+          ]
+        }
+      ],
+      "formula_count": 6
+    },
+    {
+      "sheet_name": "明细表H2-2",
+      "max_row": 48,
+      "max_column": 50,
+      "column_count": 50,
+      "merged_ranges": [
+        "AM10:AM12",
+        "AL11:AL12",
+        "AT9:AU10",
+        "AX9:AX12",
+        "Z11:AA11",
+        "AJ11:AJ12",
+        "H9:H12",
+        "AV9:AW10",
+        "AI11:AI12",
+        "AI2:AX2",
+        "AD11:AF11",
+        "C9:C12",
+        "AS11:AS12",
+        "AI9:AS9",
+        "E9:E12",
+        "AU11:AU12",
+        "U11:V11",
+        "AV11:AV12",
+        "AG11:AH11",
+        "A2:R2",
+        "S1:AH1",
+        "AK11:AK12",
+        "W11:Y11",
+        "AI10:AL10",
+        "AN11:AN12",
+        "AI1:AX1",
+        "Z10:AH10",
+        "J11:K11",
+        "AP11:AP12",
+        "B9:B12",
+        "AB11:AC11",
+        "J9:AH9",
+        "S2:AH2",
+        "N11:P11",
+        "AP10:AS10",
+        "AW11:AW12",
+        "D9:D12",
+        "F9:F12",
+        "A9:A12",
+        "J10:R10",
+        "Q11:R11",
+        "AR11:AR12",
+        "I9:I12",
+        "AQ11:AQ12",
+        "AT11:AT12",
+        "A21:D21",
+        "G9:G12",
+        "L11:M11",
+        "A1:R1",
+        "AO11:AO12",
+        "AN10:AO10",
+        "S10:T11",
+        "U10:Y10"
+      ],
+      "headers": [
+        {
+          "row": 1,
+          "cells": [
+            {
+              "col": "A",
+              "col_idx": 1,
+              "value": "致同会计师事务所"
+            },
+            {
+              "col": "S",
+              "col_idx": 19,
+              "value": "致同会计师事务所"
+            },
+            {
+              "col": "AI",
+              "col_idx": 35,
+              "value": "致同会计师事务所"
+            }
+          ]
+        },
+        {
+          "row": 2,
+          "cells": [
+            {
+              "col": "A",
+              "col_idx": 1,
+              "value": "在建工程明细表"
+            },
+            {
+              "col": "S",
+              "col_idx": 19,
+              "value": "在建工程明细表"
+            },
+            {
+              "col": "AI",
+              "col_idx": 35,
+              "value": "在建工程明细表"
+            }
+          ]
+        },
+        {
+          "row": 3,
+          "cells": [
+            {
+              "col": "A",
+              "col_idx": 1,
+              "value": "=底稿目录!A2"
+            },
+            {
+              "col": "E",
+              "col_idx": 5,
+              "value": "=底稿目录!A4"
+            },
+            {
+              "col": "K",
+              "col_idx": 11,
+              "value": "=底稿目录!A6"
+            },
+            {
+              "col": "Q",
+              "col_idx": 17,
+              "value": "索引号："
+            },
+            {
+              "col": "R",
+              "col_idx": 18,
+              "value": "H2-2"
+            },
+            {
+              "col": "S",
+              "col_idx": 19,
+              "value": "=底稿目录!A2"
+            },
+            {
+              "col": "Y",
+              "col_idx": 25,
+              "value": "=底稿目录!A4"
+            },
+            {
+              "col": "AD",
+              "col_idx": 30,
+              "value": "=底稿目录!A6"
+            },
+            {
+              "col": "AG",
+              "col_idx": 33,
+              "value": "索引号："
+            },
+            {
+              "col": "AH",
+              "col_idx": 34,
+              "value": "H2-2"
+            },
+            {
+              "col": "AI",
+              "col_idx": 35,
+              "value": "=底稿目录!A2"
+            },
+            {
+              "col": "AM",
+              "col_idx": 39,
+              "value": "=底稿目录!A4"
+            },
+            {
+              "col": "AQ",
+              "col_idx": 43,
+              "value": "=底稿目录!A6"
+            },
+            {
+              "col": "AW",
+              "col_idx": 49,
+              "value": "索引号："
+            },
+            {
+              "col": "AX",
+              "col_idx": 50,
+              "value": "H2-2"
+            }
+          ]
+        }
+      ],
+      "formula_cells": [
+        {
+          "cell": "A3",
+          "formula": "=底稿目录!A2"
+        },
+        {
+          "cell": "E3",
+          "formula": "=底稿目录!A4"
+        },
+        {
+          "cell": "K3",
+          "formula": "=底稿目录!A6"
+        },
+        {
+          "cell": "S3",
+          "formula": "=底稿目录!A2"
+        },
+        {
+          "cell": "Y3",
+          "formula": "=底稿目录!A4"
+        },
+        {
+          "cell": "AD3",
+          "formula": "=底稿目录!A6"
+        },
+        {
+          "cell": "AI3",
+          "formula": "=底稿目录!A2"
+        },
+        {
+          "cell": "AM3",
+          "formula": "=底稿目录!A4"
+        },
+        {
+          "cell": "AQ3",
+          "formula": "=底稿目录!A6"
+        },
+        {
+          "cell": "A4",
+          "formula": "=底稿目录!A3"
+        },
+        {
+          "cell": "E4",
+          "formula": "=底稿目录!A5"
+        },
+        {
+          "cell": "K4",
+          "formula": "=底稿目录!A7"
+        },
+        {
+          "cell": "S4",
+          "formula": "=底稿目录!A3"
+        },
+        {
+          "cell": "Y4",
+          "formula": "=底稿目录!A5"
+        },
+        {
+          "cell": "AD4",
+          "formula": "=底稿目录!A7"
+        },
+        {
+          "cell": "AI4",
+          "formula": "=底稿目录!A3"
+        },
+        {
+          "cell": "AM4",
+          "formula": "=底稿目录!A5"
+        },
+        {
+          "cell": "AQ4",
+          "formula": "=底稿目录!A7"
+        },
+        {
+          "cell": "D13",
+          "formula": "=IF(AH13=0,0,AH13/B13)"
+        },
+        {
+          "cell": "Q13",
+          "formula": "=J13+L13-N13-O13"
+        },
+        {
+          "cell": "R13",
+          "formula": "=K13+M13-P13"
+        },
+        {
+          "cell": "Z13",
+          "formula": "=J13+S13"
+        },
+        {
+          "cell": "AA13",
+          "formula": "=K13+T13"
+        },
+        {
+          "cell": "AB13",
+          "formula": "=L13+U13"
+        },
+        {
+          "cell": "AC13",
+          "formula": "=M13+V13"
+        },
+        {
+          "cell": "AD13",
+          "formula": "=N13+W13"
+        },
+        {
+          "cell": "AE13",
+          "formula": "=O13+X13"
+        },
+        {
+          "cell": "AF13",
+          "formula": "=P13+Y13"
+        },
+        {
+          "cell": "AG13",
+          "formula": "=Z13+AB13-AD13-AE13"
+        },
+        {
+          "cell": "AH13",
+          "formula": "=AA13+AC13-AF13"
+        },
+        {
+          "cell": "AL13",
+          "formula": "=AI13+AJ13-AK13"
+        },
+        {
+          "cell": "AP13",
+          "formula": "=AI13+AM13"
+        },
+        {
+          "cell": "AQ13",
+          "formula": "=AJ13+AN13"
+        },
+        {
+          "cell": "AR13",
+          "formula": "=AK13+AO13"
+        },
+        {
+          "cell": "AS13",
+          "formula": "=AP13+AQ13-AR13"
+        },
+        {
+          "cell": "AT13",
+          "formula": "=J13-AI13"
+        },
+        {
+          "cell": "AU13",
+          "formula": "=Z13-AP13"
+        },
+        {
+          "cell": "AV13",
+          "formula": "=R13-AL13"
+        },
+        {
+          "cell": "AW13",
+          "formula": "=AH13-AS13"
+        },
+        {
+          "cell": "D14",
+          "formula": "=IF(AH14=0,0,AH14/B14)"
+        },
+        {
+          "cell": "Q14",
+          "formula": "=J14+L14-N14-O14"
+        },
+        {
+          "cell": "R14",
+          "formula": "=K14+M14-P14"
+        },
+        {
+          "cell": "Z14",
+          "formula": "=J14+S14"
+        },
+        {
+          "cell": "AA14",
+          "formula": "=K14+T14"
+        },
+        {
+          "cell": "AB14",
+          "formula": "=L14+U14"
+        },
+        {
+          "cell": "AC14",
+          "formula": "=M14+V14"
+        },
+        {
+          "cell": "AD14",
+          "formula": "=N14+W14"
+        },
+        {
+          "cell": "AE14",
+          "formula": "=O14+X14"
+        },
+        {
+          "cell": "AF14",
+          "formula": "=P14+Y14"
+        },
+        {
+          "cell": "AG14",
+          "formula": "=Z14+AB14-AD14-AE14"
+        },
+        {
+          "cell": "AH14",
+          "formula": "=AA14+AC14-AF14"
+        },
+        {
+          "cell": "AL14",
+          "formula": "=AI14+AJ14-AK14"
+        },
+        {
+          "cell": "AP14",
+          "formula": "=AI14+AM14"
+        },
+        {
+          "cell": "AQ14",
+          "formula": "=AJ14+AN14"
+        },
+        {
+          "cell": "AR14",
+          "formula": "=AK14+AO14"
+        },
+        {
+          "cell": "AS14",
+          "formula": "=AP14+AQ14-AR14"
+        },
+        {
+          "cell": "AT14",
+          "formula": "=J14-AI14"
+        },
+        {
+          "cell": "AU14",
+          "formula": "=Z14-AP14"
+        },
+        {
+          "cell": "AV14",
+          "formula": "=R14-AL14"
+        },
+        {
+          "cell": "AW14",
+          "formula": "=AH14-AS14"
+        },
+        {
+          "cell": "D15",
+          "formula": "=IF(AH15=0,0,AH15/B15)"
+        },
+        {
+          "cell": "Q15",
+          "formula": "=J15+L15-N15-O15"
+        },
+        {
+          "cell": "R15",
+          "formula": "=K15+M15-P15"
+        },
+        {
+          "cell": "Z15",
+          "formula": "=J15+S15"
+        },
+        {
+          "cell": "AA15",
+          "formula": "=K15+T15"
+        },
+        {
+          "cell": "AB15",
+          "formula": "=L15+U15"
+        },
+        {
+          "cell": "AC15",
+          "formula": "=M15+V15"
+        },
+        {
+          "cell": "AD15",
+          "formula": "=N15+W15"
+        },
+        {
+          "cell": "AE15",
+          "formula": "=O15+X15"
+        },
+        {
+          "cell": "AF15",
+          "formula": "=P15+Y15"
+        },
+        {
+          "cell": "AG15",
+          "formula": "=Z15+AB15-AD15-AE15"
+        },
+        {
+          "cell": "AH15",
+          "formula": "=AA15+AC15-AF15"
+        },
+        {
+          "cell": "AL15",
+          "formula": "=AI15+AJ15-AK15"
+        },
+        {
+          "cell": "AP15",
+          "formula": "=AI15+AM15"
+        },
+        {
+          "cell": "AQ15",
+          "formula": "=AJ15+AN15"
+        },
+        {
+          "cell": "AR15",
+          "formula": "=AK15+AO15"
+        },
+        {
+          "cell": "AS15",
+          "formula": "=AP15+AQ15-AR15"
+        },
+        {
+          "cell": "AT15",
+          "formula": "=J15-AI15"
+        },
+        {
+          "cell": "AU15",
+          "formula": "=Z15-AP15"
+        },
+        {
+          "cell": "AV15",
+          "formula": "=R15-AL15"
+        },
+        {
+          "cell": "AW15",
+          "formula": "=AH15-AS15"
+        },
+        {
+          "cell": "D16",
+          "formula": "=IF(AH16=0,0,AH16/B16)"
+        },
+        {
+          "cell": "Q16",
+          "formula": "=J16+L16-N16-O16"
+        },
+        {
+          "cell": "R16",
+          "formula": "=K16+M16-P16"
+        },
+        {
+          "cell": "Z16",
+          "formula": "=J16+S16"
+        },
+        {
+          "cell": "AA16",
+          "formula": "=K16+T16"
+        },
+        {
+          "cell": "AB16",
+          "formula": "=L16+U16"
+        },
+        {
+          "cell": "AC16",
+          "formula": "=M16+V16"
+        },
+        {
+          "cell": "AD16",
+          "formula": "=N16+W16"
+        },
+        {
+          "cell": "AE16",
+          "formula": "=O16+X16"
+        },
+        {
+          "cell": "AF16",
+          "formula": "=P16+Y16"
+        },
+        {
+          "cell": "AG16",
+          "formula": "=Z16+AB16-AD16-AE16"
+        },
+        {
+          "cell": "AH16",
+          "formula": "=AA16+AC16-AF16"
+        },
+        {
+          "cell": "AL16",
+          "formula": "=AI16+AJ16-AK16"
+        },
+        {
+          "cell": "AP16",
+          "formula": "=AI16+AM16"
+        },
+        {
+          "cell": "AQ16",
+          "formula": "=AJ16+AN16"
+        },
+        {
+          "cell": "AR16",
+          "formula": "=AK16+AO16"
+        },
+        {
+          "cell": "AS16",
+          "formula": "=AP16+AQ16-AR16"
+        },
+        {
+          "cell": "AT16",
+          "formula": "=J16-AI16"
+        },
+        {
+          "cell": "AU16",
+          "formula": "=Z16-AP16"
+        }
+      ],
+      "data_types": {
+        "s": 106,
+        "n": 2068,
+        "f": 226
+      },
+      "sample_data": [
+        {
+          "row": 4,
+          "cells": [
+            {
+              "col": "A",
+              "value": "=底稿目录!A3",
+              "type": "f"
+            },
+            {
+              "col": "E",
+              "value": "=底稿目录!A5",
+              "type": "f"
+            },
+            {
+              "col": "K",
+              "value": "=底稿目录!A7",
+              "type": "f"
+            },
+            {
+              "col": "Q",
+              "value": "页  次：",
+              "type": "s"
+            },
+            {
+              "col": "S",
+              "value": "=底稿目录!A3",
+              "type": "f"
+            }
+          ]
+        },
+        {
+          "row": 5,
+          "cells": [
+            {
+              "col": "A",
+              "value": "一、审计目标:",
+              "type": "s"
+            }
+          ]
+        },
+        {
+          "row": 6,
+          "cells": [
+            {
+              "col": "A",
+              "value": "1.资产负债表中记录的在建工程是存在的，且已记录于恰当的账户；2.所有应记录的在建工程均已记录，所有应当包括在财务报表中的相关披露均已包括；",
+              "type": "s"
+            }
+          ]
+        },
+        {
+          "row": 7,
+          "cells": [
+            {
+              "col": "A",
+              "value": "3.在建工程以恰当的金额包括在财务报表中，与之相关的计价或分摊调整已恰当记录，相关披露已得到恰当计量和描述；",
+              "type": "s"
+            }
+          ]
+        },
+        {
+          "row": 8,
+          "cells": [
+            {
+              "col": "A",
+              "value": "二、审计过程：",
+              "type": "s"
+            }
+          ]
+        }
+      ],
+      "formula_count": 226
+    },
+    {
+      "sheet_name": "调整分录汇总H2-3",
+      "max_row": 24,
+      "max_column": 10,
+      "column_count": 10,
+      "merged_ranges": [
+        "A1:J1",
+        "A24:J24",
+        "A2:J2"
+      ],
+      "headers": [
+        {
+          "row": 1,
+          "cells": [
+            {
+              "col": "A",
+              "col_idx": 1,
+              "value": "致同会计师事务所"
+            }
+          ]
+        },
+        {
+          "row": 2,
+          "cells": [
+            {
+              "col": "A",
+              "col_idx": 1,
+              "value": "在建工程调整分录汇总表"
+            }
+          ]
+        },
+        {
+          "row": 3,
+          "cells": [
+            {
+              "col": "A",
+              "col_idx": 1,
+              "value": "=底稿目录!A2"
+            },
+            {
+              "col": "D",
+              "col_idx": 4,
+              "value": "=底稿目录!A4"
+            },
+            {
+              "col": "G",
+              "col_idx": 7,
+              "value": "=底稿目录!A6"
+            },
+            {
+              "col": "I",
+              "col_idx": 9,
+              "value": "索引号："
+            },
+            {
+              "col": "J",
+              "col_idx": 10,
+              "value": "H2-3"
+            }
+          ]
+        }
+      ],
+      "formula_cells": [
+        {
+          "cell": "A3",
+          "formula": "=底稿目录!A2"
+        },
+        {
+          "cell": "D3",
+          "formula": "=底稿目录!A4"
+        },
+        {
+          "cell": "G3",
+          "formula": "=底稿目录!A6"
+        },
+        {
+          "cell": "A4",
+          "formula": "=底稿目录!A3"
+        },
+        {
+          "cell": "D4",
+          "formula": "=底稿目录!A5"
+        },
+        {
+          "cell": "G4",
+          "formula": "=底稿目录!A7"
+        }
+      ],
+      "data_types": {
+        "s": 16,
+        "n": 218,
+        "f": 6
+      },
+      "sample_data": [
+        {
+          "row": 4,
+          "cells": [
+            {
+              "col": "A",
+              "value": "=底稿目录!A3",
+              "type": "f"
+            },
+            {
+              "col": "D",
+              "value": "=底稿目录!A5",
+              "type": "f"
+            },
+            {
+              "col": "G",
+              "value": "=底稿目录!A7",
+              "type": "f"
+            },
+            {
+              "col": "I",
+              "value": "页  次：",
+              "type": "s"
+            }
+          ]
+        },
+        {
+          "row": 5,
+          "cells": [
+            {
+              "col": "A",
+              "value": "调整事项说明",
+              "type": "s"
+            },
+            {
+              "col": "B",
+              "value": "类别（报表调整/账项调整/其他）",
+              "type": "s"
+            },
+            {
+              "col": "C",
+              "value": "报表项目",
+              "type": "s"
+            },
+            {
+              "col": "D",
+              "value": "科目名称",
+              "type": "s"
+            },
+            {
+              "col": "E",
+              "value": "附注项目",
+              "type": "s"
+            },
+            {
+              "col": "F",
+              "value": "……",
+              "type": "s"
+            },
+            {
+              "col": "G",
+              "value": "借方调整金额",
+              "type": "s"
+            },
+            {
+              "col": "H",
+              "value": "贷方调整金额",
+              "type": "s"
+            },
+            {
+              "col": "I",
+              "value": "索引",
+              "type": "s"
+            },
+            {
+              "col": "J",
+              "value": "备注",
+              "type": "s"
+            }
+          ]
+        }
+      ],
+      "formula_count": 6
+    },
+    {
+      "sheet_name": "分析表H2-4",
+      "max_row": 25,
+      "max_column": 24,
+      "column_count": 24,
+      "merged_ranges": [
+        "A2:F2",
+        "A1:F1"
+      ],
+      "headers": [
+        {
+          "row": 1,
+          "cells": [
+            {
+              "col": "A",
+              "col_idx": 1,
+              "value": "致同会计师事务所"
+            }
+          ]
+        },
+        {
+          "row": 2,
+          "cells": [
+            {
+              "col": "A",
+              "col_idx": 1,
+              "value": "在建工程分析表"
+            }
+          ]
+        },
+        {
+          "row": 3,
+          "cells": [
+            {
+              "col": "A",
+              "col_idx": 1,
+              "value": "=底稿目录!A2"
+            },
+            {
+              "col": "C",
+              "col_idx": 3,
+              "value": "=底稿目录!A4"
+            },
+            {
+              "col": "D",
+              "col_idx": 4,
+              "value": "=底稿目录!A6"
+            },
+            {
+              "col": "E",
+              "col_idx": 5,
+              "value": "索引号："
+            },
+            {
+              "col": "F",
+              "col_idx": 6,
+              "value": "H2-4"
+            }
+          ]
+        }
+      ],
+      "formula_cells": [
+        {
+          "cell": "A3",
+          "formula": "=底稿目录!A2"
+        },
+        {
+          "cell": "C3",
+          "formula": "=底稿目录!A4"
+        },
+        {
+          "cell": "D3",
+          "formula": "=底稿目录!A6"
+        },
+        {
+          "cell": "A4",
+          "formula": "=底稿目录!A3"
+        },
+        {
+          "cell": "C4",
+          "formula": "=底稿目录!A5"
+        },
+        {
+          "cell": "D4",
+          "formula": "=底稿目录!A7"
+        },
+        {
+          "cell": "E9",
+          "formula": "=C9-D9"
+        },
+        {
+          "cell": "E10",
+          "formula": "=C10-D10"
+        },
+        {
+          "cell": "E11",
+          "formula": "=C11-D11"
+        },
+        {
+          "cell": "E12",
+          "formula": "=C12-D12"
+        },
+        {
+          "cell": "E13",
+          "formula": "=C13-D13"
+        },
+        {
+          "cell": "E14",
+          "formula": "=C14-D14"
+        },
+        {
+          "cell": "E15",
+          "formula": "=C15-D15"
+        }
+      ],
+      "data_types": {
+        "s": 23,
+        "n": 564,
+        "f": 13
+      },
+      "sample_data": [
+        {
+          "row": 4,
+          "cells": [
+            {
+              "col": "A",
+              "value": "=底稿目录!A3",
+              "type": "f"
+            },
+            {
+              "col": "C",
+              "value": "=底稿目录!A5",
+              "type": "f"
+            },
+            {
+              "col": "D",
+              "value": "=底稿目录!A7",
+              "type": "f"
+            },
+            {
+              "col": "E",
+              "value": "页  次：",
+              "type": "s"
+            }
+          ]
+        },
+        {
+          "row": 5,
+          "cells": [
+            {
+              "col": "A",
+              "value": "一、审计目标：",
+              "type": "s"
+            }
+          ]
+        },
+        {
+          "row": 6,
+          "cells": [
+            {
+              "col": "A",
+              "value": "1.资产负债表中记录的在建工程是存在的，且已记录于恰当的账户；2.所有应记录的在建工程均已记录，所有应当包括在财务报表中的相关披露均已包括；",
+              "type": "s"
+            }
+          ]
+        },
+        {
+          "row": 7,
+          "cells": [
+            {
+              "col": "A",
+              "value": "二、审计过程：",
+              "type": "s"
+            }
+          ]
+        },
+        {
+          "row": 8,
+          "cells": [
+            {
+              "col": "A",
+              "value": "序号",
+              "type": "s"
+            },
+            {
+              "col": "B",
+              "value": "项目",
+              "type": "s"
+            },
+            {
+              "col": "C",
+              "value": "2025年",
+              "type": "s"
+            },
+            {
+              "col": "D",
+              "value": "2024年",
+              "type": "s"
+            },
+            {
+              "col": "E",
+              "value": "变动",
+              "type": "s"
+            },
+            {
+              "col": "F",
+              "value": "变动原因及合理性解释",
+              "type": "s"
+            }
+          ]
+        }
+      ],
+      "formula_count": 13
+    },
+    {
+      "sheet_name": "转固时点检查表H2-5",
+      "max_row": 28,
+      "max_column": 15,
+      "column_count": 15,
+      "merged_ranges": [
+        "G17:H17",
+        "G10:G11",
+        "M10:M11",
+        "A1:N1",
+        "F17:F18",
+        "I17:I18",
+        "L10:L11",
+        "N10:N11",
+        "A17:A18",
+        "K17:K18",
+        "A2:N2",
+        "A10:A11",
+        "I10:I11",
+        "K10:K11",
+        "B17:E17",
+        "J17:J18",
+        "L17:L18",
+        "B10:E10",
+        "F10:F11",
+        "H10:H11",
+        "J10:J11"
+      ],
+      "headers": [
+        {
+          "row": 1,
+          "cells": [
+            {
+              "col": "A",
+              "col_idx": 1,
+              "value": "致同会计师事务所"
+            }
+          ]
+        },
+        {
+          "row": 2,
+          "cells": [
+            {
+              "col": "A",
+              "col_idx": 1,
+              "value": "转固时点检查表"
+            }
+          ]
+        },
+        {
+          "row": 3,
+          "cells": [
+            {
+              "col": "A",
+              "col_idx": 1,
+              "value": "=底稿目录!A2"
+            },
+            {
+              "col": "H",
+              "col_idx": 8,
+              "value": "=底稿目录!A4"
+            },
+            {
+              "col": "K",
+              "col_idx": 11,
+              "value": "=底稿目录!A6"
+            },
+            {
+              "col": "M",
+              "col_idx": 13,
+              "value": "索引号："
+            },
+            {
+              "col": "N",
+              "col_idx": 14,
+              "value": "H2-5"
+            }
+          ]
+        }
+      ],
+      "formula_cells": [
+        {
+          "cell": "A3",
+          "formula": "=底稿目录!A2"
+        },
+        {
+          "cell": "H3",
+          "formula": "=底稿目录!A4"
+        },
+        {
+          "cell": "K3",
+          "formula": "=底稿目录!A6"
+        },
+        {
+          "cell": "A4",
+          "formula": "=底稿目录!A3"
+        },
+        {
+          "cell": "H4",
+          "formula": "=底稿目录!A5"
+        },
+        {
+          "cell": "K4",
+          "formula": "=底稿目录!A7"
+        }
+      ],
+      "data_types": {
+        "s": 42,
+        "n": 372,
+        "f": 6
+      },
+      "sample_data": [
+        {
+          "row": 4,
+          "cells": [
+            {
+              "col": "A",
+              "value": "=底稿目录!A3",
+              "type": "f"
+            },
+            {
+              "col": "H",
+              "value": "=底稿目录!A5",
+              "type": "f"
+            },
+            {
+              "col": "K",
+              "value": "=底稿目录!A7",
+              "type": "f"
+            },
+            {
+              "col": "M",
+              "value": "页  次：",
+              "type": "s"
+            }
+          ]
+        },
+        {
+          "row": 5,
+          "cells": [
+            {
+              "col": "A",
+              "value": "一、审计目标：",
+              "type": "s"
+            }
+          ]
+        },
+        {
+          "row": 6,
+          "cells": [
+            {
+              "col": "A",
+              "value": "1.资产负债表中记录的在建工程是存在的，且已记录于恰当的账户；2.所有应记录的在建工程均已记录，所有应当包括在财务报表中的相关披露均已包括；",
+              "type": "s"
+            }
+          ]
+        },
+        {
+          "row": 7,
+          "cells": [
+            {
+              "col": "A",
+              "value": "3.在建工程以恰当的金额包括在财务报表中，与之相关的计价或分摊调整已恰当记录，相关披露已得到恰当计量和描述；",
+              "type": "s"
+            }
+          ]
+        },
+        {
+          "row": 8,
+          "cells": [
+            {
+              "col": "A",
+              "value": "二、审计过程",
+              "type": "s"
+            }
+          ]
+        }
+      ],
+      "formula_count": 6
+    },
+    {
+      "sheet_name": "在建工程审核记录H2-6",
+      "max_row": 39,
+      "max_column": 12,
+      "column_count": 12,
+      "merged_ranges": [
+        "A2:K2",
+        "A1:K1"
+      ],
+      "headers": [
+        {
+          "row": 1,
+          "cells": [
+            {
+              "col": "A",
+              "col_idx": 1,
+              "value": "致同会计师事务所"
+            }
+          ]
+        },
+        {
+          "row": 2,
+          "cells": [
+            {
+              "col": "A",
+              "col_idx": 1,
+              "value": "在建工程－XX项目-XX子项目审核记录"
+            }
+          ]
+        },
+        {
+          "row": 3,
+          "cells": [
+            {
+              "col": "A",
+              "col_idx": 1,
+              "value": "=底稿目录!A2"
+            },
+            {
+              "col": "D",
+              "col_idx": 4,
+              "value": "=底稿目录!A4"
+            },
+            {
+              "col": "H",
+              "col_idx": 8,
+              "value": "=底稿目录!A6"
+            },
+            {
+              "col": "J",
+              "col_idx": 10,
+              "value": "索引号："
+            },
+            {
+              "col": "K",
+              "col_idx": 11,
+              "value": "H2-6"
+            }
+          ]
+        }
+      ],
+      "formula_cells": [
+        {
+          "cell": "A3",
+          "formula": "=底稿目录!A2"
+        },
+        {
+          "cell": "D3",
+          "formula": "=底稿目录!A4"
+        },
+        {
+          "cell": "H3",
+          "formula": "=底稿目录!A6"
+        },
+        {
+          "cell": "A4",
+          "formula": "=底稿目录!A3"
+        },
+        {
+          "cell": "D4",
+          "formula": "=底稿目录!A5"
+        },
+        {
+          "cell": "H4",
+          "formula": "=底稿目录!A7"
+        }
+      ],
+      "data_types": {
+        "s": 37,
+        "n": 425,
+        "f": 6
+      },
+      "sample_data": [
+        {
+          "row": 4,
+          "cells": [
+            {
+              "col": "A",
+              "value": "=底稿目录!A3",
+              "type": "f"
+            },
+            {
+              "col": "D",
+              "value": "=底稿目录!A5",
+              "type": "f"
+            },
+            {
+              "col": "H",
+              "value": "=底稿目录!A7",
+              "type": "f"
+            },
+            {
+              "col": "J",
+              "value": "页  次：",
+              "type": "s"
+            }
+          ]
+        },
+        {
+          "row": 5,
+          "cells": [
+            {
+              "col": "A",
+              "value": "1、项目综合描述：",
+              "type": "s"
+            }
+          ]
+        },
+        {
+          "row": 7,
+          "cells": [
+            {
+              "col": "A",
+              "value": "2、资料及合同核对情况描述：",
+              "type": "s"
+            }
+          ]
+        },
+        {
+          "row": 8,
+          "cells": [
+            {
+              "col": "B",
+              "value": "A、详见资料核对表，索引（             ）",
+              "type": "s"
+            }
+          ]
+        },
+        {
+          "row": 9,
+          "cells": [
+            {
+              "col": "B",
+              "value": "B、详见合同核对表，索引（             ）",
+              "type": "s"
+            }
+          ]
+        }
+      ],
+      "formula_count": 6
+    },
+    {
+      "sheet_name": "工程造价比较表H2-7",
+      "max_row": 23,
+      "max_column": 16,
+      "column_count": 16,
+      "merged_ranges": [
+        "A2:M2",
+        "A1:M1"
+      ],
+      "headers": [
+        {
+          "row": 1,
+          "cells": [
+            {
+              "col": "A",
+              "col_idx": 1,
+              "value": "致同会计师事务所"
+            }
+          ]
+        },
+        {
+          "row": 2,
+          "cells": [
+            {
+              "col": "A",
+              "col_idx": 1,
+              "value": "工程造价比较分析表"
+            }
+          ]
+        },
+        {
+          "row": 3,
+          "cells": [
+            {
+              "col": "A",
+              "col_idx": 1,
+              "value": "=底稿目录!A2"
+            },
+            {
+              "col": "D",
+              "col_idx": 4,
+              "value": "=底稿目录!A4"
+            },
+            {
+              "col": "I",
+              "col_idx": 9,
+              "value": "=底稿目录!A6"
+            },
+            {
+              "col": "L",
+              "col_idx": 12,
+              "value": "索引号："
+            },
+            {
+              "col": "M",
+              "col_idx": 13,
+              "value": "H2-7"
+            }
+          ]
+        }
+      ],
+      "formula_cells": [
+        {
+          "cell": "A3",
+          "formula": "=底稿目录!A2"
+        },
+        {
+          "cell": "D3",
+          "formula": "=底稿目录!A4"
+        },
+        {
+          "cell": "I3",
+          "formula": "=底稿目录!A6"
+        },
+        {
+          "cell": "A4",
+          "formula": "=底稿目录!A3"
+        },
+        {
+          "cell": "D4",
+          "formula": "=底稿目录!A5"
+        },
+        {
+          "cell": "I4",
+          "formula": "=底稿目录!A7"
+        },
+        {
+          "cell": "E8",
+          "formula": "=C8/D8"
+        },
+        {
+          "cell": "L8",
+          "formula": "=J8-K8"
+        },
+        {
+          "cell": "E9",
+          "formula": "=C9/D9"
+        },
+        {
+          "cell": "L9",
+          "formula": "=J9-K9"
+        },
+        {
+          "cell": "E10",
+          "formula": "=C10/D10"
+        },
+        {
+          "cell": "L10",
+          "formula": "=J10-K10"
+        },
+        {
+          "cell": "E11",
+          "formula": "=C11/D11"
+        },
+        {
+          "cell": "L11",
+          "formula": "=J11-K11"
+        }
+      ],
+      "data_types": {
+        "s": 31,
+        "n": 323,
+        "f": 14
+      },
+      "sample_data": [
+        {
+          "row": 4,
+          "cells": [
+            {
+              "col": "A",
+              "value": "=底稿目录!A3",
+              "type": "f"
+            },
+            {
+              "col": "D",
+              "value": "=底稿目录!A5",
+              "type": "f"
+            },
+            {
+              "col": "I",
+              "value": "=底稿目录!A7",
+              "type": "f"
+            },
+            {
+              "col": "L",
+              "value": "页  次：",
+              "type": "s"
+            }
+          ]
+        },
+        {
+          "row": 5,
+          "cells": [
+            {
+              "col": "A",
+              "value": "一、审计目标：1.资产负债表中记录的在建工程是存在的，且已记录于恰当的账户；",
+              "type": "s"
+            }
+          ]
+        },
+        {
+          "row": 6,
+          "cells": [
+            {
+              "col": "A",
+              "value": "二、审计过程：",
+              "type": "s"
+            }
+          ]
+        },
+        {
+          "row": 7,
+          "cells": [
+            {
+              "col": "A",
+              "value": "序号",
+              "type": "s"
+            },
+            {
+              "col": "B",
+              "value": "项目",
+              "type": "s"
+            },
+            {
+              "col": "C",
+              "value": "工程项目总造价",
+              "type": "s"
+            },
+            {
+              "col": "D",
+              "value": "建筑面积",
+              "type": "s"
+            },
+            {
+              "col": "E",
+              "value": "单方造价",
+              "type": "s"
+            },
+            {
+              "col": "F",
+              "value": "可比价1",
+              "type": "s"
+            },
+            {
+              "col": "G",
+              "value": "可比价2",
+              "type": "s"
+            },
+            {
+              "col": "H",
+              "value": "可比价3",
+              "type": "s"
+            },
+            {
+              "col": "I",
+              "value": "可比价来源索引",
+              "type": "s"
+            },
+            {
+              "col": "J",
+              "value": "本期增加额",
+              "type": "s"
+            },
+            {
+              "col": "K",
+              "value": "本期计入现金流量金额",
+              "type": "s"
+            },
+            {
+              "col": "L",
+              "value": "差异",
+              "type": "s"
+            },
+            {
+              "col": "M",
+              "value": "差异原因",
+              "type": "s"
+            }
+          ]
+        },
+        {
+          "row": 8,
+          "cells": [
+            {
+              "col": "A",
+              "value": "1",
+              "type": "n"
+            },
+            {
+              "col": "B",
+              "value": "工程A",
+              "type": "s"
+            },
+            {
+              "col": "E",
+              "value": "=C8/D8",
+              "type": "f"
+            },
+            {
+              "col": "L",
+              "value": "=J8-K8",
+              "type": "f"
+            }
+          ]
+        }
+      ],
+      "formula_count": 14
+    },
+    {
+      "sheet_name": "增加检查表H2-8",
+      "max_row": 57,
+      "max_column": 24,
+      "column_count": 24,
+      "merged_ranges": [
+        "B12:B13",
+        "F12:F13",
+        "R12:T12",
+        "I12:K12",
+        "A1:W1",
+        "L12:M12",
+        "A12:A13",
+        "C12:C13",
+        "A32:F32",
+        "U12:U13",
+        "D12:D13",
+        "W12:W13",
+        "A31:F31",
+        "N12:Q12",
+        "A30:F30",
+        "A2:W2",
+        "V12:V13",
+        "A5:W5",
+        "E12:E13"
+      ],
+      "headers": [
+        {
+          "row": 1,
+          "cells": [
+            {
+              "col": "A",
+              "col_idx": 1,
+              "value": "致同会计师事务所"
+            }
+          ]
+        },
+        {
+          "row": 2,
+          "cells": [
+            {
+              "col": "A",
+              "col_idx": 1,
+              "value": "在建工程增加检查表"
+            }
+          ]
+        },
+        {
+          "row": 3,
+          "cells": [
+            {
+              "col": "A",
+              "col_idx": 1,
+              "value": "=底稿目录!A2"
+            },
+            {
+              "col": "D",
+              "col_idx": 4,
+              "value": "=底稿目录!A4"
+            },
+            {
+              "col": "H",
+              "col_idx": 8,
+              "value": "=底稿目录!A6"
+            },
+            {
+              "col": "V",
+              "col_idx": 22,
+              "value": "索引号："
+            },
+            {
+              "col": "W",
+              "col_idx": 23,
+              "value": "H2-8"
+            }
+          ]
+        }
+      ],
+      "formula_cells": [
+        {
+          "cell": "A3",
+          "formula": "=底稿目录!A2"
+        },
+        {
+          "cell": "D3",
+          "formula": "=底稿目录!A4"
+        },
+        {
+          "cell": "H3",
+          "formula": "=底稿目录!A6"
+        },
+        {
+          "cell": "A4",
+          "formula": "=底稿目录!A3"
+        },
+        {
+          "cell": "D4",
+          "formula": "=底稿目录!A5"
+        },
+        {
+          "cell": "H4",
+          "formula": "=底稿目录!A7"
+        },
+        {
+          "cell": "H30",
+          "formula": "=SUM(H14:H29)"
+        },
+        {
+          "cell": "K30",
+          "formula": "=SUM(K14:K29)"
+        },
+        {
+          "cell": "T30",
+          "formula": "=SUM(T14:T29)"
+        },
+        {
+          "cell": "H31",
+          "formula": "='明细表H2-2'!AB21"
+        },
+        {
+          "cell": "H32",
+          "formula": "=H30/H31"
+        }
+      ],
+      "data_types": {
+        "s": 76,
+        "n": 1281,
+        "f": 11
+      },
+      "sample_data": [
+        {
+          "row": 4,
+          "cells": [
+            {
+              "col": "A",
+              "value": "=底稿目录!A3",
+              "type": "f"
+            },
+            {
+              "col": "D",
+              "value": "=底稿目录!A5",
+              "type": "f"
+            },
+            {
+              "col": "H",
+              "value": "=底稿目录!A7",
+              "type": "f"
+            }
+          ]
+        },
+        {
+          "row": 5,
+          "cells": [
+            {
+              "col": "A",
+              "value": "一、审计目标：1.资产负债表中记录的在建工程是存在的，且已记录于恰当的账户；2.所有应记录的在建工程均已记录，所有应当包括在财务报表中的相关披露均已包括；3.记录的在建工程由被审计单位拥有或控制；4.",
+              "type": "s"
+            }
+          ]
+        },
+        {
+          "row": 6,
+          "cells": [
+            {
+              "col": "A",
+              "value": "二、样本选取标准与规模：",
+              "type": "s"
+            }
+          ]
+        },
+        {
+          "row": 7,
+          "cells": [
+            {
+              "col": "A",
+              "value": "测试总体：",
+              "type": "s"
+            },
+            {
+              "col": "B",
+              "value": "如在建工程借方发生额所有凭证共XX笔金额XX",
+              "type": "s"
+            },
+            {
+              "col": "F",
+              "value": "特定样本：",
+              "type": "s"
+            },
+            {
+              "col": "G",
+              "value": "XX金额以上（大额）、关联方/关联交易形成的款项、XX异常款项全部测试，共XX笔；",
+              "type": "s"
+            }
+          ]
+        },
+        {
+          "row": 8,
+          "cells": [
+            {
+              "col": "A",
+              "value": "抽样总体：",
+              "type": "s"
+            },
+            {
+              "col": "B",
+              "value": "测试总体扣除特定样本以外的样本，共XX笔、金额XX",
+              "type": "s"
+            },
+            {
+              "col": "F",
+              "value": "确定的抽样样本量：",
+              "type": "s"
+            },
+            {
+              "col": "G",
+              "value": "抽取XX笔",
+              "type": "s"
+            },
+            {
+              "col": "H",
+              "value": "（如果使用了样本计算器计算样本量，样本量计算过程见<XX>底稿）",
+              "type": "s"
+            }
+          ]
+        }
+      ],
+      "formula_count": 11
+    },
+    {
+      "sheet_name": "减少检查表H2-9",
+      "max_row": 44,
+      "max_column": 27,
+      "column_count": 27,
+      "merged_ranges": [
+        "I12:J12",
+        "K12:O12",
+        "B12:B13",
+        "A12:A13",
+        "R12:R13",
+        "C12:C13",
+        "A26:D26",
+        "A2:R2",
+        "P12:P13",
+        "A25:D25",
+        "Q12:Q13",
+        "A1:R1",
+        "D12:D13",
+        "A24:D24",
+        "A5:R5"
+      ],
+      "headers": [
+        {
+          "row": 1,
+          "cells": [
+            {
+              "col": "A",
+              "col_idx": 1,
+              "value": "致同会计师事务所"
+            }
+          ]
+        },
+        {
+          "row": 2,
+          "cells": [
+            {
+              "col": "A",
+              "col_idx": 1,
+              "value": "在建工程减少检查表"
+            }
+          ]
+        },
+        {
+          "row": 3,
+          "cells": [
+            {
+              "col": "A",
+              "col_idx": 1,
+              "value": "=底稿目录!A2"
+            },
+            {
+              "col": "E",
+              "col_idx": 5,
+              "value": "=底稿目录!A4"
+            },
+            {
+              "col": "H",
+              "col_idx": 8,
+              "value": "=底稿目录!A6"
+            },
+            {
+              "col": "Q",
+              "col_idx": 17,
+              "value": "索引号："
+            },
+            {
+              "col": "R",
+              "col_idx": 18,
+              "value": "H2-9"
+            }
+          ]
+        }
+      ],
+      "formula_cells": [
+        {
+          "cell": "A3",
+          "formula": "=底稿目录!A2"
+        },
+        {
+          "cell": "E3",
+          "formula": "=底稿目录!A4"
+        },
+        {
+          "cell": "H3",
+          "formula": "=底稿目录!A6"
+        },
+        {
+          "cell": "A4",
+          "formula": "=底稿目录!A3"
+        },
+        {
+          "cell": "E4",
+          "formula": "=底稿目录!A5"
+        },
+        {
+          "cell": "H4",
+          "formula": "=底稿目录!A7"
+        },
+        {
+          "cell": "E24",
+          "formula": "=SUM(E14:E23)"
+        },
+        {
+          "cell": "F24",
+          "formula": "=SUM(F14:F23)"
+        },
+        {
+          "cell": "G24",
+          "formula": "=SUM(G14:G23)"
+        },
+        {
+          "cell": "H24",
+          "formula": "=SUM(H14:H23)"
+        },
+        {
+          "cell": "E25",
+          "formula": "='明细表H2-2'!AD21"
+        },
+        {
+          "cell": "G25",
+          "formula": "='明细表H2-2'!AF21"
+        },
+        {
+          "cell": "E26",
+          "formula": "=E24/E25"
+        },
+        {
+          "cell": "G26",
+          "formula": "=G24/G25"
+        }
+      ],
+      "data_types": {
+        "s": 61,
+        "n": 1113,
+        "f": 14
+      },
+      "sample_data": [
+        {
+          "row": 4,
+          "cells": [
+            {
+              "col": "A",
+              "value": "=底稿目录!A3",
+              "type": "f"
+            },
+            {
+              "col": "E",
+              "value": "=底稿目录!A5",
+              "type": "f"
+            },
+            {
+              "col": "H",
+              "value": "=底稿目录!A7",
+              "type": "f"
+            },
+            {
+              "col": "Q",
+              "value": "页  次：",
+              "type": "s"
+            }
+          ]
+        },
+        {
+          "row": 5,
+          "cells": [
+            {
+              "col": "A",
+              "value": "一、审计目标：1.资产负债表中记录的在建工程是存在的，且已记录于恰当的账户；2.所有应记录的在建工程均已记录，所有应当包括在财务报表中的相关披露均已包括；3.在建工程以恰当的金额包括在财务报表中，与之",
+              "type": "s"
+            }
+          ]
+        },
+        {
+          "row": 6,
+          "cells": [
+            {
+              "col": "A",
+              "value": "二、样本选取标准与规模：",
+              "type": "s"
+            }
+          ]
+        },
+        {
+          "row": 7,
+          "cells": [
+            {
+              "col": "A",
+              "value": "测试总体：",
+              "type": "s"
+            },
+            {
+              "col": "B",
+              "value": "如在建工程贷方发生额所有凭证共XX笔金额XX",
+              "type": "s"
+            },
+            {
+              "col": "F",
+              "value": "特定样本：",
+              "type": "s"
+            },
+            {
+              "col": "G",
+              "value": "XX金额以上（大额）、关联方/关联交易形成的款项、XX异常款项全部测试，共XX笔；",
+              "type": "s"
+            },
+            {
+              "col": "H",
+              "value": "XX金额以上（大额）、关联方/关联交易形成的款项、XX异常款项全部测试，共XX笔；",
+              "type": "s"
+            }
+          ]
+        },
+        {
+          "row": 8,
+          "cells": [
+            {
+              "col": "A",
+              "value": "抽样总体：",
+              "type": "s"
+            },
+            {
+              "col": "B",
+              "value": "测试总体扣除特定样本以外的样本，共XX笔、金额XX",
+              "type": "s"
+            },
+            {
+              "col": "F",
+              "value": "确定的抽样样本量：",
+              "type": "s"
+            },
+            {
+              "col": "G",
+              "value": "抽取XX笔",
+              "type": "s"
+            },
+            {
+              "col": "I",
+              "value": "（如果使用了样本计算器计算样本量，样本量计算过程见<XX>底稿）",
+              "type": "s"
+            }
+          ]
+        }
+      ],
+      "formula_count": 14
+    },
+    {
+      "sheet_name": "利息资本化测算表（无专门借款）H2-10",
+      "max_row": 78,
+      "max_column": 28,
+      "column_count": 28,
+      "merged_ranges": [
+        "A2:L2",
+        "A8:A9",
+        "A38:A39",
+        "L38:L39",
+        "A1:L1"
+      ],
+      "headers": [
+        {
+          "row": 1,
+          "cells": [
+            {
+              "col": "A",
+              "col_idx": 1,
+              "value": "致同会计师事务所"
+            }
+          ]
+        },
+        {
+          "row": 2,
+          "cells": [
+            {
+              "col": "A",
+              "col_idx": 1,
+              "value": "在建工程利息资本化测算表（无专门借款）"
+            }
+          ]
+        },
+        {
+          "row": 3,
+          "cells": [
+            {
+              "col": "A",
+              "col_idx": 1,
+              "value": "=底稿目录!A2"
+            },
+            {
+              "col": "D",
+              "col_idx": 4,
+              "value": "=底稿目录!A4"
+            },
+            {
+              "col": "H",
+              "col_idx": 8,
+              "value": "=底稿目录!A6"
+            },
+            {
+              "col": "K",
+              "col_idx": 11,
+              "value": "索引号："
+            },
+            {
+              "col": "L",
+              "col_idx": 12,
+              "value": "H2-10"
+            }
+          ]
+        }
+      ],
+      "formula_cells": [
+        {
+          "cell": "A3",
+          "formula": "=底稿目录!A2"
+        },
+        {
+          "cell": "D3",
+          "formula": "=底稿目录!A4"
+        },
+        {
+          "cell": "H3",
+          "formula": "=底稿目录!A6"
+        },
+        {
+          "cell": "A4",
+          "formula": "=底稿目录!A3"
+        },
+        {
+          "cell": "D4",
+          "formula": "=底稿目录!A5"
+        },
+        {
+          "cell": "H4",
+          "formula": "=底稿目录!A7"
+        },
+        {
+          "cell": "G10",
+          "formula": "=B10*E10/F10"
+        },
+        {
+          "cell": "I10",
+          "formula": "=IF(G10=0,0,H10/G10)"
+        },
+        {
+          "cell": "G11",
+          "formula": "=B11*E11/F11"
+        },
+        {
+          "cell": "I11",
+          "formula": "=IF(G11=0,0,H11/G11)"
+        },
+        {
+          "cell": "G12",
+          "formula": "=B12*E12/F12"
+        },
+        {
+          "cell": "I12",
+          "formula": "=IF(G12=0,0,H12/G12)"
+        },
+        {
+          "cell": "G13",
+          "formula": "=B13*E13/F13"
+        },
+        {
+          "cell": "I13",
+          "formula": "=IF(G13=0,0,H13/G13)"
+        },
+        {
+          "cell": "G14",
+          "formula": "=B14*E14/F14"
+        },
+        {
+          "cell": "I14",
+          "formula": "=IF(G14=0,0,H14/G14)"
+        },
+        {
+          "cell": "G15",
+          "formula": "=B15*E15/F15"
+        },
+        {
+          "cell": "I15",
+          "formula": "=IF(G15=0,0,H15/G15)"
+        },
+        {
+          "cell": "B16",
+          "formula": "=SUM(B10:B15)"
+        },
+        {
+          "cell": "E16",
+          "formula": "=SUM(E10:E15)"
+        },
+        {
+          "cell": "F16",
+          "formula": "=SUM(F10:F15)"
+        },
+        {
+          "cell": "G16",
+          "formula": "=SUM(G10:G15)"
+        },
+        {
+          "cell": "H16",
+          "formula": "=SUM(H10:H15)"
+        },
+        {
+          "cell": "B34",
+          "formula": "=SUM(B22:B33)"
+        },
+        {
+          "cell": "G34",
+          "formula": "=SUM(G22:G33)"
+        },
+        {
+          "cell": "G40",
+          "formula": "=SUM(B40:F40)"
+        },
+        {
+          "cell": "J40",
+          "formula": "=G40+I40-D40"
+        },
+        {
+          "cell": "K40",
+          "formula": "=J40*$K$37"
+        },
+        {
+          "cell": "G41",
+          "formula": "=SUM(B41:F41)"
+        },
+        {
+          "cell": "J41",
+          "formula": "=J40+(G41-H41-D41+I41)/2"
+        },
+        {
+          "cell": "K41",
+          "formula": "=J41*$K$37"
+        },
+        {
+          "cell": "G42",
+          "formula": "=SUM(B42:F42)"
+        },
+        {
+          "cell": "J42",
+          "formula": "=J41+(G42-H42-D42+I42)/2"
+        },
+        {
+          "cell": "K42",
+          "formula": "=J42*$K$37"
+        },
+        {
+          "cell": "G43",
+          "formula": "=SUM(B43:F43)"
+        },
+        {
+          "cell": "J43",
+          "formula": "=J42+(G43-H43-D43+I43)/2"
+        },
+        {
+          "cell": "K43",
+          "formula": "=J43*$K$37"
+        },
+        {
+          "cell": "G44",
+          "formula": "=SUM(B44:F44)"
+        },
+        {
+          "cell": "J44",
+          "formula": "=J43+(G44-H44-D44+I44)/2"
+        },
+        {
+          "cell": "K44",
+          "formula": "=J44*$K$37"
+        },
+        {
+          "cell": "G45",
+          "formula": "=SUM(B45:F45)"
+        },
+        {
+          "cell": "J45",
+          "formula": "=J44+(G45-H45-D45+I45)/2"
+        },
+        {
+          "cell": "K45",
+          "formula": "=J45*$K$37"
+        },
+        {
+          "cell": "G46",
+          "formula": "=SUM(B46:F46)"
+        },
+        {
+          "cell": "J46",
+          "formula": "=J45+(G46-H46-D46+I46)/2"
+        },
+        {
+          "cell": "K46",
+          "formula": "=J46*$K$37"
+        },
+        {
+          "cell": "G47",
+          "formula": "=SUM(B47:F47)"
+        },
+        {
+          "cell": "J47",
+          "formula": "=J46+(G47-H47-D47+I47)/2"
+        },
+        {
+          "cell": "K47",
+          "formula": "=J47*$K$37"
+        },
+        {
+          "cell": "G48",
+          "formula": "=SUM(B48:F48)"
+        },
+        {
+          "cell": "J48",
+          "formula": "=J47+(G48-H48-D48+I48)/2"
+        },
+        {
+          "cell": "K48",
+          "formula": "=J48*$K$37"
+        },
+        {
+          "cell": "G49",
+          "formula": "=SUM(B49:F49)"
+        },
+        {
+          "cell": "J49",
+          "formula": "=J48+(G49-H49-D49+I49)/2"
+        },
+        {
+          "cell": "K49",
+          "formula": "=J49*$K$37"
+        },
+        {
+          "cell": "G50",
+          "formula": "=SUM(B50:F50)"
+        },
+        {
+          "cell": "J50",
+          "formula": "=J49+(G50-H50-D50+I50)/2"
+        },
+        {
+          "cell": "K50",
+          "formula": "=J50*$K$37"
+        },
+        {
+          "cell": "G51",
+          "formula": "=SUM(B51:F51)"
+        },
+        {
+          "cell": "J51",
+          "formula": "=J50+(G51-H51-D51+I51)/2"
+        },
+        {
+          "cell": "K51",
+          "formula": "=J51*$K$37"
+        },
+        {
+          "cell": "G52",
+          "formula": "=SUM(B52:F52)"
+        },
+        {
+          "cell": "J52",
+          "formula": "=J51+(G52-H52-D52+I52)/2"
+        },
+        {
+          "cell": "K52",
+          "formula": "=J52*$K$37"
+        },
+        {
+          "cell": "B53",
+          "formula": "=SUM(B41:B52)"
+        },
+        {
+          "cell": "C53",
+          "formula": "=SUM(C41:C52)"
+        },
+        {
+          "cell": "D53",
+          "formula": "=SUM(D41:D52)"
+        },
+        {
+          "cell": "E53",
+          "formula": "=SUM(E41:E52)"
+        },
+        {
+          "cell": "F53",
+          "formula": "=SUM(F41:F52)"
+        },
+        {
+          "cell": "G53",
+          "formula": "=SUM(G41:G52)"
+        },
+        {
+          "cell": "H53",
+          "formula": "=SUM(H41:H52)"
+        },
+        {
+          "cell": "I53",
+          "formula": "=SUM(I41:I52)"
+        },
+        {
+          "cell": "J53",
+          "formula": "=SUM(J41:J52)"
+        },
+        {
+          "cell": "K53",
+          "formula": "=SUM(K41:K52)"
+        },
+        {
+          "cell": "G54",
+          "formula": "=SUM(B54:F54)"
+        },
+        {
+          "cell": "K54",
+          "formula": "=D53"
+        },
+        {
+          "cell": "B55",
+          "formula": "=B40+B53-B54"
+        },
+        {
+          "cell": "C55",
+          "formula": "=C40+C53-C54"
+        },
+        {
+          "cell": "D55",
+          "formula": "=D40+D53-D54"
+        },
+        {
+          "cell": "E55",
+          "formula": "=E40+E53-E54"
+        },
+        {
+          "cell": "F55",
+          "formula": "=F40+F53-F54"
+        },
+        {
+          "cell": "G55",
+          "formula": "=G40+G53-G54"
+        },
+        {
+          "cell": "K55",
+          "formula": "=K53-K54"
+        },
+        {
+          "cell": "L55",
+          "formula": "=K55/K53"
+        }
+      ],
+      "data_types": {
+        "s": 105,
+        "n": 1995,
+        "f": 84
+      },
+      "sample_data": [
+        {
+          "row": 4,
+          "cells": [
+            {
+              "col": "A",
+              "value": "=底稿目录!A3",
+              "type": "f"
+            },
+            {
+              "col": "D",
+              "value": "=底稿目录!A5",
+              "type": "f"
+            },
+            {
+              "col": "H",
+              "value": "=底稿目录!A7",
+              "type": "f"
+            },
+            {
+              "col": "K",
+              "value": "页  次：",
+              "type": "s"
+            }
+          ]
+        },
+        {
+          "row": 5,
+          "cells": [
+            {
+              "col": "A",
+              "value": "一、审计目标：在建工程以恰当的金额包括在财务报表中，与之相关的计价或分摊调整已恰当记录，相关披露已得到恰当计量和描述。",
+              "type": "s"
+            }
+          ]
+        },
+        {
+          "row": 6,
+          "cells": [
+            {
+              "col": "A",
+              "value": "二、审计过程：",
+              "type": "s"
+            }
+          ]
+        },
+        {
+          "row": 7,
+          "cells": [
+            {
+              "col": "A",
+              "value": "1",
+              "type": "n"
+            },
+            {
+              "col": "B",
+              "value": " 计算一般借款资本化加权平均年利率：",
+              "type": "s"
+            }
+          ]
+        },
+        {
+          "row": 8,
+          "cells": [
+            {
+              "col": "A",
+              "value": "序号",
+              "type": "s"
+            },
+            {
+              "col": "B",
+              "value": "一般借款本金",
+              "type": "s"
+            },
+            {
+              "col": "C",
+              "value": "本期开始计息日",
+              "type": "s"
+            },
+            {
+              "col": "D",
+              "value": "本期结束计息日",
+              "type": "s"
+            },
+            {
+              "col": "E",
+              "value": "本期计息天数",
+              "type": "s"
+            },
+            {
+              "col": "F",
+              "value": "当期天数",
+              "type": "s"
+            },
+            {
+              "col": "G",
+              "value": "一般借款本金加权平均数",
+              "type": "s"
+            },
+            {
+              "col": "H",
+              "value": "一般借款当期实际发生的利息费用",
+              "type": "s"
+            },
+            {
+              "col": "I",
+              "value": "一般借款的资本化率＝一般借款加权平均利率(年利率)",
+              "type": "s"
+            }
+          ]
+        }
+      ],
+      "formula_count": 84
+    },
+    {
+      "sheet_name": "利息资本化测算表（有专门借款）H2-11",
+      "max_row": 48,
+      "max_column": 28,
+      "column_count": 28,
+      "merged_ranges": [
+        "A2:M2",
+        "A8:A9",
+        "M8:M9",
+        "A1:M1"
+      ],
+      "headers": [
+        {
+          "row": 1,
+          "cells": [
+            {
+              "col": "A",
+              "col_idx": 1,
+              "value": "致同会计师事务所"
+            }
+          ]
+        },
+        {
+          "row": 2,
+          "cells": [
+            {
+              "col": "A",
+              "col_idx": 1,
+              "value": "在建工程利息资本化测算表（存在专门借款）"
+            }
+          ]
+        },
+        {
+          "row": 3,
+          "cells": [
+            {
+              "col": "A",
+              "col_idx": 1,
+              "value": "=底稿目录!A2"
+            },
+            {
+              "col": "F",
+              "col_idx": 6,
+              "value": "=底稿目录!A4"
+            },
+            {
+              "col": "I",
+              "col_idx": 9,
+              "value": "=底稿目录!A6"
+            },
+            {
+              "col": "L",
+              "col_idx": 12,
+              "value": "索引号："
+            },
+            {
+              "col": "M",
+              "col_idx": 13,
+              "value": "H2-11"
+            }
+          ]
+        }
+      ],
+      "formula_cells": [
+        {
+          "cell": "A3",
+          "formula": "=底稿目录!A2"
+        },
+        {
+          "cell": "F3",
+          "formula": "=底稿目录!A4"
+        },
+        {
+          "cell": "I3",
+          "formula": "=底稿目录!A6"
+        },
+        {
+          "cell": "A4",
+          "formula": "=底稿目录!A3"
+        },
+        {
+          "cell": "F4",
+          "formula": "=底稿目录!A5"
+        },
+        {
+          "cell": "I4",
+          "formula": "=底稿目录!A7"
+        },
+        {
+          "cell": "G10",
+          "formula": "=SUM(B10:F10)"
+        },
+        {
+          "cell": "K10",
+          "formula": "=G10+I10-D10"
+        },
+        {
+          "cell": "L10",
+          "formula": "=K10*$L$7"
+        },
+        {
+          "cell": "G11",
+          "formula": "=SUM(B11:F11)"
+        },
+        {
+          "cell": "K11",
+          "formula": "=K10+(G11-H11-D11+I11-J11)/2"
+        },
+        {
+          "cell": "L11",
+          "formula": "=K11*$L$7"
+        },
+        {
+          "cell": "G12",
+          "formula": "=SUM(B12:F12)"
+        },
+        {
+          "cell": "K12",
+          "formula": "=K11+(G12-H12-D12+I12-J12)/2"
+        },
+        {
+          "cell": "L12",
+          "formula": "=K12*$L$7"
+        },
+        {
+          "cell": "G13",
+          "formula": "=SUM(B13:F13)"
+        },
+        {
+          "cell": "K13",
+          "formula": "=K12+(G13-H13-D13+I13-J13)/2"
+        },
+        {
+          "cell": "L13",
+          "formula": "=K13*$L$7"
+        },
+        {
+          "cell": "G14",
+          "formula": "=SUM(B14:F14)"
+        },
+        {
+          "cell": "K14",
+          "formula": "=K13+(G14-H14-D14+I14-J14)/2"
+        },
+        {
+          "cell": "L14",
+          "formula": "=K14*$L$7"
+        },
+        {
+          "cell": "G15",
+          "formula": "=SUM(B15:F15)"
+        },
+        {
+          "cell": "K15",
+          "formula": "=K14+(G15-H15-D15+I15-J15)/2"
+        },
+        {
+          "cell": "L15",
+          "formula": "=K15*$L$7"
+        },
+        {
+          "cell": "G16",
+          "formula": "=SUM(B16:F16)"
+        },
+        {
+          "cell": "K16",
+          "formula": "=K15+(G16-H16-D16+I16-J16)/2"
+        },
+        {
+          "cell": "L16",
+          "formula": "=K16*$L$7"
+        },
+        {
+          "cell": "G17",
+          "formula": "=SUM(B17:F17)"
+        },
+        {
+          "cell": "K17",
+          "formula": "=K16+(G17-H17-D17+I17-J17)/2"
+        },
+        {
+          "cell": "L17",
+          "formula": "=K17*$L$7"
+        },
+        {
+          "cell": "G18",
+          "formula": "=SUM(B18:F18)"
+        },
+        {
+          "cell": "K18",
+          "formula": "=K17+(G18-H18-D18+I18-J18)/2"
+        },
+        {
+          "cell": "L18",
+          "formula": "=K18*$L$7"
+        },
+        {
+          "cell": "G19",
+          "formula": "=SUM(B19:F19)"
+        },
+        {
+          "cell": "K19",
+          "formula": "=K18+(G19-H19-D19+I19-J19)/2"
+        },
+        {
+          "cell": "L19",
+          "formula": "=K19*$L$7"
+        },
+        {
+          "cell": "G20",
+          "formula": "=SUM(B20:F20)"
+        },
+        {
+          "cell": "K20",
+          "formula": "=K19+(G20-H20-D20+I20-J20)/2"
+        },
+        {
+          "cell": "L20",
+          "formula": "=K20*$L$7"
+        },
+        {
+          "cell": "G21",
+          "formula": "=SUM(B21:F21)"
+        },
+        {
+          "cell": "K21",
+          "formula": "=K20+(G21-H21-D21+I21-J21)/2"
+        },
+        {
+          "cell": "L21",
+          "formula": "=K21*$L$7"
+        },
+        {
+          "cell": "G22",
+          "formula": "=SUM(B22:F22)"
+        },
+        {
+          "cell": "K22",
+          "formula": "=K21+(G22-H22-D22+I22-J22)/2"
+        },
+        {
+          "cell": "L22",
+          "formula": "=K22*$L$7"
+        },
+        {
+          "cell": "B23",
+          "formula": "=SUM(B11:B22)"
+        },
+        {
+          "cell": "C23",
+          "formula": "=SUM(C11:C22)"
+        },
+        {
+          "cell": "D23",
+          "formula": "=SUM(D11:D22)"
+        },
+        {
+          "cell": "E23",
+          "formula": "=SUM(E11:E22)"
+        },
+        {
+          "cell": "F23",
+          "formula": "=SUM(F11:F22)"
+        },
+        {
+          "cell": "G23",
+          "formula": "=SUM(G11:G22)"
+        },
+        {
+          "cell": "H23",
+          "formula": "=SUM(H11:H22)"
+        },
+        {
+          "cell": "I23",
+          "formula": "=SUM(I11:I22)"
+        },
+        {
+          "cell": "J23",
+          "formula": "=SUM(J11:J22)"
+        },
+        {
+          "cell": "K23",
+          "formula": "=SUM(K11:K22)"
+        },
+        {
+          "cell": "L23",
+          "formula": "=SUM(L11:L22)"
+        },
+        {
+          "cell": "G24",
+          "formula": "=SUM(B24:F24)"
+        },
+        {
+          "cell": "B25",
+          "formula": "=B10+B23-B24"
+        },
+        {
+          "cell": "C25",
+          "formula": "=C10+C23-C24"
+        },
+        {
+          "cell": "D25",
+          "formula": "=D10+D23-D24"
+        },
+        {
+          "cell": "E25",
+          "formula": "=E10+E23-E24"
+        },
+        {
+          "cell": "F25",
+          "formula": "=F10+F23-F24"
+        },
+        {
+          "cell": "G25",
+          "formula": "=G10+G23-G24"
+        },
+        {
+          "cell": "L25",
+          "formula": "=L23+L24-D23"
+        },
+        {
+          "cell": "M25",
+          "formula": "=L25/L23"
+        }
+      ],
+      "data_types": {
+        "s": 74,
+        "n": 1205,
+        "f": 65
+      },
+      "sample_data": [
+        {
+          "row": 4,
+          "cells": [
+            {
+              "col": "A",
+              "value": "=底稿目录!A3",
+              "type": "f"
+            },
+            {
+              "col": "F",
+              "value": "=底稿目录!A5",
+              "type": "f"
+            },
+            {
+              "col": "I",
+              "value": "=底稿目录!A7",
+              "type": "f"
+            },
+            {
+              "col": "L",
+              "value": "页  次：",
+              "type": "s"
+            }
+          ]
+        },
+        {
+          "row": 5,
+          "cells": [
+            {
+              "col": "A",
+              "value": "一、审计目标：在建工程以恰当的金额包括在财务报表中，与之相关的计价或分摊调整已恰当记录，相关披露已得到恰当计量和描述。",
+              "type": "s"
+            }
+          ]
+        },
+        {
+          "row": 6,
+          "cells": [
+            {
+              "col": "A",
+              "value": "二、审计过程：",
+              "type": "s"
+            }
+          ]
+        },
+        {
+          "row": 7,
+          "cells": [
+            {
+              "col": "K",
+              "value": "资本化率（月）：",
+              "type": "s"
+            }
+          ]
+        },
+        {
+          "row": 8,
+          "cells": [
+            {
+              "col": "A",
+              "value": "            项目\n\n月份",
+              "type": "s"
+            },
+            {
+              "col": "B",
+              "value": "前期开发",
+              "type": "s"
+            },
+            {
+              "col": "C",
+              "value": "工程费用",
+              "type": "s"
+            },
+            {
+              "col": "D",
+              "value": "借款费用",
+              "type": "s"
+            },
+            {
+              "col": "E",
+              "value": "建安工程",
+              "type": "s"
+            },
+            {
+              "col": "F",
+              "value": "土地",
+              "type": "s"
+            },
+            {
+              "col": "G",
+              "value": "工程支出合计",
+              "type": "s"
+            },
+            {
+              "col": "H",
+              "value": "本年减少",
+              "type": "s"
+            },
+            {
+              "col": "I",
+              "value": "预付工程款",
+              "type": "s"
+            },
+            {
+              "col": "J",
+              "value": "专门借款",
+              "type": "s"
+            },
+            {
+              "col": "K",
+              "value": "加权平均支出",
+              "type": "s"
+            },
+            {
+              "col": "L",
+              "value": "资本化金额",
+              "type": "s"
+            },
+            {
+              "col": "M",
+              "value": "备注",
+              "type": "s"
+            }
+          ]
+        }
+      ],
+      "formula_count": 65
+    },
+    {
+      "sheet_name": "监盘计划H2-12",
+      "max_row": 58,
+      "max_column": 15,
+      "column_count": 15,
+      "merged_ranges": [
+        "A1:I1",
+        "A2:I2"
+      ],
+      "headers": [
+        {
+          "row": 1,
+          "cells": [
+            {
+              "col": "A",
+              "col_idx": 1,
+              "value": "致同会计师事务所"
+            }
+          ]
+        },
+        {
+          "row": 2,
+          "cells": [
+            {
+              "col": "A",
+              "col_idx": 1,
+              "value": "在建工程监盘计划"
+            }
+          ]
+        },
+        {
+          "row": 3,
+          "cells": [
+            {
+              "col": "A",
+              "col_idx": 1,
+              "value": "=底稿目录!A2"
+            },
+            {
+              "col": "D",
+              "col_idx": 4,
+              "value": "=底稿目录!A4"
+            },
+            {
+              "col": "F",
+              "col_idx": 6,
+              "value": "=底稿目录!A6"
+            },
+            {
+              "col": "H",
+              "col_idx": 8,
+              "value": "索引号："
+            },
+            {
+              "col": "I",
+              "col_idx": 9,
+              "value": "H2-12"
+            }
+          ]
+        }
+      ],
+      "formula_cells": [
+        {
+          "cell": "A3",
+          "formula": "=底稿目录!A2"
+        },
+        {
+          "cell": "D3",
+          "formula": "=底稿目录!A4"
+        },
+        {
+          "cell": "F3",
+          "formula": "=底稿目录!A6"
+        },
+        {
+          "cell": "A4",
+          "formula": "=底稿目录!A3"
+        },
+        {
+          "cell": "D4",
+          "formula": "=底稿目录!A5"
+        },
+        {
+          "cell": "F4",
+          "formula": "=底稿目录!A7"
+        },
+        {
+          "cell": "E13",
+          "formula": "=C13-D13"
+        },
+        {
+          "cell": "E14",
+          "formula": "=C14-D14"
+        },
+        {
+          "cell": "E15",
+          "formula": "=C15-D15"
+        },
+        {
+          "cell": "D40",
+          "formula": "=B40-C40"
+        },
+        {
+          "cell": "B43",
+          "formula": "=SUM(B40:B42)"
+        },
+        {
+          "cell": "C43",
+          "formula": "=SUM(C40:C42)"
+        },
+        {
+          "cell": "D43",
+          "formula": "=SUM(D40:D42)"
+        },
+        {
+          "cell": "E43",
+          "formula": "=SUM(E40:E42)"
+        },
+        {
+          "cell": "F43",
+          "formula": "=SUM(F40:F42)"
+        },
+        {
+          "cell": "G43",
+          "formula": "=SUM(G40:G42)"
+        },
+        {
+          "cell": "H43",
+          "formula": "=SUM(H40:H42)"
+        },
+        {
+          "cell": "I43",
+          "formula": "=SUM(I40:I42)"
+        }
+      ],
+      "data_types": {
+        "s": 73,
+        "n": 779,
+        "f": 18
+      },
+      "sample_data": [
+        {
+          "row": 4,
+          "cells": [
+            {
+              "col": "A",
+              "value": "=底稿目录!A3",
+              "type": "f"
+            },
+            {
+              "col": "D",
+              "value": "=底稿目录!A5",
+              "type": "f"
+            },
+            {
+              "col": "F",
+              "value": "=底稿目录!A7",
+              "type": "f"
+            },
+            {
+              "col": "H",
+              "value": "页  次：",
+              "type": "s"
+            }
+          ]
+        },
+        {
+          "row": 5,
+          "cells": [
+            {
+              "col": "A",
+              "value": "被审计单位名称：                            ",
+              "type": "s"
+            },
+            {
+              "col": "F",
+              "value": "审计目标：                       ",
+              "type": "s"
+            }
+          ]
+        },
+        {
+          "row": 6,
+          "cells": [
+            {
+              "col": "A",
+              "value": "一、确定的在建工程存在性认定可能存在重大错报的风险程度：",
+              "type": "s"
+            }
+          ]
+        },
+        {
+          "row": 8,
+          "cells": [
+            {
+              "col": "A",
+              "value": "二、了解被审计单位在建工程期末状况与管理规定：",
+              "type": "s"
+            }
+          ]
+        },
+        {
+          "row": 9,
+          "cells": [
+            {
+              "col": "A",
+              "value": "（一）在建工程的期末状况：",
+              "type": "s"
+            }
+          ]
+        }
+      ],
+      "formula_count": 18
+    },
+    {
+      "sheet_name": "盘点检查表H2-13",
+      "max_row": 40,
+      "max_column": 15,
+      "column_count": 15,
+      "merged_ranges": [
+        "J13:J14",
+        "L13:L14",
+        "G13:G14",
+        "A21:C21",
+        "A2:O2",
+        "A23:C23",
+        "B13:B14",
+        "D13:E13",
+        "M13:M14",
+        "A22:C22",
+        "F13:F14",
+        "H13:H14",
+        "N13:N14",
+        "A13:A14",
+        "I13:I14",
+        "K13:K14",
+        "C13:C14",
+        "O13:O14",
+        "A1:O1"
+      ],
+      "headers": [
+        {
+          "row": 1,
+          "cells": [
+            {
+              "col": "A",
+              "col_idx": 1,
+              "value": "致同会计师事务所"
+            }
+          ]
+        },
+        {
+          "row": 2,
+          "cells": [
+            {
+              "col": "A",
+              "col_idx": 1,
+              "value": "在建工程盘点检查表"
+            }
+          ]
+        },
+        {
+          "row": 3,
+          "cells": [
+            {
+              "col": "A",
+              "col_idx": 1,
+              "value": "=底稿目录!A2"
+            },
+            {
+              "col": "F",
+              "col_idx": 6,
+              "value": "=底稿目录!A4"
+            },
+            {
+              "col": "K",
+              "col_idx": 11,
+              "value": "=底稿目录!A6"
+            },
+            {
+              "col": "N",
+              "col_idx": 14,
+              "value": "索引号："
+            },
+            {
+              "col": "O",
+              "col_idx": 15,
+              "value": "H2-13"
+            }
+          ]
+        }
+      ],
+      "formula_cells": [
+        {
+          "cell": "A3",
+          "formula": "=底稿目录!A2"
+        },
+        {
+          "cell": "F3",
+          "formula": "=底稿目录!A4"
+        },
+        {
+          "cell": "K3",
+          "formula": "=底稿目录!A6"
+        },
+        {
+          "cell": "A4",
+          "formula": "=底稿目录!A3"
+        },
+        {
+          "cell": "F4",
+          "formula": "=底稿目录!A5"
+        },
+        {
+          "cell": "K4",
+          "formula": "=底稿目录!A7"
+        },
+        {
+          "cell": "H15",
+          "formula": "=G15-D15"
+        },
+        {
+          "cell": "I15",
+          "formula": "=G15-F15"
+        },
+        {
+          "cell": "J15",
+          "formula": "=F15-D15"
+        },
+        {
+          "cell": "H16",
+          "formula": "=G16-D16"
+        },
+        {
+          "cell": "I16",
+          "formula": "=G16-F16"
+        },
+        {
+          "cell": "J16",
+          "formula": "=F16-D16"
+        },
+        {
+          "cell": "H17",
+          "formula": "=G17-D17"
+        },
+        {
+          "cell": "I17",
+          "formula": "=G17-F17"
+        },
+        {
+          "cell": "J17",
+          "formula": "=F17-D17"
+        },
+        {
+          "cell": "H18",
+          "formula": "=G18-D18"
+        },
+        {
+          "cell": "I18",
+          "formula": "=G18-F18"
+        },
+        {
+          "cell": "J18",
+          "formula": "=F18-D18"
+        },
+        {
+          "cell": "H19",
+          "formula": "=G19-D19"
+        },
+        {
+          "cell": "I19",
+          "formula": "=G19-F19"
+        },
+        {
+          "cell": "J19",
+          "formula": "=F19-D19"
+        },
+        {
+          "cell": "H20",
+          "formula": "=G20-D20"
+        },
+        {
+          "cell": "I20",
+          "formula": "=G20-F20"
+        },
+        {
+          "cell": "J20",
+          "formula": "=F20-D20"
+        },
+        {
+          "cell": "D21",
+          "formula": "=SUM(D15:D20)"
+        },
+        {
+          "cell": "E21",
+          "formula": "=SUM(E15:E20)"
+        },
+        {
+          "cell": "F21",
+          "formula": "=SUM(F15:F20)"
+        },
+        {
+          "cell": "G21",
+          "formula": "=SUM(G15:G20)"
+        },
+        {
+          "cell": "H21",
+          "formula": "=SUM(H15:H20)"
+        },
+        {
+          "cell": "I21",
+          "formula": "=SUM(I15:I20)"
+        },
+        {
+          "cell": "J21",
+          "formula": "=SUM(J15:J20)"
+        }
+      ],
+      "data_types": {
+        "s": 55,
+        "n": 514,
+        "f": 31
+      },
+      "sample_data": [
+        {
+          "row": 4,
+          "cells": [
+            {
+              "col": "A",
+              "value": "=底稿目录!A3",
+              "type": "f"
+            },
+            {
+              "col": "F",
+              "value": "=底稿目录!A5",
+              "type": "f"
+            },
+            {
+              "col": "K",
+              "value": "=底稿目录!A7",
+              "type": "f"
+            },
+            {
+              "col": "N",
+              "value": "页  次：",
+              "type": "s"
+            }
+          ]
+        },
+        {
+          "row": 5,
+          "cells": [
+            {
+              "col": "A",
+              "value": "一、审计目标：",
+              "type": "s"
+            }
+          ]
+        },
+        {
+          "row": 6,
+          "cells": [
+            {
+              "col": "A",
+              "value": "1.资产负债表中记录的在建工程是存在的，且已记录于恰当的账户；2.在建工程以恰当的金额包括在财务报表中，与之相关的计价或分摊调整已恰当记录，相关披露已得到恰当计量和描述 。",
+              "type": "s"
+            }
+          ]
+        },
+        {
+          "row": 7,
+          "cells": [
+            {
+              "col": "A",
+              "value": "二、样本选取标准与规模：",
+              "type": "s"
+            }
+          ]
+        },
+        {
+          "row": 8,
+          "cells": [
+            {
+              "col": "A",
+              "value": "测试总体：",
+              "type": "s"
+            },
+            {
+              "col": "B",
+              "value": "如期末在建工程项目数量XX、金额XX",
+              "type": "s"
+            },
+            {
+              "col": "G",
+              "value": "特定样本：",
+              "type": "s"
+            },
+            {
+              "col": "H",
+              "value": "XX金额以上（大额）、关联方/关联交易形成的款项、XX异常款项全部测试，共XX笔；",
+              "type": "s"
+            }
+          ]
+        }
+      ],
+      "formula_count": 31
+    },
+    {
+      "sheet_name": "监盘小结H2-14",
+      "max_row": 85,
+      "max_column": 11,
+      "column_count": 11,
+      "merged_ranges": [
+        "E28:G28",
+        "A24:E24",
+        "A46:C46",
+        "H29:I29",
+        "A11:E11",
+        "E30:G30",
+        "H25:I25",
+        "A2:I2",
+        "E27:G27",
+        "A41:E41",
+        "E26:G26",
+        "A49:D49",
+        "E60:F60",
+        "E25:G25",
+        "A7:D7",
+        "H28:I28",
+        "H27:I27",
+        "E57:F57",
+        "A43:E43",
+        "A55:D55",
+        "A1:I1",
+        "A31:E31",
+        "E29:G29",
+        "H30:I30",
+        "H26:I26"
+      ],
+      "headers": [
+        {
+          "row": 1,
+          "cells": [
+            {
+              "col": "A",
+              "col_idx": 1,
+              "value": "致同会计师事务所"
+            }
+          ]
+        },
+        {
+          "row": 2,
+          "cells": [
+            {
+              "col": "A",
+              "col_idx": 1,
+              "value": "在建工程监盘小结"
+            }
+          ]
+        },
+        {
+          "row": 3,
+          "cells": [
+            {
+              "col": "A",
+              "col_idx": 1,
+              "value": "=底稿目录!A2"
+            },
+            {
+              "col": "D",
+              "col_idx": 4,
+              "value": "=底稿目录!A4"
+            },
+            {
+              "col": "F",
+              "col_idx": 6,
+              "value": "=底稿目录!A6"
+            },
+            {
+              "col": "H",
+              "col_idx": 8,
+              "value": "索引号："
+            },
+            {
+              "col": "I",
+              "col_idx": 9,
+              "value": "H2-14"
+            }
+          ]
+        }
+      ],
+      "formula_cells": [
+        {
+          "cell": "A3",
+          "formula": "=底稿目录!A2"
+        },
+        {
+          "cell": "D3",
+          "formula": "=底稿目录!A4"
+        },
+        {
+          "cell": "F3",
+          "formula": "=底稿目录!A6"
+        },
+        {
+          "cell": "A4",
+          "formula": "=底稿目录!A3"
+        },
+        {
+          "cell": "D4",
+          "formula": "=底稿目录!A5"
+        },
+        {
+          "cell": "F4",
+          "formula": "=底稿目录!A7"
+        }
+      ],
+      "data_types": {
+        "s": 59,
+        "n": 870,
+        "f": 6
+      },
+      "sample_data": [
+        {
+          "row": 4,
+          "cells": [
+            {
+              "col": "A",
+              "value": "=底稿目录!A3",
+              "type": "f"
+            },
+            {
+              "col": "D",
+              "value": "=底稿目录!A5",
+              "type": "f"
+            },
+            {
+              "col": "F",
+              "value": "=底稿目录!A7",
+              "type": "f"
+            },
+            {
+              "col": "H",
+              "value": "页  次：",
+              "type": "s"
+            }
+          ]
+        },
+        {
+          "row": 5,
+          "cells": [
+            {
+              "col": "A",
+              "value": "一、资产负债表日：                            ",
+              "type": "s"
+            }
+          ]
+        },
+        {
+          "row": 7,
+          "cells": [
+            {
+              "col": "A",
+              "value": "二、实际现场察看前的检查程序：",
+              "type": "s"
+            }
+          ]
+        },
+        {
+          "row": 8,
+          "cells": [
+            {
+              "col": "A",
+              "value": "1．工程管理部门:                            管理人员：                             ",
+              "type": "s"
+            }
+          ]
+        },
+        {
+          "row": 9,
+          "cells": [
+            {
+              "col": "A",
+              "value": "2、在建工程管理制度设计是否合理:             是否有效执行：           索引：            ",
+              "type": "s"
+            }
+          ]
+        }
+      ],
+      "formula_count": 6
+    },
+    {
+      "sheet_name": "减值测算表H2-15",
+      "max_row": 34,
+      "max_column": 28,
+      "column_count": 28,
+      "merged_ranges": [
+        "A2:L2",
+        "A7:A9",
+        "K7:K9",
+        "L7:L9",
+        "A1:L1",
+        "C7:C8",
+        "D7:D8",
+        "B7:B9",
+        "I7:I8",
+        "H7:H8",
+        "J7:J8",
+        "E7:G7"
+      ],
+      "headers": [
+        {
+          "row": 1,
+          "cells": [
+            {
+              "col": "A",
+              "col_idx": 1,
+              "value": "致同会计师事务所"
+            }
+          ]
+        },
+        {
+          "row": 2,
+          "cells": [
+            {
+              "col": "A",
+              "col_idx": 1,
+              "value": "在建工程减值测算表"
+            }
+          ]
+        },
+        {
+          "row": 3,
+          "cells": [
+            {
+              "col": "A",
+              "col_idx": 1,
+              "value": "=底稿目录!A2"
+            },
+            {
+              "col": "D",
+              "col_idx": 4,
+              "value": "=底稿目录!A4"
+            },
+            {
+              "col": "G",
+              "col_idx": 7,
+              "value": "=底稿目录!A6"
+            },
+            {
+              "col": "K",
+              "col_idx": 11,
+              "value": "索引号："
+            },
+            {
+              "col": "L",
+              "col_idx": 12,
+              "value": "H2-15"
+            }
+          ]
+        }
+      ],
+      "formula_cells": [
+        {
+          "cell": "A3",
+          "formula": "=底稿目录!A2"
+        },
+        {
+          "cell": "D3",
+          "formula": "=底稿目录!A4"
+        },
+        {
+          "cell": "G3",
+          "formula": "=底稿目录!A6"
+        },
+        {
+          "cell": "A4",
+          "formula": "=底稿目录!A3"
+        },
+        {
+          "cell": "D4",
+          "formula": "=底稿目录!A5"
+        },
+        {
+          "cell": "G4",
+          "formula": "=底稿目录!A7"
+        },
+        {
+          "cell": "G10",
+          "formula": "=MAX(E10,F10)"
+        },
+        {
+          "cell": "H10",
+          "formula": "=IF(D10>G10,D10-G10,0)"
+        },
+        {
+          "cell": "J10",
+          "formula": "=H10-I10"
+        },
+        {
+          "cell": "G11",
+          "formula": "=MAX(E11,F11)"
+        },
+        {
+          "cell": "H11",
+          "formula": "=IF(D11>G11,D11-G11,0)"
+        },
+        {
+          "cell": "J11",
+          "formula": "=H11-I11"
+        },
+        {
+          "cell": "G12",
+          "formula": "=MAX(E12,F12)"
+        },
+        {
+          "cell": "H12",
+          "formula": "=IF(D12>G12,D12-G12,0)"
+        },
+        {
+          "cell": "J12",
+          "formula": "=H12-I12"
+        },
+        {
+          "cell": "G13",
+          "formula": "=MAX(E13,F13)"
+        },
+        {
+          "cell": "H13",
+          "formula": "=IF(D13>G13,D13-G13,0)"
+        },
+        {
+          "cell": "J13",
+          "formula": "=H13-I13"
+        },
+        {
+          "cell": "G14",
+          "formula": "=MAX(E14,F14)"
+        },
+        {
+          "cell": "H14",
+          "formula": "=IF(D14>G14,D14-G14,0)"
+        },
+        {
+          "cell": "J14",
+          "formula": "=H14-I14"
+        },
+        {
+          "cell": "G15",
+          "formula": "=MAX(E15,F15)"
+        },
+        {
+          "cell": "H15",
+          "formula": "=IF(D15>G15,D15-G15,0)"
+        },
+        {
+          "cell": "J15",
+          "formula": "=H15-I15"
+        },
+        {
+          "cell": "G16",
+          "formula": "=MAX(E16,F16)"
+        },
+        {
+          "cell": "H16",
+          "formula": "=IF(D16>G16,D16-G16,0)"
+        },
+        {
+          "cell": "J16",
+          "formula": "=H16-I16"
+        },
+        {
+          "cell": "G17",
+          "formula": "=MAX(E17,F17)"
+        },
+        {
+          "cell": "H17",
+          "formula": "=IF(D17>G17,D17-G17,0)"
+        },
+        {
+          "cell": "J17",
+          "formula": "=H17-I17"
+        },
+        {
+          "cell": "G18",
+          "formula": "=MAX(E18,F18)"
+        },
+        {
+          "cell": "H18",
+          "formula": "=IF(D18>G18,D18-G18,0)"
+        },
+        {
+          "cell": "J18",
+          "formula": "=H18-I18"
+        },
+        {
+          "cell": "D19",
+          "formula": "=SUM(D10:D18)"
+        },
+        {
+          "cell": "E19",
+          "formula": "=SUM(E10:E18)"
+        },
+        {
+          "cell": "F19",
+          "formula": "=SUM(F10:F18)"
+        },
+        {
+          "cell": "G19",
+          "formula": "=SUM(G10:G18)"
+        },
+        {
+          "cell": "H19",
+          "formula": "=SUM(H10:H18)"
+        },
+        {
+          "cell": "I19",
+          "formula": "=SUM(I10:I18)"
+        },
+        {
+          "cell": "J19",
+          "formula": "=SUM(J10:J18)"
+        }
+      ],
+      "data_types": {
+        "s": 42,
+        "n": 870,
+        "f": 40
+      },
+      "sample_data": [
+        {
+          "row": 4,
+          "cells": [
+            {
+              "col": "A",
+              "value": "=底稿目录!A3",
+              "type": "f"
+            },
+            {
+              "col": "D",
+              "value": "=底稿目录!A5",
+              "type": "f"
+            },
+            {
+              "col": "G",
+              "value": "=底稿目录!A7",
+              "type": "f"
+            },
+            {
+              "col": "K",
+              "value": "页  次：",
+              "type": "s"
+            }
+          ]
+        },
+        {
+          "row": 5,
+          "cells": [
+            {
+              "col": "A",
+              "value": "一、审计目标:",
+              "type": "s"
+            },
+            {
+              "col": "B",
+              "value": "在建工程以恰当的金额包括在财务报表中，与之相关的计价或分摊调整已恰当记录，相关披露已得到恰当计量和描述 ",
+              "type": "s"
+            }
+          ]
+        },
+        {
+          "row": 6,
+          "cells": [
+            {
+              "col": "A",
+              "value": "二、审计过程：",
+              "type": "s"
+            }
+          ]
+        },
+        {
+          "row": 7,
+          "cells": [
+            {
+              "col": "A",
+              "value": "工程项目名称",
+              "type": "s"
+            },
+            {
+              "col": "B",
+              "value": "是否存在减值迹象",
+              "type": "s"
+            },
+            {
+              "col": "C",
+              "value": "减值迹象描述",
+              "type": "s"
+            },
+            {
+              "col": "D",
+              "value": "账面价值",
+              "type": "s"
+            },
+            {
+              "col": "E",
+              "value": "可收回金额",
+              "type": "s"
+            },
+            {
+              "col": "H",
+              "value": "期末应计提的减值金额（当⑤＜②）",
+              "type": "s"
+            },
+            {
+              "col": "I",
+              "value": "期末账面已计提的减值准备",
+              "type": "s"
+            },
+            {
+              "col": "J",
+              "value": "本期应补提\n或冲回的减值准备",
+              "type": "s"
+            },
+            {
+              "col": "K",
+              "value": "工作底稿索引号",
+              "type": "s"
+            },
+            {
+              "col": "L",
+              "value": "备注",
+              "type": "s"
+            }
+          ]
+        },
+        {
+          "row": 8,
+          "cells": [
+            {
+              "col": "E",
+              "value": "公允价值减处置费用的净额",
+              "type": "s"
+            },
+            {
+              "col": "F",
+              "value": "预计未来现金流量现值",
+              "type": "s"
+            },
+            {
+              "col": "G",
+              "value": "可收回金额（③、④较高者）",
+              "type": "s"
+            }
+          ]
+        }
+      ],
+      "formula_count": 40
+    },
+    {
+      "sheet_name": "可收回金额测试表H2-16",
+      "max_row": 63,
+      "max_column": 28,
+      "column_count": 28,
+      "merged_ranges": [
+        "K21:K22",
+        "D21:D22",
+        "I16:I17",
+        "H21:H22",
+        "A16:A17",
+        "N21:N22",
+        "O16:O17",
+        "F21:F22",
+        "A2:O2",
+        "N8:N9",
+        "A14:O14",
+        "C21:C22",
+        "I21:I22",
+        "O21:O22",
+        "J16:J17",
+        "O18:O20",
+        "A21:A22",
+        "A8:A9",
+        "L16:M17",
+        "O8:O9",
+        "J21:J22",
+        "L21:M21",
+        "E21:E22",
+        "K16:K17",
+        "G21:G22",
+        "A1:O1",
+        "N16:N17"
+      ],
+      "headers": [
+        {
+          "row": 1,
+          "cells": [
+            {
+              "col": "A",
+              "col_idx": 1,
+              "value": "致同会计师事务所"
+            }
+          ]
+        },
+        {
+          "row": 2,
+          "cells": [
+            {
+              "col": "A",
+              "col_idx": 1,
+              "value": "在建工程减值准备测试表-可收回金额"
+            }
+          ]
+        },
+        {
+          "row": 3,
+          "cells": [
+            {
+              "col": "A",
+              "col_idx": 1,
+              "value": "=底稿目录!A2"
+            },
+            {
+              "col": "D",
+              "col_idx": 4,
+              "value": "=底稿目录!A4"
+            },
+            {
+              "col": "J",
+              "col_idx": 10,
+              "value": "=底稿目录!A6"
+            },
+            {
+              "col": "M",
+              "col_idx": 13,
+              "value": "索引号："
+            },
+            {
+              "col": "N",
+              "col_idx": 14,
+              "value": "H2-16"
+            }
+          ]
+        }
+      ],
+      "formula_cells": [
+        {
+          "cell": "A3",
+          "formula": "=底稿目录!A2"
+        },
+        {
+          "cell": "D3",
+          "formula": "=底稿目录!A4"
+        },
+        {
+          "cell": "J3",
+          "formula": "=底稿目录!A6"
+        },
+        {
+          "cell": "A4",
+          "formula": "=底稿目录!A3"
+        },
+        {
+          "cell": "D4",
+          "formula": "=底稿目录!A5"
+        },
+        {
+          "cell": "J4",
+          "formula": "=底稿目录!A7"
+        },
+        {
+          "cell": "M10",
+          "formula": "=SUM(H10:L10)"
+        },
+        {
+          "cell": "N10",
+          "formula": "=IF(B10>0,B10,IF(D10>0,D10,F10))-M10"
+        },
+        {
+          "cell": "M11",
+          "formula": "=SUM(H11:L11)"
+        },
+        {
+          "cell": "N11",
+          "formula": "=IF(B11>0,B11,IF(D11>0,D11,F11))-M11"
+        },
+        {
+          "cell": "M12",
+          "formula": "=SUM(H12:L12)"
+        },
+        {
+          "cell": "N12",
+          "formula": "=IF(B12>0,B12,IF(D12>0,D12,F12))-M12"
+        },
+        {
+          "cell": "B13",
+          "formula": "=SUM(B10:B12)"
+        },
+        {
+          "cell": "D13",
+          "formula": "=SUM(D10:D12)"
+        },
+        {
+          "cell": "F13",
+          "formula": "=SUM(F10:F12)"
+        },
+        {
+          "cell": "H13",
+          "formula": "=SUM(H10:H12)"
+        },
+        {
+          "cell": "I13",
+          "formula": "=SUM(I10:I12)"
+        },
+        {
+          "cell": "J13",
+          "formula": "=SUM(J10:J12)"
+        },
+        {
+          "cell": "K13",
+          "formula": "=SUM(K10:K12)"
+        },
+        {
+          "cell": "L13",
+          "formula": "=SUM(L10:L12)"
+        },
+        {
+          "cell": "M13",
+          "formula": "=SUM(M10:M12)"
+        },
+        {
+          "cell": "N13",
+          "formula": "=SUM(N10:N12)"
+        },
+        {
+          "cell": "G18",
+          "formula": "=F18"
+        },
+        {
+          "cell": "B19",
+          "formula": "=1/(1+$K$23)^1"
+        },
+        {
+          "cell": "C19",
+          "formula": "=1/(1+$K$23)^2"
+        },
+        {
+          "cell": "D19",
+          "formula": "=1/(1+$K$23)^3"
+        },
+        {
+          "cell": "E19",
+          "formula": "=1/(1+$K$23)^4"
+        },
+        {
+          "cell": "F19",
+          "formula": "=1/(1+$K$23)^5"
+        },
+        {
+          "cell": "G19",
+          "formula": "=(1+H18)/((J23-H18)*(1+K23)^5)"
+        },
+        {
+          "cell": "B20",
+          "formula": "=B18*B19"
+        },
+        {
+          "cell": "C20",
+          "formula": "=C18*C19"
+        },
+        {
+          "cell": "D20",
+          "formula": "=D18*D19"
+        },
+        {
+          "cell": "E20",
+          "formula": "=E18*E19"
+        },
+        {
+          "cell": "F20",
+          "formula": "=F18*F19"
+        },
+        {
+          "cell": "G20",
+          "formula": "=G18*G19"
+        },
+        {
+          "cell": "N20",
+          "formula": "=SUM(B20:G20)"
+        },
+        {
+          "cell": "I23",
+          "formula": "=F23+G23*(H23-F23)"
+        },
+        {
+          "cell": "J23",
+          "formula": "=((C23*E23*(1-B23)+D23*I23))/(C23+D23)"
+        },
+        {
+          "cell": "K23",
+          "formula": "=J23/(1-(B23+L23))"
+        },
+        {
+          "cell": "N23",
+          "formula": "=MAX(N13,N20)"
+        },
+        {
+          "cell": "B26",
+          "formula": "=N23"
+        }
+      ],
+      "data_types": {
+        "s": 97,
+        "n": 1626,
+        "f": 41
+      },
+      "sample_data": [
+        {
+          "row": 4,
+          "cells": [
+            {
+              "col": "A",
+              "value": "=底稿目录!A3",
+              "type": "f"
+            },
+            {
+              "col": "D",
+              "value": "=底稿目录!A5",
+              "type": "f"
+            },
+            {
+              "col": "J",
+              "value": "=底稿目录!A7",
+              "type": "f"
+            },
+            {
+              "col": "M",
+              "value": "页  次：",
+              "type": "s"
+            }
+          ]
+        },
+        {
+          "row": 5,
+          "cells": [
+            {
+              "col": "A",
+              "value": "一、审计目标:",
+              "type": "s"
+            },
+            {
+              "col": "B",
+              "value": "在建工程以恰当的金额包括在财务报表中，与之相关的计价或分摊调整已恰当记录，相关披露已得到恰当计量和描述 ",
+              "type": "s"
+            }
+          ]
+        },
+        {
+          "row": 6,
+          "cells": [
+            {
+              "col": "A",
+              "value": "二、审计过程：",
+              "type": "s"
+            }
+          ]
+        },
+        {
+          "row": 7,
+          "cells": [
+            {
+              "col": "A",
+              "value": "（一）资产的公允价值减去处置费用后的净额",
+              "type": "s"
+            }
+          ]
+        },
+        {
+          "row": 8,
+          "cells": [
+            {
+              "col": "A",
+              "value": "工程项目名称",
+              "type": "s"
+            },
+            {
+              "col": "B",
+              "value": "公允价值",
+              "type": "s"
+            },
+            {
+              "col": "H",
+              "value": "处置费用（资产处置的直接归属费用）",
+              "type": "s"
+            },
+            {
+              "col": "N",
+              "value": "公允价值-处置费用",
+              "type": "s"
+            },
+            {
+              "col": "O",
+              "value": "备注",
+              "type": "s"
+            }
+          ]
+        }
+      ],
+      "formula_count": 41
+    },
+    {
+      "sheet_name": "关联交易检查表H2-17",
+      "max_row": 102,
+      "max_column": 15,
+      "column_count": 15,
+      "merged_ranges": [
+        "A2:N2",
+        "A1:N1"
+      ],
+      "headers": [
+        {
+          "row": 1,
+          "cells": [
+            {
+              "col": "A",
+              "col_idx": 1,
+              "value": "致同会计师事务所"
+            }
+          ]
+        },
+        {
+          "row": 2,
+          "cells": [
+            {
+              "col": "A",
+              "col_idx": 1,
+              "value": "关联交易检查表"
+            }
+          ]
+        },
+        {
+          "row": 3,
+          "cells": [
+            {
+              "col": "A",
+              "col_idx": 1,
+              "value": "=底稿目录!A2"
+            },
+            {
+              "col": "F",
+              "col_idx": 6,
+              "value": "=底稿目录!A4"
+            },
+            {
+              "col": "H",
+              "col_idx": 8,
+              "value": "=底稿目录!A6"
+            },
+            {
+              "col": "M",
+              "col_idx": 13,
+              "value": "索引号："
+            },
+            {
+              "col": "N",
+              "col_idx": 14,
+              "value": "H2-17"
+            }
+          ]
+        }
+      ],
+      "formula_cells": [
+        {
+          "cell": "A3",
+          "formula": "=底稿目录!A2"
+        },
+        {
+          "cell": "F3",
+          "formula": "=底稿目录!A4"
+        },
+        {
+          "cell": "H3",
+          "formula": "=底稿目录!A6"
+        },
+        {
+          "cell": "A4",
+          "formula": "=底稿目录!A3"
+        },
+        {
+          "cell": "F4",
+          "formula": "=底稿目录!A5"
+        },
+        {
+          "cell": "H4",
+          "formula": "=底稿目录!A7"
+        }
+      ],
+      "data_types": {
+        "s": 49,
+        "n": 1475,
+        "f": 6
+      },
+      "sample_data": [
+        {
+          "row": 4,
+          "cells": [
+            {
+              "col": "A",
+              "value": "=底稿目录!A3",
+              "type": "f"
+            },
+            {
+              "col": "F",
+              "value": "=底稿目录!A5",
+              "type": "f"
+            },
+            {
+              "col": "H",
+              "value": "=底稿目录!A7",
+              "type": "f"
+            },
+            {
+              "col": "M",
+              "value": "页  次：",
+              "type": "s"
+            }
+          ]
+        },
+        {
+          "row": 5,
+          "cells": [
+            {
+              "col": "A",
+              "value": "一、审计目标:",
+              "type": "s"
+            }
+          ]
+        },
+        {
+          "row": 6,
+          "cells": [
+            {
+              "col": "A",
+              "value": "1.资产负债表中记录的在建工程是存在的，且已记录于恰当的账户；2.所有应记录的在建工程均已记录，所有应当包括在财务报表中的相关披露均已包括；3.记录的在建工程由被审计单位拥有或控制。",
+              "type": "s"
+            }
+          ]
+        },
+        {
+          "row": 7,
+          "cells": [
+            {
+              "col": "A",
+              "value": "4.在建工程以恰当的金额包括在财务报表中，与之相关的计价或分摊调整已恰当记录，相关披露已得到恰当计量和描述；5.在建工程已被恰当地汇总或分解且表述清楚，相关披露在按照企业会计准则的编制基础下是相关的、",
+              "type": "s"
+            }
+          ]
+        },
+        {
+          "row": 8,
+          "cells": [
+            {
+              "col": "A",
+              "value": "二、审计过程：",
+              "type": "s"
+            }
+          ]
+        }
+      ],
+      "formula_count": 6
+    }
+  ],
+  "sheet_name_mapping": {
+    "Tab_Index": "底稿目录",
+    "Procedure_Table_H2A": "在建工程实质性程序表H2A",
+    "Adjudication_H2_1": "审定表H2-1",
+    "Disclosure_Listed": "附注披露信息（上市公司）",
+    "Disclosure_SOE": "附注披露信息（国有企业）",
+    "Detail_H2_2": "明细表H2-2",
+    "Adjustment_H2_3": "调整分录汇总H2-3",
+    "Analysis_H2_4": "分析表H2-4",
+    "Transfer_Check_H2_5": "转固时点检查表H2-5",
+    "Review_Record_H2_6": "在建工程审核记录H2-6",
+    "Cost_Comparison_H2_7": "工程造价比较表H2-7",
+    "Addition_Check_H2_8": "增加检查表H2-8",
+    "Decrease_Check_H2_9": "减少检查表H2-9",
+    "Interest_Cap_NoBorrow_H2_10": "利息资本化测算表（无专门借款）H2-10",
+    "Interest_Cap_WithBorrow_H2_11": "利息资本化测算表（有专门借款）H2-11",
+    "Stocktake_Plan_H2_12": "监盘计划H2-12",
+    "Stocktake_Check_H2_13": "盘点检查表H2-13",
+    "Stocktake_Summary_H2_14": "监盘小结H2-14",
+    "Impairment_H2_15": "减值测算表H2-15",
+    "Recoverable_H2_16": "可收回金额测试表H2-16",
+    "Related_Party_H2_17": "关联交易检查表H2-17"
+  },
+  "validation": {
+    "sheet_count_ok": true,
+    "all_sheets_have_data": true,
+    "total_formula_cells": 930,
+    "total_merged_ranges": 270
+  }
+}

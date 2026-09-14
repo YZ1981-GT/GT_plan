@@ -215,6 +215,8 @@ class TestAttachmentService:
         await svc.associate_with_wp(uuid.UUID(att["id"]), seeded_db["wp"].id)
         await db_session.commit()
         items = await svc.get_wp_attachments(seeded_db["wp"].id)
+        if isinstance(items, dict):
+            items = items["items"]
         assert len(items) == 1
 
     @pytest.mark.asyncio
@@ -354,7 +356,15 @@ class TestAttachmentAPI:
         assert resp.status_code == 200
 
     @pytest.mark.asyncio
-    async def test_associate_api(self, client, seeded_db):
+    async def test_associate_api(self, client, seeded_db, monkeypatch):
+        """附件 associate API：本用例聚焦服务层关联写入；可见性门控在 SQLite 夹具下 mock。"""
+        async def _allow(*_a, **_k):
+            return object()
+
+        monkeypatch.setattr(
+            "app.routers.attachments.gate_attachment_associate",
+            _allow,
+        )
         create_resp = await client.post(f"/api/projects/{FAKE_PROJECT_ID}/attachments", json={
             "file_name": "evidence.pdf", "file_path": "/ev", "file_type": "pdf", "file_size": 100,
         })

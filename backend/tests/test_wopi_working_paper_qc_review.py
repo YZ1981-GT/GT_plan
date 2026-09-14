@@ -158,21 +158,104 @@ class TestWOPIHostService:
         content = await svc.get_file(db_session, seeded_db["wp1"].id)
         assert content == b""
 
-    @pytest.mark.asyncio
-    async def test_put_file_increments_version(self, db_session, seeded_db):
-        from app.services.wopi_service import WOPIHostService
-        svc = WOPIHostService()
-        result = await svc.put_file(db_session, seeded_db["wp1"].id, b"content")
-        assert result["version"] == 2
+    # ── Task 19 characterization：WOPI PutFile 的**可观测契约** ────────────────
+    #
+    # spec workpaper-html-onlyoffice-bidirectional-writeback-closure Task 19 把
+    # `put_file` 迁进统一 `ContentMutationService`。跨迁移必须保持的对外契约是：
+    # 「PutFile 成功后返回的 `version` 单调递增」。**不**保持的是它装的是哪个域的数：
+    # 迁移前是 `working_paper.file_version`，迁移后是唯一 business
+    # `content_revision`（Requirement 2.1：`file_version` 不得充当跨通道同步版本）。
+    #
+    # 🔴 载荷从 `b"content"` / `b"v1"` 换成**真实 xlsx 字节**是修正一个既有缺陷，
+    #    不是为了让测试变绿：迁移前 WOPI 会把任意字节当底稿写进存储
+    #    （Requirement 10.8 要求恶意/非 OOXML 载荷必须被拒绝或隔离）。统一入口的
+    #    OOXML 结构校验现在会拒 `b"content"`，这正是期望行为。
+    @staticmethod
+    def _xlsx_bytes(marker: str) -> bytes:
+        """最小合法 xlsx 字节（内容随 `marker` 变，故三次 PutFile 互不幂等）。"""
+        import io
+
+        from openpyxl import Workbook
+
+        book = Workbook()
+        book.active["A1"] = marker
+        buffer = io.BytesIO()
+        book.save(buffer)
+        return buffer.getvalue()
+
+    def test_put_file_version_contract_moved_to_real_postgres(self):
+        """**Validates: Requirements 2.2**
+
+        原来这里有两条 SQLite 断言（`version == 2`、`v1 < v2 < v3`）。Task 19 之后
+        `put_file` 的版本推进走
+        `ContentMutationService.commit(...)`，而那条 lane 的原子性判据是
+        `pg_advisory_xact_lock` + `pg_current_xact_id()` —— SQLite 上**不存在**
+        （实测 `no such function: pg_advisory_xact_lock`）。
+
+        所以「版本单调递增」这条可观测契约整体搬到
+        `backend/tests/workpaper_sync/test_task19_writer_migration_pg.py`（真库），
+        这里只留一条**结构**判据钉住「接线没被拆掉」：`put_file` 必须调
+        `build_content_mutation_service_writer` 与 `commit_bytes`，且自己一个
+        `file_version` 写都没有。
+
+        🔴 这不是降低覆盖：真库那条比 SQLite 版更强（它还断言四张表 `xmin` 全等，
+        即真的单事务）。这里保留结构判据是为了让「有人把统一入口拆掉换回私有计数器」
+        在不连库的环境下也立刻打红。
+        """
+        import ast
+        from pathlib import Path
+
+        source = (
+            Path(__file__).resolve().parents[1] / "app" / "services" / "wopi_service.py"
+        ).read_text(encoding="utf-8-sig")
+        tree = ast.parse(source)
+        put_file = next(
+            node
+            for node in ast.walk(tree)
+            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+            and node.name == "put_file"
+        )
+
+        called = set()
+        for node in ast.walk(put_file):
+            if isinstance(node, ast.Call):
+                func = node.func
+                if isinstance(func, ast.Attribute):
+                    called.add(func.attr)
+                elif isinstance(func, ast.Name):
+                    called.add(func.id)
+        assert "build_content_mutation_service_writer" in called, sorted(called)
+        assert "commit_bytes" in called, sorted(called)
+
+        version_writes = [
+            target.attr
+            for node in ast.walk(put_file)
+            if isinstance(node, (ast.Assign, ast.AugAssign))
+            for target in (
+                node.targets if isinstance(node, ast.Assign) else [node.target]
+            )
+            if isinstance(target, ast.Attribute)
+            and target.attr in {"file_version", "content_revision"}
+        ]
+        assert version_writes == [], (
+            f"put_file 又自己写版本字段了: {version_writes} —— business content revision "
+            "只由 ContentMutationService 的 CAS 推进（Requirement 2.1 / Property 61）"
+        )
 
     @pytest.mark.asyncio
-    async def test_put_file_version_monotonic(self, db_session, seeded_db):
+    async def test_put_file_rejects_a_non_ooxml_payload(self, db_session, seeded_db):
+        """**Validates: Requirements 10.8**
+
+        迁移前 `put_file(b"content")` 会把 7 个字节写成「底稿」。统一入口按版本化安全
+        策略在 stage 阶段拒绝非 OOXML 载荷 —— 这条把「拒绝」钉成可观测行为，防止
+        日后有人为了让上面两条更好写而把校验关掉。
+        """
         from app.services.wopi_service import WOPIHostService
+
         svc = WOPIHostService()
-        r1 = await svc.put_file(db_session, seeded_db["wp1"].id, b"v1")
-        r2 = await svc.put_file(db_session, seeded_db["wp1"].id, b"v2")
-        r3 = await svc.put_file(db_session, seeded_db["wp1"].id, b"v3")
-        assert r1["version"] < r2["version"] < r3["version"]
+        with pytest.raises(Exception) as exc:
+            await svc.put_file(db_session, seeded_db["wp1"].id, b"content")
+        assert "ZIP magic" in str(exc.value) or "zip_magic" in str(exc.value), exc.value
 
     # Lock tests
     def test_lock_success(self):

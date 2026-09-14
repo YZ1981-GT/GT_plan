@@ -1,0 +1,15 @@
+{
+  "stage": "before",
+  "checked_at": "2026-08-24T16:02:33.342057+00:00",
+  "templates": {
+    "backend/wp_templates/K/K11 资产减值损失.xlsx": {
+      "sha256": "dc0e5434b7c8e345913864ce524ad30a0a3729b5655627f3c30bce52294a9190",
+      "bytes": 58013
+    },
+    "backend/wp_templates/C/C24 会计分录 - 细节测试.xlsx": {
+      "sha256": "b70229f48c13a635595b13f74aa199cb2d96ed1106a1661a66cecb7e6e87d5c6",
+      "bytes": 1291610
+    }
+  },
+  "lock_files": []
+}

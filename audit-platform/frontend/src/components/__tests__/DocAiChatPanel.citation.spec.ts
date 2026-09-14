@@ -17,7 +17,8 @@ import ElementPlus from 'element-plus'
 // Mock vue-router
 const mockRouterPush = vi.fn()
 vi.mock('vue-router', () => ({
-  useRoute: () => ({ params: { projectId: 'proj-123' } }),
+  // 与 defaultProps 的 PROJECT_ID 保持一致（vi.mock 工厂被提升，不能引用后声明的常量）
+  useRoute: () => ({ params: { projectId: '22222222-2222-4222-8222-222222222222' } }),
   useRouter: () => ({ push: mockRouterPush }),
 }))
 
@@ -46,12 +47,15 @@ const mockFetch = vi.fn()
 global.fetch = mockFetch
 
 import DocAiChatPanel from '../DocAiChatPanel.vue'
+import { buildWorkpaperHost } from '@/composables/useAiHostContext'
+
+// Task 2 起面板只接受一个 host prop（由宿主 adapter 构造）；引用跳转用的 projectId
+// 取自宿主反查值，不再是裸 prop。ID 必须是合法 UUID —— adapter 会拒绝 'wp-001' 这类形态。
+const WP_ID = '11111111-1111-4111-8111-111111111111'
+const PROJECT_ID = '22222222-2222-4222-8222-222222222222'
 
 const defaultProps = {
-  docType: 'workpaper',
-  docId: 'wp-001',
-  projectId: 'proj-123',
-  year: 2025,
+  host: buildWorkpaperHost({ wpId: WP_ID, projectId: PROJECT_ID, auditYear: 2025 }),
   visible: true,
 }
 
@@ -140,7 +144,7 @@ describe('DocAiChatPanel — 引用来源跳转（需求 3.2, 3.3 / D3）', () =
 
     expect(mockRouterPush).toHaveBeenCalledWith({
       name: 'WorkpaperEditor',
-      params: { projectId: 'proj-123', wpId: 'wp-789' },
+      params: { projectId: PROJECT_ID, wpId: 'wp-789' },
     })
     expect(openSpy).not.toHaveBeenCalled()
   })
@@ -176,7 +180,7 @@ describe('DocAiChatPanel — 引用来源跳转（需求 3.2, 3.3 / D3）', () =
     // 验证 router 导航
     expect(mockRouterPush).toHaveBeenCalledWith({
       name: 'WorkpaperEditor',
-      params: { projectId: 'proj-123', wpId: 'wp-789' },
+      params: { projectId: PROJECT_ID, wpId: 'wp-789' },
     })
 
     // 验证 eventBus 定位事件
@@ -211,7 +215,7 @@ describe('DocAiChatPanel — 引用来源跳转（需求 3.2, 3.3 / D3）', () =
 
     expect(mockRouterPush).toHaveBeenCalledWith({
       name: 'TrialBalance',
-      params: { projectId: 'proj-123' },
+      params: { projectId: PROJECT_ID },
     })
     expect(openSpy).not.toHaveBeenCalled()
   })
@@ -308,7 +312,7 @@ describe('DocAiChatPanel — 引用来源跳转（需求 3.2, 3.3 / D3）', () =
     // 仍然导航到底稿
     expect(mockRouterPush).toHaveBeenCalledWith({
       name: 'WorkpaperEditor',
-      params: { projectId: 'proj-123', wpId: 'wp-100' },
+      params: { projectId: PROJECT_ID, wpId: 'wp-100' },
     })
 
     // 但不触发 eventBus 定位事件

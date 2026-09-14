@@ -42,6 +42,15 @@ vi.mock('@/stores/roleContext', () => ({
   useRoleContextStore: () => mockRoleContext,
 }))
 
+// ─── Mock usePermissionMatrix（P2 Req7: canDo drives canEdit in useAuditContext） ───
+const mockCanDo = vi.fn(() => true)
+vi.mock('@/composables/usePermissionMatrix', () => ({
+  usePermissionMatrix: () => ({
+    canDo: mockCanDo,
+    currentRole: { value: 'auditor' },
+  }),
+}))
+
 let testPinia: Pinia
 
 /** Helper：在 setup 中调用 composable 并返回结果 */
@@ -67,6 +76,7 @@ describe('归档项目按钮 disabled + tooltip — Task 1.5', () => {
     testPinia = createPinia()
     setActivePinia(testPinia)
     mockRoleContext.canEditInProject = true
+    mockCanDo.mockImplementation(() => true)
   })
 
   describe('canEdit 在归档状态下为 false', () => {

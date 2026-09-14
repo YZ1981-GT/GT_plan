@@ -23,6 +23,9 @@ from app.schemas.attachment_lineage_schema import (
     AttachmentLineageCreate,
     AttachmentLineageResponse,
 )
+from app.services.wp_visibility.entry_integration import (
+    enforce_attachment_wp_visibility,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -40,6 +43,13 @@ async def link_attachment(
     current_user: User = Depends(get_current_user),
 ):
     """将附件关联到具体位置（wp_cell / report_row / note_section）。"""
+    # Wp_Bound_Gate 附件可见性隔离（Task 4 / R3 leak_risk → gated，additive）：
+    # 若附件已绑定底稿，要求当前用户对至少一个关联底稿可见（scope_cycles/委派隔离），
+    # 全部不可见 → External_Not_Found(404)；未绑定底稿 → 放行交既有授权（passthrough）。
+    await enforce_attachment_wp_visibility(
+        db, current_user, attachment_id=attachment_id,
+        action="attach_read", method="GET", entrypoint="attachment.read",
+    )
     lineage = AttachmentLineage(
         attachment_id=attachment_id,
         target_type=body.target_type,
@@ -60,6 +70,11 @@ async def get_attachment_links(
     current_user: User = Depends(get_current_user),
 ):
     """查询附件的所有溯源关联。"""
+    # Wp_Bound_Gate 附件可见性隔离（Task 4 / R3 leak_risk → gated，additive）。
+    await enforce_attachment_wp_visibility(
+        db, current_user, attachment_id=attachment_id,
+        action="attach_read", method="GET", entrypoint="attachment.read",
+    )
     stmt = (
         select(AttachmentLineage)
         .where(AttachmentLineage.attachment_id == attachment_id)
@@ -77,6 +92,11 @@ async def unlink_attachment(
     current_user: User = Depends(get_current_user),
 ):
     """删除附件溯源关联。"""
+    # Wp_Bound_Gate 附件可见性隔离（Task 4 / R3 leak_risk → gated，additive）。
+    await enforce_attachment_wp_visibility(
+        db, current_user, attachment_id=attachment_id,
+        action="attach_read", method="GET", entrypoint="attachment.read",
+    )
     stmt = select(AttachmentLineage).where(
         AttachmentLineage.id == link_id,
         AttachmentLineage.attachment_id == attachment_id,

@@ -748,5 +748,7 @@ class WpOfflineImportService:
                 }
                 for name, content in sheets.items()
             ]
-        except Exception:
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).warning("离线导入提取 sheet 数据失败: %s", e)
             return []

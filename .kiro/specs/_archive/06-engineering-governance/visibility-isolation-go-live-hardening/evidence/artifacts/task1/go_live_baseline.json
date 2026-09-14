@@ -1,0 +1,73 @@
+{
+  "spec": "visibility-isolation-go-live-hardening",
+  "artifact": "go_live_baseline",
+  "purpose": "Task 1 baseline: record the 6 Go_Live_Items as built-not-live and distinguish BUILT vs LIVE/ACCEPTED.",
+  "distinction": {
+    "built": "机制代码已实现并在 Parent_Spec 的开发库上以 property/integration 测试验证通过（已构建）。",
+    "live_accepted": "机制在真实生产/运行时被启用、挂载、审计、真实压测与真实浏览器验收，并由本 spec 独立 Closeout Evidence 证明为 LIVE/ACCEPTED（尚未达成）。"
+  },
+  "parent_spec": {
+    "name": "procedure-delegation-visibility-isolation",
+    "status": "closed (Task 1-18 all passed, Completion Guard green)",
+    "evidence": ".kiro/specs/procedure-delegation-visibility-isolation/evidence/manifest.json",
+    "migration_head": "V113",
+    "note": "Parent evidence is cited as proof the 6 mechanisms are BUILT-and-TESTED, NOT that they are LIVE/ACCEPTED."
+  },
+  "go_live_items": [
+    {
+      "id": "GLI-1",
+      "task": "2",
+      "requirement": "1",
+      "title": "启用编辑器令牌强制 (OnlyOffice/WOPI ONLYOFFICE_JWT_ENFORCE)",
+      "status": "built-not-live",
+      "built_proof": "editor_security 令牌绑定/回调重校验恒 fail-closed 校验已构建并测试 (Parent test_editor_security.py)。",
+      "not_live_reason": "settings.ONLYOFFICE_JWT_ENFORCE 默认 False，门拒绝时仅记 warning 放行，生产未启用。"
+    },
+    {
+      "id": "GLI-2",
+      "task": "3",
+      "requirement": "2",
+      "title": "挂载 epoch 失效 Redis dispatcher 到 app.main lifespan",
+      "status": "built-not-live",
+      "built_proof": "InvalidationDispatcher publisher/subscriber 与 PersistentEpochCache 已构建并测试 (Parent test_task13_epoch_cache_rate_profile.py)。",
+      "not_live_reason": "dispatcher 未挂载到 app.main lifespan，≤1s 撤权仅靠 DB epoch 安全网，Fast_Path 未生效。"
+    },
+    {
+      "id": "GLI-3",
+      "task": "4",
+      "requirement": "3",
+      "title": "审计 72 条 native_authz 入口并接门/豁免",
+      "status": "built-not-live",
+      "built_proof": "Route_Coverage_Ledger 与 coverage_guard 已构建，native_authz 基线计数为 72 (Parent test_task16_coverage_guard.py)。",
+      "not_live_reason": "72 条 native_authz 入口未逐条审计为 Leak_Risk(接门) 或 Justified_Allowlist(附理由)。"
+    },
+    {
+      "id": "GLI-4",
+      "task": "5",
+      "requirement": "4",
+      "title": "真实 6000 并发容量验收与冻结生产 Rate_Limit_Profile",
+      "status": "built-not-live",
+      "built_proof": "rate_limit_profile.freeze/CapacityReport 与代表性压测 harness 已构建 (Parent test_task17_capacity_and_role_acceptance.py)。",
+      "not_live_reason": "未真实跑 6000 并发或诚实外推，生产 Rate_Limit_Profile 未以 Capacity_Report_Hash 冻结。"
+    },
+    {
+      "id": "GLI-5",
+      "task": "6",
+      "requirement": "5",
+      "title": "Playwright 8 角色 fresh-context 验收",
+      "status": "built-not-live",
+      "built_proof": "gate/PG 级角色隔离已构建并测试 (Parent test_wp_bound_gate.py / test_task15_full_entry_integration.py)。",
+      "not_live_reason": "未以真实浏览器为 8 个 Acceptance_Role 各建全新 context 执行 fresh navigation 验收。"
+    },
+    {
+      "id": "GLI-6",
+      "task": "7",
+      "requirement": "6",
+      "title": "PR 提交与依赖 spec 交互验证",
+      "status": "built-not-live",
+      "built_proof": "Parent_Spec 实现完成于工作分支。",
+      "not_live_reason": "实现未经 PR 提交，未与 procedure-delegation-notification 依赖 spec 做交互回归区分验证。"
+    }
+  ],
+  "baseline_verdict": "所有 6 项均 built-not-live；Go_Live_Gate 在此基线必须 fail-closed 阻断上线声明。"
+}

@@ -17,9 +17,11 @@ from uuid import UUID
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.services.ledger_import.sign_convention_types import BALANCE_TOLERANCE
 
-# 容差：±1 元
-TOLERANCE = Decimal("1")
+
+# 平衡校验容差：±1 元（统一来源 sign_convention_types.BALANCE_TOLERANCE）
+TOLERANCE = BALANCE_TOLERANCE
 
 
 class DataQualityService:
@@ -84,30 +86,47 @@ class DataQualityService:
         return result.scalar() or 0
 
     async def _check_debit_credit_balance(self, project_id: UUID, year: int) -> dict:
-        """借贷平衡：所有科目期末借方合计 = 期末贷方合计
+        """借贷平衡：从 tb_balance v1 口径校验（与试算表页面同口径）。
 
-        使用 trial_balance 的 audited_amount 按 account_category 分组求和。
-        资产+费用类（asset/expense）余额为正=借方余额
-        负债+权益+收入类（liability/equity/revenue）余额为正=贷方余额
+        tb_balance.closing_balance 是 v1 口径（借正贷负），
+        正数=借方余额，负数=贷方余额。SUM 应≈0（完美平衡）。
+        使用 get_active_filter 确保只查活跃数据集。
         """
-        result = await self.db.execute(sa.text("""
-            SELECT
-                COALESCE(SUM(CASE WHEN account_category IN ('asset', 'expense') THEN audited_amount ELSE 0 END), 0) as debit_total,
-                COALESCE(SUM(CASE WHEN account_category IN ('liability', 'equity', 'revenue') THEN audited_amount ELSE 0 END), 0) as credit_total
-            FROM trial_balance
-            WHERE project_id = :pid AND year = :yr AND is_deleted = false
-        """), {"pid": project_id, "yr": year})
-        row = result.fetchone()
+        from app.models.audit_platform_models import TbBalance
+        from app.services.dataset_query import get_active_filter
+
+        tb = TbBalance.__table__
+        active_filter = await get_active_filter(self.db, tb, project_id, year)
+
+        # v1 口径：正数=借方，负数=贷方，只取一级科目（level=1）防子科目双算
+        result = await self.db.execute(
+            sa.select(
+                sa.func.coalesce(
+                    sa.func.sum(
+                        sa.case((tb.c.closing_balance > 0, tb.c.closing_balance), else_=sa.literal(0))
+                    ), 0
+                ).label("debit_total"),
+                sa.func.coalesce(
+                    sa.func.sum(
+                        sa.case((tb.c.closing_balance < 0, sa.func.abs(tb.c.closing_balance)), else_=sa.literal(0))
+                    ), 0
+                ).label("credit_total"),
+            ).where(
+                active_filter,
+                tb.c.level == 1,
+            )
+        )
+        row = result.first()
 
         if row is None:
             return {
                 "status": "warning",
-                "message": "试算表无数据，无法检查借贷平衡",
+                "message": "余额表无数据，无法检查借贷平衡",
                 "details": {},
             }
 
-        debit_total = Decimal(str(row[0] or 0))
-        credit_total = Decimal(str(row[1] or 0))
+        debit_total = Decimal(str(row.debit_total or 0))
+        credit_total = Decimal(str(row.credit_total or 0))
         diff = abs(debit_total - credit_total)
 
         if diff <= TOLERANCE:
@@ -278,8 +297,48 @@ class DataQualityService:
             }
 
     async def _check_report_balance(self, project_id: UUID, year: int) -> dict:
-        """报表平衡：BS 资产合计 = 负债合计 + 权益合计"""
-        # 查找资产合计、负债合计、权益合计行
+        """报表平衡：BS 资产总计 = 负债和所有者权益总计
+
+        优先用 row_code 精确定位合计行（BS-039 资产总计 / BS-099 负债和所有者
+        权益总计），避免 row_name 模糊匹配的陷阱：
+        - "流动资产合计"/"非流动资产合计" 都含子串"资产合计"，会被误当资产总计；
+        - 真正的"资产总计"不含"资产合计"四字，模糊匹配反而漏掉。
+        row_name 匹配仅作兼容旧 row_code 的 fallback。
+        """
+        # 1. 优先 row_code 精确取数（兼容新旧两套编码）
+        async def _by_code(codes: list[str]) -> Decimal | None:
+            # 用 OR 避免 asyncpg 数组参数兼容问题
+            placeholders = " OR ".join(f"row_code = :c{i}" for i in range(len(codes)))
+            params = {"pid": project_id, "yr": year}
+            params.update({f"c{i}": c for i, c in enumerate(codes)})
+            res = await self.db.execute(sa.text(f"""
+                SELECT current_period_amount FROM financial_report
+                WHERE project_id = :pid AND year = :yr AND report_type = 'balance_sheet'
+                  AND is_deleted = false AND ({placeholders})
+                ORDER BY current_period_amount DESC NULLS LAST
+                LIMIT 1
+            """), params)
+            v = res.scalar_one_or_none()
+            return Decimal(str(v)) if v is not None else None
+
+        asset_total = await _by_code(["BS-039", "BS-021"])
+        liability_equity_total = await _by_code(["BS-099", "BS-057"])
+
+        if asset_total is not None and liability_equity_total is not None:
+            diff = abs(asset_total - liability_equity_total)
+            status = "passed" if diff <= TOLERANCE else "blocking"
+            msg = "资产负债表平衡" if diff <= TOLERANCE else f"资产负债表不平衡，差异 {diff:.2f} 元"
+            return {
+                "status": status,
+                "message": msg,
+                "details": {
+                    "asset_total": str(asset_total),
+                    "liability_equity_total": str(liability_equity_total),
+                    "difference": str(diff),
+                },
+            }
+
+        # 2. Fallback：row_name 模糊匹配（精确区分"总计"与子合计）
         result = await self.db.execute(sa.text("""
             SELECT row_name, current_period_amount
             FROM financial_report
@@ -306,7 +365,8 @@ class DataQualityService:
             name = row[0] or ""
             amount = Decimal(str(row[1] or 0))
 
-            if "资产合计" in name and "负债" not in name:
+            # 排除子合计行（流动/非流动），只认整表总计
+            if ("资产总计" in name) or ("资产合计" in name and "流动" not in name and "负债" not in name):
                 asset_total = amount
             elif "负债和所有者权益" in name or "负债和股东权益" in name:
                 liability_equity_total = amount

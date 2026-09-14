@@ -1,0 +1,286 @@
+{
+  "baseline_inventory_digest": "47f09bed917669c537696e7792f91d27c59103a62222c2dfe537eb82315e8a99",
+  "baseline_counts": {
+    "after_save_still_increments_revision": 0,
+    "artifact_snapshot_writer_not_verifiable": 0,
+    "bypasses_unified_commit": 261,
+    "keeps_legacy_write_path_beside_unified_commit": 0,
+    "missing_required_domain": 0,
+    "multi_resolver": 4,
+    "non_canonical_resolver_only": 64,
+    "owns_direct_commit": 105,
+    "representation_upgrade_increments_business_revision": 0,
+    "retired_writer_not_verifiable": 0,
+    "unadjudicated_resolver": 34,
+    "unadjudicated_writer": 236,
+    "writer_without_characterization_test": 208,
+    "writes_legacy_version_field": 5
+  },
+  "verdict_histogram": {
+    "RED": 5
+  },
+  "injections": [
+    {
+      "id": "I1",
+      "path": "backend/app/routers/wp_html_save.py",
+      "inject": "wp.file_version = int(wp.file_version or 0) + 1",
+      "why": "把 Task 18 删掉的 `file_version` 计数器加回到**已经**经过统一入口的 writer 旁边。这是 Property 4 的双 revision 形态：一次业务应用推进两个计数器",
+      "stale_gate_exit": 2,
+      "stale_gate_refused": true,
+      "gate_exit_after_injection": 1,
+      "criteria_gained": {
+        "keeps_legacy_write_path_beside_unified_commit": [
+          "app.routers.wp_html_save::save_html_data"
+        ],
+        "writes_legacy_version_field": [
+          "app.routers.wp_html_save::save_html_data"
+        ]
+      },
+      "criteria_lost": {},
+      "counts_before": {
+        "after_save_still_increments_revision": 0,
+        "artifact_snapshot_writer_not_verifiable": 0,
+        "bypasses_unified_commit": 261,
+        "keeps_legacy_write_path_beside_unified_commit": 0,
+        "missing_required_domain": 0,
+        "multi_resolver": 4,
+        "non_canonical_resolver_only": 64,
+        "owns_direct_commit": 105,
+        "representation_upgrade_increments_business_revision": 0,
+        "retired_writer_not_verifiable": 0,
+        "unadjudicated_resolver": 34,
+        "unadjudicated_writer": 236,
+        "writer_without_characterization_test": 208,
+        "writes_legacy_version_field": 5
+      },
+      "counts_after": {
+        "after_save_still_increments_revision": 0,
+        "artifact_snapshot_writer_not_verifiable": 0,
+        "bypasses_unified_commit": 261,
+        "keeps_legacy_write_path_beside_unified_commit": 1,
+        "missing_required_domain": 0,
+        "multi_resolver": 4,
+        "non_canonical_resolver_only": 64,
+        "owns_direct_commit": 105,
+        "representation_upgrade_increments_business_revision": 0,
+        "retired_writer_not_verifiable": 0,
+        "unadjudicated_resolver": 34,
+        "unadjudicated_writer": 236,
+        "writer_without_characterization_test": 208,
+        "writes_legacy_version_field": 6
+      },
+      "verdict": "RED",
+      "restored_byte_identical": true,
+      "inventory_digest_restored": true
+    },
+    {
+      "id": "I2",
+      "path": "backend/app/routers/wp_html_save.py",
+      "inject": "wp.parsed_data['_version'] = 2",
+      "why": "Task 3 的原始头号发现：HTML 保存自己拿 `parsed_data._version` 当乐观锁。旧域换个位置（parsed_data 里的键）也必须被认出来",
+      "stale_gate_exit": 2,
+      "stale_gate_refused": true,
+      "gate_exit_after_injection": 1,
+      "criteria_gained": {
+        "keeps_legacy_write_path_beside_unified_commit": [
+          "app.routers.wp_html_save::save_html_data"
+        ],
+        "writes_legacy_version_field": [
+          "app.routers.wp_html_save::save_html_data"
+        ]
+      },
+      "criteria_lost": {},
+      "counts_before": {
+        "after_save_still_increments_revision": 0,
+        "artifact_snapshot_writer_not_verifiable": 0,
+        "bypasses_unified_commit": 261,
+        "keeps_legacy_write_path_beside_unified_commit": 0,
+        "missing_required_domain": 0,
+        "multi_resolver": 4,
+        "non_canonical_resolver_only": 64,
+        "owns_direct_commit": 105,
+        "representation_upgrade_increments_business_revision": 0,
+        "retired_writer_not_verifiable": 0,
+        "unadjudicated_resolver": 34,
+        "unadjudicated_writer": 236,
+        "writer_without_characterization_test": 208,
+        "writes_legacy_version_field": 5
+      },
+      "counts_after": {
+        "after_save_still_increments_revision": 0,
+        "artifact_snapshot_writer_not_verifiable": 0,
+        "bypasses_unified_commit": 261,
+        "keeps_legacy_write_path_beside_unified_commit": 1,
+        "missing_required_domain": 0,
+        "multi_resolver": 4,
+        "non_canonical_resolver_only": 64,
+        "owns_direct_commit": 105,
+        "representation_upgrade_increments_business_revision": 0,
+        "retired_writer_not_verifiable": 0,
+        "unadjudicated_resolver": 34,
+        "unadjudicated_writer": 236,
+        "writer_without_characterization_test": 208,
+        "writes_legacy_version_field": 6
+      },
+      "verdict": "RED",
+      "restored_byte_identical": true,
+      "inventory_digest_restored": true
+    },
+    {
+      "id": "I3",
+      "path": "backend/app/routers/wp_html_save.py",
+      "inject": "await db.commit()",
+      "why": "第二个事务边界：一次业务写入落在两个事务里（Requirement 2.4 / 13.1）。注意它既不写 legacy 字段也不写 content_revision —— 只有把 commit 也算进双 revision 准则里才抓得到",
+      "stale_gate_exit": 2,
+      "stale_gate_refused": true,
+      "gate_exit_after_injection": 1,
+      "criteria_gained": {
+        "keeps_legacy_write_path_beside_unified_commit": [
+          "app.routers.wp_html_save::save_html_data"
+        ],
+        "owns_direct_commit": [
+          "app.routers.wp_html_save::save_html_data"
+        ]
+      },
+      "criteria_lost": {},
+      "counts_before": {
+        "after_save_still_increments_revision": 0,
+        "artifact_snapshot_writer_not_verifiable": 0,
+        "bypasses_unified_commit": 261,
+        "keeps_legacy_write_path_beside_unified_commit": 0,
+        "missing_required_domain": 0,
+        "multi_resolver": 4,
+        "non_canonical_resolver_only": 64,
+        "owns_direct_commit": 105,
+        "representation_upgrade_increments_business_revision": 0,
+        "retired_writer_not_verifiable": 0,
+        "unadjudicated_resolver": 34,
+        "unadjudicated_writer": 236,
+        "writer_without_characterization_test": 208,
+        "writes_legacy_version_field": 5
+      },
+      "counts_after": {
+        "after_save_still_increments_revision": 0,
+        "artifact_snapshot_writer_not_verifiable": 0,
+        "bypasses_unified_commit": 261,
+        "keeps_legacy_write_path_beside_unified_commit": 1,
+        "missing_required_domain": 0,
+        "multi_resolver": 4,
+        "non_canonical_resolver_only": 64,
+        "owns_direct_commit": 106,
+        "representation_upgrade_increments_business_revision": 0,
+        "retired_writer_not_verifiable": 0,
+        "unadjudicated_resolver": 34,
+        "unadjudicated_writer": 236,
+        "writer_without_characterization_test": 208,
+        "writes_legacy_version_field": 5
+      },
+      "verdict": "RED",
+      "restored_byte_identical": true,
+      "inventory_digest_restored": true
+    },
+    {
+      "id": "I4",
+      "path": "backend/app/services/wp_storage_service.py",
+      "inject": "wp.file_version = int(wp.file_version or 0) + 1",
+      "why": "artifact-snapshot 类别的 falsifier：把 Task 19 删掉的伪版本推进加回来 ⇒ 该行重新持久化业务内容 ⇒ **失去**类别、回到门里。证明类别不是一张豁免名单",
+      "stale_gate_exit": 2,
+      "stale_gate_refused": true,
+      "gate_exit_after_injection": 1,
+      "criteria_gained": {
+        "bypasses_unified_commit": [
+          "app.services.wp_storage_service::WpStorageService.save_version"
+        ],
+        "writes_legacy_version_field": [
+          "app.services.wp_storage_service::WpStorageService.save_version"
+        ]
+      },
+      "criteria_lost": {},
+      "counts_before": {
+        "after_save_still_increments_revision": 0,
+        "artifact_snapshot_writer_not_verifiable": 0,
+        "bypasses_unified_commit": 261,
+        "keeps_legacy_write_path_beside_unified_commit": 0,
+        "missing_required_domain": 0,
+        "multi_resolver": 4,
+        "non_canonical_resolver_only": 64,
+        "owns_direct_commit": 105,
+        "representation_upgrade_increments_business_revision": 0,
+        "retired_writer_not_verifiable": 0,
+        "unadjudicated_resolver": 34,
+        "unadjudicated_writer": 236,
+        "writer_without_characterization_test": 208,
+        "writes_legacy_version_field": 5
+      },
+      "counts_after": {
+        "after_save_still_increments_revision": 0,
+        "artifact_snapshot_writer_not_verifiable": 0,
+        "bypasses_unified_commit": 262,
+        "keeps_legacy_write_path_beside_unified_commit": 0,
+        "missing_required_domain": 0,
+        "multi_resolver": 4,
+        "non_canonical_resolver_only": 64,
+        "owns_direct_commit": 105,
+        "representation_upgrade_increments_business_revision": 0,
+        "retired_writer_not_verifiable": 0,
+        "unadjudicated_resolver": 34,
+        "unadjudicated_writer": 236,
+        "writer_without_characterization_test": 208,
+        "writes_legacy_version_field": 6
+      },
+      "verdict": "RED",
+      "restored_byte_identical": true,
+      "inventory_digest_restored": true
+    },
+    {
+      "id": "I5",
+      "path": "backend/app/services/workpaper_sync/excel_instrumentation.py",
+      "inject": "await self._repo.bump_content_revision(wp_id=wp_id, expected=0)",
+      "why": "Property 4 的另一半：纯 representation 升级不得推进业务 revision。升级器不在`entries` 里，所以这条只能由 `representation_upgrade_lane` 分母来判",
+      "stale_gate_exit": 2,
+      "stale_gate_refused": true,
+      "gate_exit_after_injection": 1,
+      "criteria_gained": {
+        "representation_upgrade_increments_business_revision": [
+          "app.services.workpaper_sync.excel_instrumentation::ExcelInstrumentationUpgrader.stage_and_register_candidate"
+        ]
+      },
+      "criteria_lost": {},
+      "counts_before": {
+        "after_save_still_increments_revision": 0,
+        "artifact_snapshot_writer_not_verifiable": 0,
+        "bypasses_unified_commit": 261,
+        "keeps_legacy_write_path_beside_unified_commit": 0,
+        "missing_required_domain": 0,
+        "multi_resolver": 4,
+        "non_canonical_resolver_only": 64,
+        "owns_direct_commit": 105,
+        "representation_upgrade_increments_business_revision": 0,
+        "retired_writer_not_verifiable": 0,
+        "unadjudicated_resolver": 34,
+        "unadjudicated_writer": 236,
+        "writer_without_characterization_test": 208,
+        "writes_legacy_version_field": 5
+      },
+      "counts_after": {
+        "after_save_still_increments_revision": 0,
+        "artifact_snapshot_writer_not_verifiable": 0,
+        "bypasses_unified_commit": 261,
+        "keeps_legacy_write_path_beside_unified_commit": 0,
+        "missing_required_domain": 0,
+        "multi_resolver": 4,
+        "non_canonical_resolver_only": 64,
+        "owns_direct_commit": 105,
+        "representation_upgrade_increments_business_revision": 1,
+        "retired_writer_not_verifiable": 0,
+        "unadjudicated_resolver": 34,
+        "unadjudicated_writer": 236,
+        "writer_without_characterization_test": 208,
+        "writes_legacy_version_field": 5
+      },
+      "verdict": "RED",
+      "restored_byte_identical": true,
+      "inventory_digest_restored": true
+    }
+  ]
+}

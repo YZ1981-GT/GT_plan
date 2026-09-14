@@ -40,18 +40,33 @@ async def search_workpapers(
     results = []
     search_term = f"%{q}%"
 
+    # Wp_Bound_Gate（Task 4 / R3）：底稿名称/编码搜索结果按可见集过滤
+    # （make_bulk_visible_filter）——不可见/跨项目/未委派/scope 外底稿静默剔除，
+    # 杜绝跨 scope 底稿标题/内容泄露（与主列表端点的可见集过滤平行）。
+    from app.services.wp_visibility.entry_integration import make_bulk_visible_filter
+
+    _visible = make_bulk_visible_filter(
+        db, current_user, entrypoint="workpaper.detail", action="read_detail",
+        method="GET", entry_family="search",
+    )
+
     try:
-        # 搜索底稿名称/编码
+        # 搜索底稿名称/编码（仅已实例化底稿；按可见集过滤）
         if not scope or scope == "content":
             stmt = text("""
-                SELECT id, wp_code, wp_name, 'workpaper' as source
-                FROM wp_index
-                WHERE project_id = :pid
-                  AND (wp_name ILIKE :q OR wp_code ILIKE :q)
+                SELECT wi.id AS wi_id, wi.wp_code, wi.wp_name, wp.id AS wp_id,
+                       'workpaper' as source
+                FROM wp_index wi
+                JOIN working_paper wp
+                  ON wp.wp_index_id = wi.id AND wp.is_deleted = false
+                WHERE wi.project_id = :pid
+                  AND (wi.wp_name ILIKE :q OR wi.wp_code ILIKE :q)
                 LIMIT :lim
             """)
             result = await db.execute(stmt, {"pid": str(project_id), "q": search_term, "lim": limit})
             for row in result.fetchall():
+                if not await _visible(row[3], None):
+                    continue  # 不可见底稿静默剔除（不泄露存在性）
                 results.append({
                     "id": str(row[0]),
                     "title": row[2] or row[1],
@@ -82,10 +97,11 @@ async def search_workpapers(
         # 搜索附件
         if not scope or scope == "attachment":
             stmt = text("""
-                SELECT id, original_filename, 'attachment' as source
+                -- attachments 的列真名是 original_file_name（无 original_filename）
+                SELECT id, original_file_name, 'attachment' as source
                 FROM attachments
                 WHERE project_id = :pid
-                  AND original_filename ILIKE :q
+                  AND original_file_name ILIKE :q
                   AND is_deleted = false
                 LIMIT :lim
             """)
@@ -98,8 +114,9 @@ async def search_workpapers(
                     "match_field": "filename",
                 })
 
-    except Exception:
-        pass  # Return partial results on error
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).warning("底稿搜索失败，返回部分结果: %s", e)  # Return partial results on error
 
     return {
         "query": q,

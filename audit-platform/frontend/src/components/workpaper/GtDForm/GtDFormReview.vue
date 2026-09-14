@@ -365,7 +365,7 @@ function onLinkedWorkpaperClick(refCode: string) {
 
 <style scoped>
 .gt-d-form-review { display: flex; flex-direction: column; gap: 16px; padding: 16px; }
-.gt-dfr__header { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; padding: 10px 14px; background: var(--gt-color-bg-soft, #f5f7fa); border-radius: 6px; font-size: 13px; }
+.gt-dfr__header { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; padding: 10px 14px; background: var(--gt-color-bg-soft, #f5f7fa); border-radius: 6px; font-size: var(--wp-font-size, 13px); }
 .gt-dfr__header-meta { display: flex; align-items: center; gap: 16px; }
 .gt-dfr__header-right { display: flex; align-items: center; gap: 10px; }
 .gt-dfr__entity { font-weight: 600; }
@@ -378,7 +378,7 @@ function onLinkedWorkpaperClick(refCode: string) {
 .gt-dfr__state-final { font-size: 12px; color: var(--el-text-color-secondary); }
 .gt-dfr__audit-log { margin-top: 12px; }
 .gt-dfr__log-item { display: flex; flex-direction: column; gap: 4px; }
-.gt-dfr__log-line { display: flex; align-items: center; gap: 6px; font-size: 13px; }
+.gt-dfr__log-line { display: flex; align-items: center; gap: 6px; font-size: var(--wp-font-size, 13px); }
 .gt-dfr__log-meta { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--el-text-color-secondary); }
 .gt-dfr__context { border: 1px solid var(--el-border-color-light); border-radius: 6px; padding: 12px 16px; }
 .gt-dfr__steps { border: 1px solid var(--el-border-color-light); border-radius: 6px; padding: 16px; }

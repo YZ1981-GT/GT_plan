@@ -1,0 +1,350 @@
+{
+  "schema_version": "f-cycle-deletion-plan:v1",
+  "task": "Task 48",
+  "spec": "workpaper-html-onlyoffice-bidirectional-writeback-closure",
+  "description": "F 循环 Excel 独立 entry 的 legacy dual-mode composable 删除清册。裁决字段逐条与 backend/data/workpaper_sync_f_cycle_manifest_slice.json 同源（capability 全为 null、html_counterpart_verdict 全为 exists），理由按 AC 12.8 的真判据（有无 HTML 对端）写，不得出现「无 adapter / 无 contract / 无 bundle」这类循环论证。删除动作本身归 Task 66（生成计划）/ Task 72（执行删除）—— 本计划只是清册，不在 Task 48 内执行删除。",
+  "paradigm_ref": "backend/data/workpaper_sync_migration_paradigm.json",
+  "adjudication_source_of_truth": "backend/data/workpaper_sync_f_cycle_manifest_slice.json#independent_entries",
+  "deletion_execution_owner": "Task 66（plan）/ Task 72（execute）",
+  "pilot_already_migrated": {
+    "entry_id": null,
+    "pilot_class": null,
+    "task": null,
+    "note": "F 循环**没有**任何 pilot：workpaper_sync_contracts/ 下 4 条生产契约（b60.hour_budget / d2.receivable_detail / g7.soe_subsidiary_disclosure / h1.disposal_check）的 review.entry_id 无一属 F 循环，adapters/registry.py 的 DELIVERED_PER_ENTRY_CONTRACTS 同样无 F 条目。这与 D 循环（D2 是 Task 41 pilot）形态不同，故本字段全为 null 而不是省略 —— 省略会让读者以为「忘了填」。"
+  },
+  "shared_base_preserved": {
+    "file": "audit-platform/frontend/src/components/workpaper/composables/useWorkpaperEntryDualMode.ts",
+    "reason": "F 循环的 8 个 entry 级 composable **都不是**它的 wrapper（实测 8 个文件里 useWorkpaperEntryDualMode 零引用），这与 D 循环的 useD1EntryDualMode 等 6 个 wrapper 形态不同 —— F 循环的 dual-mode 是各自独立实现（54~192 行）。该共享基座仍被 G2/J2/J3/M10 等非 F 循环 entry 使用，NOT deleted。",
+    "remaining_consumers_after_f_cycle": [
+      "audit-platform/frontend/src/components/workpaper/composables/useG2DualMode.ts",
+      "audit-platform/frontend/src/components/workpaper/composables/useJ2DualMode.ts",
+      "audit-platform/frontend/src/components/workpaper/composables/useJ3DualMode.ts",
+      "audit-platform/frontend/src/components/workpaper/composables/useM10DualMode.ts"
+    ],
+    "f_cycle_does_not_consume_it": true
+  },
+  "entries": [
+    {
+      "entry_id": "xlsx/gt-f1-prepayment",
+      "wp_code_pattern": "F1P",
+      "host_component": "audit-platform/frontend/src/components/workpaper/GtF1Prepayment.vue",
+      "capability_adjudication": null,
+      "capability_verdict_stage": "pipeline_entry_pending_definition_delivery",
+      "capability_target": "bidirectional",
+      "html_counterpart_verdict": "exists",
+      "adjudication_reason": "按 AC 12.8 的真判据（有无 HTML 对端）实测：本 entry 的业务内容真实存在于 checklist_responses（primary managed table `F1-det-rows` 存 JSON 行数组，行身份 `rowId` 由 useF1Detail.generateRowId() 生成，owner 常量 ITEM_ID_ROWS），模板依据 `F/F1 预付账款.xlsx!明细表F1-2!A12` = '债权人名称' ⇒ html_counterpart_verdict = exists ⇒ **不得**标 single_onlyoffice。同时 AC 12.1 的六件前置未交付 ⇒ 也不得标 bidirectional，capability 终态未定（见 slice 的 blocking_preconditions BP-1..BP-4）。",
+      "html_counterpart_source_refs": [
+        "audit-platform/frontend/src/components/workpaper/GtF1Prepayment.vue#L19",
+        "audit-platform/frontend/src/components/workpaper/composables/useF1FormData.ts",
+        "audit-platform/frontend/src/components/workpaper/composables/useF1Detail.ts",
+        "backend/app/routers/checklist_responses.py#L84",
+        "backend/app/routers/checklist_responses.py#L132",
+        "backend/app/routers/wp_render_strategies/_f1_prepayment.py",
+        "backend/wp_templates/F/F1 预付账款.xlsx!明细表F1-2!A12 = '债权人名称'"
+      ],
+      "legacy_composables_to_delete": [
+        {
+          "file": "audit-platform/frontend/src/components/workpaper/composables/useF1DualMode.ts",
+          "type": "standalone_dual_mode_implementation",
+          "lines": 107,
+          "wraps_shared_base": false,
+          "consumers": [
+            "audit-platform/frontend/src/components/workpaper/GtF1Prepayment.vue"
+          ]
+        }
+      ],
+      "legacy_composables_preserved": [],
+      "localStorage_prefix": null,
+      "action": "delete_entry_composable_and_update_host"
+    },
+    {
+      "entry_id": "xlsx/gt-f2-inventory-main",
+      "wp_code_pattern": "F2I",
+      "host_component": "audit-platform/frontend/src/components/workpaper/GtF2InventoryMain.vue",
+      "capability_adjudication": null,
+      "capability_verdict_stage": "pipeline_entry_pending_definition_delivery",
+      "capability_target": "bidirectional",
+      "html_counterpart_verdict": "exists",
+      "adjudication_reason": "按 AC 12.8 的真判据（有无 HTML 对端）实测：本 entry 的业务内容真实存在于 checklist_responses，且持久化键是**复合键** —— 11 张分类明细表（F2-3~F2-13）共用 dataKey(sheetCode) 拼出的 `${sheetCode}-rows`，F2-2 汇总表另有 8 个 `F2-2-*` 键。模板依据 `F/F2-1至F2-14 …审定明细表类（Leap-常规程序）.xlsx!一、原材料明细表F2-3!A6` = '存货编码' ⇒ html_counterpart_verdict = exists ⇒ **不得**标 single_onlyoffice。AC 12.1 的六件前置未交付 ⇒ 也不得标 bidirectional。另背两条形态缺陷：OO 整册码回落打开会计政策册（BP-5）、载入路径行身份可退化成数组下标（BP-7）。",
+      "html_counterpart_source_refs": [
+        "audit-platform/frontend/src/components/workpaper/GtF2InventoryMain.vue#L16",
+        "audit-platform/frontend/src/components/workpaper/composables/useF2FormData.ts",
+        "audit-platform/frontend/src/components/workpaper/composables/useF2DetailSheet.ts",
+        "backend/app/routers/checklist_responses.py#L84",
+        "backend/app/routers/checklist_responses.py#L132",
+        "backend/app/routers/wp_render_strategies/_f2_inventory_main.py",
+        "backend/wp_templates/F/F2-1至F2-14 存货及跌价准备-审定明细表类（Leap-常规程序）.xlsx!一、原材料明细表F2-3!A6 = '存货编码'"
+      ],
+      "legacy_composables_to_delete": [
+        {
+          "file": "audit-platform/frontend/src/components/workpaper/composables/useF2DualMode.ts",
+          "type": "standalone_dual_mode_implementation",
+          "lines": 125,
+          "wraps_shared_base": false,
+          "consumers": [
+            "audit-platform/frontend/src/components/workpaper/GtF2InventoryMain.vue"
+          ]
+        },
+        {
+          "file": "audit-platform/frontend/src/components/workpaper/composables/useF2InvMaiDualMode.ts",
+          "type": "vestigial_stub",
+          "lines": 11,
+          "wraps_shared_base": false,
+          "consumers": []
+        }
+      ],
+      "legacy_composables_preserved": [],
+      "localStorage_prefix": null,
+      "action": "delete_entry_composable_and_update_host"
+    },
+    {
+      "entry_id": "xlsx/gt-f2-inventory-special",
+      "wp_code_pattern": "F2I",
+      "host_component": "audit-platform/frontend/src/components/workpaper/GtF2InventorySpecial.vue",
+      "capability_adjudication": null,
+      "capability_verdict_stage": "pipeline_entry_pending_definition_delivery",
+      "capability_target": "bidirectional",
+      "html_counterpart_verdict": "exists",
+      "adjudication_reason": "按 AC 12.8 的真判据（有无 HTML 对端）实测：本 entry 的业务内容真实存在于 checklist_responses（primary managed table `F2-55-rows` 存 JSON 对象，products 数组承载行，行身份 `id` 由 newContractCostId() 生成 f2cc- 前缀串，owner 常量 ROWS_KEY），模板依据 `F/F2-55至F2-58 合同履约成本.xlsx!合同履约成本构成明细表F2-55!A5` = '项目编码' ⇒ html_counterpart_verdict = exists ⇒ **不得**标 single_onlyoffice。AC 12.1 的六件前置未交付 ⇒ 也不得标 bidirectional。另叠加 BP-5（整册码回落打开会计政策册）。",
+      "html_counterpart_source_refs": [
+        "audit-platform/frontend/src/components/workpaper/GtF2InventorySpecial.vue#L26",
+        "audit-platform/frontend/src/components/workpaper/composables/useF2SpecialFormData.ts",
+        "audit-platform/frontend/src/components/workpaper/composables/useF2ContractCost.ts",
+        "backend/app/routers/checklist_responses.py#L84",
+        "backend/app/routers/checklist_responses.py#L132",
+        "backend/app/routers/wp_render_strategies/_f2_inventory_special.py",
+        "backend/wp_templates/F/F2-55至F2-58 合同履约成本.xlsx!合同履约成本构成明细表F2-55!A5 = '项目编码'"
+      ],
+      "legacy_composables_to_delete": [
+        {
+          "file": "audit-platform/frontend/src/components/workpaper/composables/useF2SpecialDualMode.ts",
+          "type": "standalone_dual_mode_implementation",
+          "lines": 54,
+          "wraps_shared_base": false,
+          "consumers": [
+            "audit-platform/frontend/src/components/workpaper/GtF2InventorySpecial.vue"
+          ]
+        },
+        {
+          "file": "audit-platform/frontend/src/components/workpaper/composables/useF2InvSpeDualMode.ts",
+          "type": "vestigial_stub",
+          "lines": 11,
+          "wraps_shared_base": false,
+          "consumers": []
+        }
+      ],
+      "legacy_composables_preserved": [],
+      "localStorage_prefix": null,
+      "action": "delete_entry_composable_and_update_host"
+    },
+    {
+      "entry_id": "xlsx/gt-f2-inventory-valuation",
+      "wp_code_pattern": "F2I",
+      "host_component": "audit-platform/frontend/src/components/workpaper/GtF2InventoryValuation.vue",
+      "capability_adjudication": null,
+      "capability_verdict_stage": "pipeline_entry_pending_definition_delivery",
+      "capability_target": "bidirectional",
+      "html_counterpart_verdict": "exists",
+      "adjudication_reason": "按 AC 12.8 的真判据（有无 HTML 对端）实测：本 entry 的业务内容真实存在于 checklist_responses（primary managed table `F2-47-rows` 存 JSON 对象，products 数组承载行，行身份 `id` 由 newImpairmentProductId() 生成 f2imp- 前缀串，owner 常量 ROWS_KEY），模板依据 `F/F2-47至F2-49 …跌价准备测试（Leap应对措施-会计估计）.xlsx!跌价准备测试表F2-47!A18` = '存货类别' ⇒ html_counterpart_verdict = exists ⇒ **不得**标 single_onlyoffice。AC 12.1 的六件前置未交付 ⇒ 也不得标 bidirectional。另叠加 BP-5：本 entry 覆盖的 14 个 sheet 分散在三本工作簿，整册码回落会打开第四本。",
+      "html_counterpart_source_refs": [
+        "audit-platform/frontend/src/components/workpaper/GtF2InventoryValuation.vue#L16",
+        "audit-platform/frontend/src/components/workpaper/composables/useF2ValuationFormData.ts",
+        "audit-platform/frontend/src/components/workpaper/composables/useF2ImpairmentTest.ts",
+        "backend/app/routers/checklist_responses.py#L84",
+        "backend/app/routers/checklist_responses.py#L132",
+        "backend/app/routers/wp_render_strategies/_f2_inventory_valuation_impairment.py",
+        "backend/wp_templates/F/F2-47至F2-49 存货及跌价准备 -跌价准备测试（Leap应对措施-会计估计）.xlsx!跌价准备测试表F2-47!A18 = '存货类别'"
+      ],
+      "legacy_composables_to_delete": [
+        {
+          "file": "audit-platform/frontend/src/components/workpaper/composables/useF2ValuationDualMode.ts",
+          "type": "standalone_dual_mode_implementation",
+          "lines": 55,
+          "wraps_shared_base": false,
+          "consumers": [
+            "audit-platform/frontend/src/components/workpaper/GtF2InventoryValuation.vue"
+          ]
+        },
+        {
+          "file": "audit-platform/frontend/src/components/workpaper/composables/useF2InvValDualMode.ts",
+          "type": "vestigial_stub",
+          "lines": 11,
+          "wraps_shared_base": false,
+          "consumers": []
+        }
+      ],
+      "legacy_composables_preserved": [],
+      "localStorage_prefix": null,
+      "action": "delete_entry_composable_and_update_host"
+    },
+    {
+      "entry_id": "xlsx/gt-f2-stocktake-bundle",
+      "wp_code_pattern": "F2S",
+      "host_component": "audit-platform/frontend/src/components/workpaper/GtF2StocktakeBundle.vue",
+      "capability_adjudication": null,
+      "capability_verdict_stage": "pipeline_entry_pending_definition_delivery",
+      "capability_target": "bidirectional",
+      "html_counterpart_verdict": "exists",
+      "adjudication_reason": "按 AC 12.8 的真判据（有无 HTML 对端）实测：本 entry 的业务内容真实存在于 checklist_responses，且键形态是**双重复合** —— 前端按 sheet 分片（`F2-21-fields` / `F2-21-rows` / `F2-21-note`，行身份 `id` 由 f2StocktakeQuestionnaire.genId() 生成 loc-/per- 前缀串），后端 F2-22/F2-23 的 Word 通道另有 `F2-22-fields` / `F2-23-fields` 常量与 `opaque:{wp_code}#{sheet_code}` 复合 commit entry_id。模板依据 `F/F2-21至F2-26 …盘点类（Leap应对措施- 存货监盘）.xlsx!盘点计划问卷F2-21!A7` = '地点' ⇒ html_counterpart_verdict = exists ⇒ **不得**标 single_onlyoffice。AC 12.1 六件事只有 authority model 一项存在且挂在 docx lane 上 ⇒ 也不得标 bidirectional。另叠加 BP-5 与 BP-9。",
+      "html_counterpart_source_refs": [
+        "audit-platform/frontend/src/components/workpaper/GtF2StocktakeBundle.vue#L23",
+        "audit-platform/frontend/src/components/workpaper/composables/useF2StocktakeFormData.ts",
+        "audit-platform/frontend/src/components/workpaper/composables/useF2StocktakeQuestionnaire.ts",
+        "backend/app/routers/checklist_responses.py#L84",
+        "backend/app/routers/checklist_responses.py#L132",
+        "backend/app/routers/wp_render_strategies/_f2_stocktake.py",
+        "backend/wp_templates/F/F2-21至F2-26 存货及跌价准备 - 盘点类（Leap应对措施- 存货监盘）.xlsx!盘点计划问卷F2-21!A7 = '地点'"
+      ],
+      "legacy_composables_to_delete": [
+        {
+          "file": "audit-platform/frontend/src/components/workpaper/composables/useF2StocktakeDualMode.ts",
+          "type": "standalone_dual_mode_implementation_with_real_sync_calls",
+          "lines": 192,
+          "wraps_shared_base": false,
+          "consumers": [
+            "audit-platform/frontend/src/components/workpaper/GtF2StocktakeBundle.vue"
+          ],
+          "deletion_caveat": "🔴 这个不是纯 legacy 桩：它是全 slice 唯一带 supportsBidirectionalSync() 与真实 plan-sync/summary-sync 调用的 dual-mode，宿主据它渲染「仅预览·无回写」标签。Task 72 执行删除前必须先确认 F2-22/F2-23 的 Word 通道（Tasks 60/61）已经把这些调用迁走，否则删掉会同时砍掉唯一已工作的 from-OO 写回入口。"
+        }
+      ],
+      "legacy_composables_preserved": [],
+      "localStorage_prefix": null,
+      "action": "delete_entry_composable_and_update_host_after_word_lane_migration"
+    },
+    {
+      "entry_id": "xlsx/gt-f3-notes-payable",
+      "wp_code_pattern": "F3N",
+      "host_component": "audit-platform/frontend/src/components/workpaper/GtF3NotesPayable.vue",
+      "capability_adjudication": null,
+      "capability_verdict_stage": "pipeline_entry_pending_definition_delivery",
+      "capability_target": "bidirectional",
+      "html_counterpart_verdict": "exists",
+      "adjudication_reason": "按 AC 12.8 的真判据（有无 HTML 对端）实测：本 entry 的业务内容真实存在于 checklist_responses（primary managed table `F3-2-rows` 存 JSON 行数组，行身份 `rowId` 由 useF3Detail.generateRowId() 生成 f3d- 前缀串，owner 常量 STORAGE_KEY），模板依据 `F/F3 应付票据.xlsx!明细表F3-2!A13` = '票据号' ⇒ html_counterpart_verdict = exists ⇒ **不得**标 single_onlyoffice。同时 AC 12.1 的六件前置未交付 ⇒ 也不得标 bidirectional，capability 终态未定（见 slice 的 blocking_preconditions BP-1..BP-4）。",
+      "html_counterpart_source_refs": [
+        "audit-platform/frontend/src/components/workpaper/GtF3NotesPayable.vue#L39",
+        "audit-platform/frontend/src/components/workpaper/composables/useF3FormData.ts",
+        "audit-platform/frontend/src/components/workpaper/composables/useF3Detail.ts",
+        "backend/app/routers/checklist_responses.py#L84",
+        "backend/app/routers/checklist_responses.py#L132",
+        "backend/app/routers/wp_render_strategies/_f3_notes_payable.py",
+        "backend/wp_templates/F/F3 应付票据.xlsx!明细表F3-2!A13 = '票据号'"
+      ],
+      "legacy_composables_to_delete": [
+        {
+          "file": "audit-platform/frontend/src/components/workpaper/composables/useF3DualMode.ts",
+          "type": "standalone_dual_mode_implementation",
+          "lines": 112,
+          "wraps_shared_base": false,
+          "consumers": [
+            "audit-platform/frontend/src/components/workpaper/GtF3NotesPayable.vue"
+          ]
+        },
+        {
+          "file": "audit-platform/frontend/src/components/workpaper/composables/useF3NotPayDualMode.ts",
+          "type": "vestigial_stub",
+          "lines": 2,
+          "wraps_shared_base": false,
+          "consumers": []
+        }
+      ],
+      "legacy_composables_preserved": [],
+      "localStorage_prefix": null,
+      "action": "delete_entry_composable_and_update_host"
+    },
+    {
+      "entry_id": "xlsx/gt-f4-accounts-payable",
+      "wp_code_pattern": "F4A",
+      "host_component": "audit-platform/frontend/src/components/workpaper/GtF4AccountsPayable.vue",
+      "capability_adjudication": null,
+      "capability_verdict_stage": "pipeline_entry_pending_definition_delivery",
+      "capability_target": "bidirectional",
+      "html_counterpart_verdict": "exists",
+      "adjudication_reason": "按 AC 12.8 的真判据（有无 HTML 对端）实测：本 entry 的业务内容真实存在于 checklist_responses（primary managed table `F4-2-rows` 存 JSON 行数组，行身份 `rowId` 由 useF4Detail.generateRowId() 生成 f4d- 前缀串，owner 常量 STORAGE_KEY），模板依据 `F/F4 应付账款.xlsx!明细表F4-2!A9` = '债权人名称' ⇒ html_counterpart_verdict = exists ⇒ **不得**标 single_onlyoffice。同时 AC 12.1 的六件前置未交付 ⇒ 也不得标 bidirectional，capability 终态未定（见 slice 的 blocking_preconditions BP-1..BP-4）。",
+      "html_counterpart_source_refs": [
+        "audit-platform/frontend/src/components/workpaper/GtF4AccountsPayable.vue#L38",
+        "audit-platform/frontend/src/components/workpaper/composables/useF4FormData.ts",
+        "audit-platform/frontend/src/components/workpaper/composables/useF4Detail.ts",
+        "backend/app/routers/checklist_responses.py#L84",
+        "backend/app/routers/checklist_responses.py#L132",
+        "backend/app/routers/wp_render_strategies/_f4_accounts_payable.py",
+        "backend/wp_templates/F/F4 应付账款.xlsx!明细表F4-2!A9 = '债权人名称'"
+      ],
+      "legacy_composables_to_delete": [
+        {
+          "file": "audit-platform/frontend/src/components/workpaper/composables/useF4DualMode.ts",
+          "type": "standalone_dual_mode_implementation",
+          "lines": 113,
+          "wraps_shared_base": false,
+          "consumers": [
+            "audit-platform/frontend/src/components/workpaper/GtF4AccountsPayable.vue"
+          ]
+        }
+      ],
+      "legacy_composables_preserved": [],
+      "localStorage_prefix": null,
+      "action": "delete_entry_composable_and_update_host"
+    },
+    {
+      "entry_id": "xlsx/gt-f5-cost-of-sales",
+      "wp_code_pattern": "F5C",
+      "host_component": "audit-platform/frontend/src/components/workpaper/GtF5CostOfSales.vue",
+      "capability_adjudication": null,
+      "capability_verdict_stage": "pipeline_entry_pending_definition_delivery",
+      "capability_target": "bidirectional",
+      "html_counterpart_verdict": "exists",
+      "adjudication_reason": "按 AC 12.8 的真判据（有无 HTML 对端）实测：本 entry 的业务内容真实存在于 checklist_responses（primary managed table 写 `F5-2-monthly-rows`、读回退旧键 `F5-2-rows`，行身份 `id` 是 m- 前缀的时间戳+随机串，owner 常量 STORAGE_KEY），模板依据 `F/F5 营业成本.xlsx!主营业务成本月度明细表F5-2!A9` = '项目 月份' ⇒ html_counterpart_verdict = exists ⇒ **不得**标 single_onlyoffice。AC 12.1 的六件前置未交付 ⇒ 也不得标 bidirectional。另背两条形态债务：主表新旧双键并存、载入路径行身份可退化成数组下标（BP-7）。",
+      "html_counterpart_source_refs": [
+        "audit-platform/frontend/src/components/workpaper/GtF5CostOfSales.vue#L29",
+        "audit-platform/frontend/src/components/workpaper/composables/useF5CosSalFormData.ts",
+        "audit-platform/frontend/src/components/workpaper/composables/useF5MonthlyDetail.ts",
+        "backend/app/routers/checklist_responses.py#L84",
+        "backend/app/routers/checklist_responses.py#L132",
+        "backend/app/routers/wp_render_strategies/_f5_cost_of_sales.py",
+        "backend/wp_templates/F/F5 营业成本.xlsx!主营业务成本月度明细表F5-2!A9 = '项目 月份'"
+      ],
+      "legacy_composables_to_delete": [
+        {
+          "file": "audit-platform/frontend/src/components/workpaper/composables/useF5CosOfDualMode.ts",
+          "type": "standalone_dual_mode_implementation",
+          "lines": 101,
+          "wraps_shared_base": false,
+          "consumers": [
+            "audit-platform/frontend/src/components/workpaper/GtF5CostOfSales.vue"
+          ]
+        }
+      ],
+      "legacy_composables_preserved": [],
+      "localStorage_prefix": null,
+      "action": "delete_entry_composable_and_update_host"
+    }
+  ],
+  "excluded_from_plan": [
+    {
+      "what": "F2-22 / F2-23 的 Word 通道 legacy（若有）",
+      "reason": "归 Tasks 60/61，与本 slice 分开计数。本计划只登记 8 条 xlsx entry 的 entry 级 composable。"
+    },
+    {
+      "what": "audit-platform/frontend/src/components/workpaper/composables/useWorkpaperEntryDualMode.ts",
+      "reason": "共享基座，F 循环一条都不消费它（实测 8 个 F composable 里零引用），仍被 G2/J2/J3/M10 使用 ⇒ 不删。"
+    }
+  ],
+  "properties_verified": [
+    21,
+    28,
+    69,
+    70
+  ],
+  "requirements_covered": [
+    "1.4",
+    "6.2",
+    "6.10",
+    "12.1",
+    "12.4",
+    "12.8",
+    "12.9",
+    "12.10",
+    "12.11",
+    "12.12",
+    "14.1"
+  ]
+}

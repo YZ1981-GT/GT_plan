@@ -1,0 +1,63 @@
+{
+  "defect_1_rels_attribute_order": {
+    "id_first_count": 358,
+    "impact_count": 10,
+    "impacted_workbooks": [
+      "A17  重大事项概要程序表.xlsx",
+      "A17-5-1 审计工作完成核对表（适用于财报审计）.xlsx",
+      "A17-5-5  审计工作完成核对表（函证程序）.xlsx",
+      "B60-1 审计项目工时预算与控制表.xlsx",
+      "G4 债权投资.xlsx",
+      "G5 长期应收款.xlsx",
+      "G6 其他债权投资.xlsx",
+      "G7 长期股权投资.xlsx",
+      "H1 固定资产.xlsx",
+      "H10 资产处置损益.xlsx"
+    ],
+    "old_assumption": "Id=\"{rid}\"[^>]*Target=\"...\"（Id 必须排在 Target 之前）",
+    "symbol": "excel_instrumentation._sheet_part_for",
+    "symptom": "InstrumentationError: workbook rels 中找不到 rIdN"
+  },
+  "defect_2_per_element_relationship_namespace": {
+    "fix_is_conditional": "只在根元素缺声明时补，避免改动另外 358 个工作簿的注入字节",
+    "impact_count": 10,
+    "impacted_workbooks": [
+      "A17  重大事项概要程序表.xlsx",
+      "A17-5-1 审计工作完成核对表（适用于财报审计）.xlsx",
+      "A17-5-5  审计工作完成核对表（函证程序）.xlsx",
+      "B60-1 审计项目工时预算与控制表.xlsx",
+      "G4 债权投资.xlsx",
+      "G5 长期应收款.xlsx",
+      "G6 其他债权投资.xlsx",
+      "G7 长期股权投资.xlsx",
+      "H1 固定资产.xlsx",
+      "H10 资产处置损益.xlsx"
+    ],
+    "old_assumption": "根元素声明 xmlns:r",
+    "symbols": [
+      "excel_instrumentation.instrument_workbook_bytes (<sheet> 注入)",
+      "excel_instrumentation._attach_table_part (<tableParts> 注入)"
+    ],
+    "symptom": "xml.etree.ElementTree.ParseError: unbound prefix"
+  },
+  "defect_3_numeric_character_references": {
+    "impact_count": 10,
+    "impacted_workbooks": [
+      "A17  重大事项概要程序表.xlsx",
+      "A17-5-1 审计工作完成核对表（适用于财报审计）.xlsx",
+      "A17-5-5  审计工作完成核对表（函证程序）.xlsx",
+      "B60-1 审计项目工时预算与控制表.xlsx",
+      "G4 债权投资.xlsx",
+      "G5 长期应收款.xlsx",
+      "G6 其他债权投资.xlsx",
+      "G7 长期股权投资.xlsx",
+      "H1 固定资产.xlsx",
+      "H10 资产处置损益.xlsx"
+    ],
+    "old_behaviour": "只还原五个具名实体，&#21512;&#35745; 原样返回",
+    "symbol": "excel_materialize._xml_unescape (+ _decode_numeric_char_refs)",
+    "symptom": "FooterAnchorDriftError: footer marker '合计' 在列 A 上一处都找不到"
+  },
+  "note": "三条同源：同一批 legacy writer 产出的工作簿。缺陷此前潜伏 —— Task 40 的守卫不调 instrument_workbook_bytes，Task 41 的 D2 模板三条都不命中。含 Task 40 的 B60 与 Task 43 的 G7 模板 ⇒ 修好后同时解锁 Task 43。",
+  "total_workbooks_scanned": 369
+}

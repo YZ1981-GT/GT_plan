@@ -1,0 +1,749 @@
+{
+  "shared_files": {
+    "source": "design.md §边界与禁区 R11.3 行",
+    "anchor": "已知需核查清单：",
+    "names": [
+      "_kfgh_cycle_adapters.py",
+      "_cycle_import_export_common.py",
+      "generate_catalog.py",
+      "check_ie_catalog_sync.py",
+      "global_catalog.json",
+      "adjustment_ie_contract.json",
+      "cycleImportExportRegistry.generated.ts",
+      "governance-checks.yml",
+      "test_ie_route_inventory.py",
+      "test_ie_prefix_reachability.py"
+    ]
+  },
+  "resolved_paths": {
+    "_kfgh_cycle_adapters.py": [
+      "backend/app/services/bulk_tab/_kfgh_cycle_adapters.py"
+    ],
+    "_cycle_import_export_common.py": [
+      "backend/app/routers/wp_render_strategies/_cycle_import_export_common.py"
+    ],
+    "generate_catalog.py": [
+      "backend/scripts/acnr/generate_catalog.py"
+    ],
+    "check_ie_catalog_sync.py": [
+      "backend/scripts/acnr/check_ie_catalog_sync.py"
+    ],
+    "global_catalog.json": [
+      "backend/data/acnr/global_catalog.json"
+    ],
+    "adjustment_ie_contract.json": [
+      "backend/data/adjustment_ie_contract.json"
+    ],
+    "cycleImportExportRegistry.generated.ts": [
+      "audit-platform/frontend/src/components/workpaper/shared/cycleImportExportRegistry.generated.ts"
+    ],
+    "governance-checks.yml": [
+      ".github/workflows/governance-checks.yml"
+    ],
+    "test_ie_route_inventory.py": [
+      "backend/tests/test_ie_route_inventory.py"
+    ],
+    "test_ie_prefix_reachability.py": [
+      "backend/tests/test_ie_prefix_reachability.py"
+    ]
+  },
+  "active_specs": {
+    "criterion": "有 tasks.md 且存在 `^\\s*-\\s\\[([ x~-])\\]` 中标记为 ' ' / '-' / '~' 的行",
+    "active": {
+      "e1-variant-recalc-and-mutation-denominator-closure": {
+        "checkbox_total": 19,
+        "unchecked": 12,
+        "tasks_mtime": "2026-08-15T12:42:30+08:00"
+      },
+      "k-cycle-extraction-formula-and-disclosure-closure": {
+        "checkbox_total": 25,
+        "unchecked": 3,
+        "tasks_mtime": "2026-08-15T12:47:08+08:00"
+      },
+      "l-cycle-extraction-formula-and-disclosure-completion": {
+        "checkbox_total": 26,
+        "unchecked": 23,
+        "tasks_mtime": "2026-08-09T23:42:51+08:00"
+      },
+      "procedure-trim-report-line-account-resolution": {
+        "checkbox_total": 16,
+        "unchecked": 16,
+        "tasks_mtime": "2026-08-12T08:59:14+08:00"
+      },
+      "workpaper-import-export-lifecycle-closure": {
+        "checkbox_total": 25,
+        "unchecked": 1,
+        "tasks_mtime": "2026-08-12T23:00:20+08:00"
+      }
+    },
+    "discovered": [
+      "e1-variant-recalc-and-mutation-denominator-closure",
+      "k-cycle-extraction-formula-and-disclosure-closure",
+      "l-cycle-extraction-formula-and-disclosure-completion",
+      "procedure-trim-report-line-account-resolution",
+      "workpaper-import-export-lifecycle-closure"
+    ],
+    "briefing_hint": [
+      "g7-column-alignment-and-extraction-closure",
+      "i-cycle-extraction-formula-and-disclosure-closure",
+      "k-cycle-extraction-formula-and-disclosure-closure",
+      "l-cycle-extraction-formula-and-disclosure-completion",
+      "workpaper-import-export-lifecycle-closure"
+    ],
+    "hint_only_in_briefing": [
+      "g7-column-alignment-and-extraction-closure",
+      "i-cycle-extraction-formula-and-disclosure-closure"
+    ],
+    "hint_missing_from_briefing": [
+      "e1-variant-recalc-and-mutation-denominator-closure",
+      "procedure-trim-report-line-account-resolution"
+    ],
+    "shell_dirs_without_tasks_md": [
+      "_archive",
+      "procedure-delegation-visibility-isolation",
+      "visibility-isolation-go-live-hardening"
+    ]
+  },
+  "findings": {
+    "governance-checks.yml": {
+      "e1-variant-recalc-and-mutation-denominator-closure/tasks.md": [
+        {
+          "line": 178,
+          "text": "- 在 `.github/workflows/governance-checks.yml` 新增 job：A 组前端守卫（vitest）+ B 组后端守卫（pytest）+ 共享件能力守卫 + `--check-anchors` 静态自检"
+        },
+        {
+          "line": 234,
+          "text": "| `.github/workflows/governance-checks.yml` | 带并发 K 循环 +22 未提交改动 | Task 17 用归因型验收 |"
+        }
+      ],
+      "e1-variant-recalc-and-mutation-denominator-closure/design.md": [
+        {
+          "line": 463,
+          "text": "挂进 `governance-checks.yml` 的每个文件路径在干净 checkout 下都存在且被 git 跟踪（沿用本轮复盘的「exists + tracked」判据形态）。"
+        },
+        {
+          "line": 469,
+          "text": "对 `governance-checks.yml` 的验收判据是「变动是否落在本 spec 的字节区间内」，不是「其他 job 一个都没变」—— 并发会话同时改该文件是常态，全局等值型判据必假红。"
+        },
+        {
+          "line": 505,
+          "text": "- 改 `governance-checks.yml` 用 `fs_append` 或精确 `str_replace`，验收用归因型判据（Property 32）。"
+        }
+      ],
+      "k-cycle-extraction-formula-and-disclosure-closure/tasks.md": [
+        {
+          "line": 216,
+          "text": "- `governance-checks.yml` 新增 job `k-cycle-extraction-formula-closure`（10 步）"
+        },
+        {
+          "line": 437,
+          "text": "**任务选择理由**：Task 14/23 当时都不安全 —— 实测 `note_template_soe.json` **35 分钟前**被并发会话改过、`governance-checks.yml` **4.6 分钟前**被改过。Task 22 只新建文件，零冲突。"
+        },
+        {
+          "line": 547,
+          "text": "**交付**：`governance-checks.yml` 新增 job `k-cycle-extraction-formula-closure`（10 步）+ 新建 `backend/tests/test_k_cycle_ci_wiring.py`（13 例）+ 变异 **M54~M60 全 RED**（全量 **60/60 RED**）。"
+        }
+      ],
+      "l-cycle-extraction-formula-and-disclosure-completion/tasks.md": [
+        {
+          "line": 248,
+          "text": "- `governance-checks.yml` 新增后端 + 前端两个 job，把幂等脚本 `--check` 纳入步骤"
+        },
+        {
+          "line": 280,
+          "text": "| `g7-column-alignment-…`（3/21） | 两份 `note_template_*.json` · `governance-checks.yml` | 同上；G7 在改列结构，本 spec 只碰 L 章节 |"
+        }
+      ],
+      "procedure-trim-report-line-account-resolution/tasks.md": [
+        {
+          "line": 195,
+          "text": "- `.github/workflows/governance-checks.yml` 新增两个 job：`report-line-account-resolution`（后端守卫 + 变异脚本）与 `report-line-account-resolution-frontend`（前端两个守卫）"
+        }
+      ],
+      "workpaper-import-export-lifecycle-closure/design.md": [
+        {
+          "line": 604,
+          "text": "`governance-checks.yml` 新增 job 覆盖本 spec 全部守卫；`yaml.safe_load` 可解析且无重名 job。"
+        }
+      ]
+    },
+    "test_ie_route_inventory.py": {
+      "workpaper-import-export-lifecycle-closure/tasks.md": [
+        {
+          "line": 54,
+          "text": "- 新建 `backend/tests/test_ie_route_inventory.py`：**运行期** `app.routes` 分组，口径照抄 design §Data Models 的 `group_ie_routes`（**必须剔除 `{wp_id}`/`{wp_code}` 路径参数段** —— 立项的「87 组」含此误计）"
+        },
+        {
+          "line": 469,
+          "text": "`backend/tests/services/test_wp_download_manifest.py` + `backend/tests/test_ie_route_inventory.py`（Task 2，22 例）·"
+        }
+      ],
+      "workpaper-import-export-lifecycle-closure/design.md": [
+        {
+          "line": 643,
+          "text": "| L4 | `backend/tests/test_ie_route_inventory.py` | **运行期 `app.routes`** 分组（照抄 `group_ie_routes`）+ 三向锁死 + 台账数字固化 |"
+        }
+      ]
+    },
+    "cycleImportExportRegistry.generated.ts": {
+      "workpaper-import-export-lifecycle-closure/tasks.md": [
+        {
+          "line": 137,
+          "text": "- 新建生成脚本 + `cycleImportExportRegistry.generated.ts`：从 ACNR catalog 的 `import_export` 段派生（`apiPrefix`/`sheets[]`/`itemId`/`storageField`）"
+        },
+        {
+          "line": 887,
+          "text": "`cycleImportExportRegistry.generated.ts`（49 前缀，脚本产出）·"
+        }
+      ],
+      "workpaper-import-export-lifecycle-closure/design.md": [
+        {
+          "line": 195,
+          "text": "- 新建 `audit-platform/frontend/src/components/workpaper/shared/cycleImportExportRegistry.generated.ts` —— 由脚本从 ACNR catalog 生成（含 `apiPrefix` / `sheets[]` / `itemId` / `storageField`）。"
+        }
+      ]
+    },
+    "test_ie_prefix_reachability.py": {
+      "workpaper-import-export-lifecycle-closure/tasks.md": [
+        {
+          "line": 169,
+          "text": "- **新增守卫**：`ieWiringIntegrity.spec.ts`（11 例，前端接线闭环）+ `backend/tests/test_ie_prefix_reachability.py`（11 例，路由可达性 + sheet 参数一致性）"
+        }
+      ]
+    },
+    "_kfgh_cycle_adapters.py": {
+      "workpaper-import-export-lifecycle-closure/tasks.md": [
+        {
+          "line": 412,
+          "text": "- **删除后应下调的基线（已实测，前置满足后直接照用）**：`_BASE_IE_MODULES` 99 → 80 · `_BASE_FACTORY_PREFIXES` 62 → 43 · `_TRULY_DEAD_FACTORY_PREFIXES` → 空集 · `IE_ADAPTER_REGISTRY` 97 → 78 · `test_kfgh_cycle_adapters.py` 的 `EXPECTED_PREFIXES[\"CEI"
+        }
+      ]
+    },
+    "global_catalog.json": {
+      "workpaper-import-export-lifecycle-closure/tasks.md": [
+        {
+          "line": 495,
+          "text": "修复已 apply：`backend/data/acnr/global_catalog.json` md5 `4daec223` → `88d0408b`，"
+        }
+      ]
+    }
+  },
+  "supplementary_surface": {
+    "criterion": "本 spec tasks.md 里反引号包裹的文件名，减去 R11.3 十项",
+    "names": [
+      ".generated.ts",
+      ".pbt.spec.ts",
+      ".pbt.test.ts",
+      "GtB23ProcessControl.vue",
+      "GtN2TaxesPayable.vue",
+      "GtN3DeferredTaxLiabilities.vue",
+      "GtN5IncomeTaxExpense.vue",
+      "M4TabAdjustment.vue",
+      "M9TabAdjustment.vue",
+      "N1TabAdjustment.vue",
+      "N1TabCalcTable.vue",
+      "N5TabAdjustment.vue",
+      "WpSamplingMethodologyBar.spec.ts",
+      "_dbprobe.json",
+      "_dbprobe.py",
+      "_dbprobe2.py",
+      "_gs6probe.py",
+      "_i4_peer_policies.py",
+      "_l2_import_export.py",
+      "_matrix.json",
+      "_matrix.py",
+      "_mut1detail.py",
+      "_mut1msg.py",
+      "_mut4_wide.json",
+      "_mut4_wide.py",
+      "_mutate.py",
+      "_mutation.json",
+      "_probe.json",
+      "_probe.py",
+      "_states.py",
+      "_timing.py",
+      "_verify.json",
+      "_verify.py",
+      "_x3_adjustment_import_export.py",
+      "a173ConsultationRecord.pbt.spec.ts",
+      "adjustmentIeContract.spec.ts",
+      "attachments_router.py",
+      "b23ProcessControl.pbt.spec.ts",
+      "baseline_snapshot_x3.json",
+      "catalog_report.json",
+      "check_catalog_drift.py",
+      "check_file_size.py",
+      "check_file_size_guard.py",
+      "check_x3_deviation_registry.py",
+      "checkpoint_7_verification.json",
+      "checkpoint_7_zero_regression_compare.json",
+      "confirmations.py",
+      "conftest.py",
+      "coverage_guard.py",
+      "cycleImportExportRegistry.spec.ts",
+      "deviation_registry.json",
+      "emit_x3_equivalence_proof.py",
+      "entry_coverage_scanner.py",
+      "equivalence_proof.json",
+      "fix_acnr_catalog_ie_gap.py",
+      "fix_x3_adjustment_ie_registration.py",
+      "ieWiringIntegrity.spec.ts",
+      "l2_interest_payable.py",
+      "l_cycle_ie_manifest.yaml",
+      "m1_dividends_payable.py",
+      "m1_dividends_payable_service.py",
+      "m4_capital_reserve.py",
+      "m4_capital_reserve_service.py",
+      "m_cycle_ie_manifest.yaml",
+      "mutate_ie_lifecycle_guards.py",
+      "n3_deferred_tax_liabilities.py",
+      "n_cycle_ie_manifest.yaml",
+      "native_authz_audit.py",
+      "prefill_formula_mapping.json",
+      "registrar_preflight_deviations.json",
+      "review_prompt.py",
+      "route_matrix_x3.json",
+      "shared_file_contention.json",
+      "snap_after.json",
+      "snapshot_x3_baseline.py",
+      "task_17_3_zero_regression_compare.json",
+      "test_adjustment_ie_contract_guard.py",
+      "test_adjustment_ie_wave1_alignment.py",
+      "test_generate_catalog.py",
+      "test_kfgh_cycle_adapters.py",
+      "test_pbt_alias_conflict.py",
+      "test_pbt_determinism.py",
+      "test_pbt_skip_reason.py",
+      "test_single_tab_adapter.py",
+      "test_task16_coverage_guard.py",
+      "test_task18_completion_guard.py",
+      "test_task4_native_authz_audit.py",
+      "test_x3_adapter_host_same_module.py",
+      "test_x3_bulk_strategy_parity.py",
+      "test_x3_catalog_registration.py",
+      "test_x3_column_alignment.py",
+      "test_x3_column_property.py",
+      "test_x3_entry_coverage_ledger.py",
+      "test_x3_ie_catalog_sync_partial_mode.py",
+      "test_x3_ie_manifest_registration.py",
+      "test_x3_ie_registrar.py",
+      "test_x3_key_ledger.py",
+      "test_x3_keyfamily_property.py",
+      "test_x3_legacy_sheet_param.py",
+      "test_x3_parse_property.py",
+      "test_x3_registrar_idempotence_property.py",
+      "test_x3_registrar_preflight_property.py",
+      "test_x3_roundtrip_live.py",
+      "test_x3_roundtrip_property.py",
+      "test_x3_same_origin_property.py",
+      "test_x3_shape_a_wiring.py",
+      "tmp_a.py",
+      "tmp_b.py",
+      "tmp_specs.json",
+      "tmp_t22_base.json",
+      "tmp_t3_contract_probe.py",
+      "tmp_t3_drift_probe.py",
+      "tmp_t3_mutate.py",
+      "tmp_t3_probe.spec.ts",
+      "tmp_t3_report.py",
+      "tmp_t3_setfield_probe.py",
+      "tmp_task25_owner.json",
+      "tmp_x3_b3_migrate.py",
+      "tmp_x3_b3_mutate.py",
+      "tmp_x3_b3_note.py",
+      "tmp_x3_b3_probe.json",
+      "tmp_x3_b3_probe.spec.ts",
+      "tmp_x3_b3_verify.py",
+      "tmp_x3_p10_anchor.py",
+      "tmp_x3_p10_dump.json",
+      "tmp_x3_p10_mutate.py",
+      "tmp_x3_p10_probe.spec.ts",
+      "tmp_x3_p10_res.json",
+      "tmp_x3_p8_dump.json",
+      "tmp_x3_p8_dump.spec.ts",
+      "tmp_x3_p8_mutate.py",
+      "tmp_x3_p8_probe.json",
+      "tmp_x3_p8_probe.spec.ts",
+      "tmp_x3_t16_mut.py",
+      "tmp_x3_t171_mutate.py",
+      "tmp_x3_t172_mutate.py",
+      "tmp_x3_t172_probe.py",
+      "tmp_x3_t173_boundary.py",
+      "tmp_x3_t173_mutate.py",
+      "tmp_x3_t52_mutate.py",
+      "tmp_x3_t52_mutation.json",
+      "tmp_x3_t52_probe.json",
+      "tmp_x3_t52_probe.py",
+      "tmp_x3_t52_verify.json",
+      "tmp_x3_t52_verify.py",
+      "tmp_x3_t53_msg.py",
+      "tmp_x3_t53_mutate.py",
+      "tmp_x3_t53_mutation.json",
+      "tmp_x3_t53_probe.py",
+      "tmp_x3_t53_restore.py",
+      "tmp_x3_t53_timing.py",
+      "tmp_x3_t54_probe.py",
+      "tmp_x3_t55_matrix.json",
+      "tmp_x3_t55_matrix.py",
+      "tmp_x3_t55_probe.py",
+      "tmp_x3_t61_gs6probe.py",
+      "tmp_x3_t61_mut4_wide.json",
+      "tmp_x3_t61_snap3.py",
+      "tmp_x3_t62_attrib.json",
+      "tmp_x3_t62_diff.json",
+      "tmp_x3_t62_gencmp.json",
+      "tmp_x3_t62_mutate.json",
+      "tmp_x3_t62_reverse.json",
+      "tmp_x3_t63_mirror.json",
+      "tmp_x3_t63_probe.py",
+      "tmp_x3_t63_reverse.json",
+      "tmp_x3_t63_task25.py",
+      "tmp_x3_t81_mutate.py",
+      "tmp_x3_t82_mutate.py",
+      "tmp_x3_t83_mutate.py",
+      "tmp_x3_t91b_mutate.py",
+      "tmp_x3_t91b_snap_before.json",
+      "tmp_x3_t92_emit_test.py",
+      "tmp_x3_t92_mutate.py",
+      "tmp_x3_t92_probe.py",
+      "tmp_x3_t93_mutate.py",
+      "tmp_x3_t93_mutation.json",
+      "tmp_x3_task12_mutation_check.py",
+      "useB23ProcessControl.ts",
+      "useI6FormulaEngine.pbt.test.ts",
+      "useL6Adjustment.ts",
+      "useM1Adjustment.ts",
+      "useM2Adjustment.ts",
+      "useM6Adjustment.ts",
+      "useM9Adjustment.ts",
+      "useN5FormData.ts",
+      "use{X}Adjustment.ts",
+      "use{X}FormData.ts",
+      "verify_x3_roundtrip_live.py",
+      "wp_bound_entry_coverage.json",
+      "wp_bulk_router.py",
+      "wp_onlyoffice_router.py",
+      "wp_template.py",
+      "x3KeyExtraction.property.spec.ts",
+      "x3KeyProbe.ts",
+      "x3ReadBackFromResponses.spec.ts",
+      "x3RegistryDerivation.property.spec.ts",
+      "x3StorageFieldMechanism.property.spec.ts",
+      "zero_regression_compare_x3.json",
+      "{X}TabAdjustment.vue"
+    ],
+    "findings": {
+      "mutate_ie_lifecycle_guards.py": {
+        "e1-variant-recalc-and-mutation-denominator-closure/tasks.md": [
+          {
+            "line": 31,
+            "text": "\"🔴 全程不得触碰 mutate_k_cycle_guards.py / mutate_i_cycle_guards.py / mutate_ie_lifecycle_guards.py（在办 spec，Property 18）。\""
+          },
+          {
+            "line": 232,
+            "text": "| `mutate_ie_lifecycle_guards.py` | clean，spec 在办 24/25 | **不碰**，豁免登记 |"
+          },
+          {
+            "line": 270,
+            "text": "**归属查清（AC 5.2 / Property 19）**：`mutate_wp_export_resolver_guards.py` **不入库**。三条判据：① 其变异目标 `wp_export/wp_file_resolver.py` 正是**在办** spec `workpaper-import-export-lifecycle-closure`(24/25) 的核心真源（该 spec 的 design.md 把 `VERDI"
+          },
+          {
+            "line": 272,
+            "text": "**未触碰**：`mutate_k_cycle_guards.py` · `mutate_i_cycle_guards.py` · `mutate_ie_lifecycle_guards.py`（Property 18）。提交用 `git commit -- <pathspec>` 限定 —— 因为 index 里有并发 i-cycle 会话预先 `git add` 的 8 个文件（含 `mutate_i_cycle_guards.py"
+          }
+        ],
+        "e1-variant-recalc-and-mutation-denominator-closure/design.md": [
+          {
+            "line": 385,
+            "text": "`mutate_k_cycle_guards.py` / `mutate_i_cycle_guards.py` / `mutate_ie_lifecycle_guards.py` 三个文件在本 spec 的全部提交中零改动，且未被本 spec `git add`。"
+          },
+          {
+            "line": 504,
+            "text": "- **不动** `mutate_k_cycle_guards.py`（k-cycle 在办，调查时 mtime 距当时 5 分钟内）· `mutate_i_cycle_guards.py`（i-cycle 在办，`A ` staged）· `mutate_ie_lifecycle_guards.py`（wp-import-export 在办）。"
+          }
+        ],
+        "workpaper-import-export-lifecycle-closure/tasks.md": [
+          {
+            "line": 271,
+            "text": "- **交付** `backend/scripts/diagnose/mutate_ie_lifecycle_guards.py`：`--list`（覆盖率 + 缺口）/ `--run`（可按 `--guard` / `--mid` 筛）/ `--include-destructive` / `--restore`"
+          }
+        ],
+        "workpaper-import-export-lifecycle-closure/design.md": [
+          {
+            "line": 649,
+            "text": "| L6 | `backend/scripts/diagnose/mutate_ie_lifecycle_guards.py` | 变异四态判定 / 锚点命中数 = 1 / md5 还原 / `--restore` |"
+          }
+        ]
+      },
+      "tmp_t22_base.json": {
+        "e1-variant-recalc-and-mutation-denominator-closure/tasks.md": [
+          {
+            "line": 65,
+            "text": "- 归属判据不得只看文件名（memory 实证：`tmp_t22_base.json` 名字带 t22 但属他 spec）"
+          },
+          {
+            "line": 199,
+            "text": "- 清理本 spec 自己的 `tmp_*` / `_wip_*` 诊断产物；归属判据 = 前缀 + 内容关键词 + mtime 三条，**不按文件名里的任务号**（`tmp_t22_base.json` 陷阱）"
+          }
+        ]
+      },
+      "prefill_formula_mapping.json": {
+        "k-cycle-extraction-formula-and-disclosure-closure/tasks.md": [
+          {
+            "line": 11,
+            "text": "**Wave 4（公式预设，Task 11~13）与 Wave 2/3 无文件重叠可并行**，但 `prefill_formula_mapping.json` 被 5 个 spec 共享，改前必查 mtime。"
+          },
+          {
+            "line": 374,
+            "text": "2. `test_k0_formula_presets::test_known_bad_sheet_names_still_bad` —— E0 已改用「函证结果汇总表E0-1」，白名单该条须移出（规则「只许变短」）。归 **E 循环 spec 遗留**；`prefill_formula_mapping.json` 当前有并发会话未提交的 954 行插入，本轮不碰该文件。"
+          },
+          {
+            "line": 384,
+            "text": "**并发安全前置**：`prefill_formula_mapping.json` 已稳定 2 天多未被动（mtime 08-12 11:14），活跃并发会话在做 x3 spec 与 consolidation 组件，与 K 无交集。先做 **round-trip 自检**（Property 25）：`json.dumps(indent=2)+尾换行` **逐字复现**原文 ⇒ 写盘只产生我改动部分的 diff，不会重排 429KB 全"
+          },
+          {
+            "line": 446,
+            "text": "| D 公式预设数据 | M28~M41 | `prefill_formula_mapping.json` 的 14 种 JSON 补丁 |"
+          },
+          {
+            "line": 468,
+            "text": "**任务选择理由**：Task 23（CI yml **8.4 分钟前**被并发会话改过）与 Task 12（`prefill_formula_mapping.json` **6 分钟前**被改过）都在活跃编辑窗口内。先核实自己的成果没被回退（`--check` 归零 + 68 守卫全绿，确认并发会话改的是该文件的非 K 部分），再改做 Task 24 —— 新建文件、纯只读、零冲突。"
+          },
+          {
+            "line": 508,
+            "text": "**零回归不用 HEAD-swap**（Requirement 14.8）：本 spec 改的 `prefill_formula_mapping.json` 混着并发会话未提交的成果，换成 HEAD 版会把别人的改动一起换掉、结果无法归因。改用「当前态 → 施加幂等脚本 → 对照」：`fix_k_cycle_prefill_presets.py --check` 归零即证明当前态已是幂等收敛态（本轮已验，且并发会话改动后复验仍归零）。"
+          },
+          {
+            "line": 813,
+            "text": "| `e-cycle-…`（17/24 在跑） | `prefill_formula_mapping.json` | 只改 K 前缀块，改前查 mtime；不并行编辑该文件 |"
+          }
+        ],
+        "k-cycle-extraction-formula-and-disclosure-closure/design.md": [
+          {
+            "line": 36,
+            "text": "L3 公式预设（prefill_formula_mapping.json）"
+          }
+        ],
+        "l-cycle-extraction-formula-and-disclosure-completion/tasks.md": [
+          {
+            "line": 9,
+            "text": "1. **改数据文件一律用幂等脚本**（`--dry-run` / `--check` / `--apply` + round-trip 自检），`prefill_formula_mapping.json` 与两份 `note_template_*.json` 是并发 spec 共享的回退高发文件。"
+          },
+          {
+            "line": 279,
+            "text": "| `e-cycle-…`（16/8） | `prefill_formula_mapping.json` · 两份 `note_template_*.json` | 幂等脚本 + 只显式暂存自己路径 |"
+          }
+        ],
+        "l-cycle-extraction-formula-and-disclosure-completion/design.md": [
+          {
+            "line": 45,
+            "text": "【类 A/B/C】prefill_formula_mapping.json"
+          },
+          {
+            "line": 301,
+            "text": "| 公式预设 | `prefill_formula_mapping.json` | 幂等脚本改写 |"
+          },
+          {
+            "line": 318,
+            "text": "对 `prefill_formula_mapping.json` 中每个 L 类块的每个 cell，其 `TB`/`ADJ`/`AUX`/`LEDGER_DETAIL` 首实参去掉点号子级后，必须 ∈ `L_CYCLE_SPECS[wp].fallback_codes` ∪ `CROSS_CYCLE_ALLOWLIST[(wp, sheet)]`。白名单每条须带理由。"
+          }
+        ]
+      },
+      "wp_bulk_router.py": {
+        "workpaper-import-export-lifecycle-closure/tasks.md": [
+          {
+            "line": 9,
+            "text": "- **场景④不是「零端点」** —— `bulk_tab/` 已有 **14 模块**、`wp_bulk_router.py` 已有 **11 端点**（模板/数据/异步/下载/回传/回滚/进度）+ `ZipAssembler`（sha256 + manifest.json）+ `conflict_resolver` + `snapshot_guard` + `workflow_gate`。缺的只是 UI 入口、归档时点门控、语义标注"
+          }
+        ],
+        "workpaper-import-export-lifecycle-closure/design.md": [
+          {
+            "line": 10,
+            "text": "- **场景④不是「零端点」，而是「已建成一整套但前端没接」**：`backend/app/services/bulk_tab/` 有 **14 个模块 / 约 15.6 万字符**，`wp_bulk_router.py` 有 **11 个端点**（`preview-manifest` / `export-templates` / `export-data` / 两个 async / `export/{task_id}/download"
+          }
+        ]
+      },
+      "cycleImportExportRegistry.spec.ts": {
+        "workpaper-import-export-lifecycle-closure/tasks.md": [
+          {
+            "line": 61,
+            "text": "- 扩展 `components/workpaper/shared/__tests__/cycleImportExportRegistry.spec.ts`：catalog ↔ registry ↔ 真实 `app.routes` 快照**三向**锁死"
+          },
+          {
+            "line": 556,
+            "text": "**交付**：`ieOrphanBaseline.spec.ts`（新建，17 例）+ `cycleImportExportRegistry.spec.ts`（扩展，20 例）。"
+          }
+        ],
+        "workpaper-import-export-lifecycle-closure/design.md": [
+          {
+            "line": 198,
+            "text": "- 守卫 `cycleImportExportRegistry.spec.ts` 扩为**三向**：catalog ↔ generated ↔ 真实 `app.routes` 快照。"
+          },
+          {
+            "line": 644,
+            "text": "| L4 前端 | `components/workpaper/shared/__tests__/cycleImportExportRegistry.spec.ts`（扩展） | catalog ↔ generated ↔ routes 快照三向 + 既有 10 key characterization |"
+          }
+        ]
+      },
+      ".generated.ts": {
+        "workpaper-import-export-lifecycle-closure/tasks.md": [
+          {
+            "line": 137,
+            "text": "- 新建生成脚本 + `cycleImportExportRegistry.generated.ts`：从 ACNR catalog 的 `import_export` 段派生（`apiPrefix`/`sheets[]`/`itemId`/`storageField`）"
+          },
+          {
+            "line": 887,
+            "text": "`cycleImportExportRegistry.generated.ts`（49 前缀，脚本产出）·"
+          }
+        ],
+        "workpaper-import-export-lifecycle-closure/design.md": [
+          {
+            "line": 195,
+            "text": "- 新建 `audit-platform/frontend/src/components/workpaper/shared/cycleImportExportRegistry.generated.ts` —— 由脚本从 ACNR catalog 生成（含 `apiPrefix` / `sheets[]` / `itemId` / `storageField`）。"
+          }
+        ]
+      },
+      "ieWiringIntegrity.spec.ts": {
+        "workpaper-import-export-lifecycle-closure/tasks.md": [
+          {
+            "line": 169,
+            "text": "- **新增守卫**：`ieWiringIntegrity.spec.ts`（11 例，前端接线闭环）+ `backend/tests/test_ie_prefix_reachability.py`（11 例，路由可达性 + sheet 参数一致性）"
+          }
+        ]
+      },
+      "test_kfgh_cycle_adapters.py": {
+        "workpaper-import-export-lifecycle-closure/tasks.md": [
+          {
+            "line": 412,
+            "text": "- **删除后应下调的基线（已实测，前置满足后直接照用）**：`_BASE_IE_MODULES` 99 → 80 · `_BASE_FACTORY_PREFIXES` 62 → 43 · `_TRULY_DEAD_FACTORY_PREFIXES` → 空集 · `IE_ADAPTER_REGISTRY` 97 → 78 · `test_kfgh_cycle_adapters.py` 的 `EXPECTED_PREFIXES[\"CEI"
+          }
+        ]
+      },
+      "l2_interest_payable.py": {
+        "workpaper-import-export-lifecycle-closure/tasks.md": [
+          {
+            "line": 421,
+            "text": "- **收敛方向是删工厂模块、保留专属 router**（不是反过来）：专属 router 除三态端点外还带业务能力 —— `h9_lease_liabilities.py` 有 `generate-amortization`（实际利率法摊销表）· `l2_interest_payable.py` 有 `accrual-check`（L1/L3 vs L2 计提核对）· `m10_other_equity_instruments.py`"
+          }
+        ]
+      },
+      "fix_acnr_catalog_ie_gap.py": {
+        "workpaper-import-export-lifecycle-closure/tasks.md": [
+          {
+            "line": 939,
+            "text": "**交付**：`backend/scripts/fix/fix_acnr_catalog_ie_gap.py`（含 `GAP_REGISTRY` 显式登记表）。"
+          },
+          {
+            "line": 1003,
+            "text": "缺口裁决理由已在 `fix_acnr_catalog_ie_gap.py` 的 `GAP_REGISTRY`（28 条带理由）。"
+          }
+        ]
+      }
+    },
+    "note": "这一层不属 R11.3 字面清单，但同样会被并发会话回退 —— 命中项在改动前须同样核 mtime 与 git status"
+  },
+  "sibling_sheet_intersection": {
+    "criterion": "在其他 active spec 的 tasks/design/requirements.md 里扫 `{父 wp_code}-{数字}`，数字为 3 的（= X-3 本体）不计",
+    "parents_scanned": [
+      "L2",
+      "L6",
+      "M1",
+      "M10",
+      "M2",
+      "M3",
+      "M4",
+      "M5",
+      "M6",
+      "M7",
+      "M8",
+      "M9",
+      "N1",
+      "N2",
+      "N3",
+      "N5"
+    ],
+    "by_parent": {
+      "L2": {
+        "L2-1": {
+          "l-cycle-extraction-formula-and-disclosure-completion/tasks.md": [
+            72
+          ],
+          "l-cycle-extraction-formula-and-disclosure-completion/design.md": [
+            324
+          ],
+          "l-cycle-extraction-formula-and-disclosure-completion/requirements.md": [
+            63
+          ]
+        },
+        "L2-2": {
+          "l-cycle-extraction-formula-and-disclosure-completion/tasks.md": [
+            174,
+            175,
+            175,
+            175,
+            293,
+            293,
+            293,
+            293,
+            330,
+            330
+          ],
+          "l-cycle-extraction-formula-and-disclosure-completion/design.md": [
+            64,
+            66,
+            66,
+            67,
+            71,
+            72
+          ],
+          "l-cycle-extraction-formula-and-disclosure-completion/requirements.md": [
+            25,
+            25,
+            25,
+            25,
+            121,
+            121,
+            121,
+            231,
+            231
+          ]
+        }
+      },
+      "L6": {
+        "L6-1": {
+          "l-cycle-extraction-formula-and-disclosure-completion/tasks.md": [
+            72
+          ],
+          "l-cycle-extraction-formula-and-disclosure-completion/design.md": [
+            324
+          ],
+          "l-cycle-extraction-formula-and-disclosure-completion/requirements.md": [
+            69
+          ]
+        },
+        "L6-2": {
+          "l-cycle-extraction-formula-and-disclosure-completion/tasks.md": [
+            81,
+            319
+          ],
+          "l-cycle-extraction-formula-and-disclosure-completion/design.md": [
+            348
+          ],
+          "l-cycle-extraction-formula-and-disclosure-completion/requirements.md": [
+            85
+          ]
+        }
+      }
+    },
+    "parents_with_intersection": [
+      "L2",
+      "L6"
+    ],
+    "note": "有交集 ⇒ R11.2「L2 / L6 非 X-3 业务表逐字节不变」不是形式条款；本 spec 对这些底稿只许在专属 router 内**追加**形态 A 端点与 IE_SHEETS 常量"
+  },
+  "reproduce": {
+    "script": "backend/scripts/diagnose/snapshot_x3_baseline.py --contention",
+    "per_file_grep": "rg -n --fixed-strings \"{name}\" .kiro/specs/e1-variant-recalc-and-mutation-denominator-closure/tasks.md .kiro/specs/e1-variant-recalc-and-mutation-denominator-closure/design.md .kiro/specs/k-cycle-extraction-formula-and-disclosure-closure/tasks.md .kiro/specs/k-cycle-extraction-formula-and-disclosure-closure/design.md .kiro/specs/l-cycle-extraction-formula-and-disclosure-completion/tasks.md .kiro/specs/l-cycle-extraction-formula-and-disclosure-completion/design.md .kiro/specs/procedure-trim-report-line-account-resolution/tasks.md .kiro/specs/procedure-trim-report-line-account-resolution/design.md .kiro/specs/workpaper-import-export-lifecycle-closure/tasks.md .kiro/specs/workpaper-import-export-lifecycle-closure/design.md",
+    "note": "把 {name} 换成清单里的文件名即可复算；行号与本文件所记一致"
+  }
+}

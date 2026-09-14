@@ -1,0 +1,33 @@
+Task 16 — HTTP/worker Coverage Ledger 漂移守卫 + CI (Route_Drift_Guard)
+Feature: procedure-delegation-visibility-isolation
+Requirements: 13.1-13.15, 16.17, 16.21-16.23
+
+guard clean (bidirectional HTTP+worker ⇔ ledger, no fake-pass): True
+guard findings total: 0  summary: {}
+
+ledger.summary.by_gate:
+  deferred_editor: 5
+  editor_security.validate_editor_token(editor_read): 1
+  editor_security.verify_callback_preconditions + resolve_wp_binding_and_access(editor.file_write): 1
+  gated: 645
+  migrated: 15
+  native_authz: 72
+  not_applicable: 1374
+  resolve_wp_binding_and_access(editor.config): 1
+  resolve_wp_binding_and_access(editor.file_write): 1
+  resolve_wp_binding_and_access(editor.file_write) -> UserCanWrite: 1
+
+wp-bound HTTP classification rollup (total wp-bound http = 749):
+  gated          : 645
+  migrated       : 15
+  editor(desc)   : 5
+  native_authz   : 71
+  not_applicable : 8  (explicit allowlist: 8)
+  deferred_editor: 5  (explicit allowlist: 5)
+  unmigrated     : 0  (MUST be 0)
+
+known pre-existing duplicate registrations (allowlisted, out of scope): 9
+non-HTTP worker classification (native_authz notification dispatcher): ['app.workers.procedure_dispatcher_worker:run']
+
+migration_head: V112
+entry_total: 2116  http_total: 2102  worker_total: 14

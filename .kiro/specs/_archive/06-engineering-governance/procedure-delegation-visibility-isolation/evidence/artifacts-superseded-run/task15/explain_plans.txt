@@ -1,0 +1,231 @@
+# Task 15 · PostgreSQL EXPLAIN (ANALYZE, BUFFERS) — visibility / gate / list
+# Feature: procedure-delegation-visibility-isolation
+# DB: audit_platform (real PostgreSQL). Plans captured on isolated seeded txn.
+
+query_count(grants_for_project, 6 visible wp) = 1  (constant single UNION ALL; no per-workpaper N+1)
+
+==============================================================================
+[1] VISIBILITY UNION ALL (Restricted; lead/assignee/reviewer/lead_history/row_history)
+==============================================================================
+Append  (cost=0.56..82.97 rows=5 width=166) (actual time=0.013..0.156 rows=12 loops=1)
+  Buffers: shared hit=113
+  ->  Nested Loop  (cost=0.56..16.70 rows=1 width=115) (actual time=0.013..0.028 rows=6 loops=1)
+        Buffers: shared hit=21
+        ->  Index Scan using uq_working_paper_project_index on working_paper wp  (cost=0.28..8.30 rows=1 width=16) (actual time=0.007..0.011 rows=6 loops=1)
+              Index Cond: (project_id = 'fc96dc2e-11d7-4f35-8ce9-d02109b99935'::uuid)
+              Filter: ((NOT is_deleted) AND (assigned_to = '94cfaa8f-be92-4280-9444-4c5c3c9d7ca2'::uuid))
+              Buffers: shared hit=3
+        ->  Index Scan using wp_index_pkey on wp_index wi  (cost=0.28..8.30 rows=1 width=18) (actual time=0.002..0.002 rows=1 loops=6)
+              Index Cond: (id = wp.wp_index_id)
+              Filter: ((NOT is_deleted) AND ((audit_cycle)::text = ANY ('{D}'::text[])))
+              Buffers: shared hit=18
+  ->  Nested Loop  (cost=0.28..21.14 rows=1 width=89) (actual time=0.041..0.060 rows=6 loops=1)
+        Buffers: shared hit=49
+        ->  Nested Loop  (cost=0.00..12.74 rows=1 width=22) (actual time=0.039..0.054 rows=6 loops=1)
+              Join Filter: (sm.id = prt.assignee_staff_id)
+              Buffers: shared hit=31
+              ->  Seq Scan on procedure_row_tasks prt  (cost=0.00..7.78 rows=1 width=38) (actual time=0.031..0.032 rows=6 loops=1)
+                    Filter: ((NOT is_deleted) AND ((workflow_status)::text <> 'cancelled'::text) AND (project_id = 'fc96dc2e-11d7-4f35-8ce9-d02109b99935'::uuid))
+                    Rows Removed by Filter: 46
+                    Buffers: shared hit=7
+              ->  Seq Scan on staff_members sm  (cost=0.00..4.95 rows=1 width=16) (actual time=0.003..0.003 rows=1 loops=6)
+                    Filter: ((NOT is_deleted) AND (user_id = '94cfaa8f-be92-4280-9444-4c5c3c9d7ca2'::uuid))
+                    Rows Removed by Filter: 41
+                    Buffers: shared hit=24
+        ->  Index Scan using wp_index_pkey on wp_index wi_1  (cost=0.28..8.30 rows=1 width=18) (actual time=0.001..0.001 rows=1 loops=6)
+              Index Cond: (id = prt.wp_index_id)
+              Filter: ((NOT is_deleted) AND ((audit_cycle)::text = ANY ('{D}'::text[])))
+              Buffers: shared hit=18
+  ->  Nested Loop  (cost=0.28..21.14 rows=1 width=89) (actual time=0.024..0.024 rows=0 loops=1)
+        Buffers: shared hit=31
+        ->  Nested Loop  (cost=0.00..12.74 rows=1 width=22) (actual time=0.024..0.024 rows=0 loops=1)
+              Join Filter: (sm_1.id = prt_1.reviewer_staff_id)
+              Rows Removed by Join Filter: 6
+              Buffers: shared hit=31
+              ->  Seq Scan on procedure_row_tasks prt_1  (cost=0.00..7.78 rows=1 width=38) (actual time=0.006..0.006 rows=6 loops=1)
+                    Filter: ((NOT is_deleted) AND ((workflow_status)::text <> 'cancelled'::text) AND (project_id = 'fc96dc2e-11d7-4f35-8ce9-d02109b99935'::uuid))
+                    Rows Removed by Filter: 46
+                    Buffers: shared hit=7
+              ->  Seq Scan on staff_members sm_1  (cost=0.00..4.95 rows=1 width=16) (actual time=0.003..0.003 rows=1 loops=6)
+                    Filter: ((NOT is_deleted) AND (user_id = '94cfaa8f-be92-4280-9444-4c5c3c9d7ca2'::uuid))
+                    Rows Removed by Filter: 41
+                    Buffers: shared hit=24
+        ->  Index Scan using wp_index_pkey on wp_index wi_2  (cost=0.28..8.30 rows=1 width=18) (never executed)
+              Index Cond: (id = prt_1.wp_index_id)
+              Filter: ((NOT is_deleted) AND ((audit_cycle)::text = ANY ('{D}'::text[])))
+  ->  Unique  (cost=11.97..11.98 rows=1 width=115) (actual time=0.036..0.036 rows=0 loops=1)
+        Buffers: shared hit=9
+        ->  Sort  (cost=11.97..11.98 rows=1 width=115) (actual time=0.036..0.036 rows=0 loops=1)
+              Sort Key: wdh.wp_index_id, wi_3.audit_cycle
+              Sort Method: quicksort  Memory: 25kB
+              Buffers: shared hit=9
+              ->  Nested Loop  (cost=0.28..11.96 rows=1 width=115) (actual time=0.019..0.019 rows=0 loops=1)
+                    Buffers: shared hit=3
+                    ->  Seq Scan on workpaper_delegation_history wdh  (cost=0.00..3.56 rows=1 width=16) (actual time=0.018..0.018 rows=0 loops=1)
+                          Filter: ((project_id = 'fc96dc2e-11d7-4f35-8ce9-d02109b99935'::uuid) AND ((target_role)::text = 'lead'::text) AND ((old_user_id = '94cfaa8f-be92-4280-9444-4c5c3c9d7ca2'::uuid) OR (new_user_id = '94cfaa8f-be92-4280-9444-4c5c3c9d7ca2'::uuid)))
+                          Rows Removed by Filter: 25
+                          Buffers: shared hit=3
+                    ->  Index Scan using wp_index_pkey on wp_index wi_3  (cost=0.28..8.30 rows=1 width=18) (never executed)
+                          Index Cond: (id = wdh.wp_index_id)
+                          Filter: ((NOT is_deleted) AND ((audit_cycle)::text = ANY ('{D}'::text[])))
+  ->  Unique  (cost=11.97..11.98 rows=1 width=421) (actual time=0.006..0.006 rows=0 loops=1)
+        Buffers: shared hit=3
+        ->  Sort  (cost=11.97..11.98 rows=1 width=421) (actual time=0.006..0.006 rows=0 loops=1)
+              Sort Key: wdh_1.wp_index_id, wi_4.audit_cycle, wdh_1.sheet_key
+              Sort Method: quicksort  Memory: 25kB
+              Buffers: shared hit=3
+              ->  Nested Loop  (cost=0.28..11.96 rows=1 width=421) (actual time=0.003..0.003 rows=0 loops=1)
+                    Buffers: shared hit=3
+                    ->  Seq Scan on workpaper_delegation_history wdh_1  (cost=0.00..3.56 rows=1 width=354) (actual time=0.003..0.003 rows=0 loops=1)
+                          Filter: (((target_role)::text = ANY ('{assignee,reviewer}'::text[])) AND (project_id = 'fc96dc2e-11d7-4f35-8ce9-d02109b99935'::uuid) AND ((old_user_id = '94cfaa8f-be92-4280-9444-4c5c3c9d7ca2'::uuid) OR (new_user_id = '94cfaa8f-be92-4280-9444-4c5c3c9d7ca2'::uuid)))
+                          Rows Removed by Filter: 25
+                          Buffers: shared hit=3
+                    ->  Index Scan using wp_index_pkey on wp_index wi_4  (cost=0.28..8.30 rows=1 width=18) (never executed)
+                          Index Cond: (id = wdh_1.wp_index_id)
+                          Filter: ((NOT is_deleted) AND ((audit_cycle)::text = ANY ('{D}'::text[])))
+Planning:
+  Buffers: shared hit=157
+Planning Time: 0.761 ms
+Execution Time: 0.193 ms
+
+==============================================================================
+[2] SINGLE-RESOURCE GATE (UNION narrowed to one wp_index)
+==============================================================================
+Append  (cost=0.56..82.69 rows=5 width=166) (actual time=0.010..0.050 rows=2 loops=1)
+  Buffers: shared hit=29
+  ->  Nested Loop  (cost=0.56..16.61 rows=1 width=115) (actual time=0.009..0.011 rows=1 loops=1)
+        Buffers: shared hit=6
+        ->  Index Scan using idx_working_paper_project_id on working_paper wp  (cost=0.28..8.30 rows=1 width=16) (actual time=0.006..0.006 rows=1 loops=1)
+              Index Cond: (project_id = 'fc96dc2e-11d7-4f35-8ce9-d02109b99935'::uuid)
+              Filter: ((NOT is_deleted) AND (wp_index_id = '96511a64-51f3-40bc-9d57-410cf12cfba0'::uuid) AND (assigned_to = '94cfaa8f-be92-4280-9444-4c5c3c9d7ca2'::uuid))
+              Rows Removed by Filter: 5
+              Buffers: shared hit=3
+        ->  Index Scan using wp_index_pkey on wp_index wi  (cost=0.28..8.30 rows=1 width=18) (actual time=0.003..0.003 rows=1 loops=1)
+              Index Cond: (id = '96511a64-51f3-40bc-9d57-410cf12cfba0'::uuid)
+              Filter: ((NOT is_deleted) AND ((audit_cycle)::text = ANY ('{D}'::text[])))
+              Buffers: shared hit=3
+  ->  Nested Loop  (cost=0.55..21.07 rows=1 width=89) (actual time=0.013..0.014 rows=1 loops=1)
+        Buffers: shared hit=10
+        ->  Nested Loop  (cost=0.27..12.76 rows=1 width=22) (actual time=0.012..0.012 rows=1 loops=1)
+              Join Filter: (sm.id = prt.assignee_staff_id)
+              Buffers: shared hit=7
+              ->  Index Scan using uq_procedure_row_tasks_active on procedure_row_tasks prt  (cost=0.27..7.80 rows=1 width=38) (actual time=0.004..0.005 rows=1 loops=1)
+                    Index Cond: ((project_id = 'fc96dc2e-11d7-4f35-8ce9-d02109b99935'::uuid) AND (wp_index_id = '96511a64-51f3-40bc-9d57-410cf12cfba0'::uuid))
+                    Filter: ((workflow_status)::text <> 'cancelled'::text)
+                    Buffers: shared hit=3
+              ->  Seq Scan on staff_members sm  (cost=0.00..4.95 rows=1 width=16) (actual time=0.007..0.007 rows=1 loops=1)
+                    Filter: ((NOT is_deleted) AND (user_id = '94cfaa8f-be92-4280-9444-4c5c3c9d7ca2'::uuid))
+                    Rows Removed by Filter: 41
+                    Buffers: shared hit=4
+        ->  Index Scan using wp_index_pkey on wp_index wi_1  (cost=0.28..8.30 rows=1 width=18) (actual time=0.001..0.001 rows=1 loops=1)
+              Index Cond: (id = '96511a64-51f3-40bc-9d57-410cf12cfba0'::uuid)
+              Filter: ((NOT is_deleted) AND ((audit_cycle)::text = ANY ('{D}'::text[])))
+              Buffers: shared hit=3
+  ->  Nested Loop  (cost=0.55..21.07 rows=1 width=89) (actual time=0.005..0.005 rows=0 loops=1)
+        Buffers: shared hit=7
+        ->  Nested Loop  (cost=0.27..12.76 rows=1 width=22) (actual time=0.005..0.005 rows=0 loops=1)
+              Join Filter: (sm_1.id = prt_1.reviewer_staff_id)
+              Rows Removed by Join Filter: 1
+              Buffers: shared hit=7
+              ->  Index Scan using uq_procedure_row_tasks_active on procedure_row_tasks prt_1  (cost=0.27..7.80 rows=1 width=38) (actual time=0.001..0.001 rows=1 loops=1)
+                    Index Cond: ((project_id = 'fc96dc2e-11d7-4f35-8ce9-d02109b99935'::uuid) AND (wp_index_id = '96511a64-51f3-40bc-9d57-410cf12cfba0'::uuid))
+                    Filter: ((workflow_status)::text <> 'cancelled'::text)
+                    Buffers: shared hit=3
+              ->  Seq Scan on staff_members sm_1  (cost=0.00..4.95 rows=1 width=16) (actual time=0.003..0.004 rows=1 loops=1)
+                    Filter: ((NOT is_deleted) AND (user_id = '94cfaa8f-be92-4280-9444-4c5c3c9d7ca2'::uuid))
+                    Rows Removed by Filter: 41
+                    Buffers: shared hit=4
+        ->  Index Scan using wp_index_pkey on wp_index wi_2  (cost=0.28..8.30 rows=1 width=18) (never executed)
+              Index Cond: (id = '96511a64-51f3-40bc-9d57-410cf12cfba0'::uuid)
+              Filter: ((NOT is_deleted) AND ((audit_cycle)::text = ANY ('{D}'::text[])))
+  ->  Unique  (cost=11.95..11.96 rows=1 width=115) (actual time=0.013..0.013 rows=0 loops=1)
+        Buffers: shared hit=3
+        ->  Sort  (cost=11.95..11.95 rows=1 width=115) (actual time=0.012..0.013 rows=0 loops=1)
+              Sort Key: wi_3.audit_cycle
+              Sort Method: quicksort  Memory: 25kB
+              Buffers: shared hit=3
+              ->  Nested Loop  (cost=0.28..11.94 rows=1 width=115) (actual time=0.006..0.006 rows=0 loops=1)
+                    Buffers: shared hit=3
+                    ->  Seq Scan on workpaper_delegation_history wdh  (cost=0.00..3.63 rows=1 width=16) (actual time=0.006..0.006 rows=0 loops=1)
+                          Filter: ((wp_index_id = '96511a64-51f3-40bc-9d57-410cf12cfba0'::uuid) AND (project_id = 'fc96dc2e-11d7-4f35-8ce9-d02109b99935'::uuid) AND ((target_role)::text = 'lead'::text) AND ((old_user_id = '94cfaa8f-be92-4280-9444-4c5c3c9d7ca2'::uuid) OR (new_user_id = '94cfaa8f-be92-4280-9444-4c5c3c9d7ca2'::uuid)))
+                          Rows Removed by Filter: 25
+                          Buffers: shared hit=3
+                    ->  Index Scan using wp_index_pkey on wp_index wi_3  (cost=0.28..8.30 rows=1 width=18) (never executed)
+                          Index Cond: (id = '96511a64-51f3-40bc-9d57-410cf12cfba0'::uuid)
+                          Filter: ((NOT is_deleted) AND ((audit_cycle)::text = ANY ('{D}'::text[])))
+  ->  Unique  (cost=11.95..11.96 rows=1 width=421) (actual time=0.005..0.006 rows=0 loops=1)
+        Buffers: shared hit=3
+        ->  Sort  (cost=11.95..11.95 rows=1 width=421) (actual time=0.005..0.005 rows=0 loops=1)
+              Sort Key: wi_4.audit_cycle, wdh_1.sheet_key
+              Sort Method: quicksort  Memory: 25kB
+              Buffers: shared hit=3
+              ->  Nested Loop  (cost=0.28..11.94 rows=1 width=421) (actual time=0.003..0.004 rows=0 loops=1)
+                    Buffers: shared hit=3
+                    ->  Seq Scan on workpaper_delegation_history wdh_1  (cost=0.00..3.63 rows=1 width=354) (actual time=0.003..0.003 rows=0 loops=1)
+                          Filter: (((target_role)::text = ANY ('{assignee,reviewer}'::text[])) AND (wp_index_id = '96511a64-51f3-40bc-9d57-410cf12cfba0'::uuid) AND (project_id = 'fc96dc2e-11d7-4f35-8ce9-d02109b99935'::uuid) AND ((old_user_id = '94cfaa8f-be92-4280-9444-4c5c3c9d7ca2'::uuid) OR (new_user_id = '94cfaa8f-be92-4280-9444-4c5c3c9d7ca2'::uuid)))
+                          Rows Removed by Filter: 25
+                          Buffers: shared hit=3
+                    ->  Index Scan using wp_index_pkey on wp_index wi_4  (cost=0.28..8.30 rows=1 width=18) (never executed)
+                          Index Cond: (id = '96511a64-51f3-40bc-9d57-410cf12cfba0'::uuid)
+                          Filter: ((NOT is_deleted) AND ((audit_cycle)::text = ANY ('{D}'::text[])))
+Planning:
+  Buffers: shared hit=10
+Planning Time: 0.296 ms
+Execution Time: 0.081 ms
+
+==============================================================================
+[3] LIST DEDUPE CTE (DISTINCT ON wp_index + NULLS LAST + wp_index_id ASC)
+==============================================================================
+Limit  (cost=187.39..187.41 rows=6 width=290) (actual time=1.001..1.003 rows=6 loops=1)
+  Buffers: shared hit=127
+  ->  Sort  (cost=187.39..187.41 rows=6 width=290) (actual time=1.000..1.001 rows=6 loops=1)
+        Sort Key: wi.wp_code, wi.id
+        Sort Method: quicksort  Memory: 26kB
+        Buffers: shared hit=127
+        ->  Unique  (cost=187.28..187.31 rows=6 width=290) (actual time=0.992..0.995 rows=6 loops=1)
+              Buffers: shared hit=127
+              ->  Sort  (cost=187.28..187.30 rows=6 width=290) (actual time=0.991..0.993 rows=6 loops=1)
+                    Sort Key: wi.id, wp.file_version DESC NULLS LAST, wp.created_at DESC NULLS LAST
+                    Sort Method: quicksort  Memory: 26kB
+                    Buffers: shared hit=127
+                    ->  Hash Right Join  (cost=44.01..187.21 rows=6 width=290) (actual time=0.113..0.985 rows=6 loops=1)
+                          Hash Cond: (wp.wp_index_id = wi.id)
+                          Buffers: shared hit=124
+                          ->  Seq Scan on working_paper wp  (cost=0.00..135.77 rows=2777 width=122) (actual time=0.009..0.828 rows=2785 loops=1)
+                                Filter: (NOT is_deleted)
+                                Buffers: shared hit=108
+                          ->  Hash  (cost=43.94..43.94 rows=6 width=72) (actual time=0.013..0.013 rows=6 loops=1)
+                                Buckets: 1024  Batches: 1  Memory Usage: 9kB
+                                Buffers: shared hit=13
+                                ->  Bitmap Heap Scan on wp_index wi  (cost=25.73..43.94 rows=6 width=72) (actual time=0.010..0.011 rows=6 loops=1)
+                                      Recheck Cond: (id = ANY ('{96511a64-51f3-40bc-9d57-410cf12cfba0,44f27144-2d2f-44ff-b5cc-411b1956fbc1,cc6ae1c1-83ae-45c5-8e17-a4a3a42603d4,541116af-ccbb-49dd-a66a-2d46d187c179,3d605e14-6d23-4540-967b-c209a413e6b3,b2a52bf8-9efd-47a3-9414-f9200eaaa9ca}'::uuid[]))
+                                      Filter: (NOT is_deleted)
+                                      Heap Blocks: exact=1
+                                      Buffers: shared hit=13
+                                      ->  Bitmap Index Scan on wp_index_pkey  (cost=0.00..25.73 rows=6 width=0) (actual time=0.007..0.007 rows=6 loops=1)
+                                            Index Cond: (id = ANY ('{96511a64-51f3-40bc-9d57-410cf12cfba0,44f27144-2d2f-44ff-b5cc-411b1956fbc1,cc6ae1c1-83ae-45c5-8e17-a4a3a42603d4,541116af-ccbb-49dd-a66a-2d46d187c179,3d605e14-6d23-4540-967b-c209a413e6b3,b2a52bf8-9efd-47a3-9414-f9200eaaa9ca}'::uuid[]))
+                                            Buffers: shared hit=12
+Planning:
+  Buffers: shared hit=70
+Planning Time: 0.219 ms
+Execution Time: 1.026 ms
+
+==============================================================================
+INDEX DECISION
+==============================================================================
+All hot-path predicates resolve through existing indexes/keys:
+  - working_paper: PK(id) + FK(wp_index_id, project_id) + assigned_to filter;
+  - wp_index: PK(id) + (project_id) filter;
+  - procedure_row_tasks: FK(wp_index_id, project_id) + assignee/reviewer_staff_id;
+  - staff_members: PK(id) + user_id;
+  - workpaper_delegation_history: (project_id) + (old/new_user_id) match.
+The visibility query is a single bounded UNION ALL scoped by project_id + user_id +
+audit_cycle = ANY(scope); the list path is a DISTINCT ON over an explicit wp_index id
+ANY(:ids) set. On representative volume the planner already uses index/seq scans whose
+cost is dominated by the bounded row sets, and the query-count is constant (no N+1).
+
+CONCLUSION: EXPLAIN does NOT empirically justify a NEW additive index at this time.
+No index added (spec: add an index ONLY when EXPLAIN proves plan improvement). If a
+future production-scale capacity run (Task 17) shows a scan hotspot, an additive index
+on workpaper_delegation_history(project_id, new_user_id) or working_paper(project_id,
+assigned_to) is the first candidate — to be re-evaluated with a fresh before/after plan.

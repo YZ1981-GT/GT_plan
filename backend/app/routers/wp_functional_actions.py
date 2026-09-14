@@ -186,8 +186,11 @@ async def _get_functional_type(
 ) -> str | None:
     """查询底稿的 functional_type（通过 wp_code 关联 classification 表）"""
     # 先获取底稿的 wp_code
+    # working_paper 无 wp_code 列 —— 它在 wp_index 上，须经 wp_index_id 关联
     result = await db.execute(text(
-        "SELECT wp_code FROM working_papers WHERE id = :wp_id AND project_id = :pid"
+        "SELECT wi.wp_code FROM working_paper wp "
+        "JOIN wp_index wi ON wi.id = wp.wp_index_id "
+        "WHERE wp.id = :wp_id AND wp.project_id = :pid"
     ), {"wp_id": str(wp_id), "pid": str(project_id)})
     row = result.fetchone()
     if not row:
@@ -259,20 +262,12 @@ async def _dispatch_action(
             params.get("year", 2025),
         )
 
-    elif endpoint == "sampling/execute":
-        # 抽凭 — 使用 WpSamplingEngine
-        from app.services.wp_sampling_engine import WpSamplingEngine
-        engine = WpSamplingEngine()
-        return await engine.execute_sampling(
-            db=db,
-            project_id=project_id,
-            year=params.get("year", 2025),
-            account_codes=params.get("account_codes", []),
-            method=params.get("method", "random"),
-            sample_size=params.get("sample_size", 25),
-            amount_threshold=params.get("amount_threshold"),
-            sampling_interval=params.get("sampling_interval"),
-        )
+    # 注：`sampling/execute` 分支已于 sampling-compliance-closure Wave 2 移除。
+    # 它走的是 legacy `WpSamplingEngine`，与 canonical 抽凭链路
+    # （`/sampling/voucher-extract` → `voucher_sampling_algorithms.execute_sampling`）
+    # 口径不同：金额用 debit+credit（canonical 用 GREATEST，一借一贷会翻倍）、
+    # 分层写死 max*0.33/0.66 + 权重 0.2/0.3/0.5（无审计依据）、MUS 用固定 interval、
+    # 且不落 workpaper_extraction_log / 不入批次 / 不可撤销。抽凭一律走 canonical 端点。
 
     else:
         raise ValueError(f"未实现的端点: {endpoint}")
@@ -295,7 +290,7 @@ async def _fill_parsed_data(
 
     # 读取当前 parsed_data
     result = await db.execute(text(
-        "SELECT parsed_data FROM working_papers WHERE id = :wp_id"
+        "SELECT parsed_data FROM working_paper WHERE id = :wp_id"
     ), {"wp_id": str(wp_id)})
     row = result.fetchone()
     if not row:
@@ -320,7 +315,7 @@ async def _fill_parsed_data(
 
     # 写回
     await db.execute(text(
-        "UPDATE working_papers SET parsed_data = :pd::jsonb WHERE id = :wp_id"
+        "UPDATE working_paper SET parsed_data = CAST(:pd AS jsonb) WHERE id = :wp_id"
     ), {"pd": json.dumps(parsed_data, ensure_ascii=False, default=str), "wp_id": str(wp_id)})
     await db.flush()
 

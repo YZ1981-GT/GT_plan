@@ -1,0 +1,13 @@
+{
+  "family": "gate_render",
+  "operative_threshold": 15,
+  "over_threshold_429": true,
+  "per_family": 63,
+  "per_project": 689,
+  "per_user": 15,
+  "per_user_isolated": true,
+  "recovers_after_window": true,
+  "resource_independent": true,
+  "retry_after_valid": 1,
+  "within_threshold_no_false_limit": true
+}

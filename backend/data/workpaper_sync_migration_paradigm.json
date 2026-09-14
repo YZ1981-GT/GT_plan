@@ -1,0 +1,804 @@
+{
+  "schema_version": "migration-paradigm:v1",
+  "frozen_by": "Task 45",
+  "spec": "workpaper-html-onlyoffice-bidirectional-writeback-closure",
+  "description": "可复用的逐 entry legacy→bridge 迁移范式。四个 pilot（B60/D2/H1/G7）验证后冻结，Tasks 46-57 复用此范式。",
+  "paradigm": {
+    "steps": [
+      {
+        "step": 1,
+        "name": "identify_legacy",
+        "description": "从 manifest 确认 entry_id，找到对应的 legacy dual-mode composable 及其宿主",
+        "output": "legacy composable path, host component paths, localStorage prefix"
+      },
+      {
+        "step": 2,
+        "name": "create_deletion_plan",
+        "description": "在 workpaper_sync_pilot_deletion_plan.json 中登记要删除的文件和要更新的宿主",
+        "output": "deletion plan entry"
+      },
+      {
+        "step": 3,
+        "name": "delete_legacy_composable",
+        "description": "物理删除 legacy composable 文件（不留 DEPRECATED 注释）",
+        "constraint": "共享基类（如 useWorkpaperEntryDualMode）如果被其他非 pilot 模块使用则不删"
+      },
+      {
+        "step": 4,
+        "name": "update_host_imports",
+        "description": "宿主 import 从 legacy composable 改为 usePilotBridgeAdapter（或直接用 WorkpaperSyncEditorHost）",
+        "constraint": "宿主只传 entryId/wpId/sheetName + flush/reload 回调"
+      },
+      {
+        "step": 5,
+        "name": "unify_mode_values",
+        "description": "如果旧模式值是 'structured'（B60），统一改为 'html'（bridge 域）",
+        "constraint": "统一键前缀 workpaper-sync-mode:，旧键由 workpaperSyncModeStorage.ts 幂等迁移"
+      },
+      {
+        "step": 6,
+        "name": "verify_no_legacy_endpoints",
+        "description": "确认宿主和 adapter 不再直接调用 /api/workpapers/{wpId}/sheets/{sn}/onlyoffice-config 或 /api/workpapers/onlyoffice/health",
+        "constraint": "这两个端点的调用只能通过 sync bridge 的 materialize 协议"
+      },
+      {
+        "step": 7,
+        "name": "run_post_delete_tests",
+        "description": "运行 test_task45_pilot_legacy_deletion.py 和 usePilotBridgeAdapter.spec.ts",
+        "constraint": "全绿才算通过；evidence 按 source_commit_changed 自动 stale"
+      }
+    ],
+    "constraints": {
+      "no_dual_path": "legacy 和 bridge 不得同时存在。删除后不得保留 fallback/DEPRECATED。",
+      "no_legacy_success_messages": "成功/失败文案由 bridge feedback 管理，adapter 不写第二份。",
+      "entry_id_source_backed": "entry_id 来自 manifest（source-backed），不是手写字符串。",
+      "evidence_stale_on_delete": "删除改变 source commit → 该 entry 的 evidence 自动 stale → 需要 new test run。",
+      "shared_base_preserved": "useWorkpaperEntryDualMode 等被其他非 pilot 模块使用的共享基类不删。",
+      "task_1_2_semantics_preserved": "Task 1/2 的历史 [x] 只代表 discovery/characterization，不代表 adapter 或真实 OO 闭环。"
+    },
+    "pilot_classes_validated": [
+      "simple_checklist (B60)",
+      "d2_large_json (D2)",
+      "h1_grouped_dynamic (H1)",
+      "g7_two_level_dynamic (G7)"
+    ]
+  },
+  "paradigm_registry": {
+    "why_this_key_exists": "Task 45 冻结的顶层 `paradigm` 只覆盖 legacy 删除与宿主改线七步，不覆盖 Tasks 46–57 启用前置要求的 definition producer 活。给它补语义别名必须**不动它的字节**（test_task46_d_cycle_migration.py 依赖 `paradigm.steps` 恰 7 步），所以别名登记在本新增顶层键里，用 JSON Pointer 引用，而不是往 `paradigm` 里加字段。",
+    "paradigms": [
+      {
+        "alias": "legacy_deletion_paradigm",
+        "json_pointer": "/paradigm",
+        "frozen_by": "Task 45",
+        "step_count": 7,
+        "scope": "四个 pilot（B60/D2/H1/G7）迁完后的 legacy composable 物理删除与宿主改线收尾",
+        "frozen_raw_block_sha256": "363c477cd8042073049c627c9f7cf13cf906ace2a5139a13a79197a5897b7f09",
+        "frozen_canonical_sha256": "81f7ce00ee2aa19813faad7b9716d821353ea84325960fc615684d57846245a2",
+        "canonical_recipe": "json.dumps(doc['paradigm'], ensure_ascii=False, indent=2, sort_keys=True) 的 UTF-8 sha256",
+        "immutability": "字节冻结。守卫用硬编码 digest 双向锁死：改了 `paradigm` 而不改守卫 ⇒ 打红；改了守卫常量而不改 `paradigm` ⇒ 打红（本键的 digest 也要与守卫常量相等）。",
+        "does_not_cover": [
+          "逐 entry 读 backend/wp_templates/ 权威模板并冻结 size+sha256",
+          "解析 HTML 对端并给出二值结论（none / exists）",
+          "发布 approved authoritative model immutable definition",
+          "发布人工审核（review_status=reviewed）的 per-entry contract",
+          "发布 non-null approved definition bundle（typed canonical slots）",
+          "经 Task 36 对 Task 17 的 non-current candidate 做校验并 finalize 出 published representation",
+          "注册 adapter、接宿主并产出逐 scenario evidence",
+          "按 AC 12.8 / 12.9 裁决 capability",
+          "按 AC 1.4 / 1.5 收掉不可兑现的模式切换按钮"
+        ],
+        "observed_consequence_of_the_gap": "范式没覆盖上述九件事 ⇒ Tasks 46/47 都走了最省的路：全裁 single_onlyoffice + 写一份 slice。实测 backend/data/workpaper_sync_entry_manifest.json 里 142 个独立 entry 中 adapter_id 非空 = 0，137 个 single_onlyoffice + 5 个 single_html，141 个仍是 legacy_fake_bidirectional；backend/data/workpaper_sync_contracts/ 下的生产 contract 只有 Tasks 40–43 的四个 pilot。照此路径把剩余 entry 全裁 single 就能拿到全绿，而平台真双向能力仍是 0 —— spec 空转。"
+      },
+      {
+        "alias": "definition_producer_paradigm",
+        "json_pointer": "/definition_producer_paradigm",
+        "added_by": "Task 45 范式补全（根因整改，不新增 spec 任务）",
+        "scope": "Tasks 46–57 每个标准 Excel 独立 entry 的 definition producer/consumer 全流程",
+        "source_of_requirement": ".kiro/specs/workpaper-html-onlyoffice-bidirectional-writeback-closure/tasks.md 的「Tasks 46–57 标准 Excel entry 启用前置」段",
+        "why_not_verbatim_locked": "tasks.md 由并发会话在改（复选框与任务正文），对它做逐字锁会产出与本范式无关的假红；逐字锁只施加在 requirements.md 的 AC 上（见 adjudication_criteria.quotation_rule）。"
+      }
+    ]
+  },
+  "definition_producer_paradigm": {
+    "schema_version": "definition-producer-paradigm:v1",
+    "added_by": "Task 45 范式补全",
+    "applies_to_tasks": [46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57],
+    "premise": "每个标准 Excel 独立 entry 都是**自己的** definition producer/consumer：逐 entry 读权威模板与业务模型，发布 approved authority model、人工审核的 per-entry contract 及 non-null approved bundle，再经 Task 36 对 Task 17 的对应 non-current candidate 做 compatibility/roundtrip/visible-equivalence 校验并 finalize 为 published representation，之后才允许注册 adapter、接宿主或标 bidirectional。",
+    "ordering_rule": "steps[].blocks 只能指向**更大**的 step 序号（前向边）；出现回边或环即守卫打红。「裁 single 的 entry 不做 step 5–10」由 step 4 的 blocks + 蕴含关系表达，不是回边。",
+    "cross_entry_rule": "不得跨 entry 复用 contract / bundle / candidate / evidence / scenario（Property 70）",
+    "steps": [
+      {
+        "step": 1,
+        "name": "freeze_manifest_slice",
+        "description": "从 source manifest 冻结本循环的 slice：写 slice_scope（cycle / document_type / selection_rule / independent_entry_count / excluded_from_slice）与 independent_entries 骨架。",
+        "output": {
+          "artifact": "backend/data/workpaper_sync_{cycle}_cycle_manifest_slice.json",
+          "must_contain": [
+            "slice_scope.selection_rule",
+            "slice_scope.independent_entry_count",
+            "slice_scope.excluded_from_slice",
+            "independent_entries[].entry_id"
+          ],
+          "verifiable_by": "守卫按 selection_rule 从 backend/data/workpaper_sync_entry_manifest.json **现算**entry 集合，与 slice 的 entry 集合做等值比对：多写一条（凑数）或少写一条（漏迁）都红。"
+        },
+        "forbidden": [
+          "手抄 entry 列表 —— 不可复算的清单等于自由文本，改了 manifest 也不会打红",
+          "把 parent_duplicate 子入口当独立 entry 计数（AC 1.6）"
+        ],
+        "blocks": [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
+      },
+      {
+        "step": 2,
+        "name": "freeze_authoritative_templates",
+        "description": "逐 entry 读 backend/wp_templates/{cycle}/ 下的**运行时权威**模板，冻结 size + sha256，并登记 belongs_to_entry、锁文件策略与参考副本状态。",
+        "output": {
+          "artifact": "slice.authoritative_templates",
+          "must_contain": [
+            "root",
+            "lock_file_policy",
+            "reference_copy_status",
+            "files[].name",
+            "files[].size",
+            "files[].sha256",
+            "files[].belongs_to_entry"
+          ],
+          "verifiable_by": "守卫用 hashlib 现算权威目录字节比对；任一漂移 fail closed（Requirement 6.10）"
+        },
+        "constraint": "唯一权威目录是 backend/wp_templates/（wp_template_init_service 运行时从这里复制）；`基础数据/…` 参考副本已落后，只能用于比对不能当真源。枚举必须跳过 `~$` 前缀的 Office 锁文件。",
+        "forbidden": [
+          "为满足数字修改模板制造对端（AC 12.8 后半句）"
+        ],
+        "blocks": [3, 5, 6, 7, 8, 9, 10, 11, 12]
+      },
+      {
+        "step": 3,
+        "name": "resolve_html_counterpart",
+        "description": "解析 HTML 对端：该 entry 的业务内容到底存在哪里 —— 持久化通道（manifest 的 html_store）、表/子表键、item_id 形态、行身份键。产出**二值**结论。",
+        "output": {
+          "artifact": "slice.independent_entries[].html_counterpart_verdict",
+          "allowed_values": [
+            "none",
+            "exists"
+          ],
+          "must_contain": [
+            "html_counterpart_verdict",
+            "html_counterpart_source_refs",
+            "html_counterpart.store",
+            "html_counterpart.table_keys",
+            "html_counterpart.row_identity_key"
+          ],
+          "verifiable_by": "source_refs 必须指向真实文件/端点/模板单元格（宿主 .vue、后端 router、backend/wp_templates 的 sheet!cell），守卫按路径存在性与 sheet 真读校验。"
+        },
+        "constraint": "`unresolved` / `unknown` / 空值都**不是结论** —— 必须继续调查到二值之一。",
+        "forbidden": [
+          "为满足数字伪造字段映射制造对端（AC 12.8 后半句）",
+          "把「还没查」写成 unresolved 然后据此裁 single"
+        ],
+        "blocks": [4, 5, 6, 7, 8, 9, 10, 11, 12]
+      },
+      {
+        "step": 4,
+        "name": "adjudicate_single_or_continue",
+        "description": "按 AC 12.8 / 12.9 做第一次裁决：html_counterpart_verdict == \"none\" ⇒ 裁 single_onlyoffice 并跳到 step 11；无 OO 业务价值或入口不可达 ⇒ 删除或裁 single_html 并跳到 step 11；verdict == \"exists\" ⇒ 该 entry 进入 definition producer 流水线（step 5 起）。",
+        "output": {
+          "artifact": "slice.independent_entries[].adjudication",
+          "must_contain": [
+            "adjudication.honest_capability",
+            "adjudication.reason",
+            "adjudication.not_single_html_because",
+            "adjudication.not_bidirectional_because"
+          ],
+          "verifiable_by": "守卫校验蕴含关系：single_* ⇒ adapter_id / authority_model / definition_bundle / instrumentation_candidate / published_representation 五个身份字段全为 null；single_onlyoffice ⇒ html_counterpart_verdict == \"none\"。"
+        },
+        "constraint": "裁 single_onlyoffice 的**唯一合法判据**是「无 HTML 对端」（AC 12.8），不是「adapter / contract / bundle 还不存在」—— 后者是本任务要消除的状态，拿它当理由是循环论证（见 adjudication_criteria.anti_patterns 的 AP-1）。",
+        "forbidden": [
+          "以「本任务应当交付的产物尚不存在」为裁决理由",
+          "对裁为 single 的 entry 伪造 contract / candidate finalize"
+        ],
+        "blocks": [5, 6, 7, 8, 9, 10, 11, 12]
+      },
+      {
+        "step": 5,
+        "name": "publish_authority_model",
+        "description": "为进入流水线的 entry 发布 approved authoritative model immutable definition，三值枚举之一：projection_contract / custom_authoritative_ooxml / opaque_single_onlyoffice。",
+        "output": {
+          "artifact": "authority model immutable definition（DB definition 表 + slice.independent_entries[].authority_model）",
+          "must_contain": [
+            "authority_model",
+            "authority_model_definition_sha256"
+          ],
+          "verifiable_by": "digest 非空且可由 definitions canonical bytes 复算；不得由 contract 是否为空隐式推断"
+        },
+        "constraint": "枚举值不得缺省，也不得用 SQL NULL / 空串 / 全零 hash 代替（Requirement 2.3 / 6.19）",
+        "blocks": [6, 7, 8, 9, 10, 11, 12]
+      },
+      {
+        "step": 6,
+        "name": "publish_per_entry_contract",
+        "description": "发布**人工审核**的 per-entry contract：逐字段 stable_field_key / json_pointer / mode / value_type / source_ref（xlsx 还要 cell），review_status 必须是 reviewed。",
+        "output": {
+          "artifact": "backend/data/workpaper_sync_contracts/{adapter_id}.json",
+          "must_contain": [
+            "contract_id",
+            "review_status",
+            "template_definition_sha256",
+            "instrumentation_definition_sha256",
+            "sheets[].tables[].fields[].source_ref"
+          ],
+          "verifiable_by": "backend/app/services/workpaper_sync/contracts.py 的 parse_contract 强校验 + test_task13_contract_registry.py"
+        },
+        "constraint": "发布顺序不可颠倒：template → instrumentation → contract → bundle → representation。`col_[a-z]+` 形态的无语义列占位一律拒绝，即使填了 source_ref。review_status=candidate 不得注册生产 adapter。",
+        "forbidden": [
+          "跨 entry 复用别的 entry 的 contract_id",
+          "contract payload 里出现 bundle_* 前向引用"
+        ],
+        "blocks": [7, 8, 9, 10, 11, 12]
+      },
+      {
+        "step": 7,
+        "name": "publish_approved_definition_bundle",
+        "description": "发布 non-null approved definition bundle：按 schema_version + authority_model_definition_digest + template/instrumentation/contract 三类 typed canonical slots 生成。",
+        "output": {
+          "artifact": "definition bundle（id + sha256 + typed child identities）",
+          "must_contain": [
+            "definition_bundle_id",
+            "definition_bundle_sha256",
+            "typed_slots"
+          ],
+          "verifiable_by": "bundle digest 永远非空；每个 slot 必须出现，可选 child 只能用版本化 typed null marker（instrumentation:none:v1 / contract:none:v1）"
+        },
+        "constraint": "字段缺失、空串、全零 hash 或 SQL NULL 均不得进入 canonical bytes（Requirement 2.3）",
+        "blocks": [8, 9, 10, 11, 12]
+      },
+      {
+        "step": 8,
+        "name": "finalize_published_representation",
+        "description": "经 Task 36 的 ExcelEntryFinalizeGate.finalize_candidate 对 Task 17 产出的 non-current representation upgrade candidate 做 compatibility / roundtrip / visible-equivalence 校验，finalize 为 published representation generation 并切 current pointer。",
+        "output": {
+          "artifact": "published immutable representation generation",
+          "must_contain": [
+            "published_representation",
+            "representation_generation",
+            "artifact_sha256"
+          ],
+          "verifiable_by": "backend/app/services/workpaper_sync/excel_entry_gate.py 的唯一出口 MaterializeCoordinator.finalize_definition_upgrade；前置不过 ⇒ 0 次调用、不切 pointer、不改 revision"
+        },
+        "constraint": "candidate 不得被 canonical resolver / room / download / current pointer / evidence 使用（Requirement 6.18）",
+        "blocks": [9, 10, 11, 12]
+      },
+      {
+        "step": 9,
+        "name": "register_adapter_and_wire_host",
+        "description": "注册 adapter（manifest 的 adapter_id 变为非空）并把宿主从 legacy dual-mode 改线到 sync bridge。",
+        "output": {
+          "artifact": "adapter registry entry + 宿主 import 改线",
+          "must_contain": [
+            "adapter_id",
+            "canonical_resolver"
+          ],
+          "verifiable_by": "重新生成 manifest 后该 entry 的 adapter_id 非空；宿主里 legacy composable import 真不在了（磁盘判据）"
+        },
+        "constraint": "此处才允许复用 legacy_deletion_paradigm（/paradigm）的七步做 legacy 删除与宿主改线",
+        "reuses_paradigm": "legacy_deletion_paradigm",
+        "blocks": [10, 11, 12]
+      },
+      {
+        "step": 10,
+        "name": "emit_per_scenario_evidence",
+        "description": "跑该 entry 自己的 required scenario set（由 source-backed profile + bundle + authority model 枚举推导），落逐 scenario evidence 与服务端重算的 evidence summary。",
+        "output": {
+          "artifact": "sync_test_run + scenario evidence 实体",
+          "must_contain": [
+            "sync_test_run_id",
+            "required_scenario_set_digest",
+            "scenario_evidence_ids",
+            "verification_state"
+          ],
+          "verifiable_by": "evidence 由服务端从 DB / artifact / timeline 重算；verification_state 为 UNVERIFIABLE 时必须带 unverifiable_reasons"
+        },
+        "constraint": "不得跨 entry 复用 scenario / evidence（Property 70）；download-only 场景必须断言 operation_ids/application_ids 为空",
+        "blocks": [11, 12]
+      },
+      {
+        "step": 11,
+        "name": "enforce_honest_mode_visibility",
+        "description": "把裁决落到界面：裁为纯 OO / 纯 HTML 的 entry 不得再显示不可兑现的模式切换按钮；未注册 adapter 或 adapter 未过契约校验的 entry 不得显示「可双向回写」，且必须显示可操作原因。",
+        "output": {
+          "artifact": "宿主/bridge 的模式可见性门控改动 + DOM 级守卫",
+          "must_contain": [
+            "ui_gate_source_refs",
+            "dom_guard_ref"
+          ],
+          "verifiable_by": "落到浏览器 DOM 或模板形态判据（遍历 + 外层门控 + 内层嵌套三要素）——只声明 capability 而模板零引用 = 结构性死代码，数据层守卫看不见（G7 两级表头 0/38 的同型缺陷）。"
+        },
+        "constraint": "这是**裁决自带的义务**（AC 1.4 / AC 1.5），不是备注：只改 slice 里的 capability 而界面照旧展示切换按钮，等于继续以双模式成功态呈现假双向。",
+        "blocks": [12]
+      },
+      {
+        "step": 12,
+        "name": "close_slice_counters",
+        "description": "收口 slice 计数：honest_adjudication_summary 的各 capability 计数必须与 independent_entries 实际吻合，slice_counters 的四类（未裁决 / 假双向已验收 / bidirectional 未验收 / stale evidence）归零或如实非零。",
+        "output": {
+          "artifact": "slice.honest_adjudication_summary + slice.blocking_preconditions",
+          "must_contain": [
+            "honest_adjudication_summary.total_independent",
+            "honest_adjudication_summary.slice_counters",
+            "blocking_preconditions[].status",
+            "blocking_preconditions[].must_fix_before"
+          ],
+          "verifiable_by": "守卫从 independent_entries 现算各计数并与 summary 等值比对；计数被篡改即红"
+        },
+        "constraint": "计数为 0 只表示「本 slice 无该类条目」，不得解读为「已具备双向能力」",
+        "blocks": []
+      }
+    ],
+    "activity_coverage": {
+      "why_this_key_exists": "启用前置段落里的九件活必须**逐件**落在某一步上，否则范式又会漏掉一整类活（旧 /paradigm 漏掉的恰是这九件）。守卫按本映射断言每件活都有归属步骤。",
+      "activities": {
+        "read_authoritative_template_and_freeze_digest": 2,
+        "parse_html_counterpart": 3,
+        "publish_approved_authority_model": 5,
+        "publish_reviewed_per_entry_contract": 6,
+        "publish_non_null_approved_bundle": 7,
+        "task36_finalize_published_representation": 8,
+        "register_adapter_and_wire_host": 9,
+        "emit_per_scenario_evidence": 10,
+        "adjudicate_capability": 4,
+        "enforce_ui_mode_visibility": 11
+      }
+    }
+  },
+  "adjudication_criteria": {
+    "schema_version": "adjudication-criteria:v1",
+    "added_by": "Task 45 范式补全",
+    "source_document": ".kiro/specs/workpaper-html-onlyoffice-bidirectional-writeback-closure/requirements.md",
+    "quotation_rule": "acceptance_criteria[].text 是 requirements.md 的**原文逐字**（仅去掉行首 `{ac}. ` 编号前缀，其余含全角引号、反引号、顿号一字不改）。守卫现读磁盘按 `{ac}. ` 前缀定位该行并逐字比对：requirements.md 改了而本键未跟 ⇒ 打红。禁止转述。",
+    "acceptance_criteria": [
+      {
+        "ac": "1.3",
+        "role": "capability_enum",
+        "text": "能力态 SHALL 限定为 `bidirectional / single_html / single_onlyoffice / unreachable`，不得使用含糊的 `dual` 布尔值。"
+      },
+      {
+        "ac": "1.4",
+        "role": "ui_obligation_no_fake_bidirectional",
+        "text": "WHEN 入口未注册 adapter 或 adapter 未通过契约校验 THEN 前端 SHALL 禁止显示“可双向回写”，并显示可操作原因。"
+      },
+      {
+        "ac": "1.5",
+        "role": "ui_obligation_no_unredeemable_switch",
+        "text": "WHEN 入口被裁决为纯 OO 或纯 HTML THEN 系统 SHALL 只显示真实可用模式，不显示不可兑现的切换按钮。"
+      },
+      {
+        "ac": "1.7",
+        "role": "unreachable_must_be_deleted",
+        "text": "不可达旧桩 SHALL 删除；不得以豁免或 `DEPRECATED` 注释长期保留。"
+      },
+      {
+        "ac": "12.1",
+        "role": "bidirectional_entry_requirements",
+        "text": "adapter 迁移 SHALL 由 manifest slice 驱动；每个独立 entry 必须记录 capability 裁决、authoritative model immutable definition、非空 immutable definition bundle id/digest 及其 template/instrumentation/contract typed slots、representation generation、自动测试、真实 OO operation 和验收态。projection-based entry 缺 approved per-entry contract/bundle 时不得进入 bidirectional 验收。"
+      },
+      {
+        "ac": "12.8",
+        "role": "single_onlyoffice_sole_criterion",
+        "text": "无 HTML 对端的纯 OO entry SHALL 标为 `single_onlyoffice`；不得为满足数字伪造字段映射或修改模板制造对端。"
+      },
+      {
+        "ac": "12.9",
+        "role": "single_html_or_delete_criterion",
+        "text": "无 OO 业务价值或不可达入口 SHALL 删除或标 `single_html`；不得保留空白模板切换入口。"
+      }
+    ],
+    "capability_enum": [
+      "bidirectional",
+      "single_html",
+      "single_onlyoffice",
+      "unreachable"
+    ],
+    "capability_enum_derived_from": "1.3",
+    "capability_enum_note": "🔴 这四个值是**终态**，不是「entry 在任何时刻都必须取其一」。枚举本身不得扩充：它逐字派生自 AC 1.3（`能力态 SHALL 限定为 bidirectional / single_html / single_onlyoffice / unreachable`），加第五个值等于改 AC。未定态由 `capability: null` + `slice_schema.required_pending_verdict_fields` 三字段表达，见 SR-3 的蕴含式。\n\n为什么必须有「未定态」这条路：迁移中的 entry 会同时被三条 AC 排除掉四个终态 —— ① 有 HTML 对端（`html_counterpart_verdict == \"exists\"`）⇒ AC 12.8 禁止 `single_onlyoffice`（且明禁「为满足数字伪造字段映射或修改模板制造对端」）；② OO 侧有真实业务价值 ⇒ AC 12.9 的 `single_html` 不适用（它只覆盖「无 OO 业务价值」）；③ 宿主在生产源码中可达 ⇒ 不是 `unreachable`；④ AC 12.1 的六件前置（authority model / per-entry contract / non-null bundle / instrumentation candidate / published representation / 逐 scenario evidence）未交付 ⇒ SR-6 禁止 `bidirectional`。四条同时成立时，硬填任一枚举值都是**伪造裁决**（AP-1 循环论证的镜像形态：不是用「产物不存在」当理由裁 single，而是用「必须填一个」当理由裁一个假的）。\n\n实测落到该形态的 slice：D 循环（Task 46，7 条）与 F 循环（Task 48，8 条）—— 两者都如实计入 `slice_counters.unadjudicated`，不是「归零冒充进度」。",
+    "verdicts": {
+      "single_onlyoffice": {
+        "derived_from_ac": "12.8",
+        "sole_legal_criterion": "该 entry **无 HTML 对端** —— 即 step 3 的调查结论为 html_counterpart_verdict == \"none\"，且结论带 html_counterpart_source_refs。",
+        "required_fields": [
+          "html_counterpart_verdict",
+          "html_counterpart_source_refs"
+        ],
+        "forbidden_verdict_value": "exists",
+        "illegal_criteria": [
+          "无 bidirectional adapter",
+          "无 per-entry contract",
+          "无 approved authority model",
+          "无 non-null definition bundle",
+          "无 Task 17 instrumentation candidate",
+          "无 published representation",
+          "无 durable forcesave+ack 管道"
+        ],
+        "why_illegal": "上列七项**正是本任务要交付的产物**。用「它们还不存在」当裁决理由是循环论证：任何 entry 在动工前都满足这个条件 ⇒ 判据恒真 ⇒ 全部 entry 都可裁 single ⇒ spec 空转。"
+      },
+      "single_html": {
+        "derived_from_ac": "12.9",
+        "sole_legal_criterion": "该入口无 OO 业务价值（OO 侧打开的是空白/无业务内容的模板切换入口）",
+        "must_also": "不得保留空白模板切换入口 —— 裁 single_html 必须同时收掉 OO 入口按钮（step 11）"
+      },
+      "unreachable": {
+        "derived_from_ac": "12.9",
+        "also_see_ac": "1.7",
+        "sole_legal_criterion": "入口在生产源码中不可达（旧桩）",
+        "must_also": "SHALL 删除；不得以豁免或 DEPRECATED 注释长期保留"
+      },
+      "bidirectional": {
+        "derived_from_ac": "12.1",
+        "required_paradigm_steps": [5, 6, 7, 8, 9, 10],
+        "sole_legal_criterion": "step 5–10 全部完成：approved authority model + reviewed per-entry contract + non-null approved bundle + Task 36 finalize 出的 published representation + 注册 adapter + 逐 scenario evidence 全绿。",
+        "forbidden": "缺 approved per-entry contract/bundle 时不得进入 bidirectional 验收"
+      }
+    },
+    "ui_obligation": {
+      "derived_from_ac": [
+        "1.4",
+        "1.5"
+      ],
+      "paradigm_step": 11,
+      "statement": "裁决自带 UI 义务：裁为纯 OO / 纯 HTML 后界面不得再显示不可兑现的切换按钮；未注册 adapter 或 adapter 未过契约校验时不得显示「可双向回写」，并须显示可操作原因。",
+      "not_a_note": "本项在 definition_producer_paradigm 里是**第 11 步**而不是备注 —— 只改 slice 里的 capability 而界面照旧展示切换按钮，等于继续以双模式成功态呈现假双向。"
+    },
+    "anti_patterns": [
+      {
+        "id": "AP-1",
+        "name": "circular_justification",
+        "statement": "用「本任务应当交付的产物尚不存在」（无 adapter / 无 contract / 无 bundle / 无 candidate / 无 published representation）当作裁 single_onlyoffice 的理由是**循环论证**，禁止。",
+        "contradicts_ac": "12.8",
+        "detector": "backend/tests/workpaper_sync/test_migration_paradigm_contract.py::TestAntiPatternCircularJustification",
+        "scan_glob": "backend/data/*_cycle_manifest_slice.json",
+        "required_remedy_fields": [
+          "html_counterpart_verdict",
+          "html_counterpart_source_refs"
+        ],
+        "allowed_verdict_values": [
+          "none",
+          "exists"
+        ],
+        "forbidden_verdict_for_single_onlyoffice": "exists",
+        "circular_reason_markers": [
+          "no bidirectional adapter",
+          "无 bidirectional adapter",
+          "no per-entry contract",
+          "无 per-entry contract",
+          "no authority model",
+          "无 authority model",
+          "no definition bundle",
+          "无 non-null definition bundle",
+          "no instrumentation candidate",
+          "无 instrumentation candidate",
+          "no forcesave/durable ack pipeline",
+          "无 durable forcesave+ack 管道",
+          "no published representation",
+          "无 published representation",
+          "missing_adapter"
+        ],
+        "known_debt_inventory": {
+          "frozen_at": "Task 45 范式补全",
+          "why_xfail_not_skip": "skip 记为通过 = fail-open。用 pytest.mark.xfail(strict=True)：债务在时报 xfailed（CI 不挂），债务清掉后会 XPASS(strict) ⇒ 反过来打红，强制摘掉标记 —— 两个方向都锁死。",
+          "subset_rule": "违规集合必须是本清单的**子集**：清单外出现新违规（Tasks 48–57 继续走老路）⇒ 非 xfail 的守卫立刻打红；清单内被修好 ⇒ 子集仍成立、不打红（不阻塞并发回填）。",
+          "release_condition": "全部 8 条债务兑现（各 entry 补 step 3 的二值结论与 source_refs、或改裁 bidirectional）后，xfail 标记必须删除；届时 strict xfail 会因 XPASS 打红提醒。",
+          "entries": [
+            {
+              "slice": "backend/data/workpaper_sync_d_cycle_manifest_slice.json",
+              "entry_id": "xlsx/gt-d1-notes-receivable",
+              "owner": "Task 46 D 循环回填（并发会话进行中）"
+            },
+            {
+              "slice": "backend/data/workpaper_sync_d_cycle_manifest_slice.json",
+              "entry_id": "xlsx/gt-d2-accounts-receivable",
+              "owner": "Task 46 D 循环回填（并发会话进行中）"
+            },
+            {
+              "slice": "backend/data/workpaper_sync_d_cycle_manifest_slice.json",
+              "entry_id": "xlsx/gt-d3-prepaid-accounts",
+              "owner": "Task 46 D 循环回填（并发会话进行中）"
+            },
+            {
+              "slice": "backend/data/workpaper_sync_d_cycle_manifest_slice.json",
+              "entry_id": "xlsx/gt-d4-operating-revenue",
+              "owner": "Task 46 D 循环回填（并发会话进行中）"
+            },
+            {
+              "slice": "backend/data/workpaper_sync_d_cycle_manifest_slice.json",
+              "entry_id": "xlsx/gt-d5-receivables-financing",
+              "owner": "Task 46 D 循环回填（并发会话进行中）"
+            },
+            {
+              "slice": "backend/data/workpaper_sync_d_cycle_manifest_slice.json",
+              "entry_id": "xlsx/gt-d6-contract-assets",
+              "owner": "Task 46 D 循环回填（并发会话进行中）"
+            },
+            {
+              "slice": "backend/data/workpaper_sync_d_cycle_manifest_slice.json",
+              "entry_id": "xlsx/gt-d7-contract-liabilities",
+              "owner": "Task 46 D 循环回填（并发会话进行中）"
+            },
+            {
+              "slice": "backend/data/workpaper_sync_e_cycle_manifest_slice.json",
+              "entry_id": "xlsx/gt-e1-monetary-fund",
+              "owner": "E 循环回填任务（待立项；本次范式补全刻意不改 E slice 字节以免与后续任务冲突）"
+            }
+          ]
+        }
+      },
+      {
+        "id": "AP-2",
+        "name": "fabricated_counterpart",
+        "statement": "为满足数字伪造字段映射或修改权威模板制造 HTML 对端，禁止。",
+        "contradicts_ac": "12.8",
+        "detector": "template digest 现算比对（step 2）+ contract 的 col_[a-z]+ 占位拒绝（step 6）"
+      },
+      {
+        "id": "AP-3",
+        "name": "unresolved_as_conclusion",
+        "statement": "把 html_counterpart_verdict 写成 unresolved / unknown / 空值然后据此裁 single，禁止 —— 那是「还没查」不是结论。",
+        "contradicts_ac": "12.8",
+        "detector": "allowed_verdict_values 只认 none / exists"
+      },
+      {
+        "id": "AP-4",
+        "name": "capability_without_ui_change",
+        "statement": "只改 slice 的 capability 而不收掉界面上不可兑现的切换按钮，禁止。",
+        "contradicts_ac": "1.5",
+        "detector": "definition_producer_paradigm 的 step 11（enforce_honest_mode_visibility）"
+      },
+      {
+        "id": "AP-5",
+        "name": "fake_contract_for_single_entry",
+        "statement": "为裁决为 single 的 entry 伪造 contract 或 finalize candidate 以凑数，禁止。",
+        "contradicts_ac": "12.1",
+        "detector": "slice 蕴含关系：single_* ⇒ 五个身份字段全 null；contracts/ 下不得出现该 entry 的文件"
+      }
+    ]
+  },
+  "slice_schema": {
+    "schema_version": "manifest-slice-schema:v1",
+    "added_by": "Task 45 范式补全",
+    "target_schema_version": "manifest-slice:v1",
+    "applies_to_tasks": [48, 49, 50, 51, 52, 53, 54, 55, 56, 57],
+    "derived_from": "backend/data/workpaper_sync_e_cycle_manifest_slice.json",
+    "reference_instance": "backend/data/workpaper_sync_e_cycle_manifest_slice.json",
+    "why_e_slice_is_the_baseline": "Task 47 的 E 循环 slice 是目前唯一形成完整字段集的事实范式（含 selection_rule、逐文件 sha256、not_single_html_because / not_bidirectional_because、verification_state + unverifiable_reasons、blocking_preconditions、cross_entry_isolation）。D 循环 slice 早于它冻结、字段集更薄，**不是**基线（grandfathered，不追溯改写）。",
+  "why_e_slice_is_the_baseline_amendment": "🔴 2026-08-31 更正上一句的事实部分：Task 46 的 D 循环收口重写已把 D slice 改成 E slice 字段集的**超集**（多 html_counterpart* / capability_verdict_stage / manifest_mirror / paradigm_schema_conflict），「字段集更薄」「不追溯改写」两句已成历史陈述，不再描述现状 —— 这一条曾登记在 D slice 的 `paradigm_schema_conflict.residual_inconsistency` 里等范式 owner 更新，本次一并兑现。`reference_instance` / `derived_from` **仍指 E slice 且不改**，理由与「谁的字段集更全」无关：反例参数化的宿主 getter（`_SCHEMA_GROUPS`）挂在参照实例的具体结构上，换实例等于重写整套反例；且 E slice 是唯一 capability 为终态的 slice，SR-3 左支的正例只有它能作证（右支的正例由 `_as_pending_verdict()` 在它之上合成）。",
+    "validator": "backend/tests/workpaper_sync/test_migration_paradigm_contract.py::validate_slice_against_schema",
+    "negative_example_rule": "守卫必须**两侧都断言**：正例 = reference_instance 必须通过；反例 = 逐一抽掉每个必填字段后必须不通过。只有正例的 schema 是死数据。",
+    "required_top_level": [
+      "schema_version",
+      "task",
+      "spec",
+      "description",
+      "frozen_at",
+      "source_manifest",
+      "paradigm_ref",
+      "sibling_slices",
+      "slice_scope",
+      "independent_entries",
+      "authoritative_templates",
+      "blocking_preconditions",
+      "cross_entry_isolation",
+      "honest_adjudication_summary",
+      "properties_verified",
+      "requirements_covered"
+    ],
+    "required_slice_scope": [
+      "cycle",
+      "document_type",
+      "selection_rule",
+      "independent_entry_count",
+      "excluded_from_slice"
+    ],
+    "required_excluded_item": [
+      "what",
+      "reason"
+    ],
+    "required_authoritative_templates": [
+      "root",
+      "reference_copy_status",
+      "lock_file_policy",
+      "files"
+    ],
+    "required_template_file": [
+      "name",
+      "size",
+      "sha256",
+      "belongs_to_entry"
+    ],
+    "required_entry": [
+      "entry_id",
+      "wp_code_pattern",
+      "document_type",
+      "host",
+      "host_path",
+      "capability",
+      "migration_state",
+      "adapter_id",
+      "authority_model",
+      "definition_bundle",
+      "instrumentation_candidate",
+      "published_representation",
+      "template_ref",
+      "mount_count",
+      "scenario_profile_id",
+      "editability",
+      "room_model",
+      "canonical_resolver",
+      "adjudication",
+      "evidence"
+    ],
+    "presence_required_value_may_be_null": [
+      "adapter_id",
+      "authority_model",
+      "definition_bundle",
+      "instrumentation_candidate",
+      "published_representation"
+    ],
+    "required_entry_adjudication": [
+      "honest_capability",
+      "reason",
+      "not_single_html_because",
+      "not_bidirectional_because"
+    ],
+    "required_entry_evidence": [
+      "browser_case",
+      "contract_test",
+      "sync_test_run_id",
+      "required_scenario_set_digest",
+      "verification_state"
+    ],
+    "required_blocking_precondition": [
+      "id",
+      "blocks",
+      "what"
+    ],
+    "required_blocking_precondition_one_of": [
+      [
+        "consequence",
+        "observable_consequences"
+      ]
+    ],
+    "required_blocking_precondition_one_of_why": "「后果必须写明」在事实范式里有两种形态：BP-1~BP-3 用单串 `consequence`，BP-4 用数组 `observable_consequences`（一条阻断项有多个可观察后果）。初版把 `consequence` 直接列进 required_blocking_precondition ⇒ 与 negative_example_rule 的「reference_instance 必须通过」自相矛盾（BP-4 没有该键）。改为 one-of 组：判据强度不变（后果仍必填），但认两种形态。守卫按 one-of 组校验，见 test_migration_paradigm_contract.py::validate_slice_against_schema。",
+    "required_cross_entry_isolation": [
+      "rule",
+      "assertions"
+    ],
+    "required_honest_adjudication_summary": [
+      "total_independent",
+      "adjudicated_as_bidirectional",
+      "adjudicated_as_single_onlyoffice",
+      "adjudicated_as_single_html",
+      "adjudicated_as_unreachable",
+      "reason",
+      "slice_counters"
+    ],
+    "required_slice_counters": [
+      "unadjudicated",
+      "fake_bidirectional_claimed_verified",
+      "bidirectional_unverified",
+      "stale_evidence"
+    ],
+    "required_pending_verdict_fields": [
+      "capability_verdict_stage",
+      "capability_target",
+      "capability_target_blocked_by"
+    ],
+    "pending_verdict_field_semantics": {
+      "capability_verdict_stage": "non_empty_string",
+      "capability_target": "member_of_capability_enum",
+      "capability_target_blocked_by": "non_empty_list"
+    },
+    "pending_verdict_counter": "unadjudicated",
+    "why_pending_verdict_is_conditionally_required": "这三个字段是**有条件必填**（`capability is null` 时必填），不是全局必填，也不是各 slice 自述里的散文。\n\n① 为什么不进 `required_entry`：绝大多数 entry 终态已定（E slice 的 single_onlyoffice、pilot 的 bidirectional），全局必填会逼作者为一个不存在的「待裁决」编造 stage/target/blocked_by —— 那正是「additive 注入即死代码」的假绿源（与 `conditional_sections.why_not_global` 同一条理由）。\n\n② 为什么不留在 slice 自述里：D slice 的 `paradigm_schema_conflict.residual_inconsistency` 与 F slice 的 `known_red_it_causes` 各写了一份「本 slice 为何 capability 为 null」，同一条规则于是有三个判官（范式校验器报 SR-3、两份 per-cycle 守卫各自放行）而严格的那个从不指向它们。声明收进 schema 后，Tasks 49–57 落到同一形态时自动被同一份校验器按同一强度检查，不必每次新增一条 xfail 豁免。\n\n③ 三个 `pending_verdict_field_semantics` 的语义 kind 是给校验器读的，不是注释：`non_empty_string`（空串/None/缺键都算缺）· `member_of_capability_enum`（目标必须是四个终态之一 —— 「不知道往哪走」不是待裁决，是没调查）· `non_empty_list`（阻断项为空 = 声称有阻塞却说不出是什么，等于自由文本豁免）。校验器遇到没有声明语义的 pending 字段必须报违规（fail closed），否则加字段不加语义就能悄悄放宽。",
+    "behavioral_rules": [
+      {
+        "id": "SR-1",
+        "rule": "honest_adjudication_summary.total_independent == len(independent_entries) == slice_scope.independent_entry_count",
+        "why": "计数是现算出来的，不是手填的 —— 抄错或凑数即红"
+      },
+      {
+        "id": "SR-2",
+        "rule": "adjudicated_as_{capability} 逐项等于 independent_entries 里该 capability 的实际条数",
+        "why": "防「slice 里写 0 个 single_onlyoffice、实际 7 个」这类摘要与明细脱节"
+      },
+      {
+        "id": "SR-3",
+        "rule": "每个 entry 的 capability 落在 adjudication_criteria.capability_enum 内（AC 1.3），**或** capability 为 null 且 slice_schema.required_pending_verdict_fields 三字段按 pending_verdict_field_semantics 全部齐备（capability_verdict_stage 非空串 · capability_target 落在 capability_enum 内 · capability_target_blocked_by 非空数组）",
+        "why": "禁止含糊的 dual 布尔或自造能力态；同时禁止「未裁决伪装成已裁决」。蕴含式的两支各锁一个方向：左支拦自造能力态，右支拦「留空而不解释」—— null 只有在把「未定态、目标是什么、被什么阻断」三件事都写出来时才合法，缺任一或 target 不在枚举内或 blocked_by 为空数组仍报违规。四个枚举值都不成立时硬填一个才是伪造裁决，见 adjudication_criteria.capability_enum_note",
+        "closes_gap": "G1（同一条 SR-3 有两个互相矛盾的判官：范式校验器报 SR-3，而 test_task46/48 的第二份独立实现放行待裁决态）"
+      },
+      {
+        "id": "SR-4",
+        "rule": "capability == adjudication.honest_capability",
+        "why": "对外字段与诚实裁决不得双口径"
+      },
+      {
+        "id": "SR-5",
+        "rule": "capability 以 single_ 开头或为 unreachable ⇒ presence_required_value_may_be_null 五个字段全部为 null",
+        "why": "AP-5：裁 single 的 entry 不得挂 adapter / contract / bundle / candidate / representation"
+      },
+      {
+        "id": "SR-6",
+        "rule": "capability == bidirectional ⇒ 上述五个字段全部非 null",
+        "why": "AC 12.1：缺 approved contract/bundle 不得进入 bidirectional 验收"
+      },
+      {
+        "id": "SR-7",
+        "rule": "evidence.verification_state == 'UNVERIFIABLE' ⇒ evidence.unverifiable_reasons 是非空列表",
+        "why": "UNVERIFIABLE 必须说明为什么无法验证，否则等于自由文本豁免"
+      },
+      {
+        "id": "SR-8",
+        "rule": "authoritative_templates.files[].belongs_to_entry 若非 null，必须命中本 slice 的某个 entry_id；为 null 时必须给 excluded_reason",
+        "why": "防模板挂到不存在的 entry 上，或悄悄夹带跨循环模板"
+      },
+      {
+        "id": "SR-9",
+        "rule": "待裁决态（capability 为 null）的条目数 == honest_adjudication_summary.slice_counters[slice_schema.pending_verdict_counter]",
+        "why": "SR-3 右支放行 null 之后必须有人管住计数，否则「把全部 entry 记成待裁决、同时报 unadjudicated=0」就能通过校验 —— 那就是 SR-3 右支被当成后门用。与 SR-1/SR-2 同形（计数现算、不许手填），只是对象换成待裁决态。D slice 7/7、F slice 8/8、E slice 0/0 实测相等"
+      }
+    ],
+    "effective_from_task_48": {
+      "required_entry": [
+        "html_counterpart_verdict",
+        "html_counterpart_source_refs"
+      ],
+      "required_blocking_precondition": [
+        "status",
+        "must_fix_before",
+        "source_refs"
+      ],
+      "why_not_retroactive": "D / E 两个 slice 冻结在本次范式补全之前，且都由并发会话在改 ⇒ 登记进 adjudication_criteria.anti_patterns 的 AP-1 known_debt_inventory，由回填任务兑现；本次不追溯改写它们的字节。守卫对存量用 subset 规则 + strict xfail 双向锁死。",
+      "why_not_retroactive_amendment": "🔴 2026-08-31 更正：上一句里「本次不追溯改写它们的字节」说的是**范式补全那一轮**不动它们，不是承诺 D/E 永不改。实际 Task 46 的 D 循环收口已重写 D slice 并主动补齐了这两个追加字段（`html_counterpart_verdict` / `html_counterpart_source_refs`），故 D slice 现在**超额**满足本节；E slice 仍未补，它那一条留在 AP-1 known_debt_inventory 里（第 8 条，owner = E 循环回填任务）。校验器的 `enforce_task48` 仍按任务号推导（≥48 才施加），不因 D 自愿补齐而改判 —— 否则「自愿超额」会变成「对 46 追溯加严」，把并发会话的 E slice 打红。",
+      "must_be_superset_of": [
+        "required_entry",
+        "required_blocking_precondition"
+      ]
+    },
+    "conditional_sections": [
+      {
+        "section": "dynamic_row_identity",
+        "trigger": "entry 含行数由业务数据决定的动态行表",
+        "required_fields": [
+          "why_this_section_exists",
+          "source_of_truth",
+          "forbidden_identity_kinds",
+          "tables"
+        ],
+        "required_table_fields": [
+          "table_key",
+          "persistence_key",
+          "row_identity"
+        ],
+        "required_row_identity_fields": [
+          "kind",
+          "identity_field",
+          "source_ref"
+        ],
+        "why_not_global": "多数 entry 是静态骨架表；设成全局必填会逼作者为不存在的动态行编造声明 —— 那正是「additive 注入即死代码」的假绿源。"
+      },
+      {
+        "section": "currency_variant_model",
+        "trigger": "同一 entry 有多个 variant sheet 且共用一个持久化键",
+        "required_fields": [
+          "variants",
+          "decoupling_rule"
+        ],
+        "why_not_global": "E 循环特有形态（E1-3 两张同尾码 sheet 共用持久化键），不是平台通例"
+      },
+      {
+        "section": "parent_duplicate_summary",
+        "trigger": "slice 覆盖的独立 entry 有 parent_duplicate 子入口（如 D4 的 31 条）",
+        "required_fields": [
+          "note"
+        ],
+        "why_not_global": "只有多子 sheet 宿主才有；AC 1.6 要求它们复用父 entry 的 adapter 而不独立计数"
+      }
+    ]
+  }
+}

@@ -1,0 +1,293 @@
+{
+  "contract_id": "d1.notes_receivable_detail",
+  "document_type": "xlsx",
+  "identity_carriers": [
+    "hidden_sheet",
+    "defined_name",
+    "excel_table",
+    "hidden_uuid_column"
+  ],
+  "instrumentation_definition_sha256": "185ea17ecb3a052b24c300d111d3c577a68aa1a7df06f722d24d251e2ca7c74b",
+  "review": {
+    "authority_root": "backend/wp_templates",
+    "entry_id": "xlsx/gt-d1-notes-receivable",
+    "html_store": {
+      "item_id": "D1-cust-rows",
+      "note": "整张按客户明细表今天存成这一条 item 的 remark（一个 JSON 数组字符串，serializeRows() 产出）。本契约按 stable field + row rowId 拆开，禁止把整 JSON 当一个字段比较（对齐 D2 AC 6.9 / 6.12 / design §Merge Algorithm）。前端模型 = useD1DetailCustomer.ts 的 CustomerRow，STORAGE_KEY='D1-cust-rows'",
+      "row_identity_key": "rowId",
+      "shape": "json_array_of_row_objects",
+      "table": "checklist_responses"
+    },
+    "pilot_class": "phase5_notes_receivable",
+    "reviewed_basis": "openpyxl 逐 sheet 直读权威模板 D/D1 应收票据.xlsx 的 21 张 sheet，只取受管 sheet 原值明细表（按客户）D1-3：单级表头行 10（15 列 A..O）、数据区 11..20 行、G/J/L/O 四列逐行公式 =D+E+F / =D+H-I / =J+K / =L+M+N（openpyxl 逐格实测），其余 A/B/C/D/E/F/H/I/K/M/N 列模板内无公式故判 editable（A/B/C 为 text，其余金额为 amount），A21 合计 footer（D21..O21 = SUM(x11:x20)）；15 个字段的 source_ref / header_source_ref 均指向上述真实单元格，字段键集合与前端 useD1DetailCustomer.CustomerRow 逐字段锁死（customerName/companyCode/relationType/priorUnadjusted/priorAje/priorRje/priorAudited/currentIncrease/currentDecrease/currentBalance/reclassification/currentUnadjusted/currentAje/currentRje/currentAudited）。注意 xlsx J 列公式=D+H-I（不含 E/F），前端 recalcRow 用 priorAudited+inc-dec=G+H-I，数值语义等价但公式文本以 xlsx 为准 ⇒ J 声明为 formula，materialize 不覆盖公式格由 OO 重算"
+  },
+  "review_status": "reviewed",
+  "schema_version": "contract-definition:v1",
+  "semantic_version": "1.0.0",
+  "sheets": [
+    {
+      "excel_name": "原值明细表（按客户）D1-3",
+      "locator": {
+        "anchor": "excel_table_sheet_association"
+      },
+      "sheet_key": "d13-managed",
+      "tables": [
+        {
+          "anchor": "A10",
+          "delete_policy": "tombstone",
+          "fields": [
+            {
+              "cell": {
+                "column": "A",
+                "row_from": "row_identity"
+              },
+              "column_key": "customer_name",
+              "header_source_ref": "源xlsx!原值明细表（按客户）D1-3!A10",
+              "header_text": "客户名称",
+              "json_pointer": "/rows/{row_uuid}/customerName",
+              "mode": "editable",
+              "source_ref": "源xlsx!原值明细表（按客户）D1-3!A11",
+              "stable_field_key": "notes_receivable_detail_rows/{row_uuid}/customer_name",
+              "store_item_id": "D1-cust-rows",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "B",
+                "row_from": "row_identity"
+              },
+              "column_key": "company_code",
+              "header_source_ref": "源xlsx!原值明细表（按客户）D1-3!B10",
+              "header_text": "公司代码",
+              "json_pointer": "/rows/{row_uuid}/companyCode",
+              "mode": "editable",
+              "source_ref": "源xlsx!原值明细表（按客户）D1-3!B11",
+              "stable_field_key": "notes_receivable_detail_rows/{row_uuid}/company_code",
+              "store_item_id": "D1-cust-rows",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "C",
+                "row_from": "row_identity"
+              },
+              "column_key": "relation_type",
+              "header_source_ref": "源xlsx!原值明细表（按客户）D1-3!C10",
+              "header_text": "关联关系",
+              "json_pointer": "/rows/{row_uuid}/relationType",
+              "mode": "editable",
+              "source_ref": "源xlsx!原值明细表（按客户）D1-3!C11",
+              "stable_field_key": "notes_receivable_detail_rows/{row_uuid}/relation_type",
+              "store_item_id": "D1-cust-rows",
+              "value_type": "enum"
+            },
+            {
+              "cell": {
+                "column": "D",
+                "row_from": "row_identity"
+              },
+              "column_key": "prior_unadjusted",
+              "header_source_ref": "源xlsx!原值明细表（按客户）D1-3!D10",
+              "header_text": "期初未审数",
+              "json_pointer": "/rows/{row_uuid}/priorUnadjusted",
+              "mode": "editable",
+              "source_ref": "源xlsx!原值明细表（按客户）D1-3!D11",
+              "stable_field_key": "notes_receivable_detail_rows/{row_uuid}/prior_unadjusted",
+              "store_item_id": "D1-cust-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "E",
+                "row_from": "row_identity"
+              },
+              "column_key": "prior_aje",
+              "header_source_ref": "源xlsx!原值明细表（按客户）D1-3!E10",
+              "header_text": "账项调整",
+              "json_pointer": "/rows/{row_uuid}/priorAje",
+              "mode": "editable",
+              "source_ref": "源xlsx!原值明细表（按客户）D1-3!E11",
+              "stable_field_key": "notes_receivable_detail_rows/{row_uuid}/prior_aje",
+              "store_item_id": "D1-cust-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "F",
+                "row_from": "row_identity"
+              },
+              "column_key": "prior_rje",
+              "header_source_ref": "源xlsx!原值明细表（按客户）D1-3!F10",
+              "header_text": "重分类调整",
+              "json_pointer": "/rows/{row_uuid}/priorRje",
+              "mode": "editable",
+              "source_ref": "源xlsx!原值明细表（按客户）D1-3!F11",
+              "stable_field_key": "notes_receivable_detail_rows/{row_uuid}/prior_rje",
+              "store_item_id": "D1-cust-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "G",
+                "row_from": "row_identity"
+              },
+              "column_key": "prior_audited",
+              "header_source_ref": "源xlsx!原值明细表（按客户）D1-3!G10",
+              "header_text": "期初审定数",
+              "json_pointer": "/rows/{row_uuid}/priorAudited",
+              "mode": "formula",
+              "source_ref": "源xlsx!原值明细表（按客户）D1-3!G11",
+              "stable_field_key": "notes_receivable_detail_rows/{row_uuid}/prior_audited",
+              "store_item_id": "D1-cust-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "H",
+                "row_from": "row_identity"
+              },
+              "column_key": "current_increase",
+              "header_source_ref": "源xlsx!原值明细表（按客户）D1-3!H10",
+              "header_text": "本期增加",
+              "json_pointer": "/rows/{row_uuid}/currentIncrease",
+              "mode": "editable",
+              "source_ref": "源xlsx!原值明细表（按客户）D1-3!H11",
+              "stable_field_key": "notes_receivable_detail_rows/{row_uuid}/current_increase",
+              "store_item_id": "D1-cust-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "I",
+                "row_from": "row_identity"
+              },
+              "column_key": "current_decrease",
+              "header_source_ref": "源xlsx!原值明细表（按客户）D1-3!I10",
+              "header_text": "本期减少",
+              "json_pointer": "/rows/{row_uuid}/currentDecrease",
+              "mode": "editable",
+              "source_ref": "源xlsx!原值明细表（按客户）D1-3!I11",
+              "stable_field_key": "notes_receivable_detail_rows/{row_uuid}/current_decrease",
+              "store_item_id": "D1-cust-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "J",
+                "row_from": "row_identity"
+              },
+              "column_key": "current_balance",
+              "header_source_ref": "源xlsx!原值明细表（按客户）D1-3!J10",
+              "header_text": "期末余额",
+              "json_pointer": "/rows/{row_uuid}/currentBalance",
+              "mode": "formula",
+              "source_ref": "源xlsx!原值明细表（按客户）D1-3!J11",
+              "stable_field_key": "notes_receivable_detail_rows/{row_uuid}/current_balance",
+              "store_item_id": "D1-cust-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "K",
+                "row_from": "row_identity"
+              },
+              "column_key": "reclassification",
+              "header_source_ref": "源xlsx!原值明细表（按客户）D1-3!K10",
+              "header_text": "被审计单位重分类调整",
+              "json_pointer": "/rows/{row_uuid}/reclassification",
+              "mode": "editable",
+              "source_ref": "源xlsx!原值明细表（按客户）D1-3!K11",
+              "stable_field_key": "notes_receivable_detail_rows/{row_uuid}/reclassification",
+              "store_item_id": "D1-cust-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "L",
+                "row_from": "row_identity"
+              },
+              "column_key": "current_unadjusted",
+              "header_source_ref": "源xlsx!原值明细表（按客户）D1-3!L10",
+              "header_text": "期末未审余额",
+              "json_pointer": "/rows/{row_uuid}/currentUnadjusted",
+              "mode": "formula",
+              "source_ref": "源xlsx!原值明细表（按客户）D1-3!L11",
+              "stable_field_key": "notes_receivable_detail_rows/{row_uuid}/current_unadjusted",
+              "store_item_id": "D1-cust-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "M",
+                "row_from": "row_identity"
+              },
+              "column_key": "current_aje",
+              "header_source_ref": "源xlsx!原值明细表（按客户）D1-3!M10",
+              "header_text": "账项调整",
+              "json_pointer": "/rows/{row_uuid}/currentAje",
+              "mode": "editable",
+              "source_ref": "源xlsx!原值明细表（按客户）D1-3!M11",
+              "stable_field_key": "notes_receivable_detail_rows/{row_uuid}/current_aje",
+              "store_item_id": "D1-cust-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "N",
+                "row_from": "row_identity"
+              },
+              "column_key": "current_rje",
+              "header_source_ref": "源xlsx!原值明细表（按客户）D1-3!N10",
+              "header_text": "重分类调整",
+              "json_pointer": "/rows/{row_uuid}/currentRje",
+              "mode": "editable",
+              "source_ref": "源xlsx!原值明细表（按客户）D1-3!N11",
+              "stable_field_key": "notes_receivable_detail_rows/{row_uuid}/current_rje",
+              "store_item_id": "D1-cust-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "O",
+                "row_from": "row_identity"
+              },
+              "column_key": "current_audited",
+              "header_source_ref": "源xlsx!原值明细表（按客户）D1-3!O10",
+              "header_text": "期末审定数",
+              "json_pointer": "/rows/{row_uuid}/currentAudited",
+              "mode": "formula",
+              "source_ref": "源xlsx!原值明细表（按客户）D1-3!O11",
+              "stable_field_key": "notes_receivable_detail_rows/{row_uuid}/current_audited",
+              "store_item_id": "D1-cust-rows",
+              "value_type": "amount"
+            }
+          ],
+          "footer_anchor": {
+            "carries_total_formula": true,
+            "marker": "合计",
+            "note": "footer 行 A21 承载合计公式（D21..O21 = SUM(x11:x20)，openpyxl 逐格实测；G/J/L/O 列 SUM 覆盖公式列，H/I 为 SUM）。区间末行 20 是模板排版末行，声明为真使结构性插行有权按声明位移量扩张该区间",
+            "search_column": "A"
+          },
+          "formula_mask": [
+            "G11:G20",
+            "J11:J20",
+            "L11:L20",
+            "O11:O20"
+          ],
+          "header_rows": 1,
+          "row_identity": {
+            "json_pointer": "/rows/*/rowId",
+            "kind": "field"
+          },
+          "table_key": "notes_receivable_detail_rows"
+        }
+      ]
+    }
+  ],
+  "template": {
+    "normalized_structure_hash": "c2da03893080de01ad3e5205e7befd2b3be0cee73b1bfc1769c688f5c50e628d",
+    "relative_path": "D/D1 应收票据.xlsx",
+    "template_sha256": "e6e8dcf28ba6e7f6fdf9867c3ac43b2f1a72e1a1b6f2aa477f58dfca39097577"
+  },
+  "template_definition_sha256": "418de2c2eab1cbcbbeb7480e9ecad25d78e72c07eb2c368fd5ed0cff7e0b0f26"
+}

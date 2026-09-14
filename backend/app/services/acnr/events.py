@@ -1,0 +1,215 @@
+"""ACNR events.py — 缓存失效钩子 + 降级策略
+
+orchestrator `after_save` 触发 `WORKPAPER_SAVED` →
+EventBus handler 调用 `invalidate()` 统一清理 L3 运行时条目与 overlay 缓存，
+同时委托旧 address_registry 失效 WP 域（strangler-fig 过渡期）。
+
+Requirements: 23.1, 23.2
+"""
+from __future__ import annotations
+
+import logging
+from typing import Any
+
+logger = logging.getLogger(__name__)
+
+
+async def invalidate(
+    project_id: str,
+    *,
+    wp_id: str | None = None,
+    addr_id: str | None = None,
+    trigger: str | None = None,
+    extra_sheets: list[str] | None = None,
+) -> None:
+    """ACNR 统一缓存失效（由 WORKPAPER_SAVED 事件驱动）。
+
+    失效策略（执行顺序：L3 → L2 → FormulaReverseIndex → Legacy V1）：
+    1. 清除 L3 RuntimeIndex 运行时条目（按 project_id 或增量按 wp_id/sheets）
+    2. 清除 L2 overlay 缓存（按 project_id）
+    3. 清除 FormulaReverseIndex 单例（反向联动索引，下次访问时重建）
+    4. 委托旧 address_registry.invalidate_async 失效 WP 域（strangler-fig 过渡）
+
+    增量模式（trigger/extra_sheets 非空时）：
+    - 仅清除指定 wp_id 或受影响 sheets 对应的 L3 条目
+    - 完整清除仍走 project_id 级别
+
+    Args:
+        project_id: 项目 ID（必传）
+        wp_id: 底稿 ID（可选，用于增量失效）
+        addr_id: 特定地址 ID（可选，预留）
+        trigger: 触发来源（html_save / univer_save / onlyoffice_callback 等）
+        extra_sheets: 受影响的 sheet 列表（可选，用于增量失效）
+
+    本函数不抛异常 — 失效失败仅 warning，不阻断主流程；TTL 为最终兜底。
+    """
+    if not project_id:
+        return
+
+    logger.info(
+        "acnr.invalidate: project=%s wp_id=%s trigger=%s sheets=%s",
+        project_id,
+        wp_id,
+        trigger,
+        extra_sheets,
+    )
+
+    # ── Step 1: L3 RuntimeIndex 失效 ─────────────────────────────────────
+    try:
+        from app.services.acnr.runtime import (
+            clear_runtime_entries,
+            clear_runtime_entries_for_wp,
+        )
+
+        # Req-5.2: 有 wp_id 时仅清该 wp L3（非 project 全量）
+        if wp_id:
+            removed = clear_runtime_entries_for_wp(project_id, wp_id)
+            logger.debug(
+                "acnr.invalidate L3: cleared %d entries for wp=%s",
+                removed, wp_id,
+            )
+        else:
+            clear_runtime_entries(project_id)
+    except Exception as exc:
+        logger.warning("acnr.invalidate L3 clear failed: %s", exc)
+
+    # ── Step 2: L2 overlay 缓存失效 ──────────────────────────────────────
+    try:
+        from app.services.acnr.overlay import clear_project_overlays
+
+        clear_project_overlays(project_id)
+    except Exception as exc:
+        logger.warning("acnr.invalidate L2 overlay clear failed: %s", exc)
+
+    # ── Step 3: FormulaReverseIndex 单例失效 ────────────────────────────
+    # 无论 extra_sheets / 增量模式如何，始终执行完整 reverse_index 失效
+    # （反向索引为全局单例，无法按 sheet 增量清理，需整体重建）。
+    try:
+        from app.services.formula_reverse_index import invalidate_reverse_index
+
+        invalidate_reverse_index()
+    except Exception as exc:
+        logger.warning("acnr.invalidate reverse_index clear failed: %s", exc)
+
+    # ── Step 4: 委托旧 address_registry 失效 WP 域（strangler-fig 过渡）──
+    try:
+        from app.services.address_registry import address_registry
+
+        await address_registry.invalidate_async(
+            str(project_id), domain="wp"
+        )
+    except Exception as exc:
+        logger.warning(
+            "acnr.invalidate address_registry delegate failed: %s", exc
+        )
+
+    # ── Step 5: 递增 project_epoch + pub-sub 通知其他 worker (Req-7 / R11) ────
+    new_epoch = 0
+    try:
+        from app.services.acnr.cache_epoch import increment_epoch
+
+        new_epoch = await increment_epoch(project_id)
+        if new_epoch > 0:
+            logger.debug(
+                "acnr.invalidate epoch: project=%s new_epoch=%d",
+                project_id, new_epoch,
+            )
+    except Exception as exc:
+        logger.warning("acnr.invalidate epoch increment failed: %s", exc)
+
+    # ── Step 6: 前端 SSE 实时广播 acnr:invalidate（best-effort，R2）──────
+    # broadcast_raw 只推同 worker 的 SSE 队列（跨 worker 由 Durable_Epoch 兜底）。
+    # project_id 已在函数入口非空校验；异常仅告警不阻断（R2.5）。
+    #
+    # 🔴 与 acnr-consumer-wiring Req 10.4 调和：`touch_wp_registry` 是渲染期高频热路径
+    # （invalidate_domain('wp') → trigger="touch_wp_registry"），不得向前端 SSE fan-out
+    # （避免 SSE 风暴）。仅 WORKPAPER_SAVED 等真实失效触发广播；热路径由 Durable_Epoch/TTL 兜底。
+    if trigger != "touch_wp_registry":
+        try:
+            from app.services.event_bus import event_bus
+
+            payload: dict[str, Any] = {"project_id": str(project_id)}
+            if wp_id:
+                payload["wp_id"] = str(wp_id)
+            if new_epoch > 0:
+                payload["epoch"] = new_epoch
+            event_bus.broadcast_raw("acnr:invalidate", payload)
+        except Exception as exc:
+            logger.warning("acnr.invalidate broadcast_raw failed: %s", exc)
+
+
+async def invalidate_domain(
+    project_id: str,
+    *,
+    domain: str,
+    wp_id: str | None = None,
+) -> None:
+    """按域的统一失效薄封装（Req 11）。
+
+    - domain == "wp" → 汇入 canonical `invalidate()`（含 L3/L2/reverse_index/legacy 全链）。
+    - 其他域（tb/report/note/aux）→ 单一 seam，当前 behavior parity 委托 legacy
+      `address_registry.invalidate_async`；未来可在此按域清 L2/L3 overlay。
+
+    本函数不抛异常 — 失效失败仅 warning，不阻断主流程。
+
+    Args:
+        project_id: 项目 ID（必传）
+        domain: 失效域（wp / tb / report / note / aux）
+        wp_id: 底稿 ID（可选，仅 wp 域增量失效用）
+    """
+    if not project_id:
+        return
+
+    if domain == "wp":
+        await invalidate(
+            str(project_id), wp_id=wp_id, trigger="touch_wp_registry"
+        )
+        return
+
+    # 非 WP 域：单一 seam，当前 behavior parity 委托 legacy
+    try:
+        from app.services.address_registry import address_registry
+
+        await address_registry.invalidate_async(str(project_id), domain=domain)
+    except Exception as exc:
+        logger.warning("acnr.invalidate_domain %s failed: %s", domain, exc)
+
+
+async def on_workpaper_saved(payload: Any) -> None:
+    """WORKPAPER_SAVED 事件处理器 — 委托 invalidate() 统一缓存失效。
+
+    EventBus handler 签名: async def handler(payload: EventPayload) -> None
+    从 EventPayload 解包参数后调用 invalidate()。
+
+    payload.extra 预期字段（by WorkpaperSaveOrchestrator）:
+        - wp_id: str
+        - trigger: str
+        - sheets: list[str] | None（可选增量）
+    """
+    project_id = getattr(payload, "project_id", None)
+    if not project_id:
+        return
+
+    extra = getattr(payload, "extra", {}) or {}
+    wp_id = extra.get("wp_id")
+    trigger = extra.get("trigger")
+    extra_sheets = extra.get("sheets")
+
+    await invalidate(
+        str(project_id),
+        wp_id=wp_id,
+        trigger=trigger,
+        extra_sheets=extra_sheets,
+    )
+
+
+def register_acnr_invalidation_handler() -> None:
+    """注册 ACNR 失效事件处理器到 EventBus。
+
+    在 register_event_handlers() 末尾调用。
+    """
+    from app.models.audit_platform_schemas import EventType
+    from app.services.event_bus import event_bus
+
+    event_bus.subscribe(EventType.WORKPAPER_SAVED, on_workpaper_saved)
+    logger.debug("ACNR: invalidation handler registered (WORKPAPER_SAVED)")

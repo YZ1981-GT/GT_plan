@@ -59,7 +59,7 @@
             v-model="row.table_type"
             size="small"
             placeholder="选择类型"
-            :disabled="row.table_type === 'unknown'"
+            @change="onTableTypeChange(row)"
           >
             <el-option label="余额表" value="balance" />
             <el-option label="序时账" value="ledger" />
@@ -374,6 +374,12 @@ function confirmYearConflict() {
 function doConfirm(forceSubmit: boolean) {
   const sheets = sheetRows.value.filter(r => r.table_type !== 'unknown')
   emit('confirm', sheets, forceSubmit)
+}
+
+/** Task 6.1: 用户手动更改 unknown sheet 类型时标记 manually_selected */
+function onTableTypeChange(row: SheetRow) {
+  // Mark that user manually selected this type (for confirm flow)
+  ;(row as any).manually_selected_type = true
 }
 </script>
 

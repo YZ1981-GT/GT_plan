@@ -1,0 +1,299 @@
+import { describe, it, expect } from 'vitest'
+import { PRESET_SEGMENTS } from '@/composables/useAgingConfig'
+import {
+  autoFillSoeFromK1Sources,
+  buildDefaultMethodRows,
+  buildBalanceStageMovementsFromK17,
+  buildGovGrantFromK1Detail,
+  buildPortfolioAgingRows,
+  calcBalanceStageTieOut,
+  calcMethodTieOut,
+  calcPortfolioSplitTieOut,
+  emptyK1SoePayload,
+  parseK1SoePayload,
+  recomputeMethodRows,
+  recomputeOtherPortfolioRows,
+  splitK1DetailByProvisionMethod,
+} from '../k1DisclosureModel'
+import { buildK1SoeSubTableData, buildK1SoeSyncPayloads } from '../k1DisclosureSyncPayload'
+import { K1_SOE_SUBTABLE } from '../k1NoteSectionMap'
+
+describe('k1SoeDisclosureModel', () => {
+  it('recomputeMethodRows calculates totals and percentages', () => {
+    const rows = recomputeMethodRows([
+      {
+        rowId: 'a', rowKey: 'individual', label: '单项',
+        endBalance: 300, endBalancePct: null, endProvision: 30, endEclRate: null, endBookValue: 0,
+        priorBalance: 0, priorBalancePct: null, priorProvision: 0, priorEclRate: null, priorBookValue: 0,
+        editable: true,
+      },
+      {
+        rowId: 'b', rowKey: 'portfolio', label: '组合',
+        endBalance: 700, endBalancePct: null, endProvision: 70, endEclRate: null, endBookValue: 0,
+        priorBalance: 0, priorBalancePct: null, priorProvision: 0, priorEclRate: null, priorBookValue: 0,
+        editable: true,
+      },
+      {
+        rowId: 'c', rowKey: 'total', label: '合计',
+        endBalance: 0, endBalancePct: 100, endProvision: 0, endEclRate: null, endBookValue: 0,
+        priorBalance: 0, priorBalancePct: 100, priorProvision: 0, priorEclRate: null, priorBookValue: 0,
+        editable: false,
+      },
+    ])
+    const total = rows.find((r) => r.rowKey === 'total')
+    expect(total?.endBalance).toBe(1000)
+    expect(total?.endProvision).toBe(100)
+    expect(rows.find((r) => r.rowKey === 'individual')?.endBalancePct).toBe(30)
+  })
+
+  it('buildGovGrantFromK1Detail filters subsidy nature', () => {
+    const rows = buildGovGrantFromK1Detail([
+      {
+        id: '1', counterparty: '财政局', nature: '政府补助-技改', beginBalance: 0, endBalance: 50000,
+        badDebtProvision: 0, stage: 1, relatedParty: '否', agingPrior: {}, agingAudited: { within1: 50000 }, remark: '2026年收回',
+      },
+      {
+        id: '2', counterparty: '供应商', nature: '押金', beginBalance: 0, endBalance: 1000,
+        badDebtProvision: 0, stage: 1, relatedParty: '否', agingPrior: {}, agingAudited: {}, remark: '',
+      },
+    ])
+    expect(rows).toHaveLength(1)
+    expect(rows[0].unitName).toBe('财政局')
+  })
+
+  it('parseK1SoePayload handles V2 JSON', () => {
+    const p = parseK1SoePayload({ version: 2, methodRows: buildDefaultMethodRows() }, PRESET_SEGMENTS.FIVE_YEAR)
+    expect(p.version).toBe(2)
+    expect(p.methodRows.length).toBe(3)
+  })
+
+  it('calcMethodTieOut detects mismatch', () => {
+    const rows = recomputeMethodRows([
+      {
+        rowId: 'a', rowKey: 'individual', label: '单项',
+        endBalance: 100, endBalancePct: null, endProvision: 0, endEclRate: null, endBookValue: 0,
+        priorBalance: 0, priorBalancePct: null, priorProvision: 0, priorEclRate: null, priorBookValue: 0,
+        editable: true,
+      },
+      {
+        rowId: 'b', rowKey: 'portfolio', label: '组合',
+        endBalance: 0, endBalancePct: null, endProvision: 0, endEclRate: null, endBookValue: 0,
+        priorBalance: 0, priorBalancePct: null, priorProvision: 0, priorEclRate: null, priorBookValue: 0,
+        editable: true,
+      },
+      {
+        rowId: 'c', rowKey: 'total', label: '合计',
+        endBalance: 0, endBalancePct: 100, endProvision: 0, endEclRate: null, endBookValue: 0,
+        priorBalance: 0, priorBalancePct: 100, priorProvision: 0, priorEclRate: null, priorBookValue: 0,
+        editable: false,
+      },
+    ])
+    const tie = calcMethodTieOut(rows, 500)
+    expect(tie.matched).toBe(false)
+  })
+
+  it('splitK1DetailByProvisionMethod excludes individual sub-rows from portfolio', () => {
+    const details = [
+      { id: '1', counterparty: '甲公司', nature: '', beginBalance: 0, endBalance: 100, badDebtProvision: 10, stage: 3, relatedParty: '否', agingPrior: {}, agingAudited: { within1: 100 }, remark: '' },
+      { id: '2', counterparty: '乙公司', nature: '', beginBalance: 0, endBalance: 200, badDebtProvision: 0, stage: 1, relatedParty: '否', agingPrior: {}, agingAudited: { within1: 200 }, remark: '' },
+    ]
+    const k13 = {
+      version: 2,
+      mainRows: [
+        { id: 'sub1', category: 'individual', label: '甲公司', isSubRow: true, isFixed: false, priorAudited: 5, currentAudited: 10, currentProvision: 0, currentReversal: 0, currentWriteOff: 0, priorBook: 0, priorAdj: 0, currentBook: 0, currentAdj: 0, reason: '' },
+        { id: 'port', category: 'portfolio', label: '按组合计提', isSubRow: false, isFixed: true, priorAudited: 0, currentAudited: 0, currentProvision: 0, currentReversal: 0, currentWriteOff: 0, priorBook: 0, priorAdj: 0, currentBook: 0, currentAdj: 0, reason: '' },
+        { id: 'tot', category: 'total', label: '合计', isSubRow: false, isFixed: true, priorAudited: 5, currentAudited: 10, currentProvision: 0, currentReversal: 0, currentWriteOff: 0, priorBook: 0, priorAdj: 0, currentBook: 0, currentAdj: 0, reason: '' },
+      ],
+      stageMovements: [],
+    }
+    const split = splitK1DetailByProvisionMethod(details, k13)
+    expect(split.individualDetails).toHaveLength(1)
+    expect(split.portfolioDetails).toHaveLength(1)
+    expect(split.portfolioDetails[0].counterparty).toBe('乙公司')
+  })
+
+  it('buildBalanceStageMovementsFromK17 aggregates opening and stage transfers', () => {
+    const details = [
+      { id: '1', counterparty: '甲', nature: '', beginBalance: 80, endBalance: 100, badDebtProvision: 0, stage: 2, relatedParty: '否', agingPrior: {}, agingAudited: {}, remark: '' },
+      { id: '2', counterparty: '乙', nature: '', beginBalance: 50, endBalance: 40, badDebtProvision: 0, stage: 1, relatedParty: '否', agingPrior: {}, agingAudited: {}, remark: '' },
+    ]
+    const stageRows = [
+      { counterparty: '甲', endBalance: 100, priorStage: 1 as const, stage: 2 as const },
+      { counterparty: '乙', endBalance: 40, priorStage: 1 as const, stage: 1 as const },
+    ] as any[]
+    const movements = buildBalanceStageMovementsFromK17(stageRows, details)
+    const opening = movements.find((r) => r.key === 'opening')
+    const closing = movements.find((r) => r.key === 'closing')
+    expect(opening?.stage1).toBe(130) // 80+50
+    expect(closing?.stage1).toBe(40)
+    expect(closing?.stage2).toBe(100)
+    const tie = calcBalanceStageTieOut(movements, 140)
+    expect(tie.matched).toBe(true)
+  })
+})
+
+describe('k1SoeDisclosureSyncPayload', () => {
+  it('buildK1SoeSubTableData uses SOE note sub-table names', () => {
+    const snap = emptyK1SoePayload()
+    snap.portfolioAgingRows = buildPortfolioAgingRows(
+      PRESET_SEGMENTS.FIVE_YEAR,
+      { end: { within1: 100, y1to2: 0, y2to3: 0, y3to4: 0, y4to5: 0, over5: 0 }, prior: {} },
+      { end: 5, prior: 0 },
+    )
+    const data = buildK1SoeSubTableData(snap)
+    expect(data[K1_SOE_SUBTABLE.aging]).toBeDefined()
+    expect(data[K1_SOE_SUBTABLE.eclMovement]).toBeDefined()
+    expect(data[K1_SOE_SUBTABLE.balanceMovement]).toBeDefined()
+    // 账龄组合与其他组合分表：portfolioAging 承载账龄组合，portfolioOther 承载人工组合
+    expect(data[K1_SOE_SUBTABLE.portfolioAging]?.length).toBeGreaterThan(0)
+    expect(data[K1_SOE_SUBTABLE.continuedInvolvement]?.length).toBeGreaterThan(0)
+  })
+
+  it('buildK1SoeSyncPayloads 附带 columns（源对齐中文列头）', () => {
+    const snap = emptyK1SoePayload()
+    const [payload] = buildK1SoeSyncPayloads('wp-k1', null, snap)
+    expect(payload).toBeDefined()
+    const cols = payload.columns!
+    expect(Object.keys(cols)).toContain(K1_SOE_SUBTABLE.aging)
+    // 🔴 账龄表按源 xlsx 国企 `A6:C15` 是**单级 3 列**（账 龄 / 期末数 / 期初数）。
+    // 原先误按「期末数/期初数 各含账面余额+坏账准备」建成 5 列两级 —— 那套结构不在源
+    // 模板里（5 列是下方「账龄组合」表 A46:G55 的形态），导致载荷不得不把「小计 +
+    // 减：坏账准备」两行压进合计行的额外两列。
+    const aging = cols[K1_SOE_SUBTABLE.aging]
+    expect(aging.map((c) => c.label)).toEqual(['账  龄', '期末数', '期初数'])
+    expect(aging.map((c) => c.key)).toEqual(['label', '期末数', '期初数'])
+    expect(aging.map((c) => c.group)).toEqual([undefined, undefined, undefined])
+    expect(aging[0].is_label).toBe(true)
+    expect(aging[0].flat).toBe(true)
+    // 「账龄组合」才是 7 列两级（源 xlsx B46:D46 期末数 / E46:G46 期初数）
+    const portAging = cols[K1_SOE_SUBTABLE.portfolioAging]
+    expect(portAging.map((c) => c.group)).toEqual([
+      undefined, '期末数', '期末数', '期末数', '期初数', '期初数', '期初数',
+    ])
+    // 政府补助表源对齐五列（源 xlsx `A126` 换行 → 括注纯文本，k1-extraction-chain-and-note-alignment 修正）
+    expect(cols[K1_SOE_SUBTABLE.govGrant].map((c) => c.label)).toEqual([
+      '单位名称（注：政府补助的发文单位）', '政府补助项目名称', '期末余额', '期末账龄',
+      '预计收取的时间、金额及依据',
+    ])
+    // 转回表含国企专有的「转回或收回前累计已计提坏账准备金额」列
+    expect(cols[K1_SOE_SUBTABLE.reversal].map((c) => c.label)).toEqual([
+      '债务人名称', '转回或收回金额', '转回或收回前累计已计提坏账准备金额', '转回或收回原因、方式',
+    ])
+    // 国企转移表无「转移方式」列（上市版才有）
+    expect(cols[K1_SOE_SUBTABLE.transfer].map((c) => c.label)).toEqual([
+      '债务人名称', '终止确认金额', '与终止确认相关的利得或损失',
+    ])
+  })
+
+  it('其他组合：坏账准备由计提比例派生，合计与账龄组合共同勾稽方法表组合行', () => {
+    const rows = recomputeOtherPortfolioRows([
+      {
+        rowId: 'a', label: '余额百分比法组合',
+        endBalance: 1000, endRatePct: 5, endProvision: 0,
+        priorBalance: 800, priorRatePct: 5, priorProvision: 0,
+        editable: true,
+      },
+    ])
+    expect(rows[0].endProvision).toBe(50)
+    expect(rows[0].priorProvision).toBe(40)
+
+    const methodRows = buildDefaultMethodRows().map((r) =>
+      r.rowKey === 'portfolio' ? { ...r, endProvision: 50 } : r,
+    )
+    const tie = calcPortfolioSplitTieOut([], rows, methodRows)
+    expect(tie.matched).toBe(true)
+  })
+
+  it('旧 otherPortfolioRows（endBalancePct 口径）迁移为计提比例', () => {
+    const legacy = JSON.stringify({
+      version: 2,
+      otherPortfolioRows: [
+        { rowId: 'x', label: '组合1', endBalance: 200, endBalancePct: 10, endProvision: 0, priorBalance: 0, priorProvision: 0 },
+      ],
+    })
+    const parsed = parseK1SoePayload(legacy, PRESET_SEGMENTS.FIVE_YEAR)
+    expect(parsed.otherPortfolioRows[0].endRatePct).toBe(10)
+    expect(parsed.otherPortfolioRows[0].endProvision).toBe(20)
+  })
+
+  it('转回行携带 accumProvision → cumulativeProvision（K1-9 取数）', () => {
+    const map = new Map<string, any>([
+      ['K1-9-writeoff', {
+        remark: JSON.stringify({
+          tables: {
+            reversal: [{ id: 'r1', unit: '甲公司', amount: 100, accumProvision: 80, reason: '重组收回', method: '银行转账收回' }],
+            writeoff: [],
+          },
+        }),
+      }],
+    ])
+    const payload = autoFillSoeFromK1Sources(emptyK1SoePayload(), map, PRESET_SEGMENTS.FIVE_YEAR, { force: true })
+    expect(payload.reversalRows[0].cumulativeProvision).toBe(80)
+  })
+
+  it('国企账龄表不生成 1 年以内月度细分行（上市专有）', () => {
+    const payload = autoFillSoeFromK1Sources(
+      emptyK1SoePayload(),
+      new Map(),
+      PRESET_SEGMENTS.FIVE_YEAR,
+      { force: true },
+    )
+    expect(payload.agingRows.some((r) => r.kind === 'sub')).toBe(false)
+    expect(payload.agingRows.some((r) => r.kind === 'subtotal1y')).toBe(false)
+  })
+})
+
+
+// ─── 2026-07-31：账龄表忠实推送 subtotal / provision / total ──────────────────
+// spec: k1-four-table-extraction-and-disclosure-alignment R8.2 / Property 8
+
+describe('国企账龄表按源模板忠实推送三种结构行', () => {
+  function snapWithAging() {
+    const snap = emptyK1SoePayload()
+    snap.agingRows = [
+      { rowId: 'a1', segmentKey: 'within1', label: '1年以内（含1年）', kind: 'data', endAmount: 600, priorAmount: 500 },
+      { rowId: 'a2', segmentKey: 'y1to2', label: '1至2年', kind: 'data', endAmount: 400, priorAmount: 300 },
+      { rowId: 'a3', segmentKey: 'subtotal', label: '小计', kind: 'subtotal', endAmount: 1000, priorAmount: 800 },
+      { rowId: 'a4', segmentKey: 'provision', label: '减：坏账准备', kind: 'provision', endAmount: 60, priorAmount: 40 },
+      { rowId: 'a5', segmentKey: 'total', label: '合计', kind: 'total', endAmount: 940, priorAmount: 760 },
+    ] as any[]
+    return snap
+  }
+
+  it('小计 / 减：坏账准备 / 合计 三行都在，且用源模板双空格字面', () => {
+    const rows = buildK1SoeSubTableData(snapWithAging())[K1_SOE_SUBTABLE.aging]
+    expect(rows.map((r) => r.label)).toEqual([
+      '1年以内（含1年）', '1至2年', '小  计', '减：坏账准备', '合  计',
+    ])
+    expect(rows.map((r) => r.row_kind)).toEqual([
+      'data', 'data', 'subtotal', 'provision', 'total',
+    ])
+  })
+
+  it('行对象键 = 期末数 / 期初数（与 columns 的 key 逐字一致，Property 8）', () => {
+    const rows = buildK1SoeSubTableData(snapWithAging())[K1_SOE_SUBTABLE.aging]
+    for (const r of rows) {
+      expect(Object.keys(r)).toContain('期末数')
+      expect(Object.keys(r)).toContain('期初数')
+      // 旧的 5 列键不得残留（否则附注拿不到数）
+      expect(Object.keys(r)).not.toContain('期末账面余额')
+    }
+    expect(rows[0].期末数).toBe(600)
+    expect(rows[2].期末数).toBe(1000)
+    expect(rows[3].期末数).toBe(60)
+    expect(rows[4].期末数).toBe(940)
+  })
+
+  it('小计 − 减：坏账准备 = 合计（源模板勾稽）', () => {
+    const rows = buildK1SoeSubTableData(snapWithAging())[K1_SOE_SUBTABLE.aging]
+    const pick = (kind: string) => rows.find((r) => r.row_kind === kind)!
+    expect(Number(pick('subtotal').期末数) - Number(pick('provision').期末数)).toBe(
+      Number(pick('total').期末数),
+    )
+  })
+
+  it('is_total 标在小计与合计行（附注加粗 + 勾稽识别）', () => {
+    const rows = buildK1SoeSubTableData(snapWithAging())[K1_SOE_SUBTABLE.aging]
+    expect(rows.map((r) => !!r.is_total)).toEqual([false, false, true, false, true])
+  })
+})

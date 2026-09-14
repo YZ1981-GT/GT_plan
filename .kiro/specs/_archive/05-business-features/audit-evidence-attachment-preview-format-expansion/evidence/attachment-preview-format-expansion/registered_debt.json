@@ -1,0 +1,57 @@
+{
+  "spec": "audit-evidence-attachment-preview-format-expansion",
+  "recorded_at": "2026-09-08",
+  "baseline_commit": "08229d87ef8ac2f9c1d148756016c23efb0befae",
+  "scope_note": "三项均明确不在本 spec 修复范围；仅登记事实与收敛建议。",
+  "debts": [
+    {
+      "id": "xlsx-0.18.5-cve",
+      "in_scope": false,
+      "summary": "xlsx@0.18.5 原型链污染与正则 DoS 告警",
+      "cves": ["CVE-2023-30533", "CVE-2024-22363"],
+      "package": "xlsx@0.18.5",
+      "declared_in": "audit-platform/frontend/package.json",
+      "untrusted_input_call_sites": [
+        {
+          "file": "audit-platform/frontend/src/composables/useExcelIO.ts",
+          "symbols": ["_loadXlsxPlain", "parseFile", "readSheetAoa"],
+          "note": "不可信上传/导入字节经动态 import('xlsx') 解析；_BLOCKED_KEYS 仅缓解表头原型污染，非完整修复。"
+        }
+      ],
+      "mitigation_today": "_BLOCKED_KEYS 过滤 __proto__/constructor/prototype；修复版不进 npm，本 spec 不换库。"
+    },
+    {
+      "id": "attachment-hub-dead-import",
+      "in_scope": false,
+      "summary": "AttachmentHub.vue 死 import AttachmentPreviewDrawer + window.open TODO",
+      "file": "audit-platform/frontend/src/views/AttachmentHub.vue",
+      "facts": [
+        "import AttachmentPreviewDrawer from '@/components/common/AttachmentPreviewDrawer.vue' 存在",
+        "模板未挂载 Drawer_Host",
+        "注释 TODO: replace window.open with AttachmentPreviewDrawer when per-file preview is added to this hub view"
+      ],
+      "decision": "本 spec 不接线 AttachmentHub；两宿主真实消费方仅 AttachmentManagement / WorkpaperAttachmentsDrawer / AttachmentTabPanel。"
+    },
+    {
+      "id": "dual-host-convergence",
+      "in_scope": true,
+      "resolved": true,
+      "resolved_at": "2026-09-09",
+      "summary": "Preview_Host 与 Drawer_Host 已收敛为单一逻辑宿主 + 两个容器薄壳",
+      "core_host": "audit-platform/frontend/src/components/attachment/preview/AttachmentPreviewCore.vue",
+      "thin_shells": [
+        "audit-platform/frontend/src/components/extension/AttachmentPreview.vue (el-dialog, variant=client)",
+        "audit-platform/frontend/src/components/common/AttachmentPreviewDrawer.vue (el-drawer, variant=server)"
+      ],
+      "convergence": [
+        "全部预览逻辑（familyVerdict 判定、ExtendedFormatPreview 分发、legacy 渲染、OCR、Office 健康探测、unsupported/CAD 文案）单一真源下沉 AttachmentPreviewCore",
+        "薄壳只负责容器形态（弹窗 vs 抽屉）与对外 props 契约，零业务逻辑重复",
+        "两套 legacy 能力矩阵仍按 LEGACY_CAPABILITIES.previewHost / drawerHost 分开消费（Req 5.1 各自 legacy DOM/文案/URL 逐项不变），但由 core 内 variant 分支统一编排，不再散落两个组件",
+        "新增格式只需在 core 接线一次，两种容器形态自动获得；变异锚点 M16 迁移至 core",
+        "legacy DOM class 名（gt-preview-* / gt-attach-preview-*）与文案在 core 内逐项复刻，task1LegacyBaseline 与 AttachmentPreviewOfficeIframe 守卫零回归全绿（180 passed）"
+      ],
+      "retained_forms_rationale": "保留弹窗与抽屉两种容器形态是因二者服务不同场景（附件管理页/底稿右栏），删除任一会破坏既有交互；收敛目标是逻辑单一真源而非删除 UI 形态。",
+      "residual": "views/AttachmentHub.vue 的死 import（debt attachment-hub-dead-import）仍 in_scope=false，未随本次收敛改动。"
+    }
+  ]
+}

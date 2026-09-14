@@ -1,0 +1,2637 @@
+{
+  "_meta": {
+    "spec": "x3-adjustment-entry-import-export",
+    "task": "7（Checkpoint —— 后端两通路可达）",
+    "kind": "只读核验（不改生产代码）",
+    "written_at": "2026-08-14T22:43:20+08:00",
+    "generated_by": "backend/scripts/diagnose/snapshot_x3_baseline.py --compare + 四份只读探针（tmp_x3_cp7_*，已删）",
+    "read_only_boundary": {
+      "invoked_suffixes": [
+        "export-template",
+        "export-data"
+      ],
+      "never_invoked": [
+        "import-data"
+      ],
+      "head_swap_used": false,
+      "db_writes": false
+    }
+  },
+  "check_1_shape_a_runtime": {
+    "criterion": "严格形态 A = `/api/workpapers/{wp_id}/{短前缀}/{三态}`（判据委派 `tests.test_x3_adapter_host_same_module.strict_shape_a_routes`）；16 短前缀 × 3 后缀 = 48 条全在，且 endpoint.__module__ 恒为 `app.routers.wp_render_strategies._x3_adjustment_import_export`",
+    "expected_routes": 48,
+    "present_routes": 48,
+    "missing": [],
+    "wrong_host_module": [],
+    "duplicate_paths": {},
+    "distinct_method_sets": [
+      [
+        "POST"
+      ]
+    ],
+    "app_routes_total": 2339,
+    "rows": [
+      {
+        "prefix": "l2",
+        "suffix": "export-template",
+        "sheet_code": "L2-3",
+        "present": true,
+        "path": "/api/workpapers/{wp_id}/l2/export-template",
+        "methods": [
+          "POST"
+        ],
+        "endpoint_module": "app.routers.wp_render_strategies._x3_adjustment_import_export",
+        "endpoint_qualname": "_register_shape_a.<locals>.export_template",
+        "duplicate_path_count": 1
+      },
+      {
+        "prefix": "l2",
+        "suffix": "export-data",
+        "sheet_code": "L2-3",
+        "present": true,
+        "path": "/api/workpapers/{wp_id}/l2/export-data",
+        "methods": [
+          "POST"
+        ],
+        "endpoint_module": "app.routers.wp_render_strategies._x3_adjustment_import_export",
+        "endpoint_qualname": "_register_shape_a.<locals>.export_data",
+        "duplicate_path_count": 1
+      },
+      {
+        "prefix": "l2",
+        "suffix": "import-data",
+        "sheet_code": "L2-3",
+        "present": true,
+        "path": "/api/workpapers/{wp_id}/l2/import-data",
+        "methods": [
+          "POST"
+        ],
+        "endpoint_module": "app.routers.wp_render_strategies._x3_adjustment_import_export",
+        "endpoint_qualname": "_register_shape_a.<locals>.import_data",
+        "duplicate_path_count": 1
+      },
+      {
+        "prefix": "l6",
+        "suffix": "export-template",
+        "sheet_code": "L6-3",
+        "present": true,
+        "path": "/api/workpapers/{wp_id}/l6/export-template",
+        "methods": [
+          "POST"
+        ],
+        "endpoint_module": "app.routers.wp_render_strategies._x3_adjustment_import_export",
+        "endpoint_qualname": "_register_shape_a.<locals>.export_template",
+        "duplicate_path_count": 1
+      },
+      {
+        "prefix": "l6",
+        "suffix": "export-data",
+        "sheet_code": "L6-3",
+        "present": true,
+        "path": "/api/workpapers/{wp_id}/l6/export-data",
+        "methods": [
+          "POST"
+        ],
+        "endpoint_module": "app.routers.wp_render_strategies._x3_adjustment_import_export",
+        "endpoint_qualname": "_register_shape_a.<locals>.export_data",
+        "duplicate_path_count": 1
+      },
+      {
+        "prefix": "l6",
+        "suffix": "import-data",
+        "sheet_code": "L6-3",
+        "present": true,
+        "path": "/api/workpapers/{wp_id}/l6/import-data",
+        "methods": [
+          "POST"
+        ],
+        "endpoint_module": "app.routers.wp_render_strategies._x3_adjustment_import_export",
+        "endpoint_qualname": "_register_shape_a.<locals>.import_data",
+        "duplicate_path_count": 1
+      },
+      {
+        "prefix": "m1",
+        "suffix": "export-template",
+        "sheet_code": "M1-3",
+        "present": true,
+        "path": "/api/workpapers/{wp_id}/m1/export-template",
+        "methods": [
+          "POST"
+        ],
+        "endpoint_module": "app.routers.wp_render_strategies._x3_adjustment_import_export",
+        "endpoint_qualname": "_register_shape_a.<locals>.export_template",
+        "duplicate_path_count": 1
+      },
+      {
+        "prefix": "m1",
+        "suffix": "export-data",
+        "sheet_code": "M1-3",
+        "present": true,
+        "path": "/api/workpapers/{wp_id}/m1/export-data",
+        "methods": [
+          "POST"
+        ],
+        "endpoint_module": "app.routers.wp_render_strategies._x3_adjustment_import_export",
+        "endpoint_qualname": "_register_shape_a.<locals>.export_data",
+        "duplicate_path_count": 1
+      },
+      {
+        "prefix": "m1",
+        "suffix": "import-data",
+        "sheet_code": "M1-3",
+        "present": true,
+        "path": "/api/workpapers/{wp_id}/m1/import-data",
+        "methods": [
+          "POST"
+        ],
+        "endpoint_module": "app.routers.wp_render_strategies._x3_adjustment_import_export",
+        "endpoint_qualname": "_register_shape_a.<locals>.import_data",
+        "duplicate_path_count": 1
+      },
+      {
+        "prefix": "m2",
+        "suffix": "export-template",
+        "sheet_code": "M2-3",
+        "present": true,
+        "path": "/api/workpapers/{wp_id}/m2/export-template",
+        "methods": [
+          "POST"
+        ],
+        "endpoint_module": "app.routers.wp_render_strategies._x3_adjustment_import_export",
+        "endpoint_qualname": "_register_shape_a.<locals>.export_template",
+        "duplicate_path_count": 1
+      },
+      {
+        "prefix": "m2",
+        "suffix": "export-data",
+        "sheet_code": "M2-3",
+        "present": true,
+        "path": "/api/workpapers/{wp_id}/m2/export-data",
+        "methods": [
+          "POST"
+        ],
+        "endpoint_module": "app.routers.wp_render_strategies._x3_adjustment_import_export",
+        "endpoint_qualname": "_register_shape_a.<locals>.export_data",
+        "duplicate_path_count": 1
+      },
+      {
+        "prefix": "m2",
+        "suffix": "import-data",
+        "sheet_code": "M2-3",
+        "present": true,
+        "path": "/api/workpapers/{wp_id}/m2/import-data",
+        "methods": [
+          "POST"
+        ],
+        "endpoint_module": "app.routers.wp_render_strategies._x3_adjustment_import_export",
+        "endpoint_qualname": "_register_shape_a.<locals>.import_data",
+        "duplicate_path_count": 1
+      },
+      {
+        "prefix": "m3",
+        "suffix": "export-template",
+        "sheet_code": "M3-3",
+        "present": true,
+        "path": "/api/workpapers/{wp_id}/m3/export-template",
+        "methods": [
+          "POST"
+        ],
+        "endpoint_module": "app.routers.wp_render_strategies._x3_adjustment_import_export",
+        "endpoint_qualname": "_register_shape_a.<locals>.export_template",
+        "duplicate_path_count": 1
+      },
+      {
+        "prefix": "m3",
+        "suffix": "export-data",
+        "sheet_code": "M3-3",
+        "present": true,
+        "path": "/api/workpapers/{wp_id}/m3/export-data",
+        "methods": [
+          "POST"
+        ],
+        "endpoint_module": "app.routers.wp_render_strategies._x3_adjustment_import_export",
+        "endpoint_qualname": "_register_shape_a.<locals>.export_data",
+        "duplicate_path_count": 1
+      },
+      {
+        "prefix": "m3",
+        "suffix": "import-data",
+        "sheet_code": "M3-3",
+        "present": true,
+        "path": "/api/workpapers/{wp_id}/m3/import-data",
+        "methods": [
+          "POST"
+        ],
+        "endpoint_module": "app.routers.wp_render_strategies._x3_adjustment_import_export",
+        "endpoint_qualname": "_register_shape_a.<locals>.import_data",
+        "duplicate_path_count": 1
+      },
+      {
+        "prefix": "m4",
+        "suffix": "export-template",
+        "sheet_code": "M4-3",
+        "present": true,
+        "path": "/api/workpapers/{wp_id}/m4/export-template",
+        "methods": [
+          "POST"
+        ],
+        "endpoint_module": "app.routers.wp_render_strategies._x3_adjustment_import_export",
+        "endpoint_qualname": "_register_shape_a.<locals>.export_template",
+        "duplicate_path_count": 1
+      },
+      {
+        "prefix": "m4",
+        "suffix": "export-data",
+        "sheet_code": "M4-3",
+        "present": true,
+        "path": "/api/workpapers/{wp_id}/m4/export-data",
+        "methods": [
+          "POST"
+        ],
+        "endpoint_module": "app.routers.wp_render_strategies._x3_adjustment_import_export",
+        "endpoint_qualname": "_register_shape_a.<locals>.export_data",
+        "duplicate_path_count": 1
+      },
+      {
+        "prefix": "m4",
+        "suffix": "import-data",
+        "sheet_code": "M4-3",
+        "present": true,
+        "path": "/api/workpapers/{wp_id}/m4/import-data",
+        "methods": [
+          "POST"
+        ],
+        "endpoint_module": "app.routers.wp_render_strategies._x3_adjustment_import_export",
+        "endpoint_qualname": "_register_shape_a.<locals>.import_data",
+        "duplicate_path_count": 1
+      },
+      {
+        "prefix": "m5",
+        "suffix": "export-template",
+        "sheet_code": "M5-3",
+        "present": true,
+        "path": "/api/workpapers/{wp_id}/m5/export-template",
+        "methods": [
+          "POST"
+        ],
+        "endpoint_module": "app.routers.wp_render_strategies._x3_adjustment_import_export",
+        "endpoint_qualname": "_register_shape_a.<locals>.export_template",
+        "duplicate_path_count": 1
+      },
+      {
+        "prefix": "m5",
+        "suffix": "export-data",
+        "sheet_code": "M5-3",
+        "present": true,
+        "path": "/api/workpapers/{wp_id}/m5/export-data",
+        "methods": [
+          "POST"
+        ],
+        "endpoint_module": "app.routers.wp_render_strategies._x3_adjustment_import_export",
+        "endpoint_qualname": "_register_shape_a.<locals>.export_data",
+        "duplicate_path_count": 1
+      },
+      {
+        "prefix": "m5",
+        "suffix": "import-data",
+        "sheet_code": "M5-3",
+        "present": true,
+        "path": "/api/workpapers/{wp_id}/m5/import-data",
+        "methods": [
+          "POST"
+        ],
+        "endpoint_module": "app.routers.wp_render_strategies._x3_adjustment_import_export",
+        "endpoint_qualname": "_register_shape_a.<locals>.import_data",
+        "duplicate_path_count": 1
+      },
+      {
+        "prefix": "m6",
+        "suffix": "export-template",
+        "sheet_code": "M6-3",
+        "present": true,
+        "path": "/api/workpapers/{wp_id}/m6/export-template",
+        "methods": [
+          "POST"
+        ],
+        "endpoint_module": "app.routers.wp_render_strategies._x3_adjustment_import_export",
+        "endpoint_qualname": "_register_shape_a.<locals>.export_template",
+        "duplicate_path_count": 1
+      },
+      {
+        "prefix": "m6",
+        "suffix": "export-data",
+        "sheet_code": "M6-3",
+        "present": true,
+        "path": "/api/workpapers/{wp_id}/m6/export-data",
+        "methods": [
+          "POST"
+        ],
+        "endpoint_module": "app.routers.wp_render_strategies._x3_adjustment_import_export",
+        "endpoint_qualname": "_register_shape_a.<locals>.export_data",
+        "duplicate_path_count": 1
+      },
+      {
+        "prefix": "m6",
+        "suffix": "import-data",
+        "sheet_code": "M6-3",
+        "present": true,
+        "path": "/api/workpapers/{wp_id}/m6/import-data",
+        "methods": [
+          "POST"
+        ],
+        "endpoint_module": "app.routers.wp_render_strategies._x3_adjustment_import_export",
+        "endpoint_qualname": "_register_shape_a.<locals>.import_data",
+        "duplicate_path_count": 1
+      },
+      {
+        "prefix": "m7",
+        "suffix": "export-template",
+        "sheet_code": "M7-3",
+        "present": true,
+        "path": "/api/workpapers/{wp_id}/m7/export-template",
+        "methods": [
+          "POST"
+        ],
+        "endpoint_module": "app.routers.wp_render_strategies._x3_adjustment_import_export",
+        "endpoint_qualname": "_register_shape_a.<locals>.export_template",
+        "duplicate_path_count": 1
+      },
+      {
+        "prefix": "m7",
+        "suffix": "export-data",
+        "sheet_code": "M7-3",
+        "present": true,
+        "path": "/api/workpapers/{wp_id}/m7/export-data",
+        "methods": [
+          "POST"
+        ],
+        "endpoint_module": "app.routers.wp_render_strategies._x3_adjustment_import_export",
+        "endpoint_qualname": "_register_shape_a.<locals>.export_data",
+        "duplicate_path_count": 1
+      },
+      {
+        "prefix": "m7",
+        "suffix": "import-data",
+        "sheet_code": "M7-3",
+        "present": true,
+        "path": "/api/workpapers/{wp_id}/m7/import-data",
+        "methods": [
+          "POST"
+        ],
+        "endpoint_module": "app.routers.wp_render_strategies._x3_adjustment_import_export",
+        "endpoint_qualname": "_register_shape_a.<locals>.import_data",
+        "duplicate_path_count": 1
+      },
+      {
+        "prefix": "m8",
+        "suffix": "export-template",
+        "sheet_code": "M8-3",
+        "present": true,
+        "path": "/api/workpapers/{wp_id}/m8/export-template",
+        "methods": [
+          "POST"
+        ],
+        "endpoint_module": "app.routers.wp_render_strategies._x3_adjustment_import_export",
+        "endpoint_qualname": "_register_shape_a.<locals>.export_template",
+        "duplicate_path_count": 1
+      },
+      {
+        "prefix": "m8",
+        "suffix": "export-data",
+        "sheet_code": "M8-3",
+        "present": true,
+        "path": "/api/workpapers/{wp_id}/m8/export-data",
+        "methods": [
+          "POST"
+        ],
+        "endpoint_module": "app.routers.wp_render_strategies._x3_adjustment_import_export",
+        "endpoint_qualname": "_register_shape_a.<locals>.export_data",
+        "duplicate_path_count": 1
+      },
+      {
+        "prefix": "m8",
+        "suffix": "import-data",
+        "sheet_code": "M8-3",
+        "present": true,
+        "path": "/api/workpapers/{wp_id}/m8/import-data",
+        "methods": [
+          "POST"
+        ],
+        "endpoint_module": "app.routers.wp_render_strategies._x3_adjustment_import_export",
+        "endpoint_qualname": "_register_shape_a.<locals>.import_data",
+        "duplicate_path_count": 1
+      },
+      {
+        "prefix": "m9",
+        "suffix": "export-template",
+        "sheet_code": "M9-3",
+        "present": true,
+        "path": "/api/workpapers/{wp_id}/m9/export-template",
+        "methods": [
+          "POST"
+        ],
+        "endpoint_module": "app.routers.wp_render_strategies._x3_adjustment_import_export",
+        "endpoint_qualname": "_register_shape_a.<locals>.export_template",
+        "duplicate_path_count": 1
+      },
+      {
+        "prefix": "m9",
+        "suffix": "export-data",
+        "sheet_code": "M9-3",
+        "present": true,
+        "path": "/api/workpapers/{wp_id}/m9/export-data",
+        "methods": [
+          "POST"
+        ],
+        "endpoint_module": "app.routers.wp_render_strategies._x3_adjustment_import_export",
+        "endpoint_qualname": "_register_shape_a.<locals>.export_data",
+        "duplicate_path_count": 1
+      },
+      {
+        "prefix": "m9",
+        "suffix": "import-data",
+        "sheet_code": "M9-3",
+        "present": true,
+        "path": "/api/workpapers/{wp_id}/m9/import-data",
+        "methods": [
+          "POST"
+        ],
+        "endpoint_module": "app.routers.wp_render_strategies._x3_adjustment_import_export",
+        "endpoint_qualname": "_register_shape_a.<locals>.import_data",
+        "duplicate_path_count": 1
+      },
+      {
+        "prefix": "m10",
+        "suffix": "export-template",
+        "sheet_code": "M10-3",
+        "present": true,
+        "path": "/api/workpapers/{wp_id}/m10/export-template",
+        "methods": [
+          "POST"
+        ],
+        "endpoint_module": "app.routers.wp_render_strategies._x3_adjustment_import_export",
+        "endpoint_qualname": "_register_shape_a.<locals>.export_template",
+        "duplicate_path_count": 1
+      },
+      {
+        "prefix": "m10",
+        "suffix": "export-data",
+        "sheet_code": "M10-3",
+        "present": true,
+        "path": "/api/workpapers/{wp_id}/m10/export-data",
+        "methods": [
+          "POST"
+        ],
+        "endpoint_module": "app.routers.wp_render_strategies._x3_adjustment_import_export",
+        "endpoint_qualname": "_register_shape_a.<locals>.export_data",
+        "duplicate_path_count": 1
+      },
+      {
+        "prefix": "m10",
+        "suffix": "import-data",
+        "sheet_code": "M10-3",
+        "present": true,
+        "path": "/api/workpapers/{wp_id}/m10/import-data",
+        "methods": [
+          "POST"
+        ],
+        "endpoint_module": "app.routers.wp_render_strategies._x3_adjustment_import_export",
+        "endpoint_qualname": "_register_shape_a.<locals>.import_data",
+        "duplicate_path_count": 1
+      },
+      {
+        "prefix": "n1",
+        "suffix": "export-template",
+        "sheet_code": "N1-3",
+        "present": true,
+        "path": "/api/workpapers/{wp_id}/n1/export-template",
+        "methods": [
+          "POST"
+        ],
+        "endpoint_module": "app.routers.wp_render_strategies._x3_adjustment_import_export",
+        "endpoint_qualname": "_register_shape_a.<locals>.export_template",
+        "duplicate_path_count": 1
+      },
+      {
+        "prefix": "n1",
+        "suffix": "export-data",
+        "sheet_code": "N1-3",
+        "present": true,
+        "path": "/api/workpapers/{wp_id}/n1/export-data",
+        "methods": [
+          "POST"
+        ],
+        "endpoint_module": "app.routers.wp_render_strategies._x3_adjustment_import_export",
+        "endpoint_qualname": "_register_shape_a.<locals>.export_data",
+        "duplicate_path_count": 1
+      },
+      {
+        "prefix": "n1",
+        "suffix": "import-data",
+        "sheet_code": "N1-3",
+        "present": true,
+        "path": "/api/workpapers/{wp_id}/n1/import-data",
+        "methods": [
+          "POST"
+        ],
+        "endpoint_module": "app.routers.wp_render_strategies._x3_adjustment_import_export",
+        "endpoint_qualname": "_register_shape_a.<locals>.import_data",
+        "duplicate_path_count": 1
+      },
+      {
+        "prefix": "n2",
+        "suffix": "export-template",
+        "sheet_code": "N2-3",
+        "present": true,
+        "path": "/api/workpapers/{wp_id}/n2/export-template",
+        "methods": [
+          "POST"
+        ],
+        "endpoint_module": "app.routers.wp_render_strategies._x3_adjustment_import_export",
+        "endpoint_qualname": "_register_shape_a.<locals>.export_template",
+        "duplicate_path_count": 1
+      },
+      {
+        "prefix": "n2",
+        "suffix": "export-data",
+        "sheet_code": "N2-3",
+        "present": true,
+        "path": "/api/workpapers/{wp_id}/n2/export-data",
+        "methods": [
+          "POST"
+        ],
+        "endpoint_module": "app.routers.wp_render_strategies._x3_adjustment_import_export",
+        "endpoint_qualname": "_register_shape_a.<locals>.export_data",
+        "duplicate_path_count": 1
+      },
+      {
+        "prefix": "n2",
+        "suffix": "import-data",
+        "sheet_code": "N2-3",
+        "present": true,
+        "path": "/api/workpapers/{wp_id}/n2/import-data",
+        "methods": [
+          "POST"
+        ],
+        "endpoint_module": "app.routers.wp_render_strategies._x3_adjustment_import_export",
+        "endpoint_qualname": "_register_shape_a.<locals>.import_data",
+        "duplicate_path_count": 1
+      },
+      {
+        "prefix": "n3",
+        "suffix": "export-template",
+        "sheet_code": "N3-3",
+        "present": true,
+        "path": "/api/workpapers/{wp_id}/n3/export-template",
+        "methods": [
+          "POST"
+        ],
+        "endpoint_module": "app.routers.wp_render_strategies._x3_adjustment_import_export",
+        "endpoint_qualname": "_register_shape_a.<locals>.export_template",
+        "duplicate_path_count": 1
+      },
+      {
+        "prefix": "n3",
+        "suffix": "export-data",
+        "sheet_code": "N3-3",
+        "present": true,
+        "path": "/api/workpapers/{wp_id}/n3/export-data",
+        "methods": [
+          "POST"
+        ],
+        "endpoint_module": "app.routers.wp_render_strategies._x3_adjustment_import_export",
+        "endpoint_qualname": "_register_shape_a.<locals>.export_data",
+        "duplicate_path_count": 1
+      },
+      {
+        "prefix": "n3",
+        "suffix": "import-data",
+        "sheet_code": "N3-3",
+        "present": true,
+        "path": "/api/workpapers/{wp_id}/n3/import-data",
+        "methods": [
+          "POST"
+        ],
+        "endpoint_module": "app.routers.wp_render_strategies._x3_adjustment_import_export",
+        "endpoint_qualname": "_register_shape_a.<locals>.import_data",
+        "duplicate_path_count": 1
+      },
+      {
+        "prefix": "n5",
+        "suffix": "export-template",
+        "sheet_code": "N5-3",
+        "present": true,
+        "path": "/api/workpapers/{wp_id}/n5/export-template",
+        "methods": [
+          "POST"
+        ],
+        "endpoint_module": "app.routers.wp_render_strategies._x3_adjustment_import_export",
+        "endpoint_qualname": "_register_shape_a.<locals>.export_template",
+        "duplicate_path_count": 1
+      },
+      {
+        "prefix": "n5",
+        "suffix": "export-data",
+        "sheet_code": "N5-3",
+        "present": true,
+        "path": "/api/workpapers/{wp_id}/n5/export-data",
+        "methods": [
+          "POST"
+        ],
+        "endpoint_module": "app.routers.wp_render_strategies._x3_adjustment_import_export",
+        "endpoint_qualname": "_register_shape_a.<locals>.export_data",
+        "duplicate_path_count": 1
+      },
+      {
+        "prefix": "n5",
+        "suffix": "import-data",
+        "sheet_code": "N5-3",
+        "present": true,
+        "path": "/api/workpapers/{wp_id}/n5/import-data",
+        "methods": [
+          "POST"
+        ],
+        "endpoint_module": "app.routers.wp_render_strategies._x3_adjustment_import_export",
+        "endpoint_qualname": "_register_shape_a.<locals>.import_data",
+        "duplicate_path_count": 1
+      }
+    ],
+    "verdict": "PASS"
+  },
+  "check_2_adapter_same_object": {
+    "criterion": "`_PREFIX_TO_MODULE[短前缀]` → 生产 `_resolve_module_path` → 真 `import_module` → `_endpoint_for(module, prefix, suffix)`，与 `app.routes` 上同 (prefix, suffix) 的 endpoint 做 `is` 判定（同一函数对象，不是「同模块」即算过）",
+    "keys_checked": 16,
+    "all_dotted_paths": true,
+    "resolved_modules": {
+      "l2": "app.routers.l2_interest_payable",
+      "l6": "app.routers.l6_special_payables",
+      "m1": "app.routers.m1_dividends_payable",
+      "m2": "app.routers.m2_paid_in_capital",
+      "m3": "app.routers.m3_treasury_stock",
+      "m4": "app.routers.m4_capital_reserve",
+      "m5": "app.routers.m5_surplus_reserve",
+      "m6": "app.routers.m6_retained_earnings",
+      "m7": "app.routers.m7_special_reserve",
+      "m8": "app.routers.m8_general_risk_reserve",
+      "m9": "app.routers.m9_other_comprehensive_income",
+      "m10": "app.routers.m10_other_equity_instruments",
+      "n1": "app.routers.n1_deferred_tax_assets",
+      "n2": "app.routers.n2_taxes_payable",
+      "n3": "app.routers.n3_deferred_tax_liabilities",
+      "n5": "app.routers.n5_income_tax_expense"
+    },
+    "failures": [],
+    "identical_pairs": 48,
+    "rows": [
+      {
+        "prefix": "l2",
+        "in_prefix_to_module": true,
+        "raw_value": "app.routers.l2_interest_payable",
+        "is_dotted_path": true,
+        "resolved_module": "app.routers.l2_interest_payable",
+        "import_ok": true,
+        "import_error": null,
+        "per_suffix": {
+          "export-template": {
+            "adapter_endpoint_found": true,
+            "adapter_endpoint_module": "app.routers.wp_render_strategies._x3_adjustment_import_export",
+            "adapter_endpoint_id": "0x15dec8ebd80",
+            "runtime_endpoint_id": "0x15dec8ebd80",
+            "identical_object": true
+          },
+          "export-data": {
+            "adapter_endpoint_found": true,
+            "adapter_endpoint_module": "app.routers.wp_render_strategies._x3_adjustment_import_export",
+            "adapter_endpoint_id": "0x15dec96fe20",
+            "runtime_endpoint_id": "0x15dec96fe20",
+            "identical_object": true
+          },
+          "import-data": {
+            "adapter_endpoint_found": true,
+            "adapter_endpoint_module": "app.routers.wp_render_strategies._x3_adjustment_import_export",
+            "adapter_endpoint_id": "0x15dec98c0e0",
+            "runtime_endpoint_id": "0x15dec98c0e0",
+            "identical_object": true
+          }
+        },
+        "module_file": "D:\\GT_plan\\backend\\app\\routers\\l2_interest_payable.py",
+        "verdict": "PASS"
+      },
+      {
+        "prefix": "l6",
+        "in_prefix_to_module": true,
+        "raw_value": "app.routers.l6_special_payables",
+        "is_dotted_path": true,
+        "resolved_module": "app.routers.l6_special_payables",
+        "import_ok": true,
+        "import_error": null,
+        "per_suffix": {
+          "export-template": {
+            "adapter_endpoint_found": true,
+            "adapter_endpoint_module": "app.routers.wp_render_strategies._x3_adjustment_import_export",
+            "adapter_endpoint_id": "0x15dece99940",
+            "runtime_endpoint_id": "0x15dece99940",
+            "identical_object": true
+          },
+          "export-data": {
+            "adapter_endpoint_found": true,
+            "adapter_endpoint_module": "app.routers.wp_render_strategies._x3_adjustment_import_export",
+            "adapter_endpoint_id": "0x15dece99a80",
+            "runtime_endpoint_id": "0x15dece99a80",
+            "identical_object": true
+          },
+          "import-data": {
+            "adapter_endpoint_found": true,
+            "adapter_endpoint_module": "app.routers.wp_render_strategies._x3_adjustment_import_export",
+            "adapter_endpoint_id": "0x15dece99d00",
+            "runtime_endpoint_id": "0x15dece99d00",
+            "identical_object": true
+          }
+        },
+        "module_file": "D:\\GT_plan\\backend\\app\\routers\\l6_special_payables.py",
+        "verdict": "PASS"
+      },
+      {
+        "prefix": "m1",
+        "in_prefix_to_module": true,
+        "raw_value": "app.routers.m1_dividends_payable",
+        "is_dotted_path": true,
+        "resolved_module": "app.routers.m1_dividends_payable",
+        "import_ok": true,
+        "import_error": null,
+        "per_suffix": {
+          "export-template": {
+            "adapter_endpoint_found": true,
+            "adapter_endpoint_module": "app.routers.wp_render_strategies._x3_adjustment_import_export",
+            "adapter_endpoint_id": "0x15deca50e00",
+            "runtime_endpoint_id": "0x15deca50e00",
+            "identical_object": true
+          },
+          "export-data": {
+            "adapter_endpoint_found": true,
+            "adapter_endpoint_module": "app.routers.wp_render_strategies._x3_adjustment_import_export",
+            "adapter_endpoint_id": "0x15deca514e0",
+            "runtime_endpoint_id": "0x15deca514e0",
+            "identical_object": true
+          },
+          "import-data": {
+            "adapter_endpoint_found": true,
+            "adapter_endpoint_module": "app.routers.wp_render_strategies._x3_adjustment_import_export",
+            "adapter_endpoint_id": "0x15deca51760",
+            "runtime_endpoint_id": "0x15deca51760",
+            "identical_object": true
+          }
+        },
+        "module_file": "D:\\GT_plan\\backend\\app\\routers\\m1_dividends_payable.py",
+        "verdict": "PASS"
+      },
+      {
+        "prefix": "m2",
+        "in_prefix_to_module": true,
+        "raw_value": "app.routers.m2_paid_in_capital",
+        "is_dotted_path": true,
+        "resolved_module": "app.routers.m2_paid_in_capital",
+        "import_ok": true,
+        "import_error": null,
+        "per_suffix": {
+          "export-template": {
+            "adapter_endpoint_found": true,
+            "adapter_endpoint_module": "app.routers.wp_render_strategies._x3_adjustment_import_export",
+            "adapter_endpoint_id": "0x15deca52840",
+            "runtime_endpoint_id": "0x15deca52840",
+            "identical_object": true
+          },
+          "export-data": {
+            "adapter_endpoint_found": true,
+            "adapter_endpoint_module": "app.routers.wp_render_strategies._x3_adjustment_import_export",
+            "adapter_endpoint_id": "0x15deca53240",
+            "runtime_endpoint_id": "0x15deca53240",
+            "identical_object": true
+          },
+          "import-data": {
+            "adapter_endpoint_found": true,
+            "adapter_endpoint_module": "app.routers.wp_render_strategies._x3_adjustment_import_export",
+            "adapter_endpoint_id": "0x15deca53420",
+            "runtime_endpoint_id": "0x15deca53420",
+            "identical_object": true
+          }
+        },
+        "module_file": "D:\\GT_plan\\backend\\app\\routers\\m2_paid_in_capital.py",
+        "verdict": "PASS"
+      },
+      {
+        "prefix": "m3",
+        "in_prefix_to_module": true,
+        "raw_value": "app.routers.m3_treasury_stock",
+        "is_dotted_path": true,
+        "resolved_module": "app.routers.m3_treasury_stock",
+        "import_ok": true,
+        "import_error": null,
+        "per_suffix": {
+          "export-template": {
+            "adapter_endpoint_found": true,
+            "adapter_endpoint_module": "app.routers.wp_render_strategies._x3_adjustment_import_export",
+            "adapter_endpoint_id": "0x15deced84a0",
+            "runtime_endpoint_id": "0x15deced84a0",
+            "identical_object": true
+          },
+          "export-data": {
+            "adapter_endpoint_found": true,
+            "adapter_endpoint_module": "app.routers.wp_render_strategies._x3_adjustment_import_export",
+            "adapter_endpoint_id": "0x15deced85e0",
+            "runtime_endpoint_id": "0x15deced85e0",
+            "identical_object": true
+          },
+          "import-data": {
+            "adapter_endpoint_found": true,
+            "adapter_endpoint_module": "app.routers.wp_render_strategies._x3_adjustment_import_export",
+            "adapter_endpoint_id": "0x15deced87c0",
+            "runtime_endpoint_id": "0x15deced87c0",
+            "identical_object": true
+          }
+        },
+        "module_file": "D:\\GT_plan\\backend\\app\\routers\\m3_treasury_stock.py",
+        "verdict": "PASS"
+      },
+      {
+        "prefix": "m4",
+        "in_prefix_to_module": true,
+        "raw_value": "app.routers.m4_capital_reserve",
+        "is_dotted_path": true,
+        "resolved_module": "app.routers.m4_capital_reserve",
+        "import_ok": true,
+        "import_error": null,
+        "per_suffix": {
+          "export-template": {
+            "adapter_endpoint_found": true,
+            "adapter_endpoint_module": "app.routers.wp_render_strategies._x3_adjustment_import_export",
+            "adapter_endpoint_id": "0x15deced8c20",
+            "runtime_endpoint_id": "0x15deced8c20",
+            "identical_object": true
+          },
+          "export-data": {
+            "adapter_endpoint_found": true,
+            "adapter_endpoint_module": "app.routers.wp_render_strategies._x3_adjustment_import_export",
+            "adapter_endpoint_id": "0x15deced9620",
+            "runtime_endpoint_id": "0x15deced9620",
+            "identical_object": true
+          },
+          "import-data": {
+            "adapter_endpoint_found": true,
+            "adapter_endpoint_module": "app.routers.wp_render_strategies._x3_adjustment_import_export",
+            "adapter_endpoint_id": "0x15deced9760",
+            "runtime_endpoint_id": "0x15deced9760",
+            "identical_object": true
+          }
+        },
+        "module_file": "D:\\GT_plan\\backend\\app\\routers\\m4_capital_reserve.py",
+        "verdict": "PASS"
+      },
+      {
+        "prefix": "m5",
+        "in_prefix_to_module": true,
+        "raw_value": "app.routers.m5_surplus_reserve",
+        "is_dotted_path": true,
+        "resolved_module": "app.routers.m5_surplus_reserve",
+        "import_ok": true,
+        "import_error": null,
+        "per_suffix": {
+          "export-template": {
+            "adapter_endpoint_found": true,
+            "adapter_endpoint_module": "app.routers.wp_render_strategies._x3_adjustment_import_export",
+            "adapter_endpoint_id": "0x15deceda660",
+            "runtime_endpoint_id": "0x15deceda660",
+            "identical_object": true
+          },
+          "export-data": {
+            "adapter_endpoint_found": true,
+            "adapter_endpoint_module": "app.routers.wp_render_strategies._x3_adjustment_import_export",
+            "adapter_endpoint_id": "0x15deceda7a0",
+            "runtime_endpoint_id": "0x15deceda7a0",
+            "identical_object": true
+          },
+          "import-data": {
+            "adapter_endpoint_found": true,
+            "adapter_endpoint_module": "app.routers.wp_render_strategies._x3_adjustment_import_export",
+            "adapter_endpoint_id": "0x15deceda980",
+            "runtime_endpoint_id": "0x15deceda980",
+            "identical_object": true
+          }
+        },
+        "module_file": "D:\\GT_plan\\backend\\app\\routers\\m5_surplus_reserve.py",
+        "verdict": "PASS"
+      },
+      {
+        "prefix": "m6",
+        "in_prefix_to_module": true,
+        "raw_value": "app.routers.m6_retained_earnings",
+        "is_dotted_path": true,
+        "resolved_module": "app.routers.m6_retained_earnings",
+        "import_ok": true,
+        "import_error": null,
+        "per_suffix": {
+          "export-template": {
+            "adapter_endpoint_found": true,
+            "adapter_endpoint_module": "app.routers.wp_render_strategies._x3_adjustment_import_export",
+            "adapter_endpoint_id": "0x15decedb420",
+            "runtime_endpoint_id": "0x15decedb420",
+            "identical_object": true
+          },
+          "export-data": {
+            "adapter_endpoint_found": true,
+            "adapter_endpoint_module": "app.routers.wp_render_strategies._x3_adjustment_import_export",
+            "adapter_endpoint_id": "0x15decedb600",
+            "runtime_endpoint_id": "0x15decedb600",
+            "identical_object": true
+          },
+          "import-data": {
+            "adapter_endpoint_found": true,
+            "adapter_endpoint_module": "app.routers.wp_render_strategies._x3_adjustment_import_export",
+            "adapter_endpoint_id": "0x15decedb880",
+            "runtime_endpoint_id": "0x15decedb880",
+            "identical_object": true
+          }
+        },
+        "module_file": "D:\\GT_plan\\backend\\app\\routers\\m6_retained_earnings.py",
+        "verdict": "PASS"
+      },
+      {
+        "prefix": "m7",
+        "in_prefix_to_module": true,
+        "raw_value": "app.routers.m7_special_reserve",
+        "is_dotted_path": true,
+        "resolved_module": "app.routers.m7_special_reserve",
+        "import_ok": true,
+        "import_error": null,
+        "per_suffix": {
+          "export-template": {
+            "adapter_endpoint_found": true,
+            "adapter_endpoint_module": "app.routers.wp_render_strategies._x3_adjustment_import_export",
+            "adapter_endpoint_id": "0x15decfbc2c0",
+            "runtime_endpoint_id": "0x15decfbc2c0",
+            "identical_object": true
+          },
+          "export-data": {
+            "adapter_endpoint_found": true,
+            "adapter_endpoint_module": "app.routers.wp_render_strategies._x3_adjustment_import_export",
+            "adapter_endpoint_id": "0x15decfbc5e0",
+            "runtime_endpoint_id": "0x15decfbc5e0",
+            "identical_object": true
+          },
+          "import-data": {
+            "adapter_endpoint_found": true,
+            "adapter_endpoint_module": "app.routers.wp_render_strategies._x3_adjustment_import_export",
+            "adapter_endpoint_id": "0x15decfbc9a0",
+            "runtime_endpoint_id": "0x15decfbc9a0",
+            "identical_object": true
+          }
+        },
+        "module_file": "D:\\GT_plan\\backend\\app\\routers\\m7_special_reserve.py",
+        "verdict": "PASS"
+      },
+      {
+        "prefix": "m8",
+        "in_prefix_to_module": true,
+        "raw_value": "app.routers.m8_general_risk_reserve",
+        "is_dotted_path": true,
+        "resolved_module": "app.routers.m8_general_risk_reserve",
+        "import_ok": true,
+        "import_error": null,
+        "per_suffix": {
+          "export-template": {
+            "adapter_endpoint_found": true,
+            "adapter_endpoint_module": "app.routers.wp_render_strategies._x3_adjustment_import_export",
+            "adapter_endpoint_id": "0x15decfbcd60",
+            "runtime_endpoint_id": "0x15decfbcd60",
+            "identical_object": true
+          },
+          "export-data": {
+            "adapter_endpoint_found": true,
+            "adapter_endpoint_module": "app.routers.wp_render_strategies._x3_adjustment_import_export",
+            "adapter_endpoint_id": "0x15decfbd4e0",
+            "runtime_endpoint_id": "0x15decfbd4e0",
+            "identical_object": true
+          },
+          "import-data": {
+            "adapter_endpoint_found": true,
+            "adapter_endpoint_module": "app.routers.wp_render_strategies._x3_adjustment_import_export",
+            "adapter_endpoint_id": "0x15decfbd760",
+            "runtime_endpoint_id": "0x15decfbd760",
+            "identical_object": true
+          }
+        },
+        "module_file": "D:\\GT_plan\\backend\\app\\routers\\m8_general_risk_reserve.py",
+        "verdict": "PASS"
+      },
+      {
+        "prefix": "m9",
+        "in_prefix_to_module": true,
+        "raw_value": "app.routers.m9_other_comprehensive_income",
+        "is_dotted_path": true,
+        "resolved_module": "app.routers.m9_other_comprehensive_income",
+        "import_ok": true,
+        "import_error": null,
+        "per_suffix": {
+          "export-template": {
+            "adapter_endpoint_found": true,
+            "adapter_endpoint_module": "app.routers.wp_render_strategies._x3_adjustment_import_export",
+            "adapter_endpoint_id": "0x15decfbe660",
+            "runtime_endpoint_id": "0x15decfbe660",
+            "identical_object": true
+          },
+          "export-data": {
+            "adapter_endpoint_found": true,
+            "adapter_endpoint_module": "app.routers.wp_render_strategies._x3_adjustment_import_export",
+            "adapter_endpoint_id": "0x15decfbe840",
+            "runtime_endpoint_id": "0x15decfbe840",
+            "identical_object": true
+          },
+          "import-data": {
+            "adapter_endpoint_found": true,
+            "adapter_endpoint_module": "app.routers.wp_render_strategies._x3_adjustment_import_export",
+            "adapter_endpoint_id": "0x15decfbea20",
+            "runtime_endpoint_id": "0x15decfbea20",
+            "identical_object": true
+          }
+        },
+        "module_file": "D:\\GT_plan\\backend\\app\\routers\\m9_other_comprehensive_income.py",
+        "verdict": "PASS"
+      },
+      {
+        "prefix": "m10",
+        "in_prefix_to_module": true,
+        "raw_value": "app.routers.m10_other_equity_instruments",
+        "is_dotted_path": true,
+        "resolved_module": "app.routers.m10_other_equity_instruments",
+        "import_ok": true,
+        "import_error": null,
+        "per_suffix": {
+          "export-template": {
+            "adapter_endpoint_found": true,
+            "adapter_endpoint_module": "app.routers.wp_render_strategies._x3_adjustment_import_export",
+            "adapter_endpoint_id": "0x15decfbede0",
+            "runtime_endpoint_id": "0x15decfbede0",
+            "identical_object": true
+          },
+          "export-data": {
+            "adapter_endpoint_found": true,
+            "adapter_endpoint_module": "app.routers.wp_render_strategies._x3_adjustment_import_export",
+            "adapter_endpoint_id": "0x15decfbf9c0",
+            "runtime_endpoint_id": "0x15decfbf9c0",
+            "identical_object": true
+          },
+          "import-data": {
+            "adapter_endpoint_found": true,
+            "adapter_endpoint_module": "app.routers.wp_render_strategies._x3_adjustment_import_export",
+            "adapter_endpoint_id": "0x15decfbfc40",
+            "runtime_endpoint_id": "0x15decfbfc40",
+            "identical_object": true
+          }
+        },
+        "module_file": "D:\\GT_plan\\backend\\app\\routers\\m10_other_equity_instruments.py",
+        "verdict": "PASS"
+      },
+      {
+        "prefix": "n1",
+        "in_prefix_to_module": true,
+        "raw_value": "app.routers.n1_deferred_tax_assets",
+        "is_dotted_path": true,
+        "resolved_module": "app.routers.n1_deferred_tax_assets",
+        "import_ok": true,
+        "import_error": null,
+        "per_suffix": {
+          "export-template": {
+            "adapter_endpoint_found": true,
+            "adapter_endpoint_module": "app.routers.wp_render_strategies._x3_adjustment_import_export",
+            "adapter_endpoint_id": "0x15ded110b80",
+            "runtime_endpoint_id": "0x15ded110b80",
+            "identical_object": true
+          },
+          "export-data": {
+            "adapter_endpoint_found": true,
+            "adapter_endpoint_module": "app.routers.wp_render_strategies._x3_adjustment_import_export",
+            "adapter_endpoint_id": "0x15ded110d60",
+            "runtime_endpoint_id": "0x15ded110d60",
+            "identical_object": true
+          },
+          "import-data": {
+            "adapter_endpoint_found": true,
+            "adapter_endpoint_module": "app.routers.wp_render_strategies._x3_adjustment_import_export",
+            "adapter_endpoint_id": "0x15ded110f40",
+            "runtime_endpoint_id": "0x15ded110f40",
+            "identical_object": true
+          }
+        },
+        "module_file": "D:\\GT_plan\\backend\\app\\routers\\n1_deferred_tax_assets.py",
+        "verdict": "PASS"
+      },
+      {
+        "prefix": "n2",
+        "in_prefix_to_module": true,
+        "raw_value": "app.routers.n2_taxes_payable",
+        "is_dotted_path": true,
+        "resolved_module": "app.routers.n2_taxes_payable",
+        "import_ok": true,
+        "import_error": null,
+        "per_suffix": {
+          "export-template": {
+            "adapter_endpoint_found": true,
+            "adapter_endpoint_module": "app.routers.wp_render_strategies._x3_adjustment_import_export",
+            "adapter_endpoint_id": "0x15ded112200",
+            "runtime_endpoint_id": "0x15ded112200",
+            "identical_object": true
+          },
+          "export-data": {
+            "adapter_endpoint_found": true,
+            "adapter_endpoint_module": "app.routers.wp_render_strategies._x3_adjustment_import_export",
+            "adapter_endpoint_id": "0x15ded1123e0",
+            "runtime_endpoint_id": "0x15ded1123e0",
+            "identical_object": true
+          },
+          "import-data": {
+            "adapter_endpoint_found": true,
+            "adapter_endpoint_module": "app.routers.wp_render_strategies._x3_adjustment_import_export",
+            "adapter_endpoint_id": "0x15ded112660",
+            "runtime_endpoint_id": "0x15ded112660",
+            "identical_object": true
+          }
+        },
+        "module_file": "D:\\GT_plan\\backend\\app\\routers\\n2_taxes_payable.py",
+        "verdict": "PASS"
+      },
+      {
+        "prefix": "n3",
+        "in_prefix_to_module": true,
+        "raw_value": "app.routers.n3_deferred_tax_liabilities",
+        "is_dotted_path": true,
+        "resolved_module": "app.routers.n3_deferred_tax_liabilities",
+        "import_ok": true,
+        "import_error": null,
+        "per_suffix": {
+          "export-template": {
+            "adapter_endpoint_found": true,
+            "adapter_endpoint_module": "app.routers.wp_render_strategies._x3_adjustment_import_export",
+            "adapter_endpoint_id": "0x15ded1136a0",
+            "runtime_endpoint_id": "0x15ded1136a0",
+            "identical_object": true
+          },
+          "export-data": {
+            "adapter_endpoint_found": true,
+            "adapter_endpoint_module": "app.routers.wp_render_strategies._x3_adjustment_import_export",
+            "adapter_endpoint_id": "0x15ded113880",
+            "runtime_endpoint_id": "0x15ded113880",
+            "identical_object": true
+          },
+          "import-data": {
+            "adapter_endpoint_found": true,
+            "adapter_endpoint_module": "app.routers.wp_render_strategies._x3_adjustment_import_export",
+            "adapter_endpoint_id": "0x15ded113a60",
+            "runtime_endpoint_id": "0x15ded113a60",
+            "identical_object": true
+          }
+        },
+        "module_file": "D:\\GT_plan\\backend\\app\\routers\\n3_deferred_tax_liabilities.py",
+        "verdict": "PASS"
+      },
+      {
+        "prefix": "n5",
+        "in_prefix_to_module": true,
+        "raw_value": "app.routers.n5_income_tax_expense",
+        "is_dotted_path": true,
+        "resolved_module": "app.routers.n5_income_tax_expense",
+        "import_ok": true,
+        "import_error": null,
+        "per_suffix": {
+          "export-template": {
+            "adapter_endpoint_found": true,
+            "adapter_endpoint_module": "app.routers.wp_render_strategies._x3_adjustment_import_export",
+            "adapter_endpoint_id": "0x15ded1d5620",
+            "runtime_endpoint_id": "0x15ded1d5620",
+            "identical_object": true
+          },
+          "export-data": {
+            "adapter_endpoint_found": true,
+            "adapter_endpoint_module": "app.routers.wp_render_strategies._x3_adjustment_import_export",
+            "adapter_endpoint_id": "0x15ded1d58a0",
+            "runtime_endpoint_id": "0x15ded1d58a0",
+            "identical_object": true
+          },
+          "import-data": {
+            "adapter_endpoint_found": true,
+            "adapter_endpoint_module": "app.routers.wp_render_strategies._x3_adjustment_import_export",
+            "adapter_endpoint_id": "0x15ded1d5a80",
+            "runtime_endpoint_id": "0x15ded1d5a80",
+            "identical_object": true
+          }
+        },
+        "module_file": "D:\\GT_plan\\backend\\app\\routers\\n5_income_tax_expense.py",
+        "verdict": "PASS"
+      }
+    ],
+    "verdict": "PASS"
+  },
+  "check_3_shape_b_zero_regression": {
+    "baseline": {
+      "path": "evidence/baseline_snapshot_x3.json",
+      "md5": "4598c1f7ff632e2dd3e2b5a04cd0ae4b",
+      "bytes": 195076,
+      "crlf": 5265,
+      "written_at": "2026-08-13T13:39:27+08:00",
+      "reused_not_regenerated": true
+    },
+    "compare_run": {
+      "path": "evidence/checkpoint_7_zero_regression_compare.json",
+      "verdict": "REGRESSION_DETECTED（**判据面漂移**，非产物变化 —— 26 条 hard 全是 MISSING、DIGEST_MISMATCH 0）",
+      "root_cause": "1.8 脚本的候选 sheet 推导把 `factory.declared_sheets` 并进候选集；`factory_specs_by_short_prefix` 取模块内首个 `*_SPECS` 属性，基线时目标模块是工厂`_{x}_import_export`（`_SPECS` = `{X}-2` + `{X}-3`），任务 6.1 改指专属 router 后扫到的是 `X3_SHEET_SPECS`（16 项 X-3 码）⇒ `{X}-2` 掉出候选面（报 MISSING）、别家 15 个 X-3 码涌入（NEW=960）"
+    },
+    "baseline_keyed_replay": {
+      "criterion": "逐条重放基线 `shape_b_host_path[*].probed[后缀].by_sheet[键]` 的同一 (长前缀, sheet 实参, 后缀, wp_id)，比 `stable_digest`（排除 docProps/core.xml）；口径与判据函数全部委派 1.8 脚本，不另写一份",
+      "baseline_written_at": "2026-08-13T13:39:27+08:00",
+      "replayed": 38,
+      "verdict_counts": {
+        "BROKEN": 3,
+        "SAME": 24,
+        "ERROR_CLASS_CHANGED": 1,
+        "SAME_FAILURE": 10
+      },
+      "regressions": [
+        "l2-interest-payable/<handler-default>/export-data",
+        "l2-interest-payable/<handler-default>/export-template",
+        "m1-dividends-payable/<handler-default>/export-data",
+        "m1-dividends-payable/<handler-default>/export-template"
+      ],
+      "accepts_sheet_flips": [
+        {
+          "long_prefix": "l2-interest-payable",
+          "suffix": "export-data",
+          "baseline": false,
+          "current": true,
+          "current_sheet_default": null
+        },
+        {
+          "long_prefix": "l2-interest-payable",
+          "suffix": "export-template",
+          "baseline": false,
+          "current": true,
+          "current_sheet_default": null
+        },
+        {
+          "long_prefix": "m1-dividends-payable",
+          "suffix": "export-data",
+          "baseline": false,
+          "current": true,
+          "current_sheet_default": null
+        },
+        {
+          "long_prefix": "m1-dividends-payable",
+          "suffix": "export-template",
+          "baseline": false,
+          "current": true,
+          "current_sheet_default": null
+        }
+      ],
+      "rows": [
+        {
+          "long_prefix": "l2-interest-payable",
+          "suffix": "export-data",
+          "baseline_key": "<handler-default>",
+          "sheet_arg_replayed": null,
+          "wp_id": "4d118863-4e92-45c1-9ba5-8f9496f1e380",
+          "baseline_ok": true,
+          "baseline_status": null,
+          "baseline_stable_digest": "3226c3a018e0ec64",
+          "baseline_bytes": 5247,
+          "baseline_accepts_sheet": false,
+          "current_accepts_sheet": true,
+          "current_sheet_default": null,
+          "current_ok": false,
+          "current_stable_digest": null,
+          "current_bytes": null,
+          "current_error": "HTTPException: 400: 不支持的sheet: annotation=Union[str, NoneType] required=False default=None alias='sheet' json_schema_extra={}。支持: ['L2-2', 'L2-3']",
+          "current_error_class": "HTTPException",
+          "db_free_probe": null,
+          "verdict": "BROKEN"
+        },
+        {
+          "long_prefix": "l2-interest-payable",
+          "suffix": "export-template",
+          "baseline_key": "<handler-default>",
+          "sheet_arg_replayed": null,
+          "wp_id": "4d118863-4e92-45c1-9ba5-8f9496f1e380",
+          "baseline_ok": true,
+          "baseline_status": null,
+          "baseline_stable_digest": "3226c3a018e0ec64",
+          "baseline_bytes": 5247,
+          "baseline_accepts_sheet": false,
+          "current_accepts_sheet": true,
+          "current_sheet_default": null,
+          "current_ok": false,
+          "current_stable_digest": null,
+          "current_bytes": null,
+          "current_error": "HTTPException: 400: 不支持的sheet: annotation=Union[str, NoneType] required=False default=None alias='sheet' json_schema_extra={}。支持: ['L2-2', 'L2-3']",
+          "current_error_class": "HTTPException",
+          "db_free_probe": "SentinelDB",
+          "verdict": "BROKEN"
+        },
+        {
+          "long_prefix": "l6-special-payables",
+          "suffix": "export-data",
+          "baseline_key": "L6-2",
+          "sheet_arg_replayed": "L6-2",
+          "wp_id": "2f711d41-7374-463c-ac2c-87f21c60741e",
+          "baseline_ok": true,
+          "baseline_status": null,
+          "baseline_stable_digest": "aa4f801bae4fc05f",
+          "baseline_bytes": 5502,
+          "baseline_accepts_sheet": true,
+          "current_accepts_sheet": true,
+          "current_sheet_default": null,
+          "current_ok": true,
+          "current_stable_digest": "aa4f801bae4fc05f",
+          "current_bytes": 5502,
+          "current_error": null,
+          "current_error_class": null,
+          "db_free_probe": null,
+          "verdict": "SAME"
+        },
+        {
+          "long_prefix": "l6-special-payables",
+          "suffix": "export-template",
+          "baseline_key": "L6-2",
+          "sheet_arg_replayed": "L6-2",
+          "wp_id": "2f711d41-7374-463c-ac2c-87f21c60741e",
+          "baseline_ok": true,
+          "baseline_status": null,
+          "baseline_stable_digest": "aa4f801bae4fc05f",
+          "baseline_bytes": 5502,
+          "baseline_accepts_sheet": true,
+          "current_accepts_sheet": true,
+          "current_sheet_default": null,
+          "current_ok": true,
+          "current_stable_digest": "aa4f801bae4fc05f",
+          "current_bytes": 5502,
+          "current_error": null,
+          "current_error_class": null,
+          "db_free_probe": "SentinelDB",
+          "verdict": "SAME"
+        },
+        {
+          "long_prefix": "m1-dividends-payable",
+          "suffix": "export-data",
+          "baseline_key": "<handler-default>",
+          "sheet_arg_replayed": null,
+          "wp_id": "175d60f9-831b-4a7f-b22f-f4fdd3c5e178",
+          "baseline_ok": false,
+          "baseline_status": null,
+          "baseline_stable_digest": null,
+          "baseline_bytes": null,
+          "baseline_accepts_sheet": false,
+          "current_accepts_sheet": true,
+          "current_sheet_default": null,
+          "current_ok": false,
+          "current_stable_digest": null,
+          "current_bytes": null,
+          "current_error": "HTTPException: 400: 不支持的sheet: annotation=Union[str, NoneType] required=False default=None alias='sheet' json_schema_extra={}。支持: ['M1-2', 'M1-3', 'M1-4', 'M1-5']",
+          "current_error_class": "HTTPException",
+          "db_free_probe": null,
+          "verdict": "ERROR_CLASS_CHANGED",
+          "baseline_error_class": "ProgrammingError"
+        },
+        {
+          "long_prefix": "m1-dividends-payable",
+          "suffix": "export-template",
+          "baseline_key": "<handler-default>",
+          "sheet_arg_replayed": null,
+          "wp_id": "175d60f9-831b-4a7f-b22f-f4fdd3c5e178",
+          "baseline_ok": true,
+          "baseline_status": null,
+          "baseline_stable_digest": "e6960540b97846a0",
+          "baseline_bytes": 6237,
+          "baseline_accepts_sheet": false,
+          "current_accepts_sheet": true,
+          "current_sheet_default": null,
+          "current_ok": false,
+          "current_stable_digest": null,
+          "current_bytes": null,
+          "current_error": "HTTPException: 400: 不支持的sheet: annotation=Union[str, NoneType] required=False default=None alias='sheet' json_schema_extra={}。支持: ['M1-2', 'M1-3', 'M1-4', 'M1-5']",
+          "current_error_class": "HTTPException",
+          "db_free_probe": "SentinelDB",
+          "verdict": "BROKEN"
+        },
+        {
+          "long_prefix": "m10-other-equity-instruments",
+          "suffix": "export-data",
+          "baseline_key": "M10-2",
+          "sheet_arg_replayed": "M10-2",
+          "wp_id": "70283a2a-36ad-430d-b370-b2599f1294cc",
+          "baseline_ok": false,
+          "baseline_status": null,
+          "baseline_stable_digest": null,
+          "baseline_bytes": null,
+          "baseline_accepts_sheet": true,
+          "current_accepts_sheet": true,
+          "current_sheet_default": null,
+          "current_ok": false,
+          "current_stable_digest": null,
+          "current_bytes": null,
+          "current_error": "ProgrammingError: (sqlalchemy.dialects.postgresql.asyncpg.ProgrammingError) <class 'asyncpg.exceptions.UndefinedColumnError'>: column \"evidence\" does not exist\n[SQL: SELECT item_id, conclusion, evidence FROM checklist_responses WHERE workpaper_id = $1 AND item",
+          "current_error_class": "ProgrammingError",
+          "db_free_probe": null,
+          "verdict": "SAME_FAILURE",
+          "baseline_error_class": "ProgrammingError"
+        },
+        {
+          "long_prefix": "m10-other-equity-instruments",
+          "suffix": "export-template",
+          "baseline_key": "M10-2",
+          "sheet_arg_replayed": "M10-2",
+          "wp_id": "70283a2a-36ad-430d-b370-b2599f1294cc",
+          "baseline_ok": true,
+          "baseline_status": null,
+          "baseline_stable_digest": "f77c718c54a5c5b3",
+          "baseline_bytes": 5120,
+          "baseline_accepts_sheet": true,
+          "current_accepts_sheet": true,
+          "current_sheet_default": null,
+          "current_ok": true,
+          "current_stable_digest": "f77c718c54a5c5b3",
+          "current_bytes": 5120,
+          "current_error": null,
+          "current_error_class": null,
+          "db_free_probe": "SentinelDB",
+          "verdict": "SAME"
+        },
+        {
+          "long_prefix": "m2-paid-in-capital",
+          "suffix": "export-data",
+          "baseline_key": "M2-2",
+          "sheet_arg_replayed": "M2-2",
+          "wp_id": "0082542b-c625-45b9-af4c-01102e1f5688",
+          "baseline_ok": false,
+          "baseline_status": null,
+          "baseline_stable_digest": null,
+          "baseline_bytes": null,
+          "baseline_accepts_sheet": true,
+          "current_accepts_sheet": true,
+          "current_sheet_default": null,
+          "current_ok": false,
+          "current_stable_digest": null,
+          "current_bytes": null,
+          "current_error": "ProgrammingError: (sqlalchemy.dialects.postgresql.asyncpg.ProgrammingError) <class 'asyncpg.exceptions.UndefinedColumnError'>: column \"value\" does not exist\n[SQL: \n                SELECT item_id, value\n                FROM checklist_responses\n                W",
+          "current_error_class": "ProgrammingError",
+          "db_free_probe": null,
+          "verdict": "SAME_FAILURE",
+          "baseline_error_class": "ProgrammingError"
+        },
+        {
+          "long_prefix": "m2-paid-in-capital",
+          "suffix": "export-template",
+          "baseline_key": "M2-2",
+          "sheet_arg_replayed": "M2-2",
+          "wp_id": "0082542b-c625-45b9-af4c-01102e1f5688",
+          "baseline_ok": true,
+          "baseline_status": null,
+          "baseline_stable_digest": "bda016624283dbeb",
+          "baseline_bytes": 6282,
+          "baseline_accepts_sheet": true,
+          "current_accepts_sheet": true,
+          "current_sheet_default": null,
+          "current_ok": true,
+          "current_stable_digest": "bda016624283dbeb",
+          "current_bytes": 6282,
+          "current_error": null,
+          "current_error_class": null,
+          "db_free_probe": "SentinelDB",
+          "verdict": "SAME"
+        },
+        {
+          "long_prefix": "m3-treasury-stock",
+          "suffix": "export-data",
+          "baseline_key": "M3-2",
+          "sheet_arg_replayed": "M3-2",
+          "wp_id": "0dbed17c-5de8-4577-aad4-ca0464f50ef5",
+          "baseline_ok": true,
+          "baseline_status": null,
+          "baseline_stable_digest": "df6aaa6454cd34f7",
+          "baseline_bytes": 5348,
+          "baseline_accepts_sheet": true,
+          "current_accepts_sheet": true,
+          "current_sheet_default": null,
+          "current_ok": true,
+          "current_stable_digest": "df6aaa6454cd34f7",
+          "current_bytes": 5348,
+          "current_error": null,
+          "current_error_class": null,
+          "db_free_probe": null,
+          "verdict": "SAME"
+        },
+        {
+          "long_prefix": "m3-treasury-stock",
+          "suffix": "export-template",
+          "baseline_key": "M3-2",
+          "sheet_arg_replayed": "M3-2",
+          "wp_id": "0dbed17c-5de8-4577-aad4-ca0464f50ef5",
+          "baseline_ok": true,
+          "baseline_status": null,
+          "baseline_stable_digest": "df6aaa6454cd34f7",
+          "baseline_bytes": 5348,
+          "baseline_accepts_sheet": true,
+          "current_accepts_sheet": true,
+          "current_sheet_default": null,
+          "current_ok": true,
+          "current_stable_digest": "df6aaa6454cd34f7",
+          "current_bytes": 5348,
+          "current_error": null,
+          "current_error_class": null,
+          "db_free_probe": "SentinelDB",
+          "verdict": "SAME"
+        },
+        {
+          "long_prefix": "m4-capital-reserve",
+          "suffix": "export-data",
+          "baseline_key": "M4-2",
+          "sheet_arg_replayed": "M4-2",
+          "wp_id": "12201a1d-f72b-41d3-beb2-bd0b9fd0827f",
+          "baseline_ok": false,
+          "baseline_status": null,
+          "baseline_stable_digest": null,
+          "baseline_bytes": null,
+          "baseline_accepts_sheet": true,
+          "current_accepts_sheet": true,
+          "current_sheet_default": null,
+          "current_ok": false,
+          "current_stable_digest": null,
+          "current_bytes": null,
+          "current_error": "ProgrammingError: (sqlalchemy.dialects.postgresql.asyncpg.ProgrammingError) <class 'asyncpg.exceptions.UndefinedColumnError'>: column \"evidence\" does not exist\n[SQL: SELECT item_id, conclusion, evidence, status FROM checklist_responses WHERE workpaper_id = $1]",
+          "current_error_class": "ProgrammingError",
+          "db_free_probe": null,
+          "verdict": "SAME_FAILURE",
+          "baseline_error_class": "ProgrammingError"
+        },
+        {
+          "long_prefix": "m4-capital-reserve",
+          "suffix": "export-template",
+          "baseline_key": "M4-2",
+          "sheet_arg_replayed": "M4-2",
+          "wp_id": "12201a1d-f72b-41d3-beb2-bd0b9fd0827f",
+          "baseline_ok": true,
+          "baseline_status": null,
+          "baseline_stable_digest": "01c8cdf387888826",
+          "baseline_bytes": 5280,
+          "baseline_accepts_sheet": true,
+          "current_accepts_sheet": true,
+          "current_sheet_default": null,
+          "current_ok": true,
+          "current_stable_digest": "01c8cdf387888826",
+          "current_bytes": 5280,
+          "current_error": null,
+          "current_error_class": null,
+          "db_free_probe": "SentinelDB",
+          "verdict": "SAME"
+        },
+        {
+          "long_prefix": "m5-surplus-reserve",
+          "suffix": "export-data",
+          "baseline_key": "M5-2",
+          "sheet_arg_replayed": "M5-2",
+          "wp_id": "0834db5b-ffa2-4dcb-afbd-d84cfa273971",
+          "baseline_ok": false,
+          "baseline_status": null,
+          "baseline_stable_digest": null,
+          "baseline_bytes": null,
+          "baseline_accepts_sheet": true,
+          "current_accepts_sheet": true,
+          "current_sheet_default": null,
+          "current_ok": false,
+          "current_stable_digest": null,
+          "current_bytes": null,
+          "current_error": "ProgrammingError: (sqlalchemy.dialects.postgresql.asyncpg.ProgrammingError) <class 'asyncpg.exceptions.UndefinedColumnError'>: column \"evidence\" does not exist\n[SQL: SELECT item_id, conclusion, evidence, status FROM checklist_responses WHERE workpaper_id = $1]",
+          "current_error_class": "ProgrammingError",
+          "db_free_probe": null,
+          "verdict": "SAME_FAILURE",
+          "baseline_error_class": "ProgrammingError"
+        },
+        {
+          "long_prefix": "m5-surplus-reserve",
+          "suffix": "export-template",
+          "baseline_key": "M5-2",
+          "sheet_arg_replayed": "M5-2",
+          "wp_id": "0834db5b-ffa2-4dcb-afbd-d84cfa273971",
+          "baseline_ok": true,
+          "baseline_status": null,
+          "baseline_stable_digest": "eff35ae911a02c3e",
+          "baseline_bytes": 5288,
+          "baseline_accepts_sheet": true,
+          "current_accepts_sheet": true,
+          "current_sheet_default": null,
+          "current_ok": true,
+          "current_stable_digest": "eff35ae911a02c3e",
+          "current_bytes": 5288,
+          "current_error": null,
+          "current_error_class": null,
+          "db_free_probe": "SentinelDB",
+          "verdict": "SAME"
+        },
+        {
+          "long_prefix": "m6-retained-earnings",
+          "suffix": "export-data",
+          "baseline_key": "M6-2",
+          "sheet_arg_replayed": "M6-2",
+          "wp_id": "7966e387-8b3a-4060-9f1b-7709a1e9554b",
+          "baseline_ok": false,
+          "baseline_status": null,
+          "baseline_stable_digest": null,
+          "baseline_bytes": null,
+          "baseline_accepts_sheet": true,
+          "current_accepts_sheet": true,
+          "current_sheet_default": null,
+          "current_ok": false,
+          "current_stable_digest": null,
+          "current_bytes": null,
+          "current_error": "ProgrammingError: (sqlalchemy.dialects.postgresql.asyncpg.ProgrammingError) <class 'asyncpg.exceptions.UndefinedColumnError'>: column \"value\" does not exist\n[SQL: \n            SELECT item_id, value\n            FROM checklist_responses\n            WHERE working",
+          "current_error_class": "ProgrammingError",
+          "db_free_probe": null,
+          "verdict": "SAME_FAILURE",
+          "baseline_error_class": "ProgrammingError"
+        },
+        {
+          "long_prefix": "m6-retained-earnings",
+          "suffix": "export-template",
+          "baseline_key": "M6-2",
+          "sheet_arg_replayed": "M6-2",
+          "wp_id": "7966e387-8b3a-4060-9f1b-7709a1e9554b",
+          "baseline_ok": true,
+          "baseline_status": null,
+          "baseline_stable_digest": "d64ff7f75681f8b8",
+          "baseline_bytes": 5190,
+          "baseline_accepts_sheet": true,
+          "current_accepts_sheet": true,
+          "current_sheet_default": null,
+          "current_ok": true,
+          "current_stable_digest": "d64ff7f75681f8b8",
+          "current_bytes": 5190,
+          "current_error": null,
+          "current_error_class": null,
+          "db_free_probe": "SentinelDB",
+          "verdict": "SAME"
+        },
+        {
+          "long_prefix": "m7-special-reserve",
+          "suffix": "export-data",
+          "baseline_key": "M7-2",
+          "sheet_arg_replayed": "M7-2",
+          "wp_id": "30e1fef9-8689-49ea-8949-949520d80005",
+          "baseline_ok": false,
+          "baseline_status": null,
+          "baseline_stable_digest": null,
+          "baseline_bytes": null,
+          "baseline_accepts_sheet": true,
+          "current_accepts_sheet": true,
+          "current_sheet_default": null,
+          "current_ok": false,
+          "current_stable_digest": null,
+          "current_bytes": null,
+          "current_error": "ModuleNotFoundError: No module named 'app.services.m7_special_reserve_service'",
+          "current_error_class": "ModuleNotFoundError",
+          "db_free_probe": null,
+          "verdict": "SAME_FAILURE",
+          "baseline_error_class": "ModuleNotFoundError"
+        },
+        {
+          "long_prefix": "m7-special-reserve",
+          "suffix": "export-template",
+          "baseline_key": "M7-2",
+          "sheet_arg_replayed": "M7-2",
+          "wp_id": "30e1fef9-8689-49ea-8949-949520d80005",
+          "baseline_ok": false,
+          "baseline_status": null,
+          "baseline_stable_digest": null,
+          "baseline_bytes": null,
+          "baseline_accepts_sheet": true,
+          "current_accepts_sheet": true,
+          "current_sheet_default": null,
+          "current_ok": false,
+          "current_stable_digest": null,
+          "current_bytes": null,
+          "current_error": "ModuleNotFoundError: No module named 'app.services.m7_special_reserve_service'",
+          "current_error_class": "ModuleNotFoundError",
+          "db_free_probe": "SentinelDB",
+          "verdict": "SAME_FAILURE",
+          "baseline_error_class": "ModuleNotFoundError"
+        },
+        {
+          "long_prefix": "m8-general-risk-reserve",
+          "suffix": "export-data",
+          "baseline_key": "M8-2",
+          "sheet_arg_replayed": "M8-2",
+          "wp_id": "0a1ed638-b3ca-47d4-8b7d-801244f6686f",
+          "baseline_ok": false,
+          "baseline_status": null,
+          "baseline_stable_digest": null,
+          "baseline_bytes": null,
+          "baseline_accepts_sheet": true,
+          "current_accepts_sheet": true,
+          "current_sheet_default": null,
+          "current_ok": false,
+          "current_stable_digest": null,
+          "current_bytes": null,
+          "current_error": "ImportError: cannot import name 'ChecklistResponse' from 'app.models.audit_platform_models' (D:\\GT_plan\\backend\\app\\models\\audit_platform_models.py)",
+          "current_error_class": "ImportError",
+          "db_free_probe": null,
+          "verdict": "SAME_FAILURE",
+          "baseline_error_class": "ImportError"
+        },
+        {
+          "long_prefix": "m8-general-risk-reserve",
+          "suffix": "export-template",
+          "baseline_key": "M8-2",
+          "sheet_arg_replayed": "M8-2",
+          "wp_id": "0a1ed638-b3ca-47d4-8b7d-801244f6686f",
+          "baseline_ok": true,
+          "baseline_status": null,
+          "baseline_stable_digest": "bde06a45ab93d864",
+          "baseline_bytes": 5368,
+          "baseline_accepts_sheet": true,
+          "current_accepts_sheet": true,
+          "current_sheet_default": null,
+          "current_ok": true,
+          "current_stable_digest": "bde06a45ab93d864",
+          "current_bytes": 5368,
+          "current_error": null,
+          "current_error_class": null,
+          "db_free_probe": "SentinelDB",
+          "verdict": "SAME"
+        },
+        {
+          "long_prefix": "m9-other-comprehensive-income",
+          "suffix": "export-data",
+          "baseline_key": "M9-2",
+          "sheet_arg_replayed": "M9-2",
+          "wp_id": "1a23bbd9-c76a-4465-b15f-965ee2fffd72",
+          "baseline_ok": false,
+          "baseline_status": null,
+          "baseline_stable_digest": null,
+          "baseline_bytes": null,
+          "baseline_accepts_sheet": true,
+          "current_accepts_sheet": true,
+          "current_sheet_default": null,
+          "current_ok": false,
+          "current_stable_digest": null,
+          "current_bytes": null,
+          "current_error": "ModuleNotFoundError: No module named 'app.services.m9_other_comprehensive_income_service'",
+          "current_error_class": "ModuleNotFoundError",
+          "db_free_probe": null,
+          "verdict": "SAME_FAILURE",
+          "baseline_error_class": "ModuleNotFoundError"
+        },
+        {
+          "long_prefix": "m9-other-comprehensive-income",
+          "suffix": "export-template",
+          "baseline_key": "M9-2",
+          "sheet_arg_replayed": "M9-2",
+          "wp_id": "1a23bbd9-c76a-4465-b15f-965ee2fffd72",
+          "baseline_ok": false,
+          "baseline_status": null,
+          "baseline_stable_digest": null,
+          "baseline_bytes": null,
+          "baseline_accepts_sheet": true,
+          "current_accepts_sheet": true,
+          "current_sheet_default": null,
+          "current_ok": false,
+          "current_stable_digest": null,
+          "current_bytes": null,
+          "current_error": "ModuleNotFoundError: No module named 'app.services.m9_other_comprehensive_income_service'",
+          "current_error_class": "ModuleNotFoundError",
+          "db_free_probe": "SentinelDB",
+          "verdict": "SAME_FAILURE",
+          "baseline_error_class": "ModuleNotFoundError"
+        },
+        {
+          "long_prefix": "n1-deferred-tax-assets",
+          "suffix": "export-data",
+          "baseline_key": "N1-2",
+          "sheet_arg_replayed": "N1-2",
+          "wp_id": "23f1276c-71ac-4a29-af64-d06cd0a75b09",
+          "baseline_ok": true,
+          "baseline_status": null,
+          "baseline_stable_digest": "20a36164326673be",
+          "baseline_bytes": 5319,
+          "baseline_accepts_sheet": true,
+          "current_accepts_sheet": true,
+          "current_sheet_default": "N1-2",
+          "current_ok": true,
+          "current_stable_digest": "20a36164326673be",
+          "current_bytes": 5319,
+          "current_error": null,
+          "current_error_class": null,
+          "db_free_probe": null,
+          "verdict": "SAME"
+        },
+        {
+          "long_prefix": "n1-deferred-tax-assets",
+          "suffix": "export-data",
+          "baseline_key": "N1-4",
+          "sheet_arg_replayed": "N1-4",
+          "wp_id": "23f1276c-71ac-4a29-af64-d06cd0a75b09",
+          "baseline_ok": true,
+          "baseline_status": null,
+          "baseline_stable_digest": "29c12f027dfc53c8",
+          "baseline_bytes": 5232,
+          "baseline_accepts_sheet": true,
+          "current_accepts_sheet": true,
+          "current_sheet_default": "N1-2",
+          "current_ok": true,
+          "current_stable_digest": "29c12f027dfc53c8",
+          "current_bytes": 5232,
+          "current_error": null,
+          "current_error_class": null,
+          "db_free_probe": null,
+          "verdict": "SAME"
+        },
+        {
+          "long_prefix": "n1-deferred-tax-assets",
+          "suffix": "export-data",
+          "baseline_key": "N1-5",
+          "sheet_arg_replayed": "N1-5",
+          "wp_id": "23f1276c-71ac-4a29-af64-d06cd0a75b09",
+          "baseline_ok": true,
+          "baseline_status": null,
+          "baseline_stable_digest": "589211bc36721f31",
+          "baseline_bytes": 5465,
+          "baseline_accepts_sheet": true,
+          "current_accepts_sheet": true,
+          "current_sheet_default": "N1-2",
+          "current_ok": true,
+          "current_stable_digest": "589211bc36721f31",
+          "current_bytes": 5465,
+          "current_error": null,
+          "current_error_class": null,
+          "db_free_probe": null,
+          "verdict": "SAME"
+        },
+        {
+          "long_prefix": "n1-deferred-tax-assets",
+          "suffix": "export-template",
+          "baseline_key": "N1-2",
+          "sheet_arg_replayed": "N1-2",
+          "wp_id": "23f1276c-71ac-4a29-af64-d06cd0a75b09",
+          "baseline_ok": true,
+          "baseline_status": null,
+          "baseline_stable_digest": "20a36164326673be",
+          "baseline_bytes": 5319,
+          "baseline_accepts_sheet": true,
+          "current_accepts_sheet": true,
+          "current_sheet_default": "N1-2",
+          "current_ok": true,
+          "current_stable_digest": "20a36164326673be",
+          "current_bytes": 5319,
+          "current_error": null,
+          "current_error_class": null,
+          "db_free_probe": "SentinelDB",
+          "verdict": "SAME"
+        },
+        {
+          "long_prefix": "n1-deferred-tax-assets",
+          "suffix": "export-template",
+          "baseline_key": "N1-4",
+          "sheet_arg_replayed": "N1-4",
+          "wp_id": "23f1276c-71ac-4a29-af64-d06cd0a75b09",
+          "baseline_ok": true,
+          "baseline_status": null,
+          "baseline_stable_digest": "29c12f027dfc53c8",
+          "baseline_bytes": 5232,
+          "baseline_accepts_sheet": true,
+          "current_accepts_sheet": true,
+          "current_sheet_default": "N1-2",
+          "current_ok": true,
+          "current_stable_digest": "29c12f027dfc53c8",
+          "current_bytes": 5232,
+          "current_error": null,
+          "current_error_class": null,
+          "db_free_probe": "SentinelDB",
+          "verdict": "SAME"
+        },
+        {
+          "long_prefix": "n1-deferred-tax-assets",
+          "suffix": "export-template",
+          "baseline_key": "N1-5",
+          "sheet_arg_replayed": "N1-5",
+          "wp_id": "23f1276c-71ac-4a29-af64-d06cd0a75b09",
+          "baseline_ok": true,
+          "baseline_status": null,
+          "baseline_stable_digest": "589211bc36721f31",
+          "baseline_bytes": 5465,
+          "baseline_accepts_sheet": true,
+          "current_accepts_sheet": true,
+          "current_sheet_default": "N1-2",
+          "current_ok": true,
+          "current_stable_digest": "589211bc36721f31",
+          "current_bytes": 5465,
+          "current_error": null,
+          "current_error_class": null,
+          "db_free_probe": "SentinelDB",
+          "verdict": "SAME"
+        },
+        {
+          "long_prefix": "n2-taxes-payable",
+          "suffix": "export-data",
+          "baseline_key": "N2-2",
+          "sheet_arg_replayed": "N2-2",
+          "wp_id": "1b98d65d-ce63-4013-9c0e-a5fcb602970d",
+          "baseline_ok": true,
+          "baseline_status": null,
+          "baseline_stable_digest": "b0fae5c7abe93548",
+          "baseline_bytes": 5499,
+          "baseline_accepts_sheet": true,
+          "current_accepts_sheet": true,
+          "current_sheet_default": null,
+          "current_ok": true,
+          "current_stable_digest": "b0fae5c7abe93548",
+          "current_bytes": 5499,
+          "current_error": null,
+          "current_error_class": null,
+          "db_free_probe": null,
+          "verdict": "SAME"
+        },
+        {
+          "long_prefix": "n2-taxes-payable",
+          "suffix": "export-template",
+          "baseline_key": "N2-2",
+          "sheet_arg_replayed": "N2-2",
+          "wp_id": "1b98d65d-ce63-4013-9c0e-a5fcb602970d",
+          "baseline_ok": true,
+          "baseline_status": null,
+          "baseline_stable_digest": "b0fae5c7abe93548",
+          "baseline_bytes": 5499,
+          "baseline_accepts_sheet": true,
+          "current_accepts_sheet": true,
+          "current_sheet_default": null,
+          "current_ok": true,
+          "current_stable_digest": "b0fae5c7abe93548",
+          "current_bytes": 5499,
+          "current_error": null,
+          "current_error_class": null,
+          "db_free_probe": "SentinelDB",
+          "verdict": "SAME"
+        },
+        {
+          "long_prefix": "n3-deferred-tax-liabilities",
+          "suffix": "export-data",
+          "baseline_key": "N3-2",
+          "sheet_arg_replayed": "N3-2",
+          "wp_id": "3091add1-9539-4c58-a8fe-2331df37be93",
+          "baseline_ok": true,
+          "baseline_status": null,
+          "baseline_stable_digest": "d5652bafebb9dbd5",
+          "baseline_bytes": 5228,
+          "baseline_accepts_sheet": true,
+          "current_accepts_sheet": true,
+          "current_sheet_default": "N3-2",
+          "current_ok": true,
+          "current_stable_digest": "d5652bafebb9dbd5",
+          "current_bytes": 5228,
+          "current_error": null,
+          "current_error_class": null,
+          "db_free_probe": null,
+          "verdict": "SAME"
+        },
+        {
+          "long_prefix": "n3-deferred-tax-liabilities",
+          "suffix": "export-template",
+          "baseline_key": "N3-2",
+          "sheet_arg_replayed": "N3-2",
+          "wp_id": "3091add1-9539-4c58-a8fe-2331df37be93",
+          "baseline_ok": true,
+          "baseline_status": null,
+          "baseline_stable_digest": "d5652bafebb9dbd5",
+          "baseline_bytes": 5228,
+          "baseline_accepts_sheet": true,
+          "current_accepts_sheet": true,
+          "current_sheet_default": "N3-2",
+          "current_ok": true,
+          "current_stable_digest": "d5652bafebb9dbd5",
+          "current_bytes": 5228,
+          "current_error": null,
+          "current_error_class": null,
+          "db_free_probe": "SentinelDB",
+          "verdict": "SAME"
+        },
+        {
+          "long_prefix": "n5-income-tax-expense",
+          "suffix": "export-data",
+          "baseline_key": "N5-2",
+          "sheet_arg_replayed": "N5-2",
+          "wp_id": "5093cc2b-fcc3-4027-9815-2ac51902580b",
+          "baseline_ok": true,
+          "baseline_status": null,
+          "baseline_stable_digest": "9ebbb4c7ba2caa97",
+          "baseline_bytes": 5214,
+          "baseline_accepts_sheet": true,
+          "current_accepts_sheet": true,
+          "current_sheet_default": "N5-5",
+          "current_ok": true,
+          "current_stable_digest": "9ebbb4c7ba2caa97",
+          "current_bytes": 5214,
+          "current_error": null,
+          "current_error_class": null,
+          "db_free_probe": null,
+          "verdict": "SAME"
+        },
+        {
+          "long_prefix": "n5-income-tax-expense",
+          "suffix": "export-data",
+          "baseline_key": "N5-5",
+          "sheet_arg_replayed": "N5-5",
+          "wp_id": "5093cc2b-fcc3-4027-9815-2ac51902580b",
+          "baseline_ok": true,
+          "baseline_status": null,
+          "baseline_stable_digest": "3b61807a67741fab",
+          "baseline_bytes": 8109,
+          "baseline_accepts_sheet": true,
+          "current_accepts_sheet": true,
+          "current_sheet_default": "N5-5",
+          "current_ok": true,
+          "current_stable_digest": "3b61807a67741fab",
+          "current_bytes": 8109,
+          "current_error": null,
+          "current_error_class": null,
+          "db_free_probe": null,
+          "verdict": "SAME"
+        },
+        {
+          "long_prefix": "n5-income-tax-expense",
+          "suffix": "export-template",
+          "baseline_key": "N5-2",
+          "sheet_arg_replayed": "N5-2",
+          "wp_id": "5093cc2b-fcc3-4027-9815-2ac51902580b",
+          "baseline_ok": true,
+          "baseline_status": null,
+          "baseline_stable_digest": "9ebbb4c7ba2caa97",
+          "baseline_bytes": 5214,
+          "baseline_accepts_sheet": true,
+          "current_accepts_sheet": true,
+          "current_sheet_default": "N5-5",
+          "current_ok": true,
+          "current_stable_digest": "9ebbb4c7ba2caa97",
+          "current_bytes": 5214,
+          "current_error": null,
+          "current_error_class": null,
+          "db_free_probe": "SentinelDB",
+          "verdict": "SAME"
+        },
+        {
+          "long_prefix": "n5-income-tax-expense",
+          "suffix": "export-template",
+          "baseline_key": "N5-5",
+          "sheet_arg_replayed": "N5-5",
+          "wp_id": "5093cc2b-fcc3-4027-9815-2ac51902580b",
+          "baseline_ok": true,
+          "baseline_status": null,
+          "baseline_stable_digest": "3b61807a67741fab",
+          "baseline_bytes": 8109,
+          "baseline_accepts_sheet": true,
+          "current_accepts_sheet": true,
+          "current_sheet_default": "N5-5",
+          "current_ok": true,
+          "current_stable_digest": "3b61807a67741fab",
+          "current_bytes": 8109,
+          "current_error": null,
+          "current_error_class": null,
+          "db_free_probe": "SentinelDB",
+          "verdict": "SAME"
+        }
+      ],
+      "verdict": "REGRESSION_DETECTED"
+    },
+    "flip_rows_disproved_as_probe_artifact": {
+      "criterion": "显式传 sheet=None（= HTTP 省略 ?sheet= 的真值）后与基线 `<handler-default>` 摘要比对",
+      "rows": [
+        {
+          "long_prefix": "l2-interest-payable",
+          "suffix": "export-template",
+          "sheet_arg": null,
+          "sheet_param_repr": "sheet: 'str | None' = Query(None)",
+          "baseline_ok": true,
+          "baseline_stable_digest": "3226c3a018e0ec64",
+          "baseline_bytes": 5247,
+          "baseline_error_class": null,
+          "current_ok": true,
+          "current_stable_digest": "3226c3a018e0ec64",
+          "current_bytes": 5247,
+          "current_error_class": null,
+          "current_error": null,
+          "verdict": "SAME"
+        },
+        {
+          "long_prefix": "l2-interest-payable",
+          "suffix": "export-data",
+          "sheet_arg": null,
+          "sheet_param_repr": "sheet: 'str | None' = Query(None)",
+          "baseline_ok": true,
+          "baseline_stable_digest": "3226c3a018e0ec64",
+          "baseline_bytes": 5247,
+          "baseline_error_class": null,
+          "current_ok": true,
+          "current_stable_digest": "3226c3a018e0ec64",
+          "current_bytes": 5247,
+          "current_error_class": null,
+          "current_error": null,
+          "verdict": "SAME"
+        },
+        {
+          "long_prefix": "m1-dividends-payable",
+          "suffix": "export-template",
+          "sheet_arg": null,
+          "sheet_param_repr": "sheet: 'str | None' = Query(None)",
+          "baseline_ok": true,
+          "baseline_stable_digest": "e6960540b97846a0",
+          "baseline_bytes": 6237,
+          "baseline_error_class": null,
+          "current_ok": true,
+          "current_stable_digest": "e6960540b97846a0",
+          "current_bytes": 6237,
+          "current_error_class": null,
+          "current_error": null,
+          "verdict": "SAME"
+        },
+        {
+          "long_prefix": "m1-dividends-payable",
+          "suffix": "export-data",
+          "sheet_arg": null,
+          "sheet_param_repr": "sheet: 'str | None' = Query(None)",
+          "baseline_ok": false,
+          "baseline_stable_digest": null,
+          "baseline_bytes": null,
+          "baseline_error_class": "ProgrammingError",
+          "current_ok": false,
+          "current_stable_digest": null,
+          "current_bytes": null,
+          "current_error_class": "ProgrammingError",
+          "current_error": "(sqlalchemy.dialects.postgresql.asyncpg.ProgrammingError) <class 'asyncpg.exceptions.UndefinedColumnError'>: column \"value\" does not exist\n[SQL: \n            SELECT item_id, value\n            FROM checklist_responses\n            WHERE wp_id",
+          "verdict": "SAME_FAILURE"
+        }
+      ],
+      "verdict_counts": {
+        "SAME": 3,
+        "SAME_FAILURE": 1
+      }
+    },
+    "asgi_http_inconclusive": {
+      "criterion": "ASGI HTTP 打 `/api/{长前缀}/{wp_id}/{后缀}`（**不带** ?sheet=），比基线摘要",
+      "rows": [
+        {
+          "url": "/api/l2-interest-payable/4d118863-4e92-45c1-9ba5-8f9496f1e380/export-template",
+          "query": "(无 sheet 参数)",
+          "status": 404,
+          "baseline_stable_digest": "3226c3a018e0ec64",
+          "baseline_ok": true,
+          "body": "{\"code\":404,\"message\":\"资源不存在或不可访问\"}",
+          "verdict": "HTTP_404"
+        },
+        {
+          "url": "/api/l2-interest-payable/4d118863-4e92-45c1-9ba5-8f9496f1e380/export-data",
+          "query": "(无 sheet 参数)",
+          "status": 404,
+          "baseline_stable_digest": "3226c3a018e0ec64",
+          "baseline_ok": true,
+          "body": "{\"code\":404,\"message\":\"资源不存在或不可访问\"}",
+          "verdict": "HTTP_404"
+        },
+        {
+          "url": "/api/m1-dividends-payable/175d60f9-831b-4a7f-b22f-f4fdd3c5e178/export-template",
+          "query": "(无 sheet 参数)",
+          "status": 404,
+          "baseline_stable_digest": "e6960540b97846a0",
+          "baseline_ok": true,
+          "body": "{\"code\":404,\"message\":\"资源不存在或不可访问\"}",
+          "verdict": "HTTP_404"
+        },
+        {
+          "url": "/api/m1-dividends-payable/175d60f9-831b-4a7f-b22f-f4fdd3c5e178/export-data",
+          "query": "(无 sheet 参数)",
+          "status": 404,
+          "baseline_stable_digest": null,
+          "baseline_ok": false,
+          "body": "{\"code\":404,\"message\":\"资源不存在或不可访问\"}",
+          "verdict": "HTTP_404"
+        }
+      ]
+    },
+    "corrected_verdict": {
+      "replayed": 38,
+      "same": 27,
+      "same_failure": 11,
+      "digest_mismatch": 0,
+      "broken": 0,
+      "note": "首轮 24 SAME / 10 SAME_FAILURE / 3 BROKEN / 1 ERROR_CLASS_CHANGED；4 条异常经「显式传 sheet=None」重放全部转 SAME / SAME_FAILURE ⇒ 零回归"
+    }
+  },
+  "check_4_strategy_limitation": {
+    "call_endpoint_passes_strategy": false,
+    "call_endpoint_kwargs_keys": [
+      "current_user",
+      "db",
+      "include_guidance",
+      "sheet",
+      "wp_id"
+    ],
+    "endpoint_signature_default": {
+      "repr": "Query(overwrite)",
+      "type": "fastapi.params.Query",
+      "is_str": false,
+      "equals_literal_overwrite": false,
+      "inner_default": "'overwrite'"
+    },
+    "should_purge_residual_by_family": {
+      "PER_FIELD": {
+        "sample_sheet": "L6-3",
+        "with_effective_default": false,
+        "with_literal_overwrite": true,
+        "with_fill_empty": false
+      },
+      "PER_FIELD_PLUS_DATA": {
+        "sample_sheet": "M10-3",
+        "with_effective_default": false,
+        "with_literal_overwrite": true,
+        "with_fill_empty": false
+      },
+      "SINGLE_JSON": {
+        "sample_sheet": "L2-3",
+        "with_effective_default": false,
+        "with_literal_overwrite": false,
+        "with_fill_empty": false
+      }
+    },
+    "resolve_conflict_branch": {
+      "with_effective_default": {
+        "row-1": {
+          "debit": "200",
+          "memo": ""
+        }
+      },
+      "with_literal_overwrite": {
+        "row-1": {
+          "debit": "200",
+          "memo": ""
+        }
+      },
+      "with_fill_empty": {
+        "row-1": {
+          "debit": "100",
+          "memo": "旧内容"
+        }
+      },
+      "default_equals_overwrite_result": true,
+      "default_equals_fill_empty_result": false
+    },
+    "spec_count": 16,
+    "key_families_present": [
+      "PER_FIELD",
+      "PER_FIELD_PLUS_DATA",
+      "SINGLE_JSON"
+    ],
+    "catalog_reachability": {
+      "criterion": "ACNR catalog 里 16 张 X-3 的 `import_export.enabled` / `api_prefix`",
+      "by_sheet": {
+        "L2-3": {
+          "state": "missing(键缺失)",
+          "api_prefix": null
+        },
+        "L6-3": {
+          "state": "missing(键缺失)",
+          "api_prefix": null
+        },
+        "M1-3": {
+          "state": "missing(键缺失)",
+          "api_prefix": null
+        },
+        "M10-3": {
+          "state": "missing(键缺失)",
+          "api_prefix": null
+        },
+        "M2-3": {
+          "state": "missing(键缺失)",
+          "api_prefix": null
+        },
+        "M3-3": {
+          "state": "missing(键缺失)",
+          "api_prefix": null
+        },
+        "M4-3": {
+          "state": "missing(键缺失)",
+          "api_prefix": null
+        },
+        "M5-3": {
+          "state": "missing(键缺失)",
+          "api_prefix": null
+        },
+        "M6-3": {
+          "state": "missing(键缺失)",
+          "api_prefix": null
+        },
+        "M7-3": {
+          "state": "missing(键缺失)",
+          "api_prefix": null
+        },
+        "M8-3": {
+          "state": "missing(键缺失)",
+          "api_prefix": null
+        },
+        "M9-3": {
+          "state": "missing(键缺失)",
+          "api_prefix": null
+        },
+        "N1-3": {
+          "state": "missing(键缺失)",
+          "api_prefix": null
+        },
+        "N2-3": {
+          "state": "missing(键缺失)",
+          "api_prefix": null
+        },
+        "N3-3": {
+          "state": "missing(键缺失)",
+          "api_prefix": null
+        },
+        "N5-3": {
+          "state": "missing(键缺失)",
+          "api_prefix": null
+        }
+      },
+      "enabled_count": 0,
+      "state_counts": {
+        "missing(键缺失)": 16
+      },
+      "note": "enabled=0 ⇒ bulk 今天不向这些 sheet 取数 ⇒ strategy 丢参在当刻不可达"
+    },
+    "strategy_param_surface": {
+      "criterion": "`_PREFIX_TO_MODULE` 逐键解析 import-data 端点，看签名里有没有 `strategy`",
+      "keys_total": 89,
+      "with_strategy": [
+        "l2",
+        "l6",
+        "m1",
+        "m10",
+        "m2",
+        "m3",
+        "m4",
+        "m5",
+        "m6",
+        "m7",
+        "m8",
+        "m9",
+        "n1",
+        "n2",
+        "n3",
+        "n5"
+      ],
+      "with_strategy_count": 16,
+      "with_strategy_non_x3": [],
+      "without_strategy_count": 73,
+      "unresolved": [],
+      "reading": "带 `strategy` 的全是本 spec 的 16 个 X-3 短前缀 ⇒ `_call_endpoint` 丢 strategy 这个存量缺口，直到 X-3 才第一次有承重意义"
+    },
+    "legacy_sheet_via_short_prefix": {
+      "criterion": "真调 `IE_ADAPTER_REGISTRY[短前缀].export_fn(sheet=..., mode='template')`",
+      "legacy_sheet_ok": [],
+      "legacy_sheet_failed": [
+        "l2",
+        "l6",
+        "m1",
+        "m2",
+        "m3",
+        "m4",
+        "m5",
+        "m6",
+        "m7",
+        "m8",
+        "m9",
+        "m10",
+        "n1",
+        "n2",
+        "n3",
+        "n5"
+      ],
+      "x3_sheet_ok": [
+        "l2",
+        "l6",
+        "m1",
+        "m2",
+        "m3",
+        "m4",
+        "m5",
+        "m6",
+        "m7",
+        "m8",
+        "m9",
+        "m10",
+        "n1",
+        "n2",
+        "n3",
+        "n5"
+      ],
+      "distinct_legacy_errors": [
+        "HTTPException: 400: 不支持的sheet: L2-2。支持: ['L2-3']",
+        "HTTPException: 400: 不支持的sheet: L6-2。支持: ['L6-3']",
+        "HTTPException: 400: 不支持的sheet: M1-2。支持: ['M1-3']",
+        "HTTPException: 400: 不支持的sheet: M10-2。支持: ['M10-3']",
+        "HTTPException: 400: 不支持的sheet: M2-2。支持: ['M2-3']",
+        "HTTPException: 400: 不支持的sheet: M3-2。支持: ['M3-3']",
+        "HTTPException: 400: 不支持的sheet: M4-2。支持: ['M4-3']",
+        "HTTPException: 400: 不支持的sheet: M5-2。支持: ['M5-3']",
+        "HTTPException: 400: 不支持的sheet: M6-2。支持: ['M6-3']",
+        "HTTPException: 400: 不支持的sheet: M7-2。支持: ['M7-3']",
+        "HTTPException: 400: 不支持的sheet: M8-2。支持: ['M8-3']",
+        "HTTPException: 400: 不支持的sheet: M9-2。支持: ['M9-3']",
+        "HTTPException: 400: 不支持的sheet: N1-2。支持: ['N1-3']",
+        "HTTPException: 400: 不支持的sheet: N2-2。支持: ['N2-3']",
+        "HTTPException: 400: 不支持的sheet: N3-2。支持: ['N3-3']",
+        "HTTPException: 400: 不支持的sheet: N5-2。支持: ['N5-3']"
+      ]
+    },
+    "conclusion": "① `_call_endpoint` 不传 strategy ⇒ 端点形参落到 `Query(\"overwrite\")` 这个 FieldInfo 对象本身，**不是字符串 overwrite**（6.1 实录措辞需更正）② 合并语义恰好等同 overwrite（`resolve_conflict` 未知策略走防御性 else）③ 残留清理**不执行**（`_should_purge_residual` 的 `== \"overwrite\"` 对 FieldInfo 不成立）⇒ 问「bulk 是否会意外清残留」：**不会**，方向相反 —— bulk 从不清残留（幽灵行留存），界面路径（形态 A 直调 / 形态 B 经 `_x3_delegate` 剥默认值后委派）会清④ 更重：用户在批量对话框选的 fill-empty / reject 被丢掉，一律按 overwrite 合并 = 静默覆盖风险⑤ 当刻用户不可见（catalog 16/16 `import_export` 键缺失、enabled=0），Wave 5 任务 8 登记器接上后同刻变可见 ⇒ 建议在任务 8/9 之前收口"
+  },
+  "test_suite": {
+    "cmd": "python -m pytest backend/tests/test_x3_column_alignment.py backend/tests/test_x3_key_ledger.py backend/tests/test_x3_shape_a_wiring.py backend/tests/test_x3_legacy_sheet_param.py backend/tests/test_x3_column_property.py backend/tests/test_x3_parse_property.py backend/tests/test_x3_keyfamily_property.py backend/tests/test_x3_entry_coverage_ledger.py backend/tests/test_ie_route_inventory.py backend/tests/test_x3_adapter_host_same_module.py backend/tests/test_ie_prefix_reachability.py backend/tests/test_single_tab_adapter.py -q -p no:randomly",
+    "collected": 400,
+    "run1": {
+      "failed": 1,
+      "passed": 394,
+      "skipped": 5,
+      "seconds": 214.64
+    },
+    "run2": {
+      "failed": 0,
+      "passed": 395,
+      "skipped": 5,
+      "seconds": 226.08
+    },
+    "per_file": {
+      "test_x3_column_alignment.py": 21,
+      "test_x3_key_ledger.py": 219,
+      "test_x3_shape_a_wiring.py": 8,
+      "test_x3_legacy_sheet_param.py": 25,
+      "test_x3_column_property.py": 9,
+      "test_x3_parse_property.py": 13,
+      "test_x3_keyfamily_property.py": 15,
+      "test_x3_entry_coverage_ledger.py": 11,
+      "test_ie_route_inventory.py": 25,
+      "test_x3_adapter_host_same_module.py": 26,
+      "test_ie_prefix_reachability.py": 18,
+      "test_single_tab_adapter.py": 10
+    },
+    "first8_subtotal": 321,
+    "known_flaky_hit": {
+      "test": "backend/tests/test_x3_column_property.py::test_p3_3_judgement_rejects_any_deformed_column_face",
+      "assertion_site": "tests/test_x3_column_property.py:906（外层覆盖断言）",
+      "message": "以下变形从未产生过有效（非恒等）实例 ⇒ 该维度实际空转：['row_shift']",
+      "cause": "`st.sampled_from(_MUTATIONS)` 未 derandomize，150 次迭代可能抽不到「row_shift 且行非空」的有效组合",
+      "run2": "同一条转绿；**未改该测试**"
+    },
+    "pipeline_note": "首轮用 `rtk … | Tee-Object` 跑该套件在 72%（第 289 项）管道死锁（pytest CPU 冻在 137.95s / 零子进程 / PG 无阻塞查询 / 日志停在 650 B）；按 rtk 规则「管道或重定向到文件不加 rtk」改 `cmd /c \"… > 日志 2>&1\"` 后两轮均正常收尾"
+  },
+  "forbidden_surface_md5": {
+    "criterion": "逐项比对任务 6.3 实录记下的 md5 / 字节数 / CRLF 数",
+    "expected_from_task_6_3": {
+      "_x3_adjustment_import_export.py": "a97a28aa11edc9d839a7c065d833c001",
+      "_kfgh_cycle_adapters.py": "5b4b06249e5146ea18cdffeca5d008f4",
+      "adjustment_ie_contract.json": "fc5d54650a2a4b3b2486fc060576d6c8",
+      "global_catalog.json": "af0868bd50d13027e091afd370fa6a41"
+    },
+    "measured": {
+      "backend/app/routers/wp_render_strategies/_x3_adjustment_import_export.py": {
+        "md5": "a97a28aa11edc9d839a7c065d833c001",
+        "bytes": 88726,
+        "crlf": 1824
+      },
+      "backend/app/services/bulk_tab/_kfgh_cycle_adapters.py": {
+        "md5": "5b4b06249e5146ea18cdffeca5d008f4",
+        "bytes": 17405,
+        "crlf": 382
+      },
+      "backend/data/adjustment_ie_contract.json": {
+        "md5": "fc5d54650a2a4b3b2486fc060576d6c8",
+        "bytes": 228807,
+        "crlf": 4624
+      },
+      "backend/data/acnr/global_catalog.json": {
+        "md5": "af0868bd50d13027e091afd370fa6a41",
+        "bytes": 1032236,
+        "crlf": 29122
+      }
+    },
+    "verdict": "全部未动",
+    "dedicated_routers_snapshot": {
+      "l2_interest_payable.py": {
+        "md5": "525152b33f5590ef4aded35181ca0a33",
+        "bytes": 21291,
+        "crlf": 527
+      },
+      "l6_special_payables.py": {
+        "md5": "fd4e169e869885b6a381ff96f01aaa74",
+        "bytes": 14492,
+        "crlf": 371
+      },
+      "m1_dividends_payable.py": {
+        "md5": "78b8fa8126f132da4dd04f4623303d21",
+        "bytes": 18715,
+        "crlf": 396
+      },
+      "m2_paid_in_capital.py": {
+        "md5": "c2af1729a75fc2a6e2aaeec06a8d3ce8",
+        "bytes": 13822,
+        "crlf": 302
+      },
+      "m3_treasury_stock.py": {
+        "md5": "f53cd3a8cfa7c62891db1ed8a4cf6d93",
+        "bytes": 11945,
+        "crlf": 256
+      },
+      "m4_capital_reserve.py": {
+        "md5": "6614ad2c1d103510f51e498ae818e96e",
+        "bytes": 13820,
+        "crlf": 294
+      },
+      "m5_surplus_reserve.py": {
+        "md5": "74e41bb340ce5c5f6a1fa67f024d87c3",
+        "bytes": 11172,
+        "crlf": 227
+      },
+      "m6_retained_earnings.py": {
+        "md5": "97a8fdad37509f5bebd36166c117be5e",
+        "bytes": 15709,
+        "crlf": 338
+      },
+      "m7_special_reserve.py": {
+        "md5": "07c7e0f1487cac6f91ca4e63ba599530",
+        "bytes": 11141,
+        "crlf": 233
+      },
+      "m8_general_risk_reserve.py": {
+        "md5": "cfdf02867d0b3cc03626cbaf1b65fff3",
+        "bytes": 11936,
+        "crlf": 257
+      },
+      "m9_other_comprehensive_income.py": {
+        "md5": "76fc32b7eff1ce0658672c55f9d2384d",
+        "bytes": 16376,
+        "crlf": 371
+      },
+      "m10_other_equity_instruments.py": {
+        "md5": "a1ad60b80ee464be04485b43947368c5",
+        "bytes": 13571,
+        "crlf": 293
+      },
+      "n1_deferred_tax_assets.py": {
+        "md5": "ad39903716017446408543d5e508851c",
+        "bytes": 21719,
+        "crlf": 537
+      },
+      "n2_taxes_payable.py": {
+        "md5": "a05cb7aca5e31a3ad315af6abbe2ee81",
+        "bytes": 25266,
+        "crlf": 593
+      },
+      "n3_deferred_tax_liabilities.py": {
+        "md5": "2712a10eae1f84b7443850bb63c442c9",
+        "bytes": 14278,
+        "crlf": 389
+      },
+      "n5_income_tax_expense.py": {
+        "md5": "74c234a3bd81b9284edc760ccef7bcb1",
+        "bytes": 20889,
+        "crlf": 537
+      }
+    }
+  },
+  "ci_red_jobs": {
+    "duty": "裁决 2：本 spec 不修红，但红的规模不得变大",
+    "probe_skipped": false,
+    "probe_skipped_note": null,
+    "jobs": {
+      "acnr-ie-catalog-sync": {
+        "exit_code": {
+          "baseline": 1,
+          "current": 1
+        },
+        "drift_entries": {
+          "baseline": 19,
+          "current": 19
+        },
+        "increased": false
+      },
+      "check-acnr-catalog-drift": {
+        "exit_code": {
+          "baseline": 1,
+          "current": 1
+        },
+        "drift_entries": {
+          "baseline": 53,
+          "current": 53
+        },
+        "increased": false
+      }
+    },
+    "increased_jobs": []
+  }
+}

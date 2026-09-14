@@ -1,0 +1,284 @@
+{
+  "policy_id": "workpaper-sync-redaction",
+  "policy_version": "workpaper-sync-redaction:v1",
+  "schema_version": 1,
+  "spec": "workpaper-html-onlyoffice-bidirectional-writeback-closure",
+  "task": 29,
+  "requirements": ["5.10", "5.11", "10.7", "13.8"],
+  "properties": ["Property 68", "Property 69"],
+  "purpose": "日志 / operation·application·recovery·close transition event detail / trace bundle / evidence 的字段级 allowlist 投影（Requirement 13.8）。allowlist 是**白名单**：未登记的键一律丢弃，而不是「已知敏感键才屏蔽」——黑名单在新增字段时必然漏。policy_version 进 evidence，改任何 allowlist/pattern 都必须提升版本号并同步守卫。",
+
+  "invariants": {
+    "allowlist_is_closed": true,
+    "unlisted_keys_are_dropped": true,
+    "nested_containers_are_projected_recursively": true,
+    "exception_text_is_pattern_scrubbed": true,
+    "urls_keep_only_scheme_host_path_shape": true,
+    "url_query_and_fragment_and_userinfo_always_dropped": true,
+    "secret_shaped_values_scrubbed_even_on_allowlisted_keys": true,
+    "no_business_cell_values_recorded": true
+  },
+
+  "placeholders": {
+    "dropped_key": "[redacted]",
+    "secret_value": "[redacted-secret]",
+    "url_query": "[redacted-query]",
+    "truncated": "[truncated]"
+  },
+
+  "limits": {
+    "max_depth": 8,
+    "max_container_items": 64,
+    "max_string_chars": 512,
+    "max_exception_chars": 1000
+  },
+
+  "allowlist": {
+    "identity": {
+      "comment": "稳定 identity。全部是 UUID / 稳定 key / 枚举，不含任何业务值。",
+      "keys": [
+        "project_id",
+        "wp_id",
+        "entry_id",
+        "sheet_key",
+        "table_key",
+        "row_key",
+        "stable_field_key",
+        "room_id",
+        "generation",
+        "participant_id",
+        "initiated_by_participant_id",
+        "route_participant_id",
+        "request_id",
+        "forcesave_request_id",
+        "folded_request_id",
+        "origin_request_id",
+        "recovery_request_id",
+        "prior_confirmation_id",
+        "client_confirmation_id",
+        "operation_id",
+        "requested_operation_id",
+        "canonical_operation_id",
+        "duplicate_of_operation_id",
+        "application_id",
+        "canonical_application_id",
+        "recovery_case_id",
+        "case_id",
+        "delivery_id",
+        "delivery_key",
+        "intent_id",
+        "close_leader_intent_id",
+        "conflict_id",
+        "version_id",
+        "content_version_id",
+        "representation_id",
+        "result_representation_id",
+        "base_representation_id",
+        "candidate_id",
+        "artifact_id",
+        "incoming_artifact_id",
+        "definition_bundle_id",
+        "authority_model_definition_id",
+        "adapter_id",
+        "correlation_id",
+        "actor_id",
+        "actor_type",
+        "user_id",
+        "run_id",
+        "scenario_id",
+        "trace_bundle_artifact_id"
+      ]
+    },
+    "digest": {
+      "comment": "内容寻址摘要。digest 本身不是敏感内容，且是「服务端可重算」的唯一凭据。",
+      "keys": [
+        "artifact_sha256",
+        "incoming_sha256",
+        "projection_sha256",
+        "incoming_projection_sha256",
+        "merged_projection_sha256",
+        "result_artifact_sha256",
+        "definition_bundle_sha256",
+        "authority_model_definition_sha256",
+        "template_definition_sha256",
+        "instrumentation_definition_sha256",
+        "contract_definition_sha256",
+        "adapter_build_digest",
+        "contributor_snapshot_digest",
+        "conflict_set_digest",
+        "eligibility_digest",
+        "detail_digest",
+        "payload_digest",
+        "frozen_request_fingerprint",
+        "manifest_source_digest",
+        "profile_source_digest",
+        "scenario_profile_digest",
+        "required_scenario_set_digest",
+        "environment_digest",
+        "server_timeline_digest",
+        "database_snapshot_digest",
+        "trace_bundle_sha256",
+        "run_manifest_sha256",
+        "candidate_confirmation_digest",
+        "candidate_contributor_digest"
+      ]
+    },
+    "protocol": {
+      "comment": "状态机与序号。这些是 timeline 的本体，Requirement 13.6 要求可查询。",
+      "keys": [
+        "from_state",
+        "to_state",
+        "state",
+        "stage",
+        "event_type",
+        "sequence_no",
+        "client_edit_epoch",
+        "origin_request_sequence",
+        "effective_request_sequence",
+        "request_sequence",
+        "latest_durable_sequence",
+        "room_latest_durable_sequence",
+        "write_fence_epoch",
+        "close_barrier_epoch",
+        "eligibility_epoch",
+        "permission_epoch",
+        "intent_sequence",
+        "callback_status",
+        "delivery_state",
+        "authority_model",
+        "authorization_result",
+        "capability",
+        "editability",
+        "room_model",
+        "direction",
+        "kind",
+        "request_kind",
+        "reason",
+        "result",
+        "logical_result_code",
+        "conflict_kind",
+        "conflict_count",
+        "superseded_by",
+        "superseded_by_application_id",
+        "revision",
+        "current_revision",
+        "result_revision",
+        "base_revision",
+        "server_applied_revision",
+        "client_confirmed_base_revision",
+        "representation_generation",
+        "attempt",
+        "followed_duplicate",
+        "scenario_kind",
+        "ordinal",
+        "aggregate_result",
+        "stale",
+        "stale_reasons"
+      ]
+    },
+    "error": {
+      "comment": "错误分型。`error_code` / `error_stage` 是封闭枚举；`error_detail` 走 exception 文本 scrub 而不是原样保留。",
+      "keys": ["error_code", "error_stage", "response_error", "http_status"],
+      "scrubbed_keys": ["error_detail", "error_message", "exception", "detail"]
+    },
+    "timing": {
+      "comment": "服务端时钟（Requirement 13.10）。浏览器 trace 时间只能进 `client_*` 前缀且不参与排序。",
+      "keys": [
+        "occurred_at",
+        "created_at",
+        "accepted_at",
+        "durable_at",
+        "application_bound_at",
+        "finished_at",
+        "started_at",
+        "claimed_at",
+        "expires_at",
+        "published_at",
+        "retired_at",
+        "verified_at",
+        "server_clock_source"
+      ]
+    },
+    "environment": {
+      "comment": "黑盒环境身份（Requirement 14.16）。",
+      "keys": [
+        "onlyoffice_build",
+        "browser_build",
+        "source_commit",
+        "runner_version",
+        "policy_version",
+        "schema_version"
+      ]
+    }
+  },
+
+  "secret_key_patterns": {
+    "comment": "键名匹配即整值屏蔽 —— 即使该键同时出现在 allowlist（allowlist 不能给敏感键开后门）。匹配是大小写无关的**子串**匹配，但末段命中 non_credential_role_suffixes 时不算凭证（见该字段注释）。",
+    "non_credential_role_suffixes": [
+      "result",
+      "state",
+      "outcome",
+      "epoch",
+      "digest",
+      "sha256",
+      "count",
+      "at",
+      "stale",
+      "reason"
+    ],
+    "non_credential_role_suffixes_why": "V151 里存在 `authorization_result` 这类**枚举结果**列：键名含 `authorization`，值域却只有 allowed/denied/stale，是 AC 13.5 要求必须可查询的审计事实。若按裸子串屏蔽，timeline 会把「授权判定结果」整列变成占位符，等于删掉一条 AC。规则因此收敛为「命中敏感词 **且** 末段不是非凭证角色词」；`token_digest` 之类同理安全（凭证的 SHA-256 不是凭证）。这份名单是封闭的，加 `header`/`value`/`payload` 之类会立刻放开真实凭证，守卫对此双向锁死。",
+    "patterns": [
+      "authorization",
+      "auth_header",
+      "bearer",
+      "token",
+      "jwt",
+      "secret",
+      "password",
+      "passwd",
+      "credential",
+      "cookie",
+      "session_key",
+      "signature",
+      "api_key",
+      "apikey",
+      "private_key",
+      "x-amz",
+      "set-cookie"
+    ]
+  },
+
+  "value_patterns": {
+    "comment": "值形态匹配 —— 即使键名合法，值本身长得像凭证/URL 也必须屏蔽或降级。顺序即优先级。",
+    "rules": [
+      {
+        "rule_id": "jwt_compact",
+        "regex": "\\beyJ[A-Za-z0-9_-]{4,}\\.[A-Za-z0-9_-]{4,}\\.[A-Za-z0-9_-]{4,}",
+        "why": "JWS compact serialization：OO callback / WOPI / Command Service 全用它"
+      },
+      {
+        "rule_id": "bearer_header",
+        "regex": "(?i)\\bbearer\\s+[A-Za-z0-9._~+/=-]{8,}",
+        "why": "授权 header 原文"
+      },
+      {
+        "rule_id": "url_with_credentials_or_query",
+        "regex": "(?i)\\b[a-z][a-z0-9+.-]*://[^\\s\"']+",
+        "why": "callback / download / Command Service URL：query 里带短期凭证"
+      },
+      {
+        "rule_id": "long_opaque_blob",
+        "regex": "\\b[A-Za-z0-9+/=_-]{80,}\\b",
+        "why": "长不透明串（base64 载荷 / 签名 / 内联 OOXML 片段）；SHA-256 是 64 字符，故阈值取 80 不会误伤 digest"
+      }
+    ]
+  },
+
+  "url_shape": {
+    "comment": "URL 只保留「协议 + host + path 形态」；query/fragment/userinfo 一律丢弃。host 不在 allowlist 时也降级为占位，避免暴露内网拓扑。",
+    "host_allowlist": ["localhost", "127.0.0.1", "onlyoffice", "documentserver"],
+    "keep_path_segments": 2,
+    "unlisted_host_placeholder": "redacted-host.invalid",
+    "unlisted_host_placeholder_why": "刻意**不用**方括号包裹：`[...]` 在 netloc 位置会被 `urllib.parse.urlsplit` 当作 bracketed IPv6 host，随后 `ipaddress.ip_address()` 抛 ValueError —— 于是脱敏后的字符串反而变成一个解析不了的 URL，反向自证会崩在解析而不是给出判定。`.invalid` 是 RFC 2606 保留 TLD，永不可解析。"
+  }
+}

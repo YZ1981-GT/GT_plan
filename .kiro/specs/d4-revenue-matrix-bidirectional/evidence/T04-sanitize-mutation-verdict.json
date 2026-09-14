@@ -1,0 +1,49 @@
+{
+  "baseline_fails": [],
+  "verdicts": [
+    {
+      "id": "M1_delete_internal_sum",
+      "actual": "RED",
+      "detail": "internal_cell_diffs=12|n_column_formulas_changed|n12_n23_sum_broken",
+      "fails": [
+        "internal_cell_diffs=12",
+        "n_column_formulas_changed",
+        "n12_n23_sum_broken"
+      ]
+    },
+    {
+      "id": "M2_touch_managed_product",
+      "actual": "RED",
+      "detail": "internal_cell_diffs=1",
+      "fails": [
+        "internal_cell_diffs=1"
+      ]
+    },
+    {
+      "id": "M3_drop_parts_keep_rels",
+      "actual": "RED",
+      "detail": "openpyxl_load:KeyError|gate:REJECT:OoxmlSecurityError:OOXML 安全门 external_relationships 拒绝：外部关系被策略拒绝: ['xl/externalLinks/_rels/externalLink1.xml.rels', 'xl/externalLinks/_rels/externalLink10.xml.rels', 'xl/externalLinks/_rels/externalLink11.xml.rels', 'xl/externalLinks/_rels/externalLink12.xml.rels', 'xl/externalLinks/_rels/externalLink13.xml.rels', 'xl/externalLinks/_rels/externalLink14.xml.rels', 'xl/externalLinks/_rels/externalLink15.xml.rels', 'xl/externalLinks/_rels/externalLink16.xml.rels', 'xl/externalLinks/_rels/externalLink17.xml.rels', 'xl/externalLinks/_rels/externalLink2.xml.rels', 'xl/externalLinks/_rels/externalLink3.xml.rels', 'xl/externalLinks/_rels/externalLink4.xml.rels', 'xl/externalLinks/_rels/externalLink5.xml.rels', 'xl/externalLinks/_rels/externalLink6.xml.rels', 'xl/externalLinks/_rels/externalLink7.xml.rels', 'xl/externalLinks/_rels/externalLink8.xml.rels', 'xl/externalLinks/_rels/externalLink9.xml.rels']",
+      "fails": [
+        "openpyxl_load:KeyError",
+        "gate:REJECT:OoxmlSecurityError:OOXML 安全门 external_relationships 拒绝：外部关系被策略拒绝: ['xl/externalLinks/_rels/externalLink1.xml.rels', 'xl/externalLinks/_rels/externalLink10.xml.rels', 'xl/externalLinks/_rels/externalLink11.xml.rels', 'xl/externalLinks/_rels/externalLink12.xml.rels', 'xl/externalLinks/_rels/externalLink13.xml.rels', 'xl/externalLinks/_rels/externalLink14.xml.rels', 'xl/externalLinks/_rels/externalLink15.xml.rels', 'xl/externalLinks/_rels/externalLink16.xml.rels', 'xl/externalLinks/_rels/externalLink17.xml.rels', 'xl/externalLinks/_rels/externalLink2.xml.rels', 'xl/externalLinks/_rels/externalLink3.xml.rels', 'xl/externalLinks/_rels/externalLink4.xml.rels', 'xl/externalLinks/_rels/externalLink5.xml.rels', 'xl/externalLinks/_rels/externalLink6.xml.rels', 'xl/externalLinks/_rels/externalLink7.xml.rels', 'xl/externalLinks/_rels/externalLink8.xml.rels', 'xl/externalLinks/_rels/externalLink9.xml.rels']"
+      ]
+    },
+    {
+      "id": "M4_overbroad_neutralize",
+      "actual": "RED",
+      "detail": "internal_cell_diffs=30|n_column_formulas_changed|n12_n23_sum_broken|gate:REJECT:OoxmlSecurityError:OOXML 安全门 external_relationships 拒绝：外部关系被策略拒绝: ['xl/externalLinks/_rels/externalLink1.xml.rels', 'xl/externalLinks/_rels/externalLink10.xml.rels', 'xl/externalLinks/_rels/externalLink11.xml.rels', 'xl/externalLinks/_rels/externalLink12.xml.rels', 'xl/externalLinks/_rels/externalLink13.xml.rels', 'xl/externalLinks/_rels/externalLink14.xml.rels', 'xl/externalLinks/_rels/externalLink15.xml.rels', 'xl/externalLinks/_rels/externalLink16.xml.rels', 'xl/externalLinks/_rels/externalLink17.xml.rels', 'xl/externalLinks/_rels/externalLink2.xml.rels', 'xl/externalLinks/_rels/externalLink3.xml.rels', 'xl/externalLinks/_rels/externalLink4.xml.rels', 'xl/externalLinks/_rels/externalLink5.xml.rels', 'xl/externalLinks/_rels/externalLink6.xml.rels', 'xl/externalLinks/_rels/externalLink7.xml.rels', 'xl/externalLinks/_rels/externalLink8.xml.rels', 'xl/externalLinks/_rels/externalLink9.xml.rels']",
+      "fails": [
+        "internal_cell_diffs=30",
+        "n_column_formulas_changed",
+        "n12_n23_sum_broken",
+        "gate:REJECT:OoxmlSecurityError:OOXML 安全门 external_relationships 拒绝：外部关系被策略拒绝: ['xl/externalLinks/_rels/externalLink1.xml.rels', 'xl/externalLinks/_rels/externalLink10.xml.rels', 'xl/externalLinks/_rels/externalLink11.xml.rels', 'xl/externalLinks/_rels/externalLink12.xml.rels', 'xl/externalLinks/_rels/externalLink13.xml.rels', 'xl/externalLinks/_rels/externalLink14.xml.rels', 'xl/externalLinks/_rels/externalLink15.xml.rels', 'xl/externalLinks/_rels/externalLink16.xml.rels', 'xl/externalLinks/_rels/externalLink17.xml.rels', 'xl/externalLinks/_rels/externalLink2.xml.rels', 'xl/externalLinks/_rels/externalLink3.xml.rels', 'xl/externalLinks/_rels/externalLink4.xml.rels', 'xl/externalLinks/_rels/externalLink5.xml.rels', 'xl/externalLinks/_rels/externalLink6.xml.rels', 'xl/externalLinks/_rels/externalLink7.xml.rels', 'xl/externalLinks/_rels/externalLink8.xml.rels', 'xl/externalLinks/_rels/externalLink9.xml.rels']"
+      ]
+    }
+  ],
+  "green_count": 0,
+  "disk_clean_gate": "PASS",
+  "disk_bak_gate": "REJECT:OoxmlSecurityError:OOXML 安全门 external_relationships 拒绝：外部关系被策略拒绝: ['xl/externalLinks/_rels/externalLink1.xml.rels', 'xl/externalLinks/_rels/externalLink10.xml.rels', 'xl/externalLinks/_rels/externalLink11.xml.rels', 'xl/externalLinks/_rels/externalLink12.xml.rels', 'xl/externalLinks/_rels/externalLink13.xml.rels', 'xl/externalLinks/_rels/externalLink14.xml.rels', 'xl/externalLinks/_rels/externalLink15.xml.rels', 'xl/externalLinks/_rels/externalLink16.xml.rels', 'xl/externalLinks/_rels/externalLink17.xml.rels', 'xl/externalLinks/_rels/externalLink2.xml.rels', 'xl/externalLinks/_rels/externalLink3.xml.rels', 'xl/externalLinks/_rels/externalLink4.xml.rels', 'xl/externalLinks/_rels/externalLink5.xml.rels', 'xl/externalLinks/_rels/externalLink6.xml.rels', 'xl/externalLinks/_rels/externalLink7.xml.rels', 'xl/externalLinks/_rels/externalLink8.xml.rels', 'xl/externalLinks/_rels/externalLink9.xml.rels']",
+  "disk_clean_sha256": "b8fb92d4c22cd5d639e415403a12cb61650639153f136a5330c930b880167b5f",
+  "bak_sha256": "ecac5d56775e10b0285a0b82b5541037bfeada4513f9a09c0d8a74a6c9d2a155",
+  "pass": true
+}

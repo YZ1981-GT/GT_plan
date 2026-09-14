@@ -1,0 +1,31 @@
+# S35 再融资核查 — 通用 d-form-table 渲染 schema
+# 适用：S35-1 ~ S35-5（5 个底稿共用同一结构）
+#
+# 匹配规则：wp_code LIKE 'S35-%'
+
+wp_code_pattern: "S35-*"
+wp_name_template: "再融资核查-{topic}"
+component_type: d-form-table
+applicable_when:
+  business_category: [refinancing]
+
+sections:
+  - name: 核查程序
+    group_key: refinancing_check
+    row_type: dynamic_rows
+    allow_add_rows: true
+    fields:
+      - { field: item_no, label: 序号, type: number, readonly: true }
+      - { field: regulatory_requirement, label: 监管要求, type: textarea, readonly: true }
+      - { field: check_procedure, label: 核查程序, type: textarea }
+      - { field: check_result, label: 核查结果, type: textarea }
+      - { field: compliance_status, label: 合规情况, type: select, options: ["符合", "基本符合", "不符合", "不适用"] }
+      - { field: issue_note, label: 问题说明, type: textarea }
+      - { field: conclusion, label: 核查结论, type: select, options: ["通过", "需整改", "不通过", "不适用"] }
+
+  - name: 结论
+    group_key: conclusion
+    row_type: conclusion
+    fields:
+      - { field: overall_conclusion, label: 总体结论, type: select, options: ["符合再融资条件", "基本符合需补充", "不符合条件", "不适用"] }
+      - { field: conclusion_note, label: 结论说明, type: textarea }

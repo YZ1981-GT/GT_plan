@@ -238,3 +238,112 @@ async def test_delete_value_from_business_enum_returns_405(db_session):
             "/api/system/dicts/risk_level/items/high",
         )
     assert resp.status_code == 405
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# P1-3.1: ai_content_status / archive_status 新增字典验证
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+@pytest.mark.asyncio
+async def test_get_dicts_includes_ai_content_status(db_session):
+    """GET /dicts 包含 ai_content_status，4 个值：pending/confirmed/rejected/expired。"""
+    app = _make_app(db_session)
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://t") as ac:
+        resp = await ac.get("/api/system/dicts")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert "ai_content_status" in data
+
+    items = data["ai_content_status"]
+    expected_values = {"pending", "confirmed", "rejected", "expired"}
+    dict_values = {item["value"] for item in items}
+    assert dict_values == expected_values
+
+
+@pytest.mark.asyncio
+async def test_get_dicts_includes_archive_status(db_session):
+    """GET /dicts 包含 archive_status，4 个值：not_archived/archiving/archived/archive_failed。"""
+    app = _make_app(db_session)
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://t") as ac:
+        resp = await ac.get("/api/system/dicts")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert "archive_status" in data
+
+    items = data["archive_status"]
+    expected_values = {"not_archived", "archiving", "archived", "archive_failed"}
+    dict_values = {item["value"] for item in items}
+    assert dict_values == expected_values
+
+
+@pytest.mark.asyncio
+async def test_put_value_on_ai_content_status_returns_405(db_session):
+    """PUT ai_content_status 带 value 字段 → 405（P1-3.4: value 不可修改）。"""
+    app = _make_app(db_session)
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://t") as ac:
+        resp = await ac.put(
+            "/api/system/dicts/ai_content_status/items/pending",
+            json={"value": "new_pending", "label": "改名"},
+        )
+    assert resp.status_code == 405
+    assert resp.json()["detail"]["error_code"] == "ENUM_DICT_VALUE_LOCKED"
+
+
+@pytest.mark.asyncio
+async def test_put_value_on_archive_status_returns_405(db_session):
+    """PUT archive_status 带 value 字段 → 405（P1-3.4: value 不可修改）。"""
+    app = _make_app(db_session)
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://t") as ac:
+        resp = await ac.put(
+            "/api/system/dicts/archive_status/items/archived",
+            json={"value": "finished", "label": "完成归档"},
+        )
+    assert resp.status_code == 405
+    assert resp.json()["detail"]["error_code"] == "ENUM_DICT_VALUE_LOCKED"
+
+
+@pytest.mark.asyncio
+async def test_post_new_value_to_ai_content_status_returns_405(db_session):
+    """POST 尝试新增 ai_content_status value → 405。"""
+    app = _make_app(db_session)
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://t") as ac:
+        resp = await ac.post(
+            "/api/system/dicts/ai_content_status/items",
+            json={"value": "auto_approved", "label": "自动通过"},
+        )
+    assert resp.status_code == 405
+
+
+@pytest.mark.asyncio
+async def test_put_label_on_ai_content_status_works(db_session):
+    """PUT 修改 ai_content_status 的 label（不含 value）→ 200（label 可覆盖）。"""
+    app = _make_app(db_session)
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://t") as ac:
+        resp = await ac.put(
+            "/api/system/dicts/ai_content_status/items/confirmed",
+            json={"label": "AI已确认"},
+        )
+        assert resp.status_code == 200
+
+        get_resp = await ac.get("/api/system/dicts")
+    items = get_resp.json()["ai_content_status"]
+    confirmed = next(x for x in items if x["value"] == "confirmed")
+    assert confirmed["label"] == "AI已确认"
+
+
+@pytest.mark.asyncio
+async def test_put_color_on_archive_status_works(db_session):
+    """PUT 修改 archive_status 的 color → 200（color 可覆盖）。"""
+    app = _make_app(db_session)
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://t") as ac:
+        resp = await ac.put(
+            "/api/system/dicts/archive_status/items/archive_failed",
+            json={"color": "warning"},
+        )
+        assert resp.status_code == 200
+
+        get_resp = await ac.get("/api/system/dicts")
+    items = get_resp.json()["archive_status"]
+    failed = next(x for x in items if x["value"] == "archive_failed")
+    assert failed["color"] == "warning"

@@ -41,58 +41,186 @@
 import { ref, computed, onMounted, onUnmounted, watch, type Ref } from 'vue'
 import { api } from '@/services/apiProxy'
 import { eventBus, type CrossRefUpdatedPayload } from '@/utils/eventBus'
+import { resolveSheetNameByDeepLink } from '@/utils/normalizeSheetName'
+import type { SheetContentType } from '@/types/workpaperSemanticContract'
+import type { WpComponentType } from '@/types/componentCapabilities.generated'
+import type { RenderConfig, SheetRenderConfig } from '@/types/renderConfig'
+import { projectSheetUid } from './sheetUidProjection'
+
+export type { WpComponentType } from '@/types/componentCapabilities.generated'
+export type {
+  CrossRefEntry,
+  RenderConfig,
+  RenderConfigWire,
+  SheetRenderConfig,
+  SheetRenderConfigWire,
+} from '@/types/renderConfig'
 
 // ─── 类型定义 ─────────────────────────────────────────────────────────────────
 
-/** componentType 白名单（9 类 + univer + skip） */
-export type WpComponentType =
-  | 'a-program-console'
-  | 'b-index'
-  | 'c-note-table'
-  | 'd-form-table'
-  | 'd-form-paragraph'
-  | 'd-form-qa'
-  | 'd-form-confirmation'
-  | 'd-form-review'
-  | 'e-control-test'
-  | 'h-static-doc'
-  | 'univer'
-  | 'skip'
-
-/** 跨底稿引用条目 */
-export interface CrossRefEntry {
-  wp_code: string
-  cell: string
+/** Guidance、公式与宿主导航共享的结构化 sheet 上下文。 */
+export interface WorkpaperSheetContext {
+  sheetName: string
+  sheetCode: string | null
+  /** G-ID stable uid from render-config; never invented from display name. */
+  sheetUid: string | null
+  sheetUidNullReason: string | null
+  host: 'html' | 'univer' | 'onlyoffice'
+  wholeWorkbook: boolean
+  /** Race stamps from HtmlStableContextEmitter (or Univer/OO host bridge). */
+  ownerEpoch?: number
+  contextRevision?: number
 }
 
-/** 单 sheet 渲染配置 */
-export interface SheetRenderConfig {
-  sheet_name: string
-  componentType: WpComponentType
-  schema: Record<string, any>
-  html_data: Record<string, any>
-  cross_refs: CrossRefEntry[]
+export interface EngineSheetIdentity {
+  id: string
+  name: string
 }
 
-/** render-config 端点完整响应 */
-export interface RenderConfig {
-  wp_id: string
-  wp_code: string
-  project_id: string
-  scope: 'standalone' | 'consolidated' | 'parent_only' | 'both'
-  is_real_workpaper: boolean
-  template_version: string
-  sheets: SheetRenderConfig[]
-  /** Sprint 4 Task 16: 自动刷数结果 */
-  fill_results?: Record<string, {
-    value: number | string | null
-    source: string
-    label: string
-    status: 'ok' | 'unavailable'
-  }>
+/**
+ * 从 render-config 的可见 sheet 中解析定位器。
+ * 初始 deep-link、页签、导航和 locate 共用同一名称归一化规则。
+ */
+export function resolveRenderSheet(
+  sheets: readonly SheetRenderConfig[],
+  locator: string | null | undefined,
+): SheetRenderConfig | null {
+  const resolvedName = resolveSheetNameByDeepLink(
+    sheets.map((sheet) => sheet.sheet_name),
+    locator,
+  )
+  if (!resolvedName) return null
+  return sheets.find((sheet) => sheet.sheet_name === resolvedName) ?? null
+}
+
+/** 将后端 sheet identity 投影为 HTML/OnlyOffice 的统一宿主 context。 */
+export function resolveWorkpaperSheetContext(
+  configWpId: string | null | undefined,
+  expectedWpId: string,
+  sheetName: string,
+  sheet: SheetRenderConfig | null | undefined,
+  wholeWorkbook = false,
+  parentWpCode: string | null | undefined = null,
+): WorkpaperSheetContext | null {
+  if (!configWpId || configWpId !== expectedWpId || !sheetName) return null
+  const isWholeWorkbook = wholeWorkbook || sheet?.whole_workbook === true
+  const isOnlyOffice = isWholeWorkbook
+    || sheet?.componentType === 'onlyoffice-sheet'
+    || sheet?.html_data?.onlyoffice === true
+  const sheetCode = isWholeWorkbook ? null : (sheet?.sheet_code ?? null)
+  const wpCode = parentWpCode?.trim() || ''
+  const projected = projectSheetUid({
+    parentWpCode: wpCode,
+    sheetCode,
+    sheetName,
+    wholeWorkbook: isWholeWorkbook,
+    explicitUid: sheet?.sheet_uid,
+    codeReason: sheet?.sheet_uid_null_reason || sheet?.sheet_code_reason,
+  })
+  // Prefer server-annotated uid when present; client projection is fallback only.
+  const sheetUid = sheet?.sheet_uid?.trim() || projected.sheetUid
+  const sheetUidNullReason = sheetUid
+    ? null
+    : (sheet?.sheet_uid_null_reason ?? projected.nullReason)
+  return {
+    sheetName,
+    sheetCode,
+    sheetUid,
+    sheetUidNullReason,
+    host: isOnlyOffice ? 'onlyoffice' : 'html',
+    wholeWorkbook: isWholeWorkbook,
+  }
+}
+
+/** Univer 的 engine sheet id 先映射真实名称，再消费 render-config 的 canonical uid/code。 */
+export function resolveUniverSheetContext(
+  engineSheets: readonly EngineSheetIdentity[],
+  activeSheetId: string | null | undefined,
+  renderSheets: readonly SheetRenderConfig[],
+  parentWpCode: string | null | undefined = null,
+): WorkpaperSheetContext | null {
+  if (!activeSheetId) return null
+  const engineSheet = engineSheets.find((sheet) => sheet.id === activeSheetId)
+  if (!engineSheet) return null
+  const renderSheet = resolveRenderSheet(renderSheets, engineSheet.name)
+  const sheetName = renderSheet?.sheet_name ?? engineSheet.name
+  const sheetCode = renderSheet?.sheet_code ?? null
+  const wpCode = parentWpCode?.trim() || ''
+  const projected = projectSheetUid({
+    parentWpCode: wpCode,
+    sheetCode,
+    sheetName,
+    wholeWorkbook: false,
+    explicitUid: renderSheet?.sheet_uid,
+    codeReason: renderSheet?.sheet_uid_null_reason || renderSheet?.sheet_code_reason,
+  })
+  const sheetUid = renderSheet?.sheet_uid?.trim() || projected.sheetUid
+  const sheetUidNullReason = sheetUid
+    ? null
+    : (renderSheet?.sheet_uid_null_reason ?? projected.nullReason)
+  return {
+    sheetName,
+    sheetCode,
+    sheetUid,
+    sheetUidNullReason,
+    host: 'univer',
+    wholeWorkbook: false,
+  }
 }
 
 // ─── Composable ──────────────────────────────────────────────────────────────
+
+/**
+ * resolveSheetType — 按优先级确定 sheet 的业务语义类型
+ *
+ * 优先级: schema 显式值 > 后端推断(API 返回) > 前端启发式 > 'unknown'
+ *
+ * 这是一个纯函数，可在 composable 外部直接使用。
+ *
+ * @param sheet - 渲染配置中的单 sheet 对象
+ * @returns 解析后的 SheetContentType
+ *
+ * Validates: Requirements 1.2, 1.3（schema 优先，启发式回退）
+ */
+export function resolveSheetType(sheet: SheetRenderConfig): SheetContentType {
+  // 1. schema 显式值（已由后端从 YAML 提取并放入 sheet_type 字段）
+  //    或后端通过启发式推断后放入 sheet_type
+  if (sheet.sheet_type) {
+    return sheet.sheet_type
+  }
+
+  // 2. 前端启发式：根据 sheet_name 中文关键词推断
+  const name = sheet.sheet_name || ''
+  const heuristic = _detectSheetTypeByName(name)
+  if (heuristic) {
+    return heuristic
+  }
+
+  // 3. 无法确定
+  return 'unknown'
+}
+
+/**
+ * 前端启发式：根据 sheet_name 中文关键词推断 sheet_type。
+ * 与后端 _infer_sheet_type_by_heuristic 保持同口径。
+ */
+function _detectSheetTypeByName(name: string): SheetContentType | null {
+  // 顺序很重要：更具体的关键词优先匹配
+  if (name.includes('函证') || name.includes('询证')) return 'confirmation_summary'
+  if (name.includes('控制测试')) return 'control_test'
+  if (name.includes('内控') && name.includes('了解')) return 'control_understanding'
+  if (name.includes('控制') && name.includes('了解')) return 'control_understanding'
+  if (name.includes('控制') && name.includes('测试')) return 'control_test'
+  if (name.includes('审定') || name.includes('汇总')) return 'audit_sheet'
+  if (name.includes('明细') || name.includes('清单')) return 'detail_table'
+  if (name.includes('分析') || name.includes('测算') || name.includes('复核')) return 'analysis'
+  if (name.includes('程序')) return 'procedure'
+  if (name.includes('调整')) return 'adjustment'
+  if (name.includes('披露') || name.includes('附注')) return 'disclosure'
+  if (name.includes('结论')) return 'conclusion'
+  if (name.includes('目录') || name.includes('索引') || name.includes('驾驶') || name.includes('控制台')) return 'control_panel'
+  return null
+}
 
 export function useWpRenderer(wpId: Ref<string>) {
   const renderConfig = ref<RenderConfig | null>(null)

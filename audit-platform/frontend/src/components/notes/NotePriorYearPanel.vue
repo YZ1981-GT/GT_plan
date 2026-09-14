@@ -71,6 +71,7 @@
 
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
+import { useDisplayPrefsStore } from '@/stores/displayPrefs'
 
 interface Props {
   modelValue: boolean
@@ -154,9 +155,11 @@ function extractNumeric(row: any): number | null {
   return null
 }
 
+const prefs = useDisplayPrefsStore()
+
 function formatAmount(val: number | null): string {
   if (val === null || val === undefined) return '—'
-  return val.toLocaleString('zh-CN', { maximumFractionDigits: 2 })
+  return prefs.fmt(val)
 }
 
 function formatPercent(val: number | null): string {

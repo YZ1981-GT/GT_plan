@@ -1,0 +1,60 @@
+{
+  "description": "J 类职工薪酬循环 audit-sheet 底稿关键坐标注册（OnlyOffice 地址名称落位）",
+  "version": "1.0.0",
+  "cycle": "J",
+  "entries": [
+    {
+      "wp_code": "J1-3",
+      "sheet_name": "工资测算",
+      "coordinates": [
+        {"cell_address": "F30", "description": "工资测算合计金额", "purpose": "wage_calculation"},
+        {"cell_address": "G30", "description": "员工人数", "purpose": "wage_calculation"},
+        {"cell_address": "H30", "description": "人均月工资", "purpose": "wage_calculation"},
+        {"cell_address": "I30", "description": "差异金额（=合计-人数×人均月工资×12）", "purpose": "wage_variance"}
+      ]
+    },
+    {
+      "wp_code": "J1-4",
+      "sheet_name": "社保测算",
+      "coordinates": [
+        {"cell_address": "F20", "description": "社保测算合计", "purpose": "social_insurance_calc"},
+        {"cell_address": "G20", "description": "缴费基数", "purpose": "social_insurance_calc"},
+        {"cell_address": "H20", "description": "缴费比例", "purpose": "social_insurance_calc"},
+        {"cell_address": "I20", "description": "差异金额（=合计-基数×比例）", "purpose": "social_insurance_variance"}
+      ]
+    },
+    {
+      "wp_code": "J2-5",
+      "sheet_name": "精算重新计算",
+      "coordinates": [
+        {"cell_address": "E10", "description": "设定受益义务现值（DBO）", "purpose": "actuarial_calc"},
+        {"cell_address": "F10", "description": "计划资产公允价值", "purpose": "actuarial_calc"},
+        {"cell_address": "G10", "description": "设定受益计划净负债（=DBO-计划资产）", "purpose": "actuarial_net_liability"},
+        {"cell_address": "E20", "description": "当期服务成本", "purpose": "actuarial_calc"},
+        {"cell_address": "F20", "description": "利息成本", "purpose": "actuarial_calc"}
+      ]
+    },
+    {
+      "wp_code": "J3-4",
+      "sheet_name": "期权公允价值测算",
+      "coordinates": [
+        {"cell_address": "C5", "description": "期权公允价值", "purpose": "option_pricing"},
+        {"cell_address": "C6", "description": "行权价格", "purpose": "option_pricing"},
+        {"cell_address": "C7", "description": "标的股价", "purpose": "option_pricing"},
+        {"cell_address": "C8", "description": "波动率", "purpose": "option_pricing"},
+        {"cell_address": "C9", "description": "无风险利率", "purpose": "option_pricing"},
+        {"cell_address": "C10", "description": "到期时间（年）", "purpose": "option_pricing"}
+      ]
+    },
+    {
+      "wp_code": "J3-5",
+      "sheet_name": "等待期费用分摊",
+      "coordinates": [
+        {"cell_address": "E10", "description": "总公允价值", "purpose": "vesting_expense"},
+        {"cell_address": "F10", "description": "等待期（月）", "purpose": "vesting_expense"},
+        {"cell_address": "G10", "description": "已服务月份", "purpose": "vesting_expense"},
+        {"cell_address": "H10", "description": "当期费用（=总公允价值÷等待期×已服务月份）", "purpose": "vesting_expense_calc"}
+      ]
+    }
+  ]
+}

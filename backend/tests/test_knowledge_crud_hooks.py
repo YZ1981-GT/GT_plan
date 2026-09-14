@@ -185,6 +185,16 @@ async def test_create_document_endpoint_triggers_hook():
     mock_doc.id = uuid.uuid4()
     mock_doc.name = "test.md"
 
+    # 知识资产写权限门（Feature dsh-agent-panel-integration Task 1）：public 文件夹 +
+    # 有效身份 → 允许。此处走真实 policy 判定，只桩掉 DB 取数。
+    from app.models.knowledge_models import KnowledgeAccessLevel
+
+    subject_result = MagicMock()
+    subject_result.scalars.return_value.all.return_value = []
+    folder_perm_result = MagicMock()
+    folder_perm_result.first.return_value = (KnowledgeAccessLevel.public, None, None)
+    mock_db.execute = AsyncMock(side_effect=[subject_result, folder_perm_result])
+
     with patch(
         "app.routers.knowledge_folders.KnowledgeDocumentService"
     ) as MockDocSvc, patch(

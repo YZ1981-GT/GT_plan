@@ -92,9 +92,39 @@ describe('WorkpaperWorkbenchView', () => {
     expect(wrapper.find('.gt-wp-guide-view').exists()).toBe(true)
   })
 
+  // 列表视图根节点为 .gt-wp-list-split（左循环树 + 右表格 master-detail）；
+  // 旧断言写的是不存在的 .gt-wp-list-default，长期恒红。
   test('list 模式渲染默认列表', async () => {
     const wrapper = mountView({ viewMode: ref('list') })
     await flushPromises()
-    expect(wrapper.find('.gt-wp-list-default').exists()).toBe(true)
+    expect(wrapper.find('.gt-wp-list-split').exists()).toBe(true)
+  })
+
+  // ?filter=stale（联动状态横条「查看详情」）→ 只保留 prefill_stale=true 的底稿
+  test('filterStale=true 时仅保留待重算底稿', async () => {
+    const filterStale = ref(false)
+    const wpList = ref<WorkpaperDetail[]>([
+      { id: 'wp-1', wp_index_id: 'idx-1', status: 'draft', prefill_stale: true } as any,
+      { id: 'wp-2', wp_index_id: 'idx-2', status: 'in_progress', prefill_stale: false } as any,
+    ])
+    const wrapper = mountView({ viewMode: ref('list'), filterStale, wpList })
+    await flushPromises()
+
+    const rowsBefore = (wrapper.vm as any).listTableData.map((r: any) => r.id)
+    expect(rowsBefore).toEqual(['wp-1', 'wp-2'])
+
+    filterStale.value = true
+    await flushPromises()
+    const rowsAfter = (wrapper.vm as any).listTableData.map((r: any) => r.id)
+    expect(rowsAfter).toEqual(['wp-1'])
+  })
+
+  test('filterStale 行数据带 prefill_stale 供「数据」列渲染待重算标记', async () => {
+    const wpList = ref<WorkpaperDetail[]>([
+      { id: 'wp-1', wp_index_id: 'idx-1', status: 'draft', prefill_stale: true } as any,
+    ])
+    const wrapper = mountView({ viewMode: ref('list'), wpList })
+    await flushPromises()
+    expect((wrapper.vm as any).listTableData[0].prefill_stale).toBe(true)
   })
 })

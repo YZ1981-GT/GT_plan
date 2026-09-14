@@ -35,15 +35,20 @@ class CrossCheckPassedRule(GateRule):
         # 从 context 获取年度，默认当前年
         year = context.get("year")
         if not year:
-            # 尝试从项目获取
+            # 尝试从项目数据获取年度（working_paper 无 year 列；
+            # 用 trial_balance.year，无则用 projects.audit_period_end 推导）
             import sqlalchemy as sa
             try:
-                q = sa.text("SELECT year FROM working_paper WHERE project_id = :pid LIMIT 1")
+                q = sa.text("""
+                    SELECT year FROM trial_balance
+                    WHERE project_id = :pid AND year IS NOT NULL
+                    ORDER BY year DESC LIMIT 1
+                """)
                 result = await db.execute(q, {"pid": str(project_id)})
                 row = result.first()
                 year = row[0] if row else None
             except Exception:
-                pass
+                year = None
 
         if not year:
             # 无法确定年度，跳过检查

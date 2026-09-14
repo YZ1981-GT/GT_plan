@@ -24,6 +24,19 @@
             <el-input v-model="form.company_code" placeholder="统一社会信用代码" maxlength="18" />
           </el-form-item>
 
+          <el-form-item prop="short_name">
+            <template #label>
+              <el-tooltip
+                content="该简称将用于审计报告正文中替代被审计单位全称，如 XX公司"
+                placement="top"
+                :show-after="300"
+              >
+                <span style="cursor: help; border-bottom: 1px dashed var(--el-text-color-secondary)">项目简称</span>
+              </el-tooltip>
+            </template>
+            <el-input v-model="form.short_name" placeholder="请输入项目简称，如 XX公司" maxlength="100" />
+          </el-form-item>
+
           <el-form-item label="审计年度" prop="audit_year">
             <el-date-picker
               v-model="auditYearDate"
@@ -68,6 +81,30 @@
             <span style="margin-left: 8px; font-size: var(--gt-font-size-xs); color: var(--gt-color-info)">
               决定报表行次和附注模板
             </span>
+          </el-form-item>
+
+          <el-form-item label="业务类型" prop="company_subtype">
+            <el-alert
+              v-if="showSubtypeBanner"
+              type="warning"
+              :closable="false"
+              show-icon
+              class="gt-subtype-banner"
+              title="待确认业务类型"
+            >
+              <template #default>
+                该项目尚未确认业务类型。系统建议「{{ subtypeLetter(recommendation?.subtype || null) }}」（{{ subtypeDesc(recommendation?.subtype || null) }}），请确认或手动选择后保存。
+                <el-button link type="primary" size="small" @click="applyRecommendation">采用建议</el-button>
+              </template>
+            </el-alert>
+            <el-select v-model="form.company_subtype" placeholder="请选择业务类型" style="width: 100%" clearable>
+              <el-option label="A — 上市公司、三板创新层及公开发债（A1-A8）" value="type_a" />
+              <el-option label="B — 三板基础层、银行、保险、期货、证券（B1-B6）" value="type_b" />
+              <el-option label="C — 其他（非A非B类业务）" value="type_c" />
+            </el-select>
+            <el-button link type="primary" size="small" class="gt-category-ref-link" @click="showCategoryReference = true">
+              📋 查看分类标准
+            </el-button>
           </el-form-item>
 
           <el-form-item v-if="form.template_type === 'custom'" label="自定义模板" prop="custom_template_id">
@@ -174,28 +211,119 @@
         </div>
       </div>
     </el-form>
+
+    <!-- 业务分类标准参考弹窗 -->
+    <el-dialog v-model="showCategoryReference" title="鉴证业务分类标准（2025年12月修订）" width="960px" top="3vh" append-to-body>
+      <BusinessCategoryFlowChart
+        :selected-category="currentCategoryLetter"
+        @select="onCategorySelect"
+        @jump="jumpToWp"
+      />
+    </el-dialog>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted, watch } from 'vue'
+import { ref, reactive, computed, onMounted, watch } from 'vue'
+import { useRouter } from 'vue-router'
 import type { FormInstance, FormRules } from 'element-plus'
 import { api } from '@/services/apiProxy'
+import { fetchTemplateRecommendation, type TemplateRecommendation } from '@/services/commonApi'
 import { useWizardStore, type BasicInfo } from '@/stores/wizard'
+import { validateUSCC } from '@/utils/uscc_validator'
+import BusinessCategoryFlowChart from '@/components/project/BusinessCategoryFlowChart.vue'
 
+const router = useRouter()
 const wizardStore = useWizardStore()
 const formRef = ref<FormInstance>()
 const auditYearDate = ref<string>('')
 const customTemplateLoading = ref(false)
 const customTemplates = ref<Array<{ id: string; name: string; version?: string }>>([])
+const recommendation = ref<TemplateRecommendation | null>(null)
+
+const SUBTYPE_DESC: Record<string, string> = {
+  type_a: '上市公司、三板创新层及公开发债',
+  type_b: '三板基础层、银行、保险、期货、证券',
+  type_c: '其他公众利益实体',
+  type_d: '非公众利益实体',
+}
+
+function subtypeLetter(subtype: string | null): string {
+  if (!subtype) return ''
+  return subtype.replace('type_', '').toUpperCase()
+}
+
+function subtypeDesc(subtype: string | null): string {
+  return subtype ? (SUBTYPE_DESC[subtype] || '') : ''
+}
+
+function applyRecommendation() {
+  if (recommendation.value?.subtype) {
+    form.company_subtype = recommendation.value.subtype
+  }
+}
+
+const showCategoryReference = ref(false)
+
+const currentCategoryLetter = computed(() => {
+  const map: Record<string, string> = { type_a: 'A', type_b: 'B', type_c: 'C' }
+  return map[form.company_subtype] || ''
+})
+
+function onCategorySelect(value: string) {
+  form.company_subtype = value
+  showCategoryReference.value = false
+}
+
+function jumpToWp(wpCode: string) {
+  const projectId = wizardStore.projectId
+  if (projectId) {
+    showCategoryReference.value = false
+    router.push({ name: 'WorkpaperByCode', params: { projectId }, query: { wp_code: wpCode } })
+  }
+}
+
+/**
+ * 「待确认业务类型」非阻断横幅（需求 1.7 ③ / 14.3）。
+ * 仅当：存量项目（有 projectId）+ 用户尚未选择 company_subtype + 后端标记 needs_confirmation
+ * + 存在建议值时展示。用户选择后即消失（confirmed，需求 1.8）。
+ */
+const showSubtypeBanner = computed(() => {
+  return (
+    !!wizardStore.projectId &&
+    !form.company_subtype &&
+    !!recommendation.value?.needs_confirmation &&
+    !!recommendation.value?.subtype
+  )
+})
+
+/** 拉取业务类型推荐（需求 7.6：须预填建议值，不仅高亮）。 */
+async function loadRecommendation() {
+  const projectId = wizardStore.projectId
+  if (!projectId) return
+  try {
+    const rec = await fetchTemplateRecommendation(projectId)
+    if (rec && rec.subtype) {
+      recommendation.value = rec
+      // 需求 7.6：预填建议值（用户未手动选择时）
+      if (!form.company_subtype) {
+        form.company_subtype = rec.subtype
+      }
+    }
+  } catch {
+    // 推荐失败不阻断向导
+  }
+}
 
 const form = reactive<BasicInfo>({
   client_name: '',
+  short_name: '',
   audit_year: null,
   project_type: '',
   accounting_standard: '',
   company_code: '',
   template_type: 'soe',
+  company_subtype: null,
   custom_template_id: '',
   custom_template_name: '',
   custom_template_version: '',
@@ -213,6 +341,25 @@ const form = reactive<BasicInfo>({
 
 const rules: FormRules = {
   client_name: [{ required: true, message: '请输入客户名称', trigger: 'blur' }],
+  short_name: [{ required: true, message: '项目简称为必填项', trigger: 'blur' }],
+  company_code: [
+    { required: true, message: '企业代码为必填项', trigger: 'blur' },
+    {
+      validator: (_rule, value: string, callback) => {
+        if (!value) {
+          callback()
+          return
+        }
+        const result = validateUSCC(value)
+        if (!result.valid) {
+          callback(new Error(result.message))
+        } else {
+          callback()
+        }
+      },
+      trigger: ['blur', 'change'],
+    },
+  ],
   audit_year: [{ required: true, message: '请选择审计年度', trigger: 'change' }],
   project_type: [{ required: true, message: '请选择项目类型', trigger: 'change' }],
   accounting_standard: [{ required: true, message: '请选择会计准则', trigger: 'change' }],
@@ -306,7 +453,19 @@ onMounted(async () => {
       onCustomTemplateChange(form.custom_template_id)
     }
   }
+  // 需求 7.6：已有项目进入向导时拉取业务类型推荐并预填
+  await loadRecommendation()
 })
+
+// 兜底：store 异步加载完成后填充表单（解决组件挂载时 store 还在 loading 的时序问题）
+watch(() => wizardStore.stepData.basic_info, (newVal) => {
+  if (newVal && !form.client_name) {
+    Object.assign(form, newVal as any)
+    if ((newVal as any).audit_year) {
+      auditYearDate.value = String((newVal as any).audit_year)
+    }
+  }
+}, { immediate: false })
 
 async function validate(): Promise<BasicInfo | null> {
   if (!formRef.value) return null
@@ -363,6 +522,26 @@ defineExpose({ validate, formRef })
   border-bottom: 2px solid var(--gt-color-primary-lighter, #e8e0f0);
 }
 
+/* 业务类型系统建议 */
+.gt-subtype-banner {
+  margin-bottom: 8px;
+}
+.gt-subtype-recommend {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 6px;
+}
+.gt-subtype-recommend-desc {
+  font-size: var(--gt-font-size-xs);
+  color: var(--gt-color-text-tertiary);
+}
+.gt-subtype-recommend-hint {
+  font-size: var(--gt-font-size-xs);
+  color: var(--gt-color-warning, #e6a23c);
+}
+
 /* 响应式：窄屏回退单栏 */
 @media (max-width: 768px) {
   .gt-form-two-col {
@@ -370,4 +549,7 @@ defineExpose({ validate, formRef })
     gap: 16px;
   }
 }
+
+/* 业务类型参考链接 */
+.gt-category-ref-link { margin-left: 8px; font-size: 12px; }
 </style>

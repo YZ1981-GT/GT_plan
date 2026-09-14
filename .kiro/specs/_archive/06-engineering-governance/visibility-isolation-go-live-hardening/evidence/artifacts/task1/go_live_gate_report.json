@@ -1,0 +1,71 @@
+{
+  "gate": "go_live_gate",
+  "go_live_items": [
+    {
+      "id": "GLI-1",
+      "latest_seq": null,
+      "latest_status": null,
+      "requirement": "1",
+      "state": "built-not-live",
+      "task": "2",
+      "title": "启用编辑器令牌强制 (OnlyOffice/WOPI ONLYOFFICE_JWT_ENFORCE)"
+    },
+    {
+      "id": "GLI-2",
+      "latest_seq": null,
+      "latest_status": null,
+      "requirement": "2",
+      "state": "built-not-live",
+      "task": "3",
+      "title": "挂载 epoch 失效 Redis dispatcher 到 app.main lifespan"
+    },
+    {
+      "id": "GLI-3",
+      "latest_seq": null,
+      "latest_status": null,
+      "requirement": "3",
+      "state": "built-not-live",
+      "task": "4",
+      "title": "审计 72 条 native_authz 入口并接门/豁免"
+    },
+    {
+      "id": "GLI-4",
+      "latest_seq": null,
+      "latest_status": null,
+      "requirement": "4",
+      "state": "built-not-live",
+      "task": "5",
+      "title": "真实 6000 并发容量验收与冻结生产 Rate_Limit_Profile"
+    },
+    {
+      "id": "GLI-5",
+      "latest_seq": null,
+      "latest_status": null,
+      "requirement": "5",
+      "state": "built-not-live",
+      "task": "6",
+      "title": "Playwright 8 角色 fresh-context 验收"
+    },
+    {
+      "id": "GLI-6",
+      "latest_seq": null,
+      "latest_status": null,
+      "requirement": "6",
+      "state": "built-not-live",
+      "task": "7",
+      "title": "PR 提交与依赖 spec 交互验证"
+    }
+  ],
+  "go_live_items_live": 0,
+  "go_live_items_total": 6,
+  "latest_artifacts_verified": {
+    "checked": 0,
+    "clean": true
+  },
+  "note": "Go_Live_Gate 骨架：仅当 6 个 Go_Live_Item 均有最新 passed run（且非 smoke 冒充）才判定 live。基线阶段 Task 2..7 尚无 run，故 6 项均 built-not-live，门 fail-closed 阻断。",
+  "problem_count": 6,
+  "semantics": "latest-run-per-task; LIVE/ACCEPTED != 已构建",
+  "spec": "visibility-isolation-go-live-hardening",
+  "total_runs": 0,
+  "verdict": "blocked"
+}

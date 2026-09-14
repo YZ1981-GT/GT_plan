@@ -30,7 +30,6 @@ from app.services.report_excel_exporter import (
     AMOUNT_FORMAT,
     NEGATIVE_FORMAT,
     REPORT_TYPE_SHEET_NAMES,
-    TEMPLATE_MAP,
     ReportExcelExporter,
 )
 
@@ -211,8 +210,11 @@ async def test_export_empty_report(db_session: AsyncSession, sample_project):
 
 
 @pytest.mark.asyncio
-async def test_format_verification(db_session: AsyncSession, sample_project, sample_report_data):
-    """Test that amount formatting is correctly applied."""
+async def test_template_preserves_number_format(db_session: AsyncSession, sample_project, sample_report_data):
+    """Template-driven fill preserves the template's own number format on filled cells.
+
+    Task 20: writing only ``.value`` keeps the template style. BS-002 maps to C6.
+    """
     exporter = ReportExcelExporter(db_session)
     output = await exporter.export(
         project_id=sample_project.id,
@@ -231,26 +233,16 @@ async def test_format_verification(db_session: AsyncSession, sample_project, sam
 
     assert ws is not None
 
-    # Check amount cells have number format
-    found_amount_cell = False
-    for row in ws.iter_rows(min_row=5, max_row=ws.max_row, min_col=2, max_col=3):
-        for cell in row:
-            if cell.value is not None and isinstance(cell.value, (int, float)):
-                found_amount_cell = True
-                # Should have number format applied
-                assert cell.number_format != "General" or cell.number_format == NEGATIVE_FORMAT
-                # Should be right-aligned
-                assert cell.alignment.horizontal == "right"
-                break
-        if found_amount_cell:
-            break
-
-    assert found_amount_cell, "Should have at least one formatted amount cell"
+    # BS-002 current value lands at C6 (real placeholder coordinate, not row order)
+    c6 = ws["C6"]
+    assert isinstance(c6.value, (int, float))
+    # Template's own number format preserved (POC uses '#,##0.00_ ')
+    assert c6.number_format != "General"
 
 
 @pytest.mark.asyncio
-async def test_total_row_formatting(db_session: AsyncSession, sample_project, sample_report_data):
-    """Test that total rows have bold font and top border."""
+async def test_formula_rows_not_overwritten(db_session: AsyncSession, sample_project, sample_report_data):
+    """Total/SUM rows in the template must NOT be overwritten by the fill (Task 20.4)."""
     exporter = ReportExcelExporter(db_session)
     output = await exporter.export(
         project_id=sample_project.id,
@@ -268,19 +260,12 @@ async def test_total_row_formatting(db_session: AsyncSession, sample_project, sa
 
     assert ws is not None
 
-    # Find total row (contains "合计")
-    found_total = False
-    for row in ws.iter_rows(min_row=5, max_row=ws.max_row):
-        cell_a = row[0]
-        if cell_a.value and "合计" in str(cell_a.value):
-            found_total = True
-            # Should be bold
-            assert cell_a.font.bold is True
-            # Should have top border
-            assert cell_a.border.top.style is not None
-            break
-
-    assert found_total, "Should find a total row with '合计'"
+    # POC SUM/total rows must remain formulas (not clobbered)
+    for coord in ("C31", "D31", "C57", "D57"):
+        val = ws[coord].value
+        assert isinstance(val, str) and val.startswith("="), (
+            f"{coord} formula was overwritten: {val!r}"
+        )
 
 
 @pytest.mark.asyncio
@@ -348,24 +333,28 @@ async def test_parameter_no_prior_year(db_session: AsyncSession, sample_project,
     ws_with = wb_with[wb_with.sheetnames[0]]
     ws_without = wb_without[wb_without.sheetnames[0]]
 
-    # The version without prior year should have fewer columns with data
-    # Count non-empty cells in data area column C (row 5+)
-    col_c_with = sum(
-        1 for row in ws_with.iter_rows(min_row=5, max_row=ws_with.max_row, min_col=3, max_col=3)
-        for cell in row if cell.value is not None
+    # Template puts prior-period values in column D. Without prior year, the D
+    # placeholders are cleared, so column D should have fewer numeric cells.
+    col_d_with = sum(
+        1 for row in ws_with.iter_rows(min_row=5, max_row=ws_with.max_row, min_col=4, max_col=4)
+        for cell in row if isinstance(cell.value, (int, float))
     )
-    col_c_without = sum(
-        1 for row in ws_without.iter_rows(min_row=5, max_row=ws_without.max_row, min_col=3, max_col=3)
-        for cell in row if cell.value is not None
+    col_d_without = sum(
+        1 for row in ws_without.iter_rows(min_row=5, max_row=ws_without.max_row, min_col=4, max_col=4)
+        for cell in row if isinstance(cell.value, (int, float))
     )
 
-    # With prior year should have more data in column C than without
-    assert col_c_with > col_c_without
+    # With prior year should have more numeric data in column D than without
+    assert col_d_with > col_d_without
 
 
 @pytest.mark.asyncio
-async def test_indentation(db_session: AsyncSession, sample_project, sample_report_data):
-    """Test that indent_level is reflected in cell content."""
+async def test_value_placement_by_row_code(db_session: AsyncSession, sample_project, sample_report_data):
+    """Values land at the template's real coordinates by row_code, not row order.
+
+    Task 20.1: BS-002 → C6, BS-003 → C7 (POC soe_standalone layout).
+    The template's own row names in column A are preserved untouched.
+    """
     exporter = ReportExcelExporter(db_session)
     output = await exporter.export(
         project_id=sample_project.id,
@@ -383,17 +372,13 @@ async def test_indentation(db_session: AsyncSession, sample_project, sample_repo
 
     assert ws is not None
 
-    # Find "货币资金" row (indent_level=1) - should have leading space
-    found_indented = False
-    for row in ws.iter_rows(min_row=5, max_row=ws.max_row, min_col=1, max_col=1):
-        cell = row[0]
-        if cell.value and "货币资金" in str(cell.value):
-            # Should have leading full-width space (indent)
-            assert str(cell.value).startswith("　"), "Indented row should start with full-width space"
-            found_indented = True
-            break
-
-    assert found_indented
+    # BS-002 货币资金 current → C6
+    assert ws["C6"].value == pytest.approx(1234567.89)
+    # BS-003 应收账款 current (negative) → C7
+    assert ws["C7"].value == pytest.approx(-500000.00)
+    # Template's own row label in column A preserved (not overwritten by exporter)
+    assert "货币资金" in str(ws["A6"].value)
+    assert "{{" not in str(ws["A6"].value)
 
 
 def test_filename_sanitization():

@@ -19,6 +19,7 @@ from app.core.database import get_db
 from app.deps import get_current_user, require_project_access
 from app.models.core import User
 from app.models.workpaper_models import WorkingPaper, WpFileStatus
+from app.services.version_trail_service import VersionTrailService
 
 logger = logging.getLogger(__name__)
 
@@ -116,8 +117,18 @@ async def batch_status_change(
             ))
             continue
 
-        # 执行状态变更
+        # ── 版本链：状态变更前自动快照 ──
         new_status = allowed_transitions[current_status]
+        await VersionTrailService.create_snapshot_fire_and_forget(
+            db=db,
+            project_id=project_id,
+            workpaper_id=wp_id,
+            user_id=current_user.id,
+            snapshot_type="status_change",
+            description=f"状态变更: {current_status} → {new_status}",
+        )
+
+        # 执行状态变更
         wp.status = WpFileStatus(new_status)
         wp.updated_by = current_user.id
         success_count += 1

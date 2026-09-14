@@ -461,16 +461,20 @@ async def tsj_review(
     db: AsyncSession = Depends(get_db),
     user=Depends(get_current_user),
 ):
-    """TSJ 提示词驱动 LLM 复核 — 调用 review_workpaper_with_prompt
+    """TSJ 提示词驱动 LLM 复核（已迁移至底稿级 ReviewPrompt 链路）
 
+    兼容 SideStandardsTab 等旧入口；内部走 sheet-level 提示词 + 结构化 findings。
     当 WP_AI_SERVICE_ENABLED=False 时返回 403。
     """
     if not settings.WP_AI_SERVICE_ENABLED:
         raise HTTPException(status_code=403, detail="AI 服务未启用")
 
-    # 验证底稿存在 & 查底稿编号/名称
     import sqlalchemy as sa
     from app.models.workpaper_models import WorkingPaper, WpIndex
+    from app.services.llm_client import chat_completion
+    from app.services.llm_response_parser import LlmResponseParser
+    from app.services.review_content_loader import load_workpaper_review_content
+    from app.services.review_prompt_service import ReviewPromptService
 
     wp = (await db.execute(
         sa.select(WorkingPaper).where(WorkingPaper.id == wp_id)
@@ -478,26 +482,49 @@ async def tsj_review(
     if not wp:
         raise HTTPException(status_code=404, detail="底稿不存在")
 
-    # 从 WpIndex 获取 wp_code / wp_name
     wp_index = (await db.execute(
         sa.select(WpIndex).where(WpIndex.id == wp.wp_index_id)
     )).scalar_one_or_none()
     wp_code_val: str | None = getattr(wp_index, "wp_code", None) if wp_index else None
     wp_name_val: str | None = getattr(wp_index, "wp_name", None) if wp_index else None
+    audit_cycle = getattr(wp_index, "audit_cycle", None) if wp_index else None
 
-    # 实例化服务并调用复核
-    from app.services.workpaper_fill_service import WorkpaperFillService
-    from app.services.ai_service import AIService
+    # 新链路：sheet-level 提示词 → DB 内容 → LLM → 结构化解析
+    prompt_service = ReviewPromptService()
+    # 无 sheet_name 时按科目级；有 wp_code 则尝试整科目复核提示词
+    prompt_result = prompt_service.load_prompt(wp_code_val or "general", sheet_name=None)
+    workpaper_content = await load_workpaper_review_content(wp_id, sheet_name=None)
 
-    svc = WorkpaperFillService(db)
-    ai_service = AIService(db)
-    results = await svc.review_workpaper_with_prompt(
-        project_id=wp.project_id,
-        workpaper_id=wp_id,
-        ai_service=ai_service,
+    system_prompt = (
+        "你是资深审计师，请根据以下复核提示词对审计底稿内容进行智能复核。\n"
+        "请以严格 JSON 格式输出复核结果，格式如下：\n"
+        '{"findings": [\n'
+        '  {"description": "问题描述", "risk_level": "high|medium|low", "passed": true|false, '
+        '"category": "认定检查|程序执行|数据完整性|风险评估|general", '
+        '"location": "Sheet名!单元格范围 或 null", "suggestion": "整改建议 或 null"}\n'
+        "]}\n\n"
+        f"## 复核提示词\n\n{prompt_result.content}"
     )
+    user_prompt = f"以下是需要复核的底稿内容：\n\n{workpaper_content}"
 
-    # 写入审计轨迹
+    try:
+        raw_response = await chat_completion(
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt},
+            ],
+            temperature=0.1,
+            max_tokens=3000,
+        )
+        if not isinstance(raw_response, str):
+            raw_response = str(raw_response or "")
+    except Exception as e:
+        logger.warning("tsj-review LLM call failed: %s", e)
+        raw_response = ""
+
+    parse_result = LlmResponseParser.parse(raw_response)
+
+    # 审计轨迹
     try:
         from app.services.audit_logger_enhanced import audit_logger
         await audit_logger.log_action(
@@ -507,51 +534,34 @@ async def tsj_review(
             object_id=wp_id,
             project_id=wp.project_id,
             details={
-                "findings_count": len(results) if results else 0,
+                "findings_count": len(parse_result.findings),
+                "prompt_source": prompt_result.source_level,
+                "migrated": True,
             },
         )
     except Exception as e:
         logger.warning(f"Failed to write audit trail for TSJ review: {e}")
 
-    # 构建响应
     findings = []
-    for item in (results or []):
-        ds = getattr(item, "data_sources", None) or {}
-        description = ds.get("description", "") or getattr(item, "content_text", "")
-        remediation = ds.get("remediation", "")
-        # content_text 格式: "{description}\n整改建议：{remediation}"
-        ct = getattr(item, "content_text", "")
-        if not remediation and "\n整改建议：" in ct:
-            parts = ct.split("\n整改建议：", 1)
-            description = parts[0]
-            remediation = parts[1] if len(parts) > 1 else ""
-        elif not description:
-            description = ct
-
+    for f in parse_result.findings:
+        desc = f.description or ""
+        rem = f.suggestion or ""
+        content_text = f"{desc}\n整改建议：{rem}" if rem else desc
         findings.append(TsjReviewItem(
-            id=str(getattr(item, "id", "")),
-            content_type=str(getattr(item, "content_type", "risk_alert")),
-            content_text=ct,
-            confidence_level=str(getattr(item, "confidence_level", None) or ""),
-            confirmation_status=str(
-                getattr(item, "confirmation_status", "pending") or "pending"
-            ),
-            issue_type=ds.get("issue_type", ""),
-            severity=ds.get("severity", "medium"),
-            sheet=ds.get("sheet", ""),
-            cell_range=ds.get("cell_range", ""),
-            description=description,
-            remediation=remediation,
+            id=f.id,
+            content_type="review_finding",
+            content_text=content_text,
+            confidence_level="",
+            confirmation_status="pending",
+            issue_type=f.category or "",
+            severity=f.risk_level or "medium",
+            sheet=(f.sheet_location or "").split("!")[0] if f.sheet_location else "",
+            cell_range=(f.sheet_location or "").split("!")[-1] if f.sheet_location and "!" in f.sheet_location else "",
+            description=desc,
+            remediation=rem,
             wp_code=wp_code_val,
             wp_name=wp_name_val,
         ))
-
-    # 获取 audit_cycle 信息
-    audit_cycle = None
-    if results and hasattr(results[0], "data_sources"):
-        ds = getattr(results[0], "data_sources", None)
-        if isinstance(ds, dict):
-            audit_cycle = ds.get("audit_cycle")
 
     return TsjReviewResponse(
         findings=findings,

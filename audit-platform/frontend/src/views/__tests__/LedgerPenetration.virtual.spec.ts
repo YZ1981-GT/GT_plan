@@ -11,6 +11,7 @@
  * 直接测试纯函数逻辑（避免 mount el-table-v2，CI 稳定）
  */
 import { describe, it, expect } from 'vitest'
+import { buildLedgerDisplay, buildLedgerFilteredDisplay } from '@/utils/ledgerDisplay'
 
 // ─── 复制被测的纯函数（保持与生产实现 1:1 对齐） ────────────────────────────
 
@@ -200,5 +201,133 @@ describe('LedgerPenetration virtual mode — filter', () => {
 
   it('空白关键字（仅空格）等同空字符串', () => {
     expect(filterRows(rows, '   ', 'all')).toEqual(rows)
+  })
+})
+
+// ─── 月小计 + 运行余额（明细账核心计算）回归测试 ──────────────────────────
+// 直接 import 生产实现 buildLedgerDisplay（@/utils/ledgerDisplay），
+// 不再 copy 副本——确保测试真正守护生产代码（改生产即影响测试）。
+// 守护 bug：月合计累加必须在「月份边界结算之后」，否则上月小计会并入本月首笔。
+
+interface RawEntry { voucher_date: string; debit_amount: number; credit_amount: number }
+
+describe('LedgerPenetration — 月小计 + 运行余额', () => {
+  const items: RawEntry[] = [
+    { voucher_date: '2025-01-10', debit_amount: 100, credit_amount: 0 },
+    { voucher_date: '2025-01-20', debit_amount: 40, credit_amount: 0 },
+    { voucher_date: '2025-02-05', debit_amount: 0, credit_amount: 30 },
+    { voucher_date: '2025-02-15', debit_amount: 70, credit_amount: 0 },
+    { voucher_date: '2025-03-01', debit_amount: 0, credit_amount: 50 },
+  ]
+
+  it('每月小计精确按月分组（不并入下月首笔）', () => {
+    const rows = buildLedgerDisplay(items, 1000)
+    const subtotals = rows.filter((r) => r._type === 'subtotal')
+    expect(subtotals).toHaveLength(3)
+    // 1月：借 140 贷 0
+    expect(subtotals[0].debit_amount).toBe(140)
+    expect(subtotals[0].credit_amount).toBe(0)
+    // 2月：借 70 贷 30
+    expect(subtotals[1].debit_amount).toBe(70)
+    expect(subtotals[1].credit_amount).toBe(30)
+    // 3月：借 0 贷 50
+    expect(subtotals[2].debit_amount).toBe(0)
+    expect(subtotals[2].credit_amount).toBe(50)
+  })
+
+  it('月小计借贷合计 = 全期借贷总额（守恒）', () => {
+    const rows = buildLedgerDisplay(items, 1000)
+    const subs = rows.filter((r) => r._type === 'subtotal')
+    const sumD = subs.reduce((s, r) => s + (r.debit_amount ?? 0), 0)
+    const sumC = subs.reduce((s, r) => s + (r.credit_amount ?? 0), 0)
+    expect(sumD).toBe(210) // 100+40+70
+    expect(sumC).toBe(80)  // 30+50
+  })
+
+  it('期初行余额 = 期初；末行运行余额 = 期初 + Σ借 − Σ贷', () => {
+    const rows = buildLedgerDisplay(items, 1000)
+    expect(rows[0]._type).toBe('opening')
+    expect(rows[0].balance).toBe(1000)
+    const lastNormal = [...rows].reverse().find((r) => r._type === 'normal')
+    expect(lastNormal!.balance).toBe(1000 + 210 - 80) // 1130
+  })
+
+  it('月小计的 balance = 该月末运行余额', () => {
+    const rows = buildLedgerDisplay(items, 1000)
+    const subs = rows.filter((r) => r._type === 'subtotal')
+    expect(subs[0].balance).toBe(1140) // 1月末: 1000+140
+    expect(subs[1].balance).toBe(1180) // 2月末: 1140+70-30
+    expect(subs[2].balance).toBe(1130) // 3月末: 1180-50
+  })
+
+  it('空数据不产生小计行', () => {
+    const rows = buildLedgerDisplay([], 500)
+    expect(rows).toHaveLength(1)
+    expect(rows[0]._type).toBe('opening')
+  })
+
+  it('筛选子集重算月小计（仅 2 月可见时只出 2 月小计）', () => {
+    const items = [
+      { id: '1', voucher_date: '2025-01-10', debit_amount: 100, credit_amount: 0 },
+      { id: '2', voucher_date: '2025-02-05', debit_amount: 50, credit_amount: 0 },
+      { id: '3', voucher_date: '2025-02-15', debit_amount: 0, credit_amount: 20 },
+    ]
+    const rows = buildLedgerFilteredDisplay(items, 1000, { keyword: '2025-02' })
+    const subs = rows.filter((r) => r._type === 'subtotal')
+    expect(subs).toHaveLength(1)
+    expect(subs[0].summary).toBe('2025-02 本月合计')
+    expect(subs[0].debit_amount).toBe(50)
+    expect(subs[0].credit_amount).toBe(20)
+  })
+
+  it('排序时附当前视图合计行', () => {
+    const items = [
+      { id: '1', voucher_date: '2025-01-10', debit_amount: 100, credit_amount: 0 },
+      { id: '2', voucher_date: '2025-01-20', debit_amount: 40, credit_amount: 0 },
+    ]
+    const rows = buildLedgerFilteredDisplay(items, 1000, {
+      sort: { key: 'debit_amount', order: 'desc' },
+    })
+    expect(rows.some((r) => r._type === 'view_subtotal')).toBe(true)
+    const viewSum = rows.find((r) => r._type === 'view_subtotal')!
+    expect(viewSum.debit_amount).toBe(140)
+  })
+
+  it('虚拟滚动 2000 行筛选+排序在 200ms 内完成', () => {
+    const items = Array.from({ length: 2000 }, (_, i) => ({
+      id: String(i),
+      voucher_date: `2025-${String((i % 12) + 1).padStart(2, '0')}-10`,
+      voucher_no: `记-${i}`,
+      summary: i % 3 === 0 ? '差旅费' : '办公费',
+      debit_amount: i % 2 === 0 ? 10 : 0,
+      credit_amount: i % 2 === 1 ? 5 : 0,
+      counterpart_account: i % 5 === 0 ? '1001' : '1002',
+    }))
+    const t0 = performance.now()
+    const rows = buildLedgerFilteredDisplay(items, 50000, {
+      keyword: '差旅',
+      amountDir: 'debit',
+      sort: { key: 'voucher_no', order: 'asc' },
+    })
+    const elapsed = performance.now() - t0
+    expect(rows.length).toBeGreaterThan(0)
+    expect(elapsed).toBeLessThan(200)
+  })
+
+  it('全量 >100 笔时第 101 笔运行余额须基于前 100 笔累计（非按页重算）', () => {
+    const items: RawEntry[] = Array.from({ length: 150 }, (_, i) => ({
+      voucher_date: '2025-01-10',
+      debit_amount: 10,
+      credit_amount: 0,
+    }))
+    const full = buildLedgerDisplay(items, 1000)
+    const normals = full.filter((r) => r._type === 'normal')
+    // 第 101 笔（index 100）余额 = 期初 + 101×10
+    expect(normals[100].balance).toBe(1000 + 101 * 10)
+    // 若错误地只对第 2 页切片（100~149）从期初重算，首行余额会错成 1010
+    const page2Slice = buildLedgerDisplay(items.slice(100, 150), 1000)
+    const wrongFirst = page2Slice.filter((r) => r._type === 'normal')[0]
+    expect(wrongFirst.balance).toBe(1010)
+    expect(normals[100].balance).not.toBe(wrongFirst.balance)
   })
 })

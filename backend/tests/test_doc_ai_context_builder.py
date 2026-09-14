@@ -22,6 +22,12 @@ from app.services.doc_ai_context_builder import (
     _strip_html_tags,
     _extract_cell_texts,
 )
+from app.services.knowledge_access_policy import (
+    ANONYMOUS_SUBJECT,
+    KnowledgeAccessPolicy,
+    KnowledgeAccessSubject,
+    KnowledgeResource,
+)
 
 
 # ---------------------------------------------------------------------------
@@ -31,6 +37,37 @@ from app.services.doc_ai_context_builder import (
 FAKE_PROJECT_ID = uuid4()
 FAKE_DOC_ID = uuid4()
 FAKE_USER = MagicMock(id=uuid4())
+
+
+def _host(
+    host_type: str = "workpaper",
+    resource_id: str | None = None,
+    *,
+    project_id: UUID | None = FAKE_PROJECT_ID,
+    year: int | None = 2025,
+    detail: dict[str, str] | None = None,
+):
+    """构造已授权宿主上下文（Task 2 起 ContextBuilder 只接受它，Req 3.6）。
+
+    这里刻意用真实 ``AuthorizedHostContext`` 而非 MagicMock：它的 ``__post_init__``
+    会拒绝"空 resource_id""项目类宿主无 project_id""全局模式带 project_id"等
+    真实服务端不可能产生的形态，避免单元测试在假形态上自证。
+    """
+    from app.services.ai_chat.contracts import HostType
+    from app.services.ai_chat.host_context import AuthorizedHostContext
+
+    ht = HostType(host_type)
+    return AuthorizedHostContext(
+        principal_id=FAKE_USER.id,
+        project_id=None if ht is HostType.global_knowledge else project_id,
+        year=year,
+        resource_type=ht,
+        resource_id=resource_id or str(FAKE_DOC_ID),
+        display_label="测试宿主",
+        permission_binding="test",
+        allowed_actions=frozenset({"read"}),
+        detail=detail or {},
+    )
 
 
 def _mock_db():
@@ -161,10 +198,7 @@ class TestContextBuilderBuild:
             return_value=_mock_semantic_search_results(),
         ):
             ctx = await builder.build(
-                doc_type="workpaper",
-                doc_id=str(FAKE_DOC_ID),
-                project_id=FAKE_PROJECT_ID,
-                year=2025,
+                host=_host("workpaper"),
                 query="银行存款审计程序有哪些？",
                 user=FAKE_USER,
             )
@@ -187,19 +221,13 @@ class TestContextBuilderBuild:
         empty_result = MagicMock()
         empty_result.first.return_value = None
 
-        # Mock 2: _get_user_project_ids (for _search_extra_scopes)
+        # Mock 2: KnowledgeAccessPolicy.resolve_subject（项目成员关系；本 builder 内只查一次）
         user_projects_result = MagicMock()
-        user_projects_result.all.return_value = []
+        user_projects_result.scalars.return_value.all.return_value = []
 
-        # Mock 3: folder query (public folder)
-        folder_obj = MagicMock()
-        folder_obj.access_level = KnowledgeAccessLevel.public
-        folder_obj.project_ids = None
-        folder_obj.created_by = None
-        folder_scalars = MagicMock()
-        folder_scalars.first.return_value = folder_obj
+        # Mock 3: load_folder_permission（只取判权三元组：public 文件夹）
         folder_result = MagicMock()
-        folder_result.scalars.return_value = folder_scalars
+        folder_result.first.return_value = (KnowledgeAccessLevel.public, None, None)
 
         # Mock 4: docs query (with permission fields)
         doc_id = uuid4()
@@ -213,11 +241,7 @@ class TestContextBuilderBuild:
             (doc_id, None, None, None, KnowledgeAccessLevel.public, None, None),
         ]
 
-        # Mock 6: _get_user_project_ids (for _filter_hits_by_permission)
-        user_projects_result2 = MagicMock()
-        user_projects_result2.all.return_value = []
-
-        # Mock 7: _get_project_summary
+        # Mock 6: _get_project_summary
         project_row = MagicMock()
         project_row.__iter__ = lambda self: iter(("项目A", "客户A", None, None))
         project_result = MagicMock()
@@ -225,12 +249,11 @@ class TestContextBuilderBuild:
 
         db.execute = AsyncMock(side_effect=[
             empty_result,           # 1: _get_doc_content
-            user_projects_result,   # 2: _get_user_project_ids (extra_scopes)
-            folder_result,          # 3: folder query
+            user_projects_result,   # 2: resolve_subject（project 成员关系，缓存复用）
+            folder_result,          # 3: load_folder_permission
             docs_result,            # 4: docs query
             doc_perm_result,        # 5: doc permissions (filter)
-            user_projects_result2,  # 6: _get_user_project_ids (filter)
-            project_result,         # 7: _get_project_summary
+            project_result,         # 6: _get_project_summary
         ])
 
         builder = ContextBuilder(db)
@@ -242,10 +265,7 @@ class TestContextBuilderBuild:
             return_value=[],
         ):
             ctx = await builder.build(
-                doc_type="workpaper",
-                doc_id=str(FAKE_DOC_ID),
-                project_id=FAKE_PROJECT_ID,
-                year=2025,
+                host=_host("workpaper"),
                 query="测试查询",
                 user=FAKE_USER,
                 extra_scopes=[str(uuid4())],
@@ -276,7 +296,7 @@ class TestGetDocContent:
         db.execute.return_value = result
 
         builder = ContextBuilder(db)
-        content = await builder._get_doc_content("workpaper", str(FAKE_DOC_ID), FAKE_PROJECT_ID)
+        content = await builder._get_doc_content(_host("workpaper"))
 
         assert "这是底稿的文本内容" in content
 
@@ -291,7 +311,7 @@ class TestGetDocContent:
         db.execute.return_value = result
 
         builder = ContextBuilder(db)
-        content = await builder._get_doc_content("workpaper", str(FAKE_DOC_ID), FAKE_PROJECT_ID)
+        content = await builder._get_doc_content(_host("workpaper"))
 
         assert "E1-1" in content
         assert "暂无解析内容" in content
@@ -307,7 +327,7 @@ class TestGetDocContent:
         db.execute.return_value = result
 
         builder = ContextBuilder(db)
-        content = await builder._get_doc_content("knowledge_doc", str(FAKE_DOC_ID), FAKE_PROJECT_ID)
+        content = await builder._get_doc_content(_host("knowledge_doc"))
 
         assert content == "知识库文档全文内容"
 
@@ -324,18 +344,36 @@ class TestGetDocContent:
         db.execute.return_value = result
 
         builder = ContextBuilder(db)
-        content = await builder._get_doc_content("knowledge_folder", str(FAKE_DOC_ID), FAKE_PROJECT_ID)
+        content = await builder._get_doc_content(_host("knowledge_folder"))
 
         assert "文档1" in content
         assert "文档2摘要" in content
 
     @pytest.mark.asyncio
-    async def test_unknown_doc_type(self):
-        """未知文档类型返回空字符串"""
+    async def test_loader_dispatch_covers_every_host_without_fallback(self):
+        """宿主 → loader 分派表覆盖全部 HostType，且 note/report 不指向底稿 loader。
+
+        Task 2 起 doc_type 是受后端枚举约束的 ``HostType``，"未知类型"在类型层面已不可构造；
+        真正需要守的是"没有 default 回退分支"（旧实现把 note/report 转给底稿 loader，
+        导致正文恒空而 AI 照常作答）。
+        """
+        from app.services.ai_chat.contracts import HostType
+
         db = _mock_db()
         builder = ContextBuilder(db)
-        content = await builder._get_doc_content("unknown_type", str(FAKE_DOC_ID), FAKE_PROJECT_ID)
-        assert content == ""
+
+        assert set(builder._doc_loaders) == set(HostType)
+        wp_loader = builder._doc_loaders[HostType.workpaper]
+        for host_type in (HostType.note, HostType.report, HostType.knowledge_folder):
+            assert builder._doc_loaders[host_type] is not wp_loader, (
+                f"{host_type.value} 竟回退到底稿 loader（Req 3.7 禁止）"
+            )
+        # 每个宿主的 loader 互不相同（唯一映射，不共享实现）
+        assert len({id(fn) for fn in builder._doc_loaders.values()}) == len(HostType)
+
+        # 未登记的 doc_type 在枚举层就无法构造
+        with pytest.raises(ValueError):
+            HostType("unknown_type")
 
 
 # ---------------------------------------------------------------------------
@@ -692,93 +730,93 @@ class TestPermissionFiltering:
     需求: 5.1
     """
 
-    def test_user_has_access_public(self):
+    # 判定真源已收敛到公共 KnowledgeAccessPolicy（Feature dsh-agent-panel-integration
+    # Task 1 / Req 2.1）：ContextBuilder 不再提供 _user_has_access / _check_folder_access /
+    # _check_doc_access 私有授权 API，下列用例改为直接验证公共 policy 的同一判定语义。
+
+    def test_can_read_public(self):
         """public 文档所有用户可访问"""
         from app.models.knowledge_models import KnowledgeAccessLevel
 
-        assert ContextBuilder._user_has_access(
-            KnowledgeAccessLevel.public, None, None, uuid4(), []
+        assert KnowledgeAccessPolicy.can_read(
+            KnowledgeAccessSubject(user_id=uuid4()),
+            KnowledgeResource.of_row(KnowledgeAccessLevel.public, None, None),
         ) is True
 
-    def test_user_has_access_none_treated_as_public(self):
-        """access_level=None 视为 public"""
-        assert ContextBuilder._user_has_access(
-            None, None, None, uuid4(), []
+    def test_can_read_none_treated_as_inherit(self):
+        """access_level=None（继承）在无父级约束时放行"""
+        assert KnowledgeAccessPolicy.can_read(
+            KnowledgeAccessSubject(user_id=uuid4()),
+            KnowledgeResource(access_level=None, project_ids=frozenset(), created_by=None),
         ) is True
 
-    def test_user_has_access_project_group_allowed(self):
+    def test_can_read_project_group_allowed(self):
         """project_group 文档：用户属于允许的项目组时可访问"""
         from app.models.knowledge_models import KnowledgeAccessLevel
 
         project_id = uuid4()
-        assert ContextBuilder._user_has_access(
-            KnowledgeAccessLevel.project_group,
-            [str(project_id)],
-            None,
-            uuid4(),
-            [project_id],
+        assert KnowledgeAccessPolicy.can_read(
+            KnowledgeAccessSubject(user_id=uuid4(), project_ids=frozenset({project_id})),
+            KnowledgeResource.of_row(
+                KnowledgeAccessLevel.project_group, [str(project_id)], None
+            ),
         ) is True
 
-    def test_user_has_access_project_group_denied(self):
+    def test_can_read_project_group_denied(self):
         """project_group 文档：用户不属于允许的项目组时拒绝"""
         from app.models.knowledge_models import KnowledgeAccessLevel
 
-        assert ContextBuilder._user_has_access(
-            KnowledgeAccessLevel.project_group,
-            [str(uuid4())],  # 允许的项目
-            None,
-            uuid4(),
-            [uuid4()],  # 用户的项目（不同）
+        assert KnowledgeAccessPolicy.can_read(
+            KnowledgeAccessSubject(user_id=uuid4(), project_ids=frozenset({uuid4()})),
+            KnowledgeResource.of_row(
+                KnowledgeAccessLevel.project_group, [str(uuid4())], None
+            ),
         ) is False
 
-    def test_user_has_access_project_group_no_user_projects(self):
+    def test_can_read_project_group_no_user_projects(self):
         """project_group 文档：用户无项目时拒绝"""
         from app.models.knowledge_models import KnowledgeAccessLevel
 
-        assert ContextBuilder._user_has_access(
-            KnowledgeAccessLevel.project_group,
-            [str(uuid4())],
-            None,
-            uuid4(),
-            [],  # 用户无项目
+        assert KnowledgeAccessPolicy.can_read(
+            KnowledgeAccessSubject(user_id=uuid4(), project_ids=frozenset()),
+            KnowledgeResource.of_row(
+                KnowledgeAccessLevel.project_group, [str(uuid4())], None
+            ),
         ) is False
 
-    def test_user_has_access_private_owner(self):
+    def test_can_read_private_owner(self):
         """private 文档：创建者可访问"""
         from app.models.knowledge_models import KnowledgeAccessLevel
 
         user_id = uuid4()
-        assert ContextBuilder._user_has_access(
-            KnowledgeAccessLevel.private,
-            None,
-            user_id,  # created_by
-            user_id,  # 同一用户
-            [],
+        assert KnowledgeAccessPolicy.can_read(
+            KnowledgeAccessSubject(user_id=user_id),
+            KnowledgeResource.of_row(KnowledgeAccessLevel.private, None, user_id),
         ) is True
 
-    def test_user_has_access_private_not_owner(self):
+    def test_can_read_private_not_owner(self):
         """private 文档：非创建者拒绝"""
         from app.models.knowledge_models import KnowledgeAccessLevel
 
-        assert ContextBuilder._user_has_access(
-            KnowledgeAccessLevel.private,
-            None,
-            uuid4(),  # created_by（其他人）
-            uuid4(),  # 当前用户
-            [],
+        assert KnowledgeAccessPolicy.can_read(
+            KnowledgeAccessSubject(user_id=uuid4()),
+            KnowledgeResource.of_row(KnowledgeAccessLevel.private, None, uuid4()),
         ) is False
 
-    def test_check_folder_access_public(self):
+    def test_can_read_folder_public(self):
         """public 文件夹所有用户可访问"""
         from app.models.knowledge_models import KnowledgeAccessLevel
 
         folder = MagicMock()
         folder.access_level = KnowledgeAccessLevel.public
-        user = MagicMock(id=uuid4())
+        folder.project_ids = None
+        folder.created_by = None
 
-        assert ContextBuilder._check_folder_access(folder, user, []) is True
+        assert KnowledgeAccessPolicy.can_read_folder(
+            KnowledgeAccessSubject(user_id=uuid4()), folder
+        ) is True
 
-    def test_check_folder_access_project_group_allowed(self):
+    def test_can_read_folder_project_group_allowed(self):
         """project_group 文件夹：用户属于允许的项目组时可访问"""
         from app.models.knowledge_models import KnowledgeAccessLevel
 
@@ -786,50 +824,77 @@ class TestPermissionFiltering:
         folder = MagicMock()
         folder.access_level = KnowledgeAccessLevel.project_group
         folder.project_ids = [str(project_id)]
-        user = MagicMock(id=uuid4())
+        folder.created_by = None
 
-        assert ContextBuilder._check_folder_access(folder, user, [project_id]) is True
+        assert KnowledgeAccessPolicy.can_read_folder(
+            KnowledgeAccessSubject(user_id=uuid4(), project_ids=frozenset({project_id})),
+            folder,
+        ) is True
 
-    def test_check_folder_access_project_group_denied(self):
+    def test_can_read_folder_project_group_denied(self):
         """project_group 文件夹：用户不属于允许的项目组时拒绝"""
         from app.models.knowledge_models import KnowledgeAccessLevel
 
         folder = MagicMock()
         folder.access_level = KnowledgeAccessLevel.project_group
         folder.project_ids = [str(uuid4())]
-        user = MagicMock(id=uuid4())
+        folder.created_by = None
 
-        assert ContextBuilder._check_folder_access(folder, user, [uuid4()]) is False
+        assert KnowledgeAccessPolicy.can_read_folder(
+            KnowledgeAccessSubject(user_id=uuid4(), project_ids=frozenset({uuid4()})),
+            folder,
+        ) is False
 
-    def test_check_folder_access_private_owner(self):
+    def test_can_read_folder_private_owner(self):
         """private 文件夹：创建者可访问"""
         from app.models.knowledge_models import KnowledgeAccessLevel
 
         user_id = uuid4()
         folder = MagicMock()
         folder.access_level = KnowledgeAccessLevel.private
+        folder.project_ids = None
         folder.created_by = user_id
-        user = MagicMock(id=user_id)
 
-        assert ContextBuilder._check_folder_access(folder, user, []) is True
+        assert KnowledgeAccessPolicy.can_read_folder(
+            KnowledgeAccessSubject(user_id=user_id), folder
+        ) is True
 
-    def test_check_folder_access_private_not_owner(self):
+    def test_can_read_folder_private_not_owner(self):
         """private 文件夹：非创建者拒绝"""
         from app.models.knowledge_models import KnowledgeAccessLevel
 
         folder = MagicMock()
         folder.access_level = KnowledgeAccessLevel.private
+        folder.project_ids = None
         folder.created_by = uuid4()
-        user = MagicMock(id=uuid4())
 
-        assert ContextBuilder._check_folder_access(folder, user, []) is False
+        assert KnowledgeAccessPolicy.can_read_folder(
+            KnowledgeAccessSubject(user_id=uuid4()), folder
+        ) is False
 
-    def test_check_doc_access_inherits_folder(self):
-        """文档 access_level=None 时继承文件夹权限（已通过文件夹检查）"""
-        user = MagicMock(id=uuid4())
-        assert ContextBuilder._check_doc_access(
-            None, None, None, user, []
+    def test_can_read_document_inherits_folder(self):
+        """文档 access_level=None 时**完整继承**父文件夹判定（不再无条件放行）"""
+        from app.models.knowledge_models import KnowledgeAccessLevel
+
+        subject = KnowledgeAccessSubject(user_id=uuid4())
+        inherit_doc = KnowledgeResource(
+            access_level=None, project_ids=frozenset(), created_by=None
+        )
+
+        # 父文件夹 public → 可见
+        assert KnowledgeAccessPolicy.can_read_document(
+            subject,
+            inherit_doc,
+            KnowledgeResource.of_row(KnowledgeAccessLevel.public, None, None),
         ) is True
+        # 父文件夹 private 且非创建者 → 继承后不可见（旧 _check_doc_access 会误放行）
+        assert KnowledgeAccessPolicy.can_read_document(
+            subject,
+            inherit_doc,
+            KnowledgeResource.of_row(KnowledgeAccessLevel.private, None, uuid4()),
+        ) is False
+        # 父级未知 → fail-closed
+        assert KnowledgeAccessPolicy.can_read_document(subject, inherit_doc, None) is False
 
     @pytest.mark.asyncio
     async def test_filter_hits_excludes_unauthorized_knowledge_docs(self):
@@ -852,9 +917,9 @@ class TestPermissionFiltering:
              KnowledgeAccessLevel.public, None, None),
         ]
 
-        # Mock 2: _get_user_project_ids 查询（之后查用户项目）
+        # Mock 2: resolve_subject 查询（之后查用户项目成员关系）
         user_projects_result = MagicMock()
-        user_projects_result.all.return_value = []
+        user_projects_result.scalars.return_value.all.return_value = []
 
         db.execute = AsyncMock(side_effect=[doc_perm_result, user_projects_result])
 
@@ -919,9 +984,9 @@ class TestPermissionFiltering:
              KnowledgeAccessLevel.public, None, None),
         ]
 
-        # Mock 2: _get_user_project_ids — 用户属于 allowed_project（后执行）
+        # Mock 2: resolve_subject — 用户属于 allowed_project（后执行）
         user_projects_result = MagicMock()
-        user_projects_result.all.return_value = [(allowed_project,)]
+        user_projects_result.scalars.return_value.all.return_value = [allowed_project]
 
         db.execute = AsyncMock(side_effect=[doc_perm_result, user_projects_result])
 
@@ -938,32 +1003,49 @@ class TestPermissionFiltering:
         assert len(filtered) == 1
 
     @pytest.mark.asyncio
-    async def test_get_user_project_ids_returns_projects(self):
-        """_get_user_project_ids 返回用户所属项目列表"""
+    async def test_resolve_subject_returns_projects(self):
+        """KnowledgeAccessPolicy.resolve_subject 返回用户所属项目集合"""
         db = _mock_db()
         user = MagicMock(id=uuid4())
         project1 = uuid4()
         project2 = uuid4()
 
         result = MagicMock()
-        result.all.return_value = [(project1,), (project2,)]
+        result.scalars.return_value.all.return_value = [project1, project2]
+        db.execute = AsyncMock(return_value=result)
+
+        subject = await KnowledgeAccessPolicy.resolve_subject(db, user)
+
+        assert subject.user_id == user.id
+        assert subject.project_ids == frozenset({project1, project2})
+
+    @pytest.mark.asyncio
+    async def test_resolve_subject_no_user(self):
+        """无用户/无 id 时返回匿名主体（不查库，private/project_group 恒不可见）"""
+        db = _mock_db()
+        db.execute = AsyncMock(side_effect=AssertionError("匿名主体不得触发成员关系查询"))
+
+        assert await KnowledgeAccessPolicy.resolve_subject(db, None) is ANONYMOUS_SUBJECT
+        assert (
+            await KnowledgeAccessPolicy.resolve_subject(db, MagicMock(id=None))
+            is ANONYMOUS_SUBJECT
+        )
+
+    @pytest.mark.asyncio
+    async def test_builder_reuses_resolved_subject(self):
+        """ContextBuilder 每轮只解析一次 subject（成员关系查询不重复）"""
+        db = _mock_db()
+        user = MagicMock(id=uuid4())
+        result = MagicMock()
+        result.scalars.return_value.all.return_value = []
         db.execute = AsyncMock(return_value=result)
 
         builder = ContextBuilder(db)
-        project_ids = await builder._get_user_project_ids(user)
+        first = await builder._knowledge_subject(user)
+        second = await builder._knowledge_subject(user)
 
-        assert len(project_ids) == 2
-        assert project1 in project_ids
-        assert project2 in project_ids
-
-    @pytest.mark.asyncio
-    async def test_get_user_project_ids_no_user(self):
-        """_get_user_project_ids 无用户时返回空列表"""
-        db = _mock_db()
-        builder = ContextBuilder(db)
-
-        assert await builder._get_user_project_ids(None) == []
-        assert await builder._get_user_project_ids(MagicMock(id=None)) == []
+        assert first is second
+        assert db.execute.await_count == 1
 
 
 # ---------------------------------------------------------------------------
@@ -1033,47 +1115,35 @@ class TestPermissionD2Property:
             doc_id = str(uuid4())
             denied_doc_ids.add(doc_id)
 
-        # 对每个文档验证 _user_has_access 判断正确
-        for doc_id in allowed_doc_ids:
-            # 确定该文档的权限类型
-            pass  # 已在上面分类
+        subject = KnowledgeAccessSubject(
+            user_id=user_id, project_ids=frozenset(user_project_ids)
+        )
+
+        def _can_read(level, project_ids, created_by) -> bool:
+            return KnowledgeAccessPolicy.can_read(
+                subject, KnowledgeResource.of_row(level, project_ids, created_by)
+            )
 
         # 验证 public 文档可访问
         for _ in range(num_public):
-            assert ContextBuilder._user_has_access(
-                KnowledgeAccessLevel.public, None, None, user_id, user_project_ids
-            ) is True
+            assert _can_read(KnowledgeAccessLevel.public, None, None) is True
 
         # 验证 private 文档（自己创建）可访问
         for _ in range(num_private_owned):
-            assert ContextBuilder._user_has_access(
-                KnowledgeAccessLevel.private, None, user_id, user_id, user_project_ids
-            ) is True
+            assert _can_read(KnowledgeAccessLevel.private, None, user_id) is True
 
         # 验证 private 文档（他人创建）不可访问
         for _ in range(num_private_other):
-            other_user = uuid4()
-            assert ContextBuilder._user_has_access(
-                KnowledgeAccessLevel.private, None, other_user, user_id, user_project_ids
-            ) is False
+            assert _can_read(KnowledgeAccessLevel.private, None, uuid4()) is False
 
         # 验证 project_group 文档（用户属于允许项目）可访问
         for _ in range(num_project_group_allowed):
-            assert ContextBuilder._user_has_access(
-                KnowledgeAccessLevel.project_group,
-                [str(allowed_project)],
-                None,
-                user_id,
-                user_project_ids,
+            assert _can_read(
+                KnowledgeAccessLevel.project_group, [str(allowed_project)], None
             ) is True
 
         # 验证 project_group 文档（用户不属于允许项目）不可访问
         for _ in range(num_project_group_denied):
-            other_project = uuid4()
-            assert ContextBuilder._user_has_access(
-                KnowledgeAccessLevel.project_group,
-                [str(other_project)],
-                None,
-                user_id,
-                user_project_ids,
+            assert _can_read(
+                KnowledgeAccessLevel.project_group, [str(uuid4())], None
             ) is False

@@ -1,0 +1,4784 @@
+{
+  "meta": {
+    "task": "0.1 openpyxl 实读 K0 管理循环函证.xlsx 全 10 sheet",
+    "source_file": "基础数据\\致同通用审计程序及底稿模板（2025年修订）\\1.致同审计程序及底稿模板（2025年）\\4.风险应对-实质性程序（D-N）\\K 管理循环\\K0 管理循环函证.xlsx",
+    "sheet_count": 11,
+    "sheet_names": [
+      "底稿目录",
+      "函证程序表K0A",
+      "函证结果汇总表K0-1",
+      "核实被函证单位信息K0-2",
+      "跟函函证过程控制K0-3",
+      "函证差异调节表K0-4",
+      "其他应收款替代程序K0-5",
+      "其他应付款替代程序K0-6",
+      "邮件传真回函可靠性验证K0-7",
+      "函证程序舞弊风险评价表K0-8",
+      "GT_Custom"
+    ]
+  },
+  "sheets": [
+    {
+      "name": "底稿目录",
+      "dimensions": {
+        "max_row": 19,
+        "max_col": 8,
+        "range": "A1:H19"
+      },
+      "merged_cells": [
+        "A14:A16",
+        "A17:A19",
+        "A10:A13"
+      ],
+      "formula_count": 0,
+      "formulas": [],
+      "header_rows": {
+        "row_1": [
+          {
+            "col": 1,
+            "letter": "A",
+            "value": "底稿开列时，可先在以下单元格填写有关内容，以便其他底稿引用有关数据："
+          }
+        ],
+        "row_2": [
+          {
+            "col": 1,
+            "letter": "A",
+            "value": "被审计单位："
+          }
+        ],
+        "row_3": [
+          {
+            "col": 1,
+            "letter": "A",
+            "value": "截止日：202X年12月31日"
+          }
+        ],
+        "row_4": [
+          {
+            "col": 1,
+            "letter": "A",
+            "value": "编制人："
+          },
+          {
+            "col": 4,
+            "letter": "D",
+            "value": "序号"
+          },
+          {
+            "col": 5,
+            "letter": "E",
+            "value": "内容"
+          },
+          {
+            "col": 6,
+            "letter": "F",
+            "value": "索引号"
+          },
+          {
+            "col": 7,
+            "letter": "G",
+            "value": "备注"
+          }
+        ],
+        "row_5": [
+          {
+            "col": 1,
+            "letter": "A",
+            "value": "编制日期："
+          },
+          {
+            "col": 4,
+            "letter": "D",
+            "value": "1"
+          },
+          {
+            "col": 5,
+            "letter": "E",
+            "value": "函证程序表"
+          },
+          {
+            "col": 6,
+            "letter": "F",
+            "value": "K0A"
+          }
+        ],
+        "row_6": [
+          {
+            "col": 1,
+            "letter": "A",
+            "value": "复核人："
+          },
+          {
+            "col": 4,
+            "letter": "D",
+            "value": "2"
+          },
+          {
+            "col": 5,
+            "letter": "E",
+            "value": "函证结果汇总表"
+          },
+          {
+            "col": 6,
+            "letter": "F",
+            "value": "K0-1"
+          }
+        ],
+        "row_7": [
+          {
+            "col": 1,
+            "letter": "A",
+            "value": "复核日期："
+          },
+          {
+            "col": 4,
+            "letter": "D",
+            "value": "3"
+          },
+          {
+            "col": 5,
+            "letter": "E",
+            "value": "核实被函证单位信息"
+          },
+          {
+            "col": 6,
+            "letter": "F",
+            "value": "K0-2"
+          }
+        ],
+        "row_8": [
+          {
+            "col": 4,
+            "letter": "D",
+            "value": "4"
+          },
+          {
+            "col": 5,
+            "letter": "E",
+            "value": "跟函函证过程控制"
+          },
+          {
+            "col": 6,
+            "letter": "F",
+            "value": "K0-3"
+          }
+        ],
+        "row_9": [
+          {
+            "col": 1,
+            "letter": "A",
+            "value": "关于工作底稿与审计程序索引号对应的说明"
+          },
+          {
+            "col": 4,
+            "letter": "D",
+            "value": "5"
+          },
+          {
+            "col": 5,
+            "letter": "E",
+            "value": "函证差异调节表"
+          },
+          {
+            "col": 6,
+            "letter": "F",
+            "value": "K0-4"
+          }
+        ],
+        "row_10": [
+          {
+            "col": 1,
+            "letter": "A",
+            "value": "1.编制的审计工作底稿应与审计程序对应。审计项目组应根据被审计单位实际情况和风险评估情况在实质性程序表中裁剪、修改或增加审计程序，根据实际执行的审计程序完成相应审计工作底稿，编制的工作底稿中应按自然顺序依次编制索引号，并通过唯一的索引号将与实质性程序表中的程序对应关联（即将工作底稿的索引号填入实质性程序表中的底稿索引号列）。"
+          },
+          {
+            "col": 4,
+            "letter": "D",
+            "value": "7"
+          },
+          {
+            "col": 5,
+            "letter": "E",
+            "value": "其他应收款替代程序检查表"
+          },
+          {
+            "col": 6,
+            "letter": "F",
+            "value": "K0-5"
+          }
+        ]
+      }
+    },
+    {
+      "name": "函证程序表K0A",
+      "dimensions": {
+        "max_row": 20,
+        "max_col": 8,
+        "range": "A1:H20"
+      },
+      "merged_cells": [
+        "E12:F12",
+        "B16:C16",
+        "B7:C7",
+        "E5:F5",
+        "E14:F14",
+        "E17:F17",
+        "E8:F8",
+        "B12:C12",
+        "A2:F2",
+        "B11:C11",
+        "E10:F10",
+        "B14:C14",
+        "E13:F13",
+        "B17:C17",
+        "B8:C8",
+        "E9:F9",
+        "B13:C13",
+        "E6:F6",
+        "E15:F15",
+        "E11:F11",
+        "B10:C10",
+        "B9:C9",
+        "B6:C6",
+        "E16:F16",
+        "B15:C15",
+        "E7:F7",
+        "B5:C5",
+        "A1:F1"
+      ],
+      "formula_count": 7,
+      "formulas": [
+        {
+          "cell": "A3",
+          "formula": "=底稿目录!A2"
+        },
+        {
+          "cell": "C3",
+          "formula": "=底稿目录!A4"
+        },
+        {
+          "cell": "D3",
+          "formula": "=底稿目录!A5"
+        },
+        {
+          "cell": "F3",
+          "formula": "=底稿目录!F5"
+        },
+        {
+          "cell": "A4",
+          "formula": "=底稿目录!A3"
+        },
+        {
+          "cell": "C4",
+          "formula": "=底稿目录!A6"
+        },
+        {
+          "cell": "D4",
+          "formula": "=底稿目录!A7"
+        }
+      ],
+      "header_rows": {
+        "row_1": [
+          {
+            "col": 1,
+            "letter": "A",
+            "value": "致同会计师事务所"
+          }
+        ],
+        "row_2": [
+          {
+            "col": 1,
+            "letter": "A",
+            "value": "其他应收款/其他应付款/……函证程序"
+          }
+        ],
+        "row_3": [
+          {
+            "col": 1,
+            "letter": "A",
+            "value": "=底稿目录!A2"
+          },
+          {
+            "col": 3,
+            "letter": "C",
+            "value": "=底稿目录!A4"
+          },
+          {
+            "col": 4,
+            "letter": "D",
+            "value": "=底稿目录!A5"
+          },
+          {
+            "col": 5,
+            "letter": "E",
+            "value": "索引号："
+          },
+          {
+            "col": 6,
+            "letter": "F",
+            "value": "=底稿目录!F5"
+          }
+        ],
+        "row_4": [
+          {
+            "col": 1,
+            "letter": "A",
+            "value": "=底稿目录!A3"
+          },
+          {
+            "col": 3,
+            "letter": "C",
+            "value": "=底稿目录!A6"
+          },
+          {
+            "col": 4,
+            "letter": "D",
+            "value": "=底稿目录!A7"
+          },
+          {
+            "col": 5,
+            "letter": "E",
+            "value": "页  次："
+          }
+        ],
+        "row_5": [
+          {
+            "col": 1,
+            "letter": "A",
+            "value": "序号"
+          },
+          {
+            "col": 2,
+            "letter": "B",
+            "value": "审计程序"
+          },
+          {
+            "col": 4,
+            "letter": "D",
+            "value": "程序分类"
+          },
+          {
+            "col": 5,
+            "letter": "E",
+            "value": "底稿索引号"
+          }
+        ],
+        "row_6": [
+          {
+            "col": 1,
+            "letter": "A",
+            "value": "1"
+          },
+          {
+            "col": 2,
+            "letter": "B",
+            "value": "以积极方式对其他应收款、其他应付款、……进行函证。"
+          },
+          {
+            "col": 4,
+            "letter": "D",
+            "value": "常规★"
+          },
+          {
+            "col": 5,
+            "letter": "E",
+            "value": "K0-1"
+          }
+        ],
+        "row_7": [
+          {
+            "col": 1,
+            "letter": "A",
+            "value": "2"
+          },
+          {
+            "col": 2,
+            "letter": "B",
+            "value": "比较当年度及以前年度的增减变动、具体构成、账龄及主要交易对手的变化，针对舞弊风险较大的债务/债权人，考虑对合同条款、交易条件、是否存在关联方关系、是否存在担保以及补充协议等实施函证程序。"
+          },
+          {
+            "col": 4,
+            "letter": "D",
+            "value": "舞弊应对/IPO/上市/新三板/重组"
+          },
+          {
+            "col": 5,
+            "letter": "E",
+            "value": "K0-1"
+          }
+        ],
+        "row_8": [
+          {
+            "col": 1,
+            "letter": "A",
+            "value": "3"
+          },
+          {
+            "col": 2,
+            "letter": "B",
+            "value": "设计询证函，考虑制作询证函防伪标识，并在发函前核实被函证单位信息（函证科目、单位名称、地址、联系人、联系电话、邮政编码、函证人等），对于函证地址与注册地址、办公地址等不一致，不同客户或供应商的函证地址相近、电话号段相邻，函证联系人非被询证单位员工等情况，需核查并记录原因。"
+          },
+          {
+            "col": 4,
+            "letter": "D",
+            "value": "常规★"
+          },
+          {
+            "col": 5,
+            "letter": "E",
+            "value": "K0-2"
+          }
+        ],
+        "row_9": [
+          {
+            "col": 1,
+            "letter": "A",
+            "value": "4"
+          },
+          {
+            "col": 2,
+            "letter": "B",
+            "value": "注册会计师直接收发询证函，跟函时观察实地场所以及函证核对过程，确认处理函证的人员身份和权限，防范询证函被拦截、篡改或发生串通舞弊，并在底稿中记录或留存控制过程；"
+          },
+          {
+            "col": 4,
+            "letter": "D",
+            "value": "常规★"
+          },
+          {
+            "col": 5,
+            "letter": "E",
+            "value": "K0-1/K0-3"
+          }
+        ],
+        "row_10": [
+          {
+            "col": 1,
+            "letter": "A",
+            "value": "5"
+          },
+          {
+            "col": 2,
+            "letter": "B",
+            "value": "留存亲自寄发函证的寄送单回执及被审计单位盖章确认的询证函复印件，核实发函快递物流信息；"
+          },
+          {
+            "col": 4,
+            "letter": "D",
+            "value": "常规★"
+          },
+          {
+            "col": 5,
+            "letter": "E",
+            "value": "K0-1/K0-2"
+          }
+        ]
+      }
+    },
+    {
+      "name": "函证结果汇总表K0-1",
+      "dimensions": {
+        "max_row": 68,
+        "max_col": 33,
+        "range": "A1:AG68"
+      },
+      "merged_cells": [
+        "S1:AB1",
+        "A5:A6",
+        "AB5:AB6",
+        "L5:R5",
+        "A2:R2",
+        "S5:W5",
+        "C28:D28",
+        "G5:K5",
+        "A1:R1",
+        "S2:AB2",
+        "C5:F5",
+        "X5:AA5",
+        "B5:B6"
+      ],
+      "formula_count": 188,
+      "formulas": [
+        {
+          "cell": "C3",
+          "formula": "=底稿目录!A2"
+        },
+        {
+          "cell": "I3",
+          "formula": "=底稿目录!A4"
+        },
+        {
+          "cell": "M3",
+          "formula": "=底稿目录!A5"
+        },
+        {
+          "cell": "R3",
+          "formula": "=底稿目录!F6"
+        },
+        {
+          "cell": "S3",
+          "formula": "=底稿目录!A2"
+        },
+        {
+          "cell": "W3",
+          "formula": "=底稿目录!A4"
+        },
+        {
+          "cell": "Y3",
+          "formula": "=底稿目录!A5"
+        },
+        {
+          "cell": "AB3",
+          "formula": "=底稿目录!F6"
+        },
+        {
+          "cell": "C4",
+          "formula": "=底稿目录!A3"
+        },
+        {
+          "cell": "I4",
+          "formula": "=底稿目录!A6"
+        },
+        {
+          "cell": "M4",
+          "formula": "=底稿目录!A7"
+        },
+        {
+          "cell": "S4",
+          "formula": "=底稿目录!A3"
+        },
+        {
+          "cell": "W4",
+          "formula": "=底稿目录!A6"
+        },
+        {
+          "cell": "Y4",
+          "formula": "=底稿目录!A7"
+        },
+        {
+          "cell": "D7",
+          "formula": "=VLOOKUP($B7,'核实被函证单位信息K0-2'!$A:$AL,2,0)"
+        },
+        {
+          "cell": "G7",
+          "formula": "=VLOOKUP($B7,'核实被函证单位信息K0-2'!$A:$AL,3,0)"
+        },
+        {
+          "cell": "J7",
+          "formula": "=VLOOKUP($B7,'核实被函证单位信息K0-2'!$A:$AL,4,0)"
+        },
+        {
+          "cell": "K7",
+          "formula": "=VLOOKUP($B7,'核实被函证单位信息K0-2'!$A:$AL,10,0)"
+        },
+        {
+          "cell": "M7",
+          "formula": "=VLOOKUP($B7,'核实被函证单位信息K0-2'!$A:$AL,16,0)"
+        },
+        {
+          "cell": "Q7",
+          "formula": "=VLOOKUP($B7,'核实被函证单位信息K0-2'!$A:$AL,19,0)"
+        },
+        {
+          "cell": "R7",
+          "formula": "=VLOOKUP($B7,'核实被函证单位信息K0-2'!$A:$AL,22,0)"
+        },
+        {
+          "cell": "T7",
+          "formula": "=IF(L7=\"是\",S7-F7,\"未回函\")"
+        },
+        {
+          "cell": "D8",
+          "formula": "=VLOOKUP($B8,'核实被函证单位信息K0-2'!$A:$AL,2,0)"
+        },
+        {
+          "cell": "G8",
+          "formula": "=VLOOKUP($B8,'核实被函证单位信息K0-2'!$A:$AL,3,0)"
+        },
+        {
+          "cell": "J8",
+          "formula": "=VLOOKUP($B8,'核实被函证单位信息K0-2'!$A:$AL,4,0)"
+        },
+        {
+          "cell": "K8",
+          "formula": "=VLOOKUP($B8,'核实被函证单位信息K0-2'!$A:$AL,10,0)"
+        },
+        {
+          "cell": "M8",
+          "formula": "=VLOOKUP($B8,'核实被函证单位信息K0-2'!$A:$AL,16,0)"
+        },
+        {
+          "cell": "Q8",
+          "formula": "=VLOOKUP($B8,'核实被函证单位信息K0-2'!$A:$AL,19,0)"
+        },
+        {
+          "cell": "R8",
+          "formula": "=VLOOKUP($B8,'核实被函证单位信息K0-2'!$A:$AL,22,0)"
+        },
+        {
+          "cell": "T8",
+          "formula": "=IF(L8=\"是\",S8-F8,\"未回函\")"
+        },
+        {
+          "cell": "D9",
+          "formula": "=VLOOKUP($B9,'核实被函证单位信息K0-2'!$A:$AL,2,0)"
+        },
+        {
+          "cell": "G9",
+          "formula": "=VLOOKUP($B9,'核实被函证单位信息K0-2'!$A:$AL,3,0)"
+        },
+        {
+          "cell": "J9",
+          "formula": "=VLOOKUP($B9,'核实被函证单位信息K0-2'!$A:$AL,4,0)"
+        },
+        {
+          "cell": "K9",
+          "formula": "=VLOOKUP($B9,'核实被函证单位信息K0-2'!$A:$AL,10,0)"
+        },
+        {
+          "cell": "M9",
+          "formula": "=VLOOKUP($B9,'核实被函证单位信息K0-2'!$A:$AL,16,0)"
+        },
+        {
+          "cell": "Q9",
+          "formula": "=VLOOKUP($B9,'核实被函证单位信息K0-2'!$A:$AL,19,0)"
+        },
+        {
+          "cell": "R9",
+          "formula": "=VLOOKUP($B9,'核实被函证单位信息K0-2'!$A:$AL,22,0)"
+        },
+        {
+          "cell": "T9",
+          "formula": "=IF(L9=\"是\",S9-F9,\"未回函\")"
+        },
+        {
+          "cell": "D10",
+          "formula": "=VLOOKUP($B10,'核实被函证单位信息K0-2'!$A:$AL,2,0)"
+        },
+        {
+          "cell": "G10",
+          "formula": "=VLOOKUP($B10,'核实被函证单位信息K0-2'!$A:$AL,3,0)"
+        },
+        {
+          "cell": "J10",
+          "formula": "=VLOOKUP($B10,'核实被函证单位信息K0-2'!$A:$AL,4,0)"
+        },
+        {
+          "cell": "K10",
+          "formula": "=VLOOKUP($B10,'核实被函证单位信息K0-2'!$A:$AL,10,0)"
+        },
+        {
+          "cell": "M10",
+          "formula": "=VLOOKUP($B10,'核实被函证单位信息K0-2'!$A:$AL,16,0)"
+        },
+        {
+          "cell": "Q10",
+          "formula": "=VLOOKUP($B10,'核实被函证单位信息K0-2'!$A:$AL,19,0)"
+        },
+        {
+          "cell": "R10",
+          "formula": "=VLOOKUP($B10,'核实被函证单位信息K0-2'!$A:$AL,22,0)"
+        },
+        {
+          "cell": "T10",
+          "formula": "=IF(L10=\"是\",S10-F10,\"未回函\")"
+        },
+        {
+          "cell": "D11",
+          "formula": "=VLOOKUP($B11,'核实被函证单位信息K0-2'!$A:$AL,2,0)"
+        },
+        {
+          "cell": "G11",
+          "formula": "=VLOOKUP($B11,'核实被函证单位信息K0-2'!$A:$AL,3,0)"
+        },
+        {
+          "cell": "J11",
+          "formula": "=VLOOKUP($B11,'核实被函证单位信息K0-2'!$A:$AL,4,0)"
+        },
+        {
+          "cell": "K11",
+          "formula": "=VLOOKUP($B11,'核实被函证单位信息K0-2'!$A:$AL,10,0)"
+        },
+        {
+          "cell": "M11",
+          "formula": "=VLOOKUP($B11,'核实被函证单位信息K0-2'!$A:$AL,16,0)"
+        },
+        {
+          "cell": "Q11",
+          "formula": "=VLOOKUP($B11,'核实被函证单位信息K0-2'!$A:$AL,19,0)"
+        },
+        {
+          "cell": "R11",
+          "formula": "=VLOOKUP($B11,'核实被函证单位信息K0-2'!$A:$AL,22,0)"
+        },
+        {
+          "cell": "T11",
+          "formula": "=IF(L11=\"是\",S11-F11,\"未回函\")"
+        },
+        {
+          "cell": "D12",
+          "formula": "=VLOOKUP($B12,'核实被函证单位信息K0-2'!$A:$AL,2,0)"
+        },
+        {
+          "cell": "G12",
+          "formula": "=VLOOKUP($B12,'核实被函证单位信息K0-2'!$A:$AL,3,0)"
+        },
+        {
+          "cell": "J12",
+          "formula": "=VLOOKUP($B12,'核实被函证单位信息K0-2'!$A:$AL,4,0)"
+        },
+        {
+          "cell": "K12",
+          "formula": "=VLOOKUP($B12,'核实被函证单位信息K0-2'!$A:$AL,10,0)"
+        },
+        {
+          "cell": "M12",
+          "formula": "=VLOOKUP($B12,'核实被函证单位信息K0-2'!$A:$AL,16,0)"
+        },
+        {
+          "cell": "Q12",
+          "formula": "=VLOOKUP($B12,'核实被函证单位信息K0-2'!$A:$AL,19,0)"
+        },
+        {
+          "cell": "R12",
+          "formula": "=VLOOKUP($B12,'核实被函证单位信息K0-2'!$A:$AL,22,0)"
+        },
+        {
+          "cell": "T12",
+          "formula": "=IF(L12=\"是\",S12-F12,\"未回函\")"
+        },
+        {
+          "cell": "D13",
+          "formula": "=VLOOKUP($B13,'核实被函证单位信息K0-2'!$A:$AL,2,0)"
+        },
+        {
+          "cell": "G13",
+          "formula": "=VLOOKUP($B13,'核实被函证单位信息K0-2'!$A:$AL,3,0)"
+        },
+        {
+          "cell": "J13",
+          "formula": "=VLOOKUP($B13,'核实被函证单位信息K0-2'!$A:$AL,4,0)"
+        },
+        {
+          "cell": "K13",
+          "formula": "=VLOOKUP($B13,'核实被函证单位信息K0-2'!$A:$AL,10,0)"
+        },
+        {
+          "cell": "M13",
+          "formula": "=VLOOKUP($B13,'核实被函证单位信息K0-2'!$A:$AL,16,0)"
+        },
+        {
+          "cell": "Q13",
+          "formula": "=VLOOKUP($B13,'核实被函证单位信息K0-2'!$A:$AL,19,0)"
+        },
+        {
+          "cell": "R13",
+          "formula": "=VLOOKUP($B13,'核实被函证单位信息K0-2'!$A:$AL,22,0)"
+        },
+        {
+          "cell": "T13",
+          "formula": "=IF(L13=\"是\",S13-F13,\"未回函\")"
+        },
+        {
+          "cell": "D14",
+          "formula": "=VLOOKUP($B14,'核实被函证单位信息K0-2'!$A:$AL,2,0)"
+        },
+        {
+          "cell": "G14",
+          "formula": "=VLOOKUP($B14,'核实被函证单位信息K0-2'!$A:$AL,3,0)"
+        },
+        {
+          "cell": "J14",
+          "formula": "=VLOOKUP($B14,'核实被函证单位信息K0-2'!$A:$AL,4,0)"
+        },
+        {
+          "cell": "K14",
+          "formula": "=VLOOKUP($B14,'核实被函证单位信息K0-2'!$A:$AL,10,0)"
+        },
+        {
+          "cell": "M14",
+          "formula": "=VLOOKUP($B14,'核实被函证单位信息K0-2'!$A:$AL,16,0)"
+        },
+        {
+          "cell": "Q14",
+          "formula": "=VLOOKUP($B14,'核实被函证单位信息K0-2'!$A:$AL,19,0)"
+        },
+        {
+          "cell": "R14",
+          "formula": "=VLOOKUP($B14,'核实被函证单位信息K0-2'!$A:$AL,22,0)"
+        },
+        {
+          "cell": "T14",
+          "formula": "=IF(L14=\"是\",S14-F14,\"未回函\")"
+        },
+        {
+          "cell": "D15",
+          "formula": "=VLOOKUP($B15,'核实被函证单位信息K0-2'!$A:$AL,2,0)"
+        },
+        {
+          "cell": "G15",
+          "formula": "=VLOOKUP($B15,'核实被函证单位信息K0-2'!$A:$AL,3,0)"
+        },
+        {
+          "cell": "J15",
+          "formula": "=VLOOKUP($B15,'核实被函证单位信息K0-2'!$A:$AL,4,0)"
+        },
+        {
+          "cell": "K15",
+          "formula": "=VLOOKUP($B15,'核实被函证单位信息K0-2'!$A:$AL,10,0)"
+        },
+        {
+          "cell": "M15",
+          "formula": "=VLOOKUP($B15,'核实被函证单位信息K0-2'!$A:$AL,16,0)"
+        },
+        {
+          "cell": "Q15",
+          "formula": "=VLOOKUP($B15,'核实被函证单位信息K0-2'!$A:$AL,19,0)"
+        },
+        {
+          "cell": "R15",
+          "formula": "=VLOOKUP($B15,'核实被函证单位信息K0-2'!$A:$AL,22,0)"
+        },
+        {
+          "cell": "T15",
+          "formula": "=IF(L15=\"是\",S15-F15,\"未回函\")"
+        },
+        {
+          "cell": "D16",
+          "formula": "=VLOOKUP($B16,'核实被函证单位信息K0-2'!$A:$AL,2,0)"
+        },
+        {
+          "cell": "G16",
+          "formula": "=VLOOKUP($B16,'核实被函证单位信息K0-2'!$A:$AL,3,0)"
+        },
+        {
+          "cell": "J16",
+          "formula": "=VLOOKUP($B16,'核实被函证单位信息K0-2'!$A:$AL,4,0)"
+        },
+        {
+          "cell": "K16",
+          "formula": "=VLOOKUP($B16,'核实被函证单位信息K0-2'!$A:$AL,10,0)"
+        },
+        {
+          "cell": "M16",
+          "formula": "=VLOOKUP($B16,'核实被函证单位信息K0-2'!$A:$AL,16,0)"
+        },
+        {
+          "cell": "Q16",
+          "formula": "=VLOOKUP($B16,'核实被函证单位信息K0-2'!$A:$AL,19,0)"
+        },
+        {
+          "cell": "R16",
+          "formula": "=VLOOKUP($B16,'核实被函证单位信息K0-2'!$A:$AL,22,0)"
+        },
+        {
+          "cell": "T16",
+          "formula": "=IF(L16=\"是\",S16-F16,\"未回函\")"
+        },
+        {
+          "cell": "D17",
+          "formula": "=VLOOKUP($B17,'核实被函证单位信息K0-2'!$A:$AL,2,0)"
+        },
+        {
+          "cell": "G17",
+          "formula": "=VLOOKUP($B17,'核实被函证单位信息K0-2'!$A:$AL,3,0)"
+        },
+        {
+          "cell": "J17",
+          "formula": "=VLOOKUP($B17,'核实被函证单位信息K0-2'!$A:$AL,4,0)"
+        },
+        {
+          "cell": "K17",
+          "formula": "=VLOOKUP($B17,'核实被函证单位信息K0-2'!$A:$AL,10,0)"
+        },
+        {
+          "cell": "M17",
+          "formula": "=VLOOKUP($B17,'核实被函证单位信息K0-2'!$A:$AL,16,0)"
+        },
+        {
+          "cell": "Q17",
+          "formula": "=VLOOKUP($B17,'核实被函证单位信息K0-2'!$A:$AL,19,0)"
+        },
+        {
+          "cell": "R17",
+          "formula": "=VLOOKUP($B17,'核实被函证单位信息K0-2'!$A:$AL,22,0)"
+        },
+        {
+          "cell": "T17",
+          "formula": "=IF(L17=\"是\",S17-F17,\"未回函\")"
+        },
+        {
+          "cell": "D18",
+          "formula": "=VLOOKUP($B18,'核实被函证单位信息K0-2'!$A:$AL,2,0)"
+        },
+        {
+          "cell": "G18",
+          "formula": "=VLOOKUP($B18,'核实被函证单位信息K0-2'!$A:$AL,3,0)"
+        },
+        {
+          "cell": "J18",
+          "formula": "=VLOOKUP($B18,'核实被函证单位信息K0-2'!$A:$AL,4,0)"
+        },
+        {
+          "cell": "K18",
+          "formula": "=VLOOKUP($B18,'核实被函证单位信息K0-2'!$A:$AL,10,0)"
+        },
+        {
+          "cell": "M18",
+          "formula": "=VLOOKUP($B18,'核实被函证单位信息K0-2'!$A:$AL,16,0)"
+        },
+        {
+          "cell": "Q18",
+          "formula": "=VLOOKUP($B18,'核实被函证单位信息K0-2'!$A:$AL,19,0)"
+        },
+        {
+          "cell": "R18",
+          "formula": "=VLOOKUP($B18,'核实被函证单位信息K0-2'!$A:$AL,22,0)"
+        },
+        {
+          "cell": "T18",
+          "formula": "=IF(L18=\"是\",S18-F18,\"未回函\")"
+        },
+        {
+          "cell": "D19",
+          "formula": "=VLOOKUP($B19,'核实被函证单位信息K0-2'!$A:$AL,2,0)"
+        },
+        {
+          "cell": "G19",
+          "formula": "=VLOOKUP($B19,'核实被函证单位信息K0-2'!$A:$AL,3,0)"
+        },
+        {
+          "cell": "J19",
+          "formula": "=VLOOKUP($B19,'核实被函证单位信息K0-2'!$A:$AL,4,0)"
+        },
+        {
+          "cell": "K19",
+          "formula": "=VLOOKUP($B19,'核实被函证单位信息K0-2'!$A:$AL,10,0)"
+        },
+        {
+          "cell": "M19",
+          "formula": "=VLOOKUP($B19,'核实被函证单位信息K0-2'!$A:$AL,16,0)"
+        },
+        {
+          "cell": "Q19",
+          "formula": "=VLOOKUP($B19,'核实被函证单位信息K0-2'!$A:$AL,19,0)"
+        },
+        {
+          "cell": "R19",
+          "formula": "=VLOOKUP($B19,'核实被函证单位信息K0-2'!$A:$AL,22,0)"
+        },
+        {
+          "cell": "T19",
+          "formula": "=IF(L19=\"是\",S19-F19,\"未回函\")"
+        },
+        {
+          "cell": "D20",
+          "formula": "=VLOOKUP($B20,'核实被函证单位信息K0-2'!$A:$AL,2,0)"
+        },
+        {
+          "cell": "G20",
+          "formula": "=VLOOKUP($B20,'核实被函证单位信息K0-2'!$A:$AL,3,0)"
+        },
+        {
+          "cell": "J20",
+          "formula": "=VLOOKUP($B20,'核实被函证单位信息K0-2'!$A:$AL,4,0)"
+        },
+        {
+          "cell": "K20",
+          "formula": "=VLOOKUP($B20,'核实被函证单位信息K0-2'!$A:$AL,10,0)"
+        },
+        {
+          "cell": "M20",
+          "formula": "=VLOOKUP($B20,'核实被函证单位信息K0-2'!$A:$AL,16,0)"
+        },
+        {
+          "cell": "Q20",
+          "formula": "=VLOOKUP($B20,'核实被函证单位信息K0-2'!$A:$AL,19,0)"
+        },
+        {
+          "cell": "R20",
+          "formula": "=VLOOKUP($B20,'核实被函证单位信息K0-2'!$A:$AL,22,0)"
+        },
+        {
+          "cell": "T20",
+          "formula": "=IF(L20=\"是\",S20-F20,\"未回函\")"
+        },
+        {
+          "cell": "D21",
+          "formula": "=VLOOKUP($B21,'核实被函证单位信息K0-2'!$A:$AL,2,0)"
+        },
+        {
+          "cell": "G21",
+          "formula": "=VLOOKUP($B21,'核实被函证单位信息K0-2'!$A:$AL,3,0)"
+        },
+        {
+          "cell": "J21",
+          "formula": "=VLOOKUP($B21,'核实被函证单位信息K0-2'!$A:$AL,4,0)"
+        },
+        {
+          "cell": "K21",
+          "formula": "=VLOOKUP($B21,'核实被函证单位信息K0-2'!$A:$AL,10,0)"
+        },
+        {
+          "cell": "M21",
+          "formula": "=VLOOKUP($B21,'核实被函证单位信息K0-2'!$A:$AL,16,0)"
+        },
+        {
+          "cell": "Q21",
+          "formula": "=VLOOKUP($B21,'核实被函证单位信息K0-2'!$A:$AL,19,0)"
+        },
+        {
+          "cell": "R21",
+          "formula": "=VLOOKUP($B21,'核实被函证单位信息K0-2'!$A:$AL,22,0)"
+        },
+        {
+          "cell": "T21",
+          "formula": "=IF(L21=\"是\",S21-F21,\"未回函\")"
+        },
+        {
+          "cell": "D22",
+          "formula": "=VLOOKUP($B22,'核实被函证单位信息K0-2'!$A:$AL,2,0)"
+        },
+        {
+          "cell": "G22",
+          "formula": "=VLOOKUP($B22,'核实被函证单位信息K0-2'!$A:$AL,3,0)"
+        },
+        {
+          "cell": "J22",
+          "formula": "=VLOOKUP($B22,'核实被函证单位信息K0-2'!$A:$AL,4,0)"
+        },
+        {
+          "cell": "K22",
+          "formula": "=VLOOKUP($B22,'核实被函证单位信息K0-2'!$A:$AL,10,0)"
+        },
+        {
+          "cell": "M22",
+          "formula": "=VLOOKUP($B22,'核实被函证单位信息K0-2'!$A:$AL,16,0)"
+        },
+        {
+          "cell": "Q22",
+          "formula": "=VLOOKUP($B22,'核实被函证单位信息K0-2'!$A:$AL,19,0)"
+        },
+        {
+          "cell": "R22",
+          "formula": "=VLOOKUP($B22,'核实被函证单位信息K0-2'!$A:$AL,22,0)"
+        },
+        {
+          "cell": "T22",
+          "formula": "=IF(L22=\"是\",S22-F22,\"未回函\")"
+        },
+        {
+          "cell": "D23",
+          "formula": "=VLOOKUP($B23,'核实被函证单位信息K0-2'!$A:$AL,2,0)"
+        },
+        {
+          "cell": "G23",
+          "formula": "=VLOOKUP($B23,'核实被函证单位信息K0-2'!$A:$AL,3,0)"
+        },
+        {
+          "cell": "J23",
+          "formula": "=VLOOKUP($B23,'核实被函证单位信息K0-2'!$A:$AL,4,0)"
+        },
+        {
+          "cell": "K23",
+          "formula": "=VLOOKUP($B23,'核实被函证单位信息K0-2'!$A:$AL,10,0)"
+        },
+        {
+          "cell": "M23",
+          "formula": "=VLOOKUP($B23,'核实被函证单位信息K0-2'!$A:$AL,16,0)"
+        },
+        {
+          "cell": "Q23",
+          "formula": "=VLOOKUP($B23,'核实被函证单位信息K0-2'!$A:$AL,19,0)"
+        },
+        {
+          "cell": "R23",
+          "formula": "=VLOOKUP($B23,'核实被函证单位信息K0-2'!$A:$AL,22,0)"
+        },
+        {
+          "cell": "T23",
+          "formula": "=IF(L23=\"是\",S23-F23,\"未回函\")"
+        },
+        {
+          "cell": "D24",
+          "formula": "=VLOOKUP($B24,'核实被函证单位信息K0-2'!$A:$AL,2,0)"
+        },
+        {
+          "cell": "G24",
+          "formula": "=VLOOKUP($B24,'核实被函证单位信息K0-2'!$A:$AL,3,0)"
+        },
+        {
+          "cell": "J24",
+          "formula": "=VLOOKUP($B24,'核实被函证单位信息K0-2'!$A:$AL,4,0)"
+        },
+        {
+          "cell": "K24",
+          "formula": "=VLOOKUP($B24,'核实被函证单位信息K0-2'!$A:$AL,10,0)"
+        },
+        {
+          "cell": "M24",
+          "formula": "=VLOOKUP($B24,'核实被函证单位信息K0-2'!$A:$AL,16,0)"
+        },
+        {
+          "cell": "Q24",
+          "formula": "=VLOOKUP($B24,'核实被函证单位信息K0-2'!$A:$AL,19,0)"
+        },
+        {
+          "cell": "R24",
+          "formula": "=VLOOKUP($B24,'核实被函证单位信息K0-2'!$A:$AL,22,0)"
+        },
+        {
+          "cell": "T24",
+          "formula": "=IF(L24=\"是\",S24-F24,\"未回函\")"
+        },
+        {
+          "cell": "D25",
+          "formula": "=VLOOKUP($B25,'核实被函证单位信息K0-2'!$A:$AL,2,0)"
+        },
+        {
+          "cell": "G25",
+          "formula": "=VLOOKUP($B25,'核实被函证单位信息K0-2'!$A:$AL,3,0)"
+        },
+        {
+          "cell": "J25",
+          "formula": "=VLOOKUP($B25,'核实被函证单位信息K0-2'!$A:$AL,4,0)"
+        },
+        {
+          "cell": "K25",
+          "formula": "=VLOOKUP($B25,'核实被函证单位信息K0-2'!$A:$AL,10,0)"
+        },
+        {
+          "cell": "M25",
+          "formula": "=VLOOKUP($B25,'核实被函证单位信息K0-2'!$A:$AL,16,0)"
+        },
+        {
+          "cell": "Q25",
+          "formula": "=VLOOKUP($B25,'核实被函证单位信息K0-2'!$A:$AL,19,0)"
+        },
+        {
+          "cell": "R25",
+          "formula": "=VLOOKUP($B25,'核实被函证单位信息K0-2'!$A:$AL,22,0)"
+        },
+        {
+          "cell": "T25",
+          "formula": "=IF(L25=\"是\",S25-F25,\"未回函\")"
+        },
+        {
+          "cell": "D26",
+          "formula": "=VLOOKUP($B26,'核实被函证单位信息K0-2'!$A:$AL,2,0)"
+        },
+        {
+          "cell": "G26",
+          "formula": "=VLOOKUP($B26,'核实被函证单位信息K0-2'!$A:$AL,3,0)"
+        },
+        {
+          "cell": "J26",
+          "formula": "=VLOOKUP($B26,'核实被函证单位信息K0-2'!$A:$AL,4,0)"
+        },
+        {
+          "cell": "K26",
+          "formula": "=VLOOKUP($B26,'核实被函证单位信息K0-2'!$A:$AL,10,0)"
+        },
+        {
+          "cell": "M26",
+          "formula": "=VLOOKUP($B26,'核实被函证单位信息K0-2'!$A:$AL,16,0)"
+        },
+        {
+          "cell": "Q26",
+          "formula": "=VLOOKUP($B26,'核实被函证单位信息K0-2'!$A:$AL,19,0)"
+        },
+        {
+          "cell": "R26",
+          "formula": "=VLOOKUP($B26,'核实被函证单位信息K0-2'!$A:$AL,22,0)"
+        },
+        {
+          "cell": "T26",
+          "formula": "=IF(L26=\"是\",S26-F26,\"未回函\")"
+        },
+        {
+          "cell": "E30",
+          "formula": "=SUMIF(E7:E26,E28,F7:F26)"
+        },
+        {
+          "cell": "F30",
+          "formula": "=SUMIF(E7:E26,F28,F7:F26)"
+        },
+        {
+          "cell": "E31",
+          "formula": "=IF(ISERROR(E30/E29),0,E30/E29)"
+        },
+        {
+          "cell": "F31",
+          "formula": "=IF(ISERROR(F30/F29),0,F30/F29)"
+        },
+        {
+          "cell": "E32",
+          "formula": "=SUMIF(E7:E26,E28,U7:U26)"
+        },
+        {
+          "cell": "F32",
+          "formula": "=SUMIF(E7:E26,F28,U7:U26)"
+        },
+        {
+          "cell": "E33",
+          "formula": "=IF(ISERROR(E32/E30),0,E32/E30)"
+        },
+        {
+          "cell": "F33",
+          "formula": "=IF(ISERROR(F32/F30),0,F32/F30)"
+        },
+        {
+          "cell": "E34",
+          "formula": "=IF(ISERROR(E32/E29),0,E32/E29)"
+        },
+        {
+          "cell": "F34",
+          "formula": "=IF(ISERROR(F32/F29),0,F32/F29)"
+        },
+        {
+          "cell": "E35",
+          "formula": "=SUMIF(E7:E26,E28,Y7:Y26)"
+        },
+        {
+          "cell": "F35",
+          "formula": "=SUMIF(E7:E26,F28,Y7:Y26)"
+        },
+        {
+          "cell": "E36",
+          "formula": "=(E35+E32)/E29"
+        },
+        {
+          "cell": "F36",
+          "formula": "=(F35+F32)/F29"
+        }
+      ],
+      "header_rows": {
+        "row_1": [
+          {
+            "col": 1,
+            "letter": "A",
+            "value": "致同会计师事务所"
+          },
+          {
+            "col": 19,
+            "letter": "S",
+            "value": "致同会计师事务所"
+          }
+        ],
+        "row_2": [
+          {
+            "col": 1,
+            "letter": "A",
+            "value": "其他应收款/其他应付款/……函证结果汇总表"
+          },
+          {
+            "col": 19,
+            "letter": "S",
+            "value": "其他应收款函证结果汇总表"
+          }
+        ],
+        "row_3": [
+          {
+            "col": 3,
+            "letter": "C",
+            "value": "=底稿目录!A2"
+          },
+          {
+            "col": 9,
+            "letter": "I",
+            "value": "=底稿目录!A4"
+          },
+          {
+            "col": 13,
+            "letter": "M",
+            "value": "=底稿目录!A5"
+          },
+          {
+            "col": 17,
+            "letter": "Q",
+            "value": "索引号："
+          },
+          {
+            "col": 18,
+            "letter": "R",
+            "value": "=底稿目录!F6"
+          },
+          {
+            "col": 19,
+            "letter": "S",
+            "value": "=底稿目录!A2"
+          },
+          {
+            "col": 23,
+            "letter": "W",
+            "value": "=底稿目录!A4"
+          },
+          {
+            "col": 25,
+            "letter": "Y",
+            "value": "=底稿目录!A5"
+          },
+          {
+            "col": 27,
+            "letter": "AA",
+            "value": "索引号："
+          },
+          {
+            "col": 28,
+            "letter": "AB",
+            "value": "=底稿目录!F6"
+          }
+        ],
+        "row_4": [
+          {
+            "col": 3,
+            "letter": "C",
+            "value": "=底稿目录!A3"
+          },
+          {
+            "col": 9,
+            "letter": "I",
+            "value": "=底稿目录!A6"
+          },
+          {
+            "col": 13,
+            "letter": "M",
+            "value": "=底稿目录!A7"
+          },
+          {
+            "col": 17,
+            "letter": "Q",
+            "value": "页 次："
+          },
+          {
+            "col": 19,
+            "letter": "S",
+            "value": "=底稿目录!A3"
+          },
+          {
+            "col": 23,
+            "letter": "W",
+            "value": "=底稿目录!A6"
+          },
+          {
+            "col": 25,
+            "letter": "Y",
+            "value": "=底稿目录!A7"
+          },
+          {
+            "col": 27,
+            "letter": "AA",
+            "value": "页 次："
+          }
+        ],
+        "row_5": [
+          {
+            "col": 1,
+            "letter": "A",
+            "value": "序号"
+          },
+          {
+            "col": 2,
+            "letter": "B",
+            "value": "询证函索引号"
+          },
+          {
+            "col": 3,
+            "letter": "C",
+            "value": "发函询证纪要"
+          },
+          {
+            "col": 7,
+            "letter": "G",
+            "value": "1、发函信息"
+          },
+          {
+            "col": 12,
+            "letter": "L",
+            "value": "2、收到回函"
+          },
+          {
+            "col": 19,
+            "letter": "S",
+            "value": "3、回函金额确认"
+          },
+          {
+            "col": 24,
+            "letter": "X",
+            "value": "4、未收到回函的替代程序"
+          },
+          {
+            "col": 28,
+            "letter": "AB",
+            "value": "审计结论"
+          }
+        ],
+        "row_6": [
+          {
+            "col": 3,
+            "letter": "C",
+            "value": "选取样本目的"
+          },
+          {
+            "col": 4,
+            "letter": "D",
+            "value": "被询证单位名称"
+          },
+          {
+            "col": 5,
+            "letter": "E",
+            "value": "账户/交易"
+          },
+          {
+            "col": 6,
+            "letter": "F",
+            "value": "金额"
+          },
+          {
+            "col": 7,
+            "letter": "G",
+            "value": "函证方式"
+          },
+          {
+            "col": 8,
+            "letter": "H",
+            "value": "发函日期"
+          },
+          {
+            "col": 9,
+            "letter": "I",
+            "value": "发函单号/跟函记录索引号"
+          },
+          {
+            "col": 10,
+            "letter": "J",
+            "value": "收件地址"
+          },
+          {
+            "col": 11,
+            "letter": "K",
+            "value": "地址核查是否一致"
+          },
+          {
+            "col": 12,
+            "letter": "L",
+            "value": "是否收到回函"
+          },
+          {
+            "col": 13,
+            "letter": "M",
+            "value": "回函方式"
+          },
+          {
+            "col": 14,
+            "letter": "N",
+            "value": "是否相符"
+          },
+          {
+            "col": 15,
+            "letter": "O",
+            "value": "回函日期"
+          },
+          {
+            "col": 16,
+            "letter": "P",
+            "value": "回函快递单号"
+          },
+          {
+            "col": 17,
+            "letter": "Q",
+            "value": "回函发出地址"
+          },
+          {
+            "col": 18,
+            "letter": "R",
+            "value": "发函地址与回函地址是否一致"
+          },
+          {
+            "col": 19,
+            "letter": "S",
+            "value": "回函金额"
+          },
+          {
+            "col": 20,
+            "letter": "T",
+            "value": "差异"
+          },
+          {
+            "col": 21,
+            "letter": "U",
+            "value": "可确认金额"
+          },
+          {
+            "col": 22,
+            "letter": "V",
+            "value": "调节索引（K1-12）"
+          },
+          {
+            "col": 23,
+            "letter": "W",
+            "value": "其他说明/备注"
+          },
+          {
+            "col": 24,
+            "letter": "X",
+            "value": "是否采取替代程序"
+          },
+          {
+            "col": 25,
+            "letter": "Y",
+            "value": "替代后可确认金额"
+          },
+          {
+            "col": 26,
+            "letter": "Z",
+            "value": "替代后不可确认金额"
+          },
+          {
+            "col": 27,
+            "letter": "AA",
+            "value": "替代程序索引号"
+          }
+        ],
+        "row_7": [
+          {
+            "col": 1,
+            "letter": "A",
+            "value": "1"
+          },
+          {
+            "col": 4,
+            "letter": "D",
+            "value": "=VLOOKUP($B7,'核实被函证单位信息K0-2'!$A:$AL,2,0)"
+          },
+          {
+            "col": 7,
+            "letter": "G",
+            "value": "=VLOOKUP($B7,'核实被函证单位信息K0-2'!$A:$AL,3,0)"
+          },
+          {
+            "col": 10,
+            "letter": "J",
+            "value": "=VLOOKUP($B7,'核实被函证单位信息K0-2'!$A:$AL,4,0)"
+          },
+          {
+            "col": 11,
+            "letter": "K",
+            "value": "=VLOOKUP($B7,'核实被函证单位信息K0-2'!$A:$AL,10,0)"
+          },
+          {
+            "col": 13,
+            "letter": "M",
+            "value": "=VLOOKUP($B7,'核实被函证单位信息K0-2'!$A:$AL,16,0)"
+          },
+          {
+            "col": 17,
+            "letter": "Q",
+            "value": "=VLOOKUP($B7,'核实被函证单位信息K0-2'!$A:$AL,19,0)"
+          },
+          {
+            "col": 18,
+            "letter": "R",
+            "value": "=VLOOKUP($B7,'核实被函证单位信息K0-2'!$A:$AL,22,0)"
+          },
+          {
+            "col": 20,
+            "letter": "T",
+            "value": "=IF(L7=\"是\",S7-F7,\"未回函\")"
+          }
+        ],
+        "row_8": [
+          {
+            "col": 1,
+            "letter": "A",
+            "value": "2"
+          },
+          {
+            "col": 4,
+            "letter": "D",
+            "value": "=VLOOKUP($B8,'核实被函证单位信息K0-2'!$A:$AL,2,0)"
+          },
+          {
+            "col": 7,
+            "letter": "G",
+            "value": "=VLOOKUP($B8,'核实被函证单位信息K0-2'!$A:$AL,3,0)"
+          },
+          {
+            "col": 10,
+            "letter": "J",
+            "value": "=VLOOKUP($B8,'核实被函证单位信息K0-2'!$A:$AL,4,0)"
+          },
+          {
+            "col": 11,
+            "letter": "K",
+            "value": "=VLOOKUP($B8,'核实被函证单位信息K0-2'!$A:$AL,10,0)"
+          },
+          {
+            "col": 13,
+            "letter": "M",
+            "value": "=VLOOKUP($B8,'核实被函证单位信息K0-2'!$A:$AL,16,0)"
+          },
+          {
+            "col": 17,
+            "letter": "Q",
+            "value": "=VLOOKUP($B8,'核实被函证单位信息K0-2'!$A:$AL,19,0)"
+          },
+          {
+            "col": 18,
+            "letter": "R",
+            "value": "=VLOOKUP($B8,'核实被函证单位信息K0-2'!$A:$AL,22,0)"
+          },
+          {
+            "col": 20,
+            "letter": "T",
+            "value": "=IF(L8=\"是\",S8-F8,\"未回函\")"
+          }
+        ],
+        "row_9": [
+          {
+            "col": 1,
+            "letter": "A",
+            "value": "3"
+          },
+          {
+            "col": 4,
+            "letter": "D",
+            "value": "=VLOOKUP($B9,'核实被函证单位信息K0-2'!$A:$AL,2,0)"
+          },
+          {
+            "col": 7,
+            "letter": "G",
+            "value": "=VLOOKUP($B9,'核实被函证单位信息K0-2'!$A:$AL,3,0)"
+          },
+          {
+            "col": 10,
+            "letter": "J",
+            "value": "=VLOOKUP($B9,'核实被函证单位信息K0-2'!$A:$AL,4,0)"
+          },
+          {
+            "col": 11,
+            "letter": "K",
+            "value": "=VLOOKUP($B9,'核实被函证单位信息K0-2'!$A:$AL,10,0)"
+          },
+          {
+            "col": 13,
+            "letter": "M",
+            "value": "=VLOOKUP($B9,'核实被函证单位信息K0-2'!$A:$AL,16,0)"
+          },
+          {
+            "col": 17,
+            "letter": "Q",
+            "value": "=VLOOKUP($B9,'核实被函证单位信息K0-2'!$A:$AL,19,0)"
+          },
+          {
+            "col": 18,
+            "letter": "R",
+            "value": "=VLOOKUP($B9,'核实被函证单位信息K0-2'!$A:$AL,22,0)"
+          },
+          {
+            "col": 20,
+            "letter": "T",
+            "value": "=IF(L9=\"是\",S9-F9,\"未回函\")"
+          }
+        ],
+        "row_10": [
+          {
+            "col": 1,
+            "letter": "A",
+            "value": "4"
+          },
+          {
+            "col": 4,
+            "letter": "D",
+            "value": "=VLOOKUP($B10,'核实被函证单位信息K0-2'!$A:$AL,2,0)"
+          },
+          {
+            "col": 7,
+            "letter": "G",
+            "value": "=VLOOKUP($B10,'核实被函证单位信息K0-2'!$A:$AL,3,0)"
+          },
+          {
+            "col": 10,
+            "letter": "J",
+            "value": "=VLOOKUP($B10,'核实被函证单位信息K0-2'!$A:$AL,4,0)"
+          },
+          {
+            "col": 11,
+            "letter": "K",
+            "value": "=VLOOKUP($B10,'核实被函证单位信息K0-2'!$A:$AL,10,0)"
+          },
+          {
+            "col": 13,
+            "letter": "M",
+            "value": "=VLOOKUP($B10,'核实被函证单位信息K0-2'!$A:$AL,16,0)"
+          },
+          {
+            "col": 17,
+            "letter": "Q",
+            "value": "=VLOOKUP($B10,'核实被函证单位信息K0-2'!$A:$AL,19,0)"
+          },
+          {
+            "col": 18,
+            "letter": "R",
+            "value": "=VLOOKUP($B10,'核实被函证单位信息K0-2'!$A:$AL,22,0)"
+          },
+          {
+            "col": 20,
+            "letter": "T",
+            "value": "=IF(L10=\"是\",S10-F10,\"未回函\")"
+          }
+        ]
+      }
+    },
+    {
+      "name": "核实被函证单位信息K0-2",
+      "dimensions": {
+        "max_row": 41,
+        "max_col": 40,
+        "range": "A1:AN41"
+      },
+      "merged_cells": [
+        "A5:A6",
+        "A1:N1",
+        "AL5:AL6",
+        "P1:AA1",
+        "AF5:AK5",
+        "AD5:AD6",
+        "A2:N2",
+        "P2:AA2",
+        "AB2:AL2",
+        "AB1:AL1",
+        "B5:O5",
+        "P5:AA5",
+        "C25:O25",
+        "AB5:AB6",
+        "AE5:AE6",
+        "AC5:AC6"
+      ],
+      "formula_count": 21,
+      "formulas": [
+        {
+          "cell": "C3",
+          "formula": "=底稿目录!A2"
+        },
+        {
+          "cell": "F3",
+          "formula": "=底稿目录!A4"
+        },
+        {
+          "cell": "K3",
+          "formula": "=底稿目录!A5"
+        },
+        {
+          "cell": "O3",
+          "formula": "=底稿目录!F7"
+        },
+        {
+          "cell": "P3",
+          "formula": "=底稿目录!A2"
+        },
+        {
+          "cell": "T3",
+          "formula": "=底稿目录!A4"
+        },
+        {
+          "cell": "W3",
+          "formula": "=底稿目录!A5"
+        },
+        {
+          "cell": "AA3",
+          "formula": "=底稿目录!F7"
+        },
+        {
+          "cell": "AB3",
+          "formula": "=底稿目录!A2"
+        },
+        {
+          "cell": "AE3",
+          "formula": "=底稿目录!A4"
+        },
+        {
+          "cell": "AH3",
+          "formula": "=底稿目录!A5"
+        },
+        {
+          "cell": "AL3",
+          "formula": "=底稿目录!F7"
+        },
+        {
+          "cell": "C4",
+          "formula": "=底稿目录!A3"
+        },
+        {
+          "cell": "F4",
+          "formula": "=底稿目录!A6"
+        },
+        {
+          "cell": "K4",
+          "formula": "=底稿目录!A7"
+        },
+        {
+          "cell": "P4",
+          "formula": "=底稿目录!A3"
+        },
+        {
+          "cell": "T4",
+          "formula": "=底稿目录!A6"
+        },
+        {
+          "cell": "W4",
+          "formula": "=底稿目录!A7"
+        },
+        {
+          "cell": "AB4",
+          "formula": "=底稿目录!A3"
+        },
+        {
+          "cell": "AE4",
+          "formula": "=底稿目录!A6"
+        },
+        {
+          "cell": "AH4",
+          "formula": "=底稿目录!A7"
+        }
+      ],
+      "header_rows": {
+        "row_1": [
+          {
+            "col": 1,
+            "letter": "A",
+            "value": "致同会计师事务所"
+          },
+          {
+            "col": 16,
+            "letter": "P",
+            "value": "致同会计师事务所"
+          },
+          {
+            "col": 28,
+            "letter": "AB",
+            "value": "致同会计师事务所"
+          }
+        ],
+        "row_2": [
+          {
+            "col": 1,
+            "letter": "A",
+            "value": "核实被函证单位信息"
+          },
+          {
+            "col": 16,
+            "letter": "P",
+            "value": "核实被函证单位信息"
+          },
+          {
+            "col": 28,
+            "letter": "AB",
+            "value": "核实被函证单位信息"
+          }
+        ],
+        "row_3": [
+          {
+            "col": 3,
+            "letter": "C",
+            "value": "=底稿目录!A2"
+          },
+          {
+            "col": 6,
+            "letter": "F",
+            "value": "=底稿目录!A4"
+          },
+          {
+            "col": 11,
+            "letter": "K",
+            "value": "=底稿目录!A5"
+          },
+          {
+            "col": 14,
+            "letter": "N",
+            "value": "索引号："
+          },
+          {
+            "col": 15,
+            "letter": "O",
+            "value": "=底稿目录!F7"
+          },
+          {
+            "col": 16,
+            "letter": "P",
+            "value": "=底稿目录!A2"
+          },
+          {
+            "col": 20,
+            "letter": "T",
+            "value": "=底稿目录!A4"
+          },
+          {
+            "col": 23,
+            "letter": "W",
+            "value": "=底稿目录!A5"
+          },
+          {
+            "col": 26,
+            "letter": "Z",
+            "value": "索引号："
+          },
+          {
+            "col": 27,
+            "letter": "AA",
+            "value": "=底稿目录!F7"
+          },
+          {
+            "col": 28,
+            "letter": "AB",
+            "value": "=底稿目录!A2"
+          },
+          {
+            "col": 31,
+            "letter": "AE",
+            "value": "=底稿目录!A4"
+          },
+          {
+            "col": 34,
+            "letter": "AH",
+            "value": "=底稿目录!A5"
+          },
+          {
+            "col": 37,
+            "letter": "AK",
+            "value": "索引号："
+          },
+          {
+            "col": 38,
+            "letter": "AL",
+            "value": "=底稿目录!F7"
+          }
+        ],
+        "row_4": [
+          {
+            "col": 3,
+            "letter": "C",
+            "value": "=底稿目录!A3"
+          },
+          {
+            "col": 6,
+            "letter": "F",
+            "value": "=底稿目录!A6"
+          },
+          {
+            "col": 11,
+            "letter": "K",
+            "value": "=底稿目录!A7"
+          },
+          {
+            "col": 14,
+            "letter": "N",
+            "value": "页  次："
+          },
+          {
+            "col": 16,
+            "letter": "P",
+            "value": "=底稿目录!A3"
+          },
+          {
+            "col": 20,
+            "letter": "T",
+            "value": "=底稿目录!A6"
+          },
+          {
+            "col": 23,
+            "letter": "W",
+            "value": "=底稿目录!A7"
+          },
+          {
+            "col": 26,
+            "letter": "Z",
+            "value": "页  次："
+          },
+          {
+            "col": 28,
+            "letter": "AB",
+            "value": "=底稿目录!A3"
+          },
+          {
+            "col": 31,
+            "letter": "AE",
+            "value": "=底稿目录!A6"
+          },
+          {
+            "col": 34,
+            "letter": "AH",
+            "value": "=底稿目录!A7"
+          },
+          {
+            "col": 37,
+            "letter": "AK",
+            "value": "页  次："
+          }
+        ],
+        "row_5": [
+          {
+            "col": 1,
+            "letter": "A",
+            "value": "函证索引"
+          },
+          {
+            "col": 2,
+            "letter": "B",
+            "value": "被审计单位提供的被函证单位信息及核对（核实被函证单位信息）（注1）"
+          },
+          {
+            "col": 16,
+            "letter": "P",
+            "value": "回函信息情况（回函核对记录）"
+          },
+          {
+            "col": 28,
+            "letter": "AB",
+            "value": "第一次发函结果？（送抵/退回）（注2）"
+          },
+          {
+            "col": 29,
+            "letter": "AC",
+            "value": "经核实的原因"
+          },
+          {
+            "col": 30,
+            "letter": "AD",
+            "value": "该原因是否合理（是/否）\n（注3）"
+          },
+          {
+            "col": 31,
+            "letter": "AE",
+            "value": "是否进行第二次发函？\n（是/否）"
+          },
+          {
+            "col": 32,
+            "letter": "AF",
+            "value": "第二次发函的被函证单位信息"
+          },
+          {
+            "col": 38,
+            "letter": "AL",
+            "value": "第二次发函结果？（送抵/退回）\n（注4）"
+          }
+        ],
+        "row_6": [
+          {
+            "col": 2,
+            "letter": "B",
+            "value": "被询证单位全称"
+          },
+          {
+            "col": 3,
+            "letter": "C",
+            "value": "函证方式"
+          },
+          {
+            "col": 4,
+            "letter": "D",
+            "value": "收件地址"
+          },
+          {
+            "col": 5,
+            "letter": "E",
+            "value": "邮编"
+          },
+          {
+            "col": 6,
+            "letter": "F",
+            "value": "联系人"
+          },
+          {
+            "col": 7,
+            "letter": "G",
+            "value": "联系电话"
+          },
+          {
+            "col": 8,
+            "letter": "H",
+            "value": "邮箱/传真"
+          },
+          {
+            "col": 9,
+            "letter": "I",
+            "value": "企查查地址"
+          },
+          {
+            "col": 10,
+            "letter": "J",
+            "value": "发函地址与企查查地址是否一致"
+          },
+          {
+            "col": 11,
+            "letter": "K",
+            "value": "地址核查不一致的说明"
+          },
+          {
+            "col": 12,
+            "letter": "L",
+            "value": "地址不一致的核实方式"
+          },
+          {
+            "col": 13,
+            "letter": "M",
+            "value": "核实的支持性文件或其他公开信息索引号"
+          },
+          {
+            "col": 14,
+            "letter": "N",
+            "value": "不一致说明是否合理"
+          },
+          {
+            "col": 15,
+            "letter": "O",
+            "value": "备注"
+          },
+          {
+            "col": 16,
+            "letter": "P",
+            "value": "回函方式"
+          },
+          {
+            "col": 17,
+            "letter": "Q",
+            "value": "是否为原件"
+          },
+          {
+            "col": 18,
+            "letter": "R",
+            "value": "是否直接收到回函"
+          },
+          {
+            "col": 19,
+            "letter": "S",
+            "value": "回函发出地址（含物流信息中的地址）"
+          },
+          {
+            "col": 20,
+            "letter": "T",
+            "value": "回函寄件人"
+          },
+          {
+            "col": 21,
+            "letter": "U",
+            "value": "回函电话"
+          },
+          {
+            "col": 22,
+            "letter": "V",
+            "value": "发函地址与回函地址是否一致"
+          },
+          {
+            "col": 23,
+            "letter": "W",
+            "value": "发函收件人与回函寄件人是否一致"
+          },
+          {
+            "col": 24,
+            "letter": "X",
+            "value": "发函收件人电话与回函寄件人电话是否一致"
+          },
+          {
+            "col": 25,
+            "letter": "Y",
+            "value": "不一致的说明"
+          },
+          {
+            "col": 26,
+            "letter": "Z",
+            "value": "核实支持性证据索引号"
+          },
+          {
+            "col": 27,
+            "letter": "AA",
+            "value": "跟函函证控制过程（K1-11）"
+          },
+          {
+            "col": 32,
+            "letter": "AF",
+            "value": "地址"
+          },
+          {
+            "col": 33,
+            "letter": "AG",
+            "value": "邮编"
+          },
+          {
+            "col": 34,
+            "letter": "AH",
+            "value": "联系人"
+          },
+          {
+            "col": 35,
+            "letter": "AI",
+            "value": "联系电话"
+          },
+          {
+            "col": 36,
+            "letter": "AJ",
+            "value": "传真"
+          },
+          {
+            "col": 37,
+            "letter": "AK",
+            "value": "信息是否核查一致"
+          }
+        ]
+      }
+    },
+    {
+      "name": "跟函函证过程控制K0-3",
+      "dimensions": {
+        "max_row": 37,
+        "max_col": 18,
+        "range": "A1:R37"
+      },
+      "merged_cells": [
+        "A2:F2",
+        "A1:F1",
+        "A5:F5"
+      ],
+      "formula_count": 7,
+      "formulas": [
+        {
+          "cell": "A3",
+          "formula": "=底稿目录!A2"
+        },
+        {
+          "cell": "C3",
+          "formula": "=底稿目录!A4"
+        },
+        {
+          "cell": "D3",
+          "formula": "=底稿目录!A5"
+        },
+        {
+          "cell": "F3",
+          "formula": "=底稿目录!F8"
+        },
+        {
+          "cell": "A4",
+          "formula": "=底稿目录!A3"
+        },
+        {
+          "cell": "C4",
+          "formula": "=底稿目录!A6"
+        },
+        {
+          "cell": "D4",
+          "formula": "=底稿目录!A7"
+        }
+      ],
+      "header_rows": {
+        "row_1": [
+          {
+            "col": 1,
+            "letter": "A",
+            "value": "致同会计师事务所"
+          }
+        ],
+        "row_2": [
+          {
+            "col": 1,
+            "letter": "A",
+            "value": "跟函函证过程控制"
+          }
+        ],
+        "row_3": [
+          {
+            "col": 1,
+            "letter": "A",
+            "value": "=底稿目录!A2"
+          },
+          {
+            "col": 3,
+            "letter": "C",
+            "value": "=底稿目录!A4"
+          },
+          {
+            "col": 4,
+            "letter": "D",
+            "value": "=底稿目录!A5"
+          },
+          {
+            "col": 5,
+            "letter": "E",
+            "value": "索引号："
+          },
+          {
+            "col": 6,
+            "letter": "F",
+            "value": "=底稿目录!F8"
+          }
+        ],
+        "row_4": [
+          {
+            "col": 1,
+            "letter": "A",
+            "value": "=底稿目录!A3"
+          },
+          {
+            "col": 3,
+            "letter": "C",
+            "value": "=底稿目录!A6"
+          },
+          {
+            "col": 4,
+            "letter": "D",
+            "value": "=底稿目录!A7"
+          },
+          {
+            "col": 5,
+            "letter": "E",
+            "value": "页次："
+          }
+        ],
+        "row_5": [
+          {
+            "col": 1,
+            "letter": "A",
+            "value": "直接至被函证方公司进行函证（“跟函”）程序的记录   "
+          }
+        ],
+        "row_6": [
+          {
+            "col": 1,
+            "letter": "A",
+            "value": "提示："
+          }
+        ],
+        "row_7": [
+          {
+            "col": 1,
+            "letter": "A",
+            "value": "·本记录是针对审计项目组成员不通过寄送，而是直接至被函证方公司进行函证（“跟函”）的情况。"
+          }
+        ],
+        "row_8": [
+          {
+            "col": 1,
+            "letter": "A",
+            "value": "·本记录应由执行跟函程序的项目组成员针对每一份经由跟函程序取得的函证编制，并由该跟函人员在记录底稿上手书签署姓名。"
+          }
+        ],
+        "row_9": [
+          {
+            "col": 1,
+            "letter": "A",
+            "value": "·[  ]中的斜体字请根据实际情况填写。"
+          }
+        ],
+        "row_10": [
+          {
+            "col": 1,
+            "letter": "A",
+            "value": "审计项目组成员[XXX…]于[202X年XX月XX日]与[被审计单位XX部XX]一同/或者在无被审计单位人员陪同下独立至"
+          }
+        ]
+      }
+    },
+    {
+      "name": "函证差异调节表K0-4",
+      "dimensions": {
+        "max_row": 21,
+        "max_col": 15,
+        "range": "A1:O21"
+      },
+      "merged_cells": [
+        "A1:I1",
+        "A2:I2"
+      ],
+      "formula_count": 25,
+      "formulas": [
+        {
+          "cell": "A3",
+          "formula": "=底稿目录!A2"
+        },
+        {
+          "cell": "D3",
+          "formula": "=底稿目录!A4"
+        },
+        {
+          "cell": "G3",
+          "formula": "=底稿目录!A5"
+        },
+        {
+          "cell": "I3",
+          "formula": "=底稿目录!F9"
+        },
+        {
+          "cell": "A4",
+          "formula": "=底稿目录!A3"
+        },
+        {
+          "cell": "D4",
+          "formula": "=底稿目录!A6"
+        },
+        {
+          "cell": "G4",
+          "formula": "=底稿目录!A7"
+        },
+        {
+          "cell": "F6",
+          "formula": "=D6-E6"
+        },
+        {
+          "cell": "F7",
+          "formula": "=D7-E7"
+        },
+        {
+          "cell": "F8",
+          "formula": "=D8-E8"
+        },
+        {
+          "cell": "F9",
+          "formula": "=D9-E9"
+        },
+        {
+          "cell": "F10",
+          "formula": "=D10-E10"
+        },
+        {
+          "cell": "F11",
+          "formula": "=D11-E11"
+        },
+        {
+          "cell": "F12",
+          "formula": "=D12-E12"
+        },
+        {
+          "cell": "F13",
+          "formula": "=D13-E13"
+        },
+        {
+          "cell": "F14",
+          "formula": "=D14-E14"
+        },
+        {
+          "cell": "F15",
+          "formula": "=D15-E15"
+        },
+        {
+          "cell": "F16",
+          "formula": "=D16-E16"
+        },
+        {
+          "cell": "F17",
+          "formula": "=D17-E17"
+        },
+        {
+          "cell": "F18",
+          "formula": "=D18-E18"
+        },
+        {
+          "cell": "F19",
+          "formula": "=D19-E19"
+        },
+        {
+          "cell": "F20",
+          "formula": "=D20-E20"
+        },
+        {
+          "cell": "D21",
+          "formula": "=SUM(D6:D20)"
+        },
+        {
+          "cell": "E21",
+          "formula": "=SUM(E6:E20)"
+        },
+        {
+          "cell": "F21",
+          "formula": "=SUM(F6:F20)"
+        }
+      ],
+      "header_rows": {
+        "row_1": [
+          {
+            "col": 1,
+            "letter": "A",
+            "value": "致同会计师事务所"
+          }
+        ],
+        "row_2": [
+          {
+            "col": 1,
+            "letter": "A",
+            "value": "其他应收款/其他应付款/……函证差异调节表"
+          }
+        ],
+        "row_3": [
+          {
+            "col": 1,
+            "letter": "A",
+            "value": "=底稿目录!A2"
+          },
+          {
+            "col": 4,
+            "letter": "D",
+            "value": "=底稿目录!A4"
+          },
+          {
+            "col": 7,
+            "letter": "G",
+            "value": "=底稿目录!A5"
+          },
+          {
+            "col": 8,
+            "letter": "H",
+            "value": "索引号："
+          },
+          {
+            "col": 9,
+            "letter": "I",
+            "value": "=底稿目录!F9"
+          }
+        ],
+        "row_4": [
+          {
+            "col": 1,
+            "letter": "A",
+            "value": "=底稿目录!A3"
+          },
+          {
+            "col": 4,
+            "letter": "D",
+            "value": "=底稿目录!A6"
+          },
+          {
+            "col": 7,
+            "letter": "G",
+            "value": "=底稿目录!A7"
+          },
+          {
+            "col": 8,
+            "letter": "H",
+            "value": "页次："
+          }
+        ],
+        "row_5": [
+          {
+            "col": 1,
+            "letter": "A",
+            "value": "询证函索引号"
+          },
+          {
+            "col": 2,
+            "letter": "B",
+            "value": "被询证单位名称"
+          },
+          {
+            "col": 3,
+            "letter": "C",
+            "value": "账户/交易"
+          },
+          {
+            "col": 4,
+            "letter": "D",
+            "value": "发函金额"
+          },
+          {
+            "col": 5,
+            "letter": "E",
+            "value": "回函金额"
+          },
+          {
+            "col": 6,
+            "letter": "F",
+            "value": "差异"
+          },
+          {
+            "col": 7,
+            "letter": "G",
+            "value": "差异原因"
+          },
+          {
+            "col": 8,
+            "letter": "H",
+            "value": "相关支持性证据"
+          },
+          {
+            "col": 9,
+            "letter": "I",
+            "value": "是否调整"
+          }
+        ],
+        "row_6": [
+          {
+            "col": 6,
+            "letter": "F",
+            "value": "=D6-E6"
+          }
+        ],
+        "row_7": [
+          {
+            "col": 6,
+            "letter": "F",
+            "value": "=D7-E7"
+          }
+        ],
+        "row_8": [
+          {
+            "col": 6,
+            "letter": "F",
+            "value": "=D8-E8"
+          }
+        ],
+        "row_9": [
+          {
+            "col": 6,
+            "letter": "F",
+            "value": "=D9-E9"
+          }
+        ],
+        "row_10": [
+          {
+            "col": 6,
+            "letter": "F",
+            "value": "=D10-E10"
+          }
+        ]
+      }
+    },
+    {
+      "name": "其他应收款替代程序K0-5",
+      "dimensions": {
+        "max_row": 73,
+        "max_col": 25,
+        "range": "A1:Y73"
+      },
+      "merged_cells": [
+        "N26:N27",
+        "L48:L49",
+        "M48:M49",
+        "A15:E15",
+        "F26:H26",
+        "L15:L16",
+        "F38:H38",
+        "M15:M16",
+        "A2:O2",
+        "I48:K48",
+        "F48:H48",
+        "I38:K38",
+        "N48:N49",
+        "L26:L27",
+        "A26:E26",
+        "L38:L39",
+        "N38:N39",
+        "N15:N16",
+        "I15:K15",
+        "M26:M27",
+        "M38:M39",
+        "A1:O1",
+        "I26:K26",
+        "F15:H15"
+      ],
+      "formula_count": 14,
+      "formulas": [
+        {
+          "cell": "A3",
+          "formula": "=底稿目录!A2"
+        },
+        {
+          "cell": "F3",
+          "formula": "=底稿目录!A4"
+        },
+        {
+          "cell": "I3",
+          "formula": "=底稿目录!A5"
+        },
+        {
+          "cell": "N3",
+          "formula": "=底稿目录!F10"
+        },
+        {
+          "cell": "A4",
+          "formula": "=底稿目录!A3"
+        },
+        {
+          "cell": "F4",
+          "formula": "=底稿目录!A6"
+        },
+        {
+          "cell": "I4",
+          "formula": "=底稿目录!A7"
+        },
+        {
+          "cell": "E12",
+          "formula": "=B12+C12-D12"
+        },
+        {
+          "cell": "E23",
+          "formula": "=SUM(E17:E22)"
+        },
+        {
+          "cell": "H23",
+          "formula": "=SUM(H17:H22)"
+        },
+        {
+          "cell": "E34",
+          "formula": "=SUM(E28:E33)"
+        },
+        {
+          "cell": "E46",
+          "formula": "=SUM(E40:E45)"
+        },
+        {
+          "cell": "M46",
+          "formula": "=SUM(M40:M45)"
+        },
+        {
+          "cell": "E56",
+          "formula": "=SUM(E50:E55)"
+        }
+      ],
+      "all_rows": {
+        "row_1": [
+          {
+            "col": 1,
+            "letter": "A",
+            "value": "致同会计师事务所"
+          }
+        ],
+        "row_2": [
+          {
+            "col": 1,
+            "letter": "A",
+            "value": "其他应收款替代程序检查表-XX公司"
+          }
+        ],
+        "row_3": [
+          {
+            "col": 1,
+            "letter": "A",
+            "value": "=底稿目录!A2"
+          },
+          {
+            "col": 6,
+            "letter": "F",
+            "value": "=底稿目录!A4"
+          },
+          {
+            "col": 9,
+            "letter": "I",
+            "value": "=底稿目录!A5"
+          },
+          {
+            "col": 13,
+            "letter": "M",
+            "value": "索引号："
+          },
+          {
+            "col": 14,
+            "letter": "N",
+            "value": "=底稿目录!F10"
+          }
+        ],
+        "row_4": [
+          {
+            "col": 1,
+            "letter": "A",
+            "value": "=底稿目录!A3"
+          },
+          {
+            "col": 6,
+            "letter": "F",
+            "value": "=底稿目录!A6"
+          },
+          {
+            "col": 9,
+            "letter": "I",
+            "value": "=底稿目录!A7"
+          },
+          {
+            "col": 13,
+            "letter": "M",
+            "value": "页次："
+          }
+        ],
+        "row_5": [
+          {
+            "col": 1,
+            "letter": "A",
+            "value": "债务人名称："
+          }
+        ],
+        "row_6": [
+          {
+            "col": 1,
+            "letter": "A",
+            "value": "一、样本选取标准与规模："
+          }
+        ],
+        "row_7": [
+          {
+            "col": 1,
+            "letter": "A",
+            "value": "测试范围："
+          },
+          {
+            "col": 2,
+            "letter": "B",
+            "value": "如借方发生额所有凭证共XX笔金额XX、贷方发生额所有凭证共XX笔金额XX"
+          },
+          {
+            "col": 8,
+            "letter": "H",
+            "value": "特定样本："
+          },
+          {
+            "col": 9,
+            "letter": "I",
+            "value": "XX金额以上（大额）、关联方/关联交易形成的款项、XX异常款项全部测试，共XX笔；"
+          }
+        ],
+        "row_8": [
+          {
+            "col": 1,
+            "letter": "A",
+            "value": "抽样总体："
+          },
+          {
+            "col": 2,
+            "letter": "B",
+            "value": "测试总体扣除特定样本以外的样本，共XX笔、金额XX"
+          },
+          {
+            "col": 8,
+            "letter": "H",
+            "value": "确定的抽样样本量："
+          },
+          {
+            "col": 10,
+            "letter": "J",
+            "value": "抽取XX笔（如果使用了样本计算器计算样本量，样本量计算过程见<XX>底稿）"
+          }
+        ],
+        "row_9": [
+          {
+            "col": 1,
+            "letter": "A",
+            "value": "抽样方法："
+          },
+          {
+            "col": 2,
+            "letter": "B",
+            "value": "随机选样/系统选样/货币单元抽样/随意选样（非统计抽样适用）"
+          },
+          {
+            "col": 8,
+            "letter": "H",
+            "value": "抽样过程："
+          },
+          {
+            "col": 9,
+            "letter": "I",
+            "value": "使用IDEA（XX抽样工具）选择XX数量占比XX%的样本进行测试，抽样工具中的样本选择过程和结果见XX底稿"
+          }
+        ],
+        "row_10": [
+          {
+            "col": 1,
+            "letter": "A",
+            "value": "二、检查过程记录："
+          }
+        ],
+        "row_11": [
+          {
+            "col": 1,
+            "letter": "A",
+            "value": "函证项目"
+          },
+          {
+            "col": 2,
+            "letter": "B",
+            "value": "年初余额"
+          },
+          {
+            "col": 3,
+            "letter": "C",
+            "value": "借方发生额"
+          },
+          {
+            "col": 4,
+            "letter": "D",
+            "value": "贷方发生额"
+          },
+          {
+            "col": 5,
+            "letter": "E",
+            "value": "期末余额"
+          }
+        ],
+        "row_12": [
+          {
+            "col": 1,
+            "letter": "A",
+            "value": "其他应收款"
+          },
+          {
+            "col": 5,
+            "letter": "E",
+            "value": "=B12+C12-D12"
+          }
+        ],
+        "row_14": [
+          {
+            "col": 1,
+            "letter": "A",
+            "value": "1.其他应收款检查-检查期后收款"
+          }
+        ],
+        "row_15": [
+          {
+            "col": 1,
+            "letter": "A",
+            "value": "记账凭证"
+          },
+          {
+            "col": 6,
+            "letter": "F",
+            "value": "银行回单"
+          },
+          {
+            "col": 9,
+            "letter": "I",
+            "value": "支持性文件1"
+          },
+          {
+            "col": 12,
+            "letter": "L",
+            "value": "……"
+          },
+          {
+            "col": 13,
+            "letter": "M",
+            "value": "索引号"
+          },
+          {
+            "col": 14,
+            "letter": "N",
+            "value": "是否异常"
+          },
+          {
+            "col": 15,
+            "letter": "O",
+            "value": "检查的关键证据和要素根据被审计单位具体情况修改"
+          }
+        ],
+        "row_16": [
+          {
+            "col": 1,
+            "letter": "A",
+            "value": "日期"
+          },
+          {
+            "col": 2,
+            "letter": "B",
+            "value": "凭证编号"
+          },
+          {
+            "col": 3,
+            "letter": "C",
+            "value": "业务内容"
+          },
+          {
+            "col": 4,
+            "letter": "D",
+            "value": "对方科目"
+          },
+          {
+            "col": 5,
+            "letter": "E",
+            "value": "金额"
+          },
+          {
+            "col": 6,
+            "letter": "F",
+            "value": "日期"
+          },
+          {
+            "col": 7,
+            "letter": "G",
+            "value": "付款方"
+          },
+          {
+            "col": 8,
+            "letter": "H",
+            "value": "金额"
+          },
+          {
+            "col": 9,
+            "letter": "I",
+            "value": "识别特征"
+          },
+          {
+            "col": 10,
+            "letter": "J",
+            "value": "信息1"
+          },
+          {
+            "col": 11,
+            "letter": "K",
+            "value": "信息2"
+          }
+        ],
+        "row_23": [
+          {
+            "col": 1,
+            "letter": "A",
+            "value": "合计"
+          },
+          {
+            "col": 5,
+            "letter": "E",
+            "value": "=SUM(E17:E22)"
+          },
+          {
+            "col": 8,
+            "letter": "H",
+            "value": "=SUM(H17:H22)"
+          }
+        ],
+        "row_25": [
+          {
+            "col": 1,
+            "letter": "A",
+            "value": "2.其他应收款检查-形成期末余额的合同、付款审批单、支出凭单等支持性证据检查"
+          }
+        ],
+        "row_26": [
+          {
+            "col": 1,
+            "letter": "A",
+            "value": "记账凭证"
+          },
+          {
+            "col": 6,
+            "letter": "F",
+            "value": "支持性文件1"
+          },
+          {
+            "col": 9,
+            "letter": "I",
+            "value": "支持性文件2"
+          },
+          {
+            "col": 12,
+            "letter": "L",
+            "value": "……"
+          },
+          {
+            "col": 13,
+            "letter": "M",
+            "value": "索引号"
+          },
+          {
+            "col": 14,
+            "letter": "N",
+            "value": "是否异常"
+          },
+          {
+            "col": 15,
+            "letter": "O",
+            "value": "检查的关键证据和要素根据被审计单位具体情况修改"
+          }
+        ],
+        "row_27": [
+          {
+            "col": 1,
+            "letter": "A",
+            "value": "日期"
+          },
+          {
+            "col": 2,
+            "letter": "B",
+            "value": "凭证编号"
+          },
+          {
+            "col": 3,
+            "letter": "C",
+            "value": "业务内容"
+          },
+          {
+            "col": 4,
+            "letter": "D",
+            "value": "对方科目"
+          },
+          {
+            "col": 5,
+            "letter": "E",
+            "value": "金额"
+          },
+          {
+            "col": 6,
+            "letter": "F",
+            "value": "识别特征"
+          },
+          {
+            "col": 7,
+            "letter": "G",
+            "value": "信息1"
+          },
+          {
+            "col": 8,
+            "letter": "H",
+            "value": "信息2"
+          },
+          {
+            "col": 9,
+            "letter": "I",
+            "value": "识别特征"
+          },
+          {
+            "col": 10,
+            "letter": "J",
+            "value": "信息1"
+          },
+          {
+            "col": 11,
+            "letter": "K",
+            "value": "信息2"
+          }
+        ],
+        "row_34": [
+          {
+            "col": 1,
+            "letter": "A",
+            "value": "合计"
+          },
+          {
+            "col": 5,
+            "letter": "E",
+            "value": "=SUM(E28:E33)"
+          }
+        ],
+        "row_36": [
+          {
+            "col": 1,
+            "letter": "A",
+            "value": "3.检查本期发生额："
+          }
+        ],
+        "row_37": [
+          {
+            "col": 1,
+            "letter": "A",
+            "value": "（1）本期借方发生额"
+          }
+        ],
+        "row_38": [
+          {
+            "col": 1,
+            "letter": "A",
+            "value": "记账凭证"
+          },
+          {
+            "col": 6,
+            "letter": "F",
+            "value": "支持性文件1"
+          },
+          {
+            "col": 9,
+            "letter": "I",
+            "value": "支持性文件2"
+          },
+          {
+            "col": 12,
+            "letter": "L",
+            "value": "……"
+          },
+          {
+            "col": 13,
+            "letter": "M",
+            "value": "索引号"
+          },
+          {
+            "col": 14,
+            "letter": "N",
+            "value": "是否异常"
+          },
+          {
+            "col": 15,
+            "letter": "O",
+            "value": "检查的关键证据和要素根据被审计单位具体情况修改"
+          }
+        ],
+        "row_39": [
+          {
+            "col": 1,
+            "letter": "A",
+            "value": "日期"
+          },
+          {
+            "col": 2,
+            "letter": "B",
+            "value": "凭证编号"
+          },
+          {
+            "col": 3,
+            "letter": "C",
+            "value": "业务内容"
+          },
+          {
+            "col": 4,
+            "letter": "D",
+            "value": "对方科目"
+          },
+          {
+            "col": 5,
+            "letter": "E",
+            "value": "金额"
+          },
+          {
+            "col": 6,
+            "letter": "F",
+            "value": "识别特征"
+          },
+          {
+            "col": 7,
+            "letter": "G",
+            "value": "信息1"
+          },
+          {
+            "col": 8,
+            "letter": "H",
+            "value": "信息2"
+          },
+          {
+            "col": 9,
+            "letter": "I",
+            "value": "识别特征"
+          },
+          {
+            "col": 10,
+            "letter": "J",
+            "value": "信息1"
+          },
+          {
+            "col": 11,
+            "letter": "K",
+            "value": "信息2"
+          }
+        ],
+        "row_46": [
+          {
+            "col": 1,
+            "letter": "A",
+            "value": "合计"
+          },
+          {
+            "col": 5,
+            "letter": "E",
+            "value": "=SUM(E40:E45)"
+          },
+          {
+            "col": 13,
+            "letter": "M",
+            "value": "=SUM(M40:M45)"
+          }
+        ],
+        "row_47": [
+          {
+            "col": 1,
+            "letter": "A",
+            "value": "（2）本期贷方发生额"
+          }
+        ],
+        "row_48": [
+          {
+            "col": 1,
+            "letter": "A",
+            "value": "记账凭证"
+          },
+          {
+            "col": 6,
+            "letter": "F",
+            "value": "支持性文件1"
+          },
+          {
+            "col": 9,
+            "letter": "I",
+            "value": "支持性文件2"
+          },
+          {
+            "col": 12,
+            "letter": "L",
+            "value": "……"
+          },
+          {
+            "col": 13,
+            "letter": "M",
+            "value": "索引号"
+          },
+          {
+            "col": 14,
+            "letter": "N",
+            "value": "是否异常"
+          }
+        ],
+        "row_49": [
+          {
+            "col": 1,
+            "letter": "A",
+            "value": "日期"
+          },
+          {
+            "col": 2,
+            "letter": "B",
+            "value": "凭证编号"
+          },
+          {
+            "col": 3,
+            "letter": "C",
+            "value": "业务内容"
+          },
+          {
+            "col": 4,
+            "letter": "D",
+            "value": "对方科目"
+          },
+          {
+            "col": 5,
+            "letter": "E",
+            "value": "金额"
+          },
+          {
+            "col": 6,
+            "letter": "F",
+            "value": "识别特征"
+          },
+          {
+            "col": 7,
+            "letter": "G",
+            "value": "信息1"
+          },
+          {
+            "col": 8,
+            "letter": "H",
+            "value": "信息2"
+          },
+          {
+            "col": 9,
+            "letter": "I",
+            "value": "识别特征"
+          },
+          {
+            "col": 10,
+            "letter": "J",
+            "value": "信息1"
+          },
+          {
+            "col": 11,
+            "letter": "K",
+            "value": "信息2"
+          }
+        ],
+        "row_56": [
+          {
+            "col": 1,
+            "letter": "A",
+            "value": "合计"
+          },
+          {
+            "col": 5,
+            "letter": "E",
+            "value": "=SUM(E50:E55)"
+          }
+        ],
+        "row_57": [
+          {
+            "col": 1,
+            "letter": "A",
+            "value": "三、审计说明："
+          }
+        ],
+        "row_61": [
+          {
+            "col": 1,
+            "letter": "A",
+            "value": "四、审计结论："
+          }
+        ],
+        "row_66": [
+          {
+            "col": 1,
+            "letter": "A",
+            "value": "编制说明："
+          }
+        ],
+        "row_67": [
+          {
+            "col": 1,
+            "letter": "A",
+            "value": "1、函证替代程序："
+          }
+        ],
+        "row_68": [
+          {
+            "col": 2,
+            "letter": "B",
+            "value": "①检查本期付款、期后收货或回收；"
+          }
+        ],
+        "row_69": [
+          {
+            "col": 2,
+            "letter": "B",
+            "value": "②检查原始凭证：合同、订货单、发票或收据、银行回单、支票存根等；"
+          }
+        ],
+        "row_70": [
+          {
+            "col": 2,
+            "letter": "B",
+            "value": "③对回函可能性不高的、余额重大的，发函同时执行替代程序。"
+          }
+        ],
+        "row_72": [
+          {
+            "col": 1,
+            "letter": "A",
+            "value": "2、概述：（1）程序的测试情况、结果；"
+          }
+        ],
+        "row_73": [
+          {
+            "col": 1,
+            "letter": "A",
+            "value": "                      （2）拟调整事项及其调整分录、未调整事项及其影响，审计范围受到限制情况及其影响。"
+          }
+        ]
+      }
+    },
+    {
+      "name": "其他应付款替代程序K0-6",
+      "dimensions": {
+        "max_row": 73,
+        "max_col": 25,
+        "range": "A1:Y73"
+      },
+      "merged_cells": [
+        "L48:L49",
+        "N26:N27",
+        "M48:M49",
+        "A15:E15",
+        "F26:H26",
+        "L15:L16",
+        "F38:H38",
+        "M15:M16",
+        "A2:O2",
+        "F15:G15",
+        "I48:K48",
+        "F48:H48",
+        "I38:K38",
+        "N48:N49",
+        "H15:J15",
+        "L26:L27",
+        "A26:E26",
+        "L38:L39",
+        "N38:N39",
+        "N15:N16",
+        "M26:M27",
+        "M38:M39",
+        "A1:O1",
+        "I26:K26",
+        "K15:K16"
+      ],
+      "formula_count": 13,
+      "formulas": [
+        {
+          "cell": "A3",
+          "formula": "=底稿目录!A2"
+        },
+        {
+          "cell": "F3",
+          "formula": "=底稿目录!A4"
+        },
+        {
+          "cell": "J3",
+          "formula": "=底稿目录!A5"
+        },
+        {
+          "cell": "N3",
+          "formula": "=底稿目录!F11"
+        },
+        {
+          "cell": "A4",
+          "formula": "=底稿目录!A3"
+        },
+        {
+          "cell": "F4",
+          "formula": "=底稿目录!A6"
+        },
+        {
+          "cell": "J4",
+          "formula": "=底稿目录!A7"
+        },
+        {
+          "cell": "E12",
+          "formula": "=B12+C12-D12"
+        },
+        {
+          "cell": "E23",
+          "formula": "=SUM(E17:E22)"
+        },
+        {
+          "cell": "J23",
+          "formula": "=SUM(J17:J22)"
+        },
+        {
+          "cell": "E34",
+          "formula": "=SUM(E28:E33)"
+        },
+        {
+          "cell": "E46",
+          "formula": "=SUM(E40:E45)"
+        },
+        {
+          "cell": "E56",
+          "formula": "=SUM(E50:E55)"
+        }
+      ],
+      "all_rows": {
+        "row_1": [
+          {
+            "col": 1,
+            "letter": "A",
+            "value": "致同会计师事务所"
+          }
+        ],
+        "row_2": [
+          {
+            "col": 1,
+            "letter": "A",
+            "value": "其他应付款替代程序检查表-XX公司"
+          }
+        ],
+        "row_3": [
+          {
+            "col": 1,
+            "letter": "A",
+            "value": "=底稿目录!A2"
+          },
+          {
+            "col": 6,
+            "letter": "F",
+            "value": "=底稿目录!A4"
+          },
+          {
+            "col": 10,
+            "letter": "J",
+            "value": "=底稿目录!A5"
+          },
+          {
+            "col": 13,
+            "letter": "M",
+            "value": "索引号："
+          },
+          {
+            "col": 14,
+            "letter": "N",
+            "value": "=底稿目录!F11"
+          }
+        ],
+        "row_4": [
+          {
+            "col": 1,
+            "letter": "A",
+            "value": "=底稿目录!A3"
+          },
+          {
+            "col": 6,
+            "letter": "F",
+            "value": "=底稿目录!A6"
+          },
+          {
+            "col": 10,
+            "letter": "J",
+            "value": "=底稿目录!A7"
+          },
+          {
+            "col": 13,
+            "letter": "M",
+            "value": "页次："
+          }
+        ],
+        "row_5": [
+          {
+            "col": 1,
+            "letter": "A",
+            "value": "债权人名称："
+          }
+        ],
+        "row_6": [
+          {
+            "col": 1,
+            "letter": "A",
+            "value": "一、样本选取标准与规模："
+          }
+        ],
+        "row_7": [
+          {
+            "col": 1,
+            "letter": "A",
+            "value": "测试范围："
+          },
+          {
+            "col": 2,
+            "letter": "B",
+            "value": "如借方发生额所有凭证共XX笔金额XX、贷方发生额所有凭证共XX笔金额XX"
+          },
+          {
+            "col": 8,
+            "letter": "H",
+            "value": "特定样本："
+          },
+          {
+            "col": 9,
+            "letter": "I",
+            "value": "XX金额以上（大额）、关联方/关联交易形成的款项、XX异常款项全部测试，共XX笔；"
+          }
+        ],
+        "row_8": [
+          {
+            "col": 1,
+            "letter": "A",
+            "value": "抽样总体："
+          },
+          {
+            "col": 2,
+            "letter": "B",
+            "value": "测试总体扣除特定样本以外的样本，共XX笔、金额XX"
+          },
+          {
+            "col": 8,
+            "letter": "H",
+            "value": "确定的抽样样本量："
+          },
+          {
+            "col": 10,
+            "letter": "J",
+            "value": "抽取XX笔"
+          },
+          {
+            "col": 11,
+            "letter": "K",
+            "value": "（如果使用了样本计算器计算样本量，样本量计算过程见<XX>底稿）"
+          }
+        ],
+        "row_9": [
+          {
+            "col": 1,
+            "letter": "A",
+            "value": "抽样方法："
+          },
+          {
+            "col": 2,
+            "letter": "B",
+            "value": "随机选样/系统选样/货币单元抽样/随意选样（非统计抽样适用）"
+          },
+          {
+            "col": 8,
+            "letter": "H",
+            "value": "抽样过程："
+          },
+          {
+            "col": 9,
+            "letter": "I",
+            "value": "使用IDEA（XX抽样工具）选择XX数量占比XX%的样本进行测试，抽样工具中的样本选择过程和结果见XX底稿"
+          }
+        ],
+        "row_10": [
+          {
+            "col": 1,
+            "letter": "A",
+            "value": "二、检查过程记录："
+          }
+        ],
+        "row_11": [
+          {
+            "col": 1,
+            "letter": "A",
+            "value": "函证项目"
+          },
+          {
+            "col": 2,
+            "letter": "B",
+            "value": "年初余额"
+          },
+          {
+            "col": 3,
+            "letter": "C",
+            "value": "借方发生额"
+          },
+          {
+            "col": 4,
+            "letter": "D",
+            "value": "贷方发生额"
+          },
+          {
+            "col": 5,
+            "letter": "E",
+            "value": "期末余额"
+          }
+        ],
+        "row_12": [
+          {
+            "col": 1,
+            "letter": "A",
+            "value": "其他应付款"
+          },
+          {
+            "col": 5,
+            "letter": "E",
+            "value": "=B12+C12-D12"
+          }
+        ],
+        "row_14": [
+          {
+            "col": 1,
+            "letter": "A",
+            "value": "1.其他应付款检查-检查期后付款"
+          }
+        ],
+        "row_15": [
+          {
+            "col": 1,
+            "letter": "A",
+            "value": "记账凭证"
+          },
+          {
+            "col": 6,
+            "letter": "F",
+            "value": "付款审批单"
+          },
+          {
+            "col": 8,
+            "letter": "H",
+            "value": "银行回单"
+          },
+          {
+            "col": 11,
+            "letter": "K",
+            "value": "……"
+          },
+          {
+            "col": 12,
+            "letter": "L",
+            "value": "……"
+          },
+          {
+            "col": 13,
+            "letter": "M",
+            "value": "索引号"
+          },
+          {
+            "col": 14,
+            "letter": "N",
+            "value": "是否异常"
+          },
+          {
+            "col": 15,
+            "letter": "O",
+            "value": "检查的关键证据和要素根据被审计单位具体情况修改"
+          }
+        ],
+        "row_16": [
+          {
+            "col": 1,
+            "letter": "A",
+            "value": "日期"
+          },
+          {
+            "col": 2,
+            "letter": "B",
+            "value": "凭证编号"
+          },
+          {
+            "col": 3,
+            "letter": "C",
+            "value": "业务内容"
+          },
+          {
+            "col": 4,
+            "letter": "D",
+            "value": "对方科目"
+          },
+          {
+            "col": 5,
+            "letter": "E",
+            "value": "金额"
+          },
+          {
+            "col": 6,
+            "letter": "F",
+            "value": "日期/编号"
+          },
+          {
+            "col": 7,
+            "letter": "G",
+            "value": "是否经过恰当审批"
+          },
+          {
+            "col": 8,
+            "letter": "H",
+            "value": "日期"
+          },
+          {
+            "col": 9,
+            "letter": "I",
+            "value": "收款方"
+          },
+          {
+            "col": 10,
+            "letter": "J",
+            "value": "金额"
+          }
+        ],
+        "row_23": [
+          {
+            "col": 1,
+            "letter": "A",
+            "value": "合计"
+          },
+          {
+            "col": 5,
+            "letter": "E",
+            "value": "=SUM(E17:E22)"
+          },
+          {
+            "col": 10,
+            "letter": "J",
+            "value": "=SUM(J17:J22)"
+          }
+        ],
+        "row_25": [
+          {
+            "col": 1,
+            "letter": "A",
+            "value": "2.其他应付款检查-形成期末余额的合同、支出凭单、发票等支持性证据检查"
+          }
+        ],
+        "row_26": [
+          {
+            "col": 1,
+            "letter": "A",
+            "value": "记账凭证"
+          },
+          {
+            "col": 6,
+            "letter": "F",
+            "value": "支持性文件1"
+          },
+          {
+            "col": 9,
+            "letter": "I",
+            "value": "支持性文件2"
+          },
+          {
+            "col": 12,
+            "letter": "L",
+            "value": "……"
+          },
+          {
+            "col": 13,
+            "letter": "M",
+            "value": "索引号"
+          },
+          {
+            "col": 14,
+            "letter": "N",
+            "value": "是否异常"
+          },
+          {
+            "col": 15,
+            "letter": "O",
+            "value": "检查的关键证据和要素根据被审计单位具体情况修改"
+          }
+        ],
+        "row_27": [
+          {
+            "col": 1,
+            "letter": "A",
+            "value": "日期"
+          },
+          {
+            "col": 2,
+            "letter": "B",
+            "value": "凭证编号"
+          },
+          {
+            "col": 3,
+            "letter": "C",
+            "value": "业务内容"
+          },
+          {
+            "col": 4,
+            "letter": "D",
+            "value": "对方科目"
+          },
+          {
+            "col": 5,
+            "letter": "E",
+            "value": "金额"
+          },
+          {
+            "col": 6,
+            "letter": "F",
+            "value": "识别特征"
+          },
+          {
+            "col": 7,
+            "letter": "G",
+            "value": "信息1"
+          },
+          {
+            "col": 8,
+            "letter": "H",
+            "value": "信息2"
+          },
+          {
+            "col": 9,
+            "letter": "I",
+            "value": "识别特征"
+          },
+          {
+            "col": 10,
+            "letter": "J",
+            "value": "信息1"
+          },
+          {
+            "col": 11,
+            "letter": "K",
+            "value": "信息2"
+          }
+        ],
+        "row_34": [
+          {
+            "col": 1,
+            "letter": "A",
+            "value": "合计"
+          },
+          {
+            "col": 5,
+            "letter": "E",
+            "value": "=SUM(E28:E33)"
+          }
+        ],
+        "row_36": [
+          {
+            "col": 1,
+            "letter": "A",
+            "value": "3.检查本期发生额："
+          }
+        ],
+        "row_37": [
+          {
+            "col": 1,
+            "letter": "A",
+            "value": "（1）本期借方发生额"
+          }
+        ],
+        "row_38": [
+          {
+            "col": 1,
+            "letter": "A",
+            "value": "记账凭证"
+          },
+          {
+            "col": 6,
+            "letter": "F",
+            "value": "支持性文件1"
+          },
+          {
+            "col": 9,
+            "letter": "I",
+            "value": "支持性文件2"
+          },
+          {
+            "col": 12,
+            "letter": "L",
+            "value": "……"
+          },
+          {
+            "col": 13,
+            "letter": "M",
+            "value": "索引号"
+          },
+          {
+            "col": 14,
+            "letter": "N",
+            "value": "是否异常"
+          },
+          {
+            "col": 15,
+            "letter": "O",
+            "value": "检查的关键证据和要素根据被审计单位具体情况修改"
+          }
+        ],
+        "row_39": [
+          {
+            "col": 1,
+            "letter": "A",
+            "value": "日期"
+          },
+          {
+            "col": 2,
+            "letter": "B",
+            "value": "凭证编号"
+          },
+          {
+            "col": 3,
+            "letter": "C",
+            "value": "业务内容"
+          },
+          {
+            "col": 4,
+            "letter": "D",
+            "value": "对方科目"
+          },
+          {
+            "col": 5,
+            "letter": "E",
+            "value": "金额"
+          },
+          {
+            "col": 6,
+            "letter": "F",
+            "value": "识别特征"
+          },
+          {
+            "col": 7,
+            "letter": "G",
+            "value": "信息1"
+          },
+          {
+            "col": 8,
+            "letter": "H",
+            "value": "信息2"
+          },
+          {
+            "col": 9,
+            "letter": "I",
+            "value": "识别特征"
+          },
+          {
+            "col": 10,
+            "letter": "J",
+            "value": "信息1"
+          },
+          {
+            "col": 11,
+            "letter": "K",
+            "value": "信息2"
+          }
+        ],
+        "row_46": [
+          {
+            "col": 1,
+            "letter": "A",
+            "value": "合计"
+          },
+          {
+            "col": 5,
+            "letter": "E",
+            "value": "=SUM(E40:E45)"
+          }
+        ],
+        "row_47": [
+          {
+            "col": 1,
+            "letter": "A",
+            "value": "（2）本期贷方发生额"
+          }
+        ],
+        "row_48": [
+          {
+            "col": 1,
+            "letter": "A",
+            "value": "记账凭证"
+          },
+          {
+            "col": 6,
+            "letter": "F",
+            "value": "支持性文件1"
+          },
+          {
+            "col": 9,
+            "letter": "I",
+            "value": "支持性文件2"
+          },
+          {
+            "col": 12,
+            "letter": "L",
+            "value": "……"
+          },
+          {
+            "col": 13,
+            "letter": "M",
+            "value": "索引号"
+          },
+          {
+            "col": 14,
+            "letter": "N",
+            "value": "是否异常"
+          }
+        ],
+        "row_49": [
+          {
+            "col": 1,
+            "letter": "A",
+            "value": "日期"
+          },
+          {
+            "col": 2,
+            "letter": "B",
+            "value": "凭证编号"
+          },
+          {
+            "col": 3,
+            "letter": "C",
+            "value": "业务内容"
+          },
+          {
+            "col": 4,
+            "letter": "D",
+            "value": "对方科目"
+          },
+          {
+            "col": 5,
+            "letter": "E",
+            "value": "金额"
+          },
+          {
+            "col": 6,
+            "letter": "F",
+            "value": "识别特征"
+          },
+          {
+            "col": 7,
+            "letter": "G",
+            "value": "信息1"
+          },
+          {
+            "col": 8,
+            "letter": "H",
+            "value": "信息2"
+          },
+          {
+            "col": 9,
+            "letter": "I",
+            "value": "识别特征"
+          },
+          {
+            "col": 10,
+            "letter": "J",
+            "value": "信息1"
+          },
+          {
+            "col": 11,
+            "letter": "K",
+            "value": "信息2"
+          }
+        ],
+        "row_56": [
+          {
+            "col": 1,
+            "letter": "A",
+            "value": "合计"
+          },
+          {
+            "col": 5,
+            "letter": "E",
+            "value": "=SUM(E50:E55)"
+          }
+        ],
+        "row_57": [
+          {
+            "col": 1,
+            "letter": "A",
+            "value": "三、审计说明："
+          }
+        ],
+        "row_61": [
+          {
+            "col": 1,
+            "letter": "A",
+            "value": "四、审计结论："
+          }
+        ],
+        "row_66": [
+          {
+            "col": 1,
+            "letter": "A",
+            "value": "编制说明："
+          }
+        ],
+        "row_67": [
+          {
+            "col": 1,
+            "letter": "A",
+            "value": "1、函证替代程序："
+          }
+        ],
+        "row_68": [
+          {
+            "col": 2,
+            "letter": "B",
+            "value": "①检查本期付款、期后收货或回收；"
+          }
+        ],
+        "row_69": [
+          {
+            "col": 2,
+            "letter": "B",
+            "value": "②检查原始凭证：合同、订货单、发票或收据、银行回单、支票存根等；"
+          }
+        ],
+        "row_70": [
+          {
+            "col": 2,
+            "letter": "B",
+            "value": "③对回函可能性不高的、余额重大的，发函同时执行替代程序。"
+          }
+        ],
+        "row_72": [
+          {
+            "col": 1,
+            "letter": "A",
+            "value": "2、概述：（1）程序的测试情况、结果；"
+          }
+        ],
+        "row_73": [
+          {
+            "col": 1,
+            "letter": "A",
+            "value": "                      （2）拟调整事项及其调整分录、未调整事项及其影响，审计范围受到限制情况及其影响。"
+          }
+        ]
+      }
+    },
+    {
+      "name": "邮件传真回函可靠性验证K0-7",
+      "dimensions": {
+        "max_row": 38,
+        "max_col": 20,
+        "range": "A1:T38"
+      },
+      "merged_cells": [
+        "A5:A6",
+        "A1:N1",
+        "N5:N6",
+        "E5:E6",
+        "A2:N2",
+        "C5:C6",
+        "F5:F6",
+        "D5:D6",
+        "B5:B6",
+        "G5:M5"
+      ],
+      "formula_count": 7,
+      "formulas": [
+        {
+          "cell": "A3",
+          "formula": "=底稿目录!A2"
+        },
+        {
+          "cell": "E3",
+          "formula": "=底稿目录!A4"
+        },
+        {
+          "cell": "H3",
+          "formula": "=底稿目录!A5"
+        },
+        {
+          "cell": "N3",
+          "formula": "=底稿目录!F12"
+        },
+        {
+          "cell": "A4",
+          "formula": "=底稿目录!A3"
+        },
+        {
+          "cell": "E4",
+          "formula": "=底稿目录!A6"
+        },
+        {
+          "cell": "H4",
+          "formula": "=底稿目录!A7"
+        }
+      ],
+      "header_rows": {
+        "row_1": [
+          {
+            "col": 1,
+            "letter": "A",
+            "value": "致同会计师事务所"
+          }
+        ],
+        "row_2": [
+          {
+            "col": 1,
+            "letter": "A",
+            "value": "邮件/传真回函可靠性验证记录"
+          }
+        ],
+        "row_3": [
+          {
+            "col": 1,
+            "letter": "A",
+            "value": "=底稿目录!A2"
+          },
+          {
+            "col": 5,
+            "letter": "E",
+            "value": "=底稿目录!A4"
+          },
+          {
+            "col": 8,
+            "letter": "H",
+            "value": "=底稿目录!A5"
+          },
+          {
+            "col": 13,
+            "letter": "M",
+            "value": "索引号："
+          },
+          {
+            "col": 14,
+            "letter": "N",
+            "value": "=底稿目录!F12"
+          }
+        ],
+        "row_4": [
+          {
+            "col": 1,
+            "letter": "A",
+            "value": "=底稿目录!A3"
+          },
+          {
+            "col": 5,
+            "letter": "E",
+            "value": "=底稿目录!A6"
+          },
+          {
+            "col": 8,
+            "letter": "H",
+            "value": "=底稿目录!A7"
+          },
+          {
+            "col": 13,
+            "letter": "M",
+            "value": "页次："
+          }
+        ],
+        "row_5": [
+          {
+            "col": 1,
+            "letter": "A",
+            "value": "序号"
+          },
+          {
+            "col": 2,
+            "letter": "B",
+            "value": "函证索引号"
+          },
+          {
+            "col": 3,
+            "letter": "C",
+            "value": "被询证单位名称"
+          },
+          {
+            "col": 4,
+            "letter": "D",
+            "value": "回函方式"
+          },
+          {
+            "col": 5,
+            "letter": "E",
+            "value": "是否由审计项目组直接接收"
+          },
+          {
+            "col": 6,
+            "letter": "F",
+            "value": "是否寄回原件"
+          },
+          {
+            "col": 7,
+            "letter": "G",
+            "value": "期末未收回原件函证可靠性验证"
+          },
+          {
+            "col": 14,
+            "letter": "N",
+            "value": "回函可靠性结论"
+          }
+        ],
+        "row_6": [
+          {
+            "col": 7,
+            "letter": "G",
+            "value": "被函证者身份确认（注1）"
+          },
+          {
+            "col": 8,
+            "letter": "H",
+            "value": "发函及回函传真信息及验证"
+          },
+          {
+            "col": 9,
+            "letter": "I",
+            "value": "发函邮箱"
+          },
+          {
+            "col": 10,
+            "letter": "J",
+            "value": "回函邮箱"
+          },
+          {
+            "col": 11,
+            "letter": "K",
+            "value": "邮箱可靠性验证（注2）"
+          },
+          {
+            "col": 12,
+            "letter": "L",
+            "value": "是否致电被函证者确认"
+          },
+          {
+            "col": 13,
+            "letter": "M",
+            "value": "对函证信息可靠性的考虑（注3）"
+          }
+        ],
+        "row_7": [
+          {
+            "col": 1,
+            "letter": "A",
+            "value": "1"
+          }
+        ],
+        "row_8": [
+          {
+            "col": 1,
+            "letter": "A",
+            "value": "2"
+          }
+        ],
+        "row_9": [
+          {
+            "col": 1,
+            "letter": "A",
+            "value": "3"
+          }
+        ],
+        "row_10": [
+          {
+            "col": 1,
+            "letter": "A",
+            "value": "4"
+          }
+        ]
+      }
+    },
+    {
+      "name": "函证程序舞弊风险评价表K0-8",
+      "dimensions": {
+        "max_row": 31,
+        "max_col": 11,
+        "range": "A1:K31"
+      },
+      "merged_cells": [
+        "A16:F16",
+        "A12:F12",
+        "A18:F18",
+        "A26:F26",
+        "A21:F21",
+        "A2:I2",
+        "A14:F14",
+        "A5:F5",
+        "A23:F23",
+        "A8:F8",
+        "A22:F22",
+        "A17:F17",
+        "A20:F20",
+        "A10:F10",
+        "A13:F13",
+        "A19:F19",
+        "A9:F9",
+        "A31:I31",
+        "A15:F15",
+        "A24:F24",
+        "A11:F11",
+        "A1:I1",
+        "A6:F6",
+        "A7:F7",
+        "A25:F25"
+      ],
+      "formula_count": 7,
+      "formulas": [
+        {
+          "cell": "A3",
+          "formula": "=底稿目录!A2"
+        },
+        {
+          "cell": "D3",
+          "formula": "=底稿目录!A4"
+        },
+        {
+          "cell": "F3",
+          "formula": "=底稿目录!A5"
+        },
+        {
+          "cell": "I3",
+          "formula": "=底稿目录!F13"
+        },
+        {
+          "cell": "A4",
+          "formula": "=底稿目录!A3"
+        },
+        {
+          "cell": "D4",
+          "formula": "=底稿目录!A6"
+        },
+        {
+          "cell": "F4",
+          "formula": "=底稿目录!A7"
+        }
+      ],
+      "header_rows": {
+        "row_1": [
+          {
+            "col": 1,
+            "letter": "A",
+            "value": "致同会计师事务所"
+          }
+        ],
+        "row_2": [
+          {
+            "col": 1,
+            "letter": "A",
+            "value": "函证程序舞弊风险评价表"
+          }
+        ],
+        "row_3": [
+          {
+            "col": 1,
+            "letter": "A",
+            "value": "=底稿目录!A2"
+          },
+          {
+            "col": 4,
+            "letter": "D",
+            "value": "=底稿目录!A4"
+          },
+          {
+            "col": 6,
+            "letter": "F",
+            "value": "=底稿目录!A5"
+          },
+          {
+            "col": 8,
+            "letter": "H",
+            "value": "索引号："
+          },
+          {
+            "col": 9,
+            "letter": "I",
+            "value": "=底稿目录!F13"
+          }
+        ],
+        "row_4": [
+          {
+            "col": 1,
+            "letter": "A",
+            "value": "=底稿目录!A3"
+          },
+          {
+            "col": 4,
+            "letter": "D",
+            "value": "=底稿目录!A6"
+          },
+          {
+            "col": 6,
+            "letter": "F",
+            "value": "=底稿目录!A7"
+          },
+          {
+            "col": 8,
+            "letter": "H",
+            "value": "页次："
+          }
+        ],
+        "row_5": [
+          {
+            "col": 1,
+            "letter": "A",
+            "value": "与函证程序有关的舞弊风险迹象"
+          },
+          {
+            "col": 7,
+            "letter": "G",
+            "value": "是否存在"
+          },
+          {
+            "col": 8,
+            "letter": "H",
+            "value": "索引号或信息来源"
+          },
+          {
+            "col": 9,
+            "letter": "I",
+            "value": "应对措施"
+          }
+        ],
+        "row_6": [
+          {
+            "col": 1,
+            "letter": "A",
+            "value": "1.管理层不允许寄发询证函；"
+          }
+        ],
+        "row_7": [
+          {
+            "col": 1,
+            "letter": "A",
+            "value": "2.管理层过度热情配合函证程序；"
+          }
+        ],
+        "row_8": [
+          {
+            "col": 1,
+            "letter": "A",
+            "value": "3.管理层试图干预、拦截、篡改询证函或回函，如坚持以特定的方式发送询证函；"
+          }
+        ],
+        "row_9": [
+          {
+            "col": 1,
+            "letter": "A",
+            "value": "4.管理层提供的函证相关信息含糊、矛盾、不完整或有缺失；"
+          }
+        ],
+        "row_10": [
+          {
+            "col": 1,
+            "letter": "A",
+            "value": "5.被询证者将回函寄至被审计单位，被审计单位将其转交注册会计师；"
+          }
+        ]
+      }
+    },
+    {
+      "name": "GT_Custom",
+      "dimensions": {
+        "max_row": 8,
+        "max_col": 2,
+        "range": "A1:B8"
+      },
+      "merged_cells": [],
+      "formula_count": 0,
+      "formulas": [],
+      "header_rows": {
+        "row_1": [
+          {
+            "col": 1,
+            "letter": "A",
+            "value": "C1"
+          },
+          {
+            "col": 2,
+            "letter": "B",
+            "value": "Custom 1"
+          }
+        ],
+        "row_2": [
+          {
+            "col": 1,
+            "letter": "A",
+            "value": "C2"
+          },
+          {
+            "col": 2,
+            "letter": "B",
+            "value": "Custom 2"
+          }
+        ],
+        "row_3": [
+          {
+            "col": 1,
+            "letter": "A",
+            "value": "C3"
+          },
+          {
+            "col": 2,
+            "letter": "B",
+            "value": "Custom 3"
+          }
+        ],
+        "row_4": [
+          {
+            "col": 1,
+            "letter": "A",
+            "value": "C4"
+          },
+          {
+            "col": 2,
+            "letter": "B",
+            "value": "Custom 4"
+          }
+        ],
+        "row_5": [
+          {
+            "col": 1,
+            "letter": "A",
+            "value": "C5"
+          },
+          {
+            "col": 2,
+            "letter": "B",
+            "value": "Custom 5"
+          }
+        ],
+        "row_6": [
+          {
+            "col": 1,
+            "letter": "A",
+            "value": "C6"
+          },
+          {
+            "col": 2,
+            "letter": "B",
+            "value": "Custom 6"
+          }
+        ],
+        "row_7": [
+          {
+            "col": 1,
+            "letter": "A",
+            "value": "C7"
+          },
+          {
+            "col": 2,
+            "letter": "B",
+            "value": "Custom 7"
+          }
+        ],
+        "row_8": [
+          {
+            "col": 1,
+            "letter": "A",
+            "value": "C8"
+          },
+          {
+            "col": 2,
+            "letter": "B",
+            "value": "Custom 8"
+          }
+        ]
+      }
+    }
+  ]
+}

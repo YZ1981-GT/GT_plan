@@ -1,0 +1,74 @@
+{
+  "task": 17,
+  "recordedAt": "2026-09-09T11:06:55.585336+00:00",
+  "allRed": true,
+  "scripts": 11,
+  "redCount": 11,
+  "results": [
+    {
+      "script": "mutate_guidance_gc0_inventory_resolution_guards.py",
+      "verdict": "RED",
+      "rc": 0
+    },
+    {
+      "script": "mutate_guidance_contract_inventory_guards.py",
+      "verdict": "RED",
+      "rc": 0
+    },
+    {
+      "script": "mutate_guidance_source_ref_wiring_guards.py",
+      "verdict": "RED",
+      "rc": 0
+    },
+    {
+      "script": "mutate_guidance_resolution_guards.py",
+      "verdict": "RED",
+      "rc": 0
+    },
+    {
+      "script": "mutate_guidance_resolution_task8_guards.py",
+      "verdict": "RED",
+      "rc": 0
+    },
+    {
+      "script": "mutate_guidance_gid_guards.py",
+      "verdict": "RED",
+      "rc": 0
+    },
+    {
+      "script": "mutate_guidance_publication_guards.py",
+      "verdict": "RED",
+      "rc": 0
+    },
+    {
+      "script": "mutate_guidance_supplement_completion_guards.py",
+      "verdict": "RED",
+      "rc": 0
+    },
+    {
+      "script": "mutate_guidance_api_task9_guards.py",
+      "verdict": "RED",
+      "rc": 0
+    },
+    {
+      "script": "mutate_guidance_handoff_consumer_guards.py",
+      "verdict": "RED",
+      "rc": 0
+    },
+    {
+      "script": "mutate_guidance_task5_snapshots.py",
+      "verdict": "RED",
+      "rc": 0
+    }
+  ],
+  "coverage": [
+    "C0 schema/matrix/fixture",
+    "identity/registry (G-ID)",
+    "inventory/accounting/snapshots",
+    "publication + supplement/completion",
+    "resolver/provenance (task8)",
+    "cache/ETag (task9)",
+    "handoff/ACK visibility",
+    "source_ref wiring"
+  ]
+}

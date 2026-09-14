@@ -1,0 +1,58 @@
+{
+  "_doc": "变异脚本**入库**豁免登记表。spec e1-variant-recalc-and-mutation-denominator-closure（Requirements 5.4/5.6/8.5）。只有一个守卫读它：test_mutation_kit_scripts_tracked.py（未入库豁免）。",
+  "_scope": "🔴 2026-08-16 职能收窄：本表**不再服务采纳守卫**（test_mutation_kit_adoption.py）。原设计让它同时管『未用共享件』的豁免，使它成为『强制迁移共享件』的管理机构——每归档一个 spec 就有一批豁免失效、一批脚本被迫迁移，工作量随归档数无限增长。现已拆开：入库是一次性动作（git add 一次即永久成立），适合用『豁免 + 失效检测』管理；采纳共享件是持续性改造（跨越等价性验证与判据形态差异），改由采纳守卫内的**存量冻结名单**管理，存量脚本只输出 INFO 不阻断。",
+  "_why": "在办 spec 的变异脚本正被并发会话编辑，代它们入库会与其打架（memory 已实证并发会话会互相回退同一文件）。豁免不是免责声明——每项必须带撤销条件，且守卫会在其 spec 归档后主动提示撤销，防止豁免变成永久后门（e-cycle spec 的 M20 变异针对的正是「白名单成了免责声明」这一形态）。失效后的处置是「由接手方**入库**」这一次性动作，不再隐含「必须迁移共享件」。",
+  "_revoked_log": [
+    {
+      "script": "backend/scripts/check/mutate_report_line_resolution_guards.py",
+      "spec": "procedure-trim-report-line-account-resolution",
+      "registered_at": "2026-08-15",
+      "revoked_at": "2026-08-15",
+      "why_revoked": "失效检测实战命中：登记后约 100 分钟内，并发会话把该 spec 从 0/16 做完并移入 _archive/05-business-features/，豁免理由「spec 在办」随之失效。复核时该脚本已被其推进方 git add（`A ` 态）⇒ tracked 守卫不再需要豁免，故按 revoke_when 撤销。该脚本转入 Wave 4 的待迁共享件清单（属已归档 spec）。",
+      "note": "本条留档是为了让「豁免被撤销过」可追溯 —— 直接删掉会让下一轮无法判断某脚本是从未登记过还是登记后撤销过。"
+    },
+    {
+      "script": "backend/scripts/diagnose/mutate_k_cycle_guards.py",
+      "spec": "k-cycle-extraction-formula-and-disclosure-closure",
+      "registered_at": "2026-08-15",
+      "revoked_at": "2026-08-16",
+      "why_revoked": "两个撤销理由同时成立：① 失效检测命中——该 spec 已归档（_archive/08-disclosure-notes/），登记时写的『spec 在办、并发会话正在编辑』已不成立；② 该脚本**已被 git 跟踪**（登记时是 `??` 未跟踪，现已由其推进方入库）⇒ tracked 守卫本就不再需要豁免，此项已是死条目。",
+      "note": "撤销**不隐含『必须迁移共享件』**。按修订后的 R7.5 与采纳守卫的存量冻结名单，该脚本（1558 行）进冻结名单、只输出 INFO——迁移需逐条等价性验证，成本不由本 spec 支付。"
+    },
+    {
+      "script": "backend/scripts/diagnose/mutate_i_cycle_guards.py",
+      "spec": "i-cycle-extraction-formula-and-disclosure-closure",
+      "registered_at": "2026-08-15",
+      "revoked_at": "2026-08-16",
+      "why_revoked": "同上两条：spec 已归档（_archive/08-disclosure-notes/），且该脚本已由其推进方 commit（登记时是 `A ` staged 未提交态）⇒ tracked 豁免成为死条目。",
+      "note": "进采纳守卫的存量冻结名单，不要求迁移共享件。"
+    },
+    {
+      "script": "backend/scripts/diagnose/mutate_ie_lifecycle_guards.py",
+      "spec": "workpaper-import-export-lifecycle-closure",
+      "registered_at": "2026-08-15",
+      "revoked_at": "2026-08-16",
+      "why_revoked": "该 spec 仍在 active 区（失效检测未命中），但此项豁免**失去用途**：登记时它的 reason 明写『脚本本体已入库，故 tracked 守卫本不需要豁免；此项是为 adoption 守卫登记的』——而 adoption 守卫已改为存量冻结名单形态、不再读本表（见 _scope）。留着会变成无人复核的死条目。",
+      "note": "该脚本进采纳守卫的存量冻结名单；其 spec 在办期间本 spec 亦不触碰它（Property 18）。"
+    },
+    {
+      "script": "backend/scripts/diagnose/mutate_wp_export_resolver_guards.py",
+      "spec": "workpaper-import-export-lifecycle-closure",
+      "registered_at": "2026-08-15",
+      "revoked_at": "2026-08-16",
+      "why_revoked": "失效检测第二次实战命中：该 spec 已由其推进方归档（_archive/05-business-features/，commit 522db4fb），登记时写的『不动在办 spec 的脚本』已不成立。按 revoke_when『由接手方判定入库或删除』复核：该脚本**已被 git 跟踪**（`git ls-files` 命中）且磁盘存在 ⇒ 唯一读本表的 tracked 守卫本就不再需要它，此项已是死条目，故撤销。",
+      "note": "撤销不隐含『必须迁移共享件』（见 _scope）。该脚本按存量冻结名单形态由采纳守卫管理，只输出 INFO。本次撤销后 exemptions 为空数组 —— 这是合法终态（无在办 spec 需要豁免），不是配置丢失。"
+    }
+  ],
+  "_schema": {
+    "script": "仓库相对路径，必填",
+    "spec": "`.kiro/specs/` 下的目录名，必填。失效检测靠它：该目录不在 active 区（= spec 已归档）时守卫提示撤销",
+    "reason": "必填，≥10 字，说明为什么现在不能动它",
+    "registered_at": "必填，YYYY-MM-DD",
+    "revoke_when": "必填，撤销条件的自然语言描述"
+  },
+  "_empty_is_legal": "exemptions 为空 = 当前没有任何在办 spec 的变异脚本需要豁免（2026-08-16 起 `.kiro/specs/` 一级下已无在办 spec）。空数组是合法终态，不得为了『看起来有内容』而回填历史条目 —— 撤销记录已全部留档在 _revoked_log。",
+  "_why_multiline_empty_array": "🔴 空数组写成两行（`[` 与 `]` 分行）是**变异脚本的接口约定**，不是格式偏好：mutate_mutation_kit_guards.py 的 M14/M15/M16 用 kind=insert 锚在 `\"exemptions\": [` 行之后注入构造条目，单行 `[]` 会让锚点失效、三条变异一起 ANCHOR-MISS。改回单行前先看那三条声明。",
+  "exemptions": [
+  ]
+}

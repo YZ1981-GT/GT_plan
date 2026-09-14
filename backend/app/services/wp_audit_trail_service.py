@@ -175,5 +175,6 @@ class WpAuditTrailService:
                 }
                 for r in rows
             ]
-        except Exception:
+        except Exception as e:
+            logger.warning("查询底稿审计轨迹失败: %s", e)
             return []

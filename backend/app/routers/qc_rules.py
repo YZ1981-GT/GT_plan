@@ -108,6 +108,15 @@ async def create_rule(
     current_user: User = Depends(require_role(["qc", "admin"])),
 ):
     """创建新 QC 规则，version 初始为 1。"""
+    from fastapi import HTTPException
+
+    # python 类型规则仅 admin 可创建（防止受限 RCE）
+    if body.expression_type == "python" and current_user.role != "admin":
+        raise HTTPException(
+            status_code=403,
+            detail="Only admin can create python-type rules",
+        )
+
     result = await qc_rule_definition_service.create_rule(
         db,
         data=body.model_dump(exclude_unset=False),
@@ -135,10 +144,20 @@ async def update_rule(
     current_user: User = Depends(require_role(["qc", "admin"])),
 ):
     """更新 QC 规则，每次更新 version+1。"""
+    from fastapi import HTTPException
+
     data = body.model_dump(exclude_unset=True)
     if not data:
         # 没有任何字段需要更新
         return await qc_rule_definition_service.get_rule(db, rule_id)
+
+    # python 类型规则仅 admin 可修改（防止受限 RCE）
+    # 检查：(a) 将 expression_type 改为 python, 或 (b) 修改已有 python 类型规则
+    if data.get("expression_type") == "python" and current_user.role != "admin":
+        raise HTTPException(
+            status_code=403,
+            detail="Only admin can modify python-type rules",
+        )
 
     result = await qc_rule_definition_service.update_rule(db, rule_id, data=data)
     await db.commit()
@@ -212,7 +231,7 @@ async def dry_run_rule(
 ):
     """规则试运行 — 需求 2
 
-    对采样底稿跑规则沙箱，不写 DB，返回命中率。
+    对采样底稿跑规则（只读执行），不写 DB，返回命中率。
     如果 sample_size > 100，走 BackgroundJob 异步化。
     """
     from app.services.qc_rule_dry_run_service import qc_rule_dry_run_service

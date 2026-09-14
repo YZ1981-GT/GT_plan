@@ -28,7 +28,6 @@ import { describe, it, expect, beforeEach } from 'vitest'
 import * as fc from 'fast-check'
 import { mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
-// @ts-expect-error — TS2307 false positive: Volar/TS-server stale cache after SFC edit; vue-tsc 0 errors, runtime passes
 import GtAmountCell from '@/components/common/GtAmountCell.vue'
 import { useDisplayPrefsStore } from '@/stores/displayPrefs'
 import { AMOUNT_UNITS } from '@/utils/formatters'

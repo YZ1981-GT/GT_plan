@@ -1,0 +1,88 @@
+{
+  "cases": [
+    {
+      "status": "passed",
+      "test": "tests.visibility_go_live_hardening.test_task3_dispatcher_lifespan.TestDispatcherMounted::test_default_flag_is_true"
+    },
+    {
+      "status": "passed",
+      "test": "tests.visibility_go_live_hardening.test_task3_dispatcher_lifespan.TestDispatcherMounted::test_flag_off_worker_exits"
+    },
+    {
+      "status": "passed",
+      "test": "tests.visibility_go_live_hardening.test_task3_dispatcher_lifespan.TestDispatcherMounted::test_start_workers_creates_dispatcher_task"
+    },
+    {
+      "status": "passed",
+      "test": "tests.visibility_go_live_hardening.test_task3_dispatcher_lifespan.TestFastPathConvergence::test_committed_outbox_fanned_out_and_converges"
+    },
+    {
+      "status": "passed",
+      "test": "tests.visibility_go_live_hardening.test_task3_dispatcher_lifespan.TestFastPathConvergence::test_handle_message_invalidates_project"
+    },
+    {
+      "status": "passed",
+      "test": "tests.visibility_go_live_hardening.test_task3_dispatcher_lifespan.TestGracefulShutdown::test_run_cancel_propagates_cleanly"
+    },
+    {
+      "status": "passed",
+      "test": "tests.visibility_go_live_hardening.test_task3_dispatcher_lifespan.TestGracefulShutdown::test_run_stops_cleanly_on_stop_event"
+    },
+    {
+      "status": "passed",
+      "test": "tests.visibility_go_live_hardening.test_task3_dispatcher_lifespan.TestReconnectResubscribe::test_runtime_disconnect_reconnects"
+    },
+    {
+      "status": "passed",
+      "test": "tests.visibility_go_live_hardening.test_task3_dispatcher_lifespan.TestRedisDownStartup::test_db_epoch_safety_net_denies_within_1s_no_stale_allow"
+    },
+    {
+      "status": "passed",
+      "test": "tests.visibility_go_live_hardening.test_task3_dispatcher_lifespan.TestRedisDownStartup::test_publisher_redis_down_noop_no_crash"
+    },
+    {
+      "status": "passed",
+      "test": "tests.visibility_go_live_hardening.test_task3_dispatcher_lifespan.TestRedisDownStartup::test_subscriber_redis_down_backoff_no_crash"
+    }
+  ],
+  "component": "H2 DispatcherLifecycle",
+  "criterion_ids": [
+    "2.1",
+    "2.2",
+    "2.3",
+    "2.4",
+    "2.5",
+    "2.6",
+    "2.7",
+    "2.8",
+    "2.9",
+    "2.10"
+  ],
+  "graceful_degradation": {
+    "redis_down_at_startup": "worker 不阻塞启动 + 指数退避重连 (base=0.5s, max=30s)",
+    "runtime_disconnect": "run_invalidation_subscriber 返回 → 重连并 resubscribe",
+    "safety_net": "PersistentEpochCache ≤1s DB epoch 核对 fail-closed, 绝不 stale-allow",
+    "shutdown": "stop_event 置位 → 优雅退出; task.cancel → CancelledError 正常传播"
+  },
+  "mount": {
+    "epoch_cache_semantics_changed": false,
+    "gate_default": true,
+    "gate_flag": "VISIBILITY_INVALIDATION_DISPATCHER_ENABLED",
+    "lifespan_hook": "app.main._start_workers",
+    "publisher": "InvalidationDispatcher.publish_pending (提交后 outbox fan-out)",
+    "subscriber": "run_invalidation_subscriber (psubscribe wp_visibility:invalidate:*)",
+    "worker_module": "app.workers.invalidation_dispatcher_worker"
+  },
+  "publisher_fanout_wiring": {
+    "channel": "wp_visibility:invalidate:{project_id}",
+    "outbox_write": "DelegationTransaction._bump_epoch (同权限/委派事务写 wp_visibility_invalidation_outbox)",
+    "visibility": "publisher 自有 session 只读已提交 outbox 行 → 仅 fan-out 事务提交后的失效"
+  },
+  "spec": "visibility-isolation-go-live-hardening",
+  "task_id": "3. 挂载 InvalidationDispatcher 到 app.main lifespan（R2）",
+  "totals": {
+    "failed": 0,
+    "passed": 11,
+    "total": 11
+  }
+}

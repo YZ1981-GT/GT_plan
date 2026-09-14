@@ -1,0 +1,4481 @@
+{
+  "schema_version": "task62-generic-docx-adjudication:v1",
+  "spec": "workpaper-html-onlyoffice-bidirectional-writeback-closure",
+  "task": "62",
+  "wave": 6,
+  "generator": "backend/scripts/gen/generate_task62_generic_docx_adjudication.py",
+  "why_this_record_instead_of_18_approved_bundles": "18/18 权威模板零 `${}` 声明 token、零既有 w:sdt；这 18 个 wp_code 的 HTML 对端字段身份由中文标记正则 + 序号后缀现算（Requirement 7.1 明禁中文正则作回写协议）。把这批序号型、语义空洞的候选写成 reviewed 契约会让机器侧全绿而实质是伪造供给，Task 62 正文亦明禁「不为满足数字伪造 contract/bundle/finalize」。故本任务先交付逐 entry 可复核裁决与阻塞登记。",
+  "the_reason_is_not_zero_dollar_tokens": {
+    "claim_explicitly_rejected": "「模板里没有 `${}` 占位所以造不出锚点」—— 这个说法是错的，本记录**不**以它为理由（Task 64 裁决记录已就同一误读做过更正，此处逐字对齐）",
+    "disproved_by_real_execution": [
+      "`WordFieldInjection(literal_anchor=True)` 是正式支持的一次性定位通道，Task 6 对 B30-11-2 用的就是中文字面标题",
+      "本记录的 `mechanism_probe` 对 A26-1 / A26-4 **真跑**了 `instrument_docx_bytes` → `verify_docx_visible_equivalence` → `read_back_word_tags`，逐条通过（`equivalent=true`、覆盖计数非空、非 document part 逐字节相同）⇒ 机制在 generic 模板上确实可用",
+      "`WordRowInjection` 支持一次性单元格坐标，空单元格也能注入"
+    ],
+    "the_actual_reasons": [
+      "**锚点不具区分度**（10/18）：`WordFieldInjection` 一个 literal token 只能绑一个 stable key 且全部出现处注入同一 tag，而 `××` 在单份约定书里最多出现 22 次、语义各不相同 ⇒ 无法逐字段注入",
+      "**候选 span 互相嵌套/重合**（2/18）：`202X年` 落在 `202X年12月31日` 内部，两者同时注入 SDT 结构上不可能",
+      "**锚点被 run 边界切断**（1/18，另有 6 个 entry 至少一个 literal 命中）：`_token_paragraphs` 要求 token verbatim 出现在原始 `word/document.xml`",
+      "**锚点只是更大人类占位的片段**（2/18）：注入后旁边的 `第YY次` / `X月X日` 仍是死文本，受管字段名不副实",
+      "**零受管字段候选**（3/18）：tagged-SDT projection 无内容可管，空 `fields` 会让「注入成功 / 等值通过」全部恒真",
+      "**字段身份不稳定**：115/136 的 field_id 带文档扫描顺序派生的序号后缀，design 对 `stable_field_key` 的定义是「adapter 全局稳定键」"
+    ]
+  },
+  "three_way_lock": {
+    "ledger_side": "backend/data/workpaper_word_template_adjudication.json",
+    "disk_side": "backend/wp_templates",
+    "impl_side": [
+      "app/services/wp_docx_template_parser.py::_LEGACY_COMPILED",
+      "app/services/wp_docx_template_parser.py::_NEW_PLACEHOLDER_RE",
+      "app/services/workpaper_sync/word_instrumentation.py::WordSdtCarrierGate.load",
+      "app/services/workpaper_sync/adapters/registry.py::PENDING_ENGINE_ADAPTERS"
+    ],
+    "requirements_side": "AC 7.7 的声明数现读，不抄 18/9"
+  },
+  "probe_gate": {
+    "source": "backend/data/onlyoffice_word_sdt_carrier_contract.json",
+    "carriers_allowed": [
+      "cell_level_field_sdt_tag_carrying_row_uuid",
+      "field_sdt_block",
+      "field_sdt_inline",
+      "sdt_external_body"
+    ],
+    "carriers_blocked": [
+      "row_sdt"
+    ],
+    "anchors_allowed": [
+      "w_tag"
+    ],
+    "anchors_blocked": [
+      "alias_display_name",
+      "paragraph_index",
+      "run_index",
+      "sdt_id"
+    ],
+    "identity": {
+      "carrier_contract_sha256": "be4d11dde4e92110d8da74c8da6de849c62f2ea58233f54e5ab6632466d67acc",
+      "carrier_gate_digest": "ec469dc7722cde207db52992a36628f2b2119a863cc165399a75b9f0d288ab3a",
+      "onlyoffice_build": "9.4.0-129",
+      "browser": "Chrome/151.0.0.0 (Playwright Chromium, Windows NT 10.0 x64)",
+      "source_commit": "d330d7cea6bb112709edce5bf287877df0a5f60c",
+      "runner": "backend/scripts/diagnose/probe_oo94_word_sdt.py",
+      "identity_schema_version": "1.0.0",
+      "instrumentation_version": "1.0.0",
+      "lock_policy": "no_w_lock_injected"
+    }
+  },
+  "word_adapter_ban": {
+    "forbidden_paths": [
+      "app/services/workpaper_sync/adapters/word.py",
+      "app/services/workpaper_sync/adapters/word"
+    ],
+    "blocking_task": "59,60,61",
+    "identity_gate": "onlyoffice_word_sdt_carrier_contract.json",
+    "delivered_docx_engine_adapters": 0
+  },
+  "entry_verdict_vocabulary": [
+    "token_declared_template",
+    "instrumentable_literal_anchor",
+    "blocked_literal_anchor_split_across_runs",
+    "blocked_partial_field_fragment_anchor",
+    "blocked_non_discriminating_literal_anchor",
+    "blocked_nested_literal_anchor",
+    "no_managed_field_candidate"
+  ],
+  "blocking_reason_vocabulary": [
+    "no_declared_token_in_authoritative_template",
+    "field_identity_derived_from_chinese_regex",
+    "ordinal_suffixed_field_ids",
+    "non_discriminating_literal_anchor",
+    "nested_or_identical_candidate_spans",
+    "merged_cell_duplicated_candidates",
+    "unrecognised_placeholder_forms_present",
+    "literal_anchor_split_across_runs",
+    "partial_field_fragment_anchor",
+    "generic_labels_only",
+    "zero_managed_field_candidates"
+  ],
+  "unrecognised_placeholder_patterns": [
+    {
+      "name": "bracketed_insert_slot",
+      "regex": "【[^】]{1,24}】"
+    },
+    {
+      "name": "ordinal_yy_slot",
+      "regex": "第\\s*YY\\s*次"
+    },
+    {
+      "name": "single_x_date_slot",
+      "regex": "X{1,2}\\s*月\\s*X{1,2}\\s*日"
+    },
+    {
+      "name": "underscore_blank",
+      "regex": "(?:_{3,}|＿{2,})"
+    }
+  ],
+  "blocking_preconditions": [
+    {
+      "id": "BP-62-1",
+      "title": "`word-template` HTML 业务模型没有稳定字段身份",
+      "evidence": [
+        "`app/services/wp_docx_template_parser.py` 的 `_LEGACY_PATTERNS` 用中文标记（`××公司` / `202X年…` / `××`）现算字段，Requirement 7.1 逐字禁止「中文正则」作正式回写协议",
+        "`_dedupe_field_id` 按文档扫描顺序追加序号后缀 ⇒ 模板中间插一个 `××` 会让其后全部 field_id 位移，不是稳定键",
+        "`_LEGACY_PATTERNS` 自身互相重叠（`202X年` 落在 `202X年12月31日` 内；两条日期正则命中同一 span）⇒ 同一物理文本产出两个「字段」",
+        "`parse_template` 的表格循环 `for cell in row.cells` 把横向合并单元格按跨列数重复扫描 ⇒ 候选数虚增"
+      ],
+      "consequence": "这 18 个 entry 拿不到「稳定键 + 唯一可锚位置」的字段集合，因此无法诚实地发布 tagged-SDT per-entry contract",
+      "release_condition": "对权威模板做受控、版本化的 `${semantic_key}` 占位改造（AC 9.9 的声明式迁移清单 + AC 3.4 的 template definition 发布），并把 `word-template` 的字段身份从序号型改为 token 型；该改造跨 `word-template-dual-mode` feature 与模板库，需自己的 spec 三件套，不属 Task 62 权限",
+      "must_fix_before": "Task 62 发布任何 per-entry contract / bundle",
+      "owner_task": "待立 spec（不得在 Task 62 内私自改模板库或 parser）",
+      "same_root_cause_as": [
+        "Task 64 裁决记录的 BP-17（「生产定位仍靠 legacy 中文正则 + `paragraph_index` 绝对索引 + 序号后缀 field_id」）",
+        "Task 63 裁决记录的 `field_identity_admissible_entries: []` 与 `legacy_chinese_derived_total`"
+      ],
+      "cross_lane_corroboration": "三个 Word lane 任务各自独立现算后落到同一条根因：Task 62 实测 18/18 模板 `declared_dollar_token_count=0`、115/136 field_id 带序号后缀；Task 63 记录 `dollar_token_total=0` 且 `field_identity_admissible_entries` 为空集；Task 64 记录 A16 链 HTML 字段面为 0。同一结论被三条独立取样路径复现，不是单个 entry 的偶然"
+    },
+    {
+      "id": "BP-62-2",
+      "title": "Word adapter 仍被 `PENDING_ENGINE_ADAPTERS` 禁止落地",
+      "evidence": [
+        "现读 `adapters/registry.py::PENDING_ENGINE_ADAPTERS` 的 docx 条目：forbidden_paths=['app/services/workpaper_sync/adapters/word.py', 'app/services/workpaper_sync/adapters/word']，blocking_task='59,60,61'",
+        "`DELIVERED_ENGINE_ADAPTERS` 里 docx adapter 现算 0 条"
+      ],
+      "consequence": "即便契约齐备，Task 62 也不得注册 Word adapter / 标 bidirectional",
+      "release_condition": "Task 61 真实 OO 9.4 F2 Word gate 全场景通过",
+      "must_fix_before": "Task 62 注册 adapter / 接宿主",
+      "owner_task": "61"
+    },
+    {
+      "id": "BP-62-3",
+      "title": "Word lane 的 published representation 供给为 0",
+      "evidence": [
+        "Task 60 发布记录里 F2-22/F2-23 的 `definition_bundle` 与 `published_representation` 均为 null（BP-10~BP-12）",
+        "`WordEntryFinalizeGate.finalize_candidate` 要求 candidate 已绑 approved bundle；`working_paper_content_version` / `working_paper_representation_upgrade_candidate` 实测 0 行"
+      ],
+      "consequence": "Task 62 无法为任何 entry finalize published representation",
+      "release_condition": "F2 lane 先经 Task 76 provisioner + Task 77 finalize gate 走通一次，证明 Word 侧 `template → instrumentation → contract → bundle → representation` 全链可发布",
+      "must_fix_before": "Task 62 标任何 entry 为已验收",
+      "owner_task": "61"
+    }
+  ],
+  "cross_entry_isolation": {
+    "rule": "不得跨 entry 复用 bundle / candidate / contract / evidence",
+    "how_enforced": "每个 entry 自己的 `template_sha256` / `normalized_structure_hash` / 候选清册 / verdict / blocking_reasons 全部独立现算；`contract_id` 由 wp_code 派生且互不相同；`REVIEWED_LITERAL_FIELDS` 的 key 集合与实测 instrumentable 集合逐个相等，多写少写都打红",
+    "f2_lane_untouched": "本任务往 `backend/data/workpaper_sync_word_contracts/` 写 0 份文件，F2-22/F2-23 的两份契约与发布记录逐字节不变"
+  },
+  "zero_families_are_non_vacuous": {
+    "authority_models_published": "分母 = 18 个 entry，全部因 BP-20 为 0，不是没有 entry",
+    "contracts_published_reviewed": "同上；`--check` 会核对暂存目录里本任务文件数为 0",
+    "definition_bundles_published": "同上，另叠加 BP-22（Word lane 供给为 0）",
+    "published_representations_finalized": "同上",
+    "adapters_registered": "分母 = 18；`PENDING_ENGINE_ADAPTERS` 现读证明禁令仍在（BP-21），`DELIVERED_ENGINE_ADAPTERS` 里 docx 为 0",
+    "templates_with_declared_dollar_token": "分母 = 18 份真实模板全部读过；为 0 是实测结论，不是没读"
+  },
+  "counters": {
+    "entries_total": 18,
+    "requirement_7_7_declared_generic_docx": 18,
+    "templates_read_from_authoritative_root": 18,
+    "templates_with_declared_dollar_token": 0,
+    "templates_with_existing_sdt": 0,
+    "candidate_occurrences_total": 136,
+    "merged_cell_duplicate_occurrences_total": 3,
+    "parser_placeholders_total": 136,
+    "ordinal_suffixed_field_ids_total": 115,
+    "span_overlap_identical_total": 2,
+    "span_overlap_contained_total": 6,
+    "span_overlap_partial_total": 0,
+    "entries_with_literal_anchor_split_across_runs": 6,
+    "entries_with_unrecognised_placeholder_forms": 17,
+    "authority_models_published": 0,
+    "contracts_published_reviewed": 0,
+    "definition_bundles_published": 0,
+    "published_representations_finalized": 0,
+    "adapters_registered": 0,
+    "entries_left_unverifiable": 18,
+    "mechanism_probe_runs": 2,
+    "entries_with_instrumentable_verdict": 0,
+    "task62_contract_files_in_staged_dir": 0,
+    "verdicts": {
+      "blocked_literal_anchor_split_across_runs": 1,
+      "blocked_nested_literal_anchor": 2,
+      "blocked_non_discriminating_literal_anchor": 10,
+      "blocked_partial_field_fragment_anchor": 2,
+      "no_managed_field_candidate": 3
+    },
+    "blocking_reasons": {
+      "field_identity_derived_from_chinese_regex": 15,
+      "generic_labels_only": 15,
+      "literal_anchor_split_across_runs": 6,
+      "merged_cell_duplicated_candidates": 1,
+      "nested_or_identical_candidate_spans": 2,
+      "no_declared_token_in_authoritative_template": 18,
+      "non_discriminating_literal_anchor": 12,
+      "ordinal_suffixed_field_ids": 13,
+      "partial_field_fragment_anchor": 14,
+      "unrecognised_placeholder_forms_present": 17,
+      "zero_managed_field_candidates": 3
+    }
+  },
+  "entries": [
+    {
+      "wp_code": "A26-1",
+      "ledger": {
+        "unified_relative_path": "A/A26-1 专业技术委员会业务报告审核提交资料清单.docx",
+        "unified_verdict": "resolved_docx",
+        "ledger_class": "generic_word_template",
+        "carrier_ambiguity": false,
+        "own_docx_carriers": [
+          "A/A26-1 专业技术委员会业务报告审核提交资料清单.docx"
+        ],
+        "component_type": "word-template"
+      },
+      "template": {
+        "relative_path": "A/A26-1 专业技术委员会业务报告审核提交资料清单.docx",
+        "size": 66241,
+        "template_sha256": "f898e887077ef3a604464fe4f5f5459cb94281d0fb12cee9747656b1e1e71f2d",
+        "normalized_structure_hash": "34ebcf367fdb3d30a4699ca8f543053b173bbd11d38d9ea0711b0303c1e3b235"
+      },
+      "structure": {
+        "paragraph_count": 18,
+        "table_count": 3,
+        "existing_sdt_count": 0,
+        "declared_dollar_token_count": 0
+      },
+      "html_counterpart": {
+        "render_strategy": "app/routers/wp_render_strategies/_word_template.py",
+        "structured_host": "audit-platform/frontend/src/components/workpaper/GtWordTemplateStructuredView.vue",
+        "persistence": "checklist_responses.item_id LIKE 'wt-A26-1-%'",
+        "field_identity_source": "app/services/wp_docx_template_parser.py::_LEGACY_PATTERNS（中文标记正则 + `_dedupe_field_id` 序号后缀）",
+        "parser_placeholder_count": 4,
+        "parser_field_ids": [
+          "audit_year",
+          "audit_year_2",
+          "audit_year_3",
+          "audit_year_4"
+        ],
+        "ordinal_suffixed_field_ids": [
+          "audit_year_2",
+          "audit_year_3",
+          "audit_year_4"
+        ],
+        "distinct_labels": [
+          "审计年度"
+        ]
+      },
+      "anchor_analysis": {
+        "candidate_occurrences": 4,
+        "merged_cell_duplicate_occurrences": 3,
+        "distinct_literal_anchors": 1,
+        "max_literal_anchor_multiplicity": 1,
+        "literal_anchor_multiplicity": {
+          "202X年": 1
+        },
+        "raw_xml_verbatim_counts": {
+          "202X年": 1
+        },
+        "literals_not_verbatim_in_raw_xml": [],
+        "span_overlap": {
+          "identical": 0,
+          "contained": 0,
+          "partial": 0
+        },
+        "unrecognised_placeholder_forms": {
+          "single_x_date_slot": 1
+        },
+        "occurrences_whose_container_has_unrecognised_form": 1,
+        "occurrences": [
+          {
+            "site": "table_cell",
+            "report_only_locator": "t01[5,0]",
+            "matched_literal": "202X年",
+            "parser_field_id_base": "audit_year",
+            "parser_label": "审计年度",
+            "merged_cell_duplicate": false,
+            "sibling_unrecognised_forms": {
+              "single_x_date_slot": 1
+            },
+            "context": "一、项目基本情况介绍\n\n\n\n二、重大会计审计事项应对情况\n截至202X年X月X日（建议临近会议日），项目组的主要审计情况介绍（下列为参考事项）\n1、常规程序执行情况\n（1）银行存款、借款的函证程序执行情况\n【函证控制情况；函证回函率；已回函是否有不符情况，如有，具体情况及解决情况；未回函的应对措施等；其他项目组认为重要"
+          },
+          {
+            "site": "table_cell",
+            "report_only_locator": "t01[5,1]",
+            "matched_literal": "202X年",
+            "parser_field_id_base": "audit_year",
+            "parser_label": "审计年度",
+            "merged_cell_duplicate": true,
+            "sibling_unrecognised_forms": {
+              "single_x_date_slot": 1
+            },
+            "context": "一、项目基本情况介绍\n\n\n\n二、重大会计审计事项应对情况\n截至202X年X月X日（建议临近会议日），项目组的主要审计情况介绍（下列为参考事项）\n1、常规程序执行情况\n（1）银行存款、借款的函证程序执行情况\n【函证控制情况；函证回函率；已回函是否有不符情况，如有，具体情况及解决情况；未回函的应对措施等；其他项目组认为重要"
+          },
+          {
+            "site": "table_cell",
+            "report_only_locator": "t01[5,2]",
+            "matched_literal": "202X年",
+            "parser_field_id_base": "audit_year",
+            "parser_label": "审计年度",
+            "merged_cell_duplicate": true,
+            "sibling_unrecognised_forms": {
+              "single_x_date_slot": 1
+            },
+            "context": "一、项目基本情况介绍\n\n\n\n二、重大会计审计事项应对情况\n截至202X年X月X日（建议临近会议日），项目组的主要审计情况介绍（下列为参考事项）\n1、常规程序执行情况\n（1）银行存款、借款的函证程序执行情况\n【函证控制情况；函证回函率；已回函是否有不符情况，如有，具体情况及解决情况；未回函的应对措施等；其他项目组认为重要"
+          },
+          {
+            "site": "table_cell",
+            "report_only_locator": "t01[5,3]",
+            "matched_literal": "202X年",
+            "parser_field_id_base": "audit_year",
+            "parser_label": "审计年度",
+            "merged_cell_duplicate": true,
+            "sibling_unrecognised_forms": {
+              "single_x_date_slot": 1
+            },
+            "context": "一、项目基本情况介绍\n\n\n\n二、重大会计审计事项应对情况\n截至202X年X月X日（建议临近会议日），项目组的主要审计情况介绍（下列为参考事项）\n1、常规程序执行情况\n（1）银行存款、借款的函证程序执行情况\n【函证控制情况；函证回函率；已回函是否有不符情况，如有，具体情况及解决情况；未回函的应对措施等；其他项目组认为重要"
+          }
+        ]
+      },
+      "lane_entry_key": "word-lane/a26-1",
+      "lane_entry_key_is_not_a_manifest_entry_id": true,
+      "manifest_entry_state": "absent_from_source_manifest",
+      "verdict": "blocked_partial_field_fragment_anchor",
+      "blocking_reasons": [
+        "field_identity_derived_from_chinese_regex",
+        "generic_labels_only",
+        "merged_cell_duplicated_candidates",
+        "no_declared_token_in_authoritative_template",
+        "ordinal_suffixed_field_ids",
+        "partial_field_fragment_anchor",
+        "unrecognised_placeholder_forms_present"
+      ],
+      "authority_model": null,
+      "authority_model_blocked_by": [
+        "BP-62-1"
+      ],
+      "contract": null,
+      "contract_blocked_by": [
+        "BP-62-1"
+      ],
+      "definition_bundle": null,
+      "definition_bundle_blocked_by": [
+        "BP-62-1",
+        "BP-62-3"
+      ],
+      "published_representation": null,
+      "published_representation_blocked_by": [
+        "BP-62-1",
+        "BP-62-3"
+      ],
+      "adapter_id": null,
+      "adapter_blocked_by": [
+        "BP-62-2"
+      ],
+      "capability": null,
+      "capability_target": "bidirectional",
+      "capability_target_blocked_by": [
+        "BP-62-1",
+        "BP-62-2",
+        "BP-62-3"
+      ],
+      "canonical_resolver": "word_resolution.resolve_word_template",
+      "evidence": {
+        "verification_state": "UNVERIFIABLE",
+        "sync_test_run_id": null,
+        "required_scenario_set_digest": null,
+        "browser_case": null,
+        "unverifiable_reasons": [
+          "verdict=blocked_partial_field_fragment_anchor；阻塞原因 ['field_identity_derived_from_chinese_regex', 'generic_labels_only', 'merged_cell_duplicated_candidates', 'no_declared_token_in_authoritative_template', 'ordinal_suffixed_field_ids', 'partial_field_fragment_anchor', 'unrecognised_placeholder_forms_present']",
+          "无 approved authority model / per-entry contract / non-null bundle",
+          "Task 61 真实 OO 9.4 Word gate 未通过（BP-21）"
+        ]
+      },
+      "mechanism_probe": {
+        "ran": true,
+        "is_not_a_contract": true,
+        "what_it_proves": "tagged-SDT 注入 + 注入前后可见等价 + 只按 w:tag 反读，在这份真实 generic 模板上逐条通过 —— 即机制不是 F2 专属。它**不**证明该 entry 可迁移：该锚点只是「截至202X年X月X日」的片段（见 verdict）",
+        "probe_id": "probe.task62.a26_1",
+        "one_time_locator_kind": "one_time_literal_text",
+        "literal_anchor": "202X年",
+        "fragment_of": "截至202X年X月X日",
+        "expected_token_occurrences": 1,
+        "probe_stable_field_key": "probe/as_of_year",
+        "note": "表 1 合并单元格内「截至202X年X月X日（建议临近会议日）」的年份片段；同格另有 20+ 个 `【…】` 填写指引槽位，parser 一个都不认",
+        "source_ref": "A26-1!t01[5,0]:202X年",
+        "instrumented_sha256": "027c2da9ee32bc275e85235b2640a54660ee59dbea2f284a287f520a20247cad",
+        "injected_tags": [
+          "gt:field:probe.task62.a26_1:probe/as_of_year"
+        ],
+        "untouched_parts": 21,
+        "non_document_parts_byte_identical": true,
+        "visible_equivalence": {
+          "schema_version": "word-instrumentation-equivalence:v1",
+          "preserved_aspects": {
+            "outside_sdt_text": false,
+            "protected_parts": true,
+            "row_uuid_set": true,
+            "sdt_hierarchy": true,
+            "sdt_tag_set": true,
+            "table_shape": true
+          },
+          "equivalent": true,
+          "visible_text_digest": "5b174171672bc7b3367ee1520975ad49e7858677c41a5c24ca486e6f16295f1e",
+          "outside_sdt_text_delta": {
+            "removed_count": 1,
+            "added_count": 1,
+            "unexplained_removed": [],
+            "unexplained_added": [],
+            "explained": true
+          },
+          "coverage": {
+            "visible_text_chars": 2999,
+            "outside_sdt_text": 123,
+            "protected_parts": 11,
+            "protected_part_classes": 8,
+            "table_shape": 3,
+            "fonts_used": 3,
+            "part_count": 22,
+            "untouched_parts": 21,
+            "declared_tokens": 1
+          },
+          "aspects": {
+            "sdt_tag_set": {
+              "before_count": 0,
+              "after_count": 1,
+              "lost_tags": [],
+              "new_tags": [
+                "gt:field:probe.task62.a26_1:probe/as_of_year"
+              ],
+              "diff_count": 0
+            },
+            "sdt_hierarchy": {
+              "diff_count": 0,
+              "diffs": {}
+            },
+            "row_uuid_set": {
+              "diff_count": 0,
+              "lost": {},
+              "new": {}
+            },
+            "outside_sdt_text": {
+              "before_count": 123,
+              "after_count": 123,
+              "removed": [
+                "截至202X年X月X日(建议临近会议日),项目组的主要审计情况介绍(下列为参考事项)"
+              ],
+              "added": [
+                "截至X月X日(建议临近会议日),项目组的主要审计情况介绍(下列为参考事项)"
+              ],
+              "diff_count": 2,
+              "declared_allowed_added": [],
+              "declared_allowed_removed": []
+            },
+            "table_shape": {
+              "before": [
+                [
+                  21,
+                  0
+                ],
+                [
+                  6,
+                  0
+                ],
+                [
+                  6,
+                  0
+                ]
+              ],
+              "after": [
+                [
+                  21,
+                  0
+                ],
+                [
+                  6,
+                  0
+                ],
+                [
+                  6,
+                  0
+                ]
+              ],
+              "diff_count": 0
+            },
+            "protected_parts": {
+              "before": {
+                "media": 1,
+                "header": 1,
+                "footer": 2,
+                "footnotes": 1,
+                "endnotes": 1,
+                "numbering": 1,
+                "styles": 1,
+                "custom_xml": 3
+              },
+              "after": {
+                "media": 1,
+                "header": 1,
+                "footer": 2,
+                "footnotes": 1,
+                "endnotes": 1,
+                "numbering": 1,
+                "styles": 1,
+                "custom_xml": 3
+              },
+              "regressions": {},
+              "diff_count": 0
+            }
+          },
+          "collection_errors": {
+            "template": [],
+            "instrumented": []
+          }
+        },
+        "tag_readback": {
+          "tags": [
+            "gt:field:probe.task62.a26_1:probe/as_of_year"
+          ],
+          "tag_count": 1,
+          "instance_count": 1,
+          "hierarchy": {
+            "gt:field:probe.task62.a26_1:probe/as_of_year": [
+              "body/tbl/tr/tc/p"
+            ]
+          },
+          "kind_map": {
+            "gt:field:probe.task62.a26_1:probe/as_of_year": [
+              "field_inline"
+            ]
+          },
+          "row_uuids": [],
+          "duplicate_row_uuids": [],
+          "untagged_sdt_count": 0,
+          "aspect_digests": {
+            "sdt_tag_set": "8b6625a738f5dbfa7aa64e966aafcedd3a3bb847bde46e6b2380c626a1f1dba5",
+            "sdt_hierarchy": "d6bf801e45d78c5a767164634d116ef8f3b37d2cd16370806564ad68e5c0d34c",
+            "row_uuid_set": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "outside_sdt_text": "2ed287ad4528fc0d47afeb0ee3d9d1ee3e8a5cd19eb16a1267abf7997d6d9a4d",
+            "table_shape": "b001ec4d0d3f48624ce802418561a11d29ce9ec69ee67912c8398030913290f4",
+            "protected_parts": "8ac5b114d3f4d62b08d3ea70a6232dddb60b40b28553edd6c6168655773fc90f"
+          }
+        },
+        "published": false,
+        "published_blocked_by": [
+          "BP-62-1",
+          "BP-62-2",
+          "BP-62-3"
+        ]
+      }
+    },
+    {
+      "wp_code": "A26-2",
+      "ledger": {
+        "unified_relative_path": "A/A26-2 专业技术委员会委员审核记录.docx",
+        "unified_verdict": "resolved_docx",
+        "ledger_class": "generic_word_template",
+        "carrier_ambiguity": false,
+        "own_docx_carriers": [
+          "A/A26-2 专业技术委员会委员审核记录.docx"
+        ],
+        "component_type": "word-template"
+      },
+      "template": {
+        "relative_path": "A/A26-2 专业技术委员会委员审核记录.docx",
+        "size": 55329,
+        "template_sha256": "0e937adbaac2368d762b00b819ae4c5de292a02d149c591eb28c326944661f7c",
+        "normalized_structure_hash": "c1fea9375642fadb29e3a77905f2a223edba7ea6f95172a598682978e537fcab"
+      },
+      "structure": {
+        "paragraph_count": 8,
+        "table_count": 1,
+        "existing_sdt_count": 0,
+        "declared_dollar_token_count": 0
+      },
+      "html_counterpart": {
+        "render_strategy": "app/routers/wp_render_strategies/_word_template.py",
+        "structured_host": "audit-platform/frontend/src/components/workpaper/GtWordTemplateStructuredView.vue",
+        "persistence": "checklist_responses.item_id LIKE 'wt-A26-2-%'",
+        "field_identity_source": "app/services/wp_docx_template_parser.py::_LEGACY_PATTERNS（中文标记正则 + `_dedupe_field_id` 序号后缀）",
+        "parser_placeholder_count": 0,
+        "parser_field_ids": [],
+        "ordinal_suffixed_field_ids": [],
+        "distinct_labels": []
+      },
+      "anchor_analysis": {
+        "candidate_occurrences": 0,
+        "merged_cell_duplicate_occurrences": 0,
+        "distinct_literal_anchors": 0,
+        "max_literal_anchor_multiplicity": 0,
+        "literal_anchor_multiplicity": {},
+        "raw_xml_verbatim_counts": {},
+        "literals_not_verbatim_in_raw_xml": [],
+        "span_overlap": {
+          "identical": 0,
+          "contained": 0,
+          "partial": 0
+        },
+        "unrecognised_placeholder_forms": {
+          "bracketed_insert_slot": 1,
+          "underscore_blank": 1
+        },
+        "occurrences_whose_container_has_unrecognised_form": 0,
+        "occurrences": []
+      },
+      "lane_entry_key": "word-lane/a26-2",
+      "lane_entry_key_is_not_a_manifest_entry_id": true,
+      "manifest_entry_state": "absent_from_source_manifest",
+      "verdict": "no_managed_field_candidate",
+      "blocking_reasons": [
+        "no_declared_token_in_authoritative_template",
+        "unrecognised_placeholder_forms_present",
+        "zero_managed_field_candidates"
+      ],
+      "authority_model": null,
+      "authority_model_blocked_by": [
+        "BP-62-1"
+      ],
+      "contract": null,
+      "contract_blocked_by": [
+        "BP-62-1"
+      ],
+      "definition_bundle": null,
+      "definition_bundle_blocked_by": [
+        "BP-62-1",
+        "BP-62-3"
+      ],
+      "published_representation": null,
+      "published_representation_blocked_by": [
+        "BP-62-1",
+        "BP-62-3"
+      ],
+      "adapter_id": null,
+      "adapter_blocked_by": [
+        "BP-62-2"
+      ],
+      "capability": null,
+      "capability_target": "bidirectional",
+      "capability_target_blocked_by": [
+        "BP-62-1",
+        "BP-62-2",
+        "BP-62-3"
+      ],
+      "canonical_resolver": "word_resolution.resolve_word_template",
+      "evidence": {
+        "verification_state": "UNVERIFIABLE",
+        "sync_test_run_id": null,
+        "required_scenario_set_digest": null,
+        "browser_case": null,
+        "unverifiable_reasons": [
+          "verdict=no_managed_field_candidate；阻塞原因 ['no_declared_token_in_authoritative_template', 'unrecognised_placeholder_forms_present', 'zero_managed_field_candidates']",
+          "无 approved authority model / per-entry contract / non-null bundle",
+          "Task 61 真实 OO 9.4 Word gate 未通过（BP-21）"
+        ]
+      },
+      "mechanism_probe": {
+        "ran": false,
+        "is_not_a_contract": true,
+        "why": "verdict=no_managed_field_candidate：字面锚点不唯一、被 run 边界切断，或无候选 —— 逐字段注入在本 entry 上无法构造"
+      }
+    },
+    {
+      "wp_code": "A26-3",
+      "ledger": {
+        "unified_relative_path": "A/A26-3 专业技术委员会会议记录.docx",
+        "unified_verdict": "resolved_docx",
+        "ledger_class": "generic_word_template",
+        "carrier_ambiguity": false,
+        "own_docx_carriers": [
+          "A/A26-3 专业技术委员会会议记录.docx"
+        ],
+        "component_type": "word-template"
+      },
+      "template": {
+        "relative_path": "A/A26-3 专业技术委员会会议记录.docx",
+        "size": 59251,
+        "template_sha256": "0c6a96980fe1eae77bd8de80e4e5db71737215fc7d9d1b57d439f768d31c4dec",
+        "normalized_structure_hash": "ee930e36b563f154234437685a4f948192d69ce508af27d75ded18bce46532de"
+      },
+      "structure": {
+        "paragraph_count": 16,
+        "table_count": 2,
+        "existing_sdt_count": 0,
+        "declared_dollar_token_count": 0
+      },
+      "html_counterpart": {
+        "render_strategy": "app/routers/wp_render_strategies/_word_template.py",
+        "structured_host": "audit-platform/frontend/src/components/workpaper/GtWordTemplateStructuredView.vue",
+        "persistence": "checklist_responses.item_id LIKE 'wt-A26-3-%'",
+        "field_identity_source": "app/services/wp_docx_template_parser.py::_LEGACY_PATTERNS（中文标记正则 + `_dedupe_field_id` 序号后缀）",
+        "parser_placeholder_count": 1,
+        "parser_field_ids": [
+          "audit_year"
+        ],
+        "ordinal_suffixed_field_ids": [],
+        "distinct_labels": [
+          "审计年度"
+        ]
+      },
+      "anchor_analysis": {
+        "candidate_occurrences": 1,
+        "merged_cell_duplicate_occurrences": 0,
+        "distinct_literal_anchors": 1,
+        "max_literal_anchor_multiplicity": 1,
+        "literal_anchor_multiplicity": {
+          "202X年": 1
+        },
+        "raw_xml_verbatim_counts": {
+          "202X年": 0
+        },
+        "literals_not_verbatim_in_raw_xml": [
+          "202X年"
+        ],
+        "span_overlap": {
+          "identical": 0,
+          "contained": 0,
+          "partial": 0
+        },
+        "unrecognised_placeholder_forms": {
+          "bracketed_insert_slot": 11,
+          "ordinal_yy_slot": 1,
+          "underscore_blank": 2
+        },
+        "occurrences_whose_container_has_unrecognised_form": 1,
+        "occurrences": [
+          {
+            "site": "paragraph",
+            "report_only_locator": "p09",
+            "matched_literal": "202X年",
+            "parser_field_id_base": "audit_year",
+            "parser_label": "审计年度",
+            "merged_cell_duplicate": false,
+            "sibling_unrecognised_forms": {
+              "ordinal_yy_slot": 1
+            },
+            "context": "（以下无正文，系事务所202X年第YY次专业技术委员会会议记录的签字页）"
+          }
+        ]
+      },
+      "lane_entry_key": "word-lane/a26-3",
+      "lane_entry_key_is_not_a_manifest_entry_id": true,
+      "manifest_entry_state": "absent_from_source_manifest",
+      "verdict": "blocked_literal_anchor_split_across_runs",
+      "blocking_reasons": [
+        "field_identity_derived_from_chinese_regex",
+        "generic_labels_only",
+        "literal_anchor_split_across_runs",
+        "no_declared_token_in_authoritative_template",
+        "partial_field_fragment_anchor",
+        "unrecognised_placeholder_forms_present"
+      ],
+      "authority_model": null,
+      "authority_model_blocked_by": [
+        "BP-62-1"
+      ],
+      "contract": null,
+      "contract_blocked_by": [
+        "BP-62-1"
+      ],
+      "definition_bundle": null,
+      "definition_bundle_blocked_by": [
+        "BP-62-1",
+        "BP-62-3"
+      ],
+      "published_representation": null,
+      "published_representation_blocked_by": [
+        "BP-62-1",
+        "BP-62-3"
+      ],
+      "adapter_id": null,
+      "adapter_blocked_by": [
+        "BP-62-2"
+      ],
+      "capability": null,
+      "capability_target": "bidirectional",
+      "capability_target_blocked_by": [
+        "BP-62-1",
+        "BP-62-2",
+        "BP-62-3"
+      ],
+      "canonical_resolver": "word_resolution.resolve_word_template",
+      "evidence": {
+        "verification_state": "UNVERIFIABLE",
+        "sync_test_run_id": null,
+        "required_scenario_set_digest": null,
+        "browser_case": null,
+        "unverifiable_reasons": [
+          "verdict=blocked_literal_anchor_split_across_runs；阻塞原因 ['field_identity_derived_from_chinese_regex', 'generic_labels_only', 'literal_anchor_split_across_runs', 'no_declared_token_in_authoritative_template', 'partial_field_fragment_anchor', 'unrecognised_placeholder_forms_present']",
+          "无 approved authority model / per-entry contract / non-null bundle",
+          "Task 61 真实 OO 9.4 Word gate 未通过（BP-21）"
+        ]
+      },
+      "mechanism_probe": {
+        "ran": false,
+        "is_not_a_contract": true,
+        "why": "verdict=blocked_literal_anchor_split_across_runs：字面锚点不唯一、被 run 边界切断，或无候选 —— 逐字段注入在本 entry 上无法构造"
+      }
+    },
+    {
+      "wp_code": "A26-4",
+      "ledger": {
+        "unified_relative_path": "A/A26-4 专业技术委员会重大业务咨询意见或分歧会议记录.docx",
+        "unified_verdict": "resolved_docx",
+        "ledger_class": "generic_word_template",
+        "carrier_ambiguity": false,
+        "own_docx_carriers": [
+          "A/A26-4 专业技术委员会重大业务咨询意见或分歧会议记录.docx"
+        ],
+        "component_type": "word-template"
+      },
+      "template": {
+        "relative_path": "A/A26-4 专业技术委员会重大业务咨询意见或分歧会议记录.docx",
+        "size": 59101,
+        "template_sha256": "43d58a8c66efead8a2341190aa49f851d19374ae0c95099b8f85603b4fd7a4a9",
+        "normalized_structure_hash": "ed387b79be4a86f022b4933fe6f97d62190e9a030acd64bb868a69c70aa3d0a9"
+      },
+      "structure": {
+        "paragraph_count": 12,
+        "table_count": 2,
+        "existing_sdt_count": 0,
+        "declared_dollar_token_count": 0
+      },
+      "html_counterpart": {
+        "render_strategy": "app/routers/wp_render_strategies/_word_template.py",
+        "structured_host": "audit-platform/frontend/src/components/workpaper/GtWordTemplateStructuredView.vue",
+        "persistence": "checklist_responses.item_id LIKE 'wt-A26-4-%'",
+        "field_identity_source": "app/services/wp_docx_template_parser.py::_LEGACY_PATTERNS（中文标记正则 + `_dedupe_field_id` 序号后缀）",
+        "parser_placeholder_count": 1,
+        "parser_field_ids": [
+          "audit_year"
+        ],
+        "ordinal_suffixed_field_ids": [],
+        "distinct_labels": [
+          "审计年度"
+        ]
+      },
+      "anchor_analysis": {
+        "candidate_occurrences": 1,
+        "merged_cell_duplicate_occurrences": 0,
+        "distinct_literal_anchors": 1,
+        "max_literal_anchor_multiplicity": 1,
+        "literal_anchor_multiplicity": {
+          "202X年": 1
+        },
+        "raw_xml_verbatim_counts": {
+          "202X年": 1
+        },
+        "literals_not_verbatim_in_raw_xml": [],
+        "span_overlap": {
+          "identical": 0,
+          "contained": 0,
+          "partial": 0
+        },
+        "unrecognised_placeholder_forms": {
+          "bracketed_insert_slot": 19,
+          "ordinal_yy_slot": 1,
+          "underscore_blank": 2
+        },
+        "occurrences_whose_container_has_unrecognised_form": 1,
+        "occurrences": [
+          {
+            "site": "paragraph",
+            "report_only_locator": "p06",
+            "matched_literal": "202X年",
+            "parser_field_id_base": "audit_year",
+            "parser_label": "审计年度",
+            "merged_cell_duplicate": false,
+            "sibling_unrecognised_forms": {
+              "ordinal_yy_slot": 1
+            },
+            "context": "（以下无正文，系事务所202X年第YY次专业技术委员会会议记录的签字页）"
+          }
+        ]
+      },
+      "lane_entry_key": "word-lane/a26-4",
+      "lane_entry_key_is_not_a_manifest_entry_id": true,
+      "manifest_entry_state": "absent_from_source_manifest",
+      "verdict": "blocked_partial_field_fragment_anchor",
+      "blocking_reasons": [
+        "field_identity_derived_from_chinese_regex",
+        "generic_labels_only",
+        "no_declared_token_in_authoritative_template",
+        "partial_field_fragment_anchor",
+        "unrecognised_placeholder_forms_present"
+      ],
+      "authority_model": null,
+      "authority_model_blocked_by": [
+        "BP-62-1"
+      ],
+      "contract": null,
+      "contract_blocked_by": [
+        "BP-62-1"
+      ],
+      "definition_bundle": null,
+      "definition_bundle_blocked_by": [
+        "BP-62-1",
+        "BP-62-3"
+      ],
+      "published_representation": null,
+      "published_representation_blocked_by": [
+        "BP-62-1",
+        "BP-62-3"
+      ],
+      "adapter_id": null,
+      "adapter_blocked_by": [
+        "BP-62-2"
+      ],
+      "capability": null,
+      "capability_target": "bidirectional",
+      "capability_target_blocked_by": [
+        "BP-62-1",
+        "BP-62-2",
+        "BP-62-3"
+      ],
+      "canonical_resolver": "word_resolution.resolve_word_template",
+      "evidence": {
+        "verification_state": "UNVERIFIABLE",
+        "sync_test_run_id": null,
+        "required_scenario_set_digest": null,
+        "browser_case": null,
+        "unverifiable_reasons": [
+          "verdict=blocked_partial_field_fragment_anchor；阻塞原因 ['field_identity_derived_from_chinese_regex', 'generic_labels_only', 'no_declared_token_in_authoritative_template', 'partial_field_fragment_anchor', 'unrecognised_placeholder_forms_present']",
+          "无 approved authority model / per-entry contract / non-null bundle",
+          "Task 61 真实 OO 9.4 Word gate 未通过（BP-21）"
+        ]
+      },
+      "mechanism_probe": {
+        "ran": true,
+        "is_not_a_contract": true,
+        "what_it_proves": "tagged-SDT 注入 + 注入前后可见等价 + 只按 w:tag 反读，在这份真实 generic 模板上逐条通过 —— 即机制不是 F2 专属。它**不**证明该 entry 可迁移：该锚点只是「202X年第YY次」的片段（见 verdict）",
+        "probe_id": "probe.task62.a26_4",
+        "one_time_locator_kind": "one_time_literal_text",
+        "literal_anchor": "202X年",
+        "fragment_of": "202X年第YY次",
+        "expected_token_occurrences": 1,
+        "probe_stable_field_key": "probe/minutes_year",
+        "note": "签字页「系事务所202X年第YY次专业技术委员会会议记录的签字页」的年份片段；兄弟占位 `第YY次`（会议次序）parser 不认。A26-3 的同一句在 python-docx 视图里一模一样，但它的原始 XML 把 `202X` 切在了 run 边界上 ⇒ 那个 entry 连定位都做不到（verdict=blocked_literal_anchor_split_across_runs），两者不可互相顶替",
+        "source_ref": "A26-4!p06:202X年",
+        "instrumented_sha256": "03c7a84980e151a0b62692dfd29407a23b91b69bfa85aed908196f610651e023",
+        "injected_tags": [
+          "gt:field:probe.task62.a26_4:probe/minutes_year"
+        ],
+        "untouched_parts": 21,
+        "non_document_parts_byte_identical": true,
+        "visible_equivalence": {
+          "schema_version": "word-instrumentation-equivalence:v1",
+          "preserved_aspects": {
+            "outside_sdt_text": false,
+            "protected_parts": true,
+            "row_uuid_set": true,
+            "sdt_hierarchy": true,
+            "sdt_tag_set": true,
+            "table_shape": true
+          },
+          "equivalent": true,
+          "visible_text_digest": "9f28bbf26c34d3dd0229ab0e3b64f02491cdf0dded350372893ee5219459cf2d",
+          "outside_sdt_text_delta": {
+            "removed_count": 1,
+            "added_count": 1,
+            "unexplained_removed": [],
+            "unexplained_added": [],
+            "explained": true
+          },
+          "coverage": {
+            "visible_text_chars": 1168,
+            "outside_sdt_text": 61,
+            "protected_parts": 11,
+            "protected_part_classes": 8,
+            "table_shape": 2,
+            "fonts_used": 2,
+            "part_count": 22,
+            "untouched_parts": 21,
+            "declared_tokens": 1
+          },
+          "aspects": {
+            "sdt_tag_set": {
+              "before_count": 0,
+              "after_count": 1,
+              "lost_tags": [],
+              "new_tags": [
+                "gt:field:probe.task62.a26_4:probe/minutes_year"
+              ],
+              "diff_count": 0
+            },
+            "sdt_hierarchy": {
+              "diff_count": 0,
+              "diffs": {}
+            },
+            "row_uuid_set": {
+              "diff_count": 0,
+              "lost": {},
+              "new": {}
+            },
+            "outside_sdt_text": {
+              "before_count": 61,
+              "after_count": 61,
+              "removed": [
+                "(以下无正文,系事务所202X年第YY次专业技术委员会会议记录的签字页)"
+              ],
+              "added": [
+                "(以下无正文,系事务所第YY次专业技术委员会会议记录的签字页)"
+              ],
+              "diff_count": 2,
+              "declared_allowed_added": [],
+              "declared_allowed_removed": []
+            },
+            "table_shape": {
+              "before": [
+                [
+                  6,
+                  0
+                ],
+                [
+                  13,
+                  0
+                ]
+              ],
+              "after": [
+                [
+                  6,
+                  0
+                ],
+                [
+                  13,
+                  0
+                ]
+              ],
+              "diff_count": 0
+            },
+            "protected_parts": {
+              "before": {
+                "media": 1,
+                "header": 1,
+                "footer": 2,
+                "footnotes": 1,
+                "endnotes": 1,
+                "numbering": 1,
+                "styles": 1,
+                "custom_xml": 3
+              },
+              "after": {
+                "media": 1,
+                "header": 1,
+                "footer": 2,
+                "footnotes": 1,
+                "endnotes": 1,
+                "numbering": 1,
+                "styles": 1,
+                "custom_xml": 3
+              },
+              "regressions": {},
+              "diff_count": 0
+            }
+          },
+          "collection_errors": {
+            "template": [],
+            "instrumented": []
+          }
+        },
+        "tag_readback": {
+          "tags": [
+            "gt:field:probe.task62.a26_4:probe/minutes_year"
+          ],
+          "tag_count": 1,
+          "instance_count": 1,
+          "hierarchy": {
+            "gt:field:probe.task62.a26_4:probe/minutes_year": [
+              "body/p"
+            ]
+          },
+          "kind_map": {
+            "gt:field:probe.task62.a26_4:probe/minutes_year": [
+              "field_inline"
+            ]
+          },
+          "row_uuids": [],
+          "duplicate_row_uuids": [],
+          "untagged_sdt_count": 0,
+          "aspect_digests": {
+            "sdt_tag_set": "fcc273d7e314120374ef35a59bb74fd93f394ef24edc89c74dbdff03c7533a66",
+            "sdt_hierarchy": "37c17b8779cdc551cb7c378109cdb85bc3eaa2663db3a45d4979ceb3784c1478",
+            "row_uuid_set": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "outside_sdt_text": "eaeac13003d65913cbc8233f4f26595dca5c7faa04ac50b1fa134f232636ec3b",
+            "table_shape": "c26a34163dec715349e563f2896a693c5670d085c7b326ff4233a815819fd843",
+            "protected_parts": "8ac5b114d3f4d62b08d3ea70a6232dddb60b40b28553edd6c6168655773fc90f"
+          }
+        },
+        "published": false,
+        "published_blocked_by": [
+          "BP-62-1",
+          "BP-62-2",
+          "BP-62-3"
+        ]
+      }
+    },
+    {
+      "wp_code": "A8-2",
+      "ledger": {
+        "unified_relative_path": "A/A8-2 其他信息比对记录20170725.docx",
+        "unified_verdict": "resolved_docx",
+        "ledger_class": "generic_word_template",
+        "carrier_ambiguity": false,
+        "own_docx_carriers": [
+          "A/A8-2 其他信息比对记录20170725.docx"
+        ],
+        "component_type": "word-template"
+      },
+      "template": {
+        "relative_path": "A/A8-2 其他信息比对记录20170725.docx",
+        "size": 38295,
+        "template_sha256": "0a42cfbad815bab3e0f68743b397f8c6c37eecadfa873493277bf9750a7e2f05",
+        "normalized_structure_hash": "e7bbfb064f71788dacd470fac29ae7d369e63eb887da967f50da7d8ba75cfa6f"
+      },
+      "structure": {
+        "paragraph_count": 30,
+        "table_count": 2,
+        "existing_sdt_count": 0,
+        "declared_dollar_token_count": 0
+      },
+      "html_counterpart": {
+        "render_strategy": "app/routers/wp_render_strategies/_word_template.py",
+        "structured_host": "audit-platform/frontend/src/components/workpaper/GtWordTemplateStructuredView.vue",
+        "persistence": "checklist_responses.item_id LIKE 'wt-A8-2-%'",
+        "field_identity_source": "app/services/wp_docx_template_parser.py::_LEGACY_PATTERNS（中文标记正则 + `_dedupe_field_id` 序号后缀）",
+        "parser_placeholder_count": 0,
+        "parser_field_ids": [],
+        "ordinal_suffixed_field_ids": [],
+        "distinct_labels": []
+      },
+      "anchor_analysis": {
+        "candidate_occurrences": 0,
+        "merged_cell_duplicate_occurrences": 0,
+        "distinct_literal_anchors": 0,
+        "max_literal_anchor_multiplicity": 0,
+        "literal_anchor_multiplicity": {},
+        "raw_xml_verbatim_counts": {},
+        "literals_not_verbatim_in_raw_xml": [],
+        "span_overlap": {
+          "identical": 0,
+          "contained": 0,
+          "partial": 0
+        },
+        "unrecognised_placeholder_forms": {
+          "single_x_date_slot": 1
+        },
+        "occurrences_whose_container_has_unrecognised_form": 0,
+        "occurrences": []
+      },
+      "lane_entry_key": "word-lane/a8-2",
+      "lane_entry_key_is_not_a_manifest_entry_id": true,
+      "manifest_entry_state": "absent_from_source_manifest",
+      "verdict": "no_managed_field_candidate",
+      "blocking_reasons": [
+        "no_declared_token_in_authoritative_template",
+        "unrecognised_placeholder_forms_present",
+        "zero_managed_field_candidates"
+      ],
+      "authority_model": null,
+      "authority_model_blocked_by": [
+        "BP-62-1"
+      ],
+      "contract": null,
+      "contract_blocked_by": [
+        "BP-62-1"
+      ],
+      "definition_bundle": null,
+      "definition_bundle_blocked_by": [
+        "BP-62-1",
+        "BP-62-3"
+      ],
+      "published_representation": null,
+      "published_representation_blocked_by": [
+        "BP-62-1",
+        "BP-62-3"
+      ],
+      "adapter_id": null,
+      "adapter_blocked_by": [
+        "BP-62-2"
+      ],
+      "capability": null,
+      "capability_target": "bidirectional",
+      "capability_target_blocked_by": [
+        "BP-62-1",
+        "BP-62-2",
+        "BP-62-3"
+      ],
+      "canonical_resolver": "word_resolution.resolve_word_template",
+      "evidence": {
+        "verification_state": "UNVERIFIABLE",
+        "sync_test_run_id": null,
+        "required_scenario_set_digest": null,
+        "browser_case": null,
+        "unverifiable_reasons": [
+          "verdict=no_managed_field_candidate；阻塞原因 ['no_declared_token_in_authoritative_template', 'unrecognised_placeholder_forms_present', 'zero_managed_field_candidates']",
+          "无 approved authority model / per-entry contract / non-null bundle",
+          "Task 61 真实 OO 9.4 Word gate 未通过（BP-21）"
+        ]
+      },
+      "mechanism_probe": {
+        "ran": false,
+        "is_not_a_contract": true,
+        "why": "verdict=no_managed_field_candidate：字面锚点不唯一、被 run 边界切断，或无候选 —— 逐字段注入在本 entry 上无法构造"
+      }
+    },
+    {
+      "wp_code": "B1-7",
+      "ledger": {
+        "unified_relative_path": "B/B1-7 质量控制委员会会议记录.docx",
+        "unified_verdict": "resolved_docx",
+        "ledger_class": "generic_word_template",
+        "carrier_ambiguity": false,
+        "own_docx_carriers": [
+          "B/B1-7 质量控制委员会会议记录.docx"
+        ],
+        "component_type": "word-template"
+      },
+      "template": {
+        "relative_path": "B/B1-7 质量控制委员会会议记录.docx",
+        "size": 18086,
+        "template_sha256": "f2141a3a71cdac2550ac68fda437dd93b8fff58d1dd76b88982b6566eb9dd037",
+        "normalized_structure_hash": "5343fbce29d55c3bde89fe420188797455d97733cfbc5f28c59890d4b99dfdeb"
+      },
+      "structure": {
+        "paragraph_count": 8,
+        "table_count": 2,
+        "existing_sdt_count": 0,
+        "declared_dollar_token_count": 0
+      },
+      "html_counterpart": {
+        "render_strategy": "app/routers/wp_render_strategies/_word_template.py",
+        "structured_host": "audit-platform/frontend/src/components/workpaper/GtWordTemplateStructuredView.vue",
+        "persistence": "checklist_responses.item_id LIKE 'wt-B1-7-%'",
+        "field_identity_source": "app/services/wp_docx_template_parser.py::_LEGACY_PATTERNS（中文标记正则 + `_dedupe_field_id` 序号后缀）",
+        "parser_placeholder_count": 0,
+        "parser_field_ids": [],
+        "ordinal_suffixed_field_ids": [],
+        "distinct_labels": []
+      },
+      "anchor_analysis": {
+        "candidate_occurrences": 0,
+        "merged_cell_duplicate_occurrences": 0,
+        "distinct_literal_anchors": 0,
+        "max_literal_anchor_multiplicity": 0,
+        "literal_anchor_multiplicity": {},
+        "raw_xml_verbatim_counts": {},
+        "literals_not_verbatim_in_raw_xml": [],
+        "span_overlap": {
+          "identical": 0,
+          "contained": 0,
+          "partial": 0
+        },
+        "unrecognised_placeholder_forms": {},
+        "occurrences_whose_container_has_unrecognised_form": 0,
+        "occurrences": []
+      },
+      "lane_entry_key": "word-lane/b1-7",
+      "lane_entry_key_is_not_a_manifest_entry_id": true,
+      "manifest_entry_state": "absent_from_source_manifest",
+      "verdict": "no_managed_field_candidate",
+      "blocking_reasons": [
+        "no_declared_token_in_authoritative_template",
+        "zero_managed_field_candidates"
+      ],
+      "authority_model": null,
+      "authority_model_blocked_by": [
+        "BP-62-1"
+      ],
+      "contract": null,
+      "contract_blocked_by": [
+        "BP-62-1"
+      ],
+      "definition_bundle": null,
+      "definition_bundle_blocked_by": [
+        "BP-62-1",
+        "BP-62-3"
+      ],
+      "published_representation": null,
+      "published_representation_blocked_by": [
+        "BP-62-1",
+        "BP-62-3"
+      ],
+      "adapter_id": null,
+      "adapter_blocked_by": [
+        "BP-62-2"
+      ],
+      "capability": null,
+      "capability_target": "bidirectional",
+      "capability_target_blocked_by": [
+        "BP-62-1",
+        "BP-62-2",
+        "BP-62-3"
+      ],
+      "canonical_resolver": "word_resolution.resolve_word_template",
+      "evidence": {
+        "verification_state": "UNVERIFIABLE",
+        "sync_test_run_id": null,
+        "required_scenario_set_digest": null,
+        "browser_case": null,
+        "unverifiable_reasons": [
+          "verdict=no_managed_field_candidate；阻塞原因 ['no_declared_token_in_authoritative_template', 'zero_managed_field_candidates']",
+          "无 approved authority model / per-entry contract / non-null bundle",
+          "Task 61 真实 OO 9.4 Word gate 未通过（BP-21）"
+        ]
+      },
+      "mechanism_probe": {
+        "ran": false,
+        "is_not_a_contract": true,
+        "why": "verdict=no_managed_field_candidate：字面锚点不唯一、被 run 边界切断，或无候选 —— 逐字段注入在本 entry 上无法构造"
+      }
+    },
+    {
+      "wp_code": "B5-1",
+      "ledger": {
+        "unified_relative_path": "B/B5-1 财务报表审计业务约定书（通用）.docx",
+        "unified_verdict": "resolved_docx",
+        "ledger_class": "generic_word_template",
+        "carrier_ambiguity": true,
+        "own_docx_carriers": [
+          "B/B5-1 财务报表审计业务约定书（通用、 总分所共同签署）.docx",
+          "B/B5-1 财务报表审计业务约定书（通用）.docx"
+        ],
+        "component_type": "word-template"
+      },
+      "template": {
+        "relative_path": "B/B5-1 财务报表审计业务约定书（通用）.docx",
+        "size": 51342,
+        "template_sha256": "296ac53bea3a56989fcecb0648630b2b896ef68f9f270eecdc4c9c5034b24bef",
+        "normalized_structure_hash": "8042402e9eb89ecdb49e873c9865afe5c77e78012ad67cfbe0b291d8a7df5cf9"
+      },
+      "structure": {
+        "paragraph_count": 181,
+        "table_count": 6,
+        "existing_sdt_count": 0,
+        "declared_dollar_token_count": 0
+      },
+      "html_counterpart": {
+        "render_strategy": "app/routers/wp_render_strategies/_word_template.py",
+        "structured_host": "audit-platform/frontend/src/components/workpaper/GtWordTemplateStructuredView.vue",
+        "persistence": "checklist_responses.item_id LIKE 'wt-B5-1-%'",
+        "field_identity_source": "app/services/wp_docx_template_parser.py::_LEGACY_PATTERNS（中文标记正则 + `_dedupe_field_id` 序号后缀）",
+        "parser_placeholder_count": 10,
+        "parser_field_ids": [
+          "placeholder_generic",
+          "placeholder_generic_2",
+          "placeholder_generic_3",
+          "placeholder_generic_4",
+          "placeholder_generic_5",
+          "placeholder_generic_6",
+          "placeholder_generic_7",
+          "placeholder_generic_8",
+          "placeholder_generic_9",
+          "placeholder_generic_10"
+        ],
+        "ordinal_suffixed_field_ids": [
+          "placeholder_generic_2",
+          "placeholder_generic_3",
+          "placeholder_generic_4",
+          "placeholder_generic_5",
+          "placeholder_generic_6",
+          "placeholder_generic_7",
+          "placeholder_generic_8",
+          "placeholder_generic_9",
+          "placeholder_generic_10"
+        ],
+        "distinct_labels": [
+          "待填内容"
+        ]
+      },
+      "anchor_analysis": {
+        "candidate_occurrences": 10,
+        "merged_cell_duplicate_occurrences": 0,
+        "distinct_literal_anchors": 1,
+        "max_literal_anchor_multiplicity": 10,
+        "literal_anchor_multiplicity": {
+          "××": 10
+        },
+        "raw_xml_verbatim_counts": {
+          "××": 10
+        },
+        "literals_not_verbatim_in_raw_xml": [],
+        "span_overlap": {
+          "identical": 0,
+          "contained": 0,
+          "partial": 0
+        },
+        "unrecognised_placeholder_forms": {
+          "bracketed_insert_slot": 9,
+          "underscore_blank": 1
+        },
+        "occurrences_whose_container_has_unrecognised_form": 6,
+        "occurrences": [
+          {
+            "site": "paragraph",
+            "report_only_locator": "p14",
+            "matched_literal": "××",
+            "parser_field_id_base": "placeholder_generic",
+            "parser_label": "待填内容",
+            "merged_cell_duplicate": false,
+            "sibling_unrecognised_forms": {
+              "bracketed_insert_slot": 1
+            },
+            "context": "1、乙方接受甲方委托，对甲方按照企业会计准则【或，其他适用的财务报告编制基础，如企业会计准则和《××会计制度》、国际财务报告准则等】编制的202×年12月31日的资产负债表，202×年度的利润表、现金流量表和所有者权益【或股东权益】变动表以及财务报表附注（以下统称财务报表）进行审计。"
+          },
+          {
+            "site": "paragraph",
+            "report_only_locator": "p17",
+            "matched_literal": "××",
+            "parser_field_id_base": "placeholder_generic",
+            "parser_label": "待填内容",
+            "merged_cell_duplicate": false,
+            "sibling_unrecognised_forms": {
+              "bracketed_insert_slot": 1
+            },
+            "context": "（1）财务报表是否在所有重大方面按照企业会计准则【或，企业会计准则和《××会计制度》】的规定编制；"
+          },
+          {
+            "site": "paragraph",
+            "report_only_locator": "p24",
+            "matched_literal": "××",
+            "parser_field_id_base": "placeholder_generic",
+            "parser_label": "待填内容",
+            "merged_cell_duplicate": false,
+            "sibling_unrecognised_forms": {
+              "bracketed_insert_slot": 1
+            },
+            "context": "2、按照企业会计准则【或，企业会计准则和《××会计制度》】的规定编制和公允反映财务报表是甲方管理层的责任，这种责任包括："
+          },
+          {
+            "site": "paragraph",
+            "report_only_locator": "p25",
+            "matched_literal": "××",
+            "parser_field_id_base": "placeholder_generic",
+            "parser_label": "待填内容",
+            "merged_cell_duplicate": false,
+            "sibling_unrecognised_forms": {
+              "bracketed_insert_slot": 1
+            },
+            "context": "（1）按照企业会计准则【或，企业会计准则和《××会计制度》】的规定编制财务报表，并使其实现公允反映；"
+          },
+          {
+            "site": "paragraph",
+            "report_only_locator": "p79",
+            "matched_literal": "××",
+            "parser_field_id_base": "placeholder_generic",
+            "parser_label": "待填内容",
+            "merged_cell_duplicate": false,
+            "sibling_unrecognised_forms": {
+              "bracketed_insert_slot": 1
+            },
+            "context": "8、如果甲方将按照企业会计准则【或，企业会计准则和《××会计制度》】的规定未作要求的补充信息与已审计财务报表一同列报，且上述补充信息不构成已审计财务报表的必要组成部分，乙方将评价这些补充信息的列报方式是否充分、清楚地使其与已审计财务报表相区分。如果未能充分、清楚地区分，乙方将要求甲方改变未审计补充信息的列报方式。如果甲"
+          },
+          {
+            "site": "paragraph",
+            "report_only_locator": "p90",
+            "matched_literal": "××",
+            "parser_field_id_base": "placeholder_generic",
+            "parser_label": "待填内容",
+            "merged_cell_duplicate": false,
+            "sibling_unrecognised_forms": {},
+            "context": "（2）鉴于甲方从事（涉及）××业务，乙方根据《中国注册会计师审计准则第1421号——利用专家的工作》的规定，可能利用专家的工作，例如独立估值专家、精算师、石油和天然气储量估算师、律师、税务专家等，协助乙方获取充分、适当的审计证据。【参考《审计准则第1421号——利用专家的工作》应用指南】"
+          },
+          {
+            "site": "paragraph",
+            "report_only_locator": "p113",
+            "matched_literal": "××",
+            "parser_field_id_base": "placeholder_generic",
+            "parser_label": "待填内容",
+            "merged_cell_duplicate": false,
+            "sibling_unrecognised_forms": {
+              "bracketed_insert_slot": 1
+            },
+            "context": "1、本次服务的收费是以乙方各级别工作人员在本次工作中所耗费的时间为基础计算的。双方商定本次服务的费用总额为人民币XX万元（￥××万元）【注释：同时列示大小写金额】。上述服务收费未包含增值税。"
+          },
+          {
+            "site": "paragraph",
+            "report_only_locator": "p120",
+            "matched_literal": "××",
+            "parser_field_id_base": "placeholder_generic",
+            "parser_label": "待填内容",
+            "merged_cell_duplicate": false,
+            "sibling_unrecognised_forms": {},
+            "context": "4、如果由于无法预见的原因，致使乙方人员抵达甲方的工作现场后，本约定书所涉及的审计服务不再进行，甲方不得要求退还预付的服务费用；如上述情况发生于乙方人员完成现场审计工作，并离开甲方的工作现场之后，甲方应另行向乙方支付人民币××元的补偿费，该补偿费应于甲方收到乙方的收款通知之日起×日内支付。"
+          },
+          {
+            "site": "paragraph",
+            "report_only_locator": "p128",
+            "matched_literal": "××",
+            "parser_field_id_base": "placeholder_generic",
+            "parser_label": "待填内容",
+            "merged_cell_duplicate": false,
+            "sibling_unrecognised_forms": {},
+            "context": "2、乙方向甲方致送审计报告一式××份。"
+          },
+          {
+            "site": "paragraph",
+            "report_only_locator": "p153",
+            "matched_literal": "××",
+            "parser_field_id_base": "placeholder_generic",
+            "parser_label": "待填内容",
+            "merged_cell_duplicate": false,
+            "sibling_unrecognised_forms": {},
+            "context": "（2）提交××仲裁委员会仲裁。"
+          }
+        ]
+      },
+      "lane_entry_key": "word-lane/b5-1",
+      "lane_entry_key_is_not_a_manifest_entry_id": true,
+      "manifest_entry_state": "absent_from_source_manifest",
+      "verdict": "blocked_non_discriminating_literal_anchor",
+      "blocking_reasons": [
+        "field_identity_derived_from_chinese_regex",
+        "generic_labels_only",
+        "no_declared_token_in_authoritative_template",
+        "non_discriminating_literal_anchor",
+        "ordinal_suffixed_field_ids",
+        "partial_field_fragment_anchor",
+        "unrecognised_placeholder_forms_present"
+      ],
+      "authority_model": null,
+      "authority_model_blocked_by": [
+        "BP-62-1"
+      ],
+      "contract": null,
+      "contract_blocked_by": [
+        "BP-62-1"
+      ],
+      "definition_bundle": null,
+      "definition_bundle_blocked_by": [
+        "BP-62-1",
+        "BP-62-3"
+      ],
+      "published_representation": null,
+      "published_representation_blocked_by": [
+        "BP-62-1",
+        "BP-62-3"
+      ],
+      "adapter_id": null,
+      "adapter_blocked_by": [
+        "BP-62-2"
+      ],
+      "capability": null,
+      "capability_target": "bidirectional",
+      "capability_target_blocked_by": [
+        "BP-62-1",
+        "BP-62-2",
+        "BP-62-3"
+      ],
+      "canonical_resolver": "word_resolution.resolve_word_template",
+      "evidence": {
+        "verification_state": "UNVERIFIABLE",
+        "sync_test_run_id": null,
+        "required_scenario_set_digest": null,
+        "browser_case": null,
+        "unverifiable_reasons": [
+          "verdict=blocked_non_discriminating_literal_anchor；阻塞原因 ['field_identity_derived_from_chinese_regex', 'generic_labels_only', 'no_declared_token_in_authoritative_template', 'non_discriminating_literal_anchor', 'ordinal_suffixed_field_ids', 'partial_field_fragment_anchor', 'unrecognised_placeholder_forms_present']",
+          "无 approved authority model / per-entry contract / non-null bundle",
+          "Task 61 真实 OO 9.4 Word gate 未通过（BP-21）"
+        ]
+      },
+      "mechanism_probe": {
+        "ran": false,
+        "is_not_a_contract": true,
+        "why": "verdict=blocked_non_discriminating_literal_anchor：字面锚点不唯一、被 run 边界切断，或无候选 —— 逐字段注入在本 entry 上无法构造"
+      }
+    },
+    {
+      "wp_code": "B5-2",
+      "ledger": {
+        "unified_relative_path": "B/B5-2 财务报表审计业务约定书（适用于上市公司审计）.docx",
+        "unified_verdict": "resolved_docx",
+        "ledger_class": "generic_word_template",
+        "carrier_ambiguity": true,
+        "own_docx_carriers": [
+          "B/B5-2 财务报表审计业务约定书（适用于上市公司审计、总分所共同签署）.docx",
+          "B/B5-2 财务报表审计业务约定书（适用于上市公司审计）.docx"
+        ],
+        "component_type": "word-template"
+      },
+      "template": {
+        "relative_path": "B/B5-2 财务报表审计业务约定书（适用于上市公司审计）.docx",
+        "size": 57254,
+        "template_sha256": "4ead4fd5efc6292ac326af973756aa95a14ef14aa1430c0868a3a6f184e1270e",
+        "normalized_structure_hash": "18dd0895f55c170e6a0b95c896ba9239908150a402e468cb8afe07a15a614bf3"
+      },
+      "structure": {
+        "paragraph_count": 209,
+        "table_count": 10,
+        "existing_sdt_count": 0,
+        "declared_dollar_token_count": 0
+      },
+      "html_counterpart": {
+        "render_strategy": "app/routers/wp_render_strategies/_word_template.py",
+        "structured_host": "audit-platform/frontend/src/components/workpaper/GtWordTemplateStructuredView.vue",
+        "persistence": "checklist_responses.item_id LIKE 'wt-B5-2-%'",
+        "field_identity_source": "app/services/wp_docx_template_parser.py::_LEGACY_PATTERNS（中文标记正则 + `_dedupe_field_id` 序号后缀）",
+        "parser_placeholder_count": 6,
+        "parser_field_ids": [
+          "placeholder_generic",
+          "placeholder_generic_2",
+          "placeholder_generic_3",
+          "placeholder_generic_4",
+          "placeholder_generic_5",
+          "placeholder_generic_6"
+        ],
+        "ordinal_suffixed_field_ids": [
+          "placeholder_generic_2",
+          "placeholder_generic_3",
+          "placeholder_generic_4",
+          "placeholder_generic_5",
+          "placeholder_generic_6"
+        ],
+        "distinct_labels": [
+          "待填内容"
+        ]
+      },
+      "anchor_analysis": {
+        "candidate_occurrences": 6,
+        "merged_cell_duplicate_occurrences": 0,
+        "distinct_literal_anchors": 1,
+        "max_literal_anchor_multiplicity": 6,
+        "literal_anchor_multiplicity": {
+          "××": 6
+        },
+        "raw_xml_verbatim_counts": {
+          "××": 6
+        },
+        "literals_not_verbatim_in_raw_xml": [],
+        "span_overlap": {
+          "identical": 0,
+          "contained": 0,
+          "partial": 0
+        },
+        "unrecognised_placeholder_forms": {
+          "bracketed_insert_slot": 25,
+          "underscore_blank": 1
+        },
+        "occurrences_whose_container_has_unrecognised_form": 2,
+        "occurrences": [
+          {
+            "site": "paragraph",
+            "report_only_locator": "p110",
+            "matched_literal": "××",
+            "parser_field_id_base": "placeholder_generic",
+            "parser_label": "待填内容",
+            "merged_cell_duplicate": false,
+            "sibling_unrecognised_forms": {},
+            "context": "（2）鉴于甲方从事（涉及）××业务，乙方根据《中国注册会计师审计准则第1421号——利用专家的工作》的规定，可能利用专家的工作，例如独立估值专家、精算师、石油和天然气储量估算师、律师、税务专家等，协助乙方获取充分、适当的审计证据。【参考《审计准则第1421号——利用专家的工作》应用指南】"
+          },
+          {
+            "site": "paragraph",
+            "report_only_locator": "p134",
+            "matched_literal": "××",
+            "parser_field_id_base": "placeholder_generic",
+            "parser_label": "待填内容",
+            "merged_cell_duplicate": false,
+            "sibling_unrecognised_forms": {
+              "bracketed_insert_slot": 1
+            },
+            "context": "1、本次服务的收费是以乙方各级别工作人员在本次工作中所耗费的时间为基础计算的。双方商定本次服务的费用总额为人民币XX万元（￥××万元）【注释：同时列示大小写金额】。上述服务收费未包含增值税。"
+          },
+          {
+            "site": "paragraph",
+            "report_only_locator": "p141",
+            "matched_literal": "××",
+            "parser_field_id_base": "placeholder_generic",
+            "parser_label": "待填内容",
+            "merged_cell_duplicate": false,
+            "sibling_unrecognised_forms": {},
+            "context": "4、如果由于无法预见的原因，致使乙方人员抵达甲方的工作现场后，本约定书所涉及的服务不再进行，甲方不得要求退还预付的服务费用；如上述情况发生于乙方人员完成现场工作，并离开甲方的工作现场之后，甲方应另行向乙方支付人民币××元的补偿费，该补偿费应于甲方收到乙方的收款通知之日起×日内支付。"
+          },
+          {
+            "site": "paragraph",
+            "report_only_locator": "p150",
+            "matched_literal": "××",
+            "parser_field_id_base": "placeholder_generic",
+            "parser_label": "待填内容",
+            "merged_cell_duplicate": false,
+            "sibling_unrecognised_forms": {},
+            "context": "2、乙方向甲方致送审计报告一式××份。"
+          },
+          {
+            "site": "paragraph",
+            "report_only_locator": "p151",
+            "matched_literal": "××",
+            "parser_field_id_base": "placeholder_generic",
+            "parser_label": "待填内容",
+            "merged_cell_duplicate": false,
+            "sibling_unrecognised_forms": {
+              "bracketed_insert_slot": 1
+            },
+            "context": "乙方向甲方致送其他报告和专项说明一式××份【不适用时请删除】。"
+          },
+          {
+            "site": "paragraph",
+            "report_only_locator": "p180",
+            "matched_literal": "××",
+            "parser_field_id_base": "placeholder_generic",
+            "parser_label": "待填内容",
+            "merged_cell_duplicate": false,
+            "sibling_unrecognised_forms": {},
+            "context": "（2）提交××仲裁委员会仲裁。"
+          }
+        ]
+      },
+      "lane_entry_key": "word-lane/b5-2",
+      "lane_entry_key_is_not_a_manifest_entry_id": true,
+      "manifest_entry_state": "absent_from_source_manifest",
+      "verdict": "blocked_non_discriminating_literal_anchor",
+      "blocking_reasons": [
+        "field_identity_derived_from_chinese_regex",
+        "generic_labels_only",
+        "no_declared_token_in_authoritative_template",
+        "non_discriminating_literal_anchor",
+        "ordinal_suffixed_field_ids",
+        "partial_field_fragment_anchor",
+        "unrecognised_placeholder_forms_present"
+      ],
+      "authority_model": null,
+      "authority_model_blocked_by": [
+        "BP-62-1"
+      ],
+      "contract": null,
+      "contract_blocked_by": [
+        "BP-62-1"
+      ],
+      "definition_bundle": null,
+      "definition_bundle_blocked_by": [
+        "BP-62-1",
+        "BP-62-3"
+      ],
+      "published_representation": null,
+      "published_representation_blocked_by": [
+        "BP-62-1",
+        "BP-62-3"
+      ],
+      "adapter_id": null,
+      "adapter_blocked_by": [
+        "BP-62-2"
+      ],
+      "capability": null,
+      "capability_target": "bidirectional",
+      "capability_target_blocked_by": [
+        "BP-62-1",
+        "BP-62-2",
+        "BP-62-3"
+      ],
+      "canonical_resolver": "word_resolution.resolve_word_template",
+      "evidence": {
+        "verification_state": "UNVERIFIABLE",
+        "sync_test_run_id": null,
+        "required_scenario_set_digest": null,
+        "browser_case": null,
+        "unverifiable_reasons": [
+          "verdict=blocked_non_discriminating_literal_anchor；阻塞原因 ['field_identity_derived_from_chinese_regex', 'generic_labels_only', 'no_declared_token_in_authoritative_template', 'non_discriminating_literal_anchor', 'ordinal_suffixed_field_ids', 'partial_field_fragment_anchor', 'unrecognised_placeholder_forms_present']",
+          "无 approved authority model / per-entry contract / non-null bundle",
+          "Task 61 真实 OO 9.4 Word gate 未通过（BP-21）"
+        ]
+      },
+      "mechanism_probe": {
+        "ran": false,
+        "is_not_a_contract": true,
+        "why": "verdict=blocked_non_discriminating_literal_anchor：字面锚点不唯一、被 run 边界切断，或无候选 —— 逐字段注入在本 entry 上无法构造"
+      }
+    },
+    {
+      "wp_code": "B5-3",
+      "ledger": {
+        "unified_relative_path": "B/B5-3 财务报表审计业务约定书（适用于国有企业审计）.docx",
+        "unified_verdict": "resolved_docx",
+        "ledger_class": "generic_word_template",
+        "carrier_ambiguity": false,
+        "own_docx_carriers": [
+          "B/B5-3 财务报表审计业务约定书（适用于国有企业审计）.docx"
+        ],
+        "component_type": "word-template"
+      },
+      "template": {
+        "relative_path": "B/B5-3 财务报表审计业务约定书（适用于国有企业审计）.docx",
+        "size": 49800,
+        "template_sha256": "c488cd7f0041c2ae332e0786ba222d4164bf70c5654a64cfcfac3e5ea7331aef",
+        "normalized_structure_hash": "8cd3eda4a6ef8c15078da0544143a3650653476e5a3a97e5874902231e3cdd5f"
+      },
+      "structure": {
+        "paragraph_count": 200,
+        "table_count": 6,
+        "existing_sdt_count": 0,
+        "declared_dollar_token_count": 0
+      },
+      "html_counterpart": {
+        "render_strategy": "app/routers/wp_render_strategies/_word_template.py",
+        "structured_host": "audit-platform/frontend/src/components/workpaper/GtWordTemplateStructuredView.vue",
+        "persistence": "checklist_responses.item_id LIKE 'wt-B5-3-%'",
+        "field_identity_source": "app/services/wp_docx_template_parser.py::_LEGACY_PATTERNS（中文标记正则 + `_dedupe_field_id` 序号后缀）",
+        "parser_placeholder_count": 12,
+        "parser_field_ids": [
+          "audit_year",
+          "placeholder_generic",
+          "placeholder_generic_2",
+          "placeholder_generic_3",
+          "placeholder_generic_4",
+          "placeholder_generic_5",
+          "placeholder_generic_6",
+          "placeholder_generic_7",
+          "placeholder_generic_8",
+          "placeholder_generic_9",
+          "placeholder_generic_10",
+          "placeholder_generic_11"
+        ],
+        "ordinal_suffixed_field_ids": [
+          "placeholder_generic_2",
+          "placeholder_generic_3",
+          "placeholder_generic_4",
+          "placeholder_generic_5",
+          "placeholder_generic_6",
+          "placeholder_generic_7",
+          "placeholder_generic_8",
+          "placeholder_generic_9",
+          "placeholder_generic_10",
+          "placeholder_generic_11"
+        ],
+        "distinct_labels": [
+          "审计年度",
+          "待填内容"
+        ]
+      },
+      "anchor_analysis": {
+        "candidate_occurrences": 12,
+        "merged_cell_duplicate_occurrences": 0,
+        "distinct_literal_anchors": 2,
+        "max_literal_anchor_multiplicity": 11,
+        "literal_anchor_multiplicity": {
+          "202X年": 1,
+          "××": 11
+        },
+        "raw_xml_verbatim_counts": {
+          "202X年": 0,
+          "××": 11
+        },
+        "literals_not_verbatim_in_raw_xml": [
+          "202X年"
+        ],
+        "span_overlap": {
+          "identical": 0,
+          "contained": 0,
+          "partial": 0
+        },
+        "unrecognised_placeholder_forms": {
+          "bracketed_insert_slot": 27,
+          "underscore_blank": 1
+        },
+        "occurrences_whose_container_has_unrecognised_form": 7,
+        "occurrences": [
+          {
+            "site": "paragraph",
+            "report_only_locator": "p08",
+            "matched_literal": "202X年",
+            "parser_field_id_base": "audit_year",
+            "parser_label": "审计年度",
+            "merged_cell_duplicate": false,
+            "sibling_unrecognised_forms": {},
+            "context": "兹由甲方委托乙方为其202X年度财务决算项目提供审计、审核及其他鉴证和相关专业服务。经双方协商，订立本业务约定书。本约定书将取代此前可能存在的甲方与乙方之间与本次服务有关的任何书面或口头的约定，并作为调整双方关于本次服务的合同关系的唯一依据。"
+          },
+          {
+            "site": "paragraph",
+            "report_only_locator": "p12",
+            "matched_literal": "××",
+            "parser_field_id_base": "placeholder_generic",
+            "parser_label": "待填内容",
+            "merged_cell_duplicate": false,
+            "sibling_unrecognised_forms": {
+              "bracketed_insert_slot": 1
+            },
+            "context": "乙方接受甲方委托，对甲方按照企业会计准则【或，其他适用的财务报告编制基础，如企业会计准则和《××会计制度》】编制的202×年12月31日的资产负债表，202×年度的利润表、现金流量表和所有者权益【或股东权益】变动表以及财务报表附注（以下统称财务报表）进行审计。"
+          },
+          {
+            "site": "paragraph",
+            "report_only_locator": "p15",
+            "matched_literal": "××",
+            "parser_field_id_base": "placeholder_generic",
+            "parser_label": "待填内容",
+            "merged_cell_duplicate": false,
+            "sibling_unrecognised_forms": {
+              "bracketed_insert_slot": 1
+            },
+            "context": "（1）财务报表是否在所有重大方面按照企业会计准则【或，企业会计准则和《××会计制度》】的规定编制；"
+          },
+          {
+            "site": "paragraph",
+            "report_only_locator": "p26",
+            "matched_literal": "××",
+            "parser_field_id_base": "placeholder_generic",
+            "parser_label": "待填内容",
+            "merged_cell_duplicate": false,
+            "sibling_unrecognised_forms": {
+              "bracketed_insert_slot": 1
+            },
+            "context": "2、按照企业会计准则【或，企业会计准则和《××会计制度》】的规定编制和公允反映财务报表是甲方管理层的责任，这种责任包括："
+          },
+          {
+            "site": "paragraph",
+            "report_only_locator": "p27",
+            "matched_literal": "××",
+            "parser_field_id_base": "placeholder_generic",
+            "parser_label": "待填内容",
+            "merged_cell_duplicate": false,
+            "sibling_unrecognised_forms": {
+              "bracketed_insert_slot": 1
+            },
+            "context": "（1）按照企业会计准则【或，企业会计准则和《××会计制度》】的规定编制财务报表，并使其实现公允反映；"
+          },
+          {
+            "site": "paragraph",
+            "report_only_locator": "p87",
+            "matched_literal": "××",
+            "parser_field_id_base": "placeholder_generic",
+            "parser_label": "待填内容",
+            "merged_cell_duplicate": false,
+            "sibling_unrecognised_forms": {
+              "bracketed_insert_slot": 1
+            },
+            "context": "6、如果甲方将按照企业会计准则【或，企业会计准则和《××会计制度》】的规定未作要求的补充信息与已审计财务报表一同列报，且上述补充信息不构成已审计财务报表的必要组成部分，乙方将评价这些补充信息的列报方式是否充分、清楚地使其与已审计财务报表相区分。如果未能充分、清楚地区分，乙方将要求甲方改变未审计补充信息的列报方式。如果甲"
+          },
+          {
+            "site": "paragraph",
+            "report_only_locator": "p99",
+            "matched_literal": "××",
+            "parser_field_id_base": "placeholder_generic",
+            "parser_label": "待填内容",
+            "merged_cell_duplicate": false,
+            "sibling_unrecognised_forms": {},
+            "context": "（2）鉴于甲方从事（涉及）××业务，乙方根据《中国注册会计师审计准则第1421号——利用专家的工作》的规定，可能利用专家的工作，例如独立估值专家、精算师、石油和天然气储量估算师、律师、税务专家等，协助乙方获取充分、适当的审计证据。【参考《审计准则第1421号——利用专家的工作》应用指南】"
+          },
+          {
+            "site": "paragraph",
+            "report_only_locator": "p124",
+            "matched_literal": "××",
+            "parser_field_id_base": "placeholder_generic",
+            "parser_label": "待填内容",
+            "merged_cell_duplicate": false,
+            "sibling_unrecognised_forms": {
+              "bracketed_insert_slot": 1
+            },
+            "context": "1、本次服务的收费是以乙方各级别工作人员在本次工作中所耗费的时间为基础计算的。双方商定本次服务的费用总额为人民币XX万元（￥××万元）【注释：同时列示大小写金额】。上述服务收费未包含增值税。"
+          },
+          {
+            "site": "paragraph",
+            "report_only_locator": "p131",
+            "matched_literal": "××",
+            "parser_field_id_base": "placeholder_generic",
+            "parser_label": "待填内容",
+            "merged_cell_duplicate": false,
+            "sibling_unrecognised_forms": {},
+            "context": "4、如果由于无法预见的原因，致使乙方人员抵达甲方的工作现场后，本约定书所涉及的服务不再进行，甲方不得要求退还预付的服务费用；如上述情况发生于乙方人员完成现场工作，并离开甲方的工作现场之后，甲方应另行向乙方支付人民币××元的补偿费，该补偿费应于甲方收到乙方的收款通知之日起×日内支付。"
+          },
+          {
+            "site": "paragraph",
+            "report_only_locator": "p140",
+            "matched_literal": "××",
+            "parser_field_id_base": "placeholder_generic",
+            "parser_label": "待填内容",
+            "merged_cell_duplicate": false,
+            "sibling_unrecognised_forms": {},
+            "context": "2、乙方向甲方致送审计报告一式××份。"
+          },
+          {
+            "site": "paragraph",
+            "report_only_locator": "p141",
+            "matched_literal": "××",
+            "parser_field_id_base": "placeholder_generic",
+            "parser_label": "待填内容",
+            "merged_cell_duplicate": false,
+            "sibling_unrecognised_forms": {
+              "bracketed_insert_slot": 1
+            },
+            "context": "乙方向甲方致送其他报告和专项说明一式××份【不适用时请删除】。"
+          },
+          {
+            "site": "paragraph",
+            "report_only_locator": "p170",
+            "matched_literal": "××",
+            "parser_field_id_base": "placeholder_generic",
+            "parser_label": "待填内容",
+            "merged_cell_duplicate": false,
+            "sibling_unrecognised_forms": {},
+            "context": "（2）提交××仲裁委员会仲裁。"
+          }
+        ]
+      },
+      "lane_entry_key": "word-lane/b5-3",
+      "lane_entry_key_is_not_a_manifest_entry_id": true,
+      "manifest_entry_state": "absent_from_source_manifest",
+      "verdict": "blocked_non_discriminating_literal_anchor",
+      "blocking_reasons": [
+        "field_identity_derived_from_chinese_regex",
+        "generic_labels_only",
+        "literal_anchor_split_across_runs",
+        "no_declared_token_in_authoritative_template",
+        "non_discriminating_literal_anchor",
+        "ordinal_suffixed_field_ids",
+        "partial_field_fragment_anchor",
+        "unrecognised_placeholder_forms_present"
+      ],
+      "authority_model": null,
+      "authority_model_blocked_by": [
+        "BP-62-1"
+      ],
+      "contract": null,
+      "contract_blocked_by": [
+        "BP-62-1"
+      ],
+      "definition_bundle": null,
+      "definition_bundle_blocked_by": [
+        "BP-62-1",
+        "BP-62-3"
+      ],
+      "published_representation": null,
+      "published_representation_blocked_by": [
+        "BP-62-1",
+        "BP-62-3"
+      ],
+      "adapter_id": null,
+      "adapter_blocked_by": [
+        "BP-62-2"
+      ],
+      "capability": null,
+      "capability_target": "bidirectional",
+      "capability_target_blocked_by": [
+        "BP-62-1",
+        "BP-62-2",
+        "BP-62-3"
+      ],
+      "canonical_resolver": "word_resolution.resolve_word_template",
+      "evidence": {
+        "verification_state": "UNVERIFIABLE",
+        "sync_test_run_id": null,
+        "required_scenario_set_digest": null,
+        "browser_case": null,
+        "unverifiable_reasons": [
+          "verdict=blocked_non_discriminating_literal_anchor；阻塞原因 ['field_identity_derived_from_chinese_regex', 'generic_labels_only', 'literal_anchor_split_across_runs', 'no_declared_token_in_authoritative_template', 'non_discriminating_literal_anchor', 'ordinal_suffixed_field_ids', 'partial_field_fragment_anchor', 'unrecognised_placeholder_forms_present']",
+          "无 approved authority model / per-entry contract / non-null bundle",
+          "Task 61 真实 OO 9.4 Word gate 未通过（BP-21）"
+        ]
+      },
+      "mechanism_probe": {
+        "ran": false,
+        "is_not_a_contract": true,
+        "why": "verdict=blocked_non_discriminating_literal_anchor：字面锚点不唯一、被 run 边界切断，或无候选 —— 逐字段注入在本 entry 上无法构造"
+      }
+    },
+    {
+      "wp_code": "B5-4",
+      "ledger": {
+        "unified_relative_path": "B/B5-4 财务报表审计业务约定书（适用于IPO审计）.docx",
+        "unified_verdict": "resolved_docx",
+        "ledger_class": "generic_word_template",
+        "carrier_ambiguity": false,
+        "own_docx_carriers": [
+          "B/B5-4 财务报表审计业务约定书（适用于IPO审计）.docx"
+        ],
+        "component_type": "word-template"
+      },
+      "template": {
+        "relative_path": "B/B5-4 财务报表审计业务约定书（适用于IPO审计）.docx",
+        "size": 57943,
+        "template_sha256": "e5c3eb998b97079dabac1edb37c2417bc1d8294b85801ec121ae3b109dc7ed78",
+        "normalized_structure_hash": "e7011a54c9de26db6c75439f9de32f3cc5c26b92023cc89b16dd0b41f280b3f7"
+      },
+      "structure": {
+        "paragraph_count": 207,
+        "table_count": 5,
+        "existing_sdt_count": 0,
+        "declared_dollar_token_count": 0
+      },
+      "html_counterpart": {
+        "render_strategy": "app/routers/wp_render_strategies/_word_template.py",
+        "structured_host": "audit-platform/frontend/src/components/workpaper/GtWordTemplateStructuredView.vue",
+        "persistence": "checklist_responses.item_id LIKE 'wt-B5-4-%'",
+        "field_identity_source": "app/services/wp_docx_template_parser.py::_LEGACY_PATTERNS（中文标记正则 + `_dedupe_field_id` 序号后缀）",
+        "parser_placeholder_count": 23,
+        "parser_field_ids": [
+          "placeholder_generic",
+          "placeholder_generic_2",
+          "placeholder_generic_3",
+          "placeholder_generic_4",
+          "placeholder_generic_5",
+          "placeholder_generic_6",
+          "placeholder_generic_7",
+          "placeholder_generic_8",
+          "placeholder_generic_9",
+          "placeholder_generic_10",
+          "placeholder_generic_11",
+          "placeholder_generic_12",
+          "placeholder_generic_13",
+          "placeholder_generic_14",
+          "placeholder_generic_15",
+          "placeholder_generic_16",
+          "placeholder_generic_17",
+          "placeholder_generic_18",
+          "placeholder_generic_19",
+          "placeholder_generic_20",
+          "audit_year",
+          "placeholder_generic_21",
+          "audit_year_2"
+        ],
+        "ordinal_suffixed_field_ids": [
+          "placeholder_generic_2",
+          "placeholder_generic_3",
+          "placeholder_generic_4",
+          "placeholder_generic_5",
+          "placeholder_generic_6",
+          "placeholder_generic_7",
+          "placeholder_generic_8",
+          "placeholder_generic_9",
+          "placeholder_generic_10",
+          "placeholder_generic_11",
+          "placeholder_generic_12",
+          "placeholder_generic_13",
+          "placeholder_generic_14",
+          "placeholder_generic_15",
+          "placeholder_generic_16",
+          "placeholder_generic_17",
+          "placeholder_generic_18",
+          "placeholder_generic_19",
+          "placeholder_generic_20",
+          "placeholder_generic_21",
+          "audit_year_2"
+        ],
+        "distinct_labels": [
+          "审计年度",
+          "待填内容"
+        ]
+      },
+      "anchor_analysis": {
+        "candidate_occurrences": 23,
+        "merged_cell_duplicate_occurrences": 0,
+        "distinct_literal_anchors": 2,
+        "max_literal_anchor_multiplicity": 21,
+        "literal_anchor_multiplicity": {
+          "20XX年": 2,
+          "××": 21
+        },
+        "raw_xml_verbatim_counts": {
+          "20XX年": 0,
+          "××": 20
+        },
+        "literals_not_verbatim_in_raw_xml": [
+          "20XX年"
+        ],
+        "span_overlap": {
+          "identical": 0,
+          "contained": 0,
+          "partial": 0
+        },
+        "unrecognised_placeholder_forms": {
+          "bracketed_insert_slot": 10,
+          "underscore_blank": 1
+        },
+        "occurrences_whose_container_has_unrecognised_form": 7,
+        "occurrences": [
+          {
+            "site": "paragraph",
+            "report_only_locator": "p12",
+            "matched_literal": "××",
+            "parser_field_id_base": "placeholder_generic",
+            "parser_label": "待填内容",
+            "merged_cell_duplicate": false,
+            "sibling_unrecognised_forms": {
+              "bracketed_insert_slot": 2
+            },
+            "context": "（1）乙方接受甲方委托，对甲方按照企业会计准则编制的20×1年12月31日、20×2年12月31日【或20××年×月××日】（以下简称“改制基准日”）的资产负债表，20××年度、20××年度【或20××年1-×月】的利润表、现金流量表和所有者权益变动表以及财务报表附注（以下统称财务报表）进行审计。"
+          },
+          {
+            "site": "paragraph",
+            "report_only_locator": "p12",
+            "matched_literal": "××",
+            "parser_field_id_base": "placeholder_generic",
+            "parser_label": "待填内容",
+            "merged_cell_duplicate": false,
+            "sibling_unrecognised_forms": {
+              "bracketed_insert_slot": 2
+            },
+            "context": "（1）乙方接受甲方委托，对甲方按照企业会计准则编制的20×1年12月31日、20×2年12月31日【或20××年×月××日】（以下简称“改制基准日”）的资产负债表，20××年度、20××年度【或20××年1-×月】的利润表、现金流量表和所有者权益变动表以及财务报表附注（以下统称财务报表）进行审计。"
+          },
+          {
+            "site": "paragraph",
+            "report_only_locator": "p12",
+            "matched_literal": "××",
+            "parser_field_id_base": "placeholder_generic",
+            "parser_label": "待填内容",
+            "merged_cell_duplicate": false,
+            "sibling_unrecognised_forms": {
+              "bracketed_insert_slot": 2
+            },
+            "context": "（1）乙方接受甲方委托，对甲方按照企业会计准则编制的20×1年12月31日、20×2年12月31日【或20××年×月××日】（以下简称“改制基准日”）的资产负债表，20××年度、20××年度【或20××年1-×月】的利润表、现金流量表和所有者权益变动表以及财务报表附注（以下统称财务报表）进行审计。"
+          },
+          {
+            "site": "paragraph",
+            "report_only_locator": "p12",
+            "matched_literal": "××",
+            "parser_field_id_base": "placeholder_generic",
+            "parser_label": "待填内容",
+            "merged_cell_duplicate": false,
+            "sibling_unrecognised_forms": {
+              "bracketed_insert_slot": 2
+            },
+            "context": "（1）乙方接受甲方委托，对甲方按照企业会计准则编制的20×1年12月31日、20×2年12月31日【或20××年×月××日】（以下简称“改制基准日”）的资产负债表，20××年度、20××年度【或20××年1-×月】的利润表、现金流量表和所有者权益变动表以及财务报表附注（以下统称财务报表）进行审计。"
+          },
+          {
+            "site": "paragraph",
+            "report_only_locator": "p12",
+            "matched_literal": "××",
+            "parser_field_id_base": "placeholder_generic",
+            "parser_label": "待填内容",
+            "merged_cell_duplicate": false,
+            "sibling_unrecognised_forms": {
+              "bracketed_insert_slot": 2
+            },
+            "context": "（1）乙方接受甲方委托，对甲方按照企业会计准则编制的20×1年12月31日、20×2年12月31日【或20××年×月××日】（以下简称“改制基准日”）的资产负债表，20××年度、20××年度【或20××年1-×月】的利润表、现金流量表和所有者权益变动表以及财务报表附注（以下统称财务报表）进行审计。"
+          },
+          {
+            "site": "paragraph",
+            "report_only_locator": "p15",
+            "matched_literal": "××",
+            "parser_field_id_base": "placeholder_generic",
+            "parser_label": "待填内容",
+            "merged_cell_duplicate": false,
+            "sibling_unrecognised_forms": {},
+            "context": "乙方对甲方按照企业会计准则编制的20××年12月31日的资产负债表，20××年度的利润表、现金流量表和所有者权益变动表以及财务报表附注（以下统称财务报表）进行审计。"
+          },
+          {
+            "site": "paragraph",
+            "report_only_locator": "p15",
+            "matched_literal": "××",
+            "parser_field_id_base": "placeholder_generic",
+            "parser_label": "待填内容",
+            "merged_cell_duplicate": false,
+            "sibling_unrecognised_forms": {},
+            "context": "乙方对甲方按照企业会计准则编制的20××年12月31日的资产负债表，20××年度的利润表、现金流量表和所有者权益变动表以及财务报表附注（以下统称财务报表）进行审计。"
+          },
+          {
+            "site": "paragraph",
+            "report_only_locator": "p17",
+            "matched_literal": "××",
+            "parser_field_id_base": "placeholder_generic",
+            "parser_label": "待填内容",
+            "merged_cell_duplicate": false,
+            "sibling_unrecognised_forms": {},
+            "context": "乙方对甲方按照企业会计准则编制的20×1年、20×2年、20×3年12月31日、20×4年×月××日（以下简称“申报财务报表截止日”）的资产负债表，20×1年度、20×2年度、20×3年度、20×4年1-×月的利润表、现金流量表和股东权益变动表以及财务报表附注（以下统称财务报表）进行审计。"
+          },
+          {
+            "site": "paragraph",
+            "report_only_locator": "p43",
+            "matched_literal": "××",
+            "parser_field_id_base": "placeholder_generic",
+            "parser_label": "待填内容",
+            "merged_cell_duplicate": false,
+            "sibling_unrecognised_forms": {},
+            "context": "4、及时为乙方的审计工作提供与审计有关的所有记录、文件和所需的其他信息（不仅包括总账和明细账，还包括从总账和明细账之外的其他途径获取的信息；在20××年×月×日之前提供审计所需的全部资料，如果在审计过程中需要补充资料，亦应及时提供），并保证所提供资料的真实性和完整性。"
+          },
+          {
+            "site": "paragraph",
+            "report_only_locator": "p96",
+            "matched_literal": "××",
+            "parser_field_id_base": "placeholder_generic",
+            "parser_label": "待填内容",
+            "merged_cell_duplicate": false,
+            "sibling_unrecognised_forms": {
+              "bracketed_insert_slot": 1
+            },
+            "context": "6、按照约定时间完成审计、审核及鉴证工作，出具审计报告及其他报告和专项说明。在适用的情况下，按照《中国注册会计师审计准则第1324号——持续经营》、《中国注册会计师审计准则第1504号——在审计报告中沟通关键审计事项》的相关规定，在审计报告中对与持续经营相关的重大不确定性和关键审计事项进行报告。乙方应于20××年×月×"
+          },
+          {
+            "site": "paragraph",
+            "report_only_locator": "p109",
+            "matched_literal": "××",
+            "parser_field_id_base": "placeholder_generic",
+            "parser_label": "待填内容",
+            "merged_cell_duplicate": false,
+            "sibling_unrecognised_forms": {},
+            "context": "（2）鉴于甲方从事（涉及）××业务，乙方根据《中国注册会计师审计准则第1421号——利用专家的工作》的规定，可能利用专家的工作，例如独立估值专家、精算师、石油和天然气储量估算师、律师、税务专家等，协助乙方获取充分、适当的审计证据。【参考《审计准则第1421号——利用专家的工作》应用指南】"
+          },
+          {
+            "site": "paragraph",
+            "report_only_locator": "p133",
+            "matched_literal": "××",
+            "parser_field_id_base": "placeholder_generic",
+            "parser_label": "待填内容",
+            "merged_cell_duplicate": false,
+            "sibling_unrecognised_forms": {
+              "bracketed_insert_slot": 1
+            },
+            "context": "1、本次服务的收费是以乙方各级别工作人员在本次工作中所耗费的时间为基础计算的。双方商定本次服务的费用总额为人民币XX万元（￥××万元）【注释：同时列示大小写金额】。上述服务收费未包含增值税。"
+          },
+          {
+            "site": "paragraph",
+            "report_only_locator": "p152",
+            "matched_literal": "××",
+            "parser_field_id_base": "placeholder_generic",
+            "parser_label": "待填内容",
+            "merged_cell_duplicate": false,
+            "sibling_unrecognised_forms": {},
+            "context": "2、乙方向甲方致送审计报告一式××份，其他报告和专项说明一式××份。"
+          },
+          {
+            "site": "paragraph",
+            "report_only_locator": "p152",
+            "matched_literal": "××",
+            "parser_field_id_base": "placeholder_generic",
+            "parser_label": "待填内容",
+            "merged_cell_duplicate": false,
+            "sibling_unrecognised_forms": {},
+            "context": "2、乙方向甲方致送审计报告一式××份，其他报告和专项说明一式××份。"
+          },
+          {
+            "site": "paragraph",
+            "report_only_locator": "p178",
+            "matched_literal": "××",
+            "parser_field_id_base": "placeholder_generic",
+            "parser_label": "待填内容",
+            "merged_cell_duplicate": false,
+            "sibling_unrecognised_forms": {},
+            "context": "（2）提交××仲裁委员会仲裁。"
+          },
+          {
+            "site": "table_cell",
+            "report_only_locator": "t03[2,0]",
+            "matched_literal": "××",
+            "parser_field_id_base": "placeholder_generic",
+            "parser_label": "待填内容",
+            "merged_cell_duplicate": false,
+            "sibling_unrecognised_forms": {},
+            "context": "第2次收费  完成20××年度、20××年度财务报表审计，出具20××年度审计报告时"
+          },
+          {
+            "site": "table_cell",
+            "report_only_locator": "t03[2,0]",
+            "matched_literal": "××",
+            "parser_field_id_base": "placeholder_generic",
+            "parser_label": "待填内容",
+            "merged_cell_duplicate": false,
+            "sibling_unrecognised_forms": {},
+            "context": "第2次收费  完成20××年度、20××年度财务报表审计，出具20××年度审计报告时"
+          },
+          {
+            "site": "table_cell",
+            "report_only_locator": "t03[2,0]",
+            "matched_literal": "××",
+            "parser_field_id_base": "placeholder_generic",
+            "parser_label": "待填内容",
+            "merged_cell_duplicate": false,
+            "sibling_unrecognised_forms": {},
+            "context": "第2次收费  完成20××年度、20××年度财务报表审计，出具20××年度审计报告时"
+          },
+          {
+            "site": "table_cell",
+            "report_only_locator": "t03[6,0]",
+            "matched_literal": "××",
+            "parser_field_id_base": "placeholder_generic",
+            "parser_label": "待填内容",
+            "merged_cell_duplicate": false,
+            "sibling_unrecognised_forms": {},
+            "context": "第5次收费  完成20××年度财务报表审计，出具20××年度审计报告时"
+          },
+          {
+            "site": "table_cell",
+            "report_only_locator": "t03[6,0]",
+            "matched_literal": "××",
+            "parser_field_id_base": "placeholder_generic",
+            "parser_label": "待填内容",
+            "merged_cell_duplicate": false,
+            "sibling_unrecognised_forms": {},
+            "context": "第5次收费  完成20××年度财务报表审计，出具20××年度审计报告时"
+          },
+          {
+            "site": "table_cell",
+            "report_only_locator": "t03[7,0]",
+            "matched_literal": "20XX年",
+            "parser_field_id_base": "audit_year",
+            "parser_label": "审计年度",
+            "merged_cell_duplicate": false,
+            "sibling_unrecognised_forms": {},
+            "context": "第6次收费  完成20××年度（或20XX年1－×月）财务报表审计，出具相关审计报告时"
+          },
+          {
+            "site": "table_cell",
+            "report_only_locator": "t03[7,0]",
+            "matched_literal": "××",
+            "parser_field_id_base": "placeholder_generic",
+            "parser_label": "待填内容",
+            "merged_cell_duplicate": false,
+            "sibling_unrecognised_forms": {},
+            "context": "第6次收费  完成20××年度（或20XX年1－×月）财务报表审计，出具相关审计报告时"
+          },
+          {
+            "site": "table_cell",
+            "report_only_locator": "t03[11,0]",
+            "matched_literal": "20XX年",
+            "parser_field_id_base": "audit_year",
+            "parser_label": "审计年度",
+            "merged_cell_duplicate": false,
+            "sibling_unrecognised_forms": {},
+            "context": "第9次收费  加期审计或审阅：完成20XX年1－X月）财务报表审计（审阅），出具相关审计报告时【注释：如果此部分工作是签订业务约定书时，尚不能预计的，则可单独签订补充协议】"
+          }
+        ]
+      },
+      "lane_entry_key": "word-lane/b5-4",
+      "lane_entry_key_is_not_a_manifest_entry_id": true,
+      "manifest_entry_state": "absent_from_source_manifest",
+      "verdict": "blocked_non_discriminating_literal_anchor",
+      "blocking_reasons": [
+        "field_identity_derived_from_chinese_regex",
+        "generic_labels_only",
+        "literal_anchor_split_across_runs",
+        "no_declared_token_in_authoritative_template",
+        "non_discriminating_literal_anchor",
+        "ordinal_suffixed_field_ids",
+        "partial_field_fragment_anchor",
+        "unrecognised_placeholder_forms_present"
+      ],
+      "authority_model": null,
+      "authority_model_blocked_by": [
+        "BP-62-1"
+      ],
+      "contract": null,
+      "contract_blocked_by": [
+        "BP-62-1"
+      ],
+      "definition_bundle": null,
+      "definition_bundle_blocked_by": [
+        "BP-62-1",
+        "BP-62-3"
+      ],
+      "published_representation": null,
+      "published_representation_blocked_by": [
+        "BP-62-1",
+        "BP-62-3"
+      ],
+      "adapter_id": null,
+      "adapter_blocked_by": [
+        "BP-62-2"
+      ],
+      "capability": null,
+      "capability_target": "bidirectional",
+      "capability_target_blocked_by": [
+        "BP-62-1",
+        "BP-62-2",
+        "BP-62-3"
+      ],
+      "canonical_resolver": "word_resolution.resolve_word_template",
+      "evidence": {
+        "verification_state": "UNVERIFIABLE",
+        "sync_test_run_id": null,
+        "required_scenario_set_digest": null,
+        "browser_case": null,
+        "unverifiable_reasons": [
+          "verdict=blocked_non_discriminating_literal_anchor；阻塞原因 ['field_identity_derived_from_chinese_regex', 'generic_labels_only', 'literal_anchor_split_across_runs', 'no_declared_token_in_authoritative_template', 'non_discriminating_literal_anchor', 'ordinal_suffixed_field_ids', 'partial_field_fragment_anchor', 'unrecognised_placeholder_forms_present']",
+          "无 approved authority model / per-entry contract / non-null bundle",
+          "Task 61 真实 OO 9.4 Word gate 未通过（BP-21）"
+        ]
+      },
+      "mechanism_probe": {
+        "ran": false,
+        "is_not_a_contract": true,
+        "why": "verdict=blocked_non_discriminating_literal_anchor：字面锚点不唯一、被 run 边界切断，或无候选 —— 逐字段注入在本 entry 上无法构造"
+      }
+    },
+    {
+      "wp_code": "B5-5",
+      "ledger": {
+        "unified_relative_path": "B/B5-5 内部控制审计业务约定书.docx",
+        "unified_verdict": "resolved_docx",
+        "ledger_class": "generic_word_template",
+        "carrier_ambiguity": false,
+        "own_docx_carriers": [
+          "B/B5-5 内部控制审计业务约定书.docx"
+        ],
+        "component_type": "word-template"
+      },
+      "template": {
+        "relative_path": "B/B5-5 内部控制审计业务约定书.docx",
+        "size": 41753,
+        "template_sha256": "904a474e85d8f39e0c38afbeb4a139d379d63120729ebd095f8b23feba628a8f",
+        "normalized_structure_hash": "fd24b20852b075f9727157bcdd3cfcd4a05bb2b2c017d20529c9c1c0092433e5"
+      },
+      "structure": {
+        "paragraph_count": 144,
+        "table_count": 4,
+        "existing_sdt_count": 0,
+        "declared_dollar_token_count": 0
+      },
+      "html_counterpart": {
+        "render_strategy": "app/routers/wp_render_strategies/_word_template.py",
+        "structured_host": "audit-platform/frontend/src/components/workpaper/GtWordTemplateStructuredView.vue",
+        "persistence": "checklist_responses.item_id LIKE 'wt-B5-5-%'",
+        "field_identity_source": "app/services/wp_docx_template_parser.py::_LEGACY_PATTERNS（中文标记正则 + `_dedupe_field_id` 序号后缀）",
+        "parser_placeholder_count": 10,
+        "parser_field_ids": [
+          "report_date",
+          "report_date_2",
+          "audit_year",
+          "report_date_3",
+          "report_date_4",
+          "audit_year_2",
+          "placeholder_generic",
+          "placeholder_generic_2",
+          "placeholder_generic_3",
+          "placeholder_generic_4"
+        ],
+        "ordinal_suffixed_field_ids": [
+          "report_date_2",
+          "report_date_3",
+          "report_date_4",
+          "audit_year_2",
+          "placeholder_generic_2",
+          "placeholder_generic_3",
+          "placeholder_generic_4"
+        ],
+        "distinct_labels": [
+          "审计年度",
+          "待填内容",
+          "报告日期"
+        ]
+      },
+      "anchor_analysis": {
+        "candidate_occurrences": 10,
+        "merged_cell_duplicate_occurrences": 0,
+        "distinct_literal_anchors": 3,
+        "max_literal_anchor_multiplicity": 4,
+        "literal_anchor_multiplicity": {
+          "202X年": 2,
+          "202X年12月31日": 4,
+          "××": 4
+        },
+        "raw_xml_verbatim_counts": {
+          "202X年": 0,
+          "202X年12月31日": 0,
+          "××": 4
+        },
+        "literals_not_verbatim_in_raw_xml": [
+          "202X年",
+          "202X年12月31日"
+        ],
+        "span_overlap": {
+          "identical": 2,
+          "contained": 4,
+          "partial": 0
+        },
+        "unrecognised_placeholder_forms": {
+          "bracketed_insert_slot": 3,
+          "underscore_blank": 1
+        },
+        "occurrences_whose_container_has_unrecognised_form": 0,
+        "occurrences": [
+          {
+            "site": "paragraph",
+            "report_only_locator": "p07",
+            "matched_literal": "202X年12月31日",
+            "parser_field_id_base": "report_date",
+            "parser_label": "报告日期",
+            "merged_cell_duplicate": false,
+            "sibling_unrecognised_forms": {},
+            "context": "兹由甲方委托乙方对截至202X年12月31日的财务报告内部控制的有效性进行审计，经双方协商，订立本业务约定书。本约定书将取代此前可能存在的甲方与乙方之间与本次服务有关的任何书面或口头的约定，并作为调整双方关于本次服务的合同关系的唯一依据。"
+          },
+          {
+            "site": "paragraph",
+            "report_only_locator": "p07",
+            "matched_literal": "202X年12月31日",
+            "parser_field_id_base": "report_date",
+            "parser_label": "报告日期",
+            "merged_cell_duplicate": false,
+            "sibling_unrecognised_forms": {},
+            "context": "兹由甲方委托乙方对截至202X年12月31日的财务报告内部控制的有效性进行审计，经双方协商，订立本业务约定书。本约定书将取代此前可能存在的甲方与乙方之间与本次服务有关的任何书面或口头的约定，并作为调整双方关于本次服务的合同关系的唯一依据。"
+          },
+          {
+            "site": "paragraph",
+            "report_only_locator": "p07",
+            "matched_literal": "202X年",
+            "parser_field_id_base": "audit_year",
+            "parser_label": "审计年度",
+            "merged_cell_duplicate": false,
+            "sibling_unrecognised_forms": {},
+            "context": "兹由甲方委托乙方对截至202X年12月31日的财务报告内部控制的有效性进行审计，经双方协商，订立本业务约定书。本约定书将取代此前可能存在的甲方与乙方之间与本次服务有关的任何书面或口头的约定，并作为调整双方关于本次服务的合同关系的唯一依据。"
+          },
+          {
+            "site": "paragraph",
+            "report_only_locator": "p10",
+            "matched_literal": "202X年12月31日",
+            "parser_field_id_base": "report_date",
+            "parser_label": "报告日期",
+            "merged_cell_duplicate": false,
+            "sibling_unrecognised_forms": {},
+            "context": "乙方接受甲方委托，对甲方截至202X年12月31日（以下简称“基准日”）按照《企业内部控制基本规范》和相关规定建立的财务报告内部控制进行审计并对其有效性发表审计意见。"
+          },
+          {
+            "site": "paragraph",
+            "report_only_locator": "p10",
+            "matched_literal": "202X年12月31日",
+            "parser_field_id_base": "report_date",
+            "parser_label": "报告日期",
+            "merged_cell_duplicate": false,
+            "sibling_unrecognised_forms": {},
+            "context": "乙方接受甲方委托，对甲方截至202X年12月31日（以下简称“基准日”）按照《企业内部控制基本规范》和相关规定建立的财务报告内部控制进行审计并对其有效性发表审计意见。"
+          },
+          {
+            "site": "paragraph",
+            "report_only_locator": "p10",
+            "matched_literal": "202X年",
+            "parser_field_id_base": "audit_year",
+            "parser_label": "审计年度",
+            "merged_cell_duplicate": false,
+            "sibling_unrecognised_forms": {},
+            "context": "乙方接受甲方委托，对甲方截至202X年12月31日（以下简称“基准日”）按照《企业内部控制基本规范》和相关规定建立的财务报告内部控制进行审计并对其有效性发表审计意见。"
+          },
+          {
+            "site": "paragraph",
+            "report_only_locator": "p63",
+            "matched_literal": "××",
+            "parser_field_id_base": "placeholder_generic",
+            "parser_label": "待填内容",
+            "merged_cell_duplicate": false,
+            "sibling_unrecognised_forms": {},
+            "context": "（2）鉴于甲方从事（涉及）××业务，乙方根据《中国注册会计师审计准则第1421号——利用专家的工作》的规定，可能利用专家的工作，例如独立估值专家、精算师、石油和天然气储量估算师、律师、税务专家等，协助乙方获取充分、适当的审计证据。【参考《审计准则第1421号——利用专家的工作》应用指南】"
+          },
+          {
+            "site": "paragraph",
+            "report_only_locator": "p82",
+            "matched_literal": "××",
+            "parser_field_id_base": "placeholder_generic",
+            "parser_label": "待填内容",
+            "merged_cell_duplicate": false,
+            "sibling_unrecognised_forms": {},
+            "context": "4、如果由于无法预见的原因，致使乙方人员抵达甲方的工作现场后，本约定书所涉及的审计服务不再进行，甲方不得要求退还预付的审计费用；如上述情况发生于乙方人员完成现场审计工作，并离开甲方的工作现场之后，甲方应另行向乙方支付人民币××元的补偿费，该补偿费应于甲方收到乙方的收款通知之日起×日内支付。"
+          },
+          {
+            "site": "paragraph",
+            "report_only_locator": "p90",
+            "matched_literal": "××",
+            "parser_field_id_base": "placeholder_generic",
+            "parser_label": "待填内容",
+            "merged_cell_duplicate": false,
+            "sibling_unrecognised_forms": {},
+            "context": "2、乙方向甲方致送审计报告一式××份。"
+          },
+          {
+            "site": "paragraph",
+            "report_only_locator": "p115",
+            "matched_literal": "××",
+            "parser_field_id_base": "placeholder_generic",
+            "parser_label": "待填内容",
+            "merged_cell_duplicate": false,
+            "sibling_unrecognised_forms": {},
+            "context": "（2）提交××仲裁委员会仲裁。"
+          }
+        ]
+      },
+      "lane_entry_key": "word-lane/b5-5",
+      "lane_entry_key_is_not_a_manifest_entry_id": true,
+      "manifest_entry_state": "absent_from_source_manifest",
+      "verdict": "blocked_nested_literal_anchor",
+      "blocking_reasons": [
+        "field_identity_derived_from_chinese_regex",
+        "generic_labels_only",
+        "literal_anchor_split_across_runs",
+        "nested_or_identical_candidate_spans",
+        "no_declared_token_in_authoritative_template",
+        "non_discriminating_literal_anchor",
+        "ordinal_suffixed_field_ids",
+        "unrecognised_placeholder_forms_present"
+      ],
+      "authority_model": null,
+      "authority_model_blocked_by": [
+        "BP-62-1"
+      ],
+      "contract": null,
+      "contract_blocked_by": [
+        "BP-62-1"
+      ],
+      "definition_bundle": null,
+      "definition_bundle_blocked_by": [
+        "BP-62-1",
+        "BP-62-3"
+      ],
+      "published_representation": null,
+      "published_representation_blocked_by": [
+        "BP-62-1",
+        "BP-62-3"
+      ],
+      "adapter_id": null,
+      "adapter_blocked_by": [
+        "BP-62-2"
+      ],
+      "capability": null,
+      "capability_target": "bidirectional",
+      "capability_target_blocked_by": [
+        "BP-62-1",
+        "BP-62-2",
+        "BP-62-3"
+      ],
+      "canonical_resolver": "word_resolution.resolve_word_template",
+      "evidence": {
+        "verification_state": "UNVERIFIABLE",
+        "sync_test_run_id": null,
+        "required_scenario_set_digest": null,
+        "browser_case": null,
+        "unverifiable_reasons": [
+          "verdict=blocked_nested_literal_anchor；阻塞原因 ['field_identity_derived_from_chinese_regex', 'generic_labels_only', 'literal_anchor_split_across_runs', 'nested_or_identical_candidate_spans', 'no_declared_token_in_authoritative_template', 'non_discriminating_literal_anchor', 'ordinal_suffixed_field_ids', 'unrecognised_placeholder_forms_present']",
+          "无 approved authority model / per-entry contract / non-null bundle",
+          "Task 61 真实 OO 9.4 Word gate 未通过（BP-21）"
+        ]
+      },
+      "mechanism_probe": {
+        "ran": false,
+        "is_not_a_contract": true,
+        "why": "verdict=blocked_nested_literal_anchor：字面锚点不唯一、被 run 边界切断，或无候选 —— 逐字段注入在本 entry 上无法构造"
+      }
+    },
+    {
+      "wp_code": "B5-6",
+      "ledger": {
+        "unified_relative_path": "B/B5-6 IPO季度财务报表审阅业务约定书.docx",
+        "unified_verdict": "resolved_docx",
+        "ledger_class": "generic_word_template",
+        "carrier_ambiguity": false,
+        "own_docx_carriers": [
+          "B/B5-6 IPO季度财务报表审阅业务约定书.docx"
+        ],
+        "component_type": "word-template"
+      },
+      "template": {
+        "relative_path": "B/B5-6 IPO季度财务报表审阅业务约定书.docx",
+        "size": 32615,
+        "template_sha256": "38f105090b47aef4b64d1a4f1bb65a87601695a41949f51a4cfdfa8fc2977983",
+        "normalized_structure_hash": "54a7947bd5b009c21f0ed2ba99cee3da42d65e46dbc6753ec673853bebed3327"
+      },
+      "structure": {
+        "paragraph_count": 125,
+        "table_count": 2,
+        "existing_sdt_count": 0,
+        "declared_dollar_token_count": 0
+      },
+      "html_counterpart": {
+        "render_strategy": "app/routers/wp_render_strategies/_word_template.py",
+        "structured_host": "audit-platform/frontend/src/components/workpaper/GtWordTemplateStructuredView.vue",
+        "persistence": "checklist_responses.item_id LIKE 'wt-B5-6-%'",
+        "field_identity_source": "app/services/wp_docx_template_parser.py::_LEGACY_PATTERNS（中文标记正则 + `_dedupe_field_id` 序号后缀）",
+        "parser_placeholder_count": 13,
+        "parser_field_ids": [
+          "audit_year",
+          "audit_year_2",
+          "audit_year_3",
+          "audit_year_4",
+          "audit_year_5",
+          "audit_year_6",
+          "audit_year_7",
+          "audit_year_8",
+          "audit_year_9",
+          "placeholder_generic",
+          "placeholder_generic_2",
+          "placeholder_generic_3",
+          "placeholder_generic_4"
+        ],
+        "ordinal_suffixed_field_ids": [
+          "audit_year_2",
+          "audit_year_3",
+          "audit_year_4",
+          "audit_year_5",
+          "audit_year_6",
+          "audit_year_7",
+          "audit_year_8",
+          "audit_year_9",
+          "placeholder_generic_2",
+          "placeholder_generic_3",
+          "placeholder_generic_4"
+        ],
+        "distinct_labels": [
+          "审计年度",
+          "待填内容"
+        ]
+      },
+      "anchor_analysis": {
+        "candidate_occurrences": 13,
+        "merged_cell_duplicate_occurrences": 0,
+        "distinct_literal_anchors": 2,
+        "max_literal_anchor_multiplicity": 9,
+        "literal_anchor_multiplicity": {
+          "202X年": 9,
+          "××": 4
+        },
+        "raw_xml_verbatim_counts": {
+          "202X年": 0,
+          "××": 4
+        },
+        "literals_not_verbatim_in_raw_xml": [
+          "202X年"
+        ],
+        "span_overlap": {
+          "identical": 0,
+          "contained": 0,
+          "partial": 0
+        },
+        "unrecognised_placeholder_forms": {
+          "bracketed_insert_slot": 3,
+          "underscore_blank": 1
+        },
+        "occurrences_whose_container_has_unrecognised_form": 1,
+        "occurrences": [
+          {
+            "site": "paragraph",
+            "report_only_locator": "p10",
+            "matched_literal": "202X年",
+            "parser_field_id_base": "audit_year",
+            "parser_label": "审计年度",
+            "merged_cell_duplicate": false,
+            "sibling_unrecognised_forms": {},
+            "context": "1、乙方接受委托，对甲方按照企业会计准则编制的202X年的合并及公司资产负债表，202X年7-9月的合并及公司利润表，202X年1-9月的合并及公司利润表、合并及公司现金流量表以及中期财务报表附注（以下统称中期财务报表）进行审阅。"
+          },
+          {
+            "site": "paragraph",
+            "report_only_locator": "p10",
+            "matched_literal": "202X年",
+            "parser_field_id_base": "audit_year",
+            "parser_label": "审计年度",
+            "merged_cell_duplicate": false,
+            "sibling_unrecognised_forms": {},
+            "context": "1、乙方接受委托，对甲方按照企业会计准则编制的202X年的合并及公司资产负债表，202X年7-9月的合并及公司利润表，202X年1-9月的合并及公司利润表、合并及公司现金流量表以及中期财务报表附注（以下统称中期财务报表）进行审阅。"
+          },
+          {
+            "site": "paragraph",
+            "report_only_locator": "p10",
+            "matched_literal": "202X年",
+            "parser_field_id_base": "audit_year",
+            "parser_label": "审计年度",
+            "merged_cell_duplicate": false,
+            "sibling_unrecognised_forms": {},
+            "context": "1、乙方接受委托，对甲方按照企业会计准则编制的202X年的合并及公司资产负债表，202X年7-9月的合并及公司利润表，202X年1-9月的合并及公司利润表、合并及公司现金流量表以及中期财务报表附注（以下统称中期财务报表）进行审阅。"
+          },
+          {
+            "site": "paragraph",
+            "report_only_locator": "p23",
+            "matched_literal": "202X年",
+            "parser_field_id_base": "audit_year",
+            "parser_label": "审计年度",
+            "merged_cell_duplicate": false,
+            "sibling_unrecognised_forms": {},
+            "context": "2、确认甲方的202X年第三季度报告[或202X年第一季度报告、202X年度半年报]中包含的除财务报表和审阅报告以外的财务信息和非财务信息（以下简称“其他信息”）与财务报表之间不存在重大不一致，且其他信息中不存在不正确陈述或其他误导性信息。"
+          },
+          {
+            "site": "paragraph",
+            "report_only_locator": "p23",
+            "matched_literal": "202X年",
+            "parser_field_id_base": "audit_year",
+            "parser_label": "审计年度",
+            "merged_cell_duplicate": false,
+            "sibling_unrecognised_forms": {},
+            "context": "2、确认甲方的202X年第三季度报告[或202X年第一季度报告、202X年度半年报]中包含的除财务报表和审阅报告以外的财务信息和非财务信息（以下简称“其他信息”）与财务报表之间不存在重大不一致，且其他信息中不存在不正确陈述或其他误导性信息。"
+          },
+          {
+            "site": "paragraph",
+            "report_only_locator": "p23",
+            "matched_literal": "202X年",
+            "parser_field_id_base": "audit_year",
+            "parser_label": "审计年度",
+            "merged_cell_duplicate": false,
+            "sibling_unrecognised_forms": {},
+            "context": "2、确认甲方的202X年第三季度报告[或202X年第一季度报告、202X年度半年报]中包含的除财务报表和审阅报告以外的财务信息和非财务信息（以下简称“其他信息”）与财务报表之间不存在重大不一致，且其他信息中不存在不正确陈述或其他误导性信息。"
+          },
+          {
+            "site": "paragraph",
+            "report_only_locator": "p55",
+            "matched_literal": "202X年",
+            "parser_field_id_base": "audit_year",
+            "parser_label": "审计年度",
+            "merged_cell_duplicate": false,
+            "sibling_unrecognised_forms": {},
+            "context": "根据有关法律法规的规定，作为负责甲方202X年第三季度报告[或202X年第一季度报告、202X年度半年报]财务报表审阅的注册会计师，乙方需要接受各监管机构（包括中华人民共和国财政部、中国证监会及其派出机构、国家金融监督管理总局及其派出机构、国务院国有资产监督管理委员会及地方国资委、中国注册会计师协会及地方注册会计师协会"
+          },
+          {
+            "site": "paragraph",
+            "report_only_locator": "p55",
+            "matched_literal": "202X年",
+            "parser_field_id_base": "audit_year",
+            "parser_label": "审计年度",
+            "merged_cell_duplicate": false,
+            "sibling_unrecognised_forms": {},
+            "context": "根据有关法律法规的规定，作为负责甲方202X年第三季度报告[或202X年第一季度报告、202X年度半年报]财务报表审阅的注册会计师，乙方需要接受各监管机构（包括中华人民共和国财政部、中国证监会及其派出机构、国家金融监督管理总局及其派出机构、国务院国有资产监督管理委员会及地方国资委、中国注册会计师协会及地方注册会计师协会"
+          },
+          {
+            "site": "paragraph",
+            "report_only_locator": "p55",
+            "matched_literal": "202X年",
+            "parser_field_id_base": "audit_year",
+            "parser_label": "审计年度",
+            "merged_cell_duplicate": false,
+            "sibling_unrecognised_forms": {},
+            "context": "根据有关法律法规的规定，作为负责甲方202X年第三季度报告[或202X年第一季度报告、202X年度半年报]财务报表审阅的注册会计师，乙方需要接受各监管机构（包括中华人民共和国财政部、中国证监会及其派出机构、国家金融监督管理总局及其派出机构、国务院国有资产监督管理委员会及地方国资委、中国注册会计师协会及地方注册会计师协会"
+          },
+          {
+            "site": "paragraph",
+            "report_only_locator": "p58",
+            "matched_literal": "××",
+            "parser_field_id_base": "placeholder_generic",
+            "parser_label": "待填内容",
+            "merged_cell_duplicate": false,
+            "sibling_unrecognised_forms": {
+              "bracketed_insert_slot": 1
+            },
+            "context": "1、本次审阅服务的收费是以乙方各级别工作人员在本次工作中所耗费的时间为基础计算的。乙方预计本次审阅服务的费用总额为人民币XX万元（￥××万元）【注释：同时列示大小写金额】。上述审阅收费未包含增值税。"
+          },
+          {
+            "site": "paragraph",
+            "report_only_locator": "p63",
+            "matched_literal": "××",
+            "parser_field_id_base": "placeholder_generic",
+            "parser_label": "待填内容",
+            "merged_cell_duplicate": false,
+            "sibling_unrecognised_forms": {},
+            "context": "4、如果由于无法预见的原因，致使乙方人员抵达甲方的工作现场后，本约定书所涉及的审阅服务不再进行，甲方不得要求退还预付的审阅费用；如上述情况发生于乙方人员完成现场审阅工作，并离开甲方的工作现场之后，甲方应另行向乙方支付人民币××元的补偿费，该补偿费应于甲方收到乙方的收款通知之日起×日内支付。"
+          },
+          {
+            "site": "paragraph",
+            "report_only_locator": "p71",
+            "matched_literal": "××",
+            "parser_field_id_base": "placeholder_generic",
+            "parser_label": "待填内容",
+            "merged_cell_duplicate": false,
+            "sibling_unrecognised_forms": {},
+            "context": "2、乙方向甲方出具审阅报告一式××份。该审阅报告仅供甲方本次刊登招股说明书时使用，不得用作任何其他用途。"
+          },
+          {
+            "site": "paragraph",
+            "report_only_locator": "p96",
+            "matched_literal": "××",
+            "parser_field_id_base": "placeholder_generic",
+            "parser_label": "待填内容",
+            "merged_cell_duplicate": false,
+            "sibling_unrecognised_forms": {},
+            "context": "（2）提交××仲裁委员会仲裁。"
+          }
+        ]
+      },
+      "lane_entry_key": "word-lane/b5-6",
+      "lane_entry_key_is_not_a_manifest_entry_id": true,
+      "manifest_entry_state": "absent_from_source_manifest",
+      "verdict": "blocked_non_discriminating_literal_anchor",
+      "blocking_reasons": [
+        "field_identity_derived_from_chinese_regex",
+        "generic_labels_only",
+        "literal_anchor_split_across_runs",
+        "no_declared_token_in_authoritative_template",
+        "non_discriminating_literal_anchor",
+        "ordinal_suffixed_field_ids",
+        "partial_field_fragment_anchor",
+        "unrecognised_placeholder_forms_present"
+      ],
+      "authority_model": null,
+      "authority_model_blocked_by": [
+        "BP-62-1"
+      ],
+      "contract": null,
+      "contract_blocked_by": [
+        "BP-62-1"
+      ],
+      "definition_bundle": null,
+      "definition_bundle_blocked_by": [
+        "BP-62-1",
+        "BP-62-3"
+      ],
+      "published_representation": null,
+      "published_representation_blocked_by": [
+        "BP-62-1",
+        "BP-62-3"
+      ],
+      "adapter_id": null,
+      "adapter_blocked_by": [
+        "BP-62-2"
+      ],
+      "capability": null,
+      "capability_target": "bidirectional",
+      "capability_target_blocked_by": [
+        "BP-62-1",
+        "BP-62-2",
+        "BP-62-3"
+      ],
+      "canonical_resolver": "word_resolution.resolve_word_template",
+      "evidence": {
+        "verification_state": "UNVERIFIABLE",
+        "sync_test_run_id": null,
+        "required_scenario_set_digest": null,
+        "browser_case": null,
+        "unverifiable_reasons": [
+          "verdict=blocked_non_discriminating_literal_anchor；阻塞原因 ['field_identity_derived_from_chinese_regex', 'generic_labels_only', 'literal_anchor_split_across_runs', 'no_declared_token_in_authoritative_template', 'non_discriminating_literal_anchor', 'ordinal_suffixed_field_ids', 'partial_field_fragment_anchor', 'unrecognised_placeholder_forms_present']",
+          "无 approved authority model / per-entry contract / non-null bundle",
+          "Task 61 真实 OO 9.4 Word gate 未通过（BP-21）"
+        ]
+      },
+      "mechanism_probe": {
+        "ran": false,
+        "is_not_a_contract": true,
+        "why": "verdict=blocked_non_discriminating_literal_anchor：字面锚点不唯一、被 run 边界切断，或无候选 —— 逐字段注入在本 entry 上无法构造"
+      }
+    },
+    {
+      "wp_code": "B5-7",
+      "ledger": {
+        "unified_relative_path": "B/B5-7 审计及专项报告等其他鉴证业务约定书（新三板）.docx",
+        "unified_verdict": "resolved_docx",
+        "ledger_class": "generic_word_template",
+        "carrier_ambiguity": false,
+        "own_docx_carriers": [
+          "B/B5-7 审计及专项报告等其他鉴证业务约定书（新三板）.docx"
+        ],
+        "component_type": "word-template"
+      },
+      "template": {
+        "relative_path": "B/B5-7 审计及专项报告等其他鉴证业务约定书（新三板）.docx",
+        "size": 55462,
+        "template_sha256": "1cd211a681948fec911c1a92ee8c242b14668f1b92b339e24cfbcedb5adbcc0e",
+        "normalized_structure_hash": "57b47939760eb413afe2420c4fec53bafac648e70167338457f4064cc375efc0"
+      },
+      "structure": {
+        "paragraph_count": 205,
+        "table_count": 5,
+        "existing_sdt_count": 0,
+        "declared_dollar_token_count": 0
+      },
+      "html_counterpart": {
+        "render_strategy": "app/routers/wp_render_strategies/_word_template.py",
+        "structured_host": "audit-platform/frontend/src/components/workpaper/GtWordTemplateStructuredView.vue",
+        "persistence": "checklist_responses.item_id LIKE 'wt-B5-7-%'",
+        "field_identity_source": "app/services/wp_docx_template_parser.py::_LEGACY_PATTERNS（中文标记正则 + `_dedupe_field_id` 序号后缀）",
+        "parser_placeholder_count": 22,
+        "parser_field_ids": [
+          "placeholder_generic",
+          "placeholder_generic_2",
+          "placeholder_generic_3",
+          "placeholder_generic_4",
+          "placeholder_generic_5",
+          "placeholder_generic_6",
+          "placeholder_generic_7",
+          "placeholder_generic_8",
+          "placeholder_generic_9",
+          "placeholder_generic_10",
+          "placeholder_generic_11",
+          "placeholder_generic_12",
+          "placeholder_generic_13",
+          "placeholder_generic_14",
+          "placeholder_generic_15",
+          "placeholder_generic_16",
+          "placeholder_generic_17",
+          "placeholder_generic_18",
+          "placeholder_generic_19",
+          "placeholder_generic_20",
+          "placeholder_generic_21",
+          "placeholder_generic_22"
+        ],
+        "ordinal_suffixed_field_ids": [
+          "placeholder_generic_2",
+          "placeholder_generic_3",
+          "placeholder_generic_4",
+          "placeholder_generic_5",
+          "placeholder_generic_6",
+          "placeholder_generic_7",
+          "placeholder_generic_8",
+          "placeholder_generic_9",
+          "placeholder_generic_10",
+          "placeholder_generic_11",
+          "placeholder_generic_12",
+          "placeholder_generic_13",
+          "placeholder_generic_14",
+          "placeholder_generic_15",
+          "placeholder_generic_16",
+          "placeholder_generic_17",
+          "placeholder_generic_18",
+          "placeholder_generic_19",
+          "placeholder_generic_20",
+          "placeholder_generic_21",
+          "placeholder_generic_22"
+        ],
+        "distinct_labels": [
+          "待填内容"
+        ]
+      },
+      "anchor_analysis": {
+        "candidate_occurrences": 22,
+        "merged_cell_duplicate_occurrences": 0,
+        "distinct_literal_anchors": 1,
+        "max_literal_anchor_multiplicity": 22,
+        "literal_anchor_multiplicity": {
+          "××": 22
+        },
+        "raw_xml_verbatim_counts": {
+          "××": 21
+        },
+        "literals_not_verbatim_in_raw_xml": [],
+        "span_overlap": {
+          "identical": 0,
+          "contained": 0,
+          "partial": 0
+        },
+        "unrecognised_placeholder_forms": {
+          "bracketed_insert_slot": 15,
+          "underscore_blank": 1
+        },
+        "occurrences_whose_container_has_unrecognised_form": 7,
+        "occurrences": [
+          {
+            "site": "paragraph",
+            "report_only_locator": "p12",
+            "matched_literal": "××",
+            "parser_field_id_base": "placeholder_generic",
+            "parser_label": "待填内容",
+            "merged_cell_duplicate": false,
+            "sibling_unrecognised_forms": {
+              "bracketed_insert_slot": 2
+            },
+            "context": "（1）乙方接受甲方委托，对甲方按照企业会计准则编制的20×1年12月31日、20×2年12月31日【或20××年×月××日】（以下简称“改制基准日”）的资产负债表，20××年度、20××年度【或20××年1-×月】的利润表、现金流量表和所有者权益变动表以及财务报表附注（以下统称财务报表）进行审计。"
+          },
+          {
+            "site": "paragraph",
+            "report_only_locator": "p12",
+            "matched_literal": "××",
+            "parser_field_id_base": "placeholder_generic",
+            "parser_label": "待填内容",
+            "merged_cell_duplicate": false,
+            "sibling_unrecognised_forms": {
+              "bracketed_insert_slot": 2
+            },
+            "context": "（1）乙方接受甲方委托，对甲方按照企业会计准则编制的20×1年12月31日、20×2年12月31日【或20××年×月××日】（以下简称“改制基准日”）的资产负债表，20××年度、20××年度【或20××年1-×月】的利润表、现金流量表和所有者权益变动表以及财务报表附注（以下统称财务报表）进行审计。"
+          },
+          {
+            "site": "paragraph",
+            "report_only_locator": "p12",
+            "matched_literal": "××",
+            "parser_field_id_base": "placeholder_generic",
+            "parser_label": "待填内容",
+            "merged_cell_duplicate": false,
+            "sibling_unrecognised_forms": {
+              "bracketed_insert_slot": 2
+            },
+            "context": "（1）乙方接受甲方委托，对甲方按照企业会计准则编制的20×1年12月31日、20×2年12月31日【或20××年×月××日】（以下简称“改制基准日”）的资产负债表，20××年度、20××年度【或20××年1-×月】的利润表、现金流量表和所有者权益变动表以及财务报表附注（以下统称财务报表）进行审计。"
+          },
+          {
+            "site": "paragraph",
+            "report_only_locator": "p12",
+            "matched_literal": "××",
+            "parser_field_id_base": "placeholder_generic",
+            "parser_label": "待填内容",
+            "merged_cell_duplicate": false,
+            "sibling_unrecognised_forms": {
+              "bracketed_insert_slot": 2
+            },
+            "context": "（1）乙方接受甲方委托，对甲方按照企业会计准则编制的20×1年12月31日、20×2年12月31日【或20××年×月××日】（以下简称“改制基准日”）的资产负债表，20××年度、20××年度【或20××年1-×月】的利润表、现金流量表和所有者权益变动表以及财务报表附注（以下统称财务报表）进行审计。"
+          },
+          {
+            "site": "paragraph",
+            "report_only_locator": "p12",
+            "matched_literal": "××",
+            "parser_field_id_base": "placeholder_generic",
+            "parser_label": "待填内容",
+            "merged_cell_duplicate": false,
+            "sibling_unrecognised_forms": {
+              "bracketed_insert_slot": 2
+            },
+            "context": "（1）乙方接受甲方委托，对甲方按照企业会计准则编制的20×1年12月31日、20×2年12月31日【或20××年×月××日】（以下简称“改制基准日”）的资产负债表，20××年度、20××年度【或20××年1-×月】的利润表、现金流量表和所有者权益变动表以及财务报表附注（以下统称财务报表）进行审计。"
+          },
+          {
+            "site": "paragraph",
+            "report_only_locator": "p15",
+            "matched_literal": "××",
+            "parser_field_id_base": "placeholder_generic",
+            "parser_label": "待填内容",
+            "merged_cell_duplicate": false,
+            "sibling_unrecognised_forms": {},
+            "context": "乙方对甲方按照企业会计准则编制的20××年12月31日的资产负债表，20××年度的利润表、现金流量表和所有者权益变动表以及财务报表附注（以下统称财务报表）进行审计。"
+          },
+          {
+            "site": "paragraph",
+            "report_only_locator": "p15",
+            "matched_literal": "××",
+            "parser_field_id_base": "placeholder_generic",
+            "parser_label": "待填内容",
+            "merged_cell_duplicate": false,
+            "sibling_unrecognised_forms": {},
+            "context": "乙方对甲方按照企业会计准则编制的20××年12月31日的资产负债表，20××年度的利润表、现金流量表和所有者权益变动表以及财务报表附注（以下统称财务报表）进行审计。"
+          },
+          {
+            "site": "paragraph",
+            "report_only_locator": "p17",
+            "matched_literal": "××",
+            "parser_field_id_base": "placeholder_generic",
+            "parser_label": "待填内容",
+            "merged_cell_duplicate": false,
+            "sibling_unrecognised_forms": {},
+            "context": "乙方对甲方按照企业会计准则编制的20×2年、20×3年12月31日、20×4年×月××日（以下简称“申报财务报表截止日”）的资产负债表， 20×2年度、20×3年度、20×4年1-×月的利润表、现金流量表和股东权益变动表以及财务报表附注（以下统称财务报表）进行审计。"
+          },
+          {
+            "site": "paragraph",
+            "report_only_locator": "p38",
+            "matched_literal": "××",
+            "parser_field_id_base": "placeholder_generic",
+            "parser_label": "待填内容",
+            "merged_cell_duplicate": false,
+            "sibling_unrecognised_forms": {},
+            "context": "4、及时为乙方的审计工作提供与审计有关的所有记录、文件和所需的其他信息（不仅包括总账和明细账，还包括从总账和明细账之外的其他途径获取的信息；在20××年×月×日之前提供审计所需的全部资料，如果在审计过程中需要补充资料，亦应及时提供），并保证所提供资料的真实性和完整性。"
+          },
+          {
+            "site": "paragraph",
+            "report_only_locator": "p91",
+            "matched_literal": "××",
+            "parser_field_id_base": "placeholder_generic",
+            "parser_label": "待填内容",
+            "merged_cell_duplicate": false,
+            "sibling_unrecognised_forms": {
+              "bracketed_insert_slot": 1
+            },
+            "context": "6、按照约定时间完成审计、审核及鉴证工作，出具审计报告及其他报告和专项说明。在适用的情况下，按照《中国注册会计师审计准则第1324号——持续经营》、《中国注册会计师审计准则第1504号——在审计报告中沟通关键审计事项》的相关规定，在审计报告中对与持续经营相关的重大不确定性和关键审计事项进行报告。乙方应于20××年×月×"
+          },
+          {
+            "site": "paragraph",
+            "report_only_locator": "p103",
+            "matched_literal": "××",
+            "parser_field_id_base": "placeholder_generic",
+            "parser_label": "待填内容",
+            "merged_cell_duplicate": false,
+            "sibling_unrecognised_forms": {},
+            "context": "（2）鉴于甲方从事（涉及）××业务，乙方根据《中国注册会计师审计准则第1421号——利用专家的工作》的规定，可能利用专家的工作，例如独立估值专家、精算师、石油和天然气储量估算师、律师、税务专家等，协助乙方获取充分、适当的审计证据。【参考《审计准则第1421号——利用专家的工作》应用指南】"
+          },
+          {
+            "site": "paragraph",
+            "report_only_locator": "p127",
+            "matched_literal": "××",
+            "parser_field_id_base": "placeholder_generic",
+            "parser_label": "待填内容",
+            "merged_cell_duplicate": false,
+            "sibling_unrecognised_forms": {
+              "bracketed_insert_slot": 1
+            },
+            "context": "1、本次服务的收费是以乙方各级别工作人员在本次工作中所耗费的时间为基础计算的。双方商定本次服务的费用总额为人民币XX万元（￥××万元）【注释：同时列示大小写金额】。上述服务收费未包含增值税。"
+          },
+          {
+            "site": "paragraph",
+            "report_only_locator": "p137",
+            "matched_literal": "××",
+            "parser_field_id_base": "placeholder_generic",
+            "parser_label": "待填内容",
+            "merged_cell_duplicate": false,
+            "sibling_unrecognised_forms": {},
+            "context": "4、如果由于无法预见的原因，致使乙方人员抵达甲方的工作现场后，本约定书所涉及的服务不再进行，甲方不得要求退还预付的服务费用；如上述情况发生于乙方人员完成现场工作，并离开甲方的工作现场之后，甲方应另行向乙方支付人民币××元的补偿费，该补偿费应于甲方收到乙方的收款通知之日起×日内支付。"
+          },
+          {
+            "site": "paragraph",
+            "report_only_locator": "p145",
+            "matched_literal": "××",
+            "parser_field_id_base": "placeholder_generic",
+            "parser_label": "待填内容",
+            "merged_cell_duplicate": false,
+            "sibling_unrecognised_forms": {},
+            "context": "2、乙方向甲方致送审计报告一式××份，其他报告和专项说明一式××份。"
+          },
+          {
+            "site": "paragraph",
+            "report_only_locator": "p145",
+            "matched_literal": "××",
+            "parser_field_id_base": "placeholder_generic",
+            "parser_label": "待填内容",
+            "merged_cell_duplicate": false,
+            "sibling_unrecognised_forms": {},
+            "context": "2、乙方向甲方致送审计报告一式××份，其他报告和专项说明一式××份。"
+          },
+          {
+            "site": "paragraph",
+            "report_only_locator": "p170",
+            "matched_literal": "××",
+            "parser_field_id_base": "placeholder_generic",
+            "parser_label": "待填内容",
+            "merged_cell_duplicate": false,
+            "sibling_unrecognised_forms": {},
+            "context": "（2）提交××仲裁委员会仲裁。"
+          },
+          {
+            "site": "table_cell",
+            "report_only_locator": "t03[2,0]",
+            "matched_literal": "××",
+            "parser_field_id_base": "placeholder_generic",
+            "parser_label": "待填内容",
+            "merged_cell_duplicate": false,
+            "sibling_unrecognised_forms": {},
+            "context": "第2次收费  完成20××年度、20××年度财务报表审计，出具20××年度审计报告时"
+          },
+          {
+            "site": "table_cell",
+            "report_only_locator": "t03[2,0]",
+            "matched_literal": "××",
+            "parser_field_id_base": "placeholder_generic",
+            "parser_label": "待填内容",
+            "merged_cell_duplicate": false,
+            "sibling_unrecognised_forms": {},
+            "context": "第2次收费  完成20××年度、20××年度财务报表审计，出具20××年度审计报告时"
+          },
+          {
+            "site": "table_cell",
+            "report_only_locator": "t03[2,0]",
+            "matched_literal": "××",
+            "parser_field_id_base": "placeholder_generic",
+            "parser_label": "待填内容",
+            "merged_cell_duplicate": false,
+            "sibling_unrecognised_forms": {},
+            "context": "第2次收费  完成20××年度、20××年度财务报表审计，出具20××年度审计报告时"
+          },
+          {
+            "site": "table_cell",
+            "report_only_locator": "t03[6,0]",
+            "matched_literal": "××",
+            "parser_field_id_base": "placeholder_generic",
+            "parser_label": "待填内容",
+            "merged_cell_duplicate": false,
+            "sibling_unrecognised_forms": {},
+            "context": "第5次收费  完成20××年度财务报表审计，出具20××年度审计报告时"
+          },
+          {
+            "site": "table_cell",
+            "report_only_locator": "t03[6,0]",
+            "matched_literal": "××",
+            "parser_field_id_base": "placeholder_generic",
+            "parser_label": "待填内容",
+            "merged_cell_duplicate": false,
+            "sibling_unrecognised_forms": {},
+            "context": "第5次收费  完成20××年度财务报表审计，出具20××年度审计报告时"
+          },
+          {
+            "site": "table_cell",
+            "report_only_locator": "t03[7,0]",
+            "matched_literal": "××",
+            "parser_field_id_base": "placeholder_generic",
+            "parser_label": "待填内容",
+            "merged_cell_duplicate": false,
+            "sibling_unrecognised_forms": {},
+            "context": "第6次收费  完成20××年度（或2017年1－×月）财务报表审计，出具相关审计报告时"
+          }
+        ]
+      },
+      "lane_entry_key": "word-lane/b5-7",
+      "lane_entry_key_is_not_a_manifest_entry_id": true,
+      "manifest_entry_state": "absent_from_source_manifest",
+      "verdict": "blocked_non_discriminating_literal_anchor",
+      "blocking_reasons": [
+        "field_identity_derived_from_chinese_regex",
+        "generic_labels_only",
+        "no_declared_token_in_authoritative_template",
+        "non_discriminating_literal_anchor",
+        "ordinal_suffixed_field_ids",
+        "partial_field_fragment_anchor",
+        "unrecognised_placeholder_forms_present"
+      ],
+      "authority_model": null,
+      "authority_model_blocked_by": [
+        "BP-62-1"
+      ],
+      "contract": null,
+      "contract_blocked_by": [
+        "BP-62-1"
+      ],
+      "definition_bundle": null,
+      "definition_bundle_blocked_by": [
+        "BP-62-1",
+        "BP-62-3"
+      ],
+      "published_representation": null,
+      "published_representation_blocked_by": [
+        "BP-62-1",
+        "BP-62-3"
+      ],
+      "adapter_id": null,
+      "adapter_blocked_by": [
+        "BP-62-2"
+      ],
+      "capability": null,
+      "capability_target": "bidirectional",
+      "capability_target_blocked_by": [
+        "BP-62-1",
+        "BP-62-2",
+        "BP-62-3"
+      ],
+      "canonical_resolver": "word_resolution.resolve_word_template",
+      "evidence": {
+        "verification_state": "UNVERIFIABLE",
+        "sync_test_run_id": null,
+        "required_scenario_set_digest": null,
+        "browser_case": null,
+        "unverifiable_reasons": [
+          "verdict=blocked_non_discriminating_literal_anchor；阻塞原因 ['field_identity_derived_from_chinese_regex', 'generic_labels_only', 'no_declared_token_in_authoritative_template', 'non_discriminating_literal_anchor', 'ordinal_suffixed_field_ids', 'partial_field_fragment_anchor', 'unrecognised_placeholder_forms_present']",
+          "无 approved authority model / per-entry contract / non-null bundle",
+          "Task 61 真实 OO 9.4 Word gate 未通过（BP-21）"
+        ]
+      },
+      "mechanism_probe": {
+        "ran": false,
+        "is_not_a_contract": true,
+        "why": "verdict=blocked_non_discriminating_literal_anchor：字面锚点不唯一、被 run 边界切断，或无候选 —— 逐字段注入在本 entry 上无法构造"
+      }
+    },
+    {
+      "wp_code": "B5-8-1",
+      "ledger": {
+        "unified_relative_path": "B/B5-8-1 审计及专项报告等其他鉴证业务约定书（企业债：会计准则）.docx",
+        "unified_verdict": "resolved_docx",
+        "ledger_class": "generic_word_template",
+        "carrier_ambiguity": false,
+        "own_docx_carriers": [
+          "B/B5-8-1 审计及专项报告等其他鉴证业务约定书（企业债：会计准则）.docx"
+        ],
+        "component_type": "word-template"
+      },
+      "template": {
+        "relative_path": "B/B5-8-1 审计及专项报告等其他鉴证业务约定书（企业债：会计准则）.docx",
+        "size": 50445,
+        "template_sha256": "a93250cd7b330d194c58ee53f6a1092832c5495c3e369f880dfcd33c33c2cf55",
+        "normalized_structure_hash": "10d2288cc5fd7bba363b87844da1b30eb9914781a374049b3ad13a905208604d"
+      },
+      "structure": {
+        "paragraph_count": 192,
+        "table_count": 5,
+        "existing_sdt_count": 0,
+        "declared_dollar_token_count": 0
+      },
+      "html_counterpart": {
+        "render_strategy": "app/routers/wp_render_strategies/_word_template.py",
+        "structured_host": "audit-platform/frontend/src/components/workpaper/GtWordTemplateStructuredView.vue",
+        "persistence": "checklist_responses.item_id LIKE 'wt-B5-8-1-%'",
+        "field_identity_source": "app/services/wp_docx_template_parser.py::_LEGACY_PATTERNS（中文标记正则 + `_dedupe_field_id` 序号后缀）",
+        "parser_placeholder_count": 8,
+        "parser_field_ids": [
+          "placeholder_generic",
+          "placeholder_generic_2",
+          "placeholder_generic_3",
+          "placeholder_generic_4",
+          "placeholder_generic_5",
+          "placeholder_generic_6",
+          "placeholder_generic_7",
+          "placeholder_generic_8"
+        ],
+        "ordinal_suffixed_field_ids": [
+          "placeholder_generic_2",
+          "placeholder_generic_3",
+          "placeholder_generic_4",
+          "placeholder_generic_5",
+          "placeholder_generic_6",
+          "placeholder_generic_7",
+          "placeholder_generic_8"
+        ],
+        "distinct_labels": [
+          "待填内容"
+        ]
+      },
+      "anchor_analysis": {
+        "candidate_occurrences": 8,
+        "merged_cell_duplicate_occurrences": 0,
+        "distinct_literal_anchors": 1,
+        "max_literal_anchor_multiplicity": 8,
+        "literal_anchor_multiplicity": {
+          "××": 8
+        },
+        "raw_xml_verbatim_counts": {
+          "××": 7
+        },
+        "literals_not_verbatim_in_raw_xml": [],
+        "span_overlap": {
+          "identical": 0,
+          "contained": 0,
+          "partial": 0
+        },
+        "unrecognised_placeholder_forms": {
+          "bracketed_insert_slot": 6,
+          "underscore_blank": 1
+        },
+        "occurrences_whose_container_has_unrecognised_form": 2,
+        "occurrences": [
+          {
+            "site": "paragraph",
+            "report_only_locator": "p32",
+            "matched_literal": "××",
+            "parser_field_id_base": "placeholder_generic",
+            "parser_label": "待填内容",
+            "merged_cell_duplicate": false,
+            "sibling_unrecognised_forms": {},
+            "context": "4、及时为乙方的审计工作提供与审计有关的所有记录、文件和所需的其他信息（不仅包括总账和明细账，还包括从总账和明细账之外的其他途径获取的信息；在20××年×月×日之前提供审计所需的全部资料，如果在审计过程中需要补充资料，亦应及时提供），并保证所提供资料的真实性和完整性。"
+          },
+          {
+            "site": "paragraph",
+            "report_only_locator": "p84",
+            "matched_literal": "××",
+            "parser_field_id_base": "placeholder_generic",
+            "parser_label": "待填内容",
+            "merged_cell_duplicate": false,
+            "sibling_unrecognised_forms": {
+              "bracketed_insert_slot": 1
+            },
+            "context": "5、按照约定时间完成审计、审核及鉴证工作，出具审计报告及其他报告和专项说明。在适用的情况下，按照《中国注册会计师审计准则第1324号——持续经营》、《中国注册会计师审计准则第1504号——在审计报告中沟通关键审计事项》、《中国注册会计师审计准则第1521号——注册会计师对其他信息的责任》的相关规定，在审计报告中对与持续"
+          },
+          {
+            "site": "paragraph",
+            "report_only_locator": "p96",
+            "matched_literal": "××",
+            "parser_field_id_base": "placeholder_generic",
+            "parser_label": "待填内容",
+            "merged_cell_duplicate": false,
+            "sibling_unrecognised_forms": {},
+            "context": "（2）鉴于甲方从事（涉及）××业务，乙方根据《中国注册会计师审计准则第1421号——利用专家的工作》的规定，可能利用专家的工作，例如独立估值专家、精算师、石油和天然气储量估算师、律师、税务专家等，协助乙方获取充分、适当的审计证据。【参考《审计准则第1421号——利用专家的工作》应用指南】"
+          },
+          {
+            "site": "paragraph",
+            "report_only_locator": "p120",
+            "matched_literal": "××",
+            "parser_field_id_base": "placeholder_generic",
+            "parser_label": "待填内容",
+            "merged_cell_duplicate": false,
+            "sibling_unrecognised_forms": {
+              "bracketed_insert_slot": 1
+            },
+            "context": "1、本次服务的收费是以乙方各级别工作人员在本次工作中所耗费的时间为基础计算的。双方商定本次服务的费用总额为人民币XX万元（￥××万元）【注释：同时列示大小写金额】。上述服务收费未包含增值税。"
+          },
+          {
+            "site": "paragraph",
+            "report_only_locator": "p125",
+            "matched_literal": "××",
+            "parser_field_id_base": "placeholder_generic",
+            "parser_label": "待填内容",
+            "merged_cell_duplicate": false,
+            "sibling_unrecognised_forms": {},
+            "context": "4、如果由于无法预见的原因，致使乙方人员抵达甲方的工作现场后，本约定书所涉及的服务不再进行，甲方不得要求退还预付的服务费用；如上述情况发生于乙方人员完成现场工作，并离开甲方的工作现场之后，甲方应另行向乙方支付人民币××元的补偿费，该补偿费应于甲方收到乙方的收款通知之日起×日内支付。"
+          },
+          {
+            "site": "paragraph",
+            "report_only_locator": "p133",
+            "matched_literal": "××",
+            "parser_field_id_base": "placeholder_generic",
+            "parser_label": "待填内容",
+            "merged_cell_duplicate": false,
+            "sibling_unrecognised_forms": {},
+            "context": "2、乙方向甲方致送审计报告一式××份，其他报告和专项说明一式××份。"
+          },
+          {
+            "site": "paragraph",
+            "report_only_locator": "p133",
+            "matched_literal": "××",
+            "parser_field_id_base": "placeholder_generic",
+            "parser_label": "待填内容",
+            "merged_cell_duplicate": false,
+            "sibling_unrecognised_forms": {},
+            "context": "2、乙方向甲方致送审计报告一式××份，其他报告和专项说明一式××份。"
+          },
+          {
+            "site": "paragraph",
+            "report_only_locator": "p159",
+            "matched_literal": "××",
+            "parser_field_id_base": "placeholder_generic",
+            "parser_label": "待填内容",
+            "merged_cell_duplicate": false,
+            "sibling_unrecognised_forms": {},
+            "context": "（2）提交××仲裁委员会仲裁。"
+          }
+        ]
+      },
+      "lane_entry_key": "word-lane/b5-8-1",
+      "lane_entry_key_is_not_a_manifest_entry_id": true,
+      "manifest_entry_state": "absent_from_source_manifest",
+      "verdict": "blocked_non_discriminating_literal_anchor",
+      "blocking_reasons": [
+        "field_identity_derived_from_chinese_regex",
+        "generic_labels_only",
+        "no_declared_token_in_authoritative_template",
+        "non_discriminating_literal_anchor",
+        "ordinal_suffixed_field_ids",
+        "partial_field_fragment_anchor",
+        "unrecognised_placeholder_forms_present"
+      ],
+      "authority_model": null,
+      "authority_model_blocked_by": [
+        "BP-62-1"
+      ],
+      "contract": null,
+      "contract_blocked_by": [
+        "BP-62-1"
+      ],
+      "definition_bundle": null,
+      "definition_bundle_blocked_by": [
+        "BP-62-1",
+        "BP-62-3"
+      ],
+      "published_representation": null,
+      "published_representation_blocked_by": [
+        "BP-62-1",
+        "BP-62-3"
+      ],
+      "adapter_id": null,
+      "adapter_blocked_by": [
+        "BP-62-2"
+      ],
+      "capability": null,
+      "capability_target": "bidirectional",
+      "capability_target_blocked_by": [
+        "BP-62-1",
+        "BP-62-2",
+        "BP-62-3"
+      ],
+      "canonical_resolver": "word_resolution.resolve_word_template",
+      "evidence": {
+        "verification_state": "UNVERIFIABLE",
+        "sync_test_run_id": null,
+        "required_scenario_set_digest": null,
+        "browser_case": null,
+        "unverifiable_reasons": [
+          "verdict=blocked_non_discriminating_literal_anchor；阻塞原因 ['field_identity_derived_from_chinese_regex', 'generic_labels_only', 'no_declared_token_in_authoritative_template', 'non_discriminating_literal_anchor', 'ordinal_suffixed_field_ids', 'partial_field_fragment_anchor', 'unrecognised_placeholder_forms_present']",
+          "无 approved authority model / per-entry contract / non-null bundle",
+          "Task 61 真实 OO 9.4 Word gate 未通过（BP-21）"
+        ]
+      },
+      "mechanism_probe": {
+        "ran": false,
+        "is_not_a_contract": true,
+        "why": "verdict=blocked_non_discriminating_literal_anchor：字面锚点不唯一、被 run 边界切断，或无候选 —— 逐字段注入在本 entry 上无法构造"
+      }
+    },
+    {
+      "wp_code": "B5-8-2",
+      "ledger": {
+        "unified_relative_path": "B/B5-8-2 审计及专项报告等其他鉴证业务约定书（企业债：会计制度）.docx",
+        "unified_verdict": "resolved_docx",
+        "ledger_class": "generic_word_template",
+        "carrier_ambiguity": false,
+        "own_docx_carriers": [
+          "B/B5-8-2 审计及专项报告等其他鉴证业务约定书（企业债：会计制度）.docx"
+        ],
+        "component_type": "word-template"
+      },
+      "template": {
+        "relative_path": "B/B5-8-2 审计及专项报告等其他鉴证业务约定书（企业债：会计制度）.docx",
+        "size": 50705,
+        "template_sha256": "ac5291962a095d36ac54f97bc4d13e02b134f2d0ea9881f7af6fd46b6edbd3a0",
+        "normalized_structure_hash": "8ab922aec6cfcfc413ccf899e7b6fc382ac465dafe58e0aaf4a47b53f107aa2a"
+      },
+      "structure": {
+        "paragraph_count": 187,
+        "table_count": 5,
+        "existing_sdt_count": 0,
+        "declared_dollar_token_count": 0
+      },
+      "html_counterpart": {
+        "render_strategy": "app/routers/wp_render_strategies/_word_template.py",
+        "structured_host": "audit-platform/frontend/src/components/workpaper/GtWordTemplateStructuredView.vue",
+        "persistence": "checklist_responses.item_id LIKE 'wt-B5-8-2-%'",
+        "field_identity_source": "app/services/wp_docx_template_parser.py::_LEGACY_PATTERNS（中文标记正则 + `_dedupe_field_id` 序号后缀）",
+        "parser_placeholder_count": 9,
+        "parser_field_ids": [
+          "placeholder_generic",
+          "placeholder_generic_2",
+          "placeholder_generic_3",
+          "placeholder_generic_4",
+          "placeholder_generic_5",
+          "placeholder_generic_6",
+          "placeholder_generic_7",
+          "placeholder_generic_8",
+          "placeholder_generic_9"
+        ],
+        "ordinal_suffixed_field_ids": [
+          "placeholder_generic_2",
+          "placeholder_generic_3",
+          "placeholder_generic_4",
+          "placeholder_generic_5",
+          "placeholder_generic_6",
+          "placeholder_generic_7",
+          "placeholder_generic_8",
+          "placeholder_generic_9"
+        ],
+        "distinct_labels": [
+          "待填内容"
+        ]
+      },
+      "anchor_analysis": {
+        "candidate_occurrences": 9,
+        "merged_cell_duplicate_occurrences": 0,
+        "distinct_literal_anchors": 1,
+        "max_literal_anchor_multiplicity": 9,
+        "literal_anchor_multiplicity": {
+          "××": 9
+        },
+        "raw_xml_verbatim_counts": {
+          "××": 8
+        },
+        "literals_not_verbatim_in_raw_xml": [],
+        "span_overlap": {
+          "identical": 0,
+          "contained": 0,
+          "partial": 0
+        },
+        "unrecognised_placeholder_forms": {
+          "bracketed_insert_slot": 9,
+          "underscore_blank": 1
+        },
+        "occurrences_whose_container_has_unrecognised_form": 2,
+        "occurrences": [
+          {
+            "site": "paragraph",
+            "report_only_locator": "p32",
+            "matched_literal": "××",
+            "parser_field_id_base": "placeholder_generic",
+            "parser_label": "待填内容",
+            "merged_cell_duplicate": false,
+            "sibling_unrecognised_forms": {},
+            "context": "4、及时为乙方的审计工作提供与审计有关的所有记录、文件和所需的其他信息（不仅包括总账和明细账，还包括从总账和明细账之外的其他途径获取的信息；在20××年×月×日之前提供审计所需的全部资料，如果在审计过程中需要补充资料，亦应及时提供），并保证所提供资料的真实性和完整性。"
+          },
+          {
+            "site": "paragraph",
+            "report_only_locator": "p84",
+            "matched_literal": "××",
+            "parser_field_id_base": "placeholder_generic",
+            "parser_label": "待填内容",
+            "merged_cell_duplicate": false,
+            "sibling_unrecognised_forms": {
+              "bracketed_insert_slot": 1
+            },
+            "context": "5、按照约定时间完成审计、审核及鉴证工作，出具审计报告及其他报告和专项说明。在适用的情况下，按照《中国注册会计师审计准则第1324号——持续经营》、《中国注册会计师审计准则第1504号——在审计报告中沟通关键审计事项》、《中国注册会计师审计准则第1521号——注册会计师对其他信息的责任》的相关规定，在审计报告中对与持续"
+          },
+          {
+            "site": "paragraph",
+            "report_only_locator": "p85",
+            "matched_literal": "××",
+            "parser_field_id_base": "placeholder_generic",
+            "parser_label": "待填内容",
+            "merged_cell_duplicate": false,
+            "sibling_unrecognised_forms": {},
+            "context": "6、如果甲方将按照企业会计准则和《××会计制度》的规定未作要求的补充信息与已审计财务报表一同列报，且上述补充信息不构成已审计财务报表的必要组成部分，乙方将评价这些补充信息的列报方式是否充分、清楚地使其与已审计财务报表相区分。如果未能充分、清楚地区分，乙方将要求甲方改变未审计补充信息的列报方式。如果甲方拒绝改变，乙方将指"
+          },
+          {
+            "site": "paragraph",
+            "report_only_locator": "p96",
+            "matched_literal": "××",
+            "parser_field_id_base": "placeholder_generic",
+            "parser_label": "待填内容",
+            "merged_cell_duplicate": false,
+            "sibling_unrecognised_forms": {},
+            "context": "（2）鉴于甲方从事（涉及）××业务，乙方根据《中国注册会计师审计准则第1421号——利用专家的工作》的规定，可能利用专家的工作，例如独立估值专家、精算师、石油和天然气储量估算师、律师、税务专家等，协助乙方获取充分、适当的审计证据。【参考《审计准则第1421号——利用专家的工作》应用指南】"
+          },
+          {
+            "site": "paragraph",
+            "report_only_locator": "p120",
+            "matched_literal": "××",
+            "parser_field_id_base": "placeholder_generic",
+            "parser_label": "待填内容",
+            "merged_cell_duplicate": false,
+            "sibling_unrecognised_forms": {
+              "bracketed_insert_slot": 1
+            },
+            "context": "1、本次服务的收费是以乙方各级别工作人员在本次工作中所耗费的时间为基础计算的。双方商定本次服务的费用总额为人民币XX万元（￥××万元）【注释：同时列示大小写金额】。上述服务收费未包含增值税。"
+          },
+          {
+            "site": "paragraph",
+            "report_only_locator": "p125",
+            "matched_literal": "××",
+            "parser_field_id_base": "placeholder_generic",
+            "parser_label": "待填内容",
+            "merged_cell_duplicate": false,
+            "sibling_unrecognised_forms": {},
+            "context": "4、如果由于无法预见的原因，致使乙方人员抵达甲方的工作现场后，本约定书所涉及的服务不再进行，甲方不得要求退还预付的服务费用；如上述情况发生于乙方人员完成现场工作，并离开甲方的工作现场之后，甲方应另行向乙方支付人民币××元的补偿费，该补偿费应于甲方收到乙方的收款通知之日起×日内支付。"
+          },
+          {
+            "site": "paragraph",
+            "report_only_locator": "p133",
+            "matched_literal": "××",
+            "parser_field_id_base": "placeholder_generic",
+            "parser_label": "待填内容",
+            "merged_cell_duplicate": false,
+            "sibling_unrecognised_forms": {},
+            "context": "2、乙方向甲方致送审计报告一式××份，其他报告和专项说明一式××份。"
+          },
+          {
+            "site": "paragraph",
+            "report_only_locator": "p133",
+            "matched_literal": "××",
+            "parser_field_id_base": "placeholder_generic",
+            "parser_label": "待填内容",
+            "merged_cell_duplicate": false,
+            "sibling_unrecognised_forms": {},
+            "context": "2、乙方向甲方致送审计报告一式××份，其他报告和专项说明一式××份。"
+          },
+          {
+            "site": "paragraph",
+            "report_only_locator": "p159",
+            "matched_literal": "××",
+            "parser_field_id_base": "placeholder_generic",
+            "parser_label": "待填内容",
+            "merged_cell_duplicate": false,
+            "sibling_unrecognised_forms": {},
+            "context": "（2）提交××仲裁委员会仲裁。"
+          }
+        ]
+      },
+      "lane_entry_key": "word-lane/b5-8-2",
+      "lane_entry_key_is_not_a_manifest_entry_id": true,
+      "manifest_entry_state": "absent_from_source_manifest",
+      "verdict": "blocked_non_discriminating_literal_anchor",
+      "blocking_reasons": [
+        "field_identity_derived_from_chinese_regex",
+        "generic_labels_only",
+        "no_declared_token_in_authoritative_template",
+        "non_discriminating_literal_anchor",
+        "ordinal_suffixed_field_ids",
+        "partial_field_fragment_anchor",
+        "unrecognised_placeholder_forms_present"
+      ],
+      "authority_model": null,
+      "authority_model_blocked_by": [
+        "BP-62-1"
+      ],
+      "contract": null,
+      "contract_blocked_by": [
+        "BP-62-1"
+      ],
+      "definition_bundle": null,
+      "definition_bundle_blocked_by": [
+        "BP-62-1",
+        "BP-62-3"
+      ],
+      "published_representation": null,
+      "published_representation_blocked_by": [
+        "BP-62-1",
+        "BP-62-3"
+      ],
+      "adapter_id": null,
+      "adapter_blocked_by": [
+        "BP-62-2"
+      ],
+      "capability": null,
+      "capability_target": "bidirectional",
+      "capability_target_blocked_by": [
+        "BP-62-1",
+        "BP-62-2",
+        "BP-62-3"
+      ],
+      "canonical_resolver": "word_resolution.resolve_word_template",
+      "evidence": {
+        "verification_state": "UNVERIFIABLE",
+        "sync_test_run_id": null,
+        "required_scenario_set_digest": null,
+        "browser_case": null,
+        "unverifiable_reasons": [
+          "verdict=blocked_non_discriminating_literal_anchor；阻塞原因 ['field_identity_derived_from_chinese_regex', 'generic_labels_only', 'no_declared_token_in_authoritative_template', 'non_discriminating_literal_anchor', 'ordinal_suffixed_field_ids', 'partial_field_fragment_anchor', 'unrecognised_placeholder_forms_present']",
+          "无 approved authority model / per-entry contract / non-null bundle",
+          "Task 61 真实 OO 9.4 Word gate 未通过（BP-21）"
+        ]
+      },
+      "mechanism_probe": {
+        "ran": false,
+        "is_not_a_contract": true,
+        "why": "verdict=blocked_non_discriminating_literal_anchor：字面锚点不唯一、被 run 边界切断，或无候选 —— 逐字段注入在本 entry 上无法构造"
+      }
+    },
+    {
+      "wp_code": "B5-9-1",
+      "ledger": {
+        "unified_relative_path": "B/B5-9-1 医院审计业务约定书（被审计医院直接委托）.docx",
+        "unified_verdict": "resolved_docx",
+        "ledger_class": "generic_word_template",
+        "carrier_ambiguity": false,
+        "own_docx_carriers": [
+          "B/B5-9-1 医院审计业务约定书（被审计医院直接委托）.docx"
+        ],
+        "component_type": "word-template"
+      },
+      "template": {
+        "relative_path": "B/B5-9-1 医院审计业务约定书（被审计医院直接委托）.docx",
+        "size": 40447,
+        "template_sha256": "cc7e0eb9a631e123b982a8e9e5ca52b146387ea41e177a64a3cd4555fcf63edf",
+        "normalized_structure_hash": "98b5683f0f520384e1e8becd62bb6123f8c52d1e8dea15571ec14d9f81a14ffb"
+      },
+      "structure": {
+        "paragraph_count": 172,
+        "table_count": 4,
+        "existing_sdt_count": 0,
+        "declared_dollar_token_count": 0
+      },
+      "html_counterpart": {
+        "render_strategy": "app/routers/wp_render_strategies/_word_template.py",
+        "structured_host": "audit-platform/frontend/src/components/workpaper/GtWordTemplateStructuredView.vue",
+        "persistence": "checklist_responses.item_id LIKE 'wt-B5-9-1-%'",
+        "field_identity_source": "app/services/wp_docx_template_parser.py::_LEGACY_PATTERNS（中文标记正则 + `_dedupe_field_id` 序号后缀）",
+        "parser_placeholder_count": 6,
+        "parser_field_ids": [
+          "placeholder_generic",
+          "placeholder_generic_2",
+          "placeholder_generic_3",
+          "placeholder_generic_4",
+          "placeholder_generic_5",
+          "placeholder_generic_6"
+        ],
+        "ordinal_suffixed_field_ids": [
+          "placeholder_generic_2",
+          "placeholder_generic_3",
+          "placeholder_generic_4",
+          "placeholder_generic_5",
+          "placeholder_generic_6"
+        ],
+        "distinct_labels": [
+          "待填内容"
+        ]
+      },
+      "anchor_analysis": {
+        "candidate_occurrences": 6,
+        "merged_cell_duplicate_occurrences": 0,
+        "distinct_literal_anchors": 1,
+        "max_literal_anchor_multiplicity": 6,
+        "literal_anchor_multiplicity": {
+          "××": 6
+        },
+        "raw_xml_verbatim_counts": {
+          "××": 6
+        },
+        "literals_not_verbatim_in_raw_xml": [],
+        "span_overlap": {
+          "identical": 0,
+          "contained": 0,
+          "partial": 0
+        },
+        "unrecognised_placeholder_forms": {
+          "bracketed_insert_slot": 3,
+          "underscore_blank": 1
+        },
+        "occurrences_whose_container_has_unrecognised_form": 1,
+        "occurrences": [
+          {
+            "site": "paragraph",
+            "report_only_locator": "p82",
+            "matched_literal": "××",
+            "parser_field_id_base": "placeholder_generic",
+            "parser_label": "待填内容",
+            "merged_cell_duplicate": false,
+            "sibling_unrecognised_forms": {},
+            "context": "（2）鉴于甲方从事（涉及）××业务，乙方根据《中国注册会计师审计准则第1421号——利用专家的工作》的规定，可能利用专家的工作，例如独立估值专家、精算师、石油和天然气储量估算师、律师、税务专家等，协助乙方获取充分、适当的审计证据。【参考《审计准则第1421号——利用专家的工作》应用指南】"
+          },
+          {
+            "site": "paragraph",
+            "report_only_locator": "p105",
+            "matched_literal": "××",
+            "parser_field_id_base": "placeholder_generic",
+            "parser_label": "待填内容",
+            "merged_cell_duplicate": false,
+            "sibling_unrecognised_forms": {
+              "bracketed_insert_slot": 1
+            },
+            "context": "1、本次审计服务的收费是以乙方各级别工作人员在本次工作中所耗费的时间为基础计算的。乙方预计本次服务的费用总额为人民币XX万元（￥××万元）【注释：同时列示大小写金额】。上述服务收费未包含增值税。"
+          },
+          {
+            "site": "paragraph",
+            "report_only_locator": "p110",
+            "matched_literal": "××",
+            "parser_field_id_base": "placeholder_generic",
+            "parser_label": "待填内容",
+            "merged_cell_duplicate": false,
+            "sibling_unrecognised_forms": {},
+            "context": "4、如果由于无法预见的原因，致使乙方人员抵达甲方的工作现场后，本约定书所涉及的审计服务中止，甲方不得要求退还预付的服务费用；如上述情况发生于乙方人员完成现场审计工作，并离开甲方的工作现场之后，甲方应另行向乙方支付人民币××元的补偿费，该补偿费应于甲方收到乙方的收款通知之日起××日内支付。"
+          },
+          {
+            "site": "paragraph",
+            "report_only_locator": "p110",
+            "matched_literal": "××",
+            "parser_field_id_base": "placeholder_generic",
+            "parser_label": "待填内容",
+            "merged_cell_duplicate": false,
+            "sibling_unrecognised_forms": {},
+            "context": "4、如果由于无法预见的原因，致使乙方人员抵达甲方的工作现场后，本约定书所涉及的审计服务中止，甲方不得要求退还预付的服务费用；如上述情况发生于乙方人员完成现场审计工作，并离开甲方的工作现场之后，甲方应另行向乙方支付人民币××元的补偿费，该补偿费应于甲方收到乙方的收款通知之日起××日内支付。"
+          },
+          {
+            "site": "paragraph",
+            "report_only_locator": "p118",
+            "matched_literal": "××",
+            "parser_field_id_base": "placeholder_generic",
+            "parser_label": "待填内容",
+            "merged_cell_duplicate": false,
+            "sibling_unrecognised_forms": {},
+            "context": "2、乙方向甲方致送审计报告一式××份。"
+          },
+          {
+            "site": "paragraph",
+            "report_only_locator": "p143",
+            "matched_literal": "××",
+            "parser_field_id_base": "placeholder_generic",
+            "parser_label": "待填内容",
+            "merged_cell_duplicate": false,
+            "sibling_unrecognised_forms": {},
+            "context": "（2）提交××仲裁委员会仲裁。"
+          }
+        ]
+      },
+      "lane_entry_key": "word-lane/b5-9-1",
+      "lane_entry_key_is_not_a_manifest_entry_id": true,
+      "manifest_entry_state": "absent_from_source_manifest",
+      "verdict": "blocked_non_discriminating_literal_anchor",
+      "blocking_reasons": [
+        "field_identity_derived_from_chinese_regex",
+        "generic_labels_only",
+        "no_declared_token_in_authoritative_template",
+        "non_discriminating_literal_anchor",
+        "ordinal_suffixed_field_ids",
+        "partial_field_fragment_anchor",
+        "unrecognised_placeholder_forms_present"
+      ],
+      "authority_model": null,
+      "authority_model_blocked_by": [
+        "BP-62-1"
+      ],
+      "contract": null,
+      "contract_blocked_by": [
+        "BP-62-1"
+      ],
+      "definition_bundle": null,
+      "definition_bundle_blocked_by": [
+        "BP-62-1",
+        "BP-62-3"
+      ],
+      "published_representation": null,
+      "published_representation_blocked_by": [
+        "BP-62-1",
+        "BP-62-3"
+      ],
+      "adapter_id": null,
+      "adapter_blocked_by": [
+        "BP-62-2"
+      ],
+      "capability": null,
+      "capability_target": "bidirectional",
+      "capability_target_blocked_by": [
+        "BP-62-1",
+        "BP-62-2",
+        "BP-62-3"
+      ],
+      "canonical_resolver": "word_resolution.resolve_word_template",
+      "evidence": {
+        "verification_state": "UNVERIFIABLE",
+        "sync_test_run_id": null,
+        "required_scenario_set_digest": null,
+        "browser_case": null,
+        "unverifiable_reasons": [
+          "verdict=blocked_non_discriminating_literal_anchor；阻塞原因 ['field_identity_derived_from_chinese_regex', 'generic_labels_only', 'no_declared_token_in_authoritative_template', 'non_discriminating_literal_anchor', 'ordinal_suffixed_field_ids', 'partial_field_fragment_anchor', 'unrecognised_placeholder_forms_present']",
+          "无 approved authority model / per-entry contract / non-null bundle",
+          "Task 61 真实 OO 9.4 Word gate 未通过（BP-21）"
+        ]
+      },
+      "mechanism_probe": {
+        "ran": false,
+        "is_not_a_contract": true,
+        "why": "verdict=blocked_non_discriminating_literal_anchor：字面锚点不唯一、被 run 边界切断，或无候选 —— 逐字段注入在本 entry 上无法构造"
+      }
+    },
+    {
+      "wp_code": "B5-9-2",
+      "ledger": {
+        "unified_relative_path": "B/B5-9-2 医院审计业务约定书（第三方委托）.docx",
+        "unified_verdict": "resolved_docx",
+        "ledger_class": "generic_word_template",
+        "carrier_ambiguity": false,
+        "own_docx_carriers": [
+          "B/B5-9-2 医院审计业务约定书（第三方委托）.docx"
+        ],
+        "component_type": "word-template"
+      },
+      "template": {
+        "relative_path": "B/B5-9-2 医院审计业务约定书（第三方委托）.docx",
+        "size": 41395,
+        "template_sha256": "bdccff9fa1d01fbcb45af287f86509fa5bd7253b4f6b379457245ebd7abf8bea",
+        "normalized_structure_hash": "2dad1a5ff4c9bfed943dcff227c73d4b85e3943d2700e41469a87cdeefe0d59c"
+      },
+      "structure": {
+        "paragraph_count": 182,
+        "table_count": 4,
+        "existing_sdt_count": 0,
+        "declared_dollar_token_count": 0
+      },
+      "html_counterpart": {
+        "render_strategy": "app/routers/wp_render_strategies/_word_template.py",
+        "structured_host": "audit-platform/frontend/src/components/workpaper/GtWordTemplateStructuredView.vue",
+        "persistence": "checklist_responses.item_id LIKE 'wt-B5-9-2-%'",
+        "field_identity_source": "app/services/wp_docx_template_parser.py::_LEGACY_PATTERNS（中文标记正则 + `_dedupe_field_id` 序号后缀）",
+        "parser_placeholder_count": 7,
+        "parser_field_ids": [
+          "placeholder_generic",
+          "placeholder_generic_2",
+          "placeholder_generic_3",
+          "placeholder_generic_4",
+          "placeholder_generic_5",
+          "placeholder_generic_6",
+          "placeholder_generic_7"
+        ],
+        "ordinal_suffixed_field_ids": [
+          "placeholder_generic_2",
+          "placeholder_generic_3",
+          "placeholder_generic_4",
+          "placeholder_generic_5",
+          "placeholder_generic_6",
+          "placeholder_generic_7"
+        ],
+        "distinct_labels": [
+          "待填内容"
+        ]
+      },
+      "anchor_analysis": {
+        "candidate_occurrences": 7,
+        "merged_cell_duplicate_occurrences": 0,
+        "distinct_literal_anchors": 1,
+        "max_literal_anchor_multiplicity": 7,
+        "literal_anchor_multiplicity": {
+          "××": 7
+        },
+        "raw_xml_verbatim_counts": {
+          "××": 7
+        },
+        "literals_not_verbatim_in_raw_xml": [],
+        "span_overlap": {
+          "identical": 0,
+          "contained": 0,
+          "partial": 0
+        },
+        "unrecognised_placeholder_forms": {
+          "bracketed_insert_slot": 3,
+          "underscore_blank": 1
+        },
+        "occurrences_whose_container_has_unrecognised_form": 1,
+        "occurrences": [
+          {
+            "site": "paragraph",
+            "report_only_locator": "p07",
+            "matched_literal": "××",
+            "parser_field_id_base": "placeholder_generic",
+            "parser_label": "待填内容",
+            "merged_cell_duplicate": false,
+            "sibling_unrecognised_forms": {},
+            "context": "丙方：  ×××"
+          },
+          {
+            "site": "paragraph",
+            "report_only_locator": "p82",
+            "matched_literal": "××",
+            "parser_field_id_base": "placeholder_generic",
+            "parser_label": "待填内容",
+            "merged_cell_duplicate": false,
+            "sibling_unrecognised_forms": {},
+            "context": "（2）鉴于甲方从事（涉及）××业务，乙方根据《中国注册会计师审计准则第1421号——利用专家的工作》的规定，可能利用专家的工作，例如独立估值专家、精算师、石油和天然气储量估算师、律师、税务专家等，协助乙方获取充分、适当的审计证据。【参考《审计准则第1421号——利用专家的工作》应用指南】"
+          },
+          {
+            "site": "paragraph",
+            "report_only_locator": "p107",
+            "matched_literal": "××",
+            "parser_field_id_base": "placeholder_generic",
+            "parser_label": "待填内容",
+            "merged_cell_duplicate": false,
+            "sibling_unrecognised_forms": {
+              "bracketed_insert_slot": 1
+            },
+            "context": "1、本次审计服务的收费是以乙方各级别工作人员在本次工作中所耗费的时间为基础计算的。乙方预计本次服务的费用总额为人民币XX万元（￥××万元）【注释：同时列示大小写金额】。上述服务收费未包含增值税。"
+          },
+          {
+            "site": "paragraph",
+            "report_only_locator": "p112",
+            "matched_literal": "××",
+            "parser_field_id_base": "placeholder_generic",
+            "parser_label": "待填内容",
+            "merged_cell_duplicate": false,
+            "sibling_unrecognised_forms": {},
+            "context": "4、如果由于无法预见及甲方不配合等原因，致使乙方人员抵达甲方的工作现场后，本约定书所涉及的审计服务中止，丙方不得要求退还预付的服务费用；如上述情况发生于乙方人员完成现场审计工作，并离开甲方的工作现场之后，丙方应另行向乙方支付人民币××元的补偿费，该补偿费应于丙方收到乙方的收款通知之日起××日内支付。"
+          },
+          {
+            "site": "paragraph",
+            "report_only_locator": "p112",
+            "matched_literal": "××",
+            "parser_field_id_base": "placeholder_generic",
+            "parser_label": "待填内容",
+            "merged_cell_duplicate": false,
+            "sibling_unrecognised_forms": {},
+            "context": "4、如果由于无法预见及甲方不配合等原因，致使乙方人员抵达甲方的工作现场后，本约定书所涉及的审计服务中止，丙方不得要求退还预付的服务费用；如上述情况发生于乙方人员完成现场审计工作，并离开甲方的工作现场之后，丙方应另行向乙方支付人民币××元的补偿费，该补偿费应于丙方收到乙方的收款通知之日起××日内支付。"
+          },
+          {
+            "site": "paragraph",
+            "report_only_locator": "p120",
+            "matched_literal": "××",
+            "parser_field_id_base": "placeholder_generic",
+            "parser_label": "待填内容",
+            "merged_cell_duplicate": false,
+            "sibling_unrecognised_forms": {},
+            "context": "2、乙方向丙方致送审计报告一式××份。"
+          },
+          {
+            "site": "paragraph",
+            "report_only_locator": "p145",
+            "matched_literal": "××",
+            "parser_field_id_base": "placeholder_generic",
+            "parser_label": "待填内容",
+            "merged_cell_duplicate": false,
+            "sibling_unrecognised_forms": {},
+            "context": "（2）提交××仲裁委员会仲裁。"
+          }
+        ]
+      },
+      "lane_entry_key": "word-lane/b5-9-2",
+      "lane_entry_key_is_not_a_manifest_entry_id": true,
+      "manifest_entry_state": "absent_from_source_manifest",
+      "verdict": "blocked_non_discriminating_literal_anchor",
+      "blocking_reasons": [
+        "field_identity_derived_from_chinese_regex",
+        "generic_labels_only",
+        "no_declared_token_in_authoritative_template",
+        "non_discriminating_literal_anchor",
+        "ordinal_suffixed_field_ids",
+        "partial_field_fragment_anchor",
+        "unrecognised_placeholder_forms_present"
+      ],
+      "authority_model": null,
+      "authority_model_blocked_by": [
+        "BP-62-1"
+      ],
+      "contract": null,
+      "contract_blocked_by": [
+        "BP-62-1"
+      ],
+      "definition_bundle": null,
+      "definition_bundle_blocked_by": [
+        "BP-62-1",
+        "BP-62-3"
+      ],
+      "published_representation": null,
+      "published_representation_blocked_by": [
+        "BP-62-1",
+        "BP-62-3"
+      ],
+      "adapter_id": null,
+      "adapter_blocked_by": [
+        "BP-62-2"
+      ],
+      "capability": null,
+      "capability_target": "bidirectional",
+      "capability_target_blocked_by": [
+        "BP-62-1",
+        "BP-62-2",
+        "BP-62-3"
+      ],
+      "canonical_resolver": "word_resolution.resolve_word_template",
+      "evidence": {
+        "verification_state": "UNVERIFIABLE",
+        "sync_test_run_id": null,
+        "required_scenario_set_digest": null,
+        "browser_case": null,
+        "unverifiable_reasons": [
+          "verdict=blocked_non_discriminating_literal_anchor；阻塞原因 ['field_identity_derived_from_chinese_regex', 'generic_labels_only', 'no_declared_token_in_authoritative_template', 'non_discriminating_literal_anchor', 'ordinal_suffixed_field_ids', 'partial_field_fragment_anchor', 'unrecognised_placeholder_forms_present']",
+          "无 approved authority model / per-entry contract / non-null bundle",
+          "Task 61 真实 OO 9.4 Word gate 未通过（BP-21）"
+        ]
+      },
+      "mechanism_probe": {
+        "ran": false,
+        "is_not_a_contract": true,
+        "why": "verdict=blocked_non_discriminating_literal_anchor：字面锚点不唯一、被 run 边界切断，或无候选 —— 逐字段注入在本 entry 上无法构造"
+      }
+    },
+    {
+      "wp_code": "S12A",
+      "ledger": {
+        "unified_relative_path": "S/S12A 评估专家工作报告（或评估专家工作总结）.docx",
+        "unified_verdict": "resolved_docx",
+        "ledger_class": "generic_word_template",
+        "carrier_ambiguity": false,
+        "own_docx_carriers": [
+          "S/S12A 评估专家工作报告（或评估专家工作总结）.docx"
+        ],
+        "component_type": "word-template"
+      },
+      "template": {
+        "relative_path": "S/S12A 评估专家工作报告（或评估专家工作总结）.docx",
+        "size": 50914,
+        "template_sha256": "0b00674e6f305742329984ffbb432ff3fbed674860ca2f42f3efc447a476c1fc",
+        "normalized_structure_hash": "1a6b09118cac69632ec719808f12e588d03e5317ed3c4f22c37946789c921142"
+      },
+      "structure": {
+        "paragraph_count": 201,
+        "table_count": 2,
+        "existing_sdt_count": 0,
+        "declared_dollar_token_count": 0
+      },
+      "html_counterpart": {
+        "render_strategy": "app/routers/wp_render_strategies/_word_template.py",
+        "structured_host": "audit-platform/frontend/src/components/workpaper/GtWordTemplateStructuredView.vue",
+        "persistence": "checklist_responses.item_id LIKE 'wt-S12A-%'",
+        "field_identity_source": "app/services/wp_docx_template_parser.py::_LEGACY_PATTERNS（中文标记正则 + `_dedupe_field_id` 序号后缀）",
+        "parser_placeholder_count": 4,
+        "parser_field_ids": [
+          "report_date",
+          "audit_year",
+          "report_date_2",
+          "audit_year_2"
+        ],
+        "ordinal_suffixed_field_ids": [
+          "report_date_2",
+          "audit_year_2"
+        ],
+        "distinct_labels": [
+          "审计年度",
+          "报告日期"
+        ]
+      },
+      "anchor_analysis": {
+        "candidate_occurrences": 4,
+        "merged_cell_duplicate_occurrences": 0,
+        "distinct_literal_anchors": 2,
+        "max_literal_anchor_multiplicity": 2,
+        "literal_anchor_multiplicity": {
+          "202X年": 2,
+          "202X年XX月XX日": 2
+        },
+        "raw_xml_verbatim_counts": {
+          "202X年": 0,
+          "202X年XX月XX日": 0
+        },
+        "literals_not_verbatim_in_raw_xml": [
+          "202X年",
+          "202X年XX月XX日"
+        ],
+        "span_overlap": {
+          "identical": 0,
+          "contained": 2,
+          "partial": 0
+        },
+        "unrecognised_placeholder_forms": {
+          "bracketed_insert_slot": 6
+        },
+        "occurrences_whose_container_has_unrecognised_form": 2,
+        "occurrences": [
+          {
+            "site": "paragraph",
+            "report_only_locator": "p06",
+            "matched_literal": "202X年XX月XX日",
+            "parser_field_id_base": "report_date",
+            "parser_label": "报告日期",
+            "merged_cell_duplicate": false,
+            "sibling_unrecognised_forms": {
+              "bracketed_insert_slot": 3
+            },
+            "context": "本专家工作报告的目的是概述关于【插入客户全称】（“【插入客户简称】”或“公司”）截止于【202X年XX月XX日】的审计工作中与利用评估专家工作有关问题的结果。本专家工作报告概述的结果作为审计小结的补充。"
+          },
+          {
+            "site": "paragraph",
+            "report_only_locator": "p06",
+            "matched_literal": "202X年",
+            "parser_field_id_base": "audit_year",
+            "parser_label": "审计年度",
+            "merged_cell_duplicate": false,
+            "sibling_unrecognised_forms": {
+              "bracketed_insert_slot": 3
+            },
+            "context": "本专家工作报告的目的是概述关于【插入客户全称】（“【插入客户简称】”或“公司”）截止于【202X年XX月XX日】的审计工作中与利用评估专家工作有关问题的结果。本专家工作报告概述的结果作为审计小结的补充。"
+          },
+          {
+            "site": "table_cell",
+            "report_only_locator": "t00[0,1]",
+            "matched_literal": "202X年XX月XX日",
+            "parser_field_id_base": "report_date",
+            "parser_label": "报告日期",
+            "merged_cell_duplicate": false,
+            "sibling_unrecognised_forms": {},
+            "context": "[202X年XX月XX日 ]"
+          },
+          {
+            "site": "table_cell",
+            "report_only_locator": "t00[0,1]",
+            "matched_literal": "202X年",
+            "parser_field_id_base": "audit_year",
+            "parser_label": "审计年度",
+            "merged_cell_duplicate": false,
+            "sibling_unrecognised_forms": {},
+            "context": "[202X年XX月XX日 ]"
+          }
+        ]
+      },
+      "lane_entry_key": "word-lane/s12a",
+      "lane_entry_key_is_not_a_manifest_entry_id": true,
+      "manifest_entry_state": "absent_from_source_manifest",
+      "verdict": "blocked_nested_literal_anchor",
+      "blocking_reasons": [
+        "field_identity_derived_from_chinese_regex",
+        "generic_labels_only",
+        "literal_anchor_split_across_runs",
+        "nested_or_identical_candidate_spans",
+        "no_declared_token_in_authoritative_template",
+        "non_discriminating_literal_anchor",
+        "ordinal_suffixed_field_ids",
+        "partial_field_fragment_anchor",
+        "unrecognised_placeholder_forms_present"
+      ],
+      "authority_model": null,
+      "authority_model_blocked_by": [
+        "BP-62-1"
+      ],
+      "contract": null,
+      "contract_blocked_by": [
+        "BP-62-1"
+      ],
+      "definition_bundle": null,
+      "definition_bundle_blocked_by": [
+        "BP-62-1",
+        "BP-62-3"
+      ],
+      "published_representation": null,
+      "published_representation_blocked_by": [
+        "BP-62-1",
+        "BP-62-3"
+      ],
+      "adapter_id": null,
+      "adapter_blocked_by": [
+        "BP-62-2"
+      ],
+      "capability": null,
+      "capability_target": "bidirectional",
+      "capability_target_blocked_by": [
+        "BP-62-1",
+        "BP-62-2",
+        "BP-62-3"
+      ],
+      "canonical_resolver": "word_resolution.resolve_word_template",
+      "evidence": {
+        "verification_state": "UNVERIFIABLE",
+        "sync_test_run_id": null,
+        "required_scenario_set_digest": null,
+        "browser_case": null,
+        "unverifiable_reasons": [
+          "verdict=blocked_nested_literal_anchor；阻塞原因 ['field_identity_derived_from_chinese_regex', 'generic_labels_only', 'literal_anchor_split_across_runs', 'nested_or_identical_candidate_spans', 'no_declared_token_in_authoritative_template', 'non_discriminating_literal_anchor', 'ordinal_suffixed_field_ids', 'partial_field_fragment_anchor', 'unrecognised_placeholder_forms_present']",
+          "无 approved authority model / per-entry contract / non-null bundle",
+          "Task 61 真实 OO 9.4 Word gate 未通过（BP-21）"
+        ]
+      },
+      "mechanism_probe": {
+        "ran": false,
+        "is_not_a_contract": true,
+        "why": "verdict=blocked_nested_literal_anchor：字面锚点不唯一、被 run 边界切断，或无候选 —— 逐字段注入在本 entry 上无法构造"
+      }
+    }
+  ],
+  "requirements_covered": [
+    "7.1",
+    "7.3",
+    "7.4",
+    "7.5",
+    "7.6",
+    "7.8",
+    "12.1",
+    "12.5",
+    "12.10",
+    "12.11",
+    "12.12"
+  ],
+  "properties_verified": [
+    "Property 30",
+    "Property 31",
+    "Property 32",
+    "Property 33",
+    "Property 34",
+    "Property 69",
+    "Property 70"
+  ]
+}

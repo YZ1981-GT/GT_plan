@@ -230,9 +230,11 @@ class TestAttachmentVersioning:
 
         assert v3["version"] == 3
         assert v3["previous_version_id"] == v2["id"]
-        # 复制了 v1 的内容
-        assert v3["file_path"] == "/v1.pdf"
+        # 复制了 v1 的内容：对外 file_path 已投影为 opaque locator（C3），真实存储位置
+        # 经内部 get_raw_storage 通道核验确实复制自 v1。
         assert v3["file_size"] == 100
+        raw_v3 = await svc.get_raw_storage(uuid.UUID(v3["id"]))
+        assert raw_v3 is not None and raw_v3["file_path"] == "/v1.pdf"
 
         # 旧版本仍在
         all_versions = await svc.list_versions(uuid.UUID(v1["id"]))

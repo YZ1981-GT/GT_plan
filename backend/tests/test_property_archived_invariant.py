@@ -102,10 +102,18 @@ def _build_app(db_session: AsyncSession, user: _FakeUser) -> FastAPI:
     """构建包含多个 mutation 路由的测试 app"""
     from app.routers.adjustments import router as adj_router
     from app.routers.working_paper import router as wp_router
+    from app.routers.wp_editor_router import router as wp_editor_router
+    from app.routers.wp_review_router import router as wp_review_router
+    from app.routers.wp_batch_router import router as wp_batch_router
+    from app.routers.wp_relation_router import router as wp_relation_router
 
     app = FastAPI()
     app.include_router(adj_router)
     app.include_router(wp_router)
+    app.include_router(wp_editor_router)
+    app.include_router(wp_review_router)
+    app.include_router(wp_batch_router)
+    app.include_router(wp_relation_router)
 
     async def _override_db():
         yield db_session

@@ -31,6 +31,15 @@ class ReviewConversation(Base):
     is_deleted: Mapped[bool] = mapped_column(server_default=text("false"))
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(server_default=func.now())
+    # V033 扩展列
+    resolved_at: Mapped[datetime | None] = mapped_column(nullable=True)
+    resolution_code: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    sla_due_at: Mapped[datetime | None] = mapped_column(nullable=True)
+    trace_id: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    priority: Mapped[str | None] = mapped_column(String(20), server_default=text("'medium'"))
+    resolved_by: Mapped[uuid.UUID | None] = mapped_column(PG_UUID(as_uuid=True), nullable=True)
+    # V082: 关联 A21~A25 检查要点
+    checklist_ref: Mapped[str | None] = mapped_column(String(20), nullable=True)
 
 
 class ReviewMessage(Base):
@@ -44,6 +53,39 @@ class ReviewMessage(Base):
     attachment_path: Mapped[str | None] = mapped_column(String(500), nullable=True)
     finding_id: Mapped[uuid.UUID | None] = mapped_column(PG_UUID(as_uuid=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
+    # V033 扩展列
+    trace_id: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    reply_to: Mapped[uuid.UUID | None] = mapped_column(PG_UUID(as_uuid=True), nullable=True)
+    redaction_flag: Mapped[bool] = mapped_column(server_default=text("false"))
+    edited_at: Mapped[datetime | None] = mapped_column(nullable=True)
+    reason_code: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    message_version: Mapped[int] = mapped_column(sa.Integer, server_default=text("1"))
+    mentions: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    # V095 扩展列 — schema漂移修复
+    thread_id: Mapped[uuid.UUID | None] = mapped_column(PG_UUID(as_uuid=True), nullable=True)
+    sender_role: Mapped[str] = mapped_column(String(50), server_default=text("'assistant'"), nullable=False)
+    # V099 私信目标字段 — schema漂移修复（DB 有列 / ORM 补齐）
+    target_user_id: Mapped[uuid.UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("users.id"), nullable=True
+    )
+    target_user_name: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    target_role: Mapped[str | None] = mapped_column(String(50), nullable=True)
+
+
+class ReviewThread(Base):
+    """V095: 复核对话线程 — 每个底稿区域一个线程"""
+
+    __tablename__ = "review_threads"
+
+    id: Mapped[uuid.UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    project_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("projects.id"), nullable=False)
+    wp_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("working_paper.id"), nullable=False)
+    section_id: Mapped[str] = mapped_column(String(50), nullable=False)
+    thread_key: Mapped[str] = mapped_column(String(200), nullable=False, unique=True)
+    status: Mapped[str] = mapped_column(String(20), server_default=text("'open'"), nullable=False)
+    created_by: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(server_default=func.now(), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(server_default=func.now(), nullable=False)
 
 
 # ── 论坛 ──────────────────────────────────────────────────

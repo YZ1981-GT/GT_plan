@@ -1,0 +1,127 @@
+{
+  "script": "e2e/g5-1-d3-unified-path.spec.ts",
+  "captured_at": "2026-09-12T10:38:51.893Z",
+  "scope": {
+    "project_id": "2aa00f57-1df4-4fe8-9840-2d65d0fd8749",
+    "wp_id": "d35c715a-9d71-4f4f-80ee-efc846533a24",
+    "entry_id": "xlsx/gt-d3-prepaid-accounts"
+  },
+  "predicates": {
+    "user_sync_requests": [
+      {
+        "method": "GET",
+        "path": "/api/projects/2aa00f57-1df4-4fe8-9840-2d65d0fd8749/workpapers/d35c715a-9d71-4f4f-80ee-efc846533a24/sync/entries/xlsx/gt-d3-prepaid-accounts/store-projection",
+        "status": 200
+      },
+      {
+        "method": "POST",
+        "path": "/api/projects/2aa00f57-1df4-4fe8-9840-2d65d0fd8749/workpapers/d35c715a-9d71-4f4f-80ee-efc846533a24/sync/entries/xlsx/gt-d3-prepaid-accounts/pending-mutations",
+        "status": 200
+      },
+      {
+        "method": "POST",
+        "path": "/api/projects/2aa00f57-1df4-4fe8-9840-2d65d0fd8749/workpapers/d35c715a-9d71-4f4f-80ee-efc846533a24/sync/entries/xlsx/gt-d3-prepaid-accounts/materialize",
+        "status": 200
+      }
+    ],
+    "forcesave_hits": [
+      {
+        "method": "POST",
+        "path": "/api/projects/2aa00f57-1df4-4fe8-9840-2d65d0fd8749/workpapers/d35c715a-9d71-4f4f-80ee-efc846533a24/sync/entries/xlsx/gt-d3-prepaid-accounts/rooms/a5590d82-47a2-4e6a-a3fc-edf5ca68fb89/forcesave",
+        "status": 202
+      }
+    ],
+    "d2_sync_hits": 0,
+    "callback_url_keys": [
+      "doc_key",
+      "generation",
+      "room_id",
+      "route_credential_id",
+      "route_token"
+    ],
+    "callback_url_redacted": "http://host.docker.internal:9980/api/workpaper-sync/rooms/a5590d82-47a2-4e6a-a3fc-edf5ca68fb89/onlyoffice-callback?room_id=%3Credacted%3E&generation=%3Credacted%3E&doc_key=%3Credacted%3E&route_credential_id=%3Credacted%3E&route_token=%3Credacted%3E",
+    "host_mounted": true,
+    "confirm_descriptor_200": true,
+    "forcesave_clicked": true,
+    "oo_cell_dirty_attempted": true,
+    "host_dirty_before_forcesave": false,
+    "forcesave_cs_error": 0,
+    "forcesave_cs_outcome": "accepted",
+    "forcesave_http_status": 202,
+    "forcesave_body_keys": [
+      "forcesave_request_id",
+      "operation_id",
+      "request_sequence",
+      "state",
+      "poll_after_ms",
+      "replayed",
+      "dispatch_error",
+      "cs_error",
+      "cs_outcome",
+      "callback_expected"
+    ],
+    "materialize_room_id": "a5590d82-47a2-4e6a-a3fc-edf5ca68fb89",
+    "materialize_has_jwt_token": true,
+    "doc_editor_called": false,
+    "doc_editor_has_root_token": false,
+    "doc_editor_document_mutable": false,
+    "host_status": "",
+    "host_error": "",
+    "confirm_forcesave_error": null,
+    "html_dom_roundtrip": {
+      "attempted": true,
+      "marker": "g5d3439283",
+      "switched_to_html": true,
+      "marker_visible": true,
+      "store_mirrored": true,
+      "dom_probe": {
+        "by_exact_text": 0,
+        "input_prop_hits": 1,
+        "search_value": "g5d3439283",
+        "tracked_operation_id": "57adbf25-10cf-40a0-b1cb-ee64a9a0b2e6"
+      }
+    },
+    "oo_write_target": "A12",
+    "oo_cell_edit_probe": {
+      "ok": true,
+      "target": "A12",
+      "attempt": 1,
+      "sheetNames": [
+        "底稿目录",
+        "预收账款实质性程序表D3A",
+        "审定表D3-1",
+        "附注披露信息(上市公司)",
+        "附注披露信息(国企)",
+        "预收账款明细表D3-2",
+        "调整分录汇总表D3-3",
+        "预收账款分析表D3-4",
+        "账龄1年以上的预收账款检查表D3-5",
+        "关联关系及交易检查表D3-6",
+        "预收账款检查表D3-7",
+        "GT_Custom",
+        "_GT_SYNC"
+      ],
+      "activeSheet": "预收账款明细表D3-2",
+      "inserted": true,
+      "entered": true,
+      "pasted": true,
+      "closeRet": true,
+      "closed": true,
+      "cellText": "g5d3439283",
+      "modified": true,
+      "saveRet": true,
+      "saved": true,
+      "cellTextAfterSave": "g5d3439283"
+    }
+  },
+  "notes": [
+    "token/JWT/route_credential 值已脱敏",
+    "OO 写格：Asc.editor 写受管 A12(customerName)；权威判据是 forcesave cs_error（0=有变更，4=no_changes）",
+    "application applied / revision+1 由同目录 DB 核查脚本补齐（venv 查库）",
+    "§9.6 条件 6：切回结构化视图后 D3TabDetail(.d3-detail) DOM 应出现 marker（getByText / input.value，排除 .detail-toolbar 搜索框）",
+    "Phase 5 第三个非 pilot canary（两级表头+账龄组）：D3 预收账款权威模板经外链净化过 OOXML 门；目标 wp d35c715a(project 2aa00f57)由 first_publication 按 created_at 定"
+  ],
+  "auth_probe": {
+    "has_token": true
+  }
+}

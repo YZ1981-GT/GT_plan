@@ -1,0 +1,405 @@
+[
+  {
+    "id": "M33",
+    "side": "fe",
+    "want": "修订号标签逐字声明",
+    "why": "修订号不再标注「仅展示/乐观锁」⇒ 下一个人会拿它拼 route。AC 8.7 明文 per-wp numeric revision 不得作 scope lookup key",
+    "verdict": "RED",
+    "summary": "185/187 passed, numFailedTestSuites=2",
+    "added": [
+      "追溯 chips 逐项来自桥，缺读取面时显式留白 applied 后展示 result revision / 代际 / 授权模型 / bundle 摘要 / effective 序号",
+      "追溯 chips 逐项来自桥，缺读取面时显式留白 修订号标签逐字声明「仅展示/乐观锁」（禁止被读成可拼 route 的资源键）"
+    ],
+    "gone": [],
+    "hit": [
+      "追溯 chips 逐项来自桥，缺读取面时显式留白 修订号标签逐字声明「仅展示/乐观锁」（禁止被读成可拼 route 的资源键）"
+    ],
+    "added_files": [
+      "WorkpaperSyncStatusBar.spec.ts"
+    ],
+    "restored": true,
+    "seconds": 4.5
+  },
+  {
+    "id": "M34",
+    "side": "fe",
+    "want": "四个 UI 文件都不从 store 模块 import fmtAmount",
+    "why": "从 store 模块具名 import `fmtAmount` ⇒ 它是 store **成员**而非模块级导出，浏览器会把整页崩成「does not provide an export named fmtAmount」，而 Volar / vitest / get_diagnostics 三层全绿",
+    "verdict": "RED",
+    "summary": "186/187 passed, numFailedTestSuites=2",
+    "added": [
+      "结构判据 四个 UI 文件都不从 store 模块 import fmtAmount（那会让整页崩）"
+    ],
+    "gone": [],
+    "hit": [
+      "结构判据 四个 UI 文件都不从 store 模块 import fmtAmount（那会让整页崩）"
+    ],
+    "added_files": [
+      "WorkpaperSyncStatusBar.spec.ts"
+    ],
+    "restored": true,
+    "seconds": 4.6
+  },
+  {
+    "id": "M35",
+    "side": "fe",
+    "want": "resolveConflicts 零调用、选择清空",
+    "why": "关闭时顺手提交一次裁决 ⇒ AC 11.7 明文「关闭面板不得自动应用任何一侧」。只断言「面板收起了」的判据对它全绿",
+    "verdict": "RED",
+    "summary": "182/187 passed, numFailedTestSuites=3",
+    "added": [
+      "关闭面板不得应用任何一侧 ESC 关闭同样零应用",
+      "关闭面板不得应用任何一侧 经 wp-sync-conflict-cancel 关闭：resolveConflicts 零调用、选择清空、只 emit update:visible(false)",
+      "关闭面板不得应用任何一侧 经 wp-sync-conflict-close 关闭：resolveConflicts 零调用、选择清空、只 emit update:visible(false)",
+      "关闭面板不得应用任何一侧 经 wp-sync-conflict-mask 关闭：resolveConflicts 零调用、选择清空、只 emit update:visible(false)",
+      "结构判据 关闭路径里没有任何提交调用（唯一 resolveConflicts 调用点在 onSubmit）"
+    ],
+    "gone": [],
+    "hit": [
+      "关闭面板不得应用任何一侧 ESC 关闭同样零应用",
+      "关闭面板不得应用任何一侧 经 wp-sync-conflict-cancel 关闭：resolveConflicts 零调用、选择清空、只 emit update:visible(false)",
+      "关闭面板不得应用任何一侧 经 wp-sync-conflict-close 关闭：resolveConflicts 零调用、选择清空、只 emit update:visible(false)",
+      "关闭面板不得应用任何一侧 经 wp-sync-conflict-mask 关闭：resolveConflicts 零调用、选择清空、只 emit update:visible(false)",
+      "结构判据 关闭路径里没有任何提交调用（唯一 resolveConflicts 调用点在 onSubmit）"
+    ],
+    "added_files": [
+      "WorkpaperSyncConflictDialog.spec.ts"
+    ],
+    "restored": true,
+    "seconds": 4.6
+  },
+  {
+    "id": "M36",
+    "side": "fe",
+    "want": "resolveConflicts 零调用、选择清空",
+    "why": "关闭不清空本地选择 ⇒ 下次打开面板时上次没提交的选择还在，用户以为那是服务端的既有裁决",
+    "verdict": "RED",
+    "summary": "183/187 passed, numFailedTestSuites=3",
+    "added": [
+      "关闭面板不得应用任何一侧 经 wp-sync-conflict-cancel 关闭：resolveConflicts 零调用、选择清空、只 emit update:visible(false)",
+      "关闭面板不得应用任何一侧 经 wp-sync-conflict-close 关闭：resolveConflicts 零调用、选择清空、只 emit update:visible(false)",
+      "关闭面板不得应用任何一侧 经 wp-sync-conflict-mask 关闭：resolveConflicts 零调用、选择清空、只 emit update:visible(false)",
+      "结构判据 关闭路径里没有任何提交调用（唯一 resolveConflicts 调用点在 onSubmit）"
+    ],
+    "gone": [],
+    "hit": [
+      "关闭面板不得应用任何一侧 经 wp-sync-conflict-cancel 关闭：resolveConflicts 零调用、选择清空、只 emit update:visible(false)",
+      "关闭面板不得应用任何一侧 经 wp-sync-conflict-close 关闭：resolveConflicts 零调用、选择清空、只 emit update:visible(false)",
+      "关闭面板不得应用任何一侧 经 wp-sync-conflict-mask 关闭：resolveConflicts 零调用、选择清空、只 emit update:visible(false)",
+      "结构判据 关闭路径里没有任何提交调用（唯一 resolveConflicts 调用点在 onSubmit）"
+    ],
+    "added_files": [
+      "WorkpaperSyncConflictDialog.spec.ts"
+    ],
+    "restored": true,
+    "seconds": 4.5
+  },
+  {
+    "id": "M37",
+    "side": "fe",
+    "want": "只点预览不点确认",
+    "why": "批量确认块无条件渲染 ⇒ 二次确认退化成一步，AC 8.3 要求批量选择二次确认",
+    "verdict": "RED",
+    "summary": "157/187 passed, numFailedTestSuites=8",
+    "added": [
+      "八项 resolve fence 齐备才可提交 一条裁决都没选 ⇒ 按钮禁用，且程序化提交写出具体码",
+      "八项 resolve fence 齐备才可提交 宿主没给 ⇒ 两条阻断原因逐项渲染、提交禁用、零 HTTP",
+      "八项 resolve fence 齐备才可提交 宿主给了 room durable fence ⇒ 提交按钮可用，提交时逐项带上八项",
+      "八项 resolve fence 齐备才可提交 服务端拒绝裁决 ⇒ 面板留在原地并显示具体码，不假装成功关闭",
+      "八项 resolve fence 齐备才可提交 缺 fence 时**程序化**提交也被拦：写出逐项阻断原因且零 HTTP（不拿 canonical 顶替）",
+      "关闭面板不得应用任何一侧 ESC 关闭同样零应用",
+      "关闭面板不得应用任何一侧 经 wp-sync-conflict-cancel 关闭：resolveConflicts 零调用、选择清空、只 emit update:visible(false)",
+      "关闭面板不得应用任何一侧 经 wp-sync-conflict-close 关闭：resolveConflicts 零调用、选择清空、只 emit update:visible(false)",
+      "关闭面板不得应用任何一侧 经 wp-sync-conflict-mask 关闭：resolveConflicts 零调用、选择清空、只 emit update:visible(false)",
+      "冲突按 sheet / table / row 三级分组，且每条双侧可追溯 frozen identity（bundle / 授权模型 / 契约）与 requested→canonical 都在面板上",
+      "冲突按 sheet / table / row 三级分组，且每条双侧可追溯 三值（打开时基线 / 服务端当前 / 回传）各占一列且互不相同",
+      "冲突按 sheet / table / row 三级分组，且每条双侧可追溯 打开面板即拉一次预览，三组各自渲染成一张卡片并带三级 data 属性",
+      "冲突按 sheet / table / row 三级分组，且每条双侧可追溯 每条冲突同时渲染 JSON Pointer 与 OO 地址（缺一条就不可追溯）",
+      "批量裁决必须点明范围并二次确认 只点预览不点确认 ⇒ 选择集一条不动（二次确认真的是两步）",
+      "批量裁决必须点明范围并二次确认 未选锚点就点「本行」⇒ 具体码 bulk_scope_anchor_required，不静默按全部处理",
+      "批量裁决必须点明范围并二次确认 确认后只落到范围内的条目上（行范围不越界到同表另一行）",
+      "批量裁决必须点明范围并二次确认 确认文案逐字含范围名、条数与裁决动作",
+      "批量裁决必须点明范围并二次确认 结构冲突永不进批量目标（选边对它毫无意义）",
+      "批量裁决必须点明范围并二次确认 范围内没有可裁决项 ⇒ 显式说明，不弹一个 0 条的确认",
+      "逐项裁决 保护策略逐项中文化（不显示裸英文枚举）",
+      "逐项裁决 手工合并只对文本字段开放，且输入值随提交带上",
+      "逐项裁决 未裁决计数只算可选边且未裁决的项",
+      "逐项裁决 结构冲突不给选边入口，改渲染「需先修复结构」",
+      "逐项裁决 选「保留当前」后进入 resolutions，data-choice 同步到 DOM",
+      "金额经 displayPrefs store 成员格式化 amount 列渲染成千分符 + 2 位小数，且不等于裸 String",
+      "金额经 displayPrefs store 成员格式化 text 类型不经金额格式化（原样展示）",
+      "金额经 displayPrefs store 成员格式化 切换平台单位后同一单元格随之变化（证明读的是活 store）",
+      "金额经 displayPrefs store 成员格式化 缺字段与显式空值渲染成两句不同的话",
+      "零消费方判决 defineExpose 的两个入口都被真的调用过，且投影与 DOM 一致",
+      "零消费方判决 组件声明的 emit 集合逐字等于本文件真正触发过的集合"
+    ],
+    "gone": [],
+    "hit": [
+      "批量裁决必须点明范围并二次确认 只点预览不点确认 ⇒ 选择集一条不动（二次确认真的是两步）",
+      "批量裁决必须点明范围并二次确认 未选锚点就点「本行」⇒ 具体码 bulk_scope_anchor_required，不静默按全部处理"
+    ],
+    "added_files": [
+      "WorkpaperSyncConflictDialog.spec.ts",
+      "WorkpaperSyncStatusBar.spec.ts"
+    ],
+    "restored": true,
+    "seconds": 4.6
+  },
+  {
+    "id": "M38",
+    "side": "fe",
+    "want": "宿主没给 ⇒ 两条阻断原因逐项渲染",
+    "why": "fence 不齐也允许提交 ⇒ 桥会拒（`bridge_resolve_fence_incomplete`），但用户看到的是一个可点的按钮和一个看不懂的错误",
+    "verdict": "RED",
+    "summary": "186/187 passed, numFailedTestSuites=2",
+    "added": [
+      "八项 resolve fence 齐备才可提交 宿主没给 ⇒ 两条阻断原因逐项渲染、提交禁用、零 HTTP"
+    ],
+    "gone": [],
+    "hit": [
+      "八项 resolve fence 齐备才可提交 宿主没给 ⇒ 两条阻断原因逐项渲染、提交禁用、零 HTTP"
+    ],
+    "added_files": [
+      "WorkpaperSyncConflictDialog.spec.ts"
+    ],
+    "restored": true,
+    "seconds": 4.6
+  },
+  {
+    "id": "M39",
+    "side": "fe",
+    "want": "缺 fence 时**程序化**提交也被拦",
+    "why": "程序化提交不再检查 fence ⇒ 门只长在 `:disabled` 上。本任务把提交入口 expose 出来正是为了让这条可被证伪",
+    "verdict": "RED",
+    "summary": "186/187 passed, numFailedTestSuites=2",
+    "added": [
+      "八项 resolve fence 齐备才可提交 缺 fence 时**程序化**提交也被拦：写出逐项阻断原因且零 HTTP（不拿 canonical 顶替）"
+    ],
+    "gone": [],
+    "hit": [
+      "八项 resolve fence 齐备才可提交 缺 fence 时**程序化**提交也被拦：写出逐项阻断原因且零 HTTP（不拿 canonical 顶替）"
+    ],
+    "added_files": [
+      "WorkpaperSyncConflictDialog.spec.ts"
+    ],
+    "restored": true,
+    "seconds": 4.6
+  },
+  {
+    "id": "M40",
+    "side": "fe",
+    "want": "服务端拒绝裁决 ⇒ 面板留在原地",
+    "why": "提交失败后仍收起面板 ⇒ 用户以为裁决已生效。失败必须留在原地并说明原因",
+    "verdict": "RED",
+    "summary": "186/187 passed, numFailedTestSuites=2",
+    "added": [
+      "八项 resolve fence 齐备才可提交 服务端拒绝裁决 ⇒ 面板留在原地并显示具体码，不假装成功关闭"
+    ],
+    "gone": [],
+    "hit": [
+      "八项 resolve fence 齐备才可提交 服务端拒绝裁决 ⇒ 面板留在原地并显示具体码，不假装成功关闭"
+    ],
+    "added_files": [
+      "WorkpaperSyncConflictDialog.spec.ts"
+    ],
+    "restored": true,
+    "seconds": 4.6
+  },
+  {
+    "id": "M41",
+    "side": "fe",
+    "want": "结构冲突不给选边入口",
+    "why": "结构冲突也给选边入口 ⇒ 用户选了一侧却收敛不了（服务端会拒），而结构/身份异常必须先修结构（AC 6.15 的 fail-closed 侧）",
+    "verdict": "RED",
+    "summary": "186/187 passed, numFailedTestSuites=2",
+    "added": [
+      "逐项裁决 结构冲突不给选边入口，改渲染「需先修复结构」"
+    ],
+    "gone": [],
+    "hit": [
+      "逐项裁决 结构冲突不给选边入口，改渲染「需先修复结构」"
+    ],
+    "added_files": [
+      "WorkpaperSyncConflictDialog.spec.ts"
+    ],
+    "restored": true,
+    "seconds": 4.7
+  },
+  {
+    "id": "M42",
+    "side": "fe",
+    "want": "手工合并只对文本字段开放",
+    "why": "手工合并对金额也开放 ⇒ 用户会在文本框里敲一个带千分符的金额，而 AC 8.3 只允许**文本字段**输入合并值",
+    "verdict": "RED",
+    "summary": "186/187 passed, numFailedTestSuites=2",
+    "added": [
+      "逐项裁决 手工合并只对文本字段开放，且输入值随提交带上"
+    ],
+    "gone": [],
+    "hit": [
+      "逐项裁决 手工合并只对文本字段开放，且输入值随提交带上"
+    ],
+    "added_files": [
+      "WorkpaperSyncConflictDialog.spec.ts"
+    ],
+    "restored": true,
+    "seconds": 4.6
+  },
+  {
+    "id": "M43",
+    "side": "fe",
+    "want": "保护策略逐项中文化",
+    "why": "保护策略显示裸英文枚举 ⇒ 平台 UI 铁律要求全中文状态标签，`read_only_masked_cell` 这类值对审计师毫无意义",
+    "verdict": "RED",
+    "summary": "186/187 passed, numFailedTestSuites=2",
+    "added": [
+      "逐项裁决 保护策略逐项中文化（不显示裸英文枚举）"
+    ],
+    "gone": [],
+    "hit": [
+      "逐项裁决 保护策略逐项中文化（不显示裸英文枚举）"
+    ],
+    "added_files": [
+      "WorkpaperSyncConflictDialog.spec.ts"
+    ],
+    "restored": true,
+    "seconds": 4.6
+  },
+  {
+    "id": "M44",
+    "side": "fe",
+    "want": "打开面板即拉一次预览",
+    "why": "打开面板不拉预览、只读桥里可能过期的缓存 ⇒ 用户裁决的是一份旧冲突集，而 `conflict_set_digest` 乐观锁会在提交时才失败",
+    "verdict": "RED",
+    "summary": "155/187 passed, numFailedTestSuites=9",
+    "added": [
+      "八项 resolve fence 齐备才可提交 一条裁决都没选 ⇒ 按钮禁用，且程序化提交写出具体码",
+      "八项 resolve fence 齐备才可提交 宿主没给 ⇒ 两条阻断原因逐项渲染、提交禁用、零 HTTP",
+      "八项 resolve fence 齐备才可提交 宿主给了 room durable fence ⇒ 提交按钮可用，提交时逐项带上八项",
+      "八项 resolve fence 齐备才可提交 服务端拒绝裁决 ⇒ 面板留在原地并显示具体码，不假装成功关闭",
+      "八项 resolve fence 齐备才可提交 缺 fence 时**程序化**提交也被拦：写出逐项阻断原因且零 HTTP（不拿 canonical 顶替）",
+      "关闭面板不得应用任何一侧 ESC 关闭同样零应用",
+      "关闭面板不得应用任何一侧 经 wp-sync-conflict-cancel 关闭：resolveConflicts 零调用、选择清空、只 emit update:visible(false)",
+      "关闭面板不得应用任何一侧 经 wp-sync-conflict-close 关闭：resolveConflicts 零调用、选择清空、只 emit update:visible(false)",
+      "关闭面板不得应用任何一侧 经 wp-sync-conflict-mask 关闭：resolveConflicts 零调用、选择清空、只 emit update:visible(false)",
+      "冲突按 sheet / table / row 三级分组，且每条双侧可追溯 frozen identity（bundle / 授权模型 / 契约）与 requested→canonical 都在面板上",
+      "冲突按 sheet / table / row 三级分组，且每条双侧可追溯 三值（打开时基线 / 服务端当前 / 回传）各占一列且互不相同",
+      "冲突按 sheet / table / row 三级分组，且每条双侧可追溯 打开面板即拉一次预览，三组各自渲染成一张卡片并带三级 data 属性",
+      "冲突按 sheet / table / row 三级分组，且每条双侧可追溯 每条冲突同时渲染 JSON Pointer 与 OO 地址（缺一条就不可追溯）",
+      "冲突按 sheet / table / row 三级分组，且每条双侧可追溯 预览形态漂移（缺 adjudicable 布尔）⇒ 渲染具体错误码，不静默画一张空表",
+      "批量裁决必须点明范围并二次确认 只点预览不点确认 ⇒ 选择集一条不动（二次确认真的是两步）",
+      "批量裁决必须点明范围并二次确认 未选锚点就点「本行」⇒ 具体码 bulk_scope_anchor_required，不静默按全部处理",
+      "批量裁决必须点明范围并二次确认 确认后只落到范围内的条目上（行范围不越界到同表另一行）",
+      "批量裁决必须点明范围并二次确认 确认文案逐字含范围名、条数与裁决动作",
+      "批量裁决必须点明范围并二次确认 结构冲突永不进批量目标（选边对它毫无意义）",
+      "批量裁决必须点明范围并二次确认 范围内没有可裁决项 ⇒ 显式说明，不弹一个 0 条的确认",
+      "结构判据 面板零 HTTP：不 import 任何请求面，全部经桥",
+      "逐项裁决 保护策略逐项中文化（不显示裸英文枚举）",
+      "逐项裁决 手工合并只对文本字段开放，且输入值随提交带上",
+      "逐项裁决 未裁决计数只算可选边且未裁决的项",
+      "逐项裁决 结构冲突不给选边入口，改渲染「需先修复结构」",
+      "逐项裁决 选「保留当前」后进入 resolutions，data-choice 同步到 DOM",
+      "金额经 displayPrefs store 成员格式化 amount 列渲染成千分符 + 2 位小数，且不等于裸 String",
+      "金额经 displayPrefs store 成员格式化 text 类型不经金额格式化（原样展示）",
+      "金额经 displayPrefs store 成员格式化 切换平台单位后同一单元格随之变化（证明读的是活 store）",
+      "金额经 displayPrefs store 成员格式化 缺字段与显式空值渲染成两句不同的话",
+      "零消费方判决 defineExpose 的两个入口都被真的调用过，且投影与 DOM 一致",
+      "零消费方判决 组件声明的 emit 集合逐字等于本文件真正触发过的集合"
+    ],
+    "gone": [],
+    "hit": [
+      "冲突按 sheet / table / row 三级分组，且每条双侧可追溯 打开面板即拉一次预览，三组各自渲染成一张卡片并带三级 data 属性"
+    ],
+    "added_files": [
+      "WorkpaperSyncConflictDialog.spec.ts",
+      "WorkpaperSyncStatusBar.spec.ts"
+    ],
+    "restored": true,
+    "seconds": 4.5
+  },
+  {
+    "id": "M45",
+    "side": "fe",
+    "want": "amount 列渲染成千分符",
+    "why": "冲突面板的金额不经 store ⇒ 平台单位/小数位切换对它无效，AC 8.2 明文金额使用平台 `displayPrefs.fmtAmount()`",
+    "verdict": "RED",
+    "summary": "185/187 passed, numFailedTestSuites=2",
+    "added": [
+      "金额经 displayPrefs store 成员格式化 amount 列渲染成千分符 + 2 位小数，且不等于裸 String",
+      "金额经 displayPrefs store 成员格式化 切换平台单位后同一单元格随之变化（证明读的是活 store）"
+    ],
+    "gone": [],
+    "hit": [
+      "金额经 displayPrefs store 成员格式化 amount 列渲染成千分符 + 2 位小数，且不等于裸 String",
+      "金额经 displayPrefs store 成员格式化 切换平台单位后同一单元格随之变化（证明读的是活 store）"
+    ],
+    "added_files": [
+      "WorkpaperSyncConflictDialog.spec.ts"
+    ],
+    "restored": true,
+    "seconds": 4.6
+  },
+  {
+    "id": "M46",
+    "side": "fe",
+    "want": "未查询时候选 / bundle 摘要 / 动作按钮全不在 DOM 里",
+    "why": "未经 authorization-first list 就进入「已列出」态 ⇒ 面板先画一张空壳，而 AC 5.8/10.6 的可见性门就是服务端那次 list",
+    "verdict": "RED",
+    "summary": "186/187 passed, numFailedTestSuites=2",
+    "added": [
+      "authorization-first list 是唯一可见性门 未查询时候选 / bundle 摘要 / 动作按钮全不在 DOM 里"
+    ],
+    "gone": [],
+    "hit": [
+      "authorization-first list 是唯一可见性门 未查询时候选 / bundle 摘要 / 动作按钮全不在 DOM 里"
+    ],
+    "added_files": [
+      "WorkpaperSyncRecoveryPanel.spec.ts"
+    ],
+    "restored": true,
+    "seconds": 4.6
+  },
+  {
+    "id": "M47",
+    "side": "fe",
+    "want": "DOM 里没有任何「重试」入口",
+    "why": "给 recovery 面板加一个普通重试入口 ⇒ AC 5.8 末句明令禁止；claim 之前 operation 为空，点下去只能得到一个 404",
+    "verdict": "RED",
+    "summary": "184/187 passed, numFailedTestSuites=4",
+    "added": [
+      "authorization-first claim 成功后三实体同时出现 claim 被服务端拒绝 ⇒ 三实体仍全空、显示具体码、不进 operation 流程",
+      "claim 之前三实体全空且不提供普通重试 DOM 里没有任何「重试」入口，且投影里 plainRetryOffered 恒 false",
+      "结构判据 剥注释后源码里根本不出现 retryOperation（普通重试结构性不可达）"
+    ],
+    "gone": [],
+    "hit": [
+      "claim 之前三实体全空且不提供普通重试 DOM 里没有任何「重试」入口，且投影里 plainRetryOffered 恒 false",
+      "结构判据 剥注释后源码里根本不出现 retryOperation（普通重试结构性不可达）"
+    ],
+    "added_files": [
+      "WorkpaperSyncRecoveryPanel.spec.ts"
+    ],
+    "restored": true,
+    "seconds": 4.6
+  },
+  {
+    "id": "M48",
+    "side": "fe",
+    "want": "timeline 的 operation 与桥跟踪的不一致",
+    "why": "claim 后不核对「跟踪的是不是原 operation」⇒ 服务端换了一条 operation 时界面照样显示「已认领」，而 AC 5.8 要求 claim 沿同一 operation 推进",
+    "verdict": "RED",
+    "summary": "186/187 passed, numFailedTestSuites=2",
+    "added": [
+      "authorization-first claim 成功后三实体同时出现 timeline 的 operation 与桥跟踪的不一致 ⇒ 可见失败，不显示「已认领」"
+    ],
+    "gone": [],
+    "hit": [
+      "authorization-first claim 成功后三实体同时出现 timeline 的 operation 与桥跟踪的不一致 ⇒ 可见失败，不显示「已认领」"
+    ],
+    "added_files": [
+      "WorkpaperSyncRecoveryPanel.spec.ts"
+    ],
+    "restored": true,
+    "seconds": 4.6
+  }
+]

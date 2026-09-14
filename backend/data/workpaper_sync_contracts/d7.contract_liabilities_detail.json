@@ -1,0 +1,481 @@
+{
+  "contract_id": "d7.contract_liabilities_detail",
+  "document_type": "xlsx",
+  "identity_carriers": [
+    "hidden_sheet",
+    "defined_name",
+    "excel_table",
+    "hidden_uuid_column"
+  ],
+  "instrumentation_definition_sha256": "0ddb7bc393070cfdf94cc49b3f22ca2cf42970fc4188dd1d93f0fe058511c76d",
+  "review": {
+    "authority_root": "backend/wp_templates",
+    "entry_id": "xlsx/gt-d7-contract-liabilities",
+    "html_store": {
+      "item_id": "D7-2-rows",
+      "note": "整张合同负债明细表存成这一条 item 的 remark（JSON 数组字符串，useD7Detail 的 JSON.stringify(rows)）。本契约按 stable field + row rowId 拆开，禁止把整 JSON 当一个字段比较（对齐 D2 AC 6.9 / 6.12）。账龄为 nested keyed（agingPrior/agingAudited，段来自 useAgingConfig D7 默认 THREE_YEAR 的 4 段），json_pointer 用 /rows/{uuid}/agingPrior/within1",
+      "row_identity_key": "rowId",
+      "shape": "json_array_of_row_objects",
+      "table": "checklist_responses"
+    },
+    "pilot_class": "phase5_contract_liabilities",
+    "reviewed_basis": "openpyxl 逐 sheet 直读权威模板 D/D7 合同负债.xlsx，只取受管 sheet 明细表D7-2：两级表头 行 8（组标题）/ 行 9（账龄子标题 1年以内/1-2/2-3/3年以上），27 列 A-AA，数据区 10-22，I/P/R/U 四列逐行公式 =F+G+H / =F-N+O（贷方科目）/ =P+Q / =R+S+T，A23 合计 footer；19 标量列 + 两个账龄组各 4 段（J-M 期初 / V-Y 期末）；字段键与前端 useD7Detail.DetailRow 逐字段锁死。wp_code=D7（载荷落点，非 D7C 幻影码 / 非 D7-2 名义码）"
+  },
+  "review_status": "reviewed",
+  "schema_version": "contract-definition:v1",
+  "semantic_version": "1.0.0",
+  "sheets": [
+    {
+      "excel_name": "明细表D7-2",
+      "locator": {
+        "anchor": "excel_table_sheet_association"
+      },
+      "sheet_key": "d72-managed",
+      "tables": [
+        {
+          "anchor": "A8",
+          "delete_policy": "tombstone",
+          "fields": [
+            {
+              "cell": {
+                "column": "A",
+                "row_from": "row_identity"
+              },
+              "column_key": "contract_name",
+              "header_source_ref": "源xlsx!明细表D7-2!A8",
+              "header_text": "合同名称/项目名称",
+              "json_pointer": "/rows/{row_uuid}/contractName",
+              "mode": "editable",
+              "source_ref": "源xlsx!明细表D7-2!A10",
+              "stable_field_key": "contract_liabilities_detail_rows/{row_uuid}/contract_name",
+              "store_item_id": "D7-2-rows",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "B",
+                "row_from": "row_identity"
+              },
+              "column_key": "company_name",
+              "header_source_ref": "源xlsx!明细表D7-2!B8",
+              "header_text": "单位名称",
+              "json_pointer": "/rows/{row_uuid}/companyName",
+              "mode": "editable",
+              "source_ref": "源xlsx!明细表D7-2!B10",
+              "stable_field_key": "contract_liabilities_detail_rows/{row_uuid}/company_name",
+              "store_item_id": "D7-2-rows",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "C",
+                "row_from": "row_identity"
+              },
+              "column_key": "company_code",
+              "header_source_ref": "源xlsx!明细表D7-2!C8",
+              "header_text": "公司代码",
+              "json_pointer": "/rows/{row_uuid}/companyCode",
+              "mode": "editable",
+              "source_ref": "源xlsx!明细表D7-2!C10",
+              "stable_field_key": "contract_liabilities_detail_rows/{row_uuid}/company_code",
+              "store_item_id": "D7-2-rows",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "D",
+                "row_from": "row_identity"
+              },
+              "column_key": "related_party_type",
+              "header_source_ref": "源xlsx!明细表D7-2!D8",
+              "header_text": "关联关系",
+              "json_pointer": "/rows/{row_uuid}/relatedPartyType",
+              "mode": "editable",
+              "source_ref": "源xlsx!明细表D7-2!D10",
+              "stable_field_key": "contract_liabilities_detail_rows/{row_uuid}/related_party_type",
+              "store_item_id": "D7-2-rows",
+              "value_type": "enum"
+            },
+            {
+              "cell": {
+                "column": "E",
+                "row_from": "row_identity"
+              },
+              "column_key": "nature_type",
+              "header_source_ref": "源xlsx!明细表D7-2!E8",
+              "header_text": "类型",
+              "json_pointer": "/rows/{row_uuid}/natureType",
+              "mode": "editable",
+              "source_ref": "源xlsx!明细表D7-2!E10",
+              "stable_field_key": "contract_liabilities_detail_rows/{row_uuid}/nature_type",
+              "store_item_id": "D7-2-rows",
+              "value_type": "enum"
+            },
+            {
+              "cell": {
+                "column": "F",
+                "row_from": "row_identity"
+              },
+              "column_key": "prior_unadjusted",
+              "header_source_ref": "源xlsx!明细表D7-2!F8",
+              "header_text": "期初未审数",
+              "json_pointer": "/rows/{row_uuid}/priorUnadjusted",
+              "mode": "editable",
+              "source_ref": "源xlsx!明细表D7-2!F10",
+              "stable_field_key": "contract_liabilities_detail_rows/{row_uuid}/prior_unadjusted",
+              "store_item_id": "D7-2-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "G",
+                "row_from": "row_identity"
+              },
+              "column_key": "prior_aje",
+              "header_source_ref": "源xlsx!明细表D7-2!G8",
+              "header_text": "账项调整",
+              "json_pointer": "/rows/{row_uuid}/priorAje",
+              "mode": "editable",
+              "source_ref": "源xlsx!明细表D7-2!G10",
+              "stable_field_key": "contract_liabilities_detail_rows/{row_uuid}/prior_aje",
+              "store_item_id": "D7-2-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "H",
+                "row_from": "row_identity"
+              },
+              "column_key": "prior_rje",
+              "header_source_ref": "源xlsx!明细表D7-2!H8",
+              "header_text": "重分类调整",
+              "json_pointer": "/rows/{row_uuid}/priorRje",
+              "mode": "editable",
+              "source_ref": "源xlsx!明细表D7-2!H10",
+              "stable_field_key": "contract_liabilities_detail_rows/{row_uuid}/prior_rje",
+              "store_item_id": "D7-2-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "I",
+                "row_from": "row_identity"
+              },
+              "column_key": "prior_audited",
+              "header_source_ref": "源xlsx!明细表D7-2!I8",
+              "header_text": "期初审定数",
+              "json_pointer": "/rows/{row_uuid}/priorAudited",
+              "mode": "formula",
+              "source_ref": "源xlsx!明细表D7-2!I10",
+              "stable_field_key": "contract_liabilities_detail_rows/{row_uuid}/prior_audited",
+              "store_item_id": "D7-2-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "J",
+                "row_from": "row_identity"
+              },
+              "column_key": "aging_prior_within1",
+              "group_source_ref": "源xlsx!明细表D7-2!J8",
+              "header_source_ref": "源xlsx!明细表D7-2!J9",
+              "header_text": "1年以内",
+              "json_pointer": "/rows/{row_uuid}/agingPrior/within1",
+              "mode": "editable",
+              "source_ref": "源xlsx!明细表D7-2!J10",
+              "stable_field_key": "contract_liabilities_detail_rows/{row_uuid}/aging_prior_within1",
+              "store_item_id": "D7-2-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "K",
+                "row_from": "row_identity"
+              },
+              "column_key": "aging_prior_y1to2",
+              "group_source_ref": "源xlsx!明细表D7-2!J8",
+              "header_source_ref": "源xlsx!明细表D7-2!K9",
+              "header_text": "1-2年",
+              "json_pointer": "/rows/{row_uuid}/agingPrior/y1to2",
+              "mode": "editable",
+              "source_ref": "源xlsx!明细表D7-2!K10",
+              "stable_field_key": "contract_liabilities_detail_rows/{row_uuid}/aging_prior_y1to2",
+              "store_item_id": "D7-2-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "L",
+                "row_from": "row_identity"
+              },
+              "column_key": "aging_prior_y2to3",
+              "group_source_ref": "源xlsx!明细表D7-2!J8",
+              "header_source_ref": "源xlsx!明细表D7-2!L9",
+              "header_text": "2-3年",
+              "json_pointer": "/rows/{row_uuid}/agingPrior/y2to3",
+              "mode": "editable",
+              "source_ref": "源xlsx!明细表D7-2!L10",
+              "stable_field_key": "contract_liabilities_detail_rows/{row_uuid}/aging_prior_y2to3",
+              "store_item_id": "D7-2-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "M",
+                "row_from": "row_identity"
+              },
+              "column_key": "aging_prior_over3",
+              "group_source_ref": "源xlsx!明细表D7-2!J8",
+              "header_source_ref": "源xlsx!明细表D7-2!M9",
+              "header_text": "3年以上",
+              "json_pointer": "/rows/{row_uuid}/agingPrior/over3",
+              "mode": "editable",
+              "source_ref": "源xlsx!明细表D7-2!M10",
+              "stable_field_key": "contract_liabilities_detail_rows/{row_uuid}/aging_prior_over3",
+              "store_item_id": "D7-2-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "N",
+                "row_from": "row_identity"
+              },
+              "column_key": "debit_amount",
+              "header_source_ref": "源xlsx!明细表D7-2!N8",
+              "header_text": "借方发生",
+              "json_pointer": "/rows/{row_uuid}/debitAmount",
+              "mode": "editable",
+              "source_ref": "源xlsx!明细表D7-2!N10",
+              "stable_field_key": "contract_liabilities_detail_rows/{row_uuid}/debit_amount",
+              "store_item_id": "D7-2-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "O",
+                "row_from": "row_identity"
+              },
+              "column_key": "credit_amount",
+              "header_source_ref": "源xlsx!明细表D7-2!O8",
+              "header_text": "贷方发生",
+              "json_pointer": "/rows/{row_uuid}/creditAmount",
+              "mode": "editable",
+              "source_ref": "源xlsx!明细表D7-2!O10",
+              "stable_field_key": "contract_liabilities_detail_rows/{row_uuid}/credit_amount",
+              "store_item_id": "D7-2-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "P",
+                "row_from": "row_identity"
+              },
+              "column_key": "end_balance",
+              "header_source_ref": "源xlsx!明细表D7-2!P8",
+              "header_text": "期末未审数",
+              "json_pointer": "/rows/{row_uuid}/endBalance",
+              "mode": "formula",
+              "source_ref": "源xlsx!明细表D7-2!P10",
+              "stable_field_key": "contract_liabilities_detail_rows/{row_uuid}/end_balance",
+              "store_item_id": "D7-2-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "Q",
+                "row_from": "row_identity"
+              },
+              "column_key": "entity_reclass",
+              "header_source_ref": "源xlsx!明细表D7-2!Q8",
+              "header_text": "被审计单位重分类调整",
+              "json_pointer": "/rows/{row_uuid}/entityReclass",
+              "mode": "editable",
+              "source_ref": "源xlsx!明细表D7-2!Q10",
+              "stable_field_key": "contract_liabilities_detail_rows/{row_uuid}/entity_reclass",
+              "store_item_id": "D7-2-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "R",
+                "row_from": "row_identity"
+              },
+              "column_key": "end_unadjusted",
+              "header_source_ref": "源xlsx!明细表D7-2!R8",
+              "header_text": "期末未审余额",
+              "json_pointer": "/rows/{row_uuid}/endUnadjusted",
+              "mode": "formula",
+              "source_ref": "源xlsx!明细表D7-2!R10",
+              "stable_field_key": "contract_liabilities_detail_rows/{row_uuid}/end_unadjusted",
+              "store_item_id": "D7-2-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "S",
+                "row_from": "row_identity"
+              },
+              "column_key": "end_aje",
+              "header_source_ref": "源xlsx!明细表D7-2!S8",
+              "header_text": "账项调整",
+              "json_pointer": "/rows/{row_uuid}/endAje",
+              "mode": "editable",
+              "source_ref": "源xlsx!明细表D7-2!S10",
+              "stable_field_key": "contract_liabilities_detail_rows/{row_uuid}/end_aje",
+              "store_item_id": "D7-2-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "T",
+                "row_from": "row_identity"
+              },
+              "column_key": "end_rje",
+              "header_source_ref": "源xlsx!明细表D7-2!T8",
+              "header_text": "重分类调整",
+              "json_pointer": "/rows/{row_uuid}/endRje",
+              "mode": "editable",
+              "source_ref": "源xlsx!明细表D7-2!T10",
+              "stable_field_key": "contract_liabilities_detail_rows/{row_uuid}/end_rje",
+              "store_item_id": "D7-2-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "U",
+                "row_from": "row_identity"
+              },
+              "column_key": "end_audited",
+              "header_source_ref": "源xlsx!明细表D7-2!U8",
+              "header_text": "期末审定数",
+              "json_pointer": "/rows/{row_uuid}/endAudited",
+              "mode": "formula",
+              "source_ref": "源xlsx!明细表D7-2!U10",
+              "stable_field_key": "contract_liabilities_detail_rows/{row_uuid}/end_audited",
+              "store_item_id": "D7-2-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "V",
+                "row_from": "row_identity"
+              },
+              "column_key": "aging_audited_within1",
+              "group_source_ref": "源xlsx!明细表D7-2!V8",
+              "header_source_ref": "源xlsx!明细表D7-2!V9",
+              "header_text": "1年以内",
+              "json_pointer": "/rows/{row_uuid}/agingAudited/within1",
+              "mode": "editable",
+              "source_ref": "源xlsx!明细表D7-2!V10",
+              "stable_field_key": "contract_liabilities_detail_rows/{row_uuid}/aging_audited_within1",
+              "store_item_id": "D7-2-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "W",
+                "row_from": "row_identity"
+              },
+              "column_key": "aging_audited_y1to2",
+              "group_source_ref": "源xlsx!明细表D7-2!V8",
+              "header_source_ref": "源xlsx!明细表D7-2!W9",
+              "header_text": "1-2年",
+              "json_pointer": "/rows/{row_uuid}/agingAudited/y1to2",
+              "mode": "editable",
+              "source_ref": "源xlsx!明细表D7-2!W10",
+              "stable_field_key": "contract_liabilities_detail_rows/{row_uuid}/aging_audited_y1to2",
+              "store_item_id": "D7-2-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "X",
+                "row_from": "row_identity"
+              },
+              "column_key": "aging_audited_y2to3",
+              "group_source_ref": "源xlsx!明细表D7-2!V8",
+              "header_source_ref": "源xlsx!明细表D7-2!X9",
+              "header_text": "2-3年",
+              "json_pointer": "/rows/{row_uuid}/agingAudited/y2to3",
+              "mode": "editable",
+              "source_ref": "源xlsx!明细表D7-2!X10",
+              "stable_field_key": "contract_liabilities_detail_rows/{row_uuid}/aging_audited_y2to3",
+              "store_item_id": "D7-2-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "Y",
+                "row_from": "row_identity"
+              },
+              "column_key": "aging_audited_over3",
+              "group_source_ref": "源xlsx!明细表D7-2!V8",
+              "header_source_ref": "源xlsx!明细表D7-2!Y9",
+              "header_text": "3年以上",
+              "json_pointer": "/rows/{row_uuid}/agingAudited/over3",
+              "mode": "editable",
+              "source_ref": "源xlsx!明细表D7-2!Y10",
+              "stable_field_key": "contract_liabilities_detail_rows/{row_uuid}/aging_audited_over3",
+              "store_item_id": "D7-2-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "Z",
+                "row_from": "row_identity"
+              },
+              "column_key": "is_confirmed",
+              "header_source_ref": "源xlsx!明细表D7-2!Z8",
+              "header_text": "是否发函",
+              "json_pointer": "/rows/{row_uuid}/isConfirmed",
+              "mode": "editable",
+              "source_ref": "源xlsx!明细表D7-2!Z10",
+              "stable_field_key": "contract_liabilities_detail_rows/{row_uuid}/is_confirmed",
+              "store_item_id": "D7-2-rows",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "AA",
+                "row_from": "row_identity"
+              },
+              "column_key": "post_transfer",
+              "header_source_ref": "源xlsx!明细表D7-2!AA8",
+              "header_text": "期后结转",
+              "json_pointer": "/rows/{row_uuid}/postTransfer",
+              "mode": "editable",
+              "source_ref": "源xlsx!明细表D7-2!AA10",
+              "stable_field_key": "contract_liabilities_detail_rows/{row_uuid}/post_transfer",
+              "store_item_id": "D7-2-rows",
+              "value_type": "amount"
+            }
+          ],
+          "footer_anchor": {
+            "carries_total_formula": true,
+            "marker": "合   计",
+            "note": "footer 行 A23 承载合计公式（I23..AA23 = SUM(x10:x22)，openpyxl 逐格实测）。声明为真使结构性插行有权按声明位移量扩张该区间",
+            "search_column": "A"
+          },
+          "formula_mask": [
+            "I10:I22",
+            "P10:P22",
+            "R10:R22",
+            "U10:U22"
+          ],
+          "header_rows": 2,
+          "row_identity": {
+            "json_pointer": "/rows/*/rowId",
+            "kind": "field"
+          },
+          "table_key": "contract_liabilities_detail_rows"
+        }
+      ]
+    }
+  ],
+  "template": {
+    "normalized_structure_hash": "d257edcea6f6d2c490755a3a5a93128aaebc1a9b2c097d1e9178897ec482b07a",
+    "relative_path": "D/D7 合同负债.xlsx",
+    "template_sha256": "0facd3fe2297dbf72804d513d54ca08c55d6a26a41bf1d5c59fc3d7ea1c76a9a"
+  },
+  "template_definition_sha256": "10d584e74541cd2d7963f15a505b1285abbd84555dff8524fe2cb8faf0f84292"
+}

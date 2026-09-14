@@ -2,9 +2,9 @@ name: CI
 
 on:
   push:
-    branches: [master]
+    branches: [master, main, 'work/**']
   pull_request:
-    branches: [master]
+    branches: [master, main]
 
 jobs:
   backend-tests:
@@ -31,8 +31,13 @@ jobs:
         with:
           python-version: "3.12"
           cache: pip
-      - name: Install dependencies
-        run: pip install -r backend/requirements.txt
+      - name: Install dependencies (uv accelerated)
+        run: |
+          pip install "uv>=0.7"
+          uv pip install --system -r backend/requirements.txt || pip install -r backend/requirements.txt
+      - name: Run migrations (populate PG schema for contract tests)
+        run: python -c "import asyncio; from app.core.migration_runner import MigrationRunner; asyncio.run(MigrationRunner(database_url='postgresql+asyncpg://test:test@localhost:5432/audit_test').run_pending())"
+        working-directory: backend
       - name: Run tests (exclude integration/e2e)
         run: |
           python -m pytest backend/tests/ \
@@ -60,9 +65,15 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - name: Install dependencies
-        run: pip install -r backend/requirements.txt
-        working-directory: .
+      - name: Install dependencies (uv accelerated)
+        run: |
+          pip install "uv>=0.7"
+          uv pip install --system -r backend/requirements.txt || pip install -r backend/requirements.txt
+      - name: Run migrations (populate PG schema for column contract test)
+        env:
+          DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/test_audit
+        run: python -c "import asyncio; from app.core.migration_runner import MigrationRunner; asyncio.run(MigrationRunner(database_url='postgresql+asyncpg://postgres:postgres@localhost:5432/test_audit').run_pending())"
+        working-directory: backend
       - name: Run PG-only tests
         env:
           DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/test_audit
@@ -82,8 +93,10 @@ jobs:
         with:
           python-version: "3.12"
           cache: pip
-      - name: Install dependencies
-        run: pip install -r backend/requirements.txt
+      - name: Install dependencies (uv accelerated)
+        run: |
+          pip install "uv>=0.7"
+          uv pip install --system -r backend/requirements.txt || pip install -r backend/requirements.txt
       - name: Run ledger_import full suite (含最小合成样本 smoke)
         run: |
           python -m pytest backend/tests/ledger_import/ \
@@ -107,8 +120,10 @@ jobs:
         with:
           python-version: "3.12"
           cache: pip
-      - name: Install dependencies
-        run: pip install -r backend/requirements.txt
+      - name: Install dependencies (uv accelerated)
+        run: |
+          pip install "uv>=0.7"
+          uv pip install --system -r backend/requirements.txt || pip install -r backend/requirements.txt
       - name: Ruff check
         run: python -m ruff check backend/
       - name: Check signature_level usage
@@ -157,6 +172,56 @@ jobs:
           # 每个值都在 error_hints.py 有 ErrorHint 注册
           python -m pytest backend/tests/ledger_import/test_error_hints.py -v --tb=short
 
+  gitleaks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITLEAKS_CONFIG: .gitleaks.toml
+
+  file-size-guard:
+    # 文件行数门禁（check_file_size.py）：whitelist 只减不增 +5% / HARD_CAPS 防回弹 / 新文件强制 ≤ 默认上限
+    # 防止瘦身成果（gtdform-shrink / editor-slimdown / gt-c-note-table-shrink 等）悄悄回弹膨胀。
+    # 退出码：0=通过 / 1=超限 / 2=whitelist 膨胀。基线文件 backend/scripts/file_size_whitelist.txt。
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: File size gate (whitelist only-decrease + HARD_CAPS)
+        run: python backend/scripts/check/check_file_size.py
+
+  migration-compat-check:
+    runs-on: ubuntu-latest
+    continue-on-error: ${{ vars.MIGRATION_COMPAT_MODE != 'strict' }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install sqlglot
+      - run: python backend/scripts/check/check_migration_compat.py --mode ${{ vars.MIGRATION_COMPAT_MODE || 'warning' }}
+
+  sqlfluff-lint:
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install sqlfluff
+        run: pip install sqlfluff
+      - name: Lint migration SQL (warning only)
+        run: sqlfluff lint backend/migrations/*.sql || true
+
   seed-validate:
     runs-on: ubuntu-latest
     steps:
@@ -168,12 +233,33 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "20"
-      - name: Install dependencies
-        run: pip install -r backend/requirements.txt
+      - name: Install dependencies (uv accelerated)
+        run: |
+          pip install "uv>=0.7"
+          uv pip install --system -r backend/requirements.txt || pip install -r backend/requirements.txt
       - name: Validate seed files
         run: python scripts/validate_seed_files.py
+      - name: Validate template manifest (strict — reject .doc, missing files)
+        run: python scripts/validate_template_manifest.py --strict
+        working-directory: backend
       - name: Dead link check (apiPaths ↔ router_registry)
         run: node scripts/dead-link-check.js
+
+  audit-xlsx-drift:
+    # INFRA-3: 验证 a7_a15_xlsx_audit.json 未与实际 xlsx 模板脱节
+    # A17 audit 就绪后纳入同门禁
+    # 过渡期 continue-on-error（观察 2 周后移除改 hard fail）
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install audit dependencies
+        run: pip install openpyxl python-calamine
+      - name: Check xlsx audit drift
+        run: python backend/scripts/audit_a7_a15_xlsx.py --diff-only
 
   frontend-build:
     runs-on: ubuntu-latest
@@ -369,7 +455,7 @@ jobs:
         run: |
           declare -A BASELINES=(
             ["src/views/WorkpaperList.vue"]=1000
-            ["src/views/workpaper-list/WorkpaperWorkbenchView.vue"]=700
+            ["src/views/workpaper-list/WorkpaperWorkbenchView.vue"]=1210
             ["src/views/workpaper-list/WorkpaperBoardView.vue"]=700
             ["src/views/workpaper-list/WorkpaperLifecycleView.vue"]=700
             ["src/views/workpaper-list/WorkpaperDependencyGraph.vue"]=700

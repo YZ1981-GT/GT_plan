@@ -22,6 +22,7 @@ from __future__ import annotations
 import uuid
 from datetime import date, datetime, timedelta
 from decimal import Decimal
+from unittest.mock import AsyncMock, patch
 
 import pytest
 import pytest_asyncio
@@ -348,11 +349,33 @@ async def test_going_concern_reuses_existing_model(db_session):
     assert result["data"]["current_evaluation"]["conclusion"] == "no_material_uncertainty"
     assert len(result["data"]["indicators"]) == 2
     assert result["data"]["prior_evaluations"] == []
+    ref = result["data"]["a15_1_reference"]
+    assert ref["source_wp"] == ["A15-1"]
+    assert ref["ready"] is False
 
 
-# ---------------------------------------------------------------------------
-# 测试 5：审计意见 Tab
-# ---------------------------------------------------------------------------
+@pytest.mark.asyncio
+async def test_going_concern_a15_1_reference_ready(db_session):
+    """A15-1 摘要 ready 时 EQCR Tab 携带只读引用。"""
+    proj = await _make_project(db_session)
+    mock_summary = {
+        "ready": True,
+        "key": "going_concern",
+        "source_wp": ["A15-1"],
+        "summary_text": "A15-1 持续经营调查：已填写 1 项\n调查结论：Y",
+        "conclusion": "Y",
+    }
+    with patch(
+        "app.services.workpaper_summaries_service.get_workpaper_summary",
+        new_callable=AsyncMock,
+        return_value=mock_summary,
+    ):
+        svc = EqcrService(db_session)
+        result = await svc.get_going_concern(proj.id)
+    ref = result["data"]["a15_1_reference"]
+    assert ref["ready"] is True
+    assert ref["conclusion"] == "Y"
+    assert "A15-1" in ref["summary_text"]
 
 
 @pytest.mark.asyncio

@@ -1,0 +1,54 @@
+# L0.yaml
+# L0 债务循环函证 — render schema
+# 复用D0共享函证组件 + 新建L0-5替代程序
+
+wp_code: L0
+template_path: backend/wp_templates/L/L0 债务循环函证.xlsx
+template_version: v2025-R5
+applicable_standards:
+- soe_standalone
+- listed_standalone
+- soe_consolidated
+- listed_consolidated
+
+sheets:
+  底稿目录:
+    component_type: b-index
+    class_code: B-底稿目录
+
+  # 注意：源模板tab名误写为"函证程序表F0A"，以wp_code=L0A为准
+  函证程序表L0A:
+    component_type: a-program-console
+    class_code: A-程序表
+
+  函证结果汇总表L0-1:
+    component_type: confirmation-summary
+    class_code: D-函证
+
+  核实被函证单位信息L0-2:
+    component_type: confirmation-entity-verify
+    class_code: D-函证
+
+  跟函函证过程控制L0-3:
+    component_type: confirmation-followup
+    class_code: D-函证
+
+  函证差异调节表L0-4:
+    component_type: confirmation-diff-reconcile
+    class_code: D-检查表
+
+  函证差异检查表（示例）:
+    component_type: confirmation-diff-checklist
+    class_code: D-检查表
+
+  长期应付款替代程序L0-5:
+    component_type: confirmation-alternative-l05
+    class_code: A-替代程序
+
+  邮件传真回函可靠性验证L0-6:
+    component_type: confirmation-reliability
+    class_code: D-函证
+
+  函证程序舞弊风险评价表L0-7:
+    component_type: confirmation-fraud-risk
+    class_code: D-函证

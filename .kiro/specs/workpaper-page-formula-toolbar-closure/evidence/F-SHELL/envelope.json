@@ -1,0 +1,83 @@
+{
+  "contractVersion": "1.0",
+  "evidenceId": "evidence-fshell-milestone-1",
+  "runId": "run-fshell-t15-2026-09-09",
+  "subject": {
+    "kind": "contract",
+    "contractId": "F-SHELL"
+  },
+  "contractVersions": {
+    "G-C0": "1.0",
+    "G-ID": "1.0",
+    "G-RAIL": "1.0",
+    "F-SHELL": "1.0"
+  },
+  "inventoryDigest": "cb788c0c01b286f7af07e7c7e680eda4db41c89a16fb9fba27dd6a46a7e9301e",
+  "sourceDigests": {
+    "contractModule": "shell/formula/fShellContract.ts",
+    "mutationReport": null
+  },
+  "operationIds": {
+    "publish": "op-publish-fshell-2026-09-08"
+  },
+  "artifacts": [
+    {
+      "kind": "contract_snapshot",
+      "path": "evidence/F-SHELL/contract.json",
+      "digest": null
+    },
+    {
+      "kind": "mutation_report",
+      "path": "basis/T13-mutation-report.json",
+      "digest": null
+    },
+    {
+      "kind": "directed_suite",
+      "path": "shell/formula/__tests__/fShellConformance.spec.ts",
+      "digest": null
+    },
+    {
+      "kind": "full_inventory",
+      "path": "basis/T15-full-inventory-run.json",
+      "digest": null
+    }
+  ],
+  "verdict": "PASS",
+  "recordedAt": "2026-09-09T00:30:00.000Z",
+  "producerTask": 15,
+  "consumers": [
+    "workpaper-guidance-content-closure:G20",
+    "custom-workpaper-template-ingestion-and-sync-closure:X12",
+    "custom-workpaper-template-ingestion-and-sync-closure:X18"
+  ],
+  "capabilities": [
+    "canonicalLocationState",
+    "workpaperCapabilitySnapshot",
+    "toolbarOutletArbiter",
+    "openFormulaManagerCommand",
+    "formulaProviderRegistry",
+    "userFormulaV2",
+    "aiActionTaxonomy",
+    "humanReviewProvider",
+    "rightRailArbiter",
+    "guidanceRailImport",
+    "shellLayoutTokens",
+    "shellA11y",
+    "shellStructuredError",
+    "dshAssistBridge"
+  ],
+  "nonCapabilities": [
+    "copy_formula_button",
+    "copy_formula_dialog",
+    "copy_location_store",
+    "fixed_rail_css",
+    "legacy_dict_user_formula_api",
+    "audit_warning_then_commit",
+    "nodekey_as_identity"
+  ],
+  "dependsOn": {
+    "G-C0": "1.0",
+    "G-ID": "1.0",
+    "G-RAIL": "1.0"
+  }
+}

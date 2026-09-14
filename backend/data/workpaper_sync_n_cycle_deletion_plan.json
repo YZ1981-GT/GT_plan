@@ -1,0 +1,680 @@
+{
+ "schema_version": "deletion-plan:v1",
+ "task": "Task 56",
+ "spec": ".kiro/specs/workpaper-html-onlyoffice-bidirectional-writeback-closure/",
+ "description": "N 循环 legacy dual-mode 删除计划。**三类删除对象**：① 8 个零生产边 orphan 模块（1,325 行，可在 step 9 前立即删，AC 1.7）；② 2 个 live composable 载体（N1/N2，必须先改线再删）；③ 3 处宿主内联载体块（N3 真实 / N4+N5 空实现，随改线一并移除）。🔴 第三类是 M 那轮**没有**的（M 十条全是 per-entry wrapper 模块）；第一类里有 5 个**不是** dual-mode 模块（V1/V2 业务孪生 + AI 模块 + 类型/常量模块）。",
+ "paradigm_ref": "backend/data/workpaper_sync_migration_paradigm.json",
+ "adjudication_source_of_truth": "backend/data/workpaper_sync_n_cycle_manifest_slice.json",
+ "orphan_source_of_truth": "本文件的 orphan_to_delete.modules（与 slice 的 orphan_dual_mode_inventory 现算等值）",
+ "switch_source_of_truth": "backend/data/workpaper_sync_n_cycle_manifest_slice.json#/mode_switch_resolution",
+ "sibling_slices": [
+  "backend/data/workpaper_sync_abcs_cycle_manifest_slice.json",
+  "backend/data/workpaper_sync_d_cycle_manifest_slice.json",
+  "backend/data/workpaper_sync_e_cycle_manifest_slice.json",
+  "backend/data/workpaper_sync_f_cycle_manifest_slice.json",
+  "backend/data/workpaper_sync_g_cycle_manifest_slice.json",
+  "backend/data/workpaper_sync_h_cycle_manifest_slice.json",
+  "backend/data/workpaper_sync_i_cycle_manifest_slice.json",
+  "backend/data/workpaper_sync_j_cycle_manifest_slice.json",
+  "backend/data/workpaper_sync_k_cycle_manifest_slice.json",
+  "backend/data/workpaper_sync_l_cycle_manifest_slice.json",
+  "backend/data/workpaper_sync_m_cycle_manifest_slice.json"
+ ],
+ "deletion_execution_owner": "Task 66 / Task 72（全局 legacy 删除两阶段门）",
+ "pilot_already_migrated": null,
+ "pilot_already_migrated_note": "N 循环没有 pilot：逐文件读 `backend/data/workpaper_sync_contracts/*.json` 的 `review.entry_id`，四条生产契约分别属 B60/D2/G7/H1，无一条属 N ⇒ 本计划无 pilot 分支。",
+ "why_this_plan_has_three_deletion_object_classes": {
+  "statement": "三类：orphan 模块（立即删）/ live composable（先改线再删）/ 宿主内联块（随改线删）",
+  "why": "删除时机不同：orphan 不可达 ⇒ 删了没人受影响；live 载体是宿主 mode 状态的唯一来源 ⇒ 先删会让模板引用未定义变量；内联块不是独立文件 ⇒ 不能「删文件」只能「改宿主」。",
+  "why_there_is_a_host_inlined_class_unlike_m": "🔴 M 十条 entry 全是 `per_entry_wrapper_over_shared_base`（载体都是独立模块），所以 M 的计划只有两类。N 有 3 条 entry（N3/N4/N5）的载体写在宿主里，照抄 M 的两类会漏掉这 3 处 —— 而漏掉它们的后果是「删完 orphan 后宿主行为一点不变」，看起来像删干净了。",
+  "why_two_of_the_inlined_ones_are_inert": "N4/N5 的内联载体 `onModeChange: () => {}` 是空实现（BP-5）⇒ 它们门控的 OO 挂载点是结构性死代码。但**不能因此把 OO 入口删掉**：AC 12.9 的判据是「无 OO 业务价值」，而 N4/N5 各有 2/3 张 sheet 只有 OO 承载。该做的是把空实现换成真载体。",
+  "why_orphans_are_not_all_dual_mode": "🔴 8 个 orphan 里只有 3 个是 dual-mode 孪生；另 5 个是 V1/V2 业务孪生（`useN4AdjudicationV2.ts` / `useN4DetailV2.ts`）、一个 AI 模块、两个类型/常量模块。只扫 `use N*DualMode.ts` 会把 orphan 数报成 3 而真值是 8（1,325 行）。",
+  "why_step_5_applies_only_to_orphans": "范式 step 5（统一 mode 值）只对 orphan 有意义：3 个 orphan 孪生用 `'html' | 'onlyoffice'`，而 live 的 N1 用三值 `'structured' | 'matrix' | 'onlyoffice'` ⇒ N1 改线时 `matrix` 这一态必须在 bridge 侧有对应（不能简单映射成两值）。",
+  "verification_recipe": "① 三类的文件/宿主集合两两不相交，且并集覆盖「N 域全部 dual-mode 载体」；② orphan 类的每个文件现算生产边 == 0；③ live 类的每个文件现算生产边 == 声明值（两侧都验）；④ 内联类的每个宿主现算 `const dualMode = {` 或 `const renderMode = ref(` 命中非空；⑤ 删除路径与其余十份 slice 的删除路径不相交。"
+ },
+ "shared_base_preserved": {
+  "file": "audit-platform/frontend/src/components/workpaper/composables/useWorkpaperEntryDualMode.ts",
+  "lines": 65,
+  "reason": "被非 N 生产边使用，`shared_base_preserved` 约束不删。",
+  "statement_position_consumers": 26,
+  "statement_position_test_consumers": 1,
+  "n_cycle_consumers": 1,
+  "non_n_consumers": 25,
+  "remaining_after_this_plan": 25,
+  "remaining_after_this_plan_recipe": "26 生产边 − N 域 1 条（useN2DualMode.ts#L2）= 25。🔴 不是 0 —— 判据不得写成「删完剩 0」。",
+  "verification_recipe": "窄口径 statement 边（`from '…'` 可独占一行；排除双引号字符串内匹配；路径解析而非 stem 相等），现算生产/测试两栏。",
+  "persists_mode_to_localstorage": false,
+  "calls_legacy_health_endpoint": true,
+  "why_health_endpoint_stays": "共享基类不属本计划删除范围；它的 legacy 端点调用由平台级改线任务处理。"
+ },
+ "orphan_to_delete": {
+  "why_this_key_exists": "AC 1.7：不可达旧桩 SHALL 删除，不得以豁免或 DEPRECATED 注释长期保留。",
+  "in_scope_of_this_deletion_plan": true,
+  "ac_reference": "1.7",
+  "can_delete_before_step_9": true,
+  "can_delete_before_step_9_why": "生产边 0，删了没有消费方受影响。",
+  "dual_mode_modules": [
+   {
+    "file": "audit-platform/frontend/src/components/workpaper/composables/useN3DualMode.ts",
+    "lines": 184,
+    "class": "orphan_dual_mode",
+    "production_consumers": 0,
+    "localStorage_key": "n3-dual-mode",
+    "storage_key_is_wp_scoped": false,
+    "calls_legacy_health_endpoint": true,
+    "live_counterpart": "宿主内联（GtN3DeferredTaxLiabilities.vue#L168）",
+    "delete_before_step_9": true
+   },
+   {
+    "file": "audit-platform/frontend/src/components/workpaper/composables/useN4DualMode.ts",
+    "lines": 184,
+    "class": "orphan_dual_mode",
+    "production_consumers": 0,
+    "localStorage_key": "n4-dual-mode",
+    "storage_key_is_wp_scoped": false,
+    "calls_legacy_health_endpoint": true,
+    "live_counterpart": "宿主内联且 inert（GtN4TaxesAndSurcharges.vue#L196）",
+    "delete_before_step_9": true
+   },
+   {
+    "file": "audit-platform/frontend/src/components/workpaper/composables/useN5DualMode.ts",
+    "lines": 184,
+    "class": "orphan_dual_mode",
+    "production_consumers": 0,
+    "localStorage_key": "n5-dual-mode",
+    "storage_key_is_wp_scoped": false,
+    "calls_legacy_health_endpoint": true,
+    "live_counterpart": "宿主内联且 inert（GtN5IncomeTaxExpense.vue#L278）",
+    "delete_before_step_9": true
+   }
+  ],
+  "non_dual_mode_modules": [
+   {
+    "file": "audit-platform/frontend/src/components/workpaper/composables/useN4AdjudicationV2.ts",
+    "lines": 288,
+    "class": "orphan_v1_v2_twin",
+    "production_consumers": 0,
+    "live_twin": "audit-platform/frontend/src/components/workpaper/composables/useN4Adjudication.ts",
+    "fabricated_key": "N4-1-rows-v2",
+    "fabricated_key_source_ref": "audit-platform/frontend/src/components/workpaper/composables/useN4AdjudicationV2.ts#L66",
+    "delete_before_step_9": true
+   },
+   {
+    "file": "audit-platform/frontend/src/components/workpaper/composables/useN4DetailV2.ts",
+    "lines": 281,
+    "class": "orphan_v1_v2_twin",
+    "production_consumers": 0,
+    "live_twin": "audit-platform/frontend/src/components/workpaper/composables/useN4Detail.ts",
+    "fabricated_key": null,
+    "fabricated_key_source_ref": null,
+    "delete_before_step_9": true
+   },
+   {
+    "file": "audit-platform/frontend/src/components/workpaper/composables/useN5AiAssist.ts",
+    "lines": 85,
+    "class": "orphan_orphan_feature_module",
+    "production_consumers": 0,
+    "live_twin": null,
+    "fabricated_key": null,
+    "fabricated_key_source_ref": null,
+    "delete_before_step_9": true
+   },
+   {
+    "file": "audit-platform/frontend/src/components/workpaper/composables/n1DisclosureSegmentTypes.ts",
+    "lines": 20,
+    "class": "orphan_orphan_type_module",
+    "production_consumers": 0,
+    "live_twin": null,
+    "fabricated_key": null,
+    "fabricated_key_source_ref": null,
+    "delete_before_step_9": true
+   },
+   {
+    "file": "audit-platform/frontend/src/components/workpaper/composables/n2VatSourceConstants.ts",
+    "lines": 99,
+    "class": "orphan_orphan_constant_module",
+    "production_consumers": 0,
+    "live_twin": null,
+    "fabricated_key": null,
+    "fabricated_key_source_ref": null,
+    "delete_before_step_9": true
+   }
+  ],
+  "counters": {
+   "modules_to_delete": 8,
+   "dual_mode_modules_to_delete": 3,
+   "non_dual_mode_modules_to_delete": 5,
+   "total_lines": 1325,
+   "dual_mode_lines": 552,
+   "non_dual_mode_lines": 773,
+   "v1_v2_twins_among_them": 2,
+   "modules_with_fabricated_key_shape": 1,
+   "modules_calling_legacy_health_endpoint": 3,
+   "modules_with_storage_key": 3,
+   "modules_with_wp_unscoped_storage_key": 3,
+   "counting_recipe": "对 `composables/` 下全部 `^(useN[1-5]|n[1-5])` 模块现算 statement 生产边，== 0 的集合与本清单做**有序等值 + 无重复**双断言；行数逐文件现算 `len(splitlines())`。"
+  }
+ },
+ "live_dual_mode_to_rewire_then_delete": {
+  "why_this_key_exists": "live 载体删除时机受 step 9 约束。",
+  "in_scope_of_this_deletion_plan": true,
+  "can_delete_before_step_9": false,
+  "can_delete_before_step_9_why": "它们是宿主 mode 状态的唯一来源；先删会让 `<el-segmented>` 与 mode 门控的 OO 挂载点引用未定义变量（Volar 未必报，运行期整页白屏）。",
+  "modules": [
+   {
+    "file": "audit-platform/frontend/src/components/workpaper/composables/useN1DualMode.ts",
+    "lines": 257,
+    "class": "live_dual_mode",
+    "production_consumers": 5,
+    "consumer_sites": [
+     "audit-platform/frontend/src/components/workpaper/GtN1DeferredTaxAssets.vue#L158",
+     "audit-platform/frontend/src/components/workpaper/n1/calc/N1TabCalcTable.vue#L511",
+     "audit-platform/frontend/src/components/workpaper/n1/core/N1TabAdjudication.vue#L435",
+     "audit-platform/frontend/src/components/workpaper/n1/core/N1TabAdjustment.vue#L311",
+     "audit-platform/frontend/src/components/workpaper/n1/core/N1TabDetail.vue#L348"
+    ],
+    "localStorage_key": "n1-dual-mode",
+    "delete_before_step_9": false
+   },
+   {
+    "file": "audit-platform/frontend/src/components/workpaper/composables/useN2DualMode.ts",
+    "lines": 17,
+    "class": "live_dual_mode",
+    "production_consumers": 1,
+    "consumer_sites": [
+     "audit-platform/frontend/src/components/workpaper/GtN2TaxesPayable.vue#L228"
+    ],
+    "localStorage_key": null,
+    "delete_before_step_9": false
+   }
+  ],
+  "counters": {
+   "modules_to_delete": 2,
+   "total_lines": 274,
+   "modules_consumed_by_host_only": 1,
+   "modules_consumed_by_host_and_child_tabs": 1,
+   "modules_calling_legacy_health_endpoint_directly": 1,
+   "modules_reaching_legacy_health_endpoint_via_shared_base": 1,
+   "modules_with_storage_key": 1,
+   "modules_with_three_mode_values": 1,
+   "counting_recipe": "`useN1DualMode.ts` 5 条边（宿主 1 + 4 个 n1 子 Tab）、`useN2DualMode.ts` 1 条边（宿主）；两者行数 257 + 17 = 274。🔴 N1 被 4 个子 Tab 直接消费 —— M 那轮的 live 载体全是「只被宿主消费」，照抄 `modules_consumed_by_child_tab == 0` 会假红。"
+  }
+ },
+ "host_inlined_carriers_to_remove": {
+  "why_this_key_exists": "🔴 M 那轮**没有**这一类。N 有 3 处宿主内联载体，其中 2 处是空实现（BP-5）。它们不是独立文件 ⇒ 不能「删文件」，只能在改线时改宿主。",
+  "in_scope_of_this_deletion_plan": true,
+  "can_delete_before_step_9": false,
+  "can_delete_before_step_9_why": "同 live 载体：模板还在引用这些变量。",
+  "hosts": [
+   {
+    "host": "audit-platform/frontend/src/components/workpaper/GtN3DeferredTaxLiabilities.vue",
+    "class": "host_inline_real",
+    "block_source_ref": "audit-platform/frontend/src/components/workpaper/GtN3DeferredTaxLiabilities.vue#L168",
+    "extra_legacy_endpoint_call": "audit-platform/frontend/src/components/workpaper/GtN3DeferredTaxLiabilities.vue#L180",
+    "delete_before_step_9": false,
+    "note": "宿主内联的 renderMode/ooHealthy/checkOoHealth 三件套 —— 改线时**必须连带删掉 #L180 的**`/api/workpapers/onlyoffice/health` 直调（BP-4），否则删了 composable 也还留着违规调用。"
+   },
+   {
+    "host": "audit-platform/frontend/src/components/workpaper/GtN4TaxesAndSurcharges.vue",
+    "class": "host_inline_inert",
+    "block_source_ref": "audit-platform/frontend/src/components/workpaper/GtN4TaxesAndSurcharges.vue#L196",
+    "extra_legacy_endpoint_call": null,
+    "delete_before_step_9": false,
+    "note": "空实现对象字面量（`onModeChange: () => {}` #L203）+ 其门控的死挂载点（#L17）。🔴 删这个块**必须同时**处理 `<el-segmented>`（#L6）—— 只删对象不删控件会让模板引用未定义变量。"
+   },
+   {
+    "host": "audit-platform/frontend/src/components/workpaper/GtN5IncomeTaxExpense.vue",
+    "class": "host_inline_inert",
+    "block_source_ref": "audit-platform/frontend/src/components/workpaper/GtN5IncomeTaxExpense.vue#L278",
+    "extra_legacy_endpoint_call": null,
+    "delete_before_step_9": false,
+    "note": "与 N4 逐字同形（同一段被复制的内联对象字面量）。"
+   }
+  ],
+  "counters": {
+   "hosts_to_change": 3,
+   "inert_blocks": 2,
+   "real_blocks": 1,
+   "hosts_with_extra_legacy_endpoint_call": 1,
+   "counting_recipe": "逐宿主现算 `const dualMode = {`（N4/N5 各 1）与 `const renderMode = ref(`（N3 1）；`onModeChange:\\s*\\(\\)\\s*=>\\s*\\{\\s*\\}` 命中 2 个宿主；`/api/workpapers/onlyoffice/health` 命中 1 个宿主（N3 #L180）。"
+  }
+ },
+ "defects_to_fix_not_delete": {
+  "why_this_key_exists": "有些登记项不是删除对象而是修复对象；混进删除清单会导致「删了就当修好了」。",
+  "in_scope_of_this_deletion_plan": false,
+  "in_scope_note": "由 Task 66/72 或新立任务承接，不在本删除计划的执行范围。",
+  "items": [
+   {
+    "bp": "BP-8",
+    "what": "3 张动态行表的位置化行身份",
+    "entries": [
+     "xlsx/gt-n1-deferred-tax-assets",
+     "xlsx/gt-n2-taxes-payable",
+     "xlsx/gt-n5-income-tax-expense"
+    ],
+    "fix": "补稳定 row 身份（N1-1 用 category、N2-8/N5-5 补 row id）"
+   },
+   {
+    "bp": "BP-10",
+    "what": "N1/N3 未采用共享 sheet 路由（wp_code 正则前置于披露判定）",
+    "entries": [
+     "xlsx/gt-n1-deferred-tax-assets",
+     "xlsx/gt-n3-deferred-tax-liabilities"
+    ],
+    "fix": "改用 `shared/cycleSheetRouting.ts`"
+   },
+   {
+    "bp": "BP-11",
+    "what": "sheet 名脏字面量 + 跨册码碰撞",
+    "entries": [
+     "xlsx/gt-n1-deferred-tax-assets",
+     "xlsx/gt-n2-taxes-payable",
+     "xlsx/gt-n3-deferred-tax-liabilities",
+     "xlsx/gt-n4-taxes-and-surcharges",
+     "xlsx/gt-n5-income-tax-expense"
+    ],
+    "fix": "OO sheet 名解析改为「册 + 精确 sheet 名」；**不得**通过改权威模板来「修」（AC 12.8 后半句禁止修改模板制造对端）"
+   },
+   {
+    "bp": "BP-7",
+    "what": "AC 1.4 提示组件 0/5 挂载",
+    "entries": [
+     "xlsx/gt-n1-deferred-tax-assets",
+     "xlsx/gt-n2-taxes-payable",
+     "xlsx/gt-n3-deferred-tax-liabilities",
+     "xlsx/gt-n4-taxes-and-surcharges",
+     "xlsx/gt-n5-income-tax-expense"
+    ],
+    "fix": "挂 `GtEntrySyncCapabilityNotice.vue`"
+   }
+  ],
+  "counters": {
+   "items_total": 4,
+   "entries_touched": 5
+  }
+ },
+ "entries": [
+  {
+   "entry_id": "xlsx/gt-n1-deferred-tax-assets",
+   "wp_code_pattern": "N1D",
+   "host_component": "audit-platform/frontend/src/components/workpaper/GtN1DeferredTaxAssets.vue",
+   "capability_adjudication": null,
+   "capability_verdict_stage": "step_4_blocked_by_step_3_result_exists",
+   "capability_target": "bidirectional",
+   "html_counterpart_verdict": "exists",
+   "adjudication_reason": "N1 实测**有** HTML 对端（checklist_responses + `N1-{sheet}-{field}` item_id 命名空间 + per-entry 持久化 composable `useN1FormData.ts`，GET/PUT 路由在后端真实存在）⇒ AC 12.8 禁止 single_onlyoffice；OO 侧打开的是真实业务工作簿 `N1 递延所得税资产.xlsx`（10 张 sheet、593 个公式格，非空白模板）⇒ AC 12.9 的 single_html 不适用；宿主经 `audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts` 的模块边可达 ⇒ 非 unreachable；AC 12.1 的六件前置（authority model / per-entry contract / non-null bundle / instrumentation candidate / published representation / 逐 scenario evidence）一件未交付 ⇒ SR-6 禁止 bidirectional。四个终态同时被排除 ⇒ 待裁决态。",
+   "html_counterpart_source_refs": [
+    "audit-platform/frontend/src/components/workpaper/composables/useN1FormData.ts#L61",
+    "audit-platform/frontend/src/components/workpaper/composables/useN1FormData.ts#L204",
+    "audit-platform/frontend/src/components/workpaper/composables/useN1FormData.ts#L208",
+    "audit-platform/frontend/src/components/workpaper/composables/useN1FormData.ts#L290",
+    "backend/app/routers/checklist_responses.py#L84",
+    "backend/app/routers/checklist_responses.py#L132"
+   ],
+   "dual_mode_carrier_kind": "per_entry_composable_three_modes",
+   "switch_verdict": "redeemable",
+   "orphan_files_to_delete_now": [
+    "audit-platform/frontend/src/components/workpaper/composables/n1DisclosureSegmentTypes.ts"
+   ],
+   "live_composables_to_rewire_then_delete": [
+    "audit-platform/frontend/src/components/workpaper/composables/useN1DualMode.ts"
+   ],
+   "live_composables_note": "🔴 live 载体**不能在 step 9 之前删**：删了宿主就没有 mode 状态，`<el-segmented>` 与 mode 门控的 OO 挂载点会引用未定义变量（编译期未必报，运行期整页白屏）。必须先改线到 sync bridge，再删。",
+   "host_inlined_block_to_remove": null,
+   "host_inlined_block_note": "本 entry 的载体是独立模块，不在宿主里内联。",
+   "inert_switch_block_to_remove": null,
+   "inert_switch_block_note": "本 entry 的开关可兑现（切过去真会渲染 OO 编辑器），不属 inert 类。",
+   "legacy_endpoints_to_remove": [
+    "audit-platform/frontend/src/components/workpaper/composables/useN1DualMode.ts#L50",
+    "audit-platform/frontend/src/components/workpaper/composables/useN1DualMode.ts#L151"
+   ],
+   "localStorage_prefix": "n1-dual-mode",
+   "localStorage_prefix_note": "🔴 N1 是本 slice **唯一**在 live 路径上落 localStorage 的 entry（`n1-dual-mode:${wpId}`，按 wpId 分隔）；其余四条 live 路径不落盘（N2 走共享基类的内存 ref、N3/N4/N5 是宿主内联 ref）。M 那轮 live 路径 localStorage 键数是 0 ⇒ 判据不得照抄。",
+   "orphan_twin_localStorage_literal": null,
+   "action": "rewire_host_to_bridge_then_delete_carrier",
+   "action_detail": "① 删 1 个 orphan 文件（可立即执行，AC 1.7）；② 宿主改线到 sync bridge（step 9），同时移除对 live composable 的 import；③ 挂上 AC 1.4 的提示组件（BP-7）。",
+   "must_fix_before_wiring": [
+    "BP-1",
+    "BP-2",
+    "BP-3",
+    "BP-6",
+    "BP-7",
+    "BP-8",
+    "BP-9",
+    "BP-10",
+    "BP-11"
+   ],
+   "must_not_wire_to": [
+    "audit-platform/frontend/src/components/workpaper/composables/n1DisclosureSegmentTypes.ts"
+   ],
+   "must_not_wire_to_why": "🔴 这些文件生产边为 0（不可达）。接 adapter 时接到它们上面，宿主行为一点不变、而契约字段会按一套从未存在过的键形态生成，常规守卫全绿。",
+   "extra_ui_action_required": "AC 1.4：挂 `GtEntrySyncCapabilityNotice.vue`（常显摘要 + tooltip 细节；只放 el-tooltip 不算满足）。AC 1.5 **不适用**（本 entry 未被裁为 single_*）。",
+   "extra_defect_actions": [
+    "BP-8：审定表持久化键从 `N1-1-adj-${index}` 改为 `N1-1-adj-${category}`。",
+    "BP-10：改用共享 sheet 路由 `shared/cycleSheetRouting.ts`（披露判定必须前置）。"
+   ]
+  },
+  {
+   "entry_id": "xlsx/gt-n2-taxes-payable",
+   "wp_code_pattern": "N2T",
+   "host_component": "audit-platform/frontend/src/components/workpaper/GtN2TaxesPayable.vue",
+   "capability_adjudication": null,
+   "capability_verdict_stage": "step_4_blocked_by_step_3_result_exists",
+   "capability_target": "bidirectional",
+   "html_counterpart_verdict": "exists",
+   "adjudication_reason": "N2 实测**有** HTML 对端（checklist_responses + `N2-{sheet}-{field}` item_id 命名空间 + per-entry 持久化 composable `useN2FormData.ts`，GET/PUT 路由在后端真实存在）⇒ AC 12.8 禁止 single_onlyoffice；OO 侧打开的是真实业务工作簿 `N2 应交税费.xlsx`（18 张 sheet、710 个公式格，非空白模板）⇒ AC 12.9 的 single_html 不适用；宿主经 `audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts` 的模块边可达 ⇒ 非 unreachable；AC 12.1 的六件前置（authority model / per-entry contract / non-null bundle / instrumentation candidate / published representation / 逐 scenario evidence）一件未交付 ⇒ SR-6 禁止 bidirectional。四个终态同时被排除 ⇒ 待裁决态。",
+   "html_counterpart_source_refs": [
+    "audit-platform/frontend/src/components/workpaper/composables/useN2FormData.ts#L43",
+    "audit-platform/frontend/src/components/workpaper/composables/useN2FormData.ts#L85",
+    "audit-platform/frontend/src/components/workpaper/composables/useN2FormData.ts#L89",
+    "audit-platform/frontend/src/components/workpaper/composables/useN2FormData.ts#L120",
+    "backend/app/routers/checklist_responses.py#L84",
+    "backend/app/routers/checklist_responses.py#L132"
+   ],
+   "dual_mode_carrier_kind": "per_entry_wrapper_over_shared_base",
+   "switch_verdict": "redeemable",
+   "orphan_files_to_delete_now": [
+    "audit-platform/frontend/src/components/workpaper/composables/n2VatSourceConstants.ts"
+   ],
+   "live_composables_to_rewire_then_delete": [
+    "audit-platform/frontend/src/components/workpaper/composables/useN2DualMode.ts"
+   ],
+   "live_composables_note": "🔴 live 载体**不能在 step 9 之前删**：删了宿主就没有 mode 状态，`<el-segmented>` 与 mode 门控的 OO 挂载点会引用未定义变量（编译期未必报，运行期整页白屏）。必须先改线到 sync bridge，再删。",
+   "host_inlined_block_to_remove": null,
+   "host_inlined_block_note": "本 entry 的载体是独立模块，不在宿主里内联。",
+   "inert_switch_block_to_remove": null,
+   "inert_switch_block_note": "本 entry 的开关可兑现（切过去真会渲染 OO 编辑器），不属 inert 类。",
+   "legacy_endpoints_to_remove": [],
+   "localStorage_prefix": null,
+   "localStorage_prefix_note": "live 路径不落 localStorage；只有 orphan 孪生自带全局键（未按 wpId 分隔，见 orphan 清单）。",
+   "orphan_twin_localStorage_literal": null,
+   "action": "rewire_host_to_bridge_then_delete_carrier",
+   "action_detail": "① 删 1 个 orphan 文件（可立即执行，AC 1.7）；② 宿主改线到 sync bridge（step 9），同时移除对 live composable 的 import；③ 挂上 AC 1.4 的提示组件（BP-7）。",
+   "must_fix_before_wiring": [
+    "BP-1",
+    "BP-2",
+    "BP-3",
+    "BP-6",
+    "BP-7",
+    "BP-8",
+    "BP-9",
+    "BP-11"
+   ],
+   "must_not_wire_to": [
+    "audit-platform/frontend/src/components/workpaper/composables/n2VatSourceConstants.ts"
+   ],
+   "must_not_wire_to_why": "🔴 这些文件生产边为 0（不可达）。接 adapter 时接到它们上面，宿主行为一点不变、而契约字段会按一套从未存在过的键形态生成，常规守卫全绿。",
+   "extra_ui_action_required": "AC 1.4：挂 `GtEntrySyncCapabilityNotice.vue`（常显摘要 + tooltip 细节；只放 el-tooltip 不算满足）。AC 1.5 **不适用**（本 entry 未被裁为 single_*）。",
+   "extra_defect_actions": [
+    "BP-8：N2-8 手工行补稳定 id（现状按数组下标写 `manualRows`）；顺带删掉无消费方的 `key: \\`manual-${idx}\\``。"
+   ]
+  },
+  {
+   "entry_id": "xlsx/gt-n3-deferred-tax-liabilities",
+   "wp_code_pattern": "N3D",
+   "host_component": "audit-platform/frontend/src/components/workpaper/GtN3DeferredTaxLiabilities.vue",
+   "capability_adjudication": null,
+   "capability_verdict_stage": "step_4_blocked_by_step_3_result_exists",
+   "capability_target": "bidirectional",
+   "html_counterpart_verdict": "exists",
+   "adjudication_reason": "N3 实测**有** HTML 对端（checklist_responses + `N3-{sheet}-{field}` item_id 命名空间 + per-entry 持久化 composable `useN3FormData.ts`，GET/PUT 路由在后端真实存在）⇒ AC 12.8 禁止 single_onlyoffice；OO 侧打开的是真实业务工作簿 `N3 递延所得税负债.xlsx`（6 张 sheet、162 个公式格，非空白模板）⇒ AC 12.9 的 single_html 不适用；宿主经 `audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts` 的模块边可达 ⇒ 非 unreachable；AC 12.1 的六件前置（authority model / per-entry contract / non-null bundle / instrumentation candidate / published representation / 逐 scenario evidence）一件未交付 ⇒ SR-6 禁止 bidirectional。四个终态同时被排除 ⇒ 待裁决态。",
+   "html_counterpart_source_refs": [
+    "audit-platform/frontend/src/components/workpaper/composables/useN3FormData.ts#L43",
+    "audit-platform/frontend/src/components/workpaper/composables/useN3FormData.ts#L100",
+    "audit-platform/frontend/src/components/workpaper/composables/useN3FormData.ts#L104",
+    "audit-platform/frontend/src/components/workpaper/composables/useN3FormData.ts#L135",
+    "backend/app/routers/checklist_responses.py#L84",
+    "backend/app/routers/checklist_responses.py#L132"
+   ],
+   "dual_mode_carrier_kind": "host_inline_real",
+   "switch_verdict": "redeemable",
+   "orphan_files_to_delete_now": [
+    "audit-platform/frontend/src/components/workpaper/composables/useN3DualMode.ts"
+   ],
+   "live_composables_to_rewire_then_delete": [],
+   "live_composables_note": "本 entry 没有 live composable 载体 —— 载体在宿主内联（见 host_inlined_block_to_remove）。",
+   "host_inlined_block_to_remove": "audit-platform/frontend/src/components/workpaper/GtN3DeferredTaxLiabilities.vue#L168",
+   "host_inlined_block_note": "宿主内联载体，随改线一并移除；不是独立文件所以不进 orphan 清单。",
+   "inert_switch_block_to_remove": null,
+   "inert_switch_block_note": "本 entry 的开关可兑现（切过去真会渲染 OO 编辑器），不属 inert 类。",
+   "legacy_endpoints_to_remove": [
+    "audit-platform/frontend/src/components/workpaper/GtN3DeferredTaxLiabilities.vue#L180"
+   ],
+   "localStorage_prefix": null,
+   "localStorage_prefix_note": "live 路径不落 localStorage；只有 orphan 孪生自带全局键（未按 wpId 分隔，见 orphan 清单）。",
+   "orphan_twin_localStorage_literal": "n3-dual-mode",
+   "action": "rewire_host_to_bridge_then_delete_carrier",
+   "action_detail": "① 删 1 个 orphan 文件（可立即执行，AC 1.7）；② 宿主改线到 sync bridge（step 9），同时移除内联载体块；③ 挂上 AC 1.4 的提示组件（BP-7）。",
+   "must_fix_before_wiring": [
+    "BP-1",
+    "BP-2",
+    "BP-3",
+    "BP-4",
+    "BP-6",
+    "BP-7",
+    "BP-9",
+    "BP-10",
+    "BP-11"
+   ],
+   "must_not_wire_to": [
+    "audit-platform/frontend/src/components/workpaper/composables/useN3DualMode.ts"
+   ],
+   "must_not_wire_to_why": "🔴 这些文件生产边为 0（不可达）。接 adapter 时接到它们上面，宿主行为一点不变、而契约字段会按一套从未存在过的键形态生成，常规守卫全绿。",
+   "extra_ui_action_required": "AC 1.4：挂 `GtEntrySyncCapabilityNotice.vue`（常显摘要 + tooltip 细节；只放 el-tooltip 不算满足）。AC 1.5 **不适用**（本 entry 未被裁为 single_*）。",
+   "extra_defect_actions": [
+    "BP-4：删掉宿主 #L180 的 `/api/workpapers/onlyoffice/health` 直调。",
+    "BP-10：改用共享 sheet 路由 `shared/cycleSheetRouting.ts`（披露判定必须前置）。"
+   ]
+  },
+  {
+   "entry_id": "xlsx/gt-n4-taxes-and-surcharges",
+   "wp_code_pattern": "N4T",
+   "host_component": "audit-platform/frontend/src/components/workpaper/GtN4TaxesAndSurcharges.vue",
+   "capability_adjudication": null,
+   "capability_verdict_stage": "step_4_blocked_by_step_3_result_exists",
+   "capability_target": "bidirectional",
+   "html_counterpart_verdict": "exists",
+   "adjudication_reason": "N4 实测**有** HTML 对端（checklist_responses + `N4-{sheet}-{field}` item_id 命名空间 + per-entry 持久化 composable `useN4FormData.ts`，GET/PUT 路由在后端真实存在）⇒ AC 12.8 禁止 single_onlyoffice；OO 侧打开的是真实业务工作簿 `N4 税金及附加.xlsx`（9 张 sheet、236 个公式格，非空白模板）⇒ AC 12.9 的 single_html 不适用；宿主经 `audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts` 的模块边可达 ⇒ 非 unreachable；AC 12.1 的六件前置（authority model / per-entry contract / non-null bundle / instrumentation candidate / published representation / 逐 scenario evidence）一件未交付 ⇒ SR-6 禁止 bidirectional。四个终态同时被排除 ⇒ 待裁决态。",
+   "html_counterpart_source_refs": [
+    "audit-platform/frontend/src/components/workpaper/composables/useN4FormData.ts#L63",
+    "audit-platform/frontend/src/components/workpaper/composables/useN4FormData.ts#L260",
+    "audit-platform/frontend/src/components/workpaper/composables/useN4FormData.ts#L263",
+    "audit-platform/frontend/src/components/workpaper/composables/useN4FormData.ts#L125",
+    "backend/app/routers/checklist_responses.py#L84",
+    "backend/app/routers/checklist_responses.py#L132"
+   ],
+   "dual_mode_carrier_kind": "host_inline_inert",
+   "switch_verdict": "inert",
+   "orphan_files_to_delete_now": [
+    "audit-platform/frontend/src/components/workpaper/composables/useN4AdjudicationV2.ts",
+    "audit-platform/frontend/src/components/workpaper/composables/useN4DetailV2.ts",
+    "audit-platform/frontend/src/components/workpaper/composables/useN4DualMode.ts"
+   ],
+   "live_composables_to_rewire_then_delete": [],
+   "live_composables_note": "本 entry 没有 live composable 载体 —— 载体在宿主内联（见 host_inlined_block_to_remove）。",
+   "host_inlined_block_to_remove": "audit-platform/frontend/src/components/workpaper/GtN4TaxesAndSurcharges.vue#L196",
+   "host_inlined_block_note": "宿主内联载体，随改线一并移除；不是独立文件所以不进 orphan 清单。",
+   "inert_switch_block_to_remove": "audit-platform/frontend/src/components/workpaper/GtN4TaxesAndSurcharges.vue#L196",
+   "inert_switch_block_note": "🔴 inert：`onModeChange: () => {}` ⇒ mode 门控的 OO 挂载点结构性不可达。改线时这个块必须整体替换（不是删掉切换 UI —— AC 12.9 的 single_html 不成立，OO 侧有真实业务价值）。",
+   "legacy_endpoints_to_remove": [],
+   "localStorage_prefix": null,
+   "localStorage_prefix_note": "live 路径不落 localStorage；只有 orphan 孪生自带全局键（未按 wpId 分隔，见 orphan 清单）。",
+   "orphan_twin_localStorage_literal": "n4-dual-mode",
+   "action": "rewire_host_to_bridge_then_delete_carrier",
+   "action_detail": "① 删 3 个 orphan 文件（可立即执行，AC 1.7）；② 宿主改线到 sync bridge（step 9），同时移除内联载体块；③ 挂上 AC 1.4 的提示组件（BP-7）。",
+   "must_fix_before_wiring": [
+    "BP-1",
+    "BP-2",
+    "BP-3",
+    "BP-5",
+    "BP-6",
+    "BP-7",
+    "BP-9",
+    "BP-11"
+   ],
+   "must_not_wire_to": [
+    "audit-platform/frontend/src/components/workpaper/composables/useN4AdjudicationV2.ts",
+    "audit-platform/frontend/src/components/workpaper/composables/useN4DetailV2.ts",
+    "audit-platform/frontend/src/components/workpaper/composables/useN4DualMode.ts"
+   ],
+   "must_not_wire_to_why": "🔴 这些文件生产边为 0（不可达）。接 adapter 时接到它们上面，宿主行为一点不变、而契约字段会按一套从未存在过的键形态生成，常规守卫全绿。N4 尤其危险：`useN4AdjudicationV2.ts` 声明的 `N4-1-rows-v2` 生产从未写过（生产写 V1 的 `N4-1-rows`）。",
+   "extra_ui_action_required": "AC 1.4：挂 `GtEntrySyncCapabilityNotice.vue`（常显摘要 + tooltip 细节；只放 el-tooltip 不算满足）。AC 1.5 **不适用**（本 entry 未被裁为 single_*）。",
+   "extra_defect_actions": [
+    "BP-5：把内联空实现换成真载体（orphan 孪生已有完整实现，可复用其逻辑）。"
+   ]
+  },
+  {
+   "entry_id": "xlsx/gt-n5-income-tax-expense",
+   "wp_code_pattern": "N5I",
+   "host_component": "audit-platform/frontend/src/components/workpaper/GtN5IncomeTaxExpense.vue",
+   "capability_adjudication": null,
+   "capability_verdict_stage": "step_4_blocked_by_step_3_result_exists",
+   "capability_target": "bidirectional",
+   "html_counterpart_verdict": "exists",
+   "adjudication_reason": "N5 实测**有** HTML 对端（checklist_responses + `N5-{sheet}-{field}` item_id 命名空间 + per-entry 持久化 composable `useN5FormData.ts`，GET/PUT 路由在后端真实存在）⇒ AC 12.8 禁止 single_onlyoffice；OO 侧打开的是真实业务工作簿 `N5 所得税费用.xlsx`（16 张 sheet、484 个公式格，非空白模板）⇒ AC 12.9 的 single_html 不适用；宿主经 `audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts` 的模块边可达 ⇒ 非 unreachable；AC 12.1 的六件前置（authority model / per-entry contract / non-null bundle / instrumentation candidate / published representation / 逐 scenario evidence）一件未交付 ⇒ SR-6 禁止 bidirectional。四个终态同时被排除 ⇒ 待裁决态。",
+   "html_counterpart_source_refs": [
+    "audit-platform/frontend/src/components/workpaper/composables/useN5FormData.ts#L60",
+    "audit-platform/frontend/src/components/workpaper/composables/useN5FormData.ts#L105",
+    "audit-platform/frontend/src/components/workpaper/composables/useN5FormData.ts#L109",
+    "audit-platform/frontend/src/components/workpaper/composables/useN5FormData.ts#L180",
+    "backend/app/routers/checklist_responses.py#L84",
+    "backend/app/routers/checklist_responses.py#L132"
+   ],
+   "dual_mode_carrier_kind": "host_inline_inert",
+   "switch_verdict": "inert",
+   "orphan_files_to_delete_now": [
+    "audit-platform/frontend/src/components/workpaper/composables/useN5AiAssist.ts",
+    "audit-platform/frontend/src/components/workpaper/composables/useN5DualMode.ts"
+   ],
+   "live_composables_to_rewire_then_delete": [],
+   "live_composables_note": "本 entry 没有 live composable 载体 —— 载体在宿主内联（见 host_inlined_block_to_remove）。",
+   "host_inlined_block_to_remove": "audit-platform/frontend/src/components/workpaper/GtN5IncomeTaxExpense.vue#L278",
+   "host_inlined_block_note": "宿主内联载体，随改线一并移除；不是独立文件所以不进 orphan 清单。",
+   "inert_switch_block_to_remove": "audit-platform/frontend/src/components/workpaper/GtN5IncomeTaxExpense.vue#L278",
+   "inert_switch_block_note": "🔴 inert：`onModeChange: () => {}` ⇒ mode 门控的 OO 挂载点结构性不可达。改线时这个块必须整体替换（不是删掉切换 UI —— AC 12.9 的 single_html 不成立，OO 侧有真实业务价值）。",
+   "legacy_endpoints_to_remove": [],
+   "localStorage_prefix": null,
+   "localStorage_prefix_note": "live 路径不落 localStorage；只有 orphan 孪生自带全局键（未按 wpId 分隔，见 orphan 清单）。",
+   "orphan_twin_localStorage_literal": "n5-dual-mode",
+   "action": "rewire_host_to_bridge_then_delete_carrier",
+   "action_detail": "① 删 2 个 orphan 文件（可立即执行，AC 1.7）；② 宿主改线到 sync bridge（step 9），同时移除内联载体块；③ 挂上 AC 1.4 的提示组件（BP-7）。",
+   "must_fix_before_wiring": [
+    "BP-1",
+    "BP-2",
+    "BP-3",
+    "BP-5",
+    "BP-6",
+    "BP-7",
+    "BP-8",
+    "BP-9",
+    "BP-11",
+    "BP-12"
+   ],
+   "must_not_wire_to": [
+    "audit-platform/frontend/src/components/workpaper/composables/useN5AiAssist.ts",
+    "audit-platform/frontend/src/components/workpaper/composables/useN5DualMode.ts"
+   ],
+   "must_not_wire_to_why": "🔴 这些文件生产边为 0（不可达）。接 adapter 时接到它们上面，宿主行为一点不变、而契约字段会按一套从未存在过的键形态生成，常规守卫全绿。",
+   "extra_ui_action_required": "AC 1.4：挂 `GtEntrySyncCapabilityNotice.vue`（常显摘要 + tooltip 细节；只放 el-tooltip 不算满足）。AC 1.5 **不适用**（本 entry 未被裁为 single_*）。",
+   "extra_defect_actions": [
+    "BP-5：把内联空实现换成真载体（orphan 孪生已有完整实现，可复用其逻辑）。",
+    "BP-8：N5-5/N5-8/N5-6-1 三张整表 JSON 补稳定 row id（现状连兜底 id 都没有）。",
+    "BP-12：把 8 个跨 entry 只读依赖建模进 required scenario set。"
+   ]
+  }
+ ],
+ "excluded_from_plan": [
+  {
+   "what": "共享基类 useWorkpaperEntryDualMode.ts",
+   "reason": "被 25 条非 N 生产边使用，shared_base_preserved 约束不删。",
+   "verified_how": "现算窄口径生产边 26 条，其中 N 路径 1 条 ⇒ 删本计划后剩 25 条（不是 0）。"
+  },
+  {
+   "what": "共享 sheet 路由 shared/cycleSheetRouting.ts",
+   "reason": "跨循环共用纯函数工厂（N2/N4/N5 + 非 N 消费方）。",
+   "verified_how": "现算 statement 消费方；N1/N3 现算 0 条边（这正是 BP-10）。"
+  },
+  {
+   "what": "4 条 parent_duplicate 子入口",
+   "reason": "AC 1.6 复用父 entry 的 adapter；它们没有自己的写路径也没有自己的 dual-mode 载体。",
+   "verified_how": "4 个子组件里 `http.put`/`api.put` 现算 0 命中、`useN\\dDualMode` import 现算命中 4（全指向 N1 的 live 载体）。"
+  },
+  {
+   "what": "四条 pilot（B60/D2/H1/G7）",
+   "reason": "Task 45 已删其 legacy。",
+   "verified_how": "逐文件读契约 `review.entry_id`，无一条属 N。"
+  },
+  {
+   "what": "权威模板本身",
+   "reason": "🔴 AC 12.8 后半句明文禁止「修改模板制造对端」；BP-11 的脏 sheet 名**不得**通过改模板修。",
+   "verified_how": "本计划的删除/修改对象清单里没有任何 `backend/wp_templates/` 路径。"
+  }
+ ],
+ "counters": {
+  "entries": 5,
+  "orphan_to_delete": 8,
+  "orphan_lines_total": 1325,
+  "live_dual_mode_to_delete": 2,
+  "live_dual_mode_lines_total": 274,
+  "host_inlined_carriers_to_remove": 3,
+  "dual_mode_module_files_total": 5,
+  "orphan_barrel_reexports_to_drop": 0,
+  "hosts_with_inlined_second_implementation": 3,
+  "inert_switch_blocks_to_remove": 2,
+  "entries_with_redeemable_switch": 3,
+  "entries_with_inert_switch": 2,
+  "entries_with_no_switch_at_all": 0,
+  "localStorage_prefix_declaration_sites": 4,
+  "entries_with_extra_ui_action_required": 5,
+  "entries_with_must_fix_before_wiring": 5,
+  "entries_with_must_not_wire_to": 5,
+  "entries_without_any_ui_gate_anchor": 0,
+  "shared_base_consumers_before": 26,
+  "shared_base_consumers_after": 25,
+  "legacy_health_endpoint_call_sites_before": 5,
+  "legacy_health_endpoint_call_sites_after": 1,
+  "test_files_requiring_sync_change": 0,
+  "counting_recipe": "🔴 每项都有来源节：`orphan_to_delete` 与 `live_dual_mode_to_rewire_then_delete` 与 `host_inlined_carriers_to_remove` 三节的条数与行数逐节现算；`localStorage_prefix_declaration_sites` = 3 个 orphan 的 STORAGE_KEY + N1 live 的 STORAGE_KEY_PREFIX = 4（M 那轮是 10，全在 orphan 侧）；`legacy_health_endpoint_call_sites_before` = 3 个 orphan + useN1DualMode + N3 宿主 = 5，`after` = 1（共享基类，不在本计划范围）；`entries_without_any_ui_gate_anchor` = 0（5 条宿主都有 `<el-segmented>`，与 M 那轮的 1 条 no_switch 不同）。"
+ },
+ "verification_recipe": "五项现算核验：① 三类删除对象两两不相交且并集覆盖 N 域全部载体；② orphan 生产边全 0；③ live 生产边等于声明值；④ 内联宿主的载体块锚点现读命中；⑤ 删除路径与其余十份 slice 不相交。",
+ "properties_verified": [
+  {
+   "property": 3,
+   "validates_requirement": "1.3",
+   "claim": "negative_direction_full"
+  },
+  {
+   "property": 23,
+   "validates_requirement": "6.4",
+   "claim": "structural_both_sides"
+  },
+  {
+   "property": 69,
+   "validates_requirement": "12.10",
+   "claim": "negative_direction_full"
+  },
+  {
+   "property": 70,
+   "validates_requirement": "12.12",
+   "claim": "full"
+  }
+ ],
+ "requirements_covered": [
+  "1.3",
+  "1.4",
+  "1.5",
+  "1.6",
+  "1.7",
+  "6.4",
+  "6.5",
+  "6.10",
+  "12.1",
+  "12.4",
+  "12.8",
+  "12.9",
+  "12.10",
+  "12.11",
+  "12.12",
+  "14.1"
+ ]
+}

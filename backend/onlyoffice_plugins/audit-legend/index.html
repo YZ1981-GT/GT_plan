@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <title>审计标识</title>
+  <style>
+    body { font-family: "Microsoft YaHei", sans-serif; padding: 12px; margin: 0; }
+    .legend-btn { display: block; width: 100%; padding: 10px; margin: 6px 0; border: 1px solid #ddd; border-radius: 4px; background: #fff; cursor: pointer; font-size: 14px; text-align: left; }
+    .legend-btn:hover { background: #f0f0ff; border-color: #7b61ff; }
+    .legend-btn .symbol { font-size: 18px; margin-right: 8px; }
+  </style>
+</head>
+<body>
+  <button class="legend-btn" onclick="applyLegend('√')"><span class="symbol">√</span>已核对</button>
+  <button class="legend-btn" onclick="applyLegend('ⓒ')"><span class="symbol">ⓒ</span>已计算</button>
+  <button class="legend-btn" onclick="applyLegend('➜')"><span class="symbol">➜</span>索引跳转</button>
+  <script src="scripts/code.js"></script>
+</body>
+</html>

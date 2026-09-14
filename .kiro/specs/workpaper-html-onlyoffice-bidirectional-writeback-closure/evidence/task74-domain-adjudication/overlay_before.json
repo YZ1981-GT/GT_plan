@@ -1,0 +1,246 @@
+{
+  "adjudications": {
+    "app.routers.excel_html::rollback_file_version": {
+      "domain": "rollback",
+      "version_domain_note": "BLOCKED for Task 19, not migrated. This endpoint rolls back storage/projects/{pid}/excel_html/{file_stem}.structure.json and rewrites the derived HTML. It cannot enter the unified protocol as written, for two reasons that are facts about its signature rather than judgements: (1) it has no wp_id at all -- it is keyed by file_stem, so there is no workpaper scope to open a content version against, and no content_revision to advance; (2) its route uses the numeric version as a resource key (POST /versions/{file_stem}/rollback/{version}), which Requirement 10.6 forbids outright. The whole excel_html module is a live parallel authority (its own structure.json, its own version snapshots, its own edit lock, its own xlsx writeback) reachable through router_registry. Resolving it means either binding the store to workpaper identity or deleting the sidecar under Requirement 12.9 -- a product decision with no equivalence evidence yet, which Requirement 12.7's 'equivalent evidence and a rollback point before deletion' explicitly gates. Recorded here so Task 20's gate sees a reason rather than an unexplained red row."
+    },
+    "app.routers.excel_html::upload_and_parse": {
+      "domain": "upload_import",
+      "version_domain_note": "Writes xlsx bytes plus derived structure/HTML under storage/projects/{id}/excel_html with no database write at all. A second content authority with no version domain."
+    },
+    "app.routers.wp_editor_router::_prefill_word_template": {
+      "domain": "dedicated_router",
+      "version_domain_note": "Writes working_paper content and copies a docx artifact while serving the OnlyOffice config request, with no version increment at all, so a prefill mutation is invisible to every version consumer."
+    },
+    "app.routers.wp_editor_router::get_wp_onlyoffice_config": {
+      "domain": "dedicated_router",
+      "version_domain_note": "Config endpoint that reaches a content writer (_prefill_word_template) as a side effect of being asked for an editor config. A read-shaped endpoint mutating content is why config must move behind the launch descriptor."
+    },
+    "app.routers.wp_editor_router::save_univer_data": {
+      "domain": "dedicated_router",
+      "version_domain_note": "Univer save path: delegates the version bump to the save orchestrator, commits on its own session, and copies a workpaper artifact in the same request. Shares the working_paper.file_version counter with html_save without a shared lock ordering."
+    },
+    "app.routers.wp_editor_router::save_univer_data._auto_parse": {
+      "domain": "dedicated_router",
+      "version_domain_note": "Nested background coroutine that opens an independent session and commits parsed_data re-parse results after the request session closed. Not covered by the caller's optimistic lock or version bump."
+    },
+    "app.routers.wp_html_save::save_html_data": {
+      "domain": "html_save",
+      "version_domain_note": "Two version domains for one save: it increments its own parsed_data._version optimistic-lock counter, then delegates a separate working_paper.file_version increment to WorkpaperSaveOrchestrator.after_save, then commits itself. The after_save call is wrapped in a bare except that degrades to logger.warning, so a failed version bump still returns 200 with a committed parsed_data write."
+    },
+    "app.routers.wp_onlyoffice_router::_resolve_wp_file": {
+      "domain": "export_storage_resolver",
+      "version_domain_note": "OnlyOffice-specific resolver that also copies the source artifact into an OnlyOffice cache directory, so resolving for edit has a write side effect and produces a path no export resolver can find."
+    },
+    "app.routers.wp_onlyoffice_router::get_sheet_onlyoffice_config": {
+      "domain": "export_storage_resolver",
+      "version_domain_note": "Config endpoint that resolves through three different resolvers in one request (custom file, OnlyOffice cache, template library) and derives doc_key from file mtime, which is exactly the divergence Requirement 2.7 removes."
+    },
+    "app.routers.wp_onlyoffice_router::get_sheet_wopi_contents": {
+      "domain": "export_storage_resolver",
+      "version_domain_note": "WOPI GetFile for sheet editing resolves through the same three-resolver fan-out as the config endpoint; download and config can disagree on which artifact is authoritative."
+    },
+    "app.routers.wp_onlyoffice_router::get_template_structure": {
+      "domain": "export_storage_resolver",
+      "version_domain_note": "Reads structure straight from the template library rather than from the project artifact, so structure and content can come from different files."
+    },
+    "app.routers.wp_onlyoffice_router::get_whole_excel_grid": {
+      "domain": "export_storage_resolver",
+      "version_domain_note": "Whole-workbook grid read resolves through the OnlyOffice cache resolver with a template-library fallback, a fourth resolution order for the same workpaper."
+    },
+    "app.routers.wp_onlyoffice_router::import_structured_docx": {
+      "domain": "upload_import",
+      "version_domain_note": "Structured docx import writes checklist_responses business content and workpaper artifact bytes, commits itself, and never advances any working_paper version field."
+    },
+    "app.routers.wp_onlyoffice_router::post_sheet_onlyoffice_callback": {
+      "domain": "oo_callback",
+      "version_domain_note": "OnlyOffice callback writes incoming artifact bytes to the resolved target, writes checklist_responses content, delegates a version bump to the orchestrator and commits itself; it resolves the target through two different resolvers and never freezes a client base."
+    },
+    "app.routers.wp_render_strategies._f2_stocktake_plan_sync::_ensure_template": {
+      "domain": "template_provisioning",
+      "version_domain_note": "Regenerates the F2-22 placeholder template on demand and can write into the template library from a request path; template identity is therefore not immutable."
+    },
+    "app.routers.wp_render_strategies._f2_stocktake_plan_sync::_onlyoffice_dir": {
+      "domain": "export_storage_resolver",
+      "version_domain_note": "Private F2-22 path resolver; a divergent authority from resolve_wp_file for the same workpaper."
+    },
+    "app.routers.wp_render_strategies._f2_stocktake_plan_sync::_save_fields": {
+      "domain": "f2_word_sync",
+      "version_domain_note": "Task 19: F2-22 field persistence no longer owns a transaction. The fields upsert and the docx body that produced it are now committed together through AuthoritativeContentWriter.commit_bytes -> ContentMutationService.commit(...) under an approved opaque_single_onlyoffice bundle. The lane follows a manifest fact rather than a preference: workpaper_sync_entry_manifest.json pins the F2 entry (xlsx/gt-f2-stocktake-bundle) at capability=single_onlyoffice, so the OOXML body is the authority (Requirement 2.11) and the projection lane refuses it by construction. The fields JSON in checklist_responses stays a derived view and is never submitted as content. Capability and the second to/from-OO flow are both untouched -- Requirement 12.7's deletion of the half-loop is Task 60. entry_id carries the sheet code so F2-22 and F2-23 cannot overwrite each other's representation generation."
+    },
+    "app.routers.wp_render_strategies._f2_stocktake_plan_sync::f2_st_plan_sync_from_oo": {
+      "domain": "f2_word_sync",
+      "version_domain_note": "F2-22 from-OO endpoint: resolves the OnlyOffice docx cache directory itself, extracts fields and delegates persistence to _save_fields, which as of Task 19 submits both the fields row and the authoritative docx body through the unified commit boundary. What remains here is the resolver fork and the missing callback: it still reads whatever is on disk at request time with no frozen base or request sequence, which is Wave 2 (rooms / durable callback) work, not a version-domain fact. A concurrent save is now translated to 409 by a narrow RevisionConflictError handler placed ahead of the pre-existing broad catch."
+    },
+    "app.routers.wp_render_strategies._f2_stocktake_plan_sync::f2_st_plan_sync_to_oo": {
+      "domain": "f2_word_sync",
+      "version_domain_note": "F2-22 to-OO endpoint: fills the docx cache from structured fields through its own _onlyoffice_dir resolver, producing an artifact no canonical resolver can find."
+    },
+    "app.routers.wp_render_strategies._f2_stocktake_summary_sync::_ensure_template": {
+      "domain": "template_provisioning",
+      "version_domain_note": "Regenerates the F2-23 placeholder template on demand from a request path."
+    },
+    "app.routers.wp_render_strategies._f2_stocktake_summary_sync::_onlyoffice_dir": {
+      "domain": "export_storage_resolver",
+      "version_domain_note": "Private F2-23 path resolver duplicating the F2-22 divergence."
+    },
+    "app.routers.wp_render_strategies._f2_stocktake_summary_sync::_save_fields": {
+      "domain": "f2_word_sync",
+      "version_domain_note": "Task 19: F2-23 field persistence migrated identically to F2-22 (same lane, same manifest-pinned capability=single_onlyoffice, same per-sheet entry_id, same opaque_single_onlyoffice bundle): the fields upsert and the authoritative docx body commit together through the unified entry, and the endpoint no longer owns a db.commit(). Capability and the second flow are preserved for Task 60."
+    },
+    "app.routers.wp_render_strategies._f2_stocktake_summary_sync::f2_st_summary_sync_from_oo": {
+      "domain": "f2_word_sync",
+      "version_domain_note": "F2-23 from-OO endpoint mirroring the F2-22 shape: own docx cache resolver, no callback wait, persistence delegated to _save_fields, which as of Task 19 routes through the unified commit boundary. The resolver fork and the missing frozen base remain Wave 2 work; a concurrent save is translated to 409 ahead of the broad catch."
+    },
+    "app.routers.wp_render_strategies._f2_stocktake_summary_sync::f2_st_summary_sync_to_oo": {
+      "domain": "f2_word_sync",
+      "version_domain_note": "F2-23 to-OO endpoint writing the docx cache through its own resolver."
+    },
+    "app.routers.wp_structure::save_structure": {
+      "domain": "dedicated_router",
+      "version_domain_note": "Increments working_paper.file_version inline instead of via the orchestrator, then flushes and commits itself; no audit log, no event publish, no optimistic lock."
+    },
+    "app.routers.wp_template::_create_one_custom_workpaper": {
+      "domain": "custom",
+      "version_domain_note": "Creates the custom workpaper artifact bytes under an ad-hoc storage path and flushes the row; the artifact path is built inline rather than through the canonical resolver."
+    },
+    "app.services.custom_query.snapshot_writer::SnapshotWriter._write_workpaper_cell": {
+      "domain": "custom",
+      "version_domain_note": "Custom-query snapshot writeback: updates working_paper.parsed_data and delegates the version bump to the save orchestrator, but performs an artifact replace in the same call, so the file and the DB version advance in separate steps."
+    },
+    "app.services.custom_query.snapshot_writer::SnapshotWriter.write_cell": {
+      "domain": "custom",
+      "version_domain_note": "Public entry one hop above _write_workpaper_cell; the version decision belongs to the callee, not this boundary."
+    },
+    "app.services.custom_workpaper_projection::refresh_custom_projection": {
+      "domain": "custom",
+      "version_domain_note": "Refresh entry point one hop above the projection writer; inherits the same missing version increment."
+    },
+    "app.services.custom_workpaper_projection::write_projection_to_parsed_data": {
+      "domain": "custom",
+      "version_domain_note": "Writes the custom xlsx projection into working_paper content with no version increment; the projection and the authoritative xlsx can drift without any version signal."
+    },
+    "app.services.version_trail_service::VersionTrailService.rollback_to_snapshot": {
+      "domain": "history_restore",
+      "version_domain_note": "Task 19: the checklist restore (delete-all + reinsert from workpaper_snapshots.data_json) now advances the single business content_revision through ContentMutationService.commit_html_projection(...). Before the migration a restore was invisible to every version reader, so a concurrent editor kept submitting against the pre-rollback base and wrote the rolled-back content straight back. Projection lane for the same reason as the template rollback: the restored content is structured rows, not an OOXML body. The rollback snapshot row is added before the only commit outlet so content, audit snapshot, content version, revision and outbox live and die together. It writes no version field and owns no commit."
+    },
+    "app.services.wopi_service::WOPIHostService.put_file": {
+      "domain": "wopi",
+      "version_domain_note": "Task 19: PutFile itself now submits the hash-verified OOXML body through AuthoritativeContentWriter.commit_bytes -> ContentMutationService.commit(...) under an approved opaque_single_onlyoffice bundle; it writes no version field and owns no commit, and the .versions snapshot name follows the pre-save content revision. Remaining debt is delegated, not local: the nested background coroutine put_file._auto_fine_extract still writes parsed_data on an independent session and commit, so this row stays in the writer set until that coroutine is migrated."
+    },
+    "app.services.wopi_service::WOPIHostService.put_file._auto_fine_extract": {
+      "domain": "wopi",
+      "version_domain_note": "Second nested background coroutine writing workpaper content on its own session and commit; a third writer for one PutFile request."
+    },
+    "app.services.wopi_service::WOPIHostService.put_file._auto_parse": {
+      "domain": "wopi",
+      "version_domain_note": "Nested background coroutine committing parsed_data on an independent session after PutFile returned; runs outside the caller's version bump and lock."
+    },
+    "app.services.working_paper_service::WorkingPaperService.upload_offline_edit": {
+      "domain": "upload_import",
+      "version_domain_note": "Second offline-edit upload path with its own inline working_paper.file_version increment, competing with WpUploadService.upload_file for the same counter."
+    },
+    "app.services.wp_download_service::WpDownloadService.download_pack": {
+      "domain": "export_storage_resolver",
+      "version_domain_note": "Uses the canonical resolve_wp_file with template fallback enabled, so a packed ZIP can contain blank templates recorded as workpaper content; resolution is keyed on file_path, not on a representation generation."
+    },
+    "app.services.wp_download_service::WpDownloadService.download_single": {
+      "domain": "export_storage_resolver",
+      "version_domain_note": "Single-file download through the canonical resolver; same file_path keying, no representation identity."
+    },
+    "app.services.wp_download_service::WpUploadService.upload_file": {
+      "domain": "upload_import",
+      "version_domain_note": "Task 19: the offline upload itself now submits the uploaded OOXML body through AuthoritativeContentWriter.commit_bytes -> ContentMutationService.commit(...), and its conflict pre-check compares working_paper.content_revision instead of the shared file_version counter. Remaining debt is delegated, not local: it still calls prefill_engine.parse_workpaper_real, which writes workpaper content on its own, so this row stays in the writer set until the prefill writer is migrated."
+    },
+    "app.services.wp_export.export_engine::WpExportEngine._export_docx": {
+      "domain": "export_storage_resolver",
+      "version_domain_note": "Export consumer of the layered docx resolver; resolves by wp_code rather than by content version and representation generation."
+    },
+    "app.services.wp_export.export_engine::WpExportEngine._resolve_docx_template": {
+      "domain": "export_storage_resolver",
+      "version_domain_note": "Reaches the canonical resolve_wp_file, then applies its own docx template fallback on top; the second layer is what makes export resolution diverge from download resolution."
+    },
+    "app.services.wp_export.wp_file_resolver::_template_fallback": {
+      "domain": "export_storage_resolver",
+      "version_domain_note": "Template-library fallback branch of the designated canonical resolver. Returns a template artifact under a template_fallback verdict, so callers that ignore the verdict silently hash a blank template instead of workpaper content."
+    },
+    "app.services.wp_migration_service::WpMigrationService.migrate_workpaper": {
+      "domain": "template_provisioning",
+      "version_domain_note": "Template-diff migration rewrites working_paper.parsed_data via raw SQL and only flushes; it marks idempotency inside parsed_data._migrated_at rather than in a version row, and advances no version field."
+    },
+    "app.services.wp_migration_service::WpMigrationService.rollback": {
+      "domain": "rollback",
+      "version_domain_note": "Task 19: the template-migration rollback now writes working_paper.parsed_data and advances the single business content_revision inside one transaction whose only commit outlet is ContentMutationService.commit_html_projection(...). It picks the projection lane because the content it restores IS the structured projection -- there are no OOXML bytes to publish as a representation, and fabricating a blank xlsx is what Requirement 3.9 forbids. capability=single_html is declared at the call site, so the plan-level refusal stays reachable; a workpaper that really has a published OO representation is refused by the database-fact check instead of silently forking its JSON projection behind the authoritative OOXML (Requirement 2.11). It writes no version field and owns no commit. Remaining debt is delegated, not local: the sibling migrate_workpaper() still writes parsed_data on its own and is unadjudicated -- template migration is not one of this task's six domains."
+    },
+    "app.services.wp_parsed_data_service::write_cell_to_parsed_data": {
+      "domain": "dedicated_router",
+      "version_domain_note": "Shared low-level parsed_data cell writer with no version increment and no commit; callers decide whether any version moves, so the same mutation is versioned or not depending on the caller."
+    },
+    "app.services.wp_storage_service::WpStorageService.save_version": {
+      "domain": "history_restore",
+      "version_domain_note": "Task 19: this method is no longer a version owner and no longer a content writer. It copies the CURRENT artifact into a .versions snapshot -- not one byte of content changes -- yet it used to run working_paper.file_version += 1, which both invented a version indistinguishable from its predecessor and made a fourth writer contend for the same counter as WOPI PutFile, the offline upload and the structure save. The snapshot name now follows the counter that actually moves (content_revision, advanced only by the ContentMutationService CAS) and this method only reads it. The return payload reports content_revision / snapshot_of_revision instead of a new_version it invented; there is no frontend caller of POST /save-version, and the only backend consumer returns the dict verbatim."
+    },
+    "app.services.wp_template_init_service::_ensure_d4_ipo_loaded": {
+      "domain": "template_provisioning",
+      "version_domain_note": "D4 wrapper one hop above _ensure_ipo_loaded; inherits the read-path content write."
+    },
+    "app.services.wp_template_init_service::_ensure_ipo_loaded": {
+      "domain": "template_provisioning",
+      "version_domain_note": "Lazily loads IPO seed content into working_paper and flushes; a content write triggered by a read path with no version increment."
+    },
+    "app.services.wp_template_init_service::init_workpaper_from_template": {
+      "domain": "template_provisioning",
+      "version_domain_note": "Copies a template from the authoritative wp_templates library into the project artifact path; the resulting artifact has no representation identity or definition bundle."
+    },
+    "app.services.wp_xlsx_export_service::_sync_export_workpaper_xlsx": {
+      "domain": "export_storage_resolver",
+      "version_domain_note": "Export resolves the template through the render-config template path helper, a third resolver family alongside resolve_wp_file and the OnlyOffice router resolvers."
+    }
+  },
+  "purpose": "Domain adjudication only. Every other inventory column (read/written version fields, commit points, orchestrator usage, side effects, canonical resolver, characterization tests) is derived by backend/scripts/gen/generate_workpaper_writer_inventory.py from the AST. An adjudication here is NOT an exemption: `bypasses_unified_commit` stays derived from source, so an adjudicated writer still keeps the unified revision gate red until it routes through ContentMutationService.",
+  "retired_adjudications": {
+    "app.routers.custom_workpaper_cells::update_custom_cells": {
+      "domain": "custom",
+      "expected_empty_facts": [
+        "version_fields_written",
+        "sql_update_columns",
+        "commit_receivers",
+        "after_save_calls"
+      ],
+      "must_still_exist": true,
+      "retired_by_task": "19",
+      "retired_reason": "Task 19 routed the custom cell write through AuthoritativeContentWriter.commit_bytes -> ContentMutationService.commit(...). The endpoint no longer increments working_paper.file_version and no longer owns a db.commit(); the authoritative xlsx body is submitted verbatim as authoritative_payload under an approved custom_authoritative_ooxml bundle whose template/instrumentation/contract slots are registry typed null markers. The function still exists and is still the only custom cell write endpoint, but the structural discovery predicate no longer classifies it as a content writer because every version/content/commit fact it used to carry is now empty.",
+      "version_domain_note": "Retired debt (kept for audit): this JSON projection endpoint used to advance the authoritative xlsx file's own version counter (working_paper.file_version += 1) and commit its own transaction. Property 50 requires the xlsx body to stay the single authority while its version, representation, room and evidence join the unified protocol; that is now the case, and the projection (grid / parsed_data) is never submitted as content."
+    },
+    "app.routers.wp_onlyoffice_router::_onlyoffice_storage_dir": {
+      "domain": "export_storage_resolver",
+      "expected_empty_facts": [
+        "ad_hoc_paths"
+      ],
+      "must_still_exist": true,
+      "retired_by_task": "58",
+      "retired_reason": "Task 58 让 `_onlyoffice_storage_dir` 委派 `workpaper_sync.canonical_paths.onlyoffice_canonical_dir`，函数体里不再有 `settings.STORAGE_ROOT / \"projects\" / ... / \"onlyoffice\"` 的 ad-hoc 路径拼装。段名与相对路径绝对化规则收敛到 canonical_paths 单一真源后，读侧（config / download / WOPI）与写侧（word-template callback）不可能再解析到两条路径 —— Requirement 9.3 点名的正是这条分叉，2026-08-29 磁盘实测其后果为 159 份 OO 存盘 落在读侧永不查看的孤儿根下（backend/storage/{pid}/workpapers/ 134 份 + storage/{pid}/workpapers/ 25 份），而 canonical 目录下只有 16 份 docx。该函数本身仍存在（URL 兼容），只是不再是路径权威。",
+      "version_domain_note": "Builds the project-level OnlyOffice cache directory from settings.STORAGE_ROOT inline; the OnlyOffice authority root is not derived from the canonical resolver. RETIRED by Task 58: the directory is now derived from canonical_paths.onlyoffice_canonical_dir (single source for the segment names and for CWD-immune absolutisation of a relative STORAGE_ROOT); this function only forwards."
+    },
+    "app.services.workpaper_save_orchestrator::WorkpaperSaveOrchestrator.after_save": {
+      "domain": "orchestrator_side_effect",
+      "expected_empty_facts": [
+        "version_fields_written",
+        "version_fields_read",
+        "sql_update_columns",
+        "content_fields_written",
+        "commit_receivers",
+        "after_save_calls",
+        "swallowed_exception_lines"
+      ],
+      "must_still_exist": true,
+      "retired_by_task": "16+18",
+      "retired_reason": "Task 16 moved the audit log and the WORKPAPER_SAVED publish into the durable outbox (no more bare-except warning degradation) and Task 18 removed `wp.file_version += 1` plus the fake `expected_version` assertion. The function still exists and is still called by all four save paths, but it no longer writes or reads any version field, owns no commit and swallows no exception, so the structural discovery predicate no longer classifies it as a content writer.",
+      "version_domain_note": "Retired debt (kept for audit): this post-save handler used to increment working_paper.file_version, and both the audit log and the event publish were wrapped in bare excepts that degraded to logger.warning, so side effects were silently lost while the version still advanced. It now only sets prefill_stale/updated_at, adds the audit log row and enqueues the durable outbox event inside the caller's transaction, then flushes."
+    }
+  },
+  "review_status": "reviewed",
+  "schema_version": 1,
+  "spec": "workpaper-html-onlyoffice-bidirectional-writeback-closure",
+  "task": "Wave 0 Task 3"
+}

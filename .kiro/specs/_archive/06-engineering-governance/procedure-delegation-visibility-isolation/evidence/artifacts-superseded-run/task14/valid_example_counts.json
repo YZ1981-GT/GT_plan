@@ -1,0 +1,110 @@
+{
+  "profile": "fast",
+  "is_completion_evidence": false,
+  "target_examples_per_property": 5,
+  "smoke_max_examples": 5,
+  "correctness_max_examples": 100,
+  "valid_example_counts": {
+    "P10": 5,
+    "P12": 5,
+    "P15": 5,
+    "P16": 5,
+    "P18": 5,
+    "P19": 5,
+    "P20": 2,
+    "P9": 5,
+    "same_source_demo": 5
+  },
+  "prompt_to_design_property_map": {
+    "prompt P1 分类/scope": "P1",
+    "prompt P2/P3/P5 staff-user + same-person": "P2",
+    "prompt P4 layers never overwrite/clear": "P3",
+    "prompt P6 procedure binding unique/reject": "P4",
+    "prompt P7 restricted visible set formula": "P5",
+    "prompt P6 history immutable after rebind": "P6",
+    "prompt P9 sheet 页面隔离 + P10 history current-version-only": "P7",
+    "prompt P8 grant single kind / no splice": "P8",
+    "prompt reviewer whitelist": "P9",
+    "prompt binding/claim conflict": "P10",
+    "prompt 429 pre-resolve + uniform 404": "P11",
+    "prompt audit failure never changes contract": "P12",
+    "prompt editor token bound through callback": "P13",
+    "prompt list ordered pipeline": "P14",
+    "prompt display never authorizes": "P15",
+    "prompt HTTP/worker ledger equality": "P16",
+    "prompt P17 permission-change epoch atomic": "P17",
+    "prompt P18 revocation converges <=1s": "P18",
+    "prompt P19 profile activation needs capacity": "P19",
+    "prompt P20 evidence append-only/hash": "P20"
+  },
+  "property_matrix": {
+    "P1": [
+      "test_role_classifier.py::TestProperty1ClassificationUniqueFailClosed::test_classification_matrix"
+    ],
+    "P2": [
+      "test_staff_user_mapping.py::TestProperty2StaffUserMapping::test_mapping_accepts_only_unique_active_bidirectional",
+      "test_delegation_transaction_pbt.py::test_pbt_mapping_transaction_invariants"
+    ],
+    "P3": [
+      "test_delegation_transaction_pbt.py::test_pbt_layers_never_overwrite"
+    ],
+    "P4": [
+      "test_procedure_wp_resolver.py::TestProperty4ProcedureBindingUniqueOrReject::test_unique_or_reject_no_mutation"
+    ],
+    "P5": [
+      "test_visibility_query.py::TestProperty5FixedSetFormula::test_visible_equals_delegated_union_history_intersect_scope"
+    ],
+    "P6": [
+      "test_visibility_query.py::TestProperty6HistoryImmutableAfterRebind::test_history_attribution_unchanged_by_rebind"
+    ],
+    "P7": [
+      "test_visibility_query.py::TestProperty7PageVisibilityAndHistoryReadonly::test_row_only_page_isolation",
+      "test_visibility_query.py::TestProperty7PageVisibilityAndHistoryReadonly::test_history_grants_are_readonly",
+      "test_procedure_wp_resolver.py::TestProperty7RowOnlySheetMapping::test_sheet_name_maps_unique_or_rejects"
+    ],
+    "P8": [
+      "test_visibility_query.py::TestProperty8OneKnownKindPerGrant::test_each_grant_single_registered_kind"
+    ],
+    "P9": [
+      "test_task14_property_gaps.py::test_p9_reviewer_whitelist_only",
+      "test_wp_bound_gate.py::TestProperty9ReviewerWhitelist (example, PG, Task6)"
+    ],
+    "P10": [
+      "test_task14_property_gaps.py::test_p10_binding_claim_conflict_fail_closed",
+      "test_wp_bound_gate.py::TestProperty10BindingClaimConflict (example, PG, Task6)"
+    ],
+    "P11": [
+      "test_wp_bound_gate.py::TestProperty11PBTUniformNotFound::test_deny_always_404_fixed_body"
+    ],
+    "P12": [
+      "test_task14_property_gaps.py::test_p12_audit_failure_never_changes_contract",
+      "test_wp_bound_gate.py::TestProperty12AuditFailureContractStable (example, PG, Task6)"
+    ],
+    "P13": [
+      "test_editor_security.py::TestEditorTokenPBT::test_valid_token_roundtrip",
+      "test_editor_security.py::TestEditorTokenPBT::test_tampered_wp_always_rejected"
+    ],
+    "P14": [
+      "test_workpaper_list_query.py::TestProperty14OrderedPipeline::test_pipeline_invariants"
+    ],
+    "P15": [
+      "test_task14_property_gaps.py::test_p15_display_and_client_identity_never_authorize",
+      "test_workpaper_list_query.py::TestProperty15DisplayNeverAuthorizes (example, PG, Task8)"
+    ],
+    "P16": [
+      "test_task14_property_gaps.py::test_p16_ledger_bidirectional_and_no_fake_pass"
+    ],
+    "P17": [
+      "test_delegation_transaction_pbt.py::test_pbt_epoch_monotonic_and_atomic"
+    ],
+    "P18": [
+      "test_task14_property_gaps.py::test_p18_revocation_converges_no_stale_allow"
+    ],
+    "P19": [
+      "test_task14_property_gaps.py::test_p19_profile_activation_requires_capacity_evidence"
+    ],
+    "P20": [
+      "test_task14_property_gaps.py::test_p20_evidence_append_only_hash_complete"
+    ]
+  }
+}

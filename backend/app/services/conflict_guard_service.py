@@ -238,78 +238,15 @@ class ConflictGuardService:
             return 0
 
     # ------------------------------------------------------------------
-    # 乐观锁版本校验
+    # 乐观锁版本校验 —— 已删除（2026-09-06）
+    #
+    # 原有 `check_version` / `increment_version` 两个方法对 `adjustments.version`
+    # 做乐观锁 CAS，但该表**从来没有 version 列**（真库实测），两个方法一调用即
+    # UndefinedColumn。同时 grep 与 codegraph 双证**全仓零调用点**
+    # （conflict_guard router 只用 acquire_lock / heartbeat_lock / release_lock）
+    # ⇒ 这是从未接线过的死代码，不是失效的生产功能。
+    #
+    # 按「死代码立即删除」处理，而不是给一个没有调用方的 CAS 补 version 列：
+    # 若将来真要给调整分录做乐观锁，应连同迁移（加列）+ 路由接线 + 并发守卫
+    # 一起设计，而不是复活这两个方法。
     # ------------------------------------------------------------------
-
-    async def check_version(
-        self,
-        adjustment_id: UUID,
-        expected_version: int,
-    ) -> None:
-        """检查调整分录版本号是否匹配。
-
-        Raises
-        ------
-        HTTPException(409)
-            版本不匹配时抛出
-        """
-        result = await self._db.execute(
-            text("""
-                SELECT version FROM adjustments
-                WHERE id = :adjustment_id
-            """),
-            {"adjustment_id": str(adjustment_id)},
-        )
-        row = result.first()
-        if row is None:
-            raise HTTPException(status_code=404, detail="Adjustment not found")
-
-        current_version = row[0]
-        if current_version != expected_version:
-            raise HTTPException(
-                status_code=409,
-                detail={
-                    "error_code": "VERSION_CONFLICT",
-                    "current_version": current_version,
-                    "expected_version": expected_version,
-                },
-            )
-
-    async def increment_version(
-        self,
-        adjustment_id: UUID,
-        expected_version: int,
-    ) -> int:
-        """递增调整分录版本号（乐观锁 CAS）。
-
-        Returns
-        -------
-        int
-            新版本号
-
-        Raises
-        ------
-        HTTPException(409)
-            版本不匹配时抛出（0 rows affected）
-        """
-        result = await self._db.execute(
-            text("""
-                UPDATE adjustments
-                SET version = version + 1
-                WHERE id = :adjustment_id
-                  AND version = :expected_version
-            """),
-            {
-                "adjustment_id": str(adjustment_id),
-                "expected_version": expected_version,
-            },
-        )
-        if result.rowcount == 0:
-            raise HTTPException(
-                status_code=409,
-                detail={
-                    "error_code": "VERSION_CONFLICT",
-                    "message": "Adjustment was modified by another user",
-                },
-            )
-        return expected_version + 1

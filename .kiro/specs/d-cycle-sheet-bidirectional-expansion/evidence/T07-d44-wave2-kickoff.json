@@ -1,0 +1,52 @@
+{
+  "measured_at": "2026-09-13",
+  "decision": "wave2_next=D4-4",
+  "rationale": [
+    "Same entry xlsx/gt-d4-operating-revenue; extend d4.revenue_detail sheets[] (no second adapter_id)",
+    "HTML store D4-4-rows already wired in useD4Adjustment / useD4CrossSheet",
+    "D1-2 deferred: different parent entry; keep D4 multi-sheet momentum"
+  ],
+  "html_store": {
+    "item_id": "D4-4-rows",
+    "composable": "useD4Adjustment",
+    "fields": [
+      "rowId",
+      "description",
+      "category",
+      "reportItem",
+      "accountName",
+      "noteItem",
+      "placeholder",
+      "debitAmount",
+      "creditAmount",
+      "indexRef",
+      "remark"
+    ]
+  },
+  "excel_probe": {
+    "template_path": "backend/wp_templates/D/D4 收入底稿.xlsx",
+    "managed_sheet": "营业收入调整分录汇总D4-4",
+    "header_row": 5,
+    "header_A_to_J": [
+      "调整事项说明",
+      "类别（报表调整/账项调整/其他）",
+      "报表项目",
+      "科目名称",
+      "附注项目",
+      "……",
+      "借方调整金额",
+      "贷方调整金额",
+      "索引",
+      "备注"
+    ],
+    "tip_row": 21,
+    "provisional_data_rows": "6-20 (empty template band; BP-21 style footer not present)",
+    "identity_column": "UNCONFIRMED — template scan found no GTROW/_GT column in A-T; Task7 mapping must freeze UUID col before contract",
+    "open_risks": [
+      "Dynamic insert band (no fixed GTROW seed like D4-3)",
+      "Column F placeholder '……' may be mask/non-store",
+      "Balance invariant debit===credit is HTML-side; Excel may not enforce"
+    ]
+  },
+  "next_blocking_gate": "Freeze column↔field mapping (T01-style) before provider/sheets[] expand"
+}

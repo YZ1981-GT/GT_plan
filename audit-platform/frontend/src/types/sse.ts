@@ -64,3 +64,7 @@ export type SSEEventType =
   | 'export.progress'
   | 'export.complete'
   | 'export.failed'
+  // A13 错报聚合
+  | 'a13_summary_updated'
+  // 复核对话
+  | 'review_message.created'

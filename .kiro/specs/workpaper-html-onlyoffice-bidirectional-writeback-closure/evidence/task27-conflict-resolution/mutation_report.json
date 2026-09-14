@@ -1,0 +1,829 @@
+{
+  "generated_by": "backend/scripts/_mutation_kit/span.py::run_cli",
+  "mode": "run",
+  "pytest_args": [
+    "backend/tests/workpaper_sync/test_task27_conflict_resolution.py",
+    "backend/tests/workpaper_sync/test_task27_conflict_resolution_pg.py",
+    "backend/tests/workpaper_sync/test_task26_oo_to_html.py",
+    "backend/tests/workpaper_sync/test_task26_oo_to_html_pg.py",
+    "backend/tests/workpaper_sync/test_task15_content_mutation.py",
+    "-q",
+    "--tb=no",
+    "-rf",
+    "-p",
+    "no:randomly"
+  ],
+  "tally": {
+    "RED": 28,
+    "GREEN": 6
+  },
+  "mutations": [
+    {
+      "id": "A01",
+      "path": "backend/app/services/workpaper_sync/oo_to_html.py",
+      "want": "test_task26_oo_to_html.py::TestManualAdjudicationIsWired::test_adjudication_is_folded_not_discarded",
+      "why": "把折叠退回 `merge.merged` —— 这**正是** Task 26 收口审计抓到的静默错值路径：`merged` 对每个冲突字段保留 current 侧值，于是「审计师点了取 incoming，落库的是 current」。真库侧同时红：落库 projection digest 变成 merged 的那个。还会连带打红 Task 15 的独立重算（重算结果与提交值不再相等）",
+      "verdict": "RED",
+      "summary": "12 failed, 386 passed in 63.50s (0:01:03)",
+      "added": [
+        "test_task26_oo_to_html.py::TestManualAdjudicationIsWired::test_adjudication_is_folded_not_discarded",
+        "test_task26_oo_to_html.py::TestManualAdjudicationIsWired::test_coordinator_really_imports_and_calls_apply_resolutions",
+        "test_task26_oo_to_html.py::TestManualAdjudicationIsWired::test_retirement_registration_is_complete",
+        "test_task26_oo_to_html_pg.py::TestManualAdjudicationIsAppliedOnRealDb::test_call_with_resolutions_succeeds",
+        "test_task26_oo_to_html_pg.py::TestManualAdjudicationIsAppliedOnRealDb::test_conflict_resolution_is_its_own_source_bucket",
+        "test_task26_oo_to_html_pg.py::TestManualAdjudicationIsAppliedOnRealDb::test_pointers_advanced_exactly_once",
+        "test_task26_oo_to_html_pg.py::TestManualAdjudicationIsAppliedOnRealDb::test_the_published_projection_is_the_folded_one_not_merge_merged",
+        "test_task27_conflict_resolution.py::TestTask26DebtIsSettled::test_the_settle_function_is_the_wiring_point",
+        "test_task27_conflict_resolution_pg.py::TestResolveFenceRejections::test_same_application_higher_sequence_only_folds",
+        "test_task27_conflict_resolution_pg.py::TestResolveProceeds::test_entry_pointer_and_room_baseline_moved",
+        "test_task27_conflict_resolution_pg.py::TestResolveProceeds::test_revision_advanced_exactly_once",
+        "test_task27_conflict_resolution_pg.py::TestResolveProceeds::test_the_published_projection_is_the_folded_one"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task26_oo_to_html.py::TestManualAdjudicationIsWired::test_adjudication_is_folded_not_discarded",
+        "test_task26_oo_to_html_pg.py::TestManualAdjudicationIsAppliedOnRealDb::test_the_published_projection_is_the_folded_one_not_merge_merged",
+        "test_task27_conflict_resolution_pg.py::TestResolveProceeds::test_the_published_projection_is_the_folded_one"
+      ],
+      "added_files": [
+        "test_task26_oo_to_html.py",
+        "test_task26_oo_to_html_pg.py",
+        "test_task27_conflict_resolution.py",
+        "test_task27_conflict_resolution_pg.py"
+      ],
+      "restored": true,
+      "restored_sha256": "df8f55c9e72a28cef3e5e1a1f14126bf808464f96662548b9e54e73f57e5f704",
+      "seconds": 67.5
+    },
+    {
+      "id": "A02",
+      "path": "backend/app/services/workpaper_sync/oo_to_html.py",
+      "want": "test_task26_oo_to_html.py::TestManualAdjudicationIsWired::test_adjudication_without_conflict_is_refused",
+      "why": "零冲突却带裁决时静默忽略 ⇒ 一次 resolve 请求被当成普通 apply 处理，审计师看到「裁决成功」而他选的字段根本没参与本次发布（conflict set 已被 rebase/supersede）。与 A03 分两条：两者共用类型时靠前的永久不可达",
+      "verdict": "RED",
+      "summary": "1 failed, 397 passed in 65.37s (0:01:05)",
+      "added": [
+        "test_task26_oo_to_html.py::TestManualAdjudicationIsWired::test_adjudication_without_conflict_is_refused"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task26_oo_to_html.py::TestManualAdjudicationIsWired::test_adjudication_without_conflict_is_refused"
+      ],
+      "added_files": [
+        "test_task26_oo_to_html.py"
+      ],
+      "restored": true,
+      "restored_sha256": "df8f55c9e72a28cef3e5e1a1f14126bf808464f96662548b9e54e73f57e5f704",
+      "seconds": 69.0
+    },
+    {
+      "id": "A03",
+      "path": "backend/app/services/workpaper_sync/oo_to_html.py",
+      "want": "test_task26_oo_to_html.py::TestManualAdjudicationIsWired::test_unresolved_conflict_never_settles",
+      "why": "有冲突却零裁决时回落到 `merge.merged` = **自动选 current**（AC 4.6 明令禁止）。判据复用冲突域既有类型而不是本模块再造一个同义类",
+      "verdict": "RED",
+      "summary": "1 failed, 397 passed in 68.59s (0:01:08)",
+      "added": [
+        "test_task26_oo_to_html.py::TestManualAdjudicationIsWired::test_unresolved_conflict_never_settles"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task26_oo_to_html.py::TestManualAdjudicationIsWired::test_unresolved_conflict_never_settles"
+      ],
+      "added_files": [
+        "test_task26_oo_to_html.py"
+      ],
+      "restored": true,
+      "restored_sha256": "df8f55c9e72a28cef3e5e1a1f14126bf808464f96662548b9e54e73f57e5f704",
+      "seconds": 72.3
+    },
+    {
+      "id": "A04",
+      "path": "backend/app/services/workpaper_sync/oo_to_html.py",
+      "want": "test_task26_oo_to_html.py::TestManualAdjudicationIsWired::test_adjudication_without_contract_is_refused",
+      "why": "缺 contract 时无法按行身份/保护策略折叠（「整行删除」与「受保护字段只许 keep_current」都判不出来），静默继续会让 `apply_resolutions` 拿 None 崩在更深处",
+      "verdict": "RED",
+      "summary": "1 failed, 397 passed in 69.15s (0:01:09)",
+      "added": [
+        "test_task26_oo_to_html.py::TestManualAdjudicationIsWired::test_adjudication_without_contract_is_refused"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task26_oo_to_html.py::TestManualAdjudicationIsWired::test_adjudication_without_contract_is_refused"
+      ],
+      "added_files": [
+        "test_task26_oo_to_html.py"
+      ],
+      "restored": true,
+      "restored_sha256": "df8f55c9e72a28cef3e5e1a1f14126bf808464f96662548b9e54e73f57e5f704",
+      "seconds": 73.0
+    },
+    {
+      "id": "A05",
+      "path": "backend/app/services/workpaper_sync/oo_to_html.py",
+      "want": "test_task26_oo_to_html.py::TestManualAdjudicationIsWired::test_settle_branches_are_the_single_decision_point",
+      "why": "绕过唯一决策点直接取未收敛快照。与 A01 分层：A01 打的是**判据体**、本条打的是**调用点**。形态判据（发布分支不得出现 `merge.merged`）与行为判据各自可证伪 —— 只有行为判据时，把决策点搬走再原地算一次同样的东西也算通过",
+      "verdict": "RED",
+      "summary": "9 failed, 389 passed in 68.75s (0:01:08)",
+      "added": [
+        "test_task26_oo_to_html.py::TestManualAdjudicationIsWired::test_settle_branches_are_the_single_decision_point",
+        "test_task26_oo_to_html_pg.py::TestManualAdjudicationIsAppliedOnRealDb::test_call_with_resolutions_succeeds",
+        "test_task26_oo_to_html_pg.py::TestManualAdjudicationIsAppliedOnRealDb::test_conflict_resolution_is_its_own_source_bucket",
+        "test_task26_oo_to_html_pg.py::TestManualAdjudicationIsAppliedOnRealDb::test_pointers_advanced_exactly_once",
+        "test_task26_oo_to_html_pg.py::TestManualAdjudicationIsAppliedOnRealDb::test_the_published_projection_is_the_folded_one_not_merge_merged",
+        "test_task27_conflict_resolution_pg.py::TestResolveFenceRejections::test_same_application_higher_sequence_only_folds",
+        "test_task27_conflict_resolution_pg.py::TestResolveProceeds::test_entry_pointer_and_room_baseline_moved",
+        "test_task27_conflict_resolution_pg.py::TestResolveProceeds::test_revision_advanced_exactly_once",
+        "test_task27_conflict_resolution_pg.py::TestResolveProceeds::test_the_published_projection_is_the_folded_one"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task26_oo_to_html.py::TestManualAdjudicationIsWired::test_settle_branches_are_the_single_decision_point",
+        "test_task26_oo_to_html_pg.py::TestManualAdjudicationIsAppliedOnRealDb::test_the_published_projection_is_the_folded_one_not_merge_merged"
+      ],
+      "added_files": [
+        "test_task26_oo_to_html.py",
+        "test_task26_oo_to_html_pg.py",
+        "test_task27_conflict_resolution_pg.py"
+      ],
+      "restored": true,
+      "restored_sha256": "df8f55c9e72a28cef3e5e1a1f14126bf808464f96662548b9e54e73f57e5f704",
+      "seconds": 72.6
+    },
+    {
+      "id": "A06",
+      "path": "backend/app/services/workpaper_sync/oo_to_html.py",
+      "want": "test_task26_oo_to_html.py::TestManualAdjudicationIsWired::test_entry_dispatch_routes_adjudication_away_from_conflict_branch",
+      "why": "分派不再看裁决 ⇒ 带裁决的调用被登记成「仍有冲突」并冻结指针，resolve 端点整条失效（审计师提交裁决后什么都没发生，而返回的是 conflict）。真库侧同时红：resolve 的 decision 是 proceed 但 revision 不动",
+      "verdict": "RED",
+      "summary": "9 failed, 389 passed in 68.96s (0:01:08)",
+      "added": [
+        "test_task26_oo_to_html.py::TestManualAdjudicationIsWired::test_entry_dispatch_routes_adjudication_away_from_conflict_branch",
+        "test_task26_oo_to_html_pg.py::TestManualAdjudicationIsAppliedOnRealDb::test_call_with_resolutions_succeeds",
+        "test_task26_oo_to_html_pg.py::TestManualAdjudicationIsAppliedOnRealDb::test_conflict_resolution_is_its_own_source_bucket",
+        "test_task26_oo_to_html_pg.py::TestManualAdjudicationIsAppliedOnRealDb::test_pointers_advanced_exactly_once",
+        "test_task26_oo_to_html_pg.py::TestManualAdjudicationIsAppliedOnRealDb::test_the_published_projection_is_the_folded_one_not_merge_merged",
+        "test_task27_conflict_resolution_pg.py::TestResolveFenceRejections::test_same_application_higher_sequence_only_folds",
+        "test_task27_conflict_resolution_pg.py::TestResolveProceeds::test_entry_pointer_and_room_baseline_moved",
+        "test_task27_conflict_resolution_pg.py::TestResolveProceeds::test_revision_advanced_exactly_once",
+        "test_task27_conflict_resolution_pg.py::TestResolveProceeds::test_the_published_projection_is_the_folded_one"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task26_oo_to_html.py::TestManualAdjudicationIsWired::test_entry_dispatch_routes_adjudication_away_from_conflict_branch",
+        "test_task26_oo_to_html_pg.py::TestManualAdjudicationIsAppliedOnRealDb::test_call_with_resolutions_succeeds",
+        "test_task27_conflict_resolution_pg.py::TestResolveProceeds::test_revision_advanced_exactly_once"
+      ],
+      "added_files": [
+        "test_task26_oo_to_html.py",
+        "test_task26_oo_to_html_pg.py",
+        "test_task27_conflict_resolution_pg.py"
+      ],
+      "restored": true,
+      "restored_sha256": "df8f55c9e72a28cef3e5e1a1f14126bf808464f96662548b9e54e73f57e5f704",
+      "seconds": 72.9
+    },
+    {
+      "id": "A07",
+      "path": "backend/app/services/workpaper_sync/oo_to_html.py",
+      "want": "test_task26_oo_to_html.py::TestManualAdjudicationIsWired::test_resolutions_reach_the_commit_boundary",
+      "why": "裁决不再交到唯一 commit 边界 ⇒ Task 15 的**独立重算**恒不触发（它只在 `resolution_choices` 非空时校验折叠）。行为完全不变 —— 这正是「第二把锁被悄悄摘掉」的形态，只有形态判据会红",
+      "verdict": "RED",
+      "summary": "9 failed, 389 passed in 69.07s (0:01:09)",
+      "added": [
+        "test_task26_oo_to_html.py::TestManualAdjudicationIsWired::test_resolutions_reach_the_commit_boundary",
+        "test_task26_oo_to_html_pg.py::TestManualAdjudicationIsAppliedOnRealDb::test_call_with_resolutions_succeeds",
+        "test_task26_oo_to_html_pg.py::TestManualAdjudicationIsAppliedOnRealDb::test_conflict_resolution_is_its_own_source_bucket",
+        "test_task26_oo_to_html_pg.py::TestManualAdjudicationIsAppliedOnRealDb::test_pointers_advanced_exactly_once",
+        "test_task26_oo_to_html_pg.py::TestManualAdjudicationIsAppliedOnRealDb::test_the_published_projection_is_the_folded_one_not_merge_merged",
+        "test_task27_conflict_resolution_pg.py::TestResolveFenceRejections::test_same_application_higher_sequence_only_folds",
+        "test_task27_conflict_resolution_pg.py::TestResolveProceeds::test_entry_pointer_and_room_baseline_moved",
+        "test_task27_conflict_resolution_pg.py::TestResolveProceeds::test_revision_advanced_exactly_once",
+        "test_task27_conflict_resolution_pg.py::TestResolveProceeds::test_the_published_projection_is_the_folded_one"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task26_oo_to_html.py::TestManualAdjudicationIsWired::test_resolutions_reach_the_commit_boundary"
+      ],
+      "added_files": [
+        "test_task26_oo_to_html.py",
+        "test_task26_oo_to_html_pg.py",
+        "test_task27_conflict_resolution_pg.py"
+      ],
+      "restored": true,
+      "restored_sha256": "df8f55c9e72a28cef3e5e1a1f14126bf808464f96662548b9e54e73f57e5f704",
+      "seconds": 72.9
+    },
+    {
+      "id": "A08",
+      "path": "backend/app/services/workpaper_sync/content_mutation.py",
+      "want": "test_task15_content_mutation.py::TestConflictGate::test_unfolded_projection_is_rejected_even_with_full_coverage",
+      "why": "唯一 commit 边界的独立重算退化成「拿 merged 跟自己比」= 重言式 ⇒ 任何调用方提交未折叠 projection 都能过关。这是「把错值当基线锁死」的镜像形态：判据在、但比的是同一个错值",
+      "verdict": "RED",
+      "summary": "10 failed, 388 passed in 69.06s (0:01:09)",
+      "added": [
+        "test_task15_content_mutation.py::TestConflictGate::test_resolved_merge_passes",
+        "test_task15_content_mutation.py::TestConflictGate::test_unfolded_projection_is_rejected_even_with_full_coverage",
+        "test_task26_oo_to_html_pg.py::TestManualAdjudicationIsAppliedOnRealDb::test_call_with_resolutions_succeeds",
+        "test_task26_oo_to_html_pg.py::TestManualAdjudicationIsAppliedOnRealDb::test_conflict_resolution_is_its_own_source_bucket",
+        "test_task26_oo_to_html_pg.py::TestManualAdjudicationIsAppliedOnRealDb::test_pointers_advanced_exactly_once",
+        "test_task26_oo_to_html_pg.py::TestManualAdjudicationIsAppliedOnRealDb::test_the_published_projection_is_the_folded_one_not_merge_merged",
+        "test_task27_conflict_resolution_pg.py::TestResolveFenceRejections::test_same_application_higher_sequence_only_folds",
+        "test_task27_conflict_resolution_pg.py::TestResolveProceeds::test_entry_pointer_and_room_baseline_moved",
+        "test_task27_conflict_resolution_pg.py::TestResolveProceeds::test_revision_advanced_exactly_once",
+        "test_task27_conflict_resolution_pg.py::TestResolveProceeds::test_the_published_projection_is_the_folded_one"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task15_content_mutation.py::TestConflictGate::test_unfolded_projection_is_rejected_even_with_full_coverage"
+      ],
+      "added_files": [
+        "test_task15_content_mutation.py",
+        "test_task26_oo_to_html_pg.py",
+        "test_task27_conflict_resolution_pg.py"
+      ],
+      "restored": true,
+      "restored_sha256": "774908886940a61798892aba406a400d1f73d5579a2d1ecce2fd43737d2e265f",
+      "seconds": 72.8
+    },
+    {
+      "id": "A09",
+      "path": "backend/app/services/workpaper_sync/oo_to_html.py",
+      "want": "*",
+      "why": "对照项：只改共享登记表里一条 capability 文案的**措辞**（不改状态、不改接线），应当**不**打红。它证明本轮判定不是「只要碰了文件就红」——没有这条对照，全红的矩阵无法排除「判定过于敏感」这一解释",
+      "verdict": "RED",
+      "summary": "398 passed in 69.09s (0:01:09)",
+      "added": [],
+      "gone": [],
+      "hit": [],
+      "added_files": [],
+      "restored": true,
+      "restored_sha256": "df8f55c9e72a28cef3e5e1a1f14126bf808464f96662548b9e54e73f57e5f704",
+      "seconds": 72.9
+    },
+    {
+      "id": "B01",
+      "path": "backend/app/services/workpaper_sync/content_mutation.py",
+      "want": "test_task27_conflict_resolution.py::TestTask26DebtIsSettled::test_the_refresh_verdict_no_longer_reads_merge_merged",
+      "why": "refresh 判据退回读 `merge.merged`。带裁决时两者不同：`merged` 与 incoming 等值 ⇒ 判「不必重载」⇒ client-confirmed 基线被推进到客户端**从未见过**的内容上（AC 8.12 末句明令禁止）。行为在零冲突路径上完全不变，所以判据必须是形态",
+      "verdict": "RED",
+      "summary": "1 failed, 397 passed in 69.50s (0:01:09)",
+      "added": [
+        "test_task27_conflict_resolution.py::TestTask26DebtIsSettled::test_the_refresh_verdict_no_longer_reads_merge_merged"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task27_conflict_resolution.py::TestTask26DebtIsSettled::test_the_refresh_verdict_no_longer_reads_merge_merged"
+      ],
+      "added_files": [
+        "test_task27_conflict_resolution.py"
+      ],
+      "restored": true,
+      "restored_sha256": "774908886940a61798892aba406a400d1f73d5579a2d1ecce2fd43737d2e265f",
+      "seconds": 73.3
+    },
+    {
+      "id": "B02",
+      "path": "backend/app/services/workpaper_sync/merge.py",
+      "want": "test_task26_oo_to_html_pg.py::TestRefreshRequired::test_server_last_applied_advances_but_client_confirmed_does_not",
+      "why": "把「要不要重载」写死成 False ⇒ merged≠incoming 时 client-confirmed 仍然推进，room 不进 refresh_required，下一次 forcesave 带着错基线继续。本条打的是 merge 域的委托口径，与 B01 的调用侧分层",
+      "verdict": "RED",
+      "summary": "5 failed, 393 passed in 69.38s (0:01:09)",
+      "added": [
+        "test_task15_content_mutation.py::TestConflictGate::test_merge_outcome_drives_client_refresh_judgement",
+        "test_task26_oo_to_html.py::TestSettlementDigestPair::test_managed_difference_reports_inequality",
+        "test_task26_oo_to_html_pg.py::TestRefreshRequired::test_room_is_refresh_required_and_superseded",
+        "test_task26_oo_to_html_pg.py::TestRefreshRequired::test_server_last_applied_advances_but_client_confirmed_does_not",
+        "test_task27_conflict_resolution.py::TestTask26DebtIsSettled::test_merge_outcome_helper_delegates_to_the_same_pure_function"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task26_oo_to_html_pg.py::TestRefreshRequired::test_server_last_applied_advances_but_client_confirmed_does_not"
+      ],
+      "added_files": [
+        "test_task15_content_mutation.py",
+        "test_task26_oo_to_html.py",
+        "test_task26_oo_to_html_pg.py",
+        "test_task27_conflict_resolution.py"
+      ],
+      "restored": true,
+      "restored_sha256": "8e0c6a9601951ea1c964ff9fa1b37c0ddda7ff762e67ae50e526d3cb65afe29d",
+      "seconds": 73.2
+    },
+    {
+      "id": "C01",
+      "path": "backend/app/services/workpaper_sync/conflict_resolution.py",
+      "want": "test_task27_conflict_resolution_pg.py::TestResolveProceeds::test_decision_is_proceed_and_maps_to_200",
+      "why": "frozen 侧 fence 写死成 0 ⇒ 与 room 现值恒不相等，所有 resolve 一律被拒（resolve 端点整条失效）。反向的危险形态由 C02 覆盖",
+      "verdict": "RED",
+      "summary": "11 failed, 387 passed in 68.59s (0:01:08)",
+      "added": [
+        "test_task27_conflict_resolution_pg.py::TestHarness::test_every_scenario_was_collected",
+        "test_task27_conflict_resolution_pg.py::TestHarness::test_no_phase_crashed_during_collection",
+        "test_task27_conflict_resolution_pg.py::TestResolveFenceRejections::test_current_revision_change_rebases_and_rebuilds_conflicts",
+        "test_task27_conflict_resolution_pg.py::TestResolveFenceRejections::test_newer_different_application_supersedes",
+        "test_task27_conflict_resolution_pg.py::TestResolveFenceRejections::test_same_application_higher_sequence_only_folds",
+        "test_task27_conflict_resolution_pg.py::TestResolveProceeds::test_decision_is_proceed_and_maps_to_200",
+        "test_task27_conflict_resolution_pg.py::TestResolveProceeds::test_entry_pointer_and_room_baseline_moved",
+        "test_task27_conflict_resolution_pg.py::TestResolveProceeds::test_no_second_operation_or_application",
+        "test_task27_conflict_resolution_pg.py::TestResolveProceeds::test_revision_advanced_exactly_once",
+        "test_task27_conflict_resolution_pg.py::TestResolveProceeds::test_the_published_projection_is_the_folded_one",
+        "test_task27_conflict_resolution_pg.py::TestResolveProceeds::test_the_resolution_trail_was_written"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task27_conflict_resolution_pg.py::TestResolveProceeds::test_decision_is_proceed_and_maps_to_200"
+      ],
+      "added_files": [
+        "test_task27_conflict_resolution_pg.py"
+      ],
+      "restored": true,
+      "restored_sha256": "c6e30019b360ab37578f1e468221f334b66a1b1c34d45db80a54d6c48f6996e8",
+      "seconds": 72.5
+    },
+    {
+      "id": "C02",
+      "path": "backend/app/services/workpaper_sync/conflict_resolution.py",
+      "want": "test_task27_conflict_resolution_pg.py::TestResolveProceeds::test_decision_is_proceed_and_maps_to_200",
+      "why": "「查不到发起人」从 -1（与任何冻结值都不等 ⇒ 拒绝）改成 0 ⇒ 冻结 epoch 恰为 0 的场景会被当成「授权仍有效」。本仓库的 participant epoch 从 5 起，因此本条会让**正常**路径变成拒绝（0 ≠ 5）—— 判据方向与 C01 相反但同样可证伪",
+      "verdict": "GREEN",
+      "summary": "398 passed in 65.86s (0:01:05)",
+      "added": [],
+      "gone": [],
+      "hit": [],
+      "added_files": [],
+      "restored": true,
+      "restored_sha256": "c6e30019b360ab37578f1e468221f334b66a1b1c34d45db80a54d6c48f6996e8",
+      "seconds": 69.5
+    },
+    {
+      "id": "C05",
+      "path": "backend/app/services/workpaper_sync/conflict_resolution.py",
+      "want": "test_task27_conflict_resolution_pg.py::TestResolveFenceRejections::test_generation_change_is_rejected_with_its_own_reason",
+      "why": "rejected 判定不再抛 ⇒ generation 已轮转/write fence 已提升/权限 epoch 已变的请求继续往下跑并真的发布内容。三条拒绝出口各自一条变异（C05/C06/C07），因为它们共用一个 `if` 链时靠前的失败会遮蔽靠后的",
+      "verdict": "RED",
+      "summary": "2 failed, 396 passed in 65.77s (0:01:05)",
+      "added": [
+        "test_task27_conflict_resolution_pg.py::TestResolveFenceRejections::test_generation_change_is_rejected_with_its_own_reason",
+        "test_task27_conflict_resolution_pg.py::TestResolveFenceRejections::test_rejection_has_zero_side_effects"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task27_conflict_resolution_pg.py::TestResolveFenceRejections::test_generation_change_is_rejected_with_its_own_reason",
+        "test_task27_conflict_resolution_pg.py::TestResolveFenceRejections::test_rejection_has_zero_side_effects"
+      ],
+      "added_files": [
+        "test_task27_conflict_resolution_pg.py"
+      ],
+      "restored": true,
+      "restored_sha256": "c6e30019b360ab37578f1e468221f334b66a1b1c34d45db80a54d6c48f6996e8",
+      "seconds": 69.3
+    },
+    {
+      "id": "C06",
+      "path": "backend/app/services/workpaper_sync/conflict_resolution.py",
+      "want": "test_task27_conflict_resolution_pg.py::TestResolveFenceRejections::test_newer_different_application_supersedes",
+      "why": "旧 conflict set 已被更新的 canonical application supersede 却仍被应用 ⇒ 把过期裁决写进当前内容。与 C05 分型的理由是补救动作不同：superseded 要「对最新 operation 重建裁决」，rejected 要「重开编辑器」",
+      "verdict": "RED",
+      "summary": "1 failed, 397 passed in 67.82s (0:01:07)",
+      "added": [
+        "test_task27_conflict_resolution_pg.py::TestResolveFenceRejections::test_newer_different_application_supersedes"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task27_conflict_resolution_pg.py::TestResolveFenceRejections::test_newer_different_application_supersedes"
+      ],
+      "added_files": [
+        "test_task27_conflict_resolution_pg.py"
+      ],
+      "restored": true,
+      "restored_sha256": "c6e30019b360ab37578f1e468221f334b66a1b1c34d45db80a54d6c48f6996e8",
+      "seconds": 71.4
+    },
+    {
+      "id": "C07",
+      "path": "backend/app/services/workpaper_sync/conflict_resolution.py",
+      "want": "test_task27_conflict_resolution_pg.py::TestResolveFenceRejections::test_current_revision_change_rebases_and_rebuilds_conflicts",
+      "why": "current revision 已推进却不 rebase ⇒ 按**过期 current** 算出来的裁决被发布，服务端在这期间的改动被静默覆盖（AC 8.5 要求返回按原 frozen bundle 重建的 rebased conflict）",
+      "verdict": "RED",
+      "summary": "1 failed, 397 passed in 69.24s (0:01:09)",
+      "added": [
+        "test_task27_conflict_resolution_pg.py::TestResolveFenceRejections::test_current_revision_change_rebases_and_rebuilds_conflicts"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task27_conflict_resolution_pg.py::TestResolveFenceRejections::test_current_revision_change_rebases_and_rebuilds_conflicts"
+      ],
+      "added_files": [
+        "test_task27_conflict_resolution_pg.py"
+      ],
+      "restored": true,
+      "restored_sha256": "c6e30019b360ab37578f1e468221f334b66a1b1c34d45db80a54d6c48f6996e8",
+      "seconds": 73.2
+    },
+    {
+      "id": "C08",
+      "path": "backend/app/services/workpaper_sync/conflict_resolution.py",
+      "want": "test_task27_conflict_resolution.py::TestFenceJudgementHasASingleSource::test_fold_is_not_mapped_to_a_rejection",
+      "why": "把 fold 映射成 409 = 「同一 canonical application 因 same-key duplicate 抬高 effective sequence 时判自己 stale」—— AC 5.5 明令禁止的 self-supersede 与 duplicate→primary→stale 循环。真库侧同时红：fold 场景不再继续同一 conflict set",
+      "verdict": "RED",
+      "summary": "3 failed, 395 passed in 69.48s (0:01:09)",
+      "added": [
+        "test_task27_conflict_resolution.py::TestDecisionMappingIsClosed::test_only_proceed_and_fold_are_success",
+        "test_task27_conflict_resolution.py::TestFenceJudgementHasASingleSource::test_fold_is_not_mapped_to_a_rejection",
+        "test_task27_conflict_resolution_pg.py::TestResolveFenceRejections::test_same_application_higher_sequence_only_folds"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task27_conflict_resolution.py::TestDecisionMappingIsClosed::test_only_proceed_and_fold_are_success",
+        "test_task27_conflict_resolution.py::TestFenceJudgementHasASingleSource::test_fold_is_not_mapped_to_a_rejection"
+      ],
+      "added_files": [
+        "test_task27_conflict_resolution.py",
+        "test_task27_conflict_resolution_pg.py"
+      ],
+      "restored": true,
+      "restored_sha256": "c6e30019b360ab37578f1e468221f334b66a1b1c34d45db80a54d6c48f6996e8",
+      "seconds": 73.3
+    },
+    {
+      "id": "C09",
+      "path": "backend/app/services/workpaper_sync/conflict_resolution.py",
+      "want": "test_task27_conflict_resolution.py::TestDecisionMappingIsClosed::test_unmapped_decision_raises_instead_of_defaulting",
+      "why": "给未映射的判定一个 200 默认值 ⇒ 新增的**拒绝**判定被静默翻译成成功。这是 fail-open 掩盖接线错误的教科书形态：静态工具全绿、行为在现有枚举上不变",
+      "verdict": "RED",
+      "summary": "1 failed, 397 passed in 69.19s (0:01:09)",
+      "added": [
+        "test_task27_conflict_resolution.py::TestDecisionMappingIsClosed::test_unmapped_decision_raises_instead_of_defaulting"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task27_conflict_resolution.py::TestDecisionMappingIsClosed::test_unmapped_decision_raises_instead_of_defaulting"
+      ],
+      "added_files": [
+        "test_task27_conflict_resolution.py"
+      ],
+      "restored": true,
+      "restored_sha256": "c6e30019b360ab37578f1e468221f334b66a1b1c34d45db80a54d6c48f6996e8",
+      "seconds": 72.9
+    },
+    {
+      "id": "C10",
+      "path": "backend/app/services/workpaper_sync/conflict_resolution.py",
+      "want": "test_task27_conflict_resolution_pg.py::TestResolveFenceRejections::test_empty_resolutions_are_refused",
+      "why": "零裁决的 resolve 被当成普通 apply ⇒ 「裁决成功」的审计事实落在一次没有任何人工选择的应用上（AC 8.6 的 actor/选择结果都成了空话）",
+      "verdict": "RED",
+      "summary": "1 failed, 397 passed in 69.56s (0:01:09)",
+      "added": [
+        "test_task27_conflict_resolution_pg.py::TestResolveFenceRejections::test_empty_resolutions_are_refused"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task27_conflict_resolution_pg.py::TestResolveFenceRejections::test_empty_resolutions_are_refused"
+      ],
+      "added_files": [
+        "test_task27_conflict_resolution_pg.py"
+      ],
+      "restored": true,
+      "restored_sha256": "c6e30019b360ab37578f1e468221f334b66a1b1c34d45db80a54d6c48f6996e8",
+      "seconds": 73.4
+    },
+    {
+      "id": "D01",
+      "path": "backend/app/services/workpaper_sync/conflict_resolution.py",
+      "want": "test_task27_conflict_resolution.py::TestRetryEligibilityGate::test_the_gate_returns_the_id_so_the_call_cannot_be_dropped",
+      "why": "闸门退化成「查了却不用」：返回值不再被消费，于是**删掉整行调用**不会有任何类型错误，下一个人重构时很自然就把它删了。行为此刻不变 —— 判据必须是形态",
+      "verdict": "RED",
+      "summary": "1 failed, 397 passed in 69.35s (0:01:09)",
+      "added": [
+        "test_task27_conflict_resolution.py::TestRetryEligibilityGate::test_the_gate_returns_the_id_so_the_call_cannot_be_dropped"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task27_conflict_resolution.py::TestRetryEligibilityGate::test_the_gate_returns_the_id_so_the_call_cannot_be_dropped"
+      ],
+      "added_files": [
+        "test_task27_conflict_resolution.py"
+      ],
+      "restored": true,
+      "restored_sha256": "c6e30019b360ab37578f1e468221f334b66a1b1c34d45db80a54d6c48f6996e8",
+      "seconds": 73.1
+    },
+    {
+      "id": "D02",
+      "path": "backend/app/services/workpaper_sync/conflict_resolution.py",
+      "want": "test_task27_conflict_resolution.py::TestRetryEligibilityGate::test_none_is_refused_with_its_own_code",
+      "why": "claim 之前的 unmatched/ambiguous recovery case 被当成普通 operation 重试 ⇒ 伪造出一条 claim 之前不该存在的 operation timeline（AC 5.8 / 8.9 / 14.3）。真库侧同时红",
+      "verdict": "RED",
+      "summary": "2 failed, 396 passed in 69.36s (0:01:09)",
+      "added": [
+        "test_task27_conflict_resolution.py::TestRetryEligibilityGate::test_none_is_refused_with_its_own_code",
+        "test_task27_conflict_resolution_pg.py::TestRetry::test_nullable_operation_retry_is_refused_with_zero_side_effects"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task27_conflict_resolution.py::TestRetryEligibilityGate::test_none_is_refused_with_its_own_code",
+        "test_task27_conflict_resolution_pg.py::TestRetry::test_nullable_operation_retry_is_refused_with_zero_side_effects"
+      ],
+      "added_files": [
+        "test_task27_conflict_resolution.py",
+        "test_task27_conflict_resolution_pg.py"
+      ],
+      "restored": true,
+      "restored_sha256": "c6e30019b360ab37578f1e468221f334b66a1b1c34d45db80a54d6c48f6996e8",
+      "seconds": 73.1
+    },
+    {
+      "id": "D03",
+      "path": "backend/app/services/workpaper_sync/conflict_resolution.py",
+      "want": "test_task27_conflict_resolution_pg.py::TestRollback::test_unpublished_canonical_artifact_is_refused_by_the_service",
+      "why": "R03 回归：删掉准入判据后 resolver 的通用 `ArtifactNotPublishedError` 会接住同一个输入 —— **行为上仍然拒绝**，但原因从「这个版本不能作回滚源」变成「artifact 未发布」，而且本域判据在所有可达输入上都不可达（provably dead）。这正是本任务真库实测踩到并修掉的形态：判据在、却永远轮不到它",
+      "verdict": "RED",
+      "summary": "8 failed, 390 passed in 69.09s (0:01:09)",
+      "added": [
+        "test_task27_conflict_resolution_pg.py::TestHarness::test_every_scenario_was_collected",
+        "test_task27_conflict_resolution_pg.py::TestHarness::test_no_phase_crashed_during_collection",
+        "test_task27_conflict_resolution_pg.py::TestRollback::test_history_rows_and_files_are_untouched",
+        "test_task27_conflict_resolution_pg.py::TestRollback::test_rollback_creates_a_new_version_and_never_rewinds",
+        "test_task27_conflict_resolution_pg.py::TestRollback::test_the_new_version_carries_the_rollback_source_bucket",
+        "test_task27_conflict_resolution_pg.py::TestRollback::test_the_rolled_back_projection_equals_the_historical_one",
+        "test_task27_conflict_resolution_pg.py::TestRollback::test_unchanged_projection_means_zero_writes",
+        "test_task27_conflict_resolution_pg.py::TestRollback::test_unpublished_canonical_artifact_is_refused_by_the_service"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task27_conflict_resolution_pg.py::TestRollback::test_unpublished_canonical_artifact_is_refused_by_the_service"
+      ],
+      "added_files": [
+        "test_task27_conflict_resolution_pg.py"
+      ],
+      "restored": true,
+      "restored_sha256": "c6e30019b360ab37578f1e468221f334b66a1b1c34d45db80a54d6c48f6996e8",
+      "seconds": 72.9
+    },
+    {
+      "id": "D04",
+      "path": "backend/app/services/workpaper_sync/conflict_resolution.py",
+      "want": "test_task27_conflict_resolution.py::TestErrorCodesAreDistinct::test_every_exported_error_has_a_unique_code",
+      "why": "不再拒绝「源 revision 高于 current」⇒ 把未来版本当历史版本回滚。🔴 本条**预期打红的是弱判据**（error_code 唯一性不受影响）—— 实测若判 GREEN，说明缺一条针对该分支的行为判据，届时必须补而不是放宽",
+      "verdict": "GREEN",
+      "summary": "398 passed in 69.04s (0:01:09)",
+      "added": [],
+      "gone": [],
+      "hit": [],
+      "added_files": [],
+      "restored": true,
+      "restored_sha256": "c6e30019b360ab37578f1e468221f334b66a1b1c34d45db80a54d6c48f6996e8",
+      "seconds": 72.8
+    },
+    {
+      "id": "D05",
+      "path": "backend/app/services/workpaper_sync/conflict_resolution.py",
+      "want": "test_task27_conflict_resolution_pg.py::TestRollback::test_unchanged_projection_means_zero_writes",
+      "why": "业务 projection 未变化时仍然创建新 content version ⇒ 制造**伪业务 revision**（AC 6.18 / 9.10 / Property 67 明令 revision 保持不变）。伪 revision 会污染evidence、双基线与全部历史读取的定位",
+      "verdict": "RED",
+      "summary": "1 failed, 397 passed in 68.95s (0:01:08)",
+      "added": [
+        "test_task27_conflict_resolution_pg.py::TestRollback::test_unchanged_projection_means_zero_writes"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task27_conflict_resolution_pg.py::TestRollback::test_unchanged_projection_means_zero_writes"
+      ],
+      "added_files": [
+        "test_task27_conflict_resolution_pg.py"
+      ],
+      "restored": true,
+      "restored_sha256": "c6e30019b360ab37578f1e468221f334b66a1b1c34d45db80a54d6c48f6996e8",
+      "seconds": 72.7
+    },
+    {
+      "id": "E01",
+      "path": "backend/app/services/workpaper_sync/conflict_resolution.py",
+      "want": "test_task27_conflict_resolution_pg.py::TestOpaqueVersionScope::test_cross_wp_uuid_and_unknown_uuid_share_one_404",
+      "why": "跨 scope 的 version UUID 不再被 scope 门拦住 ⇒ 换个 wp 试同一个 UUID 就能探测别的项目有哪些版本（AC 8.7 末句 / 10.6 的统一 404 被破）。业务行那道二次核对仍会拒，但错误**类型/时序**不同 ⇒ 存在性泄露",
+      "verdict": "GREEN",
+      "summary": "398 passed in 62.11s (0:01:02)",
+      "added": [],
+      "gone": [],
+      "hit": [],
+      "added_files": [],
+      "restored": true,
+      "restored_sha256": "c6e30019b360ab37578f1e468221f334b66a1b1c34d45db80a54d6c48f6996e8",
+      "seconds": 65.1
+    },
+    {
+      "id": "E02",
+      "path": "backend/app/services/workpaper_sync/conflict_resolution.py",
+      "want": "*",
+      "why": "业务行不再按 wp 过滤 ⇒ scope index 与 content version 行之间失去二次核对（scope row 被错写/被 retire 后就能跨 wp 定位）。E01 与本条是同一条不变量的两道门，必须各自可证伪",
+      "verdict": "GREEN",
+      "summary": "398 passed in 64.81s (0:01:04)",
+      "added": [],
+      "gone": [],
+      "hit": [],
+      "added_files": [],
+      "restored": true,
+      "restored_sha256": "c6e30019b360ab37578f1e468221f334b66a1b1c34d45db80a54d6c48f6996e8",
+      "seconds": 67.6
+    },
+    {
+      "id": "E03",
+      "path": "backend/app/services/workpaper_sync/conflict_resolution.py",
+      "want": "test_task27_conflict_resolution.py::TestFrozenContractLock::test_drifted_digest_is_refused",
+      "why": "按 registry **当前 alias** 渲染历史 operation 的预览/折叠 ⇒ 审计师看到的业务标签、单元格地址与 value_type 可能已漂移到新模板上（AC 6.2 / 7.10）。真库侧同时红",
+      "verdict": "RED",
+      "summary": "2 failed, 396 passed in 58.17s",
+      "added": [
+        "test_task27_conflict_resolution.py::TestFrozenContractLock::test_drifted_digest_is_refused",
+        "test_task27_conflict_resolution_pg.py::TestConflictPreview::test_a_drifted_contract_is_refused"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task27_conflict_resolution.py::TestFrozenContractLock::test_drifted_digest_is_refused",
+        "test_task27_conflict_resolution_pg.py::TestConflictPreview::test_a_drifted_contract_is_refused"
+      ],
+      "added_files": [
+        "test_task27_conflict_resolution.py",
+        "test_task27_conflict_resolution_pg.py"
+      ],
+      "restored": true,
+      "restored_sha256": "c6e30019b360ab37578f1e468221f334b66a1b1c34d45db80a54d6c48f6996e8",
+      "seconds": 61.1
+    },
+    {
+      "id": "F01",
+      "path": "backend/app/services/workpaper_sync/oo_to_html.py",
+      "want": "test_task27_conflict_resolution_pg.py::TestConflictPreview::test_conflict_rows_were_really_persisted",
+      "why": "冲突不再落行 ⇒ 只剩 `conflict_count/digest` 两个标量：预览没有数据可读（AC 8.1 的九个要素全部丢失），裁决轨迹也无处可写（AC 8.6）。改成一个不存在的方法名而不是删整段：删整段会连带让 `write.inserted` NameError，归因变成「语法层错误」而不是「判据缺失」",
+      "verdict": "RED",
+      "summary": "21 failed, 377 passed in 60.98s (0:01:00)",
+      "added": [
+        "test_task26_oo_to_html_pg.py::TestConflictLeavesEverythingUntouched::test_application_records_the_conflict_set",
+        "test_task26_oo_to_html_pg.py::TestConflictLeavesEverythingUntouched::test_conflict_path_never_materializes",
+        "test_task26_oo_to_html_pg.py::TestConflictLeavesEverythingUntouched::test_p27_only_the_touched_row_conflicts",
+        "test_task26_oo_to_html_pg.py::TestConflictLeavesEverythingUntouched::test_result_is_conflict_with_exactly_one_record",
+        "test_task26_oo_to_html_pg.py::TestManualAdjudicationIsAppliedOnRealDb::test_conflict_rows_were_persisted_before_resolve",
+        "test_task26_oo_to_html_pg.py::TestManualAdjudicationIsAppliedOnRealDb::test_the_same_world_really_produces_a_conflict",
+        "test_task26_oo_to_html_pg.py::TestManualAdjudicationIsAppliedOnRealDb::test_the_state_machine_is_not_what_let_it_through",
+        "test_task27_conflict_resolution_pg.py::TestConflictPreview::test_amount_fields_declare_their_value_type",
+        "test_task27_conflict_resolution_pg.py::TestConflictPreview::test_conflict_rows_were_really_persisted",
+        "test_task27_conflict_resolution_pg.py::TestConflictPreview::test_every_item_is_traceable_on_both_sides",
+        "test_task27_conflict_resolution_pg.py::TestConflictPreview::test_grouping_is_by_sheet_table_row",
+        "test_task27_conflict_resolution_pg.py::TestHarness::test_every_scenario_was_collected",
+        "test_task27_conflict_resolution_pg.py::TestHarness::test_no_phase_crashed_during_collection",
+        "test_task27_conflict_resolution_pg.py::TestResolveFenceRejections::test_current_revision_change_rebases_and_rebuilds_conflicts",
+        "test_task27_conflict_resolution_pg.py::TestResolveFenceRejections::test_same_application_higher_sequence_only_folds",
+        "test_task27_conflict_resolution_pg.py::TestResolveProceeds::test_decision_is_proceed_and_maps_to_200",
+        "test_task27_conflict_resolution_pg.py::TestResolveProceeds::test_entry_pointer_and_room_baseline_moved",
+        "test_task27_conflict_resolution_pg.py::TestResolveProceeds::test_no_second_operation_or_application",
+        "test_task27_conflict_resolution_pg.py::TestResolveProceeds::test_revision_advanced_exactly_once",
+        "test_task27_conflict_resolution_pg.py::TestResolveProceeds::test_the_published_projection_is_the_folded_one",
+        "test_task27_conflict_resolution_pg.py::TestResolveProceeds::test_the_resolution_trail_was_written"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task27_conflict_resolution_pg.py::TestConflictPreview::test_conflict_rows_were_really_persisted"
+      ],
+      "added_files": [
+        "test_task26_oo_to_html_pg.py",
+        "test_task27_conflict_resolution_pg.py"
+      ],
+      "restored": true,
+      "restored_sha256": "df8f55c9e72a28cef3e5e1a1f14126bf808464f96662548b9e54e73f57e5f704",
+      "seconds": 64.2
+    },
+    {
+      "id": "F02",
+      "path": "backend/app/services/workpaper_sync/repository.py",
+      "want": "test_task27_conflict_resolution_pg.py::TestConflictPreview::test_conflict_rows_were_really_persisted",
+      "why": "rebase 后消失的旧冲突不再被打 `superseded_at` ⇒ 预览把已经不存在的冲突继续展示给审计师，而它的三方值早已过期。判据落在「live 行数 == 本轮冲突数」上",
+      "verdict": "GREEN",
+      "summary": "398 passed in 61.43s (0:01:01)",
+      "added": [],
+      "gone": [],
+      "hit": [],
+      "added_files": [],
+      "restored": true,
+      "restored_sha256": "bb0200a36ccea2019667414520c74853332956e54bf57403ba5b0ce765f6a444",
+      "seconds": 64.6
+    },
+    {
+      "id": "F03",
+      "path": "backend/app/services/workpaper_sync/conflict_resolution.py",
+      "want": "test_task27_conflict_resolution_pg.py::TestResolveProceeds::test_the_resolution_trail_was_written",
+      "why": "AC 8.6 的裁决轨迹（actor / 时间 / 选择结果 / 落地值）不再落库 ⇒ 事后无法回答「谁在什么时候选了什么」。内容照常发布，因此只有查冲突行的判据会红",
+      "verdict": "RED",
+      "summary": "2 failed, 396 passed in 69.50s (0:01:09)",
+      "added": [
+        "test_task27_conflict_resolution_pg.py::TestResolveFenceRejections::test_same_application_higher_sequence_only_folds",
+        "test_task27_conflict_resolution_pg.py::TestResolveProceeds::test_the_resolution_trail_was_written"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task27_conflict_resolution_pg.py::TestResolveProceeds::test_the_resolution_trail_was_written"
+      ],
+      "added_files": [
+        "test_task27_conflict_resolution_pg.py"
+      ],
+      "restored": true,
+      "restored_sha256": "c6e30019b360ab37578f1e468221f334b66a1b1c34d45db80a54d6c48f6996e8",
+      "seconds": 73.4
+    },
+    {
+      "id": "F04",
+      "path": "backend/app/services/workpaper_sync/conflict_resolution.py",
+      "want": "test_task27_conflict_resolution_pg.py::TestResolveProceeds::test_the_resolution_trail_was_written",
+      "why": "轨迹里的落地值退回 current 侧 ⇒ 审计轨迹与实际发布内容不一致（轨迹说保留了current，内容里是 incoming）。与 F03 分层：F03 打的是「有没有写」，本条打的是「写的是不是对的值」",
+      "verdict": "RED",
+      "summary": "1 failed, 397 passed in 69.15s (0:01:09)",
+      "added": [
+        "test_task27_conflict_resolution_pg.py::TestResolveProceeds::test_the_resolution_trail_was_written"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task27_conflict_resolution_pg.py::TestResolveProceeds::test_the_resolution_trail_was_written"
+      ],
+      "added_files": [
+        "test_task27_conflict_resolution_pg.py"
+      ],
+      "restored": true,
+      "restored_sha256": "c6e30019b360ab37578f1e468221f334b66a1b1c34d45db80a54d6c48f6996e8",
+      "seconds": 72.9
+    },
+    {
+      "id": "F05",
+      "path": "backend/app/services/workpaper_sync/repository.py",
+      "want": "test_task27_conflict_resolution_pg.py::TestResolveProceeds::test_the_resolution_trail_was_written",
+      "why": "裁决找不到对应冲突行时静默跳过 ⇒ 「裁决记录不全」变成静默失败，而轨迹的全部价值就在于完整。判据落在 `conflict_rows_marked == 1` 上",
+      "verdict": "GREEN",
+      "summary": "398 passed in 69.28s (0:01:09)",
+      "added": [],
+      "gone": [],
+      "hit": [],
+      "added_files": [],
+      "restored": true,
+      "restored_sha256": "bb0200a36ccea2019667414520c74853332956e54bf57403ba5b0ce765f6a444",
+      "seconds": 73.1
+    },
+    {
+      "id": "R01",
+      "path": "backend/app/services/workpaper_sync/conflict_resolution.py",
+      "want": "test_task27_conflict_resolution_pg.py::TestResolveProceeds::test_decision_is_proceed_and_maps_to_200",
+      "why": "R01 回归：把 fence 读取退回**手写 SQL 的错列名**（`frozen_write_fence_epoch` 并不存在）。这是本任务真库实测抓到的第一个缺陷 —— 离线守卫、`get_diagnostics`、vitest 全绿，只有真库执行会 `UndefinedColumnError`。改用 ORM 列引用之后列名错误在 import 期就暴露",
+      "verdict": "RED",
+      "summary": "12 failed, 386 passed in 69.25s (0:01:09)",
+      "added": [
+        "test_task27_conflict_resolution_pg.py::TestHarness::test_every_scenario_was_collected",
+        "test_task27_conflict_resolution_pg.py::TestHarness::test_no_phase_crashed_during_collection",
+        "test_task27_conflict_resolution_pg.py::TestResolveFenceRejections::test_current_revision_change_rebases_and_rebuilds_conflicts",
+        "test_task27_conflict_resolution_pg.py::TestResolveFenceRejections::test_generation_change_is_rejected_with_its_own_reason",
+        "test_task27_conflict_resolution_pg.py::TestResolveFenceRejections::test_newer_different_application_supersedes",
+        "test_task27_conflict_resolution_pg.py::TestResolveFenceRejections::test_same_application_higher_sequence_only_folds",
+        "test_task27_conflict_resolution_pg.py::TestResolveProceeds::test_decision_is_proceed_and_maps_to_200",
+        "test_task27_conflict_resolution_pg.py::TestResolveProceeds::test_entry_pointer_and_room_baseline_moved",
+        "test_task27_conflict_resolution_pg.py::TestResolveProceeds::test_no_second_operation_or_application",
+        "test_task27_conflict_resolution_pg.py::TestResolveProceeds::test_revision_advanced_exactly_once",
+        "test_task27_conflict_resolution_pg.py::TestResolveProceeds::test_the_published_projection_is_the_folded_one",
+        "test_task27_conflict_resolution_pg.py::TestResolveProceeds::test_the_resolution_trail_was_written"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task27_conflict_resolution_pg.py::TestResolveProceeds::test_decision_is_proceed_and_maps_to_200"
+      ],
+      "added_files": [
+        "test_task27_conflict_resolution_pg.py"
+      ],
+      "restored": true,
+      "restored_sha256": "c6e30019b360ab37578f1e468221f334b66a1b1c34d45db80a54d6c48f6996e8",
+      "seconds": 73.2
+    },
+    {
+      "id": "R02",
+      "path": "backend/app/services/workpaper_sync/repository.py",
+      "want": "test_task27_conflict_resolution_pg.py::TestRollback::test_rollback_creates_a_new_version_and_never_rewinds",
+      "why": "R02 回归：artifact 登记不再做内容寻址幂等 ⇒ rollback 重新 materialize 出**逐字节相同**的 representation（文件名 `{generation:09d}-{sha12}`、新 content version 的 generation 又从 1 起）时撞 `uq_wpa_relative_path`。这是回滚的**正常**路径而不是边缘情况",
+      "verdict": "RED",
+      "summary": "7 failed, 391 passed in 66.90s (0:01:06)",
+      "added": [
+        "test_task27_conflict_resolution_pg.py::TestHarness::test_every_scenario_was_collected",
+        "test_task27_conflict_resolution_pg.py::TestHarness::test_no_phase_crashed_during_collection",
+        "test_task27_conflict_resolution_pg.py::TestRollback::test_history_rows_and_files_are_untouched",
+        "test_task27_conflict_resolution_pg.py::TestRollback::test_rollback_creates_a_new_version_and_never_rewinds",
+        "test_task27_conflict_resolution_pg.py::TestRollback::test_the_new_version_carries_the_rollback_source_bucket",
+        "test_task27_conflict_resolution_pg.py::TestRollback::test_the_rolled_back_projection_equals_the_historical_one",
+        "test_task27_conflict_resolution_pg.py::TestRollback::test_unchanged_projection_means_zero_writes"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task27_conflict_resolution_pg.py::TestRollback::test_rollback_creates_a_new_version_and_never_rewinds"
+      ],
+      "added_files": [
+        "test_task27_conflict_resolution_pg.py"
+      ],
+      "restored": true,
+      "restored_sha256": "bb0200a36ccea2019667414520c74853332956e54bf57403ba5b0ce765f6a444",
+      "seconds": 70.1
+    }
+  ]
+}

@@ -1,0 +1,596 @@
+{
+  "managed_sheet": "减少检查表H1-8",
+  "not_selected_reason": {
+    "明细表H1-2": "表头物理占 4 行（9/10/11/12），超出 contracts._parse_table 的 header_rows 值域 1..3（Task 13 已把 4 锁死为被拒）；下移 anchor 会丢掉最外层分组（固定资产原值/累计折旧/减值准备）= 压扁列结构。登记为 UPSTREAM_DEBT_FOUR_LEVEL_HEADER_NOT_EXPRESSIBLE"
+  },
+  "sheet_count": 26,
+  "sheets": [
+    {
+      "conditional_formatting_count": 0,
+      "data_validation_count": 0,
+      "dimensions": "A1:H28",
+      "footer_rows_with_total_marker": [],
+      "horizontal_merge_rows": [],
+      "max_column": 8,
+      "max_row": 28,
+      "merge_count": 3,
+      "selected_as_managed": false,
+      "sheet": "底稿目录",
+      "sheet_protection": false
+    },
+    {
+      "conditional_formatting_count": 0,
+      "data_validation_count": 0,
+      "dimensions": "A1:M40",
+      "footer_rows_with_total_marker": [],
+      "horizontal_merge_rows": [
+        1,
+        2,
+        5,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15,
+        17,
+        18,
+        19,
+        20,
+        21,
+        22,
+        23,
+        24,
+        25,
+        26,
+        27,
+        28,
+        29,
+        30,
+        31,
+        32,
+        33,
+        34,
+        35,
+        36,
+        37,
+        38
+      ],
+      "max_column": 13,
+      "max_row": 40,
+      "merge_count": 45,
+      "selected_as_managed": false,
+      "sheet": "固定资产审计程序表H1A",
+      "sheet_protection": false
+    },
+    {
+      "conditional_formatting_count": 3,
+      "data_validation_count": 0,
+      "dimensions": "A1:I74",
+      "footer_rows_with_total_marker": [
+        13,
+        20,
+        27,
+        34,
+        53
+      ],
+      "horizontal_merge_rows": [
+        1,
+        2,
+        5
+      ],
+      "max_column": 9,
+      "max_row": 74,
+      "merge_count": 6,
+      "selected_as_managed": false,
+      "sheet": "审定表H1-1",
+      "sheet_protection": false
+    },
+    {
+      "conditional_formatting_count": 0,
+      "data_validation_count": 0,
+      "dimensions": "A1:IW93",
+      "footer_rows_with_total_marker": [],
+      "horizontal_merge_rows": [
+        1,
+        2,
+        52,
+        53,
+        54,
+        55,
+        56,
+        57,
+        58,
+        85,
+        93
+      ],
+      "max_column": 257,
+      "max_row": 93,
+      "merge_count": 11,
+      "selected_as_managed": false,
+      "sheet": "附注披露信息（上市公司）",
+      "sheet_protection": false
+    },
+    {
+      "conditional_formatting_count": 0,
+      "data_validation_count": 0,
+      "dimensions": "A1:IV78",
+      "footer_rows_with_total_marker": [
+        14,
+        23,
+        32,
+        41,
+        50
+      ],
+      "horizontal_merge_rows": [
+        1,
+        2
+      ],
+      "max_column": 256,
+      "max_row": 78,
+      "merge_count": 2,
+      "selected_as_managed": false,
+      "sheet": "附注披露信息（国有企业）",
+      "sheet_protection": false
+    },
+    {
+      "conditional_formatting_count": 0,
+      "data_validation_count": 3,
+      "dimensions": "A1:BB56",
+      "footer_rows_with_total_marker": [
+        33
+      ],
+      "horizontal_merge_rows": [
+        1,
+        2,
+        9,
+        10,
+        11,
+        33,
+        35,
+        36,
+        37,
+        38,
+        39
+      ],
+      "max_column": 54,
+      "max_row": 56,
+      "merge_count": 70,
+      "selected_as_managed": false,
+      "sheet": "明细表H1-2",
+      "sheet_protection": false
+    },
+    {
+      "conditional_formatting_count": 0,
+      "data_validation_count": 1,
+      "dimensions": "A1:M24",
+      "footer_rows_with_total_marker": [],
+      "horizontal_merge_rows": [
+        1,
+        2
+      ],
+      "max_column": 13,
+      "max_row": 24,
+      "merge_count": 2,
+      "selected_as_managed": false,
+      "sheet": "调整分录汇总H1-3",
+      "sheet_protection": false
+    },
+    {
+      "conditional_formatting_count": 0,
+      "data_validation_count": 0,
+      "dimensions": "A1:L31",
+      "footer_rows_with_total_marker": [
+        17,
+        24
+      ],
+      "horizontal_merge_rows": [
+        1,
+        2
+      ],
+      "max_column": 12,
+      "max_row": 31,
+      "merge_count": 2,
+      "selected_as_managed": false,
+      "sheet": "闲置检查表H1-4",
+      "sheet_protection": false
+    },
+    {
+      "conditional_formatting_count": 0,
+      "data_validation_count": 1,
+      "dimensions": "A1:P34",
+      "footer_rows_with_total_marker": [],
+      "horizontal_merge_rows": [
+        1,
+        2,
+        17
+      ],
+      "max_column": 16,
+      "max_row": 34,
+      "merge_count": 7,
+      "selected_as_managed": false,
+      "sheet": "会计政策估计检查表H1-5",
+      "sheet_protection": false
+    },
+    {
+      "conditional_formatting_count": 0,
+      "data_validation_count": 0,
+      "dimensions": "A1:T29",
+      "footer_rows_with_total_marker": [],
+      "horizontal_merge_rows": [
+        1,
+        2
+      ],
+      "max_column": 20,
+      "max_row": 29,
+      "merge_count": 2,
+      "selected_as_managed": false,
+      "sheet": "分析表H1-6",
+      "sheet_protection": false
+    },
+    {
+      "conditional_formatting_count": 0,
+      "data_validation_count": 2,
+      "dimensions": "A1:X61",
+      "footer_rows_with_total_marker": [
+        32,
+        33
+      ],
+      "horizontal_merge_rows": [
+        1,
+        2,
+        5,
+        14,
+        32,
+        33,
+        34
+      ],
+      "max_column": 24,
+      "max_row": 61,
+      "merge_count": 21,
+      "selected_as_managed": false,
+      "sheet": "增加检查表H1-7",
+      "sheet_protection": false
+    },
+    {
+      "conditional_formatting_count": 0,
+      "data_validation_count": 2,
+      "dimensions": "A1:AA43",
+      "footer_rows_with_total_marker": [
+        28,
+        29
+      ],
+      "horizontal_merge_rows": [
+        1,
+        2,
+        5,
+        10,
+        11,
+        28,
+        29,
+        30
+      ],
+      "max_column": 27,
+      "max_row": 43,
+      "merge_count": 32,
+      "selected_as_managed": true,
+      "sheet": "减少检查表H1-8",
+      "sheet_protection": false
+    },
+    {
+      "conditional_formatting_count": 0,
+      "data_validation_count": 0,
+      "dimensions": "A1:O58",
+      "footer_rows_with_total_marker": [
+        42
+      ],
+      "horizontal_merge_rows": [
+        1,
+        2
+      ],
+      "max_column": 15,
+      "max_row": 58,
+      "merge_count": 2,
+      "selected_as_managed": false,
+      "sheet": "监盘计划H1-9",
+      "sheet_protection": false
+    },
+    {
+      "conditional_formatting_count": 0,
+      "data_validation_count": 0,
+      "dimensions": "A1:Q65",
+      "footer_rows_with_total_marker": [
+        27,
+        28,
+        29,
+        45,
+        46,
+        47
+      ],
+      "horizontal_merge_rows": [
+        1,
+        2,
+        15,
+        28,
+        29,
+        32,
+        46,
+        47
+      ],
+      "max_column": 17,
+      "max_row": 65,
+      "merge_count": 30,
+      "selected_as_managed": false,
+      "sheet": "盘点检查表H1-10",
+      "sheet_protection": false
+    },
+    {
+      "conditional_formatting_count": 0,
+      "data_validation_count": 0,
+      "dimensions": "A1:J125",
+      "footer_rows_with_total_marker": [
+        97,
+        110
+      ],
+      "horizontal_merge_rows": [
+        1,
+        2
+      ],
+      "max_column": 10,
+      "max_row": 125,
+      "merge_count": 2,
+      "selected_as_managed": false,
+      "sheet": "监盘小结H1-11",
+      "sheet_protection": false
+    },
+    {
+      "conditional_formatting_count": 0,
+      "data_validation_count": 0,
+      "dimensions": "A1:AB68",
+      "footer_rows_with_total_marker": [
+        65
+      ],
+      "horizontal_merge_rows": [
+        1,
+        2,
+        31,
+        32,
+        33,
+        34,
+        35
+      ],
+      "max_column": 28,
+      "max_row": 68,
+      "merge_count": 7,
+      "selected_as_managed": false,
+      "sheet": "折旧测算表（不含减值）-直线法H1-12",
+      "sheet_protection": false
+    },
+    {
+      "conditional_formatting_count": 0,
+      "data_validation_count": 0,
+      "dimensions": "A1:AB48",
+      "footer_rows_with_total_marker": [],
+      "horizontal_merge_rows": [
+        1,
+        2,
+        31,
+        32,
+        33,
+        34,
+        35
+      ],
+      "max_column": 28,
+      "max_row": 48,
+      "merge_count": 7,
+      "selected_as_managed": false,
+      "sheet": "折旧测算表（含减值）H1-12",
+      "sheet_protection": false
+    },
+    {
+      "conditional_formatting_count": 0,
+      "data_validation_count": 0,
+      "dimensions": "A1:AC50",
+      "footer_rows_with_total_marker": [
+        29
+      ],
+      "horizontal_merge_rows": [
+        1,
+        2,
+        29,
+        30,
+        31,
+        32,
+        33,
+        34,
+        35
+      ],
+      "max_column": 29,
+      "max_row": 50,
+      "merge_count": 9,
+      "selected_as_managed": false,
+      "sheet": "折旧测算表（多次减值）H1-12",
+      "sheet_protection": false
+    },
+    {
+      "conditional_formatting_count": 0,
+      "data_validation_count": 0,
+      "dimensions": "A1:K23",
+      "footer_rows_with_total_marker": [
+        13
+      ],
+      "horizontal_merge_rows": [
+        1,
+        2,
+        13
+      ],
+      "max_column": 11,
+      "max_row": 23,
+      "merge_count": 3,
+      "selected_as_managed": false,
+      "sheet": "折旧分配分析表H1-13",
+      "sheet_protection": false
+    },
+    {
+      "conditional_formatting_count": 0,
+      "data_validation_count": 2,
+      "dimensions": "A1:AG42",
+      "footer_rows_with_total_marker": [
+        22,
+        33
+      ],
+      "horizontal_merge_rows": [
+        1,
+        2,
+        7,
+        22,
+        23,
+        24,
+        25,
+        26,
+        27,
+        28,
+        30,
+        33,
+        36,
+        37,
+        38,
+        39,
+        40,
+        41,
+        42
+      ],
+      "max_column": 33,
+      "max_row": 42,
+      "merge_count": 29,
+      "selected_as_managed": false,
+      "sheet": "减值测算表H1-14",
+      "sheet_protection": false
+    },
+    {
+      "conditional_formatting_count": 0,
+      "data_validation_count": 2,
+      "dimensions": "A1:AB88",
+      "footer_rows_with_total_marker": [],
+      "horizontal_merge_rows": [
+        1,
+        2,
+        17,
+        22
+      ],
+      "max_column": 28,
+      "max_row": 88,
+      "merge_count": 26,
+      "selected_as_managed": false,
+      "sheet": "可收回金额测试表H1-15",
+      "sheet_protection": false
+    },
+    {
+      "conditional_formatting_count": 0,
+      "data_validation_count": 1,
+      "dimensions": "A1:V98",
+      "footer_rows_with_total_marker": [
+        17
+      ],
+      "horizontal_merge_rows": [
+        1,
+        2,
+        7
+      ],
+      "max_column": 22,
+      "max_row": 98,
+      "merge_count": 7,
+      "selected_as_managed": false,
+      "sheet": "房屋建筑物权属检查表H1-16",
+      "sheet_protection": false
+    },
+    {
+      "conditional_formatting_count": 1,
+      "data_validation_count": 2,
+      "dimensions": "A1:U95",
+      "footer_rows_with_total_marker": [
+        29
+      ],
+      "horizontal_merge_rows": [
+        1,
+        2,
+        6,
+        7,
+        30,
+        33,
+        35,
+        37,
+        39,
+        42,
+        45,
+        46,
+        47,
+        48
+      ],
+      "max_column": 21,
+      "max_row": 95,
+      "merge_count": 20,
+      "selected_as_managed": false,
+      "sheet": "运输设备权属检查表H1-17",
+      "sheet_protection": false
+    },
+    {
+      "conditional_formatting_count": 0,
+      "data_validation_count": 2,
+      "dimensions": "A1:O106",
+      "footer_rows_with_total_marker": [],
+      "horizontal_merge_rows": [
+        1,
+        2
+      ],
+      "max_column": 15,
+      "max_row": 106,
+      "merge_count": 2,
+      "selected_as_managed": false,
+      "sheet": "关联交易检查表H1-18",
+      "sheet_protection": false
+    },
+    {
+      "conditional_formatting_count": 0,
+      "data_validation_count": 0,
+      "dimensions": "A1:Y93",
+      "footer_rows_with_total_marker": [],
+      "horizontal_merge_rows": [
+        1,
+        2,
+        7
+      ],
+      "max_column": 25,
+      "max_row": 93,
+      "merge_count": 14,
+      "selected_as_managed": false,
+      "sheet": "经营租出固定资产检查表H1-19",
+      "sheet_protection": false
+    },
+    {
+      "conditional_formatting_count": 0,
+      "data_validation_count": 1,
+      "dimensions": "A1:V125",
+      "footer_rows_with_total_marker": [
+        29,
+        47
+      ],
+      "horizontal_merge_rows": [
+        1,
+        2,
+        7,
+        18
+      ],
+      "max_column": 22,
+      "max_row": 125,
+      "merge_count": 12,
+      "selected_as_managed": false,
+      "sheet": "融资租出固定资产检查表H1-20",
+      "sheet_protection": false
+    }
+  ],
+  "template_relative_path": "H/H1 固定资产.xlsx",
+  "template_sha256": "344f83216b9024e3c3fde7c1ed545eb0026a6cf088a0b0dfd0916e47b64fdc87"
+}

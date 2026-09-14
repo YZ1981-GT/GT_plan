@@ -1,0 +1,630 @@
+{
+  "pbtResults": {},
+  "executionHistory": {
+    "1. 建立公共资源权限策略与 `ResourceAccessResolver`": [
+      {
+        "executionId": "81441cff-b4c1-4aa2-88c1-43084a1ea895",
+        "chatSessionId": "sess_27164671-32bf-42ed-8b9e-03be687cc1ab",
+        "timestamp": 1787330269186
+      },
+      {
+        "executionId": "81441cff-b4c1-4aa2-88c1-43084a1ea895",
+        "chatSessionId": "sess_27164671-32bf-42ed-8b9e-03be687cc1ab",
+        "timestamp": 1787330280255
+      },
+      {
+        "executionId": "81441cff-b4c1-4aa2-88c1-43084a1ea895",
+        "chatSessionId": "sess_27164671-32bf-42ed-8b9e-03be687cc1ab",
+        "timestamp": 1787335072826
+      }
+    ],
+    "2. 实现可信 `HostContextResolver` 并纠正全部宿主契约": [
+      {
+        "executionId": "81441cff-b4c1-4aa2-88c1-43084a1ea895",
+        "chatSessionId": "sess_27164671-32bf-42ed-8b9e-03be687cc1ab",
+        "timestamp": 1787330269238
+      },
+      {
+        "executionId": "81441cff-b4c1-4aa2-88c1-43084a1ea895",
+        "chatSessionId": "sess_27164671-32bf-42ed-8b9e-03be687cc1ab",
+        "timestamp": 1787335093684
+      },
+      {
+        "executionId": "81441cff-b4c1-4aa2-88c1-43084a1ea895",
+        "chatSessionId": "sess_27164671-32bf-42ed-8b9e-03be687cc1ab",
+        "timestamp": 1787340541793
+      }
+    ],
+    "3. 增强 AI chat 持久化模型与并发约束": [
+      {
+        "executionId": "81441cff-b4c1-4aa2-88c1-43084a1ea895",
+        "chatSessionId": "sess_27164671-32bf-42ed-8b9e-03be687cc1ab",
+        "timestamp": 1787330269282
+      },
+      {
+        "executionId": "81441cff-b4c1-4aa2-88c1-43084a1ea895",
+        "chatSessionId": "sess_27164671-32bf-42ed-8b9e-03be687cc1ab",
+        "timestamp": 1787335098534
+      },
+      {
+        "executionId": "81441cff-b4c1-4aa2-88c1-43084a1ea895",
+        "chatSessionId": "sess_27164671-32bf-42ed-8b9e-03be687cc1ab",
+        "timestamp": 1787340546801
+      }
+    ],
+    "4. 定义 typed contract 并实现幂等 Run 创建 API": [
+      {
+        "executionId": "81441cff-b4c1-4aa2-88c1-43084a1ea895",
+        "chatSessionId": "sess_27164671-32bf-42ed-8b9e-03be687cc1ab",
+        "timestamp": 1787330269339
+      },
+      {
+        "executionId": "81441cff-b4c1-4aa2-88c1-43084a1ea895",
+        "chatSessionId": "sess_27164671-32bf-42ed-8b9e-03be687cc1ab",
+        "timestamp": 1787340552352
+      },
+      {
+        "executionId": "81441cff-b4c1-4aa2-88c1-43084a1ea895",
+        "chatSessionId": "sess_27164671-32bf-42ed-8b9e-03be687cc1ab",
+        "timestamp": 1787345484059
+      }
+    ],
+    "5. 实现 `ChatRunCoordinator`、SSE replay、取消与 drain": [
+      {
+        "executionId": "81441cff-b4c1-4aa2-88c1-43084a1ea895",
+        "chatSessionId": "sess_27164671-32bf-42ed-8b9e-03be687cc1ab",
+        "timestamp": 1787330269379
+      },
+      {
+        "executionId": "81441cff-b4c1-4aa2-88c1-43084a1ea895",
+        "chatSessionId": "sess_27164671-32bf-42ed-8b9e-03be687cc1ab",
+        "timestamp": 1787345496576
+      },
+      {
+        "executionId": "dfd9d5e1-7ab7-497f-b7ad-98a65849339d",
+        "chatSessionId": "sess_27164671-32bf-42ed-8b9e-03be687cc1ab",
+        "timestamp": 1787349999847
+      },
+      {
+        "executionId": "dfd9d5e1-7ab7-497f-b7ad-98a65849339d",
+        "chatSessionId": "sess_27164671-32bf-42ed-8b9e-03be687cc1ab",
+        "timestamp": 1787350583032
+      }
+    ],
+    "6. 实现统一 `ChatEngine` 与 `NativeEngine`": [
+      {
+        "executionId": "81441cff-b4c1-4aa2-88c1-43084a1ea895",
+        "chatSessionId": "sess_27164671-32bf-42ed-8b9e-03be687cc1ab",
+        "timestamp": 1787330269413
+      },
+      {
+        "executionId": "81441cff-b4c1-4aa2-88c1-43084a1ea895",
+        "chatSessionId": "sess_27164671-32bf-42ed-8b9e-03be687cc1ab",
+        "timestamp": 1787345502090
+      },
+      {
+        "executionId": "dfd9d5e1-7ab7-497f-b7ad-98a65849339d",
+        "chatSessionId": "sess_27164671-32bf-42ed-8b9e-03be687cc1ab",
+        "timestamp": 1787350005584
+      },
+      {
+        "executionId": "dfd9d5e1-7ab7-497f-b7ad-98a65849339d",
+        "chatSessionId": "sess_27164671-32bf-42ed-8b9e-03be687cc1ab",
+        "timestamp": 1787350583618
+      }
+    ],
+    "7. 把 AI 内容采纳改为 server-authoritative、幂等且 fail-closed": [
+      {
+        "executionId": "81441cff-b4c1-4aa2-88c1-43084a1ea895",
+        "chatSessionId": "sess_27164671-32bf-42ed-8b9e-03be687cc1ab",
+        "timestamp": 1787330269446
+      },
+      {
+        "executionId": "81441cff-b4c1-4aa2-88c1-43084a1ea895",
+        "chatSessionId": "sess_27164671-32bf-42ed-8b9e-03be687cc1ab",
+        "timestamp": 1787340557502
+      },
+      {
+        "executionId": "81441cff-b4c1-4aa2-88c1-43084a1ea895",
+        "chatSessionId": "sess_27164671-32bf-42ed-8b9e-03be687cc1ab",
+        "timestamp": 1787345491378
+      }
+    ],
+    "8. 收敛前端 canonical SSE transport 与 run state": [
+      {
+        "executionId": "81441cff-b4c1-4aa2-88c1-43084a1ea895",
+        "chatSessionId": "sess_27164671-32bf-42ed-8b9e-03be687cc1ab",
+        "timestamp": 1787330269500
+      },
+      {
+        "executionId": "ceecb71b-dda6-40ee-a78d-bfde03a71fcd",
+        "chatSessionId": "sess_27164671-32bf-42ed-8b9e-03be687cc1ab",
+        "timestamp": 1787361003637
+      },
+      {
+        "executionId": "ceecb71b-dda6-40ee-a78d-bfde03a71fcd",
+        "chatSessionId": "sess_27164671-32bf-42ed-8b9e-03be687cc1ab",
+        "timestamp": 1787361572117
+      }
+    ],
+    "9. 建立 `PlatformAiChatPanel` 并迁移所有宿主": [
+      {
+        "executionId": "81441cff-b4c1-4aa2-88c1-43084a1ea895",
+        "chatSessionId": "sess_27164671-32bf-42ed-8b9e-03be687cc1ab",
+        "timestamp": 1787330269541
+      },
+      {
+        "executionId": "ceecb71b-dda6-40ee-a78d-bfde03a71fcd",
+        "chatSessionId": "sess_27164671-32bf-42ed-8b9e-03be687cc1ab",
+        "timestamp": 1787361579066
+      },
+      {
+        "executionId": "ceecb71b-dda6-40ee-a78d-bfde03a71fcd",
+        "chatSessionId": "sess_27164671-32bf-42ed-8b9e-03be687cc1ab",
+        "timestamp": 1787362195434
+      }
+    ],
+    "10. 统一不可信内容渲染并清理浏览器敏感缓存": [
+      {
+        "executionId": "81441cff-b4c1-4aa2-88c1-43084a1ea895",
+        "chatSessionId": "sess_27164671-32bf-42ed-8b9e-03be687cc1ab",
+        "timestamp": 1787330269570
+      },
+      {
+        "executionId": "b7ca4f49-dc8e-400f-967a-513332916a87",
+        "chatSessionId": "sess_27164671-32bf-42ed-8b9e-03be687cc1ab",
+        "timestamp": 1787362957054
+      },
+      {
+        "executionId": "46e05449-89a9-4c9a-9e27-0edda4bd15fa",
+        "chatSessionId": "sess_e2ac27e0-009b-42a5-af2d-b3b2d25e6bd9",
+        "timestamp": 1787377747000
+      }
+    ],
+    "11. 完成三档响应式与可访问性": [
+      {
+        "executionId": "81441cff-b4c1-4aa2-88c1-43084a1ea895",
+        "chatSessionId": "sess_27164671-32bf-42ed-8b9e-03be687cc1ab",
+        "timestamp": 1787330269606
+      }
+    ],
+    "12. 接通真实限流、哈希链审计与运行指标": [
+      {
+        "executionId": "81441cff-b4c1-4aa2-88c1-43084a1ea895",
+        "chatSessionId": "sess_27164671-32bf-42ed-8b9e-03be687cc1ab",
+        "timestamp": 1787330269642
+      },
+      {
+        "executionId": "46e05449-89a9-4c9a-9e27-0edda4bd15fa",
+        "chatSessionId": "sess_e2ac27e0-009b-42a5-af2d-b3b2d25e6bd9",
+        "timestamp": 1787366861764
+      },
+      {
+        "executionId": "46e05449-89a9-4c9a-9e27-0edda4bd15fa",
+        "chatSessionId": "sess_e2ac27e0-009b-42a5-af2d-b3b2d25e6bd9",
+        "timestamp": 1787366884792
+      },
+      {
+        "executionId": "46e05449-89a9-4c9a-9e27-0edda4bd15fa",
+        "chatSessionId": "sess_e2ac27e0-009b-42a5-af2d-b3b2d25e6bd9",
+        "timestamp": 1787367694497
+      }
+    ],
+    "13. Phase A 行为守卫、并发测试与浏览器基线": [
+      {
+        "executionId": "81441cff-b4c1-4aa2-88c1-43084a1ea895",
+        "chatSessionId": "sess_27164671-32bf-42ed-8b9e-03be687cc1ab",
+        "timestamp": 1787330269682
+      }
+    ],
+    "14. 实现 mention 聚合搜索、授权加载与 Context Manifest": [
+      {
+        "executionId": "81441cff-b4c1-4aa2-88c1-43084a1ea895",
+        "chatSessionId": "sess_27164671-32bf-42ed-8b9e-03be687cc1ab",
+        "timestamp": 1787330269735
+      }
+    ],
+    "15. 实现前端 mention 与 Context Inspector": [
+      {
+        "executionId": "81441cff-b4c1-4aa2-88c1-43084a1ea895",
+        "chatSessionId": "sess_27164671-32bf-42ed-8b9e-03be687cc1ab",
+        "timestamp": 1787330269787
+      },
+      {
+        "executionId": "46e05449-89a9-4c9a-9e27-0edda4bd15fa",
+        "chatSessionId": "sess_e2ac27e0-009b-42a5-af2d-b3b2d25e6bd9",
+        "timestamp": 1787366861805
+      },
+      {
+        "executionId": "46e05449-89a9-4c9a-9e27-0edda4bd15fa",
+        "chatSessionId": "sess_e2ac27e0-009b-42a5-af2d-b3b2d25e6bd9",
+        "timestamp": 1787367718549
+      },
+      {
+        "executionId": "46e05449-89a9-4c9a-9e27-0edda4bd15fa",
+        "chatSessionId": "sess_e2ac27e0-009b-42a5-af2d-b3b2d25e6bd9",
+        "timestamp": 1787369086782
+      }
+    ],
+    "16. 实现会话附件 metadata、安全上传与 OCR 状态机": [
+      {
+        "executionId": "81441cff-b4c1-4aa2-88c1-43084a1ea895",
+        "chatSessionId": "sess_27164671-32bf-42ed-8b9e-03be687cc1ab",
+        "timestamp": 1787330269825
+      }
+    ],
+    "17. 实现附件、粘贴、OCR 展开与清理交互": [
+      {
+        "executionId": "81441cff-b4c1-4aa2-88c1-43084a1ea895",
+        "chatSessionId": "sess_27164671-32bf-42ed-8b9e-03be687cc1ab",
+        "timestamp": 1787330269866
+      },
+      {
+        "executionId": "46e05449-89a9-4c9a-9e27-0edda4bd15fa",
+        "chatSessionId": "sess_e2ac27e0-009b-42a5-af2d-b3b2d25e6bd9",
+        "timestamp": 1787366861844
+      },
+      {
+        "executionId": "46e05449-89a9-4c9a-9e27-0edda4bd15fa",
+        "chatSessionId": "sess_e2ac27e0-009b-42a5-af2d-b3b2d25e6bd9",
+        "timestamp": 1787367719316
+      },
+      {
+        "executionId": "46e05449-89a9-4c9a-9e27-0edda4bd15fa",
+        "chatSessionId": "sess_e2ac27e0-009b-42a5-af2d-b3b2d25e6bd9",
+        "timestamp": 1787369087522
+      }
+    ],
+    "18. 实现幂等项目笔记转存服务": [
+      {
+        "executionId": "81441cff-b4c1-4aa2-88c1-43084a1ea895",
+        "chatSessionId": "sess_27164671-32bf-42ed-8b9e-03be687cc1ab",
+        "timestamp": 1787330269908
+      }
+    ],
+    "19. 实现消息选择、复制和项目笔记 UI": [
+      {
+        "executionId": "81441cff-b4c1-4aa2-88c1-43084a1ea895",
+        "chatSessionId": "sess_27164671-32bf-42ed-8b9e-03be687cc1ab",
+        "timestamp": 1787330269944
+      },
+      {
+        "executionId": "46e05449-89a9-4c9a-9e27-0edda4bd15fa",
+        "chatSessionId": "sess_e2ac27e0-009b-42a5-af2d-b3b2d25e6bd9",
+        "timestamp": 1787366861885
+      },
+      {
+        "executionId": "46e05449-89a9-4c9a-9e27-0edda4bd15fa",
+        "chatSessionId": "sess_e2ac27e0-009b-42a5-af2d-b3b2d25e6bd9",
+        "timestamp": 1787367720063
+      },
+      {
+        "executionId": "46e05449-89a9-4c9a-9e27-0edda4bd15fa",
+        "chatSessionId": "sess_e2ac27e0-009b-42a5-af2d-b3b2d25e6bd9",
+        "timestamp": 1787369088315
+      }
+    ],
+    "20. 实现服务端复核模式与 single-system assembly": [
+      {
+        "executionId": "81441cff-b4c1-4aa2-88c1-43084a1ea895",
+        "chatSessionId": "sess_27164671-32bf-42ed-8b9e-03be687cc1ab",
+        "timestamp": 1787330269976
+      }
+    ],
+    "21. 实现前端复核模式条": [
+      {
+        "executionId": "81441cff-b4c1-4aa2-88c1-43084a1ea895",
+        "chatSessionId": "sess_27164671-32bf-42ed-8b9e-03be687cc1ab",
+        "timestamp": 1787330270010
+      },
+      {
+        "executionId": "46e05449-89a9-4c9a-9e27-0edda4bd15fa",
+        "chatSessionId": "sess_e2ac27e0-009b-42a5-af2d-b3b2d25e6bd9",
+        "timestamp": 1787366861925
+      },
+      {
+        "executionId": "46e05449-89a9-4c9a-9e27-0edda4bd15fa",
+        "chatSessionId": "sess_e2ac27e0-009b-42a5-af2d-b3b2d25e6bd9",
+        "timestamp": 1787367720793
+      },
+      {
+        "executionId": "46e05449-89a9-4c9a-9e27-0edda4bd15fa",
+        "chatSessionId": "sess_e2ac27e0-009b-42a5-af2d-b3b2d25e6bd9",
+        "timestamp": 1787369089139
+      }
+    ],
+    "22. 接入 `AddressCoordinateIndexSource` 与迁移": [
+      {
+        "executionId": "81441cff-b4c1-4aa2-88c1-43084a1ea895",
+        "chatSessionId": "sess_27164671-32bf-42ed-8b9e-03be687cc1ab",
+        "timestamp": 1787330270040
+      }
+    ],
+    "23. 接通地址 mention、权限、脱敏与跳转": [
+      {
+        "executionId": "81441cff-b4c1-4aa2-88c1-43084a1ea895",
+        "chatSessionId": "sess_27164671-32bf-42ed-8b9e-03be687cc1ab",
+        "timestamp": 1787330270080
+      },
+      {
+        "executionId": "46e05449-89a9-4c9a-9e27-0edda4bd15fa",
+        "chatSessionId": "sess_e2ac27e0-009b-42a5-af2d-b3b2d25e6bd9",
+        "timestamp": 1787366861963
+      },
+      {
+        "executionId": "46e05449-89a9-4c9a-9e27-0edda4bd15fa",
+        "chatSessionId": "sess_e2ac27e0-009b-42a5-af2d-b3b2d25e6bd9",
+        "timestamp": 1787367721692
+      },
+      {
+        "executionId": "46e05449-89a9-4c9a-9e27-0edda4bd15fa",
+        "chatSessionId": "sess_e2ac27e0-009b-42a5-af2d-b3b2d25e6bd9",
+        "timestamp": 1787369090387
+      }
+    ],
+    "24. Phase B 行为守卫与浏览器验收": [
+      {
+        "executionId": "81441cff-b4c1-4aa2-88c1-43084a1ea895",
+        "chatSessionId": "sess_27164671-32bf-42ed-8b9e-03be687cc1ab",
+        "timestamp": 1787330270116
+      },
+      {
+        "executionId": "46e05449-89a9-4c9a-9e27-0edda4bd15fa",
+        "chatSessionId": "sess_e2ac27e0-009b-42a5-af2d-b3b2d25e6bd9",
+        "timestamp": 1787366861995
+      },
+      {
+        "executionId": "46e05449-89a9-4c9a-9e27-0edda4bd15fa",
+        "chatSessionId": "sess_e2ac27e0-009b-42a5-af2d-b3b2d25e6bd9",
+        "timestamp": 1787369101679
+      },
+      {
+        "executionId": "46e05449-89a9-4c9a-9e27-0edda4bd15fa",
+        "chatSessionId": "sess_e2ac27e0-009b-42a5-af2d-b3b2d25e6bd9",
+        "timestamp": 1787370899625
+      }
+    ],
+    "25. 实现 MCP scoped REST endpoints 与 token 生命周期": [
+      {
+        "executionId": "81441cff-b4c1-4aa2-88c1-43084a1ea895",
+        "chatSessionId": "sess_27164671-32bf-42ed-8b9e-03be687cc1ab",
+        "timestamp": 1787330270151
+      },
+      {
+        "executionId": "46e05449-89a9-4c9a-9e27-0edda4bd15fa",
+        "chatSessionId": "sess_e2ac27e0-009b-42a5-af2d-b3b2d25e6bd9",
+        "timestamp": 1787366862029
+      },
+      {
+        "executionId": "46e05449-89a9-4c9a-9e27-0edda4bd15fa",
+        "chatSessionId": "sess_e2ac27e0-009b-42a5-af2d-b3b2d25e6bd9",
+        "timestamp": 1787370924299
+      },
+      {
+        "executionId": "46e05449-89a9-4c9a-9e27-0edda4bd15fa",
+        "chatSessionId": "sess_e2ac27e0-009b-42a5-af2d-b3b2d25e6bd9",
+        "timestamp": 1787371864866
+      }
+    ],
+    "26. 实现 `audit-data` MCP stdio server": [
+      {
+        "executionId": "81441cff-b4c1-4aa2-88c1-43084a1ea895",
+        "chatSessionId": "sess_27164671-32bf-42ed-8b9e-03be687cc1ab",
+        "timestamp": 1787330270188
+      },
+      {
+        "executionId": "46e05449-89a9-4c9a-9e27-0edda4bd15fa",
+        "chatSessionId": "sess_e2ac27e0-009b-42a5-af2d-b3b2d25e6bd9",
+        "timestamp": 1787366862083
+      },
+      {
+        "executionId": "46e05449-89a9-4c9a-9e27-0edda4bd15fa",
+        "chatSessionId": "sess_e2ac27e0-009b-42a5-af2d-b3b2d25e6bd9",
+        "timestamp": 1787371901258
+      },
+      {
+        "executionId": "46e05449-89a9-4c9a-9e27-0edda4bd15fa",
+        "chatSessionId": "sess_e2ac27e0-009b-42a5-af2d-b3b2d25e6bd9",
+        "timestamp": 1787372508575
+      }
+    ],
+    "27. 完成 DSH SDK discovery、精确 pin 与 custom Cordis smoke": [
+      {
+        "executionId": "81441cff-b4c1-4aa2-88c1-43084a1ea895",
+        "chatSessionId": "sess_27164671-32bf-42ed-8b9e-03be687cc1ab",
+        "timestamp": 1787330270224
+      },
+      {
+        "executionId": "46e05449-89a9-4c9a-9e27-0edda4bd15fa",
+        "chatSessionId": "sess_e2ac27e0-009b-42a5-af2d-b3b2d25e6bd9",
+        "timestamp": 1787366862119
+      },
+      {
+        "executionId": "46e05449-89a9-4c9a-9e27-0edda4bd15fa",
+        "chatSessionId": "sess_e2ac27e0-009b-42a5-af2d-b3b2d25e6bd9",
+        "timestamp": 1787370924907
+      },
+      {
+        "executionId": "46e05449-89a9-4c9a-9e27-0edda4bd15fa",
+        "chatSessionId": "sess_e2ac27e0-009b-42a5-af2d-b3b2d25e6bd9",
+        "timestamp": 1787371864918
+      }
+    ],
+    "28. 实现 `DshEngine`、有界 worker 与取消传播": [
+      {
+        "executionId": "81441cff-b4c1-4aa2-88c1-43084a1ea895",
+        "chatSessionId": "sess_27164671-32bf-42ed-8b9e-03be687cc1ab",
+        "timestamp": 1787330270259
+      },
+      {
+        "executionId": "46e05449-89a9-4c9a-9e27-0edda4bd15fa",
+        "chatSessionId": "sess_e2ac27e0-009b-42a5-af2d-b3b2d25e6bd9",
+        "timestamp": 1787366862155
+      },
+      {
+        "executionId": "46e05449-89a9-4c9a-9e27-0edda4bd15fa",
+        "chatSessionId": "sess_e2ac27e0-009b-42a5-af2d-b3b2d25e6bd9",
+        "timestamp": 1787372520554
+      },
+      {
+        "executionId": "46e05449-89a9-4c9a-9e27-0edda4bd15fa",
+        "chatSessionId": "sess_e2ac27e0-009b-42a5-af2d-b3b2d25e6bd9",
+        "timestamp": 1787373414155
+      }
+    ],
+    "29. 接通 DSH 脱敏、提示注入边界与工具审计": [
+      {
+        "executionId": "81441cff-b4c1-4aa2-88c1-43084a1ea895",
+        "chatSessionId": "sess_27164671-32bf-42ed-8b9e-03be687cc1ab",
+        "timestamp": 1787330270298
+      },
+      {
+        "executionId": "46e05449-89a9-4c9a-9e27-0edda4bd15fa",
+        "chatSessionId": "sess_e2ac27e0-009b-42a5-af2d-b3b2d25e6bd9",
+        "timestamp": 1787366862190
+      },
+      {
+        "executionId": "46e05449-89a9-4c9a-9e27-0edda4bd15fa",
+        "chatSessionId": "sess_e2ac27e0-009b-42a5-af2d-b3b2d25e6bd9",
+        "timestamp": 1787373432993
+      },
+      {
+        "executionId": "46e05449-89a9-4c9a-9e27-0edda4bd15fa",
+        "chatSessionId": "sess_e2ac27e0-009b-42a5-af2d-b3b2d25e6bd9",
+        "timestamp": 1787374447901
+      }
+    ],
+    "30. 接通 capability、feature flag、启动与 local-only 自检": [
+      {
+        "executionId": "81441cff-b4c1-4aa2-88c1-43084a1ea895",
+        "chatSessionId": "sess_27164671-32bf-42ed-8b9e-03be687cc1ab",
+        "timestamp": 1787330270333
+      },
+      {
+        "executionId": "46e05449-89a9-4c9a-9e27-0edda4bd15fa",
+        "chatSessionId": "sess_e2ac27e0-009b-42a5-af2d-b3b2d25e6bd9",
+        "timestamp": 1787366862227
+      },
+      {
+        "executionId": "46e05449-89a9-4c9a-9e27-0edda4bd15fa",
+        "chatSessionId": "sess_e2ac27e0-009b-42a5-af2d-b3b2d25e6bd9",
+        "timestamp": 1787373433748
+      },
+      {
+        "executionId": "46e05449-89a9-4c9a-9e27-0edda4bd15fa",
+        "chatSessionId": "sess_e2ac27e0-009b-42a5-af2d-b3b2d25e6bd9",
+        "timestamp": 1787374448775
+      }
+    ],
+    "31. Phase C 双用户、取消、进程、端口与 egress 真实验收": [
+      {
+        "executionId": "81441cff-b4c1-4aa2-88c1-43084a1ea895",
+        "chatSessionId": "sess_27164671-32bf-42ed-8b9e-03be687cc1ab",
+        "timestamp": 1787330270372
+      },
+      {
+        "executionId": "46e05449-89a9-4c9a-9e27-0edda4bd15fa",
+        "chatSessionId": "sess_e2ac27e0-009b-42a5-af2d-b3b2d25e6bd9",
+        "timestamp": 1787366862261
+      },
+      {
+        "executionId": "46e05449-89a9-4c9a-9e27-0edda4bd15fa",
+        "chatSessionId": "sess_e2ac27e0-009b-42a5-af2d-b3b2d25e6bd9",
+        "timestamp": 1787374462232
+      },
+      {
+        "executionId": "46e05449-89a9-4c9a-9e27-0edda4bd15fa",
+        "chatSessionId": "sess_e2ac27e0-009b-42a5-af2d-b3b2d25e6bd9",
+        "timestamp": 1787375149867
+      }
+    ],
+    "32. 建立跨阶段后端/前端守卫与独立 CI jobs": [
+      {
+        "executionId": "81441cff-b4c1-4aa2-88c1-43084a1ea895",
+        "chatSessionId": "sess_27164671-32bf-42ed-8b9e-03be687cc1ab",
+        "timestamp": 1787330270408
+      },
+      {
+        "executionId": "46e05449-89a9-4c9a-9e27-0edda4bd15fa",
+        "chatSessionId": "sess_e2ac27e0-009b-42a5-af2d-b3b2d25e6bd9",
+        "timestamp": 1787366862295
+      },
+      {
+        "executionId": "46e05449-89a9-4c9a-9e27-0edda4bd15fa",
+        "chatSessionId": "sess_e2ac27e0-009b-42a5-af2d-b3b2d25e6bd9",
+        "timestamp": 1787375157706
+      },
+      {
+        "executionId": "46e05449-89a9-4c9a-9e27-0edda4bd15fa",
+        "chatSessionId": "sess_e2ac27e0-009b-42a5-af2d-b3b2d25e6bd9",
+        "timestamp": 1787375800643
+      }
+    ],
+    "33. 执行完整变异检验并修复假绿守卫": [
+      {
+        "executionId": "81441cff-b4c1-4aa2-88c1-43084a1ea895",
+        "chatSessionId": "sess_27164671-32bf-42ed-8b9e-03be687cc1ab",
+        "timestamp": 1787330270442
+      },
+      {
+        "executionId": "46e05449-89a9-4c9a-9e27-0edda4bd15fa",
+        "chatSessionId": "sess_e2ac27e0-009b-42a5-af2d-b3b2d25e6bd9",
+        "timestamp": 1787366862331
+      },
+      {
+        "executionId": "46e05449-89a9-4c9a-9e27-0edda4bd15fa",
+        "chatSessionId": "sess_e2ac27e0-009b-42a5-af2d-b3b2d25e6bd9",
+        "timestamp": 1787375807570
+      },
+      {
+        "executionId": "46e05449-89a9-4c9a-9e27-0edda4bd15fa",
+        "chatSessionId": "sess_e2ac27e0-009b-42a5-af2d-b3b2d25e6bd9",
+        "timestamp": 1787376916639
+      }
+    ],
+    "34. 完整 Playwright 五角色、三视口与用户可见行为验收": [
+      {
+        "executionId": "81441cff-b4c1-4aa2-88c1-43084a1ea895",
+        "chatSessionId": "sess_27164671-32bf-42ed-8b9e-03be687cc1ab",
+        "timestamp": 1787330270511
+      },
+      {
+        "executionId": "46e05449-89a9-4c9a-9e27-0edda4bd15fa",
+        "chatSessionId": "sess_e2ac27e0-009b-42a5-af2d-b3b2d25e6bd9",
+        "timestamp": 1787366862373
+      },
+      {
+        "executionId": "46e05449-89a9-4c9a-9e27-0edda4bd15fa",
+        "chatSessionId": "sess_e2ac27e0-009b-42a5-af2d-b3b2d25e6bd9",
+        "timestamp": 1787376924249
+      },
+      {
+        "executionId": "46e05449-89a9-4c9a-9e27-0edda4bd15fa",
+        "chatSessionId": "sess_e2ac27e0-009b-42a5-af2d-b3b2d25e6bd9",
+        "timestamp": 1787377292148
+      }
+    ],
+    "35. clean checkout、三件套一致性与收口复盘": [
+      {
+        "executionId": "81441cff-b4c1-4aa2-88c1-43084a1ea895",
+        "chatSessionId": "sess_27164671-32bf-42ed-8b9e-03be687cc1ab",
+        "timestamp": 1787330270551
+      },
+      {
+        "executionId": "46e05449-89a9-4c9a-9e27-0edda4bd15fa",
+        "chatSessionId": "sess_e2ac27e0-009b-42a5-af2d-b3b2d25e6bd9",
+        "timestamp": 1787366862405
+      },
+      {
+        "executionId": "46e05449-89a9-4c9a-9e27-0edda4bd15fa",
+        "chatSessionId": "sess_e2ac27e0-009b-42a5-af2d-b3b2d25e6bd9",
+        "timestamp": 1787377298923
+      },
+      {
+        "executionId": "46e05449-89a9-4c9a-9e27-0edda4bd15fa",
+        "chatSessionId": "sess_e2ac27e0-009b-42a5-af2d-b3b2d25e6bd9",
+        "timestamp": 1787377732507
+      }
+    ]
+  }
+}

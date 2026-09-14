@@ -1,0 +1,103 @@
+{
+  "wp_code": "L6",
+  "name": "专项应付款",
+  "version": "2025-R5",
+  "_note": "此JSON配置为简化版本，实际底稿结构可能更复杂。实施时需根据yaml文件中的实际sheet结构进行详细配置。参考yaml文件：backend/data/ledger_adapters/wp_render_schema/generated/L6.yaml",
+  "account_codes": [
+    "2712"
+  ],
+  "source_files": [
+    {
+      "file": "L6 专项应付款.xlsx",
+      "sheets": [
+        "底稿目录",
+        "专项应付款实质性程序表L6A",
+        "审定表L6-1",
+        "附注披露信息（上市公司）",
+        "附注披露信息（国有企业）",
+        "明细表L6-2",
+        "调整分录汇总L6-3",
+        "检查表L6-4"
+      ]
+    }
+  ],
+  "sheet_rules": [
+    {
+      "exact_name": "专项应付款实质性程序表L6A",
+      "code": "L6A",
+      "type": "procedure"
+    },
+    {
+      "exact_name": "审定表L6-1",
+      "code": "L6-1",
+      "type": "summary",
+      "header_rows": [
+        5,
+        6
+      ],
+      "data_start_row": 7,
+      "key_rows": {
+        "total": {
+          "row": 12,
+          "label": "合计",
+          "is_total": true,
+          "report_row": "BS-L07"
+        }
+      },
+      "layout": {
+        "label_col": 1,
+        "columns": {
+          "opening_balance": {
+            "col": 2,
+            "label": "期初余额"
+          },
+          "increase": {
+            "col": 3,
+            "label": "本期增加"
+          },
+          "decrease": {
+            "col": 4,
+            "label": "本期减少"
+          },
+          "closing_balance": {
+            "col": 5,
+            "label": "期末余额"
+          },
+          "audit_adjustment": {
+            "col": 6,
+            "label": "审计调整"
+          },
+          "closing_audited": {
+            "col": 7,
+            "label": "期末审定数"
+          }
+        }
+      }
+    },
+    {
+      "exact_name": "附注披露信息（上市公司）",
+      "code": "L6-listed",
+      "type": "disclosure_listed"
+    },
+    {
+      "exact_name": "附注披露信息（国有企业）",
+      "code": "L6-soe",
+      "type": "disclosure_soe"
+    },
+    {
+      "exact_name": "明细表L6-2",
+      "code": "L6-2",
+      "type": "detail"
+    },
+    {
+      "exact_name": "调整分录汇总L6-3",
+      "code": "L6-3",
+      "type": "adjustment"
+    },
+    {
+      "exact_name": "检查表L6-4",
+      "code": "L6-4",
+      "type": "check"
+    }
+  ]
+}

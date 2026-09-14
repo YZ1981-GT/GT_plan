@@ -1,0 +1,82 @@
+{
+  "description": "N 类税费循环 audit-sheet 底稿关键坐标注册（OnlyOffice 地址名称落位）",
+  "version": "1.0.0",
+  "cycle": "N",
+  "entries": [
+    {
+      "wp_code": "N1-3",
+      "sheet_name": "暂时性差异计算表（可抵扣）",
+      "coordinates": [
+        {"cell_address": "B5", "description": "科目名称", "purpose": "account_name"},
+        {"cell_address": "C5", "description": "账面价值", "purpose": "book_value"},
+        {"cell_address": "D5", "description": "计税基础", "purpose": "tax_basis"},
+        {"cell_address": "E5", "description": "可抵扣暂时性差异", "purpose": "deductible_difference"},
+        {"cell_address": "F5", "description": "适用税率", "purpose": "tax_rate"},
+        {"cell_address": "G5", "description": "递延所得税资产", "purpose": "dta_amount"},
+        {"cell_address": "G99", "description": "DTA合计", "purpose": "dta_total"}
+      ]
+    },
+    {
+      "wp_code": "N3-3",
+      "sheet_name": "暂时性差异计算表（应纳税）",
+      "coordinates": [
+        {"cell_address": "B5", "description": "科目名称", "purpose": "account_name"},
+        {"cell_address": "C5", "description": "账面价值", "purpose": "book_value"},
+        {"cell_address": "D5", "description": "计税基础", "purpose": "tax_basis"},
+        {"cell_address": "E5", "description": "应纳税暂时性差异", "purpose": "taxable_difference"},
+        {"cell_address": "F5", "description": "适用税率", "purpose": "tax_rate"},
+        {"cell_address": "G5", "description": "递延所得税负债", "purpose": "dtl_amount"},
+        {"cell_address": "G99", "description": "DTL合计", "purpose": "dtl_total"}
+      ]
+    },
+    {
+      "wp_code": "N2-3",
+      "sheet_name": "增值税核对表",
+      "coordinates": [
+        {"cell_address": "C5", "description": "销项税额", "purpose": "output_vat"},
+        {"cell_address": "C6", "description": "进项税额", "purpose": "input_vat"},
+        {"cell_address": "C7", "description": "进项税额转出", "purpose": "input_vat_transfer"},
+        {"cell_address": "C8", "description": "应缴增值税（公式）", "purpose": "vat_payable"},
+        {"cell_address": "D8", "description": "申报应缴增值税", "purpose": "vat_declared"},
+        {"cell_address": "E8", "description": "差异", "purpose": "vat_variance"}
+      ]
+    },
+    {
+      "wp_code": "N5-3",
+      "sheet_name": "所得税计算表",
+      "coordinates": [
+        {"cell_address": "C5", "description": "利润总额", "purpose": "profit_before_tax"},
+        {"cell_address": "C6", "description": "纳税调增合计", "purpose": "tax_increase_total"},
+        {"cell_address": "C7", "description": "纳税调减合计", "purpose": "tax_decrease_total"},
+        {"cell_address": "C8", "description": "应纳税所得额（公式）", "purpose": "taxable_income"},
+        {"cell_address": "C9", "description": "适用税率", "purpose": "tax_rate"},
+        {"cell_address": "C10", "description": "当期所得税费用", "purpose": "current_income_tax_expense"}
+      ]
+    },
+    {
+      "wp_code": "N5-4",
+      "sheet_name": "纳税调增调减明细",
+      "coordinates": [
+        {"cell_address": "B5", "description": "调整项目", "purpose": "adjustment_item"},
+        {"cell_address": "C5", "description": "账面金额", "purpose": "book_amount"},
+        {"cell_address": "D5", "description": "税法金额", "purpose": "tax_amount"},
+        {"cell_address": "E5", "description": "调增金额", "purpose": "increase_amount"},
+        {"cell_address": "F5", "description": "调减金额", "purpose": "decrease_amount"},
+        {"cell_address": "E99", "description": "调增合计", "purpose": "increase_total"},
+        {"cell_address": "F99", "description": "调减合计", "purpose": "decrease_total"}
+      ]
+    },
+    {
+      "wp_code": "N5-5",
+      "sheet_name": "有效税率分析",
+      "coordinates": [
+        {"cell_address": "C5", "description": "利润总额", "purpose": "profit_before_tax"},
+        {"cell_address": "C6", "description": "所得税费用", "purpose": "income_tax_expense"},
+        {"cell_address": "C7", "description": "有效税率（公式）", "purpose": "effective_tax_rate"},
+        {"cell_address": "D7", "description": "法定税率", "purpose": "statutory_tax_rate"},
+        {"cell_address": "E7", "description": "税率差异", "purpose": "rate_difference"},
+        {"cell_address": "B10", "description": "差异解释", "purpose": "difference_explanation"}
+      ]
+    }
+  ]
+}

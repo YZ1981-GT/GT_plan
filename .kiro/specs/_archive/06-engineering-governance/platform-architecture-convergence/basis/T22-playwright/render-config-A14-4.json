@@ -1,0 +1,17 @@
+{
+  "wp_code": "A14-4",
+  "wp_id": "342e8635-0a43-4c9a-b656-b1d7c879ef66",
+  "project_id": "0ec33ac9-3de5-4e65-b3bf-f9dccd7b2a49",
+  "kind": "onlyoffice+html",
+  "decision_trace_len": 8,
+  "sheet_types": [
+    "onlyoffice-sheet",
+    "h-static-doc",
+    "h-static-doc",
+    "h-static-doc",
+    "d-form-table",
+    "h-static-doc",
+    "h-static-doc",
+    "h-static-doc"
+  ]
+}

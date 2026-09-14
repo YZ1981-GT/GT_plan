@@ -159,3 +159,16 @@ async def get_llm_metrics(
         from fastapi import HTTPException
         raise HTTPException(status_code=403, detail="仅管理员可访问 LLM 指标")
     return llm_metrics.get_metrics()
+
+
+@router.get("/wp-metrics")
+async def get_wp_metrics(
+    current_user: User = Depends(get_current_user),
+):
+    """底稿模块性能指标（Design §10）。
+
+    返回 render-config 冷/热耗时、renderer 调用次数、save 耗时/失败/冲突。
+    Requirements: 8.1-8.3
+    """
+    from app.services.wp_metrics import wp_metrics
+    return wp_metrics.get_summary()

@@ -1,0 +1,82 @@
+# backend/data/ledger_adapters/wp_render_schema/L6-1.yaml
+# 专项应付款审定表 — 专属组件渲染 schema
+# Requirements: §1.6（L6 专项应付款）
+# Design: §2 审定表负债类贷方科目
+# Template: L6 专项应付款.xlsx
+#
+# 核心公式：负债类期末=期初+贷方-借方（贷方/负债类！）
+# 科目2601专项应付款 — 政府专项拨款等，需按项目/用途列示并核查专款专用
+
+wp_code: L6-1
+wp_name: 专项应付款审定表
+component_type: l6-special-payables
+template_path: backend/wp_templates/L/L6 专项应付款.xlsx
+template_version: v2025-R5
+applicable_standards: [soe_standalone, listed_standalone, soe_consolidated, listed_consolidated]
+related_accounts:
+  - code: '2601'
+    name: 专项应付款
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 审定表 — 单区块结构（贷方/负债类）
+# 按专项项目分类 + 小计
+# ═══════════════════════════════════════════════════════════════════════════════
+
+income_statement_type: false
+amount_source: closing_balance
+
+dynamic_rows: true
+row_template:
+  group_key: special_project
+  row_type: special_payable_row
+  fields:
+    - { field: project_name, label: 专项项目, type: text }
+    - { field: funding_source, label: 拨款来源, type: text }
+    - { field: begin_balance, label: 期初余额, type: number }
+    - { field: credit_amount, label: 贷方发生额(拨入), type: number }
+    - { field: debit_amount, label: 借方发生额(使用/结转), type: number }
+    - { field: end_balance, label: 期末余额, type: number, formula: "begin_balance + credit_amount - debit_amount" }
+    - { field: unadjusted_amount, label: 未审金额, type: number, auto_source: trial_balance.unadjusted_amount }
+    - { field: aje_amount, label: 审计调整, type: number }
+    - { field: rje_amount, label: 重分类调整, type: number }
+    - { field: audited_amount, label: 审定金额, type: number, formula: "unadjusted_amount + aje_amount + rje_amount" }
+    - { field: prior_year_audited, label: 上年审定金额, type: number, auto_source: trial_balance.prior_audited }
+    - { field: variance_amount, label: 变动金额, type: number, formula: "audited_amount - prior_year_audited" }
+
+sections:
+  - name: 专项应付款合计
+    row_type: total
+    formula_source: "SUM(all special_project rows)"
+    direction: credit
+    formula_note: "负债类贷方：期末=期初+贷方-借方"
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 联动配置
+# ═══════════════════════════════════════════════════════════════════════════════
+
+writeback:
+  target: trial_balance.audited_amount
+  trigger: WORKPAPER_SAVED
+  handler: _on_d_audit_determination_saved
+  match_pattern: "^L6-1$"
+  key_field: account_code
+  value_field: audited_amount
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 跨底稿引用
+# ═══════════════════════════════════════════════════════════════════════════════
+
+cross_refs:
+  - ref_id: CW-L6-1-001
+    target_wp: L6-2
+    target_field: 明细表合计
+    description: '审定表合计 ↔ L6-2 明细表合计交叉验证'
+    severity: required
+    direction: bidirectional
+
+  - ref_id: CW-L6-1-002
+    target_wp: L6-3
+    target_field: 调整分录汇总
+    description: '审定表调整金额 → L6-3 调整分录汇总'
+    severity: required
+    direction: outbound

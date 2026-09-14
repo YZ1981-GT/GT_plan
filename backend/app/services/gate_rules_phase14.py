@@ -19,6 +19,18 @@ from app.services.gate_rules_ai_content import AIContentMustBeConfirmedRule  # n
 
 logger = logging.getLogger(__name__)
 
+# 🔴 QC-19/20/24 的裁剪判据必须查 `workpaper_procedures`，不是 procedure_instances。
+#    历史缺陷（2026-09-06 修）：原查 procedure_instances 的 name / working_paper_id /
+#    trim_category / trim_status / trim_evidence_refs —— 真库**全都不存在**
+#    ⇒ 每次抛 UndefinedColumn，被各规则的 except 吞成 `return None`，
+#    而 return None 在 gate_engine 里等于「检查通过」⇒ 这三条 blocking 门禁
+#    自上线起从未拦下过任何违规（日志只剩一行 error，调用方看到的是"通过"）。
+#    裁剪真实落库见 services/wp_procedure_service.py 的 trim：
+#      status='not_applicable' + trimmed_by + trimmed_at + trim_reason
+#    映射：mandatory→is_mandatory=true；已裁剪→trimmed_at NOT NULL；缺证据→trim_reason 空。
+#    服务层虽已拦 is_mandatory，但门禁是**独立防线**（要能发现绕过服务层的写入），非冗余。
+#    契约守卫：tests/test_gate_rules_phase14_schema_contract.py
+
 
 # ── QC-19: mandatory 程序裁剪阻断 ──────────────────────────────
 
@@ -32,14 +44,12 @@ class QC19MandatoryTrimRule(GateRule):
         if not wp_id:
             return None
         try:
-            from app.models.workpaper_models import WorkingPaper
-            # 查找关联的 procedure_instances
+            # 判据表与历史缺陷见模块顶部说明
             stmt = text("""
-                SELECT id, name FROM procedure_instances
-                WHERE working_paper_id = :wp_id
-                  AND trim_category = 'mandatory'
-                  AND trim_status = 'trimmed'
-                  AND (is_deleted = false OR is_deleted IS NULL)
+                SELECT id, description FROM workpaper_procedures
+                WHERE wp_id = :wp_id
+                  AND is_mandatory = true
+                  AND trimmed_at IS NOT NULL
                 LIMIT 5
             """)
             result = await db.execute(stmt, {"wp_id": str(wp_id)})
@@ -56,7 +66,9 @@ class QC19MandatoryTrimRule(GateRule):
                 suggested_action="请恢复被裁剪的 mandatory 程序或走例外审批流程",
             )
         except Exception as e:
-            logger.error(f"[QC-19] check error: {e}")
+            # 不向上抛（单规则失败不阻断整体评估），但必须留 traceback ——
+            # 原实现正是靠丢弃它把「列不存在」静默成了「通过」。
+            logger.error(f"[QC-19] check error: {e}", exc_info=True)
             return None
 
 
@@ -72,13 +84,17 @@ class QC20ConditionalNoEvidenceRule(GateRule):
         if not wp_id:
             return None
         try:
+            # 与 QC-19 同源（见模块顶部）。映射：conditional → is_mandatory = false；
+            # 已裁剪 → trimmed_at NOT NULL；缺证据 → trim_reason 为 NULL 或空白。
+            # 该表无 trim_evidence_refs（jsonb 结构化引用数组）这一维度，故现阶段以
+            # 「裁剪理由是否填写」作为证据充分性的可执行判据；将来若补上该列，
+            # 应把判据升级为「引用数组非空」而不是继续沿用理由非空。
             stmt = text("""
-                SELECT id, name FROM procedure_instances
-                WHERE working_paper_id = :wp_id
-                  AND trim_category = 'conditional'
-                  AND trim_status = 'trimmed'
-                  AND (trim_evidence_refs IS NULL OR jsonb_array_length(trim_evidence_refs) = 0)
-                  AND (is_deleted = false OR is_deleted IS NULL)
+                SELECT id, description FROM workpaper_procedures
+                WHERE wp_id = :wp_id
+                  AND is_mandatory = false
+                  AND trimmed_at IS NOT NULL
+                  AND (trim_reason IS NULL OR btrim(trim_reason) = '')
                 LIMIT 5
             """)
             result = await db.execute(stmt, {"wp_id": str(wp_id)})
@@ -92,10 +108,10 @@ class QC20ConditionalNoEvidenceRule(GateRule):
                 severity=self.severity,
                 message=f"conditional 程序裁剪缺少证据引用（{len(rows)}项）",
                 location={"wp_id": str(wp_id), "section": "procedure_status", "procedure_ids": proc_ids},
-                suggested_action="请补充 trim_evidence_refs 后重新提交",
+                suggested_action="请补充裁剪理由（trim_reason）后重新提交",
             )
         except Exception as e:
-            logger.error(f"[QC-20] check error: {e}")
+            logger.error(f"[QC-20] check error: {e}", exc_info=True)
             return None
 
 
@@ -246,13 +262,15 @@ class QC24LLMTrimConflictRule(GateRule):
             return None
         try:
             # 检查是否有已确认的 AI 内容与被裁剪的程序冲突
+            #
+            # 与 QC-19/20 同源（见模块顶部）。procedure_instances 与
+            # workpaper_procedures 是两套程序表，此处按「同一底稿」(wp_id) 关联。
             stmt = text("""
                 SELECT g.id FROM wp_ai_generations g
-                JOIN procedure_instances p ON p.working_paper_id = g.wp_id
+                JOIN workpaper_procedures p ON p.wp_id = g.wp_id
                 WHERE g.wp_id = :wp_id
                   AND g.status = 'confirmed'
-                  AND p.trim_status = 'trimmed'
-                  AND (p.is_deleted = false OR p.is_deleted IS NULL)
+                  AND p.trimmed_at IS NOT NULL
                 LIMIT 1
             """)
             result = await db.execute(stmt, {"wp_id": str(wp_id)})
@@ -268,7 +286,7 @@ class QC24LLMTrimConflictRule(GateRule):
                 )
             return None
         except Exception as e:
-            logger.error(f"[QC-24] check error: {e}")
+            logger.error(f"[QC-24] check error: {e}", exc_info=True)
             return None
 
 
@@ -284,14 +302,21 @@ class QC25ReportNoteVersionStaleRule(GateRule):
         if not project_id:
             return None
         try:
-            # 检查审计报告段落引用的附注版本是否过期
-            # 简化实现：检查 report_snapshots 是否有 stale 标记
+            # 检查审计报告段落引用的附注版本是否过期（真实表 report_snapshot 单数；
+            # is_stale 列由 V049 补齐）。保留 to_regclass 守卫作防御（测试环境未跑迁移时优雅跳过）。
             stmt = text("""
-                SELECT rs.id FROM report_snapshots rs
+                SELECT rs.id FROM report_snapshot rs
                 WHERE rs.project_id = :project_id
                   AND rs.is_stale = true
+                  AND to_regclass('public.report_snapshot') IS NOT NULL
                 LIMIT 1
             """)
+            # 先确认表存在，不存在直接跳过（连 SELECT 都不发，杜绝污染）
+            exists = (await db.execute(
+                text("SELECT to_regclass('public.report_snapshot')")
+            )).scalar()
+            if exists is None:
+                return None
             result = await db.execute(stmt, {"project_id": str(project_id)})
             row = result.fetchone()
             if row:
@@ -322,9 +347,24 @@ class QC26NoteSourceMappingMissingRule(GateRule):
         if not project_id:
             return None
         try:
+            # disclosure_notes 真实 schema 无 is_key_disclosure / source_cells 列
+            # （历史设计漂移）→ 先校验列存在再查，缺列直接跳过，杜绝
+            # UndefinedColumn 失败污染外层事务（InFailedSQLTransactionError 级联）。
+            cols_exist = (await db.execute(text("""
+                SELECT COUNT(*) FROM information_schema.columns
+                WHERE table_name = 'disclosure_notes'
+                  AND column_name IN ('is_key_disclosure', 'source_cells')
+            """))).scalar() or 0
+            if cols_exist < 2:
+                logger.debug(
+                    "[QC-26] check skipped: disclosure_notes 缺 is_key_disclosure/source_cells 列"
+                )
+                return None
             # 检查附注关键披露是否缺少 source_cells 映射
+            # 注：标题列真名 section_title（无 title 列）；上面列守卫使本查询当前不执行，
+            # 但将来补上 is_key_disclosure/source_cells 后写错列名会立刻踩坑。
             stmt = text("""
-                SELECT dn.id, dn.title FROM disclosure_notes dn
+                SELECT dn.id, dn.section_title FROM disclosure_notes dn
                 WHERE dn.project_id = :project_id
                   AND dn.is_key_disclosure = true
                   AND (dn.source_cells IS NULL OR dn.source_cells = '[]'::jsonb)
@@ -1045,39 +1085,55 @@ def _load_enabled_rule_codes_sync() -> set[str]:
     用于启动时 register_phase14_rules 的同步上下文。
     非 python 类型规则记 warning 并跳过。
     """
-    from sqlalchemy import create_engine as create_sync_engine, select as sync_select, text as sync_text
+    import concurrent.futures
+
+    def _in_isolated_thread() -> set[str]:
+        import asyncio
+        import sys
+
+        if sys.platform == "win32":
+            asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
+        return asyncio.run(_load_enabled_rule_codes_async())
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
+        return pool.submit(_in_isolated_thread).result(timeout=30)
+
+
+async def _load_enabled_rule_codes_async() -> set[str]:
+    """asyncpg 裸查询，避免 lifespan greenlet 栈内 SQLAlchemy ORM/sync 引擎递归溢出。"""
+    from urllib.parse import urlparse
+
+    import asyncpg
+
     from app.core.config import settings
 
-    # 尝试用同步引擎快速查询
+    raw = str(settings.DATABASE_URL).replace("postgresql+asyncpg://", "postgresql://")
+    parsed = urlparse(raw)
+    conn = await asyncpg.connect(
+        host=parsed.hostname or "localhost",
+        port=parsed.port or 5432,
+        user=parsed.username or "postgres",
+        password=parsed.password or "",
+        database=(parsed.path or "/audit_platform").lstrip("/"),
+    )
     try:
-        from app.models.qc_rule_models import QcRuleDefinition
-        from app.models.base import Base
-        import sqlalchemy as sa_sync
+        rows = await conn.fetch(
+            "SELECT rule_code, expression_type "
+            "FROM qc_rule_definitions WHERE enabled IS TRUE"
+        )
+    finally:
+        await conn.close()
 
-        db_url = str(settings.DATABASE_URL)
-        # 转换 async URL 为 sync URL
-        if "aiosqlite" in db_url:
-            db_url = db_url.replace("sqlite+aiosqlite", "sqlite")
-        elif "asyncpg" in db_url:
-            db_url = db_url.replace("postgresql+asyncpg", "postgresql")
-
-        sync_engine = create_sync_engine(db_url, echo=False)
-        with sync_engine.connect() as conn:
-            result = conn.execute(
-                sa_sync.select(
-                    QcRuleDefinition.rule_code,
-                    QcRuleDefinition.expression_type,
-                ).where(QcRuleDefinition.enabled == sa_sync.true())
+    enabled_codes: set[str] = set()
+    for row in rows:
+        rule_code = row["rule_code"]
+        expression_type = row["expression_type"]
+        if expression_type != "python":
+            logger.warning(
+                "R6 stub: non-python rule ignored: %s (type=%s)",
+                rule_code,
+                expression_type,
             )
-            rows = result.all()
-
-        enabled_codes: set[str] = set()
-        for rule_code, expression_type in rows:
-            if expression_type != "python":
-                logger.warning("R6 stub: non-python rule ignored: %s (type=%s)", rule_code, expression_type)
-                continue
-            enabled_codes.add(rule_code)
-        sync_engine.dispose()
-        return enabled_codes
-    except Exception:
-        raise
+            continue
+        enabled_codes.add(rule_code)
+    return enabled_codes

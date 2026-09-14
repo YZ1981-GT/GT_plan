@@ -17,7 +17,7 @@ from typing import Any, Optional
 
 from app.deps import get_current_user
 
-router = APIRouter(prefix="/api/address-registry/v2", tags=["linkage-analysis"])
+router = APIRouter(prefix="/api/address-registry/v2", tags=["地址坐标-变更影响分析(V2/linkage)"])
 
 # 模块级缓存
 _L2_CACHE: Optional[dict] = None

@@ -1,0 +1,18 @@
+{
+  "milestone": "X-RUNTIME-EVIDENCE",
+  "spec": "custom-workpaper-template-ingestion-and-sync-closure",
+  "task": 19,
+  "recorded_at": "2026-09-09",
+  "verdict": "PARTIAL",
+  "notes": [
+    "ProjectWorkbookInstance + staging CAS + F-SHELL wizard 已落地",
+    "四 SYNC gate 未归零：不得宣称 editable_grid 双向全通过",
+    "C2_REEVALUATION_REQUESTED 待 guidance G23 消费本 partial evidence"
+  ],
+  "sync_gates": {
+    "SYNC-MULTI-RESOLVER": "BLOCKED",
+    "SYNC-ENTRY-NAMESPACE": "BLOCKED",
+    "SYNC-UNIFIED-ROOM": "BLOCKED",
+    "SYNC-DURABLE-APPLICATION": "BLOCKED"
+  }
+}

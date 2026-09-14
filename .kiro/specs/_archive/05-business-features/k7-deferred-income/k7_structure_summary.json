@@ -1,0 +1,1382 @@
+{
+  "source_file": "d:\\GT_plan\\基础数据\\致同通用审计程序及底稿模板（2025年修订）\\1.致同审计程序及底稿模板（2025年）\\4.风险应对-实质性程序（D-N）\\K 管理循环\\K7 递延收益.xlsx",
+  "total_sheets": 11,
+  "sheet_names": [
+    "底稿目录",
+    "实质性程序表K7A",
+    "审定表K7-1",
+    "附注披露信息（上市公司）",
+    "附注披露信息（国有企业）",
+    "明细表K7-2",
+    "调整分录汇总K7-3",
+    "测算表K7-4",
+    "递延收益检查表K7-5",
+    "会计提示",
+    "GT_Custom"
+  ],
+  "total_formulas": 295,
+  "formula_summary": {
+    "底稿目录": {
+      "total_cells": 0,
+      "unique_patterns": 0,
+      "formula_columns": 0,
+      "max_in_row": 0
+    },
+    "实质性程序表K7A": {
+      "total_cells": 7,
+      "unique_patterns": 2,
+      "formula_columns": 4,
+      "max_in_row": 4
+    },
+    "审定表K7-1": {
+      "total_cells": 50,
+      "unique_patterns": 22,
+      "formula_columns": 12,
+      "max_in_row": 10
+    },
+    "附注披露信息（上市公司）": {
+      "total_cells": 11,
+      "unique_patterns": 6,
+      "formula_columns": 6,
+      "max_in_row": 4
+    },
+    "附注披露信息（国有企业）": {
+      "total_cells": 21,
+      "unique_patterns": 10,
+      "formula_columns": 9,
+      "max_in_row": 7
+    },
+    "明细表K7-2": {
+      "total_cells": 102,
+      "unique_patterns": 27,
+      "formula_columns": 20,
+      "max_in_row": 18
+    },
+    "调整分录汇总K7-3": {
+      "total_cells": 7,
+      "unique_patterns": 2,
+      "formula_columns": 4,
+      "max_in_row": 4
+    },
+    "测算表K7-4": {
+      "total_cells": 87,
+      "unique_patterns": 18,
+      "formula_columns": 14,
+      "max_in_row": 8
+    },
+    "递延收益检查表K7-5": {
+      "total_cells": 10,
+      "unique_patterns": 5,
+      "formula_columns": 5,
+      "max_in_row": 4
+    },
+    "会计提示": {
+      "total_cells": 0,
+      "unique_patterns": 0,
+      "formula_columns": 0,
+      "max_in_row": 0
+    },
+    "GT_Custom": {
+      "total_cells": 0,
+      "unique_patterns": 0,
+      "formula_columns": 0,
+      "max_in_row": 0
+    }
+  },
+  "accounting_tips_sheet": "会计提示",
+  "functional_sheets": [
+    "底稿目录",
+    "实质性程序表K7A",
+    "审定表K7-1",
+    "附注披露信息（上市公司）",
+    "附注披露信息（国有企业）",
+    "明细表K7-2",
+    "调整分录汇总K7-3",
+    "测算表K7-4",
+    "递延收益检查表K7-5"
+  ],
+  "oo_fallback_sheets": [
+    "会计提示",
+    "GT_Custom"
+  ],
+  "validation": {
+    "design_doc_expected": {
+      "K7-1": 49,
+      "K7-2": 21,
+      "K7-4": 23
+    },
+    "actual_total_cells": {
+      "K7-1": 50,
+      "K7-2": 102,
+      "K7-4": 87
+    },
+    "actual_unique_patterns": {
+      "K7-1": 22,
+      "K7-2": 27,
+      "K7-4": 18
+    },
+    "actual_formula_columns": {
+      "K7-1": 12,
+      "K7-2": 20,
+      "K7-4": 14
+    },
+    "actual_max_in_row": {
+      "K7-1": 10,
+      "K7-2": 18,
+      "K7-4": 8
+    },
+    "interpretation": "K7-1: design=49 vs actual=50 (差1,吻合,差异为表头索引公式); K7-2: design=21 vs actual=102 (design为估算,实际含重复行公式); K7-4: design=23 vs actual=87 (design为估算,实际含重复行公式). 以xlsx实际为准, design doc数字作为参考.",
+    "conclusion": "CONFIRMED - 结构已完整读取,以actual数据为准开发"
+  },
+  "sheet_details": {
+    "底稿目录": {
+      "max_row": 21,
+      "max_column": 9,
+      "formula_count": 0,
+      "unique_formula_patterns": 0,
+      "formula_columns_count": 0,
+      "formula_columns": [],
+      "max_formulas_in_single_row": 0,
+      "merged_cells": 3,
+      "sheet_type": {
+        "code": "K7-Index",
+        "type": "index",
+        "componentize": true
+      },
+      "header_rows": [
+        [
+          "A1=底稿开列时，可先在以下单元格填写有关内容，以便其他底稿引用有关数据："
+        ],
+        [
+          "A2=被审计单位："
+        ],
+        [
+          "A3=截止日：202X年12月31日",
+          "D3=序号",
+          "E3=内容",
+          "F3=索引号",
+          "G3=备注"
+        ]
+      ],
+      "columns": [
+        "截止日：202X年12月31日",
+        "序号",
+        "内容",
+        "索引号",
+        "备注"
+      ],
+      "formulas_per_column": {},
+      "formula_patterns": [],
+      "formulas_sample": []
+    },
+    "实质性程序表K7A": {
+      "max_row": 26,
+      "max_column": 10,
+      "formula_count": 7,
+      "unique_formula_patterns": 2,
+      "formula_columns_count": 4,
+      "formula_columns": [
+        "A",
+        "C",
+        "E",
+        "I"
+      ],
+      "max_formulas_in_single_row": 4,
+      "merged_cells": 23,
+      "sheet_type": {
+        "code": "K7A",
+        "type": "functional",
+        "componentize": true
+      },
+      "header_rows": [
+        [
+          "A1=致同会计师事务所"
+        ],
+        [
+          "A2=递延收益实质性程序表"
+        ],
+        [
+          "A3==底稿目录!A2",
+          "C3==底稿目录!A4",
+          "E3==底稿目录!A5",
+          "H3=索引号：",
+          "I3==底稿目录!F4"
+        ]
+      ],
+      "columns": [],
+      "formulas_per_column": {
+        "A": 2,
+        "C": 2,
+        "E": 2,
+        "I": 1
+      },
+      "formula_patterns": [
+        "=底稿目录!A{R}",
+        "=底稿目录!F{R}"
+      ],
+      "formulas_sample": [
+        {
+          "cell": "A3",
+          "col": "A",
+          "row": 3,
+          "formula": "=底稿目录!A2"
+        },
+        {
+          "cell": "C3",
+          "col": "C",
+          "row": 3,
+          "formula": "=底稿目录!A4"
+        },
+        {
+          "cell": "E3",
+          "col": "E",
+          "row": 3,
+          "formula": "=底稿目录!A5"
+        },
+        {
+          "cell": "I3",
+          "col": "I",
+          "row": 3,
+          "formula": "=底稿目录!F4"
+        },
+        {
+          "cell": "A4",
+          "col": "A",
+          "row": 4,
+          "formula": "=底稿目录!A3"
+        },
+        {
+          "cell": "C4",
+          "col": "C",
+          "row": 4,
+          "formula": "=底稿目录!A6"
+        },
+        {
+          "cell": "E4",
+          "col": "E",
+          "row": 4,
+          "formula": "=底稿目录!A7"
+        }
+      ]
+    },
+    "审定表K7-1": {
+      "max_row": 54,
+      "max_column": 13,
+      "formula_count": 50,
+      "unique_formula_patterns": 22,
+      "formula_columns_count": 12,
+      "formula_columns": [
+        "A",
+        "C",
+        "D",
+        "E",
+        "F",
+        "G",
+        "H",
+        "I",
+        "J",
+        "K",
+        "L",
+        "M"
+      ],
+      "max_formulas_in_single_row": 10,
+      "merged_cells": 12,
+      "sheet_type": {
+        "code": "K7-1",
+        "type": "functional",
+        "componentize": true
+      },
+      "header_rows": [
+        [
+          "A1=致同会计师事务所"
+        ],
+        [
+          "A2=递延收益审定表"
+        ],
+        [
+          "A3==底稿目录!A2",
+          "E3==底稿目录!A4",
+          "I3==底稿目录!A5",
+          "L3=索引：",
+          "M3==底稿目录!F5"
+        ]
+      ],
+      "columns": [
+        "项目",
+        "期初数",
+        "期末数",
+        "本期审定数与上期\n审定数的比较",
+        "原因分析"
+      ],
+      "formulas_per_column": {
+        "A": 2,
+        "C": 4,
+        "D": 5,
+        "E": 6,
+        "F": 5,
+        "G": 4,
+        "H": 4,
+        "I": 6,
+        "J": 5,
+        "K": 4,
+        "L": 4,
+        "M": 1
+      },
+      "formula_patterns": [
+        "=C{R}+D{R}+E{R}",
+        "=F{R}-F{R}",
+        "=G{R}+H{R}+I{R}",
+        "=IF(AND(F{R}=0,J{R}=0),0,IF(AND(F{R}=0,J{R}>0),1,K{R}/F{R}))",
+        "=J{R}-F{R}",
+        "=J{R}-J{R}",
+        "=L{R}",
+        "=SUM(C{R}:C{R})",
+        "=SUM(D{R}:D{R})",
+        "=SUM(E{R}:E{R})",
+        "=SUM(G{R}:G{R})",
+        "=SUM(H{R}:H{R})",
+        "=SUM(I{R}:I{R})",
+        "=SUM(J{R}:J{R})",
+        "=SUMIF('明细表K{R}-2'!$B$11:$B$21,$A{R},'明细表K{R}-2'!$C$11:$C$21)",
+        "=SUMIF('明细表K{R}-2'!$B$11:$B$21,$A{R},'明细表K{R}-2'!$F$11:$F$21)",
+        "=SUMIF('明细表K{R}-2'!$B$11:$B$21,$A{R},'明细表K{R}-2'!$G$11:$G$21)",
+        "=SUMIF('明细表K{R}-2'!$B$11:$B$21,$A{R},'明细表K{R}-2'!$G$11:$G$21)+SUMIF('明细表K{R}-2'!$B$11:$B$21,$A{R},'明细表K{R}-2'!$I$11:$I$21)-SUMIF('明细表K{R}-2'!$B$11:$B$21,$A{R},'明细表K{R}-2'!$J$11:$J$21)",
+        "=SUMIF('明细表K{R}-2'!$B$11:$B$21,$A{R},'明细表K{R}-2'!$H$11:$H$21)",
+        "=SUMIF('明细表K{R}-2'!$B$11:$B$21,$A{R},'明细表K{R}-2'!$H$11:$H$21)+SUMIF('明细表K{R}-2'!$B$11:$B$21,$A{R},'明细表K{R}-2'!$K$11:$K$21)-SUMIF('明细表K{R}-2'!$B$11:$B$21,$A{R},'明细表K{R}-2'!$L$11:$L$21)"
+      ],
+      "formulas_sample": [
+        {
+          "cell": "A3",
+          "col": "A",
+          "row": 3,
+          "formula": "=底稿目录!A2"
+        },
+        {
+          "cell": "E3",
+          "col": "E",
+          "row": 3,
+          "formula": "=底稿目录!A4"
+        },
+        {
+          "cell": "I3",
+          "col": "I",
+          "row": 3,
+          "formula": "=底稿目录!A5"
+        },
+        {
+          "cell": "M3",
+          "col": "M",
+          "row": 3,
+          "formula": "=底稿目录!F5"
+        },
+        {
+          "cell": "A4",
+          "col": "A",
+          "row": 4,
+          "formula": "=底稿目录!A3"
+        },
+        {
+          "cell": "E4",
+          "col": "E",
+          "row": 4,
+          "formula": "=底稿目录!A6"
+        },
+        {
+          "cell": "I4",
+          "col": "I",
+          "row": 4,
+          "formula": "=底稿目录!A7"
+        },
+        {
+          "cell": "C7",
+          "col": "C",
+          "row": 7,
+          "formula": "=SUMIF('明细表K7-2'!$B$11:$B$21,$A7,'明细表K7-2'!$C$11:$C$21)"
+        },
+        {
+          "cell": "D7",
+          "col": "D",
+          "row": 7,
+          "formula": "=SUMIF('明细表K7-2'!$B$11:$B$21,$A7,'明细表K7-2'!$G$11:$G$21)"
+        },
+        {
+          "cell": "E7",
+          "col": "E",
+          "row": 7,
+          "formula": "=SUMIF('明细表K7-2'!$B$11:$B$21,$A7,'明细表K7-2'!$H$11:$H$21)"
+        },
+        {
+          "cell": "F7",
+          "col": "F",
+          "row": 7,
+          "formula": "=C7+D7+E7"
+        },
+        {
+          "cell": "G7",
+          "col": "G",
+          "row": 7,
+          "formula": "=SUMIF('明细表K7-2'!$B$11:$B$21,$A7,'明细表K7-2'!$F$11:$F$21)"
+        },
+        {
+          "cell": "H7",
+          "col": "H",
+          "row": 7,
+          "formula": "=SUMIF('明细表K7-2'!$B$11:$B$21,$A7,'明细表K7-2'!$G$11:$G$21)+SUMIF('明细表K7-2'!$B$11:$B$21,$A7,'明细表K7-2'!$I$11:$I$21)-SUMIF('明细表K7-2'!$B$11:$B$21,$A7,'明细表K7-2'!$J$11:$J$21)"
+        },
+        {
+          "cell": "I7",
+          "col": "I",
+          "row": 7,
+          "formula": "=SUMIF('明细表K7-2'!$B$11:$B$21,$A7,'明细表K7-2'!$H$11:$H$21)+SUMIF('明细表K7-2'!$B$11:$B$21,$A7,'明细表K7-2'!$K$11:$K$21)-SUMIF('明细表K7-2'!$B$11:$B$21,$A7,'明细表K7-2'!$L$11:$L$21)"
+        },
+        {
+          "cell": "J7",
+          "col": "J",
+          "row": 7,
+          "formula": "=G7+H7+I7"
+        }
+      ]
+    },
+    "附注披露信息（上市公司）": {
+      "max_row": 18,
+      "max_column": 11,
+      "formula_count": 11,
+      "unique_formula_patterns": 6,
+      "formula_columns_count": 6,
+      "formula_columns": [
+        "A",
+        "B",
+        "C",
+        "D",
+        "E",
+        "G"
+      ],
+      "max_formulas_in_single_row": 4,
+      "merged_cells": 3,
+      "sheet_type": {
+        "code": "附注披露信息（上市公司）",
+        "type": "disclosure",
+        "componentize": true
+      },
+      "header_rows": [
+        [
+          "A1=致同会计师事务所"
+        ],
+        [
+          "A2=附注披露信息"
+        ],
+        [
+          "A3==底稿目录!A2",
+          "B3==底稿目录!A4",
+          "D3==底稿目录!A5",
+          "F3=索引号：",
+          "G3==底稿目录!F6"
+        ]
+      ],
+      "columns": [
+        "项  目",
+        "期初余额",
+        "本期增加",
+        "本期减少",
+        "期末余额",
+        "形成原因"
+      ],
+      "formulas_per_column": {
+        "A": 2,
+        "B": 3,
+        "C": 1,
+        "D": 3,
+        "E": 1,
+        "G": 1
+      },
+      "formula_patterns": [
+        "=SUM(B{R}:B{R})",
+        "=SUM(C{R}:C{R})",
+        "=SUM(D{R}:D{R})",
+        "=SUM(E{R}:E{R})",
+        "=底稿目录!A{R}",
+        "=底稿目录!F{R}"
+      ],
+      "formulas_sample": [
+        {
+          "cell": "A3",
+          "col": "A",
+          "row": 3,
+          "formula": "=底稿目录!A2"
+        },
+        {
+          "cell": "B3",
+          "col": "B",
+          "row": 3,
+          "formula": "=底稿目录!A4"
+        },
+        {
+          "cell": "D3",
+          "col": "D",
+          "row": 3,
+          "formula": "=底稿目录!A5"
+        },
+        {
+          "cell": "G3",
+          "col": "G",
+          "row": 3,
+          "formula": "=底稿目录!F6"
+        },
+        {
+          "cell": "A4",
+          "col": "A",
+          "row": 4,
+          "formula": "=底稿目录!A3"
+        },
+        {
+          "cell": "B4",
+          "col": "B",
+          "row": 4,
+          "formula": "=底稿目录!A6"
+        },
+        {
+          "cell": "D4",
+          "col": "D",
+          "row": 4,
+          "formula": "=底稿目录!A7"
+        },
+        {
+          "cell": "B11",
+          "col": "B",
+          "row": 11,
+          "formula": "=SUM(B8:B10)"
+        },
+        {
+          "cell": "C11",
+          "col": "C",
+          "row": 11,
+          "formula": "=SUM(C8:C10)"
+        },
+        {
+          "cell": "D11",
+          "col": "D",
+          "row": 11,
+          "formula": "=SUM(D8:D10)"
+        },
+        {
+          "cell": "E11",
+          "col": "E",
+          "row": 11,
+          "formula": "=SUM(E8:E10)"
+        }
+      ]
+    },
+    "附注披露信息（国有企业）": {
+      "max_row": 18,
+      "max_column": 10,
+      "formula_count": 21,
+      "unique_formula_patterns": 10,
+      "formula_columns_count": 9,
+      "formula_columns": [
+        "A",
+        "B",
+        "C",
+        "D",
+        "E",
+        "F",
+        "G",
+        "H",
+        "J"
+      ],
+      "max_formulas_in_single_row": 7,
+      "merged_cells": 2,
+      "sheet_type": {
+        "code": "附注披露信息（国有企业）",
+        "type": "disclosure",
+        "componentize": true
+      },
+      "header_rows": [
+        [
+          "A1=致同会计师事务所"
+        ],
+        [
+          "A2=附注披露信息"
+        ],
+        [
+          "A3==底稿目录!A2",
+          "C3==底稿目录!A4",
+          "E3==底稿目录!A5",
+          "I3=索引号：",
+          "J3==底稿目录!F7"
+        ]
+      ],
+      "columns": [
+        "项目/类别",
+        "期初余额",
+        "本期增加",
+        "本期减少",
+        "期末余额"
+      ],
+      "formulas_per_column": {
+        "A": 2,
+        "B": 2,
+        "C": 4,
+        "D": 2,
+        "E": 4,
+        "F": 1,
+        "G": 1,
+        "H": 4,
+        "J": 1
+      },
+      "formula_patterns": [
+        "=B{R}+C{R}-D{R}-F{R}-G{R}",
+        "=SUM(B{R}:B{R})",
+        "=SUM(C{R}:C{R})",
+        "=SUM(D{R}:D{R})",
+        "=SUM(E{R}:E{R})",
+        "=SUM(F{R}:F{R})",
+        "=SUM(G{R}:G{R})",
+        "=SUM(H{R}:H{R})",
+        "=底稿目录!A{R}",
+        "=底稿目录!F{R}"
+      ],
+      "formulas_sample": [
+        {
+          "cell": "A3",
+          "col": "A",
+          "row": 3,
+          "formula": "=底稿目录!A2"
+        },
+        {
+          "cell": "C3",
+          "col": "C",
+          "row": 3,
+          "formula": "=底稿目录!A4"
+        },
+        {
+          "cell": "E3",
+          "col": "E",
+          "row": 3,
+          "formula": "=底稿目录!A5"
+        },
+        {
+          "cell": "J3",
+          "col": "J",
+          "row": 3,
+          "formula": "=底稿目录!F7"
+        },
+        {
+          "cell": "A4",
+          "col": "A",
+          "row": 4,
+          "formula": "=底稿目录!A3"
+        },
+        {
+          "cell": "C4",
+          "col": "C",
+          "row": 4,
+          "formula": "=底稿目录!A6"
+        },
+        {
+          "cell": "E4",
+          "col": "E",
+          "row": 4,
+          "formula": "=底稿目录!A7"
+        },
+        {
+          "cell": "B11",
+          "col": "B",
+          "row": 11,
+          "formula": "=SUM(B8:B10)"
+        },
+        {
+          "cell": "C11",
+          "col": "C",
+          "row": 11,
+          "formula": "=SUM(C8:C10)"
+        },
+        {
+          "cell": "D11",
+          "col": "D",
+          "row": 11,
+          "formula": "=SUM(D8:D10)"
+        },
+        {
+          "cell": "E11",
+          "col": "E",
+          "row": 11,
+          "formula": "=SUM(E8:E10)"
+        },
+        {
+          "cell": "H15",
+          "col": "H",
+          "row": 15,
+          "formula": "=B15+C15-D15-F15-G15"
+        },
+        {
+          "cell": "H16",
+          "col": "H",
+          "row": 16,
+          "formula": "=B16+C16-D16-F16-G16"
+        },
+        {
+          "cell": "H17",
+          "col": "H",
+          "row": 17,
+          "formula": "=B17+C17-D17-F17-G17"
+        },
+        {
+          "cell": "B18",
+          "col": "B",
+          "row": 18,
+          "formula": "=SUM(B15:B17)"
+        }
+      ]
+    },
+    "明细表K7-2": {
+      "max_row": 41,
+      "max_column": 32,
+      "formula_count": 102,
+      "unique_formula_patterns": 27,
+      "formula_columns_count": 20,
+      "formula_columns": [
+        "A",
+        "C",
+        "D",
+        "E",
+        "F",
+        "G",
+        "H",
+        "I",
+        "J",
+        "K",
+        "L",
+        "M",
+        "N",
+        "O",
+        "P",
+        "Q",
+        "R",
+        "S",
+        "T",
+        "W"
+      ],
+      "max_formulas_in_single_row": 18,
+      "merged_cells": 28,
+      "sheet_type": {
+        "code": "K7-2",
+        "type": "functional",
+        "componentize": true
+      },
+      "header_rows": [
+        [
+          "A1=致同会计师事务所"
+        ],
+        [
+          "A2=递延收益明细表"
+        ],
+        [
+          "A3==底稿目录!A2",
+          "H3==底稿目录!A4",
+          "O3==底稿目录!A5",
+          "V3=索引号：",
+          "W3==底稿目录!F8"
+        ]
+      ],
+      "columns": [
+        "1.资产负债表中记录的递延收益是存在的，且已记录于恰当的账户",
+        "2.所有应记录的递延收益均已记录，所有应当包括在财务报表中的",
+        "3.递延收益以恰当的金额包括在财务报表中，与之相关的计价或分"
+      ],
+      "formulas_per_column": {
+        "A": 2,
+        "C": 1,
+        "D": 1,
+        "E": 1,
+        "F": 12,
+        "G": 1,
+        "H": 3,
+        "I": 1,
+        "J": 1,
+        "K": 1,
+        "L": 1,
+        "M": 12,
+        "N": 12,
+        "O": 3,
+        "P": 12,
+        "Q": 12,
+        "R": 1,
+        "S": 12,
+        "T": 12,
+        "W": 1
+      },
+      "formula_patterns": [
+        "=C{R}+D{R}-E{R}",
+        "=C{R}+G{R}+H{R}",
+        "=D{R}+I{R}+K{R}",
+        "=E{R}+J{R}+L{R}",
+        "=M{R}+N{R}-Q{R}",
+        "=N{R}-O{R}",
+        "=Q{R}-R{R}",
+        "=SUM(C{R}:C{R})",
+        "=SUM(D{R}:D{R})",
+        "=SUM(E{R}:E{R})",
+        "=SUM(F{R}:F{R})",
+        "=SUM(G{R}:G{R})",
+        "=SUM(H{R}:H{R})",
+        "=SUM(I{R}:I{R})",
+        "=SUM(J{R}:J{R})",
+        "=SUM(K{R}:K{R})",
+        "=SUM(L{R}:L{R})",
+        "=SUM(M{R}:M{R})",
+        "=SUM(N{R}:N{R})",
+        "=SUM(O{R}:O{R})"
+      ],
+      "formulas_sample": [
+        {
+          "cell": "A3",
+          "col": "A",
+          "row": 3,
+          "formula": "=底稿目录!A2"
+        },
+        {
+          "cell": "H3",
+          "col": "H",
+          "row": 3,
+          "formula": "=底稿目录!A4"
+        },
+        {
+          "cell": "O3",
+          "col": "O",
+          "row": 3,
+          "formula": "=底稿目录!A5"
+        },
+        {
+          "cell": "W3",
+          "col": "W",
+          "row": 3,
+          "formula": "=底稿目录!F8"
+        },
+        {
+          "cell": "A4",
+          "col": "A",
+          "row": 4,
+          "formula": "=底稿目录!A3"
+        },
+        {
+          "cell": "H4",
+          "col": "H",
+          "row": 4,
+          "formula": "=底稿目录!A6"
+        },
+        {
+          "cell": "O4",
+          "col": "O",
+          "row": 4,
+          "formula": "=底稿目录!A7"
+        },
+        {
+          "cell": "F11",
+          "col": "F",
+          "row": 11,
+          "formula": "=C11+D11-E11"
+        },
+        {
+          "cell": "M11",
+          "col": "M",
+          "row": 11,
+          "formula": "=C11+G11+H11"
+        },
+        {
+          "cell": "N11",
+          "col": "N",
+          "row": 11,
+          "formula": "=D11+I11+K11"
+        },
+        {
+          "cell": "P11",
+          "col": "P",
+          "row": 11,
+          "formula": "=N11-O11"
+        },
+        {
+          "cell": "Q11",
+          "col": "Q",
+          "row": 11,
+          "formula": "=E11+J11+L11"
+        },
+        {
+          "cell": "S11",
+          "col": "S",
+          "row": 11,
+          "formula": "=Q11-R11"
+        },
+        {
+          "cell": "T11",
+          "col": "T",
+          "row": 11,
+          "formula": "=M11+N11-Q11"
+        },
+        {
+          "cell": "F12",
+          "col": "F",
+          "row": 12,
+          "formula": "=C12+D12-E12"
+        }
+      ]
+    },
+    "调整分录汇总K7-3": {
+      "max_row": 25,
+      "max_column": 10,
+      "formula_count": 7,
+      "unique_formula_patterns": 2,
+      "formula_columns_count": 4,
+      "formula_columns": [
+        "A",
+        "C",
+        "E",
+        "J"
+      ],
+      "max_formulas_in_single_row": 4,
+      "merged_cells": 3,
+      "sheet_type": {
+        "code": "K7-3",
+        "type": "functional",
+        "componentize": true
+      },
+      "header_rows": [
+        [
+          "A1=致同会计师事务所"
+        ],
+        [
+          "A2=递延收益调整分录汇总表"
+        ],
+        [
+          "A3==底稿目录!A2",
+          "C3==底稿目录!A4",
+          "E3==底稿目录!A5",
+          "I3=索引：",
+          "J3==底稿目录!F9"
+        ]
+      ],
+      "columns": [
+        "调整事项说明",
+        "类别（报表调整/账项调整/其他）",
+        "报表项目",
+        "科目名称",
+        "附注项目",
+        "……",
+        "借方调整金额",
+        "贷方调整金额",
+        "索引",
+        "备注"
+      ],
+      "formulas_per_column": {
+        "A": 2,
+        "C": 2,
+        "E": 2,
+        "J": 1
+      },
+      "formula_patterns": [
+        "=底稿目录!A{R}",
+        "=底稿目录!F{R}"
+      ],
+      "formulas_sample": [
+        {
+          "cell": "A3",
+          "col": "A",
+          "row": 3,
+          "formula": "=底稿目录!A2"
+        },
+        {
+          "cell": "C3",
+          "col": "C",
+          "row": 3,
+          "formula": "=底稿目录!A4"
+        },
+        {
+          "cell": "E3",
+          "col": "E",
+          "row": 3,
+          "formula": "=底稿目录!A5"
+        },
+        {
+          "cell": "J3",
+          "col": "J",
+          "row": 3,
+          "formula": "=底稿目录!F9"
+        },
+        {
+          "cell": "A4",
+          "col": "A",
+          "row": 4,
+          "formula": "=底稿目录!A3"
+        },
+        {
+          "cell": "C4",
+          "col": "C",
+          "row": 4,
+          "formula": "=底稿目录!A6"
+        },
+        {
+          "cell": "E4",
+          "col": "E",
+          "row": 4,
+          "formula": "=底稿目录!A7"
+        }
+      ]
+    },
+    "测算表K7-4": {
+      "max_row": 26,
+      "max_column": 27,
+      "formula_count": 87,
+      "unique_formula_patterns": 18,
+      "formula_columns_count": 14,
+      "formula_columns": [
+        "A",
+        "B",
+        "C",
+        "E",
+        "G",
+        "J",
+        "K",
+        "L",
+        "M",
+        "N",
+        "O",
+        "P",
+        "Q",
+        "R"
+      ],
+      "max_formulas_in_single_row": 8,
+      "merged_cells": 2,
+      "sheet_type": {
+        "code": "K7-4",
+        "type": "functional",
+        "componentize": true
+      },
+      "header_rows": [
+        [
+          "A1=致同会计师事务所"
+        ],
+        [
+          "A2=递延收益测算表"
+        ],
+        [
+          "A3==底稿目录!A2",
+          "G3==底稿目录!A4",
+          "N3==底稿目录!A5",
+          "Q3=索引号：",
+          "R3==底稿目录!F10"
+        ]
+      ],
+      "columns": [
+        "摊销期初",
+        "2024-01-01 00:00:00",
+        "摊销期末",
+        "2024-12-31 00:00:00"
+      ],
+      "formulas_per_column": {
+        "A": 2,
+        "B": 1,
+        "C": 1,
+        "E": 1,
+        "G": 12,
+        "J": 9,
+        "K": 9,
+        "L": 9,
+        "M": 9,
+        "N": 12,
+        "O": 1,
+        "P": 10,
+        "Q": 10,
+        "R": 1
+      },
+      "formula_patterns": [
+        "=B{R}+E{R}",
+        "=C{R}+E{R}-M{R}-N{R}",
+        "=DATE((YEAR(D{R})+I{R}),MONTH(D{R}),DAY(D{R}))",
+        "=IF(C{R}=0,0,C{R}/(I{R}*12-DATEDIF(D{R},$B$9,\"M\"))*K{R})",
+        "=IF(C{R}=0,0,IF(J{R}>$D$9,12,IF(YEAR($D$9)<>YEAR(J{R}),0,MONTH(J{R}))))",
+        "=IF(C{R}=0,MONTH($D$9)-MONTH(F{R}),IF(J{R}>$D$9,MONTH($D$9)-MONTH(F{R})+1,MONTH(J{R})-MONTH(F{R})+1))",
+        "=IF(L{R}=0,0,E{R}/L{R}*L{R})",
+        "=M{R}+N{R}-O{R}",
+        "=SUM(B{R}:B{R})",
+        "=SUM(C{R}:C{R})",
+        "=SUM(E{R}:E{R})",
+        "=SUM(G{R}:G{R})",
+        "=SUM(N{R}:N{R})",
+        "=SUM(O{R}:O{R})",
+        "=SUM(P{R}:P{R})",
+        "=SUM(Q{R}:Q{R})",
+        "=底稿目录!A{R}",
+        "=底稿目录!F{R}"
+      ],
+      "formulas_sample": [
+        {
+          "cell": "A3",
+          "col": "A",
+          "row": 3,
+          "formula": "=底稿目录!A2"
+        },
+        {
+          "cell": "G3",
+          "col": "G",
+          "row": 3,
+          "formula": "=底稿目录!A4"
+        },
+        {
+          "cell": "N3",
+          "col": "N",
+          "row": 3,
+          "formula": "=底稿目录!A5"
+        },
+        {
+          "cell": "R3",
+          "col": "R",
+          "row": 3,
+          "formula": "=底稿目录!F10"
+        },
+        {
+          "cell": "A4",
+          "col": "A",
+          "row": 4,
+          "formula": "=底稿目录!A3"
+        },
+        {
+          "cell": "G4",
+          "col": "G",
+          "row": 4,
+          "formula": "=底稿目录!A6"
+        },
+        {
+          "cell": "N4",
+          "col": "N",
+          "row": 4,
+          "formula": "=底稿目录!A7"
+        },
+        {
+          "cell": "G11",
+          "col": "G",
+          "row": 11,
+          "formula": "=B11+E11"
+        },
+        {
+          "cell": "J11",
+          "col": "J",
+          "row": 11,
+          "formula": "=DATE((YEAR(D11)+I11),MONTH(D11),DAY(D11))"
+        },
+        {
+          "cell": "K11",
+          "col": "K",
+          "row": 11,
+          "formula": "=IF(C11=0,0,IF(J11>$D$9,12,IF(YEAR($D$9)<>YEAR(J11),0,MONTH(J11))))"
+        },
+        {
+          "cell": "L11",
+          "col": "L",
+          "row": 11,
+          "formula": "=IF(C11=0,MONTH($D$9)-MONTH(F11),IF(J11>$D$9,MONTH($D$9)-MONTH(F11)+1,MONTH(J11)-MONTH(F11)+1))"
+        },
+        {
+          "cell": "M11",
+          "col": "M",
+          "row": 11,
+          "formula": "=IF(C11=0,0,C11/(I11*12-DATEDIF(D11,$B$9,\"M\"))*K11)"
+        },
+        {
+          "cell": "N11",
+          "col": "N",
+          "row": 11,
+          "formula": "=IF(L11=0,0,E11/L11*L11)"
+        },
+        {
+          "cell": "P11",
+          "col": "P",
+          "row": 11,
+          "formula": "=M11+N11-O11"
+        },
+        {
+          "cell": "Q11",
+          "col": "Q",
+          "row": 11,
+          "formula": "=C11+E11-M11-N11"
+        }
+      ]
+    },
+    "递延收益检查表K7-5": {
+      "max_row": 30,
+      "max_column": 18,
+      "formula_count": 10,
+      "unique_formula_patterns": 5,
+      "formula_columns_count": 5,
+      "formula_columns": [
+        "A",
+        "E",
+        "H",
+        "I",
+        "Q"
+      ],
+      "max_formulas_in_single_row": 4,
+      "merged_cells": 12,
+      "sheet_type": {
+        "code": "K7-5",
+        "type": "functional",
+        "componentize": true
+      },
+      "header_rows": [
+        [
+          "A1=致同会计师事务所"
+        ],
+        [
+          "A2=递延收益检查表"
+        ],
+        [
+          "A3==底稿目录!A2",
+          "E3==底稿目录!A4",
+          "I3==底稿目录!A5",
+          "P3=索引号：",
+          "Q3==底稿目录!F11"
+        ]
+      ],
+      "columns": [],
+      "formulas_per_column": {
+        "A": 2,
+        "E": 2,
+        "H": 3,
+        "I": 2,
+        "Q": 1
+      },
+      "formula_patterns": [
+        "='明细表K{R}-2'!N{R}",
+        "=H{R}/H{R}",
+        "=SUM(H{R}:H{R})",
+        "=底稿目录!A{R}",
+        "=底稿目录!F{R}"
+      ],
+      "formulas_sample": [
+        {
+          "cell": "A3",
+          "col": "A",
+          "row": 3,
+          "formula": "=底稿目录!A2"
+        },
+        {
+          "cell": "E3",
+          "col": "E",
+          "row": 3,
+          "formula": "=底稿目录!A4"
+        },
+        {
+          "cell": "I3",
+          "col": "I",
+          "row": 3,
+          "formula": "=底稿目录!A5"
+        },
+        {
+          "cell": "Q3",
+          "col": "Q",
+          "row": 3,
+          "formula": "=底稿目录!F11"
+        },
+        {
+          "cell": "A4",
+          "col": "A",
+          "row": 4,
+          "formula": "=底稿目录!A3"
+        },
+        {
+          "cell": "E4",
+          "col": "E",
+          "row": 4,
+          "formula": "=底稿目录!A6"
+        },
+        {
+          "cell": "I4",
+          "col": "I",
+          "row": 4,
+          "formula": "=底稿目录!A7"
+        },
+        {
+          "cell": "H20",
+          "col": "H",
+          "row": 20,
+          "formula": "=SUM(H12:H19)"
+        },
+        {
+          "cell": "H21",
+          "col": "H",
+          "row": 21,
+          "formula": "='明细表K7-2'!N22"
+        },
+        {
+          "cell": "H22",
+          "col": "H",
+          "row": 22,
+          "formula": "=H20/H21"
+        }
+      ]
+    },
+    "会计提示": {
+      "max_row": 43,
+      "max_column": 8,
+      "formula_count": 0,
+      "unique_formula_patterns": 0,
+      "formula_columns_count": 0,
+      "formula_columns": [],
+      "max_formulas_in_single_row": 0,
+      "merged_cells": 1,
+      "sheet_type": {
+        "code": null,
+        "type": "accounting_tips_auxiliary",
+        "componentize": false,
+        "fallback": "OnlyOffice"
+      },
+      "header_rows": [
+        [
+          "A1=政府补助的确认、计量与列报"
+        ],
+        [
+          "A2=（一）实务问题"
+        ],
+        [
+          "A3=1、如何区分财政资金与政府补助？收到的资金，如何在资产负债表列报分类（权益、负债或损益），如何现金流量分类？"
+        ]
+      ],
+      "columns": [],
+      "formulas_per_column": {},
+      "formula_patterns": [],
+      "formulas_sample": []
+    },
+    "GT_Custom": {
+      "max_row": 8,
+      "max_column": 2,
+      "formula_count": 0,
+      "unique_formula_patterns": 0,
+      "formula_columns_count": 0,
+      "formula_columns": [],
+      "max_formulas_in_single_row": 0,
+      "merged_cells": 0,
+      "sheet_type": {
+        "code": null,
+        "type": "system_hidden",
+        "componentize": false,
+        "fallback": "hidden"
+      },
+      "header_rows": [
+        [
+          "A1=C1",
+          "B1=Custom 1"
+        ],
+        [
+          "A2=C2",
+          "B2=Custom 2"
+        ],
+        [
+          "A3=C3",
+          "B3=Custom 3"
+        ]
+      ],
+      "columns": [],
+      "formulas_per_column": {},
+      "formula_patterns": [],
+      "formulas_sample": []
+    }
+  }
+}

@@ -276,9 +276,37 @@ const eqcrTabBadges = computed(() => ({
 const loading = ref(false)
 const overview = ref<EqcrProjectOverview | null>(null)
 const timeSummary = ref<{ total_hours: number; record_count: number } | null>(null)
-const activeTab = ref<
-  'materiality' | 'estimate' | 'related_party' | 'going_concern' | 'opinion_type' | 'shadow_compute' | 'review_notes' | 'prior_year' | 'memo' | 'component_auditor' | 'key_findings_summary'
->('materiality')
+const EQCR_TABS = [
+  'materiality',
+  'estimate',
+  'related_party',
+  'going_concern',
+  'opinion_type',
+  'shadow_compute',
+  'review_notes',
+  'prior_year',
+  'memo',
+  'component_auditor',
+  'key_findings_summary',
+] as const
+
+type EqcrTabName = (typeof EQCR_TABS)[number]
+
+function resolveEqcrTab(raw: unknown): EqcrTabName {
+  const tab = String(raw ?? '')
+  return (EQCR_TABS as readonly string[]).includes(tab)
+    ? (tab as EqcrTabName)
+    : 'materiality'
+}
+
+const activeTab = ref<EqcrTabName>(resolveEqcrTab(route.query.tab))
+
+watch(
+  () => route.query.tab,
+  (tab) => {
+    activeTab.value = resolveEqcrTab(tab)
+  },
+)
 
 // ─── Phase 4 F3: EQCR 快照模式 ─────────────────────────────────────────────
 const snapshotMode = ref(false)

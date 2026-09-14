@@ -129,6 +129,21 @@ async def delete_misstatement(
         raise HTTPException(status_code=400, detail=str(e))
 
 
+@router.get("/for-letter")
+async def get_for_representation_letter(
+    project_id: UUID,
+    year: int = Query(...),
+    db: AsyncSession = Depends(get_db),
+    _user=Depends(get_current_user),
+):
+    """返回 A16 管理层声明书用的未更正错报摘要文本"""
+    from app.services.misstatement_summary_service import MisstatementSummaryService
+
+    svc = MisstatementSummaryService(db)
+    text = await svc.get_for_representation_letter(project_id, year)
+    return {"summary": text}
+
+
 @router.get("/summary")
 async def get_summary(
     project_id: UUID,
@@ -174,6 +189,42 @@ async def recheck_threshold(
         "rechecked": True,
         "summary": result.model_dump(),
     }
+
+
+@router.post("/{misstatement_id}/mark-reversed")
+async def mark_as_reversed(
+    project_id: UUID,
+    misstatement_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """A13 Req 4.3: 将结转错报标记为已转回，从累计中排除。"""
+    svc = UnadjustedMisstatementService(db)
+    try:
+        result = await svc.mark_as_reversed(project_id, misstatement_id)
+        await db.commit()
+        return result.model_dump()
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.post("/communication-draft")
+async def generate_communication_draft_endpoint(
+    project_id: UUID,
+    year: int = Query(...),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """A13 Req 5.1-5.7: 生成管理层沟通函草稿。
+
+    查询 prior_year_status IN ('continuing', 'new') 的未更正错报，
+    生成 Communication_Draft JSON 并持久化到 A13-5 sheet data。
+    """
+    from app.services.a13_communication_draft import create_communication_draft
+
+    draft = await create_communication_draft(db, project_id, year)
+    await db.commit()
+    return draft
 
 
 # R10 Spec B / Sprint 3.2.2 — 错报关联底稿

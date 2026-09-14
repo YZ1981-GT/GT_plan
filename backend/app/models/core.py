@@ -5,7 +5,7 @@ from datetime import date, datetime
 from decimal import Decimal
 
 from sqlalchemy import Boolean, ForeignKey, Index, Numeric, String, Text, func, text
-from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy.dialects.postgresql import JSONB, UUID as PG_UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models.base import (
@@ -75,6 +75,19 @@ class Project(Base, SoftDeleteMixin, TimestampMixin, AuditMixin):
         ForeignKey("accounting_standards.id"), nullable=True
     )
     company_code: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    short_name: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    # audit-report-template-integration V066: 企业子类型 type_a/type_b/type_c/type_d
+    company_subtype: Mapped[str | None] = mapped_column(String(10), nullable=True)
+    # V077: 业务分类 A/B/C
+    business_category: Mapped[str | None] = mapped_column(String(10), nullable=True)
+    # V087: A21~A25 复核底稿模板选择
+    audit_type: Mapped[str | None] = mapped_column(
+        String(32), nullable=True, server_default=text("'financial'")
+    )
+    is_large_soe: Mapped[bool] = mapped_column(
+        Boolean, server_default=text("false"), nullable=False
+    )
+    audit_year: Mapped[int | None] = mapped_column(nullable=True, comment="审计年度（物化列，唯一性索引依赖）")
     template_type: Mapped[str | None] = mapped_column(String(20), nullable=True)
     report_scope: Mapped[str | None] = mapped_column(String(20), nullable=True)
     parent_company_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
@@ -129,6 +142,9 @@ class Project(Base, SoftDeleteMixin, TimestampMixin, AuditMixin):
         server_default=text("false"),
         comment="是否有外币业务（驱动 E1-1 双区显隐 + E1-3 双版本二选一）",
     )
+    # V045 扩展列
+    prior_year_project_id: Mapped[uuid.UUID | None] = mapped_column(PG_UUID(as_uuid=True), nullable=True)
+    migration_note: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     # multi-standard-unification 需求 1.1: 结构化统一准则状态源（单一真理源）
     # {entity_type: "soe"|"listed"|"private", scope: "standalone"|"consolidated",
@@ -252,6 +268,19 @@ class Notification(Base):
     is_read: Mapped[bool] = mapped_column(default=False)
     read_at: Mapped[datetime | None] = mapped_column(nullable=True)
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
+
+    # --- V105 聚合通知扩展（procedure-delegation-notification / Task 2）---
+    # additive-only：event_id+recipient_user_id 去重、dedup_key、metadata 驱动跳转（不解析中文 content）。
+    # 唯一去重索引 uq_notifications_event_recipient 由 V105 迁移拥有。
+    event_id: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    recipient_user_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("users.id"), nullable=True
+    )
+    dedup_key: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    # 属性名避开 DeclarativeBase.metadata 保留字，DB 列名仍为 "metadata"
+    notification_metadata: Mapped[dict | None] = mapped_column(
+        "metadata", JSONB, nullable=True
+    )
 
     __table_args__ = (
         Index("idx_notifications_recipient_read", "recipient_id", "is_read"),

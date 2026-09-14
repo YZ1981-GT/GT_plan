@@ -31,6 +31,7 @@ import logging
 import os
 import re
 import subprocess
+from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
@@ -40,6 +41,12 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
 
 logger = logging.getLogger("audit_platform.migration")
+
+# PG advisory lock key — 全局唯一 64 位整数，多 worker/多进程启动时串行化迁移。
+# 任意常量即可，只要全仓迁移路径统一用这一把锁。取 "GTMIG" 的 ASCII 拼读派生值。
+# 多 worker 部署（gunicorn -w N / 多容器）时：仅抢到锁的进程跑迁移，
+# 其余进程阻塞等锁释放后再查 schema_version，发现已最新 → pending 为空直接返回。
+_MIGRATION_ADVISORY_LOCK_KEY = 0x47544D4947  # b"GTMIG" 大端拼读
 
 # 匹配 V001__xxx.sql 格式
 _VERSION_RE = re.compile(r"^V(\d+)__.*\.sql$", re.IGNORECASE)
@@ -125,6 +132,26 @@ class FailureRecord:
     error_message: str
 
 
+@dataclass
+class ChecksumDrift:
+    """已应用迁移的 checksum 漂移记录（Task 2.3 finding）。
+
+    「已应用迁移文件被事后编辑」时，schema_version 里记录的 ``checksum``
+    与磁盘上当前文件重新计算的 SHA-256 不再一致——迁移不会重跑，改动静默丢失。
+    ``detect_checksum_drift`` 纯检测（不重跑、不修改），返回此记录列表供守卫报警。
+
+    - version           : 版本号（如 "106"）
+    - filename          : schema_version 记录的迁移文件名
+    - stored_checksum   : schema_version 中存储的（应用时）checksum
+    - current_checksum  : 当前磁盘文件重新计算的 checksum（文件缺失时为 None）
+    """
+
+    version: str
+    filename: str
+    stored_checksum: str
+    current_checksum: str | None
+
+
 @dataclass(eq=False)
 class RunPendingResult:
     """run_pending 的返回值（resilient 模式）。
@@ -185,7 +212,16 @@ class MigrationRunner:
             self._engine = engine
             self._owns_engine = False
         elif database_url:
-            self._engine = create_async_engine(database_url, pool_pre_ping=True)
+            from app.core.config import settings as _settings
+            _mig_connect_args = (
+                {"ssl": False}
+                if database_url.startswith("postgresql")
+                and getattr(_settings, "DB_DISABLE_SSL", False)
+                else {}
+            )
+            self._engine = create_async_engine(
+                database_url, pool_pre_ping=True, connect_args=_mig_connect_args
+            )
             self._owns_engine = True
         else:
             raise ValueError("必须提供 database_url 或 engine")
@@ -208,9 +244,20 @@ class MigrationRunner:
         - 失败写入 schema_migration_failures 表（attempt_count 递增）
         - 成功的迁移清除 failure 记录
 
+        并发安全（migration-concurrency-lock / 多 worker 前置阻断 ①）：
+        PostgreSQL 下用 ``pg_advisory_lock`` 在独立 session 持锁，全程串行化迁移——
+        多 worker（gunicorn -w N / 多容器）同时启动时仅持锁进程跑迁移，
+        其余进程阻塞等锁释放，释放后查 schema_version 发现已最新 → pending 为空直接返回。
+        SQLite / 非 PG 方言无 advisory lock 概念 → 跳过加锁直接执行（单测/单进程场景）。
+
         向后兼容：返回值实现 __iter__/__len__/__bool__，旧调用 ``for v in result``
         / ``len(result)`` / ``if result`` 仍可工作（语义为 executed list）。
         """
+        async with self._advisory_lock():
+            return await self._run_pending_inner()
+
+    async def _run_pending_inner(self) -> RunPendingResult:
+        """run_pending 的实际迁移逻辑（已在 advisory lock 保护下调用）。"""
         await self.ensure_schema_version_table()
         await self.ensure_failure_table()
 
@@ -260,6 +307,61 @@ class MigrationRunner:
                 [f"{f.version}({f.error_type})" for f in failed],
             )
         return RunPendingResult(executed=executed, failed=failed)
+
+    @asynccontextmanager
+    async def _advisory_lock(self):
+        """PG session 级 advisory lock 上下文管理器。
+
+        - PostgreSQL：在一条**独立**连接上 ``pg_advisory_lock(key)`` 阻塞获取，
+          退出时 ``pg_advisory_unlock(key)``。advisory lock 绑定 session（连接），
+          故必须在同一连接 acquire/release，且持锁期间该连接保持打开。
+        - 非 PG（SQLite 等）：无 advisory lock 概念，直接 yield（不加锁）。
+
+        失败兜底：获取锁过程出现异常时记 WARNING 并降级为不加锁执行（不阻塞启动）。
+        单 yield：避免 except 分支二次 yield 与 greenlet_spawn 嵌套导致递归溢出。
+        """
+        if self._engine.dialect.name != "postgresql":
+            yield
+            return
+
+        conn = None
+        locked = False
+        try:
+            conn = await self._engine.connect()
+            await conn.execute(
+                text("SELECT pg_advisory_lock(:k)"),
+                {"k": _MIGRATION_ADVISORY_LOCK_KEY},
+            )
+            locked = True
+            logger.info(
+                "[Migration] 已获取 advisory lock(%s)，开始串行迁移",
+                _MIGRATION_ADVISORY_LOCK_KEY,
+            )
+        except Exception as lock_err:
+            logger.warning(
+                "[Migration] advisory lock 获取失败，降级为不加锁执行: %s", lock_err
+            )
+
+        try:
+            yield
+        finally:
+            if conn is not None:
+                if locked:
+                    try:
+                        await conn.execute(
+                            text("SELECT pg_advisory_unlock(:k)"),
+                            {"k": _MIGRATION_ADVISORY_LOCK_KEY},
+                        )
+                        logger.info(
+                            "[Migration] 已释放 advisory lock(%s)",
+                            _MIGRATION_ADVISORY_LOCK_KEY,
+                        )
+                    except Exception as unlock_err:
+                        logger.warning(
+                            "[Migration] advisory unlock 失败（连接关闭后会话锁自动释放）: %s",
+                            unlock_err,
+                        )
+                await conn.close()
 
     # ------------------------------------------------------------------
     # 扫描
@@ -345,6 +447,50 @@ class MigrationRunner:
                 text("SELECT MAX(version) FROM schema_version")
             )
             return result.scalar()
+
+    async def detect_checksum_drift(self) -> list[ChecksumDrift]:
+        """检测「已应用迁移文件被事后编辑」的 checksum 漂移（纯检测，不重跑）。
+
+        对比 schema_version 表中每条已应用迁移记录的存储 checksum 与磁盘上当前
+        对应文件重新计算出的 SHA-256：
+        - 两者一致          → 无漂移；
+        - 两者不同          → 报漂移（文件应用后被编辑，改动静默丢失）；
+        - 磁盘文件已缺失    → 报漂移（current_checksum=None）；
+        - schema_version 记录的文件在磁盘上无同版本迁移 → 跳过（可能是回滚日志行或
+          手工插入的非文件行），不误报。
+
+        Returns
+        -------
+        list[ChecksumDrift]
+            所有漂移记录（版本号数值升序）。无漂移返回空列表。
+        """
+        await self.ensure_schema_version_table()
+
+        # 磁盘上当前迁移文件：version -> MigrationFile（含最新 checksum）
+        disk_by_version = {m.version: m for m in self.scan_migrations()}
+
+        async with self._engine.begin() as conn:
+            rows = await conn.execute(
+                text("SELECT version, filename, checksum FROM schema_version")
+            )
+            stored = rows.fetchall()
+
+        drifts: list[ChecksumDrift] = []
+        for version, filename, stored_checksum in stored:
+            disk = disk_by_version.get(version)
+            if disk is None:
+                # 磁盘上无该版本迁移文件：可能是回滚日志/手工行，不作为漂移误报。
+                continue
+            if disk.checksum != stored_checksum:
+                drifts.append(ChecksumDrift(
+                    version=version,
+                    filename=filename,
+                    stored_checksum=stored_checksum,
+                    current_checksum=disk.checksum,
+                ))
+
+        drifts.sort(key=lambda d: int(d.version))
+        return drifts
 
     # ------------------------------------------------------------------
     # 回滚 API

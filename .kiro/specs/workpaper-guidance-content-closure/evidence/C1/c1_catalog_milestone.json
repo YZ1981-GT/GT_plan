@@ -1,0 +1,35 @@
+{
+  "milestone": "C1",
+  "contractVersion": "1.0",
+  "producerSpec": "workpaper-guidance-content-closure",
+  "producerTask": 21,
+  "recordedAt": "2026-09-09T07:21:17.299486+00:00",
+  "verdict": "FAIL",
+  "reasonCodes": [
+    "pending_entries_present"
+  ],
+  "runId": "c1-20260909T072117Z",
+  "inventoryDigest": "58fba33eab6d7922f1da1b671374f4419ae826e5e98b32e08c676a3adc6a0383",
+  "cutoffAt": "2026-09-09T07:21:17.299486+00:00",
+  "inputDigests": {
+    "static_entries": "e09d31ab915e15ce2affde717a927ab9388f1c5f54a88ff993b52c6757c05f58",
+    "template_lineage_id": "lineage:standard",
+    "template_version_id": "version:active"
+  },
+  "stageAccounting": {
+    "gross_required": 373,
+    "effective_required": 373,
+    "complete": 0,
+    "pending": 373,
+    "blocked": 0,
+    "valid_exempted": 0,
+    "out_of_scope": 0,
+    "pass": false
+  },
+  "entryCount": 373,
+  "notes": [
+    "C1 PASS requires effective_required == complete and pending=blocked=0",
+    "FAIL here is expected until Task 7 nine-section content/publication closes unmapped sheets",
+    "This freeze does not mutate historical milestones; later catalog changes need a new run"
+  ]
+}

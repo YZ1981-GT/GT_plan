@@ -1,0 +1,397 @@
+{
+  "version": "1.0",
+  "description": "现金流量表逆算公式配置（一般企业适用）",
+  "tolerance_note": "逆算含增值税估算容差，差异超重要性水平标记异常",
+  "cash_equivalent_accounts": {
+    "cash": ["1001"],
+    "bank_deposit": ["1002"],
+    "other_monetary": ["1012"],
+    "short_term_investment": ["1101"],
+    "restricted_note": "1101 中三个月以上定期/受限资金需手动排除"
+  },
+  "reconciliation": {
+    "bs_cf_check": {
+      "description": "BS货币资金期末 - 期初 = CF现金净增加额",
+      "formula": "bs_cash_end - bs_cash_begin == cf_net_increase",
+      "components": {
+        "bs_cash_end": {"source": "FR", "report_type": "balance_sheet", "row_code": "BS-002", "period": "end"},
+        "bs_cash_begin": {"source": "FR", "report_type": "balance_sheet", "row_code": "BS-002", "period": "begin"},
+        "cf_net_increase": {"source": "FR", "report_type": "cash_flow_statement", "row_code": "CFS-061"}
+      }
+    },
+    "activity_sum_check": {
+      "description": "经营+投资+筹资+汇率影响 = 现金净增加额",
+      "formula": "operating_net + investing_net + financing_net + exchange_effect == cf_net_increase",
+      "components": {
+        "operating_net": {"source": "FR", "report_type": "cash_flow_statement", "row_code": "CFS-033"},
+        "investing_net": {"source": "FR", "report_type": "cash_flow_statement", "row_code": "CFS-047"},
+        "financing_net": {"source": "FR", "report_type": "cash_flow_statement", "row_code": "CFS-059"},
+        "exchange_effect": {"source": "FR", "report_type": "cash_flow_statement", "row_code": "CFS-060"},
+        "cf_net_increase": {"source": "FR", "report_type": "cash_flow_statement", "row_code": "CFS-061"}
+      }
+    },
+    "supplementary_check": {
+      "description": "附表间接法经营CF = 主表经营CF",
+      "formula": "indirect_operating == direct_operating",
+      "components": {
+        "indirect_operating": {"source": "FR", "report_type": "cash_flow_supplementary", "row_code": "CFSS-020"},
+        "direct_operating": {"source": "FR", "report_type": "cash_flow_statement", "row_code": "CFS-033"}
+      }
+    }
+  },
+  "operating": [
+    {
+      "item": "销售商品、提供劳务收到的现金",
+      "row_code": "CFS-002",
+      "formula": "revenue + (ar_begin - ar_end) + (notes_receivable_begin - notes_receivable_end) + (advance_end - advance_begin) + vat_output_estimate",
+      "formula_description": "营业收入 + 应收账款减少 + 应收票据减少 + 预收增加 + 增值税销项估算",
+      "has_vat_tolerance": true,
+      "components": {
+        "revenue": {"source": "FR", "report_type": "income_statement", "row_code": "IS-002"},
+        "ar_begin": {"source": "TB", "accounts": ["1122"], "period": "begin"},
+        "ar_end": {"source": "TB", "accounts": ["1122"], "period": "end"},
+        "notes_receivable_begin": {"source": "TB", "accounts": ["1121"], "period": "begin"},
+        "notes_receivable_end": {"source": "TB", "accounts": ["1121"], "period": "end"},
+        "advance_begin": {"source": "TB", "accounts": ["2203"], "period": "begin"},
+        "advance_end": {"source": "TB", "accounts": ["2203"], "period": "end"},
+        "vat_output_estimate": {"source": "TB", "accounts": ["2221"], "period": "current_credit", "note": "增值税销项税额，从应交税费贷方发生额估算"}
+      }
+    },
+    {
+      "item": "收到的税费返还",
+      "row_code": "CFS-016",
+      "formula": "manual_or_zero",
+      "formula_description": "通常无法从TB逆算，标记为人工核实项",
+      "has_vat_tolerance": false,
+      "components": {}
+    },
+    {
+      "item": "收到其他与经营活动有关的现金",
+      "row_code": "CFS-017",
+      "formula": "manual_or_zero",
+      "formula_description": "杂项收入，通常无法逆算，标记为人工核实项",
+      "has_vat_tolerance": false,
+      "components": {}
+    },
+    {
+      "item": "购买商品、接受劳务支付的现金",
+      "row_code": "CFS-019",
+      "formula": "cost + (inventory_end - inventory_begin) + (ap_begin - ap_end) + (prepay_end - prepay_begin) + vat_input_estimate",
+      "formula_description": "营业成本 + 存货增加 + 应付账款减少 + 预付增加 + 增值税进项估算",
+      "has_vat_tolerance": true,
+      "components": {
+        "cost": {"source": "FR", "report_type": "income_statement", "row_code": "IS-008"},
+        "inventory_begin": {"source": "TB", "accounts": ["1401", "1403", "1405"], "period": "begin"},
+        "inventory_end": {"source": "TB", "accounts": ["1401", "1403", "1405"], "period": "end"},
+        "ap_begin": {"source": "TB", "accounts": ["2201", "2202"], "period": "begin"},
+        "ap_end": {"source": "TB", "accounts": ["2201", "2202"], "period": "end"},
+        "prepay_begin": {"source": "TB", "accounts": ["1123"], "period": "begin"},
+        "prepay_end": {"source": "TB", "accounts": ["1123"], "period": "end"},
+        "vat_input_estimate": {"source": "TB", "accounts": ["2221"], "period": "current_debit", "note": "增值税进项税额，从应交税费借方发生额估算"}
+      }
+    },
+    {
+      "item": "支付给职工及为职工支付的现金",
+      "row_code": "CFS-029",
+      "formula": "staff_cost + (staff_payable_begin - staff_payable_end)",
+      "formula_description": "应付职工薪酬本期借方发生额（含工资/社保/公积金等）",
+      "has_vat_tolerance": false,
+      "components": {
+        "staff_cost": {"source": "TB", "accounts": ["2211"], "period": "current_debit", "note": "应付职工薪酬借方=实际支付"},
+        "staff_payable_begin": {"source": "TB", "accounts": ["2211"], "period": "begin"},
+        "staff_payable_end": {"source": "TB", "accounts": ["2211"], "period": "end"}
+      }
+    },
+    {
+      "item": "支付的各项税费",
+      "row_code": "CFS-030",
+      "formula": "tax_expense + (tax_payable_begin - tax_payable_end)",
+      "formula_description": "税金及附加+所得税费用 + 应交税费减少",
+      "has_vat_tolerance": true,
+      "components": {
+        "tax_expense": {"source": "FR", "report_type": "income_statement", "row_code": "IS-021", "note": "税金及附加"},
+        "tax_payable_begin": {"source": "TB", "accounts": ["2221"], "period": "begin"},
+        "tax_payable_end": {"source": "TB", "accounts": ["2221"], "period": "end"}
+      }
+    },
+    {
+      "item": "支付其他与经营活动有关的现金",
+      "row_code": "CFS-031",
+      "formula": "period_expenses - depreciation_in_expenses - staff_in_expenses",
+      "formula_description": "销售+管理+研发费用 - 其中折旧摊销 - 其中人工（粗估）",
+      "has_vat_tolerance": false,
+      "components": {
+        "selling_expense": {"source": "FR", "report_type": "income_statement", "row_code": "IS-022"},
+        "admin_expense": {"source": "FR", "report_type": "income_statement", "row_code": "IS-023"},
+        "rd_expense": {"source": "FR", "report_type": "income_statement", "row_code": "IS-024"},
+        "note": "需扣除费用中已计入职工/折旧的部分，粗估为差额项"
+      }
+    }
+  ],
+  "investing": [
+    {
+      "item": "收回投资收到的现金",
+      "row_code": "CFS-035",
+      "formula": "manual_or_zero",
+      "formula_description": "长期股权投资/金融资产处置收回，需结合明细账核实",
+      "has_vat_tolerance": false,
+      "components": {
+        "investment_decrease": {"source": "TB", "accounts": ["1501", "1502", "1101", "1511"], "period": "decrease", "note": "投资类科目借方减少"}
+      }
+    },
+    {
+      "item": "取得投资收益收到的现金",
+      "row_code": "CFS-036",
+      "formula": "investment_income",
+      "formula_description": "投资收益（扣除权益法确认的未收现部分）",
+      "has_vat_tolerance": false,
+      "components": {
+        "investment_income": {"source": "FR", "report_type": "income_statement", "row_code": "IS-033", "note": "投资收益行"}
+      }
+    },
+    {
+      "item": "处置固定资产、无形资产和其他长期资产收回的现金净额",
+      "row_code": "CFS-037",
+      "formula": "manual_or_zero",
+      "formula_description": "需结合固定资产清理科目和明细账核实",
+      "has_vat_tolerance": false,
+      "components": {
+        "asset_disposal": {"source": "TB", "accounts": ["1606"], "period": "current_credit", "note": "固定资产清理贷方"}
+      }
+    },
+    {
+      "item": "购建固定资产、无形资产和其他长期资产支付的现金",
+      "row_code": "CFS-041",
+      "formula": "fa_increase + ia_increase + cip_increase + (construction_payable_begin - construction_payable_end)",
+      "formula_description": "固定资产+无形资产+在建工程增加 - 应付工程款减少",
+      "has_vat_tolerance": true,
+      "components": {
+        "fa_increase": {"source": "TB", "accounts": ["1601"], "period": "current_debit"},
+        "ia_increase": {"source": "TB", "accounts": ["1701"], "period": "current_debit"},
+        "cip_increase": {"source": "TB", "accounts": ["1604"], "period": "current_debit", "note": "在建工程"}
+      }
+    },
+    {
+      "item": "投资支付的现金",
+      "row_code": "CFS-042",
+      "formula": "investment_increase",
+      "formula_description": "长期股权投资/其他投资增加",
+      "has_vat_tolerance": false,
+      "components": {
+        "investment_increase": {"source": "TB", "accounts": ["1501", "1502", "1511"], "period": "current_debit"}
+      }
+    }
+  ],
+  "financing": [
+    {
+      "item": "吸收投资收到的现金",
+      "row_code": "CFS-049",
+      "formula": "equity_increase",
+      "formula_description": "实收资本/资本公积增加（扣除资本公积中非现金部分）",
+      "has_vat_tolerance": false,
+      "components": {
+        "paid_in_capital": {"source": "TB", "accounts": ["4001"], "period": "current_credit"},
+        "capital_reserve": {"source": "TB", "accounts": ["4002"], "period": "current_credit"}
+      }
+    },
+    {
+      "item": "取得借款收到的现金",
+      "row_code": "CFS-051",
+      "formula": "short_loan_increase + long_loan_increase",
+      "formula_description": "短期借款+长期借款本期贷方发生额",
+      "has_vat_tolerance": false,
+      "components": {
+        "short_loan_increase": {"source": "TB", "accounts": ["2001"], "period": "current_credit"},
+        "long_loan_increase": {"source": "TB", "accounts": ["2501"], "period": "current_credit"}
+      }
+    },
+    {
+      "item": "偿还债务支付的现金",
+      "row_code": "CFS-054",
+      "formula": "short_loan_decrease + long_loan_decrease + bond_decrease",
+      "formula_description": "短期借款+长期借款+应付债券本期借方发生额",
+      "has_vat_tolerance": false,
+      "components": {
+        "short_loan_decrease": {"source": "TB", "accounts": ["2001"], "period": "current_debit"},
+        "long_loan_decrease": {"source": "TB", "accounts": ["2501"], "period": "current_debit"},
+        "bond_decrease": {"source": "TB", "accounts": ["2502"], "period": "current_debit"}
+      }
+    },
+    {
+      "item": "分配股利、利润或偿付利息支付的现金",
+      "row_code": "CFS-055",
+      "formula": "dividend_paid + interest_paid",
+      "formula_description": "应付股利减少 + 利息费用（扣除资本化部分）",
+      "has_vat_tolerance": false,
+      "components": {
+        "dividend_paid": {"source": "TB", "accounts": ["2232"], "period": "current_debit", "note": "应付股利借方"},
+        "interest_expense": {"source": "FR", "report_type": "income_statement", "row_code": "IS-026", "note": "利息费用"}
+      }
+    }
+  ],
+  "supplementary_indirect": {
+    "description": "附表间接法：净利润调节为经营活动现金流量各调整项的数据源",
+    "target_row_code": "CFSS-020",
+    "items": [
+      {
+        "item": "净利润",
+        "row_code": "CFSS-002",
+        "source": "FR",
+        "report_type": "income_statement",
+        "row_code_ref": "IS-047",
+        "sign": 1
+      },
+      {
+        "item": "资产减值损失",
+        "row_code": "CFSS-003",
+        "source": "TB",
+        "accounts": ["6701"],
+        "period": "current_debit",
+        "sign": 1,
+        "note": "资产减值损失借方发生额"
+      },
+      {
+        "item": "信用减值损失",
+        "row_code": "CFSS-004",
+        "source": "TB",
+        "accounts": ["6702"],
+        "period": "current_debit",
+        "sign": 1,
+        "note": "信用减值损失借方发生额"
+      },
+      {
+        "item": "固定资产折旧、油气资产折耗、生产性生物资产折旧",
+        "row_code": "CFSS-005",
+        "source": "TB",
+        "accounts": ["1602"],
+        "period": "current_credit",
+        "sign": 1,
+        "note": "累计折旧贷方发生额"
+      },
+      {
+        "item": "使用权资产折旧",
+        "row_code": "CFSS-006",
+        "source": "TB",
+        "accounts": ["1604"],
+        "period": "current_credit",
+        "sign": 1,
+        "note": "使用权资产累计折旧"
+      },
+      {
+        "item": "无形资产摊销",
+        "row_code": "CFSS-007",
+        "source": "TB",
+        "accounts": ["1702"],
+        "period": "current_credit",
+        "sign": 1,
+        "note": "累计摊销贷方发生额"
+      },
+      {
+        "item": "长期待摊费用摊销",
+        "row_code": "CFSS-008",
+        "source": "TB",
+        "accounts": ["1801"],
+        "period": "current_credit",
+        "sign": 1,
+        "note": "长期待摊费用贷方（摊销）"
+      },
+      {
+        "item": "处置固定资产、无形资产和其他长期资产的损失",
+        "row_code": "CFSS-009",
+        "source": "FR",
+        "report_type": "income_statement",
+        "row_code_ref": "IS-037",
+        "sign": 1,
+        "note": "资产处置收益取反（收益为负=损失为正加回）"
+      },
+      {
+        "item": "固定资产报废损失",
+        "row_code": "CFSS-010",
+        "source": "FR",
+        "report_type": "income_statement",
+        "row_code_ref": "IS-038",
+        "sign": 1,
+        "note": "营业外支出中报废损失"
+      },
+      {
+        "item": "公允价值变动损失",
+        "row_code": "CFSS-011",
+        "source": "FR",
+        "report_type": "income_statement",
+        "row_code_ref": "IS-032",
+        "sign": -1,
+        "note": "公允价值变动收益取反"
+      },
+      {
+        "item": "财务费用",
+        "row_code": "CFSS-012",
+        "source": "FR",
+        "report_type": "income_statement",
+        "row_code_ref": "IS-025",
+        "sign": 1,
+        "note": "财务费用（利息相关部分）"
+      },
+      {
+        "item": "投资损失",
+        "row_code": "CFSS-013",
+        "source": "FR",
+        "report_type": "income_statement",
+        "row_code_ref": "IS-033",
+        "sign": -1,
+        "note": "投资收益取反"
+      },
+      {
+        "item": "递延所得税资产减少",
+        "row_code": "CFSS-014",
+        "source": "TB",
+        "accounts": ["1811"],
+        "period": "decrease",
+        "sign": 1,
+        "note": "递延所得税资产期初-期末（减少为正）"
+      },
+      {
+        "item": "递延所得税负债增加",
+        "row_code": "CFSS-015",
+        "source": "TB",
+        "accounts": ["2901"],
+        "period": "increase",
+        "sign": 1,
+        "note": "递延所得税负债期末-期初（增加为正）"
+      },
+      {
+        "item": "存货的减少",
+        "row_code": "CFSS-016",
+        "source": "TB",
+        "accounts": ["1401", "1403", "1405"],
+        "period": "decrease",
+        "sign": 1,
+        "note": "存货期初-期末（减少为正）"
+      },
+      {
+        "item": "经营性应收项目的减少",
+        "row_code": "CFSS-017",
+        "source": "TB",
+        "accounts": ["1122", "1123", "1221", "1121"],
+        "period": "decrease",
+        "sign": 1,
+        "note": "应收账款+预付+其他应收+应收票据 期初-期末"
+      },
+      {
+        "item": "经营性应付项目的增加",
+        "row_code": "CFSS-018",
+        "source": "TB",
+        "accounts": ["2201", "2202", "2203", "2241"],
+        "period": "increase",
+        "sign": 1,
+        "note": "应付账款+预收+合同负债+其他应付 期末-期初"
+      },
+      {
+        "item": "其他",
+        "row_code": "CFSS-019",
+        "source": "manual",
+        "sign": 1,
+        "note": "差额倒轧项，通常为0"
+      }
+    ]
+  }
+}

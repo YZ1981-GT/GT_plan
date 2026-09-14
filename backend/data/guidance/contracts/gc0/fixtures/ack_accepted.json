@@ -1,0 +1,17 @@
+{
+  "contractVersion": "1.0",
+  "ackId": "ack-001",
+  "handoffId": "handoff-finalized-001",
+  "handoffDigest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "consumer": "guidance",
+  "consumerVersion": "guid-impl-1.0.0",
+  "verdict": "ACCEPTED",
+  "validatedDigests": {
+    "authority": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "artifact": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "mapping": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "formulaBoundary": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+  },
+  "reasonCodes": [],
+  "recordedAt": "2026-09-07T00:00:00Z"
+}

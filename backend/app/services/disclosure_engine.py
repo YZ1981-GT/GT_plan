@@ -4,6 +4,7 @@
 - generate_notes: 根据附注模版种子数据生成附注初稿
 - populate_table_data: 从试算表取数填充附注表格
 - update_note_values: 增量更新受影响附注数值
+- refill_sections: 窄接口，复用填充链重算指定章节单元格
 - on_reports_updated: EventBus 事件处理器
 
 Validates: Requirements 4.2, 4.3, 4.4, 4.7, 4.8, 4.9, 4.10, 8.1
@@ -13,8 +14,11 @@ from __future__ import annotations
 
 import json
 import logging
+import re
+from dataclasses import dataclass, field
 from decimal import Decimal
 from pathlib import Path
+from typing import Any
 from uuid import UUID
 
 from fastapi import HTTPException
@@ -32,11 +36,39 @@ from app.models.report_models import (
     NoteStatus,
     SourceTemplate,
 )
+from app.services.note_section_catalog import (
+    filter_template_sections,
+    normalize_report_scope,
+    normalize_section_code,
+)
+from app.services.parent_company_note_sections import (
+    PARENT_PROJECT_MISSING_KEY,
+    PARENT_SOURCE_META_KEY,
+    ParentScopeCache,
+    build_parent_source_meta,
+    is_parent_company_section,
+    resolve_parent_scope_for_notes,
+)
 from app.services.note_template_service import NoteTemplateService
 from app.services.note_template_merge import merge_templates
 from app.services.note_custom_template_service import NoteCustomTemplateService
+from app.core.config import settings
+from app.services.llm_client import chat_completion
+from app.services.note_knowledge_enricher import NoteKnowledgeEnricher
 
 logger = logging.getLogger(__name__)
+
+
+def _is_llm_error(text: str | None) -> bool:
+    """判断 chat_completion 返回是否为服务降级占位串（非有效生成）。
+
+    chat_completion 失败/熔断/超时时返回占位串（`[LLM ...]` / `⚠️...`）而非抛异常，
+    故非空且非占位串才当作有效正文。等价于 enricher 内部同款判定。
+    """
+    if not text:
+        return True
+    t = str(text).strip()
+    return (not t) or t.startswith("[") or t.startswith("⚠️")
 
 SEED_DATA_PATH = Path(__file__).resolve().parent.parent.parent / "data" / "note_templates_seed.json"
 
@@ -45,6 +77,64 @@ def _load_seed_data() -> dict:
     """加载附注模版种子数据"""
     with open(SEED_DATA_PATH, encoding="utf-8-sig") as f:
         return json.load(f)
+
+
+# ── Wave4 Task 5.3：模板 check role → 附注校验 preset 枚举（供 collect_inline_rules_for_note 消费）──
+# 中文枚举（seed ``check_roles``）直接透传；英文 formula-gen 键（``check_presets``）仅映射语义
+# 明确者，其余跳过（不臆造校验规则）。
+_CHECK_ROLE_TO_VALIDATION_PRESET = {
+    "balance": "余额",
+    "sub_item": "其中项",
+    "movement": "宽表",
+}
+_VALID_VALIDATION_PRESETS = frozenset(
+    {"余额", "宽表", "纵向", "交叉", "跨科目", "其中项",
+     "二级明细", "完整性", "账龄衔接", "LLM审核", "描述"}
+)
+
+
+def _resolve_check_roles(tmpl: dict) -> list[str]:
+    """从模板抽取校验 preset 枚举（中文），供注入 ``table_data._validation_rules``。
+
+    ``check_roles``（seed，中文）优先，回退 ``check_presets``（formula-gen 键，英文）。
+    中文枚举透传（须在 _VALID_VALIDATION_PRESETS 内）；英文键经 map 转语义明确者，
+    未知键跳过（不臆造）。去重保序。
+    """
+    raw = tmpl.get("check_roles")
+    if not isinstance(raw, list) or not raw:
+        raw = tmpl.get("check_presets")
+    if not isinstance(raw, list):
+        return []
+    out: list[str] = []
+    for item in raw:
+        if not isinstance(item, str):
+            continue
+        s = item.strip()
+        val = s if s in _VALID_VALIDATION_PRESETS else _CHECK_ROLE_TO_VALIDATION_PRESET.get(s)
+        if val and val not in out:
+            out.append(val)
+    return out
+
+
+def _inject_validation_rules(table_data: dict | None, tmpl: dict) -> None:
+    """把模板声明的校验 preset 注入 ``table_data._validation_rules``（Wave4 Task 5.3 补装配）。
+
+    背景（实证断链）：``_build_table_data`` 只返回 ``{headers, rows}``，生成链从不把校验
+    preset 写进 note.table_data → ``collect_inline_rules_for_note`` 生产中无 inline 规则可消费。
+    此处从模板 ``check_roles``/``check_presets`` 解析枚举并写入 sidecar 键 ``_validation_rules``。
+
+    附加式 + 幂等：仅当解析出非空 preset 且 table_data 尚无 ``_validation_rules`` 时注入；
+    只新增一个 sidecar 键，不改既有 headers/rows/_tables（渲染忽略未知键 → 零渲染回归）。
+    校验由 ``NoteValidationEngine.collect_inline_rules_for_note`` 在 ``validate_all``
+    （按需 ``POST /disclosure-notes/.../validate`` 触发）时消费，不在生成时自动跑。
+    """
+    if not isinstance(table_data, dict):
+        return
+    if table_data.get("_validation_rules"):
+        return
+    presets = _resolve_check_roles(tmpl)
+    if presets:
+        table_data["_validation_rules"] = presets
 
 
 def _extract_basic_info(wizard_state: dict | None) -> dict:
@@ -56,6 +146,408 @@ def _extract_basic_info(wizard_state: dict | None) -> dict:
     )
 
 
+# ---------------------------------------------------------------------------
+# Markdown 标题转中文序号
+# ---------------------------------------------------------------------------
+
+_CN_NUMBERS = ['一', '二', '三', '四', '五', '六', '七', '八', '九', '十',
+               '十一', '十二', '十三', '十四', '十五', '十六', '十七', '十八', '十九', '二十']
+
+
+# 匹配"（表N）"占位模式的正则
+_TABLE_SUFFIX_RE = re.compile(r"[（(]表\d+[）)]")
+
+# 匹配编号标题的正则（如 "（1）按账龄披露"、"1. 本期计提"）
+_NUMBERED_TITLE_RE = re.compile(
+    r"^(?:[（(](\d+)[）)]|(\d+)[.、．])\s*(.+)"
+)
+
+_GUIDANCE_KEYWORDS = (
+    "应",
+    "说明",
+    "披露",
+    "参考附注",
+    "提示",
+    "注：",
+    "注:",
+    "评价",
+    "确认",
+    "列示",
+    "逐项",
+)
+
+
+def is_guidance_paragraph(para: str) -> bool:
+    """判定单段是否为高置信度指引文字（生成与存量迁移共用）。"""
+    s = (para or "").strip()
+    if not s:
+        return False
+    wrapped = (
+        (s.startswith("（") and s.endswith("）"))
+        or (s.startswith("(") and s.endswith(")"))
+        or (s.startswith("【") and s.endswith("】"))
+        or (s.startswith("《") and s.endswith("》"))
+    )
+    if not wrapped:
+        return False
+    return any(kw in s for kw in _GUIDANCE_KEYWORDS)
+
+
+def _is_table_title_paragraph(para: str) -> bool:
+    """短编号标题类段落（供表名消费，不进正文/指引）。"""
+    s = (para or "").strip()
+    if not s:
+        return False
+    if s.startswith("#"):          # markdown 标题：任意长度都算标题行
+        return True
+    if len(s) > 20:                # 非 # 的短标题才受长度约束
+        return False
+    return bool(_NUMBERED_TITLE_RE.match(s))
+
+
+def _paragraph_matches_table_name(para: str, table_names: list[str]) -> bool:
+    """段落是否**精确等于**某张表名（去掉 markdown # 前缀后比较）。
+
+    模板 text_sections 常把子表标题写成与 tables[].name 完全一致的**无编号纯文本**
+    行（如 应收票据 五、4 的「期末本公司已质押的应收票据」），`_is_table_title_paragraph`
+    只认 # / 编号标题会漏判 → 这些标题行漏进可编辑正文。此处用**精确等于**判定
+    （保守，不用包含匹配，避免误吞含表名子串的实质正文）。
+    """
+    s = (para or "").lstrip("#").strip()
+    if not s:
+        return False
+    return any(bool(n) and s == n.strip() for n in table_names)
+
+
+# 括号配对表：跨段/跨行的多段指引块（如 `【提示：` 起、`…】` 止）需先合并为
+# 单一段落，`is_guidance_paragraph`（要求首尾同段成对）才能正确判为指引。
+_BRACKET_OPEN_TO_CLOSE = {"【": "】", "（": "）", "(": ")", "《": "》"}
+_BRACKET_OPEN_CHARS = tuple(_BRACKET_OPEN_TO_CLOSE.keys())
+
+
+def _bracket_unbalanced(text: str) -> bool:
+    """任一开括号数量多于其对应闭括号 → 该文本内的括号块尚未闭合。"""
+    return any(
+        text.count(o) > text.count(c) for o, c in _BRACKET_OPEN_TO_CLOSE.items()
+    )
+
+
+def _merge_bracket_blocks(paragraphs: list[str]) -> list[str]:
+    """合并被拆成多段/多行的括号指引块（`【提示：` … `…】`）为单一段落。
+
+    仅当某段以开括号（【（(《）起且自身未闭合时才启动合并，持续吸纳后续段落
+    直至括号配平；配平后作为一个段落输出。若始终未闭合（模板残缺），退回逐段
+    原样输出（不吞并后续正文，保持零回归）。已配平/普通正文段落原样透传。
+    """
+    merged: list[str] = []
+    buf: list[str] = []
+    for para in paragraphs:
+        if buf:
+            buf.append(para)
+            if not _bracket_unbalanced("\n".join(buf)):
+                merged.append("\n".join(buf))
+                buf = []
+            continue
+        stripped = (para or "").strip()
+        if stripped.startswith(_BRACKET_OPEN_CHARS) and _bracket_unbalanced(para):
+            buf = [para]
+        else:
+            merged.append(para)
+    if buf:                        # 未闭合：逐段原样输出（不合并、不吞后文）
+        merged.extend(buf)
+    return merged
+
+
+def _flatten_paragraphs(
+    text_sections: list[str] | None,
+    text_template: str | None,
+) -> list[str]:
+    """将 text_sections（按行）/ text_template（按空行块）拍平为段落列表。"""
+    paragraphs: list[str] = []
+    for section in text_sections or []:
+        for line in section.split("\n"):
+            line = line.strip()
+            if line:
+                paragraphs.append(line)
+    if not paragraphs and text_template:
+        for block in text_template.split("\n\n"):
+            block = block.strip()
+            if block:
+                paragraphs.append(block)
+    return paragraphs
+
+
+def _match_title_to_table_idx(
+    title: str,
+    table_names: list[str],
+    fallback: int,
+) -> int | None:
+    """把一行标题映射到 table 索引（四级匹配）。
+
+    1. 精确匹配 table name
+    2. 编号标题 `（N）xxx` → idx N-1
+    3. 包含匹配（标题包含表名 或 表名包含标题）
+    4. 兜底：游标 +1（越界则返回 None）
+    """
+    clean = title.lstrip("#").strip()
+    # 1. 精确匹配
+    for i, n in enumerate(table_names):
+        if n and clean == n:
+            return i
+    # 2. 编号匹配 （N）xxx / N. xxx → idx N-1
+    m = _NUMBERED_TITLE_RE.match(clean)
+    if m:
+        num = int(m.group(1) or m.group(2))
+        if 1 <= num <= len(table_names):
+            return num - 1
+    # 3. 包含匹配
+    for i, n in enumerate(table_names):
+        if n and (clean in n or n in clean):
+            return i
+    # 4. 兜底：游标 +1
+    nxt = fallback + 1
+    return nxt if nxt < len(table_names) else None
+
+
+def classify_template_content(
+    text_sections: list[str] | None,
+    text_template: str | None,
+    tables: list[dict] | None = None,
+) -> tuple[str | None, str | None, dict[int, str]]:
+    """将模板 text_sections/text_template 分流为三类。
+
+    返回 (substantive_text, section_guidance_text, per_table_guidance)：
+    - substantive_text: 实质正文（合并）→ text_content
+    - section_guidance_text: 无法归属到具体表 / 单表场景的通用提示 → guidance_text
+    - per_table_guidance: {table_idx: guidance_str} → _tables[idx].guidance
+
+    游标算法：遍历段落，标题行推进游标（标题行本身丢弃），多表场景下
+    指引段落归属到当前游标对应的表；单表/无表场景指引归章节级。
+
+    向后兼容：旧调用方不传 tables → per_table_guidance={}，所有指引归
+    section_guidance（行为同旧）。
+    """
+    paragraphs = _merge_bracket_blocks(_flatten_paragraphs(text_sections, text_template))
+    table_names = [(t.get("name") or "").strip() for t in (tables or [])]
+    multi_table = len(table_names) > 1
+
+    substantive_parts: list[str] = []
+    section_guidance_parts: list[str] = []
+    per_table_guidance: dict[int, list[str]] = {}
+    current_idx = 0
+
+    for para in paragraphs:
+        if is_guidance_paragraph(para):
+            if multi_table:
+                per_table_guidance.setdefault(current_idx, []).append(para)
+            else:
+                section_guidance_parts.append(para)
+            continue
+        if _is_table_title_paragraph(para) or _paragraph_matches_table_name(para, table_names):
+            # 标题行：推进游标到匹配的 table_idx（标题行本身不进任何输出）
+            # 含两类：① # / 编号标题（_is_table_title_paragraph）
+            #        ② 与 tables[].name 精确相等的无编号纯文本标题（_paragraph_matches_table_name）
+            if multi_table:
+                idx = _match_title_to_table_idx(para, table_names, current_idx)
+                if idx is not None:
+                    current_idx = idx
+            continue
+        # 正文
+        substantive_parts.append(para)
+
+    substantive = "\n\n".join(substantive_parts) if substantive_parts else None
+    section_guidance = (
+        "\n\n".join(section_guidance_parts) if section_guidance_parts else None
+    )
+    table_guidance = {i: "\n\n".join(v) for i, v in per_table_guidance.items() if v}
+    return substantive, section_guidance, table_guidance
+
+
+def identify_guidance(text_content: str) -> tuple[str, str] | None:
+    """存量拆分：按段落识别指引；无法可靠识别时返回 None。
+
+    ⚠ 往返语义：拆分按 `\\n\\n` 分两桶后各自 join，**不保留指引段在正文中的原始
+    交错位置**。即 `指引A\\n\\n正文B\\n\\n指引C` → guidance=`指引A\\n\\n指引C`、
+    remaining=`正文B`，原排版顺序丢失。Property 6 的"往返一致"仅指字符集不丢失，
+    **不可**用 `guidance + remaining` 还原原始排版；真正还原只能靠备份表 rollback。
+    """
+    if not text_content or not str(text_content).strip():
+        return None
+    segments = _merge_bracket_blocks(text_content.split("\n\n"))
+    guidance_segments: list[str] = []
+    remaining_segments: list[str] = []
+    any_hit = False
+    for seg in segments:
+        if is_guidance_paragraph(seg.strip()):
+            guidance_segments.append(seg)
+            any_hit = True
+        else:
+            remaining_segments.append(seg)
+    if not any_hit:
+        return None
+    guidance = "\n\n".join(guidance_segments)
+    remaining = "\n\n".join(remaining_segments)
+    return guidance, remaining
+
+
+def _infer_table_names_from_text(
+    built_tables: list[dict],
+    text_sections: list[str] | None,
+) -> None:
+    """动态提取表格标题：name 为空或占位时，从 text_sections 按序号匹配。
+
+    逻辑：
+    1. 收集所有 name 需要修复的表格索引
+    2. 从 text_sections 中解析编号标题（如 "（1）按账龄披露应收账款"）
+    3. 按序号对应回填 built_tables[N].name
+
+    也支持无编号场景：text_sections 中的短标题（≤20字、非空、非指引）按出现顺序对应表格。
+    """
+    if not built_tables:
+        return
+
+    # 收集需要修复 name 的表格索引
+    needs_fix: list[int] = []
+    for i, tbl in enumerate(built_tables):
+        name = (tbl.get("name") or "").strip()
+        if not name or _TABLE_SUFFIX_RE.search(name):
+            needs_fix.append(i)
+
+    if not needs_fix:
+        return
+
+    # 从 text_sections 提取编号标题
+    numbered_titles: dict[int, str] = {}  # 1-based index → title
+    sequential_titles: list[str] = []  # 非编号的短标题按顺序
+
+    sections_text = text_sections or []
+    for section in sections_text:
+        for line in section.split("\n"):
+            line = line.strip()
+            if not line or line.startswith("#") or line.startswith("【"):
+                continue
+            m = _NUMBERED_TITLE_RE.match(line)
+            if m:
+                idx = int(m.group(1) or m.group(2))
+                title = m.group(3).strip()
+                if title and len(title) <= 30:
+                    numbered_titles[idx] = title
+            elif len(line) <= 20 and not line.startswith("（") and not line.startswith("注"):
+                # 短标题候选（非指引、非注释）
+                sequential_titles.append(line)
+
+    # 回填策略 1：按编号匹配（"（1）xxx" → 表1, "（2）xxx" → 表2）
+    for i in needs_fix:
+        idx_1based = i + 1
+        if idx_1based in numbered_titles:
+            built_tables[i]["name"] = numbered_titles[idx_1based]
+
+    # 回填策略 2：对仍无名称的表格，按 sequential_titles 顺序对应
+    remaining = [i for i in needs_fix if not (built_tables[i].get("name") or "").strip() or _TABLE_SUFFIX_RE.search(built_tables[i].get("name", ""))]
+    for j, i in enumerate(remaining):
+        if j < len(sequential_titles):
+            built_tables[i]["name"] = sequential_titles[j]
+
+
+# seed 模板上声明的列元数据键：需透传到生成的 table_data 才能渲染两级表头
+_SEED_COLUMN_META_KEYS = ("columns", "_column_groups")
+
+
+def _carry_seed_table_guidance(seed_tables: list[dict], built_tables: list[dict]) -> None:
+    """把 seed 表显式声明的 ``guidance``（TAB 页签编制提示）写回生成的 table_data。
+
+    与 ``per_table_guidance``（从 ``text_sections`` 按游标推断）的关系：
+    seed 上**显式声明**的 guidance 优先——它是人工按源模板红字 / 15号文条款 / 勾稽关系
+    撰写的，比按段落游标推断更准确。未声明 guidance 的表保持推断结果不变
+    （当前仅 K1 其他应收款 §五、8 / §八、9 显式声明，其余章节零影响）。
+
+    spec: k1-other-receivable-disclosure-alignment R4.3 / R5.4
+    """
+    for i, seed in enumerate(seed_tables):
+        if i >= len(built_tables) or not isinstance(seed, dict):
+            continue
+        g = seed.get("guidance")
+        if isinstance(g, str) and g.strip():
+            built_tables[i]["guidance"] = g
+
+
+def _carry_seed_column_meta(seed: dict, built: dict) -> None:
+    """把 seed 表的列元数据（``columns`` / ``_column_groups``）透传到生成的 table_data。
+
+    ``_build_table_data`` 只产出 ``{headers, rows}``，会丢弃 seed 上声明的两级表头
+    元数据，导致模板生成（非底稿同步）的附注渲染成扁平表头。此处按需补写。
+
+    幂等 + 零影响：
+    - seed 未声明 / 声明为空 / 类型非法（非 list） → 不写任何键
+    - ``built`` 已有同名键（如底稿投影已填）→ 不覆盖
+
+    消费方：``DisclosureEditor.activeTableColumns``（嵌套 el-table-column）与
+    ``note_word_exporter._build_two_level_header_rows``（fill_multi_header）。
+
+    spec: f2-inventory-disclosure-template-alignment R5 / Property 9
+    """
+    if not isinstance(seed, dict) or not isinstance(built, dict):
+        return
+    for key in _SEED_COLUMN_META_KEYS:
+        val = seed.get(key)
+        if not isinstance(val, list) or not val:
+            continue
+        if key in built:
+            continue
+        built[key] = val
+
+
+def _convert_md_headings_to_numbered(text: str) -> str:
+    """将模板中的 ## / ### markdown 标题转为中文序号格式。
+
+    ## 标题  → （一）标题、（二）标题 ...
+    ### 标题 → 1. 标题、2. 标题 ...（在每个 ## 下重新计数）
+    """
+    import re
+    lines = text.split('\n')
+    result = []
+    h2_counter = 0
+    h3_counter = 0
+    for line in lines:
+        m2 = re.match(r'^##\s+(.+)$', line)
+        m3 = re.match(r'^###\s+(.+)$', line)
+        if m2:
+            h2_counter += 1
+            h3_counter = 0  # 重置三级计数
+            label = _CN_NUMBERS[h2_counter - 1] if h2_counter <= len(_CN_NUMBERS) else str(h2_counter)
+            result.append(f'（{label}）{m2.group(1)}')
+        elif m3:
+            h3_counter += 1
+            result.append(f'{h3_counter}. {m3.group(1)}')
+        else:
+            result.append(line)
+    return '\n'.join(result)
+
+
+# ---------------------------------------------------------------------------
+# refill_sections 数据类
+# ---------------------------------------------------------------------------
+
+@dataclass
+class CellRefillRecord:
+    """单元格重算变更记录"""
+    section: str          # note_section
+    row_index: int
+    col_index: int
+    old_value: Any
+    new_value: Any
+
+
+@dataclass
+class RefillReport:
+    """refill_sections 返回的重算报告"""
+    sections_recomputed: list[str] = field(default_factory=list)
+    text_only_sections: list[str] = field(default_factory=list)
+    cells_updated: int = 0
+    records: list[CellRefillRecord] = field(default_factory=list)
+    errors: list[str] = field(default_factory=list)
+
+
 class DisclosureEngine:
     """附注生成引擎"""
 
@@ -65,6 +557,206 @@ class DisclosureEngine:
         self._wp_account_cache: dict = {}
         self._tb_cache: dict = {}
         self._wp_fine_cache: dict = {}  # 底稿精细化明细行缓存
+        # 母公司章取数上下文（Task 12/13）：母公司章的 binding 取数须指向
+        # **同代码同年度 standalone 兄弟项目**而非合并项目自身。惰性构造，
+        # 非合并项目 / 未命中母公司章时全程不查库（零回归支点）。
+        self._parent_scope_cache: ParentScopeCache | None = None
+        # RAG 增强旁路：按 note_section 暂存本次生成所依据的 Citation，
+        # 供后续落库/返回时附带（不改 _generate_text_with_llm 的 str|None 签名）。
+        self._last_citations: dict = {}
+        # 知识库增强编排层（仅开关开启时按需构造，Property 6 零回归依赖此惰性构造）
+        self._enricher: NoteKnowledgeEnricher | None = None
+
+    def _get_enricher(self) -> NoteKnowledgeEnricher:
+        """惰性构造 NoteKnowledgeEnricher（仅 RAG 开关开启的调用路径触达）。"""
+        if self._enricher is None:
+            self._enricher = NoteKnowledgeEnricher(self.db)
+        return self._enricher
+
+    def _stash_citations(self, note_section: str, citations: list) -> None:
+        """把本次 RAG 生成所依据的 Citation 暂存到旁路 dict。"""
+        if not isinstance(getattr(self, "_last_citations", None), dict):
+            self._last_citations = {}
+        self._last_citations[note_section] = citations or []
+
+    # ------------------------------------------------------------------
+    # 母公司章取数上下文（Task 12/13）
+    # ------------------------------------------------------------------
+    async def _parent_scope(self, project_id: UUID, year: int) -> ParentScopeCache:
+        """惰性解析并缓存母公司口径（每个 engine 实例只查一次库）。
+
+        判定与取数**完全由 `parent_company_scope` helper 承担**，本层不重写
+        `(company_code, audit_year, report_scope)` 三条件（Property 20 的
+        源码级守卫按此断言）。
+        """
+        cached = getattr(self, "_parent_scope_cache", None)
+        if cached is not None and cached.matches(project_id, year):
+            return cached
+        scope = await resolve_parent_scope_for_notes(self.db, project_id, year)
+        self._parent_scope_cache = scope
+        return scope
+
+    async def _build_resolver_ctx(
+        self,
+        project_id: UUID,
+        year: int,
+        section_number: str | None,
+        **extra: Any,
+    ) -> dict[str, Any]:
+        """构造 resolver ctx；母公司章切换到母公司单体项目的 `_tb_cache`。
+
+        非母公司章 / 非合并项目 → 与改造前逐键等价（零回归支点，
+        `test_parent_company_note_sourcing` 有 characterization 断言）。
+
+        母公司章命中且兄弟项目存在 → `project_id` 与 `_tb_cache` 双双换成母公司
+        单体项目的，并附 `_parent_source_meta` 供载荷溯源（Task 13）。
+        兄弟项目缺失 → 不改 `project_id`，但 `_tb_cache` 置空 dict 并标
+        `parent_project_missing`：**留空而非取合并数**（需求 8.4，取到合并数
+        比取不到更坏 —— 母公司章会静默显示合并口径金额）。
+        """
+        ctx: dict[str, Any] = {
+            "project_id": project_id,
+            "year": year,
+            "db": self.db,
+            "_tb_cache": getattr(self, "_tb_cache", None) or {},
+            "_wp_cache": getattr(self, "_wp_cache", None) or {},
+            "_prior_notes_cache": getattr(self, "_prior_notes_cache", None) or {},
+        }
+        if section_number is not None:
+            ctx["section_number"] = section_number
+        ctx.update(extra)
+
+        if not is_parent_company_section(section_number):
+            return ctx
+
+        try:
+            scope = await self._parent_scope(project_id, year)
+        except Exception as err:  # pragma: no cover - defensive
+            # fail-open：母公司口径解析失败不阻断整份附注生成，但**必须留空**
+            # 而不是回落合并数（否则母公司章静默显示合并口径）。
+            logger.warning(
+                "母公司口径解析失败（project=%s year=%s section=%s）：%s；"
+                "该章节取数留空",
+                project_id, year, section_number, err,
+            )
+            ctx["_tb_cache"] = {}
+            ctx[PARENT_PROJECT_MISSING_KEY] = True
+            return ctx
+
+        if scope.resolution_failed:
+            # 🔴 「口径解析本身失败」与「确定不是合并项目」必须是两态：
+            # 前者是「不知道该取哪个项目」⇒ 必须留空；后者是「确定不是合并项目」
+            # ⇒ 按原路径取数。两者合并处理会让 DB 抖动时母公司章静默显示
+            # **合并口径金额**（错数，比取不到更坏）。
+            logger.warning(
+                "母公司口径解析失败（project=%s year=%s section=%s）：该章节取数留空",
+                project_id, year, section_number,
+            )
+            ctx["_tb_cache"] = {}
+            ctx[PARENT_PROJECT_MISSING_KEY] = True
+            return ctx
+
+        if not scope.is_consolidated:
+            # 非合并项目：母公司章按 scope='consolidated_only' 本不该出现在
+            # 单体项目的附注里（`filter_template_sections` 已过滤）；真到了
+            # 这里说明是存量数据，按原路径取数不改行为。
+            return ctx
+
+        if scope.parent_project_id is None:
+            logger.info(
+                "母公司章 %s 取数留空：项目 %s 尚未建母公司单体（合法状态）",
+                section_number, project_id,
+            )
+            ctx["_tb_cache"] = {}
+            ctx[PARENT_PROJECT_MISSING_KEY] = True
+            return ctx
+
+        ctx["project_id"] = scope.parent_project_id
+        ctx["_tb_cache"] = await self._parent_tb_cache(scope.parent_project_id, year)
+        ctx[PARENT_SOURCE_META_KEY] = build_parent_source_meta(scope)
+        return ctx
+
+    @staticmethod
+    def _attach_parent_source_meta(
+        table_data: Any, ctx: dict[str, Any] | None
+    ) -> Any:
+        """把 ctx 里的母公司取数溯源落进 table_data 并**返回该 table_data**（Task 13）。
+
+        非母公司章 → ctx 无这两个键 ⇒ **空操作**（零回归支点：改造前后 table_data
+        逐键相同）。母公司章 → 落 ``_parent_company_source``（三项溯源）或
+        ``parent_project_missing``（前端显示「本项目未建母公司单体」灰态）。
+
+        🔴 只落在**表级** dict 上，不动 ``rows`` —— 母公司章的 rows 由结构任务
+        （Task 4~7）拥有，本任务不得改行结构。
+
+        🔴 两条签名约定（勿"精简"回去，各对应一个已实测的 P0）：
+
+        1. **必须返回 ``table_data``**。legacy 路径写的是
+           ``return self._attach_parent_source_meta({...}, parent_ctx)``；返回
+           ``None`` 会让 ``_build_table_data`` 对**每一张**无 binding 的表返回
+           ``None`` ⇒ 整章表格凭空消失，而 ``get_diagnostics`` 与既有测试全绿。
+        2. **``ctx`` 允许为 ``None``**。legacy 路径在非母公司章时 ``parent_ctx``
+           就是 ``None``；不容忍会抛 ``AttributeError: 'NoneType' has no
+           attribute 'get'`` ⇒ 所有 legacy 表构建整体崩溃（已实测复现）。
+        """
+        if not isinstance(table_data, dict) or not ctx:
+            return table_data
+        meta = ctx.get(PARENT_SOURCE_META_KEY)
+        if isinstance(meta, dict) and meta:
+            table_data[PARENT_SOURCE_META_KEY] = meta
+        if ctx.get(PARENT_PROJECT_MISSING_KEY):
+            table_data[PARENT_PROJECT_MISSING_KEY] = True
+        return table_data
+
+    async def _parent_tb_cache(self, parent_project_id: UUID, year: int) -> dict:
+        """母公司单体项目的 `trial_balance` 缓存（结构与 `_tb_cache` 逐键一致）。
+
+        复用 `_preload_data_for_notes` 的同一投影口径（按 `standard_account_code`
+        与 `account_name` 双键索引、三个字段 audited/unadjusted/opening），
+        避免两套取数口径漂移。
+        """
+        cached = getattr(self, "_parent_tb_cache_store", None)
+        key = (parent_project_id, year)
+        if isinstance(cached, dict) and key in cached:
+            return cached[key]
+
+        tb: dict[str, dict] = {}
+        try:
+            result = await self.db.execute(
+                sa.select(TrialBalance).where(
+                    TrialBalance.project_id == parent_project_id,
+                    TrialBalance.year == year,
+                    TrialBalance.is_deleted == sa.false(),
+                )
+            )
+            for row in result.scalars().all():
+                code = row.standard_account_code or row.account_code or ""
+                name = row.account_name or row.standard_account_name or ""
+                entry = {
+                    "audited": float(row.audited_amount or 0),
+                    "unadjusted": float(row.unadjusted_amount or 0),
+                    "opening": float(row.opening_balance or 0),
+                }
+                if name:
+                    tb[name] = entry
+                if code:
+                    tb[code] = entry
+        except Exception as err:
+            logger.warning(
+                "母公司单体项目 %s 的 trial_balance 预加载失败：%s；该章节取数留空",
+                parent_project_id, err,
+            )
+            try:
+                await self.db.rollback()
+            except Exception:
+                pass
+            tb = {}
+
+        if not isinstance(cached, dict):
+            cached = {}
+            self._parent_tb_cache_store = cached
+        cached[key] = tb
+        return tb
 
     async def _get_project_basic_info(self, project_id: UUID) -> dict:
         result = await self.db.execute(
@@ -102,7 +794,16 @@ class DisclosureEngine:
             raise HTTPException(status_code=400, detail="当前项目绑定的自定义附注模板不存在或已失效，请重新选择")
         return template.get("sections", [])
 
-    async def _load_templates(self, project_id: UUID, template_type: str) -> list[dict]:
+    async def _load_templates(
+        self,
+        project_id: UUID,
+        template_type: str,
+        report_scope: str | None = None,
+    ) -> list[dict]:
+        if report_scope is None:
+            basic_info = await self._get_project_basic_info(project_id)
+            report_scope = basic_info.get("report_scope")
+
         if template_type == "custom":
             sections = await self._get_custom_template_sections(project_id)
             return [
@@ -160,10 +861,14 @@ class DisclosureEngine:
             custom_sections = []
 
         sections = merge_templates(baseline_sections, custom_sections)
+        sections = filter_template_sections(sections, report_scope)
 
         return [
             {
-                "note_section": s.get("section_number", f"五、{idx + 1}"),
+                "note_section": normalize_section_code(
+                    s.get("section_number", f"五、{idx + 1}"),
+                    template_type=template_type,
+                ),
                 "section_title": s.get("section_title", ""),
                 "account_name": s.get("account_name") or s.get("section_title", ""),
                 "content_type": s.get("content_type", "table"),
@@ -214,12 +919,30 @@ class DisclosureEngine:
         3. 通用附注生成提示词
 
         返回 None 表示LLM不可用或未配置，降级到模板默认文字。
-        """
-        try:
-            from app.services.llm_client import llm_client
-            if not llm_client:
-                return None
 
+        接入 disclosure-note-knowledge-ai-enrichment：
+        - RAG 开关开启时优先经 NoteKnowledgeEnricher grounded 生成（附 Citation 旁路暂存）；
+          text 非空则用之，否则退回下方通用 LLM 路径。
+        - 通用路径已修复历史 dead-import（原 `from ... import llm_client` 符号不存在，
+          导致本函数恒返 None）：现使用模块级 `chat_completion`（返回 str），非占位串即正文。
+        - 任一环失败一律 fail-open 返回 None，降级到模板默认文字（Req6）。
+        """
+        # ── RAG 注入（开关开启时优先）────────────────────────────────
+        if settings.DISCLOSURE_NOTE_RAG_ENABLED:
+            try:
+                enricher = self._get_enricher()
+                draft = await enricher.generate_note_text(
+                    project_id, year, note_section, section_title, account_name,
+                )
+                if draft and draft.text:
+                    self._stash_citations(note_section, draft.citations)
+                    return draft.text
+                # text 为空 → 退回通用 LLM 路径
+            except Exception as e:  # fail-open：RAG 异常不阻断，降级通用路径
+                logger.warning("RAG note generation degraded for %s: %s", note_section, e)
+
+        # ── 通用 LLM 路径（dead-import 已修复）────────────────────────
+        try:
             # 构建上下文
             context_parts = [
                 f"科目: {account_name}",
@@ -244,7 +967,9 @@ class DisclosureEngine:
                 "如果数据不足，请生成标准模板文字并标注需要补充的信息。"
             )
 
-            result = await llm_client.chat_completion(
+            # chat_completion 返回 str；服务不可用/熔断/超时返回占位串（[LLM.../⚠️...），
+            # 经 _is_llm_error 判定，非占位串且非空才当作有效正文。
+            result = await chat_completion(
                 messages=[
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": f"请为以下附注章节生成正文：\n\n{context}"},
@@ -253,8 +978,8 @@ class DisclosureEngine:
                 max_tokens=2000,
             )
 
-            if result and result.get("content"):
-                return result["content"]
+            if result and not _is_llm_error(result):
+                return result
         except Exception as e:
             logger.debug("LLM text generation skipped for %s: %s", note_section, e)
 
@@ -345,21 +1070,38 @@ class DisclosureEngine:
             except Exception:
                 pass
 
-        # 预加载上年附注（避免 generate_notes 循环中 165 次逐章节查询）
+        # 预加载上年附注（避免 generate_notes 循环中 165 次逐章节查询）。
+        # 缓存结构扩为 {note_section: {"text": str|None, "table": dict|None}}，
+        # 供 resolve_prior_year_note 的 value 模式做单元格级反查（Wave1 Task2.3）。
+        # text 读取路径（generate_notes 优先级1）兼容 dict + 旧扁平字符串。
         try:
             prior_notes_result = await self.db.execute(
-                sa.select(DisclosureNote.note_section, DisclosureNote.text_content).where(
+                sa.select(
+                    DisclosureNote.note_section,
+                    DisclosureNote.text_content,
+                    DisclosureNote.table_data,
+                ).where(
                     DisclosureNote.project_id == project_id,
                     DisclosureNote.year == year - 1,
                     DisclosureNote.is_deleted == sa.false(),
-                    DisclosureNote.text_content.isnot(None),
+                    sa.or_(
+                        DisclosureNote.text_content.isnot(None),
+                        DisclosureNote.table_data.isnot(None),
+                    ),
                 )
             )
-            self._prior_notes_cache = {
-                row.note_section: row.text_content
-                for row in prior_notes_result.fetchall()
-                if row.text_content and len(row.text_content) > 20
-            }
+            prior_cache: dict[str, Any] = {}
+            for row in prior_notes_result.fetchall():
+                text = (
+                    row.text_content
+                    if (row.text_content and len(row.text_content) > 20)
+                    else None
+                )
+                table = row.table_data if isinstance(row.table_data, dict) else None
+                if text is None and table is None:
+                    continue
+                prior_cache[row.note_section] = {"text": text, "table": table}
+            self._prior_notes_cache = prior_cache
         except Exception as _pn_err:
             logger.warning("preload prior notes failed: %s", _pn_err)
             self._prior_notes_cache = {}
@@ -429,8 +1171,25 @@ class DisclosureEngine:
         wp_data = getattr(self, '_wp_cache', None) or {}
         wp_account_map = getattr(self, '_wp_account_cache', None) or {}
         tb_map = getattr(self, '_tb_cache', None) or {}
+
+        # ── Task 12/13：母公司章的 legacy 路径同样须换取数源 ──────────────
+        # 🔴 母公司章 7 个子节里只有 5 个命中 binding（营业收入与营业成本 / 投资收益 /
+        # 现金流量表补充资料 三者无 binding 条目），它们走的正是本 legacy 路径直读
+        # `self._tb_cache` = 合并项目的试算表 ⇒ 只接 binding 路径会让这几节**静默显示
+        # 合并口径金额**（错数，比取不到更坏）。
+        parent_ctx: dict[str, Any] | None = None
+        if is_parent_company_section(section_number):
+            parent_ctx = await self._build_resolver_ctx(project_id, year, section_number)
+            tb_map = parent_ctx.get("_tb_cache") or {}
+            # 底稿缓存也一并清空：`_wp_cache` 里是**合并项目**的底稿审定数，
+            # 留着会让母公司章优先取到合并口径（legacy 路径底稿优先于试算表）。
+            wp_data = {}
         # 底稿精细化提取结果缓存（detail rows）
         wp_fine_cache = getattr(self, '_wp_fine_cache', None) or {}
+        if parent_ctx is not None:
+            # 同理：`_wp_fine_cache` 是合并项目底稿的 fine_summary 明细行，
+            # 留着会让母公司章的动态明细行显示合并口径明细。
+            wp_fine_cache = {}
 
         # 构建底稿数据按科目名索引
         wp_by_account: dict[str, dict] = {}
@@ -518,6 +1277,14 @@ class DisclosureEngine:
 
             rows.append({"label": label, "values": values, "is_total": False})
 
+        # 浮动行表预留：若只有合计行、无数据行，预留 3 行空行供用户填写
+        non_total_rows = [r for r in rows if not r.get("is_total")]
+        if not non_total_rows and rows:
+            # 在第一个合计行之前插入 3 行空白
+            first_total_idx = next((i for i, r in enumerate(rows) if r.get("is_total")), len(rows))
+            for _ in range(3):
+                rows.insert(first_total_idx, {"label": "", "values": [None] * num_value_cols, "is_total": False})
+
         # 回填合计行
         for i, row in enumerate(rows):
             if row.get("is_total") and i > 0:
@@ -534,7 +1301,9 @@ class DisclosureEngine:
                     )
                     row["values"][ci] = total
 
-        return {"headers": headers, "rows": rows}
+        return self._attach_parent_source_meta(
+            {"headers": headers, "rows": rows}, parent_ctx
+        )
 
     # ------------------------------------------------------------------
     # Sprint 1 Task 1.3 / 1.4 — binding 驱动的新路径
@@ -611,15 +1380,9 @@ class DisclosureEngine:
             return {"headers": headers, "rows": []}
 
         # 构造 ctx — 注入预加载缓存 + db + project_id + year + section_number
-        ctx: dict = {
-            "project_id": project_id,
-            "year": year,
-            "db": self.db,
-            "section_number": section_number,
-            "_tb_cache": getattr(self, "_tb_cache", None) or {},
-            "_wp_cache": getattr(self, "_wp_cache", None) or {},
-            "_prior_notes_cache": getattr(self, "_prior_notes_cache", None) or {},
-        }
+        # 母公司章（十六、* / 十二、*）会在此把 project_id 与 _tb_cache 换成
+        # 同代码同年度 standalone 兄弟项目的（Task 12），其余章节逐键等价。
+        ctx: dict = await self._build_resolver_ctx(project_id, year, section_number)
 
         # binding.rows 是 dict (label -> row_binding)
         binding_rows = table_binding.get("rows") or {}
@@ -734,7 +1497,76 @@ class DisclosureEngine:
         # 回填合计行
         self._backfill_totals(output_rows, num_value_cols)
 
-        return {"headers": list(headers), "rows": output_rows}
+        out: dict = {"headers": list(headers), "rows": output_rows}
+        # Task 13：母公司章取数溯源随表落库（前端溯源面板 / 「本项目未建母公司单体」灰态）
+        self._attach_parent_source_meta(out, ctx)
+        return out
+
+    # ------------------------------------------------------------------
+    # Wave2 (Task 3.2)：表内公式二次求值编排（灰度内调用）
+    # ------------------------------------------------------------------
+    async def _evaluate_note_formulas(
+        self,
+        project_id: UUID,
+        year: int,
+        note_section: str,
+        table_data: dict,
+    ) -> dict:
+        """对已构建的 table_data 跑公式家族（sum/report/aging/prior_year_note）
+        第二遍求值回填。
+
+        - 复用 ``_resolve_cell_binding`` 从 section binding 重建各格 binding
+          （按 table_index 定位多表），不重复造 binding 解析。
+        - 交 ``NoteFormulaEvaluator.evaluate_table`` 求值：manual/locked 保留、
+          单元格级 fail-open、返回新 table_data（不就地改）。
+        - 仅在 ``DISCLOSURE_NOTE_FORMULA_ENABLED`` 开启时被调用（调用方旁路）；
+          且公式家族 resolver 内部亦受开关约束，双重零回归保障。
+        """
+        from app.services.note_formula_evaluator import NoteFormulaEvaluator
+        from app.services.note_template_bindings_loader import (
+            get_binding_for_section,
+        )
+
+        try:
+            sec_binding = get_binding_for_section(note_section)
+        except Exception:
+            sec_binding = None
+        sec_tables = (
+            (sec_binding.get("tables") or [])
+            if isinstance(sec_binding, dict)
+            else []
+        )
+
+        def _binding_resolver(
+            table_index: int,
+            label: str,
+            col_idx: int,
+            cell_meta: dict,
+        ) -> dict | None:
+            if not (0 <= table_index < len(sec_tables)):
+                return None
+            tbl_binding = sec_tables[table_index]
+            if not isinstance(tbl_binding, dict):
+                return None
+            binding_rows = tbl_binding.get("rows") or {}
+            if not isinstance(binding_rows, dict):
+                return None
+            header_normalize = tbl_binding.get("header_normalize") or []
+            if not isinstance(header_normalize, list):
+                header_normalize = []
+            return self._resolve_cell_binding(
+                label, col_idx, binding_rows, header_normalize, cell_meta,
+            )
+
+        # 母公司章在此同样切换到母公司单体项目（Task 12）——公式二次求值与首遍
+        # 取数必须同源，否则同一格首遍取母公司数、二次求值又按合并数覆盖。
+        ctx: dict[str, Any] = await self._build_resolver_ctx(
+            project_id, year, note_section
+        )
+        ctx["report_data"] = getattr(self, "_report_data_cache", None) or {}
+        ctx["_cell_binding_resolver"] = _binding_resolver
+        evaluator = NoteFormulaEvaluator()
+        return await evaluator.evaluate_table(table_data, ctx)
 
     # ------------------------------------------------------------------
     # 生成附注
@@ -773,6 +1605,11 @@ class DisclosureEngine:
         source_template = self._persist_source_template(template_type)
         results = []
 
+        # ── 统一入口：公式灰度按项目解析一次传下游（避免逐格查库）──
+        from app.services.note_formula_gray_service import is_note_formula_enabled
+
+        self._formula_on = await is_note_formula_enabled(self.db, project_id)
+
         # 预加载底稿和试算表数据（避免165次重复查询导致事务超时）
         self._wp_cache = {}
         self._tb_cache = {}
@@ -800,12 +1637,45 @@ class DisclosureEngine:
             text_sections = tmpl.get("text_sections", [])
             text_content = None
 
-            # 优先级1：从上年附注拉取（连续审计场景）- 从预加载缓存取，避免逐章节查询
+            # 优先级1：从上年附注拉取（连续审计场景）- 从预加载缓存取，避免逐章节查询。
+            # 缓存条目为 {"text","table"} dict（Wave1 Task2.3）；兼容旧扁平字符串 / 测试 stub。
             prior_notes_cache = getattr(self, '_prior_notes_cache', {})
-            prior_text = prior_notes_cache.get(note_section)
+            prior_entry = prior_notes_cache.get(note_section)
+            if isinstance(prior_entry, dict):
+                prior_text = prior_entry.get("text")
+            else:
+                prior_text = prior_entry
             if prior_text and len(prior_text) > 20:
-                text_content = prior_text
-                logger.info("note %s: filled from prior year (cache)", note_section)
+                # 上年数据可能混装 guidance（旧版未分流），自动清洗
+                split_result = identify_guidance(prior_text)
+                if split_result:
+                    _prior_guidance, _prior_remaining = split_result
+                    text_content = _prior_remaining if _prior_remaining.strip() else None
+                    # prior guidance 不覆盖模板 guidance（优先级3会处理模板的）
+                else:
+                    text_content = prior_text
+                if text_content:
+                    logger.info("note %s: filled from prior year (cache)", note_section)
+
+            # 优先级1b：知识库上年回退 —— 仅当 DB 缺失（text_content 空）且 RAG 开关开启。
+            # 保持 DB 优先（Property 3：DB 命中则不调知识库回退）。单章 try/except 隔离（Property 12）。
+            if not text_content and settings.DISCLOSURE_NOTE_RAG_ENABLED:
+                try:
+                    enricher = self._get_enricher()
+                    py_draft = await enricher.retrieve_prior_year_note(
+                        project_id, note_section, section_title, account_name,
+                    )
+                    if py_draft and py_draft.text and len(py_draft.text) > 20:
+                        text_content = py_draft.text
+                        self._stash_citations(note_section, py_draft.citations)
+                        logger.info(
+                            "note %s: filled from prior year (knowledge_doc)", note_section
+                        )
+                except Exception as _rag_py_err:  # 单章降级，不影响其余章节
+                    logger.warning(
+                        "prior-year RAG fallback degraded for %s: %s",
+                        note_section, _rag_py_err,
+                    )
 
             # 优先级2：LLM生成（预留接口，通过 note_prompts 配置每章节独立提示词）
             if not text_content:
@@ -819,9 +1689,21 @@ class DisclosureEngine:
                 except Exception:
                     pass
 
-            # 优先级3：模板默认文字
-            if not text_content:
-                text_content = "\n\n".join(text_sections) if text_sections else tmpl.get("text_template")
+            # 优先级3：模板分流 — 指引→guidance_text，实质正文→substantive（替换原灌正文逻辑）
+            # 传入 tables 以支持 per-table guidance 归属（多表场景）
+            substantive, guidance, per_table_guidance = classify_template_content(
+                text_sections, tmpl.get("text_template"), tmpl.get("tables"),
+            )
+            guidance_text = guidance
+
+            if not text_content and substantive:
+                text_content = substantive
+
+            # R1 markdown 源头止血：LLM/上年/substantive 产出的 markdown 草稿在写入
+            # text_content 前归一为纯文本（去 ###/** 标记保文字），前端富文本框不再显字面 markdown。
+            if text_content:
+                from app.services.note_content_utils import sanitize_note_narrative
+                text_content = sanitize_note_narrative(text_content)
 
             if text_content and content_type_str == "table":
                 content_type_str = "mixed"  # 有正文就升级为 mixed
@@ -841,7 +1723,23 @@ class DisclosureEngine:
                         )
                         if built:
                             built["name"] = tbl.get("name", "")
-                        built_tables.append(built or {"name": tbl.get("name", ""), "headers": tbl.get("headers", []), "rows": []})
+                        else:
+                            built = {
+                                "name": tbl.get("name", ""),
+                                "headers": tbl.get("headers", []),
+                                "rows": [],
+                            }
+                        _carry_seed_column_meta(tbl, built)
+                        built_tables.append(built)
+
+                    # 动态提取表格标题：name 为空或"（表N）"占位时，从 text_sections 按序号匹配
+                    _infer_table_names_from_text(built_tables, text_sections)
+                    # per-table guidance：写入对应表的 guidance 字段（仅有效索引）
+                    for idx, g in per_table_guidance.items():
+                        if 0 <= idx < len(built_tables) and g:
+                            built_tables[idx]["guidance"] = g
+                    # seed 显式声明的 guidance 优先于按段落游标推断的结果
+                    _carry_seed_table_guidance(tables_list, built_tables)
                     # 存储为独立的 _tables 数组，避免循环引用
                     if built_tables:
                         table_data = {
@@ -859,6 +1757,34 @@ class DisclosureEngine:
                 logger.warning("build table_data failed for %s: %s", note_section, _tbl_err)
                 table_data = None
 
+            # ── Wave2 (Task 3.2)：表内公式二次求值（灰度内） ──
+            # _build_with_binding 首遍未解算公式家族单元格（sum/report/aging 依赖
+            # 同表/报表在首遍落值后才能算），此处构表后、upsert 前跑第二遍回填；
+            # 随后走既有 merge_table_data_preserving_cell_modes 合并保留 manual/locked。
+            # 开关关时旁路（零回归 Property 12）；异常 fail-open 不阻断附注生成。
+            if getattr(self, '_formula_on', settings.DISCLOSURE_NOTE_FORMULA_ENABLED) and table_data is not None:
+                try:
+                    table_data = await self._evaluate_note_formulas(
+                        project_id, year, note_section, table_data,
+                    )
+                except Exception as _ev_err:
+                    logger.warning(
+                        "evaluate note formulas failed for %s: %s (fail-open)",
+                        note_section, _ev_err,
+                    )
+
+            # ── Wave4 (Task 5.3)：注入 inline 校验 preset（供 validate_all 消费）──
+            # 补装配生成链断链：让 note.table_data 携带 _validation_rules，
+            # 使 collect_inline_rules_for_note 在按需校验时能派发规则。附加式、零渲染回归。
+            if table_data is not None:
+                try:
+                    _inject_validation_rules(table_data, tmpl)
+                except Exception as _vr_err:  # pragma: no cover - defensive
+                    logger.warning(
+                        "inject _validation_rules failed for %s: %s (fail-open)",
+                        note_section, _vr_err,
+                    )
+
             # Upsert into disclosure_notes
             existing = await self.db.execute(
                 sa.select(DisclosureNote).where(
@@ -875,19 +1801,26 @@ class DisclosureEngine:
                 note.account_name = account_name
                 note.content_type = ContentType(content_type_str)
                 # D1 三态合并：已存在 note 且历史 table_data 非空 → 走合并保留 manual/locked
+                # 但对底稿同步来源的章节（_source=workpaper），跳过表格覆盖保持底稿数据
                 if table_data is not None and note.table_data:
-                    from sqlalchemy.orm.attributes import flag_modified
+                    existing_source = (note.table_data or {}).get("_source") if isinstance(note.table_data, dict) else None
+                    if existing_source in ("workpaper", "workpaper_html"):
+                        # 底稿同步来源：不覆盖表格结构，只更新文本/guidance/元数据
+                        pass
+                    else:
+                        from sqlalchemy.orm.attributes import flag_modified
 
-                    from app.services.note_cell_merge import (
-                        merge_table_data_preserving_cell_modes,
-                    )
-                    note.table_data = merge_table_data_preserving_cell_modes(
-                        note.table_data, table_data,
-                    )
-                    flag_modified(note, "table_data")
+                        from app.services.note_cell_merge import (
+                            merge_table_data_preserving_cell_modes,
+                        )
+                        note.table_data = merge_table_data_preserving_cell_modes(
+                            note.table_data, table_data,
+                        )
+                        flag_modified(note, "table_data")
                 else:
                     note.table_data = table_data
                 note.text_content = text_content
+                note.guidance_text = guidance_text
                 note.source_template = source_template
                 note.sort_order = sort_order
             else:
@@ -900,6 +1833,7 @@ class DisclosureEngine:
                     content_type=ContentType(content_type_str),
                     table_data=table_data,
                     text_content=text_content,
+                    guidance_text=guidance_text,
                     source_template=source_template,
                     status=NoteStatus.draft,
                     sort_order=sort_order,
@@ -1004,7 +1938,12 @@ class DisclosureEngine:
             if note:
                 old_td = note.table_data or {}
                 if old_td:
-                    note.table_data = merge_table_data_preserving_cell_modes(old_td, new_td)
+                    # 底稿同步来源的章节：跳过表格覆盖保持底稿数据
+                    existing_source = old_td.get("_source") if isinstance(old_td, dict) else None
+                    if existing_source in ("workpaper", "workpaper_html"):
+                        pass  # 不覆盖底稿同步的表格结构
+                    else:
+                        note.table_data = merge_table_data_preserving_cell_modes(old_td, new_td)
                 else:
                     note.table_data = new_td
                 # JSONB 字段需要显式标记，确保嵌套字段持久化
@@ -1013,6 +1952,376 @@ class DisclosureEngine:
 
         await self.db.flush()
         return updated
+
+    # ------------------------------------------------------------------
+    # refill_sections — 窄接口，复用填充链重算指定章节
+    # ------------------------------------------------------------------
+    async def refill_sections(
+        self,
+        project_id: UUID,
+        year: int,
+        section_codes: list[str] | None = None,
+        *,
+        skip_manual: bool = True,
+    ) -> RefillReport:
+        """复用 _preload_data_for_notes + 逐 cell dispatch_resolver 重算指定章节。
+
+        - 只处理 content_type 含表格的章节；纯文本章节计入 text_only_sections。
+        - 仅写 _cell_modes[str(col)]=='auto' 的单元格（skip_manual=True 时）。
+        - 逐格比较 old vs new，变化才计 cells_updated 并写回。
+        - flag_modified(note,'table_data')；只 flush 不 commit。
+        - 取数失败的章节记入 errors，不抛异常。
+
+        Validates: Requirements 2.1, 2.2, 2.4, 2.5, 2.6, 2.7, 1.3
+        """
+        from sqlalchemy.orm.attributes import flag_modified
+
+        from app.services.note_source_resolvers import (
+            dispatch_resolver,
+            resolve_formula,
+        )
+        from app.services.note_template_bindings_loader import (
+            get_binding_for_section,
+        )
+
+        report = RefillReport()
+
+        # 1. 预加载缓存
+        self._wp_cache = {}
+        self._tb_cache = {}
+        self._wp_account_cache = {}
+        self._wp_fine_cache = {}
+        self._prior_notes_cache = {}
+        try:
+            await self._preload_data_for_notes(project_id, year)
+        except Exception as pre_err:
+            logger.warning("refill_sections: preload failed: %s", pre_err)
+            try:
+                await self.db.rollback()
+            except Exception:
+                pass
+
+        # 2. 查询待处理的附注
+        where_clauses = [
+            DisclosureNote.project_id == project_id,
+            DisclosureNote.year == year,
+            DisclosureNote.is_deleted == sa.false(),
+        ]
+        if section_codes:
+            where_clauses.append(DisclosureNote.note_section.in_(section_codes))
+
+        result = await self.db.execute(
+            sa.select(DisclosureNote).where(*where_clauses)
+        )
+        notes = result.scalars().all()
+
+        for note in notes:
+            section = note.note_section or ""
+
+            # 3. 纯文本/叙述章节 → 跳过
+            ct = note.content_type
+            if ct not in (ContentType.table, ContentType.mixed):
+                report.text_only_sections.append(section)
+                continue
+
+            td = note.table_data
+            if not td or not isinstance(td, dict):
+                report.text_only_sections.append(section)
+                continue
+
+            # 4a. 底稿同步来源（_source=workpaper/workpaper_html）的章节：
+            # 表格结构（sub_table_data 推送的 rows/headers）由底稿披露表拥有，
+            # 刷新不得覆盖其 cell 值——底稿是该章节表格数据的唯一真源。
+            # 仅 binding 取数单元格（如 TB 科目期末余额）允许被 refill 更新，
+            # 但当前这类章节的 rows 通常无 binding 匹配（workpaper 推送的行
+            # 无 _cell_meta semantic），自然跳过；显式 guard 以防 binding 模板
+            # 意外命中 label 导致底稿推送的真实金额被 TB 值覆盖。
+            _note_source = td.get("_source")
+            if _note_source in ("workpaper", "workpaper_html"):
+                report.text_only_sections.append(section)
+                continue
+
+            # 4. 获取 binding + 计算待刷新的表清单
+            sec_binding = get_binding_for_section(section)
+            sec_tables = (sec_binding.get("tables") or []) if sec_binding else []
+
+            # 多表附注：前端 `currentNoteTables` 与 Word 导出都**优先渲染 `_tables`**，
+            # 而顶层 rows 只是生成时 `_tables[0]` 的镜像副本 → 旧实现只刷顶层 rows，
+            # 对多表附注等于「白刷」（用户看不到），且 table1..N 从不刷新、
+            # 只有 `_tables` 没有顶层 rows 的附注被整章跳过。改为逐表刷新。
+            nested = td.get("_tables")
+            targets: list[tuple[int, dict]] = []
+            if isinstance(nested, list) and nested:
+                for _ti, _tbl in enumerate(nested):
+                    if isinstance(_tbl, dict) and isinstance(_tbl.get("rows"), list):
+                        targets.append((_ti, _tbl))
+            if not targets:
+                _top_rows = td.get("rows")
+                if not _top_rows or not isinstance(_top_rows, list):
+                    report.text_only_sections.append(section)
+                    continue
+                targets.append((0, td))
+
+            # 逐 note 构造 resolver ctx（Task 12：收敛到 `_build_resolver_ctx` 唯一入口）。
+            # 🔴 原实现在循环**外**构造一次并复用 ⇒ 母公司章的 refill 会拿合并项目
+            # 的 `_tb_cache` 取数（静默显示合并数）。改为逐 note 构造后：
+            # 非母公司章零额外查询（`_build_resolver_ctx` 对非母公司章不查库）、
+            # 母公司口径经 `_parent_scope_cache` 每实例只解析一次。
+            ctx = await self._build_resolver_ctx(project_id, year, section)
+            # Wave2：暴露当前 note table_data 供 sum source 反查兄弟单元格
+            #（含 `_tables`；resolver 侧按 binding.table_index / ctx.table_index 选表）
+            ctx["table_data"] = td
+
+            section_had_error = False
+            section_touched = False
+            table0_touched = False
+
+            for table_index, table_obj in targets:
+                if section_had_error:
+                    break
+                rows = table_obj.get("rows") or []
+                table_binding = (
+                    sec_tables[table_index]
+                    if 0 <= table_index < len(sec_tables)
+                    and isinstance(sec_tables[table_index], dict)
+                    else {}
+                )
+                binding_rows = table_binding.get("rows") or {}
+                if not isinstance(binding_rows, dict):
+                    binding_rows = {}
+                header_normalize = table_binding.get("header_normalize") or []
+                if not isinstance(header_normalize, list):
+                    header_normalize = []
+
+                headers = table_obj.get("headers") or []
+                num_value_cols = max(0, len(headers) - 1)
+                # legacy 表 headers 常为空（表头读时由 _cell_meta 语义投影），此时
+                # 从行 values 长度推断值列数，否则 num_value_cols=0 使刷新彻底 no-op。
+                if num_value_cols == 0:
+                    for _r in rows:
+                        if isinstance(_r, dict) and isinstance(_r.get("values"), list):
+                            num_value_cols = max(num_value_cols, len(_r["values"]))
+
+                ctx["table_index"] = table_index
+                table_touched = False
+
+                try:
+                    for row_idx, row in enumerate(rows):
+                        if not isinstance(row, dict):
+                            continue
+                        if row.get("is_total"):
+                            continue  # 合计行由 _backfill_totals 处理
+
+                        values = row.get("values")
+                        if not isinstance(values, list):
+                            continue
+
+                        cell_modes = row.get("_cell_modes") or {}
+                        cell_meta = row.get("_cell_meta") or {}
+                        label = row.get("label", "")
+
+                        for col_idx in range(min(num_value_cols, len(values))):
+                            mode = cell_modes.get(str(col_idx), "auto")
+
+                            # 从 binding 获取 cell 定义（先解析，供 legacy 判定使用）
+                            cell_binding = self._resolve_cell_binding(
+                                label, col_idx, binding_rows, header_normalize,
+                                cell_meta,
+                            )
+                            if cell_binding is None:
+                                # 无 binding → 无法重算，跳过
+                                continue
+
+                            # skip_manual: 仅处理 auto 单元格；但兼容 legacy——老生成器把
+                            # 本应自动的单元格硬编码为 manual（无用户手工值），binding 声明
+                            # auto 且该格从无用户值时，按 auto 重算并归一为 auto。
+                            legacy_refill = False
+                            if skip_manual and mode != "auto":
+                                if self._is_legacy_auto_cell(
+                                    row, col_idx, mode, cell_binding, cell_meta,
+                                    values,
+                                ):
+                                    legacy_refill = True
+                                else:
+                                    continue
+
+                            # Wave2：公式家族（sum/report/aging）由 resolve_formula 承载
+                            # （dispatch_resolver 未注册），受灰度开关约束。
+                            # 追加 'formula'：spec disclosure-note-formula-data-population
+                            # 决策 3 —— binding 写 source='formula' + formula_kind 子类型。
+                            _src = cell_binding.get("source")
+                            if _src in ("sum", "report", "aging", "formula"):
+                                if not getattr(self, '_formula_on', settings.DISCLOSURE_NOTE_FORMULA_ENABLED):
+                                    # 开关关 → 旁路公式家族，绝不用 None 覆盖既有值（零回归）
+                                    continue
+                                new_val = await resolve_formula(cell_binding, ctx)
+                                if new_val is None:
+                                    # 缺数据不覆盖既有值（fail-open）
+                                    continue
+                            else:
+                                # 调 dispatch_resolver（含 prior_year_note / 数据源）
+                                new_val = await dispatch_resolver(cell_binding, ctx)
+
+                            old_val = values[col_idx]
+
+                            # 比较 old vs new（规范化比较）
+                            if not self._values_differ(old_val, new_val):
+                                continue
+
+                            # 写回
+                            values[col_idx] = new_val
+                            # legacy 单元格重算后归一为 auto，使后续刷新走正常自动路径
+                            if legacy_refill:
+                                cell_modes[str(col_idx)] = "auto"
+                                row["_cell_modes"] = cell_modes
+                            table_touched = True
+                            section_touched = True
+                            report.cells_updated += 1
+                            report.records.append(CellRefillRecord(
+                                section=section,
+                                row_index=row_idx,
+                                col_index=col_idx,
+                                old_value=old_val,
+                                new_value=new_val,
+                            ))
+
+                    # 重算合计行（逐表）
+                    if table_touched:
+                        self._backfill_totals(rows, num_value_cols)
+                        if table_index == 0:
+                            table0_touched = True
+
+                except Exception as err:
+                    section_had_error = True
+                    report.errors.append(f"{section}: {err}")
+                    logger.warning(
+                        "refill_sections: section %s table %s failed: %s",
+                        section, table_index, err,
+                    )
+
+            if section_had_error:
+                continue
+
+            if section_touched:
+                # 多表附注：顶层 rows/headers/name 是生成时 `_tables[0]` 的镜像，
+                # table0 真被刷新时同步回去，避免"顶层旧 / _tables 新"两份不一致
+                # （前端与 Word 导出优先读 _tables，其它 legacy 读取方读顶层）。
+                # 仅在 table0 触碰时镜像：否则会用未变的 nested[0] 覆盖顶层
+                # （历史数据顶层可能被单独更新过），造成数据回退。
+                if (
+                    table0_touched
+                    and isinstance(nested, list)
+                    and nested
+                    and isinstance(nested[0], dict)
+                ):
+                    td["rows"] = nested[0].get("rows") or []
+                    _t0_headers = nested[0].get("headers")
+                    if isinstance(_t0_headers, list):
+                        td["headers"] = _t0_headers
+                    if nested[0].get("name") is not None:
+                        td["name"] = nested[0].get("name") or ""
+                flag_modified(note, "table_data")
+                report.sections_recomputed.append(section)
+
+        # 5. flush（不 commit）
+        await self.db.flush()
+
+        return report
+
+    @staticmethod
+    def _is_legacy_auto_cell(
+        row: dict,
+        col_idx: int,
+        mode: str,
+        cell_binding: dict,
+        cell_meta: dict,
+        values: list,
+    ) -> bool:
+        """判定 legacy 单元格是否应按 auto 重算（供 refill_sections 兼容老数据）。
+
+        仅当全部满足才返回 True（否则尊重用户手工/锁定态）：
+          - 存储态 mode == "manual"（locked 绝不重算）
+          - row 标记 ``_legacy_row``（老生成器产物，manual 非用户意图）
+          - binding 声明该格 mode 为 auto（缺省视为 auto）
+          - _cell_meta[col].manual_value 为 None（该格从无用户手工输入）
+          - 当前值为空（None / 空串）——已有值不覆盖
+        """
+        if mode != "manual":
+            return False
+        if not row.get("_legacy_row"):
+            return False
+        if (cell_binding.get("mode") or "auto") != "auto":
+            return False
+        slot = cell_meta.get(str(col_idx))
+        if isinstance(slot, dict) and slot.get("manual_value") is not None:
+            return False
+        cur = values[col_idx] if col_idx < len(values) else None
+        return cur is None or cur == ""
+
+    @staticmethod
+    def _resolve_cell_binding(
+        label: str,
+        col_idx: int,
+        binding_rows: dict,
+        header_normalize: list,
+        cell_meta: dict,
+    ) -> dict | None:
+        """从 binding json 还原单个单元格的 resolver binding dict。
+
+        优先级：
+        1. cell_meta 中记录的 binding 信息（semantic → binding_rows[label].binding[semantic]）
+        2. header_normalize 定位 semantic → binding_rows[label].binding[semantic]
+        3. 都没有 → None（跳过该单元格）
+        """
+        # 确定 semantic
+        semantic: str | None = None
+        meta_entry = cell_meta.get(str(col_idx))
+        if isinstance(meta_entry, dict):
+            semantic = meta_entry.get("semantic")
+
+        if not semantic:
+            actual_col = col_idx + 1  # col 0 is row label
+            if actual_col < len(header_normalize) and isinstance(
+                header_normalize[actual_col], dict
+            ):
+                semantic = header_normalize[actual_col].get("semantic")
+
+        if not semantic:
+            return None
+
+        # 查 binding_rows
+        row_binding = binding_rows.get(label) or {}
+        cell_bindings = row_binding.get("binding") or {}
+        if not isinstance(cell_bindings, dict):
+            return None
+
+        # 精确匹配
+        cell = cell_bindings.get(semantic)
+        if not cell:
+            # 前缀匹配
+            prefix = semantic + "_col"
+            for k, v in cell_bindings.items():
+                if isinstance(k, str) and k.startswith(prefix):
+                    cell = v
+                    break
+
+        if not isinstance(cell, dict):
+            return None
+
+        return cell
+
+    @staticmethod
+    def _values_differ(old_val: Any, new_val: Any) -> bool:
+        """比较两个值是否不同（规范化 None/Decimal/float 比较）。"""
+        if old_val is None and new_val is None:
+            return False
+        if old_val is None or new_val is None:
+            return True
+        # 数值比较：统一 float
+        try:
+            return float(old_val) != float(new_val)
+        except (TypeError, ValueError):
+            return str(old_val) != str(new_val)
 
     # ------------------------------------------------------------------
     # 获取附注
@@ -1033,6 +2342,11 @@ class DisclosureEngine:
             .order_by(DisclosureNote.sort_order)
         )
         notes = result.scalars().all()
+        # has_data：与 NoteWordExporter._has_content 收敛为同一共享 helper
+        # （note_content_utils.note_has_data，单一真源），防"附注树标记≠Word 导出结果"漂移
+        # （spec disclosure-notes-selective-generation Req2）。is_empty(not_applicable)→false。
+        from app.services.note_content_utils import note_has_data
+
         return [
             {
                 "id": str(n.id),
@@ -1040,8 +2354,9 @@ class DisclosureEngine:
                 "section_title": n.section_title,
                 "account_name": n.account_name,
                 "content_type": n.content_type.value if n.content_type else None,
-                "status": n.status.value if n.status else "draft",
+                "status": "not_applicable" if n.is_empty else (n.status.value if n.status else "draft"),
                 "sort_order": n.sort_order,
+                "has_data": note_has_data(n),
             }
             for n in notes
         ]
@@ -1086,7 +2401,15 @@ class DisclosureEngine:
                             )
                             if built:
                                 built["name"] = tbl.get("name", "")
-                            built_tables.append(built or {"name": tbl.get("name", ""), "headers": tbl.get("headers", []), "rows": []})
+                            else:
+                                built = {
+                                    "name": tbl.get("name", ""),
+                                    "headers": tbl.get("headers", []),
+                                    "rows": [],
+                                }
+                            _carry_seed_column_meta(tbl, built)
+                            built_tables.append(built)
+                        _carry_seed_table_guidance(tables_list, built_tables)
                         if built_tables:
                             note.table_data = {
                                 "headers": built_tables[0].get("headers", []),
@@ -1192,6 +2515,7 @@ class DisclosureEngine:
         note_id: UUID,
         table_data: dict | None = None,
         text_content: str | None = None,
+        guidance_text: str | None = None,
         status: NoteStatus | None = None,
     ) -> DisclosureNote | None:
         """更新附注章节内容。
@@ -1215,6 +2539,8 @@ class DisclosureEngine:
             flag_modified(note, "table_data")
         if text_content is not None:
             note.text_content = text_content
+        if guidance_text is not None:
+            note.guidance_text = guidance_text
         if status is not None:
             note.status = status
 
@@ -1309,368 +2635,20 @@ class DisclosureEngine:
         row_idx: int,
         col_idx: int,
     ) -> dict:
-        """单元格溯源：返回 binding 元数据 + 公式展开 + 命中数据行采样.
+        """单元格溯源 — 委托 disclosure_trace 模块。
 
-        Spec:   .kiro/specs/disclosure-note-full-revamp/ Sprint 2 Task 2.3
-        Design: D5 CellTrace 溯源链 端点 schema
-        Reqs:   R3.1 验收 21、22
-
-        返回结构：
-        ```
-        {
-            "binding": {"source": "trial_balance", "field": "audited_amount",
-                        "account_codes": [...], "agg": "sum", ...},
-            "formula_resolved": "=SUM(TB('1601','期末'), TB('1602','期末'))",
-            "computed_value": 1234.56,
-            "evidence": {
-                "trial_balance_rows": [...],
-                "ledger_sample": [],
-                "aux_balance_sample": []
-            },
-            "computed_at": "2026-..."
-        }
-        ```
-
-        失败语义（不抛异常 — 始终返 dict 给前端拿来展示）：
-        - note_id 不存在 → ``{"error": "note_not_found"}``
-        - row_idx / col_idx 越界 → ``{"error": "cell_index_out_of_range",
-                                       "computed_value": None}``
-        - 缺 binding_id → ``{"error": "no_binding",
-                              "computed_value": <实际格值>}``
-        - binding 反查失败 → ``{"error": "binding_not_found", ...}``
+        详细文档见 app.services.disclosure_trace.trace_cell
         """
-        from datetime import datetime, timezone
+        from app.services.disclosure_trace import trace_cell as _trace_cell
 
-        # 1. 加载 note
-        result = await self.db.execute(
-            sa.select(DisclosureNote).where(
-                DisclosureNote.id == note_id,
-                DisclosureNote.is_deleted == sa.false(),
-            )
+        return await _trace_cell(
+            self.db, note_id, row_idx, col_idx,
+            tb_cache=getattr(self, "_tb_cache", None),
         )
-        note = result.scalar_one_or_none()
-        if note is None:
-            return {"error": "note_not_found", "note_id": str(note_id)}
-
-        # 2. 解析 row / col 索引（兼容多表 _tables[0] 兜底）
-        td = note.table_data or {}
-        rows = td.get("rows") or []
-        if not rows and isinstance(td.get("_tables"), list) and td["_tables"]:
-            first_tbl = td["_tables"][0]
-            if isinstance(first_tbl, dict):
-                rows = first_tbl.get("rows") or []
-
-        if not isinstance(row_idx, int) or row_idx < 0 or row_idx >= len(rows):
-            return {
-                "error": "cell_index_out_of_range",
-                "axis": "row",
-                "row_idx": row_idx,
-                "row_count": len(rows),
-                "computed_value": None,
-            }
-
-        row = rows[row_idx] or {}
-        values = row.get("values") or []
-        if not isinstance(col_idx, int) or col_idx < 0 or col_idx >= len(values):
-            return {
-                "error": "cell_index_out_of_range",
-                "axis": "col",
-                "col_idx": col_idx,
-                "col_count": len(values),
-                "computed_value": None,
-            }
-
-        computed_value = values[col_idx]
-        cell_meta_all = row.get("_cell_meta") or {}
-        cell_meta = cell_meta_all.get(str(col_idx)) or {}
-        binding_id = cell_meta.get("binding_id")
-        semantic = cell_meta.get("semantic")
-        # 优先用 cell_meta.computed_at，其次用 note.updated_at
-        computed_at = cell_meta.get("computed_at")
-        if not computed_at:
-            note_updated = getattr(note, "updated_at", None)
-            if note_updated is not None:
-                try:
-                    computed_at = note_updated.isoformat()
-                except Exception:
-                    computed_at = str(note_updated)
-            else:
-                computed_at = datetime.now(timezone.utc).isoformat()
-
-        if not binding_id:
-            return {
-                "error": "no_binding",
-                "computed_value": computed_value,
-                "semantic": semantic,
-                "computed_at": computed_at,
-            }
-
-        # 3. 反查 binding 定义（按 note.note_section + label + semantic）
-        binding = self._lookup_binding(note, row, semantic)
-        if not binding:
-            return {
-                "error": "binding_not_found",
-                "binding_id": binding_id,
-                "computed_value": computed_value,
-                "semantic": semantic,
-                "computed_at": computed_at,
-            }
-
-        # 4. 公式展开（不重算 — 仅字符串展开）
-        formula_resolved = self._expand_formula(binding)
-
-        # 5. 抽取证据数据行（每类 ≤ 100 行）
-        evidence = await self._gather_evidence(note, binding, sample_limit=100)
-
-        return {
-            "binding": dict(binding),  # 浅拷贝避免外部修改污染 cache
-            "binding_id": binding_id,
-            "formula_resolved": formula_resolved,
-            "computed_value": computed_value,
-            "evidence": evidence,
-            "computed_at": computed_at,
-            "semantic": semantic,
-            "row_label": row.get("label"),
-        }
-
-    @staticmethod
-    def _lookup_binding(
-        note: DisclosureNote,
-        row: dict,
-        semantic: str | None,
-    ) -> dict | None:
-        """从 note_template_bindings.json 反查单元格级 binding 定义.
-
-        匹配链：
-          1. 用 ``note.note_section`` 取章节级 binding（多表时取 ``tables[0]``）
-          2. 在 ``rows[<row.label>]`` 找到行级 binding
-          3. 在 ``binding[<semantic>]`` 取单元格 binding（含 source / agg / mode）
-          4. 任一步缺失 → 返回 None
-        """
-        if not isinstance(semantic, str) or not semantic:
-            return None
-        try:
-            from app.services.note_template_bindings_loader import (
-                get_binding_for_section,
-            )
-            sec_binding = get_binding_for_section(note.note_section)
-        except Exception:
-            return None
-        if not sec_binding:
-            return None
-        tables = sec_binding.get("tables") or []
-        if not tables or not isinstance(tables[0], dict):
-            return None
-        # 默认 table_index=0；多表追溯精准化留待后续（cell_meta 暂不带 table_idx）
-        table_binding = tables[0]
-        rows_def = table_binding.get("rows")
-        if not isinstance(rows_def, dict):
-            return None
-        label = row.get("label") or ""
-        row_binding = rows_def.get(label) or {}
-        cells = row_binding.get("binding")
-        if not isinstance(cells, dict):
-            return None
-        # 精确匹配 semantic；前缀次之（多列变体如 closing_balance_col0）
-        cell = cells.get(semantic)
-        if not isinstance(cell, dict):
-            prefix = semantic + "_col"
-            for k, v in cells.items():
-                if isinstance(k, str) and k.startswith(prefix) and isinstance(v, dict):
-                    cell = v
-                    break
-        return cell if isinstance(cell, dict) else None
 
     @staticmethod
     def _expand_formula(binding: dict) -> str:
-        """根据 binding 元数据生成可读的公式字符串（不求值）.
+        """公式展开代理 — 委托 disclosure_trace 模块（保持测试兼容）。"""
+        from app.services.disclosure_trace import _expand_formula
+        return _expand_formula(binding)
 
-        策略：对应 7 个 source 各生成一段简明 DSL 表达：
-          - trial_balance:   ``=SUM(TB('1601','audited'), TB('1602','audited'))``
-          - ledger_sum:      ``=LEDGER_SUM('debit_amount', codes=[...], period=...)``
-          - aux_balance:     ``=AUX_BALANCE('closing_balance', codes=[...])``
-          - aux_ledger_aging: ``=AGING('1年以内', codes=[...])``
-          - prior_year_note: ``=PRIOR(section='...', field='value')``
-          - manual:          ``=MANUAL('<value>')``
-          - formula:         ``=FORMULA('<expression>')``  （Sprint 1.5 占位）
-        """
-        if not isinstance(binding, dict):
-            return "=UNKNOWN()"
-        source = binding.get("source") or "unknown"
-        codes = binding.get("account_codes") or []
-        field = binding.get("field") or ""
-        agg = (binding.get("agg") or "sum").lower()
-
-        if source == "trial_balance":
-            if not codes:
-                return f"=TB([],'{field}')"
-            parts = [f"TB('{c}','{field}')" for c in codes]
-            if len(parts) == 1:
-                expr = parts[0]
-            else:
-                expr = f"SUM({', '.join(parts)})"
-            return "=" + ("-" + expr if agg == "sum_minus" else expr)
-
-        if source == "ledger_sum":
-            pf = binding.get("period_filter") or {}
-            mode = pf.get("mode") or "year_range"
-            start = pf.get("start", "")
-            end = pf.get("end", "")
-            return (
-                f"=LEDGER_SUM('{field}', codes={list(codes)}, "
-                f"period={{mode:{mode}, start:{start}, end:{end}}})"
-            )
-
-        if source == "aux_balance":
-            aux_type = binding.get("aux_type") or ""
-            return f"=AUX_BALANCE('{field}', codes={list(codes)}, aux_type='{aux_type}')"
-
-        if source == "aux_ledger_aging":
-            bucket = binding.get("bucket") or ""
-            return f"=AGING('{bucket}', codes={list(codes)})"
-
-        if source == "prior_year_note":
-            section = binding.get("section") or binding.get("note_section") or ""
-            return f"=PRIOR(section='{section}', field='{field or 'value'}')"
-
-        if source == "manual":
-            mv = binding.get("manual_value")
-            return f"=MANUAL({mv!r})"
-
-        if source == "formula":
-            expr = binding.get("expression") or binding.get("formula") or ""
-            return f"=FORMULA({expr!r})"
-
-        return f"=UNKNOWN(source={source!r})"
-
-    async def _gather_evidence(
-        self,
-        note: DisclosureNote,
-        binding: dict,
-        *,
-        sample_limit: int = 100,
-    ) -> dict:
-        """采样命中证据数据 — 三类来源各 ≤ sample_limit 行.
-
-        - trial_balance_rows: 走 ``self._tb_cache``（generate_notes 已预热）；
-                              缓存为空时实时查 ``TrialBalance`` 表
-        - ledger_sample:      实时查 ``TbLedger``（带 period_filter 过滤）
-        - aux_balance_sample: 实时查 ``TbAuxBalance``（带 aux_type 过滤）
-
-        失败 / 表不存在 / 模型 import 失败 → 该类返 ``[]``，不抛异常.
-        """
-        codes = [c for c in (binding.get("account_codes") or []) if isinstance(c, str)]
-        source = binding.get("source") or ""
-        evidence: dict[str, list] = {
-            "trial_balance_rows": [],
-            "ledger_sample": [],
-            "aux_balance_sample": [],
-        }
-
-        # ---- trial_balance_rows ----
-        # 缓存优先（generate_notes 已预热则免去 SQL）
-        tb_cache = getattr(self, "_tb_cache", None) or {}
-        if codes and tb_cache:
-            picked = []
-            for c in codes:
-                entry = tb_cache.get(c)
-                if isinstance(entry, dict):
-                    picked.append({"account_code": c, **entry})
-                if len(picked) >= sample_limit:
-                    break
-            evidence["trial_balance_rows"] = picked[:sample_limit]
-        elif codes and source == "trial_balance":
-            # 缓存未热 — 实时查
-            try:
-                result = await self.db.execute(
-                    sa.select(
-                        TrialBalance.standard_account_code,
-                        TrialBalance.audited_amount,
-                        TrialBalance.opening_balance,
-                    )
-                    .where(
-                        TrialBalance.project_id == note.project_id,
-                        TrialBalance.year == note.year,
-                        TrialBalance.standard_account_code.in_(codes),
-                        TrialBalance.is_deleted == sa.false(),
-                    )
-                    .limit(sample_limit)
-                )
-                for row in result.all():
-                    evidence["trial_balance_rows"].append({
-                        "account_code": row.standard_account_code,
-                        "audited": float(row.audited_amount or 0),
-                        "opening": float(row.opening_balance or 0),
-                    })
-            except Exception as err:
-                logger.debug("trace_cell tb sample failed: %s", err)
-
-        # ---- ledger_sample ----（仅 source==ledger_sum 时取）
-        if codes and source == "ledger_sum":
-            try:
-                from app.models.audit_platform_models import TbLedger
-                stmt = (
-                    sa.select(
-                        TbLedger.account_code,
-                        TbLedger.voucher_date,
-                        TbLedger.debit_amount,
-                        TbLedger.credit_amount,
-                        TbLedger.summary,
-                    )
-                    .where(
-                        TbLedger.project_id == note.project_id,
-                        TbLedger.year == note.year,
-                        TbLedger.is_deleted == sa.false(),
-                        TbLedger.account_code.in_(codes),
-                    )
-                    .limit(sample_limit)
-                )
-                result = await self.db.execute(stmt)
-                for r in result.all():
-                    evidence["ledger_sample"].append({
-                        "account_code": r.account_code,
-                        "voucher_date": r.voucher_date.isoformat() if r.voucher_date else None,
-                        "debit": float(r.debit_amount or 0),
-                        "credit": float(r.credit_amount or 0),
-                        "summary": r.summary or "",
-                    })
-            except Exception as err:
-                logger.debug("trace_cell ledger sample failed: %s", err)
-
-        # ---- aux_balance_sample ----（仅 source==aux_balance / aux_ledger_aging 时取）
-        if codes and source in ("aux_balance", "aux_ledger_aging"):
-            try:
-                from app.models.audit_platform_models import TbAuxBalance
-                where = [
-                    TbAuxBalance.project_id == note.project_id,
-                    TbAuxBalance.year == note.year,
-                    TbAuxBalance.is_deleted == sa.false(),
-                    TbAuxBalance.account_code.in_(codes),
-                ]
-                aux_type = binding.get("aux_type")
-                if isinstance(aux_type, str) and aux_type:
-                    where.append(TbAuxBalance.aux_type == aux_type)
-                stmt = (
-                    sa.select(
-                        TbAuxBalance.account_code,
-                        TbAuxBalance.aux_type,
-                        TbAuxBalance.aux_name,
-                        TbAuxBalance.closing_balance,
-                        TbAuxBalance.opening_balance,
-                    )
-                    .where(*where)
-                    .limit(sample_limit)
-                )
-                result = await self.db.execute(stmt)
-                for r in result.all():
-                    evidence["aux_balance_sample"].append({
-                        "account_code": r.account_code,
-                        "aux_type": r.aux_type,
-                        "aux_name": r.aux_name,
-                        "closing": float(r.closing_balance or 0),
-                        "opening": float(r.opening_balance or 0),
-                    })
-            except Exception as err:
-                logger.debug("trace_cell aux_balance sample failed: %s", err)
-
-        return evidence

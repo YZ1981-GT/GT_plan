@@ -213,12 +213,12 @@ async def _get_project_id(db: AsyncSession, instance_type: str, instance_id: UUI
     from sqlalchemy import text as sql_text
 
     table_map = {
-        "workpaper": "working_papers",
+        "workpaper": "working_paper",
         "adjustment": "adjustments",
         "misstatement": "misstatements",
         "disclosure": "disclosure_notes",
     }
-    table_name = table_map.get(instance_type, "working_papers")
+    table_name = table_map.get(instance_type, "working_paper")
 
     try:
         stmt = sql_text(f"SELECT project_id FROM {table_name} WHERE id = :iid LIMIT 1")
@@ -257,13 +257,13 @@ async def _load_instance_data(db: AsyncSession, instance_type: str, instance_id:
         "disclosure": "parsed_data",
     }
     table_map = {
-        "workpaper": "working_papers",
+        "workpaper": "working_paper",
         "adjustment": "adjustments",
         "misstatement": "misstatements",
         "disclosure": "disclosure_notes",
     }
 
-    table_name = table_map.get(instance_type, "working_papers")
+    table_name = table_map.get(instance_type, "working_paper")
     data_field = data_field_map.get(instance_type, "table_data")
 
     try:
@@ -290,13 +290,13 @@ async def _save_instance_data(db: AsyncSession, instance_type: str, instance_id:
         "disclosure": "parsed_data",
     }
     table_map = {
-        "workpaper": "working_papers",
+        "workpaper": "working_paper",
         "adjustment": "adjustments",
         "misstatement": "misstatements",
         "disclosure": "disclosure_notes",
     }
 
-    table_name = table_map.get(instance_type, "working_papers")
+    table_name = table_map.get(instance_type, "working_paper")
     data_field = data_field_map.get(instance_type, "table_data")
 
     try:

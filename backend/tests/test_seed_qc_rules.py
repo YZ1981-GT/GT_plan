@@ -11,7 +11,11 @@ from sqlalchemy import select
 
 from app.models.base import Base
 from app.models.qc_rule_models import QcRuleDefinition
-from scripts.seed_qc_rules import SEED_RULES, seed_qc_rules
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts" / "seed"))
+from seed_qc_rules import SEED_RULES, seed_qc_rules
 
 SQLiteTypeCompiler.visit_JSONB = SQLiteTypeCompiler.visit_JSON
 

@@ -1,0 +1,739 @@
+# ═══════════════════════════════════════════════════════════════════════════════
+# ACNR D 循环 Import/Export 手维清单（d_cycle_ie_manifest.yaml）
+# ═══════════════════════════════════════════════════════════════════════════════
+#
+# 用途：ACNR 生成器（generate_catalog.py）的 D 循环 import_export 输入源
+#       （design.md「Generator pipeline」/ R1.2 / R18.6 / R-ROUTE）。
+#
+# 铁律（design.md §「d_cycle_ie_manifest.yaml 示例结构」与蓝图 §13.11）：
+#   - 本文件为「手工整理」，**禁止 AST 自动扫描** d*_import_export.py。
+#   - I/E 路由只认本清单的 api_prefix + item_id（R18.6 / R-ROUTE）。
+#   - CI `check-ie-catalog-sync` 校验本清单与 catalog 的 import_export 段一致（首期先 D）。
+#
+# 数据来源（逐 sheet 手工阅读，2026 修订版底稿）：
+#   backend/app/routers/wp_render_strategies/_d1_import_export.py  (_SHEET_ITEM_ID)
+#   backend/app/routers/wp_render_strategies/_d2_import_export.py  (SHEET_ITEM_ID_MAP + 多 key 分流)
+#   backend/app/routers/wp_render_strategies/_d3_import_export.py  (_SHEET_ITEM_ID)
+#   backend/app/routers/wp_render_strategies/_d4_import_export.py  (item_id = {sheet}-rows 默认 + 特例)
+#   backend/app/routers/wp_render_strategies/_d5_import_export.py  (_SHEET_ITEM_ID)
+#   backend/app/routers/wp_render_strategies/_d6_import_export.py  (_SHEET_ITEM_ID)
+#   backend/app/routers/wp_render_strategies/_d7_import_export.py  (_SHEET_ITEM_ID)
+#
+# 字段说明：
+#   sheet_code        : Tab 编码（= API ?sheet= 参数），如 D2-2。
+#   api_prefix        : 三级端点前缀，如 d2 → POST /api/workpapers/{wp_id}/d2/{export-template|export-data|import-data}。
+#   item_id           : checklist_responses.item_id；多 key sheet（导入分流/导出合并）用列表。
+#   storage_field     : 落库列（本循环统一存 checklist_responses.remark，值为 JSON 数组/对象）。
+#   import_order      : bulk 导入次序（每循环 10 起、步长 10；审定表 D*-1 先行）。
+#   depends_on_sheets : 依赖 sheet（沿用示例约定：明细/子表依赖本循环审定表 D*-1；D6 无 D6-1 则为空）。
+#   storage_mode      : （可选）row_json = 单/多 item_id 存 JSON 行数组；keyed_fields = 按行键×字段逐格存（审定表）。
+#
+# 备注：
+#   - 审定表 D*-1（及 D1-14 政策问答）为固定行、按字段逐格落库（keyed_fields），
+#     item_id 为前缀模式（如 D7-1-adj-*），非单一 JSON 数组；已标 storage_mode: keyed_fields。
+#   - D1-15 使用独立端点前缀 d1-ecl（hardcoded sheet=D1-15），单独标注。
+# ═══════════════════════════════════════════════════════════════════════════════
+
+version: "1"
+cycle: D
+
+entries:
+  # ───────────────────────── D1 应收票据（api_prefix: d1） ─────────────────────────
+  - sheet_code: D1-1
+    api_prefix: d1
+    item_id: "D1-1-*"
+    storage_field: remark
+    storage_mode: keyed_fields
+    import_order: 10
+    depends_on_sheets: []
+  - sheet_code: D1-2
+    api_prefix: d1
+    item_id: D1-cat-rows
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 20
+    depends_on_sheets: [D1-1]
+  - sheet_code: D1-3
+    api_prefix: d1
+    item_id: D1-cust-rows
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 30
+    depends_on_sheets: [D1-1]
+  - sheet_code: D1-4
+    api_prefix: d1
+    item_id: [D1-bd-individual-rows, D1-bd-portfolio-rows]
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 40
+    depends_on_sheets: [D1-1]
+  - sheet_code: D1-5
+    api_prefix: d1
+    item_id: D1-entry-rows
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 50
+    depends_on_sheets: [D1-1]
+  - sheet_code: D1-6
+    api_prefix: d1
+    item_id: D1-bm-basis-rows
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 60
+    depends_on_sheets: [D1-1]
+  - sheet_code: D1-7
+    api_prefix: d1
+    item_id: D1-memo-rows
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 70
+    depends_on_sheets: [D1-1]
+  - sheet_code: D1-8
+    api_prefix: d1
+    item_id: D1-endorse-discount-rows
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 80
+    depends_on_sheets: [D1-1]
+  - sheet_code: D1-8T
+    api_prefix: d1
+    item_id: D1-endorse-transfer-rows
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 90
+    depends_on_sheets: [D1-1]
+  - sheet_code: D1-9
+    api_prefix: d1
+    item_id: D1-interest-rows
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 100
+    depends_on_sheets: [D1-1]
+  - sheet_code: D1-10
+    api_prefix: d1
+    item_id: D1-inventory-rows
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 110
+    depends_on_sheets: [D1-1]
+  - sheet_code: D1-11
+    api_prefix: d1
+    item_id: D1-rp-rows
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 120
+    depends_on_sheets: [D1-1]
+  - sheet_code: D1-12
+    api_prefix: d1
+    item_id: D1-pledge-rows
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 130
+    depends_on_sheets: [D1-1]
+  - sheet_code: D1-13
+    api_prefix: d1
+    item_id: D1-sampling-vouching-rows
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 140
+    depends_on_sheets: [D1-1]
+  - sheet_code: D1-14
+    api_prefix: d1
+    item_id: "D1-policy-*"
+    storage_field: remark
+    storage_mode: keyed_fields
+    import_order: 150
+    depends_on_sheets: [D1-1]
+  - sheet_code: D1-15
+    api_prefix: d1-ecl
+    item_id: [D1-ecl-portfolio-rows, D1-ecl-individual-rows]
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 160
+    depends_on_sheets: [D1-1]
+  - sheet_code: D1-16
+    api_prefix: d1
+    item_id: [D1-writeoff-reversal-rows, D1-writeoff-writeoff-rows]
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 170
+    depends_on_sheets: [D1-1]
+
+  # ───────────────────────── D2 应收账款（api_prefix: d2） ─────────────────────────
+  - sheet_code: D2-1
+    api_prefix: d2
+    item_id: "D2-1-*"
+    storage_field: remark
+    storage_mode: keyed_fields
+    import_order: 10
+    depends_on_sheets: []
+  - sheet_code: D2-2
+    api_prefix: d2
+    item_id: D2-detail-rows
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 20
+    depends_on_sheets: [D2-1]
+  - sheet_code: D2-3
+    api_prefix: d2
+    item_id: [D2-bd-individual-rows, D2-bd-aging-rows, D2-bd-customer-rows]
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 30
+    depends_on_sheets: [D2-1]
+  - sheet_code: D2-4
+    api_prefix: d2
+    item_id: D2-entry-rows
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 40
+    depends_on_sheets: [D2-1]
+  - sheet_code: D2-6
+    api_prefix: d2
+    item_id: D2-related-party-rows
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 50
+    depends_on_sheets: [D2-1]
+  - sheet_code: D2-7
+    api_prefix: d2
+    item_id: D2-voucher-samples
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 60
+    depends_on_sheets: [D2-1]
+  - sheet_code: D2-8
+    api_prefix: d2
+    item_id: [D2-policy-paragraphs, D2-policy-historical-matrix, D2-policy-migration-matrix]
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 70
+    depends_on_sheets: [D2-1]
+  - sheet_code: D2-9
+    api_prefix: d2
+    item_id: D2-ecl-single-rows
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 80
+    depends_on_sheets: [D2-1]
+  - sheet_code: D2-10
+    api_prefix: d2
+    item_id: D2-ecl-migration-matrix
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 90
+    depends_on_sheets: [D2-1]
+  - sheet_code: D2-11
+    api_prefix: d2
+    item_id: [D2-writeoff-reversal-rows, D2-writeoff-writeoff-rows]
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 100
+    depends_on_sheets: [D2-1]
+  - sheet_code: D2-12
+    api_prefix: d2
+    item_id: [D2-pledge-rows, D2-factoring-rows]
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 110
+    depends_on_sheets: [D2-1]
+  - sheet_code: D2-13
+    api_prefix: d2
+    item_id: [D2-bizmodel-judgments, D2-bizmodel-groups]
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 120
+    depends_on_sheets: [D2-1]
+
+  # ───────────────────────── D3 预收账款（api_prefix: d3） ─────────────────────────
+  - sheet_code: D3-1
+    api_prefix: d3
+    item_id: "D3-1-*"
+    storage_field: remark
+    storage_mode: keyed_fields
+    import_order: 10
+    depends_on_sheets: []
+  - sheet_code: D3-2
+    api_prefix: d3
+    item_id: D3-det-rows
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 20
+    depends_on_sheets: [D3-1]
+  - sheet_code: D3-3
+    api_prefix: d3
+    item_id: D3-aje-rows
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 30
+    depends_on_sheets: [D3-1]
+  - sheet_code: D3-4-debit
+    api_prefix: d3
+    item_id: D3-ana-debit-rows
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 40
+    depends_on_sheets: [D3-1]
+  - sheet_code: D3-4-credit
+    api_prefix: d3
+    item_id: D3-ana-credit-rows
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 50
+    depends_on_sheets: [D3-1]
+  - sheet_code: D3-5
+    api_prefix: d3
+    item_id: D3-lt-rows
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 60
+    depends_on_sheets: [D3-1]
+  - sheet_code: D3-6
+    api_prefix: d3
+    item_id: D3-rp-rows
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 70
+    depends_on_sheets: [D3-1]
+  - sheet_code: D3-7
+    api_prefix: d3
+    item_id: D3-vc-post-rows
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 80
+    depends_on_sheets: [D3-1]
+
+  # ───────────────────────── D4 营业收入（api_prefix: d4） ─────────────────────────
+  - sheet_code: D4-1
+    api_prefix: d4
+    item_id: D4-1-adj-rows
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 10
+    depends_on_sheets: []
+  - sheet_code: D4-2
+    api_prefix: d4
+    item_id: D4-2-rows
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 20
+    depends_on_sheets: [D4-1]
+  - sheet_code: D4-3
+    api_prefix: d4
+    item_id: D4-3-rows
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 30
+    depends_on_sheets: [D4-1]
+  - sheet_code: D4-4
+    api_prefix: d4
+    item_id: D4-4-rows
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 40
+    depends_on_sheets: [D4-1]
+  - sheet_code: D4-6
+    api_prefix: d4
+    item_id: D4-6-indicators-v2
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 50
+    depends_on_sheets: [D4-1]
+  - sheet_code: D4-7
+    api_prefix: d4
+    item_id: D4-7-products
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 60
+    depends_on_sheets: [D4-1]
+  - sheet_code: D4-8
+    api_prefix: d4
+    item_id: D4-8-products
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 70
+    depends_on_sheets: [D4-1]
+  - sheet_code: D4-9
+    api_prefix: d4
+    item_id: D4-9-data
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 80
+    depends_on_sheets: [D4-1]
+  - sheet_code: D4-10
+    api_prefix: d4
+    item_id: D4-10-data
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 90
+    depends_on_sheets: [D4-1]
+  - sheet_code: D4-11
+    api_prefix: d4
+    item_id: D4-11-data
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 100
+    depends_on_sheets: [D4-1]
+  - sheet_code: D4-12
+    api_prefix: d4
+    item_id: D4-12-contracts-v2
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 110
+    depends_on_sheets: [D4-1]
+  - sheet_code: D4-14
+    api_prefix: d4
+    item_id: D4-14-transactions
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 120
+    depends_on_sheets: [D4-1]
+  - sheet_code: D4-15
+    api_prefix: d4
+    item_id: D4-15-rows
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 130
+    depends_on_sheets: [D4-1]
+  - sheet_code: D4-16
+    api_prefix: d4
+    item_id: D4-16-rows
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 140
+    depends_on_sheets: [D4-1]
+  - sheet_code: D4-17
+    api_prefix: d4
+    item_id: D4-17-rows
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 150
+    depends_on_sheets: [D4-1]
+  - sheet_code: D4-18
+    api_prefix: d4
+    item_id: D4-18-rows
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 160
+    depends_on_sheets: [D4-1]
+  - sheet_code: D4-19
+    api_prefix: d4
+    item_id: D4-19-rows
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 170
+    depends_on_sheets: [D4-1]
+  - sheet_code: D4-20
+    api_prefix: d4
+    item_id: D4-20-rows
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 180
+    depends_on_sheets: [D4-1]
+  - sheet_code: D4-20-provision
+    api_prefix: d4
+    item_id: D4-20-provision-rows
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 181
+    depends_on_sheets: [D4-1]
+  - sheet_code: D4-20-current
+    api_prefix: d4
+    item_id: D4-20-current-rows
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 182
+    depends_on_sheets: [D4-1]
+  - sheet_code: D4-20-post
+    api_prefix: d4
+    item_id: D4-20-post-rows
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 183
+    depends_on_sheets: [D4-1]
+  - sheet_code: D4-21
+    api_prefix: d4
+    item_id: D4-21-rows
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 190
+    depends_on_sheets: [D4-1]
+  - sheet_code: D4-22
+    api_prefix: d4
+    item_id: D4-22-data
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 200
+    depends_on_sheets: [D4-1]
+  - sheet_code: D4-23
+    api_prefix: d4
+    item_id: D4-23-data
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 210
+    depends_on_sheets: [D4-1]
+  - sheet_code: D4-24
+    api_prefix: d4
+    item_id: D4-24-rows
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 220
+    depends_on_sheets: [D4-1]
+  - sheet_code: D4-25
+    api_prefix: d4
+    item_id: D4-25-rows
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 230
+    depends_on_sheets: [D4-1]
+  - sheet_code: D4-26
+    api_prefix: d4
+    item_id: D4-26-rows
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 240
+    depends_on_sheets: [D4-1]
+  - sheet_code: D4-27
+    api_prefix: d4
+    item_id: D4-27-rows
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 250
+    depends_on_sheets: [D4-1]
+  - sheet_code: D4-28
+    api_prefix: d4
+    item_id: D4-28-rows
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 260
+    depends_on_sheets: [D4-1]
+  - sheet_code: D4-29
+    api_prefix: d4
+    item_id: D4-29-rows
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 270
+    depends_on_sheets: [D4-1]
+  - sheet_code: D4-30
+    api_prefix: d4
+    item_id: D4-30-rows
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 280
+    depends_on_sheets: [D4-1]
+  - sheet_code: D4-31
+    api_prefix: d4
+    item_id: D4-31-rows
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 290
+    depends_on_sheets: [D4-1]
+  - sheet_code: D4-32
+    api_prefix: d4
+    item_id: D4-32-rows
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 300
+    depends_on_sheets: [D4-1]
+  - sheet_code: D4-33
+    api_prefix: d4
+    item_id: D4-33-rows
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 310
+    depends_on_sheets: [D4-1]
+  - sheet_code: D4-34
+    api_prefix: d4
+    item_id: D4-34-rows
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 320
+    depends_on_sheets: [D4-1]
+  - sheet_code: D4-34-rental
+    api_prefix: d4
+    item_id: D4-34-rental-rows
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 321
+    depends_on_sheets: [D4-1]
+  - sheet_code: D4-34-consult
+    api_prefix: d4
+    item_id: D4-34-consult-rows
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 322
+    depends_on_sheets: [D4-1]
+  - sheet_code: D4-35
+    api_prefix: d4
+    item_id: D4-35-rows
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 330
+    depends_on_sheets: [D4-1]
+  - sheet_code: D4-36
+    api_prefix: d4
+    item_id: D4-36-rows
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 340
+    depends_on_sheets: [D4-1]
+  - sheet_code: D4-36-forward
+    api_prefix: d4
+    item_id: D4-36-forward-rows
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 341
+    depends_on_sheets: [D4-1]
+  - sheet_code: D4-36-backward
+    api_prefix: d4
+    item_id: D4-36-backward-rows
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 342
+    depends_on_sheets: [D4-1]
+
+  # ───────────────────────── D5 应收款项融资（api_prefix: d5） ─────────────────────────
+  - sheet_code: D5-1
+    api_prefix: d5
+    item_id: "D5-1-adj-*"
+    storage_field: remark
+    storage_mode: keyed_fields
+    import_order: 10
+    depends_on_sheets: []
+  - sheet_code: D5-2
+    api_prefix: d5
+    item_id: D5-2-rows
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 20
+    depends_on_sheets: [D5-1]
+  - sheet_code: D5-3
+    api_prefix: d5
+    item_id: D5-3-rows
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 30
+    depends_on_sheets: [D5-1]
+  - sheet_code: D5-4
+    api_prefix: d5
+    item_id: D5-4-rows
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 40
+    depends_on_sheets: [D5-1]
+
+  # ───────────────────────── D6 合同资产（api_prefix: d6） ─────────────────────────
+  - sheet_code: D6-2
+    api_prefix: d6
+    item_id: D6-2-rows
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 10
+    depends_on_sheets: []
+  - sheet_code: D6-3
+    api_prefix: d6
+    item_id: D6-3-rows
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 20
+    depends_on_sheets: [D6-2]
+  - sheet_code: D6-5
+    api_prefix: d6
+    item_id: D6-5-rows
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 30
+    depends_on_sheets: [D6-2]
+  - sheet_code: D6-6-period
+    api_prefix: d6
+    item_id: D6-6-block1-rows
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 40
+    depends_on_sheets: [D6-2]
+  - sheet_code: D6-6-post
+    api_prefix: d6
+    item_id: D6-6-block2-rows
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 50
+    depends_on_sheets: [D6-2]
+  - sheet_code: D6-8
+    api_prefix: d6
+    item_id: D6-8-single-rows
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 60
+    depends_on_sheets: [D6-2]
+  - sheet_code: D6-9-reversal
+    api_prefix: d6
+    item_id: D6-9-reversal-rows
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 70
+    depends_on_sheets: [D6-2]
+  - sheet_code: D6-9-writeoff
+    api_prefix: d6
+    item_id: D6-9-writeoff-rows
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 80
+    depends_on_sheets: [D6-2]
+
+  # ───────────────────────── D7 合同负债（api_prefix: d7） ─────────────────────────
+  - sheet_code: D7-1
+    api_prefix: d7
+    item_id: "D7-1-adj-*"
+    storage_field: remark
+    storage_mode: keyed_fields
+    import_order: 10
+    depends_on_sheets: []
+  - sheet_code: D7-2
+    api_prefix: d7
+    item_id: D7-2-rows
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 20
+    depends_on_sheets: [D7-1]
+  - sheet_code: D7-3
+    api_prefix: d7
+    item_id: D7-3-rows
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 30
+    depends_on_sheets: [D7-1]
+  - sheet_code: D7-4
+    api_prefix: d7
+    item_id: [D7-4-debit-rows, D7-4-credit-rows]
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 40
+    depends_on_sheets: [D7-1]
+  - sheet_code: D7-5
+    api_prefix: d7
+    item_id: D7-5-rows
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 50
+    depends_on_sheets: [D7-1]
+  - sheet_code: D7-6
+    api_prefix: d7
+    item_id: D7-6-rows
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 60
+    depends_on_sheets: [D7-1]
+  - sheet_code: D7-7-period
+    api_prefix: d7
+    item_id: D7-7-period-rows
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 70
+    depends_on_sheets: [D7-1]
+  - sheet_code: D7-7-post
+    api_prefix: d7
+    item_id: D7-7-post-rows
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 80
+    depends_on_sheets: [D7-1]

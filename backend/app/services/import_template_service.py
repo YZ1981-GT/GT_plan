@@ -118,6 +118,97 @@ TEMPLATE_COLUMNS: dict[ImportType, list[tuple[str, bool, str, str]]] = {
     ],
 }
 
+# ── 模板内置示例行登记表 ────────────────────────────────────
+#
+# `_is_example_row` 判定为「全部可比字段逐字相等」（spec 决策 4），因此除
+# `TEMPLATE_COLUMNS` 的单示例外，模板里其余内置示例行必须**逐行登记**在此，
+# 否则收紧判定会让这些示例行变成脏数据（违反 R2.5 / Property 5）。
+#
+# adjustments 富模板（`GET /adjustments/export-template`）的 AJE模板 / RJE模板
+# 各写 2 行示例（借贷各一行，见 `app/routers/adjustments.py`）：
+#   AJE 第 1 行与 TEMPLATE_COLUMNS 单示例一致（不重复登记），其余 3 行登记于此。
+#
+# 值的写法必须与读取端一致：读取端 `str(v or "").strip()` 会把数值 0 读成 ""，
+# 故金额 0 登记为 ""（空值不参与比较），非零金额登记为 `_norm_example_value`
+# 规范化后的字符串（100000.00 → "100000"）。
+#
+# 已知边界：富模板 AJE 第 1 行的二级科目名称在「项目科目库无应收账款」时会被替换为
+# 项目里第一个 1xxx 科目（见 adjustments.py 的 example_name1 兜底），此时该行与登记值
+# 不再全等 → 按数据行导入（用户可见的 AJE-001 分录 / 明确报错），而不是静默丢数据。
+TEMPLATE_EXAMPLE_ROWS: dict[ImportType, list[list[str]]] = {
+    ImportType.adjustments: [
+        # AJE模板 第 2 行（贷方侧示例）
+        ["AJE-001", "AJE", "补提应收账款减值", "", "信用减值损失", "", "", "", "100000", ""],
+        # RJE模板 第 1/2 行
+        ["RJE-001", "RJE", "长投重分类为其他权益工具", "", "其他权益工具投资", "", "", "", "50000", ""],
+        ["RJE-001", "RJE", "长投重分类为其他权益工具", "", "长期股权投资", "", "", "", "", "50000"],
+    ],
+}
+
+
+# ── adjustments 表头别名 / sheet 选取 / 类型 sheet 名兜底 ──────
+#
+# 三者被 `validate_import_file` 与 `parse_import_data` **两条独立路径**共用，
+# 必须走同一份定义，否则会出现「校验过了但解析仍缺类型」（或反之）的不一致。
+#
+# 旧 → 新 表头别名（parse 阶段统一规范化，后续 `_import_adjustments` 只看新字段名）：
+#   分录编号→编号 / 调整类型→类型 / 科目名称→二级科目名称 / 科目编码→二级科目编码
+# 汇总导出（`GET /adjustments/export-summary`）用的就是「科目编码/科目名称」，
+# 故经此别名后其产物可被中央导入直接接受（Property 6）。
+_ADJ_HEADER_ALIASES: dict[str, str] = {
+    "分录编号": "编号",
+    "调整类型": "类型",
+    "科目名称": "二级科目名称",
+    "科目编码": "二级科目编码",
+}
+
+# 说明型 sheet（不含数据行）
+_ADJ_SHEET_SKIP_NAMES = {"关注事项", "标准科目库", "项目科目库", "说明", "Sheet1"}
+
+# sheet 名 → 调整类型的判别关键词（富模板 AJE模板/RJE模板；汇总导出 AJE审计调整/RJE重分类）
+_ADJ_TYPE_SHEET_HINTS: tuple[tuple[str, tuple[str, ...]], ...] = (
+    ("AJE", ("AJE", "审计调整")),
+    ("RJE", ("RJE", "重分类")),
+)
+
+
+def normalize_adjustment_header(name: str) -> str:
+    """把调整分录模板的旧表头名规范化为新字段名（未登记的原样返回）。"""
+    return _ADJ_HEADER_ALIASES.get(name, name)
+
+
+def infer_adjustment_type_from_sheet_name(sheet_name: str) -> str | None:
+    """从 sheet 名推断调整类型（AJE/RJE）；无法判别或同时命中两类 → None。
+
+    仅在文件缺「类型」列时作兜底；「类型」列存在时一律以列值为准（R3.3）。
+    """
+    name = str(sheet_name or "")
+    upper = name.upper()
+    hits = [
+        adj_type
+        for adj_type, keywords in _ADJ_TYPE_SHEET_HINTS
+        if any((kw.upper() in upper) if kw.isascii() else (kw in name) for kw in keywords)
+    ]
+    if len(hits) == 1:
+        return hits[0]
+    return None
+
+
+def adjustment_sheet_candidates(workbook) -> list[str]:
+    """调整分录文件里的候选数据 sheet 名（跳过说明型 sheet）。
+
+    `validate_import_file` 取其第一个，`parse_import_data` 合并全部；
+    两者同源以保证类型兜底判定一致。
+    """
+    names: list[str] = []
+    for sn in workbook.sheetnames:
+        if sn in _ADJ_SHEET_SKIP_NAMES:
+            continue
+        if "模板" in sn or "AJE" in sn.upper() or "RJE" in sn.upper():
+            names.append(sn)
+    return names
+
+
 # 导入类型的中文名称
 IMPORT_TYPE_LABELS: dict[ImportType, str] = {
     ImportType.adjustments: "调整分录",
@@ -264,51 +355,97 @@ class ImportValidationResult:
         self.warnings: list[ValidationError] = []
         self.row_count: int = 0
         self.preview_rows: list[dict[str, Any]] = []
+        # 被识别并跳过的模板内置示例行数（不计入 row_count，也不产生 errors）
+        self.example_skipped_count: int = 0
 
     @property
     def valid(self) -> bool:
         return len(self.errors) == 0
 
     def to_dict(self) -> dict:
-        return {
+        out = {
             "valid": self.valid,
             "row_count": self.row_count,
             "errors": [e.to_dict() for e in self.errors],
             "warnings": [w.to_dict() for w in self.warnings],
             "preview_rows": self.preview_rows[:10],  # 最多预览 10 行
         }
+        # 仅在真有示例行被跳过时附带：保持既有响应结构逐字节不变
+        if self.example_skipped_count:
+            out["example_skipped_count"] = self.example_skipped_count
+        return out
 
 
 # 数值类型关键词集合
 _NUMERIC_TYPES = {"数值", "整数"}
 
 
+def _norm_example_value(v) -> str:
+    """规范化值: 去前后空白 + 数字 100000 == 字符串 100000 == 100000.00"""
+    s = str(v).strip() if v is not None else ""
+    try:
+        f = float(s.replace(",", ""))
+        if f == int(f):
+            return str(int(f))
+        return str(f)
+    except (ValueError, TypeError):
+        return s
+
+
+def _example_comparable_pairs(
+    row_values: list[str], example_values: list[str], columns: list[tuple]
+) -> list[tuple[Any, Any]]:
+    """取出「可比字段」对：示例值非空的列；数值列示例为空视同 0 也参与比较。
+
+    - 示例值非空 → 可比（含模板公式自动填充列在示例里为空的情形不参与，避免误判）。
+    - 数值列示例为空 ⇔ 示例金额 0（模板写 0 被读取端读成 ""）→ 补 0 后可比，
+      使「仅改金额」也必然落数据行（Property 4）。
+    """
+    pairs: list[tuple[Any, Any]] = []
+    for idx, (actual, example) in enumerate(zip(row_values, example_values)):
+        if str(example).strip():
+            pairs.append((actual, example))
+            continue
+        dtype = str(columns[idx][2]) if idx < len(columns) else ""
+        if _is_numeric_column(dtype):
+            pairs.append((actual if str(actual).strip() else "0", "0"))
+    return pairs
+
+
+def _example_row_candidates(columns: list[tuple]) -> list[list[str]]:
+    """该模板的全部内置示例行候选 = TEMPLATE_COLUMNS 单示例 + TEMPLATE_EXAMPLE_ROWS 登记项。"""
+    candidates: list[list[str]] = [[str(col[3]) for col in columns]]
+    for import_type, cols in TEMPLATE_COLUMNS.items():
+        if cols is columns or cols == columns:
+            candidates.extend(TEMPLATE_EXAMPLE_ROWS.get(import_type, []))
+            break
+    return candidates
+
+
 def _is_example_row(row_values: list[str], columns: list[tuple]) -> bool:
-    """判断是否为模板示例行（宽松匹配：超过一半的值和示例一致即视为示例行）
+    """判断是否为模板内置示例行（严格匹配：与某个内置示例行的全部可比字段逐字相等）。
+
+    可比字段见 `_example_comparable_pairs`（示例值非空的列 + 示例为空的数值列按 0 比较）。
+    只要有任一可比字段不同，即视为真实数据行
+    —— 审计师在示例行位置覆盖填写真实分录不会再被静默丢弃（spec 决策 4 / Property 4）。
+
+    候选示例行见 `_example_row_candidates`：模板里有几行内置示例就登记几行，
+    保证「模板内置示例行仍被跳过」（Property 5）。
 
     注: 仅在前 6 行使用 (覆盖 adjustments 模板的 5 行示例区).
     """
     if not row_values:
         return False
 
-    example_values = [col[3] for col in columns]
-
-    def _norm(v) -> str:
-        """规范化值: 去前后空白 + 数字 100000 == 字符串 100000"""
-        s = str(v).strip() if v is not None else ""
-        try:
-            f = float(s.replace(",", ""))
-            if f == int(f):
-                return str(int(f))
-            return str(f)
-        except (ValueError, TypeError):
-            return s
-
-    matchable_pairs = [(a, b) for a, b in zip(row_values, example_values) if str(b).strip()]
-    if not matchable_pairs:
-        return False
-    match_count = sum(1 for a, b in matchable_pairs if _norm(a) == _norm(b))
-    return match_count >= max(2, len(matchable_pairs) * 0.6)
+    for example_values in _example_row_candidates(columns):
+        matchable_pairs = _example_comparable_pairs(row_values, example_values, columns)
+        if not matchable_pairs:
+            continue
+        if all(
+            _norm_example_value(a) == _norm_example_value(b) for a, b in matchable_pairs
+        ):
+            return True
+    return False
 
 
 def _is_numeric_column(dtype: str) -> bool:
@@ -357,24 +494,23 @@ def validate_import_file(
     # ─── 自动选 sheet (与 parse_import_data 同款策略) ─────
     # adjustments 类型: 找模板 sheet, 跳过 关注事项/标准科目库 等说明 sheet
     ws = None
+    candidate_names: list[str] = []
     if import_type == ImportType.adjustments:
-        skip_names = {"关注事项", "标准科目库", "项目科目库", "说明", "Sheet1"}
-        for sn in wb.sheetnames:
-            if sn in skip_names:
-                continue
-            if "模板" in sn or "AJE" in sn.upper() or "RJE" in sn.upper():
-                ws = wb[sn]
-                break
+        candidate_names = adjustment_sheet_candidates(wb)
+        if candidate_names:
+            ws = wb[candidate_names[0]]
     if ws is None:
         ws = wb.active
     if ws is None:
         result.errors.append(ValidationError(None, "", "文件中没有工作表"))
         return result
 
-    # 读取表头（第 1 行）
+    # 读取表头（第 1 行）；adjustments 的旧表头名规范化为新字段名（与 parse 同源）
     header_row = []
     for cell in next(ws.iter_rows(min_row=1, max_row=1, values_only=False), []):
         val = str(cell.value or "").strip().lstrip("* ").strip()
+        if import_type == ImportType.adjustments:
+            val = normalize_adjustment_header(val)
         header_row.append(val)
 
     if not header_row:
@@ -384,6 +520,25 @@ def validate_import_file(
     # 检查必填列是否存在
     header_set = set(header_row)
     missing = required_names - header_set
+
+    # ─── 类型 sheet 名兜底（R3.2）─────────────────────────
+    # 缺「类型」列但 sheet 名可判别（AJE审计调整 / RJE重分类 / AJE模板…）时按 sheet 名注入。
+    # 判定必须覆盖 parse 会读的**全部**候选 sheet，否则会出现「校验过了但解析某 sheet 仍缺类型」。
+    sheet_inferred_type: str | None = None
+    if import_type == ImportType.adjustments and "类型" in missing:
+        names = candidate_names or [ws.title]
+        inferred = [infer_adjustment_type_from_sheet_name(n) for n in names]
+        if all(inferred):
+            missing = missing - {"类型"}
+            result.warnings.append(ValidationError(
+                1, "类型",
+                "未找到「类型」列，已按 sheet 名推断调整类型: "
+                + ", ".join(f"{n}→{t}" for n, t in zip(names, inferred)),
+                severity="warning",
+            ))
+    if import_type == ImportType.adjustments and "类型" in header_set:
+        sheet_inferred_type = infer_adjustment_type_from_sheet_name(ws.title)
+
     if missing:
         result.errors.append(ValidationError(
             1, "", f"缺少必填列: {', '.join(sorted(missing))}"
@@ -412,6 +567,7 @@ def validate_import_file(
         if row_idx <= 6:
             row_values = [str(v or "").strip() for v in row[:len(columns)]]
             if _is_example_row(row_values, columns):
+                result.example_skipped_count += 1
                 continue
 
         # 跳过全空行
@@ -444,6 +600,17 @@ def validate_import_file(
                             row_idx, col_name, f"第 {row_idx} 行「{col_name}」应为数值，实际值: {val}"
                         ))
 
+        # 类型来源冲突提示（R3.3：以列为准，仅提示不阻断）
+        if sheet_inferred_type and len(result.warnings) < error_count_limit:
+            cell_type = str(row_data.get("类型") or "").strip().upper()
+            if cell_type in ("AJE", "RJE") and cell_type != sheet_inferred_type:
+                result.warnings.append(ValidationError(
+                    row_idx, "类型",
+                    f"第 {row_idx} 行「类型」列为 {cell_type}，"
+                    f"与 sheet 名「{ws.title}」隐含的 {sheet_inferred_type} 不一致，以列值为准",
+                    severity="warning",
+                ))
+
         data_rows.append(row_data)
 
     result.row_count = len(data_rows)
@@ -462,8 +629,16 @@ def validate_import_file(
 def parse_import_data(
     import_type: ImportType,
     file_bytes: bytes,
+    *,
+    stats: dict[str, Any] | None = None,
 ) -> list[dict[str, Any]]:
     """解析已校验通过的 Excel 文件，返回结构化数据列表。
+
+    `stats`（可选出参）：传入 dict 时写回解析统计。
+      - `example_skipped`：被识别并跳过的模板内置示例行数（恒写回）
+      - `type_inferred_from_sheet`：缺「类型」列时按 sheet 名兜底注入的行数（仅 >0 才写回）
+      - `type_source_conflicts`：「类型」列值与 sheet 名冲突的行（仅非空才写回，以列为准）
+    返回值契约不变。
 
     特殊处理 (adjustments):
     - 优先读取所有匹配 AJE/RJE 模板的 sheet (跳过 关注事项 / 标准科目库 等说明型 sheet)
@@ -481,13 +656,8 @@ def parse_import_data(
     # adjustments: 找名称含 模板 且不是 关注事项/标准科目库 的 sheet (支持多 sheet 合并)
     target_sheets: list = []
     if import_type == ImportType.adjustments:
-        skip_names = {"关注事项", "标准科目库", "项目科目库", "说明", "Sheet1"}
-        for sn in wb.sheetnames:
-            if sn in skip_names:
-                continue
-            # 含"模板"关键词或不在跳过名单的都试着读
-            if "模板" in sn or "AJE" in sn.upper() or "RJE" in sn.upper():
-                target_sheets.append(wb[sn])
+        # 与 validate_import_file 同源的候选 sheet 判定
+        target_sheets = [wb[sn] for sn in adjustment_sheet_candidates(wb)]
         # 兜底: 没找到任何模板 sheet 就用 active
         if not target_sheets:
             target_sheets = [wb.active] if wb.active is not None else []
@@ -496,17 +666,14 @@ def parse_import_data(
         target_sheets = [wb.active] if wb.active is not None else []
 
     # ─── 兼容旧字段名: 把旧字段名映射到新字段 ──────────────
-    # 旧 → 新 别名表 (parse 阶段统一规范化, 后续 _import_adjustments 只看新字段)
-    legacy_alias_map = {
-        "分录编号": "编号",
-        "调整类型": "类型",
-        # 7 列模板兼容 (科目名称/科目编码 → 二级科目名称/二级科目编码)
-        "科目名称": "二级科目名称",
-        "科目编码": "二级科目编码",
-    }
+    # 别名表见模块级 `_ADJ_HEADER_ALIASES`（与 validate_import_file 同源）。
+    # 注: 历史上对所有 import_type 一律套用，此处保持不变以免改动其他类型的解析行为。
 
     # ─── 解析数据行 ──────────────────────────────────────
     rows: list[dict[str, Any]] = []
+    example_skipped = 0
+    type_inferred_from_sheet = 0
+    type_source_conflicts: list[dict[str, Any]] = []
     for ws in target_sheets:
         if ws is None:
             continue
@@ -520,7 +687,7 @@ def parse_import_data(
         col_map: dict[str, int] = {}
         for idx, name in enumerate(header_row):
             # 别名规范化
-            normalized = legacy_alias_map.get(name, name)
+            normalized = normalize_adjustment_header(name)
             if normalized in known_set or name in (
                 "借方科目代码", "借方科目名称", "贷方科目代码", "贷方科目名称",
                 "借方金额", "贷方金额",  # 可能直接含,也属于已知
@@ -531,11 +698,18 @@ def parse_import_data(
         if not col_map:
             continue  # 这个 sheet 没识别到任何列, 跳过
 
+        # 类型来源：缺「类型」列时按 sheet 名兜底注入；列存在则以列为准（R3.2 / R3.3）
+        sheet_type: str | None = None
+        if import_type == ImportType.adjustments:
+            sheet_type = infer_adjustment_type_from_sheet_name(ws.title)
+        type_col_present = "类型" in col_map
+
         for row_idx, row in enumerate(ws.iter_rows(min_row=2, values_only=True), start=2):
             # 跳过示例行 (扩展到前 6 行覆盖 adjustments 模板的 5 行示例区)
             if row_idx <= 6:
                 row_values = [str(v or "").strip() for v in row[:len(columns)]]
                 if _is_example_row(row_values, columns):
+                    example_skipped += 1
                     continue
 
             # 跳过全空行
@@ -547,9 +721,33 @@ def parse_import_data(
                 if col_idx < len(row):
                     row_data[col_name] = row[col_idx]
 
+            if sheet_type:
+                if not type_col_present:
+                    # 该 sheet 全部行按 sheet 名注入类型
+                    row_data["类型"] = sheet_type
+                    type_inferred_from_sheet += 1
+                else:
+                    cell_type = str(row_data.get("类型") or "").strip().upper()
+                    if cell_type in ("AJE", "RJE") and cell_type != sheet_type:
+                        # 以列值为准，仅记录冲突提示（不阻断）
+                        type_source_conflicts.append({
+                            "sheet": ws.title,
+                            "row": row_idx,
+                            "column_value": cell_type,
+                            "sheet_inferred": sheet_type,
+                        })
+
             rows.append(row_data)
 
     wb.close()
+    if stats is not None:
+        # 被跳过的示例行以独立口径可见（不计入 failed，见 R2.3）
+        stats["example_skipped"] = example_skipped
+        # 类型兜底 / 冲突：仅在非空时写回，保持既有 stats 形状不变
+        if type_inferred_from_sheet:
+            stats["type_inferred_from_sheet"] = type_inferred_from_sheet
+        if type_source_conflicts:
+            stats["type_source_conflicts"] = type_source_conflicts
     return rows
 
 

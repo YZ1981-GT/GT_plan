@@ -1,0 +1,72 @@
+# backend/data/wp_render_schema/M6-1.yaml
+# 未分配利润审定表 — d-form-table 渲染 schema
+# Requirements: §5（M6 未分配利润，联动损益合计）
+# Design: §3 审定表标准字段（单行公式：期初+净利润-提取-分配=期末）
+# Template: M6 未分配利润.xlsx
+
+wp_code: M6-1
+wp_name: 未分配利润审定表
+component_type: d-form-table
+template_path: backend/wp_templates/M/M6 未分配利润.xlsx
+template_version: v2025-R5
+applicable_standards: [soe_standalone, listed_standalone, soe_consolidated, listed_consolidated]
+related_accounts:
+  - code: '4104'
+    name: 未分配利润
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 审定表 — 单行公式型（期初+净利润-提取法定-提取任意-分配=期末）
+# ═══════════════════════════════════════════════════════════════════════════════
+
+dynamic_rows: false
+
+sections:
+  - name: 未分配利润变动
+    row_type: single_formula
+    fields:
+      - { field: opening_retained_earnings, label: 期初未分配利润, type: number, auto_source: trial_balance.opening_balance }
+      - { field: net_income, label: 本年净利润, type: number, auto_source: income_statement_total }
+      - { field: statutory_surplus_reserve, label: 提取法定盈余公积, type: number }
+      - { field: discretionary_surplus_reserve, label: 提取任意盈余公积, type: number }
+      - { field: dividend_distribution, label: 分配股利, type: number }
+      - { field: prior_year_adjustment, label: 以前年度损益调整, type: number }
+      - { field: closing_retained_earnings, label: 期末未分配利润, type: number, formula: "opening_retained_earnings + net_income - statutory_surplus_reserve - discretionary_surplus_reserve - dividend_distribution + prior_year_adjustment" }
+      - { field: unadjusted_amount, label: 未审金额, type: number, auto_source: trial_balance.unadjusted_amount }
+      - { field: aje_debit, label: 审计调整借方, type: number }
+      - { field: aje_credit, label: 审计调整贷方, type: number }
+      - { field: rje_debit, label: 重分类调整借方, type: number }
+      - { field: rje_credit, label: 重分类调整贷方, type: number }
+      - { field: audited_amount, label: 审定金额, type: number, formula: "unadjusted_amount + aje_debit - aje_credit + rje_debit - rje_credit" }
+      - { field: variance_amount, label: 审定与公式差异, type: number, formula: "audited_amount - closing_retained_earnings" }
+      - { field: variance_note, label: 差异说明, type: textarea }
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 联动配置
+# ═══════════════════════════════════════════════════════════════════════════════
+
+writeback:
+  target: trial_balance.audited_amount
+  trigger: WORKPAPER_SAVED
+  handler: _on_d_audit_determination_saved
+  match_pattern: "^[D-N]\\d+-1$"
+  key_field: account_code
+  value_field: audited_amount
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 跨底稿引用
+# ═══════════════════════════════════════════════════════════════════════════════
+
+cross_refs:
+  - ref_id: CW-M6-1-001
+    target_wp: M6-2
+    target_field: 勾稽表
+    description: '审定表 → M6-2 未分配利润勾稽表核对'
+    severity: required
+    direction: outbound
+
+  - ref_id: CW-M6-1-002
+    target_wp: M6-5
+    target_field: 损益联动
+    description: '审定表 ← M6-5 损益联动验证'
+    severity: required
+    direction: inbound

@@ -1,0 +1,262 @@
+任务 2.4 —— 12 张 X-3 补登 AJE/RJE 枚举大小写：实证汇总
+==============================================================================
+
+本文件由 tmp_x3_t24_* 系列临时探针汇总而成（探针已删）。三段：
+  ① 逐张前端实测证据（文件:行号 + 原文）
+  ② 「未登记分支」空转实证（补合成夹具的依据）
+  ③ 变异检验两轮（四态判读）
+
+
+==============================================================================
+① 逐张前端实测证据（判据 = 界面按什么值 filter）
+==============================================================================
+
+
+### L2-3
+  [decl] composables/useL2Adjustment.ts:31  entryType: 'AJE' | 'RJE'
+  [decl] composables/useL2Adjustment.ts:134  const activeEntryType = ref<'AJE' | 'RJE'>('AJE')
+  [decl] composables/useL2Adjustment.ts:238  function addEntry(entryType?: 'AJE' | 'RJE'): void {
+  [filter] composables/useL2Adjustment.ts:155  return entries.value.filter(e => e.entryType === 'AJE')
+  [filter] composables/useL2Adjustment.ts:160  return entries.value.filter(e => e.entryType === 'RJE')
+  [filter] composables/useL2Adjustment.ts:240  const sameTypeEntries = entries.value.filter(e => e.entryType === type)
+  [filter] l2/core/L2TabAdjustment.vue:476  const aje = entries.value.filter(e => e.entryType === 'AJE')
+  [filter] l2/core/L2TabAdjustment.vue:477  const rje = entries.value.filter(e => e.entryType === 'RJE')
+  [bind] l2/core/L2TabAdjustment.vue:60  :data="currentEntries"
+  [coerce] composables/useL2Adjustment.ts:31  entryType: 'AJE' | 'RJE'
+  [coerce] composables/useL2Adjustment.ts:111  entryType: raw.entryType === 'RJE' ? 'RJE' : 'AJE',
+
+### L6-3
+  [decl] composables/useL6Adjustment.ts:30  export type L6AdjustmentType = 'AJE' | 'RJE'
+  [filter] composables/useL6Adjustment.ts:97  return entries.value.filter(e => e.type === activeType.value)
+  [filter] composables/useL6Adjustment.ts:102  return entries.value.filter(e => e.type === 'AJE')
+  [filter] composables/useL6Adjustment.ts:107  return entries.value.filter(e => e.type === 'RJE')
+  [bind] l6/core/L6TabAdjustment.vue:48  <el-table :data="filteredEntries" border size="small" style="width: 100%">
+
+### M1-3
+  [decl] composables/useM1Adjustment.ts:29  export type M1AdjustmentType = 'AJE' | 'RJE'
+  [filter] composables/useM1Adjustment.ts:96  return entries.value.filter(e => e.type === activeType.value)
+  [filter] composables/useM1Adjustment.ts:101  return entries.value.filter(e => e.type === 'AJE')
+  [filter] composables/useM1Adjustment.ts:106  return entries.value.filter(e => e.type === 'RJE')
+  [bind] m1/core/M1TabAdjustment.vue:48  <el-table :data="filteredEntries" border size="small" style="width: 100%">
+
+### M2-3
+  [decl] composables/useM2Adjustment.ts:30  export type M2AdjustmentType = 'AJE' | 'RJE'
+  [filter] composables/useM2Adjustment.ts:97  return entries.value.filter(e => e.type === activeType.value)
+  [filter] composables/useM2Adjustment.ts:102  return entries.value.filter(e => e.type === 'AJE')
+  [filter] composables/useM2Adjustment.ts:107  return entries.value.filter(e => e.type === 'RJE')
+  [bind] m2/core/M2TabAdjustment.vue:48  <el-table :data="filteredEntries" border size="small" style="width: 100%">
+
+### M3-3
+  [decl] composables/useM3Adjustment.ts:26  export type M3AdjustmentType = 'AJE' | 'RJE'
+  [filter] composables/useM3Adjustment.ts:92  return entries.value.filter(e => e.type === activeType.value)
+  [filter] composables/useM3Adjustment.ts:97  return entries.value.filter(e => e.type === 'AJE')
+  [filter] composables/useM3Adjustment.ts:102  return entries.value.filter(e => e.type === 'RJE')
+  [bind] m3/core/M3TabAdjustment.vue:50  <el-table :data="filteredEntries" border size="small" style="width: 100%">
+  [coerce] m3/core/M3TabAdjustment.vue:376  type: data.type === 'RJE' ? 'RJE' : 'AJE',
+  [coerce] m3/core/M3TabAdjustment.vue:408  type: 'AJE',
+
+### M4-3
+  [decl] composables/useM4Adjustment.ts:26  export type M4AdjustmentType = 'AJE' | 'RJE'
+  [filter] composables/useM4Adjustment.ts:92  return entries.value.filter(e => e.type === activeType.value)
+  [filter] composables/useM4Adjustment.ts:97  return entries.value.filter(e => e.type === 'AJE')
+  [filter] composables/useM4Adjustment.ts:102  return entries.value.filter(e => e.type === 'RJE')
+  [bind] m4/core/M4TabAdjustment.vue:72  :data="adjustment.filteredEntries.value"
+  [coerce] m4/core/M4TabAdjustment.vue:423  type: data.type || 'AJE',
+
+### M5-3
+  [decl] composables/useM5Adjustment.ts:30  export type M5AdjustmentType = 'AJE' | 'RJE'
+  [filter] composables/useM5Adjustment.ts:96  return entries.value.filter(e => e.type === activeType.value)
+  [filter] composables/useM5Adjustment.ts:101  return entries.value.filter(e => e.type === 'AJE')
+  [filter] composables/useM5Adjustment.ts:106  return entries.value.filter(e => e.type === 'RJE')
+  [bind] m5/core/M5TabAdjustment.vue:72  :data="adjustment.filteredEntries.value"
+  [coerce] m5/core/M5TabAdjustment.vue:415  type: data.type || 'AJE',
+
+### M6-3
+  [decl] composables/useM6Adjustment.ts:31  export type M6AdjustmentType = 'AJE' | 'RJE'
+  [filter] composables/useM6Adjustment.ts:97  return entries.value.filter(e => e.type === activeType.value)
+  [filter] composables/useM6Adjustment.ts:102  return entries.value.filter(e => e.type === 'AJE')
+  [filter] composables/useM6Adjustment.ts:107  return entries.value.filter(e => e.type === 'RJE')
+  [bind] m6/core/M6TabAdjustment.vue:72  :data="adjustment.filteredEntries.value"
+  [coerce] composables/useM6Adjustment.ts:270  type: data.type || 'AJE',
+
+### M7-3
+  [decl] composables/useM7Adjustment.ts:32  export type M7AdjustmentType = 'AJE' | 'RJE'
+  [filter] composables/useM7Adjustment.ts:98  return entries.value.filter(e => e.type === activeType.value)
+  [filter] composables/useM7Adjustment.ts:103  return entries.value.filter(e => e.type === 'AJE')
+  [filter] composables/useM7Adjustment.ts:108  return entries.value.filter(e => e.type === 'RJE')
+  [bind] m7/core/M7TabAdjustment.vue:45  <el-table :data="filteredEntries" border size="small" style="width: 100%">
+  [coerce] m7/core/M7TabAdjustment.vue:309  type: d.type || 'AJE',
+
+### M8-3
+  [decl] composables/useM8Adjustment.ts:33  export type M8AdjustmentType = 'AJE' | 'RJE'
+  [filter] composables/useM8Adjustment.ts:99  return entries.value.filter(e => e.type === activeType.value)
+  [filter] composables/useM8Adjustment.ts:104  return entries.value.filter(e => e.type === 'AJE')
+  [filter] composables/useM8Adjustment.ts:109  return entries.value.filter(e => e.type === 'RJE')
+  [bind] m8/core/M8TabAdjustment.vue:45  :data="adjustment.filteredEntries.value"
+  [coerce] m8/core/M8TabAdjustment.vue:498  type: d.type || 'AJE',
+
+### M9-3
+  [decl] composables/useM9Adjustment.ts:31  export type M9AdjustmentType = 'AJE' | 'RJE'
+  [filter] composables/useM9Adjustment.ts:102  return entries.value.filter(e => e.type === activeType.value)
+  [filter] composables/useM9Adjustment.ts:107  return entries.value.filter(e => e.type === 'AJE')
+  [filter] composables/useM9Adjustment.ts:112  return entries.value.filter(e => e.type === 'RJE')
+  [bind] m9/core/M9TabAdjustment.vue:49  <el-table :data="filteredEntries" border size="small" style="width: 100%">
+
+### M10-3
+  [decl] composables/useM10Adjustment.ts:31  export type M10AdjustmentType = 'AJE' | 'RJE'
+  [filter] composables/useM10Adjustment.ts:97  return entries.value.filter(e => e.type === activeType.value)
+  [filter] composables/useM10Adjustment.ts:102  return entries.value.filter(e => e.type === 'AJE')
+  [filter] composables/useM10Adjustment.ts:107  return entries.value.filter(e => e.type === 'RJE')
+  [bind] m10/core/M10TabAdjustment.vue:72  :data="adjustment.filteredEntries.value"
+  [coerce] m10/core/M10TabAdjustment.vue:430  type: data.type || 'AJE',
+
+### N1-3
+  [decl] n1/core/N1TabAdjustment.vue:335  type AdjustmentType = 'AJE' | 'RJE'
+  [filter] n1/core/N1TabAdjustment.vue:400  entries.value.filter(e => e.type === activeType.value),
+  [bind] n1/core/N1TabAdjustment.vue:73  :data="filteredEntries"
+
+### N2-3
+  [decl] n2/core/N2TabAdjustment.vue:270  type AdjustmentType = 'AJE' | 'RJE'
+  [filter] n2/core/N2TabAdjustment.vue:331  entries.value.filter(e => e.type === activeType.value),
+  [filter] n2/core/N2TabAdjustment.vue:380  const ajeItems = entries.value.filter(e => e.type === 'AJE' && e.accountCode === '2221')
+  [filter] n2/core/N2TabAdjustment.vue:385  const rjeItems = entries.value.filter(e => e.type === 'RJE' && e.accountCode === '2221')
+  [bind] n2/core/N2TabAdjustment.vue:66  :data="filteredEntries"
+
+### N3-3
+  [decl] n3/core/N3TabAdjustment.vue:341  type AdjustmentType = 'AJE' | 'RJE'
+  [filter] n3/core/N3TabAdjustment.vue:398  entries.value.filter(e => e.type === activeType.value),
+  [bind] n3/core/N3TabAdjustment.vue:67  :data="filteredEntries"
+
+### N5-3
+  [decl] n5/core/N5TabAdjustment.vue:167  id: string; seq: number; type: 'aje' | 'rje'
+  [filter] n5/core/N5TabAdjustment.vue:176  const ajeEntries = computed(() => entries.value.filter(e => e.type === 'aje'))
+  [filter] n5/core/N5TabAdjustment.vue:177  const rjeEntries = computed(() => entries.value.filter(e => e.type === 'rje'))
+  [filter] n5/core/N5TabAdjustment.vue:233  seq: entries.value.filter(e => e.type === entryType).length + 1,
+  [bind] n5/core/N5TabAdjustment.vue:40  <el-table :data="ajeEntries" border size="small" v-if="ajeEntries.length > 0">
+  [bind] n5/core/N5TabAdjustment.vue:79  <el-table :data="rjeEntries" border size="small" v-if="rjeEntries.length > 0">
+  [coerce] n5/core/N5TabAdjustment.vue:167  id: string; seq: number; type: 'aje' | 'rje'
+
+==============================================================================
+② 「未登记分支」空转实证
+==============================================================================
+
+作业面 = 16 张
+实现侧未登记集合 = []
+清单侧未登记集合 = []
+
+逐张实测形态：
+  L2-3   field=entryType  values={'AJE': 'AJE', 'RJE': 'RJE'}
+  L6-3   field=type       values={'AJE': 'AJE', 'RJE': 'RJE'}
+  M1-3   field=type       values={'AJE': 'AJE', 'RJE': 'RJE'}
+  M10-3  field=type       values={'AJE': 'AJE', 'RJE': 'RJE'}
+  M2-3   field=type       values={'AJE': 'AJE', 'RJE': 'RJE'}
+  M3-3   field=type       values={'AJE': 'AJE', 'RJE': 'RJE'}
+  M4-3   field=type       values={'AJE': 'AJE', 'RJE': 'RJE'}
+  M5-3   field=type       values={'AJE': 'AJE', 'RJE': 'RJE'}
+  M6-3   field=type       values={'AJE': 'AJE', 'RJE': 'RJE'}
+  M7-3   field=type       values={'AJE': 'AJE', 'RJE': 'RJE'}
+  M8-3   field=type       values={'AJE': 'AJE', 'RJE': 'RJE'}
+  M9-3   field=type       values={'AJE': 'AJE', 'RJE': 'RJE'}
+  N1-3   field=type       values={'AJE': 'AJE', 'RJE': 'RJE'}
+  N2-3   field=type       values={'AJE': 'AJE', 'RJE': 'RJE'}
+  N3-3   field=type       values={'AJE': 'AJE', 'RJE': 'RJE'}
+  N5-3   field=type       values={'AJE': 'aje', 'RJE': 'rje'}
+
+⇒ `test_import_writes_entry_type_iff_casing_registered` 的 `values is None` 分支实例数 = 0 （0 = 恒真空转，必须补合成夹具）
+⇒ `test_unregistered_set_matches_ledger` 的 `declared is None` 分支实例数 = 0 （0 = 该分支同样退化）
+
+
+==============================================================================
+③-1 变异检验第一轮（后端判据面）
+==============================================================================
+
+==============================================================================
+CONTROL —— 未变异基线
+  pytest: 235 passed, 5 skipped in 6.50s  exit=0
+  基线失败集: []
+
+==============================================================================
+MUT-1 —— 清单把 `M4-3` 的大小写登记成小写（前端实测是大写）
+    锚点 OK：唯一差异叶子 = .sheets.M4-3.unmapped_fields[0].handling
+    pytest: 235 passed, 5 skipped in 6.36s
+    新增红 0 条：[]
+  ⇒ [MUT-1] 四态 = GREEN（守卫缺陷：变异未被任何判据检出）
+    还原：md5 4fe412f3f027e448ccad00226180a3f3 → 4fe412f3f027e448ccad00226180a3f3  一致=True
+
+==============================================================================
+MUT-2 —— 清单摘掉 `M7-3` 的「取值」句式（退回未登记）
+    锚点 OK：唯一差异叶子 = .sheets.M7-3.unmapped_fields[0].handling
+    pytest: 1 failed, 234 passed, 5 skipped in 6.65s
+    新增红 1 条：['backend\\tests\\test_x3_key_ledger.py::TestEntryTypeCasingDrivesBehaviour::test_all_sixteen_have_casing_registered']
+    「应保持绿」清单：['test_import_writes_entry_type_iff_casing_registered'] ⇒ 全部保持绿 OK
+  ⇒ [MUT-2] 四态 = RED
+    还原：md5 4fe412f3f027e448ccad00226180a3f3 → 4fe412f3f027e448ccad00226180a3f3  一致=True
+
+==============================================================================
+MUT-3 —— 实现改成「未登记就猜大写」（`_entry_type_literal` 不再返回 None）
+    锚点 OK：命中 1 处（文件行尾 = CRLF）
+    pytest: 3 failed, 232 passed, 5 skipped in 6.88s
+    新增红 3 条：['backend\\tests\\test_x3_key_ledger.py::TestEntryTypeUnregisteredBranchSynthetic::test_synthetic_unregistered_sheet_refuses_to_write_key[L2-3]', 'backend\\tests\\test_x3_key_ledger.py::TestEntryTypeUnregisteredBranchSynthetic::test_synthetic_unregistered_sheet_refuses_to_write_key[M9-3]', 'backend\\tests\\test_x3_key_ledger.py::TestEntryTypeUnregisteredBranchSynthetic::test_synthetic_unregistered_sheet_refuses_to_write_key[N5-3]']
+  ⇒ [MUT-3] 四态 = RED
+    还原：md5 a97a28aa11edc9d839a7c065d833c001 → a97a28aa11edc9d839a7c065d833c001  一致=True
+
+==============================================================================
+MUT-3-PRE —— 同一变异，但把合成夹具整类 deselect（= 补夹具之前的判据面）
+    pytest: 228 passed, 5 skipped, 7 deselected in 5.54s
+    新增红 0 条：[]
+  ⇒ [MUT-3-PRE] 四态 = GREEN（守卫缺陷：变异未被任何判据检出）
+    还原：md5 a97a28aa11edc9d839a7c065d833c001 → a97a28aa11edc9d839a7c065d833c001  一致=True
+
+==============================================================================
+POST-RESTORE —— 复跑必须回到基线
+  pytest: 235 passed, 5 skipped in 6.70s  exit=0  失败集=[]  与基线一致=True
+
+汇总：MUT-1=GREEN（守卫缺陷：变异未被任何判据检出） · MUT-2=RED · MUT-3=RED · MUT-3-PRE=GREEN（守卫缺陷：变异未被任何判据检出）
+收尾 md5：ledger=4fe412f3f027e448ccad00226180a3f3  impl=a97a28aa11edc9d839a7c065d833c001
+
+==============================================================================
+③-2 变异检验第二轮（补前端判据后复验）
+==============================================================================
+
+==============================================================================
+CONTROL —— 未变异基线（后端判据面 + 前端判据面）
+  后端: 235 passed, 5 skipped in 6.43s  失败集=[]
+  前端: 121 tests / 121 passed / 0 failed  失败集=[]
+
+==============================================================================
+MUT-1（复验）—— 清单把 `M4-3` 登记成小写（前端实测是大写）
+    锚点 OK：唯一差异叶子 = .sheets.M4-3.unmapped_fields[0].handling
+    后端: 235 passed, 5 skipped in 6.18s
+    前端: 121 tests / 119 passed / 2 failed
+    后端新增红 0：[]
+    前端新增红 2：['ntryType 枚举大小写（x3 spec 任务 2.4，R3.5 / R2.8） 反向自检 — 篡改清单登记的大小写 ⇒ 判据必判不一致', 'Type 枚举大小写（x3 spec 任务 2.4，R3.5 / R2.8） 逐张 M4-3 — 清单登记的大小写 == 前端源码实测字面量']
+  ⇒ [MUT-1] 四态 = RED
+    还原：md5 4fe412f3f027e448ccad00226180a3f3 → 4fe412f3f027e448ccad00226180a3f3  一致=True
+
+==============================================================================
+MUT-2（复验）—— 清单摘掉 `M7-3` 的「取值」句式（退回未登记）
+    锚点 OK：唯一差异叶子 = .sheets.M7-3.unmapped_fields[0].handling
+    后端: 8 failed, 227 passed, 5 skipped in 5.92s
+    前端: 121 tests / 120 passed / 1 failed
+    后端新增红 8：['test_all_sixteen_have_casing_registered', 'test_control_clone_behaves_like_real_module', 'test_synthetic_unregistered_set_agreement[L2-3]', 'test_synthetic_unregistered_set_agreement[M9-3]', 'test_synthetic_unregistered_set_agreement[N5-3]', 'test_synthetic_unregistered_sheet_refuses_to_write_key[L2-3]', 'test_synthetic_unregistered_sheet_refuses_to_write_key[M9-3]', 'test_synthetic_unregistered_sheet_refuses_to_write_key[N5-3]']
+    前端新增红 1：['Type 枚举大小写（x3 spec 任务 2.4，R3.5 / R2.8） 逐张 M7-3 — 清单登记的大小写 == 前端源码实测字面量']
+  ⇒ [MUT-2] 四态 = RED
+    还原：md5 4fe412f3f027e448ccad00226180a3f3 → 4fe412f3f027e448ccad00226180a3f3  一致=True
+
+==============================================================================
+MUT-4 —— 前端探针改成「返常量大写」（判据必须落在真读源码上）
+    锚点 OK：命中 1 处（行尾 LF）
+    后端: 235 passed, 5 skipped in 6.70s
+    前端: 121 tests / 118 passed / 3 failed
+    后端新增红 0：[]
+    前端新增红 3：['x3 spec 任务 2.4，R3.5 / R2.8） 反向自检 — 改前端源码的 filter 字面量 ⇒ 实测值随之改变（不是在读清单）', ' 枚举大小写（x3 spec 任务 2.4，R3.5 / R2.8） 反空转 — 16 张必须都能从源码判出两个方向，且实测出 ≥2 种拼写', 'Type 枚举大小写（x3 spec 任务 2.4，R3.5 / R2.8） 逐张 N5-3 — 清单登记的大小写 == 前端源码实测字面量']
+  ⇒ [MUT-4] 四态 = RED
+    还原：md5 3c4c991c3a155c81243f57b28c6f3cb9 → 3c4c991c3a155c81243f57b28c6f3cb9  一致=True
+
+==============================================================================
+POST-RESTORE
+  后端: 235 passed, 5 skipped in 6.43s  与基线一致=True
+  前端: 121 tests / 121 passed / 0 failed  与基线一致=True
+
+汇总：MUT-1=RED · MUT-2=RED · MUT-4=RED
+收尾 md5：ledger=4fe412f3f027e448ccad00226180a3f3  probe=3c4c991c3a155c81243f57b28c6f3cb9

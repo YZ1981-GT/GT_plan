@@ -1,0 +1,90 @@
+# backend/data/wp_render_schema/F5-1.yaml
+# 营业成本审定表 — d-form-table 渲染 schema（降级/元数据）
+# Requirements: F5-1 审定表
+# Template: F5 营业成本.xlsx / sheet: 营业务成本审定表F5-1
+# 真实结构：主营业务成本(按产品明细从F5-2取数) + 其他业务成本(从F5-3取数)
+#           本期/上期各含：未审数/账项调整/重分类调整/审定数(=之和)
+# 修订(2026-07-01)：补充调整分录 cross_ref → F5-4
+
+wp_code: F5-1
+wp_name: 营业成本审定表
+component_type: d-form-table
+template_path: backend/wp_templates/F/F5 营业成本.xlsx
+template_version: v2025-R5
+applicable_standards: [soe_standalone, listed_standalone, soe_consolidated, listed_consolidated]
+related_accounts:
+  - code: '6401'
+    name: 主营业务成本
+  - code: '6402'
+    name: 其他业务成本
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 审定表 — 双组（主营业务成本 + 其他业务成本）
+# ═══════════════════════════════════════════════════════════════════════════════
+
+sections:
+  - name: 主营业务成本
+    account_code_prefix: '6401'
+    row_layout: product_rows           # 按产品明细行，从 F5-2 主营业务成本月度明细表取数
+    fields: &audit_determination_fields
+      - { field: item_name, label: 项目, type: text, readonly: true }
+      - { field: current_unaudited, label: 本期未审数, type: number, auto_source: trial_balance.unadjusted_amount }
+      - { field: current_aje, label: 本期账项调整, type: number }
+      - { field: current_rje, label: 本期重分类调整, type: number }
+      - { field: current_audited, label: 本期审定数, type: number, formula: "current_unaudited + current_aje + current_rje" }
+      - { field: prior_unaudited, label: 上期未审数, type: number, auto_source: trial_balance.prior_unadjusted }
+      - { field: prior_aje, label: 上期账项调整, type: number }
+      - { field: prior_rje, label: 上期重分类调整, type: number }
+      - { field: prior_audited, label: 上期审定数, type: number, formula: "prior_unaudited + prior_aje + prior_rje" }
+      - { field: index_ref, label: 索引, type: text }
+
+  - name: 其他业务成本
+    account_code_prefix: '6402'
+    row_layout: category_rows          # 从 F5-3 其他业务成本明细表取数
+    fields: *audit_determination_fields
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 联动配置
+# ═══════════════════════════════════════════════════════════════════════════════
+
+writeback:
+  target: trial_balance.audited_amount
+  trigger: WORKPAPER_SAVED
+  handler: _on_d_audit_determination_saved
+  match_pattern: "^[D-N]\\d+-1$"
+  key_field: account_code
+  value_field: current_audited
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 跨底稿引用
+# ═══════════════════════════════════════════════════════════════════════════════
+
+cross_refs:
+  - ref_id: CW-F5-1-001
+    target_wp: F5-2
+    target_field: 主营业务成本月度明细合计
+    description: '主营业务成本审定 ← F5-2 月度明细表'
+    severity: info
+    direction: inbound
+
+  - ref_id: CW-F5-1-002
+    target_wp: F5-3
+    target_field: 其他业务成本明细合计
+    description: '其他业务成本审定 ← F5-3 明细表'
+    severity: info
+    direction: inbound
+
+  - ref_id: CW-F5-1-003
+    target_wp: F5-4
+    target_field: 调整分录汇总
+    description: '审定表账项调整 ← F5-4 调整分录汇总'
+    severity: required
+    direction: inbound
+
+  - ref_id: CW-F5-1-004
+    target_wp: F2-1
+    target_field: 存货审定金额
+    description: '营业成本 ← F2-1 存货审定（成本结转联动，见 F5-6 数量核对/F5-7 倒轧）'
+    severity: info
+    direction: inbound
+

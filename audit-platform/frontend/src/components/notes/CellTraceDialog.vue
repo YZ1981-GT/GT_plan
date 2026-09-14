@@ -175,6 +175,7 @@
 import { computed, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import { api } from '@/services/apiProxy'
+import { useDisplayPrefsStore } from '@/stores/displayPrefs'
 
 interface BindingMeta {
   source?: string
@@ -294,9 +295,11 @@ function modeTagType(mode?: string): 'primary' | 'success' | 'warning' | 'danger
   return 'info'
 }
 
+const prefs = useDisplayPrefsStore()
+
 function formatValue(v: unknown): string {
   if (v === null || v === undefined) return '—'
-  if (typeof v === 'number') return v.toLocaleString('zh-CN', { maximumFractionDigits: 2, minimumFractionDigits: 2 })
+  if (typeof v === 'number') return prefs.fmt(v)
   return String(v)
 }
 

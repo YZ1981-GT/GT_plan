@@ -39,6 +39,8 @@ export interface SheetNavFacadeAPI {
   totalCount: ComputedRef<number>
   switchTo: (id: string) => void
   refresh: () => void
+  /** 绑定/释放真实 Univer API；所有循环导航实例共享创建 facade 时的同一 ref。 */
+  bindUniverApi: (api: any | null) => void
   applyForeignCurrencyVisibility: () => void
   flatSheets: ComputedRef<Array<{ id: string; name: string }>>
   // 暴露各循环 nav 实例供外部使用（branch selector 等）
@@ -99,6 +101,7 @@ export function useSheetNavFacade(
 
   function switchTo(id: string) { _activeNav().switchTo(id) }
   function refresh() { _activeNav().refresh() }
+  function bindUniverApi(api: any | null) { univerAPIRef.value = api }
   function applyForeignCurrencyVisibility() { eUniverNav.applyForeignCurrencyVisibility() }
 
   const flatSheets = computed(() => {
@@ -119,6 +122,7 @@ export function useSheetNavFacade(
     totalCount,
     switchTo,
     refresh,
+    bindUniverApi,
     applyForeignCurrencyVisibility,
     flatSheets,
     hCycleNav,

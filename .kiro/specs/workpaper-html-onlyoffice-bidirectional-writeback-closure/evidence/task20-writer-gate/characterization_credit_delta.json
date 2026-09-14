@@ -1,0 +1,1184 @@
+{
+  "predicate_before": "module hit AND any qualname part hit (name proximity, incl. patch-target strings)",
+  "predicate_after": "a call expression in the test file resolves through an import/instantiation binding to this exact writer",
+  "writer_without_characterization_test_before": 165,
+  "writer_without_characterization_test_after": 208,
+  "rows_that_lost_credit": 52,
+  "rows_that_gained_credit": 0,
+  "rows_with_changed_evidence": 75,
+  "recorded_false_credits_now_gone": {
+    "app.services.wp_storage_service::WpStorageService.list_versions": {
+      "before": [
+        "backend/tests/workpaper_sync/test_task19_writer_migration.py"
+      ],
+      "after": []
+    },
+    "app.services.wp_migration_service::WpMigrationService.rollback": {
+      "before": [
+        "backend/tests/test_wp_template_migration_integration.py",
+        "backend/tests/test_wp_template_migration_property.py",
+        "backend/tests/workpaper_sync/test_task19_writer_migration.py"
+      ],
+      "after": [
+        "backend/tests/workpaper_sync/test_task19_writer_migration.py"
+      ]
+    }
+  },
+  "lost": [
+    {
+      "writer_id": "app.routers.wp_editor_router::save_univer_data",
+      "kind": "writer",
+      "was_credited_by": [
+        "backend/tests/test_univer_save_event_emission.py"
+      ]
+    },
+    {
+      "writer_id": "app.routers.wp_editor_router::save_univer_data._auto_parse",
+      "kind": "writer",
+      "was_credited_by": [
+        "backend/tests/test_univer_save_event_emission.py"
+      ]
+    },
+    {
+      "writer_id": "app.routers.wp_f2_impairment::_maybe_apply_impairment_to_workpaper",
+      "kind": "writer",
+      "was_credited_by": [
+        "backend/tests/test_f2_valuation_impairment.py",
+        "backend/tests/test_k11_schema_verification.py"
+      ]
+    },
+    {
+      "writer_id": "app.routers.wp_f2_valuation::_maybe_apply_samples_to_workpaper",
+      "kind": "writer",
+      "was_credited_by": [
+        "backend/tests/test_f2_valuation_impairment.py"
+      ]
+    },
+    {
+      "writer_id": "app.routers.wp_h_depreciation::_maybe_apply_depreciation_to_workpaper",
+      "kind": "writer",
+      "was_credited_by": [
+        "backend/tests/test_h1_depreciation_engine.py"
+      ]
+    },
+    {
+      "writer_id": "app.routers.wp_h_depreciation::h1_depreciation_calc",
+      "kind": "writer",
+      "was_credited_by": [
+        "backend/tests/test_h1_depreciation_engine.py"
+      ]
+    },
+    {
+      "writer_id": "app.routers.wp_h_impairment::h1_impairment_analysis",
+      "kind": "writer",
+      "was_credited_by": [
+        "backend/tests/test_h1_impairment_analysis.py"
+      ]
+    },
+    {
+      "writer_id": "app.routers.wp_j_payroll_calc::j1_payroll_calc",
+      "kind": "writer",
+      "was_credited_by": [
+        "backend/tests/test_j_payroll_calc.py"
+      ]
+    },
+    {
+      "writer_id": "app.routers.wp_j_share_payment::j3_share_payment_calc",
+      "kind": "writer",
+      "was_credited_by": [
+        "backend/tests/test_j_share_payment.py"
+      ]
+    },
+    {
+      "writer_id": "app.routers.wp_k_expense_analysis::k_expense_analysis",
+      "kind": "writer",
+      "was_credited_by": [
+        "backend/tests/test_k_expense_analysis.py"
+      ]
+    },
+    {
+      "writer_id": "app.routers.wp_k_impairment_summary::k11_impairment_summary",
+      "kind": "writer",
+      "was_credited_by": [
+        "backend/tests/test_k_impairment_summary.py"
+      ]
+    },
+    {
+      "writer_id": "app.routers.wp_l_bond_amortization::l_bond_amortization",
+      "kind": "writer",
+      "was_credited_by": [
+        "backend/tests/test_l_bond_amortization.py"
+      ]
+    },
+    {
+      "writer_id": "app.routers.wp_l_interest_calc::_maybe_apply_interest_to_workpaper",
+      "kind": "writer",
+      "was_credited_by": [
+        "backend/tests/test_l_interest_calc.py"
+      ]
+    },
+    {
+      "writer_id": "app.routers.wp_l_interest_calc::l_interest_calc",
+      "kind": "writer",
+      "was_credited_by": [
+        "backend/tests/test_l_interest_calc.py"
+      ]
+    },
+    {
+      "writer_id": "app.routers.wp_m_equity_movement::_maybe_apply_equity_to_workpaper",
+      "kind": "writer",
+      "was_credited_by": [
+        "backend/tests/test_m_equity_movement.py"
+      ]
+    },
+    {
+      "writer_id": "app.routers.wp_n_income_tax_calc::_maybe_apply_income_tax_to_workpaper",
+      "kind": "writer",
+      "was_credited_by": [
+        "backend/tests/test_n_income_tax_calc.py"
+      ]
+    },
+    {
+      "writer_id": "app.routers.wp_n_income_tax_calc::n_income_tax_calc",
+      "kind": "writer",
+      "was_credited_by": [
+        "backend/tests/test_n_income_tax_calc.py"
+      ]
+    },
+    {
+      "writer_id": "app.routers.wp_onlyoffice_router::get_sheet_onlyoffice_config",
+      "kind": "resolver",
+      "was_credited_by": [
+        "backend/tests/test_wp_onlyoffice_router.py"
+      ]
+    },
+    {
+      "writer_id": "app.routers.wp_onlyoffice_router::post_sheet_onlyoffice_callback",
+      "kind": "writer_resolver",
+      "was_credited_by": [
+        "backend/tests/test_wp_onlyoffice_router.py"
+      ]
+    },
+    {
+      "writer_id": "app.routers.wp_render_strategies._g6_other_bond_investment_main_service::G6OtherBondInvestmentMainService.save_adjudication",
+      "kind": "writer",
+      "was_credited_by": [
+        "backend/tests/test_g6_other_bond_investment_main_api.py"
+      ]
+    },
+    {
+      "writer_id": "app.routers.wp_render_strategies._g7_long_term_equity_main_service::G7LongTermEquityMainService.save_adjudication",
+      "kind": "writer",
+      "was_credited_by": [
+        "backend/tests/test_g7_long_term_equity_main_pbt.py"
+      ]
+    },
+    {
+      "writer_id": "app.routers.wp_render_strategies._g7_long_term_equity_subsidiary_service::G7SubsidiaryService.save_control_judgment",
+      "kind": "writer",
+      "was_credited_by": [
+        "backend/tests/test_g7_sub_formula_pbt.py",
+        "backend/tests/test_g7_sub_unit.py"
+      ]
+    },
+    {
+      "writer_id": "app.routers.wp_render_strategies._g7_long_term_equity_subsidiary_service::G7SubsidiaryService.save_measurement",
+      "kind": "writer",
+      "was_credited_by": [
+        "backend/tests/test_g7_sub_formula_pbt.py",
+        "backend/tests/test_g7_sub_unit.py"
+      ]
+    },
+    {
+      "writer_id": "app.routers.wp_render_strategies._j1_import_export::import_data",
+      "kind": "writer",
+      "was_credited_by": [
+        "backend/tests/test_j1_disclosure_import_export.py"
+      ]
+    },
+    {
+      "writer_id": "app.routers.wp_render_strategies._x3_adjustment_import_export::write_rows",
+      "kind": "writer",
+      "was_credited_by": [
+        "backend/tests/test_x3_roundtrip_live.py",
+        "backend/tests/test_x3_roundtrip_property.py"
+      ]
+    },
+    {
+      "writer_id": "app.routers.wp_template::_create_one_custom_workpaper",
+      "kind": "writer_resolver",
+      "was_credited_by": [
+        "backend/tests/test_custom_workpaper_batch.py"
+      ]
+    },
+    {
+      "writer_id": "app.services.audit_check.aggregator::AuditCheckAggregator.recompute_project",
+      "kind": "writer",
+      "was_credited_by": [
+        "backend/tests/test_audit_check_aggregator.py",
+        "backend/tests/test_audit_check_m2_properties_pbt.py",
+        "backend/tests/test_audit_check_project_sources.py"
+      ]
+    },
+    {
+      "writer_id": "app.services.audit_check.aggregator::AuditCheckAggregator.recompute_workpaper",
+      "kind": "writer",
+      "was_credited_by": [
+        "backend/tests/test_audit_check_aggregator.py",
+        "backend/tests/test_audit_check_m2_properties_pbt.py",
+        "backend/tests/test_audit_check_project_sources.py"
+      ]
+    },
+    {
+      "writer_id": "app.services.chain_orchestrator::ChainOrchestrator._execute_step",
+      "kind": "writer",
+      "was_credited_by": [
+        "backend/tests/test_audit_chain_properties.py",
+        "backend/tests/test_chain_orchestrator.py"
+      ]
+    },
+    {
+      "writer_id": "app.services.chain_orchestrator::ChainOrchestrator._step_generate_workpapers",
+      "kind": "writer",
+      "was_credited_by": [
+        "backend/tests/test_audit_chain_properties.py",
+        "backend/tests/test_chain_orchestrator.py"
+      ]
+    },
+    {
+      "writer_id": "app.services.custom_query.snapshot_writer::SnapshotWriter._write_workpaper_cell",
+      "kind": "writer",
+      "was_credited_by": [
+        "backend/tests/test_snapshot_writer.py",
+        "backend/tests/test_workpaper_save_orchestrator_integration.py",
+        "backend/tests/test_writeback_pbt.py"
+      ]
+    },
+    {
+      "writer_id": "app.services.eqcr_memo_service::EqcrMemoService.finalize_memo",
+      "kind": "writer_resolver",
+      "was_credited_by": [
+        "backend/tests/test_eqcr_full_flow.py"
+      ]
+    },
+    {
+      "writer_id": "app.services.event_handlers._impl::register_event_handlers._on_b514_high_risk",
+      "kind": "writer",
+      "was_credited_by": [
+        "backend/tests/test_note_conversion_preview_rollback.py"
+      ]
+    },
+    {
+      "writer_id": "app.services.evidence_governance.secure_attachment_gateway::SecureAttachmentGateway._promote_available._promote",
+      "kind": "writer",
+      "was_credited_by": [
+        "backend/tests/attachment_ocr_ai_evidence_governance_hardening/test_evidence_governance_http_wiring_integration.py",
+        "backend/tests/attachment_ocr_ai_evidence_governance_hardening/test_finalized_locator_opaque_contract.py",
+        "backend/tests/test_evidence_governance_attachment_security_gates.py",
+        "backend/tests/test_evidence_governance_durable_quarantine_reaper_wave2.py",
+        "backend/tests/test_evidence_governance_secure_attachment_gateway_wave2_3_2.py",
+        "backend/tests/test_evidence_governance_secure_attachment_gateway_wave2_3_3.py"
+      ]
+    },
+    {
+      "writer_id": "app.services.prefill_engine::PrefillService.prefill_workpaper",
+      "kind": "writer",
+      "was_credited_by": [
+        "backend/tests/test_phase8.py",
+        "backend/tests/test_phase8_smoke.py",
+        "backend/tests/test_prefill_parse.py",
+        "backend/tests/test_remaining_property.py"
+      ]
+    },
+    {
+      "writer_id": "app.services.procedure_trim_service::ProcedureTrimService.clear_completeness_scope_override",
+      "kind": "writer",
+      "was_credited_by": [
+        "backend/tests/procedure_delegation/test_procedure_trim_service.py",
+        "backend/tests/procedure_trim/test_completeness_scope_override.py",
+        "backend/tests/procedure_trim/test_task23_zero_regression.py",
+        "backend/tests/procedure_trim/test_trim_reason_code_contract.py"
+      ]
+    },
+    {
+      "writer_id": "app.services.procedure_trim_service::ProcedureTrimService.set_completeness_scope_override",
+      "kind": "writer",
+      "was_credited_by": [
+        "backend/tests/procedure_delegation/test_procedure_trim_service.py",
+        "backend/tests/procedure_trim/test_completeness_scope_override.py",
+        "backend/tests/procedure_trim/test_task23_zero_regression.py",
+        "backend/tests/procedure_trim/test_trim_reason_code_contract.py"
+      ]
+    },
+    {
+      "writer_id": "app.services.wopi_service::WOPIHostService.check_file_info",
+      "kind": "resolver",
+      "was_credited_by": [
+        "backend/tests/test_phase8.py",
+        "backend/tests/test_remaining_property.py",
+        "backend/tests/test_wopi_working_paper_qc_review.py"
+      ]
+    },
+    {
+      "writer_id": "app.services.wopi_service::WOPIHostService.get_file",
+      "kind": "resolver",
+      "was_credited_by": [
+        "backend/tests/test_phase8.py",
+        "backend/tests/test_remaining_property.py",
+        "backend/tests/test_wopi_working_paper_qc_review.py"
+      ]
+    },
+    {
+      "writer_id": "app.services.wopi_service::WOPIHostService.put_file",
+      "kind": "writer",
+      "was_credited_by": [
+        "backend/tests/test_phase8.py",
+        "backend/tests/test_remaining_property.py",
+        "backend/tests/test_wopi_working_paper_qc_review.py"
+      ]
+    },
+    {
+      "writer_id": "app.services.wopi_service::WOPIHostService.put_file._auto_fine_extract",
+      "kind": "writer",
+      "was_credited_by": [
+        "backend/tests/test_phase8.py",
+        "backend/tests/test_remaining_property.py",
+        "backend/tests/test_wopi_working_paper_qc_review.py"
+      ]
+    },
+    {
+      "writer_id": "app.services.wopi_service::WOPIHostService.put_file._auto_parse",
+      "kind": "writer",
+      "was_credited_by": [
+        "backend/tests/test_phase8.py",
+        "backend/tests/test_remaining_property.py",
+        "backend/tests/test_wopi_working_paper_qc_review.py"
+      ]
+    },
+    {
+      "writer_id": "app.services.working_paper_service::WorkingPaperService.upload_offline_edit",
+      "kind": "writer",
+      "was_credited_by": [
+        "backend/tests/test_reassignment_notifications.py",
+        "backend/tests/test_review_status_split.py",
+        "backend/tests/test_wopi_working_paper_qc_review.py"
+      ]
+    },
+    {
+      "writer_id": "app.services.workpaper_sync.artifacts::ArtifactStorageLayout.project_root",
+      "kind": "resolver",
+      "was_credited_by": [
+        "backend/tests/workpaper_sync/test_task11_artifact_repository.py"
+      ]
+    },
+    {
+      "writer_id": "app.services.wp_download_service::WpDownloadService.download_pack",
+      "kind": "resolver",
+      "was_credited_by": [
+        "backend/tests/test_phase10_step0_step1.py"
+      ]
+    },
+    {
+      "writer_id": "app.services.wp_download_service::WpDownloadService.download_single",
+      "kind": "resolver",
+      "was_credited_by": [
+        "backend/tests/test_phase10_step0_step1.py"
+      ]
+    },
+    {
+      "writer_id": "app.services.wp_download_service::WpUploadService.upload_file",
+      "kind": "writer_resolver",
+      "was_credited_by": [
+        "backend/tests/test_phase10_step0_step1.py"
+      ]
+    },
+    {
+      "writer_id": "app.services.wp_export.export_engine::WpExportEngine._export_docx",
+      "kind": "resolver",
+      "was_credited_by": [
+        "backend/tests/test_e2e_export_import_roundtrip.py",
+        "backend/tests/test_pbt_program_audit_export.py"
+      ]
+    },
+    {
+      "writer_id": "app.services.wp_export.export_engine::WpExportEngine._resolve_docx_template",
+      "kind": "resolver",
+      "was_credited_by": [
+        "backend/tests/test_e2e_export_import_roundtrip.py",
+        "backend/tests/test_pbt_program_audit_export.py"
+      ]
+    },
+    {
+      "writer_id": "app.services.wp_migration_service::WpMigrationService.migrate_workpaper",
+      "kind": "writer",
+      "was_credited_by": [
+        "backend/tests/test_wp_template_migration_integration.py",
+        "backend/tests/test_wp_template_migration_property.py",
+        "backend/tests/workpaper_sync/test_task19_writer_migration.py"
+      ]
+    },
+    {
+      "writer_id": "app.services.wp_standard_conversion_service::WpStandardConversionService._archive_source_only_workpapers",
+      "kind": "writer",
+      "was_credited_by": [
+        "backend/tests/test_multi_standard_unification_property.py"
+      ]
+    },
+    {
+      "writer_id": "app.services.wp_storage_service::WpStorageService.list_versions",
+      "kind": "resolver",
+      "was_credited_by": [
+        "backend/tests/workpaper_sync/test_task19_writer_migration.py"
+      ]
+    }
+  ],
+  "gained": [],
+  "changed": [
+    {
+      "writer_id": "app.routers.checklist_responses::batch_save_checklist_responses",
+      "kind": "writer",
+      "before": [
+        "backend/tests/test_checklist_persistence_contract_pbt.py",
+        "backend/tests/test_checklist_responses.py"
+      ],
+      "after": [
+        "backend/tests/test_checklist_persistence_contract_pbt.py"
+      ]
+    },
+    {
+      "writer_id": "app.routers.wp_editor_router::save_univer_data",
+      "kind": "writer",
+      "before": [
+        "backend/tests/test_univer_save_event_emission.py"
+      ],
+      "after": []
+    },
+    {
+      "writer_id": "app.routers.wp_editor_router::save_univer_data._auto_parse",
+      "kind": "writer",
+      "before": [
+        "backend/tests/test_univer_save_event_emission.py"
+      ],
+      "after": []
+    },
+    {
+      "writer_id": "app.routers.wp_f2_impairment::_maybe_apply_impairment_to_workpaper",
+      "kind": "writer",
+      "before": [
+        "backend/tests/test_f2_valuation_impairment.py",
+        "backend/tests/test_k11_schema_verification.py"
+      ],
+      "after": []
+    },
+    {
+      "writer_id": "app.routers.wp_f2_valuation::_maybe_apply_samples_to_workpaper",
+      "kind": "writer",
+      "before": [
+        "backend/tests/test_f2_valuation_impairment.py"
+      ],
+      "after": []
+    },
+    {
+      "writer_id": "app.routers.wp_g_ecl::_maybe_apply_ecl_to_workpaper",
+      "kind": "writer",
+      "before": [
+        "backend/tests/test_g_ecl_model.py",
+        "backend/tests/test_k11_schema_verification.py"
+      ],
+      "after": [
+        "backend/tests/test_g_ecl_model.py"
+      ]
+    },
+    {
+      "writer_id": "app.routers.wp_h_depreciation::_maybe_apply_depreciation_to_workpaper",
+      "kind": "writer",
+      "before": [
+        "backend/tests/test_h1_depreciation_engine.py"
+      ],
+      "after": []
+    },
+    {
+      "writer_id": "app.routers.wp_h_depreciation::h1_depreciation_calc",
+      "kind": "writer",
+      "before": [
+        "backend/tests/test_h1_depreciation_engine.py"
+      ],
+      "after": []
+    },
+    {
+      "writer_id": "app.routers.wp_h_impairment::_maybe_apply_impairment_to_workpaper",
+      "kind": "writer",
+      "before": [
+        "backend/tests/test_h1_impairment_analysis.py",
+        "backend/tests/test_k11_schema_verification.py"
+      ],
+      "after": [
+        "backend/tests/test_h1_impairment_analysis.py"
+      ]
+    },
+    {
+      "writer_id": "app.routers.wp_h_impairment::h1_impairment_analysis",
+      "kind": "writer",
+      "before": [
+        "backend/tests/test_h1_impairment_analysis.py"
+      ],
+      "after": []
+    },
+    {
+      "writer_id": "app.routers.wp_i_goodwill::_maybe_apply_goodwill_impairment_to_workpaper",
+      "kind": "writer",
+      "before": [
+        "backend/tests/test_i3_goodwill_impairment.py",
+        "backend/tests/test_k11_schema_verification.py"
+      ],
+      "after": [
+        "backend/tests/test_i3_goodwill_impairment.py"
+      ]
+    },
+    {
+      "writer_id": "app.routers.wp_j_payroll_calc::j1_payroll_calc",
+      "kind": "writer",
+      "before": [
+        "backend/tests/test_j_payroll_calc.py"
+      ],
+      "after": []
+    },
+    {
+      "writer_id": "app.routers.wp_j_share_payment::j3_share_payment_calc",
+      "kind": "writer",
+      "before": [
+        "backend/tests/test_j_share_payment.py"
+      ],
+      "after": []
+    },
+    {
+      "writer_id": "app.routers.wp_k_expense_analysis::k_expense_analysis",
+      "kind": "writer",
+      "before": [
+        "backend/tests/test_k_expense_analysis.py"
+      ],
+      "after": []
+    },
+    {
+      "writer_id": "app.routers.wp_k_impairment_summary::k11_impairment_summary",
+      "kind": "writer",
+      "before": [
+        "backend/tests/test_k_impairment_summary.py"
+      ],
+      "after": []
+    },
+    {
+      "writer_id": "app.routers.wp_l_bond_amortization::l_bond_amortization",
+      "kind": "writer",
+      "before": [
+        "backend/tests/test_l_bond_amortization.py"
+      ],
+      "after": []
+    },
+    {
+      "writer_id": "app.routers.wp_l_interest_calc::_maybe_apply_interest_to_workpaper",
+      "kind": "writer",
+      "before": [
+        "backend/tests/test_l_interest_calc.py"
+      ],
+      "after": []
+    },
+    {
+      "writer_id": "app.routers.wp_l_interest_calc::l_interest_calc",
+      "kind": "writer",
+      "before": [
+        "backend/tests/test_l_interest_calc.py"
+      ],
+      "after": []
+    },
+    {
+      "writer_id": "app.routers.wp_m_equity_movement::_maybe_apply_equity_to_workpaper",
+      "kind": "writer",
+      "before": [
+        "backend/tests/test_m_equity_movement.py"
+      ],
+      "after": []
+    },
+    {
+      "writer_id": "app.routers.wp_n_income_tax_calc::_maybe_apply_income_tax_to_workpaper",
+      "kind": "writer",
+      "before": [
+        "backend/tests/test_n_income_tax_calc.py"
+      ],
+      "after": []
+    },
+    {
+      "writer_id": "app.routers.wp_n_income_tax_calc::n_income_tax_calc",
+      "kind": "writer",
+      "before": [
+        "backend/tests/test_n_income_tax_calc.py"
+      ],
+      "after": []
+    },
+    {
+      "writer_id": "app.routers.wp_onlyoffice_router::get_sheet_onlyoffice_config",
+      "kind": "resolver",
+      "before": [
+        "backend/tests/test_wp_onlyoffice_router.py"
+      ],
+      "after": []
+    },
+    {
+      "writer_id": "app.routers.wp_onlyoffice_router::post_sheet_onlyoffice_callback",
+      "kind": "writer_resolver",
+      "before": [
+        "backend/tests/test_wp_onlyoffice_router.py"
+      ],
+      "after": []
+    },
+    {
+      "writer_id": "app.routers.wp_render_strategies._g6_other_bond_investment_main_service::G6OtherBondInvestmentMainService.save_adjudication",
+      "kind": "writer",
+      "before": [
+        "backend/tests/test_g6_other_bond_investment_main_api.py"
+      ],
+      "after": []
+    },
+    {
+      "writer_id": "app.routers.wp_render_strategies._g7_long_term_equity_main_service::G7LongTermEquityMainService.save_adjudication",
+      "kind": "writer",
+      "before": [
+        "backend/tests/test_g7_long_term_equity_main_pbt.py"
+      ],
+      "after": []
+    },
+    {
+      "writer_id": "app.routers.wp_render_strategies._g7_long_term_equity_subsidiary_service::G7SubsidiaryService.save_control_judgment",
+      "kind": "writer",
+      "before": [
+        "backend/tests/test_g7_sub_formula_pbt.py",
+        "backend/tests/test_g7_sub_unit.py"
+      ],
+      "after": []
+    },
+    {
+      "writer_id": "app.routers.wp_render_strategies._g7_long_term_equity_subsidiary_service::G7SubsidiaryService.save_measurement",
+      "kind": "writer",
+      "before": [
+        "backend/tests/test_g7_sub_formula_pbt.py",
+        "backend/tests/test_g7_sub_unit.py"
+      ],
+      "after": []
+    },
+    {
+      "writer_id": "app.routers.wp_render_strategies._j1_import_export::import_data",
+      "kind": "writer",
+      "before": [
+        "backend/tests/test_j1_disclosure_import_export.py"
+      ],
+      "after": []
+    },
+    {
+      "writer_id": "app.routers.wp_render_strategies._x3_adjustment_import_export::write_rows",
+      "kind": "writer",
+      "before": [
+        "backend/tests/test_x3_roundtrip_live.py",
+        "backend/tests/test_x3_roundtrip_property.py"
+      ],
+      "after": []
+    },
+    {
+      "writer_id": "app.routers.wp_template::_create_one_custom_workpaper",
+      "kind": "writer_resolver",
+      "before": [
+        "backend/tests/test_custom_workpaper_batch.py"
+      ],
+      "after": []
+    },
+    {
+      "writer_id": "app.services.audit_check.aggregator::AuditCheckAggregator.recompute_project",
+      "kind": "writer",
+      "before": [
+        "backend/tests/test_audit_check_aggregator.py",
+        "backend/tests/test_audit_check_m2_properties_pbt.py",
+        "backend/tests/test_audit_check_project_sources.py"
+      ],
+      "after": []
+    },
+    {
+      "writer_id": "app.services.audit_check.aggregator::AuditCheckAggregator.recompute_workpaper",
+      "kind": "writer",
+      "before": [
+        "backend/tests/test_audit_check_aggregator.py",
+        "backend/tests/test_audit_check_m2_properties_pbt.py",
+        "backend/tests/test_audit_check_project_sources.py"
+      ],
+      "after": []
+    },
+    {
+      "writer_id": "app.services.batch_review_service::BatchReviewService.execute_batch",
+      "kind": "writer",
+      "before": [
+        "backend/tests/test_batch_review_pbt.py",
+        "backend/tests/test_review_prompt_integration.py"
+      ],
+      "after": [
+        "backend/tests/test_batch_review_pbt.py"
+      ]
+    },
+    {
+      "writer_id": "app.services.batch_review_service::BatchReviewService.persist_review_results",
+      "kind": "writer",
+      "before": [
+        "backend/tests/test_batch_review_pbt.py",
+        "backend/tests/test_review_prompt_integration.py"
+      ],
+      "after": [
+        "backend/tests/test_review_prompt_integration.py"
+      ]
+    },
+    {
+      "writer_id": "app.services.chain_orchestrator::ChainOrchestrator._execute_step",
+      "kind": "writer",
+      "before": [
+        "backend/tests/test_audit_chain_properties.py",
+        "backend/tests/test_chain_orchestrator.py"
+      ],
+      "after": []
+    },
+    {
+      "writer_id": "app.services.chain_orchestrator::ChainOrchestrator._step_generate_workpapers",
+      "kind": "writer",
+      "before": [
+        "backend/tests/test_audit_chain_properties.py",
+        "backend/tests/test_chain_orchestrator.py"
+      ],
+      "after": []
+    },
+    {
+      "writer_id": "app.services.custom_query.snapshot_writer::SnapshotWriter._write_workpaper_cell",
+      "kind": "writer",
+      "before": [
+        "backend/tests/test_snapshot_writer.py",
+        "backend/tests/test_workpaper_save_orchestrator_integration.py",
+        "backend/tests/test_writeback_pbt.py"
+      ],
+      "after": []
+    },
+    {
+      "writer_id": "app.services.custom_query.snapshot_writer::SnapshotWriter.write_cell",
+      "kind": "writer",
+      "before": [
+        "backend/tests/test_custom_query_auth_preservation.py",
+        "backend/tests/test_snapshot_writer.py",
+        "backend/tests/test_workpaper_save_orchestrator_integration.py",
+        "backend/tests/test_writeback_pbt.py"
+      ],
+      "after": [
+        "backend/tests/test_snapshot_writer.py",
+        "backend/tests/test_workpaper_save_orchestrator_integration.py",
+        "backend/tests/test_writeback_pbt.py"
+      ]
+    },
+    {
+      "writer_id": "app.services.deliverable_refresh_service::DeliverableRefreshService.refresh_all_stale_sections",
+      "kind": "writer",
+      "before": [
+        "backend/tests/test_deliverable_lineage_e2e.py",
+        "backend/tests/test_deliverable_lineage_properties.py",
+        "backend/tests/test_deliverable_refresh_inplace.py"
+      ],
+      "after": [
+        "backend/tests/test_deliverable_lineage_properties.py",
+        "backend/tests/test_deliverable_refresh_inplace.py"
+      ]
+    },
+    {
+      "writer_id": "app.services.deliverable_service::DeliverableService.render_and_store",
+      "kind": "writer",
+      "before": [
+        "backend/tests/test_deliverable_archive_pbt.py",
+        "backend/tests/test_deliverable_center_integration.py",
+        "backend/tests/test_deliverable_center_p0.py",
+        "backend/tests/test_deliverable_center_p1.py",
+        "backend/tests/test_deliverable_center_p2.py",
+        "backend/tests/test_deliverable_hash_pbt.py",
+        "backend/tests/test_deliverable_lineage_e2e.py",
+        "backend/tests/test_deliverable_lineage_properties.py",
+        "backend/tests/test_deliverable_oo_edit_provenance.py",
+        "backend/tests/test_deliverable_refresh_inplace.py",
+        "backend/tests/test_deliverable_routes.py",
+        "backend/tests/test_deliverable_sign_pbt.py",
+        "backend/tests/test_deliverable_snapshot_pbt.py",
+        "backend/tests/test_deliverable_version_chain_view.py"
+      ],
+      "after": [
+        "backend/tests/test_deliverable_center_p0.py",
+        "backend/tests/test_deliverable_hash_pbt.py",
+        "backend/tests/test_deliverable_oo_edit_provenance.py",
+        "backend/tests/test_deliverable_snapshot_pbt.py"
+      ]
+    },
+    {
+      "writer_id": "app.services.eqcr_memo_service::EqcrMemoService.finalize_memo",
+      "kind": "writer_resolver",
+      "before": [
+        "backend/tests/test_eqcr_full_flow.py"
+      ],
+      "after": []
+    },
+    {
+      "writer_id": "app.services.event_handlers._impl::register_event_handlers._on_b514_high_risk",
+      "kind": "writer",
+      "before": [
+        "backend/tests/test_note_conversion_preview_rollback.py"
+      ],
+      "after": []
+    },
+    {
+      "writer_id": "app.services.evidence_governance.secure_attachment_gateway::SecureAttachmentGateway._promote_available._promote",
+      "kind": "writer",
+      "before": [
+        "backend/tests/attachment_ocr_ai_evidence_governance_hardening/test_evidence_governance_http_wiring_integration.py",
+        "backend/tests/attachment_ocr_ai_evidence_governance_hardening/test_finalized_locator_opaque_contract.py",
+        "backend/tests/test_evidence_governance_attachment_security_gates.py",
+        "backend/tests/test_evidence_governance_durable_quarantine_reaper_wave2.py",
+        "backend/tests/test_evidence_governance_secure_attachment_gateway_wave2_3_2.py",
+        "backend/tests/test_evidence_governance_secure_attachment_gateway_wave2_3_3.py"
+      ],
+      "after": []
+    },
+    {
+      "writer_id": "app.services.export_progress_service::ExportProgressService._run_export",
+      "kind": "writer",
+      "before": [
+        "backend/tests/test_batch_export_progress.py",
+        "backend/tests/test_export_cleanup.py"
+      ],
+      "after": [
+        "backend/tests/test_batch_export_progress.py"
+      ]
+    },
+    {
+      "writer_id": "app.services.export_progress_service::ExportProgressService.create_task",
+      "kind": "writer",
+      "before": [
+        "backend/tests/test_batch_export_progress.py",
+        "backend/tests/test_export_cleanup.py"
+      ],
+      "after": [
+        "backend/tests/test_batch_export_progress.py"
+      ]
+    },
+    {
+      "writer_id": "app.services.pdf_export_engine::PDFExportEngine.execute_export",
+      "kind": "writer",
+      "before": [
+        "backend/tests/test_pdf_export.py",
+        "backend/tests/test_remaining_property.py"
+      ],
+      "after": [
+        "backend/tests/test_pdf_export.py"
+      ]
+    },
+    {
+      "writer_id": "app.services.prefill_engine::ParseService.parse_workpaper",
+      "kind": "writer",
+      "before": [
+        "backend/tests/test_prefill_parse.py",
+        "backend/tests/test_remaining_property.py"
+      ],
+      "after": [
+        "backend/tests/test_prefill_parse.py"
+      ]
+    },
+    {
+      "writer_id": "app.services.prefill_engine::PrefillService.prefill_workpaper",
+      "kind": "writer",
+      "before": [
+        "backend/tests/test_phase8.py",
+        "backend/tests/test_phase8_smoke.py",
+        "backend/tests/test_prefill_parse.py",
+        "backend/tests/test_remaining_property.py"
+      ],
+      "after": []
+    },
+    {
+      "writer_id": "app.services.procedure_trim_engine::ProcedureTrimEngine.revert",
+      "kind": "writer",
+      "before": [
+        "backend/tests/test_phase8.py",
+        "backend/tests/test_procedure_trim_engine.py",
+        "backend/tests/test_procedure_trimming.py"
+      ],
+      "after": [
+        "backend/tests/test_procedure_trim_engine.py",
+        "backend/tests/test_procedure_trimming.py"
+      ]
+    },
+    {
+      "writer_id": "app.services.procedure_trim_engine::ProcedureTrimEngine.trim",
+      "kind": "writer",
+      "before": [
+        "backend/tests/test_phase8.py",
+        "backend/tests/test_procedure_trim_engine.py",
+        "backend/tests/test_procedure_trimming.py"
+      ],
+      "after": [
+        "backend/tests/test_procedure_trim_engine.py",
+        "backend/tests/test_procedure_trimming.py"
+      ]
+    },
+    {
+      "writer_id": "app.services.procedure_trim_service::ProcedureTrimService.clear_completeness_scope_override",
+      "kind": "writer",
+      "before": [
+        "backend/tests/procedure_delegation/test_procedure_trim_service.py",
+        "backend/tests/procedure_trim/test_completeness_scope_override.py",
+        "backend/tests/procedure_trim/test_task23_zero_regression.py",
+        "backend/tests/procedure_trim/test_trim_reason_code_contract.py"
+      ],
+      "after": []
+    },
+    {
+      "writer_id": "app.services.procedure_trim_service::ProcedureTrimService.set_completeness_scope_override",
+      "kind": "writer",
+      "before": [
+        "backend/tests/procedure_delegation/test_procedure_trim_service.py",
+        "backend/tests/procedure_trim/test_completeness_scope_override.py",
+        "backend/tests/procedure_trim/test_task23_zero_regression.py",
+        "backend/tests/procedure_trim/test_trim_reason_code_contract.py"
+      ],
+      "after": []
+    },
+    {
+      "writer_id": "app.services.template_engine::TemplateEngine.generate_project_workpapers",
+      "kind": "resolver",
+      "before": [
+        "backend/tests/test_remaining_property.py",
+        "backend/tests/test_template_engine.py"
+      ],
+      "after": [
+        "backend/tests/test_template_engine.py"
+      ]
+    },
+    {
+      "writer_id": "app.services.version_trail_service::VersionTrailService.rollback_to_snapshot",
+      "kind": "writer",
+      "before": [
+        "backend/tests/test_version_trail_compute_diff.py",
+        "backend/tests/test_version_trail_integration.py",
+        "backend/tests/test_version_trail_pbt.py"
+      ],
+      "after": [
+        "backend/tests/test_version_trail_integration.py",
+        "backend/tests/test_version_trail_pbt.py"
+      ]
+    },
+    {
+      "writer_id": "app.services.wopi_service::WOPIHostService.check_file_info",
+      "kind": "resolver",
+      "before": [
+        "backend/tests/test_phase8.py",
+        "backend/tests/test_remaining_property.py",
+        "backend/tests/test_wopi_working_paper_qc_review.py"
+      ],
+      "after": []
+    },
+    {
+      "writer_id": "app.services.wopi_service::WOPIHostService.get_file",
+      "kind": "resolver",
+      "before": [
+        "backend/tests/test_phase8.py",
+        "backend/tests/test_remaining_property.py",
+        "backend/tests/test_wopi_working_paper_qc_review.py"
+      ],
+      "after": []
+    },
+    {
+      "writer_id": "app.services.wopi_service::WOPIHostService.put_file",
+      "kind": "writer",
+      "before": [
+        "backend/tests/test_phase8.py",
+        "backend/tests/test_remaining_property.py",
+        "backend/tests/test_wopi_working_paper_qc_review.py"
+      ],
+      "after": []
+    },
+    {
+      "writer_id": "app.services.wopi_service::WOPIHostService.put_file._auto_fine_extract",
+      "kind": "writer",
+      "before": [
+        "backend/tests/test_phase8.py",
+        "backend/tests/test_remaining_property.py",
+        "backend/tests/test_wopi_working_paper_qc_review.py"
+      ],
+      "after": []
+    },
+    {
+      "writer_id": "app.services.wopi_service::WOPIHostService.put_file._auto_parse",
+      "kind": "writer",
+      "before": [
+        "backend/tests/test_phase8.py",
+        "backend/tests/test_remaining_property.py",
+        "backend/tests/test_wopi_working_paper_qc_review.py"
+      ],
+      "after": []
+    },
+    {
+      "writer_id": "app.services.working_paper_service::WorkingPaperService.upload_offline_edit",
+      "kind": "writer",
+      "before": [
+        "backend/tests/test_reassignment_notifications.py",
+        "backend/tests/test_review_status_split.py",
+        "backend/tests/test_wopi_working_paper_qc_review.py"
+      ],
+      "after": []
+    },
+    {
+      "writer_id": "app.services.workpaper_generation_service::WorkpaperGenerationService.ensure_working_paper",
+      "kind": "writer_resolver",
+      "before": [
+        "backend/tests/test_custom_wp_formula_full_chain.py",
+        "backend/tests/test_ensure_working_paper.py",
+        "backend/tests/test_ensure_wp_idempotent_pbt.py"
+      ],
+      "after": [
+        "backend/tests/test_ensure_working_paper.py",
+        "backend/tests/test_ensure_wp_idempotent_pbt.py"
+      ]
+    },
+    {
+      "writer_id": "app.services.workpaper_sync.artifacts::ArtifactStorageLayout.project_root",
+      "kind": "resolver",
+      "before": [
+        "backend/tests/workpaper_sync/test_task11_artifact_repository.py"
+      ],
+      "after": []
+    },
+    {
+      "writer_id": "app.services.workpaper_sync.repository::WorkpaperSyncRepository.bump_content_revision",
+      "kind": "writer",
+      "before": [
+        "backend/tests/workpaper_sync/test_task10_repository_pg.py",
+        "backend/tests/workpaper_sync/test_task11_retention_orphan_pg.py",
+        "backend/tests/workpaper_sync/test_task12_resolution_pg.py",
+        "backend/tests/workpaper_sync/test_task15_content_mutation_pg.py",
+        "backend/tests/workpaper_sync/test_task17_excel_instrumentation_pg.py",
+        "backend/tests/workpaper_sync/test_task18_html_save_unified_revision_pg.py",
+        "backend/tests/workpaper_sync/test_task21_room_service_pg.py"
+      ],
+      "after": [
+        "backend/tests/workpaper_sync/test_task10_repository_pg.py"
+      ]
+    },
+    {
+      "writer_id": "app.services.wp_download_service::WpDownloadService.download_pack",
+      "kind": "resolver",
+      "before": [
+        "backend/tests/test_phase10_step0_step1.py"
+      ],
+      "after": []
+    },
+    {
+      "writer_id": "app.services.wp_download_service::WpDownloadService.download_single",
+      "kind": "resolver",
+      "before": [
+        "backend/tests/test_phase10_step0_step1.py"
+      ],
+      "after": []
+    },
+    {
+      "writer_id": "app.services.wp_download_service::WpUploadService.upload_file",
+      "kind": "writer_resolver",
+      "before": [
+        "backend/tests/test_phase10_step0_step1.py"
+      ],
+      "after": []
+    },
+    {
+      "writer_id": "app.services.wp_evidence_ocr_service::WpEvidenceOcrService.fill_evidence_group",
+      "kind": "writer",
+      "before": [
+        "backend/tests/test_wp_evidence_collection.py",
+        "backend/tests/test_wp_functional_actions.py"
+      ],
+      "after": [
+        "backend/tests/test_wp_evidence_collection.py"
+      ]
+    },
+    {
+      "writer_id": "app.services.wp_export.export_engine::WpExportEngine._export_docx",
+      "kind": "resolver",
+      "before": [
+        "backend/tests/test_e2e_export_import_roundtrip.py",
+        "backend/tests/test_pbt_program_audit_export.py"
+      ],
+      "after": []
+    },
+    {
+      "writer_id": "app.services.wp_export.export_engine::WpExportEngine._resolve_docx_template",
+      "kind": "resolver",
+      "before": [
+        "backend/tests/test_e2e_export_import_roundtrip.py",
+        "backend/tests/test_pbt_program_audit_export.py"
+      ],
+      "after": []
+    },
+    {
+      "writer_id": "app.services.wp_migration_service::WpMigrationService.migrate_workpaper",
+      "kind": "writer",
+      "before": [
+        "backend/tests/test_wp_template_migration_integration.py",
+        "backend/tests/test_wp_template_migration_property.py",
+        "backend/tests/workpaper_sync/test_task19_writer_migration.py"
+      ],
+      "after": []
+    },
+    {
+      "writer_id": "app.services.wp_migration_service::WpMigrationService.rollback",
+      "kind": "writer",
+      "before": [
+        "backend/tests/test_wp_template_migration_integration.py",
+        "backend/tests/test_wp_template_migration_property.py",
+        "backend/tests/workpaper_sync/test_task19_writer_migration.py"
+      ],
+      "after": [
+        "backend/tests/workpaper_sync/test_task19_writer_migration.py"
+      ]
+    },
+    {
+      "writer_id": "app.services.wp_standard_conversion_service::WpStandardConversionService._archive_source_only_workpapers",
+      "kind": "writer",
+      "before": [
+        "backend/tests/test_multi_standard_unification_property.py"
+      ],
+      "after": []
+    },
+    {
+      "writer_id": "app.services.wp_storage_service::WpStorageService.list_versions",
+      "kind": "resolver",
+      "before": [
+        "backend/tests/workpaper_sync/test_task19_writer_migration.py"
+      ],
+      "after": []
+    },
+    {
+      "writer_id": "app.services.wp_template_finder::find_template_file_any",
+      "kind": "resolver",
+      "before": [
+        "backend/tests/test_wp_template_finder_d4_prefix.py",
+        "backend/tests/workpaper_sync/test_task12_canonical_resolver.py"
+      ],
+      "after": [
+        "backend/tests/test_wp_template_finder_d4_prefix.py"
+      ]
+    },
+    {
+      "writer_id": "app.services.wp_template_init_service::_ensure_d4_ipo_loaded",
+      "kind": "writer",
+      "before": [
+        "backend/tests/test_d4_ipo_trigger.py",
+        "backend/tests/test_f2_ipo_trigger.py"
+      ],
+      "after": [
+        "backend/tests/test_d4_ipo_trigger.py"
+      ]
+    }
+  ]
+}

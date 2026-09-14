@@ -1,0 +1,530 @@
+{
+  "schema_version": "deletion-plan:v1",
+  "task": "Task 49",
+  "spec": "workpaper-html-onlyoffice-bidirectional-writeback-closure",
+  "description": "G 循环（除 G7）17 条独立 entry 的 legacy dual-mode 删除清册。本任务**不执行删除** —— 范式的 legacy_deletion_paradigm 七步归 Task 66（生成计划）/ Task 72（执行删除），且删除的前置是 step 9（注册 adapter + 宿主改线），本任务只交付 step 1~4 与 step 11。清册的作用是把「删什么、删的前置是什么、哪条被跨循环共用」冻结成可复核事实，避免 Task 72 重新发现。",
+  "frozen_at": "Task 49（2026-08-31）",
+  "paradigm_ref": "backend/data/workpaper_sync_migration_paradigm.json",
+  "adjudication_source_of_truth": "backend/data/workpaper_sync_g_cycle_manifest_slice.json#independent_entries",
+  "deletion_execution_owner": "Task 66（生成计划）/ Task 72（Stage B 精确删除）",
+  "properties_verified": [
+    20,
+    21,
+    28,
+    69,
+    70
+  ],
+  "pilot_already_migrated": {
+    "entry_id": null,
+    "note": "本 slice 无 pilot。G 循环确实有一个 pilot —— G7（Tasks 40–43 四个 pilot 之一，产物 workpaper_sync_contracts/g7.soe_subsidiary_disclosure.json），但 G7 的 3 条 entry 按任务正文已排除在本 slice 之外，故本清册的 17 条 entry 里 pilot 数为 0。写 null + 说明而不是省略字段：省略会让「有没有 pilot」这件事在文档里无从判断。"
+  },
+  "shared_base_preserved": {
+    "file": "audit-platform/frontend/src/components/workpaper/composables/useWorkpaperEntryDualMode.ts",
+    "g_cycle_does_not_consume_it": false,
+    "g_cycle_consumption_note": "🔴 与 F 循环不同：G 循环**有一条**包了共享基座 —— `useG2DualMode.ts`（59 行，是唯一薄封装）。其余 16 条是各自独立实现（73~174 行），不引用基座。故 Task 72 删 G 循环 composable 时**必须保留基座**：它既被 useG2DualMode 消费，也被其他非 G 循环模块消费。把它列进删除清册会打断多个循环。",
+    "consumers_in_g_cycle": [
+      "audit-platform/frontend/src/components/workpaper/composables/useG2DualMode.ts"
+    ]
+  },
+  "unreachable_stub_to_delete": {
+    "why_this_key_exists": "AC 1.7 原文：「不可达旧桩 SHALL 删除；不得以豁免或 `DEPRECATED` 注释长期保留。」G 循环有一个，它不在 independent_entries 里（independent_entry=false）⇒ 若不单列，清册会漏掉一条 AC 1.7 义务。",
+    "entry_id": "xlsx/gt-g6-other-bond-ecl",
+    "host_component": "audit-platform/frontend/src/components/workpaper/GtG6OtherBondEcl.vue",
+    "manifest_capability": "unreachable",
+    "manifest_migration_state": "unreachable_pending_delete",
+    "inbound_reference_count": 0,
+    "unreachable_reason_from_manifest": "Historical simplified stub; htmlRendererRegistry resolves g6-other-bond-investment-ecl to GtG6OtherBondInvestmentEcl.vue",
+    "delete_only_after": "无前置 —— 它零入边，删除不影响任何运行路径。归 Task 66/72 是流程要求（删除生产源码属破坏性操作，需专门任务与门），不是技术阻塞。",
+    "blocking_precondition": "BP-11",
+    "guard": "守卫锁死它仍然零入边，且**按模块边判而不是按符号名判**：① 全仓（audit-platform/frontend/src 的 .ts/.vue，排除 __tests__、旧桩自身与生成物 components.d.ts）没有任何 import 指向 `GtG6OtherBondEcl.vue`，也没有任何模板用 `<GtG6OtherBondEcl` / `<gt-g6-other-bond-ecl` 标签；② registry 里那条同名别名必须仍然指向 GtG6OtherBondInvestmentEcl.vue（形态一变即红，见 registry_homonymous_alias）；③ 探针带反向自检 —— 同一把尺量 GtG6OtherBondInvestmentEcl.vue 的 import 必须命中，否则「零入边」是探针恒假；④ components.d.ts 是否声明旧桩这一事实也双向锁（generated_dts_declares_it）。若有人给旧桩接了真入边（救活它），①打红。",
+    "generated_dts_declares_it": true,
+    "registry_homonymous_alias": {
+      "declared_in": "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts",
+      "declared_at": "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts#L378",
+      "alias_name": "GtG6OtherBondEcl",
+      "resolves_to": "GtG6OtherBondInvestmentEcl.vue",
+      "is_an_inbound_edge_to_the_stub": false,
+      "verbatim": "const GtG6OtherBondEcl = defineAsyncComponent(() => import('./GtG6OtherBondInvestmentEcl.vue'))",
+      "why_name_based_probes_misfire": "registry 里这个**局部常量**叫 GtG6OtherBondEcl，指向的却是真正在用的 GtG6OtherBondInvestmentEcl.vue（短名变量 + 长名文件）。任何按**符号名**判「旧桩是否被引用」的探针都会在这里命中并误报「旧桩被救活」—— Task 49 首轮的守卫正是这么红的：它先 `registry.replace('GtG6OtherBondInvestmentEcl','')` 消掉长名再查短名，结果把别名声明行留成 `const GtG6OtherBondEcl = … import('./.vue')`，短名照样在。正确判据是按**模块边**：全仓有没有 import 指向 `GtG6OtherBondEcl.vue` 这个路径，以及有没有模板用 `<GtG6OtherBondEcl` / `<gt-g6-other-bond-ecl` 标签（后者会经 unplugin-vue-components 的全局注册解析到该文件）。实测两类边都是 0。",
+      "measured": "2026-08-16 全仓实扫（audit-platform/frontend/src 下 .ts/.vue，排除 __tests__、旧桩自身与生成物 components.d.ts，共扫 1000+ 模块）：按路径 import 命中 0 处、按标签使用命中 0 处。出现字符串 `GtG6OtherBondEcl` 的位置共 5 处，逐处归因：① htmlRendererRegistry.ts#L378 同名别名（指向 InvestmentEcl.vue，非入边）② htmlRendererRegistry.ts#L1465 `component: GtG6OtherBondEcl`（用的是①那个别名，非入边）③ GtG6OtherBondInvestmentEcl.vue#L110-L111 注释（逐字写着「根目录 GtG6OtherBondEcl.vue 为历史简版桩，不再被 registry 引用」）④ components.d.ts#L1123 unplugin-vue-components 生成的全局组件类型声明（生成物，按目录扫全部 .vue 得来，非运行时边）⑤ workpaperSyncManifest.generated.ts#L3390/L3408 生成的 manifest 把它登记为 hostPath / source_host（那正是它作为 unreachable entry 被登记的地方）。",
+      "note_on_generated_dts": "components.d.ts 会为旧桩生成一条全局组件声明（`GtG6OtherBondEcl: typeof import('./components/workpaper/GtG6OtherBondEcl.vue')['default']`）。它是 unplugin-vue-components 按目录扫出来的**生成物**，不是人写的引用；但它的存在意味着「只要有人在任意模板里写 `<GtG6OtherBondEcl/>`，旧桩就会被真正加载」—— 所以守卫同时锁死标签用法为 0。删桩后该声明会随下次生成自动消失。"
+    }
+  },
+  "entries": [
+    {
+      "entry_id": "xlsx/gt-g1-trading-financial-assets",
+      "host_component": "audit-platform/frontend/src/components/workpaper/GtG1TradingFinancialAssets.vue",
+      "capability_adjudication": null,
+      "capability_verdict_stage": "pipeline_entry_pending_definition_delivery",
+      "capability_target": "bidirectional",
+      "html_counterpart_verdict": "exists",
+      "adjudication_reason": "step 3 逐 entry 实测：本 entry 的业务内容**真实存在于 HTML 侧** —— 宿主经 useG1TraFinFormData.ts 把结构化 Tab 的录入 PUT 到 /api/workpapers/{wp_id}/checklist-responses，主表 G1-2-rows 整表存成一条 item 的 结构化 JSON 只写 conclusion（remark 留给纯文本说明）（写入点 audit-platform/frontend/src/components/workpaper/composables/useG1Detail.ts#L653），行身份是 id（inline template literal，非数组下标）。因此 html_counterpart_verdict == \"exists\"，按 AC 12.8 该 entry **不得**标 single_onlyoffice —— AC 12.8 的判据是「有没有 HTML 对端」。同时 OO 侧不是空白模板切换入口（见 not_single_html_because），宿主在 htmlRendererRegistry.ts 有真实入边（manifest 的 profile_source.inbound_reference_count == 1），故不是 unreachable。而 AC 12.1 要求的 approved authority model / 人工审核 per-entry contract / non-null approved bundle / Task 36 finalize 出的 published representation / 注册 adapter / 逐 scenario evidence 六件事尚未交付，故也**不得**标 bidirectional。四个枚举值当下都不成立 ⇒ capability 终态未定，如实计入 slice_counters.unadjudicated，缺什么逐条写进 blocking_preconditions。",
+      "legacy_composables_to_delete": [
+        {
+          "file": "audit-platform/frontend/src/components/workpaper/composables/useG1DualMode.ts",
+          "exported": "useG1DualMode",
+          "line_count": 174,
+          "localstorage_prefix": "g1-dual-mode:",
+          "wraps_shared_base": false,
+          "production_consumers": [
+            "audit-platform/frontend/src/components/workpaper/GtE1MonetaryFund.vue",
+            "audit-platform/frontend/src/components/workpaper/GtG1TradingFinancialAssets.vue"
+          ],
+          "test_consumers": [],
+          "cross_cycle_production_consumers": [
+            "audit-platform/frontend/src/components/workpaper/GtE1MonetaryFund.vue"
+          ],
+          "delete_only_after": "该 entry 完成范式 step 9（注册 adapter + 宿主改线到 sync bridge）；且**所有** cross_cycle_production_consumers 也已改线 —— 本条被跨循环共用，见 BP-9"
+        }
+      ],
+      "notice_mounted": true,
+      "ui_toolbar_gate": "class=\"g1-toolbar\""
+    },
+    {
+      "entry_id": "xlsx/gt-g2-interest-receivable",
+      "host_component": "audit-platform/frontend/src/components/workpaper/GtG2InterestReceivable.vue",
+      "capability_adjudication": null,
+      "capability_verdict_stage": "pipeline_entry_pending_definition_delivery",
+      "capability_target": "bidirectional",
+      "html_counterpart_verdict": "exists",
+      "adjudication_reason": "step 3 逐 entry 实测：本 entry 的业务内容**真实存在于 HTML 侧** —— 宿主经 useG2IntRecFormData.ts 把结构化 Tab 的录入 PUT 到 /api/workpapers/{wp_id}/checklist-responses，主表 G2-2-detail-rows 整表存成一条 item 的 结构化 JSON 只写 remark，conclusion 置 null（写入点 audit-platform/frontend/src/components/workpaper/composables/useG2Detail.ts#L517），行身份是 id（generateId()，非数组下标）。因此 html_counterpart_verdict == \"exists\"，按 AC 12.8 该 entry **不得**标 single_onlyoffice —— AC 12.8 的判据是「有没有 HTML 对端」。同时 OO 侧不是空白模板切换入口（见 not_single_html_because），宿主在 htmlRendererRegistry.ts 有真实入边（manifest 的 profile_source.inbound_reference_count == 1），故不是 unreachable。而 AC 12.1 要求的 approved authority model / 人工审核 per-entry contract / non-null approved bundle / Task 36 finalize 出的 published representation / 注册 adapter / 逐 scenario evidence 六件事尚未交付，故也**不得**标 bidirectional。四个枚举值当下都不成立 ⇒ capability 终态未定，如实计入 slice_counters.unadjudicated，缺什么逐条写进 blocking_preconditions。",
+      "legacy_composables_to_delete": [
+        {
+          "file": "audit-platform/frontend/src/components/workpaper/composables/useG2DualMode.ts",
+          "exported": "useG2DualMode",
+          "line_count": 59,
+          "localstorage_prefix": null,
+          "wraps_shared_base": true,
+          "production_consumers": [
+            "audit-platform/frontend/src/components/workpaper/GtG2InterestReceivable.vue"
+          ],
+          "test_consumers": [],
+          "cross_cycle_production_consumers": [],
+          "delete_only_after": "该 entry 完成范式 step 9（注册 adapter + 宿主改线到 sync bridge）"
+        }
+      ],
+      "notice_mounted": true,
+      "ui_toolbar_gate": "class=\"g2-interest-receivable-toolbar\""
+    },
+    {
+      "entry_id": "xlsx/gt-g3-dividend-receivable",
+      "host_component": "audit-platform/frontend/src/components/workpaper/GtG3DividendReceivable.vue",
+      "capability_adjudication": null,
+      "capability_verdict_stage": "pipeline_entry_pending_definition_delivery",
+      "capability_target": "bidirectional",
+      "html_counterpart_verdict": "exists",
+      "adjudication_reason": "step 3 逐 entry 实测：本 entry 的业务内容**真实存在于 HTML 侧** —— 宿主经 useG3FormData.ts 把结构化 Tab 的录入 PUT 到 /api/workpapers/{wp_id}/checklist-responses，主表 G3-2-detail-rows 整表存成一条 item 的 结构化 JSON 只写 conclusion（remark 留给纯文本说明）（写入点 audit-platform/frontend/src/components/workpaper/composables/useG3Detail.ts#L336），行身份是 id（inline template literal，非数组下标）。因此 html_counterpart_verdict == \"exists\"，按 AC 12.8 该 entry **不得**标 single_onlyoffice —— AC 12.8 的判据是「有没有 HTML 对端」。同时 OO 侧不是空白模板切换入口（见 not_single_html_because），宿主在 htmlRendererRegistry.ts 有真实入边（manifest 的 profile_source.inbound_reference_count == 1），故不是 unreachable。而 AC 12.1 要求的 approved authority model / 人工审核 per-entry contract / non-null approved bundle / Task 36 finalize 出的 published representation / 注册 adapter / 逐 scenario evidence 六件事尚未交付，故也**不得**标 bidirectional。四个枚举值当下都不成立 ⇒ capability 终态未定，如实计入 slice_counters.unadjudicated，缺什么逐条写进 blocking_preconditions。",
+      "legacy_composables_to_delete": [
+        {
+          "file": "audit-platform/frontend/src/components/workpaper/composables/useG3DualMode.ts",
+          "exported": "useG3DualMode",
+          "line_count": 118,
+          "localstorage_prefix": "g3-dual-mode:",
+          "wraps_shared_base": false,
+          "production_consumers": [
+            "audit-platform/frontend/src/components/workpaper/GtG3DividendReceivable.vue"
+          ],
+          "test_consumers": [],
+          "cross_cycle_production_consumers": [],
+          "delete_only_after": "该 entry 完成范式 step 9（注册 adapter + 宿主改线到 sync bridge）"
+        }
+      ],
+      "notice_mounted": true,
+      "ui_toolbar_gate": "class=\"g3-dividend-receivable-toolbar\""
+    },
+    {
+      "entry_id": "xlsx/gt-g4-bond-investment-main",
+      "host_component": "audit-platform/frontend/src/components/workpaper/GtG4BondInvestmentMain.vue",
+      "capability_adjudication": null,
+      "capability_verdict_stage": "pipeline_entry_pending_definition_delivery",
+      "capability_target": "bidirectional",
+      "html_counterpart_verdict": "exists",
+      "adjudication_reason": "step 3 逐 entry 实测：本 entry 的业务内容**真实存在于 HTML 侧** —— 宿主经 useG4BonInvFormData.ts 把结构化 Tab 的录入 PUT 到 /api/workpapers/{wp_id}/checklist-responses，主表 G4-2-rows 整表存成一条 item 的 经 storage contract 的 buildCanonicalPayload：conclusion 为权威，remark 同文双写做迁移期兼容（写入点 audit-platform/frontend/src/components/workpaper/composables/useG4MainDetail.ts#L544），行身份是 id（generateId()，非数组下标）。因此 html_counterpart_verdict == \"exists\"，按 AC 12.8 该 entry **不得**标 single_onlyoffice —— AC 12.8 的判据是「有没有 HTML 对端」。同时 OO 侧不是空白模板切换入口（见 not_single_html_because），宿主在 htmlRendererRegistry.ts 有真实入边（manifest 的 profile_source.inbound_reference_count == 1），故不是 unreachable。而 AC 12.1 要求的 approved authority model / 人工审核 per-entry contract / non-null approved bundle / Task 36 finalize 出的 published representation / 注册 adapter / 逐 scenario evidence 六件事尚未交付，故也**不得**标 bidirectional。四个枚举值当下都不成立 ⇒ capability 终态未定，如实计入 slice_counters.unadjudicated，缺什么逐条写进 blocking_preconditions。",
+      "legacy_composables_to_delete": [
+        {
+          "file": "audit-platform/frontend/src/components/workpaper/composables/useG4MainDualMode.ts",
+          "exported": "useG4MainDualMode",
+          "line_count": 108,
+          "localstorage_prefix": "g4-main-dual-mode:",
+          "wraps_shared_base": false,
+          "production_consumers": [
+            "audit-platform/frontend/src/components/workpaper/GtG4BondInvestmentMain.vue"
+          ],
+          "test_consumers": [
+            "audit-platform/frontend/src/components/workpaper/__tests__/gCycleProcedureConsole.spec.ts"
+          ],
+          "cross_cycle_production_consumers": [],
+          "delete_only_after": "该 entry 完成范式 step 9（注册 adapter + 宿主改线到 sync bridge）。另需同步更新 test_consumers 里的既有 spec（它们直接 import 本模块）"
+        }
+      ],
+      "notice_mounted": true,
+      "ui_toolbar_gate": "class=\"g4-bond-investment-main-toolbar\""
+    },
+    {
+      "entry_id": "xlsx/gt-g4-bond-investment-sppi",
+      "host_component": "audit-platform/frontend/src/components/workpaper/GtG4BondInvestmentSppi.vue",
+      "capability_adjudication": null,
+      "capability_verdict_stage": "pipeline_entry_pending_definition_delivery",
+      "capability_target": "bidirectional",
+      "html_counterpart_verdict": "exists",
+      "adjudication_reason": "step 3 逐 entry 实测：本 entry 的业务内容**真实存在于 HTML 侧** —— 宿主经 useG4SppiFormData.ts 把结构化 Tab 的录入 PUT 到 /api/workpapers/{wp_id}/checklist-responses，主表 G4-7-items 整表存成一条 item 的 经 storage contract 的 buildCanonicalPayload：conclusion 为权威，remark 同文双写做迁移期兼容（写入点 audit-platform/frontend/src/composables/useG4SppiInventory.ts#L305），行身份是 id（generateId()，非数组下标）。因此 html_counterpart_verdict == \"exists\"，按 AC 12.8 该 entry **不得**标 single_onlyoffice —— AC 12.8 的判据是「有没有 HTML 对端」。同时 OO 侧不是空白模板切换入口（见 not_single_html_because），宿主在 htmlRendererRegistry.ts 有真实入边（manifest 的 profile_source.inbound_reference_count == 1），故不是 unreachable。而 AC 12.1 要求的 approved authority model / 人工审核 per-entry contract / non-null approved bundle / Task 36 finalize 出的 published representation / 注册 adapter / 逐 scenario evidence 六件事尚未交付，故也**不得**标 bidirectional。四个枚举值当下都不成立 ⇒ capability 终态未定，如实计入 slice_counters.unadjudicated，缺什么逐条写进 blocking_preconditions。",
+      "legacy_composables_to_delete": [
+        {
+          "file": "audit-platform/frontend/src/composables/useG4SppiDualMode.ts",
+          "exported": "useG4SppiDualMode",
+          "line_count": 108,
+          "localstorage_prefix": "g4-sppi-dual-mode:",
+          "wraps_shared_base": false,
+          "production_consumers": [
+            "audit-platform/frontend/src/components/workpaper/GtG4BondInvestmentSppi.vue"
+          ],
+          "test_consumers": [],
+          "cross_cycle_production_consumers": [],
+          "delete_only_after": "该 entry 完成范式 step 9（注册 adapter + 宿主改线到 sync bridge）"
+        }
+      ],
+      "notice_mounted": true,
+      "ui_toolbar_gate": "class=\"g4-bond-investment-sppi-toolbar\""
+    },
+    {
+      "entry_id": "xlsx/gt-g4-bond-investment-ecl",
+      "host_component": "audit-platform/frontend/src/components/workpaper/GtG4BondInvestmentEcl.vue",
+      "capability_adjudication": null,
+      "capability_verdict_stage": "pipeline_entry_pending_definition_delivery",
+      "capability_target": "bidirectional",
+      "html_counterpart_verdict": "exists",
+      "adjudication_reason": "step 3 逐 entry 实测：本 entry 的业务内容**真实存在于 HTML 侧** —— 宿主经 useG4EclFormData.ts 把结构化 Tab 的录入 PUT 到 /api/workpapers/{wp_id}/checklist-responses，主表 G4-9-rows 整表存成一条 item 的 写入点逐字 `{ remark: json, conclusion: json }` 双写；读取侧 readCanonicalRaw 以 conclusion 优先、remark 兜底（写入点 audit-platform/frontend/src/components/workpaper/g4-bond-investment-ecl/impairment/G4TabStageClassification.vue#L505），行身份是 id（crypto.randomUUID()，非数组下标）。因此 html_counterpart_verdict == \"exists\"，按 AC 12.8 该 entry **不得**标 single_onlyoffice —— AC 12.8 的判据是「有没有 HTML 对端」。同时 OO 侧不是空白模板切换入口（见 not_single_html_because），宿主在 htmlRendererRegistry.ts 有真实入边（manifest 的 profile_source.inbound_reference_count == 1），故不是 unreachable。而 AC 12.1 要求的 approved authority model / 人工审核 per-entry contract / non-null approved bundle / Task 36 finalize 出的 published representation / 注册 adapter / 逐 scenario evidence 六件事尚未交付，故也**不得**标 bidirectional。四个枚举值当下都不成立 ⇒ capability 终态未定，如实计入 slice_counters.unadjudicated，缺什么逐条写进 blocking_preconditions。",
+      "legacy_composables_to_delete": [
+        {
+          "file": "audit-platform/frontend/src/components/workpaper/composables/useG4EclDualMode.ts",
+          "exported": "useG4EclDualMode",
+          "line_count": 108,
+          "localstorage_prefix": "g4-ecl-dual-mode:",
+          "wraps_shared_base": false,
+          "production_consumers": [
+            "audit-platform/frontend/src/components/workpaper/GtG4BondInvestmentEcl.vue"
+          ],
+          "test_consumers": [],
+          "cross_cycle_production_consumers": [],
+          "delete_only_after": "该 entry 完成范式 step 9（注册 adapter + 宿主改线到 sync bridge）"
+        }
+      ],
+      "notice_mounted": true,
+      "ui_toolbar_gate": "class=\"g4-bond-investment-ecl-toolbar\""
+    },
+    {
+      "entry_id": "xlsx/gt-g5-long-term-receivable",
+      "host_component": "audit-platform/frontend/src/components/workpaper/GtG5LongTermReceivable.vue",
+      "capability_adjudication": null,
+      "capability_verdict_stage": "pipeline_entry_pending_definition_delivery",
+      "capability_target": "bidirectional",
+      "html_counterpart_verdict": "exists",
+      "adjudication_reason": "step 3 逐 entry 实测：本 entry 的业务内容**真实存在于 HTML 侧** —— 宿主经 useG5LonRecFormData.ts 把结构化 Tab 的录入 PUT 到 /api/workpapers/{wp_id}/checklist-responses，主表 G5-2-rows 整表存成一条 item 的 写入点逐字 `{ remark: json, conclusion: json }` 双写；读取侧 readCanonicalRaw 以 conclusion 优先、remark 兜底（写入点 audit-platform/frontend/src/components/workpaper/g5-long-term-receivable/core/G5TabBalanceDetail.vue#L292），行身份是 id（crypto.randomUUID()，非数组下标）。因此 html_counterpart_verdict == \"exists\"，按 AC 12.8 该 entry **不得**标 single_onlyoffice —— AC 12.8 的判据是「有没有 HTML 对端」。同时 OO 侧不是空白模板切换入口（见 not_single_html_because），宿主在 htmlRendererRegistry.ts 有真实入边（manifest 的 profile_source.inbound_reference_count == 1），故不是 unreachable。而 AC 12.1 要求的 approved authority model / 人工审核 per-entry contract / non-null approved bundle / Task 36 finalize 出的 published representation / 注册 adapter / 逐 scenario evidence 六件事尚未交付，故也**不得**标 bidirectional。四个枚举值当下都不成立 ⇒ capability 终态未定，如实计入 slice_counters.unadjudicated，缺什么逐条写进 blocking_preconditions。",
+      "legacy_composables_to_delete": [
+        {
+          "file": "audit-platform/frontend/src/components/workpaper/composables/useG5DualMode.ts",
+          "exported": "useG5DualMode",
+          "line_count": 106,
+          "localstorage_prefix": "g5-dual-mode:",
+          "wraps_shared_base": false,
+          "production_consumers": [
+            "audit-platform/frontend/src/components/workpaper/GtG5LongTermReceivable.vue"
+          ],
+          "test_consumers": [],
+          "cross_cycle_production_consumers": [],
+          "delete_only_after": "该 entry 完成范式 step 9（注册 adapter + 宿主改线到 sync bridge）"
+        }
+      ],
+      "notice_mounted": true,
+      "ui_toolbar_gate": "class=\"g5-long-term-receivable-toolbar\""
+    },
+    {
+      "entry_id": "xlsx/gt-g6-other-bond-main",
+      "host_component": "audit-platform/frontend/src/components/workpaper/GtG6OtherBondMain.vue",
+      "capability_adjudication": null,
+      "capability_verdict_stage": "pipeline_entry_pending_definition_delivery",
+      "capability_target": "bidirectional",
+      "html_counterpart_verdict": "exists",
+      "adjudication_reason": "step 3 逐 entry 实测：本 entry 的业务内容**真实存在于 HTML 侧** —— 宿主经 useG6MainFormData.ts 把结构化 Tab 的录入 PUT 到 /api/workpapers/{wp_id}/checklist-responses，主表 G6-2-rows 整表存成一条 item 的 写入点逐字 `{ remark: json, conclusion: json }` 双写；读取侧 readCanonicalRaw 以 conclusion 优先、remark 兜底（写入点 audit-platform/frontend/src/components/workpaper/composables/useG6MainDetail.ts#L453），行身份是 id（generateId()，非数组下标）。因此 html_counterpart_verdict == \"exists\"，按 AC 12.8 该 entry **不得**标 single_onlyoffice —— AC 12.8 的判据是「有没有 HTML 对端」。同时 OO 侧不是空白模板切换入口（见 not_single_html_because），宿主在 htmlRendererRegistry.ts 有真实入边（manifest 的 profile_source.inbound_reference_count == 1），故不是 unreachable。而 AC 12.1 要求的 approved authority model / 人工审核 per-entry contract / non-null approved bundle / Task 36 finalize 出的 published representation / 注册 adapter / 逐 scenario evidence 六件事尚未交付，故也**不得**标 bidirectional。四个枚举值当下都不成立 ⇒ capability 终态未定，如实计入 slice_counters.unadjudicated，缺什么逐条写进 blocking_preconditions。",
+      "legacy_composables_to_delete": [
+        {
+          "file": "audit-platform/frontend/src/components/workpaper/composables/useG6MainDualMode.ts",
+          "exported": "useG6MainDualMode",
+          "line_count": 108,
+          "localstorage_prefix": "g6-main-dual-mode:",
+          "wraps_shared_base": false,
+          "production_consumers": [
+            "audit-platform/frontend/src/components/workpaper/GtG6OtherBondMain.vue"
+          ],
+          "test_consumers": [],
+          "cross_cycle_production_consumers": [],
+          "delete_only_after": "该 entry 完成范式 step 9（注册 adapter + 宿主改线到 sync bridge）"
+        }
+      ],
+      "notice_mounted": true,
+      "ui_toolbar_gate": "class=\"g6-other-bond-investment-main-toolbar\""
+    },
+    {
+      "entry_id": "xlsx/gt-g6-other-bond-sppi",
+      "host_component": "audit-platform/frontend/src/components/workpaper/GtG6OtherBondSppi.vue",
+      "capability_adjudication": null,
+      "capability_verdict_stage": "pipeline_entry_pending_definition_delivery",
+      "capability_target": "bidirectional",
+      "html_counterpart_verdict": "exists",
+      "adjudication_reason": "step 3 逐 entry 实测：本 entry 的业务内容**真实存在于 HTML 侧** —— 宿主经 useG6SppiFormData.ts 把结构化 Tab 的录入 PUT 到 /api/workpapers/{wp_id}/checklist-responses，主表 G6-5-fair-value-data 整表存成一条 item 的 结构化 JSON 只写 conclusion（remark 留给纯文本说明）（写入点 audit-platform/frontend/src/components/workpaper/g6-other-bond-investment-sppi/fair-value/G6TabFairValueTest.vue#L615），行身份是 id（inline template literal，非数组下标）。因此 html_counterpart_verdict == \"exists\"，按 AC 12.8 该 entry **不得**标 single_onlyoffice —— AC 12.8 的判据是「有没有 HTML 对端」。同时 OO 侧不是空白模板切换入口（见 not_single_html_because），宿主在 htmlRendererRegistry.ts 有真实入边（manifest 的 profile_source.inbound_reference_count == 1），故不是 unreachable。而 AC 12.1 要求的 approved authority model / 人工审核 per-entry contract / non-null approved bundle / Task 36 finalize 出的 published representation / 注册 adapter / 逐 scenario evidence 六件事尚未交付，故也**不得**标 bidirectional。四个枚举值当下都不成立 ⇒ capability 终态未定，如实计入 slice_counters.unadjudicated，缺什么逐条写进 blocking_preconditions。本 entry 另背一条形态缺陷：载入路径的行身份可退化成数组下标（BP-7）。",
+      "legacy_composables_to_delete": [
+        {
+          "file": "audit-platform/frontend/src/components/workpaper/composables/useG6SppiDualMode.ts",
+          "exported": "useG6SppiDualMode",
+          "line_count": 108,
+          "localstorage_prefix": "g6-sppi-dual-mode:",
+          "wraps_shared_base": false,
+          "production_consumers": [
+            "audit-platform/frontend/src/components/workpaper/GtG6OtherBondSppi.vue"
+          ],
+          "test_consumers": [],
+          "cross_cycle_production_consumers": [],
+          "delete_only_after": "该 entry 完成范式 step 9（注册 adapter + 宿主改线到 sync bridge）"
+        }
+      ],
+      "notice_mounted": true,
+      "ui_toolbar_gate": "class=\"g6-other-bond-investment-sppi-toolbar\""
+    },
+    {
+      "entry_id": "xlsx/gt-g6-other-bond-investment-ecl",
+      "host_component": "audit-platform/frontend/src/components/workpaper/GtG6OtherBondInvestmentEcl.vue",
+      "capability_adjudication": null,
+      "capability_verdict_stage": "pipeline_entry_pending_definition_delivery",
+      "capability_target": "bidirectional",
+      "html_counterpart_verdict": "exists",
+      "adjudication_reason": "step 3 逐 entry 实测：本 entry 的业务内容**真实存在于 HTML 侧** —— 宿主经 useG6EclFormData.ts 把结构化 Tab 的录入 PUT 到 /api/workpapers/{wp_id}/checklist-responses，主表 G6-11-rows 整表存成一条 item 的 写入点逐字 `{ remark: json, conclusion: json }` 双写；读取侧 readCanonicalRaw 以 conclusion 优先、remark 兜底（写入点 audit-platform/frontend/src/components/workpaper/g6-other-bond-investment-ecl/impairment/G6TabStageClassification.vue#L452），行身份是 id（newId()，非数组下标）。因此 html_counterpart_verdict == \"exists\"，按 AC 12.8 该 entry **不得**标 single_onlyoffice —— AC 12.8 的判据是「有没有 HTML 对端」。同时 OO 侧不是空白模板切换入口（见 not_single_html_because），宿主在 htmlRendererRegistry.ts 有真实入边（manifest 的 profile_source.inbound_reference_count == 1），故不是 unreachable。而 AC 12.1 要求的 approved authority model / 人工审核 per-entry contract / non-null approved bundle / Task 36 finalize 出的 published representation / 注册 adapter / 逐 scenario evidence 六件事尚未交付，故也**不得**标 bidirectional。四个枚举值当下都不成立 ⇒ capability 终态未定，如实计入 slice_counters.unadjudicated，缺什么逐条写进 blocking_preconditions。",
+      "legacy_composables_to_delete": [
+        {
+          "file": "audit-platform/frontend/src/components/workpaper/composables/useG6EclDualMode.ts",
+          "exported": "useG6EclDualMode",
+          "line_count": 108,
+          "localstorage_prefix": "g6-ecl-dual-mode:",
+          "wraps_shared_base": false,
+          "production_consumers": [
+            "audit-platform/frontend/src/components/workpaper/GtG6OtherBondInvestmentEcl.vue"
+          ],
+          "test_consumers": [],
+          "cross_cycle_production_consumers": [],
+          "delete_only_after": "该 entry 完成范式 step 9（注册 adapter + 宿主改线到 sync bridge）"
+        }
+      ],
+      "notice_mounted": true,
+      "ui_toolbar_gate": "class=\"g6-other-bond-investment-ecl-toolbar\""
+    },
+    {
+      "entry_id": "xlsx/gt-g8-other-equity-instruments",
+      "host_component": "audit-platform/frontend/src/components/workpaper/GtG8OtherEquityInstruments.vue",
+      "capability_adjudication": null,
+      "capability_verdict_stage": "pipeline_entry_pending_definition_delivery",
+      "capability_target": "bidirectional",
+      "html_counterpart_verdict": "exists",
+      "adjudication_reason": "step 3 逐 entry 实测：本 entry 的业务内容**真实存在于 HTML 侧** —— 宿主经 useG8FormData.ts 把结构化 Tab 的录入 PUT 到 /api/workpapers/{wp_id}/checklist-responses，主表 G8-detail-rows 整表存成一条 item 的 结构化 JSON 只写 remark，conclusion 置 null（写入点 audit-platform/frontend/src/components/workpaper/composables/useG8Detail.ts#L400），行身份是 rowId（genId()，非数组下标）。因此 html_counterpart_verdict == \"exists\"，按 AC 12.8 该 entry **不得**标 single_onlyoffice —— AC 12.8 的判据是「有没有 HTML 对端」。同时 OO 侧不是空白模板切换入口（见 not_single_html_because），宿主在 htmlRendererRegistry.ts 有真实入边（manifest 的 profile_source.inbound_reference_count == 1），故不是 unreachable。而 AC 12.1 要求的 approved authority model / 人工审核 per-entry contract / non-null approved bundle / Task 36 finalize 出的 published representation / 注册 adapter / 逐 scenario evidence 六件事尚未交付，故也**不得**标 bidirectional。四个枚举值当下都不成立 ⇒ capability 终态未定，如实计入 slice_counters.unadjudicated，缺什么逐条写进 blocking_preconditions。",
+      "legacy_composables_to_delete": [
+        {
+          "file": "audit-platform/frontend/src/components/workpaper/composables/useG8DualMode.ts",
+          "exported": "useG8DualMode",
+          "line_count": 88,
+          "localstorage_prefix": "g8-dual-mode:",
+          "wraps_shared_base": false,
+          "production_consumers": [
+            "audit-platform/frontend/src/components/workpaper/GtG8OtherEquityInstruments.vue"
+          ],
+          "test_consumers": [
+            "audit-platform/frontend/src/components/workpaper/composables/__tests__/g8ReviewFixes.spec.ts"
+          ],
+          "cross_cycle_production_consumers": [],
+          "delete_only_after": "该 entry 完成范式 step 9（注册 adapter + 宿主改线到 sync bridge）。另需同步更新 test_consumers 里的既有 spec（它们直接 import 本模块）"
+        }
+      ],
+      "notice_mounted": true,
+      "ui_toolbar_gate": "class=\"g8-toolbar\""
+    },
+    {
+      "entry_id": "xlsx/gt-g9-other-noncurrent-financial",
+      "host_component": "audit-platform/frontend/src/components/workpaper/GtG9OtherNoncurrentFinancial.vue",
+      "capability_adjudication": null,
+      "capability_verdict_stage": "pipeline_entry_pending_definition_delivery",
+      "capability_target": "bidirectional",
+      "html_counterpart_verdict": "exists",
+      "adjudication_reason": "step 3 逐 entry 实测：本 entry 的业务内容**真实存在于 HTML 侧** —— 宿主经 useG9FormData.ts 把结构化 Tab 的录入 PUT 到 /api/workpapers/{wp_id}/checklist-responses，主表 G9-detail-rows 整表存成一条 item 的 结构化 JSON 只写 remark，conclusion 置 null（写入点 audit-platform/frontend/src/components/workpaper/composables/useG9Detail.ts#L322），行身份是 rowId（genId()，非数组下标）。因此 html_counterpart_verdict == \"exists\"，按 AC 12.8 该 entry **不得**标 single_onlyoffice —— AC 12.8 的判据是「有没有 HTML 对端」。同时 OO 侧不是空白模板切换入口（见 not_single_html_because），宿主在 htmlRendererRegistry.ts 有真实入边（manifest 的 profile_source.inbound_reference_count == 1），故不是 unreachable。而 AC 12.1 要求的 approved authority model / 人工审核 per-entry contract / non-null approved bundle / Task 36 finalize 出的 published representation / 注册 adapter / 逐 scenario evidence 六件事尚未交付，故也**不得**标 bidirectional。四个枚举值当下都不成立 ⇒ capability 终态未定，如实计入 slice_counters.unadjudicated，缺什么逐条写进 blocking_preconditions。",
+      "legacy_composables_to_delete": [
+        {
+          "file": "audit-platform/frontend/src/components/workpaper/composables/useG9DualMode.ts",
+          "exported": "useG9DualMode",
+          "line_count": 120,
+          "localstorage_prefix": "g9-dual-mode:",
+          "wraps_shared_base": false,
+          "production_consumers": [
+            "audit-platform/frontend/src/components/workpaper/GtG9OtherNoncurrentFinancial.vue"
+          ],
+          "test_consumers": [
+            "audit-platform/frontend/src/components/workpaper/composables/__tests__/g9ReviewFixes.spec.ts"
+          ],
+          "cross_cycle_production_consumers": [],
+          "delete_only_after": "该 entry 完成范式 step 9（注册 adapter + 宿主改线到 sync bridge）。另需同步更新 test_consumers 里的既有 spec（它们直接 import 本模块）"
+        }
+      ],
+      "notice_mounted": true,
+      "ui_toolbar_gate": "class=\"g9-toolbar\""
+    },
+    {
+      "entry_id": "xlsx/gt-g10-trading-financial-liabilities",
+      "host_component": "audit-platform/frontend/src/components/workpaper/GtG10TradingFinancialLiabilities.vue",
+      "capability_adjudication": null,
+      "capability_verdict_stage": "pipeline_entry_pending_definition_delivery",
+      "capability_target": "bidirectional",
+      "html_counterpart_verdict": "exists",
+      "adjudication_reason": "step 3 逐 entry 实测：本 entry 的业务内容**真实存在于 HTML 侧** —— 宿主经 useG10FormData.ts 把结构化 Tab 的录入 PUT 到 /api/workpapers/{wp_id}/checklist-responses，主表 G10-detail-rows 整表存成一条 item 的 结构化 JSON 只写 remark，conclusion 置 null（写入点 audit-platform/frontend/src/components/workpaper/composables/useG10Detail.ts#L382），行身份是 rowId（genId()，非数组下标）。因此 html_counterpart_verdict == \"exists\"，按 AC 12.8 该 entry **不得**标 single_onlyoffice —— AC 12.8 的判据是「有没有 HTML 对端」。同时 OO 侧不是空白模板切换入口（见 not_single_html_because），宿主在 htmlRendererRegistry.ts 有真实入边（manifest 的 profile_source.inbound_reference_count == 1），故不是 unreachable。而 AC 12.1 要求的 approved authority model / 人工审核 per-entry contract / non-null approved bundle / Task 36 finalize 出的 published representation / 注册 adapter / 逐 scenario evidence 六件事尚未交付，故也**不得**标 bidirectional。四个枚举值当下都不成立 ⇒ capability 终态未定，如实计入 slice_counters.unadjudicated，缺什么逐条写进 blocking_preconditions。",
+      "legacy_composables_to_delete": [
+        {
+          "file": "audit-platform/frontend/src/components/workpaper/composables/useG10DualMode.ts",
+          "exported": "useG10DualMode",
+          "line_count": 89,
+          "localstorage_prefix": "g10-dual-mode:",
+          "wraps_shared_base": false,
+          "production_consumers": [
+            "audit-platform/frontend/src/components/workpaper/GtG10TradingFinancialLiabilities.vue"
+          ],
+          "test_consumers": [],
+          "cross_cycle_production_consumers": [],
+          "delete_only_after": "该 entry 完成范式 step 9（注册 adapter + 宿主改线到 sync bridge）"
+        }
+      ],
+      "notice_mounted": true,
+      "ui_toolbar_gate": "class=\"g10-trading-financial-liabilities-toolbar\""
+    },
+    {
+      "entry_id": "xlsx/gt-g11-investment-income",
+      "host_component": "audit-platform/frontend/src/components/workpaper/GtG11InvestmentIncome.vue",
+      "capability_adjudication": null,
+      "capability_verdict_stage": "pipeline_entry_pending_definition_delivery",
+      "capability_target": "bidirectional",
+      "html_counterpart_verdict": "exists",
+      "adjudication_reason": "step 3 逐 entry 实测：本 entry 的业务内容**真实存在于 HTML 侧** —— 宿主经 useG11FormData.ts 把结构化 Tab 的录入 PUT 到 /api/workpapers/{wp_id}/checklist-responses，主表 G11-detail-rows 整表存成一条 item 的 结构化 JSON 只写 remark，conclusion 置 null（写入点 audit-platform/frontend/src/components/workpaper/composables/useG11DetailAnalysis.ts#L233），行身份是 id（generateId()，非数组下标）。因此 html_counterpart_verdict == \"exists\"，按 AC 12.8 该 entry **不得**标 single_onlyoffice —— AC 12.8 的判据是「有没有 HTML 对端」。同时 OO 侧不是空白模板切换入口（见 not_single_html_because），宿主在 htmlRendererRegistry.ts 有真实入边（manifest 的 profile_source.inbound_reference_count == 1），故不是 unreachable。而 AC 12.1 要求的 approved authority model / 人工审核 per-entry contract / non-null approved bundle / Task 36 finalize 出的 published representation / 注册 adapter / 逐 scenario evidence 六件事尚未交付，故也**不得**标 bidirectional。四个枚举值当下都不成立 ⇒ capability 终态未定，如实计入 slice_counters.unadjudicated，缺什么逐条写进 blocking_preconditions。",
+      "legacy_composables_to_delete": [
+        {
+          "file": "audit-platform/frontend/src/components/workpaper/composables/useG11DualMode.ts",
+          "exported": "useG11DualMode",
+          "line_count": 120,
+          "localstorage_prefix": "g11-dual-mode:",
+          "wraps_shared_base": false,
+          "production_consumers": [
+            "audit-platform/frontend/src/components/workpaper/GtG11InvestmentIncome.vue"
+          ],
+          "test_consumers": [],
+          "cross_cycle_production_consumers": [],
+          "delete_only_after": "该 entry 完成范式 step 9（注册 adapter + 宿主改线到 sync bridge）"
+        }
+      ],
+      "notice_mounted": true,
+      "ui_toolbar_gate": "class=\"g11-investment-income-toolbar\""
+    },
+    {
+      "entry_id": "xlsx/gt-g12-net-hedge-gains",
+      "host_component": "audit-platform/frontend/src/components/workpaper/GtG12NetHedgeGains.vue",
+      "capability_adjudication": null,
+      "capability_verdict_stage": "pipeline_entry_pending_definition_delivery",
+      "capability_target": "bidirectional",
+      "html_counterpart_verdict": "exists",
+      "adjudication_reason": "step 3 逐 entry 实测：本 entry 的业务内容**真实存在于 HTML 侧** —— 宿主经 useG12FormData.ts 把结构化 Tab 的录入 PUT 到 /api/workpapers/{wp_id}/checklist-responses，主表 G12-hedge-detail-rows 整表存成一条 item 的 结构化 JSON 只写 remark，conclusion 置 null（写入点 audit-platform/frontend/src/components/workpaper/composables/useG12HedgeDetail.ts#L138），行身份是 rowId（genId()，非数组下标）。因此 html_counterpart_verdict == \"exists\"，按 AC 12.8 该 entry **不得**标 single_onlyoffice —— AC 12.8 的判据是「有没有 HTML 对端」。同时 OO 侧不是空白模板切换入口（见 not_single_html_because），宿主在 htmlRendererRegistry.ts 有真实入边（manifest 的 profile_source.inbound_reference_count == 1），故不是 unreachable。而 AC 12.1 要求的 approved authority model / 人工审核 per-entry contract / non-null approved bundle / Task 36 finalize 出的 published representation / 注册 adapter / 逐 scenario evidence 六件事尚未交付，故也**不得**标 bidirectional。四个枚举值当下都不成立 ⇒ capability 终态未定，如实计入 slice_counters.unadjudicated，缺什么逐条写进 blocking_preconditions。",
+      "legacy_composables_to_delete": [
+        {
+          "file": "audit-platform/frontend/src/components/workpaper/composables/useG12DualMode.ts",
+          "exported": "useG12DualMode",
+          "line_count": 120,
+          "localstorage_prefix": "g12-dual-mode:",
+          "wraps_shared_base": false,
+          "production_consumers": [
+            "audit-platform/frontend/src/components/workpaper/GtG12NetHedgeGains.vue"
+          ],
+          "test_consumers": [],
+          "cross_cycle_production_consumers": [],
+          "delete_only_after": "该 entry 完成范式 step 9（注册 adapter + 宿主改线到 sync bridge）"
+        }
+      ],
+      "notice_mounted": true,
+      "ui_toolbar_gate": "class=\"g12-net-hedge-gains-toolbar\""
+    },
+    {
+      "entry_id": "xlsx/gt-g13-fair-value-changes",
+      "host_component": "audit-platform/frontend/src/components/workpaper/GtG13FairValueChanges.vue",
+      "capability_adjudication": null,
+      "capability_verdict_stage": "pipeline_entry_pending_definition_delivery",
+      "capability_target": "bidirectional",
+      "html_counterpart_verdict": "exists",
+      "adjudication_reason": "step 3 逐 entry 实测：本 entry 的业务内容**真实存在于 HTML 侧** —— 宿主经 useG13FormData.ts 把结构化 Tab 的录入 PUT 到 /api/workpapers/{wp_id}/checklist-responses，主表 G13-detail-rows 整表存成一条 item 的 结构化 JSON 只写 remark，conclusion 置 null（写入点 audit-platform/frontend/src/components/workpaper/composables/useG13Detail.ts#L185），行身份是 rowId（generateRowId()，非数组下标）。因此 html_counterpart_verdict == \"exists\"，按 AC 12.8 该 entry **不得**标 single_onlyoffice —— AC 12.8 的判据是「有没有 HTML 对端」。同时 OO 侧不是空白模板切换入口（见 not_single_html_because），宿主在 htmlRendererRegistry.ts 有真实入边（manifest 的 profile_source.inbound_reference_count == 1），故不是 unreachable。而 AC 12.1 要求的 approved authority model / 人工审核 per-entry contract / non-null approved bundle / Task 36 finalize 出的 published representation / 注册 adapter / 逐 scenario evidence 六件事尚未交付，故也**不得**标 bidirectional。四个枚举值当下都不成立 ⇒ capability 终态未定，如实计入 slice_counters.unadjudicated，缺什么逐条写进 blocking_preconditions。",
+      "legacy_composables_to_delete": [
+        {
+          "file": "audit-platform/frontend/src/components/workpaper/composables/useG13DualMode.ts",
+          "exported": "useG13DualMode",
+          "line_count": 73,
+          "localstorage_prefix": "g13-dual-mode:",
+          "wraps_shared_base": false,
+          "production_consumers": [
+            "audit-platform/frontend/src/components/workpaper/GtG13FairValueChanges.vue"
+          ],
+          "test_consumers": [],
+          "cross_cycle_production_consumers": [],
+          "delete_only_after": "该 entry 完成范式 step 9（注册 adapter + 宿主改线到 sync bridge）"
+        }
+      ],
+      "notice_mounted": true,
+      "ui_toolbar_gate": "class=\"g13-fair-value-changes-toolbar\""
+    },
+    {
+      "entry_id": "xlsx/gt-g14-credit-impairment-loss",
+      "host_component": "audit-platform/frontend/src/components/workpaper/GtG14CreditImpairmentLoss.vue",
+      "capability_adjudication": null,
+      "capability_verdict_stage": "pipeline_entry_pending_definition_delivery",
+      "capability_target": "bidirectional",
+      "html_counterpart_verdict": "exists",
+      "adjudication_reason": "step 3 逐 entry 实测：本 entry 的业务内容**真实存在于 HTML 侧** —— 宿主经 useG14FormData.ts 把结构化 Tab 的录入 PUT 到 /api/workpapers/{wp_id}/checklist-responses，主表 G14-detail-rows 整表存成一条 item 的 结构化 JSON 只写 remark，conclusion 置 null（写入点 audit-platform/frontend/src/components/workpaper/composables/useG14Detail.ts#L199），行身份是 rowKey（createDefaultRows() / G14_LINE_ITEMS，非数组下标）。因此 html_counterpart_verdict == \"exists\"，按 AC 12.8 该 entry **不得**标 single_onlyoffice —— AC 12.8 的判据是「有没有 HTML 对端」。同时 OO 侧不是空白模板切换入口（见 not_single_html_because），宿主在 htmlRendererRegistry.ts 有真实入边（manifest 的 profile_source.inbound_reference_count == 1），故不是 unreachable。而 AC 12.1 要求的 approved authority model / 人工审核 per-entry contract / non-null approved bundle / Task 36 finalize 出的 published representation / 注册 adapter / 逐 scenario evidence 六件事尚未交付，故也**不得**标 bidirectional。四个枚举值当下都不成立 ⇒ capability 终态未定，如实计入 slice_counters.unadjudicated，缺什么逐条写进 blocking_preconditions。",
+      "legacy_composables_to_delete": [
+        {
+          "file": "audit-platform/frontend/src/components/workpaper/composables/useG14DualMode.ts",
+          "exported": "useG14DualMode",
+          "line_count": 73,
+          "localstorage_prefix": "g14-dual-mode:",
+          "wraps_shared_base": false,
+          "production_consumers": [
+            "audit-platform/frontend/src/components/workpaper/GtG14CreditImpairmentLoss.vue"
+          ],
+          "test_consumers": [],
+          "cross_cycle_production_consumers": [],
+          "delete_only_after": "该 entry 完成范式 step 9（注册 adapter + 宿主改线到 sync bridge）"
+        }
+      ],
+      "notice_mounted": true,
+      "ui_toolbar_gate": "class=\"g14-credit-impairment-loss-toolbar\""
+    }
+  ],
+  "cross_cycle_shared_composable": {
+    "file": "audit-platform/frontend/src/components/workpaper/composables/useG1DualMode.ts",
+    "consumers": [
+      "audit-platform/frontend/src/components/workpaper/GtG1TradingFinancialAssets.vue",
+      "audit-platform/frontend/src/components/workpaper/GtE1MonetaryFund.vue"
+    ],
+    "e_cycle_deferred_registration": {
+      "where": "backend/data/workpaper_sync_e_cycle_manifest_slice.json 关联的 E 循环 deletion plan",
+      "recorded_unlock_condition": "Task 49 完成 G1 entry 的裁决与迁移",
+      "can_it_be_released_now": false,
+      "why_not": "解锁条件写窄了。Task 49 交付的是范式 step 1~4（枚举 / 模板冻结 / 对端调查 / 裁决）与 step 11（UI 义务），**不含 step 9（注册 adapter + 宿主改线）**。删除 useG1DualMode.ts 的前提是**两个消费方都已改线**：只改 G1 不改 E1，删文件会直接打断 E1 货币资金底稿的双模式切换；只改 E1 不改 G1 同理。",
+      "restated_unlock_condition": "「xlsx/gt-g1-trading-financial-assets 与 xlsx/gt-e1-monetary-fund 两条 entry 都完成范式 step 9（改线到 sync bridge）」之后才可删除 useG1DualMode.ts；执行归 Task 66/72。",
+      "additional_finding_for_e_cycle": "E1 宿主传给 useG1DualMode 的 `availableSheets` 是 `computed(() => [])`（GtE1MonetaryFund.vue#L549），而 G1 宿主传真实 sheets 列表 —— 两个消费方对同一实现的用法本就不等价。改线时不能只按 G1 的用法重构；且 E1 永远走兜底路径这件事与本 slice 的 BP-5 直接相关（G1_SHEET_LABEL_MAP 有 5 条不是真实 tab）。",
+      "blocking_precondition": "BP-9"
+    }
+  },
+  "requirements_covered": [
+    "1.4",
+    "1.7",
+    "12.1",
+    "12.9",
+    "12.12",
+    "14.1"
+  ]
+}

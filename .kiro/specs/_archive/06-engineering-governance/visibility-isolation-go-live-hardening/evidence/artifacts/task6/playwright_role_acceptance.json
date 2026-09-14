@@ -1,0 +1,78 @@
+{
+  "all_roles_ok": true,
+  "family_matrix_ok": true,
+  "lane": "playwright_fresh_context_browser",
+  "note": "真实浏览器 fresh-context 8 角色 lane 已执行并通过（非 GAP）：backend 9980 + frontend 3030 均健康；逐角色全新 browser context + fresh navigation；深链 allow=200/deny=404；拒绝显 '资源不存在或不可访问' 无名称闪现；console error=0；撤权刷新 ≤1s 收敛。",
+  "revocation": {
+    "before_allowed": true,
+    "denied_after_revoke": true,
+    "within_1s": true
+  },
+  "roles": {
+    "admin": {
+      "allow_deny_matrix_ok": true,
+      "console_error_count": 0,
+      "deny_shows_placeholder_no_name_flash": true,
+      "login": true,
+      "probe_count": 3,
+      "role_ok": true
+    },
+    "assignee": {
+      "allow_deny_matrix_ok": true,
+      "console_error_count": 0,
+      "deny_shows_placeholder_no_name_flash": true,
+      "login": true,
+      "probe_count": 3,
+      "role_ok": true
+    },
+    "history_lead": {
+      "allow_deny_matrix_ok": true,
+      "console_error_count": 0,
+      "deny_shows_placeholder_no_name_flash": true,
+      "login": true,
+      "probe_count": 3,
+      "role_ok": true
+    },
+    "history_row": {
+      "allow_deny_matrix_ok": true,
+      "console_error_count": 0,
+      "deny_shows_placeholder_no_name_flash": true,
+      "login": true,
+      "probe_count": 3,
+      "role_ok": true
+    },
+    "lead": {
+      "allow_deny_matrix_ok": true,
+      "console_error_count": 0,
+      "deny_shows_placeholder_no_name_flash": true,
+      "login": true,
+      "probe_count": 3,
+      "role_ok": true
+    },
+    "restricted": {
+      "allow_deny_matrix_ok": true,
+      "console_error_count": 0,
+      "deny_shows_placeholder_no_name_flash": true,
+      "login": true,
+      "probe_count": 3,
+      "role_ok": true
+    },
+    "reviewer": {
+      "allow_deny_matrix_ok": true,
+      "console_error_count": 0,
+      "deny_shows_placeholder_no_name_flash": true,
+      "login": true,
+      "probe_count": 3,
+      "role_ok": true
+    },
+    "supervisor": {
+      "allow_deny_matrix_ok": true,
+      "console_error_count": 0,
+      "deny_shows_placeholder_no_name_flash": true,
+      "login": true,
+      "probe_count": 2,
+      "role_ok": true
+    }
+  },
+  "status": "executed_passed"
+}

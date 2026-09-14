@@ -1,0 +1,131 @@
+{
+  "script": "e2e/g5-1-d6-unified-path.spec.ts",
+  "captured_at": "2026-09-12T11:10:06.648Z",
+  "scope": {
+    "project_id": "2aa00f57-1df4-4fe8-9840-2d65d0fd8749",
+    "wp_id": "1ed2feaf-3c3c-4a6c-824b-3be8d6e5b377",
+    "entry_id": "xlsx/gt-d6-contract-assets"
+  },
+  "predicates": {
+    "user_sync_requests": [
+      {
+        "method": "GET",
+        "path": "/api/projects/2aa00f57-1df4-4fe8-9840-2d65d0fd8749/workpapers/1ed2feaf-3c3c-4a6c-824b-3be8d6e5b377/sync/entries/xlsx/gt-d6-contract-assets/store-projection",
+        "status": 200
+      },
+      {
+        "method": "POST",
+        "path": "/api/projects/2aa00f57-1df4-4fe8-9840-2d65d0fd8749/workpapers/1ed2feaf-3c3c-4a6c-824b-3be8d6e5b377/sync/entries/xlsx/gt-d6-contract-assets/pending-mutations",
+        "status": 200
+      },
+      {
+        "method": "POST",
+        "path": "/api/projects/2aa00f57-1df4-4fe8-9840-2d65d0fd8749/workpapers/1ed2feaf-3c3c-4a6c-824b-3be8d6e5b377/sync/entries/xlsx/gt-d6-contract-assets/materialize",
+        "status": 200
+      }
+    ],
+    "forcesave_hits": [
+      {
+        "method": "POST",
+        "path": "/api/projects/2aa00f57-1df4-4fe8-9840-2d65d0fd8749/workpapers/1ed2feaf-3c3c-4a6c-824b-3be8d6e5b377/sync/entries/xlsx/gt-d6-contract-assets/rooms/cc67e279-bed3-4e3f-bc6d-6e1d8d71bcfc/forcesave",
+        "status": 202
+      }
+    ],
+    "d2_sync_hits": 0,
+    "callback_url_keys": [
+      "doc_key",
+      "generation",
+      "room_id",
+      "route_credential_id",
+      "route_token"
+    ],
+    "callback_url_redacted": "http://host.docker.internal:9980/api/workpaper-sync/rooms/cc67e279-bed3-4e3f-bc6d-6e1d8d71bcfc/onlyoffice-callback?room_id=%3Credacted%3E&generation=%3Credacted%3E&doc_key=%3Credacted%3E&route_credential_id=%3Credacted%3E&route_token=%3Credacted%3E",
+    "host_mounted": true,
+    "confirm_descriptor_200": true,
+    "forcesave_clicked": true,
+    "oo_cell_dirty_attempted": true,
+    "host_dirty_before_forcesave": false,
+    "forcesave_cs_error": 0,
+    "forcesave_cs_outcome": "accepted",
+    "forcesave_http_status": 202,
+    "forcesave_body_keys": [
+      "forcesave_request_id",
+      "operation_id",
+      "request_sequence",
+      "state",
+      "poll_after_ms",
+      "replayed",
+      "dispatch_error",
+      "cs_error",
+      "cs_outcome",
+      "callback_expected"
+    ],
+    "materialize_room_id": "cc67e279-bed3-4e3f-bc6d-6e1d8d71bcfc",
+    "materialize_has_jwt_token": true,
+    "doc_editor_called": false,
+    "doc_editor_has_root_token": false,
+    "doc_editor_document_mutable": false,
+    "host_status": "",
+    "host_error": "",
+    "confirm_forcesave_error": null,
+    "html_dom_roundtrip": {
+      "attempted": true,
+      "marker": "g5d6309270",
+      "switched_to_html": true,
+      "marker_visible": true,
+      "store_mirrored": true,
+      "dom_probe": {
+        "by_exact_text": 0,
+        "input_prop_hits": 1,
+        "search_value": "g5d6309270",
+        "tracked_operation_id": "f9108adc-bb49-405b-8ff9-16796ef0fcb1"
+      }
+    },
+    "oo_write_target": "B14",
+    "oo_cell_edit_probe": {
+      "ok": true,
+      "target": "B14",
+      "attempt": 1,
+      "sheetNames": [
+        "底稿目录",
+        "合同资产实质性程序表 D6A",
+        "合同资产实质性程序表 D7A（原）",
+        "审定表D6-1",
+        "附注披露信息(上市公司）",
+        "附注披露信息（国企）",
+        "明细表D6-2",
+        "合同资产减值准备明细表D6-3",
+        "调整分录汇总表D6-4",
+        "关联关系及交易检查D6-5",
+        "合同资产检查表D6-6",
+        "合同资产减值准备会计政策检查D6-7",
+        "减值准备测算D6-8",
+        "减值准备转回、核销检查表D6-9",
+        "GT_Custom",
+        "_GT_SYNC"
+      ],
+      "activeSheet": "明细表D6-2",
+      "findErr": "InvalidStateError: Failed to execute 'drawImage' on 'CanvasRenderingContext2D': The image argument is a canvas element with a width or height of 0.",
+      "inserted": true,
+      "entered": true,
+      "pasted": true,
+      "closeRet": true,
+      "closed": true,
+      "cellText": "g5d6309270",
+      "modified": true,
+      "saveRet": true,
+      "saved": true,
+      "cellTextAfterSave": "g5d6309270"
+    }
+  },
+  "notes": [
+    "token/JWT/route_credential 值已脱敏",
+    "OO 写格：Asc.editor 写受管 B14(contractName 文本列，A 列是 seqNo 数字列不写)；权威判据是 forcesave cs_error（0=有变更，4=no_changes）",
+    "application applied / revision+1 由同目录 DB 核查脚本补齐（venv 查库）",
+    "§9.6 条件 6：切回结构化视图后 D6TabDetail(.d6-tab-detail) DOM 应出现 marker（getByText / input.value，排除 .tab-toolbar 搜索框）",
+    "Phase 5 第四个非 pilot canary（两级表头+账龄组，账龄 FLAT 键）：D6 合同资产权威模板经外链净化过 OOXML 门；目标 wp 1ed2feaf(project 2aa00f57)由 first_publication 按 created_at 定"
+  ],
+  "auth_probe": {
+    "has_token": true
+  }
+}

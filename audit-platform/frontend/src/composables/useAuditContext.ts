@@ -15,6 +15,7 @@ import { computed, watch, onScopeDispose, type ComputedRef } from 'vue'
 import { useRoute } from 'vue-router'
 import { useProjectStore } from '@/stores/project'
 import { useRoleContextStore } from '@/stores/roleContext'
+import { usePermissionMatrix } from '@/composables/usePermissionMatrix'
 import { eventBus } from '@/utils/eventBus'
 
 export interface AuditContextState {
@@ -42,6 +43,7 @@ export function useAuditContext(options?: {
   const route = useRoute()
   const projectStore = useProjectStore()
   const roleContextStore = useRoleContextStore()
+  const { canDo } = usePermissionMatrix()
 
   // ─── 响应式 computed（三级 fallback 铁律） ───
   const projectId = computed(() => projectStore.projectId || (route.params.projectId as string) || '')
@@ -54,7 +56,7 @@ export function useAuditContext(options?: {
 
   const isArchived = computed(() => projectStore.projectStatus === 'archived')
 
-  const canEdit = computed(() => !isArchived.value && roleContextStore.canEditInProject)
+  const canEdit = computed(() => !isArchived.value && canDo('edit', 'workpaper'))
 
   // ─── onContextChange 回调注册 ───
   const callbacks = new Set<(ctx: { projectId: string; year: number }) => void>()

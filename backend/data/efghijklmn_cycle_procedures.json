@@ -3375,7 +3375,7 @@
         },
         {
           "step_name": "账龄分析",
-          "description": "编制预付账款账龄分析表，识别长期挂账项目",
+          "description": "在 F1-2 明细表完成账龄划分，F1-5 识别账龄1年及以上大额预付并评估可收回性",
           "is_required": true,
           "related_sheet": null,
           "category": "substantive",

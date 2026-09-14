@@ -325,7 +325,6 @@ async def empty_recycle_bin(
 
     await db.commit()
     return {"message": f"已永久删除 {deleted_count} 条记录", "deleted_count": deleted_count}
-    return resp
 
 
 @router.get("/stats")

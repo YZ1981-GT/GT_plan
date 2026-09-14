@@ -1,0 +1,508 @@
+<template>
+  <div class="confirmation-detail">
+    <div v-if="!row" class="confirmation-detail__empty">
+      <span class="confirmation-detail__empty-hint">👆 点击上方表格中的行查看/编辑详情</span>
+    </div>
+    <el-collapse v-else v-model="activeStages" class="confirmation-detail__collapse">
+      <!-- Stage 1: 基本信息 -->
+      <el-collapse-item title="基本信息" name="basic">
+        <el-form label-width="100px" size="small">
+          <el-form-item label="被询证单位">
+            <el-input
+              :model-value="row.entity_name"
+              :disabled="readonly"
+              @update:model-value="(v) => emitUpdate('entity_name', v)"
+            />
+          </el-form-item>
+          <el-form-item label="地址">
+            <el-input
+              :model-value="row.entity_address"
+              :disabled="readonly"
+              @update:model-value="(v) => emitUpdate('entity_address', v)"
+            />
+          </el-form-item>
+          <el-form-item label="联系人">
+            <el-input
+              :model-value="row.contact_person"
+              :disabled="readonly"
+              @update:model-value="(v) => emitUpdate('contact_person', v)"
+            />
+          </el-form-item>
+          <el-form-item label="联系电话">
+            <el-input
+              :model-value="row.contact_phone"
+              :disabled="readonly"
+              @update:model-value="(v) => emitUpdate('contact_phone', v)"
+            />
+          </el-form-item>
+          <el-form-item label="科目">
+            <el-select
+              :model-value="row.account_type"
+              :disabled="readonly"
+              @update:model-value="(v) => emitUpdate('account_type', v)"
+              placeholder="请选择或输入"
+              filterable
+              allow-create
+              default-first-option
+            >
+              <el-option
+                v-for="opt in getDictOptions('confirmation_account_type')"
+                :key="opt"
+                :label="opt"
+                :value="opt"
+              />
+            </el-select>
+          </el-form-item>
+          <el-form-item label="币种">
+            <el-select
+              :model-value="row.currency || 'CNY'"
+              :disabled="readonly"
+              @update:model-value="(v) => emitUpdate('currency', v)"
+              placeholder="CNY"
+              filterable
+              allow-create
+              default-first-option
+            >
+              <el-option v-for="opt in ['CNY', 'USD', 'EUR', 'HKD', 'GBP', 'JPY']" :key="opt" :label="opt" :value="opt" />
+            </el-select>
+          </el-form-item>
+        </el-form>
+      </el-collapse-item>
+
+      <!-- Stage 2: 函证信息 -->
+      <el-collapse-item title="函证信息" name="confirmation">
+        <el-form label-width="100px" size="small">
+          <el-form-item label="函证方式">
+            <el-select
+              :model-value="row.confirmation_method"
+              :disabled="readonly"
+              @update:model-value="(v) => emitUpdate('confirmation_method', v)"
+              placeholder="请选择"
+            >
+              <el-option
+                v-for="opt in getDictOptions('confirmation_method')"
+                :key="opt"
+                :label="opt"
+                :value="opt"
+              />
+            </el-select>
+          </el-form-item>
+          <el-form-item label="发函日期">
+            <el-date-picker
+              :model-value="row.send_date"
+              :disabled="readonly"
+              type="date"
+              value-format="YYYY-MM-DD"
+              @update:model-value="(v) => emitUpdate('send_date', v)"
+              placeholder="选择日期"
+            />
+          </el-form-item>
+          <el-form-item label="函证金额">
+            <el-input-number
+              :model-value="row.amount"
+              :disabled="readonly"
+              :precision="2"
+              :controls="false"
+              @update:model-value="(v) => emitUpdate('amount', v)"
+            />
+          </el-form-item>
+          <el-form-item label="选取样本目的">
+            <el-input
+              :model-value="row.sample_purpose"
+              :disabled="readonly"
+              @update:model-value="(v) => emitUpdate('sample_purpose', v)"
+            />
+          </el-form-item>
+          <el-form-item label="发函单号">
+            <el-input
+              :model-value="row.send_doc_no"
+              :disabled="readonly"
+              @update:model-value="(v) => emitUpdate('send_doc_no', v)"
+            />
+          </el-form-item>
+          <el-form-item label="收件地址核查">
+            <el-select
+              :model-value="row.send_addr_match"
+              :disabled="readonly"
+              @update:model-value="(v) => emitUpdate('send_addr_match', v)"
+              placeholder="是否一致"
+              clearable
+            >
+              <el-option label="一致" value="consistent" />
+              <el-option label="不一致" value="inconsistent" />
+              <el-option label="待核实" value="pending" />
+            </el-select>
+          </el-form-item>
+
+          <!--
+            是否收到回函 + 相符情况 —— **必须放在「回函信息」块之外的常显区**。
+
+            🔴 改造前的死锁（2026-08-05 实测）：
+               ① 明细面板**完全没有** `is_replied` 录入控件（全仓 `emitUpdate('is_replied'` 0 命中）
+               ② 「相符情况」被放在「回函信息」块内，而该块 `v-show="row.is_replied"`
+               ⇒ 新建行 `is_replied === undefined` → 块 display:none（实测 w=0,h=0）
+               ⇒ 既无法把 `match_status` 设成「未回函」，也无法把 `is_replied` 设成「否」
+               ⇒ `defaultUnrepliedFilter` 两个分支都不成立
+                  → **列表视图录入的行永远进不了 F0-5「从 F0-1 带入」**
+
+            🔴 「相符情况」是三态（相符 / 不符 / **未回函**），「未回函」恰恰在没有回函时才有意义
+               ⇒ 把它 gate 在「已回函」之下是分类错误，故移到此处常显。
+            spec: f0-confirmation-linkage-and-structural-enhancement Wave 9 / Defect 1
+          -->
+          <el-form-item label="是否收到回函">
+            <el-select
+              :model-value="replyFlag"
+              :disabled="readonly"
+              @update:model-value="(v) => emitUpdate('is_replied', v)"
+              placeholder="请选择"
+              clearable
+              data-testid="is-replied-select"
+            >
+              <el-option
+                v-for="opt in REPLY_FLAG_OPTIONS"
+                :key="opt.value"
+                :label="opt.label"
+                :value="opt.value"
+              />
+            </el-select>
+          </el-form-item>
+          <el-form-item label="相符情况">
+            <el-select
+              :model-value="row.match_status"
+              :disabled="readonly"
+              @update:model-value="(v) => emitUpdate('match_status', v)"
+              placeholder="请选择"
+              clearable
+              data-testid="match-status-select"
+            >
+              <el-option
+                v-for="opt in getDictOptions('confirmation_match')"
+                :key="opt"
+                :label="opt"
+                :value="opt"
+              />
+            </el-select>
+          </el-form-item>
+        </el-form>
+      </el-collapse-item>
+
+      <!--
+        Stage 3: 回函信息 —— 可见性走归一化谓词 `shouldShowReplyBlock`，
+        **不是** `row.is_replied` 裸真值判断（字符串 `'是'` 也要认；
+        且「只填了相符情况没填是否回函」的既有数据不能把回函金额藏起来）。
+      -->
+      <el-collapse-item v-show="shouldShowReplyBlock(row)" title="回函信息" name="reply">
+        <el-form label-width="100px" size="small">
+          <el-form-item label="回函日期">
+            <el-date-picker
+              :model-value="row.reply_date"
+              :disabled="readonly"
+              type="date"
+              value-format="YYYY-MM-DD"
+              @update:model-value="(v) => emitUpdate('reply_date', v)"
+              placeholder="选择日期"
+            />
+          </el-form-item>
+          <el-form-item label="回函方式">
+            <el-select
+              :model-value="row.reply_method"
+              :disabled="readonly"
+              @update:model-value="(v) => emitUpdate('reply_method', v)"
+              placeholder="请选择"
+            >
+              <el-option
+                v-for="opt in getDictOptions('confirmation_reply_method')"
+                :key="opt"
+                :label="opt"
+                :value="opt"
+              />
+            </el-select>
+          </el-form-item>
+          <el-form-item label="回函金额">
+            <el-input-number
+              :model-value="row.reply_amount"
+              :disabled="readonly"
+              :precision="2"
+              :controls="false"
+              @update:model-value="(v) => emitUpdate('reply_amount', v)"
+            />
+          </el-form-item>
+          <el-form-item label="回函快递单号">
+            <el-input
+              :model-value="row.reply_courier_no"
+              :disabled="readonly"
+              @update:model-value="(v) => emitUpdate('reply_courier_no', v)"
+            />
+          </el-form-item>
+          <el-form-item label="回函发出地址">
+            <el-input
+              :model-value="row.reply_from_addr"
+              :disabled="readonly"
+              @update:model-value="(v) => emitUpdate('reply_from_addr', v)"
+            />
+          </el-form-item>
+          <el-form-item label="发函回函地址核查">
+            <el-select
+              :model-value="row.send_reply_addr_match"
+              :disabled="readonly"
+              @update:model-value="(v) => emitUpdate('send_reply_addr_match', v)"
+              placeholder="是否一致"
+              clearable
+            >
+              <el-option label="一致" value="consistent" />
+              <el-option label="不一致" value="inconsistent" />
+              <el-option label="待核实" value="pending" />
+            </el-select>
+          </el-form-item>
+        </el-form>
+      </el-collapse-item>
+
+      <!-- Stage 4: 确认金额 -->
+      <el-collapse-item title="确认金额" name="confirmed">
+        <el-form label-width="100px" size="small">
+          <el-form-item label="可确认金额">
+            <div class="confirmation-detail__amount-row">
+              <span class="confirmation-detail__amount-display">
+                {{ row.confirmed_amount != null ? row.confirmed_amount.toLocaleString() + '元' : '0元' }}
+              </span>
+              <el-tooltip placement="top" :content="confirmedAmountFormula">
+                <el-tag size="small" type="info" class="confirmation-detail__formula-tag">fx 公式</el-tag>
+              </el-tooltip>
+            </div>
+          </el-form-item>
+          <el-form-item label="差异金额">
+            <div class="confirmation-detail__amount-row">
+              <span class="confirmation-detail__amount-display">
+                {{ row.difference != null ? row.difference.toLocaleString() + '元' : '0元' }}
+              </span>
+              <el-tooltip placement="top" content="差异 = 函证金额 - 回函金额（相符时为0）">
+                <el-tag size="small" type="info" class="confirmation-detail__formula-tag">fx 公式</el-tag>
+              </el-tooltip>
+            </div>
+          </el-form-item>
+          <el-form-item label="差异索引">
+            <div class="confirmation-detail__ref-row">
+              <el-input
+                :model-value="row.diff_ref_index"
+                :disabled="readonly"
+                @update:model-value="(v) => emitUpdate('diff_ref_index', v)"
+                placeholder="D0-4 索引"
+                style="flex:1"
+              />
+              <el-button
+                v-if="row.diff_ref_index"
+                size="small"
+                text
+                type="primary"
+                @click="$emit('jump-to-ref', row.diff_ref_index)"
+              >跳转 →</el-button>
+            </div>
+          </el-form-item>
+          <el-form-item label="是否替代程序">
+            <el-switch
+              :model-value="row.use_alternative"
+              :disabled="readonly"
+              @update:model-value="(v) => emitUpdate('use_alternative', v)"
+            />
+          </el-form-item>
+          <el-form-item v-if="row.use_alternative" label="替代不可确认">
+            <el-input-number
+              :model-value="row.alt_unconfirmed"
+              :disabled="readonly"
+              :precision="2"
+              :controls="false"
+              @update:model-value="(v) => emitUpdate('alt_unconfirmed', v)"
+            />
+          </el-form-item>
+          <el-form-item label="替代索引">
+            <div class="confirmation-detail__ref-row">
+              <el-input
+                :model-value="row.alt_ref_index"
+                :disabled="readonly"
+                @update:model-value="(v) => emitUpdate('alt_ref_index', v)"
+                placeholder="D0-5/D0-6 索引"
+                style="flex:1"
+              />
+              <el-button
+                v-if="row.alt_ref_index"
+                size="small"
+                text
+                type="primary"
+                @click="$emit('jump-to-ref', row.alt_ref_index)"
+              >跳转 →</el-button>
+            </div>
+          </el-form-item>
+          <el-form-item label="备注">
+            <el-input
+              :model-value="row.remark"
+              :disabled="readonly"
+              type="textarea"
+              :rows="2"
+              @update:model-value="(v) => emitUpdate('remark', v)"
+            />
+          </el-form-item>
+          <!--
+            发函询证纪要（历史录入值）——**只读呈现，不提供编辑入口**。
+
+            🔴 源模板 `X0-1!C5:F5`「发函询证纪要」是**跨 4 列的合并段头**（下辖
+               选取样本目的 / 被询证单位名称 / 账户交易 / 金额），源模板中没有名为
+               「发函询证纪要」的可填标量列 ⇒ 平台既有的 `send_memo` 是**伪列**。
+            🔴 已从 `CYCLE_VARIANT_COLUMNS.L0` 撤下（不再进列渲染），但**字段不删**：
+               既有项目可能已录入内容，删字段即数据丢失（数据零丢失红线 R10.6）。
+               故只在有值时以只读形式呈现 + 说明来历，让审计师能看到并自行转录到
+               对应的段内列（选取样本目的等），而不再新增该维度录入。
+            spec: l0-confirmation-source-alignment R4.2 / Property 19
+          -->
+          <el-form-item v-if="row.send_memo" label="发函询证纪要">
+            <div class="confirmation-detail__legacy-memo">
+              <el-input
+                :model-value="row.send_memo"
+                type="textarea"
+                :rows="2"
+                readonly
+                data-testid="send-memo-legacy-readonly"
+              />
+              <el-alert
+                type="info"
+                :closable="false"
+                show-icon
+                class="confirmation-detail__legacy-memo-hint"
+              >
+                <template #title>
+                  源模板此处为合并段头（下辖「选取样本目的 / 被询证单位名称 / 账户交易 / 金额」四列），
+                  非可填列。本值为历史录入，仅作留档只读展示；如仍需记录，请填入对应的段内列。
+                </template>
+              </el-alert>
+            </div>
+          </el-form-item>
+        </el-form>
+      </el-collapse-item>
+    </el-collapse>
+  </div>
+</template>
+
+<script setup lang="ts">
+import { ref, computed } from 'vue'
+import type { ConfirmationRow } from './confirmationTypes'
+import {
+  REPLY_FLAG_OPTIONS,
+  isNotReplied,
+  isReplied,
+  shouldShowReplyBlock,
+} from './replyStatus'
+
+const props = defineProps<{
+  row: ConfirmationRow | null
+  readonly: boolean
+  dictData: Record<string, any[]>
+}>()
+
+const emit = defineEmits<{
+  (e: 'update', field: string, value: any): void
+  (e: 'jump-to-ref', refCode: string): void
+}>()
+
+const activeStages = ref<string[]>(['basic', 'confirmation', 'reply', 'confirmed'])
+
+/**
+ * 「是否收到回函」下拉的 model —— 把三态映射回持久化字面 `'是'`/`'否'`。
+ *
+ * 🔴 未填（`undefined`）必须映射成 `undefined` 而不是 `'否'`，否则新建行会
+ * 显示成「否」并被 `defaultUnrepliedFilter` 当成明确未回函带进替代程序底稿。
+ */
+const replyFlag = computed<'是' | '否' | undefined>(() => {
+  const state = isReplied(props.row)
+  if (state === true) return '是'
+  if (state === false) return '否'
+  return undefined
+})
+
+/** 可确认金额的计算公式说明（根据当前行状态动态生成） */
+const confirmedAmountFormula = computed(() => {
+  const row = props.row
+  if (!row) return '尚未选择行'
+  if (row.match_status === '相符') return '相符 → 可确认金额 = 函证金额'
+  if (row.match_status === '不符') return '不符 → 可确认金额 = 回函金额（差异待 D0-4 调节）'
+  // 🔴 走归一谓词，不写 `row.is_replied === '否'` —— 完整表格视图写入的是布尔
+  // `false`，字符串比较对它恒不成立 ⇒ 改造前这两条提示从未渲染过（2026-08-05 实证）。
+  if (isNotReplied(row) && row.confirmation_method === '消极式') return '消极式未回函 → 视同相符，可确认金额 = 函证金额'
+  if (isNotReplied(row)) return '积极式未回函 → 需替代程序确认（D0-5/D0-6）'
+  return '可确认金额 = 根据回函情况自动计算'
+})
+
+function emitUpdate(field: string, value: any) {
+  if (!props.readonly) {
+    emit('update', field, value)
+  }
+}
+
+function getDictOptions(dictKey: string): string[] {
+  const options = props.dictData?.[dictKey]
+  if (!Array.isArray(options)) return []
+  // Support both string[] and { label, value }[] formats
+  return options.map((opt) => (typeof opt === 'string' ? opt : opt.label ?? opt.value ?? ''))
+}
+</script>
+
+<style scoped>
+.confirmation-detail__empty {
+  padding: 12px 16px;
+  text-align: center;
+  border: 1px dashed #dcdfe6;
+  border-radius: 4px;
+  margin: 8px 0;
+}
+.confirmation-detail__empty-hint {
+  font-size: var(--wp-font-size, 13px);
+  color: #909399;
+}
+
+.confirmation-detail__collapse {
+  padding: 0 8px;
+}
+
+.confirmation-detail__amount-display {
+  font-weight: 600;
+  color: var(--el-color-primary);
+}
+
+.confirmation-detail__amount-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.confirmation-detail__formula-tag {
+  cursor: help;
+  font-size: 11px;
+}
+.confirmation-detail__ref-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+}
+
+/* 历史录入的伪列值（send_memo）只读留档区 */
+.confirmation-detail__legacy-memo {
+  width: 100%;
+}
+.confirmation-detail__legacy-memo-hint {
+  margin-top: 6px;
+}
+.confirmation-detail__legacy-memo-hint :deep(.el-alert__title) {
+  font-size: 12px;
+  line-height: 1.6;
+  font-weight: 400;
+}
+
+.confirmation-detail__legacy-memo {
+  width: 100%;
+}
+.confirmation-detail__legacy-memo-hint {
+  margin-top: 6px;
+}
+.confirmation-detail__legacy-memo-hint :deep(.el-alert__title) {
+  font-size: 12px;
+  line-height: 1.6;
+}
+</style>

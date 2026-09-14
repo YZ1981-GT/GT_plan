@@ -1,0 +1,2398 @@
+{
+  "before_digest": "34af766107245073417b839e9ff410178130c2215051437fcc21e9c9eec22e9f",
+  "after_digest": "47f09bed917669c537696e7792f91d27c59103a62222c2dfe537eb82315e8a99",
+  "before_source_digest": "7531d2f841807e4d84cb609f5d4fb39b451208ff9c6211d404623cb9b5b017b6",
+  "after_source_digest": "617ab177eb4fb610cef12a6f086b46f9e08f08e97b1a92b00533a934780d5d99",
+  "row_count_before": 320,
+  "row_count_after": 320,
+  "added_rows": [],
+  "removed_rows": [],
+  "changed_row_count": 320,
+  "attribution_histogram": {
+    "MINE-ARTIFACT-SNAPSHOT-CATEGORY": 1,
+    "MINE-CHARACTERIZATION-CALLSITE": 75,
+    "MINE-NEW-KEYS-ONLY": 244
+  },
+  "unattributed_rows": [],
+  "new_fact_keys": [
+    "artifact_write_targets",
+    "representation_candidate_calls",
+    "revision_bump_calls"
+  ],
+  "new_verdict_keys": [
+    "artifact_snapshot_only",
+    "writes_business_content",
+    "keeps_legacy_write_path_beside_unified_commit"
+  ],
+  "stats_before": {
+    "by_content_store": {
+      "<artifact_or_delegated_only>": 116,
+      "checklist_responses": 83,
+      "working_paper": 71
+    },
+    "by_domain": {
+      "custom": 5,
+      "dedicated_router": 6,
+      "export_storage_resolver": 14,
+      "f2_word_sync": 6,
+      "history_restore": 2,
+      "html_save": 1,
+      "oo_callback": 1,
+      "rollback": 2,
+      "template_provisioning": 6,
+      "unadjudicated": 270,
+      "upload_import": 4,
+      "wopi": 3
+    },
+    "by_kind": {
+      "resolver": 51,
+      "writer": 248,
+      "writer_resolver": 21
+    },
+    "bypasses_unified_commit_count": 262,
+    "direct_commit_writer_count": 105,
+    "legacy_version_field_writer_count": 5,
+    "multi_resolver_count": 4,
+    "non_canonical_resolver_only_count": 64,
+    "resolver_count": 72,
+    "retired_by_domain": {
+      "custom": 1,
+      "orchestrator_side_effect": 1
+    },
+    "retired_writer_count": 2,
+    "row_count": 320,
+    "save_orchestrator_writer_count": 4,
+    "swallowing_writer_count": 114,
+    "unadjudicated_count": 270,
+    "unadjudicated_writer_count": 236,
+    "version_field_write_histogram": {
+      "file_version": 5,
+      "parsed_data.schema_version": 1
+    },
+    "writer_count": 269,
+    "writer_without_characterization_test_count": 165,
+    "writes_unified_content_revision_count": 1
+  },
+  "stats_after": {
+    "artifact_snapshot_only_count": 1,
+    "by_content_store": {
+      "<artifact_or_delegated_only>": 116,
+      "checklist_responses": 83,
+      "working_paper": 71
+    },
+    "by_domain": {
+      "custom": 5,
+      "dedicated_router": 6,
+      "export_storage_resolver": 14,
+      "f2_word_sync": 6,
+      "history_restore": 2,
+      "html_save": 1,
+      "oo_callback": 1,
+      "rollback": 2,
+      "template_provisioning": 6,
+      "unadjudicated": 270,
+      "upload_import": 4,
+      "wopi": 3
+    },
+    "by_kind": {
+      "resolver": 51,
+      "writer": 248,
+      "writer_resolver": 21
+    },
+    "bypasses_unified_commit_count": 261,
+    "direct_commit_writer_count": 105,
+    "keeps_legacy_write_path_beside_unified_commit_count": 0,
+    "legacy_version_field_writer_count": 5,
+    "multi_resolver_count": 4,
+    "non_canonical_resolver_only_count": 64,
+    "resolver_count": 72,
+    "retired_by_domain": {
+      "custom": 1,
+      "orchestrator_side_effect": 1
+    },
+    "retired_writer_count": 2,
+    "row_count": 320,
+    "save_orchestrator_writer_count": 4,
+    "swallowing_writer_count": 114,
+    "unadjudicated_count": 270,
+    "unadjudicated_writer_count": 236,
+    "version_field_write_histogram": {
+      "file_version": 5,
+      "parsed_data.schema_version": 1
+    },
+    "writer_count": 269,
+    "writer_without_characterization_test_count": 208,
+    "writes_unified_content_revision_count": 1
+  },
+  "representation_upgrade_lane_after": [
+    {
+      "candidate_calls": [
+        "create_upgrade_candidate",
+        "stage_upgrade_candidate"
+      ],
+      "commit_receivers": [],
+      "function_id": "app.services.workpaper_sync.excel_instrumentation::ExcelInstrumentationUpgrader.stage_and_register_candidate",
+      "revision_bump_calls": [],
+      "sql_update_columns": [],
+      "version_fields_written": []
+    }
+  ],
+  "changed_rows": [
+    {
+      "writer_id": "app.routers.a171_ai_generate::a171_sync_from_docx",
+      "attribution": "MINE-NEW-KEYS-ONLY",
+      "changed_fields": []
+    },
+    {
+      "writer_id": "app.routers.a176_docx_sync::a176_sync_from_docx",
+      "attribution": "MINE-NEW-KEYS-ONLY",
+      "changed_fields": []
+    },
+    {
+      "writer_id": "app.routers.a17_summary::independence_import_b3_periods",
+      "attribution": "MINE-NEW-KEYS-ONLY",
+      "changed_fields": []
+    },
+    {
+      "writer_id": "app.routers.a21_review::review_sign",
+      "attribution": "MINE-NEW-KEYS-ONLY",
+      "changed_fields": []
+    },
+    {
+      "writer_id": "app.routers.a21_review::review_unlock",
+      "attribution": "MINE-NEW-KEYS-ONLY",
+      "changed_fields": []
+    },
+    {
+      "writer_id": "app.routers.attachments::download_attachment",
+      "attribution": "MINE-NEW-KEYS-ONLY",
+      "changed_fields": []
+    },
+    {
+      "writer_id": "app.routers.attachments::preview_attachment",
+      "attribution": "MINE-NEW-KEYS-ONLY",
+      "changed_fields": []
+    },
+    {
+      "writer_id": "app.routers.audit_check::report_audit_checks",
+      "attribution": "MINE-NEW-KEYS-ONLY",
+      "changed_fields": []
+    },
+    {
+      "writer_id": "app.routers.checklist_responses::_do_batch_save",
+      "attribution": "MINE-NEW-KEYS-ONLY",
+      "changed_fields": []
+    },
+    {
+      "writer_id": "app.routers.checklist_responses::batch_save_checklist_responses",
+      "attribution": "MINE-CHARACTERIZATION-CALLSITE",
+      "changed_fields": [
+        "characterization_tests"
+      ],
+      "characterization_before": [
+        "backend/tests/test_checklist_persistence_contract_pbt.py",
+        "backend/tests/test_checklist_responses.py"
+      ],
+      "characterization_after": [
+        "backend/tests/test_checklist_persistence_contract_pbt.py"
+      ]
+    },
+    {
+      "writer_id": "app.routers.completion_phase::export_workpaper_word",
+      "attribution": "MINE-NEW-KEYS-ONLY",
+      "changed_fields": []
+    },
+    {
+      "writer_id": "app.routers.excel_html::confirm_as_template",
+      "attribution": "MINE-NEW-KEYS-ONLY",
+      "changed_fields": []
+    },
+    {
+      "writer_id": "app.routers.excel_html::diff_file_versions",
+      "attribution": "MINE-NEW-KEYS-ONLY",
+      "changed_fields": []
+    },
+    {
+      "writer_id": "app.routers.excel_html::download_file",
+      "attribution": "MINE-NEW-KEYS-ONLY",
+      "changed_fields": []
+    },
+    {
+      "writer_id": "app.routers.excel_html::execute_formulas",
+      "attribution": "MINE-NEW-KEYS-ONLY",
+      "changed_fields": []
+    },
+    {
+      "writer_id": "app.routers.excel_html::export_module_excel",
+      "attribution": "MINE-NEW-KEYS-ONLY",
+      "changed_fields": []
+    },
+    {
+      "writer_id": "app.routers.excel_html::export_module_word",
+      "attribution": "MINE-NEW-KEYS-ONLY",
+      "changed_fields": []
+    },
+    {
+      "writer_id": "app.routers.excel_html::get_cell_info",
+      "attribution": "MINE-NEW-KEYS-ONLY",
+      "changed_fields": []
+    },
+    {
+      "writer_id": "app.routers.excel_html::get_html_preview",
+      "attribution": "MINE-NEW-KEYS-ONLY",
+      "changed_fields": []
+    },
+    {
+      "writer_id": "app.routers.excel_html::list_file_versions",
+      "attribution": "MINE-NEW-KEYS-ONLY",
+      "changed_fields": []
+    },
+    {
+      "writer_id": "app.routers.excel_html::rollback_file_version",
+      "attribution": "MINE-NEW-KEYS-ONLY",
+      "changed_fields": []
+    },
+    {
+      "writer_id": "app.routers.excel_html::save_edits",
+      "attribution": "MINE-NEW-KEYS-ONLY",
+      "changed_fields": []
+    },
+    {
+      "writer_id": "app.routers.excel_html::sync_from_onlyoffice",
+      "attribution": "MINE-NEW-KEYS-ONLY",
+      "changed_fields": []
+    },
+    {
+      "writer_id": "app.routers.excel_html::upload_and_parse",
+      "attribution": "MINE-NEW-KEYS-ONLY",
+      "changed_fields": []
+    },
+    {
+      "writer_id": "app.routers.h5_oil_gas_assets::_save_rows_to_db",
+      "attribution": "MINE-NEW-KEYS-ONLY",
+      "changed_fields": []
+    },
+    {
+      "writer_id": "app.routers.h5_oil_gas_assets::h5_import_data",
+      "attribution": "MINE-NEW-KEYS-ONLY",
+      "changed_fields": []
+    },
+    {
+      "writer_id": "app.routers.h7_biological_assets::import_data",
+      "attribution": "MINE-NEW-KEYS-ONLY",
+      "changed_fields": []
+    },
+    {
+      "writer_id": "app.routers.h9_lease_liabilities::h9_import_data",
+      "attribution": "MINE-NEW-KEYS-ONLY",
+      "changed_fields": []
+    },
+    {
+      "writer_id": "app.routers.l1_short_term_loans::l1_import_data",
+      "attribution": "MINE-NEW-KEYS-ONLY",
+      "changed_fields": []
+    },
+    {
+      "writer_id": "app.routers.l2_interest_payable::l2_import_data",
+      "attribution": "MINE-NEW-KEYS-ONLY",
+      "changed_fields": []
+    },
+    {
+      "writer_id": "app.routers.l3_long_term_loans::l3_import_data",
+      "attribution": "MINE-NEW-KEYS-ONLY",
+      "changed_fields": []
+    },
+    {
+      "writer_id": "app.routers.l4_bonds_payable::l4_import_data",
+      "attribution": "MINE-NEW-KEYS-ONLY",
+      "changed_fields": []
+    },
+    {
+      "writer_id": "app.routers.l5_long_term_payables::l5_import_data",
+      "attribution": "MINE-NEW-KEYS-ONLY",
+      "changed_fields": []
+    },
+    {
+      "writer_id": "app.routers.l6_special_payables::l6_import_data",
+      "attribution": "MINE-NEW-KEYS-ONLY",
+      "changed_fields": []
+    },
+    {
+      "writer_id": "app.routers.l7_other_noncurrent_liabilities::l7_import_data",
+      "attribution": "MINE-NEW-KEYS-ONLY",
+      "changed_fields": []
+    },
+    {
+      "writer_id": "app.routers.l8_financial_expenses::l8_import_data",
+      "attribution": "MINE-NEW-KEYS-ONLY",
+      "changed_fields": []
+    },
+    {
+      "writer_id": "app.routers.m10_other_equity_instruments::m10_import_data",
+      "attribution": "MINE-NEW-KEYS-ONLY",
+      "changed_fields": []
+    },
+    {
+      "writer_id": "app.routers.m3_treasury_stock::m3_import_data",
+      "attribution": "MINE-NEW-KEYS-ONLY",
+      "changed_fields": []
+    },
+    {
+      "writer_id": "app.routers.m4_capital_reserve::m4_import_data",
+      "attribution": "MINE-NEW-KEYS-ONLY",
+      "changed_fields": []
+    },
+    {
+      "writer_id": "app.routers.m5_surplus_reserve::m5_import_data",
+      "attribution": "MINE-NEW-KEYS-ONLY",
+      "changed_fields": []
+    },
+    {
+      "writer_id": "app.routers.n2_taxes_payable::n2_import_data",
+      "attribution": "MINE-NEW-KEYS-ONLY",
+      "changed_fields": []
+    },
+    {
+      "writer_id": "app.routers.n3_deferred_tax_liabilities::n3_import_data",
+      "attribution": "MINE-NEW-KEYS-ONLY",
+      "changed_fields": []
+    },
+    {
+      "writer_id": "app.routers.n4_taxes_and_surcharges::_upsert_rows_data",
+      "attribution": "MINE-NEW-KEYS-ONLY",
+      "changed_fields": []
+    },
+    {
+      "writer_id": "app.routers.n4_taxes_and_surcharges::n4_import_data",
+      "attribution": "MINE-NEW-KEYS-ONLY",
+      "changed_fields": []
+    },
+    {
+      "writer_id": "app.routers.n5_income_tax_expense::n5_import_data",
+      "attribution": "MINE-NEW-KEYS-ONLY",
+      "changed_fields": []
+    },
+    {
+      "writer_id": "app.routers.office_preview::_resolve_local_path",
+      "attribution": "MINE-NEW-KEYS-ONLY",
+      "changed_fields": []
+    },
+    {
+      "writer_id": "app.routers.review_prompt::review_workpaper",
+      "attribution": "MINE-NEW-KEYS-ONLY",
+      "changed_fields": []
+    },
+    {
+      "writer_id": "app.routers.version_trail::rollback_version",
+      "attribution": "MINE-NEW-KEYS-ONLY",
+      "changed_fields": []
+    },
+    {
+      "writer_id": "app.routers.working_paper::update_parsed_data",
+      "attribution": "MINE-NEW-KEYS-ONLY",
+      "changed_fields": []
+    },
+    {
+      "writer_id": "app.routers.wp_ai_confirm::confirm_ai_content",
+      "attribution": "MINE-NEW-KEYS-ONLY",
+      "changed_fields": []
+    },
+    {
+      "writer_id": "app.routers.wp_download::get_cloud_url",
+      "attribution": "MINE-NEW-KEYS-ONLY",
+      "changed_fields": []
+    },
+    {
+      "writer_id": "app.routers.wp_editor_router::_prefill_word_template",
+      "attribution": "MINE-NEW-KEYS-ONLY",
+      "changed_fields": []
+    },
+    {
+      "writer_id": "app.routers.wp_editor_router::get_wp_onlyoffice_config",
+      "attribution": "MINE-NEW-KEYS-ONLY",
+      "changed_fields": []
+    },
+    {
+      "writer_id": "app.routers.wp_editor_router::parse_workpaper",
+      "attribution": "MINE-NEW-KEYS-ONLY",
+      "changed_fields": []
+    },
+    {
+      "writer_id": "app.routers.wp_editor_router::prefill_workpaper",
+      "attribution": "MINE-NEW-KEYS-ONLY",
+      "changed_fields": []
+    },
+    {
+      "writer_id": "app.routers.wp_editor_router::save_univer_data",
+      "attribution": "MINE-CHARACTERIZATION-CALLSITE",
+      "changed_fields": [
+        "characterization_tests",
+        "verdicts.has_characterization_test"
+      ],
+      "characterization_before": [
+        "backend/tests/test_univer_save_event_emission.py"
+      ],
+      "characterization_after": []
+    },
+    {
+      "writer_id": "app.routers.wp_editor_router::save_univer_data._auto_parse",
+      "attribution": "MINE-CHARACTERIZATION-CALLSITE",
+      "changed_fields": [
+        "characterization_tests",
+        "verdicts.has_characterization_test"
+      ],
+      "characterization_before": [
+        "backend/tests/test_univer_save_event_emission.py"
+      ],
+      "characterization_after": []
+    },
+    {
+      "writer_id": "app.routers.wp_f2_impairment::_maybe_apply_impairment_to_workpaper",
+      "attribution": "MINE-CHARACTERIZATION-CALLSITE",
+      "changed_fields": [
+        "characterization_tests",
+        "verdicts.has_characterization_test"
+      ],
+      "characterization_before": [
+        "backend/tests/test_f2_valuation_impairment.py",
+        "backend/tests/test_k11_schema_verification.py"
+      ],
+      "characterization_after": []
+    },
+    {
+      "writer_id": "app.routers.wp_f2_impairment::f2_impairment_analysis",
+      "attribution": "MINE-NEW-KEYS-ONLY",
+      "changed_fields": []
+    },
+    {
+      "writer_id": "app.routers.wp_f2_valuation::_maybe_apply_samples_to_workpaper",
+      "attribution": "MINE-CHARACTERIZATION-CALLSITE",
+      "changed_fields": [
+        "characterization_tests",
+        "verdicts.has_characterization_test"
+      ],
+      "characterization_before": [
+        "backend/tests/test_f2_valuation_impairment.py"
+      ],
+      "characterization_after": []
+    },
+    {
+      "writer_id": "app.routers.wp_f2_valuation::f2_valuation_sample",
+      "attribution": "MINE-NEW-KEYS-ONLY",
+      "changed_fields": []
+    },
+    {
+      "writer_id": "app.routers.wp_fine_rules::fine_extract",
+      "attribution": "MINE-NEW-KEYS-ONLY",
+      "changed_fields": []
+    },
+    {
+      "writer_id": "app.routers.wp_formula::save_formula",
+      "attribution": "MINE-NEW-KEYS-ONLY",
+      "changed_fields": []
+    },
+    {
+      "writer_id": "app.routers.wp_functional_actions::_fill_parsed_data",
+      "attribution": "MINE-NEW-KEYS-ONLY",
+      "changed_fields": []
+    },
+    {
+      "writer_id": "app.routers.wp_functional_actions::execute_workpaper_action",
+      "attribution": "MINE-NEW-KEYS-ONLY",
+      "changed_fields": []
+    },
+    {
+      "writer_id": "app.routers.wp_g_classification::_maybe_apply_classification_to_workpaper",
+      "attribution": "MINE-NEW-KEYS-ONLY",
+      "changed_fields": []
+    },
+    {
+      "writer_id": "app.routers.wp_g_classification::g1_classification_check",
+      "attribution": "MINE-NEW-KEYS-ONLY",
+      "changed_fields": []
+    },
+    {
+      "writer_id": "app.routers.wp_g_ecl::_maybe_apply_ecl_to_workpaper",
+      "attribution": "MINE-CHARACTERIZATION-CALLSITE",
+      "changed_fields": [
+        "characterization_tests"
+      ],
+      "characterization_before": [
+        "backend/tests/test_g_ecl_model.py",
+        "backend/tests/test_k11_schema_verification.py"
+      ],
+      "characterization_after": [
+        "backend/tests/test_g_ecl_model.py"
+      ]
+    },
+    {
+      "writer_id": "app.routers.wp_g_ecl::g_ecl_calc",
+      "attribution": "MINE-NEW-KEYS-ONLY",
+      "changed_fields": []
+    },
+    {
+      "writer_id": "app.routers.wp_g_fair_value::_maybe_apply_fair_value_to_workpaper",
+      "attribution": "MINE-NEW-KEYS-ONLY",
+      "changed_fields": []
+    },
+    {
+      "writer_id": "app.routers.wp_g_fair_value::g_fair_value_test",
+      "attribution": "MINE-NEW-KEYS-ONLY",
+      "changed_fields": []
+    },
+    {
+      "writer_id": "app.routers.wp_guidance_chat::_resolve_template_path",
+      "attribution": "MINE-NEW-KEYS-ONLY",
+      "changed_fields": []
+    },
+    {
+      "writer_id": "app.routers.wp_guidance_chat::get_workpaper_guidance",
+      "attribution": "MINE-NEW-KEYS-ONLY",
+      "changed_fields": []
+    },
+    {
+      "writer_id": "app.routers.wp_guidance_chat::workpaper_ai_chat",
+      "attribution": "MINE-NEW-KEYS-ONLY",
+      "changed_fields": []
+    },
+    {
+      "writer_id": "app.routers.wp_h_depreciation::_maybe_apply_depreciation_to_workpaper",
+      "attribution": "MINE-CHARACTERIZATION-CALLSITE",
+      "changed_fields": [
+        "characterization_tests",
+        "verdicts.has_characterization_test"
+      ],
+      "characterization_before": [
+        "backend/tests/test_h1_depreciation_engine.py"
+      ],
+      "characterization_after": []
+    },
+    {
+      "writer_id": "app.routers.wp_h_depreciation::h1_depreciation_calc",
+      "attribution": "MINE-CHARACTERIZATION-CALLSITE",
+      "changed_fields": [
+        "characterization_tests",
+        "verdicts.has_characterization_test"
+      ],
+      "characterization_before": [
+        "backend/tests/test_h1_depreciation_engine.py"
+      ],
+      "characterization_after": []
+    },
+    {
+      "writer_id": "app.routers.wp_h_impairment::_maybe_apply_impairment_to_workpaper",
+      "attribution": "MINE-CHARACTERIZATION-CALLSITE",
+      "changed_fields": [
+        "characterization_tests"
+      ],
+      "characterization_before": [
+        "backend/tests/test_h1_impairment_analysis.py",
+        "backend/tests/test_k11_schema_verification.py"
+      ],
+      "characterization_after": [
+        "backend/tests/test_h1_impairment_analysis.py"
+      ]
+    },
+    {
+      "writer_id": "app.routers.wp_h_impairment::h1_impairment_analysis",
+      "attribution": "MINE-CHARACTERIZATION-CALLSITE",
+      "changed_fields": [
+        "characterization_tests",
+        "verdicts.has_characterization_test"
+      ],
+      "characterization_before": [
+        "backend/tests/test_h1_impairment_analysis.py"
+      ],
+      "characterization_after": []
+    },
+    {
+      "writer_id": "app.routers.wp_html_save::save_html_data",
+      "attribution": "MINE-NEW-KEYS-ONLY",
+      "changed_fields": []
+    },
+    {
+      "writer_id": "app.routers.wp_i_amortization::_execute",
+      "attribution": "MINE-NEW-KEYS-ONLY",
+      "changed_fields": []
+    },
+    {
+      "writer_id": "app.routers.wp_i_amortization::_maybe_apply_amortization_to_workpaper",
+      "attribution": "MINE-NEW-KEYS-ONLY",
+      "changed_fields": []
+    },
+    {
+      "writer_id": "app.routers.wp_i_capitalization::_maybe_apply_capitalization_check_to_workpaper",
+      "attribution": "MINE-NEW-KEYS-ONLY",
+      "changed_fields": []
+    },
+    {
+      "writer_id": "app.routers.wp_i_capitalization::i2_capitalization_check",
+      "attribution": "MINE-NEW-KEYS-ONLY",
+      "changed_fields": []
+    },
+    {
+      "writer_id": "app.routers.wp_i_goodwill::_maybe_apply_goodwill_impairment_to_workpaper",
+      "attribution": "MINE-CHARACTERIZATION-CALLSITE",
+      "changed_fields": [
+        "characterization_tests"
+      ],
+      "characterization_before": [
+        "backend/tests/test_i3_goodwill_impairment.py",
+        "backend/tests/test_k11_schema_verification.py"
+      ],
+      "characterization_after": [
+        "backend/tests/test_i3_goodwill_impairment.py"
+      ]
+    },
+    {
+      "writer_id": "app.routers.wp_i_goodwill::i3_goodwill_impairment_analysis",
+      "attribution": "MINE-NEW-KEYS-ONLY",
+      "changed_fields": []
+    },
+    {
+      "writer_id": "app.routers.wp_j_payroll_calc::_maybe_apply_payroll_to_workpaper",
+      "attribution": "MINE-NEW-KEYS-ONLY",
+      "changed_fields": []
+    },
+    {
+      "writer_id": "app.routers.wp_j_payroll_calc::j1_payroll_calc",
+      "attribution": "MINE-CHARACTERIZATION-CALLSITE",
+      "changed_fields": [
+        "characterization_tests",
+        "verdicts.has_characterization_test"
+      ],
+      "characterization_before": [
+        "backend/tests/test_j_payroll_calc.py"
+      ],
+      "characterization_after": []
+    },
+    {
+      "writer_id": "app.routers.wp_j_share_payment::_maybe_apply_share_payment_to_workpaper",
+      "attribution": "MINE-NEW-KEYS-ONLY",
+      "changed_fields": []
+    },
+    {
+      "writer_id": "app.routers.wp_j_share_payment::j3_share_payment_calc",
+      "attribution": "MINE-CHARACTERIZATION-CALLSITE",
+      "changed_fields": [
+        "characterization_tests",
+        "verdicts.has_characterization_test"
+      ],
+      "characterization_before": [
+        "backend/tests/test_j_share_payment.py"
+      ],
+      "characterization_after": []
+    },
+    {
+      "writer_id": "app.routers.wp_k_expense_analysis::_maybe_apply_analysis_to_workpaper",
+      "attribution": "MINE-NEW-KEYS-ONLY",
+      "changed_fields": []
+    },
+    {
+      "writer_id": "app.routers.wp_k_expense_analysis::k_expense_analysis",
+      "attribution": "MINE-CHARACTERIZATION-CALLSITE",
+      "changed_fields": [
+        "characterization_tests",
+        "verdicts.has_characterization_test"
+      ],
+      "characterization_before": [
+        "backend/tests/test_k_expense_analysis.py"
+      ],
+      "characterization_after": []
+    },
+    {
+      "writer_id": "app.routers.wp_k_impairment_summary::_maybe_apply_summary_to_workpaper",
+      "attribution": "MINE-NEW-KEYS-ONLY",
+      "changed_fields": []
+    },
+    {
+      "writer_id": "app.routers.wp_k_impairment_summary::k11_impairment_summary",
+      "attribution": "MINE-CHARACTERIZATION-CALLSITE",
+      "changed_fields": [
+        "characterization_tests",
+        "verdicts.has_characterization_test"
+      ],
+      "characterization_before": [
+        "backend/tests/test_k_impairment_summary.py"
+      ],
+      "characterization_after": []
+    },
+    {
+      "writer_id": "app.routers.wp_l_bond_amortization::_maybe_apply_to_workpaper",
+      "attribution": "MINE-NEW-KEYS-ONLY",
+      "changed_fields": []
+    },
+    {
+      "writer_id": "app.routers.wp_l_bond_amortization::l_bond_amortization",
+      "attribution": "MINE-CHARACTERIZATION-CALLSITE",
+      "changed_fields": [
+        "characterization_tests",
+        "verdicts.has_characterization_test"
+      ],
+      "characterization_before": [
+        "backend/tests/test_l_bond_amortization.py"
+      ],
+      "characterization_after": []
+    },
+    {
+      "writer_id": "app.routers.wp_l_interest_calc::_maybe_apply_interest_to_workpaper",
+      "attribution": "MINE-CHARACTERIZATION-CALLSITE",
+      "changed_fields": [
+        "characterization_tests",
+        "verdicts.has_characterization_test"
+      ],
+      "characterization_before": [
+        "backend/tests/test_l_interest_calc.py"
+      ],
+      "characterization_after": []
+    },
+    {
+      "writer_id": "app.routers.wp_l_interest_calc::l_interest_calc",
+      "attribution": "MINE-CHARACTERIZATION-CALLSITE",
+      "changed_fields": [
+        "characterization_tests",
+        "verdicts.has_characterization_test"
+      ],
+      "characterization_before": [
+        "backend/tests/test_l_interest_calc.py"
+      ],
+      "characterization_after": []
+    },
+    {
+      "writer_id": "app.routers.wp_m_equity_movement::_maybe_apply_equity_to_workpaper",
+      "attribution": "MINE-CHARACTERIZATION-CALLSITE",
+      "changed_fields": [
+        "characterization_tests",
+        "verdicts.has_characterization_test"
+      ],
+      "characterization_before": [
+        "backend/tests/test_m_equity_movement.py"
+      ],
+      "characterization_after": []
+    },
+    {
+      "writer_id": "app.routers.wp_m_equity_movement::m_equity_movement",
+      "attribution": "MINE-NEW-KEYS-ONLY",
+      "changed_fields": []
+    },
+    {
+      "writer_id": "app.routers.wp_n_income_tax_calc::_maybe_apply_income_tax_to_workpaper",
+      "attribution": "MINE-CHARACTERIZATION-CALLSITE",
+      "changed_fields": [
+        "characterization_tests",
+        "verdicts.has_characterization_test"
+      ],
+      "characterization_before": [
+        "backend/tests/test_n_income_tax_calc.py"
+      ],
+      "characterization_after": []
+    },
+    {
+      "writer_id": "app.routers.wp_n_income_tax_calc::n_income_tax_calc",
+      "attribution": "MINE-CHARACTERIZATION-CALLSITE",
+      "changed_fields": [
+        "characterization_tests",
+        "verdicts.has_characterization_test"
+      ],
+      "characterization_before": [
+        "backend/tests/test_n_income_tax_calc.py"
+      ],
+      "characterization_after": []
+    },
+    {
+      "writer_id": "app.routers.wp_onlyoffice_router::_onlyoffice_storage_dir",
+      "attribution": "MINE-NEW-KEYS-ONLY",
+      "changed_fields": []
+    },
+    {
+      "writer_id": "app.routers.wp_onlyoffice_router::_resolve_wp_file",
+      "attribution": "MINE-NEW-KEYS-ONLY",
+      "changed_fields": []
+    },
+    {
+      "writer_id": "app.routers.wp_onlyoffice_router::get_sheet_onlyoffice_config",
+      "attribution": "MINE-CHARACTERIZATION-CALLSITE",
+      "changed_fields": [
+        "characterization_tests",
+        "verdicts.has_characterization_test"
+      ],
+      "characterization_before": [
+        "backend/tests/test_wp_onlyoffice_router.py"
+      ],
+      "characterization_after": []
+    },
+    {
+      "writer_id": "app.routers.wp_onlyoffice_router::get_sheet_wopi_contents",
+      "attribution": "MINE-NEW-KEYS-ONLY",
+      "changed_fields": []
+    },
+    {
+      "writer_id": "app.routers.wp_onlyoffice_router::get_template_structure",
+      "attribution": "MINE-NEW-KEYS-ONLY",
+      "changed_fields": []
+    },
+    {
+      "writer_id": "app.routers.wp_onlyoffice_router::get_whole_excel_grid",
+      "attribution": "MINE-NEW-KEYS-ONLY",
+      "changed_fields": []
+    },
+    {
+      "writer_id": "app.routers.wp_onlyoffice_router::import_structured_docx",
+      "attribution": "MINE-NEW-KEYS-ONLY",
+      "changed_fields": []
+    },
+    {
+      "writer_id": "app.routers.wp_onlyoffice_router::post_sheet_onlyoffice_callback",
+      "attribution": "MINE-CHARACTERIZATION-CALLSITE",
+      "changed_fields": [
+        "characterization_tests",
+        "verdicts.has_characterization_test"
+      ],
+      "characterization_before": [
+        "backend/tests/test_wp_onlyoffice_router.py"
+      ],
+      "characterization_after": []
+    },
+    {
+      "writer_id": "app.routers.wp_prefill_preview::prefill_apply",
+      "attribution": "MINE-NEW-KEYS-ONLY",
+      "changed_fields": []
+    },
+    {
+      "writer_id": "app.routers.wp_prefill_preview::prefill_preview",
+      "attribution": "MINE-NEW-KEYS-ONLY",
+      "changed_fields": []
+    },
+    {
+      "writer_id": "app.routers.wp_procedure_status::update_procedure_categories",
+      "attribution": "MINE-NEW-KEYS-ONLY",
+      "changed_fields": []
+    },
+    {
+      "writer_id": "app.routers.wp_render_config::_get_render_config_impl",
+      "attribution": "MINE-NEW-KEYS-ONLY",
+      "changed_fields": []
+    },
+    {
+      "writer_id": "app.routers.wp_render_config::export_template",
+      "attribution": "MINE-NEW-KEYS-ONLY",
+      "changed_fields": []
+    },
+    {
+      "writer_id": "app.routers.wp_render_config_helpers::_resolve_template_path",
+      "attribution": "MINE-NEW-KEYS-ONLY",
+      "changed_fields": []
+    },
+    {
+      "writer_id": "app.routers.wp_render_strategies._a_program::_generate_a_program_data",
+      "attribution": "MINE-NEW-KEYS-ONLY",
+      "changed_fields": []
+    },
+    {
+      "writer_id": "app.routers.wp_render_strategies._c24_import_export::c24_import_data",
+      "attribution": "MINE-NEW-KEYS-ONLY",
+      "changed_fields": []
+    },
+    {
+      "writer_id": "app.routers.wp_render_strategies._d1_disclosure_export::import_disclosure_data",
+      "attribution": "MINE-NEW-KEYS-ONLY",
+      "changed_fields": []
+    },
+    {
+      "writer_id": "app.routers.wp_render_strategies._d1_import_export._impl::_import_d1_13_data",
+      "attribution": "MINE-NEW-KEYS-ONLY",
+      "changed_fields": []
+    },
+    {
+      "writer_id": "app.routers.wp_render_strategies._d1_import_export._impl::_import_d1_14_data",
+      "attribution": "MINE-NEW-KEYS-ONLY",
+      "changed_fields": []
+    },
+    {
+      "writer_id": "app.routers.wp_render_strategies._d1_import_export._impl::_import_d1_15_data",
+      "attribution": "MINE-NEW-KEYS-ONLY",
+      "changed_fields": []
+    },
+    {
+      "writer_id": "app.routers.wp_render_strategies._d1_import_export._impl::_import_d1_16_data",
+      "attribution": "MINE-NEW-KEYS-ONLY",
+      "changed_fields": []
+    },
+    {
+      "writer_id": "app.routers.wp_render_strategies._d1_import_export._impl::_import_d1_1_data",
+      "attribution": "MINE-NEW-KEYS-ONLY",
+      "changed_fields": []
+    },
+    {
+      "writer_id": "app.routers.wp_render_strategies._d1_import_export._impl::_import_d1_4_data",
+      "attribution": "MINE-NEW-KEYS-ONLY",
+      "changed_fields": []
+    },
+    {
+      "writer_id": "app.routers.wp_render_strategies._d1_import_export._impl::_import_d1_5_data",
+      "attribution": "MINE-NEW-KEYS-ONLY",
+      "changed_fields": []
+    },
+    {
+      "writer_id": "app.routers.wp_render_strategies._d1_import_export._impl::_import_d1_7_data",
+      "attribution": "MINE-NEW-KEYS-ONLY",
+      "changed_fields": []
+    },
+    {
+      "writer_id": "app.routers.wp_render_strategies._d1_import_export._impl::_persist_d1_5_entries",
+      "attribution": "MINE-NEW-KEYS-ONLY",
+      "changed_fields": []
+    },
+    {
+      "writer_id": "app.routers.wp_render_strategies._d1_import_export._impl::_upsert_d1_cell",
+      "attribution": "MINE-NEW-KEYS-ONLY",
+      "changed_fields": []
+    },
+    {
+      "writer_id": "app.routers.wp_render_strategies._d1_import_export._impl::d1_ecl_import_data",
+      "attribution": "MINE-NEW-KEYS-ONLY",
+      "changed_fields": []
+    },
+    {
+      "writer_id": "app.routers.wp_render_strategies._d1_import_export._impl::d1_import_aux_balance",
+      "attribution": "MINE-NEW-KEYS-ONLY",
+      "changed_fields": []
+    },
+    {
+      "writer_id": "app.routers.wp_render_strategies._d1_import_export._impl::d1_import_data",
+      "attribution": "MINE-NEW-KEYS-ONLY",
+      "changed_fields": []
+    },
+    {
+      "writer_id": "app.routers.wp_render_strategies._d2_disclosure_import_export::_upsert_text",
+      "attribution": "MINE-NEW-KEYS-ONLY",
+      "changed_fields": []
+    },
+    {
+      "writer_id": "app.routers.wp_render_strategies._d2_disclosure_import_export::import_disclosure_data",
+      "attribution": "MINE-NEW-KEYS-ONLY",
+      "changed_fields": []
+    },
+    {
+      "writer_id": "app.routers.wp_render_strategies._d2_import_export::_import_d2_1_data",
+      "attribution": "MINE-NEW-KEYS-ONLY",
+      "changed_fields": []
+    },
+    {
+      "writer_id": "app.routers.wp_render_strategies._d2_import_export::_import_d2_5_data",
+      "attribution": "MINE-NEW-KEYS-ONLY",
+      "changed_fields": []
+    },
+    {
+      "writer_id": "app.routers.wp_render_strategies._d2_import_export::_upsert_d2_adj_cell",
+      "attribution": "MINE-NEW-KEYS-ONLY",
+      "changed_fields": []
+    },
+    {
+      "writer_id": "app.routers.wp_render_strategies._d2_import_export::import_data",
+      "attribution": "MINE-NEW-KEYS-ONLY",
+      "changed_fields": []
+    },
+    {
+      "writer_id": "app.routers.wp_render_strategies._d3_import_export::_persist_d3_1_rows",
+      "attribution": "MINE-NEW-KEYS-ONLY",
+      "changed_fields": []
+    },
+    {
+      "writer_id": "app.routers.wp_render_strategies._d3_import_export::_upsert_response",
+      "attribution": "MINE-NEW-KEYS-ONLY",
+      "changed_fields": []
+    },
+    {
+      "writer_id": "app.routers.wp_render_strategies._d3_import_export::d3_import_aux_balance",
+      "attribution": "MINE-NEW-KEYS-ONLY",
+      "changed_fields": []
+    },
+    {
+      "writer_id": "app.routers.wp_render_strategies._d3_import_export::d3_import_data",
+      "attribution": "MINE-NEW-KEYS-ONLY",
+      "changed_fields": []
+    },
+    {
+      "writer_id": "app.routers.wp_render_strategies._d4_import_export::d4_import_data",
+      "attribution": "MINE-NEW-KEYS-ONLY",
+      "changed_fields": []
+    },
+    {
+      "writer_id": "app.routers.wp_render_strategies._d5_import_export::_persist_d5_1_rows",
+      "attribution": "MINE-NEW-KEYS-ONLY",
+      "changed_fields": []
+    },
+    {
+      "writer_id": "app.routers.wp_render_strategies._d5_import_export::_upsert_d5_response",
+      "attribution": "MINE-NEW-KEYS-ONLY",
+      "changed_fields": []
+    },
+    {
+      "writer_id": "app.routers.wp_render_strategies._d5_import_export::d5_import_aux_balance",
+      "attribution": "MINE-NEW-KEYS-ONLY",
+      "changed_fields": []
+    },
+    {
+      "writer_id": "app.routers.wp_render_strategies._d5_import_export::d5_import_data",
+      "attribution": "MINE-NEW-KEYS-ONLY",
+      "changed_fields": []
+    },
+    {
+      "writer_id": "app.routers.wp_render_strategies._d6_import_export::d6_import_aux_balance",
+      "attribution": "MINE-NEW-KEYS-ONLY",
+      "changed_fields": []
+    },
+    {
+      "writer_id": "app.routers.wp_render_strategies._d6_import_export::d6_import_data",
+      "attribution": "MINE-NEW-KEYS-ONLY",
+      "changed_fields": []
+    },
+    {
+      "writer_id": "app.routers.wp_render_strategies._d7_import_export::_import_d7_1_data",
+      "attribution": "MINE-NEW-KEYS-ONLY",
+      "changed_fields": []
+    },
+    {
+      "writer_id": "app.routers.wp_render_strategies._d7_import_export::_upsert_d7_cell",
+      "attribution": "MINE-NEW-KEYS-ONLY",
+      "changed_fields": []
+    },
+    {
+      "writer_id": "app.routers.wp_render_strategies._d7_import_export::d7_import_aux_balance",
+      "attribution": "MINE-NEW-KEYS-ONLY",
+      "changed_fields": []
+    },
+    {
+      "writer_id": "app.routers.wp_render_strategies._d7_import_export::d7_import_data",
+      "attribution": "MINE-NEW-KEYS-ONLY",
+      "changed_fields": []
+    },
+    {
+      "writer_id": "app.routers.wp_render_strategies._e1_import_export::e1_import_data",
+      "attribution": "MINE-NEW-KEYS-ONLY",
+      "changed_fields": []
+    },
+    {
+      "writer_id": "app.routers.wp_render_strategies._f0_import_export::_save_html_data",
+      "attribution": "MINE-NEW-KEYS-ONLY",
+      "changed_fields": []
+    },
+    {
+      "writer_id": "app.routers.wp_render_strategies._f0_import_export::import_data",
+      "attribution": "MINE-NEW-KEYS-ONLY",
+      "changed_fields": []
+    },
+    {
+      "writer_id": "app.routers.wp_render_strategies._f2_disclosure_import_export::_upsert_remark",
+      "attribution": "MINE-NEW-KEYS-ONLY",
+      "changed_fields": []
+    },
+    {
+      "writer_id": "app.routers.wp_render_strategies._f2_disclosure_import_export::import_disclosure_data",
+      "attribution": "MINE-NEW-KEYS-ONLY",
+      "changed_fields": []
+    },
+    {
+      "writer_id": "app.routers.wp_render_strategies._f2_import_export::_import_f2_1_data",
+      "attribution": "MINE-NEW-KEYS-ONLY",
+      "changed_fields": []
+    },
+    {
+      "writer_id": "app.routers.wp_render_strategies._f2_import_export::f2_import_data",
+      "attribution": "MINE-NEW-KEYS-ONLY",
+      "changed_fields": []
+    },
+    {
+      "writer_id": "app.routers.wp_render_strategies._f2_stocktake_plan_sync::_ensure_template",
+      "attribution": "MINE-NEW-KEYS-ONLY",
+      "changed_fields": []
+    },
+    {
+      "writer_id": "app.routers.wp_render_strategies._f2_stocktake_plan_sync::_onlyoffice_dir",
+      "attribution": "MINE-NEW-KEYS-ONLY",
+      "changed_fields": []
+    },
+    {
+      "writer_id": "app.routers.wp_render_strategies._f2_stocktake_plan_sync::_save_fields",
+      "attribution": "MINE-NEW-KEYS-ONLY",
+      "changed_fields": []
+    },
+    {
+      "writer_id": "app.routers.wp_render_strategies._f2_stocktake_plan_sync::f2_st_plan_sync_from_oo",
+      "attribution": "MINE-NEW-KEYS-ONLY",
+      "changed_fields": []
+    },
+    {
+      "writer_id": "app.routers.wp_render_strategies._f2_stocktake_plan_sync::f2_st_plan_sync_to_oo",
+      "attribution": "MINE-NEW-KEYS-ONLY",
+      "changed_fields": []
+    },
+    {
+      "writer_id": "app.routers.wp_render_strategies._f2_stocktake_summary_sync::_ensure_template",
+      "attribution": "MINE-NEW-KEYS-ONLY",
+      "changed_fields": []
+    },
+    {
+      "writer_id": "app.routers.wp_render_strategies._f2_stocktake_summary_sync::_onlyoffice_dir",
+      "attribution": "MINE-NEW-KEYS-ONLY",
+      "changed_fields": []
+    },
+    {
+      "writer_id": "app.routers.wp_render_strategies._f2_stocktake_summary_sync::_save_fields",
+      "attribution": "MINE-NEW-KEYS-ONLY",
+      "changed_fields": []
+    },
+    {
+      "writer_id": "app.routers.wp_render_strategies._f2_stocktake_summary_sync::f2_st_summary_sync_from_oo",
+      "attribution": "MINE-NEW-KEYS-ONLY",
+      "changed_fields": []
+    },
+    {
+      "writer_id": "app.routers.wp_render_strategies._f2_stocktake_summary_sync::f2_st_summary_sync_to_oo",
+      "attribution": "MINE-NEW-KEYS-ONLY",
+      "changed_fields": []
+    },
+    {
+      "writer_id": "app.routers.wp_render_strategies._g0_confirmation_import_export::_save_html_data",
+      "attribution": "MINE-NEW-KEYS-ONLY",
+      "changed_fields": []
+    },
+    {
+      "writer_id": "app.routers.wp_render_strategies._g0_confirmation_import_export::import_data",
+      "attribution": "MINE-NEW-KEYS-ONLY",
+      "changed_fields": []
+    },
+    {
+      "writer_id": "app.routers.wp_render_strategies._g11_investment_income_import_export::_upsert_g11_adj_store",
+      "attribution": "MINE-NEW-KEYS-ONLY",
+      "changed_fields": []
+    },
+    {
+      "writer_id": "app.routers.wp_render_strategies._g11_investment_income_import_export::import_data",
+      "attribution": "MINE-NEW-KEYS-ONLY",
+      "changed_fields": []
+    },
+    {
+      "writer_id": "app.routers.wp_render_strategies._g11_investment_income_validate::_upsert_adj_store",
+      "attribution": "MINE-NEW-KEYS-ONLY",
+      "changed_fields": []
+    },
+    {
+      "writer_id": "app.routers.wp_render_strategies._g11_investment_income_validate::_upsert_conclusion",
+      "attribution": "MINE-NEW-KEYS-ONLY",
+      "changed_fields": []
+    },
+    {
+      "writer_id": "app.routers.wp_render_strategies._g11_investment_income_validate::save_g11_adjudication",
+      "attribution": "MINE-NEW-KEYS-ONLY",
+      "changed_fields": []
+    },
+    {
+      "writer_id": "app.routers.wp_render_strategies._g6_other_bond_investment_main_service::G6OtherBondInvestmentMainService.save_adjudication",
+      "attribution": "MINE-CHARACTERIZATION-CALLSITE",
+      "changed_fields": [
+        "characterization_tests",
+        "verdicts.has_characterization_test"
+      ],
+      "characterization_before": [
+        "backend/tests/test_g6_other_bond_investment_main_api.py"
+      ],
+      "characterization_after": []
+    },
+    {
+      "writer_id": "app.routers.wp_render_strategies._g7_long_term_equity_main_service::G7LongTermEquityMainService.save_adjudication",
+      "attribution": "MINE-CHARACTERIZATION-CALLSITE",
+      "changed_fields": [
+        "characterization_tests",
+        "verdicts.has_characterization_test"
+      ],
+      "characterization_before": [
+        "backend/tests/test_g7_long_term_equity_main_pbt.py"
+      ],
+      "characterization_after": []
+    },
+    {
+      "writer_id": "app.routers.wp_render_strategies._g7_long_term_equity_subsidiary_service::G7SubsidiaryService.save_control_judgment",
+      "attribution": "MINE-CHARACTERIZATION-CALLSITE",
+      "changed_fields": [
+        "characterization_tests",
+        "verdicts.has_characterization_test"
+      ],
+      "characterization_before": [
+        "backend/tests/test_g7_sub_formula_pbt.py",
+        "backend/tests/test_g7_sub_unit.py"
+      ],
+      "characterization_after": []
+    },
+    {
+      "writer_id": "app.routers.wp_render_strategies._g7_long_term_equity_subsidiary_service::G7SubsidiaryService.save_measurement",
+      "attribution": "MINE-CHARACTERIZATION-CALLSITE",
+      "changed_fields": [
+        "characterization_tests",
+        "verdicts.has_characterization_test"
+      ],
+      "characterization_before": [
+        "backend/tests/test_g7_sub_formula_pbt.py",
+        "backend/tests/test_g7_sub_unit.py"
+      ],
+      "characterization_after": []
+    },
+    {
+      "writer_id": "app.routers.wp_render_strategies._h0_confirmation_import_export::_save_html_data",
+      "attribution": "MINE-NEW-KEYS-ONLY",
+      "changed_fields": []
+    },
+    {
+      "writer_id": "app.routers.wp_render_strategies._h0_confirmation_import_export::import_data",
+      "attribution": "MINE-NEW-KEYS-ONLY",
+      "changed_fields": []
+    },
+    {
+      "writer_id": "app.routers.wp_render_strategies._h10_asset_disposal_income_validate::_upsert_adj_store",
+      "attribution": "MINE-NEW-KEYS-ONLY",
+      "changed_fields": []
+    },
+    {
+      "writer_id": "app.routers.wp_render_strategies._h10_asset_disposal_income_validate::_upsert_conclusion",
+      "attribution": "MINE-NEW-KEYS-ONLY",
+      "changed_fields": []
+    },
+    {
+      "writer_id": "app.routers.wp_render_strategies._h10_asset_disposal_income_validate::save_h10_adjudication",
+      "attribution": "MINE-NEW-KEYS-ONLY",
+      "changed_fields": []
+    },
+    {
+      "writer_id": "app.routers.wp_render_strategies._j1_disclosure_import_export::_upsert_remark",
+      "attribution": "MINE-NEW-KEYS-ONLY",
+      "changed_fields": []
+    },
+    {
+      "writer_id": "app.routers.wp_render_strategies._j1_disclosure_import_export::import_disclosure_data",
+      "attribution": "MINE-NEW-KEYS-ONLY",
+      "changed_fields": []
+    },
+    {
+      "writer_id": "app.routers.wp_render_strategies._j1_import_export::_upsert_items",
+      "attribution": "MINE-NEW-KEYS-ONLY",
+      "changed_fields": []
+    },
+    {
+      "writer_id": "app.routers.wp_render_strategies._j1_import_export::import_data",
+      "attribution": "MINE-CHARACTERIZATION-CALLSITE",
+      "changed_fields": [
+        "characterization_tests",
+        "verdicts.has_characterization_test"
+      ],
+      "characterization_before": [
+        "backend/tests/test_j1_disclosure_import_export.py"
+      ],
+      "characterization_after": []
+    },
+    {
+      "writer_id": "app.routers.wp_render_strategies._j3_import_export::import_data",
+      "attribution": "MINE-NEW-KEYS-ONLY",
+      "changed_fields": []
+    },
+    {
+      "writer_id": "app.routers.wp_render_strategies._k0_confirmation_import_export::_save_html_data",
+      "attribution": "MINE-NEW-KEYS-ONLY",
+      "changed_fields": []
+    },
+    {
+      "writer_id": "app.routers.wp_render_strategies._k0_confirmation_import_export::import_data",
+      "attribution": "MINE-NEW-KEYS-ONLY",
+      "changed_fields": []
+    },
+    {
+      "writer_id": "app.routers.wp_render_strategies._k1_import_export::_k1_1_import_handler",
+      "attribution": "MINE-NEW-KEYS-ONLY",
+      "changed_fields": []
+    },
+    {
+      "writer_id": "app.routers.wp_render_strategies._k1_import_export::_k1_6_import_handler",
+      "attribution": "MINE-NEW-KEYS-ONLY",
+      "changed_fields": []
+    },
+    {
+      "writer_id": "app.routers.wp_render_strategies._k1_import_export::_upsert_remark_text",
+      "attribution": "MINE-NEW-KEYS-ONLY",
+      "changed_fields": []
+    },
+    {
+      "writer_id": "app.routers.wp_render_strategies._l0_confirmation_import_export::_save_html_data",
+      "attribution": "MINE-NEW-KEYS-ONLY",
+      "changed_fields": []
+    },
+    {
+      "writer_id": "app.routers.wp_render_strategies._l0_confirmation_import_export::import_data",
+      "attribution": "MINE-NEW-KEYS-ONLY",
+      "changed_fields": []
+    },
+    {
+      "writer_id": "app.routers.wp_render_strategies._x3_adjustment_import_export::_delete_many",
+      "attribution": "MINE-NEW-KEYS-ONLY",
+      "changed_fields": []
+    },
+    {
+      "writer_id": "app.routers.wp_render_strategies._x3_adjustment_import_export::write_rows",
+      "attribution": "MINE-CHARACTERIZATION-CALLSITE",
+      "changed_fields": [
+        "characterization_tests",
+        "verdicts.has_characterization_test"
+      ],
+      "characterization_before": [
+        "backend/tests/test_x3_roundtrip_live.py",
+        "backend/tests/test_x3_roundtrip_property.py"
+      ],
+      "characterization_after": []
+    },
+    {
+      "writer_id": "app.routers.wp_structure::save_structure",
+      "attribution": "MINE-NEW-KEYS-ONLY",
+      "changed_fields": []
+    },
+    {
+      "writer_id": "app.routers.wp_template::_create_one_custom_workpaper",
+      "attribution": "MINE-CHARACTERIZATION-CALLSITE",
+      "changed_fields": [
+        "characterization_tests",
+        "verdicts.has_characterization_test"
+      ],
+      "characterization_before": [
+        "backend/tests/test_custom_workpaper_batch.py"
+      ],
+      "characterization_after": []
+    },
+    {
+      "writer_id": "app.routers.wp_template::generate_from_codes",
+      "attribution": "MINE-NEW-KEYS-ONLY",
+      "changed_fields": []
+    },
+    {
+      "writer_id": "app.routers.wp_template_docx::convert_docx_to_univer_doc",
+      "attribution": "MINE-NEW-KEYS-ONLY",
+      "changed_fields": []
+    },
+    {
+      "writer_id": "app.routers.wp_template_download::download_template_by_code",
+      "attribution": "MINE-NEW-KEYS-ONLY",
+      "changed_fields": []
+    },
+    {
+      "writer_id": "app.routers.wp_template_download::download_template_prefilled",
+      "attribution": "MINE-NEW-KEYS-ONLY",
+      "changed_fields": []
+    },
+    {
+      "writer_id": "app.routers.wp_template_download::preview_template_as_pdf",
+      "attribution": "MINE-NEW-KEYS-ONLY",
+      "changed_fields": []
+    },
+    {
+      "writer_id": "app.routers.wp_user_formulas::restore_preset_formula",
+      "attribution": "MINE-NEW-KEYS-ONLY",
+      "changed_fields": []
+    },
+    {
+      "writer_id": "app.routers.wp_user_formulas::update_user_formulas",
+      "attribution": "MINE-NEW-KEYS-ONLY",
+      "changed_fields": []
+    },
+    {
+      "writer_id": "app.services.a13_communication_draft::_persist_draft_to_a13_5",
+      "attribution": "MINE-NEW-KEYS-ONLY",
+      "changed_fields": []
+    },
+    {
+      "writer_id": "app.services.a13_communication_draft::create_communication_draft",
+      "attribution": "MINE-NEW-KEYS-ONLY",
+      "changed_fields": []
+    },
+    {
+      "writer_id": "app.services.a171_docx_sync::_get_project_file",
+      "attribution": "MINE-NEW-KEYS-ONLY",
+      "changed_fields": []
+    },
+    {
+      "writer_id": "app.services.a171_docx_sync::sync_docx_to_responses",
+      "attribution": "MINE-NEW-KEYS-ONLY",
+      "changed_fields": []
+    },
+    {
+      "writer_id": "app.services.a176_docx_sync::_get_project_file",
+      "attribution": "MINE-NEW-KEYS-ONLY",
+      "changed_fields": []
+    },
+    {
+      "writer_id": "app.services.a176_docx_sync::sync_docx_to_responses",
+      "attribution": "MINE-NEW-KEYS-ONLY",
+      "changed_fields": []
+    },
+    {
+      "writer_id": "app.services.a177_docx_sync::_get_project_file",
+      "attribution": "MINE-NEW-KEYS-ONLY",
+      "changed_fields": []
+    },
+    {
+      "writer_id": "app.services.a177_docx_sync::_upsert_response",
+      "attribution": "MINE-NEW-KEYS-ONLY",
+      "changed_fields": []
+    },
+    {
+      "writer_id": "app.services.a177_docx_sync::sync_docx_to_responses",
+      "attribution": "MINE-NEW-KEYS-ONLY",
+      "changed_fields": []
+    },
+    {
+      "writer_id": "app.services.a17_independence_drift::import_b3_periods_to_a177",
+      "attribution": "MINE-NEW-KEYS-ONLY",
+      "changed_fields": []
+    },
+    {
+      "writer_id": "app.services.audit_check.aggregator::AuditCheckAggregator.recompute_project",
+      "attribution": "MINE-CHARACTERIZATION-CALLSITE",
+      "changed_fields": [
+        "characterization_tests",
+        "verdicts.has_characterization_test"
+      ],
+      "characterization_before": [
+        "backend/tests/test_audit_check_aggregator.py",
+        "backend/tests/test_audit_check_m2_properties_pbt.py",
+        "backend/tests/test_audit_check_project_sources.py"
+      ],
+      "characterization_after": []
+    },
+    {
+      "writer_id": "app.services.audit_check.aggregator::AuditCheckAggregator.recompute_workpaper",
+      "attribution": "MINE-CHARACTERIZATION-CALLSITE",
+      "changed_fields": [
+        "characterization_tests",
+        "verdicts.has_characterization_test"
+      ],
+      "characterization_before": [
+        "backend/tests/test_audit_check_aggregator.py",
+        "backend/tests/test_audit_check_m2_properties_pbt.py",
+        "backend/tests/test_audit_check_project_sources.py"
+      ],
+      "characterization_after": []
+    },
+    {
+      "writer_id": "app.services.auto_data_resolvers._misstatement_aggregation::_persist_summary",
+      "attribution": "MINE-NEW-KEYS-ONLY",
+      "changed_fields": []
+    },
+    {
+      "writer_id": "app.services.auto_data_resolvers._misstatement_aggregation::_resolve_a13_summary",
+      "attribution": "MINE-NEW-KEYS-ONLY",
+      "changed_fields": []
+    },
+    {
+      "writer_id": "app.services.b60_plan_service::ensure_workpapers_for_codes",
+      "attribution": "MINE-NEW-KEYS-ONLY",
+      "changed_fields": []
+    },
+    {
+      "writer_id": "app.services.b60_plan_service::save_attachment_flags",
+      "attribution": "MINE-NEW-KEYS-ONLY",
+      "changed_fields": []
+    },
+    {
+      "writer_id": "app.services.batch_review_service::BatchReviewService.execute_batch",
+      "attribution": "MINE-CHARACTERIZATION-CALLSITE",
+      "changed_fields": [
+        "characterization_tests"
+      ],
+      "characterization_before": [
+        "backend/tests/test_batch_review_pbt.py",
+        "backend/tests/test_review_prompt_integration.py"
+      ],
+      "characterization_after": [
+        "backend/tests/test_batch_review_pbt.py"
+      ]
+    },
+    {
+      "writer_id": "app.services.batch_review_service::BatchReviewService.persist_review_results",
+      "attribution": "MINE-CHARACTERIZATION-CALLSITE",
+      "changed_fields": [
+        "characterization_tests"
+      ],
+      "characterization_before": [
+        "backend/tests/test_batch_review_pbt.py",
+        "backend/tests/test_review_prompt_integration.py"
+      ],
+      "characterization_after": [
+        "backend/tests/test_review_prompt_integration.py"
+      ]
+    },
+    {
+      "writer_id": "app.services.bulk_tab._d_cycle_adapters::_d3_import",
+      "attribution": "MINE-NEW-KEYS-ONLY",
+      "changed_fields": []
+    },
+    {
+      "writer_id": "app.services.bulk_tab._d_cycle_adapters::_d4_import",
+      "attribution": "MINE-NEW-KEYS-ONLY",
+      "changed_fields": []
+    },
+    {
+      "writer_id": "app.services.bulk_tab._d_cycle_adapters::_d5_import",
+      "attribution": "MINE-NEW-KEYS-ONLY",
+      "changed_fields": []
+    },
+    {
+      "writer_id": "app.services.bulk_tab._d_cycle_adapters::_d6_import",
+      "attribution": "MINE-NEW-KEYS-ONLY",
+      "changed_fields": []
+    },
+    {
+      "writer_id": "app.services.bulk_tab._d_cycle_adapters::_d7_import",
+      "attribution": "MINE-NEW-KEYS-ONLY",
+      "changed_fields": []
+    },
+    {
+      "writer_id": "app.services.bulk_tab._kfgh_cycle_adapters::_j3_import",
+      "attribution": "MINE-NEW-KEYS-ONLY",
+      "changed_fields": []
+    },
+    {
+      "writer_id": "app.services.bulk_tab.snapshot_guard::SnapshotGuard.rollback_single",
+      "attribution": "MINE-NEW-KEYS-ONLY",
+      "changed_fields": []
+    },
+    {
+      "writer_id": "app.services.chain_orchestrator::ChainOrchestrator._execute_step",
+      "attribution": "MINE-CHARACTERIZATION-CALLSITE",
+      "changed_fields": [
+        "characterization_tests",
+        "verdicts.has_characterization_test"
+      ],
+      "characterization_before": [
+        "backend/tests/test_audit_chain_properties.py",
+        "backend/tests/test_chain_orchestrator.py"
+      ],
+      "characterization_after": []
+    },
+    {
+      "writer_id": "app.services.chain_orchestrator::ChainOrchestrator._step_generate_workpapers",
+      "attribution": "MINE-CHARACTERIZATION-CALLSITE",
+      "changed_fields": [
+        "characterization_tests",
+        "verdicts.has_characterization_test"
+      ],
+      "characterization_before": [
+        "backend/tests/test_audit_chain_properties.py",
+        "backend/tests/test_chain_orchestrator.py"
+      ],
+      "characterization_after": []
+    },
+    {
+      "writer_id": "app.services.consistency_check_service::ConsistencyCheckService.update_workpaper_consistency",
+      "attribution": "MINE-NEW-KEYS-ONLY",
+      "changed_fields": []
+    },
+    {
+      "writer_id": "app.services.custom_query.snapshot_writer::SnapshotWriter._write_workpaper_cell",
+      "attribution": "MINE-CHARACTERIZATION-CALLSITE",
+      "changed_fields": [
+        "characterization_tests",
+        "verdicts.has_characterization_test"
+      ],
+      "characterization_before": [
+        "backend/tests/test_snapshot_writer.py",
+        "backend/tests/test_workpaper_save_orchestrator_integration.py",
+        "backend/tests/test_writeback_pbt.py"
+      ],
+      "characterization_after": []
+    },
+    {
+      "writer_id": "app.services.custom_query.snapshot_writer::SnapshotWriter.write_cell",
+      "attribution": "MINE-CHARACTERIZATION-CALLSITE",
+      "changed_fields": [
+        "characterization_tests"
+      ],
+      "characterization_before": [
+        "backend/tests/test_custom_query_auth_preservation.py",
+        "backend/tests/test_snapshot_writer.py",
+        "backend/tests/test_workpaper_save_orchestrator_integration.py",
+        "backend/tests/test_writeback_pbt.py"
+      ],
+      "characterization_after": [
+        "backend/tests/test_snapshot_writer.py",
+        "backend/tests/test_workpaper_save_orchestrator_integration.py",
+        "backend/tests/test_writeback_pbt.py"
+      ]
+    },
+    {
+      "writer_id": "app.services.custom_workpaper_projection::refresh_custom_projection",
+      "attribution": "MINE-NEW-KEYS-ONLY",
+      "changed_fields": []
+    },
+    {
+      "writer_id": "app.services.custom_workpaper_projection::write_projection_to_parsed_data",
+      "attribution": "MINE-NEW-KEYS-ONLY",
+      "changed_fields": []
+    },
+    {
+      "writer_id": "app.services.deliverable_refresh_service::DeliverableRefreshService.refresh_all_stale_sections",
+      "attribution": "MINE-CHARACTERIZATION-CALLSITE",
+      "changed_fields": [
+        "characterization_tests"
+      ],
+      "characterization_before": [
+        "backend/tests/test_deliverable_lineage_e2e.py",
+        "backend/tests/test_deliverable_lineage_properties.py",
+        "backend/tests/test_deliverable_refresh_inplace.py"
+      ],
+      "characterization_after": [
+        "backend/tests/test_deliverable_lineage_properties.py",
+        "backend/tests/test_deliverable_refresh_inplace.py"
+      ]
+    },
+    {
+      "writer_id": "app.services.deliverable_service::DeliverableService.render_and_store",
+      "attribution": "MINE-CHARACTERIZATION-CALLSITE",
+      "changed_fields": [
+        "characterization_tests"
+      ],
+      "characterization_before": [
+        "backend/tests/test_deliverable_archive_pbt.py",
+        "backend/tests/test_deliverable_center_integration.py",
+        "backend/tests/test_deliverable_center_p0.py",
+        "backend/tests/test_deliverable_center_p1.py",
+        "backend/tests/test_deliverable_center_p2.py",
+        "backend/tests/test_deliverable_hash_pbt.py",
+        "backend/tests/test_deliverable_lineage_e2e.py",
+        "backend/tests/test_deliverable_lineage_properties.py",
+        "backend/tests/test_deliverable_oo_edit_provenance.py",
+        "backend/tests/test_deliverable_refresh_inplace.py",
+        "backend/tests/test_deliverable_routes.py",
+        "backend/tests/test_deliverable_sign_pbt.py",
+        "backend/tests/test_deliverable_snapshot_pbt.py",
+        "backend/tests/test_deliverable_version_chain_view.py"
+      ],
+      "characterization_after": [
+        "backend/tests/test_deliverable_center_p0.py",
+        "backend/tests/test_deliverable_hash_pbt.py",
+        "backend/tests/test_deliverable_oo_edit_provenance.py",
+        "backend/tests/test_deliverable_snapshot_pbt.py"
+      ]
+    },
+    {
+      "writer_id": "app.services.eqcr_memo_service::EqcrMemoService.finalize_memo",
+      "attribution": "MINE-CHARACTERIZATION-CALLSITE",
+      "changed_fields": [
+        "characterization_tests",
+        "verdicts.has_characterization_test"
+      ],
+      "characterization_before": [
+        "backend/tests/test_eqcr_full_flow.py"
+      ],
+      "characterization_after": []
+    },
+    {
+      "writer_id": "app.services.event_handlers._impl::register_event_handlers._on_b514_high_risk",
+      "attribution": "MINE-CHARACTERIZATION-CALLSITE",
+      "changed_fields": [
+        "characterization_tests",
+        "verdicts.has_characterization_test"
+      ],
+      "characterization_before": [
+        "backend/tests/test_note_conversion_preview_rollback.py"
+      ],
+      "characterization_after": []
+    },
+    {
+      "writer_id": "app.services.evidence_governance.secure_attachment_gateway::SecureAttachmentGateway._promote_available._promote",
+      "attribution": "MINE-CHARACTERIZATION-CALLSITE",
+      "changed_fields": [
+        "characterization_tests",
+        "verdicts.has_characterization_test"
+      ],
+      "characterization_before": [
+        "backend/tests/attachment_ocr_ai_evidence_governance_hardening/test_evidence_governance_http_wiring_integration.py",
+        "backend/tests/attachment_ocr_ai_evidence_governance_hardening/test_finalized_locator_opaque_contract.py",
+        "backend/tests/test_evidence_governance_attachment_security_gates.py",
+        "backend/tests/test_evidence_governance_durable_quarantine_reaper_wave2.py",
+        "backend/tests/test_evidence_governance_secure_attachment_gateway_wave2_3_2.py",
+        "backend/tests/test_evidence_governance_secure_attachment_gateway_wave2_3_3.py"
+      ],
+      "characterization_after": []
+    },
+    {
+      "writer_id": "app.services.export_job_service::ExportJobService.update_progress",
+      "attribution": "MINE-NEW-KEYS-ONLY",
+      "changed_fields": []
+    },
+    {
+      "writer_id": "app.services.export_progress_service::ExportProgressService._run_export",
+      "attribution": "MINE-CHARACTERIZATION-CALLSITE",
+      "changed_fields": [
+        "characterization_tests"
+      ],
+      "characterization_before": [
+        "backend/tests/test_batch_export_progress.py",
+        "backend/tests/test_export_cleanup.py"
+      ],
+      "characterization_after": [
+        "backend/tests/test_batch_export_progress.py"
+      ]
+    },
+    {
+      "writer_id": "app.services.export_progress_service::ExportProgressService.create_task",
+      "attribution": "MINE-CHARACTERIZATION-CALLSITE",
+      "changed_fields": [
+        "characterization_tests"
+      ],
+      "characterization_before": [
+        "backend/tests/test_batch_export_progress.py",
+        "backend/tests/test_export_cleanup.py"
+      ],
+      "characterization_after": [
+        "backend/tests/test_batch_export_progress.py"
+      ]
+    },
+    {
+      "writer_id": "app.services.formula_runtime.adapters.workpaper::WorkpaperMutationAdapter.apply_many",
+      "attribution": "MINE-NEW-KEYS-ONLY",
+      "changed_fields": []
+    },
+    {
+      "writer_id": "app.services.formula_runtime.adapters.workpaper::WorkpaperMutationAdapter.restore_many",
+      "attribution": "MINE-NEW-KEYS-ONLY",
+      "changed_fields": []
+    },
+    {
+      "writer_id": "app.services.h7_biological_assets_service::import_h7_data",
+      "attribution": "MINE-NEW-KEYS-ONLY",
+      "changed_fields": []
+    },
+    {
+      "writer_id": "app.services.l4_bonds_payable_service::import_data",
+      "attribution": "MINE-NEW-KEYS-ONLY",
+      "changed_fields": []
+    },
+    {
+      "writer_id": "app.services.l5_long_term_payables_service::import_data",
+      "attribution": "MINE-NEW-KEYS-ONLY",
+      "changed_fields": []
+    },
+    {
+      "writer_id": "app.services.l6_special_payables_service::import_data",
+      "attribution": "MINE-NEW-KEYS-ONLY",
+      "changed_fields": []
+    },
+    {
+      "writer_id": "app.services.l7_other_noncurrent_liabilities_service::import_data",
+      "attribution": "MINE-NEW-KEYS-ONLY",
+      "changed_fields": []
+    },
+    {
+      "writer_id": "app.services.l8_financial_expenses_service::import_data",
+      "attribution": "MINE-NEW-KEYS-ONLY",
+      "changed_fields": []
+    },
+    {
+      "writer_id": "app.services.m10_other_equity_instruments_service::import_data",
+      "attribution": "MINE-NEW-KEYS-ONLY",
+      "changed_fields": []
+    },
+    {
+      "writer_id": "app.services.m3_treasury_stock_service::import_data",
+      "attribution": "MINE-NEW-KEYS-ONLY",
+      "changed_fields": []
+    },
+    {
+      "writer_id": "app.services.m4_capital_reserve_service::import_data",
+      "attribution": "MINE-NEW-KEYS-ONLY",
+      "changed_fields": []
+    },
+    {
+      "writer_id": "app.services.m5_surplus_reserve_service::import_data",
+      "attribution": "MINE-NEW-KEYS-ONLY",
+      "changed_fields": []
+    },
+    {
+      "writer_id": "app.services.n2_taxes_payable_service::import_data",
+      "attribution": "MINE-NEW-KEYS-ONLY",
+      "changed_fields": []
+    },
+    {
+      "writer_id": "app.services.n3_deferred_tax_liabilities_service::import_data",
+      "attribution": "MINE-NEW-KEYS-ONLY",
+      "changed_fields": []
+    },
+    {
+      "writer_id": "app.services.n4_taxes_and_surcharges_service::parse_import_file",
+      "attribution": "MINE-NEW-KEYS-ONLY",
+      "changed_fields": []
+    },
+    {
+      "writer_id": "app.services.pdf_export_engine::PDFExportEngine.execute_export",
+      "attribution": "MINE-CHARACTERIZATION-CALLSITE",
+      "changed_fields": [
+        "characterization_tests"
+      ],
+      "characterization_before": [
+        "backend/tests/test_pdf_export.py",
+        "backend/tests/test_remaining_property.py"
+      ],
+      "characterization_after": [
+        "backend/tests/test_pdf_export.py"
+      ]
+    },
+    {
+      "writer_id": "app.services.prefill_engine::ParseService.parse_workpaper",
+      "attribution": "MINE-CHARACTERIZATION-CALLSITE",
+      "changed_fields": [
+        "characterization_tests"
+      ],
+      "characterization_before": [
+        "backend/tests/test_prefill_parse.py",
+        "backend/tests/test_remaining_property.py"
+      ],
+      "characterization_after": [
+        "backend/tests/test_prefill_parse.py"
+      ]
+    },
+    {
+      "writer_id": "app.services.prefill_engine::PrefillService.prefill_workpaper",
+      "attribution": "MINE-CHARACTERIZATION-CALLSITE",
+      "changed_fields": [
+        "characterization_tests",
+        "verdicts.has_characterization_test"
+      ],
+      "characterization_before": [
+        "backend/tests/test_phase8.py",
+        "backend/tests/test_phase8_smoke.py",
+        "backend/tests/test_prefill_parse.py",
+        "backend/tests/test_remaining_property.py"
+      ],
+      "characterization_after": []
+    },
+    {
+      "writer_id": "app.services.prefill_engine::_write_cell_provenance",
+      "attribution": "MINE-NEW-KEYS-ONLY",
+      "changed_fields": []
+    },
+    {
+      "writer_id": "app.services.prefill_engine::batch_prefill_ordered",
+      "attribution": "MINE-NEW-KEYS-ONLY",
+      "changed_fields": []
+    },
+    {
+      "writer_id": "app.services.prefill_engine::parse_workpaper_real",
+      "attribution": "MINE-NEW-KEYS-ONLY",
+      "changed_fields": []
+    },
+    {
+      "writer_id": "app.services.prefill_engine::prefill_workpaper_real",
+      "attribution": "MINE-NEW-KEYS-ONLY",
+      "changed_fields": []
+    },
+    {
+      "writer_id": "app.services.prefill_engine::resolve_stale_after_recalc",
+      "attribution": "MINE-NEW-KEYS-ONLY",
+      "changed_fields": []
+    },
+    {
+      "writer_id": "app.services.procedure_projection_service::ProcedureProjectionService.rebuild",
+      "attribution": "MINE-NEW-KEYS-ONLY",
+      "changed_fields": []
+    },
+    {
+      "writer_id": "app.services.procedure_projection_service::ProcedureProjectionService.write_path",
+      "attribution": "MINE-NEW-KEYS-ONLY",
+      "changed_fields": []
+    },
+    {
+      "writer_id": "app.services.procedure_trim_engine::ProcedureTrimEngine.revert",
+      "attribution": "MINE-CHARACTERIZATION-CALLSITE",
+      "changed_fields": [
+        "characterization_tests"
+      ],
+      "characterization_before": [
+        "backend/tests/test_phase8.py",
+        "backend/tests/test_procedure_trim_engine.py",
+        "backend/tests/test_procedure_trimming.py"
+      ],
+      "characterization_after": [
+        "backend/tests/test_procedure_trim_engine.py",
+        "backend/tests/test_procedure_trimming.py"
+      ]
+    },
+    {
+      "writer_id": "app.services.procedure_trim_engine::ProcedureTrimEngine.trim",
+      "attribution": "MINE-CHARACTERIZATION-CALLSITE",
+      "changed_fields": [
+        "characterization_tests"
+      ],
+      "characterization_before": [
+        "backend/tests/test_phase8.py",
+        "backend/tests/test_procedure_trim_engine.py",
+        "backend/tests/test_procedure_trimming.py"
+      ],
+      "characterization_after": [
+        "backend/tests/test_procedure_trim_engine.py",
+        "backend/tests/test_procedure_trimming.py"
+      ]
+    },
+    {
+      "writer_id": "app.services.procedure_trim_service::ProcedureTrimService.clear_completeness_scope_override",
+      "attribution": "MINE-CHARACTERIZATION-CALLSITE",
+      "changed_fields": [
+        "characterization_tests",
+        "verdicts.has_characterization_test"
+      ],
+      "characterization_before": [
+        "backend/tests/procedure_delegation/test_procedure_trim_service.py",
+        "backend/tests/procedure_trim/test_completeness_scope_override.py",
+        "backend/tests/procedure_trim/test_task23_zero_regression.py",
+        "backend/tests/procedure_trim/test_trim_reason_code_contract.py"
+      ],
+      "characterization_after": []
+    },
+    {
+      "writer_id": "app.services.procedure_trim_service::ProcedureTrimService.set_completeness_scope_override",
+      "attribution": "MINE-CHARACTERIZATION-CALLSITE",
+      "changed_fields": [
+        "characterization_tests",
+        "verdicts.has_characterization_test"
+      ],
+      "characterization_before": [
+        "backend/tests/procedure_delegation/test_procedure_trim_service.py",
+        "backend/tests/procedure_trim/test_completeness_scope_override.py",
+        "backend/tests/procedure_trim/test_task23_zero_regression.py",
+        "backend/tests/procedure_trim/test_trim_reason_code_contract.py"
+      ],
+      "characterization_after": []
+    },
+    {
+      "writer_id": "app.services.qc_rule_dry_run_service::_WorkpaperSample.__init__",
+      "attribution": "MINE-NEW-KEYS-ONLY",
+      "changed_fields": []
+    },
+    {
+      "writer_id": "app.services.qc_rule_dry_run_service::_build_qc_context._SimpleContext.__init__",
+      "attribution": "MINE-NEW-KEYS-ONLY",
+      "changed_fields": []
+    },
+    {
+      "writer_id": "app.services.review_checklist_service::save_review_sign",
+      "attribution": "MINE-NEW-KEYS-ONLY",
+      "changed_fields": []
+    },
+    {
+      "writer_id": "app.services.template_engine::TemplateEngine.generate_project_workpapers",
+      "attribution": "MINE-CHARACTERIZATION-CALLSITE",
+      "changed_fields": [
+        "characterization_tests"
+      ],
+      "characterization_before": [
+        "backend/tests/test_remaining_property.py",
+        "backend/tests/test_template_engine.py"
+      ],
+      "characterization_after": [
+        "backend/tests/test_template_engine.py"
+      ]
+    },
+    {
+      "writer_id": "app.services.version_trail_service::VersionTrailService.rollback_to_snapshot",
+      "attribution": "MINE-CHARACTERIZATION-CALLSITE",
+      "changed_fields": [
+        "characterization_tests"
+      ],
+      "characterization_before": [
+        "backend/tests/test_version_trail_compute_diff.py",
+        "backend/tests/test_version_trail_integration.py",
+        "backend/tests/test_version_trail_pbt.py"
+      ],
+      "characterization_after": [
+        "backend/tests/test_version_trail_integration.py",
+        "backend/tests/test_version_trail_pbt.py"
+      ]
+    },
+    {
+      "writer_id": "app.services.wopi_service::WOPIHostService.check_file_info",
+      "attribution": "MINE-CHARACTERIZATION-CALLSITE",
+      "changed_fields": [
+        "characterization_tests",
+        "verdicts.has_characterization_test"
+      ],
+      "characterization_before": [
+        "backend/tests/test_phase8.py",
+        "backend/tests/test_remaining_property.py",
+        "backend/tests/test_wopi_working_paper_qc_review.py"
+      ],
+      "characterization_after": []
+    },
+    {
+      "writer_id": "app.services.wopi_service::WOPIHostService.get_file",
+      "attribution": "MINE-CHARACTERIZATION-CALLSITE",
+      "changed_fields": [
+        "characterization_tests",
+        "verdicts.has_characterization_test"
+      ],
+      "characterization_before": [
+        "backend/tests/test_phase8.py",
+        "backend/tests/test_remaining_property.py",
+        "backend/tests/test_wopi_working_paper_qc_review.py"
+      ],
+      "characterization_after": []
+    },
+    {
+      "writer_id": "app.services.wopi_service::WOPIHostService.put_file",
+      "attribution": "MINE-CHARACTERIZATION-CALLSITE",
+      "changed_fields": [
+        "characterization_tests",
+        "verdicts.has_characterization_test"
+      ],
+      "characterization_before": [
+        "backend/tests/test_phase8.py",
+        "backend/tests/test_remaining_property.py",
+        "backend/tests/test_wopi_working_paper_qc_review.py"
+      ],
+      "characterization_after": []
+    },
+    {
+      "writer_id": "app.services.wopi_service::WOPIHostService.put_file._auto_fine_extract",
+      "attribution": "MINE-CHARACTERIZATION-CALLSITE",
+      "changed_fields": [
+        "characterization_tests",
+        "verdicts.has_characterization_test"
+      ],
+      "characterization_before": [
+        "backend/tests/test_phase8.py",
+        "backend/tests/test_remaining_property.py",
+        "backend/tests/test_wopi_working_paper_qc_review.py"
+      ],
+      "characterization_after": []
+    },
+    {
+      "writer_id": "app.services.wopi_service::WOPIHostService.put_file._auto_parse",
+      "attribution": "MINE-CHARACTERIZATION-CALLSITE",
+      "changed_fields": [
+        "characterization_tests",
+        "verdicts.has_characterization_test"
+      ],
+      "characterization_before": [
+        "backend/tests/test_phase8.py",
+        "backend/tests/test_remaining_property.py",
+        "backend/tests/test_wopi_working_paper_qc_review.py"
+      ],
+      "characterization_after": []
+    },
+    {
+      "writer_id": "app.services.wopi_service::_resolve_put_target",
+      "attribution": "MINE-NEW-KEYS-ONLY",
+      "changed_fields": []
+    },
+    {
+      "writer_id": "app.services.word_template_filler::WordTemplateFiller.fill_audit_report",
+      "attribution": "MINE-NEW-KEYS-ONLY",
+      "changed_fields": []
+    },
+    {
+      "writer_id": "app.services.word_template_filler::WordTemplateFiller.fill_disclosure_notes",
+      "attribution": "MINE-NEW-KEYS-ONLY",
+      "changed_fields": []
+    },
+    {
+      "writer_id": "app.services.word_template_filler::WordTemplateFiller.fill_financial_reports",
+      "attribution": "MINE-NEW-KEYS-ONLY",
+      "changed_fields": []
+    },
+    {
+      "writer_id": "app.services.word_template_filler::WordTemplateFiller.fill_full_package",
+      "attribution": "MINE-NEW-KEYS-ONLY",
+      "changed_fields": []
+    },
+    {
+      "writer_id": "app.services.working_paper_service::WorkingPaperService.upload_offline_edit",
+      "attribution": "MINE-CHARACTERIZATION-CALLSITE",
+      "changed_fields": [
+        "characterization_tests",
+        "verdicts.has_characterization_test"
+      ],
+      "characterization_before": [
+        "backend/tests/test_reassignment_notifications.py",
+        "backend/tests/test_review_status_split.py",
+        "backend/tests/test_wopi_working_paper_qc_review.py"
+      ],
+      "characterization_after": []
+    },
+    {
+      "writer_id": "app.services.workpaper_generation_service::WorkpaperGenerationService.ensure_working_paper",
+      "attribution": "MINE-CHARACTERIZATION-CALLSITE",
+      "changed_fields": [
+        "characterization_tests"
+      ],
+      "characterization_before": [
+        "backend/tests/test_custom_wp_formula_full_chain.py",
+        "backend/tests/test_ensure_working_paper.py",
+        "backend/tests/test_ensure_wp_idempotent_pbt.py"
+      ],
+      "characterization_after": [
+        "backend/tests/test_ensure_working_paper.py",
+        "backend/tests/test_ensure_wp_idempotent_pbt.py"
+      ]
+    },
+    {
+      "writer_id": "app.services.workpaper_sync.artifacts::ArtifactStorageLayout.project_root",
+      "attribution": "MINE-CHARACTERIZATION-CALLSITE",
+      "changed_fields": [
+        "characterization_tests",
+        "verdicts.has_characterization_test"
+      ],
+      "characterization_before": [
+        "backend/tests/workpaper_sync/test_task11_artifact_repository.py"
+      ],
+      "characterization_after": []
+    },
+    {
+      "writer_id": "app.services.workpaper_sync.repository::WorkpaperSyncRepository.bump_content_revision",
+      "attribution": "MINE-CHARACTERIZATION-CALLSITE",
+      "changed_fields": [
+        "characterization_tests"
+      ],
+      "characterization_before": [
+        "backend/tests/workpaper_sync/test_task10_repository_pg.py",
+        "backend/tests/workpaper_sync/test_task11_retention_orphan_pg.py",
+        "backend/tests/workpaper_sync/test_task12_resolution_pg.py",
+        "backend/tests/workpaper_sync/test_task15_content_mutation_pg.py",
+        "backend/tests/workpaper_sync/test_task17_excel_instrumentation_pg.py",
+        "backend/tests/workpaper_sync/test_task18_html_save_unified_revision_pg.py",
+        "backend/tests/workpaper_sync/test_task21_room_service_pg.py"
+      ],
+      "characterization_after": [
+        "backend/tests/workpaper_sync/test_task10_repository_pg.py"
+      ]
+    },
+    {
+      "writer_id": "app.services.wp_account_package_resolver::_build_results._resolve_source_file",
+      "attribution": "MINE-NEW-KEYS-ONLY",
+      "changed_fields": []
+    },
+    {
+      "writer_id": "app.services.wp_conversion._generate::WpConversionGenerateMixin._generate_one_workpaper",
+      "attribution": "MINE-NEW-KEYS-ONLY",
+      "changed_fields": []
+    },
+    {
+      "writer_id": "app.services.wp_conversion._generate::WpConversionGenerateMixin._populate_parsed_data",
+      "attribution": "MINE-NEW-KEYS-ONLY",
+      "changed_fields": []
+    },
+    {
+      "writer_id": "app.services.wp_download_service::WpDownloadService.download_pack",
+      "attribution": "MINE-CHARACTERIZATION-CALLSITE",
+      "changed_fields": [
+        "characterization_tests",
+        "verdicts.has_characterization_test"
+      ],
+      "characterization_before": [
+        "backend/tests/test_phase10_step0_step1.py"
+      ],
+      "characterization_after": []
+    },
+    {
+      "writer_id": "app.services.wp_download_service::WpDownloadService.download_single",
+      "attribution": "MINE-CHARACTERIZATION-CALLSITE",
+      "changed_fields": [
+        "characterization_tests",
+        "verdicts.has_characterization_test"
+      ],
+      "characterization_before": [
+        "backend/tests/test_phase10_step0_step1.py"
+      ],
+      "characterization_after": []
+    },
+    {
+      "writer_id": "app.services.wp_download_service::WpUploadService.upload_file",
+      "attribution": "MINE-CHARACTERIZATION-CALLSITE",
+      "changed_fields": [
+        "characterization_tests",
+        "verdicts.has_characterization_test"
+      ],
+      "characterization_before": [
+        "backend/tests/test_phase10_step0_step1.py"
+      ],
+      "characterization_after": []
+    },
+    {
+      "writer_id": "app.services.wp_evidence_ocr_service::WpEvidenceOcrService.fill_evidence_group",
+      "attribution": "MINE-CHARACTERIZATION-CALLSITE",
+      "changed_fields": [
+        "characterization_tests"
+      ],
+      "characterization_before": [
+        "backend/tests/test_wp_evidence_collection.py",
+        "backend/tests/test_wp_functional_actions.py"
+      ],
+      "characterization_after": [
+        "backend/tests/test_wp_evidence_collection.py"
+      ]
+    },
+    {
+      "writer_id": "app.services.wp_explanation_service::WpExplanationService.confirm_draft",
+      "attribution": "MINE-NEW-KEYS-ONLY",
+      "changed_fields": []
+    },
+    {
+      "writer_id": "app.services.wp_export.export_engine::WpExportEngine._export_docx",
+      "attribution": "MINE-CHARACTERIZATION-CALLSITE",
+      "changed_fields": [
+        "characterization_tests",
+        "verdicts.has_characterization_test"
+      ],
+      "characterization_before": [
+        "backend/tests/test_e2e_export_import_roundtrip.py",
+        "backend/tests/test_pbt_program_audit_export.py"
+      ],
+      "characterization_after": []
+    },
+    {
+      "writer_id": "app.services.wp_export.export_engine::WpExportEngine._resolve_docx_template",
+      "attribution": "MINE-CHARACTERIZATION-CALLSITE",
+      "changed_fields": [
+        "characterization_tests",
+        "verdicts.has_characterization_test"
+      ],
+      "characterization_before": [
+        "backend/tests/test_e2e_export_import_roundtrip.py",
+        "backend/tests/test_pbt_program_audit_export.py"
+      ],
+      "characterization_after": []
+    },
+    {
+      "writer_id": "app.services.wp_export.wp_file_resolver::_template_fallback",
+      "attribution": "MINE-NEW-KEYS-ONLY",
+      "changed_fields": []
+    },
+    {
+      "writer_id": "app.services.wp_migration_service::WpMigrationService.migrate_workpaper",
+      "attribution": "MINE-CHARACTERIZATION-CALLSITE",
+      "changed_fields": [
+        "characterization_tests",
+        "verdicts.has_characterization_test"
+      ],
+      "characterization_before": [
+        "backend/tests/test_wp_template_migration_integration.py",
+        "backend/tests/test_wp_template_migration_property.py",
+        "backend/tests/workpaper_sync/test_task19_writer_migration.py"
+      ],
+      "characterization_after": []
+    },
+    {
+      "writer_id": "app.services.wp_migration_service::WpMigrationService.rollback",
+      "attribution": "MINE-CHARACTERIZATION-CALLSITE",
+      "changed_fields": [
+        "characterization_tests"
+      ],
+      "characterization_before": [
+        "backend/tests/test_wp_template_migration_integration.py",
+        "backend/tests/test_wp_template_migration_property.py",
+        "backend/tests/workpaper_sync/test_task19_writer_migration.py"
+      ],
+      "characterization_after": [
+        "backend/tests/workpaper_sync/test_task19_writer_migration.py"
+      ]
+    },
+    {
+      "writer_id": "app.services.wp_parsed_data_service::write_cell_to_parsed_data",
+      "attribution": "MINE-NEW-KEYS-ONLY",
+      "changed_fields": []
+    },
+    {
+      "writer_id": "app.services.wp_standard_conversion_service::WpStandardConversionService._archive_source_only_workpapers",
+      "attribution": "MINE-CHARACTERIZATION-CALLSITE",
+      "changed_fields": [
+        "characterization_tests",
+        "verdicts.has_characterization_test"
+      ],
+      "characterization_before": [
+        "backend/tests/test_multi_standard_unification_property.py"
+      ],
+      "characterization_after": []
+    },
+    {
+      "writer_id": "app.services.wp_standard_conversion_service::WpStandardConversionService.convert_workpapers",
+      "attribution": "MINE-NEW-KEYS-ONLY",
+      "changed_fields": []
+    },
+    {
+      "writer_id": "app.services.wp_storage_service::WpStorageService.list_versions",
+      "attribution": "MINE-CHARACTERIZATION-CALLSITE",
+      "changed_fields": [
+        "characterization_tests",
+        "verdicts.has_characterization_test"
+      ],
+      "characterization_before": [
+        "backend/tests/workpaper_sync/test_task19_writer_migration.py"
+      ],
+      "characterization_after": []
+    },
+    {
+      "writer_id": "app.services.wp_storage_service::WpStorageService.save_version",
+      "attribution": "MINE-ARTIFACT-SNAPSHOT-CATEGORY",
+      "changed_fields": [
+        "verdicts.bypasses_unified_commit"
+      ],
+      "characterization_before": [
+        "backend/tests/workpaper_sync/test_task19_writer_migration.py"
+      ],
+      "characterization_after": [
+        "backend/tests/workpaper_sync/test_task19_writer_migration.py"
+      ]
+    },
+    {
+      "writer_id": "app.services.wp_template_finder::find_all_template_files",
+      "attribution": "MINE-NEW-KEYS-ONLY",
+      "changed_fields": []
+    },
+    {
+      "writer_id": "app.services.wp_template_finder::find_template_file_any",
+      "attribution": "MINE-CHARACTERIZATION-CALLSITE",
+      "changed_fields": [
+        "characterization_tests"
+      ],
+      "characterization_before": [
+        "backend/tests/test_wp_template_finder_d4_prefix.py",
+        "backend/tests/workpaper_sync/test_task12_canonical_resolver.py"
+      ],
+      "characterization_after": [
+        "backend/tests/test_wp_template_finder_d4_prefix.py"
+      ]
+    },
+    {
+      "writer_id": "app.services.wp_template_init_service::_ensure_d4_ipo_loaded",
+      "attribution": "MINE-CHARACTERIZATION-CALLSITE",
+      "changed_fields": [
+        "characterization_tests"
+      ],
+      "characterization_before": [
+        "backend/tests/test_d4_ipo_trigger.py",
+        "backend/tests/test_f2_ipo_trigger.py"
+      ],
+      "characterization_after": [
+        "backend/tests/test_d4_ipo_trigger.py"
+      ]
+    },
+    {
+      "writer_id": "app.services.wp_template_init_service::_ensure_ipo_loaded",
+      "attribution": "MINE-NEW-KEYS-ONLY",
+      "changed_fields": []
+    },
+    {
+      "writer_id": "app.services.wp_template_init_service::init_workpaper_from_template",
+      "attribution": "MINE-NEW-KEYS-ONLY",
+      "changed_fields": []
+    },
+    {
+      "writer_id": "app.services.wp_xlsx_export_service::_sync_export_workpaper_xlsx",
+      "attribution": "MINE-NEW-KEYS-ONLY",
+      "changed_fields": []
+    }
+  ]
+}

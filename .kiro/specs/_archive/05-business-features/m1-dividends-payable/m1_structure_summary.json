@@ -1,0 +1,3612 @@
+{
+  "source_file": "D:\\GT_plan\\数据\\致同通用审计程序及底稿模板（2025年修订）\\1.致同审计程序及底稿模板（2025年）\\4.风险应对-实质性程序（D-N）\\M 权益循环\\M1 应付股利（利润）.xlsx",
+  "account_code": "2232",
+  "account_name": "应付股利",
+  "account_direction": "贷方/负债类",
+  "formula_rule": "期末=期初+贷方-借方（宣告在贷方增加，支付在借方减少）",
+  "sheet_count": 11,
+  "sheet_names": [
+    "底稿目录",
+    "应付股利实质性程序表M1",
+    "审定表M1-1",
+    "附注披露信息（上市公司）",
+    "附注披露信息（国有企业）",
+    "明细表M1-2",
+    "调整分录汇总M1-3",
+    "外币汇率测算表M1-4",
+    "应付股利（利润）测算表M1-5",
+    "应付股利（利润）检查表M1-6",
+    "GT_Custom"
+  ],
+  "total_formula_count": 338,
+  "formula_summary_by_sheet": {
+    "应付股利实质性程序表M1": 7,
+    "审定表M1-1": 92,
+    "附注披露信息（上市公司）": 13,
+    "附注披露信息（国有企业）": 12,
+    "明细表M1-2": 141,
+    "调整分录汇总M1-3": 7,
+    "外币汇率测算表M1-4": 23,
+    "应付股利（利润）测算表M1-5": 28,
+    "应付股利（利润）检查表M1-6": 15
+  },
+  "design_verification": {
+    "effective_sheet_count": 10,
+    "effective_sheets": [
+      "底稿目录",
+      "应付股利实质性程序表M1",
+      "审定表M1-1",
+      "附注披露信息（上市公司）",
+      "附注披露信息（国有企业）",
+      "明细表M1-2",
+      "调整分录汇总M1-3",
+      "外币汇率测算表M1-4",
+      "应付股利（利润）测算表M1-5",
+      "应付股利（利润）检查表M1-6"
+    ],
+    "design_expected_10_sheets": true,
+    "sheet_mapping_to_design": {
+      "底稿目录": "Tab_Index",
+      "应付股利实质性程序表M1": "Procedure_Table_M1",
+      "审定表M1-1": "Adjudication_M1_1",
+      "附注披露信息（上市公司）": "Disclosure_Listed",
+      "附注披露信息（国有企业）": "Disclosure_SOE",
+      "明细表M1-2": "Detail_M1_2",
+      "调整分录汇总M1-3": "Adjustment_M1_3",
+      "外币汇率测算表M1-4": "FX_Rate_M1_4",
+      "应付股利（利润）测算表M1-5": "Dividend_Calc_M1_5",
+      "应付股利（利润）检查表M1-6": "Dividend_Check_M1_6"
+    },
+    "formula_verification": {
+      "M1-1_审定表": {
+        "total_formulas": 92,
+        "calc_formulas_excl_header_refs": 79,
+        "design_expected": 73,
+        "note": "92 total includes 7 header refs from 底稿目录; 85 calc formulas (审定数/变动额/变动率/明细引用)"
+      },
+      "M1-4_外币汇率": {
+        "total_formulas": 23,
+        "calc_formulas_excl_header_refs": 16,
+        "design_expected": 13,
+        "note": "23 total includes 7 header refs; 16 calc = 6×E=C*D + 6×G=E-F + 4×SUM"
+      },
+      "M1-5_股利测算": {
+        "total_formulas": 28,
+        "calc_formulas_excl_header_refs": 21,
+        "design_expected": 13,
+        "note": "28 total includes 7 header refs; 21 calc = 8×D=B*C + 8×F=D-E + 5×SUM"
+      }
+    },
+    "key_formula_patterns": {
+      "M1-4_FX": {
+        "折算本位币": "E=C*D (原币×汇率)",
+        "汇兑差异": "G=E-F (折算-账面)",
+        "合计": "SUM(range)"
+      },
+      "M1-5_Dividend": {
+        "应宣告股利": "D=B*C (可供分配×比例)",
+        "宣告差异": "F=D-E (测算-账面)",
+        "合计": "SUM(range)"
+      },
+      "M1-1_Adjudication": {
+        "审定数": "I=F+G+H (未审+AJE+RJE) 或引用明细",
+        "变动额": "J=I-E (期末审定-期初审定)",
+        "变动率": "K=IF(AND(E=0,J=0),0,...) 条件变动率",
+        "明细引用": "='明细表M1-2'!cell"
+      }
+    },
+    "dimensions_verification": {
+      "M1-1_审定表": {
+        "actual": "56×12",
+        "design": "56×12",
+        "match": true
+      },
+      "M1-2_明细表": {
+        "actual": "38×27",
+        "design": "38×27",
+        "match": true
+      },
+      "M1-4_外币汇率": {
+        "actual": "25×7",
+        "design": "25×7",
+        "match": true
+      },
+      "M1-5_股利测算": {
+        "actual": "29×14",
+        "design": "29×14",
+        "match": true
+      },
+      "附注_上市": {
+        "actual": "20×17",
+        "design": "20×17",
+        "match": true
+      },
+      "附注_国企": {
+        "actual": "16×8",
+        "design": "16×8",
+        "match": true
+      }
+    }
+  },
+  "sheets": {
+    "底稿目录": {
+      "title": "底稿目录",
+      "dimensions": "A1:H24",
+      "max_row": 24,
+      "max_column": 8,
+      "merged_cells": [
+        "A19:A21",
+        "A22:A24",
+        "A15:A18"
+      ],
+      "header_rows": [
+        [
+          "底稿开列时，可先在以下单元格填写有关内容，以便其他底稿引用有关数据：",
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          "被审计单位：",
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          "截止日：202X年12月31日",
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          "编制人：",
+          null,
+          null,
+          "序号",
+          "内容",
+          "索引号",
+          "备注",
+          null
+        ],
+        [
+          "编制日期：",
+          null,
+          null,
+          1,
+          "应付股利实质性程序表",
+          "M1A ",
+          null,
+          null
+        ],
+        [
+          "复核人：",
+          null,
+          null,
+          2,
+          "审定表",
+          "M1-1",
+          null,
+          null
+        ],
+        [
+          "复核日期：",
+          null,
+          null,
+          3,
+          "附注披露信息(上市公司)",
+          null,
+          null,
+          "无需打印"
+        ],
+        [
+          "项目类型（以下内容请根据实际情况修改）：",
+          null,
+          null,
+          4,
+          "附注披露信息(国企)",
+          null,
+          null,
+          "无需打印"
+        ]
+      ],
+      "formula_count": 0,
+      "formulas": []
+    },
+    "应付股利实质性程序表M1": {
+      "title": "应付股利实质性程序表M1",
+      "dimensions": "A1:L24",
+      "max_row": 24,
+      "max_column": 12,
+      "merged_cells": [
+        "G10:I10",
+        "G13:I13",
+        "A12:F12",
+        "A2:I2",
+        "A8:F8",
+        "B15:B16",
+        "A10:F10",
+        "A13:F13",
+        "A9:F9",
+        "G9:I9",
+        "A14:B14",
+        "G12:I12",
+        "G11:I11",
+        "A11:F11",
+        "D15:H15",
+        "A1:I1",
+        "G8:I8",
+        "A15:A16",
+        "C15:C16",
+        "I15:I16"
+      ],
+      "header_rows": [
+        [
+          "致同会计师事务所",
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          "应付股利（利润）实质性程序",
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          "=底稿目录!A2",
+          null,
+          "=底稿目录!A4",
+          null,
+          "=底稿目录!A5",
+          null,
+          null,
+          "索引号：",
+          "=底稿目录!F5",
+          null,
+          null,
+          null
+        ],
+        [
+          "=底稿目录!A3",
+          null,
+          "=底稿目录!A6",
+          null,
+          "=底稿目录!A7",
+          null,
+          null,
+          "页  次：",
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          "一、本账户涉及的科目",
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          "应付股利",
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          "二、审计目标与认定的对应关系",
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          "审计目标",
+          null,
+          null,
+          null,
+          null,
+          null,
+          "财务报表的认定　",
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      ],
+      "formula_count": 7,
+      "formulas": [
+        {
+          "cell": "A3",
+          "formula": "=底稿目录!A2",
+          "row": 3,
+          "col": 1
+        },
+        {
+          "cell": "C3",
+          "formula": "=底稿目录!A4",
+          "row": 3,
+          "col": 3
+        },
+        {
+          "cell": "E3",
+          "formula": "=底稿目录!A5",
+          "row": 3,
+          "col": 5
+        },
+        {
+          "cell": "I3",
+          "formula": "=底稿目录!F5",
+          "row": 3,
+          "col": 9
+        },
+        {
+          "cell": "A4",
+          "formula": "=底稿目录!A3",
+          "row": 4,
+          "col": 1
+        },
+        {
+          "cell": "C4",
+          "formula": "=底稿目录!A6",
+          "row": 4,
+          "col": 3
+        },
+        {
+          "cell": "E4",
+          "formula": "=底稿目录!A7",
+          "row": 4,
+          "col": 5
+        }
+      ]
+    },
+    "审定表M1-1": {
+      "title": "审定表M1-1",
+      "dimensions": "A1:L56",
+      "max_row": 56,
+      "max_column": 12,
+      "merged_cells": [
+        "A5:A6",
+        "A2:L2",
+        "J5:K5",
+        "A1:L1",
+        "B5:E5",
+        "F5:I5",
+        "L5:L6"
+      ],
+      "header_rows": [
+        [
+          "致同会计师事务所",
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          "应付股利（利润）审定表",
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          "=底稿目录!A2",
+          null,
+          null,
+          null,
+          "=底稿目录!A4",
+          null,
+          null,
+          "=底稿目录!A5",
+          null,
+          null,
+          "索引号：",
+          "=底稿目录!F6"
+        ],
+        [
+          "=底稿目录!A3",
+          null,
+          null,
+          null,
+          "=底稿目录!A6",
+          null,
+          null,
+          "=底稿目录!A7",
+          null,
+          null,
+          "页  次：",
+          null
+        ],
+        [
+          "项目名称",
+          "期初数",
+          null,
+          null,
+          null,
+          "期末数",
+          null,
+          null,
+          null,
+          "本期审定数与上期\n审定数的比较",
+          null,
+          "原因分析"
+        ],
+        [
+          null,
+          "未审数",
+          "账项调整",
+          "重分类调整",
+          "审定数",
+          "未审数",
+          "账项调整",
+          "重分类调整",
+          "审定数",
+          "变动额",
+          "变动率",
+          null
+        ],
+        [
+          "=底稿目录!A9",
+          "='明细表M1-2'!D25",
+          "='明细表M1-2'!H25",
+          "='明细表M1-2'!I25",
+          "='明细表M1-2'!N25",
+          "='明细表M1-2'!G25",
+          "='明细表M1-2'!J25+'明细表M1-2'!K25",
+          "='明细表M1-2'!L25+'明细表M1-2'!M25",
+          "='明细表M1-2'!Q25",
+          "=I7-E7",
+          "=IF(AND(E7=0,J7=0),0,IF(AND(E7=0,J7>0),1,J7/E7))",
+          null
+        ],
+        [
+          "=底稿目录!A10",
+          "='明细表M1-2'!D26",
+          "='明细表M1-2'!H26",
+          "='明细表M1-2'!I26",
+          "='明细表M1-2'!N26",
+          "='明细表M1-2'!G26",
+          "='明细表M1-2'!J26+'明细表M1-2'!K26",
+          "='明细表M1-2'!L26+'明细表M1-2'!M26",
+          "='明细表M1-2'!Q26",
+          "=I8-E8",
+          "=IF(AND(E8=0,J8=0),0,IF(AND(E8=0,J8>0),1,J8/E8))",
+          null
+        ]
+      ],
+      "formula_count": 92,
+      "formulas": [
+        {
+          "cell": "A3",
+          "formula": "=底稿目录!A2",
+          "row": 3,
+          "col": 1
+        },
+        {
+          "cell": "E3",
+          "formula": "=底稿目录!A4",
+          "row": 3,
+          "col": 5
+        },
+        {
+          "cell": "H3",
+          "formula": "=底稿目录!A5",
+          "row": 3,
+          "col": 8
+        },
+        {
+          "cell": "L3",
+          "formula": "=底稿目录!F6",
+          "row": 3,
+          "col": 12
+        },
+        {
+          "cell": "A4",
+          "formula": "=底稿目录!A3",
+          "row": 4,
+          "col": 1
+        },
+        {
+          "cell": "E4",
+          "formula": "=底稿目录!A6",
+          "row": 4,
+          "col": 5
+        },
+        {
+          "cell": "H4",
+          "formula": "=底稿目录!A7",
+          "row": 4,
+          "col": 8
+        },
+        {
+          "cell": "A7",
+          "formula": "=底稿目录!A9",
+          "row": 7,
+          "col": 1
+        },
+        {
+          "cell": "B7",
+          "formula": "='明细表M1-2'!D25",
+          "row": 7,
+          "col": 2
+        },
+        {
+          "cell": "C7",
+          "formula": "='明细表M1-2'!H25",
+          "row": 7,
+          "col": 3
+        },
+        {
+          "cell": "D7",
+          "formula": "='明细表M1-2'!I25",
+          "row": 7,
+          "col": 4
+        },
+        {
+          "cell": "E7",
+          "formula": "='明细表M1-2'!N25",
+          "row": 7,
+          "col": 5
+        },
+        {
+          "cell": "F7",
+          "formula": "='明细表M1-2'!G25",
+          "row": 7,
+          "col": 6
+        },
+        {
+          "cell": "G7",
+          "formula": "='明细表M1-2'!J25+'明细表M1-2'!K25",
+          "row": 7,
+          "col": 7
+        },
+        {
+          "cell": "H7",
+          "formula": "='明细表M1-2'!L25+'明细表M1-2'!M25",
+          "row": 7,
+          "col": 8
+        },
+        {
+          "cell": "I7",
+          "formula": "='明细表M1-2'!Q25",
+          "row": 7,
+          "col": 9
+        },
+        {
+          "cell": "J7",
+          "formula": "=I7-E7",
+          "row": 7,
+          "col": 10
+        },
+        {
+          "cell": "K7",
+          "formula": "=IF(AND(E7=0,J7=0),0,IF(AND(E7=0,J7>0),1,J7/E7))",
+          "row": 7,
+          "col": 11
+        },
+        {
+          "cell": "A8",
+          "formula": "=底稿目录!A10",
+          "row": 8,
+          "col": 1
+        },
+        {
+          "cell": "B8",
+          "formula": "='明细表M1-2'!D26",
+          "row": 8,
+          "col": 2
+        },
+        {
+          "cell": "C8",
+          "formula": "='明细表M1-2'!H26",
+          "row": 8,
+          "col": 3
+        },
+        {
+          "cell": "D8",
+          "formula": "='明细表M1-2'!I26",
+          "row": 8,
+          "col": 4
+        },
+        {
+          "cell": "E8",
+          "formula": "='明细表M1-2'!N26",
+          "row": 8,
+          "col": 5
+        },
+        {
+          "cell": "F8",
+          "formula": "='明细表M1-2'!G26",
+          "row": 8,
+          "col": 6
+        },
+        {
+          "cell": "G8",
+          "formula": "='明细表M1-2'!J26+'明细表M1-2'!K26",
+          "row": 8,
+          "col": 7
+        },
+        {
+          "cell": "H8",
+          "formula": "='明细表M1-2'!L26+'明细表M1-2'!M26",
+          "row": 8,
+          "col": 8
+        },
+        {
+          "cell": "I8",
+          "formula": "='明细表M1-2'!Q26",
+          "row": 8,
+          "col": 9
+        },
+        {
+          "cell": "J8",
+          "formula": "=I8-E8",
+          "row": 8,
+          "col": 10
+        },
+        {
+          "cell": "K8",
+          "formula": "=IF(AND(E8=0,J8=0),0,IF(AND(E8=0,J8>0),1,J8/E8))",
+          "row": 8,
+          "col": 11
+        },
+        {
+          "cell": "A9",
+          "formula": "=底稿目录!A11",
+          "row": 9,
+          "col": 1
+        },
+        {
+          "cell": "B9",
+          "formula": "='明细表M1-2'!D27",
+          "row": 9,
+          "col": 2
+        },
+        {
+          "cell": "C9",
+          "formula": "='明细表M1-2'!H27",
+          "row": 9,
+          "col": 3
+        },
+        {
+          "cell": "D9",
+          "formula": "='明细表M1-2'!I27",
+          "row": 9,
+          "col": 4
+        },
+        {
+          "cell": "E9",
+          "formula": "='明细表M1-2'!N27",
+          "row": 9,
+          "col": 5
+        },
+        {
+          "cell": "F9",
+          "formula": "='明细表M1-2'!G27",
+          "row": 9,
+          "col": 6
+        },
+        {
+          "cell": "G9",
+          "formula": "='明细表M1-2'!J27+'明细表M1-2'!K27",
+          "row": 9,
+          "col": 7
+        },
+        {
+          "cell": "H9",
+          "formula": "='明细表M1-2'!L27+'明细表M1-2'!M27",
+          "row": 9,
+          "col": 8
+        },
+        {
+          "cell": "I9",
+          "formula": "='明细表M1-2'!Q27",
+          "row": 9,
+          "col": 9
+        },
+        {
+          "cell": "J9",
+          "formula": "=I9-E9",
+          "row": 9,
+          "col": 10
+        },
+        {
+          "cell": "K9",
+          "formula": "=IF(AND(E9=0,J9=0),0,IF(AND(E9=0,J9>0),1,J9/E9))",
+          "row": 9,
+          "col": 11
+        },
+        {
+          "cell": "A10",
+          "formula": "=底稿目录!A12",
+          "row": 10,
+          "col": 1
+        },
+        {
+          "cell": "B10",
+          "formula": "='明细表M1-2'!D28",
+          "row": 10,
+          "col": 2
+        },
+        {
+          "cell": "C10",
+          "formula": "='明细表M1-2'!H28",
+          "row": 10,
+          "col": 3
+        },
+        {
+          "cell": "D10",
+          "formula": "='明细表M1-2'!I28",
+          "row": 10,
+          "col": 4
+        },
+        {
+          "cell": "E10",
+          "formula": "='明细表M1-2'!N28",
+          "row": 10,
+          "col": 5
+        },
+        {
+          "cell": "F10",
+          "formula": "='明细表M1-2'!G28",
+          "row": 10,
+          "col": 6
+        },
+        {
+          "cell": "G10",
+          "formula": "='明细表M1-2'!J28+'明细表M1-2'!K28",
+          "row": 10,
+          "col": 7
+        },
+        {
+          "cell": "H10",
+          "formula": "='明细表M1-2'!L28+'明细表M1-2'!M28",
+          "row": 10,
+          "col": 8
+        },
+        {
+          "cell": "I10",
+          "formula": "='明细表M1-2'!Q28",
+          "row": 10,
+          "col": 9
+        },
+        {
+          "cell": "J10",
+          "formula": "=I10-E10",
+          "row": 10,
+          "col": 10
+        },
+        {
+          "cell": "K10",
+          "formula": "=IF(AND(E10=0,J10=0),0,IF(AND(E10=0,J10>0),1,J10/E10))",
+          "row": 10,
+          "col": 11
+        },
+        {
+          "cell": "A11",
+          "formula": "=底稿目录!A13",
+          "row": 11,
+          "col": 1
+        },
+        {
+          "cell": "B11",
+          "formula": "='明细表M1-2'!D29",
+          "row": 11,
+          "col": 2
+        },
+        {
+          "cell": "C11",
+          "formula": "='明细表M1-2'!H29",
+          "row": 11,
+          "col": 3
+        },
+        {
+          "cell": "D11",
+          "formula": "='明细表M1-2'!I29",
+          "row": 11,
+          "col": 4
+        },
+        {
+          "cell": "E11",
+          "formula": "='明细表M1-2'!N29",
+          "row": 11,
+          "col": 5
+        },
+        {
+          "cell": "F11",
+          "formula": "='明细表M1-2'!G29",
+          "row": 11,
+          "col": 6
+        },
+        {
+          "cell": "G11",
+          "formula": "='明细表M1-2'!J29+'明细表M1-2'!K29",
+          "row": 11,
+          "col": 7
+        },
+        {
+          "cell": "H11",
+          "formula": "='明细表M1-2'!L29+'明细表M1-2'!M29",
+          "row": 11,
+          "col": 8
+        },
+        {
+          "cell": "I11",
+          "formula": "='明细表M1-2'!Q29",
+          "row": 11,
+          "col": 9
+        },
+        {
+          "cell": "J11",
+          "formula": "=I11-E11",
+          "row": 11,
+          "col": 10
+        },
+        {
+          "cell": "K11",
+          "formula": "=IF(AND(E11=0,J11=0),0,IF(AND(E11=0,J11>0),1,J11/E11))",
+          "row": 11,
+          "col": 11
+        },
+        {
+          "cell": "A12",
+          "formula": "=底稿目录!A16",
+          "row": 12,
+          "col": 1
+        },
+        {
+          "cell": "B12",
+          "formula": "='明细表M1-2'!D31",
+          "row": 12,
+          "col": 2
+        },
+        {
+          "cell": "C12",
+          "formula": "='明细表M1-2'!H31",
+          "row": 12,
+          "col": 3
+        },
+        {
+          "cell": "D12",
+          "formula": "='明细表M1-2'!I31",
+          "row": 12,
+          "col": 4
+        },
+        {
+          "cell": "E12",
+          "formula": "='明细表M1-2'!N31",
+          "row": 12,
+          "col": 5
+        },
+        {
+          "cell": "F12",
+          "formula": "='明细表M1-2'!G31",
+          "row": 12,
+          "col": 6
+        },
+        {
+          "cell": "G12",
+          "formula": "='明细表M1-2'!J31+'明细表M1-2'!K31",
+          "row": 12,
+          "col": 7
+        },
+        {
+          "cell": "H12",
+          "formula": "='明细表M1-2'!L31+'明细表M1-2'!M31",
+          "row": 12,
+          "col": 8
+        },
+        {
+          "cell": "I12",
+          "formula": "='明细表M1-2'!Q31",
+          "row": 12,
+          "col": 9
+        },
+        {
+          "cell": "J12",
+          "formula": "=I12-E12",
+          "row": 12,
+          "col": 10
+        },
+        {
+          "cell": "K12",
+          "formula": "=IF(AND(E12=0,J12=0),0,IF(AND(E12=0,J12>0),1,J12/E12))",
+          "row": 12,
+          "col": 11
+        },
+        {
+          "cell": "A13",
+          "formula": "='明细表M1-2'!A23",
+          "row": 13,
+          "col": 1
+        },
+        {
+          "cell": "B13",
+          "formula": "=SUM(B7:B12)",
+          "row": 13,
+          "col": 2
+        },
+        {
+          "cell": "C13",
+          "formula": "=SUM(C7:C12)",
+          "row": 13,
+          "col": 3
+        },
+        {
+          "cell": "D13",
+          "formula": "=SUM(D7:D12)",
+          "row": 13,
+          "col": 4
+        },
+        {
+          "cell": "E13",
+          "formula": "=SUM(E7:E12)",
+          "row": 13,
+          "col": 5
+        },
+        {
+          "cell": "F13",
+          "formula": "=SUM(F7:F12)",
+          "row": 13,
+          "col": 6
+        },
+        {
+          "cell": "G13",
+          "formula": "=SUM(G7:G12)",
+          "row": 13,
+          "col": 7
+        },
+        {
+          "cell": "H13",
+          "formula": "=SUM(H7:H12)",
+          "row": 13,
+          "col": 8
+        },
+        {
+          "cell": "I13",
+          "formula": "=SUM(I7:I12)",
+          "row": 13,
+          "col": 9
+        },
+        {
+          "cell": "J13",
+          "formula": "=SUM(J7:J12)",
+          "row": 13,
+          "col": 10
+        },
+        {
+          "cell": "K13",
+          "formula": "=IF(AND(E13=0,J13=0),0,IF(AND(E13=0,J13>0),1,J13/E13))",
+          "row": 13,
+          "col": 11
+        },
+        {
+          "cell": "E15",
+          "formula": "=E13-E14",
+          "row": 15,
+          "col": 5
+        },
+        {
+          "cell": "I15",
+          "formula": "=I13-I14",
+          "row": 15,
+          "col": 9
+        },
+        {
+          "cell": "B23",
+          "formula": "=I13",
+          "row": 23,
+          "col": 2
+        },
+        {
+          "cell": "C23",
+          "formula": "=E13",
+          "row": 23,
+          "col": 3
+        },
+        {
+          "cell": "B25",
+          "formula": "=SUM(B22:B24)",
+          "row": 25,
+          "col": 2
+        },
+        {
+          "cell": "C25",
+          "formula": "=SUM(C22:C24)",
+          "row": 25,
+          "col": 3
+        },
+        {
+          "cell": "B27",
+          "formula": "=B25-B26",
+          "row": 27,
+          "col": 2
+        },
+        {
+          "cell": "C27",
+          "formula": "=C25-C26",
+          "row": 27,
+          "col": 3
+        }
+      ]
+    },
+    "附注披露信息（上市公司）": {
+      "title": "附注披露信息（上市公司）",
+      "dimensions": "A1:Q20",
+      "max_row": 20,
+      "max_column": 17,
+      "merged_cells": [
+        "A2:F2",
+        "A1:F1"
+      ],
+      "header_rows": [
+        [
+          "致同会计师事务所",
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          "应付股利（利润）附注披露信息（上市公司）",
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          "=底稿目录!A2",
+          "=底稿目录!A4",
+          null,
+          "=底稿目录!A5",
+          "索引号：",
+          "M1-1",
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          "=底稿目录!A3",
+          "=底稿目录!A6",
+          null,
+          "=底稿目录!A7",
+          "页次：",
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          "应付股利",
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          "【其他应付款、应付股利与应付利息的合计数披露详见M4-1】",
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          "项目（或股东名称）",
+          "期末余额",
+          "上年年末余额",
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          "普通股股利",
+          "='审定表M1-1'!I7",
+          "='审定表M1-1'!E7",
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      ],
+      "formula_count": 13,
+      "formulas": [
+        {
+          "cell": "A3",
+          "formula": "=底稿目录!A2",
+          "row": 3,
+          "col": 1
+        },
+        {
+          "cell": "B3",
+          "formula": "=底稿目录!A4",
+          "row": 3,
+          "col": 2
+        },
+        {
+          "cell": "D3",
+          "formula": "=底稿目录!A5",
+          "row": 3,
+          "col": 4
+        },
+        {
+          "cell": "A4",
+          "formula": "=底稿目录!A3",
+          "row": 4,
+          "col": 1
+        },
+        {
+          "cell": "B4",
+          "formula": "=底稿目录!A6",
+          "row": 4,
+          "col": 2
+        },
+        {
+          "cell": "D4",
+          "formula": "=底稿目录!A7",
+          "row": 4,
+          "col": 4
+        },
+        {
+          "cell": "B8",
+          "formula": "='审定表M1-1'!I7",
+          "row": 8,
+          "col": 2
+        },
+        {
+          "cell": "C8",
+          "formula": "='审定表M1-1'!E7",
+          "row": 8,
+          "col": 3
+        },
+        {
+          "cell": "B9",
+          "formula": "=SUM(B10:B12)",
+          "row": 9,
+          "col": 2
+        },
+        {
+          "cell": "C9",
+          "formula": "=SUM(C10:C12)",
+          "row": 9,
+          "col": 3
+        },
+        {
+          "cell": "B14",
+          "formula": "=B8+B9+B13",
+          "row": 14,
+          "col": 2
+        },
+        {
+          "cell": "C14",
+          "formula": "=C8+C9+C13",
+          "row": 14,
+          "col": 3
+        },
+        {
+          "cell": "B20",
+          "formula": "=SUM(B17:B19)",
+          "row": 20,
+          "col": 2
+        }
+      ]
+    },
+    "附注披露信息（国有企业）": {
+      "title": "附注披露信息（国有企业）",
+      "dimensions": "A1:H16",
+      "max_row": 16,
+      "max_column": 8,
+      "merged_cells": [
+        "A1:D1",
+        "A2:D2"
+      ],
+      "header_rows": [
+        [
+          "致同会计师事务所",
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          "应付股利（利润）附注披露信息（国有企业）",
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          "=底稿目录!A2",
+          "=底稿目录!A4",
+          "=底稿目录!A5",
+          "索引号：M1-1",
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          "=底稿目录!A3",
+          "=底稿目录!A6",
+          "=底稿目录!A7",
+          "页次：",
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          "应付股利",
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          "【其他应付款、应付股利与应付利息的合计数披露详见M4-1】",
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          "项  目",
+          "期末余额",
+          "期初余额",
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      ],
+      "formula_count": 12,
+      "formulas": [
+        {
+          "cell": "A3",
+          "formula": "=底稿目录!A2",
+          "row": 3,
+          "col": 1
+        },
+        {
+          "cell": "B3",
+          "formula": "=底稿目录!A4",
+          "row": 3,
+          "col": 2
+        },
+        {
+          "cell": "C3",
+          "formula": "=底稿目录!A5",
+          "row": 3,
+          "col": 3
+        },
+        {
+          "cell": "A4",
+          "formula": "=底稿目录!A3",
+          "row": 4,
+          "col": 1
+        },
+        {
+          "cell": "B4",
+          "formula": "=底稿目录!A6",
+          "row": 4,
+          "col": 2
+        },
+        {
+          "cell": "C4",
+          "formula": "=底稿目录!A7",
+          "row": 4,
+          "col": 3
+        },
+        {
+          "cell": "B9",
+          "formula": "='审定表M1-1'!I7",
+          "row": 9,
+          "col": 2
+        },
+        {
+          "cell": "C9",
+          "formula": "='审定表M1-1'!E7",
+          "row": 9,
+          "col": 3
+        },
+        {
+          "cell": "B10",
+          "formula": "='审定表M1-1'!I8+'审定表M1-1'!I9",
+          "row": 10,
+          "col": 2
+        },
+        {
+          "cell": "C10",
+          "formula": "='审定表M1-1'!E8+'审定表M1-1'!E9",
+          "row": 10,
+          "col": 3
+        },
+        {
+          "cell": "B12",
+          "formula": "=SUM(B9:B11)",
+          "row": 12,
+          "col": 2
+        },
+        {
+          "cell": "C12",
+          "formula": "=SUM(C9:C11)",
+          "row": 12,
+          "col": 3
+        }
+      ]
+    },
+    "明细表M1-2": {
+      "title": "明细表M1-2",
+      "dimensions": "A1:AA38",
+      "max_row": 38,
+      "max_column": 27,
+      "merged_cells": [
+        "A25:C25",
+        "D12:G12",
+        "B12:B13",
+        "A27:C27",
+        "A26:C26",
+        "L12:M12",
+        "A2:U2",
+        "A12:A13",
+        "R12:R13",
+        "T12:T13",
+        "C12:C13",
+        "U12:U13",
+        "A29:C29",
+        "A28:C28",
+        "N12:Q12",
+        "H12:I12",
+        "J12:K12",
+        "S12:S13",
+        "A1:U1"
+      ],
+      "header_rows": [
+        [
+          "致同会计师事务所",
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          "应付股利（利润）明细表",
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          "=底稿目录!A2",
+          null,
+          null,
+          null,
+          null,
+          null,
+          "=底稿目录!A4",
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          "=底稿目录!A5",
+          null,
+          null,
+          null,
+          null,
+          null,
+          "索引号：",
+          "=底稿目录!F9",
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          "=底稿目录!A3",
+          null,
+          null,
+          null,
+          null,
+          null,
+          "=底稿目录!A6",
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          "=底稿目录!A7",
+          null,
+          null,
+          null,
+          null,
+          null,
+          "页  次：",
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          "一、审计目标:",
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          "1.资产负债表中记录的应付股利（利润）是存在的，且已经记录在恰当的账户中；",
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          "2.所有应记录的应付股利（利润）均已记录，所有应当包括在财务报表中的相关披露均已包括；",
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          "3.应付股利（利润）以恰当的金额包括在财务报表中，与之相关的计价或分摊调整已恰当记录，相关披露已得到恰当计量和描述 ；",
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      ],
+      "formula_count": 141,
+      "formulas": [
+        {
+          "cell": "A3",
+          "formula": "=底稿目录!A2",
+          "row": 3,
+          "col": 1
+        },
+        {
+          "cell": "G3",
+          "formula": "=底稿目录!A4",
+          "row": 3,
+          "col": 7
+        },
+        {
+          "cell": "N3",
+          "formula": "=底稿目录!A5",
+          "row": 3,
+          "col": 14
+        },
+        {
+          "cell": "U3",
+          "formula": "=底稿目录!F9",
+          "row": 3,
+          "col": 21
+        },
+        {
+          "cell": "A4",
+          "formula": "=底稿目录!A3",
+          "row": 4,
+          "col": 1
+        },
+        {
+          "cell": "G4",
+          "formula": "=底稿目录!A6",
+          "row": 4,
+          "col": 7
+        },
+        {
+          "cell": "N4",
+          "formula": "=底稿目录!A7",
+          "row": 4,
+          "col": 14
+        },
+        {
+          "cell": "G14",
+          "formula": "=D14+E14-F14",
+          "row": 14,
+          "col": 7
+        },
+        {
+          "cell": "N14",
+          "formula": "=D14+H14+I14",
+          "row": 14,
+          "col": 14
+        },
+        {
+          "cell": "O14",
+          "formula": "=E14+J14+L14",
+          "row": 14,
+          "col": 15
+        },
+        {
+          "cell": "P14",
+          "formula": "=F14+K14+M14",
+          "row": 14,
+          "col": 16
+        },
+        {
+          "cell": "Q14",
+          "formula": "=N14+O14-P14",
+          "row": 14,
+          "col": 17
+        },
+        {
+          "cell": "G15",
+          "formula": "=D15+E15-F15",
+          "row": 15,
+          "col": 7
+        },
+        {
+          "cell": "N15",
+          "formula": "=D15+H15+I15",
+          "row": 15,
+          "col": 14
+        },
+        {
+          "cell": "O15",
+          "formula": "=E15+J15+L15",
+          "row": 15,
+          "col": 15
+        },
+        {
+          "cell": "P15",
+          "formula": "=F15+K15+M15",
+          "row": 15,
+          "col": 16
+        },
+        {
+          "cell": "Q15",
+          "formula": "=N15+O15-P15",
+          "row": 15,
+          "col": 17
+        },
+        {
+          "cell": "G16",
+          "formula": "=D16+E16-F16",
+          "row": 16,
+          "col": 7
+        },
+        {
+          "cell": "N16",
+          "formula": "=D16+H16+I16",
+          "row": 16,
+          "col": 14
+        },
+        {
+          "cell": "O16",
+          "formula": "=E16+J16+L16",
+          "row": 16,
+          "col": 15
+        },
+        {
+          "cell": "P16",
+          "formula": "=F16+K16+M16",
+          "row": 16,
+          "col": 16
+        },
+        {
+          "cell": "Q16",
+          "formula": "=N16+O16-P16",
+          "row": 16,
+          "col": 17
+        },
+        {
+          "cell": "G17",
+          "formula": "=D17+E17-F17",
+          "row": 17,
+          "col": 7
+        },
+        {
+          "cell": "N17",
+          "formula": "=D17+H17+I17",
+          "row": 17,
+          "col": 14
+        },
+        {
+          "cell": "O17",
+          "formula": "=E17+J17+L17",
+          "row": 17,
+          "col": 15
+        },
+        {
+          "cell": "P17",
+          "formula": "=F17+K17+M17",
+          "row": 17,
+          "col": 16
+        },
+        {
+          "cell": "Q17",
+          "formula": "=N17+O17-P17",
+          "row": 17,
+          "col": 17
+        },
+        {
+          "cell": "G18",
+          "formula": "=D18+E18-F18",
+          "row": 18,
+          "col": 7
+        },
+        {
+          "cell": "N18",
+          "formula": "=D18+H18+I18",
+          "row": 18,
+          "col": 14
+        },
+        {
+          "cell": "O18",
+          "formula": "=E18+J18+L18",
+          "row": 18,
+          "col": 15
+        },
+        {
+          "cell": "P18",
+          "formula": "=F18+K18+M18",
+          "row": 18,
+          "col": 16
+        },
+        {
+          "cell": "Q18",
+          "formula": "=N18+O18-P18",
+          "row": 18,
+          "col": 17
+        },
+        {
+          "cell": "G19",
+          "formula": "=D19+E19-F19",
+          "row": 19,
+          "col": 7
+        },
+        {
+          "cell": "N19",
+          "formula": "=D19+H19+I19",
+          "row": 19,
+          "col": 14
+        },
+        {
+          "cell": "O19",
+          "formula": "=E19+J19+L19",
+          "row": 19,
+          "col": 15
+        },
+        {
+          "cell": "P19",
+          "formula": "=F19+K19+M19",
+          "row": 19,
+          "col": 16
+        },
+        {
+          "cell": "Q19",
+          "formula": "=N19+O19-P19",
+          "row": 19,
+          "col": 17
+        },
+        {
+          "cell": "G20",
+          "formula": "=D20+E20-F20",
+          "row": 20,
+          "col": 7
+        },
+        {
+          "cell": "N20",
+          "formula": "=D20+H20+I20",
+          "row": 20,
+          "col": 14
+        },
+        {
+          "cell": "O20",
+          "formula": "=E20+J20+L20",
+          "row": 20,
+          "col": 15
+        },
+        {
+          "cell": "P20",
+          "formula": "=F20+K20+M20",
+          "row": 20,
+          "col": 16
+        },
+        {
+          "cell": "Q20",
+          "formula": "=N20+O20-P20",
+          "row": 20,
+          "col": 17
+        },
+        {
+          "cell": "G21",
+          "formula": "=D21+E21-F21",
+          "row": 21,
+          "col": 7
+        },
+        {
+          "cell": "N21",
+          "formula": "=D21+H21+I21",
+          "row": 21,
+          "col": 14
+        },
+        {
+          "cell": "O21",
+          "formula": "=E21+J21+L21",
+          "row": 21,
+          "col": 15
+        },
+        {
+          "cell": "P21",
+          "formula": "=F21+K21+M21",
+          "row": 21,
+          "col": 16
+        },
+        {
+          "cell": "Q21",
+          "formula": "=N21+O21-P21",
+          "row": 21,
+          "col": 17
+        },
+        {
+          "cell": "G22",
+          "formula": "=D22+E22-F22",
+          "row": 22,
+          "col": 7
+        },
+        {
+          "cell": "N22",
+          "formula": "=D22+H22+I22",
+          "row": 22,
+          "col": 14
+        },
+        {
+          "cell": "O22",
+          "formula": "=E22+J22+L22",
+          "row": 22,
+          "col": 15
+        },
+        {
+          "cell": "P22",
+          "formula": "=F22+K22+M22",
+          "row": 22,
+          "col": 16
+        },
+        {
+          "cell": "Q22",
+          "formula": "=N22+O22-P22",
+          "row": 22,
+          "col": 17
+        },
+        {
+          "cell": "D23",
+          "formula": "=SUM(D14:D22)",
+          "row": 23,
+          "col": 4
+        },
+        {
+          "cell": "E23",
+          "formula": "=SUM(E14:E22)",
+          "row": 23,
+          "col": 5
+        },
+        {
+          "cell": "F23",
+          "formula": "=SUM(F14:F22)",
+          "row": 23,
+          "col": 6
+        },
+        {
+          "cell": "G23",
+          "formula": "=SUM(G14:G22)",
+          "row": 23,
+          "col": 7
+        },
+        {
+          "cell": "H23",
+          "formula": "=SUM(H14:H22)",
+          "row": 23,
+          "col": 8
+        },
+        {
+          "cell": "I23",
+          "formula": "=SUM(I14:I22)",
+          "row": 23,
+          "col": 9
+        },
+        {
+          "cell": "J23",
+          "formula": "=SUM(J14:J22)",
+          "row": 23,
+          "col": 10
+        },
+        {
+          "cell": "K23",
+          "formula": "=SUM(K14:K22)",
+          "row": 23,
+          "col": 11
+        },
+        {
+          "cell": "L23",
+          "formula": "=SUM(L14:L22)",
+          "row": 23,
+          "col": 12
+        },
+        {
+          "cell": "M23",
+          "formula": "=SUM(M14:M22)",
+          "row": 23,
+          "col": 13
+        },
+        {
+          "cell": "N23",
+          "formula": "=SUM(N14:N22)",
+          "row": 23,
+          "col": 14
+        },
+        {
+          "cell": "O23",
+          "formula": "=SUM(O14:O22)",
+          "row": 23,
+          "col": 15
+        },
+        {
+          "cell": "P23",
+          "formula": "=SUM(P14:P22)",
+          "row": 23,
+          "col": 16
+        },
+        {
+          "cell": "Q23",
+          "formula": "=SUM(Q14:Q22)",
+          "row": 23,
+          "col": 17
+        },
+        {
+          "cell": "A25",
+          "formula": "=底稿目录!A9",
+          "row": 25,
+          "col": 1
+        },
+        {
+          "cell": "D25",
+          "formula": "=SUMPRODUCT(($C$14:$C$22=$A25)*(D$14:D$22))",
+          "row": 25,
+          "col": 4
+        },
+        {
+          "cell": "E25",
+          "formula": "=SUMPRODUCT(($C$14:$C$22=$A25)*(E$14:E$22))",
+          "row": 25,
+          "col": 5
+        },
+        {
+          "cell": "F25",
+          "formula": "=SUMPRODUCT(($C$14:$C$22=$A25)*(F$14:F$22))",
+          "row": 25,
+          "col": 6
+        },
+        {
+          "cell": "G25",
+          "formula": "=SUMPRODUCT(($C$14:$C$22=$A25)*(G$14:G$22))",
+          "row": 25,
+          "col": 7
+        },
+        {
+          "cell": "H25",
+          "formula": "=SUMPRODUCT(($C$14:$C$22=$A25)*(H$14:H$22))",
+          "row": 25,
+          "col": 8
+        },
+        {
+          "cell": "I25",
+          "formula": "=SUMPRODUCT(($C$14:$C$22=$A25)*(I$14:I$22))",
+          "row": 25,
+          "col": 9
+        },
+        {
+          "cell": "J25",
+          "formula": "=SUMPRODUCT(($C$14:$C$22=$A25)*(J$14:J$22))",
+          "row": 25,
+          "col": 10
+        },
+        {
+          "cell": "K25",
+          "formula": "=SUMPRODUCT(($C$14:$C$22=$A25)*(K$14:K$22))",
+          "row": 25,
+          "col": 11
+        },
+        {
+          "cell": "L25",
+          "formula": "=SUMPRODUCT(($C$14:$C$22=$A25)*(L$14:L$22))",
+          "row": 25,
+          "col": 12
+        },
+        {
+          "cell": "M25",
+          "formula": "=SUMPRODUCT(($C$14:$C$22=$A25)*(M$14:M$22))",
+          "row": 25,
+          "col": 13
+        },
+        {
+          "cell": "N25",
+          "formula": "=SUMPRODUCT(($C$14:$C$22=$A25)*(N$14:N$22))",
+          "row": 25,
+          "col": 14
+        },
+        {
+          "cell": "O25",
+          "formula": "=SUMPRODUCT(($C$14:$C$22=$A25)*(O$14:O$22))",
+          "row": 25,
+          "col": 15
+        },
+        {
+          "cell": "P25",
+          "formula": "=SUMPRODUCT(($C$14:$C$22=$A25)*(P$14:P$22))",
+          "row": 25,
+          "col": 16
+        },
+        {
+          "cell": "Q25",
+          "formula": "=SUMPRODUCT(($C$14:$C$22=$A25)*(Q$14:Q$22))",
+          "row": 25,
+          "col": 17
+        },
+        {
+          "cell": "A26",
+          "formula": "=底稿目录!A10",
+          "row": 26,
+          "col": 1
+        },
+        {
+          "cell": "D26",
+          "formula": "=SUMPRODUCT(($C$14:$C$22=$A26)*(D$14:D$22))",
+          "row": 26,
+          "col": 4
+        },
+        {
+          "cell": "E26",
+          "formula": "=SUMPRODUCT(($C$14:$C$22=$A26)*(E$14:E$22))",
+          "row": 26,
+          "col": 5
+        },
+        {
+          "cell": "F26",
+          "formula": "=SUMPRODUCT(($C$14:$C$22=$A26)*(F$14:F$22))",
+          "row": 26,
+          "col": 6
+        },
+        {
+          "cell": "G26",
+          "formula": "=SUMPRODUCT(($C$14:$C$22=$A26)*(G$14:G$22))",
+          "row": 26,
+          "col": 7
+        },
+        {
+          "cell": "H26",
+          "formula": "=SUMPRODUCT(($C$14:$C$22=$A26)*(H$14:H$22))",
+          "row": 26,
+          "col": 8
+        },
+        {
+          "cell": "I26",
+          "formula": "=SUMPRODUCT(($C$14:$C$22=$A26)*(I$14:I$22))",
+          "row": 26,
+          "col": 9
+        },
+        {
+          "cell": "J26",
+          "formula": "=SUMPRODUCT(($C$14:$C$22=$A26)*(J$14:J$22))",
+          "row": 26,
+          "col": 10
+        },
+        {
+          "cell": "K26",
+          "formula": "=SUMPRODUCT(($C$14:$C$22=$A26)*(K$14:K$22))",
+          "row": 26,
+          "col": 11
+        },
+        {
+          "cell": "L26",
+          "formula": "=SUMPRODUCT(($C$14:$C$22=$A26)*(L$14:L$22))",
+          "row": 26,
+          "col": 12
+        },
+        {
+          "cell": "M26",
+          "formula": "=SUMPRODUCT(($C$14:$C$22=$A26)*(M$14:M$22))",
+          "row": 26,
+          "col": 13
+        },
+        {
+          "cell": "N26",
+          "formula": "=SUMPRODUCT(($C$14:$C$22=$A26)*(N$14:N$22))",
+          "row": 26,
+          "col": 14
+        },
+        {
+          "cell": "O26",
+          "formula": "=SUMPRODUCT(($C$14:$C$22=$A26)*(O$14:O$22))",
+          "row": 26,
+          "col": 15
+        },
+        {
+          "cell": "P26",
+          "formula": "=SUMPRODUCT(($C$14:$C$22=$A26)*(P$14:P$22))",
+          "row": 26,
+          "col": 16
+        },
+        {
+          "cell": "Q26",
+          "formula": "=SUMPRODUCT(($C$14:$C$22=$A26)*(Q$14:Q$22))",
+          "row": 26,
+          "col": 17
+        },
+        {
+          "cell": "A27",
+          "formula": "=底稿目录!A11",
+          "row": 27,
+          "col": 1
+        },
+        {
+          "cell": "D27",
+          "formula": "=SUMPRODUCT(($C$14:$C$22=$A27)*(D$14:D$22))",
+          "row": 27,
+          "col": 4
+        },
+        {
+          "cell": "E27",
+          "formula": "=SUMPRODUCT(($C$14:$C$22=$A27)*(E$14:E$22))",
+          "row": 27,
+          "col": 5
+        },
+        {
+          "cell": "F27",
+          "formula": "=SUMPRODUCT(($C$14:$C$22=$A27)*(F$14:F$22))",
+          "row": 27,
+          "col": 6
+        },
+        {
+          "cell": "G27",
+          "formula": "=SUMPRODUCT(($C$14:$C$22=$A27)*(G$14:G$22))",
+          "row": 27,
+          "col": 7
+        },
+        {
+          "cell": "H27",
+          "formula": "=SUMPRODUCT(($C$14:$C$22=$A27)*(H$14:H$22))",
+          "row": 27,
+          "col": 8
+        },
+        {
+          "cell": "I27",
+          "formula": "=SUMPRODUCT(($C$14:$C$22=$A27)*(I$14:I$22))",
+          "row": 27,
+          "col": 9
+        },
+        {
+          "cell": "J27",
+          "formula": "=SUMPRODUCT(($C$14:$C$22=$A27)*(J$14:J$22))",
+          "row": 27,
+          "col": 10
+        },
+        {
+          "cell": "K27",
+          "formula": "=SUMPRODUCT(($C$14:$C$22=$A27)*(K$14:K$22))",
+          "row": 27,
+          "col": 11
+        },
+        {
+          "cell": "L27",
+          "formula": "=SUMPRODUCT(($C$14:$C$22=$A27)*(L$14:L$22))",
+          "row": 27,
+          "col": 12
+        },
+        {
+          "cell": "M27",
+          "formula": "=SUMPRODUCT(($C$14:$C$22=$A27)*(M$14:M$22))",
+          "row": 27,
+          "col": 13
+        },
+        {
+          "cell": "N27",
+          "formula": "=SUMPRODUCT(($C$14:$C$22=$A27)*(N$14:N$22))",
+          "row": 27,
+          "col": 14
+        },
+        {
+          "cell": "O27",
+          "formula": "=SUMPRODUCT(($C$14:$C$22=$A27)*(O$14:O$22))",
+          "row": 27,
+          "col": 15
+        },
+        {
+          "cell": "P27",
+          "formula": "=SUMPRODUCT(($C$14:$C$22=$A27)*(P$14:P$22))",
+          "row": 27,
+          "col": 16
+        },
+        {
+          "cell": "Q27",
+          "formula": "=SUMPRODUCT(($C$14:$C$22=$A27)*(Q$14:Q$22))",
+          "row": 27,
+          "col": 17
+        },
+        {
+          "cell": "A28",
+          "formula": "=底稿目录!A12",
+          "row": 28,
+          "col": 1
+        },
+        {
+          "cell": "D28",
+          "formula": "=SUMPRODUCT(($C$14:$C$22=$A28)*(D$14:D$22))",
+          "row": 28,
+          "col": 4
+        },
+        {
+          "cell": "E28",
+          "formula": "=SUMPRODUCT(($C$14:$C$22=$A28)*(E$14:E$22))",
+          "row": 28,
+          "col": 5
+        },
+        {
+          "cell": "F28",
+          "formula": "=SUMPRODUCT(($C$14:$C$22=$A28)*(F$14:F$22))",
+          "row": 28,
+          "col": 6
+        },
+        {
+          "cell": "G28",
+          "formula": "=SUMPRODUCT(($C$14:$C$22=$A28)*(G$14:G$22))",
+          "row": 28,
+          "col": 7
+        },
+        {
+          "cell": "H28",
+          "formula": "=SUMPRODUCT(($C$14:$C$22=$A28)*(H$14:H$22))",
+          "row": 28,
+          "col": 8
+        },
+        {
+          "cell": "I28",
+          "formula": "=SUMPRODUCT(($C$14:$C$22=$A28)*(I$14:I$22))",
+          "row": 28,
+          "col": 9
+        },
+        {
+          "cell": "J28",
+          "formula": "=SUMPRODUCT(($C$14:$C$22=$A28)*(J$14:J$22))",
+          "row": 28,
+          "col": 10
+        },
+        {
+          "cell": "K28",
+          "formula": "=SUMPRODUCT(($C$14:$C$22=$A28)*(K$14:K$22))",
+          "row": 28,
+          "col": 11
+        },
+        {
+          "cell": "L28",
+          "formula": "=SUMPRODUCT(($C$14:$C$22=$A28)*(L$14:L$22))",
+          "row": 28,
+          "col": 12
+        },
+        {
+          "cell": "M28",
+          "formula": "=SUMPRODUCT(($C$14:$C$22=$A28)*(M$14:M$22))",
+          "row": 28,
+          "col": 13
+        },
+        {
+          "cell": "N28",
+          "formula": "=SUMPRODUCT(($C$14:$C$22=$A28)*(N$14:N$22))",
+          "row": 28,
+          "col": 14
+        },
+        {
+          "cell": "O28",
+          "formula": "=SUMPRODUCT(($C$14:$C$22=$A28)*(O$14:O$22))",
+          "row": 28,
+          "col": 15
+        },
+        {
+          "cell": "P28",
+          "formula": "=SUMPRODUCT(($C$14:$C$22=$A28)*(P$14:P$22))",
+          "row": 28,
+          "col": 16
+        },
+        {
+          "cell": "Q28",
+          "formula": "=SUMPRODUCT(($C$14:$C$22=$A28)*(Q$14:Q$22))",
+          "row": 28,
+          "col": 17
+        },
+        {
+          "cell": "A29",
+          "formula": "=底稿目录!A13",
+          "row": 29,
+          "col": 1
+        },
+        {
+          "cell": "D29",
+          "formula": "=SUMPRODUCT(($C$14:$C$22=$A29)*(D$14:D$22))",
+          "row": 29,
+          "col": 4
+        },
+        {
+          "cell": "E29",
+          "formula": "=SUMPRODUCT(($C$14:$C$22=$A29)*(E$14:E$22))",
+          "row": 29,
+          "col": 5
+        },
+        {
+          "cell": "F29",
+          "formula": "=SUMPRODUCT(($C$14:$C$22=$A29)*(F$14:F$22))",
+          "row": 29,
+          "col": 6
+        },
+        {
+          "cell": "G29",
+          "formula": "=SUMPRODUCT(($C$14:$C$22=$A29)*(G$14:G$22))",
+          "row": 29,
+          "col": 7
+        },
+        {
+          "cell": "H29",
+          "formula": "=SUMPRODUCT(($C$14:$C$22=$A29)*(H$14:H$22))",
+          "row": 29,
+          "col": 8
+        },
+        {
+          "cell": "I29",
+          "formula": "=SUMPRODUCT(($C$14:$C$22=$A29)*(I$14:I$22))",
+          "row": 29,
+          "col": 9
+        },
+        {
+          "cell": "J29",
+          "formula": "=SUMPRODUCT(($C$14:$C$22=$A29)*(J$14:J$22))",
+          "row": 29,
+          "col": 10
+        },
+        {
+          "cell": "K29",
+          "formula": "=SUMPRODUCT(($C$14:$C$22=$A29)*(K$14:K$22))",
+          "row": 29,
+          "col": 11
+        },
+        {
+          "cell": "L29",
+          "formula": "=SUMPRODUCT(($C$14:$C$22=$A29)*(L$14:L$22))",
+          "row": 29,
+          "col": 12
+        },
+        {
+          "cell": "M29",
+          "formula": "=SUMPRODUCT(($C$14:$C$22=$A29)*(M$14:M$22))",
+          "row": 29,
+          "col": 13
+        },
+        {
+          "cell": "N29",
+          "formula": "=SUMPRODUCT(($C$14:$C$22=$A29)*(N$14:N$22))",
+          "row": 29,
+          "col": 14
+        },
+        {
+          "cell": "O29",
+          "formula": "=SUMPRODUCT(($C$14:$C$22=$A29)*(O$14:O$22))",
+          "row": 29,
+          "col": 15
+        },
+        {
+          "cell": "P29",
+          "formula": "=SUMPRODUCT(($C$14:$C$22=$A29)*(P$14:P$22))",
+          "row": 29,
+          "col": 16
+        },
+        {
+          "cell": "Q29",
+          "formula": "=SUMPRODUCT(($C$14:$C$22=$A29)*(Q$14:Q$22))",
+          "row": 29,
+          "col": 17
+        }
+      ]
+    },
+    "调整分录汇总M1-3": {
+      "title": "调整分录汇总M1-3",
+      "dimensions": "A1:J26",
+      "max_row": 26,
+      "max_column": 10,
+      "merged_cells": [
+        "A1:J1",
+        "A24:J24",
+        "A2:J2"
+      ],
+      "header_rows": [
+        [
+          "致同会计师事务所",
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          "应付股利（利润）调整分录汇总表",
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          "=底稿目录!A2",
+          null,
+          "=底稿目录!A4",
+          null,
+          null,
+          "=底稿目录!A5",
+          null,
+          null,
+          "索引号：",
+          "=底稿目录!F10"
+        ],
+        [
+          "=底稿目录!A3",
+          null,
+          "=底稿目录!A6",
+          null,
+          null,
+          "=底稿目录!A7",
+          null,
+          null,
+          "页  次：",
+          null
+        ],
+        [
+          "调整事项说明",
+          "类别（报表调整/账项调整/其他）",
+          "报表项目",
+          "科目名称",
+          "附注项目",
+          "……",
+          "借方调整金额",
+          "贷方调整金额",
+          "索引",
+          "备注"
+        ],
+        [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      ],
+      "formula_count": 7,
+      "formulas": [
+        {
+          "cell": "A3",
+          "formula": "=底稿目录!A2",
+          "row": 3,
+          "col": 1
+        },
+        {
+          "cell": "C3",
+          "formula": "=底稿目录!A4",
+          "row": 3,
+          "col": 3
+        },
+        {
+          "cell": "F3",
+          "formula": "=底稿目录!A5",
+          "row": 3,
+          "col": 6
+        },
+        {
+          "cell": "J3",
+          "formula": "=底稿目录!F10",
+          "row": 3,
+          "col": 10
+        },
+        {
+          "cell": "A4",
+          "formula": "=底稿目录!A3",
+          "row": 4,
+          "col": 1
+        },
+        {
+          "cell": "C4",
+          "formula": "=底稿目录!A6",
+          "row": 4,
+          "col": 3
+        },
+        {
+          "cell": "F4",
+          "formula": "=底稿目录!A7",
+          "row": 4,
+          "col": 6
+        }
+      ]
+    },
+    "外币汇率测算表M1-4": {
+      "title": "外币汇率测算表M1-4",
+      "dimensions": "A1:G25",
+      "max_row": 25,
+      "max_column": 7,
+      "merged_cells": [
+        "A8:A9",
+        "A1:G1",
+        "B8:B9",
+        "A2:G2",
+        "C8:G8"
+      ],
+      "header_rows": [
+        [
+          "致同会计师事务所",
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          "外币汇率测算表",
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          "=底稿目录!A2",
+          null,
+          "=底稿目录!A4",
+          null,
+          "=底稿目录!A5",
+          "索引号：",
+          "=底稿目录!F11"
+        ],
+        [
+          "=底稿目录!A3",
+          null,
+          "=底稿目录!A6",
+          null,
+          "=底稿目录!A7",
+          "页  次：",
+          null
+        ],
+        [
+          "一、审计目标:",
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          "1.应付股利（利润）以恰当的金额包括在财务报表中，与之相关的计价或分摊调整已恰当记录，相关披露已得到恰当计量和描述 ",
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          "二、审计过程：",
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          "股本名称",
+          "币种",
+          "期末应付股利（利润）金额",
+          null,
+          null,
+          null,
+          null
+        ]
+      ],
+      "formula_count": 23,
+      "formulas": [
+        {
+          "cell": "A3",
+          "formula": "=底稿目录!A2",
+          "row": 3,
+          "col": 1
+        },
+        {
+          "cell": "C3",
+          "formula": "=底稿目录!A4",
+          "row": 3,
+          "col": 3
+        },
+        {
+          "cell": "E3",
+          "formula": "=底稿目录!A5",
+          "row": 3,
+          "col": 5
+        },
+        {
+          "cell": "G3",
+          "formula": "=底稿目录!F11",
+          "row": 3,
+          "col": 7
+        },
+        {
+          "cell": "A4",
+          "formula": "=底稿目录!A3",
+          "row": 4,
+          "col": 1
+        },
+        {
+          "cell": "C4",
+          "formula": "=底稿目录!A6",
+          "row": 4,
+          "col": 3
+        },
+        {
+          "cell": "E4",
+          "formula": "=底稿目录!A7",
+          "row": 4,
+          "col": 5
+        },
+        {
+          "cell": "E10",
+          "formula": "=C10*D10",
+          "row": 10,
+          "col": 5
+        },
+        {
+          "cell": "G10",
+          "formula": "=E10-F10",
+          "row": 10,
+          "col": 7
+        },
+        {
+          "cell": "E11",
+          "formula": "=C11*D11",
+          "row": 11,
+          "col": 5
+        },
+        {
+          "cell": "G11",
+          "formula": "=E11-F11",
+          "row": 11,
+          "col": 7
+        },
+        {
+          "cell": "E12",
+          "formula": "=C12*D12",
+          "row": 12,
+          "col": 5
+        },
+        {
+          "cell": "G12",
+          "formula": "=E12-F12",
+          "row": 12,
+          "col": 7
+        },
+        {
+          "cell": "E13",
+          "formula": "=C13*D13",
+          "row": 13,
+          "col": 5
+        },
+        {
+          "cell": "G13",
+          "formula": "=E13-F13",
+          "row": 13,
+          "col": 7
+        },
+        {
+          "cell": "E14",
+          "formula": "=C14*D14",
+          "row": 14,
+          "col": 5
+        },
+        {
+          "cell": "G14",
+          "formula": "=E14-F14",
+          "row": 14,
+          "col": 7
+        },
+        {
+          "cell": "E15",
+          "formula": "=C15*D15",
+          "row": 15,
+          "col": 5
+        },
+        {
+          "cell": "G15",
+          "formula": "=E15-F15",
+          "row": 15,
+          "col": 7
+        },
+        {
+          "cell": "C16",
+          "formula": "=SUM(C10:C15)",
+          "row": 16,
+          "col": 3
+        },
+        {
+          "cell": "E16",
+          "formula": "=SUM(E10:E15)",
+          "row": 16,
+          "col": 5
+        },
+        {
+          "cell": "F16",
+          "formula": "=SUM(F10:F15)",
+          "row": 16,
+          "col": 6
+        },
+        {
+          "cell": "G16",
+          "formula": "=SUM(G10:G15)",
+          "row": 16,
+          "col": 7
+        }
+      ]
+    },
+    "应付股利（利润）测算表M1-5": {
+      "title": "应付股利（利润）测算表M1-5",
+      "dimensions": "A1:N29",
+      "max_row": 29,
+      "max_column": 14,
+      "merged_cells": [
+        "A2:H2",
+        "A1:H1"
+      ],
+      "header_rows": [
+        [
+          "致同会计师事务所",
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          "应付股利（利润）测算表",
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          "=底稿目录!A2",
+          null,
+          "=底稿目录!A4",
+          null,
+          null,
+          "=底稿目录!A5",
+          "索引号：",
+          "=底稿目录!F12",
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          "=底稿目录!A3",
+          null,
+          "=底稿目录!A6",
+          null,
+          null,
+          "=底稿目录!A7",
+          "页  次：",
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          "一、审计目标:",
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          "1.应付股利（利润）以恰当的金额包括在财务报表中，与之相关的计价或分摊调整已恰当记录，相关披露已得到恰当计量和描述 ",
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          "二、审计过程：",
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          "检查应付股利（利润）的计提是否根据董事会或股东会(或股东大会)决定的利润分配方案，从税后可供分配利润中计算确定。",
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      ],
+      "formula_count": 28,
+      "formulas": [
+        {
+          "cell": "A3",
+          "formula": "=底稿目录!A2",
+          "row": 3,
+          "col": 1
+        },
+        {
+          "cell": "C3",
+          "formula": "=底稿目录!A4",
+          "row": 3,
+          "col": 3
+        },
+        {
+          "cell": "F3",
+          "formula": "=底稿目录!A5",
+          "row": 3,
+          "col": 6
+        },
+        {
+          "cell": "H3",
+          "formula": "=底稿目录!F12",
+          "row": 3,
+          "col": 8
+        },
+        {
+          "cell": "A4",
+          "formula": "=底稿目录!A3",
+          "row": 4,
+          "col": 1
+        },
+        {
+          "cell": "C4",
+          "formula": "=底稿目录!A6",
+          "row": 4,
+          "col": 3
+        },
+        {
+          "cell": "F4",
+          "formula": "=底稿目录!A7",
+          "row": 4,
+          "col": 6
+        },
+        {
+          "cell": "D10",
+          "formula": "=B10*C10",
+          "row": 10,
+          "col": 4
+        },
+        {
+          "cell": "F10",
+          "formula": "=D10-E10",
+          "row": 10,
+          "col": 6
+        },
+        {
+          "cell": "D11",
+          "formula": "=B11*C11",
+          "row": 11,
+          "col": 4
+        },
+        {
+          "cell": "F11",
+          "formula": "=D11-E11",
+          "row": 11,
+          "col": 6
+        },
+        {
+          "cell": "D12",
+          "formula": "=B12*C12",
+          "row": 12,
+          "col": 4
+        },
+        {
+          "cell": "F12",
+          "formula": "=D12-E12",
+          "row": 12,
+          "col": 6
+        },
+        {
+          "cell": "D13",
+          "formula": "=B13*C13",
+          "row": 13,
+          "col": 4
+        },
+        {
+          "cell": "F13",
+          "formula": "=D13-E13",
+          "row": 13,
+          "col": 6
+        },
+        {
+          "cell": "D14",
+          "formula": "=B14*C14",
+          "row": 14,
+          "col": 4
+        },
+        {
+          "cell": "F14",
+          "formula": "=D14-E14",
+          "row": 14,
+          "col": 6
+        },
+        {
+          "cell": "D15",
+          "formula": "=B15*C15",
+          "row": 15,
+          "col": 4
+        },
+        {
+          "cell": "F15",
+          "formula": "=D15-E15",
+          "row": 15,
+          "col": 6
+        },
+        {
+          "cell": "D16",
+          "formula": "=B16*C16",
+          "row": 16,
+          "col": 4
+        },
+        {
+          "cell": "F16",
+          "formula": "=D16-E16",
+          "row": 16,
+          "col": 6
+        },
+        {
+          "cell": "D17",
+          "formula": "=B17*C17",
+          "row": 17,
+          "col": 4
+        },
+        {
+          "cell": "F17",
+          "formula": "=D17-E17",
+          "row": 17,
+          "col": 6
+        },
+        {
+          "cell": "B18",
+          "formula": "=SUM(B10:B17)",
+          "row": 18,
+          "col": 2
+        },
+        {
+          "cell": "C18",
+          "formula": "=SUM(C10:C17)",
+          "row": 18,
+          "col": 3
+        },
+        {
+          "cell": "D18",
+          "formula": "=SUM(D10:D17)",
+          "row": 18,
+          "col": 4
+        },
+        {
+          "cell": "E18",
+          "formula": "=SUM(E10:E17)",
+          "row": 18,
+          "col": 5
+        },
+        {
+          "cell": "F18",
+          "formula": "=SUM(F10:F17)",
+          "row": 18,
+          "col": 6
+        }
+      ]
+    },
+    "应付股利（利润）检查表M1-6": {
+      "title": "应付股利（利润）检查表M1-6",
+      "dimensions": "A1:P36",
+      "max_row": 36,
+      "max_column": 16,
+      "merged_cells": [
+        "P10:P11",
+        "N10:N11",
+        "O10:O11",
+        "A2:N2",
+        "I10:M10",
+        "H10:H11",
+        "A10:G10",
+        "A1:N1"
+      ],
+      "header_rows": [
+        [
+          "致同会计师事务所",
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          "应付股利（利润）检查表",
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          "=底稿目录!A2",
+          null,
+          null,
+          null,
+          "=底稿目录!A4",
+          null,
+          null,
+          "=底稿目录!A5",
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          "索引号：",
+          "=底稿目录!F13"
+        ],
+        [
+          "=底稿目录!A3",
+          null,
+          null,
+          null,
+          "=底稿目录!A6",
+          null,
+          null,
+          "=底稿目录!A7",
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          "页  次：",
+          null
+        ],
+        [
+          "一、测试目标：",
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          "1.资产负债表中记录的应付股利（利润）是存在的，且已经记录在恰当的账户中；",
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          "2.应付股利（利润）以恰当的金额包括在财务报表中，与之相关的计价或分摊调整已恰当记录，相关披露已得到恰当计量和描述 ",
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          "二、测试：",
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      ],
+      "formula_count": 15,
+      "formulas": [
+        {
+          "cell": "A3",
+          "formula": "=底稿目录!A2",
+          "row": 3,
+          "col": 1
+        },
+        {
+          "cell": "E3",
+          "formula": "=底稿目录!A4",
+          "row": 3,
+          "col": 5
+        },
+        {
+          "cell": "H3",
+          "formula": "=底稿目录!A5",
+          "row": 3,
+          "col": 8
+        },
+        {
+          "cell": "P3",
+          "formula": "=底稿目录!F13",
+          "row": 3,
+          "col": 16
+        },
+        {
+          "cell": "A4",
+          "formula": "=底稿目录!A3",
+          "row": 4,
+          "col": 1
+        },
+        {
+          "cell": "E4",
+          "formula": "=底稿目录!A6",
+          "row": 4,
+          "col": 5
+        },
+        {
+          "cell": "H4",
+          "formula": "=底稿目录!A7",
+          "row": 4,
+          "col": 8
+        },
+        {
+          "cell": "F20",
+          "formula": "=SUM(F12:F19)",
+          "row": 20,
+          "col": 6
+        },
+        {
+          "cell": "G20",
+          "formula": "=SUM(G12:G19)",
+          "row": 20,
+          "col": 7
+        },
+        {
+          "cell": "E23",
+          "formula": "='明细表M1-2'!P23",
+          "row": 23,
+          "col": 5
+        },
+        {
+          "cell": "F23",
+          "formula": "=F20",
+          "row": 23,
+          "col": 6
+        },
+        {
+          "cell": "G23",
+          "formula": "=ROUND(F23/E23,4)",
+          "row": 23,
+          "col": 7
+        },
+        {
+          "cell": "E24",
+          "formula": "='明细表M1-2'!O23",
+          "row": 24,
+          "col": 5
+        },
+        {
+          "cell": "F24",
+          "formula": "=G20",
+          "row": 24,
+          "col": 6
+        },
+        {
+          "cell": "G24",
+          "formula": "=ROUND(F24/E24,2)",
+          "row": 24,
+          "col": 7
+        }
+      ]
+    },
+    "GT_Custom": {
+      "title": "GT_Custom",
+      "dimensions": "A1:B8",
+      "max_row": 8,
+      "max_column": 2,
+      "merged_cells": [],
+      "header_rows": [
+        [
+          "C1",
+          "Custom 1"
+        ],
+        [
+          "C2",
+          "Custom 2"
+        ],
+        [
+          "C3",
+          "Custom 3"
+        ],
+        [
+          "C4",
+          "Custom 4"
+        ],
+        [
+          "C5",
+          "Custom 5"
+        ],
+        [
+          "C6",
+          "Custom 6"
+        ],
+        [
+          "C7",
+          "Custom 7"
+        ],
+        [
+          "C8",
+          "Custom 8"
+        ]
+      ],
+      "formula_count": 0,
+      "formulas": []
+    }
+  }
+}

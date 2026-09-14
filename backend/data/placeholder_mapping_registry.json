@@ -1,0 +1,19 @@
+{
+  "auto": {
+    "entity_name": {"source": "project.basic_info.client_name"},
+    "entity_short_name": {"source": "project.basic_info.entity_short_name"},
+    "audit_period": {"source": "computed.audit_period"},
+    "audit_year": {"source": "computed.audit_year"},
+    "report_scope": {"source": "project.basic_info.report_scope"},
+    "signing_partner": {"source": "project.basic_info.signing_partner_name"},
+    "report_date": {"source": "deliverable.report_date"}
+  },
+  "financial": {
+    "total_assets": {"report_type": "balance_sheet", "row_code": "BS-039"},
+    "total_liabilities": {"report_type": "balance_sheet", "row_code": "BS-070"},
+    "total_equity": {"report_type": "balance_sheet", "row_code": "BS-091"},
+    "total_revenue": {"report_type": "income_statement", "row_code": "IS-001"},
+    "net_profit": {"report_type": "income_statement", "row_code": "IS-024"}
+  },
+  "manual": ["保留意见事项", "关键审计事项", "强调事项", "形成保留意见的基础", "形成否定意见的基础", "形成无法表示意见的基础", "其他事项"]
+}

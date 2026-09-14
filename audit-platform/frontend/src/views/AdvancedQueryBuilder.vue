@@ -20,7 +20,7 @@
     <div v-if="!embedded" class="gt-aqb-header">
       <h2 class="gt-aqb-title">高级查询构建器</h2>
       <span class="gt-aqb-subtitle">
-        可视化条件 · SQL 预览 · 结果导出 · 仅 admin / manager 可访问
+        可视化条件 · SQL 预览 · 结果导出 · 仅 admin / manager / partner 可访问
       </span>
     </div>
 
@@ -46,19 +46,30 @@
             </el-select>
           </el-form-item>
 
-          <!-- 字段勾选 -->
-          <el-form-item v-if="currentTable" label="返回字段（默认全部）">
+          <!-- 字段勾选：按业务/个人信息/技术三层分组，业务列在前 -->
+          <el-form-item v-if="currentTable" label="返回字段（默认业务字段）">
             <div class="gt-aqb-field-grid">
               <el-checkbox-group v-model="dsl.fields">
-                <el-checkbox
-                  v-for="f in currentTable.fields"
-                  :key="f"
-                  :label="f"
-                  :value="f"
-                  size="small"
-                >{{ f }}</el-checkbox>
+                <template v-for="grp in fieldGroups" :key="grp.label">
+                  <div class="gt-aqb-field-group-label">{{ grp.label }}</div>
+                  <el-checkbox
+                    v-for="f in grp.fields"
+                    :key="f"
+                    :label="f"
+                    :value="f"
+                    size="small"
+                  >{{ f }}</el-checkbox>
+                </template>
               </el-checkbox-group>
             </div>
+            <div class="gt-aqb-field-hint">
+              不勾选时返回业务字段（{{ defaultFieldCount }} 个），不含 id / 时间戳等技术字段
+            </div>
+          </el-form-item>
+
+          <!-- ACNR 选字段树（复用 useAcnr，与公式选址同一棵树；跨模块 cell 级字段） -->
+          <el-form-item label="ACNR 选字段（跨模块单元格）">
+            <CustomQueryFieldPicker v-model="acnrFieldIds" />
           </el-form-item>
 
           <!-- 过滤条件 -->
@@ -249,7 +260,27 @@
         <div class="gt-aqb-section">
           <div class="gt-aqb-section-title">
             查询结果 <span v-if="result" class="gt-aqb-result-count">共 {{ result.total }} 行</span>
+            <span v-if="result?.scope" class="gt-aqb-scope-tag">
+              {{ result.scope.all_projects
+                ? '范围：全部项目'
+                : `范围：${result.scope.project_count} 个项目` }}
+            </span>
+            <el-checkbox
+              v-if="result && result.rows.length"
+              v-model="showTechnicalColumns"
+              size="small"
+              class="gt-aqb-tech-toggle"
+            >显示技术字段<template v-if="hiddenTechnicalCount > 0">（已隐藏 {{ hiddenTechnicalCount }} 列）</template></el-checkbox>
           </div>
+          <el-alert
+            v-for="w in result?.warnings || []"
+            :key="w"
+            :title="w"
+            type="warning"
+            :closable="false"
+            show-icon
+            class="gt-aqb-warning"
+          />
           <el-table
             v-if="result && result.rows.length"
             :data="result.rows"
@@ -259,13 +290,53 @@
             max-height="500"
           >
             <el-table-column
-              v-for="col in result.columns"
-              :key="col"
-              :prop="col"
-              :label="col"
-              show-overflow-tooltip
+              v-for="col in resultColumns"
+              :key="col.key"
+              :prop="col.key"
+              :label="col.title"
+              :show-overflow-tooltip="!col.drillable"
               min-width="140"
-            />
+            >
+              <template #default="{ row }">
+                <!-- 可下钻列：显示值 + GtIndexChip（value=addr_id，经 resolveIndex 拿 jump_route 下钻，R4.3） -->
+                <span
+                  v-if="col.drillable && cellAddrId(row, col)"
+                  class="gt-aqb-drill-cell"
+                >
+                  <span>{{ row[col.key] }}</span>
+                  <GtIndexChip
+                    :value="addrIdToIndexRef(cellAddrId(row, col)) || ''"
+                    :context-project-id="(route.params.projectId as string) || ''"
+                    :validate="false"
+                    prevent-navigate
+                    context="下钻到数据来源底稿格"
+                    class="gt-aqb-drill-chip"
+                    @click="drill(cellAddrId(row, col))"
+                  />
+                </span>
+                <!-- 无 addr_id → 不可下钻普通文本列（R4.5） -->
+                <span v-else>{{ row[col.key] }}</span>
+              </template>
+            </el-table-column>
+            <!-- P2-6: 公式引用列——当 formula_refs 有非 null 值时显示，支持一键复制到公式编辑器 -->
+            <el-table-column
+              v-if="hasFormulaRefs"
+              label="公式引用"
+              width="200"
+              fixed="right"
+            >
+              <template #default="{ $index }">
+                <span
+                  v-if="result!.formula_refs?.[$index]"
+                  class="gt-aqb-formula-ref"
+                  @click="copyFormulaRef($index)"
+                  title="点击复制公式引用"
+                >
+                  {{ result!.formula_refs![$index] }}
+                  <el-icon style="margin-left:4px;vertical-align:middle"><DocumentCopy /></el-icon>
+                </span>
+              </template>
+            </el-table-column>
           </el-table>
           <div v-else-if="result" class="gt-aqb-empty">查询返回 0 行</div>
           <div v-else class="gt-aqb-empty">尚未执行查询</div>
@@ -277,14 +348,37 @@
 
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue'
+import { useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { DocumentCopy } from '@element-plus/icons-vue'
 import http from '@/utils/http'
 import api from '@/services/apiProxy'
 import { handleApiError } from '@/utils/errorHandler'
+import { resolveColumnLabel } from '@/components/query/queryColumnLabels'
+import { sanitizeExportName } from '@/components/query/queryExport'
+import {
+  defaultFieldsOf,
+  filterVisibleColumns,
+  groupFieldsByTier,
+} from '@/components/query/queryFieldTiers'
+import CustomQueryFieldPicker from '@/components/custom-query/CustomQueryFieldPicker.vue'
+import GtIndexChip from '@/components/workpaper/GtIndexChip.vue'
+import {
+  useAcnrDrill,
+  normalizeColumns,
+  cellAddrId,
+  addrIdToIndexRef,
+  type QueryColumnMeta,
+} from '@/composables/useAcnrDrill'
 
 withDefaults(defineProps<{ embedded?: boolean }>(), { embedded: false })
 
-interface TableMeta {
+interface TableMetaTiers {
+  default_fields?: string[]
+  technical_fields?: string[]
+  pii_fields?: string[]
+}
+interface TableMeta extends TableMetaTiers {
   name: string
   label: string
   fields: string[]
@@ -315,17 +409,50 @@ interface AggregateRow {
 }
 interface QueryResult {
   rows: Record<string, any>[]
-  columns: string[]
+  // 后端可能返回 ColumnMeta[]（含 addr_id/drillable）或 legacy string[]，统一由 normalizeColumns 归一
+  columns: Array<string | Record<string, any>>
   total: number
   table: string
   sql: string
+  formula_refs?: (string | null)[]
+  /** 本次生效的项目作用域（R2.2：跨项目查询要让用户知道自己在跨项目） */
+  scope?: { all_projects: boolean; project_count: number | null; unscoped_tables: string[] }
+  /** 非致命提示（全局配置表未按项目过滤、无项目分派等） */
+  warnings?: string[]
 }
 
 const schema = ref<Schema | null>(null)
+// ACNR 选字段：选中 cell 节点的 addr_id 列表（R2.4，作跨模块查询字段标识）
+const acnrFieldIds = ref<string[]>([])
 // schema 缓存（sessionStorage）
-const SCHEMA_CACHE_KEY = 'gt:query-builder:schema-v1'
+// schema 版本号随「下发列分层」升位：旧缓存不含 default_fields/technical_fields，
+// 沿用会让字段下拉退化为不分组、结果表也无从隐藏技术列。
+const SCHEMA_CACHE_KEY = 'gt:query-builder:schema-v2'
 const sqlPreview = ref<string>('')
 const result = ref<QueryResult | null>(null)
+
+// 结果列下钻（R4.2/R4.4/R4.6/R4.7）：project 上下文取自路由（构建器可在项目内嵌入使用）
+const route = useRoute()
+const { drill } = useAcnrDrill(() => (route.params.projectId as string) || '')
+// 归一结果列为 QueryColumnMeta（含 addr_id/drillable）
+// ─── 列分层（R7.2 / R11.3）：真源在后端 table_whitelist，前端只分组不硬编码列名 ───
+const fieldGroups = computed(() => groupFieldsByTier(currentTable.value))
+const defaultFieldCount = computed(() => defaultFieldsOf(currentTable.value).length)
+const showTechnicalColumns = ref(false)
+const hiddenTechnicalCount = computed(() => {
+  if (showTechnicalColumns.value) return 0
+  return allResultColumns.value.length - resultColumns.value.length
+})
+
+const allResultColumns = computed<QueryColumnMeta[]>(() =>
+  normalizeColumns(result.value?.columns).map(c => ({ ...c, title: resolveColumnLabel(c.key, c.title) })),
+)
+
+// 结果表默认隐藏技术列（数据仍完整返回，开关即可查看，无需重查）
+const resultColumns = computed<QueryColumnMeta[]>(() =>
+  filterVisibleColumns(allResultColumns.value, currentTable.value, showTechnicalColumns.value),
+)
+
 const loadingPreview = ref(false)
 const loadingExecute = ref(false)
 const loadingExport = ref(false)
@@ -506,6 +633,8 @@ function buildPayload() {
     })),
     group_by: dsl.group_by,
     limit: dsl.limit,
+    // ACNR 选字段：以 addr_id 作为跨模块查询字段标识（R2.4）
+    acnr_targets: acnrFieldIds.value,
   }
 }
 
@@ -573,7 +702,7 @@ async function doExport() {
     const link = document.createElement('a')
     link.href = URL.createObjectURL(blob)
     // 文件名带表 label 更易识别
-    const tableLabel = (currentTable.value?.label || dsl.table).replace(/[\\/:*?"<>|]/g, '_')
+    const tableLabel = sanitizeExportName(currentTable.value?.label || dsl.table)
     link.download = `${tableLabel}_${Date.now()}.xlsx`
     link.click()
     URL.revokeObjectURL(link.href)
@@ -583,6 +712,24 @@ async function doExport() {
   } finally {
     loadingExport.value = false
   }
+}
+
+// ─── P2-6: 公式引用支持（查询结果 → 结构化引用桥接） ─────────────────────────
+
+/** 当前结果中是否有可用的 formula_refs（至少一个非 null） */
+const hasFormulaRefs = computed(() => {
+  return result.value?.formula_refs?.some(r => r != null) ?? false
+})
+
+/** 一键复制公式引用到剪贴板 */
+function copyFormulaRef(index: number) {
+  const ref = result.value?.formula_refs?.[index]
+  if (!ref) return
+  navigator.clipboard.writeText(ref).then(() => {
+    ElMessage.success(`已复制: ${ref}`)
+  }).catch(() => {
+    ElMessage.warning('复制失败，请手动复制')
+  })
 }
 </script>
 
@@ -693,10 +840,61 @@ async function doExport() {
   font-size: 12px;
   flex: 1;
 }
+.gt-aqb-field-group-label {
+  width: 100%;
+  margin: 6px 0 2px;
+  font-size: 12px;
+  color: #909399;
+  font-weight: 600;
+}
+
+.gt-aqb-field-hint {
+  margin-top: 4px;
+  font-size: 12px;
+  color: #909399;
+}
+
+.gt-aqb-scope-tag {
+  margin-left: 8px;
+  font-size: 12px;
+  color: #909399;
+}
+
+.gt-aqb-tech-toggle {
+  margin-left: auto;
+}
+
+.gt-aqb-warning {
+  margin-bottom: 8px;
+}
+
 .gt-aqb-result-count {
   font-size: 12px;
   color: #666;
   font-weight: normal;
   margin-left: 8px;
+}
+.gt-aqb-formula-ref {
+  font-family: 'Consolas', 'Courier New', monospace;
+  font-size: 11px;
+  color: var(--gt-color-primary, #5b3aa8);
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 3px;
+  background: #f3eef8;
+  white-space: nowrap;
+  transition: background 0.15s;
+}
+.gt-aqb-formula-ref:hover {
+  background: #e8ddf4;
+}
+.gt-aqb-drill-cell {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
+}
+.gt-aqb-drill-chip {
+  flex-shrink: 0;
 }
 </style>

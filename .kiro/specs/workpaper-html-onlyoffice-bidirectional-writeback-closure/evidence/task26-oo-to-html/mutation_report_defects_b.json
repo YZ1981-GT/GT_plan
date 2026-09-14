@@ -1,0 +1,151 @@
+{
+  "generated_by": "backend/scripts/_mutation_kit/span.py::run_cli",
+  "mode": "run",
+  "pytest_args": [
+    "backend/tests/workpaper_sync/test_task26_oo_to_html.py",
+    "backend/tests/workpaper_sync/test_task26_oo_to_html_pg.py",
+    "backend/tests/workpaper_sync/test_task14_merge_conflicts.py",
+    "backend/tests/workpaper_sync/test_task15_content_mutation.py",
+    "-q",
+    "--tb=no",
+    "-rf",
+    "-p",
+    "no:randomly"
+  ],
+  "tally": {
+    "RED": 4
+  },
+  "mutations": [
+    {
+      "id": "D05",
+      "path": "backend/app/services/workpaper_sync/oo_to_html.py",
+      "want": "test_task26_oo_to_html.py::TestFinalAuthorizationFence::test_eligibility_is_not_compared_for_ordinary_forcesave",
+      "why": "把 eligibility 判据张冠李戴到普通 forcesave 上。普通 forcesave 从不经 leader 仲裁，拿 room 的 leader 资格 epoch 跟它比就是拿无关量当判据；别人的 close leader 失格会推进 room epoch，那时正在飞的普通 forcesave 会被误杀（真正该拦它的是 `write_fence_epoch` —— 撤销 writer 必提升 write fence）。反过来 close-capture 则再也不比 ⇒ 缺陷①原地复活",
+      "verdict": "RED",
+      "summary": "36 failed, 428 passed in 46.46s",
+      "added": [
+        "test_task26_oo_to_html.py::TestFinalAuthorizationFence::test_close_capture_reports_a_real_eligibility_comparison",
+        "test_task26_oo_to_html.py::TestFinalAuthorizationFence::test_closing_initiator_is_still_live",
+        "test_task26_oo_to_html.py::TestFinalAuthorizationFence::test_each_branch_rejects_independently[close_capture_eligibility_advanced]",
+        "test_task26_oo_to_html.py::TestFinalAuthorizationFence::test_each_branch_rejects_independently[close_capture_eligibility_unproven]",
+        "test_task26_oo_to_html.py::TestFinalAuthorizationFence::test_eligibility_is_not_compared_for_ordinary_forcesave",
+        "test_task26_oo_to_html.py::TestFinalAuthorizationFence::test_matching_facts_pass_and_report_every_compared_item",
+        "test_task26_oo_to_html_pg.py::TestAppliedHappyPath::test_application_and_operation_reached_applied_terminal",
+        "test_task26_oo_to_html_pg.py::TestAppliedHappyPath::test_both_fences_ran_and_in_order",
+        "test_task26_oo_to_html_pg.py::TestAppliedHappyPath::test_business_revision_advanced_exactly_once",
+        "test_task26_oo_to_html_pg.py::TestAppliedHappyPath::test_entry_pointer_moved_to_the_new_result_representation",
+        "test_task26_oo_to_html_pg.py::TestAppliedHappyPath::test_outbox_row_written_in_the_same_transaction",
+        "test_task26_oo_to_html_pg.py::TestAppliedHappyPath::test_p14_reload_floor_equals_application_result_revision",
+        "test_task26_oo_to_html_pg.py::TestAppliedHappyPath::test_p25_incoming_field_change_was_auto_merged",
+        "test_task26_oo_to_html_pg.py::TestAppliedHappyPath::test_p62_both_baselines_advance_when_merged_equals_incoming",
+        "test_task26_oo_to_html_pg.py::TestAppliedHappyPath::test_p65_incoming_is_never_promoted",
+        "test_task26_oo_to_html_pg.py::TestAppliedHappyPath::test_p65_merged_projection_digest_equals_published_projection_artifact",
+        "test_task26_oo_to_html_pg.py::TestAppliedHappyPath::test_p65_result_representation_bundle_equals_frozen_bundle",
+        "test_task26_oo_to_html_pg.py::TestAppliedHappyPath::test_probe_actually_executed_twice",
+        "test_task26_oo_to_html_pg.py::TestAppliedHappyPath::test_result_is_applied",
+        "test_task26_oo_to_html_pg.py::TestCloseCaptureEligibilityFence::test_epoch_advance_after_promotion_blocks_the_commit",
+        "test_task26_oo_to_html_pg.py::TestCloseCaptureEligibilityFence::test_frozen_side_reads_the_promotion_event_not_the_intent_row",
+        "test_task26_oo_to_html_pg.py::TestCloseCaptureEligibilityFence::test_generation_is_superseded_so_the_close_is_not_blocked_forever",
+        "test_task26_oo_to_html_pg.py::TestCloseCaptureEligibilityFence::test_nothing_committed_when_eligibility_advanced",
+        "test_task26_oo_to_html_pg.py::TestCloseCaptureEligibilityFence::test_ordinary_forcesave_reports_not_applicable",
+        "test_task26_oo_to_html_pg.py::TestCloseCaptureEligibilityFence::test_the_fence_actually_compared_the_eligibility_item",
+        "test_task26_oo_to_html_pg.py::TestDurablePostFailureAndRetry::test_p38_retry_succeeds_and_produces_exactly_one_revision",
+        "test_task26_oo_to_html_pg.py::TestFinalAuthorizationFence::test_each_revocation_shape_blocks_the_commit[revoked_before_write]",
+        "test_task26_oo_to_html_pg.py::TestFinalAuthorizationFence::test_write_fence_fires_after_publish_and_before_revision_bump",
+        "test_task26_oo_to_html_pg.py::TestReapplyIsRefused::test_first_apply_succeeded",
+        "test_task26_oo_to_html_pg.py::TestReapplyIsRefused::test_second_apply_is_refused_with_its_own_error_code",
+        "test_task26_oo_to_html_pg.py::TestRefreshRequired::test_application_and_operation_are_refresh_required",
+        "test_task26_oo_to_html_pg.py::TestRefreshRequired::test_next_forcesave_is_rejected",
+        "test_task26_oo_to_html_pg.py::TestRefreshRequired::test_result_is_refresh_required",
+        "test_task26_oo_to_html_pg.py::TestRefreshRequired::test_result_revision_still_bound_for_audit",
+        "test_task26_oo_to_html_pg.py::TestRefreshRequired::test_room_is_refresh_required_and_superseded",
+        "test_task26_oo_to_html_pg.py::TestRefreshRequired::test_server_last_applied_advances_but_client_confirmed_does_not"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task26_oo_to_html.py::TestFinalAuthorizationFence::test_close_capture_reports_a_real_eligibility_comparison",
+        "test_task26_oo_to_html.py::TestFinalAuthorizationFence::test_eligibility_is_not_compared_for_ordinary_forcesave"
+      ],
+      "added_files": [
+        "test_task26_oo_to_html.py",
+        "test_task26_oo_to_html_pg.py"
+      ],
+      "restored": true,
+      "restored_sha256": "ab8b9e323464f8e836fd9e64b523de063043d85f3a263a540e549b40c956dc1c",
+      "seconds": 49.3
+    },
+    {
+      "id": "D06",
+      "path": "backend/app/services/workpaper_sync/oo_to_html.py",
+      "want": "test_task26_oo_to_html_pg.py::TestCloseCaptureEligibilityFence::test_frozen_side_reads_the_promotion_event_not_the_intent_row",
+      "why": "冻结侧改读 `close_intent.eligibility_epoch`（**intent 创建时**的值）而不是 append-only 的 promotion event。真实世界里两者必然分叉：前任 leader 在 promotion 前失格会让 room epoch +1，successor 在新 epoch 被 promote，而它的 intent 行还记着创建时的旧值 ⇒ 合法 successor 的 clean close 被误判成 stale。🔴 这条变异只有在 S18 摆出「intent 行 7 / promotion event 0 / room 0」的判别性输入后才能被证伪 —— 单人 close 下两值都是 0，读哪一列都判等值，于是这个区分写了也无人能证伪（`test_the_desync_..._was_staged` 是那条输入自身的自证）",
+      "verdict": "RED",
+      "summary": "11 failed, 453 passed in 44.09s",
+      "added": [
+        "test_task26_oo_to_html_pg.py::TestCloseCaptureEligibilityFence::test_close_capture_with_unchanged_epoch_still_applies",
+        "test_task26_oo_to_html_pg.py::TestCloseCaptureEligibilityFence::test_epoch_advance_after_promotion_blocks_the_commit",
+        "test_task26_oo_to_html_pg.py::TestCloseCaptureEligibilityFence::test_frozen_side_reads_the_promotion_event_not_the_intent_row",
+        "test_task26_oo_to_html_pg.py::TestCloseCaptureEligibilityFence::test_generation_is_superseded_so_the_close_is_not_blocked_forever",
+        "test_task26_oo_to_html_pg.py::TestCloseCaptureEligibilityFence::test_no_successor_can_be_promoted_afterwards",
+        "test_task26_oo_to_html_pg.py::TestCloseCaptureEligibilityFence::test_nothing_committed_when_eligibility_advanced",
+        "test_task26_oo_to_html_pg.py::TestCloseCaptureEligibilityFence::test_the_desync_between_intent_row_and_promotion_event_was_staged",
+        "test_task26_oo_to_html_pg.py::TestCloseCaptureEligibilityFence::test_the_fence_actually_compared_the_eligibility_item",
+        "test_task26_oo_to_html_pg.py::TestCloseCaptureEligibilityFence::test_the_scenario_really_produced_a_close_capture",
+        "test_task26_oo_to_html_pg.py::TestHarness::test_every_scenario_was_collected",
+        "test_task26_oo_to_html_pg.py::TestHarness::test_no_phase_crashed_during_collection"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task26_oo_to_html_pg.py::TestCloseCaptureEligibilityFence::test_frozen_side_reads_the_promotion_event_not_the_intent_row"
+      ],
+      "added_files": [
+        "test_task26_oo_to_html_pg.py"
+      ],
+      "restored": true,
+      "restored_sha256": "ab8b9e323464f8e836fd9e64b523de063043d85f3a263a540e549b40c956dc1c",
+      "seconds": 46.8
+    },
+    {
+      "id": "D07",
+      "path": "backend/app/services/workpaper_sync/oo_to_html.py",
+      "want": "test_task26_oo_to_html_pg.py::TestCloseCaptureEligibilityFence::test_generation_is_superseded_so_the_close_is_not_blocked_forever",
+      "why": "缺陷③的精确复现（修前形态：`_record_post_durable_failure` 只写 application/operation 终态就返回）。AC 10.10 末句是「进入 `authorization_stale` **并** supersede/recovery」，Property 63 另有「不能永久 blocked」。reconciler 见到 `state=promoted` 就提前返回并把这条路交给最终 fence（`repository.reconcile_close_intents` 源码注释原文），所以 fence 不 supersede 就没有第二个人会做：room 停在 `close_barrier`，clean close 永远等不到内容，UI 只能显示无限 loading",
+      "verdict": "RED",
+      "summary": "1 failed, 463 passed in 44.25s",
+      "added": [
+        "test_task26_oo_to_html_pg.py::TestCloseCaptureEligibilityFence::test_generation_is_superseded_so_the_close_is_not_blocked_forever"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task26_oo_to_html_pg.py::TestCloseCaptureEligibilityFence::test_generation_is_superseded_so_the_close_is_not_blocked_forever"
+      ],
+      "added_files": [
+        "test_task26_oo_to_html_pg.py"
+      ],
+      "restored": true,
+      "restored_sha256": "ab8b9e323464f8e836fd9e64b523de063043d85f3a263a540e549b40c956dc1c",
+      "seconds": 46.9
+    },
+    {
+      "id": "D08",
+      "path": "backend/app/services/workpaper_sync/oo_to_html.py",
+      "want": "test_task26_oo_to_html_pg.py::TestCloseCaptureEligibilityFence::test_generation_is_superseded_so_the_close_is_not_blocked_forever",
+      "why": "幂等分支的条件取反 ⇒ 「已 superseded 就不再推进」变成「还没 supersede 就直接返回」。与 D07 分开：D07 短路的是**调用**，本条短路的是 supersede 自身的幂等守卫。两条共用一个判据时，靠前的失败会遮蔽靠后的，于是分别注入才能证明两段各自都有牙 —— 而 `room_superseded=True` 仍会被写上，所以只看 outcome 字段的守卫会漏掉本条（判据必须落在 room **行**的 `state`/`refresh_reason` 上）",
+      "verdict": "RED",
+      "summary": "1 failed, 463 passed in 48.11s",
+      "added": [
+        "test_task26_oo_to_html_pg.py::TestCloseCaptureEligibilityFence::test_generation_is_superseded_so_the_close_is_not_blocked_forever"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task26_oo_to_html_pg.py::TestCloseCaptureEligibilityFence::test_generation_is_superseded_so_the_close_is_not_blocked_forever"
+      ],
+      "added_files": [
+        "test_task26_oo_to_html_pg.py"
+      ],
+      "restored": true,
+      "restored_sha256": "ab8b9e323464f8e836fd9e64b523de063043d85f3a263a540e549b40c956dc1c",
+      "seconds": 51.4
+    }
+  ]
+}

@@ -56,6 +56,20 @@ class TaskEvent(Base):
     trace_id = Column(String(64), nullable=False)
     created_at = Column(DateTime(timezone=True), nullable=False, default=datetime.utcnow)
 
+    # --- V105 Delivery_Outbox 扩展（procedure-delegation-notification / Task 2）---
+    # additive-only：有序聚合投递、幂等键、领取 lease、dead-letter。索引由 V105 迁移拥有。
+    aggregate_type = Column(String(40), nullable=True, comment="聚合类型，如 procedure_row_task")
+    aggregate_id = Column(UUID(as_uuid=True), nullable=True, comment="聚合实例 id")
+    aggregate_version = Column(Integer, nullable=True, comment="aggregate 内单调版本，按序投递")
+    idempotency_key = Column(String(128), nullable=True, comment="幂等键，全局唯一（部分唯一索引）")
+    delegation_batch_id = Column(UUID(as_uuid=True), nullable=True, comment="批量委派批次 id，用于通知聚合")
+    available_at = Column(DateTime(timezone=True), nullable=True, comment="可领取时间（退避）")
+    lease_expires_at = Column(DateTime(timezone=True), nullable=True, comment="领取租约到期时间")
+    claimed_by = Column(String(80), nullable=True, comment="领取者标识")
+    processed_at = Column(DateTime(timezone=True), nullable=True, comment="投递完成时间")
+    dead_letter_at = Column(DateTime(timezone=True), nullable=True, comment="进入死信时间")
+    last_error = Column(Text, nullable=True, comment="最近一次失败原因")
+
     __table_args__ = (
         Index("idx_task_events_project_status", "project_id", "status", created_at.desc()),
         Index("idx_task_events_trace", "trace_id"),

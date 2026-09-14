@@ -137,8 +137,9 @@ async def _analyze_payment_patterns(
                     category=category,
                 ))
             return patterns
-    except Exception:
-        pass
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).debug("分析客户付款模式失败，回退 stub: %s", e)
 
     # Fallback: 返回 stub 数据
     return [

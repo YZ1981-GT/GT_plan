@@ -18,11 +18,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_db
 from app.deps import get_current_user
 from app.models.core import User
+from app.models.workpaper_models import WpIndex, WorkingPaper
+from app.routers.wp_render_config import _maybe_custom_classifications
 from app.services.wp_classification_service import (
     ClassificationNotFoundError,
     WpClassificationService,
     derive_component_type,
 )
+import sqlalchemy as sa
 
 logger = logging.getLogger(__name__)
 
@@ -78,8 +81,45 @@ async def get_wp_classifications(
             project_id=project_id,
             template_version_id=template_version_id,
         )
-    except ClassificationNotFoundError as e:
-        raise HTTPException(status_code=404, detail=str(e))
+    except ClassificationNotFoundError:
+        classifications = []
+
+    if not classifications:
+        wp_index = (
+            await db.execute(
+                sa.select(WpIndex).where(
+                    WpIndex.project_id == project_id,
+                    WpIndex.wp_code == wp_code,
+                    WpIndex.is_deleted == False,  # noqa: E712
+                )
+            )
+        ).scalar_one_or_none()
+        working_paper = None
+        if wp_index is not None:
+            working_paper = (
+                await db.execute(
+                    sa.select(WorkingPaper).where(
+                        WorkingPaper.project_id == project_id,
+                        WorkingPaper.wp_index_id == wp_index.id,
+                        WorkingPaper.is_deleted == False,  # noqa: E712
+                    )
+                )
+            ).scalar_one_or_none()
+        if wp_index is not None and working_paper is not None:
+            classifications = await _maybe_custom_classifications(
+                db,
+                project_id,
+                wp_code,
+                wp_index.wp_name,
+                classifications,
+                working_paper,
+            )
+
+    if not classifications:
+        raise HTTPException(
+            status_code=404,
+            detail=f"No classification found for wp_code='{wp_code}'",
+        )
 
     # 构建响应：为每个 sheet 派生 componentType
     items: list[ClassificationItem] = []

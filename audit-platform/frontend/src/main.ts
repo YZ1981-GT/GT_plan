@@ -2,9 +2,14 @@ import { createApp } from 'vue'
 import { createPinia } from 'pinia'
 import { VueQueryPlugin } from '@tanstack/vue-query'
 import { ElMessage } from 'element-plus'
+import dayjs from 'dayjs'
+import 'dayjs/locale/zh-cn'
 // Element Plus 样式：按需导入由 unplugin-vue-components 自动处理，
 // 但仍需全局引入 base 样式（CSS 变量、字体等）
 import 'element-plus/dist/index.css'
+
+// dayjs 全局中文
+dayjs.locale('zh-cn')
 // Element Plus 暗色主题 CSS 变量（配合 html.dark class 自动生效）
 import 'element-plus/theme-chalk/dark/css-vars.css'
 import 'nprogress/nprogress.css'
@@ -15,6 +20,17 @@ import { initWebVitals } from './utils/monitor'
 import { queryClient } from './utils/queryClient'
 import { vPermission } from './directives/permission'
 import { registerServiceWorker } from './composables/useOfflineCache'
+import vTabWheel from './directives/vTabWheel'
+import { installCrossWpEventBridge } from './utils/crossWpEventBridge'
+import { clearOnUpgrade } from './utils/aiChatCacheCleanup'
+
+// 跨底稿事件传输桥（P0）：统一 window CustomEvent ⇄ mitt eventBus，
+// 归一 substantive:adjudicated / disclosure:note-text-updated payload。
+// 必须在任何组件挂载前安装，确保所有生产者/消费者互通。
+installCrossWpEventBridge()
+
+// Task 10: 首次升级时清理遗留 AI 聊天敏感缓存（doc_ai_chat_*）
+clearOnUpgrade()
 
 const app = createApp(App)
 
@@ -24,6 +40,7 @@ app.use(router)
 
 // 注册全局指令
 app.directive('permission', vPermission)
+app.directive('tab-wheel', vTabWheel)
 
 // 图标由 unplugin-vue-components 自动按需注册，无需全量注册（P1.3 修复）
 
