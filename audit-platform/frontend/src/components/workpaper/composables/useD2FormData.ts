@@ -163,20 +163,9 @@ export function useD2FormData(wpId: Ref<string>, projectId?: Ref<string>, htmlDa
     void saveImmediate([updated]).catch(() => undefined)
   }
 
-  // ─── trial_balance 回写 ──────────────────────────────────────────────────
-
-  /** 回写审定数到 trial_balance（科目 1122 应收账款） */
-  async function writebackTrialBalance(accountCode: string, auditedAmount: number): Promise<void> {
-    if (!projectId?.value) return
-    try {
-      await api.put(`/api/projects/${projectId.value}/trial-balance/writeback`, {
-        account_code: accountCode,
-        audited_amount: auditedAmount,
-      })
-    } catch {
-      ElMessage.warning('审定数回写失败，请手动确认试算表数据')
-    }
-  }
+  // 注：原 writebackTrialBalance（PUT /trial-balance/writeback）已移除 ——
+  // TB 回写收敛为审定表 useD2Adjudication.publishToTb（显式二次确认 → publish-to-tb 端点）。
+  // spec: tb-writeback-explicit-publish-gate Task 2 / Req 1,2,9。
 
   // ─── 子底稿数据读取 ──────────────────────────────────────────────────────
 
@@ -214,7 +203,6 @@ export function useD2FormData(wpId: Ref<string>, projectId?: Ref<string>, htmlDa
     flushPendingSave,
     getField,
     setFieldImmediate,
-    writebackTrialBalance,
     loadSubWorkpaperData,
     stateOf: persistence.stateOf,
     cancelPendingSave: persistence.cancel,

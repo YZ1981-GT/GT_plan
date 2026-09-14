@@ -204,20 +204,9 @@ export function useD3FormData(options: UseD3FormDataOptions) {
     _debounceTimers.set(itemId, timer)
   }
 
-  // ─── trial_balance 回写 ──────────────────────────────────────────────────
-
-  /** 回写审定数到 trial_balance（科目 2203 预收账款） */
-  async function writebackTrialBalance(auditedAmount: number): Promise<void> {
-    if (!projectId.value) return
-    try {
-      await api.put(`/api/projects/${projectId.value}/trial-balance/writeback`, {
-        account_code: '2203',
-        audited_amount: auditedAmount,
-      })
-    } catch {
-      ElMessage.warning('审定数回写失败，请手动确认试算表数据')
-    }
-  }
+  // 注：原 writebackTrialBalance（PUT /trial-balance/writeback，科目 2203）为零消费死代码，已移除。
+  // D3-1 审定数回写走显式发布门（随批次改造），普通保存/数据变化不写 TB。
+  // spec: tb-writeback-explicit-publish-gate Task 2 / Req 1,9。
 
   // ─── Flush（组件卸载） ───────────────────────────────────────────────────
 
@@ -256,7 +245,6 @@ export function useD3FormData(options: UseD3FormDataOptions) {
     saveImmediate,
     saveBatch,
     debouncedSave,
-    writebackTrialBalance,
     // G5-1 D3-2 canary：sync bridge flushHtml 前需 flush 掉 2s debounce 未落库的行
     flushPendingSave: _flushPending,
   }

@@ -305,7 +305,7 @@ import { resolveCycleReviewSection } from './composables/cycleReviewSectionMap'
 import GtWpReviewRail from './GtWpReviewRail.vue'
 import { WorkpaperRuntimeContextKey } from './composables/useWorkpaperScaffold'
 import { useD2ReviewThreads } from './composables/useD2ReviewThreads'
-import { D2_SAVE_ITEMS_KEY, D2_WRITEBACK_KEY } from './composables/d2InjectionKeys'
+import { D2_SAVE_ITEMS_KEY } from './composables/d2InjectionKeys'
 import { normalizeD2SheetName } from './composables/d2Constants'
 import D2TabIndex from './d2/D2TabIndex.vue'
 import GtOnlyOfficeSheet from './GtOnlyOfficeSheet.vue'
@@ -544,27 +544,13 @@ async function d2SaveItems(items: ChecklistResponse[]): Promise<void> {
   }
 }
 
-function d2Writeback(accountCode: string, auditedAmount: number): void {
-  if (accountCode != null && auditedAmount != null) {
-    void formData.writebackTrialBalance(accountCode, auditedAmount)
-  }
-}
-
 provide(D2_SAVE_ITEMS_KEY, d2SaveItems)
-provide(D2_WRITEBACK_KEY, d2Writeback)
 
 // 向后兼容：保留 window event 监听，过渡期内旧写法仍能工作
 function handleD2SaveItems(e: Event): void {
   const items = (e as CustomEvent<{ items: ChecklistResponse[] }>).detail?.items
   if (Array.isArray(items) && items.length > 0) {
     void d2SaveItems(items)
-  }
-}
-
-function handleD2Writeback(e: Event): void {
-  const d = (e as CustomEvent<{ accountCode: string; auditedAmount: number }>).detail
-  if (d?.accountCode != null && d.auditedAmount != null) {
-    d2Writeback(d.accountCode, d.auditedAmount)
   }
 }
 
@@ -600,13 +586,11 @@ async function selfLoad(): Promise<void> {
 
 onMounted(() => {
   window.addEventListener('d2:save-items', handleD2SaveItems)
-  window.addEventListener('d2:writeback-trial-balance', handleD2Writeback)
   void selfLoad()
 })
 
 onBeforeUnmount(() => {
   window.removeEventListener('d2:save-items', handleD2SaveItems)
-  window.removeEventListener('d2:writeback-trial-balance', handleD2Writeback)
   void formData.flushPendingSave().catch(() => undefined)
 })
 </script>

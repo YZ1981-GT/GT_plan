@@ -62,6 +62,8 @@ const {
   sumifStatus,
   detailCrossValidation,
   eclCrossValidation,
+  publishToTb,
+  publishing,
 } = useD2Adjudication(baseOpts)
 
 const crossSheet = useD2CrossSheet({ allResponses: toRef(props, 'allResponses') as Ref<Map<string, any>> })
@@ -472,6 +474,13 @@ const dSourceHints = [
         <el-button size="small" type="primary" plain :loading="adjPull.loading.value" @click="openBringInAdjustment">
           <el-icon><Download /></el-icon>带入调整
         </el-button>
+        <el-button
+          size="small"
+          type="warning"
+          :loading="publishing"
+          :disabled="isReadonly"
+          @click="publishToTb"
+        >发布到试算表</el-button>
         <el-button size="small" @click="onExportTemplate">导出模板</el-button>
         <el-button size="small" @click="onExportData">导出数据</el-button>
         <el-upload :show-file-list="false" accept=".xlsx" :before-upload="onImportFile">

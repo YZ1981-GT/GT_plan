@@ -242,29 +242,9 @@ export function useD7FormData(options: UseD7FormDataOptions) {
     _debounceTimers.set(itemId, timer)
   }
 
-  // ─── trial_balance 回写 ──────────────────────────────────────────────────
-
-  /**
-   * 回写审定数到 trial_balance（科目 2205 合同负债，贷方科目/负债类）
-   * 并发布 EventBus 'substantive:adjudicated' 事件通知其他组件
-   */
-  async function writebackTrialBalance(auditedAmount: number): Promise<void> {
-    if (!projectId.value) return
-    try {
-      await http.put(`/api/projects/${projectId.value}/trial-balance/writeback`, {
-        account_code: '2205',
-        audited_amount: auditedAmount,
-      })
-      // 发布 EventBus 通知审定数变更
-      try {
-        window.dispatchEvent(new CustomEvent('substantive:adjudicated', {
-          detail: { wpCode: 'D7', accountCode: '2205', auditedAmount },
-        }))
-      } catch { /* EventBus publish 失败不阻塞 */ }
-    } catch {
-      ElMessage.warning('审定数回写失败，请手动确认试算表数据')
-    }
-  }
+  // 注：原 writebackTrialBalance（PUT /trial-balance/writeback，科目 2205）为零消费死代码，已移除。
+  // D7-1 审定数回写走显式发布门（随批次改造），普通保存/数据变化不写 TB。
+  // spec: tb-writeback-explicit-publish-gate Task 2 / Req 1,9。
 
   // ─── Flush（组件卸载） ───────────────────────────────────────────────────
 
@@ -302,7 +282,6 @@ export function useD7FormData(options: UseD7FormDataOptions) {
     saveImmediate,
     saveBatch,
     debouncedSave,
-    writebackTrialBalance,
     // G5-1 D7 canary：统一同步桥 flushHtml 需在 readStoreProjection 前 flush 掉 2s
     // debounce 未落库的行（否则服务端投影仍是旧 store，与 D1/D2 同型缺陷）。
     flushPendingSave: _flushPending,

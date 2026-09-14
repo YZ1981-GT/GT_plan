@@ -157,20 +157,9 @@ export function useD1FormData(wpId: Ref<string>, projectId?: Ref<string>) {
     saveImmediate([updated])
   }
 
-  // ─── trial_balance 回写 ──────────────────────────────────────────────────
-
-  /** 回写审定数到 trial_balance */
-  async function writebackTrialBalance(accountCode: string, auditedAmount: number): Promise<void> {
-    if (!projectId?.value) return
-    try {
-      await api.put(`/api/projects/${projectId.value}/trial-balance/writeback`, {
-        account_code: accountCode,
-        audited_amount: auditedAmount,
-      })
-    } catch {
-      ElMessage.warning('审定数回写失败，请手动确认试算表数据')
-    }
-  }
+  // 注：原 writebackTrialBalance（PUT /trial-balance/writeback）为零消费死代码，已移除。
+  // D1-1 审定数回写走显式发布门（useD1Adjudication → publish-to-tb，随批次改造），
+  // 普通保存/数据变化不写 TB。spec: tb-writeback-explicit-publish-gate Task 2 / Req 1,9。
 
   // ─── 子底稿数据读取 ──────────────────────────────────────────────────────
 
@@ -212,7 +201,6 @@ export function useD1FormData(wpId: Ref<string>, projectId?: Ref<string>) {
     flushPendingSave,
     getField,
     setFieldImmediate,
-    writebackTrialBalance,
     loadSubWorkpaperData,
   }
 }

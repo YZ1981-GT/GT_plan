@@ -185,26 +185,9 @@ export function useD5FormData(options: UseD5FormDataOptions) {
     _debounceTimers.set(itemId, timer)
   }
 
-  // ─── trial_balance 回写 ──────────────────────────────────────────────────
-
-  /** 回写审定数到 trial_balance（科目 1124 应收款项融资）并发布 EventBus */
-  async function writebackTrialBalance(auditedAmount: number): Promise<void> {
-    if (!projectId.value) return
-    try {
-      await api.put(`/api/projects/${projectId.value}/trial-balance/writeback`, {
-        account_code: '1124',
-        audited_amount: auditedAmount,
-      })
-      // 发布 EventBus 通知审定数变更
-      try {
-        window.dispatchEvent(new CustomEvent('substantive:adjudicated', {
-          detail: { wpCode: 'D5', accountCode: '1124', auditedAmount },
-        }))
-      } catch { /* EventBus publish 失败不阻塞 */ }
-    } catch {
-      ElMessage.warning('审定数回写失败，请手动确认试算表数据')
-    }
-  }
+  // 注：原 writebackTrialBalance（PUT /trial-balance/writeback，科目 1124）为零消费死代码，已移除。
+  // D5-1 审定数回写走显式发布门（随批次改造），普通保存/数据变化不写 TB。
+  // spec: tb-writeback-explicit-publish-gate Task 2 / Req 1,9。
 
   // ─── Flush（组件卸载） ───────────────────────────────────────────────────
 
@@ -242,7 +225,6 @@ export function useD5FormData(options: UseD5FormDataOptions) {
     saveImmediate,
     saveBatch,
     debouncedSave,
-    writebackTrialBalance,
     // G5-1 D5-2 canary：sync bridge flushHtml 前需 flush 掉 debounce 未落库的行
     flushPendingSave: _flushPending,
   }

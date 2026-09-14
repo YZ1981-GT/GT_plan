@@ -9,18 +9,20 @@
  * - SUMIF聚合：从D2-2明细表按"信用风险组合方式"聚合到审定表各行
  * - 公式引擎：审定数/变动额/变动率自动计算
  * - EventBus：发布 substantive:adjudicated / 监听 adjustment:created
- * - writebackTrialBalance：回写 trial_balance.audited_amount（科目1122）
+ * - publishToTb：显式确认（二次确认）→ 走 publish-to-tb 显式发布端点回写
+ *   trial_balance.audited_amount（科目1122）；普通保存/数据变化不再自动写 TB
+ *   （spec: tb-writeback-explicit-publish-gate Task 2 / Req 1,2,8）
  *
  * Requirements: 1.1-1.10, 21.1, 21.2, 21.5, 21.6
  */
-import { ref, computed, watch, inject, onBeforeUnmount, type Ref, type ComputedRef } from 'vue'
+import { ref, computed, watch, onBeforeUnmount, type Ref, type ComputedRef } from 'vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import {
   parseNum,
   getAuditedAmount,
   getChangeRate,
   sumif,
 } from './useD2FormulaEngine'
-import { D2_WRITEBACK_KEY } from './d2InjectionKeys'
 import { resolveTbAmountWithSeed } from './dCycleTbSeed'
 import { eventBus } from '@/utils/eventBus'
 import type { ChecklistItem, ChecklistResponse } from './useD2FormData'
@@ -123,12 +125,12 @@ export const ADJUDICATION_ROW_CONFIG: Array<{
 
 export function useD2Adjudication(options: UseD2BaseOptions) {
   const { wpId, projectId, allResponses, isReadonly } = options
-
-  const injectedWriteback = inject(D2_WRITEBACK_KEY, undefined)
+  const readonly = isReadonly ?? ref(false)
 
   // ─── State ─────────────────────────────────────────────────────────────
 
   const sumifStatus = ref<'loaded' | 'computing' | 'error'>('loaded')
+  const publishing = ref(false)
   let debounceTimer: ReturnType<typeof setTimeout> | null = null
   let previousAuditedAmount: number | null = null
   const eventListeners: Array<{ event: string; handler: (e: Event) => void }> = []
@@ -467,13 +469,14 @@ export function useD2Adjudication(options: UseD2BaseOptions) {
 
   // ─── EventBus: Watch audited amount changes → auto publish ─────────────
 
+  // 审定数变化 → 仅发布 substantive:adjudicated（附注/检查表刷新），
+  // **不再**自动回写 trial_balance —— TB 回写收敛为用户显式确认动作（publishToTb）。
+  // spec: tb-writeback-explicit-publish-gate Req 1（普通保存/数据变化绝不写 TB）。
   watch(
     () => totalRow.value.currentAudited,
     (current) => {
       if (previousAuditedAmount !== null && previousAuditedAmount !== current) {
         publishAdjudicated()
-        // 回写 trial_balance
-        writebackTrialBalance(current)
       }
       previousAuditedAmount = current
     }
@@ -520,28 +523,68 @@ export function useD2Adjudication(options: UseD2BaseOptions) {
     }))
   }
 
-  // ─── Writeback Trial Balance ───────────────────────────────────────────
+  // ─── Publish to Trial Balance（显式发布门，复刻 D4-1 范式） ──────────────
 
   /**
-   * 回写审定数到 trial_balance（科目 1122）
-   * 通过 CustomEvent 通知父组件执行实际API调用
+   * 确认发布审定数到试算表（科目 1122 应收账款）。
+   *
+   * spec: tb-writeback-explicit-publish-gate Task 2 / Req 2。
+   * 此前 D2 靠 totalRow.currentAudited watcher 自动 dispatch
+   * `d2:writeback-trial-balance` → 旧端点 `PUT /projects/{pid}/trial-balance/writeback`
+   * 直写 audited_amount，**绕过**显式确认门（无二次确认/无幂等/无 publish_confirmed）。
+   * 现改为与 D4-1 同范式：二次确认（中文）→ `POST /workpapers/{wpId}/audit-determination/publish-to-tb`
+   * （携带审定表 sheet 名 + writeback_rows 预算行），后端校验发布权限、发
+   * `publish_confirmed=True` + token → 回写 handler 幂等回写 trial_balance。
+   * 普通保存/数据变化对 TB 仍是 no-op（watcher 只 emit substantive:adjudicated）。
    */
-  function writebackTrialBalance(auditedAmount: number): void {
-    if (!projectId.value) return
-    if (injectedWriteback) {
-      injectedWriteback('1122', auditedAmount)
-    } else {
-      try {
-        window.dispatchEvent(new CustomEvent('d2:writeback-trial-balance', {
-          detail: {
-            projectId: projectId.value,
-            accountCode: '1122',
-            auditedAmount,
-          },
-        }))
-      } catch {
-        console.warn('[useD2Adjudication] writebackTrialBalance dispatch failed')
-      }
+  async function publishToTb(): Promise<void> {
+    if (readonly.value || publishing.value) return
+
+    // 二次确认（中文，危险操作提示）
+    try {
+      await ElMessageBox.confirm(
+        '发布后将把应收账款审定数（科目 1122）写入试算表（trial_balance），'
+        + '并触发报表/错报评价等下游重算。确认发布？',
+        '发布到试算表确认',
+        {
+          confirmButtonText: '确认发布',
+          cancelButtonText: '取消',
+          type: 'warning',
+        },
+      )
+    } catch {
+      return // 用户取消 → 无任何副作用（不写 TB、不 emit）
+    }
+
+    if (!wpId.value) {
+      ElMessage.error('缺少底稿标识，无法发布')
+      return
+    }
+
+    // 审定数取合计行 currentAudited（前端已算最终值 → 走 writeback_rows 预算行）
+    const auditedAmount = totalRow.value.currentAudited
+
+    publishing.value = true
+    try {
+      const { api } = await import('@/services/apiProxy')
+      const resp: any = await api.post(
+        `/api/workpapers/${wpId.value}/audit-determination/publish-to-tb`,
+        {
+          // sheet 名固定含审定表子码 D2-1，后端 extract_determination_wp_code 据此解出 D2-1
+          sheet_name: '审定表D2-1',
+          writeback_rows: [
+            { account_code: '1122', audited_amount: auditedAmount, amount_kind: 'balance' },
+          ],
+        },
+      )
+      ElMessage.success(resp?.message || '已发布到试算表')
+
+      // 发布成功 → 通知下游附注/检查表刷新（TB 回写已由后端确认门完成）
+      publishAdjudicated()
+    } catch (err: any) {
+      ElMessage.error(err?.response?.data?.detail || err?.message || '发布失败，请重试')
+    } finally {
+      publishing.value = false
     }
   }
 
@@ -639,6 +682,8 @@ export function useD2Adjudication(options: UseD2BaseOptions) {
     // 操作
     updateCell,
     publishAdjudicated,
+    publishToTb,
+    publishing,
     isChangeRateWarning,
     detailCrossValidation,
     eclCrossValidation,

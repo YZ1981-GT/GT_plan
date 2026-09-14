@@ -210,30 +210,9 @@ export function useD6FormData(options: UseD6FormDataOptions) {
     _debounceTimers.set(itemId, timer)
   }
 
-  // ─── trial_balance 回写 ──────────────────────────────────────────────────
-
-  /** 回写审定数到 trial_balance（科目 1141 合同资产）并发布 EventBus
-   *
-   * 合同资产科目为 1141；`report_config` 报表行 BS-011 四准则一致。
-   * 原 `1402` 是在途物资（存货类），属误用。
-   */
-  async function writebackTrialBalance(auditedAmount: number): Promise<void> {
-    if (!projectId.value) return
-    try {
-      await api.put(`/api/projects/${projectId.value}/trial-balance/writeback`, {
-        account_code: '1141',
-        audited_amount: auditedAmount,
-      })
-      // 发布 EventBus 通知审定数变更
-      try {
-        window.dispatchEvent(new CustomEvent('substantive:adjudicated', {
-          detail: { wpCode: 'D6', accountCode: '1141', auditedAmount },
-        }))
-      } catch { /* EventBus publish 失败不阻塞 */ }
-    } catch {
-      ElMessage.warning('审定数回写失败，请手动确认试算表数据')
-    }
-  }
+  // 注：原 writebackTrialBalance（PUT /trial-balance/writeback，科目 1141 合同资产）为零消费死代码，已移除。
+  // D6-1 审定数回写走显式发布门（随批次改造），普通保存/数据变化不写 TB。
+  // spec: tb-writeback-explicit-publish-gate Task 2 / Req 1,9。
 
   // ─── Flush（组件卸载） ───────────────────────────────────────────────────
 
@@ -271,7 +250,6 @@ export function useD6FormData(options: UseD6FormDataOptions) {
     saveImmediate,
     saveBatch,
     debouncedSave,
-    writebackTrialBalance,
     // G5-1 D6-2 canary：sync bridge flushHtml 前需 flush 掉 debounce 未落库的行
     flushPendingSave: _flushPending,
   }
