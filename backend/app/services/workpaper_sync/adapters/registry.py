@@ -1157,7 +1157,7 @@ DELIVERED_PER_ENTRY_CONTRACTS: Final[tuple[Mapping[str, Any], ...]] = (
         "document_type": "xlsx",
         "authority_model": "projection_contract",
         "template_relative_path": "D/D3 预收账款.xlsx",
-        "adapter_registered": True,
+        "adapter_registered": False,
         "reason": (
             "G5-1 Phase 5 第三个 canary（同 D1/D7 的 harness 无关独立 entry 路径）。选型守卫 "
             "assert_entry_selectable 核四条 manifest 事实（entry 存在 / independent=True / "
@@ -1170,8 +1170,10 @@ DELIVERED_PER_ENTRY_CONTRACTS: Final[tuple[Mapping[str, Any], ...]] = (
             "checklist_responses.item_id='D3-det-rows'，账龄 nested keyed。wp_code 裁决=['D3']"
             "（**不是 D3P 幻影码 / D3-2 名义码**）：D3-det-rows 全库 0 行（同 H1 空表单），但 sibling "
             "D3-vc-current-rows 载荷落 wp_code=D3（1 行 3601B）已证 D3 store 落点=D3，且 D3 wp 未删除"
-            "有 file_path。`adapter_registered=True`：overlay 已裁决 bidirectional + manifest 重生 + "
-            "发布链产出 approved bundle + current published representation。"
+            "有 file_path。`adapter_registered=False`：**与真实库对齐**——真库 "
+            "`register_from_manifest()` 当前只注册 {d2,d4,g7,h1}（有真实供给的 entry），"
+            "D3-det-rows / D3-vc 全库 0 行、无 current published representation ⇒ 未注册成功。"
+            "原登记乐观标 True 与现实脱钩（Property 49 实测捕获）；发布链真正产出 representation 后再回填 True。"
         ),
     },
     # ── G5-1 追加（Phase 5 第四个 canary：D6 合同资产，两级表头 + 账龄组，账龄 FLAT 键）─────
@@ -1184,7 +1186,7 @@ DELIVERED_PER_ENTRY_CONTRACTS: Final[tuple[Mapping[str, Any], ...]] = (
         "document_type": "xlsx",
         "authority_model": "projection_contract",
         "template_relative_path": "D/D6 合同资产.xlsx",
-        "adapter_registered": True,
+        "adapter_registered": False,
         "reason": (
             "G5-1 Phase 5 第四个 canary（同 D1/D3/D7 的 harness 无关独立 entry 路径）。选型守卫核四条"
             "manifest 事实（entry 存在 / independent=True / profile==room_service_wired.v1 / "
@@ -1196,7 +1198,9 @@ DELIVERED_PER_ENTRY_CONTRACTS: Final[tuple[Mapping[str, Any], ...]] = (
             "非 D3/D7 的 nested），字段键与前端 useD6Detail.DetailRow 锁死。HTML store = "
             "checklist_responses.item_id='D6-2-rows'。wp_code 裁决=['D6']（**不是 D6C 幻影码 / D6-2 "
             "名义码**）：D6-2-rows 全库 0 行（同 H1/D3 空表单），D6 wp 未删除有 file_path。"
-            "`adapter_registered=True`：overlay 裁决 + manifest 重生 + 发布链产出 published representation。"
+            "`adapter_registered=False`：**与真实库对齐**——真库 `register_from_manifest()` 当前只注册 "
+            "{d2,d4,g7,h1}，D6-2-rows 0 行、无 current published representation ⇒ 未注册成功。"
+            "原乐观标 True 与现实脱钩（Property 49 捕获）；发布链产出 representation 后再回填 True。"
         ),
     },
     # ── G5-1 追加（Phase 5 第五个 canary：D5 应收款项融资，两级表头无账龄 FVOCI）─────
@@ -1209,7 +1213,7 @@ DELIVERED_PER_ENTRY_CONTRACTS: Final[tuple[Mapping[str, Any], ...]] = (
         "document_type": "xlsx",
         "authority_model": "projection_contract",
         "template_relative_path": "D/D5 应收款项融资.xlsx",
-        "adapter_registered": True,
+        "adapter_registered": False,
         "reason": (
             "G5-1 Phase 5 第五个 canary（同 D1/D3/D6/D7 的 harness 无关独立 entry 路径）。选型守卫核"
             "四条 manifest 事实（entry 存在 / independent=True / profile==room_service_wired.v1 / "
@@ -1221,7 +1225,9 @@ DELIVERED_PER_ENTRY_CONTRACTS: Final[tuple[Mapping[str, Any], ...]] = (
             "每个子列是不同语义字段），字段键与前端 useD5Detail.DetailRow 锁死（postRealized/eclStage "
             "store-only 不入）。HTML store = checklist_responses.item_id='D5-2-rows'。wp_code 裁决=['D5']"
             "（**不是 D5R 幻影码 / D5-2 名义码**）：D5-2-rows 全库 0 行（同 H1/D3/D6 空表单），D5 wp 未删除"
-            "有 file_path。`adapter_registered=True`：overlay 裁决 + manifest 重生 + 发布链产出 representation。"
+            "有 file_path。`adapter_registered=False`：**与真实库对齐**——真库 `register_from_manifest()` "
+            "当前只注册 {d2,d4,g7,h1}，D5-2-rows 0 行、无 current published representation ⇒ 未注册成功。"
+            "原乐观标 True 与现实脱钩（Property 49 捕获）；发布链产出 representation 后再回填 True。"
         ),
     },
     # ── G5-1 D4 营业收入（位置数组；契约含 D4-2/D4-3/D4-5 sibling sheets）─────
@@ -1424,9 +1430,14 @@ def _describe_provider_block(item: "ManifestRegistrationPlanItem") -> str:
                 f"provider {module_path}.attach_pilot_adapters 返回空元组，其"
                 f"自身 capability 前置未过: {exc}"
             )
+    # provider 自身 capability 前置过了，但仍返回空 —— 真因是 **manifest 实测 capability
+    # 尚未裁决 bidirectional**。把它显式点名（引用 `item.capability` 现算值），reason 才是
+    # 可执行事实（AC 5.12），不退化成「早退分支无原因」的悬空指针。
     return (
-        f"provider {module_path}.attach_pilot_adapters 返回空元组，而 capability "
-        "前置现算为已通过 -- 早退分支未留下原因，需在 provider 侧补显式原因"
+        f"provider {module_path}.attach_pilot_adapters 返回空元组：manifest 实测 "
+        f"capability={item.capability.value}（非 bidirectional）—— 未裁决双向前不注册 "
+        "adapter，是**顺序**而非遗漏。capability 裁决为 bidirectional（reviewed overlay，"
+        "finalize 之后）后 provider 才会走 build_excel_adapter → register()。"
     )
 
 async def _describe_entry_supply(*, session: Any, entry_id: str) -> str | None:

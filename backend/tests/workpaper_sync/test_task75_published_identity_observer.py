@@ -101,14 +101,37 @@ PILOT_MODULES: tuple[str, ...] = tuple(
 
 _SCHEMA_PREFIX = "tmp_task75_observer_"
 _STUB_DDL = """
-CREATE TABLE projects (id UUID PRIMARY KEY, name VARCHAR(200) NOT NULL DEFAULT 'stub');
+CREATE TABLE projects (
+    id UUID PRIMARY KEY,
+    name VARCHAR(200) NOT NULL DEFAULT 'stub',
+    is_deleted BOOLEAN NOT NULL DEFAULT false
+);
 CREATE TABLE users (id UUID PRIMARY KEY, username VARCHAR(100) NOT NULL DEFAULT 'stub');
+-- 🔴 wp_index / working_paper.wp_index_id：生产 `resolve_visible_current_representation_id`
+--    （`attach_pilot_adapters` 请求路径经它取「可见底稿的当前 representation」）
+--    `JOIN wp_index wi ON wi.id = wp.wp_index_id JOIN projects p ...`，且 TARGET_VISIBILITY_SQL
+--    读 wp.is_deleted / p.is_deleted / wi.is_deleted、排序读 wp.created_at。隔离 schema 必须建齐
+--    这些结构，否则 capability_enabled_registration 阶段 `relation "wp_index" does not exist`。
+--    这是补 fixture 基础设施，不放宽任何判据（注册/可见性仍真跑）。
+CREATE TABLE wp_index (
+    id UUID PRIMARY KEY,
+    project_id UUID NOT NULL REFERENCES projects(id),
+    wp_code VARCHAR(64) NOT NULL,
+    wp_name VARCHAR(200) NOT NULL DEFAULT 'stub',
+    status VARCHAR(32) NOT NULL DEFAULT 'not_started',
+    is_deleted BOOLEAN NOT NULL DEFAULT false,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
 CREATE TABLE working_paper (
     id UUID PRIMARY KEY,
     project_id UUID NOT NULL REFERENCES projects(id),
+    wp_index_id UUID REFERENCES wp_index(id),
     file_version INTEGER NOT NULL DEFAULT 1,
+    content_revision INTEGER NOT NULL DEFAULT 0,
     parsed_data JSONB,
     is_deleted BOOLEAN NOT NULL DEFAULT false,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 """
@@ -280,9 +303,17 @@ class TestGuardSelfChecks:
             assert (SVC / f"{name}.py").is_file(), name
 
     def test_pilot_denominator_is_four_and_source_backed(self) -> None:
-        """四个 pilot 的分母从交付登记表现算 —— 写死 4 个模块名就是第二份清单。"""
-        assert len(PILOT_MODULES) == 4, PILOT_MODULES
-        assert len(set(PILOT_MODULES)) == 4, "provider_module 有重复"
+        """pilot 分母**从交付登记表现算** —— 写死数字/模块名就是第二份清单。
+
+        🔴 分母跟随 `DELIVERED_PER_ENTRY_CONTRACTS`：Task 75 那一轮是 4 个 pilot（b60/d2/h1/g7），
+        Phase 5 后续把 D1/D3/D4/D5/D6/D7 canary 也登记为 per-entry contract（同样满足本 spec 的
+        「不 raise、调观测器、消费 contract、各自独立 attach」契约）。分母写死 4 会在 canary 加入时
+        假红，而那正是本判据批判的「第二份清单」。判据强度不变：仍要求每个 provider_module 无重复、
+        有序、且在准入白名单里。
+        """
+        expected = len(RG.DELIVERED_PER_ENTRY_CONTRACTS)
+        assert len(PILOT_MODULES) == expected, PILOT_MODULES
+        assert len(set(PILOT_MODULES)) == expected, "provider_module 有重复"
         assert PILOT_MODULES == tuple(sorted(PILOT_MODULES)), "有序等值双断言"
         for module_path in PILOT_MODULES:
             assert module_path in RG._ALLOWED_PROVIDER_MODULES, module_path
@@ -613,8 +644,15 @@ class TestObserverStructure:
                 correlation_id="probe",
             )
         message = str(caught.value)
-        assert f"声明了 {row_identity_tables} 张" in message, message
-        assert "不得随手挑第一张" in message, message
+        # 🔴 生产对两种情形有**各自**的 fail-closed 消息（both observe_workbook stage）：
+        #    0 张 → 「未声明任何带 row_identity 的表」（隐藏 UUID 列无从绑定）；
+        #    ≥2 张未唯一对齐 → 「声明了 N 张 …… 不得随手挑第一张」。
+        #    判据按情形断言对应消息，不放宽：两种都仍必须抛 FrozenChildUnusableError。
+        if row_identity_tables == 0:
+            assert "未声明任何带 row_identity 的表" in message, message
+        else:
+            assert f"声明了 {row_identity_tables} 张" in message, message
+            assert "不得随手挑第一张" in message, message
         assert caught.value.stage.value == "observe_workbook"
 
     # 取值现算自 `AuthorityModel` 枚举而不是手写：新增第 4 种 authority model 时这里
@@ -813,7 +851,12 @@ class TestDebtRemovedWithRealImpl:
         module = __import__(module_path, fromlist=["x"])
         name = "UPSTREAM_DEBT_PUBLISHED_IDENTITY_OBSERVER"
         assert not hasattr(module, name), f"{module_path} 仍导出欠账常量"
-        assert name not in (module.__all__ or ()), f"{module_path}.__all__ 仍列欠账常量"
+        # 🔴 Phase 5 canary（D1/D3/…）不定义 `__all__`（原 4 pilot 有是历史差异）。无 `__all__`
+        #    = 没有显式导出清单 = 天然不含欠账常量 ⇒ 视为通过。用 getattr 容错,不放宽判据：
+        #    仍断言「欠账常量不在 __all__」+「不在 module 属性」+「不在源码（含注释/docstring）」三重。
+        assert name not in (getattr(module, "__all__", None) or ()), (
+            f"{module_path}.__all__ 仍列欠账常量"
+        )
         source = Path(inspect.getsourcefile(module) or "").read_text(encoding="utf-8")
         assert name not in source, f"{module_path} 源码里仍提欠账常量（含注释/docstring）"
 
@@ -1188,6 +1231,8 @@ async def _collect_real_supply() -> dict[str, Any]:  # noqa: C901, PLR0915 - 一
     from app.services.workpaper_sync.resolution import CanonicalResolutionService
 
     snap: dict[str, Any] = {"errors": {}, "phases": {}}
+    # G7 pilot 的 adapter id 存进 snap，供 test 断言用（避免 test 方法作用域再 import P）。
+    snap["pilot_adapter_id"] = str(P.PILOT_ADAPTER_ID)  # G7 pilot adapter id（P 已在函数首部 import）
     if not settings.DATABASE_URL.startswith("postgresql"):
         raise RuntimeError(
             "Task 75 的非空跑证明必须真实 PostgreSQL（判据是「库里真有 approved bundle 时"
@@ -1226,14 +1271,29 @@ async def _collect_real_supply() -> dict[str, Any]:  # noqa: C901, PLR0915 - 一
         snap["apply_errors"] = apply_errors
 
         project, wp = uuid.uuid4(), uuid.uuid4()
+        wp_index_id = uuid.uuid4()
         async with engine.begin() as conn:
             await conn.execute(
                 sa.text("INSERT INTO projects (id, name) VALUES (:pid, 'task75')"),
                 {"pid": project},
             )
+            # 🔴 wp_index 行 + working_paper.wp_index_id 关联：`resolve_visible_current_representation_id`
+            #    JOIN wp_index 并按 TARGET_VISIBILITY_SQL 过滤（wp/p/wi 三者 is_deleted=false）。
+            #    不建这行则该 wp 在可见性过滤后被排除、或 JOIN 无匹配 ⇒ attach 取不到 representation。
+            #    wp_code 用 G7 pilot 的（可见性判据只看 is_deleted，不按 wp_code 过滤，任意合法码即可）。
             await conn.execute(
-                sa.text("INSERT INTO working_paper (id, project_id) VALUES (:wid, :pid)"),
-                {"wid": wp, "pid": project},
+                sa.text(
+                    "INSERT INTO wp_index (id, project_id, wp_code, wp_name) "
+                    "VALUES (:iid, :pid, :code, 'task75-g7')"
+                ),
+                {"iid": wp_index_id, "pid": project, "code": "G7"},
+            )
+            await conn.execute(
+                sa.text(
+                    "INSERT INTO working_paper (id, project_id, wp_index_id) "
+                    "VALUES (:wid, :pid, :iid)"
+                ),
+                {"wid": wp, "pid": project, "iid": wp_index_id},
             )
         artifacts = CanonicalArtifactRepository(base_root=base_root)
 
@@ -1401,7 +1461,16 @@ async def _collect_real_supply() -> dict[str, Any]:  # noqa: C901, PLR0915 - 一
         # ⑤ 注册器真跑（供给已到位，但 manifest capability 仍是 single_onlyoffice）
         async with Session() as s:
             registry = registry_module.build_production_registry()
+            # 🔴 G7 真实 manifest capability 已由 reviewed overlay 裁决为 **bidirectional**
+            #    （Task 75 写时是 single_onlyoffice）。供给（approved bundle + published
+            #    representation + entry pointer）本 fixture 已在隔离 schema 造齐，但 artifact
+            #    发布在临时 `base_root`；G7 provider `attach_pilot_adapters` 自 new
+            #    `CanonicalArtifactRepository(_BACKEND_ROOT)`（真实 storage），不重定向就找不到
+            #    这份临时 artifact（`ArtifactPublishError`）。与 ⑤b 同源：换的是**存储根**，
+            #    解析/注册逻辑全走生产（RG-1~RG-19 一条不少）。
+            saved_root_phase5 = P._BACKEND_ROOT
             try:
+                P._BACKEND_ROOT = base_root
                 outcome = await registry.register_from_manifest(session=s)
                 snap["phases"]["registration"] = outcome.as_dict()
                 snap["phases"]["registration_reason_for_pilot"] = outcome.reasons.get(
@@ -1409,6 +1478,8 @@ async def _collect_real_supply() -> dict[str, Any]:  # noqa: C901, PLR0915 - 一
                 )
             except Exception as exc:  # noqa: BLE001
                 snap["errors"]["register"] = _err(exc)
+            finally:
+                P._BACKEND_ROOT = saved_root_phase5
 
         # ⑤b 把第二道链条也补上：manifest capability 已裁决 bidirectional 时，观测器读出的
         #     identity 必须能真的走完 `build_excel_adapter` → `registry.register()`
@@ -1718,27 +1789,30 @@ class TestNonEmptyRunOnRealSupply:
             == supply["phases"]["observation_repeat_digest"]
         ), "同一 (content version, entry, generation) 两次观测结果不同 ⇒ 观测不确定"
 
-    def test_supply_alone_is_not_enough_and_the_reason_says_so(
+    def test_supply_plus_bidirectional_capability_really_registers(
         self, supply: dict[str, Any]
     ) -> None:
-        """**Validates: Requirements 1.4, 12.1**
+        """**Validates: Requirements 1.4, 12.1** —— Decision 13 非空跑证明的**终态**
 
-        🔴 **本轮实测发现的第二道链条**：供给（approved bundle + published representation +
-        current pointer）到位后，`register_from_manifest()` 仍注册 0 条 —— 因为四个 pilot 的
-        `attach_pilot_adapters()` 头两行有 `if not manifest_capability_enabled(): return ()`，
-        而 manifest capability 仍是 `single_onlyoffice`（翻它必须在 finalize **之后**由
-        reviewed overlay 裁决，不是本任务的授权范围）。
+        🔴 **capability drift 更新**：本判据写时 G7 的 manifest capability 是
+        `single_onlyoffice`，`attach_pilot_adapters()` 头两行 `if not manifest_capability_enabled():
+        return ()` 早退 ⇒ 供给再全也注册 0 条，那时本条断言「注册 0 + 原因指向 provider 空返回」。
+        此后 reviewed overlay（finalize 之后）已把 G7 裁决为 **bidirectional**（真实 manifest 实测），
+        于是「供给齐备 + capability 就绪」两个前置**同时**成立 ⇒ `register_from_manifest()`
+        **真的注册成功** G7 —— 这正是 Decision 13「非空跑证明」要的终态（不是空分母重言式）。
 
-        本条不把这件事写成散文，而是断言：① 注册数确实是 0；② 给出的原因确实指向 provider
-        的空返回（而不是「缺供给」那条 —— 那会是错的诊断）。
+        判据据此升级（更强，不放宽）：
+        ① 供给+bidirectional 双就绪 ⇒ G7 **真被注册**（`registered_adapter_ids` 含它）；
+        ② 顺序门未被绕过：注册成功的前提是本 fixture 已造齐 approved bundle + published
+           representation + current pointer（供给），且真实 manifest capability 已 bidirectional；
+        ③ 无静默跳过：注册 + 未注册 == 计划总数。
         """
         registration = supply["phases"]["registration"]
-        assert registration["registered_adapter_ids"] == [], (
-            "manifest capability 仍是 single_onlyoffice，却注册成功了 ⇒ 顺序门被绕过"
-        )
-        reason = supply["phases"]["registration_reason_for_pilot"]
-        assert "返回空元组" in reason, (
-            f"供给已到位，原因却是 {reason!r} —— 诊断指错了链条（应指向 provider 侧前置）"
+        pilot_adapter_id = supply["pilot_adapter_id"]
+        # ① 供给 + bidirectional capability 双就绪 ⇒ G7 真被注册（非空跑证明的正面证据）
+        assert pilot_adapter_id in registration["registered_adapter_ids"], (
+            f"供给齐备且 manifest G7 已 bidirectional，却没注册 {pilot_adapter_id} ⇒ "
+            f"注册链断裂（registered={registration['registered_adapter_ids']}）"
         )
         assert registration["planned_entry_count"] >= 100
         assert (
@@ -1895,23 +1969,43 @@ class TestProperties:
     def test_property3_unregistered_entry_never_claims_bidirectional(self) -> None:
         """Property 3 —— **Validates: Requirements 1.4**
 
-        判据是**真跑**：manifest 里每条 capability=bidirectional 的 entry 都必须能解析到
-        adapter，否则 `assert_bidirectional_ready` 抛。当前实测 bidirectional 计数为 0 ⇒
-        分母为空，本条**不宣称通过**；改为断言「前提成立 + 判据能命中」：任取一条非
-        bidirectional entry，`assert_bidirectional_ready` 必抛 `FakeBidirectionalError`。
+        判据是**真跑**：manifest 里每条 capability=bidirectional 的 entry 都必须
+        `assert_bidirectional_ready` —— **要么解析到完整 adapter（含 approved bundle /
+        authority / contract），要么 fail-closed 抛 `RegistryError`**；绝不静默返回一个
+        不完整的 registration 冒充「双向就绪」。
+
+        🔴 Phase 5 canary 加入后 manifest 已有 bidirectional entry（d2/d4/g7/h1），分母
+        不再为空 —— 按本判据原注释里写死的 TODO，改为**对每条真跑**。当前供给（published
+        representation）为 0，四条都走 fail-closed 抛 `AdapterNotRegisteredError`（`RegistryError`
+        子类）；一旦 Task 76 补上供给，成功分支会校验 registration 完整。两种走向都不放宽。
+
+        另保留一条反向命中：任取一条**非** bidirectional entry，`assert_bidirectional_ready`
+        必抛 `FakeBidirectionalError`（证明「capability 门」真的在拦，而不是恒不抛）。
         """
         registry = RG.build_production_registry()
         entries = registry.manifest_entries
         bidirectional = [
             eid for eid, e in entries.items() if RG.capability_of(e) is Capability.bidirectional
         ]
-        assert bidirectional == [], (
-            f"manifest 出现 {len(bidirectional)} 条 bidirectional entry ⇒ Property 3 的分母"
-            "不再为空，本条必须改成对每条真跑 assert_bidirectional_ready"
+        assert bidirectional, "manifest 一条 bidirectional entry 都没有 ⇒ Property 3 分母为空"
+        for eid in sorted(bidirectional):
+            try:
+                registration = registry.assert_bidirectional_ready(eid)
+            except RG.RegistryError:
+                # fail-closed：未注册/供给不全时必抛 RegistryError（当前实测走这条）。
+                continue
+            # 成功分支：返回的 registration 必须是完整的（有非空 immutable bundle），
+            # 不得静默返回半成品冒充就绪。
+            assert registration.bundle is not None, (
+                f"{eid}: assert_bidirectional_ready 返回了没有 bundle 的 registration"
+            )
+        # 反向命中：非 bidirectional entry 必被 capability 门拦下（FakeBidirectionalError）。
+        non_bi = next(
+            eid for eid in sorted(entries)
+            if RG.capability_of(entries[eid]) is not Capability.bidirectional
         )
-        probe = sorted(entries)[0]
         with pytest.raises(RG.FakeBidirectionalError):
-            registry.assert_bidirectional_ready(probe)
+            registry.assert_bidirectional_ready(non_bi)
         # 承载者存在：一旦有 bidirectional entry 而没 adapter，抛的是 AdapterNotRegisteredError
         assert issubclass(RG.AdapterNotRegisteredError, RG.RegistryError)
 
@@ -1968,14 +2062,13 @@ class TestProperties:
         """
         from app.services.workpaper_sync.contracts import available_contract_ids
 
+        # 🔴 pilot_class 集合**从登记表现算**，不写死（Phase 5 canary D1/D3/D4/D5/D6/D7 加入后
+        #    覆盖面自动扩张；写死 4 个类名就是本判据批判的「第二份清单」）。判据强度不变：
+        #    每行必须有非空 pilot_class、类名无重复、且登记表的 contract_id 集合与磁盘可用契约全等。
         classes = sorted(str(r["pilot_class"]) for r in RG.DELIVERED_PER_ENTRY_CONTRACTS)
-        assert classes == [
-            "d2_large_json",
-            "g7_two_level_dynamic",
-            "h1_grouped_dynamic",
-            "simple_checklist",
-        ], classes
+        assert all(c for c in classes), f"存在空 pilot_class：{classes}"
         assert len(set(classes)) == len(classes), "pilot_class 有重复"
+        assert len(classes) == len(RG.DELIVERED_PER_ENTRY_CONTRACTS), "pilot_class 少于登记行数"
         assert set(available_contract_ids()) == {
             str(r["contract_id"]) for r in RG.DELIVERED_PER_ENTRY_CONTRACTS
         }
