@@ -863,8 +863,10 @@ class TestSliceScopeIsRecomputable:
                 assert decl["manifest_entry_id"] in {e["entry_id"] for e in full_manifest["entries"]}
 
     def test_host_module_edges_in_the_renderer_registry_are_real(self, manifest_slice: dict) -> None:
-        registry = HTML_RENDERER_REGISTRY.read_text(encoding="utf-8")
-        lines = registry.splitlines()
+        # 🔴 commit 82f58ea44 把 htmlRendererRegistry.ts 的集中式注册拆分到 registry/entries/*.ts
+        # 子模块。registry_source 现指向子模块（如 registry/entries/specialized.ts#Lnnn）。判据改为
+        # 按 ref 里的**路径**读对应文件（原来硬读主 registry ⇒ 拆分后行号超界 IndexError），仍逐条
+        # 校验「该行是 componentType 声明 + 下一行 import 指向宿主文件」，不弱化。
         diff = next(
             d
             for d in manifest_slice["j_cycle_form_differences"]["differences"]
@@ -872,13 +874,13 @@ class TestSliceScopeIsRecomputable:
         )
         for rel, decl in diff["hosts"].items():
             ref = decl["registry_source"]
-            line = lines[_line_no_of(ref) - 1]
-            assert f"'{decl['component_type']}'" in line, (
-                f"{ref} 那一行不是 componentType {decl['component_type']!r}：{line.strip()!r}"
+            window = _line_window(ref, 2).splitlines()
+            assert window, f"{ref} 取不到行窗口"
+            assert f"'{decl['component_type']}'" in window[0], (
+                f"{ref} 那一行不是 componentType {decl['component_type']!r}：{window[0].strip()!r}"
             )
-            component_line = lines[_line_no_of(ref)]
-            assert pathlib.Path(rel).name in component_line, (
-                f"{ref} 的下一行没有指向 {rel}：{component_line.strip()!r}"
+            assert len(window) >= 2 and pathlib.Path(rel).name in window[1], (
+                f"{ref} 的下一行没有指向 {rel}：{window[1].strip() if len(window) >= 2 else '<无下一行>'!r}"
             )
 
     def test_no_pilot_contract_belongs_to_the_j_cycle(self) -> None:
@@ -2281,8 +2283,16 @@ class TestProperty3And20:
             r"SYNC_ADAPTER_REGISTERED_ENTRY_IDS[^=]*=\s*\[([^\]]*)\]", module
         )
         assert registered, "读不出已注册 entry 集合"
-        assert not registered.group(1).strip(), (
-            "已注册 entry 集合非空 ⇒ 有 entry 可宣称双向，Property 3 的分母变了"
+        # 🔴 迁移推进后此集合已非空（d2 等 entry 真注册了 adapter）。原判据冻结「集合必须为空」
+        # 是迁移前快照 —— 现在它非空恰恰让 AC 1.4 的两个分支**都有真实分母**（已注册分支有 d2
+        # 这类真样本、未注册分支有 J1）。改为断言集合是良构的非空 entry_id 列表（每项形如
+        # 'xlsx/...'），证明「已注册 ⇒ null」分支不是空跑；两分支逻辑完整性仍逐条校验。不弱化。
+        registered_ids = re.findall(r"'([^']+)'", registered.group(1))
+        assert registered_ids, (
+            "已注册 entry 集合为空 ⇒ AC 1.4 的「已注册 ⇒ 无通知」分支没有真实分母"
+        )
+        assert all("/" in rid for rid in registered_ids), (
+            f"已注册集合里有不像 entry_id 的项：{registered_ids}"
         )
         assert "return null" in module and "level: 'not_synchronized'" in module, (
             "entrySyncNotice 的两个分支不完整 ⇒ 「已注册 ⇒ null / 未注册 ⇒ 非空通知」无从验"

@@ -8,7 +8,7 @@
   "orphan_source_of_truth": "backend/data/workpaper_sync_k_cycle_manifest_slice.json#orphan_dual_mode_inventory",
   "deletion_execution_owner": "Task 66（plan）/ Task 72（execute）",
   "pilot_already_migrated": null,
-  "pilot_already_migrated_note": "🔴 K 循环**没有** pilot，故本键为 null 而不是像 H 那样填一条。实证：四个 pilot 是 B60（Task 40）/ D2（41）/ H1（42）/ G7（43），逐文件读 `backend/data/workpaper_sync_contracts/*.json` 顶层 `review.entry_id` 得 xlsx/b60/gt-b60-bundle · xlsx/gt-d2-accounts-receivable · xlsx/gt-g7-long-term-equity-main · xlsx/gt-h1-fixed-assets，无一条属 K。",
+  "pilot_already_migrated_note": "🔴 K 循环**没有** pilot，故本键为 null 而不是像 H 那样填一条。实证：逐文件读 `backend/data/workpaper_sync_contracts/*.json` 顶层 `review.entry_id` 得已迁移契约归属 —— 原始四个 pilot 是 B60（Task 40）/ D2（41）/ H1（42）/ G7（43），随 D 循环 adapter 迁移推进现共 10 条：xlsx/b60/gt-b60-bundle · xlsx/gt-d1-notes-receivable · xlsx/gt-d2-accounts-receivable · xlsx/gt-d3-prepaid-accounts · xlsx/gt-d4-operating-revenue · xlsx/gt-d5-receivables-financing · xlsx/gt-d6-contract-assets · xlsx/gt-d7-contract-liabilities · xlsx/gt-g7-long-term-equity-main · xlsx/gt-h1-fixed-assets，无一条属 K。",
   "why_this_plan_has_two_deletion_object_classes": {
     "statement": "🔴 本清册的删除对象分两类且**都在 entry 范围内**：① K1~K7 的 orphan composable（7 个文件，直接删，零副作用）；② K8~K13 的在用 composable（6 个文件，须先改线）。外加 ③ K1~K7 宿主里的 7 段内联 IIFE（不是文件，是代码块）。",
     "why": "K 循环的 dual-mode 承载分裂成两种形态（KD-1 / KD-2）：K1~K7 的宿主内联了实现而把 composable 变成死桩；K8~K13 的宿主真 import composable。两类的删除前置完全不同 —— 前者删了行为不变，后者删了会让模式切换失效 ⇒ 必须分两个容器登记，混在一起会让「哪些能立刻删」说不清。",
@@ -35,7 +35,7 @@
       "K1": {
         "host_path": "audit-platform/frontend/src/components/workpaper/GtK1OtherReceivables.vue",
         "carrier_kind": "host_inlined_iife",
-        "carrier_site": "audit-platform/frontend/src/components/workpaper/GtK1OtherReceivables.vue#L376",
+        "carrier_site": "audit-platform/frontend/src/components/workpaper/GtK1OtherReceivables.vue#L380",
         "inline_localStorage_prefix": null,
         "legacy_endpoints_called_from_host": [
           "/api/workpapers/onlyoffice/health"
@@ -207,7 +207,7 @@
         "legacy_endpoints_called": [
           "/api/workpapers/onlyoffice/health"
         ],
-        "host_inlined_twin": "audit-platform/frontend/src/components/workpaper/GtK1OtherReceivables.vue#L376",
+        "host_inlined_twin": "audit-platform/frontend/src/components/workpaper/GtK1OtherReceivables.vue#L380",
         "twin_localStorage_prefix": null,
         "prefix_collision_with_twin": false,
         "action": "delete",
@@ -498,8 +498,8 @@
         "backend/app/routers/checklist_responses.py#L84"
       ],
       "legacy_composables_to_delete": [],
-      "legacy_composables_to_delete_note": "🔴 K1 的 per-entry composable `useK1DualMode.ts` **是一阶 orphan**（生产边与测试边各 0）⇒ 它不在本 entry 的「改线后随之删除」清单里，而在 `orphan_dual_mode_to_delete` 里按 AC 1.7 独立删除。本 entry 的 dual-mode 实现是宿主内联 IIFE（audit-platform/frontend/src/components/workpaper/GtK1OtherReceivables.vue#L376），改线时删的是**宿主里的那段代码**而不是一个文件。",
-      "host_inlined_block_to_remove": "audit-platform/frontend/src/components/workpaper/GtK1OtherReceivables.vue#L376",
+      "legacy_composables_to_delete_note": "🔴 K1 的 per-entry composable `useK1DualMode.ts` **是一阶 orphan**（生产边与测试边各 0）⇒ 它不在本 entry 的「改线后随之删除」清单里，而在 `orphan_dual_mode_to_delete` 里按 AC 1.7 独立删除。本 entry 的 dual-mode 实现是宿主内联 IIFE（audit-platform/frontend/src/components/workpaper/GtK1OtherReceivables.vue#L380），改线时删的是**宿主里的那段代码**而不是一个文件。",
+      "host_inlined_block_to_remove": "audit-platform/frontend/src/components/workpaper/GtK1OtherReceivables.vue#L380",
       "legacy_endpoints_to_remove": [
         "/api/workpapers/onlyoffice/health"
       ],

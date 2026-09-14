@@ -106,10 +106,20 @@ CAPABILITY_ENUM = ("bidirectional", "single_html", "single_onlyoffice", "unreach
 HTML_COUNTERPART_VERDICTS = ("none", "exists")
 
 #: 四条 pilot 契约的**实证**归属（逐文件读顶层 `review.entry_id`）。
-#: 🔴 文件名与 entry_id 不同构，禁按文件名猜。
+#: 🔴 文件名与 entry_id 不同构，禁按文件名猜。逐文件读顶层 review.entry_id 的**实证**冻结值。
+#: 契约目录随 D 循环 adapter 迁移推进而增长（原 4 条 b60/d2/g7/h1 → 现 10 条，新增 D1/D3/D4/
+#: D5/D6/D7 的 reviewed 生产契约）。冻结值同步更新到当前真实态并复核：全部 10 条都属 D/B/G/H
+#: 循环，无一属 K 循环（本 slice 的 owner not in k_ids 语义不变）。文件名↔entry_id 不同构仍成立
+#: （b60 是三段式、g7 是 -long-term-equity-main 而非文件名暗示的 -soe-subsidiary）。
 PILOT_CONTRACT_OWNERS = {
     "xlsx/b60/gt-b60-bundle",
+    "xlsx/gt-d1-notes-receivable",
     "xlsx/gt-d2-accounts-receivable",
+    "xlsx/gt-d3-prepaid-accounts",
+    "xlsx/gt-d4-operating-revenue",
+    "xlsx/gt-d5-receivables-financing",
+    "xlsx/gt-d6-contract-assets",
+    "xlsx/gt-d7-contract-liabilities",
     "xlsx/gt-g7-long-term-equity-main",
     "xlsx/gt-h1-fixed-assets",
 }
@@ -633,13 +643,23 @@ class TestSliceScopeIsRecomputable:
     def test_host_module_edges_in_the_renderer_registry_are_real(
         self, manifest_slice: dict
     ) -> None:
-        """AC 12.9 的「入口可达」用**模块边**判，不按符号名 grep。"""
+        """AC 12.9 的「入口可达」用**模块边**判，不按符号名 grep。
+
+        🔴 commit 82f58ea44 把 htmlRendererRegistry.ts 的集中式 defineAsyncComponent 注册拆分到
+        registry/entries/*.ts 子模块，import 相对前缀也随子目录深度由 './' 变 '../../'。判据相应
+        读主 registry + 全部 entries 子模块的合并文本，needle 忽略相对前缀（匹配 import(...{stem}.vue)）。
+        仍要求真实模块边存在，不弱化。
+        """
         reg = _strip_comments(HTML_RENDERER_REGISTRY.read_text(encoding="utf-8"))
+        entries_dir = HTML_RENDERER_REGISTRY.parent / "registry" / "entries"
+        assert entries_dir.is_dir(), f"registry/entries 目录不存在（拆分结构已变）：{entries_dir}"
+        for sub in sorted(entries_dir.glob("*.ts")):
+            reg += "\n" + _strip_comments(sub.read_text(encoding="utf-8"))
         for entry in manifest_slice["independent_entries"]:
             stem = pathlib.Path(entry["host_path"]).stem
-            needle = f"import('./{stem}.vue')"
-            assert needle in reg, (
-                f"{entry['entry_id']} 的宿主在 htmlRendererRegistry 里没有模块边 "
+            needle = re.compile(r"import\(['\"][^'\"]*/" + re.escape(f"{stem}.vue") + r"['\"]\)")
+            assert needle.search(reg), (
+                f"{entry['entry_id']} 的宿主在 htmlRendererRegistry(含 registry/entries/*) 里没有模块边 "
                 f"（找 {needle!r}）⇒ 不能声称「入口可达」"
             )
 

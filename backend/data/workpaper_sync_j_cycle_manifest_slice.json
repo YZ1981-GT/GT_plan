@@ -405,19 +405,19 @@
         "hosts": {
           "audit-platform/frontend/src/components/workpaper/j1/GtJ1EmployeeCompensation.vue": {
             "component_type": "j1-employee-compensation",
-            "registry_source": "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts#L1696",
+            "registry_source": "audit-platform/frontend/src/components/workpaper/registry/entries/specialized.ts#L362",
             "has_oo_mount": true,
             "manifest_entry_id": "xlsx/j1/gt-j1-employee-compensation"
           },
           "audit-platform/frontend/src/components/workpaper/j2/GtJ2DefinedBenefitPlan.vue": {
             "component_type": "j2-defined-benefit-plan",
-            "registry_source": "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts#L1704",
+            "registry_source": "audit-platform/frontend/src/components/workpaper/registry/entries/specialized.ts#L370",
             "has_oo_mount": false,
             "manifest_entry_id": null
           },
           "audit-platform/frontend/src/components/workpaper/j3/GtJ3ShareBasedPayment.vue": {
             "component_type": "j3-share-based-payment",
-            "registry_source": "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts#L1712",
+            "registry_source": "audit-platform/frontend/src/components/workpaper/registry/entries/specialized.ts#L378",
             "has_oo_mount": false,
             "manifest_entry_id": null
           }
@@ -518,11 +518,11 @@
         "why_it_matters": "I 循环把「符号名 grep 会误报」这条钉死了，改用 import 路径字面量口径 —— 但**路径字面量口径同样会被这 5 处骗到**（字符串里就有 `from '...'` 的完整形态）。实测：宽口径（逐文件命中即计）得共享基类 30 个消费方，statement-position 口径得 **29** 个。差的那 1 个就是这个生成文件。判据必须再加一条：匹配位置所在行、其之前的未转义双引号个数为奇数 ⇒ 该匹配落在双引号字符串内 ⇒ 不是语句。",
         "how_to_verify": "两侧都验：① 该生成文件里 `useWorkpaperEntryDualMode` 的子串命中数 > 0（伪边确实存在，不是判据自说自话）；② statement-position 口径下该文件的 import 边数 == 0；③ 共享基类的 statement 边总数 == 29 且 J 循环贡献恰 3 条。",
         "pseudo_edge_sites": [
-          "audit-platform/frontend/src/components/workpaper/sync/workpaperSyncLegacyBaseline.generated.ts#L1319",
-          "audit-platform/frontend/src/components/workpaper/sync/workpaperSyncLegacyBaseline.generated.ts#L1353",
-          "audit-platform/frontend/src/components/workpaper/sync/workpaperSyncLegacyBaseline.generated.ts#L1387",
-          "audit-platform/frontend/src/components/workpaper/sync/workpaperSyncLegacyBaseline.generated.ts#L1421",
-          "audit-platform/frontend/src/components/workpaper/sync/workpaperSyncLegacyBaseline.generated.ts#L1477"
+          "audit-platform/frontend/src/components/workpaper/sync/workpaperSyncLegacyBaseline.generated.ts#L1159",
+          "audit-platform/frontend/src/components/workpaper/sync/workpaperSyncLegacyBaseline.generated.ts#L1193",
+          "audit-platform/frontend/src/components/workpaper/sync/workpaperSyncLegacyBaseline.generated.ts#L1227",
+          "audit-platform/frontend/src/components/workpaper/sync/workpaperSyncLegacyBaseline.generated.ts#L1261",
+          "audit-platform/frontend/src/components/workpaper/sync/workpaperSyncLegacyBaseline.generated.ts#L1317"
         ],
         "pseudo_edge_count": 5,
         "wide_scope_consumer_count": 30,

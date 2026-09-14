@@ -118,7 +118,7 @@
         ],
         "segmented_sites_before_comment_strip": [
           10,
-          375
+          379
         ],
         "second_level_gate_sites": [
           11
@@ -127,7 +127,7 @@
       },
       "dual_mode_carrier": {
         "kind": "host_inlined_iife",
-        "site": "audit-platform/frontend/src/components/workpaper/GtK1OtherReceivables.vue#L376",
+        "site": "audit-platform/frontend/src/components/workpaper/GtK1OtherReceivables.vue#L380",
         "orphan_twin": "audit-platform/frontend/src/components/workpaper/composables/useK1DualMode.ts",
         "localStorage_prefix": "k1-dual-mode:"
       },
@@ -1830,10 +1830,16 @@
       "13 条 entry 的 template_ref.workbook 两两不同（现算集合大小 == 13）⇒ 不存在两条 entry 共用一本权威模板。",
       "deletion plan 的删除路径集合与其余七份 slice 的删除路径集合不相交。"
     ],
-    "contract_scan_recipe": "🔴 契约目录共 5 个文件，其中 **生产契约 4 份**（`review_status == \"reviewed\"`，逐文件读顶层 `review.entry_id`）与 **candidate 样例 1 份**（_example.candidate.json，`review_status == \"candidate\"`，`review.entry_id` 为 null）。判据只对生产契约要求 `review.entry_id` 非空；candidate 那份本身就是 step 6 的「review_status=candidate 不得注册生产 adapter」的反例分母 —— 首轮把它一起要求 entry_id 非空，守卫打红才发现口径错。",
+    "contract_scan_recipe": "🔴 契约目录共 11 个文件，其中 **生产契约 10 份**（`review_status == \"reviewed\"`，逐文件读顶层 `review.entry_id`）与 **candidate 样例 1 份**（_example.candidate.json，`review_status == \"candidate\"`，`review.entry_id` 为 null）。判据只对生产契约要求 `review.entry_id` 非空；candidate 那份本身就是 step 6 的「review_status=candidate 不得注册生产 adapter」的反例分母 —— 首轮把它一起要求 entry_id 非空，守卫打红才发现口径错。🔴 2026-09-14 更新：契约目录随 D 循环 adapter 迁移推进由 4 份增至 10 份（新增 D1/D3/D4/D5/D6/D7 的 reviewed 生产契约），全部属 D/B/G/H 循环、无一属 K 循环，本 slice 的 owner not in k_ids 语义不变。",
     "production_contract_files": [
       "b60.hour_budget.json",
+      "d1.notes_receivable_detail.json",
       "d2.receivable_detail.json",
+      "d3.prepaid_receipts_detail.json",
+      "d4.revenue_detail.json",
+      "d5.receivables_financing_detail.json",
+      "d6.contract_assets_detail.json",
+      "d7.contract_liabilities_detail.json",
       "g7.soe_subsidiary_disclosure.json",
       "h1.disposal_check.json"
     ],
@@ -1857,7 +1863,7 @@
         "recompute": "对 K1~K7 现算宿主里 `const dualMode = (() => ` 的行号（各恰 1 处）与 `import { useK{n}DualMode }` 的命中数（各 0）；对 K8~K13 反向：IIFE 命中 0、import 命中各 1 处。两侧都验。",
         "measured": {
           "K1": {
-            "inline_iife_site": "audit-platform/frontend/src/components/workpaper/GtK1OtherReceivables.vue#L376",
+            "inline_iife_site": "audit-platform/frontend/src/components/workpaper/GtK1OtherReceivables.vue#L380",
             "imports_dedicated_composable": null,
             "inline_localStorage_prefix": null,
             "orphan_twin_prefix": "k1-dual-mode:"
@@ -2002,7 +2008,7 @@
           "K1": {
             "before": [
               10,
-              375
+              379
             ],
             "after": [
               10
@@ -2138,7 +2144,7 @@
         "legacy_endpoints_called": [
           "/api/workpapers/onlyoffice/health"
         ],
-        "host_inlined_twin": "audit-platform/frontend/src/components/workpaper/GtK1OtherReceivables.vue#L376",
+        "host_inlined_twin": "audit-platform/frontend/src/components/workpaper/GtK1OtherReceivables.vue#L380",
         "twin_localStorage_prefix": null,
         "prefix_collision_with_twin": false,
         "action": "delete",
