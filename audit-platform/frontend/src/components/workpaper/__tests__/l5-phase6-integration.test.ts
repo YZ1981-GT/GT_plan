@@ -11,11 +11,12 @@
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
-const { mockEmit, mockOn, mockOff, mockPut, mockGet } = vi.hoisted(() => ({
+const { mockEmit, mockOn, mockOff, mockPut, mockPost, mockGet } = vi.hoisted(() => ({
   mockEmit: vi.fn(),
   mockOn: vi.fn(),
   mockOff: vi.fn(),
   mockPut: vi.fn().mockResolvedValue({}),
+  mockPost: vi.fn().mockResolvedValue({}),
   mockGet: vi.fn().mockResolvedValue([]),
 }))
 
@@ -33,6 +34,7 @@ vi.mock('@/services/apiProxy', () => ({
   api: {
     get: mockGet,
     put: mockPut,
+    post: mockPost,
   },
 }))
 

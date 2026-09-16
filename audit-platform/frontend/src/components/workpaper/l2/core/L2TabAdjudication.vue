@@ -214,14 +214,14 @@
     <!-- ═══ TB回写按钮 ═══ -->
     <div class="adj-footer">
       <el-button
-        type="primary"
-        :disabled="isReadonly || isSubmitting"
-        :loading="isSubmitting"
+        type="warning"
+        :disabled="isReadonly || publishing"
+        :loading="publishing"
         @click="handleSubmit"
       >
-        TB回写
+        发布到试算表
       </el-button>
-      <span class="footer-hint">回写期末审定合计至试算平衡表（科目 2231 应付利息）</span>
+      <span class="footer-hint">二次确认后回写期末审定合计至试算平衡表（科目 2231 应付利息）</span>
     </div>
 
     <!-- ═══ 审计说明 ═══ -->
@@ -394,7 +394,8 @@ const {
   updateRecon,
   updateCell,
   importFromDetail,
-  submitAdjudication,
+  publishToTb,
+  publishing,
 } = useL2Adjudication({
   allResponses,
   wpId: toRef(props, 'wpId'),
@@ -475,18 +476,10 @@ async function handleImportFromDetail(): Promise<void> {
   }
 }
 
-// ─── TB回写 ──────────────────────────────────────────────────────────────────
-const isSubmitting = ref(false)
+// ─── 发布到试算表（显式确认门，Req 2；科目2231） ──────────────────────────────
 async function handleSubmit(): Promise<void> {
-  isSubmitting.value = true
-  try {
-    await submitAdjudication()
-    ElMessage.success('期末审定数已回写至试算平衡表（科目 2231）')
-  } catch {
-    ElMessage.error('回写失败，请稍后重试')
-  } finally {
-    isSubmitting.value = false
-  }
+  if (props.isReadonly) return
+  await publishToTb()
 }
 
 // ─── AI辅助 ──────────────────────────────────────────────────────────────────

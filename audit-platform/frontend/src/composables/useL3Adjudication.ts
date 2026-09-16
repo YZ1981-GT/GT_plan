@@ -17,7 +17,8 @@
  *    且旧版 inject('l3FormData')/('l3AdjudicationData') 无 provide → 崩溃/不 hydrate。
  *    本次重建为源模板结构 + 自 formData.allResponses hydrate。
  */
-import { computed, watch, onBeforeUnmount, type ComputedRef } from 'vue'
+import { computed, ref, watch, onBeforeUnmount, type ComputedRef } from 'vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { eventBus } from '@/utils/eventBus'
 import type { useL3FormData, ChecklistResponse } from '@/components/workpaper/composables/useL3FormData'
 
@@ -176,6 +177,9 @@ function buildTotalRow(rows: L3AdjRow[]): L3AdjRow {
 export function useL3Adjudication(formData: ReturnType<typeof useL3FormData>) {
   const { allResponses, saveField, debouncedSave, writebackTB } = formData
 
+  /** 发布中状态（防重复提交，供发布按钮 :loading 绑定） */
+  const publishing = ref(false)
+
   // ─── Rows ────────────────────────────────────────────────────────────────
 
   const rows: ComputedRef<L3AdjRow[]> = computed(() =>
@@ -249,12 +253,47 @@ export function useL3Adjudication(formData: ReturnType<typeof useL3FormData>) {
     return count
   }
 
-  // ─── TB回写 ──────────────────────────────────────────────────────────────
+  // ─── TB回写 + 显式发布门 publishToTb ────────────────────────────────────────
 
+  /**
+   * 保存审定合计 + 经显式发布端点回写 TB（内部动作，由 publishToTb 二次确认后调用）。
+   * spec: tb-writeback-explicit-publish-gate Task 4。writebackTB 已改走 publish-to-tb。
+   */
   async function submitAdjudication(): Promise<void> {
     const amount = totalAuditedAmount.value
-    await writebackTB(amount)
     await saveField('L3-L3-1-adjudication-total', { remark: String(amount) })
+    await writebackTB(amount)
+  }
+
+  /**
+   * 确认发布审定数到试算表（科目 2501 长期借款）。
+   *
+   * spec: tb-writeback-explicit-publish-gate Task 4 / Req 2。
+   * 二次确认（中文）→ submitAdjudication（保存 + 走 publish-to-tb 回写）。用户取消 → 无副作用。
+   */
+  async function publishToTb(): Promise<void> {
+    if (publishing.value) return
+
+    try {
+      await ElMessageBox.confirm(
+        '发布后将把长期借款期末审定合计（科目 2501）写入试算表（trial_balance），'
+        + '并触发报表/错报评价等下游重算。确认发布？',
+        '发布到试算表确认',
+        { confirmButtonText: '确认发布', cancelButtonText: '取消', type: 'warning' },
+      )
+    } catch {
+      return // 用户取消 → 无任何副作用（不保存、不写 TB、不 emit）
+    }
+
+    publishing.value = true
+    try {
+      await submitAdjudication()
+      ElMessage.success('已发布到试算表')
+    } catch (err: any) {
+      ElMessage.error(err?.response?.data?.detail || err?.message || '发布失败，请重试')
+    } finally {
+      publishing.value = false
+    }
   }
 
   // ─── EventBus（明细/调整变化 → allResponses 自动响应） ─────────────────
@@ -278,6 +317,9 @@ export function useL3Adjudication(formData: ReturnType<typeof useL3FormData>) {
     updateCell,
     importFromDetail,
     submitAdjudication,
+    // 显式发布到试算表（二次确认门）
+    publishToTb,
+    publishing,
     L3_SOURCE_ROWS,
   }
 }

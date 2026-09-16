@@ -35,6 +35,15 @@
         <el-button type="primary" size="small" :loading="isSaving" @click="handleSave">
           保存
         </el-button>
+        <el-button
+          type="warning"
+          size="small"
+          :loading="publishing"
+          :disabled="isReadonly"
+          @click="handlePublishToTb"
+        >
+          发布到试算表
+        </el-button>
       </div>
     </div>
 
@@ -399,7 +408,9 @@ const {
   addRow,
   removeRow,
   updateRow,
-  saveAndWriteback,
+  saveAdjudication,
+  publishToTb,
+  publishing,
   subscribeDisclosure,
 } = useL6Adjudication(formData, adjudicationRows)
 
@@ -473,11 +484,18 @@ function fmtPercent(val: number): string {
 async function handleSave() {
   isSaving.value = true
   try {
-    await saveAndWriteback()
-    ElMessage.success('审定表已保存并回写TB')
+    // 普通保存不写 TB（Req 1）；TB 回写走「发布到试算表」显式确认门
+    await saveAdjudication()
+    ElMessage.success('审定表已保存')
   } finally {
     isSaving.value = false
   }
+}
+
+/** 发布到试算表（显式确认门，Req 2；科目2711） */
+async function handlePublishToTb() {
+  if (props.isReadonly) return
+  await publishToTb()
 }
 
 async function handleAddRow() {

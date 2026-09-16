@@ -26,6 +26,15 @@
         </el-dropdown>
         <el-button size="small" @click="handleReview"><el-icon><Check /></el-icon> 复核</el-button>
         <el-button type="primary" size="small" :loading="isSaving" @click="handleSave">保存</el-button>
+        <el-button
+          type="warning"
+          size="small"
+          :loading="publishing"
+          :disabled="isReadonly"
+          @click="handlePublishToTb"
+        >
+          发布到试算表
+        </el-button>
       </div>
     </div>
 
@@ -253,7 +262,9 @@ const {
   specialPayableAudited, updateSpecialPayable, reconTotal,
   auditNote, conclusion, updateText,
   updateGrossRow, updateUnrecognizedRow, updateGrossReason, updateUnrecognizedReason,
-  saveAndWriteback,
+  saveAdjudication,
+  publishToTb,
+  publishing,
 } = useL5Adjudication(formData, adjudicationData)
 
 // ─── 行编辑（按 key 定位 index） ─────────────────────────────────────────────
@@ -334,7 +345,14 @@ const fileInputRef = ref<HTMLInputElement | null>(null)
 
 async function handleSave() {
   isSaving.value = true
-  try { await saveAndWriteback() } finally { isSaving.value = false }
+  // 普通保存不写 TB（Req 1）；TB 回写走「发布到试算表」显式确认门
+  try { await saveAdjudication() } finally { isSaving.value = false }
+}
+
+/** 发布到试算表（显式确认门，Req 2；双科目2701+2702） */
+async function handlePublishToTb() {
+  if (props.isReadonly) return
+  await publishToTb()
 }
 
 function handleImportExport(command: string) {

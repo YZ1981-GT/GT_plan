@@ -17,7 +17,8 @@
  * 注：原自造模型（期初|贷方|借方|期末|未审|AJE|RJE，本期发生额口径）已删除 ——
  *     源模板 N2-1 是**双期余额表**，本期发生额只存在于 N2-2 明细表。
  */
-import { computed, type ComputedRef, type Ref } from 'vue'
+import { computed, ref, type ComputedRef, type Ref } from 'vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import {
   calcAuditedAmount,
   calcSubtotal,
@@ -322,11 +323,52 @@ export function useN2Adjudication14(options: UseN2Adjudication14Options) {
     }
   }
 
-  async function saveAndSync(): Promise<void> {
+  /**
+   * 普通保存（保存审定行 + 合计），**不写 TB**。
+   * spec: tb-writeback-explicit-publish-gate Task 6 / Req 1（普通保存绝不写 TB）。
+   * 原 saveAndSync 保存后自动 `writebackTB` 绕过显式确认门（违反 Req 1），
+   * 已把 TB 回写拆到 publishToTb（二次确认门）。
+   */
+  async function saveAdjudication(): Promise<void> {
     const raw = _currentRaw()
     await saveField('1', 'adjudication-rows', raw)
     await saveField('1', 'end-audited-total', total.value.endAudited)
-    await writebackTB(total.value.endAudited)
+  }
+
+  /** 发布中状态（防重复提交，供发布按钮 :loading 绑定） */
+  const publishing = ref(false)
+
+  /**
+   * 确认发布审定数到试算表（科目 2221 应交税费期末余额）。
+   *
+   * spec: tb-writeback-explicit-publish-gate Task 6 / Req 2。
+   * 二次确认（中文）→ 保存审定行 → writebackTB 走
+   * `POST /workpapers/{wpId}/audit-determination/publish-to-tb`。用户取消 → 无副作用。
+   */
+  async function publishToTb(): Promise<void> {
+    if (publishing.value) return
+
+    try {
+      await ElMessageBox.confirm(
+        '发布后将把应交税费期末审定合计（科目 2221）写入试算表（trial_balance），'
+        + '并触发报表/错报评价等下游重算。确认发布？',
+        '发布到试算表确认',
+        { confirmButtonText: '确认发布', cancelButtonText: '取消', type: 'warning' },
+      )
+    } catch {
+      return // 用户取消 → 无任何副作用
+    }
+
+    publishing.value = true
+    try {
+      await saveAdjudication()
+      await writebackTB(total.value.endAudited)
+      ElMessage.success('已发布到试算表')
+    } catch (err: any) {
+      ElMessage.error(err?.response?.data?.detail || err?.message || '发布失败，请重试')
+    } finally {
+      publishing.value = false
+    }
   }
 
   return {
@@ -335,6 +377,9 @@ export function useN2Adjudication14(options: UseN2Adjudication14Options) {
     updateRow,
     addRow,
     removeRow,
-    saveAndSync,
+    saveAdjudication,
+    // 显式发布到试算表（二次确认门）
+    publishToTb,
+    publishing,
   }
 }

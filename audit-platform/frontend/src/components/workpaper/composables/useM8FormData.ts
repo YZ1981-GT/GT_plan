@@ -47,6 +47,8 @@ export interface UseM8FormDataOptions {
 const DEBOUNCE_MS = 2000
 const ITEM_PREFIX = 'M8-'
 const ACCOUNT_CODE = '4104' // 一般风险准备（贷方/权益类！金融企业专属）
+/** 审定表 sheet 名（含子码 M8-1，供后端 extract_determination_wp_code 解出） */
+const DETERMINATION_SHEET_NAME = '审定表M8-1'
 
 // ─── Composable ──────────────────────────────────────────────────────────────
 
@@ -293,23 +295,26 @@ export function useM8FormData(options: UseM8FormDataOptions) {
    *
    * 并发布 EventBus 'substantive:adjudicated' 事件通知其他组件（附注刷新等）。
    */
+  // spec: tb-writeback-explicit-publish-gate Task 5 / Req 1,2,8。改走显式发布门：
+  // 仅在用户显式确认（useM8Adjudication.publishToTb 二次确认）后调用 →
+  // `POST /workpapers/{wpId}/audit-determination/publish-to-tb`（携审定表 sheet 名 +
+  // writeback_rows 预算行），后端发 publish_confirmed=True + token → handler 幂等回写。
+  // 此前直调旧端点 PUT trial-balance/writeback 且由 watcher 数据变化自动触发（违反 Req 1）。
   async function writebackTB(auditedAmount: number): Promise<void> {
-    if (!projectId.value) return
-    try {
-      await api.put(`/api/projects/${projectId.value}/trial-balance/writeback`, {
-        account_code: ACCOUNT_CODE,
-        audited_amount: auditedAmount,
-      })
-      // 发布 EventBus 通知审定数变更（附注等组件订阅刷新）
-      eventBus.emit('substantive:adjudicated', {
-        accountCode: ACCOUNT_CODE,
-        auditedAmount,
-        wpCode: 'M8',
-        timestamp: Date.now(),
-      })
-    } catch {
-      ElMessage.warning('审定数回写失败，请手动确认试算表数据')
-    }
+    if (!wpId.value) return
+    await api.post(`/api/workpapers/${wpId.value}/audit-determination/publish-to-tb`, {
+      sheet_name: DETERMINATION_SHEET_NAME,
+      writeback_rows: [
+        { account_code: ACCOUNT_CODE, audited_amount: auditedAmount, amount_kind: 'balance' },
+      ],
+    })
+    // 发布 EventBus 通知审定数变更（附注等组件订阅刷新）
+    eventBus.emit('substantive:adjudicated', {
+      accountCode: ACCOUNT_CODE,
+      auditedAmount,
+      wpCode: 'M8',
+      timestamp: Date.now(),
+    })
   }
 
   // ─── Flush（组件卸载） ───────────────────────────────────────────────────

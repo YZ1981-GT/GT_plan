@@ -16,7 +16,8 @@
  *
  * 科目：6603 财务费用（**借方/损益类！**取发生额）
  */
-import { computed, watch, type ComputedRef } from 'vue'
+import { computed, ref, watch, type ComputedRef } from 'vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { eventBus } from '@/utils/eventBus'
 import {
   calcAuditedAmount,
@@ -104,6 +105,9 @@ export function useL8Adjudication(
   rows: { value: L8AdjudicationRow[] },
 ) {
   const { writebackTB, saveBatch, debouncedSave } = formData
+
+  /** 发布中状态（防重复提交，供发布按钮 :loading 绑定） */
+  const publishing = ref(false)
 
   // ─── 1. 计算属性：公式列自动计算 ──────────────────────────────────────
 
@@ -198,14 +202,17 @@ export function useL8Adjudication(
     _triggerSave(index)
   }
 
-  // ─── 6. 保存 + TB回写 ─────────────────────────────────────────────────
+  // ─── 6. 保存（普通保存不写 TB） ────────────────────────────────────────
 
   /**
-   * 保存审定表并触发TB回写 + EventBus
-   * - 回写 trial_balance 科目 6603（发生额口径！）
-   * - publish 'substantive:adjudicated'
+   * 保存审定表明细/合计到 checklist_responses（普通保存动作）。
+   *
+   * spec: tb-writeback-explicit-publish-gate Task 4 / Req 1。
+   * 此前该函数（原名 saveAndWriteback）保存后**自动**回写 trial_balance，且由 §7
+   * watcher 在数据变化时触发 → 违反 Req 1（普通保存/数据变化绝不写 TB）。现只保存 +
+   * emit substantive:adjudicated（附注刷新），TB 回写收敛为用户显式确认动作（publishToTb）。
    */
-  async function saveAndWriteback(): Promise<void> {
+  async function saveAdjudication(): Promise<void> {
     const items = computedRows.value.map((row, i) => {
       return [
         { itemId: `L8-1-row-${row.key}-unadj`, data: { remark: String(row.currentUnadjusted) } },
@@ -223,21 +230,65 @@ export function useL8Adjudication(
     })
 
     await saveBatch(items)
-
-    // TB回写（科目6603，发生额口径！）
-    await writebackTB(totalRow.value.currentAudited)
   }
 
-  // ─── 7. 审定数变化监听 → 自动回写 ────────────────────────────────────────
+  // ─── 7. 审定数变化监听 → 仅保存 + emit（不写 TB） ────────────────────────
 
+  // 审定数变化 → 保存 + 仅发布 substantive:adjudicated（附注/检查表刷新），**不再**自动
+  // 回写 trial_balance —— TB 回写收敛为用户显式确认动作（publishToTb）。
+  // spec: tb-writeback-explicit-publish-gate Req 1（普通保存/数据变化绝不写 TB）。
   watch(
     () => totalRow.value.currentAudited,
     async (newVal, oldVal) => {
       if (oldVal !== undefined && newVal !== oldVal) {
-        await saveAndWriteback()
+        await saveAdjudication()
+        eventBus.emit('substantive:adjudicated', {
+          accountCode: '6603',
+          auditedAmount: newVal,
+          wpCode: 'L8',
+          timestamp: Date.now(),
+        })
       }
     },
   )
+
+  // ─── 7b. 显式发布到试算表（显式确认门，复刻 M1/D2 范式） ──────────────────
+
+  /**
+   * 确认发布审定数到试算表（科目 6603 财务费用，**发生额口径！**）。
+   *
+   * spec: tb-writeback-explicit-publish-gate Task 4 / Req 2。
+   * 二次确认（中文）→ 保存明细 → formData.writebackTB 走
+   * `POST /workpapers/{wpId}/audit-determination/publish-to-tb`（amount_kind=occurrence）
+   * 回写 trial_balance（后端发 publish_confirmed=True + token，handler 幂等回写）。
+   * 用户取消 → 无副作用。
+   */
+  async function publishToTb(): Promise<void> {
+    if (publishing.value) return
+
+    try {
+      await ElMessageBox.confirm(
+        '发布后将把财务费用本期审定发生额（科目 6603，发生额口径）写入试算表'
+        + '（trial_balance），并触发报表/错报评价等下游重算。确认发布？',
+        '发布到试算表确认',
+        { confirmButtonText: '确认发布', cancelButtonText: '取消', type: 'warning' },
+      )
+    } catch {
+      return // 用户取消 → 无任何副作用（不保存、不写 TB、不 emit）
+    }
+
+    publishing.value = true
+    try {
+      await saveAdjudication()
+      // TB 回写（科目6603财务费用，发生额口径）经显式发布端点 + emit substantive:adjudicated
+      await writebackTB(totalRow.value.currentAudited)
+      ElMessage.success('已发布到试算表')
+    } catch (err: any) {
+      ElMessage.error(err?.response?.data?.detail || err?.message || '发布失败，请重试')
+    } finally {
+      publishing.value = false
+    }
+  }
 
   // ─── 8. EventBus 订阅附注刷新 ────────────────────────────────────────────
 
@@ -279,8 +330,11 @@ export function useL8Adjudication(
     crossValidateWithDetail,
     // 行操作
     updateRow,
-    // 保存+回写
-    saveAndWriteback,
+    // 保存（普通保存不写 TB）
+    saveAdjudication,
+    // 显式发布到试算表（二次确认门）
+    publishToTb,
+    publishing,
     subscribeDisclosure,
   }
 }

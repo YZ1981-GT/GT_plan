@@ -9,6 +9,7 @@
  * 5. 期末数按源表逻辑从 F4-2 明细表汇总，期初/期末分别与试算平衡表勾稽。
  */
 import { computed, inject, onBeforeUnmount, ref, watch, type ComputedRef, type Ref } from 'vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { calcAdjustedAmount, calcCreditBalance, calcSubtotal, parseNum } from './useF4AccPayFormulaEngine'
 import type { ChecklistResponse } from './useF4FormData'
 import { eventBus } from '@/utils/eventBus'
@@ -402,7 +403,7 @@ export function parseF4TrialBalance(value: string | null | undefined): F4TrialBa
 }
 
 export function useF4Adjudication(options: UseF4AdjudicationOptions) {
-  const { allResponses, isReadonly, projectId, tbAmountSeed } = options
+  const { wpId, allResponses, isReadonly, projectId, tbAmountSeed } = options
   const readonly = isReadonly ?? ref(false)
   let debounceTimer: ReturnType<typeof setTimeout> | null = null
   const natureStored = ref<StoredF4AdjRow[]>([])
@@ -610,6 +611,8 @@ export function useF4Adjudication(options: UseF4AdjudicationOptions) {
   function publishAdjudicated(): void {
     const auditedAmount = totalRow.value.closingAdjusted
     // 统一走 eventBus（crossWpEventBridge 带再入守卫转发到 window，旧 window 监听者不受影响）
+    // 🔴 不再 dispatch f4:writeback-trial-balance 绕过门：TB 回写走显式确认（publishToTb）。
+    // spec: tb-writeback-explicit-publish-gate Task 3。
     try {
       eventBus.emit('substantive:adjudicated', {
         wpCode: 'F4',
@@ -621,10 +624,59 @@ export function useF4Adjudication(options: UseF4AdjudicationOptions) {
     } catch {
       console.warn('[useF4Adjudication] EventBus publish substantive:adjudicated failed')
     }
-    if (projectId.value) {
-      window.dispatchEvent(new CustomEvent('f4:writeback-trial-balance', {
-        detail: { projectId: projectId.value, accountCode: '2202', auditedAmount },
-      }))
+  }
+
+  // ─── Publish to Trial Balance（显式发布门，复刻 D2/D4-1 范式） ──────────────
+
+  const publishing = ref(false)
+
+  /**
+   * 确认发布审定数到试算表（科目 2202 应付账款）。
+   *
+   * spec: tb-writeback-explicit-publish-gate Task 3 / Req 1,2,8。
+   * 此前 F4 靠 publishAdjudicated 自动 dispatch `f4:writeback-trial-balance`
+   * → GtF4 监听 → 旧端点 `PUT /projects/{pid}/trial-balance/writeback` 直写，绕过确认门。
+   * 现改为：二次确认（中文）→ `POST /workpapers/{wpId}/audit-determination/publish-to-tb`。
+   */
+  async function publishToTb(): Promise<void> {
+    if (readonly.value || publishing.value) return
+
+    try {
+      await ElMessageBox.confirm(
+        '发布后将把应付账款审定数（科目 2202）写入试算表（trial_balance），'
+        + '并触发报表/错报评价等下游重算。确认发布？',
+        '发布到试算表确认',
+        { confirmButtonText: '确认发布', cancelButtonText: '取消', type: 'warning' },
+      )
+    } catch {
+      return // 用户取消 → 无任何副作用
+    }
+
+    if (!wpId.value) {
+      ElMessage.error('缺少底稿标识，无法发布')
+      return
+    }
+
+    const auditedAmount = totalRow.value.closingAdjusted
+
+    publishing.value = true
+    try {
+      const { api } = await import('@/services/apiProxy')
+      const resp: any = await api.post(
+        `/api/workpapers/${wpId.value}/audit-determination/publish-to-tb`,
+        {
+          sheet_name: '审定表F4-1',
+          writeback_rows: [
+            { account_code: '2202', audited_amount: auditedAmount, amount_kind: 'balance' },
+          ],
+        },
+      )
+      ElMessage.success(resp?.message || '已发布到试算表')
+      publishAdjudicated()
+    } catch (err: any) {
+      ElMessage.error(err?.response?.data?.detail || err?.message || '发布失败，请重试')
+    } finally {
+      publishing.value = false
     }
   }
 
@@ -728,6 +780,8 @@ export function useF4Adjudication(options: UseF4AdjudicationOptions) {
     auditNote,
     auditConclusion,
     publishAdjudicated,
+    publishToTb,
+    publishing,
     serialize,
     deserialize,
     pullFromTB,

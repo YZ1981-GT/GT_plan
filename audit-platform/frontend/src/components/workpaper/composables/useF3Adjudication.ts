@@ -5,6 +5,7 @@
  * 比照 useD4Adjudication
  */
 import { ref, computed, watch, onBeforeUnmount, type Ref, type ComputedRef } from 'vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { eventBus } from '@/utils/eventBus'
 import {
   parseNum,
@@ -295,16 +296,64 @@ function mergeCrossSheet(stored: StoredF3AdjRow): StoredF3AdjRow {
       auditedAmount: amount,
     }
     // P1-8：统一走 eventBus（crossWpEventBridge 会镜像到 window，旧监听者不受影响）
+    // 🔴 不再 dispatch f3:writeback-trial-balance 绕过门：TB 回写走显式确认（publishToTb）。
+    // spec: tb-writeback-explicit-publish-gate Task 3。
     try {
       eventBus.emit('substantive:adjudicated', payload)
     } catch { /* silent */ }
+  }
 
-    if (projectId.value) {
-      try {
-        window.dispatchEvent(new CustomEvent('f3:writeback-trial-balance', {
-          detail: { projectId: projectId.value, accountCode: '2201', auditedAmount: amount },
-        }))
-      } catch { /* silent */ }
+  // ─── Publish to Trial Balance（显式发布门，复刻 D2/D4-1 范式） ──────────────
+
+  const publishing = ref(false)
+
+  /**
+   * 确认发布审定数到试算表（科目 2201 应付票据）。
+   *
+   * spec: tb-writeback-explicit-publish-gate Task 3 / Req 1,2,8。
+   * 此前 F3 靠 publishAdjudicated 自动 dispatch `f3:writeback-trial-balance`
+   * → GtF3 监听 → 旧端点 `PUT /projects/{pid}/trial-balance/writeback` 直写，绕过确认门。
+   * 现改为：二次确认（中文）→ `POST /workpapers/{wpId}/audit-determination/publish-to-tb`。
+   */
+  async function publishToTb(): Promise<void> {
+    if (readonly.value || publishing.value) return
+
+    try {
+      await ElMessageBox.confirm(
+        '发布后将把应付票据审定数（科目 2201）写入试算表（trial_balance），'
+        + '并触发报表/错报评价等下游重算。确认发布？',
+        '发布到试算表确认',
+        { confirmButtonText: '确认发布', cancelButtonText: '取消', type: 'warning' },
+      )
+    } catch {
+      return // 用户取消 → 无任何副作用
+    }
+
+    if (!wpId.value) {
+      ElMessage.error('缺少底稿标识，无法发布')
+      return
+    }
+
+    const auditedAmount = subtotalRow.value.closingAdjusted
+
+    publishing.value = true
+    try {
+      const { api } = await import('@/services/apiProxy')
+      const resp: any = await api.post(
+        `/api/workpapers/${wpId.value}/audit-determination/publish-to-tb`,
+        {
+          sheet_name: '审定表F3-1',
+          writeback_rows: [
+            { account_code: '2201', audited_amount: auditedAmount, amount_kind: 'balance' },
+          ],
+        },
+      )
+      ElMessage.success(resp?.message || '已发布到试算表')
+      publishAdjudicated()
+    } catch (err: any) {
+      ElMessage.error(err?.response?.data?.detail || err?.message || '发布失败，请重试')
+    } finally {
+      publishing.value = false
     }
   }
 
@@ -379,6 +428,8 @@ function mergeCrossSheet(stored: StoredF3AdjRow): StoredF3AdjRow {
     auditConclusion,
     updateCell,
     publishAdjudicated,
+    publishToTb,
+    publishing,
     pullFromTB,
   }
 }

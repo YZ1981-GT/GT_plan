@@ -44,6 +44,8 @@ import { L7_REPORT_ROW_CODE } from './l7AccountScope'
 // 🔴 L7 宁缺勿造：2801 是预计负债（K5），2901 是递延所得税负债（N1/N3）。
 // report_config BS-071/BS-097 引用 2901 属撞码缺陷。保留 writebackTB 用 report_row_code。
 const ACCOUNT_CODE = L7_REPORT_ROW_CODE as string // writeback 用报表行，非科目码
+/** 审定表 sheet 名（含子码 L7-1，供后端 extract_determination_wp_code 解出） */
+const DETERMINATION_SHEET_NAME = '审定表L7-1'
 
 // ─── Composable ──────────────────────────────────────────────────────────────
 
@@ -227,26 +229,31 @@ export function useL7FormData(options: UseL7FormDataOptions) {
   // ─── writebackTB (回写审定数到 trial_balance 2801) ─────────────────────────
 
   /**
-   * 回写审定数到 trial_balance（科目 2801 其他非流动负债，贷方/负债类）。
-   * 并发布 EventBus 'substantive:adjudicated' 事件通知其他组件（附注刷新等）。
+   * 发布审定数到 trial_balance（其他非流动负债；回写用报表行 BS-071，非科目码）。
+   *
+   * spec: tb-writeback-explicit-publish-gate Task 4 / Req 1,2,8。
+   * 此前直调旧端点 `PUT /projects/{pid}/trial-balance/writeback`（无二次确认/无
+   * publish_confirmed/无幂等），且由 useL7Adjudication 的 watcher 在数据变化时**自动**
+   * 触发（违反 Req 1）。现改为显式发布门：仅在用户显式确认（useL7Adjudication.publishToTb
+   * 二次确认）后调用本函数 → `POST /workpapers/{wpId}/audit-determination/publish-to-tb`。
+   * account_code 沿用报表行 BS-071（L7 无独立科目码，宁缺勿造）。成功后 emit。
    */
   async function writebackTB(auditedAmount: number): Promise<void> {
-    if (!projectId.value) return
-    try {
-      await api.put(`/api/projects/${projectId.value}/trial-balance/writeback`, {
-        account_code: ACCOUNT_CODE,
-        audited_amount: auditedAmount,
-      })
-      // 发布 mitt EventBus 通知审定数变更（附注等组件订阅刷新）
-      eventBus.emit('substantive:adjudicated', {
-        accountCode: ACCOUNT_CODE,
-        auditedAmount,
-        wpCode: 'L7',
-        timestamp: Date.now(),
-      })
-    } catch {
-      ElMessage.warning('审定数回写失败，请手动确认试算表数据')
-    }
+    if (!wpId.value) return
+    await api.post(`/api/workpapers/${wpId.value}/audit-determination/publish-to-tb`, {
+      // sheet 名固定含审定表子码 L7-1，后端 extract_determination_wp_code 据此解出 L7-1
+      sheet_name: DETERMINATION_SHEET_NAME,
+      writeback_rows: [
+        { account_code: ACCOUNT_CODE, audited_amount: auditedAmount, amount_kind: 'balance' },
+      ],
+    })
+    // 发布 mitt EventBus 通知审定数变更（附注等组件订阅刷新）
+    eventBus.emit('substantive:adjudicated', {
+      accountCode: ACCOUNT_CODE,
+      auditedAmount,
+      wpCode: 'L7',
+      timestamp: Date.now(),
+    })
   }
 
   // ─── Flush（组件卸载） ───────────────────────────────────────────────────

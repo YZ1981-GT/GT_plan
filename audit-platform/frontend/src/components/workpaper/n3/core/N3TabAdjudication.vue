@@ -308,13 +308,13 @@
     <!-- ═══ TB回写 + 联动状态 ═══ -->
     <div class="action-bar">
       <el-button
-        type="primary"
+        type="warning"
         size="small"
         :disabled="isReadonly"
-        :loading="writebackLoading"
+        :loading="publishing"
         @click="handleWritebackTB"
       >
-        回写审定数 → TB(2901)
+        发布到试算表 → TB(2901)
       </el-button>
       <div class="n5-linkage-indicator">
         <span class="n5-label">N5递延税费用联动：</span>
@@ -461,7 +461,8 @@ const {
   crossValidation,
   updateRow,
   pullFromTB,
-  saveAndSync,
+  publishToTb,
+  publishing,
 } = useN3Adjudication({
   allResponses: allResponsesRef,
   saveField: formData.setField,
@@ -597,10 +598,6 @@ const tableData = computed<DisplayRow[]>(() => {
 
 const n1Correspondence = computed(() => n3ToN1Correspondence.value)
 
-// ─── TB回写 loading ──────────────────────────────────────────────────────────
-
-const writebackLoading = ref(false)
-
 // ─── 只读判断 ────────────────────────────────────────────────────────────────
 
 const isReadonly = computed(() => props.isReadonly ?? false)
@@ -680,18 +677,16 @@ function getRowClassName({ row }: { row: any }): string {
 
 // ─── TB回写 ──────────────────────────────────────────────────────────────────
 
+// spec: tb-writeback-explicit-publish-gate Task 6 / Req 2。
+// TB 回写经显式确认门：publishToTb 弹中文二次确认 → formData.writebackTB 走
+// POST /audit-determination/publish-to-tb（科目 2901 期末余额）。发布成功后再触发
+// N3→N5 递延所得税负债联动（publishDeferredTaxLiabilityUpdated）+ 自动快照；取消则不触发。
 async function handleWritebackTB() {
-  writebackLoading.value = true
-  try {
-    await saveAndSync()
-    publishDeferredTaxLiabilityUpdated()
-    scheduleAutoSnapshot?.()
-    ElMessage.success('审定数已回写试算表（科目2901期末余额）')
-  } catch (err: any) {
-    ElMessage.error(`回写失败：${err.message || '未知错误'}`)
-  } finally {
-    writebackLoading.value = false
-  }
+  if (isReadonly.value) return
+  const published = await publishToTb()
+  if (!published) return
+  publishDeferredTaxLiabilityUpdated()
+  scheduleAutoSnapshot?.()
 }
 
 // ─── readField 辅助 + N3-3 净影响合并 ───────────────────────────────────────

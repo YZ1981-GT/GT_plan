@@ -17,7 +17,8 @@
  *    且 adjudicationData 是组件本地 reactive（每次挂载归零、可编辑输入从不持久化/hydrate）
  *    → 与源模板双期结构不符 + 刷新数据全丢。本次重建为源模板双期结构 + 自 allResponses hydrate。
  */
-import { computed, watch, type ComputedRef } from 'vue'
+import { computed, ref, watch, type ComputedRef } from 'vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { eventBus } from '@/utils/eventBus'
 import type { useL4FormData, ChecklistResponse } from './useL4FormData'
 
@@ -180,6 +181,9 @@ function buildSubtotal(variety: L4Variety, leaves: L4AdjRow[]): L4AdjRow {
 export function useL4Adjudication(formData: ReturnType<typeof useL4FormData>) {
   const { allResponses, saveField, debouncedSave, writebackTB } = formData
 
+  /** 发布中状态（防重复提交，供发布按钮 :loading 绑定） */
+  const publishing = ref(false)
+
   // ─── 叶子行 ────────────────────────────────────────────────────────────
 
   const leafRows: ComputedRef<L4AdjRow[]> = computed(() =>
@@ -303,12 +307,48 @@ export function useL4Adjudication(formData: ReturnType<typeof useL4FormData>) {
     return count
   }
 
-  // ─── TB回写 ──────────────────────────────────────────────────────────────
+  // ─── TB回写 + 显式发布门 publishToTb ────────────────────────────────────────
 
+  /**
+   * 保存审定合计 + 经显式发布端点回写 TB（内部动作，由 publishToTb 二次确认后调用）。
+   * spec: tb-writeback-explicit-publish-gate Task 4。writebackTB 已改走 publish-to-tb
+   * 且内部已 emit 'substantive:adjudicated'。
+   */
   async function submitAdjudication(): Promise<void> {
     const amount = totalAuditedAmount.value
     await saveField('L4-L4-1-adjudication-total', { remark: String(amount) })
-    await writebackTB(amount)  // useL4FormData.writebackTB 内部已 emit 'substantive:adjudicated'
+    await writebackTB(amount)
+  }
+
+  /**
+   * 确认发布审定数到试算表（科目 2502 应付债券）。
+   *
+   * spec: tb-writeback-explicit-publish-gate Task 4 / Req 2。
+   * 二次确认（中文）→ submitAdjudication（保存 + 走 publish-to-tb 回写）。用户取消 → 无副作用。
+   */
+  async function publishToTb(): Promise<void> {
+    if (publishing.value) return
+
+    try {
+      await ElMessageBox.confirm(
+        '发布后将把应付债券期末审定合计（科目 2502）写入试算表（trial_balance），'
+        + '并触发报表/错报评价等下游重算。确认发布？',
+        '发布到试算表确认',
+        { confirmButtonText: '确认发布', cancelButtonText: '取消', type: 'warning' },
+      )
+    } catch {
+      return // 用户取消 → 无任何副作用（不保存、不写 TB、不 emit）
+    }
+
+    publishing.value = true
+    try {
+      await submitAdjudication()
+      ElMessage.success('已发布到试算表')
+    } catch (err: any) {
+      ElMessage.error(err?.response?.data?.detail || err?.message || '发布失败，请重试')
+    } finally {
+      publishing.value = false
+    }
   }
 
   // ─── EventBus（调整变化 → allResponses 自动响应） ─────────────────────
@@ -324,6 +364,9 @@ export function useL4Adjudication(formData: ReturnType<typeof useL4FormData>) {
     updateCell,
     importFromDetail,
     submitAdjudication,
+    // 显式发布到试算表（二次确认门）
+    publishToTb,
+    publishing,
     L4_SOURCE_ROWS,
   }
 }

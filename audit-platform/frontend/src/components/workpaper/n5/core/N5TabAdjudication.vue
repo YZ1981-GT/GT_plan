@@ -147,8 +147,8 @@
 
     <!-- ═══ TB回写按钮 ═══ -->
     <div class="action-bar">
-      <el-button type="primary" size="small" :disabled="isReadonly" :loading="writebackLoading" @click="handleWritebackTB">
-        回写审定数 → TB(6801·本期发生额)
+      <el-button type="warning" size="small" :disabled="isReadonly" :loading="writebackLoading" @click="handleWritebackTB">
+        发布到试算表 → TB(6801·本期发生额)
       </el-button>
       <span class="action-hint">损益类科目回写本期发生额口径</span>
     </div>
@@ -206,7 +206,7 @@
  * Requirements: 2.1-2.8
  */
 import { ref, computed, inject, onMounted, type Ref } from 'vue'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { MagicStick, ChatDotSquare, Download } from '@element-plus/icons-vue'
 import { useN5FormData } from '../../composables/useN5FormData'
 import { calcAuditedAmount, parseNum } from '../../composables/useN5FormulaEngine'
@@ -424,13 +424,33 @@ async function handleCellChange(row: AdjRow) {
   scheduleAutoSnapshot?.()
 }
 
+// spec: tb-writeback-explicit-publish-gate Task 6 / Req 2。
+// N5 无独立 useN5Adjudication composable，故显式确认门（publishToTb）直接落在本 tab：
+// 二次确认（中文）→ formData.writebackTB 走 POST /audit-determination/publish-to-tb
+// （6801 本期发生额 amount_kind=occurrence）。用户取消 → 无副作用。
 async function handleWritebackTB() {
+  if (props.isReadonly || writebackLoading.value) return
+
+  try {
+    await ElMessageBox.confirm(
+      '发布后将把所得税费用本期审定发生额（科目 6801）写入试算表（trial_balance），'
+      + '并触发报表/错报评价等下游重算。确认发布？',
+      '发布到试算表确认',
+      { confirmButtonText: '确认发布', cancelButtonText: '取消', type: 'warning' },
+    )
+  } catch {
+    return // 用户取消 → 无任何副作用
+  }
+
   writebackLoading.value = true
   try {
     await formData.writebackTB(totalRow.value.audited)
-    ElMessage.success('审定数已回写试算表（科目6801·本期发生额）')
-  } catch { ElMessage.error('回写失败') }
-  finally { writebackLoading.value = false }
+    ElMessage.success('已发布到试算表（科目6801·本期发生额）')
+  } catch (err: any) {
+    ElMessage.error(err?.response?.data?.detail || err?.message || '发布失败，请重试')
+  } finally {
+    writebackLoading.value = false
+  }
 }
 
 async function handleNotesSave() { await formData.setField('1', 'audit-notes', auditNotes.value) }

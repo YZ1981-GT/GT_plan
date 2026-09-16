@@ -187,7 +187,7 @@
  *
  * 科目覆盖：1123 预付账款（借方科目/资产类）
  */
-import { ref, computed, onMounted, onBeforeUnmount, provide, inject, defineAsyncComponent } from 'vue'
+import { ref, computed, onMounted, provide, inject, defineAsyncComponent } from 'vue'
 import { useF1FormData } from './composables/useF1FormData'
 import { useF1CrossSheet } from './composables/useF1CrossSheet'
 import { useWorkpaperReviewThreads } from './composables/useWorkpaperReviewThreads'
@@ -335,7 +335,6 @@ const {
   loadAll,
   saveImmediate: rawSaveImmediate,
   debouncedSave,
-  writebackTrialBalance,
 } = useF1FormData({
   wpId: wpIdRef,
   projectId: projectIdRef,
@@ -383,12 +382,6 @@ const { getThreadDot, getRowDot } = useWorkpaperReviewThreads(wpIdRef)
 provide('getThreadDot', getThreadDot)
 provide('getRowDot', getRowDot)
 
-function handleF1Writeback(e: Event): void {
-  const d = (e as CustomEvent<{ accountCode?: string; auditedAmount?: number }>).detail
-  if (d?.auditedAmount == null) return
-  void writebackTrialBalance(d.auditedAmount)
-}
-
 async function selfLoad() {
   if (props.htmlData) {
     // htmlData 已由 render-config 注入，仍拉 checklist 全量
@@ -411,13 +404,12 @@ async function selfLoad() {
   }
 }
 
+// ─── TB 回写：已移除 f1:writeback-trial-balance 监听器（spec tb-writeback-explicit-publish-gate Task 3） ──
+// 原 handleF1Writeback 监听 window 'f1:writeback-trial-balance' → useF1FormData.writebackTrialBalance
+// 落库 trial_balance，绕过显式确认门。改造后 TB 回写由审定表 F1TabAdjudication 的
+// publishToTb（显式二次确认 → publish-to-tb 端点）承载；publishAdjudicated 只 emit substantive:adjudicated。
 onMounted(() => {
-  window.addEventListener('f1:writeback-trial-balance', handleF1Writeback)
   void selfLoad()
-})
-
-onBeforeUnmount(() => {
-  window.removeEventListener('f1:writeback-trial-balance', handleF1Writeback)
 })
 </script>
 

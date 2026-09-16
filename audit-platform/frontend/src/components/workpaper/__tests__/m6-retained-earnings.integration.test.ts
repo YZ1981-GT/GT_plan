@@ -592,8 +592,10 @@ describe('集成测试 — TB回写: useM6FormData.writebackTB (Req 2.6)', () =>
     onHandlers.clear()
   })
 
-  it('writebackTB 调用正确的API端点+科目4104', async () => {
-    // 直接测试 writebackTB 的 API 调用逻辑
+  it('writebackTB 走显式发布端点 publish-to-tb（科目4104，不再调旧 PUT）', async () => {
+    // spec: tb-writeback-explicit-publish-gate Task 5 —— writebackTB 改走显式发布门
+    // POST /workpapers/{wpId}/audit-determination/publish-to-tb（sheet_name + writeback_rows），
+    // 不再直调旧端点 PUT /projects/{pid}/trial-balance/writeback。
     const { useM6FormData } = await import('../composables/useM6FormData')
 
     const scope = effectScope()
@@ -605,12 +607,19 @@ describe('集成测试 — TB回写: useM6FormData.writebackTB (Req 2.6)', () =>
 
       await formData.writebackTB(15000000)
 
-      expect(api.put).toHaveBeenCalledWith(
+      expect(api.post).toHaveBeenCalledWith(
+        '/api/workpapers/wp-123/audit-determination/publish-to-tb',
+        expect.objectContaining({
+          sheet_name: expect.stringMatching(/M6-1/),
+          writeback_rows: [
+            { account_code: '4104', audited_amount: 15000000, amount_kind: 'balance' },
+          ],
+        }),
+      )
+      // 不再调用旧端点
+      expect(api.put).not.toHaveBeenCalledWith(
         '/api/projects/proj-456/trial-balance/writeback',
-        {
-          account_code: '4104',
-          audited_amount: 15000000,
-        },
+        expect.anything(),
       )
     })
     scope.stop()
@@ -641,18 +650,20 @@ describe('集成测试 — TB回写: useM6FormData.writebackTB (Req 2.6)', () =>
     scope.stop()
   })
 
-  it('writebackTB projectId为空时不发起请求', async () => {
+  it('writebackTB wpId为空时不发起请求（显式发布门早退）', async () => {
     const { useM6FormData } = await import('../composables/useM6FormData')
 
     const scope = effectScope()
     await scope.run(async () => {
       const formData = useM6FormData({
-        wpId: ref('wp-123'),
-        projectId: ref(''),
+        // wpId 为空 → 显式发布门早退（改造后 writebackTB 以 wpId 为守卫，不再以 projectId）
+        wpId: ref(''),
+        projectId: ref('proj-101'),
       })
 
       await formData.writebackTB(5000000)
 
+      expect(api.post).not.toHaveBeenCalled()
       expect(api.put).not.toHaveBeenCalled()
     })
     scope.stop()

@@ -5,6 +5,7 @@
  * 比照 useD4Adjudication / useF3Adjudication
  */
 import { ref, computed, watch, onBeforeUnmount, type Ref, type ComputedRef } from 'vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import {
   parseNum,
   calcSubtotal,
@@ -343,21 +344,7 @@ export function useF2Adjudication(opts: UseF2AdjudicationOptions) {
   }
 
   function publishAdjudicated(): void {
-    const netByCategory = netRows.value.map((r) => ({
-      rowKey: r.rowKey,
-      label: r.label,
-      accountCode: F2_ROW_KEY_ACCOUNT[r.rowKey] || '',
-      endAudited: r.endAudited,
-      opening: r.opening,
-    }))
-
-    const accountCodes = [...new Set(netByCategory.map((r) => r.accountCode).filter(Boolean))]
-    const auditedAmounts: Record<string, number> = {}
-    for (const row of netByCategory) {
-      if (row.accountCode) {
-        auditedAmounts[row.accountCode] = (auditedAmounts[row.accountCode] || 0) + row.endAudited
-      }
-    }
+    const { accountCodes, auditedAmounts } = aggregateAuditedByAccount()
 
     const payload = {
       wpCode: 'F2',
@@ -366,22 +353,92 @@ export function useF2Adjudication(opts: UseF2AdjudicationOptions) {
       netTotal: netSubtotal.value.endAudited,
     }
 
+    // 🔴 不再 dispatch f2:writeback-trial-balance 绕过门：TB 回写走显式确认（publishToTb）。
+    // spec: tb-writeback-explicit-publish-gate Task 3。
     try {
       eventBus.emit('substantive:adjudicated', payload)
     } catch { /* silent */ }
+  }
 
-    if (opts.projectId.value) {
-      for (const [accountCode, amount] of Object.entries(auditedAmounts)) {
-        try {
-          window.dispatchEvent(new CustomEvent('f2:writeback-trial-balance', {
-            detail: {
-              projectId: opts.projectId.value,
-              accountCode,
-              auditedAmount: amount,
-            },
-          }))
-        } catch { /* silent */ }
+  /**
+   * 按科目归集净值审定数（多科目：F2_ROW_KEY_ACCOUNT 各类别 → 各自净值 endAudited）。
+   * publishAdjudicated（发 substantive:adjudicated）与 publishToTb（发 publish-to-tb）共用。
+   */
+  function aggregateAuditedByAccount(): {
+    accountCodes: string[]
+    auditedAmounts: Record<string, number>
+  } {
+    const netByCategory = netRows.value.map((r) => ({
+      rowKey: r.rowKey,
+      accountCode: F2_ROW_KEY_ACCOUNT[r.rowKey] || '',
+      endAudited: r.endAudited,
+    }))
+    const accountCodes = [...new Set(netByCategory.map((r) => r.accountCode).filter(Boolean))]
+    const auditedAmounts: Record<string, number> = {}
+    for (const row of netByCategory) {
+      if (row.accountCode) {
+        auditedAmounts[row.accountCode] = (auditedAmounts[row.accountCode] || 0) + row.endAudited
       }
+    }
+    return { accountCodes, auditedAmounts }
+  }
+
+  // ─── Publish to Trial Balance（显式发布门，复刻 D2/D4-1 范式，多科目） ──────
+
+  const publishing = ref(false)
+
+  /**
+   * 确认发布审定数到试算表（存货多科目：F2_ROW_KEY_ACCOUNT 各类别 1401~1412/1471）。
+   *
+   * spec: tb-writeback-explicit-publish-gate Task 3 / Req 1,2,5,8。
+   * 此前 F2 靠 publishAdjudicated 自动 per-account dispatch `f2:writeback-trial-balance`
+   * → GtF2 监听 → 旧端点 `PUT /projects/{pid}/trial-balance/writeback` 直写，绕过确认门。
+   * 现改为：二次确认（中文）→ `POST /workpapers/{wpId}/audit-determination/publish-to-tb`
+   * （writeback_rows 一次原子发布全部相关存货科目）。
+   */
+  async function publishToTb(): Promise<void> {
+    if (opts.isReadonly.value || publishing.value) return
+
+    try {
+      await ElMessageBox.confirm(
+        '发布后将把存货各类别审定净值写入试算表（trial_balance），'
+        + '并触发报表/错报评价等下游重算。确认发布？',
+        '发布到试算表确认',
+        { confirmButtonText: '确认发布', cancelButtonText: '取消', type: 'warning' },
+      )
+    } catch {
+      return // 用户取消 → 无任何副作用
+    }
+
+    if (!opts.wpId.value) {
+      ElMessage.error('缺少底稿标识，无法发布')
+      return
+    }
+
+    const { auditedAmounts } = aggregateAuditedByAccount()
+    const writeback_rows = Object.entries(auditedAmounts).map(([account_code, audited_amount]) => ({
+      account_code,
+      audited_amount,
+      amount_kind: 'balance' as const,
+    }))
+    if (writeback_rows.length === 0) {
+      ElMessage.warning('无可发布的存货科目审定数')
+      return
+    }
+
+    publishing.value = true
+    try {
+      const { api } = await import('@/services/apiProxy')
+      const resp: any = await api.post(
+        `/api/workpapers/${opts.wpId.value}/audit-determination/publish-to-tb`,
+        { sheet_name: '存货审定表F2-1', writeback_rows },
+      )
+      ElMessage.success(resp?.message || '已发布到试算表')
+      publishAdjudicated()
+    } catch (err: any) {
+      ElMessage.error(err?.response?.data?.detail || err?.message || '发布失败，请重试')
+    } finally {
+      publishing.value = false
     }
   }
 
@@ -438,6 +495,8 @@ export function useF2Adjudication(opts: UseF2AdjudicationOptions) {
     updateCell,
     updateTrialBalanceAmount,
     publishAdjudicated,
+    publishToTb,
+    publishing,
   }
 }
 

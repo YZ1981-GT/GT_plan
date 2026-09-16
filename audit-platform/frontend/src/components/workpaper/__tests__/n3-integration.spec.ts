@@ -15,7 +15,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { ref, effectScope, nextTick } from 'vue'
 import { useN3CrossSheet } from '../composables/useN3CrossSheet'
-import type { ChecklistResponse } from '../composables/useN3FormData'
+import { useN3FormData, type ChecklistResponse } from '../composables/useN3FormData'
 import {
   calcAuditedAmount,
   calcLiabilityEndBalance,
@@ -33,11 +33,13 @@ import { eventBus } from '@/utils/eventBus'
 
 const mockGet = vi.fn()
 const mockPut = vi.fn()
+const mockPost = vi.fn()
 
 vi.mock('@/services/apiProxy', () => ({
   api: {
     get: (...args: any[]) => mockGet(...args),
     put: (...args: any[]) => mockPut(...args),
+    post: (...args: any[]) => mockPost(...args),
   },
 }))
 
@@ -60,6 +62,8 @@ beforeEach(() => {
   mockGet.mockReset()
   mockPut.mockReset()
   mockPut.mockResolvedValue([])
+  mockPost.mockReset()
+  mockPost.mockResolvedValue({ published: true })
 })
 
 afterEach(() => {
@@ -94,24 +98,30 @@ describe('集成测试 — 负债类取数正确性 (Req 6.6)', () => {
     expect(liabilityEnd).not.toBe(assetEnd)
   })
 
-  it('writebackTB payload 正确性：account_code=2901, direction=credit', async () => {
-    mockPut.mockResolvedValue({})
-    // 直接模拟 writebackTB 逻辑（验证 payload 格式）
-    const auditedAmount = 15_000_000
-    const projectId = 'proj-test-01'
-    await mockPut(`/api/projects/${projectId}/trial-balance/writeback`, {
-      account_code: '2901',
-      audited_amount: auditedAmount,
-      direction: 'credit',
+  // spec: tb-writeback-explicit-publish-gate Task 6 —— N3 审定数回写改走显式发布门
+  // POST /audit-determination/publish-to-tb（不再直调旧 PUT /trial-balance/writeback）。
+  it('writebackTB 走 publish-to-tb（sheet_name N3-1 / 科目 2901 / amount_kind=balance）', async () => {
+    const scope = effectScope()
+    await scope.run(async () => {
+      const formData = useN3FormData({ wpId: ref('wp-n3-01'), projectId: ref('proj-test-01') })
+      await formData.writebackTB(15_000_000)
     })
-    expect(mockPut).toHaveBeenCalledWith(
-      `/api/projects/${projectId}/trial-balance/writeback`,
-      expect.objectContaining({
-        account_code: '2901',
-        audited_amount: 15_000_000,
-        direction: 'credit', // 负债类贷方科目！
-      }),
+    scope.stop()
+
+    // 不再调旧端点
+    for (const call of mockPut.mock.calls) {
+      expect(call[0]).not.toContain('trial-balance/writeback')
+    }
+    const publishCall = mockPost.mock.calls.find((c) =>
+      String(c[0]).includes('/audit-determination/publish-to-tb'),
     )
+    expect(publishCall).toBeDefined()
+    expect(publishCall![0]).toContain('/api/workpapers/wp-n3-01/audit-determination/publish-to-tb')
+    expect(publishCall![1].sheet_name).toMatch(/N3\-1/)
+    const row = publishCall![1].writeback_rows.find((r: any) => r.account_code === '2901')
+    expect(row).toBeDefined()
+    expect(row.audited_amount).toBe(15_000_000)
+    expect(row.amount_kind).toBe('balance')
   })
 
   it('审定数公式链完整性：未审+AJE+RJE = 审定数', () => {

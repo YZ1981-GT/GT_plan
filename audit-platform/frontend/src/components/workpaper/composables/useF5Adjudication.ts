@@ -8,6 +8,7 @@
  * 4. 审计说明须分析本期较上期增减，变动比例超过 30% 的品种说明主要原因。
  */
 import { ref, computed, watch, onBeforeUnmount, type Ref, type ComputedRef } from 'vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import {
   parseNum,
   calcAdjustedAmount,
@@ -235,7 +236,8 @@ export function aggregateF54AdjustmentImpact(
 }
 
 export function useF5Adjudication(options: UseF5AdjudicationOptions) {
-  const { projectId, allResponses, isReadonly } = options
+  // projectId 保留在 options 接口（调用方仍传），但改造后 TB 回写走 wpId 端点，本 composable 不再用 projectId
+  const { wpId, allResponses, isReadonly } = options
   const readonly = isReadonly ?? ref(false)
 
   let debounceTimer: ReturnType<typeof setTimeout> | null = null
@@ -540,17 +542,69 @@ export function useF5Adjudication(options: UseF5AdjudicationOptions) {
       timestamp: Date.now(),
     }
     // 统一走 eventBus（crossWpEventBridge 带再入守卫转发到 window，旧 window 监听者不受影响）
+    // 🔴 保留 substantive:adjudicated(6401)：GtF5 的 F5-7 成本倒轧校验区依赖此事件消费审定营业成本。
+    // 🔴 不再 dispatch f5:writeback-trial-balance 绕过门：TB 回写走显式确认（publishToTb）。
+    // spec: tb-writeback-explicit-publish-gate Task 3。
     try {
       eventBus.emit('substantive:adjudicated', payload as any)
     } catch {
       console.warn('[useF5Adjudication] EventBus publish substantive:adjudicated failed')
     }
-    if (projectId.value) {
-      try {
-        window.dispatchEvent(new CustomEvent('f5:writeback-trial-balance', {
-          detail: { projectId: projectId.value, accountCode: '6401', auditedAmount: amount },
-        }))
-      } catch { /* silent */ }
+  }
+
+  // ─── Publish to Trial Balance（显式发布门，复刻 D2/D4-1 范式，损益发生额口径） ──
+
+  const publishing = ref(false)
+
+  /**
+   * 确认发布审定数到试算表（科目 6401 营业成本，损益类发生额 occurrence 口径）。
+   *
+   * spec: tb-writeback-explicit-publish-gate Task 3 / Req 1,2,6,8。
+   * 此前 F5 靠 publishAdjudicated 自动 dispatch `f5:writeback-trial-balance`
+   * → GtF5 监听 → 旧端点 `PUT /projects/{pid}/trial-balance/writeback` 直写，绕过确认门。
+   * 现改为：二次确认（中文）→ `POST /workpapers/{wpId}/audit-determination/publish-to-tb`
+   * （writeback_rows 直传前端已算的最终发生额，amount_kind='occurrence'）。
+   * 发布成功仍调 publishAdjudicated → emit substantive:adjudicated（F5-7 校验区回归）。
+   */
+  async function publishToTb(): Promise<void> {
+    if (readonly.value || publishing.value) return
+
+    try {
+      await ElMessageBox.confirm(
+        '发布后将把营业成本审定数（科目 6401，本期发生额）写入试算表（trial_balance），'
+        + '并触发报表/错报评价等下游重算。确认发布？',
+        '发布到试算表确认',
+        { confirmButtonText: '确认发布', cancelButtonText: '取消', type: 'warning' },
+      )
+    } catch {
+      return // 用户取消 → 无任何副作用
+    }
+
+    if (!wpId.value) {
+      ElMessage.error('缺少底稿标识，无法发布')
+      return
+    }
+
+    const auditedAmount = grandTotal.value.currentAdjusted
+
+    publishing.value = true
+    try {
+      const { api } = await import('@/services/apiProxy')
+      const resp: any = await api.post(
+        `/api/workpapers/${wpId.value}/audit-determination/publish-to-tb`,
+        {
+          sheet_name: '营业务成本审定表F5-1',
+          writeback_rows: [
+            { account_code: '6401', audited_amount: auditedAmount, amount_kind: 'occurrence' },
+          ],
+        },
+      )
+      ElMessage.success(resp?.message || '已发布到试算表')
+      publishAdjudicated()
+    } catch (err: any) {
+      ElMessage.error(err?.response?.data?.detail || err?.message || '发布失败，请重试')
+    } finally {
+      publishing.value = false
     }
   }
 
@@ -683,6 +737,8 @@ export function useF5Adjudication(options: UseF5AdjudicationOptions) {
     saveAuditNote,
     saveAuditConclusion,
     publishAdjudicated,
+    publishToTb,
+    publishing,
     serialize,
     deserialize,
     pullFromTB,

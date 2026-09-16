@@ -14,6 +14,15 @@
         <el-button size="small" @click="handleReview">
           <el-icon><Check /></el-icon> 复核
         </el-button>
+        <el-button
+          type="warning"
+          size="small"
+          :loading="publishing"
+          :disabled="isReadonly"
+          @click="handlePublishToTb"
+        >
+          发布到试算表
+        </el-button>
       </div>
     </div>
 
@@ -241,7 +250,7 @@
  * - 从 L4-2 明细带入 + 与 L4-2 期末摊余成本交叉验证
  * - 期末审定合计回写 TB 2502 + EventBus 'substantive:adjudicated'
  */
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { MagicStick, Check, Download } from '@element-plus/icons-vue'
 import { inject } from 'vue'
@@ -276,8 +285,14 @@ const formData = useL4FormData({
 
 const {
   displayRows, totalRow, totalAuditedAmount,
-  auditNote, conclusion, updateText, updateCell, importFromDetail, submitAdjudication,
+  auditNote, conclusion, updateText, updateCell, importFromDetail, publishToTb, publishing,
 } = useL4Adjudication(formData)
+
+/** 发布到试算表（显式确认门，Req 2；科目2502） */
+async function handlePublishToTb() {
+  if (props.isReadonly) return
+  await publishToTb()
+}
 
 const { adjudicationVsDetail } = useL4CrossSheet(formData.allResponses)
 const crossCheck = computed(() => adjudicationVsDetail.value)
@@ -371,14 +386,11 @@ function handleReview() {
   openReviewDialog?.()
 }
 
-// ─── TB 回写（期末审定合计变化 → 自动回写） ─────────────────────────────────
-
-watch(totalAuditedAmount, async (newVal, oldVal) => {
-  if (props.isReadonly) return
-  if (oldVal !== undefined && newVal !== oldVal) {
-    await submitAdjudication()
-  }
-})
+// ─── TB 回写 ─────────────────────────────────────────────────────────────────
+// spec: tb-writeback-explicit-publish-gate Task 4 / Req 1。
+// 此前 watch(totalAuditedAmount) 在数据变化时**自动** submitAdjudication → 写 TB，
+// 违反 Req 1（数据变化绝不写 TB）。已移除该自动回写 watcher；TB 回写收敛为用户显式
+// 点「发布到试算表」（handlePublishToTb → publishToTb 二次确认门）。
 
 // ─── 行样式 ──────────────────────────────────────────────────────────────────
 

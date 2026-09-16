@@ -16,7 +16,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { ref, effectScope } from 'vue'
 import { useN1CrossSheet } from '../composables/useN1CrossSheet'
-import type { ChecklistResponse } from '../composables/useN1FormData'
+import { useN1FormData, type ChecklistResponse } from '../composables/useN1FormData'
 import {
   calcAuditedAmount,
   calcAssetEndBalance,
@@ -42,11 +42,13 @@ import { eventBus } from '@/utils/eventBus'
 
 const mockGet = vi.fn()
 const mockPut = vi.fn()
+const mockPost = vi.fn()
 
 vi.mock('@/services/apiProxy', () => ({
   api: {
     get: (...args: any[]) => mockGet(...args),
     put: (...args: any[]) => mockPut(...args),
+    post: (...args: any[]) => mockPost(...args),
   },
 }))
 
@@ -71,6 +73,8 @@ beforeEach(() => {
   mockGet.mockReset()
   mockPut.mockReset()
   mockPut.mockResolvedValue([])
+  mockPost.mockReset()
+  mockPost.mockResolvedValue({ published: true })
 })
 
 afterEach(() => {
@@ -105,23 +109,36 @@ describe('集成测试 — 资产类取数正确性 (Req 8.1-8.4)', () => {
     expect(assetEnd).not.toBe(liabilityEnd)
   })
 
-  it('writebackTB payload 正确性：account_code=1811, direction=debit', async () => {
-    mockPut.mockResolvedValue({})
-    const auditedAmount = 15_000_000
-    const projectId = 'proj-test-01'
-    await mockPut(`/api/projects/${projectId}/trial-balance/writeback`, {
-      account_code: '1811',
-      audited_amount: auditedAmount,
-      direction: 'debit',
+  // spec: tb-writeback-explicit-publish-gate Task 6 —— N1 审定数回写改走显式发布门
+  // POST /audit-determination/publish-to-tb（不再直调旧 PUT /trial-balance/writeback）；
+  // 且回写后仍 emit 'deferred-tax:asset-updated'（N1→N5 联动，Req 8 保留）。
+  it('writebackTB 走 publish-to-tb（sheet_name N1-1 / 科目 1811 / amount_kind=balance）+ 保留 N1→N5 联动', async () => {
+    const dtSpy = vi.fn()
+    eventBus.on('deferred-tax:asset-updated', dtSpy)
+    const scope = effectScope()
+    await scope.run(async () => {
+      const formData = useN1FormData({ wpId: ref('wp-n1-01'), projectId: ref('proj-test-01') })
+      await formData.writebackTB(15_000_000)
     })
-    expect(mockPut).toHaveBeenCalledWith(
-      `/api/projects/${projectId}/trial-balance/writeback`,
-      expect.objectContaining({
-        account_code: '1811',
-        audited_amount: 15_000_000,
-        direction: 'debit', // 资产类借方科目！
-      }),
+    scope.stop()
+    eventBus.off('deferred-tax:asset-updated', dtSpy)
+
+    // 不再调旧端点
+    for (const call of mockPut.mock.calls) {
+      expect(call[0]).not.toContain('trial-balance/writeback')
+    }
+    const publishCall = mockPost.mock.calls.find((c) =>
+      String(c[0]).includes('/audit-determination/publish-to-tb'),
     )
+    expect(publishCall).toBeDefined()
+    expect(publishCall![0]).toContain('/api/workpapers/wp-n1-01/audit-determination/publish-to-tb')
+    expect(publishCall![1].sheet_name).toMatch(/N1\-1/)
+    const row = publishCall![1].writeback_rows.find((r: any) => r.account_code === '1811')
+    expect(row).toBeDefined()
+    expect(row.audited_amount).toBe(15_000_000)
+    expect(row.amount_kind).toBe('balance')
+    // N1→N5 联动事件保留
+    expect(dtSpy).toHaveBeenCalled()
   })
 
   it('审定数公式链完整性：未审+AJE+RJE = 审定数', () => {

@@ -17,7 +17,8 @@
  *
  * 科目：2901 递延所得税负债（贷方/负债类！期末=期初+贷方-借方）
  */
-import { computed, type ComputedRef, type Ref } from 'vue'
+import { computed, ref, type ComputedRef, type Ref } from 'vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import {
   calcAuditedAmount,
   calcLiabilityEndBalance,
@@ -409,22 +410,16 @@ export function useN3Adjudication(options: UseN3AdjudicationOptions) {
     return { filled, total: Math.round(total * 100) / 100, bySlot: Boolean(slots) }
   }
 
-  // ─── 6. 审定数变化 → TB回写 ───────────────────────────────────────────────
+  // ─── 6. 保存审定表 + 同步合计（普通保存，不写 TB） ─────────────────────────
 
   /**
-   * 触发TB回写（审定合计→trial_balance 2901期末余额）
+   * 保存审定表数据并同步合计到独立字段（供 useN3CrossSheet 和 N5 联动使用）。
+   *
+   * spec: tb-writeback-explicit-publish-gate Task 6 / Req 1（普通保存绝不写 TB）。
+   * 原 saveAndSync 保存后自动 `triggerWriteback`（→ writebackTB）绕过显式确认门
+   * （违反 Req 1）；已把 TB 回写拆到 publishToTb（二次确认门）。合计同步保留（下游 N5 读取）。
    */
-  async function triggerWriteback(): Promise<void> {
-    await writebackTB(total.value.audited)
-  }
-
-  // ─── 7. 保存审定表 + 同步合计 ─────────────────────────────────────────────
-
-  /**
-   * 保存审定表数据并同步合计到独立字段
-   * 供 useN3CrossSheet 和 N5 联动使用
-   */
-  async function saveAndSync(): Promise<void> {
+  async function saveAdjudication(): Promise<void> {
     // 保存整体rows（只存可编辑字段，公式列由computed计算）
     const raw = rows.value.map(r => ({
       category: r.category,
@@ -441,9 +436,46 @@ export function useN3Adjudication(options: UseN3AdjudicationOptions) {
     await saveField('1', 'end-balance-total', total.value.endBalance)
     await saveField('1', 'audited-total', total.value.audited)
     await saveField('1', 'change-total', total.value.change)
+  }
 
-    // TB回写
-    await triggerWriteback()
+  // ─── 7. 显式发布到试算表（显式确认门，复刻 M/L/D2 范式） ────────────────────
+
+  /** 发布中状态（防重复提交，供发布按钮 :loading 绑定） */
+  const publishing = ref(false)
+
+  /**
+   * 确认发布审定数到试算表（科目 2901 递延所得税负债期末余额）。
+   *
+   * spec: tb-writeback-explicit-publish-gate Task 6 / Req 2。
+   * 二次确认（中文）→ 保存审定行 → writebackTB 走
+   * `POST /workpapers/{wpId}/audit-determination/publish-to-tb`。用户取消 → 无副作用。
+   */
+  async function publishToTb(): Promise<boolean> {
+    if (publishing.value) return false
+
+    try {
+      await ElMessageBox.confirm(
+        '发布后将把递延所得税负债期末审定合计（科目 2901）写入试算表（trial_balance），'
+        + '并触发报表/错报评价等下游重算。确认发布？',
+        '发布到试算表确认',
+        { confirmButtonText: '确认发布', cancelButtonText: '取消', type: 'warning' },
+      )
+    } catch {
+      return false // 用户取消 → 无任何副作用
+    }
+
+    publishing.value = true
+    try {
+      await saveAdjudication()
+      await writebackTB(total.value.audited)
+      ElMessage.success('已发布到试算表')
+      return true
+    } catch (err: any) {
+      ElMessage.error(err?.response?.data?.detail || err?.message || '发布失败，请重试')
+      return false
+    } finally {
+      publishing.value = false
+    }
   }
 
   // ─── Return ────────────────────────────────────────────────────────────────
@@ -455,8 +487,10 @@ export function useN3Adjudication(options: UseN3AdjudicationOptions) {
     crossValidation,
     updateRow,
     pullFromTB,
-    triggerWriteback,
-    saveAndSync,
+    saveAdjudication,
+    // 显式发布到试算表（二次确认门）
+    publishToTb,
+    publishing,
   }
 }
 

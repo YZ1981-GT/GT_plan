@@ -15,7 +15,8 @@
  *    与源模板双期变动分析结构不符（缺期初审定分解/变动额率/原因分析）。
  *    本次重建为源模板双期结构。明细表 L1-2 仍保留 roll-forward（期末=期初+贷-借）。
  */
-import { computed, watch, type ComputedRef } from 'vue'
+import { computed, ref, watch, type ComputedRef } from 'vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { eventBus } from '@/utils/eventBus'
 import { calcSubtotal } from '@/composables/useL1FormulaEngine'
 import type { useL1FormData } from '@/composables/useL1FormData'
@@ -77,6 +78,9 @@ function calcRate(base: number, change: number): number {
  */
 export function useL1Adjudication(formData: ReturnType<typeof useL1FormData>) {
   const { adjudicationData, detailRows, saveImmediate, writebackTB } = formData
+
+  /** 发布中状态（防重复提交，供发布按钮 :loading 绑定） */
+  const publishing = ref(false)
 
   // ─── 1. 计算属性：每行派生列 ───────────────────────────────────────────
 
@@ -193,14 +197,18 @@ export function useL1Adjudication(formData: ReturnType<typeof useL1FormData>) {
     return count
   }
 
-  // ─── 5. TB回写 + EventBus ──────────────────────────────────────────────
+  // ─── 5. 保存（普通保存不写 TB） ────────────────────────────────────────
 
   /**
-   * 保存审定表并触发TB回写 + EventBus。
-   * 序列化「可编辑输入字段」（beginUnadjusted/beginAje/beginRje/endUnadjusted/endAje/endRje/reason），
-   * 派生列由 computedCategories 重算，无需持久化。
+   * 保存审定表明细/合计到 checklist_responses（普通保存动作）。
+   *
+   * spec: tb-writeback-explicit-publish-gate Task 4 / Req 1。
+   * 此前该函数（原名 saveAndWriteback）保存后**自动**回写 trial_balance，且由 §6
+   * watcher 在数据变化时触发 → 违反 Req 1（普通保存/数据变化绝不写 TB）。现只保存 +
+   * emit substantive:adjudicated（附注刷新），TB 回写收敛为用户显式确认动作（publishToTb）。
+   * 序列化「可编辑输入字段」，派生列由 computedCategories 重算，无需持久化。
    */
-  async function saveAndWriteback(): Promise<void> {
+  async function saveAdjudication(): Promise<void> {
     const items = adjudicationData.value.categories.map((cat, i) => {
       const n = i + 1
       return [
@@ -215,22 +223,13 @@ export function useL1Adjudication(formData: ReturnType<typeof useL1FormData>) {
     }).flat()
 
     await saveImmediate(items)
-
-    // TB回写（期末审定合计）
-    const auditedTotal = total.value.endAudited
-    await writebackTB(auditedTotal)
-
-    // EventBus publish
-    eventBus.emit('substantive:adjudicated', {
-      accountCode: '2001',
-      auditedAmount: auditedTotal,
-      wpCode: 'L1',
-      timestamp: Date.now(),
-    })
   }
 
-  // ─── 6. 可编辑字段变化监听 → 自动保存 + 回写 ──────────────────────────
+  // ─── 6. 可编辑字段变化监听 → 仅保存 + emit（不写 TB） ────────────────────
 
+  // 审定数变化 → 保存 + 仅发布 substantive:adjudicated（附注/检查表刷新），**不再**自动
+  // 回写 trial_balance —— TB 回写收敛为用户显式确认动作（publishToTb）。
+  // spec: tb-writeback-explicit-publish-gate Req 1（普通保存/数据变化绝不写 TB）。
   const _editableSignature = computed(() =>
     adjudicationData.value.categories
       .map(c => `${c.beginUnadjusted}|${c.beginAje}|${c.beginRje}|${c.endUnadjusted}|${c.endAje}|${c.endRje}|${c.reason}`)
@@ -238,9 +237,52 @@ export function useL1Adjudication(formData: ReturnType<typeof useL1FormData>) {
   )
   watch(_editableSignature, async (newVal, oldVal) => {
     if (oldVal !== undefined && newVal !== oldVal) {
-      await saveAndWriteback()
+      await saveAdjudication()
+      eventBus.emit('substantive:adjudicated', {
+        accountCode: '2001',
+        auditedAmount: total.value.endAudited,
+        wpCode: 'L1',
+        timestamp: Date.now(),
+      })
     }
   })
+
+  // ─── 6b. 显式发布到试算表（显式确认门，复刻 M1/D2 范式） ──────────────────
+
+  /**
+   * 确认发布审定数到试算表（科目 2001 短期借款）。
+   *
+   * spec: tb-writeback-explicit-publish-gate Task 4 / Req 2。
+   * 二次确认（中文）→ 保存明细 → formData.writebackTB 走
+   * `POST /workpapers/{wpId}/audit-determination/publish-to-tb` 回写 trial_balance
+   * （后端发 publish_confirmed=True + token，handler 幂等回写）。用户取消 → 无副作用。
+   */
+  async function publishToTb(): Promise<void> {
+    if (publishing.value) return
+
+    try {
+      await ElMessageBox.confirm(
+        '发布后将把短期借款期末审定合计（科目 2001）写入试算表（trial_balance），'
+        + '并触发报表/错报评价等下游重算。确认发布？',
+        '发布到试算表确认',
+        { confirmButtonText: '确认发布', cancelButtonText: '取消', type: 'warning' },
+      )
+    } catch {
+      return // 用户取消 → 无任何副作用（不保存、不写 TB、不 emit）
+    }
+
+    publishing.value = true
+    try {
+      await saveAdjudication()
+      // TB 回写（科目2001短期借款）经显式发布端点 + emit substantive:adjudicated
+      await writebackTB(total.value.endAudited)
+      ElMessage.success('已发布到试算表')
+    } catch (err: any) {
+      ElMessage.error(err?.response?.data?.detail || err?.message || '发布失败，请重试')
+    } finally {
+      publishing.value = false
+    }
+  }
 
   // ─── Return ────────────────────────────────────────────────────────────
 
@@ -251,7 +293,11 @@ export function useL1Adjudication(formData: ReturnType<typeof useL1FormData>) {
     updateCategory,
     updateReason,
     importFromDetail,
-    saveAndWriteback,
+    // 保存（普通保存不写 TB）
+    saveAdjudication,
+    // 显式发布到试算表（二次确认门）
+    publishToTb,
+    publishing,
   }
 }
 

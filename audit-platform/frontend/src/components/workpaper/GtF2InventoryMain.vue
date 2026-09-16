@@ -406,12 +406,10 @@ async function handleF2SaveItems(e: Event): Promise<void> {
   }
 }
 
-function handleF2Writeback(e: Event): void {
-  const d = (e as CustomEvent<{ accountCode: string; auditedAmount: number }>).detail
-  if (d?.accountCode != null && d.auditedAmount != null) {
-    void formData.writebackTrialBalance(d.accountCode, d.auditedAmount)
-  }
-}
+// ─── TB 回写：已移除 f2:writeback-trial-balance 监听器（spec tb-writeback-explicit-publish-gate Task 3） ──
+// 原 handleF2Writeback 监听 window 'f2:writeback-trial-balance' → useF2FormData.writebackTrialBalance
+// 落库 trial_balance，绕过显式确认门。改造后 TB 回写由 F2TabAdjudication.publishToTb
+// （显式二次确认 → publish-to-tb 端点，多科目原子发布）承载；publishAdjudicated 只 emit substantive:adjudicated。
 
 async function selfLoad(): Promise<void> {
   if (props.htmlData?.projectContext) {
@@ -430,13 +428,11 @@ async function selfLoad(): Promise<void> {
 
 onMounted(() => {
   window.addEventListener('f2:save-items', handleF2SaveItems)
-  window.addEventListener('f2:writeback-trial-balance', handleF2Writeback)
   void selfLoad()
 })
 
 onBeforeUnmount(() => {
   window.removeEventListener('f2:save-items', handleF2SaveItems)
-  window.removeEventListener('f2:writeback-trial-balance', handleF2Writeback)
 })
 </script>
 

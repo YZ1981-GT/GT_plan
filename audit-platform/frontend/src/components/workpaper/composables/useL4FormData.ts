@@ -42,6 +42,8 @@ const ITEM_PREFIX = 'L4-'
 import { L4_GROSS_FALLBACK_STANDARD } from './l4AccountScope'
 
 const ACCOUNT_CODE = L4_GROSS_FALLBACK_STANDARD // 应付债券（贷方/负债类）
+/** 审定表 sheet 名（含子码 L4-1，供后端 extract_determination_wp_code 解出） */
+const DETERMINATION_SHEET_NAME = '审定表L4-1'
 
 // ─── Composable ──────────────────────────────────────────────────────────────
 
@@ -225,26 +227,31 @@ export function useL4FormData(options: UseL4FormDataOptions) {
   // ─── writebackTB (回写审定数到 trial_balance 2502) ─────────────────────────
 
   /**
-   * 回写审定数到 trial_balance（科目 2502 应付债券，贷方/负债类）。
-   * 并发布 EventBus 'substantive:adjudicated' 事件通知其他组件（附注刷新等）。
+   * 发布审定数到 trial_balance（科目 2502 应付债券，贷方/负债类）。
+   *
+   * spec: tb-writeback-explicit-publish-gate Task 4 / Req 1,2,8。
+   * 此前直调旧端点 `PUT /projects/{pid}/trial-balance/writeback`（无二次确认/无
+   * publish_confirmed/无幂等），且由 L4TabAdjudication 的 watch(totalAuditedAmount)
+   * 在数据变化时**自动**触发（违反 Req 1）。现改为显式发布门：仅在用户显式确认
+   * （useL4Adjudication.publishToTb 二次确认）后调用本函数 →
+   * `POST /workpapers/{wpId}/audit-determination/publish-to-tb`。成功后 emit。
    */
   async function writebackTB(auditedAmount: number): Promise<void> {
-    if (!projectId.value) return
-    try {
-      await api.put(`/api/projects/${projectId.value}/trial-balance/writeback`, {
-        account_code: ACCOUNT_CODE,
-        audited_amount: auditedAmount,
-      })
-      // 发布 EventBus 通知审定数变更（附注等组件订阅刷新）
-      eventBus.emit('substantive:adjudicated', {
-        accountCode: ACCOUNT_CODE,
-        auditedAmount,
-        wpCode: 'L4',
-        timestamp: Date.now(),
-      })
-    } catch {
-      ElMessage.warning('审定数回写失败，请手动确认试算表数据')
-    }
+    if (!wpId.value) return
+    await api.post(`/api/workpapers/${wpId.value}/audit-determination/publish-to-tb`, {
+      // sheet 名固定含审定表子码 L4-1，后端 extract_determination_wp_code 据此解出 L4-1
+      sheet_name: DETERMINATION_SHEET_NAME,
+      writeback_rows: [
+        { account_code: ACCOUNT_CODE, audited_amount: auditedAmount, amount_kind: 'balance' },
+      ],
+    })
+    // 发布 EventBus 通知审定数变更（附注等组件订阅刷新）
+    eventBus.emit('substantive:adjudicated', {
+      accountCode: ACCOUNT_CODE,
+      auditedAmount,
+      wpCode: 'L4',
+      timestamp: Date.now(),
+    })
   }
 
   // ─── Flush（组件卸载） ───────────────────────────────────────────────────

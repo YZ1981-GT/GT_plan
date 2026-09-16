@@ -16,6 +16,15 @@
         plain
         @click="handleImportFromDetail"
       >从 L1-2 明细带入</el-button>
+      <el-button
+        type="warning"
+        size="small"
+        :loading="publishing"
+        :disabled="isReadonly"
+        @click="handlePublishToTb"
+      >
+        发布到试算表
+      </el-button>
     </div>
 
     <!-- ═══ 审计目标 ═══ -->
@@ -297,8 +306,14 @@ const formData = inject<ReturnType<typeof useL1FormData>>('l1FormData')!
 
 // ─── Composable ──────────────────────────────────────────────────────────────
 
-const { computedCategories, total, updateCategory, updateReason, importFromDetail } =
+const { computedCategories, total, updateCategory, updateReason, importFromDetail, publishToTb, publishing } =
   useL1Adjudication(formData)
+
+/** 发布到试算表（显式确认门，Req 2） */
+async function handlePublishToTb() {
+  if (props.isReadonly) return
+  await publishToTb()
+}
 
 // ─── 从集中登记带入调整（2001 短期借款，负债贷方；双列 endAje/endRje） ───
 const bringInRows = computed(() =>

@@ -60,6 +60,8 @@ export interface TbSeedData {
 const DEBOUNCE_MS = 2000
 const ITEM_PREFIX = 'N1-'
 const ACCOUNT_CODE = '1811' // 递延所得税资产（借方/资产类！取期末余额）
+/** 审定表 sheet 名（含子码 N1-1，供后端 extract_determination_wp_code 解出） */
+const DETERMINATION_SHEET_NAME = '审定表N1-1'
 
 // ─── Composable ──────────────────────────────────────────────────────────────
 
@@ -444,41 +446,48 @@ export function useN1FormData(options: UseN1FormDataOptions) {
   // ─── writebackTB (回写审定数到 trial_balance 1811, 期末余额口径) ─────────────
 
   /**
-   * 回写审定数到 trial_balance（科目 1811 递延所得税资产，**期末余额口径！**）。
+   * 发布审定数到 trial_balance（科目 1811 递延所得税资产，**期末余额口径！**）。
+   *
+   * spec: tb-writeback-explicit-publish-gate Task 6 / Req 1,2,8。
+   * 此前直调旧端点 `PUT /projects/{pid}/trial-balance/writeback`（无二次确认/无
+   * publish_confirmed/无幂等），且由 useN1Adjudication 的 debounce watcher 在数据变化时
+   * **自动**触发（违反 Req 1）。现改为显式发布门：仅在用户显式确认（useN1Adjudication.publishToTb
+   * 二次确认）后调用本函数 → `POST /workpapers/{wpId}/audit-determination/publish-to-tb`。
    *
    * ⚠️ 资产类特殊：
-   * - 回写的 audited_amount 代表审定的期末余额（非发生额！）
+   * - 回写的 audited_amount 代表审定的期末余额（非发生额！amount_kind='balance'）
    * - 递延所得税资产为借方科目：正值=资产余额
    * - 期末余额 = 期初 + 本期借方(确认递延税资产) - 本期贷方(转回递延税资产)
    *
-   * 并发布 EventBus 'substantive:adjudicated' + 'deferred-tax:asset-updated' 事件。
+   * 成功后**保留**发布两条 EventBus 事件（design §3 联动，不得删除）：
+   *   1. 'substantive:adjudicated'（附注等组件订阅刷新）
+   *   2. 'deferred-tax:asset-updated'（供 N5 递延所得税费用核对表接收 N1→N5 联动）
    */
   async function writebackTB(auditedAmount: number): Promise<void> {
-    if (!projectId.value) return
-    try {
-      await api.put(`/api/projects/${projectId.value}/trial-balance/writeback`, {
-        account_code: ACCOUNT_CODE,
-        audited_amount: auditedAmount,
-      })
-      // 发布 EventBus 通知审定数变更（附注等组件订阅刷新）
-      eventBus.emit('substantive:adjudicated', {
-        accountCode: ACCOUNT_CODE,
-        auditedAmount,
-        wpCode: 'N1',
-        timestamp: Date.now(),
-      })
-      // 发布递延所得税资产更新事件（供N5递延所得税费用核对表接收）
-      eventBus.emit('deferred-tax:asset-updated', {
-        accountCode: ACCOUNT_CODE,
-        auditedAmount,
-        // 本期变动额 = 审定期末余额 - 期初余额（供N5核对递延所得税费用）
-        periodChange: auditedAmount - tbSeed.value.beginBalance,
-        wpCode: 'N1',
-        timestamp: Date.now(),
-      })
-    } catch {
-      ElMessage.warning('审定数回写失败，请手动确认试算表数据')
-    }
+    if (!wpId.value) return
+    await api.post(`/api/workpapers/${wpId.value}/audit-determination/publish-to-tb`, {
+      // sheet 名固定含审定表子码 N1-1，后端 extract_determination_wp_code 据此解出 N1-1
+      sheet_name: DETERMINATION_SHEET_NAME,
+      writeback_rows: [
+        { account_code: ACCOUNT_CODE, audited_amount: auditedAmount, amount_kind: 'balance' },
+      ],
+    })
+    // 发布 EventBus 通知审定数变更（附注等组件订阅刷新）
+    eventBus.emit('substantive:adjudicated', {
+      accountCode: ACCOUNT_CODE,
+      auditedAmount,
+      wpCode: 'N1',
+      timestamp: Date.now(),
+    })
+    // 发布递延所得税资产更新事件（供N5递延所得税费用核对表接收 —— N1→N5 联动，保留）
+    eventBus.emit('deferred-tax:asset-updated', {
+      accountCode: ACCOUNT_CODE,
+      auditedAmount,
+      // 本期变动额 = 审定期末余额 - 期初余额（供N5核对递延所得税费用）
+      periodChange: auditedAmount - tbSeed.value.beginBalance,
+      wpCode: 'N1',
+      timestamp: Date.now(),
+    })
   }
 
   // ─── Flush（组件卸载） ───────────────────────────────────────────────────

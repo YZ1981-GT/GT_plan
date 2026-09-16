@@ -201,20 +201,10 @@ export function useF1FormData(options: UseF1FormDataOptions) {
     _debounceTimers.set(itemId, timer)
   }
 
-  // ─── trial_balance 回写 ──────────────────────────────────────────────────
-
-  /** 回写审定数到 trial_balance（科目 1123 预付账款） */
-  async function writebackTrialBalance(auditedAmount: number): Promise<void> {
-    if (!projectId.value) return
-    try {
-      await api.put(`/api/projects/${projectId.value}/trial-balance/writeback`, {
-        account_code: '1123',
-        audited_amount: auditedAmount,
-      })
-    } catch {
-      ElMessage.warning('审定数回写失败，请手动确认试算表数据')
-    }
-  }
+  // ─── trial_balance 回写：已移除 writebackTrialBalance（spec tb-writeback-explicit-publish-gate Task 3） ──
+  // 原 writebackTrialBalance(1123) 直调旧端点 PUT /projects/{pid}/trial-balance/writeback，
+  // 绕过显式确认门。改造后 TB 回写走显式发布门（F1TabAdjudication.publishToTb → publish-to-tb）。
+  // 唯一消费方 GtF1Prepayment.handleF1Writeback 已随监听器移除 ⇒ 此函数为零消费死代码。
 
   // ─── Flush（组件卸载） ───────────────────────────────────────────────────
 
@@ -253,7 +243,6 @@ export function useF1FormData(options: UseF1FormDataOptions) {
     saveImmediate,
     saveBatch,
     debouncedSave,
-    writebackTrialBalance,
   }
 }
 

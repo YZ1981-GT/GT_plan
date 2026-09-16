@@ -23,7 +23,8 @@
  *
  * 25×12结构，84公式
  */
-import { computed, watch, type ComputedRef, type Ref } from 'vue'
+import { computed, ref, watch, type ComputedRef, type Ref } from 'vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { eventBus } from '@/utils/eventBus'
 import {
   calcAuditedAmount,
@@ -106,6 +107,9 @@ export function useM8Adjudication(
 ) {
   const { writebackTB, saveBatch, debouncedSave } = formData
 
+  /** 发布中状态（防重复提交，供发布按钮 :loading 绑定） */
+  const publishing = ref(false)
+
   // ─── 1. 计算属性：公式列自动计算 ──────────────────────────────────────
 
   /** 各行公式列自动计算 */
@@ -181,7 +185,7 @@ export function useM8Adjudication(
    * - 回写 trial_balance 科目 4104（贷方/权益类！）
    * - publish 'substantive:adjudicated'
    */
-  async function saveAndWriteback(): Promise<void> {
+  async function saveAdjudication(): Promise<void> {
     const items = computedRows.value.map((row, i) => {
       const n = i + 1
       return [
@@ -198,21 +202,58 @@ export function useM8Adjudication(
     )
 
     await saveBatch(items)
-
-    // TB回写（科目4104一般风险准备，贷方/权益类！）
-    await writebackTB(totalRow.value.endAudited)
   }
 
-  // ─── 7. 审定数变化监听 → 自动回写 ────────────────────────────────────────
+  // ─── 7. 审定数变化监听 → 保存 + 仅 emit（不写 TB） ────────────────────────
 
+  // 审定数变化 → 保存明细 + 发布 substantive:adjudicated（附注刷新），**不再**自动
+  // 回写 trial_balance —— TB 回写收敛为用户显式确认动作（publishToTb）。
+  // spec: tb-writeback-explicit-publish-gate Req 1（普通保存/数据变化绝不写 TB）。
   watch(
     () => totalRow.value.endAudited,
     async (newVal, oldVal) => {
       if (oldVal !== undefined && newVal !== oldVal) {
-        await saveAndWriteback()
+        await saveAdjudication()
+        eventBus.emit('substantive:adjudicated', {
+          accountCode: '4104',
+          auditedAmount: newVal,
+          wpCode: 'M8',
+          timestamp: Date.now(),
+        })
       }
     },
   )
+
+  // ─── 7b. 显式发布到试算表（显式确认门，复刻 D2/D4-1 范式） ────────────────
+
+  /**
+   * 确认发布审定数到试算表（科目 4104 一般风险准备）。
+   * spec: tb-writeback-explicit-publish-gate Task 5 / Req 2。
+   * 二次确认（中文）→ 保存明细 → formData.writebackTB 走 publish-to-tb。用户取消 → 无副作用。
+   */
+  async function publishToTb(): Promise<void> {
+    if (publishing.value) return
+    try {
+      await ElMessageBox.confirm(
+        '发布后将把一般风险准备审定数（科目 4104）写入试算表（trial_balance），'
+        + '并触发报表/错报评价等下游重算。确认发布？',
+        '发布到试算表确认',
+        { confirmButtonText: '确认发布', cancelButtonText: '取消', type: 'warning' },
+      )
+    } catch {
+      return
+    }
+    publishing.value = true
+    try {
+      await saveAdjudication()
+      await writebackTB(totalRow.value.endAudited)
+      ElMessage.success('已发布到试算表')
+    } catch (err: any) {
+      ElMessage.error(err?.response?.data?.detail || err?.message || '发布失败，请重试')
+    } finally {
+      publishing.value = false
+    }
+  }
 
   // ─── 8. 与明细表交叉验证 ──────────────────────────────────────────────
 
@@ -283,8 +324,11 @@ export function useM8Adjudication(
     equityEndCheck,
     // 行操作
     updateRow,
-    // 保存+回写
-    saveAndWriteback,
+    // 保存（普通保存不写 TB）
+    saveAdjudication,
+    // 显式发布到试算表（二次确认门）
+    publishToTb,
+    publishing,
     // 交叉验证
     crossValidateWithDetail,
     // EventBus

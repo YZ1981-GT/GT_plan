@@ -14,7 +14,8 @@
  *    与源模板双期 + 三区段(净值逐行) + 减一年内到期结构不符。本次重建。
  *    保留 L5-L5-1-rows JSON 存储 + hydration（P0 数据丢失已修）。
  */
-import { computed, watch, type ComputedRef } from 'vue'
+import { computed, ref, watch, type ComputedRef } from 'vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { eventBus } from '@/utils/eventBus'
 import type { useL5FormData } from './useL5FormData'
 
@@ -155,6 +156,9 @@ export function useL5Adjudication(
 ) {
   const { allResponses, debouncedSave, saveField, writebackTB } = formData
 
+  /** 发布中状态（防重复提交，供发布按钮 :loading 绑定） */
+  const publishing = ref(false)
+
   // ─── Hydration（读回完整双区段行，一次性水合避免覆盖编辑） ───────────────
   let _hydratedOnce = false
   function hydrate(): void {
@@ -267,15 +271,55 @@ export function useL5Adjudication(
     _persistRows()
   }
 
-  // ─── TB回写 + EventBus ─────────────────────────────────────────────────
-  async function saveAndWriteback(): Promise<void> {
+  // ─── 保存（普通保存不写 TB） ────────────────────────────────────────────
+
+  /**
+   * 保存审定表明细/合计到 checklist_responses（普通保存动作）。
+   *
+   * spec: tb-writeback-explicit-publish-gate Task 4 / Req 1。
+   * 此前该函数（原名 saveAndWriteback）保存后**自动**双科目回写 trial_balance（由保存
+   * 按钮 handleSave 触发）→ 违反 Req 1（普通保存绝不写 TB）。现只保存，TB 回写收敛为
+   * 用户显式确认动作（publishToTb）。
+   */
+  async function saveAdjudication(): Promise<void> {
     _persistRows()
     await saveField('L5-L5-1-adjudication-total', { remark: String(grossTotal.value.endAudited) })
-    // 双科目回写：原值(2701) + 未确认融资费用（writebackTB 内部已 emit 'substantive:adjudicated'）
-    await writebackTB({
-      payableAmount: grossTotal.value.endAudited,
-      unrecognizedAmount: unrecognizedTotal.value.endAudited,
-    })
+  }
+
+  /**
+   * 确认发布审定数到试算表（双科目：2701 长期应付款 + 2702 未确认融资费用）。
+   *
+   * spec: tb-writeback-explicit-publish-gate Task 4 / Req 2。
+   * 二次确认（中文）→ 保存 → formData.writebackTB 单次 publish-to-tb（含双科目
+   * writeback_rows 原子发布，内部已 emit 'substantive:adjudicated'）。用户取消 → 无副作用。
+   */
+  async function publishToTb(): Promise<void> {
+    if (publishing.value) return
+
+    try {
+      await ElMessageBox.confirm(
+        '发布后将把长期应付款（科目 2701）与未确认融资费用（科目 2702）期末审定合计'
+        + '写入试算表（trial_balance），并触发报表/错报评价等下游重算。确认发布？',
+        '发布到试算表确认',
+        { confirmButtonText: '确认发布', cancelButtonText: '取消', type: 'warning' },
+      )
+    } catch {
+      return // 用户取消 → 无任何副作用（不保存、不写 TB、不 emit）
+    }
+
+    publishing.value = true
+    try {
+      await saveAdjudication()
+      await writebackTB({
+        payableAmount: grossTotal.value.endAudited,
+        unrecognizedAmount: unrecognizedTotal.value.endAudited,
+      })
+      ElMessage.success('已发布到试算表')
+    } catch (err: any) {
+      ElMessage.error(err?.response?.data?.detail || err?.message || '发布失败，请重试')
+    } finally {
+      publishing.value = false
+    }
   }
 
   function subscribeDisclosure(callback: () => void): () => void {
@@ -307,8 +351,11 @@ export function useL5Adjudication(
     updateUnrecognizedRow,
     updateGrossReason,
     updateUnrecognizedReason,
-    // 保存
-    saveAndWriteback,
+    // 保存（普通保存不写 TB）
+    saveAdjudication,
+    // 显式发布到试算表（二次确认门）
+    publishToTb,
+    publishing,
     subscribeDisclosure,
     CATEGORIES,
   }

@@ -15,8 +15,10 @@
  *
  * 科目：2801 其他非流动负债（贷方/负债类！期末=期初+贷方-借方）
  */
-import { computed, watch, type ComputedRef } from 'vue'
+import { computed, ref, watch, type ComputedRef } from 'vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { eventBus } from '@/utils/eventBus'
+import { L7_REPORT_ROW_CODE } from './l7AccountScope'
 import {
   calcAuditedAmount,
   calcLiabilityEndBalance,
@@ -88,6 +90,9 @@ export function useL7Adjudication(
   rows: { value: L7AdjudicationRow[] },
 ) {
   const { allResponses, writebackTB, saveBatch, debouncedSave } = formData
+
+  /** 发布中状态（防重复提交，供发布按钮 :loading 绑定） */
+  const publishing = ref(false)
 
   // ─── 0. Hydration（读回 per-row 完整数据；此前 onMounted 只 loadData 无 restore → 刷新丢失） ──
   let _hydratedOnce = false
@@ -204,14 +209,17 @@ export function useL7Adjudication(
     _triggerSave(index)
   }
 
-  // ─── 4. 保存 + TB回写 ─────────────────────────────────────────────────
+  // ─── 4. 保存（普通保存不写 TB） ────────────────────────────────────────
 
   /**
-   * 保存审定表并触发TB回写 + EventBus
-   * - 回写 trial_balance 科目 2801
-   * - publish 'substantive:adjudicated'
+   * 保存审定表明细/合计到 checklist_responses（普通保存动作）。
+   *
+   * spec: tb-writeback-explicit-publish-gate Task 4 / Req 1。
+   * 此前该函数（原名 saveAndWriteback）保存后**自动**回写 trial_balance，且由 §5
+   * watcher 在数据变化时触发 → 违反 Req 1（普通保存/数据变化绝不写 TB）。现只保存 +
+   * emit substantive:adjudicated（附注刷新），TB 回写收敛为用户显式确认动作（publishToTb）。
    */
-  async function saveAndWriteback(): Promise<void> {
+  async function saveAdjudication(): Promise<void> {
     const items = computedRows.value.map((row, i) => {
       const n = i + 1
       return [
@@ -228,21 +236,63 @@ export function useL7Adjudication(
     })
 
     await saveBatch(items)
-
-    // TB回写（科目2801）
-    await writebackTB(totalRow.value.endAudited)
   }
 
-  // ─── 5. 审定数变化监听 → 自动回写 ────────────────────────────────────────
+  // ─── 5. 审定数变化监听 → 仅保存 + emit（不写 TB） ────────────────────────
 
+  // 审定数变化 → 保存 + 仅发布 substantive:adjudicated（附注/检查表刷新），**不再**自动
+  // 回写 trial_balance —— TB 回写收敛为用户显式确认动作（publishToTb）。
+  // spec: tb-writeback-explicit-publish-gate Req 1（普通保存/数据变化绝不写 TB）。
   watch(
     () => totalRow.value.endAudited,
     async (newVal, oldVal) => {
       if (oldVal !== undefined && newVal !== oldVal) {
-        await saveAndWriteback()
+        await saveAdjudication()
+        eventBus.emit('substantive:adjudicated', {
+          accountCode: L7_REPORT_ROW_CODE,
+          auditedAmount: newVal,
+          wpCode: 'L7',
+          timestamp: Date.now(),
+        })
       }
     },
   )
+
+  // ─── 5b. 显式发布到试算表（显式确认门，复刻 M1/D2 范式） ──────────────────
+
+  /**
+   * 确认发布审定数到试算表（其他非流动负债；回写用报表行 BS-071）。
+   *
+   * spec: tb-writeback-explicit-publish-gate Task 4 / Req 2。
+   * 二次确认（中文）→ 保存明细 → formData.writebackTB 走
+   * `POST /workpapers/{wpId}/audit-determination/publish-to-tb` 回写 trial_balance。
+   * 用户取消 → 无副作用。
+   */
+  async function publishToTb(): Promise<void> {
+    if (publishing.value) return
+
+    try {
+      await ElMessageBox.confirm(
+        '发布后将把其他非流动负债期末审定合计（报表行 BS-071）写入试算表（trial_balance），'
+        + '并触发报表/错报评价等下游重算。确认发布？',
+        '发布到试算表确认',
+        { confirmButtonText: '确认发布', cancelButtonText: '取消', type: 'warning' },
+      )
+    } catch {
+      return // 用户取消 → 无任何副作用（不保存、不写 TB、不 emit）
+    }
+
+    publishing.value = true
+    try {
+      await saveAdjudication()
+      await writebackTB(totalRow.value.endAudited)
+      ElMessage.success('已发布到试算表')
+    } catch (err: any) {
+      ElMessage.error(err?.response?.data?.detail || err?.message || '发布失败，请重试')
+    } finally {
+      publishing.value = false
+    }
+  }
 
   // ─── 6. EventBus 订阅附注刷新 ────────────────────────────────────────────
 
@@ -283,8 +333,11 @@ export function useL7Adjudication(
     // 行操作
     addRow,
     updateRow,
-    // 保存+回写
-    saveAndWriteback,
+    // 保存（普通保存不写 TB）
+    saveAdjudication,
+    // 显式发布到试算表（二次确认门）
+    publishToTb,
+    publishing,
     subscribeDisclosure,
   }
 }

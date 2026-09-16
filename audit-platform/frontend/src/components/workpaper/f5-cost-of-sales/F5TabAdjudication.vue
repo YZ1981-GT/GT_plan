@@ -257,8 +257,8 @@
           上期差异 {{ fmt(adj.priorVariance.value) }}
         </el-tag>
         <el-tag v-else-if="adj.priorTrialBalanceAmount.value" type="success" size="small">上期核对一致</el-tag>
-        <el-button size="small" type="primary" :disabled="isReadonly" @click="adj.publishAdjudicated()">
-          发布审定数（回写TB）
+        <el-button size="small" type="warning" :loading="adj.publishing.value" :disabled="isReadonly" @click="adj.publishToTb()">
+          发布到试算表
         </el-button>
       </div>
     </div>

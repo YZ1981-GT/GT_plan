@@ -169,8 +169,14 @@
         <span class="tb-label">与试算平衡表核对（科目1123）：试算平衡表数 {{ fmtAmount(trialBalanceAmount) }}</span>
         <el-tag v-if="trialBalanceDiff !== 0" type="danger" size="small">差异 {{ fmtAmount(trialBalanceDiff) }}</el-tag>
         <el-tag v-else type="success" size="small">核对一致</el-tag>
-        <el-button size="small" type="primary" :disabled="isReadonly" @click="confirmAdjudication">
-          发布审定数（回写TB）
+        <el-button
+          size="small"
+          type="warning"
+          :loading="publishing"
+          :disabled="isReadonly"
+          @click="confirmAdjudication"
+        >
+          发布到试算表
         </el-button>
       </div>
 
@@ -334,7 +340,8 @@ const {
   hasNaturePrefill,
   pullNatureFromTB,
   updateCell,
-  publishAdjudicated,
+  publishToTb,
+  publishing,
 } = useF1Adjudication({
   allResponses: allResponsesRef,
   wpId: wpIdRef,
@@ -438,9 +445,10 @@ function openReview() {
   openReviewDialog?.('F1-adj-conclusion')
 }
 
-function confirmAdjudication() {
-  publishAdjudicated()
-  ElMessage.success('已确认审定并发布（回写试算 1123）')
+async function confirmAdjudication() {
+  // 显式发布门：二次确认 → publish-to-tb 端点（不再自动绕过门写 TB）
+  // spec: tb-writeback-explicit-publish-gate Task 3
+  await publishToTb()
 }
 
 async function generateChangeAnalysis() {

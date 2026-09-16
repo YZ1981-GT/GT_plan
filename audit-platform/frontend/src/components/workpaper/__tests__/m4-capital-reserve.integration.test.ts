@@ -4,7 +4,7 @@
  * 覆盖：
  * 1. EventBus J3→M4 linkage: 'j3:equity-settled' → useM4CrossSheet.shareBasedVsJ3 更新
  * 2. EventBus M2→M4 linkage: 'm2:fx-diff-to-m4' → useM4CrossSheet.fxDiffVsM2 更新
- * 3. TB writeback: writebackTB(auditedAmount) → PUT /trial-balance/writeback + EventBus 'substantive:adjudicated'
+ * 3. TB writeback: writebackTB(auditedAmount) → POST /audit-determination/publish-to-tb + EventBus 'substantive:adjudicated'（显式发布门，spec tb-writeback-explicit-publish-gate Task 5）
  * 4. Cross-sheet validation: adjudicationVsDetail.isMatch 审定表 vs 明细表勾稽
  * 5. Share-based diff threshold: shareBasedVsJ3.isConsistent 阈值逻辑
  * 6. EventBus cleanup: onScopeDispose 取消订阅
@@ -223,8 +223,10 @@ describe('集成测试 — TB writeback (Req 2.6)', () => {
     onHandlers.clear()
   })
 
-  it('writebackTB 调用正确端点 account_code=4002', async () => {
-    // 直接测试 useM4FormData 的 writebackTB
+  it('writebackTB 走显式发布端点 publish-to-tb（科目4002，不再调旧 PUT）', async () => {
+    // spec: tb-writeback-explicit-publish-gate Task 5 —— writebackTB 改走显式发布门
+    // POST /workpapers/{wpId}/audit-determination/publish-to-tb（sheet_name + writeback_rows），
+    // 不再直调旧端点 PUT /projects/{pid}/trial-balance/writeback。
     const { useM4FormData } = await import('../composables/useM4FormData')
 
     const scope = effectScope()
@@ -236,12 +238,19 @@ describe('集成测试 — TB writeback (Req 2.6)', () => {
 
       await formData.writebackTB(88000)
 
-      expect(api.put).toHaveBeenCalledWith(
+      expect(api.post).toHaveBeenCalledWith(
+        '/api/workpapers/wp-123/audit-determination/publish-to-tb',
+        expect.objectContaining({
+          sheet_name: expect.stringMatching(/M4-1/),
+          writeback_rows: [
+            { account_code: '4002', audited_amount: 88000, amount_kind: 'balance' },
+          ],
+        }),
+      )
+      // 不再调用旧端点
+      expect(api.put).not.toHaveBeenCalledWith(
         '/api/projects/proj-456/trial-balance/writeback',
-        {
-          account_code: '4002',
-          audited_amount: 88000,
-        },
+        expect.anything(),
       )
     })
     scope.stop()

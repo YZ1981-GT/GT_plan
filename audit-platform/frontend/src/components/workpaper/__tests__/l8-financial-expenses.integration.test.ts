@@ -16,8 +16,9 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { ref, effectScope } from 'vue'
 
-const { mockPut, mockGet, mockEmit, mockOn, mockOff } = vi.hoisted(() => ({
+const { mockPut, mockPost, mockGet, mockEmit, mockOn, mockOff } = vi.hoisted(() => ({
   mockPut: vi.fn().mockResolvedValue({ data: { code: 0 } }),
+  mockPost: vi.fn().mockResolvedValue({ data: { code: 0 } }),
   mockGet: vi.fn().mockResolvedValue({ data: [] }),
   mockEmit: vi.fn(),
   mockOn: vi.fn(),
@@ -38,6 +39,7 @@ vi.mock('@/services/apiProxy', () => ({
   api: {
     get: mockGet,
     put: mockPut,
+    post: mockPost,
   },
 }))
 
@@ -215,7 +217,10 @@ describe('集成测试 — TB回写 (Req 2.6)', () => {
     vi.clearAllMocks()
   })
 
-  it('writebackTB 调用API正确参数（科目6603, 发生额口径）', async () => {
+  it('writebackTB 走显式发布端点 publish-to-tb（科目6603 发生额口径，不再调旧 PUT）', async () => {
+    // spec: tb-writeback-explicit-publish-gate Task 4 —— writebackTB 改走显式发布门
+    // POST /workpapers/{wpId}/audit-determination/publish-to-tb（sheet_name + writeback_rows，
+    // amount_kind=occurrence 发生额口径），不再直调旧端点 PUT /projects/{pid}/trial-balance/writeback。
     const { useL8FormData } = await import('../composables/useL8FormData')
     const scope = effectScope()
 
@@ -227,13 +232,17 @@ describe('集成测试 — TB回写 (Req 2.6)', () => {
 
       await formData.writebackTB(1_500_000)
 
-      expect(api.put).toHaveBeenCalledWith(
-        '/api/projects/test-project-001/trial-balance/writeback',
-        {
-          account_code: '6603',
-          audited_amount: 1_500_000,
-        },
+      expect(api.post).toHaveBeenCalledWith(
+        '/api/workpapers/test-wp-l8/audit-determination/publish-to-tb',
+        expect.objectContaining({
+          sheet_name: expect.stringMatching(/L8-1/),
+          writeback_rows: [
+            { account_code: '6603', audited_amount: 1_500_000, amount_kind: 'occurrence' },
+          ],
+        }),
       )
+      // 不再调用旧端点
+      expect(api.put).not.toHaveBeenCalled()
     })
 
     scope.stop()
@@ -264,17 +273,20 @@ describe('集成测试 — TB回写 (Req 2.6)', () => {
     scope.stop()
   })
 
-  it('空projectId时不调用API', async () => {
+  it('空wpId时不调用API（守卫已由 projectId 改 wpId）', async () => {
+    // spec: tb-writeback-explicit-publish-gate Task 4 —— 显式发布端点以 wpId 定位底稿，
+    // 守卫由 projectId 改为 wpId：空 wpId 时不发 publish-to-tb 请求。
     const { useL8FormData } = await import('../composables/useL8FormData')
     const scope = effectScope()
 
     await scope.run(async () => {
       const formData = useL8FormData({
-        wpId: ref('test-wp'),
-        projectId: ref(''),
+        wpId: ref(''),
+        projectId: ref('test-project-001'),
       })
 
       await formData.writebackTB(1_000_000)
+      expect(api.post).not.toHaveBeenCalled()
       expect(api.put).not.toHaveBeenCalled()
     })
 

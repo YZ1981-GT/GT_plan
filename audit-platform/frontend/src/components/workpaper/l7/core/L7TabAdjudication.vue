@@ -25,6 +25,15 @@
         <el-button type="primary" size="small" :loading="isSaving" @click="handleSave">
           保存
         </el-button>
+        <el-button
+          type="warning"
+          size="small"
+          :loading="publishing"
+          :disabled="isReadonly"
+          @click="handlePublishToTb"
+        >
+          发布到试算表
+        </el-button>
       </div>
     </div>
 
@@ -394,7 +403,9 @@ const {
   computedRows: rawComputedRows,
   totalRow,
   updateRow: composableUpdateRow,
-  saveAndWriteback,
+  saveAdjudication,
+  publishToTb,
+  publishing,
 } = useL7Adjudication(formData, rows)
 
 // ─── 合计行 + TB核对行 → 拼装为表格数据 ────────────────────────────────────────
@@ -518,10 +529,17 @@ function fmtPercent(val: number): string {
 async function handleSave() {
   isSaving.value = true
   try {
-    await saveAndWriteback()
+    // 普通保存不写 TB（Req 1）；TB 回写走「发布到试算表」显式确认门
+    await saveAdjudication()
   } finally {
     isSaving.value = false
   }
+}
+
+/** 发布到试算表（显式确认门，Req 2；报表行 BS-071） */
+async function handlePublishToTb() {
+  if (props.isReadonly) return
+  await publishToTb()
 }
 
 function saveAuditNote() {

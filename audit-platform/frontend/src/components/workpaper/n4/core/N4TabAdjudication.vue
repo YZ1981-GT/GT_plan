@@ -224,13 +224,13 @@
     <!-- ═══ TB回写按钮 ═══ -->
     <div class="action-bar">
       <el-button
-        type="primary"
+        type="warning"
         size="small"
-        :disabled="props.isReadonly || !adjudication.isChanged.value"
-        :loading="writebackLoading"
+        :disabled="props.isReadonly"
+        :loading="adjudication.publishing.value"
         @click="handleWritebackTB"
       >
-        保存审定 → TB(6403·本期发生额)
+        发布到试算表 → TB(6403·本期发生额)
       </el-button>
       <span class="action-hint">损益类科目回写本期发生额口径（借方科目：借−贷）</span>
     </div>
@@ -373,7 +373,6 @@ const {
 
 // ─── Local state ─────────────────────────────────────────────────────────────
 
-const writebackLoading = ref(false)
 const auditNote = ref('')
 const auditConcl = ref('')
 
@@ -514,18 +513,14 @@ function handleCellChange(rowKey: string, field: keyof N4AdjRow, value: number):
 
 // ─── TB Writeback ────────────────────────────────────────────────────────────
 
+// spec: tb-writeback-explicit-publish-gate Task 6 / Req 2。
+// TB 回写经显式确认门：adjudication.publishToTb 弹中文二次确认 → formData.writebackTB 走
+// POST /audit-determination/publish-to-tb（6403 本期发生额 amount_kind=occurrence）。
+// 发布成功后再触发 A 类利润表勾稽联动（publishTaxesSurchargesUpdated）；取消则不触发。
 async function handleWritebackTB(): Promise<void> {
-  writebackLoading.value = true
-  try {
-    await adjudication.writeback()
-    // 发布A利润表勾稽事件
-    crossSheet.publishTaxesSurchargesUpdated()
-    ElMessage.success('审定数已回写试算表（科目6403·本期发生额）')
-  } catch {
-    ElMessage.error('回写失败，请稍后重试')
-  } finally {
-    writebackLoading.value = false
-  }
+  if (props.isReadonly) return
+  const published = await adjudication.publishToTb()
+  if (published) crossSheet.publishTaxesSurchargesUpdated()
 }
 
 // ─── Notes / Conclusion ──────────────────────────────────────────────────────

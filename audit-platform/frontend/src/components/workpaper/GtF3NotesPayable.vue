@@ -505,19 +505,10 @@ async function handleF3SaveItems(e: Event): Promise<void> {
 
 
 
-function handleF3Writeback(e: Event): void {
-
-  const d = (e as CustomEvent<{ accountCode: string; auditedAmount: number }>).detail
-
-  if (d?.accountCode != null && d.auditedAmount != null) {
-
-    void formData.writebackTrialBalance(d.accountCode, d.auditedAmount)
-
-  }
-
-}
-
-
+// ─── TB 回写：已移除 f3:writeback-trial-balance 监听器（spec tb-writeback-explicit-publish-gate Task 3） ──
+// 原 handleF3Writeback 监听 window 'f3:writeback-trial-balance' → useF3FormData.writebackTrialBalance
+// 落库 trial_balance，绕过显式确认门。改造后 TB 回写由 F3TabAdjudication.publishToTb
+// （显式二次确认 → publish-to-tb 端点）承载；publishAdjudicated 只 emit substantive:adjudicated。
 
 async function selfLoad(): Promise<void> {
 
@@ -549,8 +540,6 @@ onMounted(() => {
 
   window.addEventListener('f3:save-items', handleF3SaveItems)
 
-  window.addEventListener('f3:writeback-trial-balance', handleF3Writeback)
-
   void selfLoad()
 
 })
@@ -560,8 +549,6 @@ onMounted(() => {
 onBeforeUnmount(() => {
 
   window.removeEventListener('f3:save-items', handleF3SaveItems)
-
-  window.removeEventListener('f3:writeback-trial-balance', handleF3Writeback)
 
 })
 

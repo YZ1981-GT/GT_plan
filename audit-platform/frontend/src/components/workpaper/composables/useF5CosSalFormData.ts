@@ -105,18 +105,10 @@ export function useF5CosSalFormData(opts: { wpId: Ref<string>; projectId: Ref<st
 
   function getSheet(name: string) { return sheetCache.value[name] ?? { rows: [] } }
 
-  /** 审定数回写试算平衡表（比照 useF3FormData / useF4FormData） */
-  async function writebackTrialBalance(accountCode: string, auditedAmount: number): Promise<void> {
-    if (!opts.projectId.value) return
-    try {
-      await api.put(`/api/projects/${opts.projectId.value}/trial-balance/writeback`, {
-        account_code: accountCode,
-        audited_amount: auditedAmount,
-      })
-    } catch {
-      ElMessage.warning('审定数回写失败，请手动确认试算表数据')
-    }
-  }
+  // ─── trial_balance 回写：已移除 writebackTrialBalance（spec tb-writeback-explicit-publish-gate Task 3） ──
+  // 原 writebackTrialBalance 直调旧端点 PUT /projects/{pid}/trial-balance/writeback 绕过确认门。
+  // 改造后 TB 回写走显式发布门（F5TabAdjudication.publishToTb → publish-to-tb，发生额口径）。
+  // 唯一消费方 GtF5CostOfSales.handleF5Writeback 已随监听器移除 ⇒ 此函数为零消费死代码。
 
   onScopeDispose(() => { for (const t of _debounceTimers.values()) clearTimeout(t) })
 
@@ -132,6 +124,5 @@ export function useF5CosSalFormData(opts: { wpId: Ref<string>; projectId: Ref<st
     saveImmediate,
     debouncedSave,
     saveBatch,
-    writebackTrialBalance,
   }
 }

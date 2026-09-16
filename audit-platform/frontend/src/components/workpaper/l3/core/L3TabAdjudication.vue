@@ -148,7 +148,7 @@
 
     <!-- ═══ TB回写 ═══ -->
     <div class="adj-footer">
-      <el-button type="primary" :disabled="isReadonly || isSubmitting" :loading="isSubmitting" @click="handleSubmit">TB回写</el-button>
+      <el-button type="warning" :disabled="isReadonly || publishing" :loading="publishing" @click="handleSubmit">发布到试算表</el-button>
       <span class="footer-hint">回写期末审定合计至试算平衡表（科目 2501 长期借款）；一年内到期部分应经 L3-3 重分类至 2801</span>
     </div>
 
@@ -260,7 +260,8 @@ const {
   updateNote,
   updateCell,
   importFromDetail,
-  submitAdjudication,
+  publishToTb,
+  publishing,
 } = useL3Adjudication(formData)
 
 // ─── 从集中登记带入调整（2501 长期借款，负债贷方；双列 endAje/endRje） ───
@@ -324,17 +325,10 @@ async function handleImportFromDetail(): Promise<void> {
   } catch { /* 取消 */ }
 }
 
-const isSubmitting = ref(false)
+// ─── 发布到试算表（显式确认门，Req 2；科目2501） ──────────────────────────────
 async function handleSubmit(): Promise<void> {
-  isSubmitting.value = true
-  try {
-    await submitAdjudication()
-    ElMessage.success('期末审定数已回写至试算平衡表（科目 2501）')
-  } catch {
-    ElMessage.error('回写失败，请稍后重试')
-  } finally {
-    isSubmitting.value = false
-  }
+  if (props.isReadonly) return
+  await publishToTb()
 }
 
 const aiLoading = ref<string>('')

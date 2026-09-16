@@ -17,6 +17,7 @@
  *    本次重建为源模板结构；旧 item_id 数据不再兼容（结构性纠错）。
  */
 import { ref, computed, watch, onBeforeUnmount, type Ref, type ComputedRef } from 'vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { eventBus } from '@/utils/eventBus'
 import type { ChecklistResponse } from './useL2FormData'
 
@@ -189,6 +190,9 @@ function aggregateRows(
 export function useL2Adjudication(options: UseL2AdjudicationOptions) {
   const { allResponses, saveField, debouncedSave, writebackTB } = options
 
+  /** 发布中状态（防重复提交，供发布按钮 :loading 绑定） */
+  const publishing = ref(false)
+
   // ─── Rows computed（含优先股汇总行的派生） ─────────────────────────────
 
   const rows: ComputedRef<AdjudicationRow[]> = computed(() => {
@@ -353,12 +357,47 @@ export function useL2Adjudication(options: UseL2AdjudicationOptions) {
     return count
   }
 
-  // ─── publishAdjudicated + writebackTB ──────────────────────────────────
+  // ─── submitAdjudication + 显式发布门 publishToTb ─────────────────────────
 
+  /**
+   * 保存审定合计 + 经显式发布端点回写 TB（内部动作，由 publishToTb 二次确认后调用）。
+   * spec: tb-writeback-explicit-publish-gate Task 4。writebackTB 已改走 publish-to-tb。
+   */
   async function submitAdjudication(): Promise<void> {
     const amount = totalAuditedAmount.value
-    await writebackTB(amount)
     await saveField('L2-L2-1-adjudication-total', { remark: String(amount) })
+    await writebackTB(amount)
+  }
+
+  /**
+   * 确认发布审定数到试算表（科目 2231 应付利息）。
+   *
+   * spec: tb-writeback-explicit-publish-gate Task 4 / Req 2。
+   * 二次确认（中文）→ submitAdjudication（保存 + 走 publish-to-tb 回写）。用户取消 → 无副作用。
+   */
+  async function publishToTb(): Promise<void> {
+    if (publishing.value) return
+
+    try {
+      await ElMessageBox.confirm(
+        '发布后将把应付利息期末审定合计（科目 2231）写入试算表（trial_balance），'
+        + '并触发报表/错报评价等下游重算。确认发布？',
+        '发布到试算表确认',
+        { confirmButtonText: '确认发布', cancelButtonText: '取消', type: 'warning' },
+      )
+    } catch {
+      return // 用户取消 → 无任何副作用（不保存、不写 TB、不 emit）
+    }
+
+    publishing.value = true
+    try {
+      await submitAdjudication()
+      ElMessage.success('已发布到试算表')
+    } catch (err: any) {
+      ElMessage.error(err?.response?.data?.detail || err?.message || '发布失败，请重试')
+    } finally {
+      publishing.value = false
+    }
   }
 
   // ─── onAdjustmentCreated（EventBus监听，明细已写入 allResponses 自动响应） ──
@@ -392,6 +431,9 @@ export function useL2Adjudication(options: UseL2AdjudicationOptions) {
     updateCell,
     importFromDetail,
     submitAdjudication,
+    // 显式发布到试算表（二次确认门）
+    publishToTb,
+    publishing,
     // EventBus
     onAdjustmentCreated,
     // 常量

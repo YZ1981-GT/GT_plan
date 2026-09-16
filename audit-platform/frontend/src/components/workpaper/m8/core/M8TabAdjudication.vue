@@ -22,6 +22,15 @@
         <el-button type="primary" size="small" :loading="isSaving" @click="handleSave">
           保存
         </el-button>
+        <el-button
+          type="warning"
+          size="small"
+          :loading="adjudication.publishing.value"
+          :disabled="isReadonly"
+          @click="handlePublishToTb"
+        >
+          发布到试算表
+        </el-button>
       </div>
     </div>
 
@@ -512,12 +521,19 @@ function fmtAmount(val: number | undefined | null): string {
 async function handleSave(): Promise<void> {
   isSaving.value = true
   try {
-    await adjudication.saveAndWriteback()
+    // 普通保存不写 TB（Req 1）；TB 回写走「发布到试算表」显式确认门
+    await adjudication.saveAdjudication()
     await versionTrail.createSnapshot('M8-1 审定表保存')
     emit('save')
   } finally {
     isSaving.value = false
   }
+}
+
+/** 发布到试算表（显式确认门，Req 2） */
+async function handlePublishToTb(): Promise<void> {
+  if (props.isReadonly) return
+  await adjudication.publishToTb()
 }
 
 function saveAuditConclusion(): void {

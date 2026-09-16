@@ -61,6 +61,8 @@ const DEBOUNCE_MS = 2000
 const ACCOUNT_CODE_6403 = '6403'
 const COMPONENT_TYPE = 'n4-taxes-and-surcharges'
 const ITEM_PREFIX = 'N4-'
+/** 审定表 sheet 名（含子码 N4-1，供后端 extract_determination_wp_code 解出） */
+const DETERMINATION_SHEET_NAME = '审定表N4-1'
 
 // ─── Composable ──────────────────────────────────────────────────────────────
 
@@ -358,25 +360,33 @@ export function useN4FormData(opts: {
   // ─── writebackTB（发生额回写！非期末余额）─────────────────────────────────
 
   /**
-   * 审定数回写 trial_balance：科目6403税金及附加
-   * ⚠️ 关键区别：损益类回写**发生额**，非期末余额！
-   * ⚠️ 6403借方科目：审定发生额 = 借方发生 - 贷方发生
+   * 发布审定数到 trial_balance：科目 6403 税金及附加（损益类**发生额**口径）。
    *
-   * 回写成功后发布 EventBus:
-   *   1. 'substantive:adjudicated' 通知附注刷新
-   *   2. 'expense:taxes-surcharges-updated' 供A类利润表勾稽
+   * spec: tb-writeback-explicit-publish-gate Task 6 / Req 1,2,8。
+   * 此前直调旧端点 `PUT /projects/{pid}/trial-balance/writeback`（无二次确认/无
+   * publish_confirmed/无幂等，用旧参 is_occurrence + amount_type:'period'）。现改为
+   * 显式发布门：仅在用户显式确认（useN4Adjudication.publishToTb 二次确认）后调用 →
+   * `POST /workpapers/{wpId}/audit-determination/publish-to-tb`，发生额语义用
+   * `amount_kind='occurrence'` 标注（替代旧 is_occurrence/amount_type 参数）。
+   *
+   * ⚠️ 6403 借方科目：审定发生额 = 借方发生 - 贷方发生（非期末余额！期末结转本年利润后为0）。
+   *
+   * 成功后**保留**发布两条 EventBus 事件（design §3 联动，不得删除）：
+   *   1. 'substantive:adjudicated'（附注刷新）
+   *   2. 'expense:taxes-surcharges-updated'（供 A 类利润表勾稽）
    *
    * @param auditedAmount 审定发生额（借方-贷方净额）
    */
   async function writebackTB(auditedAmount: number): Promise<void> {
-    if (!projectId.value) return
+    if (!wpId.value) return
     isSaving.value = true
     try {
-      await api.put(`/api/projects/${projectId.value}/trial-balance/writeback`, {
-        account_code: ACCOUNT_CODE_6403,
-        audited_amount: auditedAmount,
-        is_occurrence: true, // 标识：损益类发生额回写
-        amount_type: 'period', // 标识：本期发生额口径（非余额）
+      await api.post(`/api/workpapers/${wpId.value}/audit-determination/publish-to-tb`, {
+        // sheet 名固定含审定表子码 N4-1，后端 extract_determination_wp_code 据此解出 N4-1
+        sheet_name: DETERMINATION_SHEET_NAME,
+        writeback_rows: [
+          { account_code: ACCOUNT_CODE_6403, audited_amount: auditedAmount, amount_kind: 'occurrence' },
+        ],
       })
 
       // 更新本地 tbData
@@ -392,7 +402,7 @@ export function useN4FormData(opts: {
         timestamp: Date.now(),
       })
 
-      // EventBus publish 'expense:taxes-surcharges-updated'（供A类利润表勾稽）
+      // EventBus publish 'expense:taxes-surcharges-updated'（供A类利润表勾稽，保留）
       eventBus.emit('expense:taxes-surcharges-updated', {
         accountCode: ACCOUNT_CODE_6403,
         auditedAmount,
@@ -402,8 +412,6 @@ export function useN4FormData(opts: {
 
       // 保存审定金额到独立 item_id 供跨sheet引用
       await saveResponse('N4-1-adjudicated-amount', String(auditedAmount))
-    } catch {
-      ElMessage.warning('审定数回写失败，请手动确认试算表数据')
     } finally {
       isSaving.value = false
     }

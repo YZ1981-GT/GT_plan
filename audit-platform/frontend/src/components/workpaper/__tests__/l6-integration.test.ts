@@ -16,8 +16,9 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { ref, effectScope } from 'vue'
 
-const { mockPut, mockGet, mockEmit, mockOn, mockOff } = vi.hoisted(() => ({
+const { mockPut, mockPost, mockGet, mockEmit, mockOn, mockOff } = vi.hoisted(() => ({
   mockPut: vi.fn().mockResolvedValue({ data: { code: 0 } }),
+  mockPost: vi.fn().mockResolvedValue({ data: { code: 0 } }),
   mockGet: vi.fn().mockResolvedValue({ data: [] }),
   mockEmit: vi.fn(),
   mockOn: vi.fn(),
@@ -38,6 +39,7 @@ vi.mock('@/services/apiProxy', () => ({
   api: {
     get: mockGet,
     put: mockPut,
+    post: mockPost,
   },
 }))
 
@@ -157,7 +159,11 @@ describe('集成测试 — writebackTB (Req 2.6)', () => {
     vi.clearAllMocks()
   })
 
-  it('writebackTB 调用API正确参数（科目2601）', async () => {
+  it('writebackTB 走显式发布端点 publish-to-tb（科目2711，不再调旧 PUT）', async () => {
+    // spec: tb-writeback-explicit-publish-gate Task 4 —— writebackTB 改走显式发布门
+    // POST /workpapers/{wpId}/audit-determination/publish-to-tb（sheet_name L6-1 +
+    // writeback_rows），不再直调旧端点。科目为 2711 专项应付款（L6_GROSS_FALLBACK_STANDARD，
+    // 纠正旧断言的 2601 租赁负债漂移）。
     const { useL6FormData } = await import('../composables/useL6FormData')
     const scope = effectScope()
 
@@ -169,29 +175,33 @@ describe('集成测试 — writebackTB (Req 2.6)', () => {
 
       await formData.writebackTB(5_000_000)
 
-      expect(api.put).toHaveBeenCalledWith(
-        '/api/projects/test-project-001/trial-balance/writeback',
-        {
-          account_code: '2601',
-          audited_amount: 5_000_000,
-        },
+      expect(api.post).toHaveBeenCalledWith(
+        '/api/workpapers/test-wp-l6-001/audit-determination/publish-to-tb',
+        expect.objectContaining({
+          sheet_name: expect.stringMatching(/L6-1/),
+          writeback_rows: [
+            { account_code: '2711', audited_amount: 5_000_000, amount_kind: 'balance' },
+          ],
+        }),
       )
+      expect(api.put).not.toHaveBeenCalled()
     })
 
     scope.stop()
   })
 
-  it('writebackTB 空projectId时不调用API', async () => {
+  it('writebackTB 空wpId时不调用API（守卫已由 projectId 改 wpId）', async () => {
     const { useL6FormData } = await import('../composables/useL6FormData')
     const scope = effectScope()
 
     await scope.run(async () => {
       const formData = useL6FormData({
-        wpId: ref('test-wp-l6'),
-        projectId: ref(''), // 空
+        wpId: ref(''), // 空
+        projectId: ref('test-project-001'),
       })
 
       await formData.writebackTB(1_000_000)
+      expect(api.post).not.toHaveBeenCalled()
       expect(api.put).not.toHaveBeenCalled()
     })
 
@@ -223,7 +233,7 @@ describe('集成测试 — EventBus publish (Req 2.6)', () => {
       expect(eventBus.emit).toHaveBeenCalledWith(
         'substantive:adjudicated',
         expect.objectContaining({
-          accountCode: '2601',
+          accountCode: '2711',
           auditedAmount: 7_500_000,
           wpCode: 'L6',
           timestamp: expect.any(Number),

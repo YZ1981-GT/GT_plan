@@ -16,8 +16,9 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { ref, nextTick } from 'vue'
 
-const { mockPut, mockGet, mockEmit, mockOn, mockOff } = vi.hoisted(() => ({
+const { mockPut, mockPost, mockGet, mockEmit, mockOn, mockOff } = vi.hoisted(() => ({
   mockPut: vi.fn().mockResolvedValue({ data: { code: 0 } }),
+  mockPost: vi.fn().mockResolvedValue({ data: { code: 0 } }),
   mockGet: vi.fn().mockResolvedValue({ data: [] }),
   mockEmit: vi.fn(),
   mockOn: vi.fn(),
@@ -38,6 +39,7 @@ vi.mock('@/services/apiProxy', () => ({
   api: {
     get: mockGet,
     put: mockPut,
+    post: mockPost,
   },
 }))
 
@@ -359,7 +361,11 @@ describe('集成测试 — writebackTB (Req 2.6)', () => {
     vi.clearAllMocks()
   })
 
-  it('writebackTB 调用API正确参数（科目2801）', async () => {
+  it('writebackTB 走显式发布端点 publish-to-tb（报表行 BS-071，不再调旧 PUT）', async () => {
+    // spec: tb-writeback-explicit-publish-gate Task 4 —— writebackTB 改走显式发布门
+    // POST /workpapers/{wpId}/audit-determination/publish-to-tb（sheet_name L7-1 +
+    // writeback_rows），不再直调旧端点。account_code 用报表行 BS-071（L7_REPORT_ROW_CODE，
+    // L7 无独立科目码，宁缺勿造；纠正旧断言的 2801 预计负债撞码）。
     const { useL7FormData } = await import('../composables/useL7FormData')
 
     // 模拟 effectScope 避免 onScopeDispose 报错
@@ -374,13 +380,16 @@ describe('集成测试 — writebackTB (Req 2.6)', () => {
 
       await formData.writebackTB(4_230_000)
 
-      expect(api.put).toHaveBeenCalledWith(
-        '/api/projects/test-project-001/trial-balance/writeback',
-        {
-          account_code: '2801',
-          audited_amount: 4_230_000,
-        },
+      expect(api.post).toHaveBeenCalledWith(
+        '/api/workpapers/test-wp-001/audit-determination/publish-to-tb',
+        expect.objectContaining({
+          sheet_name: expect.stringMatching(/L7-1/),
+          writeback_rows: [
+            { account_code: 'BS-071', audited_amount: 4_230_000, amount_kind: 'balance' },
+          ],
+        }),
       )
+      expect(api.put).not.toHaveBeenCalled()
     })
 
     scope.stop()
@@ -402,7 +411,7 @@ describe('集成测试 — writebackTB (Req 2.6)', () => {
       expect(eventBus.emit).toHaveBeenCalledWith(
         'substantive:adjudicated',
         expect.objectContaining({
-          accountCode: '2801',
+          accountCode: 'BS-071',
           auditedAmount: 5_000_000,
           wpCode: 'L7',
         }),
@@ -412,18 +421,19 @@ describe('集成测试 — writebackTB (Req 2.6)', () => {
     scope.stop()
   })
 
-  it('writebackTB 空projectId时不调用API', async () => {
+  it('writebackTB 空wpId时不调用API（守卫已由 projectId 改 wpId）', async () => {
     const { useL7FormData } = await import('../composables/useL7FormData')
     const { effectScope } = await import('vue')
     const scope = effectScope()
 
     await scope.run(async () => {
       const formData = useL7FormData({
-        wpId: ref('test-wp'),
-        projectId: ref(''), // 空
+        wpId: ref(''), // 空
+        projectId: ref('test-project-001'),
       })
 
       await formData.writebackTB(1_000_000)
+      expect(api.post).not.toHaveBeenCalled()
       expect(api.put).not.toHaveBeenCalled()
     })
 

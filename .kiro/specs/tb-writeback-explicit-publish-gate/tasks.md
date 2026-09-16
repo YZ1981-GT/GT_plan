@@ -191,35 +191,190 @@ M0（端点扩展，Task 1）是所有**活路径**逐组件任务的前置；�
 
 ## M2：F 循环（活，5 个，form B）
 
-- [ ] 3. F 循环审定表改走显式发布端点
+- [x] 3. F 循环审定表改走显式发布端点
   - **第一步实证 sheet 名**：grep F1–F5 组件 `sheetName`/render schema(`backend/data/ledger_adapters/wp_render_schema/`)/`SheetLabels`，确认 `F{n}-1` 可解（R1 低风险，F5 成本 occurrence 存疑须确认）
   - 活路径（form B）：`useF1FormData`~`useF4FormData`、`useF5CosSalFormData` + `GtF1Prepayment`（移除 `f1:writeback-trial-balance`）、`GtF5CostOfSales`（移除 `f5:writeback-trial-balance`，保留 `f5:save-items` + `substantive:adjudicated` 供 F5-7 校验区）
   - 前端单测 + 端到端验证点
   - _需求: 1, 2, 8_
+  - **✅ 完成证据（2026）**：
+    - **sheet 名可解性 + 科目 + 口径实证表（`extract_determination_wp_code` 正则 `([D-N]\d+-1)\b`，全可解无降级；F 全 form B）**：
+
+      | 组件 | 科目 | 口径 amount_kind | 审定表 sheet 名（实证来源 `useFPurchaseInventorySheetGroups.test.ts`） | 解出子码 | dispatcher（form B） | writeback_rows |
+      |---|---|---|---|---|---|---|
+      | F1 预付账款 | 1123 | balance | `审定表F1-1` | F1-1 ✅ | useF1Adjudication.publishAdjudicated | 单行 1123 |
+      | F2 存货 | **多科目动态**（`F2_ROW_KEY_ACCOUNT`：1401~1411/1412进销差价/1471跌价，各类别净值 endAudited） | balance | `存货审定表F2-1` | F2-1 ✅ | useF2Adjudication.publishAdjudicated（原 per-account dispatch） | 多行（按科目归集净值，一次原子发布） |
+      | F3 应付票据 | 2201 | balance | `审定表F3-1` | F3-1 ✅ | useF3Adjudication.publishAdjudicated | 单行 2201 |
+      | F4 应付账款 | 2202 | balance | `审定表F4-1` | F4-1 ✅ | useF4Adjudication.publishAdjudicated | 单行 2202 |
+      | F5 营业成本 | 6401 | **occurrence（损益类发生额！）**（F5TabAdjudication guidance 明示"损益类仅列本期/上期发生额，无期初期末"） | `营业务成本审定表F5-1` | F5-1 ✅ | useF5Adjudication.publishAdjudicated | 单行 6401 occurrence |
+
+    - **form B 链处置（删/留清单，实证 grep `f[1-5]:writeback-trial-balance` 全仓仅剩注释/docstring）**：
+      - **删（dispatch）**：`useF1/F2/F3/F4/F5Adjudication.publishAdjudicated` 内的 `window.dispatchEvent('f{n}:writeback-trial-balance')`（F2 是 per-account 循环 dispatch）——**改造后 publishAdjudicated 只 emit `substantive:adjudicated`**。
+      - **删（listener + handler）**：`GtF{1-5}` 的 `handleF{n}Writeback` + `window.addEventListener('f{n}:writeback-trial-balance')` + `removeEventListener`；GtF1 连带删无用的 `onBeforeUnmount` import。
+      - **删（FormData 死代码）**：`useF1FormData.writebackTrialBalance(1123)` / `useF2/F3/F4FormData.writebackTrialBalance(accountCode,amount)` / `useF5CosSalFormData.writebackTrialBalance` + 各自 return export（唯一消费方是被删的 handleF{n}Writeback ⇒ 零消费死代码）。各处配中文收口注释。
+      - **保留（严格）**：`f1/f2/f3/f4/f5:save-items` 监听全保留（GtF{1-5} 的 handleF{n}SaveItems + onBeforeUnmount 中的 remove）；`substantive:adjudicated` emit 全保留。
+    - **🔴 F5-7 校验区保留证据（重点）**：`GtF5CostOfSales.vue` 的 **`substantive:adjudicated` 监听器（handleAdjudicated，消费 6401 审定营业成本 → adjudicatedCOGS → F5-7 成本倒轧校验区 + 持久化）严格保留**（onMounted/onBeforeUnmount 均只删 `f5:writeback-trial-balance` 那一条，`f5:save-items` + `substantive:adjudicated` 两条完整保留）；`useF5Adjudication.publishAdjudicated` 仍 emit `substantive:adjudicated`（6401），且 `publishToTb` 成功后调 `publishAdjudicated()` ⇒ F5-7 校验区在发布后仍收到审定数刷新。测试断言 F5 发布后仍 emit substantive:adjudicated(wpCode=F5)。
+    - **改造范式（复刻 D2/D4-1）**：每个 `useF{n}Adjudication` 新增 `publishToTb`（`readonly/publishing` 早退 → `ElMessageBox.confirm` 中文二次确认 → `import api` → `api.post('/api/workpapers/{wpId}/audit-determination/publish-to-tb', {sheet_name, writeback_rows})` → `ElMessage.success` → `publishAdjudicated()` 通知下游；取消/readonly 无副作用）+ `publishing` ref；F2 多科目用 `aggregateAuditedByAccount()`（publishAdjudicated 与 publishToTb 共用）生成多行 writeback_rows。**useF4/F5Adjudication 原不 destructure `wpId`（TB 回写走 projectId），本次补 `wpId`**（F5 的 projectId 改造后无用，从 destructure 移除但保留 options 接口）。各 Tab 发布按钮改 `type=warning` `:loading=publishing` 文案统一「发布到试算表」，`confirmAdjudication` 改 async 调 `publishToTb`（F4 保留原 crossCheck/variance 守卫再发布）。
+    - **改的文件（20 源 + 1 新测试 = 21）**：
+      - Adjudication（5）：`useF1Adjudication.ts` / `useF2Adjudication.ts` / `useF3Adjudication.ts` / `useF4Adjudication.ts` / `useF5Adjudication.ts`（移除 dispatch + 加 publishToTb/publishing + import ElMessage/ElMessageBox；F2 加 aggregateAuditedByAccount；F4/F5 补 wpId destructure）
+      - FormData（5）：`useF1FormData.ts` / `useF2FormData.ts` / `useF3FormData.ts` / `useF4FormData.ts` / `useF5CosSalFormData.ts`（删 writebackTrialBalance + return export + 收口注释；ElMessage 仍用于 load/save 保留 import）
+      - Tab 组件（5）：`f1/F1TabAdjudication.vue` / `f2/core/F2TabAdjudication.vue` / `f3-notes-payable/F3TabAdjudication.vue` / `f4-accounts-payable/F4TabAdjudication.vue` / `f5-cost-of-sales/F5TabAdjudication.vue`（destructure publishToTb/publishing + 按钮改造 + confirm 改 async 调 publishToTb）
+      - 宿主（5）：`GtF1Prepayment.vue` / `GtF2InventoryMain.vue` / `GtF3NotesPayable.vue` / `GtF4AccountsPayable.vue` / `GtF5CostOfSales.vue`（删 handleF{n}Writeback + f{n}:writeback listener + writeback 调用；GtF1 删 onBeforeUnmount import；GtF5 严格保留 save-items + substantive:adjudicated）
+      - 新增测试：`composables/__tests__/fAdjudicationPublishGate.spec.ts`（参数化 F1~F5 × 6 用例 = 30）
+    - **测试命令与 pass 数**：
+      - 新测试：`rtk npx vitest run src/components/workpaper/composables/__tests__/fAdjudicationPublishGate.spec.ts --reporter=dot` → **30 passed / 0 failed**（确认→POST publish-to-tb body(sheet_name 匹配 F{n}-1 / writeback_rows 含期望科目 / amount_kind F1-4=balance F5=occurrence) / 不再调 trial-balance/writeback(PUT) / 取消→无 post 无 emit / readonly→无 post / 不再 dispatch f{n}:writeback-trial-balance / 发布成功仍 emit substantive:adjudicated(wpCode)）
+      - F 既有回归：`GtF4AccountsPayable.integration + GtF3NotesPayable.integration + useF4Adjudication + f4AgingUnification.pbt + useF2Adjudication.p6 + useF2Adjudication.seed + useF1AgingScope` → **169 passed / 0 failed**（GtF3/GtF4 integration 中断言 f3/f4:writeback payload 形状的用例是本地 payload 断言，非实际 dispatch，未受影响仍绿）
+      - D2 gate 回归（共享 eventBus）：`d2AdjudicationPublishGate.spec.ts` → **6 passed**
+      - ESLint（21 改动文件）：**0 errors**（34 warnings 全为未改代码既存 `no-adhoc-wp-structure`(表渲染 19) / `no-amount-arithmetic`(小计公式 10) / `no-amount-toFixed`(格式化 5)，新增 publishToTb/发布按钮 0 warning）；getDiagnostics 20 源 + 1 测试全 0。
+    - **发现的偏差/降级**：
+      - 🟢 **sheet 名全可解**：F 循环审定表子码均标准 `F{n}-1`（`useFPurchaseInventorySheetGroups.test.ts` 实证 `审定表F1-1`/`存货审定表F2-1`/`审定表F3-1`/`审定表F4-1`/`营业务成本审定表F5-1`），无不可解降级项。
+      - 🟢 **F5 occurrence 已确认**：F5 营业成本损益类，`amount_kind='occurrence'`（唯一非 balance），前端已算最终发生额直传 writeback_rows（Req 6）。
+      - 🟢 **F2 多科目**：动态科目由前端 `F2_ROW_KEY_ACCOUNT` 按净值归集后透传，端点不硬编码（Req 5.2）。
+      - 🟢 **死代码登记（非降级，属清理）**：F1~F5 各 FormData writeback 移除后唯一消费方（handleF{n}Writeback）同批移除，前端 `trial-balance/writeback` 命中数减少 5+（F2 原 per-account 更多），支撑 Req 9.1 收口。
+    - **端到端验证点**：前端单测覆盖「确认→publish-to-tb 落库路径」+「F5-7 校验区 substantive:adjudicated 回归」；后端 M0 集成测试覆盖 writeback_rows→WORKPAPER_SAVED(publish_confirmed)→handler 幂等回写（F5 occurrence 透传已在 M0 test_publish_to_tb_writeback_rows 覆盖）。真实项目 Playwright 全链路归 task 21*（待 start-dev.bat 环境）；真实 PG 无 F 循环审定数据的 UAT 归 task 20*（data-blocked）。
 
 ## M3：L 循环（活，8 个，A 形态）
 
-- [ ] 4. L 循环审定表改走显式发布端点
+- [x] 4. L 循环审定表改走显式发布端点
   - **第一步实证 sheet 名**：grep L1–L8 确认 `L{n}-1` 可解（R1 低风险）
   - 活路径（A 形态，各 `useL{n}Adjudication` destructure+invoke）：`useL2FormData`~`useL8FormData`（`components/workpaper/composables/`）+ `useL1FormData`/`useL1Adjudication`/`useL3Adjudication`（`src/composables/`）；L1/L3 经 `writebackTB` 由 adjudication 层调用，统一改造。**L 循环无 FormData 死代码重复**（writeback 就在 FormData 被 Adjudication 消费）
   - 前端单测 + 端到端验证点
   - _需求: 1, 2, 8_
+  - **✅ 完成证据（2026）**：
+    - **sheet 名可解性 + 科目 + 口径实证表（extract_determination_wp_code 正则 `^[D-N]\d+-1$`，`审定表L{n}-1` → `L{n}-1` ✅ 全可解，无降级项；L 负债类 R1 低风险，L8 发生额中风险已实证）**：
+
+      | 组件 | 科目 | 口径 amount_kind | 审定表 sheet 名 | 解出子码 | FormData 位置 | 反模式家族 |
+      |---|---|---|---|---|---|---|
+      | L1 短期借款 | 2001 | balance | 审定表L1-1 | L1-1 ✅ | `src/composables/`（**positional args (wpId,projectId,isReadonly) + isReadonly guard**） | A（Adjudication watcher `_editableSignature` 自动写） |
+      | L2 应付利息 | 2231（`L2_GROSS_FALLBACK_STANDARD`） | balance | 审定表L2-1 | L2-1 ✅ | `components/workpaper/composables/` | B（tab handleSubmit→submitAdjudication） |
+      | L3 长期借款 | 2501（`L3_GROSS_FALLBACK_STANDARD`） | balance | 审定表L3-1 | L3-1 ✅ | FormData 在 `components/workpaper/composables/`，**Adjudication 在 `src/composables/`** | B（tab handleSubmit→submitAdjudication） |
+      | L4 应付债券 | 2502（`L4_GROSS_FALLBACK_STANDARD`） | balance | 审定表L4-1 | L4-1 ✅ | `components/workpaper/composables/` | B（**tab watch(totalAuditedAmount) 自动写**，已删 watcher） |
+      | L5 长期应付款 | **2701 + 2702 双科目**（`L5_GROSS_FALLBACK_STANDARD`+未确认融资费用） | balance | 审定表L5-1 | L5-1 ✅ | `components/workpaper/composables/` | B（保存按钮 handleSave→saveAndWriteback 写 TB） |
+      | L6 专项应付款 | 2711（`L6_GROSS_FALLBACK_STANDARD`，纠正旧 2601 租赁负债漂移） | balance | 审定表L6-1 | L6-1 ✅ | `components/workpaper/composables/` | A（Adjudication watcher 自动写） |
+      | L7 其他非流动负债 | **BS-071 报表行**（`L7_REPORT_ROW_CODE`，L7 无独立科目码宁缺勿造） | balance | 审定表L7-1 | L7-1 ✅ | `components/workpaper/composables/` | A（Adjudication watcher 自动写） |
+      | L8 财务费用 | 6603（`L8_GROSS_FALLBACK_STANDARD`） | **occurrence（发生额口径！）** | 审定表L8-1 | L8-1 ✅ | `components/workpaper/composables/` | A（Adjudication watcher 自动写；tab 另有 handleWritebackTB 无确认按钮） |
+
+      sheet 名实证来源：后端 `event_handlers_cycle_linkage.py::_on_d_audit_determination_saved` 正则 `^[D-N]\d+-1$` + `misstatement_service.py` `^[D-N]\d*-1$`。**L 全 8 子码标准 `L{n}-1`，无不可解降级。**
+    - **改造范式（复刻 M1/D2/D4-1，适配 L 三种结构）**：反模式 = `useLxFormData.writebackTB` 直调旧端点 `PUT /projects/{pid}/trial-balance/writeback` + 由 Adjudication watcher（A）/ tab watch（L4）/ 保存按钮（L5）**自动或无二次确认**触发（违反 Req 1/2）。三处改造：
+      1. **`useLxFormData.writebackTB`**（8 个）：改走 `POST /api/workpapers/{wpId}/audit-determination/publish-to-tb`，body=`{ sheet_name:'审定表Lx-1', writeback_rows:[{account_code, audited_amount, amount_kind}] }`（L8=occurrence，其余 balance；L5 单次 POST 含 2701+2702 两行原子发布）；**守卫由 `projectId` 改 `wpId`**；成功后 `eventBus.emit('substantive:adjudicated', ...)`（L1 原 emit 在 Adjudication，本次移进 FormData 以统一 gate 断言）。加 `DETERMINATION_SHEET_NAME` 常量。
+      2. **`useLxAdjudication`**：Family A（L1/L6/L7/L8）`saveAndWriteback`→`saveAdjudication`（**移除 TB 写**），watcher 改「数据变化 → saveAdjudication + 仅 emit（不写 TB）」；Family B（L2/L3/L4）`submitAdjudication` 改「先 saveField 再 writebackTB」（不含确认）。全部 +`publishToTb`（`publishing` 早退 → `ElMessageBox.confirm` 中文二次确认 → 保存+writebackTB → 成功 emit + `ElMessage.success`；取消→无副作用）+`publishing` ref；import 加 `ref`/`ElMessage`/`ElMessageBox`（L7 另 import `L7_REPORT_ROW_CODE` 供 watcher emit accountCode）。
+      3. **`LxTabAdjudication.vue`**：destructure 改名（saveAdjudication/publishToTb/publishing）；handleSave 改调 saveAdjudication（普通保存不写 TB）；加发布按钮（`type=warning` `:loading=publishing` `:disabled=isReadonly` `@click=handlePublishToTb`）+ `handlePublishToTb`（props.isReadonly 早退→publishToTb）。**L4 tab 删除 `watch(totalAuditedAmount)→submitAdjudication` 自动写 watcher + 去掉未用的 `watch` import**；**L8 tab 复用原 TB回写按钮位改 publishToTb + 删 `isWritingBack` ref**；L2/L3 tab 复用原 TB回写按钮改 publishToTb + 删 `isSubmitting` ref。
+    - **改的文件（24 源 + 1 新测试 + 4 既有测试更新 = 29）**：
+      - FormData（8）：`useL1FormData.ts`(src/composables) / `useL2~L8FormData.ts`(components/workpaper/composables) —— writebackTB 改走 publish-to-tb + DETERMINATION_SHEET_NAME 常量 + 守卫改 wpId + 收口注释
+      - Adjudication（8）：`useL1Adjudication.ts`/`useL3Adjudication.ts`(src/composables) / `useL2/L4/L5/L6/L7/L8Adjudication.ts`(components/workpaper/composables) —— saveAndWriteback→saveAdjudication 去 TB 写（A）/ submitAdjudication 收敛（B）/ watcher 仅 emit / +publishToTb+publishing
+      - 组件（8）：`L1~L8TabAdjudication.vue` —— destructure + handleSave/handleSubmit 改 saveAdjudication + handlePublishToTb + 发布按钮（L4 删自动写 watcher，L8 删 isWritingBack，L2/L3 删 isSubmitting）
+      - 新增测试：`composables/__tests__/lAdjudicationPublishGate.spec.ts`（参数化 8 循环 × 5 用例 = 40，静态导入 useLx*，吸收 L1 positional args / L5 payload 双科目 / L3 Adjudication 跨路径差异）
+      - 既有测试更新（4）：`l8-financial-expenses.integration.test.ts`（api mock +post；writebackTB 断言旧 PUT → publish-to-tb writeback_rows 科目6603 amount_kind=occurrence + 不再调旧端点；空 projectId→改空 wpId 守卫）、`l6-integration.test.ts`（同上科目 **2711**（纠正 2601 漂移）+ 空 wpId 守卫 + emit accountCode 2711）、`l7-integration.test.ts`（同上 account_code **BS-071**（纠正 2801 撞码）+ emit BS-071 + 空 wpId 守卫）、`l5-phase6-integration.test.ts`（api mock +post，双科目 2701+2702 两次 emit 断言保留）
+    - **测试命令与 pass 数**：
+      - 新 gate 测试：`rtk npx vitest run lAdjudicationPublishGate.spec.ts --reporter=dot` → **40 passed / 0 failed**（每 Lx：writebackTB 走 publish-to-tb 断言 sheet_name(Lx-1)/科目/audited/amount_kind(L8 occurrence 其余 balance) / 不再调 PUT trial-balance/writeback / 成功仍 emit substantive:adjudicated(wpCode Lx/科目) / publishToTb 取消→无 post 无 emit / publishToTb 确认→经 writebackTB 命中 publish-to-tb）
+      - gate + 4 更新既有测试联跑：`rtk npx vitest run lAdjudicationPublishGate + l8-financial-expenses.integration + l6-integration + l7-integration + l5-phase6-integration --reporter=dot` → **111 passed / 0 failed**
+      - ESLint（24 改动源 + 1 测试 + 4 更新测试 + 8 tab）：**0 errors**（warnings 全为未改代码既存 no-adhoc-wp-structure/no-amount-toFixed/no-amount-arithmetic，在 el-table-column/fmtAmount/crossValidation；新增 publishToTb/handlePublishToTb/发布按钮/gate 测试 0 warning）
+      - getDiagnostics（24 源 + 8 tab）：**全 0**
+    - **发现的偏差/降级**：
+      - 🟢 **sheet 名全可解**：L 负债类 8 子码标准 `L{n}-1`，无不可解降级。
+      - 🟢 **account drift 顺手纠正（触类旁通）**：l6-integration 旧断言 2601（租赁负债）→ 源实为 2711（专项应付款，`L6_GROSS_FALLBACK_STANDARD`）；l7-integration 旧断言 2801（预计负债撞码）→ 源实为 BS-071（报表行，`L7_REPORT_ROW_CODE`）。本次更新既有测试时**按真实源码 grep 实证纠正**为 2711/BS-071（memory 记载的 test-vs-source drift 一并修复）。
+      - 🟡 **L7 account_code 是报表行非科目码**：L7 无独立科目（2801=K5 预计负债/2901=N1 递延所得税负债，report_config 撞码），沿用既有 `writebackTB` 用 `L7_REPORT_ROW_CODE='BS-071'` 作 account_code（改造前后一致，非本任务引入）。
+      - 🟡 **L5 双科目单次原子发布**：原两次 `PUT`（2701+2702）→ 改为单次 `POST publish-to-tb` 含两 writeback_rows（原子性更好，符合 M0 端点 writeback_rows 多行契约）。
+      - 🟢 **无 FormData 死代码重复**（与设计一致）：L 的 writebackTB 就在 FormData 被 Adjudication/tab 消费，8 个全活路径，无零消费 duplicate（区别于 H/I/K 循环）。
+    - **⚠️ 预存无关失败（非本任务引入，git stash 实证）**：`l4-bonds-payable.integration.test.ts` 2 个 `adjudicationVsDetail`（cross-sheet 勾稽 diff）用例 fail —— 根因在 `useL4CrossSheet.ts` 解析 `L4-L4-2-rows` 的 `auditedAmount` 聚合漂移（detail 合计算成 0 → diff=总额），**与 TB 回写正交**。`git stash` 本任务全部改动后单跑该 spec 复现**完全相同** 2 fail，证明改动前即失败（且 `useL4CrossSheet.ts` 不在本任务改动清单，git status 实证）；属既存 cross-sheet test-vs-source drift，归 L4 独立修复，本任务不碰。
+    - **端到端验证点**：前端单测覆盖「确认→publish-to-tb 落库路径 + 取消→无副作用 + 数据变化仅 emit 不写 TB」；后端 M0 集成测试（task 1）覆盖 writeback_rows→WORKPAPER_SAVED(publish_confirmed)→handler 幂等回写（含 occurrence amount_kind 透传 / 多科目 rows）。真实项目 Playwright 全链路实测归 task 21*（待 start-dev.bat 环境）；真实 PG 无 L 循环审定数据的 UAT 归 task 20*（data-blocked）。
 
 ## M4：M 循环（活，10 个同构，可批量套模板）
 
-- [ ] 5. M 循环审定表改走显式发布端点
+- [x] 5. M 循环审定表改走显式发布端点
   - **第一步实证 sheet 名**：grep M1–M10 确认 `M{n}-1` 可解（R1 低风险）
   - 活路径（10 个同构 A 形态：`useM{n}Adjudication` `const {writebackTB}=formData` + invoke）：`useM1FormData`~`useM10FormData`（权益类单科目为主）。**高度同构，套一个模板批量改**。**无 FormData 死代码重复**
   - 前端单测 + 端到端验证点
   - _需求: 1, 2, 8_
+  - **✅ 完成证据（2026）**：
+    - **sheet 名可解性表（extract_determination_wp_code 正则 `([D-N]\d+-1)\b`，`审定表M{n}-1` → `M{n}-1`；含 M10：`审定表M10-1` → `M10-1` ✅ 全可解，无降级项）**：
+
+      | 组件 | 科目(单科目余额) | 审定表 sheet 名 | 解出子码 | 合计审定字段 | 备注 |
+      |---|---|---|---|---|---|
+      | M1 应付股利 | 2232（负债贷方） | 审定表M1-1 | M1-1 ✅ | endAudited | 模板 |
+      | M2 实收资本/股本 | 4001 | 审定表M2-1 | M2-1 ✅ | endAudited | |
+      | M3 库存股 | 4002（借方/权益备抵） | 审定表M3-1 | M3-1 ✅ | audited | |
+      | M4 资本公积 | 4002 | 审定表M4-1 | M4-1 ✅ | audited | |
+      | M5 盈余公积 | 4101 | 审定表M5-1 | M5-1 ✅ | audited | self-emit + **M5→M6 `m5:surplus-accrual` 联动保留** |
+      | M6 未分配利润 | 4104 | 审定表M6-1 | M6-1 ✅ | audited | self-emit |
+      | M7 专项储备 | 4201 | 审定表M7-1 | M7-1 ✅ | audited | 有小计 |
+      | M8 一般风险准备 | 4104 | 审定表M8-1 | M8-1 ✅ | endAudited | 组件用 `adjudication.xxx` 对象访问 |
+      | M9 其他综合收益 | 4103 | 审定表M9-1 | M9-1 ✅ | audited | 有双区块小计 |
+      | M10 其他权益工具 | 4003 | 审定表M10-1 | M10-1 ✅（regex `\d+` 匹配 10） | audited | self-emit(三分组小计) |
+
+      sheet 名实证来源：`src/composables/useMEquityCycleSheetGroups.ts` §3「审定表M*-1 pattern」+ 其 spec 固化 `审定表M2-1…审定表M10-1`；后端正则 `wp_account_package_resolver.py::_DETERMINATION_CODE_RE`。**M 权益类全 R1 低风险，10 个子码全可解，无不可解降级。**
+    - **改造范式（复刻 D2/D4-1，适配 M 结构）**：M 循环反模式 = `useMxFormData.writebackTB` 直调旧端点 `PUT /projects/{pid}/trial-balance/writeback` + `useMxAdjudication` 的 `totalRow` watcher **数据变化即自动** `saveAndWriteback()`→writebackTB（违反 Req 1）。三处改造：
+      1. **`useMxFormData.writebackTB`**（10 个）：改走 `POST /api/workpapers/{wpId}/audit-determination/publish-to-tb`，body=`{ sheet_name:'审定表Mx-1', writeback_rows:[{account_code, audited_amount, amount_kind:'balance'}] }`；守卫由 `projectId` 改 `wpId`；**保留** 成功后 `eventBus.emit('substantive:adjudicated', {accountCode, auditedAmount, wpCode:'Mx', timestamp})`。加 `DETERMINATION_SHEET_NAME` 常量。
+      2. **`useMxAdjudication`**（10 个）：`saveAndWriteback`→重命名 `saveAdjudication`（**只保存，移除 `await writebackTB`**）；watcher 改为「数据变化 → saveAdjudication + 仅 emit（不写 TB）」（Req 1）；新增 `publishToTb`（`publishing` 早退 → `ElMessageBox.confirm` 中文二次确认 → saveAdjudication → writebackTB → 成功 emit + `ElMessage.success`；取消→无副作用）+ `publishing` ref。**M5/M6/M10 self-emit 抽取为 `emitAdjudicated()`**（watcher + publish 后各调一次），**M5 保留 `m5:surplus-accrual` M5→M6 跨模块联动**（design §3/Property 4）。
+      3. **`MxTabAdjudication.vue`**（10 个）：destructure `saveAdjudication/publishToTb/publishing`；`handleSave` 改调 `saveAdjudication`（普通保存不写 TB）；section-header 加「发布到试算表」按钮（`type=warning` `:loading=publishing`(M8 `adjudication.publishing.value`) `:disabled=isReadonly` `@click=handlePublishToTb`）+ `handlePublishToTb`（readonly 早退→publishToTb）。
+    - **改的文件（30 源 + 1 新测试 + 2 既有测试更新 = 33）**：
+      - FormData（10）：`useM1~M10FormData.ts`（writebackTB 改走 publish-to-tb + DETERMINATION_SHEET_NAME 常量 + 守卫改 wpId + 收口注释）
+      - Adjudication（10）：`useM1~M10Adjudication.ts`（saveAndWriteback→saveAdjudication 去 TB 写 / watcher 仅 emit / +publishToTb+publishing / +ref+ElMessage+ElMessageBox import；M5/M6/M10 +emitAdjudicated）
+      - 组件（10）：`M1~M10TabAdjudication.vue`（destructure + handleSave 改 saveAdjudication + handlePublishToTb + 发布按钮）
+      - 新增测试：`composables/__tests__/mAdjudicationPublishGate.spec.ts`（参数化 10 循环 × 5 用例 = 50，静态导入 useMx*）
+      - 既有测试更新：`m4-capital-reserve.integration.test.ts`（writebackTB 断言旧 PUT → 改断言 publish-to-tb writeback_rows 科目4002 + 不再调旧端点；头注释更新）、`m6-retained-earnings.integration.test.ts`（同上科目4104 + guard 测试 projectId空→改 wpId空早退）
+    - **测试命令与 pass 数**：
+      - 新 gate 测试：`rtk npx vitest run mAdjudicationPublishGate.spec.ts --reporter=dot` → **50 passed / 0 failed**（每 Mx：writebackTB 走 publish-to-tb 断言 sheet_name(Mx-1)/科目/audited/amount_kind=balance / 不再调 PUT trial-balance/writeback / 成功仍 emit substantive:adjudicated(wpCode Mx/科目) / publishToTb 取消→无 post 无 emit / publishToTb 确认→经 writebackTB 命中 publish-to-tb）
+      - 全 M 循环回归（43 spec）：`rtk npx vitest run src/components/workpaper/__tests__/m{1..10} + mAdjudicationPublishGate` → **967 passed / 2 todo / 0 failed**
+      - ESLint（30 改动源 + 3 测试）：**0 errors**（89 warnings 全为未改代码既存：el-table-column no-bare-amount-cell / autosize textarea no-adhoc-wp-structure / fmtAmount·fmtPercent 的 no-amount-toFixed / cross-validation 的 no-amount-arithmetic；新增代码 publishToTb/emitAdjudicated/watcher/按钮 0 warning）
+      - getDiagnostics（30 源）：**全 0**
+    - **发现的偏差/降级**：
+      - 🟢 **sheet 名全可解**：M 权益类 10 子码标准 `M{n}-1`（含 M10 经 regex `\d+` 正确匹配），无不可解降级。
+      - 🟢 **无 FormData 死代码重复**（与设计一致）：M 的 writebackTB 就在 FormData 被 Adjudication 消费，10 个全活路径，无零消费 duplicate（区别于 H/I/K 循环）。
+      - 🟡 **M4/M6 既有测试断言旧反模式**：`m4/m6 integration` 各 1 个 `writebackTB → PUT trial-balance/writeback` 断言正是本 spec 消除的反模式（Property 9 / D2 先例：测试断言旧行为须随迁移更新）→ 已改为断言 publish-to-tb writeback_rows；M6 guard 测试语义从 projectId 守卫改为 wpId 守卫。非降级，属测试跟随源迁移。
+      - 🟡 **UX 变更（合理，符合 Req 2）**：M 循环原靠 watcher **自动**写 TB（无用户确认，正是本 spec 消除的反模式）→ 改造后各 MxTabAdjudication 新增「发布到试算表」按钮承载显式二次确认动作；数据变化只 emit 附注刷新不写 TB（Req 1）。
+      - 🟢 **双 emit 可接受**：M5/M6/M10 发布路径 writebackTB(基本 payload) + emitAdjudicated(富 payload) 各 emit 一次 substantive:adjudicated，下游附注刷新幂等，无害。
+    - **端到端验证点**：前端单测覆盖「确认→publish-to-tb 落库路径」+「数据变化只 emit 不写 TB」+「取消无副作用」+「不再调旧端点」；后端 M0 集成测试（task1）覆盖 writeback_rows→WORKPAPER_SAVED(publish_confirmed)→handler 幂等回写。真实项目 Playwright 全链路 + 真实 PG UAT 归 task 20*/21*（data-blocked / 待 start-dev.bat 环境）。
+    - **未触碰**：`ieOrphanBaseline.spec.ts`（他 spec）；`n1_deferred_tax_assets_service.py` DEPRECATED 旁路（正交）；S 类独立回写服务（正交，非目标）；其他循环 tasks 3-15 的活路径。
 
 ## M5：N 循环（活，5 个；N1 watcher 须改显式）
 
-- [ ] 6. N 循环审定表改走显式发布端点
+- [x] 6. N 循环审定表改走显式发布端点
   - **第一步实证 sheet 名**：grep N1–N5 确认 `N{n}-1` 可解（N5 6801 occurrence 存疑须确认）
   - 活路径：`useN1FormData`~`useN5FormData`（5 个，税费）；**N1 特例**——`useN1Adjudication` 有 debounce watcher 自动写 TB（违反 Req 1），改造须把自动 watcher 写改为显式确认（watcher 只保留 emit，不写 TB）；N5(6801) 发生额；N4 有 V1+V2 两 adjudication；确认 `n1_deferred_tax_assets_service.py` DEPRECATED 裸 SQL 旁路不复活。**无 FormData 死代码重复**
   - 前端单测（断言 N1 数据变化只 emit 不写 TB）+ 端到端验证点
   - _需求: 1, 2, 8_
+  - **✅ 完成证据（2026）**：
+    - **sheet 名可解性 + 科目 + 口径实证表（extract_determination_wp_code 正则 `([D-N]\d+-1)\b`，handler `^[D-N]\d+-1$`；`审定表N{n}-1` → `N{n}-1` ✅ 全可解，无降级项。N4/N5 发生额中风险已实证）**：
+
+      | 组件 | 科目 | 口径 amount_kind | 审定表 sheet 名 | 解出子码 | FormData 位置 | 反模式家族 |
+      |---|---|---|---|---|---|---|
+      | N1 递延所得税资产 | 1811 | **balance（期末余额）** | 审定表N1-1 | N1-1 ✅ | `components/workpaper/composables/` | A（Adjudication debounce 2s watcher 自动写，**已删**） |
+      | N2 应交税费 | 2221 | balance | 审定表N2-1 | N2-1 ✅ | 同上 | B（tab handleWritebackTB→saveAndSync 无确认） |
+      | N3 递延所得税负债 | 2901 | balance | 审定表N3-1 | N3-1 ✅ | 同上 | B（tab handleWritebackTB→saveAndSync 无确认，+ N3→N5 联动） |
+      | N4 税金及附加 | 6403 | **occurrence（发生额！）** | 审定表N4-1 | N4-1 ✅ | 同上 | B（tab handleWritebackTB→adjudication.writeback 无确认；旧参 is_occurrence+amount_type:period） |
+      | N5 所得税费用 | 6801 | **occurrence（发生额！）** | 审定表N5-1 | N5-1 ✅ | 同上 | B（tab handleWritebackTB 直调 formData.writebackTB 无确认；旧参 amount_type:period） |
+
+      sheet 名实证来源：后端 `wp_account_package_resolver.py::_DETERMINATION_CODE_RE = re.compile(r"([D-N]\d+-1)\b")` + handler `event_handlers_cycle_linkage.py::_on_d_audit_determination_saved` 正则 `^[D-N]\d+-1$`。sheet_name 常量统一用 `审定表N{n}-1`（复刻 L/M 范式），全 5 子码标准 `N{n}-1` 可解，无不可解降级。
+    - **N4 V1/V2 双 adjudication 处置（grep 实证）**：
+      - **V1 `useN4Adjudication` = LIVE**（`N4TabAdjudication.vue:310` import + 构造，是真实渲染宿主）→ **完整改造**（`writeback()` 去自动写 TB 收敛为经 publishToTb；+ `publishToTb`(二次确认)+`publishing`）。
+      - **V2 `useN4AdjudicationV2` = 零消费死代码**（全仓 0 个 `.vue` 消费方，0 个测试引用，仅自身文件 + 一处 test-helper 文档注释提及）→ 按 Task 17 死代码判法**不新增 publishToTb**；但其 `writeback()` 委托注入的 `writebackTB`，而 `useN4FormData.writebackTB` 已改走 publish-to-tb，故 V2 即便被调用也已合规（不再直调旧 PUT）。已加收口注释登记；整体死代码清理归 task 17。**未误删活的 V1，未误接死的 V2。**
+    - **N1 debounce watcher 处理（Req 1 特例，R7）**：`useN1Adjudication` 原有 `watch(() => totals.value.endAudited)` debounce 2s → `formData.writebackTB(newVal)`（数据一变就静默写 TB，违反 Req 1）→ **已删除该自动回写 watcher** + 连带删除随之失效的 `_suppressWriteback` / `_writebackTimer` / `nextTick` import（死状态）。合计同步供 crossSheet/下游 N5 读取的职责由 `_syncTotals()`（`watch(rows,...)`，与 TB 回写无关）承载，保留不动。TB 回写收敛为 `publishToTb`（二次确认门）。**gate 测试断言：构造 adjudication + updateRow 数据变化后，20ms 内无任何 POST publish-to-tb / PUT trial-balance/writeback（自动写已消除）。**
+    - **N1→N5 联动保留（Req 8，design §3）**：`useN1FormData.writebackTB` 改走 publish-to-tb 后**保留**成功后的两条 emit：`substantive:adjudicated`（附注刷新）+ `deferred-tax:asset-updated`（供 N5 递延所得税费用核对表接收 N1→N5 联动）。**gate 测试 + n1-integration 断言：发布后 deferred-tax:asset-updated 仍 emit（wpCode=N1/accountCode=1811）。** N3→N5 联动（`publishDeferredTaxLiabilityUpdated`）：N3 tab 改为 publishToTb 成功后（返回 boolean）才触发该联动 + 自动快照，取消则不触发。
+    - **改造范式（复刻 M/L/D2）**：反模式 = `useNxFormData.writebackTB` 直调旧端点 `PUT /projects/{pid}/trial-balance/writeback`（N4/N5 带旧参 is_occurrence/amount_type:period）+ 由 Adjudication watcher（N1）/ tab 保存按钮（N2~N5，无二次确认）触发。三处改造：
+      1. **`useNxFormData.writebackTB`**（5 个）：改走 `POST /api/workpapers/{wpId}/audit-determination/publish-to-tb`，body=`{ sheet_name:'审定表Nx-1', writeback_rows:[{account_code, audited_amount, amount_kind}] }`（N4/N5=occurrence，N1/N2/N3=balance）；**守卫由 `projectId` 改 `wpId`**；N4/N5 移除旧 `is_occurrence`/`amount_type:'period'` 参数（改用 `amount_kind='occurrence'`）；N2 移除 `year` 参数；成功后保留原 emit（N1 双 emit / N4 双 emit expense:taxes-surcharges-updated / N2/N3/N5 单 emit）。加 `DETERMINATION_SHEET_NAME` 常量。
+      2. **`useNxAdjudication`**（N1/N2/N3/N4 有 composable）：N1 删自动写 watcher；N2 `saveAndSync`→`saveAdjudication`(去 TB 写)；N3 `saveAndSync`→`saveAdjudication`(去 TB 写)+删 `triggerWriteback`；N4 V1 `writeback()` 收敛为仅经 publishToTb 调用。全部 +`publishToTb`（`publishing` 早退 → `ElMessageBox.confirm` 中文二次确认 → 保存/写回 → 成功 emit + `ElMessage.success`；取消→无副作用）+`publishing` ref（N3/N4 publishToTb 返 boolean 供 tab 决定是否触发跨模块联动）。N5 无 adjudication composable → 显式确认门直接落在 `N5TabAdjudication.vue` handleWritebackTB。
+      3. **`NxTabAdjudication.vue`**（5 个）：handleWritebackTB 改调 publishToTb（N5 内联 confirm）；发布按钮 `type=warning` `:loading=publishing`(N5 用 writebackLoading) `:disabled=isReadonly`，文案改「发布到试算表」；删除各 tab 的 `writebackLoading`（N1~N4，N5 保留复用）。
+    - **改的文件（15 源 + 1 新测试 + 2 既有测试更新 = 18）**：
+      - FormData（5）：`useN1~N5FormData.ts`（writebackTB 改走 publish-to-tb + DETERMINATION_SHEET_NAME 常量 + 守卫改 wpId + N4/N5 去旧参 + N2 去 year 参 + 收口注释）
+      - Adjudication（4 + 1 死代码注释）：`useN1Adjudication.ts`（删自动写 watcher + 死状态 + 加 publishToTb+publishing）、`useN2Adjudication.ts`（saveAndSync→saveAdjudication + publishToTb）、`useN3Adjudication.ts`（saveAndSync→saveAdjudication 删 triggerWriteback + publishToTb 返 boolean）、`useN4Adjudication.ts`（V1 writeback 收敛 + publishToTb 返 boolean）、`useN4AdjudicationV2.ts`（死代码收口注释，未接线）
+      - 组件（5）：`N1~N5TabAdjudication.vue`（handleWritebackTB→publishToTb + 发布按钮 warning + N3/N4 联动仅发布成功后触发 + N5 内联 confirm）
+      - 新增测试：`composables/__tests__/nAdjudicationPublishGate.spec.ts`（参数化 N1~N4 × 5 用例 + N1 特例(数据变化不写 TB / N1→N5 联动) + N4 参数迁移(无 is_occurrence/amount_type) + N5 routing 3 用例 = **26 用例**）
+      - 既有测试更新（2）：`n1-integration.spec.ts`（原 mock-only writebackTB 断言旧 PUT → 改为调真实 useN1FormData.writebackTB + 断言 publish-to-tb writeback_rows 科目1811 amount_kind=balance + 不再调旧端点 + N1→N5 联动 deferred-tax:asset-updated 保留；加 mockPost）、`n3-integration.spec.ts`（同上科目2901 amount_kind=balance；加 mockPost）
+    - **测试命令与 pass 数**：
+      - 新 gate 测试：`rtk npx vitest run nAdjudicationPublishGate.spec.ts --reporter=dot` → **26 passed / 0 failed**（每 N1~N4：writebackTB 走 publish-to-tb 断言 sheet_name(Nx-1)/科目/audited/amount_kind(N4 occurrence 其余 balance) / 无 PUT/POST 命中旧 trial-balance/writeback / 成功仍 emit substantive:adjudicated(wpCode Nx/科目) / publishToTb 取消→无 post 无 emit / publishToTb 确认→经 writebackTB 命中 publish-to-tb；N1 数据变化 20ms 内不写 TB；N1 发布仍 emit deferred-tax:asset-updated；N4 body 无 is_occurrence/amount_type 用 amount_kind=occurrence；N5 routing 3 用例）
+      - N 循环全量回归（13 spec）：`rtk npx vitest run n1-integration + n1-contract + n1-pbt + n1LossCheckModel + n1UnrecognizedLossPayload + n2-contract + n3-integration + n3-contract + n3-pbt + n5-contract + n5-pbt + nCycleSheetRouting + nCycleTaxConsistency + nAdjudicationPublishGate` → **236 passed / 0 failed**
+      - ESLint（15 源 + 3 测试 = 18 文件）：**0 errors**（68 warnings 全为未改代码既存 gt-audit/no-amount-arithmetic·no-amount-toFixed·no-adhoc-wp-structure·no-bare-amount-cell，在 formula 计算/fmtAmount/el-table-column；新增 publishToTb/writebackTB/gate 测试 0 warning）
+      - getDiagnostics（12 核心文件）：**全 0**
+    - **发现的偏差/降级**：
+      - 🟢 **sheet 名全可解**：N 税费类 5 子码标准 `N{n}-1`（含 N4/N5 发生额审定表），无不可解降级。
+      - 🟢 **无 FormData 死代码重复**（与设计一致）：N 的 writebackTB 就在 FormData 被 Adjudication/tab 消费，5 个全活路径，无零消费 duplicate（区别于 H/I/K 循环）。唯一死代码 = N4 V2 adjudication（整 composable 零消费，归 task 17 判法登记，未接线未误删）。
+      - 🟡 **N4 dim2 断言口径调整（合理）**：N4 `writebackTB` 除 publish-to-tb 外仍 `PUT /checklist-responses` 保存审定合计（`N4-1-adjudicated-amount`，正常持久化，非 TB 回写）→ gate 测试 dim2 断言口径改为「无任何 PUT/POST 命中旧 `trial-balance/writeback` 字面量」而非「PUT 从未调用」。非降级，属 N4 特有的合法保存副作用。
+      - 🟡 **N4/N5 旧参迁移（合理）**：旧 `is_occurrence:true`/`amount_type:'period'` 参数是旧端点 `PUT trial-balance/writeback` 的口径标注；publish-to-tb 端点用 `writeback_rows[].amount_kind='occurrence'` 承载同一语义（M0/task1 契约），故删除旧参、改用 amount_kind。gate 测试专门断言 N4 body 不再含旧参。
+      - 🟡 **UX 变更（合理，符合 Req 2）**：N 循环原靠 watcher 自动写（N1）或无二次确认按钮（N2~N5）写 TB（正是本 spec 消除的反模式）→ 改造后各 NxTabAdjudication 的按钮承载显式二次确认动作（文案「发布到试算表」）；N1 数据变化只 emit 附注刷新不写 TB（Req 1）。
+      - 🟢 **既有测试跟随源迁移（非降级，D2/M 先例）**：n1-integration/n3-integration 原「writebackTB payload 正确性」是 mock-only 测试（直调 mockPut 断言旧端点，不跑真实 composable，改动前即不会破）；本次改为调真实 composable + 断言 publish-to-tb 新路径，使其真正验证迁移（test-follows-source）。
+      - 🟢 **`n1_deferred_tax_assets_service.py` DEPRECATED 裸 SQL 旁路未复活**：本任务仅改前端，未触碰该后端 service（正交，确认不复活）。
+    - **端到端验证点**：前端单测覆盖「确认→publish-to-tb 落库路径 + 取消→无副作用 + N1 数据变化仅 emit 不写 TB + N1→N5/N3→N5 联动保留 + N4/N5 发生额 amount_kind 透传」；后端 M0 集成测试（task 1）覆盖 writeback_rows→WORKPAPER_SAVED(publish_confirmed)→handler 幂等回写（含 occurrence amount_kind）。真实项目 Playwright 全链路实测归 task 21*（待 start-dev.bat 环境）；真实 PG 无 N 循环审定数据的 UAT 归 task 20*（data-blocked）。
+    - **未触碰**：`ieOrphanBaseline.spec.ts`（他 spec）；`n1_deferred_tax_assets_service.py` DEPRECATED 旁路（正交）；S 类独立回写服务（正交，非目标）；其他循环 tasks 3/7-15 的活路径。
 
 ## M6：K 循环（活 11 个，多科目 + 发生额主战场；受 task 16 决策约束）
 

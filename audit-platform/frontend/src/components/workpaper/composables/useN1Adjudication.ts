@@ -15,7 +15,8 @@
  *
  * 科目：1811 递延所得税资产（**借方/资产类**！期末余额=期初+借-贷）
  */
-import { ref, computed, watch, nextTick, type Ref, type ComputedRef } from 'vue'
+import { ref, computed, watch, type Ref, type ComputedRef } from 'vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import {
   calcAuditedAmount,
   calcAssetEndBalance,
@@ -155,8 +156,6 @@ export function useN1Adjudication(options: UseN1AdjudicationOptions) {
   //       必须在 allResponses 首次填充后重新 hydrate，否则刷新后数据全空、
   //       且用户一编辑就以空值覆盖持久化（数据丢失）。
   let _hydrated = false
-  /** hydrate 期间抑制 TB 自动回写（避免用刚加载的值触发回写+事件） */
-  let _suppressWriteback = true
 
   function _hasStoredRows(): boolean {
     for (let i = 0; i < N1_ADJUDICATION_CATEGORIES.length; i++) {
@@ -174,17 +173,9 @@ export function useN1Adjudication(options: UseN1AdjudicationOptions) {
       _hydrated = true
       // hydrate 后同步一次合计（供 crossSheet / 下游 N5 读取）
       _syncTotals()
-      nextTick(() => {
-        _suppressWriteback = false
-      })
     },
     { immediate: true },
   )
-
-  // 无历史数据（新底稿）时也应放开自动回写
-  nextTick(() => {
-    if (!_hydrated) _suppressWriteback = false
-  })
 
   // ─── 2. 计算属性：公式列自动计算 ──────────────────────────────────────────
 
@@ -445,30 +436,53 @@ export function useN1Adjudication(options: UseN1AdjudicationOptions) {
 
   watch(rows, () => _syncTotals(), { deep: true })
 
-  // ─── 7. TB回写触发（审定数变化） ───────────────────────────────────────
+  // ─── 7. 审定数变化 → 仅同步合计（不写 TB） ─────────────────────────────
+
+  // spec: tb-writeback-explicit-publish-gate Task 6 / Req 1（数据变化/普通保存绝不写 TB）。
+  // 🔴 原实现有一个 `watch(() => totals.value.endAudited)` debounce 2s → 自动
+  //    `formData.writebackTB(newVal)`，即数据一变就静默回写 trial_balance（绕过显式确认门，
+  //    违反 Req 1）。已**删除该自动回写 watcher**。合计同步供 crossSheet / 下游 N5 读取
+  //    的职责由 §6 `_syncTotals()`（`watch(rows, ...)`）承载，与 TB 回写无关，保留不动。
+  //    TB 回写收敛为用户显式确认动作（publishToTb，见 §7b）。
+
+  // ─── 7b. 显式发布到试算表（显式确认门，复刻 M/L/D2 范式） ──────────────────
+
+  /** 发布中状态（防重复提交，供发布按钮 :loading 绑定） */
+  const publishing = ref(false)
 
   /**
-   * 审定合计变化 → 回写 trial_balance。
+   * 确认发布审定数到试算表（科目 1811 递延所得税资产，期末余额口径）。
    *
-   * 🔴 去抖 2s：逐格录入时 endAudited 每敲一下就变，原实现每次变化立即 PUT
-   *    → 一次录入产生数十次 TB 回写请求（且中间态是不完整数字）。
-   *    去抖后只回写"停手后的稳定值"；显式「回写试算表」按钮仍走 formData.writebackTB。
+   * spec: tb-writeback-explicit-publish-gate Task 6 / Req 2。
+   * 二次确认（中文）→ formData.writebackTB 走
+   * `POST /workpapers/{wpId}/audit-determination/publish-to-tb` 回写 trial_balance，
+   * 并保留 N1→N5 联动（deferred-tax:asset-updated）+ 附注刷新（substantive:adjudicated）。
+   * 用户取消 → 无副作用（不写 TB、不 emit）。
    */
-  const _WRITEBACK_DEBOUNCE_MS = 2000
-  let _writebackTimer: ReturnType<typeof setTimeout> | null = null
+  async function publishToTb(): Promise<void> {
+    if (publishing.value) return
 
-  watch(
-    () => totals.value.endAudited,
-    (newVal, oldVal) => {
-      if (_suppressWriteback) return
-      if (oldVal === undefined || newVal === oldVal) return
-      if (_writebackTimer) clearTimeout(_writebackTimer)
-      _writebackTimer = setTimeout(() => {
-        _writebackTimer = null
-        void formData.writebackTB(newVal)
-      }, _WRITEBACK_DEBOUNCE_MS)
-    },
-  )
+    try {
+      await ElMessageBox.confirm(
+        '发布后将把递延所得税资产期末审定合计（科目 1811）写入试算表（trial_balance），'
+        + '并触发报表/错报评价等下游重算。确认发布？',
+        '发布到试算表确认',
+        { confirmButtonText: '确认发布', cancelButtonText: '取消', type: 'warning' },
+      )
+    } catch {
+      return // 用户取消 → 无任何副作用
+    }
+
+    publishing.value = true
+    try {
+      await formData.writebackTB(totals.value.endAudited)
+      ElMessage.success('已发布到试算表')
+    } catch (err: any) {
+      ElMessage.error(err?.response?.data?.detail || err?.message || '发布失败，请重试')
+    } finally {
+      publishing.value = false
+    }
+  }
 
   // ─── Return ────────────────────────────────────────────────────────────
 
@@ -484,6 +498,9 @@ export function useN1Adjudication(options: UseN1AdjudicationOptions) {
     updateRow,
     auditConclusion,
     auditNotes,
+    // 显式发布到试算表（二次确认门）
+    publishToTb,
+    publishing,
   }
 }
 

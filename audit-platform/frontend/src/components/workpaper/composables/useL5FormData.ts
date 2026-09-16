@@ -51,6 +51,8 @@ import { L5_GROSS_FALLBACK_STANDARD } from './l5AccountScope'
 
 const ACCOUNT_CODE_PAYABLE = L5_GROSS_FALLBACK_STANDARD // 长期应付款（贷方/负债类）
 const ACCOUNT_CODE_UNRECOGNIZED = '2702' // 未确认融资费用（借方/负债备抵类）
+/** 审定表 sheet 名（含子码 L5-1，供后端 extract_determination_wp_code 解出） */
+const DETERMINATION_SHEET_NAME = '审定表L5-1'
 
 // ─── Composable ──────────────────────────────────────────────────────────────
 
@@ -234,42 +236,41 @@ export function useL5FormData(options: UseL5FormDataOptions) {
   // ─── writebackTB (回写审定数到 trial_balance 2701+未确认融资费用) ───────────
 
   /**
-   * 回写审定数到 trial_balance（双科目）：
+   * 发布审定数到 trial_balance（双科目）：
    * - 2701 长期应付款（贷方/负债类）
-   * - 未确认融资费用（借方/负债备抵类）
+   * - 2702 未确认融资费用（借方/负债备抵类）
    *
-   * 并发布 EventBus 'substantive:adjudicated' 事件通知其他组件（附注刷新等）。
+   * spec: tb-writeback-explicit-publish-gate Task 4 / Req 1,2,8。
+   * 此前直调旧端点 `PUT /projects/{pid}/trial-balance/writeback`（两个科目各一次，无
+   * 二次确认/无 publish_confirmed/无幂等），由保存按钮 handleSave 触发。现改为显式发布门：
+   * 仅在用户显式确认（useL5Adjudication.publishToTb 二次确认）后调用本函数 →
+   * 单次 `POST /workpapers/{wpId}/audit-determination/publish-to-tb`（writeback_rows 含
+   * 两个科目预算行，原子发布），后端发 publish_confirmed=True + token → handler 幂等回写。
+   * 成功后为两科目各 emit substantive:adjudicated（附注刷新）。
    */
   async function writebackTB(payload: WritebackPayload): Promise<void> {
-    if (!projectId.value) return
-    try {
-      // 并行回写两个科目
-      await Promise.all([
-        api.put(`/api/projects/${projectId.value}/trial-balance/writeback`, {
-          account_code: ACCOUNT_CODE_PAYABLE,
-          audited_amount: payload.payableAmount,
-        }),
-        api.put(`/api/projects/${projectId.value}/trial-balance/writeback`, {
-          account_code: ACCOUNT_CODE_UNRECOGNIZED,
-          audited_amount: payload.unrecognizedAmount,
-        }),
-      ])
-      // 发布 EventBus 通知审定数变更（附注等组件订阅刷新）
-      eventBus.emit('substantive:adjudicated', {
-        accountCode: ACCOUNT_CODE_PAYABLE,
-        auditedAmount: payload.payableAmount,
-        wpCode: 'L5',
-        timestamp: Date.now(),
-      })
-      eventBus.emit('substantive:adjudicated', {
-        accountCode: ACCOUNT_CODE_UNRECOGNIZED,
-        auditedAmount: payload.unrecognizedAmount,
-        wpCode: 'L5',
-        timestamp: Date.now(),
-      })
-    } catch {
-      ElMessage.warning('审定数回写失败，请手动确认试算表数据')
-    }
+    if (!wpId.value) return
+    await api.post(`/api/workpapers/${wpId.value}/audit-determination/publish-to-tb`, {
+      // sheet 名固定含审定表子码 L5-1，后端 extract_determination_wp_code 据此解出 L5-1
+      sheet_name: DETERMINATION_SHEET_NAME,
+      writeback_rows: [
+        { account_code: ACCOUNT_CODE_PAYABLE, audited_amount: payload.payableAmount, amount_kind: 'balance' },
+        { account_code: ACCOUNT_CODE_UNRECOGNIZED, audited_amount: payload.unrecognizedAmount, amount_kind: 'balance' },
+      ],
+    })
+    // 发布 EventBus 通知审定数变更（附注等组件订阅刷新）
+    eventBus.emit('substantive:adjudicated', {
+      accountCode: ACCOUNT_CODE_PAYABLE,
+      auditedAmount: payload.payableAmount,
+      wpCode: 'L5',
+      timestamp: Date.now(),
+    })
+    eventBus.emit('substantive:adjudicated', {
+      accountCode: ACCOUNT_CODE_UNRECOGNIZED,
+      auditedAmount: payload.unrecognizedAmount,
+      wpCode: 'L5',
+      timestamp: Date.now(),
+    })
   }
 
   // ─── Flush（组件卸载） ───────────────────────────────────────────────────

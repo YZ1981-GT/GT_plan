@@ -310,13 +310,13 @@
       <!-- ═══ TB回写 + N5联动状态 ═══ -->
       <div class="n1-action-bar">
         <el-button
-          type="primary"
+          type="warning"
           size="small"
           :disabled="isReadonly"
-          :loading="writebackLoading"
+          :loading="adjudication.publishing.value"
           @click="handleWritebackTB"
         >
-          回写审定数 → TB(1811期末余额)
+          发布到试算表 → TB(1811期末余额)
         </el-button>
         <div class="n5-linkage-indicator">
           <span class="n5-label">N5递延税费用联动：</span>
@@ -508,7 +508,6 @@ const {
 
 // ─── State ───────────────────────────────────────────────────────────────────
 
-const writebackLoading = ref(false)
 const aiLoading = ref(false)
 
 // ─── Lifecycle ───────────────────────────────────────────────────────────────
@@ -631,17 +630,12 @@ async function handlePullLossFromN15() {
 
 // ─── TB回写 ──────────────────────────────────────────────────────────────────
 
+// spec: tb-writeback-explicit-publish-gate Task 6 / Req 2。
+// TB 回写经显式确认门：adjudication.publishToTb 弹中文二次确认 → formData.writebackTB 走
+// POST /audit-determination/publish-to-tb（保留 N1→N5 联动 deferred-tax:asset-updated）。
 async function handleWritebackTB() {
-  writebackLoading.value = true
-  try {
-    const auditedEndTotal = adjudication.totals.value.endAudited
-    await formData.writebackTB(auditedEndTotal)
-    ElMessage.success('审定数已回写试算表（科目1811期末余额）')
-  } catch (err: any) {
-    ElMessage.error(`回写失败：${err?.message || '未知错误'}`)
-  } finally {
-    writebackLoading.value = false
-  }
+  if (props.isReadonly) return
+  await adjudication.publishToTb()
 }
 
 // ─── 审计说明/结论保存 ───────────────────────────────────────────────────────

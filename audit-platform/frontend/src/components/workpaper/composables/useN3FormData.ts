@@ -42,6 +42,8 @@ export interface UseN3FormDataOptions {
 const DEBOUNCE_MS = 2000
 const ITEM_PREFIX = 'N3-'
 const ACCOUNT_CODE = '2901' // 递延所得税负债（贷方/负债类！）
+/** 审定表 sheet 名（含子码 N3-1，供后端 extract_determination_wp_code 解出） */
+const DETERMINATION_SHEET_NAME = '审定表N3-1'
 
 // ─── Composable ──────────────────────────────────────────────────────────────
 
@@ -291,35 +293,38 @@ export function useN3FormData(options: UseN3FormDataOptions) {
   // ─── writebackTB (回写审定数到 trial_balance 2901) ─────────────────────────
 
   /**
-   * 回写审定数到 trial_balance（科目 2901 递延所得税负债，**贷方/负债类！**）。
+   * 发布审定数到 trial_balance（科目 2901 递延所得税负债，**贷方/负债类！**）。
+   *
+   * spec: tb-writeback-explicit-publish-gate Task 6 / Req 1,2,8。
+   * 此前直调旧端点 `PUT /projects/{pid}/trial-balance/writeback`（无二次确认/无
+   * publish_confirmed/无幂等）。现改为显式发布门：仅在用户显式确认
+   * （useN3Adjudication.publishToTb 二次确认）后调用 →
+   * `POST /workpapers/{wpId}/audit-determination/publish-to-tb`。
    *
    * 负债类贷方方向铁律：
    * - 期末余额 = 期初余额 + 本期贷方(确认) - 本期借方(转回)
-   * - 回写的 audited_amount 代表期末余额（正数=递延所得税负债贷方余额）
-   * - direction = 'credit'（TB取数方向为贷方）
+   * - 回写的 audited_amount 代表期末余额（正数=递延所得税负债贷方余额，amount_kind='balance'）
    * - 递延所得税负债=应纳税暂时性差异×适用税率
    *
-   * 并发布 EventBus 'substantive:adjudicated' 事件通知其他组件（附注/N5联动等）。
+   * 成功后 emit 'substantive:adjudicated'（附注/N5 递延所得税费用核对刷新，design §3 保留）。
    */
   async function writebackTB(auditedAmount: number): Promise<void> {
-    if (!projectId.value) return
-    try {
-      await api.put(`/api/projects/${projectId.value}/trial-balance/writeback`, {
-        account_code: ACCOUNT_CODE,
-        audited_amount: auditedAmount,
-        direction: 'credit', // 负债类贷方科目，期末余额
-      })
-      // 发布 EventBus 通知审定数变更（附注/N5递延所得税费用核对等组件订阅刷新）
-      eventBus.emit('substantive:adjudicated', {
-        accountCode: ACCOUNT_CODE,
-        auditedAmount,
-        wpCode: 'N3',
-        direction: 'credit',
-        timestamp: Date.now(),
-      })
-    } catch {
-      ElMessage.warning('审定数回写失败，请手动确认试算表数据')
-    }
+    if (!wpId.value) return
+    await api.post(`/api/workpapers/${wpId.value}/audit-determination/publish-to-tb`, {
+      // sheet 名固定含审定表子码 N3-1，后端 extract_determination_wp_code 据此解出 N3-1
+      sheet_name: DETERMINATION_SHEET_NAME,
+      writeback_rows: [
+        { account_code: ACCOUNT_CODE, audited_amount: auditedAmount, amount_kind: 'balance' },
+      ],
+    })
+    // 发布 EventBus 通知审定数变更（附注/N5递延所得税费用核对等组件订阅刷新）
+    eventBus.emit('substantive:adjudicated', {
+      accountCode: ACCOUNT_CODE,
+      auditedAmount,
+      wpCode: 'N3',
+      direction: 'credit',
+      timestamp: Date.now(),
+    })
   }
 
   // ─── Flush（组件卸载） ───────────────────────────────────────────────────

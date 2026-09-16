@@ -54,7 +54,8 @@ const {
   updateTrialBalance,
   auditNote,
   auditConclusion,
-  publishAdjudicated,
+  publishToTb,
+  publishing,
   pullFromTB,
 } = useF4Adjudication({
   wpId: toRef(props, 'wpId') as Ref<string>,
@@ -208,13 +209,13 @@ async function generateConclusion(): Promise<void> {
   if (generated) auditConclusion.value = generated
 }
 
-function confirmAdjudication(): void {
+async function confirmAdjudication(): Promise<void> {
   if (!crossCheckPassed.value || hasOpeningVariance.value || hasClosingVariance.value) {
     ElMessage.warning('存在分类口径差异或试算平衡表差异，请核对后再确认')
     return
   }
-  publishAdjudicated()
-  ElMessage.success('已确认审定并发布应付账款审定数')
+  // 显式发布门：二次确认 → publish-to-tb 端点（spec tb-writeback-explicit-publish-gate Task 3）
+  await publishToTb()
 }
 </script>
 
@@ -246,8 +247,8 @@ function confirmAdjudication(): void {
 
     <div class="toolbar">
       <div>
-        <el-button type="primary" size="small" :disabled="isReadonly" @click="confirmAdjudication">
-          确认审定
+        <el-button type="warning" size="small" :loading="publishing" :disabled="isReadonly" @click="confirmAdjudication">
+          发布到试算表
         </el-button>
         <el-tag v-if="detailAggregation.hasData" type="success" size="small">期末已联动 F4-2</el-tag>
         <el-tag v-else type="warning" size="small">F4-2无有效明细，期末可手工录入</el-tag>

@@ -322,23 +322,19 @@ async function handleF4SaveItems(e: Event): Promise<void> {
   }
 }
 
-function handleF4Writeback(e: Event): void {
-  const d = (e as CustomEvent<{ accountCode: string; auditedAmount: number }>).detail
-  if (d?.accountCode != null && d.auditedAmount != null) {
-    void formData.writebackTrialBalance(d.accountCode, d.auditedAmount)
-  }
-}
+// ─── TB 回写：已移除 f4:writeback-trial-balance 监听器（spec tb-writeback-explicit-publish-gate Task 3） ──
+// 原 handleF4Writeback 监听 window 'f4:writeback-trial-balance' → useF4FormData.writebackTrialBalance
+// 落库 trial_balance，绕过显式确认门。改造后 TB 回写由 F4TabAdjudication.publishToTb
+// （显式二次确认 → publish-to-tb 端点）承载；publishAdjudicated 只 emit substantive:adjudicated。
 
 onMounted(async () => {
   window.addEventListener('f4:save-items', handleF4SaveItems)
-  window.addEventListener('f4:writeback-trial-balance', handleF4Writeback)
   await formData.loadAll()
   isLoading.value = false
 })
 
 onBeforeUnmount(() => {
   window.removeEventListener('f4:save-items', handleF4SaveItems)
-  window.removeEventListener('f4:writeback-trial-balance', handleF4Writeback)
 })
 </script>
 

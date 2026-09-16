@@ -60,6 +60,8 @@ const ITEM_PREFIX = 'L8-'
 import { L8_GROSS_FALLBACK_STANDARD } from './l8AccountScope'
 
 const ACCOUNT_CODE = L8_GROSS_FALLBACK_STANDARD // 财务费用（借方/损益类！取发生额）
+/** 审定表 sheet 名（含子码 L8-1，供后端 extract_determination_wp_code 解出） */
+const DETERMINATION_SHEET_NAME = '审定表L8-1'
 
 // ─── Composable ──────────────────────────────────────────────────────────────
 
@@ -318,34 +320,40 @@ export function useL8FormData(options: UseL8FormDataOptions) {
     _debounceTimers.set(itemId, timer)
   }
 
-  // ─── writebackTB (回写审定数到 trial_balance 6603, 发生额口径) ─────────────
+  // ─── writebackTB (显式发布审定数到 trial_balance 6603, 发生额口径) ──────────
 
   /**
-   * 回写审定数到 trial_balance（科目 6603 财务费用，**发生额口径！**）。
+   * 发布审定数到 trial_balance（科目 6603 财务费用，**发生额口径！**）。
    *
    * ⚠️ 损益类特殊：
-   * - 回写的 audited_amount 代表审定的本期发生额（非余额）
+   * - 回写的 audited_amount 代表审定的本期发生额（非余额）→ amount_kind='occurrence'
    * - 费用为借方科目：正值=费用增加，负值=费用冲回
    *
-   * 并发布 EventBus 'substantive:adjudicated' 事件通知其他组件（附注刷新等）。
+   * spec: tb-writeback-explicit-publish-gate Task 4 / Req 1,2,8。
+   * 此前直调旧端点 `PUT /projects/{pid}/trial-balance/writeback`（无二次确认/无
+   * publish_confirmed/无幂等），且由 useL8Adjudication 的 watcher 在数据变化时**自动**
+   * 触发（违反 Req 1）。现改为显式发布门：仅在用户显式确认后调用本函数 →
+   * `POST /workpapers/{wpId}/audit-determination/publish-to-tb`（携审定表 sheet 名 +
+   * writeback_rows 预算行，amount_kind 标 occurrence），后端发 publish_confirmed=True +
+   * token → handler 幂等回写。成功后 emit substantive:adjudicated（附注刷新）。
    */
   async function writebackTB(amount: number): Promise<void> {
-    if (!projectId.value) return
-    try {
-      await api.put(`/api/projects/${projectId.value}/trial-balance/writeback`, {
-        account_code: ACCOUNT_CODE,
-        audited_amount: amount,
-      })
-      // 发布 EventBus 通知审定数变更（附注等组件订阅刷新）
-      eventBus.emit('substantive:adjudicated', {
-        accountCode: ACCOUNT_CODE,
-        auditedAmount: amount,
-        wpCode: 'L8',
-        timestamp: Date.now(),
-      })
-    } catch {
-      ElMessage.warning('审定数回写失败，请手动确认试算表数据')
-    }
+    if (!wpId.value) return
+    await api.post(`/api/workpapers/${wpId.value}/audit-determination/publish-to-tb`, {
+      // sheet 名固定含审定表子码 L8-1，后端 extract_determination_wp_code 据此解出 L8-1
+      sheet_name: DETERMINATION_SHEET_NAME,
+      writeback_rows: [
+        // 发生额口径！amount_kind='occurrence'（后端透传，区别于余额类 balance）
+        { account_code: ACCOUNT_CODE, audited_amount: amount, amount_kind: 'occurrence' },
+      ],
+    })
+    // 发布 EventBus 通知审定数变更（附注等组件订阅刷新）
+    eventBus.emit('substantive:adjudicated', {
+      accountCode: ACCOUNT_CODE,
+      auditedAmount: amount,
+      wpCode: 'L8',
+      timestamp: Date.now(),
+    })
   }
 
   // ─── Flush（组件卸载） ───────────────────────────────────────────────────

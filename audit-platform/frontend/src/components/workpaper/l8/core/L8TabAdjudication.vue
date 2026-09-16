@@ -191,18 +191,18 @@
         </el-table-column>
       </el-table>
 
-      <!-- TB回写按钮 -->
+      <!-- 发布到试算表按钮（显式确认门） -->
       <div class="tb-writeback-bar">
         <el-button
           type="warning"
           size="small"
           :disabled="isReadonly"
-          :loading="isWritingBack"
-          @click="handleWritebackTB"
+          :loading="publishing"
+          @click="handlePublishToTb"
         >
-          TB回写（发生额口径！）
+          发布到试算表（发生额口径！）
         </el-button>
-        <span class="tb-hint">将审定合计回写试算表科目6603（损益类发生额口径）</span>
+        <span class="tb-hint">二次确认后将审定合计回写试算表科目6603（损益类发生额口径）</span>
       </div>
     </div>
 
@@ -345,7 +345,9 @@ const {
   totalRow,
   abnormalChangeRows,
   updateRow,
-  saveAndWriteback,
+  saveAdjudication,
+  publishToTb,
+  publishing,
 } = useL8Adjudication(formData, rows)
 
 // ─── 从集中登记带入调整（6603 财务费用，损益借方·发生额口径；带入本期 AJE/RJE） ────
@@ -436,7 +438,6 @@ function getRowClassName({ rowIndex }: { row: any; rowIndex: number }): string {
 // ─── UI State ────────────────────────────────────────────────────────────────
 
 const isSaving = ref(false)
-const isWritingBack = ref(false)
 const auditNote = ref('')
 
 // ─── Handlers ────────────────────────────────────────────────────────────────
@@ -458,19 +459,17 @@ function handleReasonUpdate(index: number, value: string): void {
 async function handleSave() {
   isSaving.value = true
   try {
-    await saveAndWriteback()
+    // 普通保存不写 TB（Req 1）；TB 回写走「发布到试算表」显式确认门
+    await saveAdjudication()
   } finally {
     isSaving.value = false
   }
 }
 
-async function handleWritebackTB() {
-  isWritingBack.value = true
-  try {
-    await formData.writebackTB(totalRow.value.currentAudited)
-  } finally {
-    isWritingBack.value = false
-  }
+/** 发布到试算表（显式确认门，Req 2；科目6603 发生额口径） */
+async function handlePublishToTb() {
+  if (props.isReadonly) return
+  await publishToTb()
 }
 
 function saveAuditNote() {

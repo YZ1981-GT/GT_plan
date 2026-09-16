@@ -22,8 +22,8 @@
         <el-tag type="danger" size="small" class="liability-tag">负债类·贷方</el-tag>
       </div>
       <div class="section-actions">
-        <el-button size="small" :disabled="isReadonly" :loading="writebackLoading" type="primary" @click="handleWritebackTB">
-          回写审定数
+        <el-button size="small" :disabled="isReadonly" :loading="publishing" type="warning" @click="handleWritebackTB">
+          发布到试算表
         </el-button>
       </div>
     </div>
@@ -397,12 +397,13 @@ const {
   updateRow,
   addRow,
   removeRow,
-  saveAndSync,
+  publishToTb,
+  publishing,
 } = useN2Adjudication14({
   allResponses: allResponsesRef,
   saveField: formData.setField,
   getField: formData.getField,
-  writebackTB: (amt: number) => formData.writebackTB(amt, props.year),
+  writebackTB: (amt: number) => formData.writebackTB(amt),
   prefill,
 })
 
@@ -427,7 +428,6 @@ watch(
 )
 
 const isReadonly = computed(() => props.isReadonly ?? false)
-const writebackLoading = ref(false)
 const noteAiLoading = ref(false)
 const conclusionAiLoading = ref(false)
 
@@ -535,16 +535,12 @@ function getSummaries({ columns }: { columns: any[] }) {
 
 // ─── TB 回写 ─────────────────────────────────────────────────────────────────
 
+// spec: tb-writeback-explicit-publish-gate Task 6 / Req 2。
+// TB 回写经显式确认门：publishToTb 弹中文二次确认 → formData.writebackTB 走
+// POST /audit-determination/publish-to-tb（科目 2221 期末余额）。
 async function handleWritebackTB() {
-  writebackLoading.value = true
-  try {
-    await saveAndSync()
-    ElMessage.success('审定期末合计已回写试算表（科目 2221 期末余额）')
-  } catch (err: any) {
-    ElMessage.error(`回写失败：${err?.message || '未知错误'}`)
-  } finally {
-    writebackLoading.value = false
-  }
+  if (isReadonly.value) return
+  await publishToTb()
 }
 
 // ─── 审计说明/结论保存 ───────────────────────────────────────────────────────

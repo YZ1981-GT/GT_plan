@@ -19,6 +19,7 @@
  * Item IDs: "N4-1-rows", "N4-1-audited-total", "N4-1-audit-note", "N4-1-audit-conclusion"
  */
 import { ref, computed, watch, type Ref, type ComputedRef } from 'vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import {
   parseNum,
   calcAuditedAmount,
@@ -310,6 +311,14 @@ export function useN4Adjudication(params: UseN4AdjudicationParams) {
 
   // ─── TB回写 + EventBus（损益类发生额！6403）────────────────────────────────
 
+  /** 发布中状态（防重复提交，供发布按钮 :loading 绑定） */
+  const publishing = ref(false)
+
+  /**
+   * 执行 TB 回写（持久化审定合计 → formData.writebackTB 发生额回写 6403）。
+   * spec: tb-writeback-explicit-publish-gate Task 6。**仅由 publishToTb 显式确认后调用**，
+   * 不再作为普通保存的自动动作。
+   */
   async function writeback(): Promise<void> {
     _persist()
     const auditedTotal = totalRow.value.audited
@@ -317,12 +326,47 @@ export function useN4Adjudication(params: UseN4AdjudicationParams) {
     // 持久化审定合计（独立item_id，供CrossSheet+render策略回读）
     onSave?.(`${ITEM_PREFIX}-audited-total`, auditedTotal)
 
-    // 调用 useN4FormData 的 writebackTB（发生额回写6403）
+    // 调用 useN4FormData 的 writebackTB（走 publish-to-tb 发生额回写6403）
     if (writebackTB) {
       await writebackTB(auditedTotal)
     }
 
     isChanged.value = false
+  }
+
+  /**
+   * 确认发布审定数到试算表（科目 6403 税金及附加本期发生额）。
+   *
+   * spec: tb-writeback-explicit-publish-gate Task 6 / Req 2。
+   * 二次确认（中文）→ writeback 走
+   * `POST /workpapers/{wpId}/audit-determination/publish-to-tb`（amount_kind='occurrence'）。
+   * 用户取消 → 无副作用。返回是否已发布（供调用方决定是否触发 A 类利润表勾稽联动）。
+   */
+  async function publishToTb(): Promise<boolean> {
+    if (isReadonly?.value || publishing.value) return false
+
+    try {
+      await ElMessageBox.confirm(
+        '发布后将把税金及附加本期审定发生额（科目 6403）写入试算表（trial_balance），'
+        + '并触发报表/错报评价/利润表勾稽等下游重算。确认发布？',
+        '发布到试算表确认',
+        { confirmButtonText: '确认发布', cancelButtonText: '取消', type: 'warning' },
+      )
+    } catch {
+      return false // 用户取消 → 无任何副作用
+    }
+
+    publishing.value = true
+    try {
+      await writeback()
+      ElMessage.success('已发布到试算表')
+      return true
+    } catch (err: any) {
+      ElMessage.error(err?.response?.data?.detail || err?.message || '发布失败，请重试')
+      return false
+    } finally {
+      publishing.value = false
+    }
   }
 
   // ─── Persist ───────────────────────────────────────────────────────────────
@@ -363,6 +407,9 @@ export function useN4Adjudication(params: UseN4AdjudicationParams) {
     addRow,
     removeRow,
     writeback,
+    // 显式发布到试算表（二次确认门）
+    publishToTb,
+    publishing,
     saveNote,
     saveConclusion,
     getAuditedTotal,

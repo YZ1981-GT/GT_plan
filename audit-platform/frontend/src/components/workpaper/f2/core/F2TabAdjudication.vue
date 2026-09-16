@@ -33,8 +33,8 @@
     <!-- 工具栏 -->
     <div class="tab-toolbar">
       <div class="toolbar-left">
-        <el-button type="primary" size="small" :disabled="isReadonly" @click="publishAdjudicated()">
-          发布审定数
+        <el-button type="warning" size="small" :loading="publishing" :disabled="isReadonly" @click="publishToTb()">
+          发布到试算表
         </el-button>
         <el-button size="small" plain :loading="grossPull.loading.value" :disabled="isReadonly" @click="openGrossBringIn">
           <el-icon><Download /></el-icon>带入调整·原值
@@ -227,7 +227,8 @@ const {
   conclusion,
   updateCell,
   updateTrialBalanceAmount,
-  publishAdjudicated,
+  publishToTb,
+  publishing,
 } = useF2Adjudication({
   wpId: toRef(props, 'wpId'),
   projectId: toRef(props, 'projectId'),

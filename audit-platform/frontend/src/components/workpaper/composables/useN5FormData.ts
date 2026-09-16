@@ -59,6 +59,8 @@ export interface TbOccurrence {
 const DEBOUNCE_MS = 2000
 const ITEM_PREFIX = 'N5-'
 const ACCOUNT_CODE = '6801' // 所得税费用（借方/损益类！取发生额）
+/** 审定表 sheet 名（含子码 N5-1，供后端 extract_determination_wp_code 解出） */
+const DETERMINATION_SHEET_NAME = '审定表N5-1'
 
 // ─── Composable ──────────────────────────────────────────────────────────────
 
@@ -320,34 +322,38 @@ export function useN5FormData(options: UseN5FormDataOptions) {
   // ─── writebackTB (回写审定数到 trial_balance 6801, 本期发生额口径) ─────────
 
   /**
-   * 回写审定数到 trial_balance（科目 6801 所得税费用，**本期发生额口径！**）。
+   * 发布审定数到 trial_balance（科目 6801 所得税费用，**本期发生额口径！**）。
+   *
+   * spec: tb-writeback-explicit-publish-gate Task 6 / Req 1,2,8。
+   * 此前直调旧端点 `PUT /projects/{pid}/trial-balance/writeback`（无二次确认/无
+   * publish_confirmed/无幂等，用旧参 amount_type:'period'）。现改为显式发布门：仅在
+   * 用户显式确认（N5TabAdjudication.publishToTb 二次确认）后调用 →
+   * `POST /workpapers/{wpId}/audit-determination/publish-to-tb`，发生额语义用
+   * `amount_kind='occurrence'` 标注（替代旧 amount_type 参数）。
    *
    * ⚠️ 损益类特殊：
    * - 回写的 audited_amount 代表审定的本期发生额（非余额）
    * - 费用为借方科目：正值=费用增加，负值=费用冲回
-   * - amount_type = "period" 标记损益类发生额口径
    *
-   * 并发布 EventBus 'substantive:adjudicated' 事件通知其他组件（附注刷新等）。
+   * 成功后 emit 'substantive:adjudicated'（附注等组件订阅刷新，design §3 保留）。
    */
   async function writebackTB(amount: number): Promise<void> {
-    if (!projectId.value) return
-    try {
-      await api.put(`/api/projects/${projectId.value}/trial-balance/writeback`, {
-        account_code: ACCOUNT_CODE,
-        audited_amount: amount,
-        amount_type: 'period',
-      })
-      // 发布 EventBus 通知审定数变更（附注等组件订阅刷新）
-      eventBus.emit('substantive:adjudicated', {
-        accountCode: ACCOUNT_CODE,
-        auditedAmount: amount,
-        wpCode: 'N5',
-        amountType: 'period',
-        timestamp: Date.now(),
-      })
-    } catch {
-      ElMessage.warning('审定数回写失败，请手动确认试算表数据')
-    }
+    if (!wpId.value) return
+    await api.post(`/api/workpapers/${wpId.value}/audit-determination/publish-to-tb`, {
+      // sheet 名固定含审定表子码 N5-1，后端 extract_determination_wp_code 据此解出 N5-1
+      sheet_name: DETERMINATION_SHEET_NAME,
+      writeback_rows: [
+        { account_code: ACCOUNT_CODE, audited_amount: amount, amount_kind: 'occurrence' },
+      ],
+    })
+    // 发布 EventBus 通知审定数变更（附注等组件订阅刷新）
+    eventBus.emit('substantive:adjudicated', {
+      accountCode: ACCOUNT_CODE,
+      auditedAmount: amount,
+      wpCode: 'N5',
+      amountType: 'period',
+      timestamp: Date.now(),
+    })
   }
 
   // ─── Flush（组件卸载） ───────────────────────────────────────────────────

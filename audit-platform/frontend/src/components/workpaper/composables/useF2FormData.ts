@@ -239,17 +239,10 @@ export function useF2FormData(options: UseF2FormDataOptions) {
     _debounceTimers.set(itemId, timer)
   }
 
-  async function writebackTrialBalance(accountCode: string, auditedAmount: number): Promise<void> {
-    if (!projectId.value) return
-    try {
-      await api.put(`/api/projects/${projectId.value}/trial-balance/writeback`, {
-        account_code: accountCode,
-        audited_amount: auditedAmount,
-      })
-    } catch {
-      ElMessage.warning(`科目 ${accountCode} 审定数回写失败，请手动确认试算表`)
-    }
-  }
+  // ─── trial_balance 回写：已移除 writebackTrialBalance（spec tb-writeback-explicit-publish-gate Task 3） ──
+  // 原 writebackTrialBalance 直调旧端点 PUT /projects/{pid}/trial-balance/writeback 绕过确认门。
+  // 改造后 TB 回写走显式发布门（F2TabAdjudication.publishToTb → publish-to-tb，多科目原子发布）。
+  // 唯一消费方 GtF2InventoryMain.handleF2Writeback 已随监听器移除 ⇒ 此函数为零消费死代码。
 
   function _flushPending(): void {
     for (const timer of _debounceTimers.values()) clearTimeout(timer)
@@ -283,7 +276,6 @@ export function useF2FormData(options: UseF2FormDataOptions) {
     saveBatch,
     saveItemsFromEvent,
     debouncedSave,
-    writebackTrialBalance,
   }
 }
 

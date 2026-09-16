@@ -50,7 +50,8 @@ const {
   auditNote,
   auditConclusion,
   updateCell,
-  publishAdjudicated,
+  publishToTb,
+  publishing,
   pullFromTB,
 } = useF3Adjudication({
   wpId: toRef(props, 'wpId') as Ref<string>,
@@ -195,9 +196,9 @@ function getRowClassName({ row }: { row: F3AdjudicationRow }): string {
   return ''
 }
 
-function confirmAdjudication() {
-  publishAdjudicated()
-  ElMessage.success('已确认审定并发布 EventBus(substantive:adjudicated)')
+async function confirmAdjudication() {
+  // 显式发布门：二次确认 → publish-to-tb 端点（spec tb-writeback-explicit-publish-gate Task 3）
+  await publishToTb()
 }
 </script>
 
@@ -236,7 +237,7 @@ function confirmAdjudication() {
     <!-- 工具栏 -->
     <div class="tab-toolbar">
       <div class="toolbar-left">
-        <el-button size="small" type="primary" :disabled="isReadonly" @click="confirmAdjudication">确认审定（回写TB）</el-button>
+        <el-button size="small" type="warning" :loading="publishing" :disabled="isReadonly" @click="confirmAdjudication">发布到试算表</el-button>
       </div>
       <div class="toolbar-right">
         <el-button size="small" type="primary" plain :loading="adjPull.loading.value" @click="openBringInAdjustment">

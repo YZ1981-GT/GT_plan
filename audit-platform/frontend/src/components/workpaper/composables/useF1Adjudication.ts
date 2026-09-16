@@ -17,6 +17,7 @@
  * Requirements: 1.1-1.8, 2.1-2.8, 3.1-3.7, 18.1
  */
 import { ref, computed, watch, onBeforeUnmount, type Ref, type ComputedRef } from 'vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { useAgingConfig, PRESET_SEGMENTS, type AgingSegment } from '@/composables/useAgingConfig'
 import { eventBus } from '@/utils/eventBus'
 import {
@@ -525,16 +526,72 @@ export function useF1Adjudication(options: UseF1AdjudicationOptions) {
     }
 
     // 统一走 eventBus（crossWpEventBridge 双向桥接，window 侧历史监听者不受影响）
+    // 🔴 不再 dispatch f1:writeback-trial-balance 绕过门：TB 回写收敛为显式确认动作
+    // （publishToTb → publish-to-tb 端点）。spec: tb-writeback-explicit-publish-gate Task 3。
     try {
       eventBus.emit('substantive:adjudicated', payload as any)
     } catch { /* silent */ }
+  }
 
-    if (projectId.value) {
-      try {
-        window.dispatchEvent(new CustomEvent('f1:writeback-trial-balance', {
-          detail: { projectId: projectId.value, accountCode: '1123', auditedAmount },
-        }))
-      } catch { /* silent */ }
+  // ─── Publish to Trial Balance（显式发布门，复刻 D2/D4-1 范式） ──────────────
+
+  const publishing = ref(false)
+
+  /**
+   * 确认发布审定数到试算表（科目 1123 预付账款）。
+   *
+   * spec: tb-writeback-explicit-publish-gate Task 3 / Req 1,2,8。
+   * 此前 F1 靠 publishAdjudicated 自动 dispatch `f1:writeback-trial-balance`
+   * → GtF1 监听 → 旧端点 `PUT /projects/{pid}/trial-balance/writeback` 直写 audited_amount，
+   * **绕过**显式确认门（无二次确认/无幂等/无 publish_confirmed）。
+   * 现改为：二次确认（中文）→ `POST /workpapers/{wpId}/audit-determination/publish-to-tb`
+   * （携带审定表 sheet 名 + writeback_rows 预算行），后端校验发布权限、发
+   * publish_confirmed + token → 回写 handler 幂等回写 trial_balance。
+   * 普通保存/数据变化对 TB 仍是 no-op（publishAdjudicated 只 emit substantive:adjudicated）。
+   */
+  async function publishToTb(): Promise<void> {
+    if (isReadonly.value || publishing.value) return
+
+    // 二次确认（中文，危险操作提示）
+    try {
+      await ElMessageBox.confirm(
+        '发布后将把预付账款审定数（科目 1123）写入试算表（trial_balance），'
+        + '并触发报表/错报评价等下游重算。确认发布？',
+        '发布到试算表确认',
+        { confirmButtonText: '确认发布', cancelButtonText: '取消', type: 'warning' },
+      )
+    } catch {
+      return // 用户取消 → 无任何副作用（不写 TB、不 emit）
+    }
+
+    if (!wpId.value) {
+      ElMessage.error('缺少底稿标识，无法发布')
+      return
+    }
+
+    // 审定数取账龄合计行 currentAudited（前端已算最终值 → 走 writeback_rows 预算行）
+    const auditedAmount = sections.value[1]?.subtotalRow?.currentAudited ?? 0
+
+    publishing.value = true
+    try {
+      const { api } = await import('@/services/apiProxy')
+      const resp: any = await api.post(
+        `/api/workpapers/${wpId.value}/audit-determination/publish-to-tb`,
+        {
+          sheet_name: '审定表F1-1',
+          writeback_rows: [
+            { account_code: '1123', audited_amount: auditedAmount, amount_kind: 'balance' },
+          ],
+        },
+      )
+      ElMessage.success(resp?.message || '已发布到试算表')
+
+      // 发布成功 → 通知下游附注/检查表刷新（TB 回写已由后端确认门完成）
+      publishAdjudicated()
+    } catch (err: any) {
+      ElMessage.error(err?.response?.data?.detail || err?.message || '发布失败，请重试')
+    } finally {
+      publishing.value = false
     }
   }
 
@@ -567,6 +624,8 @@ export function useF1Adjudication(options: UseF1AdjudicationOptions) {
     // 操作
     updateCell,
     publishAdjudicated,
+    publishToTb,
+    publishing,
     // Internal (for testing)
     _NATURE_LABEL_TO_KEY: NATURE_LABEL_TO_KEY,
   }

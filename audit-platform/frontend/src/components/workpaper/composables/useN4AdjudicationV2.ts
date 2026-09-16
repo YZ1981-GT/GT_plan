@@ -244,6 +244,12 @@ export function useN4AdjudicationV2(params: UseN4AdjudicationV2Params) {
 
   // ─── Writeback TB ──────────────────────────────────────────────────────
 
+  // spec: tb-writeback-explicit-publish-gate Task 6。
+  // ⚠️ useN4AdjudicationV2 是**零消费死代码**（无任何 .vue 渲染宿主 / 测试引用；N4 活路径用
+  //    useN4Adjudication V1，见 N4TabAdjudication.vue）。此处 writeback 委托注入的 writebackTB，
+  //    而 useN4FormData.writebackTB 已改走显式发布门 POST /audit-determination/publish-to-tb，
+  //    故本函数即便被调用也已合规（不再直调旧 PUT 端点）。按 Task 17 死代码判法：不误删活的、
+  //    死的仅登记不接线（未新增 publishToTb）；整体死代码清理归 task 17。
   async function writeback(): Promise<void> {
     _persist()
     const auditedTotal = totalRow.value.curAudited

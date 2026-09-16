@@ -296,17 +296,15 @@ function seedAdjudicatedFromStore(): void {
   else if (formData.adjudicatedCogs.value) adjudicatedCOGS.value = formData.adjudicatedCogs.value
 }
 
-function handleF5Writeback(e: Event): void {
-  const d = (e as CustomEvent<{ accountCode: string; auditedAmount: number }>).detail
-  if (d?.accountCode != null && d.auditedAmount != null) {
-    void formData.writebackTrialBalance(d.accountCode, d.auditedAmount)
-  }
-}
+// ─── TB 回写：已移除 f5:writeback-trial-balance 监听器（spec tb-writeback-explicit-publish-gate Task 3） ──
+// 原 handleF5Writeback 监听 window 'f5:writeback-trial-balance' → useF5CosSalFormData.writebackTrialBalance
+// 落库 trial_balance，绕过显式确认门。改造后 TB 回写由 F5TabAdjudication.publishToTb
+// （显式二次确认 → publish-to-tb 端点，发生额口径）承载。
+// 🔴 严格保留 f5:save-items（持久化）+ substantive:adjudicated（F5-7 成本倒轧校验区消费 6401 审定数）两条监听。
 
 onMounted(async () => {
   window.addEventListener('f5:save-items', handleF5SaveItems)
   window.addEventListener('substantive:adjudicated', handleAdjudicated)
-  window.addEventListener('f5:writeback-trial-balance', handleF5Writeback)
   await formData.loadAll()
   seedAdjudicatedFromStore()
   // 异步拉取 D4 收入数据（供毛利率分析，不阻塞首屏）
@@ -317,7 +315,6 @@ onMounted(async () => {
 onBeforeUnmount(() => {
   window.removeEventListener('f5:save-items', handleF5SaveItems)
   window.removeEventListener('substantive:adjudicated', handleAdjudicated)
-  window.removeEventListener('f5:writeback-trial-balance', handleF5Writeback)
 })
 </script>
 
