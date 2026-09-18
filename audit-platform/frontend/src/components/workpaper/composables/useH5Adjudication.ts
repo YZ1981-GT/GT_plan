@@ -9,6 +9,8 @@
  * Requirements: 2.1-2.8
  */
 import { ref, computed, watch, type Ref } from 'vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import { api } from '@/services/apiProxy'
 import type { ChecklistItem } from './useH5FormData'
 import {
   calcAuditedAmount,
@@ -59,10 +61,13 @@ export function useH5Adjudication(opts: {
   crossSheetDetailCost?: Ref<number>
   crossSheetDetailDepletion?: Ref<number>
   onSave?: (itemId: string, value: any) => void
-  onWritebackTB?: (auditedCost: number, auditedDepletion: number) => Promise<void>
   onPublishEvent?: (event: string, payload: any) => void
+  /** 只读态：显式发布 TB 早退（spec tb-writeback-explicit-publish-gate Task 10 / Req 3 前端侧） */
+  isReadonly?: Ref<boolean>
 }) {
   const { allResponses, onSave } = opts
+  /** spec: tb-writeback-explicit-publish-gate Task 10 —— 显式发布到 TB 的进行中标志 */
+  const publishing = ref(false)
 
   // ─── State ─────────────────────────────────────────────────────────────────
 
@@ -248,16 +253,55 @@ export function useH5Adjudication(opts: {
     _persist()
   }
 
-  async function publishAdjudicated(): Promise<void> {
+  /**
+   * 仅发布 substantive:adjudicated 事件通知下游（附注刷新），不写 TB（Req 1）。
+   */
+  function emitAdjudicated(): void {
     const auditedCost = costSubtotal.value.audited
     const auditedDepl = depletionSubtotal.value.audited
-    if (opts.onWritebackTB) await opts.onWritebackTB(auditedCost, auditedDepl)
     if (opts.onPublishEvent) {
       opts.onPublishEvent('substantive:adjudicated', {
         wp_code: 'H5', account_codes: ['1631', '1632'],
         cost_audited: auditedCost, depletion_audited: auditedDepl,
         net_value: netValueAudited.value,
       })
+    }
+  }
+
+  /**
+   * spec: tb-writeback-explicit-publish-gate Task 10 / Req 1,2,5,8。
+   * 显式发布审定数到试算表：中文二次确认 → POST /workpapers/{wpId}/audit-determination/publish-to-tb
+   * （双科目 1631 原值 + 1632 累计折耗，balance 口径，单次原子发布），成功后仍 emit substantive:adjudicated。
+   * 取消/readonly 早退，不写 TB、不 emit。此前经 onWritebackTB 回调两次直调旧端点 PUT trial-balance/writeback。
+   */
+  async function publishToTb(): Promise<void> {
+    if (publishing.value || opts.isReadonly?.value) return
+    const auditedCost = costSubtotal.value.audited
+    const auditedDepl = depletionSubtotal.value.audited
+    try {
+      await ElMessageBox.confirm(
+        '将把油气资产原值(1631)、累计折耗(1632)审定数写入试算表，并触发报表及错报评价重算。是否继续？',
+        '发布到试算表',
+        { confirmButtonText: '确认发布', cancelButtonText: '取消', type: 'warning' },
+      )
+    } catch {
+      return
+    }
+    publishing.value = true
+    try {
+      await api.post(`/api/workpapers/${opts.wpId.value}/audit-determination/publish-to-tb`, {
+        sheet_name: '审定表H5-1',
+        writeback_rows: [
+          { account_code: '1631', audited_amount: auditedCost, amount_kind: 'balance' },
+          { account_code: '1632', audited_amount: auditedDepl, amount_kind: 'balance' },
+        ],
+      })
+      ElMessage.success('已发布到试算表 1631/1632')
+      emitAdjudicated()
+    } catch {
+      ElMessage.warning('审定数发布失败，请稍后重试或手动确认试算表数据')
+    } finally {
+      publishing.value = false
     }
   }
 
@@ -290,6 +334,6 @@ export function useH5Adjudication(opts: {
     costRows, depletionRows, impairmentRows, auditNote, auditConclusion,
     costSubtotal, depletionSubtotal, impairmentSubtotal, netValueAudited,
     reconciliationResults, crossValidation,
-    updateCell, publishAdjudicated, saveNote, saveConclusion,
+    updateCell, publishToTb, publishing, emitAdjudicated, saveNote, saveConclusion,
   }
 }

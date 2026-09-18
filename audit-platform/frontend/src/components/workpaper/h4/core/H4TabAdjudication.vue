@@ -393,8 +393,14 @@
     </el-card>
 
     <div v-if="!props.isReadonly" class="action-bar">
-      <el-button type="primary" :loading="publishing" @click="handlePublish">
-        确认审定 → 回写TB(1605)
+      <el-button
+        type="warning"
+        :loading="state.publishing.value"
+        :disabled="props.isReadonly"
+        data-testid="h4-publish-tb"
+        @click="handlePublish"
+      >
+        发布到试算表
       </el-button>
     </div>
 
@@ -461,7 +467,6 @@ const props = defineProps<{
 
 const openReviewDialog = inject<(id: string) => void>('openReviewDialog', () => {})
 const saveResponse = inject<(itemId: string, value: any) => void>('saveResponse', () => {})
-const publishing = ref(false)
 const seedingCip = ref(false)
 const { resolveInstance } = useAcnr()
 
@@ -484,25 +489,13 @@ const state = useH4Adjudication({
   projectId: toRef(props, 'projectId'),
   allResponses: allResponsesRef as any,
   tbData,
+  isReadonly: toRef(props, 'isReadonly'),
   onSave: (itemId: string, value: any) => {
     // 与 H4-2/H4-3/H4-4 一致：走主入口 persistResponse 落库
     saveResponse(itemId, value)
   },
-  onWritebackTB: async (amount: number) => {
-    // 真实回写 trial_balance（端点按 LIKE 前缀匹配子科目）
-    try {
-      await http.put(`/api/projects/${props.projectId}/trial-balance/writeback`, {
-        account_code: '1605',
-        audited_amount: amount,
-      })
-    } catch (e: any) {
-      ElMessage.warning(`TB回写请求失败: ${e?.message || e}`)
-    }
-    window.dispatchEvent(new CustomEvent('substantive:adjudicated', {
-      detail: { wpCode: 'H4', accountCode: '1605', auditedAmount: amount },
-    }))
-    ElMessage.success(`已回写 TB 科目1605 审定数 ${fmtAmt(amount)}`)
-  },
+  // spec: tb-writeback-explicit-publish-gate Task 10 —— TB 回写改由 state.publishToTb
+  // 走显式发布门（中文二次确认 → POST publish-to-tb 科目 1605 balance），发布后 emit substantive:adjudicated。
 })
 
 const crossSheet = useH4CrossSheet(allResponsesRef as any)
@@ -776,12 +769,7 @@ onUnmounted(() => {
 })
 
 async function handlePublish() {
-  publishing.value = true
-  try {
-    await state.publishAdjudicated()
-  } finally {
-    publishing.value = false
-  }
+  await state.publishToTb()
 }
 
 function openReview(id: string) {

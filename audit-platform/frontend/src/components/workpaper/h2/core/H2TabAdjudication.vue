@@ -372,8 +372,14 @@
     </el-card>
 
     <div v-if="!isReadonly" class="action-bar">
-      <el-button type="primary" :loading="publishing" @click="handlePublish">
-        确认审定 → 回写TB
+      <el-button
+        type="warning"
+        :loading="state.publishing.value"
+        :disabled="isReadonly"
+        data-testid="h2-publish-tb"
+        @click="handlePublish"
+      >
+        发布到试算表
       </el-button>
     </div>
 
@@ -452,7 +458,6 @@ const props = defineProps<{
 
 const openReviewDialog = inject<(id: string) => void>('openReviewDialog', () => {})
 const saveResponse = inject<(id: string, val: any) => void>('saveResponse', () => {})
-const publishing = ref(false)
 
 const allResponsesRef = computed(() => props.allResponses)
 const { adjustmentSync, detailTotals, transferSummary } = useH2CrossSheet(allResponsesRef as any)
@@ -526,18 +531,8 @@ const state = useH2Adjudication({
     props.allResponses.set(itemId, { ...existing, item_id: itemId, remark })
     saveResponse(itemId, value)
   },
-  onWritebackTB: async (auditedAmount: number) => {
-    try {
-      await http.put(`/api/projects/${props.projectId}/trial-balance/writeback`, {
-        account_code: '1604',
-        audited_amount: auditedAmount,
-      })
-      tbData.value = { ...tbData.value, audited_amount: auditedAmount }
-      ElMessage.success('已回写试算平衡表 1604')
-    } catch {
-      ElMessage.warning('审定数回写失败，请手动确认试算表数据')
-    }
-  },
+  // spec: tb-writeback-explicit-publish-gate Task 10 —— TB 回写改由 state.publishToTb
+  // 走显式发布门（中文二次确认 → POST publish-to-tb 科目 1604 balance）；此处仅桥接事件 + CIP 快照缓存。
   onPublishEvent: (event, payload) => {
     const detail = { ...(payload || {}), projectId: props.projectId }
     eventBus.emit(event as any, detail)
@@ -749,12 +744,7 @@ async function handleSeedMaterials() {
 }
 
 async function handlePublish() {
-  publishing.value = true
-  try {
-    await state.publishAdjudicated()
-  } finally {
-    publishing.value = false
-  }
+  await state.publishToTb()
 }
 
 function openReview(id: string) {

@@ -16,6 +16,9 @@
  * - 兼容旧存档：category=income/expense/balance + beginBalance/unadjusted/aje/rje
  */
 import { ref, computed, watch, type Ref, type ComputedRef } from 'vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import { api } from '@/services/apiProxy'
+import { eventBus } from '@/utils/eventBus'
 import {
   calcAuditedAmount,
   calcSubtotal,
@@ -418,9 +421,12 @@ export function useH6Adjudication(params: {
   tbData?: Ref<{ unadjusted1606: number; audited1606: number }>
   h10Amount?: Ref<number>
   onSave?: (itemId: string, value: any) => void
-  onWritebackTB?: (auditedAmount: number) => Promise<void>
+  /** 只读态：显式发布 TB 早退（spec tb-writeback-explicit-publish-gate Task 10 / Req 3 前端侧） */
+  isReadonly?: Ref<boolean>
 }) {
-  const { allResponses, onSave, onWritebackTB, tbData, h10Amount } = params
+  const { allResponses, onSave, tbData, h10Amount } = params
+  /** spec: tb-writeback-explicit-publish-gate Task 10 —— 显式发布到 TB 的进行中标志 */
+  const publishing = ref(false)
 
   const rows = ref<H6AdjudicationRow[]>([])
   const auditNote = ref('')
@@ -759,10 +765,60 @@ export function useH6Adjudication(params: {
     }
   }
 
-  async function publishAdjudicated(): Promise<void> {
+  /**
+   * 仅持久化 + 发布 substantive:adjudicated 事件，不写 TB（Req 1）。
+   */
+  function emitAdjudicated(): void {
     _persist()
-    if (onWritebackTB) {
-      await onWritebackTB(endBalanceAudited.value)
+    eventBus.emit('substantive:adjudicated', {
+      wpCode: 'H6',
+      accountCode: '1606',
+      auditedAmount: endBalanceAudited.value,
+      adjudicatedAmount: endBalanceAudited.value,
+      isTransitAccount: true,
+      timestamp: Date.now(),
+    } as any)
+  }
+
+  /**
+   * spec: tb-writeback-explicit-publish-gate Task 10 / Req 1,2,8 + Property 10（消除假回写）。
+   * 显式发布审定数到试算表：中文二次确认 → POST /workpapers/{wpId}/audit-determination/publish-to-tb
+   * （单科目 1606 固定资产清理，balance 口径），成功后 emit substantive:adjudicated。
+   * 此前 onWritebackTB 回调只 emit 不写 TB（假回写，弹「已回写TB」但 trial_balance 从未变），
+   * 本次按 K5/K7 决策(a) 补真回写，消除"提示成功但 TB 未变"的假回写状态。取消/readonly 早退，不写不 emit。
+   */
+  async function publishToTb(): Promise<void> {
+    if (publishing.value || params.isReadonly?.value) return
+    _persist()
+    const amount = endBalanceAudited.value
+    try {
+      await ElMessageBox.confirm(
+        '将把固定资产清理(1606)审定数写入试算表，并触发报表及错报评价重算。是否继续？',
+        '发布到试算表',
+        { confirmButtonText: '确认发布', cancelButtonText: '取消', type: 'warning' },
+      )
+    } catch {
+      return
+    }
+    publishing.value = true
+    try {
+      await api.post(`/api/workpapers/${params.wpId.value}/audit-determination/publish-to-tb`, {
+        sheet_name: '审定表H6-1',
+        writeback_rows: [{ account_code: '1606', audited_amount: amount, amount_kind: 'balance' }],
+      })
+      ElMessage.success('已发布到试算表 1606')
+      eventBus.emit('substantive:adjudicated', {
+        wpCode: 'H6',
+        accountCode: '1606',
+        auditedAmount: amount,
+        adjudicatedAmount: amount,
+        isTransitAccount: true,
+        timestamp: Date.now(),
+      } as any)
+    } catch {
+      ElMessage.warning('审定数发布失败，请稍后重试或手动确认试算表数据')
+    } finally {
+      publishing.value = false
     }
   }
 
@@ -881,7 +937,9 @@ export function useH6Adjudication(params: {
     syncEndAdjFromH63,
     save,
     load,
-    publishAdjudicated,
+    publishToTb,
+    publishing,
+    emitAdjudicated,
     saveNote,
     saveConclusion,
     saveQualitativeNotes,

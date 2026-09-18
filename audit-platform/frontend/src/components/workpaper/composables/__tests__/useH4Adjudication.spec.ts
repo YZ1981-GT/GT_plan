@@ -25,7 +25,7 @@ function setup(map?: Map<string, any>) {
         remark: typeof val === 'string' ? val : JSON.stringify(val),
       })
     },
-    onWritebackTB: vi.fn(),
+    // spec: tb-writeback-explicit-publish-gate Task 10 —— onWritebackTB 已移除（改走 publishToTb 显式发布门）
   })
   return { api, allResponses, saved }
 }

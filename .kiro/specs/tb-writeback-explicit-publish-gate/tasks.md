@@ -442,17 +442,95 @@ M0（端点扩展，Task 1）是所有**活路径**逐组件任务的前置；�
 
 ## M7：H 循环（活 9 个，单/双科目 + 形态多样）
 
-- [ ] 10. H 循环单科目审定表改走显式发布端点
+- [x] 10. H 循环单科目审定表改走显式发布端点
   - **第一步实证 sheet 名**：grep H1/H2/H3/H4/H5/H6/H7/H10 确认子码可解（H7 1621 公允 / H10 处置损益 occurrence 高风险须实证）
   - 活路径：H1(inline callback，1601/1602/1603 多科目)、H2(inline，1604)、H3(inline watcher 1.5s debounce，grossCode/accumDepCode，**防跨循环污染**：本项目无该科目则不写)、H4(inline，1605 LIKE 前缀)、H5(A，1631/1632 多科目)、H6(inline callback)、H7(inline api.put，cost/fair 两组件 1621)、H10(A+B，H10_ACCOUNT_CODE 发生额)
   - 前端单测（H3 断言不污染他循环）+ 端到端验证点
   - _需求: 1, 2, 8_
+  - **✅ 完成证据（2026）**：
+    - **sheet 名可解性 + 科目 + 口径实证表**（sheet 名来源：`backend/data/ledger_adapters/wp_render_schema/generated/H{n}.yaml` 均含 `label: H{n}-1` 子码；`extract_determination_wp_code` 正则 `([D-N]\d+-1)\b` / handler `^[D-N]\d+-1$`；我传 `sheet_name='审定表H{n}-1'` 全可解，无 R1 降级）：
 
-- [ ] 11. H9 双科目审定表改走显式发布端点
+      | wp | 组件 / 载体 | 我传的 sheet_name | 解出子码 | 科目 | 口径 amount_kind | 形态实证来源 |
+      |---|---|---|---|---|---|---|
+      | H1 | `useH1Adjudication.publishToTb`（原 `.vue` onWritebackTB 回调 for 循环 http.put） | `审定表H1-1` | H1-1 ✅ | 1601/1602/1603（**多科目**） | balance | H1TabAdjudication.vue:onWritebackTB |
+      | H2 | `useH2Adjudication.publishToTb`（原 onWritebackTB 回调 http.put 1604） | `审定表H2-1` | H2-1 ✅ | 1604 | balance | H2TabAdjudication.vue:onWritebackTB |
+      | H3 | `H3TabAdjudicationCost.vue publishToTb`（原 1.5s debounce watcher 自动 http.put） | `审定表H3-1` | H3-1 ✅ | grossCode(兜底1521) + accumDepCode(1525，**动态**) | balance | H3TabAdjudicationCost.vue:writebackTrialBalance |
+      | H4 | `useH4Adjudication.publishToTb`（原 onWritebackTB 回调 http.put 1605） | `审定表H4-1` | H4-1 ✅ | 1605（端点 LIKE 前缀匹配子科目） | balance | H4TabAdjudication.vue:onWritebackTB |
+      | H5 | `useH5Adjudication.publishToTb`（原 onWritebackTB → formData.writebackTB 两次 api.put） | `审定表H5-1` | H5-1 ✅ | 1631/1632（**多科目**） | balance | H5TabAdjudication.vue:onWritebackTB |
+      | H6 | `useH6Adjudication.publishToTb`（原 onWritebackTB **只 emit 不写=假回写**） | `审定表H6-1` | H6-1 ✅ | 1606 固定资产清理（isTransitAccount） | balance | H6TabAdjudication.vue:onWritebackTB |
+      | H7 Cost | `H7TabAdjudicationCost.vue handlePublish`（原自包含 api.put 1621） | `审定表H7-1` | H7-1 ✅ | 1621（成本模式净值） | **balance**（🔴运行时实证：1621 生产性生物资产是**余额类资产**非损益，成本模式审定的是期末净值余额） | H7TabAdjudicationCost.vue:handlePublish |
+      | H7 Fair | `H7TabAdjudicationFair.vue handlePublish`（原自包含 api.put 1621） | `审定表H7-1` | H7-1 ✅ | 1621（公允价值） | **balance**（🔴运行时实证：公允价值模式审定的是**期末公允价值余额**，非发生额；task「occurrence 存疑」实证结论=balance） | H7TabAdjudicationFair.vue:handlePublish |
+      | H10 | `useH10Adjudication.publishToTb`（原 publishAdjudicated→writebackFn 在 mount/debounce/跨wp **三处自动写**） | `审定表H10-1` | H10-1 ✅ | H10_ACCOUNT_CODE=**6115** 资产处置损益 | **occurrence**（🔴运行时实证：6115 损益类，`fetchTrialBalanceAmount` 取「贷方发生 − 借方发生」=本期发生额，非余额） | h10Constants.ts:H10_ACCOUNT_CODE / useH10Adjudication.ts |
+
+    - **🔴 H3 防跨循环污染实现说明（硬约束，gate 专项守护）**：
+      - 回写科目一律取 render 下发的 `h3AccountScope`（`html_data.tb_source_codes.slots[key]`），**不臆断硬编码**。改造前历史 bug 是写死 1503/1504（分属 G6 可供出售金融资产 / G4 债权投资，属别循环），会把投资性房地产审定数污染到他循环科目行（同 H8/H9 污染 K2 那次）。
+      - `publishToTb` 构造 `writeback_rows` 时逐槽判断：`if (grossCode.value) rows.push(...)`；`if (accumDepCode.value) rows.push(...)`。其中 `accumDepCode = isAccountAbsent ? '' : accountCode`——**本项目无累计折旧科目（后端解析 found=false）时为空串 → 该行被跳过（宁缺勿造）**。`grossCode` 经 `h3AccountScope.accountCode` 恒解出至少兜底码 1521（1521 是 H3 本循环科目族，写它不污染他循环，与旧 1503/1504 本质不同）。
+      - `rows.length === 0` 时不发 POST（`ElMessage.warning` 提示「本项目无相关科目，未发布任何 TB 行」）。
+      - gate 专项断言：`hAdjudicationPublishGate.spec.ts` 的「🔴 防污染：本项目无累计折旧科目（found=false）→ writeback_rows 不含该行」用例 mount H3 传 `tb_source_codes.slots.accum_dep.found=false`，断言 `writeback_rows` 只含 1521、**不含 1525**、`toHaveLength(1)`。
+    - **改造范式说明**：
+      - **A 类（H1/H2/H4/H5/H6，adjudication composable）**：把原 `.vue` 的 `onWritebackTB` 回调（直调旧端点 `PUT /projects/{pid}/trial-balance/writeback`）删除，改在 `useHxAdjudication` 新增 `publishToTb()`：`readonly/publishing` 早退 → `ElMessageBox.confirm` 中文二次确认 → `api.post('/api/workpapers/{wpId}/audit-determination/publish-to-tb', {sheet_name, writeback_rows})` → `ElMessage.success` → `emitAdjudicated()`（仍 emit `substantive:adjudicated`）。同时把原 `publishAdjudicated`（写 TB + emit）拆为 `emitAdjudicated`（**只 emit 不写 TB**，供数据变化/普通保存路径 Req 1）与 `publishToTb`（显式写）。`.vue` `handlePublish` 改为 `await state.publishToTb()`，删本地 `publishing` ref 改用 composable 的，加/改「发布到试算表」按钮（`type=warning` `:loading=publishing` `:disabled=isReadonly` `data-testid=h{n}-publish-tb`）。为可测 readonly 早退，给 H1/H4/H5/H6 composable 补 `isReadonly?: Ref<boolean>` 入参（H2/H10 本已有）。
+      - **H3（.vue inline watcher）**：删 1.5s debounce 自动写 TB（`debouncedWritebackTb`/`writebackTrialBalance` 原 `http.put`）——违反 Req 1。单元格变化 `onOrigCellChange`/`onDepCellChange`/`onImpairCellChange` 改为只调 `emitAdjudicated()`（emit `substantive:adjudicated` 不写 TB）。新增 `publishToTb()`（confirm + POST + 防污染 rows）+ 工具栏「发布到试算表」按钮（`data-testid=h3-publish-tb`，`:disabled=isReadonly`）。
+      - **H7 Cost/Fair（.vue 自包含 handlePublish）**：`handlePublish` 加 `if (publishing.value||props.isReadonly) return` + `ElMessageBox.confirm` 中文二次确认，`api.put(.../trial-balance/writeback)` 改 `api.post(.../publish-to-tb, {sheet_name:'审定表H7-1', writeback_rows:[{1621, balance}]})`，保留 `eventBus.emit('substantive:adjudicated')`。按钮改 `type=warning` + `data-testid=h7-cost/fair-publish-tb`。
+      - **H10（A+B 多重自动写）**：删 `onMounted → void publishAdjudicated()` 自动写（改 `emitAdjudicated()` 只 emit）；`publishAdjudicatedDebounced`(1.5s，被 applyDetailFill/fillFromDetail/行编辑触发)改调 `emitAdjudicated`（只 emit）；`publishAdjudicated` 拆为 `emitAdjudicated` + `publishToTb`（confirm + POST 6115 **occurrence** + emit）；删 `writebackTB`/`writebackTrialBalance` 入参与 `writebackFn`。`H10TabAdjudication.onPublish` 改 `await adj.publishToTb()`（内置 confirm），按钮改 `data-testid=h10-publish-tb`。`GtH10.handleSubstantiveAdjudicated`（跨 wp 收到 6115 审定即自动 `formData.writebackTrialBalance` 写 TB 的旁路，违反 Req 1/2）连 listener 一并删除；跨 wp 处置明细带入仍走 `disposal:completed`（只追加 H10-2 明细行不写 TB）。
+      - **H6/H10 决策(a)补真回写（Property 10）**：H6 原 `onWritebackTB` 只 emit「已回写TB(1606)」提示但从不写 `trial_balance`（假回写）；H10 `onPublish` 显示「6115 发生额已回写」但 `publishAdjudicated` 只 emit。二者按 K5/K7 决策(a) 补真回写（走 publish-to-tb），消除「提示成功但 TB 未变」的假回写状态。
+      - **死代码清理（触类旁通）**：H5 迁移后 `useH5FormData.writebackTB`（1631/1632）零消费 → 删 + 收口注释 + 移除 return export + 清失效 `eventBus` import；H10 `useH10FormData.writebackTB`（+alias `writebackTrialBalance`）零消费 → 删 + 收口注释。grep 实证二者全仓 0 生产/测试调用方。
+    - **改的文件（18 源 + 1 新测试 + 3 改测试 = 22）**：
+      - Adjudication composable（6）：`useH1Adjudication.ts` / `useH2Adjudication.ts` / `useH4Adjudication.ts` / `useH5Adjudication.ts` / `useH6Adjudication.ts` / `useH10Adjudication.ts`（各拆 emitAdjudicated + publishToTb + publishing + isReadonly 守卫 + import ElMessage/ElMessageBox/api；移除 onWritebackTB 入参）
+      - FormData（2 死代码清理）：`useH5FormData.ts`（删 writebackTB + eventBus import）/ `useH10FormData.ts`（删 writebackTB + writebackTrialBalance alias）
+      - Tab 组件（8）：`h1/core/H1TabAdjudication.vue` / `h2/core/H2TabAdjudication.vue` / `h3/core/H3TabAdjudicationCost.vue` / `h4/core/H4TabAdjudication.vue` / `h5/core/H5TabAdjudication.vue` / `h6/core/H6TabAdjudication.vue` / `h7/core/H7TabAdjudicationCost.vue` / `h7/core/H7TabAdjudicationFair.vue` / `h10/core/H10TabAdjudication.vue`（destructure publishToTb/publishing + 按钮改造 data-testid + handlePublish 调 publishToTb；H3 删 debounce 自动写 + 加按钮；H7 handlePublish 加 confirm + 改 POST）—— 实为 9 个 .vue
+      - 宿主（1）：`GtH10AssetDisposalIncome.vue`（删跨 wp 自动写 listener handleSubstantiveAdjudicated + 移除 writeback-trial-balance prop 传递 + 删无用 H10_ACCOUNT_CODE import）
+      - 新增测试：`composables/__tests__/hAdjudicationPublishGate.spec.ts`（参数化 H1/H2/H4/H5/H6/H10 composable + mount H3/H7Cost/H7Fair）
+      - 改测试（test-follows-source）：`useH1Adjudication.spec.ts` + `useH2Adjudication.spec.ts`（旧 publishAdjudicated/onWritebackTB 用例 → publishToTb 断言 + 加 apiProxy/element-plus mock）/ `useH4Adjudication.spec.ts`（清死 onWritebackTB prop）/ `h6Integration.spec.ts`（更新注释）
+    - **测试命令与 pass 数**：
+      - 新 gate：`rtk npx vitest run src/components/workpaper/composables/__tests__/hAdjudicationPublishGate.spec.ts --reporter=dot` → **43 passed / 0 failed**（Group A composable H1/H2/H4/H5/H6/H10 × [POST 命中 sheet_name/科目/amount_kind、不再调旧端点、取消→无post无emit、readonly→无post、发布后仍 emit substantive:adjudicated] + H1 多科目 3 行 / H5 双科目 2 行 / H10 occurrence 专项 + Group B mount H3[两科目/🔴防污染无accumDep只1行/取消/readonly disabled] + H7 Cost/Fair[点击→POST 1621 balance/取消/readonly]）
+      - 回归：`useH1/H2/H4/H6Adjudication + hAdjudicationPublishGate` = **93 passed**；`h5Integration + h6Integration + h3-integration + h10AssetDisposalIncome.integration + useH10P1 + useH10P2 + h7BiologicalAssets.integration + h7BiologicalAssets.e2e + h5OilGasAssetsRegistry + h3SourcePanelWiring + useH10Disclosure + h10DisclosureSync` = **156 passed / 0 failed**
+      - ESLint（13 核心改动文件 + GtH10）：**0 errors**（warnings 全为 loadTb/calc 未改代码既存 no-amount-arithmetic/no-amount-toFixed/no-direct-audit-fetch，新增 publishToTb 代码 0 warning）
+      - file_size gate：`check_file_size.py` 全部改动文件 **通过**（最大 H1TabAdjudication.vue 1062 行 / useH4Adjudication.ts 1152 行，均 <1500 上限；无文件需入白名单）
+    - **发现的偏差/降级**：
+      - 🟢 **sheet 名全可解无降级**：H1–H10 审定表子码均标准 `H{n}-1`（render schema generated/H*.yaml 逐一实证含 `label: H{n}-1`）。
+      - 🟡 **H7 口径实证纠偏（task「occurrence 存疑」）**：task 标 H7 为 occurrence 高风险，运行时实证=**balance**（1621 生产性生物资产是余额类资产，成本模式审定净值余额 / 公允模式审定期末公允价值余额，均非损益发生额）。已按 balance 实现。
+      - 🟡 **H6/H10 原为假回写（未在 K5/K7 决策清单）**：census 未标 H6/H10 为假回写，实证发现 H6 `onWritebackTB` 只 emit、H10 `publishAdjudicated` 只 emit（TB 写实际靠 mount/debounce/跨wp 自动路径）。按 Property 10 + K 决策(a) 先例补真回写，消除假回写状态。
+      - 🟢 **H3 gross 恒写兜底码 1521 非「宁缺勿造」违反**：`h3AccountScope.accountCode(gross)` 无 isAccountAbsent 检查 + queryCodes 有 fallback 1521，故 gross 恒解出。这是源码既有行为（沿用不改）；1521 是 H3 本循环族不污染他循环，防污染硬约束的落点是备抵科目 accumDep/impair（缺则跳过）。
+      - 🟡 **vue-tsc 全量类型检查环境 OOM**：`npx vue-tsc --noEmit` 即使 `--max-old-space-size=8192` 仍 exit 134（JS heap OOM，项目体量所致，非本任务代码问题）。改用 ESLint（typescript-eslint TS-aware 解析，0 error）+ vitest（esbuild 编译全部被测模块 + 60/93/156 测试运行通过）交叉验证类型/编译正确性。
+    - **预存无关失败实证**：本任务改动前 grep 确认 H5/H10 FormData.writebackTB 无任何测试引用（删除不破坏既有测试）；改写的 3 个既有测试均属 test-follows-source（断言旧端点/旧方法，随迁移更新）。未见与本任务无关的预存失败被引入（所跑 H1~H10 全批次 156+93 全绿）。
+    - **端到端验证点**：前端 gate + mount 覆盖「确认→publish-to-tb 落库路径 + 取消/readonly 早退 + 防污染 + 多科目 + occurrence」；后端 M0 端点集成测试（Task 1）已覆盖 writeback_rows→WORKPAPER_SAVED(publish_confirmed)→handler 幂等回写。真实项目 Playwright 全链路归 task 21*（待 start-dev.bat 环境），真实 PG H 循环审定数据 UAT 归 task 20*（data-blocked）。
+
+- [x] 11. H9 双科目审定表改走显式发布端点
   - **第一步实证 sheet 名**：grep H9 确认 `H9-1` 可解
   - 活路径：`H9TabAdjudication`(inline callback，租赁负债 + 未确认融资费用双科目)；**注意端点路径当前无 `/api` 前缀需归一**
   - 前端单测（双科目 writeback_rows）+ 端到端验证点
   - _需求: 5, 2, 8_
+  - **✅ 完成证据（2026）**：
+    - **sheet 名可解性 + 双科目 + 口径实证表**（sheet 名来源：`backend/data/ledger_adapters/wp_render_schema/generated/H9.yaml` L143 `审定表H9-1:`（`A2: 租赁负债审定表` / `class_code: F-审定表`）；`extract_determination_wp_code` 正则 `([D-N]\d+-1)\b` / handler `^[D-N]\d+-1$`；我传 `sheet_name='审定表H9-1'` → 解出 `H9-1` ✅，无 R1 降级）：
+
+      | 载体 | 我传的 sheet_name | 解出子码 | 科目（实证来源） | 口径 amount_kind | 形态实证来源 |
+      |---|---|---|---|---|---|
+      | `H9TabAdjudication.vue` 内联 `handleWriteback`（.vue 内联，非 composable；改造后 = publishToTb 语义） | `审定表H9-1` | H9-1 ✅ | **双科目**：租赁负债 gross（`leaseLiabilityCode = h9Scope.grossCode(tbSourceCodes)`，兜底 `2601`，双族 2601/2651）+ 未确认融资费用（`unearnedFinanceCode = h9Scope.slotCodes(...,'unearned_finance')[0]`，兜底 `2602`） | **balance**（🔴运行时实证：租赁负债=负债类期末余额、未确认融资费用=负债备抵类期末余额，均资产负债表项非损益发生额；组件方法论上下文明示「负债类期末=期初+贷方-借方；备抵类期末=期初+借方-贷方」） | `H9TabAdjudication.vue:handleWriteback` + `hCycleAccountScope.ts:H9_ACCOUNT_DEF`（`slotFallbacks.gross=['2601','2651']` / `unearned_finance=['2602']` / `grossFallback='2601'` / `wrongLegacyCodes=['2205']`） |
+
+    - **🔴 /api 前缀归一说明（本任务重点）**：
+      - **改造前真实路径**：`H9TabAdjudication.handleWriteback` 用 **`http.put('/projects/${props.projectId}/trial-balance/writeback', {...})`** —— (a) **无 `/api` 前缀**（`http` = `@/utils/http`，非 apiProxy）；(b) **双科目分两次 PUT**（先租赁负债、再未确认融资费用，非原子）；(c) 无二次确认（点按钮直写）；(d) **历史 latent bug**：`account_code: leaseLiabilityCode`/`unearnedFinanceCode` 传的是 **ComputedRef 本体未 `.value` 解包** = 科目码传成对象（后端按对象取科目必失败/写错科目）。
+      - **改造后统一路径**：`api.post('/api/workpapers/${props.wpId}/audit-determination/publish-to-tb', { sheet_name:'审定表H9-1', writeback_rows:[…] })`（`const { api } = await import('@/services/apiProxy')`，含 `/api` 前缀；`wpId` 守卫）。ComputedRef 全部 `.value` 正确解包（`leaseLiabilityCode.value`/`unearnedFinanceCode.value`）。
+    - **改造范式说明（复刻 D2/D4-1/F/H/K）**：
+      - `handleWriteback` 改造：`writebackLoading.value || props.isReadonly` 早退（复用既有 `writebackLoading` ref 作 publishing 守卫）→ 缺 `wpId` 早退 → **双科目归集为 `writeback_rows` 两行**（`leaseCode` 非空 push 租赁负债 balance 行、`unearnedCode` 非空 push 未确认融资费用 balance 行）→ `rows.length===0` 时 `ElMessage.warning` 早退（宁缺勿造）→ `ElMessageBox.confirm` 中文二次确认（明示写入两科目 + 触发下游报表/错报评价重算）→ `api.post publish-to-tb` **单次原子发布** → `ElMessage.success` → **`publishAdjudicated()`（保留，仍 emit `substantive:adjudicated`）**。取消（confirm reject catch return）/readonly 无副作用（不发 POST、不 emit）。
+      - **保留 `substantive:adjudicated` emit + 活联动（Req 8）**：`useH9Adjudication.publishAdjudicated()` 内 `window.dispatchEvent(new CustomEvent('substantive:adjudicated', { detail:{ wpCode:'H9', accountCode:'2601', auditedAmount, auditedAmountFinanceCost } }))` **完整保留** → H8-H9 CAS21 联动 / 附注 / 报表刷新不回归。`adjustment:created` 监听（H9-4→H9-1 AJE/RJE 联动）保留不动。
+      - 「发布到试算表」按钮改造：`type=warning`（原 `primary`）+ `data-testid=h9-publish-tb` + `:loading=writebackLoading` + `:disabled=isReadonly`；文案「发布到试算表（{租赁负债码} 租赁负债 + {未确认融资费用码} 未确认融资费用）」（原「审定数回写TB」）。按钮仍在 `v-if="!isReadonly"` 包裹内（readonly 无按钮）。
+      - 死代码：`http` import 移除（全文 `http.` 计数 0）；编制提示两行文案更新（「发布到试算表（须二次确认）」/「经二次确认后走显式发布门 publish-to-tb，双科目单次原子发布」）；docstring 避免 `trial-balance/writeback` 字面量（源码 `trial-balance/writeback` + `projects/{pid}/trial_balance` 计数均 **0**，为 task 18 CI 守卫预留 clean）。**H9 FormData 死代码此前已由 task 17 批B 移除**（`useH9FormData.writebackTB` 零消费，已删+收口注释），本任务无需再动；全仓无 `h9:writeback-trial-balance` window 监听器（本组件 form A inline callback，非 form B）。
+    - **改的文件（1 源 + 1 改测试 = 2）**：
+      - `h9/core/H9TabAdjudication.vue`：`handleWriteback` 重写（confirm + 双科目 writeback_rows + POST publish-to-tb + 保留 publishAdjudicated emit）+ 移除 `http` import + 按钮 type/testid/disabled + 2 行编制提示文案 + docstring
+      - `composables/__tests__/hAdjudicationPublishGate.spec.ts`：新增「H9 双科目审定表发布走显式发布门」describe（mount H9TabAdjudication 走真实点击路径，5 用例；复刻 Task 10 H3/H7 Group B mount 范式；因 H9 用 `window.dispatchEvent` 派发 substantive:adjudicated，emit 断言用 `window.addEventListener` 而非 eventBus）
+    - **测试命令与 pass 数**：
+      - gate（H1~H10 + H9）：`rtk npx vitest run src/components/workpaper/composables/__tests__/hAdjudicationPublishGate.spec.ts --reporter=dot` → **48 passed / 0 failed**（原 43 H1-H10 + 新增 5 H9：①确认→POST publish-to-tb（url 含 `/api/workpapers/wp-h9-001/audit-determination/publish-to-tb` / sheet_name 匹配 H9-1 / **writeback_rows 恰 2 行含 2601+2602** / 全 amount_kind=balance / audited_amount 为 number）②不再调旧端点 trial-balance/writeback（PUT/POST 变体）③取消二次确认→无 POST 无 emit ④readonly→无发布按钮 + 无 POST ⑤发布后仍 emit substantive:adjudicated（detail.wpCode='H9'））
+      - H9 全回归：`npx vitest run src/components/workpaper/h9 + useH9AdjudicationFill + useH9P0Pack + useH9Engines.unit + useH9TerminationAndLinkage + h9LeaseLiabilities.pbt + h9LeaseLiabilities.contract` → **135 passed / 0 failed**（含 `h9AdjudicationTbWiring.spec.ts` 源码扫描契约测试全过，证明 `:html-data`/`:wp-id`/`:project-id`/`:all-responses`/`:is-readonly` prop 未被破坏 + 契约测试 `h9LeaseLiabilities.contract` 全过）
+      - ESLint（2 改动文件）：**0 errors**（14 warnings 全为 `no-amount-toFixed`，均在未改的 summary/linkage 展示代码 `.toFixed()`，新增 handleWriteback + 测试代码 0 warning）；getDiagnostics 2 文件 0 问题。
+      - file_size gate：H9TabAdjudication.vue **892 行**（HEAD 847 行，净增 45 行；<1500 上限，无需 whitelist）。
+    - **发现的偏差/降级**：
+      - 🟢 **sheet 名可解无降级**：`审定表H9-1` 实证在 render schema，解出 `H9-1`。
+      - 🟢 **口径实证 balance（无 occurrence 存疑）**：H9 双科目均资产负债表项（租赁负债 + 未确认融资费用备抵），非损益发生额 → 均 balance。
+      - 🟡 **修复历史 latent bug**：改造前 `handleWriteback` 传 ComputedRef 本体未解包（`account_code: leaseLiabilityCode` 而非 `.value`）—— 科目码传成对象。改造后正确解包。
+      - 🟢 **无假回写**：H9 改造前是**真回写**（两次 http.put 真写 TB），非 H6/H10 那类只 emit 的假回写；本任务只是把两次 PUT 归一为单次原子 POST + 加二次确认。
+      - 🟢 **form A 无 form B listener 可删**：H9 是 .vue inline callback（form A），无 `h9:writeback-trial-balance` dispatch/listener 链需拆（与 F/部分 H 的 form B 不同）。
+    - **预存无关失败实证**：所跑 H9 全批次（gate 48 + 回归 135）全绿，无预存失败被引入。H9 FormData 死代码 task 17 批B 已删且无测试引用（本任务未触碰）；本任务改的测试（hAdjudicationPublishGate 新增 describe）属新增，非改写既有断言。**无需 git stash 实证**（零失败）。
+    - **端到端验证点**：前端 gate mount 覆盖「点击「发布到试算表」→ 中文二次确认 → publish-to-tb 双科目原子落库路径 + 取消/readonly 早退 + 双科目单次 writeback_rows + 仍 emit substantive:adjudicated」；后端 M0 端点集成测试（Task 1）已覆盖 writeback_rows→WORKPAPER_SAVED(publish_confirmed)→handler 幂等回写。真实项目 Playwright 全链路归 task 21*（待 start-dev.bat 环境），真实 PG H9 租赁负债审定数据 UAT 归 task 20*（data-blocked）。
 
 ## M8：G 循环（活 11 个，sheet 名可解性存疑最高）
 

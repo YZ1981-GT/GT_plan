@@ -19,6 +19,9 @@
  * Requirements: 2.1-2.10（列结构以 xlsx/冲突决议为准）
  */
 import { ref, computed, watch, type Ref, type ComputedRef } from 'vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import { api } from '@/services/apiProxy'
+import { eventBus } from '@/utils/eventBus'
 import { calcAuditedAmount, calcSubtotal } from './useH4FormulaEngine'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -344,9 +347,12 @@ export function useH4Adjudication(params: {
     opening1604?: number
   }>
   onSave?: (itemId: string, value: any) => void
-  onWritebackTB?: (auditedAmount: number) => Promise<void>
+  /** 只读态：显式发布 TB 早退（spec tb-writeback-explicit-publish-gate Task 10 / Req 3 前端侧） */
+  isReadonly?: Ref<boolean>
 }) {
-  const { allResponses, onSave, onWritebackTB, tbData } = params
+  const { allResponses, onSave, tbData } = params
+  /** spec: tb-writeback-explicit-publish-gate Task 10 —— 显式发布到 TB 的进行中标志 */
+  const publishing = ref(false)
 
   const rows = ref<H4AdjudicationRow[]>([])
   const auditNote = ref('')
@@ -912,10 +918,53 @@ export function useH4Adjudication(params: {
     }
   }
 
-  async function publishAdjudicated(): Promise<void> {
+  /**
+   * 仅持久化 + 发布 substantive:adjudicated 事件，不写 TB（Req 1：普通保存/数据变化绝不写 TB）。
+   */
+  function emitAdjudicated(): void {
     _persist()
-    if (onWritebackTB) {
-      await onWritebackTB(adjudicatedTotal.value)
+    eventBus.emit('substantive:adjudicated', {
+      wpCode: 'H4',
+      accountCode: '1605',
+      auditedAmount: adjudicatedTotal.value,
+    } as any)
+  }
+
+  /**
+   * spec: tb-writeback-explicit-publish-gate Task 10 / Req 1,2,8。
+   * 显式发布审定数到试算表：中文二次确认 → POST /workpapers/{wpId}/audit-determination/publish-to-tb
+   * （单科目 1605 工程物资，balance 口径；端点按 LIKE 前缀匹配子科目），成功后仍 emit substantive:adjudicated。
+   * 取消/readonly 早退，不写 TB、不 emit。此前经 onWritebackTB 回调直调旧端点 PUT trial-balance/writeback。
+   */
+  async function publishToTb(): Promise<void> {
+    if (publishing.value || params.isReadonly?.value) return
+    _persist()
+    const amount = adjudicatedTotal.value
+    try {
+      await ElMessageBox.confirm(
+        '将把工程物资(1605)审定数写入试算表，并触发报表及错报评价重算。是否继续？',
+        '发布到试算表',
+        { confirmButtonText: '确认发布', cancelButtonText: '取消', type: 'warning' },
+      )
+    } catch {
+      return
+    }
+    publishing.value = true
+    try {
+      await api.post(`/api/workpapers/${params.wpId.value}/audit-determination/publish-to-tb`, {
+        sheet_name: '审定表H4-1',
+        writeback_rows: [{ account_code: '1605', audited_amount: amount, amount_kind: 'balance' }],
+      })
+      ElMessage.success('已发布到试算表 1605')
+      eventBus.emit('substantive:adjudicated', {
+        wpCode: 'H4',
+        accountCode: '1605',
+        auditedAmount: amount,
+      } as any)
+    } catch {
+      ElMessage.warning('审定数发布失败，请稍后重试或手动确认试算表数据')
+    } finally {
+      publishing.value = false
     }
   }
 
@@ -1085,7 +1134,9 @@ export function useH4Adjudication(params: {
     syncEndAdjFromH43,
     save,
     load,
-    publishAdjudicated,
+    publishToTb,
+    publishing,
+    emitAdjudicated,
     saveNote,
     saveConclusion,
     saveQualitativeNotes,

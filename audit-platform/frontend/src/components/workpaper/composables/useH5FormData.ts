@@ -24,7 +24,6 @@
 import { ref, onScopeDispose, type Ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { api } from '@/services/apiProxy'
-import { eventBus } from '@/utils/eventBus'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -225,50 +224,11 @@ export function useH5FormData(opts: {
 
   // ─── writebackTB（1631油气资产 + 1632累计折耗） ────────────────────────────
 
-  /**
-   * 审定数回写 trial_balance：
-   * - 1631 油气资产（借方/资产类）
-   * - 1632 累计折耗（贷方/备抵类）
-   *
-   * 回写成功后发布 EventBus 'substantive:adjudicated' 通知附注刷新。
-   *
-   * @param accountCode 科目代码（'1631' 或 '1632'）
-   * @param amount 审定数金额
-   */
-  async function writebackTB(accountCode: string, amount: number): Promise<void> {
-    if (!projectId.value) return
-    if (accountCode !== ACCOUNT_CODE_1631 && accountCode !== ACCOUNT_CODE_1632) {
-      console.warn(`[H5] writebackTB: 未知科目代码 ${accountCode}，仅支持 1631/1632`)
-      return
-    }
-
-    isSaving.value = true
-    try {
-      await api.put(`/api/projects/${projectId.value}/trial-balance/writeback`, {
-        account_code: accountCode,
-        audited_amount: amount,
-      })
-
-      // 更新本地 tbData
-      if (accountCode === ACCOUNT_CODE_1631) {
-        tbData.value.costAudited = amount
-      } else {
-        tbData.value.depletionAudited = amount
-      }
-
-      // EventBus publish 'substantive:adjudicated'
-      eventBus.emit('substantive:adjudicated', {
-        wpId: wpId.value,
-        accountCode,
-        auditedAmount: amount,
-        componentType: COMPONENT_TYPE,
-      })
-    } catch {
-      ElMessage.warning('审定数回写失败，请手动确认试算表数据')
-    } finally {
-      isSaving.value = false
-    }
-  }
+  // 注：原 writebackTB（PUT /trial-balance/writeback，科目 1631 油气资产 + 1632 累计折耗，
+  // 含 substantive:adjudicated emit）在 H5-1 迁移到显式发布门后成为零消费死代码，已移除。
+  // 活路径 = useH5Adjudication.publishToTb（中文二次确认 → POST publish-to-tb 双科目 1631/1632
+  // 单次原子发布 balance 口径，成功后 emit substantive:adjudicated）。
+  // spec: tb-writeback-explicit-publish-gate Task 10 / Req 1,2,5,8。
 
   // ─── selfLoad（render-config + checklist_responses） ────────────────────────
 
@@ -435,8 +395,6 @@ export function useH5FormData(opts: {
     saveResponse,
     debouncedSave,
     saveBatch,
-    // TB writeback
-    writebackTB,
     // Load
     selfLoad,
     loadTbData,

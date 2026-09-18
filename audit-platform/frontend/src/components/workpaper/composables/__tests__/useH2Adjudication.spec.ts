@@ -4,6 +4,17 @@
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { ref, nextTick } from 'vue'
+
+// spec: tb-writeback-explicit-publish-gate Task 10 —— publishToTb 走 apiProxy + ElMessageBox 确认
+const { mockPost } = vi.hoisted(() => ({ mockPost: vi.fn(async () => ({ published: true })) }))
+vi.mock('@/services/apiProxy', () => ({
+  api: { post: mockPost, put: vi.fn(async () => ({})), get: vi.fn(async () => ({ data: [] })) },
+}))
+vi.mock('element-plus', () => ({
+  ElMessageBox: { confirm: vi.fn(async () => 'confirm') },
+  ElMessage: { success: vi.fn(), error: vi.fn(), warning: vi.fn(), info: vi.fn() },
+}))
+
 import { useH2Adjudication, CHANGE_RATE_THRESHOLD } from '../useH2Adjudication'
 
 function makeMap(entries: Record<string, any> = {}) {
@@ -218,8 +229,10 @@ describe('useH2Adjudication', () => {
     expect(api.materialsAudited.value).toBe(80)
   })
 
-  it('确认审定触发 TB 回写与 EventBus', async () => {
-    const writeback = vi.fn(async () => {})
+  it('publishToTb 走显式发布门 POST publish-to-tb（1604 balance）与 EventBus', async () => {
+    // spec: tb-writeback-explicit-publish-gate Task 10 —— 原 publishAdjudicated(onWritebackTB 回调直调
+    // 旧端点) 改为 publishToTb（中文二次确认 → POST publish-to-tb 科目 1604 balance，成功后 emit）。
+    mockPost.mockClear()
     const publish = vi.fn()
     const allResponses = ref(makeMap())
     const api = useH2Adjudication({
@@ -228,14 +241,19 @@ describe('useH2Adjudication', () => {
       allResponses: allResponses as any,
       isReadonly: ref(false),
       onSave,
-      onWritebackTB: writeback,
       onPublishEvent: publish,
     })
     await nextTick()
     api.addProjectRow('A')
     api.updateCell('cost', api.costDetailRows.value[0].rowId, 'endUnadjusted', 999)
-    await api.publishAdjudicated()
-    expect(writeback).toHaveBeenCalledWith(999)
+    await api.publishToTb()
+    expect(mockPost).toHaveBeenCalledTimes(1)
+    const [url, body] = mockPost.mock.calls[0]!
+    expect(url).toBe('/api/workpapers/wp-1/audit-determination/publish-to-tb')
+    expect(body.sheet_name).toMatch(/H2-1/)
+    expect(body.writeback_rows).toEqual([
+      { account_code: '1604', audited_amount: 999, amount_kind: 'balance' },
+    ])
     expect(publish).toHaveBeenCalledWith(
       'substantive:adjudicated',
       expect.objectContaining({ account_codes: ['1604'], audited_amount: 999 }),

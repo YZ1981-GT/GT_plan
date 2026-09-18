@@ -25,7 +25,7 @@ import { applyH10DetailToAdjStore } from './h10FillFromDetail'
 import type { ChecklistResponse } from './useF1FormData'
 import { api } from '@/services/apiProxy'
 import { eventBus } from '@/utils/eventBus'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 
 export interface H10AdjudicationRow {
   rowKey: string
@@ -59,17 +59,15 @@ export function useH10Adjudication(opts: {
   allResponses: Ref<Map<string, ChecklistResponse>>
   debouncedSave: (id: string, d: Partial<ChecklistResponse>) => void
   isReadonly: Ref<boolean> | ComputedRef<boolean>
-  writebackTB?: (auditedAmount: number) => Promise<void>
-  writebackTrialBalance?: (auditedAmount: number) => Promise<void>
 }) {
   const rowStore = ref<RowStore>(parseH10AdjStore(undefined))
   const trialBalanceAmount = ref(0)
+  /** spec: tb-writeback-explicit-publish-gate Task 10 —— 显式发布到 TB 的进行中标志 */
+  const publishing = ref(false)
   const auditNote = ref('')
   const auditConclusion = ref('')
   const aiLoading = ref(false)
   const collapsedGroups = ref<Record<string, boolean>>({})
-
-  const writebackFn = () => opts.writebackTB ?? opts.writebackTrialBalance
 
   const detail = useH10Detail({
     allResponses: opts.allResponses,
@@ -214,12 +212,14 @@ export function useH10Adjudication(opts: {
     opts.debouncedSave(ITEM_ID_CONCLUSION, { conclusion: value })
   }
 
+  // spec: tb-writeback-explicit-publish-gate Task 10 / Req 1 —— 数据变化 debounce 只 emit 事件，
+  // 绝不写 TB（原 debounce 走 publishAdjudicated 会自动写 TB，违反 Req 1，已改为只 emit）。
   let publishTimer: ReturnType<typeof setTimeout> | null = null
   function publishAdjudicatedDebounced(): void {
     if (publishTimer) clearTimeout(publishTimer)
     publishTimer = setTimeout(() => {
       publishTimer = null
-      void publishAdjudicated()
+      emitAdjudicated()
     }, 1500)
   }
 
@@ -313,11 +313,12 @@ export function useH10Adjudication(opts: {
     }
   }
 
-  async function publishAdjudicated(): Promise<void> {
+  /**
+   * 仅持久化审定合计 + 发布 substantive:adjudicated 事件，不写 TB（Req 1：数据变化/mount 绝不写 TB）。
+   */
+  function emitAdjudicated(): void {
     const amount = totalRow.value.currentAudited
     opts.debouncedSave('H10-1-adjudicated-amount', { conclusion: String(amount) })
-    const wb = writebackFn()
-    if (wb) await wb(amount)
     const payload = {
       accountCode: H10_ACCOUNT_CODE,
       adjudicatedAmount: amount,
@@ -330,6 +331,41 @@ export function useH10Adjudication(opts: {
     try {
       eventBus.emit('substantive:adjudicated', payload as any)
     } catch { /* silent */ }
+  }
+
+  /**
+   * spec: tb-writeback-explicit-publish-gate Task 10 / Req 1,2,6,8。
+   * 显式发布审定数到试算表：中文二次确认 → POST /workpapers/{wpId}/audit-determination/publish-to-tb
+   * （单科目 6115 资产处置损益，**occurrence 发生额口径**——损益类审定的是本期发生额），成功后 emit substantive:adjudicated。
+   * 取消/readonly 早退，不写 TB、不 emit。此前 publishAdjudicated 在 mount/1.5s debounce 自动经 writebackFn
+   * 直调旧端点 PUT trial-balance/writeback（自动写、无确认，违反 Req 1）。
+   */
+  async function publishToTb(): Promise<void> {
+    if (publishing.value || opts.isReadonly.value) return
+    const amount = totalRow.value.currentAudited
+    opts.debouncedSave('H10-1-adjudicated-amount', { conclusion: String(amount) })
+    try {
+      await ElMessageBox.confirm(
+        '将把资产处置损益(6115)本期审定发生额写入试算表，并触发报表及错报评价重算。是否继续？',
+        '发布到试算表',
+        { confirmButtonText: '确认发布', cancelButtonText: '取消', type: 'warning' },
+      )
+    } catch {
+      return
+    }
+    publishing.value = true
+    try {
+      await api.post(`/api/workpapers/${opts.wpId.value}/audit-determination/publish-to-tb`, {
+        sheet_name: '审定表H10-1',
+        writeback_rows: [{ account_code: H10_ACCOUNT_CODE, audited_amount: amount, amount_kind: 'occurrence' }],
+      })
+      ElMessage.success('已发布到试算表 6115')
+      emitAdjudicated()
+    } catch {
+      ElMessage.warning('审定数发布失败，请稍后重试或手动确认试算表数据')
+    } finally {
+      publishing.value = false
+    }
   }
 
   async function loadTrialBalanceFromApi(): Promise<void> {
@@ -358,7 +394,8 @@ export function useH10Adjudication(opts: {
 
   onMounted(() => {
     void loadTrialBalanceFromApi()
-    void publishAdjudicated()
+    // spec: tb-writeback-explicit-publish-gate Task 10 / Req 1 —— mount 只 emit 同步下游，绝不写 TB。
+    emitAdjudicated()
     window.addEventListener('h10:adjustment-writeback', onAdjustmentWriteback)
   })
   onBeforeUnmount(() => {
@@ -384,7 +421,9 @@ export function useH10Adjudication(opts: {
     updateAuditNote,
     updateAuditConclusion,
     toggleGroup,
-    publishAdjudicated,
+    publishToTb,
+    publishing,
+    emitAdjudicated,
     applyAdjustmentWriteback,
     fillFromDetail,
     validateFormulasRemote,

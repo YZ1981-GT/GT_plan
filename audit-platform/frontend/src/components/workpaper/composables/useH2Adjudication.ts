@@ -17,6 +17,8 @@
  * Task: 3.3 | Requirements: 2.1-2.12（列结构以 xlsx/冲突决议为准）
  */
 import { ref, computed, watch, type Ref, type ComputedRef } from 'vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import { api } from '@/services/apiProxy'
 import { calcAuditedAmount, calcSubtotal, calcTriangleWithTransfer } from './useH2FormulaEngine'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -252,9 +254,10 @@ export function useH2Adjudication(options: {
   /** @deprecated 优先从 allResponses 自算 */
   transferSummary?: ComputedRef<{ totalTransfer: number; items: Array<{ name: string; amount: number }> }>
   onSave?: (itemId: string, value: any) => void
-  onWritebackTB?: (auditedAmount: number) => Promise<void>
   onPublishEvent?: (event: string, payload: any) => void
 }) {
+  /** spec: tb-writeback-explicit-publish-gate Task 10 —— 显式发布到 TB 的进行中标志 */
+  const publishing = ref(false)
   const costRows = ref<H2AdjudicationRow[]>([])
   const impairRows = ref<H2AdjudicationRow[]>([])
   const auditNote = ref('')
@@ -770,12 +773,15 @@ export function useH2Adjudication(options: {
     }
   }
 
-  async function publishAdjudicated(): Promise<void> {
+  /**
+   * 仅发布 substantive:adjudicated 事件通知下游（附注/H4 国企披露 CIP 回放），不写 TB。
+   * 数据变化 / 普通保存路径只走本函数（Req 1：普通保存绝不写 TB）。
+   */
+  function emitAdjudicated(): void {
     const auditedTotal = costTotalRow.value.endAudited
     const impairEnd = impairTotalRow.value.endAudited
     const beginCost = costTotalRow.value.beginAudited
     const beginImpair = impairTotalRow.value.beginAudited
-    if (options.onWritebackTB) await options.onWritebackTB(auditedTotal)
     if (options.onPublishEvent) {
       options.onPublishEvent('substantive:adjudicated', {
         wpCode: 'H2',
@@ -799,6 +805,39 @@ export function useH2Adjudication(options: {
           beginImpairment: beginImpair,
         },
       })
+    }
+  }
+
+  /**
+   * spec: tb-writeback-explicit-publish-gate Task 10 / Req 1,2,8。
+   * 显式发布审定数到试算表：中文二次确认 → POST /workpapers/{wpId}/audit-determination/publish-to-tb
+   * （单科目 1604 在建工程，balance 口径），成功后仍 emit substantive:adjudicated 供下游刷新。
+   * 取消/readonly 早退，不写 TB、不 emit。此前经 onWritebackTB 回调直调旧端点 PUT trial-balance/writeback。
+   */
+  async function publishToTb(): Promise<void> {
+    if (publishing.value || options.isReadonly.value) return
+    const auditedTotal = costTotalRow.value.endAudited
+    try {
+      await ElMessageBox.confirm(
+        '将把在建工程(1604)审定数写入试算表，并触发报表及错报评价重算。是否继续？',
+        '发布到试算表',
+        { confirmButtonText: '确认发布', cancelButtonText: '取消', type: 'warning' },
+      )
+    } catch {
+      return
+    }
+    publishing.value = true
+    try {
+      await api.post(`/api/workpapers/${options.wpId.value}/audit-determination/publish-to-tb`, {
+        sheet_name: '审定表H2-1',
+        writeback_rows: [{ account_code: '1604', audited_amount: auditedTotal, amount_kind: 'balance' }],
+      })
+      ElMessage.success('已发布到试算表 1604')
+      emitAdjudicated()
+    } catch {
+      ElMessage.warning('审定数发布失败，请稍后重试或手动确认试算表数据')
+    } finally {
+      publishing.value = false
     }
   }
 
@@ -917,7 +956,9 @@ export function useH2Adjudication(options: {
     removeProjectRow,
     syncFromH22,
     syncEndAdjustmentFromH23,
-    publishAdjudicated,
+    publishToTb,
+    publishing,
+    emitAdjudicated,
     saveNote,
     saveConclusion,
     applyConclusionTemplate,

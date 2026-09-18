@@ -226,8 +226,9 @@ describe('H6 集成 — 审定↔明细一致性 (Req 2.5)', () => {
 // 原 describe('H6 集成 — TB回写 (Req 2.8)') 唯一用例直调 useH6FormData.writebackTrialBalance，
 // 测的是零消费死代码（useH6FormData 无 .vue 生产宿主，writebackTrialBalance 已随批B移除）。
 // 批B 删了 useH6FormData.writebackTrialBalance 死代码但漏删此直调用例致其变红，批C 补删。
-// H6 活路径 TB 回写在 H6TabAdjudication.onWritebackTB → useH6Adjudication.publishAdjudicated，
-// 走显式发布门 publish-to-tb（改造归 M7/task10）。
+// H6 活路径 TB 回写现走 H6TabAdjudication → useH6Adjudication.publishToTb（显式发布门
+// publish-to-tb，中文二次确认 → POST 科目 1606 balance；补真回写消除原假回写，Task 10 已完成）。
+// 门控行为回归见 composables/__tests__/hAdjudicationPublishGate.spec.ts。
 
 // ─── 6. useH6Adjudication transitCheck ───────────────────────────────────────
 

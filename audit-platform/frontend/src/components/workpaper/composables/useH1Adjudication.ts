@@ -9,6 +9,8 @@
  * Requirements: 2.1-2.12
  */
 import { ref, computed, watch, type Ref } from 'vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import { api } from '@/services/apiProxy'
 import type { ChecklistItem } from './useH1FormData'
 import {
   calcAuditedAmount,
@@ -173,8 +175,9 @@ export function useH1Adjudication(
     /** TB 子科目按分类预填（来自 render html_data） */
     categoryPrefill?: Ref<H1CategoryPrefillPayload | null | undefined>
     onSave?: (itemId: string, value: any) => void
-    onWritebackTB?: (auditedCost: number, auditedDep: number, auditedImpair: number) => Promise<void>
     onPublishEvent?: (event: string, payload: any) => void
+    /** 只读态：显式发布 TB 早退（spec tb-writeback-explicit-publish-gate Task 10 / Req 3 前端侧） */
+    isReadonly?: Ref<boolean>
   },
 ) {
   const costRows = ref<AdjudicationRow[]>([])
@@ -186,6 +189,8 @@ export function useH1Adjudication(
   /** 按分类净值/原值变动说明（与 H1-6 共用键） */
   const changeExplanations = ref<Record<string, string>>({})
   const prefillApplied = ref(false)
+  /** spec: tb-writeback-explicit-publish-gate Task 10 —— 显式发布到 TB 的进行中标志 */
+  const publishing = ref(false)
 
   function _getJson(itemId: string): any {
     const item = allResponses.value.get(itemId)
@@ -605,25 +610,60 @@ export function useH1Adjudication(
     }
   }
 
-  async function publishAdjudicated(): Promise<void> {
+  /**
+   * 仅发布 substantive:adjudicated 事件通知下游（附注/公式管理/A13），不写 TB。
+   * 数据变化 / 普通保存路径只走本函数（Req 1：普通保存绝不写 TB）。
+   */
+  function emitAdjudicated(): void {
+    if (!options?.onPublishEvent) return
+    options.onPublishEvent('substantive:adjudicated', {
+      wp_code: 'H1',
+      account_codes: ['1601', '1602', '1603'],
+      cost_audited: costSubtotal.value.audited,
+      dep_audited: depSubtotal.value.audited,
+      impair_audited: impairSubtotal.value.audited,
+      net_value: netValueAudited.value,
+      net_value_begin: netValueBegin.value,
+    })
+  }
+
+  /**
+   * spec: tb-writeback-explicit-publish-gate Task 10 / Req 1,2,8。
+   * 显式发布审定数到试算表：中文二次确认 → POST /workpapers/{wpId}/audit-determination/publish-to-tb
+   * （多科目 1601/1602/1603 单次原子发布，balance 口径），成功后仍 emit substantive:adjudicated
+   * 供附注/公式管理刷新。取消/readonly 早退，不写 TB、不 emit。
+   * 此前经 onWritebackTB 回调直调旧端点 PUT /projects/{pid}/trial-balance/writeback（三次循环、无确认）。
+   */
+  async function publishToTb(): Promise<void> {
+    if (publishing.value || options?.isReadonly?.value) return
     const auditedCost = costSubtotal.value.audited
     const auditedDep = depSubtotal.value.audited
     const auditedImpair = impairSubtotal.value.audited
-
-    if (options?.onWritebackTB) {
-      await options.onWritebackTB(auditedCost, auditedDep, auditedImpair)
+    try {
+      await ElMessageBox.confirm(
+        '将把固定资产原值(1601)、累计折旧(1602)、减值准备(1603)审定数写入试算表，并触发报表及错报评价重算。是否继续？',
+        '发布到试算表',
+        { confirmButtonText: '确认发布', cancelButtonText: '取消', type: 'warning' },
+      )
+    } catch {
+      return // 用户取消：不写 TB、不 emit
     }
-
-    if (options?.onPublishEvent) {
-      options.onPublishEvent('substantive:adjudicated', {
-        wp_code: 'H1',
-        account_codes: ['1601', '1602', '1603'],
-        cost_audited: auditedCost,
-        dep_audited: auditedDep,
-        impair_audited: auditedImpair,
-        net_value: netValueAudited.value,
-        net_value_begin: netValueBegin.value,
+    publishing.value = true
+    try {
+      await api.post(`/api/workpapers/${wpId.value}/audit-determination/publish-to-tb`, {
+        sheet_name: '审定表H1-1',
+        writeback_rows: [
+          { account_code: '1601', audited_amount: auditedCost, amount_kind: 'balance' },
+          { account_code: '1602', audited_amount: auditedDep, amount_kind: 'balance' },
+          { account_code: '1603', audited_amount: auditedImpair, amount_kind: 'balance' },
+        ],
       })
+      ElMessage.success('已发布到试算表 1601/1602/1603')
+      emitAdjudicated()
+    } catch {
+      ElMessage.warning('审定数发布失败，请稍后重试或手动确认试算表数据')
+    } finally {
+      publishing.value = false
     }
   }
 
@@ -690,7 +730,9 @@ export function useH1Adjudication(
     syncAdjustmentsFromH3,
     applyCategoryPrefill,
     setChangeExplanation,
-    publishAdjudicated,
+    publishToTb,
+    publishing,
+    emitAdjudicated,
     saveNote,
     saveConclusion,
     saveQualitativeNotes,

@@ -409,8 +409,14 @@
     </el-card>
 
     <div v-if="!props.isReadonly" class="action-bar">
-      <el-button type="primary" :loading="publishing" @click="handlePublish">
-        确认审定 → 回写TB(1606)
+      <el-button
+        type="warning"
+        :loading="state.publishing.value"
+        :disabled="props.isReadonly"
+        data-testid="h6-publish-tb"
+        @click="handlePublish"
+      >
+        发布到试算表
       </el-button>
     </div>
 
@@ -456,7 +462,6 @@ const saveResponse = inject<(itemId: string, value: any) => void>('saveResponse'
   const strVal = value != null ? (typeof value === 'string' ? value : JSON.stringify(value)) : null
   props.allResponses.set(itemId, { item_id: itemId, remark: strVal, conclusion: null })
 })
-const publishing = ref(false)
 const seedingFa = ref(false)
 const { resolveInstance } = useAcnr()
 
@@ -468,21 +473,12 @@ const allResponsesRef = computed(() => props.allResponses)
 const state = useH6Adjudication({
   wpId: toRef(props, 'wpId'),
   projectId: toRef(props, 'projectId'),
+  isReadonly: toRef(props, 'isReadonly'),
   allResponses: allResponsesRef as any,
   h10Amount: h10AmountInjected,
   onSave: (itemId: string, value: any) => saveResponse(itemId, value),
-  onWritebackTB: async (amount: number) => {
-    // 统一走 eventBus（crossWpEventBridge 自动桥接 window 供旧监听者）
-    const { eventBus } = await import('@/utils/eventBus')
-    eventBus.emit('substantive:adjudicated', {
-      wpCode: 'H6',
-      accountCode: '1606',
-      auditedAmount: amount,
-      adjudicatedAmount: amount,
-      isTransitAccount: true,
-      timestamp: Date.now(),
-    } as any)
-  },
+  // spec: tb-writeback-explicit-publish-gate Task 10 —— TB 回写改由 state.publishToTb
+  // 走显式发布门（中文二次确认 → POST publish-to-tb 科目 1606 balance）；补真回写消除原假回写状态（Property 10）。
 })
 
 const crossSheet = useH6CrossSheet(allResponsesRef as any)
@@ -657,13 +653,7 @@ function onFsChange(kind: string, side: 'end' | 'begin', value: number) {
 }
 
 async function handlePublish() {
-  publishing.value = true
-  try {
-    await state.publishAdjudicated()
-    ElMessage.success('已确认审定并回写 TB(1606)')
-  } finally {
-    publishing.value = false
-  }
+  await state.publishToTb()
 }
 
 function openReview(id: string) {

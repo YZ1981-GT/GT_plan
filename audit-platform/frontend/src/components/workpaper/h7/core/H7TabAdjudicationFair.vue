@@ -110,7 +110,15 @@
 
     <!-- 操作按钮 -->
     <div class="action-bar" v-if="!isReadonly">
-      <el-button type="primary" :loading="publishing" @click="handlePublish">确认审定 → 回写TB(1621)</el-button>
+      <el-button
+        type="warning"
+        :loading="publishing"
+        :disabled="isReadonly"
+        data-testid="h7-fair-publish-tb"
+        @click="handlePublish"
+      >
+        发布到试算表
+      </el-button>
     </div>
 
     <!-- 编制提示 -->
@@ -148,7 +156,7 @@
  * Spec: .kiro/specs/h7-biological-assets/  Requirements: 双计量·公允价值模式审定
  */
 import { ref, computed, onMounted, inject, toRef } from 'vue'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { Download } from '@element-plus/icons-vue'
 import { api } from '@/services/apiProxy'
 import { eventBus } from '@/utils/eventBus'
@@ -261,18 +269,33 @@ async function persist(itemId: string, value: any) {
 
 function onFair() { void persist('H7-1-fair', fairRow.value) }
 
+// spec: tb-writeback-explicit-publish-gate Task 10 / Req 1,2,8。
+// 中文二次确认 → POST /workpapers/{wpId}/audit-determination/publish-to-tb（单科目 1621 生产性生物资产
+// 公允价值，balance 口径——公允价值模式下审定的是期末公允价值余额，非损益发生额），成功后 emit substantive:adjudicated。
+// 取消/readonly 早退，不写 TB、不 emit。此前直调旧端点 PUT trial-balance/writeback（无确认）。
 async function handlePublish() {
+  if (publishing.value || props.isReadonly) return
+  const amount = auditedFair.value
+  try {
+    await ElMessageBox.confirm(
+      '将把生产性生物资产(1621)公允价值审定数写入试算表，并触发报表及错报评价重算。是否继续？',
+      '发布到试算表',
+      { confirmButtonText: '确认发布', cancelButtonText: '取消', type: 'warning' },
+    )
+  } catch {
+    return
+  }
   publishing.value = true
   try {
-    await api.put(`/api/projects/${props.projectId}/trial-balance/writeback`, {
-      account_code: '1621',
-      audited_amount: auditedFair.value,
+    await api.post(`/api/workpapers/${props.wpId}/audit-determination/publish-to-tb`, {
+      sheet_name: '审定表H7-1',
+      writeback_rows: [{ account_code: '1621', audited_amount: amount, amount_kind: 'balance' }],
     })
     eventBus.emit('substantive:adjudicated', {
-      wpId: props.wpId, accountCode: '1621', auditedAmount: auditedFair.value, componentType: 'h7-biological-assets',
+      wpId: props.wpId, accountCode: '1621', auditedAmount: amount, componentType: 'h7-biological-assets',
     })
-    ElMessage.success('审定数已回写试算表(1621)')
-  } catch { ElMessage.warning('回写失败，请手动确认试算表') } finally { publishing.value = false }
+    ElMessage.success('已发布到试算表 1621')
+  } catch { ElMessage.warning('审定数发布失败，请稍后重试或手动确认试算表数据') } finally { publishing.value = false }
 }
 
 function handleReview(id: string) { openReviewDialog(id) }

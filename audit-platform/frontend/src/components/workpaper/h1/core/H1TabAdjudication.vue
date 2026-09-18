@@ -629,8 +629,14 @@
     </el-card>
 
     <div v-if="!isReadonly" class="action-bar">
-      <el-button type="primary" :loading="publishing" @click="handlePublish">
-        确认审定 → 回写TB
+      <el-button
+        type="warning"
+        :loading="publishing"
+        :disabled="isReadonly"
+        data-testid="h1-publish-tb"
+        @click="handlePublish"
+      >
+        发布到试算表
       </el-button>
     </div>
 
@@ -705,7 +711,6 @@ const openReviewDialog = inject<(id: string) => void>('openReviewDialog', () => 
 const saveResponse = inject<(id: string, val: any) => void>('saveResponse', () => {})
 
 const allResponsesRef = computed(() => props.allResponses)
-const publishing = ref(false)
 const aiNoteLoading = ref(false)
 const aiConcLoading = ref(false)
 
@@ -763,7 +768,8 @@ const {
   syncAdjustmentsFromH3,
   applyCategoryPrefill,
   setChangeExplanation,
-  publishAdjudicated,
+  publishToTb,
+  publishing,
   saveNote,
   saveConclusion,
   saveQualitativeNotes,
@@ -786,27 +792,12 @@ const {
       props.allResponses.set(itemId, { ...existing, item_id: itemId, remark })
       saveResponse(itemId, value)
     },
-    onWritebackTB: async (cost, dep, impair) => {
-      const codes: Array<{ code: string; amount: number }> = [
-        { code: '1601', amount: cost },
-        { code: '1602', amount: dep },
-        { code: '1603', amount: impair },
-      ]
-      try {
-        for (const { code, amount } of codes) {
-          await http.put(`/api/projects/${props.projectId}/trial-balance/writeback`, {
-            account_code: code,
-            audited_amount: amount,
-          })
-        }
-        ElMessage.success('已回写试算平衡表 1601/1602/1603')
-      } catch {
-        ElMessage.warning('审定数回写失败，请手动确认试算表数据')
-      }
-    },
+    // spec: tb-writeback-explicit-publish-gate Task 10 —— TB 回写改由 composable.publishToTb
+    // 走显式发布门（中文二次确认 → POST publish-to-tb 多科目原子发布）；此处仅桥接事件。
     onPublishEvent: (event, payload) => {
       eventBus.emit(event as any, payload)
     },
+    isReadonly: toRef(props, 'isReadonly'),
   },
 )
 
@@ -943,12 +934,7 @@ function onNetExplanation(category: string, text: string) {
 }
 
 async function handlePublish() {
-  publishing.value = true
-  try {
-    await publishAdjudicated()
-  } finally {
-    publishing.value = false
-  }
+  await publishToTb()
 }
 
 function handleReview(id: string) {

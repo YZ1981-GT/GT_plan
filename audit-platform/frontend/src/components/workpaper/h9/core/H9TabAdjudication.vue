@@ -380,10 +380,16 @@
       </div>
     </el-card>
 
-    <!-- TB回写 -->
+    <!-- TB回写：显式发布门（二次确认 → publish-to-tb 端点，双科目单次原子发布） -->
     <div v-if="!isReadonly" class="writeback-area">
-      <el-button type="primary" @click="handleWriteback" :loading="writebackLoading">
-        审定数回写TB（{{ LEASE_LIAB_CODE }} 租赁负债 + 未确认融资费用）
+      <el-button
+        type="warning"
+        data-testid="h9-publish-tb"
+        @click="handleWriteback"
+        :loading="writebackLoading"
+        :disabled="isReadonly"
+      >
+        发布到试算表（{{ leaseLiabilityCode }} 租赁负债 + {{ unearnedFinanceCode }} 未确认融资费用）
       </el-button>
     </div>
 
@@ -413,12 +419,12 @@
     <details class="compile-hint">
       <summary>编制提示</summary>
       <ul>
-        <li>编制顺序：先编 H9-2/H9-3 明细 →「从明细带入」→ 填 AJE/RJE 与一年内到期重分类 → 核变动率 → 回写 TB</li>
+        <li>编制顺序：先编 H9-2/H9-3 明细 →「从明细带入」→ 填 AJE/RJE 与一年内到期重分类 → 核变动率 →「发布到试算表」（须二次确认）</li>
         <li>租赁负债为贷方科目（负债类），期末=期初+贷方-借方；未确认融资费用为借方备抵，期末=期初+借方-贷方</li>
         <li>报表数=审定数−重分类(一年一年内到期)；变动额/率对齐 Excel 本期审定与上期比较</li>
         <li>净额变动率超过 30% 时须在审计说明中写明主要原因（模板红字要求）</li>
         <li>CAS21：H9初始确认≈H8初始计量-直接费用+激励（±1元）；H9-1 审定合计应与 H9-2 明细合计勾稽</li>
-        <li>回写TB后自动发布 substantive:adjudicated 事件</li>
+        <li>「发布到试算表」经二次确认后走显式发布门（publish-to-tb），双科目单次原子发布，并发布 substantive:adjudicated 事件</li>
         <li>「带入调整」：从集中登记按科目 {{ LEASE_LIAB_CODE }} 拉取调整分录，逐笔分配到租赁负债原值行的 AJE/RJE，带入后审定数自动更新并联动附注</li>
         <!-- 历史版本曾把租赁负债科目号误写为 2205（合同负债，D7 循环 BS-047）；
              该说明**只留在注释里**，用户侧只应看到本项目真实科目码。 -->
@@ -457,7 +463,6 @@
 import { ref, toRef, computed, watch, onMounted, onBeforeUnmount } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Download } from '@element-plus/icons-vue'
-import http from '@/utils/http'
 import { eventBus } from '@/utils/eventBus'
 import { useH9Adjudication, type H9AdjudicationRow } from '../../composables/useH9Adjudication'
 import { useH9CrossSheet } from '../../composables/useH9CrossSheet'
@@ -739,24 +744,64 @@ function handleDeleteRow(rowId: string) {
   deleteRow(rowId)
 }
 
+/**
+ * 审定数发布到试算表 —— 显式发布门（spec tb-writeback-explicit-publish-gate Task 11 / Req 5,2,8）。
+ *
+ * 🔴 改造前 handleWriteback 直调旧的 TB 直写端点（`PUT /projects/{pid}/…`，**无 /api 前缀**、
+ * 用 `http` 而非 `api`、双科目分两次 PUT、无二次确认，且历史把 ComputedRef
+ * `leaseLiabilityCode`/`unearnedFinanceCode` 未解包直接透传 = 科目码传成对象），
+ * 绕过显式确认门。改造后与 D2/D4-1/F/H/K 同范式：
+ *   readonly/publishing 早退 → ElMessageBox.confirm 中文二次确认 →
+ *   `POST /api/workpapers/{wpId}/audit-determination/publish-to-tb`（**双科目在单次
+ *   writeback_rows 原子发布**，balance 口径，科目由 h9Scope 运行态解析后透传，端点不硬编码）
+ *   → ElMessage.success → publishAdjudicated()（仍 emit substantive:adjudicated 供 H8/附注/报表联动）。
+ * 取消/readonly 无副作用（不发请求、不 emit）。
+ */
 async function handleWriteback() {
+  if (writebackLoading.value || props.isReadonly) return
+  if (!props.wpId) {
+    ElMessage.warning('底稿未就绪，无法发布')
+    return
+  }
+
+  // 双科目归集为 writeback_rows 两行（租赁负债贷方类 + 未确认融资费用借方备抵类，均 balance 口径）
+  const rows: Array<{ account_code: string; audited_amount: number; amount_kind: 'balance' }> = []
+  const leaseCode = leaseLiabilityCode.value
+  const unearnedCode = unearnedFinanceCode.value
+  if (leaseCode) {
+    rows.push({ account_code: leaseCode, audited_amount: liabilitySubtotal.value.audited, amount_kind: 'balance' })
+  }
+  if (unearnedCode) {
+    rows.push({ account_code: unearnedCode, audited_amount: unearnedSubtotal.value.audited, amount_kind: 'balance' })
+  }
+  if (rows.length === 0) {
+    ElMessage.warning('本项目无相关科目，未发布任何 TB 行')
+    return
+  }
+
+  try {
+    await ElMessageBox.confirm(
+      `确认将审定数发布到试算表？将写入 ${rows.map(r => r.account_code).join('、')} 两个科目，`
+        + '并触发下游报表 / 错报评价重算。',
+      '发布到试算表',
+      { confirmButtonText: '确认发布', cancelButtonText: '取消', type: 'warning' },
+    )
+  } catch {
+    return // 用户取消 → 无副作用
+  }
+
   writebackLoading.value = true
   try {
-    // 回写租赁负债（贷方/负债类）——科目码走 h9Scope 单一真源
-    await http.put(`/projects/${props.projectId}/trial-balance/writeback`, {
-      account_code: leaseLiabilityCode,
-      audited_amount: liabilitySubtotal.value.audited,
+    const { api } = await import('@/services/apiProxy')
+    await api.post(`/api/workpapers/${props.wpId}/audit-determination/publish-to-tb`, {
+      sheet_name: '审定表H9-1',
+      writeback_rows: rows,
     })
-    // 回写未确认融资费用（借方/负债备抵类）
-    await http.put(`/projects/${props.projectId}/trial-balance/writeback`, {
-      account_code: unearnedFinanceCode,
-      audited_amount: unearnedSubtotal.value.audited,
-    })
-    // Publish adjudicated event (dispatches 'substantive:adjudicated')
+    // 发布后仍 emit substantive:adjudicated（H8 联动 / 附注 / 报表刷新 —— Req 8）
     await publishAdjudicated()
-    ElMessage.success(`审定数已回写TB（${leaseLiabilityCode} 租赁负债 + 未确认融资费用）`)
+    ElMessage.success(`审定数已发布到试算表（${rows.map(r => r.account_code).join(' + ')}）`)
   } catch {
-    ElMessage.warning('审定数回写失败，请手动确认试算表数据')
+    ElMessage.warning('审定数发布失败，请手动确认试算表数据')
   } finally {
     writebackLoading.value = false
   }

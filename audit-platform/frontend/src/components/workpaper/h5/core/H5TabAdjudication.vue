@@ -281,8 +281,14 @@
 
     <!-- 操作按钮 -->
     <div class="action-bar" v-if="!isReadonly">
-      <el-button type="primary" @click="handlePublish" :loading="publishing">
-        确认审定 → 回写TB
+      <el-button
+        type="warning"
+        :loading="state.publishing.value"
+        :disabled="isReadonly"
+        data-testid="h5-publish-tb"
+        @click="handlePublish"
+      >
+        发布到试算表
       </el-button>
     </div>
 
@@ -343,7 +349,6 @@ const props = defineProps<{
 const openReviewDialog = inject<(id: string) => void>('openReviewDialog', () => {})
 
 const allResponsesRef = computed(() => props.allResponses)
-const publishing = ref(false)
 
 // FormData composable for save + TB writeback
 const formData = useH5FormData({
@@ -355,11 +360,10 @@ const state = useH5Adjudication({
   allResponses: allResponsesRef as any,
   wpId: toRef(props, 'wpId'),
   projectId: toRef(props, 'projectId'),
+  isReadonly: toRef(props, 'isReadonly'),
   onSave: (itemId: string, value: any) => formData.setResponse(itemId, value),
-  onWritebackTB: async (auditedCost: number, auditedDepletion: number) => {
-    await formData.writebackTB('1631', auditedCost)
-    await formData.writebackTB('1632', auditedDepletion)
-  },
+  // spec: tb-writeback-explicit-publish-gate Task 10 —— TB 回写改由 state.publishToTb
+  // 走显式发布门（中文二次确认 → POST publish-to-tb 双科目 1631/1632 balance 单次原子发布）；此处仅桥接事件。
   onPublishEvent: (event: string, payload: any) => {
     eventBus.emit(event as any, { ...payload, timestamp: Date.now() })
   },
@@ -439,12 +443,7 @@ function onCellChange(block: BlockType, rowId: string, field: string, value: num
 }
 
 async function handlePublish() {
-  publishing.value = true
-  try {
-    await state.publishAdjudicated()
-  } finally {
-    publishing.value = false
-  }
+  await state.publishToTb()
 }
 
 

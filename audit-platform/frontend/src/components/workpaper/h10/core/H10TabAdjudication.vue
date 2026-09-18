@@ -157,7 +157,7 @@
       <span v-else>{{ fmt(adj.trialBalanceAmount.value) }}</span>
       <span :class="['variance', { 'is-error': adj.hasVarianceHighlight.value }]">差异：{{ fmt(adj.variance.value) }}</span>
       <el-button v-if="!isReadonly" size="small" link @click="adj.loadTrialBalanceFromApi()">刷新TB</el-button>
-      <el-button size="small" type="primary" :disabled="isReadonly" :loading="publishLoading" data-testid="h10-publish-adj" @click="onPublish">发布审定数</el-button>
+      <el-button size="small" type="warning" :disabled="isReadonly" :loading="adj.publishing.value" data-testid="h10-publish-tb" @click="onPublish">发布到试算表</el-button>
     </div>
 
     <el-card shadow="never" class="h10-note-card">
@@ -205,21 +205,20 @@ const props = defineProps<{
   projectId: string
   isReadonly: boolean
   debouncedSave: (itemId: string, data: Partial<ChecklistResponse>) => void
-  writebackTrialBalance?: (amount: number) => Promise<void>
 }>()
 
 const emit = defineEmits<{ imported: [] }>()
 const jumpToSection = inject<((sheetName: string) => void) | null>('jumpToSection', null)
 const validateLoading = ref(false)
-const publishLoading = ref(false)
 
+// spec: tb-writeback-explicit-publish-gate Task 10 —— TB 回写走 adj.publishToTb（显式确认门），
+// 不再从宿主注入 writebackTrialBalance 自动写（原 6115 在 mount/debounce/跨wp 自动写违反 Req 1）。
 const adj = useH10Adjudication({
   wpId: toRef(props, 'wpId'),
   projectId: toRef(props, 'projectId'),
   allResponses: toRef(props, 'allResponses'),
   isReadonly: toRef(props, 'isReadonly'),
   debouncedSave: props.debouncedSave,
-  writebackTrialBalance: props.writebackTrialBalance,
 })
 
 const cross = useH10CrossSheet({
@@ -296,18 +295,14 @@ async function runValidate(): Promise<void> {
   }
 }
 
+// spec: tb-writeback-explicit-publish-gate Task 10 —— 发布走 adj.publishToTb（含中文二次确认）。
+// 先校验公式，确认后 POST publish-to-tb（6115 occurrence）+ 保存审定数到后端。取消则不写 TB。
 async function onPublish(): Promise<void> {
   if (props.isReadonly) return
-  publishLoading.value = true
-  try {
-    const ok = await adj.validateWithBackend()
-    if (!ok) ElMessage.warning('公式校验未通过，请检查审定表与明细表')
-    await adj.publishAdjudicated()
-    await adj.saveAdjudicationToBackend()
-    ElMessage.success('审定数已发布（6115 发生额已回写）')
-  } finally {
-    publishLoading.value = false
-  }
+  const ok = await adj.validateWithBackend()
+  if (!ok) ElMessage.warning('公式校验未通过，请检查审定表与明细表')
+  await adj.publishToTb()
+  await adj.saveAdjudicationToBackend()
 }
 
 function fmt(v: number | null | undefined): string {

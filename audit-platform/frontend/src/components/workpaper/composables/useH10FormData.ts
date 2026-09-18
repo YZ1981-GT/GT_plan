@@ -142,21 +142,11 @@ export function useH10FormData(opts: { wpId: Ref<string>; projectId: Ref<string>
     }
   }
 
-  async function writebackTB(auditedAmount: number): Promise<void> {
-    if (!opts.projectId.value) return
-    try {
-      await api.put(`/api/projects/${opts.projectId.value}/trial-balance/writeback`, {
-        account_code: H10_ACCOUNT_CODE,
-        audited_amount: auditedAmount,
-      })
-      await saveImmediate('H10-adj-tb-writeback', {
-        remark: JSON.stringify({ accountCode: H10_ACCOUNT_CODE, auditedAmount }),
-      })
-      await saveImmediate('H10-1-adjudicated-amount', { conclusion: String(auditedAmount) })
-    } catch {
-      ElMessage.warning('审定数回写失败，请手动确认试算表数据')
-    }
-  }
+  // 注：原 writebackTB（PUT /trial-balance/writeback，科目 6115 资产处置损益 + saveImmediate）
+  // 在 H10-1 迁移到显式发布门后成为零消费死代码，已移除（原被 useH10Adjudication.publishAdjudicated
+  // 的 mount/1.5s debounce 自动写 + GtH10 跨 wp 监听自动写调用，三者均自动写、违反 Req 1，已一并移除）。
+  // 活路径 = useH10Adjudication.publishToTb（中文二次确认 → POST publish-to-tb 科目 6115 occurrence 发生额）。
+  // spec: tb-writeback-explicit-publish-gate Task 10 / Req 1,2,6,8。
 
   function getSheet(name: string) {
     return sheetCache.value[name] ?? { rows: [] }
@@ -232,8 +222,6 @@ export function useH10FormData(opts: { wpId: Ref<string>; projectId: Ref<string>
     saveImmediate,
     debouncedSave,
     fetchTrialBalanceAmount,
-    writebackTB,
-    writebackTrialBalance: writebackTB,
     handleDisposalCompleted,
     handleSourceDisposalUpdated,
   }

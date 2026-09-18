@@ -4,6 +4,17 @@
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { ref, nextTick } from 'vue'
+
+// spec: tb-writeback-explicit-publish-gate Task 10 —— publishToTb 走 apiProxy + ElMessageBox 确认
+const { mockPost } = vi.hoisted(() => ({ mockPost: vi.fn(async () => ({ published: true })) }))
+vi.mock('@/services/apiProxy', () => ({
+  api: { post: mockPost, put: vi.fn(async () => ({})), get: vi.fn(async () => ({ data: [] })) },
+}))
+vi.mock('element-plus', () => ({
+  ElMessageBox: { confirm: vi.fn(async () => 'confirm') },
+  ElMessage: { success: vi.fn(), error: vi.fn(), warning: vi.fn(), info: vi.fn() },
+}))
+
 import { useH1Adjudication } from '../useH1Adjudication'
 
 function makeMap(entries: Record<string, any> = {}) {
@@ -212,21 +223,31 @@ describe('useH1Adjudication', () => {
     })
   })
 
-  it('publishAdjudicated 回写含减值并发布事件', async () => {
+  it('publishToTb 走显式发布门 POST publish-to-tb（1601/1602/1603 balance）并发布事件', async () => {
+    // spec: tb-writeback-explicit-publish-gate Task 10 —— 原 publishAdjudicated(onWritebackTB 回调直调
+    // 旧端点) 改为 publishToTb（中文二次确认 → POST publish-to-tb 多科目原子发布，成功后 emit）。
+    mockPost.mockClear()
     const allResponses = ref(makeMap())
-    const onWritebackTB = vi.fn(async () => {})
     const onPublishEvent = vi.fn()
     const api = useH1Adjudication(wpId, projectId, allResponses as any, {
       onSave,
-      onWritebackTB,
       onPublishEvent,
+      isReadonly: ref(false),
     })
     await nextTick()
     api.updateCell('cost', api.costRows.value[0].rowId, 'unadjusted', 1000)
     api.updateCell('impair', api.impairRows.value[0].rowId, 'unadjusted', 80)
 
-    await api.publishAdjudicated()
-    expect(onWritebackTB).toHaveBeenCalledWith(1000, 0, 80)
+    await api.publishToTb()
+    expect(mockPost).toHaveBeenCalledTimes(1)
+    const [url, body] = mockPost.mock.calls[0]!
+    expect(url).toBe('/api/workpapers/wp-1/audit-determination/publish-to-tb')
+    expect(body.sheet_name).toMatch(/H1-1/)
+    expect(body.writeback_rows).toEqual([
+      { account_code: '1601', audited_amount: 1000, amount_kind: 'balance' },
+      { account_code: '1602', audited_amount: 0, amount_kind: 'balance' },
+      { account_code: '1603', audited_amount: 80, amount_kind: 'balance' },
+    ])
     expect(onPublishEvent).toHaveBeenCalledWith(
       'substantive:adjudicated',
       expect.objectContaining({

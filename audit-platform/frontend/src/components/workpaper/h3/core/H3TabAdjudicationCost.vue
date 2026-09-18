@@ -62,6 +62,16 @@
       <el-button size="small" type="primary" plain :disabled="isReadonly" :loading="adjPullImpair.loading.value" @click="openBringInImpair">
         <el-icon><Download /></el-icon>带入调整(减值)
       </el-button>
+      <el-button
+        size="small"
+        type="warning"
+        :loading="publishing"
+        :disabled="isReadonly"
+        data-testid="h3-publish-tb"
+        @click="publishToTb"
+      >
+        发布到试算表
+      </el-button>
       <span class="chip-wrap"><GtIndexChip value="wp:H3-1" :context-project-id="projectId" /></span>
       <el-tag size="small" type="info">共 {{ originalRows.length }} 行</el-tag>
       <el-tag v-if="h32CategoryMatch.unmatchedCount > 0" size="small" type="warning">
@@ -387,9 +397,9 @@
  */
 import { ref, computed, inject, toRef, onMounted, watch } from 'vue'
 import { Download } from '@element-plus/icons-vue'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { useH3AdjudicationCost } from '../../composables/useH3AdjudicationCost'
-import http from '@/utils/http'
+import { api } from '@/services/apiProxy'
 import { eventBus } from '@/utils/eventBus'
 import type { H3CostOriginalRow, H3CostDepRow, H3CostImpairRow } from '../../composables/useH3AdjudicationCost'
 import type { H3FillDiffRow, H3FillMode } from '../../composables/h3FillFromDetail'
@@ -656,56 +666,81 @@ function saveAuditConclusion(val: string) {
   void saveImmediate(CONCLUSION_KEY, val)
 }
 
+// spec: tb-writeback-explicit-publish-gate Task 10 / Req 1 —— 单元格变化只发布 substantive:adjudicated
+// 联动附注/公式管理/A13，绝不写 TB（原 1.5s debounce 自动写 TB 违反 Req 1，已移除）。
 function onOrigCellChange(row: H3CostOriginalRow, field: keyof H3CostOriginalRow) {
   updateOriginalCell(row.rowId, field, (row as any)[field])
-  debouncedWritebackTb()
+  emitAdjudicated()
 }
 function onDepCellChange(row: H3CostDepRow, field: keyof H3CostDepRow) {
   updateDepCell(row.rowId, field, (row as any)[field])
-  debouncedWritebackTb()
+  emitAdjudicated()
 }
 function onImpairCellChange(row: H3CostImpairRow, field: keyof H3CostImpairRow) {
   updateImpairCell(row.rowId, field, (row as any)[field])
-  debouncedWritebackTb()
+  emitAdjudicated()
 }
 
-// ─── TB 回写 + 发布 substantive:adjudicated ────────────────────────────────
-let _wbTimer: ReturnType<typeof setTimeout> | null = null
-function debouncedWritebackTb() {
-  if (_wbTimer) clearTimeout(_wbTimer)
-  _wbTimer = setTimeout(() => { void writebackTrialBalance() }, 1500)
+// ─── 仅发布 substantive:adjudicated（不写 TB）───────────────────────────────
+function emitAdjudicated() {
+  const costAudited = originalTotal.value.audited ?? 0
+  const depAudited = depTotal.value.audited ?? 0
+  eventBus.emit('substantive:adjudicated', {
+    wpCode: 'H3',
+    accountCode: grossCode.value,
+    auditedAmount: costAudited - depAudited,
+    adjudicatedAmount: costAudited - depAudited,
+    timestamp: Date.now(),
+  })
 }
 
-async function writebackTrialBalance() {
+/**
+ * spec: tb-writeback-explicit-publish-gate Task 10 / Req 1,2,8 + 🔴 防跨循环污染。
+ * 显式发布审定数到试算表：中文二次确认 → POST /workpapers/{wpId}/audit-determination/publish-to-tb。
+ * 🔴 回写科目一律取 render 下发的语义定位结果（h3AccountScope），本项目无该科目（grossCode/accumDepCode
+ *    为空串）时**不写该行**（宁缺勿造，防止把投资性房地产审定数污染到别循环科目，如历史上误写 1503/1504
+ *    可供出售金融资产/债权投资）。writeback_rows 因此可能为 1 行、2 行或 0 行。
+ * 取消/readonly 早退，不写 TB、不 emit。此前经 1.5s debounce 自动直调旧端点 PUT trial-balance/writeback。
+ */
+const publishing = ref(false)
+async function publishToTb() {
+  if (publishing.value || props.isReadonly) return
+  const costAudited = originalTotal.value.audited ?? 0
+  const depAudited = depTotal.value.audited ?? 0
+  // 🔴 防污染：只为本项目实际拥有的科目构造回写行；无科目则跳过该行
+  const rows: Array<{ account_code: string; audited_amount: number; amount_kind: 'balance' }> = []
+  if (grossCode.value) {
+    rows.push({ account_code: grossCode.value, audited_amount: costAudited, amount_kind: 'balance' })
+  }
+  if (accumDepCode.value) {
+    rows.push({ account_code: accumDepCode.value, audited_amount: depAudited, amount_kind: 'balance' })
+  }
+  if (rows.length === 0) {
+    ElMessage.warning('本项目无投资性房地产相关科目，未发布任何 TB 行（防止污染其他循环科目）')
+    return
+  }
   try {
-    const costAudited = originalTotal.value.audited ?? 0
-    const depAudited = depTotal.value.audited ?? 0
-    // 🔴 回写目标科目一律取 render 下发的语义定位结果（`h3AccountScope`），
-    //    改造前写死 1503/1504 —— 那是**可供出售金融资产(G6)** 与 **债权投资(G4)**，
-    //    历史上一直在往别的循环的试算表行写投资性房地产审定数（同 H8/H9 污染 K2 那次）。
-    if (grossCode.value) {
-      await http.put(`/api/projects/${props.projectId}/trial-balance/writeback`, {
-        account_code: grossCode.value,
-        audited_amount: costAudited,
-      })
-    }
-    // 累计折旧（贷方备抵审定数，绝对值）；本项目无该科目时不写（宁缺勿造）
-    if (accumDepCode.value) {
-      await http.put(`/api/projects/${props.projectId}/trial-balance/writeback`, {
-        account_code: accumDepCode.value,
-        audited_amount: depAudited,
-      })
-    }
-    // 发布审定事件联动附注/公式管理/A13
-    eventBus.emit('substantive:adjudicated', {
-      wpCode: 'H3',
-      accountCode: grossCode.value,
-      auditedAmount: costAudited - depAudited,
-      adjudicatedAmount: costAudited - depAudited,
-      timestamp: Date.now(),
+    await ElMessageBox.confirm(
+      `将把投资性房地产审定数写入试算表（科目 ${rows.map((r) => r.account_code).join('、')}），并触发报表及错报评价重算。是否继续？`,
+      '发布到试算表',
+      { confirmButtonText: '确认发布', cancelButtonText: '取消', type: 'warning' },
+    )
+  } catch {
+    return
+  }
+  publishing.value = true
+  try {
+    await api.post(`/api/workpapers/${props.wpId}/audit-determination/publish-to-tb`, {
+      sheet_name: '审定表H3-1',
+      writeback_rows: rows,
     })
+    ElMessage.success(`已发布到试算表 ${rows.map((r) => r.account_code).join('、')}`)
+    emitAdjudicated()
   } catch (e) {
-    console.warn('[H3-1 Cost] TB writeback failed:', e)
+    console.warn('[H3-1 Cost] TB publish failed:', e)
+    ElMessage.warning('审定数发布失败，请稍后重试或手动确认试算表数据')
+  } finally {
+    publishing.value = false
   }
 }
 

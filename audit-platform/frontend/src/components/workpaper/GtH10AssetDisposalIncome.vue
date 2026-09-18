@@ -49,7 +49,6 @@
           :project-id="props.projectId"
           :is-readonly="isReadonly"
           :debounced-save="onDebouncedSave"
-          :writeback-trial-balance="formData.writebackTrialBalance"
           @imported="reloadAll"
         />
       </template>
@@ -153,7 +152,6 @@ import { WorkpaperRuntimeContextKey } from './composables/useWorkpaperScaffold'
 import { useWorkpaperReviewProvide } from './composables/useWorkpaperReviewProvide'
 import { useWorkpaperReviewThreads } from './composables/useWorkpaperReviewThreads'
 import { useWorkpaperEntryInjections } from './composables/useWorkpaperEntryInjections'
-import { H10_ACCOUNT_CODE } from './composables/h10Constants'
 import type { ChecklistResponse } from './composables/useF1FormData'
 import HiFourTableSourcePanel from './shared/HiFourTableSourcePanel.vue'
 import { getHiExtractionSegments } from './composables/hiExtractionSegments'
@@ -246,12 +244,10 @@ function handleSourceDisposalUpdated(ev: Event) {
   formData.handleSourceDisposalUpdated(detail)
 }
 
-function handleSubstantiveAdjudicated(ev: Event) {
-  const detail = (ev as CustomEvent).detail ?? {}
-  if (detail.accountCode === H10_ACCOUNT_CODE && detail.wpCode && detail.wpCode !== 'H10') {
-    void formData.writebackTrialBalance(Number(detail.adjudicatedAmount ?? detail.auditedAmount ?? 0))
-  }
-}
+// spec: tb-writeback-explicit-publish-gate Task 10 / Req 1,2 —— 移除原「跨 wp 收到 6115 审定事件即
+// 自动 formData.writebackTrialBalance 写 TB」的旁路（自动写、无确认，违反 Req 1/2）。H10 的 TB 回写
+// 一律经 H10TabAdjudication 的显式发布门（adj.publishToTb 中文二次确认）。跨 wp 处置明细带入仍走
+// disposal:completed（handleDisposalCompleted 只追加 H10-2 明细行，不写 TB）。
 
 useWorkpaperReviewProvide({ wpId: wpIdRef, projectId: projectIdRef })
 const { getThreadDot, getRowDot } = useWorkpaperReviewThreads(wpIdRef)
@@ -263,7 +259,6 @@ useWorkpaperEntryInjections({ onJumpToSection: sheetLabel => emit('jump-to-secti
 onMounted(async () => {
   window.addEventListener('disposal:completed', handleDisposalCompleted)
   window.addEventListener('disposal:source-updated', handleSourceDisposalUpdated)
-  window.addEventListener('substantive:adjudicated', handleSubstantiveAdjudicated)
   await formData.loadAll()
   isLoading.value = false
 })
@@ -271,7 +266,6 @@ onMounted(async () => {
 onBeforeUnmount(() => {
   window.removeEventListener('disposal:completed', handleDisposalCompleted)
   window.removeEventListener('disposal:source-updated', handleSourceDisposalUpdated)
-  window.removeEventListener('substantive:adjudicated', handleSubstantiveAdjudicated)
 })
 </script>
 
