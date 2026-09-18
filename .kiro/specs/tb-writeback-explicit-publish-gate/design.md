@@ -335,3 +335,26 @@ K5(2701)/K7(2401) 改造后 `⟹` 要么走 `publish-to-tb` 真回写（决策 a
 - **R3——形态 B CustomEvent 链误删下游**：`{cycle}:writeback-trial-balance` 与 `{cycle}:save-items`、`substantive:adjudicated` 常在同一 `onMounted` 注册。缓解：改造只摘 writeback 那一条 listener，测试断言其余事件仍注册。
 - **R4——真实数据缺失致 UAT 假绿**：多数循环无真实审定数据，端到端只能隔离验证。缓解：明确标 `data-blocked` + `[ ]*`，用"代码已改但真实项目未实测"措辞，不假绿。
 - **R5——旧端点删除误伤**：删除前须 grep 确认前端零调用且无服务内部合法调用方。缓解：末任务先 grep 断言再决策删除/降级。
+
+## 实施回填与复盘（2026）
+
+> append-only 回填，不改上文原始设计推理（审计轨迹）；凡与上文冲突以本章为准。
+
+### 修正 1 — H7(1621) 口径实证为 balance（非 design 猜的 occurrence）
+Task 10 实证：1621 生产性生物资产是余额类资产（成本/公允模式均审定期末余额）→ amount_kind=balance。§4/R1 将其归入“高风险损益发生额”是错的。教训：口径按科目在 trial_balance 的实际取数实证，不按循环名臆断。
+
+### 修正 2 — 假回写不止 K5/K7：H6(1606)/H10(6115) 亦是
+Task 10 实证 H6/H10 原只 emit 不写 TB（TB 靠 mount/debounce/跨wp 自动路径写，本身违反 Req 1），按 Property 10 决策(a) 补真回写。Property 10 适用范围应为“全 D~N 中任何'提示成功但当前调用栈不写 TB'的路径”，非枚举 K5/K7。
+
+### 修正 3 — I2 是第三类假回写（非“已现代化”）
+Task 13 实证：I2 用的 per-wp 端点 /api/workpapers/{wpId}/writeback-trial-balance 后端无路由定义（grep backend 零命中）→ onAfterSave 每次保存 catch 吞 404 = 运行时 no-op 假回写，且自动写违反 Req 1。裁定=并入 publish-to-tb。教训：“已现代化”必须后端 grep 路由定义对账，不能只看前端调用串。
+
+### 补强 4 — Testing Strategy 应强制“组件级 mount/运行时验证”
+G7 return 孤儿 export（模块加载即 ReferenceError）+ G5 isReadonly 对 Ref 恒真（发布门失效）两 bug 纯 diff/ESLint/getDiagnostics 都测不出，全靠 gate 测试 @vue/test-utils mount 真实点击才暴露。因此每个改造组件必须有 gate 测试（确认→post/取消→无副作用/readonly→无post/不调旧端点/仍emit）；「getDiagnostics 0 + ESLint 0」不足以证明运行时正确。
+
+### 补强 5 — 预存失败基线机制
+实施中反复靠 git stash 甄别“52 failed 是他 spec 预存”。建议类似大范围逐组件 spec 实施前先落一份预存失败基线清单，实施中对照基线而非每次 stash。
+
+### 未变的正确判断
+方案 B、R1 最高风险+逐任务 grep 实证、Property 9 死代码铁律——复盘均确认前瞻性成立。
+
