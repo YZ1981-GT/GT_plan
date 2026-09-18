@@ -1,0 +1,19 @@
+{
+  "pbtResults": {},
+  "executionHistory": {
+    "13. I 循环审定表改走显式发布端点（改 adjudication 层，避开 FormData 死代码）": [
+      {
+        "executionId": "cebaf49c-4897-4f01-8f8c-ae45d6d05902",
+        "chatSessionId": "sess_309ba0c3-692a-4fc6-843c-2e163c6eaef5",
+        "timestamp": 1789729065701
+      }
+    ],
+    "14. E1 审定表改走显式发布端点": [
+      {
+        "executionId": "cebaf49c-4897-4f01-8f8c-ae45d6d05902",
+        "chatSessionId": "sess_309ba0c3-692a-4fc6-843c-2e163c6eaef5",
+        "timestamp": 1789731445656
+      }
+    ]
+  }
+}

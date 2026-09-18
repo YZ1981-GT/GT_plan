@@ -152,7 +152,8 @@
         :wp-id="wpId"
         :project-id="projectId"
       />
-      <el-button size="small" type="success" :disabled="isReadonly" @click="handleSave">保存并回写</el-button>
+      <el-button size="small" type="success" :disabled="isReadonly" @click="handleSave">保存</el-button>
+      <el-button size="small" type="warning" :disabled="isReadonly" :loading="publishing" data-testid="i3-publish-tb" @click="handlePublish">发布到试算表(1711)</el-button>
     </div>
 
     <div class="table-section">
@@ -496,6 +497,8 @@ const {
   syncImpairmentFromI36,
   fillConclusionDraft,
   saveAdjudication,
+  publishToTb,
+  publishing,
   saveNote,
   saveConclusion,
   layerSummary,
@@ -691,12 +694,18 @@ function handleApplyTb(): void {
 }
 
 async function handleSave(): Promise<void> {
+  // 普通保存不写 TB（Req 1）；TB 回写走「发布到试算表」显式确认门
   const r = await saveAdjudication()
   if (!r.ok) {
     ElMessage.error(`保存被阻断：${r.message}`)
     return
   }
-  ElMessage.success(r.message.includes('已保存') ? r.message : `${r.message}；已尝试回写 TB`)
+  ElMessage.success(r.message)
+}
+
+// 显式发布门：二次确认 → publish-to-tb 端点（spec tb-writeback-explicit-publish-gate Task 13）
+async function handlePublish(): Promise<void> {
+  await publishToTb()
 }
 
 function handleReview(): void {

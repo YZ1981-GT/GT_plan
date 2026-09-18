@@ -78,6 +78,8 @@ const {
   saveVarianceNote,
   applyFourTablePrefill,
   getVal,
+  publishToTb,
+  publishing,
 } = useE1Adjudication(options)
 
 // ─── 四表取数（溯源 + 带入未审数）───────────────────────────────────────────────
@@ -324,6 +326,17 @@ function getRowClass({ row }: { row: AdjRow }): string {
             : '四表库暂无货币资金数据（需先导入余额表）'"
           @click="pullFromFourTable"
         >📥 从四表库带入未审数</el-button>
+        <!-- 发布到试算表（显式发布门）：经二次确认才写 trial_balance；普通保存/数据变化不写。
+             spec: tb-writeback-explicit-publish-gate Task 14（Req 2）。 -->
+        <el-button
+          type="warning"
+          size="small"
+          :loading="publishing"
+          :disabled="isReadonly"
+          data-testid="e1-publish-tb"
+          title="把货币资金审定数（1001/1002/1012）发布到试算表，需二次确认，会触发下游报表/错报评价重算"
+          @click="publishToTb"
+        >📤 发布到试算表</el-button>
       </div>
       <div class="toolbar-right">
         <span class="chip-wrap"><GtIndexChip value="wp:E1-2" :context-project-id="projectId" /></span>

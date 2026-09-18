@@ -562,3 +562,10 @@ backend/app/routers/wp_render_strategies/_d4_import_export.py  3399
 #     spec: d4-dual-mode-formula-governance P0-项4/项5
 backend/app/services/formula_engine.py  1964
 backend/tests/test_cycle_linkage_handlers_integration.py  1096
+
+# spec: tb-writeback-explicit-publish-gate（Task 13 I 循环入库，2026）
+#   I1TabAdjudication.vue —— 改动前即 1596 行已超 1500 上限（HEAD splitlines 口径）。
+#   本次 Task 13 改造(inline writeback 改走 publish-to-tb + 发布按钮)净减 5 行(1596->1591)，
+#   非从零造超限。baseline 取当前真实行数 1591，门禁继续拦膨胀。拆分方向：把 I1-1 应付职工薪酬
+#   审定表的多科目归集/AI 生成/披露区各抽伴生模块，属独立瘦身任务。
+audit-platform/frontend/src/components/workpaper/i1/core/I1TabAdjudication.vue  1591

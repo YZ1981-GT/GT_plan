@@ -312,6 +312,23 @@ export function useI5Adjudication(
     saveConclusion(t.text)
   }
 
+  // ─── 显式发布门状态（防重复提交，供发布按钮 :loading 绑定） ─────────────────
+  const publishing = ref(false)
+
+  /** 发布下游联动事件（仅 emit，不写 TB）。 */
+  function _emitAdjudicated(): void {
+    window.dispatchEvent(new CustomEvent('substantive:adjudicated', {
+      detail: { wpCode: 'I5', accountCodes: [ACCOUNT_CODE_1911], auditedTotal: subtotals.value.audited },
+    }))
+  }
+
+  /**
+   * 保存审定表（普通保存动作，不写 TB）。
+   *
+   * spec: tb-writeback-explicit-publish-gate Task 13 / Req 1。
+   * 此前保存后**自动** PUT 旧端点回写 trial_balance(1911) → 违反 Req 1。现只保存 + emit；
+   * TB 回写收敛为用户显式确认动作（publishToTb）。
+   */
   async function writeback(force = false): Promise<{ ok: boolean; message?: string }> {
     const gate = validateI5AdjudicationSave({
       rows: computedRows.value,
@@ -329,22 +346,61 @@ export function useI5Adjudication(
     const auditedTotal = subtotals.value.audited
     options?.onSave?.(`${ITEM_PREFIX}-audited-total`, auditedTotal)
 
-    if (projectId.value) {
-      try {
-        await api.put(`/api/projects/${projectId.value}/trial-balance/writeback`, {
-          account_code: ACCOUNT_CODE_1911,
-          audited_amount: auditedTotal,
-        })
-        ElMessage.success('审定数已回写试算表(1911)')
-      } catch {
-        ElMessage.warning('审定数回写试算表失败，请手动确认')
-      }
+    _emitAdjudicated()
+    return { ok: true }
+  }
+
+  // ─── 显式发布到试算表（显式确认门，复刻 D2/D4-1 范式） ────────────────────────
+
+  /**
+   * 确认发布审定数到试算表（科目 1911 其他非流动资产）。
+   *
+   * spec: tb-writeback-explicit-publish-gate Task 13 / Req 2。
+   * 二次确认（中文）→ 保存明细 → `POST /workpapers/{wpId}/audit-determination/publish-to-tb`
+   * （审定表 sheet 名 I5-1 + writeback_rows 预算行 1911 balance）。用户取消 → 无副作用。
+   */
+  async function publishToTb(): Promise<void> {
+    if (publishing.value) return
+
+    try {
+      await ElMessageBox.confirm(
+        '发布后将把其他非流动资产审定数（科目 1911）写入试算表（trial_balance），'
+        + '并触发报表/错报评价等下游重算。确认发布？',
+        '发布到试算表确认',
+        { confirmButtonText: '确认发布', cancelButtonText: '取消', type: 'warning' },
+      )
+    } catch {
+      return // 用户取消 → 无任何副作用
     }
 
-    window.dispatchEvent(new CustomEvent('substantive:adjudicated', {
-      detail: { wpCode: 'I5', accountCodes: [ACCOUNT_CODE_1911], auditedTotal },
-    }))
-    return { ok: true }
+    if (!wpId.value) {
+      ElMessage.error('缺少底稿标识，无法发布')
+      return
+    }
+
+    // 先保存明细（普通保存，不写 TB）；被 gate 阻断则不发布
+    const saved = await writeback(false)
+    if (!saved.ok) return
+
+    publishing.value = true
+    try {
+      const resp: any = await api.post(
+        `/api/workpapers/${wpId.value}/audit-determination/publish-to-tb`,
+        {
+          // sheet 名固定含审定表子码 I5-1，后端 extract_determination_wp_code 据此解出 I5-1
+          sheet_name: '审定表I5-1',
+          writeback_rows: [
+            { account_code: ACCOUNT_CODE_1911, audited_amount: subtotals.value.audited, amount_kind: 'balance' },
+          ],
+        },
+      )
+      ElMessage.success(resp?.message || '已发布到试算表')
+      _emitAdjudicated()
+    } catch (err: any) {
+      ElMessage.error(err?.response?.data?.detail || err?.message || '发布失败，请重试')
+    } finally {
+      publishing.value = false
+    }
   }
 
   function saveNote(note: string): void {
@@ -412,6 +468,9 @@ export function useI5Adjudication(
     fillVarianceNoteDraft,
     applyConclusionTemplate,
     writeback,
+    // 显式发布到试算表（二次确认门）
+    publishToTb,
+    publishing,
     saveNote,
     saveConclusion,
     saveSignificantMatters,

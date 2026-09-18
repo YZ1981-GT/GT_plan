@@ -22,7 +22,7 @@
  * Requirements: 2.1-2.8, 4.4, 4.7
  */
 import { ref, computed, watch, onMounted, onBeforeUnmount, type Ref, type ComputedRef } from 'vue'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import {
   buildI6AdjudicationAuditNoteDraft,
   pickI6HighChangeRateRows,
@@ -548,38 +548,16 @@ export function useI6Adjudication(options: {
     options.onSave?.(`${ITEM_PREFIX}-capitalized-i2`, capitalizedI2.value)
   }
 
-  // ─── Actions: TB回写（writebackTB **发生额** 6602）────────────────────────
+  // ─── 显式发布门状态（防重复提交，供发布按钮 :loading 绑定） ─────────────────
+  const publishing = ref(false)
 
   /**
-   * 回写审定发生额到 trial_balance（科目6602）
-   * 1. 持久化行数据到 checklist_responses
-   * 2. writebackTrialBalance（科目6602，**发生额**！）
-   * 3. 发布 'substantive:adjudicated' EventBus事件
-   * 4. 发布 'research:expense-updated' EventBus事件（I6→I2联动）
+   * 发布下游联动事件（仅 emit，不写 TB）：
+   * - 'substantive:adjudicated'（附注/报表刷新）
+   * - 'research:expense-updated'（**I6→I2 联动**，费用化研发额驱动 I2 研发总额面板）
    */
-  async function writeback(): Promise<void> {
-    _persist()
-
+  function _emitAdjudicated(): void {
     const auditedTotal = totalRow.value.本期审定
-
-    // 持久化审定合计（独立item_id，供render策略回读seed + 跨session持久化）
-    options.onSave?.(`${ITEM_PREFIX}-audited-total`, auditedTotal)
-
-    // TB回写（科目6602，**发生额！**）
-    if (options.projectId?.value) {
-      try {
-        await api.put(`/api/projects/${options.projectId.value}/trial-balance/writeback`, {
-          account_code: ACCOUNT_CODE_6602,
-          audited_amount: auditedTotal,
-          is_occurrence: true, // 标记为发生额回写（非余额）
-        })
-        ElMessage.success('审定发生额已回写试算表(6602)')
-      } catch {
-        ElMessage.warning('审定发生额回写试算表失败，请手动确认')
-      }
-    }
-
-    // 发布 'substantive:adjudicated' EventBus 事件
     window.dispatchEvent(new CustomEvent('substantive:adjudicated', {
       detail: {
         wpCode: 'I6',
@@ -588,16 +566,91 @@ export function useI6Adjudication(options: {
         isOccurrence: true, // 损益类标记
       },
     }))
-
-    // 发布 'research:expense-updated' EventBus 事件（I6→I2联动）
+    // I6→I2 联动（费用化研发额 → I2 研发总额面板），改造须保留
     window.dispatchEvent(new CustomEvent('research:expense-updated', {
       detail: {
         expenseAmount: auditedTotal,
         source: 'I6-adjudication',
       },
     }))
+  }
 
+  // ─── Actions: 保存审定发生额（普通保存不写 TB，Req 1）────────────────────────
+
+  /**
+   * 保存审定发生额到 checklist_responses（普通保存动作，不写 TB）。
+   *
+   * spec: tb-writeback-explicit-publish-gate Task 13 / Req 1。
+   * 此前 writeback 保存后**自动** PUT 旧端点回写 trial_balance(6602 发生额) → 违反 Req 1。
+   * 现只保存 + emit（含 I6→I2 联动）；TB 回写收敛为用户显式确认动作（publishToTb）。
+   */
+  async function writeback(): Promise<void> {
+    _persist()
+
+    const auditedTotal = totalRow.value.本期审定
+    // 持久化审定合计（独立item_id，供render策略回读seed + 跨session持久化）
+    options.onSave?.(`${ITEM_PREFIX}-audited-total`, auditedTotal)
+
+    _emitAdjudicated()
     isChanged.value = false
+  }
+
+  // ─── 显式发布到试算表（显式确认门，损益类发生额 6602）────────────────────────
+
+  /**
+   * 确认发布审定发生额到试算表（科目 6602 研发费用，**发生额 occurrence**）。
+   *
+   * spec: tb-writeback-explicit-publish-gate Task 13 / Req 2,6。
+   * 二次确认（中文）→ 保存明细 → `POST /workpapers/{wpId}/audit-determination/publish-to-tb`
+   * （审定表 sheet 名 I6-1 + writeback_rows 预算行 6602，amount_kind='occurrence'）。
+   * 发布成功后保留 I6→I2 联动（research:expense-updated）+ substantive:adjudicated。
+   * 用户取消 → 无任何副作用（不写 TB、不 emit）。
+   */
+  async function publishToTb(): Promise<void> {
+    if (publishing.value) return
+
+    try {
+      await ElMessageBox.confirm(
+        '发布后将把研发费用审定发生额（科目 6602）写入试算表（trial_balance），'
+        + '并触发报表/错报评价等下游重算。确认发布？',
+        '发布到试算表确认',
+        { confirmButtonText: '确认发布', cancelButtonText: '取消', type: 'warning' },
+      )
+    } catch {
+      return // 用户取消 → 无任何副作用（不写 TB、不 emit）
+    }
+
+    if (!options.wpId?.value) {
+      ElMessage.error('缺少底稿标识，无法发布')
+      return
+    }
+
+    // 先保存明细（普通保存，不写 TB）
+    _persist()
+    const auditedTotal = totalRow.value.本期审定
+    options.onSave?.(`${ITEM_PREFIX}-audited-total`, auditedTotal)
+
+    publishing.value = true
+    try {
+      const resp: any = await api.post(
+        `/api/workpapers/${options.wpId.value}/audit-determination/publish-to-tb`,
+        {
+          // sheet 名固定含审定表子码 I6-1，后端 extract_determination_wp_code 据此解出 I6-1
+          sheet_name: '审定表I6-1',
+          writeback_rows: [
+            { account_code: ACCOUNT_CODE_6602, audited_amount: auditedTotal, amount_kind: 'occurrence' },
+          ],
+        },
+      )
+      ElMessage.success(resp?.message || '已发布审定发生额到试算表(6602)')
+      // 发布成功 → 保留下游联动（含 I6→I2 research:expense-updated）
+      _emitAdjudicated()
+      isChanged.value = false
+    } catch (err: any) {
+      ElMessage.error(err?.response?.data?.detail || err?.message || '发布失败，请重试')
+    } finally {
+      publishing.value = false
+    }
   }
 
   // ─── Actions: 全量重算 ────────────────────────────────────────────────────
@@ -732,8 +785,11 @@ export function useI6Adjudication(options: {
     syncFromDetail,
     // Actions — 全量重算
     computeAll,
-    // Actions — TB回写+EventBus
+    // Actions — 保存审定发生额（普通保存不写 TB）+ EventBus 联动
     writeback,
+    // 显式发布到试算表（二次确认门，占额 occurrence）
+    publishToTb,
+    publishing,
     // Actions — 保存
     saveNote,
     saveConclusion,

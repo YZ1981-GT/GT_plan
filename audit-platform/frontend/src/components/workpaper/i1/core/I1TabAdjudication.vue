@@ -86,8 +86,8 @@
         >
           从 I1-3 回写 AJE/RJE
         </el-button>
-        <el-button size="small" type="primary" :disabled="isReadonly" :loading="publishing" @click="handlePublish">
-          确认审定 → 回写TB
+        <el-button size="small" type="warning" :disabled="isReadonly" :loading="publishing" data-testid="i1-publish-tb" @click="handlePublish">
+          发布到试算表(1701/1702/1703)
         </el-button>
         <el-tag size="small" :type="isAllReconciled ? 'success' : 'danger'">
           {{ isAllReconciled ? '三角勾稽平衡' : '勾稽不平' }}
@@ -886,6 +886,8 @@ const {
   significantNetChanges,
   updateCell,
   saveAdjudication,
+  publishToTb,
+  publishing,
   saveNote,
   saveConclusion,
   saveQualitativeNotes,
@@ -909,8 +911,6 @@ const {
     onSave: (itemId: string, value: any) => emit('save', itemId, value),
   },
 )
-
-const publishing = ref(false)
 
 // ─── 从四表库带入未审数（消费 render 的 adjudication_prefill，按类别名匹配行） ───
 //
@@ -1113,14 +1113,10 @@ async function onFileSelected(e: Event) {
   if (file) await importData('I1', file)
 }
 
+// 显式发布门：二次确认 → publish-to-tb 端点（多科目 1701/1702/1703 单次原子发布）
+// spec: tb-writeback-explicit-publish-gate Task 13
 async function handlePublish() {
-  publishing.value = true
-  try {
-    await saveAdjudication()
-    ElMessage.success('已保存审定并尝试回写 TB')
-  } finally {
-    publishing.value = false
-  }
+  await publishToTb()
 }
 
 function handleSyncI13() {
@@ -1293,9 +1289,8 @@ function onConclusionBlur(): void {
 
 // ─── Review ──────────────────────────────────────────────────────────────────
 
-function handleReview(section: string): void {
-  // 由主入口 provide 的 openReviewDialog 处理
-  console.log('[I1-Adjudication] Review:', section)
+function handleReview(_section: string): void {
+  // 由主入口 provide 的 openReviewDialog 处理（移除 no-console 调试输出）
 }
 
 // ─── Navigation ──────────────────────────────────────────────────────────────

@@ -465,23 +465,110 @@ M0（端点扩展，Task 1）是所有**活路径**逐组件任务的前置；�
 
 ## M9：I + E + J1（活 8 个；I2 先评估合规）
 
-- [ ] 13. I 循环审定表改走显式发布端点（改 adjudication 层，避开 FormData 死代码）
+- [x] 13. I 循环审定表改走显式发布端点（改 adjudication 层，避开 FormData 死代码）
   - **第一步实证 sheet 名 + I2 特例评估**：grep I1–I6 确认子码可解；**I2 已用新 per-wp 端点** `POST /api/workpapers/{wpId}/writeback-trial-balance`（非旧 project 端点）→ 先评估 I2 是否已合规 / 可直接并入 `publish-to-tb`，不当普通旧端点直调改
   - 活路径（adjudication 层 inline writeback）：I1(多科目 1701/1702/1703)、I3(1711)、I4(1801)、I5(1911)、I6(6602 发生额，**保留 I6→I2 联动** `research:expense-updated`+`i6:adjustment-writeback`)、I2(视评估结果)。（`useI1~I6FormData.writeback*` 是 BP-5 死代码 duplicate，归 task 17，**只改真实被消费的 adjudication，勿接死代码**）
   - 前端单测（I6 断言 I6→I2 联动仍发）+ 端到端验证点
   - _需求: 1, 2, 8_
+  - **✅ 完成证据（2026）**：
+    - **🔴 sheet 名可解性 + 科目 + 口径实证表**（实证来源：`backend/data/ledger_adapters/wp_render_schema/generated/I{1..6}.yaml` sheet label；`extract_determination_wp_code` 正则 `([D-N]\d+-1)\b`（`wp_account_package_resolver.py:82`）；handler 正则 `^[D-N]\d+-1$`（`event_handlers_cycle_linkage.py:441`））：
 
-- [ ] 14. E1 审定表改走显式发布端点
+      | wp | render sheet label | 我传的 sheet_name | 解出子码 | 科目 | 口径 |
+      |---|---|---|---|---|---|
+      | I1 | `审定表I1`（**无 -1**） | `审定表I1-1` | I1-1 ✅ | 1701/1702/1703（多科目） | balance |
+      | I2 | `审定表I2-1` | `审定表I2-1` | I2-1 ✅ | 开发支出（render 下发 → 兜底 1704，动态） | balance |
+      | I3 | `审定表I3-1` | `审定表I3-1` | I3-1 ✅ | 1711 | balance |
+      | I4 | `审定表I4-1` | `审定表I4-1` | I4-1 ✅ | 1801 | balance |
+      | I5 | `审定表I5-1` | `审定表I5-1` | I5-1 ✅ | 1911 | balance |
+      | I6 | `审定表I6-1` | `审定表I6-1` | I6-1 ✅ | 6602（损益类） | **occurrence** |
+
+      **均可解，无 R1 降级**。I1 的 render label 是 `审定表I1`（无 `-1`，正则解不出），但与其余循环一样由**前端传字面量 `sheet_name`**（复刻 D2/D4-1/K6/L6 范式，不依赖 render label），传 `审定表I1-1` 即解出 `I1-1` ✅；handler `^[D-N]\d+-1$` 接受 I1-1~I6-1。
+    - **🟡 I2 特例评估裁定**（grep 实证）：
+      - **(a) 是否已合规？否**。改造前 `I2TabAdjudication.vue` 靠 `useI2Adjudication({ onAfterSave: s => writebackTb(s.endAudited) })` **每次保存自动**回写 TB → 直接违反 Req 1（普通保存/数据变化绝不写 TB）；且其端点 `POST /api/workpapers/{wpId}/writeback-trial-balance` **后端无路由定义**（`grep 'writeback-trial-balance' backend/app/**/*.py` 零命中，唯一引用是 fix 脚本 docstring）→ `catch{}` 吞 404 ⇒ 运行时实为 **no-op 假回写**。既不合规也不真回写。
+      - **(b) 是否可/应并入 publish-to-tb？应并入**。移除 `onAfterSave` 自动回写，改为用户显式二次确认 → 统一 `POST /workpapers/{wpId}/audit-determination/publish-to-tb`（`sheet_name '审定表I2-1'` + `writeback_rows [{i2AccountCode, balance}]`），与其余 I 循环一致。开发支出为资产类 → `balance`。`save()` 内原有的 `substantive:adjudicated` emit 保留（附注刷新不回归）。`http` import 保留（`fetchI2TbData` 仍用）。
+    - **改造范式**（复刻 D2/D4-1/K6/L6 inline `api.post publish-to-tb`）：每个 `useIxAdjudication` 的 save 动作（`saveAdjudication`/`writeback`）去掉 inline `api.put trial-balance/writeback`，只 persist + `_emitAdjudicated`（仅 emit `substantive:adjudicated`，Req 1）；新增 `publishToTb`（`publishing` 早退 → `ElMessageBox.confirm` 中文二次确认 → 保存明细 → `api.post publish-to-tb` writeback_rows → 成功后 `_emitAdjudicated`）+ `publishing` ref。守卫用 `wpId`。各 TabAdjudication 加「发布到试算表」按钮（`type=warning` `:loading=publishing` `:disabled=isReadonly` `data-testid=i{n}-publish-tb`），原「保存并回写/回写TB」按钮改为「保存」（只保存不写 TB）。
+    - **改的文件清单（11 个源文件 + 2 个测试）**：
+      - `composables/useI1Adjudication.ts`：`saveAdjudication` 去三科目 PUT；新增 `publishToTb`（单次 `writeback_rows` 三科目 1701/1702/1703 balance，**多科目原子发布**，Req 5）+ `publishing`。（`onCellChange` 仍调 `saveAdjudication` → 现只 emit 不写 TB，合规）
+      - `composables/useI3Adjudication.ts`：`saveAdjudication` 去 1711 PUT；新增 `publishToTb`（gate 阻断则不发布）+ `publishing`。
+      - `composables/useI4Adjudication.ts` / `useI5Adjudication.ts`：`writeback(force)` 去 PUT（保留名作 save 动作，host 仍 `writeback(false)`）；新增 `publishToTb`（1801 / 1911 balance）+ `publishing`。
+      - `composables/useI6Adjudication.ts`：`writeback` 转 save-only（`_emitAdjudicated` 含 `substantive:adjudicated` + **`research:expense-updated`（I6→I2 联动，保留）**）；新增 `publishToTb`（6602 **occurrence**，Req 6）+ `publishing`；import 补 `ElMessageBox`。`i6:adjustment-writeback` 监听器（`onMounted`）未动。
+      - `i1/core/I1TabAdjudication.vue`：删本地 `publishing`，destructure composable 的 `publishToTb/publishing`，`handlePublish` 改调 `publishToTb`，按钮 `确认审定 → 回写TB` → `发布到试算表(1701/1702/1703)`（warning，`data-testid=i1-publish-tb`）；顺手删 `handleReview` 里预存无用 `console.log`（消 no-console error，见下）。
+      - `i2/core/I2TabAdjudication.vue`：移除 `onAfterSave` 自动回写；`writebackTb` → `publishToTb`（confirm → publish-to-tb）；加 `publishing` + 发布按钮 `data-testid=i2-publish-tb`；save 按钮 `保存并回写`→`保存`。
+      - `i3/i4/i5/i6/core/I{n}TabAdjudication.vue`：destructure `publishToTb/publishing`，加 `handlePublish` + 发布按钮（`data-testid=i{n}-publish-tb`）；I6 host **补传 `wpId: computed(()=>props.wpId)`**（原未传，`publishToTb` 需 `options.wpId`）；save 按钮去「回写」字样。
+    - **测试**：新增 `composables/__tests__/iAdjudicationPublishGate.spec.ts`（参数化 I1/I3/I4/I5/I6：确认→POST publish-to-tb 命中 sheet_name/科目全覆盖/amount_kind、取消→无 post 无 emit、不再调旧 PUT、发布后仍 emit `substantive:adjudicated`；I1 专项断言多科目单次 `writeback_rows`；I6 专项断言 occurrence + I6→I2 `research:expense-updated` 仍 emit）——**17 passed**。更新 `__tests__/i6Integration.spec.ts` 6.1 块（test-follows-source：`writeback()` 不再写 TB、新增 `publishToTb` occurrence 断言、补 `ElMessageBox` mock）。
+    - **命令与 pass 数**：`rtk npx vitest run <9 文件> --reporter=dot` → **202 passed / 0 failed**（iAdjudicationPublishGate 17 + i6Integration + iCycleAdjudicationSeed 96 + i6AdjustmentModel + useI6Adjustment + useI1Adjudication + GtI1IntangibleAssets 19 + i2SheetDispatch + i5SheetDispatch）。ESLint 改动文件 **0 error**（gt-audit warnings 为预存全仓噪声）。
+    - **发现的偏差/预存问题（git 实证非本任务引入）**：① `I1TabAdjudication.vue` `handleReview` 的 `console.log`（no-console error）**预存于 HEAD**（`git show HEAD:...I1TabAdjudication.vue | grep console.log` 命中）——因「改动文件 0 error」铁律顺手删除该死调试。② `iCycleAdjudicationSeed.spec.ts` 首轮 10 假红：其 `stripTs` 天真块注释正则 `/\*[\s\S]*?\*/` 把我 I2 注释里 `backend/app/**` 的 `/**` 误当块注释开头 → 吞掉 `fourTableHint`；**git stash 实证是本任务注释引入** → 改注释措辞消除 `/**`，96 passed 恢复。③ `vue-tsc --noEmit` 全项目 OOM（exit 134，NODE_OPTIONS=8192 仍崩）是**预存环境限制**（仓库过大），崩溃前无 `error TS` 输出；类型正确性由 vitest（vite transform 全绿）+ ESLint 0 error 佐证，getDiagnostics 层面等价通过。
+    - **降级/待环境**：真实 PG 无对应 I 循环审定数据 → 端到端 UAT 归 task 20*（data-blocked）；Playwright 归 task 21*（待 start-dev.bat 环境）。本任务代码 + 单测/集成测试层面已封板。
+
+- [x] 14. E1 审定表改走显式发布端点
   - **第一步实证 sheet 名**：grep E1 确认 `E1-1` 可解
   - 活路径：`useE1Adjudication`（多科目 byCode 遍历 → `writeback_rows`，self-invoke）
   - 前端单测 + 端到端验证点
   - _需求: 5, 2, 8_
+  - **✅ 完成证据（2026）**：
+    - **🔴 sheet 名可解性 + 科目（多科目）+ 口径实证表**（实证来源：render schema `backend/data/ledger_adapters/wp_render_schema/generated/E1-1.yaml`（sheet `货币资金审定表E1-1`）+ `E1-1.yaml`（sheet `E1-1 货币资金审定表` / `wp_code: E1-1`）；`extract_determination_wp_code` 正则 `([D-N]\d+-1)\b`（`wp_account_package_resolver.py:82`）；handler 正则 `^[D-N]\d+-1$`（`event_handlers_cycle_linkage.py:441`，E ∈ [D-N]））：
 
-- [ ] 15. J1 审定表改走显式发布端点（J2 是死代码，归 task 17）
+      | wp | render sheet label（实证来源） | 前端传的 sheet_name | 解出子码 | 科目（多科目 byCode 遍历） | 口径 amount_kind |
+      |---|---|---|---|---|---|
+      | E1 | `货币资金审定表E1-1`（generated/E1-1.yaml） | `审定表E1-1` | E1-1 ✅ | **1001 库存现金 / 1002 银行存款本金 / 1012 其他货币资金+数字货币**（`aggregateAuditedByCode('ending')` 三科目归集） | balance（余额类，各行 `amount_kind='balance'`） |
+
+      **可解，无 R1 降级**。render label 是 `货币资金审定表E1-1`（含 `E1-1`，正则可解）；但与其余循环一致由**前端传字面量 sheet_name `审定表E1-1`**（复刻 D2/D4-1/I/K/L 范式，`E1_DETERMINATION_SHEET_NAME` 常量，不依赖 render label——host `GtE1MonetaryFund` 未向 `E1TabAdjudication` 传 sheetName），传 `审定表E1-1` 即解出 `E1-1` ✅；handler `^[D-N]\d+-1$` 接受 E1-1。
+    - **改造范式说明**（复刻 D2/D4-1/I 循环 inline `api.post publish-to-tb`，多科目单次原子发布）：
+      1. **self-invoke writeback 消除（Req 1）**：改造前 `useE1Adjudication` 在 `flushSave`（debounce 2s 保存）与 `watch(totalRow.endingAudited)`（数据变化）里**自动** `api.put('/projects/{pid}/trial-balance/writeback')` 三科目直写（绕过显式门/无二次确认/无幂等/无 publish_confirmed）。现 `writebackTrialBalance()` 语义收敛为**仅内存同步**（调 `syncAuditedTotals()` 写 allResponses 供 E1-14 分析表/附注/全局告警读取，**不落 TB**），`flushSave` 仍调它（只同步不写 TB），`watch(totalRow)` 改为**仅 emit `substantive:adjudicated`**（不再调 writebackTrialBalance）。`projectId` 从 destructure 移除（原唯一用途是旧 PUT 的 `/projects/{pid}/`），守卫改用 `wpId`。
+      2. **新增 `publishToTb`（Req 2/5）**：`readonly/publishing` 早退 → `wpId` 空守卫 → `syncAuditedTotals()` + `aggregateAuditedByCode('ending')` **多科目 byCode 遍历生成 writeback_rows 三行**（1001/1002/1012，各 `amount_kind='balance'`，一次原子发布，端点不硬编码科目、前端算好透传）→ `ElMessageBox.confirm` 中文二次确认（明示写入 trial_balance + 触发下游报表/错报评价重算）→ `api.post('/api/workpapers/{wpId}/audit-determination/publish-to-tb', {sheet_name, writeback_rows})` → `ElMessage.success` → `publishAdjudicated()`；用户取消 → 无副作用（不 post/不 emit/不写 TB）。新增 `publishing` ref。
+      3. **保留 `substantive:adjudicated` emit 及活路径联动（Req 8）**：`publishAdjudicated()`（wpCode='E1' / accountCode='1001,1002,1012' / detail 三科目明细）保留，`watch(totalRow.endingAudited)` 数据变化仍 emit（Req 1：只 emit 不写 TB），`publishToTb` 成功后也 emit → 下游附注/E1-14/全局告警刷新不回归；`detailRows` watch（immediate）仅内存同步保留。
+      4. **E1 TabAdjudication 发布按钮**：`E1TabAdjudication.vue` 加「📤 发布到试算表」按钮（`type=warning` `size=small` `:loading=publishing` `:disabled=isReadonly` `data-testid=e1-publish-tb` `@click=publishToTb`），destructure `publishToTb`/`publishing`。
+    - **改的文件清单（2 源 + 1 新测试）**：
+      - `composables/useE1Adjudication.ts`：`writebackTrialBalance` 收敛为仅内存同步（去 inline PUT）+ 新增 `publishToTb`/`publishing` + `watch(totalRow)` 去 writebackTrialBalance 只 emit + 移除 `projectId` destructure + import `ElMessageBox`/`api`（已有）+ 收口注释；return 补 `publishToTb`/`publishing`。
+      - `e1/E1TabAdjudication.vue`：destructure `publishToTb`/`publishing` + 工具栏加发布按钮（warning/loading/disabled/data-testid）。
+      - 新增测试 `composables/__tests__/eAdjudicationPublishGate.spec.ts`（6 用例）。
+    - **⚠️ FormData 死代码 duplicate 排查（触类旁通 grep）**：`file_search useE1FormData` → **不存在**（E1 无 FormData composable）；grep `useE1FormData.writeback*` 全仓 0 命中 ⇒ **E1 无 FormData 死代码 duplicate 待清理**（与 D/H/K 循环不同，E1 单 adjudication 承载，无 FormData 旁路）。grep `trial-balance/writeback|writebackTrialBalance` 于全部 E1 composable/组件 → **仅 useE1Adjudication 注释引用**（描述改造前反模式），**0 处 live 旧端点直调**。
+    - **测试命令与 pass 数**：
+      - 新 gate 测试：`rtk npx vitest run src/components/workpaper/composables/__tests__/eAdjudicationPublishGate.spec.ts --reporter=dot` → **6 passed / 0 failed**（①确认→POST publish-to-tb 命中 url + sheet_name(E1-1) + writeback_rows；②多科目 1001/1002/1012 在**同一次** writeback_rows、各 amount_kind=balance、审定数归集正确(1001=100000/1002=2000000/1012=35000)；③不再调旧 trial-balance/writeback(PUT 未被调用)；④取消→无 post 无 emit；⑤readonly→无 post；⑥发布后仍 emit substantive:adjudicated(wpCode=E1/accountCode=1001,1002,1012)）
+      - E1/E 循环回归：`npx vitest run <eAdjudicationPublishGate + e1AdjudicationPrefill + e1AmountControlIronLaw + e1MainRowPrefill + e1DisclosureConsistency + e1HostPropWiring + e1HostSeedWiring + e1SourcePanelWiring + useE1Adjustment.pbt + useE1FormulaEngine + e1SheetDispatch>` → **11 files / 206 passed / 0 failed**
+      - 后端 M0 契约（E1 依赖）：`rtk ..\.venv\Scripts\python.exe -m pytest tests/test_publish_to_tb_writeback_rows.py -q` → **12 passed**
+      - ESLint（3 改动文件）：`npx eslint useE1Adjudication.ts E1TabAdjudication.vue eAdjudicationPublishGate.spec.ts` → **0 errors / 9 warnings**（9 warnings 全为**预存未改代码**：composable line 225/226/300/303 `aggregateAuditedByCode` 三科目 sum 算术 + line 672 `previousTotalAudited - current` watch + Tab line 265 toFixed / 448/494/532 autosize textarea；`git show HEAD:` 实证 toFixed/autosize 4 命中 + previousTotalAudited/byCode 算术 2 命中**均存在于 HEAD**，非本任务引入；新增 publishToTb/按钮代码 0 warning）；getDiagnostics 0。
+    - **test-follows-source 核查**：grep E1 全部 `__tests__` 对 `trial-balance/writeback|writebackTrialBalance` → **0 命中** ⇒ 无既有测试断言旧端点，无需迁移更新（E1 旧自动回写无专属断言测试）。
+    - **发现的偏差/降级**：
+      - 🟡 **E1 UX 变更（合理，符合 Req 1/2）**：改造前 E1 靠 `flushSave` + `watch(totalRow)` **自动**写 TB（无用户确认，正是本 spec 要消除的反模式）；改造后 E1 无隐式自动回写入口 → 本任务在 E1TabAdjudication 新增「发布到试算表」按钮承载显式确认动作。数据变化/普通保存只 emit `substantive:adjudicated` + 内存同步，不写 TB。
+      - 🟢 **E1 无 FormData 死代码**（与 D/H/K 循环不同）：E1 单 `useE1Adjudication` 承载，无 `useE1FormData` 旁路 ⇒ 本任务无「顺手删除零消费 FormData writeback」动作（grep 实证不存在），非遗漏。
+      - 🟢 **sheet 名可解**：render label `货币资金审定表E1-1` 本身可解，前端传字面量 `审定表E1-1` 更稳，无不可解降级项。
+    - **端到端验证点 / 待环境**：前端 gate 单测覆盖「确认→publish-to-tb 落库路径 + 多科目单次原子发布 + 取消/readonly 无副作用 + 不调旧端点 + 仍 emit」；后端 M0 集成测试覆盖 writeback_rows(balance)→WORKPAPER_SAVED(publish_confirmed)→handler 幂等回写。真实 PG 无 E 循环货币资金审定数据 → 端到端 UAT 归 task 20*（data-blocked）；Playwright 全链路归 task 21*（待 start-dev.bat 环境）。本任务代码 + 单测/集成测试层面已封板。
+    - **⚠️ 说明**：本任务源码（useE1Adjudication `publishToTb`/内存同步收敛 + E1TabAdjudication 按钮）+ gate 测试在此前 in-progress 轮次已落地（`git status` 实证：composable/Tab `M`、test `??`），本轮完成全量验证（gate 6 + E 回归 206 + 后端 12 + ESLint 0 error + FormData 死代码/旧端点/test-follows-source 全 grep 实证）并补齐完成证据块。
+
+- [x] 15. J1 审定表改走显式发布端点（J2 是死代码，归 task 17）
   - **第一步实证 sheet 名**：grep J1 确认 `J1-1` 可解
   - 活路径：`J1TabAdjudication`（@click 按钮 inline，2211）。**J2 不在本任务**——census 实证 J2 整模块（`useJ2FormData`/`useJ2Integration` + `events/publish` + `actuarial` 联动）是无渲染宿主的孤儿链，J2 真实宿主 `J2TabAdjudication.vue` 无 TB 回写；J2 死代码清理归 task 17
   - 前端单测 + 端到端验证点
   - _需求: 1, 2, 8_
+  - **✅ 完成证据（2026）**：
+    - **🔴 sheet 名可解性 + 科目 + 口径实证表**（实证来源：render schema `backend/data/ledger_adapters/wp_render_schema/generated/J1.yaml`（sheet `审定表J1-1 `，class_code `F-审定表`）+ `backend/data/ledger_adapters/wp_render_schema/J1-1.yaml`（`wp_code: J1-1`，`应付职工薪酬审定表`）；`extract_determination_wp_code` 正则 `([D-N]\d+-1)\b`；handler 正则 `^[D-N]\d+-1$`，J ∈ [D-N]）：
+
+      | wp | render sheet label（实证来源） | 前端传的 sheet_name | 解出子码 | 科目 | 口径 amount_kind |
+      |---|---|---|---|---|---|
+      | J1 | `审定表J1-1 `（generated/J1.yaml）/ `wp_code: J1-1`（J1-1.yaml） | `审定表J1-1` | J1-1 ✅ | **2211 应付职工薪酬**（组件 inline 常量，负债贷方；报表行 BS-069 国企 / BS-051 上市，无备抵科目） | **balance**（负债余额类，期末审定合计） |
+
+      **可解，无 R1 降级**（低风险余额类审定表）。render label 本身含 `J1-1` 可解；与其余循环一致由**前端传字面量 sheet_name `审定表J1-1`**（复刻 D2/D4-1/E1/I/K12 范式，不依赖 render label），传 `审定表J1-1` 即解出 `J1-1` ✅；handler `^[D-N]\d+-1$` 接受 J1-1。科目 2211 经 `J1TabAdjudication.vue` inline 实证（原 `http.put` body `account_code:'2211'`、audit-objective/guidance 文案、useAdjudicationBringIn `subjectCode:'2211'` 三处交叉印证），**非臆造**。
+    - **改造范式说明**（复刻 K12/E1/I inline `api.post publish-to-tb`）：J1 的回写逻辑**内联在 `J1TabAdjudication.vue` 的 `<script setup>`**（`writebackTB()` 函数，非独立 composable；`file_search useJ1FormData` → 0 命中，**J1 无 FormData 死代码 duplicate**，同 E1）。改造前 `writebackTB` 已有 `isReadonly` 早退 + `ElMessageBox.confirm`，但内部直调旧端点 `http.put('/api/projects/{projectId}/trial-balance/writeback', {account_code:'2211', audited_amount})`（绕过显式发布门/无幂等/无 publish_confirmed）。改造：
+      1. **旧端点直调消除（Req 2/3）**：`http.put trial-balance/writeback` → `const { api } = await import('@/services/apiProxy')` + `api.post('/api/workpapers/${props.wpId}/audit-determination/publish-to-tb', { sheet_name: '审定表J1-1', writeback_rows: [{ account_code: '2211', audited_amount: amount, amount_kind: 'balance' }] })`（`amount = grandTotal.value.endAudited` 期末审定合计，单科目余额类）。守卫改用 `wpId`（原旧端点用 `projectId`）。
+      2. **早退强化（Req 1/2）**：`if (isReadonly || writebackLoading.value) return`（加 `writebackLoading` 早退防重复点击）。`ElMessageBox.confirm` 文案改为「发布到试算表确认」（明示写入 trial_balance + 触发报表/错报评价下游重算），确认按钮「确认发布」；用户取消 → `catch { return }` 无任何副作用（不 post/不 emit/不写 TB）。
+      3. **保留 `substantive:adjudicated` emit（Req 8）**：发布成功后仍 `eventBus.emit('substantive:adjudicated', { wpCode:'J1', accountCode:'2211', auditedAmount, begin_audited, end_audited, projectId, timestamp })`（下游附注/报表联动不回归）。`useAdjudicationBringIn`（带入调整，独立 emit）未动。
+      4. **按钮 + 文案**：`发布到试算表（2211）` 按钮 `type=success`→`type=warning`、加 `data-testid=j1-publish-tb`、`:loading=writebackLoading`、`:disabled=isReadonly`；audit-objective alert 与 guidance 第 8 条「回写试算平衡表」文案同步改「发布到试算表」（显式发布门语义）。
+    - **改的文件清单（1 源 + 1 新测试）**：
+      - `j1/core/J1TabAdjudication.vue`：`writebackTB()` 去 `http.put` 旧端点 → `api.post publish-to-tb`（writeback_rows 2211 balance）+ `writebackLoading` 早退 + confirm 文案 + 收口注释；按钮 warning/testid + audit-objective/guidance 文案。
+      - 新增 `components/workpaper/composables/__tests__/jAdjudicationPublishGate.spec.ts`（6 用例，`@vue/test-utils` mount `J1TabAdjudication` 点击 `[data-testid=j1-publish-tb]` 走真实点击路径——J1 handler 内联在 .vue 无独立 composable，按任务要求 mount 组件测按钮点击路径；stub 子组件 + mock apiProxy/http/element-plus/useAdjudicationBringIn(其 onMounted 会 load)/useAuditContext 隔离网络）。
+    - **测试命令与 pass 数**：
+      - 新 gate 测试：`rtk npx vitest run src/components/workpaper/composables/__tests__/jAdjudicationPublishGate.spec.ts --reporter=dot` → **6 passed / 0 failed**（①按钮存在 data-testid=j1-publish-tb + 文案；②确认→POST publish-to-tb 命中 url(wp-j1-001) + sheet_name(J1-1) + writeback_rows 单行 2211/amount_kind=balance/audited_amount=期末审定合计 1000000；③不再调旧 trial-balance/writeback(api.put 未被调用 + 无 http.put/api.post 含该字面量)；④取消→无 post 无 emit；⑤readonly→按钮 disabled + 早退无 post；⑥发布后仍 emit substantive:adjudicated wpCode=J1/accountCode=2211/auditedAmount=1000000）
+      - J1/J 循环回归：`npx vitest run <jAdjudicationPublishGate + src/composables/workpaper/j1 全套 + src/components/workpaper/j1 全套 + j1AllocationLedgerPull + j1DisclosureConsistency + j1h4DisclosureColumns + j1NoteSubtableContract + j1NoteSyncPayload>` → **17 files / 269 passed / 0 failed**（含 useJ1Adjudication/useJ1FormulaEngine.pbt/j1-component-dispatch/j1-e2e-integration/j1DisclosureDetailPull 等既有回归，零回归）
+      - ESLint（2 改动文件）：`npx eslint J1TabAdjudication.vue jAdjudicationPublishGate.spec.ts --format compact` → **EXIT=0，0 error / 3 warning**（3 warning 全为 `gt-audit/no-adhoc-wp-structure` 手写 autosize textarea @ line 141/207/219，是**预存的审计说明/结论卡片**未改代码；`git show HEAD:...J1TabAdjudication.vue | grep autosize` → 3 命中，实证 HEAD 已存在非本任务引入；新增 publish-to-tb/按钮代码 0 warning）；getDiagnostics 0（vite transform 全绿佐证 TS 编译通过）。
+    - **test-follows-source 核查**：grep J1 全部 `__tests__` 对 `trial-balance/writeback|writebackTB` live 断言 → 唯一命中是本任务新增的 gate 测试（断言**不再**调旧端点）；既有 `j1-e2e-integration.spec.ts` 仅 skeleton placeholder（`expect(true).toBe(true)`，注释描述场景，无旧端点 live 断言）⇒ 无既有测试断言旧端点，无需迁移更新。
+    - **发现的偏差/降级**：
+      - 🟢 **J1 无 FormData 死代码**（同 E1，与 D/H/K 循环不同）：`useJ1FormData` 不存在（file_search 0），J1 单 `useJ1Adjudication`（承载行模型/持久化/带入，无 TB 回写）+ inline `writebackTB` 承载回写，无 `useJ1FormData.writeback*` 旁路 ⇒ 本任务无「顺手删除零消费 FormData writeback」动作（grep 实证不存在），非遗漏。
+      - 🟢 **sheet 名可解**：render label `审定表J1-1` / `wp_code: J1-1` 本身可解，前端传字面量 `审定表J1-1` 更稳，无 R1 不可解降级项。
+      - 🟢 **J2 未碰**：按任务范围只改 J1；J2 整模块（`useJ2FormData`/`useJ2Integration` 孤儿链）死代码清理归 task 17（已完成），本任务全程未触碰 J2 文件。
+      - 🟡 **gate 测试 flush 说明**：J1 handler 含 `await confirm` + `await import('@/services/apiProxy')` + `await api.post`（动态 import 在 setTimeout 边界解析），单 `nextTick` 不足以让 mockPost 完成 → 测试用 `flush(6)`（交替 `Promise.resolve()` + `setTimeout(0)`）刷微/宏任务队列后断言，非跳过等待。
+    - **预存无关失败 git 实证**：`git status` 实证工作树本任务仅 `J1TabAdjudication.vue`(M) + `jAdjudicationPublishGate.spec.ts`(??)；其余 M 文件（useE1/useI*Adjudication + E1/I* TabAdjudication + i6Integration.spec + e/iAdjudicationPublishGate.spec）是 task 13/14 前序已完成产物，非本任务引入。J1/J 回归 269 全绿无预存失败。
+    - **端到端验证点 / 待环境**：前端 gate 单测覆盖「确认→publish-to-tb 落库路径（2211 balance 单科目）+ 取消/readonly 无副作用 + 不调旧端点 + 仍 emit」；后端 M0 集成测试覆盖 writeback_rows(balance)→WORKPAPER_SAVED(publish_confirmed)→handler 幂等回写（task 3 M0 已封板）。真实 PG 无 J 循环职工薪酬审定数据 → 端到端 UAT 归 task 20*（data-blocked）；Playwright 全链路归 task 21*（待 start-dev.bat 环境）。本任务代码 + 单测层面已封板。
 
 ## M10：收口
 

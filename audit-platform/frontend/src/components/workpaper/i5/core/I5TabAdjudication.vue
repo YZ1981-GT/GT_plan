@@ -157,7 +157,8 @@
       <el-button size="small" plain :disabled="isReadonly" @click="() => applyTbData()">TB写入未审</el-button>
       <el-button size="small" plain :disabled="isReadonly" @click="() => applyPriorFromTb()">写入上期审定</el-button>
       <el-button size="small" type="primary" plain :disabled="isReadonly" @click="addRow">+ 新增</el-button>
-      <el-button size="small" type="success" :disabled="isReadonly" @click="handleSave">保存并回写</el-button>
+      <el-button size="small" type="success" :disabled="isReadonly" @click="handleSave">保存</el-button>
+      <el-button size="small" type="warning" :disabled="isReadonly" :loading="publishing" data-testid="i5-publish-tb" @click="handlePublish">发布到试算表(1911)</el-button>
     </div>
 
     <div v-if="useVirtualScroll" class="virtual-toolbar">
@@ -544,6 +545,8 @@ const {
   fillVarianceNoteDraft,
   applyConclusionTemplate,
   writeback,
+  publishToTb,
+  publishing,
   saveNote,
   saveConclusion,
   saveSignificantMatters,
@@ -706,7 +709,13 @@ function onCellChange(rowId: string, field: keyof I5AdjudicationRow, value: numb
 }
 
 async function handleSave(): Promise<void> {
+  // 普通保存不写 TB（Req 1）；TB 回写走「发布到试算表」显式确认门
   await writeback(false)
+}
+
+// 显式发布门：二次确认 → publish-to-tb 端点（spec tb-writeback-explicit-publish-gate Task 13）
+async function handlePublish(): Promise<void> {
+  await publishToTb()
 }
 
 function handleReview(): void {

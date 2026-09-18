@@ -86,8 +86,16 @@
             从 I6-3 同步调整
           </el-button>
           <el-button size="small" :disabled="isReadonly" @click="adj.syncFromDetail(true)">强制覆盖</el-button>
-          <el-button size="small" type="success" :disabled="isReadonly" @click="adj.writeback()">
-            回写TB(6602)
+          <el-button size="small" :disabled="isReadonly" @click="adj.writeback()">保存</el-button>
+          <el-button
+            size="small"
+            type="warning"
+            :disabled="isReadonly"
+            :loading="adj.publishing.value"
+            data-testid="i6-publish-tb"
+            @click="adj.publishToTb()"
+          >
+            发布到试算表(6602发生额)
           </el-button>
           <el-button size="small" type="default" text @click="handleReview">复核</el-button>
         </div>
@@ -340,6 +348,8 @@ const tbSourceCodes = computed(() => extractTbSourceCodes(props.htmlData))
 const adj = useI6Adjudication({
   allResponses: computed(() => props.allResponses),
   tbData: computed(() => props.tbData),
+  // wpId 供显式发布门 publishToTb 调 POST /workpapers/{wpId}/audit-determination/publish-to-tb
+  wpId: computed(() => props.wpId),
   projectId: computed(() => props.projectId),
   isReadonly: computed(() => props.isReadonly),
   onSave: (itemId, value) => emit('save', itemId, value),

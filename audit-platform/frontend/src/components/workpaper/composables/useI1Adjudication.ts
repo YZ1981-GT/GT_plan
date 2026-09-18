@@ -21,7 +21,7 @@
  * Requirements: 2.1-2.11
  */
 import { ref, computed, watch, type Ref } from 'vue'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { api } from '@/services/apiProxy'
 import type { ChecklistItem, TbData } from './useI1FormData'
 import {
@@ -591,14 +591,36 @@ export function useI1Adjudication(
   const ACCOUNT_CODE_1702 = '1702'
   const ACCOUNT_CODE_1703 = '1703'
 
-  // ─── saveAdjudication（持久化 + TB回写 + EventBus）──────────────────────────
+  // ─── 显式发布门状态（防重复提交，供发布按钮 :loading 绑定） ─────────────────
+  const publishing = ref(false)
+
+  /** 发布下游联动事件（保存/发布均可复用；仅 emit，不写 TB）。 */
+  function _emitAdjudicated(): void {
+    // 发布 'substantive:adjudicated' EventBus 事件（轻量通知，附注/报表等消费）
+    window.dispatchEvent(new CustomEvent('substantive:adjudicated', {
+      detail: {
+        wpCode: 'I1',
+        accountCodes: [ACCOUNT_CODE_1701, ACCOUNT_CODE_1702, ACCOUNT_CODE_1703],
+        auditedCost: costSubtotal.value.audited,
+        auditedAmort: amortSubtotal.value.audited,
+        auditedImpairment: impairmentSubtotal.value.audited,
+        netValue: netValueAudited.value,
+      },
+    }))
+  }
+
+  // ─── saveAdjudication（普通保存不写 TB，Req 1）──────────────────────────────
 
   /**
-   * 保存审定表并回写TB（Req 2.10）：
+   * 保存审定表（普通保存动作）：
    * 1. 持久化三区块行数据到 checklist_responses
    * 2. 持久化审定小计到独立 item_id（render策略回读seed）
-   * 3. writebackTrialBalance（科目1701+1702+1703）
-   * 4. 发布 'substantive:adjudicated' EventBus事件
+   * 3. 发布 'substantive:adjudicated' EventBus事件（附注/报表刷新）
+   *
+   * spec: tb-writeback-explicit-publish-gate Task 13 / Req 1。
+   * 此前该函数保存后**自动**回写 trial_balance（三科目 PUT 旧端点），且被
+   * onCellChange 在每次数据变化时调用 → 违反 Req 1（普通保存/数据变化绝不写 TB）。
+   * 现只保存 + emit；TB 回写收敛为用户显式确认动作（publishToTb）。
    *
    * 铁律：EventBus跨表值必须持久化到checklist_responses(独立item_id)+render策略回读seed
    */
@@ -620,39 +642,69 @@ export function useI1Adjudication(
     options?.onSave?.(`${ITEM_PREFIX}-amort-increase-total`, amortSubtotal.value.increase)
     options?.onSave?.('I1-1-amort-provision', amortSubtotal.value.increase)
 
-    // TB回写（科目1701+1702+1703）
-    if (projectId.value) {
-      try {
-        await Promise.all([
-          api.put(`/api/projects/${projectId.value}/trial-balance/writeback`, {
-            account_code: ACCOUNT_CODE_1701,
-            audited_amount: auditedCost,
-          }),
-          api.put(`/api/projects/${projectId.value}/trial-balance/writeback`, {
-            account_code: ACCOUNT_CODE_1702,
-            audited_amount: auditedAmort,
-          }),
-          api.put(`/api/projects/${projectId.value}/trial-balance/writeback`, {
-            account_code: ACCOUNT_CODE_1703,
-            audited_amount: auditedImpairment,
-          }),
-        ])
-      } catch {
-        ElMessage.warning('审定数回写试算表失败，请手动确认')
-      }
+    _emitAdjudicated()
+  }
+
+  // ─── 显式发布到试算表（显式确认门，复刻 D2/D4-1 范式） ────────────────────────
+
+  /**
+   * 确认发布审定数到试算表（多科目 1701 原值 / 1702 累计摊销 / 1703 减值准备）。
+   *
+   * spec: tb-writeback-explicit-publish-gate Task 13 / Req 2,5。
+   * 二次确认（中文）→ 保存明细 → 单次 `POST /workpapers/{wpId}/audit-determination/publish-to-tb`
+   * （审定表 sheet 名 I1-1 + writeback_rows 三科目预算行，balance 口径，单次原子发布）。
+   * 后端校验发布权限、发 publish_confirmed=True + token → 回写 handler 幂等回写
+   * trial_balance。用户取消 → 无任何副作用（不写 TB、不 emit）。
+   */
+  async function publishToTb(): Promise<void> {
+    if (publishing.value) return
+
+    try {
+      await ElMessageBox.confirm(
+        '发布后将把无形资产审定数（科目 1701 原值 / 1702 累计摊销 / 1703 减值准备）'
+        + '写入试算表（trial_balance），并触发报表/错报评价等下游重算。确认发布？',
+        '发布到试算表确认',
+        { confirmButtonText: '确认发布', cancelButtonText: '取消', type: 'warning' },
+      )
+    } catch {
+      return // 用户取消 → 无任何副作用（不写 TB、不 emit）
     }
 
-    // 发布 'substantive:adjudicated' EventBus 事件（轻量通知，附注/报表等消费）
-    window.dispatchEvent(new CustomEvent('substantive:adjudicated', {
-      detail: {
-        wpCode: 'I1',
-        accountCodes: [ACCOUNT_CODE_1701, ACCOUNT_CODE_1702, ACCOUNT_CODE_1703],
-        auditedCost,
-        auditedAmort,
-        auditedImpairment,
-        netValue: netValueAudited.value,
-      },
-    }))
+    if (!wpId.value) {
+      ElMessage.error('缺少底稿标识，无法发布')
+      return
+    }
+
+    // 持久化审定明细（普通保存路径，不写 TB）
+    await saveAdjudication()
+
+    const auditedCost = costSubtotal.value.audited
+    const auditedAmort = amortSubtotal.value.audited
+    const auditedImpairment = impairmentSubtotal.value.audited
+
+    publishing.value = true
+    try {
+      // 多科目单次原子发布：三科目一次 writeback_rows（余额类 balance）
+      const resp: any = await api.post(
+        `/api/workpapers/${wpId.value}/audit-determination/publish-to-tb`,
+        {
+          // sheet 名固定含审定表子码 I1-1，后端 extract_determination_wp_code 据此解出 I1-1
+          sheet_name: '审定表I1-1',
+          writeback_rows: [
+            { account_code: ACCOUNT_CODE_1701, audited_amount: auditedCost, amount_kind: 'balance' },
+            { account_code: ACCOUNT_CODE_1702, audited_amount: auditedAmort, amount_kind: 'balance' },
+            { account_code: ACCOUNT_CODE_1703, audited_amount: auditedImpairment, amount_kind: 'balance' },
+          ],
+        },
+      )
+      ElMessage.success(resp?.message || '已发布到试算表')
+      // 发布成功 → 通知下游附注/报表刷新（TB 回写已由后端确认门完成）
+      _emitAdjudicated()
+    } catch (err: any) {
+      ElMessage.error(err?.response?.data?.detail || err?.message || '发布失败，请重试')
+    } finally {
+      publishing.value = false
+    }
   }
 
   // ─── Persist ───────────────────────────────────────────────────────────────
@@ -1053,6 +1105,9 @@ export function useI1Adjudication(
     // Actions
     updateCell,
     saveAdjudication,
+    // 显式发布到试算表（二次确认门）
+    publishToTb,
+    publishing,
     saveNote,
     saveConclusion,
     saveQualitativeNotes,

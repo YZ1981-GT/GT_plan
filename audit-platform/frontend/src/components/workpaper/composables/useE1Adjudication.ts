@@ -16,6 +16,7 @@
  * Requirements: 1.1-1.7, 12.1-12.5
  */
 import { ref, computed, watch, onBeforeUnmount, type Ref, type ComputedRef } from 'vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import {
   parseNum,
   calcAudited,
@@ -26,6 +27,15 @@ import {
 import { buildE1MainRowSlotWrites } from './e1MainRowPrefill'
 import { eventBus } from '@/utils/eventBus'
 import { api } from '@/services/apiProxy'
+
+/**
+ * E1-1 审定表 sheet 名（字面量）。
+ * 后端 `extract_determination_wp_code` 正则 `([D-N]\d+-1)\b` 从中解出子码 `E1-1`
+ * → handler `_on_d_audit_determination_saved`（`^[D-N]\d+-1$`）匹配 → 回写 trial_balance。
+ * 复刻 D2/D4-1/I 循环范式：由前端传字面量 sheet_name，不依赖 render label
+ * （E1 host GtE1MonetaryFund 未向 E1TabAdjudication 传 sheetName）。
+ */
+const E1_DETERMINATION_SHEET_NAME = '审定表E1-1'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -120,11 +130,15 @@ function safeParseRows<T>(jsonStr: string | null | undefined): T[] {
 // ─── Composable ──────────────────────────────────────────────────────────────
 
 export function useE1Adjudication(options: UseE1BaseOptions) {
-  const { projectId, allResponses, debouncedSave, isReadonly } = options
+  // projectId 不再解构：改造前唯一用途是 writebackTrialBalance 里 api.put(/projects/{pid}/…)，
+  // 该 self-invoke PUT 已移除（TB 回写改走 per-wp 显式发布门 publish-to-tb）。
+  const { wpId, allResponses, debouncedSave, isReadonly } = options
 
   let debounceTimer: ReturnType<typeof setTimeout> | null = null
   const crossSheetStatus = ref<'loaded' | 'loading' | 'error'>('loaded')
   const isLoading = ref(false)
+  /** 「发布到试算表」进行中 —— 防重复点击 + 按钮 loading。 */
+  const publishing = ref(false)
 
   // ─── allResponses Helpers ────────────────────────────────────────────
 
@@ -513,23 +527,70 @@ export function useE1Adjudication(options: UseE1BaseOptions) {
     }
   }
 
+  /**
+   * 🔴 内存同步（**不写 TB**）。
+   *
+   * spec: tb-writeback-explicit-publish-gate Task 14（Req 1：普通保存/数据变化绝不写 TB）。
+   * 改造前此函数在 `flushSave`（debounce 保存）与 `watch(totalRow.endingAudited)`（数据变化）
+   * 里**自动** `api.put('/projects/{pid}/trial-balance/writeback')` 三科目直写 audited_amount，
+   * 绕过显式发布门（无二次确认/无幂等/无 publish_confirmed）——正是本 spec 要消除的反模式。
+   * 现改为**仅**把三科目审定合计同步到 allResponses（供 E1-14 分析表/附注披露/全局告警实时读取），
+   * 真实 TB 回写只经 `publishToTb`（显式二次确认 → publish-to-tb 显式发布门）。
+   * 保留原公开名（`syncAuditedTotals` 的既有调用方无需改），语义收敛为「只同步不落库」。
+   */
   function writebackTrialBalance(): void {
-    if (!projectId.value) return
-
-    const byCode = aggregateAuditedByCode()
-
     // Write to allResponses for cross-spec consumption (E1-14 分析表/全局告警读取)
     syncAuditedTotals()
+  }
 
-    // 真实 TB 回写：走平台统一端点（对齐 F3/F4/F5/G 循环 writebackTrialBalance）。
-    // 按 1001/1002/1012 三科目分别 upsert 审定数到 trial_balance。
-    for (const [code, amount] of Object.entries(byCode)) {
-      api
-        .put(`/api/projects/${projectId.value}/trial-balance/writeback`, {
-          account_code: code,
-          audited_amount: amount,
-        })
-        .catch(() => { /* silent：回写失败不阻断本地保存 */ })
+  /**
+   * 发布审定数到试算表（显式发布门）。
+   *
+   * spec: tb-writeback-explicit-publish-gate Task 14（Req 2/5/8）。
+   * 复刻 D2/D4-1/I 循环范式：中文二次确认 →
+   * `POST /api/workpapers/{wpId}/audit-determination/publish-to-tb`
+   * （多科目 1001/1002/1012 一次归集为 writeback_rows 多行原子发布，各科目 amount_kind=balance
+   *  余额类）。成功后 emit `substantive:adjudicated` 保留下游联动（附注刷新/E1-14）。
+   * readonly / publishing 早退；用户取消 → 无副作用（不 post、不 emit、不写 TB）。
+   */
+  async function publishToTb(): Promise<void> {
+    if (isReadonly.value || publishing.value) return
+    if (!wpId.value) return
+
+    // 归集三科目期末审定合计 → writeback_rows（余额类）。
+    // 同步一次内存合计，确保发布前 allResponses 与将发布的数一致。
+    syncAuditedTotals()
+    const byCode = aggregateAuditedByCode('ending')
+    const rows = Object.entries(byCode).map(([code, amount]) => ({
+      account_code: code,
+      audited_amount: amount,
+      amount_kind: 'balance' as const,
+    }))
+
+    try {
+      await ElMessageBox.confirm(
+        '发布后将把货币资金审定数（库存现金 1001 / 银行存款 1002 / 其他货币资金 1012）'
+          + '写入试算表（trial_balance），并触发报表 / 错报评价等下游重算。确认发布？',
+        '发布到试算表确认',
+        { confirmButtonText: '确认发布', cancelButtonText: '取消', type: 'warning' },
+      )
+    } catch {
+      return // 用户取消 → 无副作用
+    }
+
+    publishing.value = true
+    try {
+      await api.post(`/api/workpapers/${wpId.value}/audit-determination/publish-to-tb`, {
+        sheet_name: E1_DETERMINATION_SHEET_NAME,
+        writeback_rows: rows,
+      })
+      ElMessage.success('已发布货币资金审定数到试算表')
+      // 保留下游联动（附注刷新 / E1-14 / 全局告警）
+      publishAdjudicated()
+    } catch {
+      ElMessage.error('发布到试算表失败，请稍后重试')
+    } finally {
+      publishing.value = false
     }
   }
 
@@ -600,14 +661,16 @@ export function useE1Adjudication(options: UseE1BaseOptions) {
     eventBus.emit('substantive:adjudicated', payload)
   }
 
-  // Watch total audited → auto publish + writeback
+  // Watch total audited → 仅通知下游联动（emit substantive:adjudicated），**不写 TB**。
+  // spec: tb-writeback-explicit-publish-gate Task 14（Req 1：数据变化绝不写 TB）。
+  // 改造前此处还调 writebackTrialBalance() 自动直写试算表（绕过显式发布门），已移除；
+  // 真实 TB 回写只经 publishToTb（显式二次确认）。内存合计同步由下方 detailRows watch 承载。
   let previousTotalAudited: number | null = null
   watch(
     () => totalRow.value.endingAudited,
     (current) => {
       if (previousTotalAudited !== null && Math.abs(previousTotalAudited - current) > BALANCE_TOLERANCE) {
         publishAdjudicated()
-        writebackTrialBalance()
       }
       previousTotalAudited = current
     },
@@ -654,6 +717,8 @@ export function useE1Adjudication(options: UseE1BaseOptions) {
     applyFourTablePrefill,
     getVal,
     writebackTrialBalance,
+    publishToTb,
+    publishing,
     publishAdjudicated,
     hydrate,
   }

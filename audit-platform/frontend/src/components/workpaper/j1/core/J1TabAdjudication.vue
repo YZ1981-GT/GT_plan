@@ -3,7 +3,7 @@
     <!-- 审计目标 -->
     <el-alert type="info" :closable="false" show-icon class="audit-objective">
       <template #title>
-        审计目标：确认应付职工薪酬各分类期初、期末审定数的准确性，分析本期变动率异常项（&gt;30% 标红），形成审定结论并回写试算平衡表（科目 2211）。
+        审计目标：确认应付职工薪酬各分类期初、期末审定数的准确性，分析本期变动率异常项（&gt;30% 标红），形成审定结论并发布到试算平衡表（科目 2211）。
       </template>
     </el-alert>
 
@@ -15,9 +15,9 @@
       <el-button size="small" type="warning" plain :disabled="isReadonly" @click="pullFromDetailWithConfirm">
         从 J1-2 明细带入未审数
       </el-button>
-      <el-button size="small" type="success" plain :disabled="isReadonly" :loading="writebackLoading"
-        @click="writebackTB">
-        回写试算平衡表（2211）
+      <el-button size="small" type="warning" plain :disabled="isReadonly" :loading="writebackLoading"
+        data-testid="j1-publish-tb" @click="writebackTB">
+        发布到试算表（2211）
       </el-button>
       <el-button size="small" type="primary" plain
         :disabled="isReadonly || !hasFourTablePrefill"
@@ -232,7 +232,7 @@
         <p>5. 辞退福利为动态行，根据实际辞退计划增减行。</p>
         <p>6.「带入调整」：可从集中登记按科目 2211 拉取调整分录，逐笔分配到各分类行期末调整，带入后审定数自动更新并联动附注。</p>
         <p>7.「从 J1-2 明细带入未审数」：按明细表项目清单重建行，未审期末=期初+本期增加−本期减少；同名行的账项调整与原因分析保留。</p>
-        <p>8.「回写试算平衡表（2211）」：以期末审定合计回写 trial_balance 审定数，并发布审定事件联动附注与报表。回写后「差异数（审定）」应为 0；「差异数（未审）」用于核对明细未审数与账面。</p>
+        <p>8.「发布到试算表（2211）」：经二次确认后以期末审定合计发布到 trial_balance 审定数（走显式发布门），并发布审定事件联动附注与报表。发布后「差异数（审定）」应为 0；「差异数（未审）」用于核对明细未审数与账面。</p>
       </div>
     </details>
 
@@ -417,26 +417,37 @@ async function pullFromDetailWithConfirm() {
   ElMessage.success(`已带入 ${rowCount} 行（其中 ${matched} 行沿用既有调整）`)
 }
 
-/** 审定合计回写试算平衡表 2211 + 发布审定事件（联动附注/报表） */
+/**
+ * 审定合计发布到试算平衡表 2211 + 发布审定事件（联动附注/报表）
+ *
+ * spec: tb-writeback-explicit-publish-gate Task 15 / Req 1,2,8。
+ * 此前直调旧端点 `PUT /projects/{pid}/trial-balance/writeback`（2211）绕过显式发布门。
+ * 现改走 `POST /workpapers/{wpId}/audit-determination/publish-to-tb`（writeback_rows，
+ * 应付职工薪酬为负债余额类 → amount_kind='balance'，sheet_name 解出 J1-1）；
+ * 二次确认 + readonly/publishing 早退。保留 substantive:adjudicated emit（下游附注/报表联动）。
+ */
 const writebackLoading = ref(false)
 async function writebackTB() {
-  if (isReadonly) return
+  if (isReadonly || writebackLoading.value) return
   const amount = grandTotal.value.endAudited
   try {
     await ElMessageBox.confirm(
-      `将以期末审定合计 ${fmtAmount(amount)} 回写试算平衡表科目 2211（应付职工薪酬）的审定数。是否继续？`,
-      '回写试算平衡表',
-      { confirmButtonText: '回写', cancelButtonText: '取消', type: 'warning' },
+      `发布后将以期末审定合计 ${fmtAmount(amount)} 把审定数写入试算表（trial_balance）科目 2211`
+      + '（应付职工薪酬），并触发报表/错报评价等下游重算。确认发布？',
+      '发布到试算表确认',
+      { confirmButtonText: '确认发布', cancelButtonText: '取消', type: 'warning' },
     )
   } catch {
-    return
+    return // 用户取消 → 无任何副作用（不发请求、不 emit、不写 TB）
   }
   writebackLoading.value = true
   try {
-    const http = (await import('@/utils/http')).default
-    await http.put(`/api/projects/${props.projectId}/trial-balance/writeback`, {
-      account_code: '2211',
-      audited_amount: amount,
+    const { api } = await import('@/services/apiProxy')
+    await api.post(`/api/workpapers/${props.wpId}/audit-determination/publish-to-tb`, {
+      sheet_name: '审定表J1-1',
+      writeback_rows: [
+        { account_code: '2211', audited_amount: amount, amount_kind: 'balance' },
+      ],
     })
     tbBalance.value = amount
     eventBus.emit('substantive:adjudicated', {
@@ -448,9 +459,9 @@ async function writebackTB() {
       projectId: props.projectId,
       timestamp: Date.now(),
     })
-    ElMessage.success('已回写试算平衡表（科目 2211）')
+    ElMessage.success('已发布到试算表（科目 2211）')
   } catch (e: any) {
-    ElMessage.error(e?.response?.data?.detail || '回写失败，请确认试算表已导入科目 2211')
+    ElMessage.error(e?.response?.data?.detail || '发布失败，请确认试算表已导入科目 2211')
   } finally {
     writebackLoading.value = false
   }

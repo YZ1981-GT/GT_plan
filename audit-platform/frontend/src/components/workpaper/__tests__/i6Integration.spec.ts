@@ -33,11 +33,15 @@ vi.mock('@/utils/http', () => ({
 
 vi.mock('element-plus', () => ({
   ElMessage: { success: vi.fn(), warning: vi.fn(), error: vi.fn(), info: vi.fn() },
+  ElMessageBox: { confirm: vi.fn().mockResolvedValue('confirm') },
 }))
 
-// ─── 6.1 EventBus: TB回写(发生额6602) + substantive:adjudicated ─────────────
-
-describe('6.1 EventBus: TB回写(发生额6602) + substantive:adjudicated', () => {
+// ─── 6.1 EventBus: 保存联动(发生额6602) + 显式发布门 publish-to-tb ────────────
+//
+// spec: tb-writeback-explicit-publish-gate Task 13。
+// I6 改造后：writeback() 为普通保存（只 emit，不写 TB，Req 1）；TB 回写收敛为
+// publishToTb（二次确认 → POST publish-to-tb，发生额 occurrence，保留 I6→I2 联动）。
+describe('6.1 保存联动(6602) + 显式发布门 publish-to-tb', () => {
   let dispatchedEvents: CustomEvent[] = []
   const originalDispatch = window.dispatchEvent
 
@@ -82,7 +86,7 @@ describe('6.1 EventBus: TB回写(发生额6602) + substantive:adjudicated', () =
     expect(typeof adjEvent!.detail.auditedTotal).toBe('number')
   })
 
-  it('useI6Adjudication.writeback() dispatches research:expense-updated', async () => {
+  it('useI6Adjudication.writeback() dispatches research:expense-updated (I6→I2 联动保留)', async () => {
     const { useI6Adjudication } = await import('../composables/useI6Adjudication')
 
     const allResponses = ref(new Map<string, any>())
@@ -98,37 +102,75 @@ describe('6.1 EventBus: TB回写(发生额6602) + substantive:adjudicated', () =
 
     await writeback()
 
-    // 验证 research:expense-updated 事件
+    // 验证 research:expense-updated 事件（I6→I2 联动）
     const researchEvent = dispatchedEvents.find(e => e.type === 'research:expense-updated')
     expect(researchEvent).toBeDefined()
     expect(researchEvent!.detail).toHaveProperty('expenseAmount')
     expect(researchEvent!.detail).toHaveProperty('source', 'I6-adjudication')
   })
 
-  it('writeback() calls TB回写 API with is_occurrence=true and account_code=6602', async () => {
+  it('writeback()（普通保存）不写 TB —— 不调旧端点 PUT trial-balance/writeback', async () => {
+    // spec: tb-writeback-explicit-publish-gate Req 1（普通保存/数据变化绝不写 TB）
     const { api } = await import('@/services/apiProxy')
+    ;(api.put as any).mockClear()
+    ;(api.post as any).mockClear()
     const { useI6Adjudication } = await import('../composables/useI6Adjudication')
 
     const allResponses = ref(new Map<string, any>())
     const tbData = ref({ unadjusted6602: 80000, audited6602: 90000 })
     const projectId = ref('proj-123')
+    const wpId = ref('wp-i6-001')
 
     const { writeback } = useI6Adjudication({
       allResponses,
       tbData,
+      wpId,
       projectId,
       onSave: vi.fn(),
     })
 
     await writeback()
 
-    expect(api.put).toHaveBeenCalledWith(
-      '/api/projects/proj-123/trial-balance/writeback',
-      expect.objectContaining({
-        account_code: '6602',
-        is_occurrence: true,
-      }),
-    )
+    // 普通保存：既不调旧 PUT 端点，也不调 publish-to-tb
+    expect(api.put).not.toHaveBeenCalled()
+    const postCalls = (api.post as any).mock.calls
+    expect(postCalls.some((c: any[]) => String(c[0]).includes('publish-to-tb'))).toBe(false)
+  })
+
+  it('publishToTb() 二次确认后走 publish-to-tb（6602 occurrence，不调旧端点）', async () => {
+    // spec: tb-writeback-explicit-publish-gate Task 13 / Req 2,6
+    const { api } = await import('@/services/apiProxy')
+    ;(api.put as any).mockClear()
+    ;(api.post as any).mockClear()
+    const { useI6Adjudication } = await import('../composables/useI6Adjudication')
+
+    const allResponses = ref(new Map<string, any>())
+    const tbData = ref({ unadjusted6602: 80000, audited6602: 90000 })
+    const projectId = ref('proj-123')
+    const wpId = ref('wp-i6-001')
+
+    const { publishToTb } = useI6Adjudication({
+      allResponses,
+      tbData,
+      wpId,
+      projectId,
+      onSave: vi.fn(),
+    })
+
+    await publishToTb()
+
+    // 不再调旧端点
+    expect(api.put).not.toHaveBeenCalled()
+    // 走显式发布门 publish-to-tb
+    const postCalls = (api.post as any).mock.calls
+    const pubCall = postCalls.find((c: any[]) => String(c[0]).includes('audit-determination/publish-to-tb'))
+    expect(pubCall).toBeDefined()
+    expect(pubCall[0]).toBe('/api/workpapers/wp-i6-001/audit-determination/publish-to-tb')
+    expect(pubCall[1].sheet_name).toMatch(/I6-1/)
+    expect(pubCall[1].writeback_rows[0]).toMatchObject({
+      account_code: '6602',
+      amount_kind: 'occurrence',
+    })
   })
 })
 
