@@ -713,10 +713,38 @@ M0（端点扩展，Task 1）是所有**活路径**逐组件任务的前置；�
     - **无回归**：改动文件 `useH7FormData.ts` ESLint **0 error**（1 warning 为未改的 `loadTbData` 既存 `no-direct-audit-fetch`，非新增）；H7 相关 vitest（`h7BiologicalAssets.integration` + `.e2e` + `hAdjudicationPublishGate`）→ **2 files / 58 passed**。
     - **改的文件（3）**：`audit-platform/frontend/src/components/workpaper/composables/useH7FormData.ts`（删死 writebackTB + eventBus import + docstring + 收口注释）；`backend/scripts/check/check_tb_writeback_no_direct_call.py`（新增守卫）；`backend/tests/scripts/test_check_tb_writeback_no_direct_call.py`（新增自测）；`.github/workflows/governance-checks.yml`（接入 job）。
 
-- [ ] 19. 决定旧端点删除 / 降级
+- [x] 19. 决定旧端点删除 / 降级
   - grep 确认前端零调用且无服务内部合法调用方（S 类走独立 service，不算）后：删除 `writeback_audited_amount` 或降级为仅内部 `publish_confirmed` 调用
   - 后端测试确认删除/降级后无回归
   - _需求: 9.3_
+  - **✅ 完成证据（2026）——决策 = (a) 删除**：
+    - **目标端点**：`backend/app/routers/trial_balance.py` 的 `@router.put("/writeback")` → `writeback_audited_amount(...)`（`PUT /api/projects/{project_id}/trial-balance/writeback`，D~N 专属组件审定数**绕过显式发布门**的直写旁路：无二次确认/无幂等 token/无 `publish_confirmed`）+ 其 `TBWritebackBody` schema。
+    - **grep 调用方实证（三面全 0，删前逐项确认，非臆断）**：
+      | 面 | 结论 | 实证 |
+      |---|---|---|
+      | **前端** `audit-platform/frontend/src/**` | **零活调用** | `trial-balance/writeback` 命中仅剩收口注释（useL1/useF*/useD*/GtK6 等的「此前直调旧端点…已移除」）+ 测试里 `.not.toContain('trial-balance/writeback')` 守卫断言；task 18 CI 守卫 `check_tb_writeback_no_direct_call.py` 锁定（本任务复跑 legacy=0/variant=0/verdict=passed，EXIT=0） |
+      | **后端内部** | **零调用方** | 全仓 grep `writeback_audited_amount`：除 `trial_balance.py` 本身，其余全部属 **S 类独立 service** —— `SEstimateTBWritebackService.writeback_audited_amount`（`s_estimate_tb_writeback_service.py` + `s_estimate_calculation.py` 调用）/ `STransactionTBWritebackService.writeback_audited_amount`（`s_transaction_*` 调用）+ 各自 S 类测试。**正交，非本路由端点调用方，全程不碰**。无任何后端 router/service `await` 此 handler 或 HTTP 调此端点 |
+      | **测试** | **无端点集成测试** | 无 `client.put(...trial-balance/writeback...)` 命中此路由。后端所有 `trial-balance/writeback` 字面量出现在：①task 18 CI 守卫自测（合成字面量，orthogonal）②`workpaper_sync_*_deletion_plan.json` 冻结迁移清单（其 test_task51/56 扫的是**前端 composable 源码字符串**，非后端路由，orthogonal）③app 运行日志。均非本路由端点的活调用/测试 |
+    - **`TBWritebackBody` 唯一使用方实证**：grep 全仓仅 `trial_balance.py` 内被删端点用（且 `from pydantic import BaseModel` 也在删除块内，无孤儿 import）。
+    - **决策裁定 (a) 删除**（首选，彻底消除绕过显式门的旁路）：路由端点前端零 + 后端内部零 + 无测试命中 ⇒ 直接删 `@router.put("/writeback")` + handler + `TBWritebackBody` schema + 块内 `BaseModel` import，代以收口注释块（记录删除依据 + Task 19 决策）。**不采 (b) 降级**：无任何暂不能断的合法内部调用方，无需保留收窄。
+    - **改的文件（2）**：
+      - `backend/app/routers/trial_balance.py`：删端点 handler + `TBWritebackBody` + `pydantic.BaseModel` import（该块唯一用途），换为收口注释（删除决策 + grep 证据摘要 + 迁移去向 publish-to-tb）
+      - `backend/app/security/wp_bound_entry_coverage.json`：**外溢发现**——删端点后 coverage ledger 出现该路由的 ghost（`stale_in_ledger`）。**采外科式最小改**（非全量重生成）：仅删该条 http 条目（`app.routers.trial_balance:writeback_audited_amount`，14 行）+ 同步 summary 计数 −1（`entry_total 2350→2349` / `http_total 2335→2334` / `http_non_wp_bound 1494→1493` / `by_family.non_wp_bound 1484→1483` / `by_action.update 116→115` / `by_gate.not_applicable 1516→1515`）。**为何不全量重生成**：committed ledger（2026-08-14 生成）已相对 live app �ative stale 64 条（其他 spec 新增端点），全量重生成会把 63 条无关条目卷入本 commit + 把他 spec 的存量漂移锁进本 spec 基线（违 R8.6）——故只删本 spec 该 1 条，其余存量漂移由各自 spec 承载
+    - **后端测试命令 + pass 数（183 passed / 0 failed）**：
+      - `..\.venv\Scripts\python.exe -m pytest tests/test_trial_balance.py tests/test_trial_balance_sign_passthrough.py tests/test_s_estimate_tb_writeback.py tests/test_s_transaction_tb_writeback.py tests/test_s_estimate_integration.py tests/test_s_special_transaction_integration.py tests/test_s_estimate_pbt.py tests/test_s_special_transaction_pbt.py tests/test_publish_to_tb_writeback_rows.py tests/test_publish_determination_to_tb.py tests/test_x3_entry_coverage_ledger.py tests/scripts/test_check_tb_writeback_no_direct_call.py -q` → **183 passed**
+      - **S 类回写零回归证据**：6 个 S 类测试文件（estimate + transaction 的 unit/integration/pbt）全绿 —— `SEstimateTBWritebackService`/`STransactionTBWritebackService` 全程未触碰，删路由端点不影响 S 类独立 service
+      - **publish-to-tb 零回归证据**：`test_publish_to_tb_writeback_rows.py`(12) + `test_publish_determination_to_tb.py`(6) 全绿 —— 显式发布门完好
+      - **trial_balance 路由零回归**：`test_trial_balance.py` + `test_trial_balance_sign_passthrough.py` 全绿 —— 同 router 其余端点（get/recalc/balance-check/trace/freeze 等）不受删除影响
+      - **X-3 ledger 守卫零回归**：`test_x3_entry_coverage_ledger.py` 全绿 —— ledger 外科编辑后 X-3 切片双向等式仍成立、无 finding 归因 X-3
+      - **task 18 CI 守卫自测**：`test_check_tb_writeback_no_direct_call.py`(24) 全绿
+    - **coverage drift 守卫状态（漂移中性—改善）**：`check_drift(app, ledger)` total **78→77**（唯一减少项恰是 `stale_in_ledger: 1` = 本 route ghost，删后 `stale_in_ledger=[]`；且 route 不在 `missing_in_ledger`）。剩余 77（64 missing + 1 wp_bound_ungated + 1 fake_pass + 11 native_authz_unaudited）**全部预存**、归各自 spec。ledger `entries_len==summary.entry_total==2349` 内部自洽。
+    - **CI 守卫仍 exit 0 证据**：`.venv\Scripts\python.exe backend\scripts\check\check_tb_writeback_no_direct_call.py` → `source_files_scanned:5189 / legacy_endpoint_hits:0 / variant_endpoint_hits:0 / verdict:passed`，**EXIT=0**。
+    - **诊断**：`trial_balance.py` `ast.parse` OK + `importlib` import OK + 确认模块无 `writeback_audited_amount`/`TBWritebackBody`；ledger JSON `json.loads` OK。改动文件 0 语法/导入错。
+    - **发现的偏差/降级（如实报告）**：
+      - 🟡 **外溢到 coverage ledger（非本任务范围内预期，但删端点必然触发）**：删路由 → coverage_guard 双向漂移守卫检出 ghost。已用外科式最小改消解（仅删本 route 条目 + 计数 −1），未卷入全量重生成的 63 条无关漂移。
+      - ⚠️ **预存无关红（非本任务引入，删前 HEAD 已实证）**：全仓两个 whole-app `is_clean()` 守卫 `test_task16_coverage_guard.py::test_no_drift_on_committed_ledger` + `test_task4_native_authz_audit.py::TestDriftGuard::test_committed_ledger_clean_no_unaudited` 在**原始 HEAD**（stash 掉我的两处改动后）即 2 failed —— 根因 = committed ledger 相对 live app 已 stale 64 条（其他 spec 新增端点 missing_in_ledger + native_authz_unaudited）。本任务**不承接**该存量全量 resync（会锁他 spec 漂移进本 spec 基线），属他 spec/独立 ledger 维护范畴。本任务改动使这两守卫的 finding 各 −1（移除本 route ghost），**未使其更差**。
+      - 🟢 **S 类正交**：`SEstimateTBWritebackService`/`STransactionTBWritebackService.writeback_audited_amount` 全程未碰，6 S 类测试全绿佐证。
+    - **未 commit**（用户统一提交）。
 
 ## 可选任务（外部依赖 / 真实数据）
 

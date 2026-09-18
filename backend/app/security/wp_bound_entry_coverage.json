@@ -125,10 +125,10 @@
     ]
   },
   "summary": {
-    "entry_total": 2350,
-    "http_total": 2335,
+    "entry_total": 2349,
+    "http_total": 2334,
     "http_wp_bound": 841,
-    "http_non_wp_bound": 1494,
+    "http_non_wp_bound": 1493,
     "worker_total": 15,
     "by_family": {
       "ai": 107,
@@ -146,7 +146,7 @@
       "html": 1,
       "import": 129,
       "infra": 10,
-      "non_wp_bound": 1484,
+      "non_wp_bound": 1483,
       "onlyoffice_wopi": 15,
       "preview": 5,
       "procedure_task": 16,
@@ -164,7 +164,7 @@
       "gated": 744,
       "migrated": 15,
       "native_authz": 64,
-      "not_applicable": 1516,
+      "not_applicable": 1515,
       "resolve_wp_binding_and_access(editor.config)": 1,
       "resolve_wp_binding_and_access(editor.file_write)": 1,
       "resolve_wp_binding_and_access(editor.file_write) -> UserCanWrite": 1,
@@ -186,7 +186,7 @@
       "read": 898,
       "retry": 1,
       "review": 17,
-      "update": 116,
+      "update": 115,
       "worker_loop": 13
     }
   },
@@ -18419,20 +18419,6 @@
       "method": "GET",
       "family": "non_wp_bound",
       "action": "read",
-      "wp_bound": false,
-      "binding": "n/a",
-      "gate": "not_applicable",
-      "matrix": "not_applicable",
-      "test_ids": []
-    },
-    {
-      "kind": "http",
-      "entrypoint": "app.routers.trial_balance:writeback_audited_amount",
-      "callable": "writeback_audited_amount",
-      "route": "/api/projects/{project_id}/trial-balance/writeback",
-      "method": "PUT",
-      "family": "non_wp_bound",
-      "action": "update",
       "wp_bound": false,
       "binding": "n/a",
       "gate": "not_applicable",

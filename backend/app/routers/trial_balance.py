@@ -352,92 +352,24 @@ async def consistency_check(
     return {"consistent": len(issues) == 0, "issues": issues}
 
 
-# ─── TB Writeback (D~N 专属组件审定数直接回写) ────────────────────────────────
-
-from pydantic import BaseModel
-
-
-class TBWritebackBody(BaseModel):
-    """前端 D~N 专属组件审定数回写请求体"""
-    account_code: str
-    audited_amount: float
-
-
-@router.put("/writeback")
-async def writeback_audited_amount(
-    project_id: UUID,
-    body: TBWritebackBody,
-    db: AsyncSession = Depends(get_db),
-    redis: Redis = Depends(get_redis),
-    current_user: User = Depends(require_project_access("edit")),
-):
-    """D~N 专属组件审定数直接回写到 trial_balance.audited_amount。
-
-    前端调用方：所有 useXFormData.writebackTB(amount) composable（L1~L8/D1~D7/F1~F5/G系列等）。
-    按 project_id + account_code 匹配 trial_balance 行并更新 audited_amount。
-    成功后失效 TB 缓存并发布 TRIAL_BALANCE_UPDATED 事件。
-    """
-    import sqlalchemy as sa
-    from decimal import Decimal
-    from app.models.audit_platform_models import TrialBalance
-
-    # 查找匹配行（取最新年度）— 先精确码匹配，再 LIKE 子科目回退求和
-    stmt = (
-        sa.select(TrialBalance)
-        .where(
-            TrialBalance.project_id == project_id,
-            TrialBalance.standard_account_code == body.account_code,
-            TrialBalance.is_deleted == sa.false(),
-        )
-        .order_by(TrialBalance.year.desc())
-        .limit(1)
-    )
-    result = await db.execute(stmt)
-    row = result.scalar_one_or_none()
-
-    if not row:
-        # 回退：查 LIKE 前缀匹配（部分项目 TB 仅有子科目无父行）
-        like_stmt = (
-            sa.select(TrialBalance)
-            .where(
-                TrialBalance.project_id == project_id,
-                TrialBalance.standard_account_code.like(f"{body.account_code}%"),
-                TrialBalance.is_deleted == sa.false(),
-            )
-            .order_by(TrialBalance.year.desc())
-            .limit(1)
-        )
-        like_result = await db.execute(like_stmt)
-        row = like_result.scalar_one_or_none()
-
-    if not row:
-        raise HTTPException(
-            status_code=404,
-            detail=f"试算表中未找到科目 {body.account_code}，请先导入试算表数据",
-        )
-
-    # 更新 audited_amount
-    row.audited_amount = Decimal(str(body.audited_amount))
-    await db.flush()
-    await db.commit()
-
-    # 失效 TB 缓存
-    cache_svc = CacheService(redis)
-    await cache_svc.invalidate_tb_cache(project_id, row.year)
-
-    # 发布 TRIAL_BALANCE_UPDATED 事件（触发报表重算/A13汇总等下游）
-    await event_bus.publish_immediate(EventPayload(
-        event_type=EventType.TRIAL_BALANCE_UPDATED,
-        project_id=project_id,
-        year=row.year,
-        account_codes=[body.account_code],
-    ))
-
-    return {
-        "message": "回写成功",
-        "account_code": body.account_code,
-        "audited_amount": str(row.audited_amount),
-    }
+# ─── TB Writeback 旧端点已删除（spec tb-writeback-explicit-publish-gate Task 19 / Req 9.3） ──
+#
+# 原 `PUT /api/projects/{project_id}/trial-balance/writeback`（handler
+# `writeback_audited_amount` + 请求体 `TBWritebackBody`）是 D~N 专属组件审定数**绕过
+# 显式发布门**的直写旁路：无二次确认、无幂等 token、无 `publish_confirmed`，直接改
+# `trial_balance.audited_amount`。本 spec 已将全部活路径（D/E/F/G/H/I/J/K/L/M/N）逐组件
+# 迁移到显式发布门 `POST /api/workpapers/{wp_id}/audit-determination/publish-to-tb`
+# （task 2~15），死代码全清（task 17），前端零直调 + CI 守卫锁定（task 18）。
+#
+# Task 19 删除决策证据（grep 实证 0 调用方）：
+#   - 前端 audit-platform/frontend/src/**：`trial-balance/writeback` 零活调用（仅收口注释
+#     与 `.not.toContain` 守卫断言），CI 守卫 check_tb_writeback_no_direct_call.py 锁定。
+#   - 后端内部：无任何路由/服务 await 此 handler 或 HTTP 调此端点。同名
+#     `writeback_audited_amount` 全部属 S 类独立 service
+#     （SEstimateTBWritebackService / STransactionTBWritebackService，正交，不碰）。
+#   - 后端测试：无集成测试经 HTTP client 命中此端点。
+# 删端点后同步重生成 coverage ledger（wp_bound_entry_coverage.json），移除该条 http 条目，
+# 使 coverage_guard 双向漂移守卫（live⇔ledger）保持 is_clean。
 
 
 # ─── 试算表锁定/解锁（团队可见，持久化到 project.wizard_state） ──────────────
