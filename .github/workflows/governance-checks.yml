@@ -5889,3 +5889,26 @@ jobs:
         run: python backend/scripts/gen/generate_workpaper_sync_program_milestones.py --check
       - name: Program milestone guards (DAG, digests, evidence, live read-only DB)
         run: python -m pytest backend/tests/workpaper_sync/test_workpaper_sync_program_milestones.py -q --tb=short
+
+  tb-writeback-no-direct-call:
+    # TB 回写直调门禁（tb-writeback-explicit-publish-gate Task 18 / Req 9.1, 9.2）
+    # 方案 B 收口后，前端源码不得再有绕过显式发布门 publish-to-tb 的 TB 回写直调：
+    #   1. 旧端点 `PUT|POST /api/projects/{pid}/trial-balance/writeback`（连字符，无二次确认/无幂等）
+    #   2. G6 变体端点 `POST /api/projects/{pid}/trial_balance`（下划线，census 死代码，task 17 已清）
+    # 守卫精度（不误报的关键）：只扫 .vue/.ts 源码、排除测试（__tests__ / *.spec / *.test），
+    # 先逐字符剥掉行/块/vue 注释再匹配「.put|.post(...URL...)」调用点 —— 收口注释里的字面量
+    # 与测试断言字符串都不会被误报，只有活代码 HTTP 调用命中即 fail（当前全树 0 命中）。
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Check no frontend direct TB-writeback call (legacy + G6 variant)
+        run: python backend/scripts/check/check_tb_writeback_no_direct_call.py
+      # 守卫自身单测（stdlib-only）：验证「真能拦 + 不误报注释/测试/事件名/table 值」。
+      # 与本仓其他 check_* 守卫同款做法（ci.yml 全量 pytest 带 -x 会被前序失败截断，故独立跑一遍）。
+      - name: Install guard self-test dependency
+        run: python -m pip install pytest==8.4.2
+      - name: Run TB-writeback direct-call guard self-tests
+        run: python -m pytest backend/tests/scripts/test_check_tb_writeback_no_direct_call.py -q

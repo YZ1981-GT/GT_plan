@@ -1,15 +1,16 @@
 /**
- * useH7FormData — H7 生产性生物资产底稿数据加载/保存/selfLoad/writebackTB
+ * useH7FormData — H7 生产性生物资产底稿数据加载/保存/selfLoad
  *
  * Spec: .kiro/specs/h7-biological-assets/ Task 3.1
  * Requirements: 1.9, 1.10, 2.7
  *
  * 职责：
  * - allResponses Map 加载 + saveResponse(即时) + debouncedSave(2s) + saveBatch
- * - writebackTB（科目1621生产性生物资产借方 + 累计折旧贷方/备抵）
  * - selfLoad逻辑（render-config?force_component_type=h7-biological-assets）
  * - TB自动取数 unadjusted_amount → 审定表未审数
- * - EventBus publish 'substantive:adjudicated' 通知附注刷新
+ *
+ * ⚠️ writebackTB 已移除（tb-writeback-explicit-publish-gate Task 18）：为零消费死代码，
+ *    H7 TB 回写统一走 H7TabAdjudication* 的 publishToTb → 显式发布门 publish-to-tb。
  *
  * 科目：1621 生产性生物资产（借方/资产类）+ 累计折旧（贷方/备抵类）
  * ⚠️ 资产负债表科目！取期末余额（非发生额）！
@@ -22,7 +23,6 @@
 import { ref, onScopeDispose, type Ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { api } from '@/services/apiProxy'
-import { eventBus } from '@/utils/eventBus'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -166,26 +166,13 @@ export function useH7FormData(opts: {
     return allResponses.value.get(itemId)?.remark ?? allResponses.value.get(itemId)?.conclusion ?? null
   }
 
-  // ─── writebackTB ──────────────────────────────────────────────────────────
-
-  async function writebackTB(auditedCost: number, auditedDep: number): Promise<void> {
-    try {
-      await api.post(`/api/projects/${projectId.value}/trial-balance/writeback`, {
-        items: [
-          { standard_account_code: ACCOUNT_CODE_1621, audited_amount: auditedCost },
-        ],
-      })
-      tbData.value.costAudited = auditedCost
-      tbData.value.depAudited = auditedDep
-      // Publish event for notes to refresh
-      eventBus.emit('substantive:adjudicated', {
-        source: 'h7-biological-assets',
-        accountCodes: [ACCOUNT_CODE_1621],
-      })
-    } catch (err: any) {
-      ElMessage.error('TB回写失败: ' + (err?.message || ''))
-    }
-  }
+  // ─── TB Writeback（已移除）────────────────────────────────────────────────
+  // spec: tb-writeback-explicit-publish-gate Task 18（收口 grep 发现的 task 17 遗漏）。
+  // 原 writebackTB(auditedCost, auditedDep) 直调旧端点
+  // `POST /api/projects/{pid}/trial-balance/writeback`（科目 1621）+ emit substantive:adjudicated，
+  // 为零消费死代码（全仓无 .vue 宿主 import useH7FormData、无测试消费 writebackTB；
+  // H7 真实 TB 回写走 H7TabAdjudicationFair/Cost 的 publishToTb → 显式发布门 publish-to-tb）。
+  // 已移除，消除该文件内 `trial-balance/writeback` 字面量（Req 9.1）。
 
   return {
     isLoading,
@@ -198,7 +185,6 @@ export function useH7FormData(opts: {
     saveResponse,
     debouncedSave,
     getValue,
-    writebackTB,
   }
 }
 

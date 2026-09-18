@@ -691,11 +691,27 @@ M0（端点扩展，Task 1）是所有**活路径**逐组件任务的前置；�
 
 ## M10：收口
 
-- [ ] 18. 确认前端零直调 + 加 CI 守卫
+- [x] 18. 确认前端零直调 + 加 CI 守卫
   - 全仓 grep 断言 `audit-platform/frontend/src/**` 中 `trial-balance/writeback` 命中数 = 0 **且** `trial_balance` 变体端点（`projects/.../trial_balance` POST，G6）命中数 = 0
   - 加 CI 守卫脚本（断言无新增前端直调，覆盖两种字面量，命中即失败），接入 `governance-checks.yml`
   - 依赖全部活改造(3~15)+死清理(17)完成
   - _需求: 9.1, 9.2_
+  - **✅ 完成证据（2026）**：
+    - **grep 实证命中数（活代码 HTTP 调用，剥注释/排除测试后）**：
+      - 旧端点 `trial-balance/writeback` **活调用 = 0**。收口 grep 发现 **1 处 task 17 遗漏的活直调死代码**（如实报告，未掩盖）：`composables/useH7FormData.ts` 的 `writebackTB()` 内 `api.post('/api/projects/{pid}/trial-balance/writeback')`。定位判定：全仓无 `.vue` 宿主 `import useH7FormData`（H7 真实回写走 `H7TabAdjudicationFair/Cost.vue` 的 `publishToTb`），无任何测试消费 `writebackTB`（`__tests__` 0 引用）——**零消费死代码**，非活路径。按 BP-5「grep 0 调用即删死代码」铁律**移除**（删 `writebackTB` 函数体 + return export + 失效的 `eventBus` import + 头 docstring 更新 + 中文收口注释）。删后活调用归 **0**。
+      - G6 变体端点 `projects/.../trial_balance`（POST）**活调用 = 0**（task 17 批C 已清 `useG6MainFormData.writebackTB`）。精准正则 `(api|http|httpApi)\.post[^\n]*/trial_balance[\`'"\s)]` 全仓 0 命中；`trial_balance`（下划线）其余出现全为合法非端点用法（SSE 事件名 `trial_balance.updated` / 查询 DSL `table:'trial_balance'` / SourceType 枚举 / 冻结/快照/balance-check 等 **子**端点 / presence view / 路由 module 名），门禁不误报。
+      - **区分实证**：改造后各组件保留描述性收口注释（「此前直调旧端点 PUT trial-balance/writeback…」）+ 测试文件 `expect(...).not.toContain('trial-balance/writeback')` 守卫断言——二者均为合法字面量引用，非活调用。守卫先剥注释再匹配「.put/.post(...URL...)」调用点 + 排除测试文件，故不误报（自测 `test_closure_comment_not_flagged`/`test_jsdoc_closure_comment_not_flagged`/`test_trial_balance_updated_event_not_flagged`/`test_test_files_excluded_from_scan` 覆盖）。
+    - **CI 守卫脚本**：`backend/scripts/check/check_tb_writeback_no_direct_call.py`（stdlib-only，秒级）。匹配逻辑：
+      - 扫 `audit-platform/frontend/src/**/*.{ts,vue}`，**排除测试**（`__tests__`/`__mocks__` 目录、`*.spec.*`/`*.test.*`/`*.stories.ts`）。
+      - **先剥注释再匹配**：逐字符状态机 `strip_comments` 剥掉 `//` 行注释、`/* */` 块注释、`<!-- -->` vue 注释，**保留字符串字面量原样**（端点 URL 在字符串里），且保留行号（回报精确行）。
+      - **匹配活调用点而非字面量出现**：legacy 正则 `\.\s*(?:put|post)\s*(?:<...>)?\s*\(\s*[\`'"][^\`'"]*trial-balance/writeback`（任意调用者 api/http/httpApi）；variant 正则 `\.\s*post\s*(?:<...>)?\s*\(\s*[\`'"][^\`'"]*/trial_balance(?=[\`'"])`（`/trial_balance` 作端点末段，紧跟引号，排除 `.updated` 事件名与 `table` 值）。
+      - 命中即 exit 1 + 打印 `文件:行 + snippet` + JSON 报告；无命中 exit 0。
+    - **governance-checks.yml 接入**：追加 job `tb-writeback-no-direct-call`（5 steps）：checkout → setup-python 3.12 → 跑守卫脚本 → 装 pytest → 跑守卫自测。YAML 已 `yaml.safe_load` 校验通过（job OK / 5 steps / 总 172 jobs）。
+    - **守卫自测**：`backend/tests/scripts/test_check_tb_writeback_no_direct_call.py`（24 用例）→ **24 passed / 0 failed**（覆盖 strip_comments 四类注释 + 行号保留 / _is_test_file / scan_file 真拦 legacy+variant + 不误报收口注释/JSDoc/事件名/table 值/freeze 子端点/publish-to-tb 正解端点 / main 集成 clean→0、违规→1、测试文件排除、缺 src 目录 fail-closed）。
+    - **守卫 exit 0 证据（真仓库）**：`.venv\Scripts\python.exe backend\scripts\check\check_tb_writeback_no_direct_call.py` → `source_files_scanned:5189 / legacy_endpoint_hits:0 / variant_endpoint_hits:0 / verdict:passed`，EXIT=0。
+    - **假直调有效性验证（真能拦）**：临时建 `src/__tmp_tb_guard_probe.ts`（含 1 活 legacy `api.put(...trial-balance/writeback)` + 1 活 variant `api.post(.../trial_balance)` + 1 注释里的字面量）→ 守卫 EXIT=1，精准报出 line 7(legacy)+line 12(variant)**且忽略注释行**（未误报 line 2 注释字面量）→ 验证后删除临时文件（守卫复跑回 EXIT=0）。
+    - **无回归**：改动文件 `useH7FormData.ts` ESLint **0 error**（1 warning 为未改的 `loadTbData` 既存 `no-direct-audit-fetch`，非新增）；H7 相关 vitest（`h7BiologicalAssets.integration` + `.e2e` + `hAdjudicationPublishGate`）→ **2 files / 58 passed**。
+    - **改的文件（3）**：`audit-platform/frontend/src/components/workpaper/composables/useH7FormData.ts`（删死 writebackTB + eventBus import + docstring + 收口注释）；`backend/scripts/check/check_tb_writeback_no_direct_call.py`（新增守卫）；`backend/tests/scripts/test_check_tb_writeback_no_direct_call.py`（新增自测）；`.github/workflows/governance-checks.yml`（接入 job）。
 
 - [ ] 19. 决定旧端点删除 / 降级
   - grep 确认前端零调用且无服务内部合法调用方（S 类走独立 service，不算）后：删除 `writeback_audited_amount` 或降级为仅内部 `publish_confirmed` 调用
