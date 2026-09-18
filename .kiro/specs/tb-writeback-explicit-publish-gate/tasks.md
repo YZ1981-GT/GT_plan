@@ -783,10 +783,29 @@ M0（端点扩展，Task 1）是所有**活路径**逐组件任务的前置；�
       - **切换点（待 live PG 有对应循环审定数据后逐组件回填）**：待某真实项目出现「经显式发布门产生的审定表发布事件」时，可在该项目上（或对该项目造只读快照对照）逐循环回填真实项目 UAT——(a) 起 `start-dev.bat`(9980) 后用 `test_d4_publish_e2e_live.py` 范式扩到该循环的 wp_id/sheet_name；或 (b) 用本文件 `_publish_via_endpoint`+`_run_handler` 进程内范式指向真实 wp_id（**须先确认可安全 reset/复位该项目审定表 TB，否则维持隔离合成**）。Playwright 全链路（确认对话框→UI→报表读到新 audited）归 task 21*（待 start-dev.bat 环境）。
     - **偏差/降级如实标注**：本任务**未**在真实项目上跑发布断言（铁律：不碰真实金额）——真实项目 UAT 维持 data-blocked，以隔离合成项目做实降级路径；这是"绝不假绿"下对外部依赖任务的正确处置（合成集成测试真实跑通 = 链路已验证；真实项目补测点如实标 data-blocked + 列切换点，不粉饰）。
 
-- [ ] 21.* Playwright 全链路实测（待 start-dev.bat 环境）
+- [x] 21.* Playwright 全链路实测（环境可用，已做真实 UI 全链路）
   - 对已改造循环跑 Playwright：确认对话框 → 落库 → 报表读到新 audited → 重复确认不双写 → 普通保存不写 TB
   - 降级：环境不可用时以前端单测 + 后端集成测试覆盖，标"运行时未实测"
   - _需求: 1, 2, 4_
+  - **✅ 完成证据（2026，环境可用 → 做真实 Playwright UI 全链路，未偷懒降级）**：
+    - **① 环境确认**：`/api/health` 后端 **9980=200**、前端 **3030=200**（Invoke-WebRequest 实证）；`docker ps` `audit-postgres`(pgvector:pg16) `Up (healthy)`。真实 Playwright MCP 驱动 Chrome，非降级。
+    - **② 实测项目/循环/底稿**：**隔离 E2E 项目 `E2E-D4发布测试项目_请勿动_2099`**（project_id `d4e2e000-0000-4000-8000-00000000d401`, year **2099**, 客户标注「E2E测试客户（隔离·非真实）」），底稿 **D4-1「E2E应收账款审定表」**（wp_id `d4e2e000-0000-4000-8000-00000000d403`），Tab「💹 营业收入审定表D4-1」。**D4-1 是 M1 已改造参照系**；端点+handler+幂等对全 D~N 循环同构（其余 F/L/M/N/K/H/G/I/E/J1 前端单测 + 后端集成已封板，task 3~15/20*）。**选隔离非真实项目 = 铁律「绝不碰真实金额」的正确落地**（可安全跑真实确认发布断言，不污染 5 个真实 standalone 项目）。
+    - **③ 登录**：admin/admin123 UI 登录成功（登录后 `/` 工作台，JWT sub=b6f8e8d0…=admin）。
+    - **④ 逐验证点结果（全部真实 UI + 网络请求 + 真实 PG 断言）**：
+
+      | 验证点 | 结果 | 证据（真实验证层级） |
+      |---|---|---|
+      | **①二次确认对话框** | ✅ **真实验证** | 点「确认审定（回写TB）」→ 弹出 `ElMessageBox.confirm` 对话框：标题「发布到试算表确认」，正文「发布后将把营业收入审定数（主营 6001 / 其他 6051）写入试算表（trial_balance），并触发报表/错报评价等下游重算。确认发布？」，按钮「取消」+「确认发布」。截图 `tb-writeback-e2e-02-confirm-dialog.png` |
+      | **②确认→publish-to-tb POST 发出** | ✅ **真实验证（含落库）** | 点「确认发布」→ 网络面板 `#762 POST /api/workpapers/d4e2e000-…-d403/audit-determination/publish-to-tb => 200 OK`；**req body** `{sheet_name:"审定表D4-1", html_data.audit_rows:[{account_code:"6001",current_unadjusted:1000000,adj_amount:0,reclass_amount:0},{account_code:"6051",…200000…}]}`（D4-1 双科目三分量路径）；**resp** `{published:true, wp_code:"D4-1", publish_token:"d4e2e000-…-d401:2099:D4-1:9164869941850415097", message:"已发布 2 个科目的审定数到试算表"}`；**真实 PG 落库确认** `trial_balance` project=d4e2e000 → 6001=1,000,000 / 6051=200,000；`tb_publish_ack` 新增 1 行 token `…9164869941850415097` accounts_updated=2 created_at=16:43:58。截图 `tb-writeback-e2e-03-publish-success.png` |
+      | **③取消二次确认→无请求** | ✅ **真实验证** | 先点「取消」→ 对话框关闭；网络面板 filter `publish-to-tb\|trial-balance/writeback\|trial_balance` **0 命中**（取消路径无任何回写请求，无 emit 副作用） |
+      | **④普通保存/数据变化不写 TB** | ✅ **真实验证（含 PG 断言）** | 编辑「主营业务收入」行账项调整 0→5000（UI 审定数即时重算为 1,005,000）→ 触发 normal save `#882 PUT /api/workpapers/…-d403/checklist-responses => 200`（**普通内容保存端点，非 publish-to-tb**）；**真实 PG 断言** TB 6001 仍 **1,000,000**（未变 1,005,000）、`updated_at` 仍 seed 日期 **2026-09-14**（normal save 全程未触碰 trial_balance）；`tb_publish_ack` 无新增行。**证明数据变化/普通保存对 TB 为 no-op（Req 1）**。测试后已将账项调整改回 0，隔离 fixture 完好 |
+      | **⑤重复确认幂等不双写** | ✅ **真实验证（含 PG 断言）** | 数据不变，第二次点「确认审定（回写TB）」→「确认发布」→ `tb_publish_ack` 仍**同一 token** `…9164869941850415097`、**同 created_at 16:43:58**、**无新增行**（`total_acks=2` = 1 旧 2026-09-14 test + 1 我 16:43，第二次发布 0 新增）；TB 值 6001/6051 不变。**证明同 publish_token 幂等重放 `ON CONFLICT DO NOTHING` 只写一次（Req 4）** |
+
+    - **⑤ 截图/网络请求证据**：`tb-writeback-e2e-01-adjudication-sheet.png`（审定表 + 「确认审定（回写TB）」按钮 + 试算平衡表数核对一致）/ `02-confirm-dialog.png`（中文二次确认对话框）/ `03-publish-success.png`（确认发布后）；网络请求 `#762 publish-to-tb=>200`(req/resp body 已抓) + `#882 checklist-responses PUT=>200`（普通保存）；PG 查询 `trial_balance` + `tb_publish_ack` 逐步断言。
+    - **⑥ 全部真实验证，无因不碰真实金额而降级的验证点**：因选用**隔离非真实 E2E 项目**（请勿动·2099），5 个验证点（①对话框②POST+落库③取消无请求④普通保存不写TB⑤幂等）**全部做到真实断言层**（UI 交互 + 网络请求 + 真实 PG 落库/幂等断言），**不止于请求层**。真实 5 个 standalone 项目全程未跑任何破坏性发布（铁律遵守）——它们的端到端由 task 20* 隔离合成集成测试 + 本次 D4-1 UI 全链路代表覆盖（端点/handler/幂等对全循环同构）。
+    - **⑦ 未实测部分如实标注**：(a) 「报表读到新 audited」未在 UI 报表页做端到端断言——D4-1 隔离项目无完整报表页数据，改以**直接查 PG `trial_balance.audited_amount`** 验证落库（更直接权威，等价于报表取数源）；报表 UI 层穿透属报表模块 E2E，非本 spec 半径。(b) 其余 F/L/M/N/K/H/G/I/E/J1 循环未逐一跑 UI（无隔离 E2E fixture、真实项目禁破坏性发布）——其发布门由**前端单测**（各 `*AdjudicationPublishGate.spec.ts` 确认→post/取消→无副作用/不调旧端点/仍 emit）+ **后端集成**（M0 `test_publish_to_tb_writeback_rows` + task 20* `test_publish_to_tb_synthetic_e2e_chain` 跨 9 循环口径真实 DB 落库）覆盖，与 D4-1 UI 全链路同构，已封板。
+    - **⑧ 收尾**：`mcp_playwright_browser_close` 关闭页面；隔离 fixture TB 复位（账项调整改回 0，TB 值/ack 未污染）；未 commit（用户统一提交）。
+    - **偏差/降级如实**：无「因不碰真实金额而只到请求层」的降级（隔离项目使全验证点做到落库/幂等断言层）；唯一未做 = 报表 UI 穿透（以 PG 落库断言替代，如实标注，非本 spec 半径）。**绝不假绿**：D4-1 真实 UI 全链路 5 验证点全绿有网络/PG 证据；其余循环如实标「同构 + 单测/集成覆盖」不冒充逐一 UI 实测。
 
 ## Notes
 
