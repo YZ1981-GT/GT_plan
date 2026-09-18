@@ -22,6 +22,16 @@
         <el-button size="small" type="success" plain :disabled="!!props.readonly || !hasPrefill" :loading="prefillLoading" @click="onPullFromTB">
           从四表库带入未审数
         </el-button>
+        <el-button
+          size="small"
+          type="warning"
+          :disabled="!!props.readonly"
+          :loading="adjudication.publishing.value"
+          data-testid="g5-publish-tb"
+          @click="adjudication.publishToTb()"
+        >
+          发布到试算表
+        </el-button>
         <el-tag size="small" :type="Math.abs(adjudication.variance.value) > 0.01 ? 'danger' : 'success'">
           差异 {{ fmtAmount(adjudication.variance.value) }}
         </el-tag>

@@ -5,8 +5,8 @@ import { useWorkpaperAuditYear } from './workpaperAuditYear'
 import { ref, onScopeDispose, type Ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { api } from '@/services/apiProxy'
-import { G10_ACCOUNT_ALIASES, G10_ACCOUNT_CODE, G10_ACCOUNT_NAME } from './g10Constants'
-import { resolveG10TbRow, g10TbResolvedCode, resolveG10TbBalanceFromList } from './g10TbResolve'
+import { G10_ACCOUNT_CODE } from './g10Constants'
+import { resolveG10TbBalanceFromList } from './g10TbResolve'
 import type { ChecklistResponse } from './useF1FormData'
 
 const DRAFT_PREFIX = 'g10-draft'
@@ -141,60 +141,10 @@ export function useG10FormData(opts: { wpId: Ref<string>; projectId: Ref<string>
     }
   }
 
-  let _tbMissingWarned = false
-
-  /**
-   * 审定数回写试算表（对标 G9）。
-   * 按别名/科目名称解析实际 TB 行；科目缺失时仅提示一次。
-   */
-  async function writebackTB(auditedAmount: number, optsWrite?: { forceToast?: boolean }): Promise<boolean> {
-    if (!opts.projectId.value) return false
-    const _year = _auditYearRef.value
-    let accountCode = G10_ACCOUNT_CODE
-    try {
-      if (_year != null) {
-        const res = await api.get(`/api/projects/${opts.projectId.value}/trial-balance`, {
-          params: { year: _year, account_prefix: G10_ACCOUNT_CODE },
-          _silent: true,
-        } as any)
-        const list = Array.isArray(res?.data ?? res) ? (res?.data ?? res) : (res?.data?.items ?? [])
-        const hit = resolveG10TbRow(list)
-        if (!hit) {
-          if (optsWrite?.forceToast || !_tbMissingWarned) {
-            _tbMissingWarned = true
-            ElMessage.info(
-              `试算表未找到「${G10_ACCOUNT_NAME}」（已试 ${G10_ACCOUNT_ALIASES.join('/')}）。`
-              + '若本年无此科目可忽略；有余额请检查科目映射后重试发布。',
-            )
-          }
-          await saveImmediate('G10-1-adjudicated-amount', { conclusion: String(auditedAmount) })
-          return false
-        }
-        accountCode = g10TbResolvedCode(hit)
-      }
-      await api.put(`/api/projects/${opts.projectId.value}/trial-balance/writeback`, {
-        account_code: accountCode,
-        audited_amount: auditedAmount,
-      }, { _silent: true } as any)
-      await saveImmediate('G10-adj-tb-writeback', {
-        remark: JSON.stringify({ accountCode, auditedAmount }),
-      })
-      await saveImmediate('G10-1-adjudicated-amount', { conclusion: String(auditedAmount) })
-      return true
-    } catch (e: any) {
-      const detail = e?.response?.data?.detail || e?.message || ''
-      ElMessage.warning(
-        detail
-          ? `审定数回写失败：${detail}`
-          : '审定数回写失败，请手动确认试算表数据',
-      )
-      return false
-    }
-  }
-
-  async function writebackTrialBalance(auditedAmount: number): Promise<void> {
-    await writebackTB(auditedAmount, { forceToast: true })
-  }
+  // spec: tb-writeback-explicit-publish-gate Task 12：原 writebackTB/writebackTrialBalance
+  // （旧端点 PUT trial-balance/writeback，经宿主 handleG10Writeback 触发）为零消费死代码——
+  // TB 回写已改由 useG10Adjudication.publishToTb（显式确认门 → POST publish-to-tb，科目由
+  // tbResolvedCode 动态透传）承载，故移除此重复定义及其 return export。
 
   function getSheet(name: string) {
     return sheetCache.value[name] ?? { rows: [] }
@@ -224,7 +174,5 @@ export function useG10FormData(opts: { wpId: Ref<string>; projectId: Ref<string>
     debouncedSave,
     flushPending,
     fetchTrialBalanceAmount,
-    writebackTB,
-    writebackTrialBalance,
   }
 }

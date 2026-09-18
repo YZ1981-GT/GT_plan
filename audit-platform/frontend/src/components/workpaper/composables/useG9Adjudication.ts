@@ -22,6 +22,7 @@ import {
 } from './useG9FormulaEngine'
 import type { ChecklistResponse } from './useF1FormData'
 import { api } from '@/services/apiProxy'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { publishGCycleSourceFv, sumFvFromChecklistRemark } from './gCycleSourceFv'
 
 export interface G9AdjudicationRow {
@@ -67,6 +68,7 @@ export function useG9Adjudication(opts: {
   const auditConclusion = ref('')
   const aiLoading = ref(false)
   const collapsedGroups = ref<Record<string, boolean>>({})
+  const publishing = ref(false)
 
   watch(() => opts.allResponses.value.get(ITEM_ID_ROWS)?.remark, (j) => {
     rowStore.value = parseG9AdjStore(j)
@@ -310,15 +312,59 @@ export function useG9Adjudication(opts: {
     () => { publishFvChangeForCross() },
   )
 
-  /** 显式发布：附注联动 + 回写试算表 */
+  /**
+   * 通知下游（附注/跨底稿刷新），**不写 TB**。
+   * spec: tb-writeback-explicit-publish-gate Task 12 / Req 1。
+   * 原额外 dispatch `g9:writeback-trial-balance`（→ 宿主 → useG9FormData.writebackTB →
+   * 旧端点 PUT trial-balance/writeback，绕过显式确认门）已移除，TB 回写改由 publishToTb 承载。
+   */
   function publishAdjudicated(): void {
     notifyAdjudicated()
-    const amount = totalRow.value.closingAdjusted
+  }
+
+  /**
+   * 显式发布审定数到试算表（科目其他非流动金融资产，默认 1519，动态解析，余额口径）。
+   * spec: tb-writeback-explicit-publish-gate Task 12 / Req 2,5。
+   * 二次确认（中文）→ `POST /workpapers/{wpId}/audit-determination/publish-to-tb`
+   * （sheet_name 审定表G9-1 + writeback_rows balance）。科目码由 tbResolvedCode 动态透传
+   *（历史项目可能 1510/1504），端点不硬编码。成功后 notifyAdjudicated；取消 → 无副作用。
+   */
+  async function publishToTb(): Promise<void> {
+    if (opts.isReadonly.value || publishing.value) return
     try {
-      window.dispatchEvent(new CustomEvent('g9:writeback-trial-balance', {
-        detail: { accountCode: G9_ACCOUNT_CODE, auditedAmount: amount, forceToast: true },
-      }))
-    } catch { /* silent */ }
+      await ElMessageBox.confirm(
+        '发布后将把其他非流动金融资产审定数写入试算表（trial_balance），'
+        + '并触发报表/错报评价等下游重算。确认发布？',
+        '发布到试算表确认',
+        { confirmButtonText: '确认发布', cancelButtonText: '取消', type: 'warning' },
+      )
+    } catch {
+      return // 用户取消 → 无副作用
+    }
+    if (!opts.wpId.value) {
+      ElMessage.error('缺少底稿标识，无法发布')
+      return
+    }
+    const amount = totalRow.value.closingAdjusted
+    const accountCode = tbResolvedCode.value || G9_ACCOUNT_CODE
+    publishing.value = true
+    try {
+      const resp: any = await api.post(
+        `/api/workpapers/${opts.wpId.value}/audit-determination/publish-to-tb`,
+        {
+          sheet_name: '审定表G9-1',
+          writeback_rows: [
+            { account_code: accountCode, audited_amount: amount, amount_kind: 'balance' },
+          ],
+        },
+      )
+      ElMessage.success(resp?.message || '已发布到试算表')
+      notifyAdjudicated()
+    } catch (err: any) {
+      ElMessage.error(err?.response?.data?.detail || err?.message || '发布失败，请重试')
+    } finally {
+      publishing.value = false
+    }
   }
 
   async function loadTrialBalanceFromApi(): Promise<boolean> {
@@ -469,6 +515,8 @@ export function useG9Adjudication(opts: {
     loadTrialBalanceFromApi,
     generateAiAnalysis,
     publishAdjudicated,
+    publishToTb,
+    publishing,
     validateFormulasRemote,
     applyAdjustmentWriteback,
     dataRows,

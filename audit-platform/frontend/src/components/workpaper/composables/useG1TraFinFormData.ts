@@ -1,9 +1,7 @@
 import { ref, onScopeDispose, type Ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { api } from '@/services/apiProxy'
-import { eventBus } from '@/utils/eventBus'
 import type { ChecklistResponse } from './useF1FormData'
-import { G1_ACCOUNT_CODE } from './g1AdjudicationItems'
 import { useWorkpaperAuditYear } from './workpaperAuditYear'
 
 export function useG1TraFinFormData(opts: {
@@ -104,35 +102,10 @@ export function useG1TraFinFormData(opts: {
     return sheetCache.value[name] ?? { rows: [] }
   }
 
-  /** 将 G1-1 审定账面余额回写试算平衡表 1501 */
-  async function writebackTrialBalance(auditedAmount: number): Promise<void> {
-    if (!opts.projectId.value) return
-    try {
-      await api.put(`/api/projects/${opts.projectId.value}/trial-balance/writeback`, {
-        account_code: G1_ACCOUNT_CODE,
-        audited_amount: auditedAmount,
-      })
-      await saveImmediate('G1-1-tb-writeback', {
-        item_id: 'G1-1-tb-writeback',
-        conclusion: null,
-        remark: JSON.stringify({ accountCode: G1_ACCOUNT_CODE, auditedAmount }),
-      })
-      await saveImmediate('G1-1-adjudicated-amount', {
-        item_id: 'G1-1-adjudicated-amount',
-        conclusion: String(auditedAmount),
-        remark: null,
-      })
-      // 发布审定数变更事件（经 crossWpEventBridge 双向桥接 → G11/G13/附注消费）
-      eventBus.emit('substantive:adjudicated', {
-        accountCode: G1_ACCOUNT_CODE,
-        auditedAmount,
-        wpCode: 'G1',
-        timestamp: Date.now(),
-      })
-    } catch {
-      ElMessage.warning('审定数回写试算失败，请手动确认试算表 1501')
-    }
-  }
+  // spec: tb-writeback-explicit-publish-gate Task 12：原 writebackTrialBalance（旧端点
+  // PUT trial-balance/writeback，经宿主 handleG1Writeback 触发）为零消费死代码——TB 回写
+  // 已改由 G1-1 审定表「发布到试算表」显式确认门（G1TabAdjudication.handlePublishToTb →
+  // POST publish-to-tb，科目1501余额口径）承载，故移除此重复定义及其 return export。
 
   /** 切表/卸载前刷出未到点的 debounce，避免 <2s 编辑丢失 */
   function flushPending(): void {
@@ -157,7 +130,5 @@ export function useG1TraFinFormData(opts: {
     saveImmediate,
     debouncedSave,
     flushPending,
-    writebackTrialBalance,
-    writebackTB: writebackTrialBalance,
   }
 }

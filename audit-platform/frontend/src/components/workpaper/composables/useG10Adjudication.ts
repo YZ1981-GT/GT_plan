@@ -87,6 +87,7 @@ export function useG10Adjudication(opts: {
   const trialBalanceAmount = ref(0)
   const tbFetchStatus = ref<'idle' | 'found' | 'missing'>('idle')
   const tbResolvedCode = ref<string | null>(null)
+  const publishing = ref(false)
   const auditNote = ref('')
   const auditConclusion = ref('')
   const aiLoading = ref(false)
@@ -344,14 +345,59 @@ export function useG10Adjudication(opts: {
     publishAdjudicatedDebounced()
   }
 
+  /**
+   * 通知下游（附注/跨底稿刷新），**不写 TB**。
+   * spec: tb-writeback-explicit-publish-gate Task 12 / Req 1。
+   * 原额外 dispatch `g10:writeback-trial-balance`（→ 宿主 → useG10FormData.writebackTB →
+   * 旧端点 PUT trial-balance/writeback，绕过显式确认门）已移除，TB 回写改由 publishToTb 承载。
+   */
   function publishAdjudicated(): void {
     notifyAdjudicated()
-    const amount = totalRow.value.closingAdjusted
+  }
+
+  /**
+   * 显式发布审定数到试算表（科目交易性金融负债，默认 2101，动态解析，余额口径）。
+   * spec: tb-writeback-explicit-publish-gate Task 12 / Req 2,5。
+   * 二次确认（中文）→ `POST /workpapers/{wpId}/audit-determination/publish-to-tb`
+   * （sheet_name 审定表G10-1 + writeback_rows balance）。科目码由 tbResolvedCode 动态透传。
+   * 成功后 notifyAdjudicated；取消 → 无副作用。
+   */
+  async function publishToTb(): Promise<void> {
+    if (opts.isReadonly.value || publishing.value) return
     try {
-      window.dispatchEvent(new CustomEvent('g10:writeback-trial-balance', {
-        detail: { accountCode: G10_ACCOUNT_CODE, auditedAmount: amount, forceToast: true },
-      }))
-    } catch { /* silent */ }
+      await ElMessageBox.confirm(
+        '发布后将把交易性金融负债审定数写入试算表（trial_balance），'
+        + '并触发报表/错报评价等下游重算。确认发布？',
+        '发布到试算表确认',
+        { confirmButtonText: '确认发布', cancelButtonText: '取消', type: 'warning' },
+      )
+    } catch {
+      return // 用户取消 → 无副作用
+    }
+    if (!opts.wpId.value) {
+      ElMessage.error('缺少底稿标识，无法发布')
+      return
+    }
+    const amount = totalRow.value.closingAdjusted
+    const accountCode = tbResolvedCode.value || G10_ACCOUNT_CODE
+    publishing.value = true
+    try {
+      const resp: any = await api.post(
+        `/api/workpapers/${opts.wpId.value}/audit-determination/publish-to-tb`,
+        {
+          sheet_name: '审定表G10-1',
+          writeback_rows: [
+            { account_code: accountCode, audited_amount: amount, amount_kind: 'balance' },
+          ],
+        },
+      )
+      ElMessage.success(resp?.message || '已发布到试算表')
+      notifyAdjudicated()
+    } catch (err: any) {
+      ElMessage.error(err?.response?.data?.detail || err?.message || '发布失败，请重试')
+    } finally {
+      publishing.value = false
+    }
   }
 
   function notifyAdjudicated(): void {
@@ -572,6 +618,8 @@ export function useG10Adjudication(opts: {
     updateAuditConclusion,
     toggleGroup,
     publishAdjudicated,
+    publishToTb,
+    publishing,
     applyAdjustmentWritebacks,
     generateAiAnalysis,
     validateFormulasRemote,

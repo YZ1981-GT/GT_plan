@@ -22,6 +22,16 @@ audit-platform/frontend/src/components/workpaper/e1/E1TabDisclosure.vue
 audit-platform/frontend/src/components/workpaper/g7-long-term-equity-main/disclosure/G7TabDisclosureSOE.vue  1667
 audit-platform/frontend/src/components/workpaper/g7-long-term-equity-main/disclosure/g7SoeDisclosureModel.ts
 
+#   G7TabAdjudication.vue —— **改动前即 1647 行已超 1500 上限**（HEAD 现状）。
+#     tb-writeback-explicit-publish-gate Task 12（G 循环）把 TB 回写从「保存即
+#     writebackTb:true 自动写」改为 handlePublishToTb 显式确认门（中文二次确认 →
+#     单次 POST publish-to-tb 双科目 1511/1512 原子发布，科目由 tb_source_codes 解析透传），
+#     净增 68 行至 1715。G7 审定表本就是长期股权投资多科目 + 多组（投资/减值/子公司）
+#     的复杂宿主，拆分方向：把「发布/取数/带入调整」抽伴生 composable，属独立打磨任务，
+#     不在本次 TB 回写门迁移范围。baseline 取当前真实行数，门禁继续拦膨胀 >5%。
+#     spec: tb-writeback-explicit-publish-gate Task 12
+audit-platform/frontend/src/components/workpaper/g7-long-term-equity-main/core/G7TabAdjudication.vue  1715
+
 #   dsh-agent-panel-acceptance.spec.ts —— 单 spec 的完整浏览器验收（三视口 × 五角色 ×
 #     Phase A/B/C），**改动前即 1690 行已超限**；本次仅 +16 行，为 AC 1.5 补「渲染结果」
 #     判据（原判据只断言 URL，而 Vue Router 的 catch-all 不改 URL ⇒ 对 404 恒绿）。
@@ -569,3 +579,11 @@ backend/tests/test_cycle_linkage_handlers_integration.py  1096
 #   非从零造超限。baseline 取当前真实行数 1591，门禁继续拦膨胀。拆分方向：把 I1-1 应付职工薪酬
 #   审定表的多科目归集/AI 生成/披露区各抽伴生模块，属独立瘦身任务。
 audit-platform/frontend/src/components/workpaper/i1/core/I1TabAdjudication.vue  1591
+
+# spec: tb-writeback-explicit-publish-gate（Task 1/M0 补齐 ORM，2026）
+#   audit_platform_models.py —— 改动前即 1367 行已远超 800 上限（平台核心 ORM 聚合文件，
+#   数十个 Mapped[] 模型集中定义）。本次补齐 TbPublishAck ORM 模型(+39 行)——M0 时建了
+#   V162__tb_publish_ack.sql 迁移 + handler 引用，但 ORM 层遗漏(三层一致校验缺 ORM 层)，
+#   本次补上使 SQLAlchemy 能查 tb_publish_ack 幂等表。baseline 取当前真实行数 1406，
+#   门禁继续拦膨胀。拆分方向：按业务域(trial_balance/审计循环/合并)拆多个 models 子模块，属独立任务。
+backend/app/models/audit_platform_models.py  1406

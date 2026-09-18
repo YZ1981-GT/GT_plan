@@ -163,8 +163,6 @@ import { useG9FormData } from './composables/useG9FormData'
 import { useG9DualMode } from './composables/useG9DualMode'
 import { WorkpaperRuntimeContextKey } from './composables/useWorkpaperScaffold'
 import { extractG9SheetCode } from './composables/g9SheetLabels'
-import { G9_ACCOUNT_CODE } from './composables/g9Constants'
-import { parseNum } from './composables/useG9FormulaEngine'
 import type { ChecklistResponse } from './composables/useF1FormData'
 import { useWorkpaperReviewThreads } from './composables/useWorkpaperReviewThreads'
 import { useHostApplicableStandards } from './composables/hostApplicableStandards'
@@ -256,27 +254,20 @@ function onDebouncedSave(id: string, d: Partial<ChecklistResponse>) {
   scheduleAutoSnapshot()
 }
 
-function handleG9Writeback(e: Event): void {
-  const detail = (e as CustomEvent<{ accountCode?: string; auditedAmount?: number; forceToast?: boolean }>).detail
-  if (detail?.accountCode && detail.accountCode !== G9_ACCOUNT_CODE) return
-  const amount = parseNum(detail?.auditedAmount)
-  if (!Number.isFinite(amount)) return
-  void formData.writebackTB(amount, { forceToast: !!detail?.forceToast })
-}
+// spec: tb-writeback-explicit-publish-gate Task 12：移除 g9:writeback-trial-balance
+// 监听器 handleG9Writeback —— TB 回写改由 G9-1 审定表「发布到试算表」显式确认门
+// （useG9Adjudication.publishToTb → POST publish-to-tb）承载。
 
 async function reloadAll() {
   await formData.loadAll()
 }
 
 onMounted(async () => {
-  // TB 回写仅听 g9:writeback-trial-balance（substantive:adjudicated 供跨模块刷新，不重复写 TB）
-  window.addEventListener('g9:writeback-trial-balance', handleG9Writeback)
   await formData.loadAll()
   isLoading.value = false
 })
 
 onBeforeUnmount(() => {
-  window.removeEventListener('g9:writeback-trial-balance', handleG9Writeback)
   formData.flushPending()
 })
 </script>

@@ -58,15 +58,15 @@ describe('G9 review fixes', () => {
     expect(isG9SheetComplete('附注国企', filled)).toBe(true)
   })
 
-  it('TB 回写单通道：父组件只听 g9:writeback-trial-balance', () => {
+  // spec: tb-writeback-explicit-publish-gate Task 12（test-follows-source）—— G9 已改走显式发布门
+  it('TB 回写走显式发布门：publishToTb → POST publish-to-tb；不再 dispatch/监听 g9:writeback-trial-balance', () => {
     const adj = readFileSync(resolve(__dirname, '../useG9Adjudication.ts'), 'utf8')
-    const form = readFileSync(resolve(__dirname, '../useG9FormData.ts'), 'utf8')
     const parent = readFileSync(resolve(__dirname, '../../GtG9OtherNoncurrentFinancial.vue'), 'utf8')
     expect(adj).toContain("'substantive:adjudicated'")
-    expect(adj).toContain("'g9:writeback-trial-balance'")
-    expect(form).toContain('/trial-balance/writeback')
-    expect(parent).toContain("addEventListener('g9:writeback-trial-balance'")
-    expect(parent).not.toMatch(/addEventListener\(\s*['"]substantive:adjudicated['"]/)
+    expect(adj).toContain('publish-to-tb')
+    expect(adj).toMatch(/function publishToTb/)
+    expect(adj).not.toContain("'g9:writeback-trial-balance'")
+    expect(parent).not.toContain("addEventListener('g9:writeback-trial-balance'")
   })
 
   it('导入清单含 G9-2~6 与附注', () => {

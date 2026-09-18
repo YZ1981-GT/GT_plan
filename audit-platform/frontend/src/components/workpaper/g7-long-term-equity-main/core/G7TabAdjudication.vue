@@ -31,6 +31,16 @@
         <el-button size="small" type="primary" :disabled="isReadonly || !isDirty" :loading="saving" @click="saveAll">
           保存
         </el-button>
+        <el-button
+          size="small"
+          type="warning"
+          :disabled="isReadonly"
+          :loading="publishing"
+          data-testid="g7-publish-tb"
+          @click="handlePublishToTb"
+        >
+          发布到试算表
+        </el-button>
         <el-button size="small" @click="openReviewDialog('G7-1-adjudication')">💬复核</el-button>
       </div>
     </div>
@@ -924,6 +934,62 @@ function schedulePublish(): void {
   }, 300)
 }
 
+// spec: tb-writeback-explicit-publish-gate Task 12 / Req 2,5。
+// 显式发布审定数到试算表（G7 多科目动态：原值 1511 + 减值 1512，一次原子发布）。
+// 二次确认（中文）→ POST /workpapers/{wpId}/audit-determination/publish-to-tb
+//（sheet_name 审定表G7-1 + writeback_rows 双科目 balance，科目由 tb_source_codes 解析后透传，
+// 端点不硬编码）。原「保存即 writebackTb:true 自动写 TB」违反 Req 1/2，已改为 save 只 emit。
+// 用户取消/只读 → 无副作用；成功后 publishAdjudicated 通知附注刷新。
+const publishing = ref(false)
+async function handlePublishToTb(): Promise<void> {
+  if (isReadonly.value || publishing.value) return
+  try {
+    await ElMessageBox.confirm(
+      '发布后将把长期股权投资审定数（原值科目 ' + accountGross.value
+      + '、减值准备科目 ' + accountImpairment.value + '）写入试算表（trial_balance），'
+      + '并触发报表/错报评价等下游重算。确认发布？',
+      '发布到试算表确认',
+      { confirmButtonText: '确认发布', cancelButtonText: '取消', type: 'warning' },
+    )
+  } catch {
+    return // 用户取消 → 无副作用
+  }
+  if (!props.wpId) {
+    ElMessage.error('缺少底稿标识，无法发布')
+    return
+  }
+  const grossCode = accountGross.value
+  const impairCode = accountImpairment.value
+  const impair = calcGroupSubtotal(groups.find(g => g.id === 'impairment')?.rows ?? [])
+  const rows: Array<{ account_code: string; audited_amount: number; amount_kind: 'balance' }> = []
+  // 原值（投资合计，非净值）→ 1511
+  if (grossCode) {
+    rows.push({ account_code: grossCode, audited_amount: investmentTotalRow.value.closingAdjusted, amount_kind: 'balance' })
+  }
+  // 减值准备 → 1512（有减值科目且金额有效时才发；科目解析不出则跳过，端点不硬编码）
+  if (impairCode && Number.isFinite(impair.closingAdjusted)) {
+    rows.push({ account_code: impairCode, audited_amount: impair.closingAdjusted, amount_kind: 'balance' })
+  }
+  if (!rows.length) {
+    ElMessage.warning('未解析出可回写的科目（tb_source_codes 为空），无法发布')
+    return
+  }
+  publishing.value = true
+  try {
+    const resp: any = await api.post(
+      `/api/workpapers/${props.wpId}/audit-determination/publish-to-tb`,
+      { sheet_name: '审定表G7-1', writeback_rows: rows },
+    )
+    ElMessage.success(resp?.message || '已发布到试算表')
+    // 通知下游附注刷新（TB 回写已由后端确认门完成，不再置 writebackTb）
+    publishAdjudicated({ writebackTb: false })
+  } catch (err: any) {
+    ElMessage.error(err?.response?.data?.detail || err?.message || '发布失败，请重试')
+  } finally {
+    publishing.value = false
+  }
+}
+
 watch(
   () => [investmentTotalRow.value.closingAdjusted, netValueRow.value.closingAdjusted],
   () => schedulePublish(),
@@ -1242,7 +1308,9 @@ async function persistTable(showMsg: boolean): Promise<void> {
     }, { _silent: !showMsg } as any)
     isDirty.value = false
     if (showMsg) ElMessage.success('审定表已保存')
-    publishAdjudicated({ writebackTb: true })
+    // spec: tb-writeback-explicit-publish-gate Task 12 / Req 1：普通保存只 emit 通知联动，
+    // 不写 TB（原 writebackTb:true 自动写试算表违反 Req 1）。TB 回写经 handlePublishToTb 显式确认门。
+    publishAdjudicated({ writebackTb: false })
     try {
       const { emitG7SourceRowsSaved } = await import('../../composables/g7DisclosureCrossSheet')
       emitG7SourceRowsSaved({

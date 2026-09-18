@@ -23,6 +23,7 @@ import {
 import { useG11DetailAnalysis } from './useG11DetailAnalysis'
 import type { ChecklistResponse } from './useF1FormData'
 import { api } from '@/services/apiProxy'
+import { ElMessage, ElMessageBox } from 'element-plus'
 
 export interface G11AdjudicationRow {
   rowKey: string
@@ -75,6 +76,7 @@ export function useG11Adjudication(opts: {
   const auditNote = ref('')
   const auditConclusion = ref('')
   const aiLoading = ref(false)
+  const publishing = ref(false)
   const collapsedGroups = ref<Record<string, boolean>>({})
 
   const detail = useG11DetailAnalysis({
@@ -268,20 +270,64 @@ export function useG11Adjudication(opts: {
     } catch { /* fallback to debounced save */ }
   }
 
+  /**
+   * 通知下游（附注/跨模块刷新），**不写 TB**。
+   * spec: tb-writeback-explicit-publish-gate Task 12 / Req 1。
+   * 原额外 dispatch `g11:writeback-trial-balance`（→ 宿主 → useG11FormData.writebackTB →
+   * 旧端点 PUT trial-balance/writeback，绕过显式确认门）已移除，TB 回写改由 publishToTb 承载。
+   */
   function publishAdjudicated(): void {
     const amount = totalRow.value.currentAudited
     opts.debouncedSave('G11-1-adjudicated-amount', { conclusion: String(amount) })
-    // substantive:adjudicated → 跨模块刷新（附注等）；TB 回写走专用事件，避免父组件双次 writeback
     try {
       window.dispatchEvent(new CustomEvent('substantive:adjudicated', {
         detail: { accountCode: G11_ACCOUNT_CODE, adjudicatedAmount: amount },
       }))
     } catch { /* silent */ }
+  }
+
+  /**
+   * 显式发布审定数到试算表（科目 6111 投资收益，**损益类发生额口径 occurrence**）。
+   * spec: tb-writeback-explicit-publish-gate Task 12 / Req 2,6。
+   * 二次确认（中文）→ `POST /workpapers/{wpId}/audit-determination/publish-to-tb`
+   * （sheet_name 审定表G11-1 + writeback_rows amount_kind=occurrence，前端已算本期审定发生额）。
+   * 成功后 publishAdjudicated 通知附注刷新；取消 → 无副作用。
+   */
+  async function publishToTb(): Promise<void> {
+    if (opts.isReadonly.value || publishing.value) return
     try {
-      window.dispatchEvent(new CustomEvent('g11:writeback-trial-balance', {
-        detail: { accountCode: G11_ACCOUNT_CODE, auditedAmount: amount },
-      }))
-    } catch { /* silent */ }
+      await ElMessageBox.confirm(
+        '发布后将把投资收益本期审定发生额（科目 6111，发生额口径）写入试算表'
+        + '（trial_balance），并触发报表/错报评价等下游重算。确认发布？',
+        '发布到试算表确认',
+        { confirmButtonText: '确认发布', cancelButtonText: '取消', type: 'warning' },
+      )
+    } catch {
+      return // 用户取消 → 无副作用
+    }
+    if (!opts.wpId.value) {
+      ElMessage.error('缺少底稿标识，无法发布')
+      return
+    }
+    const amount = totalRow.value.currentAudited
+    publishing.value = true
+    try {
+      const resp: any = await api.post(
+        `/api/workpapers/${opts.wpId.value}/audit-determination/publish-to-tb`,
+        {
+          sheet_name: '审定表G11-1',
+          writeback_rows: [
+            { account_code: G11_ACCOUNT_CODE, audited_amount: amount, amount_kind: 'occurrence' },
+          ],
+        },
+      )
+      ElMessage.success(resp?.message || '已发布到试算表')
+      publishAdjudicated()
+    } catch (err: any) {
+      ElMessage.error(err?.response?.data?.detail || err?.message || '发布失败，请重试')
+    } finally {
+      publishing.value = false
+    }
   }
 
   async function loadTrialBalanceFromApi(): Promise<void> {
@@ -347,6 +393,8 @@ export function useG11Adjudication(opts: {
     updateAuditConclusion,
     toggleGroup,
     publishAdjudicated,
+    publishToTb,
+    publishing,
     applyNetAdjustment,
     validateWithBackend,
     saveAdjudicationToBackend,

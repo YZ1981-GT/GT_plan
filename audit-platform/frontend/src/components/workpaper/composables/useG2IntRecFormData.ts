@@ -70,28 +70,10 @@ export function useG2IntRecFormData(opts: { wpId: Ref<string>; projectId: Ref<st
 
   function getSheet(name: string) { return sheetCache.value[name] ?? { rows: [] } }
 
-  /** 将 G2-1 审定净值回写试算平衡表 1132（对齐 G11） */
-  async function writebackTrialBalance(auditedAmount: number): Promise<void> {
-    if (!opts.projectId.value) return
-    try {
-      await api.put(`/api/projects/${opts.projectId.value}/trial-balance/writeback`, {
-        account_code: G2_ACCOUNT_CODE,
-        audited_amount: auditedAmount,
-      })
-      await saveImmediate('G2-1-tb-writeback', {
-        item_id: 'G2-1-tb-writeback',
-        conclusion: null,
-        remark: JSON.stringify({ accountCode: G2_ACCOUNT_CODE, auditedAmount }),
-      })
-      await saveImmediate('G2-1-adjudicated-amount', {
-        item_id: 'G2-1-adjudicated-amount',
-        conclusion: String(auditedAmount),
-        remark: null,
-      })
-    } catch {
-      ElMessage.warning('审定数回写试算失败，请手动确认试算表 1132')
-    }
-  }
+  // spec: tb-writeback-explicit-publish-gate Task 12：原 writebackTrialBalance（旧端点
+  // PUT trial-balance/writeback，经宿主 handleG2Writeback 触发）为零消费死代码——TB 回写
+  // 已改由 useG2Adjudication.publishToTb（显式确认门 → POST publish-to-tb，科目1132余额口径）
+  // 承载，故移除此重复定义及其 return export。
 
   function flushPending(): void {
     for (const [itemId, timer] of _debounceTimers.entries()) {
@@ -115,8 +97,6 @@ export function useG2IntRecFormData(opts: { wpId: Ref<string>; projectId: Ref<st
     saveImmediate,
     debouncedSave,
     flushPending,
-    writebackTrialBalance,
-    writebackTB: writebackTrialBalance,
     accountCode: G2_ACCOUNT_CODE,
   }
 }

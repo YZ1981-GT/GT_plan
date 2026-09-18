@@ -186,28 +186,10 @@ export function useG3FormData(opts: UseG3FormDataOptions) {
     _debounceTimers.set(itemId, timer)
   }
 
-  /** 将 G3-1 期末审定合计回写试算平衡表 1131 */
-  async function writebackTrialBalance(auditedAmount: number): Promise<void> {
-    if (!projectId.value) return
-    try {
-      await api.put(`/api/projects/${projectId.value}/trial-balance/writeback`, {
-        account_code: G3_ACCOUNT_CODE,
-        audited_amount: auditedAmount,
-      })
-      await saveImmediate('G3-1-tb-writeback', {
-        item_id: 'G3-1-tb-writeback',
-        conclusion: null,
-        remark: JSON.stringify({ accountCode: G3_ACCOUNT_CODE, auditedAmount }),
-      })
-      await saveImmediate('G3-1-adjudicated-amount', {
-        item_id: 'G3-1-adjudicated-amount',
-        conclusion: String(auditedAmount),
-        remark: null,
-      })
-    } catch {
-      ElMessage.warning('审定数回写试算失败，请手动确认试算表 1131')
-    }
-  }
+  // spec: tb-writeback-explicit-publish-gate Task 12：原 writebackTrialBalance（旧端点
+  // PUT trial-balance/writeback，经宿主 provide(G3WritebackTbKey) → useG3Adjudication 注入调用）
+  // 为零消费死代码——TB 回写已改由 useG3Adjudication.publishToTb（显式确认门 → POST publish-to-tb，
+  // 科目1131余额口径）承载，故移除此重复定义及其 return export。
 
   function flushPending(): void {
     for (const timer of _debounceTimers.values()) {
@@ -242,8 +224,6 @@ export function useG3FormData(opts: UseG3FormDataOptions) {
     saveBatch,
     debouncedSave,
     flushPending,
-    writebackTrialBalance,
-    writebackTB: writebackTrialBalance,
     accountCode: G3_ACCOUNT_CODE,
   }
 }

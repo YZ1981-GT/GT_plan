@@ -12,11 +12,13 @@ vi.mock('vue', async () => {
   return { ...actual as object, onMounted: vi.fn(), onBeforeUnmount: vi.fn() }
 })
 
+const { mockPost } = vi.hoisted(() => ({ mockPost: vi.fn(async () => ({ message: 'ok' })) }))
 vi.mock('@/services/apiProxy', () => ({
-  api: { get: vi.fn().mockResolvedValue({ data: [] }) },
+  api: { get: vi.fn().mockResolvedValue({ data: [] }), post: mockPost },
 }))
 
 vi.mock('element-plus', () => ({
+  ElMessageBox: { confirm: vi.fn(async () => 'confirm') },
   ElMessage: { warning: vi.fn(), success: vi.fn(), error: vi.fn(), info: vi.fn() },
 }))
 
@@ -100,14 +102,16 @@ describe('useG14Adjudication', () => {
     expect(adj.statusSummary.value.reasonOk).toBe(true)
   })
 
-  it('差异未清或原因缺失时 publishAdjudicated 不发布', () => {
-    const save = vi.fn()
+  // spec: tb-writeback-explicit-publish-gate Task 12（test-follows-source）——
+  // 发布前守卫（原因缺失/差异未清/合计变动率超阈）已从 publishAdjudicated 迁到 publishToTb。
+  // publishAdjudicated 现为 emit-only（不写 TB、不 gate）；发布门守卫在 publishToTb 内。
+  it('差异未清或原因缺失时 publishToTb 不发布（守卫）；补齐后走 POST publish-to-tb', async () => {
     const allResponses = ref(new Map())
     const adj = useG14Adjudication({
       wpId: ref('wp-1'),
       projectId: ref('proj-1'),
       allResponses,
-      debouncedSave: save,
+      debouncedSave: vi.fn(),
       isReadonly: ref(false),
     })
 
@@ -115,13 +119,19 @@ describe('useG14Adjudication', () => {
     adj.updatePriorField('ar', 'priorUnadjusted', 1000)
     adj.updateTrialBalance(1400)
 
-    adj.publishAdjudicated()
-    expect(save).not.toHaveBeenCalledWith('G14-1-adjudicated-amount', expect.anything())
+    // 合计变动率超阈但原因未填 → 守卫拦下，不发 POST
+    await adj.publishToTb()
+    expect(mockPost).not.toHaveBeenCalled()
 
+    // 补齐原因分析 + 审计说明 → 守卫通过 → 走显式发布门 POST publish-to-tb（6702 occurrence）
     adj.updatePriorField('ar', 'reasonAnalysis', 'ECL 阶段迁移')
     adj.updateAuditNote('合计变动超 30%，主要为应收账款坏账计提增加')
-    adj.publishAdjudicated()
-    expect(save).toHaveBeenCalledWith('G14-1-adjudicated-amount', { conclusion: '1400' })
+    await adj.publishToTb()
+    expect(mockPost).toHaveBeenCalledTimes(1)
+    const [url, body] = mockPost.mock.calls[0]!
+    expect(url).toContain('/api/workpapers/wp-1/audit-determination/publish-to-tb')
+    expect(body.sheet_name).toMatch(/G14-1/)
+    expect(body.writeback_rows[0]).toMatchObject({ account_code: '6702', amount_kind: 'occurrence' })
   })
 
   it('|变动额|≥10万 亦触发原因必填（P2 金额阈值）', () => {

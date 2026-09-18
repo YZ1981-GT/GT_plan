@@ -534,12 +534,53 @@ M0（端点扩展，Task 1）是所有**活路径**逐组件任务的前置；�
 
 ## M8：G 循环（活 11 个，sheet 名可解性存疑最高）
 
-- [ ] 12. G 循环审定表改走显式发布端点（逐组件确认子码）
+- [x] 12. G 循环审定表改走显式发布端点（逐组件确认子码）
   - **第一步逐一实证 sheet 名（R1 中/高风险）**：grep 每个 G 底稿 `sheetName`/render schema/`SheetLabels` 实证能否解出 `[D-N]{n}-1`；G1/G2/G3/G5/G7 中风险（命名多样），G8–G14 高风险（损益/公允/减值发生额）
   - 活路径（form B）：G1–G3,G5,G7–G14（`useG{n}FormData` + `GtG{n}`，移除 `g{n}:writeback-trial-balance`，保留 `g{n}:save-items` 与「substantive:adjudicated 供跨模块刷新不重复写 TB」语义）；G7 多科目动态(权益+减值)；G8–G14 发生额可批量套模板。（G4 无 TB 回写正交排除；G6 变体端点死代码归 task 17）
   - **不可解者**：任务内规整命名，或按 R1 降级登记（保留旁路单独登记）。切换点 = 端点 `extract_determination_wp_code` 返回 None → 400
   - 前端单测 + 端到端验证点
   - _需求: 1, 2, 8, 7_
+  - **✅ 完成证据（2026，本轮收尾：G 循环代码改造在前序会话工作树完成，本轮补 gate 测试 + 回归更新 + 验证 + 修复验证中发现的 2 个真 bug）**：
+    - **🔴 sheet 名可解性 + 科目 + 口径逐组件实证表**（sheet 名来源：`backend/data/ledger_adapters/wp_render_schema/generated/G{n}.yaml` 逐一 grep 确认；`extract_determination_wp_code` 正则 `([D-N]\d+-1)\b` / handler `^[D-N]\d+-1$`；各组件传的 `sheet_name` 字面量为源码 grep 实证，非臆断；**全可解，无 R1 降级**）：
+
+      | 组件 | 载体 | 我传的 sheet_name（源码实证） | render schema 子码 | 解出 | 科目（源码实证） | 口径 amount_kind |
+      |---|---|---|---|---|---|---|
+      | G1 交易性金融资产 | `G1TabAdjudication.vue handlePublishToTb`（.vue 内联） | `审定表G1-1` | `审定表G1-1`(G1.yaml) | G1-1 ✅ | 硬编码 `'1501'`（totalRow.closingAudited） | balance |
+      | G2 应收利息 | `useG2Adjudication.publishToTb` | `审定表G2-1` | `审定表G2-1`(G2.yaml) | G2-1 ✅ | `G2_ACCOUNT_CODE`=1132（g2AdjudicationItems.ts） | balance |
+      | G3 应收股利 | `useG3Adjudication.publishToTb` | `审定表G3-1` | `审定表G3-1`(G3.yaml) | G3-1 ✅ | `G3_ACCOUNT_CODE`=1131（g3Constants.ts） | balance |
+      | G5 长期应收款 | `useG5Adjudication.publishToTb` | `审定表G5-1` | `审定表G5-1`(G5.yaml) | G5-1 ✅ | `G5_ACCOUNT_CODE`=1531（g5Constants.ts） | balance |
+      | G7 长期股权投资 | `G7TabAdjudication.vue handlePublishToTb`（.vue 内联，**多科目动态**） | `审定表G7-1` | `长期股权投资审定表G7-1`(G7.yaml，正则仍解出 G7-1) | G7-1 ✅ | 原值 `accountGross`(兜底 1511) + 减值 `accountImpairment`(兜底 1512)，由 tb_source_codes 解析透传，端点不硬编码 | balance |
+      | G8 其他权益工具投资 | `useG8Adjudication.publishToTb` | `审定表G8-1` | `审定表G8-1`(G8.yaml) | G8-1 ✅ | `G8_ACCOUNT_CODE`=1503（g8Constants.ts） | balance |
+      | G9 其他非流动金融资产 | `useG9Adjudication.publishToTb`（**动态**） | `审定表G9-1` | `审定表G9-1`(G9.yaml) | G9-1 ✅ | `tbResolvedCode.value || G9_ACCOUNT_CODE`(兜底 1519，g9Constants.ts；历史 1510/1504) | balance |
+      | G10 交易性金融负债 | `useG10Adjudication.publishToTb`（**动态**） | `审定表G10-1` | `审定表G10-1`(G10.yaml) | G10-1 ✅ | `tbResolvedCode.value || G10_ACCOUNT_CODE`(兜底 2101，g10Constants.ts) | balance |
+      | G11 投资收益 | `useG11Adjudication.publishToTb` | `审定表G11-1` | `审定表G11-1`(G11.yaml) | G11-1 ✅ | `G11_ACCOUNT_CODE`=6111（g11Constants.ts） | **occurrence**（损益类本期发生额，源码 confirm 文案明示） |
+      | G12 净敞口套期收益 | `useG12Adjudication.publishToTb`（有 variance/原因发布前置守卫） | `审定表G12-1` | `审定表G12-1`(G12.yaml) | G12-1 ✅ | `G12_ACCOUNT_CODE`=6103（g12Constants.ts） | **occurrence** |
+      | G13 公允价值变动收益 | `useG13Adjudication.publishToTb` | `审定表G13-1` | `审定表G13-1`(G13.yaml) | G13-1 ✅ | `G13_ACCOUNT_CODE`=6101（g13Constants.ts） | **occurrence** |
+      | G14 信用减值损失 | `useG14Adjudication.publishToTb`（有 原因/明细/variance 发布前置守卫） | `审定表G14-1` | `审定表G14-1`(G14.yaml) | G14-1 ✅ | `G14_ACCOUNT_CODE`=6702（g14Constants.ts） | **occurrence** |
+
+      - **G4 正交排除**：G4 无 TB 回写（investment 主表，回写走 G4MainAdjustment/G4_ACCOUNT_CODE=1501 但非审定发布门场景），本 task 不含。
+      - **G6 归 task 17**：`useG6MainFormData.writebackTB`（变体端点 `POST /api/projects/{pid}/trial_balance` 科目 1503）为零消费死代码，已在 task 17 批C 移除。
+    - **form B 链处置实证（grep `g{n}:writeback-trial-balance` 全仓仅剩收口注释）**：G1–G3/G5/G8–G14 各 `useG{n}Adjudication.publishAdjudicated`/`broadcastAdjudicated` 已移除 `dispatch('g{n}:writeback-trial-balance')`（改 emit-only `substantive:adjudicated`）；各宿主 `GtG{n}` 已移除 `handleG{n}Writeback` 监听器（保留收口注释，`g{n}:save-items` 等其他事件保留）；各 `useG{n}FormData.writebackTB/writebackTrialBalance` 零消费死代码已删 + 收口注释。**通道实证**：G3 走 mitt `eventBus.emit('substantive:adjudicated')`，其余（G2/G5/G8/G9/G10/G11/G12/G13/G14/G1/G7）走 `window.dispatchEvent(new CustomEvent('substantive:adjudicated'))`（gate 测试 emit 断言同挂两通道兼容）。
+    - **改造范式**：composable 型（G2/G3/G5/G8/G9/G10/G11/G12/G13/G14）新增 `publishToTb`（`isReadonly/publishing` 早退 → `ElMessageBox.confirm` 中文二次确认 → `api.post publish-to-tb {sheet_name, writeback_rows}` → 成功后 `publishAdjudicated/notifyAdjudicated/broadcastAdjudicated` 通知附注刷新）+ `publishing` ref；`.vue` 内联型（G1/G7）在 `handlePublishToTb` 承载同逻辑（G7 多科目 `if(grossCode) rows.push` + `if(impairCode) rows.push` 单次原子 writeback_rows，rows 空则 warning 不发）。G12/G14 保留原发布前置守卫（variance/原因/明细）。
+    - **本轮改的文件（源 1 修 bug + 测试 9）**：
+      - 🔴 bugfix 源文件：
+        - `composables/useG7FormData.ts`：前序会话删除了 `writebackTB` 定义但 **return 块残留 `writebackTB` / `writebackTrialBalance: writebackTB` 两条 export → 运行时 ReferenceError（模块加载即崩）**。本轮删除孤儿 export + 加注释。grep 实证 GtG7/测试均不 destructure 这两 export，删除安全。
+        - `composables/useG5Adjudication.ts`：`isReadonly` 计算属性 `!!opts.isReadonly?.value || !!opts.isReadonly` 在 `opts.isReadonly` 为 Ref 时 `!!Ref对象` 恒真 → **isReadonly 恒 true → 发布按钮永久禁用 + publishToTb 早退 → 发布门对 G5 形同虚设**（GtG5 传的正是 `readonlyRef` Ref）。本轮改 `isRef(opts.isReadonly) ? !!opts.isReadonly.value : !!opts.isReadonly` 正确解包 + 加 `isRef` import + 注释。gate 测试 G5 用例守护。
+      - 新增 gate 测试：`composables/__tests__/gAdjudicationPublishGate.spec.ts`（Group A composable G2/G3/G5/G8/G9/G10/G11/G12/G13/G14 × [POST 命中 sheet_name/科目/amount_kind、不再调旧端点、取消→无post无emit、readonly→无post、发布后仍 emit substantive:adjudicated] + Group B mount G1/G7[点击→POST/取消/readonly disabled，G7 多科目单次 writeback_rows 含 1511+1512]）。G12 有 variance 发布前置守卫（空数据审定合计非 0 → variance≠0），测试用 `prep` hook 把 TB 取数对齐审定合计清零 variance 后走真正发布门。
+      - 改测试（test-follows-source，随迁移更新旧断言）：`g8/g9/g11/g12/g13/g14ReviewFixes.spec.ts` 的「TB 回写单通道」用例（原断言 `g{n}:writeback-trial-balance` dispatch + 父组件 addEventListener + FormData `/trial-balance/writeback`）→ 改断言 publishToTb → `publish-to-tb` + 不再 dispatch/监听旧事件；`useG2Adjudication.spec.ts`「publishAdjudicated 派发试算回写事件」→ 改断言只 emit `substantive:adjudicated`、不再派发 `g2:writeback-trial-balance`；`useG14Adjudication.spec.ts`「差异未清或原因缺失时 publishAdjudicated 不发布」→ 守卫已从 publishAdjudicated 迁到 publishToTb，改断言 `publishToTb` 守卫拦下（不发 POST）、补齐原因后走 POST（6702 occurrence）+ 加 post/ElMessageBox mock。
+    - **测试命令与 pass 数**：
+      - 新 gate：`rtk npx vitest run src/components/workpaper/composables/__tests__/gAdjudicationPublishGate.spec.ts --reporter=dot` → **56 passed / 0 failed**（10 composable × 5 + G1 × 3 + G7 × 3）
+      - 迁移守护 + 单测（9 spec）：`useG2Adjudication + useG14Adjudication + gAdjudicationPublishGate + g8/g9/g11/g12/g13/g14ReviewFixes` → **9 files 全绿**
+      - ESLint（本轮 11 改动文件）：**0 errors**（2 warnings 均为 `no-direct-audit-fetch`，在 useG5Adjudication:492 / useG7FormData:430 的 `fetchTrialBalance` 未改代码，非本轮新增）
+      - file_size gate：`check_file_size.py` —— 本轮改动文件中仅 `G7TabAdjudication.vue`（1715 行 > 1500）超限，但**改动前 HEAD 即 1647 行已超限**（前序会话迁移 +68 行至 1715），已登记 `backend/scripts/file_size_whitelist.txt`（baseline=1715，附拆分方向）；useG5Adjudication(622)/useG7FormData(508)/G1TabAdjudication(625) 均 <1500 无需登记。
+      - 类型/编译：vue-tsc 全量 OOM（项目体量，同 H task 记录）；改用 ESLint（typescript-eslint TS-aware，0 error）+ vitest（esbuild 编译全部被测模块 + 56+回归运行通过）交叉验证。
+    - **发现的偏差/降级 + 修复的 bug**：
+      - 🟢 **sheet 名全可解无降级**：G1–G14 审定表子码经 render schema generated/G*.yaml 逐一实证可解（G7 label 为 `长期股权投资审定表G7-1`，正则 `([D-N]\d+-1)\b` 仍解出 `G7-1`）。
+      - 🔴 **修复 2 个真 bug（验证中发现，根因修复）**：①useG7FormData.ts return 块残留已删的 `writebackTB` export（前序会话未删净）→ ReferenceError；②useG5Adjudication.ts `isReadonly` 对 Ref 恒真致 G5 发布门失效。均属前序会话 G 迁移的遗留缺陷，本轮根因修复 + 测试守护。
+      - 🟢 **G12/G14 发布前置守卫保留**：variance 差异 / 原因分析必填 / 明细一致性守卫在 publishToTb 内保留（未因迁移丢失），gate 测试对 G12 用 prep 清零 variance 验证守卫通过后的真正发布路径；G14 单测专项验证守卫拦截 + 补齐后放行。
+      - 🟢 **口径 occurrence/balance 逐组件核对**：G11/G12/G13/G14 损益类（投资收益/套期收益/公允价值变动收益/信用减值损失）= occurrence；G1/G2/G3/G5/G7/G8/G9/G10 资产负债表项 = balance（源码 writeback_rows amount_kind 字面量实证）。
+    - **预存无关失败 git stash 实证**：本轮跑 `composables/__tests__` + g1 + g7 全量得 12907 测试 / 54 failed；其中 2 个（useG2/useG14Adjudication）本轮已修（test-follows-source），其余 **52 个分布在 11 个文件**（`d4FourTableWiring / g7ColumnThreeWayAlignment / hgDisclosureColumns / k4NoteSectionMap / kLiabilityNoteSubtableContract / kPlNoteSubtableContract / l2l4DisclosureWiring / l4-bonds-payable.integration / noteSectionMapNamingCoverage / useF3Integration / useF5Integration`）—— `git stash` 我全部改动后单跑这 11 文件在 **HEAD 基线同样 52 failed**，证明属 D4/K/L/F/hg-disclosure 等**他 spec 的预存失败**，非本 task 引入（本 task 未触碰这些文件）。stash pop 后改动完整恢复。
+    - **端到端验证点**：前端 gate + mount 覆盖「确认→publish-to-tb 落库路径 + 取消/readonly 早退 + 多科目单次 writeback_rows(G7) + occurrence(G11-G14) + 守卫(G12/G14) + 发布后仍 emit substantive:adjudicated」；后端 M0 端点集成测试（Task 1）已覆盖 writeback_rows→WORKPAPER_SAVED(publish_confirmed)→handler 幂等回写。真实项目 Playwright 全链路归 task 21*（待 start-dev.bat 环境），真实 PG G 循环审定数据 UAT 归 task 20*（data-blocked）。
 
 ## M9：I + E + J1（活 8 个；I2 先评估合规）
 

@@ -3,7 +3,7 @@ import { useWorkpaperAuditYear } from './workpaperAuditYear'
  * useG14Adjudication — G14-1 审定表（本期自 G14-2 同步，上期独立录入）
  */
 import { ref, computed, watch, onMounted, onBeforeUnmount, type Ref, type ComputedRef } from 'vue'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import {
   G14_ACCOUNT_CODE,
   G14_CHANGE_AMOUNT_THRESHOLD,
@@ -75,6 +75,7 @@ export function useG14Adjudication(options: UseG14AdjudicationOptions) {
   const auditConclusion = ref('')
   const aiLoading = ref(false)
   const tbLoading = ref(false)
+  const publishing = ref(false)
   /** none | found | missing | error */
   const tbFetchStatus = ref<'none' | 'found' | 'missing' | 'error'>('none')
 
@@ -301,7 +302,31 @@ export function useG14Adjudication(options: UseG14AdjudicationOptions) {
     }
   }
 
+  /**
+   * 通知下游（附注/跨模块刷新），**不写 TB**。
+   * spec: tb-writeback-explicit-publish-gate Task 12 / Req 1。
+   */
   function publishAdjudicated(): void {
+    const amount = totalRow.value.currentAudited
+    options.debouncedSave('G14-1-adjudicated-amount', { conclusion: String(amount) })
+    try {
+      window.dispatchEvent(
+        new CustomEvent('substantive:adjudicated', {
+          detail: { accountCode: G14_ACCOUNT_CODE, adjudicatedAmount: amount },
+        }),
+      )
+    } catch { /* silent */ }
+  }
+
+  /**
+   * 显式发布审定数到试算表（科目 6702 信用减值损失，**损益类发生额口径 occurrence**）。
+   * spec: tb-writeback-explicit-publish-gate Task 12 / Req 2,6。
+   * 保留原发布前守卫（未填原因 / 明细不一致 / 试算差异 / 合计变动率）→ 中文二次确认 →
+   * `POST /workpapers/{wpId}/audit-determination/publish-to-tb`（amount_kind=occurrence）。
+   * 成功后 publishAdjudicated（附注刷新）；取消/守卫不过 → 无副作用。
+   */
+  async function publishToTb(): Promise<void> {
+    if (options.isReadonly.value || publishing.value) return
     if (hasMissingReasons.value) {
       ElMessage.warning(
         `有 ${missingReasonCount.value} 行变动超阈值未填原因分析，请先补充后再发布`,
@@ -320,24 +345,39 @@ export function useG14Adjudication(options: UseG14AdjudicationOptions) {
       ElMessage.warning('合计变动率超过 30%，请在审计说明中填写主要原因后再发布')
       return
     }
+    try {
+      await ElMessageBox.confirm(
+        '发布后将把信用减值损失本期审定发生额（科目 6702，发生额口径）写入试算表'
+        + '（trial_balance），并触发报表/错报评价等下游重算。确认发布？',
+        '发布到试算表确认',
+        { confirmButtonText: '确认发布', cancelButtonText: '取消', type: 'warning' },
+      )
+    } catch {
+      return // 用户取消 → 无副作用
+    }
+    if (!options.wpId.value) {
+      ElMessage.error('缺少底稿标识，无法发布')
+      return
+    }
     const amount = totalRow.value.currentAudited
-    options.debouncedSave('G14-1-adjudicated-amount', { conclusion: String(amount) })
-    // substantive:adjudicated → 跨模块刷新；TB 回写走专用事件，避免父组件双次 writeback
+    publishing.value = true
     try {
-      window.dispatchEvent(
-        new CustomEvent('substantive:adjudicated', {
-          detail: { accountCode: G14_ACCOUNT_CODE, adjudicatedAmount: amount },
-        }),
+      const resp: any = await api.post(
+        `/api/workpapers/${options.wpId.value}/audit-determination/publish-to-tb`,
+        {
+          sheet_name: '审定表G14-1',
+          writeback_rows: [
+            { account_code: G14_ACCOUNT_CODE, audited_amount: amount, amount_kind: 'occurrence' },
+          ],
+        },
       )
-    } catch { /* silent */ }
-    try {
-      window.dispatchEvent(
-        new CustomEvent('g14:writeback-trial-balance', {
-          detail: { accountCode: G14_ACCOUNT_CODE, auditedAmount: amount },
-        }),
-      )
-    } catch { /* silent */ }
-    ElMessage.success(`已发布信用减值损失审定数 ${amount.toLocaleString('zh-CN', { minimumFractionDigits: 2 })} 元`)
+      ElMessage.success(resp?.message || '已发布到试算表')
+      publishAdjudicated()
+    } catch (err: any) {
+      ElMessage.error(err?.response?.data?.detail || err?.message || '发布失败，请重试')
+    } finally {
+      publishing.value = false
+    }
   }
 
   async function generateAiAnalysis(): Promise<void> {
@@ -404,6 +444,8 @@ export function useG14Adjudication(options: UseG14AdjudicationOptions) {
     updateAuditConclusion,
     loadTrialBalanceFromApi,
     publishAdjudicated,
+    publishToTb,
+    publishing,
     generateAiAnalysis,
     G14_LINE_ITEMS,
   }

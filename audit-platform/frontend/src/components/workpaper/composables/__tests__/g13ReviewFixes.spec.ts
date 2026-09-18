@@ -56,12 +56,12 @@ describe('G13 review fixes', () => {
     const adj = readFileSync(resolve(__dirname, '../useG13Adjudication.ts'), 'utf8')
     const form = readFileSync(resolve(__dirname, '../useG13FormData.ts'), 'utf8')
     const parent = readFileSync(resolve(__dirname, '../../GtG13FairValueChanges.vue'), 'utf8')
-    expect(adj).toContain("'g13:writeback-trial-balance'")
-    expect(adj).toMatch(/function publishAdjudicated[\s\S]*g13:writeback-trial-balance/)
+    // spec: tb-writeback-explicit-publish-gate Task 12（test-follows-source）—— G13 已改走显式发布门
+    expect(adj).toContain('publish-to-tb')
+    expect(adj).toMatch(/function publishToTb/)
     expect(adj).toMatch(/function broadcastAdjudicated[\s\S]*substantive:adjudicated/)
-    expect(form).toContain('/trial-balance/writeback')
-    expect(parent).toContain("addEventListener('g13:writeback-trial-balance'")
-    expect(parent).not.toMatch(/addEventListener\(\s*['"]substantive:adjudicated['"]/)
+    expect(adj).not.toContain("'g13:writeback-trial-balance'")
+    expect(parent).not.toContain("addEventListener('g13:writeback-trial-balance'")
   })
 
   it('已移除 useG13FaiVal* 别名与 inventory 登记', () => {

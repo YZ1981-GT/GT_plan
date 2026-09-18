@@ -477,6 +477,14 @@ export function useG1Adjudication(opts: {
     },
   })
 
+  /**
+   * 通知下游（附注/跨模块刷新），**不写 TB**。
+   * spec: tb-writeback-explicit-publish-gate Task 12 / Req 1。
+   * 原此函数额外 dispatch `g1:writeback-trial-balance`（→ 宿主 handleG1Writeback →
+   * useG1TraFinFormData.writebackTrialBalance → 旧端点 PUT trial-balance/writeback，绕过显式
+   * 确认门，且在 watch(closingAudited) 数据变化时自动触发，违反 Req 1）。现移除该 dispatch，
+   * TB 回写改由 G1-1 审定表「发布到试算表」显式确认门（G1TabAdjudication.handlePublishToTb）承载。
+   */
   function publishAdjudicated(): void {
     try {
       window.dispatchEvent(
@@ -486,14 +494,6 @@ export function useG1Adjudication(opts: {
             accountCode: G1_ACCOUNT_CODE,
             auditedAmount: totalRow.value.closingAudited,
             priorAudited: totalRow.value.openingAudited,
-          },
-        }),
-      )
-      window.dispatchEvent(
-        new CustomEvent('g1:writeback-trial-balance', {
-          detail: {
-            accountCode: G1_ACCOUNT_CODE,
-            auditedAmount: totalRow.value.closingAudited,
           },
         }),
       )

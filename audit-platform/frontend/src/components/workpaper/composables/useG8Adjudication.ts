@@ -22,6 +22,7 @@ import {
 } from './useG8FormulaEngine'
 import type { ChecklistResponse } from './useF1FormData'
 import { api } from '@/services/apiProxy'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { publishGCycleSourceFv, sumFvFromChecklistRemark } from './gCycleSourceFv'
 
 export interface G8AdjudicationRow {
@@ -62,6 +63,7 @@ export function useG8Adjudication(opts: {
   const auditConclusion = ref('')
   const aiLoading = ref(false)
   const collapsed = ref(false)
+  const publishing = ref(false)
 
   watch(() => opts.allResponses.value.get(ITEM_ID_ROWS)?.remark, (j) => {
     rowStore.value = parseG8AdjStore(j)
@@ -310,15 +312,61 @@ export function useG8Adjudication(opts: {
     publishFvChangeForCross()
   }
 
-  /** 显式发布：附注联动 + 回写试算表 */
+  /**
+   * 通知下游（附注/跨底稿刷新），**不写 TB**。
+   * spec: tb-writeback-explicit-publish-gate Task 12 / Req 1。
+   * 原此函数额外 dispatch `g8:writeback-trial-balance`（→ 宿主 handleG8Writeback →
+   * useG8FormData.writebackTB → 旧端点 PUT trial-balance/writeback，绕过显式确认门，
+   * 且在 onMounted/数据变化时自动触发，违反 Req 1）。现移除该 dispatch，
+   * TB 回写改由显式确认门 publishToTb 承载。
+   */
   function publishAdjudicated(): void {
     notifyAdjudicated()
-    const amount = totalRow.value.closingAdjusted
+  }
+
+  /**
+   * 显式发布审定数到试算表（科目 1503 其他权益工具投资，余额口径）。
+   * spec: tb-writeback-explicit-publish-gate Task 12 / Req 2。
+   * 二次确认（中文）→ `POST /workpapers/{wpId}/audit-determination/publish-to-tb`
+   * （sheet_name 审定表G8-1 + writeback_rows 预算行 balance），后端发 publish_confirmed=True
+   * + token → handler 幂等回写 trial_balance。成功后 notifyAdjudicated（附注刷新）。
+   * 用户取消 → 无任何副作用。
+   */
+  async function publishToTb(): Promise<void> {
+    if (opts.isReadonly.value || publishing.value) return
     try {
-      window.dispatchEvent(new CustomEvent('g8:writeback-trial-balance', {
-        detail: { accountCode: G8_ACCOUNT_CODE, auditedAmount: amount, forceToast: true },
-      }))
-    } catch { /* silent */ }
+      await ElMessageBox.confirm(
+        '发布后将把其他权益工具投资审定数（科目 1503）写入试算表（trial_balance），'
+        + '并触发报表/错报评价等下游重算。确认发布？',
+        '发布到试算表确认',
+        { confirmButtonText: '确认发布', cancelButtonText: '取消', type: 'warning' },
+      )
+    } catch {
+      return // 用户取消 → 无副作用
+    }
+    if (!opts.wpId.value) {
+      ElMessage.error('缺少底稿标识，无法发布')
+      return
+    }
+    const amount = totalRow.value.closingAdjusted
+    publishing.value = true
+    try {
+      const resp: any = await api.post(
+        `/api/workpapers/${opts.wpId.value}/audit-determination/publish-to-tb`,
+        {
+          sheet_name: '审定表G8-1',
+          writeback_rows: [
+            { account_code: G8_ACCOUNT_CODE, audited_amount: amount, amount_kind: 'balance' },
+          ],
+        },
+      )
+      ElMessage.success(resp?.message || '已发布到试算表')
+      notifyAdjudicated()
+    } catch (err: any) {
+      ElMessage.error(err?.response?.data?.detail || err?.message || '发布失败，请重试')
+    } finally {
+      publishing.value = false
+    }
   }
 
   /** 发布 G8 明细 FV 变动合计，供 G13 跨底稿勾稽 */
@@ -472,6 +520,8 @@ export function useG8Adjudication(opts: {
     loadTrialBalanceFromApi,
     generateAiAnalysis,
     publishAdjudicated,
+    publishToTb,
+    publishing,
     validateFormulasRemote,
     applyAdjustmentWriteback,
     dataRows,

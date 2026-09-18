@@ -204,8 +204,15 @@
         <span :class="['variance', { 'is-error': adj.hasVarianceHighlight.value }]">
           差异数：{{ fmt(adj.variance.value) }}
         </span>
-        <el-button size="small" type="primary" :disabled="isReadonly" @click="adj.publishAdjudicated()">
-          发布审定数
+        <el-button
+          size="small"
+          type="warning"
+          :disabled="isReadonly"
+          :loading="adj.publishing.value"
+          data-testid="g13-publish-tb"
+          @click="adj.publishToTb()"
+        >
+          发布到试算表（发生额口径！）
         </el-button>
       </div>
     </div>

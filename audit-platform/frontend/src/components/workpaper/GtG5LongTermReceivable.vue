@@ -381,12 +381,10 @@ function handleAdjudicated(e: Event): void {
   }
 }
 
-function handleG5Writeback(e: Event): void {
-  const d = (e as CustomEvent<{ accountCode?: string; auditedAmount?: number }>).detail
-  if (!d || d.accountCode !== '1531') return
-  if (typeof d.auditedAmount !== 'number' || !Number.isFinite(d.auditedAmount)) return
-  void formData.writebackTrialBalance(d.auditedAmount)
-}
+// spec: tb-writeback-explicit-publish-gate Task 12：移除 g5:writeback-trial-balance
+// 监听器 handleG5Writeback —— TB 回写改由 G5-1 审定表「发布到试算表」显式确认门
+// （useG5Adjudication.publishToTb → POST publish-to-tb，科目1531余额口径）承载。
+// 保留 g5:save-items 与 substantive:adjudicated（供跨模块刷新，不重复写 TB）。
 
 async function selfLoad(): Promise<void> {
   try {
@@ -413,7 +411,6 @@ async function retrySelfLoad(): Promise<void> {
 onMounted(async () => {
   window.addEventListener('g5:save-items', handleG5SaveItems)
   window.addEventListener('substantive:adjudicated', handleAdjudicated)
-  window.addEventListener('g5:writeback-trial-balance', handleG5Writeback)
   await selfLoad()
   isLoading.value = false
 })
@@ -421,7 +418,6 @@ onMounted(async () => {
 onBeforeUnmount(() => {
   window.removeEventListener('g5:save-items', handleG5SaveItems)
   window.removeEventListener('substantive:adjudicated', handleAdjudicated)
-  window.removeEventListener('g5:writeback-trial-balance', handleG5Writeback)
   formData.flushPending()
 })
 </script>

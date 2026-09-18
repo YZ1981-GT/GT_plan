@@ -241,7 +241,16 @@
         <span :class="['variance', { 'is-error': adj.hasVarianceHighlight.value }]">差异数：{{ fmt(adj.variance.value) }}</span>
       </template>
       <el-button v-if="!isReadonly" size="small" link @click="refreshTb">刷新TB</el-button>
-      <el-button size="small" type="primary" :disabled="isReadonly" data-testid="g9-publish-adj" @click="onPublish">发布审定数</el-button>
+      <el-button
+        size="small"
+        type="warning"
+        :loading="adj.publishing.value"
+        :disabled="isReadonly"
+        data-testid="g9-publish-tb"
+        @click="onPublish"
+      >
+        发布到试算表
+      </el-button>
     </div>
 
     <G9AuditTextCards
@@ -475,6 +484,9 @@ async function refreshTb() {
   }
 }
 
+// spec: tb-writeback-explicit-publish-gate Task 12 / Req 2。
+// 发布到试算表经显式确认门：保留原发布前守卫（未填原因/试算差异），再调 adj.publishToTb
+// 弹中文二次确认 → POST publish-to-tb（科目1519动态余额）；取消/只读 → 无副作用。
 function onPublish() {
   if (adj.hasMissingReasons.value) {
     ElMessage.warning('存在 |变动率|>20% 未填原因分析，请先补充或确认无重大波动')
@@ -484,8 +496,7 @@ function onPublish() {
     ElMessage.warning('试算表与审定合计存在差异，请核对后再发布')
     return
   }
-  adj.publishAdjudicated()
-  ElMessage.success(`已发布审定数 ${fmt(adj.totalRow.value.closingAdjusted)}`)
+  void adj.publishToTb()
 }
 
 async function runValidate() {

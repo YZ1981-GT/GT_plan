@@ -153,8 +153,6 @@ import { useG12DualMode } from './composables/useG12DualMode'
 import { WorkpaperRuntimeContextKey } from './composables/useWorkpaperScaffold'
 import { useWorkpaperReviewThreads } from './composables/useWorkpaperReviewThreads'
 import { useWorkpaperEntryInjections } from './composables/useWorkpaperEntryInjections'
-import { G12_ACCOUNT_CODE } from './composables/g12Constants'
-import { parseNum } from './composables/useG12FormulaEngine'
 import type { ChecklistResponse } from './composables/useF1FormData'
 import { useHostApplicableStandards } from './composables/hostApplicableStandards'
 import GtEntrySyncCapabilityNotice from './sync/GtEntrySyncCapabilityNotice.vue'
@@ -238,13 +236,9 @@ function onDebouncedSave(itemId: string, data: Partial<ChecklistResponse>) {
   scheduleAutoSnapshot()
 }
 
-function handleG12Writeback(e: Event): void {
-  const detail = (e as CustomEvent<{ accountCode?: string; auditedAmount?: number }>).detail
-  if (detail?.accountCode && detail.accountCode !== G12_ACCOUNT_CODE) return
-  const amount = parseNum(detail?.auditedAmount)
-  if (!Number.isFinite(amount)) return
-  void formData.writebackTrialBalance(amount)
-}
+// spec: tb-writeback-explicit-publish-gate Task 12：移除 g12:writeback-trial-balance
+// 监听器 handleG12Writeback —— TB 回写改由 G12-1 审定表「发布到试算表」显式确认门
+// （useG12Adjudication.publishToTb → POST publish-to-tb，科目6103发生额口径）承载。
 
 async function reloadAll() {
   await formData.loadAll()
@@ -271,14 +265,13 @@ useWorkpaperEntryInjections({
 })
 
 onMounted(async () => {
-  // TB 回写仅听 g12:writeback-trial-balance（substantive:adjudicated 供跨模块刷新，不重复写 TB）
-  window.addEventListener('g12:writeback-trial-balance', handleG12Writeback)
+
   await formData.loadAll()
   isLoading.value = false
 })
 
 onBeforeUnmount(() => {
-  window.removeEventListener('g12:writeback-trial-balance', handleG12Writeback)
+
   formData.flushPending()
 })
 </script>

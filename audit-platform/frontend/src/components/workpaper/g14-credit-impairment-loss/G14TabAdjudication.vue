@@ -255,12 +255,13 @@
         </div>
         <el-button
           size="small"
-          type="primary"
+          type="warning"
           :disabled="isReadonly"
-          data-testid="g14-adj-publish"
-          @click="adj.publishAdjudicated()"
+          :loading="adj.publishing.value"
+          data-testid="g14-publish-tb"
+          @click="adj.publishToTb()"
         >
-          发布审定数
+          发布到试算表（发生额口径！）
         </el-button>
       </div>
       <p v-if="adj.tbFetchStatus.value === 'missing'" class="recon-hint">

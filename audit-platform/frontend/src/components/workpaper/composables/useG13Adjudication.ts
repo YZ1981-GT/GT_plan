@@ -23,6 +23,7 @@ import { useG13Detail } from './useG13Detail'
 import { G13_AJE_ADJ_OVERLAY_ID } from './g13AdjStorage'
 import type { ChecklistResponse } from './useF1FormData'
 import { api } from '@/services/apiProxy'
+import { ElMessage, ElMessageBox } from 'element-plus'
 
 export interface G13AdjudicationRow {
   rowKey: string
@@ -103,6 +104,7 @@ export function useG13Adjudication(options: UseG13AdjudicationOptions) {
   const auditNote = ref('')
   const auditConclusion = ref('')
   const aiLoading = ref(false)
+  const publishing = ref(false)
 
   const detail = useG13Detail({
     allResponses: options.allResponses,
@@ -334,17 +336,58 @@ export function useG13Adjudication(options: UseG13AdjudicationOptions) {
     } catch { /* silent */ }
   }
 
-  /** 显式发布：跨模块刷新 + TB 回写（自动 watch 仅 broadcast，避免频繁写 TB） */
+  /**
+   * 通知下游（附注/跨模块刷新），**不写 TB**。
+   * spec: tb-writeback-explicit-publish-gate Task 12 / Req 1。
+   * 原额外 dispatch `g13:writeback-trial-balance`（→ 宿主 → useG13FormData.writebackTrialBalance
+   * → 旧端点 PUT trial-balance/writeback，绕过显式确认门）已移除，TB 回写改由 publishToTb 承载。
+   */
   function publishAdjudicated(): void {
-    const amount = totalRow.value.currentAudited
     broadcastAdjudicated()
+  }
+
+  /**
+   * 显式发布审定数到试算表（科目 6101 公允价值变动收益，**损益类发生额口径 occurrence**）。
+   * spec: tb-writeback-explicit-publish-gate Task 12 / Req 2,6。
+   * 二次确认（中文）→ `POST /workpapers/{wpId}/audit-determination/publish-to-tb`
+   * （sheet_name 审定表G13-1 + writeback_rows amount_kind=occurrence）。成功后 broadcastAdjudicated
+   * （附注刷新）；取消 → 无副作用。
+   */
+  async function publishToTb(): Promise<void> {
+    if (options.isReadonly.value || publishing.value) return
     try {
-      window.dispatchEvent(
-        new CustomEvent('g13:writeback-trial-balance', {
-          detail: { accountCode: G13_ACCOUNT_CODE, auditedAmount: amount },
-        }),
+      await ElMessageBox.confirm(
+        '发布后将把公允价值变动收益本期审定发生额（科目 6101，发生额口径）写入试算表'
+        + '（trial_balance），并触发报表/错报评价等下游重算。确认发布？',
+        '发布到试算表确认',
+        { confirmButtonText: '确认发布', cancelButtonText: '取消', type: 'warning' },
       )
-    } catch { /* silent */ }
+    } catch {
+      return // 用户取消 → 无副作用
+    }
+    if (!options.wpId.value) {
+      ElMessage.error('缺少底稿标识，无法发布')
+      return
+    }
+    const amount = totalRow.value.currentAudited
+    publishing.value = true
+    try {
+      const resp: any = await api.post(
+        `/api/workpapers/${options.wpId.value}/audit-determination/publish-to-tb`,
+        {
+          sheet_name: '审定表G13-1',
+          writeback_rows: [
+            { account_code: G13_ACCOUNT_CODE, audited_amount: amount, amount_kind: 'occurrence' },
+          ],
+        },
+      )
+      ElMessage.success(resp?.message || '已发布到试算表')
+      broadcastAdjudicated()
+    } catch (err: any) {
+      ElMessage.error(err?.response?.data?.detail || err?.message || '发布失败，请重试')
+    } finally {
+      publishing.value = false
+    }
   }
 
   let _pubTimer: ReturnType<typeof setTimeout> | null = null
@@ -412,6 +455,8 @@ export function useG13Adjudication(options: UseG13AdjudicationOptions) {
     updateAuditNote,
     updateAuditConclusion,
     publishAdjudicated,
+    publishToTb,
+    publishing,
     generateAiAnalysis,
   }
 }

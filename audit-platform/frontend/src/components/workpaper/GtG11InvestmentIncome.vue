@@ -182,8 +182,6 @@ import { useG11DualMode } from './composables/useG11DualMode'
 import { WorkpaperRuntimeContextKey } from './composables/useWorkpaperScaffold'
 import { useWorkpaperReviewThreads } from './composables/useWorkpaperReviewThreads'
 import { useWorkpaperEntryInjections } from './composables/useWorkpaperEntryInjections'
-import { G11_ACCOUNT_CODE } from './composables/g11Constants'
-import { parseNum } from './composables/useG11FormulaEngine'
 import { useG11CrossValidation } from './composables/useG11CrossValidation'
 import { resolveG11SheetLabel } from './composables/g11SheetLabels'
 import { offerG11DisclosurePull, G11_OFFER_DISCLOSURE_PULL_EVENT, promptForG11DisclosureSource } from './composables/g11DisclosureSync'
@@ -315,13 +313,9 @@ function onDebouncedSave(itemId: string, data: Partial<ChecklistResponse>) {
   scheduleAutoSnapshot()
 }
 
-function handleG11Writeback(e: Event): void {
-  const detail = (e as CustomEvent<{ accountCode?: string; auditedAmount?: number }>).detail
-  if (detail?.accountCode && detail.accountCode !== G11_ACCOUNT_CODE) return
-  const amount = parseNum(detail?.auditedAmount)
-  if (!Number.isFinite(amount)) return
-  void formData.writebackTrialBalance(amount)
-}
+// spec: tb-writeback-explicit-publish-gate Task 12：移除 g11:writeback-trial-balance
+// 监听器 handleG11Writeback —— TB 回写改由 G11-1 审定表「发布到试算表」显式确认门
+// （useG11Adjudication.publishToTb → POST publish-to-tb，科目6111发生额口径）承载。
 
 function handleG11OfferDisclosurePull(e: Event): void {
   const source = (e as CustomEvent<{ source?: string }>).detail?.source
@@ -357,8 +351,6 @@ useWorkpaperEntryInjections({
 })
 
 onMounted(async () => {
-  // TB 回写仅听 g11:writeback-trial-balance（substantive:adjudicated 供跨模块刷新，不重复写 TB）
-  window.addEventListener('g11:writeback-trial-balance', handleG11Writeback)
   window.addEventListener(G11_OFFER_DISCLOSURE_PULL_EVENT, handleG11OfferDisclosurePull)
   await formData.loadAll()
   isLoading.value = false
@@ -366,7 +358,6 @@ onMounted(async () => {
 })
 
 onBeforeUnmount(() => {
-  window.removeEventListener('g11:writeback-trial-balance', handleG11Writeback)
   window.removeEventListener(G11_OFFER_DISCLOSURE_PULL_EVENT, handleG11OfferDisclosurePull)
   formData.flushPending()
 })

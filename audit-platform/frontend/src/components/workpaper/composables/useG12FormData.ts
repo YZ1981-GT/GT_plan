@@ -113,22 +113,10 @@ export function useG12FormData(opts: { wpId: Ref<string>; projectId: Ref<string>
     }
   }
 
-  /** 审定数回写试算表（科目 6103，损益类） */
-  async function writebackTrialBalance(auditedAmount: number): Promise<void> {
-    if (!opts.projectId.value) return
-    try {
-      await api.put(`/api/projects/${opts.projectId.value}/trial-balance/writeback`, {
-        account_code: G12_ACCOUNT_CODE,
-        audited_amount: auditedAmount,
-      })
-      await saveImmediate('G12-adj-tb-writeback', {
-        remark: JSON.stringify({ accountCode: G12_ACCOUNT_CODE, auditedAmount }),
-      })
-      await saveImmediate('G12-1-adjudicated-amount', { conclusion: String(auditedAmount) })
-    } catch {
-      ElMessage.warning('审定数回写失败，请手动确认试算表数据')
-    }
-  }
+  // spec: tb-writeback-explicit-publish-gate Task 12：原 writebackTrialBalance（旧端点
+  // PUT trial-balance/writeback，经宿主 handleG12Writeback 触发）为零消费死代码——TB 回写
+  // 已改由 useG12Adjudication.publishToTb（显式确认门 → POST publish-to-tb，科目6103发生额
+  // 口径 occurrence）承载，故移除此重复定义及其 return export。
 
   function getSheet(name: string) {
     return sheetCache.value[name] ?? { rows: [] }
@@ -160,7 +148,5 @@ export function useG12FormData(opts: { wpId: Ref<string>; projectId: Ref<string>
     debouncedSave,
     flushPending,
     fetchTrialBalanceAmount,
-    writebackTB: writebackTrialBalance,
-    writebackTrialBalance,
   }
 }

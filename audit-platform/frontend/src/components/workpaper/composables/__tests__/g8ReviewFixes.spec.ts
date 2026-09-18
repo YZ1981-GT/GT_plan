@@ -53,17 +53,19 @@ describe('G8 review fixes', () => {
     expect(isG8SheetComplete('G8-1', filled)).toBe(true)
   })
 
-  it('TB 回写单通道：debounce 不写 TB；父组件只听 g8:writeback', () => {
+  // spec: tb-writeback-explicit-publish-gate Task 12（test-follows-source）—— G8 已改走显式发布门
+  it('TB 回写走显式发布门：publishToTb → POST publish-to-tb；debounce 只 emit 不写 TB；不再监听 g8:writeback', () => {
     const adj = readFileSync(resolve(__dirname, '../useG8Adjudication.ts'), 'utf8')
-    const form = readFileSync(resolve(__dirname, '../useG8FormData.ts'), 'utf8')
     const parent = readFileSync(resolve(__dirname, '../../GtG8OtherEquityInstruments.vue'), 'utf8')
+    // 数据变化/debounce 只 emit substantive:adjudicated（不写 TB）
     expect(adj).toMatch(/function notifyAdjudicated[\s\S]*substantive:adjudicated/)
-    expect(adj).toMatch(/function publishAdjudicated[\s\S]*g8:writeback-trial-balance/)
     expect(adj).toMatch(/function publishAdjudicatedDebounced[\s\S]*notifyAdjudicated/)
-    expect(form).toContain('/trial-balance/writeback')
-    expect(form).toContain('flushPending')
-    expect(parent).toContain("addEventListener('g8:writeback-trial-balance'")
-    expect(parent).not.toMatch(/addEventListener\(\s*['"]substantive:adjudicated['"]/)
+    // 显式发布门：publishToTb 走 POST publish-to-tb
+    expect(adj).toContain('publish-to-tb')
+    expect(adj).toMatch(/function publishToTb/)
+    // 旧的 g8:writeback-trial-balance 单通道已移除
+    expect(adj).not.toContain("dispatchEvent(new CustomEvent('g8:writeback-trial-balance'")
+    expect(parent).not.toContain("addEventListener('g8:writeback-trial-balance'")
   })
 
   it('导入清单含 G8-2~6 与附注', () => {

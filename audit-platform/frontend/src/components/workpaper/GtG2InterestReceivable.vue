@@ -385,18 +385,14 @@ function handleAdjudicated(e: Event): void {
   }
 }
 
-/** 审定净值回写试算 1132（对齐 G11） */
-function handleG2Writeback(e: Event): void {
-  const d = (e as CustomEvent<{ accountCode?: string; auditedAmount?: number }>).detail
-  if (!d || d.accountCode !== '1132') return
-  if (typeof d.auditedAmount !== 'number' || !Number.isFinite(d.auditedAmount)) return
-  void formData.writebackTrialBalance(d.auditedAmount)
-}
+// spec: tb-writeback-explicit-publish-gate Task 12：移除 g2:writeback-trial-balance
+// 监听器 handleG2Writeback —— TB 回写改由 G2-1 审定表「发布到试算表」显式确认门
+// （useG2Adjudication.publishToTb → POST publish-to-tb，科目1132余额口径）承载。
+// 保留 g2:save-items 与 substantive:adjudicated（供跨模块刷新，不重复写 TB）。
 
 onMounted(async () => {
   window.addEventListener('g2:save-items', handleG2SaveItems)
   window.addEventListener('substantive:adjudicated', handleAdjudicated)
-  window.addEventListener('g2:writeback-trial-balance', handleG2Writeback)
   await formData.loadAll()
   isLoading.value = false
 })
@@ -404,7 +400,6 @@ onMounted(async () => {
 onBeforeUnmount(() => {
   window.removeEventListener('g2:save-items', handleG2SaveItems)
   window.removeEventListener('substantive:adjudicated', handleAdjudicated)
-  window.removeEventListener('g2:writeback-trial-balance', handleG2Writeback)
   formData.flushPending()
 })
 </script>

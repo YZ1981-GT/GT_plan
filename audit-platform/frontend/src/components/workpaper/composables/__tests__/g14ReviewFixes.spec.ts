@@ -61,15 +61,15 @@ describe('G14 review fixes', () => {
     expect(isG14SheetComplete('附注国企', filled)).toBe(true)
   })
 
-  it('TB 回写单通道：父组件只听 g14:writeback-trial-balance', () => {
+  // spec: tb-writeback-explicit-publish-gate Task 12（test-follows-source）—— G14 已改走显式发布门
+  it('TB 回写走显式发布门：publishToTb → POST publish-to-tb；不再 dispatch/监听 g14:writeback-trial-balance', () => {
     const adj = readFileSync(resolve(__dirname, '../useG14Adjudication.ts'), 'utf8')
-    const form = readFileSync(resolve(__dirname, '../useG14FormData.ts'), 'utf8')
     const parent = readFileSync(resolve(__dirname, '../../GtG14CreditImpairmentLoss.vue'), 'utf8')
     expect(adj).toContain("'substantive:adjudicated'")
-    expect(adj).toContain("'g14:writeback-trial-balance'")
-    expect(form).toContain('/trial-balance/writeback')
-    expect(parent).toContain("addEventListener('g14:writeback-trial-balance'")
-    expect(parent).not.toMatch(/addEventListener\(\s*['"]substantive:adjudicated['"]/)
+    expect(adj).toContain('publish-to-tb')
+    expect(adj).toMatch(/function publishToTb/)
+    expect(adj).not.toContain("'g14:writeback-trial-balance'")
+    expect(parent).not.toContain("addEventListener('g14:writeback-trial-balance'")
   })
 
   it('导入清单仅 G14-2 / G14-3', () => {

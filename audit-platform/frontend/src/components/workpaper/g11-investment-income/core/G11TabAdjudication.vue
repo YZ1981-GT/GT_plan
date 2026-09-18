@@ -215,7 +215,16 @@
         style="width:140px" @update:model-value="(v: number) => adj.updateTrialBalance(v ?? 0)" />
       <span v-else>{{ fmt(adj.trialBalanceAmount.value) }}</span>
       <span :class="['variance', { 'is-error': adj.hasVarianceHighlight.value }]">差异：{{ fmt(adj.variance.value) }}</span>
-      <el-button size="small" type="primary" :disabled="isReadonly" :loading="publishLoading" @click="onPublish">发布审定数</el-button>
+      <el-button
+        size="small"
+        type="warning"
+        :disabled="isReadonly"
+        :loading="adj.publishing.value"
+        data-testid="g11-publish-tb"
+        @click="onPublish"
+      >
+        发布到试算表（发生额口径！）
+      </el-button>
     </div>
 
     <el-card shadow="never" class="g11-note-card">
@@ -468,21 +477,18 @@ async function onFallbackToOther(): Promise<void> {
   }
 }
 
-const publishLoading = ref(false)
-
+// spec: tb-writeback-explicit-publish-gate Task 12 / Req 2,6。
+// 发布到试算表经显式确认门：先跑后端公式校验（不阻塞），再 adj.publishToTb 弹中文二次确认
+// → POST publish-to-tb（科目6111，发生额口径 occurrence）；成功后落库审定数 + 触发附注拉取。
+// 用户取消 → publishToTb 内早退无副作用，此处 saveAdjudicationToBackend/offer 属附注/持久化
+// 非 TB 副作用，保持原流程。
 async function onPublish(): Promise<void> {
   if (props.isReadonly) return
-  publishLoading.value = true
-  try {
-    const ok = await adj.validateWithBackend()
-    if (!ok) ElMessage.warning('公式校验未通过，请检查审定表与明细表')
-    adj.publishAdjudicated()
-    await adj.saveAdjudicationToBackend()
-    ElMessage.success('审定数已发布')
-    dispatchG11OfferDisclosurePull('G11-1')
-  } finally {
-    publishLoading.value = false
-  }
+  const ok = await adj.validateWithBackend()
+  if (!ok) ElMessage.warning('公式校验未通过，请检查审定表与明细表')
+  await adj.publishToTb()
+  await adj.saveAdjudicationToBackend()
+  dispatchG11OfferDisclosurePull('G11-1')
 }
 
 function rowClassName({ row }: { row: { changeRateHighlight: boolean; reasonRequired: boolean; reasonAnalysis: string } }): string {

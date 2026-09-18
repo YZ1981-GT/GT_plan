@@ -170,8 +170,6 @@ import { useG8FormData } from './composables/useG8FormData'
 import { useG8DualMode } from './composables/useG8DualMode'
 import { WorkpaperRuntimeContextKey } from './composables/useWorkpaperScaffold'
 import { extractG8SheetCode } from './composables/g8SheetLabels'
-import { G8_ACCOUNT_CODE } from './composables/g8Constants'
-import { parseNum } from './composables/useG8FormulaEngine'
 import type { ChecklistResponse } from './composables/useF1FormData'
 import { useWorkpaperReviewThreads } from './composables/useWorkpaperReviewThreads'
 import { useHostApplicableStandards } from './composables/hostApplicableStandards'
@@ -270,13 +268,9 @@ async function handleG8SaveItems(e: Event): Promise<void> {
   }
 }
 
-function handleG8Writeback(e: Event): void {
-  const detail = (e as CustomEvent<{ accountCode?: string; auditedAmount?: number; forceToast?: boolean }>).detail
-  if (detail?.accountCode && detail.accountCode !== G8_ACCOUNT_CODE) return
-  const amount = parseNum(detail?.auditedAmount)
-  if (!Number.isFinite(amount)) return
-  void formData.writebackTB(amount, { forceToast: !!detail?.forceToast })
-}
+// spec: tb-writeback-explicit-publish-gate Task 12：移除 g8:writeback-trial-balance
+// 监听器 handleG8Writeback —— TB 回写改由 G8-1 审定表「发布到试算表」显式确认门
+// （useG8Adjudication.publishToTb → POST publish-to-tb）承载。保留 g8:save-items。
 
 async function reloadAll() {
   await formData.loadAll()
@@ -284,15 +278,12 @@ async function reloadAll() {
 
 onMounted(async () => {
   window.addEventListener('g8:save-items', handleG8SaveItems)
-  // TB 回写仅听 g8:writeback-trial-balance（substantive:adjudicated 供跨模块刷新，不重复写 TB）
-  window.addEventListener('g8:writeback-trial-balance', handleG8Writeback)
   await formData.loadAll()
   isLoading.value = false
 })
 
 onBeforeUnmount(() => {
   window.removeEventListener('g8:save-items', handleG8SaveItems)
-  window.removeEventListener('g8:writeback-trial-balance', handleG8Writeback)
   formData.flushPending()
 })
 </script>

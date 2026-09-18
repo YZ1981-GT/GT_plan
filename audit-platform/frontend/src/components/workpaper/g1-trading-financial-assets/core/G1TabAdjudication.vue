@@ -242,6 +242,16 @@
         <template v-else> ✗</template>
       </span>
       <span class="book-total-hint">账面余额合计审定：{{ fmt(totalRow.closingAudited) }}</span>
+      <el-button
+        size="small"
+        type="warning"
+        :loading="publishing"
+        :disabled="isReadonly"
+        data-testid="g1-publish-tb"
+        @click="handlePublishToTb"
+      >
+        发布到试算表
+      </el-button>
     </div>
 
     <G1AuditTextCards
@@ -337,6 +347,47 @@ const {
   isReadonly: toRef(props, 'isReadonly'),
   htmlData: toRef(props, 'htmlData'),
 })
+
+// spec: tb-writeback-explicit-publish-gate Task 12 / Req 2。
+// 发布到试算表经显式确认门：中文二次确认 → POST /workpapers/{wpId}/audit-determination/publish-to-tb
+// （sheet_name 审定表G1-1 + writeback_rows 科目1501 余额口径）。数据变化只 emit substantive:adjudicated
+// 不写 TB（useG1Adjudication.publishAdjudicated 已改 emit-only）。取消/只读 → 无副作用。
+const publishing = ref(false)
+async function handlePublishToTb(): Promise<void> {
+  if (props.isReadonly || publishing.value) return
+  try {
+    await ElMessageBox.confirm(
+      '发布后将把交易性金融资产审定数（科目 1501）写入试算表（trial_balance），'
+      + '并触发报表/错报评价等下游重算。确认发布？',
+      '发布到试算表确认',
+      { confirmButtonText: '确认发布', cancelButtonText: '取消', type: 'warning' },
+    )
+  } catch {
+    return // 用户取消 → 无副作用
+  }
+  if (!wpId.value) {
+    ElMessage.error('缺少底稿标识，无法发布')
+    return
+  }
+  publishing.value = true
+  try {
+    const { api } = await import('@/services/apiProxy')
+    const resp: any = await api.post(
+      `/api/workpapers/${wpId.value}/audit-determination/publish-to-tb`,
+      {
+        sheet_name: '审定表G1-1',
+        writeback_rows: [
+          { account_code: '1501', audited_amount: totalRow.value.closingAudited, amount_kind: 'balance' },
+        ],
+      },
+    )
+    ElMessage.success(resp?.message || '已发布到试算表')
+  } catch (err: any) {
+    ElMessage.error(err?.response?.data?.detail || err?.message || '发布失败，请重试')
+  } finally {
+    publishing.value = false
+  }
+}
 
 // ─── 从集中登记带入调整（1501 交易性金融资产，资产借方；带入期末账项调整，单列合并 AJE/RJE） ───
 const bringInRows = computed(() =>

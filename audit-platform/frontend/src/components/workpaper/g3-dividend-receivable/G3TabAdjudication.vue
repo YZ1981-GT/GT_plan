@@ -21,6 +21,16 @@
         <el-button size="small" type="primary" plain :loading="adjPull.loading.value" @click="openBringInAdjustment">
           <el-icon><Download /></el-icon>带入调整
         </el-button>
+        <el-button
+          size="small"
+          type="warning"
+          :disabled="isReadonly"
+          :loading="adj.publishing.value"
+          data-testid="g3-publish-tb"
+          @click="adj.publishToTb()"
+        >
+          发布到试算表
+        </el-button>
         <el-button size="small" :disabled="isReadonly" @click="adj.addRow()">＋ 新增被投资方</el-button>
         <el-button size="small" :disabled="isReadonly" @click="onSyncFromDetail">从 G3-2 汇总</el-button>
         <el-button size="small" :disabled="isReadonly || !projectId" :loading="tbLoading" @click="onFetchTb">

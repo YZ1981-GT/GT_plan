@@ -783,6 +783,45 @@ class TrialBalance(Base):
     )
 
 
+class TbPublishAck(Base):
+    """审定表→试算表"发布"耐久确认/幂等表（对应迁移 V162）。
+
+    ``_on_d_audit_determination_saved`` handler 以本表做耐久幂等 ack：同一发布确认
+    （``publish_token`` 唯一）重复投递只回写 TB 一次。``accounts_updated`` 回填实际
+    更新行数供审计。
+    """
+
+    __tablename__ = "tb_publish_ack"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        PG_UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    project_id: Mapped[uuid.UUID] = mapped_column(
+        PG_UUID(as_uuid=True), nullable=False
+    )
+    year: Mapped[int] = mapped_column(sa.Integer, nullable=False)
+    wp_code: Mapped[str] = mapped_column(String(32), nullable=False)
+    # 幂等键：同一确认重复投递共用同一 token
+    publish_token: Mapped[str] = mapped_column(
+        String(128), nullable=False, unique=True
+    )
+    # 发布确认者（服务端可校验其权限）
+    confirmed_by: Mapped[uuid.UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True), nullable=True
+    )
+    accounts_updated: Mapped[int] = mapped_column(
+        sa.Integer, server_default=text("0"), nullable=False
+    )
+    created_at: Mapped[datetime] = mapped_column(server_default=func.now())
+
+    __table_args__ = (
+        Index(
+            "idx_tb_publish_ack_project_year",
+            "project_id", "year",
+        ),
+    )
+
+
 # ---------------------------------------------------------------------------
 # Materiality 模型
 # ---------------------------------------------------------------------------

@@ -3,7 +3,7 @@ import { useWorkpaperAuditYear } from './workpaperAuditYear'
  * useG12Adjudication — G12-1 审定表
  */
 import { ref, computed, watch, onMounted, type Ref, type ComputedRef } from 'vue'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import {
   G12_ACCOUNT_CODE,
   G12_CHANGE_RATE_THRESHOLD,
@@ -42,6 +42,7 @@ export function useG12Adjudication(opts: {
   const auditConclusion = ref('')
   const aiLoading = ref(false)
   const tbLoading = ref(false)
+  const publishing = ref(false)
   const hedge = useG12HedgeDetail({ allResponses: opts.allResponses, debouncedSave: opts.debouncedSave, isReadonly: opts.isReadonly })
 
   watch(() => opts.allResponses.value.get(ITEM_PRIOR)?.remark, (j) => {
@@ -162,7 +163,29 @@ export function useG12Adjudication(opts: {
     }
   }
 
+  /**
+   * 通知下游（附注/跨模块刷新），**不写 TB**。
+   * spec: tb-writeback-explicit-publish-gate Task 12 / Req 1。
+   */
   function publishAdjudicated() {
+    const amount = totalRow.value.currentAudited
+    opts.debouncedSave('G12-1-adjudicated-amount', { conclusion: String(amount) })
+    try {
+      window.dispatchEvent(new CustomEvent('substantive:adjudicated', {
+        detail: { accountCode: G12_ACCOUNT_CODE, adjudicatedAmount: amount },
+      }))
+    } catch { /* silent */ }
+  }
+
+  /**
+   * 显式发布审定数到试算表（科目 6103 净敞口套期收益，**损益类发生额口径 occurrence**）。
+   * spec: tb-writeback-explicit-publish-gate Task 12 / Req 2,6。
+   * 保留原发布前守卫（试算差异 / 未填原因）→ 中文二次确认 →
+   * `POST /workpapers/{wpId}/audit-determination/publish-to-tb`（amount_kind=occurrence）。
+   * 成功后 publishAdjudicated（附注刷新）；取消/守卫不过 → 无副作用。
+   */
+  async function publishToTb(): Promise<void> {
+    if (opts.isReadonly.value || publishing.value) return
     if (hasVarianceHighlight.value) {
       ElMessage.warning('审定合计与试算平衡表存在差异，请先核对')
       return
@@ -176,20 +199,39 @@ export function useG12Adjudication(opts: {
       ElMessage.warning(`变动率超 ${G12_AUDIT_NOTE_REASON_THRESHOLD * 100}% 时须填写主要变动原因`)
       return
     }
+    try {
+      await ElMessageBox.confirm(
+        '发布后将把净敞口套期收益本期审定发生额（科目 6103，发生额口径）写入试算表'
+        + '（trial_balance），并触发报表/错报评价等下游重算。确认发布？',
+        '发布到试算表确认',
+        { confirmButtonText: '确认发布', cancelButtonText: '取消', type: 'warning' },
+      )
+    } catch {
+      return // 用户取消 → 无副作用
+    }
+    if (!opts.wpId.value) {
+      ElMessage.error('缺少底稿标识，无法发布')
+      return
+    }
     const amount = totalRow.value.currentAudited
-    opts.debouncedSave('G12-1-adjudicated-amount', { conclusion: String(amount) })
-    // substantive:adjudicated → 跨模块刷新（附注等）；TB 回写走专用事件，避免父组件双次 writeback
+    publishing.value = true
     try {
-      window.dispatchEvent(new CustomEvent('substantive:adjudicated', {
-        detail: { accountCode: G12_ACCOUNT_CODE, adjudicatedAmount: amount },
-      }))
-    } catch { /* silent */ }
-    try {
-      window.dispatchEvent(new CustomEvent('g12:writeback-trial-balance', {
-        detail: { accountCode: G12_ACCOUNT_CODE, auditedAmount: amount },
-      }))
-    } catch { /* silent */ }
-    ElMessage.success('审定数已发布，附注披露将自动同步')
+      const resp: any = await api.post(
+        `/api/workpapers/${opts.wpId.value}/audit-determination/publish-to-tb`,
+        {
+          sheet_name: '审定表G12-1',
+          writeback_rows: [
+            { account_code: G12_ACCOUNT_CODE, audited_amount: amount, amount_kind: 'occurrence' },
+          ],
+        },
+      )
+      ElMessage.success(resp?.message || '已发布到试算表')
+      publishAdjudicated()
+    } catch (err: any) {
+      ElMessage.error(err?.response?.data?.detail || err?.message || '发布失败，请重试')
+    } finally {
+      publishing.value = false
+    }
   }
 
   async function generateAiAnalysis(): Promise<void> {
@@ -219,6 +261,6 @@ export function useG12Adjudication(opts: {
     aiLoading, tbLoading, hedge,
     updatePriorField, updateTrialBalance,
     updateAuditNote, updateAuditMainReason, updateAuditCaseDesc, updateAuditConclusion,
-    publishAdjudicated, generateAiAnalysis, loadTrialBalanceFromApi,
+    publishAdjudicated, publishToTb, publishing, generateAiAnalysis, loadTrialBalanceFromApi,
   }
 }

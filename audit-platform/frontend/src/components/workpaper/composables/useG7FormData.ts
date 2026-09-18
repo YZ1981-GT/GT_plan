@@ -408,39 +408,11 @@ export function useG7FormData(opts: UseG7FormDataOptions) {
     } catch { /* ignore */ }
   }
 
-  // ─── writebackTB ────────────────────────────────────────────────────────────
-
-  /**
-   * writebackTB: 保存审定数后回写 trial_balance
-   * 默认科目1511（投资原值/合计）；可传 accountCode 回写1512减值等。
-   * 注意：1511 应回写投资合计（原值），不是净值。
-   */
-  async function writebackTB(
-    adjudicatedAmount: number,
-    accountCode: string = G7_ACCOUNT_CODE,
-  ): Promise<void> {
-    if (!projectId.value) return
-    try {
-      await api.put(`/api/projects/${projectId.value}/trial-balance/writeback`, {
-        account_code: accountCode,
-        audited_amount: adjudicatedAmount,
-      })
-      if (accountCode === G7_ACCOUNT_CODE) {
-        await saveImmediate('G7-1-adjudicated-amount', { conclusion: String(adjudicatedAmount) })
-      }
-      await saveImmediate(
-        accountCode === G7_ACCOUNT_CODE ? 'G7-main-tb-writeback' : `G7-main-tb-writeback-${accountCode}`,
-        {
-          remark: JSON.stringify({ accountCode, auditedAmount: adjudicatedAmount }),
-        },
-      )
-    } catch (err: any) {
-      const msg = err?.message || ''
-      if (msg !== 'canceled' && err?.code !== 'ERR_CANCELED') {
-        ElMessage.warning(`审定数回写失败（${accountCode}），请手动确认试算表数据`)
-      }
-    }
-  }
+  // spec: tb-writeback-explicit-publish-gate Task 12：原 writebackTB（旧端点
+  // PUT trial-balance/writeback，经宿主 handleG7Adjudicated 的 writebackTb:true 分支触发，
+  // 支持动态双科目 1511/1512）为零消费死代码——TB 回写已改由 G7-1 审定表「发布到试算表」
+  // 显式确认门（G7TabAdjudication.handlePublishToTb → 单次 POST publish-to-tb 双科目原子发布，
+  // 科目由 tb_source_codes 解析透传）承载，故移除此定义及其 return export。
 
   /**
    * 从 render 策略或 trial_balance API 获取 TB 取数（科目1511）
@@ -527,9 +499,8 @@ export function useG7FormData(opts: UseG7FormDataOptions) {
     saveBatch,
     saveContent,
     debouncedSave,
-    // Writeback
-    writebackTB,
-    writebackTrialBalance: writebackTB,
+    // 注：writebackTB / writebackTrialBalance 已作为零消费死代码移除（见上，Task 12）；
+    // G7 TB 回写走 G7-1 审定表「发布到试算表」显式确认门（G7TabAdjudication.handlePublishToTb）。
     accountCode: G7_ACCOUNT_CODE,
   }
 }

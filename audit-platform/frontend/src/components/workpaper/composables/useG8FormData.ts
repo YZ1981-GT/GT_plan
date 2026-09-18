@@ -165,24 +165,10 @@ export function useG8FormData(opts: { wpId: Ref<string>; projectId: Ref<string> 
     }
   }
 
-  async function writebackTB(auditedAmount: number, optsWrite?: { forceToast?: boolean }): Promise<void> {
-    if (!opts.projectId.value) return
-    try {
-      await api.put(`/api/projects/${opts.projectId.value}/trial-balance/writeback`, {
-        account_code: G8_ACCOUNT_CODE,
-        audited_amount: auditedAmount,
-      }, { _silent: true } as any)
-      await saveImmediate('G8-adj-tb-writeback', {
-        remark: JSON.stringify({ accountCode: G8_ACCOUNT_CODE, auditedAmount }),
-      })
-      await saveImmediate('G8-1-adjudicated-amount', { conclusion: String(auditedAmount) })
-      if (optsWrite?.forceToast) {
-        ElMessage.success(`已回写试算表 ${G8_ACCOUNT_CODE}：${auditedAmount.toLocaleString('zh-CN', { minimumFractionDigits: 2 })}`)
-      }
-    } catch {
-      ElMessage.warning('审定数回写失败，请手动确认试算表数据')
-    }
-  }
+  // spec: tb-writeback-explicit-publish-gate Task 12：原 writebackTB（旧端点
+  // PUT trial-balance/writeback，经宿主 handleG8Writeback 触发）为零消费死代码——TB
+  // 回写已改由 useG8Adjudication.publishToTb（显式确认门 → POST publish-to-tb）承载，
+  // 故移除此重复定义及其 return export。
 
   function flushPending(): void {
     for (const [itemId, timer] of _debounceTimers) {
@@ -210,7 +196,5 @@ export function useG8FormData(opts: { wpId: Ref<string>; projectId: Ref<string> 
     flushPending,
     getTrialBalanceAmount,
     fetchTrialBalanceAmount,
-    writebackTB,
-    writebackTrialBalance: writebackTB,
   }
 }

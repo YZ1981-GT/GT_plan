@@ -223,7 +223,11 @@ describe('useG2Adjudication — 模板结构审定公式', () => {
     expect(gc.closingAdjustment).toBe(88)
   })
 
-  it('publishAdjudicated 派发试算回写事件', () => {
+  // spec: tb-writeback-explicit-publish-gate Task 12（test-follows-source）——
+  // 原 publishAdjudicated 额外 dispatch `g2:writeback-trial-balance`（旧 TB 回写单通道）已移除。
+  // 现 publishAdjudicated 仅 emit `substantive:adjudicated`（下游附注刷新，不写 TB）；
+  // TB 回写改由 publishToTb（显式确认门 → POST publish-to-tb）承载。
+  it('publishAdjudicated 只 emit substantive:adjudicated（不再派发 g2:writeback-trial-balance）', () => {
     const store = JSON.stringify({
       'gross-collective': {
         openingUnadjusted: 0,
@@ -233,12 +237,18 @@ describe('useG2Adjudication — 模板结构审定公式', () => {
       },
     })
     const { adj } = setup({ 'G2-1-rows': store })
-    const seen: any[] = []
-    const handler = (e: Event) => seen.push((e as CustomEvent).detail)
-    window.addEventListener('g2:writeback-trial-balance', handler)
+    const substantive: any[] = []
+    const writeback: any[] = []
+    const subHandler = (e: Event) => substantive.push((e as CustomEvent).detail)
+    const wbHandler = (e: Event) => writeback.push((e as CustomEvent).detail)
+    window.addEventListener('substantive:adjudicated', subHandler)
+    window.addEventListener('g2:writeback-trial-balance', wbHandler)
     adj.publishAdjudicated()
-    window.removeEventListener('g2:writeback-trial-balance', handler)
-    expect(seen[0]?.accountCode).toBe('1132')
-    expect(seen[0]?.auditedAmount).toBe(1500)
+    window.removeEventListener('substantive:adjudicated', subHandler)
+    window.removeEventListener('g2:writeback-trial-balance', wbHandler)
+    // 只走 substantive:adjudicated（科目 1132 / 审定净值 1500），旧单通道不再派发
+    expect(substantive[0]?.accountCode).toBe('1132')
+    expect(substantive[0]?.auditedAmount).toBe(1500)
+    expect(writeback).toHaveLength(0)
   })
 })

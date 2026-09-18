@@ -178,7 +178,7 @@ import { useG3FormData } from './composables/useG3FormData'
 import { useG3DualMode } from './composables/useG3DualMode'
 import { buildDirectoryHtmlData } from './composables/gCycleIndexRouting'
 import { eventBus } from '@/utils/eventBus'
-import { G3SaveItemsKey, G3WritebackTbKey, G3DetailRevisionKey } from './composables/g3InternalKeys'
+import { G3SaveItemsKey, G3DetailRevisionKey } from './composables/g3InternalKeys'
 import { WorkpaperRuntimeContextKey } from './composables/useWorkpaperScaffold'
 import { useHostApplicableStandards } from './composables/hostApplicableStandards'
 import { useWorkpaperReviewThreads } from './composables/useWorkpaperReviewThreads'
@@ -323,10 +323,9 @@ provide(G3SaveItemsKey, async (items: ChecklistResponse[]) => {
   scheduleAutoSnapshot()
 })
 
-provide(G3WritebackTbKey, async (auditedAmount: number) => {
-  if (typeof auditedAmount !== 'number' || !Number.isFinite(auditedAmount)) return
-  await formData.writebackTrialBalance(auditedAmount)
-})
+// spec: tb-writeback-explicit-publish-gate Task 12：移除 provide(G3WritebackTbKey)
+// —— TB 回写改由 G3-1 审定表「发布到试算表」显式确认门（useG3Adjudication.publishToTb →
+// POST publish-to-tb，科目1131余额口径）承载，不再经注入回调 → useG3FormData.writebackTrialBalance。
 
 /** 经 eventBus 订阅（crossWpEventBridge 已桥接 window ↔ mitt） */
 function handleAdjudicated(d: {

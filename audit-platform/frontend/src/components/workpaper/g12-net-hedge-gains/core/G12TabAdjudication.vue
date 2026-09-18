@@ -230,7 +230,16 @@
       <el-button size="small" :loading="adj.tbLoading.value" :disabled="isReadonly"
         @click="adj.loadTrialBalanceFromApi(true)">从 TB 取数</el-button>
       <span :class="['variance', { 'is-error': adj.hasVarianceHighlight.value }]">差异：{{ fmt(adj.variance.value) }}</span>
-      <el-button size="small" type="primary" :disabled="isReadonly" @click="adj.publishAdjudicated()">发布审定数</el-button>
+      <el-button
+        size="small"
+        type="warning"
+        :disabled="isReadonly"
+        :loading="adj.publishing.value"
+        data-testid="g12-publish-tb"
+        @click="adj.publishToTb()"
+      >
+        发布到试算表（发生额口径！）
+      </el-button>
     </div>
 
     <el-card shadow="never" class="note-card">

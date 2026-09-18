@@ -240,8 +240,15 @@
       <span v-else>{{ fmt(adj.trialBalanceAmount.value) }}</span>
       <span class="tb-var">差异 {{ fmt(adj.variance.value) }} {{ adj.hasVarianceHighlight.value ? '✗' : '✓' }}</span>
       <el-button v-if="!isReadonly" size="small" link @click="adj.loadTrialBalanceFromApi()">刷新TB</el-button>
-      <el-button size="small" type="primary" :disabled="isReadonly" data-testid="g8-publish-adj" @click="onPublish">
-        发布审定数
+      <el-button
+        size="small"
+        type="warning"
+        :loading="adj.publishing.value"
+        :disabled="isReadonly"
+        data-testid="g8-publish-tb"
+        @click="onPublish"
+      >
+        发布到试算表
       </el-button>
       <el-button size="small" link type="primary" @click="goSheet('G8-3')">查看 G8-3 调整</el-button>
     </div>
@@ -484,9 +491,11 @@ function onSyncFromDetail() {
   )
 }
 
+// spec: tb-writeback-explicit-publish-gate Task 12 / Req 2。
+// 发布到试算表经显式确认门：adj.publishToTb 弹中文二次确认 → POST publish-to-tb（科目1503余额）。
+// 取消/只读 → 无副作用；成功后 notifyAdjudicated 通知附注刷新。
 function onPublish() {
-  adj.publishAdjudicated()
-  ElMessage.success(`已发布审定数 ${fmt(adj.totalRow.value.closingAdjusted)}`)
+  void adj.publishToTb()
 }
 
 async function runValidate() {

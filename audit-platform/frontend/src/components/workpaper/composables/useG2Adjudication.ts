@@ -32,6 +32,7 @@ import {
   aggregateProvisionFromBadDebt,
 } from './g2CrossHelpers'
 import { api } from '@/services/apiProxy'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import type { ChecklistResponse } from './useF1FormData'
 
 export { G2_ACCOUNT_CODE, G2_CHANGE_RATE_THRESHOLD }
@@ -310,8 +311,9 @@ export interface UseG2AdjudicationOptions {
 export function useG2Adjudication(options: UseG2AdjudicationOptions) {
   const _auditYearRef = useWorkpaperAuditYear()
 
-  const { allResponses, projectId, isReadonly } = options
+  const { allResponses, projectId, isReadonly, wpId } = options
   const readonly = isReadonly ?? ref(false)
+  const publishing = ref(false)
 
   let debounceTimer: ReturnType<typeof setTimeout> | null = null
 
@@ -379,6 +381,14 @@ export function useG2Adjudication(options: UseG2AdjudicationOptions) {
     { immediate: true },
   )
 
+  /**
+   * 通知下游（附注/跨模块刷新），**不写 TB**。
+   * spec: tb-writeback-explicit-publish-gate Task 12 / Req 1。
+   * 原额外 dispatch `g2:writeback-trial-balance`（→ 宿主 handleG2Writeback →
+   * useG2InterestReceivableFormData.writebackTrialBalance → 旧端点 PUT trial-balance/writeback，
+   * 绕过显式确认门，且在 watch(closingAudited) 数据变化时自动触发，违反 Req 1）已移除，
+   * TB 回写改由 publishToTb 承载。
+   */
   function publishAdjudicated(): void {
     const amount = subtotalRow.value.closingAudited
     const payload = {
@@ -390,16 +400,53 @@ export function useG2Adjudication(options: UseG2AdjudicationOptions) {
     }
     try {
       window.dispatchEvent(new CustomEvent('substantive:adjudicated', { detail: payload }))
-      window.dispatchEvent(
-        new CustomEvent('g2:writeback-trial-balance', {
-          detail: {
-            accountCode: G2_ACCOUNT_CODE,
-            auditedAmount: amount,
-          },
-        }),
-      )
     } catch {
       /* ignore */
+    }
+  }
+
+  /**
+   * 显式发布审定净值到试算表（科目 1132 应收利息，余额口径）。
+   * spec: tb-writeback-explicit-publish-gate Task 12 / Req 2。
+   * 二次确认（中文）→ `POST /workpapers/{wpId}/audit-determination/publish-to-tb`
+   * （sheet_name 审定表G2-1 + writeback_rows balance）。成功后 publishAdjudicated（附注刷新）；
+   * 取消 → 无副作用。
+   */
+  async function publishToTb(): Promise<void> {
+    if (readonly.value || publishing.value) return
+    try {
+      await ElMessageBox.confirm(
+        '发布后将把应收利息审定净值（科目 1132）写入试算表（trial_balance），'
+        + '并触发报表/错报评价等下游重算。确认发布？',
+        '发布到试算表确认',
+        { confirmButtonText: '确认发布', cancelButtonText: '取消', type: 'warning' },
+      )
+    } catch {
+      return // 用户取消 → 无副作用
+    }
+    const wpIdVal = wpId?.value ?? ''
+    if (!wpIdVal) {
+      ElMessage.error('缺少底稿标识，无法发布')
+      return
+    }
+    const amount = subtotalRow.value.closingAudited
+    publishing.value = true
+    try {
+      const resp: any = await api.post(
+        `/api/workpapers/${wpIdVal}/audit-determination/publish-to-tb`,
+        {
+          sheet_name: '审定表G2-1',
+          writeback_rows: [
+            { account_code: G2_ACCOUNT_CODE, audited_amount: amount, amount_kind: 'balance' },
+          ],
+        },
+      )
+      ElMessage.success(resp?.message || '已发布到试算表')
+      publishAdjudicated()
+    } catch (err: any) {
+      ElMessage.error(err?.response?.data?.detail || err?.message || '发布失败，请重试')
+    } finally {
+      publishing.value = false
     }
   }
 
@@ -635,6 +682,8 @@ export function useG2Adjudication(options: UseG2AdjudicationOptions) {
     syncFromSupporting,
     applyAdjustmentWriteback,
     publishAdjudicated,
+    publishToTb,
+    publishing,
     G2_CHANGE_RATE_THRESHOLD,
   }
 }

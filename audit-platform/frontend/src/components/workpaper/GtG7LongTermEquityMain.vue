@@ -348,31 +348,10 @@ const tbSourceCodes = computed<TbSourceCodes | null>(() => {
 })
 provide('g7TbSourceCodes', tbSourceCodes)
 
-/** 审定发布：仅保存后 writebackTb=true 才回写 TB；打开/编辑中的广播不改试算表 */
-function handleG7Adjudicated(e: Event): void {
-  const detail = (e as CustomEvent<{
-    accountCode?: string
-    adjudicatedAmount?: number
-    impairmentAccountCode?: string
-    impairmentAmount?: number
-    writebackTb?: boolean
-  }>).detail
-  const src = tbSourceCodes.value
-  // 事件过滤按解析出的原值科目口径（点号边界），不比字面量
-  if (!isG7GrossCode(detail?.accountCode, src)) return
-  if (detail.writebackTb !== true) return
-  const amount = Number(detail.adjudicatedAmount)
-  if (Number.isFinite(amount)) {
-    void formData.writebackTB(amount, g7AccountCode(src))
-  }
-  const impairAmt = Number(detail.impairmentAmount)
-  if (Number.isFinite(impairAmt)) {
-    void formData.writebackTB(
-      impairAmt,
-      detail.impairmentAccountCode || g7ImpairmentAccountCode(src),
-    )
-  }
-}
+// spec: tb-writeback-explicit-publish-gate Task 12：移除 handleG7Adjudicated 的 TB 回写旁路
+// —— 原「审定表保存后 substantive:adjudicated{writebackTb:true} → formData.writebackTB(1511/1512)」
+// 是绕过显式确认门的自动写（违反 Req 1/2）。TB 回写改由 G7-1 审定表「发布到试算表」显式确认门
+// （G7TabAdjudication.handlePublishToTb → 单次 POST publish-to-tb 双科目原子发布）承载。
 
 // ─── selfLoad 模式：htmlData 为 null 时自动获取数据 ─────────────────────────
 async function selfLoadInit(): Promise<void> {
@@ -397,7 +376,6 @@ async function retrySelfLoad(): Promise<void> {
 
 // ─── 生命周期 ───────────────────────────────────────────────────────────────
 onMounted(async () => {
-  window.addEventListener('substantive:adjudicated', handleG7Adjudicated)
   window.addEventListener('g7:linkage-changed', handleLinkageChanged)
   await selfLoadInit()
   isLoading.value = false
@@ -405,7 +383,6 @@ onMounted(async () => {
 })
 
 onBeforeUnmount(() => {
-  window.removeEventListener('substantive:adjudicated', handleG7Adjudicated)
   window.removeEventListener('g7:linkage-changed', handleLinkageChanged)
 })
 </script>

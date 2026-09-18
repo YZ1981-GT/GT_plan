@@ -471,11 +471,8 @@ function onSheetImported() {
   void formData.loadAll()
 }
 
-function handleG1Writeback(payload: any): void {
-  if (!payload || payload.accountCode !== '1501') return
-  if (typeof payload.auditedAmount !== 'number' || !Number.isFinite(payload.auditedAmount)) return
-  void formData.writebackTrialBalance(payload.auditedAmount)
-}
+// spec: tb-writeback-explicit-publish-gate Task 12：移除 handleG1Writeback（旧 TB 回写路径）
+// —— TB 回写改由 G1-1 审定表「发布到试算表」显式确认门（G1TabAdjudication.handlePublishToTb）承载。
 
 function handleAdjudicated(payload: any): void {
   const code = payload?.accountCode ?? payload?.account_codes?.[0]
@@ -490,10 +487,6 @@ function handleAdjudicated(payload: any): void {
 }
 
 /** window兼容监听器（供crossWpEventBridge旧生产者） */
-function handleG1WritebackWindow(e: Event): void {
-  const d = (e as CustomEvent).detail
-  handleG1Writeback(d)
-}
 function handleAdjudicatedWindow(e: Event): void {
   const d = (e as CustomEvent).detail
   handleAdjudicated(d)
@@ -541,16 +534,16 @@ defineExpose({
 
 onMounted(() => {
   // eventBus 订阅（crossWpEventBridge已双向桥接，优先mitt）
+  // spec: tb-writeback-explicit-publish-gate Task 12：移除 g1:writeback-trial-balance 监听
+  // （TB 回写改由 G1-1 审定表「发布到试算表」显式确认门承载）；保留 substantive:adjudicated
+  // 供审定数落库/附注刷新（不写 TB）。
   eventBus.on('substantive:adjudicated', handleAdjudicated)
-  // window 兼容（旧生产者仍走CustomEvent，桥接覆盖）
-  window.addEventListener('g1:writeback-trial-balance', handleG1WritebackWindow)
   window.addEventListener('substantive:adjudicated', handleAdjudicatedWindow)
   void selfLoad()
 })
 
 onBeforeUnmount(() => {
   eventBus.off('substantive:adjudicated', handleAdjudicated)
-  window.removeEventListener('g1:writeback-trial-balance', handleG1WritebackWindow)
   window.removeEventListener('substantive:adjudicated', handleAdjudicatedWindow)
   formData.flushPending()
 })

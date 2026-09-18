@@ -16,6 +16,16 @@
         <el-button size="small" :disabled="isReadonly" :loading="syncing" @click="onSyncSupporting">
           从 G2-2/G2-3 汇总未审
         </el-button>
+        <el-button
+          size="small"
+          type="warning"
+          :disabled="isReadonly"
+          :loading="adj.publishing.value"
+          data-testid="g2-publish-tb"
+          @click="adj.publishToTb()"
+        >
+          发布到试算表
+        </el-button>
         <el-tooltip :content="fourTableHint" placement="top">
           <el-button
             size="small"

@@ -8,7 +8,7 @@ import { useWorkpaperAuditYear } from './workpaperAuditYear'
  *       ?????? / ????
  * ??????= ?? + ???? + ??????|???|>30% ??????
  */
-import { ref, computed, watch, onMounted, onUnmounted, type Ref } from 'vue'
+import { ref, computed, watch, onMounted, onUnmounted, isRef, type Ref } from 'vue'
 import {
   parseNum,
   calcAdjustedAmount,
@@ -29,6 +29,7 @@ import {
 } from './g5AdjudicationItems'
 import { readCanonicalRaw } from './g5StorageContract'
 import { api } from '@/services/apiProxy'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import type { ChecklistResponse } from './useF1FormData'
 
 export { G5_ACCOUNT_CODE, G5_CHANGE_RATE_THRESHOLD, G5_ADJ_WRITEBACK_ROW_KEY }
@@ -267,7 +268,14 @@ export function useG5Adjudication(opts: {
   const tbValues = ref<{ opening: number; closing: number }>({ opening: 0, closing: 0 })
   let suppressPersist = false
 
-  const isReadonly = computed(() => !!opts.isReadonly?.value || !!opts.isReadonly)
+  // spec: tb-writeback-explicit-publish-gate Task 12（bugfix）：原 `!!opts.isReadonly?.value || !!opts.isReadonly`
+  // 在 opts.isReadonly 为 Ref 时，`!!opts.isReadonly`（ref 对象恒真）使 isReadonly 恒为 true，
+  // 导致「发布到试算表」按钮永久禁用、publishToTb 早退（发布门对 G5 形同虚设）。改用 isRef 正确解包
+  // Ref / 兼容裸布尔。
+  const isReadonly = computed(() =>
+    isRef(opts.isReadonly) ? !!opts.isReadonly.value : !!opts.isReadonly,
+  )
+  const publishing = ref(false)
 
   const rows = computed(() => buildG5AdjudicationRows(store.value, tbValues.value.closing))
 
@@ -408,6 +416,13 @@ export function useG5Adjudication(opts: {
     persist()
   }
 
+  /**
+   * 通知下游（附注/跨模块刷新），**不写 TB**。
+   * spec: tb-writeback-explicit-publish-gate Task 12 / Req 1。
+   * 原额外 dispatch `g5:writeback-trial-balance`（→ 宿主 handleG5Writeback →
+   * useG5FormData.writebackTrialBalance → 旧端点 PUT trial-balance/writeback，绕过显式确认门，
+   * 且在 watch(adjudicatedAmount) 数据变化时自动触发，违反 Req 1）已移除，TB 回写改由 publishToTb 承载。
+   */
   function publishAdjudicated(): void {
     const amount = adjudicatedAmount.value
     try {
@@ -419,13 +434,52 @@ export function useG5Adjudication(opts: {
           auditedAmount: amount,
         },
       }))
-      window.dispatchEvent(new CustomEvent('g5:writeback-trial-balance', {
-        detail: {
-          accountCode: G5_ACCOUNT_CODE,
-          auditedAmount: amount,
-        },
-      }))
     } catch { /* silent */ }
+  }
+
+  /**
+   * 显式发布审定净值到试算表（科目 1531 长期应收款，余额口径）。
+   * spec: tb-writeback-explicit-publish-gate Task 12 / Req 2。
+   * 二次确认（中文）→ `POST /workpapers/{wpId}/audit-determination/publish-to-tb`
+   * （sheet_name 审定表G5-1 + writeback_rows balance）。成功后 publishAdjudicated（附注刷新）；
+   * 取消 → 无副作用。
+   */
+  async function publishToTb(): Promise<void> {
+    if (isReadonly.value || publishing.value) return
+    try {
+      await ElMessageBox.confirm(
+        '发布后将把长期应收款审定净值（科目 1531）写入试算表（trial_balance），'
+        + '并触发报表/错报评价等下游重算。确认发布？',
+        '发布到试算表确认',
+        { confirmButtonText: '确认发布', cancelButtonText: '取消', type: 'warning' },
+      )
+    } catch {
+      return // 用户取消 → 无副作用
+    }
+    const wpIdVal = typeof opts.wpId === 'object' ? opts.wpId?.value : opts.wpId
+    if (!wpIdVal) {
+      ElMessage.error('缺少底稿标识，无法发布')
+      return
+    }
+    const amount = adjudicatedAmount.value
+    publishing.value = true
+    try {
+      const resp: any = await api.post(
+        `/api/workpapers/${wpIdVal}/audit-determination/publish-to-tb`,
+        {
+          sheet_name: '审定表G5-1',
+          writeback_rows: [
+            { account_code: G5_ACCOUNT_CODE, audited_amount: amount, amount_kind: 'balance' },
+          ],
+        },
+      )
+      ElMessage.success(resp?.message || '已发布到试算表')
+      publishAdjudicated()
+    } catch (err: any) {
+      ElMessage.error(err?.response?.data?.detail || err?.message || '发布失败，请重试')
+    } finally {
+      publishing.value = false
+    }
   }
 
   /** ???? 1531 */
@@ -555,6 +609,8 @@ export function useG5Adjudication(opts: {
     pullFromTB,
     hydrateFromStore,
     publishAdjudicated,
+    publishToTb,
+    publishing,
     fetchTrialBalance,
     STORAGE_KEY,
     /** @deprecated 保留供 UI 层 */

@@ -6,8 +6,8 @@ import { ref, onScopeDispose, type Ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { api } from '@/services/apiProxy'
 import { eventBus } from '@/utils/eventBus'
-import { G9_ACCOUNT_CODE, G9_ACCOUNT_NAME, G9_ACCOUNT_ALIASES } from './g9Constants'
-import { resolveG9TbRow, g9TbRowBalance, g9TbResolvedCode } from './g9TbResolve'
+import { G9_ACCOUNT_CODE } from './g9Constants'
+import { resolveG9TbRow, g9TbRowBalance } from './g9TbResolve'
 import type { ChecklistResponse } from './useF1FormData'
 
 const DRAFT_PREFIX = 'g9-draft'
@@ -173,58 +173,10 @@ export function useG9FormData(opts: { wpId: Ref<string>; projectId: Ref<string> 
     }
   }
 
-  let _tbMissingWarned = false
-
-  /**
-   * 审定数回写试算表。
-   * - 按别名/科目名称解析实际 TB 行，避免硬编码 1504 在本项目不存在时 404
-   * - 请求 _silent，避免全局拦截器与本地各弹一次
-   * - 科目缺失时仅提示一次（建筑施工等项目常年无此科目属正常）
-   */
-  async function writebackTB(auditedAmount: number, optsWrite?: { forceToast?: boolean }): Promise<boolean> {
-    if (!opts.projectId.value) return false
-    const _year = _auditYearRef.value
-    let accountCode = G9_ACCOUNT_CODE
-    try {
-      if (_year != null) {
-        const res = await api.get(`/api/projects/${opts.projectId.value}/trial-balance`, {
-          params: { year: _year },
-          _silent: true,
-        } as any)
-        const list = Array.isArray(res?.data ?? res) ? (res?.data ?? res) : (res?.data?.items ?? [])
-        const hit = resolveG9TbRow(list)
-        if (!hit) {
-          if (optsWrite?.forceToast || !_tbMissingWarned) {
-            _tbMissingWarned = true
-            ElMessage.info(
-              `试算表未找到「${G9_ACCOUNT_NAME}」（已试 ${G9_ACCOUNT_ALIASES.join('/')}）。`
-              + '若本年无此科目可忽略；有余额请检查科目映射后重试发布。',
-            )
-          }
-          await saveImmediate('G9-1-adjudicated-amount', { conclusion: String(auditedAmount) })
-          return false
-        }
-        accountCode = g9TbResolvedCode(hit)
-      }
-      await api.put(`/api/projects/${opts.projectId.value}/trial-balance/writeback`, {
-        account_code: accountCode,
-        audited_amount: auditedAmount,
-      }, { _silent: true } as any)
-      await saveImmediate('G9-adj-tb-writeback', {
-        remark: JSON.stringify({ accountCode, auditedAmount }),
-      })
-      await saveImmediate('G9-1-adjudicated-amount', { conclusion: String(auditedAmount) })
-      return true
-    } catch (e: any) {
-      const detail = e?.response?.data?.detail || e?.message || ''
-      ElMessage.warning(
-        detail
-          ? `审定数回写失败：${detail}`
-          : '审定数回写失败，请手动确认试算表数据',
-      )
-      return false
-    }
-  }
+  // spec: tb-writeback-explicit-publish-gate Task 12：原 writebackTB（旧端点
+  // PUT trial-balance/writeback，经宿主 handleG9Writeback 触发）为零消费死代码——TB
+  // 回写已改由 useG9Adjudication.publishToTb（显式确认门 → POST publish-to-tb，科目由
+  // tbResolvedCode 动态透传）承载，故移除此重复定义及其 return export。
 
   /** 卸载前刷出未落盘的 debounce 保存（比照 F2/G7） */
   function flushPending(): void {
@@ -253,7 +205,5 @@ export function useG9FormData(opts: { wpId: Ref<string>; projectId: Ref<string> 
     flushPending,
     getTrialBalanceAmount,
     fetchTrialBalanceAmount,
-    writebackTB,
-    writebackTrialBalance: writebackTB,
   }
 }

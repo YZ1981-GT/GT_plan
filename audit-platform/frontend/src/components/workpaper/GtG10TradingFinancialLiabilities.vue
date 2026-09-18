@@ -178,9 +178,7 @@
  */
 import { ref, computed, onMounted, onBeforeUnmount, defineAsyncComponent, provide, inject } from 'vue'
 import { useG10FormData } from './composables/useG10FormData'
-import { G10_ACCOUNT_CODE } from './composables/g10Constants'
 import { offerG10DisclosurePull, G10_OFFER_DISCLOSURE_PULL_EVENT } from './composables/g10DisclosureSync'
-import { parseNum } from './composables/useG10FormulaEngine'
 import { useG10DualMode } from './composables/useG10DualMode'
 import { WorkpaperRuntimeContextKey } from './composables/useWorkpaperScaffold'
 import { useWorkpaperReviewThreads } from './composables/useWorkpaperReviewThreads'
@@ -299,13 +297,9 @@ async function reloadAll() {
   await formData.loadAll()
 }
 
-function handleG10Writeback(e: Event): void {
-  const detail = (e as CustomEvent<{ accountCode?: string; auditedAmount?: number; forceToast?: boolean }>).detail
-  if (detail?.accountCode && detail.accountCode !== G10_ACCOUNT_CODE) return
-  const amount = parseNum(detail?.auditedAmount)
-  if (!Number.isFinite(amount)) return
-  void formData.writebackTB(amount, { forceToast: !!detail?.forceToast })
-}
+// spec: tb-writeback-explicit-publish-gate Task 12：移除 g10:writeback-trial-balance
+// 监听器 handleG10Writeback —— TB 回写改由 G10-1 审定表「发布到试算表」显式确认门
+// （useG10Adjudication.publishToTb → POST publish-to-tb）承载。保留 g10:save-items 等其他事件。
 
 const availableSheets = computed(() => {
   const fromHtml = props.htmlData?.sheets ?? props.htmlData?.render_config?.sheets
@@ -328,7 +322,6 @@ useWorkpaperEntryInjections({
 
 onMounted(async () => {
   window.addEventListener('g10:save-items', handleG10SaveItems)
-  window.addEventListener('g10:writeback-trial-balance', handleG10Writeback)
   window.addEventListener(G10_OFFER_DISCLOSURE_PULL_EVENT, handleG10OfferDisclosurePull)
   await formData.loadAll()
   isLoading.value = false
@@ -336,7 +329,6 @@ onMounted(async () => {
 
 onBeforeUnmount(() => {
   window.removeEventListener('g10:save-items', handleG10SaveItems)
-  window.removeEventListener('g10:writeback-trial-balance', handleG10Writeback)
   window.removeEventListener(G10_OFFER_DISCLOSURE_PULL_EVENT, handleG10OfferDisclosurePull)
   formData.flushPending()
 })

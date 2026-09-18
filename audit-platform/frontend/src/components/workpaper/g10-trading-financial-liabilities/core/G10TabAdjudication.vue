@@ -257,7 +257,16 @@
         style="width:140px" @update:model-value="(v: number) => adj.updateTrialBalance(v ?? 0)" />
       <span v-else>{{ fmt(adj.trialBalanceAmount.value) }}</span>
       <span :class="['variance', { 'is-error': adj.hasVarianceHighlight.value }]">差异：{{ fmt(adj.variance.value) }}</span>
-      <el-button size="small" type="primary" :disabled="isReadonly" @click="onPublish">发布审定数</el-button>
+      <el-button
+        size="small"
+        type="warning"
+        :loading="adj.publishing.value"
+        :disabled="isReadonly"
+        data-testid="g10-publish-tb"
+        @click="onPublish"
+      >
+        发布到试算表
+      </el-button>
     </div>
 
     <G10AuditTextCards
@@ -520,8 +529,10 @@ function onPublish() {
     ElMessage.warning('(三)与(一)+(二)勾稽不一致，请核对后再发布')
     return
   }
-  adj.publishAdjudicated()
-  ElMessage.success(`已发布审定数 ${fmt(adj.totalRow.value.closingAdjusted)}`)
+  // spec: tb-writeback-explicit-publish-gate Task 12 / Req 2。
+  // 发布到试算表经显式确认门：保留发布前守卫，再调 adj.publishToTb 弹中文二次确认
+  // → POST publish-to-tb（科目2101动态余额）；取消/只读 → 无副作用。
+  void adj.publishToTb()
 }
 
 async function runValidate() {

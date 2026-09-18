@@ -53,13 +53,18 @@ describe('G11 review fixes', () => {
     expect(isG11SheetComplete('G11A', filled)).toBe(true)
   })
 
-  it('TB 回写单通道：父组件只听 g11:writeback-trial-balance', () => {
+  // spec: tb-writeback-explicit-publish-gate Task 12（test-follows-source）—— G11 已改走显式发布门
+  it('TB 回写走显式发布门：publishToTb → POST publish-to-tb；不再 dispatch/监听 g11:writeback-trial-balance', () => {
     const adj = readFileSync(resolve(__dirname, '../useG11Adjudication.ts'), 'utf8')
     const parent = readFileSync(resolve(__dirname, '../../GtG11InvestmentIncome.vue'), 'utf8')
+    // 数据变化/publishAdjudicated 仍 emit substantive:adjudicated（下游附注刷新，不写 TB）
     expect(adj).toContain("dispatchEvent(new CustomEvent('substantive:adjudicated'")
-    expect(adj).toContain("dispatchEvent(new CustomEvent('g11:writeback-trial-balance'")
-    expect(parent).toContain("addEventListener('g11:writeback-trial-balance'")
-    expect(parent).not.toMatch(/addEventListener\(\s*['"]substantive:adjudicated['"]/)
+    // 显式发布门：publishToTb 走 POST publish-to-tb
+    expect(adj).toContain('publish-to-tb')
+    expect(adj).toMatch(/function publishToTb/)
+    // 旧的 g11:writeback-trial-balance 单通道已移除（源码不再 dispatch，父组件不再监听）
+    expect(adj).not.toContain("dispatchEvent(new CustomEvent('g11:writeback-trial-balance'")
+    expect(parent).not.toContain("addEventListener('g11:writeback-trial-balance'")
   })
 
   it('P2：oei_dividend 优先 1507；oth_debt 优先 1506', () => {

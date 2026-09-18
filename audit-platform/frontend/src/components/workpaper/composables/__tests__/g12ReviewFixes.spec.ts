@@ -54,13 +54,15 @@ describe('G12 review fixes', () => {
     expect(isG12SheetComplete('G12A', filled)).toBe(true)
   })
 
-  it('TB 回写单通道：父组件只听 g12:writeback-trial-balance', () => {
+  // spec: tb-writeback-explicit-publish-gate Task 12（test-follows-source）—— G12 已改走显式发布门
+  it('TB 回写走显式发布门：publishToTb → POST publish-to-tb；不再 dispatch/监听 g12:writeback-trial-balance', () => {
     const adj = readFileSync(resolve(__dirname, '../useG12Adjudication.ts'), 'utf8')
     const parent = readFileSync(resolve(__dirname, '../../GtG12NetHedgeGains.vue'), 'utf8')
     expect(adj).toContain("dispatchEvent(new CustomEvent('substantive:adjudicated'")
-    expect(adj).toContain("dispatchEvent(new CustomEvent('g12:writeback-trial-balance'")
-    expect(parent).toContain("addEventListener('g12:writeback-trial-balance'")
-    expect(parent).not.toMatch(/addEventListener\(\s*['"]substantive:adjudicated['"]/)
+    expect(adj).toContain('publish-to-tb')
+    expect(adj).toMatch(/function publishToTb/)
+    expect(adj).not.toContain("dispatchEvent(new CustomEvent('g12:writeback-trial-balance'")
+    expect(parent).not.toContain("addEventListener('g12:writeback-trial-balance'")
   })
 
   it('G12A 表名与导入清单含 G12-5', () => {

@@ -14,7 +14,7 @@
  * Requirements: 3.1~3.10
  */
 import { ref, computed, watch, onMounted, onBeforeUnmount, inject, type Ref, type ComputedRef } from 'vue'
-import { ElMessageBox } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { api } from '@/services/apiProxy'
 import { eventBus } from '@/utils/eventBus'
 import {
@@ -46,7 +46,7 @@ import {
   G3_WP_CODE,
   G3_DETAIL_ROWS_KEY,
 } from './g3Constants'
-import { G3SaveItemsKey, G3WritebackTbKey, G3DetailRevisionKey } from './g3InternalKeys'
+import { G3SaveItemsKey, G3DetailRevisionKey } from './g3InternalKeys'
 import { useWorkpaperAuditYear, resolveAuditYearNumber } from './workpaperAuditYear'
 import type { ChecklistResponse } from './useF1FormData'
 
@@ -156,10 +156,10 @@ export interface UseG3AdjudicationOptions {
 // ─── Composable ──────────────────────────────────────────────────────────────
 
 export function useG3Adjudication(options: UseG3AdjudicationOptions) {
-  const { projectId, allResponses, isReadonly, auditYear } = options
+  const { wpId, projectId, allResponses, isReadonly, auditYear } = options
   const readonly = isReadonly ?? ref(false)
+  const publishing = ref(false)
   const saveItemsFn = inject(G3SaveItemsKey, null)
-  const writebackTbFn = inject(G3WritebackTbKey, null)
   const detailRevision = inject(G3DetailRevisionKey, null)
   const runtimeYear = useWorkpaperAuditYear(auditYear)
   /** 已跟进的 G3-2 修订号（热更新用） */
@@ -253,6 +253,13 @@ export function useG3Adjudication(options: UseG3AdjudicationOptions) {
   )
 
   // ─── EventBus: publish substantive:adjudicated + TB writeback（科目1131）──
+  /**
+   * 通知下游（附注/跨模块刷新），**不写 TB**。
+   * spec: tb-writeback-explicit-publish-gate Task 12 / Req 1。
+   * 原此函数在审定合计变化的 watch 里通过注入的 writebackTbFn（→ 宿主 provide 的
+   * useG3FormData.writebackTrialBalance → 旧端点 PUT trial-balance/writeback）自动写 TB，
+   * 绕过显式确认门且违反 Req 1。现移除 writebackTbFn 调用，TB 回写改由 publishToTb 承载。
+   */
   function publishAdjudicated(): void {
     const amount = subtotalRow.value.closingAdjusted
     try {
@@ -262,10 +269,51 @@ export function useG3Adjudication(options: UseG3AdjudicationOptions) {
         auditedAmount: amount,
         timestamp: Date.now(),
       })
-      if (writebackTbFn) {
-        void writebackTbFn(amount)
-      }
     } catch { /* EventBus publish 失败不阻塞编辑 */ }
+  }
+
+  /**
+   * 显式发布审定数到试算表（科目 1131 应收股利，余额口径）。
+   * spec: tb-writeback-explicit-publish-gate Task 12 / Req 2。
+   * 二次确认（中文）→ `POST /workpapers/{wpId}/audit-determination/publish-to-tb`
+   * （sheet_name 审定表G3-1 + writeback_rows balance）。成功后 publishAdjudicated（附注刷新）；
+   * 取消 → 无副作用。
+   */
+  async function publishToTb(): Promise<void> {
+    if (readonly.value || publishing.value) return
+    try {
+      await ElMessageBox.confirm(
+        '发布后将把应收股利审定数（科目 1131）写入试算表（trial_balance），'
+        + '并触发报表/错报评价等下游重算。确认发布？',
+        '发布到试算表确认',
+        { confirmButtonText: '确认发布', cancelButtonText: '取消', type: 'warning' },
+      )
+    } catch {
+      return // 用户取消 → 无副作用
+    }
+    if (!wpId.value) {
+      ElMessage.error('缺少底稿标识，无法发布')
+      return
+    }
+    const amount = subtotalRow.value.closingAdjusted
+    publishing.value = true
+    try {
+      const resp: any = await api.post(
+        `/api/workpapers/${wpId.value}/audit-determination/publish-to-tb`,
+        {
+          sheet_name: '审定表G3-1',
+          writeback_rows: [
+            { account_code: G3_ACCOUNT_CODE, audited_amount: amount, amount_kind: 'balance' },
+          ],
+        },
+      )
+      ElMessage.success(resp?.message || '已发布到试算表')
+      publishAdjudicated()
+    } catch (err: any) {
+      ElMessage.error(err?.response?.data?.detail || err?.message || '发布失败，请重试')
+    } finally {
+      publishing.value = false
+    }
   }
 
   // 审定合计变化时自动发布
@@ -482,6 +530,8 @@ export function useG3Adjudication(options: UseG3AdjudicationOptions) {
     syncFromDetail,
     applyAdjustmentWriteback,
     publishAdjudicated,
+    publishToTb,
+    publishing,
   }
 }
 

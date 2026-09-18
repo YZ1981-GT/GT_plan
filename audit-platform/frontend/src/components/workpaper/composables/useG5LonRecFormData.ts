@@ -2,7 +2,6 @@ import { ref, onScopeDispose, inject, type InjectionKey, type Ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { api } from '@/services/apiProxy'
 import type { ChecklistResponse } from './useF1FormData'
-import { G5_ACCOUNT_CODE } from './g5Constants'
 
 export type G5LonRecFormData = ReturnType<typeof useG5LonRecFormData>
 export const G5FormDataKey: InjectionKey<G5LonRecFormData> = Symbol('g5FormData')
@@ -111,29 +110,10 @@ export function useG5LonRecFormData(opts: {
 
   function getSheet(name: string) { return sheetCache.value[name] ?? { rows: [] } }
 
-  /** 将 G5-1 审定净额回写试算平衡表 1531 */
-  async function writebackTrialBalance(auditedAmount: number): Promise<void> {
-    if (!opts.projectId.value) return
-    try {
-      await api.put(`/api/projects/${opts.projectId.value}/trial-balance/writeback`, {
-        account_code: G5_ACCOUNT_CODE,
-        audited_amount: auditedAmount,
-      })
-      const payload = JSON.stringify({ accountCode: G5_ACCOUNT_CODE, auditedAmount })
-      await saveImmediate('G5-1-tb-writeback', {
-        item_id: 'G5-1-tb-writeback',
-        conclusion: payload,
-        remark: payload,
-      })
-      await saveImmediate('G5-1-adjudicated-amount', {
-        item_id: 'G5-1-adjudicated-amount',
-        conclusion: String(auditedAmount),
-        remark: null,
-      })
-    } catch {
-      ElMessage.warning('审定数回写试算失败，请手动确认试算表 1531')
-    }
-  }
+  // spec: tb-writeback-explicit-publish-gate Task 12：原 writebackTrialBalance（旧端点
+  // PUT trial-balance/writeback，经宿主 handleG5Writeback 触发）为零消费死代码——TB 回写
+  // 已改由 useG5Adjudication.publishToTb（显式确认门 → POST publish-to-tb，科目1531余额口径）
+  // 承载，故移除此重复定义及其 return export。
 
   function flushPending(): void {
     for (const [itemId, timer] of _debounceTimers.entries()) {
@@ -156,7 +136,5 @@ export function useG5LonRecFormData(opts: {
     saveBatch,
     debouncedSave,
     flushPending,
-    writebackTrialBalance,
-    writebackTB: writebackTrialBalance,
   }
 }
