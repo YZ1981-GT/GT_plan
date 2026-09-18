@@ -337,10 +337,10 @@
       </div>
     </el-card>
 
-    <!-- 操作按钮 -->
+    <!-- 操作按钮（显式发布门） -->
     <div class="action-bar" v-if="!isReadonly">
-      <el-button type="primary" @click="handleWritebackTB" :loading="publishing">
-        确认审定 → 回写TB（{{ tbAccountLabel }}）
+      <el-button type="warning" @click="publishToTb" :loading="publishing">
+        发布到试算表（{{ tbAccountLabel }}）
       </el-button>
     </div>
 
@@ -634,26 +634,59 @@ function saveConclusion() {
   emit('save', 'K2-1-audit-conclusion', { remark: auditConclusion.value })
 }
 
-/** 确认审定 → 回写TB + EventBus 通知 */
-async function handleWritebackTB() {
+/**
+ * 发布审定数到试算表（显式发布门，复刻 D2/D4-1 范式）。
+ *
+ * spec: tb-writeback-explicit-publish-gate Task 7 / Req 1,2,8。
+ * 此前 handleWritebackTB 直调旧端点 `PUT /projects/{pid}/trial-balance/writeback`
+ * 绕过确认门（无二次确认/无幂等/无 publish_confirmed）。现改为二次确认（中文）→
+ * `POST /workpapers/{wpId}/audit-determination/publish-to-tb`（writeback_rows 携带
+ * 动态科目 tbAccountCode 与前端已算审定合计，balance 口径）。保留 substantive:adjudicated emit。
+ */
+async function publishToTb() {
+  if (props.isReadonly || publishing.value) return
+
+  const accountCode = tbAccountCode.value
+  try {
+    await ElMessageBox.confirm(
+      `发布后将把其他流动资产审定数（科目 ${accountCode}，期末余额）写入试算表（trial_balance），`
+      + '并触发报表/错报评价等下游重算。确认发布？',
+      '发布到试算表确认',
+      { confirmButtonText: '确认发布', cancelButtonText: '取消', type: 'warning' },
+    )
+  } catch {
+    return // 用户取消 → 无任何副作用
+  }
+
+  if (!props.wpId) {
+    ElMessage.error('缺少底稿标识，无法发布')
+    return
+  }
+
+  const auditedTotal = subtotalRow.value.audited
   publishing.value = true
   try {
-    const auditedTotal = subtotalRow.value.audited
-    await http.put(`/api/projects/${props.projectId}/trial-balance/writeback`, {
-      account_code: tbAccountCode.value,
-      audited_amount: auditedTotal,
-    })
+    const { api } = await import('@/services/apiProxy')
+    const resp: any = await api.post(
+      `/api/workpapers/${props.wpId}/audit-determination/publish-to-tb`,
+      {
+        sheet_name: '审定表K2-1',
+        writeback_rows: [
+          { account_code: accountCode, audited_amount: auditedTotal, amount_kind: 'balance' },
+        ],
+      },
+    )
     emit('save', 'K2-1-audited-total', { remark: String(auditedTotal) })
     eventBus.emit('substantive:adjudicated', {
       wpCode: 'K2',
-      accountCode: tbAccountCode.value,
+      accountCode,
       auditedAmount: auditedTotal,
       adjudicatedAmount: auditedTotal,
       timestamp: Date.now(),
     })
-    ElMessage.success(`审定数已回写TB（${tbAccountCode.value} 其他流动资产）`)
-  } catch {
-    ElMessage.error('TB回写失败')
+    ElMessage.success(resp?.message || '已发布到试算表')
+  } catch (err: any) {
+    ElMessage.error(err?.response?.data?.detail || err?.message || '发布失败，请重试')
   } finally {
     publishing.value = false
   }

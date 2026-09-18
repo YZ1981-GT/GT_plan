@@ -265,8 +265,8 @@
 
     <!-- ═══ TB回写按钮 ═══ -->
     <div class="tb-writeback-bar">
-      <el-button type="primary" size="small" :disabled="isReadonly" @click="handleTbWriteback">
-        回写试算表(6701发生额)
+      <el-button type="warning" size="small" :disabled="isReadonly" @click="handleTbWriteback">
+        发布到试算表(6701发生额)
       </el-button>
       <span v-if="detailCrossValidation.isBalanced" class="match-indicator">
         <el-icon color="#67c23a"><CircleCheckFilled /></el-icon> 明细勾稽平衡

@@ -36,7 +36,11 @@ vi.mock('@/utils/eventBus', () => ({
 
 vi.mock('element-plus', () => ({
   ElMessage: { success: vi.fn(), warning: vi.fn(), error: vi.fn() },
-  ElMessageBox: { prompt: vi.fn().mockResolvedValue({ value: 'test' }) },
+  // tb-writeback-explicit-publish-gate Task 7：writeback() 内置二次确认，默认放行（resolve）
+  ElMessageBox: {
+    prompt: vi.fn().mockResolvedValue({ value: 'test' }),
+    confirm: vi.fn().mockResolvedValue('confirm'),
+  },
 }))
 
 vi.mock('@/services/apiProxy', () => ({
@@ -146,7 +150,10 @@ describe('useK11Adjudication — 审定回写(发生额)', () => {
     saveSpy = vi.fn()
   })
 
-  it('writeback()发送正确payload: account_code=6701, is_occurrence=true', async () => {
+  // spec: tb-writeback-explicit-publish-gate Task 7 — K11 发生额改走显式发布门 publish-to-tb。
+  // 二次确认放行后，POST /workpapers/{wpId}/audit-determination/publish-to-tb，
+  // writeback_rows 含 account_code=6701 + amount_kind='occurrence'（非旧 PUT is_occurrence）。
+  it('writeback()发送正确payload: publish-to-tb, account_code=6701, occurrence', async () => {
     const adj = useK11Adjudication({
       allResponses,
       projectId: ref('proj-1'),
@@ -162,15 +169,20 @@ describe('useK11Adjudication — 审定回写(发生额)', () => {
 
     await adj.writeback()
 
-    // 验证http.put被调用，payload含 account_code='6701' + is_occurrence=true
+    // 不再调旧端点 http.put trial-balance/writeback
     const { default: http } = await import('@/utils/http')
-    const putCalls = (http.put as any).mock.calls
-    expect(putCalls.length).toBeGreaterThan(0)
-    const writebackCall = putCalls.find((c: any[]) => c[0]?.includes('writeback'))
-    expect(writebackCall).toBeDefined()
-    expect(writebackCall[1]).toMatchObject({
+    const httpPutCalls = (http.put as any).mock.calls
+    expect(httpPutCalls.find((c: any[]) => c[0]?.includes('trial-balance/writeback'))).toBeUndefined()
+
+    // 走显式发布门 api.post publish-to-tb
+    const postCalls = (api.post as any).mock.calls
+    const pubCall = postCalls.find((c: any[]) => c[0]?.includes('audit-determination/publish-to-tb'))
+    expect(pubCall).toBeDefined()
+    expect(pubCall[0]).toBe('/api/workpapers/wp-k11/audit-determination/publish-to-tb')
+    expect(pubCall[1].sheet_name).toMatch(/K11-1/)
+    expect(pubCall[1].writeback_rows[0]).toMatchObject({
       account_code: '6701',
-      is_occurrence: true,
+      amount_kind: 'occurrence',
     })
   })
 
@@ -215,10 +227,10 @@ describe('useK11Adjudication — 审定回写(发生额)', () => {
 
     await adj.writeback()
 
-    const { default: http } = await import('@/utils/http')
-    const putCalls = (http.put as any).mock.calls
-    const writebackCall = putCalls.find((c: any[]) => c[0]?.includes('writeback'))
-    expect(writebackCall[1].audited_amount).toBe(15700)
+    // 审定合计通过 publish-to-tb 的 writeback_rows[0].audited_amount 透传
+    const postCalls = (api.post as any).mock.calls
+    const pubCall = postCalls.find((c: any[]) => c[0]?.includes('audit-determination/publish-to-tb'))
+    expect(pubCall[1].writeback_rows[0].audited_amount).toBe(15700)
   })
 })
 

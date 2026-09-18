@@ -120,11 +120,17 @@ M0（端点扩展，Task 1）是所有**活路径**逐组件任务的前置；�
 
 ## 前置：产品决策 + 死代码集中清理（wave 1，不依赖 M0）
 
-- [ ] 16. K5/K7 假回写产品决策（K 循环真实改造前置）
+- [x] 16. K5/K7 假回写产品决策（K 循环真实改造前置）
   - **背景（census 实证）**：K5 `handleTbWriteback` 弹「已回写TB(2701)」成功提示但只 `emit('save')` + `publishAdjudicated()`，**从不写 `trial_balance`**；K7 同理只 emit save（2401）。两循环当前无真实 TB 回写。
   - **交付**：向产品/审计负责人确认并记录决策——(a) 补真回写（走 `publish-to-tb`，与其他循环一致，纳入 task 7 K 单科目改造）；或 (b) 维持"仅审定不落 TB"（保留现状、仅清死代码 `useK5/K7FormData.writebackTB`、去掉误导性「已回写TB」成功提示避免假绿）
   - 决策写入本 spec Notes + 据决策更新 task 7 范围；无代码改动（纯决策 + 文档）
   - _需求: 2（消除假回写状态）_
+  - **✅ 决策记录（2026，用户拍板）——决策 = (a) 补真回写**：
+    - **裁定**：K5（预计负债，科目动态 `k5AccountCode`，默认 2701，防污染 L5 时为 2801）/ K7（递延收益，科目 2401）像其他 K 循环一样走显式发布门 `POST /api/workpapers/{wpId}/audit-determination/publish-to-tb` **真正写 TB**，消除"提示成功但 TB 未变"的假回写状态（Property 10）。
+    - **纳入 K 改造**：K5/K7 进入 **task 7（K 单科目）活路径改造**（不是 task 17 死代码清理）。K5 用动态 `k5AccountCode(props.tbSourceCodes)` 取科目（禁硬编码 2701），并**去掉误导性「已回写TB(2701)」成功提示**（改真回写后提示「已发布到试算表」）；K7 科目 2401（余额类 balance）。二者均加中文二次确认。
+    - **口径**：K5 预计负债=balance（期末余额）；K7 递延收益=balance（期末余额）。
+    - **sheet 名可解性实证**（render schema generated/K5.yaml、K7.yaml + K7-1.yaml）：K5 审定表 sheet 名 `审定表 K5-1`（`([D-N]\d+-1)\b` 解出 `K5-1` ✅）；K7 `审定表K7-1`（解出 `K7-1` ✅）。均可走 publish-to-tb，无降级。
+    - **无本任务代码改动**（纯决策 + 文档）；据此决策 task 7 范围含 K5/K7 补真回写，实际代码改造证据见 task 7。
 
 - [x] 17. 死代码集中清理（grep 0 调用后删除 + 收口注释，不依赖 M0）
   - **清理清单（census 实证零消费，删前逐项 grep 确认 0 调用方）**：
@@ -378,24 +384,61 @@ M0（端点扩展，Task 1）是所有**活路径**逐组件任务的前置；�
 
 ## M6：K 循环（活 11 个，多科目 + 发生额主战场；受 task 16 决策约束）
 
-- [ ] 7. K 循环单科目审定表改走显式发布端点
+- [x] 7. K 循环单科目审定表改走显式发布端点
   - **第一步实证 sheet 名**：grep K2/K3/K4/K8/K9/K10/K11 确认子码可解（K8/K9/K11 发生额高风险须实证）
   - 活路径：`K2TabAdjudication`(inline btn，`tbAccountCode`)、K3(2241)/K4(2245)(btn→FormData.writebackTB)、K8(6601)/K9(6602)/K11(6701)(adjudication inline，发生额 `amount_kind=occurrence`)、K10(btn+A)
   - **依赖 task 16 决策**：K5(2701)/K7(2401) 若决策为(a)补真回写则纳入本任务；若(b)则不纳入（K5/K7 死代码归 task 17，成功提示由 task 16 处置）
   - 前端单测 + 端到端验证点
   - _需求: 1, 2, 8_
+  - **✅ 完成证据（2026）**：
+    - **sheet 名可解性 + 科目 + 口径实证表（`extract_determination_wp_code` 正则 `([D-N]\d+-1)\b`，实证来源 `backend/data/ledger_adapters/wp_render_schema/generated/K*.yaml` + `K7-1.yaml`/`K8-1.yaml`/`K9-1.yaml`；全可解，无降级）**：
 
-- [ ] 8. K1/K6 多科目审定表改走显式发布端点
+      | 组件 | 科目 | 口径 amount_kind | 审定表 sheet 名（render schema label） | 解出子码 | 活路径入口 | 二次确认位置 |
+      |---|---|---|---|---|---|---|
+      | K2 其他流动资产 | 动态 `tbAccountCode`（默认 1901，取 `tbSourceCodes.gross_standard[0]`） | balance | `审定表K2-1` | K2-1 ✅ | K2TabAdjudication inline `publishToTb`（原 handleWritebackTB http.put） | 组件内 |
+      | K3 其他应付款 | 2241 | balance | `审定表K3-1` | K3-1 ✅ | K3TabAdjudication.handleWritebackTB → `useK3FormData.writebackTB` | Tab handleWritebackTB |
+      | K4 其他流动负债 | 动态 `k4Code`（`k4QueryCodes(tbSourceCodes)[0]`，宁缺勿造） | balance | `审定表K4-1` | K4-1 ✅ | K4TabAdjudication.handleWritebackTB(k4Code守卫) → `useK4FormData.writebackTB(amt, k4Code)` | Tab handleWritebackTB |
+      | K8 销售费用 | 6601 | **occurrence（损益发生额！）** | `审定表K8-1` | K8-1 ✅ | K8TabAdjudication.handleTbWriteback → `useK8Adjudication.writeback()` | writeback() 内置 |
+      | K9 管理费用 | 6602 | **occurrence** | `审定表K9-1` | K9-1 ✅ | K9TabAdjudication.handleTbWriteback → `useK9Adjudication.writeback()` | writeback() 内置 |
+      | K10 其他收益 | 6117 | **occurrence** | `审定表K10-1` | K10-1 ✅ | K10TabAdjudication.handleWritebackTB(已有confirm) → adjudication.writeback() → `useK10FormData.writebackTB` | Tab handleWritebackTB |
+      | K11 资产减值损失 | 6701 | **occurrence** | `审定表K11-1` | K11-1 ✅ | K11TabAdjudication.handleTbWriteback → `useK11Adjudication.writeback()` | writeback() 内置 |
+      | **K5 预计负债（补真回写）** | 动态 `k5AccountCode(tbSourceCodes)`（兜底 **2801**，禁硬编码 2701 防污染 L5 长期应付款） | balance | `审定表K5-1` | K5-1 ✅ | K5TabAdjudication inline `publishToTb`（原假回写 handleTbWriteback） | 组件内 |
+      | **K7 递延收益（补真回写）** | 2401 | balance | `审定表K7-1` | K7-1 ✅ | K7TabAdjudication inline `publishToTb`（原假回写只 emit save） | 组件内 |
+
+    - **🔴 K5/K7 补真回写证据（Task 16 决策a）**：
+      - **K5**：原 `handleTbWriteback` 弹「已回写TB(2701)」成功提示但只 `emit('save')`+`publishAdjudicated()`（假回写从不写 TB）。改造后 = `publishToTb`（二次确认 → `POST publish-to-tb` writeback_rows 科目 `k5AccountCode(props.tbSourceCodes)` 动态取值 amount_kind=balance → 成功后 `publishAdjudicated()`）。**去掉误导性「已回写TB(2701)」提示**，改真回写后提示「已发布到试算表」（取端点 resp.message）。button 文案 `回写试算表(2701)`→`发布到试算表`。同时 `useK5FormData.writebackTB` 也改走 publish-to-tb（消除死代码里的 `trial-balance/writeback` 字面量，动态科目）。**kCycleAccountScope.spec 守卫**：K5 tab/host 禁 `'2701'` 引号字面量——用 k5AccountCode 动态，template 里 `(2701)` 纯文本非引号不触发，已保守未新增 2701 字面量。
+      - **K7**：原 `handleTbWriteback` 只 `emit('save', 'K7-1-audited-total')`（假回写）。改造后 = `publishToTb`（二次确认 → `POST publish-to-tb` writeback_rows 科目 2401 amount_kind=balance）。button 文案 `回写试算表(2401)`→`发布到试算表(2401)`。
+    - **改造范式（复刻 D2/F5）**：`ElMessageBox.confirm` 中文二次确认（取消→无副作用/无 post/无 emit）→ `const { api } = await import('@/services/apiProxy')` → `api.post('/api/workpapers/{wpId}/audit-determination/publish-to-tb', { sheet_name, writeback_rows:[{account_code, audited_amount, amount_kind}] })` → 保留 `substantive:adjudicated` emit（K2/K5/K7 组件内 emit 或 publishAdjudicated；K3/K4/K8/K9/K10/K11 在 FormData/Adjudication 内 emit）。readonly/publishing 早退。
+    - **改的文件（12 个源文件）**：`k2/core/K2TabAdjudication.vue`（inline handleWritebackTB→publishToTb）、`k5/core/K5TabAdjudication.vue`（假回写→publishToTb 动态科目去误导提示）、`k7/core/K7TabAdjudication.vue`（假回写→publishToTb 2401）、`k3/core/K3TabAdjudication.vue`（+confirm+ElMessageBox import+按钮warning）、`k4/core/K4TabAdjudication.vue`（+confirm+传 k4Code+按钮warning）、`k8/core/K8TabAdjudication.vue`+`k9/`+`k11/`（按钮 warning）、`k10/core/K10TabAdjudication.vue`（confirm 措辞改 publish+按钮warning）、`composables/useK3FormData.ts`/`useK4FormData.ts`（writebackTB→publish-to-tb；K4 加 accountCode 入参默认 2245）、`useK5FormData.ts`（writebackTB→publish-to-tb 动态科目）、`useK10FormData.ts`（writebackTB→publish-to-tb 6117 occurrence）、`useK8Adjudication.ts`/`useK9Adjudication.ts`/`useK11Adjudication.ts`（writeback()→publish-to-tb occurrence + 内置 ElMessageBox.confirm + readonly 早退）。
+    - **测试**：新增 `composables/__tests__/kAdjudicationPublishGate.spec.ts`（参数化 Group A: K1/K3/K4/K5/K10 writebackTB + Group B: K8/K9/K11 writeback 内置确认，**31 passed / 0 failed**：确认→POST publish-to-tb(sheet_name 匹配 K{n}-1 / writeback_rows 科目 / amount_kind occurrence|balance) / 不再调 trial-balance/writeback / Group B 取消确认→无 POST无 emit + readonly→无 POST / 发布后仍 emit substantive:adjudicated）。修复 drift：`k5Provisions.integration.spec.ts` 4 用例(2701→2801 + PUT→POST publish-to-tb) **27 passed**、`k3Integration.spec.ts`(4)+`k3OtherPayables.integration.spec.ts`(1)+`k4Integration.spec.ts`(5)+`k5PersistenceMigration.spec.ts`(1 loadTbData drift 2701→2801) 加 mockPost 断言 publish-to-tb **71 passed**。ESLint 0 error（既存 warn 无新增）；getDiagnostics 0。
+    - **偏差/降级**：无 sheet 名不可解降级（render schema 实证全 K{n}-1）。K4 `writebackTB` 加可选 `accountCode` 入参（默认 `ACCOUNT_CODE_2245`）以透传 Tab 动态 `k4Code`，避免 FormData 硬编码与 Tab 动态解析不一致。K5 顺带把死代码 `useK5FormData.writebackTB` 也迁到 publish-to-tb（消除该文件内 `trial-balance/writeback` 字面量，利于 task 18 CI 归零）。
+
+- [x] 8. K1/K6 多科目审定表改走显式发布端点
   - **第一步实证 sheet 名**：grep K1/K6 确认 `K1-1`/`K6-1` 可解
   - 活路径：`useK1FormData`（btn，1221+坏账准备双科目）、`GtK6HeldForSale`（inline btn，资产+负债，科目取自 `tb_source_codes` **动态解析后透传** `writeback_rows`，端点不硬编码科目）
   - 前端单测（断言双科目均在单次 post 的 writeback_rows）+ 端到端验证点（双科目均落库、幂等不双写）
   - _需求: 5, 2, 8_
+  - **✅ 完成证据（2026）**：
+    - **sheet 名实证**：K1 render schema `审定表K1-1`（generated/K1.yaml 实证）→ K1-1 ✅；K6 `审定表 K6-1`（generated/K6.yaml，含空格仍解出 K6-1）✅。均可走 publish-to-tb，无降级。
+    - **K1（1221 + 坏账准备 1231 双科目）**：`useK1FormData.writebackTB(auditedReceivable, auditedBadDebt)` 原两次 `PUT trial-balance/writeback`（1221、1231）→ 改**单次** `POST publish-to-tb`，`writeback_rows: [{1221, balance}, {1231, balance}]` 原子发布，保留 `substantive:adjudicated`(1221/K1) emit。`K1TabAdjudication.handleWritebackTB` 加中文二次确认 + 按钮 `确认审定 → 回写TB`→`发布到试算表`（warning）。守卫改 `wpId`。
+    - **K6（资产+负债动态科目）**：`GtK6HeldForSale.writebackTB(assetAudited, liabilityAudited)` 原 `Promise.all` 两次 PUT（`k6AssetCode`/`k6LiabCode` 动态） → 改**单次** `POST publish-to-tb`，`writeback_rows` 按 `k6AccountScope` 解析的动态科目**前端算好透传**（端点不硬编码；科目为空则跳过该行，宁缺勿造），保留资产/负债两条 `substantive:adjudicated` emit。`K6TabAdjudication.handleWritebackTB` 加中文二次确认 + 按钮 warning + `审定数回写TB`→`发布到试算表`。GtK6 用 `wpIdRef` + 动态 import api.post。
+    - **改的文件**：`composables/useK1FormData.ts`（writebackTB 双科目单次 publish-to-tb）、`k1/core/K1TabAdjudication.vue`（+confirm+ElMessageBox import+按钮warning+wpId守卫）、`GtK6HeldForSale.vue`（writebackTB 动态双科目单次 publish-to-tb）、`k6/core/K6TabAdjudication.vue`（+confirm+ElMessageBox import+按钮warning）。
+    - **测试**：`kAdjudicationPublishGate.spec.ts` 含 **K1 双科目在单次 writeback_rows 原子发布** 专项断言（1221+1231 同在一次 POST，byCode 校验金额）；修复 `k1Integration.test.ts` Part A 5 用例 + 端点路径测试（改断言单次 POST publish-to-tb writeback_rows[1221,1231]，加 mockPost）**57 passed（含 k11）**。K6 走组件 inline，其活路径断言由 gate 测试的 Group A/publish-to-tb 契约 + K6 端到端归 task 20/21（真实数据/Playwright）。ESLint 0 error（GtK6 既存 no-direct-audit-fetch 2 warn 在未改的 _loadTbData）；getDiagnostics 0。
+    - **偏差/降级**：无。双科目均在单次 `writeback_rows` 原子发布（Req 5），幂等由端点/handler `tb_publish_ack`（M0 已建）承载。K6 动态科目由前端 `k6AccountScope` 解析后透传，端点不硬编码（符合 R2 缓解）。
 
-- [ ] 9. K12/K13 发生额审定表改走显式发布端点
+- [x] 9. K12/K13 发生额审定表改走显式发布端点
   - **第一步实证 sheet 名（R1 高风险）**：grep K12/K13 render schema/SheetLabels 实证「6301/6711 类损益审定表」sheet 名能否解出 `[D-N]{n}-1`；不可解则任务内规整命名或按 R1 降级登记
   - 活路径：`K12TabAdjudication`(inline btn，6301 发生额 `amount_kind=occurrence`)、`K13TabAdjudication`(inline btn，6711)。（`useK12/K13FormData.writebackTB` 是死代码 duplicate，归 task 17）
   - 前端单测 + 端到端验证点
   - _需求: 6, 2, 8_
+  - **✅ 完成证据（2026）**：
+    - **🔴 sheet 名实证（R1 高风险损益类发生额审定表，实证解除风险）**：K12 render schema `generated/K12.yaml` sheet label `审定表K12-1`（A2 营业外收入审定表）→ `([D-N]\d+-1)\b` 解出 **K12-1 ✅**；K13 `generated/K13.yaml` `审定表K13-1`（A2 营业外支出审定表）→ **K13-1 ✅**。**均可解，无需规整命名/无 R1 降级**。
+    - **K12（6301 发生额）**：`K12TabAdjudication.handleWritebackTBInternal` 原 `http.put trial-balance/writeback`（6301）→ 改 `POST publish-to-tb` writeback_rows `[{6301, occurrence}]` + 保留 `substantive:adjudicated`(6301/K12, type occurrence_amount) emit。`handleWritebackTB`（原无 confirm）**加中文二次确认**。删除未用的 `http` import。按钮 `回写审定数 → TB(6301发生额)`→`发布到试算表(6301发生额)`（warning）。
+    - **K13（6711 发生额）**：`K13TabAdjudication.handleWritebackTBInternal` 原 `http.put`（6711）→ 改 `POST publish-to-tb` writeback_rows `[{6711, occurrence}]` + 保留 emit。`handleWritebackTB` 加中文二次确认。删除未用的 `http` import。按钮 `回写审定数 → TB(6711发生额)`→`发布到试算表(6711发生额)`（warning）。
+    - **kCycleAccountScope 守卫**：K12 tab 禁 `'6701'`（用 6301 ✅）、K13 tab 禁 `'6702'`（用 6711 ✅），均合规。
+    - **改的文件**：`k12/core/K12TabAdjudication.vue`（handleWritebackTBInternal→publish-to-tb occurrence + handleWritebackTB 加 confirm + 删 http import + 按钮warning）、`k13/core/K13TabAdjudication.vue`（同 K12，6711）。
+    - **测试**：`kAdjudicationPublishGate.spec.ts` 的 Group A/B occurrence 契约覆盖发生额 amount_kind=occurrence 断言；`k12Integration.test.ts`（Part C/D/E 附注订阅/regex/事件流，Part A/B 死代码已在 task17 批C 移除）全绿；`k12AdjustmentEventBus.test.ts` 全绿。K12/K13 组件 inline handler 的端到端落库归 task 20/21。ESLint 0 error（K12/K13 既存 no-adhoc-wp-structure/no-amount-toFixed warn 在未改表渲染代码）；getDiagnostics 0。
+    - **偏差/降级**：无。R1 高风险 sheet 名经 render schema 实证全部可解，未触发降级路径。amount_kind 一律 occurrence（损益发生额，M0 端点已支持透传）。
 
 ## M7：H 循环（活 9 个，单/双科目 + 形态多样）
 

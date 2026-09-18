@@ -351,13 +351,18 @@ export function useK10FormData(opts: {
    * @param auditedAmount 审定发生额（贷方-借方净额）
    */
   async function writebackTB(auditedAmount: number): Promise<void> {
-    if (!projectId.value) return
+    // spec: tb-writeback-explicit-publish-gate Task 7 / Req 1,2,6,8。
+    // 此前直调旧端点 `PUT /projects/{pid}/trial-balance/writeback` 绕过确认门。现改走
+    // `POST /workpapers/{wpId}/audit-determination/publish-to-tb`（6117，amount_kind='occurrence'）；
+    // 二次确认在调用方 K10TabAdjudication.handleWritebackTB（已有）。
+    if (!wpId.value) return
     isSaving.value = true
     try {
-      await api.put(`/api/projects/${projectId.value}/trial-balance/writeback`, {
-        account_code: ACCOUNT_CODE_6117,
-        audited_amount: auditedAmount,
-        is_occurrence: true, // 标识：损益类发生额回写
+      await api.post(`/api/workpapers/${wpId.value}/audit-determination/publish-to-tb`, {
+        sheet_name: '审定表K10-1',
+        writeback_rows: [
+          { account_code: ACCOUNT_CODE_6117, audited_amount: auditedAmount, amount_kind: 'occurrence' },
+        ],
       })
 
       // 更新本地 tbData
@@ -374,8 +379,8 @@ export function useK10FormData(opts: {
 
       // 保存审定金额到独立 item_id 供跨sheet引用
       await saveResponse('K10-1-adjudicated-amount', String(auditedAmount))
-    } catch {
-      ElMessage.warning('审定数回写失败，请手动确认试算表数据')
+    } catch (err: any) {
+      ElMessage.warning(err?.response?.data?.detail || '审定数发布失败，请手动确认试算表数据')
     } finally {
       isSaving.value = false
     }

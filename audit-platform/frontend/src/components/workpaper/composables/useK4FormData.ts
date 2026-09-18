@@ -172,35 +172,36 @@ export function useK4FormData(params: {
   // ─── writebackTB（2245 其他流动负债 负债口径） ────────────────────────────────
 
   /**
-   * 审定数回写 trial_balance：科目2245其他流动负债（贷方/负债类）。
-   * 回写成功后发布 EventBus 'substantive:adjudicated' 通知附注刷新。
+   * 审定数发布到 trial_balance（显式发布门）：其他流动负债（贷方/负债类）。
+   * 发布成功后发布 EventBus 'substantive:adjudicated' 通知附注刷新。
    *
-   * ⚠️ 负债类2245！正数口径回写（v2 trial_balance 正数，无需取反）。
-   * 负债类方向：期末=期初+贷方-借方
+   * ⚠️ 负债类！正数口径回写（v2 trial_balance 正数，无需取反）。负债类方向：期末=期初+贷方-借方
    *
-   * Req 2.6: WHEN 审定数变化时 SHALL 回写trial_balance(2245)+发布'substantive:adjudicated'
+   * spec: tb-writeback-explicit-publish-gate Task 7 / Req 1,2,8。
+   * 此前直调旧端点 `PUT /projects/{pid}/trial-balance/writeback` 绕过确认门。现改走
+   * `POST /workpapers/{wpId}/audit-determination/publish-to-tb`（writeback_rows，balance 口径）；
+   * 二次确认在调用方 K4TabAdjudication.handleWritebackTB。
+   * 科目码由调用方传入（K4 宁缺勿造循环，科目取自 k4QueryCodes 动态解析，缺省回退 2245）。
    */
-  async function writebackTB(auditedAmount: number): Promise<void> {
-    if (!projectId.value) return
-    try {
-      await api.put(`/api/projects/${projectId.value}/trial-balance/writeback`, {
-        account_code: ACCOUNT_CODE_2245,
-        audited_amount: auditedAmount,
-      })
+  async function writebackTB(auditedAmount: number, accountCode: string = ACCOUNT_CODE_2245): Promise<void> {
+    if (!wpId.value || !accountCode) return
+    await api.post(`/api/workpapers/${wpId.value}/audit-determination/publish-to-tb`, {
+      sheet_name: '审定表K4-1',
+      writeback_rows: [
+        { account_code: accountCode, audited_amount: auditedAmount, amount_kind: 'balance' },
+      ],
+    })
 
-      // EventBus publish 'substantive:adjudicated'
-      eventBus.emit('substantive:adjudicated', {
-        accountCode: ACCOUNT_CODE_2245,
-        auditedAmount,
-        wpCode: 'K4',
-        timestamp: Date.now(),
-      })
+    // EventBus publish 'substantive:adjudicated'
+    eventBus.emit('substantive:adjudicated', {
+      accountCode,
+      auditedAmount,
+      wpCode: 'K4',
+      timestamp: Date.now(),
+    })
 
-      // 同步更新本地 tbData
-      tbData.value.audited2245 = auditedAmount
-    } catch {
-      ElMessage.warning('审定数回写失败，请手动确认试算表数据')
-    }
+    // 同步更新本地 tbData
+    tbData.value.audited2245 = auditedAmount
   }
 
   // ─── Save core ─────────────────────────────────────────────────────────────

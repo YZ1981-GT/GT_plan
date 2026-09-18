@@ -168,10 +168,10 @@
       </el-table-column>
     </el-table>
 
-    <!-- ═══ TB回写按钮 ═══ -->
+    <!-- ═══ TB回写按钮（显式发布门） ═══ -->
     <div class="tb-writeback-bar">
-      <el-button type="primary" size="small" :disabled="isReadonly" @click="handleTbWriteback">
-        回写试算表(2701)
+      <el-button type="warning" size="small" :loading="publishing" :disabled="isReadonly" @click="publishToTb">
+        发布到试算表
       </el-button>
       <span v-if="tbReconciliation.isMatch" class="match-indicator">
         <el-icon color="#67c23a"><CircleCheckFilled /></el-icon> 勾稽平衡
@@ -252,7 +252,7 @@
  */
 import WpFourTableSourcePanel from '../../shared/WpFourTableSourcePanel.vue'
 import { k5AccountCode } from '../../composables/k5AccountScope'
-import { computed, toRef } from 'vue'
+import { computed, ref, toRef } from 'vue'
 import { MagicStick, CircleCheckFilled, WarningFilled, Download } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useK5Adjudication } from '../../composables/useK5Adjudication'
@@ -327,11 +327,60 @@ function handleCellChange(rowKey: string, field: string, value: any) {
   emit('save', `K5-1-${rowKey}-${field}`, { remark: String(value ?? '') })
 }
 
-function handleTbWriteback() {
-  emit('save', 'K5-1-audited-total', { remark: String(subtotalRow.value.audited) })
-  // 发布审定数事件通知附注/A13/下游
-  publishAdjudicated()
-  ElMessage.success('已回写TB(2701)并发布审定数')
+const publishing = ref(false)
+
+/**
+ * 发布审定数到试算表（显式发布门，复刻 D2/D4-1 范式）。
+ *
+ * spec: tb-writeback-explicit-publish-gate Task 7 / Task 16 决策(a) / Req 1,2,8。
+ * 🔴 补真回写：此前 handleTbWriteback 弹「已回写TB(2701)」成功提示却只 emit save +
+ * publishAdjudicated（假回写，从不写 trial_balance）。现改为二次确认（中文）→
+ * `POST /workpapers/{wpId}/audit-determination/publish-to-tb` 真正写 TB，消除假回写状态。
+ * 🔴 科目码取自 k5AccountCode（报表映射解析，兜底 2801，禁硬编码 2701 防污染 L5 长期应付款）。
+ * 发布成功仍调 publishAdjudicated → emit substantive:adjudicated（附注/A13 下游刷新回归）。
+ */
+async function publishToTb(): Promise<void> {
+  if (props.isReadonly || publishing.value) return
+
+  const accountCode = k5AccountCode(props.tbSourceCodes as any)
+  try {
+    await ElMessageBox.confirm(
+      `发布后将把预计负债审定数（科目 ${accountCode}，期末余额）写入试算表（trial_balance），`
+      + '并触发报表/错报评价等下游重算。确认发布？',
+      '发布到试算表确认',
+      { confirmButtonText: '确认发布', cancelButtonText: '取消', type: 'warning' },
+    )
+  } catch {
+    return // 用户取消 → 无任何副作用
+  }
+
+  if (!props.wpId) {
+    ElMessage.error('缺少底稿标识，无法发布')
+    return
+  }
+
+  const auditedTotal = subtotalRow.value.audited
+  publishing.value = true
+  try {
+    const { api } = await import('@/services/apiProxy')
+    const resp: any = await api.post(
+      `/api/workpapers/${props.wpId}/audit-determination/publish-to-tb`,
+      {
+        sheet_name: '审定表K5-1',
+        writeback_rows: [
+          { account_code: accountCode, audited_amount: auditedTotal, amount_kind: 'balance' },
+        ],
+      },
+    )
+    emit('save', 'K5-1-audited-total', { remark: String(auditedTotal) })
+    // 保留下游联动：发布审定数事件通知附注/A13/下游
+    publishAdjudicated()
+    ElMessage.success(resp?.message || '已发布到试算表')
+  } catch (err: any) {
+    ElMessage.error(err?.response?.data?.detail || err?.message || '发布失败，请重试')
+  } finally {
+    publishing.value = false
+  }
 }
 
 function handleSaveConclusion() { saveAll() }

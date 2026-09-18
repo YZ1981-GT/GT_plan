@@ -355,34 +355,44 @@ const k6LiabCode = computed(() => {
  * writebackTB: 审定数回写 trial_balance 双科目 + 发布 substantive:adjudicated。
  * Requirement 2.6: WHEN 审定数变化时 SHALL 回写+发布。
  */
+/**
+ * spec: tb-writeback-explicit-publish-gate Task 8 / Req 1,2,5,8。
+ * 此前 Promise.all 两次 `PUT /projects/{pid}/trial-balance/writeback`（资产 + 负债动态科目）
+ * 绕过确认门。现改为单次 `POST /workpapers/{wpId}/audit-determination/publish-to-tb`，动态双科目
+ * 在同一次 writeback_rows 原子发布（balance 口径，科目由 k6AccountScope 解析后透传，端点不硬编码）。
+ * 二次确认在调用方 K6TabAdjudication.handleWritebackTB。保留资产/负债两条 substantive:adjudicated emit。
+ */
 async function writebackTB(assetAudited: number, liabilityAudited: number): Promise<void> {
-  if (!props.projectId) return
+  if (!wpIdRef.value) return
+  const rows: Array<{ account_code: string; audited_amount: number; amount_kind: 'balance' }> = []
+  if (k6AssetCode.value) rows.push({ account_code: k6AssetCode.value, audited_amount: assetAudited, amount_kind: 'balance' })
+  if (k6LiabCode.value) rows.push({ account_code: k6LiabCode.value, audited_amount: liabilityAudited, amount_kind: 'balance' })
+  if (rows.length === 0) return // 宁缺勿造：无科目不发布
   try {
-    await Promise.all([
-      http.put(`/api/projects/${props.projectId}/trial-balance/writeback`, {
-        account_code: k6AssetCode.value,
-        audited_amount: assetAudited,
-      }),
-      http.put(`/api/projects/${props.projectId}/trial-balance/writeback`, {
-        account_code: k6LiabCode.value,
-        audited_amount: liabilityAudited,
-      }),
-    ])
+    const { api } = await import('@/services/apiProxy')
+    await api.post(`/api/workpapers/${wpIdRef.value}/audit-determination/publish-to-tb`, {
+      sheet_name: '审定表K6-1',
+      writeback_rows: rows,
+    })
 
     // EventBus: substantive:adjudicated (资产)
-    eventBus.emit('substantive:adjudicated', {
-      accountCode: k6AssetCode.value,
-      auditedAmount: assetAudited,
-      wpCode: 'K6',
-      timestamp: Date.now(),
-    })
+    if (k6AssetCode.value) {
+      eventBus.emit('substantive:adjudicated', {
+        accountCode: k6AssetCode.value,
+        auditedAmount: assetAudited,
+        wpCode: 'K6',
+        timestamp: Date.now(),
+      })
+    }
     // EventBus: substantive:adjudicated (负债)
-    eventBus.emit('substantive:adjudicated', {
-      accountCode: k6LiabCode.value,
-      auditedAmount: liabilityAudited,
-      wpCode: 'K6',
-      timestamp: Date.now(),
-    })
+    if (k6LiabCode.value) {
+      eventBus.emit('substantive:adjudicated', {
+        accountCode: k6LiabCode.value,
+        auditedAmount: liabilityAudited,
+        wpCode: 'K6',
+        timestamp: Date.now(),
+      })
+    }
 
     // 同步本地 tbData
     tbData.value.auditedAsset = assetAudited

@@ -58,9 +58,11 @@ describe('K5 persistence migration', () => {
 
     expect(form.getResponse('rows')).toEqual(rows)
     expect(api.get).toHaveBeenCalledWith('/api/workpapers/wp-k5/checklist-responses')
+    // 科目码取自 k5QueryCodes（无 tb_source_codes 兜底 2801，防污染 L5 长期应付款；非旧 2701）
+    // spec: tb-writeback-explicit-publish-gate（K5 补真回写连带修 test-vs-source drift）
     expect(api.get).toHaveBeenCalledWith(
       '/api/projects/project-real/trial-balance',
-      expect.objectContaining({ params: { account_prefix: '2701', year: 2025 } }),
+      expect.objectContaining({ params: { account_prefix: '2801', year: 2025 } }),
     )
   })
 

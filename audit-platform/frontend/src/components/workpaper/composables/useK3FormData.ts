@@ -160,34 +160,35 @@ export function useK3FormData(params: {
   // ─── writebackTB（2241 其他应付款 负债口径） ────────────────────────────────
 
   /**
-   * 审定数回写 trial_balance：科目2241其他应付款（贷方/负债类）。
-   * 回写成功后发布 EventBus 'substantive:adjudicated' 通知附注刷新。
+   * 审定数发布到 trial_balance（显式发布门）：科目2241其他应付款（贷方/负债类）。
+   * 发布成功后发布 EventBus 'substantive:adjudicated' 通知附注刷新。
    *
    * ⚠️ 负债类2241！正数口径回写（v2 trial_balance 正数，无需取反）。
    *
-   * Req 2.6: WHEN 审定数变化时 SHALL 回写trial_balance(2241)+发布'substantive:adjudicated'
+   * spec: tb-writeback-explicit-publish-gate Task 7 / Req 1,2,8。
+   * 此前直调旧端点 `PUT /projects/{pid}/trial-balance/writeback` 绕过确认门。现改走
+   * `POST /workpapers/{wpId}/audit-determination/publish-to-tb`（writeback_rows 携带 2241
+   * 与审定合计，balance 口径），二次确认在调用方 K3TabAdjudication.handleWritebackTB。
    */
   async function writebackTB(auditedAmount: number): Promise<void> {
-    if (!projectId.value) return
-    try {
-      await api.put(`/api/projects/${projectId.value}/trial-balance/writeback`, {
-        account_code: ACCOUNT_CODE_2241,
-        audited_amount: auditedAmount,
-      })
+    if (!wpId.value) return
+    await api.post(`/api/workpapers/${wpId.value}/audit-determination/publish-to-tb`, {
+      sheet_name: '审定表K3-1',
+      writeback_rows: [
+        { account_code: ACCOUNT_CODE_2241, audited_amount: auditedAmount, amount_kind: 'balance' },
+      ],
+    })
 
-      // EventBus publish 'substantive:adjudicated'
-      eventBus.emit('substantive:adjudicated', {
-        accountCode: ACCOUNT_CODE_2241,
-        auditedAmount,
-        wpCode: 'K3',
-        timestamp: Date.now(),
-      })
+    // EventBus publish 'substantive:adjudicated'
+    eventBus.emit('substantive:adjudicated', {
+      accountCode: ACCOUNT_CODE_2241,
+      auditedAmount,
+      wpCode: 'K3',
+      timestamp: Date.now(),
+    })
 
-      // 同步更新本地 tbData
-      tbData.value.audited2241 = auditedAmount
-    } catch {
-      ElMessage.warning('审定数回写失败，请手动确认试算表数据')
-    }
+    // 同步更新本地 tbData
+    tbData.value.audited2241 = auditedAmount
   }
 
   // ─── Save core ─────────────────────────────────────────────────────────────

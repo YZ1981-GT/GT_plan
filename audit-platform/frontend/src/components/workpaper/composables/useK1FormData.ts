@@ -235,29 +235,26 @@ export function useK1FormData(opts: UseK1FormDataOptions) {
    * Req 2.8: WHEN 审定数变化时 SHALL 回写trial_balance(1221+坏账准备)+发布'substantive:adjudicated'
    */
   async function writebackTB(auditedReceivable: number, auditedBadDebt: number): Promise<void> {
-    if (!projectId.value) return
-    try {
-      // 1. 回写 1221 其他应收款
-      await api.put(`/api/projects/${projectId.value}/trial-balance/writeback`, {
-        account_code: ACCOUNT_CODE_1221,
-        audited_amount: auditedReceivable,
-      })
-      // 2. 回写 坏账准备
-      await api.put(`/api/projects/${projectId.value}/trial-balance/writeback`, {
-        account_code: ACCOUNT_CODE_BAD_DEBT,
-        audited_amount: auditedBadDebt,
-      })
+    if (!wpId.value) return
+    // spec: tb-writeback-explicit-publish-gate Task 8 / Req 1,2,5,8。
+    // 此前两次 `PUT /projects/{pid}/trial-balance/writeback`（1221 + 坏账准备）绕过确认门。
+    // 现改为单次 `POST /workpapers/{wpId}/audit-determination/publish-to-tb`，双科目在同一次
+    // writeback_rows 原子发布（balance 口径），二次确认在调用方 K1TabAdjudication.handleWritebackTB。
+    await api.post(`/api/workpapers/${wpId.value}/audit-determination/publish-to-tb`, {
+      sheet_name: '审定表K1-1',
+      writeback_rows: [
+        { account_code: ACCOUNT_CODE_1221, audited_amount: auditedReceivable, amount_kind: 'balance' },
+        { account_code: ACCOUNT_CODE_BAD_DEBT, audited_amount: auditedBadDebt, amount_kind: 'balance' },
+      ],
+    })
 
-      // 3. EventBus publish 'substantive:adjudicated'
-      eventBus.emit('substantive:adjudicated', {
-        accountCode: ACCOUNT_CODE_1221,
-        auditedAmount: auditedReceivable,
-        wpCode: 'K1',
-        timestamp: Date.now(),
-      })
-    } catch {
-      ElMessage.warning('审定数回写失败，请手动确认试算表数据')
-    }
+    // EventBus publish 'substantive:adjudicated'
+    eventBus.emit('substantive:adjudicated', {
+      accountCode: ACCOUNT_CODE_1221,
+      auditedAmount: auditedReceivable,
+      wpCode: 'K1',
+      timestamp: Date.now(),
+    })
   }
 
   // ─── Flush（组件卸载） ───────────────────────────────────────────────────

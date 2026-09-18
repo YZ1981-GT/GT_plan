@@ -350,8 +350,8 @@
 
     <!-- 操作按钮 -->
     <div class="action-bar" v-if="!isReadonly">
-      <el-button type="primary" @click="handleWritebackTB" :loading="publishing">
-        确认审定 → 回写TB
+      <el-button type="warning" @click="handleWritebackTB" :loading="publishing">
+        发布到试算表
       </el-button>
     </div>
 
@@ -399,7 +399,7 @@
  */
 import { ref, computed, inject, toRef, onMounted, onBeforeUnmount, nextTick } from 'vue'
 import { MagicStick, Download } from '@element-plus/icons-vue'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import type { UploadFile } from 'element-plus'
 import http from '@/utils/http'
 import { eventBus } from '@/utils/eventBus'
@@ -748,16 +748,31 @@ async function onImportChange(uploadFile: UploadFile) {
   if (result) await reloadFromServer()
 }
 
+// spec: tb-writeback-explicit-publish-gate Task 8 — 二次确认 → useK1FormData.writebackTB
+// 走 publish-to-tb 显式发布门，双科目(1221+坏账准备)单次原子发布。
 async function handleWritebackTB() {
+  if (props.isReadonly || publishing.value) return
+  const recSec = receivableSection.value
+  const bdSec = badDebtSection.value
+  if (!recSec || !bdSec) return
+  try {
+    await ElMessageBox.confirm(
+      '发布后将把其他应收款审定数（科目 1221 及坏账准备，期末余额）写入试算表（trial_balance），'
+      + '并触发报表/错报评价等下游重算。确认发布？',
+      '发布到试算表确认',
+      { confirmButtonText: '确认发布', cancelButtonText: '取消', type: 'warning' },
+    )
+  } catch {
+    return // 用户取消 → 无任何副作用
+  }
   publishing.value = true
   try {
-    const recSec = receivableSection.value
-    const bdSec = badDebtSection.value
-    if (!recSec || !bdSec) return
     await writebackTB(recSec.subtotalRow.audited, bdSec.subtotalRow.audited)
     persistAuditedTotals()
-    ElMessage.success('审定数已回写TB（1221+坏账准备）')
-  } catch { ElMessage.error('TB回写失败') }
+    ElMessage.success('已发布到试算表（1221+坏账准备）')
+  } catch (err: any) {
+    ElMessage.error(err?.response?.data?.detail || err?.message || '发布失败，请重试')
+  }
   finally { publishing.value = false }
 }
 function handleSyncK14(scope: K14WritebackScope = 'all') {

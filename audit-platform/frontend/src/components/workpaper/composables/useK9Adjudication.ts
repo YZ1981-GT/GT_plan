@@ -18,7 +18,7 @@
  * Item IDs: "K9-1-row-{idx}-{field}"
  */
 import { ref, computed, watch, nextTick, type Ref, type ComputedRef } from 'vue'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { eventBus } from '@/utils/eventBus'
 import {
   parseNum,
@@ -362,7 +362,28 @@ export function useK9Adjudication(params: UseK9AdjudicationParams) {
 
   // ─── TB回写 + EventBus（损益类发生额！）────────────────────────────────────
 
+  /**
+   * 发布审定发生额到试算表（显式发布门，损益类 occurrence 口径）。
+   *
+   * spec: tb-writeback-explicit-publish-gate Task 7 / Req 1,2,6,8。
+   * 此前 writeback() 直调旧端点绕过确认门。现改为二次确认（中文）→
+   * `POST /workpapers/{wpId}/audit-determination/publish-to-tb`（6602，amount_kind='occurrence'）。
+   * 保留 substantive:adjudicated emit。用户取消 → 无任何副作用。
+   */
   async function writeback(): Promise<void> {
+    if (isReadonly?.value) return
+
+    try {
+      await ElMessageBox.confirm(
+        '发布后将把管理费用审定数（科目 6602，本期发生额）写入试算表（trial_balance），'
+        + '并触发报表/错报评价等下游重算。确认发布？',
+        '发布到试算表确认',
+        { confirmButtonText: '确认发布', cancelButtonText: '取消', type: 'warning' },
+      )
+    } catch {
+      return // 用户取消 → 无任何副作用
+    }
+
     _persist()
     const auditedTotal = totalRow.value.audited
 
@@ -371,19 +392,27 @@ export function useK9Adjudication(params: UseK9AdjudicationParams) {
     // 同步 by-item 供附注自动取数（确保发事件前已写入）
     _persistAuditedByItem()
 
-    // TB回写（科目6602，**发生额！**）
-    if (projectId.value) {
-      try {
-        const { default: http } = await import('@/utils/http')
-        await http.put(`/api/projects/${projectId.value}/trial-balance/writeback`, {
-          account_code: ACCOUNT_CODE_6602,
-          audited_amount: auditedTotal,
-          is_occurrence: true, // 损益类标记
-        })
-        ElMessage.success('审定发生额已回写试算表(6602)')
-      } catch {
-        ElMessage.warning('审定发生额回写失败，请手动确认')
-      }
+    if (!wpId.value) {
+      ElMessage.error('缺少底稿标识，无法发布')
+      return
+    }
+
+    // TB回写（科目6602，**发生额！** occurrence）
+    try {
+      const { api } = await import('@/services/apiProxy')
+      const resp: any = await api.post(
+        `/api/workpapers/${wpId.value}/audit-determination/publish-to-tb`,
+        {
+          sheet_name: '审定表K9-1',
+          writeback_rows: [
+            { account_code: ACCOUNT_CODE_6602, audited_amount: auditedTotal, amount_kind: 'occurrence' },
+          ],
+        },
+      )
+      ElMessage.success(resp?.message || '已发布到试算表(6602发生额)')
+    } catch (err: any) {
+      ElMessage.error(err?.response?.data?.detail || err?.message || '发布失败，请重试')
+      return
     }
 
     // 发布 'substantive:adjudicated' EventBus事件（mitt eventBus，附注组件 subscribe 刷新）

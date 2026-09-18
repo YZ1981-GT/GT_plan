@@ -285,13 +285,13 @@
     <!-- ═══ TB回写操作栏 ═══ -->
     <div class="k13-action-bar">
       <el-button
-        type="primary"
+        type="warning"
         size="small"
         :disabled="props.isReadonly"
         :loading="writebackLoading"
         @click="handleWritebackTB"
       >
-        回写审定数 → TB(6711发生额)
+        发布到试算表(6711发生额)
       </el-button>
       <span class="tb-info">
         TB未审发生额：{{ fmtAmt(props.tbData.unadjusted6711) }}　|　
@@ -382,7 +382,6 @@ import WpFourTableSourcePanel from '../../shared/WpFourTableSourcePanel.vue'
 import { ref, inject, defineAsyncComponent, watch, toRef, computed } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { MagicStick, Download } from '@element-plus/icons-vue'
-import http from '@/utils/http'
 import { useK13Adjudication } from '../../composables/useK13Adjudication'
 import { generateK13AiText } from '../../composables/useK13AiText'
 import { useAuditContext } from '@/composables/useAuditContext'
@@ -489,16 +488,22 @@ function getSummaries({ columns }: any) {
 
 // ─── TB回写 ──────────────────────────────────────────────────────────────────
 
+// spec: tb-writeback-explicit-publish-gate Task 9 / Req 1,2,6,8。
+// 此前直调旧端点 `PUT /projects/{pid}/trial-balance/writeback`（6711 发生额）绕过确认门。
+// 现改走 `POST /workpapers/{wpId}/audit-determination/publish-to-tb`（amount_kind='occurrence'）；
+// 二次确认在 handleWritebackTB。保留 substantive:adjudicated emit。
 async function handleWritebackTBInternal(auditedAmount: number): Promise<void> {
-  // 真实回写试算表（科目6711发生额），端点已存在，LIKE 前缀回退
-  if (props.projectId) {
+  if (props.wpId) {
     try {
-      await http.put(`/api/projects/${props.projectId}/trial-balance/writeback`, {
-        account_code: '6711',
-        audited_amount: auditedAmount,
+      const { api } = await import('@/services/apiProxy')
+      await api.post(`/api/workpapers/${props.wpId}/audit-determination/publish-to-tb`, {
+        sheet_name: '审定表K13-1',
+        writeback_rows: [
+          { account_code: '6711', audited_amount: auditedAmount, amount_kind: 'occurrence' },
+        ],
       })
     } catch (err: any) {
-      ElMessage.warning('TB 回写请求失败，已发布联动事件：' + (err?.response?.data?.detail || err?.message || ''))
+      ElMessage.warning('TB 发布请求失败，已发布联动事件：' + (err?.response?.data?.detail || err?.message || ''))
     }
   }
   // 发布 EventBus 'substantive:adjudicated'（供 K13 附注/A 报表等下游刷新）
@@ -509,15 +514,26 @@ async function handleWritebackTBInternal(auditedAmount: number): Promise<void> {
     type: 'occurrence_amount', // 标识：发生额回写（损益类）
     timestamp: Date.now(),
   })
-  ElMessage.success('审定数已回写试算表（科目6711发生额）')
+  ElMessage.success('已发布到试算表（科目6711发生额）')
 }
 
 async function handleWritebackTB(): Promise<void> {
+  if (props.isReadonly || writebackLoading.value) return
+  try {
+    await ElMessageBox.confirm(
+      '发布后将把营业外支出审定数（科目 6711，本期发生额）写入试算表（trial_balance），'
+      + '并触发报表/错报评价等下游重算。确认发布？',
+      '发布到试算表确认',
+      { confirmButtonText: '确认发布', cancelButtonText: '取消', type: 'warning' },
+    )
+  } catch {
+    return // 用户取消 → 无任何副作用
+  }
   writebackLoading.value = true
   try {
     await adjudication.writeback()
   } catch (err: any) {
-    ElMessage.error(`回写失败：${err?.message || '未知错误'}`)
+    ElMessage.error(err?.response?.data?.detail || `发布失败：${err?.message || '未知错误'}`)
   } finally {
     writebackLoading.value = false
   }

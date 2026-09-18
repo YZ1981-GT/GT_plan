@@ -32,11 +32,13 @@ vi.mock('@/utils/eventBus', () => ({
 // ─── Mock API ────────────────────────────────────────────────────────────────
 
 const mockPut = vi.fn().mockResolvedValue({ data: { code: 200 } })
+const mockPost = vi.fn().mockResolvedValue({ message: '已发布到试算表' })
 const mockGet = vi.fn().mockResolvedValue({ data: [] })
 
 vi.mock('@/services/apiProxy', () => ({
   api: {
     put: (...args: any[]) => mockPut(...args),
+    post: (...args: any[]) => mockPost(...args),
     get: (...args: any[]) => mockGet(...args),
   },
 }))
@@ -70,26 +72,24 @@ describe('K1 EventBus Integration: TB回写 → substantive:adjudicated → 附�
     vi.restoreAllMocks()
   })
 
-  // ═══ Part A: writebackTB → API calls + EventBus emit ═══
+  // ═══ Part A: writebackTB → 显式发布门 publish-to-tb + EventBus emit ═══
+  // spec: tb-writeback-explicit-publish-gate Task 8。K1 双科目(1221+坏账准备1231)改走单次
+  // POST /workpapers/{wpId}/audit-determination/publish-to-tb（writeback_rows），不再两次 PUT 旧端点。
 
-  describe('writebackTB → TB回写双科目 + EventBus emit', () => {
-    it('should PUT 1221 and 坏账准备 to trial-balance/writeback endpoint', async () => {
+  describe('writebackTB → 显式发布门双科目 + EventBus emit', () => {
+    it('should POST 1221 + 坏账准备 to publish-to-tb in a single writeback_rows', async () => {
       await formData.writebackTB(500000, 35000)
 
-      // 验证两次 PUT 调用路径正确
-      expect(mockPut).toHaveBeenCalledTimes(2)
-
-      // 第一次: 1221 其他应收款
-      expect(mockPut).toHaveBeenNthCalledWith(1,
-        '/api/projects/proj-001/trial-balance/writeback',
-        { account_code: '1221', audited_amount: 500000 },
-      )
-
-      // 第二次: 坏账准备 (1231)
-      expect(mockPut).toHaveBeenNthCalledWith(2,
-        '/api/projects/proj-001/trial-balance/writeback',
-        { account_code: '1231', audited_amount: 35000 },
-      )
+      // 单次 POST 到显式发布门（不再两次 PUT 旧端点）
+      expect(mockPut).not.toHaveBeenCalled()
+      expect(mockPost).toHaveBeenCalledTimes(1)
+      const [url, body] = mockPost.mock.calls[0]
+      expect(url).toBe('/api/workpapers/wp-k1-001/audit-determination/publish-to-tb')
+      expect(body.sheet_name).toMatch(/K1-1/)
+      expect(body.writeback_rows).toEqual([
+        { account_code: '1221', audited_amount: 500000, amount_kind: 'balance' },
+        { account_code: '1231', audited_amount: 35000, amount_kind: 'balance' },
+      ])
     })
 
     it('should emit substantive:adjudicated after successful writeback', async () => {
@@ -117,22 +117,23 @@ describe('K1 EventBus Integration: TB回写 → substantive:adjudicated → 附�
     })
 
     it('should NOT emit event when API call fails', async () => {
-      mockPut.mockRejectedValueOnce(new Error('network error'))
+      mockPost.mockRejectedValueOnce(new Error('network error'))
 
-      await formData.writebackTB(100000, 5000)
+      // writebackTB 不吞异常（二次确认+错误提示在宿主 Tab），故此处 catch
+      await formData.writebackTB(100000, 5000).catch(() => {})
 
       expect(emitSpy).not.toHaveBeenCalled()
     })
 
-    it('should NOT emit when projectId is empty', async () => {
-      const emptyProject = useK1FormData({
-        wpId: ref('wp-k1-001'),
-        projectId: ref(''),
+    it('should NOT publish when wpId is empty', async () => {
+      const emptyWp = useK1FormData({
+        wpId: ref(''),
+        projectId: ref('proj-001'),
       })
 
-      await emptyProject.writebackTB(100000, 5000)
+      await emptyWp.writebackTB(100000, 5000)
 
-      expect(mockPut).not.toHaveBeenCalled()
+      expect(mockPost).not.toHaveBeenCalled()
       expect(emitSpy).not.toHaveBeenCalled()
     })
   })
@@ -235,15 +236,13 @@ describe('K1 EventBus Integration: TB回写 → substantive:adjudicated → 附�
       expect(autoFillCalled).toBe(false)
     })
 
-    it('TB writeback endpoint path matches useK1FormData contract', async () => {
+    it('TB 发布端点路径匹配显式发布门契约（publish-to-tb）', async () => {
       await formData.writebackTB(300000, 20000)
 
-      // Verify endpoint pattern: /api/projects/{projectId}/trial-balance/writeback
-      const firstCallUrl = mockPut.mock.calls[0][0]
-      const secondCallUrl = mockPut.mock.calls[1][0]
-
-      expect(firstCallUrl).toMatch(/^\/api\/projects\/[^/]+\/trial-balance\/writeback$/)
-      expect(secondCallUrl).toMatch(/^\/api\/projects\/[^/]+\/trial-balance\/writeback$/)
+      // spec: tb-writeback-explicit-publish-gate Task 8 — 单次 POST 到显式发布门，非旧 PUT 端点
+      expect(mockPut).not.toHaveBeenCalled()
+      const url = mockPost.mock.calls[0][0]
+      expect(url).toMatch(/^\/api\/workpapers\/[^/]+\/audit-determination\/publish-to-tb$/)
     })
   })
 })

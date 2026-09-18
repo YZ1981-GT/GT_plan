@@ -248,8 +248,8 @@
         从K10-2带入
       </el-button>
       <el-button size="small" type="primary" plain :disabled="isReadonly" @click="handleAddRow">+ 新增来源行</el-button>
-      <el-button size="small" type="success" :disabled="isReadonly" @click="handleWritebackTB">
-        回写TB（6117发生额）
+      <el-button size="small" type="warning" :disabled="isReadonly" @click="handleWritebackTB">
+        发布到试算表（6117发生额）
       </el-button>
     </div>
 
@@ -485,15 +485,18 @@ async function handleAddRow(): Promise<void> {
   } catch { /* cancelled */ }
 }
 
+// spec: tb-writeback-explicit-publish-gate Task 7 — 二次确认 → adjudication.writeback()
+// → useK10FormData.writebackTB 走 publish-to-tb 显式发布门（6117 occurrence）。
 async function handleWritebackTB(): Promise<void> {
   try {
     await ElMessageBox.confirm(
-      `确认将审定合计 ${fmtAmt(adjudication.totalRow.value.audited)} 回写TB（6117发生额）？`,
-      '回写确认',
-      { confirmButtonText: '确认回写', cancelButtonText: '取消', type: 'warning' },
+      `发布后将把其他收益审定合计 ${fmtAmt(adjudication.totalRow.value.audited)}（科目 6117，本期发生额）`
+      + '写入试算表（trial_balance），并触发报表/错报评价等下游重算。确认发布？',
+      '发布到试算表确认',
+      { confirmButtonText: '确认发布', cancelButtonText: '取消', type: 'warning' },
     )
     await adjudication.writeback()
-    ElMessage.success('已回写TB（6117其他收益发生额）')
+    ElMessage.success('已发布到试算表（6117其他收益发生额）')
   } catch { /* cancelled */ }
 }
 

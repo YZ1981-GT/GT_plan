@@ -195,23 +195,29 @@ export function useK5FormData(params: {
   // ─── writebackTB（预计负债 负债口径） ───────────────────────────────────────
 
   /**
-   * 审定数回写 trial_balance。
-   * 回写成功后发布 EventBus 'substantive:adjudicated' 通知附注刷新。
+   * 审定数发布到 trial_balance（显式发布门）。
+   * 发布成功后发布 EventBus 'substantive:adjudicated' 通知附注刷新。
    *
    * 🔴 科目码取自 {@link k5AccountCode}（报表映射解析结果，兜底 `2801`）。
    * 历史实现写死 `2701` → 把**预计负债审定数写进长期应付款**，污染 L5 的
    * `trial_balance` 口径。这不是显示问题，是数据污染。
    *
-   * ⚠️ 负债类！正数口径回写（v2 trial_balance 正数，无需取反）。
-   * 负债类方向：期末=期初+计提-转销
+   * ⚠️ 负债类！正数口径回写（v2 trial_balance 正数，无需取反）。负债类方向：期末=期初+计提-转销
+   *
+   * spec: tb-writeback-explicit-publish-gate Task 7 / Task 16 决策(a) / Req 1,2,8。
+   * 此前直调旧端点 `PUT /projects/{pid}/trial-balance/writeback` 绕过确认门。现改走
+   * `POST /workpapers/{wpId}/audit-determination/publish-to-tb`（writeback_rows，balance 口径）；
+   * 二次确认由调用方承载（K5 活路径 = K5TabAdjudication.publishToTb）。
    */
   async function writebackTB(auditedAmount: number): Promise<void> {
-    if (!projectId.value) return
+    if (!wpId.value) return
     isSaving.value = true
     try {
-      await api.put(`/api/projects/${projectId.value}/trial-balance/writeback`, {
-        account_code: accountCode.value,
-        audited_amount: auditedAmount,
+      await api.post(`/api/workpapers/${wpId.value}/audit-determination/publish-to-tb`, {
+        sheet_name: '审定表K5-1',
+        writeback_rows: [
+          { account_code: accountCode.value, audited_amount: auditedAmount, amount_kind: 'balance' },
+        ],
       })
 
       // EventBus publish 'substantive:adjudicated'
@@ -225,7 +231,7 @@ export function useK5FormData(params: {
       // 同步更新本地 tbData
       tbData.value.audited = auditedAmount
     } catch {
-      ElMessage.warning('审定数回写失败，请手动确认试算表数据')
+      ElMessage.warning('审定数发布失败，请手动确认试算表数据')
     } finally {
       isSaving.value = false
     }

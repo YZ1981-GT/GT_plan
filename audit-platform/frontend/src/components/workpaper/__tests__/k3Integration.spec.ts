@@ -11,6 +11,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 
 const mockK3Emit = vi.fn()
 const mockK3ApiPut = vi.fn().mockResolvedValue({})
+const mockK3ApiPost = vi.fn().mockResolvedValue({ message: '已发布到试算表' })
 
 vi.mock('@/utils/eventBus', () => ({
   eventBus: {
@@ -23,6 +24,7 @@ vi.mock('@/utils/eventBus', () => ({
 vi.mock('@/services/apiProxy', () => ({
   api: {
     put: (...args: unknown[]) => mockK3ApiPut(...args),
+    post: (...args: unknown[]) => mockK3ApiPost(...args),
     get: vi.fn().mockResolvedValue({}),
   },
 }))
@@ -51,11 +53,13 @@ describe('K3 Integration — Task 6.1: TB回写 + substantive:adjudicated', () =
 
     await formData.writebackTB(500000)
 
-    expect(mockK3ApiPut).toHaveBeenCalledWith(
-      '/api/projects/test-proj-456/trial-balance/writeback',
+    // spec: tb-writeback-explicit-publish-gate Task 7 — K3 改走显式发布门 publish-to-tb
+    expect(mockK3ApiPut).not.toHaveBeenCalled()
+    expect(mockK3ApiPost).toHaveBeenCalledWith(
+      '/api/workpapers/test-wp-123/audit-determination/publish-to-tb',
       expect.objectContaining({
-        account_code: '2241',
-        audited_amount: 500000,
+        sheet_name: expect.stringMatching(/K3-1/),
+        writeback_rows: [{ account_code: '2241', audited_amount: 500000, amount_kind: 'balance' }],
       }),
     )
 
@@ -243,9 +247,12 @@ describe('K3 Integration — Task 7.2-A: TB回写流程 (负债口径 2241)', ()
 
     await formData.writebackTB(1_500_000)
 
-    expect(mockK3ApiPut).toHaveBeenCalledWith(
-      '/api/projects/proj-001/trial-balance/writeback',
-      { account_code: '2241', audited_amount: 1_500_000 },
+    expect(mockK3ApiPut).not.toHaveBeenCalled()
+    expect(mockK3ApiPost).toHaveBeenCalledWith(
+      '/api/workpapers/wp-k3-001/audit-determination/publish-to-tb',
+      expect.objectContaining({
+        writeback_rows: [{ account_code: '2241', audited_amount: 1_500_000, amount_kind: 'balance' }],
+      }),
     )
   })
 
@@ -272,7 +279,7 @@ describe('K3 Integration — Task 7.2-A: TB回写流程 (负债口径 2241)', ()
   })
 
   it('writebackTB updates local tbData.audited2241', async () => {
-    const api = { put: vi.fn().mockResolvedValue({}), get: vi.fn().mockResolvedValue({}) }
+    const api = { put: vi.fn().mockResolvedValue({}), post: vi.fn().mockResolvedValue({}), get: vi.fn().mockResolvedValue({}) }
     vi.doMock('@/services/apiProxy', () => ({ api }))
 
     const { useK3FormData } = await import('../composables/useK3FormData')
@@ -301,9 +308,12 @@ describe('K3 Integration — Task 7.2-A: TB回写流程 (负债口径 2241)', ()
 
     await formData.writebackTB(0)
 
-    expect(mockK3ApiPut).toHaveBeenCalledWith(
-      '/api/projects/proj-004/trial-balance/writeback',
-      { account_code: '2241', audited_amount: 0 },
+    expect(mockK3ApiPut).not.toHaveBeenCalled()
+    expect(mockK3ApiPost).toHaveBeenCalledWith(
+      '/api/workpapers/wp-k3-004/audit-determination/publish-to-tb',
+      expect.objectContaining({
+        writeback_rows: [{ account_code: '2241', audited_amount: 0, amount_kind: 'balance' }],
+      }),
     )
     expect(formData.tbData.value.audited2241).toBe(0)
   })

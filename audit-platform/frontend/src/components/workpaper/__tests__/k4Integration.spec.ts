@@ -12,8 +12,9 @@
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
-const { mockPut, mockGet, mockEmit } = vi.hoisted(() => ({
+const { mockPut, mockPost, mockGet, mockEmit } = vi.hoisted(() => ({
   mockPut: vi.fn().mockResolvedValue({}),
+  mockPost: vi.fn().mockResolvedValue({ message: '已发布到试算表' }),
   mockGet: vi.fn().mockResolvedValue({}),
   mockEmit: vi.fn(),
 }))
@@ -22,6 +23,7 @@ vi.mock('@/services/apiProxy', () => ({
   api: {
     get: mockGet,
     put: mockPut,
+    post: mockPost,
   },
 }))
 
@@ -104,6 +106,7 @@ describe('K4 Integration — TB回写(2245负债类) + EventBus', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     mockPut.mockResolvedValue({})
+    mockPost.mockResolvedValue({ message: '已发布到试算表' })
     mockGet.mockResolvedValue({})
   })
 
@@ -119,9 +122,14 @@ describe('K4 Integration — TB回写(2245负债类) + EventBus', () => {
 
     await formData.writebackTB(800_000)
 
-    expect(mockPut).toHaveBeenCalledWith(
-      '/api/projects/proj-001/trial-balance/writeback',
-      { account_code: '2245', audited_amount: 800_000 },
+    // spec: tb-writeback-explicit-publish-gate Task 7 — K4 改走显式发布门 publish-to-tb（默认科目 2245）
+    expect(mockPut).not.toHaveBeenCalled()
+    expect(mockPost).toHaveBeenCalledWith(
+      '/api/workpapers/wp-k4-001/audit-determination/publish-to-tb',
+      expect.objectContaining({
+        sheet_name: expect.stringMatching(/K4-1/),
+        writeback_rows: [{ account_code: '2245', audited_amount: 800_000, amount_kind: 'balance' }],
+      }),
     )
   })
 
@@ -174,9 +182,12 @@ describe('K4 Integration — TB回写(2245负债类) + EventBus', () => {
 
     await formData.writebackTB(0)
 
-    expect(mockPut).toHaveBeenCalledWith(
-      '/api/projects/proj-004/trial-balance/writeback',
-      { account_code: '2245', audited_amount: 0 },
+    expect(mockPut).not.toHaveBeenCalled()
+    expect(mockPost).toHaveBeenCalledWith(
+      '/api/workpapers/wp-k4-004/audit-determination/publish-to-tb',
+      expect.objectContaining({
+        writeback_rows: [{ account_code: '2245', audited_amount: 0, amount_kind: 'balance' }],
+      }),
     )
     expect(formData.tbData.value.audited2245).toBe(0)
   })
@@ -193,9 +204,12 @@ describe('K4 Integration — TB回写(2245负债类) + EventBus', () => {
 
     await formData.writebackTB(-100_000)
 
-    expect(mockPut).toHaveBeenCalledWith(
-      '/api/projects/proj-005/trial-balance/writeback',
-      { account_code: '2245', audited_amount: -100_000 },
+    expect(mockPut).not.toHaveBeenCalled()
+    expect(mockPost).toHaveBeenCalledWith(
+      '/api/workpapers/wp-k4-005/audit-determination/publish-to-tb',
+      expect.objectContaining({
+        writeback_rows: [{ account_code: '2245', audited_amount: -100_000, amount_kind: 'balance' }],
+      }),
     )
   })
 })

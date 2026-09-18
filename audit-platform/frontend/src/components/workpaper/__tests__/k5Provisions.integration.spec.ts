@@ -269,7 +269,7 @@ describe('K5 Integration — useK5Adjudication 审定公式', () => {
 
 // ═══ 7.2-C: TB回写(2701) + EventBus substantive:adjudicated ═══
 
-describe('K5 Integration — TB回写(2701) + EventBus', () => {
+describe('K5 Integration — 显式发布门 publish-to-tb(动态科目2801) + EventBus', () => {
   beforeEach(() => {
     vi.resetModules()
   })
@@ -278,8 +278,12 @@ describe('K5 Integration — TB回写(2701) + EventBus', () => {
     vi.restoreAllMocks()
   })
 
-  it('writebackTB calls PUT with account_code=2701', async () => {
-    const mockApi = { put: vi.fn().mockResolvedValue({}), get: vi.fn().mockResolvedValue({}) }
+  // spec: tb-writeback-explicit-publish-gate Task 7 / Task 16 决策(a)。
+  // 🔴 修复 test-vs-source drift：K5 已从旧端点 `PUT /trial-balance/writeback`(2701) 改走
+  // 显式发布门 `POST /workpapers/{wpId}/audit-determination/publish-to-tb`（writeback_rows），
+  // 且科目码取自 k5AccountCode（无 tb_source_codes 时兜底 2801，防污染 L5 长期应付款）。
+  it('writebackTB posts to publish-to-tb with account_code=2801 (dynamic, 非旧2701)', async () => {
+    const mockApi = { post: vi.fn().mockResolvedValue({}), put: vi.fn().mockResolvedValue({}), get: vi.fn().mockResolvedValue({}) }
     const mockEventBus = { emit: vi.fn(), on: vi.fn(), off: vi.fn() }
     vi.doMock('@/services/apiProxy', () => ({ api: mockApi }))
     vi.doMock('@/utils/eventBus', () => ({ eventBus: mockEventBus }))
@@ -295,14 +299,20 @@ describe('K5 Integration — TB回写(2701) + EventBus', () => {
 
     await formData.writebackTB(600000)
 
-    expect(mockApi.put).toHaveBeenCalledWith(
-      '/api/projects/proj-001/trial-balance/writeback',
-      { account_code: '2701', audited_amount: 600000 },
-    )
+    // 不再调旧端点
+    expect(mockApi.put).not.toHaveBeenCalled()
+    // 走显式发布门
+    expect(mockApi.post).toHaveBeenCalledTimes(1)
+    const [url, body] = mockApi.post.mock.calls[0]
+    expect(url).toBe('/api/workpapers/wp-k5-001/audit-determination/publish-to-tb')
+    expect(body.sheet_name).toMatch(/K5-1/)
+    expect(body.writeback_rows).toEqual([
+      { account_code: '2801', audited_amount: 600000, amount_kind: 'balance' },
+    ])
   })
 
-  it('writebackTB emits substantive:adjudicated with 2701/K5', async () => {
-    const mockApi = { put: vi.fn().mockResolvedValue({}), get: vi.fn().mockResolvedValue({}) }
+  it('writebackTB emits substantive:adjudicated with 2801/K5 (dynamic account)', async () => {
+    const mockApi = { post: vi.fn().mockResolvedValue({}), put: vi.fn().mockResolvedValue({}), get: vi.fn().mockResolvedValue({}) }
     const mockEventBus = { emit: vi.fn(), on: vi.fn(), off: vi.fn() }
     vi.doMock('@/services/apiProxy', () => ({ api: mockApi }))
     vi.doMock('@/utils/eventBus', () => ({ eventBus: mockEventBus }))
@@ -321,7 +331,7 @@ describe('K5 Integration — TB回写(2701) + EventBus', () => {
     expect(mockEventBus.emit).toHaveBeenCalledWith(
       'substantive:adjudicated',
       expect.objectContaining({
-        accountCode: '2701',
+        accountCode: '2801',
         auditedAmount: 1200000,
         wpCode: 'K5',
       }),
@@ -329,7 +339,7 @@ describe('K5 Integration — TB回写(2701) + EventBus', () => {
   })
 
   it('writebackTB updates local tbData.audited', async () => {
-    const mockApi = { put: vi.fn().mockResolvedValue({}), get: vi.fn().mockResolvedValue({}) }
+    const mockApi = { post: vi.fn().mockResolvedValue({}), put: vi.fn().mockResolvedValue({}), get: vi.fn().mockResolvedValue({}) }
     const mockEventBus = { emit: vi.fn(), on: vi.fn(), off: vi.fn() }
     vi.doMock('@/services/apiProxy', () => ({ api: mockApi }))
     vi.doMock('@/utils/eventBus', () => ({ eventBus: mockEventBus }))
@@ -348,8 +358,8 @@ describe('K5 Integration — TB回写(2701) + EventBus', () => {
     expect(formData.tbData.value.audited).toBe(2500000)
   })
 
-  it('writebackTB zero amount is valid (全部转销)', async () => {
-    const mockApi = { put: vi.fn().mockResolvedValue({}), get: vi.fn().mockResolvedValue({}) }
+  it('writebackTB zero amount is valid (全部转销) → publish-to-tb 2801', async () => {
+    const mockApi = { post: vi.fn().mockResolvedValue({}), put: vi.fn().mockResolvedValue({}), get: vi.fn().mockResolvedValue({}) }
     const mockEventBus = { emit: vi.fn(), on: vi.fn(), off: vi.fn() }
     vi.doMock('@/services/apiProxy', () => ({ api: mockApi }))
     vi.doMock('@/utils/eventBus', () => ({ eventBus: mockEventBus }))
@@ -365,9 +375,12 @@ describe('K5 Integration — TB回写(2701) + EventBus', () => {
 
     await formData.writebackTB(0)
 
-    expect(mockApi.put).toHaveBeenCalledWith(
-      '/api/projects/proj-004/trial-balance/writeback',
-      { account_code: '2701', audited_amount: 0 },
+    expect(mockApi.put).not.toHaveBeenCalled()
+    expect(mockApi.post).toHaveBeenCalledWith(
+      '/api/workpapers/wp-k5-004/audit-determination/publish-to-tb',
+      expect.objectContaining({
+        writeback_rows: [{ account_code: '2801', audited_amount: 0, amount_kind: 'balance' }],
+      }),
     )
   })
 })

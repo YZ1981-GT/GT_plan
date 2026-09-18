@@ -280,10 +280,10 @@
       </el-tooltip>
     </div>
 
-    <!-- ═══ TB回写 + 勾稽状态 ═══ -->
+    <!-- ═══ TB回写 + 勾稽状态（显式发布门） ═══ -->
     <div class="tb-writeback-bar">
-      <el-button type="primary" size="small" :disabled="isReadonly" @click="handleTbWriteback">
-        回写试算表(2401)
+      <el-button type="warning" size="small" :loading="publishing" :disabled="isReadonly" @click="publishToTb">
+        发布到试算表(2401)
       </el-button>
       <span v-if="reconciliation.isBalanced" class="match-indicator">
         <el-icon color="#67c23a"><CircleCheckFilled /></el-icon> 勾稽平衡
@@ -355,9 +355,9 @@
  * ⚠️ 负债类！期末=期初+收到(贷方增加)-分摊(借方减少)
  */
 import WpFourTableSourcePanel from '../../shared/WpFourTableSourcePanel.vue'
-import { computed, inject, toRef, type Ref } from 'vue'
+import { computed, inject, ref, toRef, type Ref } from 'vue'
 import { MagicStick, CircleCheckFilled, WarningFilled, Download } from '@element-plus/icons-vue'
-import { ElMessageBox } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { useK7Adjudication, type K7AdjRow } from '../../composables/useK7Adjudication'
 import { useAuditContext } from '@/composables/useAuditContext'
 import { useAdjudicationBringIn } from '../../composables/useAdjudicationBringIn'
@@ -465,8 +465,56 @@ function handleCellChange(rowKey: string, field: string, value: any) {
   adj.updateCell(rowKey, field, value)
 }
 
-function handleTbWriteback() {
-  emit('save', 'K7-1-audited-total', { remark: String(grandTotal.value.audited) })
+const publishing = ref(false)
+
+/**
+ * 发布审定数到试算表（显式发布门，复刻 D2/D4-1 范式）。
+ *
+ * spec: tb-writeback-explicit-publish-gate Task 7 / Task 16 决策(a) / Req 1,2,8。
+ * 🔴 补真回写：此前 handleTbWriteback 只 emit('save', 'K7-1-audited-total')（假回写，
+ * 从不写 trial_balance）。现改为二次确认（中文）→
+ * `POST /workpapers/{wpId}/audit-determination/publish-to-tb` 真正写 TB（科目 2401
+ * 递延收益，负债类期末余额 balance），消除假回写状态。
+ */
+async function publishToTb(): Promise<void> {
+  if (props.isReadonly || publishing.value) return
+
+  try {
+    await ElMessageBox.confirm(
+      '发布后将把递延收益审定数（科目 2401，期末余额）写入试算表（trial_balance），'
+      + '并触发报表/错报评价等下游重算。确认发布？',
+      '发布到试算表确认',
+      { confirmButtonText: '确认发布', cancelButtonText: '取消', type: 'warning' },
+    )
+  } catch {
+    return // 用户取消 → 无任何副作用
+  }
+
+  if (!props.wpId) {
+    ElMessage.error('缺少底稿标识，无法发布')
+    return
+  }
+
+  const auditedTotal = grandTotal.value.audited
+  publishing.value = true
+  try {
+    const { api } = await import('@/services/apiProxy')
+    const resp: any = await api.post(
+      `/api/workpapers/${props.wpId}/audit-determination/publish-to-tb`,
+      {
+        sheet_name: '审定表K7-1',
+        writeback_rows: [
+          { account_code: '2401', audited_amount: auditedTotal, amount_kind: 'balance' },
+        ],
+      },
+    )
+    emit('save', 'K7-1-audited-total', { remark: String(auditedTotal) })
+    ElMessage.success(resp?.message || '已发布到试算表')
+  } catch (err: any) {
+    ElMessage.error(err?.response?.data?.detail || err?.message || '发布失败，请重试')
+  } finally {
+    publishing.value = false
+  }
 }
 
 function handleSaveConclusion() {

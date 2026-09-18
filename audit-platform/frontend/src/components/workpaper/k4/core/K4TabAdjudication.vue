@@ -219,8 +219,8 @@
 
     <!-- ═══ 操作按钮 ═══ -->
     <div class="action-bar" v-if="!isReadonly">
-      <el-button type="primary" @click="handleWritebackTB" :loading="publishing">
-        确认审定 → 回写TB（2245其他流动负债）
+      <el-button type="warning" @click="handleWritebackTB" :loading="publishing">
+        发布到试算表（其他流动负债）
       </el-button>
     </div>
 
@@ -274,7 +274,7 @@ import WpFourTableSourcePanel from '../../shared/WpFourTableSourcePanel.vue'
 import { k4QueryCodes } from '../../composables/k4AccountScope'
 import { ref, computed, inject, toRef } from 'vue'
 import { MagicStick, Download } from '@element-plus/icons-vue'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { eventBus } from '@/utils/eventBus'
 import http from '@/utils/http'
 import { useK4Adjudication, type K4AdjRow } from '../../composables/useK4Adjudication'
@@ -390,18 +390,32 @@ function saveConclusion() {
 
 // ─── TB回写 + saveAll + EventBus ─────────────────────────────────────────────
 
+// spec: tb-writeback-explicit-publish-gate Task 7 — 二次确认 → useK4FormData.writebackTB
+// 走 publish-to-tb 显式发布门（动态科目 k4Code，balance），普通保存/数据变化不再写 TB。
 async function handleWritebackTB() {
+  if (props.isReadonly) return
   if (!k4Code.value) {
     // 宁缺勿造：无科目时不写库（三表零命中）
+    ElMessage.warning('未解析到其他流动负债科目，无法发布（三表零命中）')
     return
+  }
+  try {
+    await ElMessageBox.confirm(
+      `发布后将把其他流动负债审定数（科目 ${k4Code.value}，期末余额）写入试算表（trial_balance），`
+      + '并触发报表/错报评价等下游重算。确认发布？',
+      '发布到试算表确认',
+      { confirmButtonText: '确认发布', cancelButtonText: '取消', type: 'warning' },
+    )
+  } catch {
+    return // 用户取消 → 无任何副作用
   }
   publishing.value = true
   try {
     const auditedTotal = getAuditedTotal()
     // 先调 composable saveAll 持久化 subtotal-debit/credit/audited-total
     await saveAllComposable()
-    // 回写 trial_balance
-    await writebackTB(auditedTotal)
+    // 发布到 trial_balance（动态科目 k4Code）
+    await writebackTB(auditedTotal, k4Code.value)
     // 发布 substantive:adjudicated → 附注/A13 消费
     try {
       eventBus.emit('substantive:adjudicated', {
@@ -414,9 +428,9 @@ async function handleWritebackTB() {
     } catch { /* silent */ }
     // 版本快照
     scheduleAutoSnapshot()
-    ElMessage.success('审定数已回写TB（2245其他流动负债），已通知附注刷新')
-  } catch {
-    ElMessage.error('TB回写失败')
+    ElMessage.success('已发布到试算表（其他流动负债），已通知附注刷新')
+  } catch (err: any) {
+    ElMessage.error(err?.response?.data?.detail || err?.message || '发布失败，请重试')
   } finally {
     publishing.value = false
   }

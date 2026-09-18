@@ -203,13 +203,13 @@
     <!-- ═══ TB回写按钮 + K6-3调整带入 ═══ -->
     <div class="tb-writeback-section">
       <el-button
-        type="primary"
+        type="warning"
         :loading="publishing"
         :disabled="isReadonly"
         @click="handleWritebackTB"
       >
         <el-icon><Upload /></el-icon>
-        审定数回写TB（持有待售资产 + 负债）
+        发布到试算表（持有待售资产 + 负债）
       </el-button>
       <el-button
         size="small"
@@ -344,7 +344,7 @@
 import WpFourTableSourcePanel from '../../shared/WpFourTableSourcePanel.vue'
 import { k6QueryCodes, K6_FALLBACK_STANDARD } from '../../composables/k6AccountScope'
 import { ref, computed, inject, toRef } from 'vue'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { MagicStick, View, Upload, QuestionFilled, Download } from '@element-plus/icons-vue'
 import { useK6Adjudication, type K6AdjRow, type K6AdjSection } from '../../composables/useK6Adjudication'
 import { useAuditContext } from '@/composables/useAuditContext'
@@ -488,25 +488,39 @@ function saveConclusion() {
 
 // ─── TB回写 ─────────────────────────────────────────────────────────────────
 
+// spec: tb-writeback-explicit-publish-gate Task 8 — 二次确认 → inject 的 GtK6HeldForSale.writebackTB
+// 走 publish-to-tb 显式发布门，动态双科目(资产+负债)单次原子发布。
 async function handleWritebackTB() {
+  if (props.isReadonly) return
   if (!k6AssetPrefix.value && !k6LiabPrefix.value) {
     // 宁缺勿造：无科目时不写库（三表零命中）
+    ElMessage.warning('未解析到持有待售资产/负债科目，无法发布（三表零命中）')
     return
+  }
+  try {
+    await ElMessageBox.confirm(
+      '发布后将把持有待售资产/负债审定数（期末余额）写入试算表（trial_balance），'
+      + '并触发报表/错报评价等下游重算。确认发布？',
+      '发布到试算表确认',
+      { confirmButtonText: '确认发布', cancelButtonText: '取消', type: 'warning' },
+    )
+  } catch {
+    return // 用户取消 → 无任何副作用
   }
   publishing.value = true
   try {
     const assetAudited = getAssetAuditedTotal()
     const liabilityAudited = getLiabilityAuditedTotal()
-    // 实际回写 trial_balance + EventBus emit substantive:adjudicated
+    // 走显式发布门（publish-to-tb）+ EventBus emit substantive:adjudicated
     await writebackTBFn(assetAudited, liabilityAudited)
     // 保存合计到 responses 供后续回写使用
     emit('save', 'K6-1-audited-asset', { remark: String(assetAudited) })
     emit('save', 'K6-1-audited-liability', { remark: String(liabilityAudited) })
     // 同步减值合计（供K6-5交叉验证）
     persistImpairmentTotal()
-    ElMessage.success(`审定数已回写TB：资产=${fmtAmt(assetAudited)}，负债=${fmtAmt(liabilityAudited)}`)
+    ElMessage.success(`已发布到试算表：资产=${fmtAmt(assetAudited)}，负债=${fmtAmt(liabilityAudited)}`)
   } catch {
-    ElMessage.error('TB回写失败')
+    ElMessage.error('发布失败，请重试')
   } finally {
     publishing.value = false
   }
