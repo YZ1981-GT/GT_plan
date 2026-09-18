@@ -748,10 +748,40 @@ M0（端点扩展，Task 1）是所有**活路径**逐组件任务的前置；�
 
 ## 可选任务（外部依赖 / 真实数据）
 
-- [ ] 20.* 各循环真实项目端到端 UAT（data-blocked 降级）
+- [x] 20.* 各循环真实项目端到端 UAT（data-blocked 降级）
   - 真实 PG 仅 5 个 standalone 项目、多数循环无对应审定表真实数据 → 对无数据循环标 `data-blocked`，降级为隔离项目/合成数据（复用 `seed_consol_uat.py` 式最小合成集）跑端点+handler 集成；真实项目补测点标"代码已改但真实项目未实测"
   - 切换点：待 live PG 有对应循环审定数据后逐组件回填
   - _需求: 全部（真实环境验证）_
+  - **✅ 完成证据（2026，降级路径做实 + 真实项目补测点如实标 data-blocked）**：
+    - **① 真实环境探测结果**：
+      - PG **可用**：`docker ps` 实证 `audit-postgres`(pgvector:pg16, 5432) `Up 6 hours (healthy)`；`settings.DATABASE_URL=postgresql+asyncpg://postgres:postgres@localhost:5432/audit_platform`；`SELECT 1` + admin 用户探测通过（admin id=b6f8e8d0-…, role=admin，handler 权限门可验证）。
+      - 真实项目 **有 TB 数据但无审定表真实发布数据**：`trial_balance` 按 project 聚合——重药控股安徽(0ec33ac9) 196 行 / 4 家重庆医药子公司 171~174 行 / 首汽租车(df5b8403) 166 行等，`audited_amount` 均已填（历史静态数据，非经本 spec publish-to-tb 门产生）。**关键 data-block**：真实项目**无「经显式发布门产生的、可断言的审定表→TB 回写事件流」**——真实 audited 是既有静态值，无法在不污染真实金额前提下断言"发布前=X→发布后=Y"。故真实项目端到端 UAT 对**所有循环**标 `data-blocked`（不可在真实项目上跑破坏性发布断言，铁律：绝不碰真实金额）。
+      - 既有隔离 E2E 项目：`E2E-D4发布测试项目_请勿动_2099`(d4e2e000, year=2099, 2 TB 行) 已存在（`test_d4_publish_e2e_live.py` 用，仅 D4-1 balance 三分量，需运行中 9980 后端）。
+    - **② 降级路径说明（核心交付）**：新增**真实 DB、进程内**端到端集成测试 `backend/tests/test_publish_to_tb_synthetic_e2e_chain.py`，用**隔离合成项目**（固定 UUID `2b0e2098-…-002098`, audit_year=**2098** 与真实 2024/2025 及 D4 e2e 的 2099 均不撞, company_code=SYN20）幂等 seed（复用 `seed_d4_publish_e2e.py` 式最小合成集：projects + trial_balance + wp_index + working_paper），真实跑通完整链路：
+        **真端点函数 `publish_determination_to_tb`（真 DB session + admin）→ 捕获其发出的 `WORKPAPER_SAVED` EventPayload → 真 handler `_on_d_audit_determination_saved` 消费 → 断言 `trial_balance.audited_amount` 真被更新（真实落库，非 mock）**。
+      - 非 mock 空转实证：seed 造真实 TB 行（audited 初值 0）→ 发布 → handler 真写 PG → 查询 PG 断言 audited==合成期望值 + `tb_publish_ack` 恰一条；测试后 `_purge` 清库，**实证 purge 后 proj/tb/wp/ack 全 0**（无真实数据污染）。
+      - 跨 loop 陷阱规避：每个 test 完整场景（reset+发布+handler+断言）在**单一 asyncio.run**内跑完，并把 handler 的 `async_session_factory` monkeypatch 为**本 loop 内 NullPool 工厂**——否则 handler 复用 app 共享池（绑已关闭 loop）报 `Event loop is closed`（首版即踩此坑，已修）。
+      - **合成数据集成测试覆盖矩阵（口径类别 × 验证要点）**：
+
+        | 口径类别 | 代表 wp_code（科目） | ①audited 落库 | ④occurrence 透传 | ⑤多科目全落 |
+        |---|---|---|---|---|
+        | balance 单科目 | D2-1(1122)、J1-1(2211) | ✅ | — | — |
+        | balance 多科目 | E1-1(1001/1002/1012)、K1-1(1221/1231含负数)、H9-1(2701/2801含负数) | ✅ | — | ✅ |
+        | occurrence 发生额 | F5-1(6401)、K8-1(6601)、N5-1(6801)、G11-1(1511) | ✅ | ✅(amount_kinds[c]=="occurrence") | — |
+
+        独立验证要点：②同 publish_token 重放（篡改哨兵 999→二次发布不改回，ack 仍 1）✅；③普通保存（无 publish_confirmed）→ handler no-op TB 不变 ✅；补充非审定表 wp_code(D2-2) → handler return TB 不变 ✅。
+      - **代表覆盖说明**：端点(`extract_determination_wp_code` + writeback_rows/三分量路径) 与 handler(`^[D-N]\d+-1$` + `publish_confirmed` 门 + `tb_publish_ack` 幂等 + 按 `standard_account_code` UPDATE audited_amount) 对**所有 D~N 循环同构**（handler 直读 `audited_amount`，balance/occurrence 落库口径一致，仅语义标注不同）；故按**口径类别**取代表覆盖（balance 单/多 + occurrence）即充分验证全循环链路，不逐 30+ 组件重复。
+    - **③ 现有测试已覆盖 vs 本任务新补的缺口（不重复造）**：
+      - 已覆盖（未重造）：`test_publish_to_tb_writeback_rows.py`(M0/12) 端点级**mock DB**入参契约（writeback_rows 优先/occurrence 透传/多科目/三分量零回归/400×3/幂等 token 合成/角色 403）；`test_cycle_linkage_handlers_integration.py` handler 级**mock session**（捕获 SQL 不落库，验 publish_confirmed 门/非审定表 return/空 rows/权限）；`test_d4_publish_e2e_live.py` **真 HTTP+真 PG** 但仅 D4-1 balance 三分量、需运行中 9980。
+      - **本任务补的缺口**：真实 DB + 进程内（无需运行 HTTP 后端，更易 CI/离线跑）驱动**端点→事件→handler→真 TB 落库**的完整链路，且覆盖 **writeback_rows 预算行路径**（既有 live 只覆盖三分量）+ **occurrence 口径真实落库**（既有 live 无）+ **balance 多科目/负数真实落库** + 幂等真实不双写 + 普通保存真实 no-op，跨 9 个循环口径代表。填补"mock 不落库 + live 仅 D4 balance 三分量"之间的真实多循环落库验证空白。
+    - **④ 测试命令 + pass 数**：
+      - 新测试：`rtk ..\.venv\Scripts\python.exe -m pytest tests/test_publish_to_tb_synthetic_e2e_chain.py -q` → **12 passed / 0 failed**（9 参数化落库 + 幂等 + 普通保存 no-op + 非审定表 no-op）。
+      - 零回归批次：`... test_publish_to_tb_synthetic_e2e_chain.py test_publish_to_tb_writeback_rows.py test_publish_determination_to_tb.py test_cycle_linkage_handlers_integration.py -q` → **52 passed / 0 failed**（新 12 + M0 12 + publish_determination 6 + handler integration 22）。第二次跑新文件再次幂等 seed 并通过，无回归。
+      - purge 实证：跑后 `SELECT count(*) FROM projects/trial_balance/working_paper/tb_publish_ack WHERE project_id=2b0e2098-…` 全 **0**（隔离数据无残留）。
+    - **⑤ data-blocked 循环清单 + 切换点**：**全部 D~N 循环的「真实项目」端到端 UAT 标 `data-blocked`**（代码已改但真实项目未实测）——真实 PG 5 个 standalone 项目的 audited 是既有静态数据，无「经 publish-to-tb 门的可断言发布事件流」，且铁律禁在真实项目上跑破坏性发布断言。
+      - **降级已做实**：上述 9 循环口径代表已在隔离合成项目跑通真实 DB 端到端落库（非 mock），链路正确性已验证。
+      - **切换点（待 live PG 有对应循环审定数据后逐组件回填）**：待某真实项目出现「经显式发布门产生的审定表发布事件」时，可在该项目上（或对该项目造只读快照对照）逐循环回填真实项目 UAT——(a) 起 `start-dev.bat`(9980) 后用 `test_d4_publish_e2e_live.py` 范式扩到该循环的 wp_id/sheet_name；或 (b) 用本文件 `_publish_via_endpoint`+`_run_handler` 进程内范式指向真实 wp_id（**须先确认可安全 reset/复位该项目审定表 TB，否则维持隔离合成**）。Playwright 全链路（确认对话框→UI→报表读到新 audited）归 task 21*（待 start-dev.bat 环境）。
+    - **偏差/降级如实标注**：本任务**未**在真实项目上跑发布断言（铁律：不碰真实金额）——真实项目 UAT 维持 data-blocked，以隔离合成项目做实降级路径；这是"绝不假绿"下对外部依赖任务的正确处置（合成集成测试真实跑通 = 链路已验证；真实项目补测点如实标 data-blocked + 列切换点，不粉饰）。
 
 - [ ] 21.* Playwright 全链路实测（待 start-dev.bat 环境）
   - 对已改造循环跑 Playwright：确认对话框 → 落库 → 报表读到新 audited → 重复确认不双写 → 普通保存不写 TB
