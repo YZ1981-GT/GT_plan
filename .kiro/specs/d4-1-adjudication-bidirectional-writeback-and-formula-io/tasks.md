@@ -92,12 +92,13 @@
   - `d4AdjudicationSyncHostWiring.spec.ts`：D4-1 接桥字面量 entry_id/sheetKey、宿主 `isD4DedicatedSyncSheet` 含 'D4-1'、fail-closed；`d4AdjudicationPublishGate.spec.ts` 不回归。
   - _Requirements: 5.1, 2.4_
 
-- [~] 11. e2e 真栈验收
+- [x] 11. e2e 真栈验收
   - `d4-bidirectional-acceptance.spec.ts` 加 D4-1（L1：进在线编辑→store-projection/materialize 200→callback 四项→OO 挂载）；L2 roundtrip：OO 改主营/其他行→forcesave cs_error=0→切回 HTML 值一致、两区不串。
   - 证据落 `docs/operations/evidence/d4-bidirectional-acceptance/D4-1.json`。
+  - **执行结论（真栈实跑 frontend 3030 / backend 9980 / OnlyOffice 8080 健康）**：L1 GREEN —— D4-1 进在线编辑走统一路径 store-projection/pending-mutations/materialize 全 200、callback 四项齐（room_id/generation/doc_key/route_credential_id+route_token）、0 条 /d2-sync 旁路、WorkpaperSyncEditorHost 挂载 + OO iframe，证据 D4-1.json。L2（D4-1-L2.json）L1 侧同 GREEN（materialize 200/callback 四项/content_version 53/OO 挂载），双区 roundtrip **如实 SKIP/blocked**：目标 wp b3ab3c46 无 D4-1 受管双区行（hasD41Rows=false），测试数据门标 blocked_reason 而非伪造 cs_error=0（真实库唯一有 D4-1-rows 的 wp 无 published representation）。playwright 3 passed / 1 skipped。L2 完整往返待 seed「同时有 published representation + D4-1-rows(main+other)」的 wp（D4_ACCEPT_L2_WP_ID 指向）后即绿。
   - _Requirements: 5.1, 5.3_
 
-- [~] 12. 三件套校验与收口
+- [x] 12. 三件套校验与收口
   - `get_diagnostics` 三件套无 error；AC→Property→task 引用齐；waves JSON 唯一；git 入库（只本 spec 产物 + 明确 D4-1 改动）。
   - _Requirements: 5.4_
 

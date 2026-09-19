@@ -1,0 +1,68 @@
+{
+  "sheet": "D4-1",
+  "sheet_name": "营业收入审定表D4-1",
+  "level": "L2",
+  "captured_at": "2026-09-19T23:12:04.482Z",
+  "scope": {
+    "project_id": "0ec33ac9-3de5-4e65-b3bf-f9dccd7b2a49",
+    "wp_id": "b3ab3c46-828f-4f48-950e-aee9bbdc923f",
+    "entry_id": "xlsx/gt-d4-operating-revenue"
+  },
+  "predicates": {
+    "user_sync_requests": [
+      {
+        "method": "GET",
+        "path": "/api/projects/0ec33ac9-3de5-4e65-b3bf-f9dccd7b2a49/workpapers/b3ab3c46-828f-4f48-950e-aee9bbdc923f/sync/entries/xlsx/gt-d4-operating-revenue/store-projection",
+        "status": 200
+      },
+      {
+        "method": "POST",
+        "path": "/api/projects/0ec33ac9-3de5-4e65-b3bf-f9dccd7b2a49/workpapers/b3ab3c46-828f-4f48-950e-aee9bbdc923f/sync/entries/xlsx/gt-d4-operating-revenue/pending-mutations",
+        "status": 200
+      },
+      {
+        "method": "POST",
+        "path": "/api/projects/0ec33ac9-3de5-4e65-b3bf-f9dccd7b2a49/workpapers/b3ab3c46-828f-4f48-950e-aee9bbdc923f/sync/entries/xlsx/gt-d4-operating-revenue/materialize",
+        "status": 200
+      }
+    ],
+    "store_projection_ok": true,
+    "materialize_ok": true,
+    "content_version": 53,
+    "d2_sync_hits": 0,
+    "callback_url_keys": [
+      "doc_key",
+      "generation",
+      "room_id",
+      "route_credential_id",
+      "route_token"
+    ],
+    "sync_host_mounted": true,
+    "oo_iframe_count": 1,
+    "forcesave_cs_error": null,
+    "forcesave_hits": [],
+    "l2_roundtrip": {
+      "attempted": false,
+      "main_marker": "",
+      "other_marker": "",
+      "switched_to_html": false,
+      "main_visible": false,
+      "other_visible": false,
+      "main_leaked_to_other": false,
+      "other_leaked_to_main": false,
+      "main_probe": null,
+      "other_probe": null,
+      "blocked_reason": "目标 wp b3ab3c46-828f-4f48-950e-aee9bbdc923f 缺 D4-1 受管行（hasD41Rows=false main=false other=false）——L2 无可改的双区受管行，需先 seed 一个同时有 published representation + D4-1-rows(main+other) 的 wp（用 D4_ACCEPT_L2_WP_ID 指向）。",
+      "forcesave_cs_error": null
+    },
+    "no_cross_contamination": true,
+    "http_errors": [],
+    "console_errors": []
+  },
+  "notes": [
+    "L1 门（materialize/callback/OO 挂载）与 D4-1.json 一致；本文件补 L2 双区 roundtrip + Property 3 无跨区污染。",
+    "OO 写主营 B8（section main-revenue R8–11）+ 其他 B14（section other-revenue R14–17）；权威判据 forcesave cs_error=0",
+    "blocked_reason 非空 = 目标 wp 无 D4-1 受管双区行（真实库唯一有 D4-1-rows 的 wp 无 published representation）——如实标 blocked，不伪造 cs_error=0。",
+    "token/JWT/route_credential 值已脱敏（仅记 callbackUrl key 名）"
+  ]
+}
