@@ -394,7 +394,7 @@ const isD4DetailSheet = computed(() => currentSheet.value != null && currentShee
 //    D4-15/16（检查表，d4-inspection-writeback-formula-io B2）同理接子组件 sync bridge，
 //    必须一并登记 —— 否则宿主对它们仍渲染 legacy 通知（「两侧数据未互通」）+ legacy dualMode。
 const isD4DedicatedSyncSheet = computed(() =>
-  ['D4-5', 'D4-15', 'D4-16', 'D4-25', 'D4-26', 'D4-27', 'D4-28', 'D4-29', 'D4-30', 'D4-31', 'D4-32'].includes(
+  ['D4-5', 'D4-15', 'D4-16', 'D4-25', 'D4-26', 'D4-27', 'D4-28', 'D4-29', 'D4-30', 'D4-31', 'D4-32', 'D4-35'].includes(
     currentSheet.value || '',
   ),
 )

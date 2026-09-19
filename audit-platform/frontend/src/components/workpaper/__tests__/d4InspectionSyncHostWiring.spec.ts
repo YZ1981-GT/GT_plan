@@ -118,6 +118,13 @@ describe('宿主 GtD4OperatingRevenue 必须把 D4-15/16 登记为 dedicated syn
     expect(list).toContain("'D4-16'")
   })
 
+  // D4-35（D4TabOtherCheck 已接 d435SyncBridge）同理必须登记，否则宿主叠加 legacy 双切换器
+  // （2026-09-19 e2e 验收实测：漏登记时点「在线编辑」命中 legacy 切换器，统一路径 store-projection 不触发）。
+  it('dedicated 列表含 D4-35（防宿主漏登记叠加 legacy 双切换器）', () => {
+    const list = extractDedicatedList(hostSrc)
+    expect(list).toContain("'D4-35'")
+  })
+
   it('自检：抽取器真在承重（列表里没有的 code 抓不到）', () => {
     const list = extractDedicatedList(hostSrc)
     expect(list).not.toContain("'D4-99'")

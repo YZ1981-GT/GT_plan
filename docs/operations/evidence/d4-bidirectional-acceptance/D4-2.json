@@ -1,0 +1,43 @@
+{
+  "sheet": "D4-2",
+  "sheet_name": "主营业务收入明细表D4-2",
+  "captured_at": "2026-09-19T12:37:58.834Z",
+  "scope": {
+    "project_id": "0ec33ac9-3de5-4e65-b3bf-f9dccd7b2a49",
+    "wp_id": "b3ab3c46-828f-4f48-950e-aee9bbdc923f",
+    "entry_id": "xlsx/gt-d4-operating-revenue"
+  },
+  "predicates": {
+    "user_sync_requests": [
+      {
+        "method": "GET",
+        "path": "/api/projects/0ec33ac9-3de5-4e65-b3bf-f9dccd7b2a49/workpapers/b3ab3c46-828f-4f48-950e-aee9bbdc923f/sync/entries/xlsx/gt-d4-operating-revenue/store-projection",
+        "status": 200
+      },
+      {
+        "method": "POST",
+        "path": "/api/projects/0ec33ac9-3de5-4e65-b3bf-f9dccd7b2a49/workpapers/b3ab3c46-828f-4f48-950e-aee9bbdc923f/sync/entries/xlsx/gt-d4-operating-revenue/pending-mutations",
+        "status": 200
+      },
+      {
+        "method": "POST",
+        "path": "/api/projects/0ec33ac9-3de5-4e65-b3bf-f9dccd7b2a49/workpapers/b3ab3c46-828f-4f48-950e-aee9bbdc923f/sync/entries/xlsx/gt-d4-operating-revenue/materialize",
+        "status": 200
+      }
+    ],
+    "store_projection_ok": true,
+    "materialize_ok": true,
+    "d2_sync_hits": 0,
+    "callback_url_keys": [
+      "doc_key",
+      "generation",
+      "room_id",
+      "route_credential_id",
+      "route_token"
+    ],
+    "sync_host_mounted": true,
+    "oo_iframe_count": 1,
+    "doc_editor_called": false,
+    "console_errors": []
+  }
+}
