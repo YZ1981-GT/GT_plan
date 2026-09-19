@@ -5953,6 +5953,10 @@ jobs:
         # 🔴 复盘补：checkbox「勾选=1/未勾=空」口径此前无实现者（value_type=text→布尔落 "True"）。
         #    这条真跑 materialize→extract，证明勾选落 OOXML 布尔 <v>1</v> 且读回 True、未勾读回空。
         run: python -m pytest backend/tests/workpaper_sync/test_d4_ipo_checkbox_materialize_roundtrip.py -q
+      - name: Run IPO all-four bidirectional roundtrip (四张表两向回写)
+        # 🔴 回答「四张底稿都实现双向回写了吗」：逐张 build→materialize（真 xlsx）→extract→merge，
+        #    D4-25/26/27/28 × HTML↔OO 两向逐字段一致（checkbox/amount/text 各按类型往返）。
+        run: python -m pytest backend/tests/workpaper_sync/test_d4_ipo_all_four_bidirectional_roundtrip.py -q
       - name: Run IPO checklist cross-language contract (后端 sheet_key/json_path ↔ 前端列 key)
         # 🔴 该守卫此前**已存在但未进 CI** —— 它正是抓 'd425-managed' vs 'd4-25-managed'
         #    这类两侧常量各自都对、拼起来不通的漂移。
