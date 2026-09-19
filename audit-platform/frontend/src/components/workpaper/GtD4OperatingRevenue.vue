@@ -537,14 +537,24 @@ async function selfLoad() {
 async function handleD4SaveItems(e: Event): Promise<void> {
   const items = (e as CustomEvent<{ items: ChecklistResponse[] }>).detail?.items
   if (!Array.isArray(items) || items.length === 0) return
-  await formData.saveBatch(
-    items
-      .filter(it => it && it.item_id)
-      .map(it => ({
-        itemId: it.item_id,
-        data: { conclusion: it.conclusion ?? null, remark: it.remark ?? null },
-      })),
-  )
+  // 这是 window 事件的 fire-and-forget handler：saveBatch 内部对 canceled 已不弹 toast
+  // 但仍 rethrow（调用方可能要感知）。切「在线编辑」会 flush→abort 掉这次自动保存的 PUT，
+  // 这里必须吞掉，否则 rethrow 无人接 → 未捕获 Promise rejection（控制台红字 CanceledError）。
+  try {
+    await formData.saveBatch(
+      items
+        .filter(it => it && it.item_id)
+        .map(it => ({
+          itemId: it.item_id,
+          data: { conclusion: it.conclusion ?? null, remark: it.remark ?? null },
+        })),
+    )
+  } catch (err: any) {
+    if (err?.code !== 'ERR_CANCELED' && err?.name !== 'CanceledError' && err?.message !== 'canceled') {
+      throw err
+    }
+    return
+  }
   scheduleAutoSnapshot()
 }
 

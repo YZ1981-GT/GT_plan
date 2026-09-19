@@ -730,3 +730,24 @@ def test_service_exposes_both_split_and_combined_read_entries() -> None:
         "retry_eligibility",
     ):
         assert callable(getattr(ra.RequestApplicationService, name)), name
+
+
+def test_router_forcesave_terminal_branch_calls_an_existing_service_method() -> None:
+    """`wp_sync_router` forcesave 分支调用的 `terminate_without_callback` 必须真的存在，
+    且签名与调用点对得上。
+
+    🔴 这是真实抓到过的缺陷：路由已经 `await svc.requests.terminate_without_callback(
+    accepted, cs_outcome=..., cs_error=...)`，但 service 上根本没有这个方法 ——
+    Command Service 返回 `terminal_without_callback` 码（如 doc_not_online / no_changes）
+    走到那条分支时 forcesave 直接 500。tsc/import 都查不出（Python 运行期才解析属性），
+    只有本条契约判据能钉住「路由调的方法 = service 定义的方法」。
+    """
+    method = getattr(ra.RequestApplicationService, "terminate_without_callback", None)
+    assert callable(method), "RequestApplicationService.terminate_without_callback 不存在"
+    sig = inspect.signature(method)
+    params = sig.parameters
+    # 调用点：terminate_without_callback(accepted, *, cs_outcome=, cs_error=)
+    assert "accepted" in params, list(params)
+    assert "cs_outcome" in params and params["cs_outcome"].kind == inspect.Parameter.KEYWORD_ONLY
+    assert "cs_error" in params and params["cs_error"].kind == inspect.Parameter.KEYWORD_ONLY
+    assert inspect.iscoroutinefunction(method), "必须是 async（router 里 await 它）"

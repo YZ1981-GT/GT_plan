@@ -353,6 +353,86 @@ describe('switchToOnlyOffice：消费 pending token，materialize 成功才 moun
   })
 })
 
+// ═══════════════════════════════════════════════════════════════════════════
+// A'. axios canceled（切页签竞态）：不是失败，不进 error 态、不记 sticky、可再次进入
+// ═══════════════════════════════════════════════════════════════════════════
+//
+// 背景：D4 整册 40+ 子 sheet 共用同一 entryId，切页签后再点「在线编辑」会让同 URL 的
+// read_store_projection / materialize 被 http.ts 去重层 abort，产生 axios CanceledError。
+// 这是纯 UI 竞态，不得当同步失败：否则弹「同步失败: canceled」红色遮罩且 sticky 永不消，
+// 还会把桥卡在 flushing/committing 里让下一次「在线编辑」的 flush_started 非法转换抛错。
+describe("axios canceled 是竞态而非失败：退回 html_idle，不写 lastError，可再次进入", () => {
+  // 覆盖三种 cancel 形态（axios 各版本/包装差异）× 三个 stage。
+  const CANCELS: ReadonlyArray<[string, unknown]> = [
+    ['code=ERR_CANCELED', { code: 'ERR_CANCELED', message: 'canceled' }],
+    ['name=CanceledError', { name: 'CanceledError', message: 'canceled' }],
+    ['__CANCEL__=true', { __CANCEL__: true, message: 'canceled' }],
+    ['message=canceled', { message: 'canceled' }],
+  ]
+
+  for (const [label, cancelErr] of CANCELS) {
+    it(`flush 阶段被取消（${label}）：停 html_idle、无 lastError、非 error 态`, async () => {
+      const h = harness()
+      h.flushHtml.mockRejectedValueOnce(cancelErr)
+      await expect(h.bridge.switchToOnlyOffice()).rejects.toBe(cancelErr)
+      // 关键三判据：不进 error、不记 sticky、干净退回 html_idle（可再次发起 flush_started）。
+      expect(h.bridge.state.value).toBe('html_idle')
+      expect(h.bridge.mode.value).toBe('html')
+      expect(h.bridge.lastError.value).toBeNull()
+      // 未越过 flush：后续端点一个都不该打。
+      expect(h.api.createPendingMutation).not.toHaveBeenCalled()
+      expect(h.api.materialize).not.toHaveBeenCalled()
+    })
+  }
+
+  it('pending_mutation 阶段被取消：退回 html_idle、无 sticky、materialize 未打', async () => {
+    const h = harness({
+      createPendingMutation: vi.fn(async () => {
+        throw { code: 'ERR_CANCELED', message: 'canceled' }
+      }),
+    })
+    await expect(h.bridge.switchToOnlyOffice()).rejects.toBeTruthy()
+    expect(h.bridge.state.value).toBe('html_idle')
+    expect(h.bridge.mode.value).toBe('html')
+    expect(h.bridge.lastError.value).toBeNull()
+    expect(h.api.materialize).not.toHaveBeenCalled()
+  })
+
+  it('materialize 阶段被取消：退回 html_idle、无 sticky', async () => {
+    const h = harness({
+      materialize: vi.fn(async () => {
+        throw { name: 'CanceledError', message: 'canceled' }
+      }),
+    })
+    await expect(h.bridge.switchToOnlyOffice()).rejects.toBeTruthy()
+    expect(h.bridge.state.value).toBe('html_idle')
+    expect(h.bridge.mode.value).toBe('html')
+    expect(h.bridge.lastError.value).toBeNull()
+  })
+
+  it('取消退回后可再次进入 OO（不被卡在 flushing 里）—— 这是 flush_started 非法转换的守卫', async () => {
+    const h = harness()
+    // 第一次：flush 被取消 → 退回 html_idle。
+    h.flushHtml.mockRejectedValueOnce({ code: 'ERR_CANCELED', message: 'canceled' })
+    await expect(h.bridge.switchToOnlyOffice()).rejects.toBeTruthy()
+    expect(h.bridge.state.value).toBe('html_idle')
+    // 第二次：正常路径，必须能一路走到 oo_loading（若上次残留在 flushing，这里会因
+    // flush_started 非法转换抛错）。
+    const descriptor = await h.bridge.switchToOnlyOffice()
+    expect(descriptor.roomId).toBe(UUID(21))
+    expect(h.bridge.state.value).toBe('oo_loading')
+    expect(h.bridge.lastError.value).toBeNull()
+  })
+
+  it('真失败（非 cancel）仍进 error 态并记 sticky —— 不被 cancel 短路误伤', async () => {
+    const h = harness()
+    h.flushHtml.mockRejectedValueOnce(new Error('本地 flush 真的炸了'))
+    await expect(h.bridge.switchToOnlyOffice()).rejects.toThrow('本地 flush 真的炸了')
+    expect(h.bridge.state.value).toBe('error')
+    expect(h.bridge.lastError.value?.errorCode).toBe(WP_BRIDGE_LOCAL_FAILURE_CODE)
+  })
+})
+
 describe('onDocumentReady 之后 await confirm-descriptor', () => {
   it('confirm 之前不进 oo_editing、不可 forcesave', async () => {
     const h = harness()

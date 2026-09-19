@@ -93,6 +93,10 @@ async function switchMode(target: 'structured' | 'onlyoffice'): Promise<void> {
   try {
     if (target === 'onlyoffice') { if (props.isReadonly) return; await syncBridge.switchToOnlyOffice() }
     else await syncBridge.switchToHtml()
+  } catch {
+    // 失败已由桥写入 feedback（syncFeedbackErr 展示真实原因）；请求被去重层取消
+    // （切页签竞态）时桥已内部退回 html_idle。这里一律吞掉，避免 rethrow 变成
+    // 未捕获 Promise rejection（控制台红字 CanceledError）。
   } finally { syncSwitching.value = false }
 }
 

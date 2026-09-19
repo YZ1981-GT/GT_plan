@@ -62,6 +62,8 @@ from app.models.workpaper_sync_models import (
 
 from .models import (
     ActorType,
+    RequestState,
+    assert_transition,
     OperationDirection,
     OperationShape,
     OperationState,
@@ -775,6 +777,71 @@ class RequestApplicationService:
         )
         accepted.assert_dispatchable()
         return accepted
+
+    # ─────────────────────────────────────────────────────────────────
+    # 6.1b Command Service 终态码（no_changes / doc_not_online / configuration_error
+    #      / implementation_defect）：不会再有 callback，request + shell 就地终结。
+    # ─────────────────────────────────────────────────────────────────
+
+    async def terminate_without_callback(
+        self,
+        accepted: AcceptedRequest,
+        *,
+        cs_outcome: str,
+        cs_error: int | None = None,
+    ) -> None:
+        """CS 返回 `terminal_without_callback` 码时，request + operation shell 就地终结。
+
+        语义（wp_sync_router forcesave 分支）：CS 明确「不会再有 callback」（且不可重试，
+        见 :attr:`CommandReturnCodeRule.terminal_without_callback`），若不收敛，request 停在
+        `frozen`、operation shell 停在 `created`，前端会无限轮询等 status 6。
+
+        - operation shell → `rejected`（`created→rejected` 合法终态；先 append-only event
+          再投影 state，与 `MaterializeCoordinator._fail_operation` 同构）；
+        - request → `terminal`（`frozen→terminal` 合法边，语义即「无后续 callback 的正常终结」）。
+
+        🔴 幂等：当前状态已是终态时静默跳过（cache_hit 重放 / 并发重复调用都不二次 append）。
+        🔴 **只 flush 不 commit**（`RequestApplicationService` 类约定；commit 由 router 负责）。
+        """
+        from datetime import datetime, timezone
+
+        stage = f"cs_terminal:{cs_outcome}"[:40]
+        error_code = (f"cs_error={cs_error}" if cs_error is not None else str(cs_outcome))[:60]
+
+        # ── operation shell → rejected（先 event 再投影 state）──
+        op = accepted.operation
+        op_state = OperationState(op.state)
+        _OP_TERMINAL = (
+            OperationState.rejected, OperationState.error, OperationState.applied,
+            OperationState.superseded, OperationState.authorization_stale,
+            OperationState.duplicate, OperationState.refresh_required,
+        )
+        if op_state not in _OP_TERMINAL:
+            await self._repo.append_operation_event(
+                operation_id=op.id,
+                from_state=op_state,
+                to_state=OperationState.rejected,
+                stage=stage,
+                actor_type=ActorType.system,
+                error_code=error_code,
+            )
+            op.state = OperationState.rejected.value
+            op.error_code = error_code
+            op.error_stage = stage
+            op.finished_at = datetime.now(timezone.utc)
+
+        # ── request → terminal（先 assert 守边再投影；仓库无 request event 封装，直接改 state）──
+        req = accepted.request
+        req_state = RequestState(req.state)
+        _REQ_TERMINAL = (
+            RequestState.terminal, RequestState.rejected,
+            RequestState.superseded, RequestState.authorization_stale,
+        )
+        if req_state not in _REQ_TERMINAL:
+            assert_transition("request", req_state, RequestState.terminal)
+            req.state = RequestState.terminal.value
+
+        await self._session.flush()
 
     # ─────────────────────────────────────────────────────────────────
     # 6.2 读路径第一步：只读 scope index 的授权
