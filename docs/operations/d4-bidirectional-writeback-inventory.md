@@ -16,6 +16,12 @@
 - **`useWpDetailGuard` CanceledError 假失败屏已修**（commit `79cf1b52e`）：切底稿竞态不再弹"加载底稿失败/canceled"全页屏。
 - D4-2 DB 侧铁证：12 个 applied oo_to_html application + 12 个 source=onlyoffice content_version（双向真实往返）。
 
+## 🔴 阻塞（2026-09-20 实测，影响整个 gt-d4-operating-revenue entry 发布）
+
+- **D4-9 provider 对真实数据抛 StorePayloadError，卡死整个 entry 的 live rematerialize**。`phase5_d4_customer_structure.build_d49_store_projection` 的 `_parse_store_payload` 期望 `D4-9-data` 为 `{current, prior}` dict，但真实项目（首汽租车等）该 store 是 **list** 形态 → rematerialize 全 entry 事务回滚，卡在 gen54。D4-9 已入 HEAD 契约（21 sheets）但**从未 live 发布过**（gen54 = D4-6 的 20-sheet bundle，不含 D4-9）。
+- **连带影响**：批次B 的 D4-17 provider 已完成 + 单测通过，但因共享同一 entry、desired bundle 含 D4-9，**无法 live 发布**（flag `_INCLUDE_D417_CUTOFF_SHEET` 暂关）。任何后续该 entry 的从零 sheet 发布都被 D4-9 挡住。
+- **解除条件**：D4-9 owner 修 `_parse_store_payload` 兼容 list 形态（或前端 D4-9-data 统一为 dict）+ live rematerialize 通过。修复前该 entry 的发布管线冻结在 gen54。属主控 §10.3 并发 owner 文件，不擅改。
+
 ## 增量更新（2026-09-20，D4-1 落地）
 
 > 基线段（上方）保持 2026-09-19 快照不改；本段记录此后的真实推进，供逐张清册与统计段引用。
@@ -54,7 +60,7 @@
 | 14 | D4-14 | 发生检查 | d4-inspection (9/16) | ❌ | D4TabOccurrence | legacy | 🔵 从零(32列七维嵌套,风险高) |
 | 15 | D4-15 | 完整性检查 | d4-inspection (9/16, B1/B2做实) | ✅ d4-15-managed | D4TabCompleteness | ✅ | ✅ |
 | 16 | D4-16 | 出口口岸核对 | d4-inspection (9/16, B1/B2做实) | ✅ d4-16-managed | D4TabExport | ✅ | ✅ |
-| 17 | D4-17 | 截止测试(账到单据) | d4-cutoff-return (3/13, RS1-3做实) | ❌ | D4TabCutoffForward | legacy | 🔵 从零(BB1-3 blocked) |
+| 17 | D4-17 | 截止测试(账到单据) | d4-cutoff-return (3/13) | 🟡 provider就绪(flag暂关) | D4TabCutoffForward | ✅ | 🟡 代码+单测就绪,契约门被D4-9阻塞 |
 | 18 | D4-18 | 截止测试(单据到账) | d4-cutoff-return (3/13) | ❌ | D4TabCutoffBackward | legacy | 🔵 从零(BB1-3 blocked) |
 | 19 | D4-19 | 销售折扣与折让 | d4-cutoff-return (3/13) | ❌ | D4TabDiscount | legacy | 🔵 从零(BB1-3 blocked) |
 | 20 | D4-20 | 销售退货检查 | d4-cutoff-return (3/13) | ❌ | D4TabReturn | legacy | 🔵 从零(BB1-3 blocked) |
