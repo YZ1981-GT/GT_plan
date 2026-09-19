@@ -116,3 +116,15 @@
 3. **不新造平台机制**：复用既有 `publish-to-tb` 端点、`_on_d_audit_determination_saved` handler、`tb_publish_ack`（V162）、`crossWpEventBridge`；不新增表、不新增事件类型。
 4. **不改处置/函证等正交联动**：`disposal:completed` / `h1:disposal-completed` / 函证联动不在本 spec 范围。
 5. **不实施本 spec 之外的口径修正**：审定数口径（正数口径、发生额取数）沿用现状，不借机重构。
+
+## 第二轮复盘补充验收标准
+
+> append-only 追加，不改上文原始需求（审计轨迹）。本节为实施完成后复盘发现的守卫缺口补充。
+
+### 需求 9 补充验收标准 9.4：显式发布端点自身的防绕过守卫
+
+4. THE 系统 SHALL 提供 CI 守卫断言显式发布端点自身不被绕过：任何调用 publish-to-tb 的前端文件 SHALL 有二次确认门 —— 同文件 ElMessageBox.confirm 或 confirmDangerous，或由同循环含 confirm 的 Adjudication 文件承载；且 watch、watchEffect、onMounted、setTimeout、setInterval 的回调体内 SHALL NOT 发起发布，即自动回写反模式；违规 SHALL 使 CI 失败。
+
+**为何需要**：原需求 9 只约束「不调旧端点」，即 Property 5。Property 1「普通保存/数据变化绝不写 TB」与 Property 2「必经显式确认」原本只有各循环 gate 单测保护，不约束未来新增组件 —— 新组件直调 publish-to-tb 忘加确认、或在 watcher 里自动调，CI 全绿放行而 Req 1/2 静默破掉。
+
+**守卫**：backend/scripts/check/check_tb_publish_confirm_gate.py，已接入 governance-checks.yml 的 tb-writeback-no-direct-call job；自测 backend/tests/scripts/test_check_tb_publish_confirm_gate.py 共 19 用例。当前基线：5189 文件扫描、两类违规均 0。

@@ -5912,3 +5912,13 @@ jobs:
         run: python -m pip install pytest==8.4.2
       - name: Run TB-writeback direct-call guard self-tests
         run: python -m pytest backend/tests/scripts/test_check_tb_writeback_no_direct_call.py -q
+      # 第二道守卫（复盘补强 6 / Req 1,2 = Property 1+2）：上面只管「不调旧端点」，
+      # 还得管「新端点不被绕过确认或自动调」：
+      #   A 确认门配对 —— 调 publish-to-tb 的文件须同文件有 confirm（直接门）
+      #     或同循环有含 confirm 的 *Adjudication* 文件（间接门，FormData 层只 post）；
+      #   B 禁自动发布 —— watch/watchEffect/onMounted/setTimeout/setInterval 回调体内
+      #     不得 publishToTb( 或 publish-to-tb post（改造前 N1/M/H3/H10 自动写属此类）。
+      - name: Check publish-to-tb confirm gate (no unconfirmed / no auto publish)
+        run: python backend/scripts/check/check_tb_publish_confirm_gate.py
+      - name: Run publish-to-tb confirm gate self-tests
+        run: python -m pytest backend/tests/scripts/test_check_tb_publish_confirm_gate.py -q

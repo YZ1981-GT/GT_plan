@@ -358,3 +358,14 @@ G7 return 孤儿 export（模块加载即 ReferenceError）+ G5 isReadonly 对 R
 ### 未变的正确判断
 方案 B、R1 最高风险+逐任务 grep 实证、Property 9 死代码铁律——复盘均确认前瞻性成立。
 
+### 补强 6 — Property 1/2 缺 CI 守卫：第二轮复盘发现，已补
+
+**缺口**：Task 18 守卫只断言「不调旧端点」，即 Property 5；而 Property 1「普通保存/数据变化绝不写 TB」与 Property 2「必经显式确认」原本无任何 CI 守卫 —— 只靠各循环 gate 单测，而单测不约束未来新增组件。若新组件直调 publish-to-tb 忘加二次确认，或在 watch / onMounted 里自动调 publishToTb，旧守卫全绿放行，Req 1/2 静默破掉。
+
+**已补**：新增 backend/scripts/check/check_tb_publish_confirm_gate.py，已接入 CI 同 job，两条判据：
+
+- **判据 A 确认门配对**：调 publish-to-tb 的文件须满足「同文件有 confirm」即直接门，实测 46 个；或「同循环有含 confirm 的 Adjudication 文件」即间接门，实测 29 个，对应 FormData 层只负责 post、confirm 在 Adjudication 层的现实架构。A2 只认文件名含 Adjudication 的 confirm —— 实证若放宽到同循环任意 confirm，useK1FormData 会误配到 useK1AiGenerate / useK1VoucherOcr 的 AI 与 OCR 确认，那不是发布门。
+- **判据 B 禁自动调用**：watch / watchEffect / onMounted / setTimeout / setInterval 的回调体内不得出现 publishToTb 调用或 publish-to-tb 发布 —— 改造前 N1 debounce、M watcher、H3 debounce、H10 mount 自动写皆属此类。回调体范围用跳字符串的括号配平提取，不用天真正则。
+
+**验证**：真仓库 5189 文件扫描，两类违规均 0，exit 0；造假违规探针即无 confirm 发布 + watch 内自动发布，守卫 exit 1 精准报出两条并给中文修复指引，探针验证后已删；守卫自测 19 passed。
+
