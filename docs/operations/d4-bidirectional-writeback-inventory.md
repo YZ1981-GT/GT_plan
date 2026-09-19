@@ -58,31 +58,33 @@
 | 18 | D4-18 | 截止测试(单据到账) | d4-cutoff-return (3/13) | ❌ | D4TabCutoffBackward | legacy | 🔵 从零(BB1-3 blocked) |
 | 19 | D4-19 | 销售折扣与折让 | d4-cutoff-return (3/13) | ❌ | D4TabDiscount | legacy | 🔵 从零(BB1-3 blocked) |
 | 20 | D4-20 | 销售退货检查 | d4-cutoff-return (3/13) | ❌ | D4TabReturn | legacy | 🔵 从零(BB1-3 blocked) |
-| 21 | D4-21 | 关联方销售/价格 | d4-21-24 (10/11) | ✅ d421-managed | D4TabRelatedPrice | **legacy** | 🟡 半接入(后端有前端未接桥) |
-| 22 | D4-22 | IPO重要指标分析 | d4-21-24 (10/11) | ✅ d422-managed | D4TabIpoIndicator | **legacy** | 🟡 半接入 |
-| 23 | D4-23 | 收入与开票比较 | d4-21-24 (10/11) | ✅ d423-managed | D4TabInvoiceCompare | **legacy** | 🟡 半接入 |
-| 24 | D4-24 | 第三方回款检查 | d4-21-24 (10/11) | ✅ d424-managed | D4TabThirdParty | **legacy** | 🟡 半接入 |
+| 21 | D4-21 | 关联方销售/价格 | d4-21-24 (10/11) | ✅ d421-managed | D4TabRelatedPrice | ✅ | ✅ (批次A 2026-09-20接桥,真OO待验) |
+| 22 | D4-22 | IPO重要指标分析 | d4-21-24 (10/11) | ✅ d422-managed | D4TabIpoIndicator | ✅ | ✅ (批次A接桥,真OO待验) |
+| 23 | D4-23 | 收入与开票比较 | d4-21-24 (10/11) | ✅ d423-managed | D4TabInvoiceCompare | ✅ | ✅ (批次A接桥,真OO待验) |
+| 24 | D4-24 | 第三方回款检查 | d4-21-24 (10/11) | ✅ d424-managed | D4TabThirdParty | ✅ | ✅ (批次A接桥,真OO待验) |
 | 25 | D4-25 | IPO经销商检查 | ipo-checklist | ✅ d4-25-managed | D4TabDealer | ✅ | ✅ |
 | 26 | D4-26 | 境外销售收入检查 | ipo-checklist | ✅ d4-26-managed | D4TabOverseas | ✅ | ✅ |
 | 27 | D4-27 | 识别未披露关联方 | ipo-checklist | ✅ d4-27-managed | D4TabUndisclosedRp | ✅ | ✅ |
 | 28 | D4-28 | 客户信息核查清单 | ipo-checklist | ✅ d4-28-managed | D4TabCustomerChecklist | ✅ | ✅ |
 | 29 | D4-29 | 客户信息检查表 | ipo-fraud | ✅ d4-29-managed | D4TabCustomerDetail | ✅ | ✅ |
-| 30 | D4-30 | 客户访谈记录汇总 | ipo-fraud (6/11) | ❌ 契约无(_INCLUDE_IPO_INTERVIEW=False) | D4TabInterviewSummary | 桥(d4-30-managed) | 🟡 前端接桥但后端契约关闭 |
-| 31 | D4-31 | 客户访谈记录 | ipo-fraud (6/11) | ❌ 同上(几何未就绪) | D4TabInterviewDetail | 桥(d4-31-managed) | 🟡 前端接桥但后端契约关闭 |
-| 32 | D4-32 | 资金流水检查 | ipo-fraud (6/11) | ❌ 同上 | D4TabFundFlow | 桥(d4-32-managed) | 🟡 前端接桥但后端契约关闭 |
+| 30 | D4-30 | 客户访谈记录汇总 | ipo-fraud (6/11) | ✅ d4-30-managed(批次A-5开门) | D4TabInterviewSummary | ✅ | ✅ (批次A-5 2026-09-20,真OO待验) |
+| 31 | D4-31 | 客户访谈记录 | ipo-fraud (6/11) | ✅ d4-31-managed(singleton) | D4TabInterviewDetail | ✅ | ✅ (批次A-5,真OO待验+singleton边界) |
+| 32 | D4-32 | 资金流水检查 | ipo-fraud (6/11) | ✅ d4-32-managed | D4TabFundFlow | ✅ | ✅ (批次A-5,真OO待验) |
 | 33 | D4-33 | 其他业务毛利率分析 | d4-33-36 (0/42) | ❌ 契约无 d433 | D4TabOtherMargin | **legacy** | 🔵 从零 |
 | 34 | D4-34 | 其他业务收入合同测算 | d4-33-36 | ❌ | D4TabOtherContract | **legacy** | 🔵 从零 |
 | 35 | D4-35 | 其他业务收入检查 | d4-33-36 | ✅ d435-managed | D4TabOtherCheck | ✅ | ✅ |
 | 36 | D4-36 | 其他业务收入截止测试 | d4-33-36 | ❌ | D4TabOtherCutoff | **legacy** | 🔵 从零 |
 
-## 统计（2026-09-20 契约 sheet_key 集合实证：d41/d42/d43/d45/d421/d422/d423/d424/d435/d4-29/d4-25/d4-26/d4-27/d4-28/d4-15/d4-16 共 **16 张**）
+## 统计（2026-09-20 批次A/A-5 后，契约 sheet_key 集合 **19 张**：d41/d42/d43/d45/d421/d422/d423/d424/d435/d4-29/d4-25/d4-26/d4-27/d4-28/d4-15/d4-16/**d4-30/d4-31/d4-32**）
 
-- ✅ 三维全绿(真双向)：**12 张** — D4-1/2/3/5/15/16/25/26/27/28/29/35（D4-1 2026-09-20 落地，e2e 证据待补）
-- 🟡 半接入(后端有契约但前端仍 legacy / 前后端不一致)：**7 张** — D4-21/22/23/24(后端契约有前端legacy) + D4-30/31/32(前端接桥但后端契约 `_INCLUDE_IPO_INTERVIEW_SHEETS=False` 关闭)
-- 🔵 owner spec 待做/从零(后端无契约 + 前端仍 legacy)：**15 张** — D4-6/7/8/9/10/11/14/17/18/19/20/33/34/36（D4-8/12 gap 待做，其余 legacy）
+> 🔴 **重要口径**：下方「✅」是**三维代码全绿（REQUEST_PATH 级）**——后端契约 + 前端接桥 + 宿主登记齐全。但**没有一张到主控 §6.4 的 `ONLYOFFICE_VERIFIED`**（需真实 OO 往返产生 `working_paper_content_application` state=applied + operation 终态 + OO 侧 content version，见 §9.5）。真 OO 验证是 env 门（start-dev.bat 全栈 + OO 容器），列为批次C。
+
+- ✅ 三维代码全绿(REQUEST_PATH)：**19 张** — D4-1/2/3/5/15/16/21/22/23/24/25/26/27/28/29/30/31/32/35
+  - 其中 D4-21/22/23/24（批次A）+ D4-30/31/32（批次A-5）为 2026-09-20 新接桥/开门；余 12 张此前已接桥
+- 🔵 owner spec 待做/从零(后端无契约 + 前端仍 legacy)：**15 张** — D4-6/7/8/9/10/11/12/14/17/18/19/20/33/34/36
 - ⬜ 裁决 single_html/N/A：**2 张** — D4-4/D4-13
 
-> 校验：12 + 7 + 15 + 2 = 36 ✓
+> 校验：19 + 15 + 2 = 36 ✓（🟡 半接入类已清零：D4-21~24 接桥、D4-30~32 开门）
 > 注：D4-6/7 前端虽已在宿主 `D4_SHEET_KEY_BY_CODE` 预留 `d46/d47-managed` 键，但契约 sheet_key 集合中**无**对应项且组件未接桥，故仍归 🔵 从零。D4-9/10/11/14/33/34/36 经 grep 实证前端组件均未 import `useWorkpaperSyncBridge`（仍 legacy），契约集合中也无对应项。
 
 ## 逐张推进优先级（建议，2026-09-20 修订）
