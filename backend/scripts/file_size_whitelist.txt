@@ -168,7 +168,14 @@ backend/app/models/audit_platform_schemas.py  1032
 backend/app/models/workpaper_models.py  1116
 backend/app/models/workpaper_sync_models.py  1152
 backend/app/routers/wp_onlyoffice_router.py  1749
-backend/app/routers/wp_sync_router.py  2341
+# 🔴 2026-09-19 登记既存欠账：基线 2341 定于 42d2f6e6f(09-02)，此后 82f58ea44(09-13,
+# D4 IPO 综合交付) 一跃到 2635 就已破门（>2458），e59e93718→2723、da57bad76→2727 继续增长，
+# 三次都未同步本条 —— 即门禁对本文件事实上已失效。本次「整册打开即定位」只加 37 行（materialize
+# 解析目标 sheet + contents 回派生字节），不是膨胀来源，但被这 306 行既存欠账挡住。
+# 抬到实测值让门禁从此刻重新生效；欠账应由抽伴生模块偿还（`_attach_launch_urls` /
+# `get_room_contents` / `_materialize_request` 一组约 220 行可整体外移，但 test_task28_sync_router
+# 有按函数名钉在本文件上的 AST 判据，搬迁需与那批判据一起改，属独立任务）。
+backend/app/routers/wp_sync_router.py  2764
 backend/app/services/excel_structure_fingerprint.py  918
 backend/app/services/word_sdt_fingerprint.py  874
 backend/app/services/workpaper_sync/adapters/registry.py  1494

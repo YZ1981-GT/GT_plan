@@ -92,9 +92,9 @@ export interface ChecklistSheetSpec {
 | sheet | headerRows | 主列 | 二级列（父组） |
 |---|---|---|---|
 | D4-25 经销商检查 | [11] | 序号/客户名称/经销商/本期销售数量/本期销售金额/占同类交易比例/期末应收账款余额/是否关联方/个人·企业/销售费用承担方式/补贴或返利/终端销售金额/备注（13） | — |
-| D4-26 境外销售收入检查 | [11,12] | 客户名称/所在国家地区/产品种类/业务模式/本期销售金额/占同类交易比例/贸易模式/主要贸易条款/出口结算模式/是否存在第三方回款/第三方回款原因/核查程序确认的销售金额/差异/差异原因分析/相关程序索引（15） | 实地走访/交易函证/海关函证/核对报关单/电子口岸数据查询（5，父组「核查程序执行情况」） |
+| D4-26 境外销售收入检查 | [11,12] | 客户名称/所在国家地区/产品种类/业务模式/本期销售金额/占同类交易比例/贸易模式/主要贸易条款/出口结算模式/是否存在第三方回款/第三方回款原因/核查程序确认的销售金额/差异/差异原因分析（14） | 实地走访/交易函证/海关函证/核对报关单/电子口岸数据查询（5，父组「核查程序执行情况」） |
 | D4-27 识别未披露的关联方 | [14] | 序号/姓名/个人客户/客户法人/合同签订人/高管亲属/财务部门/管理部门/技术部门/生产部门/营销部门/其他/总计/重名(Y·N)/公司股东高管亲属员工/年度销售额/说明/索引号（18） | — |
-| D4-28 客户信息核查清单 | [12,13] | 序号/客户名称/选取原因/销售金额/占总交易比重/应收账款期末余额/占期末余额比重/合同负债期末余额/占期末余额比重/核查方式/索引号（11） | 工商资料查询/互联网信息查询/函证/视频·电话访谈/实地走访（5，父组「核查方式（√）」） |
+| D4-28 客户信息核查清单 | [12,13] | 序号/客户名称/选取原因/销售金额/占总交易比重/应收账款期末余额/占期末余额比重/合同负债期末余额/占期末余额比重（9）+ 索引号 | 工商资料查询/互联网信息查询/函证/视频·电话访谈/实地走访（5，父组「核查方式（√）」）→ 全表 15 列 |
 
 **行记录**：`{ rowId: string, ...columns.map(c => c.key) }`。`rowId` 为稳定业务标识，不依赖 seq 排序或列号；列映射使用稳定 key 并校验结构，重复表头使用完整分组路径。
 
@@ -211,26 +211,38 @@ def d4_25_dealer_sales(db, project_id, year, customer_name):
 - 匹配不到时返回 `None`（前端显示空），**禁止返回 0** —— 0 会被误解为「已核对为零」。
 - `test_auto_data_resolvers.py` 的契约「引用的 auto_data_source 都已注册」自动覆盖新注册。
 
-### 表内计算（前端公式引擎）
+### 表内计算（前端派生值预览，非 F-SHELL 公式定义）
 
-复用既有 `userFormulaV2` 体系（`UserFormulaV2Command` 含 `expression` / `refs[]` / `baseVersion` /
-`assertFunctionCategorySplit`）。本 spec 的 `$col` 引用统一解析为**列规格 `key`**，不是 label：
+表内计算（占比 / 差异 / 总计）是**本表算术派生值**，由前端纯函数引擎 `ipoChecklistFormulaEngine.ts`
+（`evaluateExpression` / `recalcDerivedColumns`）在行创建与依赖列变更时重算。`$col` 引用统一解析为
+**列规格 `key`**（非 label）：
 
-- `$本期销售金额` → `row.本期销售金额`
-- `SUM($x)` → 该列在**当前全部行**上的求和（分母为 0 时返回 `null`，不返回 0）
-- 表达式求值在行创建与依赖列变更时重算；**派生列**（`derived: true`）在表格视图默认只读。
+- `$salesAmount` → `row.salesAmount`（本行本列）
+- `SUM($col)` → 该列在**当前全部行**上的求和（跨行聚合）；`SUM($a,$b,...)` → 行内多列之和（D4-27 总计）
+- 分母为 0 / 空 → `null`（不返回 0、不显示 0%、不抛除零，Property 21/26/33）
+- **派生列**（`derived: true`）在表格视图默认只读。
 
-### 用户二次编辑（不落预设）
+🔴 **与 governance C2（F-SHELL v2）的边界判定**（对照 `c2_formula_contract.md`）：
 
-有效公式定义由 F-SHELL v2 mutation 管理，支持 `expression`、`refs`、`params`；后端权威执行，HTML/OO 共同投影。默认、custom、删除、恢复默认分开，禁止 `field_overrides` 与 checklist remark 公式覆盖。
+| 维度 | 本表 intra_sheet 派生值 | C2 治理的公式定义（WpFormula） |
+|---|---|---|
+| 产物 | **普通数值**，写进 `row[columnKey]` → 序列化进 `checklist_responses.{sheet}-rows.remark` | 持久化公式定义（`expression`/`refs`/`preset`/`custom`） |
+| 引用范围 | 仅本表列（本行 / 本表跨行） | 可跨底稿（走 ACNR `full_resolve`） |
+| 用户可编辑表达式 | **否**（预设为代码常量 `IPO_FORMULA_PRESETS`） | 是（走 FormulaBar / F-SHELL v2 白名单 DSL） |
+| CAS / 留痕 | 由数据层 CAS 兜（P0-4 `checklist_responses.content_version`） | 定义版本 CAS（`baseVersion`） |
 
-```
-field_overrides[project]  >  IPO_FORMULA_PRESETS  >  手填空值
-```
+**结论**：intra_sheet 派生值属 c2 契约 C.3 明列的「普通值 override 正交域」，**不纳入 F-SHELL v2 治理**；
+它不进 `WpFormula`、不进 `remark` 公式库、无 `field_overrides` 覆盖库，不违反 governance 三禁（自建 sync
+bridge / field_overrides 公式库 / 前后端重复默认值）。真正的**公式**部分（表间提取 inter_sheet）已走后端
+`@auto_resolver` 权威执行，Property 13 跨语言契约守卫钉死。若未来需要**用户可编辑的公式**，才走 F-SHELL v2。
 
-- 覆盖**只影响本项目**（另一项目仍用预设，AC 3.6）。
-- 清除覆盖 = 删该 key，回落平台预设（AC 3.5）。
-- 用户在派生列直接手填 → 写入覆盖 `{expression: null, manualValue: v}`，**锁定为手填不再重算**（Property 15）。
+### 派生列手填锁定（非公式覆盖库）
+
+用户在派生列直接手填 → `useIpoChecklistTab.updateCell` 把该 `${rowId}:${columnKey}` 记入 `manualLocks`
+（内存 Set），写入的是**普通值**，`recalcDerivedColumns` 遇锁定项跳过、不再重算（Property 15）。
+删除该行或清空手填即解锁回落预设重算。**无 `{expression, manualValue}` 覆盖库，无 project 级 field_overrides**
+——手填值与其它单元格一样走 `persist` → `d4:save-items` → 平台保存（含 CAS 留痕）。跨项目天然隔离：
+另一项目的 rows 项独立，预设公式对其照常生效（AC 3.6）。
 
 ## 导入导出闭环（Requirement 4）
 
@@ -238,25 +250,30 @@ field_overrides[project]  >  IPO_FORMULA_PRESETS  >  手填空值
 
 1. **列头三向守卫**：`_SHEET_HEADERS[sheet]`（1D 摊平）== 列规格摊平后的 `label` 序列 == 源模板表头单元格。
    任一处改动必须同步另一处（守卫在 CI 跑，防漂移）。
-2. **导入后 reload**（AC 4.2，当前缺失的唯一一跳）：`useD4ImportExport` 的 `importData` 成功回调里
-   `emit('imported')` → 宿主 `setActiveMode('表格视图')` + `reloadRows()`。
-   禁止只弹「导入成功」而视图仍显示旧数据。
+2. **导入后 reload**（AC 4.2）：组件 `handleImportFile` 在 `importData` 返回非 null 后
+   `await reloadHost()`（宿主 `GtD4OperatingRevenue.vue` `provide('reloadWorkpaperData', selfLoad)`）
+   + `emit('imported')`。禁止只弹「导入成功」而视图仍显示旧数据。
 3. **导出保留两级表头合并**：导出 xlsx 对 D4-26/D4-28 写入父组合并单元格
-   （`O11:S11` / `J12:N12`），禁止压扁成 20/16 个平铺列头。
+   （`O11:S11` / `J12:N12`），禁止压扁成 19/15 个平铺列头。
 
 往返无损（Property 18）由守卫断言：`d4_export_data(sheet)` 输出 → `d4_import_data` 导入 →
 rows 项内容 == 导入前（数值容差 0.005，空值归一为 `null`）。
 
 ## 前端组件接线
 
-宿主 `GtD4OperatingRevenue.vue`（`KNOWN_HTML_SHEETS` 已含 D4-25~28，第 94–97 行分发）不动分发逻辑，
-只改四个组件内部。四张表共享三个新模块：
+宿主 `GtD4OperatingRevenue.vue`（`KNOWN_HTML_SHEETS` 已含 D4-25~28）不动分发逻辑，
+只改四个组件内部。四张表共享三个模块 + 复用平台既有 sync bridge：
 
-| 新文件 | 职责 |
+| 文件 | 职责 |
 |---|---|
 | `d4/ipo/ipoChecklistSchema.ts` | 列规格 + 公式真源 + 投影规则纯函数（`rowsToSheet` / `sheetToRows`） |
-| `d4/ipo/useIpoChecklistSyncBridge.ts` | 双模式回写桥（flush → 投影 → 冲突裁决 → fail-visible） |
-| `d4/ipo/ipoChecklistFormulaEngine.ts` | F-SHELL v2 预览适配，不持有公式覆盖库 |
+| `d4/ipo/useIpoChecklistTab.ts` | 四表共享行逻辑（CRUD / 派生列重算 / rows 项持久化 / `flushPendingSave` / `reloadHost`） |
+| `d4/ipo/ipoChecklistFormulaEngine.ts` | 前端 intra_sheet 派生值预览纯函数（非 F-SHELL 公式定义，见上「表内计算」判定） |
+| **复用** `components/workpaper/sync/useWorkpaperSyncBridge.ts` | 平台既有双模式桥（**非自建**）：组件传 `flushHtml`(先 `flushPendingSave` 再 `readStoreProjection`) + `reloadHtml`(=`reloadHost`)，配 `WorkpaperSyncEditorHost` + `capabilityForEntry`（参照 D4-5 canary）。冲突裁决 / durable ack / 三方合并由平台桥兜（governance C1）。 |
+
+🔴 **不新建 `useIpoChecklistSyncBridge`**（governance 明令禁止自建同步 composable）。双模式回写走平台
+`useWorkpaperSyncBridge`（真实路径 `components/workpaper/sync/`），冲突裁决与 fail-visible 由平台桥的
+`feedback`/`state` 提供，组件只做 `syncFeedbackErr` 独立 `el-alert` 展示（失败不显示「已同步」）。
 
 四个组件（`D4Tab{Dealer,Overseas,UndisclosedRp,CustomerChecklist}.vue`）改写为：
 

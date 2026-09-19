@@ -780,6 +780,25 @@ async def materialize(
         idempotency_key=idempotency_key,
         pending_mutation_token=token,
     )
+
+    # ── 打开即定位（整册 workbook）：先解析目标 sheet，再落 mutation ───────────
+    # 一个 entry 的 artifact 可被**多张受管 sheet 共享**（D4 的 13 张同一本
+    # `D/D4 收入底稿.xlsx`）。本次要定位到哪张，只有本请求的 `sheet_key` 知道；
+    # 物理名只有该 entry 的 approved 契约知道 —— 两者在此合流，随后一路签进 contents
+    # token（`sign_room_contents_token(sheet=...)`），由 contents 端点按 token 里冻结的
+    # 目标 sheet 派生 activeTab 字节。放在**这一处**而不是各组件：`_attach_launch_urls`
+    # 是全部 entry 唯一的启动 URL 装配点，改这里所有整册底稿一次受益。
+    #
+    # 位置刻意在 `coordinator.materialize` **之前**：`_registration` 要跑查询，而
+    # materialize 之后会话里已有待落的 mutation，不在那之后插入只读查询。
+    # `_materialize_request` 刚解析过同一 registration（进程级缓存已热），这里是内存命中。
+    from app.services.workpaper_sync.room_launch import resolve_launch_target_sheet
+
+    target_sheet = resolve_launch_target_sheet(
+        contract=getattr(await _registration(svc, scope), "contract", None),
+        sheet_key=mat_request.sheet_key,
+    )
+
     try:
         authorized = await coordinator.authorize(mat_request)
         outcome = await coordinator.materialize(authorized)
@@ -795,7 +814,9 @@ async def materialize(
         )
     body = outcome.descriptor.as_dict()
     body["replayed"] = bool(outcome.replayed)
-    return await _attach_launch_urls(body, http_request=request, svc=svc)
+    return await _attach_launch_urls(
+        body, http_request=request, svc=svc, target_sheet=target_sheet
+    )
 
 
 async def _attach_launch_urls(
@@ -803,6 +824,7 @@ async def _attach_launch_urls(
     *,
     http_request: Request,
     svc: _SyncServices,
+    target_sheet: str = "",
 ) -> dict[str, Any]:
     """响应时补签 `document.url` + room-bound `callbackUrl`（Task 28 docstring）。
 
@@ -878,6 +900,9 @@ async def _attach_launch_urls(
             room_id=room_id,
             representation_id=representation_id,
             artifact_sha256=artifact_sha256,
+            # 目标 sheet 进 claim 而不是 query：它必须与 room/representation 一起被签名
+            # （见 `sign_room_contents_token` 的说明）。空串 = 不定位，token 形态不变。
+            sheet=str(target_sheet or ""),
         ),
     )
 
@@ -922,7 +947,7 @@ async def get_room_contents(
     预言机：能构造 token 的人据此可以区分「这个 representation 存在但文件没了」。
     现在四者在 service 层合成同一类域异常，出口只有 `_not_found()` 一处。
     """
-    from fastapi.responses import FileResponse
+    from fastapi.responses import FileResponse, Response
 
     from app.core.config import settings
     from app.services.workpaper_sync.room_launch import (
@@ -955,6 +980,18 @@ async def get_room_contents(
     except RoomContentsUnavailableError as exc:
         raise _not_found() from exc
 
+    if resolved.data is not None:
+        # 「打开即定位」的派生字节（activeTab 指向 token 里冻结的目标 sheet）。
+        # 🔴 必须回字节流：磁盘上的 canonical artifact 被 `artifact_sha256` 锁死、
+        # 永不就地改写，回 `FileResponse(resolved.path)` 会把定位结果原样丢掉 ——
+        # `ResolvedRoomContents.data` 的 docstring 写的就是这条约束。
+        return Response(
+            content=resolved.data,
+            media_type=resolved.media_type,
+            headers={
+                "content-disposition": f'attachment; filename="{resolved.filename}"'
+            },
+        )
     return FileResponse(
         resolved.path,
         media_type=resolved.media_type,

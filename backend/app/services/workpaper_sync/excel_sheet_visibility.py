@@ -517,6 +517,70 @@ def plan_all_sheets_visible(workbook_xml: str) -> tuple[str, VisibilityOutcome]:
     )
 
 
+def plan_active_sheet_only(
+    workbook_xml: str, target: str
+) -> tuple[str, VisibilityOutcome]:
+    """只把 `target` 设为活动 sheet（activeTab），**不改任何 sheet 的可见性**。**纯函数**。
+
+    与 :func:`plan_single_sheet_visibility` 的区别：后者会隐藏其余 sheet（per-sheet
+    编辑场景），本函数保持所有 sheet 原可见性 —— 用于整册双模式编辑：审计师切「在线编辑」
+    时 workbook 定位到目标受管 sheet，但仍能自由切换、看到 sheet 间关系（不违反
+    test_template_override_lossless Property 10 的整册可见设计）。
+
+    幂等：目标已是 activeTab（或匹配不到 / 单 sheet workbook）时 `changed=False`，
+    调用方不落盘。仅改 `xl/workbook.xml` 的 `<workbookView activeTab=...>`，不动 `<sheet state>`。
+    """
+    entries = _parse_sheet_entries(workbook_xml)
+    if len(entries) <= 1:
+        return workbook_xml, VisibilityOutcome(
+            changed=False,
+            target_sheet=entries[0].name if entries else None,
+            visible=tuple(e.name for e in entries if e.is_visible),
+            hidden=tuple(e.name for e in entries if not e.is_visible),
+            active_tab=None,
+            reason="single_sheet_workbook",
+        )
+
+    resolved = resolve_target_sheet([e.name for e in entries], target)
+    if resolved is None:
+        # 安全降级：匹配不到目标就一个字节都不动
+        return workbook_xml, VisibilityOutcome(
+            changed=False,
+            target_sheet=None,
+            visible=tuple(e.name for e in entries if e.is_visible),
+            hidden=tuple(e.name for e in entries if not e.is_visible),
+            active_tab=None,
+            reason="target_not_matched",
+        )
+
+    target_entry = next(e for e in entries if e.name == resolved)
+    current_view = _WORKBOOK_VIEW_RE.search(workbook_xml)
+    current_active = (
+        _get_attr(current_view.group("attrs") or "", "activeTab") if current_view else None
+    )
+    if (current_active or "0") == str(target_entry.index):
+        return workbook_xml, VisibilityOutcome(
+            changed=False,
+            target_sheet=resolved,
+            visible=tuple(e.name for e in entries if e.is_visible),
+            hidden=tuple(e.name for e in entries if not e.is_visible),
+            active_tab=target_entry.index,
+            reason="already_active",
+        )
+
+    # desired 保持各 sheet 原 state（不隐藏），只改 activeTab。
+    desired = {e.index: e.state for e in entries}
+    rebuilt = _render_sheets(workbook_xml, desired=desired, active_tab=target_entry.index)
+    return rebuilt, VisibilityOutcome(
+        changed=True,
+        target_sheet=resolved,
+        visible=tuple(e.name for e in entries if e.is_visible),
+        hidden=tuple(e.name for e in entries if not e.is_visible),
+        active_tab=target_entry.index,
+        reason="active_tab_set",
+    )
+
+
 # ═══════════════════════════════════════════════════════════════════════════
 # 6. zip 重写 + 结构性自检
 # ═══════════════════════════════════════════════════════════════════════════
@@ -621,3 +685,35 @@ def apply_single_sheet_visibility(path: Path | str, target: str) -> VisibilityOu
 def restore_all_sheets_visible(path: Path | str) -> VisibilityOutcome:
     """把全部 sheet 恢复可见（幂等，无变化不落盘）。"""
     return _apply(Path(path), plan_all_sheets_visible)
+
+
+def derive_bytes_with_active_sheet(data: bytes, target: str) -> bytes | None:
+    """产出「activeTab 指向 `target`」的**派生字节**；无需改变时返回 None。**不落盘**。
+
+    用于 OO `document.url` 的 contents 响应（整册 workbook 的「打开即定位」）：
+
+    * canonical artifact 的 `artifact_sha256` 被 descriptor / digest 校验锁死，不能就地改写；
+    * 同一份 artifact 被**多张受管 sheet 共享**（D4 的 D4-2/25/26/27/28 同 entry 同 workbook），
+      activeTab 写进 artifact 只能有一个值；
+    * activeTab 是**打开时的视图状态**，不是内容 —— 每次打开按本次目标 sheet 派生即可。
+
+    Returns:
+        新字节；`None` 表示无需改变（已是目标 activeTab / 目标匹配不到 / 单 sheet workbook）。
+
+    Raises:
+        SheetVisibilityWorkbookPartMissingError: 字节流不是 OOXML workbook（调用方退回原文件）。
+    """
+    with zipfile.ZipFile(io.BytesIO(data)) as zf:
+        if WORKBOOK_PART not in zf.namelist():
+            raise SheetVisibilityWorkbookPartMissingError(
+                f"字节流里没有 {WORKBOOK_PART} —— 不是一个 OOXML workbook"
+            )
+        workbook_xml = zf.read(WORKBOOK_PART).decode("utf-8")
+
+    rebuilt, outcome = plan_active_sheet_only(workbook_xml, target)
+    if not outcome.changed:
+        return None
+    new_data = _replace_workbook_part(data, rebuilt.encode("utf-8"))
+    # 与落盘路径同款结构性自检：除 workbook.xml 外逐部件字节不变（内容零篡改的硬判据）。
+    _assert_only_workbook_part_changed(data, new_data)
+    return new_data

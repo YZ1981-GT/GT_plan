@@ -122,6 +122,8 @@ class RoomContentsClaims:
     room_id: uuid.UUID
     representation_id: uuid.UUID
     artifact_sha256: str
+    #: 本次打开要定位到的工作表全名（整册 workbook 用；空串 = 不定位，保持原 activeTab）。
+    sheet: str = ""
 
 
 def sign_room_contents_token(
@@ -130,6 +132,7 @@ def sign_room_contents_token(
     room_id: uuid.UUID,
     representation_id: uuid.UUID,
     artifact_sha256: str,
+    sheet: str = "",
     ttl_seconds: int = DEFAULT_CONTENTS_TTL_SECONDS,
 ) -> str:
     """签发 `document.url` 用的短 TTL token。
@@ -145,18 +148,20 @@ def sign_room_contents_token(
             "缺少 ONLYOFFICE_JWT_SECRET —— 不得签发无签名的 room contents URL"
         )
     now = int(time.time())
-    return jwt.encode(
-        {
-            "pur": CONTENTS_TOKEN_PURPOSE,
-            "room_id": str(room_id),
-            "representation_id": str(representation_id),
-            "artifact_sha256": str(artifact_sha256),
-            "iat": now,
-            "exp": now + int(ttl_seconds),
-        },
-        secret,
-        algorithm="HS256",
-    )
+    payload: dict[str, Any] = {
+        "pur": CONTENTS_TOKEN_PURPOSE,
+        "room_id": str(room_id),
+        "representation_id": str(representation_id),
+        "artifact_sha256": str(artifact_sha256),
+        "iat": now,
+        "exp": now + int(ttl_seconds),
+    }
+    # 🔴 目标 sheet 进 claim（而不是 query 参数）：它必须与 room/representation 一起被签名，
+    #    否则任何人都能改 URL 让 OO 打开另一张 sheet 的定位（虽只是视图状态，但 URL 可篡改
+    #    这件事本身不该存在）。空串不写进 claim，保持旧 token 形态与向后兼容。
+    if str(sheet or "").strip():
+        payload["sheet"] = str(sheet).strip()
+    return jwt.encode(payload, secret, algorithm="HS256")
 
 
 def verify_room_contents_token(
@@ -186,6 +191,7 @@ def verify_room_contents_token(
             room_id=uuid.UUID(str(claims["room_id"])),
             representation_id=uuid.UUID(str(claims["representation_id"])),
             artifact_sha256=str(claims.get("artifact_sha256") or ""),
+            sheet=str(claims.get("sheet") or ""),
         )
     except (KeyError, ValueError, TypeError) as exc:
         raise RoomContentsTokenInvalidError(f"contents token claim 非法：{exc}") from exc
@@ -198,11 +204,18 @@ def verify_room_contents_token(
 
 @dataclass(frozen=True)
 class ResolvedRoomContents:
-    """可以直接交给 `FileResponse` 的三件套。"""
+    """可以直接交给 `FileResponse` 的三件套。
+
+    `data` 非 None 时调用方必须回**字节流**而不是 `FileResponse(path)`：那是「按本次打开的
+    目标 sheet 设了 activeTab」的派生字节（见 :func:`resolve_room_contents`）。
+    磁盘上的 canonical artifact 永不被改写。
+    """
 
     path: Path
     media_type: str
     filename: str
+    #: 视图定位后的派生字节（None = 直接发磁盘原文件）。
+    data: bytes | None = None
 
 
 async def resolve_room_contents(
@@ -265,10 +278,33 @@ async def resolve_room_contents(
         raise RoomContentsUnavailableError("artifact 文件不在磁盘上")
 
     document_type = str(artifact.document_type or "")
+    media_type = _XLSX_MEDIA if document_type == "xlsx" else "application/octet-stream"
+    filename = f"{str(rep.entry_id).replace('/', '_')}.{document_type}"
+
+    # ── 整册 workbook 的「打开即定位」：按 token 里冻结的目标 sheet 设 activeTab ──
+    #
+    # 🔴 为什么在**这里**做，而不是在物化时写进 artifact：
+    #   1. 一份 artifact 被**多张受管 sheet 共享**（D4 的 D4-2/25/26/27/28 同一 entry 同一
+    #      workbook）。把 activeTab 写进 artifact 只能有一个值，D4-26 打开就会停在 D4-25。
+    #   2. activeTab 是**打开时的视图状态**，不是内容。物化只在内容变更时发生，复用既有
+    #      artifact 的打开（幂等复用路径）根本不会经过物化 ⇒ 绑在物化上必然漏。
+    #   3. canonical artifact 的 `artifact_sha256` 被 descriptor / digest 校验锁死，
+    #      事后改写文件会让 digest 不符。故这里只产**派生字节**，磁盘原文件一个字节不动。
+    #
+    # 尽力而为：任何异常都退回原文件（定位失败最多是「没帮用户跳过去」，不影响可编辑性）。
+    data: bytes | None = None
+    if document_type == "xlsx" and str(claims.sheet or "").strip():
+        try:
+            from app.services.workpaper_sync.excel_sheet_visibility import (
+                derive_bytes_with_active_sheet,
+            )
+
+            data = derive_bytes_with_active_sheet(path.read_bytes(), claims.sheet.strip())
+        except Exception:  # noqa: BLE001 - 视图定位失败不得影响内容可达性
+            data = None
+
     return ResolvedRoomContents(
-        path=path,
-        media_type=_XLSX_MEDIA if document_type == "xlsx" else "application/octet-stream",
-        filename=f"{str(rep.entry_id).replace('/', '_')}.{document_type}",
+        path=path, media_type=media_type, filename=filename, data=data
     )
 
 
@@ -341,6 +377,39 @@ def build_signed_launch_config(
     return config
 
 
+# ═══════════════════════════════════════════════════════════════════════════
+# 打开即定位：(entry, sheet_key) → 工作簿内的物理 sheet 名
+# ═══════════════════════════════════════════════════════════════════════════
+
+
+def resolve_launch_target_sheet(*, contract: Any, sheet_key: str) -> str:
+    """本次打开要定位到的**物理** sheet 名；解析不到返回 `""`（= 不定位）。
+
+    唯一真源是该 entry 的 **approved 契约** ``sheets[].sheet_key → excel_name``。
+    不从 ``sheet_key`` 反推名字（``d4-26-managed`` 与 ``境外销售收入检查D4-26`` 之间
+    没有任何可推导关系），也不去模板目录里猜文档。
+
+    🔴 为什么必须按 **entry 的契约** 查，而不是按 wp_code 去模板目录找：
+    一个 wp_code 在磁盘上可能有**多份文档**。``backend/wp_templates/D`` 下 D4 就有 9 份
+    xlsx，其中 ``D4-1至D4-4 …（Leap-常规程序）.xlsx`` 只有 10 张 sheet、**根本不含**
+    ``境外销售收入检查D4-26``（它在 ``D4-22至D4-32…IPO…xlsx`` 与整册本里）。
+    契约把 entry 钉在唯一一份工作簿上（``xlsx/gt-d4-operating-revenue`` →
+    ``D/D4 收入底稿.xlsx``，46 张 sheet、13 张受管），所以它声明的 ``excel_name``
+    **必然**落在本次要下发的那份 artifact 里 —— 文档与定位一次解析同时确定，
+    不存在「定位到一张不在这本工作簿里的 sheet」。
+
+    解析不到即返回空串（**不抛**）：定位是视图便利，不该让整条打开链路失败。
+    未登记契约的 entry、未声明的 sheet_key、单 sheet 契约都落这条，行为与改动前一致。
+    """
+    key = str(sheet_key or "").strip()
+    if not key or contract is None:
+        return ""
+    for sheet in getattr(contract, "sheets", ()) or ():
+        if str(getattr(sheet, "sheet_key", "") or "").strip() == key:
+            return str(getattr(sheet, "excel_name", "") or "").strip()
+    return ""
+
+
 def build_contents_url(*, base_url: str, room_id: uuid.UUID, token: str) -> str:
     """`document.url` 的唯一拼装点 —— 路径与 `public_router` 上那条路由必须同源。"""
     return (
@@ -363,6 +432,7 @@ __all__ = [
     "RoomLaunchSecretMissingError",
     "build_contents_url",
     "build_signed_launch_config",
+    "resolve_launch_target_sheet",
     "resolve_room_contents",
     "sign_room_contents_token",
     "verify_room_contents_token",

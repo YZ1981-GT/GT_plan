@@ -385,7 +385,17 @@ const D4_SHEET_KEY_BY_CODE: Record<string, string> = {
   'D4-32': 'd4-32-managed',
 }
 const isD4DetailSheet = computed(() => currentSheet.value != null && currentSheet.value in D4_SHEET_KEY_BY_CODE)
-const isD4DedicatedSyncSheet = computed(() => ['D4-5', 'D4-29', 'D4-30', 'D4-31', 'D4-32'].includes(currentSheet.value || ''))
+// 🔴 自管双模式的 sheet：由**子组件自身**接 useWorkpaperSyncBridge + WorkpaperSyncEditorHost
+//    管理「表格视图 ↔ 在线编辑」。宿主对它们**不得**再渲染自己的 legacy 模式切换器 ——
+//    否则页面上出现两个模式切换器叠加，用户点到宿主那个会走 legacy `GtOnlyOfficeSheet`
+//    （整册、不定位到目标 sheet、且「两侧数据未互通」），而真正的双向同步桥被埋在下面。
+//    D4-25/26/27/28（IPO 检查表，d4-ipo-checklist-dual-mode-writeback-and-formula）此前
+//    漏登记，实测出现双切换器 + 误入 legacy 路径。
+const isD4DedicatedSyncSheet = computed(() =>
+  ['D4-5', 'D4-25', 'D4-26', 'D4-27', 'D4-28', 'D4-29', 'D4-30', 'D4-31', 'D4-32'].includes(
+    currentSheet.value || '',
+  ),
+)
 const syncSwitching = ref(false)
 const syncEditorHostRef = ref<{ forceSave: () => Promise<{ operationId: string }> } | null>(null)
 const syncEntryId = ref(D4_SYNC_ENTRY_ID)
@@ -422,12 +432,23 @@ const syncBusy = computed(
 )
 
 // renderMode / 切换：D4-2 走 syncBridge，其余 sheet 沿用 useD4EntryDualMode。
+//
+// 🔴 dedicated sync sheet（D4-25/26/27/28/29… 由子组件自管 sync 双模式）**绝不**参与宿主
+//    的 legacy dualMode：宿主的 `renderMode` 对它们恒为 `'html'`、setter 为 no-op。
+//    否则会两头咬人——`dualMode.mode` 是宿主级单例、切 sheet 不重置：在 D4-26 点过「在线
+//    编辑」会把它置成 `onlyoffice`，切到 D4-28 后残留，`renderMode` 继续返回 `onlyoffice`
+//    → 宿主 legacy `GtOnlyOfficeSheet` 分支被激活，与子组件自己的 sync 切换器叠加，
+//    出现「双切换器 + 两侧数据未互通」。dedicated sheet 的模式只由子组件的 sync bridge
+//    表达，宿主一律不读/不写 legacy ref，从根上杜绝这个竞态。
 const renderMode = computed({
-  get: (): D4RenderMode =>
-    isD4DetailSheet.value
+  get: (): D4RenderMode => {
+    if (isD4DedicatedSyncSheet.value) return 'html'
+    return isD4DetailSheet.value
       ? (syncBridge.mode.value === 'oo' ? 'onlyoffice' : 'html')
-      : dualMode.mode.value,
+      : dualMode.mode.value
+  },
   set: (v: D4RenderMode) => {
+    if (isD4DedicatedSyncSheet.value) return // 子组件自管，宿主不介入
     if (isD4DetailSheet.value) void switchRenderMode(v)
     else void dualMode.switchMode(v)
   },

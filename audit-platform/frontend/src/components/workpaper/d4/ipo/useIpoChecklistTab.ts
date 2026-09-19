@@ -64,11 +64,22 @@ export function useIpoChecklistTab(opts: UseIpoChecklistTabOptions) {
         const parsed = JSON.parse(r.remark)
         if (Array.isArray(parsed)) {
           // 归一：确保每行有 rowId/seq，缺失补上
-          rows.value = parsed.map((row: any, i: number) => ({
-            rowId: row.rowId ?? `${opts.sheetCode}-legacy-${i}`,
-            seq: typeof row.seq === 'number' ? row.seq : i + 1,
+          const normalized: ChecklistRow[] = parsed.map((row: any, i: number) => ({
             ...row,
+            rowId: row.rowId ?? `${opts.sheetCode}-legacy-${i}`,
+            seq: Number(row.seq) || i + 1,
           }))
+          // 🔴 过滤纯占位空行（除 seqColumn/rowId/seq 外所有列皆空）——防源模板占位序号
+          // 被推成占位披露行（AC 5.7 / Property 22），与投影侧 sheetToRows 全空行跳过同口径。
+          const dataKeys = spec.columns.filter((c) => !c.seqColumn).map((c) => c.key)
+          rows.value = normalized.filter((row) =>
+            dataKeys.some((k) => {
+              const v = row[k]
+              return v != null && String(v).trim() !== '' && v !== false
+            }),
+          )
+          // seq 重排为连续 1..N（过滤后不留空洞）
+          rows.value.forEach((row, i) => (row.seq = i + 1))
           recalcDerivedColumns(opts.sheetCode, rows.value, manualLocks.value)
           return
         }

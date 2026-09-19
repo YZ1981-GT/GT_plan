@@ -128,13 +128,23 @@ def _wp_code_filename_prefix_ok(filename: str, wp_code: str) -> bool:
 _code_prefix_boundary_ok = _wp_code_filename_prefix_ok
 
 
-#: 整册合并本文件名：`{编码}{中文短名}`，编码后**紧跟** CJK，无 `-子号`、无空格、无「至」。
-#: 现存两例：``D4收入底稿.xlsx`` / ``F2存货.xlsx``。
+#: 整册合并本文件名：`{编码}[空格?]{中文短名}`，编码后（最多一个空格后）跟 CJK，
+#: 无 `-子号`、无「至」。现存三例：``D4收入底稿.xlsx`` / ``D4 收入底稿.xlsx`` / ``F2存货.xlsx``。
 #:
-#: 🔴 要求「紧跟 CJK」而不是「非数字」，是为了把 ``D4 收入底稿.xlsx``（编码后是空格）
-#: 排除在外 —— 同一目录下同时存在带空格与不带空格两份时，判据必须是确定的；
-#: 权威惯例是不带空格的那份（``D4收入底稿.xlsx`` 已入库，带空格那份是工作树新增）。
-_WHOLE_EXCEL_NAME_RE = re.compile(r"^[A-Z]+\d+[\u4e00-\u9fff]")
+#: 🔴 2026-09-19：空格形态**必须**被认成整册本。原注释写「权威惯例是不带空格的那份
+#: （带空格那份是工作树新增）」——该前提已失效：``git ls-files`` 实测两份**都已入库**，
+#: 且带空格那份才是权威：
+#:
+#: * ``D4 收入底稿.xlsx``（199176 B, sha ``b8fb92d4…``）= sync 契约 ``d4.revenue_detail``
+#:   的 ``TemplateRef`` 钉住的那份，且 ``xl/workbook.xml`` **无** ``<externalReference>``
+#:   （``scripts/fix/sanitize_d4_template_external_links.py`` 就是净化它的，旁边留有
+#:   ``.preclean.bak``）；
+#: * ``D4收入底稿.xlsx``（352950 B）未净化，带 36 个 ``xl/externalLinks/`` 部件。
+#:
+#: 本模块保持**纯路径解析**（不读 xlsx 字节），所以「净化与否」的取舍不在这里做：本函数
+#: 只负责**枚举候选**（见 :func:`find_whole_workbook_templates`），由需要字节事实的调用方
+#: （`wp_onlyoffice_router._resolve_whole_workbook_template`）挑选。
+_WHOLE_EXCEL_NAME_RE = re.compile(r"^[A-Z]+\d+ ?[\u4e00-\u9fff]")
 
 
 def _is_whole_excel_template_name(name: str) -> bool:
@@ -143,13 +153,14 @@ def _is_whole_excel_template_name(name: str) -> bool:
     True ::
 
         D4收入底稿.xlsx
+        D4 收入底稿.xlsx
         F2存货.xlsx
 
     False ::
 
         D4-1至D4-4 营业收入 - 审定表明细表.xlsx      # 编码后是 '-'
         F2-1至F2-14 存货实质性程序-审定表明细表类.xlsx # 同上
-        D4 收入底稿.xlsx                              # 编码后是空格
+        D4-33至D4-36 其他业务收入.xlsx                # 同上
     """
     if not name:
         return False
@@ -157,8 +168,8 @@ def _is_whole_excel_template_name(name: str) -> bool:
     return bool(_WHOLE_EXCEL_NAME_RE.match(stem))
 
 
-def find_whole_workbook_template(wp_code: str) -> Path | None:
-    """该 wp_code 的**整册合并本**（如 ``D4收入底稿.xlsx`` / ``F2存货.xlsx``）。
+def find_whole_workbook_templates(wp_code: str) -> tuple[Path, ...]:
+    """该 wp_code 的**全部**整册合并本候选，确定性排序（纯路径解析，不读 xlsx 字节）。
 
     整册本**不在** ``_index.json`` 里（索引只收范围式拆分包），因此只能扫权威目录。
     这也是它必须走独立入口的原因：普通链路（``find_template_file`` /
@@ -166,20 +177,36 @@ def find_whole_workbook_template(wp_code: str) -> Path | None:
 
     前缀用 :func:`_wp_code_filename_prefix_ok` 而非裸 ``startswith``，避免
     ``D4`` 命中假想的 ``D40…``。
+
+    返回**多个**而不是一个：D4 目录下同时存在净化前后两份同名整册本，而「哪份可用」是
+    字节事实（有无 ``<externalReference>``），不能在纯路径层裁决。排序按
+    ``(名字长度, 名字)``，不依赖目录枚举顺序。
     """
     if not wp_code:
-        return None
+        return ()
     subdir = TEMPLATES_DIR / wp_code[0]
     if not subdir.exists():
-        return None
-    for f in sorted(subdir.iterdir()):
-        if f.suffix.lower() not in (".xlsx", ".xlsm"):
-            continue
-        if not _wp_code_filename_prefix_ok(f.name, wp_code):
-            continue
-        if _is_whole_excel_template_name(f.name):
-            return f
-    return None
+        return ()
+    hits = [
+        f
+        for f in subdir.iterdir()
+        if f.suffix.lower() in (".xlsx", ".xlsm")
+        and _wp_code_filename_prefix_ok(f.name, wp_code)
+        and _is_whole_excel_template_name(f.name)
+    ]
+    hits.sort(key=lambda p: (len(p.name), p.name))
+    return tuple(hits)
+
+
+def find_whole_workbook_template(wp_code: str) -> Path | None:
+    """该 wp_code 的整册合并本**首个**候选（纯路径口径）。
+
+    🔴 需要「可用的那份」（无断链外部引用）的调用方**不要**用本函数，用
+    ``wp_onlyoffice_router._resolve_whole_workbook_template`` —— 它在本函数的候选集上
+    加一道字节判据。本函数保留是为了让纯路径场景（无需读 xlsx）仍有入口。
+    """
+    candidates = find_whole_workbook_templates(wp_code)
+    return candidates[0] if candidates else None
 
 
 #: 主模板优先级阶梯（**按序**，前一级命中即不看后一级）。

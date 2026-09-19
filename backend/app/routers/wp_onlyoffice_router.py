@@ -224,6 +224,7 @@ def _resolve_wp_file(
     template_path: Path | None,
     *,
     visible_sheet: str | None = None,
+    cache_stem: str | None = None,
 ) -> Path:
     """解析 wp_code 对应的单一共享文件（不再 per-sheet 复制）。
 
@@ -235,6 +236,9 @@ def _resolve_wp_file(
                    （解决多sheet workbook在OO中显示无关tab/打开到错误sheet的问题）。
                    对已存在的缓存文件同样生效（幂等，可见性无变化时不落盘，
                    避免无谓刷新 doc_key）。
+    cache_stem:    覆盖工作副本的文件名主干（默认 wp_code）。整册模式用
+                   `_whole_cache_stem(wp_code)` —— 它的源文档是整册本，与主模板**不是同
+                   一份文档**，共用一个文件名会让整册永久复用旧文档（见该常量的说明）。
     """
     storage_dir = _onlyoffice_storage_dir(project_id)
 
@@ -242,7 +246,8 @@ def _resolve_wp_file(
     ext = template_path.suffix.lower() if template_path else ".xlsx"
     if not ext:
         ext = ".xlsx"
-    file_name = f"{wp_code}{ext}"           # single file per wp_code, 保留原始扩展名
+    stem = cache_stem or wp_code
+    file_name = f"{stem}{ext}"              # one file per document identity, 保留原始扩展名
     target = storage_dir / file_name
 
     # 曾错误地把 xlsx 缓存 rename 成 .docx：内容仍是 workbook，需丢弃重拷
@@ -261,7 +266,7 @@ def _resolve_wp_file(
         return target
 
     # 兼容旧格式：曾按 .xlsx 缓存，现模板为 docx/doc 时不可 rename（内容仍是 xlsx）
-    legacy_target = storage_dir / f"{wp_code}.xlsx"
+    legacy_target = storage_dir / f"{stem}.xlsx"
     if legacy_target.exists() and ext != ".xlsx":
         try:
             legacy_target.unlink()
@@ -376,6 +381,19 @@ def _ensure_all_sheets_visible(file_path: Path) -> None:
         logger.info(
             "已恢复 %s 的全部 %d 张 sheet 为可见", file_path.name, len(outcome.visible)
         )
+
+
+# ── 整册（完整Excel）源文档身份 ──────────────────────────────────────────────
+# 判定本体在伴生模块 `app.services.wp_whole_workbook_document`：哪份文档才算这个 wp_code
+# 的整本、两份候选选哪份、工作副本叫什么名字 —— 都是业务判定，不是路由参数搬运。
+# 这里只起私名别名，保持四个消费点（config / WOPI contents / 降级 grid / callback）的调用
+# 形态不变。
+from app.services.wp_whole_workbook_document import (  # noqa: E402
+    has_external_references as _has_external_references,
+    resolve_whole_workbook_template as _resolve_whole_workbook_template,
+    whole_cache_stem as _whole_cache_stem,
+    whole_workbook_template_or_primary as _whole_workbook_template_or_primary,
+)
 
 
 # doc_key 不再由本模块生成。
@@ -678,7 +696,14 @@ async def get_sheet_onlyoffice_config(
             if _candidate_tpl:
                 _sheet_wp_code = _candidate
 
-    template_path = find_template_file_any(_sheet_wp_code)
+    # 完整Excel：源文档必须是**整册合并本**（D4 → `D4 收入底稿.xlsx` 46 张 sheet），
+    # 不是主模板阶梯挑出的审定包（10 张，连 D4-26 都没有）。见
+    # `_resolve_whole_workbook_template`。
+    template_path = (
+        _whole_workbook_template_or_primary(_sheet_wp_code)
+        if whole_workbook
+        else find_template_file_any(_sheet_wp_code)
+    )
     # custom：直编业务文件本体（无模板可复制，且必须与投影读取同源）
     _custom_file = _resolve_custom_wp_file(wp, _sheet_wp_code)
     if _custom_file is not None:
@@ -688,6 +713,7 @@ async def get_sheet_onlyoffice_config(
             file_path = _resolve_wp_file(
                 project_id, _sheet_wp_code, template_path,
                 visible_sheet=None if whole_workbook else sheet_name,
+                cache_stem=_whole_cache_stem(_sheet_wp_code) if whole_workbook else None,
             )
         except FileNotFoundError as exc:
             raise HTTPException(status_code=404, detail=str(exc))
@@ -734,6 +760,12 @@ async def get_sheet_onlyoffice_config(
     callback_url = (
         f"{base_url}/api/workpapers/{wp_id}/sheets/{sheet_name}/onlyoffice-callback"
     )
+    # 🔴 整册模式必须把 `whole` 带进 callback：callback 原来只能从 `sheet_name` 反推
+    # wp_code，整册模式传的是「首个业务 sheet 名」（如 `营业收入审计程序表D4A`），于是
+    # 反推出 `D4A` 并把整册编辑结果写进 `D4A.xlsx`，而 config/WOPI 读的是 `D4.xlsx`
+    # —— 读写异地，整册里的改动保存后再打开就没了。加这个参数让回写与读侧同码。
+    if whole_workbook:
+        callback_url += "?whole=1"
 
     # 6. 判断编辑模式
     from app.models.workpaper_models import WpFileStatus
@@ -857,9 +889,14 @@ async def get_whole_excel_grid(
         sheet_name=sheet or "__whole_excel__",
     )
 
-    template_path = find_template_file_any(wp_code)
+    # 这是「完整Excel」在 OO 不可用时的只读降级面，源文档必须与 config/WOPI 同一份整册本，
+    # 否则降级后看到的 sheet 列表比在线编辑时少一大截。
+    template_path = _whole_workbook_template_or_primary(wp_code)
     try:
-        file_path = _resolve_wp_file(project_id, wp_code, template_path, visible_sheet=None)
+        file_path = _resolve_wp_file(
+            project_id, wp_code, template_path,
+            visible_sheet=None, cache_stem=_whole_cache_stem(wp_code),
+        )
     except FileNotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc))
 
@@ -957,7 +994,12 @@ async def get_sheet_wopi_contents(
         if settings.ONLYOFFICE_JWT_ENFORCE:
             raise HTTPException(status_code=404, detail=EXTERNAL_NOT_FOUND_DETAIL)
 
-    template_path = find_template_file_any(_sheet_wp_code)
+    # 与 config 端点同口径：整册模式取整册合并本（否则 DocServer 下到的是 10 张的审定包）
+    template_path = (
+        _whole_workbook_template_or_primary(_sheet_wp_code)
+        if _is_whole
+        else find_template_file_any(_sheet_wp_code)
+    )
     # custom：下载业务文件本体（与 config / callback / 投影同源）
     _custom_file = _resolve_custom_wp_file(wp, _sheet_wp_code)
     if _custom_file is not None:
@@ -967,6 +1009,7 @@ async def get_sheet_wopi_contents(
             file_path = _resolve_wp_file(
                 project_id, _sheet_wp_code, template_path,
                 visible_sheet=None if _is_whole else sheet_name,
+                cache_stem=_whole_cache_stem(_sheet_wp_code) if _is_whole else None,
             )
         except FileNotFoundError as exc:
             raise HTTPException(status_code=404, detail=str(exc))
@@ -1257,12 +1300,18 @@ async def post_sheet_onlyoffice_callback(
         # 保存回其独立文件而非父 wp_code（D4），否则用户编辑丢失。
         from app.services.wp_template_finder import find_template_file_any as _find_tpl
 
+        # 🔴 整册模式（config 在 callbackUrl 上带了 `whole=1`）**不得**按 sheet 名反推子码：
+        # 整册传的是「首个业务 sheet 名」，反推会得到 `D4A` 并把整册编辑写进 `D4A.xlsx`，
+        # 而 config/WOPI 读的是整册工作副本 —— 读写异地，用户在完整Excel 里的改动保存后
+        # 再打开就没了。这里与那两个端点的 `_sheet_wp_code` / cache_stem 推导逐条对称。
+        _save_is_whole = str(request.query_params.get("whole") or "") == "1"
         _save_wp_code = wp_code
-        _m_save = re.search(r"([A-Z]\d+(?:-\d+)?[A-Z]?)(?:-新增)?\s*$", sheet_name)
-        if _m_save and _m_save.group(1) != wp_code:
-            _cand = _m_save.group(1)
-            if _find_tpl(_cand):
-                _save_wp_code = _cand
+        if not _save_is_whole:
+            _m_save = re.search(r"([A-Z]\d+(?:-\d+)?[A-Z]?)(?:-新增)?\s*$", sheet_name)
+            if _m_save and _m_save.group(1) != wp_code:
+                _cand = _m_save.group(1)
+                if _find_tpl(_cand):
+                    _save_wp_code = _cand
 
         # 下载编辑后文件
         try:
@@ -1290,9 +1339,13 @@ async def post_sheet_onlyoffice_callback(
             if _tpl_for_ext and _tpl_for_ext.suffix
             else ".xlsx"
         )
-        # 已有 docx 缓存时优先按 docx 写回（F2-22 等从 xlsx 改挂 Word 的场景）
+        # 已有 docx 缓存时优先按 docx 写回（F2-22 等从 xlsx 改挂 Word 的场景）。
+        # 整册模式按整册 stem 探测，否则会拿 `D4.docx` 的存在去决定 `D4__whole` 的扩展名。
         _oo_dir = _onlyoffice_storage_dir(project_id)
-        if (_oo_dir / f"{_save_wp_code}.docx").exists():
+        _probe_stem = (
+            _whole_cache_stem(_save_wp_code) if _save_is_whole else _save_wp_code
+        )
+        if (_oo_dir / f"{_probe_stem}.docx").exists():
             _save_ext = ".docx"
 
         # custom：落盘到业务文件本体（与 config / WOPI / 投影同源）。
@@ -1320,8 +1373,13 @@ async def post_sheet_onlyoffice_callback(
 
             target = word_canonical_write_target(project_id, _save_wp_code or wp_code)
         else:
-            # 按模板实际扩展名落盘（F2-22 为 docx，不得硬编码 xlsx）
-            target = _oo_dir / f"{_save_wp_code}{_save_ext}"
+            # 按模板实际扩展名落盘（F2-22 为 docx，不得硬编码 xlsx）。
+            # 整册模式走 `_whole_cache_stem` —— 与 config / WOPI 的 `cache_stem` 同一来源，
+            # 否则整册编辑会落到主模板那份工作副本上（读写异地）。
+            _save_stem = (
+                _whole_cache_stem(_save_wp_code) if _save_is_whole else _save_wp_code
+            )
+            target = _oo_dir / f"{_save_stem}{_save_ext}"
 
         try:
             target.parent.mkdir(parents=True, exist_ok=True)

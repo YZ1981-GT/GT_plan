@@ -86,6 +86,30 @@ export const WP_BRIDGE_NON_DISCLOSURE_CODE = 'sync_scope_not_visible_or_forbidde
  */
 export const WP_BRIDGE_LOCAL_FAILURE_CODE = 'sync_step_failed_without_server_code'
 
+/**
+ * axios「请求被取消」判据（`utils/http.ts` 的请求去重层 `AbortController.abort()`）。
+ *
+ * 🔴 为什么要在桥里单独识别它、且**绝不**记进 `lastError`/`error` 态：
+ * D4 整册的 40+ 张子 sheet **共用同一个 entryId**（`xlsx/gt-d4-operating-revenue`），
+ * 于是 `read_store_projection` / `materialize` 在不同子 sheet 间是**同一个 URL**。
+ * 用户切页签后再点「在线编辑」，http.ts 去重层会把上一发在飞的同 URL 请求 `abort()`
+ * —— 这是**纯 UI 竞态**，不是同步失败：真正落库/授权/身份都没发生任何错误。
+ *
+ * 若把它当普通失败（`readWireError` 看不出它是 cancel：无 response、message 恰好是
+ * `'canceled'`），就会弹出「同步失败: canceled」红色遮罩，而且因 `lastError` 是 sticky
+ * （Property 48）永不消退。全仓其余保存路径（`useD4FormData`/`WpPopupMixedForm` 等
+ * 十余处）都对 canceled 做了同款短路，唯独 sync 目录漏了这一处 —— 此判据补齐它。
+ */
+function isRequestCanceled(error: unknown): boolean {
+  const e = (error ?? {}) as { code?: unknown; name?: unknown; message?: unknown; __CANCEL__?: unknown }
+  return (
+    e.code === 'ERR_CANCELED' ||
+    e.name === 'CanceledError' ||
+    e.__CANCEL__ === true ||
+    e.message === 'canceled'
+  )
+}
+
 /** 合成码的中文文案：可诊断（说得出是 scope/授权面）但不透露对象是否存在。 */
 const NON_DISCLOSURE_TEXT = '该同步对象不可访问：请确认项目/底稿/条目范围与当前权限'
 
@@ -372,7 +396,29 @@ export function useWorkpaperSyncBridge(options: WorkpaperSyncBridgeOptions) {
     lastError.value = null
   }
 
+  /**
+   * 请求被去重层取消（切页签竞态，见 `isRequestCanceled`）：这不是失败，是一次被
+   * 上层新请求作废的在飞尝试。处理成「干净退回 HTML」——
+   *
+   * * **不写 `lastError`**：否则 sticky error 遮罩（Property 48）永不消退；
+   * * 用 `identity_rejected` 把状态从 `flushing`/`committing`/`materializing` 退回
+   *   `html_idle`（这三态在 `DETERMINISTIC_EDGES` 里都有这条边）——若原样停在
+   *   `flushing`，下一次点「在线编辑」发的 `flush_started` 会因非法转换抛错；
+   * * 最后 `throw` 原异常，宿主 `switchRenderMode` 的空 catch 吞掉即保持 HTML 态。
+   */
+  function recoverFromCanceled(error: unknown): never {
+    try {
+      apply('identity_rejected')
+    } catch {
+      // 已不在 in-flight 态（terminal / 已回 html_idle）：状态不动即可。
+    }
+    throw error
+  }
+
   function fail(stage: string, error: unknown): never {
+    if (isRequestCanceled(error)) {
+      recoverFromCanceled(error)
+    }
     const described = describeBridgeFailure(stage, error)
     lastError.value = described
     // `sync_failed` 在当前状态不合法时，宁可保留原状态也不越表 —— 表就是判据。
@@ -456,6 +502,9 @@ export function useWorkpaperSyncBridge(options: WorkpaperSyncBridgeOptions) {
    * 且不可重试 —— 两类都不得让编辑器打开。
    */
   function failIdentityOrSync(stage: string, error: unknown): never {
+    if (isRequestCanceled(error)) {
+      recoverFromCanceled(error)
+    }
     const described = describeBridgeFailure(stage, error)
     lastError.value = described
     const identityFailure =
