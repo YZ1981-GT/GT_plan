@@ -492,13 +492,16 @@ _TIER_B_PROVENANCE: dict[str, list[dict]] = {
         },
         {
             "sheet_name": "D4-1",
-            "anchor": "D4-1-adj-rows",
+            "anchor": "D4-1-rows",
             "description": (
                 "审定表主营/其他收入明细行（按产品/项目）未审数**不从四表库填**：TB 6001/6051"
                 "只有科目总额、无产品/项目维度（宁缺勿造 R3.4）→ 明细行由 D4-2/D4-3 明细"
                 "SUMIF 聚合派生。可从四表库干净取的仅 D4-1-adj-tb-6001/D4-1-adj-tb-6051"
                 "（6001 主营/6051 其他审定发生额，TB↔审定小计核对标量），已作 Tier A 可编辑"
                 "公式 TB('6001','审定数')/TB('6051','审定数')。"
+                "锚点键 = 前端新模型 rowsItemId(D4_ADJ_ROWS_SPEC)=`D4-1-rows`（initRows 首读，"
+                "per-field `D4-1-{rowId}-{field}`）；旧整行 JSON 键 `D4-1-adj-rows` 仅前端 "
+                "migrateLegacyD4Rows 迁移读兼容，不再作后端主键（Task 8 对齐）。"
             ),
         },
     ],

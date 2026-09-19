@@ -2462,10 +2462,19 @@ class TestEngineEntryGates:
         outcome = extract(base_path, definitions, binding=binding)
         assert outcome.stats.field_count == 58
 
-    def test_second_dynamic_table_on_same_sheet_fails_closed(
+    def test_second_dynamic_table_on_same_sheet_is_skipped_not_fatal(
         self, base_inventory: dict[str, Any]
     ) -> None:
-        """第二张动态行表没有自己的 Table/UUID 绑定 ⇒ 拒绝沿用第一组。"""
+        """同 sheet 第二张动态行表属**兄弟 binding**（各有自己的 Table/UUID 列），本 binding
+        这一趟应**跳过**它 —— 既不当本 binding 的表返回，也**不再** fail-closed。
+
+        背景（GENERALIZE，主控 §5.3 shared-lock）：一张受管 sheet 可有 N 张动态行表
+        （D4-1 主营/其他、D4-9 本期/上期），`ExcelSyncAdapter.extract` 逐 binding 各调一次
+        `managed_tables_of` 再 merge。原实现在同 sheet 见到第二张动态表就硬抛，等于把已被
+        兄弟 binding 绑定的合法表误判成"未绑定的第二动态表"。「每张动态表都有 binding」这条
+        不变式改由看得见全部 binding 的上游 `_align_specs_to_sibling_tables`（行 table 总数 ==
+        specs 数 + spec↔table 双射）保证，本函数不再独立校验。
+        """
         payload = contract_payload()
         second = json.loads(json.dumps(payload["sheets"][0]["tables"][0]))
         second["table_key"] = "k11_rows_2"
@@ -2476,9 +2485,22 @@ class TestEngineEntryGates:
             )
         payload["sheets"][0]["tables"].append(second)
         contract = parse_contract(payload, adapter_id=CONTRACT_ID)
-        with pytest.raises(X.ManagedRegionResolutionError) as exc:
-            X.managed_tables_of(contract, binding=BINDING)
-        assert "k11_rows_2" in str(exc.value)
+        # 本 binding（k11_rows）这一趟：返回自己的动态表，不抛。
+        dynamic, statics = X.managed_tables_of(contract, binding=BINDING)
+        assert dynamic.table_key == "k11_rows"
+        # 兄弟动态表 k11_rows_2 既不当本 binding 的动态表，也不落静态清册。
+        assert dynamic.table_key != "k11_rows_2"
+        assert all(t.table_key != "k11_rows_2" for t in statics), (
+            f"兄弟动态表 k11_rows_2 被误纳入 k11_rows 的静态清册: "
+            f"{[t.table_key for t in statics]}"
+        )
+        # 反过来给第二张动态表自己的 binding，也应各归各的（不串区）。
+        sibling_binding = X.ExcelIdentityBinding(
+            table_name=TABLE_NAME, uuid_column=UUID_COL, table_key="k11_rows_2"
+        )
+        sib_dynamic, sib_statics = X.managed_tables_of(contract, binding=sibling_binding)
+        assert sib_dynamic.table_key == "k11_rows_2"
+        assert all(t.table_key != "k11_rows" for t in sib_statics)
 
     def test_binding_table_key_must_be_dynamic(self, contract: Any) -> None:
         with pytest.raises(X.ManagedRegionResolutionError):

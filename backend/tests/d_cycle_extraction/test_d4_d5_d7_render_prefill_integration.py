@@ -63,7 +63,10 @@ _D7_BASELINE_KEYS = {
 
 # 每循环 (module, baseline_keys, sheet_name, 分类行前缀集)
 _CYCLES = {
-    "D4": (d4, _D4_BASELINE_KEYS, "营业收入审定表D4-1", ("D4-1-adj-rows",)),
+    # Task 8：前端新模型键 `D4-1-rows`（initRows 首读）+ per-field `D4-1-{rowId}-{field}`；
+    # 旧整行 JSON 键 `D4-1-adj-rows` 仅前端迁移路径命中。两键均纳入「宁缺勿造」防臆造守卫，
+    # 但排除 TB↔审定核对标量 `D4-1-adj-tb-6001/6051`（Tier A 可编辑公式，非明细行未审数）。
+    "D4": (d4, _D4_BASELINE_KEYS, "营业收入审定表D4-1", ("D4-1-rows", "D4-1-adj-rows")),
     "D5": (d5, _D5_BASELINE_KEYS, "应收款项融资审定表D5-1", ("D5-1-adj-notes-receivable-", "D5-1-adj-accounts-receivable-")),
     "D7": (d7, _D7_BASELINE_KEYS, "合同负债审定表D7-1", ("D7-1-adj-nature-", "D7-1-adj-aging-")),
 }
@@ -378,10 +381,12 @@ def test_tier_b_provenance_honest(wp_code):
         assert e["tier"] == "B"
         assert e["value"] is None
     anchors = {e["anchor"] for e in entries}
-    # 明细归集条目
+    # 明细归集条目（X-2 明细表）
     assert any("-2-rows" in a or "-2-" in a for a in anchors)
-    # 审定表分类不填声明条目
-    assert any("adj" in a for a in anchors)
+    # 审定表分类不填声明条目（X-1 审定表）—— 按 sheet_name 识别，不依赖 anchor 字面。
+    # Task 8：D4-1 锚点已由旧键 `D4-1-adj-rows` 对齐前端新键 `D4-1-rows`（不再含 "adj"）。
+    adj_sheets = {e["sheet_name"] for e in entries if e["sheet_name"].endswith("-1")}
+    assert adj_sheets, f"{wp_code} 应有 X-1 审定表宁缺勿造声明条目"
 
 
 @pytest.mark.parametrize("wp_code", ["D4", "D5", "D7"])
@@ -482,3 +487,60 @@ def _wp_formula(target_cell, *, expression, sheet_name="D5-1", wp=None):
 
 def _user():
     return SimpleNamespace(id=uuid4(), username="tester")
+
+
+# ---------------------------------------------------------------------------
+# Task 8：后端 seed 键对齐（消除前后端不一致）
+#   d_cycle_extraction/presets.py D4-1 provenance 锚点 `D4-1-adj-rows` → 前端新键
+#   `D4-1-rows`（rowsItemId(D4_ADJ_ROWS_SPEC)，initRows 首读）。旧键仅前端迁移路径命中。
+#   `D4-1-adj-tb-6001/6051` Tier A 公式（TB↔审定核对标量）保持不动。
+#   _Requirements: 2.1, 3.3
+# ---------------------------------------------------------------------------
+
+
+def test_task8_d4_1_provenance_anchor_aligned_to_new_key():
+    """D4-1 Tier B 溯源锚点 = 前端新模型键 `D4-1-rows`；旧键 `D4-1-adj-rows` 不再作后端主键。"""
+    entries = tier_b_provenance("D4")
+    d4_1 = [e for e in entries if e["sheet_name"] == "D4-1"]
+    assert len(d4_1) == 1, "D4-1 应有且仅一条审定表宁缺勿造声明"
+    anchor = d4_1[0]["anchor"]
+    # 判据①：锚点落新键（前端 initRows 首读的 rowsItemId = `D4-1-rows`）
+    assert anchor == "D4-1-rows", f"D4-1 provenance 锚点应对齐前端新键 D4-1-rows，实为 {anchor}"
+    # 判据②：旧整行 JSON 键不再作后端主锚点（仅迁移路径命中，描述中可提及但非 anchor 值）
+    assert anchor != "D4-1-adj-rows"
+
+
+def test_task8_provenance_anchor_never_uses_old_write_key():
+    """遍历全 D 循环 provenance：任何 anchor 值本身都不得是旧写键 `D4-1-adj-rows`。"""
+    for wp_code in ["D1", "D2", "D3", "D4", "D5", "D7"]:
+        for e in tier_b_provenance(wp_code):
+            assert e["anchor"] != "D4-1-adj-rows", (
+                f"{wp_code} 仍以旧写键 D4-1-adj-rows 作 anchor（Task 8 应对齐 D4-1-rows）"
+            )
+
+
+def test_task8_tier_a_tb_scalars_preserved():
+    """D4-1-adj-tb-6001/6051 Tier A 公式保持不动（TB↔审定核对标量，非明细行未审数）。"""
+    presets = load_presets("D4")
+    assert len(presets) == 2, "D4 应有 2 条 Tier A 预设（6001 主营 + 6051 其他）"
+    by_anchor = {p["anchor"]: p for p in presets}
+    assert by_anchor["D4-1-adj-tb-6001"]["expression"] == "TB('6001','审定数')"
+    assert by_anchor["D4-1-adj-tb-6051"]["expression"] == "TB('6051','审定数')"
+
+
+def test_task8_tb_scalars_not_flagged_by_no_fabrication_guard():
+    """新旧锚点前缀均不误伤 Tier A 核对标量键（防守卫把 6001/6051 当臆造明细行）。"""
+    prefixes = ("D4-1-rows", "D4-1-adj-rows")
+    for scalar_key in ("D4-1-adj-tb-6001", "D4-1-adj-tb-6051"):
+        assert not any(scalar_key.startswith(p) for p in prefixes), (
+            f"{scalar_key} 不应被明细行防臆造守卫前缀命中"
+        )
+
+
+def test_task8_new_key_matches_frontend_rows_item_id_convention():
+    """后端锚点 `D4-1-rows` 与前端 rowsItemId 约定 `{prefix}-rows`（prefix=D4-1）一致。"""
+    # 前端 D4_ADJ_PREFIX = 'D4-1'，rowsItemId(spec) = f"{spec.prefix}-rows" = 'D4-1-rows'
+    expected = f"{'D4-1'}-rows"
+    entries = tier_b_provenance("D4")
+    d4_1_anchor = next(e["anchor"] for e in entries if e["sheet_name"] == "D4-1")
+    assert d4_1_anchor == expected

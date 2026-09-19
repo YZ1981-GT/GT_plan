@@ -13,7 +13,7 @@
 #   mutate_ie_lifecycle_guards.py —— 变异检验清单（54 条 Mutation 声明式常量 + 四态判读引擎），
 #     条目本身是数据不是逻辑；拆分后「守卫清单 ↔ 变异覆盖率」的分母核对会跨文件。
 #     spec: workpaper-import-export-lifecycle-closure Task 21 + x3 任务 14.1
-backend/app/services/workpaper_sync/projection_first_publication.py  1125
+backend/app/services/workpaper_sync/projection_first_publication.py  1362
 backend/scripts/check/check_x3_deviation_registry.py  2474
 backend/scripts/diagnose/mutate_ie_lifecycle_guards.py  1290
 
@@ -192,9 +192,9 @@ backend/app/services/workpaper_sync/endpoint_guard.py  1119
 backend/app/services/workpaper_sync/entry_source_facts.py  1096
 backend/app/services/workpaper_sync/evidence.py  1252
 backend/app/services/workpaper_sync/excel_entry_gate.py  1317
-backend/app/services/workpaper_sync/excel_extract.py  2936
-backend/app/services/workpaper_sync/excel_instrumentation.py  1850
-backend/app/services/workpaper_sync/excel_materialize.py  1605
+backend/app/services/workpaper_sync/excel_extract.py  3399
+backend/app/services/workpaper_sync/excel_instrumentation.py  2105
+backend/app/services/workpaper_sync/excel_materialize.py  2980
 backend/app/services/workpaper_sync/materialize_coordinator.py  2936
 backend/app/services/workpaper_sync/merge.py  1612
 backend/app/services/workpaper_sync/models.py  1486
@@ -603,3 +603,20 @@ audit-platform/frontend/src/components/workpaper/i1/core/I1TabAdjudication.vue  
 #   本次补上使 SQLAlchemy 能查 tb_publish_ack 幂等表。baseline 取当前真实行数 1406，
 #   门禁继续拦膨胀。拆分方向：按业务域(trial_balance/审计循环/合并)拆多个 models 子模块，属独立任务。
 backend/app/models/audit_platform_models.py  1406
+
+# ═══════════════════════════════════════════════════════════════════════════
+# spec: d4-1-adjudication-bidirectional-writeback-and-formula-io（2026 入库）
+#   同 sheet 双区（D4-1 主营/其他动态行，参照 D4-9）需 4 处共享内核修复，四个内核文件
+#   随之净增（均为**改动前即在册大文件**，非从零造超限，逐条说明修改的必要性）：
+#   excel_instrumentation.py 1850→2105：_attach_table_part 合并 <tableParts>（同 sheet 二次
+#     注入追加 tablePart + count，不新建独立块）+ 变异守卫锚点。单动态表工作簿字节不回归。
+#   projection_first_publication.py 1125→1362：_align_specs_to_sibling_tables 按 managed_sheet
+#     归组、同 sheet 双区靠 UUID 列一一配对（替换位置 zip + 计数守卫改数 row table）。
+#   excel_extract.py 2936→3399：managed_tables_of 对同 sheet 兄弟动态表 continue 跳过
+#     （不 fail-closed；「每张动态表有 binding」由上游 bijection 保证）+ 文档。
+#   excel_materialize.py 1605→2980：footer per-region 解析（_template_id_for_table_name
+#     经 GT_MANAGED_TABLES/GT_TEMPLATE_IDS 平行清册取 template_id + _find_marker_row min_row
+#     分区），4 处 footer 解析点同口径 + MaterializePlan.managed_table_name。
+#   四处均为深耦合双向内核（受主控 §5.3 共享锁约束），拆分需与逐字节锁/AST 变异守卫一起改，
+#   属独立瘦身任务；baseline 取当前真实行数，门禁继续拦膨胀 >5%。
+# ═══════════════════════════════════════════════════════════════════════════

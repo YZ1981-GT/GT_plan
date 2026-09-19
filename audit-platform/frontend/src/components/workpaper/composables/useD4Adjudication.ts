@@ -1001,6 +1001,10 @@ export function useD4Adjudication(options: UseD4AdjudicationOptions) {
     updateCell,
     publishAdjudicated,
     publishing,
+
+    // Sync bridge 接桥用：flush 待存改动（先于 readStoreProjection 读投影，防投影旧值）。
+    // 别名内部 flushSave（走 `d4:save-items` 事件由宿主 formData 落库）。
+    flushPendingSave: flushSave,
   }
 }
 

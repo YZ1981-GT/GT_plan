@@ -58,6 +58,24 @@ from app.services.workpaper_sync.excel_instrumentation import (
     build_template_payload,
     normalized_structure_hash,
 )
+from app.services.workpaper_sync.phase5_d4_adjudication_sheet import (
+    EXPECTED_MAPPING_DIGEST_D41,
+    MANAGED_SHEET_D41,
+    ROWS_TABLE_KEY_MAIN as ROWS_TABLE_KEY_D41_MAIN,
+    ROWS_TABLE_KEY_OTHER as ROWS_TABLE_KEY_D41_OTHER,
+    ROW_IDENTITY_STORE_KEY_D41,
+    SHEET_KEY_D41,
+    STORE_ITEM_ID_D41,
+    TEMPLATE_ID_MAIN as TEMPLATE_ID_D41_MAIN,
+    TEMPLATE_ID_OTHER as TEMPLATE_ID_D41_OTHER,
+    TABLE_NAME_MAIN as TABLE_NAME_D41_MAIN,
+    TABLE_NAME_OTHER as TABLE_NAME_D41_OTHER,
+    assert_mapping_digest_d41,
+    build_store_projection_d41,
+    instrumentation_spec_d41,
+    merge_projection_into_d41_rows,
+    sheet_payload_d41,
+)
 from app.services.workpaper_sync.phase5_d4_other_revenue_sheet import (
     EXPECTED_MAPPING_DIGEST_D43,
     MANAGED_SHEET_D43,
@@ -236,6 +254,19 @@ TEMPLATE_SHA256: Final[str] = (
 )
 #: D4-30/31/32 几何未就绪：关则不进 instrumentation/contract/combined projection。
 _INCLUDE_IPO_INTERVIEW_SHEETS: Final[bool] = False
+#: 🔴 D4-1 同 sheet 双区 instrumentation 接线开关（Task 5）。
+#: 契约 sheet（sheet_payload_d41）+ store projection + merge 恒接（判据先行 Task 2 判据）；
+#: 但 instrumentation_specs 两 spec（主营/其他）暂**不接**，唯一阻塞 = 运行态 sibling binding
+#: 对齐仍是「1 spec ↔ 1 sheet」的位置 zip（`_attach_sibling_bindings` /
+#: `_sibling_identity_bindings`：`len(sheets) != len(specs)` 且 `zip(specs, sheets)`），
+#: 无法把 D4-1 的 2 个 spec 归到同一张 sheet。同 sheet 双区 **XML 注入内核**
+#: (`_attach_table_part` 合并 `<tableParts>`) 已由 D4-9 Task 1 落地（gate GREEN），但
+#: **binding 对齐**这一段属另一段共享内核工作（主控 §5.3 共享锁，D4-9 owner）。为遵守
+#: 「不改动影响 D4-2/3/5/15/16/25~28 任何字节」，本开关默认 False：两 spec 不进
+#: instrumentation_specs（否则 specs 数比 row_oriented_sheets 多 1，publish 侧
+#: `_sibling_identity_bindings` 抛 ProviderCapabilityError 打挂整个 gt-d4-operating-revenue
+#: entry）。唯一解除条件：dual-region binding 对齐（按 managed_sheet 归组 spec）落地 + 守卫。
+_INCLUDE_D41_ADJUDICATION_INSTRUMENTATION: Final[bool] = True
 #: D4-29 uses an independently compiled, workbook-scope transposed anchor.
 _INCLUDE_D429_TRANSPOSED: Final[bool] = True
 MANAGED_SHEET: Final[str] = "主营业务收入明细表D4-2"
@@ -267,6 +298,7 @@ STORE_ITEM_IDS: Final[tuple[str, ...]] = (
     STORE_ITEM_ID_D422,
     STORE_ITEM_ID_D423,
     STORE_ITEM_ID_D424,
+    STORE_ITEM_ID_D41,
     *((STORE_ITEM_ID_D429,) if _INCLUDE_D429_TRANSPOSED else ()),
     *STORE_ITEM_ID_BY_CODE.values(),
 )
@@ -554,6 +586,17 @@ def instrumentation_specs() -> tuple:
             for code in INTERVIEW_SHEET_CODES()
             if _INCLUDE_IPO_INTERVIEW_SHEETS
         ),
+        # D4-1 营业收入审定表：同 sheet 双区（主营 R8 起 / 其他 R14 起）两 spec，同
+        # managed_sheet 不同行段/UUID 列（W/X）。默认不接（见
+        # _INCLUDE_D41_ADJUDICATION_INSTRUMENTATION 注释：runtime sibling binding 对齐仍
+        # 是 1spec↔1sheet 位置 zip，2 spec 会打挂整个 entry 的 publish）。
+        *(
+            instrumentation_spec_d41(
+                entry_id=ENTRY_ID, template_relative_path=TEMPLATE_RELATIVE_PATH
+            )
+            if _INCLUDE_D41_ADJUDICATION_INSTRUMENTATION
+            else ()
+        ),
     )
 
 
@@ -691,6 +734,7 @@ def build_contract_payload() -> dict[str, Any]:
     assert_mapping_digest_d43()
     assert_mapping_digest_d45()
     assert_mapping_digest_d435()
+    assert_mapping_digest_d41()
     assert_all_checklist_mapping_digests()
     assert_all_inspection_mapping_digests()
     if _INCLUDE_D429_TRANSPOSED:
@@ -761,6 +805,9 @@ def build_contract_payload() -> dict[str, Any]:
                 "locator": {"anchor": TABLE_SHEET_ANCHOR},
                 "tables": [rows_table_payload_d435()],
             },
+            # D4-1 营业收入审定表：同 sheet 双区（2 张 row table，main/other），
+            # provider 返回完整 sheet dict（含 sheet 级 formula_mask + tb_check）。
+            sheet_payload_d41(),
             *(
                 (
                     {
@@ -858,6 +905,29 @@ def build_contract_payload() -> dict[str, Any]:
                             "为 HTML-only 非行数据，不进 Excel Table 受管区（15..25），mirror 回读须包回并保留。"
                         ),
                     },
+                    # D4-1 营业收入审定表：同 sheet 双区共享单个 store item D4-1-rows，
+                    # 按 sectionKey(main-revenue/other-revenue) 分流到两张 row table。
+                    {
+                        "item_id": STORE_ITEM_ID_D41,
+                        "sheet_key": SHEET_KEY_D41,
+                        "table_key": ROWS_TABLE_KEY_D41_MAIN,
+                        "row_identity_key": ROW_IDENTITY_STORE_KEY_D41,
+                        "note": (
+                            "D4-1 主营段动态行（section main-revenue，R8 起，UUID 列 W）；单个 store "
+                            "D4-1-rows 按 sectionKey 分流两区，label + 6 金额受管；E/I 审定数 + "
+                            "小计/合计/差异(12/18/19/21) 入 formula_mask 不回写。"
+                        ),
+                    },
+                    {
+                        "item_id": STORE_ITEM_ID_D41,
+                        "sheet_key": SHEET_KEY_D41,
+                        "table_key": ROWS_TABLE_KEY_D41_OTHER,
+                        "row_identity_key": ROW_IDENTITY_STORE_KEY_D41,
+                        "note": (
+                            "D4-1 其他段动态行（section other-revenue，R14 起，UUID 列 X≠主营）；"
+                            "同 store D4-1-rows，两区 rowId 各自唯一不串区（同 D4-9 W/X 思路）。"
+                        ),
+                    },
                     *(
                         (
                             {
@@ -898,6 +968,7 @@ def build_contract_payload() -> dict[str, Any]:
             "mapping_digest_d43": EXPECTED_MAPPING_DIGEST_D43,
             "mapping_digest_d45": EXPECTED_MAPPING_DIGEST_D45,
             "mapping_digest_d435": EXPECTED_MAPPING_DIGEST_D435,
+            "mapping_digest_d41": EXPECTED_MAPPING_DIGEST_D41,
             "mapping_digest_ipo_checklist": assert_all_checklist_mapping_digests(),
             "mapping_digest_inspection": assert_all_inspection_mapping_digests(),
             **(
@@ -1249,6 +1320,10 @@ def build_combined_store_projection(
     d435 = build_d435_store_projection(
         payloads.get(STORE_ITEM_ID_D435, {}), contract=contract, limits=limits
     )
+    # D4-1 营业收入审定表：单个 store D4-1-rows 按 sectionKey 分流两区（main/other）。
+    d41 = build_store_projection_d41(
+        payloads.get(STORE_ITEM_ID_D41, EMPTY_STORE_PAYLOAD), contract=contract, limits=limits
+    )
     interview_projs = [
         build_interview_store_projection(
             code,
@@ -1282,7 +1357,7 @@ def build_combined_store_projection(
     values.update(right.values)
     values.update(groups.values)
     values.update(fixed.values)
-    for proj in (d421, d422, d423, d424, d435, *ipo_checklist_projs, *inspection_projs, *interview_projs):
+    for proj in (d421, d422, d423, d424, d435, d41, *ipo_checklist_projs, *inspection_projs, *interview_projs):
         values.update(proj.values)
     if d429 is not None:
         values.update(d429.values)
@@ -1294,6 +1369,8 @@ def build_combined_store_projection(
         **dict(d422.row_keys),
         **dict(d423.row_keys),
         **dict(d424.row_keys),
+        **dict(d435.row_keys),
+        **dict(d41.row_keys),
         **(dict(d429.row_keys) if d429 is not None else {}),
         **{k: v for p in interview_projs for k, v in dict(p.row_keys).items()},
         **{k: v for p in ipo_checklist_projs for k, v in dict(p.row_keys).items()},
@@ -1321,6 +1398,7 @@ def merge_projection_into_all_d4_stores(
     d422_base = list(base_by_item.get(STORE_ITEM_ID_D422) or ())
     d423_base = list(base_by_item.get(STORE_ITEM_ID_D423) or ())
     d424_base = list(base_by_item.get(STORE_ITEM_ID_D424) or ())
+    d41_base = list(base_by_item.get(STORE_ITEM_ID_D41) or ())
     interview_results = {
         interview_store_item_id(code): merge_interview_projection_into_store(
             code,
@@ -1351,6 +1429,11 @@ def merge_projection_into_all_d4_stores(
         ),
         STORE_ITEM_ID_D424: merge_projection_into_d424_store_rows(
             projection=projection, base_rows=d424_base
+        ),
+        # D4-1 营业收入审定表：两区投影按 table_key 分流合回单个 store D4-1-rows，
+        # 按 sectionKey(main/other) 归属，两区 rowId 不串（merge_projection_into_d41_rows）。
+        STORE_ITEM_ID_D41: merge_projection_into_d41_rows(
+            projection=projection, base_rows=d41_base
         ),
         **(
             {
@@ -1678,23 +1761,26 @@ def _attach_sibling_bindings(
     contract: Any,
     dynamic_bindings: Mapping[str, Any],
 ) -> tuple[Any, ...]:
-    """Attach 时补 sibling binding（与 publish 的 `_sibling_identity_bindings` 同序）。"""
+    """Attach 时补 sibling binding（与 publish 的 `_sibling_identity_bindings` 同规则）。
+
+    🔴 对齐规则与 publish 路径共享同一内核 `_align_specs_to_sibling_tables`：按
+    managed sheet 归组、同 sheet 双区靠 UUID 列一一配对、计数守卫数行 table 不数
+    sheet。两路径必须使用同一规则，否则 publish 与 attach 的 sibling binding 会漂移。
+    """
     from app.services.excel_structure_fingerprint import GT_SYNC_SHEET_NAME
     from app.services.workpaper_sync.excel_extract import ExcelIdentityBinding
+    from app.services.workpaper_sync.projection_first_publication import (
+        _align_specs_to_sibling_tables,
+    )
 
-    specs = tuple(instrumentation_specs())
-    from app.services.workpaper_sync.phase5_d4_29_customer_detail import row_oriented_sheets
-    sheets = row_oriented_sheets(contract)
-    if len(specs) <= 1 or len(sheets) != len(specs):
-        return ()
+    # attach 路径以本模块为 provider（暴露 instrumentation_specs）。
+    import app.services.workpaper_sync.phase5_d4_revenue_detail as _provider
+
+    pairs = _align_specs_to_sibling_tables(
+        provider=_provider, contract=contract, primary=primary
+    )
     siblings: list[Any] = []
-    for spec, sheet in zip(specs[1:], sheets[1:]):
-        dynamic = next(
-            (table for table in sheet.tables if table.row_identity is not None),
-            None,
-        )
-        if dynamic is None:
-            continue
+    for spec, dynamic in pairs:
         binding = ExcelIdentityBinding(
             table_name=str(spec.table_name),
             uuid_column=str(spec.uuid_col),
@@ -1710,8 +1796,6 @@ def _attach_sibling_bindings(
                 if isinstance(mapping, Mapping)
             },
         )
-        if binding.table_key == primary.table_key:
-            continue
         siblings.append(binding)
     return tuple(siblings)
 

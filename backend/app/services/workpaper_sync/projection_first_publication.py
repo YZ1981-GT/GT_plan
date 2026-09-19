@@ -1117,6 +1117,142 @@ def _store_projection_for_provider(
     return provider.build_store_projection(store_payload, contract=contract)
 
 
+def _uuid_col_by_table(contract: Any) -> Mapping[tuple[str, str], str]:
+    """从**原始 payload**（`canonical_payload`）取每张 table 声明的 `uuid_col`。
+
+    🔴 为什么读 payload 而不是 `TableSpec`：`parse_contract` 不把 `uuid_col`
+    parse 进 `TableSpec`（它只保留 table_key/row_identity/formula_mask 等），
+    但同 sheet 双区必须靠 UUID 列把 spec 与 table 一一配对。键取
+    `(sheet_key, table_key)` 以在同 sheet 双区里唯一定位。
+    """
+    result: dict[tuple[str, str], str] = {}
+    for sheet in (contract.canonical_payload.get("sheets") or ()):
+        sk = str(sheet.get("sheet_key") or "")
+        for table in sheet.get("tables") or ():
+            tk = str(table.get("table_key") or "")
+            raw = table.get("uuid_col") or table.get("uuid_column")
+            if raw:
+                result[(sk, tk)] = str(raw)
+    return result
+
+
+def _align_specs_to_sibling_tables(
+    *, provider: Any, contract: Any, primary: Any
+) -> list[tuple[Any, Any]]:
+    """把 `instrumentation_specs` 对齐到各自的**行 table**（不是位置 spec↔sheet）。
+
+    返回 `[(spec, table_spec), ...]`（已剔除 primary 对应的 table）。对齐规则：
+
+    1. 先按 **managed sheet** 归组：spec 落到 `excel_name==spec.managed_sheet`
+       或 `sheet_key==spec.resolved_sheet_key` 的那张 `row_oriented_sheets`。
+    2. sheet 内多张行 table（同 sheet 双区，如 D4-1 主营/其他）→ 用 **UUID 列**
+       把 spec 与 table 一一配对（`spec.uuid_col` ↔ 该 table 在 payload 里声明的
+       `uuid_col`）。sheet 内只有 1 张行 table（既有多 sheet entry）→ 直接取它，
+       与历史 `zip(specs, sheets)` 行为等价（tables-per-sheet==1 时 table 归组
+       == sheet 归组）。
+    3. **bijection 校验**：非 primary 的 spec 各映射到恰好 1 张不同的 table，
+       没有 table 被两个 spec 争用；计数守卫改为「row_oriented_sheets 的行 table
+       总数 == len(specs)」（数 table 不数 sheet）。任一违背 fail-closed。
+    """
+    specs_fn = getattr(provider, "instrumentation_specs", None)
+    if not callable(specs_fn):
+        return []
+    specs = tuple(specs_fn())
+    if len(specs) <= 1:
+        return []
+
+    from app.services.workpaper_sync.phase5_d4_29_customer_detail import (
+        row_oriented_sheets,
+    )
+
+    sheets = row_oriented_sheets(contract)
+    # 每张 sheet 的行 table（row_identity 非空即动态行 table）。
+    row_tables_by_sheet: dict[str, list[Any]] = {}
+    total_row_tables = 0
+    for sheet in sheets:
+        row_tables = [t for t in sheet.tables if t.row_identity is not None]
+        row_tables_by_sheet[sheet.sheet_key] = row_tables
+        total_row_tables += len(row_tables)
+
+    # 计数守卫：数 table 不数 sheet（同 sheet 双区 sheet 数 < spec 数是合法的）。
+    if total_row_tables != len(specs):
+        raise ProviderCapabilityError(
+            f"provider {getattr(provider, '__name__', provider)!r} 的 "
+            f"instrumentation_specs 数 ({len(specs)}) 与契约行 table 总数 "
+            f"({total_row_tables}) 不一致 —— 多 sheet / 同 sheet 双区 binding 无法对齐"
+        )
+
+    uuid_cols = _uuid_col_by_table(contract)
+    provider_name = getattr(provider, "__name__", provider)
+
+    def _sheet_for(spec: Any) -> Any:
+        managed = str(getattr(spec, "managed_sheet", "") or "")
+        resolved = str(getattr(spec, "resolved_sheet_key", "") or "")
+        for sheet in sheets:
+            if managed and sheet.excel_name == managed:
+                return sheet
+            if resolved and sheet.sheet_key == resolved:
+                return sheet
+        raise ProviderCapabilityError(
+            f"provider {provider_name!r} 的 spec（managed_sheet={managed!r} / "
+            f"sheet_key={resolved!r}）在契约行 sheets 里找不到对应受管 sheet —— "
+            "spec 与契约 sheet 身份不一致，无法对齐 sibling binding"
+        )
+
+    def _table_for(spec: Any, sheet: Any) -> Any:
+        row_tables = row_tables_by_sheet.get(sheet.sheet_key) or []
+        if not row_tables:
+            raise ProviderCapabilityError(
+                f"provider {provider_name!r} 的受管 sheet {sheet.sheet_key!r} "
+                "没有任何动态行 table —— 无法建立 sibling binding"
+            )
+        if len(row_tables) == 1:
+            # 单张行 table（既有多 sheet entry）：直接取，等价于历史 sheet 归组。
+            return row_tables[0]
+        # 同 sheet 双区：用 UUID 列一一配对（robust key，两侧都唯一存在）。
+        spec_uuid = str(getattr(spec, "uuid_col", "") or "")
+        if not spec_uuid:
+            raise ProviderCapabilityError(
+                f"provider {provider_name!r} 的 spec（table_name="
+                f"{getattr(spec, 'table_name', None)!r}）落在同 sheet 双区 "
+                f"{sheet.sheet_key!r}（{len(row_tables)} 张行 table）却没有 uuid_col —— "
+                "同 sheet 多区必须靠 UUID 列把 spec 与 table 配对"
+            )
+        matched = [
+            t
+            for t in row_tables
+            if uuid_cols.get((sheet.sheet_key, str(t.table_key))) == spec_uuid
+        ]
+        if len(matched) != 1:
+            raise ProviderCapabilityError(
+                f"provider {provider_name!r} 同 sheet 双区 {sheet.sheet_key!r} 里，"
+                f"spec uuid_col={spec_uuid!r} 匹配到 {len(matched)} 张 table "
+                f"（应恰好 1 张）—— UUID 列必须在契约 table 上唯一声明，"
+                "才能把 spec 与其目标行 table 一一对应"
+            )
+        return matched[0]
+
+    pairs: list[tuple[Any, Any]] = []
+    claimed: dict[tuple[str, str], Any] = {}
+    for spec in specs:
+        sheet = _sheet_for(spec)
+        table = _table_for(spec, sheet)
+        claim_key = (sheet.sheet_key, str(table.table_key))
+        prior = claimed.get(claim_key)
+        if prior is not None:
+            raise ProviderCapabilityError(
+                f"provider {provider_name!r} 的 table {claim_key!r} 被两个 spec "
+                f"争用（table_name={getattr(prior, 'table_name', None)!r} 与 "
+                f"{getattr(spec, 'table_name', None)!r}）—— spec↔table 必须是双射"
+            )
+        claimed[claim_key] = spec
+        # primary 对应的 table 由主 binding 覆盖，不进 sibling。
+        if str(table.table_key) == str(primary.table_key):
+            continue
+        pairs.append((spec, table))
+    return pairs
+
+
 def _sibling_identity_bindings(
     *,
     provider: Any,
@@ -1124,32 +1260,15 @@ def _sibling_identity_bindings(
     contract: Any,
     primary: Any,
 ) -> tuple[Any, ...]:
-    """同 workbook 其它受管 sheet 的 binding（与 `instrumentation_specs` 顺序对齐）。"""
+    """同 workbook 其它受管行 table 的 binding（按 managed sheet 归组、UUID 列配对）。"""
     from app.services.excel_structure_fingerprint import GT_SYNC_SHEET_NAME
     from app.services.workpaper_sync.excel_extract import ExcelIdentityBinding
 
-    specs_fn = getattr(provider, "instrumentation_specs", None)
-    if not callable(specs_fn):
-        return ()
-    specs = tuple(specs_fn())
-    if len(specs) <= 1:
-        return ()
-    from app.services.workpaper_sync.phase5_d4_29_customer_detail import row_oriented_sheets
-    sheets = row_oriented_sheets(contract)
-    if len(sheets) != len(specs):
-        raise ProviderCapabilityError(
-            f"provider {getattr(provider, '__name__', provider)!r} 的 "
-            f"instrumentation_specs 数 ({len(specs)}) 与契约 sheets 数 ({len(sheets)}) "
-            "不一致 —— 多 sheet binding 无法对齐"
-        )
+    pairs = _align_specs_to_sibling_tables(
+        provider=provider, contract=contract, primary=primary
+    )
     siblings: list[Any] = []
-    for spec, sheet in zip(specs[1:], sheets[1:]):
-        dynamic = next(
-            (table for table in sheet.tables if table.row_identity is not None),
-            None,
-        )
-        if dynamic is None:
-            continue
+    for spec, dynamic in pairs:
         binding = ExcelIdentityBinding(
             table_name=str(spec.table_name),
             uuid_column=str(spec.uuid_col),
@@ -1164,8 +1283,6 @@ def _sibling_identity_bindings(
                 for table_key, mapping in staged.observed_dynamic_bindings.items()
             },
         )
-        if binding.table_key == primary.table_key:
-            continue
         siblings.append(binding)
     return tuple(siblings)
 

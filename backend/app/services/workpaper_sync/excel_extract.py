@@ -753,9 +753,39 @@ def managed_tables_of(
     由 Excel Table 锚点定界，静态块靠**同一张 sheet** 上的固定行列定位（它们没有行身份，
     也就不需要 Table 锚点）。
 
-    第二张**动态**表 fail closed：每张动态表都需要自己的 Table 锚点与 UUID 列绑定，而
-    :class:`ExcelIdentityBinding` 只声明了一组 —— 静默沿用第一组会把 B 表的行读到 A 表的
-    identity 上。
+    ═══ 同 sheet 多动态区（D4-1 主营/其他、D4-9 本期/上期）═══
+
+    一张受管 sheet 上可以有 **N 张动态行表**，每张各有**自己的** :class:`ExcelIdentityBinding`
+    （Table 名 / UUID 列各异，如 D4-1 主营 UUID 列 W、其他 UUID 列 X）。adapter 层
+    (:meth:`ExcelSyncAdapter.extract`) 会 `for binding in self._all_bindings()` **逐 binding
+    各调一次** :func:`extract_projection`（内部即调本函数），再 `_merge_projections` 合并 ——
+    也就是说本函数**一次只处理一个 binding**，同 sheet 的其它动态表属于**兄弟 binding**，
+    会在它们各自那一趟被单独解析。因此：
+
+    * 本 binding 的动态表 = 与 `binding.table_key` 匹配的那张（不变）；
+    * 同 sheet 其它**动态**表 = 兄弟 binding 的地盘，**跳过**（既不当本 binding 的表返回，
+      也**不再 fail closed**）—— 原实现把兄弟动态表硬判成「未绑定的第二动态表」是错的：
+      它其实**已被绑定**，只是在另一趟。
+
+    ═══ fail-closed 迁移到看得见全部 binding 的上游 ═══
+
+    「每张动态表都必须有 binding」这条不变式，本函数（只看一个 binding）**无法**独立校验。
+    它由**看得见全部 binding 的上游**保证：`projection_first_publication.
+    _align_specs_to_sibling_tables` 强制 `row_oriented_sheets` 的行 table 总数 ==
+    `instrumentation_specs` 数（数 table 不数 sheet），并做 spec↔table **双射**校验
+    （没有 table 被两个 spec 争用、没有 table 无 spec 认领），任一违背 fail-closed。因此
+    「同 sheet 的某张动态表压根没有 binding」在 publish/attach 阶段就已被拒，本函数据此
+    可以安全跳过兄弟动态表而不漏掉真正未绑定的表。
+
+    ═══ 静态表归属 ═══
+
+    静态表（无 `row_identity`）不像动态表那样按 binding 一一切分 —— 它们没有行身份，
+    每个 binding 都把它们纳入本 sheet 的受管坐标（:func:`_managed_coordinates`）。这是
+    **安全方向**：静态格被**每个** binding 都当受管 ⇒ 没有任何一趟会把它误判成 unmanaged
+    drift；:func:`_merge_projections` 对相同静态 key 幂等（后写覆盖等值），不会双计。
+    D4-1 本 sheet **0 张静态表**（footer 走 tb_check + formula_mask，非 TableSpec），所以
+    这条对 D4-1 是空操作；对 D4-9「本期/上期动态 + 合计静态」这类，合计静态被两 binding
+    共同持有、既不丢也不漂移。
     """
     sheet = next(
         (
@@ -782,12 +812,11 @@ def managed_tables_of(
         if table.table_key == dynamic.table_key:
             continue
         if table.has_dynamic_rows:
-            raise ManagedRegionResolutionError(
-                f"契约 {contract.contract_id} 的 sheet {sheet.sheet_key!r} 上还有第二张动态行表 "
-                f"{table.table_key!r}，但 identity binding 只声明了一组 Table/UUID 列 —— "
-                "沿用同一组会把它的行读到 "
-                f"{dynamic.table_key!r} 的 identity 上"
-            )
+            # 同 sheet 的其它动态表属于**兄弟 binding**（各有自己的 Table/UUID 列），
+            # 会在 adapter.extract 的另一趟被单独解析 —— 本趟跳过，不当本 binding 的表、
+            # 也不 fail closed。「每张动态表都有 binding」由上游 bijection 校验保证
+            # （_align_specs_to_sibling_tables：行 table 总数 == specs 数 + spec↔table 双射）。
+            continue
         statics.append(table)
     # 其它 sheet 的表由各自 binding / sibling_bindings 覆盖；此处只解析本 sheet。
     return dynamic, tuple(statics)

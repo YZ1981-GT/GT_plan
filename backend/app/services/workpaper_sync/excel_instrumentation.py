@@ -1126,6 +1126,30 @@ def _attach_table_part(sheet_xml: str, *, rel_id: str = _GT_TABLE_REL_ID) -> str
     root_end = sheet_xml.find(">", sheet_xml.find("<worksheet"))
     root_tag = sheet_xml[: root_end + 1] if root_end > 0 else sheet_xml
     rel_ns_decl = "" if 'xmlns:r="' in root_tag else f' xmlns:r="{_REL_NS}"'
+
+    # 🔴 同 sheet 双区（D4-1 主营/其他、D4-9 本期/上期）：一张 worksheet 被注入两次
+    #    Table 时，OOXML 只允许**一个** `<tableParts>` 块（`count` = 块内 `<tablePart>` 数）。
+    #    原实现无条件新建独立块 ⇒ 同 sheet 第二次注入产出两个 `<tableParts>` = 非法 XML，
+    #    openpyxl 只认最后一张 Table，第一区 identity 丢失 = 假双向（D4-9 design §2.1.1）。
+    #    修复：sheet 已有 `<tableParts>` 时**往块内追加** `<tablePart>` 并 count+1；否则走
+    #    原路径新建块。单区 sheet（现有全部 358 个工作簿）无既有块 ⇒ 走 else 分支，
+    #    注入字节与 Task 40/41 冻结的 structure hash 完全不变。
+    existing = re.search(r'<tableParts\b[^>]*\bcount="(\d+)"', sheet_xml)
+    if existing:
+        new_count = int(existing.group(1)) + 1
+        # count 属性 +1
+        sheet_xml = sheet_xml.replace(
+            existing.group(0),
+            existing.group(0).replace(
+                f'count="{existing.group(1)}"', f'count="{new_count}"'
+            ),
+            1,
+        )
+        # 在该 <tableParts> 块闭合前追加新的 <tablePart>（r: 前缀在块的根声明或 worksheet 根已绑定）
+        return _insert_before(
+            sheet_xml, "</tableParts>", f'<tablePart r:id="{rel_id}"/>', what="tablePart 追加"
+        )
+
     block = (
         f'<tableParts{rel_ns_decl} count="1">'
         f'<tablePart r:id="{rel_id}"/></tableParts>'

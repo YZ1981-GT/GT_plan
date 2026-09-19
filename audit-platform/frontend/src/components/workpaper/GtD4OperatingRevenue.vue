@@ -393,8 +393,12 @@ const isD4DetailSheet = computed(() => currentSheet.value != null && currentShee
 //    漏登记，实测出现双切换器 + 误入 legacy 路径。
 //    D4-15/16（检查表，d4-inspection-writeback-formula-io B2）同理接子组件 sync bridge，
 //    必须一并登记 —— 否则宿主对它们仍渲染 legacy 通知（「两侧数据未互通」）+ legacy dualMode。
+//    D4-1（审定表，d4-1-adjudication-bidirectional-writeback-and-formula-io Task 7）改造为
+//    子组件自管 sync bridge（sheetKey=d41-managed，同 entry gt-d4-operating-revenue），
+//    必须登记为 dedicated —— 否则宿主对它叠加 legacy 双切换器（点到宿主那个走整册
+//    GtOnlyOfficeSheet「两侧数据未互通」），真正的双向同步桥被埋在下面。
 const isD4DedicatedSyncSheet = computed(() =>
-  ['D4-5', 'D4-15', 'D4-16', 'D4-25', 'D4-26', 'D4-27', 'D4-28', 'D4-29', 'D4-30', 'D4-31', 'D4-32', 'D4-35'].includes(
+  ['D4-1', 'D4-5', 'D4-15', 'D4-16', 'D4-25', 'D4-26', 'D4-27', 'D4-28', 'D4-29', 'D4-30', 'D4-31', 'D4-32', 'D4-35'].includes(
     currentSheet.value || '',
   ),
 )

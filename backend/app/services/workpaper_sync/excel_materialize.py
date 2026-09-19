@@ -741,6 +741,12 @@ class MaterializePlan:
     #: ``_refresh_gt_sync_runtime_binding`` 只重冻结本 sheet 的 ``GT_FOOTER_ROW_{TID}``，
     #: 避免 sibling 的 footer 键被主 sheet 插行误移位。
     managed_sheet_key: str | None = None
+    #: 本次 materialize 的 region 物理 Excel Table displayName（如 ``GT_D41_MAIN_ROWS``）。
+    #: 🔴 **同 sheet 双区**（一个 sheet_key 对应 N 个 template_id）时 sheet_key 不足以定位
+    #: 本 region 的 ``GT_FOOTER_ROW_{TID}``；``_refresh_gt_sync_runtime_binding`` 用它经
+    #: ``_GT_SYNC`` 的平行清册 ``GT_MANAGED_TABLES``/``GT_TEMPLATE_IDS`` 精确定位本区的
+    #: per-template footer 键，只移位该键（不动 sibling 区）。
+    managed_table_name: str | None = None
 
     @property
     def field_writes(self) -> tuple[CellWrite, ...]:
@@ -1192,10 +1198,65 @@ def _template_ids_from_sheet_key(sheet_key: str) -> tuple[str, ...]:
     return (raw,) if raw else ()
 
 
-def _resolve_frozen_footer_row(
-    runtime_binding: Mapping[str, str], *, sheet_key: str | None
+def _template_id_for_table_name(
+    runtime_binding: Mapping[str, str], table_name: str | None
 ) -> str | None:
-    """多 sheet：优先 ``GT_FOOTER_ROW_{TEMPLATE_ID}``；否则回退 ``GT_FOOTER_ROW``。"""
+    """物理 Excel Table displayName → 冻结 TEMPLATE_ID（用于取 ``GT_FOOTER_ROW_{TID}``）。
+
+    🔴 **同 sheet 双区**（一个 ``sheet_key`` 对应 N 个 region/template_id）时，``sheet_key``
+    不足以定位本 region 的 footer —— instrumentation 写的是 per-SPEC 键
+    ``GT_FOOTER_ROW_{spec.template_id}``（如 D4-1 的 ``GT_FOOTER_ROW_D41MAIN`` /
+    ``_D41OTHER``），而 ``sheet_key=d41-managed`` 经 :func:`_template_ids_from_sheet_key`
+    只得到单个 ``D41``，两边对不上会回退裸 ``GT_FOOTER_ROW``（primary sheet 的行）→ 误判
+    footer 下移。
+
+    唯一在两侧都一致的桥梁是 ``instrument_workbook_bytes_multi`` 写进隐藏 ``_GT_SYNC`` 的
+    **平行有序**清册 ``GT_MANAGED_TABLES`` = ``table_name,…`` 与 ``GT_TEMPLATE_IDS`` =
+    ``template_id,…``（下标一一对应）。给定本 region 的物理 ``table_name``（=
+    ``binding.table_name`` / ``region.table_name``），据此定位它在 ``GT_MANAGED_TABLES``
+    的下标，取同下标的 ``GT_TEMPLATE_IDS`` 即本 region 的 template_id。
+
+    单 region / 旧 artifact（无 ``GT_MANAGED_TABLES``/``GT_TEMPLATE_IDS``，或 table_name
+    不在清册里）返回 ``None`` —— 调用方回退到既有 ``sheet_key`` 路径，行为逐字不变。
+    """
+    if not table_name:
+        return None
+    raw_tables = str(runtime_binding.get("GT_MANAGED_TABLES") or "").strip()
+    raw_tids = str(runtime_binding.get("GT_TEMPLATE_IDS") or "").strip()
+    if not raw_tables or not raw_tids:
+        return None
+    table_names = [t for t in raw_tables.split(",") if t]
+    template_ids = [t for t in raw_tids.split(",") if t]
+    if len(table_names) != len(template_ids):
+        # 清册畸形（两列长度不齐）—— 不猜下标对应，交回 sheet_key 路径。
+        return None
+    try:
+        idx = table_names.index(str(table_name))
+    except ValueError:
+        return None
+    return template_ids[idx]
+
+
+def _resolve_frozen_footer_row(
+    runtime_binding: Mapping[str, str],
+    *,
+    sheet_key: str | None,
+    table_name: str | None = None,
+) -> str | None:
+    """多 sheet：优先 ``GT_FOOTER_ROW_{TEMPLATE_ID}``；否则回退 ``GT_FOOTER_ROW``。
+
+    🔴 **优先按 region 的物理 ``table_name`` 定位 template_id**（同 sheet 双区唯一正确的
+    区分维度，见 :func:`_template_id_for_table_name`）。table_name 缺省或映射不到时，退回
+    既有 ``sheet_key`` → template_id 路径（单 region-per-sheet 场景逐字不变），最后回退裸
+    ``GT_FOOTER_ROW``。
+
+    冻结值始终取自 ``_GT_SYNC`` 的**声明**（不从可见 marker 反推），漂移检测不被削弱。
+    """
+    region_tid = _template_id_for_table_name(runtime_binding, table_name)
+    if region_tid is not None:
+        keyed = runtime_binding.get(f"GT_FOOTER_ROW_{region_tid}")
+        if keyed is not None:
+            return keyed
     if sheet_key:
         for tid in _template_ids_from_sheet_key(str(sheet_key)):
             keyed = runtime_binding.get(f"GT_FOOTER_ROW_{tid}")
@@ -1212,6 +1273,8 @@ def assert_footer_anchor_stable(
     runtime_binding: Mapping[str, str],
     row_shift: RowShiftPlan | None = None,
     table_key: str | None = None,
+    table_name: str | None = None,
+    search_from_row: int = 0,
 ) -> int | None:
     """footer 标记行必须与 representation 冻结的 `GT_FOOTER_ROW` 一致（AC 6.9 / 6.3）。
 
@@ -1224,9 +1287,18 @@ def assert_footer_anchor_stable(
       `r:id="(rId\\d+)"` 的 sheet 定位，而 Task 17 的关系 id 是 `rIdGTSYNC`，于是恒读空、
       把「sheet 定位失败」误报成「缺 GT_FOOTER_ROW」）。
 
-    多 sheet 契约：传 `table_key` 时只用该表的 footer_anchor，并优先读
-    ``GT_FOOTER_ROW_{TEMPLATE_ID}``（与 sheet_key ``{tid.lower()}-managed`` 对齐）；
-    缺省回退主键 ``GT_FOOTER_ROW``（单 sheet / 旧 artifact 兼容）。
+    多 sheet 契约：传 `table_key` 时只用该表的 footer_anchor。冻结行的取用**优先按本
+    region 的物理 `table_name`**（= `binding.table_name` / `region.table_name`）经隐藏
+    `_GT_SYNC` 的平行清册 ``GT_MANAGED_TABLES``/``GT_TEMPLATE_IDS`` 定位 template_id，读
+    ``GT_FOOTER_ROW_{TEMPLATE_ID}`` —— 这是**同 sheet 双区**（一个 sheet_key 对应 N 个
+    region/template_id，如 D4-1 主营 `D41MAIN`=12 / 其他 `D41OTHER`=18）唯一正确的区分维度。
+    `table_name` 缺省时退回 ``sheet_key`` → template_id 路径（``{tid.lower()}-managed``），
+    最后回退主键 ``GT_FOOTER_ROW``（单 sheet / 旧 artifact 兼容），逐字不变。
+
+    🔴 `search_from_row`：同 sheet 双区里可见侧同一 marker（``小计``）在每区各出现一次，
+    不设下限会恒取第一处 → 给「其他」区判 footer 时误取「主营」区的 marker 行。传入本
+    region 数据区首行（``region.first_row``）作可见侧搜索下限，冻结侧则按 `table_name`
+    取本区的 ``GT_FOOTER_ROW_{TID}``，两侧同区对齐。默认 0（单 region 逐字不变）。
 
     两者不一致即 footer 已下移（OO 在受管区域内插了行）。此时**fail closed**而不是跟着
     marker 写：Task 37 的 extract 仍按契约 `static_row` 反读，跟着写会让「写在 28 行、
@@ -1284,7 +1356,11 @@ def assert_footer_anchor_stable(
     xml = entries[sheet_part].decode("utf-8")
     shared = _shared_strings(entries)
     observed = _find_marker_row(
-        xml, column=anchor.search_column, marker=anchor.marker, shared=shared
+        xml,
+        column=anchor.search_column,
+        marker=anchor.marker,
+        shared=shared,
+        min_row=search_from_row,
     )
     if observed is None:
         raise FooterAnchorDriftError(
@@ -1293,7 +1369,9 @@ def assert_footer_anchor_stable(
             "定位不到即结构漂移，不得按固定行号继续写"
         )
     frozen = _resolve_frozen_footer_row(
-        runtime_binding, sheet_key=getattr(sheet_for_table, "sheet_key", None)
+        runtime_binding,
+        sheet_key=getattr(sheet_for_table, "sheet_key", None),
+        table_name=table_name,
     )
     if frozen is None:
         raise FooterAnchorDriftError(
@@ -1343,7 +1421,7 @@ def _shared_strings(entries: Mapping[str, bytes]) -> list[str]:
 
 
 def _find_marker_row(
-    xml: str, *, column: str, marker: str, shared: Sequence[str]
+    xml: str, *, column: str, marker: str, shared: Sequence[str], min_row: int = 0
 ) -> int | None:
     """在指定列上找 marker 文本所在行（支持 sharedString / inlineStr / str 三种载体）。
 
@@ -1351,6 +1429,12 @@ def _find_marker_row(
     会把结尾 ``/`` 吃进 attrs、再拿后面第一个 ``</c>``（往往是下一行有文本的格）当
     本格闭合，footer marker 就被「吞掉」→ ``FooterAnchorDriftError``（G7 canary
     真栈：A84 自闭合吞掉 A85 的 footer）。attrs 不得跨越 ``/``；自闭合格直接跳过。
+
+    🔴 ``min_row``：**同 sheet 双区**里同一 marker（如 ``小计``）会在每个 region 各出现
+    一次（D4-1 主营 R12 / 其他 R18）。不设下限就恒取第一处（R12），给「其他」区判 footer
+    时会把主营的 R12 当成它的 footer marker。传入本 region 数据区首行（``region.first_row``）
+    作下限后，主营区从 R8 起搜到 R12、其他区从 R14 起搜跳过 R12 命中 R18 —— 各归各的。
+    单 region 传 0（默认），行为逐字不变。
     """
     for match in re.finditer(
         r'<c r="'
@@ -1375,6 +1459,8 @@ def _find_marker_row(
         else:
             value = re.search(r"<v>(.*?)</v>", body, re.S)
             text = _xml_unescape(value.group(1)) if value else None
+        if row < min_row:
+            continue
         if text is not None and text.strip() == marker:
             return row
     return None
@@ -1614,6 +1700,11 @@ def plan_managed_writes(
         contract=contract,
         runtime_binding=runtime_binding,
         table_key=dynamic_table.table_key,
+        # 🔴 同 sheet 双区：按本 region 的物理 table_name 定位 per-region 冻结 footer，
+        #    不靠 sheet_key（一个 sheet_key 对应两个 region 时不足以区分）；
+        #    可见侧 marker 搜索也从本区数据首行起，避免命中另一区的同名 marker。
+        table_name=binding.table_name,
+        search_from_row=region.first_row,
     )
     anchor = dynamic_table.footer_anchor
     if footer_row is not None:
@@ -1814,6 +1905,7 @@ def plan_managed_writes(
         table_part=table_part,
         workbook_row_change=workbook_row_change,
         managed_sheet_key=_sheet_key_for_table(contract, binding.table_key),
+        managed_table_name=binding.table_name,
     )
 
 
@@ -1976,6 +2068,7 @@ def _plan_row_shift(
     #    各有 12 个 orphan 行要插，此路径每次必炸。修复 = 用 `region.table_key` 定位本表的
     #    footer_anchor + 用 `_resolve_frozen_footer_row(sheet_key=...)` 取本表冻结行号。
     region_sheet_key = _sheet_key_for_table(contract, region.table_key)
+    region_table_name = region.table_name
     anchor = next(
         (
             table.footer_anchor
@@ -1987,7 +2080,11 @@ def _plan_row_shift(
     )
     total_formula_rows: tuple[int, ...] = ()
     if anchor is not None and anchor.carries_total_formula:
-        frozen = _resolve_frozen_footer_row(runtime_binding, sheet_key=region_sheet_key)
+        frozen = _resolve_frozen_footer_row(
+            runtime_binding,
+            sheet_key=region_sheet_key,
+            table_name=region_table_name,
+        )
         raw = str(frozen or "").strip()
         if not raw.isdigit():
             raise _reject(
@@ -2194,9 +2291,20 @@ def _apply_workbook_propagation(
             key = (entry.ref_before, entry.ref_after)
             pairs[key] = pairs.get(key, 0) + 1
         applied = 0
+        # 🔴 候选顺序含**单引号→&apos; 的转义形态**：definedName / 公式里的 sheet 名
+        #    单引号在 workbook.xml 里序列化为 `&apos;`（如 `&apos;境外销售收入检查D4-26&apos;`），
+        #    而计划期 `ref_before` 由 `_unescape`(html.unescape) 还原成**裸单引号** `'`。
+        #    `_escape` 只转义 `& < >`（不转单引号），于是裸 `'` 的候选在 `&apos;` 序列化的
+        #    workbook.xml 里 `count()` 恒为 0 → 误报 PropagationDriftError（D4-26 Print_Area
+        #    33→34、FOOTER_ANCHOR 30→31 两处真栈）。补一个 `'`→`&apos;` 的候选即对齐序列化。
+        def _apos(s: str) -> str:
+            return s.replace("'", "&apos;")
+
         for before, after in sorted(pairs, key=lambda kv: len(kv[0]), reverse=True):
             for cand_before, cand_after in (
+                (_apos(_escape(before)), _apos(_escape(after))),
                 (_escape(before), _escape(after)),
+                (_apos(before), _apos(after)),
                 (before, after),
             ):
                 hits = text.count(cand_before)
@@ -2248,6 +2356,10 @@ def assert_shifted_footer_gates(
         runtime_binding=runtime_binding,
         row_shift=plan.row_shift,
         table_key=region.table_key,
+        # 同 sheet 双区：apply 后复核同样按 region 的物理 table_name 取本区冻结 footer，
+        # 可见侧 marker 从本区数据首行起搜（位移不改 first_row）。
+        table_name=region.table_name,
+        search_from_row=region.first_row,
     )
     if footer_row is None:
         return None
@@ -2432,13 +2544,19 @@ def _refresh_gt_sync_runtime_binding(
         dict(pairs).get("GT_FOOTER_ROW"), what="GT_FOOTER_ROW", required=False
     )
     managed_sheet_key = str(getattr(plan, "managed_sheet_key", None) or "").strip() or None
-    # 与 `_resolve_frozen_footer_row` 同口径：优先紧凑 TEMPLATE_ID（D425），
-    # 避免 `d4-25-managed` → `D4-25` 对不上 `GT_FOOTER_ROW_D425`。
-    managed_tid = (
-        _template_ids_from_sheet_key(managed_sheet_key)[0]
-        if managed_sheet_key
-        else None
-    )
+    managed_table_name = str(getattr(plan, "managed_table_name", None) or "").strip() or None
+    # 🔴 同 sheet 双区：优先按本 region 的物理 table_name 经 `_GT_SYNC` 平行清册
+    #    (`GT_MANAGED_TABLES`/`GT_TEMPLATE_IDS`) 取 per-region template_id（D41MAIN / D41OTHER）。
+    #    这样 D4-1 主营插行只移位 `GT_FOOTER_ROW_D41MAIN`，不误动 `GT_FOOTER_ROW_D41OTHER`。
+    #    映射不到（单 region / 旧 artifact）再退回 sheet_key → 紧凑 TEMPLATE_ID（D425），
+    #    避免 `d4-25-managed` → `D4-25` 对不上 `GT_FOOTER_ROW_D425`。
+    managed_tid = _template_id_for_table_name(pair_map, managed_table_name)
+    if managed_tid is None:
+        managed_tid = (
+            _template_ids_from_sheet_key(managed_sheet_key)[0]
+            if managed_sheet_key
+            else None
+        )
 
     new_pairs: list[tuple[str, str]] = []
     seen: set[str] = set()
