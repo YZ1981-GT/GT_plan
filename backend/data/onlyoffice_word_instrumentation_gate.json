@@ -20,12 +20,12 @@
       {
         "role": "carrier_contract",
         "path": "backend/data/onlyoffice_word_sdt_carrier_contract.json",
-        "sha256": "be4d11dde4e92110d8da74c8da6de849c62f2ea58233f54e5ab6632466d67acc"
+        "sha256": "bb82909043ab380f5e1cd0bd441e62ca16e800cd9b6ff99286017911b8e1c272"
       },
       {
         "role": "fingerprint_module",
         "path": "backend/app/services/word_sdt_fingerprint.py",
-        "sha256": "b494a3e0c8f89525ea8225a0a74a2077ed080d838b7a1518337a9845f76dc857"
+        "sha256": "6d321adf23e64c4500b6c0b0bd2a86cdbaf0243ba854a36fa3c257b172ddbf36"
       }
     ],
     "probed_templates": [
@@ -56,7 +56,7 @@
       {
         "role": "probe_script",
         "path": "backend/scripts/diagnose/probe_oo94_word_sdt.py",
-        "sha256": "5d01ffd61d3993302462734a88350855adfb5c8951b2e87f4cf8c5340c5dd2f5"
+        "sha256": "2809b4b88fd54ed9a4644f4c8e38d5324547da74ac079b38c34ff671709ff686"
       },
       {
         "role": "operation_matrix",

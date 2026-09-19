@@ -45,7 +45,7 @@
       {
         "role": "probe_script",
         "path": "backend/scripts/diagnose/probe_oo94_excel_identity.py",
-        "sha256": "c27cc64a6313aaa13f4dda05b05e7bbbfdf8ed0c0639d0aa9fa5ab696f0fa6af"
+        "sha256": "f5bb66149a19a61d69c0967bbee01caab44d38af0f29d9fc2dd1dadfcf701c67"
       },
       {
         "role": "operation_matrix",

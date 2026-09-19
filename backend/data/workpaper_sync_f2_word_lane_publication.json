@@ -1867,7 +1867,7 @@
     ],
     "descriptor_props_on_the_mount": [],
     "oo_component_self_fetches_config": true,
-    "oo_component_self_fetch_line": 172,
+    "oo_component_self_fetch_line": 190,
     "router_callback_has_a_lane_specific_docx_branch": true,
     "why_property_47_is_still_not_claimed": "承载者存在但形态相反：Property 47 要求「挂载组件不自行请求 config，只消费含 approved bundle 的 descriptor，可 await forceSave，且 ready/dirty/saveRequested/incomingDurable/terminal/recoveryCase/error 各有真实触发路径」。现算结果是「挂载点自行请求 config + 零 descriptor prop + 无 durable ack」⇒ 它是**反例**而不是通过项。本任务不接 descriptor/bridge（Task 60 正文把接线排在 bundle/representation 之后），故只登记事实与 BP-15，不宣称 Property 47 通过。"
   },
