@@ -43,7 +43,7 @@
 | 3 | D4-3 | 其他业务收入明细 | d-cycle-expansion (9/9) | ✅ d43-managed | D4TabOtherRevenue(宿主走桥) | ✅ | ✅ |
 | 4 | D4-4 | 调整分录汇总 | gap-closure (0/5) | ❌ | — | — | ⬜ 已裁 single_html(无行身份列) |
 | 5 | D4-5 | 会计政策检查 | d-cycle-expansion | ✅ d45-managed | D4TabPolicyCheck | ✅ | ✅ |
-| 6 | D4-6 | 重要指标分析 | d-cycle-expansion | ❌ (前端有 d46-managed 键但契约未声明) | D4TabIndicator | legacy | 🔵 从零 |
+| 6 | D4-6 | 重要指标分析 | d-cycle-expansion | ✅ d46-managed(批次B从零) | D4TabIndicator | ✅ | ✅ (批次B 2026-09-20落地,真OO待验) |
 | 7 | D4-7 | 毛利率分析 | d-cycle-expansion | ❌ (前端有 d47-managed 键但契约未声明) | D4TabMarginMonthly | legacy | 🔵 从零 |
 | 8 | D4-8 | 重要产品毛利分析 | gap-closure (0/5) | ❌ | — | — | 🔵 gap待做 |
 | 9 | D4-9 | 重要客户结构分析 | d4-9-customer (1/15) | ❌ 无 d49 契约 | D4TabCustomerStructure | legacy | 🔵 从零(Task1双区instrumentation已由D4-1借道落地,余待做) |
@@ -79,12 +79,13 @@
 
 > 🔴 **重要口径**：下方「✅」是**三维代码全绿（REQUEST_PATH 级）**——后端契约 + 前端接桥 + 宿主登记齐全。但**没有一张到主控 §6.4 的 `ONLYOFFICE_VERIFIED`**（需真实 OO 往返产生 `working_paper_content_application` state=applied + operation 终态 + OO 侧 content version，见 §9.5）。真 OO 验证是 env 门（start-dev.bat 全栈 + OO 容器），列为批次C。
 
-- ✅ 三维代码全绿(REQUEST_PATH)：**19 张** — D4-1/2/3/5/15/16/21/22/23/24/25/26/27/28/29/30/31/32/35
-  - 其中 D4-21/22/23/24（批次A）+ D4-30/31/32（批次A-5）为 2026-09-20 新接桥/开门；余 12 张此前已接桥
-- 🔵 owner spec 待做/从零(后端无契约 + 前端仍 legacy)：**15 张** — D4-6/7/8/9/10/11/12/14/17/18/19/20/33/34/36
+- ✅ 三维代码全绿(REQUEST_PATH)：**20 张** — D4-1/2/3/5/**6**/15/16/21/22/23/24/25/26/27/28/29/30/31/32/35
+  - D4-21/22/23/24（批次A）+ D4-30/31/32（批次A-5）+ **D4-6（批次B 从零第一张，provider phase5_d4_indicator_sheet，gen54）** 为 2026-09-20 新接桥/开门/落地；余 12 张此前已接桥
+- 🔵 owner spec 待做/从零(后端无契约 + 前端仍 legacy)：**14 张** — D4-7/8/9/10/11/12/14/17/18/19/20/33/34/36
 - ⬜ 裁决 single_html/N/A：**2 张** — D4-4/D4-13
 
-> 校验：19 + 15 + 2 = 36 ✓（🟡 半接入类已清零：D4-21~24 接桥、D4-30~32 开门）
+> 校验：20 + 14 + 2 = 36 ✓（🟡 半接入类已清零）
+> 契约集合现 **20 张**（+d46-managed）；entry `xlsx/gt-d4-operating-revenue` 当前 representation gen54。
 > 注：D4-6/7 前端虽已在宿主 `D4_SHEET_KEY_BY_CODE` 预留 `d46/d47-managed` 键，但契约 sheet_key 集合中**无**对应项且组件未接桥，故仍归 🔵 从零。D4-9/10/11/14/33/34/36 经 grep 实证前端组件均未 import `useWorkpaperSyncBridge`（仍 legacy），契约集合中也无对应项。
 
 ## 逐张推进优先级（建议，2026-09-20 修订）
