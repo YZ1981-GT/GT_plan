@@ -79,7 +79,12 @@ TAB_L5_ADJ = f"{WP}/l5/core/L5TabAdjudication.vue"
 L3_ORPHAN = f"{COMP}/useL3DualMode.ts"
 L2_DETAIL = f"{COMP}/useL2Detail.ts"
 REGISTRY_TS = f"{WP}/htmlRendererRegistry.ts"
+#: 🔴 commit 82f58ea44 把集中式注册拆到 registry/entries/*.ts，`component:` 模块边随之搬家
+#: （相对路径从 './GtX.vue' 变为 '../../GtX.vue'）。真源码变异必须打在**真实落点**上。
+REGISTRY_SPECIALIZED = f"{WP}/registry/entries/specialized.ts"
 OO_ROUTER = "backend/app/routers/wp_onlyoffice_router.py"
+#: 🔴 sheet 可见性的**真源**：router 的内联匹配已抽取到此共享模块（见 M46 注释）。
+SHEET_VISIBILITY = "backend/app/services/workpaper_sync/excel_sheet_visibility.py"
 
 # ── 期望打红的守卫（文件::类::方法，与 pytest 的 short nodeid 同形）─────────
 T54 = "test_task54_l_cycle_migration.py"
@@ -821,19 +826,31 @@ MUTATIONS: list[Mutation] = [
         tags=("source", "sheet"),
     ),
     Mutation(
-        id="M46", side="be", path=OO_ROUTER, kind="replace",
-        anchor="            if ws.title == target_sheet:",
-        new="            if ws.title.strip() == target_sheet.strip():",
+        #: 🔴 真源已搬家：`_hide_non_target_sheets` 的内联匹配被抽取为共享模块
+        #: `app/services/workpaper_sync/excel_sheet_visibility.resolve_target_sheet`
+        #: （router 现在只是委托调用，`ws.title` 已不在 router 里）。守卫本身已升级为
+        #: **行为等价比对**（直接 import resolve_target_sheet 与 `_router_matches` 逐条对比），
+        #: 所以变异必须打在新真源上 —— 继续打 router 只会 ANCHOR-MISS，敏感性证明静默失效。
+        id="M46", side="be", path=SHEET_VISIBILITY, kind="replace",
+        #: 🔴 打**兜底条件**而不是精确匹配分支。实测（2026-09-19，真实 L 册 104 个 target）：
+        #: 把精确匹配改成 `name.strip() == target.strip()` 在本语料上 **0 次**改变
+        #: `resolve_target_sheet` 的返回值 —— 那是**等价变异体**（先被精确分支捞到还是先被兜底
+        #: 捞到，结果同一张 sheet），行为型守卫保持 GREEN 是**正确**的，不是敏感性缺口，别照它
+        #: 去"加强"守卫。去掉兜底的 `target in name` 则实测 **2 次**改变返回值（L4 册两张尾随
+        #: 空格 / 后缀带编码的 sheet 从有解变 None）⇒ 行为等价比对必须打红。
+        anchor="        if target in name or name.endswith(target):",
+        new="        if name.endswith(target):",
         want=f"{_SELF}::test_router_matcher_replicates_the_real_source_rule",
-        why="改掉 router 的精确匹配分支 —— 复刻规则的自检必须打红（否则 _router_matches 会静默过期）",
-        scope_check=text_both("ws.title.strip() == target_sheet.strip():",
-                              "            if ws.title == target_sheet:"),
+        why="砍掉真源兜底匹配的 `target in name` 一半（只留 endswith）—— 复刻规则的自检必须打红"
+            "（否则 _router_matches 会静默过期）",
+        scope_check=text_both("        if name.endswith(target):",
+                              "        if target in name or name.endswith(target):"),
         tags=("source", "sheet"),
     ),
     Mutation(
-        id="M47", side="be", path=REGISTRY_TS, kind="replace",
-        anchor="    component: defineAsyncComponent(() => import('./GtL8FinancialExpenses.vue')),",
-        new="    component: defineAsyncComponent(() => import('./GtL8FinancialExpensesX.vue')),",
+        id="M47", side="be", path=REGISTRY_SPECIALIZED, kind="replace",
+        anchor="    component: defineAsyncComponent(() => import('../../GtL8FinancialExpenses.vue')),",
+        new="    component: defineAsyncComponent(() => import('../../GtL8FinancialExpensesX.vue')),",
         want=f"{_SCOPE}::test_host_module_edges_in_the_renderer_registry_are_real",
         why="把 L8 宿主的 registry 模块边指到不存在的文件 —— 可达性判据必须由模块边现算打红",
         scope_check=text_contains("GtL8FinancialExpensesX.vue"),

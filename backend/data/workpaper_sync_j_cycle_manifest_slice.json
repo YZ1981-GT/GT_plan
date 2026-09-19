@@ -464,7 +464,7 @@
             "audit-platform/frontend/src/components/workpaper/j1/inspection/J1TabSeveranceCheck.vue": 229
           },
           "dynamic_import": {
-            "audit-platform/frontend/src/components/workpaper/j1/core/J1TabAdjudication.vue": [282, 436, 513],
+            "audit-platform/frontend/src/components/workpaper/j1/core/J1TabAdjudication.vue": [282, 524],
             "audit-platform/frontend/src/components/workpaper/j1/core/J1TabDisclosureListed.vue": [291, 393, 500],
             "audit-platform/frontend/src/components/workpaper/j1/core/J1TabDisclosureSoe.vue": [270, 325, 470]
           },
@@ -472,7 +472,8 @@
           "dynamic_import_file_count": 3,
           "static_import_pattern": "^\\s*import http from '@/utils/http'",
           "dynamic_import_pattern": "await import\\('@/utils/http'\\)",
-          "counting_note": "4 + 3 = 7 == second_write_path_file_count ✓。两族的文件集合必须互斥且并集等于 second_write_path_sites 的文件集合（守卫现扫两个正则并逐文件比对行号）。"
+          "counting_note": "4 + 3 = 7 == second_write_path_file_count ✓。两族的文件集合必须互斥且并集等于 second_write_path_sites 的文件集合（守卫现扫两个正则并逐文件比对行号）。",
+          "adjudication_dynamic_sites_evolution_note": "🔴 J1TabAdjudication.vue 的动态取 client 站点从 3 处（#L282/#L436/#L513）变为 2 处（#L282/#L524）：commit 7372bf52c「I/E1/J1 审定表改走显式发布门 publish-to-tb」把原 #L436 那处 TB 回写从 `await import('@/utils/http')` 改为 `await import('@/services/apiProxy')`（#L445，配二次确认 ElMessageBox），第三处随发布门代码块增长从 #L513 顺移到 #L524。**不是漏改也不是弱化**：本块盘点的是「第二写路径（per-tab 直写 checklist-responses）里 http client 的取得形态」，而 TB 回写走的是 publish-to-tb 发布门、本就不属于第二写路径（second_write_path_sites 在该文件只登记 #L283 一条，未变）；文件数 4+3=7 亦未变。"
         },
         "registered_as": "BP-5"
       },

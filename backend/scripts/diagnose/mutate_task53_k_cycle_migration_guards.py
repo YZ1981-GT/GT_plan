@@ -82,6 +82,9 @@ HOST_K1 = f"{WP}/GtK1OtherReceivables.vue"
 HOST_K2 = f"{WP}/GtK2OtherCurrentAssets.vue"
 K9_SOE = f"{WP}/k9/core/K9TabDisclosureSoe.vue"
 REGISTRY_TS = f"{WP}/htmlRendererRegistry.ts"
+#: 🔴 commit 82f58ea44 把集中式注册拆到 registry/entries/*.ts，`component:` 模块边随之搬家
+#: （相对路径从 './GtX.vue' 变为 '../../GtX.vue'）。真源码变异必须打在**真实落点**上。
+REGISTRY_SPECIALIZED = f"{WP}/registry/entries/specialized.ts"
 K8_STRATEGY = "backend/app/routers/wp_render_strategies/_k8_selling_expenses.py"
 K_SPECS = "backend/app/services/four_table/k_cycle_specs.py"
 
@@ -567,14 +570,16 @@ MUTATIONS: list[Mutation] = [
         scope_check=text_both('class="k1-toolbar-renamed"', 'class="k1-header-toolbar"'),
     ),
     Mutation(
-        id="M33", side="be", path=REGISTRY_TS, kind="replace",
-        anchor="    component: defineAsyncComponent(() => import('./GtK5Provisions.vue')),",
-        new="    component: defineAsyncComponent(() => import('./GtKamWorkpaper.vue')),",
+        id="M33", side="be", path=REGISTRY_SPECIALIZED, kind="replace",
+        anchor="    component: defineAsyncComponent(() => import('../../GtK5Provisions.vue')),",
+        new="    component: defineAsyncComponent(() => import('../../GtKamWorkpaper.vue')),",
         want=f"{_SCOPE}::test_host_module_edges_in_the_renderer_registry_are_real",
         why="🔴「入口可达」用 htmlRendererRegistry 的**模块边**判、不按符号名 grep。"
             "把 K5 的模块边换成别的文件 ⇒ 可达性判据打红",
-        scope_check=text_both("import('./GtKamWorkpaper.vue')",
-                             "import('./GtK5Provisions.vue')"),
+        #: 🔴 拆分后相对路径由 './GtX.vue' 变 '../../GtX.vue'，作用域自证的字面量必须一起改，
+        #: 否则变异虽落盘但自证判它「落在作用域外」⇒ 报 ANCHOR-MISS 而非 RED。
+        scope_check=text_both("import('../../GtKamWorkpaper.vue')",
+                             "import('../../GtK5Provisions.vue')"),
     ),
     Mutation(
         id="M34", side="be", path=K1_ORPHAN, kind="replace",

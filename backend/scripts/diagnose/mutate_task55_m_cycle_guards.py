@@ -89,6 +89,9 @@ FORMDATA_M1 = f"{COMP}/useM1FormData.ts"
 CLASSIFY_M10 = f"{COMP}/useM10ClassificationCheck.ts"
 SHARED_BASE = f"{COMP}/useWorkpaperEntryDualMode.ts"
 REGISTRY_TS = f"{WP}/htmlRendererRegistry.ts"
+#: 🔴 commit 82f58ea44 把集中式注册拆到 registry/entries/*.ts，`component:` 模块边随之搬家
+#: （相对路径从 './GtX.vue' 变为 '../../GtX.vue'）。真源码变异必须打在**真实落点**上。
+REGISTRY_SPECIALIZED = f"{WP}/registry/entries/specialized.ts"
 CONFLICTS_PY = "backend/app/services/workpaper_sync/conflicts.py"
 REMATERIALIZE_PY = "backend/app/services/workpaper_sync/excel_rematerialize.py"
 
@@ -681,9 +684,9 @@ MUTATIONS += [
         scope_check=text_has("blankRows(rows, 3)"),
     ),
     Mutation(
-        id="M42", side="be", path=REGISTRY_TS, kind="replace",
-        anchor="    component: defineAsyncComponent(() => import('./GtM9OtherComprehensiveIncome.vue')),",
-        new="    component: defineAsyncComponent(() => import('./GtM9OtherComprehensiveIncomeX.vue')),",
+        id="M42", side="be", path=REGISTRY_SPECIALIZED, kind="replace",
+        anchor="    component: defineAsyncComponent(() => import('../../GtM9OtherComprehensiveIncome.vue')),",
+        new="    component: defineAsyncComponent(() => import('../../GtM9OtherComprehensiveIncomeX.vue')),",
         want=f"{_SCOPE}::test_host_module_edges_in_the_renderer_registry_are_real",
         why="🔴 可达性判据 = htmlRendererRegistry 的**模块边**（路径解析口径，不是符号名 grep）。"
             "把 import 路径改掉 ⇒ M9 宿主失去模块边、可达性结论翻转。"

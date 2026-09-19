@@ -128,7 +128,7 @@ OFF_RD_CELLS = {1: 14, 2: 14, 3: 14}
 OFF_RD_EXPECTED_FIRST = {1: 24, 2: 24}
 OFF_RD_IMPL_FIRST = {1: 45 + 1, 2: 33 + 1}   # `"impl_labels": [` 行 + 1 = 首个标签
 OFF_TK_STATUS = {1: 39, 3: 31, 6: 54, 7: 38}
-OFF_TK_ORPHAN_VERDICT = {6: 51, 7: 35}
+#: （原 OFF_TK_ORPHAN_VERDICT 已删：唯一命中的锚点不需要偏移，见 M41 的注释。）
 OFF_OD_LINES = 2
 OFF_OD_ORDER = 3
 OFF_OD_PRODUCTION = 6
@@ -851,14 +851,18 @@ MUTATIONS: list[Mutation] = [
     ),
     Mutation(
         id="M41", side="be", path=SLICE, kind="replace",
-        scope=TK(6), offset=OFF_TK_ORPHAN_VERDICT[6],
+        #: 🔴 靶子从 TK-6 迁到 TK-7：2026-09-14（tb-writeback Task 17 批C）把 TK-6 的 orphan 载体
+        #: `useJ2FormData.ts` 作为孤儿链 TB 回写死代码**物理删除**，TK-6 的 orphan_carrier_* 登记
+        #: 随之移除（只留 orphan_carrier_removed_note）⇒ 全文仅 TK-7 还有这条裁决，也正是守卫现在
+        #: 唯一会遍历到的那条（`checked == 1` 精确等值）。原 `scope=TK(6), offset=51` 指向的字段已
+        #: 不存在 —— 这不是行号漂移而是结构变更，必须换靶而不是改偏移。
         anchor='        "orphan_carrier_verdict": "FABRICATED_KEY_SHAPE_NEVER_WRITTEN_IN_PRODUCTION",',
         new='        "orphan_carrier_verdict": "REAL_KEY_SHAPE",',
         want=f"{_TK}::test_tk6_orphan_carrier_key_shape_never_appears_in_production",
-        why="🔴 把 orphan 载体的伪造键形态裁决改掉仍绿 ⇒ 「`J2-${key}` 从未在生产写过」这条"
+        why="🔴 把 orphan 载体的伪造键形态裁决改掉仍绿 ⇒ 「`J3-${key}` 从未在生产写过」这条"
             "（Task 52 正文要「解清」的核心结论）是自述而非实证",
         scope_check=_by_id(
-            "transport_key_resolution.declarations", "TK-6",
+            "transport_key_resolution.declarations", "TK-7",
             "orphan_carrier_verdict", "REAL_KEY_SHAPE",
         ),
         tags=("transport-key", "orphan", "data"),
@@ -1079,15 +1083,21 @@ MUTATIONS: list[Mutation] = [
         tags=("property-28", "data"),
     ),
     Mutation(
+        #: 🔴 平台行为演进（commit 82f58ea44 / D4-IPO）：程序表码 `J{n}A` 无独立 render schema ⇒
+        #: `find_template_file` 回落到主码 `J{n}` 工作簿，J2A 的权威值已从 null 变为主册文件名。
+        #: 变异方向**反转**：把它改回旧的 null 快照 —— 守卫必须咬住这种「退回过时冻结值」的回归，
+        #: 否则回落行为哪天被改坏也不会有人知道。
         id="M58", side="be", path=SLICE, kind="replace",
-        anchor='      { "wp_code": "J2A", "resolved": null, "resolved_any": null },',
-        new='      { "wp_code": "J2A", "resolved": "J2 长期应付职工薪酬-设定受益计划净资产.xlsx", "resolved_any": null },',
-        want=f"{_P28}::test_program_table_and_j0_codes_resolve_to_none",
+        anchor='      { "wp_code": "J2A", "resolved": "J2 长期应付职工薪酬-设定受益计划净资产.xlsx",'
+               ' "resolved_any": "J2 长期应付职工薪酬-设定受益计划净资产.xlsx" },',
+        new='      { "wp_code": "J2A", "resolved": null, "resolved_any": null },',
+        want=f"{_P28}::test_program_table_codes_fall_back_to_main_workbook_but_j0_resolves_to_none",
         wants=(f"{_P28}::test_template_resolution_audit_recomputes",),
-        why="把程序表码 J2A 的「两个函数都返回 None」改成有解仍绿 ⇒ 那组否定式判据没跑，"
-            "而它与 J0（册不存在）是两种不同理由的 None，必须都真跑",
+        why="把程序表码 J2A 的回落目标改回旧的 null 快照 ⇒ ①逐码回落断言打红 ②「返回 None 的码"
+            "集合恰为 {J0}」打红（J2A 会混进来）③现跑 `find_template_file` 的重算审计打红。"
+            "三条一起证明：回落行为与 J0 的 None 是两种不同理由，都必须真跑而不是抄冻结值。",
         scope_check=lambda data: any(
-            row["wp_code"] == "J2A" and row["resolved"] is not None
+            row["wp_code"] == "J2A" and row["resolved"] is None
             for row in json.loads(data.decode("utf-8"))["template_resolution_audit"]["measured"]
         ),
         tags=("property-28", "data"),

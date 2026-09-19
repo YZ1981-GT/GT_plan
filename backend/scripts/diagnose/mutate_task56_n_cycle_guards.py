@@ -342,7 +342,9 @@ MUTATIONS: list[Mutation] = [
         id="M11", side="be", path=SLICE, kind="replace",
         anchor='  "capability_verdict_pending": 5,',
         new='  "capability_verdict_pending": 0,',
-        line=2677,
+        #: 🔴 去掉 line= —— spec 明确「line 仅当 anchor 多处命中时用于消歧」。该锚点全文唯一，
+        #: 写死绝对行号只会让 slice 上方增删行时产生**假 MISS**（敏感性证明静默失效）。
+
         want=f"{_P69}::test_summary_counters_recompute_from_the_entries",
         why="summary 与明细脱节（SR-2 同形）。",
         scope_check=doc_path_is(("honest_adjudication_summary", "capability_verdict_pending"), 0),
@@ -351,7 +353,8 @@ MUTATIONS: list[Mutation] = [
         id="M12", side="be", path=SLICE, kind="replace",
         anchor='  "authoritative_formula_cells_total": 2185,',
         new='  "authoritative_formula_cells_total": 2186,',
-        line=2689,
+        #: 🔴 同 M11：锚点全文唯一，绝对行号是假 MISS 的来源。
+
         want=f"{_P69}::test_template_counters_recompute",
         why="公式格总数改 1 ⇒ openpyxl 现算不符。这条同时证明公式扫描是真跑而不是抄数。",
         scope_check=doc_path_is(
@@ -404,16 +407,20 @@ MUTATIONS: list[Mutation] = [
     ),
     Mutation(
         id="M17", side="be", path=SLICE, kind="replace",
-        anchor='  "pairwise_recipe": "配对数 = C(len(slices), 2)。本轮 slice 数 11 ⇒ '
-               '55 对。\U0001f534 守卫必须**现算** `len(slices) * (len(slices) - 1) // 2` '
-               '并与实际比较的对数相等，不得写死 55 —— 下一轮（Task 57 的 A/B/C/S）会再变。",',
+        #: 🔴 Task 57 落盘 abcs slice 后，本行的**事实陈述**已随 slice 数 11 → 12、对数 55 → 66
+        #: 更新（判据强度未动）。锚点必须跟着真文本走，否则 MISS。
+        anchor='  "pairwise_recipe": "配对数 = C(len(slices), 2)。本轮 slice 数 12 ⇒ '
+               '66 对。\U0001f534 守卫必须**现算** `len(slices) * (len(slices) - 1) // 2` '
+               '并与实际比较的对数相等，不得写死 66 —— 上一版写「11 ⇒ 55，下一轮（Task 57 的 '
+               'A/B/C/S）会再变」，Task 57 已落盘 `workpaper_sync_abcs_cycle_manifest_slice.json`'
+               '（46 条 entry），故此处的**事实陈述**随之更新；判据强度（现算而非写死）一字未动。",',
         new='  "pairwise_recipe": "配对数 = 45 对（写死）。",',
         want=f"{_P70}::test_all_slices_are_pairwise_disjoint",
-        why="🔴 把对数写死成 M 那轮的 45 ⇒ 与现算 `C(11,2)=55` 不符。"
+        why="🔴 把对数写死成 M 那轮的 45 ⇒ 与现算 `C(12,2)=66` 不符。"
             "交付要求明确点名「必须现算不写死」。",
         scope_check=lambda data: (
             "45" in _doc(data)["cross_entry_isolation"]["pairwise_recipe"]
-            and "55" not in _doc(data)["cross_entry_isolation"]["pairwise_recipe"]),
+            and "66" not in _doc(data)["cross_entry_isolation"]["pairwise_recipe"]),
     ),
 
     # ── E 组：真源码变异（证明 impl 现读）───────────────────────────────
@@ -525,7 +532,8 @@ MUTATIONS: list[Mutation] = [
         id="M27", side="be", path=ADJ_N1, kind="replace",
         anchor="    formData.debouncedSave(`${ITEM_PREFIX}-${index}`, {",
         new="    formData.debouncedSave(`${ITEM_PREFIX}-${row.category}`, {",
-        line=429,
+        #: 🔴 去掉 line= —— 前端行号随定稿改动漂移（429 → 420），而该锚点全文唯一。
+
         want=f"{_P23}::test_two_families_and_the_reverse_families_recompute",
         wants=(f"{_P23}::test_identity_counters_recompute",
                f"{_P23}::test_defect_tables_source_refs_carry_the_expected_tokens"),
@@ -579,7 +587,9 @@ MUTATIONS: list[Mutation] = [
         id="M32", side="be", path=PLAN, kind="replace",
         anchor='   "switch_verdict": "inert",',
         new='   "switch_verdict": "redeemable",',
-        line=486,
+        #: 🔴 锚点有 2 处命中（N4 / N5 两个 inert entry），改用 **scope 相对定位**而非绝对行号：
+        #: entry_id 是块的语义标识，上方任意增删行都不影响它（绝对行号会被 486 → 487 这类漂移打断）。
+        scope='   "entry_id": "xlsx/gt-n4-taxes-and-surcharges",', offset=17,
         want=f"{_DEL}::test_plan_entries_mirror_the_slice_adjudication",
         why="plan 与 slice 的开关结论脱节 ⇒ 两份产物必须同口径。",
         scope_check=lambda data: [
@@ -620,7 +630,9 @@ MUTATIONS: list[Mutation] = [
         id="M36", side="be", path=SLICE, kind="replace",
         anchor='     "kind": "generated_opaque_persisted",',
         new='     "kind": "array_index",',
-        line=2173,
+        #: 🔴 锚点有 2 处命中（n3_detail_rows / 另一张干净表），改用 scope 相对定位：
+        #: persistence_key 全文唯一且是该表的业务标识，比绝对行号（2173 → 2174 已漂）稳。
+        scope='    "persistence_key": "N3-2-rows",', offset=3,
         want=f"{_P23}::test_every_table_verdict_follows_from_its_kind",
         wants=(f"{_CONTRACT}::test_every_scanned_slice_passes_the_schema",
                f"{_COVERAGE}::test_every_slice_passes_the_json_nominated_validator"),

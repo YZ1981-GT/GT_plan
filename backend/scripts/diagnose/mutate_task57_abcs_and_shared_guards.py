@@ -77,6 +77,13 @@ FE = "audit-platform/frontend/src"
 WP = f"{FE}/components/workpaper"
 CO = f"{WP}/composables"
 REGISTRY_TS = f"{WP}/htmlRendererRegistry.ts"
+#: 🔴 commit 82f58ea44 把 htmlRendererRegistry.ts 的集中式注册拆分到 registry/entries/*.ts
+#: 子模块。componentType 字面量与 component import 现在落在这些子文件里 —— 真源码变异必须
+#: 打在**真实落点**上，否则锚点 MISS、对应守卫的敏感性证明失效（M14/M15/M26 因此迁移）。
+REGISTRY_ENTRIES = f"{WP}/registry/entries"
+REGISTRY_PROGRAMS = f"{REGISTRY_ENTRIES}/programs.ts"
+REGISTRY_FORMS = f"{REGISTRY_ENTRIES}/forms.ts"
+REGISTRY_CONFIRMATIONS = f"{REGISTRY_ENTRIES}/confirmations.ts"
 OVERRIDES = "backend/app/data/wp_code_overrides.json"
 HOST_A101 = f"{WP}/GtA101GovernanceCommunication.vue"
 A101_PERSIST = f"{CO}/useA101GovernanceCommunication.ts"
@@ -297,12 +304,12 @@ MUTATIONS: list[Mutation] = [
     ),
     Mutation(
         id="M04", side="be", path=SLICE, kind="replace",
-        anchor='  "global_parent_duplicate_count": 43,',
-        new='  "global_parent_duplicate_count": 42,',
+        anchor='  "global_parent_duplicate_count": 33,',
+        new='  "global_parent_duplicate_count": 32,',
         want=f"{_SCOPE}::test_parent_duplicate_section_is_absent_because_in_scope_count_is_zero",
-        why="AC 1.6 原文写「43 个父组件重复入口」；改成 42 ⇒ 与 manifest 现算不符。"
-            "这条同时守住「in-scope 为 0 不等于全局为 0」这个区分。",
-        scope_check=doc_path_is(("slice_scope", "global_parent_duplicate_count"), 42),
+        why="AC 1.6 原文写「43 个父组件重复入口」，随 L/M/N 前端重构现算为 33；改成 32 ⇒ 与 manifest "
+            "现算不符。这条同时守住「in-scope 为 0 不等于全局为 0」这个区分。",
+        scope_check=doc_path_is(("slice_scope", "global_parent_duplicate_count"), 32),
     ),
     Mutation(
         id="M05", side="be", path=SLICE, kind="insert",
@@ -411,7 +418,7 @@ MUTATIONS: list[Mutation] = [
 
     # ── C 组：真源码变异 —— 分组键第一维（registry 模块边）───────────────
     Mutation(
-        id="M14", side="be", path=REGISTRY_TS, kind="replace",
+        id="M14", side="be", path=REGISTRY_PROGRAMS, kind="replace",
         anchor="    componentType: 'a10-1-governance-communication',",
         new="    componentType: 'a10-1-governance-communication-renamed',",
         want=f"{_GRP}::test_component_type_is_read_from_the_registry_module_edge",
@@ -421,15 +428,17 @@ MUTATIONS: list[Mutation] = [
         scope_check=source_has_line("componentType: 'a10-1-governance-communication-renamed',"),
     ),
     Mutation(
-        id="M15", side="be", path=REGISTRY_TS, kind="replace",
-        anchor="const GtB50RiskAssessment = defineAsyncComponent(() => import('./GtB50RiskAssessment.vue'))",
-        new="const GtB50RiskAssessment = defineAsyncComponent(() => import('./GtB22AControlMatrix.vue'))",
+        id="M15", side="be", path=REGISTRY_FORMS, kind="replace",
+        anchor="const GtDForm = defineAsyncComponent(() => import('../../GtDForm/GtDForm.vue'))",
+        new="const GtDForm = defineAsyncComponent(() => import('../../GtB50RiskAssessment.vue'))",
         want=f"{_GRP}::test_component_type_is_read_from_the_registry_module_edge",
         why="🔴 把提升式 `const` 的 import 指到另一个组件 ⇒ 模块边改变。"
             "这条专门证明「两种 `component:` 写法都要认」不是空话：只认内联写法的解析器"
-            "在这条上会 GREEN。",
+            "在这条上会 GREEN。"
+            "🔴 拆分（82f58ea44）后 B50 已改为内联写法，全仓**唯一**残存的提升式 `const` 是 "
+            "forms.ts 的 GtDForm —— 变异必须跟到这里，否则 `hoisted > 0` 的断言就失去变异保护。",
         scope_check=source_has_line(
-            "const GtB50RiskAssessment = defineAsyncComponent(() => import('./GtB22AControlMatrix.vue'))"),
+            "const GtDForm = defineAsyncComponent(() => import('../../GtB50RiskAssessment.vue'))"),
     ),
 
     # ── D 组：真源码变异 —— 分组键第二维（持久化通道）────────────────────
@@ -552,7 +561,7 @@ MUTATIONS: list[Mutation] = [
             "import { useWorkpaperEntryDualMode } from './composables/useWorkpaperEntryDualMode'"),
     ),
     Mutation(
-        id="M26", side="be", path=REGISTRY_TS, kind="replace",
+        id="M26", side="be", path=REGISTRY_CONFIRMATIONS, kind="replace",
         anchor="    componentType: 'confirmation-summary',",
         new="    componentType: 'confirmation-summary-x',",
         want=f"{_AC16}::test_component_types_and_workbooks_recompute",
