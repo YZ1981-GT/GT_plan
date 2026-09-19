@@ -310,3 +310,42 @@ def test_checkbox_columns_enumerated_and_boolean() -> None:
 def test_all_mapping_digests_match_frozen_values() -> None:
     """四张表的 mapping_digest 与冻结值一致（改列字母/列序/表头即红）。"""
     CK.assert_all_checklist_mapping_digests()
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# 超模板占位行数：last_data_row 不是运行时截断点（Task C 语义澄清的运行时证据）
+#
+# 源模板每张表只有固定占位行（D4-25 = 12..21 共 10 行）。用户担心「插到第 11 行会不会
+# 被吞 / 顶掉结论区」。store↔projection 层不涉及 xlsx 行几何（footer 下移是 materialize
+# 层的事），但它必须先做到「行数超占位也不截断、行身份不丢」—— 否则第 11 行起的数据在
+# 进入 materialize 之前就没了。本组把这条钉死：给远超 last_data_row 占位数的行集，
+# 投影行数必须精确等于输入行数，且每行身份可回读。
+# ═══════════════════════════════════════════════════════════════════════════
+
+
+@pytest.mark.parametrize("code", CK.CHECKLIST_SHEET_CODES)
+def test_rows_beyond_template_placeholder_are_not_truncated(code: str, contract: Any) -> None:
+    """行数远超模板占位（last_data_row-first_data_row+1）时，投影/merge 都不得截断。"""
+    s = CK._SHEETS[code]
+    placeholder_rows = s["last_data_row"] - s["first_data_row"] + 1
+    n = placeholder_rows + 5  # 蓄意超占位 5 行（如 D4-25 15 行 > 10 占位）
+    name_path = _json_paths(code)[1]
+    payload = [_row(code, f"row-{i}", **{name_path: f"客户{i}"}) for i in range(n)]
+
+    proj = CK.build_store_projection(code, payload, contract=contract)
+    table_key = s["table_key"]
+    assert len(proj.row_keys[table_key]) == n, (
+        f"{code}: 投影行数 {len(proj.row_keys[table_key])} != 输入 {n} "
+        f"—— last_data_row({s['last_data_row']}) 被误当截断点了"
+    )
+
+    merged, _a, _v, _t = CK.merge_projection_into_rows(
+        code, projection=proj, base_rows=[{"rowId": f"row-{i}"} for i in range(n)]
+    )
+    assert len(merged) == n, f"{code}: merge 后行数 {len(merged)} != {n}"
+    by_id = {r["rowId"]: r for r in merged}
+    # 抽查超占位的那 5 行（下标 >= placeholder_rows）身份与值都在
+    for i in range(placeholder_rows, n):
+        assert by_id[f"row-{i}"][name_path] == f"客户{i}", (
+            f"{code}: 超占位第 {i} 行（模板只有 {placeholder_rows} 占位）丢失/串行"
+        )

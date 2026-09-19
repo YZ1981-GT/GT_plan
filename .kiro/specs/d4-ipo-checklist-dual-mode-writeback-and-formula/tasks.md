@@ -344,7 +344,10 @@ D4-25 **13** 列 / D4-26 **19** 列（14 主 + 5 二级）/ D4-27 **18** 列 / D
     - 竞态下 materialize 500 经查为后端**正确的幂等守卫**（`pending_mutation_payload_mismatch`），非缺陷。
   - **🔴 待补（本轮未实测）**：① 完整数据 roundtrip（OO 改单元格→保存→切回表格视图值一致 / 表格改→切 OO 有值）；
     ② D4-27 勾身份列→总计→手填锁定→清空解锁；③ 占比分母 0 留空的浏览器实测；④ 导入导出→表格视图立即显示导入行；
-    ⑤ fail-visible（断开 OO 显失败原因）；⑥ 冲突确认框不静默覆盖；⑦ 只读禁写。
+    ⑤ fail-visible（断开 OO 显失败原因）；⑥ 冲突确认框不静默覆盖；⑦ 只读禁写；
+    ⑧ **动态插行不顶掉结论区**（行数超模板占位 last_data_row 时，真 xlsx materialize 把 footer「三、审计说明：」
+    整体下移、不覆盖 —— store 层「超占位不截断」已由 `test_d4_ipo_checklist_store_roundtrip.py::
+    test_rows_beyond_template_placeholder_are_not_truncated` 坐实，但真 OOXML 行几何的 footer 下移仍需浏览器/materialize 实测）。
   - 🔴 判「能力接没接」落到唯一消费方 + 有渲染宿主，不只 grep 符号名。
   - **现状**：无固化 e2e 脚本文件；定位/竞态/双切换器由本会话 Playwright MCP 手动走查 + 截图证据实测通过，
     数据 roundtrip 等 7 项待补实测。
@@ -414,6 +417,9 @@ D4-25 **13** 列 / D4-26 **19** 列（14 主 + 5 二级）/ D4-27 **18** 列 / D
   - **🔴 待补**：逐张四表**完整 HTML→OO→HTML 数据 roundtrip**（改值→保存→回读一致）、公式编辑重开、导出、
     跨项目隔离——本轮聚焦定位与竞态修复，未跑数据往返闭环。代码层已就位（Task 10-14 全绿守卫），governance C4
     要求的真实 roundtrip 数据一致性未测前该项保持部分未验证。
+  - **🟢 行定位专项已加固（2026-09-19 复核）**：四表 header/first/last/footer/uuid_col 经 openpyxl 直读源模板
+    + 真 instrumented workbook 字节级双重实测全部正确（用户直觉担心的 D4-25「最下面行次」= last=21/footer=23、
+    D4-26「首行」= first=13 均属实无误）；新增 footer 源模板守卫 + store 层「超占位不截断」守卫（详见下方复盘小节）。
   - Validates: Requirements 2.10, 4.6, 5.8
 
 ### Governance Properties
@@ -477,3 +483,35 @@ activeTab 双重实证；竞态无假失败/双切换器）；但**完整数据 
 
 **改进建议**：四组件 `window.dispatchEvent('d4:save-items')` 保存路径可评估收敛到统一 save 编排器
 （当前每组件各自 dispatch，宿主统一监听，功能正确但分散）。
+
+## 行定位专项复核（2026-09-19，用户质疑 D4-25/D4-26 行次触发）
+
+**起因**：用户读三件套时凭直觉怀疑「D4-25 双向回写最下面行次不对、D4-26 首行不对」。
+
+**核查结论：生产代码行定位全部正确，无 bug**。openpyxl 直读源模板 + 真 instrumented workbook 字节级双重实测：
+
+| sheet | header_rows | first | last | footer(A列「三、审计说明：」) | uuid_col | 判定 |
+|---|---|---|---|---|---|---|
+| D4-25 | 11 | 12 | 21 | 23 | N | ✅ 首行末行都对 |
+| D4-26 | 11,12 | 13 | 22 | 30 | T | ✅ 首行对（两级表头故 13 起）|
+| D4-27 | 14 | 15 | 24 | 27 | S | ✅ |
+| D4-28 | 12,13 | 14 | 24 | 25 | P | ✅ |
+
+用户「不对」的真实来源是 **spec 文档与生产代码脱节**：design.md 原描述的是已删死函数 `rowsToSheet/sheetToRows`
+的 `dataStartRow` 单值口径，且缺 `last_data_row`/`footer_row` 两个决定「最下面行次」的边界。据此做了四项加固：
+
+- **B（守卫加固）**：`test_ipo_checklist_column_contract.py` 追加 footer 源模板守卫
+  `test_provider_footer_row_points_to_marker_in_source_template`（4 表参数化）+ `test_selfcheck_footer_guard_is_load_bearing`
+  反向自检——从 provider `_SHEETS` 读 footer_row，openpyxl 直读源模板 `A{footer_row}` 必须 == 「三、审计说明：」。
+  历史「D4-26 footer 误抄成 23」这类行号错抄从「靠人肉注释提醒」升级为「改一字即红」（实证：误抄 23 时 A23=None）。
+  18 passed（原 13 + 新 5）。
+- **A（文档对齐）**：design.md 补行锚点权威表（4 表 header/first/last/footer/uuid_col），注明真源 =
+  `phase5_d4_ipo_checklist_sheets.py._SHEETS` 随 mapping_digest 冻结；投影规则两处引用改用 first/footer 边界。
+- **C（语义澄清）**：design.md 新增「行定位与溢出保护」小节 + 后端 provider `footer_anchor.note` 同步 ——
+  明确 `last_data_row` 仅模板占位基线、**非运行时写入截断点**，运行时硬上限是 `_ROW_LIMIT`(500)，超占位插行下移 footer。
+- **D（实测缺口）**：store 层「超占位行不截断」已由 `test_d4_ipo_checklist_store_roundtrip.py::
+  test_rows_beyond_template_placeholder_are_not_truncated`（4 表参数化，40 passed）坐实；真 OOXML 行几何的
+  footer 下移仍需浏览器/materialize 实测（已补进 Task 19 待补第 ⑧ 项）。
+
+**方法论教训**：spec 文档若沿用已删死代码的口径描述运行时行为，会让 review 者对正确的生产代码产生误判 ——
+文档行锚点必须以生产 provider 为单一真源并随其冻结，且「决定边界的字段」（下边界 footer）不能只写「首行」。

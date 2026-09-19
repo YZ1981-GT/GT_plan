@@ -25,6 +25,12 @@ spec: d4-ipo-checklist-dual-mode-writeback-and-formula · 后端 store-projectio
 
 行身份 = `rowId`（前端 ChecklistRow 的稳定 key，禁下标兜底）。json_path = 前端列 key（camelCase）。
 
+🔴 **`LAST_DATA_ROW_*` 语义**：仅记源模板出厂时的**占位末行**（如 D4-25=21，共 12..21 十行占位），
+用于 `mapping_digest` 冻结与守卫复算，**不是运行时写入截断点**。四张表是动态行，真实行数超占位时
+instrumentation 插行并把 `FOOTER_ROW_*` 结论区整体下移；运行时唯一硬上限是 `_ROW_LIMIT`(500)。
+把 `last_data_row` 误当截断点会吞掉第 11 行起的数据 —— store 层「超占位不截断」由
+`tests/workpaper_sync/test_d4_ipo_checklist_store_roundtrip.py::test_rows_beyond_template_placeholder_are_not_truncated` 守护。
+
 四张表的 mapping_digest 冻结于本模块（`gen` 由 `_digest(mapping_digest_payload_*)` 现算）。
 """
 

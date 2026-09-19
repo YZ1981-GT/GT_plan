@@ -320,3 +320,66 @@ def test_selfcheck_reverse_wrong_label_must_fail():
     )
     # 反向：一个错误期望必须能被这条断言否定
     assert xlsx[8] != "个人·企业", "spec prose 的 个人·企业 是错的，源模板是 个人/企业"
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# footer 行号源模板守卫（Task B，2026-09-19）
+# ═══════════════════════════════════════════════════════════════════════════
+# 背景：D4-26 曾把 footer_row 误抄成 23（那是 D4-25 的行号），靠人肉注释「非 23；23
+# 是误抄 D4-25 行号」提醒。注释拦不住复发 —— 把它升级成机器守卫：后端 provider 声明的
+# 每张表 footer_row，openpyxl 直读源模板 `A{footer_row}` 归一后必须 == 该表 footer_marker
+# 「三、审计说明：」。任一表把 footer 行号抄错（指到空行 / 指到别表行号 / 差一行），
+# 直读的单元格文本就对不上 marker，立即打红。
+#
+# 真源 = phase5_d4_ipo_checklist_sheets._SHEETS（生产 store-projection provider，与
+# mapping_digest 一同冻结）。本守卫是「行号 ↔ 源模板文本」的第五边，补齐列结构三向守卫
+# 只管表头行、不管下边界（结论区起点）的盲区。
+
+
+def _provider_footer_meta() -> dict[str, tuple[int, str]]:
+    """从后端 provider 读每张表的 (footer_row, footer_marker)。"""
+    from app.services.workpaper_sync.phase5_d4_ipo_checklist_sheets import _SHEETS
+
+    return {
+        code: (s["footer_row"], s["footer_marker"]) for code, s in _SHEETS.items()
+    }
+
+
+def _read_xlsx_cell_a(sheet_code: str, row: int) -> str:
+    """openpyxl 直读源模板某表 A 列指定行的文本（strip 后原样，不做 label 归一）。"""
+    meta = _SHEET_META[sheet_code]
+    wb = openpyxl.load_workbook(_TEMPLATE, data_only=False)
+    try:
+        ws = wb[meta["sheet_name"]]
+        v = ws.cell(row, 1).value
+        return "" if v is None else str(v).strip()
+    finally:
+        wb.close()
+
+
+@pytest.mark.parametrize("sheet_code", ["D4-25", "D4-26", "D4-27", "D4-28"])
+def test_provider_footer_row_points_to_marker_in_source_template(sheet_code: str):
+    """后端 provider 的 footer_row 必须精确指向源模板的「三、审计说明：」结论区首行。
+
+    这条守卫钉死「最下面行次」：受管数据区下边界 = footer_row，写超它会顶掉结论区。
+    """
+    footer_row, footer_marker = _provider_footer_meta()[sheet_code]
+    cell_text = _read_xlsx_cell_a(sheet_code, footer_row)
+    assert cell_text == footer_marker, (
+        f"{sheet_code} provider footer_row={footer_row} 指向的源模板 "
+        f"A{footer_row}={cell_text!r}，与 footer_marker={footer_marker!r} 不符 —— "
+        f"行号抄错（如误抄别表行号 / 差一行 / 指到空行），下边界失守会顶掉结论区"
+    )
+
+
+def test_selfcheck_footer_guard_is_load_bearing():
+    """反向自检：把 footer_row 故意错拨一行，直读文本必须对不上 marker（证明守卫非恒真）。
+
+    D4-25 footer 在 A23；A22 是空行、A24 是审计目标正文 —— 拨到任一相邻行都不该等于 marker。
+    """
+    _, marker = _provider_footer_meta()["D4-25"]
+    # 正确行成立
+    assert _read_xlsx_cell_a("D4-25", 23) == marker
+    # 错拨 ±1 必不成立（否则守卫退化成「任意行都过」的恒真）
+    assert _read_xlsx_cell_a("D4-25", 22) != marker, "A22 应为空行，若等于 marker 则守卫失效"
+    assert _read_xlsx_cell_a("D4-25", 24) != marker, "A24 应为正文，若等于 marker 则守卫失效"

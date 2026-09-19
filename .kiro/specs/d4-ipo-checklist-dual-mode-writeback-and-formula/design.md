@@ -81,11 +81,29 @@ export interface ChecklistSheetSpec {
   sheetCode: 'D4-25' | 'D4-26' | 'D4-27' | 'D4-28'
   sheetName: string          // 源 xlsx tab 全名（OO sheet-name 用）
   headerRows: number[]       // [11] | [11,12] | [14] | [12,13]
-  dataStartRow: number       // 数据区首行
+  dataStartRow: number       // 数据区首行（= 下方权威表 first；前端展示用，运行时行定位以后端 provider 为准）
   noteAnchor?: string        // 结论/审计说明区锚点单元格
   columns: readonly ChecklistColumnSpec[]
 }
 ```
+
+🔴 **双向回写的运行时行定位真源不是前端 `ChecklistSheetSpec`，而是后端 store-projection provider**
+`backend/app/services/workpaper_sync/phase5_d4_ipo_checklist_sheets.py` 的 `_SHEETS`（历史上前端
+`rowsToSheet`/`sheetToRows` 是死代码已删，见 tasks.md Task 2 复盘）。行定位由四个锚点共同决定，
+不是 `dataStartRow` 单值 —— 尤其「最下面行次」由 `last_data_row`（模板占位末行）与 `footer_row`
+（结论区首行，受管区硬下边界）钉死。四张表的权威行锚点（openpyxl 直读源模板 + 真 instrumented
+workbook 字节级实测，2026-09-19 复核）：
+
+| sheet | header_rows | first_data_row | last_data_row | footer_row（A 列「三、审计说明：」） | uuid_col |
+|---|---|---|---|---|---|
+| D4-25 经销商检查 | 11 | 12 | 21 | 23 | N |
+| D4-26 境外销售收入检查 | 11, 12 | 13 | 22 | 30 | T |
+| D4-27 识别未披露的关联方 | 14 | 15 | 24 | 27 | S |
+| D4-28 客户信息核查清单 | 12, 13 | 14 | 24 | 25 | P |
+
+此表随后端 `_SHEETS` 的 `mapping_digest` 一同冻结；`footer_row` 另有源模板守卫钉死
+（`test_ipo_checklist_column_contract.py::test_provider_footer_row_points_to_marker_in_source_template`，
+行号误抄 / 差一行即红）。D4-26 的 `footer_row=30`（不是 23 —— 23 是 D4-25 的行号，曾被误抄过一次）。
 
 四张表列规格（实测自源模板，真源 `backend/wp_templates/D/…IPO…xlsx`）：
 
@@ -116,7 +134,8 @@ export interface ChecklistSheetSpec {
 
 ### OO → rows 投影规则（Property 6/7/8）
 
-1. 只读 `dataStartRow` 之后的行（表头行与编制说明区一律跳过）。
+1. 只读 `first_data_row` 至 `footer_row` 之间的受管数据区（表头行、编制说明区、结论区一律跳过）；
+   下边界 = `footer_row`（上表），越过它就是「三、审计说明：」结论区，禁止读入。
 **不适用固定列号**：投影按稳定 `columnKey` 与完整 `groupPath` 建立映射，并校验表头结构；禁止按列号或 label 猜测，重复表头必须以分组路径区分。
 3. 跳过 `seqColumn`；跳过「全空行」（所有非序号列的值均为空）→ **不产生幽灵空行**（Property 8）。
 4. `checkbox` 列：`1` / `true` / `Y` / `是` / 勾选 → `true`，其余 → `false`（D4-27 源模板示例值就是 `1`）。
@@ -125,10 +144,27 @@ export interface ChecklistSheetSpec {
 
 ### rows → OO 投影规则
 
-1. 行按 `seq` 升序写入 `dataStartRow` 起的数据区。
+1. 行按 `seq` 升序从 `first_data_row` 起写入数据区；行数超过模板占位（`last_data_row - first_data_row + 1`）
+   时**插行下移** `footer_row` 结论区（不覆盖），运行时硬上限是 `_ROW_LIMIT`(500) 而非 `last_data_row`
+   （见「行定位与溢出保护」）。
 2. `checkbox` → `1`（与源模板口径一致）；`null`/`undefined` → 空单元格（**不写 `''` 占位文本**）。
 3. `amount` 列写数值不写格式化字符串（`fmtAmount` 只用于显示）。
 4. **保留表头行与父组合并**：写入数据区不改 `headerRows` 行，也不拆 `O11:S11` / `J12:N12`。
+
+### 行定位与溢出保护（`last_data_row` 语义澄清）
+
+四张表是**动态行**（用户按需新增，非固定 10 行）。行锚点的三个数字语义不同，别混用：
+
+| 锚点 | 语义 | 用途 |
+|---|---|---|
+| `first_data_row` | 受管数据区**首行**（源模板第一条占位行） | 写入起点、UUID 首行 |
+| `last_data_row` | 源模板**占位末行**（D4-25 是 21，共 10 行占位） | **仅模板初始形态基线**，不是运行时写入截断点 |
+| `footer_row` | 结论区首行（A 列「三、审计说明：」） | 受管区下边界；行数超占位时**插行下移**它，不覆盖 |
+
+🔴 **`last_data_row` 不是运行时上限**：真实行数 > 模板占位（`last_data_row - first_data_row + 1`）时，
+instrumentation 会插行并把 `footer_row` 结论区整体下移，`last_data_row` 只记录模板出厂时的占位末行、
+用于 `mapping_digest` 冻结与守卫复算。运行时唯一硬上限是 `_ROW_LIMIT`(500)（后端 `limits`），超限停止
+投影并提示。把 `last_data_row` 误当写入截断点会导致第 11 行起的数据被吞 —— 这是本 spec 明令禁止的读法。
 
 ### 冲突裁决（Property 10，AC 2.5）
 
