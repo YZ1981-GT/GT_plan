@@ -230,6 +230,18 @@ export function useD4RelatedPrice(options: UseD4BaseOptions) {
     } catch { /* silent */ }
   }
 
+  // 立即 flush 防抖中的落库（双向回写 flushHtml 用：先落库再 readStoreProjection）。
+  // 与 useD4CompletenessCheck.flushPendingSave 同构：清定时器 + 立即派发 d4:save-items。
+  function flushPendingSave(): void {
+    if (debounceTimer) { clearTimeout(debounceTimer); debounceTimer = null }
+    flushSave()
+  }
+
+  // 双向回写 reloadHtml 用：从 allResponses 重读 store 行（切回 HTML 后刷新）。
+  function reload(): void {
+    loadRows()
+  }
+
   onBeforeUnmount(() => {
     if (debounceTimer) {
       clearTimeout(debounceTimer)
@@ -248,6 +260,8 @@ export function useD4RelatedPrice(options: UseD4BaseOptions) {
     addRow,
     removeRow,
     updateCell,
+    flushPendingSave,
+    reload,
   }
 }
 

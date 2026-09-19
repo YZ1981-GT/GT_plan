@@ -397,8 +397,14 @@ const isD4DetailSheet = computed(() => currentSheet.value != null && currentShee
 //    子组件自管 sync bridge（sheetKey=d41-managed，同 entry gt-d4-operating-revenue），
 //    必须登记为 dedicated —— 否则宿主对它叠加 legacy 双切换器（点到宿主那个走整册
 //    GtOnlyOfficeSheet「两侧数据未互通」），真正的双向同步桥被埋在下面。
+//    D4-21/22/23/24（关联方/IPO 检查表，d4-21-24 spec）后端契约 d421~d424-managed 早已就绪，
+//    但前端此前仍是 legacy GtOnlyOfficeSheet（inventory 记的「半接入」）。批次A 迁到子组件自管
+//    sync bridge，必须一并登记为 dedicated。
+//    D4-9（重要客户结构分析，d4-9-customer-structure-bidirectional-writeback）改造为子组件
+//    自管 sync bridge（独立 entry xlsx/gt-d4-customer-structure，sheetKey=d49-managed），
+//    必须登记为 dedicated —— 否则宿主对它叠加 legacy 双切换器 + 走整册 GtOnlyOfficeSheet。
 const isD4DedicatedSyncSheet = computed(() =>
-  ['D4-1', 'D4-5', 'D4-15', 'D4-16', 'D4-25', 'D4-26', 'D4-27', 'D4-28', 'D4-29', 'D4-30', 'D4-31', 'D4-32', 'D4-35'].includes(
+  ['D4-1', 'D4-5', 'D4-9', 'D4-15', 'D4-16', 'D4-21', 'D4-22', 'D4-23', 'D4-24', 'D4-25', 'D4-26', 'D4-27', 'D4-28', 'D4-29', 'D4-30', 'D4-31', 'D4-32', 'D4-35'].includes(
     currentSheet.value || '',
   ),
 )

@@ -7,7 +7,7 @@
     "excel_table",
     "hidden_uuid_column"
   ],
-  "instrumentation_definition_sha256": "31f1f3ddebf6ea32ad48835236701777986349db8e421d43a2339268aae9f0e9",
+  "instrumentation_definition_sha256": "dd1a428bfc11978b449d325f587ea5b5c42df86ffa8b8d41aea92e3f0af14080",
   "review": {
     "authority_root": "backend/wp_templates",
     "entry_id": "xlsx/gt-d4-operating-revenue",
@@ -77,14 +77,14 @@
         {
           "item_id": "D4-1-rows",
           "note": "D4-1 主营段动态行（section main-revenue，R8 起，UUID 列 W）；单个 store D4-1-rows 按 sectionKey 分流两区，label + 6 金额受管；E/I 审定数 + 小计/合计/差异(12/18/19/21) 入 formula_mask 不回写。",
-          "row_identity_key": "rowKey",
+          "row_identity_key": "rowId",
           "sheet_key": "d41-managed",
           "table_key": "adjudication_main_rows"
         },
         {
           "item_id": "D4-1-rows",
           "note": "D4-1 其他段动态行（section other-revenue，R14 起，UUID 列 X≠主营）；同 store D4-1-rows，两区 rowId 各自唯一不串区（同 D4-9 W/X 思路）。",
-          "row_identity_key": "rowKey",
+          "row_identity_key": "rowId",
           "sheet_key": "d41-managed",
           "table_key": "adjudication_other_rows"
         },
@@ -1930,7 +1930,7 @@
           ],
           "header_rows": 2,
           "row_identity": {
-            "json_pointer": "/rows/*/rowKey",
+            "json_pointer": "/rows/*/rowId",
             "kind": "field"
           },
           "section_key": "main-revenue",
@@ -2087,7 +2087,7 @@
           ],
           "header_rows": 2,
           "row_identity": {
-            "json_pointer": "/rows/*/rowKey",
+            "json_pointer": "/rows/*/rowId",
             "kind": "field"
           },
           "section_key": "other-revenue",
@@ -4017,6 +4017,975 @@
         }
       ],
       "template_id": "D416"
+    },
+    {
+      "excel_name": "客户访谈记录汇总表D4-30",
+      "locator": {
+        "anchor": "excel_table_sheet_association"
+      },
+      "sheet_key": "d4-30-managed",
+      "tables": [
+        {
+          "anchor": "A5",
+          "delete_policy": "tombstone",
+          "fields": [
+            {
+              "cell": {
+                "column": "B",
+                "row_from": "row_identity"
+              },
+              "column_key": "name",
+              "header_source_ref": "源xlsx!客户访谈记录汇总表D4-30!B11",
+              "header_text": "客户名称",
+              "json_pointer": "/rows/{row_uuid}/name",
+              "mode": "editable",
+              "source_ref": "源xlsx!客户访谈记录汇总表D4-30!B6",
+              "stable_field_key": "d4_30_customers/{row_uuid}/name",
+              "store_item_id": "D4-30-customers",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "C",
+                "row_from": "row_identity"
+              },
+              "column_key": "time",
+              "header_source_ref": "源xlsx!客户访谈记录汇总表D4-30!C11",
+              "header_text": "访谈时间",
+              "json_pointer": "/rows/{row_uuid}/fields/time",
+              "mode": "editable",
+              "source_ref": "源xlsx!客户访谈记录汇总表D4-30!C6",
+              "stable_field_key": "d4_30_customers/{row_uuid}/time",
+              "store_item_id": "D4-30-customers",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "D",
+                "row_from": "row_identity"
+              },
+              "column_key": "reason",
+              "header_source_ref": "源xlsx!客户访谈记录汇总表D4-30!D11",
+              "header_text": "访谈原因",
+              "json_pointer": "/rows/{row_uuid}/fields/reason",
+              "mode": "editable",
+              "source_ref": "源xlsx!客户访谈记录汇总表D4-30!D6",
+              "stable_field_key": "d4_30_customers/{row_uuid}/reason",
+              "store_item_id": "D4-30-customers",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "E",
+                "row_from": "row_identity"
+              },
+              "column_key": "method",
+              "header_source_ref": "源xlsx!客户访谈记录汇总表D4-30!E11",
+              "header_text": "访谈方式",
+              "json_pointer": "/rows/{row_uuid}/fields/method",
+              "mode": "editable",
+              "source_ref": "源xlsx!客户访谈记录汇总表D4-30!E6",
+              "stable_field_key": "d4_30_customers/{row_uuid}/method",
+              "store_item_id": "D4-30-customers",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "F",
+                "row_from": "row_identity"
+              },
+              "column_key": "reg_address",
+              "header_source_ref": "源xlsx!客户访谈记录汇总表D4-30!F11",
+              "header_text": "被访谈公司注册地址",
+              "json_pointer": "/rows/{row_uuid}/fields/regAddress",
+              "mode": "editable",
+              "source_ref": "源xlsx!客户访谈记录汇总表D4-30!F6",
+              "stable_field_key": "d4_30_customers/{row_uuid}/reg_address",
+              "store_item_id": "D4-30-customers",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "G",
+                "row_from": "row_identity"
+              },
+              "column_key": "visit_address",
+              "header_source_ref": "源xlsx!客户访谈记录汇总表D4-30!G11",
+              "header_text": "实地走访公司地址",
+              "json_pointer": "/rows/{row_uuid}/fields/visitAddress",
+              "mode": "editable",
+              "source_ref": "源xlsx!客户访谈记录汇总表D4-30!G6",
+              "stable_field_key": "d4_30_customers/{row_uuid}/visit_address",
+              "store_item_id": "D4-30-customers",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "H",
+                "row_from": "row_identity"
+              },
+              "column_key": "interviewee",
+              "header_source_ref": "源xlsx!客户访谈记录汇总表D4-30!H11",
+              "header_text": "接受访谈人员及身份",
+              "json_pointer": "/rows/{row_uuid}/fields/interviewee",
+              "mode": "editable",
+              "source_ref": "源xlsx!客户访谈记录汇总表D4-30!H6",
+              "stable_field_key": "d4_30_customers/{row_uuid}/interviewee",
+              "store_item_id": "D4-30-customers",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "I",
+                "row_from": "row_identity"
+              },
+              "column_key": "auditor",
+              "header_source_ref": "源xlsx!客户访谈记录汇总表D4-30!I11",
+              "header_text": "参与访谈的审计人员",
+              "json_pointer": "/rows/{row_uuid}/fields/auditor",
+              "mode": "editable",
+              "source_ref": "源xlsx!客户访谈记录汇总表D4-30!I6",
+              "stable_field_key": "d4_30_customers/{row_uuid}/auditor",
+              "store_item_id": "D4-30-customers",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "J",
+                "row_from": "row_identity"
+              },
+              "column_key": "others",
+              "header_source_ref": "源xlsx!客户访谈记录汇总表D4-30!J11",
+              "header_text": "参与访谈的其他人员",
+              "json_pointer": "/rows/{row_uuid}/fields/others",
+              "mode": "editable",
+              "source_ref": "源xlsx!客户访谈记录汇总表D4-30!J6",
+              "stable_field_key": "d4_30_customers/{row_uuid}/others",
+              "store_item_id": "D4-30-customers",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "K",
+                "row_from": "row_identity"
+              },
+              "column_key": "travel_info",
+              "header_source_ref": "源xlsx!客户访谈记录汇总表D4-30!K11",
+              "header_text": "访谈人员行程信息",
+              "json_pointer": "/rows/{row_uuid}/fields/travelInfo",
+              "mode": "editable",
+              "source_ref": "源xlsx!客户访谈记录汇总表D4-30!K6",
+              "stable_field_key": "d4_30_customers/{row_uuid}/travel_info",
+              "store_item_id": "D4-30-customers",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "L",
+                "row_from": "row_identity"
+              },
+              "column_key": "on_site_confirm",
+              "header_source_ref": "源xlsx!客户访谈记录汇总表D4-30!L11",
+              "header_text": "是否现场函证",
+              "json_pointer": "/rows/{row_uuid}/fields/onSiteConfirm",
+              "mode": "editable",
+              "source_ref": "源xlsx!客户访谈记录汇总表D4-30!L6",
+              "stable_field_key": "d4_30_customers/{row_uuid}/on_site_confirm",
+              "store_item_id": "D4-30-customers",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "M",
+                "row_from": "row_identity"
+              },
+              "column_key": "key_points",
+              "header_source_ref": "源xlsx!客户访谈记录汇总表D4-30!M11",
+              "header_text": "访谈关注要点",
+              "json_pointer": "/rows/{row_uuid}/fields/keyPoints",
+              "mode": "editable",
+              "source_ref": "源xlsx!客户访谈记录汇总表D4-30!M6",
+              "stable_field_key": "d4_30_customers/{row_uuid}/key_points",
+              "store_item_id": "D4-30-customers",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "N",
+                "row_from": "row_identity"
+              },
+              "column_key": "contract_check",
+              "header_source_ref": "源xlsx!客户访谈记录汇总表D4-30!N11",
+              "header_text": "合同执行核对情况",
+              "json_pointer": "/rows/{row_uuid}/fields/contractCheck",
+              "mode": "editable",
+              "source_ref": "源xlsx!客户访谈记录汇总表D4-30!N6",
+              "stable_field_key": "d4_30_customers/{row_uuid}/contract_check",
+              "store_item_id": "D4-30-customers",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "O",
+                "row_from": "row_identity"
+              },
+              "column_key": "amount_match",
+              "header_source_ref": "源xlsx!客户访谈记录汇总表D4-30!O11",
+              "header_text": "交易金额核对是否一致",
+              "json_pointer": "/rows/{row_uuid}/fields/amountMatch",
+              "mode": "editable",
+              "source_ref": "源xlsx!客户访谈记录汇总表D4-30!O6",
+              "stable_field_key": "d4_30_customers/{row_uuid}/amount_match",
+              "store_item_id": "D4-30-customers",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "P",
+                "row_from": "row_identity"
+              },
+              "column_key": "balance_match",
+              "header_source_ref": "源xlsx!客户访谈记录汇总表D4-30!P11",
+              "header_text": "往来余额核对是否一致",
+              "json_pointer": "/rows/{row_uuid}/fields/balanceMatch",
+              "mode": "editable",
+              "source_ref": "源xlsx!客户访谈记录汇总表D4-30!P6",
+              "stable_field_key": "d4_30_customers/{row_uuid}/balance_match",
+              "store_item_id": "D4-30-customers",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "Q",
+                "row_from": "row_identity"
+              },
+              "column_key": "conclusion",
+              "header_source_ref": "源xlsx!客户访谈记录汇总表D4-30!Q11",
+              "header_text": "访谈结论",
+              "json_pointer": "/rows/{row_uuid}/fields/conclusion",
+              "mode": "editable",
+              "source_ref": "源xlsx!客户访谈记录汇总表D4-30!Q6",
+              "stable_field_key": "d4_30_customers/{row_uuid}/conclusion",
+              "store_item_id": "D4-30-customers",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "R",
+                "row_from": "row_identity"
+              },
+              "column_key": "index_ref",
+              "header_source_ref": "源xlsx!客户访谈记录汇总表D4-30!R11",
+              "header_text": "访谈表索引",
+              "json_pointer": "/rows/{row_uuid}/fields/indexRef",
+              "mode": "editable",
+              "source_ref": "源xlsx!客户访谈记录汇总表D4-30!R6",
+              "stable_field_key": "d4_30_customers/{row_uuid}/index_ref",
+              "store_item_id": "D4-30-customers",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "S",
+                "row_from": "row_identity"
+              },
+              "column_key": "custom_dimensions",
+              "header_source_ref": "源xlsx!客户访谈记录汇总表D4-30!S11",
+              "header_text": "自定义检查项",
+              "json_pointer": "/rows/{row_uuid}/customDimensions",
+              "mode": "editable",
+              "source_ref": "源xlsx!客户访谈记录汇总表D4-30!S6",
+              "stable_field_key": "d4_30_customers/{row_uuid}/custom_dimensions",
+              "store_item_id": "D4-30-customers",
+              "value_type": "json"
+            }
+          ],
+          "footer_anchor": {
+            "carries_total_formula": false,
+            "marker": "访谈表索引",
+            "search_column": "A"
+          },
+          "formula_mask": [],
+          "header_rows": 1,
+          "row_identity": {
+            "json_pointer": "/rows/*/id",
+            "kind": "field"
+          },
+          "table_key": "d4_30_customers"
+        }
+      ],
+      "template_id": "D430"
+    },
+    {
+      "excel_name": "客户访谈记录 D4-31",
+      "locator": {
+        "anchor": "excel_table_sheet_association"
+      },
+      "sheet_key": "d4-31-managed",
+      "tables": [
+        {
+          "anchor": "A4",
+          "delete_policy": "tombstone",
+          "fields": [
+            {
+              "cell": {
+                "column": "A",
+                "row_from": "row_identity"
+              },
+              "column_key": "target",
+              "header_source_ref": "源xlsx!客户访谈记录 D4-31!A11",
+              "header_text": "访谈对象",
+              "json_pointer": "/rows/{row_uuid}/target",
+              "mode": "editable",
+              "source_ref": "源xlsx!客户访谈记录 D4-31!A5",
+              "stable_field_key": "d4_31_interview/{row_uuid}/target",
+              "store_item_id": "D4-31-interview",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "B",
+                "row_from": "row_identity"
+              },
+              "column_key": "time_place",
+              "header_source_ref": "源xlsx!客户访谈记录 D4-31!B11",
+              "header_text": "访谈时间及地点",
+              "json_pointer": "/rows/{row_uuid}/timePlace",
+              "mode": "editable",
+              "source_ref": "源xlsx!客户访谈记录 D4-31!B5",
+              "stable_field_key": "d4_31_interview/{row_uuid}/time_place",
+              "store_item_id": "D4-31-interview",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "C",
+                "row_from": "row_identity"
+              },
+              "column_key": "interviewee",
+              "header_source_ref": "源xlsx!客户访谈记录 D4-31!C11",
+              "header_text": "接受访谈人员及职务",
+              "json_pointer": "/rows/{row_uuid}/interviewee",
+              "mode": "editable",
+              "source_ref": "源xlsx!客户访谈记录 D4-31!C5",
+              "stable_field_key": "d4_31_interview/{row_uuid}/interviewee",
+              "store_item_id": "D4-31-interview",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "D",
+                "row_from": "row_identity"
+              },
+              "column_key": "interviewer",
+              "header_source_ref": "源xlsx!客户访谈记录 D4-31!D11",
+              "header_text": "访谈人",
+              "json_pointer": "/rows/{row_uuid}/interviewer",
+              "mode": "editable",
+              "source_ref": "源xlsx!客户访谈记录 D4-31!D5",
+              "stable_field_key": "d4_31_interview/{row_uuid}/interviewer",
+              "store_item_id": "D4-31-interview",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "E",
+                "row_from": "row_identity"
+              },
+              "column_key": "introduction",
+              "header_source_ref": "源xlsx!客户访谈记录 D4-31!E11",
+              "header_text": "接受访谈人介绍",
+              "json_pointer": "/rows/{row_uuid}/introduction",
+              "mode": "editable",
+              "source_ref": "源xlsx!客户访谈记录 D4-31!E5",
+              "stable_field_key": "d4_31_interview/{row_uuid}/introduction",
+              "store_item_id": "D4-31-interview",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "F",
+                "row_from": "row_identity"
+              },
+              "column_key": "company_name",
+              "header_source_ref": "源xlsx!客户访谈记录 D4-31!F11",
+              "header_text": "公司名称",
+              "json_pointer": "/rows/{row_uuid}/companyName",
+              "mode": "editable",
+              "source_ref": "源xlsx!客户访谈记录 D4-31!F5",
+              "stable_field_key": "d4_31_interview/{row_uuid}/company_name",
+              "store_item_id": "D4-31-interview",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "G",
+                "row_from": "row_identity"
+              },
+              "column_key": "reg_capital",
+              "header_source_ref": "源xlsx!客户访谈记录 D4-31!G11",
+              "header_text": "注册资本",
+              "json_pointer": "/rows/{row_uuid}/regCapital",
+              "mode": "editable",
+              "source_ref": "源xlsx!客户访谈记录 D4-31!G5",
+              "stable_field_key": "d4_31_interview/{row_uuid}/reg_capital",
+              "store_item_id": "D4-31-interview",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "H",
+                "row_from": "row_identity"
+              },
+              "column_key": "establish_date",
+              "header_source_ref": "源xlsx!客户访谈记录 D4-31!H11",
+              "header_text": "成立日期",
+              "json_pointer": "/rows/{row_uuid}/establishDate",
+              "mode": "editable",
+              "source_ref": "源xlsx!客户访谈记录 D4-31!H5",
+              "stable_field_key": "d4_31_interview/{row_uuid}/establish_date",
+              "store_item_id": "D4-31-interview",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "I",
+                "row_from": "row_identity"
+              },
+              "column_key": "biz_nature",
+              "header_source_ref": "源xlsx!客户访谈记录 D4-31!I11",
+              "header_text": "经济性质",
+              "json_pointer": "/rows/{row_uuid}/bizNature",
+              "mode": "editable",
+              "source_ref": "源xlsx!客户访谈记录 D4-31!I5",
+              "stable_field_key": "d4_31_interview/{row_uuid}/biz_nature",
+              "store_item_id": "D4-31-interview",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "J",
+                "row_from": "row_identity"
+              },
+              "column_key": "legal_rep",
+              "header_source_ref": "源xlsx!客户访谈记录 D4-31!J11",
+              "header_text": "法定代表人",
+              "json_pointer": "/rows/{row_uuid}/legalRep",
+              "mode": "editable",
+              "source_ref": "源xlsx!客户访谈记录 D4-31!J5",
+              "stable_field_key": "d4_31_interview/{row_uuid}/legal_rep",
+              "store_item_id": "D4-31-interview",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "A",
+                "row_from": "row_identity"
+              },
+              "column_key": "equity_structure",
+              "header_source_ref": "源xlsx!客户访谈记录 D4-31!A11",
+              "header_text": "股权结构",
+              "json_pointer": "/rows/{row_uuid}/equityStructure",
+              "mode": "editable",
+              "source_ref": "源xlsx!客户访谈记录 D4-31!A5",
+              "stable_field_key": "d4_31_interview/{row_uuid}/equity_structure",
+              "store_item_id": "D4-31-interview",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "B",
+                "row_from": "row_identity"
+              },
+              "column_key": "q1_relation",
+              "header_source_ref": "源xlsx!客户访谈记录 D4-31!B11",
+              "header_text": "业务关系",
+              "json_pointer": "/rows/{row_uuid}/q1_relation",
+              "mode": "editable",
+              "source_ref": "源xlsx!客户访谈记录 D4-31!B5",
+              "stable_field_key": "d4_31_interview/{row_uuid}/q1_relation",
+              "store_item_id": "D4-31-interview",
+              "value_type": "json"
+            },
+            {
+              "cell": {
+                "column": "C",
+                "row_from": "row_identity"
+              },
+              "column_key": "q2a_payment",
+              "header_source_ref": "源xlsx!客户访谈记录 D4-31!C11",
+              "header_text": "采购结算",
+              "json_pointer": "/rows/{row_uuid}/q2a_payment",
+              "mode": "editable",
+              "source_ref": "源xlsx!客户访谈记录 D4-31!C5",
+              "stable_field_key": "d4_31_interview/{row_uuid}/q2a_payment",
+              "store_item_id": "D4-31-interview",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "D",
+                "row_from": "row_identity"
+              },
+              "column_key": "q2b_collection",
+              "header_source_ref": "源xlsx!客户访谈记录 D4-31!D11",
+              "header_text": "销售结算",
+              "json_pointer": "/rows/{row_uuid}/q2b_collection",
+              "mode": "editable",
+              "source_ref": "源xlsx!客户访谈记录 D4-31!D5",
+              "stable_field_key": "d4_31_interview/{row_uuid}/q2b_collection",
+              "store_item_id": "D4-31-interview",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "E",
+                "row_from": "row_identity"
+              },
+              "column_key": "q3a_has_contract",
+              "header_source_ref": "源xlsx!客户访谈记录 D4-31!E11",
+              "header_text": "是否有合同",
+              "json_pointer": "/rows/{row_uuid}/q3a_hasContract",
+              "mode": "editable",
+              "source_ref": "源xlsx!客户访谈记录 D4-31!E5",
+              "stable_field_key": "d4_31_interview/{row_uuid}/q3a_has_contract",
+              "store_item_id": "D4-31-interview",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "F",
+                "row_from": "row_identity"
+              },
+              "column_key": "q3b_quality",
+              "header_source_ref": "源xlsx!客户访谈记录 D4-31!F11",
+              "header_text": "产品质量",
+              "json_pointer": "/rows/{row_uuid}/q3b_quality",
+              "mode": "editable",
+              "source_ref": "源xlsx!客户访谈记录 D4-31!F5",
+              "stable_field_key": "d4_31_interview/{row_uuid}/q3b_quality",
+              "store_item_id": "D4-31-interview",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "G",
+                "row_from": "row_identity"
+              },
+              "column_key": "q3c_return_clause",
+              "header_source_ref": "源xlsx!客户访谈记录 D4-31!G11",
+              "header_text": "退货条款",
+              "json_pointer": "/rows/{row_uuid}/q3c_returnClause",
+              "mode": "editable",
+              "source_ref": "源xlsx!客户访谈记录 D4-31!G5",
+              "stable_field_key": "d4_31_interview/{row_uuid}/q3c_return_clause",
+              "store_item_id": "D4-31-interview",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "H",
+                "row_from": "row_identity"
+              },
+              "column_key": "q3d_return_amount",
+              "header_source_ref": "源xlsx!客户访谈记录 D4-31!H11",
+              "header_text": "退货金额",
+              "json_pointer": "/rows/{row_uuid}/q3d_returnAmount",
+              "mode": "editable",
+              "source_ref": "源xlsx!客户访谈记录 D4-31!H5",
+              "stable_field_key": "d4_31_interview/{row_uuid}/q3d_return_amount",
+              "store_item_id": "D4-31-interview",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "I",
+                "row_from": "row_identity"
+              },
+              "column_key": "q3e_acceptance",
+              "header_source_ref": "源xlsx!客户访谈记录 D4-31!I11",
+              "header_text": "验收方式",
+              "json_pointer": "/rows/{row_uuid}/q3e_acceptance",
+              "mode": "editable",
+              "source_ref": "源xlsx!客户访谈记录 D4-31!I5",
+              "stable_field_key": "d4_31_interview/{row_uuid}/q3e_acceptance",
+              "store_item_id": "D4-31-interview",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "J",
+                "row_from": "row_identity"
+              },
+              "column_key": "q3f_has_rebate",
+              "header_source_ref": "源xlsx!客户访谈记录 D4-31!J11",
+              "header_text": "是否返利",
+              "json_pointer": "/rows/{row_uuid}/q3f_hasRebate",
+              "mode": "editable",
+              "source_ref": "源xlsx!客户访谈记录 D4-31!J5",
+              "stable_field_key": "d4_31_interview/{row_uuid}/q3f_has_rebate",
+              "store_item_id": "D4-31-interview",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "A",
+                "row_from": "row_identity"
+              },
+              "column_key": "q3f_rebate_method",
+              "header_source_ref": "源xlsx!客户访谈记录 D4-31!A11",
+              "header_text": "返利方式",
+              "json_pointer": "/rows/{row_uuid}/q3f_rebateMethod",
+              "mode": "editable",
+              "source_ref": "源xlsx!客户访谈记录 D4-31!A5",
+              "stable_field_key": "d4_31_interview/{row_uuid}/q3f_rebate_method",
+              "store_item_id": "D4-31-interview",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "B",
+                "row_from": "row_identity"
+              },
+              "column_key": "q3f_rebate_amount",
+              "header_source_ref": "源xlsx!客户访谈记录 D4-31!B11",
+              "header_text": "返利金额",
+              "json_pointer": "/rows/{row_uuid}/q3f_rebateAmount",
+              "mode": "editable",
+              "source_ref": "源xlsx!客户访谈记录 D4-31!B5",
+              "stable_field_key": "d4_31_interview/{row_uuid}/q3f_rebate_amount",
+              "store_item_id": "D4-31-interview",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "C",
+                "row_from": "row_identity"
+              },
+              "column_key": "q3g_final_sold",
+              "header_source_ref": "源xlsx!客户访谈记录 D4-31!C11",
+              "header_text": "是否终端销售",
+              "json_pointer": "/rows/{row_uuid}/q3g_finalSold",
+              "mode": "editable",
+              "source_ref": "源xlsx!客户访谈记录 D4-31!C5",
+              "stable_field_key": "d4_31_interview/{row_uuid}/q3g_final_sold",
+              "store_item_id": "D4-31-interview",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "D",
+                "row_from": "row_identity"
+              },
+              "column_key": "q4_other_funds",
+              "header_source_ref": "源xlsx!客户访谈记录 D4-31!D11",
+              "header_text": "其他资金往来",
+              "json_pointer": "/rows/{row_uuid}/q4_otherFunds",
+              "mode": "editable",
+              "source_ref": "源xlsx!客户访谈记录 D4-31!D5",
+              "stable_field_key": "d4_31_interview/{row_uuid}/q4_other_funds",
+              "store_item_id": "D4-31-interview",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "E",
+                "row_from": "row_identity"
+              },
+              "column_key": "q5_other_matters",
+              "header_source_ref": "源xlsx!客户访谈记录 D4-31!E11",
+              "header_text": "其他事项",
+              "json_pointer": "/rows/{row_uuid}/q5_otherMatters",
+              "mode": "editable",
+              "source_ref": "源xlsx!客户访谈记录 D4-31!E5",
+              "stable_field_key": "d4_31_interview/{row_uuid}/q5_other_matters",
+              "store_item_id": "D4-31-interview",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "F",
+                "row_from": "row_identity"
+              },
+              "column_key": "q6_has_shares",
+              "header_source_ref": "源xlsx!客户访谈记录 D4-31!F11",
+              "header_text": "持有股份",
+              "json_pointer": "/rows/{row_uuid}/q6_hasShares",
+              "mode": "editable",
+              "source_ref": "源xlsx!客户访谈记录 D4-31!F5",
+              "stable_field_key": "d4_31_interview/{row_uuid}/q6_has_shares",
+              "store_item_id": "D4-31-interview",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "G",
+                "row_from": "row_identity"
+              },
+              "column_key": "q6_has_position",
+              "header_source_ref": "源xlsx!客户访谈记录 D4-31!G11",
+              "header_text": "担任职务",
+              "json_pointer": "/rows/{row_uuid}/q6_hasPosition",
+              "mode": "editable",
+              "source_ref": "源xlsx!客户访谈记录 D4-31!G5",
+              "stable_field_key": "d4_31_interview/{row_uuid}/q6_has_position",
+              "store_item_id": "D4-31-interview",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "H",
+                "row_from": "row_identity"
+              },
+              "column_key": "q6_has_transaction",
+              "header_source_ref": "源xlsx!客户访谈记录 D4-31!H11",
+              "header_text": "关联交易",
+              "json_pointer": "/rows/{row_uuid}/q6_hasTransaction",
+              "mode": "editable",
+              "source_ref": "源xlsx!客户访谈记录 D4-31!H5",
+              "stable_field_key": "d4_31_interview/{row_uuid}/q6_has_transaction",
+              "store_item_id": "D4-31-interview",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "I",
+                "row_from": "row_identity"
+              },
+              "column_key": "sign_interviewee",
+              "header_source_ref": "源xlsx!客户访谈记录 D4-31!I11",
+              "header_text": "受访人签字",
+              "json_pointer": "/rows/{row_uuid}/signInterviewee",
+              "mode": "editable",
+              "source_ref": "源xlsx!客户访谈记录 D4-31!I5",
+              "stable_field_key": "d4_31_interview/{row_uuid}/sign_interviewee",
+              "store_item_id": "D4-31-interview",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "J",
+                "row_from": "row_identity"
+              },
+              "column_key": "sign_auditor",
+              "header_source_ref": "源xlsx!客户访谈记录 D4-31!J11",
+              "header_text": "审计人员签字",
+              "json_pointer": "/rows/{row_uuid}/signAuditor",
+              "mode": "editable",
+              "source_ref": "源xlsx!客户访谈记录 D4-31!J5",
+              "stable_field_key": "d4_31_interview/{row_uuid}/sign_auditor",
+              "store_item_id": "D4-31-interview",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "A",
+                "row_from": "row_identity"
+              },
+              "column_key": "sign_other",
+              "header_source_ref": "源xlsx!客户访谈记录 D4-31!A11",
+              "header_text": "其他签字",
+              "json_pointer": "/rows/{row_uuid}/signOther",
+              "mode": "editable",
+              "source_ref": "源xlsx!客户访谈记录 D4-31!A5",
+              "stable_field_key": "d4_31_interview/{row_uuid}/sign_other",
+              "store_item_id": "D4-31-interview",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "B",
+                "row_from": "row_identity"
+              },
+              "column_key": "sign_date",
+              "header_source_ref": "源xlsx!客户访谈记录 D4-31!B11",
+              "header_text": "签字日期",
+              "json_pointer": "/rows/{row_uuid}/signDate",
+              "mode": "editable",
+              "source_ref": "源xlsx!客户访谈记录 D4-31!B5",
+              "stable_field_key": "d4_31_interview/{row_uuid}/sign_date",
+              "store_item_id": "D4-31-interview",
+              "value_type": "text"
+            }
+          ],
+          "footer_anchor": {
+            "carries_total_formula": false,
+            "marker": "2.针对识别出的第三方配合实施财务舞弊的风险，可以考虑采用跟函方式进行函证，观察函证处理过程，评估回函可靠性。",
+            "search_column": "A"
+          },
+          "formula_mask": [],
+          "header_rows": 1,
+          "row_identity": {
+            "json_pointer": "/rows/*/singleton",
+            "kind": "field"
+          },
+          "table_key": "d4_31_interview"
+        }
+      ],
+      "template_id": "D431"
+    },
+    {
+      "excel_name": "客户、供应商等资金流水检查D4-32",
+      "locator": {
+        "anchor": "excel_table_sheet_association"
+      },
+      "sheet_key": "d4-32-managed",
+      "tables": [
+        {
+          "anchor": "A12",
+          "delete_policy": "tombstone",
+          "fields": [
+            {
+              "cell": {
+                "column": "A",
+                "row_from": "row_identity"
+              },
+              "column_key": "group_label",
+              "header_source_ref": "源xlsx!客户、供应商等资金流水检查D4-32!A11",
+              "header_text": "分组",
+              "json_pointer": "/rows/{row_uuid}/groupLabel",
+              "mode": "editable",
+              "source_ref": "源xlsx!客户、供应商等资金流水检查D4-32!A13",
+              "stable_field_key": "d4_32_groups/{row_uuid}/group_label",
+              "store_item_id": "D4-32-groups",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "B",
+                "row_from": "row_identity"
+              },
+              "column_key": "name",
+              "header_source_ref": "源xlsx!客户、供应商等资金流水检查D4-32!B11",
+              "header_text": "单位名称/姓名",
+              "json_pointer": "/rows/{row_uuid}/name",
+              "mode": "editable",
+              "source_ref": "源xlsx!客户、供应商等资金流水检查D4-32!B13",
+              "stable_field_key": "d4_32_groups/{row_uuid}/name",
+              "store_item_id": "D4-32-groups",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "C",
+                "row_from": "row_identity"
+              },
+              "column_key": "amount",
+              "header_source_ref": "源xlsx!客户、供应商等资金流水检查D4-32!C11",
+              "header_text": "本期交易金额",
+              "json_pointer": "/rows/{row_uuid}/amount",
+              "mode": "editable",
+              "source_ref": "源xlsx!客户、供应商等资金流水检查D4-32!C13",
+              "stable_field_key": "d4_32_groups/{row_uuid}/amount",
+              "store_item_id": "D4-32-groups",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "D",
+                "row_from": "row_identity"
+              },
+              "column_key": "ratio",
+              "header_source_ref": "源xlsx!客户、供应商等资金流水检查D4-32!D11",
+              "header_text": "占同类交易比例",
+              "json_pointer": "/rows/{row_uuid}/ratio",
+              "mode": "editable",
+              "source_ref": "源xlsx!客户、供应商等资金流水检查D4-32!D13",
+              "stable_field_key": "d4_32_groups/{row_uuid}/ratio",
+              "store_item_id": "D4-32-groups",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "E",
+                "row_from": "row_identity"
+              },
+              "column_key": "bank",
+              "header_source_ref": "源xlsx!客户、供应商等资金流水检查D4-32!E11",
+              "header_text": "开户银行",
+              "json_pointer": "/rows/{row_uuid}/bank",
+              "mode": "editable",
+              "source_ref": "源xlsx!客户、供应商等资金流水检查D4-32!E13",
+              "stable_field_key": "d4_32_groups/{row_uuid}/bank",
+              "store_item_id": "D4-32-groups",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "F",
+                "row_from": "row_identity"
+              },
+              "column_key": "account",
+              "header_source_ref": "源xlsx!客户、供应商等资金流水检查D4-32!F11",
+              "header_text": "账号",
+              "json_pointer": "/rows/{row_uuid}/account",
+              "mode": "editable",
+              "source_ref": "源xlsx!客户、供应商等资金流水检查D4-32!F13",
+              "stable_field_key": "d4_32_groups/{row_uuid}/account",
+              "store_item_id": "D4-32-groups",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "G",
+                "row_from": "row_identity"
+              },
+              "column_key": "method",
+              "header_source_ref": "源xlsx!客户、供应商等资金流水检查D4-32!G11",
+              "header_text": "资金流水获取途径",
+              "json_pointer": "/rows/{row_uuid}/method",
+              "mode": "editable",
+              "source_ref": "源xlsx!客户、供应商等资金流水检查D4-32!G13",
+              "stable_field_key": "d4_32_groups/{row_uuid}/method",
+              "store_item_id": "D4-32-groups",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "H",
+                "row_from": "row_identity"
+              },
+              "column_key": "has_anomaly",
+              "header_source_ref": "源xlsx!客户、供应商等资金流水检查D4-32!H11",
+              "header_text": "是否发现异常交易",
+              "json_pointer": "/rows/{row_uuid}/hasAnomaly",
+              "mode": "editable",
+              "source_ref": "源xlsx!客户、供应商等资金流水检查D4-32!H13",
+              "stable_field_key": "d4_32_groups/{row_uuid}/has_anomaly",
+              "store_item_id": "D4-32-groups",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "I",
+                "row_from": "row_identity"
+              },
+              "column_key": "index_ref",
+              "header_source_ref": "源xlsx!客户、供应商等资金流水检查D4-32!I11",
+              "header_text": "索引号",
+              "json_pointer": "/rows/{row_uuid}/indexRef",
+              "mode": "editable",
+              "source_ref": "源xlsx!客户、供应商等资金流水检查D4-32!I13",
+              "stable_field_key": "d4_32_groups/{row_uuid}/index_ref",
+              "store_item_id": "D4-32-groups",
+              "value_type": "text"
+            }
+          ],
+          "footer_anchor": {
+            "carries_total_formula": false,
+            "marker": "三、审计说明",
+            "search_column": "A"
+          },
+          "formula_mask": [],
+          "header_rows": 1,
+          "row_identity": {
+            "json_pointer": "/rows/*/id",
+            "kind": "field"
+          },
+          "table_key": "d4_32_groups"
+        }
+      ],
+      "template_id": "D432"
     }
   ],
   "template": {

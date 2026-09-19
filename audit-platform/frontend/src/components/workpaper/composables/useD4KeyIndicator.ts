@@ -311,6 +311,18 @@ export function useD4KeyIndicator(options: UseD4KeyIndicatorOptions) {
     window.dispatchEvent(new CustomEvent('d4:save-items', { detail: { items } }))
   }
 
+  // 双向回写 flushHtml 用：清防抖 + 立即派发 d4:save-items（先落库再 readStoreProjection）。
+  function flushPendingSave() {
+    if (debounceTimer) { clearTimeout(debounceTimer); debounceTimer = null }
+    flushSave()
+  }
+
+  // 双向回写 reloadHtml 用：切回 HTML 后从 allResponses 重读。
+  function reload() {
+    loadData()
+    loadNoteConclusion()
+  }
+
   function updateAuditNote(val: string) {
     if (isReadonly.value) return
     auditNote.value = val
@@ -349,6 +361,8 @@ export function useD4KeyIndicator(options: UseD4KeyIndicatorOptions) {
     updateAuditConclusion,
     recalcAuto,
     loadData,
+    flushPendingSave,
+    reload,
   }
 }
 

@@ -18,8 +18,10 @@
   - D4-29 生命周期修复重开：已补真实组件挂载测试 5 项（保存等待、保存失败与重试、oo_editing 切回矩阵、回读失败保留编辑器、结论独立刷新）；与同步桥/API 合跑 122 passed。移除 flush await 后，保存时序测试按预期 RED，恢复后全绿。
   - 浏览器验收未完成：已登录并打开重庆和平药房项目 D4-29；点击内部在线编辑后 store-projection 请求尚未取得响应，未进入实际 Excel 往返。页面同时存在内外两套模式入口及「两侧数据未互通」提示，仍需继续排查。浏览器验收由本任务继续负责，不交由用户代验。
 
-- [ ] 8. D4-30/31/32 接入统一同步桥与受管 provider；未注册能力保持阻塞态，不修改 D4-29。
+- [~] 8. D4-30/31/32 接入统一同步桥与受管 provider；未注册能力保持阻塞态，不修改 D4-29。
   - Requirements: 5.1, 6.1, 6.2
+  - **后端契约门已开（2026-09-20，批次A-5）**：历史 `_INCLUDE_IPO_INTERVIEW_SHEETS=False`「几何未就绪」注释经探针实证作废——provider `phase5_d4_ipo_interview_sheets` 三张表几何完整。翻转开关后 `build_contract_payload()`+`parse_contract` 通过（19 sheets），`instrumentation_specs`=19 与契约行 table 数 19 对齐，`_align_specs_to_sibling_tables` 成功（18 sibling pairs，无 ProviderCapabilityError）。发布链跑全（真库 audit-postgres）：`generate_phase5_d4_contract --apply`（digest 58f68630）→ `fix_task76_provision --apply`（bundle 38→39，revision 75 不变，errors[]）→ `d43_rematerialize --apply`（gen 51→52，bundle 49f6a6f5，无 FooterAnchorDrift）。DB 确认 entry `xlsx/gt-d4-operating-revenue` 现指向 gen52 = 含 D4-30/31/32 的 bundle。90 focused 测试无回归。前端 `D4TabInterviewSummary/Detail/FundFlow` 早已接 `useWorkpaperSyncBridge`（sheetKey d4-30/31/32-managed）+ `WorkpaperSyncEditorHost` + 宿主 `isD4DedicatedSyncSheet` 已登记 → 三维全绿（REQUEST_PATH 级）。
+  - **仍缺（未标 [x] 的原因）**：真 OO 往返 evidence（主控 §6.4 `HOST-CONSUMES-UNIFIED-PATH` 的谓词 4-6 需真实 DB application 记录），待 start-dev.bat 全栈 + 真实 OO 容器逐张跑 e2e。D4-31 单对象问卷（singleton identity）的 OO 往返尤需实测（空问卷不注入 singleton 的边界）。
 - [ ] 9. D4-32 unknown 组保真与人工映射：保留 label/id/金额三态/账号中文，非法 JSON 和保存失败保留旧数据并显示错误。
   - Requirements: 5.2, 5.3
 

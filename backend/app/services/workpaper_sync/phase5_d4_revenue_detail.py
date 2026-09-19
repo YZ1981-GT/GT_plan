@@ -252,8 +252,11 @@ TEMPLATE_RELATIVE_PATH: Final[str] = "D/D4 收入底稿.xlsx"
 TEMPLATE_SHA256: Final[str] = (
     "b8fb92d4c22cd5d639e415403a12cb61650639153f136a5330c930b880167b5f"
 )
-#: D4-30/31/32 几何未就绪：关则不进 instrumentation/contract/combined projection。
-_INCLUDE_IPO_INTERVIEW_SHEETS: Final[bool] = False
+#: D4-30/31/32 IPO 访谈/资金流水受管 sheet 接入（批次A-5，d4-ipo-fraud Task 8，2026-09-20）。
+#: 旧「几何未就绪」注释已作废（探针实证）：contract parse 通过 19 sheets、instrumentation_specs=19
+#: 与行 table 数对齐、_align_specs_to_sibling_tables 成功（sibling 内核已由 D4-1 dual-region
+#: GENERALIZE，单 sheet 单 table 是其子集）。已跑发布链 + rematerialize gen52 无 drift。
+_INCLUDE_IPO_INTERVIEW_SHEETS: Final[bool] = True
 #: 🔴 D4-1 同 sheet 双区 instrumentation 接线开关（Task 5）。
 #: 契约 sheet（sheet_payload_d41）+ store projection + merge 恒接（判据先行 Task 2 判据）；
 #: 但 instrumentation_specs 两 spec（主营/其他）暂**不接**，唯一阻塞 = 运行态 sibling binding
