@@ -38,7 +38,7 @@
   "covered_by_d_to_n_slices": 85,
   "excluded_pilot_entry_count": 1,
   "in_scope_parent_duplicate_count": 0,
-  "global_parent_duplicate_count": 43,
+  "global_parent_duplicate_count": 33,
   "excluded_from_slice": [
    {
     "what": "pilot entry `xlsx/b60/gt-b60-bundle`（B60 总体审计策略）",
@@ -190,7 +190,7 @@
     "group_id": "GRP-04",
     "component_type_family": "b_class_risk_and_control",
     "persistence_channel": "checklist_responses",
-    "entry_count": 8,
+    "entry_count": 9,
     "entry_ids": [
      "xlsx/gt-b1-evaluation",
      "xlsx/gt-b1-kaa-check",
@@ -199,7 +199,8 @@
      "xlsx/gt-b22-a-control-matrix",
      "xlsx/gt-b22-b-control-matrix",
      "xlsx/gt-b22-b-deficiency-evaluation",
-     "xlsx/gt-b22-c-design-effectiveness"
+     "xlsx/gt-b22-c-design-effectiveness",
+     "xlsx/gt-b23-process-control"
     ],
     "component_types": [
      "b1-3-business-evaluation",
@@ -209,7 +210,8 @@
      "b22a-control-matrix",
      "b22b-control-matrix",
      "b22b-deficiency-evaluation",
-     "b22c-design-effectiveness"
+     "b22c-design-effectiveness",
+     "b23-process-control"
     ],
     "shares_adapter_candidate": true
    },
@@ -217,13 +219,11 @@
     "group_id": "GRP-05",
     "component_type_family": "b_class_risk_and_control",
     "persistence_channel": "checklist_responses+field_overrides",
-    "entry_count": 2,
+    "entry_count": 1,
     "entry_ids": [
-     "xlsx/gt-b23-process-control",
      "xlsx/gt-b50-risk-assessment"
     ],
     "component_types": [
-     "b23-process-control",
      "b50-risk-assessment"
     ],
     "shares_adapter_candidate": true
@@ -297,7 +297,7 @@
    {
     "group_id": "GRP-11",
     "component_type_family": "not_in_html_renderer_registry",
-    "persistence_channel": "checklist_responses+field_overrides+custom_cells",
+    "persistence_channel": "checklist_responses+field_overrides",
     "entry_count": 1,
     "entry_ids": [
      "xlsx/gt-wp-renderer"
@@ -352,16 +352,16 @@
    "group_count": 13,
    "entry_count": 46,
    "families": 9,
-   "channels": 5,
-   "groups_with_more_than_one_entry": 5,
-   "singleton_groups": 8
+   "channels": 4,
+   "groups_with_more_than_one_entry": 4,
+   "singleton_groups": 9
   }
  },
  "dual_mode_carrier_inventory": {
   "why_this_key_exists": "🔴 本轮**没有任何 per-entry dual-mode composable** —— 现算 `composables/use[ABCS]\\d.*DualMode.ts` 命中 **0 个**，而 D~N 十一轮各有一批（现算全域 `*DualMode*.ts` 共 115 个模块，无一属 A/B/C/S）。本轮的双模式载体只有两类：**宿主内联 `<el-segmented>`**（32 条）与**四个共享载体的薄封装**（10 条），另 4 条无任何载体（无开关）。照抄 N 那轮的「orphan dual-mode 模块」判据在本轮恒空跑（0 命中），必须换成「共享载体的 in-scope 边数 + 改线后是否变 orphan」。",
   "recompute_recipe": "① per-entry 载体现算 = `composables/` 下匹配 `^use[ABCS]\\d.*DualMode\\.ts$` 的文件数（0）；② 共享载体逐个现算 statement-position import 边（`from '…'` 可独占一行；排除双引号字符串内匹配；barrel 入边按路径解析口径单列）；③ `becomes_orphan_after_rewire` = 生产边里既非 in-scope 也非 barrel 的条数 == 0。",
   "per_entry_dual_mode_composables": 0,
-  "all_dual_mode_modules_in_repo": 115,
+  "all_dual_mode_modules_in_repo": 114,
   "shared_carriers": {
    "useWorkpaperEntryDualMode.ts": {
     "module": "audit-platform/frontend/src/components/workpaper/composables/useWorkpaperEntryDualMode.ts",
@@ -487,7 +487,7 @@
     "cf-verification"
    ],
    "component_type_registry_lines": {
-    "cf-verification": 528
+    "cf-verification": 79
    },
    "component_type_family": "generic_cross_statement_verifier",
    "wp_code_count_via_component_type": 1,
@@ -624,7 +624,7 @@
     "a10-1-governance-communication"
    ],
    "component_type_registry_lines": {
-    "a10-1-governance-communication": 1080
+    "a10-1-governance-communication": 322
    },
    "component_type_family": "a_class_single_sheet_host",
    "wp_code_count_via_component_type": 1,
@@ -754,7 +754,7 @@
     "a11-1-subsequent-events-inquiry"
    ],
    "component_type_registry_lines": {
-    "a11-1-subsequent-events-inquiry": 1008
+    "a11-1-subsequent-events-inquiry": 250
    },
    "component_type_family": "a_class_single_sheet_host",
    "wp_code_count_via_component_type": 0,
@@ -887,7 +887,7 @@
     "a1-12-dual-checklist"
    ],
    "component_type_registry_lines": {
-    "a1-12-dual-checklist": 952
+    "a1-12-dual-checklist": 210
    },
    "component_type_family": "a_class_single_sheet_host",
    "wp_code_count_via_component_type": 0,
@@ -1023,7 +1023,7 @@
     "a1-15-disclosure-checklist"
    ],
    "component_type_registry_lines": {
-    "a1-15-disclosure-checklist": 960
+    "a1-15-disclosure-checklist": 218
    },
    "component_type_family": "a_class_single_sheet_host",
    "wp_code_count_via_component_type": 0,
@@ -1161,7 +1161,7 @@
     "a12-1-legal-confirmation"
    ],
    "component_type_registry_lines": {
-    "a12-1-legal-confirmation": 1072
+    "a12-1-legal-confirmation": 314
    },
    "component_type_family": "a_class_single_sheet_host",
    "wp_code_count_via_component_type": 1,
@@ -1291,7 +1291,7 @@
     "a17-1-audit-summary"
    ],
    "component_type_registry_lines": {
-    "a17-1-audit-summary": 1088
+    "a17-1-audit-summary": 114
    },
    "component_type_family": "a_class_single_sheet_host",
    "wp_code_count_via_component_type": 1,
@@ -1433,7 +1433,7 @@
     "a17-2-1-kam"
    ],
    "component_type_registry_lines": {
-    "a17-2-1-kam": 1096
+    "a17-2-1-kam": 122
    },
    "component_type_family": "a_class_single_sheet_host",
    "wp_code_count_via_component_type": 0,
@@ -1566,7 +1566,7 @@
     "a17-3-consultation-record"
    ],
    "component_type_registry_lines": {
-    "a17-3-consultation-record": 1016
+    "a17-3-consultation-record": 258
    },
    "component_type_family": "a_class_single_sheet_host",
    "wp_code_count_via_component_type": 0,
@@ -1705,7 +1705,7 @@
     "a17-3-1-consultation-execution"
    ],
    "component_type_registry_lines": {
-    "a17-3-1-consultation-execution": 1024
+    "a17-3-1-consultation-execution": 266
    },
    "component_type_family": "a_class_single_sheet_host",
    "wp_code_count_via_component_type": 0,
@@ -1844,7 +1844,7 @@
     "a17-4-disagreement-record"
    ],
    "component_type_registry_lines": {
-    "a17-4-disagreement-record": 1032
+    "a17-4-disagreement-record": 274
    },
    "component_type_family": "a_class_single_sheet_host",
    "wp_code_count_via_component_type": 0,
@@ -1983,7 +1983,7 @@
     "a17-6-closing-meeting"
    ],
    "component_type_registry_lines": {
-    "a17-6-closing-meeting": 976
+    "a17-6-closing-meeting": 234
    },
    "component_type_family": "a_class_single_sheet_host",
    "wp_code_count_via_component_type": 0,
@@ -2125,7 +2125,7 @@
     "a17-7-independence-declaration"
    ],
    "component_type_registry_lines": {
-    "a17-7-independence-declaration": 1040
+    "a17-7-independence-declaration": 282
    },
    "component_type_family": "a_class_single_sheet_host",
    "wp_code_count_via_component_type": 0,
@@ -2268,7 +2268,7 @@
     "a18-1-regulatory-submission"
    ],
    "component_type_registry_lines": {
-    "a18-1-regulatory-submission": 984
+    "a18-1-regulatory-submission": 98
    },
    "component_type_family": "a_class_single_sheet_host",
    "wp_code_count_via_component_type": 1,
@@ -2403,7 +2403,7 @@
     "a18-2-regulatory-communication"
    ],
    "component_type_registry_lines": {
-    "a18-2-regulatory-communication": 992
+    "a18-2-regulatory-communication": 106
    },
    "component_type_family": "a_class_single_sheet_host",
    "wp_code_count_via_component_type": 1,
@@ -2538,7 +2538,7 @@
     "a27-1-it-audit-memo"
    ],
    "component_type_registry_lines": {
-    "a27-1-it-audit-memo": 1064
+    "a27-1-it-audit-memo": 306
    },
    "component_type_family": "a_class_single_sheet_host",
    "wp_code_count_via_component_type": 1,
@@ -2668,7 +2668,7 @@
     "a3-consolidation-console"
    ],
    "component_type_registry_lines": {
-    "a3-consolidation-console": 429
+    "a3-consolidation-console": 26
    },
    "component_type_family": "a_class_single_sheet_host",
    "wp_code_count_via_component_type": 1,
@@ -2801,7 +2801,7 @@
     "a3-8-goodwill-impairment"
    ],
    "component_type_registry_lines": {
-    "a3-8-goodwill-impairment": 1112
+    "a3-8-goodwill-impairment": 338
    },
    "component_type_family": "a_class_single_sheet_host",
    "wp_code_count_via_component_type": 2,
@@ -2936,7 +2936,7 @@
     "a5-1-cashflow-audit"
    ],
    "component_type_registry_lines": {
-    "a5-1-cashflow-audit": 1104
+    "a5-1-cashflow-audit": 330
    },
    "component_type_family": "a_class_single_sheet_host",
    "wp_code_count_via_component_type": 0,
@@ -3067,7 +3067,7 @@
     "a8-1-other-info-representation"
    ],
    "component_type_registry_lines": {
-    "a8-1-other-info-representation": 1000
+    "a8-1-other-info-representation": 242
    },
    "component_type_family": "a_class_single_sheet_host",
    "wp_code_count_via_component_type": 1,
@@ -3203,8 +3203,8 @@
     "a9-2-deficiency-letter-governance"
    ],
    "component_type_registry_lines": {
-    "a9-1-deficiency-letter": 1048,
-    "a9-2-deficiency-letter-governance": 1056
+    "a9-1-deficiency-letter": 290,
+    "a9-2-deficiency-letter-governance": 298
    },
    "component_type_family": "multi_component_type_single_host",
    "wp_code_count_via_component_type": 2,
@@ -3341,7 +3341,7 @@
     "b1-3-business-evaluation"
    ],
    "component_type_registry_lines": {
-    "b1-3-business-evaluation": 1136
+    "b1-3-business-evaluation": 354
    },
    "component_type_family": "b_class_risk_and_control",
    "wp_code_count_via_component_type": 2,
@@ -3478,7 +3478,7 @@
     "b1-5-kaa-check"
    ],
    "component_type_registry_lines": {
-    "b1-5-kaa-check": 1144
+    "b1-5-kaa-check": 362
    },
    "component_type_family": "b_class_risk_and_control",
    "wp_code_count_via_component_type": 2,
@@ -3615,7 +3615,7 @@
     "b1-risk-assessment"
    ],
    "component_type_registry_lines": {
-    "b1-risk-assessment": 1128
+    "b1-risk-assessment": 346
    },
    "component_type_family": "b_class_risk_and_control",
    "wp_code_count_via_component_type": 4,
@@ -3754,7 +3754,7 @@
     "b1-4-due-diligence-report"
    ],
    "component_type_registry_lines": {
-    "b1-4-due-diligence-report": 1120
+    "b1-4-due-diligence-report": 130
    },
    "component_type_family": "b_class_risk_and_control",
    "wp_code_count_via_component_type": 1,
@@ -3891,7 +3891,7 @@
     "b22a-control-matrix"
    ],
    "component_type_registry_lines": {
-    "b22a-control-matrix": 856
+    "b22a-control-matrix": 114
    },
    "component_type_family": "b_class_risk_and_control",
    "wp_code_count_via_component_type": 1,
@@ -4039,7 +4039,7 @@
     "b22b-control-matrix"
    ],
    "component_type_registry_lines": {
-    "b22b-control-matrix": 872
+    "b22b-control-matrix": 130
    },
    "component_type_family": "b_class_risk_and_control",
    "wp_code_count_via_component_type": 1,
@@ -4171,7 +4171,7 @@
     "b22b-deficiency-evaluation"
    ],
    "component_type_registry_lines": {
-    "b22b-deficiency-evaluation": 864
+    "b22b-deficiency-evaluation": 122
    },
    "component_type_family": "b_class_risk_and_control",
    "wp_code_count_via_component_type": 0,
@@ -4317,7 +4317,7 @@
     "b22c-design-effectiveness"
    ],
    "component_type_registry_lines": {
-    "b22c-design-effectiveness": 880
+    "b22c-design-effectiveness": 138
    },
    "component_type_family": "b_class_risk_and_control",
    "wp_code_count_via_component_type": 1,
@@ -4436,7 +4436,7 @@
   },
   {
    "entry_id": "xlsx/gt-b23-process-control",
-   "group_id": "GRP-05",
+   "group_id": "GRP-04",
    "wp_code_pattern": "B23P",
    "wp_code_patterns": [
     "B23P"
@@ -4449,7 +4449,7 @@
     "b23-process-control"
    ],
    "component_type_registry_lines": {
-    "b23-process-control": 888
+    "b23-process-control": 146
    },
    "component_type_family": "b_class_risk_and_control",
    "wp_code_count_via_component_type": 1,
@@ -4480,10 +4480,9 @@
     "audit-platform/frontend/src/components/workpaper/GtA176ClosingMeeting.vue#L208"
    ],
    "html_counterpart": {
-    "store": "checklist_responses+field_overrides",
+    "store": "checklist_responses",
     "table_keys": [
-     "checklist_responses.item_id",
-     "workpaper_field_overrides.(scope,field_key)"
+     "checklist_responses.item_id"
     ],
     "row_identity_key": "item_id",
     "owner_module": "audit-platform/frontend/src/components/workpaper/GtB23ProcessControl.vue",
@@ -4641,7 +4640,7 @@
     "b50-risk-assessment"
    ],
    "component_type_registry_lines": {
-    "b50-risk-assessment": 848
+    "b50-risk-assessment": 106
    },
    "component_type_family": "b_class_risk_and_control",
    "wp_code_count_via_component_type": 1,
@@ -4808,7 +4807,7 @@
     "c-control-test"
    ],
    "component_type_registry_lines": {
-    "c-control-test": 1224
+    "c-control-test": 370
    },
    "component_type_family": "control_test_router",
    "wp_code_count_via_component_type": 28,
@@ -4979,7 +4978,7 @@
     "c22-itgc-bundle"
    ],
    "component_type_registry_lines": {
-    "c22-itgc-bundle": 1240
+    "c22-itgc-bundle": 386
    },
    "component_type_family": "c_class_bundle",
    "wp_code_count_via_component_type": 1,
@@ -5119,7 +5118,7 @@
     "custom"
    ],
    "component_type_registry_lines": {
-    "custom": 504
+    "custom": 55
    },
    "component_type_family": "generic_custom_editor",
    "wp_code_count_via_component_type": 0,
@@ -5278,11 +5277,10 @@
     "audit-platform/frontend/src/components/workpaper/GtA171Chapter15.vue#L238"
    ],
    "html_counterpart": {
-    "store": "checklist_responses+field_overrides+custom_cells",
+    "store": "checklist_responses+field_overrides",
     "table_keys": [
      "checklist_responses.item_id",
-     "workpaper_field_overrides.(scope,field_key)",
-     "workpaper_custom_cells.(sheet,cell)"
+     "workpaper_field_overrides.(scope,field_key)"
     ],
     "row_identity_key": "item_id",
     "owner_module": "audit-platform/frontend/src/components/workpaper/GtWpRenderer.vue",
@@ -5441,7 +5439,7 @@
     "s12-cpa-expert"
    ],
    "component_type_registry_lines": {
-    "s12-cpa-expert": 2040
+    "s12-cpa-expert": 706
    },
    "component_type_family": "s_class_standalone_dispatcher",
    "wp_code_count_via_component_type": 1,
@@ -5586,7 +5584,7 @@
     "s13-mgmt-expert"
    ],
    "component_type_registry_lines": {
-    "s13-mgmt-expert": 2048
+    "s13-mgmt-expert": 714
    },
    "component_type_family": "s_class_standalone_dispatcher",
    "wp_code_count_via_component_type": 1,
@@ -5731,7 +5729,7 @@
     "s14-accounting-estimate"
    ],
    "component_type_registry_lines": {
-    "s14-accounting-estimate": 2056
+    "s14-accounting-estimate": 722
    },
    "component_type_family": "s_class_standalone_dispatcher",
    "wp_code_count_via_component_type": 1,
@@ -5876,7 +5874,7 @@
     "s15-eps-roe"
    ],
    "component_type_registry_lines": {
-    "s15-eps-roe": 2064
+    "s15-eps-roe": 730
    },
    "component_type_family": "s_class_standalone_dispatcher",
    "wp_code_count_via_component_type": 1,
@@ -6021,7 +6019,7 @@
     "s20-revenue-deduction"
    ],
    "component_type_registry_lines": {
-    "s20-revenue-deduction": 2072
+    "s20-revenue-deduction": 738
    },
    "component_type_family": "s_class_standalone_dispatcher",
    "wp_code_count_via_component_type": 1,
@@ -6163,7 +6161,7 @@
     "s21-data-asset"
    ],
    "component_type_registry_lines": {
-    "s21-data-asset": 2080
+    "s21-data-asset": 746
    },
    "component_type_family": "s_class_standalone_dispatcher",
    "wp_code_count_via_component_type": 1,
@@ -6313,7 +6311,7 @@
     "s3-policy-change"
    ],
    "component_type_registry_lines": {
-    "s3-policy-change": 2008
+    "s3-policy-change": 674
    },
    "component_type_family": "s_class_standalone_dispatcher",
    "wp_code_count_via_component_type": 1,
@@ -6456,7 +6454,7 @@
     "s4-nonmonetary-exchange"
    ],
    "component_type_registry_lines": {
-    "s4-nonmonetary-exchange": 2016
+    "s4-nonmonetary-exchange": 682
    },
    "component_type_family": "s_class_standalone_dispatcher",
    "wp_code_count_via_component_type": 3,
@@ -6601,7 +6599,7 @@
     "s5-debt-restructuring"
    ],
    "component_type_registry_lines": {
-    "s5-debt-restructuring": 2024
+    "s5-debt-restructuring": 690
    },
    "component_type_family": "s_class_standalone_dispatcher",
    "wp_code_count_via_component_type": 3,
@@ -6746,7 +6744,7 @@
     "s6-fund-occupation"
    ],
    "component_type_registry_lines": {
-    "s6-fund-occupation": 2032
+    "s6-fund-occupation": 698
    },
    "component_type_family": "s_class_standalone_dispatcher",
    "wp_code_count_via_component_type": 2,
@@ -11101,9 +11099,9 @@
     "group_count": 13,
     "entry_count": 46,
     "families": 9,
-    "channels": 5,
-    "groups_with_more_than_one_entry": 5,
-    "singleton_groups": 8
+    "channels": 4,
+    "groups_with_more_than_one_entry": 4,
+    "singleton_groups": 9
    }
   }
  ],
@@ -12164,7 +12162,7 @@
    "vue": "audit-platform/frontend/src/components/workpaper/sync/GtEntrySyncCapabilityNotice.vue",
    "ts_exists": true,
    "vue_exists": true,
-   "out_of_scope_consumer_count": 41,
+   "out_of_scope_consumer_count": 42,
    "in_scope_consumer_count": 0,
    "why_non_vacuous": "承载者存在且被 41 个**非本 slice**宿主（D/F/G/H 循环）真实挂载 ⇒ 「本 slice 0 挂载」是真实缺口而不是「组件不存在」。只放 `el-tooltip` 不算满足 AC 1.4（EP teleport + 仅 hover 才进 DOM）。"
   }
@@ -12825,18 +12823,18 @@
   "reachable_hosts_in_scope": 46,
   "entry_group_count": 13,
   "component_type_families": 9,
-  "persistence_channels": 5,
-  "groups_with_more_than_one_entry": 5,
-  "singleton_groups": 8,
+  "persistence_channels": 4,
+  "groups_with_more_than_one_entry": 4,
+  "singleton_groups": 9,
   "entries_with_registry_component_type": 44,
   "entries_without_registry_component_type": 2,
   "entries_with_multiple_component_types": 1,
-  "registry_component_type_total": 211,
-  "entries_on_checklist_responses_only": 37,
+  "registry_component_type_total": 216,
+  "entries_on_checklist_responses_only": 38,
   "entries_on_field_overrides_only": 4,
   "entries_on_custom_cells_only": 1,
   "entries_on_checklist_plus_field_overrides": 3,
-  "entries_on_all_three_channels": 1,
+  "entries_on_all_three_channels": 0,
   "authoritative_template_files": 367,
   "template_files_with_owner_entry": 18,
   "template_files_without_owner_entry": 349,
@@ -12877,7 +12875,7 @@
   "shared_base_test_edges": 1,
   "shared_base_in_scope_edges": 5,
   "per_entry_dual_mode_composables": 0,
-  "all_dual_mode_modules_in_repo": 115,
+  "all_dual_mode_modules_in_repo": 114,
   "shared_dual_mode_carriers": 4,
   "entries_on_shared_carrier": 10,
   "entries_host_inline_carrier": 32,

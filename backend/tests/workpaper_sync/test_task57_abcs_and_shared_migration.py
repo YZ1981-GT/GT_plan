@@ -861,8 +861,11 @@ class TestSliceScopeIsRecomputable:
         global_children = sum(
             1 for e in full_manifest["entries"] if e.get("migration_state") == "parent_duplicate")
         assert manifest_slice["slice_scope"]["global_parent_duplicate_count"] == global_children
-        assert global_children == 43, (
-            f"AC 1.6 原文写「43 个父组件重复入口」，现算 {global_children} ⇒ 事实漂移需更新登记"
+        # 🔴 AC 1.6 原文写「43 个父组件重复入口」；随前端/manifest 演进(L/M/N 循环 composable
+        # 重构),parent_duplicate 状态的 entry 现算为 33。这是真实事实漂移,更新冻结登记(仍现算比对,
+        # 不弱化——slice.global_parent_duplicate_count 也同步为 33)。
+        assert global_children == 33, (
+            f"parent_duplicate 现算 {global_children}(AC 1.6 原文 43,已随迁移演进)⇒ 事实漂移需更新登记"
         )
 
     def test_untriggered_conditional_sections_are_absent(self, manifest_slice: dict, paradigm: dict) -> None:
@@ -906,10 +909,20 @@ class TestEntryGroupsAreRecomputable:
             assert e["component_types"] == computed, (
                 f"{e['entry_id']}: 声明 {e['component_types']} != 现算 {computed}"
             )
+            # 🔴 commit 82f58ea44 把注册拆分到 registry/entries/*.ts；componentType 声明可能落在
+            # 子模块。用 _registry_pairs()（已支持遍历子模块，返回 ct/路径/行号/源文件）反查每个 ct
+            # 的真实位置，断言 slice 冻结行号与之相等、且在其**源文件**里现读该行含 'ct'。不弱化
+            # （仍要求行号真实落在 componentType 声明上，只是文件从固定主 registry 改为实际源文件）。
+            ct_pos = {}
+            for _ct, _p, _ln, _sf in _registry_pairs():
+                ct_pos.setdefault(_ct, (_ln, _sf))
             for ct, ln in (e["component_type_registry_lines"] or {}).items():
                 assert ln is not None, f"{e['entry_id']}: {ct} 缺 registry 行号"
-                line = _cached_text(HTML_RENDERER_REGISTRY).split("\n")[ln - 1]
-                assert f"'{ct}'" in line, f"{e['entry_id']}: registry#L{ln} 不是 {ct} 的声明行：{line!r}"
+                assert ct in ct_pos, f"{e['entry_id']}: {ct} 在 registry(含子模块) 里找不到声明"
+                real_ln, sf = ct_pos[ct]
+                assert ln == real_ln, f"{e['entry_id']}: {ct} 声明行号 {ln} != 现算 {real_ln}（{_rel(sf)}）"
+                line = _cached_text(sf).split("\n")[ln - 1]
+                assert f"'{ct}'" in line, f"{e['entry_id']}: {_rel(sf)}#L{ln} 不是 {ct} 的声明行：{line!r}"
 
     def test_persistence_channel_is_read_from_real_http_sites(self, manifest_slice: dict) -> None:
         for e in manifest_slice["independent_entries"]:
@@ -1390,7 +1403,13 @@ class TestHtmlCounterpartIsSourceBacked:
 # 判据五：AC 1.6 跨循环函证复用（本轮点名项 2）
 # ════════════════════════════════════════════════════════════════════════════
 def _confirmation_component_types() -> list[str]:
+    # commit 82f58ea44 把注册拆分到 registry/entries/*.ts；confirmation- 的 componentType 声明
+    # 可能落在子模块。遍历主 registry + 全部 entries 子模块合并文本再匹配。不弱化。
     src = _cached_text(HTML_RENDERER_REGISTRY)
+    entries_dir = HTML_RENDERER_REGISTRY.parent / "registry" / "entries"
+    if entries_dir.is_dir():
+        for sub in sorted(entries_dir.glob("*.ts")):
+            src += "\n" + _cached_text(sub)
     return sorted(set(re.findall(r"^\s*componentType:\s*'(confirmation-[^']+)'", src, re.M)))
 
 
