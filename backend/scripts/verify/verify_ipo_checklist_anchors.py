@@ -42,10 +42,17 @@ ENGINE_TS = _FRONTEND / "src/components/workpaper/d4/ipo/ipoChecklistFormulaEngi
 DEALER_VUE = _FRONTEND / "src/components/workpaper/d4/ipo/D4TabDealer.vue"
 OVERSEAS_VUE = _FRONTEND / "src/components/workpaper/d4/ipo/D4TabOverseas.vue"
 BACKEND_IO = _BACKEND / "app/routers/wp_render_strategies/_d4_import_export.py"
+#: 🔴 投影的**真源**（2026-09-19 复盘）：原「投影 4」锚点全锚在前端
+#   `ipoChecklistSchema.rowsToSheet/sheetToRows` 上，而那两个函数在生产代码里零调用方
+#   （四组件走平台桥 + 服务端现算 projection），规则也与后端已分叉 —— 即那 4 条探针
+#   从来没在守护任何会运行的代码。函数已删除，探针改锚到这里。
+BACKEND_PROVIDER = _BACKEND / "app/services/workpaper_sync/phase5_d4_ipo_checklist_sheets.py"
 
 # ── 被驱动的守卫 ─────────────────────────────────────────────────────────────
 COLUMN_GUARD = "tests/test_ipo_checklist_column_contract.py"
 SYNC_SPEC = "src/components/workpaper/d4/ipo/__tests__/ipoSyncBridge.spec.ts"
+#: 生产路径 projection roundtrip 守卫（P6/P7/P8 的真正落点）。
+ROUNDTRIP_GUARD = "tests/workpaper_sync/test_d4_ipo_checklist_store_roundtrip.py"
 FORMULA_PRESET_SPEC = "src/components/workpaper/d4/ipo/__tests__/ipoFormulaPreset.spec.ts"
 FORMULA_ENGINE_SPEC = "src/components/workpaper/d4/ipo/__tests__/ipoFormulaEngine.spec.ts"
 WIRING_SPEC = "src/components/workpaper/__tests__/d4IpoSyncHostWiring.spec.ts"
@@ -74,17 +81,27 @@ ANCHORS: list[Anchor] = [
            "{ key: 'customerName', label: '客户名称', group: null, type: 'text', width: 130 },\n  { key: 'dealer', label: '经销商', group: null, type: 'text', width: 100 },",
            "{ key: 'dealer', label: '经销商', group: null, type: 'text', width: 100 },\n  { key: 'customerName', label: '客户名称', group: null, type: 'text', width: 130 },",
            "ts", COLUMN_GUARD),
-    # ── 投影 4 ──
-    Anchor("proj-checkbox", "改 checkbox→1 映射为 →0", SCHEMA_TS,
-           "if (col.type === 'checkbox') return truthyCheckbox(v) ? 1 : null",
-           "if (col.type === 'checkbox') return truthyCheckbox(v) ? 0 : null", "ts", SYNC_SPEC),
-    Anchor("proj-emptyrow", "删全空行跳过（continue → pass）", SCHEMA_TS,
-           "if (allEmpty) continue", "if (allEmpty && false) continue", "ts", SYNC_SPEC),
-    Anchor("proj-nan", "非数字解析改为返回 NaN（去掉 isFinite 保护）", SCHEMA_TS,
-           "if (!Number.isFinite(n)) return null\n  return pct ? n / 100 : n",
-           "return pct ? n / 100 : n", "ts", SYNC_SPEC),
-    Anchor("proj-pct", "百分比 12.3% 解析改为不除 100", SCHEMA_TS,
-           "return pct ? n / 100 : n", "return n", "ts", SYNC_SPEC),
+    # ── 投影 4（锚在**生产路径** provider，不再锚前端死函数）──
+    Anchor("proj-row-identity", "删「缺 rowId 即拒」（禁下标兜底失效 → 幽灵行）",
+           BACKEND_PROVIDER,
+           'raise D4ChecklistDigestError(\n                f"{item_id} 第 {ordinal} 行缺稳定行身份 {identity_key!r}（禁下标兜底）"\n            )',
+           'identity = f"__ordinal_{ordinal}__"',
+           "py", ROUNDTRIP_GUARD),
+    Anchor("proj-dup-identity", "删重复 rowId 检测（两行互相覆盖且无人知情）",
+           BACKEND_PROVIDER,
+           'if identity in seen:\n            raise D4ChecklistDigestError(f"{item_id} 重复行身份 {identity!r}")',
+           "if False:\n            pass",
+           "py", ROUNDTRIP_GUARD),
+    Anchor("proj-mask-leak", "把 D4-27 总计列 M 从 FORMULA_MASK 摘掉（投影会覆盖内嵌 =SUM）",
+           BACKEND_PROVIDER,
+           'FORMULA_MASK_D427: Final[tuple[str, ...]] = (\n    f"M{FIRST_DATA_ROW_D427}:M{LAST_DATA_ROW_D427}",\n)',
+           "FORMULA_MASK_D427: Final[tuple[str, ...]] = ()",
+           "py", ROUNDTRIP_GUARD),
+    Anchor("proj-json-path", "把一列 json_path 拼错（投影写进不存在的字段 → 往返丢值）",
+           BACKEND_PROVIDER,
+           '("ar_balance", "G", "editable", "amount", "arBalance", "期末应收账款余额")',
+           '("ar_balance", "G", "editable", "amount", "arBalanceTYPO", "期末应收账款余额")',
+           "py", ROUNDTRIP_GUARD),
     # ── 公式 4 ──
     Anchor("fml-resolver", "把一个 resolver 名拼错一字", SCHEMA_TS,
            "resolver: 'd4_27_related_party_sales'", "resolver: 'd4_27_related_party_saleX'", "ts", FORMULA_PRESET_SPEC),

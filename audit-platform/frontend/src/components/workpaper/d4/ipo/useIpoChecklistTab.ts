@@ -76,7 +76,8 @@ export function useIpoChecklistTab(opts: UseIpoChecklistTabOptions) {
             seq: Number(row.seq) || i + 1,
           }))
           // 🔴 过滤纯占位空行（除 seqColumn/rowId/seq 外所有列皆空）——防源模板占位序号
-          // 被推成占位披露行（AC 5.7 / Property 22），与投影侧 sheetToRows 全空行跳过同口径。
+          // 被推成占位披露行（AC 5.7 / Property 22）。这是**表格视图渲染侧**的过滤；
+          // OO 侧的行身份由后端 provider 按 rowId 判定（缺 rowId 直接拒绝），两者各管一段。
           const dataKeys = spec.columns.filter((c) => !c.seqColumn).map((c) => c.key)
           rows.value = normalized.filter((row) =>
             dataKeys.some((k) => {

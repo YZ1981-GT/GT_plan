@@ -2619,7 +2619,7 @@
               "source_ref": "源xlsx!境外销售收入检查D4-26!O13",
               "stable_field_key": "overseas_sales_rows/{row_uuid}/check_field_visit",
               "store_item_id": "D4-26-rows",
-              "value_type": "text"
+              "value_type": "boolean"
             },
             {
               "cell": {
@@ -2634,7 +2634,7 @@
               "source_ref": "源xlsx!境外销售收入检查D4-26!P13",
               "stable_field_key": "overseas_sales_rows/{row_uuid}/check_trans_confirm",
               "store_item_id": "D4-26-rows",
-              "value_type": "text"
+              "value_type": "boolean"
             },
             {
               "cell": {
@@ -2649,7 +2649,7 @@
               "source_ref": "源xlsx!境外销售收入检查D4-26!Q13",
               "stable_field_key": "overseas_sales_rows/{row_uuid}/check_customs_confirm",
               "store_item_id": "D4-26-rows",
-              "value_type": "text"
+              "value_type": "boolean"
             },
             {
               "cell": {
@@ -2664,7 +2664,7 @@
               "source_ref": "源xlsx!境外销售收入检查D4-26!R13",
               "stable_field_key": "overseas_sales_rows/{row_uuid}/check_declaration",
               "store_item_id": "D4-26-rows",
-              "value_type": "text"
+              "value_type": "boolean"
             },
             {
               "cell": {
@@ -2679,7 +2679,7 @@
               "source_ref": "源xlsx!境外销售收入检查D4-26!S13",
               "stable_field_key": "overseas_sales_rows/{row_uuid}/check_eport_data",
               "store_item_id": "D4-26-rows",
-              "value_type": "text"
+              "value_type": "boolean"
             }
           ],
           "footer_anchor": {
@@ -2753,7 +2753,7 @@
               "source_ref": "源xlsx!识别未披露的关联方D4-27!C15",
               "stable_field_key": "undisclosed_rp_rows/{row_uuid}/is_personal_customer",
               "store_item_id": "D4-27-rows",
-              "value_type": "text"
+              "value_type": "boolean"
             },
             {
               "cell": {
@@ -2768,7 +2768,7 @@
               "source_ref": "源xlsx!识别未披露的关联方D4-27!D15",
               "stable_field_key": "undisclosed_rp_rows/{row_uuid}/is_customer_legal",
               "store_item_id": "D4-27-rows",
-              "value_type": "text"
+              "value_type": "boolean"
             },
             {
               "cell": {
@@ -2783,7 +2783,7 @@
               "source_ref": "源xlsx!识别未披露的关联方D4-27!E15",
               "stable_field_key": "undisclosed_rp_rows/{row_uuid}/is_contract_signer",
               "store_item_id": "D4-27-rows",
-              "value_type": "text"
+              "value_type": "boolean"
             },
             {
               "cell": {
@@ -2798,7 +2798,7 @@
               "source_ref": "源xlsx!识别未披露的关联方D4-27!F15",
               "stable_field_key": "undisclosed_rp_rows/{row_uuid}/is_exec_relative",
               "store_item_id": "D4-27-rows",
-              "value_type": "text"
+              "value_type": "boolean"
             },
             {
               "cell": {
@@ -2813,7 +2813,7 @@
               "source_ref": "源xlsx!识别未披露的关联方D4-27!G15",
               "stable_field_key": "undisclosed_rp_rows/{row_uuid}/is_finance_dept",
               "store_item_id": "D4-27-rows",
-              "value_type": "text"
+              "value_type": "boolean"
             },
             {
               "cell": {
@@ -2828,7 +2828,7 @@
               "source_ref": "源xlsx!识别未披露的关联方D4-27!H15",
               "stable_field_key": "undisclosed_rp_rows/{row_uuid}/is_mgmt_dept",
               "store_item_id": "D4-27-rows",
-              "value_type": "text"
+              "value_type": "boolean"
             },
             {
               "cell": {
@@ -2843,7 +2843,7 @@
               "source_ref": "源xlsx!识别未披露的关联方D4-27!I15",
               "stable_field_key": "undisclosed_rp_rows/{row_uuid}/is_tech_dept",
               "store_item_id": "D4-27-rows",
-              "value_type": "text"
+              "value_type": "boolean"
             },
             {
               "cell": {
@@ -2858,7 +2858,7 @@
               "source_ref": "源xlsx!识别未披露的关联方D4-27!J15",
               "stable_field_key": "undisclosed_rp_rows/{row_uuid}/is_production_dept",
               "store_item_id": "D4-27-rows",
-              "value_type": "text"
+              "value_type": "boolean"
             },
             {
               "cell": {
@@ -2873,7 +2873,7 @@
               "source_ref": "源xlsx!识别未披露的关联方D4-27!K15",
               "stable_field_key": "undisclosed_rp_rows/{row_uuid}/is_marketing_dept",
               "store_item_id": "D4-27-rows",
-              "value_type": "text"
+              "value_type": "boolean"
             },
             {
               "cell": {
@@ -2888,7 +2888,7 @@
               "source_ref": "源xlsx!识别未披露的关联方D4-27!L15",
               "stable_field_key": "undisclosed_rp_rows/{row_uuid}/is_other",
               "store_item_id": "D4-27-rows",
-              "value_type": "text"
+              "value_type": "boolean"
             },
             {
               "cell": {
@@ -3144,7 +3144,7 @@
               "source_ref": "源xlsx!客户信息核查清单D4-28!J14",
               "stable_field_key": "customer_checklist_rows/{row_uuid}/method_business_info",
               "store_item_id": "D4-28-rows",
-              "value_type": "text"
+              "value_type": "boolean"
             },
             {
               "cell": {
@@ -3159,7 +3159,7 @@
               "source_ref": "源xlsx!客户信息核查清单D4-28!K14",
               "stable_field_key": "customer_checklist_rows/{row_uuid}/method_internet",
               "store_item_id": "D4-28-rows",
-              "value_type": "text"
+              "value_type": "boolean"
             },
             {
               "cell": {
@@ -3174,7 +3174,7 @@
               "source_ref": "源xlsx!客户信息核查清单D4-28!L14",
               "stable_field_key": "customer_checklist_rows/{row_uuid}/method_confirmation",
               "store_item_id": "D4-28-rows",
-              "value_type": "text"
+              "value_type": "boolean"
             },
             {
               "cell": {
@@ -3189,7 +3189,7 @@
               "source_ref": "源xlsx!客户信息核查清单D4-28!M14",
               "stable_field_key": "customer_checklist_rows/{row_uuid}/method_interview",
               "store_item_id": "D4-28-rows",
-              "value_type": "text"
+              "value_type": "boolean"
             },
             {
               "cell": {
@@ -3204,7 +3204,7 @@
               "source_ref": "源xlsx!客户信息核查清单D4-28!N14",
               "stable_field_key": "customer_checklist_rows/{row_uuid}/method_field_visit",
               "store_item_id": "D4-28-rows",
-              "value_type": "text"
+              "value_type": "boolean"
             },
             {
               "cell": {

@@ -84,7 +84,53 @@ D4-25 **13** 列 / D4-26 **19** 列（14 主 + 5 二级）/ D4-27 **18** 列 / D
   - ✅ **证据**：13 passed（含 `test_selfcheck_reverse_wrong_label_must_fail` / `test_selfcheck_strip_ts_comments_is_load_bearing` / `test_selfcheck_xlsx_normalize_is_load_bearing`）。
   - _Requirements: 1.1, 1.2, 1.3, 1.4, 2.1, 9.1, 9.2_
 
-- [x] 2. 双模式回写判据守卫
+- [x] 2. 双模式回写判据守卫（🔴 **2026-09-19 复盘重写：原判据测的是死代码**）
+  - 🔴 **原实现的假绿**：`ipoSyncBridge.spec.ts` 测的是 `ipoChecklistSchema.rowsToSheet` /
+    `sheetToRows` —— 这两个函数在生产代码里**零调用方**（四组件走平台桥 `useWorkpaperSyncBridge`
+    + `readStoreProjection`，projection 由**服务端现算**，`workpaperSyncApi.ts` 明文「前端不得重造
+    列 → stable-key 映射」）。更糟的是它们的规则与后端 provider **已经分叉**：
+    | 环节 | 前端死函数 | 后端生产路径 |
+    |---|---|---|
+    | 行定位 | 按 `seq` 排序推网格行序 | UUID 列 `row_from="row_identity"`（顺序无关）|
+    | checkbox | `true→1` 转换 | `value_type="text"` 原值照抄（**无转换**）|
+    | 空行 | 显式跳过全空行 | 要求 `rowId`，缺失直接抛错 |
+    | 列定位 | `columns` 数组下标隐含 | 显式列字母 + `mapping_digest` 冻结 |
+    即「测了一个不参与运行、且规则已错的实现」——Property 6/7/8 在生产路径上**零覆盖**
+    （全 `backend/` 唯一 import 该 provider 的测试只读 `_SHEETS` 常量，从不调投影函数；
+    而同目录其它 D4 受管表都有 roundtrip 测试）。
+  - ✅ **已处置**：
+    - 删除 `rowsToSheet` / `sheetToRows` / `truthyCheckbox` / `parseNumeric`（0 调用方，
+      符合删旧代码铁律），原位留「别再加回来 + 真源在后端 provider」的说明块。
+    - `ipoSyncBridge.spec.ts` 重写为**前端这一侧真正该管的事**（列规格形态：列数冻结、
+      两级表头父组各 5 子列且全 checkbox、D4-27 10 勾选列 + total 派生、派生列与 intra_sheet
+      公式双向锁死、列 key 唯一），并加一条**防回归判据**：`rowsToSheet`/`sheetToRows`
+      必须保持 undefined（谁加回来就红）。
+    - **P6/P7/P8 迁到生产路径**：新增 `backend/tests/workpaper_sync/test_d4_ipo_checklist_store_roundtrip.py`
+      （28 passed），真跑 `build_store_projection` → `merge_projection_into_rows`，用**真实解析的契约**
+      （`D4.build_contract_payload()` → `parse_contract`）而非 stub：逐列往返相等 / 金额容差 0.005 /
+      行身份权威（base_rows 倒序不串行）/ 缺 rowId 拒绝 / 重复 rowId 拒绝 / 空 store 零行 /
+      D4-27 total 不入契约且在 mask / checkbox 布尔原样透传（**如实冻结现状**）/ mapping_digest 冻结。
+    - 变异探针「投影 4」原也全锚在死代码上（`--check-anchors` 删函数后立刻 4 个 MISS，
+      证明它们从未守护任何会运行的代码）→ 重锚到 provider：`proj-row-identity` /
+      `proj-dup-identity` / `proj-mask-leak` / `proj-json-path`，**实跑变异逐条确认 RED**，
+      锚点恢复 15/15 唯一命中。
+  - ✅ **checkbox「勾选=1」口径已接通（2026-09-19，不再是待裁决）**：源模板口径是「勾选=1 / 未勾=空」，
+    但接通前 checkbox 列契约是 `value_type="text"`、provider 原值照抄布尔 ⇒ 布尔 `True` 会落成
+    OOXML 内联字符串 `"True"` 而非数字/布尔，「1 ↔ true」在生产路径**没有实现者**。
+    - 改法（复用平台 BP-22 已有的 boolean 链路，最小面）：D4-26/27/28 的 20 个勾选列
+      `value_type` 从 `text` 改 `boolean`（D4-27 的 `is_duplicate_name` 是 Y/N select，保持 text）；
+      `build_store_projection` 勾选 `True`→`True`、未勾 `False/空`→`None`（未勾落空格，不落 `<v>0>`）；
+      `merge_projection_into_rows` 回读 `None`/未勾→`False`（前端 el-checkbox 要严格布尔）。
+      重生成契约 JSON（`generate_phase5_d4_contract.py --apply`，精确 20 行 text→boolean，
+      `mapping_digest` 不含 value_type 故不变，`assert_contract_file_matches_source` 转绿）。
+    - **真 OOXML 端到端实测**（`test_d4_ipo_checkbox_materialize_roundtrip.py`）：真跑
+      materialize→extract，字节级断言勾选落**真布尔格**（无 `>True<` 内联字符串）、extract 读回 `True`、
+      未勾落空格读回缺席/None（不为 0）；反向验证：把一列改回 `text` → 2 tests ERROR。
+    - 守卫：`test_d4_ipo_checklist_store_roundtrip.py` +8（勾选列枚举 boolean / 勾→True 未勾→None /
+      merge 回读严格布尔），36 passed；契约 JSON 断言 + 跨语言契约 + 变异锚点 15/15 全绿。
+  - _Requirements: 2.1, 2.2, 2.3, 2.4, 2.5, 2.6, 2.7, 9.7_
+
+- [x] 2b. （原 Task 2 正文，保留作历史）双模式回写判据守卫
   - `audit-platform/frontend/src/components/workpaper/d4/ipo/__tests__/ipoSyncBridge.spec.ts`：
     rows → OO 投影数值容差 0.005；OO → rows 全空行不产生行记录；投影失败 fail-visible（成功文案不得出现）。
   - 🔴 冲突裁决 / durable ack / 三方合并由**平台桥** `useWorkpaperSyncBridge` 兜（governance C1），
@@ -256,6 +302,20 @@ D4-25 **13** 列 / D4-26 **19** 列（14 主 + 5 二级）/ D4-27 **18** 列 / D
     只看退出码会误判后三态为 RED。锚点分布 15 个（列规格 3 · 投影 4 · 公式 4 · 导入导出 2 · 渲染 2）。
   - ✅ **证据**：脚本文件存在；变异锚点见脚本内 `--check-anchors`。
   - _Requirements: 9.5, 9.7_
+
+- [x] 17b. CI job 补齐缺失守卫（2026-09-19 复盘）
+  - 🔴 **发现**：`d4-ipo-checklist` job 的后端步骤**只跑了 `test_ipo_checklist_column_contract.py` 一条**。
+    未进 CI 的有三条，其中一条是**既存**守卫：
+    - `test_d4_ipo_checklist_cross_lang_contract.py`（既存！正是抓 `d425-managed` vs
+      `d4-25-managed` 这类「两侧常量各自都对、拼起来不通」的漂移——不进 CI 等于没有）
+    - `test_d4_ipo_checklist_store_roundtrip.py`（本轮新增，P6/P7/P8 生产路径）
+    - `test_auto_data_row_level_params.py`（本轮新增，表间提取的参数通道；该端点此前零测试）
+  - ✅ 三条已加进 job（8 → 11 steps）；依赖从 `pytest+openpyxl` 升级为
+    `pip install -r backend/requirements.txt`（新判据要 import `app.*`；**全部不连库** ——
+    provider 是纯函数、端点用 monkeypatch 替调度器）。YAML 解析有效，**173 jobs 不变，未触碰其他 job**。
+  - ✅ 前端步骤是整目录 `npx vitest run src/components/workpaper/d4/ipo/__tests__/`，
+    本轮新增的 `ipoInterSheetFetch.spec.ts` / `ipoChecklistTabManualLock.spec.ts` **自动纳入**。
+  - _Requirements: 9.6, 9.8_
 
 - [x] 17. 后端测试与 CI job
   - ✅ **CI job 已加**：`governance-checks.yml` 末尾 `fs_append` 新增 `d4-ipo-checklist` job（8 steps）：

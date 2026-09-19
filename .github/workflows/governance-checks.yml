@@ -5938,10 +5938,28 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - name: Install backend test deps
-        run: python -m pip install pytest==8.4.2 openpyxl
+      # 三向列契约与变异锚点只需纯解析依赖；下面的 projection roundtrip / 跨语言契约 /
+      # auto-data 端点判据要 import app.*（fastapi/sqlalchemy/pydantic），故装全量 requirements。
+      # 这些判据全部**不连库**（provider 是纯函数，端点用 monkeypatch 替调度器）。
+      - name: Install backend deps
+        run: python -m pip install -r backend/requirements.txt
       - name: Run IPO checklist column three-way contract (列规格↔_SHEET_HEADERS↔源模板)
         run: python -m pytest backend/tests/test_ipo_checklist_column_contract.py -q
+      - name: Run IPO checklist store projection roundtrip (P6/P7/P8 生产路径)
+        # 🔴 复盘补：Property 6/7/8 原先只被前端死函数（rowsToSheet/sheetToRows，零调用方）
+        #    覆盖，生产路径零守卫。这条真跑 build_store_projection → merge_projection_into_rows。
+        run: python -m pytest backend/tests/workpaper_sync/test_d4_ipo_checklist_store_roundtrip.py -q
+      - name: Run IPO checkbox materialize roundtrip (勾选=1 真 OOXML 往返)
+        # 🔴 复盘补：checkbox「勾选=1/未勾=空」口径此前无实现者（value_type=text→布尔落 "True"）。
+        #    这条真跑 materialize→extract，证明勾选落 OOXML 布尔 <v>1</v> 且读回 True、未勾读回空。
+        run: python -m pytest backend/tests/workpaper_sync/test_d4_ipo_checkbox_materialize_roundtrip.py -q
+      - name: Run IPO checklist cross-language contract (后端 sheet_key/json_path ↔ 前端列 key)
+        # 🔴 该守卫此前**已存在但未进 CI** —— 它正是抓 'd425-managed' vs 'd4-25-managed'
+        #    这类两侧常量各自都对、拼起来不通的漂移。
+        run: python -m pytest backend/tests/workpaper_sync/test_d4_ipo_checklist_cross_lang_contract.py -q
+      - name: Run auto-data row-level param forwarding (表间提取的参数通道)
+        # 🔴 复盘补：这个端点此前零测试覆盖，而它不传行级参数会让四张表的表间提取恒返空。
+        run: python -m pytest backend/tests/test_auto_data_row_level_params.py -q
       - name: Verify IPO checklist mutation anchors (15/15 唯一命中)
         run: python backend/scripts/verify/verify_ipo_checklist_anchors.py --check-anchors
       - uses: actions/setup-node@v4

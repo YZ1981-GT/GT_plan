@@ -195,92 +195,26 @@ export const DERIVED_COLUMNS: Record<string, readonly string[]> = Object.fromEnt
 // ═══════════════════════════════════════════════════════════════════════════
 export type ChecklistRow = Record<string, unknown> & { rowId: string; seq: number }
 
-// ── 投影值转换 ───────────────────────────────────────────────────────────────
-function truthyCheckbox(v: unknown): boolean {
-  if (v === true) return true
-  if (typeof v === 'number') return v === 1
-  const s = String(v ?? '').trim()
-  return s === '1' || s === 'true' || s === 'Y' || s === 'y' || s === '是' || s === '√'
-}
-
-/**
- * 解析数值单元格：非数字（含 `12.3%`）→ 按数值解析，失败 → null（禁写 NaN）。
- * 百分比文本 `12.3%` → 0.123。
- */
-function parseNumeric(v: unknown): number | null {
-  if (v == null || v === '') return null
-  if (typeof v === 'number') return Number.isFinite(v) ? v : null
-  let s = String(v).trim().replace(/,/g, '')
-  if (s === '') return null
-  let pct = false
-  if (s.endsWith('%')) {
-    pct = true
-    s = s.slice(0, -1)
-  }
-  const n = Number(s)
-  if (!Number.isFinite(n)) return null
-  return pct ? n / 100 : n
-}
-
-/**
- * rows → OO sheet 数据区二维数组（按列规格顺序，逐行）。
- * - 行按 seq 升序
- * - checkbox → 1（与源模板口径一致）；false/空 → null（空单元格，不写占位文本）
- * - amount/number/percent 写数值不写格式化串
- * - seqColumn 写序号（1-based 由 seq 派生）
- */
-export function rowsToSheet(rows: ChecklistRow[], spec: ChecklistSheetSpec): unknown[][] {
-  const sorted = [...rows].sort((a, b) => (Number(a.seq) || 0) - (Number(b.seq) || 0))
-  return sorted.map((row, idx) =>
-    spec.columns.map((col) => {
-      if (col.seqColumn) return idx + 1
-      const v = row[col.key]
-      if (col.type === 'checkbox') return truthyCheckbox(v) ? 1 : null
-      if (col.type === 'amount' || col.type === 'number' || col.type === 'percent') {
-        const n = parseNumeric(v)
-        return n
-      }
-      return v == null || v === '' ? null : v
-    }),
-  )
-}
-
-/**
- * OO sheet 数据区二维数组 → rows。
- * - 全空行跳过（不产生幽灵空行）
- * - seqColumn 不参与投影（由行序派生 seq）
- * - checkbox：1/true/Y/是 → true，其余 → false
- * - number/amount/percent：解析失败 → null（禁写 NaN）
- */
-export function sheetToRows(grid: unknown[][], spec: ChecklistSheetSpec): ChecklistRow[] {
-  const out: ChecklistRow[] = []
-  let seq = 0
-  for (const gridRow of grid) {
-    // 判空：所有非序号列都为空
-    const nonSeqCols = spec.columns.filter((c) => !c.seqColumn)
-    const allEmpty = nonSeqCols.every((col) => {
-      const raw = gridRow[spec.columns.indexOf(col)]
-      return raw == null || String(raw).trim() === ''
-    })
-    if (allEmpty) continue
-    seq += 1
-    const row: ChecklistRow = { rowId: `d4-${Date.now().toString(36)}-${seq}`, seq }
-    for (let i = 0; i < spec.columns.length; i++) {
-      const col = spec.columns[i]
-      if (col.seqColumn) continue
-      const raw = gridRow[i]
-      if (col.type === 'checkbox') {
-        row[col.key] = truthyCheckbox(raw)
-      } else if (col.type === 'amount' || col.type === 'number' || col.type === 'percent') {
-        row[col.key] = parseNumeric(raw)
-      } else {
-        row[col.key] = raw == null ? '' : String(raw)
-      }
-    }
-    out.push(row)
-  }
-  return out
-}
+// ═══════════════════════════════════════════════════════════════════════════
+// ⚠️ 这里**不再**有 rows ↔ OO 网格的投影函数（2026-09-19 复盘删除 `rowsToSheet` /
+//    `sheetToRows` / `truthyCheckbox` / `parseNumeric`）。别再加回来。
+//
+// 原因：投影的唯一真源在**后端** provider
+//   `backend/app/services/workpaper_sync/phase5_d4_ipo_checklist_sheets.py`
+//   （`build_store_projection` / `merge_projection_into_rows`）。四个组件走平台桥
+//   `useWorkpaperSyncBridge` + `readStoreProjection`，projection 由**服务端现算**
+//   （`workpaperSyncApi.ts` 明文："前端不得重造列 → stable-key 映射"，Requirement 6.1）。
+//
+// 被删的那两个函数在生产代码里**零调用方**，且其规则与后端**已经分叉**——留着是
+// 「看起来像真源的错真源」，谁照它接线就会引入真 bug：
+//   行定位：它按 `seq` 排序推网格行序 ／ 后端按 UUID 列 `row_from="row_identity"`（顺序无关）
+//   checkbox：它做 `true→1` 转换       ／ 后端 `value_type="text"` 原值照抄（无转换）
+//   空行：   它显式跳过全空行           ／ 后端要求 `rowId`，缺失直接抛错
+//   列定位： 它靠 `columns` 数组下标     ／ 后端用显式列字母 + `mapping_digest` 冻结
+//
+// AC 2.3/2.4 与 Property 6/7/8 的守卫已迁到生产路径：
+//   `backend/tests/workpaper_sync/test_d4_ipo_checklist_store_roundtrip.py`
+// ═══════════════════════════════════════════════════════════════════════════
 
 // ═══════════════════════════════════════════════════════════════════════════
 // 公式真源（IPO_FORMULA_PRESETS）—— 唯一公式字面量来源，组件只引用不定义。

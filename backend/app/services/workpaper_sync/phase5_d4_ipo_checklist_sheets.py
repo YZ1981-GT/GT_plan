@@ -67,6 +67,32 @@ def _resolve_store_path(row: Mapping[str, Any], json_path: str) -> Any:
         return None
 
 
+def _checkbox_json_paths(sheet_code: str) -> frozenset[str]:
+    """该 sheet 里 value_type=boolean 的列的 json_path 集合（勾选框列）。
+
+    唯一真源 = 字段元组第 4 位 `"boolean"`，不另维护列表（防两处漂移）。
+    """
+    return frozenset(
+        spec[4] for spec in _SHEETS[sheet_code]["fields"] if spec[3] == "boolean"
+    )
+
+
+def _coerce_checkbox_to_store(value: Any) -> Any:
+    """HTML store（JS 布尔）→ 投影值：勾选 `True`，未勾（False/空/0）→ `None`。
+
+    🔴 未勾映射为 `None` 而不是 `False`：boolean_literal 落盘时 `None`→空格、`False`→`<v>0</v>`，
+    源模板口径是「勾选=1 / 未勾=空白」，所以未勾必须是 `None`（否则 Excel 里满屏 0）。
+    """
+    if value is True or value == 1 or (isinstance(value, str) and value.strip() in ("1", "true", "True", "是", "Y", "√")):
+        return True
+    return None
+
+
+def _coerce_checkbox_from_projection(value: Any) -> Any:
+    """投影值（真 bool / 未勾 None）→ HTML store：`None`/未勾 → `False`（前端 el-checkbox 要严格布尔）。"""
+    return value is True
+
+
 # ═══════════════════════════════════════════════════════════════════════════
 # D4-25 经销商检查（动态行，单级表头）
 # ═══════════════════════════════════════════════════════════════════════════
@@ -146,11 +172,12 @@ MANAGED_FIELD_SPECS_D426: Final[tuple[tuple[str, str, str, str, str, str], ...]]
     ("confirmed_sales_amount", "L", "editable", "amount", "confirmedSalesAmount", "核查程序确认的销售金额"),
     ("difference", "M", "editable", "amount", "difference", "差异"),
     ("difference_reason", "N", "editable", "text", "differenceReason", "差异原因分析"),
-    ("check_field_visit", "O", "editable", "text", "checkFieldVisit", "实地走访"),
-    ("check_trans_confirm", "P", "editable", "text", "checkTransConfirm", "交易函证"),
-    ("check_customs_confirm", "Q", "editable", "text", "checkCustomsConfirm", "海关函证"),
-    ("check_declaration", "R", "editable", "text", "checkDeclaration", "核对报关单"),
-    ("check_eport_data", "S", "editable", "text", "checkEportData", "电子口岸数据查询"),
+    # 5 个核查程序勾选列：value_type=boolean（勾选落 OOXML 真布尔 <v>1</v>，未勾空格）。
+    ("check_field_visit", "O", "editable", "boolean", "checkFieldVisit", "实地走访"),
+    ("check_trans_confirm", "P", "editable", "boolean", "checkTransConfirm", "交易函证"),
+    ("check_customs_confirm", "Q", "editable", "boolean", "checkCustomsConfirm", "海关函证"),
+    ("check_declaration", "R", "editable", "boolean", "checkDeclaration", "核对报关单"),
+    ("check_eport_data", "S", "editable", "boolean", "checkEportData", "电子口岸数据查询"),
 )
 FORMULA_MASK_D426: Final[tuple[str, ...]] = ()
 EXPECTED_MAPPING_DIGEST_D426: Final[str] = (
@@ -183,17 +210,19 @@ TABLE_NAME_D427: Final[str] = f"GT_{TEMPLATE_ID_D427}_ROWS"
 MANAGED_FIELD_SPECS_D427: Final[tuple[tuple[str, str, str, str, str, str], ...]] = (
     ("seq", "A", "editable", "text", "seq", "序号"),
     ("name", "B", "editable", "text", "name", "姓名"),
-    ("is_personal_customer", "C", "editable", "text", "isPersonalCustomer", "个人客户"),
-    ("is_customer_legal", "D", "editable", "text", "isCustomerLegal", "客户法人"),
-    ("is_contract_signer", "E", "editable", "text", "isContractSigner", "合同签订人"),
-    ("is_exec_relative", "F", "editable", "text", "isExecRelative", "高管亲属"),
-    ("is_finance_dept", "G", "editable", "text", "isFinanceDept", "财务部门"),
-    ("is_mgmt_dept", "H", "editable", "text", "isMgmtDept", "管理部门"),
-    ("is_tech_dept", "I", "editable", "text", "isTechDept", "技术部门"),
-    ("is_production_dept", "J", "editable", "text", "isProductionDept", "生产部门"),
-    ("is_marketing_dept", "K", "editable", "text", "isMarketingDept", "营销部门"),
-    ("is_other", "L", "editable", "text", "isOther", "其他"),
+    # 10 个身份属性勾选列：value_type=boolean（源模板示例 C16=1/G16=1 即勾选态）。
+    ("is_personal_customer", "C", "editable", "boolean", "isPersonalCustomer", "个人客户"),
+    ("is_customer_legal", "D", "editable", "boolean", "isCustomerLegal", "客户法人"),
+    ("is_contract_signer", "E", "editable", "boolean", "isContractSigner", "合同签订人"),
+    ("is_exec_relative", "F", "editable", "boolean", "isExecRelative", "高管亲属"),
+    ("is_finance_dept", "G", "editable", "boolean", "isFinanceDept", "财务部门"),
+    ("is_mgmt_dept", "H", "editable", "boolean", "isMgmtDept", "管理部门"),
+    ("is_tech_dept", "I", "editable", "boolean", "isTechDept", "技术部门"),
+    ("is_production_dept", "J", "editable", "boolean", "isProductionDept", "生产部门"),
+    ("is_marketing_dept", "K", "editable", "boolean", "isMarketingDept", "营销部门"),
+    ("is_other", "L", "editable", "boolean", "isOther", "其他"),
     # M = 总计（=SUM(C:L)）入 mask，不在此列表
+    # 🔴 is_duplicate_name 是 Y/N 文本 select（非勾选框），保持 text，不改 boolean。
     ("is_duplicate_name", "N", "editable", "text", "isDuplicateName", "重名(Y/N)"),
     ("shareholder_exec_relative", "O", "editable", "text", "shareholderExecRelative", "公司股东/高管/亲属/员工"),
     ("annual_sales", "P", "editable", "amount", "annualSales", "年度销售额"),
@@ -240,11 +269,12 @@ MANAGED_FIELD_SPECS_D428: Final[tuple[tuple[str, str, str, str, str, str], ...]]
     ("ar_proportion", "G", "editable", "text", "arProportion", "占期末余额比重"),
     ("contract_liab_balance", "H", "editable", "amount", "contractLiabBalance", "合同负债期末余额"),
     ("contract_liab_proportion", "I", "editable", "text", "contractLiabProportion", "占期末余额比重"),
-    ("method_business_info", "J", "editable", "text", "methodBusinessInfo", "工商资料查询"),
-    ("method_internet", "K", "editable", "text", "methodInternet", "互联网信息查询"),
-    ("method_confirmation", "L", "editable", "text", "methodConfirmation", "函证"),
-    ("method_interview", "M", "editable", "text", "methodInterview", "视频、电话访谈"),
-    ("method_field_visit", "N", "editable", "text", "methodFieldVisit", "实地走访"),
+    # 5 个核查方式勾选列：value_type=boolean（勾选落 <v>1</v>，未勾空格）。
+    ("method_business_info", "J", "editable", "boolean", "methodBusinessInfo", "工商资料查询"),
+    ("method_internet", "K", "editable", "boolean", "methodInternet", "互联网信息查询"),
+    ("method_confirmation", "L", "editable", "boolean", "methodConfirmation", "函证"),
+    ("method_interview", "M", "editable", "boolean", "methodInterview", "视频、电话访谈"),
+    ("method_field_visit", "N", "editable", "boolean", "methodFieldVisit", "实地走访"),
     ("index_no", "O", "editable", "text", "indexNo", "索引号"),
 )
 FORMULA_MASK_D428: Final[tuple[str, ...]] = ()
@@ -464,6 +494,7 @@ def build_store_projection(sheet_code: str, payload, *, contract, limits=None):
     budget = StreamingProjectionBudget(lim)
     values: dict[str, FieldValue] = {}
     row_keys: list[str] = []
+    checkbox_paths = _checkbox_json_paths(sheet_code)
     for identity, row in _iter_store_rows(
         payload, identity_key=s["identity_key"], item_id=s["store_item_id"]
     ):
@@ -473,9 +504,14 @@ def build_store_projection(sheet_code: str, payload, *, contract, limits=None):
             spec = contract.field_by_stable_key(stable_key_for(sheet_code, column_key))
             budget.add_field()
             sk = stable_key_for(sheet_code, column_key, identity)
+            raw = _resolve_store_path(row, json_path)
+            # checkbox 列：JS 布尔 → 勾选 True / 未勾 None（源模板「1 / 空」口径，见 _coerce_*）。
+            cell_value = (
+                _coerce_checkbox_to_store(raw) if json_path in checkbox_paths else raw
+            )
             values[sk] = FieldValue(
                 stable_key=sk,
-                value=_resolve_store_path(row, json_path),
+                value=cell_value,
                 value_type=spec.value_type,
                 mode=spec.mode,
                 row_key=identity,
@@ -497,6 +533,7 @@ def merge_projection_into_rows(
     table_key = s["table_key"]
     identity_key = s["identity_key"]
     field_to_path = {spec[0]: spec[4] for spec in s["fields"]}
+    checkbox_paths = _checkbox_json_paths(sheet_code)
     prefix = f"{table_key}/"
 
     by_id: dict[str, dict[str, Any]] = {}
@@ -529,7 +566,11 @@ def merge_projection_into_rows(
         if not json_path:
             continue
         visited += 1
-        if set_json_path(target, json_path, getattr(fv, "value", None)):
+        write_value = getattr(fv, "value", None)
+        # checkbox 列：真 bool / 未勾 None → 前端 el-checkbox 要严格布尔（None/未勾 → False）。
+        if json_path in checkbox_paths:
+            write_value = _coerce_checkbox_from_projection(write_value)
+        if set_json_path(target, json_path, write_value):
             applied += 1
             touched.add(str(rid))
     return [by_id[rid] for rid in order], applied, visited, touched
