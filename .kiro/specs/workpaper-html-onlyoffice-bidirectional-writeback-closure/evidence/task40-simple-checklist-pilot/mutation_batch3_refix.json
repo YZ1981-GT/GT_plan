@@ -1,0 +1,97 @@
+[
+  {
+    "id": "M14",
+    "side": "be",
+    "want": "test_task40_simple_checklist_pilot.py::TestContractIsGroundedInTheTemplate::test_uuid_column_sits_right_of_the_managed_business_columns",
+    "why": "隐藏 UUID 列落到受管业务列内仍绿 ⇒ 注入会覆盖可见业务单元格（Requirement 6.13）",
+    "verdict": "RED",
+    "summary": "28 failed, 54 passed in 7.65s",
+    "added": [
+      "test_task40_simple_checklist_pilot.py::TestContractIsGroundedInTheTemplate::test_disk_contract_matches_the_source_of_truth",
+      "test_task40_simple_checklist_pilot.py::TestContractIsGroundedInTheTemplate::test_mutated_contract_payload_is_rejected",
+      "test_task40_simple_checklist_pilot.py::TestContractIsGroundedInTheTemplate::test_uuid_column_sits_right_of_the_managed_business_columns",
+      "test_task40_simple_checklist_pilot.py::TestPublishDagIsOneWay::test_contract_payload_references_both_and_no_bundle",
+      "test_task40_simple_checklist_pilot.py::TestPublishDagIsOneWay::test_instrumentation_declares_no_disproved_anchor",
+      "test_task40_simple_checklist_pilot.py::TestPublishDagIsOneWay::test_instrumentation_payload_references_template_only",
+      "test_task40_simple_checklist_pilot.py::TestPublishDagIsOneWay::test_instrumentation_sheet_key_matches_the_contract",
+      "test_task40_simple_checklist_pilot.py::TestPublishDagIsOneWay::test_template_payload_has_no_self_or_forward_reference",
+      "test_task40_simple_checklist_pilot_pg.py::test_black_box_scenarios_are_unverifiable",
+      "test_task40_simple_checklist_pilot_pg.py::test_bundle_digest_matches_the_canonical_recompute",
+      "test_task40_simple_checklist_pilot_pg.py::test_bundle_is_non_null_and_all_children_are_approved",
+      "test_task40_simple_checklist_pilot_pg.py::test_download_only_scenario_has_zero_operation_and_application",
+      "test_task40_simple_checklist_pilot_pg.py::test_every_required_scenario_has_a_persisted_row",
+      "test_task40_simple_checklist_pilot_pg.py::test_every_scenario_row_binds_a_published_trace_bundle",
+      "test_task40_simple_checklist_pilot_pg.py::test_field_level_oracles_really_ran_the_merge",
+      "test_task40_simple_checklist_pilot_pg.py::test_four_definitions_and_one_bundle_are_published",
+      "test_task40_simple_checklist_pilot_pg.py::test_no_entity_is_reused_across_scenarios",
+      "test_task40_simple_checklist_pilot_pg.py::test_no_phase_crashed_during_collection",
+      "test_task40_simple_checklist_pilot_pg.py::test_ordinals_are_dense_and_unique",
+      "test_task40_simple_checklist_pilot_pg.py::test_pilot_class_stays_unverifiable_after_this_run",
+      "test_task40_simple_checklist_pilot_pg.py::test_plan_uses_the_pilot_bundle_and_derives_a_non_empty_set",
+      "test_task40_simple_checklist_pilot_pg.py::test_property25_different_field_merge_passes_on_the_pilot_contract",
+      "test_task40_simple_checklist_pilot_pg.py::test_property26_same_field_conflict_passes_on_the_pilot_contract",
+      "test_task40_simple_checklist_pilot_pg.py::test_required_set_covers_every_unconditional_family",
+      "test_task40_simple_checklist_pilot_pg.py::test_reused_entity_is_refused_at_write_time",
+      "test_task40_simple_checklist_pilot_pg.py::test_run_is_not_verified_without_real_onlyoffice",
+      "test_task40_simple_checklist_pilot_pg.py::test_run_row_freezes_the_pilot_identity",
+      "test_task40_simple_checklist_pilot_pg.py::test_upstream_gap_scenarios_are_failed_not_unverifiable"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task40_simple_checklist_pilot.py::TestContractIsGroundedInTheTemplate::test_uuid_column_sits_right_of_the_managed_business_columns"
+    ],
+    "added_files": [
+      "test_task40_simple_checklist_pilot.py",
+      "test_task40_simple_checklist_pilot_pg.py"
+    ],
+    "restored": true,
+    "seconds": 10.8
+  },
+  {
+    "id": "M15",
+    "side": "be",
+    "want": "test_task40_simple_checklist_pilot.py::TestContractIsGroundedInTheTemplate::test_uuid_column_sits_right_of_the_managed_business_columns",
+    "why": "数据区末行少一行仍绿 ⇒ 模板留的可增行（第 23 行）被排除在受管区域外，OO 在那里录入的值永远读不回来",
+    "verdict": "RED",
+    "summary": "25 failed, 57 passed in 7.58s",
+    "added": [
+      "test_task40_simple_checklist_pilot.py::TestContractIsGroundedInTheTemplate::test_disk_contract_matches_the_source_of_truth",
+      "test_task40_simple_checklist_pilot.py::TestContractIsGroundedInTheTemplate::test_formula_column_is_really_a_formula_in_the_template",
+      "test_task40_simple_checklist_pilot.py::TestContractIsGroundedInTheTemplate::test_formula_mask_covers_the_formula_column",
+      "test_task40_simple_checklist_pilot.py::TestContractIsGroundedInTheTemplate::test_uuid_column_sits_right_of_the_managed_business_columns",
+      "test_task40_simple_checklist_pilot.py::TestPublishDagIsOneWay::test_contract_payload_references_both_and_no_bundle",
+      "test_task40_simple_checklist_pilot_pg.py::test_black_box_scenarios_are_unverifiable",
+      "test_task40_simple_checklist_pilot_pg.py::test_bundle_digest_matches_the_canonical_recompute",
+      "test_task40_simple_checklist_pilot_pg.py::test_bundle_is_non_null_and_all_children_are_approved",
+      "test_task40_simple_checklist_pilot_pg.py::test_download_only_scenario_has_zero_operation_and_application",
+      "test_task40_simple_checklist_pilot_pg.py::test_every_required_scenario_has_a_persisted_row",
+      "test_task40_simple_checklist_pilot_pg.py::test_every_scenario_row_binds_a_published_trace_bundle",
+      "test_task40_simple_checklist_pilot_pg.py::test_field_level_oracles_really_ran_the_merge",
+      "test_task40_simple_checklist_pilot_pg.py::test_four_definitions_and_one_bundle_are_published",
+      "test_task40_simple_checklist_pilot_pg.py::test_no_entity_is_reused_across_scenarios",
+      "test_task40_simple_checklist_pilot_pg.py::test_no_phase_crashed_during_collection",
+      "test_task40_simple_checklist_pilot_pg.py::test_ordinals_are_dense_and_unique",
+      "test_task40_simple_checklist_pilot_pg.py::test_pilot_class_stays_unverifiable_after_this_run",
+      "test_task40_simple_checklist_pilot_pg.py::test_plan_uses_the_pilot_bundle_and_derives_a_non_empty_set",
+      "test_task40_simple_checklist_pilot_pg.py::test_property25_different_field_merge_passes_on_the_pilot_contract",
+      "test_task40_simple_checklist_pilot_pg.py::test_property26_same_field_conflict_passes_on_the_pilot_contract",
+      "test_task40_simple_checklist_pilot_pg.py::test_required_set_covers_every_unconditional_family",
+      "test_task40_simple_checklist_pilot_pg.py::test_reused_entity_is_refused_at_write_time",
+      "test_task40_simple_checklist_pilot_pg.py::test_run_is_not_verified_without_real_onlyoffice",
+      "test_task40_simple_checklist_pilot_pg.py::test_run_row_freezes_the_pilot_identity",
+      "test_task40_simple_checklist_pilot_pg.py::test_upstream_gap_scenarios_are_failed_not_unverifiable"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task40_simple_checklist_pilot.py::TestContractIsGroundedInTheTemplate::test_disk_contract_matches_the_source_of_truth",
+      "test_task40_simple_checklist_pilot.py::TestContractIsGroundedInTheTemplate::test_formula_column_is_really_a_formula_in_the_template",
+      "test_task40_simple_checklist_pilot.py::TestContractIsGroundedInTheTemplate::test_uuid_column_sits_right_of_the_managed_business_columns"
+    ],
+    "added_files": [
+      "test_task40_simple_checklist_pilot.py",
+      "test_task40_simple_checklist_pilot_pg.py"
+    ],
+    "restored": true,
+    "seconds": 10.8
+  }
+]

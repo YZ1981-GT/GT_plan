@@ -1,0 +1,68 @@
+# F0.yaml — 存货循环函证 (采购与付款)
+# 人工校准: 2026-07-01 基于openpyxl实读源模板
+# 科目: 预付账款/应付票据/应付账款/采购
+# 架构: 复用D0函证模块共享组件(confirmation-*)，F0-5/F0-6为F循环特有替代程序
+
+wp_code: F0
+template_path: backend/wp_templates/F/F0 存货循环函证.xlsx
+template_version: v2025-R5
+applicable_standards:
+  - soe_standalone
+  - listed_standalone
+  - soe_consolidated
+  - listed_consolidated
+
+sheets:
+  底稿目录:
+    component_type: b-index
+    class_code: B-底稿目录
+
+  函证程序表F0A:
+    component_type: a-program-console
+    class_code: A-程序表
+    description: 预付账款/应付票据/应付账款/采购函证程序表
+
+  函证结果汇总表F0-1:
+    component_type: confirmation-summary
+    class_code: D-函证
+    description: 采购循环函证结果汇总表(SSOT枢纽)
+
+  核实被函证单位信息F0-2:
+    component_type: confirmation-entity-verify
+    class_code: D-函证
+    description: 核实被函证单位信息(5阶段分区)
+
+  跟函函证过程控制F0-3:
+    component_type: confirmation-followup
+    class_code: D-函证
+    description: 跟函函证过程控制(段落式)
+
+  函证差异调节表F0-4:
+    component_type: confirmation-diff-reconcile
+    class_code: D-函证
+    description: 函证差异调节表(发函-回函差异)
+
+  函证差异检查表（示例）:
+    component_type: confirmation-diff-checklist
+    class_code: D-函证
+    description: 函证差异检查表示例模板(按客户复制)
+
+  预付及采购替代程序F0-5:
+    component_type: confirmation-alternative-f05
+    class_code: D-函证
+    description: 预付账款/采购替代程序(F循环特有,需新建)
+
+  应付及采购替代程序F0-6:
+    component_type: confirmation-alternative-f06
+    class_code: D-函证
+    description: 应付票据/应付账款/采购替代程序(F循环特有,需新建)
+
+  邮件传真回函可靠性验证F0-7:
+    component_type: confirmation-reliability
+    class_code: D-函证
+    description: 邮件/传真回函可靠性验证记录
+
+  函证程序舞弊风险评价表F0-8:
+    component_type: confirmation-fraud-risk
+    class_code: D-函证
+    description: 函证程序舞弊风险评价表(跨循环复用)

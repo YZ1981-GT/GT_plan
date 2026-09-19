@@ -33,6 +33,50 @@ BUDGET_ALERT_80 = "budget_alert_80"
 BUDGET_OVERRUN = "budget_overrun"
 HANDOVER_RECEIVED = "handover_received"
 
+# deliverable-center P2
+DELIVERABLE_APPROVAL_SUBMITTED = "deliverable_approval_submitted"
+DELIVERABLE_APPROVAL_DONE = "deliverable_approval_done"
+DELIVERABLE_APPROVAL_REJECTED = "deliverable_approval_rejected"
+
+# ── procedure-delegation-notification / Task 11：程序行任务通知（前后端同步）──
+# 跳转严格由 notification.metadata 驱动（不解析中文 content，Req 10.8）；前端
+# notificationTypes.ts 的 PROCEDURE_TASK_* 常量与本文件一一对应。
+PROCEDURE_TASK_ASSIGNED = "procedure_task.assigned"
+PROCEDURE_TASK_REASSIGNED = "procedure_task.reassigned"
+PROCEDURE_TASK_SUBMITTED = "procedure_task.submitted"
+PROCEDURE_TASK_CHANGES_REQUESTED = "procedure_task.changes_requested"
+PROCEDURE_TASK_REVIEWED = "procedure_task.reviewed"
+PROCEDURE_TASK_REVIEWER_MISSING = "procedure_task.reviewer_missing"
+PROCEDURE_TASK_DELEGATION_BATCH = "procedure_task.delegation_batch"
+# 程序行复核对话消息（comment/reply 共用一种消息类型，Req 8.7）
+PROCEDURE_REVIEW_MESSAGE = "procedure_review_message"
+
+# ── adjustment-collaboration-and-propagation：调整分录协作接力 ──
+# 跳转由 metadata.object_type='adjustment_collaboration' + object_id=entry_group_id 驱动。
+ADJ_COLLAB_ASSIGNED = "adjustment_collaboration.assigned"
+ADJ_COLLAB_CONTRIBUTED = "adjustment_collaboration.contributed"
+ADJ_COLLAB_CONFIRMED = "adjustment_collaboration.confirmed"
+ADJ_COLLAB_REJECTED = "adjustment_collaboration.rejected"
+
+ADJ_COLLAB_NOTIFICATION_TYPES = [
+    ADJ_COLLAB_ASSIGNED,
+    ADJ_COLLAB_CONTRIBUTED,
+    ADJ_COLLAB_CONFIRMED,
+    ADJ_COLLAB_REJECTED,
+]
+
+# 程序行任务通知类型集合（供前后端同步契约测试校验一致性）。
+PROCEDURE_TASK_NOTIFICATION_TYPES = [
+    PROCEDURE_TASK_ASSIGNED,
+    PROCEDURE_TASK_REASSIGNED,
+    PROCEDURE_TASK_SUBMITTED,
+    PROCEDURE_TASK_CHANGES_REQUESTED,
+    PROCEDURE_TASK_REVIEWED,
+    PROCEDURE_TASK_REVIEWER_MISSING,
+    PROCEDURE_TASK_DELEGATION_BATCH,
+    PROCEDURE_REVIEW_MESSAGE,
+]
+
 # ── 通知元数据字典 ──────────────────────────────────────────────
 # 每个类型对应 title_template / content_template / jump_route
 # title_template 和 content_template 支持 Python str.format() 占位符
@@ -107,6 +151,21 @@ NOTIFICATION_META: dict[str, dict[str, str]] = {
         "content_template": "有 {workpapers_moved} 张底稿、{issues_moved} 张工单、{assignments_moved} 个项目委派已转交给您",
         "jump_route": "/staff-management",
     },
+    DELIVERABLE_APPROVAL_SUBMITTED: {
+        "title_template": "交付物待审批",
+        "content_template": "项目「{project_name}」的 {doc_type} 交付物已提交审批，请处理",
+        "jump_route": "/projects/{project_id}/deliverable-center",
+    },
+    DELIVERABLE_APPROVAL_DONE: {
+        "title_template": "交付物审批通过",
+        "content_template": "项目「{project_name}」的 {doc_type} 交付物已审批通过",
+        "jump_route": "/projects/{project_id}/deliverable-center",
+    },
+    DELIVERABLE_APPROVAL_REJECTED: {
+        "title_template": "交付物审批驳回",
+        "content_template": "项目「{project_name}」的 {doc_type} 交付物已被驳回：{reason}",
+        "jump_route": "/projects/{project_id}/deliverable-center",
+    },
 }
 
 # ── 所有通知类型列表（便于校验） ──────────────────────────────────
@@ -126,6 +185,23 @@ ALL_NOTIFICATION_TYPES = [
     BUDGET_ALERT_80,
     BUDGET_OVERRUN,
     HANDOVER_RECEIVED,
+    DELIVERABLE_APPROVAL_SUBMITTED,
+    DELIVERABLE_APPROVAL_DONE,
+    DELIVERABLE_APPROVAL_REJECTED,
+    # procedure-delegation-notification / Task 11
+    PROCEDURE_TASK_ASSIGNED,
+    PROCEDURE_TASK_REASSIGNED,
+    PROCEDURE_TASK_SUBMITTED,
+    PROCEDURE_TASK_CHANGES_REQUESTED,
+    PROCEDURE_TASK_REVIEWED,
+    PROCEDURE_TASK_REVIEWER_MISSING,
+    PROCEDURE_TASK_DELEGATION_BATCH,
+    PROCEDURE_REVIEW_MESSAGE,
+    # adjustment-collaboration-and-propagation
+    ADJ_COLLAB_ASSIGNED,
+    ADJ_COLLAB_CONTRIBUTED,
+    ADJ_COLLAB_CONFIRMED,
+    ADJ_COLLAB_REJECTED,
 ]
 
 
@@ -149,6 +225,9 @@ REQUIRED_METADATA_FIELDS: dict[str, list[str]] = {
     BUDGET_ALERT_80: ["object_type", "object_id", "project_id", "project_name", "threshold", "utilization_pct"],
     BUDGET_OVERRUN: ["object_type", "object_id", "project_id", "project_name", "threshold", "utilization_pct"],
     HANDOVER_RECEIVED: ["workpapers_moved", "issues_moved", "assignments_moved"],
+    DELIVERABLE_APPROVAL_SUBMITTED: ["object_type", "object_id", "project_name", "doc_type"],
+    DELIVERABLE_APPROVAL_DONE: ["object_type", "object_id", "project_name", "doc_type"],
+    DELIVERABLE_APPROVAL_REJECTED: ["object_type", "object_id", "project_name", "doc_type", "reason"],
 }
 
 

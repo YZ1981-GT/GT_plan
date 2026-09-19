@@ -90,10 +90,10 @@
       <div class="interest-result">
         <el-descriptions :column="2" size="small" border>
           <el-descriptions-item label="利息总额">
-            <span class="gt-amt">¥ {{ formatAmount(result.interest_amount) }}</span>
+            <span class="gt-amt">¥ {{ prefs.fmt(result.interest_amount) }}</span>
           </el-descriptions-item>
           <el-descriptions-item label="日利息">
-            <span class="gt-amt">¥ {{ formatAmount(result.daily_interest) }}</span>
+            <span class="gt-amt">¥ {{ prefs.fmt(result.daily_interest) }}</span>
           </el-descriptions-item>
           <el-descriptions-item label="计息天数">
             {{ result.period_days }} 天
@@ -147,6 +147,7 @@ import { reactive, ref, computed, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import { api } from '@/services/apiProxy'
 import { handleApiError } from '@/utils/errorHandler'
+import { useDisplayPrefsStore } from '@/stores/displayPrefs'
 
 interface Props {
   visible: boolean
@@ -199,11 +200,8 @@ const isFormValid = computed(() => {
   )
 })
 
-function formatAmount(s: string | number) {
-  const n = Number(s)
-  if (!Number.isFinite(n)) return String(s)
-  return n.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-}
+const prefs = useDisplayPrefsStore()
+
 
 function buildRequestBody(applySheet?: string) {
   return {
@@ -226,7 +224,7 @@ async function onCalc() {
       buildRequestBody(),
     )
     result.value = resp
-    ElMessage.success(`计算完成：利息总额 ¥${formatAmount(resp.interest_amount)}`)
+    ElMessage.success(`计算完成：利息总额 ¥${prefs.fmt(resp.interest_amount)}`)
   } catch (e: any) {
     handleApiError(e, '利息测算计算')
   } finally {

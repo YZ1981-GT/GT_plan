@@ -1,0 +1,350 @@
+[
+  {
+    "id": "M17",
+    "side": "fe",
+    "want": "宿主没给冻结身份 ⇒ 一条明确原因",
+    "why": "宿主没给冻结 bundle/fence 时不再阻断 ⇒ claim 按钮亮起，点下去只能靠服务端拒。AC 5.8 要求 claim 必须冻结非空 bundle 与 fence",
+    "verdict": "RED",
+    "summary": "185/187 passed, numFailedTestSuites=4",
+    "added": [
+      "claim 之前三实体全空且不提供普通重试 宿主没给冻结身份 ⇒ 摘要显示「未提供」、claim 禁用、阻断原因逐条渲染",
+      "recovery 阻断原因与三实体投影 宿主没给冻结身份 ⇒ 一条明确原因（bundle 摘要与写栅栏）"
+    ],
+    "gone": [],
+    "hit": [
+      "claim 之前三实体全空且不提供普通重试 宿主没给冻结身份 ⇒ 摘要显示「未提供」、claim 禁用、阻断原因逐条渲染",
+      "recovery 阻断原因与三实体投影 宿主没给冻结身份 ⇒ 一条明确原因（bundle 摘要与写栅栏）"
+    ],
+    "added_files": [
+      "WorkpaperSyncRecoveryPanel.spec.ts",
+      "workpaperSyncPresentation.spec.ts"
+    ],
+    "restored": true,
+    "seconds": 4.8
+  },
+  {
+    "id": "M18",
+    "side": "fe",
+    "want": "服务端关掉 claim",
+    "why": "忽略服务端给的能力布尔 ⇒ 已 claim / 已终结 / 已过期的 case 仍显示可认领。Task 28 的 router 注释里记着同一个坑（终态集写死字面量导致漂移）",
+    "verdict": "RED",
+    "summary": "185/187 passed, numFailedTestSuites=4",
+    "added": [
+      "claim 之前三实体全空且不提供普通重试 服务端关掉两个动作 ⇒ 两个按钮都不渲染，并给出中文阻断原因",
+      "recovery 阻断原因与三实体投影 服务端关掉 claim ⇒ 原因里带中文状态名"
+    ],
+    "gone": [],
+    "hit": [
+      "claim 之前三实体全空且不提供普通重试 服务端关掉两个动作 ⇒ 两个按钮都不渲染，并给出中文阻断原因",
+      "recovery 阻断原因与三实体投影 服务端关掉 claim ⇒ 原因里带中文状态名"
+    ],
+    "added_files": [
+      "WorkpaperSyncRecoveryPanel.spec.ts",
+      "workpaperSyncPresentation.spec.ts"
+    ],
+    "restored": true,
+    "seconds": 4.6
+  },
+  {
+    "id": "M19",
+    "side": "fe",
+    "want": "claim 前三实体逐项",
+    "why": "claim 前三实体渲染成空白 ⇒ 「还没创建」与「取数失败」不可区分。AC 5.8 的三实体全空是**可观测事实**，必须显式说出来",
+    "verdict": "RED",
+    "summary": "185/187 passed, numFailedTestSuites=4",
+    "added": [
+      "claim 之前三实体全空且不提供普通重试 三实体逐项渲染「尚未创建」，data-entities-present=0",
+      "recovery 阻断原因与三实体投影 claim 前三实体逐项「尚未创建」，presentCount=0"
+    ],
+    "gone": [],
+    "hit": [
+      "claim 之前三实体全空且不提供普通重试 三实体逐项渲染「尚未创建」，data-entities-present=0",
+      "recovery 阻断原因与三实体投影 claim 前三实体逐项「尚未创建」，presentCount=0"
+    ],
+    "added_files": [
+      "WorkpaperSyncRecoveryPanel.spec.ts",
+      "workpaperSyncPresentation.spec.ts"
+    ],
+    "restored": true,
+    "seconds": 4.7
+  },
+  {
+    "id": "M20",
+    "side": "fe",
+    "want": "claim 之前三实体为 null",
+    "why": "三实体齐备恒真 ⇒ claim 之前的 case 也显示「三实体齐备」，而那时 request/application/operation 一个都不存在",
+    "verdict": "RED",
+    "summary": "186/187 passed, numFailedTestSuites=2",
+    "added": [
+      "两条 timeline 各自投影 claim 之前三实体为 null 且 hasThreeEntities=false（不得投影成 0/空串）"
+    ],
+    "gone": [],
+    "hit": [
+      "两条 timeline 各自投影 claim 之前三实体为 null 且 hasThreeEntities=false（不得投影成 0/空串）"
+    ],
+    "added_files": [
+      "workpaperSyncPresentation.spec.ts"
+    ],
+    "restored": true,
+    "seconds": 4.6
+  },
+  {
+    "id": "M21",
+    "side": "fe",
+    "want": "缺 sequence_no 的事件被丢掉",
+    "why": "缺号事件不再丢弃 ⇒ timeline 里出现一行没有序号的事件，而 `(stream, parent_id, sequence_no)` 才是事件的业务身份",
+    "verdict": "RED",
+    "summary": "186/187 passed, numFailedTestSuites=2",
+    "added": [
+      "两条 timeline 各自投影 缺 sequence_no 的事件被丢掉而不是编一个序号"
+    ],
+    "gone": [],
+    "hit": [
+      "两条 timeline 各自投影 缺 sequence_no 的事件被丢掉而不是编一个序号"
+    ],
+    "added_files": [
+      "workpaperSyncPresentation.spec.ts"
+    ],
+    "restored": true,
+    "seconds": 4.6
+  },
+  {
+    "id": "M22",
+    "side": "fe",
+    "want": "占位符不是空串也不是",
+    "why": "缺读取面的摘要显示成一个破折号 ⇒ 与「值就是空」不可区分。已登记缺口必须显式说出「无读取面」，否则下一个人会以为它本该是空",
+    "verdict": "RED",
+    "summary": "184/187 passed, numFailedTestSuites=6",
+    "added": [
+      "追溯 chips 逐项来自桥，缺读取面时显式留白 还没有 descriptor / operation 时每个 chip 都是显式占位符，不是 0 或空白",
+      "追溯事实逐项落在 DOM 上 还没有 descriptor 时每条事实都是占位符（不给 0 / 空串）",
+      "追溯缺口登记表 占位符不是空串也不是 0/—（空白会被读成「值就是空」）"
+    ],
+    "gone": [],
+    "hit": [
+      "追溯缺口登记表 占位符不是空串也不是 0/—（空白会被读成「值就是空」）"
+    ],
+    "added_files": [
+      "WorkpaperSyncDetailsDrawer.spec.ts",
+      "WorkpaperSyncStatusBar.spec.ts",
+      "workpaperSyncPresentation.spec.ts"
+    ],
+    "restored": true,
+    "seconds": 4.7
+  },
+  {
+    "id": "M23",
+    "side": "fe",
+    "want": "五项已登记缺口都有 id/label/reason",
+    "why": "缺口不写成因 ⇒ 界面上只剩一个占位符，读者无从判断是「服务端没给」还是「前端忘了接」。缺口登记的价值全在成因上",
+    "verdict": "RED",
+    "summary": "186/187 passed, numFailedTestSuites=2",
+    "added": [
+      "追溯缺口登记表 五项已登记缺口都有 id/label/reason，且 id 唯一"
+    ],
+    "gone": [],
+    "hit": [
+      "追溯缺口登记表 五项已登记缺口都有 id/label/reason，且 id 唯一"
+    ],
+    "added_files": [
+      "workpaperSyncPresentation.spec.ts"
+    ],
+    "restored": true,
+    "seconds": 4.7
+  },
+  {
+    "id": "M24",
+    "side": "fe",
+    "want": "状态条不自己拼状态文案",
+    "why": "状态条自己编一句成功文案 ⇒ AC 11.3 明令禁止统一显示「同步成功」，Property 48 也要求真失败后不得被成功文案覆盖。文案真源只能是桥",
+    "verdict": "RED",
+    "summary": "176/187 passed, numFailedTestSuites=6",
+    "added": [
+      "Task 34 点名的九类同步形态各有独立中文文案 applied / conflict / refresh_required 三种终局文案互不相同",
+      "Task 34 点名的九类同步形态各有独立中文文案 durable（文件已耐久）与 primary application-bound（已关联）分别可辨",
+      "Task 34 点名的九类同步形态各有独立中文文案 recovery pending 明说尚未创建回写任务，且不提供普通重试",
+      "Task 34 点名的九类同步形态各有独立中文文案 request frozen（正在冻结保存请求）与 accepted 后的等待回传各说各话",
+      "Task 34 点名的九类同步形态各有独立中文文案 命令未被受理（forcesave_frozen）与命令已受理不是同一句话",
+      "close leader 失权后的三种结局在状态条上逐一可辨 close_recovery_required：显式说明无接任者需重新授权，settled 且有具体下一步",
+      "一次真失败之后不被任何成功文案覆盖 applied 之后 reload 失败 ⇒ 头条变成失败原因、阶段带失败前缀、无成功色",
+      "一次真失败之后不被任何成功文案覆盖 用户显式发起新尝试才清掉 sticky error（不是随便一次成功就洗白）",
+      "一次真失败之后不被任何成功文案覆盖 终态（duplicate）上报失败时状态不动但失败仍然可见（sticky）",
+      "每个可观测桥状态各渲染一份互不相同的中文状态 24 个状态的 data-state / 头条文案 / 基调 / 等待语义四项同时正确，阶段标签两两不同",
+      "结构判据 状态条不自己拼状态文案：唯一文案来源是桥的 feedback 与状态表"
+    ],
+    "gone": [],
+    "hit": [
+      "一次真失败之后不被任何成功文案覆盖 applied 之后 reload 失败 ⇒ 头条变成失败原因、阶段带失败前缀、无成功色",
+      "每个可观测桥状态各渲染一份互不相同的中文状态 24 个状态的 data-state / 头条文案 / 基调 / 等待语义四项同时正确，阶段标签两两不同",
+      "结构判据 状态条不自己拼状态文案：唯一文案来源是桥的 feedback 与状态表"
+    ],
+    "added_files": [
+      "WorkpaperSyncStatusBar.spec.ts"
+    ],
+    "restored": true,
+    "seconds": 4.6
+  },
+  {
+    "id": "M25",
+    "side": "fe",
+    "want": "applied 之后 reload 失败",
+    "why": "失败基调不盖过状态基调 ⇒ `applied` 后重载失败时状态条仍是绿色，用户据此以为回写已落地",
+    "verdict": "RED",
+    "summary": "186/187 passed, numFailedTestSuites=2",
+    "added": [
+      "每个可观测桥状态各渲染一份互不相同的中文状态 24 个状态的 data-state / 头条文案 / 基调 / 等待语义四项同时正确，阶段标签两两不同"
+    ],
+    "gone": [],
+    "hit": [
+      "每个可观测桥状态各渲染一份互不相同的中文状态 24 个状态的 data-state / 头条文案 / 基调 / 等待语义四项同时正确，阶段标签两两不同"
+    ],
+    "added_files": [
+      "WorkpaperSyncStatusBar.spec.ts"
+    ],
+    "restored": true,
+    "seconds": 4.8
+  },
+  {
+    "id": "M26",
+    "side": "fe",
+    "want": "命令未被受理（forcesave_frozen）与命令已受理不是同一句话",
+    "why": "失败时阶段标签不加前缀 ⇒ 一个带 sticky error 的 `applied` 会显示成「结构化回写完成」，两种结局在界面上不可辨",
+    "verdict": "RED",
+    "summary": "184/187 passed, numFailedTestSuites=4",
+    "added": [
+      "Task 34 点名的九类同步形态各有独立中文文案 命令未被受理（forcesave_frozen）与命令已受理不是同一句话",
+      "一次真失败之后不被任何成功文案覆盖 applied 之后 reload 失败 ⇒ 头条变成失败原因、阶段带失败前缀、无成功色",
+      "每个可观测桥状态各渲染一份互不相同的中文状态 24 个状态的 data-state / 头条文案 / 基调 / 等待语义四项同时正确，阶段标签两两不同"
+    ],
+    "gone": [],
+    "hit": [
+      "Task 34 点名的九类同步形态各有独立中文文案 命令未被受理（forcesave_frozen）与命令已受理不是同一句话",
+      "一次真失败之后不被任何成功文案覆盖 applied 之后 reload 失败 ⇒ 头条变成失败原因、阶段带失败前缀、无成功色",
+      "每个可观测桥状态各渲染一份互不相同的中文状态 24 个状态的 data-state / 头条文案 / 基调 / 等待语义四项同时正确，阶段标签两两不同"
+    ],
+    "added_files": [
+      "WorkpaperSyncStatusBar.spec.ts"
+    ],
+    "restored": true,
+    "seconds": 4.7
+  },
+  {
+    "id": "M27",
+    "side": "fe",
+    "want": "合法 successor 完成后阶段标签归因于接任者",
+    "why": "接任者代为完成不做归因 ⇒ 与「我自己保存成功」逐字同态。Task 34 明文 successor 接任进展不得渲染成保存成功",
+    "verdict": "RED",
+    "summary": "186/187 passed, numFailedTestSuites=2",
+    "added": [
+      "close leader 失权后的三种结局在状态条上逐一可辨 合法 successor 完成后阶段标签归因于接任者（不与自己保存成功同态）"
+    ],
+    "gone": [],
+    "hit": [
+      "close leader 失权后的三种结局在状态条上逐一可辨 合法 successor 完成后阶段标签归因于接任者（不与自己保存成功同态）"
+    ],
+    "added_files": [
+      "WorkpaperSyncStatusBar.spec.ts"
+    ],
+    "restored": true,
+    "seconds": 4.9
+  },
+  {
+    "id": "M28",
+    "side": "fe",
+    "want": "24 个状态的 data-state",
+    "why": "转圈无条件渲染 ⇒ 终态（duplicate / download-only / close-recovery-required）上永远转圈，正是 Task 34 禁止的无限等待",
+    "verdict": "RED",
+    "summary": "184/187 passed, numFailedTestSuites=4",
+    "added": [
+      "Task 34 点名的九类同步形态各有独立中文文案 duplicate 同时显示 requested → canonical 两个 id，且是 settled 终态",
+      "close leader 失权后的三种结局在状态条上逐一可辨 close_recovery_required：显式说明无接任者需重新授权，settled 且有具体下一步",
+      "每个可观测桥状态各渲染一份互不相同的中文状态 24 个状态的 data-state / 头条文案 / 基调 / 等待语义四项同时正确，阶段标签两两不同"
+    ],
+    "gone": [],
+    "hit": [
+      "Task 34 点名的九类同步形态各有独立中文文案 duplicate 同时显示 requested → canonical 两个 id，且是 settled 终态",
+      "close leader 失权后的三种结局在状态条上逐一可辨 close_recovery_required：显式说明无接任者需重新授权，settled 且有具体下一步",
+      "每个可观测桥状态各渲染一份互不相同的中文状态 24 个状态的 data-state / 头条文案 / 基调 / 等待语义四项同时正确，阶段标签两两不同"
+    ],
+    "added_files": [
+      "WorkpaperSyncStatusBar.spec.ts"
+    ],
+    "restored": true,
+    "seconds": 4.8
+  },
+  {
+    "id": "M29",
+    "side": "fe",
+    "want": "primary 快照下不渲染 duplicate 折叠行",
+    "why": "非 duplicate 也渲染折叠行 ⇒ 一次正常 primary 回写被显示成「已被折叠」，而 requested 与 canonical 此时本来就相同，形态判据分不出来",
+    "verdict": "RED",
+    "summary": "186/187 passed, numFailedTestSuites=2",
+    "added": [
+      "Task 34 点名的九类同步形态各有独立中文文案 primary 快照下不渲染 duplicate 折叠行（不给非 duplicate 编一个 canonical）"
+    ],
+    "gone": [],
+    "hit": [
+      "Task 34 点名的九类同步形态各有独立中文文案 primary 快照下不渲染 duplicate 折叠行（不给非 duplicate 编一个 canonical）"
+    ],
+    "added_files": [
+      "WorkpaperSyncStatusBar.spec.ts"
+    ],
+    "restored": true,
+    "seconds": 4.8
+  },
+  {
+    "id": "M30",
+    "side": "fe",
+    "want": "recovery 期间即便裁决可重试也不给普通重试",
+    "why": "recovery 期间也给普通重试 ⇒ AC 5.8 末句明文 nullable operation 的 recovery case不得进入普通 operation retry",
+    "verdict": "GREEN",
+    "summary": "187/187 passed, numFailedTestSuites=0",
+    "added": [],
+    "gone": [],
+    "hit": [],
+    "added_files": [],
+    "restored": true,
+    "seconds": 4.8
+  },
+  {
+    "id": "M31",
+    "side": "fe",
+    "want": "没有 requested operation 时也不给普通重试",
+    "why": "没有 requested operation 也给重试 ⇒ 点下去桥会拒（`bridge_no_requested_operation`），而 crash 早于 forcesave 时本来就没有可重试的 operation",
+    "verdict": "RED",
+    "summary": "185/187 passed, numFailedTestSuites=2",
+    "added": [
+      "classifySyncFailure 的三个布尔各有一个消费方 recovery 期间即便裁决可重试也不给普通重试（AC 5.8 末句）",
+      "classifySyncFailure 的三个布尔各有一个消费方 没有 requested operation 时也不给普通重试（crash 早于 forcesave）"
+    ],
+    "gone": [],
+    "hit": [
+      "classifySyncFailure 的三个布尔各有一个消费方 没有 requested operation 时也不给普通重试（crash 早于 forcesave）"
+    ],
+    "added_files": [
+      "WorkpaperSyncStatusBar.spec.ts"
+    ],
+    "restored": true,
+    "seconds": 4.6
+  },
+  {
+    "id": "M32",
+    "side": "fe",
+    "want": "409 stale identity ⇒ 三个布尔全 false",
+    "why": "三个 verdict 布尔之一被写死 ⇒ 409 stale identity 之后界面仍宣称可以返回编辑，而 `classifySyncFailure` 在每个分支里都把它判为 false",
+    "verdict": "RED",
+    "summary": "186/187 passed, numFailedTestSuites=2",
+    "added": [
+      "classifySyncFailure 的三个布尔各有一个消费方 409 stale identity ⇒ 三个布尔全 false：重试按钮消失，两条披露显示「禁止」"
+    ],
+    "gone": [],
+    "hit": [
+      "classifySyncFailure 的三个布尔各有一个消费方 409 stale identity ⇒ 三个布尔全 false：重试按钮消失，两条披露显示「禁止」"
+    ],
+    "added_files": [
+      "WorkpaperSyncStatusBar.spec.ts"
+    ],
+    "restored": true,
+    "seconds": 4.5
+  }
+]

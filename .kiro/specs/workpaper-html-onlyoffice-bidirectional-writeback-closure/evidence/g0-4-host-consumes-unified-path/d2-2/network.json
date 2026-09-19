@@ -1,0 +1,59 @@
+{
+  "schema_version": "host-unified-path-network-evidence/v1",
+  "run_id": "g0-4-d2-2-negative-baseline-v1",
+  "entry_id": "xlsx/gt-d2-accounts-receivable",
+  "capture_kind": "deterministic_component_source_trace",
+  "execution_status": "COMPLETED",
+  "positive_state_eligible": false,
+  "complete_for_negative_assertion": true,
+  "complete_for_positive_assertion": false,
+  "requests": [
+    {
+      "method": "GET",
+      "url_template": "/api/workpapers/{wp_id}/d2-sync/status"
+    },
+    {
+      "method": "POST",
+      "url_template": "/api/workpapers/{wp_id}/d2-sync/push-to-excel"
+    },
+    {
+      "method": "POST",
+      "url_template": "/api/workpapers/{wp_id}/d2-sync/forcesave"
+    },
+    {
+      "method": "POST",
+      "url_template": "/api/workpapers/{wp_id}/d2-sync/pull-from-excel"
+    },
+    {
+      "method": "GET",
+      "url_template": "/api/workpapers/{wp_id}/sheets/{sheet}/onlyoffice-config"
+    }
+  ],
+  "source_bindings": [
+    {
+      "path": "audit-platform/frontend/src/components/workpaper/GtD2AccountsReceivable.vue",
+      "sha256": "2b5048ae754a55fcc0e52cca46c1a725cc0d0e46eca8411fa5a67ea58ac5ba27",
+      "required_literals": [
+        "useD2SyncBridge({",
+        "requestForceSave: () => ooSheetRef.value?.forceSave()"
+      ]
+    },
+    {
+      "path": "audit-platform/frontend/src/components/workpaper/sync/useD2SyncBridge.ts",
+      "sha256": "d9936f33dbea3c57d1d77e75ca1de1701a4744ab03405dd97e1c026af33024bd",
+      "required_literals": [
+        "/d2-sync/status",
+        "/d2-sync/push-to-excel",
+        "/d2-sync/pull-from-excel"
+      ]
+    },
+    {
+      "path": "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue",
+      "sha256": "78d814dd91886907511d446c7ef4d4be3f2a78326deaf08ef43dc336d8ded3ba",
+      "required_literals": [
+        "/d2-sync/forcesave",
+        "/onlyoffice-config"
+      ]
+    }
+  ]
+}

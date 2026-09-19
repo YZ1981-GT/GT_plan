@@ -35,7 +35,12 @@ async def wp_chat(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """底稿 LLM 对话 — SSE 流式返回"""
+    """底稿 LLM 对话 — SSE 流式返回
+
+    TODO [zero-downtime-deployment Task 8.1]: 接入 sse_registry
+    - 进入 chat_stream 时 register，退出时 unregister
+    - from app.core.sse_registry import sse_registry
+    """
     svc = WpChatService()
     return StreamingResponse(
         svc.chat_stream(db, wp_id, req.message, req.context),

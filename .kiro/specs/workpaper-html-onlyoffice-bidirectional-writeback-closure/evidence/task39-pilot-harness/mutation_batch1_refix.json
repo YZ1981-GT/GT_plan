@@ -1,0 +1,82 @@
+[
+  {
+    "id": "M04",
+    "side": "be",
+    "want": "test_task39_pilot_harness.py::TestOracleRegistryTwoWayLock::test_a_missing_module_and_a_malformed_ref_are_both_caught",
+    "why": "`module:attr` 形态不再校验 ⇒ 缺 `:` 的 ref 会掉到 `hasattr(module, \"\")` 那条分支上报同一个 kind，形态校验变成不可达。首轮 GREEN 的原因正是判据只断 kind ——改成同时断诊断文案后才能 falsify（共享错误码的经典形态）",
+    "verdict": "RED",
+    "summary": "1 failed, 100 passed in 10.73s",
+    "added": [
+      "test_task39_pilot_harness.py::TestOracleRegistryTwoWayLock::test_a_missing_module_and_a_malformed_ref_are_both_caught"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task39_pilot_harness.py::TestOracleRegistryTwoWayLock::test_a_missing_module_and_a_malformed_ref_are_both_caught"
+    ],
+    "added_files": [
+      "test_task39_pilot_harness.py"
+    ],
+    "restored": true,
+    "seconds": 14.0
+  },
+  {
+    "id": "M05",
+    "side": "be",
+    "want": "test_task39_pilot_harness.py::TestOracleRegistryTwoWayLock::test_a_module_that_fails_to_import_for_a_non_import_reason_still_fails_closed",
+    "why": "import 失败只捕 ImportError ⇒ 模块内语法错/依赖缺失原样穿透，调用侧看到的不是可归因的 oracle_unresolvable。首轮 GREEN 的原因是三个样例全落 ModuleNotFoundError（ImportError 子类）—— 必须用真放盘的语法错模块才可 falsify",
+    "verdict": "RED",
+    "summary": "1 failed, 100 passed in 10.65s",
+    "added": [
+      "test_task39_pilot_harness.py::TestOracleRegistryTwoWayLock::test_a_module_that_fails_to_import_for_a_non_import_reason_still_fails_closed"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task39_pilot_harness.py::TestOracleRegistryTwoWayLock::test_a_module_that_fails_to_import_for_a_non_import_reason_still_fails_closed"
+    ],
+    "added_files": [
+      "test_task39_pilot_harness.py"
+    ],
+    "restored": true,
+    "seconds": 14.0
+  },
+  {
+    "id": "M08",
+    "side": "be",
+    "want": "test_task39_pilot_harness_pg.py::TestPlanIsDerivedFromSourceFacts::test_plan_really_resolves_every_scenarios_production_symbol",
+    "why": "plan 不再逐场景解析生产符号 ⇒ 接线是否存在这条判据在生产路径上不可达。首轮 GREEN 的原因是判据只看 plan 产出的场景 id（少了解析并不改变它）——改成「把某场景的生产符号换成不存在的名字，plan 必须拒」后才可 falsify",
+    "verdict": "RED",
+    "summary": "1 failed, 100 passed in 10.59s",
+    "added": [
+      "test_task39_pilot_harness_pg.py::TestPlanIsDerivedFromSourceFacts::test_plan_really_resolves_every_scenarios_production_symbol"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task39_pilot_harness_pg.py::TestPlanIsDerivedFromSourceFacts::test_plan_really_resolves_every_scenarios_production_symbol"
+    ],
+    "added_files": [
+      "test_task39_pilot_harness_pg.py"
+    ],
+    "restored": true,
+    "seconds": 14.0
+  },
+  {
+    "id": "M14",
+    "side": "be",
+    "want": "test_task39_pilot_harness.py::TestNoRealOnlyOfficeMeansUnverifiable::test_a_merge_scenario_without_three_way_input_is_unverifiable",
+    "why": "字段级场景缺三方 projection 也放行 ⇒ oracle 拿 None 去执行（AttributeError），P25/P26 的判定退化成「什么都没查」。首轮 GREEN 的原因是 want 指向直接调 `evaluate_*` 的判据 —— 那道门在 `run_scenario_oracle` 里，必须走它才测得到",
+    "verdict": "RED",
+    "summary": "1 failed, 100 passed in 10.65s",
+    "added": [
+      "test_task39_pilot_harness.py::TestNoRealOnlyOfficeMeansUnverifiable::test_a_merge_scenario_without_three_way_input_is_unverifiable"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task39_pilot_harness.py::TestNoRealOnlyOfficeMeansUnverifiable::test_a_merge_scenario_without_three_way_input_is_unverifiable"
+    ],
+    "added_files": [
+      "test_task39_pilot_harness.py"
+    ],
+    "restored": true,
+    "seconds": 14.0
+  }
+]

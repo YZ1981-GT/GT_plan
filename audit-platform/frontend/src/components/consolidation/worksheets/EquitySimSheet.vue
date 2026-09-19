@@ -166,7 +166,7 @@ import { ElMessage } from 'element-plus'
 import { confirmBatch, confirmDangerous } from '@/utils/confirm'
 import { useFullscreen } from '@/composables/useFullscreen'
 import { useDisplayPrefsStore } from '@/stores/displayPrefs'
-import { useExcelIO } from '@/composables/useExcelIO'
+import { exportMultiSheetData, useExcelIO } from '@/composables/useExcelIO'
 
 interface CompanyCol { name: string; code?: string; ratio: number }
 interface EquitySimRow {
@@ -355,24 +355,34 @@ async function exportTemplate() {
     Object.fromEntries([r.seq, r.step, r.direction, r.subject, r.detail, r.total ?? '',
       ...(r.values || []).map(v => v ?? '')].map((v, i) => [String(i), v]))
   )
-  // Use raw XLSX for the instruction sheet + data sheet combo
-  const XLSX = await import('xlsx'); const wb = XLSX.utils.book_new()
+  // 改造前这里的注释是「Use raw XLSX for the instruction sheet + data sheet combo」——
+  // 即因为要「说明 sheet + 数据 sheet」两 sheet 组合而绕开了封装。
+  // 现在 exportMultiSheetData 支持纯 AOA 形态的 sheet，这个理由已不成立（B4 批）。
   const instr = [['模拟权益法调整表 — 填写说明'],[],['⚠ 重要提示：'],
     ['1. 在"数据填写"工作表填写，不要修改sheet名称'],
     ['2. 步骤行（紫色背景）为分组标题，无需填写'],
     ['3. 按"项目+二级明细"匹配导入，不要修改项目列文字'],
     ['4. 期初模拟数据可从上年底稿获取或手动输入'],
     ['5. 期末=期初+增加-减少，系统自动计算']]
-  const wsI = XLSX.utils.aoa_to_sheet(instr); wsI['!cols']=[{wch:60}]
-  XLSX.utils.book_append_sheet(wb, wsI, '填写说明')
+
   const ratioArr = ['','','','期末持股比例','', '', ...companies.value.map(c => `${c.ratio}%`)]
   const hdrArr = headers
   const dataArr = directRows.value.map(r => [r.seq, r.step, r.direction, r.subject, r.detail, r.total ?? '',
     ...(r.values || []).map(v => v ?? '')])
-  const wsD = XLSX.utils.aoa_to_sheet([ratioArr, hdrArr, ...dataArr])
-  wsD['!cols'] = [{wch:5},{wch:22},{wch:8},{wch:18},{wch:18},{wch:14},...companies.value.map(()=>({wch:14}))]
-  XLSX.utils.book_append_sheet(wb, wsD, '数据填写')
-  XLSX.writeFile(wb, '模拟权益法调整表_模板.xlsx'); ElMessage.success('模板已导出')
+  await exportMultiSheetData({
+    sheets: [
+      { sheetName: '填写说明', rows: instr, colWidths: [{ wch: 60 }] },
+      {
+        sheetName: '数据填写',
+        rows: [ratioArr, hdrArr, ...dataArr],
+        colWidths: [{ wch: 5 }, { wch: 22 }, { wch: 8 }, { wch: 18 }, { wch: 18 }, { wch: 14 }, ...companies.value.map(() => ({ wch: 14 }))],
+      },
+    ],
+    fileName: '模拟权益法调整表_模板.xlsx',
+    applyStyles: false,
+    successMessage: false,
+  })
+  ElMessage.success('模板已导出')
 }
 
 async function exportData() {

@@ -11,13 +11,14 @@
  * 5. "采纳并写回" emits 'applied'
  * 6. 默认 statutory_rate = 0.25
  * 7. buildRequestBody 构造正确 payload
- * 8. formatAmount / formatRate 格式化正确
+ * 8. displayPrefs.fmt / formatRate 格式化正确
  * 9. 动态 key-value 差异项增删
  */
 import { describe, it, expect, vi } from 'vitest'
 import { mount } from '@vue/test-utils'
 import { nextTick } from 'vue'
 import IncomeTaxCalcDialog from '../IncomeTaxCalcDialog.vue'
+import { useDisplayPrefsStore } from '@/stores/displayPrefs'
 
 // Mock element-plus
 vi.mock('element-plus', () => ({
@@ -197,35 +198,23 @@ describe('IncomeTaxCalcDialog — buildRequestBody', () => {
   })
 })
 
-describe('IncomeTaxCalcDialog — formatAmount', () => {
+describe('IncomeTaxCalcDialog — formatAmount (displayPrefs.fmt)', () => {
   it('正数格式化为千分位 + 2 位小数', () => {
-    const wrapper = mount(IncomeTaxCalcDialog, {
-      props: defaultProps,
-      global: globalStubs,
-    })
-    const vm = wrapper.vm as any
-    const result = vm.formatAmount('250000.00')
+    const prefs = useDisplayPrefsStore()
+    const result = prefs.fmt('250000.00')
     expect(result).toContain('250')
     expect(result).toContain('000')
     expect(result).toContain('.00')
   })
 
   it('零值格式化正确', () => {
-    const wrapper = mount(IncomeTaxCalcDialog, {
-      props: defaultProps,
-      global: globalStubs,
-    })
-    const vm = wrapper.vm as any
-    expect(vm.formatAmount(0)).toBe('0.00')
+    const prefs = useDisplayPrefsStore()
+    expect(prefs.fmt(0)).toBe('0.00')
   })
 
-  it('非数字字符串原样返回', () => {
-    const wrapper = mount(IncomeTaxCalcDialog, {
-      props: defaultProps,
-      global: globalStubs,
-    })
-    const vm = wrapper.vm as any
-    expect(vm.formatAmount('N/A')).toBe('N/A')
+  it('非数字字符串返回 —', () => {
+    const prefs = useDisplayPrefsStore()
+    expect(prefs.fmt('N/A')).toBe('—')
   })
 })
 

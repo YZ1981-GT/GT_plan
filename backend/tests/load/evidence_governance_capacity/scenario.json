@@ -1,0 +1,184 @@
+{
+  "spec": "attachment-ocr-ai-evidence-governance-hardening",
+  "task": "8.2",
+  "requirements": [
+    "R12",
+    "R15"
+  ],
+  "target_virtual_users": 6000,
+  "steady_state_seconds": 1800,
+  "burst_seconds": 600,
+  "load_profile": [
+    {
+      "name": "warmup-1k",
+      "users": 1000,
+      "spawn_rate": 100,
+      "duration_s": 120,
+      "kind": "warmup"
+    },
+    {
+      "name": "warmup-3k",
+      "users": 3000,
+      "spawn_rate": 200,
+      "duration_s": 120,
+      "kind": "warmup"
+    },
+    {
+      "name": "steady-6k",
+      "users": 6000,
+      "spawn_rate": 300,
+      "duration_s": 1800,
+      "kind": "steady"
+    },
+    {
+      "name": "burst-7.2k",
+      "users": 7200,
+      "spawn_rate": 400,
+      "duration_s": 600,
+      "kind": "burst"
+    }
+  ],
+  "traffic_model": [
+    {
+      "name": "metadata_read",
+      "weight_pct": 70,
+      "description": "附件/版本/引用元数据读 + cursor 列表 + OCR job 状态（不读文件字节）",
+      "slo_ops": [
+        "metadata_read",
+        "cursor_list"
+      ]
+    },
+    {
+      "name": "write_associate",
+      "weight_pct": 20,
+      "description": "创建 EvidenceRef / 跨模块关联（含 audit+outbox，不含外部 I/O）",
+      "slo_ops": [
+        "governance_write"
+      ]
+    },
+    {
+      "name": "ocr_ai_enqueue",
+      "weight_pct": 7,
+      "description": "OCR/AI enqueue（staged 持久+入队，返回 202）",
+      "slo_ops": [
+        "staged_enqueue"
+      ]
+    },
+    {
+      "name": "impact_archive_control",
+      "weight_pct": 3,
+      "description": "影响范围查询 + 归档请求（异步构建）",
+      "slo_ops": [
+        "impact_le_100_nodes",
+        "archive_request"
+      ]
+    }
+  ],
+  "slo_table": [
+    {
+      "op": "metadata_read",
+      "p95_ms": 200,
+      "basis": "单附件/版本/引用元数据读；不读文件字节"
+    },
+    {
+      "op": "cursor_list",
+      "p95_ms": 300,
+      "basis": "cursor 列表；默认 limit<=100"
+    },
+    {
+      "op": "impact_le_100_nodes",
+      "p95_ms": 500,
+      "basis": "<=100 节点直接影响；超阈值异步"
+    },
+    {
+      "op": "governance_write",
+      "p95_ms": 500,
+      "basis": "引用/治理元数据写；含 audit+outbox，不含外部 I/O"
+    },
+    {
+      "op": "staged_enqueue",
+      "p95_ms": 300,
+      "basis": "staged 持久+enqueue；接收完成后计时，返回 202"
+    },
+    {
+      "op": "sync_finalize_create",
+      "p95_ms": 1000,
+      "basis": "同步 finalize 创建；只有预算内完成才 201"
+    },
+    {
+      "op": "finalize_external_task",
+      "p95_ms": 30000,
+      "basis": "finalize 外部任务；与 enqueue SLO 分开统计"
+    },
+    {
+      "op": "formal_preflight_le_500_deps",
+      "p95_ms": 750,
+      "basis": "FormalOutput preflight <=500 依赖；读 materialized summary/watermark"
+    },
+    {
+      "op": "stale_enqueue",
+      "p95_ms": 200,
+      "basis": "stale 入队；闭包 95%<=5s，超大图<=60s"
+    },
+    {
+      "op": "archive_request",
+      "p95_ms": 500,
+      "basis": "archive request；构建异步"
+    }
+  ],
+  "acceptance": {
+    "max_error_rate_pct": 1.0,
+    "max_cross_project_leakage": 0,
+    "max_duplicate_side_effects": 0,
+    "max_forbidden_terminal_states": 0,
+    "max_lost_persisted_jobs": 0
+  },
+  "chaos_faults": [
+    {
+      "dependency": "storage",
+      "mode": "unavailable",
+      "expected_behaviour": "读取先鉴权后拒绝；不产生可用 Attachment/Version；脱敏审计；元数据读路径不受影响",
+      "unaffected_slo_ops": [
+        "metadata_read",
+        "cursor_list"
+      ]
+    },
+    {
+      "dependency": "ocr",
+      "mode": "timeout",
+      "expected_behaviour": "OCR job 安全失败/有界退避；保留已有结果；不进入 confirmed/written_back",
+      "unaffected_slo_ops": [
+        "metadata_read",
+        "cursor_list",
+        "governance_write"
+      ]
+    },
+    {
+      "dependency": "retrieval",
+      "mode": "unverifiable",
+      "expected_behaviour": "引用标记不可验证；禁止进入 confirmed AI 内容或 Formal_Output",
+      "unaffected_slo_ops": [
+        "metadata_read",
+        "cursor_list"
+      ]
+    },
+    {
+      "dependency": "ai",
+      "mode": "stub",
+      "expected_behaviour": "显示降级状态；禁止自动确认或正式写回；保留原始业务数据不变",
+      "unaffected_slo_ops": [
+        "metadata_read",
+        "cursor_list",
+        "governance_write"
+      ]
+    }
+  ],
+  "canary": {
+    "name": "cross_project_canary",
+    "description": "以项目 A 身份尝试读取/关联项目 B 的 evidence ref、OCR job、impact；任一非 4xx-denied 响应或响应泄露目标元数据即计为泄露",
+    "denied_statuses": [
+      403,
+      404
+    ]
+  }
+}

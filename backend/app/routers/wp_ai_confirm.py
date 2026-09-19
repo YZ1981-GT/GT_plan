@@ -118,6 +118,8 @@ async def confirm_ai_content(
     await db.flush()
     await db.commit()
 
+    # NOTE: touch_wp_registry 已由 ACNR events.on_workpaper_saved 统一处理（R23.1/R23.2）
+
     action_labels = {"accept": "采纳", "reject": "拒绝", "revise": "修订"}
     return AiConfirmResponse(
         cell_ref=cell_ref,

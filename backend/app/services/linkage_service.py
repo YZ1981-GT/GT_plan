@@ -130,8 +130,8 @@ class LinkageService:
         # 使用 account_mapping 将标准科目映射回客户科目
         adjustments_query = text("""
             SELECT a.id, a.adjustment_no, a.account_code, a.account_name,
-                   a.debit_amount, a.credit_amount, a.summary,
-                   a.adjustment_type, a.status, a.created_at,
+                   a.debit_amount, a.credit_amount, a.description AS summary,
+                   a.adjustment_type, a.review_status AS status, a.created_at,
                    a.entry_group_id
             FROM adjustments a
             JOIN account_mapping am ON am.project_id = a.project_id
@@ -143,8 +143,8 @@ class LinkageService:
               AND am.standard_account_code = ANY(:codes)
             UNION
             SELECT a.id, a.adjustment_no, a.account_code, a.account_name,
-                   a.debit_amount, a.credit_amount, a.summary,
-                   a.adjustment_type, a.status, a.created_at,
+                   a.debit_amount, a.credit_amount, a.description AS summary,
+                   a.adjustment_type, a.review_status AS status, a.created_at,
                    a.entry_group_id
             FROM adjustments a
             WHERE a.project_id = :project_id
@@ -169,8 +169,8 @@ class LinkageService:
             placeholders = ", ".join(f":code_{i}" for i in range(len(account_codes)))
             fallback_query = text(f"""
                 SELECT a.id, a.adjustment_no, a.account_code, a.account_name,
-                       a.debit_amount, a.credit_amount, a.summary,
-                       a.adjustment_type, a.status, a.created_at,
+                       a.debit_amount, a.credit_amount, a.description AS summary,
+                       a.adjustment_type, a.review_status AS status, a.created_at,
                        a.entry_group_id
                 FROM adjustments a
                 WHERE a.project_id = :project_id
@@ -681,7 +681,7 @@ class LinkageService:
             WHERE project_id = :project_id
               AND year = :year
               AND is_deleted = false
-              AND status != 'rejected'
+              AND review_status != 'rejected'
             GROUP BY account_code
         """)
         try:

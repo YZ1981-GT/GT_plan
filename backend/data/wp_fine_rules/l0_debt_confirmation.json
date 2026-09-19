@@ -1,0 +1,47 @@
+{
+  "wp_code": "L0",
+  "name": "债务循环函证",
+  "version": "2025-R5",
+  "_note": "此JSON配置为简化版本，实际底稿结构可能更复杂。实施时需根据yaml文件中的实际sheet结构进行详细配置。参考yaml文件：backend/data/ledger_adapters/wp_render_schema/generated/L0.yaml",
+  "account_codes": [],
+  "source_files": [
+    {
+      "file": "L0 债务循环函证.xlsx",
+      "sheets": [
+        "底稿目录",
+        "函证结果汇总表L0-1",
+        "核实被函证单位信息L0-2",
+        "函证发出记录表L0-3",
+        "函证收回记录表L0-4",
+        "函证控制表L0-5"
+      ]
+    }
+  ],
+  "sheet_rules": [
+    {
+      "exact_name": "函证结果汇总表L0-1",
+      "code": "L0-1",
+      "type": "confirmation_summary"
+    },
+    {
+      "exact_name": "核实被函证单位信息L0-2",
+      "code": "L0-2",
+      "type": "check"
+    },
+    {
+      "exact_name": "函证发出记录表L0-3",
+      "code": "L0-3",
+      "type": "confirmation_issue"
+    },
+    {
+      "exact_name": "函证收回记录表L0-4",
+      "code": "L0-4",
+      "type": "confirmation_receive"
+    },
+    {
+      "exact_name": "函证控制表L0-5",
+      "code": "L0-5",
+      "type": "confirmation_control"
+    }
+  ]
+}

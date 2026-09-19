@@ -1,0 +1,525 @@
+{
+  "contract_id": "d6.contract_assets_detail",
+  "document_type": "xlsx",
+  "identity_carriers": [
+    "hidden_sheet",
+    "defined_name",
+    "excel_table",
+    "hidden_uuid_column"
+  ],
+  "instrumentation_definition_sha256": "368cabf44ff329222f2547d067259a9d77619c34a81d068de864a0f0a3148ac4",
+  "review": {
+    "authority_root": "backend/wp_templates",
+    "entry_id": "xlsx/gt-d6-contract-assets",
+    "html_store": {
+      "item_id": "D6-2-rows",
+      "note": "整张合同资产明细表存成这一条 item 的 remark（JSON 数组字符串，useD6Detail 的 JSON.stringify(rows)）。本契约按 stable field + row rowId 拆开。🔴 账龄是 FLAT top-level 键（agePrior1y / ageEnd1y ...），json_pointer 无 nested 分层（与 D3/D7 的 nested agingPrior/within1 不同）。",
+      "row_identity_key": "rowId",
+      "shape": "json_array_of_row_objects",
+      "table": "checklist_responses"
+    },
+    "pilot_class": "phase5_contract_assets",
+    "reviewed_basis": "openpyxl 逐 sheet 直读净化后权威模板 D/D6 合同资产.xlsx（外链净化后 sha256 88125e42），只取受管 sheet 明细表D6-2：两级表头 行 12（组标题）/ 行 13（账龄子标题 1年以下/1～2/２～3/3年以上），32 列 A-AF，数据区 14-25，J/Q/T 三列逐行公式 =G+H+I / =G+O-P（借方科目）/ =Q+R+S，A26「合   计」footer（3 半角空格）；20 标量列 + 两个账龄组各 4 段（K-N 期初 / U-X 期末，FLAT 键 agePrior*/ageEnd*）；字段键与前端 useD6Detail.DetailRow 逐字段锁死。wp_code=D6（载荷落点：D6-2-rows 全库 0 行同 H1/D3 空表单，D6 wp 未删除有 file_path；非 D6C 幻影码）"
+  },
+  "review_status": "reviewed",
+  "schema_version": "contract-definition:v1",
+  "semantic_version": "1.0.0",
+  "sheets": [
+    {
+      "excel_name": "明细表D6-2",
+      "locator": {
+        "anchor": "excel_table_sheet_association"
+      },
+      "sheet_key": "d62-managed",
+      "tables": [
+        {
+          "anchor": "A12",
+          "delete_policy": "tombstone",
+          "fields": [
+            {
+              "cell": {
+                "column": "A",
+                "row_from": "row_identity"
+              },
+              "column_key": "seq_no",
+              "header_source_ref": "源xlsx!明细表D6-2!A12",
+              "header_text": "序号",
+              "json_pointer": "/rows/{row_uuid}/seqNo",
+              "mode": "editable",
+              "source_ref": "源xlsx!明细表D6-2!A14",
+              "stable_field_key": "contract_assets_detail_rows/{row_uuid}/seq_no",
+              "store_item_id": "D6-2-rows",
+              "value_type": "integer"
+            },
+            {
+              "cell": {
+                "column": "B",
+                "row_from": "row_identity"
+              },
+              "column_key": "contract_name",
+              "header_source_ref": "源xlsx!明细表D6-2!B12",
+              "header_text": "合同名称/项目名称",
+              "json_pointer": "/rows/{row_uuid}/contractName",
+              "mode": "editable",
+              "source_ref": "源xlsx!明细表D6-2!B14",
+              "stable_field_key": "contract_assets_detail_rows/{row_uuid}/contract_name",
+              "store_item_id": "D6-2-rows",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "C",
+                "row_from": "row_identity"
+              },
+              "column_key": "contract_type",
+              "header_source_ref": "源xlsx!明细表D6-2!C12",
+              "header_text": "类型",
+              "json_pointer": "/rows/{row_uuid}/contractType",
+              "mode": "editable",
+              "source_ref": "源xlsx!明细表D6-2!C14",
+              "stable_field_key": "contract_assets_detail_rows/{row_uuid}/contract_type",
+              "store_item_id": "D6-2-rows",
+              "value_type": "enum"
+            },
+            {
+              "cell": {
+                "column": "D",
+                "row_from": "row_identity"
+              },
+              "column_key": "customer_name",
+              "header_source_ref": "源xlsx!明细表D6-2!D12",
+              "header_text": "客户名称",
+              "json_pointer": "/rows/{row_uuid}/customerName",
+              "mode": "editable",
+              "source_ref": "源xlsx!明细表D6-2!D14",
+              "stable_field_key": "contract_assets_detail_rows/{row_uuid}/customer_name",
+              "store_item_id": "D6-2-rows",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "E",
+                "row_from": "row_identity"
+              },
+              "column_key": "company_code",
+              "header_source_ref": "源xlsx!明细表D6-2!E12",
+              "header_text": "公司代码",
+              "json_pointer": "/rows/{row_uuid}/companyCode",
+              "mode": "editable",
+              "source_ref": "源xlsx!明细表D6-2!E14",
+              "stable_field_key": "contract_assets_detail_rows/{row_uuid}/company_code",
+              "store_item_id": "D6-2-rows",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "F",
+                "row_from": "row_identity"
+              },
+              "column_key": "related_party_type",
+              "header_source_ref": "源xlsx!明细表D6-2!F12",
+              "header_text": "关联关系",
+              "json_pointer": "/rows/{row_uuid}/relatedPartyType",
+              "mode": "editable",
+              "source_ref": "源xlsx!明细表D6-2!F14",
+              "stable_field_key": "contract_assets_detail_rows/{row_uuid}/related_party_type",
+              "store_item_id": "D6-2-rows",
+              "value_type": "enum"
+            },
+            {
+              "cell": {
+                "column": "G",
+                "row_from": "row_identity"
+              },
+              "column_key": "prior_unadjusted",
+              "header_source_ref": "源xlsx!明细表D6-2!G12",
+              "header_text": "期初未审数",
+              "json_pointer": "/rows/{row_uuid}/priorUnadjusted",
+              "mode": "editable",
+              "source_ref": "源xlsx!明细表D6-2!G14",
+              "stable_field_key": "contract_assets_detail_rows/{row_uuid}/prior_unadjusted",
+              "store_item_id": "D6-2-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "H",
+                "row_from": "row_identity"
+              },
+              "column_key": "prior_aje",
+              "header_source_ref": "源xlsx!明细表D6-2!H12",
+              "header_text": "期初账项调整",
+              "json_pointer": "/rows/{row_uuid}/priorAje",
+              "mode": "editable",
+              "source_ref": "源xlsx!明细表D6-2!H14",
+              "stable_field_key": "contract_assets_detail_rows/{row_uuid}/prior_aje",
+              "store_item_id": "D6-2-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "I",
+                "row_from": "row_identity"
+              },
+              "column_key": "prior_rje",
+              "header_source_ref": "源xlsx!明细表D6-2!I12",
+              "header_text": "期初重分类调整",
+              "json_pointer": "/rows/{row_uuid}/priorRje",
+              "mode": "editable",
+              "source_ref": "源xlsx!明细表D6-2!I14",
+              "stable_field_key": "contract_assets_detail_rows/{row_uuid}/prior_rje",
+              "store_item_id": "D6-2-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "J",
+                "row_from": "row_identity"
+              },
+              "column_key": "prior_audited",
+              "header_source_ref": "源xlsx!明细表D6-2!J12",
+              "header_text": "期初审定余额",
+              "json_pointer": "/rows/{row_uuid}/priorAudited",
+              "mode": "formula",
+              "source_ref": "源xlsx!明细表D6-2!J14",
+              "stable_field_key": "contract_assets_detail_rows/{row_uuid}/prior_audited",
+              "store_item_id": "D6-2-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "K",
+                "row_from": "row_identity"
+              },
+              "column_key": "age_prior1y",
+              "group_source_ref": "源xlsx!明细表D6-2!K12",
+              "header_source_ref": "源xlsx!明细表D6-2!K13",
+              "header_text": "1年以下",
+              "json_pointer": "/rows/{row_uuid}/agePrior1y",
+              "mode": "editable",
+              "source_ref": "源xlsx!明细表D6-2!K14",
+              "stable_field_key": "contract_assets_detail_rows/{row_uuid}/age_prior1y",
+              "store_item_id": "D6-2-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "L",
+                "row_from": "row_identity"
+              },
+              "column_key": "age_prior1to2y",
+              "group_source_ref": "源xlsx!明细表D6-2!K12",
+              "header_source_ref": "源xlsx!明细表D6-2!L13",
+              "header_text": "1～2年",
+              "json_pointer": "/rows/{row_uuid}/agePrior1to2y",
+              "mode": "editable",
+              "source_ref": "源xlsx!明细表D6-2!L14",
+              "stable_field_key": "contract_assets_detail_rows/{row_uuid}/age_prior1to2y",
+              "store_item_id": "D6-2-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "M",
+                "row_from": "row_identity"
+              },
+              "column_key": "age_prior2to3y",
+              "group_source_ref": "源xlsx!明细表D6-2!K12",
+              "header_source_ref": "源xlsx!明细表D6-2!M13",
+              "header_text": "２～3年",
+              "json_pointer": "/rows/{row_uuid}/agePrior2to3y",
+              "mode": "editable",
+              "source_ref": "源xlsx!明细表D6-2!M14",
+              "stable_field_key": "contract_assets_detail_rows/{row_uuid}/age_prior2to3y",
+              "store_item_id": "D6-2-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "N",
+                "row_from": "row_identity"
+              },
+              "column_key": "age_prior3y_above",
+              "group_source_ref": "源xlsx!明细表D6-2!K12",
+              "header_source_ref": "源xlsx!明细表D6-2!N13",
+              "header_text": "3年以上",
+              "json_pointer": "/rows/{row_uuid}/agePrior3yAbove",
+              "mode": "editable",
+              "source_ref": "源xlsx!明细表D6-2!N14",
+              "stable_field_key": "contract_assets_detail_rows/{row_uuid}/age_prior3y_above",
+              "store_item_id": "D6-2-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "O",
+                "row_from": "row_identity"
+              },
+              "column_key": "debit_amount",
+              "header_source_ref": "源xlsx!明细表D6-2!O12",
+              "header_text": "借方发生",
+              "json_pointer": "/rows/{row_uuid}/debitAmount",
+              "mode": "editable",
+              "source_ref": "源xlsx!明细表D6-2!O14",
+              "stable_field_key": "contract_assets_detail_rows/{row_uuid}/debit_amount",
+              "store_item_id": "D6-2-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "P",
+                "row_from": "row_identity"
+              },
+              "column_key": "credit_amount",
+              "header_source_ref": "源xlsx!明细表D6-2!P12",
+              "header_text": "贷方发生",
+              "json_pointer": "/rows/{row_uuid}/creditAmount",
+              "mode": "editable",
+              "source_ref": "源xlsx!明细表D6-2!P14",
+              "stable_field_key": "contract_assets_detail_rows/{row_uuid}/credit_amount",
+              "store_item_id": "D6-2-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "Q",
+                "row_from": "row_identity"
+              },
+              "column_key": "end_unadjusted",
+              "header_source_ref": "源xlsx!明细表D6-2!Q12",
+              "header_text": "期末未审余额",
+              "json_pointer": "/rows/{row_uuid}/endUnadjusted",
+              "mode": "formula",
+              "source_ref": "源xlsx!明细表D6-2!Q14",
+              "stable_field_key": "contract_assets_detail_rows/{row_uuid}/end_unadjusted",
+              "store_item_id": "D6-2-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "R",
+                "row_from": "row_identity"
+              },
+              "column_key": "end_aje",
+              "header_source_ref": "源xlsx!明细表D6-2!R12",
+              "header_text": "账项调整",
+              "json_pointer": "/rows/{row_uuid}/endAje",
+              "mode": "editable",
+              "source_ref": "源xlsx!明细表D6-2!R14",
+              "stable_field_key": "contract_assets_detail_rows/{row_uuid}/end_aje",
+              "store_item_id": "D6-2-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "S",
+                "row_from": "row_identity"
+              },
+              "column_key": "end_rje",
+              "header_source_ref": "源xlsx!明细表D6-2!S12",
+              "header_text": "重分类调整",
+              "json_pointer": "/rows/{row_uuid}/endRje",
+              "mode": "editable",
+              "source_ref": "源xlsx!明细表D6-2!S14",
+              "stable_field_key": "contract_assets_detail_rows/{row_uuid}/end_rje",
+              "store_item_id": "D6-2-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "T",
+                "row_from": "row_identity"
+              },
+              "column_key": "end_audited",
+              "header_source_ref": "源xlsx!明细表D6-2!T12",
+              "header_text": "期末审定余额",
+              "json_pointer": "/rows/{row_uuid}/endAudited",
+              "mode": "formula",
+              "source_ref": "源xlsx!明细表D6-2!T14",
+              "stable_field_key": "contract_assets_detail_rows/{row_uuid}/end_audited",
+              "store_item_id": "D6-2-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "U",
+                "row_from": "row_identity"
+              },
+              "column_key": "age_end1y",
+              "group_source_ref": "源xlsx!明细表D6-2!U12",
+              "header_source_ref": "源xlsx!明细表D6-2!U13",
+              "header_text": "1年以下",
+              "json_pointer": "/rows/{row_uuid}/ageEnd1y",
+              "mode": "editable",
+              "source_ref": "源xlsx!明细表D6-2!U14",
+              "stable_field_key": "contract_assets_detail_rows/{row_uuid}/age_end1y",
+              "store_item_id": "D6-2-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "V",
+                "row_from": "row_identity"
+              },
+              "column_key": "age_end1to2y",
+              "group_source_ref": "源xlsx!明细表D6-2!U12",
+              "header_source_ref": "源xlsx!明细表D6-2!V13",
+              "header_text": "1～2年",
+              "json_pointer": "/rows/{row_uuid}/ageEnd1to2y",
+              "mode": "editable",
+              "source_ref": "源xlsx!明细表D6-2!V14",
+              "stable_field_key": "contract_assets_detail_rows/{row_uuid}/age_end1to2y",
+              "store_item_id": "D6-2-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "W",
+                "row_from": "row_identity"
+              },
+              "column_key": "age_end2to3y",
+              "group_source_ref": "源xlsx!明细表D6-2!U12",
+              "header_source_ref": "源xlsx!明细表D6-2!W13",
+              "header_text": "２～3年",
+              "json_pointer": "/rows/{row_uuid}/ageEnd2to3y",
+              "mode": "editable",
+              "source_ref": "源xlsx!明细表D6-2!W14",
+              "stable_field_key": "contract_assets_detail_rows/{row_uuid}/age_end2to3y",
+              "store_item_id": "D6-2-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "X",
+                "row_from": "row_identity"
+              },
+              "column_key": "age_end3y_above",
+              "group_source_ref": "源xlsx!明细表D6-2!U12",
+              "header_source_ref": "源xlsx!明细表D6-2!X13",
+              "header_text": "3年以上",
+              "json_pointer": "/rows/{row_uuid}/ageEnd3yAbove",
+              "mode": "editable",
+              "source_ref": "源xlsx!明细表D6-2!X14",
+              "stable_field_key": "contract_assets_detail_rows/{row_uuid}/age_end3y_above",
+              "store_item_id": "D6-2-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "Y",
+                "row_from": "row_identity"
+              },
+              "column_key": "receivable_within_1y",
+              "header_source_ref": "源xlsx!明细表D6-2!Y12",
+              "header_text": "1年以内收款权",
+              "json_pointer": "/rows/{row_uuid}/receivableWithin1y",
+              "mode": "editable",
+              "source_ref": "源xlsx!明细表D6-2!Y14",
+              "stable_field_key": "contract_assets_detail_rows/{row_uuid}/receivable_within_1y",
+              "store_item_id": "D6-2-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "Z",
+                "row_from": "row_identity"
+              },
+              "column_key": "receivable_above_1y",
+              "header_source_ref": "源xlsx!明细表D6-2!Z12",
+              "header_text": "1年以上收款权",
+              "json_pointer": "/rows/{row_uuid}/receivableAbove1y",
+              "mode": "editable",
+              "source_ref": "源xlsx!明细表D6-2!Z14",
+              "stable_field_key": "contract_assets_detail_rows/{row_uuid}/receivable_above_1y",
+              "store_item_id": "D6-2-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "AA",
+                "row_from": "row_identity"
+              },
+              "column_key": "is_in_construction_period",
+              "header_source_ref": "源xlsx!明细表D6-2!AA12",
+              "header_text": "是否在建设期或质保期内",
+              "json_pointer": "/rows/{row_uuid}/isInConstructionPeriod",
+              "mode": "editable",
+              "source_ref": "源xlsx!明细表D6-2!AA14",
+              "stable_field_key": "contract_assets_detail_rows/{row_uuid}/is_in_construction_period",
+              "store_item_id": "D6-2-rows",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "AB",
+                "row_from": "row_identity"
+              },
+              "column_key": "credit_risk_group",
+              "header_source_ref": "源xlsx!明细表D6-2!AB12",
+              "header_text": "信用风险组合方式",
+              "json_pointer": "/rows/{row_uuid}/creditRiskGroup",
+              "mode": "editable",
+              "source_ref": "源xlsx!明细表D6-2!AB14",
+              "stable_field_key": "contract_assets_detail_rows/{row_uuid}/credit_risk_group",
+              "store_item_id": "D6-2-rows",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "AC",
+                "row_from": "row_identity"
+              },
+              "column_key": "is_confirmed",
+              "header_source_ref": "源xlsx!明细表D6-2!AC12",
+              "header_text": "是否函证",
+              "json_pointer": "/rows/{row_uuid}/isConfirmed",
+              "mode": "editable",
+              "source_ref": "源xlsx!明细表D6-2!AC14",
+              "stable_field_key": "contract_assets_detail_rows/{row_uuid}/is_confirmed",
+              "store_item_id": "D6-2-rows",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "AD",
+                "row_from": "row_identity"
+              },
+              "column_key": "post_period_settlement",
+              "header_source_ref": "源xlsx!明细表D6-2!AD12",
+              "header_text": "期后结转金额",
+              "json_pointer": "/rows/{row_uuid}/postPeriodSettlement",
+              "mode": "editable",
+              "source_ref": "源xlsx!明细表D6-2!AD14",
+              "stable_field_key": "contract_assets_detail_rows/{row_uuid}/post_period_settlement",
+              "store_item_id": "D6-2-rows",
+              "value_type": "amount"
+            }
+          ],
+          "footer_anchor": {
+            "carries_total_formula": true,
+            "marker": "合   计",
+            "note": "footer 行 A26「合   计」（3 半角空格，同 D7）。声明为真使结构性插行有权按声明位移量扩张该区间",
+            "search_column": "A"
+          },
+          "formula_mask": [
+            "J14:J25",
+            "Q14:Q25",
+            "T14:T25"
+          ],
+          "header_rows": 2,
+          "row_identity": {
+            "json_pointer": "/rows/*/rowId",
+            "kind": "field"
+          },
+          "table_key": "contract_assets_detail_rows"
+        }
+      ]
+    }
+  ],
+  "template": {
+    "normalized_structure_hash": "2d9a80b6b0d1d4c8525db8a7815f0ba0e2e4f09171fe6762f18a2d89994eb0db",
+    "relative_path": "D/D6 合同资产.xlsx",
+    "template_sha256": "88125e42d79d72813c5d460be2d925adb623d85f881a177dcb4eb7c9ec1e218c"
+  },
+  "template_definition_sha256": "3bc883579a03bfa1c9f8cc8a26aca3da7e8e72364ac84e9adca703ba96a62ef5"
+}

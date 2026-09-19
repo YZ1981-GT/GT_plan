@@ -1,0 +1,37 @@
+{
+  "measured_at": "2026-09-13",
+  "spec": "d-cycle-sheet-bidirectional-expansion",
+  "task": "8 — D4-4 单元格双向可行性裁决",
+  "decision": "single_html",
+  "verdict": "D4-4「营业收入调整分录汇总」判为 single_html，不做 OO 单元格双向回写。",
+  "authority": {
+    "template_path": "backend/wp_templates/D/D4 收入底稿.xlsx",
+    "template_sha256": "b8fb92d4c22cd5d639e415403a12cb61650639153f136a5330c930b880167b5f",
+    "method": "openpyxl 直读真实 tab 名与几何（唯一权威，非 prefill/note 脚本里的旧名）",
+    "real_tab_name": "营业收入调整分录汇总D4-4",
+    "geometry": "A1:J23；标题区 A1-A4；表头行 5（10 字段键列 A-J）；数据区 6-20（空模板带）；行21 使用提示",
+    "header_A_to_J": [
+      "调整事项说明",
+      "类别（报表调整/账项调整/其他）",
+      "报表项目",
+      "科目名称",
+      "附注项目",
+      "……",
+      "借方调整金额",
+      "贷方调整金额",
+      "索引",
+      "备注"
+    ]
+  },
+  "why_single_html": [
+    "① 无行身份列：openpyxl 全表扫 A-T 无 GTROW/_GT UUID 列（D4-2/D4-3 均有 UUID 列作行身份锚）——单元格双向回写按行 UUID 定位，缺锚即无法稳定回写（证据 T07-d44-wave2-kickoff.json identity_column=UNCONFIRMED）。",
+    "② 已有专用同步链，OO 回写会争同一 store：D4-4-rows 由 useD4Adjustment（双列借贷 + BALANCE_TOLERANCE 平衡校验）拥有，并喂 3 个下游——useD4Adjudication.adjustmentTotals（→审定表 D4-1）、useD4CrossSheet（D4-4→D4-1 AJE/RJE）、useAdjustmentCentralSync→后端 AdjustmentSyncService（source_ref {wp_id}:D4-4-rows，wp_code D4）→ A13/试算表联动。OO 单元格覆盖 D4-4-rows 会绕过借贷平衡校验并可能破坏 A13 联动。",
+    "③ 借贷平衡不变式仅 HTML 侧强制：Excel 模板不校验 debit===credit，OO 侧编辑可轻易产生不平衡分录。",
+    "④ 动态插入带、无固定 GTROW seed；列 F『……』为排版占位（非 store 字段）。"
+  ],
+  "expansion_spec_red_line": "README『程序表/附注类应诚实判 single_html，不得强行单元格双向』—— 调整分录汇总属已有专用同步链的 hub 表，同理归 single_html 侧（不是网格明细）。",
+  "overrides_prior": "撤销 T07-d44-wave2-kickoff.json 的『wave2_next=D4-4 bidirectional』裁决——该 kickoff 已实测出映射门（无 UUID 列）未过；本裁决据模板真相 + hub 冲突改判 single_html。",
+  "next_bidirectional_canary": "D1-2 按类别明细（另一父 entry 的字段键明细，无 adjustment-hub 冲突）——见 tasks Task 7 更新 + README 分波表 Wave 3→提前。",
+  "known_data_bug_flagged_not_fixed": "src/generated/dSheetLabels.ts 将 'D4-4' 误映射为 '主营业务收入审计程序表D4A（修订前）'——与真实 tab『营业收入调整分录汇总D4-4』不符。属 generated 标签映射的既有缺陷，非本裁决引入；建议其生成器所属 spec 修，勿在此手改 generated 文件。",
+  "no_code_changed": true
+}

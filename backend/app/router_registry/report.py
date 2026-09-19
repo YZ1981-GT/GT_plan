@@ -34,11 +34,18 @@ def register_report_routers(app: FastAPI) -> None:
     from app.routers.report_trace import router as rt_router
     from app.routers.word_export import router as word_export_router
     from app.routers.report_mapping import router as report_mapping_router
+    from app.routers.deliverable import router as deliverable_router
 
     for r in [rc_router, reports_router, cfs_router, dn_router, ar_router,
               export_router, nt_router, nwm_router, ntr_router, nai_router,
               rt_router, word_export_router, report_mapping_router]:
         app.include_router(r, tags=["报表与附注"])
+
+    app.include_router(deliverable_router, tags=["deliverable-center"])
+
+    # ═══ deliverable-lineage-and-writeback: 溯源 + 章节状态 ═══
+    from app.routers.deliverable_lineage import router as deliverable_lineage_router
+    app.include_router(deliverable_lineage_router, tags=["deliverable-lineage"])
 
     # ═══ §44. 报表 Excel 导出 ═══
     from app.routers.report_export import router as report_export_router
@@ -107,3 +114,23 @@ def register_report_routers(app: FastAPI) -> None:
     # ═══ §98. report-config-baseline：主模板回填 + 联动 ═══
     from app.routers.report_config_baseline import router as report_config_baseline_router
     app.include_router(report_config_baseline_router, tags=["report-config-baseline"])
+
+    # ═══ §99. P2-2: 签发一致性清单 ═══
+    from app.routers.signoff_checklist import router as signoff_checklist_router
+    app.include_router(signoff_checklist_router, tags=["signoff-checklist"])
+
+    # ═══ §100. formula-management-library：logic_check 报表勾稽执行端点 ═══
+    from app.routers.formula_logic_check import router as formula_logic_check_router
+    app.include_router(formula_logic_check_router, tags=["formula-logic-check"])
+
+    # ═══ §101. formula-management-library：全局一键刷新统一入口（合伙人专属） ═══
+    from app.routers.draft_refresh import router as draft_refresh_router
+    app.include_router(draft_refresh_router, tags=["draft-refresh"])
+
+    # ═══ §102. formula-management-library：公式模块导入导出 + 编报说明单一源 ═══
+    from app.routers.formula_import_export import router as formula_ie_router
+    app.include_router(formula_ie_router, tags=["formula-import-export"])
+
+    # ═══ §103. formula-management-library：全局刷新范围动态发现（合伙人专属，Req 20） ═══
+    from app.routers.refresh_scopes import router as refresh_scopes_router
+    app.include_router(refresh_scopes_router, tags=["refresh-scopes"])

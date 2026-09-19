@@ -3,15 +3,19 @@ import http from '@/utils/http'
 
 export interface BasicInfo {
   client_name: string
+  short_name: string
   audit_year: number | null
   project_type: string
   accounting_standard: string
   company_code: string
   template_type: string
+  // audit-report-template-integration 需求 1.5：企业子类型 type_a/b/c/d
+  company_subtype: string | null
   custom_template_id: string
   custom_template_name: string
   custom_template_version: string
   report_scope: string
+  consolidation_type: string
   parent_company_name: string
   parent_company_code: string
   ultimate_company_name: string
@@ -118,15 +122,17 @@ export const useWizardStore = defineStore('wizard', {
         // Filter out null values for optional fields
         const payload: Record<string, unknown> = {
           client_name: basicInfo.client_name,
+          short_name: basicInfo.short_name,
           audit_year: basicInfo.audit_year,
           project_type: basicInfo.project_type,
           accounting_standard: basicInfo.accounting_standard,
-        }
-        if (basicInfo.company_code) {
-          payload.company_code = basicInfo.company_code
+          company_code: basicInfo.company_code,
         }
         if (basicInfo.template_type) {
           payload.template_type = basicInfo.template_type
+        }
+        if (basicInfo.company_subtype) {
+          payload.company_subtype = basicInfo.company_subtype
         }
         if (basicInfo.template_type === 'custom' && basicInfo.custom_template_id) {
           payload.custom_template_id = basicInfo.custom_template_id
@@ -174,11 +180,50 @@ export const useWizardStore = defineStore('wizard', {
     async loadWizardState(projectId: string) {
       this.loading = true
       try {
-        const { data } = await http.get(`/api/projects/${projectId}/wizard`)
-        const state: WizardState = data
+        // validateStatus: 404 不触发 http.ts 拦截器弹窗（项目已完成向导时 404 正常）
+        const resp = await http.get(`/api/projects/${projectId}/wizard`, {
+          validateStatus: (s: number) => s < 400 || s === 404,
+        })
+        if (resp.status === 404) {
+          // 无向导状态 → 从项目详情回填基本信息（兼容批量导入项目）
+          await this._fallbackFromProjectDetail(projectId)
+          return
+        }
+        const state: WizardState = resp.data
         this.applyWizardState(state)
+        // 如果 wizard_state 存在但 basic_info 为空（批量导入项目），从项目详情回填
+        if (!this.stepData.basic_info || !Object.keys(this.stepData.basic_info).length) {
+          await this._fallbackFromProjectDetail(projectId)
+        }
+      } catch (e: any) {
+        // 其他错误静默（不阻塞页面加载）
+        console.warn('[wizard] loadWizardState failed:', e?.message)
+        // 尝试从项目详情回填
+        await this._fallbackFromProjectDetail(projectId)
       } finally {
         this.loading = false
+      }
+    },
+
+    /** 从项目详情 API 回填 basic_info（批量导入项目的兜底） */
+    async _fallbackFromProjectDetail(projectId: string) {
+      try {
+        const { data } = await http.get(`/api/projects/${projectId}`)
+        const proj = data
+        this.projectId = projectId
+        this.stepData.basic_info = {
+          client_name: proj.client_name || '',
+          short_name: proj.short_name || '',
+          company_code: proj.company_code || '',
+          audit_year: proj.audit_year || null,
+          project_type: proj.project_type || 'annual',
+          accounting_standard: 'CAS',
+          template_type: proj.template_type || 'soe',
+          report_scope: proj.report_scope || 'standalone',
+        }
+        this.completedSteps.basic_info = true
+      } catch {
+        // 项目详情也失败则放弃
       }
     },
 

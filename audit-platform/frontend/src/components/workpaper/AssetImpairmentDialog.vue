@@ -134,17 +134,17 @@
 
         <el-descriptions :column="2" size="small" border>
           <el-descriptions-item label="资产组">{{ result.asset_group_id }}</el-descriptions-item>
-          <el-descriptions-item label="账面价值">¥ {{ formatAmount(result.book_value) }}</el-descriptions-item>
-          <el-descriptions-item label="未来现金流现值">¥ {{ formatAmount(result.present_value_of_cash_flows) }}</el-descriptions-item>
+          <el-descriptions-item label="账面价值">¥ {{ prefs.fmt(result.book_value) }}</el-descriptions-item>
+          <el-descriptions-item label="未来现金流现值">¥ {{ prefs.fmt(result.present_value_of_cash_flows) }}</el-descriptions-item>
           <el-descriptions-item label="公允价值减处置费用">
-            {{ result.fair_value_less_costs ? '¥ ' + formatAmount(result.fair_value_less_costs) : '未提供' }}
+            {{ result.fair_value_less_costs ? '¥ ' + prefs.fmt(result.fair_value_less_costs) : '未提供' }}
           </el-descriptions-item>
           <el-descriptions-item label="可收回金额">
-            <span class="amt-highlight">¥ {{ formatAmount(result.recoverable_amount) }}</span>
+            <span class="amt-highlight">¥ {{ prefs.fmt(result.recoverable_amount) }}</span>
           </el-descriptions-item>
           <el-descriptions-item label="减值损失">
             <span :class="result.is_impaired ? 'amt-danger' : 'amt-safe'">
-              ¥ {{ formatAmount(result.impairment_loss) }}
+              ¥ {{ prefs.fmt(result.impairment_loss) }}
             </span>
           </el-descriptions-item>
         </el-descriptions>
@@ -157,11 +157,11 @@
         >
           <el-table-column label="年份" prop="year" width="100" align="center" />
           <el-table-column label="现金流" width="140" align="right">
-            <template #default="{ row }">¥ {{ formatAmount(row.cash_flow) }}</template>
+            <template #default="{ row }">¥ {{ prefs.fmt(row.cash_flow) }}</template>
           </el-table-column>
           <el-table-column label="折现因子" prop="discount_factor" width="120" align="right" />
           <el-table-column label="现值" width="140" align="right">
-            <template #default="{ row }">¥ {{ formatAmount(row.present_value) }}</template>
+            <template #default="{ row }">¥ {{ prefs.fmt(row.present_value) }}</template>
           </el-table-column>
         </el-table>
       </div>
@@ -195,6 +195,7 @@ import { reactive, ref, computed, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import { api } from '@/services/apiProxy'
 import { handleApiError } from '@/utils/errorHandler'
+import { useDisplayPrefsStore } from '@/stores/displayPrefs'
 
 interface Props {
   visible: boolean
@@ -268,11 +269,7 @@ const isFormValid = computed(() => {
   return form.cash_flows.some((cf) => cf > 0)
 })
 
-function formatAmount(s: string | number) {
-  const n = Number(s)
-  if (!Number.isFinite(n)) return String(s)
-  return n.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-}
+const prefs = useDisplayPrefsStore()
 
 function buildRequestBody(applySheet?: string) {
   const body: Record<string, any> = {
@@ -300,7 +297,7 @@ async function onAnalyze() {
     )
     result.value = resp
     if (resp?.is_impaired) {
-      ElMessage.warning(`分析完成：需计提减值 ¥${formatAmount(resp.impairment_loss)}`)
+      ElMessage.warning(`分析完成：需计提减值 ¥${prefs.fmt(resp.impairment_loss)}`)
     } else {
       ElMessage.success('分析完成：无需计提减值')
     }

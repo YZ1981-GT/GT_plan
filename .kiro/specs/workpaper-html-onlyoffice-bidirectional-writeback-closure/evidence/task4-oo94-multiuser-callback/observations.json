@@ -1,0 +1,268 @@
+{
+  "generated_at": "2026-08-24T15:01:28.523126+00:00",
+  "callback_count": 15,
+  "statuses_seen": [
+    1,
+    2,
+    4,
+    6
+  ],
+  "status_with_userdata": [
+    6
+  ],
+  "status_without_userdata": [
+    1,
+    2,
+    4,
+    6
+  ],
+  "jwt_verified_all": true,
+  "body_key_union": [
+    "actions",
+    "changesurl",
+    "filetype",
+    "forcesavetype",
+    "history",
+    "key",
+    "lastsave",
+    "notmodified",
+    "status",
+    "token",
+    "url",
+    "userdata",
+    "users"
+  ],
+  "artifact_digests": [
+    {
+      "seq": 3,
+      "status": 6,
+      "userdata": "req-001-initiated-by-alice",
+      "sha256": "966888cd223f588046580803574667c45322260bb1e0d8d3c4e149e6834b8443",
+      "cells": {
+        "Z90": "ALICE-EDIT-Z90",
+        "Z92": "BOB-EDIT-Z92"
+      }
+    },
+    {
+      "seq": 5,
+      "status": 6,
+      "userdata": null,
+      "sha256": "48e8067e7ac2f873b305bc5649c004918f1c138a286569fd8ed8a0e8d169fc94",
+      "cells": {
+        "Z90": "ALICE-EDIT-Z90",
+        "Z92": "BOB-EDIT-Z92"
+      }
+    },
+    {
+      "seq": 8,
+      "status": 6,
+      "userdata": "req-003-after-drop-of-bob",
+      "sha256": "b62c2dccdd280953d9d634a7ccbfa6df735c264249696141a98be03915f1e44f",
+      "cells": {
+        "Z90": "ALICE-EDIT-Z90",
+        "Z92": "BOB-EDIT-Z92"
+      }
+    },
+    {
+      "seq": 9,
+      "status": 6,
+      "userdata": "req-001-initiated-by-alice",
+      "sha256": "bf686be0340f330672bc2aebf0c7a7d1b08f3702ae3cf2fe4044d4aaf2dc78bb",
+      "cells": {
+        "Z90": "ALICE-EDIT-Z90",
+        "Z92": "BOB-EDIT-Z92"
+      }
+    },
+    {
+      "seq": 10,
+      "status": 2,
+      "userdata": null,
+      "sha256": "1a4fc9a346061b9e27c7cd6c5f5af09205dd617367759e69ca74fb2213e2b6c5",
+      "cells": {
+        "Z90": "ALICE-EDIT-Z90",
+        "Z92": "BOB-EDIT-Z92"
+      }
+    },
+    {
+      "seq": 2,
+      "status": 6,
+      "userdata": "req-p3-errinject",
+      "sha256": "51f8533920b06cd2fb579f5b6415b416dc5b194e6f55443b954b06ebfd028f01",
+      "cells": {
+        "Z90": "ALICE-PHASE3-ERRINJECT",
+        "Z92": null
+      }
+    },
+    {
+      "seq": 3,
+      "status": 2,
+      "userdata": null,
+      "sha256": "51439a2a5f29014dcdbd8c109081808d8e84e306cd30628e842a35cbe34adcb5",
+      "cells": {
+        "Z90": "ALICE-PHASE3-ERRINJECT",
+        "Z92": null
+      }
+    }
+  ],
+  "commands": [
+    {
+      "request": {
+        "c": "forcesave",
+        "key": "t4probe1787582477",
+        "userdata": "req-001-initiated-by-alice"
+      },
+      "http_status": 200,
+      "body": {
+        "key": "t4probe1787582477",
+        "error": 0
+      },
+      "jwt_style": "payload"
+    },
+    {
+      "request": {
+        "c": "info",
+        "key": "t4probe1787582477"
+      },
+      "http_status": 200,
+      "body": {
+        "key": "t4probe1787582477",
+        "error": 0,
+        "users": [
+          "alice",
+          "bob"
+        ]
+      },
+      "jwt_style": "payload"
+    },
+    {
+      "request": {
+        "c": "forcesave",
+        "key": "t4probe1787582477"
+      },
+      "http_status": 200,
+      "body": {
+        "key": "t4probe1787582477",
+        "error": 6
+      },
+      "jwt_style": "none"
+    },
+    {
+      "request": {
+        "c": "forcesave",
+        "key": "t4probe1787582477"
+      },
+      "http_status": 200,
+      "body": {
+        "key": "t4probe1787582477",
+        "error": 4
+      },
+      "jwt_style": "flat"
+    },
+    {
+      "request": {
+        "c": "forcesave",
+        "key": "t4probe1787582477"
+      },
+      "http_status": 200,
+      "body": {
+        "key": "t4probe1787582477",
+        "error": 0
+      },
+      "jwt_style": "payload"
+    },
+    {
+      "request": {
+        "c": "drop",
+        "key": "t4probe1787582477",
+        "users": [
+          "bob"
+        ]
+      },
+      "http_status": 200,
+      "body": {
+        "key": "t4probe1787582477",
+        "error": 0
+      },
+      "jwt_style": "payload"
+    },
+    {
+      "request": {
+        "c": "info",
+        "key": "t4probe1787582477"
+      },
+      "http_status": 200,
+      "body": {
+        "key": "t4probe1787582477",
+        "error": 0,
+        "users": [
+          "alice"
+        ]
+      },
+      "jwt_style": "payload"
+    },
+    {
+      "request": {
+        "c": "forcesave",
+        "key": "t4probe1787582477",
+        "userdata": "req-003-after-drop-of-bob"
+      },
+      "http_status": 200,
+      "body": {
+        "key": "t4probe1787582477",
+        "error": 0
+      },
+      "jwt_style": "payload"
+    },
+    {
+      "request": {
+        "c": "forcesave",
+        "key": "t4probe1787582477",
+        "userdata": "req-001-initiated-by-alice"
+      },
+      "http_status": 200,
+      "body": {
+        "key": "t4probe1787582477",
+        "error": 0
+      },
+      "jwt_style": "payload"
+    },
+    {
+      "request": {
+        "c": "forcesave",
+        "key": "t4probe1787583257",
+        "userdata": "req-p3-errinject"
+      },
+      "http_status": 200,
+      "body": {
+        "key": "t4probe1787583257",
+        "error": 0
+      },
+      "jwt_style": "payload"
+    },
+    {
+      "request": {
+        "c": "forcesave",
+        "key": "t4probe1787583257",
+        "userdata": "req-p3-after-close"
+      },
+      "http_status": 200,
+      "body": {
+        "key": "t4probe1787583257",
+        "error": 1
+      },
+      "jwt_style": "payload"
+    },
+    {
+      "request": {
+        "c": "info",
+        "key": "t4probe1787583257"
+      },
+      "http_status": 200,
+      "body": {
+        "key": "t4probe1787583257",
+        "error": 1
+      },
+      "jwt_style": "payload"
+    }
+  ]
+}

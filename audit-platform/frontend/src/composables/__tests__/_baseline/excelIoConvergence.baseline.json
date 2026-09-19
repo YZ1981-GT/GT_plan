@@ -1,0 +1,264 @@
+{
+  "_spec": "frontend-excel-io-single-entry-convergence",
+  "_task": "Wave 1 Task 1",
+  "_measured_at": "2026-08-12",
+  "_scan_scope": {
+    "include": "audit-platform/frontend/src/**/*.{vue,ts}",
+    "exclude": [
+      "composables/useExcelIO.ts (单一入口本身)",
+      "**/__tests__/** (需 mock 真实库)",
+      "**/*.spec.ts",
+      "**/*.test.ts",
+      "exempt[] 中登记的路径"
+    ],
+    "regex": "(?:from|import\\()\\s*['\"](xlsx|xlsx-js-style|exceljs)['\"]",
+    "strip_comments_first": true,
+    "_why_strip": "components/formula/exportFormulaTemplate.ts 写的是 import(/* @vite-ignore */ 'exceljs')，注释夹在 import( 与字符串之间，不剥注释会静默漏掉该文件（第一轮扫描即因此把 exceljs 记成 3 个而非 4 个）"
+  },
+  "bare_import_files": {
+    "initial": 46,
+    "current": 0,
+    "target": 0
+  },
+  "_files_deleted_not_migrated": [
+    "utils/batchExport.ts"
+  ],
+  "_deleted_note": "这里列的是「HEAD 里有裸 import、但最终处置是删除而非迁移」的文件，不计入 _progress[].files（否则会把删除算成迁移成果）。因此三方数量关系是：HEAD 有裸 import 的生产文件 47 = _progress[].files 并集 46 + 本清单 1。守卫 `_progress[].files 覆盖完整且声明即已迁` 锁死这层关系；`initial=46` 的口径 = 需要迁移的文件数，不含已删。",
+  "bare_import_calls": {
+    "initial": 93,
+    "current": 0,
+    "target": 0
+  },
+  "by_lib_files": {
+    "xlsx": 0,
+    "exceljs": 0,
+    "xlsx-js-style": 0
+  },
+  "_batches": {
+    "_note": "2026-08-12 实测划定，与 spec 立项数有两处偏差：B2 是 14 不是 12，B7 是 10 不是 12（两个函证文件曾被误归散件）",
+    "B1-次级封装": { "files": 2, "calls": 3, "status": "done" },
+    "B2-函证组": { "files": 14, "calls": 34, "status": "done" },
+    "B3-HI-composables": { "files": 8, "calls": 15, "status": "done" },
+    "B4-consolidation": { "files": 5, "calls": 15, "status": "done" },
+    "B5-exceljs": { "files": 4, "calls": 9, "status": "done" },
+    "B6-大文件": { "files": 3, "calls": 5, "status": "done" },
+    "B7-散件": { "files": 10, "calls": 13, "status": "done" }
+  },
+  "_progress": [
+    {
+      "batch": "B1",
+      "date": "2026-08-12",
+      "files": ["components/query/queryExport.ts"],
+      "_files_removed_later": {
+        "utils/batchExport.ts": "2026-08-14 经用户裁决**整文件删除**（孤儿链：exportBatchToXlsx 生产零消费方，唯一可能场景 BatchQueryResultGroup.vue 自身也零消费方 ⇒ 「合并导出」用户不可达）。连带删除：该组件、b1-batchExport-multi.json 快照、变异 M8、ExcelMultiSheetDef.headerStyle（专为它而加的覆写通道）。**必须从 files 移出** —— check_vite_transform.mjs --from-baseline 会按此清单逐文件真编译，列一个不存在的文件会让 CI 直接 exit 2。"
+      },
+      "files_after": 44,
+      "calls_after": 91,
+      "note": "xlsx-js-style 归零（原本仅 batchExport.ts 一处）。两文件产物经等价守卫逐格比对，零变化。"
+    },
+    {
+      "batch": "B2-1/14",
+      "date": "2026-08-12",
+      "files": ["components/workpaper/confirmation/alternativeD05/GtConfirmationAlternativeD05.vue"],
+      "files_after": 43,
+      "calls_after": 88,
+      "note": "B2 最复杂样板（模板导出 6 sheet / 数据导出 5 sheet / 1 处导入）。迁移中补出 L1-5（多 sheet 支持纯 AOA 形态）与 L1-6（requireFirstCell，防首列留空行被静默丢弃）两项能力。"
+    },
+    {
+      "batch": "B2-14/14",
+      "date": "2026-08-12",
+      "files_after": 30,
+      "calls_after": 57,
+      "files": [
+        "components/workpaper/confirmation/GtConfirmationSummary.vue",
+        "components/workpaper/confirmation/alternativeD06/GtConfirmationAlternativeD06.vue",
+        "components/workpaper/confirmation/alternativeF05/GtConfirmationAlternativeF05.vue",
+        "components/workpaper/confirmation/alternativeF06/GtConfirmationAlternativeF06.vue",
+        "components/workpaper/confirmation/alternativeH05/GtConfirmationAlternativeH05.vue",
+        "components/workpaper/confirmation/alternativeK06/GtConfirmationAlternativeK06.vue",
+        "components/workpaper/confirmation/diffChecklist/GtConfirmationDiffChecklist.vue",
+        "components/workpaper/confirmation/diffReconcile/GtConfirmationDiffReconcile.vue",
+        "components/workpaper/confirmation/entityVerify/GtConfirmationEntityVerify.vue",
+        "components/workpaper/confirmation/followup/GtConfirmationFollowup.vue",
+        "components/workpaper/confirmation/reliability/GtConfirmationReliability.vue",
+        "components/workpaper/confirmation/wealthList/GtConfirmationWealthList.vue",
+        "components/workpaper/g0-confirmation/alternativeG06/GtConfirmationAlternativeG06.vue"
+      ],
+      "_files_backfilled_at": "2026-08-14：这 13 个文件原本只写在下方 note 文字里，files 数组为空。后果连锁三处（提交前用「HEAD 反查裸 import」核对时发现）：① 按 files 精确 stage 的脚本漏掉它们 ⇒ commit 后远端仍带裸 import，CI 的零裸 import 守卫必红 ② CI 的 Vite 编译扫描 `--from-baseline` 只覆盖 33/46 ③「46 → 0」在权威清单里只体现 33。已补齐并加守卫 `_progress[].files ∪ 删除文件 == bare_import_files` 锁死（见 excelIoConvergence.spec.ts）。教训：把清单写在自然语言 note 里等于没写 —— 机器读不到的记录不是单一真源。",
+      "per_file_notes": {
+        "requireFirstCell_false": [
+          "D05", "D06", "F05", "F06", "H05", "K06", "G06", "entityVerify", "reliability", "GtConfirmationSummary"
+        ],
+        "requireFirstCell_default_true": [
+          "wealthList —— 首列是「索引号」（必填关键列），与其余「序号可留空」不同"
+        ],
+        "successMessage_false_原本不弹": [
+          "diffChecklist", "diffReconcile", "followup", "entityVerify", "GtConfirmationSummary"
+        ],
+        "H05_差异": "数据导出区块 sheet 首列标签是「被函证单位」而非「公司名称」，已保持原样",
+        "D05_差异": "模板导出第三个区块 sheet 名「③本期收款检查」而数据导出是「③本期收款」，原本就不一致，未在收敛中统一"
+      }
+    },
+    {
+      "batch": "B3",
+      "date": "2026-08-12",
+      "files": [
+        "components/workpaper/composables/useH1Depreciation.ts",
+        "components/workpaper/composables/useH3Depreciation.ts",
+        "components/workpaper/composables/useH8Depreciation.ts",
+        "components/workpaper/composables/useH8DepreciationAlloc.ts",
+        "components/workpaper/composables/useH8Impairment.ts",
+        "components/workpaper/composables/useI1AdditionCheck.ts",
+        "components/workpaper/composables/useI1Amortization.ts",
+        "components/workpaper/composables/useI1Impairment.ts"
+      ],
+      "files_after": 22,
+      "calls_after": 42,
+      "note": "H/I 类 composables 全批 8 文件 / 15 调用点。迁移中推翻立项写法：这批**不用 parseFile**。原因是它们各自传 cellDates/defval/raw 等低层选项，硬塞进 parseFile 会让后者退化成「什么都能干因而什么都不保证」。改为补出 L1-7 readSheetAoa 与 L1-8 readSheetObjects 两个低层薄封装，语义与直接调 SheetJS 逐项相同。",
+      "layering": "parseFile = 带业务约定的高层（跳示例行 / 固定表头 / 空值归 null）；readSheetAoa & readSheetObjects = 低层，只做防护与选项透传"
+    },
+    {
+      "batch": "B4",
+      "date": "2026-08-12",
+      "files": [
+        "components/consolidation/ConsolTrialBalanceTab.vue",
+        "components/consolidation/worksheets/EquitySimSheet.vue",
+        "components/consolidation/worksheets/NetAssetSheet.vue",
+        "components/consolidation/worksheets/ShareChangeSheet.vue",
+        "components/consolidation/ConsolNoteTab.vue"
+      ],
+      "files_after": 17,
+      "calls_after": 27,
+      "note": "合并报表全批 5 文件 / 15 调用点，其中 ConsolNoteTab 一个文件占 9 点（全库最集中）。迁移中补出 L1-9 readWorkbookAoa（一次解析返回全部 sheet 的 AOA）。",
+      "per_file_notes": {
+        "L1-9_补出原因": "ShareChangeSheet.onFileSelected 与 ConsolNoteTab.onNoteBatchImport 都要在**多个** sheet 间按名字模糊匹配（前者「含公司名且含净资产」，一份文件有 公司数×3 个 sheet；后者遍历全部 sheet 匹配章节标题）。若用 readSheetAoa 多次调用，会对同一文件重复 arrayBuffer()+read() N 次，而原实现只 read 一次 —— 既慢也不等价。",
+        "EquitySimSheet_注释消解": "该文件原有注释 `// Use raw XLSX for the instruction sheet + data sheet combo`，明确说明「因为要组合说明 sheet + 数据 sheet 所以绕开封装」。L1-5（多 sheet 支持纯 AOA 形态）已消除这个理由，注释连同裸 import 一并移除。NetAssetSheet 是同一形态。",
+        "死_import_清理": "ShareChangeSheet 原本已 `import { parseFile }` 但全文零调用 —— 是上一轮收敛没做完的痕迹，按「死代码立即删除」铁律清掉。",
+        "ShareChangeSheet_去重": "exportTemplate 与 exportData 的「公司三类 sheet」构造原本是逐字符相同的两份复制，抽成 buildCompanySheetDefs() 消除。",
+        "uniqueSheetName_名不副实": "ConsolNoteTab 的 uniqueSheetName(usedNames, ...) 把名字 add 进 Set 但**从不检查**是否已存在，根本没去重。迁移当时按严格等价原则未动（它内部已 substring(0,31)，故封装内的 slice(0,31) 是无操作，等价成立）。**2026-08-14 已修 + 加 6 例守卫 + 变异 M15/M16**：实测 282 个 section、18 个被截断、零重复（prefix 由唯一 section_id 派生且在名字最前），故「会抛错」在当前数据下不成立；但该「撞不上」依赖章节编号体系的形态，且后果是整批导出失败，故仍实现了去重（加 ~n 后缀且为后缀预留位置再截断）。"
+      }
+    },
+    {
+      "batch": "B5",
+      "date": "2026-08-12",
+      "files": [
+        "components/workpaper/composables/useB23ImportExport.ts",
+        "components/workpaper/GtB30GroupAudit.vue",
+        "components/workpaper/d2/D2TabAnalysis.vue",
+        "components/formula/exportFormulaTemplate.ts"
+      ],
+      "files_after": 13,
+      "calls_after": 18,
+      "note": "exceljs 归零。**立项假设被实测推翻：这批不是「换引擎批」，而是「入口收两个引擎」**。补出 L1-10 createExcelJsWorkbook / loadExcelJsWorkbook 两个薄 loader，库 import 收进入口而引擎不变，故调用方语义逐行不变、严格等价自动成立。",
+      "_why_not_switch_engine": {
+        "结论": "收敛的目标是「库调用只在一处、CVE 与版本统一管控、将来换库只改一个文件」，不是「全项目必须用同一个库」。强行换 SheetJS 要逐条对齐五处语义差异，而这些风险换不来任何安全收益 —— exceljs 是独立实现，不带 xlsx 那两个永不修复的 CVE。",
+        "实测语义差异_2026-08-12": {
+          "中间整空行": "ExcelJS eachRow 跳过（3 行）；SheetJS AOA 保留（5 行，给 [] ）",
+          "row.values": "ExcelJS 是 1-based（[0] 为 null）；SheetJS AOA 是 0-based。GtB30 下游按 r[1] 取第一列，换引擎需全量偏移索引，错一个就整体错列",
+          "尾部缺列": "ExcelJS 不补齐；SheetJS 传 defval 会补齐到最宽（useB23 的 isControlMatrixHeader 校验列结构，受此影响）",
+          "行内空单元格": "ExcelJS eachCell 不产生键；SheetJS 给 undefined/''（D2TabAnalysis 依赖「不产生键」）",
+          "找不到_sheet": "ExcelJS getWorksheet() 返回 undefined，GtB30 据此报「格式不符」；而 readSheetAoa 的 sheetName 找不到会**降级取第一个** ⇒ 直接换会把「明确报错」变成「静默读错 sheet」"
+        },
+        "硬缺失": "xlsx-js-style 写入端**不保留冻结窗格**。实测：用 ExcelJS 读 xlsx-js-style 产物得 state:'normal'，而 ExcelJS 自写自读得 state:'frozen',ySplit:1（判据自检有效）。exportFormulaTemplate.ts 依赖 views:[{state:'frozen',ySplit:1}]，换引擎必然丢功能。",
+        "同批实测的两项_可用_能力": "加粗字体与列宽 xlsx-js-style 写入端**有效**（ExcelJS 读回 bold:true / width:20.83）。之前用 SheetJS 自己读回是空，那是**读取端**不完整解析样式，不是写入丢失 —— 这条差别很容易把人误导成「xlsx-js-style 不支持样式」。"
+      },
+      "per_file_notes": {
+        "为何不用回调式封装": "B23 的 exportData 要在 writeBuffer **之前**判断「0 个 sheet 就走 warning 分支」。空工作簿调 writeBuffer 会抛错，回调式（封装内部直接 writeBuffer）会把 warning 变成 catch 里的 error，不等价。故 createExcelJsWorkbook 返回工作簿本体交给调用方。",
+        "exportFormulaTemplate_额外收益": "该文件原写法是 `await import(/* @vite-ignore */ 'exceljs')`，@vite-ignore 是为规避「在巨型 FormulaManagerDialog.vue 中动态导入 exceljs 导致 Vite import-analysis 解析失败」而加。动态 import 移进 useExcelIO 后本文件只做静态 import，该规避不再必要。",
+        "D2TabAnalysis_省掉_FileReader": "原先 FileReader.readAsArrayBuffer(file) → wb.xlsx.load(buffer)。loadExcelJsWorkbook 直接收 File（内部 file.arrayBuffer()），与之等价，故省掉这一层。",
+        "D2TabAnalysis_未加原型污染防护": "`obj[headers[colNum-1]] = cell.value` 的键来自文件。未加防护是有意的：单层赋值时 `o['__proto__']=标量` 静默无效（与 security.spec.ts 对 xlsx 路径的实测同理），且混进换引擎批会让问题归因困难。列为后续观察项，不在本批处理。"
+      }
+    },
+    {
+      "batch": "B6",
+      "date": "2026-08-12",
+      "files": [
+        "views/TrialBalance.vue",
+        "views/ProcedureTrimming.vue",
+        "components/workpaper/GtB22AControlMatrix.vue"
+      ],
+      "files_after": 10,
+      "calls_after": 13,
+      "note": "三个大文件（4484 / 3933 / 2668 行）共 5 个调用点，全是单 sheet AOA，形态与 B4 已迁的一致，无新增能力需求。"
+    },
+    {
+      "batch": "B7",
+      "date": "2026-08-12",
+      "files": [
+        "components/workpaper/c23/C23SampleSheet.vue",
+        "components/trial-balance/ReportLineMappingDialog.vue",
+        "components/trial-balance/TbComparisonView.vue",
+        "components/common/ExcelImportPreviewDialog.vue",
+        "components/ledger-import/LedgerBalanceTreeView.vue",
+        "components/workpaper/c24/C24AnomalyAccountSheet.vue",
+        "components/workpaper/custom/GtCustomWpBatchDialog.vue",
+        "components/workpaper/GtB22BControlMatrix.vue",
+        "components/workpaper/WorkpaperAssignmentMatrix.vue",
+        "views/ConsolidationIndex.vue"
+      ],
+      "files_after": 0,
+      "calls_after": 0,
+      "note": "**收敛完成：46 → 0，exempt[] 为空，无一豁免。** 守卫全套 107/107 全绿（终态守卫「生产文件零裸 import」首次转绿），变异 13/13 全 RED。",
+      "new_capabilities": {
+        "L1-11_ExcelJsonSheetDef": "json_to_sheet 形态。ReportLineMappingDialog（3 sheet）与 LedgerBalanceTreeView 原本传对象数组。拒绝让调用方自己转 AOA —— json_to_sheet 的表头是**所有**对象键的并集（按首次出现序），手写 Object.keys(data[0]) 在对象键不齐时会静默漏列，空数组还直接抛错。",
+        "L1-12_blankrows": "GtCustomWpBatchDialog 显式传 blankrows:false。该选项默认值随 header 而变（header:1 下 SheetJS 默认保留空行），必须能透传。"
+      },
+      "_封装默认口径与调用方不同的三处": {
+        "_why_important": "这批暴露出一类风险：封装的统一口径对个别调用方是**错的**，机械替换会静默改行为。",
+        "ExcelImportPreviewDialog": "降级取**最后一个** sheet（注释写明是为跳过「填写说明」），而封装统一口径是降级取第一个。改用 readWorkbookAoa 自己选 sheet 名。",
+        "GtCustomWpBatchDialog": "要区分「没有任何工作表」并给出明确 excelError 文案。readSheetAoa 在无 sheet 时给不出可区分信号，同样改用 readWorkbookAoa。",
+        "ReportLineMappingDialog_before_upload": "onImportTemplate 是 el-upload 的 before-upload 钩子，**必须同步返回 false**。原写法 `import('xlsx').then(async ...); return false` 不等待解析就返回。若改成 async function，返回值变成 resolved Promise，Element Plus 视为「允许上传」，会真往 action（此处未设置 = 当前地址）POST 一个无效请求。故拆成同步外壳 + async 实现。"
+      },
+      "_顺带修掉的体积问题": "C24AnomalyAccountSheet.vue 是全库**唯一的静态 import**（`import * as XLSX from 'xlsx'`），会把 xlsx 打进主包而非按需加载。收敛后变成入口内的动态 import。"
+    },
+    {
+      "batch": "横切修复（不属任何迁移批）",
+      "date": "2026-08-14",
+      "files": ["composables/useExcelIO.ts"],
+      "files_after": 0,
+      "calls_after": 0,
+      "note": "Playwright 实测（Task 18）顺带查出的既有缺陷：applyExcelStyleTemplate 写 `vertical:'middle'`（CSS 写法），而 OOXML 的 ST_VerticalAlignment 只认 top/center/bottom/distributed/justify ⇒ **产出非法 OOXML，openpyxl 拒绝打开整个文件**。已改为 `center` 并收敛成 _STYLE_VERTICAL 常量。",
+      "_evidence": {
+        "实证样本": ".playwright-mcp/审定表-审定表D2-1.xlsx（2026-06-20 导出，早于本轮改动），openpyxl 抛 `ValueError: Value must be one of {'top','bottom','distributed','justify','center'}` → `Unable to read workbook: could not read stylesheet`",
+        "对照实验": "同内容只改这一个值：middle → 打不开；center → 正常读取",
+        "对照样本": "同目录下本轮用 applyStyles:false 导出的两个试算平衡表文件 openpyxl 读取正常（无样式故不受影响）"
+      },
+      "_impact": {
+        "统计口径": "调用 exportData/exportTemplate/exportMultiSheetData/exportToBytes/exportMultiSheetToBytes 且选项里没有 applyStyles",
+        "显式传_applyStyles": 57,
+        "走默认值_受影响": 12,
+        "受影响调用点": [
+          "components/report/MultiYearCompare.vue",
+          "components/workpaper/GtA1Dashboard.vue",
+          "components/workpaper/GtA2AdjustmentConsole.vue",
+          "components/workpaper/GtA3ConsolidationConsole.vue",
+          "components/workpaper/WorkpaperHtmlTable.vue",
+          "components/workpaper/composables/useK1WriteoffImportExport.ts (×2)",
+          "components/workpaper/i2/core/I2TabAnalysis.vue",
+          "components/workpaper/i2/impairment/I2TabImpairment.vue",
+          "components/workpaper/i2/inspection/I2TabWorkHourCheck.vue",
+          "composables/useAProgramPopups.ts",
+          "composables/useTableToolbar.ts"
+        ],
+        "实际影响面更大": "useTableToolbar 是通用工具栏、WorkpaperHtmlTable 是底稿 HTML 表格通用导出，二者被大量表格复用",
+        "后端连带": "项目后端有 674 处 openpyxl。「前端导出模板 → 用户填 → 后端解析」这条路上，只要用户没在 Excel 里重存过（Excel 保存会修正非法值），后端就读不了。"
+      },
+      "_why_fixed_while_others_registered_only": "本条是「一个枚举值写错」，修复方向唯一且后果是「产物无法被标准工具读取」= 功能缺陷；而 uniqueSheetName 名不副实、batchExport 孤儿链涉及功能层决策（要不要真去重 / 接线还是删除），超本 spec 半径。且本 spec 刚把全部导出收敛到这一处，是修它成本最低的时刻 —— 不修等于用「单一入口」把缺陷固化。",
+      "_guard": "新增 3 例守卫（useExcelIO.excelJs.spec.ts）：真写出字节后解 zip 读 styles.xml，逐个校验 vertical/horizontal/border style/patternType 是否在 OOXML 合法枚举里。**不是**断言源码常量（那是 grep 式守卫，常量对了但某处内联写死仍会漏）。变异 M14 = RED。另有 openpyxl 端到端验证：三线表边框/加粗/对齐全保留且可正常解析。",
+      "_外观影响": "会变。非法值被 Excel 忽略后用的是默认垂直对齐（通常 bottom），改对后才真的垂直居中 —— 方向是「让原本写坏的意图生效」。不影响本 spec 的 3 份等价基线：它们都不走 applyStyles:true 路径。"
+    }
+  ],
+  "_other_buckets_for_reference": {
+    "_note": "纯参考值，无守卫断言。test calls 从 16 涨到 23 是本 spec 自己新增的守卫文件（newApi / equivalence / excelJs）里 mock 真实库所致；entry calls 从 2 涨到 3 是 B5 把 exceljs 也收进入口（xlsx + xlsx-js-style + exceljs）。均属预期。",
+    "test_exempt": { "files": 6, "calls": 23 },
+    "entry_useExcelIO": { "files": 1, "calls": 3 }
+  },
+  "exempt": [],
+  "_exempt_max": 5,
+  "_rules": [
+    "current 只许下调，不许上调（R6.6）",
+    "exempt 每条必须含 reason 与 evidence（R1.4）",
+    "exempt 条目数不得超过 _exempt_max，且该上限只许下调",
+    "exempt 里的文件若实际已无裸 import，守卫打红要求移出（R5.6 stale 检测）"
+  ]
+}

@@ -14,6 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_db
 from app.deps import get_current_user
 from app.schemas._common import OptionalAmountDecimal
+from app.services.note_readiness_service import run_validation_best_effort
 from app.services.note_wp_mapping_service import NoteWpMappingService
 
 router = APIRouter(prefix="/api/disclosure-notes", tags=["note-wp-mapping"])
@@ -52,6 +53,35 @@ async def refresh_from_workpapers(
     svc = NoteWpMappingService(db)
     result = await svc.refresh_from_workpapers(project_id, year)
     await db.commit()
+    # 透传更丰富返回体：显式添加 cells_updated 便于前端消费
+    # service 返回 refreshed=cells_updated（向后兼容旧键名），
+    # 同时增加 cells_updated 明确语义供前端区分提示文案（Req 2.7, 2.8）
+    result["cells_updated"] = result.get("refreshed", 0)
+    # P0-4（附注联动复盘）：刷新后自动补跑校验并落库（fail-open，不影响已提交刷新）
+    result["validation"] = await run_validation_best_effort(db, project_id, year)
+    return result
+
+
+@router.post("/{project_id}/{year}/{note_section}/refresh-from-workpaper")
+async def refresh_section_from_workpaper(
+    project_id: UUID,
+    year: int,
+    note_section: str,
+    db: AsyncSession = Depends(get_db),
+    user=Depends(get_current_user),
+):
+    """只重算单个章节的科目数据（当前页面刷新）。
+
+    与项目级 refresh-from-workpapers 区别：后端仅重算 note_section 本节，
+    使「刷新」按钮的前后端行为一致（只动当前节，避免全量写库→前端只重载
+    当前节造成的其它章节前后端不一致）。
+    """
+    svc = NoteWpMappingService(db)
+    result = await svc.refresh_section_from_workpapers(project_id, year, note_section)
+    await db.commit()
+    result["cells_updated"] = result.get("refreshed", 0)
+    # P0-4：单章节刷新后同样自动补跑校验（fail-open）
+    result["validation"] = await run_validation_best_effort(db, project_id, year)
     return result
 
 

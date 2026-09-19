@@ -66,12 +66,17 @@
                   :data="cat.items"
                   size="small"
                   stripe
+                  class="gt-compact-table gt-completeness-table"
                   style="margin-top: 8px"
                 >
                   <el-table-column prop="wp_code" label="底稿编号" width="120" />
                   <el-table-column prop="wp_name" label="底稿名称" min-width="180" />
-                  <el-table-column prop="assignee" label="责任人" width="100" />
-                  <el-table-column prop="status" label="状态" width="100" />
+                  <el-table-column prop="assignee" label="责任人" width="100">
+                    <template #default="{ row }">{{ row.assignee || '—' }}</template>
+                  </el-table-column>
+                  <el-table-column prop="status" label="状态" width="100">
+                    <template #default="{ row }">{{ statusLabel(row.status) }}</template>
+                  </el-table-column>
                 </el-table>
               </div>
             </div>
@@ -348,6 +353,27 @@ function categoryLabel(category: string): string {
     case 'stale': return '过期底稿'
     default: return category
   }
+}
+
+const STATUS_LABELS: Record<string, string> = {
+  // WorkingPaper 文件状态
+  draft: '草稿',
+  in_progress: '进行中',
+  submitted: '已提交',
+  under_review: '复核中',
+  review_passed: '复核通过',
+  archived: '已归档',
+  rejected: '已退回',
+  // 报告类别状态
+  missing: '缺失',
+  stale: '已过期',
+  unsigned: '未签字',
+  unresolved_reviews: '有未解决意见',
+  not_started: '未开始',
+}
+
+function statusLabel(status: string): string {
+  return STATUS_LABELS[status] || status
 }
 
 async function fetchCompletenessReport() {
@@ -715,6 +741,21 @@ onBeforeUnmount(() => {
   font-weight: 500;
   font-size: 14px;
   color: var(--el-text-color-primary, #303133);
+}
+
+/* 完整性报告表格：字号统一 13，行高固定（与报表模块紧凑表格一致） */
+.gt-completeness-table {
+  font-size: 13px;
+}
+.gt-completeness-table :deep(td.el-table__cell),
+.gt-completeness-table :deep(th.el-table__cell) {
+  padding: 0 !important;
+  height: 32px !important;
+}
+.gt-completeness-table :deep(.cell) {
+  padding: 2px 8px !important;
+  line-height: 28px !important;
+  font-size: 13px;
 }
 
 .gt-completeness-footer {

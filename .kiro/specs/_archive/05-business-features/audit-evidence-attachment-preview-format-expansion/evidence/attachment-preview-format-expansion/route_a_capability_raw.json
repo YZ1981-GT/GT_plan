@@ -1,0 +1,65 @@
+{
+  "route": "A",
+  "packages": {
+    "@open-file-viewer/core": "0.1.44",
+    "@open-file-viewer/vue": "0.1.44"
+  },
+  "capability": {
+    "archiveLimits": false,
+    "emailIsolation": false,
+    "dxf": true,
+    "disposable": true,
+    "license": true
+  },
+  "capability_eligible": false,
+  "evidence": {
+    "archive": {
+      "archiveLimits": false,
+      "evidence": {
+        "hasFiveNamedLimits": false,
+        "usesJszipOrPako": true,
+        "note": "公开 archivePlugin 无本 spec 五项资源门；不得因体积入选"
+      }
+    },
+    "email": {
+      "emailIsolation": false,
+      "evidence": {
+        "hasCspContract": false,
+        "hasPrivatePurify": false,
+        "allowsHttpRefsLikely": true,
+        "note": "emailPlugin 允许 http(s) URI 且无零外发/CSP 契约"
+      }
+    },
+    "dxf": {
+      "dxf": true,
+      "evidence": {
+        "hasCadPlugin": true,
+        "dxfMention": true,
+        "drawingPluginPresent": true,
+        "peerDeps": {
+          "@mlightcad/cad-simple-viewer": ">=1.5.9",
+          "@mlightcad/data-model": ">=1.12.3",
+          "@mlightcad/libredwg-web": ">=0.7.4",
+          "lodash-es": ">=4.17.21",
+          "pdfjs-dist": ">=4"
+        }
+      }
+    },
+    "license": {
+      "license": true,
+      "evidence": {
+        "peerDeclaresGpl": true,
+        "gplPeerResolvedIntoLock": false,
+        "gplInstalled": false,
+        "note": "probe 不安装 GPL peer；仅当 lock 出现已解析 node_modules 条目或已安装时 license=false；peer 声明单独记证"
+      }
+    },
+    "disposable": {
+      "disposable": true,
+      "evidence": {
+        "hasDisposeApi": true
+      }
+    }
+  },
+  "gpl_peer_installed": false
+}

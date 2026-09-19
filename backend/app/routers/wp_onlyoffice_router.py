@@ -1,0 +1,1813 @@
+"""底稿 Sheet 级 OnlyOffice WOPI 路由
+
+提供非白名单 sheet（函证检查表/替代程序表等）的 OnlyOffice 编辑集成：
+- GET  /api/workpapers/{wp_id}/sheets/{sheet_name}/onlyoffice-config  — 编辑器配置（doc_key + JWT）
+- GET  /api/workpapers/{wp_id}/sheets/{sheet_name}/wopi/contents      — WOPI GetFile（xlsx 文件内容）
+
+设计参考：.kiro/specs/d0-onlyoffice-migration/design.md §1.2
+"""
+
+from __future__ import annotations
+
+import hashlib
+import logging
+import re
+import shutil
+from pathlib import Path
+from uuid import UUID
+
+import httpx
+from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile
+from fastapi.responses import FileResponse
+from jose import jwt, JWTError
+from sqlalchemy.ext.asyncio import AsyncSession
+import sqlalchemy as sa
+
+from app.core.config import settings
+from app.core.database import get_db
+from app.deps import get_current_user, require_project_access
+from app.models.core import User
+from app.models.workpaper_models import WpIndex, WorkingPaper
+from app.services.wp_visibility import editor_security as _editor_security
+from app.services.wp_visibility.denial import (
+    EXTERNAL_NOT_FOUND_DETAIL,
+    ExternalNotFound,
+    RateLimited,
+)
+
+logger = logging.getLogger(__name__)
+
+#: 仓库内 `backend/` 目录绝对路径。`working_paper.file_path` 存的是**相对 `backend/` 的
+#: 相对路径**（`storage\projects\...`，Windows 反斜杠），生产进程 CWD 恰为 `backend/` 故
+#: 裸 `Path(file_path)` 可用；但诊断脚本/测试可能从仓库根运行 ⇒ 需要绝对回退。
+#: 🔴 与 `custom_workpaper_projection` 的相对解析口径一致（先按 CWD，再按 backend 根）。
+_BACKEND_ROOT = Path(__file__).resolve().parents[2]
+
+router = APIRouter(
+    prefix="/api/workpapers",
+    tags=["working-papers"],
+)
+
+# 公共状态端点专用路由（无 {wp_id} 路由 → router_registry 不会附加 dedicated_wp_gate）。
+# /onlyoffice/health 是无鉴权状态探针（设计如此：docstring + native_authz_audit 均标注公开，
+# 契约测试断言不返回 401/403）。若挂在主 router 上会被 dedicated_wp_gate 的 get_current_user
+# 拦截 → 前端裸 fetch（无 Authorization）恒 401 → 双模式"OO不可用"。故独立到本路由保持公开。
+public_router = APIRouter(
+    prefix="/api/workpapers",
+    tags=["working-papers"],
+)
+
+
+# ---------------------------------------------------------------------------
+# Task 11 · 组件 C11 EditorSecurity — 统一门接入 + 全 claim 令牌
+#
+# 编辑器入口（config / file-read / callback / convert）与 WOPI 入口统一经
+# resolve_wp_binding_and_access 判定授权；令牌用 editor_security 全量校验
+# （签名/过期/jti/非空/逐 claim 绑定）。
+#
+# 部署分阶段（settings.ONLYOFFICE_JWT_ENFORCE，默认 False）：
+#   - enforce=True：门拒绝 → 对外统一 404（External_Not_Found），令牌 secret 缺失亦 fail-closed。
+#   - enforce=False（dev，JWT disabled）：门拒绝仅记录告警并放行，供开发编辑；
+#     令牌校验机制本身恒 fail-closed（editor_security），仅"是否阻断请求"受 enforce 控制。
+# 校验机制（editor_security / gate signed_token 全量校验）与部署 enforce 解耦。
+# ---------------------------------------------------------------------------
+
+
+async def _gate_editor(
+    db: AsyncSession,
+    current_user: User,
+    *,
+    wp_id: UUID,
+    project_id: UUID | None,
+    entrypoint: str,
+    action: str,
+    method: str,
+    sheet_name: str | None = None,
+    signed_token: str | None = None,
+    requested_version: str | None = None,
+):
+    """对编辑器入口调用统一门（Req 8.8/8.9）。
+
+    返回 WpAccessContext（allow）或 None（enforce 关闭且门拒绝，dev 放行）。
+    RateLimited 恒抛 429；enforce 开启时门拒绝抛 404（External_Not_Found 固定 body）。
+    """
+    from app.services.wp_visibility.wp_bound_gate import (
+        BindingAdapters,
+        resolve_wp_binding_and_access,
+    )
+
+    req = BindingAdapters().wp(
+        entrypoint=entrypoint,
+        action=action,
+        method=method,
+        wp_id=wp_id,
+        project_id=project_id,
+        entry_family="onlyoffice_wopi",
+        requested_sheet_key=sheet_name,
+        requested_version=requested_version,
+        signed_token=signed_token,
+    )
+    try:
+        return await resolve_wp_binding_and_access(db, current_user, req)
+    except RateLimited:
+        raise  # 资源无关 429 恒生效
+    except ExternalNotFound:
+        if settings.ONLYOFFICE_JWT_ENFORCE:
+            raise HTTPException(status_code=404, detail=EXTERNAL_NOT_FOUND_DETAIL)
+        logger.debug(
+            "editor gate deny (enforce off, dev passthrough) entrypoint=%s wp_id=%s action=%s",
+            entrypoint, wp_id, action,
+        )
+        return None
+
+
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+
+
+def _onlyoffice_storage_dir(project_id: UUID) -> Path:
+    """项目级 OO 目录 —— 段名/绝对化委派 canonical_paths（Task 58 / Req 9.3 见该模块）。"""
+    from app.services.workpaper_sync.canonical_paths import onlyoffice_canonical_dir
+    return onlyoffice_canonical_dir(project_id)
+
+
+async def _load_wp_or_404(db: AsyncSession, wp_id: UUID) -> tuple[WorkingPaper, str]:
+    """查询底稿 + wp_code，并执行项目软删守卫。三端点统一入口。
+
+    - 校验 WorkingPaper.is_deleted == False
+    - 校验 projects.is_deleted == False（复用 render-config Step1.5 同款裸 SQL）
+    - 返回 (wp, wp_code)
+    """
+    result = await db.execute(
+        sa.select(WorkingPaper, WpIndex.wp_code)
+        .join(WpIndex, WpIndex.id == WorkingPaper.wp_index_id)
+        .where(
+            WorkingPaper.id == wp_id,
+            WorkingPaper.is_deleted == sa.false(),
+        )
+    )
+    row = result.first()
+    if row is None:
+        raise HTTPException(status_code=404, detail="底稿不存在")
+    wp, wp_code = row[0], row[1]
+
+    # 项目软删守卫（复用 render-config Step1.5 同款裸 SQL）
+    proj_deleted = (
+        await db.execute(
+            sa.text("SELECT is_deleted FROM projects WHERE id = :pid"),
+            {"pid": str(wp.project_id)},
+        )
+    ).scalar()
+    if proj_deleted:
+        raise HTTPException(status_code=404, detail="项目已删除")
+
+    return wp, wp_code
+
+
+def _resolve_custom_wp_file(wp, wp_code: str | None) -> Path | None:
+    """自定义底稿的 OO 目标文件 = **业务文件本体**（不走 OO 缓存副本）。
+
+    非 custom / 无 file_path / 文件不存在 / 非 xlsx 一律返回 None，调用方退回既有
+    「模板 → 缓存副本」路径（零回归方向）。
+
+    ## 为什么 custom 必须直编本体（2026-08-08 浏览器实测抓出，Task 26）
+
+    既有 `_resolve_wp_file` 只认两个来源：OO 缓存 `{oo_dir}/{wp_code}.xlsx` 或
+    **模板文件**。自定义底稿**没有模板**（`find_template_file_any` 必返 None），
+    其 xlsx 在 `working_paper.file_path` 指的业务存储下 ⇒ 两来源都不命中 ⇒
+    `FileNotFoundError` ⇒ **config 端点 404，「在线编辑」从来打不开**。
+
+    更深一层：即便复制一份到缓存也不对 —— callback 落盘写缓存，而
+    `refresh_custom_projection` 读的是 `wp.file_path`（业务文件）⇒ OO 改动永远进不了
+    HTML 侧，且「xlsx 为唯一权威」退化成两份 xlsx 互相打架（本 spec 的架构口径是
+    xlsx 本体唯一权威、`html_data.cells` 只是它的投影）。
+
+    故 custom 的 config / WOPI 下载 / callback 落盘三处统一指向业务文件本体，
+    与投影读取同源。
+
+    🔴 **不调 `_hide_non_target_sheets`**：custom 恒单 sheet（sheet 名 == wp_code），
+    没有「多 sheet workbook 在 OO 里显示无关 tab」的问题；而对业务文件本体动
+    可见性会真实改写用户底稿。
+    """
+    from app.services.custom_workpaper_context import resolve_is_custom_sync
+
+    try:
+        if not resolve_is_custom_sync(wp, wp_code):
+            return None
+        raw = getattr(wp, "file_path", None)
+        if not raw:
+            return None
+        fp = Path(str(raw))
+        if fp.suffix.lower() not in (".xlsx", ".xlsm"):
+            return None
+        # 🔴 `working_paper.file_path` 存的是**相对 backend/ 的相对路径**
+        #    （`storage\projects\...`，Windows 反斜杠）。投影侧 `project_custom_workpaper`
+        #    直接 `Path(file_path)` 依赖 CWD=backend/，此处沿用同一口径 + 一次
+        #    backend 根回退，避免两侧解析出不同文件（那会让 OO 编的与投影读的分叉）。
+        if not fp.exists():
+            fp2 = _BACKEND_ROOT / fp
+            if fp2.exists():
+                fp = fp2
+        if not fp.exists() or fp.stat().st_size == 0:
+            logger.warning("custom OO: 业务文件缺失或为空 %s", fp)
+            return None
+        return fp
+    except Exception as exc:  # noqa: BLE001 — 解析失败退回既有路径
+        logger.warning("custom OO 文件解析失败 wp_code=%s: %s", wp_code, exc)
+        return None
+
+
+def _resolve_wp_file(
+    project_id: UUID,
+    wp_code: str,
+    template_path: Path | None,
+    *,
+    visible_sheet: str | None = None,
+    cache_stem: str | None = None,
+) -> Path:
+    """解析 wp_code 对应的单一共享文件（不再 per-sheet 复制）。
+
+    按 {wp_code}.{ext} 命名单一文件，扩展名取自模板实际类型。
+    同一 wp_code 的多个 sheet 共享此文件。
+    首次从模板整本复制一次，后续复用。
+
+    visible_sheet: 若提供，用 openpyxl 隐藏非目标 sheet 并置其为活动 sheet
+                   （解决多sheet workbook在OO中显示无关tab/打开到错误sheet的问题）。
+                   对已存在的缓存文件同样生效（幂等，可见性无变化时不落盘，
+                   避免无谓刷新 doc_key）。
+    cache_stem:    覆盖工作副本的文件名主干（默认 wp_code）。整册模式用
+                   `_whole_cache_stem(wp_code)` —— 它的源文档是整册本，与主模板**不是同
+                   一份文档**，共用一个文件名会让整册永久复用旧文档（见该常量的说明）。
+    """
+    storage_dir = _onlyoffice_storage_dir(project_id)
+
+    # 确定文件扩展名：优先从模板取实际后缀，回退 xlsx
+    ext = template_path.suffix.lower() if template_path else ".xlsx"
+    if not ext:
+        ext = ".xlsx"
+    stem = cache_stem or wp_code
+    file_name = f"{stem}{ext}"              # one file per document identity, 保留原始扩展名
+    target = storage_dir / file_name
+
+    # 曾错误地把 xlsx 缓存 rename 成 .docx：内容仍是 workbook，需丢弃重拷
+    if target.exists() and ext in (".docx", ".doc") and _oo_file_is_xlsx_zip(target):
+        try:
+            target.unlink()
+            logger.info("已清除伪 docx（实为 xlsx）OO 缓存: %s", target.name)
+        except OSError as exc:
+            logger.warning("无法删除伪 docx OO 缓存 %s: %s", target, exc)
+
+    if target.exists():
+        # 共享缓存文件按当前请求的目标 sheet 重设可见性/活动 sheet
+        # （否则首次复制时锁定的 sheet 永久生效，切换 sheet 后 OO 打开错误页）。
+        if visible_sheet and ext in (".xlsx", ".xlsm"):
+            _hide_non_target_sheets(target, visible_sheet)
+        return target
+
+    # 兼容旧格式：曾按 .xlsx 缓存，现模板为 docx/doc 时不可 rename（内容仍是 xlsx）
+    legacy_target = storage_dir / f"{stem}.xlsx"
+    if legacy_target.exists() and ext != ".xlsx":
+        try:
+            legacy_target.unlink()
+            logger.info(
+                "已清除过时 OO xlsx 缓存以便改挂 %s 模板: %s",
+                ext, legacy_target.name,
+            )
+        except OSError as exc:
+            logger.warning("无法删除过时 OO xlsx 缓存 %s: %s", legacy_target, exc)
+
+    if template_path and template_path.exists():
+        storage_dir.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(template_path, target)
+
+        # 隐藏非目标 sheet（多sheet workbook 场景）
+        if visible_sheet and ext in (".xlsx", ".xlsm"):
+            _hide_non_target_sheets(target, visible_sheet)
+
+        return target
+    raise FileNotFoundError(f"OnlyOffice 文件不存在且无模板可复制: {file_name}")
+
+
+def _oo_file_is_xlsx_zip(path: Path) -> bool:
+    """True if path is an OOXML workbook (xl/) rather than a Word document (word/)."""
+    try:
+        import zipfile
+
+        with zipfile.ZipFile(path) as zf:
+            names = zf.namelist()
+        has_xl = any(n.startswith("xl/") for n in names)
+        has_word = any(n.startswith("word/") for n in names)
+        return has_xl and not has_word
+    except Exception:
+        return False
+
+
+def _hide_non_target_sheets(file_path: Path, target_sheet: str) -> None:
+    """将非目标 sheet 设为 hidden，让 OO 只显示目标 tab。
+
+    匹配逻辑：target_sheet 可能是完整名或末尾含编码，精确匹配优先，否则用
+    contains / endswith（规则由 `excel_sheet_visibility.resolve_target_sheet`
+    承载，与本函数历史行为逐条一致）。至少保留一个可见 sheet。
+
+    幂等：目标 sheet 已是唯一可见且为活动 sheet 时不落盘（避免 mtime 变化
+    导致无谓刷新、打断进行中的 OO 编辑会话）。
+
+    ## 🔴 2026-09-03：实现从 openpyxl 全量重写换成 zip 级外科手术
+
+    原实现 `openpyxl.load_workbook()` + `wb.save()` 会重写整本 workbook。K11
+    实测毁坏（before → after）：zip 部件 **37 → 19**（丢 7 个
+    `printerSettings*.bin` + 6 个 `worksheets/_rels/*.rels` + `sharedStrings.xml`
+    + `calcChain.xml` + 批注与 customXml）、共享公式主格 **12 → 0**（整组被
+    展平）、缓存值 **716 → 478 且余下写成空标签 `<v></v>`**、样式索引全表重排
+    （`s="94"` → `s="218"`）。这条路径在**每次切换 sheet 时都跑一次**，改坏的是
+    用户正在 OO 里编辑并会被回写的那份文件。
+
+    `excel_materialize.select_write_strategy` 早已判定 openpyxl 在本项目
+    351 个模板上一个都不安全；此处曾绕过那道门。
+
+    隐藏 sheet 本身无害 —— Excel / OO 里隐藏的 sheet 照样参与计算，跨 sheet
+    公式引用（实测 188 份模板共 81,955 处）指向隐藏 sheet 完全正常。所以行为
+    不变，只把实现换成「除 `xl/workbook.xml` 外一个字节都不动」，并由
+    `_assert_only_workbook_part_changed` 结构性自检兜住。
+
+    失败时**不落盘**（临时文件先写、成功才顶替），并记 ERROR 而非 WARNING ——
+    原来的 `except Exception: logger.warning` 正是这类毁坏能长期无声发生的原因。
+    """
+    from app.services.workpaper_sync.excel_sheet_visibility import (
+        apply_single_sheet_visibility,
+    )
+
+    try:
+        outcome = apply_single_sheet_visibility(file_path, target_sheet)
+    except Exception as exc:  # noqa: BLE001 — 可见性是体验优化，不该 500 掉编辑器
+        logger.error(
+            "sheet 可见性改写失败（文件未被修改）%s target=%r: %s: %s",
+            file_path.name, target_sheet, type(exc).__name__, exc,
+        )
+        return
+    if outcome.changed:
+        logger.info(
+            "sheet 可见性已改写 %s：可见=%s 隐藏 %d 张 activeTab=%s",
+            file_path.name, outcome.visible, len(outcome.hidden), outcome.active_tab,
+        )
+    elif outcome.reason == "target_not_matched":
+        logger.warning(
+            "sheet 可见性未改：目标 %r 在 %s 里匹配不到任何 sheet",
+            target_sheet, file_path.name,
+        )
+
+
+def _ensure_all_sheets_visible(file_path: Path) -> None:
+    """「完整Excel」页签：把共享工作簿的全部 sheet 恢复可见（幂等，无变化不落盘）。
+
+    共享文件曾被 _hide_non_target_sheets 隐藏为单 sheet，整册编辑前需恢复。
+
+    与 `_hide_non_target_sheets` 同因换成 zip 级实现 —— 见那里的实测毁坏记录。
+    """
+    from app.services.workpaper_sync.excel_sheet_visibility import (
+        restore_all_sheets_visible,
+    )
+
+    try:
+        outcome = restore_all_sheets_visible(file_path)
+    except Exception as exc:  # noqa: BLE001
+        logger.error(
+            "恢复全部 sheet 可见失败（文件未被修改）%s: %s: %s",
+            file_path.name, type(exc).__name__, exc,
+        )
+        return
+    if outcome.changed:
+        logger.info(
+            "已恢复 %s 的全部 %d 张 sheet 为可见", file_path.name, len(outcome.visible)
+        )
+
+
+# ── 整册（完整Excel）源文档身份 ──────────────────────────────────────────────
+# 判定本体在伴生模块 `app.services.wp_whole_workbook_document`：哪份文档才算这个 wp_code
+# 的整本、两份候选选哪份、工作副本叫什么名字 —— 都是业务判定，不是路由参数搬运。
+# 这里只起私名别名，保持四个消费点（config / WOPI contents / 降级 grid / callback）的调用
+# 形态不变。
+from app.services.wp_whole_workbook_document import (  # noqa: E402
+    has_external_references as _has_external_references,
+    resolve_whole_workbook_template as _resolve_whole_workbook_template,
+    whole_cache_stem as _whole_cache_stem,
+    whole_workbook_template_or_primary as _whole_workbook_template_or_primary,
+)
+
+
+# doc_key 不再由本模块生成。
+#
+# 旧实现是 `md5(wp_code + st_mtime_ns)`：任何一次写盘（包括下面那次 sheet 可见性改写）
+# 都会轮转 doc_key，OO 于是把它当成另一个文档 —— 进行中的协同会话被切断，且两个用户在
+# 不同时刻打开同一底稿会各自进一间房，最后保存的人静默覆盖另一个人的全部改动。
+#
+# 现在由 `app.services.onlyoffice_room_identity` 从 room 身份 `(wp_id, entry_id,
+# generation)` 派生（Task 21 / AC 2.7 / Property 6）。sheet 名与「完整 Excel」视图算在
+# entry_id 里，所以切换 sheet 仍然换 key、仍会重新下载；变化的只是「同一视图反复打开
+# 不再无谓轮转」。**不留 mtime fallback**（design §wp_onlyoffice_router）。
+
+
+def _rewrite_onlyoffice_download_url(url: str) -> str:
+    """重写 OnlyOffice callback 下载 URL 的 scheme+host 为后端可达的 ONLYOFFICE_URL。
+
+    OnlyOffice 容器在 status=2/6 callback 里返回的 ``url`` 使用其自身视角地址
+    （容器内 ``http://localhost/cache/...`` 指向容器 80 端口，或用容器 hostname），
+    宿主机后端无法访问 → 下载失败 → 前端弹"无法保存文档"。
+
+    将 url 的 scheme+netloc 替换为 ``settings.ONLYOFFICE_URL`` 的 scheme+netloc
+    （如 ``http://localhost:8080``，宿主机可达），保留 path/query 不变。
+    ONLYOFFICE_URL 未配置时原样返回（不破坏 Docker 内部署场景）。
+    """
+    from urllib.parse import urlsplit, urlunsplit
+
+    base = settings.ONLYOFFICE_URL
+    if not base:
+        return url
+    try:
+        base_parts = urlsplit(base)
+        url_parts = urlsplit(url)
+        if not base_parts.netloc:
+            return url
+        # 已经是同一 host:port 则无需重写
+        if url_parts.netloc == base_parts.netloc:
+            return url
+        return urlunsplit((
+            base_parts.scheme or url_parts.scheme,
+            base_parts.netloc,
+            url_parts.path,
+            url_parts.query,
+            url_parts.fragment,
+        ))
+    except Exception:
+        return url
+
+
+def _sign_jwt(payload: dict) -> str:
+    """使用 OnlyOffice JWT secret 签名"""
+    if not settings.ONLYOFFICE_JWT_SECRET:
+        return ""
+    return jwt.encode(payload, settings.ONLYOFFICE_JWT_SECRET, algorithm="HS256")
+
+
+def _extract_placeholder_value_from_docx(
+    file_path: Path, placeholder
+) -> str | None:
+    """从已保存的 docx 中提取指定占位符位置的当前文本值。
+
+    根据 placeholder.position 定位到段落或表格单元格，
+    提取该位置的文本。如果占位符 pattern 仍然存在则返回 None（未编辑）。
+    """
+    try:
+        from docx import Document
+
+        doc = Document(str(file_path))
+        pos = placeholder.position
+
+        if "paragraph_index" in pos:
+            para_idx = pos["paragraph_index"]
+            if para_idx < len(doc.paragraphs):
+                para_text = doc.paragraphs[para_idx].text.strip()
+                # 如果整段文字就是占位符本身，用户未编辑
+                if placeholder.pattern in para_text:
+                    return None
+                # 尝试用占位符位置前后文本提取填充值
+                # 简化方案：返回完整段落文本（单占位符段落）
+                return para_text if para_text else None
+        elif "table_index" in pos:
+            tbl_idx = pos["table_index"]
+            row_idx = pos.get("row", 0)
+            col_idx = pos.get("col", 0)
+            if tbl_idx < len(doc.tables):
+                table = doc.tables[tbl_idx]
+                if row_idx < len(table.rows):
+                    row = table.rows[row_idx]
+                    if col_idx < len(row.cells):
+                        cell_text = row.cells[col_idx].text.strip()
+                        if placeholder.pattern in cell_text:
+                            return None
+                        return cell_text if cell_text else None
+    except Exception:
+        return None
+    return None
+
+
+def _sign_wopi_token(wp_id: UUID, wp_code: str, ttl_seconds: int = 300) -> str:
+    """为 WOPI download_url 生成短时效签名 token。
+
+    嵌入 download_url 的 ?token= 参数，确保即使容器不附带 outbox JWT，
+    WOPI 端点也能校验请求合法性。TTL 默认 5 分钟（编辑器打开后立即下载）。
+    """
+    import time
+
+    if not settings.ONLYOFFICE_JWT_SECRET:
+        return ""
+    payload = {
+        "sub": "wopi",
+        "wp_id": str(wp_id),
+        "wp_code": wp_code,
+        "exp": int(time.time()) + ttl_seconds,
+    }
+    return jwt.encode(payload, settings.ONLYOFFICE_JWT_SECRET, algorithm="HS256")
+
+
+# ---------------------------------------------------------------------------
+# GET /api/workpapers/onlyoffice/health
+# (静态路径，必须注册在 /{wp_id} 动态通配之前)
+# ---------------------------------------------------------------------------
+
+
+@public_router.get("/onlyoffice/health")
+async def get_onlyoffice_health(db: AsyncSession = Depends(get_db)):
+    """底稿模块 OnlyOffice 健康预检。
+
+    复用交付模块已有 health_check（不重复实现），返回健康状态 + 活跃席位 + 席位上限。
+    前端 GtOnlyOfficeSheet mounted 时主动调用，不健康直接降级（不加载 api.js）。
+    无需用户鉴权（状态端点）。
+    """
+    from app.services.onlyoffice_callback_service import OnlyOfficeCallbackService
+    from app.services.onlyoffice_session_limiter import get_active_count, MAX_SESSIONS
+
+    try:
+        svc = OnlyOfficeCallbackService(db)
+        healthy = await svc.health_check()
+    except Exception:
+        healthy = False
+
+    try:
+        active = await get_active_count()
+    except Exception:
+        active = 0
+
+    return {
+        "healthy": healthy,
+        "active_sessions": active,
+        "max_sessions": MAX_SESSIONS,
+    }
+
+
+# ---------------------------------------------------------------------------
+# GET /api/workpapers/{wp_id}/template-structure
+# ---------------------------------------------------------------------------
+
+
+@router.get("/{wp_id}/template-structure")
+async def get_template_structure(
+    wp_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """返回 word-template 底稿的解析后模板结构 + 已填数据。
+
+    1. 查询底稿 + wp_code
+    2. 校验 componentType == "word-template"
+    3. 解析模板文件（带 mtime 缓存）
+    4. 合并 checklist_responses 当前值
+    5. 返回 {template_structure, filled_responses, sign_status}
+    """
+    from app.services.wp_classification_service import _WP_CODE_OVERRIDE
+    from app.services.wp_template_finder import find_template_file_any
+    from app.services.wp_docx_template_parser import get_cached_structure
+
+    # 1. 查询底稿 + wp_code + 项目软删守卫
+    wp, wp_code = await _load_wp_or_404(db, wp_id)
+
+    # 2. 校验 componentType 是否为 word-template
+    component_type = _WP_CODE_OVERRIDE.get(wp_code)
+    if component_type != "word-template":
+        raise HTTPException(status_code=400, detail="该底稿不是 word-template 类型")
+
+    # 3. 解析模板文件路径
+    template_path = find_template_file_any(wp_code)
+    if not template_path or not template_path.exists():
+        raise HTTPException(
+            status_code=404, detail=f"模板文件不存在: {wp_code}"
+        )
+
+    # 4. 获取缓存的 TemplateStructure
+    try:
+        structure = get_cached_structure(str(template_path), wp_code)
+    except (ValueError, Exception) as e:  # noqa: BLE001
+        raise HTTPException(status_code=422, detail=f"模板解析失败: {e}")
+
+    # 5. 查询 checklist_responses (item_id LIKE 'wt-{wp_code}-%')
+    filled_responses: dict[str, str] = {}
+    prefix = f"wt-{wp_code}-"
+
+    try:
+        result = await db.execute(
+            sa.text(
+                "SELECT item_id, conclusion, remark "
+                "FROM checklist_responses "
+                "WHERE wp_id = :wp_id AND item_id LIKE :prefix"
+            ),
+            {"wp_id": str(wp_id), "prefix": f"{prefix}%"},
+        )
+        for row in result.fetchall():
+            field_id = row.item_id[len(prefix):]
+            value = row.conclusion or row.remark or ""
+            if value:
+                filled_responses[field_id] = value
+    except Exception as e:  # noqa: BLE001
+        logger.warning(
+            "template-structure: checklist_responses 查询失败 wp_id=%s: %s",
+            wp_id, e,
+        )
+
+    # 6. 序列化结构 + 合并 current_value
+    from dataclasses import asdict as _asdict
+
+    placeholders = []
+    for p in structure.placeholders:
+        p_dict = _asdict(p)
+        p_dict["current_value"] = filled_responses.get(p.field_id, "")
+        placeholders.append(p_dict)
+
+    paragraphs = [_asdict(para) for para in structure.paragraphs]
+    tables = [_asdict(tbl) for tbl in structure.tables]
+
+    template_structure = {
+        "placeholders": placeholders,
+        "paragraphs": paragraphs,
+        "tables": tables,
+        "metadata": structure.metadata,
+    }
+
+    return {
+        "template_structure": template_structure,
+        "filled_responses": filled_responses,
+        "sign_status": None,
+    }
+
+
+# ---------------------------------------------------------------------------
+# GET /api/workpapers/{wp_id}/sheets/{sheet_name}/onlyoffice-config
+# ---------------------------------------------------------------------------
+
+
+@router.get("/{wp_id}/sheets/{sheet_name}/onlyoffice-config")
+async def get_sheet_onlyoffice_config(
+    wp_id: UUID,
+    sheet_name: str,
+    request: Request,
+    whole_workbook: bool = False,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_project_access("readonly")),
+):
+    """返回 OnlyOffice 编辑器配置（doc_key / download_url / callback_url / JWT token）
+
+    前端 GtOnlyOfficeSheet 组件调用此端点获取配置后创建 DocEditor iframe。
+
+    whole_workbook=True（完整Excel 页签）：不加 actionLink，OnlyOffice 打开整本 xlsx
+    原生显示全部 sheet tab，供组员直接编辑。
+    """
+    # 1. 查询底稿 + wp_code + 项目软删守卫
+    wp, wp_code = await _load_wp_or_404(db, wp_id)
+    project_id = wp.project_id
+
+    # 1.5 统一门授权（Req 8.8/8.9）：editor.config 读入口。
+    gate_ctx = await _gate_editor(
+        db, current_user, wp_id=wp_id, project_id=project_id,
+        entrypoint="editor.config", action="editor_config", method="GET",
+        sheet_name=sheet_name,
+    )
+
+    # 2. OnlyOffice 可用性检查
+    if not settings.ONLYOFFICE_URL:
+        raise HTTPException(status_code=503, detail="OnlyOffice 未配置")
+
+    # 3. 解析文件路径（项目存储优先 → 回退模板）
+    from app.services.wp_template_finder import find_template_file_any
+
+    # 聚合包内的独立 source_wp_code sheet（如 D4-5）：尝试用 sheet 级编码找独立模板
+    # 完整Excel（whole_workbook）：始终用整册 wp_code（如 G1），禁止落到 G1-1/D4-12 等子码缓存，
+    # 否则打开的不是「整本」底稿。
+    _sheet_wp_code = wp_code
+    if not whole_workbook:
+        # 从 sheet_name 提取可能的独立 wp_code（尾部匹配 or 头部匹配）
+        # 尾部匹配：如 "营业收入会计政策检查D4-5"、"存货采购入库检查表F2-33-新增"（忽略修订尾缀）
+        _m = re.search(r"([A-Z]\d+(?:-\d+)?[A-Z]?)(?:-新增)?\s*$", sheet_name)
+        # 头部匹配：如 "C14-2评价控制偏差" / "C14-2 xxx"
+        if not _m:
+            _m = re.match(r"([A-Z]\d+(?:-\d+)?[A-Z]?)\s*", sheet_name)
+        if _m and _m.group(1) != wp_code:
+            _candidate = _m.group(1)
+            _candidate_tpl = find_template_file_any(_candidate)
+            if _candidate_tpl:
+                _sheet_wp_code = _candidate
+
+    # 完整Excel：源文档必须是**整册合并本**（D4 → `D4 收入底稿.xlsx` 46 张 sheet），
+    # 不是主模板阶梯挑出的审定包（10 张，连 D4-26 都没有）。见
+    # `_resolve_whole_workbook_template`。
+    template_path = (
+        _whole_workbook_template_or_primary(_sheet_wp_code)
+        if whole_workbook
+        else find_template_file_any(_sheet_wp_code)
+    )
+    # custom：直编业务文件本体（无模板可复制，且必须与投影读取同源）
+    _custom_file = _resolve_custom_wp_file(wp, _sheet_wp_code)
+    if _custom_file is not None:
+        file_path = _custom_file
+    else:
+        try:
+            file_path = _resolve_wp_file(
+                project_id, _sheet_wp_code, template_path,
+                visible_sheet=None if whole_workbook else sheet_name,
+                cache_stem=_whole_cache_stem(_sheet_wp_code) if whole_workbook else None,
+            )
+        except FileNotFoundError as exc:
+            raise HTTPException(status_code=404, detail=str(exc))
+
+    # 完整Excel 页签：恢复全部 sheet 可见（共享文件可能被单 sheet 模式隐藏过）
+    # 🔴 custom 跳过：恒单 sheet，且不得改写用户底稿本体的可见性
+    if (
+        whole_workbook
+        and _custom_file is None
+        and file_path.suffix.lower() in (".xlsx", ".xlsm")
+    ):
+        _ensure_all_sheets_visible(file_path)
+
+    # 4. room 身份派生 doc_key（Task 21：与 mtime/路径/用户全部无关）
+    from app.services import onlyoffice_room_identity as _room_identity
+
+    _room_entry_id = _room_identity.sheet_entry_id(
+        wp_code=_sheet_wp_code, sheet_name=sheet_name, whole_workbook=whole_workbook
+    )
+    doc_key = await _room_identity.resolve_room_doc_key(db, wp_id=wp_id, entry_id=_room_entry_id)
+
+    # 5. 构建 URL（download_url 嵌全 claim 有限时效签名 token，Req 10.1/10.10）
+    base_url = settings.ONLYOFFICE_CALLBACK_BASE or str(request.base_url).rstrip("/")
+    # 全 claim 编辑器令牌（secret 配置时）；无 secret（dev JWT disabled）回退旧短 token。
+    if settings.ONLYOFFICE_JWT_SECRET:
+        wopi_token = _editor_security.sign_editor_token(
+            secret=settings.ONLYOFFICE_JWT_SECRET,
+            sub=str(current_user.id),
+            project_id=str(project_id),
+            wp_id=str(wp_id),
+            sheet_name=sheet_name,
+            wp_code=_sheet_wp_code,
+            version=str(wp.file_version),
+            action="editor_read",
+        )
+    else:
+        wopi_token = _sign_wopi_token(wp_id, _sheet_wp_code)
+    download_url = (
+        f"{base_url}/api/workpapers/{wp_id}/sheets/{sheet_name}/wopi/contents"
+        f"?whole={'1' if whole_workbook else '0'}"
+    )
+    if wopi_token:
+        download_url += f"&token={wopi_token}"
+    callback_url = (
+        f"{base_url}/api/workpapers/{wp_id}/sheets/{sheet_name}/onlyoffice-callback"
+    )
+    # 🔴 整册模式必须把 `whole` 带进 callback：callback 原来只能从 `sheet_name` 反推
+    # wp_code，整册模式传的是「首个业务 sheet 名」（如 `营业收入审计程序表D4A`），于是
+    # 反推出 `D4A` 并把整册编辑结果写进 `D4A.xlsx`，而 config/WOPI 读的是 `D4.xlsx`
+    # —— 读写异地，整册里的改动保存后再打开就没了。加这个参数让回写与读侧同码。
+    if whole_workbook:
+        callback_url += "?whole=1"
+
+    # 6. 判断编辑模式
+    from app.models.workpaper_models import WpFileStatus
+
+    mode = "edit"
+    if wp.status in (
+        WpFileStatus.review_passed,
+        WpFileStatus.archived,
+    ):
+        mode = "view"
+    # UserCanWrite = gate allow ∩ file state ∩ lock：History_Only / 只读授权 → view（Req 10.8/Design C11）。
+    # gate_ctx 为 None 表示 enforce 关闭且门拒绝（dev 放行），不额外收紧。
+    if gate_ctx is not None and getattr(gate_ctx, "readonly", False):
+        mode = "view"
+
+    # 6.5 席位接入：仅 edit 模式占席位；view（只读）不占
+    if mode == "edit":
+        from app.services.onlyoffice_session_limiter import acquire_session
+
+        ok = await acquire_session(current_user.id, doc_key)
+        if not ok:
+            raise HTTPException(
+                status_code=429,
+                detail="当前编辑人数已满，请稍后再试",
+            )
+
+    # 7. 根据实际文件扩展名确定 fileType / documentType
+    from pathlib import Path as _Path
+
+    _ext = _Path(file_path).suffix.lower().lstrip(".")
+    if _ext in ("doc", "docx", "odt", "rtf"):
+        file_type = _ext if _ext == "docx" else "docx"
+        document_type = "word"
+    elif _ext in ("ppt", "pptx", "odp"):
+        file_type = _ext if _ext == "pptx" else "pptx"
+        document_type = "slide"
+    else:
+        file_type = "xlsx"
+        document_type = "cell"
+
+    # 8. 构建 OnlyOffice config
+    config = {
+        "document": {
+            "fileType": file_type,
+            "key": doc_key,
+            "title": f"{wp_code}_{sheet_name}.{file_type}",
+            "url": download_url,
+            "permissions": {
+                "edit": mode == "edit",
+                "download": True,
+                "print": True,
+            },
+        },
+        "documentType": document_type,
+        "editorConfig": {
+            "mode": mode,
+            "lang": "zh-CN",
+            "callbackUrl": callback_url,
+            **(
+                {}
+                if whole_workbook or document_type != "cell"
+                else {"actionLink": {"action": {"type": "bookmark", "data": sheet_name}}}
+            ),
+            "user": {
+                "id": str(current_user.id),
+                "name": current_user.username,
+            },
+            "customization": {
+                "forcesave": True,
+                "compactHeader": True,
+                # 紧凑工具栏：ribbon 默认折叠为单行，给单元格区腾空间。
+                # 用户仍可双击选项卡展开。toolbar:true 保留选项卡可用。
+                "compactToolbar": True,
+                "toolbar": True,
+            },
+        },
+        "type": "desktop",
+    }
+
+    # 9. JWT 签名
+    token = _sign_jwt(config)
+
+    return {
+        "config": config,
+        "token": token,
+        "mode": mode,
+        "documentType": document_type,
+        "onlyoffice_url": settings.ONLYOFFICE_URL,
+    }
+
+
+# ---------------------------------------------------------------------------
+# GET /api/workpapers/{wp_id}/whole-excel-grid
+# 「完整Excel」OnlyOffice 降级时：从整册模板抽取只读网格，避免空态
+# ---------------------------------------------------------------------------
+
+
+@router.get("/{wp_id}/whole-excel-grid")
+async def get_whole_excel_grid(
+    wp_id: UUID,
+    sheet: str | None = None,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """完整Excel 降级展示：按整册 wp_code 取模板 xlsx，抽取指定 sheet 网格。
+
+    返回 sheets 列表 + 当前 sheet 的 html_data（cells/merged/…），供 GtGridSheet 渲染。
+    """
+    from app.services.wp_grid_extract import extract_grid, strip_standard_header
+    from app.services.wp_template_finder import (
+        find_template_file_any,
+        _should_skip_historical_sheet,
+    )
+
+    wp, wp_code = await _load_wp_or_404(db, wp_id)
+    project_id = wp.project_id
+
+    await _gate_editor(
+        db, current_user, wp_id=wp_id, project_id=project_id,
+        entrypoint="editor.config", action="editor_config", method="GET",
+        sheet_name=sheet or "__whole_excel__",
+    )
+
+    # 这是「完整Excel」在 OO 不可用时的只读降级面，源文档必须与 config/WOPI 同一份整册本，
+    # 否则降级后看到的 sheet 列表比在线编辑时少一大截。
+    template_path = _whole_workbook_template_or_primary(wp_code)
+    try:
+        file_path = _resolve_wp_file(
+            project_id, wp_code, template_path,
+            visible_sheet=None, cache_stem=_whole_cache_stem(wp_code),
+        )
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+
+    if file_path.suffix.lower() in (".xlsx", ".xlsm"):
+        _ensure_all_sheets_visible(file_path)
+
+    import openpyxl
+
+    try:
+        wb = openpyxl.load_workbook(str(file_path), read_only=True, data_only=False)
+        all_names = list(wb.sheetnames)
+        wb.close()
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"无法读取底稿 Excel: {exc}")
+
+    sheet_names = [n for n in all_names if not _should_skip_historical_sheet(n)]
+    if not sheet_names:
+        sheet_names = all_names
+
+    # 默认跳过「底稿目录」，优先展示业务 sheet
+    preferred = sheet
+    if not preferred:
+        preferred = next((n for n in sheet_names if "底稿目录" not in n), None)
+        preferred = preferred or (sheet_names[0] if sheet_names else None)
+    if not preferred or preferred not in all_names:
+        raise HTTPException(status_code=404, detail="模板中无可用 sheet")
+
+    grid = extract_grid(file_path, preferred)
+    if isinstance(grid, dict) and grid.get("cells"):
+        grid = strip_standard_header(grid)
+
+    return {
+        "wp_code": wp_code,
+        "template_name": template_path.name if template_path else file_path.name,
+        "sheets": sheet_names,
+        "active_sheet": preferred,
+        "html_data": grid or {"cells": {}},
+    }
+
+
+# ---------------------------------------------------------------------------
+# GET /api/workpapers/{wp_id}/sheets/{sheet_name}/wopi/contents
+# ---------------------------------------------------------------------------
+
+
+# 🔴 OnlyOffice DocServer 机对机端点：用 ?token=（editor_read 签名 JWT）自校验，不带用户 Bearer。
+# 必须挂 public_router（不经 dedicated_wp_gate 的 get_current_user）——否则 DocServer 下载文档
+# 恒 401 → 编辑器 onError -4「下载失败」→ 双模式点在线编辑后立刻降级回结构化。自身 JWT 校验完整。
+@public_router.get("/{wp_id}/sheets/{sheet_name}/wopi/contents")
+async def get_sheet_wopi_contents(
+    wp_id: UUID,
+    sheet_name: str,
+    request: Request,
+    whole: str = "0",
+    db: AsyncSession = Depends(get_db),
+):
+    """WOPI GetFile — JWT 鉴权后返回 xlsx 内容。
+
+    安全模型修正：不再依赖"doc_key 不可预测性"（端点从不校验它）。
+    改为校验 OnlyOffice 下载请求所带 JWT（Authorization header 或 ?token= 查询参数）。
+    """
+    # 1. JWT 鉴权
+    if not _verify_wopi_jwt(request):
+        raise HTTPException(status_code=403, detail="WOPI 请求未授权")
+
+    # 2. 查询底稿 + 项目软删守卫
+    wp, wp_code = await _load_wp_or_404(db, wp_id)
+    project_id = wp.project_id
+
+    # 解析文件路径
+    from app.services.wp_template_finder import find_template_file_any
+
+    _is_whole = whole == "1"
+    # 完整Excel：始终用整册 wp_code；单 sheet：可落到独立子模板（如 D4-5）
+    _sheet_wp_code = wp_code
+    if not _is_whole:
+        # 🔴 必须与 onlyoffice-config 端点使用相同的 sheet 级 wp_code 解析逻辑：
+        # 聚合包内独立 source sheet（如 D4-5）应服务其独立文件，而非父 wp_code（D4）
+        # 对应的任意 D4 模板（否则 OO 下载到 D4-12 合同检查表却标题显示 D4-5）。
+        _m = re.search(r"([A-Z]\d+(?:-\d+)?[A-Z]?)(?:-新增)?\s*$", sheet_name)
+        if not _m:
+            _m = re.match(r"([A-Z]\d+(?:-\d+)?[A-Z]?)\s*", sheet_name)
+        if _m and _m.group(1) != wp_code:
+            _candidate = _m.group(1)
+            if find_template_file_any(_candidate):
+                _sheet_wp_code = _candidate
+
+    # 全 claim 令牌逐项绑定校验（Req 10.4/10.5）：拦截跨资源重放（为其它 wp/sheet 签发的令牌）。
+    ok, reason = _validate_editor_download_token(
+        request, wp_id=wp_id, project_id=project_id, sheet_name=sheet_name,
+        wp_code=_sheet_wp_code, version=str(wp.file_version), action="editor_read",
+    )
+    if not ok:
+        logger.warning("WOPI GetFile 令牌绑定校验失败 wp_id=%s reason=%s", wp_id, reason)
+        if settings.ONLYOFFICE_JWT_ENFORCE:
+            raise HTTPException(status_code=404, detail=EXTERNAL_NOT_FOUND_DETAIL)
+
+    # 与 config 端点同口径：整册模式取整册合并本（否则 DocServer 下到的是 10 张的审定包）
+    template_path = (
+        _whole_workbook_template_or_primary(_sheet_wp_code)
+        if _is_whole
+        else find_template_file_any(_sheet_wp_code)
+    )
+    # custom：下载业务文件本体（与 config / callback / 投影同源）
+    _custom_file = _resolve_custom_wp_file(wp, _sheet_wp_code)
+    if _custom_file is not None:
+        file_path = _custom_file
+    else:
+        try:
+            file_path = _resolve_wp_file(
+                project_id, _sheet_wp_code, template_path,
+                visible_sheet=None if _is_whole else sheet_name,
+                cache_stem=_whole_cache_stem(_sheet_wp_code) if _is_whole else None,
+            )
+        except FileNotFoundError as exc:
+            raise HTTPException(status_code=404, detail=str(exc))
+
+    if _is_whole and _custom_file is None and file_path.suffix.lower() in (".xlsx", ".xlsm"):
+        _ensure_all_sheets_visible(file_path)
+
+    if not file_path.exists():
+        raise HTTPException(status_code=404, detail="文件不存在")
+
+    return FileResponse(
+        path=str(file_path),
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        filename=file_path.name,
+    )
+
+
+# ---------------------------------------------------------------------------
+# POST /api/workpapers/{wp_id}/sheets/{sheet_name}/onlyoffice-callback
+# ---------------------------------------------------------------------------
+
+# OnlyOffice callback status codes that require file download
+_SAVE_STATUSES = {2, 6}  # 2=ready to save, 6=force save
+# OnlyOffice callback status codes that indicate session close (release seat)
+_RELEASE_STATUSES = {3, 4, 7}  # 3=save error close, 4=close no change, 7=force save error
+
+
+def _extract_user_id_from_callback(body: dict) -> str | None:
+    """从 OO callback body 提取 userid。
+
+    actions[].userid 优先（含 type=0 断开/type=1 连接），回退 users[0]。
+    返回 None 时跳过席位释放，依赖 TTL 兜底。
+    """
+    actions = body.get("actions") or []
+    for a in actions:
+        uid = a.get("userid")
+        if uid:
+            return str(uid)
+    users = body.get("users") or []
+    if users:
+        return str(users[0])
+    return None
+
+
+def _verify_wopi_jwt(request: Request) -> bool:
+    """校验 WOPI GetFile 请求 JWT。
+
+    OnlyOffice 对 document.url 的下载请求带 JWT（header 或 token 查询参数）。
+    无 JWT_SECRET 配置（测试环境）→ 直通。
+    """
+    if not settings.ONLYOFFICE_JWT_SECRET:
+        return True
+    token = request.headers.get("Authorization") or request.query_params.get("token")
+    if not token:
+        logger.warning("WOPI GetFile 缺少 JWT, wp_id 越权下载风险")
+        return False
+    try:
+        if token.lower().startswith("bearer "):
+            token = token[7:]
+        jwt.decode(token, settings.ONLYOFFICE_JWT_SECRET, algorithms=["HS256"])
+        return True
+    except JWTError as exc:
+        logger.warning("WOPI GetFile JWT 校验失败: %s", exc)
+        return False
+
+
+def _validate_editor_download_token(
+    request: Request,
+    *,
+    wp_id: UUID,
+    project_id: UUID,
+    sheet_name: str,
+    wp_code: str,
+    version: str,
+    action: str,
+    require_write: bool = False,
+) -> tuple[bool, str | None]:
+    """WOPI GetFile / PutFile 全 claim 令牌校验（Req 10.1–10.5/10.8）。
+
+    仅在配置了 secret 时启用（dev JWT disabled → (True, None) 放行，与 _verify_wopi_jwt 一致）。
+    从 ``?token=`` / Authorization 提取原始令牌，逐 claim 绑定到服务端解析资源。
+    返回 (ok, reason)。
+    """
+    secret = settings.ONLYOFFICE_JWT_SECRET
+    if not secret:
+        return True, None  # dev：JWT disabled 放行（机制本身 fail-closed，见 editor_security）
+    token = request.headers.get("Authorization") or request.query_params.get("token")
+    result = _editor_security.validate_editor_token(
+        token,
+        secret=secret,
+        expected={
+            "project_id": str(project_id),
+            "wp_id": str(wp_id),
+            "sheet_name": str(sheet_name),
+            "wp_code": str(wp_code),
+            "version": str(version),
+            "action": str(action),
+        },
+        require_write=require_write,
+    )
+    return result.ok, result.reason
+
+
+def _verify_callback_jwt(request: Request) -> bool:
+    """校验 OnlyOffice callback 请求的 JWT 签名。
+
+    无 JWT_SECRET 配置时跳过验证（测试环境直通）。
+    """
+    if not settings.ONLYOFFICE_JWT_SECRET:
+        return True
+
+    token = request.headers.get("Authorization")
+    if not token:
+        logger.warning("OnlyOffice callback 缺少 Authorization header")
+        return False
+
+    try:
+        if token.lower().startswith("bearer "):
+            token = token[7:]
+        jwt.decode(
+            token,
+            settings.ONLYOFFICE_JWT_SECRET,
+            algorithms=["HS256"],
+        )
+        return True
+    except JWTError as exc:
+        logger.warning("OnlyOffice callback JWT 校验失败: %s", exc)
+        return False
+
+
+def _has_room_bound_callback_query(request: Request) -> bool:
+    """URL 是否带齐 room/generation/doc_key/route_credential 四项绑定 query。
+
+    参数名从 `callback_route.URL_BOUND_PARAMS` **读取**而不是在此重写一份：
+    两处各写一份清单时，新增一项绑定会让委派判据静默漏掉新式 callback，
+    于是它落进 legacy 分支被按 sheet 名覆盖文件 —— 而两边的单测都绿。
+    """
+    from app.services.workpaper_sync.callback_route import URL_BOUND_PARAMS
+
+    query = request.query_params
+    return all(str(query.get(name) or "").strip() for name in URL_BOUND_PARAMS)
+
+
+async def _delegate_room_bound_callback(request: Request, db: AsyncSession) -> dict:
+    """新式 callback **只**委派 Task 22 的 `CallbackDeliveryService`。
+
+    本函数刻意不做任何判定：不 `jwt.decode`、不比 doc_key、不判 status 语义、
+    不把 URL 里的 participant hint 当作者 —— 全部在
+    `callback_route.verify_callback_route` 与 delivery service 内。
+    """
+    from app.routers.wp_sync_router import post_room_onlyoffice_callback
+
+    raw_room = str(request.query_params.get("room_id") or "").strip()
+    try:
+        room_id = UUID(raw_room)
+    except (ValueError, TypeError):
+        logger.warning("新式 callback 的 room_id=%r 非法 UUID", raw_room)
+        return {"error": 1}
+    return await post_room_onlyoffice_callback(room_id=room_id, request=request, db=db)
+
+
+# 🔴 OnlyOffice DocServer 回调端点：用 OnlyOffice callback JWT 自校验（无用户 Bearer）。
+# 同 wopi/contents，必须挂 public_router 绕过 dedicated_wp_gate，否则保存回写恒 401。
+@public_router.post("/{wp_id}/sheets/{sheet_name}/onlyoffice-callback")
+async def post_sheet_onlyoffice_callback(
+    wp_id: UUID,
+    sheet_name: str,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+):
+    """OnlyOffice 编辑回调端点。
+
+    OnlyOffice 容器在文档保存/关闭时 POST 此端点：
+    - status=1: 用户正在编辑（无操作）
+    - status=2: 文档准备保存（下载编辑后文件并覆盖存储）
+    - status=3: 保存出错（无操作）
+    - status=4: 关闭无修改（无操作）
+    - status=6: 强制保存（同 status=2）
+    - status=7: 强制保存出错（无操作）
+
+    注意：此端点不做用户鉴权（由 OnlyOffice 容器内部调用），
+    安全性由 JWT 签名验证 + 内网隔离保障。
+    必须始终返回 {"error": 0} 确认收到（OnlyOffice 协议要求）。
+
+    ═══ 兼容委派（spec workpaper-html-onlyoffice-bidirectional-writeback-closure · Task 28）═══
+
+    design §「callback compatibility 与真值表」要求**现有 callback URL 保持兼容**，
+    但由 room/generation/doc_key/route_credential 四项绑定签发的新式 callback
+    （`callback_route.build_callback_url` 产出）**只**委派新服务
+    （`CallbackDeliveryService`），本函数下方的 legacy 逻辑一行都不跑。
+
+    判据是 URL 的四项绑定 query 是否齐备 —— 那是 `assert_url_binding` 校验的同一组
+    参数名（`callback_route.URL_BOUND_PARAMS`，单一真源）。legacy 编辑器签发的 URL
+    没有这四项，因此其行为逐字节不变（本改动对 legacy 路径是**纯增量**）。
+
+    ⚠️ 尚未收口：把 legacy 分支整体删掉、让本端点**无条件**只委派，取决于
+    `get_sheet_onlyoffice_config` / `get_sheet_wopi_contents` / `get_whole_excel_grid`
+    三条 resolver 行先迁到 room/staged representation substrate —— 那是 **Task 30**
+    的 `multi_resolver` gate 明文承接的范围（自 Task 20 移交）。在它们仍是
+    `status=deferred` 之前无条件委派会让 legacy 编辑器的保存直接失效。
+    """
+    if _has_room_bound_callback_query(request):
+        return await _delegate_room_bound_callback(request, db)
+
+    # 1. JWT 验证（若配置了 secret）
+    if not _verify_callback_jwt(request):
+        logger.warning(
+            "OnlyOffice callback JWT 校验失败 wp_id=%s sheet=%s",
+            wp_id,
+            sheet_name,
+        )
+        # OnlyOffice 协议要求返回 error 非 0 表示拒绝
+        return {"error": 1}
+
+    # 2. 解析 body
+    body = await request.json()
+    status = body.get("status")
+    doc_key = body.get("key")
+    user_id = _extract_user_id_from_callback(body)
+
+    # 3. status=2/6: 保存 — 下载写回后释放席位
+    if status in _SAVE_STATUSES:
+        url = body.get("url")
+        if not url:
+            logger.warning(
+                "OnlyOffice callback status=%s 但缺少 url, wp_id=%s sheet=%s",
+                status,
+                wp_id,
+                sheet_name,
+            )
+            return {"error": 1}
+
+        # 重写下载 URL 的 host:port 为后端可达的 ONLYOFFICE_URL。
+        # OnlyOffice 容器在 callback 里给出的 url 用其自身视角的地址
+        # （容器内 http://localhost/cache/... = 容器 80 端口 / 或容器 hostname），
+        # host 上的后端访问不到 → 下载失败 → "无法保存文档"。
+        # 将其 scheme+netloc 替换为 ONLYOFFICE_URL（host 可达，如 localhost:8080）。
+        url = _rewrite_onlyoffice_download_url(url)
+
+        # 查询底稿 + 项目软删守卫
+        wp, wp_code = await _load_wp_or_404(db, wp_id)
+        project_id = wp.project_id
+
+        # 落盘前重校验（Req 10.6/10.7/10.8）：Current_Version + action + 文件状态 + 撤权/epoch。
+        # 归档/复核通过 → 只读，拒绝回调写入（不覆盖磁盘）。
+        from app.models.workpaper_models import WpFileStatus as _WpFileStatus
+
+        file_state_writable = wp.status not in (
+            _WpFileStatus.review_passed,
+            _WpFileStatus.archived,
+        )
+        gate_allow_write = file_state_writable
+        # enforce 开启且能定位 actor 时，重跑门检测已撤权会话 / 越权（editor_write）。
+        if settings.ONLYOFFICE_JWT_ENFORCE and user_id:
+            try:
+                actor = (
+                    await db.execute(sa.select(User).where(User.id == UUID(user_id)))
+                ).scalar_one_or_none()
+                if actor is not None:
+                    ctx = await _gate_editor(
+                        db, actor, wp_id=wp_id, project_id=project_id,
+                        entrypoint="editor.file_write", action="editor_write",
+                        method="POST", sheet_name=sheet_name,
+                    )
+                    gate_allow_write = ctx is not None and not getattr(
+                        ctx, "readonly", False
+                    )
+                else:
+                    gate_allow_write = False
+            except (ValueError, ExternalNotFound):
+                gate_allow_write = False
+        ok_cb, cb_reason = _editor_security.verify_callback_preconditions(
+            claim_action="callback",
+            server_action="callback",
+            claim_version=None,
+            current_version=str(wp.file_version),
+            gate_allow_write=gate_allow_write,
+            epoch_valid=True,
+        )
+        if not ok_cb:
+            logger.warning(
+                "OnlyOffice callback 落盘前重校验拒绝 wp_id=%s sheet=%s reason=%s",
+                wp_id, sheet_name, cb_reason,
+            )
+            return {"error": 1}
+
+        # 🔴 与 config / WOPI 端点一致：聚合包内独立 source sheet（如 D4-5）
+        # 保存回其独立文件而非父 wp_code（D4），否则用户编辑丢失。
+        from app.services.wp_template_finder import find_template_file_any as _find_tpl
+
+        # 🔴 整册模式（config 在 callbackUrl 上带了 `whole=1`）**不得**按 sheet 名反推子码：
+        # 整册传的是「首个业务 sheet 名」，反推会得到 `D4A` 并把整册编辑写进 `D4A.xlsx`，
+        # 而 config/WOPI 读的是整册工作副本 —— 读写异地，用户在完整Excel 里的改动保存后
+        # 再打开就没了。这里与那两个端点的 `_sheet_wp_code` / cache_stem 推导逐条对称。
+        _save_is_whole = str(request.query_params.get("whole") or "") == "1"
+        _save_wp_code = wp_code
+        if not _save_is_whole:
+            _m_save = re.search(r"([A-Z]\d+(?:-\d+)?[A-Z]?)(?:-新增)?\s*$", sheet_name)
+            if _m_save and _m_save.group(1) != wp_code:
+                _cand = _m_save.group(1)
+                if _find_tpl(_cand):
+                    _save_wp_code = _cand
+
+        # 下载编辑后文件
+        try:
+            async with httpx.AsyncClient(timeout=60) as client:
+                resp = await client.get(url)
+                resp.raise_for_status()
+                file_bytes = resp.content
+        except Exception as exc:
+            logger.error(
+                "OnlyOffice callback: 下载编辑后文件失败 url=%s error=%s",
+                url,
+                exc,
+            )
+            return {"error": 1}
+
+        # 覆盖写入项目存储
+        # 判断是否为 word-template（docx）底稿
+        from app.services.wp_classification_service import _WP_CODE_OVERRIDE
+
+        component_type = _WP_CODE_OVERRIDE.get(wp_code)
+        is_word_template = component_type == "word-template"
+        _tpl_for_ext = _find_tpl(_save_wp_code)
+        _save_ext = (
+            _tpl_for_ext.suffix.lower()
+            if _tpl_for_ext and _tpl_for_ext.suffix
+            else ".xlsx"
+        )
+        # 已有 docx 缓存时优先按 docx 写回（F2-22 等从 xlsx 改挂 Word 的场景）。
+        # 整册模式按整册 stem 探测，否则会拿 `D4.docx` 的存在去决定 `D4__whole` 的扩展名。
+        _oo_dir = _onlyoffice_storage_dir(project_id)
+        _probe_stem = (
+            _whole_cache_stem(_save_wp_code) if _save_is_whole else _save_wp_code
+        )
+        if (_oo_dir / f"{_probe_stem}.docx").exists():
+            _save_ext = ".docx"
+
+        # custom：落盘到业务文件本体（与 config / WOPI / 投影同源）。
+        # 🔴 写缓存副本会让 `refresh_custom_projection`（读 wp.file_path）永远看不到
+        #    OO 改动，且「xlsx 唯一权威」退化成两份 xlsx（Task 26 实测抓出）。
+        _custom_target = _resolve_custom_wp_file(wp, _save_wp_code or wp_code)
+        if _custom_target is not None:
+            target = _custom_target
+        elif is_word_template:
+            # 🔴 Task 58 / Requirement 9.3 / Property 39：word-template 落盘目标必须
+            # 与 config / download 读侧解析到**同一** canonical path。
+            #
+            # 原实现是 `Path(f"storage/{project_id}/workpapers/{wp_code}.docx")` ——
+            # 缺 `projects/` 与 `onlyoffice/` 两段、且是**相对 CWD** 的路径。读侧走
+            # `_onlyoffice_storage_dir()`（`.../projects/{pid}/workpapers/onlyoffice/`）
+            # ⇒ 写进去的文件读侧永远看不到，表现为「OO 里保存成功，重开又是旧的」。
+            # 2026-08-29 磁盘实测：孤儿根下共 159 份 docx，读侧目录只有 16 份。
+            #
+            # 现在统一走 `word_canonical_write_target()`，它内部就是
+            # `WordCanonicalResolver.resolve(intent=callback)`，与 config/download/
+            # materialize/extract 共用同一个解析函数（意图只决定权限，不决定路径）。
+            from app.services.workpaper_sync.word_resolution import (
+                word_canonical_write_target,
+            )
+
+            target = word_canonical_write_target(project_id, _save_wp_code or wp_code)
+        else:
+            # 按模板实际扩展名落盘（F2-22 为 docx，不得硬编码 xlsx）。
+            # 整册模式走 `_whole_cache_stem` —— 与 config / WOPI 的 `cache_stem` 同一来源，
+            # 否则整册编辑会落到主模板那份工作副本上（读写异地）。
+            _save_stem = (
+                _whole_cache_stem(_save_wp_code) if _save_is_whole else _save_wp_code
+            )
+            target = _oo_dir / f"{_save_stem}{_save_ext}"
+
+        try:
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_bytes(file_bytes)
+            # 文件生命周期版本（`file_version`）—— 本路径**自己**的所有者。
+            #
+            # Task 18 / Requirement 2.1 / 2.12：原来由共享的 `orchestrator.after_save`
+            # 递增。那个 handler 必须可重放（Requirement 2.12），因此不能持有任何版本域
+            # ——重放一次就多一个伪版本。真正知道「文件被换了」的只有这一行紧邻的
+            # `write_bytes`，所以所有者落在这里。
+            #
+            # 业务内容版本（`content_revision`）不在这里推进：OO callback 迁入
+            # `ContentMutationService` 是 Task 19/22 的活，它要先有 durable incoming、
+            # extract、三方 merge 与 canonical rematerialize 才能算「一次业务内容应用」。
+            wp.file_version = (wp.file_version or 0) + 1
+            logger.info(
+                "OnlyOffice callback: 文件已保存 wp_id=%s sheet=%s path=%s size=%d "
+                "file_version=%s",
+                wp_id,
+                sheet_name,
+                target,
+                len(file_bytes),
+                wp.file_version,
+            )
+        except Exception as exc:
+            logger.error(
+                "OnlyOffice callback: 文件写入失败 path=%s error=%s",
+                target,
+                exc,
+            )
+            return {"error": 1}
+
+        # ─── F2-22 监盘计划 / F2-23 监盘小结：docx → fields JSON 回写 ───
+        if (
+            _save_wp_code in ("F2-22", "F2-23")
+            and target.suffix.lower() == ".docx"
+        ):
+            try:
+                import json as _json
+
+                if _save_wp_code == "F2-23":
+                    from app.services.f2_stocktake_summary_sync import (
+                        FIELDS_ITEM_ID,
+                        extract_fields_from_docx,
+                        merge_extracted_into_existing,
+                        parse_fields_json,
+                    )
+                else:
+                    from app.services.f2_stocktake_plan_sync import (
+                        FIELDS_ITEM_ID,
+                        extract_fields_from_docx,
+                        merge_extracted_into_existing,
+                        parse_fields_json,
+                    )
+
+                existing_row = (
+                    await db.execute(
+                        sa.text(
+                            "SELECT remark FROM checklist_responses "
+                            "WHERE wp_id = :wid AND item_id = :iid LIMIT 1"
+                        ),
+                        {"wid": str(wp_id), "iid": FIELDS_ITEM_ID},
+                    )
+                ).first()
+                existing = parse_fields_json(
+                    existing_row.remark if existing_row else None
+                )
+                extracted = extract_fields_from_docx(target)
+                merged = merge_extracted_into_existing(existing, extracted)
+                await db.execute(
+                    sa.text(
+                        "INSERT INTO checklist_responses "
+                        "(project_id, wp_id, item_id, conclusion, remark) "
+                        "VALUES (:pid, :wid, :iid, NULL, :remark) "
+                        "ON CONFLICT (wp_id, item_id) "
+                        "DO UPDATE SET remark = EXCLUDED.remark, "
+                        "project_id = COALESCE(checklist_responses.project_id, EXCLUDED.project_id)"
+                    ),
+                    {
+                        "pid": str(project_id),
+                        "wid": str(wp_id),
+                        "iid": FIELDS_ITEM_ID,
+                        "remark": _json.dumps(merged, ensure_ascii=False),
+                    },
+                )
+                await db.commit()
+                logger.info(
+                    "OnlyOffice callback: %s 字段已回写 wp_id=%s keys=%s",
+                    _save_wp_code,
+                    wp_id,
+                    list(extracted.keys()),
+                )
+            except Exception as exc:  # noqa: BLE001
+                logger.warning(
+                    "OnlyOffice callback: %s 回写失败 wp_id=%s: %s",
+                    _save_wp_code,
+                    wp_id,
+                    exc,
+                )
+
+        # ─── custom: OO 侧编辑落盘后从 xlsx 重投影，让 HTML 侧看得见 ───
+        # 🔴 加法式接线：`_is_custom` 为假时本块整体跳过，非 custom 回调路径逐字节不变。
+        # 🔴 fail-open + WARNING：投影只是 xlsx 的派生物，投影失败不能让 OO 保存报错
+        #    （报错会让用户以为文档没保存，从而重复保存/丢失编辑）。
+        # 这是「OO 改动能被 HTML 侧看见」的唯一通路 —— 平台既有双模式两侧数据不共享，
+        # 自定义底稿是自由网格、两侧编同一批单元格，只能靠 xlsx 权威打通。
+        if target.suffix.lower() == ".xlsx":
+            try:
+                from app.services.custom_workpaper_context import resolve_is_custom
+                from app.services.custom_workpaper_projection import (
+                    refresh_custom_projection,
+                )
+
+                # 🔴 三个位置参数（db, wp, wp_code）—— 少传一个会抛 TypeError
+                # 并被下面的 `except Exception` 吞成 WARNING ⇒ 整块变死代码而测试全绿
+                # （H 循环 Task 5 已实证同型缺陷，故守卫用 sig.bind 钉死绑定）
+                _custom_sheet = _save_wp_code or wp_code
+                if await resolve_is_custom(db, wp, _custom_sheet):
+                    refresh_custom_projection(wp, _custom_sheet)
+                    await db.commit()
+                    logger.info(
+                        "OnlyOffice callback: custom 底稿投影已刷新 wp_id=%s sheet=%s",
+                        wp_id,
+                        _custom_sheet,
+                    )
+            except Exception as exc:  # noqa: BLE001 — 投影失败不阻塞 OO 保存
+                logger.warning(
+                    "OnlyOffice callback: custom 投影刷新失败 wp_id=%s: %s",
+                    wp_id,
+                    exc,
+                )
+
+        # ─── word-template: 从保存的 docx 提取占位符值并回写 checklist_responses ───
+        if is_word_template:
+            try:
+                from app.services.wp_docx_template_parser import parse_template
+
+                structure = parse_template(str(target))
+                if structure.placeholders:
+                    prefix = f"wt-{wp_code}-"
+                    for placeholder in structure.placeholders:
+                        # 从已保存文档中提取当前占位符位置的实际文本值
+                        # 如果文本与原始 pattern 不同，说明用户已编辑
+                        current_value = _extract_placeholder_value_from_docx(
+                            target, placeholder
+                        )
+                        if current_value and current_value != placeholder.pattern:
+                            item_id = f"{prefix}{placeholder.field_id}"
+                            await db.execute(
+                                sa.text(
+                                    "INSERT INTO checklist_responses "
+                                    "(project_id, wp_id, item_id, conclusion, remark) "
+                                    "VALUES (:pid, :wid, :iid, :val, '') "
+                                    "ON CONFLICT (wp_id, item_id) "
+                                    "DO UPDATE SET conclusion = EXCLUDED.conclusion, "
+                                    "project_id = COALESCE(checklist_responses.project_id, EXCLUDED.project_id)"
+                                ),
+                                {
+                                    "pid": str(project_id),
+                                    "wid": str(wp_id),
+                                    "iid": item_id,
+                                    "val": current_value,
+                                },
+                            )
+                    await db.commit()
+                    logger.info(
+                        "OnlyOffice callback: word-template 占位符值已同步 wp_id=%s wp_code=%s",
+                        wp_id, wp_code,
+                    )
+            except Exception as exc:
+                logger.warning(
+                    "OnlyOffice callback: word-template 占位符提取失败 wp_id=%s: %s",
+                    wp_id, exc,
+                )
+
+        # 更新 workpaper.updated_at（last_modified）
+        from datetime import datetime, timezone
+
+        try:
+            wp.updated_at = datetime.now(timezone.utc)
+            await db.commit()
+        except Exception as exc:
+            logger.warning(
+                "OnlyOffice callback: 更新 updated_at 失败 wp_id=%s error=%s",
+                wp_id,
+                exc,
+            )
+            # 文件已写入成功，updated_at 更新失败不阻塞
+
+        # 写回成功后释放席位
+        if user_id and doc_key:
+            from app.services.onlyoffice_session_limiter import release_session
+
+            await release_session(user_id, doc_key)
+
+        # 统一后处理 — orchestrator 负责 file_version++, prefill_stale, audit log,
+        # 以及耐久 outbox 入队（同事务不发布），commit 后再 publish_pending。
+        #
+        # Task 16 / Requirement 13.4：这一处**必须**保留 try/except 并且仍然返回
+        # error=0 —— design.md「明确拒绝的方案 §8」说明白了：文件已经耐久保存后再给
+        # OnlyOffice 返回非零会让它重发 callback，制造重复 delivery 与重复版本。所以这
+        # 里的正确形态是"ack OO + 把失败记成 ERROR"，而不是原来的 warning。
+        # 事件本身不再依赖这个 except：after_save 已经把 WORKPAPER_SAVED 写成耐久
+        # outbox 行，只要事务提交成功，outbox_replay_worker 就会把它发出去。
+        # 真正的失败恢复台账（callback recovery case）由 Task 22 建立。
+        try:
+            from app.services.workpaper_save_orchestrator import orchestrator as save_orchestrator
+            from app.services.workpaper_sync.outbox import DurableEventOutboxService
+
+            # 创建虚拟 user 对象（callback 来自 OO 容器，非真实用户请求）
+            class _CallbackUser:
+                id = UUID(user_id) if user_id else None
+
+            await save_orchestrator.after_save(
+                db, wp, _CallbackUser(),
+                trigger="onlyoffice_callback",
+                extra={
+                    "sheet_name": sheet_name,
+                    "doc_key": doc_key or "",
+                    "file_size": len(file_bytes),
+                },
+            )
+            await db.commit()
+            await DurableEventOutboxService.publish_pending(db)
+        except Exception as exc:
+            logger.error(
+                "orchestrator.after_save failed in onlyoffice_callback wp=%s "
+                "(文件已耐久保存，仍向 OO 返回 error=0 避免重发): %s",
+                wp_id, exc, exc_info=True,
+            )
+            try:
+                await db.rollback()
+            except Exception:  # pragma: no cover - 回滚失败时 session 已不可用
+                logger.error("onlyoffice callback: rollback 失败 wp=%s", wp_id, exc_info=True)
+
+        return {"error": 0}
+
+    # 4. status=3/4/7: 关闭（无修改/保存出错/强制保存出错）— 释放席位
+    if status in _RELEASE_STATUSES:
+        if user_id and doc_key:
+            from app.services.onlyoffice_session_limiter import release_session
+
+            await release_session(user_id, doc_key)
+        return {"error": 0}
+
+    # 5. status=1 等：编辑中，无操作
+    return {"error": 0}
+
+
+# ─── POST /api/workpapers/{wp_id}/import-structured ──────────────────────────
+# Task 7.3: 导入离线填写的 docx → 解析占位符 → 写回 checklist_responses
+
+
+@router.post("/{wp_id}/import-structured")
+async def import_structured_docx(
+    wp_id: UUID,
+    file: UploadFile = File(...),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """导入离线填写的 docx，解析占位符值并写回 checklist_responses。
+
+    流程：
+    1. 校验上传文件为有效 docx
+    2. 查询底稿 + wp_code + 校验 word-template 类型
+    3. 获取参考模板的 TemplateStructure（占位符列表）
+    4. 解析上传的 docx 提取占位符位置的当前文本
+    5. 对比参考模板默认值，提取用户填写的值
+    6. Upsert 到 checklist_responses
+    7. 返回 {imported_count, warnings}
+    """
+    from app.services.wp_classification_service import _WP_CODE_OVERRIDE
+    from app.services.wp_template_finder import find_template_file_any
+    from app.services.wp_docx_template_parser import get_cached_structure
+
+    # 1. 验证文件类型
+    filename = file.filename or ""
+    if not filename.lower().endswith(".docx"):
+        raise HTTPException(
+            status_code=422,
+            detail="文件格式不匹配，请使用正确的模板（仅支持 .docx）",
+        )
+
+    # 2. 查询底稿 + wp_code + 项目软删守卫
+    wp, wp_code = await _load_wp_or_404(db, wp_id)
+
+    # 3. 校验 componentType 是否为 word-template
+    component_type = _WP_CODE_OVERRIDE.get(wp_code)
+    if component_type != "word-template":
+        raise HTTPException(status_code=400, detail="该底稿不是 word-template 类型")
+
+    # 4. 获取参考模板结构
+    template_path = find_template_file_any(wp_code)
+    if not template_path or not template_path.exists():
+        raise HTTPException(
+            status_code=404, detail=f"模板文件不存在: {wp_code}"
+        )
+
+    try:
+        ref_structure = get_cached_structure(str(template_path), wp_code)
+    except (ValueError, Exception) as e:  # noqa: BLE001
+        raise HTTPException(status_code=422, detail=f"参考模板解析失败: {e}")
+
+    if not ref_structure.placeholders:
+        raise HTTPException(
+            status_code=422,
+            detail="该模板无可编辑占位符，无法导入数据",
+        )
+
+    # 5. 保存上传文件到临时位置并解析
+    import tempfile
+
+    try:
+        content = await file.read()
+    except Exception as exc:
+        raise HTTPException(status_code=422, detail=f"文件读取失败: {exc}")
+
+    if len(content) < 100:
+        raise HTTPException(
+            status_code=422,
+            detail="文件格式不匹配，请使用正确的模板",
+        )
+
+    tmp_dir = tempfile.mkdtemp(prefix="wp_import_")
+    tmp_path = Path(tmp_dir) / "uploaded.docx"
+    try:
+        tmp_path.write_bytes(content)
+    except Exception as exc:
+        raise HTTPException(status_code=422, detail=f"文件保存失败: {exc}")
+
+    # 6. 验证上传文件为有效 docx
+    from docx import Document as _Doc
+
+    try:
+        _Doc(str(tmp_path))
+    except Exception:
+        # 清理临时文件
+        try:
+            tmp_path.unlink(missing_ok=True)
+            Path(tmp_dir).rmdir()
+        except OSError:
+            pass
+        raise HTTPException(
+            status_code=422,
+            detail="文件格式不匹配，请使用正确的模板",
+        )
+
+    # 7. 从上传文件中提取占位符值
+    imported_count = 0
+    warnings: list[str] = []
+    prefix = f"wt-{wp_code}-"
+
+    # 预加载上传文档用于结构校验
+    try:
+        uploaded_doc = _Doc(str(tmp_path))
+        uploaded_para_count = len(uploaded_doc.paragraphs)
+        uploaded_table_count = len(uploaded_doc.tables)
+    except Exception:
+        uploaded_para_count = 0
+        uploaded_table_count = 0
+
+    for placeholder in ref_structure.placeholders:
+        current_value = _extract_placeholder_value_from_docx(tmp_path, placeholder)
+
+        if current_value is None:
+            # 占位符原样保留（未编辑）或位置无法定位
+            # 检查是否位置超出上传文档范围（结构不匹配）
+            pos = placeholder.position
+            if "paragraph_index" in pos:
+                if pos["paragraph_index"] >= uploaded_para_count:
+                    warnings.append(
+                        f"字段 '{placeholder.label}' (位置 paragraph[{pos['paragraph_index']}]) 在上传文件中不存在"
+                    )
+            elif "table_index" in pos:
+                if pos["table_index"] >= uploaded_table_count:
+                    warnings.append(
+                        f"字段 '{placeholder.label}' (位置 table[{pos['table_index']}]) 在上传文件中不存在"
+                    )
+            continue
+
+        # 值与默认值相同 → 跳过（用户未真正填写）
+        if current_value == placeholder.default_value:
+            continue
+
+        # 8. Upsert to checklist_responses
+        item_id = f"{prefix}{placeholder.field_id}"
+        try:
+            await db.execute(
+                sa.text(
+                    "INSERT INTO checklist_responses "
+                    "(project_id, wp_id, item_id, conclusion, remark) "
+                    "VALUES (:pid, :wid, :iid, :val, '') "
+                    "ON CONFLICT (wp_id, item_id) "
+                    "DO UPDATE SET conclusion = EXCLUDED.conclusion, "
+                    "project_id = COALESCE(checklist_responses.project_id, EXCLUDED.project_id)"
+                ),
+                {
+                    "pid": str(wp.project_id),
+                    "wid": str(wp_id),
+                    "iid": item_id,
+                    "val": current_value,
+                },
+            )
+            imported_count += 1
+        except Exception as exc:
+            warnings.append(
+                f"字段 '{placeholder.label}' 保存失败: {exc}"
+            )
+
+    # 9. 提交事务
+    if imported_count > 0:
+        try:
+            await db.commit()
+        except Exception as exc:
+            logger.error(
+                "import-structured: 事务提交失败 wp_id=%s: %s",
+                wp_id, exc,
+            )
+            raise HTTPException(status_code=500, detail=f"数据保存失败: {exc}")
+
+    # 10. 清理临时文件
+    try:
+        tmp_path.unlink(missing_ok=True)
+        Path(tmp_dir).rmdir()
+    except OSError:
+        pass
+
+    return {
+        "imported_count": imported_count,
+        "warnings": warnings,
+    }

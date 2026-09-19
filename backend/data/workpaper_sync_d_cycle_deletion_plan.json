@@ -1,0 +1,247 @@
+{
+  "schema_version": "d-cycle-deletion-plan:v1",
+  "task": "Task 46",
+  "spec": "workpaper-html-onlyoffice-bidirectional-writeback-closure",
+  "description": "D 循环 Excel 独立 entry 的 legacy dual-mode composable 删除计划。**2026-08-30 收口重写裁决字段**：首轮 6 条 capability_adjudication 全是 single_onlyoffice 且理由循环论证，现按 AC 12.8 改为「html_counterpart_verdict = exists ⇒ capability 终态未定」。删除动作本身仍归 Task 66（生成计划）/ Task 72（执行删除）—— 本计划只是清册，不在 Task 46 内执行删除。",
+  "paradigm_ref": "backend/data/workpaper_sync_migration_paradigm.json",
+  "pilot_already_migrated": {
+    "entry_id": "xlsx/gt-d2-accounts-receivable",
+    "pilot_class": "d2_large_json",
+    "task": "Task 41/45",
+    "note": "D2 的 entry 级 legacy composable（useD2EntryDualMode）由 Task 45 的 pilot deletion plan 处理。🔴 「pilot」不等于「已迁移」：registry 里 d2.receivable_detail 的 adapter_registered 仍是 False，manifest 的 adapter_id 仍为 null ⇒ D2 与其余 6 条一样，capability 终态未定。"
+  },
+  "shared_base_preserved": {
+    "file": "audit-platform/frontend/src/components/workpaper/composables/useWorkpaperEntryDualMode.ts",
+    "reason": "Still imported by G2/J2/J3/M10 and other non-D-cycle entries. NOT deleted.",
+    "remaining_consumers_after_d_cycle": [
+      "audit-platform/frontend/src/components/workpaper/composables/useG2DualMode.ts",
+      "audit-platform/frontend/src/components/workpaper/composables/useJ2DualMode.ts",
+      "audit-platform/frontend/src/components/workpaper/composables/useJ3DualMode.ts",
+      "audit-platform/frontend/src/components/workpaper/composables/useM10DualMode.ts"
+    ]
+  },
+  "entries": [
+    {
+      "entry_id": "xlsx/gt-d1-notes-receivable",
+      "wp_code_pattern": "D1N",
+      "host_component": "audit-platform/frontend/src/components/workpaper/GtD1NotesReceivable.vue",
+      "capability_adjudication": null,
+      "adjudication_reason": "按 AC 12.8 的真判据（有无 HTML 对端）重裁：本 entry 的业务内容真实存在于 `checklist_responses`（primary managed table `D1-cust-rows` 存 JSON 行数组，行身份 `rowId`，owner `useD1DetailCustomer.ts`），模板依据 `D/D1 应收票据.xlsx!原值明细表（按客户）D1-3!A10` = '客户名称' ⇒ html_counterpart_verdict = exists ⇒ **不得**标 single_onlyoffice。同时 AC 12.1 的六件前置未交付 ⇒ 也不得标 bidirectional，capability 终态未定（见 slice 的 blocking_preconditions BP-1..BP-5）。🔴 首轮理由「无 bidirectional adapter / OO 打开模板副本」是 AP-1 circular_justification —— 拿本任务应交付的产物尚不存在当裁决依据。",
+      "legacy_composables_to_delete": [
+        {
+          "file": "audit-platform/frontend/src/components/workpaper/composables/useD1EntryDualMode.ts",
+          "type": "wrapper_of_useWorkpaperEntryDualMode",
+          "consumers": [
+            "audit-platform/frontend/src/components/workpaper/GtD1NotesReceivable.vue"
+          ]
+        }
+      ],
+      "legacy_composables_preserved": [
+        {
+          "file": "audit-platform/frontend/src/components/workpaper/composables/useD1DualMode.ts",
+          "reason": "Used by D1 sub-components (D1-10 inspection tabs). Not the entry-level composable. Reviewed: also legacy but scoped to sub-tabs, separate migration scope."
+        }
+      ],
+      "localStorage_prefix": "wp-entry-dual-mode:",
+      "action": "delete_entry_composable_and_update_host",
+      "capability_verdict_stage": "pipeline_entry_pending_definition_delivery",
+      "capability_target": "bidirectional",
+      "html_counterpart_verdict": "exists",
+      "html_counterpart_source_refs": [
+        "audit-platform/frontend/src/components/workpaper/GtD1NotesReceivable.vue#L27",
+        "audit-platform/frontend/src/components/workpaper/composables/useD1FormData.ts",
+        "audit-platform/frontend/src/components/workpaper/composables/useD1DetailCustomer.ts",
+        "backend/app/routers/checklist_responses.py#L84",
+        "backend/app/routers/checklist_responses.py#L132",
+        "backend/app/routers/wp_render_strategies/_d1_notes_receivable.py",
+        "backend/wp_templates/D/D1 应收票据.xlsx!原值明细表（按客户）D1-3!A10 = '客户名称'"
+      ]
+    },
+    {
+      "entry_id": "xlsx/gt-d3-prepaid-accounts",
+      "wp_code_pattern": "D3P",
+      "host_component": "audit-platform/frontend/src/components/workpaper/GtD3PrepaidAccounts.vue",
+      "capability_adjudication": null,
+      "adjudication_reason": "按 AC 12.8 的真判据（有无 HTML 对端）重裁：本 entry 的业务内容真实存在于 `checklist_responses`（primary managed table `D3-det-rows` 存 JSON 行数组，行身份 `rowId`，owner `useD3Detail.ts`），模板依据 `D/D3 预收账款.xlsx!预收账款明细表D3-2!A10` = '对方单位名称' ⇒ html_counterpart_verdict = exists ⇒ **不得**标 single_onlyoffice。同时 AC 12.1 的六件前置未交付 ⇒ 也不得标 bidirectional，capability 终态未定（见 slice 的 blocking_preconditions BP-1..BP-5）。🔴 首轮理由「无 bidirectional adapter / OO 打开模板副本」是 AP-1 circular_justification —— 拿本任务应交付的产物尚不存在当裁决依据。",
+      "legacy_composables_to_delete": [
+        {
+          "file": "audit-platform/frontend/src/components/workpaper/composables/useD3EntryDualMode.ts",
+          "type": "wrapper_of_useWorkpaperEntryDualMode",
+          "consumers": [
+            "audit-platform/frontend/src/components/workpaper/GtD3PrepaidAccounts.vue"
+          ]
+        }
+      ],
+      "legacy_composables_preserved": [
+        {
+          "file": "audit-platform/frontend/src/components/workpaper/composables/useD3DualMode.ts",
+          "reason": "Used by D3 sub-tab components. Separate migration scope."
+        }
+      ],
+      "localStorage_prefix": "wp-entry-dual-mode:",
+      "action": "delete_entry_composable_and_update_host",
+      "capability_verdict_stage": "pipeline_entry_pending_definition_delivery",
+      "capability_target": "bidirectional",
+      "html_counterpart_verdict": "exists",
+      "html_counterpart_source_refs": [
+        "audit-platform/frontend/src/components/workpaper/GtD3PrepaidAccounts.vue#L13",
+        "audit-platform/frontend/src/components/workpaper/composables/useD3FormData.ts",
+        "audit-platform/frontend/src/components/workpaper/composables/useD3Detail.ts",
+        "backend/app/routers/checklist_responses.py#L84",
+        "backend/app/routers/checklist_responses.py#L132",
+        "backend/app/routers/wp_render_strategies/_d3_prepaid_accounts.py",
+        "backend/wp_templates/D/D3 预收账款.xlsx!预收账款明细表D3-2!A10 = '对方单位名称'"
+      ]
+    },
+    {
+      "entry_id": "xlsx/gt-d4-operating-revenue",
+      "wp_code_pattern": "D4O",
+      "host_component": "audit-platform/frontend/src/components/workpaper/GtD4OperatingRevenue.vue",
+      "capability_adjudication": null,
+      "adjudication_reason": "按 AC 12.8 的真判据（有无 HTML 对端）重裁：本 entry 的业务内容真实存在于 `checklist_responses`（primary managed table `D4-4-rows` 存 JSON 行数组，行身份 `rowId`，owner `useD4Adjustment.ts`），模板依据 `D/D4-1至D4-4 营业收入 - 审定表明细表（Leap-常规程序）.xlsx!营业收入调整分录汇总D4-4!A5` = '调整事项说明' ⇒ html_counterpart_verdict = exists ⇒ **不得**标 single_onlyoffice。同时 AC 12.1 的六件前置未交付 ⇒ 也不得标 bidirectional，capability 终态未定（见 slice 的 blocking_preconditions BP-1..BP-5）。🔴 首轮理由「无 bidirectional adapter / OO 打开模板副本」是 AP-1 circular_justification —— 拿本任务应交付的产物尚不存在当裁决依据。",
+      "legacy_composables_to_delete": [
+        {
+          "file": "audit-platform/frontend/src/components/workpaper/composables/useD4EntryDualMode.ts",
+          "type": "wrapper_of_useWorkpaperEntryDualMode",
+          "consumers": [
+            "audit-platform/frontend/src/components/workpaper/GtD4OperatingRevenue.vue"
+          ]
+        }
+      ],
+      "legacy_composables_preserved": [
+        {
+          "file": "audit-platform/frontend/src/components/workpaper/composables/useD4DualMode.ts",
+          "reason": "Used by D4 sub-tab components (D4-5 through D4-36). Separate migration scope. NOT deleted with entry-level composable."
+        }
+      ],
+      "localStorage_prefix": "wp-entry-dual-mode:",
+      "action": "delete_entry_composable_and_update_host",
+      "capability_verdict_stage": "pipeline_entry_pending_definition_delivery",
+      "capability_target": "bidirectional",
+      "html_counterpart_verdict": "exists",
+      "html_counterpart_source_refs": [
+        "audit-platform/frontend/src/components/workpaper/GtD4OperatingRevenue.vue#L15",
+        "audit-platform/frontend/src/components/workpaper/composables/useD4FormData.ts",
+        "audit-platform/frontend/src/components/workpaper/composables/useD4Adjustment.ts",
+        "backend/app/routers/checklist_responses.py#L84",
+        "backend/app/routers/checklist_responses.py#L132",
+        "backend/app/routers/wp_render_strategies/_d4_operating_revenue.py",
+        "backend/wp_templates/D/D4-1至D4-4 营业收入 - 审定表明细表（Leap-常规程序）.xlsx!营业收入调整分录汇总D4-4!A5 = '调整事项说明'"
+      ]
+    },
+    {
+      "entry_id": "xlsx/gt-d5-receivables-financing",
+      "wp_code_pattern": "D5R",
+      "host_component": "audit-platform/frontend/src/components/workpaper/GtD5ReceivablesFinancing.vue",
+      "capability_adjudication": null,
+      "adjudication_reason": "按 AC 12.8 的真判据（有无 HTML 对端）重裁：本 entry 的业务内容真实存在于 `checklist_responses`（primary managed table `D5-2-rows` 存 JSON 行数组，行身份 `rowId`，owner `useD5Detail.ts`），模板依据 `D/D5 应收款项融资.xlsx!应收款项融资明细表D5-2!B10` = '明细项目' ⇒ html_counterpart_verdict = exists ⇒ **不得**标 single_onlyoffice。同时 AC 12.1 的六件前置未交付 ⇒ 也不得标 bidirectional，capability 终态未定（见 slice 的 blocking_preconditions BP-1..BP-5）。🔴 首轮理由「无 bidirectional adapter / OO 打开模板副本」是 AP-1 circular_justification —— 拿本任务应交付的产物尚不存在当裁决依据。",
+      "legacy_composables_to_delete": [
+        {
+          "file": "audit-platform/frontend/src/components/workpaper/composables/useD5EntryDualMode.ts",
+          "type": "wrapper_of_useWorkpaperEntryDualMode",
+          "consumers": [
+            "audit-platform/frontend/src/components/workpaper/GtD5ReceivablesFinancing.vue"
+          ]
+        }
+      ],
+      "legacy_composables_preserved": [],
+      "localStorage_prefix": "wp-entry-dual-mode:",
+      "action": "delete_entry_composable_and_update_host",
+      "capability_verdict_stage": "pipeline_entry_pending_definition_delivery",
+      "capability_target": "bidirectional",
+      "html_counterpart_verdict": "exists",
+      "html_counterpart_source_refs": [
+        "audit-platform/frontend/src/components/workpaper/GtD5ReceivablesFinancing.vue#L13",
+        "audit-platform/frontend/src/components/workpaper/composables/useD5FormData.ts",
+        "audit-platform/frontend/src/components/workpaper/composables/useD5Detail.ts",
+        "backend/app/routers/checklist_responses.py#L84",
+        "backend/app/routers/checklist_responses.py#L132",
+        "backend/app/routers/wp_render_strategies/_d5_receivables_financing.py",
+        "backend/wp_templates/D/D5 应收款项融资.xlsx!应收款项融资明细表D5-2!B10 = '明细项目'"
+      ]
+    },
+    {
+      "entry_id": "xlsx/gt-d6-contract-assets",
+      "wp_code_pattern": "D6C",
+      "host_component": "audit-platform/frontend/src/components/workpaper/GtD6ContractAssets.vue",
+      "capability_adjudication": null,
+      "adjudication_reason": "按 AC 12.8 的真判据（有无 HTML 对端）重裁：本 entry 的业务内容真实存在于 `checklist_responses`（primary managed table `D6-2-rows` 存 JSON 行数组，行身份 `rowId`，owner `useD6Detail.ts`），模板依据 `D/D6 合同资产.xlsx!明细表D6-2!B12` = '合同名称/项目名称' ⇒ html_counterpart_verdict = exists ⇒ **不得**标 single_onlyoffice。同时 AC 12.1 的六件前置未交付 ⇒ 也不得标 bidirectional，capability 终态未定（见 slice 的 blocking_preconditions BP-1..BP-5）。🔴 首轮理由「无 bidirectional adapter / OO 打开模板副本」是 AP-1 circular_justification —— 拿本任务应交付的产物尚不存在当裁决依据。",
+      "legacy_composables_to_delete": [
+        {
+          "file": "audit-platform/frontend/src/components/workpaper/composables/useD6EntryDualMode.ts",
+          "type": "wrapper_of_useWorkpaperEntryDualMode",
+          "consumers": [
+            "audit-platform/frontend/src/components/workpaper/GtD6ContractAssets.vue"
+          ]
+        }
+      ],
+      "legacy_composables_preserved": [],
+      "localStorage_prefix": "wp-entry-dual-mode:",
+      "action": "delete_entry_composable_and_update_host",
+      "capability_verdict_stage": "pipeline_entry_pending_definition_delivery",
+      "capability_target": "bidirectional",
+      "html_counterpart_verdict": "exists",
+      "html_counterpart_source_refs": [
+        "audit-platform/frontend/src/components/workpaper/GtD6ContractAssets.vue#L13",
+        "audit-platform/frontend/src/components/workpaper/composables/useD6FormData.ts",
+        "audit-platform/frontend/src/components/workpaper/composables/useD6Detail.ts",
+        "backend/app/routers/checklist_responses.py#L84",
+        "backend/app/routers/checklist_responses.py#L132",
+        "backend/app/routers/wp_render_strategies/_d6_contract_assets.py",
+        "backend/wp_templates/D/D6 合同资产.xlsx!明细表D6-2!B12 = '合同名称/项目名称'"
+      ]
+    },
+    {
+      "entry_id": "xlsx/gt-d7-contract-liabilities",
+      "wp_code_pattern": "D7C",
+      "host_component": "audit-platform/frontend/src/components/workpaper/GtD7ContractLiabilities.vue",
+      "capability_adjudication": null,
+      "adjudication_reason": "按 AC 12.8 的真判据（有无 HTML 对端）重裁：本 entry 的业务内容真实存在于 `checklist_responses`（primary managed table `D7-2-rows` 存 JSON 行数组，行身份 `rowId`，owner `useD7Detail.ts`），模板依据 `D/D7 合同负债.xlsx!明细表D7-2!A8` = '合同名称/项目名称' ⇒ html_counterpart_verdict = exists ⇒ **不得**标 single_onlyoffice。同时 AC 12.1 的六件前置未交付 ⇒ 也不得标 bidirectional，capability 终态未定（见 slice 的 blocking_preconditions BP-1..BP-5）。🔴 首轮理由「无 bidirectional adapter / OO 打开模板副本」是 AP-1 circular_justification —— 拿本任务应交付的产物尚不存在当裁决依据。",
+      "legacy_composables_to_delete": [
+        {
+          "file": "audit-platform/frontend/src/components/workpaper/composables/useD7EntryDualMode.ts",
+          "type": "wrapper_of_useWorkpaperEntryDualMode",
+          "consumers": [
+            "audit-platform/frontend/src/components/workpaper/GtD7ContractLiabilities.vue"
+          ]
+        }
+      ],
+      "legacy_composables_preserved": [],
+      "localStorage_prefix": "wp-entry-dual-mode:",
+      "action": "delete_entry_composable_and_update_host",
+      "capability_verdict_stage": "pipeline_entry_pending_definition_delivery",
+      "capability_target": "bidirectional",
+      "html_counterpart_verdict": "exists",
+      "html_counterpart_source_refs": [
+        "audit-platform/frontend/src/components/workpaper/GtD7ContractLiabilities.vue#L13",
+        "audit-platform/frontend/src/components/workpaper/composables/useD7FormData.ts",
+        "audit-platform/frontend/src/components/workpaper/composables/useD7Detail.ts",
+        "backend/app/routers/checklist_responses.py#L84",
+        "backend/app/routers/checklist_responses.py#L132",
+        "backend/app/routers/wp_render_strategies/_d7_contract_liabilities.py",
+        "backend/wp_templates/D/D7 合同负债.xlsx!明细表D7-2!A8 = '合同名称/项目名称'"
+      ]
+    }
+  ],
+  "properties_verified": [
+    20,
+    21,
+    28,
+    69,
+    70
+  ],
+  "requirements_covered": [
+    "6.1",
+    "6.2",
+    "6.10",
+    "9.1",
+    "12.1",
+    "12.4",
+    "12.10",
+    "12.11",
+    "12.12",
+    "14.1"
+  ],
+  "adjudication_source_of_truth": "backend/data/workpaper_sync_d_cycle_manifest_slice.json#independent_entries",
+  "deletion_execution_owner": "Task 66（plan）/ Task 72（execute）"
+}

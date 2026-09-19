@@ -1,0 +1,68 @@
+{
+  "schema_version": "task47-radiation:v1",
+  "task": "Task 47",
+  "spec": "workpaper-html-onlyoffice-bidirectional-writeback-closure",
+  "why": "别跑全量 backend/tests（根目录 1522 个测试文件，前台跑数分钟无输出会被当卡死）。按**引用关系反查辐射面**：扫测试文件里对本次改动物的实际引用，只跑命中集合。",
+  "changed_or_new_artifacts": {
+    "added": [
+      "backend/data/workpaper_sync_e_cycle_manifest_slice.json",
+      "backend/data/workpaper_sync_e_cycle_deletion_plan.json",
+      "backend/tests/workpaper_sync/test_task47_e_cycle_migration.py",
+      "backend/scripts/check/mutate_task47_e_cycle_migration_guards.py",
+      "audit-platform/frontend/src/components/workpaper/composables/__tests__/e1SyncEntryRowIdentity.spec.ts"
+    ],
+    "deleted": [
+      "audit-platform/frontend/src/components/workpaper/composables/useE1DualMode.ts",
+      "audit-platform/frontend/src/components/workpaper/composables/__tests__/useE1DualMode.spec.ts"
+    ],
+    "read_but_unmodified_production_sources": [
+      "audit-platform/frontend/src/components/workpaper/composables/e1BankAccountPrefill.ts",
+      "audit-platform/frontend/src/components/workpaper/composables/useE1BankDetail.ts",
+      "audit-platform/frontend/src/components/workpaper/composables/useG1DualMode.ts",
+      "audit-platform/frontend/src/components/workpaper/composables/g1SheetLabels.ts",
+      "audit-platform/frontend/src/components/workpaper/GtE1MonetaryFund.vue"
+    ]
+  },
+  "reference_tokens": [
+    "useE1DualMode",
+    "workpaper_sync_e_cycle_manifest_slice",
+    "workpaper_sync_e_cycle_deletion_plan",
+    "e1BankAccountPrefill",
+    "useE1BankDetail",
+    "useG1DualMode",
+    "g1SheetLabels",
+    "buildBankSeedRowsFromAccounts",
+    "buildAccountListSeedRowsFromAccounts",
+    "classifyFxForm"
+  ],
+  "backend_selection": {
+    "hit_count": 2,
+    "files": [
+      "backend/tests/four_table/test_e1_render_account_prefill.py",
+      "backend/tests/workpaper_sync/test_task47_e_cycle_migration.py"
+    ],
+    "command": "python -m pytest backend/tests/four_table/test_e1_render_account_prefill.py backend/tests/workpaper_sync/test_task47_e_cycle_migration.py -q --tb=short -p no:randomly",
+    "result": "84 passed, 0 failed"
+  },
+  "frontend_selection": {
+    "hit_count": 9,
+    "files": [
+      "audit-platform/frontend/src/components/workpaper/composables/__tests__/e1BankAccountPrefill.spec.ts",
+      "audit-platform/frontend/src/components/workpaper/composables/__tests__/e1BankDetailFxForm.spec.ts",
+      "audit-platform/frontend/src/components/workpaper/composables/__tests__/e1BankVariantIntegrity.spec.ts",
+      "audit-platform/frontend/src/components/workpaper/composables/__tests__/e1HostSeedWiring.spec.ts",
+      "audit-platform/frontend/src/components/workpaper/composables/__tests__/e1NegativeBalance.spec.ts",
+      "audit-platform/frontend/src/components/workpaper/composables/__tests__/e1RestrictedL2.spec.ts",
+      "audit-platform/frontend/src/components/workpaper/composables/__tests__/e1SyncEntryRowIdentity.spec.ts",
+      "audit-platform/frontend/src/components/workpaper/composables/__tests__/g1SheetLabels.spec.ts",
+      "audit-platform/frontend/src/components/workpaper/composables/__tests__/useG1Adjustment.spec.ts"
+    ],
+    "command": "npx vitest run e1BankAccountPrefill e1BankDetailFxForm e1BankVariantIntegrity e1HostSeedWiring e1NegativeBalance e1RestrictedL2 e1SyncEntryRowIdentity g1SheetLabels useG1Adjustment",
+    "result": "9 test files passed, 196 tests passed, 0 failed"
+  },
+  "deleted_symbol_leftover_check": {
+    "symbol": "useE1DualMode",
+    "remaining_references_in_frontend_src": 0,
+    "method": "全前端 .ts/.vue 逐文件读取后查符号（不是 IDE 索引）"
+  }
+}

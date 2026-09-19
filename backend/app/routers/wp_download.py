@@ -37,12 +37,22 @@ async def download_pack(
         "workpaper_batch_download: user=%s project=%s count=%d",
         str(current_user.id), str(project_id), len(body.wp_ids),
     )
+    # Wp_Bound_Gate（Task 4 / R3）：打包底稿正文前用可见集过滤 wp_ids
+    # （make_bulk_visible_filter）；不可见/跨项目/未委派/scope 外底稿静默剔除，
+    # 不泄露存在性，绝不进入 ZIP（manifest 只由可见集构建）。
+    from app.services.wp_visibility.entry_integration import make_bulk_visible_filter
+
+    _visible = make_bulk_visible_filter(
+        db, current_user, entrypoint="workpaper.detail", action="read_detail",
+        method="GET", entry_family="download",
+    )
+    visible_wp_ids = [wid for wid in body.wp_ids if await _visible(wid, None)]
     svc = WpDownloadService()
     try:
         buf = await svc.download_pack(
             db=db,
             project_id=project_id,
-            wp_ids=body.wp_ids,
+            wp_ids=visible_wp_ids,
             include_prefill=body.include_prefill,
         )
         return StreamingResponse(
@@ -73,11 +83,17 @@ async def download_single(
         info = await svc.download_single(db=db, project_id=project_id, wp_id=wp_id)
         from pathlib import Path
         file_path = Path(info["file_path"])
+        # 中文文件名需 RFC5987 编码（HTTP 头按 latin-1，直接放中文会 UnicodeEncodeError）
+        from urllib.parse import quote
+        _fname = info["file_name"]
+        ascii_name = _fname.encode("ascii", "ignore").decode() or "workpaper.xlsx"
+        utf8_name = quote(_fname, safe="")
+        disposition = f"attachment; filename=\"{ascii_name}\"; filename*=UTF-8''{utf8_name}"
         return StreamingResponse(
             open(file_path, "rb"),
             media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             headers={
-                "Content-Disposition": f'attachment; filename="{info["file_name"]}"',
+                "Content-Disposition": disposition,
                 "X-WP-Version": str(info["file_version"]),
             },
         )

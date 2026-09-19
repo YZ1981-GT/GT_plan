@@ -1,0 +1,94 @@
+{
+  "contractVersion": "1.0",
+  "evidenceId": "evidence-gc0-milestone-1",
+  "runId": "run-gc0-milestone-1",
+  "subject": {
+    "kind": "contract",
+    "contractId": "G-C0"
+  },
+  "contractVersions": {
+    "G-C0": "1.0"
+  },
+  "inventoryDigest": null,
+  "sourceDigests": {
+    "schema.json": "fc413f6151519b80b5f8b9b2d2fefbd993066d115c54761967db77aa93199d99",
+    "compatibility_matrix.json": "46eea1e94469f018b9efdbbc44623fa514a487a5b3510e91649171597c429598",
+    "fixtures/ack_accepted.json": "e75ce5ddef931dfb8030deeb775bafca377d1ddfe949fad3a4d688278c34ee15",
+    "fixtures/ack_rejected.json": "2250887df166f21e46b2d2c45e3c7eb3ce5921508375e1abc08619b21758cf6d",
+    "fixtures/evidence_catalog_entry.json": "067480f46ff14d22f0a5ff39bb1c5351843e57bdf304f1ebea9adca61a4b4947",
+    "fixtures/evidence_contract.json": "244b6d74fa215df23f05a1aaf182782ac3502ae784816bfc44e40d543fdafa42",
+    "fixtures/handoff_candidate.json": "0966f8d0077410f1eff7cf1e7605a80a12f7b5b41a988a6d05ec3b8d5a843df5",
+    "fixtures/handoff_finalized.json": "ea388f98867af497c8bef38e2be48a56c580802bd943cbdc95ad643ae440e4df",
+    "fixtures/location_cell.json": "5b39d6287c545a98d37688d93ac7baddf2ee632350f9947c198501b98ee4b3ac",
+    "fixtures/location_page.json": "5ce3bb74e449bd7ac18a7b52fb6baccbc3ef68e904717da7b73c631ed3498dc3",
+    "fixtures/location_sheet.json": "c61941abb881e56fc3ab1f9fc00a6d2e6299fe2033c7fcf360bddba0aab34bd3",
+    "fixtures/location_whole_workbook.json": "109c0cc2fcb4a5338c72af0750be0662c4d7cfe807b5fa953860db61ed3032bf"
+  },
+  "operationIds": {
+    "write": "op-write-gc0-2026-09-07"
+  },
+  "artifacts": [
+    {
+      "kind": "report",
+      "uri": "backend/data/guidance/contracts/gc0/schema.json",
+      "sha256": "fc413f6151519b80b5f8b9b2d2fefbd993066d115c54761967db77aa93199d99"
+    },
+    {
+      "kind": "report",
+      "uri": "backend/data/guidance/contracts/gc0/compatibility_matrix.json",
+      "sha256": "46eea1e94469f018b9efdbbc44623fa514a487a5b3510e91649171597c429598"
+    },
+    {
+      "kind": "report",
+      "uri": "backend/data/guidance/contracts/gc0/fixtures/ack_accepted.json",
+      "sha256": "e75ce5ddef931dfb8030deeb775bafca377d1ddfe949fad3a4d688278c34ee15"
+    },
+    {
+      "kind": "report",
+      "uri": "backend/data/guidance/contracts/gc0/fixtures/ack_rejected.json",
+      "sha256": "2250887df166f21e46b2d2c45e3c7eb3ce5921508375e1abc08619b21758cf6d"
+    },
+    {
+      "kind": "report",
+      "uri": "backend/data/guidance/contracts/gc0/fixtures/evidence_catalog_entry.json",
+      "sha256": "067480f46ff14d22f0a5ff39bb1c5351843e57bdf304f1ebea9adca61a4b4947"
+    },
+    {
+      "kind": "report",
+      "uri": "backend/data/guidance/contracts/gc0/fixtures/evidence_contract.json",
+      "sha256": "244b6d74fa215df23f05a1aaf182782ac3502ae784816bfc44e40d543fdafa42"
+    },
+    {
+      "kind": "report",
+      "uri": "backend/data/guidance/contracts/gc0/fixtures/handoff_candidate.json",
+      "sha256": "0966f8d0077410f1eff7cf1e7605a80a12f7b5b41a988a6d05ec3b8d5a843df5"
+    },
+    {
+      "kind": "report",
+      "uri": "backend/data/guidance/contracts/gc0/fixtures/handoff_finalized.json",
+      "sha256": "ea388f98867af497c8bef38e2be48a56c580802bd943cbdc95ad643ae440e4df"
+    },
+    {
+      "kind": "report",
+      "uri": "backend/data/guidance/contracts/gc0/fixtures/location_cell.json",
+      "sha256": "5b39d6287c545a98d37688d93ac7baddf2ee632350f9947c198501b98ee4b3ac"
+    },
+    {
+      "kind": "report",
+      "uri": "backend/data/guidance/contracts/gc0/fixtures/location_page.json",
+      "sha256": "5ce3bb74e449bd7ac18a7b52fb6baccbc3ef68e904717da7b73c631ed3498dc3"
+    },
+    {
+      "kind": "report",
+      "uri": "backend/data/guidance/contracts/gc0/fixtures/location_sheet.json",
+      "sha256": "c61941abb881e56fc3ab1f9fc00a6d2e6299fe2033c7fcf360bddba0aab34bd3"
+    },
+    {
+      "kind": "report",
+      "uri": "backend/data/guidance/contracts/gc0/fixtures/location_whole_workbook.json",
+      "sha256": "109c0cc2fcb4a5338c72af0750be0662c4d7cfe807b5fa953860db61ed3032bf"
+    }
+  ],
+  "verdict": "PASS",
+  "recordedAt": "2026-09-07T00:00:00Z"
+}

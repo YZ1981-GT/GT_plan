@@ -10,7 +10,10 @@ import uuid
 from datetime import datetime
 
 import sqlalchemy as sa
-from sqlalchemy import ForeignKey, Index, String, Text, func, text
+from sqlalchemy import (
+    ForeignKey, Index, Integer, Numeric, String, Text, UniqueConstraint, func, text,
+)
+from sqlalchemy import DateTime as SADateTime
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
@@ -290,6 +293,26 @@ class WorkingPaper(Base):
     file_version: Mapped[int] = mapped_column(
         sa.Integer, server_default=text("1"), nullable=False
     )
+    # ─── V151 / spec workpaper-html-onlyoffice-bidirectional-writeback-closure ───
+    #
+    # 唯一 business content revision 域（Requirement 2.1）。V151 用
+    # `ALTER TABLE ... ADD COLUMN IF NOT EXISTS` 加了这两列，但 ORM 侧一直没声明 ——
+    # 于是任何用 `Base.metadata.create_all` 建库的测试（SQLite in-memory）里这两列
+    # **根本不存在**，读它的代码报 `no such column: content_revision`。Task 19 把
+    # 上传/WOPI/custom 迁进统一 revision 域后必须补上，否则迁移后的写路径在
+    # metadata 建库的环境里恒炸（Task 19 实测到这一点）。
+    #
+    # 🔴 `current_content_version_id` 刻意**不声明 ForeignKey**：目标表
+    # `working_paper_content_version` 定义在 `workpaper_sync_models`，而那个模块并非
+    # 所有 `create_all` 场景都会被 import。声明 FK 会让未 import 它的场景在
+    # `create_all` 阶段 NoReferencedTableError —— 真正的 FK 约束由 V151
+    # (`fk_wp_current_content_version`) 在数据库侧持有，那才是权威。
+    content_revision: Mapped[int] = mapped_column(
+        sa.BigInteger, server_default=text("0"), nullable=False
+    )
+    current_content_version_id: Mapped[uuid.UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True), nullable=True
+    )
     last_parsed_at: Mapped[datetime | None] = mapped_column(nullable=True)
     parsed_data: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
     prefill_stale: Mapped[bool] = mapped_column(
@@ -484,6 +507,24 @@ class ReviewRecord(Base):
         String(20),
         nullable=True,
         comment="复核层级: L1/L2/L3/L4/L5/committee/it/tax",
+    )
+    # P1-1: 复核意见证据链
+    evidence_refs: Mapped[list | None] = mapped_column(
+        JSONB,
+        nullable=True,
+        default=list,
+        comment="关联的 EvidenceRef 列表（底稿单元格、附件、报告段落、附注表格）",
+    )
+    close_evidence_refs: Mapped[list | None] = mapped_column(
+        JSONB,
+        nullable=True,
+        default=list,
+        comment="关闭依据 EvidenceRef 列表（重大复核意见关闭时必填）",
+    )
+    close_reason: Mapped[str | None] = mapped_column(
+        Text,
+        nullable=True,
+        comment="关闭说明（重大复核意见关闭时必填）",
     )
     is_deleted: Mapped[bool] = mapped_column(
         server_default=text("false"), nullable=False
@@ -704,6 +745,18 @@ class SamplingRecord(Base):
         sa.Numeric(20, 2), nullable=True
     )
     conclusion: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # ── V139（sampling-compliance-closure R5.3）：与抽凭批次绑定 + 方法学快照 ──
+    # 权威留痕仍是 workpaper_extraction_log.extraction_criteria；本表是可查询侧投影，
+    # 支撑项目级/QC 级「所有抽样是否都有总体描述/样本量依据/结论」的一次性查询。
+    batch_id: Mapped[uuid.UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True), nullable=True
+    )
+    sampling_method: Mapped[str | None] = mapped_column(sa.String(32), nullable=True)
+    random_seed: Mapped[int | None] = mapped_column(sa.BigInteger, nullable=True)
+    # 抽样框数据集版本：序时账重导后据此判定该批次已不可复算
+    dataset_id: Mapped[uuid.UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True), nullable=True
+    )
     is_deleted: Mapped[bool] = mapped_column(
         server_default=text("false"), nullable=False
     )
@@ -715,4 +768,368 @@ class SamplingRecord(Base):
 
     __table_args__ = (
         Index("idx_sampling_records_project_wp", "project_id", "working_paper_id"),
+    )
+
+
+class SampledVoucher(Base):
+    """抽样凭证（抽凭联动）
+
+    用户在凭证穿透视图点击"抽中本凭证"→记录到此表，作为抽凭样本清单。
+    后续可关联 sampling_record_id（统计层）或 working_paper_id（底稿层）。
+    对应迁移 V084__sampled_vouchers.sql。
+    """
+
+    __tablename__ = "sampled_vouchers"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        PG_UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    project_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("projects.id"), nullable=False
+    )
+    year: Mapped[int] = mapped_column(sa.Integer, nullable=False)
+    voucher_no: Mapped[str] = mapped_column(sa.String(100), nullable=False)
+    account_code: Mapped[str | None] = mapped_column(sa.String(50), nullable=True)
+    sampling_record_id: Mapped[uuid.UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True), nullable=True
+    )
+    working_paper_id: Mapped[uuid.UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True), nullable=True
+    )
+    note: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # ── V139（sampling-compliance-closure R5.3）──
+    # 抽凭批次标识；NULL = 非抽凭引擎来源（如 ledger_penetration 穿透页手工标记）。
+    # 同批次同凭证由部分唯一索引 uq_sampled_vouchers_batch 防重；不同 batch_id 的
+    # 同一凭证**允许共存** —— 那正是「该凭证被抽过两次」这一需要被发现的事实。
+    batch_id: Mapped[uuid.UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True), nullable=True
+    )
+    sampled_by: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("users.id"), nullable=True
+    )
+    sampled_at: Mapped[datetime] = mapped_column(server_default=func.now())
+    is_deleted: Mapped[bool] = mapped_column(
+        server_default=text("false"), nullable=False
+    )
+    created_at: Mapped[datetime] = mapped_column(server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(server_default=func.now())
+
+    __table_args__ = (
+        Index("idx_sampled_vouchers_project_year", "project_id", "year"),
+    )
+
+
+# ---------------------------------------------------------------------------
+# WpFormula 模型（自定义底稿公式绑定，独立表）
+# ---------------------------------------------------------------------------
+
+
+class WpFormula(Base):
+    """自定义底稿公式绑定（独立表，custom-workpaper-formula-binding）
+
+    与 V052__wp_formula.sql 三层一致：表名/列名/索引名完全对应。
+    UUID 主键由 ORM 端 default=uuid.uuid4 兜底赋值（DDL 的 gen_random_uuid()
+    仅作裸 SQL 插入兜底），避免 PK 缺 default bug。
+    """
+
+    __tablename__ = "wp_formula"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        PG_UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    project_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("projects.id"), nullable=False
+    )
+    wp_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("working_paper.id"), nullable=False
+    )
+    sheet_name: Mapped[str] = mapped_column(String(255), nullable=False)
+    target_cell: Mapped[str] = mapped_column(String(50), nullable=False)
+    expression: Mapped[str] = mapped_column(Text, nullable=False)
+    category: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_by: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("users.id"), nullable=True
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        sa.DateTime(timezone=True), server_default=func.now()
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        sa.DateTime(timezone=True), server_default=func.now()
+    )
+
+    # ── V100 公式管理库扩展列（formula-management-library）──────────────
+    # 三类型公式治理 + 最近计算时间 + 规范化引用 + 初稿语义/来源标记。
+    # formula_type ∈ {auto_calc, logic_check, reasonability}
+    formula_type: Mapped[str] = mapped_column(
+        String(20), nullable=False, server_default=text("'auto_calc'")
+    )
+
+    # ── V104 formula-runtime-convergence 生命周期扩展 ──────────────────
+    # lifecycle_state ∈ {saved, validated, executing, succeeded, failed, stale, rolled_back}
+    lifecycle_state: Mapped[str] = mapped_column(
+        String(20), nullable=False, server_default=text("'saved'")
+    )
+    # 定义版本：每次保存定义递增
+    definition_version: Mapped[int] = mapped_column(
+        sa.Integer, nullable=False, server_default=text("1")
+    )
+    # 定义 hash：由影响执行的定义字段（expression, formula_type, refs）计算
+    definition_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    last_computed_at: Mapped[datetime | None] = mapped_column(
+        sa.DateTime(timezone=True), nullable=True
+    )
+    # refs: [{addr_id | formula_ref, ...}] —— 规范化引用，禁裸字符串
+    # NOTE: 不写 `'[]'::jsonb`（PG 字面 cast）—— SQLite 测试 dialect 不识别 `::`
+    # 会导致建表 DDL 报 "unrecognized token"。`'[]'` 在 PG/SQLite 双方言下
+    # 都能解析为合法空 JSON 数组（同 custom_query_models / review_template_models 约定）。
+    refs: Mapped[list | dict] = mapped_column(
+        JSONB, nullable=False, server_default=text("'[]'")
+    )
+    issue_description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    hint_text: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # formula_source ∈ {preset, custom, reference}
+    formula_source: Mapped[str] = mapped_column(
+        String(20), nullable=False, server_default=text("'custom'")
+    )
+    # reference 来源指向被参照源公式；非 reference 来源为 NULL
+    reference_formula_id: Mapped[uuid.UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True), nullable=True
+    )
+
+    # ── V163 稳定键（P0-项1 d4-dual-mode-formula-governance）──────────────
+    # 目标 identity = (wp_id, stable_sheet_key, row_key, field_key)；preset_version 不入。
+    # 旧列 sheet_name/target_cell + 旧唯一索引保留一版过渡（双写共存）。
+    # needs_review：target_cell 无法安全解析为 A1（命名单元等）时置 True，供人工复核（不静默丢）。
+    stable_sheet_key: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    row_key: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    field_key: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    stable_key_needs_review: Mapped[bool] = mapped_column(
+        sa.Boolean, nullable=False, server_default=text("false")
+    )
+
+    __table_args__ = (
+        Index(
+            "uq_wp_formula_wp_sheet_cell",
+            "wp_id", "sheet_name", "target_cell",
+            unique=True,
+        ),
+        Index("idx_wp_formula_project", "project_id"),
+        # 新稳定键唯一索引（部分索引，仅对已回填行生效；needs_review 行 row_key 可空用 '' 兜底）
+        Index(
+            "uq_wp_formula_stable_key",
+            "wp_id", "stable_sheet_key",
+            sa.text("COALESCE(row_key, '')"), "field_key",
+            unique=True,
+            postgresql_where=sa.text("stable_sheet_key IS NOT NULL"),
+        ),
+    )
+
+
+class DraftMarker(Base):
+    """初稿标记（V100 formula-management-library）。
+
+    可查询、可区分初稿 vs 已审定；对应迁移 V100 的 draft_marker 表。
+    """
+
+    __tablename__ = "draft_marker"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        PG_UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    project_id: Mapped[uuid.UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
+    year: Mapped[int] = mapped_column(sa.Integer, nullable=False)
+    # 数据单元定位（如 audit_sheet:{wp_id}:{cell} / report:{row_code}）
+    unit_scope: Mapped[str] = mapped_column(String(255), nullable=False)
+    # state ∈ {draft, human_edited}
+    state: Mapped[str] = mapped_column(
+        String(20), nullable=False, server_default=text("'draft'")
+    )
+    # 关联生成它的刷新批次
+    refresh_id: Mapped[uuid.UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True), nullable=True
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        sa.DateTime(timezone=True), server_default=func.now()
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        sa.DateTime(timezone=True), server_default=func.now()
+    )
+
+    __table_args__ = (
+        Index(
+            "uq_draft_marker_unit",
+            "project_id", "year", "unit_scope",
+            unique=True,
+        ),
+    )
+
+
+class DraftRefreshAudit(Base):
+    """初稿刷新审计留痕（append-only，V100 formula-management-library）。
+
+    仅 append，不暴露 UPDATE/DELETE；对应迁移 V100 的 draft_refresh_audit 表。
+    """
+
+    __tablename__ = "draft_refresh_audit"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        PG_UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    project_id: Mapped[uuid.UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
+    year: Mapped[int] = mapped_column(sa.Integer, nullable=False)
+    operator_id: Mapped[uuid.UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
+    operator_role: Mapped[str] = mapped_column(String(50), nullable=False)
+    operated_at: Mapped[datetime] = mapped_column(
+        sa.DateTime(timezone=True), server_default=func.now()
+    )
+    scope: Mapped[str] = mapped_column(String(100), nullable=False)
+    # 幂等键
+    tb_snapshot_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    affected_count: Mapped[int] = mapped_column(
+        sa.Integer, nullable=False, server_default=text("0")
+    )
+    # result_status ∈ {success, blocked, rolled_back}
+    result_status: Mapped[str] = mapped_column(String(20), nullable=False)
+    # NOTE: 不写 `'{}'::jsonb`（PG 字面 cast）—— SQLite 测试 dialect 不识别 `::`
+    # `'{}'` 在 PG/SQLite 双方言下都能解析为合法空 JSON 对象（同 custom_query_models 约定）。
+    detail: Mapped[dict] = mapped_column(
+        JSONB, nullable=False, server_default=text("'{}'")
+    )
+
+    # ── V104 formula-runtime-convergence 扩展 ──
+    revision_fingerprint: Mapped[str | None] = mapped_column(
+        String(64), nullable=True
+    )
+    transaction_mode: Mapped[str] = mapped_column(
+        String(30), nullable=False, server_default=text("'all_or_nothing'")
+    )
+    idempotency_key: Mapped[str | None] = mapped_column(
+        String(64), nullable=True
+    )
+    failure_detail: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+
+    __table_args__ = (
+        Index(
+            "idx_draft_audit_project_year",
+            "project_id", "year", sa.text("operated_at DESC"),
+        ),
+    )
+
+
+class DraftRefreshSnapshot(Base):
+    """初稿刷新回滚快照（V100 formula-management-library）。
+
+    覆盖前内容，供回滚恢复；对应迁移 V100 的 draft_refresh_snapshot 表。
+    """
+
+    __tablename__ = "draft_refresh_snapshot"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        PG_UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    refresh_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("draft_refresh_audit.id"), nullable=False
+    )
+    unit_scope: Mapped[str] = mapped_column(String(255), nullable=False)
+    # 覆盖前内容（供回滚恢复）
+    before_value: Mapped[dict | list] = mapped_column(JSONB, nullable=False)
+    # 被覆盖的人工编辑者标识（Req 4.3）
+    editor_id: Mapped[uuid.UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True), nullable=True
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        sa.DateTime(timezone=True), server_default=func.now()
+    )
+
+    # ── V104 formula-runtime-convergence 扩展 ──
+    domain: Mapped[str | None] = mapped_column(String(30), nullable=True)
+    target_locator: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    after_value: Mapped[dict | list | None] = mapped_column(JSONB, nullable=True)
+    before_version: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    after_version: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    restored_at: Mapped[datetime | None] = mapped_column(
+        sa.DateTime(timezone=True), nullable=True
+    )
+
+    __table_args__ = (
+        Index("idx_draft_snapshot_refresh", "refresh_id"),
+    )
+
+
+# ---------------------------------------------------------------------------
+# FormulaRuntimeOutbox 模型（V104 formula-runtime-convergence）
+# ---------------------------------------------------------------------------
+
+
+class FormulaRuntimeOutbox(Base):
+    """公式运行时事务 Outbox — 与业务写入同事务提交，提交后可靠发布 stale/invalidation 事件。
+
+    对应迁移 V104__formula_runtime_outbox.sql 的 formula_runtime_outbox 表。
+    event_key UNIQUE 保证幂等发布。
+    """
+
+    __tablename__ = "formula_runtime_outbox"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        PG_UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    event_key: Mapped[str] = mapped_column(String(128), nullable=False, unique=True)
+    run_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("draft_refresh_audit.id"), nullable=False
+    )
+    event_type: Mapped[str] = mapped_column(String(50), nullable=False)
+    payload: Mapped[dict] = mapped_column(
+        JSONB, nullable=False, server_default=text("'{}'")
+    )
+    attempts: Mapped[int] = mapped_column(
+        sa.Integer, nullable=False, server_default=text("0")
+    )
+    delivered_at: Mapped[datetime | None] = mapped_column(
+        sa.DateTime(timezone=True), nullable=True
+    )
+    last_error: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        sa.DateTime(timezone=True), server_default=func.now()
+    )
+
+    __table_args__ = (
+        Index("idx_outbox_run_id", "run_id"),
+        Index("idx_outbox_undelivered", "delivered_at", postgresql_where=text("delivered_at IS NULL")),
+    )
+
+
+# ---------------------------------------------------------------------------
+# V130: 试算平衡表版本快照
+# ---------------------------------------------------------------------------
+
+
+class TrialBalanceSnapshot(Base):
+    """试算平衡表版本快照 - 记录每次审定表变更时的试算表完整状态"""
+
+    __tablename__ = "trial_balance_snapshots"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        PG_UUID(as_uuid=True), primary_key=True, server_default=text("gen_random_uuid()")
+    )
+    project_id: Mapped[uuid.UUID] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("projects.id"), nullable=False
+    )
+    year: Mapped[int] = mapped_column(Integer, nullable=False)
+    version_no: Mapped[int] = mapped_column(Integer, nullable=False)
+    trigger: Mapped[str] = mapped_column(String(30), nullable=False)
+    actor_id: Mapped[uuid.UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True), nullable=True
+    )
+    content_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    snapshot_data: Mapped[dict] = mapped_column(JSONB, nullable=False)
+    row_count: Mapped[int] = mapped_column(Integer, nullable=False, server_default=text("0"))
+    audited_total: Mapped[float | None] = mapped_column(Numeric, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        sa.DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+
+    __table_args__ = (
+        UniqueConstraint("project_id", "year", "version_no", name="uq_tb_snapshot_version"),
+        Index("idx_tb_snapshots_project_year_time", "project_id", "year", created_at.desc()),
     )

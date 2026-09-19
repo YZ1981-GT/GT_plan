@@ -32,6 +32,11 @@ IMPORT_JOB_DATA_TYPE = "__smart_import_job__"
 # asyncio 互斥锁：保证 acquire_lock 的检查+写入原子性（单 worker 内有效）
 _acquire_mutex = asyncio.Lock()
 
+# Redis 分布式锁配置
+_REDIS_LOCK_PREFIX = "import_lock:"
+_REDIS_LOCK_TTL = 1800  # 30min auto-expire failsafe
+_REDIS_ACTIVE_SET_KEY = "import_lock:active_set"
+
 
 class ImportLockError(RuntimeError):
     """无法获取项目导入锁（F23）。
@@ -254,6 +259,114 @@ class ImportQueueService:
         except Exception:
             logger.exception("持久化导入进度失败: batch_id=%s progress=%s", batch_id, progress)
 
+    # ------------------------------------------------------------------
+    # Redis 分布式锁 helpers
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    async def _get_redis():
+        """获取 Redis 客户端（降级返回 None）"""
+        from app.core.redis import get_redis
+        return await get_redis()
+
+    @staticmethod
+    async def _redis_acquire_lock(project_id: UUID) -> bool:
+        """尝试通过 Redis SET NX EX 获取分布式导入锁。
+
+        key: import_lock:{project_id}, TTL=30min（自动过期兜底）。
+        成功返回 True，已被占用返回 False。
+        Redis 不可用时返回 None（触发 DB fallback）。
+        """
+        redis = await ImportQueueService._get_redis()
+        if redis is None:
+            return None  # type: ignore[return-value]
+        try:
+            key = f"{_REDIS_LOCK_PREFIX}{project_id}"
+            acquired = await redis.set(key, "1", nx=True, ex=_REDIS_LOCK_TTL)
+            return bool(acquired)
+        except Exception as e:
+            logger.warning("Redis lock acquire failed (pid=%s): %s", project_id, e)
+            return None  # type: ignore[return-value]
+
+    @staticmethod
+    async def _redis_release_lock(project_id: UUID) -> None:
+        """释放 Redis 分布式导入锁。"""
+        redis = await ImportQueueService._get_redis()
+        if redis is None:
+            return
+        try:
+            key = f"{_REDIS_LOCK_PREFIX}{project_id}"
+            await redis.delete(key)
+        except Exception as e:
+            logger.warning("Redis lock release failed (pid=%s): %s", project_id, e)
+
+    @staticmethod
+    async def _redis_check_global_concurrency() -> int | None:
+        """检查全局活跃导入数（Redis Set: import_lock:active_set）。
+
+        返回当前活跃数量，Redis 不可用时返回 None。
+        """
+        redis = await ImportQueueService._get_redis()
+        if redis is None:
+            return None
+        try:
+            count = await redis.scard(_REDIS_ACTIVE_SET_KEY)
+            return int(count or 0)
+        except Exception as e:
+            logger.warning("Redis SCARD active_set failed: %s", e)
+            return None
+
+    @staticmethod
+    async def _redis_add_to_active_set(project_id: UUID) -> None:
+        """将项目加入全局活跃集合。"""
+        redis = await ImportQueueService._get_redis()
+        if redis is None:
+            return
+        try:
+            await redis.sadd(_REDIS_ACTIVE_SET_KEY, str(project_id))
+        except Exception as e:
+            logger.warning("Redis SADD active_set failed (pid=%s): %s", project_id, e)
+
+    @staticmethod
+    async def _redis_remove_from_active_set(project_id: UUID) -> None:
+        """将项目从全局活跃集合移除。"""
+        redis = await ImportQueueService._get_redis()
+        if redis is None:
+            return
+        try:
+            await redis.srem(_REDIS_ACTIVE_SET_KEY, str(project_id))
+        except Exception as e:
+            logger.warning("Redis SREM active_set failed (pid=%s): %s", project_id, e)
+
+    # ------------------------------------------------------------------
+    # DB fallback lock (SELECT FOR UPDATE)
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    async def _db_fallback_acquire_lock(project_id: UUID, db: AsyncSession) -> bool:
+        """Redis 不可用时的 DB 降级锁：SELECT FOR UPDATE 检查活跃任务。
+
+        利用 PG 行锁保证跨 worker 互斥。
+        Returns True if no active job exists (lock acquired via DB row creation).
+        """
+        from sqlalchemy import text
+        try:
+            result = await db.execute(
+                select(ImportBatch)
+                .where(
+                    ImportBatch.project_id == project_id,
+                    ImportBatch.data_type == IMPORT_JOB_DATA_TYPE,
+                    ImportBatch.status == ImportStatus.processing,
+                )
+                .with_for_update(nowait=True)
+            )
+            active = result.scalars().first()
+            return active is None
+        except Exception as e:
+            # nowait=True + lock contention → OperationalError
+            logger.warning("DB fallback lock contention (pid=%s): %s", project_id, e)
+            return False
+
     @staticmethod
     async def acquire_lock(
         project_id: UUID,
@@ -264,9 +377,12 @@ class ImportQueueService:
         file_name: str,
         year: int = 0,
     ) -> tuple[bool, str, UUID | None]:
-        """尝试获取导入锁。
+        """尝试获取导入锁（Redis 分布式锁 + DB fallback）。
 
-        数据库唯一索引保证跨实例互斥；asyncio.Lock 仅减少单进程内重复提交竞争。
+        锁获取策略：
+        1. 尝试 Redis SET NX EX（跨 worker 互斥）
+        2. Redis 不可用 → DB SELECT FOR UPDATE fallback
+        3. 全局并发限制: Redis SCARD active_set ≤ MAX（降级时用 DB count）
 
         Returns:
             (success, message, batch_id)
@@ -276,17 +392,41 @@ class ImportQueueService:
             ImportQueueService._cleanup_stale_memory_locks()
             await ImportQueueService._expire_stale_jobs(db)
 
-            # 检查数据库中是否有活跃任务（跨 Web/worker 实例唯一可信来源）
+            # Step 1: Redis 分布式锁
+            redis_result = await ImportQueueService._redis_acquire_lock(project_id)
+            if redis_result is False:
+                # Redis 告知已被占用
+                return False, "项目正在导入中（另一 worker 持有锁）", None
+            elif redis_result is None:
+                # Redis 不可用 → DB fallback
+                logger.info("Redis unavailable, falling back to DB lock (pid=%s)", pid)
+                db_can_acquire = await ImportQueueService._db_fallback_acquire_lock(project_id, db)
+                if not db_can_acquire:
+                    return False, "项目正在导入中（DB 锁检测）", None
+            # redis_result is True → Redis 锁已获取
+
+            # Step 2: 检查全局并发上限
+            redis_active = await ImportQueueService._redis_check_global_concurrency()
+            if redis_active is not None:
+                if redis_active >= _MAX_CONCURRENT_IMPORTS:
+                    # 释放刚获取的 Redis 锁
+                    await ImportQueueService._redis_release_lock(project_id)
+                    return False, f"系统繁忙，当前有 {redis_active} 个导入任务在执行，请稍后重试", None
+            else:
+                # Redis 不可用时用 DB 计数
+                active = await ImportQueueService._count_active_jobs(db)
+                if active >= _MAX_CONCURRENT_IMPORTS:
+                    await ImportQueueService._redis_release_lock(project_id)
+                    return False, f"系统繁忙，当前有 {active} 个导入任务在执行，请稍后重试", None
+
+            # Step 3: DB 双重确认（防止 Redis 锁重入后 DB 已有活跃批次）
             active_batch = await ImportQueueService._get_active_job_batch(project_id, db)
             if active_batch is not None:
+                await ImportQueueService._redis_release_lock(project_id)
                 started = active_batch.started_at.isoformat() if active_batch.started_at else "?"
                 return False, f"项目正在导入中（{started} 开始）", None
 
-            # 检查总并发数
-            active = await ImportQueueService._count_active_jobs(db)
-            if active >= _MAX_CONCURRENT_IMPORTS:
-                return False, f"系统繁忙，当前有 {active} 个导入任务在执行，请稍后重试", None
-
+            # Step 4: 创建 ImportBatch
             started_at = datetime.now(timezone.utc).replace(tzinfo=None)
             batch = ImportBatch(
                 project_id=project_id,
@@ -309,9 +449,13 @@ class ImportQueueService:
                 await db.refresh(batch)
             except IntegrityError:
                 await db.rollback()
+                await ImportQueueService._redis_release_lock(project_id)
                 active_batch = await ImportQueueService._get_active_job_batch(project_id, db)
                 started = active_batch.started_at.isoformat() if active_batch and active_batch.started_at else "?"
                 return False, f"项目正在导入中（{started} 开始）", None
+
+            # Step 5: 加入全局活跃集合
+            await ImportQueueService._redis_add_to_active_set(project_id)
 
             _import_locks[pid] = {
                 "batch_id": str(batch.id),
@@ -324,8 +468,19 @@ class ImportQueueService:
             return True, "OK", batch.id
 
     @staticmethod
+    async def release_lock_async(project_id: UUID):
+        """释放导入锁（Redis 分布式锁 + 内存态）。"""
+        await ImportQueueService._redis_release_lock(project_id)
+        await ImportQueueService._redis_remove_from_active_set(project_id)
+        _import_locks.pop(str(project_id), None)
+
+    @staticmethod
     def release_lock(project_id: UUID):
-        """释放导入锁。"""
+        """释放导入锁（内存态，兼容同步调用场景）。
+
+        注意：同步版本不清理 Redis 锁（依赖 TTL 自动过期兜底）。
+        推荐使用 release_lock_async。
+        """
         _import_locks.pop(str(project_id), None)
 
     # -----------------------------------------------------------------------

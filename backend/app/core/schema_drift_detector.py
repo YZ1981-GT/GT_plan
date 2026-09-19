@@ -63,6 +63,111 @@ class SchemaDriftDetector:
         "alembic_version",
         # PG 系统
         "pg_stat_statements",
+        # 业务基础设施表（裸 SQL / 迁移管理，无 ORM 映射）
+        "app_audit_log",
+        "data_snapshots",
+        "group_note_templates",
+        "note_section_locks",
+        "note_section_templates",
+        "review_conversation_exports",
+        "review_conversation_participants",
+        "system_settings",
+        "tb_aux_balance_summary",
+        "wp_migration_snapshots",
+        "wp_sheet_locks",
+        # 历史残留表（一次性脚本产物 / 联动审计日志）
+        "linkage_audit_log",
+        "seed_load_history",
+        # V117 工时统一后保留的旧表（work_hours 数据已迁移到 work_hour_entries）
+        "work_hours_legacy",
+        # 符号约定迁移(V064)产生的备份表，迁移完成后未清理
+        "_sign_migration_backup",
+        # 科目类别修正迁移(migrate_account_category_correction.py)的回滚备份表，
+        # 一次性脚本快照 (project_id,table,record_id,old_category)，需保留以支持 --rollback
+        "_category_correction_backup",
+        "_note_guidance_split_backup",
+        "_note_text_ch8_backup",
+        # 附注治理一次性清理脚本的回滚备份表（用完保留以支持 --rollback）：
+        # _note_ai_text_backup（清理 text_content 残留 AI 草稿）
+        # _note_wrong_year_orphan_backup（清理错误年度孤儿披露记录）
+        # _note_text_markdown_backup（清理 text_content 的 markdown 残留）
+        "_note_ai_text_backup",
+        "_note_wrong_year_orphan_backup",
+        "_note_text_markdown_backup",
+        # checklist_responses: 裸 SQL 迁移建表，无独立 ORM 模型（数据通过 raw SQL 操作）
+        "checklist_responses",
+        # custom_account_packages: 裸 SQL 迁移建表
+        "custom_account_packages",
+        # ── V154 Excel 模板覆盖层版本台账（有意不做 ORM 映射）────────────────────
+        # 🔴 与下面 V149 那两张「未接通结构」不同：本表三层全接通
+        #    （迁移 V154 + services/wp_template_override.py 的 6 个 async 函数 +
+        #     routers/wp_template_override_router.py 已注册进 router_registry）。
+        #    不映射 ORM 是**设计裁决**，理由是表上的三条约束全靠 DB 承载：
+        #      · trg_wptov_immutable    —— 除 is_current 外全列不可变
+        #      · trg_wptov_forbid_delete —— 禁止物理删除（回滚只改 is_current）
+        #      · uq_wptov_one_current_per_scope —— is_current 唯一性靠部分唯一索引
+        #    而 is_current 的转移必须走 CAS 式两步（先 demote 取回父版本再 INSERT，
+        #    见 record_override_version）。一旦映射进 ORM，任何 `row.is_current = True`
+        #    或 `session.delete(row)` 都能绕过这套顺序，Requirement 4.3「不删行」与
+        #    Property 16「每次保存都接上父版本」就失去可执行判据。
+        #    → 表名单一真源 = wp_template_override.OVERRIDE_VERSION_TABLE。
+        #    本条与「无 ORM 模型」双向锁死，见 tests/test_schema_drift_detector.py
+        #    的 test_v154_override_version_table_allowlisted_and_unmapped。
+        "workpaper_template_override_version",
+        # ── V149 MCP scoped token（dsh-agent-panel-integration Task 25）────────────
+        # 🔴 这两张表当前是**未接通的结构**，不是历史残留：
+        #    V149 注释写「持久化，跨进程可见」，而实现 `services/ai_chat/mcp_token.py`
+        #    的撤销集与 `mcp_budget.py` 的配额都是**进程内 dict**（docstring 自述
+        #    「撤销通过 revocation set（内存，进程级）」）。全后端对这两张表零读写。
+        #    → 屏蔽 drift 噪音，但接通持久化（或回滚 V149）仍是待办；届时应删本条并
+        #      补 ORM 模型，而不是让它长期停留在 allowlist 里。
+        "ai_chat_mcp_call_log",
+        "ai_chat_mcp_token_revocations",
+        # ── V155 OO 内容修订号（有意不做 ORM 映射）──────────────────────────────
+        # 🔴 与上面 V149 那两张「未接通结构」不同：本表三层全接通
+        #    （迁移 V155 + services/onlyoffice_room_identity.py 的
+        #     `_content_revision` 读 / `bump_oo_content_revision` 写，后者由 D2 的
+        #     push_html_to_excel 在真的改写受管内容后调用）。
+        #    不映射 ORM 是**设计裁决**：`revision` 的推进只允许走那条
+        #      INSERT ... ON CONFLICT (wp_id, entry_id)
+        #        DO UPDATE SET revision = <表名>.revision + 1
+        #    —— 自增在 DB 侧原子完成，并发两次改写各得一个新号。一旦映射进 ORM，
+        #    任何 `row.revision = x` 都能绕过它：读-改-写竞态下两次改写拿到同一个号
+        #    ⇒ doc_key 不轮转 ⇒ 正好退回本表要解决的「服务端已写 756 行、OO 仍显示
+        #    空模板」那个缺陷（V155 表头注释记的浏览器实测）。
+        #    → 表名单一真源 = onlyoffice_room_identity.OO_CONTENT_REVISION_TABLE。
+        #    本条与「无 ORM 模型」双向锁死，见 tests/test_schema_drift_detector.py
+        #    的 test_v155_oo_content_revision_table_allowlisted_and_unmapped。
+        "working_paper_oo_content_revision",
+    })
+
+    # 列级 allowlist：DB 有但 ORM 不需映射的列（历史残留 / 已弃用 / 有意只走裸 SQL）
+    KNOWN_COLUMN_ALLOWLIST: frozenset[tuple[str, str]] = frozenset({
+        ("cell_annotations", "sheet_name"),       # 旧版列，已被 sheet_id 取代
+        ("adjustments", "status"),                # 旧 status 列，业务改用 review_status
+        ("projects", "template_version_id"),      # 旧关联列，不再 ORM 映射
+        # ── V151 workpaper-sync business content revision（有意不做 ORM 映射）──────
+        # 🔴 `content_revision` 的推进必须走 CAS
+        #    （`UPDATE working_paper SET content_revision = content_revision + 1
+        #      WHERE id = :wp AND content_revision = :expected RETURNING content_revision`，
+        #    见 services/workpaper_sync/repository.bump_content_revision），
+        #    并且只允许经 `RevisionLockedRepository` 门面调用 —— 纯表示升级路径上
+        #    `bump_content_revision` / `set_current_content_version` 在构造上不可达
+        #    （变异检验 M21/M23 依赖这条）。一旦把两列映射进 `WorkingPaper` ORM，
+        #    任何 `wp.content_revision = x` 都能绕过 CAS 与门面，Requirement 2.1 /
+        #    Property 4「纯定义升级不推进 business revision」就失去可执行判据。
+        #    → 因此这两列**有意**只走裸 SQL，不是漏映射。
+        ("working_paper", "content_revision"),
+        ("working_paper", "current_content_version_id"),
+        # ── V149 ai_chat_runs 的 MCP 计量列（与上面两张 MCP 表同因，未接通）────────
+        ("ai_chat_runs", "mcp_token_issued"),
+        ("ai_chat_runs", "mcp_calls_used"),
+        ("ai_chat_runs", "mcp_total_bytes"),
+    })
+
+    # ORM 定义但 DB 可能不存在的列（graceful 降级场景，如 pgvector 扩展未安装）
+    KNOWN_ORM_EXTRA_COLUMN_ALLOWLIST: frozenset[tuple[str, str]] = frozenset({
+        ("knowledge_index", "embedding_vec"),     # V119 pgvector 列，PG 扩展不可用时跳过
     })
 
     # 外部租户表前缀（与业务共用 audit_platform 库的第三方工具表）。
@@ -151,11 +256,12 @@ class SchemaDriftDetector:
         items.extend(self._diff_columns(orm_tables, db_tables))
         items.extend(await self._diff_enums())
 
-        # 过滤 allowlist + 外部租户表（Metabase/Quartz 共库污染）
+        # 过滤 allowlist + 外部租户表（Metabase/Quartz 共库污染）+ 列级 allowlist
         return [
             it for it in items
             if it.table not in self.KNOWN_ALLOWLIST
             and not self._is_external_tenant_table(it.table)
+            and (it.table, it.column) not in self.KNOWN_COLUMN_ALLOWLIST
         ]
 
     async def write_log(self, items: list[DriftItem]) -> None:
@@ -237,6 +343,12 @@ class SchemaDriftDetector:
             result[table.name] = cols
         return result
 
+    # Pydantic schema / 非 ORM 模块：不参与 Base.metadata 注册，跳过可避免
+    # 热重载期间无意义 import 及误报（如 app.models.ai_schemas）。
+    _SKIP_MODEL_MODULES: frozenset[str] = frozenset({
+        "app.models.ai_schemas",
+    })
+
     @staticmethod
     def _import_all_models() -> None:
         """遍历 app.models 包，import 所有子模块，确保 Base.metadata 完整。
@@ -252,6 +364,11 @@ class SchemaDriftDetector:
         for mod_info in pkgutil.walk_packages(
             models_pkg.__path__, prefix="app.models."
         ):
+            if mod_info.name in SchemaDriftDetector._SKIP_MODEL_MODULES:
+                continue
+            # *_schemas 为 Pydantic DTO，非 SQLAlchemy ORM
+            if mod_info.name.rsplit(".", 1)[-1].endswith("_schemas"):
+                continue
             try:
                 importlib.import_module(mod_info.name)
             except Exception as e:  # noqa: BLE001 — 坏模块不应阻塞 drift 扫描
@@ -321,6 +438,8 @@ class SchemaDriftDetector:
             db_cols = db[table]
 
             for col in orm_cols.keys() - db_cols.keys():
+                if (table, col) in self.KNOWN_ORM_EXTRA_COLUMN_ALLOWLIST:
+                    continue
                 items.append(DriftItem(
                     table=table, column=col,
                     drift_type="orm_extra",

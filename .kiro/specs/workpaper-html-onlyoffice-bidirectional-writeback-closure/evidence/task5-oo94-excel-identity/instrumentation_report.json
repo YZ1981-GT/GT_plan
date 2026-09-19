@@ -1,0 +1,835 @@
+{
+  "run_id": "task5-1787587606",
+  "generated_at": "2026-08-24T16:06:46.860652+00:00",
+  "docs": {
+    "k11": {
+      "template_rel": "backend/wp_templates/K/K11 资产减值损失.xlsx",
+      "template_sha256": "dc0e5434b7c8e345913864ce524ad30a0a3729b5655627f3c30bce52294a9190",
+      "instrumented_sha256": "4408f116e37ba6a0dc1860802ecee31c169a6e938688d526cf922cc2b3acad22",
+      "note": "K11-1 审定表：A7:A25 为跨表引用动态行，A26 为 SUM footer，全表 7 sheet / 190 公式 / 8 merge / 1 drawing，无 external link（OO 不会弹外链提示）。",
+      "manifest": {
+        "template_id": "K11",
+        "template_rel": "backend/wp_templates/K/K11 资产减值损失.xlsx",
+        "template_sha256": "dc0e5434b7c8e345913864ce524ad30a0a3729b5655627f3c30bce52294a9190",
+        "instrumentation_version": "1.0.0",
+        "identity_schema_version": "1.0.0",
+        "identity_carriers": [
+          "hidden_sheet",
+          "defined_name",
+          "hidden_uuid_column"
+        ],
+        "managed_sheet_name_at_instrumentation": "审定表K11-1",
+        "managed_sheet_id": "1",
+        "managed_range": "A7:L25",
+        "footer_row": 26,
+        "row_uuid_column": "N",
+        "row_uuids": {
+          "7": "GTROW-K11-0007",
+          "8": "GTROW-K11-0008",
+          "9": "GTROW-K11-0009",
+          "10": "GTROW-K11-0010",
+          "11": "GTROW-K11-0011",
+          "12": "GTROW-K11-0012",
+          "13": "GTROW-K11-0013",
+          "14": "GTROW-K11-0014",
+          "15": "GTROW-K11-0015",
+          "16": "GTROW-K11-0016",
+          "17": "GTROW-K11-0017",
+          "18": "GTROW-K11-0018",
+          "19": "GTROW-K11-0019",
+          "20": "GTROW-K11-0020",
+          "21": "GTROW-K11-0021",
+          "22": "GTROW-K11-0022",
+          "23": "GTROW-K11-0023",
+          "24": "GTROW-K11-0024",
+          "25": "GTROW-K11-0025"
+        },
+        "managed_table": "GT_K11_1_ROWS",
+        "managed_table_ref": "A7:N25",
+        "defined_names": {
+          "GT_MANAGED_REGION_K11": "'审定表K11-1'!$A$7:$L$25",
+          "GT_FOOTER_ANCHOR_K11": "'审定表K11-1'!$A$26",
+          "GT_SYNC_ANCHOR_K11": "_GT_SYNC!$A$1",
+          "GT_ROW_UUID_RANGE_K11": "'审定表K11-1'!$N$7:$N$25"
+        },
+        "defined_name_scopes": {
+          "GT_MANAGED_REGION_K11": null,
+          "GT_FOOTER_ANCHOR_K11": null,
+          "GT_SYNC_ANCHOR_K11": null,
+          "GT_ROW_UUID_RANGE_K11": "审定表K11-1"
+        },
+        "visible_equivalence_policy": "strict",
+        "ignored_by_business_sheet_enumerators": [
+          "_GT_SYNC"
+        ],
+        "instrumented_sha256": "4408f116e37ba6a0dc1860802ecee31c169a6e938688d526cf922cc2b3acad22",
+        "instrumented_bytes": 51246
+      },
+      "inventory_locator_kwargs": {
+        "expected_table": "GT_K11_1_ROWS",
+        "uuid_column_letter": "N",
+        "uuid_sheet_id": "1",
+        "uuid_sheet_name": "审定表K11-1"
+      },
+      "expected_identity_inventory": {
+        "hidden_sheet": {
+          "present": true,
+          "is_hidden": true,
+          "required_keys": [
+            "GT_SYNC_SCHEMA_VERSION",
+            "GT_IDENTITY_SCHEMA_VERSION",
+            "GT_INSTRUMENTATION_VERSION",
+            "GT_TEMPLATE_ID",
+            "GT_TEMPLATE_SHA256",
+            "GT_MANAGED_SHEET_ID",
+            "GT_ROW_UUID_COLUMN"
+          ],
+          "excluded_from_business_enumeration": true
+        },
+        "defined_name": {
+          "present": true,
+          "names": [
+            "GT_FOOTER_ANCHOR_K11",
+            "GT_MANAGED_REGION_K11",
+            "GT_ROW_UUID_RANGE_K11",
+            "GT_SYNC_ANCHOR_K11"
+          ],
+          "count": 4
+        },
+        "excel_table": {
+          "present": true,
+          "table_name": "GT_K11_1_ROWS",
+          "table_ref": "A7:N25"
+        },
+        "hidden_uuid_column": {
+          "present": true,
+          "uuid_column_letter": "N",
+          "uuid_column_hidden": true,
+          "row_uuid_values": [
+            "GTROW-K11-0007",
+            "GTROW-K11-0008",
+            "GTROW-K11-0009",
+            "GTROW-K11-0010",
+            "GTROW-K11-0011",
+            "GTROW-K11-0012",
+            "GTROW-K11-0013",
+            "GTROW-K11-0014",
+            "GTROW-K11-0015",
+            "GTROW-K11-0016",
+            "GTROW-K11-0017",
+            "GTROW-K11-0018",
+            "GTROW-K11-0019",
+            "GTROW-K11-0020",
+            "GTROW-K11-0021",
+            "GTROW-K11-0022",
+            "GTROW-K11-0023",
+            "GTROW-K11-0024",
+            "GTROW-K11-0025"
+          ],
+          "row_uuid_count": 19,
+          "resolved_sheet_by": "sheet_id"
+        }
+      },
+      "identity_inventory_before_instrumentation": {
+        "byte_sha256": "dc0e5434b7c8e345913864ce524ad30a0a3729b5655627f3c30bce52294a9190",
+        "sheet_names": [
+          "底稿目录",
+          "实质性程序表 K11A",
+          "审定表K11-1",
+          "附注披露信息（上市公司）",
+          "附注披露信息（国企）",
+          "明细表K11-2",
+          "调整分录汇总K11-3"
+        ],
+        "errors": [],
+        "hidden_sheet": {
+          "present": false,
+          "sheet_name": "_GT_SYNC",
+          "state": null,
+          "is_hidden": false,
+          "pairs": {},
+          "pair_count": 0,
+          "excluded_from_business_enumeration": true
+        },
+        "defined_name": {
+          "present": false,
+          "prefix": "GT_",
+          "names": {},
+          "scopes": {},
+          "hidden_flags": {},
+          "count": 0,
+          "all_defined_name_count": 8
+        },
+        "excel_table": {
+          "expected_table": "GT_K11_1_ROWS",
+          "present": false,
+          "table_name": null,
+          "table_ref": null,
+          "table_sheet": null,
+          "table_part": null,
+          "header_row_count_zero": null,
+          "table_columns": [],
+          "all_tables": [],
+          "all_table_count": 0
+        },
+        "hidden_uuid_column": {
+          "present": false,
+          "resolved_sheet": "审定表K11-1",
+          "resolved_sheet_by": "sheet_id",
+          "requested_sheet_id": "1",
+          "requested_sheet_name": "审定表K11-1",
+          "sheet_display_name_drifted": false,
+          "uuid_column_letter": "N",
+          "uuid_column_header": null,
+          "uuid_column_hidden": false,
+          "row_uuids": {},
+          "row_uuid_count": 0,
+          "distinct_row_uuid_count": 0,
+          "empty_row_uuids": [],
+          "duplicate_row_uuids": [],
+          "errors": []
+        }
+      },
+      "actual_identity_inventory_after_instrumentation": {
+        "byte_sha256": "4408f116e37ba6a0dc1860802ecee31c169a6e938688d526cf922cc2b3acad22",
+        "sheet_names": [
+          "底稿目录",
+          "实质性程序表 K11A",
+          "审定表K11-1",
+          "附注披露信息（上市公司）",
+          "附注披露信息（国企）",
+          "明细表K11-2",
+          "调整分录汇总K11-3",
+          "_GT_SYNC"
+        ],
+        "errors": [],
+        "hidden_sheet": {
+          "present": true,
+          "sheet_name": "_GT_SYNC",
+          "state": "hidden",
+          "is_hidden": true,
+          "pairs": {
+            "GT_SYNC_SCHEMA_VERSION": "1",
+            "GT_IDENTITY_SCHEMA_VERSION": "1.0.0",
+            "GT_INSTRUMENTATION_VERSION": "1.0.0",
+            "GT_TEMPLATE_ID": "K11",
+            "GT_TEMPLATE_SHA256": "dc0e5434b7c8e345913864ce524ad30a0a3729b5655627f3c30bce52294a9190",
+            "GT_PROBE_RUN_ID": "task5-1787587606",
+            "GT_MANAGED_SHEET_ID": "1",
+            "GT_MANAGED_SHEET_NAME_AT_INSTRUMENTATION": "审定表K11-1",
+            "GT_MANAGED_RANGE": "A7:L25",
+            "GT_FOOTER_ROW": "26",
+            "GT_ROW_UUID_COLUMN": "N",
+            "GT_ROW_UUID_FIRST_ROW": "7",
+            "GT_ROW_UUID_LAST_ROW": "25",
+            "GT_MANAGED_TABLE": "GT_K11_1_ROWS",
+            "GT_MANAGED_TABLE_REF": "A7:N25"
+          },
+          "pair_count": 15,
+          "excluded_from_business_enumeration": true
+        },
+        "defined_name": {
+          "present": true,
+          "prefix": "GT_",
+          "names": {
+            "GT_MANAGED_REGION_K11": "'审定表K11-1'!$A$7:$L$25",
+            "GT_FOOTER_ANCHOR_K11": "'审定表K11-1'!$A$26",
+            "GT_SYNC_ANCHOR_K11": "_GT_SYNC!$A$1",
+            "GT_ROW_UUID_RANGE_K11": "'审定表K11-1'!$N$7:$N$25"
+          },
+          "scopes": {
+            "GT_MANAGED_REGION_K11": null,
+            "GT_FOOTER_ANCHOR_K11": null,
+            "GT_SYNC_ANCHOR_K11": null,
+            "GT_ROW_UUID_RANGE_K11": "审定表K11-1"
+          },
+          "hidden_flags": {
+            "GT_MANAGED_REGION_K11": false,
+            "GT_FOOTER_ANCHOR_K11": false,
+            "GT_SYNC_ANCHOR_K11": false,
+            "GT_ROW_UUID_RANGE_K11": false
+          },
+          "count": 4,
+          "all_defined_name_count": 12
+        },
+        "excel_table": {
+          "expected_table": "GT_K11_1_ROWS",
+          "present": true,
+          "table_name": "GT_K11_1_ROWS",
+          "table_ref": "A7:N25",
+          "table_sheet": "审定表K11-1",
+          "table_part": "xl/tables/tableGtRowId.xml",
+          "header_row_count_zero": true,
+          "table_columns": [
+            "GTCol1",
+            "GTCol2",
+            "GTCol3",
+            "GTCol4",
+            "GTCol5",
+            "GTCol6",
+            "GTCol7",
+            "GTCol8",
+            "GTCol9",
+            "GTCol10",
+            "GTCol11",
+            "GTCol12",
+            "GTCol13",
+            "GTCol14"
+          ],
+          "all_tables": [
+            {
+              "display_name": "GT_K11_1_ROWS",
+              "sheet": "审定表K11-1",
+              "ref": "A7:N25"
+            }
+          ],
+          "all_table_count": 1
+        },
+        "hidden_uuid_column": {
+          "present": true,
+          "resolved_sheet": "审定表K11-1",
+          "resolved_sheet_by": "sheet_id",
+          "requested_sheet_id": "1",
+          "requested_sheet_name": "审定表K11-1",
+          "sheet_display_name_drifted": false,
+          "uuid_column_letter": "N",
+          "uuid_column_header": null,
+          "uuid_column_hidden": true,
+          "row_uuids": {
+            "7": "GTROW-K11-0007",
+            "8": "GTROW-K11-0008",
+            "9": "GTROW-K11-0009",
+            "10": "GTROW-K11-0010",
+            "11": "GTROW-K11-0011",
+            "12": "GTROW-K11-0012",
+            "13": "GTROW-K11-0013",
+            "14": "GTROW-K11-0014",
+            "15": "GTROW-K11-0015",
+            "16": "GTROW-K11-0016",
+            "17": "GTROW-K11-0017",
+            "18": "GTROW-K11-0018",
+            "19": "GTROW-K11-0019",
+            "20": "GTROW-K11-0020",
+            "21": "GTROW-K11-0021",
+            "22": "GTROW-K11-0022",
+            "23": "GTROW-K11-0023",
+            "24": "GTROW-K11-0024",
+            "25": "GTROW-K11-0025"
+          },
+          "row_uuid_count": 19,
+          "distinct_row_uuid_count": 19,
+          "empty_row_uuids": [],
+          "duplicate_row_uuids": [],
+          "errors": []
+        }
+      },
+      "visible_equivalence": {
+        "label_before": "pre_instrumentation",
+        "label_after": "post_instrumentation",
+        "ignored_sheets": [
+          "_GT_SYNC"
+        ],
+        "byte_sha256": {
+          "pre_instrumentation": "dc0e5434b7c8e345913864ce524ad30a0a3729b5655627f3c30bce52294a9190",
+          "post_instrumentation": "4408f116e37ba6a0dc1860802ecee31c169a6e938688d526cf922cc2b3acad22"
+        },
+        "aspects": {
+          "visible_sheets": {
+            "equivalent": true,
+            "pre_instrumentation": [
+              "底稿目录",
+              "实质性程序表 K11A",
+              "审定表K11-1",
+              "附注披露信息（上市公司）",
+              "附注披露信息（国企）",
+              "明细表K11-2",
+              "调整分录汇总K11-3"
+            ],
+            "post_instrumentation": [
+              "底稿目录",
+              "实质性程序表 K11A",
+              "审定表K11-1",
+              "附注披露信息（上市公司）",
+              "附注披露信息（国企）",
+              "明细表K11-2",
+              "调整分录汇总K11-3"
+            ],
+            "added": [],
+            "removed": []
+          },
+          "business_values": {
+            "equivalent": true,
+            "diff_count": 0,
+            "first_diffs": []
+          },
+          "formulas": {
+            "equivalent": true,
+            "diff_count": 0,
+            "first_diffs": []
+          },
+          "styles": {
+            "equivalent": true,
+            "diff_count": 0,
+            "first_diffs": []
+          },
+          "merges": {
+            "equivalent": true,
+            "diff_count": 0,
+            "first_diffs": []
+          },
+          "protected_parts": {
+            "equivalent": true,
+            "categories_present": {
+              "drawing": 1
+            },
+            "diff_count": 0,
+            "first_diffs": [],
+            "covered": true
+          }
+        },
+        "aspect_digests": {
+          "pre_instrumentation": {
+            "visible_sheets": "5e7f884284be0ea793a30a6c0eb36e88d8d680d65f7c9b164f244d9bd5d30b40",
+            "business_values": "19d2aedf2fc7270b66a2c31fcd424b806453605467ce81e032cfc4ed4684ebc7",
+            "formulas": "f6f50be27705fcb145aaa740a7579ae06cd388ccb6ad604e16b3d19a0ec0668d",
+            "styles": "05005ae483ec4aafa57f72a6a266a8b51af4a7fbae102834b5a609797b9459dc",
+            "merges": "215d8e8b3402adc365c2eb89934707668bb6909b647767286dcebdfbea81d8ed",
+            "protected_parts": "b8281a27de4dcb18b0a018bb984fd8354fd8425f10105a7c3dafc9f37d771add"
+          },
+          "post_instrumentation": {
+            "visible_sheets": "5e7f884284be0ea793a30a6c0eb36e88d8d680d65f7c9b164f244d9bd5d30b40",
+            "business_values": "f12bdb46b7c095070640851769d55e7295e6dee9ec9e72a384f8f66ac2e8ed92",
+            "formulas": "f6f50be27705fcb145aaa740a7579ae06cd388ccb6ad604e16b3d19a0ec0668d",
+            "styles": "24ba40d7b2258b352761c1b9cfd3f42694d50b9bf41676036eccfdefee99c84e",
+            "merges": "215d8e8b3402adc365c2eb89934707668bb6909b647767286dcebdfbea81d8ed",
+            "protected_parts": "b8281a27de4dcb18b0a018bb984fd8354fd8425f10105a7c3dafc9f37d771add"
+          }
+        },
+        "hidden_sheets_added": [
+          "_GT_SYNC"
+        ],
+        "metadata_sheet_excluded_from_business": true,
+        "unexpected_table_columns": [],
+        "collection_errors": {
+          "pre_instrumentation": [],
+          "post_instrumentation": []
+        },
+        "equivalent": true,
+        "aspect_verdicts": {
+          "visible_sheets": true,
+          "business_values": true,
+          "formulas": true,
+          "styles": true,
+          "merges": true,
+          "protected_parts": true
+        }
+      }
+    },
+    "c24": {
+      "template_rel": "backend/wp_templates/C/C24 会计分录 - 细节测试.xlsx",
+      "template_sha256": "b70229f48c13a635595b13f74aa199cb2d96ed1106a1661a66cecb7e6e87d5c6",
+      "instrumented_sha256": "ca0a744993a7e40a8c3013dcdb7a0a726c02d30adc01f42ef5ba29d51beaa9d1",
+      "note": "全平台 351 个模板里**唯一**含 chart 部件者（8 chart / 3 drawing / 1 media / 1 既有 Excel Table）⇒ 用来取证 instrumentation 与 OO 往返是否破坏 drawing/chart。",
+      "manifest": {
+        "template_id": "C24",
+        "template_rel": "backend/wp_templates/C/C24 会计分录 - 细节测试.xlsx",
+        "template_sha256": "b70229f48c13a635595b13f74aa199cb2d96ed1106a1661a66cecb7e6e87d5c6",
+        "instrumentation_version": "1.0.0",
+        "identity_schema_version": "1.0.0",
+        "identity_carriers": [
+          "hidden_sheet",
+          "defined_name"
+        ],
+        "managed_sheet_name_at_instrumentation": "C24-0汇总表",
+        "managed_sheet_id": "5",
+        "managed_range": "A8:H20",
+        "footer_row": 21,
+        "row_uuid_column": "N",
+        "row_uuids": {
+          "8": "GTROW-C24-0008",
+          "9": "GTROW-C24-0009",
+          "10": "GTROW-C24-0010",
+          "11": "GTROW-C24-0011",
+          "12": "GTROW-C24-0012",
+          "13": "GTROW-C24-0013",
+          "14": "GTROW-C24-0014",
+          "15": "GTROW-C24-0015",
+          "16": "GTROW-C24-0016",
+          "17": "GTROW-C24-0017",
+          "18": "GTROW-C24-0018",
+          "19": "GTROW-C24-0019",
+          "20": "GTROW-C24-0020"
+        },
+        "managed_table": null,
+        "managed_table_ref": null,
+        "defined_names": {
+          "GT_MANAGED_REGION_C24": "'C24-0汇总表'!$A$8:$H$20",
+          "GT_FOOTER_ANCHOR_C24": "'C24-0汇总表'!$A$21",
+          "GT_SYNC_ANCHOR_C24": "_GT_SYNC!$A$1",
+          "GT_ROW_UUID_RANGE_C24": "'C24-0汇总表'!$N$8:$N$20"
+        },
+        "defined_name_scopes": {
+          "GT_MANAGED_REGION_C24": null,
+          "GT_FOOTER_ANCHOR_C24": null,
+          "GT_SYNC_ANCHOR_C24": null,
+          "GT_ROW_UUID_RANGE_C24": "C24-0汇总表"
+        },
+        "visible_equivalence_policy": "strict",
+        "ignored_by_business_sheet_enumerators": [
+          "_GT_SYNC"
+        ],
+        "instrumented_sha256": "ca0a744993a7e40a8c3013dcdb7a0a726c02d30adc01f42ef5ba29d51beaa9d1",
+        "instrumented_bytes": 1074648
+      },
+      "inventory_locator_kwargs": {
+        "expected_table": null,
+        "uuid_column_letter": "N",
+        "uuid_sheet_id": "5",
+        "uuid_sheet_name": "C24-0汇总表"
+      },
+      "expected_identity_inventory": {
+        "hidden_sheet": {
+          "present": true,
+          "is_hidden": true,
+          "required_keys": [
+            "GT_SYNC_SCHEMA_VERSION",
+            "GT_IDENTITY_SCHEMA_VERSION",
+            "GT_INSTRUMENTATION_VERSION",
+            "GT_TEMPLATE_ID",
+            "GT_TEMPLATE_SHA256",
+            "GT_MANAGED_SHEET_ID",
+            "GT_ROW_UUID_COLUMN"
+          ],
+          "excluded_from_business_enumeration": true
+        },
+        "defined_name": {
+          "present": true,
+          "names": [
+            "GT_FOOTER_ANCHOR_C24",
+            "GT_MANAGED_REGION_C24",
+            "GT_ROW_UUID_RANGE_C24",
+            "GT_SYNC_ANCHOR_C24"
+          ],
+          "count": 4
+        },
+        "excel_table": {
+          "present": false,
+          "reason": "该文档未注入 Table 载体（只取证前两类 + 裸隐藏列）"
+        },
+        "hidden_uuid_column": {
+          "present": true,
+          "uuid_column_letter": "N",
+          "uuid_column_hidden": true,
+          "row_uuid_values": [
+            "GTROW-C24-0008",
+            "GTROW-C24-0009",
+            "GTROW-C24-0010",
+            "GTROW-C24-0011",
+            "GTROW-C24-0012",
+            "GTROW-C24-0013",
+            "GTROW-C24-0014",
+            "GTROW-C24-0015",
+            "GTROW-C24-0016",
+            "GTROW-C24-0017",
+            "GTROW-C24-0018",
+            "GTROW-C24-0019",
+            "GTROW-C24-0020"
+          ],
+          "row_uuid_count": 13,
+          "resolved_sheet_by": "sheet_id"
+        }
+      },
+      "identity_inventory_before_instrumentation": {
+        "byte_sha256": "b70229f48c13a635595b13f74aa199cb2d96ed1106a1661a66cecb7e6e87d5c6",
+        "sheet_names": [
+          "细节测试C24A",
+          "C24-0汇总表",
+          "C24-1完整性-借贷方发生额",
+          "C24-2完整性-分录&余额表对比",
+          "C24-3完整性-跳号测试",
+          "C24-4细节测试-异常账户测试",
+          "C24-5细节测试-异常分录测试",
+          "参考-本福特定律测试",
+          "参考-本福特定律测试-虚拟会计分录",
+          "2025假期清单",
+          "GT_Custom"
+        ],
+        "errors": [],
+        "hidden_sheet": {
+          "present": false,
+          "sheet_name": "_GT_SYNC",
+          "state": null,
+          "is_hidden": false,
+          "pairs": {},
+          "pair_count": 0,
+          "excluded_from_business_enumeration": true
+        },
+        "defined_name": {
+          "present": false,
+          "prefix": "GT_",
+          "names": {},
+          "scopes": {},
+          "hidden_flags": {},
+          "count": 0,
+          "all_defined_name_count": 35
+        },
+        "excel_table": {
+          "expected_table": null,
+          "present": false,
+          "table_name": null,
+          "table_ref": null,
+          "table_sheet": null,
+          "table_part": null,
+          "header_row_count_zero": null,
+          "table_columns": [],
+          "all_tables": [
+            {
+              "display_name": "_2025__2",
+              "sheet": "2025假期清单",
+              "ref": "A1:E34"
+            }
+          ],
+          "all_table_count": 1
+        },
+        "hidden_uuid_column": {
+          "present": false,
+          "resolved_sheet": "C24-0汇总表",
+          "resolved_sheet_by": "sheet_id",
+          "requested_sheet_id": "5",
+          "requested_sheet_name": "C24-0汇总表",
+          "sheet_display_name_drifted": false,
+          "uuid_column_letter": "N",
+          "uuid_column_header": null,
+          "uuid_column_hidden": false,
+          "row_uuids": {},
+          "row_uuid_count": 0,
+          "distinct_row_uuid_count": 0,
+          "empty_row_uuids": [],
+          "duplicate_row_uuids": [],
+          "errors": []
+        }
+      },
+      "actual_identity_inventory_after_instrumentation": {
+        "byte_sha256": "ca0a744993a7e40a8c3013dcdb7a0a726c02d30adc01f42ef5ba29d51beaa9d1",
+        "sheet_names": [
+          "细节测试C24A",
+          "C24-0汇总表",
+          "C24-1完整性-借贷方发生额",
+          "C24-2完整性-分录&余额表对比",
+          "C24-3完整性-跳号测试",
+          "C24-4细节测试-异常账户测试",
+          "C24-5细节测试-异常分录测试",
+          "参考-本福特定律测试",
+          "参考-本福特定律测试-虚拟会计分录",
+          "2025假期清单",
+          "GT_Custom",
+          "_GT_SYNC"
+        ],
+        "errors": [],
+        "hidden_sheet": {
+          "present": true,
+          "sheet_name": "_GT_SYNC",
+          "state": "hidden",
+          "is_hidden": true,
+          "pairs": {
+            "GT_SYNC_SCHEMA_VERSION": "1",
+            "GT_IDENTITY_SCHEMA_VERSION": "1.0.0",
+            "GT_INSTRUMENTATION_VERSION": "1.0.0",
+            "GT_TEMPLATE_ID": "C24",
+            "GT_TEMPLATE_SHA256": "b70229f48c13a635595b13f74aa199cb2d96ed1106a1661a66cecb7e6e87d5c6",
+            "GT_PROBE_RUN_ID": "task5-1787587606",
+            "GT_MANAGED_SHEET_ID": "5",
+            "GT_MANAGED_SHEET_NAME_AT_INSTRUMENTATION": "C24-0汇总表",
+            "GT_MANAGED_RANGE": "A8:H20",
+            "GT_FOOTER_ROW": "21",
+            "GT_ROW_UUID_COLUMN": "N",
+            "GT_ROW_UUID_FIRST_ROW": "8",
+            "GT_ROW_UUID_LAST_ROW": "20"
+          },
+          "pair_count": 13,
+          "excluded_from_business_enumeration": true
+        },
+        "defined_name": {
+          "present": true,
+          "prefix": "GT_",
+          "names": {
+            "GT_MANAGED_REGION_C24": "'C24-0汇总表'!$A$8:$H$20",
+            "GT_FOOTER_ANCHOR_C24": "'C24-0汇总表'!$A$21",
+            "GT_SYNC_ANCHOR_C24": "_GT_SYNC!$A$1",
+            "GT_ROW_UUID_RANGE_C24": "'C24-0汇总表'!$N$8:$N$20"
+          },
+          "scopes": {
+            "GT_MANAGED_REGION_C24": null,
+            "GT_FOOTER_ANCHOR_C24": null,
+            "GT_SYNC_ANCHOR_C24": null,
+            "GT_ROW_UUID_RANGE_C24": "C24-0汇总表"
+          },
+          "hidden_flags": {
+            "GT_MANAGED_REGION_C24": false,
+            "GT_FOOTER_ANCHOR_C24": false,
+            "GT_SYNC_ANCHOR_C24": false,
+            "GT_ROW_UUID_RANGE_C24": false
+          },
+          "count": 4,
+          "all_defined_name_count": 39
+        },
+        "excel_table": {
+          "expected_table": null,
+          "present": false,
+          "table_name": null,
+          "table_ref": null,
+          "table_sheet": null,
+          "table_part": null,
+          "header_row_count_zero": null,
+          "table_columns": [],
+          "all_tables": [
+            {
+              "display_name": "_2025__2",
+              "sheet": "2025假期清单",
+              "ref": "A1:E34"
+            }
+          ],
+          "all_table_count": 1
+        },
+        "hidden_uuid_column": {
+          "present": true,
+          "resolved_sheet": "C24-0汇总表",
+          "resolved_sheet_by": "sheet_id",
+          "requested_sheet_id": "5",
+          "requested_sheet_name": "C24-0汇总表",
+          "sheet_display_name_drifted": false,
+          "uuid_column_letter": "N",
+          "uuid_column_header": null,
+          "uuid_column_hidden": true,
+          "row_uuids": {
+            "8": "GTROW-C24-0008",
+            "9": "GTROW-C24-0009",
+            "10": "GTROW-C24-0010",
+            "11": "GTROW-C24-0011",
+            "12": "GTROW-C24-0012",
+            "13": "GTROW-C24-0013",
+            "14": "GTROW-C24-0014",
+            "15": "GTROW-C24-0015",
+            "16": "GTROW-C24-0016",
+            "17": "GTROW-C24-0017",
+            "18": "GTROW-C24-0018",
+            "19": "GTROW-C24-0019",
+            "20": "GTROW-C24-0020"
+          },
+          "row_uuid_count": 13,
+          "distinct_row_uuid_count": 13,
+          "empty_row_uuids": [],
+          "duplicate_row_uuids": [],
+          "errors": []
+        }
+      },
+      "visible_equivalence": {
+        "label_before": "pre_instrumentation",
+        "label_after": "post_instrumentation",
+        "ignored_sheets": [
+          "_GT_SYNC"
+        ],
+        "byte_sha256": {
+          "pre_instrumentation": "b70229f48c13a635595b13f74aa199cb2d96ed1106a1661a66cecb7e6e87d5c6",
+          "post_instrumentation": "ca0a744993a7e40a8c3013dcdb7a0a726c02d30adc01f42ef5ba29d51beaa9d1"
+        },
+        "aspects": {
+          "visible_sheets": {
+            "equivalent": true,
+            "pre_instrumentation": [
+              "细节测试C24A",
+              "C24-0汇总表",
+              "C24-1完整性-借贷方发生额",
+              "C24-2完整性-分录&余额表对比",
+              "C24-3完整性-跳号测试",
+              "C24-4细节测试-异常账户测试",
+              "C24-5细节测试-异常分录测试",
+              "参考-本福特定律测试",
+              "参考-本福特定律测试-虚拟会计分录"
+            ],
+            "post_instrumentation": [
+              "细节测试C24A",
+              "C24-0汇总表",
+              "C24-1完整性-借贷方发生额",
+              "C24-2完整性-分录&余额表对比",
+              "C24-3完整性-跳号测试",
+              "C24-4细节测试-异常账户测试",
+              "C24-5细节测试-异常分录测试",
+              "参考-本福特定律测试",
+              "参考-本福特定律测试-虚拟会计分录"
+            ],
+            "added": [],
+            "removed": []
+          },
+          "business_values": {
+            "equivalent": true,
+            "diff_count": 0,
+            "first_diffs": []
+          },
+          "formulas": {
+            "equivalent": true,
+            "diff_count": 0,
+            "first_diffs": []
+          },
+          "styles": {
+            "equivalent": true,
+            "diff_count": 0,
+            "first_diffs": []
+          },
+          "merges": {
+            "equivalent": true,
+            "diff_count": 0,
+            "first_diffs": []
+          },
+          "protected_parts": {
+            "equivalent": true,
+            "categories_present": {
+              "chart": 8,
+              "drawing": 3,
+              "media": 1
+            },
+            "diff_count": 0,
+            "first_diffs": [],
+            "covered": true
+          }
+        },
+        "aspect_digests": {
+          "pre_instrumentation": {
+            "visible_sheets": "10ec702af170fdcd4d4ad2a8ebbecfb8527fe6e991a5216342e053440ff39c48",
+            "business_values": "c0edbab6ad9ffe5778c5f3feb6c68bec03fc4e4a0c4652643d32b0de650e766d",
+            "formulas": "2e1d2b5d54bb5ceb4143942a524b24c2d7ee8ecc9fcbe763a2a8cb74eb1d8a98",
+            "styles": "80d967c7e6db5d08a0196e7f04e1542c240a64059a362f8c4badb0651cb7c330",
+            "merges": "4df1fa2216dc257ccc55e0afc26a0a3444da79ac868dab9b7fddd58ea9e23c64",
+            "protected_parts": "7afaa7c70f8fbdd2bba9f72c4d1fffeea6fea11fae8e904e5250d99842803b5a"
+          },
+          "post_instrumentation": {
+            "visible_sheets": "10ec702af170fdcd4d4ad2a8ebbecfb8527fe6e991a5216342e053440ff39c48",
+            "business_values": "fa3d95fc7a859c4b2f1f351ba9ada46cd79e40368e9c039c71cf8760c3039bfc",
+            "formulas": "2e1d2b5d54bb5ceb4143942a524b24c2d7ee8ecc9fcbe763a2a8cb74eb1d8a98",
+            "styles": "67bcf73dd60ce4bf876033c4d288d248ecd545a24db3bd8e64fe8497ff4d845c",
+            "merges": "4df1fa2216dc257ccc55e0afc26a0a3444da79ac868dab9b7fddd58ea9e23c64",
+            "protected_parts": "7afaa7c70f8fbdd2bba9f72c4d1fffeea6fea11fae8e904e5250d99842803b5a"
+          }
+        },
+        "hidden_sheets_added": [
+          "_GT_SYNC"
+        ],
+        "metadata_sheet_excluded_from_business": true,
+        "unexpected_table_columns": [],
+        "collection_errors": {
+          "pre_instrumentation": [],
+          "post_instrumentation": []
+        },
+        "equivalent": true,
+        "aspect_verdicts": {
+          "visible_sheets": true,
+          "business_values": true,
+          "formulas": true,
+          "styles": true,
+          "merges": true,
+          "protected_parts": true
+        }
+      }
+    }
+  }
+}

@@ -8,7 +8,7 @@ from __future__ import annotations
 import uuid
 from datetime import datetime
 
-from sqlalchemy import ForeignKey, Numeric, String, Text, text
+from sqlalchemy import Boolean, ForeignKey, Numeric, String, Text, text
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -49,6 +49,19 @@ class AiContentLog(Base, TimestampMixin):
     generated_at: Mapped[datetime] = mapped_column(
         server_default=text("now()"), nullable=False
     )
+    # V108 evidence-governance additive 扩展（design §4.6）
+    service_status: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    output_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    evidence_ref_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("evidence_refs.id", ondelete="RESTRICT"), nullable=True
+    )
+    citation_snapshot_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("citation_snapshots.id", ondelete="RESTRICT"), nullable=True
+    )
+    is_stale: Mapped[bool] = mapped_column(
+        Boolean, server_default=text("false"), nullable=False
+    )
+    stale_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
 
 
 class CrossModuleConflict(Base, TimestampMixin):
@@ -103,3 +116,11 @@ class TimeMachineSnapshot(Base):
     created_at: Mapped[datetime] = mapped_column(
         server_default=text("now()"), nullable=False
     )
+    # DB 扩展列
+    diff_patch: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    module: Mapped[str] = mapped_column(String(50), nullable=False, server_default=text("''"))
+    # NOTE: 不写 `'{}'::jsonb`（PG 字面 cast）—— SQLite 测试 dialect 不识别 `::`
+    # 会导致建表 DDL 报 "unrecognized token"。`'{}'` 在 PG/SQLite 双方言下
+    # 都能解析为合法空 JSON 对象（同 report_models / custom_query_models 约定）。
+    snapshot_data: Mapped[dict] = mapped_column(JSONB, nullable=False, server_default=text("'{}'"))
+    created_by: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)

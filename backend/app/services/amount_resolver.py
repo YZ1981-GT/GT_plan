@@ -70,6 +70,8 @@ class TrialBalanceResolver:
         self.year = year
         self._use_unadjusted = use_unadjusted
         self._tb_cache: dict[str, TrialBalance | None] = {}
+        # 前缀聚合缓存：父科目码 -> 该科目及所有子科目行（口径根治，2026-07，与 report_engine 一致）
+        self._tb_prefix_cache: dict[str, list[TrialBalance]] = {}
 
     async def _get_tb_row(self, account_code: str) -> TrialBalance | None:
         if account_code in self._tb_cache:
@@ -86,25 +88,48 @@ class TrialBalanceResolver:
         self._tb_cache[account_code] = row
         return row
 
-    async def resolve_tb(self, account_code: str, column_name: str) -> Decimal:
-        row = await self._get_tb_row(account_code)
-        if row is None:
-            return Decimal("0")
+    async def _get_tb_rows_prefix(self, account_code: str) -> list[TrialBalance]:
+        """取「科目及其所有子科目」行（前缀聚合口径，与 report_engine 同口径）。"""
+        cached = self._tb_prefix_cache.get(account_code)
+        if cached is not None:
+            return cached
+        result = await self.db.execute(
+            sa.select(TrialBalance).where(
+                TrialBalance.project_id == self.project_id,
+                TrialBalance.year == self.year,
+                TrialBalance.standard_account_code.like(f"{account_code}%"),
+                TrialBalance.is_deleted == sa.false(),
+            )
+        )
+        rows = list(result.scalars().all())
+        self._tb_prefix_cache[account_code] = rows
+        for r in rows:
+            self._tb_cache[r.standard_account_code] = r
+        return rows
 
-        if self._use_unadjusted and column_name in ("期末余额", "审定数"):
-            return row.unadjusted_amount or Decimal("0")
+    async def resolve_tb(self, account_code: str, column_name: str) -> Decimal:
+        """解析 TB → 按「科目及其所有子科目」前缀聚合（与 report_engine._resolve_tb 同口径）。"""
+        rows = await self._get_tb_rows_prefix(account_code)
+        if not rows:
+            return Decimal("0")
 
         field = _COLUMN_MAP.get(column_name)
-        if field is None:
+        unadjusted_end = self._use_unadjusted and column_name in ("期末余额", "审定数")
+        if not unadjusted_end and field is None:
             return Decimal("0")
 
-        if field == "_period_amount":
-            amount = (row.unadjusted_amount or Decimal("0")) if self._use_unadjusted else (row.audited_amount or Decimal("0"))
-            opening = row.opening_balance or Decimal("0")
-            return amount - opening
-
-        val = getattr(row, field, None)
-        return val if val is not None else Decimal("0")
+        total = Decimal("0")
+        for row in rows:
+            if unadjusted_end:
+                total += row.unadjusted_amount or Decimal("0")
+            elif field == "_period_amount":
+                amount = (row.unadjusted_amount or Decimal("0")) if self._use_unadjusted else (row.audited_amount or Decimal("0"))
+                opening = row.opening_balance or Decimal("0")
+                total += amount - opening
+            else:
+                val = getattr(row, field, None)
+                total += val if val is not None else Decimal("0")
+        return total
 
     async def resolve_sum(self, code_range: str, column_name: str) -> Decimal:
         parts = code_range.split("~")

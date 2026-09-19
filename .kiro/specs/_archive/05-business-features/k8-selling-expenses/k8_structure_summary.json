@@ -1,0 +1,678 @@
+{
+  "source_file": "d:\\GT_plan\\基础数据\\致同通用审计程序及底稿模板（2025年修订）\\1.致同审计程序及底稿模板（2025年）\\4.风险应对-实质性程序（D-N）\\K 管理循环\\K8 销售费用.xlsx",
+  "total_sheets": 12,
+  "sheet_names": [
+    "底稿目录",
+    "实质性程序表K8A",
+    "审定表K8-1",
+    "附注披露信息（上市公司）",
+    "附注披露信息（国企）",
+    "明细表K8-2",
+    "调整分录汇总K8-3",
+    "实质性分析K8-4",
+    "合同检查表K8-5",
+    "截止性测试(从记账凭证至原始凭证）K8-6",
+    "截止性测试（从原始凭证至记账凭证）K8-7",
+    "销售费用检查表K8-8"
+  ],
+  "sheets": [
+    {
+      "sheet_name": "底稿目录",
+      "used_range": {
+        "min_row": 1,
+        "max_row": 19,
+        "min_col": 1,
+        "max_col": 6,
+        "used_rows": 19,
+        "used_cols": 6
+      },
+      "row_count": 19,
+      "col_count": 6,
+      "formula_count": 0,
+      "business_formula_count": 0,
+      "column_headers": [
+        "底稿开列时，可先在以下单元格填写有关内容，以便其他底稿引用有关数据：",
+        "目录"
+      ],
+      "formula_samples": []
+    },
+    {
+      "sheet_name": "实质性程序表K8A",
+      "used_range": {
+        "min_row": 1,
+        "max_row": 35,
+        "min_col": 1,
+        "max_col": 10,
+        "used_rows": 35,
+        "used_cols": 10
+      },
+      "row_count": 35,
+      "col_count": 10,
+      "formula_count": 7,
+      "business_formula_count": 0,
+      "column_headers": [
+        "致同会计师事务所"
+      ],
+      "formula_samples": [
+        {
+          "cell": "A3",
+          "formula": "=底稿目录!A2"
+        },
+        {
+          "cell": "C3",
+          "formula": "=底稿目录!A4"
+        },
+        {
+          "cell": "E3",
+          "formula": "=底稿目录!A5"
+        },
+        {
+          "cell": "I3",
+          "formula": "=底稿目录!D4"
+        },
+        {
+          "cell": "A4",
+          "formula": "=底稿目录!A3"
+        },
+        {
+          "cell": "C4",
+          "formula": "=底稿目录!A6"
+        },
+        {
+          "cell": "E4",
+          "formula": "=底稿目录!A7"
+        }
+      ]
+    },
+    {
+      "sheet_name": "审定表K8-1",
+      "used_range": {
+        "min_row": 1,
+        "max_row": 29,
+        "min_col": 1,
+        "max_col": 12,
+        "used_rows": 29,
+        "used_cols": 12
+      },
+      "row_count": 29,
+      "col_count": 12,
+      "formula_count": 135,
+      "business_formula_count": 128,
+      "column_headers": [
+        "致同会计师事务所"
+      ],
+      "formula_samples": [
+        {
+          "cell": "A3",
+          "formula": "=底稿目录!A2"
+        },
+        {
+          "cell": "D3",
+          "formula": "=底稿目录!A4"
+        },
+        {
+          "cell": "I3",
+          "formula": "=底稿目录!A5"
+        },
+        {
+          "cell": "L3",
+          "formula": "=底稿目录!D5"
+        },
+        {
+          "cell": "A4",
+          "formula": "=底稿目录!A3"
+        },
+        {
+          "cell": "D4",
+          "formula": "=底稿目录!A6"
+        },
+        {
+          "cell": "I4",
+          "formula": "=底稿目录!A7"
+        },
+        {
+          "cell": "A7",
+          "formula": "='明细表K8-2'!A12"
+        },
+        {
+          "cell": "B7",
+          "formula": "=SUMIF('明细表K8-2'!$Z$12:$Z$24,$A7,'明细表K8-2'!$T$12:$T$24)"
+        },
+        {
+          "cell": "C7",
+          "formula": "=SUMIF('明细表K8-2'!$Z$12:$Z$24,$A7,'明细表K8-2'!$U$12:$U$24)"
+        }
+      ]
+    },
+    {
+      "sheet_name": "附注披露信息（上市公司）",
+      "used_range": {
+        "min_row": 1,
+        "max_row": 42,
+        "min_col": 1,
+        "max_col": 28,
+        "used_rows": 42,
+        "used_cols": 28
+      },
+      "row_count": 42,
+      "col_count": 28,
+      "formula_count": 41,
+      "business_formula_count": 34,
+      "column_headers": [
+        "致同会计师事务所"
+      ],
+      "formula_samples": [
+        {
+          "cell": "A3",
+          "formula": "=底稿目录!A2"
+        },
+        {
+          "cell": "B3",
+          "formula": "=底稿目录!A4"
+        },
+        {
+          "cell": "C3",
+          "formula": "=底稿目录!A5"
+        },
+        {
+          "cell": "E3",
+          "formula": "=底稿目录!D6"
+        },
+        {
+          "cell": "A4",
+          "formula": "=底稿目录!A3"
+        },
+        {
+          "cell": "B4",
+          "formula": "=底稿目录!A6"
+        },
+        {
+          "cell": "C4",
+          "formula": "=底稿目录!A7"
+        },
+        {
+          "cell": "A7",
+          "formula": "='审定表K8-1'!A7"
+        },
+        {
+          "cell": "B7",
+          "formula": "='审定表K8-1'!I7"
+        },
+        {
+          "cell": "C7",
+          "formula": "='审定表K8-1'!E7"
+        }
+      ]
+    },
+    {
+      "sheet_name": "附注披露信息（国企）",
+      "used_range": {
+        "min_row": 1,
+        "max_row": 30,
+        "min_col": 1,
+        "max_col": 5,
+        "used_rows": 30,
+        "used_cols": 5
+      },
+      "row_count": 30,
+      "col_count": 5,
+      "formula_count": 41,
+      "business_formula_count": 34,
+      "column_headers": [
+        "致同会计师事务所"
+      ],
+      "formula_samples": [
+        {
+          "cell": "A3",
+          "formula": "=底稿目录!A2"
+        },
+        {
+          "cell": "B3",
+          "formula": "=底稿目录!A4"
+        },
+        {
+          "cell": "C3",
+          "formula": "=底稿目录!A5"
+        },
+        {
+          "cell": "E3",
+          "formula": "=底稿目录!D7"
+        },
+        {
+          "cell": "A4",
+          "formula": "=底稿目录!A3"
+        },
+        {
+          "cell": "B4",
+          "formula": "=底稿目录!A6"
+        },
+        {
+          "cell": "C4",
+          "formula": "=底稿目录!A7"
+        },
+        {
+          "cell": "A7",
+          "formula": "='审定表K8-1'!A7"
+        },
+        {
+          "cell": "B7",
+          "formula": "='审定表K8-1'!I7"
+        },
+        {
+          "cell": "C7",
+          "formula": "='审定表K8-1'!E7"
+        }
+      ]
+    },
+    {
+      "sheet_name": "明细表K8-2",
+      "used_range": {
+        "min_row": 1,
+        "max_row": 48,
+        "min_col": 1,
+        "max_col": 27,
+        "used_rows": 48,
+        "used_cols": 27
+      },
+      "row_count": 48,
+      "col_count": 27,
+      "formula_count": 123,
+      "business_formula_count": 116,
+      "column_headers": [
+        "致同会计师事务所"
+      ],
+      "formula_samples": [
+        {
+          "cell": "A3",
+          "formula": "=底稿目录!A2"
+        },
+        {
+          "cell": "G3",
+          "formula": "=底稿目录!A4"
+        },
+        {
+          "cell": "Q3",
+          "formula": "=底稿目录!A5"
+        },
+        {
+          "cell": "AA3",
+          "formula": "=底稿目录!D8"
+        },
+        {
+          "cell": "A4",
+          "formula": "=底稿目录!A3"
+        },
+        {
+          "cell": "G4",
+          "formula": "=底稿目录!A6"
+        },
+        {
+          "cell": "Q4",
+          "formula": "=底稿目录!A7"
+        },
+        {
+          "cell": "N12",
+          "formula": "=SUM(B12:M12)"
+        },
+        {
+          "cell": "Q12",
+          "formula": "=N12+O12+P12"
+        },
+        {
+          "cell": "R12",
+          "formula": "=IF(Q12=0,0,Q12/$Q$25)"
+        }
+      ]
+    },
+    {
+      "sheet_name": "调整分录汇总K8-3",
+      "used_range": {
+        "min_row": 1,
+        "max_row": 21,
+        "min_col": 1,
+        "max_col": 10,
+        "used_rows": 21,
+        "used_cols": 10
+      },
+      "row_count": 21,
+      "col_count": 10,
+      "formula_count": 7,
+      "business_formula_count": 0,
+      "column_headers": [
+        "致同会计师事务所"
+      ],
+      "formula_samples": [
+        {
+          "cell": "A3",
+          "formula": "=底稿目录!A2"
+        },
+        {
+          "cell": "C3",
+          "formula": "=底稿目录!A4"
+        },
+        {
+          "cell": "F3",
+          "formula": "=底稿目录!A5"
+        },
+        {
+          "cell": "J3",
+          "formula": "=底稿目录!D9"
+        },
+        {
+          "cell": "A4",
+          "formula": "=底稿目录!A3"
+        },
+        {
+          "cell": "C4",
+          "formula": "=底稿目录!A6"
+        },
+        {
+          "cell": "F4",
+          "formula": "=底稿目录!A7"
+        }
+      ]
+    },
+    {
+      "sheet_name": "实质性分析K8-4",
+      "used_range": {
+        "min_row": 1,
+        "max_row": 39,
+        "min_col": 1,
+        "max_col": 17,
+        "used_rows": 39,
+        "used_cols": 17
+      },
+      "row_count": 39,
+      "col_count": 17,
+      "formula_count": 111,
+      "business_formula_count": 104,
+      "column_headers": [
+        "致同会计师事务所"
+      ],
+      "formula_samples": [
+        {
+          "cell": "A3",
+          "formula": "=底稿目录!A2"
+        },
+        {
+          "cell": "C3",
+          "formula": "=底稿目录!A4"
+        },
+        {
+          "cell": "F3",
+          "formula": "=底稿目录!A5"
+        },
+        {
+          "cell": "J3",
+          "formula": "=底稿目录!D10"
+        },
+        {
+          "cell": "A4",
+          "formula": "=底稿目录!A3"
+        },
+        {
+          "cell": "C4",
+          "formula": "=底稿目录!A6"
+        },
+        {
+          "cell": "F4",
+          "formula": "=底稿目录!A7"
+        },
+        {
+          "cell": "A11",
+          "formula": "='明细表K8-2'!A12"
+        },
+        {
+          "cell": "B11",
+          "formula": "='明细表K8-2'!Q12"
+        },
+        {
+          "cell": "C11",
+          "formula": "=IF(B11=0,0,B11/$B$21)"
+        }
+      ]
+    },
+    {
+      "sheet_name": "合同检查表K8-5",
+      "used_range": {
+        "min_row": 1,
+        "max_row": 55,
+        "min_col": 1,
+        "max_col": 22,
+        "used_rows": 55,
+        "used_cols": 22
+      },
+      "row_count": 55,
+      "col_count": 22,
+      "formula_count": 47,
+      "business_formula_count": 40,
+      "column_headers": [
+        "致同会计师事务所"
+      ],
+      "formula_samples": [
+        {
+          "cell": "A3",
+          "formula": "=底稿目录!A2"
+        },
+        {
+          "cell": "H3",
+          "formula": "=底稿目录!A4"
+        },
+        {
+          "cell": "M3",
+          "formula": "=底稿目录!A5"
+        },
+        {
+          "cell": "Q3",
+          "formula": "=底稿目录!D11"
+        },
+        {
+          "cell": "A4",
+          "formula": "=底稿目录!A3"
+        },
+        {
+          "cell": "H4",
+          "formula": "=底稿目录!A6"
+        },
+        {
+          "cell": "M4",
+          "formula": "=底稿目录!A7"
+        },
+        {
+          "cell": "J11",
+          "formula": "=IF(OR($E$9=\"\",H11=\"\",$C$9=\"\",I11=\"\"),0,DATEDIF(H11, I11, \"m\")+1)"
+        },
+        {
+          "cell": "K11",
+          "formula": "=IF(OR($E$9=\"\",H11=\"\",$C$9=\"\",I11=\"\"),0,IF(H11>$E$9,0,IF(H11=0,0,IF(AND(H11<$C$9,I11>$E$9),VALUE(DATEDIF($C$9,$E$9,\"m\")+1),IF(AND(H11<$C$9,I11<=$E$9),VALUE(DATEDIF($C$9,I11,\"m\")+1),IF(AND(H11>=$C$9,I11>$E$9),VALUE(DATEDIF(H11,$E$9,\"m\")+1),IF(AND(H11>=$C$9,I11<=$E$9),VALUE(DATEDIF(H11,I11,\"m\")+1),)))))))"
+        },
+        {
+          "cell": "L11",
+          "formula": "=IF(K11=0,0,K11/J11*D11)"
+        }
+      ]
+    },
+    {
+      "sheet_name": "截止性测试(从记账凭证至原始凭证）K8-6",
+      "used_range": {
+        "min_row": 1,
+        "max_row": 44,
+        "min_col": 1,
+        "max_col": 11,
+        "used_rows": 44,
+        "used_cols": 11
+      },
+      "row_count": 44,
+      "col_count": 11,
+      "formula_count": 7,
+      "business_formula_count": 0,
+      "column_headers": [
+        "致同会计师事务所"
+      ],
+      "formula_samples": [
+        {
+          "cell": "A3",
+          "formula": "=底稿目录!A2"
+        },
+        {
+          "cell": "C3",
+          "formula": "=底稿目录!A4"
+        },
+        {
+          "cell": "G3",
+          "formula": "=底稿目录!A5"
+        },
+        {
+          "cell": "K3",
+          "formula": "=底稿目录!D12"
+        },
+        {
+          "cell": "A4",
+          "formula": "=底稿目录!A3"
+        },
+        {
+          "cell": "C4",
+          "formula": "=底稿目录!A6"
+        },
+        {
+          "cell": "G4",
+          "formula": "=底稿目录!A7"
+        }
+      ]
+    },
+    {
+      "sheet_name": "截止性测试（从原始凭证至记账凭证）K8-7",
+      "used_range": {
+        "min_row": 1,
+        "max_row": 44,
+        "min_col": 1,
+        "max_col": 12,
+        "used_rows": 44,
+        "used_cols": 12
+      },
+      "row_count": 44,
+      "col_count": 12,
+      "formula_count": 7,
+      "business_formula_count": 0,
+      "column_headers": [
+        "致同会计师事务所"
+      ],
+      "formula_samples": [
+        {
+          "cell": "A3",
+          "formula": "=底稿目录!A2"
+        },
+        {
+          "cell": "E3",
+          "formula": "=底稿目录!A4"
+        },
+        {
+          "cell": "H3",
+          "formula": "=底稿目录!A5"
+        },
+        {
+          "cell": "K3",
+          "formula": "=底稿目录!D12"
+        },
+        {
+          "cell": "A4",
+          "formula": "=底稿目录!A3"
+        },
+        {
+          "cell": "E4",
+          "formula": "=底稿目录!A6"
+        },
+        {
+          "cell": "H4",
+          "formula": "=底稿目录!A7"
+        }
+      ]
+    },
+    {
+      "sheet_name": "销售费用检查表K8-8",
+      "used_range": {
+        "min_row": 1,
+        "max_row": 43,
+        "min_col": 1,
+        "max_col": 17,
+        "used_rows": 43,
+        "used_cols": 17
+      },
+      "row_count": 43,
+      "col_count": 17,
+      "formula_count": 10,
+      "business_formula_count": 3,
+      "column_headers": [
+        "致同会计师事务所"
+      ],
+      "formula_samples": [
+        {
+          "cell": "A3",
+          "formula": "=底稿目录!A2"
+        },
+        {
+          "cell": "F3",
+          "formula": "=底稿目录!A4"
+        },
+        {
+          "cell": "I3",
+          "formula": "=底稿目录!A5"
+        },
+        {
+          "cell": "Q3",
+          "formula": "=底稿目录!D14"
+        },
+        {
+          "cell": "A4",
+          "formula": "=底稿目录!A3"
+        },
+        {
+          "cell": "F4",
+          "formula": "=底稿目录!A6"
+        },
+        {
+          "cell": "I4",
+          "formula": "=底稿目录!A7"
+        },
+        {
+          "cell": "G34",
+          "formula": "=SUM(G17:G33)"
+        },
+        {
+          "cell": "G35",
+          "formula": "='明细表K8-2'!Q25"
+        },
+        {
+          "cell": "G36",
+          "formula": "=G34/G35"
+        }
+      ]
+    }
+  ],
+  "validation": {
+    "K8-1_total_formulas": {
+      "actual": 135,
+      "business_formulas": 128,
+      "note": "requirements预估73为业务公式数的近似（实际业务公式更多，因含跨行重复模板）"
+    },
+    "K8-4_total_formulas": {
+      "actual": 111,
+      "business_formulas": 104,
+      "note": "requirements预估25为唯一公式模式数的近似（实际每行重复同一模式）"
+    },
+    "K8-6_row_count": {
+      "expected": 44,
+      "actual": 44,
+      "pass": true
+    },
+    "K8-7_row_count": {
+      "expected": 44,
+      "actual": 44,
+      "pass": true
+    }
+  },
+  "total_formulas": 536,
+  "total_business_formulas": 459,
+  "all_row_validations_pass": true,
+  "formula_count_note": "Requirements中K8-1预估73公式、K8-4预估25公式为'唯一公式模板/列'计数方式。openpyxl实际统计为逐单元格计数（含跨行重复）。K8-1实际135(业务128)，K8-4实际111(业务104)。K8-6/K8-7行数44行精确匹配。"
+}

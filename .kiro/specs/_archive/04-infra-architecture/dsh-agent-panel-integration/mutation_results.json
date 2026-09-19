@@ -1,0 +1,346 @@
+{
+  "spec": "dsh-agent-panel-integration",
+  "task": 33,
+  "execution_date": "2026-08-16",
+  "supersedes": {
+    "previous_execution_date": "2026-08-16",
+    "reason": "上一版把 10/15 记为 verdict='VERIFIED_ANCHOR_ONLY'（只做 --check-anchors 静态自检，note 写 'full run reserved for CI or dedicated session'）。Task 33 子任务原文要求「每个变异必须命中唯一锚点**并由预期测试打红**」，静态锚点检查不满足该条件：按变异四态，GREEN（守卫缺陷）恰恰只有真跑才暴露。本版把那 10 条全部真跑，四态判定，非 RED 全部修复后复跑至 RED。",
+    "what_the_full_run_exposed": "10 条真跑首轮结果 = RED 3 / GREEN 6 / WRONG-TEST 1 / ANCHOR-MISS 0。即此前标『已验证』的 10 条里有 7 条其实是缺陷（6 个守卫缺陷 + 1 个脚本缺陷），全部被静态检查放行。"
+  },
+  "check_anchors": {
+    "status": "PASS",
+    "total_mutations": 35,
+    "task33_mutations": 15,
+    "all_anchors_unique": true,
+    "all_replacements_non_trivial": true,
+    "all_expect_tests_locatable": true,
+    "all_expect_tests_are_real_test_names": true,
+    "static_check_strengthened": "新增第 4 类静态判据：expect_test 必须命中**测试名/用例标题**（pytest `def test_*` / vitest `it|test|describe('…')`），不能只是源码正文里的任意片段。M10 就是靠这一点漏过旧检查的。已做反向自检：把 M10 的 expect_test 换回旧值 'user_id'，静态检查必须打红（已验证会打红）。"
+  },
+  "mutations_verified": {
+    "total": 15,
+    "actually_run": 15,
+    "all_run_red": true,
+    "verdict_tally_final": { "RED": 15, "GREEN": 0, "ANCHOR_MISS": 0, "WRONG_TEST": 0 },
+    "verdict_tally_first_full_run": { "RED": 8, "GREEN": 6, "ANCHOR_MISS": 0, "WRONG_TEST": 1 },
+    "note": "15/15 全部真跑并判定为 RED。不再有 VERIFIED_ANCHOR_ONLY 这类中间态。生产代码字节级复原已用 sha256 逐文件校验（10/10 一致），无 .bak 残留。"
+  },
+  "restoration_check": {
+    "method": "变异前后对 10 个 target 文件取 sha256 前 16 位逐一比对 + rglob 扫 *.mutate-dsh.bak",
+    "targets_byte_identical": "10/10",
+    "bak_residue": 0
+  },
+  "detailed_results": [
+    {
+      "id": "M01",
+      "name": "移除前置 gate（authorize_host 异常不 fail-closed）",
+      "target": "backend/app/services/ai_chat/access.py",
+      "suite": "be",
+      "selector": "backend/tests/dsh_agent_panel/test_task1_resource_access.py",
+      "verdict": "RED",
+      "detail": "新增失败 1 条",
+      "new_fails": [
+        "backend\\tests\\dsh_agent_panel\\test_task1_resource_access.py::test_resolver_internal_failure_fails_closed"
+      ]
+    },
+    {
+      "id": "M02",
+      "name": "调换 host loader（note 改用 workpaper locator）",
+      "target": "backend/app/services/ai_chat/host_context.py",
+      "suite": "be",
+      "selector": "backend/tests/dsh_agent_panel/test_task2_host_context.py",
+      "verdict": "RED",
+      "detail": "新增失败 7 条",
+      "new_fails": [
+        "backend\\tests\\dsh_agent_panel\\test_task2_host_context.py::TestProperty2AssertionConsistency::test_forged_project_assertion_returns_mismatch",
+        "backend\\tests\\dsh_agent_panel\\test_task2_host_context.py::TestProperty2AssertionConsistency::test_forged_year_assertion_returns_mismatch",
+        "backend\\tests\\dsh_agent_panel\\test_task2_host_context.py::TestProperty2AssertionConsistency::test_matching_assertions_pass_and_canonicalize",
+        "backend\\tests\\dsh_agent_panel\\test_task2_host_context.py::TestProperty5UniqueHostLoader::test_display_label_is_loaded_only_after_authorization",
+        "backend\\tests\\dsh_agent_panel\\test_task2_host_context.py::TestProperty5UniqueHostLoader::test_each_host_resolves_via_its_own_business_model",
+        "backend\\tests\\dsh_agent_panel\\test_task2_host_context.py::TestProperty5UniqueHostLoader::test_note_and_report_never_touch_workpaper_loader",
+        "backend\\tests\\dsh_agent_panel\\test_task2_host_context.py::TestProperty5UniqueHostLoader::test_note_stable_section_key_resolves_to_instance"
+      ]
+    },
+    {
+      "id": "M03",
+      "name": "去掉 MentionRef id min_length 校验",
+      "target": "backend/app/services/ai_chat/run_contract.py",
+      "suite": "be",
+      "selector": "backend/tests/dsh_agent_panel/test_task24_phase_b_guards.py",
+      "verdict": "RED",
+      "detail": "新增失败 1 条，含预期「non_null_id」",
+      "new_fails": [
+        "backend\\tests\\dsh_agent_panel\\test_task24_phase_b_guards.py::TestProperty11MentionSchemaConsistency::test_mention_candidate_requires_non_null_id"
+      ]
+    },
+    {
+      "id": "M04",
+      "name": "error 后发 done（破坏终态唯一性）",
+      "target": "backend/app/services/ai_chat/run_contract.py",
+      "suite": "be",
+      "selector": "backend/tests/dsh_agent_panel/test_task4_run_contract.py",
+      "verdict": "RED",
+      "detail": "新增失败 9 条，含预期「terminal」",
+      "new_fails": [
+        "backend\\tests\\dsh_agent_panel\\test_task4_run_contract.py::test_terminal_states_have_no_outgoing_transitions"
+      ]
+    },
+    {
+      "id": "M05",
+      "name": "取消不传 child（cancel 不设跨进程标记）",
+      "target": "backend/app/services/ai_chat/run_coordinator.py",
+      "suite": "be",
+      "selector": "backend/tests/dsh_agent_panel/test_task5_run_coordinator.py",
+      "verdict": "RED",
+      "detail": "新增失败 3 条，含预期「cancel」",
+      "new_fails": [
+        "backend\\tests\\dsh_agent_panel\\test_task5_run_coordinator.py::TestCancelPropagationEndToEnd::test_cancel_produces_exactly_one_terminal_and_no_completed_message",
+        "backend\\tests\\dsh_agent_panel\\test_task5_run_coordinator.py::TestCancelPropagationEndToEnd::test_cancel_reaches_engine_and_child_and_freezes_tool_calls",
+        "backend\\tests\\dsh_agent_panel\\test_task5_run_coordinator.py::TestCancelPropagationEndToEnd::test_uncooperative_engine_is_still_stopped_by_the_coordinator"
+      ]
+    },
+    {
+      "id": "M06",
+      "name": "SSE 拆包（feedChunk 清空 buffer 而非累积）",
+      "target": "audit-platform/frontend/src/utils/sse.ts",
+      "suite": "fe",
+      "selector": "sse.spec",
+      "verdict": "RED",
+      "detail": "新增失败 6 条，含预期「每字节分片结果与基线一致」",
+      "new_fails": [
+        "Property 9: 任意分片等价 2 字节分片结果与基线一致",
+        "Property 9: 任意分片等价 7 字节分片结果与基线一致",
+        "Property 9: 任意分片等价 在 data: 行中间切分仍一致",
+        "Property 9: 任意分片等价 每字节分片结果与基线一致",
+        "Property 9: 任意分片等价 随机切分点结果一致（10 组）",
+        "server_draining 帧 drain 帧在分片下仍正确识别"
+      ],
+      "first_run_verdict": "GREEN",
+      "root_cause": "脚本缺陷（selector 跑错测试套）。原 selector = `sseEventTypes`，而 `sseEventTypes.spec.ts` 测的是 `@/types/sse` 的 **SSEEventType 联合类型**，与 `utils/sse.ts` 的解析器毫无关系。跨 chunk buffer 的真实判据一直在 `utils/__tests__/sse.spec.ts`（41 例「任意分片等价」），只是从没被这个锚点跑到。",
+      "fix": "selector 改为 `sse.spec`（已实测在 frontend/src 下唯一匹配 `utils/__tests__/sse.spec.ts`；sseEventTypes / useSSEReconnect / useProcedureTaskSse / sseConsolidationGuard 均不匹配），expect_test 改为「每字节分片结果与基线一致」。生产代码与守卫均未改动 —— 本条证明的是「原判据其实一直有效，是变异脚本指错了地方」。"
+    },
+    {
+      "id": "M07",
+      "name": "放宽 attachment owner 校验",
+      "target": "backend/app/services/ai_chat/attachment_service.py",
+      "suite": "be",
+      "selector": "backend/tests/dsh_agent_panel/test_task24_phase_b_guards.py",
+      "verdict": "RED",
+      "detail": "新增失败 2 条，含预期「test_cross_user_attachment_is_filtered_out_of_run」",
+      "new_fails": [
+        "backend\\tests\\dsh_agent_panel\\test_task24_phase_b_guards.py::TestProperty18AttachmentSecurityBeforeOCR::test_cross_user_attachment_is_filtered_out_of_run",
+        "backend\\tests\\dsh_agent_panel\\test_task24_phase_b_guards.py::TestProperty18AttachmentSecurityBeforeOCR::test_owner_check_rejects_even_when_session_matches"
+      ],
+      "first_run_verdict": "GREEN",
+      "root_cause": "守卫缺陷（fail-open）。原 `test_cross_user_attachment_rejected` 调用 `validate_for_run(attachment_id=…, user_id=…, project_id=…)`，而真实签名是 `validate_for_run(*, attachment_ids: list[UUID], owner_id: UUID, session_id: UUID)` ⇒ **每次都抛 TypeError**；断言写的是 `pytest.raises((AttachmentValidationError, PermissionError, Exception))`，TypeError 也是 Exception，于是无论 owner 校验在不在都恒绿。第二处判据错误：`validate_for_run` 根本**不抛异常**，它返回过滤后的列表。",
+      "fix": "改为断言**返回值**过滤掉他人附件（`test_cross_user_attachment_is_filtered_out_of_run`），并补 session 维度反向自检（`test_owner_check_rejects_even_when_session_matches` / `test_cross_session_attachment_is_filtered_out_of_run`）+ 一条签名反向自检 `test_validate_for_run_signature_matches_call_sites`（断言 `attachment_id`/`user_id`/`project_id` 这三个错名**不存在**于签名，防同类 fail-open 复发）。"
+    },
+    {
+      "id": "M08",
+      "name": "采纳信任客户端正文（不从 DB 读取）",
+      "target": "backend/app/services/ai_chat/adopt.py",
+      "suite": "be",
+      "selector": "backend/tests/dsh_agent_panel/test_task7_adopt_fail_closed.py",
+      "verdict": "RED",
+      "detail": "新增失败 11 条，含预期「adopt」",
+      "new_fails": [
+        "backend\\tests\\dsh_agent_panel\\test_task7_adopt_fail_closed.py::test_adopted_content_equals_stored_message_not_any_client_input"
+      ]
+    },
+    {
+      "id": "M09",
+      "name": "启用 semantic fallback（EmbeddingUnavailableError 改名使 raise 路径失效）",
+      "target": "backend/app/services/ai_chat/address_index_source.py",
+      "suite": "be",
+      "selector": "backend/tests/dsh_agent_panel/test_task24_phase_b_guards.py",
+      "verdict": "RED",
+      "detail": "新增失败 3 条，含预期「canonical_error_not_lexical_fallback」",
+      "new_fails": [
+        "backend\\tests\\dsh_agent_panel\\test_task24_phase_b_guards.py::TestProperty16SemanticUnavailableNoDegradation::test_semantic_unavailable_consumers_resolve_the_same_error_class",
+        "backend\\tests\\dsh_agent_panel\\test_task24_phase_b_guards.py::TestProperty16SemanticUnavailableNoDegradation::test_strict_search_empty_result_is_not_an_error",
+        "backend\\tests\\dsh_agent_panel\\test_task24_phase_b_guards.py::TestProperty16SemanticUnavailableNoDegradation::test_strict_search_raises_canonical_error_not_lexical_fallback"
+      ],
+      "first_run_verdict": "GREEN",
+      "root_cause": "守卫缺陷（源码字符串判据 + 恒真 or 子句 + 惰性 import）。Property 16 原判据是 `assert 'bm25' not in src.lower() or 'fallback' not in src.lower()`，而 `AddressCoordinateIndexSource` 类正文里写的是中文「回退」，第一个子句恒 True ⇒ 整条恒真。且 `EmbeddingUnavailableError` 的两个消费方（`knowledge_index_service.semantic_search_strict` 抛 / `mcp_tools.tool_kb_search` 捕）都是**函数体内惰性 import**，改类名只在调用期炸 ImportError，而 Phase B 没有一条测试触达那两条调用路径。",
+      "fix": "补 4 条行为判据：① 真调 `semantic_search_strict` 并 patch `_vector_search` 抛错，断言抛出的**就是**权威类型 `EmbeddingUnavailableError` 且保留 `__cause__`；② 反向自检「向量召回成功但零命中」必须是空列表而非不可用（防判据退化成「没结果就算不可用」）；③ 断言两个消费方惰性 import 解析出的是**同一个类对象**；④ `check_embedding_health` 在 AIService 抛错/返回空时必须返回 False。"
+    },
+    {
+      "id": "M10",
+      "name": "复用跨用户 MCP token（跳过 user_id 校验）",
+      "target": "backend/app/services/ai_chat/mcp_token.py",
+      "suite": "be",
+      "selector": "backend/tests/test_ai_chat_mcp_token.py",
+      "verdict": "RED",
+      "detail": "新增失败 1 条，含预期「wrong_user_rejected」",
+      "new_fails": [
+        "backend\\tests\\test_ai_chat_mcp_token.py::TestCrossUserIsolation::test_wrong_user_rejected"
+      ],
+      "first_run_verdict": "WRONG_TEST",
+      "root_cause": "脚本缺陷（expect_test 不是测试名）。`expect_test='user_id'` 在 `test_ai_chat_mcp_token.py` 正文里确实存在（参数名/断言里），所以旧版 `--check-anchors` 放行；但真正打红的测试叫 `test_wrong_user_rejected`，四态判定成 WRONG-TEST。守卫本身是有效的 —— 它确实抓到了改动。",
+      "fix": "expect_test 改为 `wrong_user_rejected`；并给 `--check-anchors` 加第 4 类静态判据（expect_test 必须命中真实测试名/用例标题），使同类漂移不必等全量实跑就能暴露。已做反向自检确认旧值会被拦下。"
+    },
+    {
+      "id": "M11",
+      "name": "移除前端终态 guard（error 后接受 delta）",
+      "target": "audit-platform/frontend/src/stores/chatRunState.ts",
+      "suite": "fe",
+      "selector": "PlatformAiChatPhaseA",
+      "verdict": "RED",
+      "detail": "新增失败 2 条，含预期「dispatch」",
+      "new_fails": [
+        "error 后 dispatch done 不改变 phase"
+      ]
+    },
+    {
+      "id": "M12",
+      "name": "恢复 localStorage 正文（清理函数跳过 legacy 前缀）",
+      "target": "audit-platform/frontend/src/utils/aiChatCacheCleanup.ts",
+      "suite": "fe",
+      "selector": "PlatformAiChatPhaseA",
+      "verdict": "RED",
+      "detail": "新增失败 3 条，含预期「clearOnLogout 删除全部」",
+      "new_fails": [
+        "Property 35: Phase A 运行时零 localStorage 正文 清理函数真的删除 localStorage 遗留正文（行为判据） clearOnLogout 删除全部 doc_ai_chat_ 正文并保留非敏感偏好",
+        "Property 35: Phase A 运行时零 localStorage 正文 清理函数真的删除 localStorage 遗留正文（行为判据） clearOnUpgrade 首次加载清理遗留正文并写入版本标记",
+        "Property 35: Phase A 运行时零 localStorage 正文 清理函数真的删除 localStorage 遗留正文（行为判据） 遗留正文里的敏感字符串在清理后不再存在于任何 localStorage 值中"
+      ],
+      "first_run_verdict": "GREEN",
+      "root_cause": "守卫缺陷（grep 式判据，假绿第②源）。Property 35 的 4 条判据全是「源码里出现某标识符即算通过」：`expect(src).toContain('clearLegacyAiChatCache')` 等。把 `LEGACY_CACHE_PREFIX` 从 `'doc_ai_chat_'` 改成 `'__never_match__'` —— 清理函数一个 key 都不删、遗留对话正文全留在浏览器里 —— 那 4 条依旧全绿，因为它们只看函数名在不在，不看函数干了什么。",
+      "fix": "补 3 条行为判据：真往 localStorage 播种 3 个 `doc_ai_chat_*` 敏感正文 + 1 个非敏感偏好 `gt-dsh-panel-width`，调真实 `clearOnLogout()` / `clearOnUpgrade()`，断言①敏感 key 全清空②非敏感偏好保留（防清理过度）③清理后所有 localStorage 值里不再出现那三段敏感中文字符串。原 4 条 grep 判据保留（防标识符被删），但已在注释里标明它们不是行为判据。"
+    },
+    {
+      "id": "M13",
+      "name": "DSH 失败降级到 native（_verify_sdk_available 不 raise）",
+      "target": "backend/app/services/ai_chat/dsh_engine.py",
+      "suite": "be",
+      "selector": "backend/tests/dsh_agent_panel/test_task28_dsh_engine.py",
+      "verdict": "RED",
+      "detail": "新增失败 2 条，含预期「test_verify_sdk_gate_raises_when_discovery_unavailable」",
+      "new_fails": [
+        "backend\\tests\\dsh_agent_panel\\test_task28_dsh_engine.py::TestDshFailureNoDegradation::test_sdk_gate_blocks_before_context_and_process_creation",
+        "backend\\tests\\dsh_agent_panel\\test_task28_dsh_engine.py::TestDshFailureNoDegradation::test_verify_sdk_gate_raises_when_discovery_unavailable"
+      ],
+      "first_run_verdict": "GREEN",
+      "root_cause": "守卫缺陷（判据只看最终错误码，分辨不出失败发生在哪一步）。`DshEngine._run` 的步骤 ② 是 SDK 门，之后还有 ④ 上下文创建 / ⑥ MCP 进程 / ⑦ DSH root / ⑧ handshake，**任何一步失败也都抛 `EngineFailure(engine_unavailable)`**，detail 里同样可能带「不可用」。于是给 `_verify_sdk_available` 开头加 `return`（门完全失效）后，流程只是往后多走几步再在别处失败，`code == engine_unavailable` 与 `'不可用' in detail` 两条断言依旧成立。",
+      "fix": "补 3 条门级判据：① 直调 `engine._verify_sdk_available()`，discovery 不可用时必须抛，且 detail 必须点名 `SDK` + `sdk_not_found` + discovery 给出的具体原因（这样才分得清是门拦的还是后续步骤失败）；② 反向自检 discovery 可用时门必须放行返回 None（防判据退化成恒抛）；③ 断言门的**副作用边界**：SDK 不可用时 `_create_run_context` 与 `DshProcessManager.spawn_mcp_process` 调用次数都必须为 0。"
+    },
+    {
+      "id": "M14",
+      "name": "切 cloud model（_check_model_health 不做 local-only 校验）",
+      "target": "backend/app/services/ai_chat/capability_endpoint.py",
+      "suite": "be",
+      "selector": "backend/tests/dsh_agent_panel/test_task30_capabilities.py",
+      "verdict": "RED",
+      "detail": "新增失败 3 条，含预期「test_cloud_model_endpoint_reported_local_only_violation」",
+      "new_fails": [
+        "backend\\tests\\dsh_agent_panel\\test_task30_capabilities.py::TestCapabilityEndpointLocalOnly::test_capabilities_health_matches_startup_health_verdict",
+        "backend\\tests\\dsh_agent_panel\\test_task30_capabilities.py::TestCapabilityEndpointLocalOnly::test_cloud_model_endpoint_reported_local_only_violation",
+        "backend\\tests\\dsh_agent_panel\\test_task30_capabilities.py::TestCapabilityEndpointLocalOnly::test_unconfigured_model_is_engine_unavailable_not_violation"
+      ],
+      "first_run_verdict": "GREEN",
+      "root_cause": "守卫缺陷（判据打在另一套实现上 + 唯一触达者只查结构不查取值）。`test_task30_capabilities.py` 的全部 local-only 判据都走 `startup_health.run_ai_chat_startup_health_check`，而 `/capabilities` 的 `health` 字段走的是**另一套实现** `capability_endpoint._collect_service_health() → _check_model_health()`。后者此前零取值覆盖：唯一触达它的 `test_capability_health_separates_services` 只断言 `hasattr(h, 'available')`。于是把 `_check_model_health` 改成无条件 `return ServiceHealth(available=True, …)`（等于关掉 local-only 校验，前端会认为云端模型可用并放开入口）全绿。",
+      "fix": "新增 `TestCapabilityEndpointLocalOnly` 5 条取值判据：本地 endpoint → available/error_code=None（反向自检）· 云端 endpoint → available=False + `local_only_violation` + endpoint 脱敏回显 + 中文「不合规」· 未配置 → `engine_unavailable`（与 violation 区分）· embedding 侧独立判定 · **两套实现对同一 settings 必须给出一致结论**（防「启动自检拦住了但前端仍放开入口」）。"
+    },
+    {
+      "id": "M15",
+      "name": "脱敏未知角色不 fail-closed（mask_for_context 不拒绝）",
+      "target": "backend/app/services/ai_chat/dsh_masking.py",
+      "suite": "be",
+      "selector": "backend/tests/test_ai_chat_task29_dsh_masking.py",
+      "verdict": "RED",
+      "detail": "新增失败 7 条",
+      "new_fails": [
+        "backend\\tests\\test_ai_chat_task29_dsh_masking.py::TestEndToEndIntegration::test_dsh_tool_result_masked_then_audited",
+        "backend\\tests\\test_ai_chat_task29_dsh_masking.py::TestFiveRoleMaskingConsistency::test_auditor_strict_masking",
+        "backend\\tests\\test_ai_chat_task29_dsh_masking.py::TestFiveRoleMaskingConsistency::test_eqcr_strict_masking",
+        "backend\\tests\\test_ai_chat_task29_dsh_masking.py::TestFiveRoleMaskingConsistency::test_manager_partial_masking",
+        "backend\\tests\\test_ai_chat_task29_dsh_masking.py::TestFiveRoleMaskingConsistency::test_native_and_dsh_same_result",
+        "backend\\tests\\test_ai_chat_task29_dsh_masking.py::TestFiveRoleMaskingConsistency::test_partner_no_masking",
+        "backend\\tests\\test_ai_chat_task29_dsh_masking.py::TestFiveRoleMaskingConsistency::test_qc_strict_masking"
+      ]
+    }
+  ],
+  "issues_found_and_fixed": [
+    {
+      "issue": "M03 原用 selector=_BE_RUN，但 min_length 守卫在 Phase B 测试",
+      "fix": "改 selector=_BE_PHASE_B, expect_test='non_null_id'",
+      "status": "fixed_and_verified_red",
+      "found_by": "首轮 5 条实跑"
+    },
+    {
+      "issue": "M11 原用 selector=chatRunState，但终态 guard 测试在 PlatformAiChatPhaseA",
+      "fix": "改 selector=_FE_PHASE_A, expect_test='dispatch'",
+      "status": "fixed_and_verified_red",
+      "found_by": "首轮 5 条实跑"
+    },
+    {
+      "issue": "M06 selector 指向 sseEventTypes.spec.ts（测的是类型联合，与解析器无关）⇒ 跑错测试套",
+      "fix": "selector 改 sse.spec（唯一匹配 utils/__tests__/sse.spec.ts），expect_test 改「每字节分片结果与基线一致」",
+      "status": "fixed_and_verified_red",
+      "category": "脚本缺陷",
+      "found_by": "剩余 10 条实跑"
+    },
+    {
+      "issue": "M07 对应守卫 fail-open：validate_for_run 调用签名写错恒抛 TypeError，被 raises(Exception) 兜住",
+      "fix": "改为断言返回列表过滤掉他人附件 + session 维度反向自检 + 签名反向自检",
+      "status": "fixed_and_verified_red",
+      "category": "守卫缺陷",
+      "found_by": "剩余 10 条实跑"
+    },
+    {
+      "issue": "M09 对应 Property 16 判据是源码字符串且带恒真 or 子句；两个消费方惰性 import 从未被触达",
+      "fix": "补 4 条行为判据（真抛真捕 + 类对象同一性 + 空态反向自检 + 探活 False）",
+      "status": "fixed_and_verified_red",
+      "category": "守卫缺陷",
+      "found_by": "剩余 10 条实跑"
+    },
+    {
+      "issue": "M10 expect_test='user_id' 只是源码片段不是测试名 ⇒ WRONG-TEST",
+      "fix": "expect_test 改 wrong_user_rejected；并给 --check-anchors 加「必须是真实测试名」静态判据 + 反向自检",
+      "status": "fixed_and_verified_red",
+      "category": "脚本缺陷",
+      "found_by": "剩余 10 条实跑"
+    },
+    {
+      "issue": "M12 对应 Property 35 判据全是 grep 式（源码含标识符即通过），改前缀让清理函数一个 key 不删仍全绿",
+      "fix": "补 3 条行为判据（真播种 localStorage → 调真实清理函数 → 断言敏感正文消失且非敏感偏好保留）",
+      "status": "fixed_and_verified_red",
+      "category": "守卫缺陷",
+      "found_by": "剩余 10 条实跑"
+    },
+    {
+      "issue": "M13 对应判据只看最终 engine_unavailable，而 SDK 门之后各步失败也是同一错误码 ⇒ 去掉门不改变可观测结果",
+      "fix": "补 3 条门级判据（直调门抛/放行 + 门后副作用计数为 0）",
+      "status": "fixed_and_verified_red",
+      "category": "守卫缺陷",
+      "found_by": "剩余 10 条实跑"
+    },
+    {
+      "issue": "M14 对应判据全打在 startup_health 上，/capabilities 自己那套实现零取值覆盖",
+      "fix": "新增 TestCapabilityEndpointLocalOnly 5 条取值判据 + 两套实现结论一致性判据",
+      "status": "fixed_and_verified_red",
+      "category": "守卫缺陷",
+      "found_by": "剩余 10 条实跑"
+    }
+  ],
+  "guard_files_touched_by_this_fix": [
+    "backend/tests/dsh_agent_panel/test_task24_phase_b_guards.py (40 → 46 tests)",
+    "backend/tests/dsh_agent_panel/test_task28_dsh_engine.py (27 → 30 tests)",
+    "backend/tests/dsh_agent_panel/test_task30_capabilities.py (20 → 25 tests)",
+    "audit-platform/frontend/src/components/ai/__tests__/PlatformAiChatPhaseA.spec.ts (+3 行为判据)",
+    "backend/scripts/diagnose/mutate_dsh_agent_panel_guards.py (M06 selector / M07·M09·M10·M12·M13·M14 expect_test / --check-anchors 第 4 类判据)"
+  ],
+  "lessons": [
+    "静态锚点检查（--check-anchors）与变异实跑**不是**强弱关系而是**互不覆盖**：静态查的是「锚点还在不在、测试名还对不对」，实跑查的是「守卫抓不抓得到」。本次 10 条静态全通过的锚点里，实跑暴露 6 个守卫缺陷。把静态通过写成『已验证』是假绿。",
+    "GREEN 的六个形态各不相同，且都能通过静态检查：① selector 跑错套（M06）② 守卫调用签名写错 + raises(Exception) 兜住（M07）③ 源码字符串判据 + 恒真 or 子句 + 惰性 import 无人触达（M09）④ grep 式判据只查标识符存在（M12）⑤ 判据只看最终错误码，而多个不同根因共用同一错误码（M13）⑥ 判据打在另一套同名实现上，唯一触达真实现的测试只查结构不查取值（M14）。",
+    "第 ⑤ 种最隐蔽：`engine_unavailable` 被 SDK 门、上下文创建、进程拉起、handshake 四处共用，只断言错误码等于它，等于什么都没断言。门类判据必须落到『门后副作用一次都没发生』。",
+    "第 ⑥ 种提醒：同一语义存在两套实现时（startup_health 与 capability_endpoint 的 local-only），必须补一条『两套结论一致』的判据，否则改一套另一套仍绿，且线上会出现自相矛盾的行为。",
+    "expect_test 必须是**测试名**而非源码任意片段 —— 否则四态会把有效守卫误判成 WRONG-TEST（M10）。已把这条固化进 --check-anchors 并做了反向自检。"
+  ],
+  "reproduce": [
+    "python backend/scripts/diagnose/mutate_dsh_agent_panel_guards.py --check-anchors",
+    "python backend/scripts/diagnose/mutate_dsh_agent_panel_guards.py --pick \"调换 host loader\" --pick \"取消不传 child\" --pick \"SSE 拆包\" --pick \"放宽 attachment owner\" --pick \"启用 semantic fallback\" --pick \"复用跨用户 MCP token\" --pick \"恢复 localStorage 正文\" --pick \"DSH 失败降级\" --pick \"切 cloud model\" --pick \"脱敏未知角色\" --out <tmp>.json",
+    "python backend/scripts/diagnose/mutate_dsh_agent_panel_guards.py --restore   # 确认无 .bak 残留"
+  ],
+  "conclusion": "Task 33 门槛条件**现在**才真正满足：15/15 全部真跑且全为 RED，GREEN / ANCHOR-MISS / WRONG-TEST 各 0，生产代码字节级复原已校验。此前『5 实跑 + 10 静态』的记录被本文件取代 —— 那 10 条里有 7 条实为缺陷。另两份结果文件（mutation_results_falsegreen_fix.json 12 条 / mutation_results_mcp_data.json 8 条）未被本次覆盖。"
+}

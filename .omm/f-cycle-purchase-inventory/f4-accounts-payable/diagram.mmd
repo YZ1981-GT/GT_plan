@@ -1,0 +1,22 @@
+graph LR
+  TB[(trial_balance 2202)] --> ADJU[F4-1 审定表<br/>性质 × 账龄双维度]
+  DET[F4-2 供应商明细 + 账龄<br/>扁平 4 字段 未统一枚举] -->|聚合| ADJU
+  ADJ[F4-3 调整分录] --> ADJU
+  ADJU -->|writeback 2202| TB
+  ADJU -->|substantive:adjudicated| DISC
+
+  DET --> ANA[实质性分析]
+  DET --> LONG[长期挂账<br/>CAS16 转销评估]
+  DET --> RP[关联方应付]
+  DET --> FIN[供应商融资安排]
+  UNREC[未入账应付搜索<br/>完整性程序] --> ADJ
+  UNREC -->|完整性错报| A13[A13 未更正错报]
+  VC[凭证检查 Dialog] --> DET
+  LEDGER[(次年序时账 2202 借方)] -->|期后付款归集| DET
+
+  ADJU --> DISC[F4 披露 上市/国企]
+  DISC -->|note-text-updated accountCode=2202| NOTE[附注 五、37 / 国企对应节]
+  LONG -.处理结论.-> K12[K12 营业外收入 / 其他应付款]
+  F2[F2 存货入库] --> DET
+  DET --> E1[E1 货币资金 付款]
+  F3[F3 应付票据 以票抵账] --> DET

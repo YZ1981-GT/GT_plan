@@ -1,0 +1,49 @@
+{
+  "spec": "audit-evidence-attachment-preview-format-expansion",
+  "task": 1,
+  "recorded_at": "2026-09-08",
+  "baseline_commit": "08229d87ef8ac2f9c1d148756016c23efb0befae",
+  "lockfile_digest_sha1": "bfc5681255faf9d94c3675ee0019e4143b53956f",
+  "lockfile_path": "audit-platform/frontend/package-lock.json",
+  "file_digests_sha1": {
+    "audit-platform/frontend/src/components/extension/AttachmentPreview.vue": "642f99340106c0262b20a4e29f0330b5d8d82f90",
+    "audit-platform/frontend/src/components/common/AttachmentPreviewDrawer.vue": "d9db268e71d1b9eae098a3aa5ba98219e9ca397c",
+    "audit-platform/frontend/src/components/workpaper/AttachmentTabPanel.vue": "5139e16435fa5fe5449627cd73f4764407b7bd80",
+    "backend/app/services/process_record_service.py": "43476018fa6dc8fac5a5f584925db078a26a2fc3",
+    "backend/app/routers/attachments.py": "4663d1299b04e9365f199b959c0ee3d202fe65cc"
+  },
+  "evidence_files": [
+    "registered_debt.json",
+    "preview_host_matrix.json",
+    "drawer_host_matrix.json",
+    "tabpanel_office_icon_matrix.json",
+    "process_record_dto_red_baseline.json",
+    "backend_preview_api_contract.json",
+    "baseline_manifest.json"
+  ],
+  "test_nodeids": {
+    "frontend": [
+      "src/components/attachment/preview/__tests__/task1LegacyBaseline.spec.ts"
+    ],
+    "backend": [
+      "tests/attachment_preview_format_expansion/test_task1_legacy_api_dto_baseline.py"
+    ]
+  },
+  "frontend_vitest_passed": 48,
+  "backend_pytest_passed": 23,
+  "properties": [16, 18, 31],
+  "notes": [
+    "三宿主集合分别冻结，未求并集",
+    "process-record DTO 缺 ocr_status/ocr_text 为红基线",
+    "TabPanel file_type→mime_type 误命名为生产链事实",
+    "三项 registered_debt 均 in_scope=false"
+  ],
+  "closure_verification": {
+    "recorded_at": "2026-09-09",
+    "frontend_vitest": {"passed": 180, "failed": 0, "skipped": 0, "suites_passed": 46},
+    "backend_pytest": {"passed": 23, "failed": 0},
+    "mutations": {"red": 47, "green": 0, "wrong_test": 0, "anchor_miss": 0, "all_restored": true},
+    "playwright": {"passed": 2, "failed": 0, "skipped": 0, "flaky": 0},
+    "note": "Task 1 字段保留实施前历史基线；本对象记录归档前最终闭环，不改写历史事实。"
+  }
+}

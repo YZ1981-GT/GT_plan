@@ -14,6 +14,7 @@ Validates: Requirements US-3（C 类底稿 → 附注自动同步）
 from __future__ import annotations
 
 import logging
+from typing import Any
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -26,6 +27,8 @@ from app.deps import get_current_user, require_project_access
 from app.models.core import User
 from app.services.wp_disclosure_sync_service import (
     ConflictError,
+    StandardMismatchError,
+    sync_batch_from_workpaper,
     sync_from_workpaper,
     wp_disclosure_sync_service,
 )
@@ -34,6 +37,13 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(
     prefix="/api/projects",
+    tags=["wp-disclosure-sync"],
+)
+
+# HTML 渲染器路径（US-3）使用独立前缀，避免叠加到 ``/api/projects`` 造成
+# ``/api/projects/api/wp-disclosure-sync/...`` 死链（历史前缀 bug 修复）。
+html_sync_router = APIRouter(
+    prefix="/api/wp-disclosure-sync",
     tags=["wp-disclosure-sync"],
 )
 
@@ -51,9 +61,17 @@ class SyncFromWorkpaperRequest(BaseModel):
         min_length=1,
         description='附注 section（如 "五-1-1 应收账款"）',
     )
-    sub_table_data: dict[str, list[dict]] = Field(
+    sub_table_data: dict[str, Any] = Field(
         default_factory=dict,
-        description="子表数据：sub_table_id → 行列表",
+        description=(
+            "子表数据：sub_table_id → 行列表。`_` 前缀键为元数据："
+            "`_note_texts`（叙述正文）、`_removed_table_keys`（改版后待删除的旧表名）。"
+            "非元数据键的值由服务层 `normalize_sub_table_data` 归一为行列表。"
+        ),
+    )
+    columns: dict[str, list[dict]] | None = Field(
+        None,
+        description="列头元数据：sub_table_id → ColumnDef[]（{key,label,is_label?,align?,format?}），供附注模块投影渲染源模板表样",
     )
     current_standard: str = Field(
         ...,
@@ -77,14 +95,96 @@ class SyncFromWorkpaperResponse(BaseModel):
         ...,
         description="是否新建了 disclosure_notes 记录（False=更新现有）",
     )
+    texts_synced: int = Field(0, description="写入的叙述正文章节数")
+
+
+class SyncBatchItem(BaseModel):
+    """批量同步中的单个章节载荷"""
+
+    sheet_name: str = Field(..., min_length=1)
+    section_id: str = Field(..., min_length=1)
+    sub_table_data: dict[str, Any] = Field(
+        default_factory=dict,
+        description="子表数据（含 `_` 前缀元数据键，同单章节同步）",
+    )
+    columns: dict[str, list[dict]] | None = Field(None, description="列头元数据 sub_table_id → ColumnDef[]")
+
+
+class SyncBatchFromWorkpaperRequest(BaseModel):
+    """多章节一次事务同步请求"""
+
+    wp_id: UUID
+    current_standard: str = Field(..., min_length=1)
+    items: list[SyncBatchItem] = Field(..., min_length=1)
+    year: int | None = None
+
+
+class StandardMismatchDetail(BaseModel):
+    """409 跨主体类型准则冲突详情"""
+
+    code: str = "STANDARD_MISMATCH"
+    detail: str
+    project_standard: str
+    requested_standard: str
+    allowed: list[str] = Field(default_factory=list)
+
+
+def _standard_mismatch_http(exc: StandardMismatchError) -> HTTPException:
+    """跨主体类型同步 → 409（拒绝写入，避免污染另一变体的章节）。"""
+    return HTTPException(
+        status_code=409,
+        detail={
+            "code": exc.code,
+            "detail": str(exc),
+            "project_standard": exc.project_standard,
+            "requested_standard": exc.requested_standard,
+            "allowed": exc.allowed,
+        },
+    )
+
+
+class SyncBatchFromWorkpaperResponse(BaseModel):
+    """批量同步结果"""
+
+    success: bool
+    sections_synced: int
+    rows_synced: int
+    texts_synced: int = 0
+    synced_at: str
+    results: list[dict] = Field(default_factory=list)
 
 
 # ─── Endpoint ────────────────────────────────────────────────────────────────
 
 
+async def _autorun_validation(
+    db: AsyncSession, project_id: UUID, year: int | None
+) -> None:
+    """底稿同步后自动补跑附注校验（P0-4，fail-open，不改响应体）。
+
+    year 缺省时由 ``run_validation_best_effort`` 的调用方负责——此处按
+    ``projects.audit_year`` 权威解析（与同步端点同口径），解析失败则跳过。
+    """
+    try:
+        from app.services.note_readiness_service import run_validation_best_effort
+        from app.services.wp_disclosure_sync_service import _resolve_target_year
+
+        eff_year = await _resolve_target_year(db, project_id, year)
+        if eff_year:
+            await run_validation_best_effort(db, project_id, eff_year)
+    except Exception as err:  # pragma: no cover — 纯附加动作
+        logger.warning("autorun validation after sync skipped: %s", err)
+
+
 @router.post(
     "/{project_id}/disclosure-notes/sync-from-workpaper",
     response_model=SyncFromWorkpaperResponse,
+    responses={
+        409: {
+            "model": StandardMismatchDetail,
+            "description": "current_standard 与项目主体类型冲突（拒绝写入）",
+        },
+    },
 )
 async def sync_disclosure_from_workpaper(
     project_id: UUID,
@@ -111,7 +211,10 @@ async def sync_disclosure_from_workpaper(
             current_standard=body.current_standard,
             user=current_user,
             year=body.year,
+            sub_table_columns=body.columns,
         )
+    except StandardMismatchError as exc:
+        raise _standard_mismatch_http(exc) from exc
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     except Exception as exc:  # pragma: no cover - defensive
@@ -125,7 +228,58 @@ async def sync_disclosure_from_workpaper(
             detail=f"附注同步失败: {exc}",
         ) from exc
 
+    # P0-4（附注联动复盘）：底稿同步成功（service 内已 commit）后自动补跑一次附注校验
+    # 并落库，使 findings 在附注树/看板上可见。fail-open，不影响已提交的同步结果。
+    await _autorun_validation(db, project_id, body.year)
+
     return SyncFromWorkpaperResponse(**result)
+
+
+@router.post(
+    "/{project_id}/disclosure-notes/sync-batch-from-workpaper",
+    response_model=SyncBatchFromWorkpaperResponse,
+    responses={
+        409: {
+            "model": StandardMismatchDetail,
+            "description": "current_standard 与项目主体类型冲突（拒绝写入）",
+        },
+    },
+)
+async def sync_disclosure_batch_from_workpaper(
+    project_id: UUID,
+    body: SyncBatchFromWorkpaperRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_project_access("edit")),
+) -> SyncBatchFromWorkpaperResponse:
+    """多章节一次事务同步（国企 G7 等跨章节编排器用）。"""
+    try:
+        result = await sync_batch_from_workpaper(
+            db,
+            project_id,
+            wp_id=body.wp_id,
+            current_standard=body.current_standard,
+            items=[item.model_dump() for item in body.items],
+            user=current_user,
+            year=body.year,
+        )
+    except StandardMismatchError as exc:
+        raise _standard_mismatch_http(exc) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    except Exception as exc:  # pragma: no cover - defensive
+        logger.exception(
+            "sync_disclosure_batch_from_workpaper failed: project=%s wp_id=%s",
+            project_id, body.wp_id,
+        )
+        await db.rollback()
+        raise HTTPException(
+            status_code=500,
+            detail=f"附注批量同步失败: {exc}",
+        ) from exc
+
+    await _autorun_validation(db, project_id, body.year)
+
+    return SyncBatchFromWorkpaperResponse(**result)
 
 
 # ─── US-3: HTML 渲染器路径同步端点 ───────────────────────────────────────────
@@ -139,6 +293,7 @@ class SyncFromHtmlRequest(BaseModel):
         default_factory=dict,
         description="子表数据",
     )
+    columns: dict | None = Field(None, description="列头元数据 sub_table_id → ColumnDef[]")
 
 
 class SyncFromHtmlResponse(BaseModel):
@@ -161,8 +316,8 @@ class ConflictDetail(BaseModel):
     last_sync_at: str | None = None
 
 
-@router.post(
-    "/api/wp-disclosure-sync/{wp_id}/sync-html",
+@html_sync_router.post(
+    "/{wp_id}/sync-html",
     response_model=SyncFromHtmlResponse,
     responses={
         409: {"model": ConflictDetail, "description": "附注侧有更新的手动编辑"},
@@ -201,6 +356,7 @@ async def sync_html_to_disclosure(
             sub_table_data=body.sub_table_data,
             project_id=project_id,
             user=current_user,
+            sub_table_columns=body.columns,
             force=force,
         )
     except ConflictError as exc:

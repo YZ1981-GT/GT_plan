@@ -1,0 +1,2813 @@
+{
+  "generated_at": "2026-08-08T04:32:25.170221+00:00",
+  "_source": "backend/scripts/diagnose/build_note_legacy_positional_pending.py（只读）",
+  "_policy": "positional 不得自动迁移（migrate 默认不带 --include-positional）；本清单供人工逐条裁决：能正名的先正名走 by_name，重名表须先解重名",
+  "summary": {
+    "total": 172,
+    "by_project": {
+      "重庆医药集团宜宾医药有限公司新健康大药房临港店_2025": 14,
+      "重庆和平药房连锁有限责任公司_2025": 6,
+      "重药控股安徽有限公司_2025": 41,
+      "陕西华氏医药有限公司_2025": 16,
+      "首汽租车_2025": 95
+    },
+    "by_risk": {
+      "MED": 172
+    },
+    "with_duplicate_names": 0
+  },
+  "items": [
+    {
+      "project": "重庆医药集团宜宾医药有限公司新健康大药房临港店_2025",
+      "note_section": "八、15",
+      "section_title": "债权投资",
+      "reason": "按序对齐（1 个名字不在模板中）⚠️ 需人工抽样确认",
+      "legacy_table_count": 6,
+      "planned_table_count": 6,
+      "legacy_row_total": 31,
+      "target_names": [
+        "债权投资情况",
+        "期末重要的债权投资",
+        "期末，处于第一阶段的债权投资的减值准备",
+        "期末，处于第二阶段的债权投资的减值准备",
+        "期末，处于第三阶段的债权投资的减值准备",
+        "本期计提、收回或转回的减值准备情况"
+      ],
+      "duplicate_target_names": [],
+      "suggested": "先按 target_name 正名 legacy 表 -> 走 by_name",
+      "risk": "MED：表数相等且目标名唯一，人工核对顺序后可迁"
+    },
+    {
+      "project": "重庆医药集团宜宾医药有限公司新健康大药房临港店_2025",
+      "note_section": "八、18",
+      "section_title": "长期股权投资",
+      "reason": "按序对齐（重名、4 个名字不在模板中）⚠️ 需人工抽样确认",
+      "legacy_table_count": 10,
+      "planned_table_count": 10,
+      "legacy_row_total": 76,
+      "target_names": [
+        "长期股权投资分类",
+        "长期股权投资明细",
+        "重要合营企业的主要财务信息（划分为持有待售的除外）",
+        "续：重要合营企业本期及上期经营成果",
+        "重要联营企业的主要财务信息",
+        "续：重要联营企业本期及上期经营成果",
+        "不重要合营企业和联营企业的汇总信息",
+        "②对合营企业或联营企业发生超额亏损的分担额",
+        "结构化主体权益的账面价值和最大损失敞口",
+        "结构化主体获得收益及转移资产情况"
+      ],
+      "duplicate_target_names": [],
+      "suggested": "先按 target_name 正名 legacy 表 -> 走 by_name",
+      "risk": "MED：表数相等且目标名唯一，人工核对顺序后可迁"
+    },
+    {
+      "project": "重庆医药集团宜宾医药有限公司新健康大药房临港店_2025",
+      "note_section": "八、21",
+      "section_title": "投资性房地产",
+      "reason": "按序对齐（重名）⚠️ 需人工抽样确认",
+      "legacy_table_count": 3,
+      "planned_table_count": 3,
+      "legacy_row_total": 27,
+      "target_names": [
+        "以成本计量",
+        "以公允价值计量",
+        "未办妥产权证书的投资性房地产"
+      ],
+      "duplicate_target_names": [],
+      "suggested": "先按 target_name 正名 legacy 表 -> 走 by_name",
+      "risk": "MED：表数相等且目标名唯一，人工核对顺序后可迁"
+    },
+    {
+      "project": "重庆医药集团宜宾医药有限公司新健康大药房临港店_2025",
+      "note_section": "八、29",
+      "section_title": "商誉",
+      "reason": "按序对齐（1 个名字不在模板中）⚠️ 需人工抽样确认",
+      "legacy_table_count": 2,
+      "planned_table_count": 2,
+      "legacy_row_total": 8,
+      "target_names": [
+        "（1）商誉账面价值",
+        "（2）商誉减值准备"
+      ],
+      "duplicate_target_names": [],
+      "suggested": "先按 target_name 正名 legacy 表 -> 走 by_name",
+      "risk": "MED：表数相等且目标名唯一，人工核对顺序后可迁"
+    },
+    {
+      "project": "重庆医药集团宜宾医药有限公司新健康大药房临港店_2025",
+      "note_section": "八、38",
+      "section_title": "预收款项",
+      "reason": "按序对齐（1 个名字不在模板中）⚠️ 需人工抽样确认",
+      "legacy_table_count": 2,
+      "planned_table_count": 2,
+      "legacy_row_total": 4,
+      "target_names": [
+        "预收款项",
+        "账龄超过1年的重要预收账款"
+      ],
+      "duplicate_target_names": [],
+      "suggested": "先按 target_name 正名 legacy 表 -> 走 by_name",
+      "risk": "MED：表数相等且目标名唯一，人工核对顺序后可迁"
+    },
+    {
+      "project": "重庆医药集团宜宾医药有限公司新健康大药房临港店_2025",
+      "note_section": "八、39",
+      "section_title": "合同负债",
+      "reason": "按序对齐（1 个名字不在模板中）⚠️ 需人工抽样确认",
+      "legacy_table_count": 2,
+      "planned_table_count": 2,
+      "legacy_row_total": 8,
+      "target_names": [
+        "合同负债",
+        "本期合同负债账面价值的重大变动"
+      ],
+      "duplicate_target_names": [],
+      "suggested": "先按 target_name 正名 legacy 表 -> 走 by_name",
+      "risk": "MED：表数相等且目标名唯一，人工核对顺序后可迁"
+    },
+    {
+      "project": "重庆医药集团宜宾医药有限公司新健康大药房临港店_2025",
+      "note_section": "八、40",
+      "section_title": "应付职工薪酬",
+      "reason": "按序对齐（重名）⚠️ 需人工抽样确认",
+      "legacy_table_count": 3,
+      "planned_table_count": 3,
+      "legacy_row_total": 27,
+      "target_names": [
+        "应付职工薪酬列示",
+        "短期薪酬列示",
+        "设定提存计划列示"
+      ],
+      "duplicate_target_names": [],
+      "suggested": "先按 target_name 正名 legacy 表 -> 走 by_name",
+      "risk": "MED：表数相等且目标名唯一，人工核对顺序后可迁"
+    },
+    {
+      "project": "重庆医药集团宜宾医药有限公司新健康大药房临港店_2025",
+      "note_section": "八、42",
+      "section_title": "其他应付款",
+      "reason": "按序对齐（1 个名字不在模板中）⚠️ 需人工抽样确认",
+      "legacy_table_count": 6,
+      "planned_table_count": 6,
+      "legacy_row_total": 19,
+      "target_names": [
+        "其他应付款",
+        "应付利息",
+        "重要的已逾期未支付的利息情况",
+        "应付股利",
+        "按款项性质列示",
+        "账龄超过1年的重要其他应付款项"
+      ],
+      "duplicate_target_names": [],
+      "suggested": "先按 target_name 正名 legacy 表 -> 走 by_name",
+      "risk": "MED：表数相等且目标名唯一，人工核对顺序后可迁"
+    },
+    {
+      "project": "重庆医药集团宜宾医药有限公司新健康大药房临港店_2025",
+      "note_section": "八、64",
+      "section_title": "营业收入、营业成本",
+      "reason": "按序对齐（2 个名字不在模板中）⚠️ 需人工抽样确认",
+      "legacy_table_count": 5,
+      "planned_table_count": 5,
+      "legacy_row_total": 32,
+      "target_names": [
+        "营业收入、营业成本",
+        "按行业（或产品类型）划分",
+        "营业收入、营业成本按地区划分",
+        "营业收入分解信息",
+        "与剩余履约义务有关的信息"
+      ],
+      "duplicate_target_names": [],
+      "suggested": "先按 target_name 正名 legacy 表 -> 走 by_name",
+      "risk": "MED：表数相等且目标名唯一，人工核对顺序后可迁"
+    },
+    {
+      "project": "重庆医药集团宜宾医药有限公司新健康大药房临港店_2025",
+      "note_section": "八、67",
+      "section_title": "研发费用",
+      "reason": "按序对齐（1 个名字不在模板中）⚠️ 需人工抽样确认",
+      "legacy_table_count": 1,
+      "planned_table_count": 1,
+      "legacy_row_total": 6,
+      "target_names": [
+        "研发费用（按费用性质列示）"
+      ],
+      "duplicate_target_names": [],
+      "suggested": "先按 target_name 正名 legacy 表 -> 走 by_name",
+      "risk": "MED：表数相等且目标名唯一，人工核对顺序后可迁"
+    },
+    {
+      "project": "重庆医药集团宜宾医药有限公司新健康大药房临港店_2025",
+      "note_section": "八、72",
+      "section_title": "公允价值变动收益",
+      "reason": "按序对齐（表名非业务名）⚠️ 需人工抽样确认",
+      "legacy_table_count": 1,
+      "planned_table_count": 1,
+      "legacy_row_total": 8,
+      "target_names": [
+        "产生公允价值变动收益的来源"
+      ],
+      "duplicate_target_names": [],
+      "suggested": "先按 target_name 正名 legacy 表 -> 走 by_name",
+      "risk": "MED：表数相等且目标名唯一，人工核对顺序后可迁"
+    },
+    {
+      "project": "重庆医药集团宜宾医药有限公司新健康大药房临港店_2025",
+      "note_section": "八、78",
+      "section_title": "所得税费用",
+      "reason": "按序对齐（重名）⚠️ 需人工抽样确认",
+      "legacy_table_count": 2,
+      "planned_table_count": 2,
+      "legacy_row_total": 14,
+      "target_names": [
+        "所得税费用",
+        "会计利润与所得税费用调整过程"
+      ],
+      "duplicate_target_names": [],
+      "suggested": "先按 target_name 正名 legacy 表 -> 走 by_name",
+      "risk": "MED：表数相等且目标名唯一，人工核对顺序后可迁"
+    },
+    {
+      "project": "重庆医药集团宜宾医药有限公司新健康大药房临港店_2025",
+      "note_section": "十一、本公司的其他关联",
+      "section_title": "本公司的其他关联方情况",
+      "reason": "按序对齐（表名非业务名、1 个名字不在模板中）⚠️ 需人工抽样确认",
+      "legacy_table_count": 1,
+      "planned_table_count": 1,
+      "legacy_row_total": 0,
+      "target_names": [
+        "本公司的其他关联方情况"
+      ],
+      "duplicate_target_names": [],
+      "suggested": "先按 target_name 正名 legacy 表 -> 走 by_name",
+      "risk": "MED：表数相等且目标名唯一，人工核对顺序后可迁"
+    },
+    {
+      "project": "重庆医药集团宜宾医药有限公司新健康大药房临港店_2025",
+      "note_section": "十、资产负债表日后利",
+      "section_title": "资产负债表日后利润分配情况说明",
+      "reason": "按序对齐（表名非业务名、1 个名字不在模板中）⚠️ 需人工抽样确认",
+      "legacy_table_count": 1,
+      "planned_table_count": 1,
+      "legacy_row_total": 1,
+      "target_names": [
+        "资产负债表日后利润分配情况说明"
+      ],
+      "duplicate_target_names": [],
+      "suggested": "先按 target_name 正名 legacy 表 -> 走 by_name",
+      "risk": "MED：表数相等且目标名唯一，人工核对顺序后可迁"
+    },
+    {
+      "project": "重庆和平药房连锁有限责任公司_2025",
+      "note_section": "八、29",
+      "section_title": "商誉",
+      "reason": "按序对齐（1 个名字不在模板中）⚠️ 需人工抽样确认",
+      "legacy_table_count": 2,
+      "planned_table_count": 2,
+      "legacy_row_total": 8,
+      "target_names": [
+        "（1）商誉账面价值",
+        "（2）商誉减值准备"
+      ],
+      "duplicate_target_names": [],
+      "suggested": "先按 target_name 正名 legacy 表 -> 走 by_name",
+      "risk": "MED：表数相等且目标名唯一，人工核对顺序后可迁"
+    },
+    {
+      "project": "重庆和平药房连锁有限责任公司_2025",
+      "note_section": "八、39",
+      "section_title": "合同负债",
+      "reason": "按序对齐（1 个名字不在模板中）⚠️ 需人工抽样确认",
+      "legacy_table_count": 2,
+      "planned_table_count": 2,
+      "legacy_row_total": 8,
+      "target_names": [
+        "合同负债",
+        "本期合同负债账面价值的重大变动"
+      ],
+      "duplicate_target_names": [],
+      "suggested": "先按 target_name 正名 legacy 表 -> 走 by_name",
+      "risk": "MED：表数相等且目标名唯一，人工核对顺序后可迁"
+    },
+    {
+      "project": "重庆和平药房连锁有限责任公司_2025",
+      "note_section": "八、64",
+      "section_title": "营业收入、营业成本",
+      "reason": "按序对齐（2 个名字不在模板中）⚠️ 需人工抽样确认",
+      "legacy_table_count": 5,
+      "planned_table_count": 5,
+      "legacy_row_total": 32,
+      "target_names": [
+        "营业收入、营业成本",
+        "按行业（或产品类型）划分",
+        "营业收入、营业成本按地区划分",
+        "营业收入分解信息",
+        "与剩余履约义务有关的信息"
+      ],
+      "duplicate_target_names": [],
+      "suggested": "先按 target_name 正名 legacy 表 -> 走 by_name",
+      "risk": "MED：表数相等且目标名唯一，人工核对顺序后可迁"
+    },
+    {
+      "project": "重庆和平药房连锁有限责任公司_2025",
+      "note_section": "八、78",
+      "section_title": "所得税费用",
+      "reason": "按序对齐（重名）⚠️ 需人工抽样确认",
+      "legacy_table_count": 2,
+      "planned_table_count": 2,
+      "legacy_row_total": 14,
+      "target_names": [
+        "所得税费用",
+        "会计利润与所得税费用调整过程"
+      ],
+      "duplicate_target_names": [],
+      "suggested": "先按 target_name 正名 legacy 表 -> 走 by_name",
+      "risk": "MED：表数相等且目标名唯一，人工核对顺序后可迁"
+    },
+    {
+      "project": "重庆和平药房连锁有限责任公司_2025",
+      "note_section": "十一、本公司的其他关联",
+      "section_title": "本公司的其他关联方情况",
+      "reason": "按序对齐（表名非业务名、1 个名字不在模板中）⚠️ 需人工抽样确认",
+      "legacy_table_count": 1,
+      "planned_table_count": 1,
+      "legacy_row_total": 0,
+      "target_names": [
+        "本公司的其他关联方情况"
+      ],
+      "duplicate_target_names": [],
+      "suggested": "先按 target_name 正名 legacy 表 -> 走 by_name",
+      "risk": "MED：表数相等且目标名唯一，人工核对顺序后可迁"
+    },
+    {
+      "project": "重庆和平药房连锁有限责任公司_2025",
+      "note_section": "十、资产负债表日后利",
+      "section_title": "资产负债表日后利润分配情况说明",
+      "reason": "按序对齐（表名非业务名、1 个名字不在模板中）⚠️ 需人工抽样确认",
+      "legacy_table_count": 1,
+      "planned_table_count": 1,
+      "legacy_row_total": 1,
+      "target_names": [
+        "资产负债表日后利润分配情况说明"
+      ],
+      "duplicate_target_names": [],
+      "suggested": "先按 target_name 正名 legacy 表 -> 走 by_name",
+      "risk": "MED：表数相等且目标名唯一，人工核对顺序后可迁"
+    },
+    {
+      "project": "重药控股安徽有限公司_2025",
+      "note_section": "三、信用减值损失（损",
+      "section_title": "信用减值损失",
+      "reason": "按序对齐（表名非业务名）⚠️ 需人工抽样确认",
+      "legacy_table_count": 1,
+      "planned_table_count": 1,
+      "legacy_row_total": 10,
+      "target_names": [
+        "项  目"
+      ],
+      "duplicate_target_names": [],
+      "suggested": "先按 target_name 正名 legacy 表 -> 走 by_name",
+      "risk": "MED：表数相等且目标名唯一，人工核对顺序后可迁"
+    },
+    {
+      "project": "重药控股安徽有限公司_2025",
+      "note_section": "三、反向购买",
+      "section_title": "反向购买",
+      "reason": "按序对齐（表名非业务名、1 个名字不在模板中）⚠️ 需人工抽样确认",
+      "legacy_table_count": 1,
+      "planned_table_count": 1,
+      "legacy_row_total": 0,
+      "target_names": [
+        "反向购买"
+      ],
+      "duplicate_target_names": [],
+      "suggested": "先按 target_name 正名 legacy 表 -> 走 by_name",
+      "risk": "MED：表数相等且目标名唯一，人工核对顺序后可迁"
+    },
+    {
+      "project": "重药控股安徽有限公司_2025",
+      "note_section": "三、固定资产",
+      "section_title": "固定资产",
+      "reason": "按序对齐（1 个名字不在模板中）⚠️ 需人工抽样确认",
+      "legacy_table_count": 1,
+      "planned_table_count": 1,
+      "legacy_row_total": 5,
+      "target_names": [
+        "各类固定资产的折旧方法"
+      ],
+      "duplicate_target_names": [],
+      "suggested": "先按 target_name 正名 legacy 表 -> 走 by_name",
+      "risk": "MED：表数相等且目标名唯一，人工核对顺序后可迁"
+    },
+    {
+      "project": "重药控股安徽有限公司_2025",
+      "note_section": "三、开发支出",
+      "section_title": "开发支出",
+      "reason": "按序对齐（重名、表名非业务名、3 个名字不在模板中）⚠️ 需人工抽样确认",
+      "legacy_table_count": 3,
+      "planned_table_count": 3,
+      "legacy_row_total": 2,
+      "target_names": [
+        "开发支出（表1）",
+        "开发支出（表2）",
+        "开发支出（表3）"
+      ],
+      "duplicate_target_names": [],
+      "suggested": "先按 target_name 正名 legacy 表 -> 走 by_name",
+      "risk": "MED：表数相等且目标名唯一，人工核对顺序后可迁"
+    },
+    {
+      "project": "重药控股安徽有限公司_2025",
+      "note_section": "三、所得税费用",
+      "section_title": "所得税费用",
+      "reason": "按序对齐（重名、表名非业务名、2 个名字不在模板中）⚠️ 需人工抽样确认",
+      "legacy_table_count": 2,
+      "planned_table_count": 2,
+      "legacy_row_total": 16,
+      "target_names": [
+        "所得税费用明细",
+        "所得税费用与利润总额的关系"
+      ],
+      "duplicate_target_names": [],
+      "suggested": "先按 target_name 正名 legacy 表 -> 走 by_name",
+      "risk": "MED：表数相等且目标名唯一，人工核对顺序后可迁"
+    },
+    {
+      "project": "重药控股安徽有限公司_2025",
+      "note_section": "三、本公司的母公司情",
+      "section_title": "本公司的母公司情况",
+      "reason": "按序对齐（表名非业务名、2 个名字不在模板中）⚠️ 需人工抽样确认",
+      "legacy_table_count": 2,
+      "planned_table_count": 2,
+      "legacy_row_total": 0,
+      "target_names": [
+        "本公司的母公司情况（表1）",
+        "本公司的母公司情况（表2）"
+      ],
+      "duplicate_target_names": [],
+      "suggested": "先按 target_name 正名 legacy 表 -> 走 by_name",
+      "risk": "MED：表数相等且目标名唯一，人工核对顺序后可迁"
+    },
+    {
+      "project": "重药控股安徽有限公司_2025",
+      "note_section": "三、本年返还政府补助",
+      "section_title": "本年返还政府补助情况",
+      "reason": "按序对齐（表名非业务名、1 个名字不在模板中）⚠️ 需人工抽样确认",
+      "legacy_table_count": 1,
+      "planned_table_count": 1,
+      "legacy_row_total": 2,
+      "target_names": [
+        "本年返还政府补助情况"
+      ],
+      "duplicate_target_names": [],
+      "suggested": "先按 target_name 正名 legacy 表 -> 走 by_name",
+      "risk": "MED：表数相等且目标名唯一，人工核对顺序后可迁"
+    },
+    {
+      "project": "重药控股安徽有限公司_2025",
+      "note_section": "三、生物资产【不适用",
+      "section_title": "生物资产",
+      "reason": "按序对齐（1 个名字不在模板中）⚠️ 需人工抽样确认",
+      "legacy_table_count": 1,
+      "planned_table_count": 1,
+      "legacy_row_total": 12,
+      "target_names": [
+        "生产性生物资产"
+      ],
+      "duplicate_target_names": [],
+      "suggested": "先按 target_name 正名 legacy 表 -> 走 by_name",
+      "risk": "MED：表数相等且目标名唯一，人工核对顺序后可迁"
+    },
+    {
+      "project": "重药控股安徽有限公司_2025",
+      "note_section": "三、研发支出",
+      "section_title": "研发支出",
+      "reason": "按序对齐（表名非业务名、1 个名字不在模板中）⚠️ 需人工抽样确认",
+      "legacy_table_count": 1,
+      "planned_table_count": 1,
+      "legacy_row_total": 9,
+      "target_names": [
+        "研发支出"
+      ],
+      "duplicate_target_names": [],
+      "suggested": "先按 target_name 正名 legacy 表 -> 走 by_name",
+      "risk": "MED：表数相等且目标名唯一，人工核对顺序后可迁"
+    },
+    {
+      "project": "重药控股安徽有限公司_2025",
+      "note_section": "三、营业外支出（注：",
+      "section_title": "营业外支出",
+      "reason": "按序对齐（表名非业务名、1 个名字不在模板中）⚠️ 需人工抽样确认",
+      "legacy_table_count": 1,
+      "planned_table_count": 1,
+      "legacy_row_total": 7,
+      "target_names": [
+        "营业外支出"
+      ],
+      "duplicate_target_names": [],
+      "suggested": "先按 target_name 正名 legacy 表 -> 走 by_name",
+      "risk": "MED：表数相等且目标名唯一，人工核对顺序后可迁"
+    },
+    {
+      "project": "重药控股安徽有限公司_2025",
+      "note_section": "三、营业外收入（注：",
+      "section_title": "营业外收入",
+      "reason": "按序对齐（表名非业务名、1 个名字不在模板中）⚠️ 需人工抽样确认",
+      "legacy_table_count": 1,
+      "planned_table_count": 1,
+      "legacy_row_total": 6,
+      "target_names": [
+        "营业外收入"
+      ],
+      "duplicate_target_names": [],
+      "suggested": "先按 target_name 正名 legacy 表 -> 走 by_name",
+      "risk": "MED：表数相等且目标名唯一，人工核对顺序后可迁"
+    },
+    {
+      "project": "重药控股安徽有限公司_2025",
+      "note_section": "三、计入其他应收款的",
+      "section_title": "计入其他应收款的政府补助",
+      "reason": "按序对齐（表名非业务名、1 个名字不在模板中）⚠️ 需人工抽样确认",
+      "legacy_table_count": 1,
+      "planned_table_count": 1,
+      "legacy_row_total": 4,
+      "target_names": [
+        "计入其他应收款的政府补助"
+      ],
+      "duplicate_target_names": [],
+      "suggested": "先按 target_name 正名 legacy 表 -> 走 by_name",
+      "risk": "MED：表数相等且目标名唯一，人工核对顺序后可迁"
+    },
+    {
+      "project": "重药控股安徽有限公司_2025",
+      "note_section": "三、资产减值损失（损",
+      "section_title": "资产减值损失",
+      "reason": "按序对齐（表名非业务名、1 个名字不在模板中）⚠️ 需人工抽样确认",
+      "legacy_table_count": 1,
+      "planned_table_count": 1,
+      "legacy_row_total": 18,
+      "target_names": [
+        "资产减值损失"
+      ],
+      "duplicate_target_names": [],
+      "suggested": "先按 target_name 正名 legacy 表 -> 走 by_name",
+      "risk": "MED：表数相等且目标名唯一，人工核对顺序后可迁"
+    },
+    {
+      "project": "重药控股安徽有限公司_2025",
+      "note_section": "三、资产处置收益（损",
+      "section_title": "资产处置收益",
+      "reason": "按序对齐（重名、表名非业务名、2 个名字不在模板中）⚠️ 需人工抽样确认",
+      "legacy_table_count": 2,
+      "planned_table_count": 2,
+      "legacy_row_total": 13,
+      "target_names": [
+        "资产处置收益（损失以“-”填列）",
+        "试运行销售损益"
+      ],
+      "duplicate_target_names": [],
+      "suggested": "先按 target_name 正名 legacy 表 -> 走 by_name",
+      "risk": "MED：表数相等且目标名唯一，人工核对顺序后可迁"
+    },
+    {
+      "project": "重药控股安徽有限公司_2025",
+      "note_section": "三、重要性标准确定方",
+      "section_title": "重要性标准确定方法和选择依据",
+      "reason": "按序对齐（表名非业务名、1 个名字不在模板中）⚠️ 需人工抽样确认",
+      "legacy_table_count": 1,
+      "planned_table_count": 1,
+      "legacy_row_total": 8,
+      "target_names": [
+        "重要性标准确定方法和选择依据"
+      ],
+      "duplicate_target_names": [],
+      "suggested": "先按 target_name 正名 legacy 表 -> 走 by_name",
+      "risk": "MED：表数相等且目标名唯一，人工核对顺序后可迁"
+    },
+    {
+      "project": "重药控股安徽有限公司_2025",
+      "note_section": "五、19",
+      "section_title": "其他权益工具投资",
+      "reason": "按序对齐（表名非业务名、1 个名字不在模板中）⚠️ 需人工抽样确认",
+      "legacy_table_count": 2,
+      "planned_table_count": 2,
+      "legacy_row_total": 4,
+      "target_names": [
+        "其他权益工具投资",
+        "期末其他权益工具投资情况"
+      ],
+      "duplicate_target_names": [],
+      "suggested": "先按 target_name 正名 legacy 表 -> 走 by_name",
+      "risk": "MED：表数相等且目标名唯一，人工核对顺序后可迁"
+    },
+    {
+      "project": "重药控股安徽有限公司_2025",
+      "note_section": "五、69",
+      "section_title": "投资收益",
+      "reason": "按序对齐（表名非业务名）⚠️ 需人工抽样确认",
+      "legacy_table_count": 2,
+      "planned_table_count": 2,
+      "legacy_row_total": 23,
+      "target_names": [
+        "投资收益",
+        "项  目"
+      ],
+      "duplicate_target_names": [],
+      "suggested": "先按 target_name 正名 legacy 表 -> 走 by_name",
+      "risk": "MED：表数相等且目标名唯一，人工核对顺序后可迁"
+    },
+    {
+      "project": "重药控股安徽有限公司_2025",
+      "note_section": "五、70",
+      "section_title": "净敞口套期收益",
+      "reason": "按序对齐（表名非业务名、1 个名字不在模板中）⚠️ 需人工抽样确认",
+      "legacy_table_count": 1,
+      "planned_table_count": 1,
+      "legacy_row_total": 4,
+      "target_names": [
+        "净敞口套期收益"
+      ],
+      "duplicate_target_names": [],
+      "suggested": "先按 target_name 正名 legacy 表 -> 走 by_name",
+      "risk": "MED：表数相等且目标名唯一，人工核对顺序后可迁"
+    },
+    {
+      "project": "重药控股安徽有限公司_2025",
+      "note_section": "八、19",
+      "section_title": "其他权益工具投资",
+      "reason": "按序对齐（1 个名字不在模板中）⚠️ 需人工抽样确认",
+      "legacy_table_count": 2,
+      "planned_table_count": 2,
+      "legacy_row_total": 9,
+      "target_names": [
+        "其他权益工具投资",
+        "期末其他权益工具投资情况"
+      ],
+      "duplicate_target_names": [],
+      "suggested": "先按 target_name 正名 legacy 表 -> 走 by_name",
+      "risk": "MED：表数相等且目标名唯一，人工核对顺序后可迁"
+    },
+    {
+      "project": "重药控股安徽有限公司_2025",
+      "note_section": "八、21",
+      "section_title": "投资性房地产",
+      "reason": "按序对齐（3 个名字不在模板中）⚠️ 需人工抽样确认",
+      "legacy_table_count": 3,
+      "planned_table_count": 3,
+      "legacy_row_total": 28,
+      "target_names": [
+        "按成本计量的投资性房地产",
+        "按公允价值计量的投资性房地产",
+        "未办妥产权证书的情况"
+      ],
+      "duplicate_target_names": [],
+      "suggested": "先按 target_name 正名 legacy 表 -> 走 by_name",
+      "risk": "MED：表数相等且目标名唯一，人工核对顺序后可迁"
+    },
+    {
+      "project": "重药控股安徽有限公司_2025",
+      "note_section": "八、24",
+      "section_title": "生产性生物资产",
+      "reason": "按序对齐（2 个名字不在模板中）⚠️ 需人工抽样确认",
+      "legacy_table_count": 2,
+      "planned_table_count": 2,
+      "legacy_row_total": 18,
+      "target_names": [
+        "（1）以成本计量",
+        "（2）以公允价值计量"
+      ],
+      "duplicate_target_names": [],
+      "suggested": "先按 target_name 正名 legacy 表 -> 走 by_name",
+      "risk": "MED：表数相等且目标名唯一，人工核对顺序后可迁"
+    },
+    {
+      "project": "重药控股安徽有限公司_2025",
+      "note_section": "八、33",
+      "section_title": "短期借款",
+      "reason": "按序对齐（1 个名字不在模板中）⚠️ 需人工抽样确认",
+      "legacy_table_count": 2,
+      "planned_table_count": 2,
+      "legacy_row_total": 6,
+      "target_names": [
+        "短期借款分类",
+        "（2）逾期借款情况"
+      ],
+      "duplicate_target_names": [],
+      "suggested": "先按 target_name 正名 legacy 表 -> 走 by_name",
+      "risk": "MED：表数相等且目标名唯一，人工核对顺序后可迁"
+    },
+    {
+      "project": "重药控股安徽有限公司_2025",
+      "note_section": "八、37",
+      "section_title": "应付账款",
+      "reason": "按序对齐（1 个名字不在模板中）⚠️ 需人工抽样确认",
+      "legacy_table_count": 2,
+      "planned_table_count": 2,
+      "legacy_row_total": 8,
+      "target_names": [
+        "应付账款",
+        "其中，账龄超过1年的重要应付账款"
+      ],
+      "duplicate_target_names": [],
+      "suggested": "先按 target_name 正名 legacy 表 -> 走 by_name",
+      "risk": "MED：表数相等且目标名唯一，人工核对顺序后可迁"
+    },
+    {
+      "project": "重药控股安徽有限公司_2025",
+      "note_section": "八、40",
+      "section_title": "应付职工薪酬",
+      "reason": "按序对齐（3 个名字不在模板中）⚠️ 需人工抽样确认",
+      "legacy_table_count": 3,
+      "planned_table_count": 3,
+      "legacy_row_total": 28,
+      "target_names": [
+        "应付职工薪酬",
+        "短期薪酬",
+        "设定提存计划"
+      ],
+      "duplicate_target_names": [],
+      "suggested": "先按 target_name 正名 legacy 表 -> 走 by_name",
+      "risk": "MED：表数相等且目标名唯一，人工核对顺序后可迁"
+    },
+    {
+      "project": "重药控股安徽有限公司_2025",
+      "note_section": "八、53",
+      "section_title": "长期应付款",
+      "reason": "按序对齐（2 个名字不在模板中）⚠️ 需人工抽样确认",
+      "legacy_table_count": 3,
+      "planned_table_count": 3,
+      "legacy_row_total": 19,
+      "target_names": [
+        "长期应付款",
+        "长期应付款（按款项性质列示）",
+        "专项应付款"
+      ],
+      "duplicate_target_names": [],
+      "suggested": "先按 target_name 正名 legacy 表 -> 走 by_name",
+      "risk": "MED：表数相等且目标名唯一，人工核对顺序后可迁"
+    },
+    {
+      "project": "重药控股安徽有限公司_2025",
+      "note_section": "八、65",
+      "section_title": "销售费用",
+      "reason": "按序对齐（1 个名字不在模板中）⚠️ 需人工抽样确认",
+      "legacy_table_count": 1,
+      "planned_table_count": 1,
+      "legacy_row_total": 4,
+      "target_names": [
+        "销售费用（按费用性质列示）"
+      ],
+      "duplicate_target_names": [],
+      "suggested": "先按 target_name 正名 legacy 表 -> 走 by_name",
+      "risk": "MED：表数相等且目标名唯一，人工核对顺序后可迁"
+    },
+    {
+      "project": "重药控股安徽有限公司_2025",
+      "note_section": "八、66",
+      "section_title": "管理费用",
+      "reason": "按序对齐（1 个名字不在模板中）⚠️ 需人工抽样确认",
+      "legacy_table_count": 1,
+      "planned_table_count": 1,
+      "legacy_row_total": 2,
+      "target_names": [
+        "管理费用（按费用性质列示）"
+      ],
+      "duplicate_target_names": [],
+      "suggested": "先按 target_name 正名 legacy 表 -> 走 by_name",
+      "risk": "MED：表数相等且目标名唯一，人工核对顺序后可迁"
+    },
+    {
+      "project": "重药控股安徽有限公司_2025",
+      "note_section": "八、68",
+      "section_title": "财务费用",
+      "reason": "按序对齐（1 个名字不在模板中）⚠️ 需人工抽样确认",
+      "legacy_table_count": 1,
+      "planned_table_count": 1,
+      "legacy_row_total": 12,
+      "target_names": [
+        "财务费用（按费用性质列示）"
+      ],
+      "duplicate_target_names": [],
+      "suggested": "先按 target_name 正名 legacy 表 -> 走 by_name",
+      "risk": "MED：表数相等且目标名唯一，人工核对顺序后可迁"
+    },
+    {
+      "project": "重药控股安徽有限公司_2025",
+      "note_section": "八、7",
+      "section_title": "预付款项",
+      "reason": "按序对齐（3 个名字不在模板中）⚠️ 需人工抽样确认",
+      "legacy_table_count": 3,
+      "planned_table_count": 3,
+      "legacy_row_total": 19,
+      "target_names": [
+        "预付款项按账龄披露",
+        "账龄超过1年的重要预付款项",
+        "按预付对象归集的预付款项期末余额前五名单位情况"
+      ],
+      "duplicate_target_names": [],
+      "suggested": "先按 target_name 正名 legacy 表 -> 走 by_name",
+      "risk": "MED：表数相等且目标名唯一，人工核对顺序后可迁"
+    },
+    {
+      "project": "重药控股安徽有限公司_2025",
+      "note_section": "八、73",
+      "section_title": "信用减值损失",
+      "reason": "按序对齐（1 个名字不在模板中）⚠️ 需人工抽样确认",
+      "legacy_table_count": 1,
+      "planned_table_count": 1,
+      "legacy_row_total": 5,
+      "target_names": [
+        "项  目"
+      ],
+      "duplicate_target_names": [],
+      "suggested": "先按 target_name 正名 legacy 表 -> 走 by_name",
+      "risk": "MED：表数相等且目标名唯一，人工核对顺序后可迁"
+    },
+    {
+      "project": "重药控股安徽有限公司_2025",
+      "note_section": "八、78",
+      "section_title": "所得税费用",
+      "reason": "按序对齐（2 个名字不在模板中）⚠️ 需人工抽样确认",
+      "legacy_table_count": 2,
+      "planned_table_count": 2,
+      "legacy_row_total": 14,
+      "target_names": [
+        "所得税费用明细",
+        "所得税费用与利润总额的关系"
+      ],
+      "duplicate_target_names": [],
+      "suggested": "先按 target_name 正名 legacy 表 -> 走 by_name",
+      "risk": "MED：表数相等且目标名唯一，人工核对顺序后可迁"
+    },
+    {
+      "project": "重药控股安徽有限公司_2025",
+      "note_section": "八、81",
+      "section_title": "现金流量表项目注释",
+      "reason": "按序对齐（6 个名字不在模板中）⚠️ 需人工抽样确认",
+      "legacy_table_count": 9,
+      "planned_table_count": 9,
+      "legacy_row_total": 14,
+      "target_names": [
+        "收到其他与经营活动有关的现金",
+        "支付其他与经营活动有关的现金",
+        "收到的重要的投资活动有关的现金",
+        "收到其他与投资活动有关的现金",
+        "支付的重要的投资活动有关的现金",
+        "支付其他与投资活动有关的现金",
+        "收到其他与筹资活动有关的现金",
+        "支付其他与筹资活动有关的现金",
+        "筹资活动产生的各项负债的变动情况"
+      ],
+      "duplicate_target_names": [],
+      "suggested": "先按 target_name 正名 legacy 表 -> 走 by_name",
+      "risk": "MED：表数相等且目标名唯一，人工核对顺序后可迁"
+    },
+    {
+      "project": "重药控股安徽有限公司_2025",
+      "note_section": "十一、关联方应收应付款",
+      "section_title": "关联方应收应付款项",
+      "reason": "按序对齐（2 个名字不在模板中）⚠️ 需人工抽样确认",
+      "legacy_table_count": 2,
+      "planned_table_count": 2,
+      "legacy_row_total": 3,
+      "target_names": [
+        "应收关联方款项（注意：是报表项目）",
+        "应付关联方款项（注意：是报表项目）"
+      ],
+      "duplicate_target_names": [],
+      "suggested": "先按 target_name 正名 legacy 表 -> 走 by_name",
+      "risk": "MED：表数相等且目标名唯一，人工核对顺序后可迁"
+    },
+    {
+      "project": "重药控股安徽有限公司_2025",
+      "note_section": "十一、本公司的其他关联",
+      "section_title": "本公司的其他关联方情况",
+      "reason": "按序对齐（表名非业务名、1 个名字不在模板中）⚠️ 需人工抽样确认",
+      "legacy_table_count": 1,
+      "planned_table_count": 1,
+      "legacy_row_total": 1,
+      "target_names": [
+        "本公司的其他关联方情况"
+      ],
+      "duplicate_target_names": [],
+      "suggested": "先按 target_name 正名 legacy 表 -> 走 by_name",
+      "risk": "MED：表数相等且目标名唯一，人工核对顺序后可迁"
+    },
+    {
+      "project": "重药控股安徽有限公司_2025",
+      "note_section": "十一、本公司的母公司情",
+      "section_title": "本公司的母公司情况",
+      "reason": "按序对齐（1 个名字不在模板中）⚠️ 需人工抽样确认",
+      "legacy_table_count": 2,
+      "planned_table_count": 2,
+      "legacy_row_total": 0,
+      "target_names": [
+        "本公司的母公司情况（表1）",
+        "本公司的母公司情况（表2）"
+      ],
+      "duplicate_target_names": [],
+      "suggested": "先按 target_name 正名 legacy 表 -> 走 by_name",
+      "risk": "MED：表数相等且目标名唯一，人工核对顺序后可迁"
+    },
+    {
+      "project": "重药控股安徽有限公司_2025",
+      "note_section": "十二、本期股份支付费用",
+      "section_title": "本期股份支付费用",
+      "reason": "按序对齐（表名非业务名、1 个名字不在模板中）⚠️ 需人工抽样确认",
+      "legacy_table_count": 1,
+      "planned_table_count": 1,
+      "legacy_row_total": 4,
+      "target_names": [
+        "本期股份支付费用"
+      ],
+      "duplicate_target_names": [],
+      "suggested": "先按 target_name 正名 legacy 表 -> 走 by_name",
+      "risk": "MED：表数相等且目标名唯一，人工核对顺序后可迁"
+    },
+    {
+      "project": "重药控股安徽有限公司_2025",
+      "note_section": "十四、其他",
+      "section_title": "其他",
+      "reason": "按序对齐（表名非业务名、2 个名字不在模板中）⚠️ 需人工抽样确认",
+      "legacy_table_count": 2,
+      "planned_table_count": 2,
+      "legacy_row_total": 0,
+      "target_names": [
+        "其他（表1）",
+        "其他（表2）"
+      ],
+      "duplicate_target_names": [],
+      "suggested": "先按 target_name 正名 legacy 表 -> 走 by_name",
+      "risk": "MED：表数相等且目标名唯一，人工核对顺序后可迁"
+    },
+    {
+      "project": "重药控股安徽有限公司_2025",
+      "note_section": "十四、前期差错更正",
+      "section_title": "前期差错更正",
+      "reason": "按序对齐（重名、表名非业务名、2 个名字不在模板中）⚠️ 需人工抽样确认",
+      "legacy_table_count": 2,
+      "planned_table_count": 2,
+      "legacy_row_total": 0,
+      "target_names": [
+        "追溯重述法",
+        "未来适用法"
+      ],
+      "duplicate_target_names": [],
+      "suggested": "先按 target_name 正名 legacy 表 -> 走 by_name",
+      "risk": "MED：表数相等且目标名唯一，人工核对顺序后可迁"
+    },
+    {
+      "project": "重药控股安徽有限公司_2025",
+      "note_section": "十四、终止经营",
+      "section_title": "终止经营",
+      "reason": "按序对齐（表名非业务名、1 个名字不在模板中）⚠️ 需人工抽样确认",
+      "legacy_table_count": 1,
+      "planned_table_count": 1,
+      "legacy_row_total": 15,
+      "target_names": [
+        "终止经营"
+      ],
+      "duplicate_target_names": [],
+      "suggested": "先按 target_name 正名 legacy 表 -> 走 by_name",
+      "risk": "MED：表数相等且目标名唯一，人工核对顺序后可迁"
+    },
+    {
+      "project": "重药控股安徽有限公司_2025",
+      "note_section": "十四、资产负债表日后利",
+      "section_title": "资产负债表日后利润分配情况（只写现金分配，若仅有转增，则不写）",
+      "reason": "按序对齐（表名非业务名、1 个名字不在模板中）⚠️ 需人工抽样确认",
+      "legacy_table_count": 1,
+      "planned_table_count": 1,
+      "legacy_row_total": 1,
+      "target_names": [
+        "资产负债表日后利润分配情况（只写现金分配，若仅有转增，则不写）"
+      ],
+      "duplicate_target_names": [],
+      "suggested": "先按 target_name 正名 legacy 表 -> 走 by_name",
+      "risk": "MED：表数相等且目标名唯一，人工核对顺序后可迁"
+    },
+    {
+      "project": "重药控股安徽有限公司_2025",
+      "note_section": "四、主要税种及税率",
+      "section_title": "主要税种及税率",
+      "reason": "按序对齐（表名非业务名、1 个名字不在模板中）⚠️ 需人工抽样确认",
+      "legacy_table_count": 2,
+      "planned_table_count": 2,
+      "legacy_row_total": 4,
+      "target_names": [
+        "主要税种及税率",
+        "主要税种及税率（表2）"
+      ],
+      "duplicate_target_names": [],
+      "suggested": "先按 target_name 正名 legacy 表 -> 走 by_name",
+      "risk": "MED：表数相等且目标名唯一，人工核对顺序后可迁"
+    },
+    {
+      "project": "陕西华氏医药有限公司_2025",
+      "note_section": "八、12",
+      "section_title": "持有待售资产",
+      "reason": "按序对齐（重名）⚠️ 需人工抽样确认",
+      "legacy_table_count": 4,
+      "planned_table_count": 4,
+      "legacy_row_total": 22,
+      "target_names": [
+        "持有待售资产",
+        "持有待售资产减值准备",
+        "持有待售非流动资产",
+        "持有待售处置组中的资产"
+      ],
+      "duplicate_target_names": [],
+      "suggested": "先按 target_name 正名 legacy 表 -> 走 by_name",
+      "risk": "MED：表数相等且目标名唯一，人工核对顺序后可迁"
+    },
+    {
+      "project": "陕西华氏医药有限公司_2025",
+      "note_section": "八、15",
+      "section_title": "债权投资",
+      "reason": "按序对齐（1 个名字不在模板中）⚠️ 需人工抽样确认",
+      "legacy_table_count": 6,
+      "planned_table_count": 6,
+      "legacy_row_total": 31,
+      "target_names": [
+        "债权投资情况",
+        "期末重要的债权投资",
+        "期末，处于第一阶段的债权投资的减值准备",
+        "期末，处于第二阶段的债权投资的减值准备",
+        "期末，处于第三阶段的债权投资的减值准备",
+        "本期计提、收回或转回的减值准备情况"
+      ],
+      "duplicate_target_names": [],
+      "suggested": "先按 target_name 正名 legacy 表 -> 走 by_name",
+      "risk": "MED：表数相等且目标名唯一，人工核对顺序后可迁"
+    },
+    {
+      "project": "陕西华氏医药有限公司_2025",
+      "note_section": "八、18",
+      "section_title": "长期股权投资",
+      "reason": "按序对齐（重名、4 个名字不在模板中）⚠️ 需人工抽样确认",
+      "legacy_table_count": 10,
+      "planned_table_count": 10,
+      "legacy_row_total": 76,
+      "target_names": [
+        "长期股权投资分类",
+        "长期股权投资明细",
+        "重要合营企业的主要财务信息（划分为持有待售的除外）",
+        "续：重要合营企业本期及上期经营成果",
+        "重要联营企业的主要财务信息",
+        "续：重要联营企业本期及上期经营成果",
+        "不重要合营企业和联营企业的汇总信息",
+        "②对合营企业或联营企业发生超额亏损的分担额",
+        "结构化主体权益的账面价值和最大损失敞口",
+        "结构化主体获得收益及转移资产情况"
+      ],
+      "duplicate_target_names": [],
+      "suggested": "先按 target_name 正名 legacy 表 -> 走 by_name",
+      "risk": "MED：表数相等且目标名唯一，人工核对顺序后可迁"
+    },
+    {
+      "project": "陕西华氏医药有限公司_2025",
+      "note_section": "八、21",
+      "section_title": "投资性房地产",
+      "reason": "按序对齐（重名）⚠️ 需人工抽样确认",
+      "legacy_table_count": 3,
+      "planned_table_count": 3,
+      "legacy_row_total": 27,
+      "target_names": [
+        "以成本计量",
+        "以公允价值计量",
+        "未办妥产权证书的投资性房地产"
+      ],
+      "duplicate_target_names": [],
+      "suggested": "先按 target_name 正名 legacy 表 -> 走 by_name",
+      "risk": "MED：表数相等且目标名唯一，人工核对顺序后可迁"
+    },
+    {
+      "project": "陕西华氏医药有限公司_2025",
+      "note_section": "八、29",
+      "section_title": "商誉",
+      "reason": "按序对齐（1 个名字不在模板中）⚠️ 需人工抽样确认",
+      "legacy_table_count": 2,
+      "planned_table_count": 2,
+      "legacy_row_total": 8,
+      "target_names": [
+        "（1）商誉账面价值",
+        "（2）商誉减值准备"
+      ],
+      "duplicate_target_names": [],
+      "suggested": "先按 target_name 正名 legacy 表 -> 走 by_name",
+      "risk": "MED：表数相等且目标名唯一，人工核对顺序后可迁"
+    },
+    {
+      "project": "陕西华氏医药有限公司_2025",
+      "note_section": "八、38",
+      "section_title": "预收款项",
+      "reason": "按序对齐（1 个名字不在模板中）⚠️ 需人工抽样确认",
+      "legacy_table_count": 2,
+      "planned_table_count": 2,
+      "legacy_row_total": 4,
+      "target_names": [
+        "预收款项",
+        "账龄超过1年的重要预收账款"
+      ],
+      "duplicate_target_names": [],
+      "suggested": "先按 target_name 正名 legacy 表 -> 走 by_name",
+      "risk": "MED：表数相等且目标名唯一，人工核对顺序后可迁"
+    },
+    {
+      "project": "陕西华氏医药有限公司_2025",
+      "note_section": "八、39",
+      "section_title": "合同负债",
+      "reason": "按序对齐（1 个名字不在模板中）⚠️ 需人工抽样确认",
+      "legacy_table_count": 2,
+      "planned_table_count": 2,
+      "legacy_row_total": 8,
+      "target_names": [
+        "合同负债",
+        "本期合同负债账面价值的重大变动"
+      ],
+      "duplicate_target_names": [],
+      "suggested": "先按 target_name 正名 legacy 表 -> 走 by_name",
+      "risk": "MED：表数相等且目标名唯一，人工核对顺序后可迁"
+    },
+    {
+      "project": "陕西华氏医药有限公司_2025",
+      "note_section": "八、4",
+      "section_title": "应收票据",
+      "reason": "按序对齐（重名、5 个名字不在模板中）⚠️ 需人工抽样确认",
+      "legacy_table_count": 12,
+      "planned_table_count": 12,
+      "legacy_row_total": 41,
+      "target_names": [
+        "应收票据分类",
+        "按坏账准备计提方法分类披露应收票据（期末数）",
+        "按坏账准备计提方法分类披露应收票据（续：期初数）",
+        "按单项计提坏账准备的应收票据",
+        "按组合计提坏账准备的应收票据",
+        "本期计提、收回或转回的应收票据坏账准备情况",
+        "本期转回或收回金额重要的应收票据坏账准备",
+        "期末已质押的应收票据",
+        "期末已背书或贴现但尚未到期的应收票据",
+        "期末因出票人未履约而其转为应收账款的票据",
+        "本期实际核销的应收票据",
+        "重要的应收票据核销情况"
+      ],
+      "duplicate_target_names": [],
+      "suggested": "先按 target_name 正名 legacy 表 -> 走 by_name",
+      "risk": "MED：表数相等且目标名唯一，人工核对顺序后可迁"
+    },
+    {
+      "project": "陕西华氏医药有限公司_2025",
+      "note_section": "八、40",
+      "section_title": "应付职工薪酬",
+      "reason": "按序对齐（重名）⚠️ 需人工抽样确认",
+      "legacy_table_count": 3,
+      "planned_table_count": 3,
+      "legacy_row_total": 27,
+      "target_names": [
+        "应付职工薪酬列示",
+        "短期薪酬列示",
+        "设定提存计划列示"
+      ],
+      "duplicate_target_names": [],
+      "suggested": "先按 target_name 正名 legacy 表 -> 走 by_name",
+      "risk": "MED：表数相等且目标名唯一，人工核对顺序后可迁"
+    },
+    {
+      "project": "陕西华氏医药有限公司_2025",
+      "note_section": "八、42",
+      "section_title": "其他应付款",
+      "reason": "按序对齐（1 个名字不在模板中）⚠️ 需人工抽样确认",
+      "legacy_table_count": 6,
+      "planned_table_count": 6,
+      "legacy_row_total": 19,
+      "target_names": [
+        "其他应付款",
+        "应付利息",
+        "重要的已逾期未支付的利息情况",
+        "应付股利",
+        "按款项性质列示",
+        "账龄超过1年的重要其他应付款项"
+      ],
+      "duplicate_target_names": [],
+      "suggested": "先按 target_name 正名 legacy 表 -> 走 by_name",
+      "risk": "MED：表数相等且目标名唯一，人工核对顺序后可迁"
+    },
+    {
+      "project": "陕西华氏医药有限公司_2025",
+      "note_section": "八、64",
+      "section_title": "营业收入、营业成本",
+      "reason": "按序对齐（2 个名字不在模板中）⚠️ 需人工抽样确认",
+      "legacy_table_count": 5,
+      "planned_table_count": 5,
+      "legacy_row_total": 32,
+      "target_names": [
+        "营业收入、营业成本",
+        "按行业（或产品类型）划分",
+        "营业收入、营业成本按地区划分",
+        "营业收入分解信息",
+        "与剩余履约义务有关的信息"
+      ],
+      "duplicate_target_names": [],
+      "suggested": "先按 target_name 正名 legacy 表 -> 走 by_name",
+      "risk": "MED：表数相等且目标名唯一，人工核对顺序后可迁"
+    },
+    {
+      "project": "陕西华氏医药有限公司_2025",
+      "note_section": "八、67",
+      "section_title": "研发费用",
+      "reason": "按序对齐（1 个名字不在模板中）⚠️ 需人工抽样确认",
+      "legacy_table_count": 1,
+      "planned_table_count": 1,
+      "legacy_row_total": 6,
+      "target_names": [
+        "研发费用（按费用性质列示）"
+      ],
+      "duplicate_target_names": [],
+      "suggested": "先按 target_name 正名 legacy 表 -> 走 by_name",
+      "risk": "MED：表数相等且目标名唯一，人工核对顺序后可迁"
+    },
+    {
+      "project": "陕西华氏医药有限公司_2025",
+      "note_section": "八、72",
+      "section_title": "公允价值变动收益",
+      "reason": "按序对齐（表名非业务名）⚠️ 需人工抽样确认",
+      "legacy_table_count": 1,
+      "planned_table_count": 1,
+      "legacy_row_total": 8,
+      "target_names": [
+        "产生公允价值变动收益的来源"
+      ],
+      "duplicate_target_names": [],
+      "suggested": "先按 target_name 正名 legacy 表 -> 走 by_name",
+      "risk": "MED：表数相等且目标名唯一，人工核对顺序后可迁"
+    },
+    {
+      "project": "陕西华氏医药有限公司_2025",
+      "note_section": "八、78",
+      "section_title": "所得税费用",
+      "reason": "按序对齐（重名）⚠️ 需人工抽样确认",
+      "legacy_table_count": 2,
+      "planned_table_count": 2,
+      "legacy_row_total": 14,
+      "target_names": [
+        "所得税费用",
+        "会计利润与所得税费用调整过程"
+      ],
+      "duplicate_target_names": [],
+      "suggested": "先按 target_name 正名 legacy 表 -> 走 by_name",
+      "risk": "MED：表数相等且目标名唯一，人工核对顺序后可迁"
+    },
+    {
+      "project": "陕西华氏医药有限公司_2025",
+      "note_section": "十一、本公司的其他关联",
+      "section_title": "本公司的其他关联方情况",
+      "reason": "按序对齐（表名非业务名、1 个名字不在模板中）⚠️ 需人工抽样确认",
+      "legacy_table_count": 1,
+      "planned_table_count": 1,
+      "legacy_row_total": 0,
+      "target_names": [
+        "本公司的其他关联方情况"
+      ],
+      "duplicate_target_names": [],
+      "suggested": "先按 target_name 正名 legacy 表 -> 走 by_name",
+      "risk": "MED：表数相等且目标名唯一，人工核对顺序后可迁"
+    },
+    {
+      "project": "陕西华氏医药有限公司_2025",
+      "note_section": "十、资产负债表日后利",
+      "section_title": "资产负债表日后利润分配情况说明",
+      "reason": "按序对齐（表名非业务名、1 个名字不在模板中）⚠️ 需人工抽样确认",
+      "legacy_table_count": 1,
+      "planned_table_count": 1,
+      "legacy_row_total": 1,
+      "target_names": [
+        "资产负债表日后利润分配情况说明"
+      ],
+      "duplicate_target_names": [],
+      "suggested": "先按 target_name 正名 legacy 表 -> 走 by_name",
+      "risk": "MED：表数相等且目标名唯一，人工核对顺序后可迁"
+    },
+    {
+      "project": "首汽租车_2025",
+      "note_section": "八、1",
+      "section_title": "货币资金",
+      "reason": "按序对齐（重名、表名非业务名、2 个名字不在模板中）⚠️ 需人工抽样确认",
+      "legacy_table_count": 2,
+      "planned_table_count": 2,
+      "legacy_row_total": 12,
+      "target_names": [
+        "货币资金",
+        "受限制的货币资金明细"
+      ],
+      "duplicate_target_names": [],
+      "suggested": "先按 target_name 正名 legacy 表 -> 走 by_name",
+      "risk": "MED：表数相等且目标名唯一，人工核对顺序后可迁"
+    },
+    {
+      "project": "首汽租车_2025",
+      "note_section": "十一、本公司的母公司情",
+      "section_title": "本公司的母公司情况",
+      "reason": "按序对齐（重名、表名非业务名、2 个名字不在模板中）⚠️ 需人工抽样确认",
+      "legacy_table_count": 2,
+      "planned_table_count": 2,
+      "legacy_row_total": 0,
+      "target_names": [
+        "本公司的母公司情况",
+        "本公司的母公司情况（表2）"
+      ],
+      "duplicate_target_names": [],
+      "suggested": "先按 target_name 正名 legacy 表 -> 走 by_name",
+      "risk": "MED：表数相等且目标名唯一，人工核对顺序后可迁"
+    },
+    {
+      "project": "首汽租车_2025",
+      "note_section": "十、重要的资产负债表",
+      "section_title": "重要的资产负债表日后事项说明",
+      "reason": "按序对齐（表名非业务名、1 个名字不在模板中）⚠️ 需人工抽样确认",
+      "legacy_table_count": 1,
+      "planned_table_count": 1,
+      "legacy_row_total": 0,
+      "target_names": [
+        "重要的资产负债表日后事项说明"
+      ],
+      "duplicate_target_names": [],
+      "suggested": "先按 target_name 正名 legacy 表 -> 走 by_name",
+      "risk": "MED：表数相等且目标名唯一，人工核对顺序后可迁"
+    },
+    {
+      "project": "首汽租车_2025",
+      "note_section": "九、1、或有负债",
+      "section_title": "1、或有负债",
+      "reason": "按序对齐（表名非业务名、2 个名字不在模板中）⚠️ 需人工抽样确认",
+      "legacy_table_count": 2,
+      "planned_table_count": 2,
+      "legacy_row_total": 5,
+      "target_names": [
+        "未决诉讼仲裁形成的或有负债及其财务影响",
+        "截至2025年12月31 日，本公司为下列单位贷款提供保证"
+      ],
+      "duplicate_target_names": [],
+      "suggested": "先按 target_name 正名 legacy 表 -> 走 by_name",
+      "risk": "MED：表数相等且目标名唯一，人工核对顺序后可迁"
+    },
+    {
+      "project": "首汽租车_2025",
+      "note_section": "八、2",
+      "section_title": "交易性金融资产",
+      "reason": "按序对齐（表名非业务名、1 个名字不在模板中）⚠️ 需人工抽样确认",
+      "legacy_table_count": 1,
+      "planned_table_count": 1,
+      "legacy_row_total": 8,
+      "target_names": [
+        "交易性金融资产"
+      ],
+      "duplicate_target_names": [],
+      "suggested": "先按 target_name 正名 legacy 表 -> 走 by_name",
+      "risk": "MED：表数相等且目标名唯一，人工核对顺序后可迁"
+    },
+    {
+      "project": "首汽租车_2025",
+      "note_section": "六、主要税种及税率",
+      "section_title": "主要税种及税率",
+      "reason": "按序对齐（1 个名字不在模板中）⚠️ 需人工抽样确认",
+      "legacy_table_count": 1,
+      "planned_table_count": 1,
+      "legacy_row_total": 3,
+      "target_names": [
+        "主要税种及税率"
+      ],
+      "duplicate_target_names": [],
+      "suggested": "先按 target_name 正名 legacy 表 -> 走 by_name",
+      "risk": "MED：表数相等且目标名唯一，人工核对顺序后可迁"
+    },
+    {
+      "project": "首汽租车_2025",
+      "note_section": "十、资产负债表日后利",
+      "section_title": "资产负债表日后利润分配情况说明",
+      "reason": "按序对齐（表名非业务名、1 个名字不在模板中）⚠️ 需人工抽样确认",
+      "legacy_table_count": 1,
+      "planned_table_count": 1,
+      "legacy_row_total": 1,
+      "target_names": [
+        "资产负债表日后利润分配情况说明"
+      ],
+      "duplicate_target_names": [],
+      "suggested": "先按 target_name 正名 legacy 表 -> 走 by_name",
+      "risk": "MED：表数相等且目标名唯一，人工核对顺序后可迁"
+    },
+    {
+      "project": "首汽租车_2025",
+      "note_section": "九、2、或有资产",
+      "section_title": "2、或有资产",
+      "reason": "按序对齐（1 个名字不在模板中）⚠️ 需人工抽样确认",
+      "legacy_table_count": 1,
+      "planned_table_count": 1,
+      "legacy_row_total": 3,
+      "target_names": [
+        "2、或有资产"
+      ],
+      "duplicate_target_names": [],
+      "suggested": "先按 target_name 正名 legacy 表 -> 走 by_name",
+      "risk": "MED：表数相等且目标名唯一，人工核对顺序后可迁"
+    },
+    {
+      "project": "首汽租车_2025",
+      "note_section": "八、3",
+      "section_title": "衍生金融资产",
+      "reason": "按序对齐（表名非业务名、1 个名字不在模板中）⚠️ 需人工抽样确认",
+      "legacy_table_count": 1,
+      "planned_table_count": 1,
+      "legacy_row_total": 1,
+      "target_names": [
+        "衍生金融资产"
+      ],
+      "duplicate_target_names": [],
+      "suggested": "先按 target_name 正名 legacy 表 -> 走 by_name",
+      "risk": "MED：表数相等且目标名唯一，人工核对顺序后可迁"
+    },
+    {
+      "project": "首汽租车_2025",
+      "note_section": "八、4",
+      "section_title": "应收票据",
+      "reason": "按序对齐（重名、表名非业务名、12 个名字不在模板中）⚠️ 需人工抽样确认",
+      "legacy_table_count": 12,
+      "planned_table_count": 12,
+      "legacy_row_total": 41,
+      "target_names": [
+        "应收票据分类",
+        "按坏账准备计提方法分类披露应收票据（期末数）",
+        "按坏账准备计提方法分类披露应收票据（续：期初数）",
+        "按单项计提坏账准备的应收票据",
+        "按组合计提坏账准备的应收票据",
+        "本期计提、收回或转回的应收票据坏账准备情况",
+        "本期转回或收回金额重要的应收票据坏账准备",
+        "期末已质押的应收票据",
+        "期末已背书或贴现但尚未到期的应收票据",
+        "期末因出票人未履约而其转为应收账款的票据",
+        "本期实际核销的应收票据",
+        "重要的应收票据核销情况"
+      ],
+      "duplicate_target_names": [],
+      "suggested": "先按 target_name 正名 legacy 表 -> 走 by_name",
+      "risk": "MED：表数相等且目标名唯一，人工核对顺序后可迁"
+    },
+    {
+      "project": "首汽租车_2025",
+      "note_section": "十一、本公司的其他关联",
+      "section_title": "本公司的其他关联方情况",
+      "reason": "按序对齐（表名非业务名、1 个名字不在模板中）⚠️ 需人工抽样确认",
+      "legacy_table_count": 1,
+      "planned_table_count": 1,
+      "legacy_row_total": 0,
+      "target_names": [
+        "本公司的其他关联方情况"
+      ],
+      "duplicate_target_names": [],
+      "suggested": "先按 target_name 正名 legacy 表 -> 走 by_name",
+      "risk": "MED：表数相等且目标名唯一，人工核对顺序后可迁"
+    },
+    {
+      "project": "首汽租车_2025",
+      "note_section": "五、对期初所有者权益",
+      "section_title": "对期初所有者权益的累积影响",
+      "reason": "按序对齐（表名非业务名、1 个名字不在模板中）⚠️ 需人工抽样确认",
+      "legacy_table_count": 1,
+      "planned_table_count": 1,
+      "legacy_row_total": 5,
+      "target_names": [
+        "对期初所有者权益的累积影响"
+      ],
+      "duplicate_target_names": [],
+      "suggested": "先按 target_name 正名 legacy 表 -> 走 by_name",
+      "risk": "MED：表数相等且目标名唯一，人工核对顺序后可迁"
+    },
+    {
+      "project": "首汽租车_2025",
+      "note_section": "十一、关联交易情况",
+      "section_title": "关联交易情况",
+      "reason": "按序对齐（重名、表名非业务名、6 个名字不在模板中）⚠️ 需人工抽样确认",
+      "legacy_table_count": 6,
+      "planned_table_count": 6,
+      "legacy_row_total": 8,
+      "target_names": [
+        "A、采购商品、接受劳务情况表",
+        "B、出售商品、提供劳务情况表",
+        "本公司作为出租方当年确认的租赁收入",
+        "本公司作为承租方",
+        "本公司作为承租方当年新增的使用权资产",
+        "本公司为承租方当年承担的租赁负债利息支出"
+      ],
+      "duplicate_target_names": [],
+      "suggested": "先按 target_name 正名 legacy 表 -> 走 by_name",
+      "risk": "MED：表数相等且目标名唯一，人工核对顺序后可迁"
+    },
+    {
+      "project": "首汽租车_2025",
+      "note_section": "八、6",
+      "section_title": "应收款项融资",
+      "reason": "按序对齐（1 个名字不在模板中）⚠️ 需人工抽样确认",
+      "legacy_table_count": 1,
+      "planned_table_count": 1,
+      "legacy_row_total": 3,
+      "target_names": [
+        "应收款项融资"
+      ],
+      "duplicate_target_names": [],
+      "suggested": "先按 target_name 正名 legacy 表 -> 走 by_name",
+      "risk": "MED：表数相等且目标名唯一，人工核对顺序后可迁"
+    },
+    {
+      "project": "首汽租车_2025",
+      "note_section": "十一、关联方应收应付款",
+      "section_title": "关联方应收应付款项",
+      "reason": "按序对齐（重名、表名非业务名、2 个名字不在模板中）⚠️ 需人工抽样确认",
+      "legacy_table_count": 2,
+      "planned_table_count": 2,
+      "legacy_row_total": 3,
+      "target_names": [
+        "应收关联方款项",
+        "应付关联方款项"
+      ],
+      "duplicate_target_names": [],
+      "suggested": "先按 target_name 正名 legacy 表 -> 走 by_name",
+      "risk": "MED：表数相等且目标名唯一，人工核对顺序后可迁"
+    },
+    {
+      "project": "首汽租车_2025",
+      "note_section": "八、8",
+      "section_title": "应收资金集中管理款",
+      "reason": "按序对齐（表名非业务名、1 个名字不在模板中）⚠️ 需人工抽样确认",
+      "legacy_table_count": 1,
+      "planned_table_count": 1,
+      "legacy_row_total": 1,
+      "target_names": [
+        "应收资金集中管理款"
+      ],
+      "duplicate_target_names": [],
+      "suggested": "先按 target_name 正名 legacy 表 -> 走 by_name",
+      "risk": "MED：表数相等且目标名唯一，人工核对顺序后可迁"
+    },
+    {
+      "project": "首汽租车_2025",
+      "note_section": "八、10",
+      "section_title": "存货",
+      "reason": "按序对齐（表名非业务名、3 个名字不在模板中）⚠️ 需人工抽样确认",
+      "legacy_table_count": 3,
+      "planned_table_count": 3,
+      "legacy_row_total": 46,
+      "target_names": [
+        "存货分类",
+        "存货跌价准备及合同履约成本减值准备",
+        "确认为存货的数据资源"
+      ],
+      "duplicate_target_names": [],
+      "suggested": "先按 target_name 正名 legacy 表 -> 走 by_name",
+      "risk": "MED：表数相等且目标名唯一，人工核对顺序后可迁"
+    },
+    {
+      "project": "首汽租车_2025",
+      "note_section": "八、11",
+      "section_title": "合同资产",
+      "reason": "按序对齐（重名、表名非业务名、3 个名字不在模板中）⚠️ 需人工抽样确认",
+      "legacy_table_count": 3,
+      "planned_table_count": 3,
+      "legacy_row_total": 5,
+      "target_names": [
+        "合同资产情况",
+        "合同资产减值准备",
+        "本期合同资产账面价值的重大变动"
+      ],
+      "duplicate_target_names": [],
+      "suggested": "先按 target_name 正名 legacy 表 -> 走 by_name",
+      "risk": "MED：表数相等且目标名唯一，人工核对顺序后可迁"
+    },
+    {
+      "project": "首汽租车_2025",
+      "note_section": "八、12",
+      "section_title": "持有待售资产",
+      "reason": "按序对齐（重名、表名非业务名、4 个名字不在模板中）⚠️ 需人工抽样确认",
+      "legacy_table_count": 4,
+      "planned_table_count": 4,
+      "legacy_row_total": 22,
+      "target_names": [
+        "持有待售资产",
+        "持有待售资产减值准备",
+        "持有待售非流动资产",
+        "持有待售处置组中的资产"
+      ],
+      "duplicate_target_names": [],
+      "suggested": "先按 target_name 正名 legacy 表 -> 走 by_name",
+      "risk": "MED：表数相等且目标名唯一，人工核对顺序后可迁"
+    },
+    {
+      "project": "首汽租车_2025",
+      "note_section": "八、13",
+      "section_title": "一年内到期的非流动资产",
+      "reason": "按序对齐（表名非业务名、1 个名字不在模板中）⚠️ 需人工抽样确认",
+      "legacy_table_count": 1,
+      "planned_table_count": 1,
+      "legacy_row_total": 5,
+      "target_names": [
+        "一年内到期的非流动资产"
+      ],
+      "duplicate_target_names": [],
+      "suggested": "先按 target_name 正名 legacy 表 -> 走 by_name",
+      "risk": "MED：表数相等且目标名唯一，人工核对顺序后可迁"
+    },
+    {
+      "project": "首汽租车_2025",
+      "note_section": "八、14",
+      "section_title": "其他流动资产",
+      "reason": "按序对齐（表名非业务名、1 个名字不在模板中）⚠️ 需人工抽样确认",
+      "legacy_table_count": 1,
+      "planned_table_count": 1,
+      "legacy_row_total": 9,
+      "target_names": [
+        "其他流动资产"
+      ],
+      "duplicate_target_names": [],
+      "suggested": "先按 target_name 正名 legacy 表 -> 走 by_name",
+      "risk": "MED：表数相等且目标名唯一，人工核对顺序后可迁"
+    },
+    {
+      "project": "首汽租车_2025",
+      "note_section": "四、固定资产",
+      "section_title": "固定资产",
+      "reason": "按序对齐（表名非业务名、1 个名字不在模板中）⚠️ 需人工抽样确认",
+      "legacy_table_count": 1,
+      "planned_table_count": 1,
+      "legacy_row_total": 7,
+      "target_names": [
+        "固定资产分类及折旧政策"
+      ],
+      "duplicate_target_names": [],
+      "suggested": "先按 target_name 正名 legacy 表 -> 走 by_name",
+      "risk": "MED：表数相等且目标名唯一，人工核对顺序后可迁"
+    },
+    {
+      "project": "首汽租车_2025",
+      "note_section": "八、15",
+      "section_title": "债权投资",
+      "reason": "按序对齐（重名、表名非业务名、6 个名字不在模板中）⚠️ 需人工抽样确认",
+      "legacy_table_count": 6,
+      "planned_table_count": 6,
+      "legacy_row_total": 31,
+      "target_names": [
+        "债权投资情况",
+        "期末重要的债权投资",
+        "期末，处于第一阶段的债权投资的减值准备",
+        "期末，处于第二阶段的债权投资的减值准备",
+        "期末，处于第三阶段的债权投资的减值准备",
+        "本期计提、收回或转回的减值准备情况"
+      ],
+      "duplicate_target_names": [],
+      "suggested": "先按 target_name 正名 legacy 表 -> 走 by_name",
+      "risk": "MED：表数相等且目标名唯一，人工核对顺序后可迁"
+    },
+    {
+      "project": "首汽租车_2025",
+      "note_section": "八、16",
+      "section_title": "其他债权投资",
+      "reason": "按序对齐（表名非业务名、2 个名字不在模板中）⚠️ 需人工抽样确认",
+      "legacy_table_count": 2,
+      "planned_table_count": 2,
+      "legacy_row_total": 2,
+      "target_names": [
+        "其他债权投资情况",
+        "期末重要的其他债权投资"
+      ],
+      "duplicate_target_names": [],
+      "suggested": "先按 target_name 正名 legacy 表 -> 走 by_name",
+      "risk": "MED：表数相等且目标名唯一，人工核对顺序后可迁"
+    },
+    {
+      "project": "首汽租车_2025",
+      "note_section": "八、17",
+      "section_title": "长期应收款",
+      "reason": "按序对齐（重名、表名非业务名、3 个名字不在模板中）⚠️ 需人工抽样确认",
+      "legacy_table_count": 3,
+      "planned_table_count": 3,
+      "legacy_row_total": 14,
+      "target_names": [
+        "长期应收款按性质披露",
+        "终止确认的长期应收款",
+        "转移长期应收款且继续涉入形成的资产、负债的金额"
+      ],
+      "duplicate_target_names": [],
+      "suggested": "先按 target_name 正名 legacy 表 -> 走 by_name",
+      "risk": "MED：表数相等且目标名唯一，人工核对顺序后可迁"
+    },
+    {
+      "project": "首汽租车_2025",
+      "note_section": "四、生物资产",
+      "section_title": "生物资产",
+      "reason": "按序对齐（表名非业务名、1 个名字不在模板中）⚠️ 需人工抽样确认",
+      "legacy_table_count": 1,
+      "planned_table_count": 1,
+      "legacy_row_total": 12,
+      "target_names": [
+        "生产性生物资产"
+      ],
+      "duplicate_target_names": [],
+      "suggested": "先按 target_name 正名 legacy 表 -> 走 by_name",
+      "risk": "MED：表数相等且目标名唯一，人工核对顺序后可迁"
+    },
+    {
+      "project": "首汽租车_2025",
+      "note_section": "八、18",
+      "section_title": "长期股权投资",
+      "reason": "按序对齐（重名、表名非业务名、10 个名字不在模板中）⚠️ 需人工抽样确认",
+      "legacy_table_count": 10,
+      "planned_table_count": 10,
+      "legacy_row_total": 76,
+      "target_names": [
+        "长期股权投资分类",
+        "长期股权投资明细",
+        "重要合营企业的主要财务信息（划分为持有待售的除外）",
+        "续：重要合营企业本期及上期经营成果",
+        "重要联营企业的主要财务信息",
+        "续：重要联营企业本期及上期经营成果",
+        "不重要合营企业和联营企业的汇总信息",
+        "②对合营企业或联营企业发生超额亏损的分担额",
+        "结构化主体权益的账面价值和最大损失敞口",
+        "结构化主体获得收益及转移资产情况"
+      ],
+      "duplicate_target_names": [],
+      "suggested": "先按 target_name 正名 legacy 表 -> 走 by_name",
+      "risk": "MED：表数相等且目标名唯一，人工核对顺序后可迁"
+    },
+    {
+      "project": "首汽租车_2025",
+      "note_section": "八、19",
+      "section_title": "其他权益工具投资",
+      "reason": "按序对齐（表名非业务名、2 个名字不在模板中）⚠️ 需人工抽样确认",
+      "legacy_table_count": 2,
+      "planned_table_count": 2,
+      "legacy_row_total": 2,
+      "target_names": [
+        "其他权益工具投资情况",
+        "期末其他权益工具投资情况"
+      ],
+      "duplicate_target_names": [],
+      "suggested": "先按 target_name 正名 legacy 表 -> 走 by_name",
+      "risk": "MED：表数相等且目标名唯一，人工核对顺序后可迁"
+    },
+    {
+      "project": "首汽租车_2025",
+      "note_section": "八、20",
+      "section_title": "其他非流动金融资产",
+      "reason": "按序对齐（表名非业务名、1 个名字不在模板中）⚠️ 需人工抽样确认",
+      "legacy_table_count": 1,
+      "planned_table_count": 1,
+      "legacy_row_total": 1,
+      "target_names": [
+        "其他非流动金融资产"
+      ],
+      "duplicate_target_names": [],
+      "suggested": "先按 target_name 正名 legacy 表 -> 走 by_name",
+      "risk": "MED：表数相等且目标名唯一，人工核对顺序后可迁"
+    },
+    {
+      "project": "首汽租车_2025",
+      "note_section": "八、21",
+      "section_title": "投资性房地产",
+      "reason": "按序对齐（重名、表名非业务名、3 个名字不在模板中）⚠️ 需人工抽样确认",
+      "legacy_table_count": 3,
+      "planned_table_count": 3,
+      "legacy_row_total": 27,
+      "target_names": [
+        "以成本计量",
+        "以公允价值计量",
+        "未办妥产权证书的投资性房地产"
+      ],
+      "duplicate_target_names": [],
+      "suggested": "先按 target_name 正名 legacy 表 -> 走 by_name",
+      "risk": "MED：表数相等且目标名唯一，人工核对顺序后可迁"
+    },
+    {
+      "project": "首汽租车_2025",
+      "note_section": "八、22",
+      "section_title": "固定资产",
+      "reason": "按序对齐（重名、表名非业务名、5 个名字不在模板中）⚠️ 需人工抽样确认",
+      "legacy_table_count": 5,
+      "planned_table_count": 5,
+      "legacy_row_total": 51,
+      "target_names": [
+        "固定资产",
+        "固定资产情况",
+        "暂时闲置的固定资产情况",
+        "未办妥产权证书的固定资产情况",
+        "固定资产清理"
+      ],
+      "duplicate_target_names": [],
+      "suggested": "先按 target_name 正名 legacy 表 -> 走 by_name",
+      "risk": "MED：表数相等且目标名唯一，人工核对顺序后可迁"
+    },
+    {
+      "project": "首汽租车_2025",
+      "note_section": "八、23",
+      "section_title": "在建工程",
+      "reason": "按序对齐（重名、表名非业务名、4 个名字不在模板中）⚠️ 需人工抽样确认",
+      "legacy_table_count": 4,
+      "planned_table_count": 4,
+      "legacy_row_total": 14,
+      "target_names": [
+        "在建工程",
+        "（1）在建工程情况",
+        "（2）重要在建工程项目本期变动情况",
+        "（3）本期计提在建工程减值准备情况"
+      ],
+      "duplicate_target_names": [],
+      "suggested": "先按 target_name 正名 legacy 表 -> 走 by_name",
+      "risk": "MED：表数相等且目标名唯一，人工核对顺序后可迁"
+    },
+    {
+      "project": "首汽租车_2025",
+      "note_section": "八、24",
+      "section_title": "生产性生物资产",
+      "reason": "按序对齐（重名、表名非业务名、2 个名字不在模板中）⚠️ 需人工抽样确认",
+      "legacy_table_count": 2,
+      "planned_table_count": 2,
+      "legacy_row_total": 26,
+      "target_names": [
+        "以成本计量",
+        "以公允价值计量"
+      ],
+      "duplicate_target_names": [],
+      "suggested": "先按 target_name 正名 legacy 表 -> 走 by_name",
+      "risk": "MED：表数相等且目标名唯一，人工核对顺序后可迁"
+    },
+    {
+      "project": "首汽租车_2025",
+      "note_section": "八、25",
+      "section_title": "油气资产",
+      "reason": "按序对齐（表名非业务名、1 个名字不在模板中）⚠️ 需人工抽样确认",
+      "legacy_table_count": 1,
+      "planned_table_count": 1,
+      "legacy_row_total": 15,
+      "target_names": [
+        "油气资产"
+      ],
+      "duplicate_target_names": [],
+      "suggested": "先按 target_name 正名 legacy 表 -> 走 by_name",
+      "risk": "MED：表数相等且目标名唯一，人工核对顺序后可迁"
+    },
+    {
+      "project": "首汽租车_2025",
+      "note_section": "八、26",
+      "section_title": "使用权资产",
+      "reason": "按序对齐（表名非业务名、1 个名字不在模板中）⚠️ 需人工抽样确认",
+      "legacy_table_count": 1,
+      "planned_table_count": 1,
+      "legacy_row_total": 25,
+      "target_names": [
+        "使用权资产"
+      ],
+      "duplicate_target_names": [],
+      "suggested": "先按 target_name 正名 legacy 表 -> 走 by_name",
+      "risk": "MED：表数相等且目标名唯一，人工核对顺序后可迁"
+    },
+    {
+      "project": "首汽租车_2025",
+      "note_section": "八、27",
+      "section_title": "无形资产",
+      "reason": "按序对齐（表名非业务名、2 个名字不在模板中）⚠️ 需人工抽样确认",
+      "legacy_table_count": 2,
+      "planned_table_count": 2,
+      "legacy_row_total": 75,
+      "target_names": [
+        "无形资产情况",
+        "确认为无形资产的数据资源"
+      ],
+      "duplicate_target_names": [],
+      "suggested": "先按 target_name 正名 legacy 表 -> 走 by_name",
+      "risk": "MED：表数相等且目标名唯一，人工核对顺序后可迁"
+    },
+    {
+      "project": "首汽租车_2025",
+      "note_section": "八、28",
+      "section_title": "开发支出",
+      "reason": "按序对齐（表名非业务名、1 个名字不在模板中）⚠️ 需人工抽样确认",
+      "legacy_table_count": 1,
+      "planned_table_count": 1,
+      "legacy_row_total": 3,
+      "target_names": [
+        "开发支出"
+      ],
+      "duplicate_target_names": [],
+      "suggested": "先按 target_name 正名 legacy 表 -> 走 by_name",
+      "risk": "MED：表数相等且目标名唯一，人工核对顺序后可迁"
+    },
+    {
+      "project": "首汽租车_2025",
+      "note_section": "八、29",
+      "section_title": "商誉",
+      "reason": "按序对齐（重名、表名非业务名、2 个名字不在模板中）⚠️ 需人工抽样确认",
+      "legacy_table_count": 2,
+      "planned_table_count": 2,
+      "legacy_row_total": 2,
+      "target_names": [
+        "（1）商誉账面价值",
+        "（2）商誉减值准备"
+      ],
+      "duplicate_target_names": [],
+      "suggested": "先按 target_name 正名 legacy 表 -> 走 by_name",
+      "risk": "MED：表数相等且目标名唯一，人工核对顺序后可迁"
+    },
+    {
+      "project": "首汽租车_2025",
+      "note_section": "八、30",
+      "section_title": "长期待摊费用",
+      "reason": "按序对齐（表名非业务名、1 个名字不在模板中）⚠️ 需人工抽样确认",
+      "legacy_table_count": 1,
+      "planned_table_count": 1,
+      "legacy_row_total": 2,
+      "target_names": [
+        "长期待摊费用"
+      ],
+      "duplicate_target_names": [],
+      "suggested": "先按 target_name 正名 legacy 表 -> 走 by_name",
+      "risk": "MED：表数相等且目标名唯一，人工核对顺序后可迁"
+    },
+    {
+      "project": "首汽租车_2025",
+      "note_section": "八、32",
+      "section_title": "其他非流动资产",
+      "reason": "按序对齐（表名非业务名、2 个名字不在模板中）⚠️ 需人工抽样确认",
+      "legacy_table_count": 2,
+      "planned_table_count": 2,
+      "legacy_row_total": 10,
+      "target_names": [
+        "其他非流动资产",
+        "[披露与合同取得成本有关的资产相关的信息，包括确定该资产金额所做的判断、该资产的摊销方法、按该资产主要类别披露的期末账面价值以及本期确认的摊销及减值损失金额等。例如："
+      ],
+      "duplicate_target_names": [],
+      "suggested": "先按 target_name 正名 legacy 表 -> 走 by_name",
+      "risk": "MED：表数相等且目标名唯一，人工核对顺序后可迁"
+    },
+    {
+      "project": "首汽租车_2025",
+      "note_section": "八、33",
+      "section_title": "短期借款",
+      "reason": "按序对齐（表名非业务名、2 个名字不在模板中）⚠️ 需人工抽样确认",
+      "legacy_table_count": 2,
+      "planned_table_count": 2,
+      "legacy_row_total": 6,
+      "target_names": [
+        "短期借款分类",
+        "已逾期未偿还的短期借款情况"
+      ],
+      "duplicate_target_names": [],
+      "suggested": "先按 target_name 正名 legacy 表 -> 走 by_name",
+      "risk": "MED：表数相等且目标名唯一，人工核对顺序后可迁"
+    },
+    {
+      "project": "首汽租车_2025",
+      "note_section": "八、34",
+      "section_title": "交易性金融负债",
+      "reason": "按序对齐（重名、表名非业务名、2 个名字不在模板中）⚠️ 需人工抽样确认",
+      "legacy_table_count": 2,
+      "planned_table_count": 2,
+      "legacy_row_total": 7,
+      "target_names": [
+        "交易性金融负债",
+        "对于指定为以公允价值计量且其变动计入当期损益的金融负债，202X年公允价值的变动情况如下表所示："
+      ],
+      "duplicate_target_names": [],
+      "suggested": "先按 target_name 正名 legacy 表 -> 走 by_name",
+      "risk": "MED：表数相等且目标名唯一，人工核对顺序后可迁"
+    },
+    {
+      "project": "首汽租车_2025",
+      "note_section": "八、35",
+      "section_title": "衍生金融负债",
+      "reason": "按序对齐（表名非业务名、1 个名字不在模板中）⚠️ 需人工抽样确认",
+      "legacy_table_count": 1,
+      "planned_table_count": 1,
+      "legacy_row_total": 1,
+      "target_names": [
+        "衍生金融负债"
+      ],
+      "duplicate_target_names": [],
+      "suggested": "先按 target_name 正名 legacy 表 -> 走 by_name",
+      "risk": "MED：表数相等且目标名唯一，人工核对顺序后可迁"
+    },
+    {
+      "project": "首汽租车_2025",
+      "note_section": "八、36",
+      "section_title": "应付票据",
+      "reason": "按序对齐（表名非业务名、1 个名字不在模板中）⚠️ 需人工抽样确认",
+      "legacy_table_count": 1,
+      "planned_table_count": 1,
+      "legacy_row_total": 3,
+      "target_names": [
+        "应付票据"
+      ],
+      "duplicate_target_names": [],
+      "suggested": "先按 target_name 正名 legacy 表 -> 走 by_name",
+      "risk": "MED：表数相等且目标名唯一，人工核对顺序后可迁"
+    },
+    {
+      "project": "首汽租车_2025",
+      "note_section": "八、37",
+      "section_title": "应付账款",
+      "reason": "按序对齐（表名非业务名、2 个名字不在模板中）⚠️ 需人工抽样确认",
+      "legacy_table_count": 2,
+      "planned_table_count": 2,
+      "legacy_row_total": 6,
+      "target_names": [
+        "应付账款",
+        "账龄超过1 年的重要应付账款"
+      ],
+      "duplicate_target_names": [],
+      "suggested": "先按 target_name 正名 legacy 表 -> 走 by_name",
+      "risk": "MED：表数相等且目标名唯一，人工核对顺序后可迁"
+    },
+    {
+      "project": "首汽租车_2025",
+      "note_section": "八、38",
+      "section_title": "预收款项",
+      "reason": "按序对齐（表名非业务名、2 个名字不在模板中）⚠️ 需人工抽样确认",
+      "legacy_table_count": 2,
+      "planned_table_count": 2,
+      "legacy_row_total": 4,
+      "target_names": [
+        "预收款项",
+        "账龄超过1年的重要预收账款"
+      ],
+      "duplicate_target_names": [],
+      "suggested": "先按 target_name 正名 legacy 表 -> 走 by_name",
+      "risk": "MED：表数相等且目标名唯一，人工核对顺序后可迁"
+    },
+    {
+      "project": "首汽租车_2025",
+      "note_section": "八、39",
+      "section_title": "合同负债",
+      "reason": "按序对齐（重名、表名非业务名、2 个名字不在模板中）⚠️ 需人工抽样确认",
+      "legacy_table_count": 2,
+      "planned_table_count": 2,
+      "legacy_row_total": 2,
+      "target_names": [
+        "合同负债",
+        "本期合同负债账面价值的重大变动"
+      ],
+      "duplicate_target_names": [],
+      "suggested": "先按 target_name 正名 legacy 表 -> 走 by_name",
+      "risk": "MED：表数相等且目标名唯一，人工核对顺序后可迁"
+    },
+    {
+      "project": "首汽租车_2025",
+      "note_section": "八、40",
+      "section_title": "应付职工薪酬",
+      "reason": "按序对齐（重名、表名非业务名、3 个名字不在模板中）⚠️ 需人工抽样确认",
+      "legacy_table_count": 3,
+      "planned_table_count": 3,
+      "legacy_row_total": 27,
+      "target_names": [
+        "应付职工薪酬列示",
+        "短期薪酬列示",
+        "设定提存计划列示"
+      ],
+      "duplicate_target_names": [],
+      "suggested": "先按 target_name 正名 legacy 表 -> 走 by_name",
+      "risk": "MED：表数相等且目标名唯一，人工核对顺序后可迁"
+    },
+    {
+      "project": "首汽租车_2025",
+      "note_section": "八、41",
+      "section_title": "应交税费",
+      "reason": "按序对齐（表名非业务名、1 个名字不在模板中）⚠️ 需人工抽样确认",
+      "legacy_table_count": 1,
+      "planned_table_count": 1,
+      "legacy_row_total": 11,
+      "target_names": [
+        "应交税费"
+      ],
+      "duplicate_target_names": [],
+      "suggested": "先按 target_name 正名 legacy 表 -> 走 by_name",
+      "risk": "MED：表数相等且目标名唯一，人工核对顺序后可迁"
+    },
+    {
+      "project": "首汽租车_2025",
+      "note_section": "八、42",
+      "section_title": "其他应付款",
+      "reason": "按序对齐（重名、表名非业务名、6 个名字不在模板中）⚠️ 需人工抽样确认",
+      "legacy_table_count": 6,
+      "planned_table_count": 6,
+      "legacy_row_total": 19,
+      "target_names": [
+        "其他应付款",
+        "应付利息",
+        "重要的已逾期未支付的利息情况",
+        "应付股利",
+        "按款项性质列示",
+        "账龄超过1年的重要其他应付款项"
+      ],
+      "duplicate_target_names": [],
+      "suggested": "先按 target_name 正名 legacy 表 -> 走 by_name",
+      "risk": "MED：表数相等且目标名唯一，人工核对顺序后可迁"
+    },
+    {
+      "project": "首汽租车_2025",
+      "note_section": "八、43",
+      "section_title": "持有待售负债",
+      "reason": "按序对齐（表名非业务名、1 个名字不在模板中）⚠️ 需人工抽样确认",
+      "legacy_table_count": 1,
+      "planned_table_count": 1,
+      "legacy_row_total": 2,
+      "target_names": [
+        "持有待售负债"
+      ],
+      "duplicate_target_names": [],
+      "suggested": "先按 target_name 正名 legacy 表 -> 走 by_name",
+      "risk": "MED：表数相等且目标名唯一，人工核对顺序后可迁"
+    },
+    {
+      "project": "首汽租车_2025",
+      "note_section": "八、44",
+      "section_title": "一年内到期的非流动负债",
+      "reason": "按序对齐（表名非业务名、1 个名字不在模板中）⚠️ 需人工抽样确认",
+      "legacy_table_count": 1,
+      "planned_table_count": 1,
+      "legacy_row_total": 7,
+      "target_names": [
+        "一年内到期的非流动负债"
+      ],
+      "duplicate_target_names": [],
+      "suggested": "先按 target_name 正名 legacy 表 -> 走 by_name",
+      "risk": "MED：表数相等且目标名唯一，人工核对顺序后可迁"
+    },
+    {
+      "project": "首汽租车_2025",
+      "note_section": "八、45",
+      "section_title": "（1）一年内到期的长期借款",
+      "reason": "按序对齐（表名非业务名、1 个名字不在模板中）⚠️ 需人工抽样确认",
+      "legacy_table_count": 1,
+      "planned_table_count": 1,
+      "legacy_row_total": 5,
+      "target_names": [
+        "（1）一年内到期的长期借款"
+      ],
+      "duplicate_target_names": [],
+      "suggested": "先按 target_name 正名 legacy 表 -> 走 by_name",
+      "risk": "MED：表数相等且目标名唯一，人工核对顺序后可迁"
+    },
+    {
+      "project": "首汽租车_2025",
+      "note_section": "八、46",
+      "section_title": "（2）一年内到期的应付债券",
+      "reason": "按序对齐（重名、表名非业务名、2 个名字不在模板中）⚠️ 需人工抽样确认",
+      "legacy_table_count": 2,
+      "planned_table_count": 2,
+      "legacy_row_total": 2,
+      "target_names": [
+        "（2）一年内到期的应付债券",
+        "一年内到期的应付债券"
+      ],
+      "duplicate_target_names": [],
+      "suggested": "先按 target_name 正名 legacy 表 -> 走 by_name",
+      "risk": "MED：表数相等且目标名唯一，人工核对顺序后可迁"
+    },
+    {
+      "project": "首汽租车_2025",
+      "note_section": "八、47",
+      "section_title": "（3）一年内到期的长期应付款",
+      "reason": "按序对齐（表名非业务名、1 个名字不在模板中）⚠️ 需人工抽样确认",
+      "legacy_table_count": 1,
+      "planned_table_count": 1,
+      "legacy_row_total": 1,
+      "target_names": [
+        "（3）一年内到期的长期应付款"
+      ],
+      "duplicate_target_names": [],
+      "suggested": "先按 target_name 正名 legacy 表 -> 走 by_name",
+      "risk": "MED：表数相等且目标名唯一，人工核对顺序后可迁"
+    },
+    {
+      "project": "首汽租车_2025",
+      "note_section": "八、48",
+      "section_title": "其他流动负债",
+      "reason": "按序对齐（表名非业务名、1 个名字不在模板中）⚠️ 需人工抽样确认",
+      "legacy_table_count": 1,
+      "planned_table_count": 1,
+      "legacy_row_total": 5,
+      "target_names": [
+        "其他流动负债"
+      ],
+      "duplicate_target_names": [],
+      "suggested": "先按 target_name 正名 legacy 表 -> 走 by_name",
+      "risk": "MED：表数相等且目标名唯一，人工核对顺序后可迁"
+    },
+    {
+      "project": "首汽租车_2025",
+      "note_section": "八、49",
+      "section_title": "长期借款",
+      "reason": "按序对齐（表名非业务名、1 个名字不在模板中）⚠️ 需人工抽样确认",
+      "legacy_table_count": 1,
+      "planned_table_count": 1,
+      "legacy_row_total": 7,
+      "target_names": [
+        "长期借款"
+      ],
+      "duplicate_target_names": [],
+      "suggested": "先按 target_name 正名 legacy 表 -> 走 by_name",
+      "risk": "MED：表数相等且目标名唯一，人工核对顺序后可迁"
+    },
+    {
+      "project": "首汽租车_2025",
+      "note_section": "八、50",
+      "section_title": "应付债券",
+      "reason": "按序对齐（表名非业务名、2 个名字不在模板中）⚠️ 需人工抽样确认",
+      "legacy_table_count": 2,
+      "planned_table_count": 2,
+      "legacy_row_total": 4,
+      "target_names": [
+        "应付债券",
+        "应付债券的增减变动（不包括划分为金融负债的优先股、永续债等其他金融工具）"
+      ],
+      "duplicate_target_names": [],
+      "suggested": "先按 target_name 正名 legacy 表 -> 走 by_name",
+      "risk": "MED：表数相等且目标名唯一，人工核对顺序后可迁"
+    },
+    {
+      "project": "首汽租车_2025",
+      "note_section": "八、51",
+      "section_title": "优先股、永续债等金融工具",
+      "reason": "按序对齐（表名非业务名、2 个名字不在模板中）⚠️ 需人工抽样确认",
+      "legacy_table_count": 2,
+      "planned_table_count": 2,
+      "legacy_row_total": 10,
+      "target_names": [
+        "期末发行在外的优先股、永续债等金融工具情况",
+        "发行在外的优先股、永续债等金融工具变动情况"
+      ],
+      "duplicate_target_names": [],
+      "suggested": "先按 target_name 正名 legacy 表 -> 走 by_name",
+      "risk": "MED：表数相等且目标名唯一，人工核对顺序后可迁"
+    },
+    {
+      "project": "首汽租车_2025",
+      "note_section": "八、52",
+      "section_title": "租赁负债",
+      "reason": "按序对齐（表名非业务名、1 个名字不在模板中）⚠️ 需人工抽样确认",
+      "legacy_table_count": 1,
+      "planned_table_count": 1,
+      "legacy_row_total": 5,
+      "target_names": [
+        "租赁负债"
+      ],
+      "duplicate_target_names": [],
+      "suggested": "先按 target_name 正名 legacy 表 -> 走 by_name",
+      "risk": "MED：表数相等且目标名唯一，人工核对顺序后可迁"
+    },
+    {
+      "project": "首汽租车_2025",
+      "note_section": "八、53",
+      "section_title": "长期应付款",
+      "reason": "按序对齐（重名、表名非业务名、3 个名字不在模板中）⚠️ 需人工抽样确认",
+      "legacy_table_count": 3,
+      "planned_table_count": 3,
+      "legacy_row_total": 19,
+      "target_names": [
+        "长期应付款",
+        "①长期应付款项期末余额最大的前5 项",
+        "①专项应付款期末余额最大的前5 项"
+      ],
+      "duplicate_target_names": [],
+      "suggested": "先按 target_name 正名 legacy 表 -> 走 by_name",
+      "risk": "MED：表数相等且目标名唯一，人工核对顺序后可迁"
+    },
+    {
+      "project": "首汽租车_2025",
+      "note_section": "八、55",
+      "section_title": "预计负债",
+      "reason": "按序对齐（表名非业务名、1 个名字不在模板中）⚠️ 需人工抽样确认",
+      "legacy_table_count": 1,
+      "planned_table_count": 1,
+      "legacy_row_total": 9,
+      "target_names": [
+        "预计负债"
+      ],
+      "duplicate_target_names": [],
+      "suggested": "先按 target_name 正名 legacy 表 -> 走 by_name",
+      "risk": "MED：表数相等且目标名唯一，人工核对顺序后可迁"
+    },
+    {
+      "project": "首汽租车_2025",
+      "note_section": "八、56",
+      "section_title": "递延收益",
+      "reason": "按序对齐（表名非业务名、2 个名字不在模板中）⚠️ 需人工抽样确认",
+      "legacy_table_count": 2,
+      "planned_table_count": 2,
+      "legacy_row_total": 3,
+      "target_names": [
+        "递延收益",
+        "其中：递延收益-政府补助情况"
+      ],
+      "duplicate_target_names": [],
+      "suggested": "先按 target_name 正名 legacy 表 -> 走 by_name",
+      "risk": "MED：表数相等且目标名唯一，人工核对顺序后可迁"
+    },
+    {
+      "project": "首汽租车_2025",
+      "note_section": "八、57",
+      "section_title": "其他非流动负债",
+      "reason": "按序对齐（表名非业务名、1 个名字不在模板中）⚠️ 需人工抽样确认",
+      "legacy_table_count": 1,
+      "planned_table_count": 1,
+      "legacy_row_total": 4,
+      "target_names": [
+        "其他非流动负债"
+      ],
+      "duplicate_target_names": [],
+      "suggested": "先按 target_name 正名 legacy 表 -> 走 by_name",
+      "risk": "MED：表数相等且目标名唯一，人工核对顺序后可迁"
+    },
+    {
+      "project": "首汽租车_2025",
+      "note_section": "八、58",
+      "section_title": "实收资本",
+      "reason": "按序对齐（表名非业务名、1 个名字不在模板中）⚠️ 需人工抽样确认",
+      "legacy_table_count": 1,
+      "planned_table_count": 1,
+      "legacy_row_total": 2,
+      "target_names": [
+        "实收资本"
+      ],
+      "duplicate_target_names": [],
+      "suggested": "先按 target_name 正名 legacy 表 -> 走 by_name",
+      "risk": "MED：表数相等且目标名唯一，人工核对顺序后可迁"
+    },
+    {
+      "project": "首汽租车_2025",
+      "note_section": "八、59",
+      "section_title": "其他权益工具",
+      "reason": "按序对齐（表名非业务名、1 个名字不在模板中）⚠️ 需人工抽样确认",
+      "legacy_table_count": 1,
+      "planned_table_count": 1,
+      "legacy_row_total": 2,
+      "target_names": [
+        "其他权益工具"
+      ],
+      "duplicate_target_names": [],
+      "suggested": "先按 target_name 正名 legacy 表 -> 走 by_name",
+      "risk": "MED：表数相等且目标名唯一，人工核对顺序后可迁"
+    },
+    {
+      "project": "首汽租车_2025",
+      "note_section": "八、60",
+      "section_title": "资本公积",
+      "reason": "按序对齐（表名非业务名、1 个名字不在模板中）⚠️ 需人工抽样确认",
+      "legacy_table_count": 1,
+      "planned_table_count": 1,
+      "legacy_row_total": 4,
+      "target_names": [
+        "资本公积"
+      ],
+      "duplicate_target_names": [],
+      "suggested": "先按 target_name 正名 legacy 表 -> 走 by_name",
+      "risk": "MED：表数相等且目标名唯一，人工核对顺序后可迁"
+    },
+    {
+      "project": "首汽租车_2025",
+      "note_section": "八、61",
+      "section_title": "专项储备",
+      "reason": "按序对齐（表名非业务名、1 个名字不在模板中）⚠️ 需人工抽样确认",
+      "legacy_table_count": 1,
+      "planned_table_count": 1,
+      "legacy_row_total": 4,
+      "target_names": [
+        "专项储备"
+      ],
+      "duplicate_target_names": [],
+      "suggested": "先按 target_name 正名 legacy 表 -> 走 by_name",
+      "risk": "MED：表数相等且目标名唯一，人工核对顺序后可迁"
+    },
+    {
+      "project": "首汽租车_2025",
+      "note_section": "八、62",
+      "section_title": "盈余公积",
+      "reason": "按序对齐（表名非业务名、1 个名字不在模板中）⚠️ 需人工抽样确认",
+      "legacy_table_count": 1,
+      "planned_table_count": 1,
+      "legacy_row_total": 6,
+      "target_names": [
+        "盈余公积"
+      ],
+      "duplicate_target_names": [],
+      "suggested": "先按 target_name 正名 legacy 表 -> 走 by_name",
+      "risk": "MED：表数相等且目标名唯一，人工核对顺序后可迁"
+    },
+    {
+      "project": "首汽租车_2025",
+      "note_section": "八、63",
+      "section_title": "未分配利润",
+      "reason": "按序对齐（表名非业务名、1 个名字不在模板中）⚠️ 需人工抽样确认",
+      "legacy_table_count": 1,
+      "planned_table_count": 1,
+      "legacy_row_total": 17,
+      "target_names": [
+        "未分配利润"
+      ],
+      "duplicate_target_names": [],
+      "suggested": "先按 target_name 正名 legacy 表 -> 走 by_name",
+      "risk": "MED：表数相等且目标名唯一，人工核对顺序后可迁"
+    },
+    {
+      "project": "首汽租车_2025",
+      "note_section": "八、64",
+      "section_title": "营业收入、营业成本",
+      "reason": "按序对齐（表名非业务名、5 个名字不在模板中）⚠️ 需人工抽样确认",
+      "legacy_table_count": 5,
+      "planned_table_count": 5,
+      "legacy_row_total": 32,
+      "target_names": [
+        "营业收入、营业成本",
+        "按行业（或产品类型）划分",
+        "营业收入、营业成本按地区划分",
+        "营业收入分解信息",
+        "与剩余履约义务有关的信息"
+      ],
+      "duplicate_target_names": [],
+      "suggested": "先按 target_name 正名 legacy 表 -> 走 by_name",
+      "risk": "MED：表数相等且目标名唯一，人工核对顺序后可迁"
+    },
+    {
+      "project": "首汽租车_2025",
+      "note_section": "八、65",
+      "section_title": "销售费用",
+      "reason": "按序对齐（表名非业务名、1 个名字不在模板中）⚠️ 需人工抽样确认",
+      "legacy_table_count": 1,
+      "planned_table_count": 1,
+      "legacy_row_total": 1,
+      "target_names": [
+        "销售费用"
+      ],
+      "duplicate_target_names": [],
+      "suggested": "先按 target_name 正名 legacy 表 -> 走 by_name",
+      "risk": "MED：表数相等且目标名唯一，人工核对顺序后可迁"
+    },
+    {
+      "project": "首汽租车_2025",
+      "note_section": "八、66",
+      "section_title": "管理费用",
+      "reason": "按序对齐（表名非业务名、1 个名字不在模板中）⚠️ 需人工抽样确认",
+      "legacy_table_count": 1,
+      "planned_table_count": 1,
+      "legacy_row_total": 2,
+      "target_names": [
+        "管理费用"
+      ],
+      "duplicate_target_names": [],
+      "suggested": "先按 target_name 正名 legacy 表 -> 走 by_name",
+      "risk": "MED：表数相等且目标名唯一，人工核对顺序后可迁"
+    },
+    {
+      "project": "首汽租车_2025",
+      "note_section": "八、67",
+      "section_title": "研发费用",
+      "reason": "按序对齐（表名非业务名、1 个名字不在模板中）⚠️ 需人工抽样确认",
+      "legacy_table_count": 1,
+      "planned_table_count": 1,
+      "legacy_row_total": 6,
+      "target_names": [
+        "研发费用（按费用性质列示）"
+      ],
+      "duplicate_target_names": [],
+      "suggested": "先按 target_name 正名 legacy 表 -> 走 by_name",
+      "risk": "MED：表数相等且目标名唯一，人工核对顺序后可迁"
+    },
+    {
+      "project": "首汽租车_2025",
+      "note_section": "八、68",
+      "section_title": "财务费用",
+      "reason": "按序对齐（表名非业务名、1 个名字不在模板中）⚠️ 需人工抽样确认",
+      "legacy_table_count": 1,
+      "planned_table_count": 1,
+      "legacy_row_total": 9,
+      "target_names": [
+        "财务费用"
+      ],
+      "duplicate_target_names": [],
+      "suggested": "先按 target_name 正名 legacy 表 -> 走 by_name",
+      "risk": "MED：表数相等且目标名唯一，人工核对顺序后可迁"
+    },
+    {
+      "project": "首汽租车_2025",
+      "note_section": "八、69",
+      "section_title": "其他收益",
+      "reason": "按序对齐（表名非业务名、1 个名字不在模板中）⚠️ 需人工抽样确认",
+      "legacy_table_count": 1,
+      "planned_table_count": 1,
+      "legacy_row_total": 4,
+      "target_names": [
+        "其他收益"
+      ],
+      "duplicate_target_names": [],
+      "suggested": "先按 target_name 正名 legacy 表 -> 走 by_name",
+      "risk": "MED：表数相等且目标名唯一，人工核对顺序后可迁"
+    },
+    {
+      "project": "首汽租车_2025",
+      "note_section": "八、70",
+      "section_title": "投资收益【下表中不适用的项目，删除】",
+      "reason": "按序对齐（表名非业务名、1 个名字不在模板中）⚠️ 需人工抽样确认",
+      "legacy_table_count": 1,
+      "planned_table_count": 1,
+      "legacy_row_total": 19,
+      "target_names": [
+        "投资收益"
+      ],
+      "duplicate_target_names": [],
+      "suggested": "先按 target_name 正名 legacy 表 -> 走 by_name",
+      "risk": "MED：表数相等且目标名唯一，人工核对顺序后可迁"
+    },
+    {
+      "project": "首汽租车_2025",
+      "note_section": "八、71",
+      "section_title": "净敞口套期收益",
+      "reason": "按序对齐（表名非业务名、1 个名字不在模板中）⚠️ 需人工抽样确认",
+      "legacy_table_count": 1,
+      "planned_table_count": 1,
+      "legacy_row_total": 3,
+      "target_names": [
+        "净敞口套期收益"
+      ],
+      "duplicate_target_names": [],
+      "suggested": "先按 target_name 正名 legacy 表 -> 走 by_name",
+      "risk": "MED：表数相等且目标名唯一，人工核对顺序后可迁"
+    },
+    {
+      "project": "首汽租车_2025",
+      "note_section": "八、72",
+      "section_title": "公允价值变动收益",
+      "reason": "按序对齐（表名非业务名）⚠️ 需人工抽样确认",
+      "legacy_table_count": 1,
+      "planned_table_count": 1,
+      "legacy_row_total": 8,
+      "target_names": [
+        "产生公允价值变动收益的来源"
+      ],
+      "duplicate_target_names": [],
+      "suggested": "先按 target_name 正名 legacy 表 -> 走 by_name",
+      "risk": "MED：表数相等且目标名唯一，人工核对顺序后可迁"
+    },
+    {
+      "project": "首汽租车_2025",
+      "note_section": "八、73",
+      "section_title": "信用减值损失",
+      "reason": "按序对齐（表名非业务名、1 个名字不在模板中）⚠️ 需人工抽样确认",
+      "legacy_table_count": 1,
+      "planned_table_count": 1,
+      "legacy_row_total": 5,
+      "target_names": [
+        "信用减值损失"
+      ],
+      "duplicate_target_names": [],
+      "suggested": "先按 target_name 正名 legacy 表 -> 走 by_name",
+      "risk": "MED：表数相等且目标名唯一，人工核对顺序后可迁"
+    },
+    {
+      "project": "首汽租车_2025",
+      "note_section": "八、74",
+      "section_title": "资产减值损失",
+      "reason": "按序对齐（表名非业务名、1 个名字不在模板中）⚠️ 需人工抽样确认",
+      "legacy_table_count": 1,
+      "planned_table_count": 1,
+      "legacy_row_total": 16,
+      "target_names": [
+        "资产减值损失"
+      ],
+      "duplicate_target_names": [],
+      "suggested": "先按 target_name 正名 legacy 表 -> 走 by_name",
+      "risk": "MED：表数相等且目标名唯一，人工核对顺序后可迁"
+    },
+    {
+      "project": "首汽租车_2025",
+      "note_section": "八、75",
+      "section_title": "资产处置收益",
+      "reason": "按序对齐（表名非业务名、1 个名字不在模板中）⚠️ 需人工抽样确认",
+      "legacy_table_count": 1,
+      "planned_table_count": 1,
+      "legacy_row_total": 8,
+      "target_names": [
+        "资产处置收益（损失以“-”号填列）"
+      ],
+      "duplicate_target_names": [],
+      "suggested": "先按 target_name 正名 legacy 表 -> 走 by_name",
+      "risk": "MED：表数相等且目标名唯一，人工核对顺序后可迁"
+    },
+    {
+      "project": "首汽租车_2025",
+      "note_section": "八、76",
+      "section_title": "营业外收入",
+      "reason": "按序对齐（表名非业务名、1 个名字不在模板中）⚠️ 需人工抽样确认",
+      "legacy_table_count": 1,
+      "planned_table_count": 1,
+      "legacy_row_total": 7,
+      "target_names": [
+        "营业外收入"
+      ],
+      "duplicate_target_names": [],
+      "suggested": "先按 target_name 正名 legacy 表 -> 走 by_name",
+      "risk": "MED：表数相等且目标名唯一，人工核对顺序后可迁"
+    },
+    {
+      "project": "首汽租车_2025",
+      "note_section": "八、77",
+      "section_title": "营业外支出",
+      "reason": "按序对齐（表名非业务名、1 个名字不在模板中）⚠️ 需人工抽样确认",
+      "legacy_table_count": 1,
+      "planned_table_count": 1,
+      "legacy_row_total": 8,
+      "target_names": [
+        "营业外支出"
+      ],
+      "duplicate_target_names": [],
+      "suggested": "先按 target_name 正名 legacy 表 -> 走 by_name",
+      "risk": "MED：表数相等且目标名唯一，人工核对顺序后可迁"
+    },
+    {
+      "project": "首汽租车_2025",
+      "note_section": "八、78",
+      "section_title": "所得税费用",
+      "reason": "按序对齐（重名、表名非业务名、2 个名字不在模板中）⚠️ 需人工抽样确认",
+      "legacy_table_count": 2,
+      "planned_table_count": 2,
+      "legacy_row_total": 14,
+      "target_names": [
+        "所得税费用",
+        "会计利润与所得税费用调整过程"
+      ],
+      "duplicate_target_names": [],
+      "suggested": "先按 target_name 正名 legacy 表 -> 走 by_name",
+      "risk": "MED：表数相等且目标名唯一，人工核对顺序后可迁"
+    },
+    {
+      "project": "首汽租车_2025",
+      "note_section": "八、79",
+      "section_title": "归属于母公司所有者的其他综合收益",
+      "reason": "按序对齐（表名非业务名、1 个名字不在模板中）⚠️ 需人工抽样确认",
+      "legacy_table_count": 1,
+      "planned_table_count": 1,
+      "legacy_row_total": 44,
+      "target_names": [
+        "其他综合收益各项目及其所得税影响和转入损益情况"
+      ],
+      "duplicate_target_names": [],
+      "suggested": "先按 target_name 正名 legacy 表 -> 走 by_name",
+      "risk": "MED：表数相等且目标名唯一，人工核对顺序后可迁"
+    },
+    {
+      "project": "首汽租车_2025",
+      "note_section": "八、80",
+      "section_title": "每股收益",
+      "reason": "按序对齐（表名非业务名、1 个名字不在模板中）⚠️ 需人工抽样确认",
+      "legacy_table_count": 1,
+      "planned_table_count": 1,
+      "legacy_row_total": 23,
+      "target_names": [
+        "每股收益"
+      ],
+      "duplicate_target_names": [],
+      "suggested": "先按 target_name 正名 legacy 表 -> 走 by_name",
+      "risk": "MED：表数相等且目标名唯一，人工核对顺序后可迁"
+    },
+    {
+      "project": "首汽租车_2025",
+      "note_section": "八、81",
+      "section_title": "现金流量表项目注释",
+      "reason": "按序对齐（重名、表名非业务名、9 个名字不在模板中）⚠️ 需人工抽样确认",
+      "legacy_table_count": 9,
+      "planned_table_count": 9,
+      "legacy_row_total": 14,
+      "target_names": [
+        "收到的重要的投资活动有关的现金",
+        "支付的重要的投资活动有关的现金",
+        "收到的其他与经营活动有关的现金",
+        "支付的其他与经营活动有关的现金",
+        "收到的其他与投资活动有关的现金",
+        "支付的其他与投资活动有关的现金",
+        "收到的其他与筹资活动有关的现金",
+        "支付的其他与筹资活动有关的现金",
+        "筹资活动产生的各项负债的变动情况"
+      ],
+      "duplicate_target_names": [],
+      "suggested": "先按 target_name 正名 legacy 表 -> 走 by_name",
+      "risk": "MED：表数相等且目标名唯一，人工核对顺序后可迁"
+    },
+    {
+      "project": "首汽租车_2025",
+      "note_section": "八、83",
+      "section_title": "股份支付",
+      "reason": "按序对齐（表名非业务名、3 个名字不在模板中）⚠️ 需人工抽样确认",
+      "legacy_table_count": 3,
+      "planned_table_count": 3,
+      "legacy_row_total": 10,
+      "target_names": [
+        "股份支付总体情况",
+        "以权益结算的股份支付情况",
+        "以现金结算的股份支付情况"
+      ],
+      "duplicate_target_names": [],
+      "suggested": "先按 target_name 正名 legacy 表 -> 走 by_name",
+      "risk": "MED：表数相等且目标名唯一，人工核对顺序后可迁"
+    },
+    {
+      "project": "首汽租车_2025",
+      "note_section": "八、84",
+      "section_title": "债务重组",
+      "reason": "按序对齐（重名、表名非业务名、4 个名字不在模板中）⚠️ 需人工抽样确认",
+      "legacy_table_count": 4,
+      "planned_table_count": 4,
+      "legacy_row_total": 16,
+      "target_names": [
+        "债务人披露情况",
+        "企业应披露转让非现金资产的公允价值、债务转成的股份的公允价值和修改其他债务条件后债务的公允价值的确定方法及依据。",
+        "债权人披露情况",
+        "企业应披露受让非现金资产的公允价值、债权转成的股权的公允价值和修改其他债务条件后债权的公允价值的确定方法及依据。"
+      ],
+      "duplicate_target_names": [],
+      "suggested": "先按 target_name 正名 legacy 表 -> 走 by_name",
+      "risk": "MED：表数相等且目标名唯一，人工核对顺序后可迁"
+    },
+    {
+      "project": "首汽租车_2025",
+      "note_section": "八、85",
+      "section_title": "借款费用",
+      "reason": "按序对齐（表名非业务名、1 个名字不在模板中）⚠️ 需人工抽样确认",
+      "legacy_table_count": 1,
+      "planned_table_count": 1,
+      "legacy_row_total": 17,
+      "target_names": [
+        "借款费用"
+      ],
+      "duplicate_target_names": [],
+      "suggested": "先按 target_name 正名 legacy 表 -> 走 by_name",
+      "risk": "MED：表数相等且目标名唯一，人工核对顺序后可迁"
+    },
+    {
+      "project": "首汽租车_2025",
+      "note_section": "八、87",
+      "section_title": "租赁",
+      "reason": "按序对齐（重名、表名非业务名、3 个名字不在模板中）⚠️ 需人工抽样确认",
+      "legacy_table_count": 3,
+      "planned_table_count": 3,
+      "legacy_row_total": 37,
+      "target_names": [
+        "承租人信息",
+        "融资租赁出租人",
+        "经营租赁出租人"
+      ],
+      "duplicate_target_names": [],
+      "suggested": "先按 target_name 正名 legacy 表 -> 走 by_name",
+      "risk": "MED：表数相等且目标名唯一，人工核对顺序后可迁"
+    },
+    {
+      "project": "首汽租车_2025",
+      "note_section": "八、89",
+      "section_title": "终止经营",
+      "reason": "按序对齐（表名非业务名、1 个名字不在模板中）⚠️ 需人工抽样确认",
+      "legacy_table_count": 1,
+      "planned_table_count": 1,
+      "legacy_row_total": 15,
+      "target_names": [
+        "终止经营"
+      ],
+      "duplicate_target_names": [],
+      "suggested": "先按 target_name 正名 legacy 表 -> 走 by_name",
+      "risk": "MED：表数相等且目标名唯一，人工核对顺序后可迁"
+    },
+    {
+      "project": "首汽租车_2025",
+      "note_section": "八、92",
+      "section_title": "外币货币性项目",
+      "reason": "按序对齐（表名非业务名、1 个名字不在模板中）⚠️ 需人工抽样确认",
+      "legacy_table_count": 1,
+      "planned_table_count": 1,
+      "legacy_row_total": 25,
+      "target_names": [
+        "外币货币性项目"
+      ],
+      "duplicate_target_names": [],
+      "suggested": "先按 target_name 正名 legacy 表 -> 走 by_name",
+      "risk": "MED：表数相等且目标名唯一，人工核对顺序后可迁"
+    },
+    {
+      "project": "首汽租车_2025",
+      "note_section": "八、93",
+      "section_title": "所有权和使用权受到限制的资产",
+      "reason": "按序对齐（表名非业务名、1 个名字不在模板中）⚠️ 需人工抽样确认",
+      "legacy_table_count": 1,
+      "planned_table_count": 1,
+      "legacy_row_total": 9,
+      "target_names": [
+        "所有权和使用权受到限制的资产"
+      ],
+      "duplicate_target_names": [],
+      "suggested": "先按 target_name 正名 legacy 表 -> 走 by_name",
+      "risk": "MED：表数相等且目标名唯一，人工核对顺序后可迁"
+    }
+  ]
+}

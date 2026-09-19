@@ -1,0 +1,21 @@
+{
+  "contractVersion": "1.0",
+  "organizationId": "org-001",
+  "projectId": "proj-2026-001",
+  "fiscalYear": 2026,
+  "wpId": "wp-00000001",
+  "wpCode": "G4-1",
+  "entryId": "entry-0001",
+  "host": "html",
+  "anchor": {
+    "kind": "sheet",
+    "sheetUid": "sheet_g4_1",
+    "sheetCode": "G4-1"
+  },
+  "display": {
+    "sheetName": "固定资产",
+    "sectionLabel": null
+  },
+  "ownerEpoch": 1,
+  "contextRevision": 0
+}

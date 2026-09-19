@@ -18,7 +18,7 @@ services:
 
   postgres:
 
-    image: postgres:16-alpine
+    image: pgvector/pgvector:pg16
 
     container_name: audit-postgres
 
@@ -36,6 +36,17 @@ services:
 
       POSTGRES_DB: ${PG_DB:-audit_platform}
 
+    command:
+      - "postgres"
+      - "-c"
+      - "max_wal_size=4GB"
+      - "-c"
+      - "checkpoint_completion_target=0.9"
+      - "-c"
+      - "maintenance_work_mem=512MB"
+      - "-c"
+      - "max_connections=200"
+
     volumes:
 
       - pg_data:/var/lib/postgresql/data
@@ -52,7 +63,25 @@ services:
 
       start_period: 10s
 
-
+  # ----------------------------------------------------------
+  # PgBouncer — transaction pooling (pg-pooling-and-load-test spec)
+  # ----------------------------------------------------------
+  pgbouncer:
+    image: edoburu/pgbouncer:1.22.1-p0
+    container_name: audit-pgbouncer
+    restart: unless-stopped
+    ports:
+      - "${PGBOUNCER_PORT:-6432}:5432"
+    environment:
+      DATABASE_URL: postgres://${PG_USER:-postgres}:${PG_PASSWORD:-postgres}@postgres:5432/${PG_DB:-audit_platform}
+      POOL_MODE: transaction
+      MAX_CLIENT_CONN: 10000
+      DEFAULT_POOL_SIZE: 50
+      RESERVE_POOL_SIZE: 10
+      IGNORE_STARTUP_PARAMETERS: extra_float_digits
+    depends_on:
+      postgres:
+        condition: service_healthy
 
   # ----------------------------------------------------------
 
@@ -355,13 +384,15 @@ services:
 
         HTTPS_PROXY: ""
 
-    container_name: audit-backend
-
+    # container_name 已移除：固定名无法多副本（zero-downtime-deployment 组件 6a）
     restart: unless-stopped
 
-    ports:
+    expose:
+      - "8000"
 
-      - "${API_PORT:-8000}:8000"
+    command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "1"]
+
+    stop_grace_period: 40s
 
     environment:
 
@@ -385,7 +416,7 @@ services:
 
       STORAGE_ROOT: ${STORAGE_ROOT:-./storage}
 
-      ATTACHMENT_PRIMARY_STORAGE: ${ATTACHMENT_PRIMARY_STORAGE:-paperless}
+      ATTACHMENT_PRIMARY_STORAGE: ${ATTACHMENT_PRIMARY_STORAGE:-local}
 
       ATTACHMENT_FALLBACK_TO_LOCAL: ${ATTACHMENT_FALLBACK_TO_LOCAL:-true}
 
@@ -409,6 +440,10 @@ services:
 
       OLLAMA_MODEL: ${OLLAMA_MODEL:-qwen3:8b}
 
+      BUILD_VERSION_JSON: ${BUILD_VERSION_JSON:-}
+
+      GRACEFUL_SHUTDOWN_TIMEOUT: "30"
+
     volumes:
 
       - ./storage:/app/storage
@@ -426,7 +461,7 @@ services:
 
     healthcheck:
 
-      test: ["CMD-SHELL", "curl -f http://localhost:8000/api/health || exit 1"]
+      test: ["CMD-SHELL", "curl -f http://localhost:8000/readyz || exit 1"]
 
       interval: 10s
 
@@ -439,9 +474,26 @@ services:
 
 
   # ----------------------------------------------------------
+  # nginx 反向代理（zero-downtime-deployment 组件 6b，A 专属）
+  # ----------------------------------------------------------
+  nginx:
+    image: nginx:alpine
+    profiles:
+      - docker-backend
+    ports:
+      - "80:80"
+    volumes:
+      - ./docker/nginx/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      - backend
+    restart: unless-stopped
 
-  # ONLYOFFICE Document Server 8.2（向后兼容，底稿编辑已迁移至 Univer 纯前端方案）
-  # 如不需要 WOPI 协议兼容，可注释掉此服务节省资源
+  # ----------------------------------------------------------
+
+  # ONLYOFFICE Document Server（开源 Community 版，GitHub 最新 v9.4.0）
+  # 镜像：onlyoffice/documentserver:latest ← ONLYOFFICE/Docker-DocumentServer
+  # 源码：https://github.com/ONLYOFFICE/DocumentServer （AGPL-3.0）
+  # 底稿主编辑已迁移至 Univer；本服务保留 WOPI/附件 Office 预览兼容
 
   # ----------------------------------------------------------
 
@@ -458,7 +510,7 @@ services:
 
   onlyoffice:
 
-    image: onlyoffice/documentserver:8.2
+    image: onlyoffice/documentserver:latest
 
     container_name: audit-onlyoffice
 
@@ -470,13 +522,26 @@ services:
 
     environment:
       - WOPI_ENABLED=true
-      - JWT_ENABLED=false
+      - JWT_ENABLED=true
+      - JWT_SECRET=${ONLYOFFICE_JWT_SECRET:-onlyoffice-dev-secret-2026}
+      # 清空代理：Docker Desktop 会把宿主机 http_proxy（如 Clash 127.0.0.1:7897）
+      # 注入容器，导致 OnlyOffice 从 host.docker.internal 下载文件走代理失败。
+      # 清空后容器直连宿主机后端，任何电脑通用。
+      - http_proxy=
+      - https_proxy=
+      - HTTP_PROXY=
+      - HTTPS_PROXY=
+      - no_proxy=*
+      - NO_PROXY=*
 
     volumes:
 
       - office_data:/var/lib/onlyoffice
-      - ./onlyoffice/plugins/audit-formula:/var/www/onlyoffice/documentserver/sdkjs-plugins/audit-formula
-      - ./onlyoffice/plugins/audit-review:/var/www/onlyoffice/documentserver/sdkjs-plugins/audit-review
+      - office_logs:/var/log/onlyoffice
+      - office_data_certs:/var/www/onlyoffice/Data
+      # 自定义插件挂载（审计标注 + 取数联动，仅 cell 编辑器可见，不影响交付模块 Word）
+      - ./backend/onlyoffice_plugins/audit-legend:/var/www/onlyoffice/documentserver/sdkjs-plugins/audit-legend:ro
+      - ./backend/onlyoffice_plugins/tb-fetch:/var/www/onlyoffice/documentserver/sdkjs-plugins/tb-fetch:ro
 
     depends_on:
 
@@ -488,13 +553,13 @@ services:
 
       test: ["CMD-SHELL", "curl -f http://localhost/healthcheck || exit 1"]
 
-      interval: 15s
+      interval: 30s
 
       timeout: 10s
 
       retries: 5
 
-      start_period: 60s
+      start_period: 120s
 
     profiles:
       - onlyoffice
@@ -562,12 +627,15 @@ services:
 
 
   # ----------------------------------------------------------
-
   # Paperless-ngx - 附件文档管理 + OCR
-
+  # ⚠️ 默认禁用（profiles: paperless）。审计平台改用 MinIO + 自有三层 OCR 管线。
+  #    paperless 与平台 PaddleOCR/检索/溯源职责重叠，不建议启用。
+  #    如确需历史档案兼容：docker compose --profile paperless up
   # ----------------------------------------------------------
 
   paperless:
+
+    profiles: ["paperless"]
 
     image: ghcr.io/paperless-ngx/paperless-ngx:latest
 
@@ -695,33 +763,7 @@ services:
 
     command:
 
-      - >-
-
-        vllm serve Kbenkhaled/Qwen3.5-27B-NVFP4
-
-        --host=0.0.0.0
-
-        --port=8000
-
-        --max-model-len=${VLLM_MAX_MODEL_LEN:-32768}
-
-        --gpu-memory-utilization=${VLLM_GPU_MEM:-0.95}
-
-        --max-num-seqs=4
-
-        --max-num-batched-tokens=32768
-
-        --kv-cache-dtype=fp8
-
-        --reasoning-parser=qwen3
-
-        --enable-auto-tool-choice
-
-        --enable-prefix-caching
-
-        --tool-call-parser=qwen3_coder
-
-        --language-model-only
+      - "vllm serve Kbenkhaled/Qwen3.5-27B-NVFP4 --host=0.0.0.0 --port=8000 --max-model-len=32768 --gpu-memory-utilization=0.93 --max-num-seqs=4 --max-num-batched-tokens=32768 --kv-cache-dtype=fp8 --reasoning-parser=qwen3 --enable-auto-tool-choice --enable-prefix-caching --tool-call-parser=qwen3_coder --language-model-only"
 
     profiles:
 
@@ -738,6 +780,96 @@ services:
       retries: 5
 
       start_period: 120s
+
+
+
+  # ----------------------------------------------------------
+
+  # vLLM Embedding — BAAI/bge-m3 (中文多语言 embedding)
+
+  # 独立容器，与 chat 模型共享 GPU（各自限制显存）
+
+  # API：http://localhost:8101/v1 (OpenAI 兼容 /embeddings)
+
+  # ----------------------------------------------------------
+
+  vllm-embed:
+
+    image: vllm/vllm-openai:cu130-nightly
+
+    container_name: audit-vllm-embed
+
+    restart: "no"
+
+    ports:
+
+      - "${VLLM_EMBED_PORT:-8101}:8000"
+
+    ipc: host
+
+    runtime: nvidia
+
+    deploy:
+
+      resources:
+
+        reservations:
+
+          devices:
+
+            - driver: nvidia
+
+              count: all
+
+              capabilities: [gpu]
+
+    volumes:
+
+      - ${VLLM_HF_CACHE:-D:/vllm/hf-cache}:/root/.cache/huggingface
+
+    environment:
+
+      - HF_HUB_OFFLINE=0
+
+      - TRANSFORMERS_OFFLINE=0
+
+      - HTTP_PROXY=http://host.docker.internal:7897
+
+      - HTTPS_PROXY=http://host.docker.internal:7897
+
+      - http_proxy=http://host.docker.internal:7897
+
+      - https_proxy=http://host.docker.internal:7897
+
+      - NO_PROXY=localhost,127.0.0.1
+
+      - no_proxy=localhost,127.0.0.1
+
+    extra_hosts:
+
+      - "host.docker.internal:host-gateway"
+
+    entrypoint: ["/bin/bash", "-c"]
+
+    command:
+
+      - "vllm serve BAAI/bge-m3 --host=0.0.0.0 --port=8000 --runner=pooling --convert=embed --max-model-len=8192 --gpu-memory-utilization=0.12 --dtype=float16 --enforce-eager"
+
+    profiles:
+
+      - gpu
+
+    healthcheck:
+
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+
+      interval: 30s
+
+      timeout: 10s
+
+      retries: 5
+
+      start_period: 60s
 
 
 
@@ -859,11 +991,19 @@ services:
 
 volumes:
 
+  # 业务库数据在历史卷 gt_workplan_pg_data（422表/含projects）。
+  # 若用默认项目名 gt_plan 会新建空的 gt_plan_pg_data，导致「无核心表」。
   pg_data:
+    external: true
+    name: gt_workplan_pg_data
 
   redis_data:
 
   office_data:
+
+  office_logs:
+
+  office_data_certs:
 
   metabase_data:
 

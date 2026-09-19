@@ -1,0 +1,62 @@
+﻿{
+  "spec": "audit-evidence-attachment-preview-format-expansion",
+  "task": 15,
+  "recorded_at": "2026-09-09T00:29:23+08:00",
+  "baseline_commit_task1": "08229d87ef8ac2f9c1d148756016c23efb0befae",
+  "lockfile_digest_sha1_now": "1942a6b5f66a97df0acff7cbbbf268c749b5ac22",
+  "commands": {
+    "frontend": "npx vitest run src/components/attachment/preview/__tests__/task1LegacyBaseline.spec.ts src/__tests__/AttachmentPreviewOfficeIframe.spec.ts",
+    "backend": "python -m pytest tests/attachment_preview_format_expansion/test_task1_legacy_api_dto_baseline.py -q"
+  },
+  "results": {
+    "frontend_passed": 53,
+    "backend_passed": 23,
+    "blocking_unauthorized_diffs": 0
+  },
+  "authorized_deltas": [
+    {
+      "id": "extended-preview-hosts",
+      "before": "zip/eml/msg/dxf → unsupported (Task1 freeze in preview_host_matrix.json)",
+      "after": "zip/eml/msg/dxf → ExtendedFormatPreview on both hosts",
+      "authorization": "Req 1.x / Tasks 12-14; Task1 matrix cases retained; separate assertions cover extended"
+    },
+    {
+      "id": "type_hint_rename",
+      "before": "TabPanel mapped file_type → mime_type",
+      "after": "file_type → type_hint only (no mime_type fallback)",
+      "authorization": "Task 13"
+    },
+    {
+      "id": "ocr_dto_projection",
+      "before": "process-record SELECT missing ocr_status/ocr_text (red baseline)",
+      "after": "projection includes ocr_status/ocr_text; OCR UI still reads same attachment fields",
+      "authorization": "Task 13; Req 5.x zero-regression of legacy OCR visibility"
+    },
+    {
+      "id": "drawer_matrix_extended_cases",
+      "before": "drawer cases for archive/email/dxf were unsupported",
+      "after": "drawer_host_matrix.json branch=extended for zip/eml/msg/dxf; dwg remains unsupported+CAD copy",
+      "authorization": "Task 14 wiring; not a silent baseline rewrite of Office/PDF/image rows"
+    }
+  ],
+  "unchanged_assertions": [
+    "Preview_Host image set excludes svg by extension alone",
+    "Preview_Host docx/xlsx/csv/pdf/.PDF/bmp/webp branches and preview URL fetch",
+    "Drawer_Host Office 10-ext set + preview-pdf URL + pdf/.PDF case matrix",
+    "Drawer_Host image requires image/* mime prefix (category 'image' stays unsupported)",
+    "TabPanel Office 6-ext set (no odt/ods/odp/rtf union with Drawer)",
+    "Backend preview whitelist + non-whitelist JSON shape + upload size-only gate",
+    "guess_file_type matrix including zip/eml/msg/dxf",
+    "registered_debt.json three items remain in_scope=false"
+  ],
+  "test_nodeids": {
+    "frontend": [
+      "src/components/attachment/preview/__tests__/task1LegacyBaseline.spec.ts",
+      "src/__tests__/AttachmentPreviewOfficeIframe.spec.ts"
+    ],
+    "backend": [
+      "tests/attachment_preview_format_expansion/test_task1_legacy_api_dto_baseline.py"
+    ]
+  },
+  "gate": "PASS_ALLOW_TASK_16"
+}

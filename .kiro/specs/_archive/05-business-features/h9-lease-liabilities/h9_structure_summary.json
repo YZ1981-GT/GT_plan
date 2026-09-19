@@ -1,0 +1,3539 @@
+{
+  "file_path": "d:\\GT_plan\\基础数据\\致同通用审计程序及底稿模板（2025年修订）\\1.致同审计程序及底稿模板（2025年）\\4.风险应对-实质性程序（D-N）\\H 固定资产循环\\H9 租赁负债.xlsx",
+  "total_sheets": 9,
+  "sheet_names": [
+    "底稿目录",
+    "租赁负债实质性程序表H9A",
+    "审定表H9-1",
+    "附注披露信息（上市公司）",
+    "附注披露信息（国企）",
+    "租赁负债明细表H9-2",
+    "未确认融资费用明细表H9-3",
+    "调整分录汇总H9-4",
+    "GT_Custom"
+  ],
+  "sheets": {
+    "底稿目录": {
+      "sheet_name": "底稿目录",
+      "dimensions": "A1:H19",
+      "max_row": 19,
+      "max_column": 8,
+      "merged_cells": [
+        "A14:A16",
+        "A17:A19",
+        "A10:A13"
+      ],
+      "headers": [
+        [
+          "底稿开列时，可先在以下单元格填写有关内容，以便其他底稿引用有关数据：",
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          "被审计单位：",
+          null,
+          null,
+          "序号",
+          "内容",
+          "索引号",
+          "备注",
+          null
+        ],
+        [
+          "截止日：202X年12月31日",
+          null,
+          null,
+          "1",
+          "租赁负债实质性程序表",
+          "H9A",
+          null,
+          null
+        ],
+        [
+          "编制人：",
+          null,
+          null,
+          "=D3+1",
+          "审定表",
+          "H9-1",
+          null,
+          null
+        ],
+        [
+          "复核人：",
+          null,
+          null,
+          "=D4+1",
+          "附注披露信息（上市公司）",
+          null,
+          "无需打印",
+          null
+        ]
+      ],
+      "column_widths": {
+        "A": 77.5,
+        "B": 2.0,
+        "C": 2.09765625,
+        "D": 6.09765625,
+        "E": 33.5,
+        "F": 6.59765625,
+        "G": 8.796875
+      },
+      "formulas": [
+        {
+          "cell": "D4",
+          "formula": "=D3+1"
+        },
+        {
+          "cell": "D5",
+          "formula": "=D4+1"
+        },
+        {
+          "cell": "D6",
+          "formula": "=D5+1"
+        },
+        {
+          "cell": "D7",
+          "formula": "=D6+1"
+        },
+        {
+          "cell": "D8",
+          "formula": "=D7+1"
+        },
+        {
+          "cell": "D9",
+          "formula": "=D8+1"
+        }
+      ],
+      "sample_data": [
+        {
+          "row": 6,
+          "values": [
+            "编制日期：",
+            null,
+            null,
+            "=D5+1",
+            "附注披露信息（国企）",
+            null,
+            "无需打印",
+            null
+          ]
+        },
+        {
+          "row": 7,
+          "values": [
+            "复核日期：",
+            null,
+            null,
+            "=D6+1",
+            "租赁负债明细表",
+            "H9-2",
+            null,
+            null
+          ]
+        },
+        {
+          "row": 8,
+          "values": [
+            null,
+            null,
+            null,
+            "=D7+1",
+            "未确认融资费用明细表",
+            "H9-3",
+            null,
+            null
+          ]
+        },
+        {
+          "row": 9,
+          "values": [
+            "关于工作底稿与审计程序索引号对应的说明",
+            null,
+            null,
+            "=D8+1",
+            "调整分录汇总",
+            "H9-4",
+            null,
+            null
+          ]
+        },
+        {
+          "row": 10,
+          "values": [
+            "1.编制的审计工作底稿应与审计程序对应。审计项目组应根据被审计单位实际情况和风险评估情况在实质性程序表中裁剪、修改或增加审计程序，根据实际执行的审计程序完成相应审计工作底稿，编制的工作底稿中应按自然顺序依次编制索引号，并通过唯一的索引号将与实质性程序表中的程序对应关联（即将工作底稿的索引号填入实质性程序表中的底稿索引号列）。",
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null
+          ]
+        },
+        {
+          "row": 11,
+          "values": [
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null
+          ]
+        },
+        {
+          "row": 12,
+          "values": [
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null
+          ]
+        },
+        {
+          "row": 13,
+          "values": [
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null
+          ]
+        },
+        {
+          "row": 14,
+          "values": [
+            "2.获取的支持性证据应与审计底稿或程序对应。审计项目组在完成底稿时获取的支持性证据应根据底稿索引号编制下一级按自然顺序排序的索引号（如D1-2-1、D1-2-2、……），并在底稿中说明引用的支持性证据、关联索引号。",
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null
+          ]
+        },
+        {
+          "row": 15,
+          "values": [
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null
+          ]
+        }
+      ],
+      "key_patterns": []
+    },
+    "租赁负债实质性程序表H9A": {
+      "sheet_name": "租赁负债实质性程序表H9A",
+      "dimensions": "A1:L30",
+      "max_row": 30,
+      "max_column": 12,
+      "merged_cells": [
+        "G10:I10",
+        "G13:I13",
+        "A12:F12",
+        "A2:I2",
+        "A8:F8",
+        "B15:B16",
+        "A10:F10",
+        "A13:F13",
+        "J18:L18",
+        "A9:F9",
+        "A5:B5",
+        "G9:I9",
+        "A14:B14",
+        "G12:I12",
+        "G11:I11",
+        "A11:F11",
+        "D15:H15",
+        "J19:L19",
+        "A1:I1",
+        "G8:I8",
+        "A15:A16",
+        "C15:C16",
+        "I15:I16"
+      ],
+      "headers": [
+        [
+          "致同会计师事务所",
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          "租赁负债实质性程序表",
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          "=底稿目录!A2",
+          null,
+          "=底稿目录!A4",
+          null,
+          "=底稿目录!A6",
+          null,
+          null,
+          "索引号：",
+          "H9A",
+          null,
+          null,
+          null
+        ],
+        [
+          "=底稿目录!A3",
+          null,
+          "=底稿目录!A5",
+          null,
+          "=底稿目录!A7",
+          null,
+          null,
+          "页  次：",
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          "一、本账户涉及的科目",
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      ],
+      "column_widths": {
+        "A": 4.5,
+        "B": 65.0,
+        "C": 12.19921875,
+        "D": 5.3984375,
+        "E": 6.796875,
+        "F": 6.296875,
+        "G": 7.5,
+        "H": 5.3984375,
+        "I": 7.69921875,
+        "J": 52.19921875,
+        "K": 9.0
+      },
+      "formulas": [
+        {
+          "cell": "A3",
+          "formula": "=底稿目录!A2"
+        },
+        {
+          "cell": "C3",
+          "formula": "=底稿目录!A4"
+        },
+        {
+          "cell": "E3",
+          "formula": "=底稿目录!A6"
+        },
+        {
+          "cell": "A4",
+          "formula": "=底稿目录!A3"
+        },
+        {
+          "cell": "C4",
+          "formula": "=底稿目录!A5"
+        },
+        {
+          "cell": "E4",
+          "formula": "=底稿目录!A7"
+        }
+      ],
+      "sample_data": [
+        {
+          "row": 6,
+          "values": [
+            "租赁负债、未确认融资费用",
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null
+          ]
+        },
+        {
+          "row": 7,
+          "values": [
+            "二、审计目标与认定的对应关系",
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null
+          ]
+        },
+        {
+          "row": 8,
+          "values": [
+            "审计目标",
+            null,
+            null,
+            null,
+            null,
+            null,
+            "财务报表的认定　",
+            null,
+            null,
+            null,
+            null,
+            null
+          ]
+        },
+        {
+          "row": 9,
+          "values": [
+            "A. 资产负债表中记录的租赁负债是存在的，且已记录于恰当的账户",
+            null,
+            null,
+            null,
+            null,
+            null,
+            "存在",
+            null,
+            null,
+            null,
+            null,
+            null
+          ]
+        },
+        {
+          "row": 10,
+          "values": [
+            "B. 所有应记录的租赁负债均已记录，所有应当包括在财务报表中的相关披露均已包括",
+            null,
+            null,
+            null,
+            null,
+            null,
+            "完整性",
+            null,
+            null,
+            null,
+            null,
+            null
+          ]
+        },
+        {
+          "row": 11,
+          "values": [
+            "C. 记录的租赁负债由被审计单位拥有或控制；",
+            null,
+            null,
+            null,
+            null,
+            null,
+            "权利和义务",
+            null,
+            null,
+            null,
+            null,
+            null
+          ]
+        },
+        {
+          "row": 12,
+          "values": [
+            "D. 租赁负债以恰当的金额包括在财务报表中，与之相关的计价或分摊调整已恰当记录，相关披露已得到恰当计量和描述 ",
+            null,
+            null,
+            null,
+            null,
+            null,
+            "准确性、计价和分摊",
+            null,
+            null,
+            null,
+            null,
+            null
+          ]
+        },
+        {
+          "row": 13,
+          "values": [
+            "E. 租赁负债已被恰当地汇总或分解且表述清楚，相关披露在按照企业会计准则的编制基础下是相关的、可理解的",
+            null,
+            null,
+            null,
+            null,
+            null,
+            "列报",
+            null,
+            null,
+            null,
+            null,
+            null
+          ]
+        },
+        {
+          "row": 14,
+          "values": [
+            "三、计划实施的实质性程序",
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null
+          ]
+        },
+        {
+          "row": 15,
+          "values": [
+            "序号",
+            "审计程序",
+            "程序分类",
+            "财务报表的认定",
+            null,
+            null,
+            null,
+            null,
+            "底稿索引号",
+            null,
+            null,
+            null
+          ]
+        }
+      ],
+      "key_patterns": []
+    },
+    "审定表H9-1": {
+      "sheet_name": "审定表H9-1",
+      "dimensions": "A1:M34",
+      "max_row": 34,
+      "max_column": 13,
+      "merged_cells": [
+        "A5:A6",
+        "A1:M1",
+        "A33:L33",
+        "B5:F5",
+        "A32:L32",
+        "A31:L31",
+        "G5:K5",
+        "L5:M5",
+        "A2:M2"
+      ],
+      "headers": [
+        [
+          "致同会计师事务所",
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          "租赁负债审定表",
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          "=底稿目录!A2",
+          null,
+          null,
+          "=底稿目录!A4",
+          null,
+          null,
+          null,
+          "=底稿目录!A6",
+          null,
+          null,
+          null,
+          "索引号：",
+          "H9-1"
+        ],
+        [
+          "=底稿目录!A3",
+          null,
+          null,
+          "=底稿目录!A5",
+          null,
+          null,
+          null,
+          "=底稿目录!A7",
+          null,
+          null,
+          null,
+          "页  次：",
+          null
+        ],
+        [
+          "项目",
+          "期初数",
+          null,
+          null,
+          null,
+          null,
+          "期末数",
+          null,
+          null,
+          null,
+          null,
+          "本期审定数与上期\n审定数的比较",
+          null
+        ]
+      ],
+      "column_widths": {
+        "A": 24.19921875,
+        "B": 10.296875,
+        "E": 11.796875,
+        "F": 10.296875,
+        "J": 12.09765625,
+        "K": 10.296875,
+        "M": 7.5
+      },
+      "formulas": [
+        {
+          "cell": "A3",
+          "formula": "=底稿目录!A2"
+        },
+        {
+          "cell": "D3",
+          "formula": "=底稿目录!A4"
+        },
+        {
+          "cell": "H3",
+          "formula": "=底稿目录!A6"
+        },
+        {
+          "cell": "A4",
+          "formula": "=底稿目录!A3"
+        },
+        {
+          "cell": "D4",
+          "formula": "=底稿目录!A5"
+        },
+        {
+          "cell": "H4",
+          "formula": "=底稿目录!A7"
+        },
+        {
+          "cell": "D8",
+          "formula": "=B8+C8"
+        },
+        {
+          "cell": "F8",
+          "formula": "=D8-E8"
+        },
+        {
+          "cell": "I8",
+          "formula": "=G8+H8"
+        },
+        {
+          "cell": "K8",
+          "formula": "=I8-J8"
+        },
+        {
+          "cell": "L8",
+          "formula": "=K8-F8"
+        },
+        {
+          "cell": "M8",
+          "formula": "=IF(AND(F8=0,L8=0),0,IF(AND(F8=0,L8>0),1,L8/F8))"
+        },
+        {
+          "cell": "D9",
+          "formula": "=B9+C9"
+        },
+        {
+          "cell": "F9",
+          "formula": "=D9-E9"
+        },
+        {
+          "cell": "I9",
+          "formula": "=G9+H9"
+        },
+        {
+          "cell": "K9",
+          "formula": "=I9-J9"
+        },
+        {
+          "cell": "L9",
+          "formula": "=K9-F9"
+        },
+        {
+          "cell": "M9",
+          "formula": "=IF(AND(F9=0,L9=0),0,IF(AND(F9=0,L9>0),1,L9/F9))"
+        },
+        {
+          "cell": "D10",
+          "formula": "=B10+C10"
+        },
+        {
+          "cell": "F10",
+          "formula": "=D10-E10"
+        },
+        {
+          "cell": "I10",
+          "formula": "=G10+H10"
+        },
+        {
+          "cell": "K10",
+          "formula": "=I10-J10"
+        },
+        {
+          "cell": "L10",
+          "formula": "=K10-F10"
+        },
+        {
+          "cell": "M10",
+          "formula": "=IF(AND(F10=0,L10=0),0,IF(AND(F10=0,L10>0),1,L10/F10))"
+        },
+        {
+          "cell": "B11",
+          "formula": "=SUM(B8:B10)"
+        },
+        {
+          "cell": "C11",
+          "formula": "=SUM(C8:C10)"
+        },
+        {
+          "cell": "D11",
+          "formula": "=SUM(D8:D10)"
+        },
+        {
+          "cell": "E11",
+          "formula": "=SUM(E8:E10)"
+        },
+        {
+          "cell": "F11",
+          "formula": "=SUM(F8:F10)"
+        },
+        {
+          "cell": "G11",
+          "formula": "=SUM(G8:G10)"
+        },
+        {
+          "cell": "H11",
+          "formula": "=SUM(H8:H10)"
+        },
+        {
+          "cell": "I11",
+          "formula": "=SUM(I8:I10)"
+        },
+        {
+          "cell": "J11",
+          "formula": "=SUM(J8:J10)"
+        },
+        {
+          "cell": "K11",
+          "formula": "=SUM(K8:K10)"
+        },
+        {
+          "cell": "L11",
+          "formula": "=K11-F11"
+        },
+        {
+          "cell": "M11",
+          "formula": "=IF(AND(F11=0,L11=0),0,IF(AND(F11=0,L11>0),1,L11/F11))"
+        },
+        {
+          "cell": "D13",
+          "formula": "=B13+C13"
+        },
+        {
+          "cell": "F13",
+          "formula": "=D13-E13"
+        },
+        {
+          "cell": "I13",
+          "formula": "=G13+H13"
+        },
+        {
+          "cell": "K13",
+          "formula": "=I13-J13"
+        },
+        {
+          "cell": "L13",
+          "formula": "=K13-F13"
+        },
+        {
+          "cell": "M13",
+          "formula": "=IF(AND(F13=0,L13=0),0,IF(AND(F13=0,L13>0),1,L13/F13))"
+        },
+        {
+          "cell": "D14",
+          "formula": "=B14+C14"
+        },
+        {
+          "cell": "F14",
+          "formula": "=D14-E14"
+        },
+        {
+          "cell": "I14",
+          "formula": "=G14+H14"
+        },
+        {
+          "cell": "K14",
+          "formula": "=I14-J14"
+        },
+        {
+          "cell": "L14",
+          "formula": "=K14-F14"
+        },
+        {
+          "cell": "M14",
+          "formula": "=IF(AND(F14=0,L14=0),0,IF(AND(F14=0,L14>0),1,L14/F14))"
+        },
+        {
+          "cell": "D15",
+          "formula": "=B15+C15"
+        },
+        {
+          "cell": "F15",
+          "formula": "=D15-E15"
+        },
+        {
+          "cell": "I15",
+          "formula": "=G15+H15"
+        },
+        {
+          "cell": "K15",
+          "formula": "=I15-J15"
+        },
+        {
+          "cell": "L15",
+          "formula": "=K15-F15"
+        },
+        {
+          "cell": "M15",
+          "formula": "=IF(AND(F15=0,L15=0),0,IF(AND(F15=0,L15>0),1,L15/F15))"
+        },
+        {
+          "cell": "B16",
+          "formula": "=SUM(B13:B15)"
+        },
+        {
+          "cell": "C16",
+          "formula": "=SUM(C13:C15)"
+        },
+        {
+          "cell": "D16",
+          "formula": "=SUM(D13:D15)"
+        },
+        {
+          "cell": "E16",
+          "formula": "=SUM(E13:E15)"
+        },
+        {
+          "cell": "F16",
+          "formula": "=SUM(F13:F15)"
+        },
+        {
+          "cell": "G16",
+          "formula": "=SUM(G13:G15)"
+        },
+        {
+          "cell": "H16",
+          "formula": "=SUM(H13:H15)"
+        },
+        {
+          "cell": "I16",
+          "formula": "=SUM(I13:I15)"
+        },
+        {
+          "cell": "J16",
+          "formula": "=SUM(J13:J15)"
+        },
+        {
+          "cell": "K16",
+          "formula": "=SUM(K13:K15)"
+        },
+        {
+          "cell": "L16",
+          "formula": "=K16-F16"
+        },
+        {
+          "cell": "M16",
+          "formula": "=IF(AND(F16=0,L16=0),0,IF(AND(F16=0,L16>0),1,L16/F16))"
+        },
+        {
+          "cell": "B18",
+          "formula": "=B8-B13"
+        },
+        {
+          "cell": "C18",
+          "formula": "=C8-C13"
+        },
+        {
+          "cell": "D18",
+          "formula": "=D8-D13"
+        },
+        {
+          "cell": "E18",
+          "formula": "=E8-E13"
+        },
+        {
+          "cell": "F18",
+          "formula": "=F8-F13"
+        },
+        {
+          "cell": "G18",
+          "formula": "=G8-G13"
+        },
+        {
+          "cell": "H18",
+          "formula": "=H8-H13"
+        },
+        {
+          "cell": "I18",
+          "formula": "=I8-I13"
+        },
+        {
+          "cell": "J18",
+          "formula": "=J8-J13"
+        },
+        {
+          "cell": "K18",
+          "formula": "=K8-K13"
+        },
+        {
+          "cell": "L18",
+          "formula": "=K18-F18"
+        },
+        {
+          "cell": "M18",
+          "formula": "=IF(AND(F18=0,L18=0),0,IF(AND(F18=0,L18>0),1,L18/F18))"
+        },
+        {
+          "cell": "B19",
+          "formula": "=B9-B14"
+        },
+        {
+          "cell": "C19",
+          "formula": "=C9-C14"
+        },
+        {
+          "cell": "D19",
+          "formula": "=D9-D14"
+        },
+        {
+          "cell": "E19",
+          "formula": "=E9-E14"
+        },
+        {
+          "cell": "F19",
+          "formula": "=F9-F14"
+        },
+        {
+          "cell": "G19",
+          "formula": "=G9-G14"
+        },
+        {
+          "cell": "H19",
+          "formula": "=H9-H14"
+        },
+        {
+          "cell": "I19",
+          "formula": "=I9-I14"
+        },
+        {
+          "cell": "J19",
+          "formula": "=J9-J14"
+        },
+        {
+          "cell": "K19",
+          "formula": "=K9-K14"
+        },
+        {
+          "cell": "L19",
+          "formula": "=K19-F19"
+        },
+        {
+          "cell": "M19",
+          "formula": "=IF(AND(F19=0,L19=0),0,IF(AND(F19=0,L19>0),1,L19/F19))"
+        },
+        {
+          "cell": "B20",
+          "formula": "=B10-B15"
+        },
+        {
+          "cell": "C20",
+          "formula": "=C10-C15"
+        },
+        {
+          "cell": "D20",
+          "formula": "=D10-D15"
+        },
+        {
+          "cell": "E20",
+          "formula": "=E10-E15"
+        },
+        {
+          "cell": "F20",
+          "formula": "=F10-F15"
+        },
+        {
+          "cell": "G20",
+          "formula": "=G10-G15"
+        },
+        {
+          "cell": "H20",
+          "formula": "=H10-H15"
+        },
+        {
+          "cell": "I20",
+          "formula": "=I10-I15"
+        },
+        {
+          "cell": "J20",
+          "formula": "=J10-J15"
+        },
+        {
+          "cell": "K20",
+          "formula": "=K10-K15"
+        },
+        {
+          "cell": "L20",
+          "formula": "=K20-F20"
+        },
+        {
+          "cell": "M20",
+          "formula": "=IF(AND(F20=0,L20=0),0,IF(AND(F20=0,L20>0),1,L20/F20))"
+        },
+        {
+          "cell": "B21",
+          "formula": "=SUM(B18:B20)"
+        },
+        {
+          "cell": "C21",
+          "formula": "=SUM(C18:C20)"
+        },
+        {
+          "cell": "D21",
+          "formula": "=SUM(D18:D20)"
+        },
+        {
+          "cell": "E21",
+          "formula": "=SUM(E18:E20)"
+        },
+        {
+          "cell": "F21",
+          "formula": "=SUM(F18:F20)"
+        },
+        {
+          "cell": "G21",
+          "formula": "=SUM(G18:G20)"
+        },
+        {
+          "cell": "H21",
+          "formula": "=SUM(H18:H20)"
+        },
+        {
+          "cell": "I21",
+          "formula": "=SUM(I18:I20)"
+        },
+        {
+          "cell": "J21",
+          "formula": "=SUM(J18:J20)"
+        },
+        {
+          "cell": "K21",
+          "formula": "=SUM(K18:K20)"
+        },
+        {
+          "cell": "L21",
+          "formula": "=K21-F21"
+        },
+        {
+          "cell": "M21",
+          "formula": "=IF(AND(F21=0,L21=0),0,IF(AND(F21=0,L21>0),1,L21/F21))"
+        },
+        {
+          "cell": "F23",
+          "formula": "=F21-F22"
+        },
+        {
+          "cell": "K23",
+          "formula": "=K21-K22"
+        }
+      ],
+      "sample_data": [
+        {
+          "row": 6,
+          "values": [
+            null,
+            "未审数",
+            "账项调整",
+            "审定数",
+            "重分类：减一年内到期的租赁负债",
+            "报表数",
+            "未审数",
+            "账项调整",
+            "审定数",
+            "重分类：减一年内到期的租赁负债",
+            "报表数",
+            "变动额",
+            "变动率"
+          ]
+        },
+        {
+          "row": 7,
+          "values": [
+            "一、租赁负债原值",
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null
+          ]
+        },
+        {
+          "row": 8,
+          "values": [
+            "项目A",
+            null,
+            null,
+            "=B8+C8",
+            null,
+            "=D8-E8",
+            null,
+            null,
+            "=G8+H8",
+            null,
+            "=I8-J8",
+            "=K8-F8",
+            "=IF(AND(F8=0,L8=0),0,IF(AND(F8=0,L8>0),1,L8/F8))"
+          ]
+        },
+        {
+          "row": 9,
+          "values": [
+            "项目B",
+            null,
+            null,
+            "=B9+C9",
+            null,
+            "=D9-E9",
+            null,
+            null,
+            "=G9+H9",
+            null,
+            "=I9-J9",
+            "=K9-F9",
+            "=IF(AND(F9=0,L9=0),0,IF(AND(F9=0,L9>0),1,L9/F9))"
+          ]
+        },
+        {
+          "row": 10,
+          "values": [
+            "…",
+            null,
+            null,
+            "=B10+C10",
+            null,
+            "=D10-E10",
+            null,
+            null,
+            "=G10+H10",
+            null,
+            "=I10-J10",
+            "=K10-F10",
+            "=IF(AND(F10=0,L10=0),0,IF(AND(F10=0,L10>0),1,L10/F10))"
+          ]
+        },
+        {
+          "row": 11,
+          "values": [
+            "合计",
+            "=SUM(B8:B10)",
+            "=SUM(C8:C10)",
+            "=SUM(D8:D10)",
+            "=SUM(E8:E10)",
+            "=SUM(F8:F10)",
+            "=SUM(G8:G10)",
+            "=SUM(H8:H10)",
+            "=SUM(I8:I10)",
+            "=SUM(J8:J10)",
+            "=SUM(K8:K10)",
+            "=K11-F11",
+            "=IF(AND(F11=0,L11=0),0,IF(AND(F11=0,L11>0),1,L11/F11))"
+          ]
+        },
+        {
+          "row": 12,
+          "values": [
+            "二、未确认融资费用",
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null
+          ]
+        },
+        {
+          "row": 13,
+          "values": [
+            "项目A",
+            null,
+            null,
+            "=B13+C13",
+            null,
+            "=D13-E13",
+            null,
+            null,
+            "=G13+H13",
+            null,
+            "=I13-J13",
+            "=K13-F13",
+            "=IF(AND(F13=0,L13=0),0,IF(AND(F13=0,L13>0),1,L13/F13))"
+          ]
+        },
+        {
+          "row": 14,
+          "values": [
+            "项目B",
+            null,
+            null,
+            "=B14+C14",
+            null,
+            "=D14-E14",
+            null,
+            null,
+            "=G14+H14",
+            null,
+            "=I14-J14",
+            "=K14-F14",
+            "=IF(AND(F14=0,L14=0),0,IF(AND(F14=0,L14>0),1,L14/F14))"
+          ]
+        },
+        {
+          "row": 15,
+          "values": [
+            "…",
+            null,
+            null,
+            "=B15+C15",
+            null,
+            "=D15-E15",
+            null,
+            null,
+            "=G15+H15",
+            null,
+            "=I15-J15",
+            "=K15-F15",
+            "=IF(AND(F15=0,L15=0),0,IF(AND(F15=0,L15>0),1,L15/F15))"
+          ]
+        }
+      ],
+      "key_patterns": [
+        {
+          "type": "summary_row",
+          "row": 11,
+          "label": "合计"
+        },
+        {
+          "type": "summary_row",
+          "row": 16,
+          "label": "合计"
+        },
+        {
+          "type": "summary_row",
+          "row": 21,
+          "label": "合计"
+        }
+      ]
+    },
+    "附注披露信息（上市公司）": {
+      "sheet_name": "附注披露信息（上市公司）",
+      "dimensions": "A1:F18",
+      "max_row": 18,
+      "max_column": 6,
+      "merged_cells": [
+        "A2:E2",
+        "A16:E16",
+        "A1:E1",
+        "A14:E14",
+        "A17:E17",
+        "A18:E18"
+      ],
+      "headers": [
+        [
+          "致同会计师事务所",
+          null,
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          "附注披露表（上市公司）",
+          null,
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          "=底稿目录!A2",
+          "=底稿目录!A4",
+          "=底稿目录!A6",
+          "索引号：",
+          null,
+          null
+        ],
+        [
+          "=底稿目录!A3",
+          "=底稿目录!A5",
+          "=底稿目录!A7",
+          "页  次：",
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null,
+          null,
+          "返回目录"
+        ]
+      ],
+      "column_widths": {
+        "A": 27.8984375,
+        "B": 13.0,
+        "C": 15.0,
+        "D": 13.5,
+        "E": 14.19921875,
+        "F": 9.0
+      },
+      "formulas": [
+        {
+          "cell": "A3",
+          "formula": "=底稿目录!A2"
+        },
+        {
+          "cell": "B3",
+          "formula": "=底稿目录!A4"
+        },
+        {
+          "cell": "C3",
+          "formula": "=底稿目录!A6"
+        },
+        {
+          "cell": "A4",
+          "formula": "=底稿目录!A3"
+        },
+        {
+          "cell": "B4",
+          "formula": "=底稿目录!A5"
+        },
+        {
+          "cell": "C4",
+          "formula": "=底稿目录!A7"
+        }
+      ],
+      "sample_data": [
+        {
+          "row": 6,
+          "values": [
+            "47、租赁负债",
+            null,
+            null,
+            null,
+            null,
+            null
+          ]
+        },
+        {
+          "row": 7,
+          "values": [
+            "项  目",
+            "期末余额",
+            "上年年末余额",
+            null,
+            null,
+            null
+          ]
+        },
+        {
+          "row": 8,
+          "values": [
+            null,
+            null,
+            null,
+            null,
+            null,
+            null
+          ]
+        },
+        {
+          "row": 9,
+          "values": [
+            null,
+            null,
+            null,
+            null,
+            null,
+            null
+          ]
+        },
+        {
+          "row": 10,
+          "values": [
+            null,
+            null,
+            null,
+            null,
+            null,
+            null
+          ]
+        },
+        {
+          "row": 11,
+          "values": [
+            "小  计",
+            "X.XX",
+            null,
+            null,
+            null,
+            null
+          ]
+        },
+        {
+          "row": 12,
+          "values": [
+            "减：一年内到期的租赁负债",
+            null,
+            null,
+            null,
+            null,
+            null
+          ]
+        },
+        {
+          "row": 13,
+          "values": [
+            "合  计",
+            "X.XX",
+            null,
+            null,
+            null,
+            null
+          ]
+        },
+        {
+          "row": 14,
+          "values": [
+            "2024年计提的租赁负债利息费用金额为XX万元，计入财务费用-利息支出金额为XX万元，计入固定资产金额为XX万元。",
+            null,
+            null,
+            null,
+            null,
+            null
+          ]
+        },
+        {
+          "row": 15,
+          "values": [
+            "【提示：",
+            null,
+            null,
+            null,
+            null,
+            null
+          ]
+        }
+      ],
+      "key_patterns": []
+    },
+    "附注披露信息（国企）": {
+      "sheet_name": "附注披露信息（国企）",
+      "dimensions": "A1:F16",
+      "max_row": 16,
+      "max_column": 6,
+      "merged_cells": [
+        "A2:E2",
+        "A15:D15",
+        "A1:E1",
+        "A16:D16",
+        "A14:D14"
+      ],
+      "headers": [
+        [
+          "致同会计师事务所",
+          null,
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          "附注披露表（上市公司）",
+          null,
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          "=底稿目录!A2",
+          "=底稿目录!A4",
+          "=底稿目录!A6",
+          "索引号：",
+          null,
+          null
+        ],
+        [
+          "=底稿目录!A3",
+          "=底稿目录!A5",
+          "=底稿目录!A7",
+          "页  次：",
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null,
+          null,
+          "返回目录"
+        ]
+      ],
+      "column_widths": {
+        "A": 34.8984375,
+        "B": 13.0,
+        "C": 17.09765625,
+        "D": 13.5,
+        "E": 9.0
+      },
+      "formulas": [
+        {
+          "cell": "A3",
+          "formula": "=底稿目录!A2"
+        },
+        {
+          "cell": "B3",
+          "formula": "=底稿目录!A4"
+        },
+        {
+          "cell": "C3",
+          "formula": "=底稿目录!A6"
+        },
+        {
+          "cell": "A4",
+          "formula": "=底稿目录!A3"
+        },
+        {
+          "cell": "B4",
+          "formula": "=底稿目录!A5"
+        },
+        {
+          "cell": "C4",
+          "formula": "=底稿目录!A7"
+        }
+      ],
+      "sample_data": [
+        {
+          "row": 6,
+          "values": [
+            "49、租赁负债",
+            null,
+            null,
+            null,
+            null,
+            null
+          ]
+        },
+        {
+          "row": 7,
+          "values": [
+            "项  目",
+            "期末余额",
+            "期初余额",
+            null,
+            null,
+            null
+          ]
+        },
+        {
+          "row": 8,
+          "values": [
+            "租赁付款额",
+            null,
+            null,
+            null,
+            null,
+            null
+          ]
+        },
+        {
+          "row": 9,
+          "values": [
+            "减：未确认的融资费用",
+            null,
+            null,
+            null,
+            null,
+            null
+          ]
+        },
+        {
+          "row": 10,
+          "values": [
+            "重分类至一年内到期的非流动负债",
+            null,
+            null,
+            null,
+            null,
+            null
+          ]
+        },
+        {
+          "row": 11,
+          "values": [
+            "……",
+            null,
+            null,
+            null,
+            null,
+            null
+          ]
+        },
+        {
+          "row": 12,
+          "values": [
+            "租赁负债净额",
+            null,
+            null,
+            null,
+            null,
+            null
+          ]
+        },
+        {
+          "row": 13,
+          "values": [
+            "【提示：",
+            null,
+            null,
+            null,
+            null,
+            null
+          ]
+        },
+        {
+          "row": 14,
+          "values": [
+            "1、承租人根据《企业会计准则第21号——租赁》所确认的租赁负债发生的利息费用适用借款费用准则。使用权资产于租赁期开始日便达到预定可使用状态，租赁负债相关利息费用不应资本化计入使用权资产。租赁期开始日后，租赁负债可视同企业的一般借款。",
+            null,
+            null,
+            null,
+            null,
+            null
+          ]
+        },
+        {
+          "row": 15,
+          "values": [
+            "2、承租人向出租人支付的租金等款项中包含应缴纳的增值税的，相关增值税税额不属于租赁付款额的范畴，不应纳入租赁负债和使用权资产的计量。",
+            null,
+            null,
+            null,
+            null,
+            null
+          ]
+        }
+      ],
+      "key_patterns": [
+        {
+          "type": "summary_row",
+          "row": 12,
+          "label": "租赁负债净额"
+        }
+      ]
+    },
+    "租赁负债明细表H9-2": {
+      "sheet_name": "租赁负债明细表H9-2",
+      "dimensions": "A1:V26",
+      "max_row": 26,
+      "max_column": 22,
+      "merged_cells": [
+        "A2:V2",
+        "M7:M8",
+        "G7:H7",
+        "A1:V1",
+        "O7:R7",
+        "T7:T8",
+        "B7:B8",
+        "A7:A8",
+        "V7:V8",
+        "I7:L7",
+        "F7:F8",
+        "C7:E7",
+        "N7:N8",
+        "S7:S8",
+        "U7:U8"
+      ],
+      "headers": [
+        [
+          "致同会计师事务所",
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          "租赁负债明细表",
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          "=底稿目录!A2",
+          null,
+          null,
+          null,
+          null,
+          "=底稿目录!A4",
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          "=底稿目录!A6",
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          "索引号：",
+          "H9-2"
+        ],
+        [
+          "=底稿目录!A3",
+          null,
+          null,
+          null,
+          null,
+          "=底稿目录!A5",
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          "=底稿目录!A7",
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          "页  次：",
+          null
+        ],
+        [
+          "一、审计目标：1. 资产负债表中记录的租赁负债是存在的，且已记录于恰当的账户；2. 所有应记录的租赁负债均已记录，所有应当包括在财务报表中的相关披露均已包括；3. 租赁负债以恰当的金额包括在财务报表中，与之相关的计价或分摊调整已恰当记录，相关披露已得到恰当计量和描述。",
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      ],
+      "column_widths": {
+        "A": 16.19921875,
+        "B": 11.8984375,
+        "C": 8.5,
+        "E": 10.8984375,
+        "G": 9.0,
+        "I": 10.8984375,
+        "M": 10.0,
+        "N": 10.8984375,
+        "O": 8.09765625,
+        "P": 9.296875,
+        "Q": 8.09765625,
+        "R": 9.0,
+        "S": 10.296875,
+        "T": 7.8984375,
+        "U": 8.0,
+        "V": 7.69921875
+      },
+      "formulas": [
+        {
+          "cell": "A3",
+          "formula": "=底稿目录!A2"
+        },
+        {
+          "cell": "F3",
+          "formula": "=底稿目录!A4"
+        },
+        {
+          "cell": "M3",
+          "formula": "=底稿目录!A6"
+        },
+        {
+          "cell": "A4",
+          "formula": "=底稿目录!A3"
+        },
+        {
+          "cell": "F4",
+          "formula": "=底稿目录!A5"
+        },
+        {
+          "cell": "M4",
+          "formula": "=底稿目录!A7"
+        },
+        {
+          "cell": "E9",
+          "formula": "=B9-C9+D9"
+        },
+        {
+          "cell": "I9",
+          "formula": "=B9+F9"
+        },
+        {
+          "cell": "J9",
+          "formula": "=C9+G9"
+        },
+        {
+          "cell": "K9",
+          "formula": "=D9+H9"
+        },
+        {
+          "cell": "L9",
+          "formula": "=I9-J9+K9"
+        },
+        {
+          "cell": "N9",
+          "formula": "=L9-M9"
+        },
+        {
+          "cell": "E10",
+          "formula": "=B10-C10+D10"
+        },
+        {
+          "cell": "I10",
+          "formula": "=B10+F10"
+        },
+        {
+          "cell": "J10",
+          "formula": "=C10+G10"
+        },
+        {
+          "cell": "K10",
+          "formula": "=D10+H10"
+        },
+        {
+          "cell": "L10",
+          "formula": "=I10-J10+K10"
+        },
+        {
+          "cell": "N10",
+          "formula": "=L10-M10"
+        },
+        {
+          "cell": "E11",
+          "formula": "=B11-C11+D11"
+        },
+        {
+          "cell": "I11",
+          "formula": "=B11+F11"
+        },
+        {
+          "cell": "J11",
+          "formula": "=C11+G11"
+        },
+        {
+          "cell": "K11",
+          "formula": "=D11+H11"
+        },
+        {
+          "cell": "L11",
+          "formula": "=I11-J11+K11"
+        },
+        {
+          "cell": "N11",
+          "formula": "=L11-M11"
+        },
+        {
+          "cell": "E12",
+          "formula": "=B12-C12+D12"
+        },
+        {
+          "cell": "I12",
+          "formula": "=B12+F12"
+        },
+        {
+          "cell": "J12",
+          "formula": "=C12+G12"
+        },
+        {
+          "cell": "K12",
+          "formula": "=D12+H12"
+        },
+        {
+          "cell": "L12",
+          "formula": "=I12-J12+K12"
+        },
+        {
+          "cell": "N12",
+          "formula": "=L12-M12"
+        },
+        {
+          "cell": "E13",
+          "formula": "=B13-C13+D13"
+        },
+        {
+          "cell": "I13",
+          "formula": "=B13+F13"
+        },
+        {
+          "cell": "J13",
+          "formula": "=C13+G13"
+        },
+        {
+          "cell": "K13",
+          "formula": "=D13+H13"
+        },
+        {
+          "cell": "L13",
+          "formula": "=I13-J13+K13"
+        },
+        {
+          "cell": "N13",
+          "formula": "=L13-M13"
+        },
+        {
+          "cell": "B14",
+          "formula": "=SUM(B9:B13)"
+        },
+        {
+          "cell": "C14",
+          "formula": "=SUM(C9:C13)"
+        },
+        {
+          "cell": "D14",
+          "formula": "=SUM(D9:D13)"
+        },
+        {
+          "cell": "E14",
+          "formula": "=SUM(E9:E13)"
+        },
+        {
+          "cell": "F14",
+          "formula": "=SUM(F9:F13)"
+        },
+        {
+          "cell": "G14",
+          "formula": "=SUM(G9:G13)"
+        },
+        {
+          "cell": "H14",
+          "formula": "=SUM(H9:H13)"
+        },
+        {
+          "cell": "I14",
+          "formula": "=SUM(I9:I13)"
+        },
+        {
+          "cell": "J14",
+          "formula": "=SUM(J9:J13)"
+        },
+        {
+          "cell": "K14",
+          "formula": "=SUM(K9:K13)"
+        },
+        {
+          "cell": "L14",
+          "formula": "=SUM(L9:L13)"
+        },
+        {
+          "cell": "M14",
+          "formula": "=SUM(M9:M13)"
+        },
+        {
+          "cell": "N14",
+          "formula": "=SUM(N9:N13)"
+        },
+        {
+          "cell": "O14",
+          "formula": "=SUM(O9:O13)"
+        },
+        {
+          "cell": "P14",
+          "formula": "=SUM(P9:P13)"
+        },
+        {
+          "cell": "Q14",
+          "formula": "=SUM(Q9:Q13)"
+        },
+        {
+          "cell": "R14",
+          "formula": "=SUM(R9:R13)"
+        },
+        {
+          "cell": "U14",
+          "formula": "=SUM(U9:U13)"
+        }
+      ],
+      "sample_data": [
+        {
+          "row": 6,
+          "values": [
+            "二、审计过程：",
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null
+          ]
+        },
+        {
+          "row": 7,
+          "values": [
+            "出租方名称",
+            "期初余额",
+            "未审数",
+            null,
+            null,
+            "期初调整",
+            "本期调整",
+            null,
+            "审定数",
+            null,
+            null,
+            null,
+            "重分类：减一年内到期的租赁负债",
+            "期末报表数",
+            "期末到期日分析",
+            null,
+            null,
+            null,
+            "是否关联方",
+            "发函或替代情况",
+            "期后付款",
+            "备注"
+          ]
+        },
+        {
+          "row": 8,
+          "values": [
+            null,
+            null,
+            "借方发生",
+            "贷方发生",
+            "期末余额",
+            null,
+            "借方发生",
+            "贷方发生",
+            "期初余额",
+            "借方发生",
+            "贷方发生",
+            "期末余额",
+            null,
+            null,
+            "1年以下",
+            "1～2年",
+            "２～3年",
+            "3年以上",
+            null,
+            null,
+            null,
+            null
+          ]
+        },
+        {
+          "row": 9,
+          "values": [
+            null,
+            null,
+            null,
+            null,
+            "=B9-C9+D9",
+            null,
+            null,
+            null,
+            "=B9+F9",
+            "=C9+G9",
+            "=D9+H9",
+            "=I9-J9+K9",
+            null,
+            "=L9-M9",
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null
+          ]
+        },
+        {
+          "row": 10,
+          "values": [
+            null,
+            null,
+            null,
+            null,
+            "=B10-C10+D10",
+            null,
+            null,
+            null,
+            "=B10+F10",
+            "=C10+G10",
+            "=D10+H10",
+            "=I10-J10+K10",
+            null,
+            "=L10-M10",
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null
+          ]
+        },
+        {
+          "row": 11,
+          "values": [
+            null,
+            null,
+            null,
+            null,
+            "=B11-C11+D11",
+            null,
+            null,
+            null,
+            "=B11+F11",
+            "=C11+G11",
+            "=D11+H11",
+            "=I11-J11+K11",
+            null,
+            "=L11-M11",
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null
+          ]
+        },
+        {
+          "row": 12,
+          "values": [
+            null,
+            null,
+            null,
+            null,
+            "=B12-C12+D12",
+            null,
+            null,
+            null,
+            "=B12+F12",
+            "=C12+G12",
+            "=D12+H12",
+            "=I12-J12+K12",
+            null,
+            "=L12-M12",
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null
+          ]
+        },
+        {
+          "row": 13,
+          "values": [
+            null,
+            null,
+            null,
+            null,
+            "=B13-C13+D13",
+            null,
+            null,
+            null,
+            "=B13+F13",
+            "=C13+G13",
+            "=D13+H13",
+            "=I13-J13+K13",
+            null,
+            "=L13-M13",
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null
+          ]
+        },
+        {
+          "row": 14,
+          "values": [
+            "合计",
+            "=SUM(B9:B13)",
+            "=SUM(C9:C13)",
+            "=SUM(D9:D13)",
+            "=SUM(E9:E13)",
+            "=SUM(F9:F13)",
+            "=SUM(G9:G13)",
+            "=SUM(H9:H13)",
+            "=SUM(I9:I13)",
+            "=SUM(J9:J13)",
+            "=SUM(K9:K13)",
+            "=SUM(L9:L13)",
+            "=SUM(M9:M13)",
+            "=SUM(N9:N13)",
+            "=SUM(O9:O13)",
+            "=SUM(P9:P13)",
+            "=SUM(Q9:Q13)",
+            "=SUM(R9:R13)",
+            "--",
+            "--",
+            "=SUM(U9:U13)",
+            "--"
+          ]
+        },
+        {
+          "row": 15,
+          "values": [
+            "1、审计说明：",
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            "2、审计结论：",
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null
+          ]
+        }
+      ],
+      "key_patterns": [
+        {
+          "type": "summary_row",
+          "row": 14,
+          "label": "合计"
+        }
+      ]
+    },
+    "未确认融资费用明细表H9-3": {
+      "sheet_name": "未确认融资费用明细表H9-3",
+      "dimensions": "A1:U27",
+      "max_row": 27,
+      "max_column": 21,
+      "merged_cells": [
+        "A2:U2",
+        "O7:O8",
+        "H7:I7",
+        "U7:U8",
+        "T7:T8",
+        "A7:A8",
+        "B7:B8",
+        "P7:S7",
+        "A5:U5",
+        "C7:E7",
+        "A1:U1",
+        "N7:N8",
+        "J7:M7",
+        "F7:G7"
+      ],
+      "headers": [
+        [
+          "致同会计师事务所",
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          "未确认融资费用明细表",
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          "=底稿目录!A2",
+          null,
+          null,
+          null,
+          null,
+          null,
+          "=底稿目录!A4",
+          null,
+          null,
+          null,
+          null,
+          null,
+          "=底稿目录!A6",
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          "索引号：",
+          "H9-3"
+        ],
+        [
+          "=底稿目录!A3",
+          null,
+          null,
+          null,
+          null,
+          null,
+          "=底稿目录!A5",
+          null,
+          null,
+          null,
+          null,
+          null,
+          "=底稿目录!A7",
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          "页  次：",
+          null
+        ],
+        [
+          "一、审计目标：1. 资产负债表中记录的租赁负债是存在的，且已记录于恰当的账户；2. 所有应记录的租赁负债均已记录，所有应当包括在财务报表中的相关披露均已包括；3. 租赁负债以恰当的金额包括在财务报表中，与之相关的计价或分摊调整已恰当记录，相关披露已得到恰当计量和描述。",
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      ],
+      "column_widths": {
+        "A": 17.0,
+        "B": 9.0,
+        "N": 11.5,
+        "O": 9.0,
+        "T": 10.09765625,
+        "U": 9.0
+      },
+      "formulas": [
+        {
+          "cell": "A3",
+          "formula": "=底稿目录!A2"
+        },
+        {
+          "cell": "G3",
+          "formula": "=底稿目录!A4"
+        },
+        {
+          "cell": "M3",
+          "formula": "=底稿目录!A6"
+        },
+        {
+          "cell": "A4",
+          "formula": "=底稿目录!A3"
+        },
+        {
+          "cell": "G4",
+          "formula": "=底稿目录!A5"
+        },
+        {
+          "cell": "M4",
+          "formula": "=底稿目录!A7"
+        },
+        {
+          "cell": "A9",
+          "formula": "='租赁负债明细表H9-2'!A9"
+        },
+        {
+          "cell": "E9",
+          "formula": "=B9+C9-D9"
+        },
+        {
+          "cell": "J9",
+          "formula": "=B9"
+        },
+        {
+          "cell": "K9",
+          "formula": "=C9+F9+H9"
+        },
+        {
+          "cell": "L9",
+          "formula": "=D9+G9+I9"
+        },
+        {
+          "cell": "M9",
+          "formula": "=J9+K9-L9"
+        },
+        {
+          "cell": "O9",
+          "formula": "=M9-N9"
+        },
+        {
+          "cell": "A10",
+          "formula": "='租赁负债明细表H9-2'!A10"
+        },
+        {
+          "cell": "J10",
+          "formula": "=B10"
+        },
+        {
+          "cell": "K10",
+          "formula": "=C10+F10+H10"
+        },
+        {
+          "cell": "L10",
+          "formula": "=D10+G10+I10"
+        },
+        {
+          "cell": "M10",
+          "formula": "=J10+K10-L10"
+        },
+        {
+          "cell": "O10",
+          "formula": "=M10-N10"
+        },
+        {
+          "cell": "A11",
+          "formula": "='租赁负债明细表H9-2'!A11"
+        },
+        {
+          "cell": "J11",
+          "formula": "=B11"
+        },
+        {
+          "cell": "K11",
+          "formula": "=C11+F11+H11"
+        },
+        {
+          "cell": "L11",
+          "formula": "=D11+G11+I11"
+        },
+        {
+          "cell": "M11",
+          "formula": "=J11+K11-L11"
+        },
+        {
+          "cell": "O11",
+          "formula": "=M11-N11"
+        },
+        {
+          "cell": "A12",
+          "formula": "='租赁负债明细表H9-2'!A12"
+        },
+        {
+          "cell": "J12",
+          "formula": "=B12"
+        },
+        {
+          "cell": "K12",
+          "formula": "=C12+F12+H12"
+        },
+        {
+          "cell": "L12",
+          "formula": "=D12+G12+I12"
+        },
+        {
+          "cell": "M12",
+          "formula": "=J12+K12-L12"
+        },
+        {
+          "cell": "O12",
+          "formula": "=M12-N12"
+        },
+        {
+          "cell": "A13",
+          "formula": "='租赁负债明细表H9-2'!A13"
+        },
+        {
+          "cell": "J13",
+          "formula": "=B13"
+        },
+        {
+          "cell": "K13",
+          "formula": "=C13+F13+H13"
+        },
+        {
+          "cell": "L13",
+          "formula": "=D13+G13+I13"
+        },
+        {
+          "cell": "M13",
+          "formula": "=J13+K13-L13"
+        },
+        {
+          "cell": "O13",
+          "formula": "=M13-N13"
+        },
+        {
+          "cell": "B14",
+          "formula": "=SUM(B9:B13)"
+        },
+        {
+          "cell": "C14",
+          "formula": "=SUM(C9:C13)"
+        },
+        {
+          "cell": "D14",
+          "formula": "=SUM(D9:D13)"
+        },
+        {
+          "cell": "E14",
+          "formula": "=SUM(E9:E13)"
+        },
+        {
+          "cell": "F14",
+          "formula": "=SUM(F9:F13)"
+        },
+        {
+          "cell": "G14",
+          "formula": "=SUM(G9:G13)"
+        },
+        {
+          "cell": "H14",
+          "formula": "=SUM(H9:H13)"
+        },
+        {
+          "cell": "I14",
+          "formula": "=SUM(I9:I13)"
+        },
+        {
+          "cell": "J14",
+          "formula": "=SUM(J9:J13)"
+        },
+        {
+          "cell": "K14",
+          "formula": "=SUM(K9:K13)"
+        },
+        {
+          "cell": "L14",
+          "formula": "=SUM(L9:L13)"
+        },
+        {
+          "cell": "M14",
+          "formula": "=SUM(M9:M13)"
+        },
+        {
+          "cell": "N14",
+          "formula": "=SUM(N9:N13)"
+        },
+        {
+          "cell": "O14",
+          "formula": "=SUM(O9:O13)"
+        },
+        {
+          "cell": "P14",
+          "formula": "=SUM(P9:P13)"
+        },
+        {
+          "cell": "Q14",
+          "formula": "=SUM(Q9:Q13)"
+        },
+        {
+          "cell": "R14",
+          "formula": "=SUM(R9:R13)"
+        },
+        {
+          "cell": "S14",
+          "formula": "=SUM(S9:S13)"
+        }
+      ],
+      "sample_data": [
+        {
+          "row": 6,
+          "values": [
+            "二、审计过程：获取或编制未确认融资费用明细表，将总金额与报表、总账、明细账合计数核对相符。",
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null
+          ]
+        },
+        {
+          "row": 7,
+          "values": [
+            "出租方名称",
+            "期初余额",
+            "未审数",
+            null,
+            null,
+            "账项调整",
+            null,
+            "重分类调整",
+            null,
+            "审定数",
+            null,
+            null,
+            null,
+            "减：期末一年内到期未确认融资费用",
+            "期末最终审定数",
+            "到期日",
+            null,
+            null,
+            null,
+            "是否是关联方",
+            "备注"
+          ]
+        },
+        {
+          "row": 8,
+          "values": [
+            null,
+            null,
+            "借方发生",
+            "贷方发生",
+            "期末余额",
+            "借方发生",
+            "贷方发生",
+            "借方发生",
+            "贷方发生",
+            "期初余额",
+            "借方发生",
+            "贷方发生",
+            "期末余额",
+            null,
+            null,
+            "1年以下",
+            "1～2年",
+            "２～3年",
+            "3年以上",
+            null,
+            null
+          ]
+        },
+        {
+          "row": 9,
+          "values": [
+            "='租赁负债明细表H9-2'!A9",
+            null,
+            null,
+            null,
+            "=B9+C9-D9",
+            null,
+            null,
+            null,
+            null,
+            "=B9",
+            "=C9+F9+H9",
+            "=D9+G9+I9",
+            "=J9+K9-L9",
+            null,
+            "=M9-N9",
+            null,
+            null,
+            null,
+            null,
+            null,
+            null
+          ]
+        },
+        {
+          "row": 10,
+          "values": [
+            "='租赁负债明细表H9-2'!A10",
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            "=B10",
+            "=C10+F10+H10",
+            "=D10+G10+I10",
+            "=J10+K10-L10",
+            null,
+            "=M10-N10",
+            null,
+            null,
+            null,
+            null,
+            null,
+            null
+          ]
+        },
+        {
+          "row": 11,
+          "values": [
+            "='租赁负债明细表H9-2'!A11",
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            "=B11",
+            "=C11+F11+H11",
+            "=D11+G11+I11",
+            "=J11+K11-L11",
+            null,
+            "=M11-N11",
+            null,
+            null,
+            null,
+            null,
+            null,
+            null
+          ]
+        },
+        {
+          "row": 12,
+          "values": [
+            "='租赁负债明细表H9-2'!A12",
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            "=B12",
+            "=C12+F12+H12",
+            "=D12+G12+I12",
+            "=J12+K12-L12",
+            null,
+            "=M12-N12",
+            null,
+            null,
+            null,
+            null,
+            null,
+            null
+          ]
+        },
+        {
+          "row": 13,
+          "values": [
+            "='租赁负债明细表H9-2'!A13",
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            "=B13",
+            "=C13+F13+H13",
+            "=D13+G13+I13",
+            "=J13+K13-L13",
+            null,
+            "=M13-N13",
+            null,
+            null,
+            null,
+            null,
+            null,
+            null
+          ]
+        },
+        {
+          "row": 14,
+          "values": [
+            "合计",
+            "=SUM(B9:B13)",
+            "=SUM(C9:C13)",
+            "=SUM(D9:D13)",
+            "=SUM(E9:E13)",
+            "=SUM(F9:F13)",
+            "=SUM(G9:G13)",
+            "=SUM(H9:H13)",
+            "=SUM(I9:I13)",
+            "=SUM(J9:J13)",
+            "=SUM(K9:K13)",
+            "=SUM(L9:L13)",
+            "=SUM(M9:M13)",
+            "=SUM(N9:N13)",
+            "=SUM(O9:O13)",
+            "=SUM(P9:P13)",
+            "=SUM(Q9:Q13)",
+            "=SUM(R9:R13)",
+            "=SUM(S9:S13)",
+            null,
+            null
+          ]
+        },
+        {
+          "row": 15,
+          "values": [
+            "三、审计说明：",
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null
+          ]
+        }
+      ],
+      "key_patterns": [
+        {
+          "type": "summary_row",
+          "row": 6,
+          "label": "二、审计过程：获取或编制未确认融资费用明细表，将总金额与报表、总账、明细账合计数核对相符。"
+        },
+        {
+          "type": "summary_row",
+          "row": 14,
+          "label": "合计"
+        }
+      ]
+    },
+    "调整分录汇总H9-4": {
+      "sheet_name": "调整分录汇总H9-4",
+      "dimensions": "A1:J23",
+      "max_row": 23,
+      "max_column": 10,
+      "merged_cells": [
+        "A1:J1",
+        "A2:J2"
+      ],
+      "headers": [
+        [
+          "致同会计师事务所",
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          "租赁负债调整分录汇总表",
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          "=底稿目录!A2",
+          null,
+          null,
+          "=底稿目录!A4",
+          null,
+          null,
+          "=底稿目录!A6",
+          null,
+          "索引号：",
+          "H9-4"
+        ],
+        [
+          "=底稿目录!A3",
+          null,
+          null,
+          "=底稿目录!A5",
+          null,
+          null,
+          "=底稿目录!A7",
+          null,
+          "页  次：",
+          null
+        ],
+        [
+          "调整事项说明",
+          "类别（报表调整/账项调整/其他）",
+          "报表项目",
+          "科目名称",
+          "附注项目",
+          "……",
+          "借方调整金额",
+          "贷方调整金额",
+          "索引",
+          "备注"
+        ]
+      ],
+      "column_widths": {
+        "A": 20.69921875,
+        "B": 15.796875,
+        "C": 13.19921875,
+        "D": 13.8984375,
+        "E": 11.19921875,
+        "F": 10.59765625,
+        "G": 10.296875,
+        "H": 11.09765625,
+        "I": 9.0
+      },
+      "formulas": [
+        {
+          "cell": "A3",
+          "formula": "=底稿目录!A2"
+        },
+        {
+          "cell": "D3",
+          "formula": "=底稿目录!A4"
+        },
+        {
+          "cell": "G3",
+          "formula": "=底稿目录!A6"
+        },
+        {
+          "cell": "A4",
+          "formula": "=底稿目录!A3"
+        },
+        {
+          "cell": "D4",
+          "formula": "=底稿目录!A5"
+        },
+        {
+          "cell": "G4",
+          "formula": "=底稿目录!A7"
+        }
+      ],
+      "sample_data": [
+        {
+          "row": 6,
+          "values": [
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null
+          ]
+        },
+        {
+          "row": 7,
+          "values": [
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null
+          ]
+        },
+        {
+          "row": 8,
+          "values": [
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null
+          ]
+        },
+        {
+          "row": 9,
+          "values": [
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null
+          ]
+        },
+        {
+          "row": 10,
+          "values": [
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null
+          ]
+        },
+        {
+          "row": 11,
+          "values": [
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null
+          ]
+        },
+        {
+          "row": 12,
+          "values": [
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null
+          ]
+        },
+        {
+          "row": 13,
+          "values": [
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null
+          ]
+        },
+        {
+          "row": 14,
+          "values": [
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null
+          ]
+        },
+        {
+          "row": 15,
+          "values": [
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null
+          ]
+        }
+      ],
+      "key_patterns": []
+    },
+    "GT_Custom": {
+      "sheet_name": "GT_Custom",
+      "dimensions": "A1:B8",
+      "max_row": 8,
+      "max_column": 2,
+      "merged_cells": [],
+      "headers": [
+        [
+          "C1",
+          "Custom 1"
+        ],
+        [
+          "C2",
+          "Custom 2"
+        ],
+        [
+          "C3",
+          "Custom 3"
+        ],
+        [
+          "C4",
+          "Custom 4"
+        ],
+        [
+          "C5",
+          "Custom 5"
+        ]
+      ],
+      "column_widths": {},
+      "formulas": [],
+      "sample_data": [
+        {
+          "row": 6,
+          "values": [
+            "C6",
+            "Custom 6"
+          ]
+        },
+        {
+          "row": 7,
+          "values": [
+            "C7",
+            "Custom 7"
+          ]
+        },
+        {
+          "row": 8,
+          "values": [
+            "C8",
+            "Custom 8"
+          ]
+        }
+      ],
+      "key_patterns": []
+    }
+  },
+  "overview": {
+    "description": "H9租赁负债底稿模板结构分析",
+    "subject_code": "2205",
+    "subject_name": "租赁负债(贷方/负债类) + 未确认融资费用(借方/负债备抵类)",
+    "standard": "CAS21 新租赁准则",
+    "paired_with": "H8 使用权资产",
+    "key_characteristic": "负债类贷方科目：期末=期初+贷方-借方；未确认融资费用是借方备抵"
+  },
+  "sheet_purposes": {
+    "底稿目录": "底稿目录(Tab_Index)",
+    "租赁负债实质性程序表H9A": "实质性程序表(Procedure_Table_H9A)",
+    "审定表H9-1": "审定表(Adjudication_H9_1) - 科目2205+未确认融资费用",
+    "附注披露信息（上市公司）": "附注披露-上市公司(Disclosure_Listed)",
+    "附注披露信息（国企）": "附注披露-国企(Disclosure_SOE)",
+    "租赁负债明细表H9-2": "租赁负债明细表(Detail_H9_2) - 22列按合同列示(含借贷/调整/到期分析/关联/发函)",
+    "未确认融资费用明细表H9-3": "未确认融资费用明细表(Finance_Cost_H9_3) - 21列(与H9-2出租方联动)",
+    "调整分录汇总H9-4": "调整分录汇总(Adjustment_H9_4) - 10列(调整事项/类别/科目/借贷)",
+    "GT_Custom": "自定义配置(GT_Custom) - 系统预留"
+  },
+  "key_findings": {
+    "total_effective_sheets": 8,
+    "spec_vs_actual_divergence": {
+      "H9-4_is_NOT_amortization": true,
+      "H9-4_actual_content": "调整分录汇总表 (Adjustment Entries Summary, 10 columns)",
+      "spec_expected_H9-4": "摊销表 (Amortization Schedule)",
+      "no_dedicated_amortization_sheet": true,
+      "resolution": "摊销表(amortization)将作为前端计算生成的功能视图，非xlsx源模板原生sheet。基于H9-2明细表的利率+期限数据动态生成每笔合同的摊销计划。"
+    },
+    "no_H9-5_H9-6_sheets": {
+      "description": "源模板无H9-5(关联交易检查表)和H9-6独立sheet",
+      "H9-2_includes_related_party": "H9-2第19列(S列)'是否关联方'已涵盖关联方信息",
+      "H9-2_includes_confirmation": "H9-2第20列(T列)'发函或替代情况'已涵盖函证",
+      "resolution": "关联交易检查功能可嵌入H9-2或作为前端衍生视图"
+    },
+    "sheet_encoding_correction": {
+      "H9-4_in_xlsx": "调整分录汇总(非摊销表)",
+      "spec_numbering_needs_update": "原spec认为H9-4=摊销/H9-5=调整/H9-6=关联。实际H9只到H9-4，且H9-4=调整。摊销和关联无独立sheet。"
+    },
+    "formula_count_estimate": {
+      "审定表H9-1": "~80 formulas (13列×34行, 复杂变动率IF公式)",
+      "明细表H9-2": "~60 formulas (22列, 期末=期初-借+贷, SUM合计)",
+      "融资费用H9-3": "~55 formulas (21列, 跨sheet引用H9-2, 复杂借贷+调整)",
+      "调整分录H9-4": "~6 formulas (仅表头引用底稿目录)",
+      "total_estimated": "~200+ formulas"
+    }
+  },
+  "adjudication_h9_1_structure": {
+    "dimensions": "A1:M34, 13列×34行",
+    "sections": [
+      {
+        "name": "一、租赁负债原值",
+        "rows": "7-11",
+        "items": "项目A/B/…+合计",
+        "note": "贷方科目！期末=期初+贷方-借方"
+      },
+      {
+        "name": "二、未确认融资费用",
+        "rows": "12-16",
+        "items": "项目A/B/…+合计",
+        "note": "借方备抵！"
+      },
+      {
+        "name": "三、租赁负债净额(原值-融资费用)",
+        "rows": "17-21",
+        "items": "差额计算",
+        "note": "row18=row8-row13"
+      },
+      {
+        "name": "四、审计比较",
+        "rows": "22-23",
+        "note": "审定vs报表差额"
+      },
+      {
+        "name": "五、审计说明/结论",
+        "rows": "31-34"
+      }
+    ],
+    "columns": {
+      "A": "项目",
+      "B": "期初-未审数",
+      "C": "期初-账项调整",
+      "D": "期初-审定数(=B+C)",
+      "E": "期初-重分类(减一年内到期)",
+      "F": "期初-报表数(=D-E)",
+      "G": "期末-未审数",
+      "H": "期末-账项调整",
+      "I": "期末-审定数(=G+H)",
+      "J": "期末-重分类(减一年内到期)",
+      "K": "期末-报表数(=I-J)",
+      "L": "变动额(=K-F)",
+      "M": "变动率(IF复杂公式)"
+    },
+    "key_formulas": {
+      "审定数": "D=B+C / I=G+H",
+      "报表数": "F=D-E / K=I-J",
+      "变动额": "L=K-F",
+      "变动率": "M=IF(AND(F=0,L=0),0,IF(AND(F=0,L>0),1,L/F))",
+      "净额": "B18=B8-B13 (原值-融资费用)",
+      "合计": "SUM(range)"
+    }
+  },
+  "detail_h9_2_structure": {
+    "dimensions": "A1:V26, 22列×26行",
+    "header_rows": "7-8 (双行表头，合并单元格)",
+    "data_rows": "9-13 (5笔合同示例)",
+    "total_row": 14,
+    "columns": {
+      "A": "出租方名称",
+      "B": "期初余额",
+      "C": "未审-借方发生",
+      "D": "未审-贷方发生",
+      "E": "未审-期末余额(=B-C+D, 负债贷方！)",
+      "F": "期初调整",
+      "G": "本期调整-借方发生",
+      "H": "本期调整-贷方发生",
+      "I": "审定-期初余额(=B+F)",
+      "J": "审定-借方发生(=C+G)",
+      "K": "审定-贷方发生(=D+H)",
+      "L": "审定-期末余额(=I-J+K, 负债贷方！)",
+      "M": "重分类：减一年内到期",
+      "N": "期末报表数(=L-M)",
+      "O": "到期日-1年以下",
+      "P": "到期日-1~2年",
+      "Q": "到期日-2~3年",
+      "R": "到期日-3年以上",
+      "S": "是否关联方",
+      "T": "发函或替代情况",
+      "U": "期后付款",
+      "V": "备注"
+    },
+    "key_formulas": {
+      "期末余额_负债类": "E=B-C+D (期初-借方+贷方, 贷方科目!)",
+      "审定期初": "I=B+F",
+      "审定借方": "J=C+G",
+      "审定贷方": "K=D+H",
+      "审定期末": "L=I-J+K (贷方!)",
+      "报表数": "N=L-M"
+    }
+  },
+  "finance_cost_h9_3_structure": {
+    "dimensions": "A1:U27, 21列×27行",
+    "header_rows": "7-8 (双行表头)",
+    "data_rows": "9-13 (与H9-2出租方联动)",
+    "total_row": 14,
+    "cross_sheet_ref": "A列引用 '租赁负债明细表H9-2'!A9~A13 (出租方名称自动同步)",
+    "columns": {
+      "A": "出租方名称(=H9-2!A列)",
+      "B": "期初余额",
+      "C": "未审-借方发生",
+      "D": "未审-贷方发生",
+      "E": "未审-期末余额(=B+C-D, 借方备抵!)",
+      "F": "账项调整-借方",
+      "G": "账项调整-贷方",
+      "H": "重分类调整-借方",
+      "I": "重分类调整-贷方",
+      "J": "审定-期初余额(=B)",
+      "K": "审定-借方发生(=C+F+H)",
+      "L": "审定-贷方发生(=D+G+I)",
+      "M": "审定-期末余额(=J+K-L, 借方备抵!)",
+      "N": "减：期末一年内到期未确认融资费用",
+      "O": "期末最终审定数(=M-N)",
+      "P": "到期日-1年以下",
+      "Q": "到期日-1~2年",
+      "R": "到期日-2~3年",
+      "S": "到期日-3年以上",
+      "T": "是否是关联方",
+      "U": "备注"
+    },
+    "key_formulas": {
+      "期末_借方备抵": "E=B+C-D (借方科目! 期初+借-贷)",
+      "审定期初": "J=B",
+      "审定借方": "K=C+F+H (全部借方合并)",
+      "审定贷方": "L=D+G+I (全部贷方合并)",
+      "审定期末_借方": "M=J+K-L (备抵借方!)",
+      "最终审定": "O=M-N"
+    },
+    "note": "未确认融资费用是借方/负债备抵类(与H9-2相反)。期末=期初+借-贷。"
+  }
+}

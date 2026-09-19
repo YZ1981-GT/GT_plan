@@ -311,3 +311,30 @@ register(
     _ai_contributions_generator,
     "AI 贡献明细（V3 Req 6.6）",
 )
+
+
+# ---------------------------------------------------------------------------
+# 章节注册：抽样记录汇总（spec: sampling-evaluation-and-governance-closure R8）
+#
+# 改造前归档包完全不感知抽样（三个归档服务里 sampling/抽样/抽凭 提及数均为 0），
+# 而 CAS 1314 的记录要求本身就是归档件的组成部分。
+# ---------------------------------------------------------------------------
+
+
+async def _sampling_records_generator(
+    project_id: UUID, db: AsyncSession
+) -> bytes | Path | None:
+    """归档引擎调用：返回 CAS 1314 抽样记录汇总文本字节。"""
+    from app.services.archive_generators.sampling_records_generator import (
+        generate_sampling_records,
+    )
+
+    return await generate_sampling_records(project_id, db)
+
+
+register(
+    "06",
+    "06-抽样记录汇总.txt",
+    _sampling_records_generator,
+    "CAS 1314 抽样记录汇总（总体/样本量依据/抽样框版本/偏差/推断错报/结论）",
+)

@@ -49,6 +49,7 @@ class WorkHourStatus(str, enum.Enum):
     draft = "draft"
     confirmed = "confirmed"
     approved = "approved"
+    rejected = "rejected"
 
 
 # ---------------------------------------------------------------------------
@@ -82,6 +83,19 @@ class StaffMember(Base, SoftDeleteMixin, TimestampMixin):
 
     # Batch 3 Fix 1: 费率计算用枚举，不依赖 title 自由文本
     role_level: Mapped[str | None] = mapped_column(String(20), nullable=True, comment="费率等级: partner/manager/senior/auditor/intern")
+
+    # P0-1 执业资质字段
+    is_cpa: Mapped[bool | None] = mapped_column(nullable=True, comment="是否注册会计师")
+    cpa_cert_no: Mapped[str | None] = mapped_column(String(50), nullable=True, comment="CPA执业证书号")
+    audit_years: Mapped[int | None] = mapped_column(nullable=True, comment="审计年限")
+    qualifications: Mapped[dict | None] = mapped_column(JSONB, nullable=True, comment="专业资质列表 [CPA,CIA,CISA...]")
+    industry_experience: Mapped[dict | None] = mapped_column(JSONB, nullable=True, comment="行业经验列表 [制造,金融,地产...]")
+
+    # 人员状态（active/on_leave/resigned）
+    status: Mapped[str] = mapped_column(String(20), server_default=text("'active'"), nullable=False, comment="人员状态: active/on_leave/resigned")
+
+    # 头像URL（预留）
+    avatar_url: Mapped[str | None] = mapped_column(String(500), nullable=True, comment="头像图片URL")
 
     __table_args__ = (
         Index("idx_staff_department", "department", postgresql_where=text("is_deleted = false")),
@@ -130,7 +144,11 @@ class ProjectAssignment(Base, SoftDeleteMixin, TimestampMixin):
 
 
 class WorkHour(Base, SoftDeleteMixin, TimestampMixin):
-    """工时记录"""
+    """工时记录 — DEPRECATED: V117 迁移后由 work_hour_entries 替代。
+    
+    本模型保留只读兼容，新数据不再写入此表。
+    所有读写操作已迁移到 WorkHourEntry (workhour_entry_models.py)。
+    """
 
     __tablename__ = "work_hours"
     __table_args__ = (
@@ -156,6 +174,13 @@ class WorkHour(Base, SoftDeleteMixin, TimestampMixin):
     # R5 需求 8：工时用途分类（允许值：preparation|review|eqcr|training|admin）
     # 为向后兼容，保持 nullable；前后端约定枚举值，不建 DB enum。
     purpose: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    # 退回原因（rejected 状态时填写）
+    rejected_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # 审批人
+    approved_by: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("users.id"), nullable=True
+    )
+    approved_at: Mapped[datetime | None] = mapped_column(nullable=True)
 
     # W-4 加班自动识别：hours > 8 即视为加班；None/0 视为非加班
     # 测试环境 hours 可能是 float/int（SQLite 存储），统一通过 Decimal 比较

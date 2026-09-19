@@ -1,0 +1,95 @@
+{
+  "generated_by": "backend/scripts/_mutation_kit/span.py::run_cli",
+  "mode": "run",
+  "pytest_args": [
+    "backend/tests/workpaper_sync/test_task27_conflict_resolution.py",
+    "backend/tests/workpaper_sync/test_task27_conflict_resolution_pg.py",
+    "backend/tests/workpaper_sync/test_task26_oo_to_html.py",
+    "backend/tests/workpaper_sync/test_task26_oo_to_html_pg.py",
+    "backend/tests/workpaper_sync/test_task15_content_mutation.py",
+    "-q",
+    "--tb=no",
+    "-rf",
+    "-p",
+    "no:randomly"
+  ],
+  "tally": {
+    "RED": 3
+  },
+  "mutations": [
+    {
+      "id": "R02",
+      "path": "backend/app/services/workpaper_sync/repository.py",
+      "want": "test_task27_conflict_resolution_pg.py::TestRollback::test_rollback_creates_a_new_version_and_never_rewinds",
+      "why": "R02 回归：artifact 登记不再做内容寻址幂等 ⇒ rollback 重新 materialize 出**逐字节相同**的 representation（文件名 `{generation:09d}-{sha12}`、新 content version 的 generation 又从 1 起）时撞 `uq_wpa_relative_path`。这是回滚的**正常**路径而不是边缘情况",
+      "verdict": "RED",
+      "summary": "7 failed, 421 passed in 61.74s (0:01:01)",
+      "added": [
+        "test_task27_conflict_resolution_pg.py::TestHarness::test_every_scenario_was_collected",
+        "test_task27_conflict_resolution_pg.py::TestHarness::test_no_phase_crashed_during_collection",
+        "test_task27_conflict_resolution_pg.py::TestRollback::test_history_rows_and_files_are_untouched",
+        "test_task27_conflict_resolution_pg.py::TestRollback::test_rollback_creates_a_new_version_and_never_rewinds",
+        "test_task27_conflict_resolution_pg.py::TestRollback::test_the_new_version_carries_the_rollback_source_bucket",
+        "test_task27_conflict_resolution_pg.py::TestRollback::test_the_rolled_back_projection_equals_the_historical_one",
+        "test_task27_conflict_resolution_pg.py::TestRollback::test_unchanged_projection_means_zero_writes"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task27_conflict_resolution_pg.py::TestRollback::test_rollback_creates_a_new_version_and_never_rewinds"
+      ],
+      "added_files": [
+        "test_task27_conflict_resolution_pg.py"
+      ],
+      "restored": true,
+      "restored_sha256": "bb0200a36ccea2019667414520c74853332956e54bf57403ba5b0ce765f6a444",
+      "seconds": 64.8
+    },
+    {
+      "id": "G01",
+      "path": "backend/app/services/workpaper_sync/conflict_resolution.py",
+      "want": "test_task27_conflict_resolution_pg.py::TestDuplicateRequestedOperation::test_preview_through_the_duplicate_returns_the_primary_conflicts",
+      "why": "冲突改按 **requested** id 读 ⇒ requested 是合法 terminal duplicate 时预览恒空（冲突行挂在 canonical primary 上），而响应仍是 200 + `conflict_count=0`：审计师看到「没有冲突」，于是那些冲突永远不会被裁决，下一次 forcesave 又被 refresh-required 挡住。AC 8.5 末段明令只要求 canonical primary 绑定 application，正是为了让 duplicate 也能读到同一份冲突集",
+      "verdict": "RED",
+      "summary": "1 failed, 427 passed in 64.37s (0:01:04)",
+      "added": [
+        "test_task27_conflict_resolution_pg.py::TestDuplicateRequestedOperation::test_preview_through_the_duplicate_returns_the_primary_conflicts"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task27_conflict_resolution_pg.py::TestDuplicateRequestedOperation::test_preview_through_the_duplicate_returns_the_primary_conflicts"
+      ],
+      "added_files": [
+        "test_task27_conflict_resolution_pg.py"
+      ],
+      "restored": true,
+      "restored_sha256": "2258121e748d5b2f6dab1d03ab7ccd82b31413dc6bd3c5a86f62eeec562f74e1",
+      "seconds": 67.3
+    },
+    {
+      "id": "H01",
+      "path": "backend/app/services/workpaper_sync/conflict_resolution.py",
+      "want": "test_task27_conflict_resolution_pg.py::TestWhoMaySubmitAdjudications::test_review_lock_or_archive_blocks_the_adjudication",
+      "why": "把落地自证摘掉（保留表达式求值，因此不是「删掉一行就语法错」的无效变异）⇒ 缺陷原样复活：复核锁定/归档/项目不可见时裁决轨迹照写、resolve 照回 200。离线侧同时红（顺序判据找不到这个调用）",
+      "verdict": "RED",
+      "summary": "4 failed, 424 passed in 62.30s (0:01:02)",
+      "added": [
+        "test_task27_conflict_resolution.py::TestResolveApplyLandedGate::test_the_rebase_branch_also_asserts_landing",
+        "test_task27_conflict_resolution_pg.py::TestWhoMaySubmitAdjudications::test_none_of_the_refusals_wrote_an_adjudication_trail",
+        "test_task27_conflict_resolution_pg.py::TestWhoMaySubmitAdjudications::test_project_invisibility_is_a_separate_refusal",
+        "test_task27_conflict_resolution_pg.py::TestWhoMaySubmitAdjudications::test_review_lock_or_archive_blocks_the_adjudication"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task27_conflict_resolution_pg.py::TestWhoMaySubmitAdjudications::test_none_of_the_refusals_wrote_an_adjudication_trail",
+        "test_task27_conflict_resolution_pg.py::TestWhoMaySubmitAdjudications::test_review_lock_or_archive_blocks_the_adjudication"
+      ],
+      "added_files": [
+        "test_task27_conflict_resolution.py",
+        "test_task27_conflict_resolution_pg.py"
+      ],
+      "restored": true,
+      "restored_sha256": "2258121e748d5b2f6dab1d03ab7ccd82b31413dc6bd3c5a86f62eeec562f74e1",
+      "seconds": 65.3
+    }
+  ]
+}

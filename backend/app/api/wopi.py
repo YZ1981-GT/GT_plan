@@ -14,13 +14,58 @@ from fastapi import APIRouter, Depends, Header, Request, Response
 from fastapi.responses import JSONResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
+import logging
+
+import sqlalchemy as sa
+
 from app.core.database import get_db
 from app.core.config import settings
 from app.deps import get_current_user
 from app.models.core import User
 from app.services.wopi_service import WOPIHostService
+from app.services.wp_visibility.denial import ExternalNotFound, RateLimited
 
 router = APIRouter(tags=["WOPI"])
+logger = logging.getLogger(__name__)
+
+
+async def _wopi_gate_allow_write(
+    db: AsyncSession, user_id_str: str | None, file_id: str
+) -> bool:
+    """WOPI 写授权 = 统一门 editor_write allow（Task 11 / Req 10 / Design C11）。
+
+    file_id 为 UUID（=wp_id）。fail-closed：用户不可解析、门拒绝、异常 → False。
+    资源无关限流 429 上抛。``UserCanWrite`` 再与文件状态、锁合取。
+    """
+    if not (user_id_str and _is_uuid(user_id_str) and _is_uuid(file_id)):
+        return False
+    try:
+        from app.services.wp_visibility.wp_bound_gate import (
+            BindingAdapters,
+            resolve_wp_binding_and_access,
+        )
+
+        actor = (
+            await db.execute(sa.select(User).where(User.id == UUID(user_id_str)))
+        ).scalar_one_or_none()
+        if actor is None:
+            return False
+        req = BindingAdapters().wp(
+            entrypoint="editor.file_write",
+            action="editor_write",
+            method="POST",
+            wp_id=UUID(file_id),
+            entry_family="onlyoffice_wopi",
+        )
+        ctx = await resolve_wp_binding_and_access(db, actor, req)
+        return ctx is not None and not getattr(ctx, "readonly", False)
+    except RateLimited:
+        raise
+    except ExternalNotFound:
+        return False
+    except Exception as exc:  # noqa: BLE001 — fail-closed
+        logger.warning("WOPI 写授权门解析异常 file_id=%s: %s", file_id, exc)
+        return False
 
 
 def _is_uuid(value: str) -> bool:
@@ -81,7 +126,11 @@ async def wopi_check_file_info(
             return error_response
         try:
             user_id = UUID(token_data["user_id"])
-            info = await svc.check_file_info(db, UUID(file_id), user_id)
+            # UserCanWrite = gate allow ∩ file state ∩ lock（Req 10 / Design C11）。
+            gate_allow = await _wopi_gate_allow_write(db, token_data.get("user_id"), file_id)
+            info = await svc.check_file_info(
+                db, UUID(file_id), user_id, gate_allow=gate_allow
+            )
 
             return JSONResponse(content=info)
         except FileNotFoundError:
@@ -152,10 +201,18 @@ async def wopi_put_file(
 
     if _is_uuid(file_id):
         svc = WOPIHostService()
-        _, error_response = await _validate_wopi_access(db, file_id, access_token)
+        token_data, error_response = await _validate_wopi_access(db, file_id, access_token)
         if error_response:
             return error_response
         lock_id = request.headers.get("X-WOPI-Lock")
+        # 落盘前门写授权重校验（Req 10.6–10.8）：撤权/越权/只读会话拒绝写入。
+        gate_allow = await _wopi_gate_allow_write(db, token_data.get("user_id"), file_id)
+        if not gate_allow:
+            logger.warning("WOPI PutFile 写授权拒绝 file_id=%s", file_id)
+            if settings.ONLYOFFICE_JWT_ENFORCE:
+                return JSONResponse(
+                    status_code=404, content={"detail": "资源不存在或不可访问"}
+                )
         try:
             result = await svc.put_file(db, UUID(file_id), body, lock_id)
             await db.commit()

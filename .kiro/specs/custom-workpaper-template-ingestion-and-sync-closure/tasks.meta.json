@@ -1,0 +1,114 @@
+{
+  "pbtResults": {},
+  "executionHistory": {
+    "8. 消费 `G-ID`，完成逐 sheet mapping、identity carrier 与 adapter SPI": [
+      {
+        "executionId": "c8c1f7e5-be65-4a9b-a333-a2e88fc08d96",
+        "chatSessionId": "sess_09e983b6-f87f-4688-a541-b53279603463",
+        "timestamp": 1788881828226
+      },
+      {
+        "executionId": "c8c1f7e5-be65-4a9b-a333-a2e88fc08d96",
+        "chatSessionId": "sess_09e983b6-f87f-4688-a541-b53279603463",
+        "timestamp": 1788881834822
+      },
+      {
+        "executionId": "c8c1f7e5-be65-4a9b-a333-a2e88fc08d96",
+        "chatSessionId": "sess_09e983b6-f87f-4688-a541-b53279603463",
+        "timestamp": 1788882836760
+      }
+    ],
+    "9. 生成 immutable candidate、静态预览与 candidate guidance": [
+      {
+        "executionId": "c8c1f7e5-be65-4a9b-a333-a2e88fc08d96",
+        "chatSessionId": "sess_09e983b6-f87f-4688-a541-b53279603463",
+        "timestamp": 1788881828291
+      },
+      {
+        "executionId": "c8c1f7e5-be65-4a9b-a333-a2e88fc08d96",
+        "chatSessionId": "sess_09e983b6-f87f-4688-a541-b53279603463",
+        "timestamp": 1788882846492
+      },
+      {
+        "executionId": "c8c1f7e5-be65-4a9b-a333-a2e88fc08d96",
+        "chatSessionId": "sess_09e983b6-f87f-4688-a541-b53279603463",
+        "timestamp": 1788883821081
+      }
+    ],
+    "10. 建立一份 `ProjectWorkbookInstance`、child entries 与统一 namespace": [
+      {
+        "executionId": "c8c1f7e5-be65-4a9b-a333-a2e88fc08d96",
+        "chatSessionId": "sess_09e983b6-f87f-4688-a541-b53279603463",
+        "timestamp": 1788881828336
+      },
+      {
+        "executionId": "c8c1f7e5-be65-4a9b-a333-a2e88fc08d96",
+        "chatSessionId": "sess_09e983b6-f87f-4688-a541-b53279603463",
+        "timestamp": 1788883893156
+      }
+    ],
+    "11. 消费 `G-HANDOFF-CONSUMER` 并实现 pending visibility finalize saga": [
+      {
+        "executionId": "c8c1f7e5-be65-4a9b-a333-a2e88fc08d96",
+        "chatSessionId": "sess_09e983b6-f87f-4688-a541-b53279603463",
+        "timestamp": 1788881828400
+      }
+    ],
+    "12. 消费 `F-SHELL` 完成 ingestion wizard 与 active custom host 接入": [
+      {
+        "executionId": "c8c1f7e5-be65-4a9b-a333-a2e88fc08d96",
+        "chatSessionId": "sess_09e983b6-f87f-4688-a541-b53279603463",
+        "timestamp": 1788881828439
+      }
+    ],
+    "13. 实现 HTML→staging xlsx→单一 writer CAS": [
+      {
+        "executionId": "c8c1f7e5-be65-4a9b-a333-a2e88fc08d96",
+        "chatSessionId": "sess_09e983b6-f87f-4688-a541-b53279603463",
+        "timestamp": 1788881828489
+      }
+    ],
+    "14. 通过四个 sync gates 接通 OnlyOffice→durable→HTML": [
+      {
+        "executionId": "c8c1f7e5-be65-4a9b-a333-a2e88fc08d96",
+        "chatSessionId": "sess_09e983b6-f87f-4688-a541-b53279603463",
+        "timestamp": 1788881828537
+      }
+    ],
+    "15. 实现 adapter three-way merge、结构 remap 与 crash recovery": [
+      {
+        "executionId": "c8c1f7e5-be65-4a9b-a333-a2e88fc08d96",
+        "chatSessionId": "sess_09e983b6-f87f-4688-a541-b53279603463",
+        "timestamp": 1788881828596
+      }
+    ],
+    "16. 实现 immutable publication、project pin、升级/回滚、withdraw/revocation": [
+      {
+        "executionId": "c8c1f7e5-be65-4a9b-a333-a2e88fc08d96",
+        "chatSessionId": "sess_09e983b6-f87f-4688-a541-b53279603463",
+        "timestamp": 1788881828652
+      }
+    ],
+    "17. 实现 artifact reference graph、retention、访问与审计": [
+      {
+        "executionId": "c8c1f7e5-be65-4a9b-a333-a2e88fc08d96",
+        "chatSessionId": "sess_09e983b6-f87f-4688-a541-b53279603463",
+        "timestamp": 1788881828712
+      }
+    ],
+    "18. 定向行为、逐项变异 RED 与完整 Playwright": [
+      {
+        "executionId": "c8c1f7e5-be65-4a9b-a333-a2e88fc08d96",
+        "chatSessionId": "sess_09e983b6-f87f-4688-a541-b53279603463",
+        "timestamp": 1788881828758
+      }
+    ],
+    "19. 发布 X milestones、全量清册门并归档": [
+      {
+        "executionId": "c8c1f7e5-be65-4a9b-a333-a2e88fc08d96",
+        "chatSessionId": "sess_09e983b6-f87f-4688-a541-b53279603463",
+        "timestamp": 1788881828824
+      }
+    ]
+  }
+}

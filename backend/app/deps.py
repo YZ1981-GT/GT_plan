@@ -1,4 +1,4 @@
-"""依赖注入 — get_current_user, require_role, require_project_access
+"""依赖注入 — get_current_user, require_role, require_project_access, require_operation
 
 Validates: Requirements 3.7, 3.8, 3.9, 3.10
 """
@@ -7,7 +7,7 @@ import logging
 from collections.abc import Callable
 from uuid import UUID
 
-from fastapi import Depends, HTTPException
+from fastapi import Depends, HTTPException, Query, Request
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jose import JWTError
 from sqlalchemy import select
@@ -118,6 +118,36 @@ async def get_current_user(
 
 
 # ---------------------------------------------------------------------------
+# get_current_user_sse — SSE (EventSource) 鉴权：header 优先 + query token 回退
+# ---------------------------------------------------------------------------
+
+
+async def get_current_user_sse(
+    request: Request,
+    token: str | None = Query(default=None),
+    db: AsyncSession = Depends(get_db),
+) -> User:
+    """SSE / EventSource 专用鉴权（acnr-invalidation-overlay-hardening R1.2/R3.1）。
+
+    `EventSource` 无法设置 Authorization 头，故鉴权 token 经 query `?token=` 传递。
+    优先读 Authorization header（普通 fetch/SSE polyfill），回退 query token（原生 EventSource）。
+    复用 `get_current_user` 的完整校验（黑名单 / SoD / decode / 用户查库 / RLS），不重复实现。
+    """
+    raw: str | None = None
+    auth_header = request.headers.get("Authorization")
+    if auth_header and auth_header.lower().startswith("bearer "):
+        raw = auth_header[7:]
+    elif token:
+        raw = token
+
+    if not raw:
+        raise HTTPException(status_code=401, detail="未认证")
+
+    creds = HTTPAuthorizationCredentials(scheme="Bearer", credentials=raw)
+    return await get_current_user(credentials=creds, db=db)
+
+
+# ---------------------------------------------------------------------------
 # require_role
 # ---------------------------------------------------------------------------
 
@@ -180,7 +210,18 @@ def require_project_access(min_permission: str = "readonly") -> Callable:
     - Redis 缓存权限查询结果（TTL=5min）
     - Redis 不可用时降级为直接查库
     - 权限不足返回 403
+
+    ``min_permission`` 必须是 :data:`PERMISSION_HIERARCHY` 的键，**在工厂调用期即校验**
+    （= 模块导入期，拼错直接启动失败）。
+
+    为什么必须 fail-closed：下面比较用的是 ``PERMISSION_HIERARCHY.get(min_permission, 0)``
+    —— 未登记的级别名会静默取到 **0**，于是 ``user_level < 0`` 恒为假，**任何项目成员
+    （含 readonly）都能通过**，门禁形同不存在。实测曾有 4 个写端点因此被降级：
+    ``disclosure_notes`` 的删除 / 状态更新 / 恢复三处写 ``"editor"``、
+    ``wp_editor_router`` 的签署状态更新写 ``"member"`` —— 两个名字都不在登记表里。
+    这类拼写错误不会有任何报错或日志，只有逐字符核对才发现，故改为导入期硬失败。
     """
+    _validate_permission_level(min_permission, caller="require_project_access")
     # PERM_CACHE_TTL 使用模块级常量（见下方），此处不重复定义
 
     async def dependency(
@@ -188,56 +229,238 @@ def require_project_access(min_permission: str = "readonly") -> Callable:
         current_user: User = Depends(get_current_user),
         db: AsyncSession = Depends(get_db),
     ) -> User:
-        # 归档项目只读守卫（仅 non-readonly 权限触发）
-        await _check_project_not_archived(db, project_id, current_user, min_permission)
-
-        # admin 跳过项目权限检查（不设置 RLS context，admin 使用 bypass 函数）
-        if current_user.role.value == "admin":
-            # admin 仍设置 RLS context 以便普通查询正常工作
-            # 跨项目聚合查询使用 SECURITY DEFINER 函数绕过
-            await set_rls_context(db, project_id)
-            return current_user
-
-        # Try Redis cache first
-        cached_level = await _get_cached_permission(current_user.id, project_id)
-        if cached_level is not None:
-            user_level = PERMISSION_HIERARCHY.get(cached_level, 0)
-            required_level = PERMISSION_HIERARCHY.get(min_permission, 0)
-            if user_level < required_level:
-                raise HTTPException(status_code=403, detail="权限不足")
-            # 设置 RLS context（SET LOCAL 仅当前事务有效）
-            await set_rls_context(db, project_id)
-            return current_user
-
-        # 查询 project_users 表
-        result = await db.execute(
-            select(ProjectUser).where(
-                ProjectUser.project_id == project_id,
-                ProjectUser.user_id == current_user.id,
-                ProjectUser.is_deleted == False,  # noqa: E712
-            )
+        return await assert_project_permission(
+            db, current_user, project_id, min_permission
         )
-        project_user = result.scalar_one_or_none()
 
-        if project_user is None:
+    return dependency
+
+
+def _validate_permission_level(min_permission: str, *, caller: str) -> None:
+    """校验权限级别名已登记，未登记即抛 ValueError（fail-closed）。"""
+    if min_permission not in PERMISSION_HIERARCHY:
+        raise ValueError(
+            f"{caller} 收到未登记的权限级别 {min_permission!r}；"
+            f"合法值：{sorted(PERMISSION_HIERARCHY)}。"
+            "未登记的级别会被 PERMISSION_HIERARCHY.get(..., 0) 静默降级为 0，"
+            "使门禁对任何项目成员放行。"
+        )
+
+
+async def assert_project_permission(
+    db: AsyncSession,
+    current_user: User,
+    project_id: UUID,
+    min_permission: str = "readonly",
+) -> User:
+    """项目级权限校验的**可直调**版本（与 ``require_project_access`` 同一实现）。
+
+    ``require_project_access`` 是 FastAPI 依赖工厂，其内部依赖从**路径/查询参数**取
+    ``project_id`` —— 对「project_id 在请求体里」或「只给了 note_id、需先反查所属项目」
+    的端点用不上。那类端点必须在函数体首句显式调用本函数。
+
+    两条路径共用同一实现，避免出现第二份权限判定（判定分叉必然漂移）。
+    """
+    _validate_permission_level(min_permission, caller="assert_project_permission")
+
+    # 归档项目只读守卫（仅 non-readonly 权限触发）
+    await _check_project_not_archived(db, project_id, current_user, min_permission)
+
+    # admin 跳过项目权限检查（不设置 RLS context，admin 使用 bypass 函数）
+    if current_user.role.value == "admin":
+        # admin 仍设置 RLS context 以便普通查询正常工作
+        # 跨项目聚合查询使用 SECURITY DEFINER 函数绕过
+        await set_rls_context(db, project_id)
+        return current_user
+
+    required_level = PERMISSION_HIERARCHY[min_permission]
+
+    # Try Redis cache first
+    cached_level = await _get_cached_permission(current_user.id, project_id)
+    if cached_level is not None:
+        if PERMISSION_HIERARCHY.get(cached_level, 0) < required_level:
             raise HTTPException(status_code=403, detail="权限不足")
-
-        # Cache the permission level
-        level_value = project_user.permission_level.value
-        await _set_cached_permission(current_user.id, project_id, level_value)
-
-        # 比较权限层级
-        user_level = PERMISSION_HIERARCHY.get(level_value, 0)
-        required_level = PERMISSION_HIERARCHY.get(min_permission, 0)
-
-        if user_level < required_level:
-            raise HTTPException(status_code=403, detail="权限不足")
-
         # 设置 RLS context（SET LOCAL 仅当前事务有效）
         await set_rls_context(db, project_id)
         return current_user
 
+    # 查询 project_users 表
+    result = await db.execute(
+        select(ProjectUser).where(
+            ProjectUser.project_id == project_id,
+            ProjectUser.user_id == current_user.id,
+            ProjectUser.is_deleted == False,  # noqa: E712
+        )
+    )
+    project_user = result.scalar_one_or_none()
+
+    if project_user is None:
+        raise HTTPException(status_code=403, detail="权限不足")
+
+    # Cache the permission level
+    level_value = project_user.permission_level.value
+    await _set_cached_permission(current_user.id, project_id, level_value)
+
+    if PERMISSION_HIERARCHY.get(level_value, 0) < required_level:
+        raise HTTPException(status_code=403, detail="权限不足")
+
+    # 设置 RLS context（SET LOCAL 仅当前事务有效）
+    await set_rls_context(db, project_id)
+    return current_user
+
+
+# ---------------------------------------------------------------------------
+# require_wp_edit_permission — 底稿编辑权门禁（Module_Refresh 用）
+# ---------------------------------------------------------------------------
+
+
+def require_wp_edit_permission() -> Callable:
+    """底稿编辑权门禁（公式管理库 Req 20，Module_Refresh 用）。
+
+    与 ``require_role`` 是**两条不同门禁**：本门禁按"对目标底稿具编辑权"放行，
+    **不要求合伙人角色**，避免模块/循环级刷新（如 ``audit-sheet-refresh`` 逐底稿刷新）
+    被锁死为合伙人专属；``require_role`` 则按系统角色判定（用于全局一键刷新的合伙人门禁）。
+
+    判定口径（基于既有 ``permission_service.Permission.WORKPAPER_WRITE`` + 项目成员编辑权）：
+
+    1. 角色须具 ``WORKPAPER_WRITE`` 能力（``permission_service`` 角色权限矩阵）——
+       ``qc`` / ``readonly`` 无该能力 → 403。
+    2. ``admin`` / ``partner`` 全局放行（矩阵含全集）。
+    3. 其余角色（``manager`` / ``auditor``）须为目标底稿所属项目成员且具 ``edit`` 权
+       （``project_users.permission_level >= edit``），否则 403（Req 20.2）。
+
+    ``wp_id`` 从路径参数解析（route 形如 ``/{wp_id}/audit-sheet-refresh``）。所有校验在
+    依赖解析阶段完成，**先于任何数据写入**（Req 20.2）。
+    """
+
+    async def dependency(
+        wp_id: UUID,
+        current_user: User = Depends(get_current_user),
+        db: AsyncSession = Depends(get_db),
+    ) -> User:
+        await authorize_wp_edit(db, current_user, wp_id)
+        return current_user
+
     return dependency
+
+
+async def authorize_wp_edit(db: AsyncSession, current_user: User, wp_id: UUID) -> UUID:
+    """底稿编辑权校验（可复用；供路径依赖 require_wp_edit_permission 与 body-wp_id 端点调用）。
+
+    判定口径同 require_wp_edit_permission：
+    1. 角色须具 WORKPAPER_WRITE（qc/readonly → 403）。
+    2. admin/partner 全局放行。
+    3. 其余角色须为目标底稿所属项目成员且具 edit 权（project_users）。
+
+    Returns:
+        目标底稿所属 project_id（供调用方进一步校验归属）。
+
+    Raises:
+        HTTPException 403（无编辑权）/ 404（底稿不存在）。
+    """
+    from app.models.workpaper_models import WorkingPaper
+    from app.services.permission_service import Permission, check_permission
+
+    role = current_user.role.value
+
+    # ① 角色级 WORKPAPER_WRITE 能力
+    if not check_permission(role, Permission.WORKPAPER_WRITE):
+        raise HTTPException(status_code=403, detail="无底稿编辑权限")
+
+    # ③ 解析目标底稿所属项目
+    project_id = (
+        await db.execute(
+            select(WorkingPaper.project_id).where(
+                WorkingPaper.id == wp_id,
+                WorkingPaper.is_deleted == False,  # noqa: E712
+            )
+        )
+    ).scalar_one_or_none()
+    if project_id is None:
+        raise HTTPException(status_code=404, detail="底稿不存在")
+
+    # ② admin/partner 全局放行（在确认底稿存在后返回其 project_id）
+    if role in ("admin", "partner"):
+        return project_id
+
+    # ④ 项目成员编辑权（project_users edit 级；复用权限缓存）
+    cached_level = await _get_cached_permission(current_user.id, project_id)
+    if cached_level is None:
+        project_user = (
+            await db.execute(
+                select(ProjectUser).where(
+                    ProjectUser.project_id == project_id,
+                    ProjectUser.user_id == current_user.id,
+                    ProjectUser.is_deleted == False,  # noqa: E712
+                )
+            )
+        ).scalar_one_or_none()
+        if project_user is None:
+            raise HTTPException(status_code=403, detail="无底稿编辑权限")
+        cached_level = project_user.permission_level.value
+        await _set_cached_permission(current_user.id, project_id, cached_level)
+
+    if PERMISSION_HIERARCHY.get(cached_level, 0) < PERMISSION_HIERARCHY["edit"]:
+        raise HTTPException(status_code=403, detail="无底稿编辑权限")
+
+    return project_id
+
+
+async def authorize_wp_read(db: AsyncSession, current_user: User, wp_id: UUID) -> UUID:
+    """底稿只读权校验（可复用；供 body/path-wp_id 的**读**端点调用）。
+
+    与 ``authorize_wp_edit`` 对称，但只要求项目 ``readonly`` 级权限——用于导出模板/
+    导出数据等读操作：不能被误提到 edit（否则 readonly 成员无法导出），但也不能对
+    非项目成员放行（否则任意登录用户可拉取他人项目底稿数据）。
+
+    判定口径：
+    1. admin/partner 全局放行（在确认底稿存在后返回其 project_id）。
+    2. 其余角色须为目标底稿所属项目成员（``project_users`` 任一权限级 ≥ readonly）。
+
+    Returns:
+        目标底稿所属 project_id。
+
+    Raises:
+        HTTPException 403（非项目成员）/ 404（底稿不存在）。
+    """
+    from app.models.workpaper_models import WorkingPaper
+
+    role = current_user.role.value
+
+    project_id = (
+        await db.execute(
+            select(WorkingPaper.project_id).where(
+                WorkingPaper.id == wp_id,
+                WorkingPaper.is_deleted == False,  # noqa: E712
+            )
+        )
+    ).scalar_one_or_none()
+    if project_id is None:
+        raise HTTPException(status_code=404, detail="底稿不存在")
+
+    if role in ("admin", "partner"):
+        return project_id
+
+    cached_level = await _get_cached_permission(current_user.id, project_id)
+    if cached_level is None:
+        project_user = (
+            await db.execute(
+                select(ProjectUser).where(
+                    ProjectUser.project_id == project_id,
+                    ProjectUser.user_id == current_user.id,
+                    ProjectUser.is_deleted == False,  # noqa: E712
+                )
+            )
+        ).scalar_one_or_none()
+        if project_user is None:
+            raise HTTPException(status_code=403, detail="无底稿访问权限")
+        cached_level = project_user.permission_level.value
+        await _set_cached_permission(current_user.id, project_id, cached_level)
+
+    if PERMISSION_HIERARCHY.get(cached_level, 0) < PERMISSION_HIERARCHY["readonly"]:
+        raise HTTPException(status_code=403, detail="无底稿访问权限")
+
+    return project_id
 
 
 # ---------------------------------------------------------------------------
@@ -398,3 +621,66 @@ async def get_user_scope_cycles(
     if sc and isinstance(sc, str) and sc.strip():
         return [c.strip() for c in sc.split(",") if c.strip()]
     return None
+
+
+# ---------------------------------------------------------------------------
+# _resolve_project_role — 查询用户在项目中的角色
+# ---------------------------------------------------------------------------
+
+
+async def _resolve_project_role(
+    db: AsyncSession, user_id: UUID, project_id: UUID | None
+) -> str | None:
+    """从 ProjectUser 表查询用户在指定项目中的角色。
+
+    返回 project_role 字符串（如 "manager"/"preparer"），无记录返回 None。
+    project_id 为 None 时直接返回 None（全局端点仅依赖 system_role）。
+    """
+    if project_id is None:
+        return None
+
+    result = await db.execute(
+        select(ProjectUser.role).where(
+            ProjectUser.project_id == project_id,
+            ProjectUser.user_id == user_id,
+            ProjectUser.is_deleted == False,  # noqa: E712
+        )
+    )
+    role_enum = result.scalar_one_or_none()
+    return role_enum.value if role_enum else None
+
+
+# ---------------------------------------------------------------------------
+# require_operation — 权限矩阵操作级授权工厂
+# ---------------------------------------------------------------------------
+
+
+def require_operation(operation: str) -> Callable:
+    """操作级权限校验依赖工厂。
+
+    根据 permission_matrix_service.can(system_role, project_role, operation) 判断。
+    admin/partner 始终通过（矩阵中已定义全集）。
+    project_id 从路径参数/查询参数自动获取；无 project_id 的全局端点仅按 system_role 判断。
+    """
+
+    async def dependency(
+        current_user: User = Depends(get_current_user),
+        project_id: UUID | None = None,
+        db: AsyncSession = Depends(get_db),
+    ) -> User:
+        from app.services.permission_matrix_service import can
+
+        system_role = current_user.role.value
+        project_role = await _resolve_project_role(db, current_user.id, project_id)
+
+        if not can(system_role, project_role, operation):
+            raise HTTPException(
+                status_code=403,
+                detail={
+                    "error_code": "OPERATION_NOT_ALLOWED",
+                    "operation": operation,
+                },
+            )
+        return current_user
+
+    return dependency

@@ -764,11 +764,11 @@ function isFieldUsed(fieldValue: string, currentHeader: string): boolean {
 // 按数据类型区分的关键字段
 const _KEY_FIELDS_BY_TYPE: Record<string, Set<string>> = {
   balance: new Set([
+    // 年度语义（spec balance-import-annual-column-semantics）：年初/本年累计/期末=关键列
     'account_code', 'account_name',
-    'opening_balance', 'opening_debit', 'opening_credit',
-    'closing_balance', 'closing_debit', 'closing_credit',
     'year_opening_debit', 'year_opening_credit',
-    'debit_amount', 'credit_amount',
+    'year_debit', 'year_credit',
+    'closing_balance', 'closing_debit', 'closing_credit',
     'aux_dimensions',
   ]),
   ledger: new Set([
@@ -790,7 +790,12 @@ const _KEY_FIELDS_BY_TYPE: Record<string, Set<string>> = {
 }
 
 const _IMPORTANT_FIELDS_BY_TYPE: Record<string, Set<string>> = {
-  balance: new Set(['direction', 'level', 'company_code']),
+  // 期初/本期（月度维度）为重要（次关键）列，非年度关键列
+  balance: new Set([
+    'direction', 'level', 'company_code',
+    'opening_balance', 'opening_debit', 'opening_credit',
+    'debit_amount', 'credit_amount',
+  ]),
   ledger: new Set(['accounting_period', 'voucher_type', 'preparer', 'counterpart_account']),
   aux_balance: new Set(['direction', 'company_code']),
   aux_ledger: new Set(['accounting_period', 'voucher_type', 'summary', 'preparer']),
@@ -858,8 +863,8 @@ function _guessDataTypeFrontend(fields: Set<string>): string {
   const hasCode = fields.has('account_code')
   const hasVoucherDate = fields.has('voucher_date')
   const hasVoucherNo = fields.has('voucher_no')
-  const hasDebit = fields.has('debit_amount')
-  const hasCredit = fields.has('credit_amount')
+  const hasDebit = fields.has('debit_amount') || fields.has('year_debit')
+  const hasCredit = fields.has('credit_amount') || fields.has('year_credit')
   const hasOpening = ['opening_balance', 'opening_debit', 'opening_credit', 'year_opening_debit', 'year_opening_credit'].some(f => fields.has(f))
   const hasClosing = ['closing_balance', 'closing_debit', 'closing_credit'].some(f => fields.has(f))
   const hasAuxDimensions = fields.has('aux_dimensions')

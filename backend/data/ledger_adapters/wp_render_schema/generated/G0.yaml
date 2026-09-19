@@ -1,0 +1,63 @@
+# G0.yaml — 投资循环函证
+# 人工校准: 2026-07-04 基于openpyxl实读源模板 + requirements.md
+# 科目: 交易性金融资产/债权投资/长期股权投资/其他权益工具投资
+# 架构: 复用D0函证模块共享组件(confirmation-*)，G0-3S/G0-6为G循环特有
+
+wp_code: G0
+template_path: backend/wp_templates/G/G0 投资循环函证.xlsx
+template_version: v2025-R5
+applicable_standards:
+  - soe_standalone
+  - listed_standalone
+  - soe_consolidated
+  - listed_consolidated
+
+sheets:
+  底稿目录:
+    component_type: b-index
+    class_code: B-底稿目录
+
+  函证程序表G0A:
+    component_type: a-program-console
+    class_code: A-程序表
+    description: 投资循环函证程序表
+
+  函证结果汇总表G0-1:
+    component_type: confirmation-summary
+    class_code: D-函证
+    description: 投资循环函证结果汇总表(SSOT枢纽)
+
+  核实被函证单位信息G0-2:
+    component_type: confirmation-entity-verify
+    class_code: D-函证
+    description: 核实被函证单位信息(5阶段分区)
+
+  跟函函证过程控制G0-3:
+    component_type: confirmation-followup
+    class_code: D-函证
+    description: 跟函函证过程控制(段落式)
+
+  函证差异核对表G0-3（证券投资）:
+    component_type: confirmation-diff-securities
+    class_code: D-函证
+    description: 证券投资函证差异核对(持仓/公允价值/市值三维)
+
+  函证差异核对表G0-4(非证券投资):
+    component_type: confirmation-diff-reconcile
+    class_code: D-函证
+    description: 非证券投资函证差异调节表(复用D0-4)
+
+  替代程序检查表G0-6:
+    component_type: confirmation-alternative-g06
+    class_code: D-函证
+    description: 投资循环替代程序(G循环特有,需新建)
+
+  邮件传真回函可靠性验证G0-7:
+    component_type: confirmation-reliability
+    class_code: D-函证
+    description: 邮件/传真回函可靠性验证记录
+
+  函证程序舞弊风险评价表G0-8:
+    component_type: confirmation-fraud-risk
+    class_code: D-函证
+    description: 函证程序舞弊风险评价表(跨循环复用)

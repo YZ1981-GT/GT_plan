@@ -1,0 +1,42 @@
+[
+  {
+    "id": "M52",
+    "side": "fe",
+    "want": "宿主没给冻结身份 ⇒ 摘要显示「未提供」、claim 禁用",
+    "why": "claim 门不看阻断原因 ⇒ 阻断原因列在界面上、按钮却亮着，用户点下去才由服务端拒（且拒绝原因未必可读）。🔴 首轮实测 GREEN：判据当时没先选候选确认，于是关掉门的其实是「未选候选」那一道 —— 判据已改成先选候选再断言禁用（`_RCV_NO_CANDIDATE` 那条结构上无法隔离本门，故不再挂进 wants）",
+    "verdict": "RED",
+    "summary": "187/188 passed, numFailedTestSuites=2",
+    "added": [
+      "claim 之前三实体全空且不提供普通重试 宿主没给冻结身份 ⇒ 摘要显示「未提供」、claim 禁用、阻断原因逐条渲染"
+    ],
+    "gone": [],
+    "hit": [
+      "claim 之前三实体全空且不提供普通重试 宿主没给冻结身份 ⇒ 摘要显示「未提供」、claim 禁用、阻断原因逐条渲染"
+    ],
+    "added_files": [
+      "WorkpaperSyncRecoveryPanel.spec.ts"
+    ],
+    "restored": true,
+    "seconds": 4.8
+  },
+  {
+    "id": "M53",
+    "side": "fe",
+    "want": "没选候选就点 claim",
+    "why": "不要求先选候选确认 ⇒ claim 会带一个 undefined 的 prior confirmation id，而 AC 5.8 要求 claim 必须引用同 room/代际的既有确认",
+    "verdict": "RED",
+    "summary": "187/188 passed, numFailedTestSuites=2",
+    "added": [
+      "authorization-first claim 成功后三实体同时出现 没选候选就点 claim ⇒ 按钮本就禁用，claim API 零调用"
+    ],
+    "gone": [],
+    "hit": [
+      "authorization-first claim 成功后三实体同时出现 没选候选就点 claim ⇒ 按钮本就禁用，claim API 零调用"
+    ],
+    "added_files": [
+      "WorkpaperSyncRecoveryPanel.spec.ts"
+    ],
+    "restored": true,
+    "seconds": 4.8
+  }
+]

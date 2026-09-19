@@ -1,0 +1,25 @@
+{
+  "name": "审计标识",
+  "guid": "asc.{A1B2C3D4-1111-2222-3333-AUDITLEGEND01}",
+  "version": "1.0.0",
+  "minVersion": "9.4.0",
+  "variations": [
+    {
+      "description": "在选中单元格叠加审计符号（√已核对/ⓒ已计算/➜索引跳转）",
+      "url": "index.html",
+      "icons": ["resources/icons/icon.png", "resources/icons/icon@2x.png"],
+      "isViewer": false,
+      "EditorsSupport": ["cell"],
+      "isVisual": true,
+      "isModal": false,
+      "isInsideMode": false,
+      "initDataType": "none",
+      "initData": "",
+      "buttons": [
+        {"text": "确定", "primary": true},
+        {"text": "取消", "primary": false}
+      ],
+      "events": ["onTargetEmpty"]
+    }
+  ]
+}

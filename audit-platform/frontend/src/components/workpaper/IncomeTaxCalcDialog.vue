@@ -111,13 +111,13 @@
       <el-divider content-position="left">计算结果</el-divider>
       <el-descriptions :column="2" size="small" border>
         <el-descriptions-item label="当期所得税">
-          <span class="gt-amt">¥ {{ formatAmount(result.current_income_tax) }}</span>
+          <span class="gt-amt">¥ {{ prefs.fmt(result.current_income_tax) }}</span>
         </el-descriptions-item>
         <el-descriptions-item label="递延所得税">
-          <span class="gt-amt">¥ {{ formatAmount(result.deferred_income_tax) }}</span>
+          <span class="gt-amt">¥ {{ prefs.fmt(result.deferred_income_tax) }}</span>
         </el-descriptions-item>
         <el-descriptions-item label="所得税费用合计">
-          <span class="gt-amt">¥ {{ formatAmount(result.total_income_tax) }}</span>
+          <span class="gt-amt">¥ {{ prefs.fmt(result.total_income_tax) }}</span>
         </el-descriptions-item>
         <el-descriptions-item label="有效税率">
           <span class="gt-amt">{{ formatRate(result.effective_rate) }}</span>
@@ -132,7 +132,7 @@
             :key="'recon-' + idx"
             :label="item.label"
           >
-            <span class="gt-amt">¥ {{ formatAmount(item.amount) }}</span>
+            <span class="gt-amt">¥ {{ prefs.fmt(item.amount) }}</span>
           </el-descriptions-item>
         </el-descriptions>
       </template>
@@ -165,6 +165,7 @@ import { reactive, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import { api } from '@/services/apiProxy'
 import { handleApiError } from '@/utils/errorHandler'
+import { useDisplayPrefsStore } from '@/stores/displayPrefs'
 
 interface Props {
   visible: boolean
@@ -234,11 +235,8 @@ function removeTemporary(idx: number) {
   form.temporary_differences.splice(idx, 1)
 }
 
-function formatAmount(s: string | number) {
-  const n = Number(s)
-  if (!Number.isFinite(n)) return String(s)
-  return n.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-}
+const prefs = useDisplayPrefsStore()
+
 
 function formatRate(s: string | number) {
   const n = Number(s)

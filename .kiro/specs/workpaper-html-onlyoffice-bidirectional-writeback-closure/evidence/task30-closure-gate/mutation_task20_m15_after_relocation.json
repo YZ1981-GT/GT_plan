@@ -1,0 +1,24 @@
+[
+  {
+    "id": "M15",
+    "side": "be",
+    "want": "test_task20_writer_gate.py::test_the_gate_still_evaluates_the_relocated_criterion",
+    "why": "`多 resolver writer=0` 已从 Task 20 移交给 Task 30、再由 Task 30 移交给 Task 71（两跳的成环理由见 tasks.md），门必须**继续算** `multi_resolver` —— 当前归属方靠它验零。这条把判定短路成 `if False`：key 还在、计数恒为零，报告与「已清零」逐字相同，M13 那种「键是否存在」的判据抓不到。所以移交侧的守卫必须是行为级的（喂一条真的多 resolver 行看它被点名），「移交」才不会静默变成「无人守」",
+    "verdict": "RED",
+    "summary": "2 failed, 58 passed, 5 warnings in 103.04s (0:01:43)",
+    "added": [
+      "test_task20_writer_gate.py::test_the_gate_names_exactly_the_rows_the_owner_must_clear",
+      "test_task20_writer_gate.py::test_the_gate_still_evaluates_the_relocated_criterion"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task20_writer_gate.py::test_the_gate_names_exactly_the_rows_the_owner_must_clear",
+      "test_task20_writer_gate.py::test_the_gate_still_evaluates_the_relocated_criterion"
+    ],
+    "added_files": [
+      "test_task20_writer_gate.py"
+    ],
+    "restored": true,
+    "seconds": 106.3
+  }
+]

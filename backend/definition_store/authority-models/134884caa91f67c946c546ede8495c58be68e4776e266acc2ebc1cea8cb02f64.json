@@ -1,0 +1,1 @@
+{"authority_model":"projection_contract","content_authority":"structured_projection","entry_id":"xlsx/gt-d4-operating-revenue","merge_model":"stable_field_three_way","pilot_class":"phase5_revenue_detail","required_slots":["template","instrumentation","contract"],"schema_version":"authority-model-definition:v1"}

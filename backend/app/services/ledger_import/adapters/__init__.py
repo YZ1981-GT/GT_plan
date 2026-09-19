@@ -187,8 +187,15 @@ class AdapterRegistry:
                 break
 
         if existing_index is not None:
+            old_adapter = self._adapters[existing_index]
             self._adapters[existing_index] = adapter
             # Keep original insertion order; no counter bump.
+            logger.info(
+                "AdapterRegistry: adapter id=%r replaced (old: %s, new: %s)",
+                adapter.id,
+                type(old_adapter).__name__,
+                type(adapter).__name__,
+            )
         else:
             self._adapters.append(adapter)
             self._insert_order[adapter.id] = self._insert_counter
@@ -342,10 +349,48 @@ for _adapter_cls in (
 ):
     registry.register(_adapter_cls())
 
+# ---------------------------------------------------------------------------
+# JSON-driven adapter loading (Task 3.1) — 启动加载入口
+# ---------------------------------------------------------------------------
+
+#: JSON adapter 定义目录的默认路径
+_DEFAULT_JSON_ADAPTER_DIR = Path(__file__).resolve().parents[4] / "data" / "ledger_adapters"
+
+
+def load_json_adapters(
+    directory: Union[Path, str, None] = None,
+    target_registry: Optional[AdapterRegistry] = None,
+) -> int:
+    """启动加载 JSON 驱动适配器的明确入口。
+
+    在应用启动时调用此函数，从 ``backend/data/ledger_adapters/*.json``
+    加载外置适配器定义并注册到全局 registry。
+
+    Args:
+        directory: JSON adapter 目录路径，默认 ``backend/data/ledger_adapters/``。
+        target_registry: 目标注册表，默认使用模块单例 ``registry``。
+
+    Returns:
+        成功加载的适配器文件数。
+    """
+    reg = target_registry or registry
+    path = Path(directory) if directory else _DEFAULT_JSON_ADAPTER_DIR
+    count = reg.reload_from_json(path)
+    if count > 0:
+        logger.info(
+            "load_json_adapters: loaded %d adapter(s) from %s", count, path
+        )
+    return count
+
+
+# 模块加载时自动执行一次（确保 import 即可用）
+_json_load_count = load_json_adapters()
+
 
 __all__ = [
     "AdapterRegistry",
     "JsonDrivenAdapter",
+    "load_json_adapters",
     "registry",
     "YonyouAdapter",
     "KingdeeAdapter",

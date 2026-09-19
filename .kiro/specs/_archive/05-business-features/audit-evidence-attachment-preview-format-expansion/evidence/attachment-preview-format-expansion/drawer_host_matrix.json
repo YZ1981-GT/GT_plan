@@ -1,0 +1,39 @@
+{
+  "host": "Drawer_Host",
+  "component": "audit-platform/frontend/src/components/common/AttachmentPreviewDrawer.vue",
+  "type_hint_field_today": "type_hint",
+  "unsupported_copy": "该格式暂不支持在线预览",
+  "office_lo_down_copy": "服务器未安装 LibreOffice，Office 在线预览不可用",
+  "office_exts_frozen": [".doc", ".docx", ".xls", ".xlsx", ".ppt", ".pptx", ".odt", ".ods", ".odp", ".rtf"],
+  "pdf_semantics": {
+    "mime_exact": "application/pdf",
+    "name_ends_with": ".pdf",
+    "name_case_sensitive": true,
+    "note": "name.endsWith('.pdf') 不 lower；.PDF 且 mime 非 application/pdf → 非 PDF 分支"
+  },
+  "image_semantics": {
+    "mime_prefix": "image/",
+    "note": "file_type 分类词 'image' 不满足 startsWith('image/')，生产链若只传分类词则不进图片分支"
+  },
+  "office_preview_url": "/api/attachments/{id}/preview-pdf",
+  "health_probe": "/api/office-preview/health",
+  "cases": [
+    {"name": "report.docx", "type_hint": "", "branch": "office", "previewSrcKind": "preview-pdf"},
+    {"name": "data.xlsx", "type_hint": "", "branch": "office", "previewSrcKind": "preview-pdf"},
+    {"name": "slides.pptx", "type_hint": "", "branch": "office", "previewSrcKind": "preview-pdf"},
+    {"name": "legacy.odt", "type_hint": "", "branch": "office", "previewSrcKind": "preview-pdf"},
+    {"name": "legacy.rtf", "type_hint": "", "branch": "office", "previewSrcKind": "preview-pdf"},
+    {"name": "doc.pdf", "type_hint": "application/pdf", "branch": "pdf", "previewSrcKind": "preview_url"},
+    {"name": "doc.pdf", "type_hint": "", "branch": "pdf", "previewSrcKind": "preview_url"},
+    {"name": "doc.PDF", "type_hint": "", "branch": "unsupported", "previewSrcKind": null},
+    {"name": "doc.PDF", "type_hint": "application/pdf", "branch": "pdf", "previewSrcKind": "preview_url"},
+    {"name": "photo.png", "type_hint": "image/png", "branch": "image", "previewSrcKind": "preview_url"},
+    {"name": "photo.png", "type_hint": "image", "branch": "unsupported", "previewSrcKind": null},
+    {"name": "photo.svg", "type_hint": "image/svg+xml", "branch": "image", "previewSrcKind": "preview_url"},
+    {"name": "archive.zip", "type_hint": "application/zip", "branch": "extended", "previewSrcKind": null},
+    {"name": "mail.eml", "type_hint": "eml", "branch": "extended", "previewSrcKind": null},
+    {"name": "mail.msg", "type_hint": "msg", "branch": "extended", "previewSrcKind": null},
+    {"name": "plan.dxf", "type_hint": "dxf", "branch": "extended", "previewSrcKind": null},
+    {"name": "plan.dwg", "type_hint": "dwg", "branch": "unsupported", "previewSrcKind": null}
+  ]
+}

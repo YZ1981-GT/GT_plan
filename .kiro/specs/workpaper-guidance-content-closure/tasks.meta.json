@@ -1,0 +1,159 @@
+{
+  "pbtResults": {},
+  "executionHistory": {
+    "2. 建立 WIP reconciliation 与真实红守卫": [
+      {
+        "executionId": "dac9c686-d378-4e4d-ba01-eec2eeb53708",
+        "chatSessionId": "sess_db0c4b58-4226-4acf-9a26-c6be5f3c4c86",
+        "timestamp": 1788848564238
+      }
+    ],
+    "3. 发布 `G-C0` 共享 wire contract bundle": [
+      {
+        "executionId": "dac9c686-d378-4e4d-ba01-eec2eeb53708",
+        "chatSessionId": "sess_db0c4b58-4226-4acf-9a26-c6be5f3c4c86",
+        "timestamp": 1788848564279
+      }
+    ],
+    "4. 发布 `G-ID`：稳定 template/sheet identity 与 SourceRef registry": [
+      {
+        "executionId": "dac9c686-d378-4e4d-ba01-eec2eeb53708",
+        "chatSessionId": "sess_db0c4b58-4226-4acf-9a26-c6be5f3c4c86",
+        "timestamp": 1788848564311
+      }
+    ],
+    "5. 实现 materialized catalog/runtime inventory 与阶段 accounting": [
+      {
+        "executionId": "dac9c686-d378-4e4d-ba01-eec2eeb53708",
+        "chatSessionId": "sess_db0c4b58-4226-4acf-9a26-c6be5f3c4c86",
+        "timestamp": 1788848564370
+      }
+    ],
+    "6. 实现 immutable Guidance Publication 与 Project Supplement": [
+      {
+        "executionId": "dac9c686-d378-4e4d-ba01-eec2eeb53708",
+        "chatSessionId": "sess_db0c4b58-4226-4acf-9a26-c6be5f3c4c86",
+        "timestamp": 1788848564402
+      }
+    ],
+    "7. 按 catalog 工作卡完成标准九段内容迁移": [
+      {
+        "executionId": "dac9c686-d378-4e4d-ba01-eec2eeb53708",
+        "chatSessionId": "sess_db0c4b58-4226-4acf-9a26-c6be5f3c4c86",
+        "timestamp": 1788848564429
+      }
+    ],
+    "8. 以 `resolve_authoritative_exact()` 重构解析链": [
+      {
+        "executionId": "dac9c686-d378-4e4d-ba01-eec2eeb53708",
+        "chatSessionId": "sess_db0c4b58-4226-4acf-9a26-c6be5f3c4c86",
+        "timestamp": 1788848564463
+      }
+    ],
+    "9. 收敛 response version、stable cache 与错误模型": [
+      {
+        "executionId": "dac9c686-d378-4e4d-ba01-eec2eeb53708",
+        "chatSessionId": "sess_db0c4b58-4226-4acf-9a26-c6be5f3c4c86",
+        "timestamp": 1788848564502
+      }
+    ],
+    "10. render-config 下发 canonical identity/location input": [
+      {
+        "executionId": "dac9c686-d378-4e4d-ba01-eec2eeb53708",
+        "chatSessionId": "sess_db0c4b58-4226-4acf-9a26-c6be5f3c4c86",
+        "timestamp": 1788848564542
+      }
+    ],
+    "11. HTML 全激活路径发布稳定 context": [
+      {
+        "executionId": "dac9c686-d378-4e4d-ba01-eec2eeb53708",
+        "chatSessionId": "sess_db0c4b58-4226-4acf-9a26-c6be5f3c4c86",
+        "timestamp": 1788848564588
+      }
+    ],
+    "12. Univer 与 OnlyOffice 诚实 context": [
+      {
+        "executionId": "dac9c686-d378-4e4d-ba01-eec2eeb53708",
+        "chatSessionId": "sess_db0c4b58-4226-4acf-9a26-c6be5f3c4c86",
+        "timestamp": 1788848564620
+      }
+    ],
+    "13. guidance store 单 fetch 与竞态隔离": [
+      {
+        "executionId": "dac9c686-d378-4e4d-ba01-eec2eeb53708",
+        "chatSessionId": "sess_db0c4b58-4226-4acf-9a26-c6be5f3c4c86",
+        "timestamp": 1788848564649
+      }
+    ],
+    "14. 展示九段、三轴 provenance、缺口与安全内容": [
+      {
+        "executionId": "dac9c686-d378-4e4d-ba01-eec2eeb53708",
+        "chatSessionId": "sess_db0c4b58-4226-4acf-9a26-c6be5f3c4c86",
+        "timestamp": 1788848564679
+      }
+    ],
+    "15. 发布 `G-RAIL` GuidanceRailAdapter": [
+      {
+        "executionId": "dac9c686-d378-4e4d-ba01-eec2eeb53708",
+        "chatSessionId": "sess_db0c4b58-4226-4acf-9a26-c6be5f3c4c86",
+        "timestamp": 1788848564708
+      }
+    ],
+    "16. 发布 `G-HANDOFF-CONSUMER` 与 durable ACK ledger": [
+      {
+        "executionId": "dac9c686-d378-4e4d-ba01-eec2eeb53708",
+        "chatSessionId": "sess_db0c4b58-4226-4acf-9a26-c6be5f3c4c86",
+        "timestamp": 1788848564741
+      }
+    ],
+    "17. 后端/data/contract 定向测试与逐项变异 RED": [
+      {
+        "executionId": "dac9c686-d378-4e4d-ba01-eec2eeb53708",
+        "chatSessionId": "sess_db0c4b58-4226-4acf-9a26-c6be5f3c4c86",
+        "timestamp": 1788848564800
+      }
+    ],
+    "18. 前端/host/rail 定向测试与逐项变异 RED": [
+      {
+        "executionId": "dac9c686-d378-4e4d-ba01-eec2eeb53708",
+        "chatSessionId": "sess_db0c4b58-4226-4acf-9a26-c6be5f3c4c86",
+        "timestamp": 1788848564841
+      }
+    ],
+    "19. 广域引用回归、CI job 与 tracked 产物": [
+      {
+        "executionId": "dac9c686-d378-4e4d-ba01-eec2eeb53708",
+        "chatSessionId": "sess_db0c4b58-4226-4acf-9a26-c6be5f3c4c86",
+        "timestamp": 1788848564873
+      }
+    ],
+    "20. Playwright 三宿主、权限与 `F-SHELL` 消费实测": [
+      {
+        "executionId": "dac9c686-d378-4e4d-ba01-eec2eeb53708",
+        "chatSessionId": "sess_db0c4b58-4226-4acf-9a26-c6be5f3c4c86",
+        "timestamp": 1788848564905
+      }
+    ],
+    "21. 生成 C1 catalog milestone": [
+      {
+        "executionId": "dac9c686-d378-4e4d-ba01-eec2eeb53708",
+        "chatSessionId": "sess_db0c4b58-4226-4acf-9a26-c6be5f3c4c86",
+        "timestamp": 1788848564954
+      }
+    ],
+    "22. 验收 `X-HANDOFF-CONFORMANCE`": [
+      {
+        "executionId": "dac9c686-d378-4e4d-ba01-eec2eeb53708",
+        "chatSessionId": "sess_db0c4b58-4226-4acf-9a26-c6be5f3c4c86",
+        "timestamp": 1788848564979
+      }
+    ],
+    "23. 消费 `X-RUNTIME-EVIDENCE`，生成 C2 milestone 与持续健康": [
+      {
+        "executionId": "dac9c686-d378-4e4d-ba01-eec2eeb53708",
+        "chatSessionId": "sess_db0c4b58-4226-4acf-9a26-c6be5f3c4c86",
+        "timestamp": 1788848565012
+      }
+    ]
+  }
+}

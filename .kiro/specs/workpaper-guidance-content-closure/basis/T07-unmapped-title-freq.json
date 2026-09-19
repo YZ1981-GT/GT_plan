@@ -1,0 +1,592 @@
+[
+  {
+    "title": "本表用途",
+    "count": 64,
+    "infer": null
+  },
+  {
+    "title": "与其他底稿的关联",
+    "count": 63,
+    "infer": null
+  },
+  {
+    "title": "二、测试方法与程序",
+    "count": 14,
+    "infer": null
+  },
+  {
+    "title": "二、适用准则",
+    "count": 9,
+    "infer": null
+  },
+  {
+    "title": "偏差率计算",
+    "count": 7,
+    "infer": null
+  },
+  {
+    "title": "扩大样本 / 替代程序",
+    "count": 7,
+    "infer": null
+  },
+  {
+    "title": "四、偏差处理",
+    "count": 7,
+    "infer": null
+  },
+  {
+    "title": "三、随机性偏差的应对与扩大样本量（步骤三）",
+    "count": 7,
+    "infer": null
+  },
+  {
+    "title": "五、评价控制缺陷与替代程序（步骤五、六）",
+    "count": 7,
+    "infer": null
+  },
+  {
+    "title": "三、样本量确定",
+    "count": 7,
+    "infer": null
+  },
+  {
+    "title": "四、偏差处理（六步法）",
+    "count": 7,
+    "infer": null
+  },
+  {
+    "title": "余额重大同时执行要求",
+    "count": 2,
+    "infer": null
+  },
+  {
+    "title": "四、多分支渲染",
+    "count": 2,
+    "infer": null
+  },
+  {
+    "title": "常见波动原因分类",
+    "count": 1,
+    "infer": null
+  },
+  {
+    "title": "合并口径特有关注点",
+    "count": 1,
+    "infer": null
+  },
+  {
+    "title": "看板指标说明",
+    "count": 1,
+    "infer": null
+  },
+  {
+    "title": "法定必须沟通事项（CAS 260）",
+    "count": 1,
+    "infer": null
+  },
+  {
+    "title": "期后事项分类标准（CAS 29）",
+    "count": 1,
+    "infer": null
+  },
+  {
+    "title": "企业层面控制评价维度",
+    "count": 1,
+    "infer": null
+  },
+  {
+    "title": "关键财务指标自动取数",
+    "count": 1,
+    "infer": null
+  },
+  {
+    "title": "整合审计额外声明条款",
+    "count": 1,
+    "infer": null
+  },
+  {
+    "title": "IPO 专项声明条款",
+    "count": 1,
+    "infer": null
+  },
+  {
+    "title": "审阅声明书特点与标准声明的区别",
+    "count": 1,
+    "infer": null
+  },
+  {
+    "title": "新三板专项声明条款",
+    "count": 1,
+    "infer": null
+  },
+  {
+    "title": "企业债专项声明条款",
+    "count": 1,
+    "infer": null
+  },
+  {
+    "title": "专项声明条款",
+    "count": 1,
+    "infer": null
+  },
+  {
+    "title": "各版本关注要点",
+    "count": 1,
+    "infer": null
+  },
+  {
+    "title": "关键规则",
+    "count": 1,
+    "infer": null
+  },
+  {
+    "title": "复核要点清单",
+    "count": 1,
+    "infer": null
+  },
+  {
+    "title": "内控审计复核要点",
+    "count": 1,
+    "infer": null
+  },
+  {
+    "title": "经理复核重点维度",
+    "count": 1,
+    "infer": null
+  },
+  {
+    "title": "内控审计经理复核重点",
+    "count": 1,
+    "infer": null
+  },
+  {
+    "title": "合伙人复核重点",
+    "count": 1,
+    "infer": null
+  },
+  {
+    "title": "内控审计合伙人复核重点",
+    "count": 1,
+    "infer": null
+  },
+  {
+    "title": "EQCR 复核重点",
+    "count": 1,
+    "infer": null
+  },
+  {
+    "title": "内控审计 EQCR 复核重点",
+    "count": 1,
+    "infer": null
+  },
+  {
+    "title": "质控复核维度",
+    "count": 1,
+    "infer": null
+  },
+  {
+    "title": "内控审计质控复核维度",
+    "count": 1,
+    "infer": null
+  },
+  {
+    "title": "1. 可收回金额确定",
+    "count": 1,
+    "infer": null
+  },
+  {
+    "title": "2. 资产的公允价值",
+    "count": 1,
+    "infer": null
+  },
+  {
+    "title": "3. 处置费用",
+    "count": 1,
+    "infer": null
+  },
+  {
+    "title": "4. 资产预计未来现金流量的现值",
+    "count": 1,
+    "infer": null
+  },
+  {
+    "title": "5. 预计资产的未来现金流量",
+    "count": 1,
+    "infer": null
+  },
+  {
+    "title": "6. 折现率",
+    "count": 1,
+    "infer": null
+  },
+  {
+    "title": "资产组定义",
+    "count": 1,
+    "infer": null
+  },
+  {
+    "title": "可收回金额确定规则",
+    "count": 1,
+    "infer": null
+  },
+  {
+    "title": "WACC 加权平均资本成本",
+    "count": 1,
+    "infer": null
+  },
+  {
+    "title": "CAPM 资本资产定价模型",
+    "count": 1,
+    "infer": null
+  },
+  {
+    "title": "DCF 折现现金流模型",
+    "count": 1,
+    "infer": null
+  },
+  {
+    "title": "合并抵销分录规则",
+    "count": 1,
+    "infer": null
+  },
+  {
+    "title": "归档时间要求",
+    "count": 1,
+    "infer": null
+  },
+  {
+    "title": "标准审计标识",
+    "count": 1,
+    "infer": null
+  },
+  {
+    "title": "使用规范",
+    "count": 1,
+    "infer": null
+  },
+  {
+    "title": "五、下游联动",
+    "count": 1,
+    "infer": null
+  },
+  {
+    "title": "六、致同事务所百分比参考",
+    "count": 1,
+    "infer": null
+  },
+  {
+    "title": "三、五区块结构",
+    "count": 1,
+    "infer": null
+  },
+  {
+    "title": "四、值得关注的缺陷指标",
+    "count": 1,
+    "infer": null
+  },
+  {
+    "title": "二、九段测试程序",
+    "count": 1,
+    "infer": null
+  },
+  {
+    "title": "五、销售与收款循环重点关注领域",
+    "count": 1,
+    "infer": null
+  },
+  {
+    "title": "二、信息处理四要素",
+    "count": 1,
+    "infer": null
+  },
+  {
+    "title": "四、ITAC 类型说明",
+    "count": 1,
+    "infer": null
+  },
+  {
+    "title": "五、货币资金循环重点关注领域",
+    "count": 1,
+    "infer": null
+  },
+  {
+    "title": "五、采购与付款循环重点关注领域",
+    "count": 1,
+    "infer": null
+  },
+  {
+    "title": "五、投资循环重点关注领域",
+    "count": 1,
+    "infer": null
+  },
+  {
+    "title": "五、固定资产循环重点关注领域",
+    "count": 1,
+    "infer": null
+  },
+  {
+    "title": "五、在建工程循环重点关注领域",
+    "count": 1,
+    "infer": null
+  },
+  {
+    "title": "五、无形资产及其他长期资产循环重点关注领域",
+    "count": 1,
+    "infer": null
+  },
+  {
+    "title": "关键指标说明",
+    "count": 1,
+    "infer": null
+  },
+  {
+    "title": "适用准则",
+    "count": 1,
+    "infer": null
+  },
+  {
+    "title": "核实程序",
+    "count": 1,
+    "infer": null
+  },
+  {
+    "title": "检查支持性文件",
+    "count": 1,
+    "infer": null
+  },
+  {
+    "title": "确认联系人身份",
+    "count": 1,
+    "infer": null
+  },
+  {
+    "title": "电子函证平台",
+    "count": 1,
+    "infer": null
+  },
+  {
+    "title": "跟函控制要求",
+    "count": 1,
+    "infer": null
+  },
+  {
+    "title": "身份权限确认",
+    "count": 1,
+    "infer": null
+  },
+  {
+    "title": "防串通舞弊",
+    "count": 1,
+    "infer": null
+  },
+  {
+    "title": "签名要求",
+    "count": 1,
+    "infer": null
+  },
+  {
+    "title": "差异调查要求",
+    "count": 1,
+    "infer": null
+  },
+  {
+    "title": "错报与舞弊评估",
+    "count": 1,
+    "infer": null
+  },
+  {
+    "title": "替代程序触发条件",
+    "count": 1,
+    "infer": null
+  },
+  {
+    "title": "差异类型说明",
+    "count": 1,
+    "infer": null
+  },
+  {
+    "title": "未达明细登记要求",
+    "count": 1,
+    "infer": null
+  },
+  {
+    "title": "D0-4 联动",
+    "count": 1,
+    "infer": null
+  },
+  {
+    "title": "差异状态含义",
+    "count": 1,
+    "infer": null
+  },
+  {
+    "title": "概述要求",
+    "count": 1,
+    "infer": null
+  },
+  {
+    "title": "注1：身份确认方式",
+    "count": 1,
+    "infer": null
+  },
+  {
+    "title": "注2：邮箱验证要点",
+    "count": 1,
+    "infer": null
+  },
+  {
+    "title": "条件列说明",
+    "count": 1,
+    "infer": null
+  },
+  {
+    "title": "审计记录要求",
+    "count": 1,
+    "infer": null
+  },
+  {
+    "title": "评价方法",
+    "count": 1,
+    "infer": null
+  },
+  {
+    "title": "编制说明",
+    "count": 1,
+    "infer": null
+  },
+  {
+    "title": "准则依据",
+    "count": 1,
+    "infer": null
+  },
+  {
+    "title": "回函率参考",
+    "count": 1,
+    "infer": null
+  },
+  {
+    "title": "行业特殊风险示例",
+    "count": 1,
+    "infer": null
+  },
+  {
+    "title": "跨循环适用",
+    "count": 1,
+    "infer": null
+  },
+  {
+    "title": "二、底稿结构（对齐 HTML 现网）",
+    "count": 1,
+    "infer": null
+  },
+  {
+    "title": "五、披露表列结构（源模板口径，不可增删列）",
+    "count": 1,
+    "infer": null
+  },
+  {
+    "title": "二、编制流程（G11-2 ↔ G11-3 ↔ G11-1）",
+    "count": 1,
+    "infer": null
+  },
+  {
+    "title": "三、G11-3 类别口径",
+    "count": 1,
+    "infer": null
+  },
+  {
+    "title": "二、底稿结构与编制顺序",
+    "count": 1,
+    "infer": null
+  },
+  {
+    "title": "三、G13-1 审定表逻辑",
+    "count": 1,
+    "infer": null
+  },
+  {
+    "title": "四、G13-3 调整分录逻辑",
+    "count": 1,
+    "infer": null
+  },
+  {
+    "title": "三、G8-1 / G8-2 勾稽要点",
+    "count": 1,
+    "infer": null
+  },
+  {
+    "title": "四、G8-3 / G8-4 要点",
+    "count": 1,
+    "infer": null
+  },
+  {
+    "title": "五、G8-5 指定适当性要点",
+    "count": 1,
+    "infer": null
+  },
+  {
+    "title": "二、G9-1 审定表编制逻辑",
+    "count": 1,
+    "infer": null
+  },
+  {
+    "title": "四、交易性与工具分类（编制说明·非打印）",
+    "count": 1,
+    "infer": null
+  },
+  {
+    "title": "四、H1-17 运输设备权属检查要点",
+    "count": 1,
+    "infer": null
+  },
+  {
+    "title": "二、编制路径（推荐）",
+    "count": 1,
+    "infer": null
+  },
+  {
+    "title": "二、建议编制顺序",
+    "count": 1,
+    "infer": null
+  },
+  {
+    "title": "三、H2-1 审定表要点",
+    "count": 1,
+    "infer": null
+  },
+  {
+    "title": "四、H2-2 明细表要点",
+    "count": 1,
+    "infer": null
+  },
+  {
+    "title": "五、转固与利息",
+    "count": 1,
+    "infer": null
+  },
+  {
+    "title": "七、减值门禁（H2-15/16）",
+    "count": 1,
+    "infer": null
+  },
+  {
+    "title": "四、跨底稿联动",
+    "count": 1,
+    "infer": null
+  },
+  {
+    "title": "四、评估框架",
+    "count": 1,
+    "infer": null
+  },
+  {
+    "title": "五、资本化5项条件",
+    "count": 1,
+    "infer": null
+  },
+  {
+    "title": "四、核心关注点",
+    "count": 1,
+    "infer": null
+  }
+]

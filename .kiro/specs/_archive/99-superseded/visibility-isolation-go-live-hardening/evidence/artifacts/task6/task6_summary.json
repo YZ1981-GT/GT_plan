@@ -1,0 +1,25 @@
+{
+  "browser_lane": {
+    "present": false,
+    "status": "GAP_deferred"
+  },
+  "feature": "visibility-isolation-go-live-hardening",
+  "gate_level": {
+    "both_denied_invariant": "scope-internal-not-delegated AND scope-external-delegated both 404 for lead/assignee/reviewer/history/restricted",
+    "external_not_found_detail": "资源不存在或不可访问",
+    "list_visibility_ok": true,
+    "revocation_no_stale_allow": true,
+    "role_matrix_roles": [
+      "admin",
+      "assignee",
+      "history_lead",
+      "history_row",
+      "lead",
+      "restricted",
+      "reviewer",
+      "supervisor"
+    ]
+  },
+  "requirement": "R5 (5.1-5.9)",
+  "task": "6"
+}

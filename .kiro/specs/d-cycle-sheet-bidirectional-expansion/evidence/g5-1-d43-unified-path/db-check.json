@@ -1,0 +1,59 @@
+{
+  "captured_at": "2026-09-13T00:04:39.766716+00:00",
+  "entry_id": "xlsx/gt-d4-operating-revenue",
+  "wp_id": "b3ab3c46-828f-4f48-950e-aee9bbdc923f",
+  "room_id": "59121da3-8c3e-450f-a83d-bf1135466a94",
+  "marker": "g5d43680692",
+  "operation": {
+    "id": "f54bbfd9-9eb2-40b2-a7ed-136b3796f73d",
+    "state": "applied",
+    "application_id": "ce851f48-97b9-4ff3-b4ed-7289185f49e3",
+    "direction": "oo_to_html",
+    "room_id": "59121da3-8c3e-450f-a83d-bf1135466a94",
+    "error_code": null,
+    "created_at": "2026-09-13T00:01:33.771504+00:00",
+    "application_bound_at": "2026-09-13T00:01:35.062069+00:00",
+    "finished_at": null
+  },
+  "application": {
+    "id": "ce851f48-97b9-4ff3-b4ed-7289185f49e3",
+    "state": "applied",
+    "result_revision": 21,
+    "adapter_id": "d4.revenue_detail",
+    "definition_bundle_id": "0b7bb759-6364-4398-a97d-fffa402c3d62",
+    "result_representation_id": "6c84fcb2-4ba8-4276-9669-f5b429e09880",
+    "created_at": "2026-09-13T00:01:35.062069+00:00",
+    "finished_at": "2026-09-13T00:02:01.268538+00:00"
+  },
+  "content_version": {
+    "id": "e255df72-fce5-4357-a06d-c0fa4304bdbe",
+    "revision": 21,
+    "source": "onlyoffice",
+    "operation_id": "f54bbfd9-9eb2-40b2-a7ed-136b3796f73d",
+    "created_at": "2026-09-13T00:01:56.945593+00:00"
+  },
+  "published_identity": {
+    "representation_id": "6c84fcb2-4ba8-4276-9669-f5b429e09880",
+    "generation": 1,
+    "bundle_id": "0b7bb759-6364-4398-a97d-fffa402c3d62",
+    "projection_sha256": "6c1d674885f0ef2a5c4319fc448abd08282f14ef07c8af135389f2442e476e17",
+    "revision": 21,
+    "source": "onlyoffice"
+  },
+  "store_mirror": {
+    "item_id": "D4-3-rows",
+    "marker_in_store": true,
+    "marker_row": {
+      "rowId": "GTROW-D43-0013",
+      "item": "g5d43680692"
+    },
+    "row_count": 6
+  },
+  "predicates": {
+    "application_applied": true,
+    "store_has_marker": true,
+    "content_version_onlyoffice_op_match": true,
+    "operation_applied": true,
+    "cross_check_op_id": true
+  }
+}

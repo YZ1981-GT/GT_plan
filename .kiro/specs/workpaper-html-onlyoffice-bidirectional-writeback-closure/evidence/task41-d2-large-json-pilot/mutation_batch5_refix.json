@@ -1,0 +1,42 @@
+[
+  {
+    "id": "M10",
+    "side": "be",
+    "want": "test_task41_d2_large_json_pilot.py::TestFrozenEntrySelection::test_render_schema_wp_code_must_stay_inside_the_matcher_domain",
+    "why": "配置的 wp_code 与 matcher 域脱钩不再打红 ⇒ D2A.yaml 改成别的码后依然被当成本 entry 的权威声明",
+    "verdict": "RED",
+    "summary": "1 failed, 149 passed in 33.75s",
+    "added": [
+      "test_task41_d2_large_json_pilot.py::TestFrozenEntrySelection::test_render_schema_wp_code_must_stay_inside_the_matcher_domain"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task41_d2_large_json_pilot.py::TestFrozenEntrySelection::test_render_schema_wp_code_must_stay_inside_the_matcher_domain"
+    ],
+    "added_files": [
+      "test_task41_d2_large_json_pilot.py"
+    ],
+    "restored": true,
+    "seconds": 37.1
+  },
+  {
+    "id": "M37",
+    "side": "be",
+    "want": "test_task41_d2_large_json_pilot.py::TestOrderingGate::test_ledger_records_adapter_not_registered_yet",
+    "why": "登记表声称 adapter 已注册而实际没有仍绿 ⇒ 交付登记与事实脱钩，「契约孤儿」这条可见欠账被账面抹平",
+    "verdict": "RED",
+    "summary": "1 failed, 149 passed in 33.77s",
+    "added": [
+      "test_task41_d2_large_json_pilot.py::TestOrderingGate::test_ledger_records_adapter_not_registered_yet"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task41_d2_large_json_pilot.py::TestOrderingGate::test_ledger_records_adapter_not_registered_yet"
+    ],
+    "added_files": [
+      "test_task41_d2_large_json_pilot.py"
+    ],
+    "restored": true,
+    "seconds": 37.3
+  }
+]

@@ -1,0 +1,248 @@
+# backend/data/wp_render_schema/k8-selling-expenses.yaml
+# K8 销售费用 — 专属组件渲染 schema
+# componentType: k8-selling-expenses
+# 科目 6601 销售费用（**损益类/借方科目！取发生额非余额**）
+# Template: K8 销售费用.xlsx（12 有效 sheet）
+# 公式特征：净发生额=借方-贷方；审定=未审+AJE+RJE；同比/占收入比分析；截止双向
+# K循环损益类底稿（与I6/H10同款处理）
+
+wp_code: K8
+wp_name: 销售费用
+component_type: k8-selling-expenses
+selfLoad: true
+template_path: backend/wp_templates/K/K8 销售费用.xlsx
+template_version: v2025-R5
+applicable_standards: [soe_standalone, listed_standalone, soe_consolidated, listed_consolidated]
+account_codes: ['6601']
+income_statement: true  # 损益类标识！
+related_accounts:
+  - code: '6601'
+    name: 销售费用
+    direction: debit
+    category: income_statement
+
+special_rules:
+  income_statement: true
+  account_direction: debit
+  net_formula: "借方发生-贷方发生"
+  source_table: "tb_ledger/tb_balance发生额列"
+  substantive_analysis: true
+  cutoff_test_bidirectional: true
+  contract_check: true
+
+formula_count: 120
+description: K循环损益类底稿（12sheet，损益类取发生额+实质性分析+截止双向+合同检查）
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# TB 回写配置（损益类！回写发生额而非期末余额）
+# ═══════════════════════════════════════════════════════════════════════════════
+
+tb_writeback:
+  account_code: '6601'
+  direction: debit
+  source_sheet: K8-1
+  value_field: audited_amount  # 审定发生额
+  value_type: occurrence_amount  # 发生额非余额！
+  trigger: WORKPAPER_SAVED
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 跨底稿引用
+# ═══════════════════════════════════════════════════════════════════════════════
+
+cross_wp_references:
+  - ref_id: CW-K8-01
+    source_wp: K8-2
+    target_wp: K8-1
+    description: '明细表合计 → 审定表K8-1净发生额'
+    direction: outbound
+  - ref_id: CW-K8-02
+    source_wp: K8-3
+    target_wp: K8-1
+    description: 'AJE/RJE汇总 → 审定表K8-1'
+    direction: outbound
+  - ref_id: CW-K8-03
+    source_wp: K8-3
+    target_wp: A13
+    description: '调整分录 → A13错报汇总'
+    direction: outbound
+  - ref_id: CW-K8-04
+    source_wp: K8-4
+    target_wp: K8-2
+    description: '实质性分析数据源 ← 明细表'
+    direction: inbound
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Sheet 定义（12 sheets）
+# ═══════════════════════════════════════════════════════════════════════════════
+
+sheets:
+  # ─────────────────────────────────────────────────────────────────────────
+  # Sheet 1: 底稿目录
+  # ─────────────────────────────────────────────────────────────────────────
+  底稿目录:
+    code: K8
+    group: core
+    dimensions: "28×13"
+    component: K8TabIndex
+    class_code: B-底稿目录
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Sheet 2: 销售费用实质性程序表K8A
+  # ─────────────────────────────────────────────────────────────────────────
+  销售费用实质性程序表K8A:
+    code: K8A
+    group: core
+    dimensions: "25×11"
+    component: a-program-console
+    class_code: A-实质性程序
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Sheet 3: 审定表K8-1（73公式！损益类！取发生额）
+  # ─────────────────────────────────────────────────────────────────────────
+  审定表K8-1:
+    code: K8-1
+    group: core
+    dimensions: "29×12"
+    component: K8TabAdjudication
+    class_code: F-审定表
+    account_codes: ['6601']
+    formula_count: 73
+    income_statement: true
+    writeback:
+      target: trial_balance.audited_amount
+      trigger: WORKPAPER_SAVED
+      key_field: account_code
+      value_field: audited_amount
+      value_type: occurrence_amount
+      accounts: ['6601']
+    event_bus:
+      publish:
+        - { event: "substantive:adjudicated", payload: "{accountCode:'6601', adjudicatedAmount}" }
+      subscribe:
+        - { event: "adjustment:created", filter: "accountCode=6601" }
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Sheet 4: 明细表K8-2（48行×27列）
+  # ─────────────────────────────────────────────────────────────────────────
+  明细表K8-2:
+    code: K8-2
+    group: core
+    dimensions: "48×27"
+    component: K8TabDetail
+    class_code: F-明细表
+    dynamic_rows: true
+    max_rows: 200
+    formula_count: 13
+    import_export: true
+    add_row_prompt: accountName
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Sheet 5: 调整分录汇总K8-3
+  # ─────────────────────────────────────────────────────────────────────────
+  调整分录汇总K8-3:
+    code: K8-3
+    group: core
+    dimensions: "21×10"
+    component: K8TabAdjustment
+    class_code: F-调整分录
+    dynamic_rows: true
+    import_export: true
+    event_bus:
+      publish:
+        - { event: "adjustment:created", payload: "{entryType, accountCode, amount}" }
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Sheet 6: 实质性分析K8-4（39行×17列，25公式）
+  # ─────────────────────────────────────────────────────────────────────────
+  实质性分析K8-4:
+    code: K8-4
+    group: analysis
+    dimensions: "39×17"
+    component: K8TabSubstantiveAnalysis
+    class_code: F-实质性分析
+    formula_count: 25
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Sheet 7: 合同检查表K8-5
+  # ─────────────────────────────────────────────────────────────────────────
+  合同检查表K8-5:
+    code: K8-5
+    group: inspection
+    dimensions: "30×10"
+    component: K8TabContractCheck
+    class_code: D-检查表
+    dynamic_rows: true
+    import_export: true
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Sheet 8: 截止性测试(记账凭证至原始凭证)K8-6
+  # ─────────────────────────────────────────────────────────────────────────
+  截止性测试(记账凭证至原始凭证)K8-6:
+    code: K8-6
+    group: cutoff
+    dimensions: "44×11"
+    component: K8TabCutoffV2S
+    class_code: F-截止测试
+    cutoff_direction: forward
+    sampling_range_days: 5
+    import_export: true
+    integrations:
+      - cutoff_auto_sampling: { direction: forward, account_prefix: '6601', days: 5 }
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Sheet 9: 截止性测试(原始凭证至记账凭证)K8-7
+  # ─────────────────────────────────────────────────────────────────────────
+  截止性测试(原始凭证至记账凭证)K8-7:
+    code: K8-7
+    group: cutoff
+    dimensions: "44×12"
+    component: K8TabCutoffS2V
+    class_code: F-截止测试
+    cutoff_direction: backward
+    sampling_range_days: 5
+    import_export: true
+    integrations:
+      - cutoff_auto_sampling: { direction: backward, account_prefix: '6601', days: 5 }
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Sheet 10: 销售费用检查表K8-8
+  # ─────────────────────────────────────────────────────────────────────────
+  销售费用检查表K8-8:
+    code: K8-8
+    group: inspection
+    dimensions: "20×6"
+    component: K8TabSellingCheck
+    class_code: D-检查表
+    import_export: true
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Sheet 11: 附注披露信息（上市公司）
+  # ─────────────────────────────────────────────────────────────────────────
+  附注披露信息（上市公司）:
+    code: disc-listed
+    group: disclosure
+    dimensions: "42×28"
+    component: K8TabDisclosureListed
+    class_code: H-附注
+    variant: listed
+    event_bus:
+      subscribe:
+        - { event: "substantive:adjudicated", filter: "accountCode=6601" }
+      publish:
+        - { event: "disclosure:note-text-updated", payload: "{noteId:'selling_expenses'}" }
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Sheet 12: 附注披露信息（国有企业）
+  # ─────────────────────────────────────────────────────────────────────────
+  附注披露信息（国有企业）:
+    code: disc-soe
+    group: disclosure
+    dimensions: "30×5"
+    component: K8TabDisclosureSoe
+    class_code: H-附注
+    variant: soe
+    event_bus:
+      subscribe:
+        - { event: "substantive:adjudicated", filter: "accountCode=6601" }
+      publish:
+        - { event: "disclosure:note-text-updated", payload: "{noteId:'selling_expenses'}" }

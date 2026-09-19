@@ -1,0 +1,166 @@
+{
+  "generated_by": "backend/scripts/_mutation_kit/span.py::run_cli",
+  "mode": "run",
+  "pytest_args": [
+    "backend/tests/workpaper_sync/test_task30_closure_gate.py",
+    "backend/tests/workpaper_sync/test_task30_closure_gate_pg.py",
+    "backend/tests/workpaper_sync/test_task21_room_service.py",
+    "backend/tests/workpaper_sync/test_task22_callback_claim.py",
+    "backend/tests/workpaper_sync/test_task24_close_intent.py",
+    "-q",
+    "--no-header",
+    "-p",
+    "no:cacheprovider",
+    "-p",
+    "no:randomly"
+  ],
+  "tally": {
+    "RED": 6
+  },
+  "mutations": [
+    {
+      "id": "M19",
+      "path": "backend/app/services/workpaper_sync/repository.py",
+      "want": "test_task30_closure_gate_pg.py::test_reconciler_is_reentrant_and_keeps_the_same_leader[order_ab]",
+      "why": "reconciler 不再幂等：已 promoted 时不短路 ⇒ 重入会再选一次 leader / 再建一条 capture，「最终 exactly-one」变成「每次调用一条」。",
+      "verdict": "RED",
+      "summary": "10 failed, 313 passed, 1 warning in 48.40s",
+      "added": [
+        "test_task30_closure_gate_pg.py::test_close_yields_exactly_one_capture[order_ab]",
+        "test_task30_closure_gate_pg.py::test_close_yields_exactly_one_capture[order_ba]",
+        "test_task30_closure_gate_pg.py::test_close_yields_exactly_one_capture[single]",
+        "test_task30_closure_gate_pg.py::test_no_capture_exists_before_predecessors_are_terminal[order_ab]",
+        "test_task30_closure_gate_pg.py::test_no_capture_exists_before_predecessors_are_terminal[order_ba]",
+        "test_task30_closure_gate_pg.py::test_no_capture_exists_before_predecessors_are_terminal[single]",
+        "test_task30_closure_gate_pg.py::test_no_phase_crashed_during_collection",
+        "test_task30_closure_gate_pg.py::test_reconciler_is_reentrant_and_keeps_the_same_leader[order_ab]",
+        "test_task30_closure_gate_pg.py::test_reconciler_is_reentrant_and_keeps_the_same_leader[order_ba]",
+        "test_task30_closure_gate_pg.py::test_reconciler_is_reentrant_and_keeps_the_same_leader[single]"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task30_closure_gate_pg.py::test_close_yields_exactly_one_capture[order_ab]",
+        "test_task30_closure_gate_pg.py::test_no_phase_crashed_during_collection",
+        "test_task30_closure_gate_pg.py::test_reconciler_is_reentrant_and_keeps_the_same_leader[order_ab]",
+        "test_task30_closure_gate_pg.py::test_reconciler_is_reentrant_and_keeps_the_same_leader[order_ba]",
+        "test_task30_closure_gate_pg.py::test_reconciler_is_reentrant_and_keeps_the_same_leader[single]"
+      ],
+      "added_files": [
+        "test_task30_closure_gate_pg.py"
+      ],
+      "restored": true,
+      "restored_sha256": "bb0200a36ccea2019667414520c74853332956e54bf57403ba5b0ce765f6a444",
+      "seconds": 51.7
+    },
+    {
+      "id": "M20",
+      "path": "backend/app/services/workpaper_sync/repository.py",
+      "want": "test_task30_closure_gate_pg.py::test_no_successor_lands_recovery_required_with_zero_capture",
+      "why": "无 successor 的显式终态缺失：改成 `superseded` 后前端看不到 `close_recovery_required`，只会看到「已作废」⇒ 用户的关闭动作既没保存也没告知需要恢复。",
+      "verdict": "RED",
+      "summary": "1 failed, 322 passed, 1 warning in 48.07s",
+      "added": [
+        "test_task30_closure_gate_pg.py::test_no_successor_lands_recovery_required_with_zero_capture"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task30_closure_gate_pg.py::test_no_successor_lands_recovery_required_with_zero_capture"
+      ],
+      "added_files": [
+        "test_task30_closure_gate_pg.py"
+      ],
+      "restored": true,
+      "restored_sha256": "bb0200a36ccea2019667414520c74853332956e54bf57403ba5b0ce765f6a444",
+      "seconds": 51.5
+    },
+    {
+      "id": "M21",
+      "path": "backend/app/services/workpaper_sync/repository.py",
+      "want": "test_task30_closure_gate_pg.py::test_retiring_a_scope_row_keeps_the_tombstone_physically",
+      "why": "退役不再落 `retired_at` ⇒ tombstone 与活行无法区分，已退役资源的访问不会走统一 404。",
+      "verdict": "RED",
+      "summary": "1 failed, 322 passed, 1 warning in 47.96s",
+      "added": [
+        "test_task30_closure_gate_pg.py::test_retiring_a_scope_row_keeps_the_tombstone_physically"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task30_closure_gate_pg.py::test_retiring_a_scope_row_keeps_the_tombstone_physically"
+      ],
+      "added_files": [
+        "test_task30_closure_gate_pg.py"
+      ],
+      "restored": true,
+      "restored_sha256": "bb0200a36ccea2019667414520c74853332956e54bf57403ba5b0ce765f6a444",
+      "seconds": 51.3
+    },
+    {
+      "id": "M22",
+      "path": "backend/app/services/workpaper_sync/repository.py",
+      "want": "test_task30_closure_gate_pg.py::test_a_retired_resource_id_cannot_be_reused",
+      "why": "域层不再拒绝 id 复用。库层唯一索引仍会拒，所以只断言「被拒」的判据会 GREEN ——本门因此额外要求拒绝类型必须是域异常（`is_domain_refusal`），这条变异正是它的验证。",
+      "verdict": "RED",
+      "summary": "1 failed, 322 passed, 2 warnings in 46.72s",
+      "added": [
+        "test_task30_closure_gate_pg.py::test_a_retired_resource_id_cannot_be_reused"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task30_closure_gate_pg.py::test_a_retired_resource_id_cannot_be_reused"
+      ],
+      "added_files": [
+        "test_task30_closure_gate_pg.py"
+      ],
+      "restored": true,
+      "restored_sha256": "bb0200a36ccea2019667414520c74853332956e54bf57403ba5b0ce765f6a444",
+      "seconds": 49.9
+    },
+    {
+      "id": "M23",
+      "path": "backend/app/services/workpaper_sync/repository.py",
+      "want": "test_task30_closure_gate.py::test_the_unified_resolver_really_requires_a_published_approved_substrate",
+      "why": "published representation 不再要求 approved 非空 bundle：换成裸 select 直接取行（语法有效、运行时照常拿到 bundle 对象），只是 approved/typed-slot 校验没了。「统一 resolver 只接受 published representation + approved bundle」这条前提正是 Task 30 那 4 条 resolver 行迁不了零的依据 —— 前提一旦被放宽，deferral 理由必须重评。",
+      "verdict": "RED",
+      "summary": "1 failed, 322 passed, 1 warning in 45.67s",
+      "added": [
+        "test_task30_closure_gate.py::test_the_unified_resolver_really_requires_a_published_approved_substrate"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task30_closure_gate.py::test_the_unified_resolver_really_requires_a_published_approved_substrate"
+      ],
+      "added_files": [
+        "test_task30_closure_gate.py"
+      ],
+      "restored": true,
+      "restored_sha256": "bb0200a36ccea2019667414520c74853332956e54bf57403ba5b0ce765f6a444",
+      "seconds": 48.7
+    },
+    {
+      "id": "M24",
+      "path": "backend/scripts/check/check_workpaper_writer_revision_gate.py",
+      "want": "test_task30_closure_gate.py::test_the_gate_still_counts_the_criterion_task30_verifies_zero_with",
+      "why": "把已移交给 Task 30 的 criterion 短路成 `if False`：key 还在、计数恒为零，报告与「已清零」逐字相同。这是本 spec 反复付过代价的 fail-open 形态，必须由行为级判据（真喂一条多 resolver 行）而不是「键是否存在」抓到。",
+      "verdict": "RED",
+      "summary": "4 failed, 318 passed, 1 skipped, 1 warning in 45.46s",
+      "added": [
+        "test_task30_closure_gate.py::test_recomputation_and_the_gate_agree_on_the_multi_resolver_rows",
+        "test_task30_closure_gate.py::test_task30_named_rows_match_the_gate_report",
+        "test_task30_closure_gate.py::test_the_criterion_is_either_cleared_or_its_blocker_is_registered",
+        "test_task30_closure_gate.py::test_the_gate_still_counts_the_criterion_task30_verifies_zero_with"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task30_closure_gate.py::test_recomputation_and_the_gate_agree_on_the_multi_resolver_rows",
+        "test_task30_closure_gate.py::test_task30_named_rows_match_the_gate_report",
+        "test_task30_closure_gate.py::test_the_gate_still_counts_the_criterion_task30_verifies_zero_with"
+      ],
+      "added_files": [
+        "test_task30_closure_gate.py"
+      ],
+      "restored": true,
+      "restored_sha256": "ec06b9a62e75164fd9d17216917ccf2b17eae801501ae4354986e0ac5a83c734",
+      "seconds": 48.5
+    }
+  ]
+}

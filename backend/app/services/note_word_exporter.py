@@ -19,9 +19,10 @@ from __future__ import annotations
 
 import logging
 import re
+from dataclasses import dataclass, field
 from io import BytesIO
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 from uuid import UUID
 
 import sqlalchemy as sa
@@ -35,9 +36,58 @@ from docx.oxml.parser import parse_xml
 from docx.shared import Cm, Pt, RGBColor, Emu
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.config import settings
 from app.models.report_models import DisclosureNote
+from app.services.note_content_utils import (
+    effective_table_data as _shared_effective_table_data,
+    note_has_data as _shared_note_has_data,
+)
+from app.services.note_section_catalog import (
+    build_variant_key,
+    detect_heading_level,
+    note_applies_to_report_scope,
+    normalize_report_scope,
+    normalize_template_type,
+)
+from app.services.note_section_numbering import compute_section_numbers
+from app.services.note_sub_table_projector import (
+    is_zero_visible_row as _is_zero_visible_row,
+)
+from app.services.note_word_dynamic_styles import (
+    get_table_render_mode,
+    should_skip_empty_section,
+)
+from app.services.template_manifest_loader import get_template_manifest_loader
+from app.services.word_doc_utils import (
+    delete_section_block,
+    remove_section_markers,
+    scan_section_blocks,
+)
 
 logger = logging.getLogger(__name__)
+
+
+# ---------------------------------------------------------------------------
+# 导出元数据（供交付中心落章节状态；spec deliverable-lineage-wiring-…）
+# ---------------------------------------------------------------------------
+
+
+@dataclass
+class NoteExportMeta:
+    """一次附注导出的章节级元数据。
+
+    交付中心据此 upsert ``deliverable_section_state``（章节溯源 / stale 增量刷新 /
+    回填的全部前提）。programmatic 模式无 SECTION 块，三项均为空 —— 与接线前
+    行为一致。
+    """
+
+    kept_codes: list[str] = field(default_factory=list)
+    #: section_code → anchor_name（Section_Anchor 书签名）
+    anchor_map: dict[str, str] = field(default_factory=dict)
+    #: section_code → Rendered_Block_Hash（生成时写入块内文字的规范化 sha256）
+    rendered_block_hashes: dict[str, str] = field(default_factory=dict)
+    variant_key: str = ""
+
 
 # ---------------------------------------------------------------------------
 # 致同标准格式常量
@@ -264,6 +314,39 @@ def _set_run_font(run, font_name=BODY_FONT, size=BODY_SIZE, bold=False):
     rFonts.set(qn("w:eastAsia"), font_name)
 
 
+# 提示性文字（guidance）样式常量：灰色小字斜体，区分正式正文
+GUIDANCE_FONT_SIZE = Pt(10.5)  # 五号，较正文小四(12pt)更小
+GUIDANCE_COLOR = RGBColor(128, 128, 128)  # 灰色
+
+
+def _add_guidance_paragraph(doc, text: str):
+    """渲染一段提示性文字（guidance）为灰色小字斜体段落，视觉上区分正式正文.
+
+    用于 note-per-table-guidance Phase 4：章节级 ``guidance_text`` 与
+    表格级 ``_tables[n].guidance`` 均以此样式输出，避免与实质正文混淆。
+
+    Returns the created paragraph (or None if text is empty).
+    """
+    clean = (text or "").strip()
+    if not clean:
+        return None
+    p = doc.add_paragraph()
+    run = p.add_run(clean)
+    # 灰色小字斜体 + 致同中文字体
+    run.font.name = BODY_FONT
+    run.font.size = GUIDANCE_FONT_SIZE
+    run.font.italic = True
+    run.font.color.rgb = GUIDANCE_COLOR
+    rPr = run._r.get_or_add_rPr()
+    rFonts = rPr.find(qn("w:rFonts"))
+    if rFonts is None:
+        rFonts = OxmlElement("w:rFonts")
+        rPr.insert(0, rFonts)
+    rFonts.set(qn("w:eastAsia"), BODY_FONT)
+    _set_paragraph_format(p, space_after=Pt(6))
+    return p
+
+
 def _add_bookmark(paragraph, bookmark_name: str):
     """Add a bookmark to a paragraph for cross-reference."""
     import random
@@ -283,6 +366,72 @@ def _add_bookmark(paragraph, bookmark_name: str):
 # ---------------------------------------------------------------------------
 
 TEMPLATE_PATH = Path(__file__).resolve().parent.parent.parent / "data" / "note_export_template.docx"
+
+# 附注 section_code 索引（variant → sections[]，含 legacy_aliases / content_type）
+SECTION_CODE_INDEX_PATH = (
+    Path(__file__).resolve().parent.parent.parent
+    / "data"
+    / "audit_report_templates"
+    / "section_code_index.json"
+)
+
+
+def _load_section_code_index(variant_key: str) -> list[dict[str, Any]]:
+    """读取 section_code_index.json 中某 variant 的 sections 列表（缺失返回 []）."""
+    if not SECTION_CODE_INDEX_PATH.exists():
+        return []
+    try:
+        import json
+
+        data = json.loads(SECTION_CODE_INDEX_PATH.read_text(encoding="utf-8"))
+    except (ValueError, OSError):
+        logger.warning("section_code_index.json 解析失败: %s", SECTION_CODE_INDEX_PATH)
+        return []
+    variants = data.get("variants", {})
+    entry = variants.get(variant_key, {})
+    sections = entry.get("sections", [])
+    return [s for s in sections if isinstance(s, dict)]
+
+
+# 模板填充后残留的 note 占位符（未匹配章节/表格），交付前必须清除，禁止泄漏进文档
+_RESIDUAL_NOTE_PLACEHOLDER_RE = re.compile(r"\{\{(?:section|table|seq):[^}]*\}\}")
+
+
+def _strip_residual_note_placeholders(doc: Document) -> int:
+    """清除模板填充后残留的 ``{{section:..}}`` / ``{{table:..}}`` / ``{{seq:..}}`` 占位符.
+
+    防御网：当某章节在模板中有占位符但 DB 无匹配 note（或 variant 口径不一致）时，
+    占位符不会被 ``_fill_section_block`` 替换 → 交付文档出现原始标记（用户所见"乱"）。
+    本函数在标记清理阶段扫描全部段落（含表格单元格 + 嵌套表格），把残留占位符抹除，
+    保证交付文档永不出现 ``{{...}}`` 原始 token。返回处理的段落数。
+    """
+    touched = 0
+
+    def _scrub_para(para) -> None:
+        nonlocal touched
+        txt = para.text or ""
+        if not _RESIDUAL_NOTE_PLACEHOLDER_RE.search(txt):
+            return
+        new_text = _RESIDUAL_NOTE_PLACEHOLDER_RE.sub("", txt)
+        para.clear()
+        if new_text.strip():
+            run = para.add_run(new_text)
+            _set_run_font(run)
+        touched += 1
+
+    def _scrub_tables(tables) -> None:
+        for tbl in tables:
+            for row in tbl.rows:
+                for cell in row.cells:
+                    for para in cell.paragraphs:
+                        _scrub_para(para)
+                    if cell.tables:  # 嵌套表格递归
+                        _scrub_tables(cell.tables)
+
+    for para in doc.paragraphs:
+        _scrub_para(para)
+    _scrub_tables(doc.tables)
+    return touched
 
 
 def _new_document() -> Document:
@@ -340,6 +489,54 @@ def apply_gt_three_line(table) -> None:
     _set_table_borders(table, top_sz=8, bottom_sz=8, header_bottom_sz=4)
     if len(table.rows) > 0:
         _set_row_bottom_border(table.rows[0], sz=4)
+
+
+def _build_two_level_header_rows(
+    headers: list[str],
+    column_groups: list[dict],
+) -> list[list[dict]]:
+    """从 headers + _column_groups 构建两行表头定义（供 fill_multi_header 消费）。
+
+    Row 0: 分组父表头（合并跨列）+ 无分组列纵向合并 2 行
+    Row 1: **仅**分组内子列名
+
+    ⚠️ Row 1 **不得**为 `rowspan=2` 的无分组列补空占位：``fill_multi_header`` 内部
+    已用 ``while grid[r][col_cursor] is not None: col_cursor += 1`` 自动跳过被上方
+    rowspan 占用的列。多补一个占位会挤占一个真实列位，导致 row 1 子列名整体右移、
+    末列被 ``col_cursor >= total_cols`` 分支丢弃。
+
+    实测（Word 导出附注存货章节）曾表现为「存货分类」第二行少了末尾「账面价值」、
+    「按组合计提」少了第二个「比例(%)」。约定同
+    ``test_fill_multi_header_basic_grid``（row1 只给子列名）。
+    """
+    num_cols = len(headers)
+    row0: list[dict] = []
+    row1: list[dict] = []
+
+    # 标记哪些列索引被分组覆盖
+    grouped_ranges: dict[int, dict] = {}  # start_col → group_info
+    for g in column_groups:
+        if "start" in g and "span" in g:
+            grouped_ranges[g["start"]] = g
+
+    i = 0
+    while i < num_cols:
+        if i in grouped_ranges:
+            g = grouped_ranges[i]
+            span = g["span"]
+            # Row 0: 分组名跨 span 列
+            row0.append({"text": g["group"], "colspan": span, "rowspan": 1})
+            # Row 1: 各子列名
+            for j in range(span):
+                col_idx = i + j
+                row1.append({"text": headers[col_idx] if col_idx < num_cols else "", "colspan": 1, "rowspan": 1})
+            i += span
+        else:
+            # 无分组列：纵向合并 2 行；row1 不补占位（fill_multi_header 会自动跳过该列位）
+            row0.append({"text": headers[i], "colspan": 1, "rowspan": 2})
+            i += 1
+
+    return [row0, row1]
 
 
 def fill_multi_header(
@@ -531,6 +728,16 @@ class NoteWordExporter:
         # Sprint 2 Task 2.2: D1 sidecar 渲染选项（export() 时被覆盖）
         self._annotate_formulas: bool = False
         self._annotate_manual: bool = False
+        # Task 10.1 / Req 18.1/18.3: 交付导出时把残留公式串解析为值（附注单元通常
+        # 已由 execute_note_formulas 求值为静态值，此标记作为「产物不留可重算表达式」
+        # 的兜底守卫，拦截任何以 '=' 开头的公式串泄漏到交付 docx）。
+        self._delivery_flatten: bool = False
+        # disclosure-note-follow-actual-content R4.3: 空表省略
+        import os
+        self._skip_empty_tables: bool = os.getenv(
+            "DISCLOSURE_EMPTY_TABLE_COLLAPSE", ""
+        ).strip().lower() not in {"0", "false", "no", "off", ""}
+        self._skipped_empty_tables: list[str] = []
 
     def _new_document(self) -> Document:
         """优先加载 GTNote 模板 docx；缺失时降级 Document() 兼容（Sprint 2 Task 2.2）."""
@@ -541,10 +748,13 @@ class NoteWordExporter:
         project_id: UUID,
         year: int,
         template_type: str = "soe",
+        report_scope: str | None = None,
         sections: list[str] | None = None,
         skip_empty: bool = False,
         annotate_formulas: bool = False,
         annotate_manual: bool = False,
+        flatten_formulas: bool = False,
+        mode: Literal["template", "programmatic"] = "programmatic",
     ) -> BytesIO:
         """导出附注为 Word 文档（致同标准格式）
 
@@ -552,26 +762,57 @@ class NoteWordExporter:
             project_id: 项目 ID
             year: 年度
             template_type: 模板类型 (soe/listed)
+            report_scope: 报表口径 standalone/consolidated；None 时从项目读取
             sections: 指定导出章节列表（None=全部）
             skip_empty: 是否跳过空章节
             annotate_formulas: D1 sidecar 渲染——公式 cell 标浅绿背景（默认关闭）
             annotate_manual:   D1 sidecar 渲染——手工 cell 标灰色边框（默认关闭）
+            mode: 导出模式
+                - "programmatic"（默认）：从零程序化拼装致同格式（现有行为，不变）
+                - "template"：基于附注 docx 模板填充（待 Phase 0.6.2 附注模板全量
+                  打标完成后启用，当前抛 NotImplementedError）
 
         Returns:
             BytesIO containing the docx file
         """
+        if mode == "template":
+            buf, _meta = await self._export_template_mode_with_meta(
+                project_id,
+                year,
+                template_type=template_type,
+                report_scope=report_scope,
+                sections=sections,
+                annotate_formulas=annotate_formulas,
+                annotate_manual=annotate_manual,
+                flatten_formulas=flatten_formulas,
+            )
+            return buf
+
+        template_type = normalize_template_type(template_type)
+        if report_scope is None:
+            report_scope = await self._resolve_report_scope(project_id)
+        report_scope = normalize_report_scope(report_scope)
+
         # Load notes data
         notes = await self._load_notes(project_id, year, sections)
+        notes = [
+            n for n in notes
+            if note_applies_to_report_scope(n.note_section, template_type, report_scope)
+        ]
 
         # Filter empty sections if requested
         if skip_empty:
-            notes = [n for n in notes if self._has_content(n)]
+            notes = [
+                n for n in notes
+                if not self._should_skip_section(n)
+            ]
 
         # Build document（Sprint 2 Task 2.2: 优先加载 GTNote* 模板 docx）
         doc = self._new_document()
         # 渲染选项透传给 _render_table
         self._annotate_formulas = annotate_formulas
         self._annotate_manual = annotate_manual
+        self._delivery_flatten = flatten_formulas
 
         self._setup_page(doc)
         self._add_title(doc, year)
@@ -618,6 +859,426 @@ class NoteWordExporter:
         output.seek(0)
         return output
 
+    async def export_with_meta(
+        self,
+        project_id: UUID,
+        year: int,
+        template_type: str = "soe",
+        report_scope: str | None = None,
+        sections: list[str] | None = None,
+        skip_empty: bool = False,
+        annotate_formulas: bool = False,
+        annotate_manual: bool = False,
+        flatten_formulas: bool = False,
+        mode: Literal["template", "programmatic"] = "programmatic",
+    ) -> tuple[BytesIO, NoteExportMeta]:
+        """与 :meth:`export` 等价，另返回章节级 :class:`NoteExportMeta`。
+
+        交付中心用 meta 落 ``deliverable_section_state``（章节溯源 / stale 刷新 /
+        回填的前提）。**additive 设计**：``export`` 的签名与返回值不变，既有 3 个
+        生产调用方与大量测试零改动。
+
+        programmatic 模式无 SECTION 块 → meta 为空壳（行为与接线前一致）。
+        """
+        if mode == "template":
+            return await self._export_template_mode_with_meta(
+                project_id,
+                year,
+                template_type=template_type,
+                report_scope=report_scope,
+                sections=sections,
+                annotate_formulas=annotate_formulas,
+                annotate_manual=annotate_manual,
+                flatten_formulas=flatten_formulas,
+            )
+
+        buf = await self.export(
+            project_id,
+            year,
+            template_type=template_type,
+            report_scope=report_scope,
+            sections=sections,
+            skip_empty=skip_empty,
+            annotate_formulas=annotate_formulas,
+            annotate_manual=annotate_manual,
+            flatten_formulas=flatten_formulas,
+            mode="programmatic",
+        )
+        return buf, NoteExportMeta()
+
+    async def _export_template_mode(
+        self,
+        project_id: UUID,
+        year: int,
+        *,
+        template_type: str,
+        report_scope: str | None,
+        sections: list[str] | None,
+        annotate_formulas: bool = False,
+        annotate_manual: bool = False,
+        flatten_formulas: bool = False,
+    ) -> BytesIO:
+        """向后兼容薄壳：委托 :meth:`_export_template_mode_with_meta` 只取文档。"""
+        buf, _meta = await self._export_template_mode_with_meta(
+            project_id,
+            year,
+            template_type=template_type,
+            report_scope=report_scope,
+            sections=sections,
+            annotate_formulas=annotate_formulas,
+            annotate_manual=annotate_manual,
+            flatten_formulas=flatten_formulas,
+        )
+        return buf
+
+    async def _export_template_mode_with_meta(
+        self,
+        project_id: UUID,
+        year: int,
+        *,
+        template_type: str,
+        report_scope: str | None,
+        sections: list[str] | None,
+        annotate_formulas: bool = False,
+        annotate_manual: bool = False,
+        flatten_formulas: bool = False,
+    ) -> tuple[BytesIO, NoteExportMeta]:
+        """基于附注 docx 模板填充导出（design §7 附注模板填充流程）.
+
+        算法：
+        1. manifest 解析 variant docx + 读 section_code_index.json
+        2. 扫描 ``##SECTION:code##`` 块（body 级，含表格）
+        3. 加载 DB notes + 裁剪状态，按 section_code（含 legacy_aliases）join
+        4. §7.1 优先级判定跳过 → 删除整 SECTION 块
+        5. 保留块：填 {{section:code}} / {{table:code:N}} / 渲染表格
+        6. {{seq:prefix}} ← compute_section_numbers（裁剪后）
+        7. 清理残留 ##SECTION:## / ##STYLE_REF:## 标记
+        8. 返回 BytesIO
+        """
+        template_type = normalize_template_type(template_type)
+        if report_scope is None:
+            report_scope = await self._resolve_report_scope(project_id)
+        report_scope = normalize_report_scope(report_scope)
+        variant_key = build_variant_key(template_type, report_scope)
+
+        # 1. 解析模板路径 + 载入 docx
+        loader = get_template_manifest_loader()
+        entry = loader.resolve_disclosure_notes(template_type, report_scope)
+        if not entry.exists:
+            raise FileNotFoundError(
+                f"附注模板缺失: {entry.abs_path}（variant={variant_key}）"
+            )
+        doc = Document(str(entry.abs_path))
+
+        # 渲染选项透传给 _render_table
+        self._annotate_formulas = annotate_formulas
+        self._annotate_manual = annotate_manual
+        self._delivery_flatten = flatten_formulas
+
+        # 索引：section_code → index entry（含 legacy_aliases）
+        index_sections = _load_section_code_index(variant_key)
+
+        # 2. 扫描 SECTION 块
+        blocks = scan_section_blocks(doc)
+
+        # 3. 加载 notes + 裁剪状态；构建 join 映射
+        notes = await self._load_notes(project_id, year, sections)
+        notes = [
+            n
+            for n in notes
+            if note_applies_to_report_scope(n.note_section, template_type, report_scope)
+        ]
+        note_by_section = {(n.note_section or "").strip(): n for n in notes}
+
+        # legacy_aliases → canonical section_code 映射（来自索引）
+        alias_to_code: dict[str, str] = {}
+        for entry_s in index_sections:
+            code = (entry_s.get("section_code") or "").strip()
+            for alias in entry_s.get("legacy_aliases", []) or []:
+                a = (alias or "").strip()
+                if a:
+                    alias_to_code[a] = code
+
+        def _match_note(section_code: str) -> DisclosureNote | None:
+            code = (section_code or "").strip()
+            note = note_by_section.get(code)
+            if note is not None:
+                return note
+            # DB note_section 可能是 legacy alias（如 五、1 → 模板 八、1）
+            for db_section, n in note_by_section.items():
+                if alias_to_code.get(db_section) == code:
+                    return n
+            return None
+
+        # 4 + 5. 逐块裁剪 / 填充
+        kept_codes: list[str] = []
+        for block in blocks:
+            # 口径排除：standalone 导出删除 consolidated_only 章节块（design §7 / 需求 12）
+            if not note_applies_to_report_scope(
+                block.section_code, template_type, report_scope
+            ):
+                delete_section_block(block)
+                continue
+            note = _match_note(block.section_code)
+            skip = False
+            if note is not None:
+                skip = should_skip_empty_section(self._note_to_skip_dict(note))
+            if skip:
+                delete_section_block(block)
+                continue
+            kept_codes.append(block.section_code)
+            if note is not None:
+                self._fill_section_block(doc, block, note)
+
+        # 6. {{seq:prefix}} 填充（仅保留章节，design §13）
+        kept_tree = [{"note_section": code} for code in kept_codes]
+        seq_numbers = compute_section_numbers(
+            kept_tree,
+            report_scope=report_scope,
+            template_type=template_type,
+        )
+        self._fill_seq_placeholders(doc, kept_codes, seq_numbers)
+
+        # 6.4 Section_Anchor 写入（spec deliverable-lineage-wiring-…，需求 1.1/1.2）：
+        # 隐藏书签 bookmarkStart 落在块首标记**前**、bookmarkEnd 落在块尾标记**后**，
+        # 故 step7 清掉标记段落后，锚点区间恰好覆盖章节内部内容 —— 这是标记清理后
+        # 唯一可用的章节定位手段（回填 / 增量刷新 / 溯源全部依赖它）。
+        # 只对 kept_codes 写（裁剪章节不写，需求 1.1）；写入不改变可见文字（需求 1.3）。
+        # 必须在 6.5 内容控件注入之前：注入只包 elements[1:-1]（标记之间），书签在
+        # 标记之外，两者互不吞并（已由 test_section_anchor_scan 实证）。
+        anchor_map: dict[str, str] = {}
+        rendered_block_hashes: dict[str, str] = {}
+        try:
+            from app.services.section_anchor_utils import (
+                SectionBlock as _AnchorSectionBlock,
+            )
+            from app.services.section_anchor_utils import (
+                block_text_hash,
+                write_section_anchors,
+            )
+
+            kept_set = set(kept_codes)
+            post_blocks: list[Any] = []
+            seen: set[str] = set()
+            for b in scan_section_blocks(doc):
+                if b.section_code in kept_set and b.section_code not in seen:
+                    seen.add(b.section_code)
+                    post_blocks.append(b)
+
+            # Rendered_Block_Hash 在标记清理前按块内正文段落算（block_text_hash 内部
+            # 排除 ## 标记行），与 refresh 侧人工编辑检测共用同一函数，禁各写一份。
+            rendered_block_hashes = {
+                b.section_code: block_text_hash(b.elements) for b in post_blocks
+            }
+            anchor_map = write_section_anchors(
+                doc,
+                [
+                    _AnchorSectionBlock(
+                        section_code=b.section_code,
+                        open_el=b.open_el,
+                        close_el=b.close_el,
+                    )
+                    for b in post_blocks
+                ],
+            )
+        except Exception:  # noqa: BLE001 — 锚点写入失败不阻断导出（需求 1.6）
+            logger.warning(
+                "section anchor write failed, deliverable will lack lineage anchors",
+                exc_info=True,
+            )
+
+        # 6.5 内容控件化（灰度 DELIVERABLE_LINEAGE_CONTENT_CONTROL_ENABLED）：
+        # 为每节「标记之间的内部内容」注入 Block Content Control（Tag=sec_xxx，与 note
+        # bookmark 并存），供前端 OnlyOffice 连接器实现真·光标跟随溯源。
+        # 必须在 step7 标记清理前、seq 填充后；只包内部内容，开闭标记留 body 级供 step7 清理。
+        # 关闭时完全跳过 → 输出与引入前逐字节等价（零回归）。
+        if settings.DELIVERABLE_LINEAGE_CONTENT_CONTROL_ENABLED:
+            try:
+                from app.services.content_control_injector import (
+                    inject_content_controls_for_blocks,
+                )
+
+                inject_content_controls_for_blocks(doc, scan_section_blocks(doc))
+            except Exception:  # noqa: BLE001 — 注入失败不阻断导出
+                logger.warning(
+                    "content control injection failed, skipped", exc_info=True
+                )
+
+        # 7. 清理残留标记
+        remove_section_markers(doc)
+        # 7.5 防御网：清除任何未被填充的 {{section/table/seq:..}} 占位符（未匹配章节
+        #     / variant 口径不一致等边界），保证交付文档永不泄漏原始 token。
+        leaked = _strip_residual_note_placeholders(doc)
+        if leaked:
+            logger.warning(
+                "note_word_exporter: 清除 %d 处残留占位符段落（存在未匹配章节，"
+                "请核对 Project.template_type 与附注生成口径是否一致）",
+                leaked,
+            )
+
+        # 8. 输出
+        output = BytesIO()
+        doc.save(output)
+        output.seek(0)
+        return output, NoteExportMeta(
+            kept_codes=list(kept_codes),
+            anchor_map=anchor_map,
+            rendered_block_hashes=rendered_block_hashes,
+            variant_key=variant_key,
+        )
+
+    def _fill_section_block(
+        self, doc: Document, block, note: DisclosureNote
+    ) -> None:
+        """填充保留章节块内的 {{section:code}} / {{table:code:N}} 占位符 + 渲染表格.
+
+        说明：当前 GT 模板（Phase 0.6.2 打标）章节块内多为参考标题 + 指引段，
+        通常**无** {{section}}/{{table}} 占位符——此时不强行注入，保留模板原貌；
+        仅当模板含占位符时才填充（兼容更完整的预备模板与测试夹具）。
+        """
+        from docx.text.paragraph import Paragraph
+        from docx.oxml.ns import qn as _qn
+
+        code = block.section_code
+        text_content = (getattr(note, "text_content", None) or "").strip()
+
+        # 收集块内段落（仅 <w:p>）
+        p_tag = _qn("w:p")
+        paragraphs = [
+            Paragraph(el, doc) for el in block.elements if el.tag == p_tag
+        ]
+
+        section_token = f"{{{{section:{code}}}}}"
+        for para in paragraphs:
+            ptext = para.text or ""
+            if section_token in ptext:
+                new_text = ptext.replace(section_token, text_content)
+                para.clear()
+                if new_text:
+                    run = para.add_run(new_text)
+                    _set_run_font(run)
+
+        # {{table:code:N}} → 渲染对应表（多表按 index 对齐）
+        tables_to_render = self._note_tables(note)
+        table_re = re.compile(
+            r"\{\{table:" + re.escape(code) + r"(?::(\d+))?\}\}"
+        )
+        for para in paragraphs:
+            m = table_re.search(para.text or "")
+            if not m:
+                continue
+            idx = int(m.group(1)) if m.group(1) else 0
+            para.clear()
+            if 0 <= idx < len(tables_to_render):
+                tbl = tables_to_render[idx]
+                # 空表 → 无业务段落（§7.1 ⑤）
+                if get_table_render_mode(tbl) == "no_business_paragraph":
+                    run = para.add_run("本期无此项业务。")
+                    _set_run_font(run)
+                else:
+                    self._render_table_at(doc, para, tbl)
+
+    def _effective_table_data(self, note: DisclosureNote) -> dict | None:
+        """返回投影后的 table_data：workpaper 来源记录把 sub_table_data + _sub_table_columns
+        投影为 _tables 后与模块渲染一致（spec disclosure-table-sync-convergence Req1.2/Property12）。
+
+        委托到共享纯函数 ``note_content_utils.effective_table_data``（单一真源，与
+        ``disclosure_engine`` 的 ``has_data`` 判定同口径，防漂移）。非 workpaper 来源 /
+        投影为空 → 原样返回 table_data（导出行为不变）；投影失败降级不阻断导出。
+        """
+        return _shared_effective_table_data(getattr(note, "table_data", None))
+
+    def _note_tables(self, note: DisclosureNote) -> list[dict]:
+        """返回 note 的表列表（多表 _tables 数组优先，降级单表）.
+
+        过滤掉 export_enabled=false 的表格（用户可在前端选择哪些表导出）。
+        workpaper 来源记录先经投影得到 _tables（与模块渲染一致）。
+
+        🔴 空表默认省略（disclosure-note-follow-actual-content R4.3）：
+        投影后的表经 `is_empty_table` 判定为空 → 跳过导出（被省略表名记入
+        `self._skipped_empty_tables` 供导出摘要消费）。只在灰度开关开启时生效。
+
+        🔴 空表头补齐（与前端 get_note_detail 读时投影一致）：历史生成/模板绑定合并
+        路径产出的部分 table_data 出现 ``headers: []`` 但 rows 非空（每行带 values +
+        ``_cell_meta[col].semantic`` 列语义）。``_render_table`` 遇空表头直接 return →
+        科目注释"有数据却空白"。此处对每张表调 ``project_headers`` 从行语义派生中文表头，
+        使数据列可渲染（读时派生，不改存量；与前端 note_header_projector 同一纯函数）。
+        """
+        from app.services.note_header_projector import project_headers
+        from app.services.note_empty_table_detector import is_empty_table
+
+        td = self._effective_table_data(note)
+        if not isinstance(td, dict):
+            return []
+        tables = td.get("_tables") or [td]
+        section_number = getattr(note, "note_section", None)
+        source_template = getattr(note, "source_template", None)
+        result: list[dict] = []
+        for idx, t in enumerate(tables):
+            if not isinstance(t, dict) or not t.get("export_enabled", True):
+                continue
+            # 模板表头优先（列数匹配才套用），语义派生兜底 —— 与模块渲染同一纯函数
+            projected = project_headers(
+                t,
+                section_number=section_number,
+                source_template=source_template,
+                table_index=idx,
+            )
+            final = projected if projected is not None else t
+            # 空表省略（R4.3）：灰度开关 + 空表判定
+            if self._skip_empty_tables and is_empty_table(final.get("rows"), final.get("columns")):
+                self._skipped_empty_tables.append(str(final.get("name") or f"表{idx + 1}"))
+                continue
+            result.append(final)
+        return result
+
+    def _render_table_at(self, doc: Document, anchor_para, table_data: dict) -> None:
+        """在 anchor 段落处渲染表格（复用 _render_table，再把表移动到锚点位置）."""
+        before = set(id(t._tbl) for t in doc.tables)
+        self._render_table(doc, table_data)
+        # 找到新追加的表，移动到 anchor 之后
+        new_tbls = [t for t in doc.tables if id(t._tbl) not in before]
+        anchor_el = anchor_para._p
+        for tbl in new_tbls:
+            tbl_el = tbl._tbl
+            parent = tbl_el.getparent()
+            if parent is not None:
+                parent.remove(tbl_el)
+            anchor_el.addnext(tbl_el)
+            anchor_el = tbl_el
+
+    def _fill_seq_placeholders(
+        self, doc: Document, kept_codes: list[str], seq_numbers: dict[str, str]
+    ) -> None:
+        """填充 {{seq:prefix}} 占位符为重算后的运行编号（design §13）.
+
+        ``seq_numbers`` 键为完整 note_section（如 ``八、1`` → ``"1"``）。
+        模板中的 ``{{seq:八}}`` 出现在某个章节块内 → 用该块 section_code 的编号；
+        组内仅 1 条不编号（compute_section_numbers 已处理），此时替换为空串。
+        """
+        from docx.text.paragraph import Paragraph
+        from docx.oxml.ns import qn as _qn
+
+        # 重新扫描块（删除后元素已变）
+        blocks = scan_section_blocks(doc)
+        p_tag = _qn("w:p")
+        seq_re = re.compile(r"\{\{seq:([^}]+)\}\}")
+        for block in blocks:
+            number = seq_numbers.get(block.section_code, "")
+            for el in block.elements:
+                if el.tag != p_tag:
+                    continue
+                para = Paragraph(el, doc)
+                ptext = para.text or ""
+                if "{{seq:" not in ptext:
+                    continue
+                new_text = seq_re.sub(number, ptext)
+                if new_text != ptext:
+                    para.clear()
+                    if new_text:
+                        run = para.add_run(new_text)
+                        _set_run_font(run)
+
     async def preview_html(self, project_id: UUID, year: int) -> str:
         """Generate HTML preview of notes.
 
@@ -657,7 +1318,9 @@ class NoteWordExporter:
                     html_parts.append(f'<p>{note.text_content}</p>')
                 if note.table_data:
                     # Sprint 0 / Task 0.3 P0 修复：HTML 预览也支持多表
-                    tables_to_render = note.table_data.get("_tables") or [note.table_data]
+                    # 过滤 export_enabled=false（用户选择不导出的表格）
+                    # workpaper 来源经投影（与模块渲染一致）
+                    tables_to_render = self._note_tables(note)
                     for tbl in tables_to_render:
                         if not isinstance(tbl, dict):
                             continue
@@ -674,14 +1337,35 @@ class NoteWordExporter:
     # Private methods
     # -----------------------------------------------------------------------
 
+    async def _resolve_report_scope(self, project_id: UUID) -> str:
+        from app.models.core import Project
+
+        result = await self.db.execute(
+            sa.select(Project.report_scope).where(
+                Project.id == project_id,
+                Project.is_deleted == sa.false(),
+            )
+        )
+        row = result.scalar_one_or_none()
+        return normalize_report_scope(row if isinstance(row, str) else None)
+
     async def _load_notes(
         self, project_id: UUID, year: int, sections: list[str] | None = None
     ) -> list[DisclosureNote]:
-        """Load notes from database."""
+        """Load notes from database.
+
+        排序铁律：必须按 ``sort_order``（章节序号，99/100/199/200...）排序，
+        **不可**按 ``note_section`` 字符串排序——中文章节号（一/二/七/九...）的
+        Unicode 码点序与审计章节顺序不一致（"七"<"三"<"九"<"二"），字符串排序会
+        导致导出 Word 章节顺序完全乱套。sort_order 相同/缺失时用 note_section 兜底。
+        """
         q = sa.select(DisclosureNote).where(
             DisclosureNote.project_id == project_id,
             DisclosureNote.year == year,
-        ).order_by(DisclosureNote.note_section)
+        ).order_by(
+            DisclosureNote.sort_order.asc().nulls_last(),
+            DisclosureNote.note_section,
+        )
 
         result = await self.db.execute(q)
         notes = list(result.scalars().all())
@@ -694,44 +1378,41 @@ class NoteWordExporter:
     def _has_content(self, note: DisclosureNote) -> bool:
         """Check if a note section has any content.
 
-        Sprint 0 / Task 0.3 P0 修复：也识别 table_data._tables 数组中的多表内容
+        委托到共享纯函数 ``note_content_utils.note_has_data``（单一真源，与
+        ``disclosure_engine.get_notes_tree`` 的 ``has_data`` 标记同口径，防"树标记≠导出结果"
+        漂移；spec disclosure-notes-selective-generation）。判定逻辑与原实现逐字节等价，
+        额外前置 ``is_empty``(not_applicable) 短路返回 False——与 ``should_skip_empty_section``
+        对 is_empty 章节的处理一致（is_empty=本期无此项业务，视为无内容）。
         """
-        if note.text_content and note.text_content.strip():
-            return True
-        if not note.table_data or not isinstance(note.table_data, dict):
-            return False
+        return _shared_note_has_data(note)
 
-        # 收集所有要检查的表（多表 _tables 数组 + 单表降级）
-        tables_to_check = note.table_data.get("_tables") or [note.table_data]
+    def _note_to_skip_dict(self, note: DisclosureNote) -> dict:
+        """将 DisclosureNote ORM 转为 should_skip_empty_section 所需 dict 形状.
 
-        for tbl in tables_to_check:
-            if not isinstance(tbl, dict):
-                continue
-            rows = tbl.get("rows", [])
-            for row in rows:
-                values = row.get("values", [])
-                cells = row.get("cells", values)
-                for cell in cells:
-                    if isinstance(cell, dict):
-                        val = cell.get("value", cell.get("manual_value", 0))
-                    else:
-                        val = cell
-                    if val and val != 0 and val != "0" and val != "-":
-                        return True
-        return False
+        字段：is_deleted / status / is_empty / text_content / table_data。
+        status 为枚举时取其 value（与 design §7.1 'not_applicable' 字符串比较一致）。
+        缺失属性用 getattr 默认值兜底（兼容测试用 Fake 对象）。
+        """
+        status = getattr(note, "status", None)
+        status_value = getattr(status, "value", status)  # 枚举 → str
+        return {
+            "is_deleted": getattr(note, "is_deleted", False),
+            "status": status_value,
+            "is_empty": getattr(note, "is_empty", False),
+            "text_content": getattr(note, "text_content", None),
+            "table_data": getattr(note, "table_data", None),
+        }
+
+    def _should_skip_section(self, note: DisclosureNote) -> bool:
+        """判断章节在 skip_empty 模式下是否应跳过（design §7.1 ①~④）.
+
+        复用 `should_skip_empty_section`（不重复实现裁剪逻辑）。
+        """
+        return should_skip_empty_section(self._note_to_skip_dict(note))
 
     def _detect_level(self, section_code: str) -> int:
-        """Detect heading level from section code pattern."""
-        if not section_code:
-            return 3
-        # Pattern: "5" or "V" = level 1, "5.1" or "V.1" = level 2, "5.1.1" = level 3
-        parts = section_code.split(".")
-        if len(parts) == 1:
-            return 1
-        elif len(parts) == 2:
-            return 2
-        else:
-            return 3
+        """Detect heading level — delegated to note_section_catalog (唯一规则)."""
+        return detect_heading_level(section_code)
 
     def _setup_page(self, doc: Document):
         """Set up page margins and orientation per 致同 standard."""
@@ -812,12 +1493,20 @@ class NoteWordExporter:
             _set_run_font(run)
             _set_paragraph_format(p)
 
+        # 章节级 guidance（note-per-table-guidance Phase 4）：在所有表格前输出一次，
+        # 灰色小字斜体区分正文。此前完全不渲染（grep guidance 零命中），属既有缺陷补齐。
+        section_guidance = getattr(note, "guidance_text", None)
+        if section_guidance and section_guidance.strip():
+            _add_guidance_paragraph(doc, section_guidance)
+
         # Table data
         if not note.table_data or not isinstance(note.table_data, dict):
             return
 
         # 优先取 _tables 数组（多表章节）；老结构降级到单表
-        tables_to_render = note.table_data.get("_tables") or [note.table_data]
+        # 过滤 export_enabled=false 的表格（用户可选择不导出特定表格）
+        # workpaper 来源经投影得到 _tables（与模块渲染一致，Property12）
+        tables_to_render = self._note_tables(note)
 
         for tbl in tables_to_render:
             if not isinstance(tbl, dict):
@@ -828,6 +1517,11 @@ class NoteWordExporter:
                 run = p.add_run(str(tbl["name"]))
                 _set_run_font(run, bold=True, size=HEADING3_FONT_SIZE)
                 _set_paragraph_format(p, space_before=Pt(6))
+            # 表格级 guidance（note-per-table-guidance Phase 4）：渲染该表前输出
+            # 其 _tables[n].guidance，灰色小字斜体区分正文。
+            tbl_guidance = tbl.get("guidance")
+            if tbl_guidance and str(tbl_guidance).strip():
+                _add_guidance_paragraph(doc, str(tbl_guidance))
             self._render_table(doc, tbl)
 
     def _render_table(self, doc: Document, table_data: dict):
@@ -845,6 +1539,13 @@ class NoteWordExporter:
         headers_raw = table_data.get("headers", [])
         rows = table_data.get("rows", [])
 
+        # 可扩位行（`row_type=expandable`）是「此处可增行」的位置标记、没有披露内容
+        # ⇒ 不渲染成可见数据行（note-template-columns-and-legacy-snapshot-closure
+        # Property 33）。判据复用投影器的单一真源谓词，不另写一份。
+        # additive：落地前全库 expandable 计数为 0 ⇒ 对存量交付件是空操作。
+        if isinstance(rows, list):
+            rows = [r for r in rows if not _is_zero_visible_row(r)]
+
         if not headers_raw or not rows:
             return
 
@@ -857,24 +1558,38 @@ class NoteWordExporter:
         num_cols = len(headers)
         num_rows = len(rows) + 1  # +1 for header row
 
+        # 检测是否有两级分组表头（_column_groups）
+        column_groups = table_data.get("_column_groups")
+        has_multi_header = isinstance(column_groups, list) and len(column_groups) > 0
+
+        if has_multi_header:
+            num_rows = len(rows) + 2  # +2 for two header rows
+
         table = doc.add_table(rows=num_rows, cols=num_cols)
         table.alignment = WD_TABLE_ALIGNMENT.CENTER
 
         # Sprint 2 Task 2.2: 致同三线表（顶/底 1pt + 表头 cell tcBorders.bottom 1/2pt + 其他 nil）
         apply_gt_three_line(table)
 
-        # Header row
-        header_row = table.rows[0]
-        for i, h in enumerate(headers):
-            cell = header_row.cells[i]
-            cell.text = ""
-            p = cell.paragraphs[0]
-            p.alignment = WD_ALIGN_PARAGRAPH.CENTER
-            run = p.add_run(str(h))
-            _set_run_font(run, bold=True)
-
-        # Sprint 2 Task 2.2: 表头行 + 数据行均固定 0.7cm + 关闭标题行重复
-        apply_gt_row_height(header_row, cm=0.7)
+        if has_multi_header:
+            # 两级表头：用 fill_multi_header 渲染合并单元格
+            header_row_defs = _build_two_level_header_rows(headers, column_groups)
+            fill_multi_header(table, header_row_defs, num_cols)
+            apply_gt_row_height(table.rows[0], cm=0.7)
+            apply_gt_row_height(table.rows[1], cm=0.7)
+            data_start_row = 2
+        else:
+            # 单级扁平表头
+            header_row = table.rows[0]
+            for i, h in enumerate(headers):
+                cell = header_row.cells[i]
+                cell.text = ""
+                p = cell.paragraphs[0]
+                p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+                run = p.add_run(str(h))
+                _set_run_font(run, bold=True)
+            apply_gt_row_height(header_row, cm=0.7)
+            data_start_row = 1
 
         # 表级 sidecar 数据（D1）：_formulas / _cell_modes 优先取 row 级
         formulas_index: dict[tuple[int, int], dict[str, Any]] = {}
@@ -889,7 +1604,7 @@ class NoteWordExporter:
             cells_data = row.get("cells", values)
             cell_modes = row.get("_cell_modes") or []
 
-            data_row = table.rows[r_idx + 1]
+            data_row = table.rows[r_idx + data_start_row]
             apply_gt_row_height(data_row, cm=0.7)
 
             # First column: label
@@ -917,6 +1632,20 @@ class NoteWordExporter:
                     cell_val = val.get("value", val.get("manual_value", 0))
                 else:
                     cell_val = val
+
+                # Task 10.1 / Req 18.1/18.3: 交付导出兜底——附注单元应已由
+                # execute_note_formulas 求值为静态值；若仍有 '=' 开头的公式串泄漏，
+                # 以其携带的最近计算值降级，并记入导出日志（不把可重算表达式写入产物）。
+                if self._delivery_flatten and isinstance(cell_val, str) and cell_val.startswith("="):
+                    last_computed = val.get("value") if isinstance(val, dict) else None
+                    logger.warning(
+                        "附注交付导出悬空/未求值公式：%r（row=%d col=%d），以最近计算值 %r 降级导出",
+                        cell_val,
+                        r_idx,
+                        data_idx,
+                        last_computed,
+                    )
+                    cell_val = last_computed if isinstance(last_computed, (int, float)) else ""
 
                 # Sprint 2 Task 2.2: 使用 fmt_amount_gt（空/零留白）替代 _format_amount（"-"）
                 formatted = fmt_amount_gt(cell_val)

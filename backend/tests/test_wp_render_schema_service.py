@@ -87,6 +87,52 @@ class TestLoadSchema:
         with pytest.raises(FileNotFoundError, match="Render schema not found"):
             service.load_schema("NONEXISTENT99")
 
+    def test_load_disclosure_schema_by_wp_code(self, service, tmp_schema_dir):
+        """附注披露专属 schema: D1 → C-D1-disclosure.yaml（精确无 D1.yaml 时命中）"""
+        disclosure_data = {
+            "wp_code": "C-D1-disclosure",
+            "sheets": {
+                "附注披露信息（上市公司）": {
+                    "component_type": "c-note-table",
+                    "sub_tables": [{"id": "x", "title": "t", "type": "static_rows"}],
+                }
+            },
+        }
+        (tmp_schema_dir / "C-D1-disclosure.yaml").write_text(
+            yaml.dump(disclosure_data, allow_unicode=True), encoding="utf-8"
+        )
+
+        result = service.load_schema("D1")
+
+        assert result["wp_code"] == "C-D1-disclosure"
+        assert "附注披露信息（上市公司）" in result["sheets"]
+
+    def test_exact_match_takes_priority_over_disclosure(self, service, tmp_schema_dir):
+        """精确 D1.yaml 优先于 C-D1-disclosure.yaml"""
+        (tmp_schema_dir / "C-D1-disclosure.yaml").write_text(
+            yaml.dump({"source": "disclosure"}, allow_unicode=True), encoding="utf-8"
+        )
+        (tmp_schema_dir / "D1.yaml").write_text(
+            yaml.dump({"source": "exact"}, allow_unicode=True), encoding="utf-8"
+        )
+
+        result = service.load_schema("D1")
+
+        assert result["source"] == "exact"
+
+    def test_disclosure_takes_priority_over_prefix_fallback(self, service, tmp_schema_dir):
+        """C-D1-disclosure.yaml 优先于前缀 D-template.yaml"""
+        (tmp_schema_dir / "D-template.yaml").write_text(
+            yaml.dump({"source": "prefix"}, allow_unicode=True), encoding="utf-8"
+        )
+        (tmp_schema_dir / "C-D1-disclosure.yaml").write_text(
+            yaml.dump({"source": "disclosure"}, allow_unicode=True), encoding="utf-8"
+        )
+
+        result = service.load_schema("D1")
+
+        assert result["source"] == "disclosure"
+
     def test_caching(self, service, tmp_schema_dir):
         """同一 wp_code 只加载一次（缓存命中）"""
         schema_data = {"wp_code": "E1A", "counter": 1}

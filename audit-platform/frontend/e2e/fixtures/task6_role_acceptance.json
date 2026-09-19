@@ -1,0 +1,191 @@
+{
+  "project_id": "a39ef9cc-12ff-4f8b-b83a-2999c71d4e86",
+  "other_project_id": "380e360d-d052-44ed-93d0-8fa07a266c53",
+  "wp": {
+    "lead": {
+      "wp_id": "ed1ad089-f5b0-438e-93d8-42c6e7b66a39",
+      "wp_index_id": "a7e08fd8-b72f-43a4-978f-d6be539d15ea",
+      "wp_code": "D2-1",
+      "wp_name": "T6应收账款主编底稿ZZZUNIQUE"
+    },
+    "undelegated": {
+      "wp_id": "b287ef40-3744-446d-8387-0e2f2918278b",
+      "wp_index_id": "b888b60d-18c2-4aef-ab6a-89ba70e5de24",
+      "wp_code": "D3-1",
+      "wp_name": "T6预付账款未委派底稿ZZZUNIQUE"
+    },
+    "row": {
+      "wp_id": "a05e1f7a-4f08-4014-bd93-1c7423e0a955",
+      "wp_index_id": "65aeb189-e03d-48a9-aa46-9a246976bd7d",
+      "wp_code": "D4-1",
+      "wp_name": "T6其他应收款行任务底稿ZZZUNIQUE"
+    },
+    "external": {
+      "wp_id": "9846ba24-fcb4-4f06-9ccb-3640cfb4a262",
+      "wp_index_id": "aebcaf0d-13c8-4ef8-be69-3a85c711b221",
+      "wp_code": "K1-1",
+      "wp_name": "T6其他应付款域外底稿ZZZUNIQUE"
+    },
+    "other": {
+      "wp_id": "f4cf4f97-39ae-478a-89c8-cce878f9fa7e",
+      "wp_index_id": "36883800-9fa3-4b22-a30c-5a4d25f03695",
+      "wp_code": "D2-1",
+      "wp_name": "T6跨项目底稿ZZZUNIQUE"
+    }
+  },
+  "roles": {
+    "admin": {
+      "username": "admin",
+      "password": "admin123",
+      "user_id": "ae9e0523-627f-44c1-b20a-99854439f6f3"
+    },
+    "supervisor": {
+      "username": "t6_supervisor",
+      "password": "t6pass123",
+      "user_id": "9fe3856b-6ac0-459e-bc9b-498bc41f2be4"
+    },
+    "lead": {
+      "username": "t6_lead",
+      "password": "t6pass123",
+      "user_id": "87955906-ddbb-4837-81ec-ed6556dd0039"
+    },
+    "assignee": {
+      "username": "t6_assignee",
+      "password": "t6pass123",
+      "user_id": "2f34e664-83d0-42a4-af62-36d4c31ba6fd"
+    },
+    "reviewer": {
+      "username": "t6_reviewer",
+      "password": "t6pass123",
+      "user_id": "0fd03e16-ecc7-40a6-b647-57a2375f7a1f"
+    },
+    "history_lead": {
+      "username": "t6_history_lead",
+      "password": "t6pass123",
+      "user_id": "b31278bb-5f94-4960-bff8-4b8b797a75e3"
+    },
+    "history_row": {
+      "username": "t6_history_row",
+      "password": "t6pass123",
+      "user_id": "3167e102-05df-4a72-b441-f1ab77b63aad"
+    },
+    "restricted": {
+      "username": "t6_restricted",
+      "password": "t6pass123",
+      "user_id": "e045d992-9496-4a22-9a7a-820fec6f8e55"
+    }
+  },
+  "probes": {
+    "admin": [
+      [
+        "lead",
+        "allow"
+      ],
+      [
+        "undelegated",
+        "allow"
+      ],
+      [
+        "external",
+        "allow"
+      ]
+    ],
+    "supervisor": [
+      [
+        "undelegated",
+        "allow"
+      ],
+      [
+        "external",
+        "deny"
+      ]
+    ],
+    "lead": [
+      [
+        "lead",
+        "allow"
+      ],
+      [
+        "undelegated",
+        "deny"
+      ],
+      [
+        "external",
+        "deny"
+      ]
+    ],
+    "assignee": [
+      [
+        "row",
+        "allow"
+      ],
+      [
+        "undelegated",
+        "deny"
+      ],
+      [
+        "external",
+        "deny"
+      ]
+    ],
+    "reviewer": [
+      [
+        "row",
+        "allow"
+      ],
+      [
+        "undelegated",
+        "deny"
+      ],
+      [
+        "external",
+        "deny"
+      ]
+    ],
+    "history_lead": [
+      [
+        "lead",
+        "allow"
+      ],
+      [
+        "undelegated",
+        "deny"
+      ],
+      [
+        "external",
+        "deny"
+      ]
+    ],
+    "history_row": [
+      [
+        "row",
+        "allow"
+      ],
+      [
+        "undelegated",
+        "deny"
+      ],
+      [
+        "external",
+        "deny"
+      ]
+    ],
+    "restricted": [
+      [
+        "lead",
+        "deny"
+      ],
+      [
+        "undelegated",
+        "deny"
+      ],
+      [
+        "external",
+        "deny"
+      ]
+    ]
+  },
+  "editor_url_template": "/projects/{project_id}/workpapers/{wp_id}/edit",
+  "render_config_path_template": "/api/workpapers/{wp_id}/render-config",
+  "external_not_found_message": "资源不存在或不可访问"
+}

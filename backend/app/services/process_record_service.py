@@ -92,7 +92,8 @@ class AttachmentLinkService:
     ) -> list[dict[str, Any]]:
         """获取底稿关联的附件列表"""
         stmt = sa.text(
-            "SELECT a.id, a.file_name, a.file_size, a.file_type, a.created_at "
+            "SELECT a.id, a.file_name, a.file_size, a.file_type, a.created_at, "
+            "a.ocr_status, a.ocr_text "
             "FROM attachments a "
             "WHERE a.reference_type = 'working_paper' "
             "AND a.reference_id = :wp_id "
@@ -109,6 +110,8 @@ class AttachmentLinkService:
                 "file_size": r.file_size,
                 "file_type": r.file_type,
                 "created_at": r.created_at.isoformat() if r.created_at else None,
+                "ocr_status": r.ocr_status,
+                "ocr_text": r.ocr_text,
             }
             for r in rows
         ]
@@ -123,7 +126,7 @@ class AttachmentLinkService:
             "SELECT a.reference_id as wp_id, w.wp_code, w.wp_name "
             "FROM attachments a "
             "LEFT JOIN wp_index w ON w.id = ("
-            "  SELECT wp_index_id FROM working_papers WHERE id = a.reference_id LIMIT 1"
+            "  SELECT wp_index_id FROM working_paper WHERE id = a.reference_id LIMIT 1"
             ") "
             "WHERE a.id = :att_id "
             "AND a.reference_type = 'working_paper' "
@@ -146,15 +149,45 @@ class AttachmentLinkService:
         attachment_id: UUID,
         wp_id: UUID,
     ) -> bool:
-        """将附件关联到底稿"""
+        """将附件关联到底稿（reference 兼容写 + 权威链表双写）。
+
+        保留 ``attachments.reference_*`` 写入（1:1 兼容路径）；随后幂等写入
+        ``attachment_working_paper``（权威真源）。权威写入失败 fail-open：不阻断
+        reference UPDATE，仅记 warning。
+
+        reference 使用 ORM ``UPDATE``（避免 raw SQL 在 SQLite 下 UUID 表征不一致）；
+        生产 PG 行为与原先 raw UPDATE 等价。
+
+        spec: attachment-workpaper-linkage-convergence Task 2.1
+        """
+        from app.models.attachment_models import Attachment
+
         await db.execute(
-            sa.text(
-                "UPDATE attachments SET reference_type = 'working_paper', "
-                "reference_id = :wp_id WHERE id = :att_id"
-            ),
-            {"wp_id": str(wp_id), "att_id": str(attachment_id)},
+            sa.update(Attachment)
+            .where(Attachment.id == attachment_id)
+            .values(reference_type="working_paper", reference_id=wp_id)
         )
         await db.flush()
+
+        # 双写权威关联真源（fail-open）
+        try:
+            from app.services.attachment_service import AttachmentService
+
+            await AttachmentService(db).ensure_wp_link(
+                attachment_id,
+                wp_id,
+                association_type="evidence",
+            )
+        except Exception:
+            from app.services.attachment_wp_fail_open import log_awp_fail_open
+
+            log_awp_fail_open(
+                "awp_dual_write_fail_open",
+                attachment_id=attachment_id,
+                wp_id=wp_id,
+                path="linkAttachment",
+            )
+
         return True
 
 

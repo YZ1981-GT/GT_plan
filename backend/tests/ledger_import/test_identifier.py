@@ -159,12 +159,14 @@ class TestLevel2Headers:
         # Check column tiers
         tier_map = {cm.column_header: cm.column_tier for cm in result.column_mappings}
 
-        # Key columns for balance
+        # 年度语义（spec balance-import-annual-column-semantics）：
+        # 期末（净额）与 account_code 为关键列；期初/本期（月度维度）为推荐列。
         assert tier_map.get("科目编码") == "key"
-        assert tier_map.get("期初余额") == "key"
-        assert tier_map.get("本期借方") == "key"
-        assert tier_map.get("本期贷方") == "key"
         assert tier_map.get("期末余额") == "key"
+        # 月度列 → recommended（期初余额/本期借方/本期贷方）
+        assert tier_map.get("期初余额") == "recommended"
+        assert tier_map.get("本期借方") == "recommended"
+        assert tier_map.get("本期贷方") == "recommended"
 
         # Recommended column
         assert tier_map.get("科目名称") == "recommended"

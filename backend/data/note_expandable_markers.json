@@ -1,0 +1,72 @@
+{
+  "_source": "backend/wp_templates/**/*.xlsx 的「附注披露信息*」sheet（运行时权威目录）",
+  "_generator": "backend/scripts/diagnose/build_note_expandable_markers.py",
+  "_note": "六种可扩行标记写法的单一真源。顺序即匹配优先级（长串先于短串）。扫描脚本 fix_note_expandable_rows.py 与守卫 test_note_expandable_rows.py 共用本文件的 markers 与 match_marker()，禁止各写一份。",
+  "_spec": "note-template-columns-and-legacy-snapshot-closure R11.1 / Property 34",
+  "markers": [
+    "可无限量添加行",
+    "......",
+    "……",
+    "可改名",
+    "预留",
+    "…"
+  ],
+  "label_markers": [
+    "可无限量添加行",
+    "......",
+    "……",
+    "预留",
+    "…"
+  ],
+  "label_marker_excluded": {
+    "可改名": "源模板里只作示例行名后缀出现（如 `项目1（可改名）`，wp_templates/G/G4 债权投资.xlsx!附注披露信息（上市公司）!A9），语义是「行名可改」而非「此处可增行」；标 expandable 会隐藏合法数据行。"
+  },
+  "files_scanned": 351,
+  "disclosure_sheets_scanned": 154,
+  "source_hits": {
+    "可无限量添加行": 23,
+    "......": 6,
+    "……": 146,
+    "可改名": 24,
+    "预留": 36,
+    "…": 7
+  },
+  "source_ref": {
+    "可无限量添加行": {
+      "path": "wp_templates/D/D1 应收票据.xlsx",
+      "sheet": "附注披露信息（上市公司）",
+      "cell": "A18",
+      "text": "可无限量添加行"
+    },
+    "……": {
+      "path": "wp_templates/D/D1 应收票据.xlsx",
+      "sheet": "附注披露信息（国企）",
+      "cell": "A38",
+      "text": "  ……"
+    },
+    "......": {
+      "path": "wp_templates/D/D4-1至D4-4 营业收入 - 审定表明细表（Leap-常规程序）.xlsx",
+      "sheet": "附注披露信息（上市公司）",
+      "cell": "A27",
+      "text": "......"
+    },
+    "…": {
+      "path": "wp_templates/E/E1-1至E1-11 货币资金- 审定表明细表（Leap-常规程序）.xlsx",
+      "sheet": "附注披露信息(国企)",
+      "cell": "A22",
+      "text": "…"
+    },
+    "可改名": {
+      "path": "wp_templates/G/G4 债权投资.xlsx",
+      "sheet": "附注披露信息（上市公司）",
+      "cell": "A9",
+      "text": "项目1（可改名）"
+    },
+    "预留": {
+      "path": "wp_templates/G/G4 债权投资.xlsx",
+      "sheet": "附注披露信息（上市公司）",
+      "cell": "A37",
+      "text": "【15号文第十九条（十一）】披露减值输入值、假设及信用风险是否显著增加的判断依据。「其中」默认1行+下方预留行；请在预留区内填写或插入行，勿改父行SUM起止边界。"
+    }
+  }
+}

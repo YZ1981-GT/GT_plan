@@ -185,7 +185,7 @@ async def create_template(
     await db.execute(
         sql_text(
             "INSERT INTO review_templates (id, title, content, applicable_cycles, priority_tag, use_count, created_by, is_deleted, created_at, updated_at) "
-            "VALUES (:id, :title, :content, :cycles::jsonb, :tag, 0, :uid, FALSE, :now, :now)"
+            "VALUES (:id, :title, :content, CAST(:cycles AS jsonb), :tag, 0, :uid, FALSE, :now, :now)"
         ),
         {
             "id": str(template_id),
@@ -238,7 +238,7 @@ async def update_template(
     await db.execute(
         sql_text(
             "UPDATE review_templates SET title = :title, content = :content, "
-            "applicable_cycles = :cycles::jsonb, priority_tag = :tag, updated_at = :now "
+            "applicable_cycles = CAST(:cycles AS jsonb), priority_tag = :tag, updated_at = :now "
             "WHERE id = :id"
         ),
         {
@@ -343,7 +343,7 @@ async def seed_review_templates(db: AsyncSession) -> int:
         await db.execute(
             sql_text(
                 "INSERT INTO review_templates (id, title, content, applicable_cycles, priority_tag, use_count, is_deleted, created_at, updated_at) "
-                "VALUES (:id, :title, :content, :cycles::jsonb, :tag, 0, FALSE, NOW(), NOW())"
+                "VALUES (:id, :title, :content, CAST(:cycles AS jsonb), :tag, 0, FALSE, NOW(), NOW())"
             ),
             {
                 "id": str(uuid.uuid4()),

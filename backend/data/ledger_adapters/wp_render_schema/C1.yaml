@@ -1,0 +1,130 @@
+# backend/data/ledger_adapters/wp_render_schema/C1.yaml
+# C1 企业层面控制测试 — 专属组件渲染 schema（元数据/降级；主渲染走专属组件 c1-entity-level-control）
+# Requirements: c1-entity-level-control R1/R2/R3/R4
+# Template: C1 企业层面控制测试.xlsx（11 内容 sheet + 1 GT_Custom 元数据）
+# Phase0 实测：主程序表按源模板九段（一~九）分组，非 COSO 五段；C1-4-4 含 19 借贷勾稽公式。
+
+wp_code: C1
+wp_name: 企业层面控制测试
+component_type: c1-entity-level-control
+template_path: backend/wp_templates/C/C1 企业层面控制测试.xlsx
+template_version: v2025-R5
+applicable_standards: [soe_standalone, listed_standalone, soe_consolidated, listed_consolidated]
+description: |
+  企业层面控制测试（整合审计适用）。评价被审计单位 COSO 五要素派生的
+  九段测试程序（控制环境/风险评估/监督/监控业务单元/信息与沟通/财务报告/
+  对业务层面控制的影响/年终程序/关联方相关内容）。
+  数据持久化在 checklist_responses（item_id 前缀 C1-），零新表零新端点。
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# sheetName v-if 分发表（键 = 源 xlsx tab 名原文，必须完全一致）
+# 由前端 GtC1EntityControl 按 sheetName 分发到各渲染模式；无效 sheetName 回退 program。
+# ═══════════════════════════════════════════════════════════════════════════════
+
+sheets:
+  - sheet_name: C1 企业层面控制测试程序表
+    render_mode: program            # 九段程序中控台（复用 GtAProgramConsole）
+    default: true
+  - sheet_name: C1-1 企业层面控制测试示例1
+    render_mode: example            # 只读示例（供参考）
+  - sheet_name: C1-2 企业层面控制测试示例2
+    render_mode: example
+  - sheet_name: C1-3企业层面控制测试示例3   # 注意：C1-3 后无空格
+    render_mode: example
+  - sheet_name: GT_Custom
+    render_mode: hidden             # 致同内部元数据，不渲染
+  - sheet_name: C1-4企业层面内控测试示例4-财务报告内部控制
+    render_mode: fr-summary         # 财报内控关键控制汇总（6 项）
+  - sheet_name: C1-4-1企业层面内控测试示例4
+    render_mode: process-record
+  - sheet_name: C1-4-2企业层面内控测试示例4
+    render_mode: process-record
+  - sheet_name: C1-4-3企业层面内控测试示例4
+    render_mode: process-record
+  - sheet_name: C1-4-4企业层面内控测试示例4
+    render_mode: process-record-sample   # 含 19 公式借贷勾稽样本表
+  - sheet_name: C1-4-5企业层面内控测试示例4
+    render_mode: process-record
+  - sheet_name: C1-4-6企业层面内控测试示例4
+    render_mode: process-record
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 主程序表九段分组（Phase0 实测切分；bu/rp 支持整段适用性裁剪）
+# slug 供 item_id 与前端 key 使用：C1-{slug}-{step}-applicable / -executor / -result / -index
+# ═══════════════════════════════════════════════════════════════════════════════
+
+section_groups:
+  - { slug: ce, order: 1, title: 控制环境, default_applicable: true }
+  - { slug: ra, order: 2, title: 风险评估, default_applicable: true }
+  - { slug: mo, order: 3, title: 监督, default_applicable: true }
+  - { slug: bu, order: 4, title: 监控业务单元, default_applicable: false, note: 集团审计适用 }
+  - { slug: ic, order: 5, title: 信息与沟通, default_applicable: true }
+  - { slug: fr, order: 6, title: 财务报告, default_applicable: true }
+  - { slug: el, order: 7, title: 对业务层面控制的影响, default_applicable: true }
+  - { slug: ye, order: 8, title: 年终程序, default_applicable: true }
+  - { slug: rp, order: 9, title: 关联方相关内容, default_applicable: false, note: 有关联方交易适用 }
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# C1-4-4 会计分录人工授权测试样本表 — 借贷勾稽（只读派生列，不可手工覆盖）
+# 列映射：date=日期 account=账户编码 ref=引用 desc=交易描述 debit=借方金额 credit=贷方金额
+# 勾稽本质：Σ借方 = Σ贷方（源模板 19 公式镜像/小计）→ useC1SampleEngine.calcSampleBalance
+# ═══════════════════════════════════════════════════════════════════════════════
+
+sample_table:
+  sheet: C1-4-4企业层面内控测试示例4
+  columns:
+    - { field: date, label: 日期, type: text }
+    - { field: account, label: 账户编码, type: text }
+    - { field: ref, label: 引用, type: text }
+    - { field: desc, label: 交易描述, type: textarea }
+    - { field: debit, label: 借方金额, type: number, unit: 元 }
+    - { field: credit, label: 贷方金额, type: number, unit: 元 }
+  derived:
+    - { field: debit_total, label: 借方合计, formula: "SUM(debit)", readonly: true, source: "源模板 C1-4-4 借贷勾稽公式" }
+    - { field: credit_total, label: 贷方合计, formula: "SUM(credit)", readonly: true, source: "源模板 C1-4-4 借贷勾稽公式" }
+    - { field: balanced, label: 借贷平衡, formula: "debit_total == credit_total", readonly: true }
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 点选枚举字典（Requirement 9.1：判断/枚举字段一律点选，减少手打）
+# ═══════════════════════════════════════════════════════════════════════════════
+
+dictionaries:
+  applicable_dict:
+    - { value: Y, label: 适用 }
+    - { value: N, label: 不适用 }
+  test_method_dict:               # 多选（询问/观察/检查/重新执行/抽样）
+    - { value: inquiry, label: 询问 }
+    - { value: observation, label: 观察 }
+    - { value: inspection, label: 检查 }
+    - { value: reperformance, label: 重新执行 }
+    - { value: sampling, label: 抽样 }
+  frequency_dict:
+    - { value: monthly, label: 每月一次 }
+    - { value: quarterly, label: 每季一次 }
+    - { value: annually, label: 每年一次 }
+    - { value: on_demand, label: 根据需要 }
+  conclusion_dict:
+    - { value: effective, label: 有效 }
+    - { value: partially_effective, label: 部分有效 }
+    - { value: ineffective, label: 无效 }
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 跨底稿引用（GtIndexChip：程序表索引列 + 缺陷回写 A14 + 结论联动 B50）
+# ═══════════════════════════════════════════════════════════════════════════════
+
+cross_refs:
+  - ref_id: CW-C1-001
+    target_wp: A14
+    description: '识别的企业层面控制缺陷 → A14 缺陷评价底稿（带入缺陷摘要）'
+    severity: info
+    direction: outbound
+  - ref_id: CW-C1-002
+    target_wp: B50
+    description: '企业层面控制整体结论 → B50 风险评估（EventBus 订阅）'
+    severity: info
+    direction: outbound
+  - ref_id: CW-C1-003
+    target_wp: C21-1
+    description: '控制缺陷汇总 → C21-1 缺陷汇总（过程记录/样本索引引用）'
+    severity: info
+    direction: outbound

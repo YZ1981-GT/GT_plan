@@ -1,0 +1,68 @@
+{
+  "projectId": "0ec33ac9-3de5-4e65-b3bf-f9dccd7b2a49",
+  "recordedAt": "2026-09-08T16:42:02.733Z",
+  "denominator": [
+    "html",
+    "univer",
+    "onlyoffice",
+    "grid",
+    "word"
+  ],
+  "matrix": [
+    {
+      "host": "html",
+      "wp_code": "B50-1",
+      "wp_id": "68b35347-4e3a-43aa-a91d-c611149df9d2",
+      "status": "reachable",
+      "sheet_types": [
+        "h-static-doc",
+        "h-static-doc"
+      ]
+    },
+    {
+      "host": "univer",
+      "wp_code": "A1-13",
+      "wp_id": "085ae719-d662-4e93-a282-a03c407cf871",
+      "status": "reachable",
+      "sheet_types": [
+        "univer",
+        "univer",
+        "univer",
+        "univer",
+        "univer"
+      ]
+    },
+    {
+      "host": "onlyoffice",
+      "wp_code": "A14-4",
+      "wp_id": "342e8635-0a43-4c9a-b656-b1d7c879ef66",
+      "status": "reachable",
+      "sheet_types": [
+        "onlyoffice-sheet",
+        "h-static-doc",
+        "h-static-doc",
+        "h-static-doc",
+        "d-form-table",
+        "h-static-doc",
+        "h-static-doc",
+        "h-static-doc"
+      ]
+    },
+    {
+      "host": "grid",
+      "wp_code": "",
+      "wp_id": "",
+      "status": "skipped",
+      "reason": "no reachable representative in project inventory this run"
+    },
+    {
+      "host": "word",
+      "wp_code": "A26-1",
+      "wp_id": "94a6056e-d533-4965-ae4e-bce9641d9342",
+      "status": "reachable",
+      "sheet_types": [
+        "word-template"
+      ]
+    }
+  ]
+}

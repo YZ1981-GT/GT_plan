@@ -1,0 +1,5 @@
+{
+  "admin_sees_all": true,
+  "lead_only_delegated": true,
+  "restricted_empty": true
+}

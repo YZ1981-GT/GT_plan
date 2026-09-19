@@ -1,0 +1,142 @@
+{
+  "script": "e2e/g4-1-g7-unified-path.spec.ts",
+  "captured_at": "2026-09-12T04:38:03.635Z",
+  "scope": {
+    "project_id": "2aa00f57-1df4-4fe8-9840-2d65d0fd8749",
+    "wp_id": "354e060f-15fa-41f0-8632-320082a54ed6",
+    "entry_id": "xlsx/gt-g7-long-term-equity-main"
+  },
+  "predicates": {
+    "user_sync_requests": [
+      {
+        "method": "GET",
+        "path": "/api/projects/2aa00f57-1df4-4fe8-9840-2d65d0fd8749/workpapers/354e060f-15fa-41f0-8632-320082a54ed6/sync/entries/xlsx/gt-g7-long-term-equity-main/store-projection",
+        "status": 200
+      },
+      {
+        "method": "POST",
+        "path": "/api/projects/2aa00f57-1df4-4fe8-9840-2d65d0fd8749/workpapers/354e060f-15fa-41f0-8632-320082a54ed6/sync/entries/xlsx/gt-g7-long-term-equity-main/pending-mutations",
+        "status": 200
+      },
+      {
+        "method": "POST",
+        "path": "/api/projects/2aa00f57-1df4-4fe8-9840-2d65d0fd8749/workpapers/354e060f-15fa-41f0-8632-320082a54ed6/sync/entries/xlsx/gt-g7-long-term-equity-main/materialize",
+        "status": 200
+      }
+    ],
+    "forcesave_hits": [
+      {
+        "method": "POST",
+        "path": "/api/projects/2aa00f57-1df4-4fe8-9840-2d65d0fd8749/workpapers/354e060f-15fa-41f0-8632-320082a54ed6/sync/entries/xlsx/gt-g7-long-term-equity-main/rooms/85f62406-a95f-4b77-a8bf-bb12fae136f3/forcesave",
+        "status": 202
+      }
+    ],
+    "d2_sync_hits": 0,
+    "callback_url_keys": [
+      "doc_key",
+      "generation",
+      "room_id",
+      "route_credential_id",
+      "route_token"
+    ],
+    "callback_url_redacted": "http://host.docker.internal:9980/api/workpaper-sync/rooms/85f62406-a95f-4b77-a8bf-bb12fae136f3/onlyoffice-callback?room_id=%3Credacted%3E&generation=%3Credacted%3E&doc_key=%3Credacted%3E&route_credential_id=%3Credacted%3E&route_token=%3Credacted%3E",
+    "host_mounted": true,
+    "confirm_descriptor_200": true,
+    "forcesave_clicked": true,
+    "oo_cell_dirty_attempted": true,
+    "host_dirty_before_forcesave": false,
+    "forcesave_dispatch_error": null,
+    "forcesave_cs_error": 0,
+    "forcesave_cs_outcome": "accepted",
+    "forcesave_callback_expected": true,
+    "forcesave_http_status": 202,
+    "forcesave_error_code": null,
+    "forcesave_body_keys": [
+      "forcesave_request_id",
+      "operation_id",
+      "request_sequence",
+      "state",
+      "poll_after_ms",
+      "replayed",
+      "dispatch_error",
+      "cs_error",
+      "cs_outcome",
+      "callback_expected"
+    ],
+    "materialize_room_id": "85f62406-a95f-4b77-a8bf-bb12fae136f3",
+    "materialize_has_jwt_token": true,
+    "doc_editor_called": false,
+    "doc_editor_has_root_token": false,
+    "doc_editor_document_mutable": false,
+    "host_status": "",
+    "host_error": "",
+    "confirm_forcesave_error": null,
+    "html_dom_roundtrip": {
+      "attempted": true,
+      "marker": "88790480",
+      "switched_to_html": true,
+      "marker_visible": true,
+      "store_mirrored": true,
+      "dom_probe": {
+        "input_or_text_hits": 1,
+        "tracked_operation_id": "39568e81-692d-4cad-abba-75f087636534"
+      }
+    },
+    "oo_write_target": "C64",
+    "oo_cell_edit_probe": {
+      "ok": true,
+      "target": "C64",
+      "attempt": 1,
+      "hasInsert": "function",
+      "hasEnter": "function",
+      "hasPaste": "function",
+      "hasFind": "function",
+      "sheetNames": [
+        "底稿目录",
+        "长期股权投资实质性程序表G7A",
+        "长期股权投资审定表G7-1",
+        "附注披露信息（上市公司）",
+        "附注披露信息（国企）",
+        "明细表G7-2",
+        "调整分录汇总G7-3",
+        "被投资单位基本信息G7-4",
+        "被投资单位财务信息（合营、联营）G7-5",
+        "被投资公司会计政策G7-6",
+        "长期股权投资初始判断G7-7",
+        "子公司初始计量测试（同控）G7-8",
+        "子公司初始计量测试（非同控）G7-9",
+        "子公司后续计量测试表G7-10",
+        "处置子公司测试表（不包含一揽子交易）G7-11",
+        "处置子公司测试表（一揽子交易）G7-12",
+        "合营、联营企业投资成本测试表G7-13",
+        "权益法测算表G7-14",
+        "权益法未实现内部交易抵销测算表G7-15",
+        "未确认投资损失测试表G7-16",
+        "减值测试表G7-17",
+        "凭证检查表G7-18",
+        "_GT_SYNC"
+      ],
+      "activeSheet": "附注披露信息（国企）",
+      "inserted": true,
+      "entered": true,
+      "pasted": true,
+      "closeRet": true,
+      "closed": true,
+      "cellText": "88790480",
+      "modified": true,
+      "saveRet": true,
+      "saved": true,
+      "cellTextAfterSave": "88790480"
+    }
+  },
+  "notes": [
+    "token/JWT/route_credential 值已脱敏",
+    "OO 写格：Asc.editor 写受管 C64(流动资产/公司1/期末)；权威判据是 forcesave 响应 cs_error（0=有变更，4=no_changes）",
+    "application applied / revision+1 由同目录 DB 核查脚本补齐",
+    "§9.6 条件 6：切回结构化视图后 DOM 应出现 marker（getByDisplayValue / virtual text / input.value，排除搜索框）",
+    "DocEditor document 必须是可变纯对象（readonly Proxy 会导致 document.token 赋值被吞 → -20）"
+  ],
+  "auth_probe": {
+    "has_token": true
+  }
+}

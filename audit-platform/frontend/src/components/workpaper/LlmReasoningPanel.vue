@@ -161,7 +161,7 @@ const confidenceColor = computed(() => {
 }
 
 .reasoning-text {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   line-height: 1.7;
   color: var(--el-text-color-primary);
   background-color: var(--el-fill-color-lighter, #f5f7fa);
@@ -177,7 +177,7 @@ const confidenceColor = computed(() => {
 
 .reference-list li {
   padding: 4px 0;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   display: flex;
   gap: 6px;
   align-items: center;

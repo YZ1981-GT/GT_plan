@@ -1,0 +1,381 @@
+/**
+ * D4 IPO 检查表（D4-25/26/27/28）列规格 + 公式真源 + 投影纯函数 —— 唯一结构真源。
+ *
+ * spec: d4-ipo-checklist-dual-mode-writeback-and-formula · Wave 2 · Task 4/6/9
+ *
+ * 🔴 唯一真源：四个 .vue 组件只读本模块，禁止各自定义列数组/公式字面量。
+ * 🔴 label 序列逐列 == 后端 `_SHEET_HEADERS[sheet]`（导入导出锚点，三向守卫钉死，
+ *    见 backend/tests/test_ipo_checklist_column_contract.py）。
+ * 🔴 列 label 与源模板表头单元格逐列一致（含全角标点，归一化规则见守卫）。
+ *    源模板真源 = backend/wp_templates/D/D4-22至D4-32营业收入-IPO 上市 新三板 重组 舞弊应对.xlsx。
+ *
+ * 数值来自 openpyxl 实测复算而非预期：D4-25=13 / D4-26=19(14主+5子) / D4-27=18 / D4-28=15(9主+5子+索引号)。
+ */
+
+export type ChecklistColumnType =
+  | 'text'
+  | 'number'
+  | 'amount'
+  | 'percent'
+  | 'select'
+  | 'checkbox'
+
+export interface ChecklistColumnSpec {
+  /** 稳定 key，禁用 label（会撞键）。投影/公式/覆盖全部按 key。 */
+  key: string
+  /** 中文 label，与源模板表头单元格逐字一致（归一化后 == 后端 _SHEET_HEADERS）。 */
+  label: string
+  /** 父组（两级表头），无父组为 null。 */
+  group: string | null
+  type: ChecklistColumnType
+  /** type='select' 专用点选项。 */
+  options?: readonly string[]
+  width?: number
+  /** 表内计算派生列（默认只读，禁手填；手填后锁定为手填值）。 */
+  derived?: boolean
+  /** 序号列（由 seq 派生，不参与投影）。 */
+  seqColumn?: boolean
+}
+
+export interface ChecklistSheetSpec {
+  sheetCode: 'D4-25' | 'D4-26' | 'D4-27' | 'D4-28'
+  /** 源 xlsx tab 全名（OO sheet-name 用，必须逐字一致）。 */
+  sheetName: string
+  /** 表头行号（1-based）。单级 [n]，两级 [main, sub]。 */
+  headerRows: number[]
+  /** 数据区首行（1-based）。 */
+  dataStartRow: number
+  /** 结论/审计说明区锚点单元格（可选）。 */
+  noteAnchor?: string
+  /** 新增行必须先输入的命名字段 key（ElMessageBox.prompt）。 */
+  nameColumnKey: string
+  columns: readonly ChecklistColumnSpec[]
+}
+
+// ── D4-25 经销商检查（单级表头 row11，13 列）─────────────────────────────────
+const D4_25_COLUMNS: readonly ChecklistColumnSpec[] = [
+  { key: 'seq', label: '序号', group: null, type: 'number', width: 55, seqColumn: true },
+  { key: 'customerName', label: '客户名称', group: null, type: 'text', width: 130 },
+  { key: 'dealer', label: '经销商', group: null, type: 'text', width: 100 },
+  { key: 'salesQty', label: '本期销售数量', group: null, type: 'number', width: 100 },
+  { key: 'salesAmount', label: '本期销售金额', group: null, type: 'amount', width: 120 },
+  { key: 'proportion', label: '占同类交易比例', group: null, type: 'percent', width: 110, derived: true },
+  { key: 'arBalance', label: '期末应收账款余额', group: null, type: 'amount', width: 130 },
+  { key: 'isRelated', label: '是否关联方', group: null, type: 'select', options: ['是', '否'], width: 90 },
+  { key: 'entityType', label: '个人/企业', group: null, type: 'select', options: ['个人', '企业'], width: 90 },
+  { key: 'expenseBearer', label: '销售费用承担方式', group: null, type: 'text', width: 120 },
+  { key: 'subsidy', label: '补贴或返利', group: null, type: 'select', options: ['是', '否'], width: 100 },
+  { key: 'terminalSalesAmount', label: '终端销售金额', group: null, type: 'amount', width: 120 },
+  { key: 'remark', label: '备注', group: null, type: 'text', width: 120 },
+]
+
+// ── D4-26 境外销售收入检查（两级表头 row11/12，14 主 + 5 子）──────────────────
+const D4_26_PROGRAM_GROUP = '核查程序执行情况'
+const D4_26_COLUMNS: readonly ChecklistColumnSpec[] = [
+  { key: 'customerName', label: '客户名称', group: null, type: 'text', width: 130 },
+  { key: 'country', label: '所在国家/地区', group: null, type: 'text', width: 110 },
+  { key: 'productType', label: '产品种类', group: null, type: 'text', width: 100 },
+  { key: 'businessMode', label: '业务模式', group: null, type: 'select', options: ['直销客户', '经销商'], width: 110 },
+  { key: 'salesAmount', label: '本期销售金额', group: null, type: 'amount', width: 120 },
+  { key: 'proportion', label: '占同类交易比例', group: null, type: 'percent', width: 110, derived: true },
+  { key: 'tradeMode', label: '贸易模式', group: null, type: 'select', options: ['EXW', 'FOB', 'CIF'], width: 100 },
+  { key: 'tradeTerms', label: '主要贸易条款', group: null, type: 'text', width: 130 },
+  { key: 'settlementMode', label: '出口结算模式', group: null, type: 'select', options: ['汇款', '托收', '信用证', '银行保函'], width: 120 },
+  { key: 'hasThirdPartyPayment', label: '是否存在第三方回款', group: null, type: 'select', options: ['是', '否'], width: 120 },
+  { key: 'thirdPartyReason', label: '第三方回款原因', group: null, type: 'text', width: 130 },
+  { key: 'confirmedSalesAmount', label: '核查程序确认的销售金额', group: null, type: 'amount', width: 150 },
+  { key: 'difference', label: '差异', group: null, type: 'amount', width: 110, derived: true },
+  { key: 'differenceReason', label: '差异原因分析', group: null, type: 'text', width: 130 },
+  // 5 二级列（父组「核查程序执行情况」，源 xlsx O12:S12）
+  { key: 'checkFieldVisit', label: '实地走访', group: D4_26_PROGRAM_GROUP, type: 'checkbox', width: 80 },
+  { key: 'checkTransConfirm', label: '交易函证', group: D4_26_PROGRAM_GROUP, type: 'checkbox', width: 80 },
+  { key: 'checkCustomsConfirm', label: '海关函证', group: D4_26_PROGRAM_GROUP, type: 'checkbox', width: 80 },
+  { key: 'checkDeclaration', label: '核对报关单', group: D4_26_PROGRAM_GROUP, type: 'checkbox', width: 90 },
+  { key: 'checkEportData', label: '电子口岸数据查询', group: D4_26_PROGRAM_GROUP, type: 'checkbox', width: 110 },
+]
+
+// ── D4-27 识别未披露的关联方（单级表头 row14，18 列，含 10 身份属性 checkbox）───
+const D4_27_COLUMNS: readonly ChecklistColumnSpec[] = [
+  { key: 'seq', label: '序号', group: null, type: 'number', width: 55, seqColumn: true },
+  { key: 'name', label: '姓名', group: null, type: 'text', width: 110 },
+  { key: 'isPersonalCustomer', label: '个人客户', group: null, type: 'checkbox', width: 80 },
+  { key: 'isCustomerLegal', label: '客户法人', group: null, type: 'checkbox', width: 80 },
+  { key: 'isContractSigner', label: '合同签订人', group: null, type: 'checkbox', width: 90 },
+  { key: 'isExecRelative', label: '高管亲属', group: null, type: 'checkbox', width: 80 },
+  { key: 'isFinanceDept', label: '财务部门', group: null, type: 'checkbox', width: 80 },
+  { key: 'isMgmtDept', label: '管理部门', group: null, type: 'checkbox', width: 80 },
+  { key: 'isTechDept', label: '技术部门', group: null, type: 'checkbox', width: 80 },
+  { key: 'isProductionDept', label: '生产部门', group: null, type: 'checkbox', width: 80 },
+  { key: 'isMarketingDept', label: '营销部门', group: null, type: 'checkbox', width: 80 },
+  { key: 'isOther', label: '其他', group: null, type: 'checkbox', width: 70 },
+  { key: 'total', label: '总计', group: null, type: 'number', width: 70, derived: true },
+  { key: 'isDuplicateName', label: '重名(Y/N)', group: null, type: 'select', options: ['Y', 'N'], width: 90 },
+  { key: 'shareholderExecRelative', label: '公司股东/高管/亲属/员工', group: null, type: 'text', width: 150 },
+  { key: 'annualSales', label: '年度销售额', group: null, type: 'amount', width: 120 },
+  { key: 'note', label: '说明', group: null, type: 'text', width: 150 },
+  { key: 'indexNo', label: '索引号', group: null, type: 'text', width: 90 },
+]
+
+// ── D4-28 客户信息核查清单（两级表头 row12/13，9 主 + 5 子 + 索引号）────────────
+const D4_28_METHOD_GROUP = '核查方式（√）'
+const D4_28_COLUMNS: readonly ChecklistColumnSpec[] = [
+  { key: 'seq', label: '序号', group: null, type: 'number', width: 55, seqColumn: true },
+  { key: 'customerName', label: '客户名称', group: null, type: 'text', width: 130 },
+  { key: 'selectionReason', label: '选取原因', group: null, type: 'text', width: 130 },
+  { key: 'salesAmount', label: '销售金额', group: null, type: 'amount', width: 120 },
+  { key: 'salesProportion', label: '占总交易比重', group: null, type: 'percent', width: 100, derived: true },
+  { key: 'arBalance', label: '应收账款期末余额', group: null, type: 'amount', width: 130 },
+  { key: 'arProportion', label: '占期末余额比重', group: null, type: 'percent', width: 110, derived: true },
+  { key: 'contractLiabBalance', label: '合同负债期末余额', group: null, type: 'amount', width: 130 },
+  { key: 'contractLiabProportion', label: '占期末余额比重', group: null, type: 'percent', width: 110, derived: true },
+  // 5 二级列（父组「核查方式（√）」，源 xlsx J13:N13）
+  { key: 'methodBusinessInfo', label: '工商资料查询', group: D4_28_METHOD_GROUP, type: 'checkbox', width: 100 },
+  { key: 'methodInternet', label: '互联网信息查询', group: D4_28_METHOD_GROUP, type: 'checkbox', width: 110 },
+  { key: 'methodConfirmation', label: '函证', group: D4_28_METHOD_GROUP, type: 'checkbox', width: 70 },
+  { key: 'methodInterview', label: '视频、电话访谈', group: D4_28_METHOD_GROUP, type: 'checkbox', width: 100 },
+  { key: 'methodFieldVisit', label: '实地走访', group: D4_28_METHOD_GROUP, type: 'checkbox', width: 80 },
+  { key: 'indexNo', label: '索引号', group: null, type: 'text', width: 90 },
+]
+
+export const SHEET_SPECS: Record<string, ChecklistSheetSpec> = {
+  'D4-25': {
+    sheetCode: 'D4-25',
+    sheetName: '经销商检查D4-25',
+    headerRows: [11],
+    dataStartRow: 12,
+    noteAnchor: 'A23',
+    nameColumnKey: 'customerName',
+    columns: D4_25_COLUMNS,
+  },
+  'D4-26': {
+    sheetCode: 'D4-26',
+    sheetName: '境外销售收入检查D4-26',
+    headerRows: [11, 12],
+    dataStartRow: 13,
+    nameColumnKey: 'customerName',
+    columns: D4_26_COLUMNS,
+  },
+  'D4-27': {
+    sheetCode: 'D4-27',
+    sheetName: '识别未披露的关联方D4-27',
+    headerRows: [14],
+    dataStartRow: 15,
+    nameColumnKey: 'name',
+    columns: D4_27_COLUMNS,
+  },
+  'D4-28': {
+    sheetCode: 'D4-28',
+    sheetName: '客户信息核查清单D4-28',
+    headerRows: [12, 13],
+    dataStartRow: 14,
+    noteAnchor: 'A25',
+    nameColumnKey: 'customerName',
+    columns: D4_28_COLUMNS,
+  },
+}
+
+/** checkbox 列 key 集合（投影 1↔true 转换用）。 */
+export const CHECKBOX_COLUMNS: Record<string, readonly string[]> = Object.fromEntries(
+  Object.entries(SHEET_SPECS).map(([code, spec]) => [
+    code,
+    spec.columns.filter((c) => c.type === 'checkbox').map((c) => c.key),
+  ]),
+)
+
+/** 派生列 key 集合（表内计算，默认只读）。 */
+export const DERIVED_COLUMNS: Record<string, readonly string[]> = Object.fromEntries(
+  Object.entries(SHEET_SPECS).map(([code, spec]) => [
+    code,
+    spec.columns.filter((c) => c.derived).map((c) => c.key),
+  ]),
+)
+
+// ═══════════════════════════════════════════════════════════════════════════
+// 行记录类型：{ rowId, seq, ...columns.map(key) }
+// ═══════════════════════════════════════════════════════════════════════════
+export type ChecklistRow = Record<string, unknown> & { rowId: string; seq: number }
+
+// ═══════════════════════════════════════════════════════════════════════════
+// ⚠️ 这里**不再**有 rows ↔ OO 网格的投影函数（2026-09-19 复盘删除 `rowsToSheet` /
+//    `sheetToRows` / `truthyCheckbox` / `parseNumeric`）。别再加回来。
+//
+// 原因：投影的唯一真源在**后端** provider
+//   `backend/app/services/workpaper_sync/phase5_d4_ipo_checklist_sheets.py`
+//   （`build_store_projection` / `merge_projection_into_rows`）。四个组件走平台桥
+//   `useWorkpaperSyncBridge` + `readStoreProjection`，projection 由**服务端现算**
+//   （`workpaperSyncApi.ts` 明文："前端不得重造列 → stable-key 映射"，Requirement 6.1）。
+//
+// 被删的那两个函数在生产代码里**零调用方**，且其规则与后端**已经分叉**——留着是
+// 「看起来像真源的错真源」，谁照它接线就会引入真 bug：
+//   行定位：它按 `seq` 排序推网格行序 ／ 后端按 UUID 列 `row_from="row_identity"`（顺序无关）
+//   checkbox：它做 `true→1` 转换       ／ 后端 `value_type="text"` 原值照抄（无转换）
+//   空行：   它显式跳过全空行           ／ 后端要求 `rowId`，缺失直接抛错
+//   列定位： 它靠 `columns` 数组下标     ／ 后端用显式列字母 + `mapping_digest` 冻结
+//
+// AC 2.3/2.4 与 Property 6/7/8 的守卫已迁到生产路径：
+//   `backend/tests/workpaper_sync/test_d4_ipo_checklist_store_roundtrip.py`
+// ═══════════════════════════════════════════════════════════════════════════
+
+// ═══════════════════════════════════════════════════════════════════════════
+// 公式真源（IPO_FORMULA_PRESETS）—— 唯一公式字面量来源，组件只引用不定义。
+//   category='inter_sheet'  → 后端 resolver（Task 7 落地）
+//   category='intra_sheet'  → 前端公式引擎（Task 8），expression 引用 $col（列 key）
+// source_ref 全部指向源模板实测单元格。
+// ═══════════════════════════════════════════════════════════════════════════
+export interface IpoFormulaPreset {
+  sheetCode: 'D4-25' | 'D4-26' | 'D4-27' | 'D4-28'
+  rowKey: '*' | string
+  columnKey: string
+  category: 'inter_sheet' | 'intra_sheet'
+  resolver?: string
+  /**
+   * `category='inter_sheet'` 时必填：resolver 返回 dict 里承载本列值的**字段名**。
+   *
+   * 🔴 为什么必须显式声明、不能靠 columnKey 推导：后端 resolver 返回 **snake_case**
+   * （`sales_amount` / `ar_balance` / `contract_liab_balance` / `annual_sales`），
+   * 前端列 key 是 **camelCase**（`salesAmount` / `arBalance` / …），两侧命名风格不同；
+   * 且**一个 resolver 供多列**（`d4_28_customer_balances` 一次返销售/应收/合同负债三值），
+   * 列与字段是 N:1 关系，只有逐条声明才能确定「这一列取返回体的哪个字段」。
+   * 该映射是跨语言契约，由守卫断言字段名真实出现在对应 resolver 的返回体里。
+   */
+  resolverField?: string
+  expression?: string
+  dependsOn: readonly string[]
+  precision: number
+  sourceRef: string
+  reason: string
+}
+
+export const IPO_FORMULA_PRESETS: readonly IpoFormulaPreset[] = [
+  // D4-25 经销商检查
+  {
+    sheetCode: 'D4-25', rowKey: '*', columnKey: 'salesAmount', category: 'inter_sheet',
+    resolver: 'd4_25_dealer_sales', resolverField: 'sales_amount', dependsOn: ['customerName'], precision: 2,
+    sourceRef: '经销商检查D4-25!E11', reason: '按客户名称从 D4-2 收入明细取本期销售金额',
+  },
+  {
+    sheetCode: 'D4-25', rowKey: '*', columnKey: 'arBalance', category: 'inter_sheet',
+    resolver: 'd4_25_dealer_sales', resolverField: 'ar_balance', dependsOn: ['customerName'], precision: 2,
+    sourceRef: '经销商检查D4-25!G11', reason: '按客户名称从 D2-2 客户账龄取期末应收账款余额',
+  },
+  {
+    sheetCode: 'D4-25', rowKey: '*', columnKey: 'proportion', category: 'intra_sheet',
+    expression: '$salesAmount / SUM($salesAmount)', dependsOn: ['salesAmount'], precision: 4,
+    sourceRef: '经销商检查D4-25!F11', reason: '占同类交易比例 = 本行销售金额 / 全部行合计',
+  },
+  // D4-26 境外销售收入检查
+  {
+    sheetCode: 'D4-26', rowKey: '*', columnKey: 'salesAmount', category: 'inter_sheet',
+    resolver: 'd4_26_overseas_sales', resolverField: 'sales_amount', dependsOn: ['customerName'], precision: 2,
+    sourceRef: '境外销售收入检查D4-26!E11', reason: '按客户名称从境外销售明细取本期销售金额',
+  },
+  {
+    sheetCode: 'D4-26', rowKey: '*', columnKey: 'difference', category: 'intra_sheet',
+    expression: '$confirmedSalesAmount - $salesAmount', dependsOn: ['confirmedSalesAmount', 'salesAmount'], precision: 2,
+    sourceRef: '境外销售收入检查D4-26!M11', reason: '差异 = 核查程序确认的销售金额 − 本期销售金额',
+  },
+  {
+    sheetCode: 'D4-26', rowKey: '*', columnKey: 'proportion', category: 'intra_sheet',
+    expression: '$salesAmount / SUM($salesAmount)', dependsOn: ['salesAmount'], precision: 4,
+    sourceRef: '境外销售收入检查D4-26!F11', reason: '占同类交易比例 = 本行销售金额 / 全部行合计',
+  },
+  // D4-27 识别未披露的关联方
+  {
+    sheetCode: 'D4-27', rowKey: '*', columnKey: 'annualSales', category: 'inter_sheet',
+    resolver: 'd4_27_related_party_sales', resolverField: 'annual_sales', dependsOn: ['name'], precision: 2,
+    sourceRef: '识别未披露的关联方D4-27!P14', reason: '按姓名从客户维度销售明细取年度销售额',
+  },
+  {
+    sheetCode: 'D4-27', rowKey: '*', columnKey: 'total', category: 'intra_sheet',
+    expression:
+      '$isPersonalCustomer + $isCustomerLegal + $isContractSigner + $isExecRelative + $isFinanceDept + $isMgmtDept + $isTechDept + $isProductionDept + $isMarketingDept + $isOther',
+    dependsOn: [
+      'isPersonalCustomer', 'isCustomerLegal', 'isContractSigner', 'isExecRelative', 'isFinanceDept',
+      'isMgmtDept', 'isTechDept', 'isProductionDept', 'isMarketingDept', 'isOther',
+    ],
+    precision: 0,
+    sourceRef: '识别未披露的关联方D4-27!M15=SUM(C15:L15)', reason: '总计 = 10 个身份属性列勾选数之和（源模板内嵌 =SUM(C15:L15)）',
+  },
+  // D4-28 客户信息核查清单
+  {
+    sheetCode: 'D4-28', rowKey: '*', columnKey: 'salesAmount', category: 'inter_sheet',
+    resolver: 'd4_28_customer_balances', resolverField: 'sales_amount', dependsOn: ['customerName'], precision: 2,
+    sourceRef: '客户信息核查清单D4-28!D12', reason: '按客户名称从 D4-2 收入明细取销售金额',
+  },
+  {
+    sheetCode: 'D4-28', rowKey: '*', columnKey: 'arBalance', category: 'inter_sheet',
+    resolver: 'd4_28_customer_balances', resolverField: 'ar_balance', dependsOn: ['customerName'], precision: 2,
+    sourceRef: '客户信息核查清单D4-28!F12', reason: '按客户名称从 D2-2 客户账龄取应收账款期末余额',
+  },
+  {
+    sheetCode: 'D4-28', rowKey: '*', columnKey: 'contractLiabBalance', category: 'inter_sheet',
+    resolver: 'd4_28_customer_balances', resolverField: 'contract_liab_balance', dependsOn: ['customerName'], precision: 2,
+    sourceRef: '客户信息核查清单D4-28!H12', reason: '按客户名称从合同负债明细取合同负债期末余额',
+  },
+  {
+    sheetCode: 'D4-28', rowKey: '*', columnKey: 'salesProportion', category: 'intra_sheet',
+    expression: '$salesAmount / SUM($salesAmount)', dependsOn: ['salesAmount'], precision: 4,
+    sourceRef: '客户信息核查清单D4-28!E12', reason: '占总交易比重 = 本行销售金额 / 全部行合计',
+  },
+  {
+    sheetCode: 'D4-28', rowKey: '*', columnKey: 'arProportion', category: 'intra_sheet',
+    expression: '$arBalance / SUM($arBalance)', dependsOn: ['arBalance'], precision: 4,
+    sourceRef: '客户信息核查清单D4-28!G12', reason: '占期末余额比重 = 本行应收账款期末余额 / 全部行合计',
+  },
+  {
+    sheetCode: 'D4-28', rowKey: '*', columnKey: 'contractLiabProportion', category: 'intra_sheet',
+    expression: '$contractLiabBalance / SUM($contractLiabBalance)', dependsOn: ['contractLiabBalance'], precision: 4,
+    sourceRef: '客户信息核查清单D4-28!I12', reason: '合同负债占比 = 本行合同负债期末余额 / 全部行合计',
+  },
+]
+
+// ═══════════════════════════════════════════════════════════════════════════
+// 表间提取（inter_sheet）取数计划 —— 「哪个 resolver、带什么行级参数、回填哪些列」
+// 的唯一推导点。放在真源模块而不是 composable：组件/composable 只执行计划，不拼装。
+// ═══════════════════════════════════════════════════════════════════════════
+
+/** 一个 resolver 一次调用能回填的全部列（N:1 —— 如 D4-28 一次返销售/应收/合同负债三值）。 */
+export interface InterSheetFetchPlan {
+  /** 后端 `@auto_resolver` 注册名。 */
+  resolver: string
+  /** 行级参数取值所在的列 key（如 `customerName` / `name`）。 */
+  nameColumnKey: string
+  /** 该 resolver 负责的列：`columnKey` ← 返回体的 `resolverField`。 */
+  targets: ReadonlyArray<{ columnKey: string; resolverField: string; precision: number }>
+}
+
+/**
+ * 该 sheet 的 inter_sheet 取数计划（按 resolver 去重分组）。
+ *
+ * 🔴 按 resolver 分组而不是逐列各发一次请求：`d4_28_customer_balances` 一次返回三个值，
+ * 逐列发请求会把同一份查询跑 3 遍（3× DB 往返）。
+ *
+ * 缺 `resolver` / `resolverField` 的条目被跳过（守卫会在 CI 里把这种漏填打红，
+ * 运行时选择静默跳过而不是抛错 —— 取数是便利，不该让整张表打不开）。
+ */
+export function interSheetFetchPlans(sheetCode: string): InterSheetFetchPlan[] {
+  const byResolver = new Map<string, InterSheetFetchPlan>()
+  for (const p of IPO_FORMULA_PRESETS) {
+    if (p.sheetCode !== sheetCode || p.category !== 'inter_sheet') continue
+    if (!p.resolver || !p.resolverField) continue
+    const nameColumnKey = p.dependsOn[0]
+    if (!nameColumnKey) continue
+    const plan = byResolver.get(p.resolver) ?? {
+      resolver: p.resolver,
+      nameColumnKey,
+      targets: [] as Array<{ columnKey: string; resolverField: string; precision: number }>,
+    }
+    ;(plan.targets as Array<{ columnKey: string; resolverField: string; precision: number }>).push({
+      columnKey: p.columnKey,
+      resolverField: p.resolverField,
+      precision: p.precision,
+    })
+    byResolver.set(p.resolver, plan)
+  }
+  return [...byResolver.values()]
+}
+
+/** 该 sheet 全部由表间提取负责回填的列 key（供 UI 标注「自动取数列」）。 */
+export function interSheetColumnKeys(sheetCode: string): readonly string[] {
+  return interSheetFetchPlans(sheetCode).flatMap((p) => p.targets.map((t) => t.columnKey))
+}

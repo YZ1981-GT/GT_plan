@@ -13,7 +13,12 @@ from starlette.responses import Response
 
 
 # 跳过包装的路径前缀
-_SKIP_PATHS = ("/docs", "/redoc", "/openapi.json", "/wopi/", "/api/events/", "/api/message/stream")
+_SKIP_PATHS = ("/docs", "/redoc", "/openapi.json", "/wopi/", "/api/events/", "/api/message/stream", "/livez", "/readyz")
+
+# OnlyOffice callback 路径需精确跳过（OnlyOffice 协议要求原始 {"error": 0} 顶层格式，
+# 不能被 ApiResponse 信封包装）。底稿编辑端点路由为 ".../onlyoffice-callback"（连字符），
+# 交付中心旧端点为 ".../onlyoffice/callback"（斜杠），两种写法都需覆盖。
+_SKIP_CONTAINS = ("onlyoffice/callback", "onlyoffice-callback")
 
 
 class ResponseWrapperMiddleware(BaseHTTPMiddleware):
@@ -22,6 +27,9 @@ class ResponseWrapperMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next: RequestResponseEndpoint) -> Response:
         # 跳过文档路径
         if request.url.path.startswith(_SKIP_PATHS):
+            return await call_next(request)
+        # 跳过 OnlyOffice callback（OnlyOffice 要求原始 {"error": 0} 格式）
+        if any(seg in request.url.path for seg in _SKIP_CONTAINS):
             return await call_next(request)
 
         response = await call_next(request)

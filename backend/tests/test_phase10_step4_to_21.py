@@ -113,6 +113,37 @@ class TestCutoffTestService:
         result = await svc.run_cutoff_test(db, uuid4(), 2025, ["6001"])
         assert result["total_entries"] == 0
         assert "2025-12-31" in result["period_end"]
+        # 加性全量统计（Req5.4）
+        assert "stats" in result and result["stats"]["total_count"] == 0
+
+    @pytest.mark.asyncio
+    async def test_cutoff_test_empty_account_codes_returns_empty(self):
+        """account_codes 空 → 空集合（不返回全表），保持 Req1.5。早返回不触库。"""
+        from app.services.sampling_enhanced_service import CutoffTestService
+        db = AsyncMock()
+        db.execute = AsyncMock(side_effect=AssertionError("空科目不应触发查询"))
+        svc = CutoffTestService()
+        result = await svc.run_cutoff_test(db, uuid4(), 2025, [])
+        assert result["total_entries"] == 0
+        assert result["entries"] == []
+        assert result["stats"]["amount_total"] == "0"
+        db.execute.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_cutoff_test_custom_cutoff_date(self):
+        """显式 cutoff_date（非 12-31）→ period_end/window 据其计算（Req1.5/P3）。"""
+        from app.services.sampling_enhanced_service import CutoffTestService
+        db = AsyncMock()
+        mock_result = MagicMock()
+        mock_result.scalars.return_value.all.return_value = []
+        db.execute = AsyncMock(return_value=mock_result)
+        svc = CutoffTestService()
+        result = await svc.run_cutoff_test(
+            db, uuid4(), 2025, ["6001"], days_before=5, days_after=10,
+            cutoff_date="2025-06-30",
+        )
+        assert result["period_end"] == "2025-06-30"
+        assert result["window"] == "2025-06-25 ~ 2025-07-10"
 
 
 class TestAgingAnalysisService:

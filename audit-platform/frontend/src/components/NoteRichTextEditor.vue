@@ -10,6 +10,8 @@
             <el-dropdown-item command="h1">一级标题</el-dropdown-item>
             <el-dropdown-item command="h2">二级标题</el-dropdown-item>
             <el-dropdown-item command="h3">三级标题</el-dropdown-item>
+            <el-dropdown-item command="h4">四级标题</el-dropdown-item>
+            <el-dropdown-item command="h5">五级标题</el-dropdown-item>
             <el-dropdown-item command="p">正文</el-dropdown-item>
           </el-dropdown-menu>
         </template>
@@ -39,16 +41,10 @@
 
       <span class="gt-note-rte-divider" />
 
-      <!-- Table insert -->
-      <el-button size="small" class="gt-note-rte-btn" title="插入表格" @click="insertTable()">表格</el-button>
-
-      <!-- Color picker -->
-      <el-color-picker
-        v-model="fontColor"
-        size="small"
-        :predefine="predefineColors"
-        @change="onColorChange"
-      />
+      <!-- P2-8: Insert Table -->
+      <el-button size="small" class="gt-note-rte-btn" title="插入表格（3列2行）" @click="insertTable">
+        ☐ 表格
+      </el-button>
 
       <span class="gt-note-rte-divider" />
 
@@ -130,13 +126,9 @@ const editorRef = ref<HTMLDivElement | null>(null)
 const sourceRef = ref<HTMLTextAreaElement | null>(null)
 const sourceMode = ref(false)
 const sourceCode = ref('')
-const fontColor = ref('#000000')
-
-const predefineColors = [
-  '#000000', '#333333', '#666666',
-  '#ff0000', '#e6a23c', '#409eff',
-  '#67c23a', '#909399', '#4b2d77',
-]
+// 标记内容来自用户输入（onInput emit 出去的值），避免父组件回写触发 watch
+// 重设 innerHTML 导致光标丢失 / 表格单元格无法连续编辑（contenteditable + v-model 经典坑）
+const isInternalChange = ref(false)
 
 // Word count (Chinese characters + words)
 const wordCount = computed(() => {
@@ -163,7 +155,17 @@ onMounted(() => {
 // Watch external changes
 watch(() => props.modelValue, (newVal) => {
   if (!editorRef.value) return
-  // Only update if content actually differs (avoid cursor jump)
+  // 跳过由本组件 onInput 触发的回写（否则浏览器规范化后的 innerHTML 与
+  // 父组件存的原始串永远不等 → 每次输入都重设 innerHTML → 光标丢失、
+  // 表格单元格无法连续输入）。仅外部真正变更（切换章节等）才重设。
+  if (isInternalChange.value) {
+    isInternalChange.value = false
+    return
+  }
+  // 编辑器正聚焦时不打断用户输入
+  if (document.activeElement === editorRef.value || editorRef.value.contains(document.activeElement)) {
+    return
+  }
   if (editorRef.value.innerHTML !== newVal) {
     editorRef.value.innerHTML = newVal || ''
   }
@@ -172,6 +174,7 @@ watch(() => props.modelValue, (newVal) => {
 // Emit on input
 function onInput() {
   if (!editorRef.value) return
+  isInternalChange.value = true
   emit('update:modelValue', editorRef.value.innerHTML)
 }
 
@@ -191,30 +194,19 @@ function onHeading(tag: string) {
   }
 }
 
-// Color change
-function onColorChange(color: string | null) {
-  if (color) {
-    exec('foreColor', color)
-  }
-}
-
-// Insert table
-function insertTable() {
-  editorRef.value?.focus()
-  const html = `<table style="border-collapse:collapse;width:100%;margin:8px 0;">
-    <tr><th style="border:1px solid var(--gt-color-border-light);padding:4px 8px;background: var(--gt-color-bg);">列1</th><th style="border:1px solid var(--gt-color-border-light);padding:4px 8px;background: var(--gt-color-bg);">列2</th><th style="border:1px solid var(--gt-color-border-light);padding:4px 8px;background: var(--gt-color-bg);">列3</th></tr>
-    <tr><td style="border:1px solid var(--gt-color-border-light);padding:4px 8px;">&nbsp;</td><td style="border:1px solid var(--gt-color-border-light);padding:4px 8px;">&nbsp;</td><td style="border:1px solid var(--gt-color-border-light);padding:4px 8px;">&nbsp;</td></tr>
-    <tr><td style="border:1px solid var(--gt-color-border-light);padding:4px 8px;">&nbsp;</td><td style="border:1px solid var(--gt-color-border-light);padding:4px 8px;">&nbsp;</td><td style="border:1px solid var(--gt-color-border-light);padding:4px 8px;">&nbsp;</td></tr>
-  </table>`
-  document.execCommand('insertHTML', false, html)
-  onInput()
-}
-
 // Insert placeholder as blue tag
 function insertPlaceholder(placeholder: string) {
   editorRef.value?.focus()
   const html = `<span class="gt-note-placeholder" contenteditable="false" data-placeholder="${placeholder}">${placeholder}</span>&nbsp;`
   document.execCommand('insertHTML', false, html)
+  onInput()
+}
+
+// P2-8: Insert a simple comparison table (3 columns x 2 data rows + header)
+function insertTable() {
+  editorRef.value?.focus()
+  const tableHtml = `<table><tr><th>项目</th><th>金额</th><th>说明</th></tr><tr><td></td><td></td><td></td></tr><tr><td></td><td></td><td></td></tr></table><p></p>`
+  document.execCommand('insertHTML', false, tableHtml)
   onInput()
 }
 

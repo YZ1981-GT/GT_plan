@@ -19,6 +19,17 @@ VALID_ROW_TYPES = {
     "total",
     "dynamic_detail",
     "formula",
+    # 「不属于任何段」的表级兜底行 —— **多段共享表**的行级合并据此把该行排除在
+    # 所有段的可写区之外（`app/services/note_shared_table_segments.UNOWNED_ROW_TYPE`）。
+    # 首个使用者 = soe `八、93 受限资产` 末行「其他」：它紧随 `BS-029 在建工程` 段，
+    # 既不是合计行也不是该段可扩行，不标则 H2 一推数据就把它删掉。
+    # spec: restricted-assets-note-row-scope-rollout Requirement 2
+    "unowned",
+    # 源模板留的「可扩位」行（`……` / `可无限量添加行`）—— 零可见内容、不参与合计；
+    # 由 `backend/scripts/fix/fix_note_expandable_rows.py` 落地，判据真源
+    # `backend/data/note_expandable_markers.json`。additive 第 6 个取值。
+    # spec: note-template-columns-and-legacy-snapshot-closure R11.2 / Property 33
+    "expandable",
 }
 
 REPO_ROOT = Path(__file__).resolve().parents[3]

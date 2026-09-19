@@ -1,0 +1,371 @@
+[
+  {
+    "id": "M01",
+    "side": "fe",
+    "want": "三个终态一律 settled",
+    "why": "把「无合法接任者」标成进行中 ⇒ 状态条转圈、用户永远等一个不会来的接任者。Task 34 明文「不得渲染成无限等待」，而「文案非空」这类判据对它全绿",
+    "verdict": "RED",
+    "summary": "183/187 passed, numFailedTestSuites=4",
+    "added": [
+      "close leader 失权后的三种结局在状态条上逐一可辨 close_recovery_required：显式说明无接任者需重新授权，settled 且有具体下一步",
+      "投影表对桥状态域穷尽且自洽 三个终态一律 settled —— 它们永不再动，转圈就是无限等待",
+      "投影表对桥状态域穷尽且自洽 每条动作提示都点得出一个具体动作（含动词且不是「请稍候」类）",
+      "投影表对桥状态域穷尽且自洽 表自证通过：progress 无提示、settled 有具体提示、只有 applied 是 success"
+    ],
+    "gone": [],
+    "hit": [
+      "close leader 失权后的三种结局在状态条上逐一可辨 close_recovery_required：显式说明无接任者需重新授权，settled 且有具体下一步",
+      "投影表对桥状态域穷尽且自洽 三个终态一律 settled —— 它们永不再动，转圈就是无限等待",
+      "投影表对桥状态域穷尽且自洽 表自证通过：progress 无提示、settled 有具体提示、只有 applied 是 success"
+    ],
+    "added_files": [
+      "WorkpaperSyncStatusBar.spec.ts",
+      "workpaperSyncPresentation.spec.ts"
+    ],
+    "restored": true,
+    "seconds": 4.8
+  },
+  {
+    "id": "M02",
+    "side": "fe",
+    "want": "表自证通过",
+    "why": "download-only 用成功基调 ⇒ 颜色是用户最先读到的那一层，绿色等于宣称回写完成。AC 5.8 明文 download-only 永不创建 application/operation",
+    "verdict": "RED",
+    "summary": "184/187 passed, numFailedTestSuites=4",
+    "added": [
+      "Task 34 点名的九类同步形态各有独立中文文案 download-only 终态不含「回写完成」，且不是成功基调",
+      "投影表对桥状态域穷尽且自洽 close_recovery_required 与 recovery_download_only 的文案与提示都不含成功字样",
+      "投影表对桥状态域穷尽且自洽 表自证通过：progress 无提示、settled 有具体提示、只有 applied 是 success"
+    ],
+    "gone": [],
+    "hit": [
+      "Task 34 点名的九类同步形态各有独立中文文案 download-only 终态不含「回写完成」，且不是成功基调",
+      "投影表对桥状态域穷尽且自洽 close_recovery_required 与 recovery_download_only 的文案与提示都不含成功字样",
+      "投影表对桥状态域穷尽且自洽 表自证通过：progress 无提示、settled 有具体提示、只有 applied 是 success"
+    ],
+    "added_files": [
+      "WorkpaperSyncStatusBar.spec.ts",
+      "workpaperSyncPresentation.spec.ts"
+    ],
+    "restored": true,
+    "seconds": 4.6
+  },
+  {
+    "id": "M03",
+    "side": "fe",
+    "want": "表自证通过",
+    "why": "settled 态没有下一步提示 ⇒ 界面停在一句「需重新授权」而不说怎么授权，对用户就是无限等待。表自证正是为拦这个而存在",
+    "verdict": "RED",
+    "summary": "183/187 passed, numFailedTestSuites=5",
+    "added": [
+      "close leader 失权后的三种结局在状态条上逐一可辨 close_recovery_required：显式说明无接任者需重新授权，settled 且有具体下一步",
+      "投影表对桥状态域穷尽且自洽 每条动作提示都点得出一个具体动作（含动词且不是「请稍候」类）",
+      "投影表对桥状态域穷尽且自洽 表自证通过：progress 无提示、settled 有具体提示、只有 applied 是 success",
+      "每个可观测桥状态各渲染一份互不相同的中文状态 settled 状态一律带具体动作提示，progress 状态一律不带（不做无限等待）"
+    ],
+    "gone": [],
+    "hit": [
+      "close leader 失权后的三种结局在状态条上逐一可辨 close_recovery_required：显式说明无接任者需重新授权，settled 且有具体下一步",
+      "投影表对桥状态域穷尽且自洽 每条动作提示都点得出一个具体动作（含动词且不是「请稍候」类）",
+      "投影表对桥状态域穷尽且自洽 表自证通过：progress 无提示、settled 有具体提示、只有 applied 是 success",
+      "每个可观测桥状态各渲染一份互不相同的中文状态 settled 状态一律带具体动作提示，progress 状态一律不带（不做无限等待）"
+    ],
+    "added_files": [
+      "WorkpaperSyncStatusBar.spec.ts",
+      "workpaperSyncPresentation.spec.ts"
+    ],
+    "restored": true,
+    "seconds": 4.6
+  },
+  {
+    "id": "M04",
+    "side": "fe",
+    "want": "接任者已完成（结局 applied）仍可辨",
+    "why": "接任者完成被判成「与 close 无关」⇒ 状态条只显示 `applied` 的「结构化回写完成」，与「我自己保存成功了」逐字同态。Task 34 要求 successor 接任进展可辨",
+    "verdict": "RED",
+    "summary": "184/187 passed, numFailedTestSuites=4",
+    "added": [
+      "close leader 失权后的三种结局在状态条上逐一可辨 合法 successor 完成后阶段标签归因于接任者（不与自己保存成功同态）",
+      "close 仲裁三种结局逐一可辨 同一会话内反复失权时取**最近**一次结局",
+      "close 仲裁三种结局逐一可辨 接任者已完成（结局 applied）仍可辨：outcome=successor_applied 且归因于接任者"
+    ],
+    "gone": [],
+    "hit": [
+      "close leader 失权后的三种结局在状态条上逐一可辨 合法 successor 完成后阶段标签归因于接任者（不与自己保存成功同态）",
+      "close 仲裁三种结局逐一可辨 接任者已完成（结局 applied）仍可辨：outcome=successor_applied 且归因于接任者"
+    ],
+    "added_files": [
+      "WorkpaperSyncStatusBar.spec.ts",
+      "workpaperSyncPresentation.spec.ts"
+    ],
+    "restored": true,
+    "seconds": 4.6
+  },
+  {
+    "id": "M05",
+    "side": "fe",
+    "want": "宿主没回传 intent id 时显式说明",
+    "why": "宿主没回传 intent id 时编一个 ⇒ 「有合法接任者」凭空成立。桥的 `notifyCloseSuccessorApplied` 只校验不保存该 id，这里编造无人能证伪",
+    "verdict": "RED",
+    "summary": "186/187 passed, numFailedTestSuites=2",
+    "added": [
+      "close 仲裁三种结局逐一可辨 宿主没回传 intent id 时显式说明「未回传」，而不是编一个 id"
+    ],
+    "gone": [],
+    "hit": [
+      "close 仲裁三种结局逐一可辨 宿主没回传 intent id 时显式说明「未回传」，而不是编一个 id"
+    ],
+    "added_files": [
+      "workpaperSyncPresentation.spec.ts"
+    ],
+    "restored": true,
+    "seconds": 4.8
+  },
+  {
+    "id": "M06",
+    "side": "fe",
+    "want": "同一会话内反复失权时取",
+    "why": "正序扫描 ⇒ 同一会话里「先无接任者、后有接任者接任」会被读成前者。close 仲裁在一次会话内可以反复发生（AC 4.10 的 successor 链）",
+    "verdict": "RED",
+    "summary": "183/187 passed, numFailedTestSuites=4",
+    "added": [
+      "close leader 失权后的三种结局在状态条上逐一可辨 合法 successor 完成后阶段标签归因于接任者（不与自己保存成功同态）",
+      "close 仲裁三种结局逐一可辨 同一会话内反复失权时取**最近**一次结局",
+      "close 仲裁三种结局逐一可辨 宿主没回传 intent id 时显式说明「未回传」，而不是编一个 id",
+      "close 仲裁三种结局逐一可辨 接任者已完成（结局 applied）仍可辨：outcome=successor_applied 且归因于接任者"
+    ],
+    "gone": [],
+    "hit": [
+      "close 仲裁三种结局逐一可辨 同一会话内反复失权时取**最近**一次结局"
+    ],
+    "added_files": [
+      "WorkpaperSyncStatusBar.spec.ts",
+      "workpaperSyncPresentation.spec.ts"
+    ],
+    "restored": true,
+    "seconds": 4.7
+  },
+  {
+    "id": "M07",
+    "side": "fe",
+    "want": "amount 经注入的 fmtAmount",
+    "why": "金额绕过 displayPrefs ⇒ 千分符/小数位/单位后缀全失效，平台单位切换对冲突面板不起作用。AC 8.2 明文金额使用平台 `displayPrefs.fmtAmount()`",
+    "verdict": "RED",
+    "summary": "183/187 passed, numFailedTestSuites=4",
+    "added": [
+      "冲突值渲染 amount 经注入的 fmtAmount 得到千分符 + 2 位小数，且与裸 String 不同",
+      "冲突值渲染 切换单位后同一函数给出不同结果（证明读的是活 store 而非本地副本）",
+      "金额经 displayPrefs store 成员格式化 amount 列渲染成千分符 + 2 位小数，且不等于裸 String",
+      "金额经 displayPrefs store 成员格式化 切换平台单位后同一单元格随之变化（证明读的是活 store）"
+    ],
+    "gone": [],
+    "hit": [
+      "冲突值渲染 amount 经注入的 fmtAmount 得到千分符 + 2 位小数，且与裸 String 不同",
+      "金额经 displayPrefs store 成员格式化 amount 列渲染成千分符 + 2 位小数，且不等于裸 String",
+      "金额经 displayPrefs store 成员格式化 切换平台单位后同一单元格随之变化（证明读的是活 store）"
+    ],
+    "added_files": [
+      "WorkpaperSyncConflictDialog.spec.ts",
+      "workpaperSyncPresentation.spec.ts"
+    ],
+    "restored": true,
+    "seconds": 4.7
+  },
+  {
+    "id": "M08",
+    "side": "fe",
+    "want": "三种「没有值」互不相同",
+    "why": "「字段缺失」与「显式空值」合并成一句 ⇒ 裁决界面说不清用户在选什么。后端刻意用 `present` 布尔把两者分开落库，读侧合并等于把那份设计作废",
+    "verdict": "RED",
+    "summary": "185/187 passed, numFailedTestSuites=4",
+    "added": [
+      "冲突值渲染 三种「没有值」互不相同：未投影 / 无此字段 / 空值",
+      "金额经 displayPrefs store 成员格式化 缺字段与显式空值渲染成两句不同的话"
+    ],
+    "gone": [],
+    "hit": [
+      "冲突值渲染 三种「没有值」互不相同：未投影 / 无此字段 / 空值",
+      "金额经 displayPrefs store 成员格式化 缺字段与显式空值渲染成两句不同的话"
+    ],
+    "added_files": [
+      "WorkpaperSyncConflictDialog.spec.ts",
+      "workpaperSyncPresentation.spec.ts"
+    ],
+    "restored": true,
+    "seconds": 4.6
+  },
+  {
+    "id": "M09",
+    "side": "fe",
+    "want": "缺 adjudicable_by_value_choice",
+    "why": "服务端漏给可裁决布尔时不再 fail visible ⇒ 结构冲突会被渲染成「选一侧就能收敛」，而结构冲突必须先修结构（AC 8.3 / SchemaAnomalyKind 的非 value-adjudicable 分支）",
+    "verdict": "RED",
+    "summary": "185/187 passed, numFailedTestSuites=4",
+    "added": [
+      "冲突按 sheet / table / row 三级分组，且每条双侧可追溯 预览形态漂移（缺 adjudicable 布尔）⇒ 渲染具体错误码，不静默画一张空表",
+      "冲突预览解析：分组、双侧定位与 fail visible 缺 adjudicable_by_value_choice ⇒ 拒绝，不默认成「可选边」"
+    ],
+    "gone": [],
+    "hit": [
+      "冲突预览解析：分组、双侧定位与 fail visible 缺 adjudicable_by_value_choice ⇒ 拒绝，不默认成「可选边」"
+    ],
+    "added_files": [
+      "WorkpaperSyncConflictDialog.spec.ts",
+      "workpaperSyncPresentation.spec.ts"
+    ],
+    "restored": true,
+    "seconds": 4.6
+  },
+  {
+    "id": "M10",
+    "side": "fe",
+    "want": "值信封缺 present 布尔",
+    "why": "值信封缺 `present` 时不拦 ⇒ `{value:1}` 被读成 `present=undefined`（假），于是一个**有值**的一侧被渲染成「无此字段」",
+    "verdict": "RED",
+    "summary": "186/187 passed, numFailedTestSuites=2",
+    "added": [
+      "冲突预览解析：分组、双侧定位与 fail visible 值信封缺 present 布尔 ⇒ 拒绝（「字段缺失」与「显式空值」不得合并）"
+    ],
+    "gone": [],
+    "hit": [
+      "冲突预览解析：分组、双侧定位与 fail visible 值信封缺 present 布尔 ⇒ 拒绝（「字段缺失」与「显式空值」不得合并）"
+    ],
+    "added_files": [
+      "workpaperSyncPresentation.spec.ts"
+    ],
+    "restored": true,
+    "seconds": 4.6
+  },
+  {
+    "id": "M11",
+    "side": "fe",
+    "want": "已裁决的项不进任何范围",
+    "why": "已裁决的项重新进入批量目标 ⇒ 用户的上一次裁决被静默覆盖，而「批量作用范围明确」的判据只看范围不看是否已裁决",
+    "verdict": "RED",
+    "summary": "186/187 passed, numFailedTestSuites=2",
+    "added": [
+      "批量裁决的显式范围 已裁决的项不进任何范围（重复写一遍就是静默覆盖）"
+    ],
+    "gone": [],
+    "hit": [
+      "批量裁决的显式范围 已裁决的项不进任何范围（重复写一遍就是静默覆盖）"
+    ],
+    "added_files": [
+      "workpaperSyncPresentation.spec.ts"
+    ],
+    "restored": true,
+    "seconds": 4.6
+  },
+  {
+    "id": "M12",
+    "side": "fe",
+    "want": "没有锚点的「本行/本表/本工作表」被拒绝",
+    "why": "没有锚点也放行「本行/本表/本工作表」⇒ 作用范围不明确，AC 8.3 要求批量选择必须明确作用范围并二次确认",
+    "verdict": "RED",
+    "summary": "185/187 passed, numFailedTestSuites=4",
+    "added": [
+      "批量裁决必须点明范围并二次确认 未选锚点就点「本行」⇒ 具体码 bulk_scope_anchor_required，不静默按全部处理",
+      "批量裁决的显式范围 没有锚点的「本行/本表/本工作表」被拒绝（范围不明确）"
+    ],
+    "gone": [],
+    "hit": [
+      "批量裁决必须点明范围并二次确认 未选锚点就点「本行」⇒ 具体码 bulk_scope_anchor_required，不静默按全部处理",
+      "批量裁决的显式范围 没有锚点的「本行/本表/本工作表」被拒绝（范围不明确）"
+    ],
+    "added_files": [
+      "WorkpaperSyncConflictDialog.spec.ts",
+      "workpaperSyncPresentation.spec.ts"
+    ],
+    "restored": true,
+    "seconds": 4.6
+  },
+  {
+    "id": "M13",
+    "side": "fe",
+    "want": "四个范围各自取到不同的目标集",
+    "why": "「本行」范围漏比行键 ⇒ 点「仅本行」实际改了同表所有行。这是最典型的「范围看起来选了、其实没生效」形态",
+    "verdict": "RED",
+    "summary": "185/187 passed, numFailedTestSuites=4",
+    "added": [
+      "批量裁决必须点明范围并二次确认 确认后只落到范围内的条目上（行范围不越界到同表另一行）",
+      "批量裁决的显式范围 四个范围各自取到不同的目标集（行 ⊂ 表 ⊂ 工作表 ⊆ 全部）"
+    ],
+    "gone": [],
+    "hit": [
+      "批量裁决必须点明范围并二次确认 确认后只落到范围内的条目上（行范围不越界到同表另一行）",
+      "批量裁决的显式范围 四个范围各自取到不同的目标集（行 ⊂ 表 ⊂ 工作表 ⊆ 全部）"
+    ],
+    "added_files": [
+      "WorkpaperSyncConflictDialog.spec.ts",
+      "workpaperSyncPresentation.spec.ts"
+    ],
+    "restored": true,
+    "seconds": 4.7
+  },
+  {
+    "id": "M14",
+    "side": "fe",
+    "want": "二次确认文案逐字点出范围名、条数与裁决动作",
+    "why": "确认文案不点条数与裁决动作 ⇒ 用户按下确认时不知道会改多少条、改成哪一侧。AC 8.3 的「明确作用范围」是文案义务，不只是内部集合正确",
+    "verdict": "RED",
+    "summary": "185/187 passed, numFailedTestSuites=4",
+    "added": [
+      "批量裁决必须点明范围并二次确认 确认文案逐字含范围名、条数与裁决动作",
+      "批量裁决的显式范围 二次确认文案逐字点出范围名、条数与裁决动作"
+    ],
+    "gone": [],
+    "hit": [
+      "批量裁决必须点明范围并二次确认 确认文案逐字含范围名、条数与裁决动作",
+      "批量裁决的显式范围 二次确认文案逐字点出范围名、条数与裁决动作"
+    ],
+    "added_files": [
+      "WorkpaperSyncConflictDialog.spec.ts",
+      "workpaperSyncPresentation.spec.ts"
+    ],
+    "restored": true,
+    "seconds": 4.6
+  },
+  {
+    "id": "M15",
+    "side": "fe",
+    "want": "宿主给了 room durable fence",
+    "why": "拿 canonical application 顶替 room 的 latest durable ⇒ 客户端断言了一个它观测不到的 room 事实，而服务端会照着这个断言做 fence 裁决（AC 8.5）",
+    "verdict": "RED",
+    "summary": "185/187 passed, numFailedTestSuites=4",
+    "added": [
+      "resolve fence 八项齐备或逐项报缺 宿主给了 room durable fence ⇒ 八项齐备且逐项来自预览/入参",
+      "八项 resolve fence 齐备才可提交 宿主给了 room durable fence ⇒ 提交按钮可用，提交时逐项带上八项"
+    ],
+    "gone": [],
+    "hit": [
+      "resolve fence 八项齐备或逐项报缺 宿主给了 room durable fence ⇒ 八项齐备且逐项来自预览/入参",
+      "八项 resolve fence 齐备才可提交 宿主给了 room durable fence ⇒ 提交按钮可用，提交时逐项带上八项"
+    ],
+    "added_files": [
+      "WorkpaperSyncConflictDialog.spec.ts",
+      "workpaperSyncPresentation.spec.ts"
+    ],
+    "restored": true,
+    "seconds": 4.6
+  },
+  {
+    "id": "M16",
+    "side": "fe",
+    "want": "room fence 用了 numeric revision 冒充 UUID",
+    "why": "宿主把 numeric revision 当 application id 传进来时不再报缺 ⇒ 一个非 opaque 值被当成合法 fence 发给服务端（AC 8.7 / 10.6 的碰撞面）",
+    "verdict": "RED",
+    "summary": "186/187 passed, numFailedTestSuites=2",
+    "added": [
+      "resolve fence 八项齐备或逐项报缺 room fence 用了 numeric revision 冒充 UUID ⇒ 仍然报缺"
+    ],
+    "gone": [],
+    "hit": [
+      "resolve fence 八项齐备或逐项报缺 room fence 用了 numeric revision 冒充 UUID ⇒ 仍然报缺"
+    ],
+    "added_files": [
+      "workpaperSyncPresentation.spec.ts"
+    ],
+    "restored": true,
+    "seconds": 4.6
+  }
+]

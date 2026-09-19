@@ -170,11 +170,35 @@ class GateEngine:
         hit_rules: list[GateRuleHit] = []
 
         for rule in rules:
+            # savepoint 隔离：单条规则 SQL 失败（即使被规则内部 try/except 吞掉）
+            # 也仅回滚本规则的 savepoint，不污染外层事务，杜绝后续
+            # gate_decision/trace 写入因 InFailedSQLTransactionError 级联全崩。
+            sp = await db.begin_nested()
             try:
                 hit = await rule.check(db, rule_context)
+                # 规则可能吞掉 SQL 异常但 PG 已将事务标记 aborted。
+                # 提交 savepoint(RELEASE)在 aborted 态会失败 → 捕获后回滚 savepoint
+                # 恢复外层事务，杜绝后续 gate_decision/trace 写入级联崩溃。
+                try:
+                    await sp.commit()
+                except Exception:
+                    try:
+                        await sp.rollback()
+                    except Exception:
+                        pass
+                    logger.warning(
+                        f"[GATE_RULE_POISON] rule={rule.rule_code} 吞掉 SQL 异常致事务中止，"
+                        f"已回滚 savepoint 恢复（gate_type={gate_type}）"
+                    )
+                    continue
                 if hit:
                     hit_rules.append(hit)
             except Exception as e:
+                # PG 中止事务仅接受 ROLLBACK TO SAVEPOINT，可恢复到 savepoint 前状态。
+                try:
+                    await sp.rollback()
+                except Exception:
+                    pass
                 logger.error(
                     f"[GATE_RULE_ERROR] rule={rule.rule_code} "
                     f"gate_type={gate_type} wp_id={wp_id} error={e}"

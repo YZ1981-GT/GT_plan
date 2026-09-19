@@ -1,0 +1,352 @@
+{
+  "generated_by": "backend/scripts/_mutation_kit/span.py::run_cli",
+  "mode": "run",
+  "pytest_args": [
+    "backend/tests/workpaper_sync/test_task27_conflict_resolution.py",
+    "backend/tests/workpaper_sync/test_task27_conflict_resolution_pg.py",
+    "backend/tests/workpaper_sync/test_task26_oo_to_html.py",
+    "backend/tests/workpaper_sync/test_task26_oo_to_html_pg.py",
+    "backend/tests/workpaper_sync/test_task15_content_mutation.py",
+    "-q",
+    "--tb=no",
+    "-rf",
+    "-p",
+    "no:randomly"
+  ],
+  "tally": {
+    "RED": 13
+  },
+  "mutations": [
+    {
+      "id": "E02",
+      "path": "backend/app/services/workpaper_sync/conflict_resolution.py",
+      "want": "test_task27_conflict_resolution.py::TestAuthorizationFirstShape::test_the_business_row_query_filters_by_workpaper",
+      "why": "业务行不再按 wp 过滤 ⇒ scope index 与 content version 行之间失去二次核对（scope row 被错写/被 retire 后就能跨 wp 定位）。🔴 这道门在 scope 门仍在时是**冗余**的，因此行为上不可证伪（任何跨 wp UUID 都先被 scope 门拦住）。冗余的第二道门只能用形态判据钉住 —— 首版 want=\"*\" 实测判 GREEN 正是因为没有形态判据",
+      "verdict": "RED",
+      "summary": "1 failed, 427 passed in 66.11s (0:01:06)",
+      "added": [
+        "test_task27_conflict_resolution.py::TestAuthorizationFirstShape::test_the_business_row_query_filters_by_workpaper"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task27_conflict_resolution.py::TestAuthorizationFirstShape::test_the_business_row_query_filters_by_workpaper"
+      ],
+      "added_files": [
+        "test_task27_conflict_resolution.py"
+      ],
+      "restored": true,
+      "restored_sha256": "fb8cf0ba59e75be72f3c24ea59783ebd9701198b893566ed551398c5c01d0751",
+      "seconds": 69.4
+    },
+    {
+      "id": "E04",
+      "path": "backend/app/services/workpaper_sync/conflict_resolution.py",
+      "want": "test_task27_conflict_resolution.py::TestAuthorizationFirstShape::test_the_two_404_doors_carry_distinguishable_internal_markers",
+      "why": "两道门用同一个标记 ⇒ 「是哪一道门在拒」重新变得不可分辨，E01 又会退回 GREEN。本条守的是**判据本身的可分辨性**（元判据）：没有它，标记机制可以被悄悄合并掉",
+      "verdict": "RED",
+      "summary": "1 failed, 427 passed in 64.45s (0:01:04)",
+      "added": [
+        "test_task27_conflict_resolution.py::TestAuthorizationFirstShape::test_the_two_404_doors_carry_distinguishable_internal_markers"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task27_conflict_resolution.py::TestAuthorizationFirstShape::test_the_two_404_doors_carry_distinguishable_internal_markers"
+      ],
+      "added_files": [
+        "test_task27_conflict_resolution.py"
+      ],
+      "restored": true,
+      "restored_sha256": "fb8cf0ba59e75be72f3c24ea59783ebd9701198b893566ed551398c5c01d0751",
+      "seconds": 67.6
+    },
+    {
+      "id": "E03",
+      "path": "backend/app/services/workpaper_sync/conflict_resolution.py",
+      "want": "test_task27_conflict_resolution.py::TestFrozenContractLock::test_drifted_digest_is_refused",
+      "why": "按 registry **当前 alias** 渲染历史 operation 的预览/折叠 ⇒ 审计师看到的业务标签、单元格地址与 value_type 可能已漂移到新模板上（AC 6.2 / 7.10）。真库侧同时红",
+      "verdict": "RED",
+      "summary": "2 failed, 426 passed in 62.11s (0:01:02)",
+      "added": [
+        "test_task27_conflict_resolution.py::TestFrozenContractLock::test_drifted_digest_is_refused",
+        "test_task27_conflict_resolution_pg.py::TestConflictPreview::test_a_drifted_contract_is_refused"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task27_conflict_resolution.py::TestFrozenContractLock::test_drifted_digest_is_refused",
+        "test_task27_conflict_resolution_pg.py::TestConflictPreview::test_a_drifted_contract_is_refused"
+      ],
+      "added_files": [
+        "test_task27_conflict_resolution.py",
+        "test_task27_conflict_resolution_pg.py"
+      ],
+      "restored": true,
+      "restored_sha256": "fb8cf0ba59e75be72f3c24ea59783ebd9701198b893566ed551398c5c01d0751",
+      "seconds": 65.2
+    },
+    {
+      "id": "F03",
+      "path": "backend/app/services/workpaper_sync/conflict_resolution.py",
+      "want": "test_task27_conflict_resolution_pg.py::TestResolveProceeds::test_the_resolution_trail_was_written",
+      "why": "AC 8.6 的裁决轨迹（actor / 时间 / 选择结果 / 落地值）不再落库 ⇒ 事后无法回答「谁在什么时候选了什么」。内容照常发布，因此只有查冲突行的判据会红",
+      "verdict": "RED",
+      "summary": "3 failed, 425 passed in 62.10s (0:01:02)",
+      "added": [
+        "test_task27_conflict_resolution_pg.py::TestDuplicateRequestedOperation::test_the_resolution_trail_lands_on_the_primary_conflict_rows",
+        "test_task27_conflict_resolution_pg.py::TestResolveFenceRejections::test_same_application_higher_sequence_only_folds",
+        "test_task27_conflict_resolution_pg.py::TestResolveProceeds::test_the_resolution_trail_was_written"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task27_conflict_resolution_pg.py::TestResolveProceeds::test_the_resolution_trail_was_written"
+      ],
+      "added_files": [
+        "test_task27_conflict_resolution_pg.py"
+      ],
+      "restored": true,
+      "restored_sha256": "fb8cf0ba59e75be72f3c24ea59783ebd9701198b893566ed551398c5c01d0751",
+      "seconds": 65.2
+    },
+    {
+      "id": "F04",
+      "path": "backend/app/services/workpaper_sync/conflict_resolution.py",
+      "want": "test_task27_conflict_resolution_pg.py::TestResolveProceeds::test_the_resolution_trail_was_written",
+      "why": "轨迹里的落地值退回 current 侧 ⇒ 审计轨迹与实际发布内容不一致（轨迹说保留了current，内容里是 incoming）。与 F03 分层：F03 打的是「有没有写」，本条打的是「写的是不是对的值」",
+      "verdict": "RED",
+      "summary": "1 failed, 427 passed in 62.27s (0:01:02)",
+      "added": [
+        "test_task27_conflict_resolution_pg.py::TestResolveProceeds::test_the_resolution_trail_was_written"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task27_conflict_resolution_pg.py::TestResolveProceeds::test_the_resolution_trail_was_written"
+      ],
+      "added_files": [
+        "test_task27_conflict_resolution_pg.py"
+      ],
+      "restored": true,
+      "restored_sha256": "fb8cf0ba59e75be72f3c24ea59783ebd9701198b893566ed551398c5c01d0751",
+      "seconds": 65.3
+    },
+    {
+      "id": "R01",
+      "path": "backend/app/services/workpaper_sync/conflict_resolution.py",
+      "want": "test_task27_conflict_resolution_pg.py::TestResolveProceeds::test_decision_is_proceed_and_maps_to_200",
+      "why": "R01 回归：把 fence 读取退回**手写 SQL 的错列名**（`frozen_write_fence_epoch` 并不存在）。这是本任务真库实测抓到的第一个缺陷 —— 离线守卫、`get_diagnostics`、vitest 全绿，只有真库执行会 `UndefinedColumnError`。改用 ORM 列引用之后列名错误在 import 期就暴露",
+      "verdict": "RED",
+      "summary": "21 failed, 407 passed in 64.28s (0:01:04)",
+      "added": [
+        "test_task27_conflict_resolution_pg.py::TestDuplicateRequestedOperation::test_no_third_operation_or_second_application_was_created",
+        "test_task27_conflict_resolution_pg.py::TestDuplicateRequestedOperation::test_preview_through_the_duplicate_returns_the_primary_conflicts",
+        "test_task27_conflict_resolution_pg.py::TestDuplicateRequestedOperation::test_resolve_through_the_duplicate_publishes_the_folded_projection",
+        "test_task27_conflict_resolution_pg.py::TestDuplicateRequestedOperation::test_the_resolution_trail_lands_on_the_primary_conflict_rows",
+        "test_task27_conflict_resolution_pg.py::TestDuplicateRequestedOperation::test_the_second_delivery_really_became_a_direct_terminal_duplicate",
+        "test_task27_conflict_resolution_pg.py::TestHarness::test_every_scenario_was_collected",
+        "test_task27_conflict_resolution_pg.py::TestHarness::test_no_phase_crashed_during_collection",
+        "test_task27_conflict_resolution_pg.py::TestResolveFenceRejections::test_current_revision_change_rebases_and_rebuilds_conflicts",
+        "test_task27_conflict_resolution_pg.py::TestResolveFenceRejections::test_generation_change_is_rejected_with_its_own_reason",
+        "test_task27_conflict_resolution_pg.py::TestResolveFenceRejections::test_newer_different_application_supersedes",
+        "test_task27_conflict_resolution_pg.py::TestResolveFenceRejections::test_revoked_initiator_blocks_the_resolve",
+        "test_task27_conflict_resolution_pg.py::TestResolveFenceRejections::test_same_application_higher_sequence_only_folds",
+        "test_task27_conflict_resolution_pg.py::TestResolveProceeds::test_decision_is_proceed_and_maps_to_200",
+        "test_task27_conflict_resolution_pg.py::TestResolveProceeds::test_entry_pointer_and_room_baseline_moved",
+        "test_task27_conflict_resolution_pg.py::TestResolveProceeds::test_no_second_operation_or_application",
+        "test_task27_conflict_resolution_pg.py::TestResolveProceeds::test_revision_advanced_exactly_once",
+        "test_task27_conflict_resolution_pg.py::TestResolveProceeds::test_the_published_projection_is_the_folded_one",
+        "test_task27_conflict_resolution_pg.py::TestResolveProceeds::test_the_resolution_trail_was_written",
+        "test_task27_conflict_resolution_pg.py::TestWhoMaySubmitAdjudications::test_project_invisibility_is_a_separate_refusal",
+        "test_task27_conflict_resolution_pg.py::TestWhoMaySubmitAdjudications::test_review_lock_or_archive_blocks_the_adjudication",
+        "test_task27_conflict_resolution_pg.py::TestWhoMaySubmitAdjudications::test_the_refused_application_is_left_in_a_non_retryable_terminal_state"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task27_conflict_resolution_pg.py::TestResolveProceeds::test_decision_is_proceed_and_maps_to_200"
+      ],
+      "added_files": [
+        "test_task27_conflict_resolution_pg.py"
+      ],
+      "restored": true,
+      "restored_sha256": "fb8cf0ba59e75be72f3c24ea59783ebd9701198b893566ed551398c5c01d0751",
+      "seconds": 67.6
+    },
+    {
+      "id": "G01",
+      "path": "backend/app/services/workpaper_sync/conflict_resolution.py",
+      "want": "test_task27_conflict_resolution_pg.py::TestDuplicateRequestedOperation::test_preview_through_the_duplicate_returns_the_primary_conflicts",
+      "why": "冲突改按 **requested** id 读 ⇒ requested 是合法 terminal duplicate 时预览恒空（冲突行挂在 canonical primary 上），而响应仍是 200 + `conflict_count=0`：审计师看到「没有冲突」，于是那些冲突永远不会被裁决，下一次 forcesave 又被 refresh-required 挡住。AC 8.5 末段明令只要求 canonical primary 绑定 application，正是为了让 duplicate 也能读到同一份冲突集",
+      "verdict": "RED",
+      "summary": "1 failed, 427 passed in 66.13s (0:01:06)",
+      "added": [
+        "test_task27_conflict_resolution_pg.py::TestDuplicateRequestedOperation::test_preview_through_the_duplicate_returns_the_primary_conflicts"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task27_conflict_resolution_pg.py::TestDuplicateRequestedOperation::test_preview_through_the_duplicate_returns_the_primary_conflicts"
+      ],
+      "added_files": [
+        "test_task27_conflict_resolution_pg.py"
+      ],
+      "restored": true,
+      "restored_sha256": "fb8cf0ba59e75be72f3c24ea59783ebd9701198b893566ed551398c5c01d0751",
+      "seconds": 69.4
+    },
+    {
+      "id": "G02",
+      "path": "backend/app/services/workpaper_sync/conflict_resolution.py",
+      "want": "test_task27_conflict_resolution_pg.py::TestDuplicateRequestedOperation::test_the_resolution_trail_lands_on_the_primary_conflict_rows",
+      "why": "裁决轨迹改按 **requested** id 回写 ⇒ duplicate 提交时冲突行一条都匹配不上。实测形态（2026-08-28）：内容**已经**经唯一 commit 边界发布、revision 已 +1，随后 `mark_conflicts_resolved` 抛 `ScopeIntegrityError` ——「内容进去了、AC 8.6 的轨迹（actor/时间/选择结果/落地值）没进去」，冲突行永远停在未裁决态，而调用方看到的是一个与裁决无关的完整性错误。与 G01 分两条：一条打读侧、一条打写侧，两者可以独立退化（G01 是静默空预览，本条是 commit 后失败）",
+      "verdict": "RED",
+      "summary": "7 failed, 421 passed in 65.96s (0:01:05)",
+      "added": [
+        "test_task27_conflict_resolution_pg.py::TestDuplicateRequestedOperation::test_no_third_operation_or_second_application_was_created",
+        "test_task27_conflict_resolution_pg.py::TestDuplicateRequestedOperation::test_preview_through_the_duplicate_returns_the_primary_conflicts",
+        "test_task27_conflict_resolution_pg.py::TestDuplicateRequestedOperation::test_resolve_through_the_duplicate_publishes_the_folded_projection",
+        "test_task27_conflict_resolution_pg.py::TestDuplicateRequestedOperation::test_the_resolution_trail_lands_on_the_primary_conflict_rows",
+        "test_task27_conflict_resolution_pg.py::TestDuplicateRequestedOperation::test_the_second_delivery_really_became_a_direct_terminal_duplicate",
+        "test_task27_conflict_resolution_pg.py::TestHarness::test_every_scenario_was_collected",
+        "test_task27_conflict_resolution_pg.py::TestHarness::test_no_phase_crashed_during_collection"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task27_conflict_resolution_pg.py::TestDuplicateRequestedOperation::test_the_resolution_trail_lands_on_the_primary_conflict_rows"
+      ],
+      "added_files": [
+        "test_task27_conflict_resolution_pg.py"
+      ],
+      "restored": true,
+      "restored_sha256": "fb8cf0ba59e75be72f3c24ea59783ebd9701198b893566ed551398c5c01d0751",
+      "seconds": 69.3
+    },
+    {
+      "id": "H01",
+      "path": "backend/app/services/workpaper_sync/conflict_resolution.py",
+      "want": "test_task27_conflict_resolution_pg.py::TestWhoMaySubmitAdjudications::test_review_lock_or_archive_blocks_the_adjudication",
+      "why": "把落地自证摘掉（保留表达式求值，因此不是「删掉一行就语法错」的无效变异）⇒ 缺陷原样复活：复核锁定/归档/项目不可见时裁决轨迹照写、resolve 照回 200。离线侧同时红（顺序判据找不到这个调用）",
+      "verdict": "RED",
+      "summary": "4 failed, 424 passed in 65.99s (0:01:05)",
+      "added": [
+        "test_task27_conflict_resolution.py::TestResolveApplyLandedGate::test_the_rebase_branch_also_asserts_landing",
+        "test_task27_conflict_resolution_pg.py::TestWhoMaySubmitAdjudications::test_none_of_the_refusals_wrote_an_adjudication_trail",
+        "test_task27_conflict_resolution_pg.py::TestWhoMaySubmitAdjudications::test_project_invisibility_is_a_separate_refusal",
+        "test_task27_conflict_resolution_pg.py::TestWhoMaySubmitAdjudications::test_review_lock_or_archive_blocks_the_adjudication"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task27_conflict_resolution_pg.py::TestWhoMaySubmitAdjudications::test_none_of_the_refusals_wrote_an_adjudication_trail",
+        "test_task27_conflict_resolution_pg.py::TestWhoMaySubmitAdjudications::test_review_lock_or_archive_blocks_the_adjudication"
+      ],
+      "added_files": [
+        "test_task27_conflict_resolution.py",
+        "test_task27_conflict_resolution_pg.py"
+      ],
+      "restored": true,
+      "restored_sha256": "fb8cf0ba59e75be72f3c24ea59783ebd9701198b893566ed551398c5c01d0751",
+      "seconds": 69.3
+    },
+    {
+      "id": "H02",
+      "path": "backend/app/services/workpaper_sync/conflict_resolution.py",
+      "want": "test_task27_conflict_resolution.py::TestResolveApplyLandedGate::test_the_admissible_set_is_exactly_the_two_landed_states",
+      "why": "把授权失效塞进「视为落地」的白名单 —— 这是判据在、集合被放宽的形态：函数照样调、异常类型照样在，只是那条终态被静默放行。真库侧同时红",
+      "verdict": "RED",
+      "summary": "7 failed, 421 passed in 65.76s (0:01:05)",
+      "added": [
+        "test_task27_conflict_resolution.py::TestResolveApplyLandedGate::test_each_terminal_state_lands_on_its_own_verdict[authorization_stale]",
+        "test_task27_conflict_resolution.py::TestResolveApplyLandedGate::test_rebase_admits_conflict_but_still_refuses_failures",
+        "test_task27_conflict_resolution.py::TestResolveApplyLandedGate::test_the_admissible_set_is_exactly_the_two_landed_states",
+        "test_task27_conflict_resolution.py::TestResolveApplyLandedGate::test_the_two_verdicts_are_separate_types_and_carry_the_inner_cause",
+        "test_task27_conflict_resolution_pg.py::TestWhoMaySubmitAdjudications::test_none_of_the_refusals_wrote_an_adjudication_trail",
+        "test_task27_conflict_resolution_pg.py::TestWhoMaySubmitAdjudications::test_project_invisibility_is_a_separate_refusal",
+        "test_task27_conflict_resolution_pg.py::TestWhoMaySubmitAdjudications::test_review_lock_or_archive_blocks_the_adjudication"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task27_conflict_resolution.py::TestResolveApplyLandedGate::test_the_admissible_set_is_exactly_the_two_landed_states",
+        "test_task27_conflict_resolution_pg.py::TestWhoMaySubmitAdjudications::test_review_lock_or_archive_blocks_the_adjudication"
+      ],
+      "added_files": [
+        "test_task27_conflict_resolution.py",
+        "test_task27_conflict_resolution_pg.py"
+      ],
+      "restored": true,
+      "restored_sha256": "fb8cf0ba59e75be72f3c24ea59783ebd9701198b893566ed551398c5c01d0751",
+      "seconds": 69.1
+    },
+    {
+      "id": "H03",
+      "path": "backend/app/services/workpaper_sync/conflict_resolution.py",
+      "want": "test_task27_conflict_resolution_pg.py::TestWhoMaySubmitAdjudications::test_review_lock_or_archive_blocks_the_adjudication",
+      "why": "不可重试（授权失效）与可重试（解析/发布失败）合流到同一个类型 ⇒ 前端只能给同一句话，而两者的补救路径相反（supersede/recovery vs 修因后 retry）。离线侧的逐终态参数化同时红",
+      "verdict": "RED",
+      "summary": "5 failed, 423 passed in 66.01s (0:01:06)",
+      "added": [
+        "test_task27_conflict_resolution.py::TestResolveApplyLandedGate::test_each_terminal_state_lands_on_its_own_verdict[authorization_stale]",
+        "test_task27_conflict_resolution.py::TestResolveApplyLandedGate::test_rebase_admits_conflict_but_still_refuses_failures",
+        "test_task27_conflict_resolution.py::TestResolveApplyLandedGate::test_the_two_verdicts_are_separate_types_and_carry_the_inner_cause",
+        "test_task27_conflict_resolution_pg.py::TestWhoMaySubmitAdjudications::test_project_invisibility_is_a_separate_refusal",
+        "test_task27_conflict_resolution_pg.py::TestWhoMaySubmitAdjudications::test_review_lock_or_archive_blocks_the_adjudication"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task27_conflict_resolution.py::TestResolveApplyLandedGate::test_each_terminal_state_lands_on_its_own_verdict[authorization_stale]",
+        "test_task27_conflict_resolution_pg.py::TestWhoMaySubmitAdjudications::test_review_lock_or_archive_blocks_the_adjudication"
+      ],
+      "added_files": [
+        "test_task27_conflict_resolution.py",
+        "test_task27_conflict_resolution_pg.py"
+      ],
+      "restored": true,
+      "restored_sha256": "fb8cf0ba59e75be72f3c24ea59783ebd9701198b893566ed551398c5c01d0751",
+      "seconds": 69.3
+    },
+    {
+      "id": "H04",
+      "path": "backend/app/services/workpaper_sync/conflict_resolution.py",
+      "want": "test_task27_conflict_resolution_pg.py::TestResolveFenceRejections::test_current_revision_change_rebases_and_rebuilds_conflicts",
+      "why": "rebase 探测的**正常**结果是 `conflict`；不传宽一格的 `landed` 就会把它判成「落地失败」⇒ 409 rebase-required 变成 `resolve_apply_failed`，客户端拿不到重建后的冲突集。反向证明这个参数不是装饰",
+      "verdict": "RED",
+      "summary": "2 failed, 426 passed in 66.10s (0:01:06)",
+      "added": [
+        "test_task27_conflict_resolution.py::TestResolveApplyLandedGate::test_the_rebase_branch_also_asserts_landing",
+        "test_task27_conflict_resolution_pg.py::TestResolveFenceRejections::test_current_revision_change_rebases_and_rebuilds_conflicts"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task27_conflict_resolution.py::TestResolveApplyLandedGate::test_the_rebase_branch_also_asserts_landing",
+        "test_task27_conflict_resolution_pg.py::TestResolveFenceRejections::test_current_revision_change_rebases_and_rebuilds_conflicts"
+      ],
+      "added_files": [
+        "test_task27_conflict_resolution.py",
+        "test_task27_conflict_resolution_pg.py"
+      ],
+      "restored": true,
+      "restored_sha256": "fb8cf0ba59e75be72f3c24ea59783ebd9701198b893566ed551398c5c01d0751",
+      "seconds": 69.4
+    },
+    {
+      "id": "H05",
+      "path": "backend/app/services/workpaper_sync/conflict_resolution.py",
+      "want": "test_task27_conflict_resolution_pg.py::TestWhoMaySubmitAdjudications::test_review_lock_or_archive_blocks_the_adjudication",
+      "why": "丢掉内层归因（是十条 fence 里的哪一条）⇒ 运维只看到「授权失效」，得自己猜是复核锁定、归档、项目不可见、generation supersede 还是 contributor 漂移（AC 10.10 要求逐条可分辨）。缩进 12 空格的那一处是 `ResolveAuthorizationStaleError`，与末尾 8 空格的 `ResolveApplyFailedError` 不同锚点，因此唯一命中",
+      "verdict": "RED",
+      "summary": "3 failed, 425 passed in 66.64s (0:01:06)",
+      "added": [
+        "test_task27_conflict_resolution.py::TestResolveApplyLandedGate::test_the_two_verdicts_are_separate_types_and_carry_the_inner_cause",
+        "test_task27_conflict_resolution_pg.py::TestWhoMaySubmitAdjudications::test_project_invisibility_is_a_separate_refusal",
+        "test_task27_conflict_resolution_pg.py::TestWhoMaySubmitAdjudications::test_review_lock_or_archive_blocks_the_adjudication"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task27_conflict_resolution.py::TestResolveApplyLandedGate::test_the_two_verdicts_are_separate_types_and_carry_the_inner_cause",
+        "test_task27_conflict_resolution_pg.py::TestWhoMaySubmitAdjudications::test_project_invisibility_is_a_separate_refusal",
+        "test_task27_conflict_resolution_pg.py::TestWhoMaySubmitAdjudications::test_review_lock_or_archive_blocks_the_adjudication"
+      ],
+      "added_files": [
+        "test_task27_conflict_resolution.py",
+        "test_task27_conflict_resolution_pg.py"
+      ],
+      "restored": true,
+      "restored_sha256": "fb8cf0ba59e75be72f3c24ea59783ebd9701198b893566ed551398c5c01d0751",
+      "seconds": 70.0
+    }
+  ]
+}

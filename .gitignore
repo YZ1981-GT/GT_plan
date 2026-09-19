@@ -36,7 +36,7 @@ backend/uploads/
 backend/storage/
 backend/wp_storage/
 backend/backups/
-# Univer Server install artifacts (univer_install.sh target dir, gitignored — not used in current deployment)
+# Univer Server install artifacts (安装目录，已废弃)
 univer-server/
 *.xlsx
 !2025人员情况.xlsx
@@ -104,6 +104,18 @@ GT_logo/
 # Commit 消息临时文件
 COMMIT_MSG_TMP.txt
 
+# 一次性调试/探测脚本（禁止入库）
+_tmp_*
+_probe*.py
+_dump_*.py
+# 🔴 上面只收了 `_tmp_*`（带前导下划线），而各 spec 会话实际大量产出的是**无下划线**的
+#    `tmp_*` 与 `backend/scripts/diagnose/_wip_*` —— 二者此前均未收录，长期污染
+#    `git status`（2026-08-12 G7 收口前根目录积了 487 个 `tmp_*`）。
+#    正式产物一律用真名（`diagnose_*.py` / `verify_*_live.py` / `mutate_*.py` / `test_*.py`），
+#    不会被这两条命中；诊断中间产物本就不该入库。
+tmp_*
+_wip_*
+
 # 开发日志
 backend_dev.log
 frontend_dev.log
@@ -133,3 +145,40 @@ pytest_junit.xml
 fullrun_result.txt
 smoke-test-*.png
 backend/.coverage
+
+# 构建期版本注入产物（CI 写入，不入库）
+backend/app/_build_version.json
+
+# 早期架构规划笔记（已被 .kiro/specs 完全替代，代码零引用）
+.omm/
+
+# CodeGraph 本地索引（机器本地，不入库）
+.codegraph/
+
+# MCP 本地密钥（复制 mcp.env.example → mcp.env）
+.cursor/mcp.env
+
+# Evidence-governance quarantine store (must never be committed — may hold rejected/malicious upload bytes)
+quarantine_store/
+backend/quarantine_store/
+
+# OfficeCLI 本地二进制（31.8MB，不入库；由 tools/officecli/install.* 按版本锁+SHA256 拉取）
+tools/officecli/bin/
+tools/officecli/_poc*
+tools/officecli/_word_probe*
+
+# 运行时产物（2026-08-01：每次提交都要手工 git restore --staged 排除，故收进忽略）
+# health.json = /health 端点响应快照（含 migration/schema_drift 实时状态，因机器而异）
+backend/health.json
+# Vite 依赖预构建缓存
+.vite/
+
+# 变异检验产物（spec: workpaper-import-export-lifecycle-closure Task 21）
+# 报告可由 `mutate_ie_lifecycle_guards.py --run` 随时重跑，不入库；
+# `.mutbak` 是脚本被强杀后的备份残留，用 `--restore` 收尾，同样不该入库。
+backend/scripts/diagnose/_mutation_reports/
+*.mutbak
+.mut_vitest_*.json
+
+# 🔴 注意：`backend/scripts/fix/_ledgers/` **不在**忽略列表内 —— 那是
+# 模板库解引用迁移（Task 19）的台账，是 `--rollback` 的唯一依据，必须入库。

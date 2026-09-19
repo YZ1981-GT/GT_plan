@@ -46,6 +46,7 @@ from app.models.audit_platform_schemas import (
 )
 from app.core.audit_decorator import audit_log
 from app.services.event_bus import event_bus
+from app.services.ledger_import.direction_resolver import resolve_account_direction
 
 
 # 合法的状态转换
@@ -143,6 +144,7 @@ class AdjustmentService:
                 entry_group_id=entry_group_id,
                 line_no=idx,
                 standard_account_code=li.standard_account_code,
+                detail_account_code=li.detail_account_code,
                 account_name=li.account_name,
                 report_line_code=li.report_line_code,
                 debit_amount=li.debit_amount,
@@ -285,6 +287,7 @@ class AdjustmentService:
                     entry_group_id=entry_group_id,
                     line_no=idx,
                     standard_account_code=li.standard_account_code,
+                    detail_account_code=li.detail_account_code,
                     account_name=li.account_name,
                     report_line_code=li.report_line_code,
                     debit_amount=li.debit_amount,
@@ -488,6 +491,7 @@ class AdjustmentService:
         year: int,
         adjustment_type: AdjustmentType | None = None,
         review_status: ReviewStatus | None = None,
+        origin: str | None = None,
         page: int = 1,
         page_size: int = 50,
     ) -> dict:
@@ -521,6 +525,13 @@ class AdjustmentService:
             base = base.where(adj.c.adjustment_type == adjustment_type)
         if review_status is not None:
             base = base.where(adj.c.review_status == review_status)
+        if origin is not None:
+            # origin 组内共享（同 entry_group 全 workpaper 或全 manual），组级过滤正确。
+            # 'manual' 兼容历史 NULL 数据。
+            if origin == "manual":
+                base = base.where(sa.or_(adj.c.origin.is_(None), adj.c.origin == "manual"))
+            else:
+                base = base.where(adj.c.origin == origin)
 
         # 用子查询做分页
         sub = base.subquery()
@@ -754,6 +765,12 @@ class AdjustmentService:
         unadjusted = Decimal(str(tb_result.scalar() or 0))
 
         # 获取 AJE/RJE 明细
+        # v2 约定（category_natural_positive）：调整净额 SUM(debit)-SUM(credit) 是"借正贷负"，
+        # 但 unadjusted_amount 已按科目自然方向存正数（Task 3.1）。为使
+        # audited = unadjusted + aje + rje 在所有类别（尤其负债/权益/收入贷方类）下方向正确，
+        # 须把净额按科目自然方向归一：借方类用 (debit-credit)，贷方类取反 (credit-debit)。
+        # 与 trial_balance_service.recalc_adjustments（Task 3.3）使用同一 direction_resolver 口径，
+        # 此处仅做"按方向归一"，不叠加额外翻转——调整分录本身仍是原始借贷金额。
         adj = Adjustment.__table__
         adj_q = (
             sa.select(
@@ -761,6 +778,8 @@ class AdjustmentService:
                 adj.c.adjustment_no,
                 adj.c.adjustment_type,
                 adj.c.description,
+                adj.c.account_code,
+                adj.c.account_name,
                 (sa.func.coalesce(sa.func.sum(adj.c.debit_amount), 0)
                  - sa.func.coalesce(sa.func.sum(adj.c.credit_amount), 0)).label("net"),
             )
@@ -775,24 +794,40 @@ class AdjustmentService:
                 adj.c.adjustment_no,
                 adj.c.adjustment_type,
                 adj.c.description,
+                adj.c.account_code,
+                adj.c.account_name,
             )
         )
         adj_result = await self.db.execute(adj_q)
+
+        # 按 (entry_group_id, type) 聚合方向归一后的净额，多科目同组时按各自方向归一再相加
+        group_acc: dict[tuple, WPAdjustmentDetail] = {}
+        for r in adj_result.fetchall():
+            direction, _src = resolve_account_direction(
+                r.account_code, r.account_name or ""
+            )
+            sign = Decimal("-1") if direction == "credit" else Decimal("1")
+            normalized = sign * Decimal(str(r.net))
+            key = (r.entry_group_id, r.adjustment_type)
+            existing = group_acc.get(key)
+            if existing is None:
+                group_acc[key] = WPAdjustmentDetail(
+                    entry_group_id=r.entry_group_id,
+                    adjustment_no=r.adjustment_no,
+                    adjustment_type=r.adjustment_type,
+                    description=r.description,
+                    amount=normalized,
+                )
+            else:
+                existing.amount += normalized
 
         aje_details: list[WPAdjustmentDetail] = []
         rje_details: list[WPAdjustmentDetail] = []
         aje_total = Decimal("0")
         rje_total = Decimal("0")
 
-        for r in adj_result.fetchall():
-            detail = WPAdjustmentDetail(
-                entry_group_id=r.entry_group_id,
-                adjustment_no=r.adjustment_no,
-                adjustment_type=r.adjustment_type,
-                description=r.description,
-                amount=Decimal(str(r.net)),
-            )
-            if r.adjustment_type in (AdjustmentType.aje.value, AdjustmentType.aje):
+        for detail in group_acc.values():
+            if detail.adjustment_type in (AdjustmentType.aje.value, AdjustmentType.aje):
                 aje_details.append(detail)
                 aje_total += detail.amount
             else:
@@ -898,6 +933,7 @@ class AdjustmentService:
                 id=e.id,
                 line_no=e.line_no,
                 standard_account_code=e.standard_account_code,
+                detail_account_code=getattr(e, "detail_account_code", None),
                 account_name=e.account_name,
                 report_line_code=e.report_line_code,
                 debit_amount=e.debit_amount,
@@ -910,6 +946,8 @@ class AdjustmentService:
         reviewed_at = adj_rows[0].reviewed_at if adj_rows else None
         rejection_reason = adj_rows[0].rejection_reason if adj_rows else None
         created_at = adj_rows[0].created_at if adj_rows else None
+        origin = getattr(adj_rows[0], "origin", None) or "manual" if adj_rows else "manual"
+        source_ref = getattr(adj_rows[0], "source_ref", None) if adj_rows else None
 
         return AdjustmentGroupResponse(
             entry_group_id=entry_group_id,
@@ -925,4 +963,6 @@ class AdjustmentService:
             line_items=line_items,
             created_by=created_by,
             created_at=created_at,
+            origin=origin,
+            source_ref=source_ref,
         )

@@ -1,0 +1,122 @@
+{
+  "script": "e2e/g5-1-d5-unified-path.spec.ts",
+  "captured_at": "2026-09-12T11:37:52.765Z",
+  "scope": {
+    "project_id": "2aa00f57-1df4-4fe8-9840-2d65d0fd8749",
+    "wp_id": "629d762a-d363-4195-b1bc-5c28e3c2bd72",
+    "entry_id": "xlsx/gt-d5-receivables-financing"
+  },
+  "predicates": {
+    "user_sync_requests": [
+      {
+        "method": "GET",
+        "path": "/api/projects/2aa00f57-1df4-4fe8-9840-2d65d0fd8749/workpapers/629d762a-d363-4195-b1bc-5c28e3c2bd72/sync/entries/xlsx/gt-d5-receivables-financing/store-projection",
+        "status": 200
+      },
+      {
+        "method": "POST",
+        "path": "/api/projects/2aa00f57-1df4-4fe8-9840-2d65d0fd8749/workpapers/629d762a-d363-4195-b1bc-5c28e3c2bd72/sync/entries/xlsx/gt-d5-receivables-financing/pending-mutations",
+        "status": 200
+      },
+      {
+        "method": "POST",
+        "path": "/api/projects/2aa00f57-1df4-4fe8-9840-2d65d0fd8749/workpapers/629d762a-d363-4195-b1bc-5c28e3c2bd72/sync/entries/xlsx/gt-d5-receivables-financing/materialize",
+        "status": 200
+      }
+    ],
+    "forcesave_hits": [
+      {
+        "method": "POST",
+        "path": "/api/projects/2aa00f57-1df4-4fe8-9840-2d65d0fd8749/workpapers/629d762a-d363-4195-b1bc-5c28e3c2bd72/sync/entries/xlsx/gt-d5-receivables-financing/rooms/4b23eb3a-3c19-42e2-9015-5634d454e89c/forcesave",
+        "status": 202
+      }
+    ],
+    "d2_sync_hits": 0,
+    "callback_url_keys": [
+      "doc_key",
+      "generation",
+      "room_id",
+      "route_credential_id",
+      "route_token"
+    ],
+    "callback_url_redacted": "http://host.docker.internal:9980/api/workpaper-sync/rooms/4b23eb3a-3c19-42e2-9015-5634d454e89c/onlyoffice-callback?room_id=%3Credacted%3E&generation=%3Credacted%3E&doc_key=%3Credacted%3E&route_credential_id=%3Credacted%3E&route_token=%3Credacted%3E",
+    "host_mounted": true,
+    "confirm_descriptor_200": true,
+    "forcesave_clicked": true,
+    "oo_cell_dirty_attempted": true,
+    "host_dirty_before_forcesave": false,
+    "forcesave_cs_error": 0,
+    "forcesave_cs_outcome": "accepted",
+    "forcesave_http_status": 202,
+    "forcesave_body_keys": [
+      "forcesave_request_id",
+      "operation_id",
+      "request_sequence",
+      "state",
+      "poll_after_ms",
+      "replayed",
+      "dispatch_error",
+      "cs_error",
+      "cs_outcome",
+      "callback_expected"
+    ],
+    "materialize_room_id": "4b23eb3a-3c19-42e2-9015-5634d454e89c",
+    "materialize_has_jwt_token": true,
+    "doc_editor_called": false,
+    "doc_editor_has_root_token": false,
+    "doc_editor_document_mutable": false,
+    "host_status": "",
+    "host_error": "",
+    "confirm_forcesave_error": null,
+    "html_dom_roundtrip": {
+      "attempted": true,
+      "marker": "g5d5979837",
+      "switched_to_html": true,
+      "marker_visible": true,
+      "store_mirrored": true,
+      "dom_probe": {
+        "by_exact_text": 0,
+        "input_prop_hits": 1,
+        "tracked_operation_id": "af6d13d7-5341-4477-a352-91cbfdca5177"
+      }
+    },
+    "oo_write_target": "B12",
+    "oo_cell_edit_probe": {
+      "ok": true,
+      "target": "B12",
+      "attempt": 1,
+      "sheetNames": [
+        "底稿目录",
+        "应收款项融资审计程序表D5A",
+        "审定表D5",
+        "附注披露信息（上市公司）",
+        "附注披露信息（国企）",
+        "应收款项融资明细表D5-2",
+        "调整分录汇总表D5-3",
+        "应收款项融资公允价值测算表D5-4",
+        "_GT_SYNC"
+      ],
+      "activeSheet": "应收款项融资明细表D5-2",
+      "inserted": true,
+      "entered": true,
+      "pasted": true,
+      "closeRet": true,
+      "closed": true,
+      "cellText": "g5d5979837",
+      "modified": true,
+      "saveRet": true,
+      "saved": true,
+      "cellTextAfterSave": "g5d5979837"
+    }
+  },
+  "notes": [
+    "token/JWT/route_credential 值已脱敏",
+    "OO 写格：Asc.editor 写受管 B12(itemName 文本列，A 列是 category enum)；权威判据是 forcesave cs_error（0=有变更，4=no_changes）",
+    "application applied / revision+1 由同目录 DB 核查脚本补齐（venv 查库）",
+    "§9.6 条件 6：切回结构化视图后 D5TabDetail(.d5-detail) DOM 应出现 marker（D5 无搜索框，直接扫 itemName 输入框，排除 .tab-toolbar）",
+    "Phase 5 第五个非 pilot canary（FVOCI 两级表头无账龄组，最简）：D5 权威模板经外链净化过 OOXML 门；目标 wp 629d762a(project 2aa00f57)由 first_publication 按 created_at 定"
+  ],
+  "auth_probe": {
+    "has_token": true
+  }
+}

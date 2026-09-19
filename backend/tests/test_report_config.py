@@ -372,12 +372,17 @@ async def test_api_get_config_detail(client: AsyncClient):
 
 @pytest.mark.asyncio
 async def test_api_clone(client: AsyncClient):
-    """POST /api/report-config/clone 克隆配置"""
+    """POST /api/report-config/clone 全量克隆（legacy strict 需显式指定）。
+
+    默认档已改为幂等的 ``mode='sync'``（只落有公式的行、可重复执行），
+    故断言 strict 语义的用例必须显式传 ``mode``，否则测的就不是这条路径了。
+    """
     resp = await client.post(
         "/api/report-config/clone",
         json={
             "project_id": str(FAKE_PROJECT_ID),
             "applicable_standard": "soe_standalone",
+            "mode": "strict",
         },
     )
     assert resp.status_code == 200
@@ -388,12 +393,13 @@ async def test_api_clone(client: AsyncClient):
 
 @pytest.mark.asyncio
 async def test_api_clone_duplicate(client: AsyncClient):
-    """POST /api/report-config/clone 重复克隆返回 400"""
+    """strict 模式重复克隆返回 400（sync 模式则幂等，见下一个用例）。"""
     await client.post(
         "/api/report-config/clone",
         json={
             "project_id": str(FAKE_PROJECT_ID),
             "applicable_standard": "soe_standalone",
+            "mode": "strict",
         },
     )
     resp = await client.post(
@@ -401,6 +407,26 @@ async def test_api_clone_duplicate(client: AsyncClient):
         json={
             "project_id": str(FAKE_PROJECT_ID),
             "applicable_standard": "soe_standalone",
+            "mode": "strict",
         },
     )
     assert resp.status_code == 400
+
+
+@pytest.mark.asyncio
+async def test_api_clone_default_mode_is_idempotent_sync(client: AsyncClient):
+    """不传 mode 时走 sync：可重复调用不报错，第二次 created=0。"""
+    body = {
+        "project_id": str(FAKE_PROJECT_ID),
+        "applicable_standard": "soe_standalone",
+    }
+    first = await client.post("/api/report-config/clone", json=body)
+    second = await client.post("/api/report-config/clone", json=body)
+
+    assert first.status_code == 200
+    assert second.status_code == 200
+    r1 = first.json().get("data", first.json())
+    r2 = second.json().get("data", second.json())
+    assert r1["created"] > 0
+    assert r2["created"] == 0
+    assert r2["skipped"] == r1["created"]

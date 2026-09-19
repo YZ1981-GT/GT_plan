@@ -632,6 +632,21 @@ describe('GtCNoteTable — 同步到附注模块', () => {
     expect(payload.section_id).toBe('五-1-1 应收账款')
     expect(payload.sub_table_data).toBeDefined()
     expect(payload.current_standard).toBe('listed_standalone')
+    // disclosure-table-sync-convergence Task 8.2: payload 携带来自 schema 的 _columns
+    expect(payload.columns).toBeDefined()
+    const colKeys = Object.keys(payload.columns)
+    expect(colKeys.length).toBeGreaterThan(0)
+    // 每个子表列头是 ColumnDef 数组，label 取自 schema（非英文字段键）
+    for (const k of colKeys) {
+      expect(Array.isArray(payload.columns[k])).toBe(true)
+      if (payload.columns[k].length > 0) {
+        expect(payload.columns[k][0]).toHaveProperty('key')
+        expect(payload.columns[k][0]).toHaveProperty('label')
+      }
+    }
+    // 至少一个子表存在被标记的标签列
+    const hasLabelCol = colKeys.some(k => payload.columns[k].some((c: any) => c.is_label))
+    expect(hasLabelCol).toBe(true)
   })
 
   it('onSyncToDisclosureNotes 缺少 section_id 时弹 warning 不发 emit', async () => {

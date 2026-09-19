@@ -172,7 +172,7 @@ function onFieldUpdate(name: string, value: any) {
 }
 .gt-e__step-desc {
   margin: 0;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   color: var(--el-text-color-secondary);
   line-height: 1.6;
   white-space: pre-line;

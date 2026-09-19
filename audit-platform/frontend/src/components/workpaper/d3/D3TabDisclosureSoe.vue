@@ -1,0 +1,320 @@
+<template>
+<div class="d3-disclosure-soe">
+  <template v-if="!isApplicable">
+    <el-alert type="info" title="当前项目不适用国企附注披露格式" :closable="false" show-icon />
+  </template>
+  <template v-else>
+    <!-- 同步状态条 -->
+    <GtWpDisclosureSyncBar :project-id="projectId" :year="auditYear" :wp-code="'D3'" :sheet-name="'附注披露信息(国企)'" />
+
+    <!-- 工具栏：同步到附注 + 跳转回附注 -->
+    <div class="d3-disclosure-toolbar">
+      <el-button type="primary" plain size="small" :loading="isSyncing" :disabled="isReadonly"
+        title="将披露表内容同步到附注模块（八、38 预收款项）"
+        @click="syncToDisclosureNotes">同步到附注</el-button>
+      <el-dropdown split-button type="default" size="small" :disabled="!projectId"
+        @click="jumpToNote('soe')"
+        @command="jumpToNote">
+        ↩ 跳转回附注（八、38）
+        <template #dropdown>
+          <el-dropdown-menu>
+            <el-dropdown-item command="soe">国企版（八、38）</el-dropdown-item>
+            <el-dropdown-item command="listed">上市版（五、38）</el-dropdown-item>
+          </el-dropdown-menu>
+        </template>
+      </el-dropdown>
+    </div>
+
+    <!-- 子节一：按账龄分类 -->
+    <div class="disclosure-card">
+      <h4 class="card-title">
+        (1) 预收账款按账龄分类
+        <el-tooltip content="数据来源：D3-1审定表按账龄分类区块" placement="top">
+          <el-tag size="small" type="info">跨sheet取数</el-tag>
+        </el-tooltip>
+      </h4>
+      <el-table :data="[...section1Rows, section1Subtotal]" size="small" border stripe>
+        <el-table-column prop="label" label="账龄" width="160">
+          <template #default="{ row }">
+            <span :class="{ 'subtotal-label': row.rowId === '__subtotal__' }">{{ row.label }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="期末金额" width="130" align="right">
+          <template #default="{ row }">
+            <span :class="{ 'cross-sheet-cell': row.rowId?.startsWith('cs-') }">
+              {{ fmtAmount(row.endAmount) }}
+            </span>
+          </template>
+        </el-table-column>
+        <el-table-column label="期初金额" width="130" align="right">
+          <template #default="{ row }">
+            <span :class="{ 'cross-sheet-cell': row.rowId?.startsWith('cs-') }">
+              {{ fmtAmount(row.priorAmount) }}
+            </span>
+          </template>
+        </el-table-column>
+      </el-table>
+    </div>
+
+    <!-- 子节二：超1年重要预收 -->
+    <div class="disclosure-card">
+      <h4 class="card-title">
+        (2) 账龄超过1年的重要预收账款
+        <el-button size="small" :disabled="isReadonly" @click="addRow">+ 添加</el-button>
+      </h4>
+      <el-table :data="[...section2Rows, section2Subtotal]" size="small" border stripe>
+        <el-table-column prop="label" label="对方单位" width="160">
+          <template #default="{ row }">
+            <template v-if="row.rowId === '__subtotal__'">
+              <span class="subtotal-label">合计</span>
+            </template>
+            <template v-else-if="row.rowId?.startsWith('cs-')">
+              <span class="cross-sheet-cell">{{ row.label }}</span>
+            </template>
+            <template v-else>
+              <el-input v-model="row.label" size="small" :disabled="isReadonly"
+                @change="(val: string) => updateCell(row.rowId, 'label', val)" />
+            </template>
+          </template>
+        </el-table-column>
+        <el-table-column label="期末金额" width="130" align="right">
+          <template #default="{ row }">
+            <template v-if="row.rowId === '__subtotal__' || row.rowId?.startsWith('cs-')">
+              <span :class="{ 'cross-sheet-cell': row.rowId?.startsWith('cs-') }">{{ fmtAmount(row.endAmount) }}</span>
+            </template>
+            <template v-else>
+              <el-input v-model.number="row.endAmount" size="small" :disabled="isReadonly"
+                @change="(val: any) => updateCell(row.rowId, 'endAmount', val)" />
+            </template>
+          </template>
+        </el-table-column>
+        <el-table-column label="期初金额" width="130" align="right">
+          <template #default="{ row }">
+            <template v-if="row.rowId === '__subtotal__' || row.rowId?.startsWith('cs-')">
+              <span>{{ fmtAmount(row.priorAmount) }}</span>
+            </template>
+            <template v-else>
+              <el-input v-model.number="row.priorAmount" size="small" :disabled="isReadonly"
+                @change="(val: any) => updateCell(row.rowId, 'priorAmount', val)" />
+            </template>
+          </template>
+        </el-table-column>
+        <el-table-column label="原因" min-width="140">
+          <template #default="{ row }">
+            <template v-if="!row.rowId?.startsWith('cs-') && row.rowId !== '__subtotal__'">
+              <el-input v-model="row.reason" size="small" :disabled="isReadonly"
+                @change="(val: string) => updateCell(row.rowId, 'reason', val)" />
+            </template>
+            <span v-else>{{ row.reason || '' }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="操作" width="50" v-if="!isReadonly">
+          <template #default="{ row }">
+            <el-popconfirm v-if="!row.rowId?.startsWith('cs-') && row.rowId !== '__subtotal__'" title="删除？" @confirm="removeRow(row.rowId)">
+              <template #reference><el-button size="small" type="danger" link>删</el-button></template>
+            </el-popconfirm>
+          </template>
+        </el-table-column>
+      </el-table>
+    </div>
+
+    <!-- D3↔D7 口径交叉核对 -->
+    <el-alert
+      v-if="d3D7ReconcileVisible"
+      :type="'info'"
+      :closable="true"
+      show-icon
+      class="d3-d7-reconcile-alert"
+    >
+      <template #title>
+        <span>
+          预收账款(D3)审定 {{ fmtAmount(d3AuditedTotal) }} + 合同负债(D7)审定 {{ fmtAmount(d7AuditedFromTb) }} = {{ fmtAmount((d3AuditedTotal ?? 0) + (d7AuditedFromTb ?? 0)) }}，
+          请与资产负债表「合同负债」行核对一致（CAS14 预收拆分口径）
+        </span>
+        <GtIndexChip value="wp:D7" context="合同负债审定表" />
+      </template>
+    </el-alert>
+
+    <!-- 编制提示 -->
+    <details class="compile-hint">
+      <summary>📋 编制提示</summary>
+      <div class="hint-content">
+        1. 国有企业应按《企业财务报告条例》和国资委监管要求，分别披露按账龄分类和超1年重要预收情况。<br/>
+        2. 账龄分类简化为"1年以内"和"1年以上"两档。<br/>
+        3. 跨sheet取数（浅蓝色背景）自动从D3-1审定表按账龄分类区块同步。
+      </div>
+    </details>
+  </template>
+</div>
+</template>
+
+<script setup lang="ts">
+/**
+ * D3TabDisclosureSoe.vue — 附注披露（国企）
+ * 2子节卡片 + 跨sheet取数 + 动态行 + 合计 + applicable_standards判断
+ */
+import { computed, ref, toRef, watch, onBeforeUnmount, type Ref } from 'vue'
+import { useRouter } from 'vue-router'
+import { ElMessage } from 'element-plus'
+import http from '@/utils/http'
+import { useDisclosureAutoSync } from '../composables/useDisclosureAutoSync'
+import { useD3DisclosureSoe } from '../composables/useD3DisclosureSoe'
+import {
+  buildD3SyncPayload,
+  D3_NOTE_SECTION,
+  type D3DisclosureSnapshot,
+} from '../composables/d3NoteSectionMap'
+import { buildNoteJumpRoute, type DisclosureVariant } from '@/views/composables/noteDisclosureReverseJump'
+import type { useD3CrossSheet } from '../composables/useD3CrossSheet'
+import type { ChecklistResponse } from '../composables/useD3FormData'
+import { useAuditContext } from '@/composables/useAuditContext'
+import { checkNoteConsistencyGeneric } from '../composables/noteConsistencyCheck'
+import GtWpDisclosureSyncBar from '../GtWpDisclosureSyncBar.vue'
+
+// @ts-ignore
+import GtIndexChip from '../GtIndexChip.vue'
+
+const props = defineProps<{
+  allResponses: Map<string, ChecklistResponse>
+  wpId: string
+  projectId: string
+  isReadonly: boolean
+  crossSheet: ReturnType<typeof useD3CrossSheet>
+  applicableStandards?: string[] | string
+  saveImmediate: (itemId: string, data: Partial<ChecklistResponse>) => Promise<void>
+  debouncedSave: (itemId: string, data: Partial<ChecklistResponse>) => void
+}>()
+
+// 父级经模板传入的是解包后的普通值（非 ref），此处重新包成 ref 供 composable 使用
+const allResponsesRef = toRef(props, 'allResponses') as Ref<Map<string, ChecklistResponse>>
+const wpIdRef = toRef(props, 'wpId') as Ref<string>
+const projectIdRef = toRef(props, 'projectId') as Ref<string>
+
+const { year: auditYear } = useAuditContext()
+const applicableStandardsRef = computed<string[]>(() => {
+  const v = props.applicableStandards
+  return Array.isArray(v) ? v : (typeof v === 'string' && v ? [v] : [])
+}) as unknown as Ref<string[]>
+
+// ─── 保存后自动同步到附注（防抖/非阻塞/失败静默）──────────────────────────────
+const autoSync = useDisclosureAutoSync({ isReadonly: () => props.isReadonly })
+onBeforeUnmount(() => autoSync.cancelPending())
+
+const {
+  isApplicable,
+  section1Rows,
+  section1Subtotal,
+  section2Rows,
+  section2Subtotal,
+  addRow,
+  removeRow,
+  updateCell,
+} = useD3DisclosureSoe({
+  allResponses: allResponsesRef,
+  wpId: wpIdRef,
+  projectId: projectIdRef,
+  saveImmediate: props.saveImmediate,
+  debouncedSave: props.debouncedSave,
+  crossSheet: props.crossSheet,
+  isReadonly: computed(() => props.isReadonly) as unknown as Ref<boolean>,
+  applicableStandards: applicableStandardsRef,
+})
+
+// 数据变化后防抖自动同步到附注
+watch(
+  [section1Rows, section2Rows],
+  () => {
+    autoSync.scheduleAutoSync(syncToDisclosureNotes)
+  },
+  { deep: true },
+)
+
+function fmtAmount(val: number | null | undefined): string {
+  if (val == null || val === 0) return '-'
+  if (val < 0) return `(${Math.abs(val).toLocaleString('zh-CN', { maximumFractionDigits: 2 })})`
+  return val.toLocaleString('zh-CN', { maximumFractionDigits: 2 })
+}
+
+// ─── D3↔D7 口径交叉核对（预收账款 + 合同负债 vs 报表行）─────────────────────
+const d3AuditedTotal = computed<number | null>(() => {
+  return section1Subtotal.value?.endAmount ?? null
+})
+
+const d7AuditedFromTb = computed<number | null>(() => {
+  const tbVal = props.allResponses.get('D3-d7-tb-audited-amount')?.remark
+  if (tbVal != null && String(tbVal).trim() !== '') {
+    const n = Number(tbVal)
+    return Number.isFinite(n) ? n : null
+  }
+  const csVal = (props.crossSheet as any)?.d7TbAudited?.value
+  if (typeof csVal === 'number' && Number.isFinite(csVal)) return csVal
+  return null
+})
+
+const d3D7ReconcileVisible = computed<boolean>(() => {
+  return d3AuditedTotal.value != null && d3AuditedTotal.value !== 0 && d7AuditedFromTb.value != null
+})
+
+// ─── 同步到附注 / 跳转回附注 ─────────────────────────────────────────────────
+const router = useRouter()
+const isSyncing = ref(false)
+
+function jumpToNote(target: DisclosureVariant): void {
+  const route = buildNoteJumpRoute(props.projectId || '', 'D3', target)
+  if (route) router.push(route)
+}
+
+/** 底稿披露表 → 附注单向推送（结构化表格同步到附注 八、38 预收款项）。 */
+async function syncToDisclosureNotes(): Promise<void> {
+  if (isSyncing.value || !props.projectId || props.isReadonly) return
+  isSyncing.value = true
+  try {
+    const snapshot: D3DisclosureSnapshot = {
+      mainRows: section1Rows.value.map((r) => ({ rowKey: r.rowKey, label: r.label, endAmount: r.endAmount, priorAmount: r.priorAmount })),
+      mainTotal: { label: '合计', endAmount: section1Subtotal.value.endAmount, priorAmount: section1Subtotal.value.priorAmount },
+      longTermRows: section2Rows.value.map((r) => ({ label: r.label, endAmount: r.endAmount, priorAmount: r.priorAmount, reason: r.reason })),
+      longTermTotal: { label: '合计', endAmount: section2Subtotal.value.endAmount, priorAmount: section2Subtotal.value.priorAmount },
+      notes: {},
+    }
+    const payload = buildD3SyncPayload('soe', props.wpId || '', applicableStandardsRef.value, snapshot)
+    const result: any = await http.post(
+      `/api/projects/${props.projectId}/disclosure-notes/sync-from-workpaper`,
+      payload,
+    )
+    const data = result?.data ?? result
+    const rows = Number(data?.rows_synced ?? 0)
+    window.dispatchEvent(new CustomEvent('disclosure:note-text-updated', {
+      detail: {
+        wpCode: 'D3',
+        accountCode: '2203',
+        projectId: props.projectId,
+        section: 'soe',
+        sectionIds: [D3_NOTE_SECTION.soe],
+      },
+    }))
+    ElMessage.success(`已同步 ${rows} 行到附注模块「${D3_NOTE_SECTION.soe} 预收款项」`)
+    // 静默校对附注合计一致性（`section1Subtotal` 为 SoeDisclosureRow，期末数在 endAmount）
+    const pageTotal = section1Subtotal.value?.endAmount ?? 0
+    checkNoteConsistencyGeneric(props.projectId, auditYear.value, D3_NOTE_SECTION.soe, pageTotal, true)
+  } catch {
+    ElMessage.warning('同步附注失败，请稍后重试')
+  } finally {
+    isSyncing.value = false
+  }
+}
+
+
+</script>
+
+<style scoped>
+.d3-disclosure-soe { padding: 16px; }
+.d3-disclosure-toolbar { display: flex; gap: 8px; align-items: center; margin-bottom: 12px; }
+.d3-d7-reconcile-alert { margin-bottom: 12px; }
+.disclosure-card { margin-bottom: 20px; padding: 16px; background: #fff; border: 1px solid #ebeef5; border-radius: 6px; }
+.card-title { font-size: 14px; font-weight: 600; margin-bottom: 12px; display: flex; align-items: center; gap: 8px; }
+.subtotal-label { font-weight: 700; }
+.cross-sheet-cell { background: #ecf5ff; padding: 2px 6px; border-radius: 2px; }
+.compile-hint { margin-top: 16px; border-left: 3px solid #409eff; background: #ecf5ff; border-radius: 4px; }
+.compile-hint summary { padding: 8px 12px; cursor: pointer; font-size: var(--wp-font-size, 13px); color: #409eff; }
+.compile-hint .hint-content { padding: 8px 12px 12px; font-size: 12px; color: #606266; line-height: 1.8; }
+</style>

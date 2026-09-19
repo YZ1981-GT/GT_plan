@@ -57,15 +57,32 @@ _PARSE_MODE: str = os.environ.get("FORMULA_PARSE_MODE", "ast")
 
 @dataclass
 class FormulaResult:
-    """公式执行结果"""
+    """公式执行结果。
+
+    ``blocked``（P0-项2）：公式结构合法但含**非白名单**内容（未注册函数 / eval/exec /
+    URL / 外链）。此时 ``value`` 仍会给出（通常 0），但 ``ok`` 为 False 且分类明确为
+    blocked —— **不静默返 0 冒充正常**，供调用方区分「配置/注入问题」与「诚实的 0」。
+    """
     value: Decimal = Decimal("0")
     errors: list[str] = field(default_factory=list)
     warnings: list[str] = field(default_factory=list)
     trace: list[str] = field(default_factory=list)  # 取数轨迹（审计用）
+    blocked: bool = False  # 含非白名单函数/危险标识/外链（P0-项2）
 
     @property
     def ok(self) -> bool:
-        return len(self.errors) == 0
+        return len(self.errors) == 0 and not self.blocked
+
+    @property
+    def state(self) -> str:
+        """求值态分类（ok/damaged/blocked）。missing 由调用方按 key 存在性判定，不在此。"""
+        if self.blocked:
+            return "blocked"
+        if self.errors and any("解析失败" in e for e in self.errors):
+            return "damaged"
+        if self.errors:
+            return "error"
+        return "ok"
 
 
 @dataclass
@@ -108,7 +125,18 @@ class FormulaContext:
 
 
 # ── 列名映射（中文 → 标准字段名） ──
+#
+# 🔴 规范字段名（值）**必须**与已交付共享件
+# `four_table/occurrence_by_standard_code.py` 的 `DEBIT_KEY`/`CREDIT_KEY` 一致
+# （`本期借方`/`本期贷方`）—— 该件的守卫
+# `test_formula_column_alias_coverage::test_occurrence_keys_match_engine_standard_fields`
+# 断言 `DEBIT_KEY in set(COLUMN_ALIASES.values())`。写成 `借方发生额` 会立刻打红。
+#
+# 发生额四键的数据来源 = `tb_balance.debit_amount` / `credit_amount`
+# （`trial_balance` **没有**发生额列，只有余额与调整），经
+# `aggregate_occurrence()` 按标准码归集（含叶子聚合，父子不双算）。
 COLUMN_ALIASES: dict[str, str] = {
+    # ── 余额类（既有 8 键，映射目标逐字不变） ──
     "期末余额": "期末余额",
     "审定数": "期末余额",
     "年初余额": "年初余额",
@@ -117,7 +145,94 @@ COLUMN_ALIASES: dict[str, str] = {
     "本期发生额": "本期发生额",
     "RJE调整": "RJE调整",
     "AJE调整": "AJE调整",
+    # ── 发生额类（新增；两两同义，规范名 = 共享件 DEBIT_KEY/CREDIT_KEY） ──
+    "本期借方": "本期借方",
+    "借方发生额": "本期借方",
+    "本期借方发生额": "本期借方",
+    "本期贷方": "本期贷方",
+    "贷方发生额": "本期贷方",
+    "本期贷方发生额": "本期贷方",
 }
+
+#: 属「发生额」语义的**规范字段名**（不是别名）。单一真源，供 `tb_data`
+#: 构造点与守卫共同引用，禁两处各写一份。
+OCCURRENCE_COLUMNS: frozenset[str] = frozenset({"本期借方", "本期贷方", "本期发生额"})
+
+
+def is_unregistered_column(col_name: str) -> bool:
+    """列名是否**未注册**（配置错）。
+
+    与「已注册但该科目无数据」（诚实的 0）区分开的唯一判据。调用方据此决定
+    记 ``errors``（配置错）还是只记 ``trace``（数据缺）。
+
+    🔴 `_resolve_tb_column` 的返回值**恒为 Decimal**（两种缺失态都返 0），
+    不用哨兵对象 —— 因为 ``TB()`` 的结果要参与四则运算，哨兵会污染算术；
+    且既有守卫 `test_resolver_distinguishes_unregistered_from_missing_data`
+    按「返 0 + trace 区分」这一契约断言。
+    """
+    return col_name not in COLUMN_ALIASES
+
+
+class FormulaColumnError(Exception):
+    """公式引用了**未注册的列名**（配置错，不是数据缺失）。
+
+    由 `_handle_tb` 抛出、`_execute_ast` 捕获后记入 ``FormulaResult.errors``。
+
+    🔴 **必须是独立异常类**：`_execute_ast` 的兜底 ``except Exception`` 会把任何
+    异常记成「AST 求值失败」，那样「列名拼错」与「解析崩溃」在 errors 里不可区分，
+    审计师无法据此定位是公式写错还是引擎坏了（R3.2 要求二者可区分）。
+    """
+
+
+def _resolve_tb_column(
+    account_data: dict[str, Any],
+    col_name: str,
+    *,
+    code: str,
+    trace: list[str],
+) -> Decimal:
+    """按列名从科目数据取值 —— **三态**，禁回退到「期末余额」。
+
+    ====================  ==========================  ==================  ==============================
+    态                    条件                        返回                记录
+    ====================  ==========================  ==================  ==============================
+    未注册列名            ``col_name`` 不在别名表     ``Decimal("0")``    trace「列名未注册」+ 调用方记 errors
+    已注册但该科目无数据  规范名不在 ``account_data`` ``Decimal("0")``    trace「该科目列无数据」
+    正常                  —                           值                  —
+    ====================  ==========================  ==================  ==============================
+
+    两种缺失态**返回值相同（0）、trace 标记不同**；调用方用
+    :func:`is_unregistered_column` 判定是否要记 ``errors``。
+
+    🔴 **改造前两处求值路径都写**::
+
+        val = account_data.get(resolved_col, account_data.get("期末余额", Decimal("0")))
+
+    即取不到目标列时**静默回退期末余额** ⇒ 「本期增加 / 本期减少 / 本期计提」列
+    拿到的是**期末余额**。全库 48 个预设格中招（``本期借方`` 19 / ``本期贷方`` 17 /
+    ``贷方发生额`` 7 / ``借方发生额`` 5，2026-08-06 实测），是**数字错不是取不到** ——
+    界面有值、零报错、既有单测全绿。
+
+    为什么「已注册但无数据」返 ``0`` 而不是 ``MISSING_COLUMN``：
+    ``aggregate_occurrence()`` **有意不产出零值键**（借贷双方都为 0 的标准码不进
+    结果），此时 0 是**诚实的 0**（该科目本期确实没有发生额），不该让整格公式失败。
+    只有「列名压根没注册」才是配置错。
+
+    spec: .kiro/specs/formula-management-runtime-closure/ R3.2 / R3.3 / Property 6~7
+    """
+    resolved = COLUMN_ALIASES.get(col_name)
+    if resolved is None:
+        trace.append(
+            f"TB('{code}','{col_name}') 列名未注册（可用：{'/'.join(sorted(COLUMN_ALIASES))}）"
+        )
+        return Decimal("0")
+    if resolved not in account_data:
+        # 文案含「列无数据」四字 —— `test_formula_column_alias_coverage::
+        # test_resolver_distinguishes_unregistered_from_missing_data` 按此断言，
+        # 用于区分本分支与「列名未注册」分支。改文案前先看该守卫。
+        trace.append(f"TB('{code}','{col_name}')：该科目列无数据（缺「{resolved}」）→ 0")
+        return Decimal("0")
+    return account_data[resolved]
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -259,6 +374,15 @@ class FormulaParseError(Exception):
     pass
 
 
+class FormulaBlockedError(Exception):
+    """公式含非白名单内容（未注册函数 / eval/exec / URL / 外链）——被拦截（P0-项2）。
+
+    与 ``FormulaParseError``（结构坏=damaged）区分：blocked 是**结构合法但语义越权/未授权**。
+    引擎据此把 ``FormulaResult.blocked`` 置 True（不静默返 0 冒充正常）。
+    """
+    pass
+
+
 class _RecursiveDescentParser:
     """递归下降解析器：expression → comparison → term → factor → atom
 
@@ -385,10 +509,12 @@ class _RecursiveDescentParser:
         return ASTFuncCall(name=name_tok.value, args=args)
 
 
+@lru_cache(maxsize=2048)
 def parse_to_ast(formula: str) -> Any:
     """解析公式字符串为 AST（内核 parse 层入口）。
 
     解析结果可缓存（同公式不重复解析）。
+    AST 节点构造后从不修改字段，可安全共享。
     """
     tokens = _tokenize(formula)
     if not tokens:
@@ -620,23 +746,46 @@ def _handle_if(args: list[Any], ctx: FormulaContext, trace: list[str]) -> Decima
 
 
 def _handle_tb(args: list[Any], ctx: FormulaContext, trace: list[str]) -> Decimal:
-    """TB('code','column') — 单科目取值"""
+    """TB('code','column') — 单科目取值
+
+    列名未注册时抛 :class:`FormulaColumnError`，由 `_execute_ast` 记入
+    ``FormulaResult.errors`` —— **禁**静默回退期末余额（R3.2）。
+    """
     str_args = _extract_string_args(args, ctx, trace)
     code = str_args[0] if str_args else ''
     col_name = str_args[1] if len(str_args) > 1 else ctx.default_column
-    resolved_col = COLUMN_ALIASES.get(col_name, col_name)
     account_data = ctx.tb_data.get(code, {})
-    val = account_data.get(resolved_col, account_data.get("期末余额", Decimal("0")))
+    val = _resolve_tb_column(account_data, col_name, code=code, trace=trace)
+    if is_unregistered_column(col_name):
+        raise FormulaColumnError(
+            f"TB('{code}','{col_name}')：列名「{col_name}」未注册，无法取值"
+        )
     trace.append(f"TB('{code}','{col_name}') = {val}")
     return val
 
 
 def _handle_sum_tb(args: list[Any], ctx: FormulaContext, trace: list[str]) -> Decimal:
-    """SUM_TB('range','column') — 范围科目求和"""
+    """SUM_TB('range','column') — 范围科目求和（**按列名**求和）。
+
+    🔴 改造前本函数**取了 `col_name` 却丢弃**，写死 ``data.get("期末余额")`` ——
+    连 `COLUMN_ALIASES` 都不查、trace 也不打印列名，比 ``TB`` 的静默回退更彻底。
+    实测当前预设里 ``SUM_TB`` 第二实参**全是期末余额语义**（影响 0 格）⇒ 属
+    **潜伏缺陷**：任何新增「``SUM_TB`` + 发生额列」的预设都会静默按期末余额求和。
+
+    零回归：``期末余额`` 走 `_resolve_tb_column` 与原 ``data.get("期末余额", 0)``
+    逐字等价（命中返值 / 缺键返 0）。
+    """
     str_args = _extract_string_args(args, ctx, trace)
     code_range = str_args[0] if str_args else ''
     col_name = str_args[1] if len(str_args) > 1 else ctx.default_column
+    # 未注册列名 → 早退报错（放在循环前，避免逐科目刷 N 条 trace）
+    if is_unregistered_column(col_name):
+        raise FormulaColumnError(
+            f"SUM_TB('{code_range}','{col_name}')：列名「{col_name}」未注册，无法取值"
+        )
     val = Decimal("0")
+    # 逐科目的「列无数据」只汇总计数，不逐条进 trace（宽区间如 1401~1499 会刷屏）
+    sink: list[str] = []
     parts = code_range.split("~")
     if len(parts) == 2:
         start, end = parts[0], parts[1]
@@ -644,8 +793,13 @@ def _handle_sum_tb(args: list[Any], ctx: FormulaContext, trace: list[str]) -> De
         for code, data in ctx.tb_data.items():
             code_prefix = code[:prefix_len]
             if start <= code_prefix <= end:
-                val += data.get("期末余额", Decimal("0"))
-    trace.append(f"SUM_TB('{code_range}') = {val}")
+                val += _resolve_tb_column(data, col_name, code=code, trace=sink)
+    missing = sum(1 for t in sink if "列无数据" in t)
+    if missing:
+        trace.append(
+            f"SUM_TB('{code_range}','{col_name}')：{missing} 个科目无该列数据（按 0 计）"
+        )
+    trace.append(f"SUM_TB('{code_range}','{col_name}') = {val}")
     return val
 
 
@@ -729,12 +883,17 @@ def _handle_note(args: list[Any], ctx: FormulaContext, trace: list[str]) -> Deci
 
 
 def _handle_wp(args: list[Any], ctx: FormulaContext, trace: list[str]) -> Decimal:
-    """WP('wp_code','column') — 底稿数据取值"""
+    """WP('wp_code','column') — 底稿数据取值（列名或单元格地址 B5）"""
     str_args = _extract_string_args(args, ctx, trace)
     wp_code = str_args[0] if str_args else ''
     col_name = str_args[1] if len(str_args) > 1 else ctx.default_column
     wp_data = ctx.wp_data.get(wp_code, {})
-    val = wp_data.get(col_name, Decimal("0"))
+    col = (col_name or "").strip()
+    if re.match(r"^[A-Z]+\d+$", col, re.IGNORECASE):
+        cell_up = col.upper()
+        val = wp_data.get(cell_up, wp_data.get(col_name, Decimal("0")))
+    else:
+        val = wp_data.get(col_name, Decimal("0"))
     trace.append(f"WP('{wp_code}','{col_name}') = {val}")
     return val
 
@@ -768,17 +927,7 @@ _REGISTRY.register("IF", _handle_if, arity=3, description="条件判断", syntax
 # 公式 Token 解析（Regex）
 # ═══════════════════════════════════════════════════════════════════════════════
 
-_TOKEN_PATTERNS = [
-    ("SUM_ROW", re.compile(r"SUM_ROW\('([^']+)','([^']+)'\)")),
-    ("SUM_TB", re.compile(r"SUM_TB\('([^']+)','([^']+)'\)")),
-    ("TB", re.compile(r"TB\('([^']+)','([^']+)'\)")),
-    ("ROW", re.compile(r"ROW\('([^']+)'\)")),
-    ("REPORT", re.compile(r"REPORT\('([^']+)','([^']+)'\)")),
-    ("PREV", re.compile(r"PREV\('([^']+)','([^']+)'\)")),
-    ("AUX", re.compile(r"AUX\('([^']+)','([^']*?)','([^']+)'\)")),
-    ("NOTE", re.compile(r"NOTE\('([^']+)','([^']+)','([^']+)'\)")),
-    ("WP", re.compile(r"WP\('([^']+)','([^']+)'\)")),
-]
+from app.services.formula_grammar import TOKEN_PATTERNS as _TOKEN_PATTERNS
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -902,15 +1051,58 @@ def execute(formula: str | None, ctx: FormulaContext) -> FormulaResult:
         return _execute_parallel(formula, ctx)
 
 
+def _is_blocked_formula(formula: str | None) -> bool:
+    """公式是否含非白名单内容（未注册函数 / eval/exec / URL / 外链）→ blocked（P0-项2）。
+
+    委托 ``formula_management.formula_state``（单一真源，避免第二份白名单/危险表）。
+    仅判 blocked（不判 damaged —— 解析失败仍走 parse_to_ast 的既有 error 路径）。
+    """
+    if not formula or not formula.strip():
+        return False
+    from app.services.formula_management.formula_state import (
+        _dangerous_or_external,
+    )
+
+    text = formula.strip()
+    if _dangerous_or_external(text):
+        return True
+    # 非白名单函数（白名单 = 本模块 FunctionRegistry，单一真源）
+    import re as _re
+    known = _REGISTRY.known_function_names()
+    for m in _re.finditer(r"([A-Za-z_][A-Za-z_0-9]*)\s*\(", text):
+        if m.group(1) not in known:
+            return True
+    return False
+
+
 def _execute_ast(formula: str, ctx: FormulaContext) -> FormulaResult:
-    """新 AST 递归下降求值路径。"""
+    """新 AST 递归下降求值路径。
+
+    P0-项2：求值前先做 blocked 判定（非白名单函数 / eval/exec / URL / 外链）——
+    命中则标 ``result.blocked=True`` 并记 error，**不静默返 0 冒充正常**。
+    仍会尝试给出 value（通常 0），但 ``ok`` 因 blocked/errors 为 False。
+    """
     result = FormulaResult()
+    # ── blocked 前置判定（结构合法但语义越权/未授权）──
+    if _is_blocked_formula(formula):
+        result.blocked = True
+        result.errors.append(
+            f"公式含非白名单内容（未注册函数/eval/URL/外链），已拦截: {formula}"
+        )
+        result.trace.append(f"BLOCKED: {formula}")
+        logger.warning("Formula blocked (non-whitelist/dangerous): %s", formula)
+        return result
     try:
         ast_node = parse_to_ast(formula)
         result.value = _eval_ast(ast_node, ctx, result.trace)
     except FormulaParseError as e:
         result.errors.append(f"AST 解析失败: {e}")
         logger.warning("AST parse error: %s (formula=%s)", e, formula)
+    except FormulaColumnError as e:
+        # 列名未注册（配置错）—— 必须与「求值崩溃」区分，且**禁**静默回退期末余额。
+        # 捕获位置在兜底 `except Exception` **之前**，否则会被归成「AST 求值失败」。
+        result.errors.append(str(e))
+        logger.warning("TB column unregistered: %s (formula=%s)", e, formula)
     except Exception as e:
         result.errors.append(f"AST 求值失败: {e}")
         logger.warning("AST eval error: %s (formula=%s)", e, formula)
@@ -934,22 +1126,51 @@ def _execute_regex(formula: str, ctx: FormulaContext) -> FormulaResult:
 
             if token_name == "TB":
                 code, col_name = match.group(1), match.group(2)
-                resolved_col = COLUMN_ALIASES.get(col_name, col_name)
                 account_data = ctx.tb_data.get(code, {})
-                val = account_data.get(resolved_col, account_data.get("期末余额", Decimal("0")))
+                # 🔴 `_TOKEN_PATTERNS` 的 TB 正则缺词边界，会匹配到
+                # `SUM_TB('a~b','col')` 的后半段（实测混合公式里 TB 命中 2 次）。
+                # 旧实现靠「`a~b` 在 tb_data 里查不到 → 0」侥幸不影响最终值，
+                # 但改造后会**多记一条 error** 把 `ok` 误判成 False ⇒ 显式跳过
+                # 区间形态（真正的 SUM_TB 由其自己的 token 分支处理）。
+                if "~" in code:
+                    continue
+                val = _resolve_tb_column(
+                    account_data, col_name, code=code, trace=result.trace
+                )
+                if is_unregistered_column(col_name):
+                    # 与 AST 路径同口径：列名未注册 → 记 error，禁回退期末余额
+                    result.errors.append(
+                        f"TB('{code}','{col_name}')：列名「{col_name}」未注册，无法取值"
+                    )
                 trace_msg = f"TB('{code}','{col_name}') = {val}"
 
             elif token_name == "SUM_TB":
                 code_range, col_name = match.group(1), match.group(2)
-                parts = code_range.split("~")
-                if len(parts) == 2:
-                    start, end = parts[0], parts[1]
-                    prefix_len = len(start)
-                    for code, data in ctx.tb_data.items():
-                        code_prefix = code[:prefix_len]
-                        if start <= code_prefix <= end:
-                            val += data.get("期末余额", Decimal("0"))
-                trace_msg = f"SUM_TB('{code_range}') = {val}"
+                # 与 AST 路径同口径：按列名求和，未注册列名记 error 而非静默按期末余额
+                if is_unregistered_column(col_name):
+                    result.errors.append(
+                        f"SUM_TB('{code_range}','{col_name}')："
+                        f"列名「{col_name}」未注册，无法取值"
+                    )
+                else:
+                    sink: list[str] = []
+                    parts = code_range.split("~")
+                    if len(parts) == 2:
+                        start, end = parts[0], parts[1]
+                        prefix_len = len(start)
+                        for code, data in ctx.tb_data.items():
+                            code_prefix = code[:prefix_len]
+                            if start <= code_prefix <= end:
+                                val += _resolve_tb_column(
+                                    data, col_name, code=code, trace=sink
+                                )
+                    missing = sum(1 for t in sink if "列无数据" in t)
+                    if missing:
+                        result.trace.append(
+                            f"SUM_TB('{code_range}','{col_name}')："
+                            f"{missing} 个科目无该列数据（按 0 计）"
+                        )
+                trace_msg = f"SUM_TB('{code_range}','{col_name}') = {val}"
 
             elif token_name == "ROW":
                 row_code = match.group(1)
@@ -1179,28 +1400,47 @@ def _extract_formula_codes(formula: str) -> set[str]:
 # FormulaEngine 类（向后兼容 formula.py 路由）
 # ═══════════════════════════════════════════════════════════════════════════════
 
+#: `FormulaEngine.execute` 的父子双算告警文案（单一真源，守卫按它断言）。
+#:
+#: spec: formula-management-runtime-closure Task 15（Requirements 7.4, 7.5）
+PARENT_CHILD_DOUBLE_COUNT_WARNING = (
+    "取数口径告警：本端点的 tb_map 按 standard_account_code 全量累加，"
+    "不做叶子聚合，区间求和存在父子双算风险"
+)
+
+
+def _has_parent_child_overlap(tb_map: dict[str, Any]) -> bool:
+    """``tb_map`` 里是否存在「父科目与其子科目同时在册」。
+
+    判据 = 存在两个码 ``a`` / ``b`` 使 ``b`` 以 ``a`` + 分隔符开头。
+    分隔符两种写法都要认：``-``（标准码，如 ``1231-01``）与
+    ``.``（客户原始码，如 ``1002.001``）—— memory 已记两套体系并存，
+    只认一种会漏判。
+
+    🔴 **不能用裸 ``b.startswith(a)``**：``1231`` 与 ``12310`` 是两个无关科目，
+    不带分隔符边界会误判成父子。
+    """
+    codes = [c for c in tb_map if c]
+    code_set = set(codes)
+    for code in codes:
+        for sep in ("-", "."):
+            prefix = code + sep
+            if any(other.startswith(prefix) for other in code_set):
+                return True
+    return False
+
+
 class FormulaEngine:
     """公式引擎类（兼容旧 API 路由）。
 
     旧路由 formula.py 需要一个带 redis_client 的类实例，
     提供 execute/list_all_functions/register_custom_function 等方法。
-    """
 
-    # 内置函数列表
-    _BUILTIN_FUNCTIONS = [
-        {"name": "TB", "description": "取科目余额", "syntax": "TB('科目编码','列名')", "category": "取数"},
-        {"name": "SUM_TB", "description": "范围科目求和", "syntax": "SUM_TB('起始~结束','列名')", "category": "取数"},
-        {"name": "ROW", "description": "引用其他行次", "syntax": "ROW('行次编码')", "category": "引用"},
-        {"name": "SUM_ROW", "description": "范围行次求和", "syntax": "SUM_ROW('起始','结束')", "category": "引用"},
-        {"name": "PREV", "description": "上年同期值", "syntax": "PREV('科目编码','列名')", "category": "取数"},
-        {"name": "REPORT", "description": "跨报表引用", "syntax": "REPORT('行次编码','期间')", "category": "引用"},
-        {"name": "AUX", "description": "辅助核算取值", "syntax": "AUX('科目','维度','列名')", "category": "取数"},
-        {"name": "ABS", "description": "绝对值", "syntax": "ABS(值)", "category": "数学"},
-        {"name": "ROUND", "description": "四舍五入", "syntax": "ROUND(值, 位数)", "category": "数学"},
-        {"name": "MAX", "description": "最大值", "syntax": "MAX(值1, 值2)", "category": "数学"},
-        {"name": "MIN", "description": "最小值", "syntax": "MIN(值1, 值2)", "category": "数学"},
-        {"name": "IF", "description": "条件判断", "syntax": "IF(条件, 真值, 假值)", "category": "逻辑"},
-    ]
+    注：函数清单的**单一权威来源**是模块级 ``_REGISTRY``（FunctionRegistry）。
+    本类不再维护独立的内置函数静态表，``list_all_functions`` 与冲突校验均从
+    ``_REGISTRY`` 派生，避免清单漂移（此前 _BUILTIN_FUNCTIONS 缺 NOTE/WP，
+    导致用户可注册自定义函数覆盖内置 NOTE/WP）。
+    """
 
     def __init__(self, redis_client=None):
         self.redis = redis_client
@@ -1218,8 +1458,8 @@ class FormulaEngine:
         """注册自定义函数（底层委托 FunctionRegistry.register，Task 4）。"""
         if not name or not name.strip():
             raise ValueError("函数名不能为空")
-        # 检查是否与内置函数冲突
-        builtin_names = {f["name"] for f in self._BUILTIN_FUNCTIONS}
+        # 检查是否与内置函数冲突（权威来源 = _REGISTRY，含 NOTE/WP/AUX 等全部内置）
+        builtin_names = _REGISTRY.known_function_names() - set(self._custom_functions.keys())
         if name in builtin_names:
             raise ValueError(f"内置函数 {name} 不可覆盖")
         # 校验表达式
@@ -1269,12 +1509,35 @@ class FormulaEngine:
             pass  # Redis 不可用时静默
 
     async def execute(self, db, project_id, year, formula_type: str, params: dict, **kwargs) -> dict:
-        """执行公式（兼容旧 API）"""
+        """执行公式（兼容旧 API：``POST /api/formula/execute`` 与 ``/batch-execute``）。
+
+        🔴🔴 **已知口径缺陷：``tb_map`` 不做叶子聚合，存在父子双算**
+        （spec formula-management-runtime-closure Task 15 / Requirements 7.4, 7.5）
+
+        本方法把 ``trial_balance`` 的 ``standard_account_code`` **全量**读出并按码累加。
+        而 ``trial_balance`` 里**父科目与子科目并存**（如 ``1231`` 与
+        ``1231-01``…``1231-05``），故：
+
+        - ``TB('1231')`` 取到的是父行本身（正确）；
+        - 但 ``SUM_TB('1401~1499')`` 这类**区间求和**会把父科目与其子科目
+          **同时计入** ⇒ 金额虚增。
+
+        平台铁律是「recalc 只汇总**叶子**科目，未映射叶子按最长前缀继承祖先映射」，
+        共享件在 ``app/services/four_table/leaf_aggregation.py``
+        （``select_leaves`` / ``aggregate_leaves`` / ``resolve_leaf_totals``）。
+
+        **本 spec 刻意只加告警不改口径**（R7.5）：改口径要动 ``FormulaRequest`` /
+        ``FormulaResult`` 契约与前端两个已登记端点
+        （``apiPaths.formula.execute`` / ``.batchExecute``），风险高于收益。
+        待收敛项已在 spec Notes 登记。
+
+        返回体新增 ``warnings`` 键承载该告警，调用方可见（不改既有三个键）。
+        """
         from decimal import Decimal
         # 简单实现：构建 tb_map 并调用统一引擎
         formula_str = params.get("formula", "")
         if not formula_str:
-            return {"value": 0, "formula": "", "error": None}
+            return {"value": 0, "formula": "", "error": None, "warnings": []}
 
         # 从 trial_balance 加载数据
         import sqlalchemy as sa
@@ -1292,7 +1555,27 @@ class FormulaEngine:
                 tb_map[r.standard_account_code] = tb_map.get(r.standard_account_code, Decimal("0")) + (r.unadjusted_amount or Decimal("0"))
 
         val = execute_formula(formula_str, tb_map, {})
-        return {"value": float(val), "formula": formula_str, "error": None}
+
+        # ── 父子双算显式告警（R7.5：不改口径但必须让调用方知道） ──────────────
+        warnings: list[str] = []
+        if _has_parent_child_overlap(tb_map):
+            msg = (
+                f"{PARENT_CHILD_DOUBLE_COUNT_WARNING}"
+                f"（本项目 trial_balance 中存在父子并存科目；区间求和类公式"
+                f"如 SUM_TB 结果可能虚增，请以各循环 four_table 叶子口径复核）"
+            )
+            warnings.append(msg)
+            logger.warning(
+                "FormulaEngine.execute 父子双算风险：project=%s year=%s formula=%s",
+                project_id, year, formula_str,
+            )
+
+        return {
+            "value": float(val),
+            "formula": formula_str,
+            "error": None,
+            "warnings": warnings,
+        }
 
     async def batch_execute(self, db, project_id, year, formulas: list[dict], **kwargs) -> list[dict]:
         """批量执行公式"""
@@ -1344,22 +1627,158 @@ class PREVExecutor:
     pass
 
 
+# ─── D2-3 坏账准备明细表嵌套结构寻址 ───────────────────────────────────────────
+# 标识 D2-3 底稿的 sheet 名标记（第二参含此子串则走 NestedTableService 而非 parsed_data）
+_D23_SHEET_MARKER = "坏账准备明细表"
+
+# D2-3 字段中文名 → bad_debt_detail_rows 金额列（13 列语义 B~N + 合计/期末余额别名）
+_D23_FIELD_TO_COLUMN: dict[str, str] = {
+    # 期初系列
+    "期初未审数": "amount_b",
+    "期初账项调整": "amount_c",
+    "重分类调整(期初)": "amount_d",
+    "重分类调整（期初）": "amount_d",
+    "重分类期初": "amount_d",
+    "期初审定数": "amount_e",
+    # 本期增加
+    "本期计提": "amount_f",
+    "本期计提合计": "amount_f",
+    "其他增加": "amount_g",
+    # 本期减少
+    "本期转回": "amount_h",
+    "本期转回合计": "amount_h",
+    "核销": "amount_i",
+    "核销合计": "amount_i",
+    "其他减少": "amount_j",
+    # 期末系列
+    "期末未审数": "amount_k",
+    "期末账项调整": "amount_l",
+    "重分类调整(期末)": "amount_m",
+    "重分类调整（期末）": "amount_m",
+    "重分类期末": "amount_m",
+    "期末审定数": "amount_n",
+    "期末余额": "amount_n",
+}
+
+
+def _normalize_provision_name(name: str) -> str:
+    """归一父行/计提方法中文名用于模糊匹配：去前缀"按"、空白与全/半角括号差异。"""
+    out = (name or "").strip()
+    if out.startswith("按"):
+        out = out[1:]
+    return out.replace(" ", "").replace("　", "")
+
+
 class WPExecutor:
     """WP 函数执行器：从底稿 parsed_data 取数
 
-    语法: WP('E1','审定数')
-    从 WorkingPaper 的 parsed_data 中按 wp_code 和列名取数。
+    语法:
+    - 两参列名/单元格: WP('E1','审定数') / WP('D1-1','B5')
+    - 三参 D2-3 嵌套寻址（合计级）: WP('D2','坏账准备明细表D2-3','本期计提合计')
+    - 三参 D2-3 嵌套寻址（父行级）: WP('D2','坏账准备明细表D2-3','单项评估计提.期末审定数')
 
-    Requirements: 39.1
+    两参时从 WorkingPaper 的 parsed_data 中按 wp_code 和列名取数；
+    第二参含「坏账准备明细表」标记时走 NestedTableService（D2-3 专用表 bad_debt_detail_rows）。
+
+    Requirements: 9.1, 9.2, 9.3, 9.4, 39.1
     """
 
     @staticmethod
-    async def execute(db, project_id, wp_code: str, column: str = "审定数"):
-        """Fetch value from workpaper parsed_data."""
+    async def _resolve_d23(
+        db, project_id, wp_code: str, sheet_name: str, field: str | None
+    ):
+        """D2-3 坏账准备明细表嵌套寻址：从 bad_debt_detail_rows 取汇总/父行值。
+
+        - 合计级：field ∈ {本期计提合计/本期转回合计/核销合计/期末余额/13 列中文名} → Summary_Row 对应金额列
+        - 父行级：field = "{计提方法中文名}.{字段名}" → 匹配 provision_method 的父行对应金额列
+
+        找不到对应底稿/字段/父行时返回 D("0")（与现有 WPExecutor 容错一致）。
+
+        Requirements: 9.1, 9.2, 9.4
+        """
         from decimal import Decimal as D
 
         try:
+            import sqlalchemy as sa
+
+            from app.models.bad_debt_models import (
+                PROVISION_METHOD_LABELS,
+                BadDebtDetailRow,
+                ProvisionMethod,
+            )
+            from app.models.workpaper_models import WpIndex
+            from app.services.bad_debt_nested_table_service import NestedTableService
+
+            field_str = (field or "").strip()
+            if not field_str:
+                return D("0")
+
+            # 解析 wp_index_id：优先匹配 wp_code 一致的底稿，否则取项目内任意有坏账行的底稿
+            rows_q = await db.execute(
+                sa.select(BadDebtDetailRow.wp_index_id, WpIndex.wp_code)
+                .join(WpIndex, BadDebtDetailRow.wp_index_id == WpIndex.id)
+                .where(WpIndex.project_id == project_id)
+                .distinct()
+            )
+            candidates = list(rows_q.all())
+            if not candidates:
+                return D("0")
+            wp_index_id = None
+            for idx_id, code in candidates:
+                if code == wp_code:
+                    wp_index_id = idx_id
+                    break
+            if wp_index_id is None:
+                wp_index_id = candidates[0][0]
+
+            tree = await NestedTableService(db).get_tree(wp_index_id)
+
+            # 父行级引用："{计提方法}.{字段}"
+            if "." in field_str:
+                parent_key, _, sub_field = field_str.partition(".")
+                col = _D23_FIELD_TO_COLUMN.get(sub_field.strip())
+                if col is None:
+                    return D("0")
+                norm_key = _normalize_provision_name(parent_key)
+                for parent in tree.parents:
+                    label = _normalize_provision_name(parent.provision_method_label)
+                    row_label = _normalize_provision_name(parent.row_label)
+                    if norm_key and (
+                        norm_key == label
+                        or norm_key == row_label
+                        or norm_key in label
+                        or label in norm_key
+                        or norm_key in row_label
+                    ):
+                        val = getattr(parent.amounts, col, None)
+                        return D(str(val)) if val is not None else D("0")
+                return D("0")
+
+            # 合计级引用：Summary_Row 对应金额列
+            col = _D23_FIELD_TO_COLUMN.get(field_str)
+            if col is None:
+                return D("0")
+            val = getattr(tree.summary.amounts, col, None)
+            return D(str(val)) if val is not None else D("0")
+        except Exception:
+            return D("0")
+
+    @staticmethod
+    async def execute(
+        db, project_id, wp_code: str, column: str = "审定数", field: str | None = None
+    ):
+        """Fetch value from workpaper parsed_data, or D2-3 nested table when applicable."""
+        from decimal import Decimal as D
+
+        # D2-3 嵌套寻址：第二参含「坏账准备明细表」标记时走 NestedTableService
+        if _D23_SHEET_MARKER in (column or ""):
+            return await WPExecutor._resolve_d23(db, project_id, wp_code, column, field)
+
+        try:
+            import sqlalchemy as sa
+
             from app.models.workpaper_models import WorkingPaper, WpIndex
+            from app.services.address_registry import extract_custom_cells
 
             result = await db.execute(
                 sa.select(WorkingPaper.parsed_data)
@@ -1376,13 +1795,53 @@ class WPExecutor:
                 return D("0")
 
             parsed_data = row or {}
+            col = (column or "").strip()
+
+            # 单元格地址（B5/C12）→ WP 域解析
+            if re.match(r"^[A-Z]+\d+$", col, re.IGNORECASE):
+                cell_up = col.upper()
+                # ── Req 21.1: WP 域先试 ACNR full_resolve/runtime 作为寻址真源，
+                #    miss/异常 → 回退 extract_custom_cells（fail-open，永不中断取数）。
+                #    调用点已是 async（await db.execute），可直接 await full_resolve，
+                #    无 sync→async 桥接风险（design §1 option 1）。──
+                resolved_cell = cell_up
+                try:
+                    from app.services.acnr.resolver import full_resolve
+
+                    acnr_result = await full_resolve(
+                        formula_ref=f"WP('{wp_code}','{wp_code}','{cell_up}')",
+                        project_id=str(project_id),
+                        db=db,
+                    )
+                    if acnr_result and acnr_result.found and acnr_result.cell_address:
+                        resolved_cell = acnr_result.cell_address.upper()
+                except Exception as exc:
+                    logger.warning(
+                        "ACNR full_resolve failed for WP cell %s/%s: %s "
+                        "(fallback to extract_custom_cells)",
+                        wp_code,
+                        cell_up,
+                        exc,
+                    )
+                # 值仍从 parsed_data 提取（extract_custom_cells 为兜底真源，保证不破坏既有取数）
+                for rec in extract_custom_cells(parsed_data):
+                    if rec.cell == resolved_cell:
+                        v = rec.value
+                        if v is None or v == "":
+                            return D("0")
+                        try:
+                            return D(str(v))
+                        except Exception:
+                            return D("0")
+                return D("0")
+
             col_map = {
                 "审定数": "audited_amount",
                 "未审数": "unadjusted_amount",
                 "期初余额": "opening_balance",
                 "期末余额": "audited_amount",
             }
-            key = col_map.get(column, column)
+            key = col_map.get(col, col)
             value = parsed_data.get(key, 0)
             return D(str(value)) if value is not None else D("0")
         except Exception:

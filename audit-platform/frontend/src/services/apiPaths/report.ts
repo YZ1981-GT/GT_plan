@@ -38,6 +38,13 @@ export const reportConfig = {
   applyMasterUpdate: '/api/report-config/apply-master-update',
   candidates: '/api/report-config/candidates',
   staleStatus: (projectId: string) => `/api/report-config/stale-status/${projectId}`,
+  /**
+   * POST `/api/report-config/clone` — 把标准模板配置落成项目级（`project:{id}`）。
+   *
+   * `mode: 'sync'` 为幂等模式：只落有公式的行、已存在则跳过（`overwrite` 可覆盖）。
+   * 项目级行由取数层优先消费（report_account_mapping / four_table 三处）。
+   */
+  clone: '/api/report-config/clone',
 } as const
 
 // ─── 报表映射 ───────────────────────────────────────────────────────────────
@@ -101,7 +108,13 @@ export const disclosureNotes = {
   update: (noteId: string) => `/api/disclosure-notes/${noteId}`,
   validate: (pid: string, year: number) => `/api/disclosure-notes/${pid}/${year}/validate`,
   validationResults: (pid: string, year: number) => `/api/disclosure-notes/${pid}/${year}/validation-results`,
+  // 附注联动复盘 P0-1：披露同步 / 校验就绪度看板（只读）
+  readiness: (pid: string, year: number) => `/api/disclosure-notes/${pid}/${year}/readiness`,
+  // 附注联动复盘 P0-2：某底稿对应附注章节的同步状态（底稿披露 sheet 状态条）
+  wpSyncStatus: (pid: string, year: number) => `/api/disclosure-notes/${pid}/${year}/wp-sync-status`,
   refreshFromWorkpapers: (pid: string, year: number) => `/api/disclosure-notes/${pid}/${year}/refresh-from-workpapers`,
+  refreshSectionFromWorkpaper: (pid: string, year: number, section: string) => `/api/disclosure-notes/${pid}/${year}/${encodeURIComponent(section)}/refresh-from-workpaper`,
+  autoPull: (pid: string, year: number, section: string) => `/api/disclosure-notes/${pid}/${year}/${encodeURIComponent(section)}/auto-pull`,
   clearFormulas: (pid: string, year: number, section: string) => `/api/disclosure-notes/${pid}/${year}/${section}/clear-formulas`,
   exportWord: (pid: string, year: number) => `/api/disclosure-notes/${pid}/${year}/export-word`,
   priorYear: (pid: string, year: number, section: string) => `/api/disclosure-notes/${pid}/${year}/${section}/prior-year`,
@@ -139,6 +152,64 @@ export const auditReport = {
   status: (reportId: string) => `/api/audit-report/${reportId}/status`,
   refreshFinancialData: (pid: string, year: number) => `/api/audit-report/${pid}/${year}/refresh-financial-data`,
   exportWord: (pid: string, year: number) => `/api/audit-report/${pid}/${year}/export-word`,
+} as const
+
+// ─── 交付件管理中心 ─────────────────────────────────────────────────────────
+
+export const deliverables = {
+  list: (pid: string) => `/api/projects/${pid}/deliverables/`,
+  versions: (pid: string, taskId: string) => `/api/projects/${pid}/deliverables/${taskId}/versions`,
+  compare: (pid: string, taskId: string) => `/api/projects/${pid}/deliverables/${taskId}/versions/compare`,
+  download: (pid: string, taskId: string, versionNo: number) =>
+    `/api/projects/${pid}/deliverables/${taskId}/versions/${versionNo}/download`,
+  guidanceDownload: (pid: string, taskId: string, versionNo: number) =>
+    `/api/projects/${pid}/deliverables/${taskId}/versions/${versionNo}/guidance-download`,
+  previewUrl: (pid: string, taskId: string, versionNo: number) =>
+    `/api/projects/${pid}/deliverables/${taskId}/versions/${versionNo}/preview-url`,
+  loadReportTemplate: (pid: string) => `/api/projects/${pid}/deliverables/report-body/load-template`,
+  renderReportBody: (pid: string) => `/api/projects/${pid}/deliverables/report-body/render`,
+  // 报告正文两阶段生成（audit-report-template-integration §11）
+  previewReportBody: (pid: string) => `/api/projects/${pid}/deliverables/report-body/preview`,
+  confirmReportBody: (pid: string) => `/api/projects/${pid}/deliverables/report-body/confirm`,
+  renderDisclosureNotes: (pid: string) => `/api/projects/${pid}/deliverables/disclosure-notes/render`,
+  renderFinancialReports: (pid: string) => `/api/projects/${pid}/deliverables/financial-reports/render`,
+  previewReportHtml: (pid: string, year: number) =>
+    `/api/projects/${pid}/deliverables/report-body/preview-html?year=${year}`,
+  completeness: (pid: string, year: number) =>
+    `/api/projects/${pid}/deliverables/completeness?year=${year}`,
+  snapshotStale: (pid: string, taskId: string, year: number) =>
+    `/api/projects/${pid}/deliverables/${taskId}/snapshot-stale?year=${year}`,
+  sign: (pid: string, taskId: string) =>
+    `/api/projects/${pid}/deliverables/${taskId}/sign`,
+  onlyofficeHealth: (pid: string) =>
+    `/api/projects/${pid}/deliverables/onlyoffice/health`,
+  onlyofficeConfig: (pid: string, taskId: string, versionNo: number, year: number) =>
+    `/api/projects/${pid}/deliverables/onlyoffice/config/${taskId}/${versionNo}?year=${year}`,
+  submitApproval: (pid: string, taskId: string) =>
+    `/api/projects/${pid}/deliverables/${taskId}/submit-approval`,
+  approve: (pid: string, taskId: string, year: number) =>
+    `/api/projects/${pid}/deliverables/${taskId}/approve?year=${year}`,
+  reject: (pid: string, taskId: string) =>
+    `/api/projects/${pid}/deliverables/${taskId}/reject`,
+  archive: (pid: string) => `/api/projects/${pid}/deliverables/archive`,
+  unarchive: (pid: string, taskId: string) =>
+    `/api/projects/${pid}/deliverables/${taskId}/unarchive`,
+  integrityVerify: (pid: string, taskId: string) =>
+    `/api/projects/${pid}/deliverables/${taskId}/integrity-verify`,
+  packageDownload: (pid: string) => `/api/projects/${pid}/deliverables/package`,
+  packageFile: (pid: string, jobId: string) =>
+    `/api/projects/${pid}/deliverables/package/${jobId}/download`,
+} as const
+
+// ─── Word 导出后台任务（一键生成全套，audit-report-template-integration §14） ──
+
+export const wordExports = {
+  fullDeliverables: (pid: string) =>
+    `/api/projects/${pid}/word-exports/full-deliverables`,
+  jobStatus: (pid: string, jobId: string) =>
+    `/api/projects/${pid}/word-exports/jobs/${jobId}`,
+  retryJob: (pid: string, jobId: string) =>
+    `/api/projects/${pid}/word-exports/jobs/${jobId}/retry`,
 } as const
 
 // ─── 导出 ───────────────────────────────────────────────────────────────────

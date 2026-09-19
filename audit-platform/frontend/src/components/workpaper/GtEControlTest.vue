@@ -329,7 +329,7 @@ defineExpose({ scrollToRow })
 
 <style scoped>
 .gt-e-control-test { padding: 16px; display: flex; flex-direction: column; gap: 24px; }
-.gt-e__header { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; padding: 12px 16px; background: var(--gt-color-bg-soft, #f5f7fa); border-radius: 6px; font-size: 13px; }
+.gt-e__header { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; padding: 12px 16px; background: var(--gt-color-bg-soft, #f5f7fa); border-radius: 6px; font-size: var(--wp-font-size, 13px); }
 .gt-e__header-meta { display: flex; align-items: center; gap: 16px; }
 .gt-e__entity { font-weight: 600; color: var(--el-text-color-primary); }
 .gt-e__period { color: var(--el-text-color-regular); }
@@ -350,7 +350,7 @@ defineExpose({ scrollToRow })
 .gt-e__conclusion-name { font-size: 14px; font-weight: 600; color: var(--el-text-color-primary); }
 .gt-e__conclusion-desc { font-size: 12px; color: var(--el-text-color-secondary); line-height: 1.5; }
 .gt-e__hints { margin-top: 8px; }
-.gt-e__hint-items { margin: 0; padding-left: 20px; font-size: 13px; line-height: 1.8; color: var(--el-text-color-regular); }
+.gt-e__hint-items { margin: 0; padding-left: 20px; font-size: var(--wp-font-size, 13px); line-height: 1.8; color: var(--el-text-color-regular); }
 .gt-e__hint-items li { margin-bottom: 4px; }
-.gt-e__hint-content { margin: 0; font-family: inherit; font-size: 13px; line-height: 1.7; color: var(--el-text-color-regular); white-space: pre-wrap; word-break: break-word; }
+.gt-e__hint-content { margin: 0; font-family: inherit; font-size: var(--wp-font-size, 13px); line-height: 1.7; color: var(--el-text-color-regular); white-space: pre-wrap; word-break: break-word; }
 </style>

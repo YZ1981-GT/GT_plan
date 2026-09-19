@@ -427,6 +427,9 @@ class ChainOrchestrator:
                     Project.report_scope,
                     Project.scenario,
                     Project.has_foreign_currency,
+                    Project.audit_type,
+                    Project.is_large_soe,
+                    Project.wizard_state,
                 ).where(Project.id == project_id)
             )
             proj_row = proj_result.first()
@@ -434,6 +437,9 @@ class ChainOrchestrator:
             report_scope = (proj_row[1] if proj_row else None) or "standalone"
             scenario = (proj_row[2] if proj_row else None) or "normal"
             has_foreign_currency = bool(proj_row[3]) if proj_row else False
+            audit_type = (proj_row[4] if proj_row else None) or "financial"
+            is_large_soe = bool(proj_row[5]) if proj_row else False
+            wizard_state = (proj_row[6] if proj_row else None) or {}
         except Exception:
             try:
                 await db.rollback()
@@ -441,24 +447,58 @@ class ChainOrchestrator:
                 pass
             template_type, report_scope = "soe", "standalone"
             scenario, has_foreign_currency = "normal", False
+            audit_type, is_large_soe, wizard_state = "financial", False, {}
 
         # Build project context flags for conditional triggers
+        audit_type_l = str(audit_type or "").lower()
+        integrated_audit = (
+            "integrated" in audit_type_l
+            or "内控" in str(audit_type or "")
+            or "icfr" in audit_type_l
+            or "integrated" in str(scenario or "").lower()
+        )
+        listed_or_ipo = template_type == "listed" or scenario in ("ipo", "listed")
         project_flags = {
             "consolidated": report_scope == "consolidated",
             "listed": template_type == "listed",
             "listed_or_segments": template_type == "listed",
             "listed_or_regulated": template_type == "listed",
-            "listed_or_ipo": template_type == "listed" or scenario in ("ipo", "listed"),
+            "listed_or_ipo": listed_or_ipo,
             "small_soe_or_general": template_type == "soe",
-            "large_soe": False,  # default; can be overridden by project metadata
+            "large_soe": is_large_soe,
             "first_engagement": False,  # default; can be overridden
             "group_audit": report_scope == "consolidated",
             # E1 Sprint 2 Task 2.2: scenario 驱动文件级裁剪（F1.2）
             "scenario_normal": scenario == "normal",
             "scenario_ipo_or_above": scenario in ("ipo", "listed", "transfer", "restructure", "fraud_response"),
             "has_foreign_currency": has_foreign_currency,
+            # B60 P3 attachment matrix flags (overridable via wizard_state.b60_attachment_flags)
+            "integrated_audit": integrated_audit,
+            "soe_annual": template_type == "soe",
+            "needs_regulatory_filing": listed_or_ipo,
+            "needs_it_audit": False,
+            "it_team_executes": False,
+            "uses_expert": False,
             # Default to False for cycle-specific flags; will be set based on TB analysis
         }
+        # Merge explicit B60 matrix answers from project wizard / attachment_flags
+        if isinstance(wizard_state, dict):
+            b60_flags = wizard_state.get("b60_attachment_flags") or wizard_state.get("attachment_flags") or {}
+            if isinstance(b60_flags, dict):
+                for k, v in b60_flags.items():
+                    if isinstance(v, bool):
+                        project_flags[k] = v
+            # Convenience: wizard may set has_it_audit / uses_expert at top level
+            if isinstance(wizard_state.get("has_it_audit"), bool):
+                project_flags["needs_it_audit"] = wizard_state["has_it_audit"]
+            if isinstance(wizard_state.get("it_team_executes"), bool):
+                project_flags["it_team_executes"] = wizard_state["it_team_executes"]
+            if isinstance(wizard_state.get("uses_expert"), bool):
+                project_flags["uses_expert"] = wizard_state["uses_expert"]
+        # IT team execute implies needs_it_audit
+        if project_flags.get("it_team_executes"):
+            project_flags["needs_it_audit"] = True
+
 
         # 3. Query TB to get actual account codes
         try:
@@ -599,6 +639,7 @@ class ChainOrchestrator:
         matched_codes = matched_primary  # for downstream code compatibility
 
         # 6. Build wp_code → name lookup (also build subtable name list per primary)
+        from app.services.wp_name_source import resolve_wp_name
         code_name_map = {m["wp_code"]: m.get("wp_name", "") for m in mappings}
 
         # 7. Generate workpapers (with template file copy + metadata link)
@@ -639,7 +680,7 @@ class ChainOrchestrator:
                 if existing_id:
                     continue
 
-                wp_name = code_name_map.get(code) or f"底稿{code}"
+                wp_name = resolve_wp_name(code, code_name_map.get(code))
 
                 # Resolve cycle: prefer metadata's cycle, fallback to first letter of code
                 meta = meta_map.get(code, {})
@@ -709,6 +750,68 @@ class ChainOrchestrator:
 
         # Total subtables collapsed (sheets within primary workpapers)
         total_subtables = sum(len(subs) for subs in matched_subtable_info.values())
+
+        # ─── 8. 为 skip 子底稿创建独立 wp_index（聚合组件内嵌 Tab 需要） ───────
+        # 当主底稿(如 A1)已创建，其子表(如 A1-11~A1-16)在 wp_code_overrides 中标为 skip
+        # 时，前端聚合组件(GtA1Dashboard/GtA17Bundle 等)需要通过 wp_index 查找这些子底稿
+        # 的 wp_id 来渲染内嵌 Tab。此处为这些 skip 子表创建独立的 wp_index + working_paper。
+        from app.services.wp_code_override_loader import load_wp_code_overrides
+        _skip_overrides = load_wp_code_overrides()
+        skip_sub_created = 0
+        for primary_code in sorted(matched_codes):
+            # 查找该主底稿下所有被标为 skip 的子表
+            skip_prefix = primary_code + "-"
+            skip_subs = [
+                code for code, ct in _skip_overrides.items()
+                if ct == "skip" and code.startswith(skip_prefix)
+            ]
+            for sub_code in sorted(skip_subs):
+                try:
+                    # Idempotent check
+                    existing = await db.execute(
+                        sa.select(WpIndex.id).where(
+                            WpIndex.project_id == project_id,
+                            WpIndex.wp_code == sub_code,
+                        )
+                    )
+                    if existing.scalar_one_or_none():
+                        continue
+
+                    sub_name = resolve_wp_name(sub_code, code_name_map.get(sub_code))
+                    cycle = primary_code[0] if primary_code and primary_code[0].isalpha() else None
+
+                    sub_wp_index = WpIndex(
+                        project_id=project_id,
+                        wp_code=sub_code,
+                        wp_name=sub_name,
+                        audit_cycle=cycle,
+                        status=WpStatus.not_started,
+                    )
+                    db.add(sub_wp_index)
+                    await db.flush()
+
+                    sub_wp = WorkingPaper(
+                        wp_index_id=sub_wp_index.id,
+                        project_id=project_id,
+                        source_type=WpSourceType.template,
+                        file_path=f"storage/projects/{project_id}/workpapers/{sub_code}.xlsx",
+                        parsed_data={},
+                    )
+                    db.add(sub_wp)
+                    await db.flush()
+                    skip_sub_created += 1
+                except Exception as sub_err:
+                    logger.warning(
+                        "chain_orchestrator: skip sub-workpaper %s creation failed: %s",
+                        sub_code, sub_err,
+                    )
+
+        if skip_sub_created:
+            logger.info(
+                "chain_orchestrator: created %d skip sub-workpaper wp_index records",
+                skip_sub_created,
+            )
+        # ─── END skip 子底稿创建 ─────────────────────────────────────────────────
 
         return {
             "created": created_count,  # 主底稿数（实际生成的 wp_index 文件）

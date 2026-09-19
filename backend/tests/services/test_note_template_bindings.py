@@ -116,7 +116,7 @@ def test_header_normalize_semantic_in_valid_set(
     bindings_payload: dict[str, Any],
 ) -> None:
     """header_normalize.semantic 必须 ∈ VALID_SEMANTICS."""
-    from backend.app.services.note_column_semantics import VALID_SEMANTICS
+    from app.services.note_column_semantics import VALID_SEMANTICS
 
     valid = set(VALID_SEMANTICS)
     invalid: list[tuple] = []

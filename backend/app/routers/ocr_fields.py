@@ -18,6 +18,9 @@ from app.core.database import get_db
 from app.deps import get_current_user
 from app.models.core import User
 from app.services.ocr_fields_service import OcrFieldsService
+from app.services.wp_visibility.entry_integration import (
+    enforce_attachment_wp_visibility,
+)
 
 router = APIRouter(tags=["OCR字段提取"])
 
@@ -34,6 +37,12 @@ async def extract_ocr_fields(
     - 若未完成，触发异步 OCR，返回 202 + job_id
     - 同一附件多次调用复用缓存结果（幂等）
     """
+    # Wp_Bound_Gate 附件可见性隔离（Task 4 / R3 leak_risk → gated，additive）：
+    # 附件绑定底稿时要求当前用户对至少一个关联底稿可见，全部不可见 → 404；未绑定 → 放行。
+    await enforce_attachment_wp_visibility(
+        db, current_user, attachment_id=attachment_id,
+        action="attach_read", method="GET", entrypoint="attachment.read",
+    )
     svc = OcrFieldsService(db)
     body, status_code = await svc.get_or_trigger_ocr_fields(attachment_id)
 

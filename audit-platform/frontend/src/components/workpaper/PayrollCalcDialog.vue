@@ -186,9 +186,9 @@
       <el-divider>计算结果</el-divider>
       <div class="payroll-result">
         <el-descriptions :column="3" size="small" border>
-          <el-descriptions-item label="年度工资总额">¥ {{ formatAmount(result.annual_summary.total_salary) }}</el-descriptions-item>
-          <el-descriptions-item label="年度社保合计">¥ {{ formatAmount(result.annual_summary.total_social_insurance) }}</el-descriptions-item>
-          <el-descriptions-item label="年度总计提">¥ {{ formatAmount(result.annual_summary.grand_total) }}</el-descriptions-item>
+          <el-descriptions-item label="年度工资总额">¥ {{ prefs.fmt(result.annual_summary.total_salary) }}</el-descriptions-item>
+          <el-descriptions-item label="年度社保合计">¥ {{ prefs.fmt(result.annual_summary.total_social_insurance) }}</el-descriptions-item>
+          <el-descriptions-item label="年度总计提">¥ {{ prefs.fmt(result.annual_summary.grand_total) }}</el-descriptions-item>
         </el-descriptions>
 
         <el-table
@@ -200,19 +200,19 @@
         >
           <el-table-column label="月份" prop="month" width="60" align="center" />
           <el-table-column label="工资" width="120" align="right">
-            <template #default="{ row }">¥ {{ formatAmount(row.salary) }}</template>
+            <template #default="{ row }">¥ {{ prefs.fmt(row.salary) }}</template>
           </el-table-column>
           <el-table-column label="养老" width="100" align="right">
-            <template #default="{ row }">¥ {{ formatAmount(row.pension) }}</template>
+            <template #default="{ row }">¥ {{ prefs.fmt(row.pension) }}</template>
           </el-table-column>
           <el-table-column label="医疗" width="100" align="right">
-            <template #default="{ row }">¥ {{ formatAmount(row.medical) }}</template>
+            <template #default="{ row }">¥ {{ prefs.fmt(row.medical) }}</template>
           </el-table-column>
           <el-table-column label="公积金" width="100" align="right">
-            <template #default="{ row }">¥ {{ formatAmount(row.housing_fund) }}</template>
+            <template #default="{ row }">¥ {{ prefs.fmt(row.housing_fund) }}</template>
           </el-table-column>
           <el-table-column label="月度合计" width="130" align="right">
-            <template #default="{ row }">¥ {{ formatAmount(row.total) }}</template>
+            <template #default="{ row }">¥ {{ prefs.fmt(row.total) }}</template>
           </el-table-column>
         </el-table>
 
@@ -258,6 +258,7 @@ import { reactive, ref, computed, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import { api } from '@/services/apiProxy'
 import { handleApiError } from '@/utils/errorHandler'
+import { useDisplayPrefsStore } from '@/stores/displayPrefs'
 
 interface Props {
   visible: boolean
@@ -330,11 +331,8 @@ const isFormValid = computed(() => {
   return form.employee_count >= 0 && form.avg_monthly_salary >= 0 && form.months >= 1
 })
 
-function formatAmount(s: string | number) {
-  const n = Number(s)
-  if (!Number.isFinite(n)) return String(s)
-  return n.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-}
+const prefs = useDisplayPrefsStore()
+
 
 function buildRequestBody(applySheet?: string) {
   return {

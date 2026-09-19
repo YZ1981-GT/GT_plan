@@ -6,6 +6,7 @@
 
 export const workpapers = {
   list: (pid: string) => `/api/projects/${pid}/working-papers`,
+  myLead: (pid: string) => `/api/projects/${pid}/my-lead-workpapers`,
   detail: (pid: string, wpId: string) => `/api/projects/${pid}/working-papers/${wpId}`,
   download: (pid: string, wpId: string) => `/api/projects/${pid}/working-papers/${wpId}/download`,
   downloadPack: (pid: string) => `/api/projects/${pid}/working-papers/download-pack`,
@@ -28,6 +29,14 @@ export const workpapers = {
   crossLinks: (pid: string, wpId: string) => `/api/projects/${pid}/working-papers/${wpId}/cross-links`,
   syncProcedure: (pid: string, wpId: string) => `/api/projects/${pid}/working-papers/${wpId}/sync-procedure`,
   dependencies: (pid: string, wpId: string) => `/api/projects/${pid}/workpapers/${wpId}/dependencies`,
+  // ─── 自定义底稿（componentType=custom）───
+  // 注意：这四个端点**不带 project 前缀**（挂在 /api/workpapers/{wpId} 下），
+  // 与上面 project-scoped 的路径不同族，勿"顺手"补 pid。
+  // spec: custom-workpaper-dual-mode-formula-and-batch
+  customCells: (wpId: string) => `/api/workpapers/${wpId}/custom-cells`,
+  customRefreshProjection: (wpId: string) => `/api/workpapers/${wpId}/custom-refresh-projection`,
+  formulas: (wpId: string) => `/api/workpapers/${wpId}/formulas`,
+  formulaDetail: (wpId: string, formulaId: string) => `/api/workpapers/${wpId}/formulas/${formulaId}`,
   structure: {
     get: (pid: string, wpId: string) => `/api/projects/${pid}/workpapers/${wpId}/structure`,
     rebuild: (pid: string, wpId: string) => `/api/projects/${pid}/workpapers/${wpId}/structure/rebuild`,
@@ -168,10 +177,94 @@ export const templates = {
 
 export const procedures = {
   list: (pid: string, cycle: string) => `/api/projects/${pid}/procedures/${cycle}`,
+  /** @deprecated 已下线（410）→ 改用 procedureRowTasks.trimPreview/trimApply */
   trim: (pid: string, cycle: string) => `/api/projects/${pid}/procedures/${cycle}/trim`,
   init: (pid: string, cycle: string) => `/api/projects/${pid}/procedures/${cycle}/init`,
   custom: (pid: string, cycle: string) => `/api/projects/${pid}/procedures/${cycle}/custom`,
+  /** @deprecated 已下线（410）→ 改用 procedureRowTasks.trimPreview/trimApply 构造 canonical entries */
   applyScheme: (pid: string, cycle: string) => `/api/projects/${pid}/procedures/${cycle}/apply-scheme`,
+  /** @deprecated 已下线（410）→ 改用 workpaperLeads */
+  assign: (pid: string) => `/api/projects/${pid}/procedures/assign`,
+  /**
+   * 裁剪三维判据上下文（只读，Task 9）：风险 / 重要性 / 数据存在性 + 完整性覆盖 + 底稿录入探测。
+   *
+   * 独立路径段 `procedure-scope`，避免被 `/procedures/{cycle}` 捕获。
+   * 任一维度取数失败 → 该维度置 null/空 + `degradations` 记一条；`degradations` 是
+   * 前端摘要降级标注的**唯一来源**（前端不再自行判断某维度是不是空的）。
+   */
+  trimDecisionContext: (pid: string) =>
+    `/api/projects/${pid}/procedure-scope/trim-decision-context`,
+} as const
+
+// ─── 底稿主编（procedure-mainline-convergence 需求 5）────────────────────────
+
+export const workpaperLeads = {
+  /** PUT：批量设置/清除底稿主编（替代旧 procedures.assign） */
+  set: (pid: string) => `/api/projects/${pid}/workpaper-leads`,
+} as const
+
+// ─── 程序行任务（procedure-delegation-notification / Task 12，V105 真源） ─────────
+
+export const procedureRowTasks = {
+  // 项目级"我的程序任务"分页查询（纯读）
+  listByProject: (pid: string) => `/api/projects/${pid}/procedure-row-tasks`,
+  // 跨项目"我的程序任务"分页查询（纯读）
+  listMine: () => `/api/my/procedure-row-tasks`,
+  // 单任务详情 + 深链定位 key（纯读）
+  detail: (pid: string, taskId: string) => `/api/projects/${pid}/procedure-row-tasks/${taskId}`,
+  // 单一状态机入口：状态转换（POST，携带 request_id + expected 版本）
+  transition: (pid: string, taskId: string) => `/api/projects/${pid}/procedure-row-tasks/${taskId}/transitions`,
+  // 两层裁剪 / 方案 preview-apply（Task 6，一次性 preview 凭证 + 真实 applied/unchanged/conflict）
+  trimPreview: (pid: string) => `/api/projects/${pid}/procedure-trim/preview`,
+  trimApply: (pid: string) => `/api/projects/${pid}/procedure-trim/apply`,
+  trimSaveScheme: (pid: string) => `/api/projects/${pid}/procedure-trim/schemes`,
+  trimRowNotApplicable: (pid: string, taskId: string) => `/api/projects/${pid}/procedure-trim/rows/${taskId}/not-applicable`,
+  trimRowRestore: (pid: string, taskId: string) => `/api/projects/${pid}/procedure-trim/rows/${taskId}/restore`,
+  /**
+   * 驳回裁剪建议（procedure-trimming-and-delegation-intelligence Task 13）。
+   *
+   * 只写 `procedure_instances.suggestion_state.rejected`，**不动 status/skip_reason** ——
+   * 驳回的语义是「不接受这个建议」，程序仍按原状保留，故不走 canonical trim。
+   */
+  trimRejectSuggestions: (pid: string) => `/api/projects/${pid}/procedure-trim/suggestions/reject`,
+  /**
+   * 完整性敏感清单的项目级覆盖（procedure-trimming-and-delegation-intelligence Task 14 / R5.5~R5.7）。
+   *
+   * 同一路径三个方法：`GET` 读回全部覆盖（含理由与最后修改留痕）、`PUT` 写一条
+   * （`Y`/`N` 都算已表态，理由必填）、`DELETE {cycle}` 撤销该循环的覆盖使其退回平台默认。
+   *
+   * 🔴 撤销是 **DELETE 删行**而不是 `PUT` 写空 —— 读取侧以「该循环是否出现在返回里」
+   * 区分「已表态」与「未覆盖」，写空串会让两态都表现为未覆盖却多一条脏记录。
+   */
+  trimCompletenessScope: (pid: string) => `/api/projects/${pid}/procedure-trim/completeness-scope`,
+  trimCompletenessScopeItem: (pid: string, cycle: string) =>
+    `/api/projects/${pid}/procedure-trim/completeness-scope/${encodeURIComponent(cycle)}`,
+  /**
+   * 附注反向联动（Task 21 / R13.1~R13.3）：程序整体裁剪 → 附注章节标「本期不适用」。
+   *
+   * `GET` 只读预览（要 `?year=`），`POST .../apply` 落库。
+   *
+   * 🔴 后端**只写** `disclosure_notes.is_empty`（附注侧既有的唯一不适用真源）+ 一条
+   * `template_lineage` provenance 面包屑。不新建不适用字段、不删章节、不动
+   * `table_data` —— 另建一套会让附注树标记与 Word 导出结果漂移。
+   * 🔴 apply 请求体**只有 year**：标注哪些章节由后端按当下裁剪状态派生，不由前端
+   * 传清单（传清单会与并发会话改过的裁剪状态脱节，把已恢复执行的循环标成不适用）。
+   */
+  trimNoteLinkage: (pid: string) => `/api/projects/${pid}/procedure-trim/note-linkage`,
+  trimNoteLinkageApply: (pid: string) => `/api/projects/${pid}/procedure-trim/note-linkage/apply`,
+  // 三粒度委派 preview-apply（Task 8，materialize 前置 + 一次性 preview 凭证）
+  delegationPreview: (pid: string) => `/api/projects/${pid}/procedure-delegations/preview`,
+  delegationApply: (pid: string) => `/api/projects/${pid}/procedure-delegations/apply`,
+  // 成员负载批量视图（只读）：口径与 preview 的 membership_load.active_task_count 一致
+  delegationMemberLoads: (pid: string) => `/api/projects/${pid}/procedure-delegations/member-loads`,
+  // 显式物化 job（delegation preview 前置；job 失败不产生 preview）
+  materialize: (pid: string) => `/api/projects/${pid}/procedure-row-tasks/materialize`,
+  materializeJob: (pid: string) => `/api/projects/${pid}/procedure-row-tasks/materialize-jobs`,
+  materializeJobStatus: (pid: string, jobId: string) => `/api/projects/${pid}/procedure-row-tasks/materialize-jobs/${jobId}`,
+  // 程序行一级复核（Task 13，ReviewConversation + IssueTicket）
+  conversation: (pid: string, taskId: string) => `/api/projects/${pid}/procedure-row-tasks/${taskId}/conversation`,
+  messages: (pid: string, taskId: string) => `/api/projects/${pid}/procedure-row-tasks/${taskId}/messages`,
+  closeIssue: (pid: string, taskId: string, issueId: string) => `/api/projects/${pid}/procedure-row-tasks/${taskId}/issues/${issueId}/close`,
 } as const
 
 // ─── 复核 ───────────────────────────────────────────────────────────────────
@@ -218,6 +311,24 @@ export const templateLibraryMgmt = {
   seedStatus: '/api/template-library-mgmt/seed-status',
   seedAll: '/api/template-library-mgmt/seed-all',
   versionInfo: '/api/template-library-mgmt/version-info',
+  formulaAcnrMigration: '/api/template-library-mgmt/formula-acnr-migration',
+
+  // ─── 模板覆盖层（spec excel-template-override-layer-and-onlyoffice-template-editor）──
+  // 权威目录 backend/wp_templates/ 运行时只读；编辑产物落覆盖层并版本化。
+  // 挂在 templateLibraryMgmt 下而不是新开一个导出对象 —— 后者要同步改 apiPaths/index.ts
+  // 的三处 re-export 列表，那是三个并发会话都在改的文件。
+  overrideResolution: (wpCode: string) =>
+    `/api/wp-template-overrides/${encodeURIComponent(wpCode)}/resolution`,
+  overrideVersions: (wpCode: string) =>
+    `/api/wp-template-overrides/${encodeURIComponent(wpCode)}/versions`,
+  overrideEditSession: (wpCode: string) =>
+    `/api/wp-template-overrides/${encodeURIComponent(wpCode)}/edit-session`,
+  overrideUpload: (wpCode: string) =>
+    `/api/wp-template-overrides/${encodeURIComponent(wpCode)}/upload`,
+  overridePromote: (wpCode: string, versionId: string) =>
+    `/api/wp-template-overrides/${encodeURIComponent(wpCode)}/versions/${versionId}/promote`,
+  overrideDeleteCurrent: (wpCode: string) =>
+    `/api/wp-template-overrides/${encodeURIComponent(wpCode)}/current`,
 } as const
 
 // ─── 自定义模板 ─────────────────────────────────────────────────────────────

@@ -30,6 +30,7 @@ from app.models.report_models import (
     FinancialReport,
     FinancialReportType,
 )
+from app.services.ledger_import.sign_convention_types import BALANCE_TOLERANCE
 
 logger = logging.getLogger(__name__)
 
@@ -325,20 +326,27 @@ class CFSWorksheetEngine:
         if amount <= Decimal("0"):
             raise ValueError("调整金额必须大于零")
 
-        # Generate adjustment number
-        count_result = await self.db.execute(
-            sa.select(sa.func.count()).select_from(CfsAdjustment).where(
+        # Generate adjustment number (use MAX to avoid collision after deletion)
+        max_result = await self.db.execute(
+            sa.select(sa.func.max(CfsAdjustment.adjustment_no)).where(
                 CfsAdjustment.project_id == project_id,
                 CfsAdjustment.year == year,
-                CfsAdjustment.is_deleted == sa.false(),
             )
         )
-        existing_count = count_result.scalar() or 0
+        max_no = max_result.scalar()
+        if max_no:
+            # Extract numeric part from "CFS-001" format
+            try:
+                next_num = int(max_no.replace("CFS-", "")) + 1
+            except (ValueError, AttributeError):
+                next_num = 1
+        else:
+            next_num = 1
 
         adjustment = CfsAdjustment(
             project_id=project_id,
             year=year,
-            adjustment_no=f"CFS-{existing_count + 1:03d}",
+            adjustment_no=f"CFS-{next_num:03d}",
             description=description,
             debit_account=debit_account,
             credit_account=credit_account,
@@ -389,7 +397,7 @@ class CFSWorksheetEngine:
         adj = result.scalar_one_or_none()
         if adj is None:
             return False
-        adj.soft_delete()
+        adj.is_deleted = True
         await self.db.flush()
         return True
 
@@ -666,7 +674,7 @@ class CFSWorksheetEngine:
         diff1 = indirect_operating - main_operating
         checks.append({
             "check_name": "间接法经营活动现金流=主表经营活动现金流",
-            "passed": diff1 == Decimal("0"),
+            "passed": abs(diff1) < BALANCE_TOLERANCE,
             "indirect_value": str(indirect_operating),
             "main_table_value": str(main_operating),
             "difference": str(diff1),
@@ -708,7 +716,7 @@ class CFSWorksheetEngine:
         diff2 = net_increase - expected_increase
         checks.append({
             "check_name": "现金净增加额=期末现金-期初现金",
-            "passed": diff2 == Decimal("0"),
+            "passed": abs(diff2) < BALANCE_TOLERANCE,
             "net_increase": str(net_increase),
             "closing_cash": str(closing_cash),
             "opening_cash": str(opening_cash),

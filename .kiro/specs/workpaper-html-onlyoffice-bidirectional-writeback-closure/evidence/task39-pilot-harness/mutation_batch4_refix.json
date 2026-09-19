@@ -1,0 +1,62 @@
+[
+  {
+    "id": "M43",
+    "side": "be",
+    "want": "test_task39_pilot_harness.py::TestRejectionKindsReachableAndDistinct::test_authority_child_of_the_wrong_kind_is_caught_by_its_own_branch",
+    "why": "bundle 的 authority child 可以是 contract/template ⇒ authority model 的身份来源被打通。首轮 GREEN 的原因是触发点用的是非法枚举值 —— 枚举分支抛同一个码，kind 分支被遮蔽（共享错误码形态）",
+    "verdict": "RED",
+    "summary": "1 failed, 108 passed in 10.80s",
+    "added": [
+      "test_task39_pilot_harness.py::TestRejectionKindsReachableAndDistinct::test_authority_child_of_the_wrong_kind_is_caught_by_its_own_branch"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task39_pilot_harness.py::TestRejectionKindsReachableAndDistinct::test_authority_child_of_the_wrong_kind_is_caught_by_its_own_branch"
+    ],
+    "added_files": [
+      "test_task39_pilot_harness.py"
+    ],
+    "restored": true,
+    "seconds": 14.1
+  },
+  {
+    "id": "M44",
+    "side": "be",
+    "want": "test_task39_pilot_harness.py::TestRejectionKindsReachableAndDistinct::test_bundle_not_approved_covers_both_the_bundle_and_its_authority_child",
+    "why": "authority model definition 未 approved 也放行 ⇒ AC 6.2 的「独立先行批准」空转。首轮 GREEN 的原因是触发点只用了 approved 的 child ⇒ state 分支不可达",
+    "verdict": "RED",
+    "summary": "1 failed, 108 passed in 10.87s",
+    "added": [
+      "test_task39_pilot_harness.py::TestRejectionKindsReachableAndDistinct::test_bundle_not_approved_covers_both_the_bundle_and_its_authority_child"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task39_pilot_harness.py::TestRejectionKindsReachableAndDistinct::test_bundle_not_approved_covers_both_the_bundle_and_its_authority_child"
+    ],
+    "added_files": [
+      "test_task39_pilot_harness.py"
+    ],
+    "restored": true,
+    "seconds": 14.3
+  },
+  {
+    "id": "M52",
+    "side": "be",
+    "want": "test_task39_pilot_harness.py::TestHarnessVersionParticipatesInStaleness::test_open_run_refuses_a_mismatched_runner_identity",
+    "why": "runner 身份不再自洽校验 ⇒ 每个 run 一开始就 stale（runner_changed），而 stale 的 run 不参与已验收计数 ⇒ 「跑了但永远不算」变成静默状态。首轮 GREEN 的原因是判据是源码级 presence（`if False:` 之下 `self._runner_version` 仍留在 raise 体里）—— 改成行为判据后才可 falsify",
+    "verdict": "RED",
+    "summary": "1 failed, 108 passed in 10.69s",
+    "added": [
+      "test_task39_pilot_harness.py::TestHarnessVersionParticipatesInStaleness::test_open_run_refuses_a_mismatched_runner_identity"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task39_pilot_harness.py::TestHarnessVersionParticipatesInStaleness::test_open_run_refuses_a_mismatched_runner_identity"
+    ],
+    "added_files": [
+      "test_task39_pilot_harness.py"
+    ],
+    "restored": true,
+    "seconds": 14.2
+  }
+]

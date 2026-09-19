@@ -1,0 +1,113 @@
+"""N 循环（递延税/应交税费/税金及附加/所得税费用）语义科目定位规格。
+
+科目映射真源 = `report_config` DB 实证 + `n1-four-table-…` / `n-cycle-tax-…` spec：
+  N1 `BS-036` = `TB('1811','期末余额')`（递延所得税资产）
+  N2 应交税费（非标准取数，子科目按税种名归类）`BS-052` = `TB('2221')`
+  N3 `BS-067` = `TB('2901','期末余额')`（递延所得税负债）
+  N4 税金及附加（IS 行，损益类）`IS-003` = `TB('6403','本期发生额')`
+  N5 所得税费用（IS 行，损益类）`IS-023` = `TB('6801','本期发生额')`
+
+🔴 N4/N5 为损益类：`tb_balance.closing_balance` 结构性恒为 0，须取发生额。
+🔴 N2 负债类（2221 应交税费方向为贷方）。
+
+spec: .kiro/specs/semantic-account-resolver-full-rollout/
+
+.. note::
+   **兜底码已逐项 DB 实证**（2026-08-03，双向对账 `account_chart`：① 该码实际叫什么名
+   ② 该名实际挂在哪个码）。曾修正的错码见各槽行内注释。
+
+.. warning::
+   🔴 **`account_chart` 并存两套编码体系** —— 同一码在 ``source='client'`` 与
+   ``source='standard'`` 下可能是**完全不同的科目**（实证 10 个项目）::
+
+       码     client 表（8 项目）    standard 表（5 项目）
+       4001   实收资本               生产成本
+       4101   盈余公积               制造费用
+       4401   其他权益工具           工程施工
+       4301   专项储备               研发支出
+
+   故 :func:`resolve_semantic_accounts` 的「**client chart 优先**按名定位」不是优化
+   而是**正确性前提**：硬编码码值 + 走 standard 表会在那 5 个项目取到成本类科目。
+   同族已知现象见 memory「存货科目编码语义在项目间冲突」。
+
+   另：本文件的兜底码只在「按名定位失败」时生效，且要求该码**在本项目科目表里确实存在**
+   （见 `semantic_account_resolver` 定位链路第 ④ 层），故一码两义不会因兜底而取错。
+"""
+from __future__ import annotations
+
+from .semantic_account_resolver import SemanticAccountSlot, SemanticAccountSpec
+
+_PROVISION_WORDS = ("减值准备", "坏账准备", "跌价准备", "累计折旧", "累计摊销", "减值损失")
+
+
+def _gross(key, names, fallback, label, extra_excludes=()):
+    return SemanticAccountSlot(
+        key=key, names=names, exclude_names=_PROVISION_WORDS + extra_excludes,
+        fallback_standard_codes=fallback, label=label,
+    )
+
+
+N1_SPEC = SemanticAccountSpec(
+    row_code="BS-036",
+    slots=(_gross("gross", ("递延所得税资产",), ("1811",), "递延所得税资产"),),
+)
+
+N2_SPEC = SemanticAccountSpec(
+    # 🔴 2026-08-03 修正：原写 `BS-052` 实为**一年内到期的非流动负债**
+    # （公式 `TB('2501')` = 长期借款，本身也是 `report_config` 的一处错码）
+    # → 单槽规格下层③会把应交税费静默解析成 2501 长期借款。
+    # 应交税费真实行 = `BS-049` = `TB('2221')`，与本槽兜底码一致（2221 双表 8/10 项目对账通过）。
+    row_code="BS-049",
+    slots=(
+        SemanticAccountSlot(
+            key="gross", names=("应交税费",),
+            exclude_names=(), fallback_standard_codes=("2221",), label="应交税费",
+        ),
+    ),
+)
+
+N3_SPEC = SemanticAccountSpec(
+    row_code="BS-067",
+    slots=(_gross("gross", ("递延所得税负债",), ("2901",), "递延所得税负债"),),
+)
+
+N4_SPEC = SemanticAccountSpec(
+    row_code="IS-003",
+    slots=(
+        SemanticAccountSlot(
+            key="gross", names=("税金及附加",),
+            exclude_names=(), fallback_standard_codes=("6403",), label="税金及附加",
+        ),
+    ),
+)
+
+N5_SPEC = SemanticAccountSpec(
+    row_code="IS-023",
+    slots=(
+        SemanticAccountSlot(
+            key="gross", names=("所得税费用",),
+            exclude_names=(), fallback_standard_codes=("6801",), label="所得税费用",
+        ),
+    ),
+)
+
+
+N_CYCLE_SPECS: dict[str, SemanticAccountSpec] = {
+    "N1": N1_SPEC, "N2": N2_SPEC, "N3": N3_SPEC, "N4": N4_SPEC, "N5": N5_SPEC,
+}
+
+N_PL_CYCLES = frozenset({"N4", "N5"})
+N_PL_POSITIVE_SIDE: dict[str, str] = {
+    "N4": "debit",   # 费用类借方正方向
+    "N5": "debit",
+}
+
+
+def spec_of(wp_code: str) -> SemanticAccountSpec | None:
+    return N_CYCLE_SPECS.get(str(wp_code or "").strip().upper())
+
+
+__all__ = [
+    "N1_SPEC", "N2_SPEC", "N3_SPEC", "N4_SPEC", "N5_SPEC",
+    "N_CYCLE_SPECS", "N_PL_CYCLES", "N_PL_POSITIVE_SIDE", "spec_of",
+]

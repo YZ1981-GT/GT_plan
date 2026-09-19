@@ -263,26 +263,43 @@ class WpDocumentRecognizer:
           5. 解析并返回字段
         """
         try:
-            from app.services.llm_client import get_llm_client
+            import json
 
-            # 获取 OCR 文本（简化：直接用文件名作为上下文）
+            from app.core.config import settings as app_settings
+            from app.schemas.llm_structured import DocRecognitionResult
+
             ocr_text = f"[附件: {att_info.get('filename', '')}]"
-
             prompt = _PROMPT_TEMPLATES.get(doc_type, _PROMPT_TEMPLATES[DocType.VOUCHER])
             prompt = prompt.format(text=ocr_text)
+            messages = [{"role": "user", "content": prompt}]
 
-            client = get_llm_client()
-            response = await client.chat_completion(
-                messages=[{"role": "user", "content": prompt}],
+            if app_settings.LLM_STRUCTURED_OUTPUT_ENABLED:
+                from app.services.structured_llm_service import (
+                    StructuredOutputError,
+                    extract_structured,
+                )
+
+                try:
+                    result = await extract_structured(
+                        messages,
+                        DocRecognitionResult,
+                        max_tokens=1000,
+                        temperature=0.1,
+                    )
+                    parsed = result.fields
+                    if parsed:
+                        return parsed
+                except StructuredOutputError as exc:
+                    logger.warning("structured extract failed, legacy fallback: %s", exc)
+
+            from app.services.llm_client import chat_completion
+
+            content = await chat_completion(
+                messages,
                 max_tokens=1000,
                 temperature=0.1,
             )
-
-            # 解析 JSON 响应
-            import json
-            content = response.get("content", "")
-            # 尝试提取 JSON
-            if "{" in content:
+            if content and "{" in content:
                 json_str = content[content.index("{"):content.rindex("}") + 1]
                 return json.loads(json_str)
             return None

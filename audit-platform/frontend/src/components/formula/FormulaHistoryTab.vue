@@ -212,11 +212,11 @@ function actionLabel(action: string): string {
   return map[action] || action
 }
 
-function actionTagType(action: string): '' | 'success' | 'warning' | 'info' | 'danger' {
-  const map: Record<string, '' | 'success' | 'warning' | 'info' | 'danger'> = {
+function actionTagType(action: string): 'success' | 'warning' | 'info' | 'danger' | undefined {
+  const map: Record<string, 'success' | 'warning' | 'info' | 'danger'> = {
     create: 'success', update: 'warning', delete: 'danger', execute: 'info',
   }
-  return map[action] || ''
+  return map[action] || undefined
 }
 
 function actionColor(action: string): 'primary' | 'success' | 'warning' | 'danger' | 'info' | undefined {

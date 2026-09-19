@@ -1,0 +1,53 @@
+flowchart TB
+    MODEL["f2AccountModel.ts<br/>F2_ROW_KEY_ACCOUNT / 1412 / 1471<br/>唯一科目真源"]
+
+    subgraph MAIN["f2-inventory-main"]
+        ADJU["F2TabAdjudication<br/>原值组 + 跌价组分块"]
+        DETS["F2TabDetailSummary"]
+        ADJ["F2TabAdjustment"]
+        DET["detail/ F2DetailSheet<br/>配置驱动 6 变体"]
+        ANA["analysis/ 整体分析·产销量<br/>成本比较·政策"]
+        CUT["inspection/ F2CutoffSheet<br/>配置驱动截止"]
+        DL["附注上市"]
+        DS["附注国企"]
+    end
+
+    subgraph VAL["f2-inventory-valuation-impairment"]
+        V1["计价测试 FIFO / 移动平均 / 标准成本"]
+        V2["成本归集 生产成本·制造费用·直接人工"]
+        V3["采购入库·材料领用·委外加工·关联采购"]
+        V4["跌价测试·转回·呆滞存货"]
+    end
+
+    subgraph SPEC["f2-inventory-special"]
+        S1["contract/ 合同履约成本·亏损合同"]
+        S2["ipo/ 供应商结构·访谈·单耗·产能能耗<br/>采购价格·未披露关联方"]
+    end
+
+    subgraph STK["f2-stocktake-bundle"]
+        K1["计划·程序·问卷"]
+        K2["抽盘结果·差异调节"]
+        K3["倒轧 F2RollTable·小结"]
+    end
+
+    TB["trial_balance 各存货科目"]
+    F5["F5 营业成本 6401"]
+    NOTE["附注 五、9 / 八、10"]
+
+    MODEL --> MAIN
+    MODEL --> VAL
+    MODEL --> SPEC
+    MODEL --> STK
+    DET --> ADJU
+    V4 -->|跌价准备 1471| ADJU
+    V1 -->|计价结论| ADJU
+    K2 -->|监盘差异| ADJU
+    K3 -->|倒轧至资产负债表日| ADJU
+    S1 -->|合同履约成本| ADJU
+    ADJ -->|单列净额调整| ADJU
+    ADJU -->|逐科目 writeback| TB
+    ADJU -->|结转成本| F5
+    ADJU --> DL
+    ADJU --> DS
+    DL --> NOTE
+    DS --> NOTE

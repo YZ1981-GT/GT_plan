@@ -1,0 +1,61 @@
+{
+  "task": 19,
+  "recordedAt": "2026-09-09T06:45:00.000Z",
+  "ciJobsAdded": [
+    "wgcc-guidance-backend-guards",
+    "wgcc-guidance-frontend-guards"
+  ],
+  "workflow": ".github/workflows/governance-checks.yml",
+  "directedPytestSubset": {
+    "passed": 89,
+    "files": [
+      "test_guidance_gc0_conformance.py",
+      "test_guidance_gid.py",
+      "test_guidance_handoff_consumer.py",
+      "test_guidance_api_task9.py",
+      "test_guidance_inventory_snapshots.py"
+    ]
+  },
+  "mutationBatch": {
+    "task17": "basis/T17-backend-mutation-report.json",
+    "allRed": true,
+    "scripts": 11
+  },
+  "cleanCheckoutGate": {
+    "verdict": "PASS",
+    "trackedPathsManifest": "basis/T19-tracked-paths.json",
+    "commit": "196753f1b",
+    "commitStat": "566 files changed, 67432 insertions(+), 5310 deletions(-)",
+    "remainingUntrackedGuidancePaths": 0,
+    "preCommitGates": [
+      "file-size gate PASS (540 staged code files)",
+      "UTF-8 integrity PASS",
+      "gitleaks skipped locally (not installed; CI covers)"
+    ],
+    "fileSizeSplits": [
+      "guidance_source_refs.py 848->631 (guidance_template_authority.py)",
+      "guidance_inventory.py 1366->static only (guidance_runtime_facts.py + guidance_runtime_inventory.py)",
+      "wp_guidance_chat.py 963->under cap (wp_guidance_chat_stream.py + wp_guidance_section_prompts.py)"
+    ],
+    "gc0ScannerFix": {
+      "defect": "substring match treated `import { type Foo }` as a local re-declaration",
+      "findingsBefore": 8,
+      "findingsAfter": 0,
+      "staleExemptionsRemoved": 2,
+      "newGuard": "test_scanner_separates_type_only_imports_from_redeclarations"
+    }
+  },
+  "verificationBeforeCommit": {
+    "backendGuidanceSuite": 245,
+    "backendMutationBatch": "11/11 RED",
+    "frontendGuards": 37
+  },
+  "canonicalMigrationCheck": {
+    "mode": "check",
+    "files": 373,
+    "changed": 0,
+    "unmapped": 159,
+    "errors": 0,
+    "note": "after T7 promote batch (308→159); still blocked by empty source_refs + missing sections + no publication"
+  }
+}

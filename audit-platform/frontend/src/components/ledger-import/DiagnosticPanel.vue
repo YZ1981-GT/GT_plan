@@ -60,6 +60,16 @@
             >
               查看明细 ({{ err.location.drill_down.expected_count || '?' }}行)
             </el-button>
+            <!-- 5.3: 平衡类 finding 打开统一诊断弹窗 -->
+            <el-button
+              v-if="['BALANCE_UNBALANCED', 'BALANCE_LEDGER_MISMATCH'].includes(err.code)"
+              link
+              type="primary"
+              size="small"
+              @click="openBalanceDiagnostics(err)"
+            >
+              诊断详情
+            </el-button>
           </div>
         </div>
         <el-empty v-else description="无错误" :image-size="60" />
@@ -87,6 +97,15 @@
       <el-icon class="is-loading"><Loading /></el-icon>
       <span>加载诊断数据...</span>
     </div>
+
+    <!-- 统一诊断弹窗（对 BALANCE_UNBALANCED 等平衡类 finding 打开） -->
+    <BalanceDiagnosticsDialog
+      v-if="balanceDiagResult"
+      v-model="balanceDiagVisible"
+      :result="balanceDiagResult"
+      @jump="onBalanceDiagJump"
+      @rerun="fetchDiagnostics"
+    />
 
     <!-- 8.14: LedgerPenetration 抽屉（通过 iframe 或路由跳转） -->
     <el-drawer
@@ -125,6 +144,8 @@
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { CircleCheck, CircleClose, Loading } from '@element-plus/icons-vue'
+import BalanceDiagnosticsDialog from '@/components/diagnostics/BalanceDiagnosticsDialog.vue'
+import type { BalanceDiagnosticsResult, DiagnosticJumpTarget } from '@/types/balance-diagnostics'
 
 const router = useRouter()
 
@@ -182,6 +203,53 @@ const loading = ref(false)
 
 const drillDrawerVisible = ref(false)
 const drillDownFilter = ref<Record<string, any> | null>(null)
+
+// ─── Balance Diagnostics Dialog ─────────────────────────────────────────────
+
+const balanceDiagVisible = ref(false)
+const balanceDiagResult = ref<BalanceDiagnosticsResult | null>(null)
+
+function openBalanceDiagnostics(err: DiagnosticError) {
+  // 对平衡类 finding 打开统一弹窗
+  const BALANCE_CODES = ['BALANCE_UNBALANCED', 'BALANCE_LEDGER_MISMATCH']
+  if (!BALANCE_CODES.includes(err.code)) return
+  // 构造一个最小的诊断结果用于展示
+  balanceDiagResult.value = {
+    caliber: 'ledger_debit_credit',
+    caliber_label: '序时账凭证借贷合计',
+    status: err.severity === 'fatal' || err.severity === 'blocking' ? 'blocking' : 'warning',
+    difference: 0,
+    debit_total: 0,
+    credit_total: 0,
+    likely_causes: [{
+      cause_code: 'source_data_unbalanced',
+      severity: 4,
+      confidence: 0.8,
+      description: err.message,
+      evidence: {},
+    }],
+    unmatched_accounts: [],
+    sign_anomalies: [],
+    sign_anomalies_unavailable: false,
+    top_contributors: [],
+    jump_targets: [],
+    data_sources: {},
+  }
+  balanceDiagVisible.value = true
+}
+
+function onBalanceDiagJump(target: DiagnosticJumpTarget) {
+  if (target.target_type === 'report_line_mapping') {
+    // 跳转到报表行次映射（不跳导入列映射）
+    router.push({
+      path: `/projects/${props.projectId}/report-line-mapping`,
+      query: target.params,
+    })
+  } else if (target.target_type === 'ledger_penetration') {
+    router.push({ path: `/projects/${props.projectId}/ledger`, query: target.params })
+  }
+  balanceDiagVisible.value = false
+}
 
 function onDrillDown(err: DiagnosticError) {
   if (!err.location?.drill_down?.filter) return

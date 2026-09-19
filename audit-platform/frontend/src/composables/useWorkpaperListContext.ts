@@ -59,6 +59,11 @@ export interface WpListContextData {
   filterCycle: Ref<string>
   filterStatus: Ref<string>
   filterAssignee: Ref<string>
+  /**
+   * 仅看「预填待重算」底稿（`prefill_stale=true`）。
+   * 由 `?filter=stale` 进入（联动状态横条「查看详情」）或筛选栏勾选开启。
+   */
+  filterStale: Ref<boolean>
   /** 'active' = 仅活跃 / 'all' = 含已裁剪 */
   showTrimmedFilter: ComputedRef<'active' | 'all'>
 
@@ -106,6 +111,7 @@ export interface WpChildEmits {
   (e: 'navigate', wpId: string): void
   (e: 'refresh'): void
   (e: 'mutate', payload: MutatePayload): void
+  (e: 'wp-selection-change', wpIds: string[]): void
 }
 
 // ─── 测试 helper ────────────────────────────────────────────────────────────
@@ -136,6 +142,7 @@ export function createMockContext(overrides: Partial<WpListContext> = {}): WpLis
     filterCycle: ref(''),
     filterStatus: ref(''),
     filterAssignee: ref(''),
+    filterStale: ref(false),
     showTrimmedFilter: computed<'active' | 'all'>(() => 'active'),
     selectedWpId: ref(''),
     totalProgress: computed<ProgressInfo>(() => ({ total: 0, completed: 0, percent: 0 })),

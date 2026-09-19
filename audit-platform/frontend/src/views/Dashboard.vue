@@ -78,7 +78,7 @@
             </div>
           </div>
           <el-skeleton v-if="loadingProjects" :rows="4" animated />
-          <el-table v-else-if="recentViewMode === 'table'" :data="recentProjects" size="small" class="gt-compact-table" :show-header="true" stripe>
+          <el-table v-else-if="recentViewMode === 'table'" :data="recentProjects" size="small" class="dashboard-recent-table" :show-header="true" stripe>
             <el-table-column prop="name" label="项目名称" min-width="200" show-overflow-tooltip>
               <template #default="{ row }">
                 <span class="project-link" @click="$router.push(`/projects/${row.id}/ledger`)">{{ row.name }}</span>
@@ -674,9 +674,10 @@ onMounted(async () => {
 .project-link { color: var(--gt-color-primary); cursor: pointer; font-weight: 500; }
 .project-link:hover { text-decoration: underline; }
 
-.gt-compact-table :deep(.el-table__row td) { padding: 8px 0; }
-.gt-compact-table :deep(.el-table__body .cell) { font-size: var(--gt-font-size-sm) !important; }
-.gt-compact-table :deep(.el-table__header .cell) { font-size: var(--gt-font-size-sm) !important; }
+/* 最近项目表：行高自然撑开（不套全局 gt-compact-table 的固定 24px 行高），保留舒适内边距 */
+.dashboard-recent-table :deep(.el-table__row td) { padding: 8px 0; }
+.dashboard-recent-table :deep(.el-table__body .cell) { font-size: var(--gt-font-size-sm) !important; }
+.dashboard-recent-table :deep(.el-table__header .cell) { font-size: var(--gt-font-size-sm) !important; }
 
 /* ── 今日日程 ── */
 .schedule-card { min-height: 240px; }

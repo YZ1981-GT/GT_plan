@@ -1,19 +1,18 @@
 /**
- * AttachmentPreview / AttachmentPreviewDrawer — AT-2 Office iframe 路径
- *
- * Validates: proposal-remaining-18 §三 AT-2，task 5.2
- *
- * 验证：
- *  - apiPaths.attachments.previewPdf(id) 路径生成正确
- *  - apiPaths.officePreview.health 路径常量正确
- *  - AttachmentPreviewDrawer 对 .docx/.xlsx/.pdf/.png 文件的 isOffice/isPdf/isImage 分流
- *  - Office 文件 previewUrl 走 previewPdf 端点
- *  - PDF 文件保留原 preview_url 不变
+ * AttachmentPreviewDrawer - AT-2 Office iframe paths
  */
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import { mount } from '@vue/test-utils'
 import { attachments as P_att, officePreview } from '@/services/apiPaths'
 import AttachmentPreviewDrawer from '@/components/common/AttachmentPreviewDrawer.vue'
+
+vi.mock('@/components/attachment/preview/ExtendedFormatPreview.vue', () => ({
+  default: {
+    name: 'ExtendedFormatPreview',
+    template: '<div class="extended-format-preview" data-testid="extended-stub" />',
+    props: ['attachmentId', 'downloadUrl', 'fileName', 'typeHint'],
+  },
+}))
 
 const stubs = {
   'el-drawer': {
@@ -29,24 +28,24 @@ const stubs = {
   OcrStatusBadge: { template: '<span class="ocr-badge" />' },
 }
 
-describe('AT-2 apiPaths 路径常量', () => {
-  it('attachments.previewPdf 生成正确路径', () => {
+describe('AT-2 apiPaths', () => {
+  it('previewPdf path', () => {
     expect(P_att.previewPdf('abc-123')).toBe('/api/attachments/abc-123/preview-pdf')
   })
 
-  it('officePreview.health 路径常量', () => {
+  it('officePreview.health path', () => {
     expect(officePreview.health).toBe('/api/office-preview/health')
   })
 
-  it('attachments.preview 与 previewPdf 是不同端点', () => {
+  it('preview and previewPdf differ', () => {
     expect(P_att.preview('xyz')).toBe('/api/attachments/xyz/preview')
     expect(P_att.previewPdf('xyz')).toBe('/api/attachments/xyz/preview-pdf')
     expect(P_att.preview('xyz')).not.toBe(P_att.previewPdf('xyz'))
   })
 })
 
-describe('AT-2 AttachmentPreviewDrawer Office iframe 路由', () => {
-  it('Office .docx 文件 → previewUrl 走 previewPdf 端点', () => {
+describe('AT-2 AttachmentPreviewDrawer routing', () => {
+  it('docx uses previewPdf', () => {
     const wrapper = mount(AttachmentPreviewDrawer, {
       global: { stubs },
       props: {
@@ -54,18 +53,16 @@ describe('AT-2 AttachmentPreviewDrawer Office iframe 路由', () => {
         attachment: {
           id: 'att-1',
           name: 'report.docx',
-          mime_type: '',
+          type_hint: '',
           preview_url: '/api/attachments/att-1/preview',
           download_url: '/api/attachments/att-1/download',
         },
       },
     })
-    const iframe = wrapper.find('iframe')
-    expect(iframe.exists()).toBe(true)
-    expect(iframe.attributes('src')).toBe('/api/attachments/att-1/preview-pdf')
+    expect(wrapper.find('iframe').attributes('src')).toBe('/api/attachments/att-1/preview-pdf')
   })
 
-  it('Office .xlsx 文件 → previewUrl 走 previewPdf 端点', () => {
+  it('xlsx uses previewPdf', () => {
     const wrapper = mount(AttachmentPreviewDrawer, {
       global: { stubs },
       props: {
@@ -73,18 +70,16 @@ describe('AT-2 AttachmentPreviewDrawer Office iframe 路由', () => {
         attachment: {
           id: 'att-2',
           name: 'data.xlsx',
-          mime_type: '',
+          type_hint: '',
           preview_url: '/api/attachments/att-2/preview',
           download_url: '/api/attachments/att-2/download',
         },
       },
     })
-    const iframe = wrapper.find('iframe')
-    expect(iframe.exists()).toBe(true)
-    expect(iframe.attributes('src')).toBe('/api/attachments/att-2/preview-pdf')
+    expect(wrapper.find('iframe').attributes('src')).toBe('/api/attachments/att-2/preview-pdf')
   })
 
-  it('PDF 文件 → 保留 preview_url 不变', () => {
+  it('pdf keeps preview_url', () => {
     const wrapper = mount(AttachmentPreviewDrawer, {
       global: { stubs },
       props: {
@@ -92,18 +87,16 @@ describe('AT-2 AttachmentPreviewDrawer Office iframe 路由', () => {
         attachment: {
           id: 'att-3',
           name: 'doc.pdf',
-          mime_type: 'application/pdf',
+          type_hint: 'application/pdf',
           preview_url: '/api/attachments/att-3/preview',
           download_url: '/api/attachments/att-3/download',
         },
       },
     })
-    const iframe = wrapper.find('iframe')
-    expect(iframe.exists()).toBe(true)
-    expect(iframe.attributes('src')).toBe('/api/attachments/att-3/preview')
+    expect(wrapper.find('iframe').attributes('src')).toBe('/api/attachments/att-3/preview')
   })
 
-  it('图片文件 → 渲染 img 标签而非 iframe', () => {
+  it('image renders img', () => {
     const wrapper = mount(AttachmentPreviewDrawer, {
       global: { stubs },
       props: {
@@ -111,7 +104,7 @@ describe('AT-2 AttachmentPreviewDrawer Office iframe 路由', () => {
         attachment: {
           id: 'att-4',
           name: 'photo.png',
-          mime_type: 'image/png',
+          type_hint: 'image/png',
           preview_url: '/api/attachments/att-4/preview',
           download_url: '/api/attachments/att-4/download',
         },
@@ -121,7 +114,7 @@ describe('AT-2 AttachmentPreviewDrawer Office iframe 路由', () => {
     expect(wrapper.find('img').exists()).toBe(true)
   })
 
-  it('未知格式 → 显示下载提示（无 iframe / img）', () => {
+  it('zip mounts ExtendedFormatPreview', () => {
     const wrapper = mount(AttachmentPreviewDrawer, {
       global: { stubs },
       props: {
@@ -129,18 +122,16 @@ describe('AT-2 AttachmentPreviewDrawer Office iframe 路由', () => {
         attachment: {
           id: 'att-5',
           name: 'archive.zip',
-          mime_type: 'application/zip',
+          type_hint: 'application/zip',
           preview_url: '',
           download_url: '/api/attachments/att-5/download',
         },
       },
     })
-    expect(wrapper.find('iframe').exists()).toBe(false)
-    expect(wrapper.find('img').exists()).toBe(false)
-    expect(wrapper.find('.el-empty').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="extended-stub"]').exists()).toBe(true)
   })
 
-  it('.ppt 文件 → previewUrl 走 previewPdf 端点（覆盖所有 6 种 Office 类型）', () => {
+  it('pptx uses previewPdf', () => {
     const wrapper = mount(AttachmentPreviewDrawer, {
       global: { stubs },
       props: {
@@ -153,8 +144,6 @@ describe('AT-2 AttachmentPreviewDrawer Office iframe 路由', () => {
         },
       },
     })
-    const iframe = wrapper.find('iframe')
-    expect(iframe.exists()).toBe(true)
-    expect(iframe.attributes('src')).toBe('/api/attachments/att-6/preview-pdf')
+    expect(wrapper.find('iframe').attributes('src')).toBe('/api/attachments/att-6/preview-pdf')
   })
 })

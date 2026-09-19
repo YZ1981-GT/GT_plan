@@ -1,0 +1,188 @@
+{
+  "total_test_files": 2281,
+  "files": {
+    "backend/tests/test_onlyoffice_single_file_dockey.py": [
+      "import:app.services.workpaper_sync"
+    ],
+    "backend/tests/test_wp_html_save.py": [
+      "import:app.services.workpaper_sync",
+      "import:app.services.workpaper_sync.entry_profile"
+    ],
+    "backend/tests/test_wp_onlyoffice_router.py": [
+      "import:app.services.workpaper_sync"
+    ],
+    "backend/tests/workpaper_sync/test_task10_orm_repository_contract.py": [
+      "import:app.models.workpaper_sync_models",
+      "import:app.services.workpaper_sync"
+    ],
+    "backend/tests/workpaper_sync/test_task10_repository_pg.py": [
+      "import:app.models.workpaper_sync_models",
+      "import:app.services.workpaper_sync"
+    ],
+    "backend/tests/workpaper_sync/test_task11_artifact_repository.py": [
+      "import:app.services.workpaper_sync"
+    ],
+    "backend/tests/workpaper_sync/test_task11_retention_orphan_pg.py": [
+      "import:app.models.workpaper_sync_models",
+      "import:app.services.workpaper_sync"
+    ],
+    "backend/tests/workpaper_sync/test_task12_canonical_resolver.py": [
+      "import:app.services.workpaper_sync"
+    ],
+    "backend/tests/workpaper_sync/test_task12_resolution_pg.py": [
+      "import:app.services.workpaper_sync"
+    ],
+    "backend/tests/workpaper_sync/test_task13_contract_registry.py": [
+      "import:app.services.workpaper_sync"
+    ],
+    "backend/tests/workpaper_sync/test_task14_merge_conflicts.py": [
+      "import:app.models.workpaper_sync_models",
+      "import:app.services.workpaper_sync"
+    ],
+    "backend/tests/workpaper_sync/test_task15_content_mutation.py": [
+      "import:app.services.workpaper_sync"
+    ],
+    "backend/tests/workpaper_sync/test_task15_content_mutation_pg.py": [
+      "import:app.services.workpaper_sync"
+    ],
+    "backend/tests/workpaper_sync/test_task16_durable_outbox_pg.py": [
+      "import:app.services.workpaper_sync"
+    ],
+    "backend/tests/workpaper_sync/test_task16_durable_outbox_wiring.py": [
+      "import:app.services.workpaper_sync"
+    ],
+    "backend/tests/workpaper_sync/test_task17_excel_instrumentation.py": [
+      "import:app.services.workpaper_sync"
+    ],
+    "backend/tests/workpaper_sync/test_task17_excel_instrumentation_pg.py": [
+      "import:app.services.workpaper_sync"
+    ],
+    "backend/tests/workpaper_sync/test_task18_html_save_unified_revision.py": [
+      "import:app.services.workpaper_sync",
+      "import:app.services.workpaper_sync.entry_profile"
+    ],
+    "backend/tests/workpaper_sync/test_task18_html_save_unified_revision_pg.py": [
+      "import:app.services.workpaper_sync",
+      "import:app.services.workpaper_sync.entry_profile"
+    ],
+    "backend/tests/workpaper_sync/test_task19_writer_migration.py": [
+      "import:app.services.workpaper_sync",
+      "import:app.services.workpaper_sync.entry_profile"
+    ],
+    "backend/tests/workpaper_sync/test_task21_room_service.py": [
+      "import:app.services.workpaper_sync",
+      "import:app.services.workpaper_sync.entry_profile"
+    ],
+    "backend/tests/workpaper_sync/test_task21_room_service_pg.py": [
+      "import:app.models.workpaper_sync_models",
+      "import:app.services.workpaper_sync"
+    ],
+    "backend/tests/workpaper_sync/test_task22_callback_claim.py": [
+      "import:app.services.workpaper_sync"
+    ],
+    "backend/tests/workpaper_sync/test_task22_callback_claim_pg.py": [
+      "import:app.models.workpaper_sync_models",
+      "import:app.services.workpaper_sync"
+    ],
+    "backend/tests/workpaper_sync/test_task23_request_application.py": [
+      "import:app.services.workpaper_sync"
+    ],
+    "backend/tests/workpaper_sync/test_task23_request_application_pg.py": [
+      "import:app.models.workpaper_sync_models",
+      "import:app.services.workpaper_sync"
+    ],
+    "backend/tests/workpaper_sync/test_task24_close_intent.py": [
+      "import:app.models.workpaper_sync_models",
+      "import:app.services.workpaper_sync"
+    ],
+    "backend/tests/workpaper_sync/test_task24_close_intent_pg.py": [
+      "import:app.models.workpaper_sync_models",
+      "import:app.services.workpaper_sync"
+    ],
+    "backend/tests/workpaper_sync/test_task25_materialize_coordinator.py": [
+      "import:app.services.workpaper_sync",
+      "import:app.services.workpaper_sync.entry_profile"
+    ],
+    "backend/tests/workpaper_sync/test_task25_materialize_coordinator_pg.py": [
+      "import:app.models.workpaper_sync_models",
+      "import:app.services.workpaper_sync",
+      "import:app.services.workpaper_sync.entry_profile"
+    ],
+    "backend/tests/workpaper_sync/test_task26_oo_to_html.py": [
+      "import:app.services.workpaper_sync"
+    ],
+    "backend/tests/workpaper_sync/test_task26_oo_to_html_pg.py": [
+      "import:app.models.workpaper_sync_models",
+      "import:app.services.workpaper_sync"
+    ],
+    "backend/tests/workpaper_sync/test_task27_conflict_resolution.py": [
+      "import:app.services.workpaper_sync"
+    ],
+    "backend/tests/workpaper_sync/test_task27_conflict_resolution_pg.py": [
+      "import:app.models.workpaper_sync_models",
+      "import:app.services.workpaper_sync"
+    ],
+    "backend/tests/workpaper_sync/test_task28_sync_router.py": [
+      "import:app.routers.wp_sync_router",
+      "import:app.services.workpaper_sync"
+    ],
+    "backend/tests/workpaper_sync/test_task28_sync_router_pg.py": [
+      "import:app.models.workpaper_sync_models",
+      "import:app.routers.wp_sync_router",
+      "import:app.services.workpaper_sync"
+    ],
+    "backend/tests/workpaper_sync/test_task29_timeline_evidence.py": [
+      "import:app.models.workpaper_sync_models",
+      "import:app.routers.wp_sync_router",
+      "import:app.services.workpaper_sync",
+      "import:app.services.workpaper_sync.alerting",
+      "import:app.services.workpaper_sync.entry_profile",
+      "import:app.services.workpaper_sync.evidence",
+      "import:app.services.workpaper_sync.metrics",
+      "import:app.services.workpaper_sync.redaction",
+      "import:app.services.workpaper_sync.timeline",
+      "symbol:AlertCondition",
+      "symbol:AlertRuleRegistry",
+      "symbol:AttributionClass",
+      "symbol:METRICS_BY_NAME",
+      "symbol:METRIC_CATALOG",
+      "symbol:RecoveryTimeline",
+      "symbol:RedactionPolicy",
+      "symbol:RequiredScenario",
+      "symbol:RequiredScenarioSet",
+      "symbol:ScenarioFamily",
+      "symbol:ScenarioKind",
+      "symbol:SyncMetrics",
+      "symbol:SyncTimelineService",
+      "symbol:TimelineEvent",
+      "symbol:TimelineQuery",
+      "symbol:assert_server_clock_only",
+      "symbol:close_scenarios_required",
+      "symbol:derive_for_manifest_entry",
+      "symbol:derive_required_scenarios",
+      "symbol:load_alert_config",
+      "symbol:load_alert_registry",
+      "symbol:load_redaction_config",
+      "symbol:load_redaction_policy",
+      "symbol:manifest_source_digest",
+      "symbol:validate_catalog",
+      "symbol:validate_registry"
+    ],
+    "backend/tests/workpaper_sync/test_task29_timeline_evidence_pg.py": [
+      "import:app.models.workpaper_sync_models",
+      "import:app.services.workpaper_sync",
+      "import:app.services.workpaper_sync.entry_profile",
+      "import:app.services.workpaper_sync.evidence",
+      "import:app.services.workpaper_sync.timeline",
+      "symbol:EvidenceRecomputer",
+      "symbol:ScenarioKind",
+      "symbol:SyncTimelineService",
+      "symbol:TimelineQuery",
+      "symbol:derive_for_manifest_entry",
+      "symbol:manifest_source_digest"
+    ],
+    "backend/tests/workpaper_sync/test_task73_entry_profile_manifest.py": [
+      "import:app.services.workpaper_sync"
+    ]
+  }
+}

@@ -141,6 +141,14 @@ def get_binding_for_section(section_number: str | None) -> dict | None:
     sec = cache.get(section_number)
     if isinstance(sec, dict):
         return sec
+    # 国企历史五、N → 八、N（note_section_catalog 唯一归一规则）
+    from app.services.note_section_catalog import resolve_binding_key
+
+    canonical = resolve_binding_key(section_number, template_type="soe")
+    if canonical != section_number:
+        sec = cache.get(canonical)
+        if isinstance(sec, dict):
+            return sec
     return None
 
 

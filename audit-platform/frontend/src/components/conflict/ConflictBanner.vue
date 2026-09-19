@@ -67,6 +67,7 @@ async function load() {
   try {
     const data: any = await api.get(
       `/api/projects/${props.projectId}/conflicts/pending`,
+      { _silent: true } as any,
     )
     if (Array.isArray(data)) {
       pendingCount.value = data.length

@@ -1,0 +1,980 @@
+[
+  {
+    "id": "M01",
+    "side": "fe",
+    "want": "未知扩展名不被 Type_Hint 覆盖",
+    "why": "未知扩展名被 Type_Hint 覆盖成 legacy ⇒ P1 必须 RED",
+    "verdict": "RED",
+    "summary": "179/180 passed, numFailedTestSuites=2",
+    "added": [
+      "Format_Registry resolvePreviewFamily 未知扩展名不被 Type_Hint 覆盖"
+    ],
+    "gone": [],
+    "hit": [
+      "Format_Registry resolvePreviewFamily 未知扩展名不被 Type_Hint 覆盖"
+    ],
+    "added_files": [
+      "attachmentPreviewFormats.spec.ts"
+    ],
+    "restored": true,
+    "seconds": 13.0
+  },
+  {
+    "id": "M02",
+    "side": "fe",
+    "want": "Preview 图片不含 svg",
+    "why": "legacy union 把 svg 扩进 Preview 图片集 ⇒ P2/P16 必须 RED",
+    "verdict": "RED",
+    "summary": "178/180 passed, numFailedTestSuites=4",
+    "added": [
+      "LEGACY_CAPABILITIES 宿主专属不求并集 Preview 图片不含 svg；Drawer Office 10 项；Tab 6 项",
+      "Task1/14 Preview_Host legacy matrix fileName='d.svg' fileType='' → 'unsupported'"
+    ],
+    "gone": [],
+    "hit": [
+      "LEGACY_CAPABILITIES 宿主专属不求并集 Preview 图片不含 svg；Drawer Office 10 项；Tab 6 项"
+    ],
+    "added_files": [
+      "attachmentPreviewFormats.spec.ts",
+      "task1LegacyBaseline.spec.ts"
+    ],
+    "restored": true,
+    "seconds": 13.3
+  },
+  {
+    "id": "M03",
+    "side": "fe",
+    "want": "<file-level>:attachmentPreviewFormats.spec.ts",
+    "why": "dwg 入 drawing 族在模块装载期 fail-closed ⇒ 文件级收集失败必须 RED",
+    "verdict": "RED",
+    "summary": "107/107 passed, numFailedTestSuites=4",
+    "added": [
+      "<file-level>:AttachmentPreviewOfficeIframe.spec.ts",
+      "<file-level>:ExtendedFormatPreview.spec.ts",
+      "<file-level>:attachmentPreviewFormats.spec.ts",
+      "<file-level>:task1LegacyBaseline.spec.ts"
+    ],
+    "gone": [],
+    "hit": [
+      "<file-level>:attachmentPreviewFormats.spec.ts"
+    ],
+    "added_files": [
+      "AttachmentPreviewOfficeIframe.spec.ts",
+      "ExtendedFormatPreview.spec.ts",
+      "attachmentPreviewFormats.spec.ts",
+      "task1LegacyBaseline.spec.ts"
+    ],
+    "restored": true,
+    "seconds": 12.4
+  },
+  {
+    "id": "M04",
+    "side": "fe",
+    "want": "下载请求固定 _dedupe:false",
+    "why": "新增三类取字节丢掉 _dedupe:false ⇒ ExtendedFormatPreview 调用契约必须 RED",
+    "verdict": "RED",
+    "summary": "179/180 passed, numFailedTestSuites=2",
+    "added": [
+      "fetchExtendedBytes 下载请求固定 _dedupe:false 并保留调用方 signal"
+    ],
+    "gone": [],
+    "hit": [
+      "fetchExtendedBytes 下载请求固定 _dedupe:false 并保留调用方 signal"
+    ],
+    "added_files": [
+      "extendedPreviewRequest.spec.ts"
+    ],
+    "restored": true,
+    "seconds": 13.9
+  },
+  {
+    "id": "M05",
+    "side": "fe",
+    "want": "wiring_error，且日志不含正文",
+    "why": "JSON trap 日志夹带 previewable ⇒ 无敏感内容断言必须 RED",
+    "verdict": "RED",
+    "summary": "177/180 passed, numFailedTestSuites=2",
+    "added": [
+      "fetchExtendedBytes application/json → wiring_error，且日志不含正文",
+      "fetchExtendedBytes application/problem+json → wiring_error，且日志不含正文",
+      "fetchExtendedBytes vendor/vnd.gt+json → wiring_error，且日志不含正文"
+    ],
+    "gone": [],
+    "hit": [
+      "fetchExtendedBytes application/json → wiring_error，且日志不含正文",
+      "fetchExtendedBytes application/problem+json → wiring_error，且日志不含正文",
+      "fetchExtendedBytes vendor/vnd.gt+json → wiring_error，且日志不含正文"
+    ],
+    "added_files": [
+      "extendedPreviewRequest.spec.ts"
+    ],
+    "restored": true,
+    "seconds": 12.5
+  },
+  {
+    "id": "M06",
+    "side": "fe",
+    "want": "releaseAll 幂等且 late-track 资源立即释放",
+    "why": "跳过 revokeObjectURL ⇒ PreviewResourceScope 回收守卫必须 RED",
+    "verdict": "RED",
+    "summary": "179/180 passed, numFailedTestSuites=2",
+    "added": [
+      "PreviewResourceScope releaseAll 幂等且 late-track 资源立即释放"
+    ],
+    "gone": [],
+    "hit": [
+      "PreviewResourceScope releaseAll 幂等且 late-track 资源立即释放"
+    ],
+    "added_files": [
+      "previewResourceScope.spec.ts"
+    ],
+    "restored": true,
+    "seconds": 12.9
+  },
+  {
+    "id": "M07",
+    "side": "fe",
+    "want": "_dedupe:false",
+    "why": "忽略 _dedupe:false 早退 ⇒ httpDedupe.signal 双请求互不取消必须 RED",
+    "verdict": "RED",
+    "summary": "178/180 passed, numFailedTestSuites=2",
+    "added": [
+      "http _dedupe:false contract 同 URL 两个 _dedupe:false 均成功；取消一个不影响另一个",
+      "http _dedupe:false contract 预先 aborted signal 不发请求（_dedupe:false）"
+    ],
+    "gone": [],
+    "hit": [
+      "http _dedupe:false contract 同 URL 两个 _dedupe:false 均成功；取消一个不影响另一个",
+      "http _dedupe:false contract 预先 aborted signal 不发请求（_dedupe:false）"
+    ],
+    "added_files": [
+      "httpDedupe.signal.spec.ts"
+    ],
+    "restored": true,
+    "seconds": 12.3
+  },
+  {
+    "id": "M08",
+    "side": "fe",
+    "want": "五项单一真源数值",
+    "why": "抬高 maxEntries ⇒ 五限真源数值守卫必须 RED",
+    "verdict": "RED",
+    "summary": "177/180 passed, numFailedTestSuites=4",
+    "added": [
+      "ARCHIVE_LIMITS 五项单一真源数值",
+      "ARCHIVE_LIMITS 各限可独立触发",
+      "archive fixtures corpus maxEntries 触发"
+    ],
+    "gone": [],
+    "hit": [
+      "ARCHIVE_LIMITS 五项单一真源数值"
+    ],
+    "added_files": [
+      "archiveFixtures.spec.ts",
+      "archiveLimits.spec.ts"
+    ],
+    "restored": true,
+    "seconds": 12.3
+  },
+  {
+    "id": "M08b",
+    "side": "fe",
+    "want": "archive 目录源码不含 fetch/XHR/http/fs 写出",
+    "why": "archive 容器引入 http ⇒ 零网络结构守卫必须 RED",
+    "verdict": "RED",
+    "summary": "179/180 passed, numFailedTestSuites=2",
+    "added": [
+      "archive module 零网络/落盘结构守卫 archive 目录源码不含 fetch/XHR/http/fs 写出"
+    ],
+    "gone": [],
+    "hit": [
+      "archive module 零网络/落盘结构守卫 archive 目录源码不含 fetch/XHR/http/fs 写出"
+    ],
+    "added_files": [
+      "archiveNoNetwork.spec.ts"
+    ],
+    "restored": true,
+    "seconds": 13.0
+  },
+  {
+    "id": "M09",
+    "side": "fe",
+    "want": "各限可独立触发",
+    "why": "压缩比门失效 ⇒ 独立触发断言/夹具 bomb 路径必须 RED",
+    "verdict": "RED",
+    "summary": "177/180 passed, numFailedTestSuites=4",
+    "added": [
+      "ARCHIVE_LIMITS 五项单一真源数值",
+      "ARCHIVE_LIMITS 各限可独立触发",
+      "archive fixtures corpus 前置 stored 条目不能稀释后续单条 deflate bomb 的压缩比"
+    ],
+    "gone": [],
+    "hit": [
+      "ARCHIVE_LIMITS 各限可独立触发"
+    ],
+    "added_files": [
+      "archiveFixtures.spec.ts",
+      "archiveLimits.spec.ts"
+    ],
+    "restored": true,
+    "seconds": 12.5
+  },
+  {
+    "id": "M10",
+    "side": "fe",
+    "want": "path depth 9 在 ZIP/TAR 真实解析中触发 maxPathDepth",
+    "why": "抬高 maxPathDepth ⇒ 深度标记与五限真源守卫必须 RED",
+    "verdict": "RED",
+    "summary": "176/180 passed, numFailedTestSuites=4",
+    "added": [
+      "ARCHIVE_LIMITS 五项单一真源数值",
+      "ARCHIVE_LIMITS 各限可独立触发",
+      "archive fixtures corpus TAR 路径门不被头阶段 ratio 遮蔽，普通/PAX/GNU 大正文均 fail closed",
+      "archive fixtures corpus path depth 9 在 ZIP/TAR 真实解析中触发 maxPathDepth"
+    ],
+    "gone": [],
+    "hit": [
+      "archive fixtures corpus path depth 9 在 ZIP/TAR 真实解析中触发 maxPathDepth"
+    ],
+    "added_files": [
+      "archiveFixtures.spec.ts",
+      "archiveLimits.spec.ts"
+    ],
+    "restored": true,
+    "seconds": 12.3
+  },
+  {
+    "id": "M13",
+    "side": "fe",
+    "want": "移除 script/事件并阻断外链图片",
+    "why": "CSP 放开 img-src * ⇒ 邮件 CSP 字面量守卫必须 RED",
+    "verdict": "RED",
+    "summary": "179/180 passed, numFailedTestSuites=2",
+    "added": [
+      "email sanitizer 移除 script/事件并阻断外链图片"
+    ],
+    "gone": [],
+    "hit": [
+      "email sanitizer 移除 script/事件并阻断外链图片"
+    ],
+    "added_files": [
+      "emailDxf.spec.ts"
+    ],
+    "restored": true,
+    "seconds": 12.3
+  },
+  {
+    "id": "M14",
+    "side": "fe",
+    "want": "移除 script/事件并阻断外链图片",
+    "why": "CSP default-src 放开 ⇒ wrapEmailSrcdoc CSP 字面量守卫必须 RED",
+    "verdict": "RED",
+    "summary": "179/180 passed, numFailedTestSuites=2",
+    "added": [
+      "email sanitizer 移除 script/事件并阻断外链图片"
+    ],
+    "gone": [],
+    "hit": [
+      "email sanitizer 移除 script/事件并阻断外链图片"
+    ],
+    "added_files": [
+      "emailDxf.spec.ts"
+    ],
+    "restored": true,
+    "seconds": 13.0
+  },
+  {
+    "id": "M16",
+    "side": "fe",
+    "want": "docx uses previewPdf",
+    "why": "Office 改回 preview_url ⇒ preview-pdf 宿主 URL 守卫必须 RED",
+    "verdict": "RED",
+    "summary": "172/180 passed, numFailedTestSuites=4",
+    "added": [
+      "AT-2 AttachmentPreviewDrawer routing docx uses previewPdf",
+      "AT-2 AttachmentPreviewDrawer routing pptx uses previewPdf",
+      "AT-2 AttachmentPreviewDrawer routing xlsx uses previewPdf",
+      "Task1/14 Drawer_Host matrix name='data.xlsx' type_hint='' → 'office'",
+      "Task1/14 Drawer_Host matrix name='legacy.odt' type_hint='' → 'office'",
+      "Task1/14 Drawer_Host matrix name='legacy.rtf' type_hint='' → 'office'",
+      "Task1/14 Drawer_Host matrix name='report.docx' type_hint='' → 'office'",
+      "Task1/14 Drawer_Host matrix name='slides.pptx' type_hint='' → 'office'"
+    ],
+    "gone": [],
+    "hit": [
+      "AT-2 AttachmentPreviewDrawer routing docx uses previewPdf"
+    ],
+    "added_files": [
+      "AttachmentPreviewOfficeIframe.spec.ts",
+      "task1LegacyBaseline.spec.ts"
+    ],
+    "restored": true,
+    "seconds": 12.6
+  },
+  {
+    "id": "M17",
+    "side": "be",
+    "want": "test_sql_select_list_includes_ocr",
+    "why": "DTO OCR 投影被替换 ⇒ process-record OCR 守卫必须 RED",
+    "verdict": "RED",
+    "summary": "1 failed, 22 passed in 1.79s",
+    "added": [
+      "test_task1_legacy_api_dto_baseline.py::TestProcessRecordDtoProjection::test_sql_select_list_includes_ocr"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task1_legacy_api_dto_baseline.py::TestProcessRecordDtoProjection::test_sql_select_list_includes_ocr"
+    ],
+    "added_files": [
+      "test_task1_legacy_api_dto_baseline.py"
+    ],
+    "restored": true,
+    "seconds": 7.9
+  },
+  {
+    "id": "M20",
+    "side": "fe",
+    "want": "dwg 仅 cad_download_only",
+    "why": "dwg 失去 cad_download_only ⇒ drawing/dwg 专用文案守卫必须 RED",
+    "verdict": "RED",
+    "summary": "179/180 passed, numFailedTestSuites=2",
+    "added": [
+      "Format_Registry resolvePreviewFamily dwg 仅 cad_download_only，不入可渲染族"
+    ],
+    "gone": [],
+    "hit": [
+      "Format_Registry resolvePreviewFamily dwg 仅 cad_download_only，不入可渲染族"
+    ],
+    "added_files": [
+      "attachmentPreviewFormats.spec.ts"
+    ],
+    "restored": true,
+    "seconds": 13.0
+  },
+  {
+    "id": "M21",
+    "side": "fe",
+    "want": "A 资格失败时即使体积更小也不得入选",
+    "why": "体积门抢在资格门前 ⇒ Route_Eligibility 先后顺序必须 RED",
+    "verdict": "RED",
+    "summary": "179/180 passed, numFailedTestSuites=2",
+    "added": [
+      "decideRoute capability-before-budget A 资格失败时即使体积更小也不得入选"
+    ],
+    "gone": [],
+    "hit": [
+      "decideRoute capability-before-budget A 资格失败时即使体积更小也不得入选"
+    ],
+    "added_files": [
+      "bundleBudget.spec.ts"
+    ],
+    "restored": true,
+    "seconds": 12.5
+  },
+  {
+    "id": "M23",
+    "side": "fe",
+    "want": "entryParserBytes 预算真源为 0",
+    "why": "预算真源 entryParserBytes 非 0 ⇒ 预算常量守卫必须 RED",
+    "verdict": "RED",
+    "summary": "179/180 passed, numFailedTestSuites=2",
+    "added": [
+      "decideRoute capability-before-budget entryParserBytes 预算真源为 0"
+    ],
+    "gone": [],
+    "hit": [
+      "decideRoute capability-before-budget entryParserBytes 预算真源为 0"
+    ],
+    "added_files": [
+      "bundleBudget.spec.ts"
+    ],
+    "restored": true,
+    "seconds": 12.9
+  },
+  {
+    "id": "M29",
+    "side": "fe",
+    "want": "dwg 不取字节",
+    "why": "单宿主断线：dwg 短路被关掉 ⇒ ExtendedFormatPreview dwg 守卫必须 RED",
+    "verdict": "RED",
+    "summary": "179/180 passed, numFailedTestSuites=2",
+    "added": [
+      "ExtendedFormatPreview dwg 不取字节也不建 Worker，显示下载提示"
+    ],
+    "gone": [],
+    "hit": [
+      "ExtendedFormatPreview dwg 不取字节也不建 Worker，显示下载提示"
+    ],
+    "added_files": [
+      "ExtendedFormatPreview.spec.ts"
+    ],
+    "restored": true,
+    "seconds": 12.9
+  },
+  {
+    "id": "M11",
+    "side": "fe",
+    "want": "加密与 unsupported method",
+    "why": "AES 加密方法被当可解 ⇒ unsupported 容器/方法分层守卫必须 RED",
+    "verdict": "RED",
+    "summary": "179/180 passed, numFailedTestSuites=2",
+    "added": [
+      "ARCHIVE_LIMITS 加密与 unsupported method"
+    ],
+    "gone": [],
+    "hit": [
+      "ARCHIVE_LIMITS 加密与 unsupported method"
+    ],
+    "added_files": [
+      "archiveLimits.spec.ts"
+    ],
+    "restored": true,
+    "seconds": 13.1
+  },
+  {
+    "id": "M12",
+    "side": "fe",
+    "want": "解析头与正文",
+    "why": "收件人归一被清空 ⇒ 邮件头部归一守卫（解析头与正文）必须 RED",
+    "verdict": "RED",
+    "summary": "179/180 passed, numFailedTestSuites=2",
+    "added": [
+      "email eml parse 解析头与正文"
+    ],
+    "gone": [],
+    "hit": [
+      "email eml parse 解析头与正文"
+    ],
+    "added_files": [
+      "emailDxf.spec.ts"
+    ],
+    "restored": true,
+    "seconds": 12.5
+  },
+  {
+    "id": "M15",
+    "side": "fe",
+    "want": "CID magic 不匹配时拒绝转 blob",
+    "why": "PNG magic 恒真 ⇒ CID magic 不匹配拒绝守卫必须 RED",
+    "verdict": "RED",
+    "summary": "178/180 passed, numFailedTestSuites=2",
+    "added": [
+      "email sanitizer CID magic 不匹配时拒绝转 blob（声明 png 但字节非 png）",
+      "email sanitizer CID 仅有 PNG 短前缀而完整 signature 错误时拒绝转 blob"
+    ],
+    "gone": [],
+    "hit": [
+      "email sanitizer CID magic 不匹配时拒绝转 blob（声明 png 但字节非 png）"
+    ],
+    "added_files": [
+      "emailDxf.spec.ts"
+    ],
+    "restored": true,
+    "seconds": 12.4
+  },
+  {
+    "id": "M18",
+    "side": "be",
+    "want": "test_upload_handler_has_size_gate_no_extension_whitelist",
+    "why": "谎报上传有扩展名白名单 ⇒ preview/upload 契约守卫必须 RED",
+    "verdict": "RED",
+    "summary": "1 failed, 22 passed in 1.86s",
+    "added": [
+      "test_task1_legacy_api_dto_baseline.py::TestPreviewWhitelistContract::test_upload_handler_has_size_gate_no_extension_whitelist"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task1_legacy_api_dto_baseline.py::TestPreviewWhitelistContract::test_upload_handler_has_size_gate_no_extension_whitelist"
+    ],
+    "added_files": [
+      "test_task1_legacy_api_dto_baseline.py"
+    ],
+    "restored": true,
+    "seconds": 8.0
+  },
+  {
+    "id": "M19",
+    "side": "fe",
+    "want": "归一为 parse_failed",
+    "why": "解析异常改为向外抛 ⇒ P19 解析异常隔离守卫必须 RED",
+    "verdict": "RED",
+    "summary": "178/180 passed, numFailedTestSuites=3",
+    "added": [
+      "MSG descriptor、recipient 与 CID 提取 MSGReader 错误/未知异常归一为 parse_failed，不 reject",
+      "raw MIME 预扫与 PostalMime 限额 PostalMime 已知限额异常保留 limit，未知异常才是 parse_failed"
+    ],
+    "gone": [],
+    "hit": [
+      "MSG descriptor、recipient 与 CID 提取 MSGReader 错误/未知异常归一为 parse_failed，不 reject"
+    ],
+    "added_files": [
+      "emailParseIsolation.spec.ts"
+    ],
+    "restored": true,
+    "seconds": 13.1
+  },
+  {
+    "id": "M22",
+    "side": "fe",
+    "want": "drawing 超门 → drawing_drop",
+    "why": "放宽 drawing 门 ⇒ drawing 超门 drawing_drop 守卫必须 RED",
+    "verdict": "RED",
+    "summary": "179/180 passed, numFailedTestSuites=2",
+    "added": [
+      "decideRoute capability-before-budget drawing 超门 → drawing_drop 且 drawingInScope=false"
+    ],
+    "gone": [],
+    "hit": [
+      "decideRoute capability-before-budget drawing 超门 → drawing_drop 且 drawingInScope=false"
+    ],
+    "added_files": [
+      "bundleBudget.spec.ts"
+    ],
+    "restored": true,
+    "seconds": 12.2
+  },
+  {
+    "id": "M24",
+    "side": "fe",
+    "want": "按需 chunk 合计超门",
+    "why": "放宽按需合计门 ⇒ subset_required 守卫必须 RED",
+    "verdict": "RED",
+    "summary": "179/180 passed, numFailedTestSuites=2",
+    "added": [
+      "decideRoute capability-before-budget 按需 chunk 合计超门 → subset_required（各 chunk 分别核算总量）"
+    ],
+    "gone": [],
+    "hit": [
+      "decideRoute capability-before-budget 按需 chunk 合计超门 → subset_required（各 chunk 分别核算总量）"
+    ],
+    "added_files": [
+      "bundleBudget.spec.ts"
+    ],
+    "restored": true,
+    "seconds": 12.4
+  },
+  {
+    "id": "M25",
+    "side": "fe",
+    "want": "entryGzipDelta 首屏增量门为 8 KiB",
+    "why": "首屏增量门真源被改 ⇒ entryGzipDelta 8KiB 常量守卫必须 RED",
+    "verdict": "RED",
+    "summary": "179/180 passed, numFailedTestSuites=2",
+    "added": [
+      "decideRoute capability-before-budget entryGzipDelta 首屏增量门为 8 KiB 单一真源"
+    ],
+    "gone": [],
+    "hit": [
+      "decideRoute capability-before-budget entryGzipDelta 首屏增量门为 8 KiB 单一真源"
+    ],
+    "added_files": [
+      "bundleBudget.spec.ts"
+    ],
+    "restored": true,
+    "seconds": 12.2
+  },
+  {
+    "id": "M32",
+    "side": "fe",
+    "want": "gzip trailer CRC",
+    "why": "跳过 GZIP trailer CRC ⇒ 损坏 TGZ 被接受，完整性守卫必须 RED",
+    "verdict": "RED",
+    "summary": "179/180 passed, numFailedTestSuites=2",
+    "added": [
+      "archive fixtures corpus gzip trailer CRC、ISIZE、截断与拼接 member 均 fail closed"
+    ],
+    "gone": [],
+    "hit": [
+      "archive fixtures corpus gzip trailer CRC、ISIZE、截断与拼接 member 均 fail closed"
+    ],
+    "added_files": [
+      "archiveFixtures.spec.ts"
+    ],
+    "restored": true,
+    "seconds": 12.4
+  },
+  {
+    "id": "M33",
+    "side": "fe",
+    "want": "classic data descriptor 有/无签名",
+    "why": "关闭 bit 3 descriptor 分支 ⇒ 合法 classic descriptor 支持守卫必须 RED",
+    "verdict": "RED",
+    "summary": "178/180 passed, numFailedTestSuites=2",
+    "added": [
+      "archive fixtures corpus classic data descriptor 字段、布局或边界不闭合时 fail closed",
+      "archive fixtures corpus classic data descriptor 有/无签名、stored/deflate 均安全解析"
+    ],
+    "gone": [],
+    "hit": [
+      "archive fixtures corpus classic data descriptor 有/无签名、stored/deflate 均安全解析"
+    ],
+    "added_files": [
+      "archiveFixtures.spec.ts"
+    ],
+    "restored": true,
+    "seconds": 12.4
+  },
+  {
+    "id": "M34",
+    "side": "fe",
+    "want": "TAR 目录条目不得携带正文",
+    "why": "允许目录正文绕过结构门 ⇒ TAR 资源绕过守卫必须 RED",
+    "verdict": "RED",
+    "summary": "179/180 passed, numFailedTestSuites=2",
+    "added": [
+      "archive fixtures corpus TAR 目录条目不得携带正文绕过实际量门"
+    ],
+    "gone": [],
+    "hit": [
+      "archive fixtures corpus TAR 目录条目不得携带正文绕过实际量门"
+    ],
+    "added_files": [
+      "archiveFixtures.spec.ts"
+    ],
+    "restored": true,
+    "seconds": 12.7
+  },
+  {
+    "id": "M35",
+    "side": "fe",
+    "want": "entry 数据跨度必须与下一结构精确闭合",
+    "why": "忽略 DEFLATE 尾随垃圾 ⇒ 声明压缩跨度未完整消费仍被接受，结构守卫必须 RED",
+    "verdict": "RED",
+    "summary": "179/180 passed, numFailedTestSuites=2",
+    "added": [
+      "archive fixtures corpus entry 数据跨度必须与下一结构精确闭合"
+    ],
+    "gone": [],
+    "hit": [
+      "archive fixtures corpus entry 数据跨度必须与下一结构精确闭合"
+    ],
+    "added_files": [
+      "archiveFixtures.spec.ts"
+    ],
+    "restored": true,
+    "seconds": 12.2
+  },
+  {
+    "id": "M36",
+    "side": "fe",
+    "want": "gzip 可选 header 不计入压缩比分母",
+    "why": "把 GZIP wrapper 计入 ratio 分母 ⇒ 巨型可选头可绕过 zip-bomb 门，守卫必须 RED",
+    "verdict": "RED",
+    "summary": "179/180 passed, numFailedTestSuites=2",
+    "added": [
+      "archive fixtures corpus gzip 可选 header 不计入压缩比分母"
+    ],
+    "gone": [],
+    "hit": [
+      "archive fixtures corpus gzip 可选 header 不计入压缩比分母"
+    ],
+    "added_files": [
+      "archiveFixtures.spec.ts"
+    ],
+    "restored": true,
+    "seconds": 12.4
+  },
+  {
+    "id": "M37",
+    "side": "fe",
+    "want": "gzip trailer CRC、ISIZE",
+    "why": "跳过 GZIP ISIZE 一致性 ⇒ 损坏 trailer 被接受，结构守卫必须 RED",
+    "verdict": "RED",
+    "summary": "179/180 passed, numFailedTestSuites=2",
+    "added": [
+      "archive fixtures corpus gzip trailer CRC、ISIZE、截断与拼接 member 均 fail closed"
+    ],
+    "gone": [],
+    "hit": [
+      "archive fixtures corpus gzip trailer CRC、ISIZE、截断与拼接 member 均 fail closed"
+    ],
+    "added_files": [
+      "archiveFixtures.spec.ts"
+    ],
+    "restored": true,
+    "seconds": 12.3
+  },
+  {
+    "id": "M38",
+    "side": "fe",
+    "want": "path depth 9 在 ZIP/TAR 真实解析中触发",
+    "why": "TAR 忽略真实路径深度门 ⇒ maxPathDepth 行为守卫必须 RED",
+    "verdict": "RED",
+    "summary": "178/180 passed, numFailedTestSuites=2",
+    "added": [
+      "archive fixtures corpus TAR 路径门不被头阶段 ratio 遮蔽，普通/PAX/GNU 大正文均 fail closed",
+      "archive fixtures corpus path depth 9 在 ZIP/TAR 真实解析中触发 maxPathDepth"
+    ],
+    "gone": [],
+    "hit": [
+      "archive fixtures corpus path depth 9 在 ZIP/TAR 真实解析中触发 maxPathDepth"
+    ],
+    "added_files": [
+      "archiveFixtures.spec.ts"
+    ],
+    "restored": true,
+    "seconds": 12.4
+  },
+  {
+    "id": "M39",
+    "side": "fe",
+    "want": "前置 stored 条目不能稀释后续单条 deflate bomb",
+    "why": "移除 ZIP 单 entry ratio ⇒ 前置大条目可稀释 bomb，守卫必须 RED",
+    "verdict": "RED",
+    "summary": "179/180 passed, numFailedTestSuites=2",
+    "added": [
+      "archive fixtures corpus 前置 stored 条目不能稀释后续单条 deflate bomb 的压缩比"
+    ],
+    "gone": [],
+    "hit": [
+      "archive fixtures corpus 前置 stored 条目不能稀释后续单条 deflate bomb 的压缩比"
+    ],
+    "added_files": [
+      "archiveFixtures.spec.ts"
+    ],
+    "restored": true,
+    "seconds": 12.6
+  },
+  {
+    "id": "M40",
+    "side": "fe",
+    "want": "受限 PAX/GNU long-name 只作用于真实条目",
+    "why": "忽略 local PAX path ⇒ 受限 PAX 真消费守卫必须 RED",
+    "verdict": "RED",
+    "summary": "178/180 passed, numFailedTestSuites=2",
+    "added": [
+      "archive fixtures corpus TAR 路径门不被头阶段 ratio 遮蔽，普通/PAX/GNU 大正文均 fail closed",
+      "archive fixtures corpus 受限 PAX/GNU long-name 只作用于真实条目，并解析 header/PAX mtime"
+    ],
+    "gone": [],
+    "hit": [
+      "archive fixtures corpus 受限 PAX/GNU long-name 只作用于真实条目，并解析 header/PAX mtime"
+    ],
+    "added_files": [
+      "archiveFixtures.spec.ts"
+    ],
+    "restored": true,
+    "seconds": 12.4
+  },
+  {
+    "id": "M41",
+    "side": "fe",
+    "want": "TAR sparse、PAX sparse 与异常扩展",
+    "why": "GNU sparse type 不再专门 fail closed ⇒ sparse 判据守卫必须 RED",
+    "verdict": "RED",
+    "summary": "179/180 passed, numFailedTestSuites=2",
+    "added": [
+      "archive fixtures corpus TAR sparse、PAX sparse 与异常扩展均 fail closed 为 container_unsupported"
+    ],
+    "gone": [],
+    "hit": [
+      "archive fixtures corpus TAR sparse、PAX sparse 与异常扩展均 fail closed 为 container_unsupported"
+    ],
+    "added_files": [
+      "archiveFixtures.spec.ts"
+    ],
+    "restored": true,
+    "seconds": 12.0
+  },
+  {
+    "id": "M42",
+    "side": "fe",
+    "want": "普通 .gz 按 hint 返回单条实际元数据",
+    "why": "忽略 .gz hint 并强制走 TAR ⇒ 普通 gzip 支持守卫必须 RED",
+    "verdict": "RED",
+    "summary": "179/180 passed, numFailedTestSuites=2",
+    "added": [
+      "archive fixtures corpus 普通 .gz 按 hint 返回单条实际元数据；tgz/无 hint 仍要求 TAR"
+    ],
+    "gone": [],
+    "hit": [
+      "archive fixtures corpus 普通 .gz 按 hint 返回单条实际元数据；tgz/无 hint 仍要求 TAR"
+    ],
+    "added_files": [
+      "archiveFixtures.spec.ts"
+    ],
+    "restored": true,
+    "seconds": 12.3
+  },
+  {
+    "id": "M43",
+    "side": "fe",
+    "want": "所有 ENTITIES/BLOCKS 实体类型都参与预扫",
+    "why": "unsupported HATCH 绕过预扫 ⇒ 全实体计数守卫必须 RED",
+    "verdict": "RED",
+    "summary": "179/180 passed, numFailedTestSuites=2",
+    "added": [
+      "dxfModel scene graph 所有 ENTITIES/BLOCKS 实体类型都参与预扫，unsupported flood 在 parser 前被拒绝"
+    ],
+    "gone": [],
+    "hit": [
+      "dxfModel scene graph 所有 ENTITIES/BLOCKS 实体类型都参与预扫，unsupported flood 在 parser 前被拒绝"
+    ],
+    "added_files": [
+      "dxfModel.spec.ts"
+    ],
+    "restored": true,
+    "seconds": 12.7
+  },
+  {
+    "id": "M44",
+    "side": "fe",
+    "want": "drawing Worker 消费单一真源的 10 秒 deadline",
+    "why": "drawing 恢复统一 15 秒 ⇒ deadline 接线守卫必须 RED",
+    "verdict": "RED",
+    "summary": "179/180 passed, numFailedTestSuites=2",
+    "added": [
+      "ExtendedFormatPreview drawing Worker 消费单一真源的 10 秒 deadline"
+    ],
+    "gone": [],
+    "hit": [
+      "ExtendedFormatPreview drawing Worker 消费单一真源的 10 秒 deadline"
+    ],
+    "added_files": [
+      "ExtendedFormatPreview.spec.ts"
+    ],
+    "restored": true,
+    "seconds": 12.8
+  },
+  {
+    "id": "M45",
+    "side": "fe",
+    "want": "CID URL 纳入 PreviewResourceScope",
+    "why": "单 URL release 失效 ⇒ CID 换信/卸载资源回收守卫必须 RED",
+    "verdict": "RED",
+    "summary": "179/180 passed, numFailedTestSuites=2",
+    "added": [
+      "EmailMessageView resource ownership CID URL 纳入 PreviewResourceScope，换邮件与卸载时成对释放"
+    ],
+    "gone": [],
+    "hit": [
+      "EmailMessageView resource ownership CID URL 纳入 PreviewResourceScope，换邮件与卸载时成对释放"
+    ],
+    "added_files": [
+      "EmailMessageView.spec.ts"
+    ],
+    "restored": true,
+    "seconds": 12.9
+  },
+  {
+    "id": "M46",
+    "side": "fe",
+    "want": "跨邮件按当前安全正文复位 HTML/text mode",
+    "why": "HTML 新邮件沿用上一封 text mode ⇒ 切信状态守卫必须 RED",
+    "verdict": "RED",
+    "summary": "179/180 passed, numFailedTestSuites=2",
+    "added": [
+      "EmailMessageView resource ownership 跨邮件按当前安全正文复位 HTML/text mode，空 HTML 时禁用按钮"
+    ],
+    "gone": [],
+    "hit": [
+      "EmailMessageView resource ownership 跨邮件按当前安全正文复位 HTML/text mode，空 HTML 时禁用按钮"
+    ],
+    "added_files": [
+      "EmailMessageView.spec.ts"
+    ],
+    "restored": true,
+    "seconds": 15.7
+  },
+  {
+    "id": "M47",
+    "side": "fe",
+    "want": "Email CID object URL 由宿主 PreviewResourceScope 统一持有",
+    "why": "宿主不再注入 scope factory ⇒ CID URL 逃逸统一资源台账，集成守卫必须 RED",
+    "verdict": "RED",
+    "summary": "179/180 passed, numFailedTestSuites=2",
+    "added": [
+      "ExtendedFormatPreview Email CID object URL 由宿主 PreviewResourceScope 统一持有并在卸载释放"
+    ],
+    "gone": [],
+    "hit": [
+      "ExtendedFormatPreview Email CID object URL 由宿主 PreviewResourceScope 统一持有并在卸载释放"
+    ],
+    "added_files": [
+      "ExtendedFormatPreview.spec.ts"
+    ],
+    "restored": true,
+    "seconds": 13.2
+  },
+  {
+    "id": "M48",
+    "side": "fe",
+    "want": "解析 header/PAX mtime",
+    "why": "TAR mtime 模型消费断线 ⇒ 元数据守卫必须 RED",
+    "verdict": "RED",
+    "summary": "179/180 passed, numFailedTestSuites=2",
+    "added": [
+      "archive fixtures corpus 受限 PAX/GNU long-name 只作用于真实条目，并解析 header/PAX mtime"
+    ],
+    "gone": [],
+    "hit": [
+      "archive fixtures corpus 受限 PAX/GNU long-name 只作用于真实条目，并解析 header/PAX mtime"
+    ],
+    "added_files": [
+      "archiveFixtures.spec.ts"
+    ],
+    "restored": true,
+    "seconds": 12.3
+  },
+  {
+    "id": "M49",
+    "side": "fe",
+    "want": "受限 PAX/GNU long-name 只作用于真实条目",
+    "why": "GNU long-name 不再覆盖下一 header ⇒ long-name 守卫必须 RED",
+    "verdict": "RED",
+    "summary": "178/180 passed, numFailedTestSuites=2",
+    "added": [
+      "archive fixtures corpus TAR 路径门不被头阶段 ratio 遮蔽，普通/PAX/GNU 大正文均 fail closed",
+      "archive fixtures corpus 受限 PAX/GNU long-name 只作用于真实条目，并解析 header/PAX mtime"
+    ],
+    "gone": [],
+    "hit": [
+      "archive fixtures corpus 受限 PAX/GNU long-name 只作用于真实条目，并解析 header/PAX mtime"
+    ],
+    "added_files": [
+      "archiveFixtures.spec.ts"
+    ],
+    "restored": true,
+    "seconds": 12.2
+  },
+  {
+    "id": "M50",
+    "side": "fe",
+    "want": "TAR 路径门不被头阶段 ratio 遮蔽",
+    "why": "只在 ratio 未超限时检查路径 ⇒ 大正文可遮蔽 TAR/PAX/GNU 深路径，交叉守卫必须 RED",
+    "verdict": "RED",
+    "summary": "179/180 passed, numFailedTestSuites=2",
+    "added": [
+      "archive fixtures corpus TAR 路径门不被头阶段 ratio 遮蔽，普通/PAX/GNU 大正文均 fail closed"
+    ],
+    "gone": [],
+    "hit": [
+      "archive fixtures corpus TAR 路径门不被头阶段 ratio 遮蔽，普通/PAX/GNU 大正文均 fail closed"
+    ],
+    "added_files": [
+      "archiveFixtures.spec.ts"
+    ],
+    "restored": true,
+    "seconds": 12.3
+  },
+  {
+    "id": "M31",
+    "side": "be",
+    "want": "test_three_debts_out_of_scope",
+    "why": "registered debt 标回 in_scope=true ⇒ 债务不夹带修复守卫必须 RED",
+    "verdict": "RED",
+    "summary": "1 failed, 22 passed in 1.62s",
+    "added": [
+      "test_task1_legacy_api_dto_baseline.py::TestRegisteredDebtLedger::test_three_debts_out_of_scope"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task1_legacy_api_dto_baseline.py::TestRegisteredDebtLedger::test_three_debts_out_of_scope"
+    ],
+    "added_files": [
+      "test_task1_legacy_api_dto_baseline.py"
+    ],
+    "restored": true,
+    "seconds": 7.5
+  }
+]

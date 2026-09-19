@@ -567,12 +567,14 @@ class ConsolReportRow(BaseModel):
     row_code: str
     row_name: str
     row_index: int = 0
+    indent_level: int = 0
     is_bold: bool = False
     is_total: bool = False
-    current_period_amount: Decimal = Decimal("0")
-    prior_period_amount: Decimal = Decimal("0")
+    is_total_row: bool = False
+    current_period_amount: Decimal | str | None = Decimal("0")
+    prior_period_amount: Decimal | str | None = Decimal("0")
     formula_used: str | None = None
-    source_accounts: list[str] = Field(default_factory=list)
+    source_accounts: dict | list | None = None
 
 
 class ConsolWorkpaperResult(BaseModel):

@@ -57,6 +57,16 @@ async def search_workpaper_versions(
           ]
         }
     """
+    from app.routers._wp_gate import enforce_wp_gate
+
+    # Wp_Bound_Gate：搜索底稿历史版本正文之前完成授权判定（Req 8.15 / version 入口族）。
+    # 无 project_id 路由参数 → gate 从 wp_id 反查 project；越权/不存在统一 404。
+    await enforce_wp_gate(
+        db, current_user,
+        entrypoint="workpaper.version_list", action="read_versions", method="GET",
+        wp_id=wp_id, entry_family="version",
+        route_name="/api/working-papers/{wp_id}/versions/search",
+    )
     try:
         results = await search_versions(db, wp_id, q, limit=limit)
     except Exception as e:  # noqa: BLE001

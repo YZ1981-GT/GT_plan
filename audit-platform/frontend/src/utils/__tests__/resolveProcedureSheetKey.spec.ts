@@ -48,10 +48,17 @@ describe('resolveProcedureSheetKey - G 循环路由 (G-F12 Task 3.6)', () => {
     expect(resolveProcedureSheetKey('G8-2')).toBe('g8a')
   })
 
+  it('G9 系列底稿（G9 / G9-1 / G9A）→ g9a', () => {
+    expect(resolveProcedureSheetKey('G9')).toBe('g9a')
+    expect(resolveProcedureSheetKey('G9-1')).toBe('g9a')
+    expect(resolveProcedureSheetKey('G9A')).toBe('g9a')
+  })
+
   // ─── 多位编号优先匹配（避免 startsWith('G1') 误匹配 G10~G14）─────────────
-  it('G10 → e1a (无专属程序表 fallback)', () => {
-    expect(resolveProcedureSheetKey('G10')).toBe('e1a')
-    expect(resolveProcedureSheetKey('G10-1')).toBe('e1a')
+  it('G10 → g10a（交易性金融负债程序表）', () => {
+    expect(resolveProcedureSheetKey('G10')).toBe('g10a')
+    expect(resolveProcedureSheetKey('G10-1')).toBe('g10a')
+    expect(resolveProcedureSheetKey('G10A')).toBe('g10a')
   })
 
   it('G11 → g11a (投资收益汇总专属)', () => {
@@ -59,16 +66,22 @@ describe('resolveProcedureSheetKey - G 循环路由 (G-F12 Task 3.6)', () => {
     expect(resolveProcedureSheetKey('G11-1')).toBe('g11a')
   })
 
-  it('G12 → e1a (净敞口套期 fallback)', () => {
-    expect(resolveProcedureSheetKey('G12')).toBe('e1a')
+  it('G12 → g12a (净敞口套期收益专属)', () => {
+    expect(resolveProcedureSheetKey('G12')).toBe('g12a')
+    expect(resolveProcedureSheetKey('G12-1')).toBe('g12a')
+    expect(resolveProcedureSheetKey('G12A')).toBe('g12a')
   })
 
-  it('G13 → e1a (公允价值变动收益 fallback)', () => {
-    expect(resolveProcedureSheetKey('G13')).toBe('e1a')
+  it('G13 → g13a (公允价值变动收益专属)', () => {
+    expect(resolveProcedureSheetKey('G13')).toBe('g13a')
+    expect(resolveProcedureSheetKey('G13-1')).toBe('g13a')
+    expect(resolveProcedureSheetKey('G13A')).toBe('g13a')
   })
 
-  it('G14 → e1a (信用减值损失 fallback)', () => {
-    expect(resolveProcedureSheetKey('G14')).toBe('e1a')
+  it('G14 → g14a (信用减值损失专属)', () => {
+    expect(resolveProcedureSheetKey('G14')).toBe('g14a')
+    expect(resolveProcedureSheetKey('G14-1')).toBe('g14a')
+    expect(resolveProcedureSheetKey('G14A')).toBe('g14a')
   })
 
   it('小写 wp_code 也能正确路由（uppercase 标准化）', () => {

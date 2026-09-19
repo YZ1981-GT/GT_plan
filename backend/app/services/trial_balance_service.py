@@ -24,6 +24,7 @@ from app.models.audit_platform_models import (
 )
 from app.models.audit_platform_schemas import EventPayload
 from app.services.dataset_query import get_active_filter
+from app.services.ledger_import.direction_resolver import resolve_account_direction
 
 logger = logging.getLogger(__name__)
 
@@ -56,56 +57,127 @@ class TrialBalanceService:
         ac = AccountChart.__table__
         balance_filter = await get_active_filter(self.db, bal, project_id, year)
 
-        # 1. 汇总查询：客户余额 → 映射 → 标准科目
-        agg_q = (
-            sa.select(
-                mp.c.standard_account_code,
-                sa.func.coalesce(sa.func.sum(bal.c.closing_balance), 0).label("total_closing"),
-                sa.func.coalesce(sa.func.sum(bal.c.opening_balance), 0).label("total_opening"),
+        # 叶子节点过滤：客户科目表是多级树（1122 父级 / 1122.01 子级），
+        # 父级余额 = 子级之和。account_mapping 把每一级 original_account_code 都
+        # 映射到标准科目，若汇总时父子全加会重复计算（父级被算两遍）→ 试算表翻倍、
+        # 资产≠负债+权益。因此只汇总叶子节点（没有被映射子科目的最明细行），
+        # 既消除父子双计，又保留二级明细（如坏账准备 1231-01/02/03）的备抵映射。
+        child = bal.alias("tb_child")
+        leaf_cond = ~sa.exists(
+            sa.select(sa.literal(1))
+            .select_from(child)
+            .where(
+                child.c.project_id == bal.c.project_id,
+                child.c.year == bal.c.year,
+                child.c.is_deleted == sa.false(),
+                child.c.account_code != bal.c.account_code,
+                child.c.account_code.like(bal.c.account_code.concat(".%")),
+                # 子级须与父级同数据集才算其子科目（active dataset 已由 balance_filter 锁定 bal）
+                sa.or_(
+                    child.c.dataset_id == bal.c.dataset_id,
+                    sa.and_(child.c.dataset_id.is_(None), bal.c.dataset_id.is_(None)),
+                ),
             )
-            .select_from(
-                bal.join(
-                    mp,
-                    sa.and_(
-                        mp.c.project_id == bal.c.project_id,
-                        mp.c.original_account_code == bal.c.account_code,
-                        mp.c.is_deleted == sa.false(),
+        )
+
+        # 1. 汇总查询：客户余额 → 映射 → 标准科目（仅叶子节点）
+        # 🔴 方向符号修复：tb_balance.closing_balance/opening_balance 在部分账套里存的是
+        #    "无符号绝对值"(贷方也是正数)，方向在 closing_direction/opening_direction 里。
+        #    若直接 SUM(closing_balance) 再对贷方类 abs()，同一父科目下"借方性质挂账"
+        #    (如 其他应付款-应付利润，direction='debit') 会被同号累加而非冲减 → 负债/资产虚增、
+        #    资产≠负债+权益。这里按方向归一到"借正贷负"有符号口径再求和：
+        #      debit  → +ABS(balance)   credit → -ABS(balance)   方向缺失 → 原值(兼容已有符号存储)。
+        #    下游 `if direction=='credit': closing=abs(closing)` 不变即自洽。
+        signed_closing = sa.case(
+            (bal.c.closing_direction == "credit", -sa.func.abs(bal.c.closing_balance)),
+            (bal.c.closing_direction == "debit", sa.func.abs(bal.c.closing_balance)),
+            else_=bal.c.closing_balance,
+        )
+        signed_opening = sa.case(
+            (bal.c.opening_direction == "credit", -sa.func.abs(bal.c.opening_balance)),
+            (bal.c.opening_direction == "debit", sa.func.abs(bal.c.opening_balance)),
+            else_=bal.c.opening_balance,
+        )
+
+        # 🔴 映射口径根治（2026-07）：未映射叶子继承最近已映射父科目标准码。
+        #    根因：account_mapping 由 auto_match 生成，常出现「父科目已映射、部分子科目漏映射」
+        #    （如 1651 使用权资产→1641 已映射，但叶子 1651.02 使用权资产_房屋及建筑物 漏映射）。
+        #    原实现用 INNER JOIN 精确匹配 original_account_code == account_code，漏映射叶子被
+        #    静默丢弃 → 丢的资产≠丢的负债 → 报表资产≠负债+权益。
+        #    修复：按「最长前缀匹配」解析每个叶子的标准码——叶子自身有映射用自身，否则回退到
+        #    最近的已映射祖先（1651.02 → 祖先 1651 → 1641）。账户层级下子科目天然属于父科目
+        #    同一标准科目，此继承会计正确；无任何已映射祖先的叶子仍返回 NULL（保持原丢弃行为）。
+        mp_anc = AccountMapping.__table__.alias("mp_anc")
+
+        def _resolved_std_subq():
+            return (
+                sa.select(mp_anc.c.standard_account_code)
+                .where(
+                    mp_anc.c.project_id == bal.c.project_id,
+                    mp_anc.c.is_deleted == sa.false(),
+                    sa.or_(
+                        bal.c.account_code == mp_anc.c.original_account_code,
+                        bal.c.account_code.like(mp_anc.c.original_account_code.concat(".%")),
                     ),
                 )
+                .order_by(sa.func.length(mp_anc.c.original_account_code).desc())
+                .limit(1)
+                .correlate(bal)
+                .scalar_subquery()
             )
+
+        agg_sub = (
+            sa.select(
+                _resolved_std_subq().label("std"),
+                signed_closing.label("sc"),
+                signed_opening.label("so"),
+            )
+            .select_from(bal)
             .where(balance_filter)
-            .group_by(mp.c.standard_account_code)
+            .where(leaf_cond)
+        ).subquery("agg_sub")
+
+        agg_q = (
+            sa.select(
+                agg_sub.c.std.label("standard_account_code"),
+                sa.func.coalesce(sa.func.sum(agg_sub.c.sc), 0).label("total_closing"),
+                sa.func.coalesce(sa.func.sum(agg_sub.c.so), 0).label("total_opening"),
+            )
+            .where(agg_sub.c.std.isnot(None))
+            .group_by(agg_sub.c.std)
         )
 
         if account_codes:
-            agg_q = agg_q.where(mp.c.standard_account_code.in_(account_codes))
+            agg_q = agg_q.where(agg_sub.c.std.in_(account_codes))
 
         result = await self.db.execute(agg_q)
         agg_rows = {r.standard_account_code: r for r in result.fetchall()}
 
         # 1b. 损益类科目额外汇总本期发生额（debit_amount - credit_amount）
         # 损益类期末余额通常为 0（已结转），审计需要看本期发生额
+        # 同样只取叶子节点，避免父子科目发生额重复累加。
+        period_sub = (
+            sa.select(
+                _resolved_std_subq().label("std"),
+                bal.c.debit_amount.label("dr"),
+                bal.c.credit_amount.label("cr"),
+            )
+            .select_from(bal)
+            .where(balance_filter)
+            .where(leaf_cond)
+        ).subquery("period_sub")
+
         period_agg_q = (
             sa.select(
-                mp.c.standard_account_code,
-                sa.func.coalesce(sa.func.sum(bal.c.debit_amount), 0).label("total_debit"),
-                sa.func.coalesce(sa.func.sum(bal.c.credit_amount), 0).label("total_credit"),
+                period_sub.c.std.label("standard_account_code"),
+                sa.func.coalesce(sa.func.sum(period_sub.c.dr), 0).label("total_debit"),
+                sa.func.coalesce(sa.func.sum(period_sub.c.cr), 0).label("total_credit"),
             )
-            .select_from(
-                bal.join(
-                    mp,
-                    sa.and_(
-                        mp.c.project_id == bal.c.project_id,
-                        mp.c.original_account_code == bal.c.account_code,
-                        mp.c.is_deleted == sa.false(),
-                    ),
-                )
-            )
-            .where(balance_filter)
-            .group_by(mp.c.standard_account_code)
+            .where(period_sub.c.std.isnot(None))
+            .group_by(period_sub.c.std)
         )
         if account_codes:
-            period_agg_q = period_agg_q.where(mp.c.standard_account_code.in_(account_codes))
+            period_agg_q = period_agg_q.where(period_sub.c.std.in_(account_codes))
 
         period_result = await self.db.execute(period_agg_q)
         period_rows = {r.standard_account_code: r for r in period_result.fetchall()}
@@ -186,30 +258,37 @@ class TrialBalanceService:
             name = level1_names.get(code) or (std.account_name if std else None)
             cat = std.category if std else AccountCategory.asset.value
 
-            # 损益类科目（5xxx/6xxx）：取单边发生额（不做借-贷，因为结转后两边相等）
-            # 收入类：取 credit_amount（贷方发生额），存为负数保持"贷方=负"语义
-            # 费用/成本类：取 debit_amount（借方发生额），存为正数保持"借方=正"语义
+            # 损益类科目（5xxx/6xxx）：取单边发生额（不做借-贷，因为结转后两边相等）。
+            # v2 约定（category_natural_positive）：按 direction_resolver 判方向后存自然正数。
+            # v2 约定（category_natural_positive）：
+            # - 资产负债权益类：从 tb_balance.closing_balance 取值(v1 借正贷负),贷方类取 abs 转正。
+            # - 损益类(5xxx/6xxx)：closing_balance 通常=0(年末结转/原始余额表不含),
+            #   须从 tb_ledger 取单边发生额(收入取贷方,费用取借方)。
             is_income_expense = code and code[0] in ('5', '6')
             if is_income_expense:
                 period = period_rows.get(code)
                 if period:
                     total_dr = Decimal(str(period.total_debit))
                     total_cr = Decimal(str(period.total_credit))
-                    # 判断是收入类还是费用类：
-                    # 收入类编码：5001/5051/5101/6001/6051/6101/6111/6117/6301
-                    # 费用类编码：5401+/6401+/6403+/6601+/6602+/6603+/6701+/6702+/6711+/6801+
-                    is_revenue = code in ('5001', '5051', '5101') or (
-                        code.startswith('6') and code[:4] in ('6001', '6051', '6101', '6111', '6115', '6117', '6301')
-                    )
-                    if is_revenue:
-                        # 收入类：取贷方发生额，存为负数（贷方语义）
-                        closing = -total_cr
+                    direction, _source = resolve_account_direction(code, name or "")
+                    if direction == "credit":
+                        # 收入类（贷方正常）：取贷方发生额，存自然正数
+                        closing = total_cr
                     else:
-                        # 费用/成本类：取借方发生额，存为正数（借方语义）
+                        # 费用/成本类（借方正常）：取借方发生额，存自然正数
                         closing = total_dr
                 else:
-                    closing = Decimal("0")
+                    # 无序时账发生额时 fallback 到 tb_balance.closing_balance abs
+                    direction, _source = resolve_account_direction(code, name or "")
+                    closing = abs(closing) if direction == "credit" else closing
                 opening = Decimal("0")  # 损益类无期初余额
+            else:
+                # 资产负债权益类：tb_balance.closing_balance 是"借正贷负"原始口径，
+                # 贷方类（负债/权益）需取绝对值转为 v2 自然正数。
+                direction, _source = resolve_account_direction(code, name or "")
+                if direction == "credit":
+                    closing = abs(closing)
+                    opening = abs(opening)
 
             row = existing_rows.get(code)
             if row:
@@ -262,6 +341,10 @@ class TrialBalanceService:
                 adj.c.project_id == project_id,
                 adj.c.year == year,
                 adj.c.is_deleted == sa.false(),
+                # V124 / workpaper-adjustment-centralization Req4.2：
+                # 仅计入 manual（含历史 NULL）来源，排除 workpaper 来源——底稿调整已由
+                # 审定表 writeback 体现于 audited_amount，若此处再计入 aje_adjustment 会双计。
+                sa.or_(adj.c.origin.is_(None), adj.c.origin != "workpaper"),
             )
             .group_by(adj.c.account_code, adj.c.adjustment_type)
         )
@@ -301,8 +384,17 @@ class TrialBalanceService:
             vals = adj_map.get(code, {"rje": Decimal("0"), "aje": Decimal("0")})
             row = existing_rows.get(code)
             if row:
-                row.rje_adjustment = vals["rje"]
-                row.aje_adjustment = vals["aje"]
+                # v2 约定（category_natural_positive）：调整净额 SUM(debit)-SUM(credit)
+                # 是"借正贷负"，但 unadjusted_amount 已按科目自然方向存正数（Task 3.1）。
+                # 对贷方正常类（负债/权益/收入），一笔贷记增加应使审定数增大，若直接相加
+                # "借正贷负"净额会方向反掉（见 design 发现 5 / 风险 2）。因此把净额归一到
+                # 科目自然方向：借方类用 (debit-credit)，贷方类取反 (credit-debit)，
+                # 使 audited = unadjusted + rje + aje 在所有类别下加减方向都正确，
+                # 且保持该不变式被下游（check_consistency / module_cell_resolver / qc_engine）复用。
+                direction, _src = resolve_account_direction(code, row.account_name or "")
+                sign = Decimal("-1") if direction == "credit" else Decimal("1")
+                row.rje_adjustment = sign * vals["rje"]
+                row.aje_adjustment = sign * vals["aje"]
 
         await self.db.flush()
 
@@ -316,7 +408,12 @@ class TrialBalanceService:
         company_code: str = "001",
         account_codes: list[str] | None = None,
     ) -> None:
-        """audited = unadjusted + rje + aje"""
+        """audited = unadjusted + rje + aje
+
+        v2 约定下 unadjusted/rje/aje 均已按科目自然方向归一为正数口径
+        （rje/aje 在 recalc_adjustments 中已按方向归一），故直接相加即得审定数，
+        无需在此再按方向取反。
+        """
         q = sa.select(TrialBalance).where(
             TrialBalance.project_id == project_id,
             TrialBalance.year == year,
@@ -464,9 +561,14 @@ class TrialBalanceService:
         if not rc_rows:
             return await self._get_summary_from_mapping(project_id, year, report_type, company_code)
 
-        # 2. 获取该项目的映射关系（标准科目 → 报表行次名称）
+        # 2. 获取该项目的映射关系（标准科目 → 报表行次名称 + 聚合方向）
         mapping_q = (
-            sa.select(rlm.c.standard_account_code, rlm.c.report_line_code, rlm.c.report_line_name)
+            sa.select(
+                rlm.c.standard_account_code,
+                rlm.c.report_line_code,
+                rlm.c.report_line_name,
+                rlm.c.mapping_sign,
+            )
             .where(
                 rlm.c.project_id == project_id,
                 rlm.c.report_type == report_type,
@@ -486,6 +588,8 @@ class TrialBalanceService:
         # 行次编码（report_config 的 row_code）→ 标准科目列表
         line_accounts: dict[str, list[str]] = {}
         all_account_codes: set[str] = set()
+        # 科目聚合符号：subtract（备抵科目）→ -1，否则 +1。供 line_accounts 分支按符号加减。
+        account_sign: dict[str, Decimal] = {}
         for r in mapping_result.fetchall():
             # 通过映射表的 report_line_name 匹配 report_config 的 row_name
             mapping_name = (r.report_line_name or '').strip().replace('：', '').replace(':', '').replace(' ', '')
@@ -503,6 +607,9 @@ class TrialBalanceService:
                     line_accounts[matched_rc_code] = []
                 line_accounts[matched_rc_code].append(r.standard_account_code)
                 all_account_codes.add(r.standard_account_code)
+                account_sign[r.standard_account_code] = (
+                    Decimal("-1") if (r.mapping_sign or "add") == "subtract" else Decimal("1")
+                )
 
         # 3. 从 trial_balance 汇总未审数
         unadj_map: dict[str, Decimal] = {}
@@ -523,17 +630,11 @@ class TrialBalanceService:
             )
             tb_result = await self.db.execute(tb_q)
             for r in tb_result.fetchall():
-                amount = Decimal(str(r.unadj))
-                # 贷方方向科目取反为正数（与 tb_amount_map 保持一致）
-                code = r.standard_account_code
-                is_credit_dir = (
-                    code[0] in ('2', '3', '4')
-                    or code in ('5001', '5051', '5101')
-                    or (code.startswith('6') and code[:4] in ('6001', '6051', '6101', '6111', '6115', '6117', '6301'))
-                )
-                if is_credit_dir and amount < 0:
-                    amount = -amount
-                unadj_map[code] = amount
+                # v2 约定（category_natural_positive）：trial_balance.unadjusted_amount
+                # 已是按科目类别存储的自然正数（Task 3.1 改造），无需再按符号取反补偿。
+                # 报表行次的方向由 ReportLineMapping 的归属（资产侧/负债侧）+ account_category 决定，
+                # 而非靠金额符号判断 —— 移除旧约定下的"二次翻转"。
+                unadj_map[r.standard_account_code] = Decimal(str(r.unadj))
 
         # 4. 从 adjustments 汇总 AJE/RJE
         aje_dr_map: dict[str, Decimal] = {}
@@ -572,12 +673,13 @@ class TrialBalanceService:
 
         # 5. 按标准行次模板构建结果
         # 使用统一公式引擎执行 report_config.formula
-        from app.services.formula_engine import execute_formula, get_formula_account_codes, FormulaContext
 
         # 构建 trial_balance 科目→金额索引（供公式引擎用）
-        # 注意：负债/权益/收入类科目在 trial_balance 中存为负数（贷方语义），
-        # 但报表展示时应为正数。此处对贷方方向科目取绝对值（取反），
-        # 使公式引擎和前端展示统一为正数。
+        # v2 约定（category_natural_positive）：trial_balance.unadjusted_amount 已是按科目类别
+        # 存储的自然正数（Task 3.1 改造）。报表展示与公式取数统一为正数，
+        # 无需再对贷方方向科目取反补偿 —— 移除中间环节的"二次翻转"。
+        from app.services.formula_engine import execute_formula, get_formula_account_codes, FormulaContext
+
         all_tb_q = (
             sa.select(tb.c.standard_account_code, tb.c.unadjusted_amount)
             .where(
@@ -592,15 +694,7 @@ class TrialBalanceService:
         for r in all_tb_result.fetchall():
             if r.standard_account_code:
                 amount = r.unadjusted_amount or Decimal("0")
-                # 贷方方向科目（2xxx负债/3xxx权益/4xxx权益/收入类）取反为正数
                 code = r.standard_account_code
-                is_credit_direction = (
-                    code[0] in ('2', '3', '4')  # 负债/权益
-                    or code in ('5001', '5051', '5101')  # 收入
-                    or (code.startswith('6') and code[:4] in ('6001', '6051', '6101', '6111', '6115', '6117', '6301'))
-                )
-                if is_credit_direction and amount < 0:
-                    amount = -amount
                 tb_amount_map[code] = (
                     tb_amount_map.get(code, Decimal("0")) + amount
                 )
@@ -678,13 +772,28 @@ class TrialBalanceService:
                 rcl_cr = total_rcl_cr
                 audited = total_audited
             else:
-                # 无公式非合计：用映射关系填充
+                # 无公式非合计：用映射关系填充（按 account_sign 加减，备抵科目为减项）
                 accounts = line_accounts.get(row_code, [])
-                unadj = sum(unadj_map.get(ac, Decimal("0")) for ac in accounts)
-                aje_dr = sum(aje_dr_map.get(ac, Decimal("0")) for ac in accounts)
-                aje_cr = sum(aje_cr_map.get(ac, Decimal("0")) for ac in accounts)
-                rcl_dr = sum(rcl_dr_map.get(ac, Decimal("0")) for ac in accounts)
-                rcl_cr = sum(rcl_cr_map.get(ac, Decimal("0")) for ac in accounts)
+                unadj = sum(
+                    account_sign.get(ac, Decimal("1")) * unadj_map.get(ac, Decimal("0"))
+                    for ac in accounts
+                )
+                aje_dr = sum(
+                    account_sign.get(ac, Decimal("1")) * aje_dr_map.get(ac, Decimal("0"))
+                    for ac in accounts
+                )
+                aje_cr = sum(
+                    account_sign.get(ac, Decimal("1")) * aje_cr_map.get(ac, Decimal("0"))
+                    for ac in accounts
+                )
+                rcl_dr = sum(
+                    account_sign.get(ac, Decimal("1")) * rcl_dr_map.get(ac, Decimal("0"))
+                    for ac in accounts
+                )
+                rcl_cr = sum(
+                    account_sign.get(ac, Decimal("1")) * rcl_cr_map.get(ac, Decimal("0"))
+                    for ac in accounts
+                )
                 audited = unadj + aje_dr - aje_cr + rcl_dr - rcl_cr
 
             row_values[row_code] = float(unadj)
@@ -765,16 +874,9 @@ class TrialBalanceService:
             )
             tb_result = await self.db.execute(tb_q)
             for r in tb_result.fetchall():
-                amount = Decimal(str(r.unadj))
-                code = r.standard_account_code
-                is_credit_dir = (
-                    code[0] in ('2', '3', '4')
-                    or code in ('5001', '5051', '5101')
-                    or (code.startswith('6') and code[:4] in ('6001', '6051', '6101', '6111', '6115', '6117', '6301'))
-                )
-                if is_credit_dir and amount < 0:
-                    amount = -amount
-                unadj_map[code] = amount
+                # v2 约定（category_natural_positive）：unadjusted_amount 已是自然正数，
+                # 无需按符号取反补偿 —— 与主路径 get_summary_with_adjustments 保持一致。
+                unadj_map[r.standard_account_code] = Decimal(str(r.unadj))
 
         aje_dr_map: dict[str, Decimal] = {}
         aje_cr_map: dict[str, Decimal] = {}

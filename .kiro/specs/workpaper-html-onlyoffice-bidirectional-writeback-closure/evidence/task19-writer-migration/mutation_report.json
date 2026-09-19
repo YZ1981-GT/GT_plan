@@ -1,0 +1,502 @@
+[
+  {
+    "id": "M01",
+    "side": "be",
+    "want": "test_task19_writer_migration.py::test_migrated_writer_owns_no_private_version_counter[update_custom_cells]",
+    "why": "把私有计数器写回去。「不再推进 file_version」是否定式承诺，短路式变异改不动「不存在」，只能注入反例。它同时是清册期望值搬动的 falsifier：只把 `legacy_version_writers` 期望集合改小而不搬生产，本条会 GREEN",
+    "verdict": "RED",
+    "summary": "5 failed, 204 passed, 1 xfailed, 2 xpassed, 6 warnings, 1 error in 66.97s (0:01:06)",
+    "added": [
+      "test_custom_workpaper_cells.py::TestEndpointWriteOrder::test_the_business_version_advances_through_the_unified_boundary",
+      "test_task19_writer_migration.py::test_migrated_writer_owns_no_private_version_counter[update_custom_cells]",
+      "test_workpaper_writer_inventory.py::test_dropping_a_row_cannot_make_the_gate_greener",
+      "test_workpaper_writer_inventory.py::test_generator_refuses_an_unverifiable_retirement",
+      "test_workpaper_writer_inventory.py::test_stale_inventory_is_rejected_rather_than_evaluated"
+    ],
+    "gone": [],
+    "hit": [
+      "test_custom_workpaper_cells.py::TestEndpointWriteOrder::test_the_business_version_advances_through_the_unified_boundary",
+      "test_task19_writer_migration.py::test_migrated_writer_owns_no_private_version_counter[update_custom_cells]"
+    ],
+    "added_files": [
+      "test_custom_workpaper_cells.py",
+      "test_task19_writer_migration.py",
+      "test_workpaper_writer_inventory.py"
+    ],
+    "restored": true,
+    "seconds": 70.1
+  },
+  {
+    "id": "M02",
+    "side": "be",
+    "want": "test_task19_writer_migration.py::test_migrated_writer_owns_no_direct_commit[update_custom_cells]",
+    "why": "加回一个裸 `db.commit()` ⇒「业务内容的唯一提交出口在 ContentMutationService」失效。第二次提交必然意味着一次业务写入落在两个事务里（Requirement 2.4 / 13.1）",
+    "verdict": "RED",
+    "summary": "4 failed, 205 passed, 1 xfailed, 2 xpassed, 6 warnings, 1 error in 69.43s (0:01:09)",
+    "added": [
+      "test_task19_writer_migration.py::test_migrated_writer_owns_no_direct_commit[update_custom_cells]",
+      "test_workpaper_writer_inventory.py::test_dropping_a_row_cannot_make_the_gate_greener",
+      "test_workpaper_writer_inventory.py::test_generator_refuses_an_unverifiable_retirement",
+      "test_workpaper_writer_inventory.py::test_stale_inventory_is_rejected_rather_than_evaluated"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task19_writer_migration.py::test_migrated_writer_owns_no_direct_commit[update_custom_cells]"
+    ],
+    "added_files": [
+      "test_task19_writer_migration.py",
+      "test_workpaper_writer_inventory.py"
+    ],
+    "restored": true,
+    "seconds": 72.8
+  },
+  {
+    "id": "M03",
+    "side": "be",
+    "want": "test_task19_writer_migration.py::test_the_custom_writer_submits_the_xlsx_body_not_a_json_projection",
+    "why": "把权威载荷换成 JSON 投影 ⇒ 正是 Requirement 2.11 / Property 50 明令禁止的「custom 底稿被标准结构化 JSON projection writer 改写」。这条是本任务点名的那条 Property 的直接 falsifier",
+    "verdict": "RED",
+    "summary": "1 failed, 209 passed, 1 xfailed, 2 xpassed, 6 warnings in 72.03s (0:01:12)",
+    "added": [
+      "test_task19_writer_migration.py::test_the_custom_writer_submits_the_xlsx_body_not_a_json_projection"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task19_writer_migration.py::test_the_custom_writer_submits_the_xlsx_body_not_a_json_projection"
+    ],
+    "added_files": [
+      "test_task19_writer_migration.py"
+    ],
+    "restored": true,
+    "seconds": 75.4
+  },
+  {
+    "id": "M04",
+    "side": "be",
+    "want": "test_task19_writer_migration.py::test_the_custom_writer_translates_the_revision_conflict_narrowly",
+    "why": "把窄捕获放宽成 `except Exception` ⇒「artifact 发布失败」「事务分裂」「步骤缺失」全被吞成一句 409「其他用户已修改」，用户看到的原因是错的，真故障也不再是 ERROR（Requirement 5.12 禁止宽泛 except 降级）",
+    "verdict": "RED",
+    "summary": "1 failed, 209 passed, 1 xfailed, 2 xpassed, 6 warnings in 72.35s (0:01:12)",
+    "added": [
+      "test_task19_writer_migration.py::test_the_custom_writer_translates_the_revision_conflict_narrowly"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task19_writer_migration.py::test_the_custom_writer_translates_the_revision_conflict_narrowly"
+    ],
+    "added_files": [
+      "test_task19_writer_migration.py"
+    ],
+    "restored": true,
+    "seconds": 75.9
+  },
+  {
+    "id": "M05",
+    "side": "be",
+    "want": "test_task19_writer_migration.py::test_migrated_writer_owns_no_private_version_counter[WOPIHostService.put_file]",
+    "why": "把 WOPI 的私有计数器写回去。同 M01：否定式承诺只能靠注入 falsify，且它同时验证清册期望集合的搬动是「生产真的搬走了」而不是「只改了数字」",
+    "verdict": "RED",
+    "summary": "4 failed, 206 passed, 1 xfailed, 2 xpassed, 6 warnings in 71.79s (0:01:11)",
+    "added": [
+      "test_task19_writer_migration.py::test_migrated_writer_owns_no_private_version_counter[WOPIHostService.put_file]",
+      "test_wopi_working_paper_qc_review.py::TestWOPIHostService::test_put_file_version_contract_moved_to_real_postgres",
+      "test_workpaper_writer_inventory.py::test_dropping_a_row_cannot_make_the_gate_greener",
+      "test_workpaper_writer_inventory.py::test_inventory_on_disk_matches_the_ast"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task19_writer_migration.py::test_migrated_writer_owns_no_private_version_counter[WOPIHostService.put_file]"
+    ],
+    "added_files": [
+      "test_task19_writer_migration.py",
+      "test_wopi_working_paper_qc_review.py",
+      "test_workpaper_writer_inventory.py"
+    ],
+    "restored": true,
+    "seconds": 75.3
+  },
+  {
+    "id": "M06",
+    "side": "be",
+    "want": "test_task19_writer_migration.py::test_the_wopi_audit_log_is_written_before_the_only_commit_outlet",
+    "why": "删掉审计留痕入库 ⇒ 判据的正面锚点消失。这条与 M07 成对：只断言「审计日志在commit 之前」而不断言「审计日志存在」时，把它整段删掉也满足次序断言",
+    "verdict": "RED",
+    "summary": "3 failed, 207 passed, 1 xfailed, 2 xpassed, 6 warnings in 71.97s (0:01:11)",
+    "added": [
+      "test_task19_writer_migration.py::test_the_wopi_audit_log_is_written_before_the_only_commit_outlet",
+      "test_workpaper_writer_inventory.py::test_dropping_a_row_cannot_make_the_gate_greener",
+      "test_workpaper_writer_inventory.py::test_inventory_on_disk_matches_the_ast"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task19_writer_migration.py::test_the_wopi_audit_log_is_written_before_the_only_commit_outlet"
+    ],
+    "added_files": [
+      "test_task19_writer_migration.py",
+      "test_workpaper_writer_inventory.py"
+    ],
+    "restored": true,
+    "seconds": 75.5
+  },
+  {
+    "id": "M07",
+    "side": "be",
+    "want": "test_task19_writer_migration.py::test_the_wopi_snapshot_name_follows_the_counter_that_actually_moves",
+    "why": "把快照名换回已冻结的 `file_version` ⇒ `{stem}_v1.xlsx` 被每次保存覆盖，`.versions` 备份看着在、实际只剩最后一份。这是「迁移引入的连带缺陷」类判据：它不是 revision 域本身的问题，而是「换了计数器后谁还在读旧的」",
+    "verdict": "RED",
+    "summary": "3 failed, 207 passed, 1 xfailed, 2 xpassed, 6 warnings in 72.23s (0:01:12)",
+    "added": [
+      "test_task19_writer_migration.py::test_the_wopi_snapshot_name_follows_the_counter_that_actually_moves",
+      "test_workpaper_writer_inventory.py::test_dropping_a_row_cannot_make_the_gate_greener",
+      "test_workpaper_writer_inventory.py::test_inventory_on_disk_matches_the_ast"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task19_writer_migration.py::test_the_wopi_snapshot_name_follows_the_counter_that_actually_moves"
+    ],
+    "added_files": [
+      "test_task19_writer_migration.py",
+      "test_workpaper_writer_inventory.py"
+    ],
+    "restored": true,
+    "seconds": 75.7
+  },
+  {
+    "id": "M08",
+    "side": "be",
+    "want": "test_task19_writer_migration.py::test_migrated_writer_routes_through_the_unified_entry[WOPIHostService.put_file]",
+    "why": "拆掉统一入口接线（结构保留、名字换掉）⇒ 内容根本不再进入统一 revision 域。M05 是否定式的（没有私有计数器），把整个提交删掉也满足，所以必须有这条正面接线判据配对",
+    "verdict": "RED",
+    "summary": "4 failed, 206 passed, 1 xfailed, 2 xpassed, 6 warnings in 72.19s (0:01:12)",
+    "added": [
+      "test_task19_writer_migration.py::test_migrated_writer_routes_through_the_unified_entry[WOPIHostService.put_file]",
+      "test_task19_writer_migration.py::test_the_wopi_audit_log_is_written_before_the_only_commit_outlet",
+      "test_wopi_working_paper_qc_review.py::TestWOPIHostService::test_put_file_rejects_a_non_ooxml_payload",
+      "test_wopi_working_paper_qc_review.py::TestWOPIHostService::test_put_file_version_contract_moved_to_real_postgres"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task19_writer_migration.py::test_migrated_writer_routes_through_the_unified_entry[WOPIHostService.put_file]",
+      "test_task19_writer_migration.py::test_the_wopi_audit_log_is_written_before_the_only_commit_outlet",
+      "test_wopi_working_paper_qc_review.py::TestWOPIHostService::test_put_file_version_contract_moved_to_real_postgres"
+    ],
+    "added_files": [
+      "test_task19_writer_migration.py",
+      "test_wopi_working_paper_qc_review.py"
+    ],
+    "restored": true,
+    "seconds": 75.6
+  },
+  {
+    "id": "M09",
+    "side": "be",
+    "want": "test_task19_writer_migration.py::test_migrated_writer_owns_no_private_version_counter[WpUploadService.upload_file]",
+    "why": "同 M01/M05。这条 writer 原本与 WOPI、storage 快照、另一条 upload 路径**共用**同一个 `file_version` 计数器（清册原话），写回去就恢复了那个四方争抢的形态",
+    "verdict": "RED",
+    "summary": "3 failed, 207 passed, 1 xfailed, 2 xpassed, 6 warnings in 71.53s (0:01:11)",
+    "added": [
+      "test_task19_writer_migration.py::test_migrated_writer_owns_no_private_version_counter[WpUploadService.upload_file]",
+      "test_workpaper_writer_inventory.py::test_dropping_a_row_cannot_make_the_gate_greener",
+      "test_workpaper_writer_inventory.py::test_inventory_on_disk_matches_the_ast"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task19_writer_migration.py::test_migrated_writer_owns_no_private_version_counter[WpUploadService.upload_file]"
+    ],
+    "added_files": [
+      "test_task19_writer_migration.py",
+      "test_workpaper_writer_inventory.py"
+    ],
+    "restored": true,
+    "seconds": 75.0
+  },
+  {
+    "id": "M10",
+    "side": "be",
+    "want": "test_task19_writer_migration.py::test_the_upload_conflict_check_compares_the_business_revision",
+    "why": "把冲突早检查的比对目标退回 `file_version` ⇒ 与真正推进的 `content_revision` 是两个计数器，客户端拿到的 server_version 与下次要提交的 expected 不是同一个数（跨域比较必然造假冲突，Requirement 2.1）",
+    "verdict": "RED",
+    "summary": "3 failed, 207 passed, 1 xfailed, 2 xpassed, 6 warnings in 71.63s (0:01:11)",
+    "added": [
+      "test_task19_writer_migration.py::test_the_upload_conflict_check_compares_the_business_revision",
+      "test_workpaper_writer_inventory.py::test_dropping_a_row_cannot_make_the_gate_greener",
+      "test_workpaper_writer_inventory.py::test_inventory_on_disk_matches_the_ast"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task19_writer_migration.py::test_the_upload_conflict_check_compares_the_business_revision"
+    ],
+    "added_files": [
+      "test_task19_writer_migration.py",
+      "test_workpaper_writer_inventory.py"
+    ],
+    "restored": true,
+    "seconds": 75.1
+  },
+  {
+    "id": "M11",
+    "side": "be",
+    "want": "test_task19_writer_migration.py::test_projection_contract_cannot_use_the_opaque_assembly",
+    "why": "放行 `projection_contract` 走 opaque 装配 ⇒ 标准结构化底稿绕过 materialize → roundtrip 等值 → 未管理区域比对三步（Property 65 的等值判据整体失效），且会用 typed null marker 冒充 per-entry contract",
+    "verdict": "RED",
+    "summary": "1 failed, 209 passed, 1 xfailed, 2 xpassed, 6 warnings in 67.78s (0:01:07)",
+    "added": [
+      "test_task19_writer_migration.py::test_projection_contract_cannot_use_the_opaque_assembly"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task19_writer_migration.py::test_projection_contract_cannot_use_the_opaque_assembly"
+    ],
+    "added_files": [
+      "test_task19_writer_migration.py"
+    ],
+    "restored": true,
+    "seconds": 71.1
+  },
+  {
+    "id": "M12",
+    "side": "be",
+    "want": "test_task19_writer_migration.py::test_opaque_entry_id_is_a_safe_single_path_segment",
+    "why": "去掉 entry_id 的路径片段归一 ⇒ `entry_id` 被 `representation_dir()` 原样当目录名用，含 `/` 或 `..` 的 wp_code 直接目录穿越（Requirement 9.6），含 `:` 的在 Windows 上 NotADirectoryError（本任务实测 WinError 267）",
+    "verdict": "RED",
+    "summary": "1 failed, 209 passed, 1 xfailed, 2 xpassed, 6 warnings in 68.55s (0:01:08)",
+    "added": [
+      "test_task19_writer_migration.py::test_opaque_entry_id_is_a_safe_single_path_segment"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task19_writer_migration.py::test_opaque_entry_id_is_a_safe_single_path_segment"
+    ],
+    "added_files": [
+      "test_task19_writer_migration.py"
+    ],
+    "restored": true,
+    "seconds": 71.9
+  },
+  {
+    "id": "M13",
+    "side": "be",
+    "want": "test_task19_writer_migration.py::test_the_resource_key_check_runs_before_any_database_read",
+    "why": "把 numeric revision 判据从 `locate()` 里摘掉 ⇒ 两个 wp 都可以有 revision=1，第一个匹配到的行就会被当成回滚源 = 跨 scope 数据泄露（Requirement 10.6 明令禁止 numeric revision 作 resource_id / route key）",
+    "verdict": "RED",
+    "summary": "1 failed, 209 passed, 1 xfailed, 2 xpassed, 6 warnings in 70.57s (0:01:10)",
+    "added": [
+      "test_task19_writer_migration.py::test_the_resource_key_check_runs_before_any_database_read"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task19_writer_migration.py::test_the_resource_key_check_runs_before_any_database_read"
+    ],
+    "added_files": [
+      "test_task19_writer_migration.py"
+    ],
+    "restored": true,
+    "seconds": 74.2
+  },
+  {
+    "id": "M14",
+    "side": "be",
+    "want": "test_task19_writer_migration.py::test_numeric_revision_is_refused_as_a_rollback_resource_key[1]",
+    "why": "短路 numeric 分支 ⇒ `1` 会掉到 `is_uuid_text('1')` 那条上，虽然仍抛同一个类型，但**诊断信息**从「numeric revision 不是 resource key」退化成「不是 UUID」。参数化到具体值正是为了让 numeric 与 non-uuid 两条路径各自可 falsify",
+    "verdict": "GREEN",
+    "summary": "210 passed, 1 xfailed, 2 xpassed, 6 warnings in 71.82s (0:01:11)",
+    "added": [],
+    "gone": [],
+    "hit": [],
+    "added_files": [],
+    "restored": true,
+    "seconds": 75.3
+  },
+  {
+    "id": "M15",
+    "side": "be",
+    "want": "test_task19_writer_migration.py::test_every_rollback_refusal_has_its_own_error_code",
+    "why": "把 candidate（语义禁令）与 not-published（状态禁令）合成一个码 ⇒ 正是 Task 18 实测到的那类真实缺陷：合成后短路 candidate 分支会被状态分支接住并抛同样的码，第一条判据变成不可达分支",
+    "verdict": "RED",
+    "summary": "1 failed, 209 passed, 1 xfailed, 2 xpassed, 6 warnings in 73.26s (0:01:13)",
+    "added": [
+      "test_task19_writer_migration.py::test_the_semantic_refusals_are_checked_before_the_state_refusal"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task19_writer_migration.py::test_the_semantic_refusals_are_checked_before_the_state_refusal"
+    ],
+    "added_files": [
+      "test_task19_writer_migration.py"
+    ],
+    "restored": true,
+    "seconds": 76.9
+  },
+  {
+    "id": "M16",
+    "side": "be",
+    "want": "test_task19_writer_migration.py::test_the_semantic_refusals_are_checked_before_the_state_refusal",
+    "why": "同 M15，另一条语义禁令：incoming 永不 published、永不 resolver-visible，durable 只证明可恢复而不证明它曾被应用（Requirement 5.6 / Property 65）",
+    "verdict": "RED",
+    "summary": "1 failed, 209 passed, 1 xfailed, 2 xpassed, 6 warnings in 76.35s (0:01:16)",
+    "added": [
+      "test_task19_writer_migration.py::test_the_semantic_refusals_are_checked_before_the_state_refusal"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task19_writer_migration.py::test_the_semantic_refusals_are_checked_before_the_state_refusal"
+    ],
+    "added_files": [
+      "test_task19_writer_migration.py"
+    ],
+    "restored": true,
+    "seconds": 80.1
+  },
+  {
+    "id": "M17",
+    "side": "be",
+    "want": "test_task19_writer_migration.py::test_the_rollback_source_digest_is_verified_against_the_disk",
+    "why": "去掉磁盘 digest 校验 ⇒ DB 说的 sha256 与磁盘内容不符时照搬，把损坏/被替换的内容发布成新版本。内容寻址不可变承诺一破，历史读取就再也不可信",
+    "verdict": "RED",
+    "summary": "1 failed, 209 passed, 1 xfailed, 2 xpassed, 6 warnings in 75.65s (0:01:15)",
+    "added": [
+      "test_task19_writer_migration.py::test_the_rollback_source_digest_is_verified_against_the_disk"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task19_writer_migration.py::test_the_rollback_source_digest_is_verified_against_the_disk"
+    ],
+    "added_files": [
+      "test_task19_writer_migration.py"
+    ],
+    "restored": true,
+    "seconds": 79.4
+  },
+  {
+    "id": "M18",
+    "side": "be",
+    "want": "test_task19_writer_migration.py::test_the_restore_lane_produces_a_new_version_from_the_located_source",
+    "why": "让 restore 产生的新版本不挂在被回滚到的那个版本下 ⇒ forward-only 回滚链断掉，「回滚过头了还能回滚回去」的可审计轨迹丢失（Requirement 8.9）",
+    "verdict": "RED",
+    "summary": "1 failed, 209 passed, 1 xfailed, 2 xpassed, 6 warnings in 75.23s (0:01:15)",
+    "added": [
+      "test_task19_writer_migration.py::test_the_restore_lane_produces_a_new_version_from_the_located_source"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task19_writer_migration.py::test_the_restore_lane_produces_a_new_version_from_the_located_source"
+    ],
+    "added_files": [
+      "test_task19_writer_migration.py"
+    ],
+    "restored": true,
+    "seconds": 78.9
+  },
+  {
+    "id": "M19",
+    "side": "be",
+    "want": "test_task19_writer_migration.py::test_the_assembly_layer_cannot_express_a_per_entry_contract",
+    "why": "给装配层加一个 `contract` 形参 ⇒「custom 不得转 JSON 三方 projection」从「构造上不可表达」退化成「运行时才拒绝」。判据刻意钉在**形参**上，因为运行时那条（`_assert_authority_shape`）属 Task 15 域，这里要的是更强的形态封闭",
+    "verdict": "RED",
+    "summary": "1 failed, 209 passed, 1 xfailed, 2 xpassed, 6 warnings in 74.05s (0:01:14)",
+    "added": [
+      "test_task19_writer_migration.py::test_the_assembly_layer_cannot_express_a_per_entry_contract"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task19_writer_migration.py::test_the_assembly_layer_cannot_express_a_per_entry_contract"
+    ],
+    "added_files": [
+      "test_task19_writer_migration.py"
+    ],
+    "restored": true,
+    "seconds": 77.7
+  },
+  {
+    "id": "M20",
+    "side": "be",
+    "want": "test_task19_writer_migration.py::test_the_adapter_build_digest_is_stable_and_never_all_zero",
+    "why": "把 adapter build digest 换成全零 hash ⇒ 伪身份（在 char(64) 与 hex 正则层面都合法，Requirement 2.3 单独点名禁止）。opaque 路径没有真 adapter 不等于可以填零",
+    "verdict": "RED",
+    "summary": "2 failed, 208 passed, 1 xfailed, 2 xpassed, 6 warnings in 73.26s (0:01:13)",
+    "added": [
+      "test_task19_writer_migration.py::test_the_adapter_build_digest_is_stable_and_never_all_zero",
+      "test_wopi_working_paper_qc_review.py::TestWOPIHostService::test_put_file_rejects_a_non_ooxml_payload"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task19_writer_migration.py::test_the_adapter_build_digest_is_stable_and_never_all_zero"
+    ],
+    "added_files": [
+      "test_task19_writer_migration.py",
+      "test_wopi_working_paper_qc_review.py"
+    ],
+    "restored": true,
+    "seconds": 76.8
+  },
+  {
+    "id": "M21",
+    "side": "be",
+    "want": "test_task19_writer_migration.py::test_the_opaque_bundle_uses_registry_markers_and_never_an_empty_hash",
+    "why": "只给一个 slot ⇒ slot omission。四个 slot 必须全出现是 Requirement 2.3 的原文，而 DB CHECK/trigger 层的拒绝在 service 层之后 —— 少一层判据就少一次早失败",
+    "verdict": "RED",
+    "summary": "2 failed, 208 passed, 1 xfailed, 2 xpassed, 6 warnings in 72.78s (0:01:12)",
+    "added": [
+      "test_task19_writer_migration.py::test_the_opaque_bundle_uses_registry_markers_and_never_an_empty_hash",
+      "test_wopi_working_paper_qc_review.py::TestWOPIHostService::test_put_file_rejects_a_non_ooxml_payload"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task19_writer_migration.py::test_the_opaque_bundle_uses_registry_markers_and_never_an_empty_hash"
+    ],
+    "added_files": [
+      "test_task19_writer_migration.py",
+      "test_wopi_working_paper_qc_review.py"
+    ],
+    "restored": true,
+    "seconds": 76.2
+  },
+  {
+    "id": "M22",
+    "side": "be",
+    "want": "test_task19_writer_migration.py::test_the_orm_declares_the_v151_content_revision_columns",
+    "why": "删掉 ORM 侧的 `content_revision` 声明 ⇒ 任何用 `Base.metadata.create_all` 建库的环境里这一列根本不存在，读它的代码报 `no such column: content_revision`（本任务实测）。V151 只在真库上加了列，ORM 不声明就等于半个迁移",
+    "verdict": "RED",
+    "summary": "1 failed, 209 passed, 1 xfailed, 2 xpassed, 6 warnings in 75.06s (0:01:15)",
+    "added": [
+      "test_task19_writer_migration.py::test_the_orm_declares_the_v151_content_revision_columns"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task19_writer_migration.py::test_the_orm_declares_the_v151_content_revision_columns"
+    ],
+    "added_files": [
+      "test_task19_writer_migration.py"
+    ],
+    "restored": true,
+    "seconds": 78.7
+  },
+  {
+    "id": "M23",
+    "side": "be",
+    "want": "test_task19_writer_migration.py::test_the_orm_declares_the_v151_content_revision_columns",
+    "why": "给它加上 ORM 级 ForeignKey ⇒ 未 import `workpaper_sync_models` 的 `create_all` 场景在建表阶段 NoReferencedTableError。真正的 FK 由 V151 在数据库侧持有；这条证明「刻意不声明 FK」是可 falsify 的决定，不是遗漏",
+    "verdict": "GREEN",
+    "summary": "rc=4 无摘要行",
+    "added": [],
+    "gone": [],
+    "hit": [],
+    "added_files": [],
+    "restored": true,
+    "seconds": 1.5
+  },
+  {
+    "id": "M24",
+    "side": "be",
+    "want": "test_task19_writer_migration.py::test_the_content_source_vocabulary_matches_the_migration",
+    "why": "让 Python 侧词表少一个值 ⇒ 与 V152 的 `ck_wpcv_source` 漂移。构造点会放行/拒绝错的集合，被放行的值最终在 DB CHECK 上炸成一个看不出来源的 IntegrityError",
+    "verdict": "GREEN",
+    "summary": "1 error in 1.82s",
+    "added": [],
+    "gone": [],
+    "hit": [],
+    "added_files": [],
+    "restored": true,
+    "seconds": 4.8
+  }
+]

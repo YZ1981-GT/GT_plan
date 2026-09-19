@@ -1,0 +1,213 @@
+# backend/data/wp_render_schema/k11-asset-impairment-loss.yaml
+# K11 资产减值损失 — 专属组件渲染 schema
+# componentType: k11-asset-impairment-loss
+# 科目 6701 资产减值损失（**损益类/借方科目！取发生额非余额**）
+# Template: K11 资产减值损失.xlsx（7 有效 sheet）
+# 公式特征：净发生额=借方-贷方；审定=未审+AJE+RJE；减值汇总=Σ各来源
+# K循环损益类减值汇总底稿（最简7sheet，联动F2/H1/I1/I3源底稿）
+
+wp_code: K11
+wp_name: 资产减值损失
+component_type: k11-asset-impairment-loss
+selfLoad: true
+template_path: backend/wp_templates/K/K11 资产减值损失.xlsx
+template_version: v2025-R5
+applicable_standards: [soe_standalone, listed_standalone, soe_consolidated, listed_consolidated]
+account_codes: ['6701']
+income_statement: true  # 损益类标识！
+related_accounts:
+  - code: '6701'
+    name: 资产减值损失
+    direction: debit
+    category: income_statement
+
+special_rules:
+  income_statement: true
+  account_direction: debit
+  net_formula: "借方发生-贷方发生"
+  source_table: "tb_ledger/tb_balance发生额列"
+  impairment_summary: true
+  source_wps: ["F2", "H1", "I1", "I3"]
+  goodwill_no_reversal: true
+
+formula_count: 80
+description: K循环损益类减值汇总底稿（7sheet，损益类取发生额+减值汇总+源底稿联动）
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# TB 回写配置（损益类！回写发生额而非期末余额）
+# ═══════════════════════════════════════════════════════════════════════════════
+
+tb_writeback:
+  account_code: '6701'
+  direction: debit
+  source_sheet: K11-1
+  value_field: audited_amount  # 审定发生额
+  value_type: occurrence_amount  # 发生额非余额！
+  trigger: WORKPAPER_SAVED
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# AI 生成配置
+# ═══════════════════════════════════════════════════════════════════════════════
+
+ai_sections:
+  - id: impairment-summary-conclusion
+    name: 减值汇总结论
+    description: 各类资产减值损失汇总+源底稿核对结论
+    location: K11-1审定表底部
+  - id: overall-opinion
+    name: 总体审计意见
+    description: K11底稿总体审计结论
+    location: K11-1审定表结论区
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 跨底稿引用
+# ═══════════════════════════════════════════════════════════════════════════════
+
+cross_wp_references:
+  - ref_id: CW-K11-01
+    source_wp: K11-2
+    target_wp: K11-1
+    description: '明细表合计 → 审定表K11-1净发生额'
+    direction: outbound
+  - ref_id: CW-K11-02
+    source_wp: K11-3
+    target_wp: K11-1
+    description: 'AJE/RJE汇总 → 审定表K11-1'
+    direction: outbound
+  - ref_id: CW-K11-03
+    source_wp: K11-3
+    target_wp: A13
+    description: '调整分录 → A13错报汇总'
+    direction: outbound
+  - ref_id: CW-K11-04
+    source_wp: K11-2
+    target_wp: F2
+    description: '明细表存货跌价 → F2存货减值'
+    direction: outbound
+  - ref_id: CW-K11-05
+    source_wp: K11-2
+    target_wp: H1
+    description: '明细表固定资产减值 → H1固定资产'
+    direction: outbound
+  - ref_id: CW-K11-06
+    source_wp: K11-2
+    target_wp: I1
+    description: '明细表无形资产减值 → I1无形资产'
+    direction: outbound
+  - ref_id: CW-K11-07
+    source_wp: K11-2
+    target_wp: I3
+    description: '明细表商誉减值 → I3商誉'
+    direction: outbound
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Sheet 定义（7 sheets）
+# ═══════════════════════════════════════════════════════════════════════════════
+
+sheets:
+  # ─────────────────────────────────────────────────────────────────────────
+  # Sheet 1: 底稿目录
+  # ─────────────────────────────────────────────────────────────────────────
+  底稿目录:
+    code: K11
+    group: core
+    dimensions: "15×8"
+    component: K11TabIndex
+    class_code: B-底稿目录
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Sheet 2: 资产减值损失实质性程序表K11A
+  # ─────────────────────────────────────────────────────────────────────────
+  资产减值损失实质性程序表K11A:
+    code: K11A
+    group: core
+    dimensions: "20×11"
+    component: a-program-console
+    class_code: A-实质性程序
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Sheet 3: 审定表K11-1（61公式！损益类！取发生额）
+  # ─────────────────────────────────────────────────────────────────────────
+  审定表K11-1:
+    code: K11-1
+    group: core
+    dimensions: "37×12"
+    component: K11TabAdjudication
+    class_code: F-审定表
+    account_codes: ['6701']
+    formula_count: 61
+    income_statement: true
+    writeback:
+      target: trial_balance.audited_amount
+      trigger: WORKPAPER_SAVED
+      key_field: account_code
+      value_field: audited_amount
+      value_type: occurrence_amount
+      accounts: ['6701']
+    event_bus:
+      publish:
+        - { event: "substantive:adjudicated", payload: "{accountCode:'6701', adjudicatedAmount}" }
+      subscribe:
+        - { event: "adjustment:created", filter: "accountCode=6701" }
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Sheet 4: 明细表K11-2（18列2区段，50行）
+  # ─────────────────────────────────────────────────────────────────────────
+  明细表K11-2:
+    code: K11-2
+    group: core
+    dimensions: "50×18"
+    component: K11TabDetail
+    class_code: F-明细表
+    dynamic_rows: true
+    max_rows: 200
+    formula_count: 17
+    import_export: true
+    add_row_prompt: impairmentItem
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Sheet 5: 调整分录汇总K11-3
+  # ─────────────────────────────────────────────────────────────────────────
+  调整分录汇总K11-3:
+    code: K11-3
+    group: core
+    dimensions: "21×10"
+    component: K11TabAdjustment
+    class_code: F-调整分录
+    dynamic_rows: true
+    import_export: true
+    event_bus:
+      publish:
+        - { event: "adjustment:created", payload: "{entryType, accountCode, amount}" }
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Sheet 6: 附注披露信息（上市公司）
+  # ─────────────────────────────────────────────────────────────────────────
+  附注披露信息（上市公司）:
+    code: disc-listed
+    group: disclosure
+    dimensions: "30×27"
+    component: K11TabDisclosureListed
+    class_code: H-附注
+    variant: listed
+    event_bus:
+      subscribe:
+        - { event: "substantive:adjudicated", filter: "accountCode=6701" }
+      publish:
+        - { event: "disclosure:note-text-updated", payload: "{noteId:'asset_impairment_loss'}" }
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Sheet 7: 附注披露信息（国有企业）
+  # ─────────────────────────────────────────────────────────────────────────
+  附注披露信息（国有企业）:
+    code: disc-soe
+    group: disclosure
+    dimensions: "29×27"
+    component: K11TabDisclosureSoe
+    class_code: H-附注
+    variant: soe
+    event_bus:
+      subscribe:
+        - { event: "substantive:adjudicated", filter: "accountCode=6701" }
+      publish:
+        - { event: "disclosure:note-text-updated", payload: "{noteId:'asset_impairment_loss'}" }

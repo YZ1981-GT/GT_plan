@@ -18,10 +18,10 @@ from __future__ import annotations
 
 import enum
 import uuid
-from datetime import datetime
+from datetime import date, datetime
 
 import sqlalchemy as sa
-from sqlalchemy import ForeignKey, Index, String, Text, func, text
+from sqlalchemy import BigInteger, ForeignKey, Index, String, Text, func, text
 from sqlalchemy.dialects.postgresql import JSONB, UUID as PG_UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -36,6 +36,7 @@ class WordExportDocType(str, enum.Enum):
     """Word导出文档类型"""
     audit_report = "audit_report"
     financial_report = "financial_report"
+    financial_report_unadjusted = "financial_report_unadjusted"
     disclosure_notes = "disclosure_notes"
     full_package = "full_package"
 
@@ -46,8 +47,10 @@ class WordExportStatus(str, enum.Enum):
     generating = "generating"
     generated = "generated"
     editing = "editing"
+    pending_approval = "pending_approval"
     confirmed = "confirmed"
     signed = "signed"
+    archived = "archived"
 
 
 # ---------------------------------------------------------------------------
@@ -58,9 +61,11 @@ VALID_STATUS_TRANSITIONS: dict[str, list[str]] = {
     "draft": ["generating"],
     "generating": ["generated"],
     "generated": ["editing"],
-    "editing": ["confirmed"],
-    "confirmed": ["signed", "editing"],  # confirmed 可 reopen 回 editing
-    "signed": [],
+    "editing": ["pending_approval", "confirmed"],
+    "pending_approval": ["confirmed", "editing"],
+    "confirmed": ["signed", "editing", "archived"],
+    "signed": ["archived"],
+    "archived": ["confirmed"],  # 仅 admin 解除归档
 }
 
 
@@ -79,7 +84,7 @@ class WordExportTask(Base):
     project_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("projects.id"), nullable=False
     )
-    doc_type: Mapped[str] = mapped_column(String(20), nullable=False)
+    doc_type: Mapped[str] = mapped_column(String(50), nullable=False)
     status: Mapped[str] = mapped_column(
         String(30), server_default=text("'draft'"), nullable=False
     )
@@ -102,6 +107,32 @@ class WordExportTask(Base):
 
     # Batch 3 Fix 2: 专用缓存键字段，不再复用 template_type
     cache_key: Mapped[str | None] = mapped_column(String(64), nullable=True, comment="批量简报缓存键 MD5")
+
+    # deliverable-center V059
+    file_size: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+    html_path: Mapped[str | None] = mapped_column(Text, nullable=True)
+    report_body_json: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    opinion_type: Mapped[str | None] = mapped_column(String(30), nullable=True)
+    company_type: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    doc_subtype: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    is_pie: Mapped[bool | None] = mapped_column(
+        server_default=text("false"), nullable=True
+    )
+    source_snapshot_refs: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    selected_sections: Mapped[list | dict | None] = mapped_column(JSONB, nullable=True)
+    report_date: Mapped[date | None] = mapped_column(sa.Date, nullable=True)
+    prior_period_info: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    approval_by: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("users.id"), nullable=True
+    )
+    approval_at: Mapped[datetime | None] = mapped_column(nullable=True)
+    reject_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
+    signed_by: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("users.id"), nullable=True
+    )
+    signed_at: Mapped[datetime | None] = mapped_column(nullable=True)
+    sign_type: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    archived_at: Mapped[datetime | None] = mapped_column(nullable=True)
 
     __table_args__ = (
         Index("idx_word_export_task_project", "project_id", "doc_type"),
@@ -132,6 +163,34 @@ class WordExportTaskVersion(Base):
         ForeignKey("users.id"), nullable=False
     )
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
+
+    # deliverable-center V059
+    html_path: Mapped[str | None] = mapped_column(Text, nullable=True)
+    file_size: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+    file_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    hash_chain_entry_id: Mapped[uuid.UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True), nullable=True
+    )
+    source_snapshot_refs: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    selected_sections: Mapped[list | dict | None] = mapped_column(JSONB, nullable=True)
+    created_via: Mapped[str | None] = mapped_column(
+        String(20), server_default=text("'generate'"), nullable=True
+    )
+    # V142（deliverable-lineage-wiring-and-writeback-closure Wave 2 / 需求 7.2, 7.3）
+    # 实际编辑人与编辑时间。NULL = 未知 —— **禁止回退 created_by 展示**：
+    # created_by 在 OO 回调场景只是「回调处理占位」，把它当编辑人会让版本链上
+    # 所有在线编辑版本作者都变成交付物创建人（历史缺陷）。
+    edited_by: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("users.id"), nullable=True
+    )
+    edited_at: Mapped[datetime | None] = mapped_column(nullable=True)
+    # V143（deliverable-lineage-wiring-and-writeback-closure Wave 4 / 需求 10.2、10.8）
+    # xlsx 手工改动差异检测**三态**：
+    #   None                      = 未检测 / 未配 Cell_Mapping → 放行
+    #   {"unavailable": "<原因>"}  = 映射存在但解析失败 → **拒绝 confirmed**（fail-closed）
+    #   {"diffs": [...]}          = 已比对；非空即有手工改动 → 拒绝；空数组 → 放行
+    # 🔴 判据不是「非空即拒绝」——`{"diffs": []}` 非空但表示已比对且一致。
+    drift_report: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
 
     __table_args__ = (
         Index(
@@ -166,6 +225,7 @@ class ReportSnapshot(Base):
     created_by: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("users.id"), nullable=False
     )
+    is_stale: Mapped[bool] = mapped_column(server_default=text("false"), nullable=False)
 
     __table_args__ = (
         Index(

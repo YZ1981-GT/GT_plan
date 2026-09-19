@@ -112,6 +112,38 @@ class TestDeriveComponentType:
         result = derive_component_type(_make_classification("F-数据表"))
         assert result == "univer"
 
+    def test_f_审定表_audit_sheet(self):
+        """F-审定表 → audit-sheet（精确匹配优先于 F- 前缀 fallback）。"""
+        result = derive_component_type(_make_classification("F-审定表"))
+        assert result == "audit-sheet"
+
+    def test_f_明细表_audit_sheet(self):
+        """F-明细表 → audit-sheet（_F_SUB_ROUTING 精确匹配）；其余 F- 仍 fallback univer。"""
+        assert derive_component_type(_make_classification("F-明细表")) == "audit-sheet"
+        assert derive_component_type(_make_classification("F-分析表")) == "univer"
+        assert derive_component_type(_make_classification("F-汇总表")) == "univer"
+
+    def test_bad_debt_sheet_name_override(self):
+        """坏账准备明细表 sheet（class_code=F-明细表，共享）→ bad-debt-sheet（sheet 名级专用路由优先）。"""
+        result = derive_component_type(
+            _make_classification("F-明细表", wp_code="D2", sheet_name="坏账准备明细表D2-3")
+        )
+        assert result == "bad-debt-sheet"
+
+    def test_bad_debt_sheet_name_override_other_cycle(self):
+        """其他循环坏账准备明细表（如 G2-3）同样路由到 bad-debt-sheet。"""
+        result = derive_component_type(
+            _make_classification("F-明细表", wp_code="G2", sheet_name="坏账准备明细表G2-3")
+        )
+        assert result == "bad-debt-sheet"
+
+    def test_non_bad_debt_detail_sheet_not_hijacked(self):
+        """非坏账准备的普通明细表 sheet 不被 sheet 名级覆盖劫持，仍走 class_code 派生（F-明细表 → audit-sheet）。"""
+        result = derive_component_type(
+            _make_classification("F-明细表", wp_code="D2", sheet_name="应收账款明细表D2-2")
+        )
+        assert result == "audit-sheet"
+
     def test_g_univer(self):
         result = derive_component_type(_make_classification("G-测算"))
         assert result == "univer"
@@ -171,6 +203,7 @@ class TestComponentTypeWhitelist:
             "D-复核记录",
             "E-控制测试",
             "F-数据表",
+            "F-审定表",
             "G-测算",
             "H-辅助说明",
             "I-占位",
@@ -208,3 +241,76 @@ class TestClassificationResult:
             has_override=True,
         )
         assert cr.has_override is True
+
+
+# ─── derive_component_type: 核对表路由 (A1-15/A1-16) ────────────────────────
+
+
+class TestChecklistTableRouting:
+    """A1-15/A1-16 核对表底稿路由到 checklist-table 组件。"""
+
+    def test_derive_component_type_a1_15_returns_checklist_table(self):
+        """A1-15（CAS 列报及披露核对表）→ checklist-table。"""
+        result = derive_component_type(_make_classification("A-程序表", wp_code="A1-15"))
+        assert result == "checklist-table"
+
+    def test_derive_component_type_a1_16_returns_checklist_table(self):
+        """A1-16（法规合规核对表）→ checklist-table。"""
+        result = derive_component_type(_make_classification("A-程序表", wp_code="A1-16"))
+        assert result == "checklist-table"
+
+    def test_checklist_table_in_valid_component_types(self):
+        """checklist-table 在白名单中。"""
+        assert "checklist-table" in VALID_COMPONENT_TYPES
+
+    def test_a16_not_affected(self):
+        """A16（管理层声明书）仍路由到 word-template，不受 A1-16 影响。"""
+        result = derive_component_type(_make_classification("A-程序表", wp_code="A16"))
+        assert result == "word-template"
+
+
+# ─── derive_component_type: 分析性复核路由 (A1-13/A1-14) ─────────────────────
+
+
+class TestAnalyticalReviewRouting:
+    """A1-13/A1-14 分析性复核底稿路由到 analytical-review 组件。"""
+
+    def test_derive_component_type_a1_13_returns_analytical_review(self):
+        """A1-13（分析性复核-母公司）→ analytical-review。"""
+        result = derive_component_type(_make_classification("A-程序表", wp_code="A1-13"))
+        assert result == "analytical-review"
+
+    def test_derive_component_type_a1_14_returns_analytical_review(self):
+        """A1-14（分析性复核-合并）→ analytical-review。"""
+        result = derive_component_type(_make_classification("A-程序表", wp_code="A1-14"))
+        assert result == "analytical-review"
+
+    def test_analytical_review_in_valid_component_types(self):
+        """analytical-review 在白名单中。"""
+        assert "analytical-review" in VALID_COMPONENT_TYPES
+
+    def test_a13_misstatement_workpaper(self):
+        """A13（错报程序表）→ misstatement-workpaper Tab 套件。"""
+        result = derive_component_type(_make_classification("A-程序表", wp_code="A13"))
+        assert result == "misstatement-workpaper"
+
+    def test_a11_bundle(self):
+        result = derive_component_type(_make_classification("A-程序表", wp_code="A11"))
+        assert result == "a11-bundle"
+
+    def test_a15_bundle(self):
+        result = derive_component_type(_make_classification("A-程序表", wp_code="A15"))
+        assert result == "a15-bundle"
+
+    def test_a17_summary(self):
+        result = derive_component_type(_make_classification("A-程序表", wp_code="A17-1"))
+        assert result == "a17-summary"
+
+    def test_a18_regulatory_letter(self):
+        result = derive_component_type(_make_classification("D-检查表", wp_code="A18-2"))
+        assert result == "regulatory-letter"
+
+    def test_a1_15_not_affected(self):
+        """A1-15 仍路由到 checklist-table，不受 A1-13/A1-14 影响。"""
+        result = derive_component_type(_make_classification("A-程序表", wp_code="A1-15"))
+        assert result == "checklist-table"

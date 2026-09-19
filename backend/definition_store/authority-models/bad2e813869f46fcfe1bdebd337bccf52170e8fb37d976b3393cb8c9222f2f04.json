@@ -1,0 +1,1 @@
+{"authority_model":"projection_contract","content_authority":"structured_projection","entry_id":"xlsx/gt-h1-fixed-assets","merge_model":"stable_field_three_way","pilot_class":"h1_grouped_dynamic","required_slots":["template","instrumentation","contract"],"schema_version":"authority-model-definition:v1"}

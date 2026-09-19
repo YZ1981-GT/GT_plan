@@ -1,0 +1,82 @@
+[
+  {
+    "id": "M33",
+    "side": "be",
+    "want": "test_task41_d2_large_json_pilot.py::TestOrderingGate::test_capability_is_not_enabled_before_finalize",
+    "why": "capability 启用门被短路 ⇒ 可以在没有 published representation 时宣称双向可用，前端显示不可兑现的切换（Requirement 1.5）",
+    "verdict": "RED",
+    "summary": "1 failed, 151 passed in 33.97s",
+    "added": [
+      "test_task41_d2_large_json_pilot.py::TestOrderingGate::test_capability_is_not_enabled_before_finalize"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task41_d2_large_json_pilot.py::TestOrderingGate::test_capability_is_not_enabled_before_finalize"
+    ],
+    "added_files": [
+      "test_task41_d2_large_json_pilot.py"
+    ],
+    "restored": true,
+    "seconds": 37.5
+  },
+  {
+    "id": "M34",
+    "side": "be",
+    "want": "test_task41_d2_large_json_pilot.py::TestUpstreamDebtsAreVisibleFacts::test_resolve_published_definitions_never_returns_none",
+    "why": "找不到载体时返回 None 而不抛 ⇒ 上游把「缺观测器」当成「这个 entry 没有身份」，一路静默走到注册一个没有 identity binding 的 adapter（本 spec 最贵的一类缺陷）",
+    "verdict": "RED",
+    "summary": "1 failed, 151 passed in 34.03s",
+    "added": [
+      "test_task41_d2_large_json_pilot.py::TestUpstreamDebtsAreVisibleFacts::test_resolve_published_definitions_never_returns_none"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task41_d2_large_json_pilot.py::TestUpstreamDebtsAreVisibleFacts::test_resolve_published_definitions_never_returns_none"
+    ],
+    "added_files": [
+      "test_task41_d2_large_json_pilot.py"
+    ],
+    "restored": true,
+    "seconds": 37.4
+  },
+  {
+    "id": "M41",
+    "side": "be",
+    "want": "test_task41_d2_large_json_pilot.py::TestProductionWiring::test_both_production_paths_go_through_the_bidirectional_contract_lock",
+    "why": "发布路径改成只读磁盘契约（不比对源侧）⇒ 一份被手改过的契约可以直接发布，而双向锁只在守卫里被调用（Task 40 实测过的判据与生产路径脱钩形态）",
+    "verdict": "RED",
+    "summary": "1 failed, 151 passed in 33.28s",
+    "added": [
+      "test_task41_d2_large_json_pilot.py::TestProductionWiring::test_both_production_paths_go_through_the_bidirectional_contract_lock"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task41_d2_large_json_pilot.py::TestProductionWiring::test_both_production_paths_go_through_the_bidirectional_contract_lock"
+    ],
+    "added_files": [
+      "test_task41_d2_large_json_pilot.py"
+    ],
+    "restored": true,
+    "seconds": 36.7
+  },
+  {
+    "id": "M42",
+    "side": "be",
+    "want": "test_task41_d2_large_json_pilot.py::TestProductionWiring::test_both_production_paths_go_through_the_bidirectional_contract_lock",
+    "why": "接线路径改成只读磁盘契约 ⇒ 同上（两个生产入口必须都走锁，只锁一个等于没锁）",
+    "verdict": "RED",
+    "summary": "1 failed, 151 passed in 33.97s",
+    "added": [
+      "test_task41_d2_large_json_pilot.py::TestProductionWiring::test_both_production_paths_go_through_the_bidirectional_contract_lock"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task41_d2_large_json_pilot.py::TestProductionWiring::test_both_production_paths_go_through_the_bidirectional_contract_lock"
+    ],
+    "added_files": [
+      "test_task41_d2_large_json_pilot.py"
+    ],
+    "restored": true,
+    "seconds": 37.3
+  }
+]

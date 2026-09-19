@@ -120,9 +120,15 @@ class NoteTrimService:
         return template
 
     async def _load_template_sections(self, project_id: UUID, template_type: str) -> list[dict]:
+        from app.services.note_section_catalog import filter_template_sections
+
+        basic_info = await self._get_project_basic_info(project_id)
+        report_scope = basic_info.get("report_scope")
+
         if template_type == "custom":
             template = await self._load_custom_template(project_id)
-            return template.get("sections", [])
+            sections = template.get("sections", [])
+            return filter_template_sections(sections, report_scope)
 
         data_dir = Path(__file__).resolve().parent.parent.parent / "data"
         tmpl_file = data_dir / f"note_template_{template_type}.json"
@@ -130,7 +136,7 @@ class NoteTrimService:
             return []
 
         tmpl = json.loads(tmpl_file.read_text(encoding="utf-8-sig"))
-        return tmpl.get("sections", [])
+        return filter_template_sections(tmpl.get("sections", []), report_scope)
 
     def _should_reinitialize(self, rows: list[NoteSectionInstance], sections: list[dict]) -> bool:
         existing = [(row.section_number, row.section_title) for row in rows]

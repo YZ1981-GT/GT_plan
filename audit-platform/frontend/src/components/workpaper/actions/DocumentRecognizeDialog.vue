@@ -53,12 +53,12 @@
           <el-descriptions-item
             v-for="(value, key) in item.fields"
             :key="key"
-            :label="fieldLabel(key as string)"
+            :label="fieldLabel(String(key))"
           >
             <el-input
-              v-model="item.fields[key as string]"
+              v-model="item.fields[String(key)]"
               size="small"
-              :placeholder="key as string"
+              :placeholder="String(key)"
               :disabled="item.confirmed"
             />
           </el-descriptions-item>

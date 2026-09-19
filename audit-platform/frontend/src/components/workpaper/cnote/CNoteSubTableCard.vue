@@ -214,7 +214,7 @@ function staticRowClass({ row }: { row: RowData }): string {
   padding: 8px 12px;
   background: var(--el-color-primary-light-9);
   border-radius: 4px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 
 .gt-cnt__footer-label {

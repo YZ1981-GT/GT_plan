@@ -16,6 +16,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.audit_platform_models import TbLedger, TbAuxLedger
 from app.services.dataset_query import get_active_filter
+from app.services.ledger_sampling_service import (
+    LedgerQueryFilters,
+    LedgerSamplingService,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -32,31 +36,81 @@ class CutoffTestService:
         days_before: int = 5,
         days_after: int = 5,
         amount_threshold: float = 10000,
+        cutoff_date: str | None = None,
     ) -> dict[str, Any]:
-        """从 tb_ledger 提取期末前后 N 天交易"""
+        """从 tb_ledger 提取截止基准日前后 N 天交易。
+
+        - period_end：优先使用显式传入的 ``cutoff_date``（YYYY-MM-DD），
+          非法或缺省时回退 ``date(year, 12, 31)``——支持期中/短期/非自然年度项目。
+        - 科目匹配：前缀 LIKE（``6601%`` 命中 ``6601.01`` / ``660101`` 等子科目），
+          与 ``LedgerSamplingService.build_ledger_query`` 口径一致，不再精确匹配漏子科目。
+        """
         period_end = date(year, 12, 31)
+        if cutoff_date:
+            try:
+                period_end = date.fromisoformat(str(cutoff_date)[:10])
+            except (ValueError, TypeError):
+                period_end = date(year, 12, 31)
         start_date = period_end - timedelta(days=days_before)
         end_date = period_end + timedelta(days=days_after)
 
-        stmt = (
-            sa.select(TbLedger)
-            .where(
-                await get_active_filter(db, TbLedger.__table__, project_id, year),
-                TbLedger.account_code.in_(account_codes),
-                TbLedger.voucher_date >= start_date,
-                TbLedger.voucher_date <= end_date,
-                sa.or_(
-                    TbLedger.debit_amount > amount_threshold,
-                    TbLedger.credit_amount > amount_threshold,
-                ),
-            )
-            .order_by(TbLedger.voucher_date, TbLedger.voucher_no)
+        valid_codes = [c for c in account_codes if c]
+
+        # account_codes 空 → 空集合（不返回全表），保持 P0/Req1.5
+        if not valid_codes:
+            return {
+                "period_end": period_end.isoformat(),
+                "window": f"{start_date.isoformat()} ~ {end_date.isoformat()}",
+                "threshold": amount_threshold,
+                "total_entries": 0,
+                "before_cutoff": 0,
+                "after_cutoff": 0,
+                "entries": [],
+                "stats": {
+                    "total_count": 0,
+                    "debit_total": "0",
+                    "credit_total": "0",
+                    "amount_total": "0",
+                    "truncated": False,
+                },
+            }
+
+        # 查询构建收敛到 LedgerSamplingService.build_ledger_query 单一真源
+        # （日期范围 + 科目前缀匹配 + dataset 安全隔离）。
+        # 🔴 阈值口径统一（审计口径决策 2026-07-24）：采用富引擎 GREATEST(debit,credit)>=t，
+        # t=0 时含零额凭证（与 cutoff-extract 完全一致）。cutoff-test 与 cutoff-extract
+        # 查询语义至此完全对齐，不再有阈值差异（差异矩阵§4）。
+        filters = LedgerQueryFilters(
+            date_start=start_date,
+            date_end=end_date,
+            account_codes=valid_codes,
+            amount_threshold=Decimal(str(amount_threshold)),
+            direction_filter="all",
         )
-        result = await db.execute(stmt)
-        rows = result.scalars().all()
+        stmt = (
+            await LedgerSamplingService.build_ledger_query(db, project_id, year, filters)
+        ).order_by(TbLedger.voucher_date, TbLedger.voucher_no)
+
+        # 安全上限：正常截止窗口（±N 天/单科目）行数很小，MAX_ENTRIES 足够；
+        # 病态超大总体不无界载入内存。用 limit(CAP+1) 探测溢出——
+        # 未溢出时行为与"返回全部"完全一致（零回归），溢出时展示前 CAP 笔 +
+        # 全量统计/前后分段走 DB 聚合（准确），truncated=True 透明告知。
+        MAX_ENTRIES = 2000
+        result = await db.execute(stmt.limit(MAX_ENTRIES + 1))
+        fetched = list(result.scalars().all())
+        truncated = len(fetched) > MAX_ENTRIES
+        rows = fetched[:MAX_ENTRIES]
 
         entries = []
+        rows_debit = Decimal("0")
+        rows_credit = Decimal("0")
+        rows_amount = Decimal("0")
         for r in rows:
+            dr = Decimal(str(r.debit_amount or 0))
+            cr = Decimal(str(r.credit_amount or 0))
+            rows_debit += dr
+            rows_credit += cr
+            rows_amount += max(abs(dr), abs(cr))
             entries.append({
                 "voucher_no": r.voucher_no,
                 "voucher_date": r.voucher_date.isoformat() if r.voucher_date else None,
@@ -68,14 +122,63 @@ class CutoffTestService:
                 "is_before_cutoff": r.voucher_date <= period_end if r.voucher_date else True,
             })
 
+        if truncated:
+            # 超大总体：全量统计与前后分段计数走 DB 聚合（准确，不受展示截断影响）
+            subq = stmt.subquery()
+            agg = sa.select(
+                sa.func.count(),
+                sa.func.coalesce(sa.func.sum(subq.c.debit_amount), 0),
+                sa.func.coalesce(sa.func.sum(subq.c.credit_amount), 0),
+                sa.func.coalesce(
+                    sa.func.sum(
+                        sa.func.greatest(
+                            sa.func.abs(sa.func.coalesce(subq.c.debit_amount, 0)),
+                            sa.func.abs(sa.func.coalesce(subq.c.credit_amount, 0)),
+                        )
+                    ),
+                    0,
+                ),
+                sa.func.coalesce(
+                    sa.func.sum(
+                        sa.case((subq.c.voucher_date <= period_end, 1), else_=0)
+                    ),
+                    0,
+                ),
+            ).select_from(subq)
+            ar = (await db.execute(agg)).one()
+            total_count = int(ar[0] or 0)
+            debit_total = Decimal(str(ar[1] or 0))
+            credit_total = Decimal(str(ar[2] or 0))
+            amount_total = Decimal(str(ar[3] or 0))
+            before_cnt = int(ar[4] or 0)
+            after_cnt = total_count - before_cnt
+        else:
+            # 未截断：rows 即全量，统计/分段从行计算（与既有行为完全一致）
+            total_count = len(entries)
+            debit_total = rows_debit
+            credit_total = rows_credit
+            amount_total = rows_amount
+            before_cnt = sum(1 for e in entries if e["is_before_cutoff"])
+            after_cnt = total_count - before_cnt
+
         return {
             "period_end": period_end.isoformat(),
             "window": f"{start_date.isoformat()} ~ {end_date.isoformat()}",
             "threshold": amount_threshold,
+            # total_entries=展示条数（截断时=MAX_ENTRIES）；全量口径见 stats.total_count
             "total_entries": len(entries),
-            "before_cutoff": sum(1 for e in entries if e["is_before_cutoff"]),
-            "after_cutoff": sum(1 for e in entries if not e["is_before_cutoff"]),
+            "before_cutoff": before_cnt,
+            "after_cutoff": after_cnt,
             "entries": entries,
+            # 加性全量统计（Req5.4）：total_count 为 DB 全量口径，truncated 透明告知是否展示截断。
+            # 现有调用方（K8/K9/I2/I6）忽略此字段，不影响既有行为。
+            "stats": {
+                "total_count": total_count,
+                "debit_total": str(debit_total),
+                "credit_total": str(credit_total),
+                "amount_total": str(amount_total),
+                "truncated": truncated,
+            },
         }
 
 

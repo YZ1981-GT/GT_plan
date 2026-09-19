@@ -523,9 +523,10 @@ def test_property_8f_rows_synced_count_matches_total(payload: dict) -> None:
     db = FakeDB()
     result = _run_sync(db, **payload)
 
+    # 与 _count_rows_synced 契约一致：``_`` 前缀键为元数据（如 _note_texts），不计数
     expected_count = sum(
-        len(rows) for rows in payload["sub_table_data"].values()
-        if isinstance(rows, list)
+        len(rows) for key, rows in payload["sub_table_data"].items()
+        if isinstance(rows, list) and not str(key).startswith("_")
     )
     assert result["rows_synced"] == expected_count, (
         f"rows_synced={result['rows_synced']!r} != expected={expected_count!r}\n"
@@ -589,3 +590,225 @@ def test_unit_empty_section_id_raises() -> None:
     # ValueError 在 commit 前抛出，notes 应为空
     assert len(db.notes) == 0
     assert db.commit_count == 0
+
+
+# ─── 回归：空载荷不清空既有子表（表格丢失主因修复） ─────────────────────────
+
+
+def test_empty_payload_does_not_wipe_existing_tables() -> None:
+    """**回归修复** — 改版底稿仅同步叙述/读不出表格/传空 {} 时，绝不清空附注已有表格。
+
+    场景：
+    1. 首次同步写入两张子表（t1、t2）。
+    2. 二次同步传入空 sub_table_data={}（模拟改版后 item_id/字段漂移读不出表格）。
+    3. 断言二次同步后附注两张表仍完整保留（不被清空为 {}）。
+    """
+    db = FakeDB()
+    project_id = uuid.uuid4()
+    wp_id = uuid.uuid4()
+
+    # 首次：写入两张表
+    _run_sync(
+        db,
+        project_id=project_id,
+        wp_id=wp_id,
+        sheet_name="C-应收账款附注",
+        section_id="五-1-2 应收账款",
+        sub_table_data={
+            "t1": [{"name": "期初", "amount": 100}],
+            "t2": [{"name": "期末", "amount": 200}],
+        },
+        current_standard="listed_standalone",
+        year=2025,
+    )
+    note = next(iter(db.notes.values()))
+    assert set(note.table_data["sub_table_data"].keys()) == {"t1", "t2"}
+
+    # 二次：空载荷（改版后读不出表格）
+    _run_sync(
+        db,
+        project_id=project_id,
+        wp_id=wp_id,
+        sheet_name="C-应收账款附注",
+        section_id="五-1-2 应收账款",
+        sub_table_data={},  # ← 空载荷
+        current_standard="listed_standalone",
+        year=2025,
+    )
+
+    note = next(iter(db.notes.values()))
+    # 关键断言：两张表仍在，未被清空
+    assert set(note.table_data["sub_table_data"].keys()) == {"t1", "t2"}, (
+        f"空载荷同步后表格被清空：{note.table_data['sub_table_data']!r}"
+    )
+    assert note.table_data["sub_table_data"]["t1"] == [{"name": "期初", "amount": 100}]
+    assert note.table_data["sub_table_data"]["t2"] == [{"name": "期末", "amount": 200}]
+
+
+def test_partial_payload_merges_preserving_unpushed_tables() -> None:
+    """**回归修复** — 部分推送时，未推送的既有子表必须保留，同名 key 覆盖。
+
+    场景：
+    1. 首次写入 t1、t2。
+    2. 二次仅推送 t1（新值）。
+    3. 断言 t1 被新值覆盖、t2 完整保留。
+    """
+    db = FakeDB()
+    project_id = uuid.uuid4()
+    wp_id = uuid.uuid4()
+
+    _run_sync(
+        db,
+        project_id=project_id,
+        wp_id=wp_id,
+        sheet_name="C-存货附注",
+        section_id="五-1-5 存货",
+        sub_table_data={
+            "t1": [{"name": "原值", "amount": 100}],
+            "t2": [{"name": "跌价", "amount": 20}],
+        },
+        current_standard="soe_standalone",
+        year=2025,
+    )
+
+    # 仅推送 t1（新值）
+    _run_sync(
+        db,
+        project_id=project_id,
+        wp_id=wp_id,
+        sheet_name="C-存货附注",
+        section_id="五-1-5 存货",
+        sub_table_data={"t1": [{"name": "原值", "amount": 999}]},
+        current_standard="soe_standalone",
+        year=2025,
+    )
+
+    note = next(iter(db.notes.values()))
+    sub = note.table_data["sub_table_data"]
+    assert set(sub.keys()) == {"t1", "t2"}, f"未推送的 t2 丢失：{sub!r}"
+    assert sub["t1"] == [{"name": "原值", "amount": 999}], "t1 应被新值覆盖"
+    assert sub["t2"] == [{"name": "跌价", "amount": 20}], "t2 应完整保留"
+
+
+def test_explicit_empty_table_key_is_valid_state_not_wipe() -> None:
+    """**回归** — 显式推送 {table_key: []} 表示该表'空行'有效状态，仅该表清空，其余保留。"""
+    db = FakeDB()
+    project_id = uuid.uuid4()
+    wp_id = uuid.uuid4()
+
+    _run_sync(
+        db,
+        project_id=project_id,
+        wp_id=wp_id,
+        sheet_name="C-应收账款附注",
+        section_id="五-1-2 应收账款",
+        sub_table_data={
+            "t1": [{"name": "期初", "amount": 100}],
+            "t2": [{"name": "期末", "amount": 200}],
+        },
+        current_standard="listed_standalone",
+        year=2025,
+    )
+
+    # 显式把 t1 推为空行（有效状态：该表本期无数据），t2 未推送
+    _run_sync(
+        db,
+        project_id=project_id,
+        wp_id=wp_id,
+        sheet_name="C-应收账款附注",
+        section_id="五-1-2 应收账款",
+        sub_table_data={"t1": []},
+        current_standard="listed_standalone",
+        year=2025,
+    )
+
+    note = next(iter(db.notes.values()))
+    sub = note.table_data["sub_table_data"]
+    assert sub["t1"] == [], "显式空表应为有效空行状态"
+    assert sub["t2"] == [{"name": "期末", "amount": 200}], "未推送的 t2 应完整保留"
+
+
+# ─── 列头元数据 _sub_table_columns 合并（P9/P10/P13） ────────────────────────
+
+
+def _run_sync_cols(
+    db: FakeDB,
+    *,
+    project_id: uuid.UUID,
+    wp_id: uuid.UUID,
+    section_id: str,
+    sub_table_data: dict,
+    sub_table_columns: dict | None,
+    year: int = 2025,
+) -> dict[str, Any]:
+    return asyncio.run(
+        sync_from_workpaper(
+            db,  # type: ignore[arg-type]
+            project_id,
+            wp_id=wp_id,
+            sheet_name="C-应收账款附注",
+            section_id=section_id,
+            sub_table_data=sub_table_data,
+            current_standard="listed_standalone",
+            user=_make_user(),
+            year=year,
+            sub_table_columns=sub_table_columns,
+        )
+    )
+
+
+def test_p13_columns_stored_alongside_sub_table_data() -> None:
+    """**Property 13** — _sub_table_columns 与 sub_table_data 一并写入 table_data。"""
+    db = FakeDB()
+    pid, wp = uuid.uuid4(), uuid.uuid4()
+    cols = {"t1": [{"key": "label", "label": "类别", "is_label": True}, {"key": "amt", "label": "金额"}]}
+    _run_sync_cols(
+        db, project_id=pid, wp_id=wp, section_id="五-1-2 应收账款",
+        sub_table_data={"t1": [{"label": "客户A", "amt": 100}]},
+        sub_table_columns=cols,
+    )
+    note = next(iter(db.notes.values()))
+    assert note.table_data["_sub_table_columns"] == cols
+
+
+def test_p9_empty_payload_preserves_columns() -> None:
+    """**Property 9** — 空载荷同步不清空既有 _sub_table_columns。"""
+    db = FakeDB()
+    pid, wp = uuid.uuid4(), uuid.uuid4()
+    cols = {"t1": [{"key": "label", "label": "类别", "is_label": True}]}
+    _run_sync_cols(
+        db, project_id=pid, wp_id=wp, section_id="五-1-2 应收账款",
+        sub_table_data={"t1": [{"label": "客户A"}]}, sub_table_columns=cols,
+    )
+    # 空载荷（无 data、无 columns）
+    _run_sync_cols(
+        db, project_id=pid, wp_id=wp, section_id="五-1-2 应收账款",
+        sub_table_data={}, sub_table_columns=None,
+    )
+    note = next(iter(db.notes.values()))
+    assert note.table_data["_sub_table_columns"] == cols, "空载荷不应清空列头"
+    assert note.table_data["sub_table_data"] == {"t1": [{"label": "客户A"}]}
+
+
+def test_p10_partial_columns_merge_preserves_unpushed() -> None:
+    """**Property 10** — 部分推送列头时，未推送子表的列头保留、同名覆盖。"""
+    db = FakeDB()
+    pid, wp = uuid.uuid4(), uuid.uuid4()
+    _run_sync_cols(
+        db, project_id=pid, wp_id=wp, section_id="五-1-5 存货",
+        sub_table_data={"t1": [{"label": "a"}], "t2": [{"label": "b"}]},
+        sub_table_columns={
+            "t1": [{"key": "label", "label": "原名T1", "is_label": True}],
+            "t2": [{"key": "label", "label": "原名T2", "is_label": True}],
+        },
+    )
+    # 仅推 t1 新列头
+    _run_sync_cols(
+        db, project_id=pid, wp_id=wp, section_id="五-1-5 存货",
+        sub_table_data={"t1": [{"label": "a2"}]},
+        sub_table_columns={"t1": [{"key": "label", "label": "新名T1", "is_label": True}]},
+    )
+    note = next(iter(db.notes.values()))
+    cols = note.table_data["_sub_table_columns"]
+    assert cols["t1"][0]["label"] == "新名T1", "t1 列头应被覆盖"
+    assert cols["t2"][0]["label"] == "原名T2", "未推送的 t2 列头应保留"

@@ -29,11 +29,9 @@
       </el-form-item>
 
       <el-form-item label="本年营业收入">
-        <el-input-number
+        <WpAmountInput
           v-model="form.revenue"
-          :min="0"
           :step="100000"
-          :precision="2"
           controls-position="right"
           style="width: 220px"
         />
@@ -51,11 +49,9 @@
       </el-table-column>
       <el-table-column label="本年金额" width="160" align="right">
         <template #default="{ row }">
-          <el-input-number
+          <WpAmountInput
             v-model="row.current"
-            :min="0"
             :step="10000"
-            :precision="2"
             controls-position="right"
             style="width: 100%"
           />
@@ -63,11 +59,9 @@
       </el-table-column>
       <el-table-column label="上年金额" width="160" align="right">
         <template #default="{ row }">
-          <el-input-number
+          <WpAmountInput
             v-model="row.prior"
-            :min="0"
             :step="10000"
-            :precision="2"
             controls-position="right"
             style="width: 100%"
           />
@@ -75,11 +69,9 @@
       </el-table-column>
       <el-table-column label="预算金额" width="160" align="right">
         <template #default="{ row }">
-          <el-input-number
+          <WpAmountInput
             v-model="row.budget"
-            :min="0"
             :step="10000"
-            :precision="2"
             controls-position="right"
             style="width: 100%"
           />
@@ -134,7 +126,7 @@
           <el-table :data="yoyTable" size="small" border max-height="240">
             <el-table-column label="费用类别" prop="category" min-width="120" />
             <el-table-column label="变化金额" width="140" align="right">
-              <template #default="{ row }">¥ {{ formatAmount(row.amount_change) }}</template>
+              <template #default="{ row }">¥ {{ prefs.fmt(row.amount_change) }}</template>
             </el-table-column>
             <el-table-column label="变化率" width="100" align="right">
               <template #default="{ row }">{{ formatRate(row.rate_change) }}</template>
@@ -151,7 +143,7 @@
           <el-table :data="budgetTable" size="small" border max-height="240">
             <el-table-column label="费用类别" prop="category" min-width="120" />
             <el-table-column label="差异金额" width="140" align="right">
-              <template #default="{ row }">¥ {{ formatAmount(row.variance_amount) }}</template>
+              <template #default="{ row }">¥ {{ prefs.fmt(row.variance_amount) }}</template>
             </el-table-column>
             <el-table-column label="差异率" width="100" align="right">
               <template #default="{ row }">{{ formatRate(row.variance_rate) }}</template>
@@ -216,12 +208,14 @@
 </template>
 
 <script setup lang="ts">
+import WpAmountInput from './shared/WpAmountInput.vue'
 import { reactive, ref, computed, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import { marked } from 'marked'
 import DOMPurify from 'dompurify'
 import { api } from '@/services/apiProxy'
 import { handleApiError } from '@/utils/errorHandler'
+import { useDisplayPrefsStore } from '@/stores/displayPrefs'
 
 interface Props {
   visible: boolean
@@ -337,11 +331,8 @@ function removeCategory(index: number) {
   form.categories.splice(index, 1)
 }
 
-function formatAmount(n: number | undefined) {
-  if (n === undefined || n === null) return '0.00'
-  if (!Number.isFinite(n)) return String(n)
-  return n.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-}
+const prefs = useDisplayPrefsStore()
+
 
 function formatRate(r: number | undefined) {
   if (r === undefined || r === null) return '—'
@@ -467,7 +458,7 @@ watch(
   background-color: var(--el-fill-color-lighter, #f5f7fa);
   border-radius: 4px;
   color: var(--el-text-color-placeholder, #a8abb2);
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   font-style: italic;
 }
 
@@ -478,7 +469,7 @@ watch(
   background-color: var(--el-fill-color-blank, #ffffff);
   border: 1px solid var(--el-border-color-lighter, #e4e7ed);
   border-radius: 6px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   line-height: 1.7;
   color: var(--el-text-color-primary);
 }

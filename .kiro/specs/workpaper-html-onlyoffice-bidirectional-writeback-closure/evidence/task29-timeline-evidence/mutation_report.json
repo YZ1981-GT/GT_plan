@@ -1,0 +1,1538 @@
+{
+  "spec": "workpaper-html-onlyoffice-bidirectional-writeback-closure",
+  "task": 29,
+  "generated_by": "backend/scripts/_mutation_kit/span.py::run_cli",
+  "pytest_args": [
+    "backend/tests/workpaper_sync/test_task29_timeline_evidence.py",
+    "backend/tests/workpaper_sync/test_task29_timeline_evidence_pg.py",
+    "-q",
+    "--tb=no",
+    "-rfE",
+    "-p",
+    "no:randomly"
+  ],
+  "mode": "merged-batches",
+  "merge_note": "分批前台执行后合并。单跑 --run all 需 ~20 分钟，被 kill 会跳过 finally 把生产代码留在变异态，故按批次跑。batch1 在 redaction.py 修改后整批重跑（batch1b），R03/R31/R32/R57 在守卫修正后重跑，均以重跑结果为准。",
+  "batch_provenance": {
+    "R01": "tmp_t29_mut_batch1b.json",
+    "R02": "tmp_t29_mut_batch1b.json",
+    "R03": "tmp_t29_mut_r03.json",
+    "R04": "tmp_t29_mut_batch1b.json",
+    "R05": "tmp_t29_mut_batch1b.json",
+    "R06": "tmp_t29_mut_batch1b.json",
+    "R07": "tmp_t29_mut_batch1b.json",
+    "R08": "tmp_t29_mut_batch1b.json",
+    "R09": "tmp_t29_mut_batch1b.json",
+    "R10": "tmp_t29_mut_batch1b.json",
+    "R11": "tmp_t29_mut_batch1b.json",
+    "R12": "tmp_t29_mut_batch1b.json",
+    "R13": "tmp_t29_mut_batch1b.json",
+    "R14": "tmp_t29_mut_batch1b.json",
+    "R21": "tmp_t29_mut_batch2.json",
+    "R22": "tmp_t29_mut_batch2.json",
+    "R23": "tmp_t29_mut_batch2.json",
+    "R24": "tmp_t29_mut_batch2.json",
+    "R25": "tmp_t29_mut_batch2.json",
+    "R26": "tmp_t29_mut_batch2.json",
+    "R27": "tmp_t29_mut_batch2.json",
+    "R28": "tmp_t29_mut_batch2.json",
+    "R31": "tmp_t29_mut_r3x.json",
+    "R32": "tmp_t29_mut_r3x.json",
+    "R33": "tmp_t29_mut_batch2.json",
+    "R34": "tmp_t29_mut_batch2.json",
+    "R35": "tmp_t29_mut_batch2.json",
+    "R36": "tmp_t29_mut_batch2.json",
+    "R37": "tmp_t29_mut_batch2.json",
+    "R38": "tmp_t29_mut_r3x.json",
+    "R41": "tmp_t29_mut_batch3.json",
+    "R42": "tmp_t29_mut_batch3.json",
+    "R43": "tmp_t29_mut_batch3.json",
+    "R44": "tmp_t29_mut_batch3.json",
+    "R45": "tmp_t29_mut_batch3.json",
+    "R46": "tmp_t29_mut_batch3.json",
+    "R47": "tmp_t29_mut_batch3.json",
+    "R48": "tmp_t29_mut_batch3.json",
+    "R49": "tmp_t29_mut_batch3.json",
+    "R50": "tmp_t29_mut_batch3.json",
+    "R51": "tmp_t29_mut_batch4.json",
+    "R52": "tmp_t29_mut_batch4.json",
+    "R53": "tmp_t29_mut_batch4.json",
+    "R54": "tmp_t29_mut_batch4.json",
+    "R55": "tmp_t29_mut_batch4.json",
+    "R56": "tmp_t29_mut_batch4.json",
+    "R57": "tmp_t29_mut_r57.json",
+    "R58": "tmp_t29_mut_batch4.json",
+    "R59": "tmp_t29_mut_batch4.json",
+    "R60": "tmp_t29_mut_batch4.json",
+    "R61": "tmp_t29_mut_batch5.json",
+    "R62": "tmp_t29_mut_batch5.json",
+    "R63": "tmp_t29_mut_batch5.json",
+    "R64": "tmp_t29_mut_batch5.json",
+    "R65": "tmp_t29_mut_batch5.json",
+    "R66": "tmp_t29_mut_batch5.json",
+    "R67": "tmp_t29_mut_batch5.json",
+    "R71": "tmp_t29_mut_batch6.json",
+    "R72": "tmp_t29_mut_batch6.json",
+    "R73": "tmp_t29_mut_batch6.json",
+    "R74": "tmp_t29_mut_batch6.json",
+    "R75": "tmp_t29_mut_batch6.json"
+  },
+  "tally": {
+    "RED": 62
+  },
+  "target_file_sha256_after_restore": {
+    "backend/app/routers/wp_sync_router.py": "ecaaa282559cacb4c673be2a23920cd38b2b01eed84ab295a66b6608f1bb6533",
+    "backend/app/services/workpaper_sync/alerting.py": "4da96e42f531142293b5344ce43d0a2ddf504f312830eb9b979cd0726465b87a",
+    "backend/app/services/workpaper_sync/evidence.py": "cfdc33db05716047d56f30bcc64a577c1118631537eee8e6e1fbd69b29d5ce54",
+    "backend/app/services/workpaper_sync/metrics.py": "eec94ac7e24a75eb934ec2274108e8ed216cbab558b07cdc75b63d789ac51e07",
+    "backend/app/services/workpaper_sync/redaction.py": "a697d642feb1a7db453db89e8a659c286a08105237cba6d9dd4a8d792a654ca2",
+    "backend/app/services/workpaper_sync/timeline.py": "5f959058b8bc9c56d11dbb522ece55267347757c2fd583aee6b27acdf08b8caf"
+  },
+  "independent_recheck": {
+    "criteria": "verdict==RED AND added!=[] AND hit!=[] AND restored_sha256==当前磁盘 sha256",
+    "problems": [],
+    "passed": true
+  },
+  "mutations": [
+    {
+      "id": "R01",
+      "path": "backend/app/services/workpaper_sync/redaction.py",
+      "want": "test_task29_timeline_evidence.py::TestRedactionReverseLeak::test_no_credential_shape_survives_projection",
+      "why": "键名层被短路 ⇒ `Authorization` 落到 allowlist 判定（未登记）而被**丢弃**而不是屏蔽。丢弃看起来也没泄露，但 `secret_keys` 报告为空 ⇒ 无法区分「屏蔽了」与「压根没查」；更要紧的是嵌套里的 `jwt` 会随父键 `detail` 一起被原样投影",
+      "verdict": "RED",
+      "summary": "1 failed, 173 passed in 14.96s",
+      "added": [
+        "test_task29_timeline_evidence.py::TestRedactionReverseLeak::test_no_credential_shape_survives_projection"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task29_timeline_evidence.py::TestRedactionReverseLeak::test_no_credential_shape_survives_projection"
+      ],
+      "added_files": [
+        "test_task29_timeline_evidence.py"
+      ],
+      "restored": true,
+      "restored_sha256": "a697d642feb1a7db453db89e8a659c286a08105237cba6d9dd4a8d792a654ca2",
+      "seconds": 18.3
+    },
+    {
+      "id": "R02",
+      "path": "backend/app/services/workpaper_sync/redaction.py",
+      "want": "test_task29_timeline_evidence.py::TestRedactionReverseLeak::test_no_credential_shape_survives_projection",
+      "why": "allowlist 层被短路 ⇒ 变成 blacklist：未登记的 `incoming_cell_values` 原样落库，审计底稿的真实金额进 timeline（Requirement 13.8 明确禁止）",
+      "verdict": "RED",
+      "summary": "1 failed, 173 passed in 15.18s",
+      "added": [
+        "test_task29_timeline_evidence.py::TestRedactionReverseLeak::test_no_credential_shape_survives_projection"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task29_timeline_evidence.py::TestRedactionReverseLeak::test_no_credential_shape_survives_projection"
+      ],
+      "added_files": [
+        "test_task29_timeline_evidence.py"
+      ],
+      "restored": true,
+      "restored_sha256": "a697d642feb1a7db453db89e8a659c286a08105237cba6d9dd4a8d792a654ca2",
+      "seconds": 18.6
+    },
+    {
+      "id": "R03",
+      "path": "backend/app/services/workpaper_sync/redaction.py",
+      "want": "test_task29_timeline_evidence.py::TestRedactionAllowlistIsTwoWayLocked::test_role_suffix_list_is_closed_both_ways",
+      "why": "角色词豁免从**末段锚定**退化成「任一段命中即放行」⇒ `digest_token` / `state_authorization` / `sha256_secret` 因首段是角色词而被判非凭证，长期凭证原样落 timeline。这是本处唯一承载行为的不变量。﹙本条的前身是「两步顺序交换」，实测为**等价变异**：判据是合取，交换后 10 个探针键行为逐一相同 ⇒ 恒 GREEN。同时暴露出真实缺口 —— 原守卫只有放行侧（`token_digest`）断言、屏蔽侧一条都没有，故末段锚定实际无守卫。已改为对两个方向都断言，并把变异换到真实不变量上。﹚",
+      "verdict": "RED",
+      "summary": "1 failed, 169 passed in 16.20s",
+      "added": [
+        "test_task29_timeline_evidence.py::TestRedactionAllowlistIsTwoWayLocked::test_role_suffix_list_is_closed_both_ways"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task29_timeline_evidence.py::TestRedactionAllowlistIsTwoWayLocked::test_role_suffix_list_is_closed_both_ways"
+      ],
+      "added_files": [
+        "test_task29_timeline_evidence.py"
+      ],
+      "restored": true,
+      "restored_sha256": "a697d642feb1a7db453db89e8a659c286a08105237cba6d9dd4a8d792a654ca2",
+      "seconds": 19.9
+    },
+    {
+      "id": "R04",
+      "path": "backend/app/services/workpaper_sync/redaction.py",
+      "want": "test_task29_timeline_evidence.py::TestRedactionReverseLeak::test_no_credential_shape_survives_projection",
+      "why": "URL 分支不再降级 ⇒ `error_detail` 里的完整下载 URL（含 query 里的短期凭证与内网 host）原样保留。AC 10.7 明文禁止",
+      "verdict": "RED",
+      "summary": "2 failed, 172 passed in 15.55s",
+      "added": [
+        "test_task29_timeline_evidence.py::TestRedactionReverseLeak::test_no_credential_shape_survives_projection",
+        "test_task29_timeline_evidence.py::TestRedactionReverseLeak::test_self_check_accepts_its_own_output"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task29_timeline_evidence.py::TestRedactionReverseLeak::test_no_credential_shape_survives_projection"
+      ],
+      "added_files": [
+        "test_task29_timeline_evidence.py"
+      ],
+      "restored": true,
+      "restored_sha256": "a697d642feb1a7db453db89e8a659c286a08105237cba6d9dd4a8d792a654ca2",
+      "seconds": 19.0
+    },
+    {
+      "id": "R05",
+      "path": "backend/app/services/workpaper_sync/redaction.py",
+      "want": "test_task29_timeline_evidence.py::TestRedactionReverseLeak::test_no_credential_shape_survives_projection",
+      "why": "query 被原样拼回 —— 「只去了 host 没去 query」是最容易犯的半截脱敏，而「URL 变短了」的粗判据看不出来",
+      "verdict": "RED",
+      "summary": "2 failed, 172 passed in 15.76s",
+      "added": [
+        "test_task29_timeline_evidence.py::TestRedactionReverseLeak::test_no_credential_shape_survives_projection",
+        "test_task29_timeline_evidence.py::TestRedactionReverseLeak::test_self_check_accepts_its_own_output"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task29_timeline_evidence.py::TestRedactionReverseLeak::test_no_credential_shape_survives_projection"
+      ],
+      "added_files": [
+        "test_task29_timeline_evidence.py"
+      ],
+      "restored": true,
+      "restored_sha256": "a697d642feb1a7db453db89e8a659c286a08105237cba6d9dd4a8d792a654ca2",
+      "seconds": 19.3
+    },
+    {
+      "id": "R06",
+      "path": "backend/app/services/workpaper_sync/redaction.py",
+      "want": "test_task29_timeline_evidence.py::TestRedactionReverseLeak::test_no_credential_shape_survives_projection",
+      "why": "未登记 host 不再降级 ⇒ 内网拓扑（DocServer 的真实地址）进日志/证据",
+      "verdict": "RED",
+      "summary": "2 failed, 172 passed in 15.81s",
+      "added": [
+        "test_task29_timeline_evidence.py::TestRedactionReverseLeak::test_no_credential_shape_survives_projection",
+        "test_task29_timeline_evidence.py::TestRedactionReverseLeak::test_self_check_accepts_its_own_output"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task29_timeline_evidence.py::TestRedactionReverseLeak::test_no_credential_shape_survives_projection"
+      ],
+      "added_files": [
+        "test_task29_timeline_evidence.py"
+      ],
+      "restored": true,
+      "restored_sha256": "a697d642feb1a7db453db89e8a659c286a08105237cba6d9dd4a8d792a654ca2",
+      "seconds": 19.4
+    },
+    {
+      "id": "R07",
+      "path": "backend/app/services/workpaper_sync/redaction.py",
+      "want": "test_task29_timeline_evidence.py::TestRedactionReverseLeak::test_bytes_never_reach_the_record",
+      "why": "bytea 列（asyncpg 返回 memoryview）被 hex 化写进记录 ⇒ 整份载荷字节进 timeline",
+      "verdict": "RED",
+      "summary": "1 failed, 173 passed in 15.72s",
+      "added": [
+        "test_task29_timeline_evidence.py::TestRedactionReverseLeak::test_bytes_never_reach_the_record"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task29_timeline_evidence.py::TestRedactionReverseLeak::test_bytes_never_reach_the_record"
+      ],
+      "added_files": [
+        "test_task29_timeline_evidence.py"
+      ],
+      "restored": true,
+      "restored_sha256": "a697d642feb1a7db453db89e8a659c286a08105237cba6d9dd4a8d792a654ca2",
+      "seconds": 19.2
+    },
+    {
+      "id": "R08",
+      "path": "backend/app/services/workpaper_sync/redaction.py",
+      "want": "test_task29_timeline_evidence.py::TestRedactionReverseLeak::test_depth_and_container_limits_bound_the_record",
+      "why": "深度门被短路 ⇒ 一条 event detail 能把任意深的嵌套结构整份写进库（Requirement 5.12 只要求记 identity 与 code）",
+      "verdict": "RED",
+      "summary": "1 failed, 173 passed in 15.94s",
+      "added": [
+        "test_task29_timeline_evidence.py::TestRedactionReverseLeak::test_depth_and_container_limits_bound_the_record"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task29_timeline_evidence.py::TestRedactionReverseLeak::test_depth_and_container_limits_bound_the_record"
+      ],
+      "added_files": [
+        "test_task29_timeline_evidence.py"
+      ],
+      "restored": true,
+      "restored_sha256": "a697d642feb1a7db453db89e8a659c286a08105237cba6d9dd4a8d792a654ca2",
+      "seconds": 19.5
+    },
+    {
+      "id": "R09",
+      "path": "backend/app/services/workpaper_sync/redaction.py",
+      "want": "test_task29_timeline_evidence.py::TestRedactionReverseLeak::test_depth_and_container_limits_bound_the_record",
+      "why": "容器上限被摘掉 ⇒ 十万行的 projection 列表整份进记录",
+      "verdict": "RED",
+      "summary": "1 failed, 173 passed in 15.90s",
+      "added": [
+        "test_task29_timeline_evidence.py::TestRedactionReverseLeak::test_depth_and_container_limits_bound_the_record"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task29_timeline_evidence.py::TestRedactionReverseLeak::test_depth_and_container_limits_bound_the_record"
+      ],
+      "added_files": [
+        "test_task29_timeline_evidence.py"
+      ],
+      "restored": true,
+      "restored_sha256": "a697d642feb1a7db453db89e8a659c286a08105237cba6d9dd4a8d792a654ca2",
+      "seconds": 19.5
+    },
+    {
+      "id": "R10",
+      "path": "backend/app/services/workpaper_sync/redaction.py",
+      "want": "test_task29_timeline_evidence.py::TestRedactionReverseLeak::test_exception_text_is_scrubbed_and_truncated",
+      "why": "异常文本不再截断 ⇒ 一条 SQL 参数超长的 asyncpg 异常能把整批业务值写进 `error_detail`（本 spec 里那类异常动辄几千字符）",
+      "verdict": "RED",
+      "summary": "4 failed, 170 passed in 15.99s",
+      "added": [
+        "test_task29_timeline_evidence.py::TestRedactionReverseLeak::test_exception_text_is_scrubbed_and_truncated",
+        "test_task29_timeline_evidence_pg.py::TestAppendOnlyProjection::test_a_healthy_operation_timeline_has_no_defect",
+        "test_task29_timeline_evidence_pg.py::TestAppendOnlyProjection::test_editing_current_state_directly_is_caught",
+        "test_task29_timeline_evidence_pg.py::TestAppendOnlyProjection::test_the_timeline_survives_the_tamper_attempts_unchanged"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task29_timeline_evidence.py::TestRedactionReverseLeak::test_exception_text_is_scrubbed_and_truncated"
+      ],
+      "added_files": [
+        "test_task29_timeline_evidence.py",
+        "test_task29_timeline_evidence_pg.py"
+      ],
+      "restored": true,
+      "restored_sha256": "a697d642feb1a7db453db89e8a659c286a08105237cba6d9dd4a8d792a654ca2",
+      "seconds": 19.6
+    },
+    {
+      "id": "R11",
+      "path": "backend/app/services/workpaper_sync/redaction.py",
+      "want": "test_task29_timeline_evidence.py::TestRedactionAllowlistIsTwoWayLocked::test_no_allowlisted_key_is_a_credential_name",
+      "why": "加宽方向的门被摘掉 ⇒ 只要把 `authorization_header` 登记进 allowlist 就能合法泄露长期凭证。这是「allowlist 两侧锁」的加宽半边",
+      "verdict": "RED",
+      "summary": "1 failed, 173 passed in 15.91s",
+      "added": [
+        "test_task29_timeline_evidence.py::TestRedactionAllowlistIsTwoWayLocked::test_no_allowlisted_key_is_a_credential_name"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task29_timeline_evidence.py::TestRedactionAllowlistIsTwoWayLocked::test_no_allowlisted_key_is_a_credential_name"
+      ],
+      "added_files": [
+        "test_task29_timeline_evidence.py"
+      ],
+      "restored": true,
+      "restored_sha256": "a697d642feb1a7db453db89e8a659c286a08105237cba6d9dd4a8d792a654ca2",
+      "seconds": 19.5
+    },
+    {
+      "id": "R12",
+      "path": "backend/app/services/workpaper_sync/redaction.py",
+      "want": "test_task29_timeline_evidence.py::TestRedactionAllowlistIsTwoWayLocked::test_emptying_a_group_is_refused",
+      "why": "清空方向的门被摘掉 ⇒ 把任一分组清空后该组字段全被丢弃，timeline 少一整段而没有任何报错。这是「allowlist 两侧锁」的清空半边",
+      "verdict": "RED",
+      "summary": "1 failed, 173 passed in 15.86s",
+      "added": [
+        "test_task29_timeline_evidence.py::TestRedactionAllowlistIsTwoWayLocked::test_emptying_a_group_is_refused"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task29_timeline_evidence.py::TestRedactionAllowlistIsTwoWayLocked::test_emptying_a_group_is_refused"
+      ],
+      "added_files": [
+        "test_task29_timeline_evidence.py"
+      ],
+      "restored": true,
+      "restored_sha256": "a697d642feb1a7db453db89e8a659c286a08105237cba6d9dd4a8d792a654ca2",
+      "seconds": 19.4
+    },
+    {
+      "id": "R13",
+      "path": "backend/app/services/workpaper_sync/redaction.py",
+      "want": "test_task29_timeline_evidence.py::TestRedactionAllowlistIsTwoWayLocked::test_dropping_a_group_entirely_is_refused",
+      "why": "整组缺失不再 fail closed ⇒ 删掉 `digest` 分组后所有 hash 被丢弃，而 hash 正是「服务端可重算」的唯一凭据（AC 14.14）",
+      "verdict": "RED",
+      "summary": "1 failed, 173 passed in 16.63s",
+      "added": [
+        "test_task29_timeline_evidence.py::TestRedactionAllowlistIsTwoWayLocked::test_dropping_a_group_entirely_is_refused"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task29_timeline_evidence.py::TestRedactionAllowlistIsTwoWayLocked::test_dropping_a_group_entirely_is_refused"
+      ],
+      "added_files": [
+        "test_task29_timeline_evidence.py"
+      ],
+      "restored": true,
+      "restored_sha256": "a697d642feb1a7db453db89e8a659c286a08105237cba6d9dd4a8d792a654ca2",
+      "seconds": 20.2
+    },
+    {
+      "id": "R14",
+      "path": "backend/app/services/workpaper_sync/redaction.py",
+      "want": "test_task29_timeline_evidence.py::TestRedactionAllowlistIsTwoWayLocked::test_role_suffix_may_not_overlap_a_credential_word",
+      "why": "角色词名单可以包含凭证词 ⇒ 把 `token` 加进角色词后，`access_token` 这类键立刻放行。末段规则就成了凭证放行通道",
+      "verdict": "RED",
+      "summary": "1 failed, 173 passed in 15.82s",
+      "added": [
+        "test_task29_timeline_evidence.py::TestRedactionAllowlistIsTwoWayLocked::test_role_suffix_may_not_overlap_a_credential_word"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task29_timeline_evidence.py::TestRedactionAllowlistIsTwoWayLocked::test_role_suffix_may_not_overlap_a_credential_word"
+      ],
+      "added_files": [
+        "test_task29_timeline_evidence.py"
+      ],
+      "restored": true,
+      "restored_sha256": "a697d642feb1a7db453db89e8a659c286a08105237cba6d9dd4a8d792a654ca2",
+      "seconds": 19.4
+    },
+    {
+      "id": "R21",
+      "path": "backend/app/services/workpaper_sync/metrics.py",
+      "want": "test_task29_timeline_evidence.py::TestMetricCatalog::test_operation_scoped_metrics_require_all_six_dims",
+      "why": "必填归因维度不再校验 ⇒ 指标可以只带 room 就记数，「按 requested+canonical operation/application 归因」这条 AC 13.7 的要求彻底落空",
+      "verdict": "RED",
+      "summary": "1 failed, 169 passed in 15.92s",
+      "added": [
+        "test_task29_timeline_evidence.py::TestMetricCatalog::test_operation_scoped_metrics_require_all_six_dims"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task29_timeline_evidence.py::TestMetricCatalog::test_operation_scoped_metrics_require_all_six_dims"
+      ],
+      "added_files": [
+        "test_task29_timeline_evidence.py"
+      ],
+      "restored": true,
+      "restored_sha256": "eec94ac7e24a75eb934ec2274108e8ed216cbab558b07cdc75b63d789ac51e07",
+      "seconds": 19.5
+    },
+    {
+      "id": "R22",
+      "path": "backend/app/services/workpaper_sync/metrics.py",
+      "want": "test_task29_timeline_evidence.py::TestMetricCatalog::test_route_scoped_metrics_forbid_participant",
+      "why": "route 级指标可以带 participant ⇒ 聚合 callback 事件被归因到 route participant，即「route 当作者」（AC 5.1 / 10.9 明文禁止）",
+      "verdict": "RED",
+      "summary": "1 failed, 169 passed in 15.86s",
+      "added": [
+        "test_task29_timeline_evidence.py::TestMetricCatalog::test_route_scoped_metrics_forbid_participant"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task29_timeline_evidence.py::TestMetricCatalog::test_route_scoped_metrics_forbid_participant"
+      ],
+      "added_files": [
+        "test_task29_timeline_evidence.py"
+      ],
+      "restored": true,
+      "restored_sha256": "eec94ac7e24a75eb934ec2274108e8ed216cbab558b07cdc75b63d789ac51e07",
+      "seconds": 19.5
+    },
+    {
+      "id": "R23",
+      "path": "backend/app/services/workpaper_sync/metrics.py",
+      "want": "test_task29_timeline_evidence.py::TestMetricCatalog::test_each_forbidden_outcome_refuses_the_generic_error_metric",
+      "why": "same-app fold / 跨 participant 409 / 无 successor 恢复态可以压成通用 error —— Task 29 正文明文禁止。压平的实际伤害：值班按重试 runbook 处理一个需要重新授权 + 新 generation 的状态",
+      "verdict": "RED",
+      "summary": "8 failed, 162 passed in 16.08s",
+      "added": [
+        "test_task29_timeline_evidence.py::TestMetricCatalog::test_each_forbidden_outcome_refuses_the_generic_error_metric[close_leader_no_successor_recovery_required]",
+        "test_task29_timeline_evidence.py::TestMetricCatalog::test_each_forbidden_outcome_refuses_the_generic_error_metric[cross_participant_idempotency_conflict]",
+        "test_task29_timeline_evidence.py::TestMetricCatalog::test_each_forbidden_outcome_refuses_the_generic_error_metric[post_durable_failure]",
+        "test_task29_timeline_evidence.py::TestMetricCatalog::test_each_forbidden_outcome_refuses_the_generic_error_metric[refresh_required]",
+        "test_task29_timeline_evidence.py::TestMetricCatalog::test_each_forbidden_outcome_refuses_the_generic_error_metric[same_application_sequence_fold]",
+        "test_task29_timeline_evidence_pg.py::TestAppendOnlyProjection::test_a_healthy_operation_timeline_has_no_defect",
+        "test_task29_timeline_evidence_pg.py::TestAppendOnlyProjection::test_editing_current_state_directly_is_caught",
+        "test_task29_timeline_evidence_pg.py::TestAppendOnlyProjection::test_the_timeline_survives_the_tamper_attempts_unchanged"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task29_timeline_evidence.py::TestMetricCatalog::test_each_forbidden_outcome_refuses_the_generic_error_metric[close_leader_no_successor_recovery_required]",
+        "test_task29_timeline_evidence.py::TestMetricCatalog::test_each_forbidden_outcome_refuses_the_generic_error_metric[cross_participant_idempotency_conflict]",
+        "test_task29_timeline_evidence.py::TestMetricCatalog::test_each_forbidden_outcome_refuses_the_generic_error_metric[post_durable_failure]",
+        "test_task29_timeline_evidence.py::TestMetricCatalog::test_each_forbidden_outcome_refuses_the_generic_error_metric[refresh_required]",
+        "test_task29_timeline_evidence.py::TestMetricCatalog::test_each_forbidden_outcome_refuses_the_generic_error_metric[same_application_sequence_fold]"
+      ],
+      "added_files": [
+        "test_task29_timeline_evidence.py",
+        "test_task29_timeline_evidence_pg.py"
+      ],
+      "restored": true,
+      "restored_sha256": "eec94ac7e24a75eb934ec2274108e8ed216cbab558b07cdc75b63d789ac51e07",
+      "seconds": 19.7
+    },
+    {
+      "id": "R24",
+      "path": "backend/app/services/workpaper_sync/metrics.py",
+      "want": "test_task29_timeline_evidence.py::TestMetricCatalog::test_result_is_mandatory_when_the_metric_has_a_closed_domain",
+      "why": "有封闭 result 域的指标允许不传 result ⇒ 「没抛异常就 +1」这种写法重新变得可行，而 Task 22/26 在 durable 之后**刻意不抛**",
+      "verdict": "RED",
+      "summary": "1 failed, 169 passed in 15.86s",
+      "added": [
+        "test_task29_timeline_evidence.py::TestMetricCatalog::test_result_is_mandatory_when_the_metric_has_a_closed_domain"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task29_timeline_evidence.py::TestMetricCatalog::test_result_is_mandatory_when_the_metric_has_a_closed_domain"
+      ],
+      "added_files": [
+        "test_task29_timeline_evidence.py"
+      ],
+      "restored": true,
+      "restored_sha256": "eec94ac7e24a75eb934ec2274108e8ed216cbab558b07cdc75b63d789ac51e07",
+      "seconds": 19.4
+    },
+    {
+      "id": "R25",
+      "path": "backend/app/services/workpaper_sync/metrics.py",
+      "want": "test_task29_timeline_evidence.py::TestMetricCatalog::test_result_is_mandatory_when_the_metric_has_a_closed_domain",
+      "why": "result 不再限制在封闭域 ⇒ 拼错的结果值（`ok` / `success`）静默写入，告警规则的 result_filter 永不命中",
+      "verdict": "RED",
+      "summary": "1 failed, 169 passed in 15.90s",
+      "added": [
+        "test_task29_timeline_evidence.py::TestMetricCatalog::test_result_is_mandatory_when_the_metric_has_a_closed_domain"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task29_timeline_evidence.py::TestMetricCatalog::test_result_is_mandatory_when_the_metric_has_a_closed_domain"
+      ],
+      "added_files": [
+        "test_task29_timeline_evidence.py"
+      ],
+      "restored": true,
+      "restored_sha256": "eec94ac7e24a75eb934ec2274108e8ed216cbab558b07cdc75b63d789ac51e07",
+      "seconds": 19.5
+    },
+    {
+      "id": "R26",
+      "path": "backend/app/services/workpaper_sync/metrics.py",
+      "want": "test_task29_timeline_evidence.py::TestMetricCatalog::test_record_outcome_has_no_default_for_result_or_landed",
+      "why": "`result` / `landed` 变成可省参数。功能上什么都不变（现有调用方全都显式传），只有签名判据会红 —— 而它正是「失败不得被记成成功」的唯一结构性保障",
+      "verdict": "RED",
+      "summary": "1 failed, 169 passed in 16.49s",
+      "added": [
+        "test_task29_timeline_evidence.py::TestMetricCatalog::test_record_outcome_has_no_default_for_result_or_landed"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task29_timeline_evidence.py::TestMetricCatalog::test_record_outcome_has_no_default_for_result_or_landed"
+      ],
+      "added_files": [
+        "test_task29_timeline_evidence.py"
+      ],
+      "restored": true,
+      "restored_sha256": "eec94ac7e24a75eb934ec2274108e8ed216cbab558b07cdc75b63d789ac51e07",
+      "seconds": 20.0
+    },
+    {
+      "id": "R27",
+      "path": "backend/app/services/workpaper_sync/metrics.py",
+      "want": "test_task29_timeline_evidence.py::TestMetricCatalog::test_sample_buffer_is_bounded",
+      "why": "样本缓冲变无界 ⇒ 容量门（6000 会话 / 20 applications/s × 10 分钟）下长跑进程内存单调涨。功能测试全绿，只有上界判据会红",
+      "verdict": "RED",
+      "summary": "1 failed, 169 passed in 15.83s",
+      "added": [
+        "test_task29_timeline_evidence.py::TestMetricCatalog::test_sample_buffer_is_bounded"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task29_timeline_evidence.py::TestMetricCatalog::test_sample_buffer_is_bounded"
+      ],
+      "added_files": [
+        "test_task29_timeline_evidence.py"
+      ],
+      "restored": true,
+      "restored_sha256": "eec94ac7e24a75eb934ec2274108e8ed216cbab558b07cdc75b63d789ac51e07",
+      "seconds": 19.4
+    },
+    {
+      "id": "R28",
+      "path": "backend/app/services/workpaper_sync/metrics.py",
+      "want": "test_task29_timeline_evidence.py::TestMetricCatalog::test_unknown_label_name_is_refused",
+      "why": "维度名不再受词汇表约束 ⇒ 同一件事在两处用 `room` 与 `room_id` 两个标签名，按 room 聚合时数据一分为二而看板照常出图",
+      "verdict": "RED",
+      "summary": "1 failed, 169 passed in 15.86s",
+      "added": [
+        "test_task29_timeline_evidence.py::TestMetricCatalog::test_unknown_label_name_is_refused"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task29_timeline_evidence.py::TestMetricCatalog::test_unknown_label_name_is_refused"
+      ],
+      "added_files": [
+        "test_task29_timeline_evidence.py"
+      ],
+      "restored": true,
+      "restored_sha256": "eec94ac7e24a75eb934ec2274108e8ed216cbab558b07cdc75b63d789ac51e07",
+      "seconds": 19.4
+    },
+    {
+      "id": "R31",
+      "path": "backend/app/services/workpaper_sync/alerting.py",
+      "want": "test_task29_timeline_evidence.py::TestAlertRegistry::test_an_alert_required_metric_without_a_rule_is_reported",
+      "why": "「alert_required 指标必须有规则」这一侧被摘掉 ⇒ 加了指标忘加规则时「已覆盖」是假的（故障永远静默）。﹙原判据是 `test_registry_self_check_is_clean`（断言自检为空）与`test_every_alert_required_metric_has_exactly_one_rule`（断言注册表数据），实测恒 GREEN：前者在合规数据上无论删哪条分支都仍为空，后者根本不经过`validate_registry`。已换成注入型判据 —— 摘掉一条规则后断言本分支**独有**的措辞 + 指标名恰出现一次。﹚",
+      "verdict": "RED",
+      "summary": "4 failed, 169 passed in 15.16s",
+      "added": [
+        "test_task29_timeline_evidence.py::TestAlertRegistry::test_an_alert_required_metric_without_a_rule_is_reported",
+        "test_task29_timeline_evidence_pg.py::TestAppendOnlyProjection::test_a_healthy_operation_timeline_has_no_defect",
+        "test_task29_timeline_evidence_pg.py::TestAppendOnlyProjection::test_editing_current_state_directly_is_caught",
+        "test_task29_timeline_evidence_pg.py::TestAppendOnlyProjection::test_the_timeline_survives_the_tamper_attempts_unchanged"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task29_timeline_evidence.py::TestAlertRegistry::test_an_alert_required_metric_without_a_rule_is_reported"
+      ],
+      "added_files": [
+        "test_task29_timeline_evidence.py",
+        "test_task29_timeline_evidence_pg.py"
+      ],
+      "restored": true,
+      "restored_sha256": "4da96e42f531142293b5344ce43d0a2ddf504f312830eb9b979cd0726465b87a",
+      "seconds": 18.6
+    },
+    {
+      "id": "R32",
+      "path": "backend/app/services/workpaper_sync/alerting.py",
+      "want": "test_task29_timeline_evidence.py::TestAlertRegistry::test_a_missing_requirement_13_9_condition_is_reported_by_its_label",
+      "why": "Requirement 13.9 的逐条覆盖核对被摘掉 ⇒ 删掉任一类规则不再打红。13.9 列了十四类，漏一类就是那类故障永远无人知道。﹙原判据同 R31，恒 GREEN；且此处还叠了一层遮蔽 —— 紧随其后的 `for condition in AlertCondition` 兜底分支对同一个缺口也会报，所以判据不能只断言「有问题」，必须断言报的是 **13.9 的中文标签**而不是 enum 名，否则兜底分支会替它顶班。﹚",
+      "verdict": "RED",
+      "summary": "1 failed, 172 passed in 15.05s",
+      "added": [
+        "test_task29_timeline_evidence.py::TestAlertRegistry::test_a_missing_requirement_13_9_condition_is_reported_by_its_label"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task29_timeline_evidence.py::TestAlertRegistry::test_a_missing_requirement_13_9_condition_is_reported_by_its_label"
+      ],
+      "added_files": [
+        "test_task29_timeline_evidence.py"
+      ],
+      "restored": true,
+      "restored_sha256": "4da96e42f531142293b5344ce43d0a2ddf504f312830eb9b979cd0726465b87a",
+      "seconds": 18.5
+    },
+    {
+      "id": "R33",
+      "path": "backend/app/services/workpaper_sync/alerting.py",
+      "want": "test_task29_timeline_evidence.py::TestAlertRegistry::test_a_typo_in_result_filter_is_refused",
+      "why": "拼错的 result 过滤值不再被拒 ⇒ 规则**静默不触发**。这是告警系统最坏的失效形态：看板全绿、规则也在、只是永远不命中",
+      "verdict": "RED",
+      "summary": "1 failed, 169 passed in 15.87s",
+      "added": [
+        "test_task29_timeline_evidence.py::TestAlertRegistry::test_a_typo_in_result_filter_is_refused"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task29_timeline_evidence.py::TestAlertRegistry::test_a_typo_in_result_filter_is_refused"
+      ],
+      "added_files": [
+        "test_task29_timeline_evidence.py"
+      ],
+      "restored": true,
+      "restored_sha256": "4da96e42f531142293b5344ce43d0a2ddf504f312830eb9b979cd0726465b87a",
+      "seconds": 19.4
+    },
+    {
+      "id": "R34",
+      "path": "backend/app/services/workpaper_sync/alerting.py",
+      "want": "test_task29_timeline_evidence.py::TestAlertRegistry::test_an_ungroupable_dedupe_dim_is_refused",
+      "why": "去重键可以用该指标根本带不出的维度 ⇒ 取不到值时所有告警合成一条（`participant_id=-`），两个 room 的故障看起来是同一个",
+      "verdict": "RED",
+      "summary": "1 failed, 169 passed in 16.06s",
+      "added": [
+        "test_task29_timeline_evidence.py::TestAlertRegistry::test_an_ungroupable_dedupe_dim_is_refused"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task29_timeline_evidence.py::TestAlertRegistry::test_an_ungroupable_dedupe_dim_is_refused"
+      ],
+      "added_files": [
+        "test_task29_timeline_evidence.py"
+      ],
+      "restored": true,
+      "restored_sha256": "4da96e42f531142293b5344ce43d0a2ddf504f312830eb9b979cd0726465b87a",
+      "seconds": 19.6
+    },
+    {
+      "id": "R35",
+      "path": "backend/app/services/workpaper_sync/alerting.py",
+      "want": "test_task29_timeline_evidence.py::TestAlertRegistry::test_zero_threshold_is_refused",
+      "why": "阈值可以为 0 ⇒ 规则对空事件流也触发，告警立刻被噪音淹掉（等价于关掉告警）",
+      "verdict": "RED",
+      "summary": "1 failed, 169 passed in 15.85s",
+      "added": [
+        "test_task29_timeline_evidence.py::TestAlertRegistry::test_zero_threshold_is_refused"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task29_timeline_evidence.py::TestAlertRegistry::test_zero_threshold_is_refused"
+      ],
+      "added_files": [
+        "test_task29_timeline_evidence.py"
+      ],
+      "restored": true,
+      "restored_sha256": "4da96e42f531142293b5344ce43d0a2ddf504f312830eb9b979cd0726465b87a",
+      "seconds": 19.5
+    },
+    {
+      "id": "R36",
+      "path": "backend/app/services/workpaper_sync/alerting.py",
+      "want": "test_task29_timeline_evidence.py::TestAlertRegistry::test_recovery_window_shorter_than_trigger_window_is_refused",
+      "why": "恢复窗口可以短于触发窗口 ⇒ 故障仍在发生时就宣布恢复",
+      "verdict": "RED",
+      "summary": "1 failed, 169 passed in 15.82s",
+      "added": [
+        "test_task29_timeline_evidence.py::TestAlertRegistry::test_recovery_window_shorter_than_trigger_window_is_refused"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task29_timeline_evidence.py::TestAlertRegistry::test_recovery_window_shorter_than_trigger_window_is_refused"
+      ],
+      "added_files": [
+        "test_task29_timeline_evidence.py"
+      ],
+      "restored": true,
+      "restored_sha256": "4da96e42f531142293b5344ce43d0a2ddf504f312830eb9b979cd0726465b87a",
+      "seconds": 19.4
+    },
+    {
+      "id": "R37",
+      "path": "backend/app/services/workpaper_sync/alerting.py",
+      "want": "test_task29_timeline_evidence.py::TestAlertRegistry::test_a_placeholder_runbook_is_refused",
+      "why": "`TODO` 也算 runbook ⇒ Requirement 13.9 的「每条规则须定义 runbook」变成形式",
+      "verdict": "RED",
+      "summary": "1 failed, 169 passed in 16.01s",
+      "added": [
+        "test_task29_timeline_evidence.py::TestAlertRegistry::test_a_placeholder_runbook_is_refused"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task29_timeline_evidence.py::TestAlertRegistry::test_a_placeholder_runbook_is_refused"
+      ],
+      "added_files": [
+        "test_task29_timeline_evidence.py"
+      ],
+      "restored": true,
+      "restored_sha256": "4da96e42f531142293b5344ce43d0a2ddf504f312830eb9b979cd0726465b87a",
+      "seconds": 19.6
+    },
+    {
+      "id": "R38",
+      "path": "backend/app/services/workpaper_sync/alerting.py",
+      "want": "test_task29_timeline_evidence.py::TestAlertRegistry::test_a_rule_for_a_non_alert_required_metric_is_reported",
+      "why": "加宽方向被摘掉 ⇒ 规则引用了 `alert_required=False` 的指标不再报。与 R31 合起来才是两侧锁死：少规则报、多规则也报。单侧锁的实际后果是「把指标的 alert_required 翻成 False」可以在不动规则表的情况下悄悄解除一类告警的覆盖承诺",
+      "verdict": "RED",
+      "summary": "1 failed, 172 passed in 15.03s",
+      "added": [
+        "test_task29_timeline_evidence.py::TestAlertRegistry::test_a_rule_for_a_non_alert_required_metric_is_reported"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task29_timeline_evidence.py::TestAlertRegistry::test_a_rule_for_a_non_alert_required_metric_is_reported"
+      ],
+      "added_files": [
+        "test_task29_timeline_evidence.py"
+      ],
+      "restored": true,
+      "restored_sha256": "4da96e42f531142293b5344ce43d0a2ddf504f312830eb9b979cd0726465b87a",
+      "seconds": 18.4
+    },
+    {
+      "id": "R41",
+      "path": "backend/app/services/workpaper_sync/timeline.py",
+      "want": "test_task29_timeline_evidence.py::TestProjectionOracle::test_a_deleted_middle_event_is_caught_as_a_sequence_gap",
+      "why": "号段连续性判据被短路。四条一致性判据各有独立缺陷码，共用一个码时靠后的会被靠前的遮蔽 —— 本 spec 已三次踩到，所以逐条变异",
+      "verdict": "RED",
+      "summary": "1 failed, 172 passed in 14.99s",
+      "added": [
+        "test_task29_timeline_evidence.py::TestProjectionOracle::test_a_deleted_middle_event_is_caught_as_a_sequence_gap"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task29_timeline_evidence.py::TestProjectionOracle::test_a_deleted_middle_event_is_caught_as_a_sequence_gap"
+      ],
+      "added_files": [
+        "test_task29_timeline_evidence.py"
+      ],
+      "restored": true,
+      "restored_sha256": "5f959058b8bc9c56d11dbb522ece55267347757c2fd583aee6b27acdf08b8caf",
+      "seconds": 18.4
+    },
+    {
+      "id": "R42",
+      "path": "backend/app/services/workpaper_sync/timeline.py",
+      "want": "test_task29_timeline_evidence.py::TestProjectionOracle::test_a_forged_event_breaks_the_transition_chain",
+      "why": "转换链判据被短路 ⇒ 伪造一条 from_state 接不上的 event 不再被发现",
+      "verdict": "RED",
+      "summary": "1 failed, 172 passed in 15.11s",
+      "added": [
+        "test_task29_timeline_evidence.py::TestProjectionOracle::test_a_forged_event_breaks_the_transition_chain"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task29_timeline_evidence.py::TestProjectionOracle::test_a_forged_event_breaks_the_transition_chain"
+      ],
+      "added_files": [
+        "test_task29_timeline_evidence.py"
+      ],
+      "restored": true,
+      "restored_sha256": "5f959058b8bc9c56d11dbb522ece55267347757c2fd583aee6b27acdf08b8caf",
+      "seconds": 18.4
+    },
+    {
+      "id": "R43",
+      "path": "backend/app/services/workpaper_sync/timeline.py",
+      "want": "test_task29_timeline_evidence.py::TestProjectionOracle::test_a_regressed_server_clock_is_caught",
+      "why": "服务端时钟单调判据被短路 ⇒ 乱序写入的 event 不再被发现（AC 13.10）",
+      "verdict": "RED",
+      "summary": "1 failed, 172 passed in 15.79s",
+      "added": [
+        "test_task29_timeline_evidence.py::TestProjectionOracle::test_a_regressed_server_clock_is_caught"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task29_timeline_evidence.py::TestProjectionOracle::test_a_regressed_server_clock_is_caught"
+      ],
+      "added_files": [
+        "test_task29_timeline_evidence.py"
+      ],
+      "restored": true,
+      "restored_sha256": "5f959058b8bc9c56d11dbb522ece55267347757c2fd583aee6b27acdf08b8caf",
+      "seconds": 19.3
+    },
+    {
+      "id": "R44",
+      "path": "backend/app/services/workpaper_sync/timeline.py",
+      "want": "test_task29_timeline_evidence.py::TestProjectionOracle::test_current_state_diverging_from_the_last_event_is_caught",
+      "why": "「current state 只是 timeline 的投影」这条 P68 的核心判据被短路 ⇒ 直接 `UPDATE` operation.state 后读侧毫无察觉。真库侧同名判据也应红",
+      "verdict": "RED",
+      "summary": "3 failed, 170 passed in 15.75s",
+      "added": [
+        "test_task29_timeline_evidence.py::TestProjectionOracle::test_assert_projection_raises_only_on_defects",
+        "test_task29_timeline_evidence.py::TestProjectionOracle::test_current_state_diverging_from_the_last_event_is_caught",
+        "test_task29_timeline_evidence_pg.py::TestAppendOnlyProjection::test_editing_current_state_directly_is_caught"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task29_timeline_evidence.py::TestProjectionOracle::test_current_state_diverging_from_the_last_event_is_caught",
+        "test_task29_timeline_evidence_pg.py::TestAppendOnlyProjection::test_editing_current_state_directly_is_caught"
+      ],
+      "added_files": [
+        "test_task29_timeline_evidence.py",
+        "test_task29_timeline_evidence_pg.py"
+      ],
+      "restored": true,
+      "restored_sha256": "5f959058b8bc9c56d11dbb522ece55267347757c2fd583aee6b27acdf08b8caf",
+      "seconds": 19.3
+    },
+    {
+      "id": "R45",
+      "path": "backend/app/services/workpaper_sync/timeline.py",
+      "want": "test_task29_timeline_evidence.py::TestProjectionOracle::test_a_stateless_sequence_fold_event_is_not_a_defect",
+      "why": "回归变异：不再过滤无状态事件 ⇒ 每次合法的 same-application sequence fold（`to_state` 为 NULL）都会误报断链与分叉。这是**真实缺陷**，而 fold 恰恰是协同下最常见的事件（Task 29 要求它「不 self-stale」）",
+      "verdict": "RED",
+      "summary": "1 failed, 172 passed in 16.02s",
+      "added": [
+        "test_task29_timeline_evidence.py::TestProjectionOracle::test_a_stateless_sequence_fold_event_is_not_a_defect"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task29_timeline_evidence.py::TestProjectionOracle::test_a_stateless_sequence_fold_event_is_not_a_defect"
+      ],
+      "added_files": [
+        "test_task29_timeline_evidence.py"
+      ],
+      "restored": true,
+      "restored_sha256": "5f959058b8bc9c56d11dbb522ece55267347757c2fd583aee6b27acdf08b8caf",
+      "seconds": 19.6
+    },
+    {
+      "id": "R46",
+      "path": "backend/app/services/workpaper_sync/timeline.py",
+      "want": "test_task29_timeline_evidence.py::TestTimelineQueryContract::test_only_server_clock_columns_may_order_the_timeline",
+      "why": "排序键不再限制在服务端列 ⇒ 浏览器 trace 时间可以决定 timeline 顺序，AC 13.10 的「不得伪造服务端 callback 顺序」失效",
+      "verdict": "RED",
+      "summary": "1 failed, 172 passed in 15.89s",
+      "added": [
+        "test_task29_timeline_evidence.py::TestTimelineQueryContract::test_only_server_clock_columns_may_order_the_timeline"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task29_timeline_evidence.py::TestTimelineQueryContract::test_only_server_clock_columns_may_order_the_timeline"
+      ],
+      "added_files": [
+        "test_task29_timeline_evidence.py"
+      ],
+      "restored": true,
+      "restored_sha256": "5f959058b8bc9c56d11dbb522ece55267347757c2fd583aee6b27acdf08b8caf",
+      "seconds": 19.4
+    },
+    {
+      "id": "R47",
+      "path": "backend/app/services/workpaper_sync/timeline.py",
+      "want": "test_task29_timeline_evidence.py::TestTimelineQueryContract::test_locators_is_a_classvar_not_a_field",
+      "why": "回归变异：`ClassVar` 改回普通注解 ⇒ `@dataclass` 把 LOCATORS 收成实例字段，`TimelineQuery(LOCATORS=())` 就能让 `validate()` 恒通过。**真实踩过**：写成 `Final[...]` 时同样会变成字段（PEP 591 只影响类型检查）",
+      "verdict": "RED",
+      "summary": "1 failed, 172 passed in 15.83s",
+      "added": [
+        "test_task29_timeline_evidence.py::TestTimelineQueryContract::test_locators_is_a_classvar_not_a_field"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task29_timeline_evidence.py::TestTimelineQueryContract::test_locators_is_a_classvar_not_a_field"
+      ],
+      "added_files": [
+        "test_task29_timeline_evidence.py"
+      ],
+      "restored": true,
+      "restored_sha256": "5f959058b8bc9c56d11dbb522ece55267347757c2fd583aee6b27acdf08b8caf",
+      "seconds": 19.4
+    },
+    {
+      "id": "R48",
+      "path": "backend/app/services/workpaper_sync/timeline.py",
+      "want": "test_task29_timeline_evidence.py::TestTimelineQueryContract::test_a_query_without_any_locator_is_refused",
+      "why": "无条件 timeline 查询被放行 ⇒ 整库 event 可被一次拉出，且绕开 authorization-before-resource（AC 10.6）",
+      "verdict": "RED",
+      "summary": "1 failed, 172 passed in 16.31s",
+      "added": [
+        "test_task29_timeline_evidence.py::TestTimelineQueryContract::test_a_query_without_any_locator_is_refused"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task29_timeline_evidence.py::TestTimelineQueryContract::test_a_query_without_any_locator_is_refused"
+      ],
+      "added_files": [
+        "test_task29_timeline_evidence.py"
+      ],
+      "restored": true,
+      "restored_sha256": "5f959058b8bc9c56d11dbb522ece55267347757c2fd583aee6b27acdf08b8caf",
+      "seconds": 19.9
+    },
+    {
+      "id": "R49",
+      "path": "backend/app/services/workpaper_sync/timeline.py",
+      "want": "test_task29_timeline_evidence.py::TestRecoveryTimelineHasNoOperation::test_the_recovery_timeline_type_has_no_operation_events_field",
+      "why": "recovery timeline 又能装 operation 事件 ⇒ AC 13.5 的「claim 前不得借 operation timeline 伪造 operation」重新只剩注释约定。结构判据比行为判据强：字段不存在就不可能填",
+      "verdict": "RED",
+      "summary": "1 failed, 172 passed in 16.02s",
+      "added": [
+        "test_task29_timeline_evidence.py::TestRecoveryTimelineHasNoOperation::test_the_recovery_timeline_type_has_no_operation_events_field"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task29_timeline_evidence.py::TestRecoveryTimelineHasNoOperation::test_the_recovery_timeline_type_has_no_operation_events_field"
+      ],
+      "added_files": [
+        "test_task29_timeline_evidence.py"
+      ],
+      "restored": true,
+      "restored_sha256": "5f959058b8bc9c56d11dbb522ece55267347757c2fd583aee6b27acdf08b8caf",
+      "seconds": 19.6
+    },
+    {
+      "id": "R50",
+      "path": "backend/app/services/workpaper_sync/timeline.py",
+      "want": "test_task29_timeline_evidence.py::TestRecoveryTimelineHasNoOperation::test_three_entities_flag_requires_all_three",
+      "why": "三实体判据的 `and` 改 `or` ⇒ 只要有一个就宣称齐备，download-only 的 case 会被判成已 claim（AC 5.8 要求 download-only 三者恒为 0）",
+      "verdict": "RED",
+      "summary": "1 failed, 172 passed in 15.86s",
+      "added": [
+        "test_task29_timeline_evidence.py::TestRecoveryTimelineHasNoOperation::test_three_entities_flag_requires_all_three"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task29_timeline_evidence.py::TestRecoveryTimelineHasNoOperation::test_three_entities_flag_requires_all_three"
+      ],
+      "added_files": [
+        "test_task29_timeline_evidence.py"
+      ],
+      "restored": true,
+      "restored_sha256": "5f959058b8bc9c56d11dbb522ece55267347757c2fd583aee6b27acdf08b8caf",
+      "seconds": 19.5
+    },
+    {
+      "id": "R51",
+      "path": "backend/app/services/workpaper_sync/evidence.py",
+      "want": "test_task29_timeline_evidence.py::TestClosePredicate::test_shared_room_alone_is_enough_even_without_bidirectional",
+      "why": "AC 12.12 的谓词 `or` 改 `and`。真 manifest 里当前**没有** bidirectional entry，所以 179 个 shared-room entry 会**全部**悄悄少八个 close 场景，而「场景都跑过了」的计数仍然满分。这是本任务最贵的一条落点",
+      "verdict": "RED",
+      "summary": "6 failed, 167 passed in 13.63s",
+      "added": [
+        "test_task29_timeline_evidence.py::TestClosePredicate::test_shared_room_alone_is_enough_even_without_bidirectional",
+        "test_task29_timeline_evidence.py::TestClosePredicate::test_truth_table[editable+exclusive+bidirectional]",
+        "test_task29_timeline_evidence.py::TestClosePredicate::test_truth_table[editable+shared+single_oo]",
+        "test_task29_timeline_evidence.py::TestDerivationOverTheRealManifest::test_the_close_predicate_hits_every_shared_editable_entry",
+        "test_task29_timeline_evidence_pg.py::TestEvidenceRecomputation::test_every_scenario_owns_its_own_application",
+        "test_task29_timeline_evidence_pg.py::TestEvidenceRecomputation::test_the_required_set_came_from_the_source_backed_profile"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task29_timeline_evidence.py::TestClosePredicate::test_shared_room_alone_is_enough_even_without_bidirectional",
+        "test_task29_timeline_evidence.py::TestDerivationOverTheRealManifest::test_the_close_predicate_hits_every_shared_editable_entry"
+      ],
+      "added_files": [
+        "test_task29_timeline_evidence.py",
+        "test_task29_timeline_evidence_pg.py"
+      ],
+      "restored": true,
+      "restored_sha256": "cfdc33db05716047d56f30bcc64a577c1118631537eee8e6e1fbd69b29d5ce54",
+      "seconds": 17.2
+    },
+    {
+      "id": "R52",
+      "path": "backend/app/services/workpaper_sync/evidence.py",
+      "want": "test_task29_timeline_evidence.py::TestClosePredicate::test_shared_room_alone_is_enough_even_without_bidirectional",
+      "why": "close 场景整组不再追加 ⇒ exactly-one close-capture 从此无人验收",
+      "verdict": "RED",
+      "summary": "52 failed, 121 passed in 9.27s",
+      "added": [
+        "test_task29_timeline_evidence.py::TestClosePredicate::test_shared_room_alone_is_enough_even_without_bidirectional",
+        "test_task29_timeline_evidence.py::TestDerivationOverTheRealManifest::test_every_entry_either_derives_or_reports_profile_drift",
+        "test_task29_timeline_evidence.py::TestDerivationOverTheRealManifest::test_the_close_predicate_hits_every_shared_editable_entry",
+        "test_task29_timeline_evidence.py::TestRequiredScenarioDerivation::test_dynamic_and_word_additions_come_from_the_machine_profile",
+        "test_task29_timeline_evidence.py::TestRequiredScenarioDerivation::test_only_the_two_field_level_scenarios_may_be_substituted",
+        "test_task29_timeline_evidence.py::TestRequiredSetDigest::test_changing_room_model_changes_the_digest",
+        "test_task29_timeline_evidence.py::TestRequiredSetDigest::test_changing_the_authority_model_changes_the_digest",
+        "test_task29_timeline_evidence.py::TestRequiredSetDigest::test_changing_the_scenario_profile_payload_changes_the_digest",
+        "test_task29_timeline_evidence.py::TestRequiredSetDigest::test_digest_is_stable_for_identical_inputs",
+        "test_task29_timeline_evidence.py::TestRequiredSetDigest::test_entry_id_is_in_the_digest_so_evidence_cannot_be_copied_across_entries",
+        "test_task29_timeline_evidence.py::TestRequiredSetDigest::test_the_derivation_version_is_part_of_the_digest",
+        "test_task29_timeline_evidence_pg.py::TestAppendOnlyProjection::test_a_cross_scope_read_is_refused",
+        "test_task29_timeline_evidence_pg.py::TestAppendOnlyProjection::test_a_healthy_operation_timeline_has_no_defect",
+        "test_task29_timeline_evidence_pg.py::TestAppendOnlyProjection::test_editing_current_state_directly_is_caught",
+        "test_task29_timeline_evidence_pg.py::TestAppendOnlyProjection::test_no_credential_or_business_value_appears_in_the_serialized_timeline",
+        "test_task29_timeline_evidence_pg.py::TestAppendOnlyProjection::test_the_projected_event_carries_the_redaction_policy_version",
+        "test_task29_timeline_evidence_pg.py::TestAppendOnlyProjection::test_the_projected_event_drops_the_surrogate_id",
+        "test_task29_timeline_evidence_pg.py::TestAppendOnlyProjection::test_the_shell_had_a_null_application_before_correlation",
+        "test_task29_timeline_evidence_pg.py::TestAppendOnlyProjection::test_the_storage_layer_refuses_every_tamper_form[delete]",
+        "test_task29_timeline_evidence_pg.py::TestAppendOnlyProjection::test_the_storage_layer_refuses_every_tamper_form[dup-seq]",
+        "test_task29_timeline_evidence_pg.py::TestAppendOnlyProjection::test_the_storage_layer_refuses_every_tamper_form[update]",
+        "test_task29_timeline_evidence_pg.py::TestAppendOnlyProjection::test_the_timeline_declares_the_server_clock_as_its_time_source",
+        "test_task29_timeline_evidence_pg.py::TestAppendOnlyProjection::test_the_timeline_reports_the_bound_application_after_correlation",
+        "test_task29_timeline_evidence_pg.py::TestAppendOnlyProjection::test_the_timeline_survives_the_tamper_attempts_unchanged",
+        "test_task29_timeline_evidence_pg.py::TestEvidenceRecomputation::test_a_clean_run_has_exactly_one_known_and_attributed_defect",
+        "test_task29_timeline_evidence_pg.py::TestEvidenceRecomputation::test_a_contradictory_profile_reports_drift_instead_of_crashing",
+        "test_task29_timeline_evidence_pg.py::TestEvidenceRecomputation::test_a_dangling_operation_fk_is_unverified",
+        "test_task29_timeline_evidence_pg.py::TestEvidenceRecomputation::test_a_missing_scenario_is_unverified",
+        "test_task29_timeline_evidence_pg.py::TestEvidenceRecomputation::test_a_scenario_whose_bundle_differs_from_its_run_is_refused_by_the_db",
+        "test_task29_timeline_evidence_pg.py::TestEvidenceRecomputation::test_an_entity_from_another_entry_is_unverified",
+        "test_task29_timeline_evidence_pg.py::TestEvidenceRecomputation::test_an_entry_without_any_run_is_unverified",
+        "test_task29_timeline_evidence_pg.py::TestEvidenceRecomputation::test_an_extra_unregistered_scenario_is_unverified",
+        "test_task29_timeline_evidence_pg.py::TestEvidenceRecomputation::test_download_only_with_entities_is_refused_by_the_storage_layer",
+        "test_task29_timeline_evidence_pg.py::TestEvidenceRecomputation::test_every_scenario_owns_its_own_application",
+        "test_task29_timeline_evidence_pg.py::TestEvidenceRecomputation::test_the_required_set_came_from_the_source_backed_profile",
+        "test_task29_timeline_evidence_pg.py::TestEvidenceReuseIsRefused::test_reusing_one_operation_for_two_scenarios_is_refused",
+        "test_task29_timeline_evidence_pg.py::TestEvidenceReuseIsRefused::test_the_same_entities_in_two_entries_runs_reddens_both",
+        "test_task29_timeline_evidence_pg.py::TestEvidenceStaleness::test_a_different_required_set_digest_makes_the_run_stale",
+        "test_task29_timeline_evidence_pg.py::TestEvidenceStaleness::test_a_different_source_commit_makes_the_run_stale",
+        "test_task29_timeline_evidence_pg.py::TestEvidenceStaleness::test_changing_the_oo_or_browser_build_makes_the_run_stale",
+        "test_task29_timeline_evidence_pg.py::TestEvidenceStaleness::test_downgrading_the_profile_cannot_keep_old_evidence_fresh",
+        "test_task29_timeline_evidence_pg.py::TestEvidenceStaleness::test_stale_alone_is_not_reported_as_verified",
+        "test_task29_timeline_evidence_pg.py::TestEvidenceStaleness::test_the_environment_digest_is_its_own_independent_stale_reason",
+        "test_task29_timeline_evidence_pg.py::TestHarness::test_no_phase_crashed_during_collection",
+        "test_task29_timeline_evidence_pg.py::TestRecoveryCaseHasNoOperationBeforeClaim::test_all_three_entities_are_absent_before_claim",
+        "test_task29_timeline_evidence_pg.py::TestRecoveryCaseHasNoOperationBeforeClaim::test_claiming_creates_all_three_entities_at_once",
+        "test_task29_timeline_evidence_pg.py::TestRecoveryCaseHasNoOperationBeforeClaim::test_the_claim_shell_became_a_primary",
+        "test_task29_timeline_evidence_pg.py::TestRecoveryCaseHasNoOperationBeforeClaim::test_the_pre_claim_payload_has_no_operation_events_key",
+        "test_task29_timeline_evidence_pg.py::TestRecoveryCaseHasNoOperationBeforeClaim::test_the_pre_claim_timeline_says_so",
+        "test_task29_timeline_evidence_pg.py::TestRecoveryCaseHasNoOperationBeforeClaim::test_the_recovery_timeline_grows_append_only",
+        "test_task29_timeline_evidence_pg.py::TestTimelineLocators::test_every_locator_returns_events",
+        "test_task29_timeline_evidence_pg.py::TestTimelineLocators::test_the_room_query_spans_more_than_one_stream"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task29_timeline_evidence.py::TestClosePredicate::test_shared_room_alone_is_enough_even_without_bidirectional"
+      ],
+      "added_files": [
+        "test_task29_timeline_evidence.py",
+        "test_task29_timeline_evidence_pg.py"
+      ],
+      "restored": true,
+      "restored_sha256": "cfdc33db05716047d56f30bcc64a577c1118631537eee8e6e1fbd69b29d5ce54",
+      "seconds": 12.9
+    },
+    {
+      "id": "R53",
+      "path": "backend/app/services/workpaper_sync/evidence.py",
+      "want": "test_task29_timeline_evidence.py::TestRequiredScenarioDerivation::test_projection_contract_may_not_substitute",
+      "why": "替换不再限制在枚举 authority model ⇒ `projection_contract` 也能把字段级两场景换掉，AC 12.12「替换规则由服务端 registry 守卫，禁止自由文本豁免」失效",
+      "verdict": "RED",
+      "summary": "1 failed, 172 passed in 15.80s",
+      "added": [
+        "test_task29_timeline_evidence.py::TestRequiredScenarioDerivation::test_projection_contract_may_not_substitute"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task29_timeline_evidence.py::TestRequiredScenarioDerivation::test_projection_contract_may_not_substitute"
+      ],
+      "added_files": [
+        "test_task29_timeline_evidence.py"
+      ],
+      "restored": true,
+      "restored_sha256": "cfdc33db05716047d56f30bcc64a577c1118631537eee8e6e1fbd69b29d5ce54",
+      "seconds": 19.4
+    },
+    {
+      "id": "R54",
+      "path": "backend/app/services/workpaper_sync/evidence.py",
+      "want": "test_task29_timeline_evidence.py::TestRequiredScenarioDerivation::test_only_the_two_field_level_scenarios_may_be_substituted",
+      "why": "替换时顺手多摘掉一条不可替换场景（download-only）。AC 12.12 明文只允许替换字段级两场景；多摘一条时「替换发生了」的粗判据仍然满足",
+      "verdict": "RED",
+      "summary": "8 failed, 165 passed in 15.91s",
+      "added": [
+        "test_task29_timeline_evidence.py::TestClosePredicate::test_shared_room_alone_is_enough_even_without_bidirectional",
+        "test_task29_timeline_evidence.py::TestDerivationOverTheRealManifest::test_every_entry_either_derives_or_reports_profile_drift",
+        "test_task29_timeline_evidence.py::TestDerivationOverTheRealManifest::test_the_close_predicate_hits_every_shared_editable_entry",
+        "test_task29_timeline_evidence.py::TestRequiredScenarioDerivation::test_only_the_two_field_level_scenarios_may_be_substituted",
+        "test_task29_timeline_evidence.py::TestRequiredSetDigest::test_changing_the_authority_model_changes_the_digest",
+        "test_task29_timeline_evidence_pg.py::TestAppendOnlyProjection::test_a_healthy_operation_timeline_has_no_defect",
+        "test_task29_timeline_evidence_pg.py::TestAppendOnlyProjection::test_editing_current_state_directly_is_caught",
+        "test_task29_timeline_evidence_pg.py::TestAppendOnlyProjection::test_the_timeline_survives_the_tamper_attempts_unchanged"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task29_timeline_evidence.py::TestRequiredScenarioDerivation::test_only_the_two_field_level_scenarios_may_be_substituted"
+      ],
+      "added_files": [
+        "test_task29_timeline_evidence.py",
+        "test_task29_timeline_evidence_pg.py"
+      ],
+      "restored": true,
+      "restored_sha256": "cfdc33db05716047d56f30bcc64a577c1118631537eee8e6e1fbd69b29d5ce54",
+      "seconds": 19.5
+    },
+    {
+      "id": "R55",
+      "path": "backend/app/services/workpaper_sync/evidence.py",
+      "want": "test_task29_timeline_evidence.py::TestScenarioKindIsLockedToV151::test_kind_is_derived_from_the_entity_shape",
+      "why": "kind 推导的两步顺序交换 ⇒ download-only 场景（同时 `expects_recovery_case` 且不 `expects_application`）被判成 `recovery_reject`，于是 V151 的`ck_wpees_download_only_zero_entities` 不再管辖它。顺序即 V151 的分支顺序，不可交换",
+      "verdict": "RED",
+      "summary": "1 failed, 172 passed in 15.82s",
+      "added": [
+        "test_task29_timeline_evidence.py::TestScenarioKindIsLockedToV151::test_kind_is_derived_from_the_entity_shape[download-only]"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task29_timeline_evidence.py::TestScenarioKindIsLockedToV151::test_kind_is_derived_from_the_entity_shape[download-only]"
+      ],
+      "added_files": [
+        "test_task29_timeline_evidence.py"
+      ],
+      "restored": true,
+      "restored_sha256": "cfdc33db05716047d56f30bcc64a577c1118631537eee8e6e1fbd69b29d5ce54",
+      "seconds": 19.5
+    },
+    {
+      "id": "R56",
+      "path": "backend/app/services/workpaper_sync/evidence.py",
+      "want": "test_task29_timeline_evidence.py::TestScenarioKindIsLockedToV151::test_the_enum_matches_the_v151_check_exactly",
+      "why": "回归变异：给 `ScenarioKind` 加一个 V151 CHECK 里没有的值。这正是**真实缺陷**的形态 —— 第一版枚举整套都不在 DDL 域里，真库插入全炸而离线守卫全绿。判据必须从迁移文本反向解析取值域做双向等值",
+      "verdict": "RED",
+      "summary": "1 failed, 172 passed in 15.83s",
+      "added": [
+        "test_task29_timeline_evidence.py::TestScenarioKindIsLockedToV151::test_the_enum_matches_the_v151_check_exactly"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task29_timeline_evidence.py::TestScenarioKindIsLockedToV151::test_the_enum_matches_the_v151_check_exactly"
+      ],
+      "added_files": [
+        "test_task29_timeline_evidence.py"
+      ],
+      "restored": true,
+      "restored_sha256": "cfdc33db05716047d56f30bcc64a577c1118631537eee8e6e1fbd69b29d5ce54",
+      "seconds": 19.5
+    },
+    {
+      "id": "R57",
+      "path": "backend/app/services/workpaper_sync/evidence.py",
+      "want": "test_task29_timeline_evidence.py::TestRequiredSetDigest::test_the_scenario_list_itself_is_part_of_the_digest",
+      "why": "required set digest 不再包含场景清单 ⇒ 增删场景后 digest 不变，旧 evidence 永不 stale（P71 的核心）。﹙原判据是 `test_changing_the_scenario_profile_payload_changes_the_digest`，实测恒 GREEN：它改的是 `scenario_profile` payload，而 `scenario_profile_digest` 是 digest 里**另一个仍在**的字段，所以摘掉 `scenario_ids` 它照样绿。同类问题存在于当时全部 5 条 digest 测试 —— 它们改的输入自己都在 digest 里。已补一条只改场景清单、其余 digest 输入逐项断言不变的判据。﹚",
+      "verdict": "RED",
+      "summary": "1 failed, 173 passed in 17.11s",
+      "added": [
+        "test_task29_timeline_evidence.py::TestRequiredSetDigest::test_the_scenario_list_itself_is_part_of_the_digest"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task29_timeline_evidence.py::TestRequiredSetDigest::test_the_scenario_list_itself_is_part_of_the_digest"
+      ],
+      "added_files": [
+        "test_task29_timeline_evidence.py"
+      ],
+      "restored": true,
+      "restored_sha256": "cfdc33db05716047d56f30bcc64a577c1118631537eee8e6e1fbd69b29d5ce54",
+      "seconds": 20.7
+    },
+    {
+      "id": "R58",
+      "path": "backend/app/services/workpaper_sync/evidence.py",
+      "want": "test_task29_timeline_evidence.py::TestRequiredSetDigest::test_the_derivation_version_is_part_of_the_digest",
+      "why": "推导版本号不再进 digest ⇒ 改了推导规则旧 run 仍算 verified（P71 明文要禁）",
+      "verdict": "RED",
+      "summary": "1 failed, 172 passed in 15.85s",
+      "added": [
+        "test_task29_timeline_evidence.py::TestRequiredSetDigest::test_the_derivation_version_is_part_of_the_digest"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task29_timeline_evidence.py::TestRequiredSetDigest::test_the_derivation_version_is_part_of_the_digest"
+      ],
+      "added_files": [
+        "test_task29_timeline_evidence.py"
+      ],
+      "restored": true,
+      "restored_sha256": "cfdc33db05716047d56f30bcc64a577c1118631537eee8e6e1fbd69b29d5ce54",
+      "seconds": 19.5
+    },
+    {
+      "id": "R59",
+      "path": "backend/app/services/workpaper_sync/evidence.py",
+      "want": "test_task29_timeline_evidence.py::TestRequiredSetDigest::test_entry_id_is_in_the_digest_so_evidence_cannot_be_copied_across_entries",
+      "why": "`entry_id` 不再进 digest ⇒ 两个 profile 相同的 entry 得到同一个 digest，证据可以跨 entry 直接复制（P70 的第一道门）",
+      "verdict": "RED",
+      "summary": "1 failed, 172 passed in 15.81s",
+      "added": [
+        "test_task29_timeline_evidence.py::TestRequiredSetDigest::test_entry_id_is_in_the_digest_so_evidence_cannot_be_copied_across_entries"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task29_timeline_evidence.py::TestRequiredSetDigest::test_entry_id_is_in_the_digest_so_evidence_cannot_be_copied_across_entries"
+      ],
+      "added_files": [
+        "test_task29_timeline_evidence.py"
+      ],
+      "restored": true,
+      "restored_sha256": "cfdc33db05716047d56f30bcc64a577c1118631537eee8e6e1fbd69b29d5ce54",
+      "seconds": 19.4
+    },
+    {
+      "id": "R60",
+      "path": "backend/app/services/workpaper_sync/evidence.py",
+      "want": "test_task29_timeline_evidence.py::TestRequiredScenarioDerivation::test_a_contradictory_profile_is_refused_by_the_single_shared_rule",
+      "why": "交叉一致性校验被摘掉 ⇒ 真 manifest 里那 5 个 `single_html + exclusive` 的 docx entry 会被当成合法 single_html 处理（跳过全部 OO 场景），而它们实际上有exclusive room。P71 点名的「profile 降级保鲜」正是这条",
+      "verdict": "RED",
+      "summary": "3 failed, 170 passed in 16.14s",
+      "added": [
+        "test_task29_timeline_evidence.py::TestRequiredScenarioDerivation::test_a_contradictory_profile_is_refused_by_the_single_shared_rule",
+        "test_task29_timeline_evidence.py::TestRequiredScenarioDerivation::test_derivation_delegates_the_cross_rule_instead_of_reimplementing_it",
+        "test_task29_timeline_evidence_pg.py::TestEvidenceRecomputation::test_a_contradictory_profile_reports_drift_instead_of_crashing"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task29_timeline_evidence.py::TestRequiredScenarioDerivation::test_a_contradictory_profile_is_refused_by_the_single_shared_rule",
+        "test_task29_timeline_evidence.py::TestRequiredScenarioDerivation::test_derivation_delegates_the_cross_rule_instead_of_reimplementing_it"
+      ],
+      "added_files": [
+        "test_task29_timeline_evidence.py",
+        "test_task29_timeline_evidence_pg.py"
+      ],
+      "restored": true,
+      "restored_sha256": "cfdc33db05716047d56f30bcc64a577c1118631537eee8e6e1fbd69b29d5ce54",
+      "seconds": 19.8
+    },
+    {
+      "id": "R61",
+      "path": "backend/app/services/workpaper_sync/evidence.py",
+      "want": "test_task29_timeline_evidence_pg.py::TestEvidenceStaleness::test_a_different_required_set_digest_makes_the_run_stale",
+      "why": "required set digest 变化不再 stale ⇒ 场景集合改了旧 run 照样 verified",
+      "verdict": "RED",
+      "summary": "1 failed, 173 passed in 15.81s",
+      "added": [
+        "test_task29_timeline_evidence_pg.py::TestEvidenceStaleness::test_a_different_required_set_digest_makes_the_run_stale"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task29_timeline_evidence_pg.py::TestEvidenceStaleness::test_a_different_required_set_digest_makes_the_run_stale"
+      ],
+      "added_files": [
+        "test_task29_timeline_evidence_pg.py"
+      ],
+      "restored": true,
+      "restored_sha256": "cfdc33db05716047d56f30bcc64a577c1118631537eee8e6e1fbd69b29d5ce54",
+      "seconds": 19.4
+    },
+    {
+      "id": "R62",
+      "path": "backend/app/services/workpaper_sync/evidence.py",
+      "want": "test_task29_timeline_evidence_pg.py::TestEvidenceStaleness::test_downgrading_the_profile_cannot_keep_old_evidence_fresh",
+      "why": "P71 明文点名的保鲜手法：把 profile 从 shared 改成 exclusive 来保住旧证据。这条判据一旦失效，179 个 entry 只要改一个字段就能规避重跑",
+      "verdict": "RED",
+      "summary": "1 failed, 173 passed in 15.89s",
+      "added": [
+        "test_task29_timeline_evidence_pg.py::TestEvidenceStaleness::test_downgrading_the_profile_cannot_keep_old_evidence_fresh"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task29_timeline_evidence_pg.py::TestEvidenceStaleness::test_downgrading_the_profile_cannot_keep_old_evidence_fresh"
+      ],
+      "added_files": [
+        "test_task29_timeline_evidence_pg.py"
+      ],
+      "restored": true,
+      "restored_sha256": "cfdc33db05716047d56f30bcc64a577c1118631537eee8e6e1fbd69b29d5ce54",
+      "seconds": 19.6
+    },
+    {
+      "id": "R63",
+      "path": "backend/app/services/workpaper_sync/evidence.py",
+      "want": "test_task29_timeline_evidence_pg.py::TestEvidenceReuseIsRefused::test_reusing_one_operation_for_two_scenarios_is_refused",
+      "why": "同 run 内复用不再被拒 ⇒ 一条 applied operation 可以冒充 24 个互不等价的场景，「逐 scenario 证据」变成一次 operation 的复制（P70）",
+      "verdict": "RED",
+      "summary": "1 failed, 173 passed in 15.85s",
+      "added": [
+        "test_task29_timeline_evidence_pg.py::TestEvidenceReuseIsRefused::test_reusing_one_operation_for_two_scenarios_is_refused"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task29_timeline_evidence_pg.py::TestEvidenceReuseIsRefused::test_reusing_one_operation_for_two_scenarios_is_refused"
+      ],
+      "added_files": [
+        "test_task29_timeline_evidence_pg.py"
+      ],
+      "restored": true,
+      "restored_sha256": "cfdc33db05716047d56f30bcc64a577c1118631537eee8e6e1fbd69b29d5ce54",
+      "seconds": 19.5
+    },
+    {
+      "id": "R64",
+      "path": "backend/app/services/workpaper_sync/evidence.py",
+      "want": "test_task29_timeline_evidence_pg.py::TestEvidenceReuseIsRefused::test_the_same_entities_in_two_entries_runs_reddens_both",
+      "why": "跨 entry 复用不再被拒 ⇒ 把 pilot entry 的证据复制到另外 178 个 entry 就能让收口计数全绿（P70 的主要攻击面）",
+      "verdict": "RED",
+      "summary": "1 failed, 173 passed in 16.26s",
+      "added": [
+        "test_task29_timeline_evidence_pg.py::TestEvidenceReuseIsRefused::test_the_same_entities_in_two_entries_runs_reddens_both"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task29_timeline_evidence_pg.py::TestEvidenceReuseIsRefused::test_the_same_entities_in_two_entries_runs_reddens_both"
+      ],
+      "added_files": [
+        "test_task29_timeline_evidence_pg.py"
+      ],
+      "restored": true,
+      "restored_sha256": "cfdc33db05716047d56f30bcc64a577c1118631537eee8e6e1fbd69b29d5ce54",
+      "seconds": 19.9
+    },
+    {
+      "id": "R65",
+      "path": "backend/app/services/workpaper_sync/evidence.py",
+      "want": "test_task29_timeline_evidence_pg.py::TestEvidenceRecomputation::test_a_clean_run_has_exactly_one_known_and_attributed_defect",
+      "why": "已登记的 schema 欠账与真实失败被合成一个码 ⇒ 每次重算都要重新排查那条已知欠账，而真实失败会被它淹掉。两类必须各有独立缺陷码",
+      "verdict": "RED",
+      "summary": "1 failed, 173 passed in 16.08s",
+      "added": [
+        "test_task29_timeline_evidence_pg.py::TestEvidenceRecomputation::test_a_clean_run_has_exactly_one_known_and_attributed_defect"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task29_timeline_evidence_pg.py::TestEvidenceRecomputation::test_a_clean_run_has_exactly_one_known_and_attributed_defect"
+      ],
+      "added_files": [
+        "test_task29_timeline_evidence_pg.py"
+      ],
+      "restored": true,
+      "restored_sha256": "cfdc33db05716047d56f30bcc64a577c1118631537eee8e6e1fbd69b29d5ce54",
+      "seconds": 19.7
+    },
+    {
+      "id": "R66",
+      "path": "backend/app/services/workpaper_sync/evidence.py",
+      "want": "test_task29_timeline_evidence_pg.py::TestEvidenceRecomputation::test_a_contradictory_profile_reports_drift_instead_of_crashing",
+      "why": "profile 漂移改成上抛 ⇒ 一个 entry 的 manifest 欠账让整批重算失败，那些 entry 从 AC 12.13 的五类计数里**消失**（而不是计为未验收）。这是「跳过就等于抹掉」的典型形态",
+      "verdict": "RED",
+      "summary": "41 failed, 133 passed in 15.77s",
+      "added": [
+        "test_task29_timeline_evidence_pg.py::TestAppendOnlyProjection::test_a_cross_scope_read_is_refused",
+        "test_task29_timeline_evidence_pg.py::TestAppendOnlyProjection::test_a_healthy_operation_timeline_has_no_defect",
+        "test_task29_timeline_evidence_pg.py::TestAppendOnlyProjection::test_editing_current_state_directly_is_caught",
+        "test_task29_timeline_evidence_pg.py::TestAppendOnlyProjection::test_no_credential_or_business_value_appears_in_the_serialized_timeline",
+        "test_task29_timeline_evidence_pg.py::TestAppendOnlyProjection::test_the_projected_event_carries_the_redaction_policy_version",
+        "test_task29_timeline_evidence_pg.py::TestAppendOnlyProjection::test_the_projected_event_drops_the_surrogate_id",
+        "test_task29_timeline_evidence_pg.py::TestAppendOnlyProjection::test_the_shell_had_a_null_application_before_correlation",
+        "test_task29_timeline_evidence_pg.py::TestAppendOnlyProjection::test_the_storage_layer_refuses_every_tamper_form[delete]",
+        "test_task29_timeline_evidence_pg.py::TestAppendOnlyProjection::test_the_storage_layer_refuses_every_tamper_form[dup-seq]",
+        "test_task29_timeline_evidence_pg.py::TestAppendOnlyProjection::test_the_storage_layer_refuses_every_tamper_form[update]",
+        "test_task29_timeline_evidence_pg.py::TestAppendOnlyProjection::test_the_timeline_declares_the_server_clock_as_its_time_source",
+        "test_task29_timeline_evidence_pg.py::TestAppendOnlyProjection::test_the_timeline_reports_the_bound_application_after_correlation",
+        "test_task29_timeline_evidence_pg.py::TestAppendOnlyProjection::test_the_timeline_survives_the_tamper_attempts_unchanged",
+        "test_task29_timeline_evidence_pg.py::TestEvidenceRecomputation::test_a_clean_run_has_exactly_one_known_and_attributed_defect",
+        "test_task29_timeline_evidence_pg.py::TestEvidenceRecomputation::test_a_contradictory_profile_reports_drift_instead_of_crashing",
+        "test_task29_timeline_evidence_pg.py::TestEvidenceRecomputation::test_a_dangling_operation_fk_is_unverified",
+        "test_task29_timeline_evidence_pg.py::TestEvidenceRecomputation::test_a_missing_scenario_is_unverified",
+        "test_task29_timeline_evidence_pg.py::TestEvidenceRecomputation::test_a_scenario_whose_bundle_differs_from_its_run_is_refused_by_the_db",
+        "test_task29_timeline_evidence_pg.py::TestEvidenceRecomputation::test_an_entity_from_another_entry_is_unverified",
+        "test_task29_timeline_evidence_pg.py::TestEvidenceRecomputation::test_an_entry_without_any_run_is_unverified",
+        "test_task29_timeline_evidence_pg.py::TestEvidenceRecomputation::test_an_extra_unregistered_scenario_is_unverified",
+        "test_task29_timeline_evidence_pg.py::TestEvidenceRecomputation::test_download_only_with_entities_is_refused_by_the_storage_layer",
+        "test_task29_timeline_evidence_pg.py::TestEvidenceRecomputation::test_every_scenario_owns_its_own_application",
+        "test_task29_timeline_evidence_pg.py::TestEvidenceRecomputation::test_the_required_set_came_from_the_source_backed_profile",
+        "test_task29_timeline_evidence_pg.py::TestEvidenceReuseIsRefused::test_reusing_one_operation_for_two_scenarios_is_refused",
+        "test_task29_timeline_evidence_pg.py::TestEvidenceReuseIsRefused::test_the_same_entities_in_two_entries_runs_reddens_both",
+        "test_task29_timeline_evidence_pg.py::TestEvidenceStaleness::test_a_different_required_set_digest_makes_the_run_stale",
+        "test_task29_timeline_evidence_pg.py::TestEvidenceStaleness::test_a_different_source_commit_makes_the_run_stale",
+        "test_task29_timeline_evidence_pg.py::TestEvidenceStaleness::test_changing_the_oo_or_browser_build_makes_the_run_stale",
+        "test_task29_timeline_evidence_pg.py::TestEvidenceStaleness::test_downgrading_the_profile_cannot_keep_old_evidence_fresh",
+        "test_task29_timeline_evidence_pg.py::TestEvidenceStaleness::test_stale_alone_is_not_reported_as_verified",
+        "test_task29_timeline_evidence_pg.py::TestEvidenceStaleness::test_the_environment_digest_is_its_own_independent_stale_reason",
+        "test_task29_timeline_evidence_pg.py::TestHarness::test_no_phase_crashed_during_collection",
+        "test_task29_timeline_evidence_pg.py::TestRecoveryCaseHasNoOperationBeforeClaim::test_all_three_entities_are_absent_before_claim",
+        "test_task29_timeline_evidence_pg.py::TestRecoveryCaseHasNoOperationBeforeClaim::test_claiming_creates_all_three_entities_at_once",
+        "test_task29_timeline_evidence_pg.py::TestRecoveryCaseHasNoOperationBeforeClaim::test_the_claim_shell_became_a_primary",
+        "test_task29_timeline_evidence_pg.py::TestRecoveryCaseHasNoOperationBeforeClaim::test_the_pre_claim_payload_has_no_operation_events_key",
+        "test_task29_timeline_evidence_pg.py::TestRecoveryCaseHasNoOperationBeforeClaim::test_the_pre_claim_timeline_says_so",
+        "test_task29_timeline_evidence_pg.py::TestRecoveryCaseHasNoOperationBeforeClaim::test_the_recovery_timeline_grows_append_only",
+        "test_task29_timeline_evidence_pg.py::TestTimelineLocators::test_every_locator_returns_events",
+        "test_task29_timeline_evidence_pg.py::TestTimelineLocators::test_the_room_query_spans_more_than_one_stream"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task29_timeline_evidence_pg.py::TestEvidenceRecomputation::test_a_contradictory_profile_reports_drift_instead_of_crashing"
+      ],
+      "added_files": [
+        "test_task29_timeline_evidence_pg.py"
+      ],
+      "restored": true,
+      "restored_sha256": "cfdc33db05716047d56f30bcc64a577c1118631537eee8e6e1fbd69b29d5ce54",
+      "seconds": 19.3
+    },
+    {
+      "id": "R67",
+      "path": "backend/app/services/workpaper_sync/evidence.py",
+      "want": "test_task29_timeline_evidence.py::TestStaleAndDefectCodesAreDistinct::test_verdict_result_is_derived_not_written",
+      "why": "缺陷与 stale 的优先级交换 ⇒ 一个既 stale 又有缺陷的 run 只报 stale，缺陷消失在「等环境刷新就好」里",
+      "verdict": "RED",
+      "summary": "1 failed, 173 passed in 15.74s",
+      "added": [
+        "test_task29_timeline_evidence.py::TestStaleAndDefectCodesAreDistinct::test_verdict_result_is_derived_not_written"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task29_timeline_evidence.py::TestStaleAndDefectCodesAreDistinct::test_verdict_result_is_derived_not_written"
+      ],
+      "added_files": [
+        "test_task29_timeline_evidence.py"
+      ],
+      "restored": true,
+      "restored_sha256": "cfdc33db05716047d56f30bcc64a577c1118631537eee8e6e1fbd69b29d5ce54",
+      "seconds": 19.3
+    },
+    {
+      "id": "R71",
+      "path": "backend/app/routers/wp_sync_router.py",
+      "want": "test_task29_timeline_evidence.py::TestRouterWiring::test_the_timeline_endpoint_goes_through_the_timeline_service",
+      "why": "timeline 端点改走别的实现 ⇒ 手写投影绕开 RedactionPolicy。Task 26 留下的「零生产调用方」欠账正是这种形态：模块存在但没人调",
+      "verdict": "RED",
+      "summary": "1 failed, 173 passed in 15.94s",
+      "added": [
+        "test_task29_timeline_evidence.py::TestRouterWiring::test_the_timeline_endpoint_goes_through_the_timeline_service"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task29_timeline_evidence.py::TestRouterWiring::test_the_timeline_endpoint_goes_through_the_timeline_service"
+      ],
+      "added_files": [
+        "test_task29_timeline_evidence.py"
+      ],
+      "restored": true,
+      "restored_sha256": "ecaaa282559cacb4c673be2a23920cd38b2b01eed84ab295a66b6608f1bb6533",
+      "seconds": 19.5
+    },
+    {
+      "id": "R72",
+      "path": "backend/app/routers/wp_sync_router.py",
+      "want": "test_task29_timeline_evidence.py::TestRouterWiring::test_the_recovery_case_timeline_endpoint_exists_and_is_separate",
+      "why": "recovery case 端点改调 operation timeline ⇒ 为 recovery 事件编一个 operation，AC 13.5 后半句被违反",
+      "verdict": "RED",
+      "summary": "1 failed, 173 passed in 15.90s",
+      "added": [
+        "test_task29_timeline_evidence.py::TestRouterWiring::test_the_recovery_case_timeline_endpoint_exists_and_is_separate"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task29_timeline_evidence.py::TestRouterWiring::test_the_recovery_case_timeline_endpoint_exists_and_is_separate"
+      ],
+      "added_files": [
+        "test_task29_timeline_evidence.py"
+      ],
+      "restored": true,
+      "restored_sha256": "ecaaa282559cacb4c673be2a23920cd38b2b01eed84ab295a66b6608f1bb6533",
+      "seconds": 19.6
+    },
+    {
+      "id": "R73",
+      "path": "backend/app/routers/wp_sync_router.py",
+      "want": "test_task29_timeline_evidence.py::TestRouterWiring::test_the_callback_metric_reads_durable_at_not_a_state_name",
+      "why": "耐久判据从 `durable_at` 换成 state 名单 —— AC 5.4 明文「归属约束只以 immutable `durable_at`/durable fact 判定，不得把泛化 terminal 当 durable」。两者在正常路径上同值，只有形态判据会红",
+      "verdict": "RED",
+      "summary": "1 failed, 173 passed in 15.75s",
+      "added": [
+        "test_task29_timeline_evidence.py::TestRouterWiring::test_the_callback_metric_reads_durable_at_not_a_state_name"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task29_timeline_evidence.py::TestRouterWiring::test_the_callback_metric_reads_durable_at_not_a_state_name"
+      ],
+      "added_files": [
+        "test_task29_timeline_evidence.py"
+      ],
+      "restored": true,
+      "restored_sha256": "ecaaa282559cacb4c673be2a23920cd38b2b01eed84ab295a66b6608f1bb6533",
+      "seconds": 19.3
+    },
+    {
+      "id": "R74",
+      "path": "backend/app/routers/wp_sync_router.py",
+      "want": "test_task29_timeline_evidence.py::TestRouterWiring::test_the_apply_path_reads_the_result_instead_of_assuming_success",
+      "why": "apply 后的终态分型少一支 ⇒ `refresh_required` 被压进 post-durable 失败告警，而它是**合法结果**（AC 4.11），只需要让用户重开编辑器",
+      "verdict": "RED",
+      "summary": "1 failed, 173 passed in 15.05s",
+      "added": [
+        "test_task29_timeline_evidence.py::TestRouterWiring::test_the_apply_path_reads_the_result_instead_of_assuming_success"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task29_timeline_evidence.py::TestRouterWiring::test_the_apply_path_reads_the_result_instead_of_assuming_success"
+      ],
+      "added_files": [
+        "test_task29_timeline_evidence.py"
+      ],
+      "restored": true,
+      "restored_sha256": "ecaaa282559cacb4c673be2a23920cd38b2b01eed84ab295a66b6608f1bb6533",
+      "seconds": 18.5
+    },
+    {
+      "id": "R75",
+      "path": "backend/app/routers/wp_sync_router.py",
+      "want": "test_task29_timeline_evidence.py::TestRouterWiring::test_no_metric_emission_uses_a_defaulted_getattr",
+      "why": "回归变异：改回带默认值的 `getattr`。**真实踩过** —— 字段名写错时默认值让指标永远记成 `application_created`，而 Volar/vitest/get_diagnostics/HEAD-swap 四层全绿",
+      "verdict": "RED",
+      "summary": "1 failed, 173 passed in 15.21s",
+      "added": [
+        "test_task29_timeline_evidence.py::TestRouterWiring::test_no_metric_emission_uses_a_defaulted_getattr"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task29_timeline_evidence.py::TestRouterWiring::test_no_metric_emission_uses_a_defaulted_getattr"
+      ],
+      "added_files": [
+        "test_task29_timeline_evidence.py"
+      ],
+      "restored": true,
+      "restored_sha256": "ecaaa282559cacb4c673be2a23920cd38b2b01eed84ab295a66b6608f1bb6533",
+      "seconds": 18.7
+    }
+  ]
+}

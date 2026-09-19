@@ -67,13 +67,27 @@ class TestL1KeyColumnAmountInvalid:
     """L1: 关键列金额非数值 → blocking。"""
 
     def test_debit_amount_not_numeric(self):
-        """debit_amount = 'abc' → AMOUNT_NOT_NUMERIC_KEY blocking。"""
+        """debit_amount（本期/月度）现为 recommended → AMOUNT_NOT_NUMERIC_RECOMMENDED warning + 置 NULL。
+
+        （年度语义变更：本期发生额为月度维度=推荐列，非数值不再 blocking，见 spec
+        balance-import-annual-column-semantics R2.2）
+        """
         rows = [{"account_code": "1001", "debit_amount": "abc", "credit_amount": "100"}]
+        findings, cleaned = validate_l1(rows, "balance", column_mapping={})
+
+        warns = [f for f in findings if f.code == "AMOUNT_NOT_NUMERIC_RECOMMENDED"]
+        assert len(warns) == 1
+        assert "debit_amount" in warns[0].message
+        assert cleaned and cleaned[0]["debit_amount"] is None
+
+    def test_year_debit_not_numeric_blocking(self):
+        """year_debit（本年累计/年度关键列）= 'abc' → AMOUNT_NOT_NUMERIC_KEY blocking。"""
+        rows = [{"account_code": "1001", "year_debit": "abc", "year_credit": "100"}]
         findings, cleaned = validate_l1(rows, "balance", column_mapping={})
 
         blocking = [f for f in findings if f.code == "AMOUNT_NOT_NUMERIC_KEY"]
         assert len(blocking) == 1
-        assert "debit_amount" in blocking[0].message
+        assert "year_debit" in blocking[0].message
 
     def test_opening_balance_with_comma(self):
         """opening_balance = '10,000.50' → 正常（逗号被 strip）。"""

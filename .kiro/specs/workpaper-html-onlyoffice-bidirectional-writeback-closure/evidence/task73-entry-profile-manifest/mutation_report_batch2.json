@@ -1,0 +1,164 @@
+[
+  {
+    "id": "M08",
+    "side": "be",
+    "want": "test_task73_entry_profile_manifest.py::TestSourceFactsAreObservedNotAssumed::test_declaration_files_are_not_reachability_evidence",
+    "why": "`components.d.ts` 由 unplugin 自动生成、提到**每一个**组件 ⇒ 算进入边后可达性判据恒真，实测过：连 overlay 已裁决的 G6 旧桩都会被判成可达",
+    "verdict": "RED",
+    "summary": "6 failed, 275 passed, 6 errors in 65.36s (0:01:05)",
+    "added": [
+      "test_task73_entry_profile_manifest.py::TestCrossRulesRunAgainstTheRealManifest::test_descriptor_is_absent_exactly_for_unreachable_hosts",
+      "test_task73_entry_profile_manifest.py::TestDerivationIsIndependentOfBusinessAdjudication::test_flipping_every_capability_leaves_the_profile_byte_identical",
+      "test_task73_entry_profile_manifest.py::TestGeneratorFailsClosed::test_reachability_and_reviewed_unreachable_rule_must_agree",
+      "test_task73_entry_profile_manifest.py::TestGeneratorFailsClosed::test_stale_reviewed_expectation_is_rejected",
+      "test_task73_entry_profile_manifest.py::TestSourceFactsAreObservedNotAssumed::test_declaration_files_are_not_reachability_evidence",
+      "test_task73_entry_profile_manifest.py::TestSourceFactsAreObservedNotAssumed::test_unreachable_host_is_derived_from_zero_inbound_references"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task73_entry_profile_manifest.py::TestSourceFactsAreObservedNotAssumed::test_declaration_files_are_not_reachability_evidence",
+      "test_task73_entry_profile_manifest.py::TestSourceFactsAreObservedNotAssumed::test_unreachable_host_is_derived_from_zero_inbound_references"
+    ],
+    "added_files": [
+      "test_task73_entry_profile_manifest.py"
+    ],
+    "restored": true,
+    "seconds": 68.3
+  },
+  {
+    "id": "M09",
+    "side": "be",
+    "want": "test_task73_entry_profile_manifest.py::TestSourceFactsAreObservedNotAssumed::test_unreachable_host_is_derived_from_zero_inbound_references",
+    "why": "unplugin 全局自动注册的宿主可以完全不写 import；只看 import 会把它们误判成不可达 ⇒ editability 批量变 unreachable，界面会把可编辑底稿标成死桩",
+    "verdict": "GREEN",
+    "summary": "287 passed in 65.95s (0:01:05)",
+    "added": [],
+    "gone": [],
+    "hit": [],
+    "added_files": [],
+    "restored": true,
+    "seconds": 69.0
+  },
+  {
+    "id": "M10",
+    "side": "be",
+    "want": "test_task73_entry_profile_manifest.py::TestSourceFactsAreObservedNotAssumed::test_unreachable_host_is_derived_from_zero_inbound_references",
+    "why": "import 说明符解析必须落到真实文件；不验证时第一个候选（无扩展名路径）就被当成目标 ⇒ 入边索引整体错位，可达性事实作废",
+    "verdict": "GREEN",
+    "summary": "287 passed in 64.34s (0:01:04)",
+    "added": [],
+    "gone": [],
+    "hit": [],
+    "added_files": [],
+    "restored": true,
+    "seconds": 67.3
+  },
+  {
+    "id": "M11",
+    "side": "be",
+    "want": "test_task73_entry_profile_manifest.py::TestSourceFactsAreObservedNotAssumed::test_room_service_is_still_unwired_and_reported_as_such",
+    "why": "「尚不可观测」必须是机器可读状态。谎称已接线时 participant_lease 会变 True、RG-17 的 lease 门失效、`room_service_state` 与 manifest 不符 —— 三处都得打红。反向（把正则改成 if False）是无效变异：今天本来就是空集",
+    "verdict": "RED",
+    "summary": "7 failed, 274 passed, 6 errors in 62.97s (0:01:02)",
+    "added": [
+      "test_task73_entry_profile_manifest.py::TestCrossRulesRunAgainstTheRealManifest::test_report_has_no_missing_profile_and_real_drift",
+      "test_task73_entry_profile_manifest.py::TestCrossRulesRunAgainstTheRealManifest::test_rg17_exercises_two_distinct_branches_on_real_data",
+      "test_task73_entry_profile_manifest.py::TestDerivationIsIndependentOfBusinessAdjudication::test_flipping_every_capability_leaves_the_profile_byte_identical",
+      "test_task73_entry_profile_manifest.py::TestGeneratorFailsClosed::test_a_dropped_profile_field_is_rejected",
+      "test_task73_entry_profile_manifest.py::TestGeneratorFailsClosed::test_reachability_and_reviewed_unreachable_rule_must_agree",
+      "test_task73_entry_profile_manifest.py::TestGeneratorFailsClosed::test_stale_reviewed_expectation_is_rejected",
+      "test_task73_entry_profile_manifest.py::TestSourceFactsAreObservedNotAssumed::test_room_service_is_still_unwired_and_reported_as_such"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task73_entry_profile_manifest.py::TestSourceFactsAreObservedNotAssumed::test_room_service_is_still_unwired_and_reported_as_such"
+    ],
+    "added_files": [
+      "test_task73_entry_profile_manifest.py"
+    ],
+    "restored": true,
+    "seconds": 65.8
+  },
+  {
+    "id": "M12",
+    "side": "be",
+    "want": "test_task73_entry_profile_manifest.py::TestSourceFactsAreObservedNotAssumed::test_doc_key_provider_probe_finds_both_real_routes",
+    "why": "静态看表达式里有没有 `st_mtime` 会被注释/间接 helper 骗过（rooms.py 已记录过同一个坑）。判据要求 xlsx provider 必须是 `probe_kind == behavioral`",
+    "verdict": "GREEN",
+    "summary": "1 error in 1.09s",
+    "added": [],
+    "gone": [],
+    "hit": [],
+    "added_files": [],
+    "restored": true,
+    "seconds": 3.8
+  },
+  {
+    "id": "M13",
+    "side": "be",
+    "want": "test_task73_entry_profile_manifest.py::TestSourceFactsAreObservedNotAssumed::test_comment_only_endpoints_are_not_counted",
+    "why": "`GtB60DocxPane.vue` 文件头注释里写着「切到在线编辑前先 GET onlyoffice-config」，不剥注释会把它当成真实请求端点 ⇒ 该 entry 的 room_model 得到假事实（实测踩过）",
+    "verdict": "GREEN",
+    "summary": "287 passed in 64.51s (0:01:04)",
+    "added": [],
+    "gone": [],
+    "hit": [],
+    "added_files": [],
+    "restored": true,
+    "seconds": 67.7
+  },
+  {
+    "id": "M14",
+    "side": "be",
+    "want": "test_task73_entry_profile_manifest.py::TestSourceFactsAreObservedNotAssumed::test_comment_only_endpoints_are_not_counted",
+    "why": "首版就是这个正则：一对跨 12 行的引号把整段注释吞成「端点」，b60 entry 因此被判`frontend_endpoint_without_backend_route` ⇒ room_model 假事实",
+    "verdict": "GREEN",
+    "summary": "287 passed in 63.65s (0:01:03)",
+    "added": [],
+    "gone": [],
+    "hit": [],
+    "added_files": [],
+    "restored": true,
+    "seconds": 66.6
+  },
+  {
+    "id": "M15",
+    "side": "be",
+    "want": "test_task73_entry_profile_manifest.py::TestGeneratorFailsClosed::test_required_entry_fields_cover_the_three_profile_fields",
+    "why": "Task 1 的欠账正是这样发生的：字段没进必填集合，于是缺了也没人打红，静默消失",
+    "verdict": "RED",
+    "summary": "1 failed, 286 passed in 64.27s (0:01:04)",
+    "added": [
+      "test_task73_entry_profile_manifest.py::TestGeneratorFailsClosed::test_required_entry_fields_cover_the_three_profile_fields"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task73_entry_profile_manifest.py::TestGeneratorFailsClosed::test_required_entry_fields_cover_the_three_profile_fields"
+    ],
+    "added_files": [
+      "test_task73_entry_profile_manifest.py"
+    ],
+    "restored": true,
+    "seconds": 67.2
+  },
+  {
+    "id": "M16",
+    "side": "be",
+    "want": "test_task73_entry_profile_manifest.py::TestGeneratorFailsClosed::test_a_dropped_profile_field_is_rejected",
+    "why": "必填集合列全了但检查被短路 = 好看的常量。这条与 M15 是两条独立判据",
+    "verdict": "RED",
+    "summary": "1 failed, 286 passed in 65.66s (0:01:05)",
+    "added": [
+      "test_task73_entry_profile_manifest.py::TestGeneratorFailsClosed::test_a_dropped_profile_field_is_rejected"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task73_entry_profile_manifest.py::TestGeneratorFailsClosed::test_a_dropped_profile_field_is_rejected"
+    ],
+    "added_files": [
+      "test_task73_entry_profile_manifest.py"
+    ],
+    "restored": true,
+    "seconds": 68.9
+  }
+]

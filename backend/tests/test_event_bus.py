@@ -379,9 +379,11 @@ class TestOnAdjustmentChanged:
         tb_map = {r.standard_account_code: r for r in rows}
         assert tb_map["1001"].aje_adjustment == Decimal("500")
         assert tb_map["1001"].audited_amount == Decimal("12500")  # 12000 + 500
-        assert tb_map["6001"].aje_adjustment == Decimal("-500")
-        # Revenue stored as negative (credit direction): unadjusted=-100000, aje=-500
-        assert tb_map["6001"].audited_amount == Decimal("-100500")  # -100000 + (-500)
+        # v2 约定（category_natural_positive）：收入类存自然正数 unadjusted=+100000。
+        # 6001 一笔贷记 500（收入增加），调整净额归一到自然方向后 aje=+500（Task 3.3），
+        # audited = unadjusted + rje + aje = 100000 + 0 + 500 = 100500（方向正确）。
+        assert tb_map["6001"].aje_adjustment == Decimal("500")
+        assert tb_map["6001"].audited_amount == Decimal("100500")
         # 未受影响的科目不变
         assert tb_map["1002"].aje_adjustment == Decimal("0")
         assert tb_map["1002"].audited_amount == Decimal("35000")

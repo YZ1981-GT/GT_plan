@@ -1,0 +1,42 @@
+{
+  "generated_by": "backend/scripts/_mutation_kit/span.py::run_cli",
+  "mode": "run",
+  "pytest_args": [
+    "backend/tests/workpaper_sync/test_task27_conflict_resolution.py",
+    "backend/tests/workpaper_sync/test_task27_conflict_resolution_pg.py",
+    "backend/tests/workpaper_sync/test_task26_oo_to_html.py",
+    "backend/tests/workpaper_sync/test_task26_oo_to_html_pg.py",
+    "backend/tests/workpaper_sync/test_task15_content_mutation.py",
+    "-q",
+    "--tb=no",
+    "-rf",
+    "-p",
+    "no:randomly"
+  ],
+  "tally": {
+    "RED": 1
+  },
+  "mutations": [
+    {
+      "id": "C02",
+      "path": "backend/app/services/workpaper_sync/conflict_resolution.py",
+      "want": "test_task27_conflict_resolution_pg.py::TestResolveFenceRejections::test_revoked_initiator_blocks_the_resolve",
+      "why": "把「当下仍然合法的发起人 epoch」退化成**读 request 上那个冻结值** ⇒ 观测侧与冻结侧永远相等 = 重言式，无论谁被撤销 fence 都判「授权仍有效」，撤销后的裁决照样落库（AC 10.10 明令禁止）。这与 Task 26 的 `_observed_contributor_digest` 吃过的教训是同一形态。🔴 首版把哨兵 -1 改成 0（再改成 client_edit_epoch）都实测判 GREEN —— 因为那两个值仍然不等于冻结的 5，fence 照样拒绝。真正要证伪的是「观测口径」而不是「哨兵值」",
+      "verdict": "RED",
+      "summary": "1 failed, 404 passed in 59.63s",
+      "added": [
+        "test_task27_conflict_resolution_pg.py::TestResolveFenceRejections::test_revoked_initiator_blocks_the_resolve"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task27_conflict_resolution_pg.py::TestResolveFenceRejections::test_revoked_initiator_blocks_the_resolve"
+      ],
+      "added_files": [
+        "test_task27_conflict_resolution_pg.py"
+      ],
+      "restored": true,
+      "restored_sha256": "0933a94e89e76a1c036233d32884576c7b2a44be0363536f5d112efa1fcd900d",
+      "seconds": 62.7
+    }
+  ]
+}

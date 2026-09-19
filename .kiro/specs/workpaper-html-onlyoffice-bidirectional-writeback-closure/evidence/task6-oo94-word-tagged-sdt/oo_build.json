@@ -1,0 +1,8 @@
+{
+  "captured_at": "2026-08-24T23:21:06.291635+00:00",
+  "dpkg_onlyoffice_documentserver": "Desired=Unknown/Install/Remove/Purge/Hold | Status=Not/Inst/Conf-files/Unpacked/halF-conf/Half-inst/trig-aWait/Trig-pend |/ Err?=(none)/Reinst-required (Status,Err: uppercase=bad) ||/ Name Version Architecture Description +++-=========================-============-============-=============================================================================== ii onlyoffice-documentserver 9.4.0-129 amd64 Online editors for text docs, spreadsheets, presentations, PDFs, and PDF forms.",
+  "endpoints": {
+    "healthcheck": "true",
+    "info": "ERROR HTTPError: HTTP Error 403: Forbidden"
+  }
+}

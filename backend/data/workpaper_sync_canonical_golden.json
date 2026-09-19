@@ -1,0 +1,261 @@
+{
+  "cases": [
+    {
+      "canonical_sha256": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+      "canonical_utf8_hex": "7b7d",
+      "case_id": "empty_object",
+      "note": "空对象",
+      "payload": {}
+    },
+    {
+      "canonical_sha256": "ebba85cfdc0a724b6cc327ecc545faeb38b9fe02eca603b430eb872f5cf75370",
+      "canonical_utf8_hex": "7b2261223a322c226d223a332c227a223a317d",
+      "case_id": "key_order_perturbation",
+      "note": "键序扰动：输入顺序 z<a<m，canonical 必须按 code point 升序输出",
+      "payload": {
+        "a": 2,
+        "m": 3,
+        "z": 1
+      }
+    },
+    {
+      "canonical_sha256": "cad69ce9f3d5756a81097633fa4dfb870b63052ab4afe01a0cc6f75fd7277ee4",
+      "canonical_utf8_hex": "7b22617272223a5b7b2270223a322c2271223a317d5d2c226f75746572223a7b2261223a332c2262223a7b2278223a322c2279223a317d7d7d",
+      "case_id": "nested_key_order",
+      "note": "嵌套对象的键序同样递归排序",
+      "payload": {
+        "arr": [
+          {
+            "p": 2,
+            "q": 1
+          }
+        ],
+        "outer": {
+          "a": 3,
+          "b": {
+            "x": 2,
+            "y": 1
+          }
+        }
+      }
+    },
+    {
+      "canonical_sha256": "5e4e2c0c02376379bf9eea6fa23bd6b2077ed9c8a59c2d0344ce3b4433b523ab",
+      "canonical_utf8_hex": "7b226974656d73223a5b332c312c322c2263222c2261222c2262225d7d",
+      "case_id": "array_order_preserved",
+      "note": "数组顺序是语义，不排序",
+      "payload": {
+        "items": [
+          3,
+          1,
+          2,
+          "c",
+          "a",
+          "b"
+        ]
+      }
+    },
+    {
+      "canonical_sha256": "a0ee22abc73bce1c3575d78fa8347f74caa459a218b70a5b6336e9ea30964232",
+      "canonical_utf8_hex": "7b226c6162656c223a22e68aabe99cb2e8a1a8efbc88e69cace5b9b4efbc89222c22756e6974223a22e58583227d",
+      "case_id": "chinese_not_escaped",
+      "note": "ensure_ascii=False：中文原样输出，两侧一致",
+      "payload": {
+        "label": "披露表（本年）",
+        "unit": "元"
+      }
+    },
+    {
+      "canonical_sha256": "c29ea54f0f0cc3139777093353678504fb44759b01c66c9289c1379dd0168983",
+      "canonical_utf8_hex": "7b22656d6f6a69223a22f09f938a222c226d617468223a22f09d9080227d",
+      "case_id": "astral_pair",
+      "note": "合法代理对（emoji / 星平面字符）原样输出",
+      "payload": {
+        "emoji": "📊",
+        "math": "𝐀"
+      }
+    },
+    {
+      "canonical_sha256": "4c36008b93153144e33cc7110ab1fda1109214c5c9f489d60136c8721bc26e92",
+      "canonical_utf8_hex": "7b2261223a332c22efbcba223a312c22f09d9080223a327d",
+      "case_id": "astral_key_order",
+      "note": "星平面键排序：code point 序（Ｚ U+FF3A < 𝐀 U+1D400）与 UTF-16 code unit 序相反，TS 侧用默认 sort() 会得到不同字节",
+      "payload": {
+        "a": 3,
+        "Ｚ": 1,
+        "𝐀": 2
+      }
+    },
+    {
+      "canonical_sha256": "46fd78571db33895a746e78fc27de44818e0e27b073eeb6378ecafb7907f22d2",
+      "canonical_utf8_hex": "7b22736570223a2261e280a862e280a963227d",
+      "case_id": "line_separators",
+      "note": "U+2028 / U+2029：JSON 字符串里合法，两侧都不转义",
+      "payload": {
+        "sep": "a b c"
+      }
+    },
+    {
+      "canonical_sha256": "1759b27250bf0b595e6010c3e6172a5ec25fdd86f5e39eb78f4763e92f7eab38",
+      "canonical_utf8_hex": "7b2273223a2271756f74653a5c22206261636b3a5c5c207461623a5c74206e6c3a5c6e2063723a5c72206374726c3a5c7530303031227d",
+      "case_id": "json_escapes",
+      "note": "必须转义的控制字符与引号/反斜杠",
+      "payload": {
+        "s": "quote:\" back:\\ tab:\t nl:\n cr:\r ctrl:\u0001"
+      }
+    },
+    {
+      "canonical_sha256": "f2b153eb80e9b908f99c2176a098b3077d687f7869f5c5c3715fa2cb2c7a0ec1",
+      "canonical_utf8_hex": "7b22616d6f756e745f61735f737472696e67223a22313233343536372e3530222c226d61785f73616665223a393030373139393235343734303939312c226d696e5f73616665223a2d393030373139393235343734303939312c226e6567223a2d34322c22726174655f61735f737472696e67223a22302e30343235222c227a65726f223a307d",
+      "case_id": "integers_only",
+      "note": "只允许整数；小数/金额以字符串承载（XL-6）",
+      "payload": {
+        "amount_as_string": "1234567.50",
+        "max_safe": 9007199254740991,
+        "min_safe": -9007199254740991,
+        "neg": -42,
+        "rate_as_string": "0.0425",
+        "zero": 0
+      }
+    },
+    {
+      "canonical_sha256": "22e00dc2f7b01420f940fbdbfbdf34fa0667cc6500186495023ba37722cbd05e",
+      "canonical_utf8_hex": "7b2266223a66616c73652c226e223a6e756c6c2c2274223a747275657d",
+      "case_id": "booleans_and_null",
+      "note": "true/false/null 字面量",
+      "payload": {
+        "f": false,
+        "n": null,
+        "t": true
+      }
+    },
+    {
+      "canonical_sha256": "9cf535828d5dbc2d87d9c4c0b99d9e7308b5fdbd22aac02bac1d60f6ac9aa127",
+      "canonical_utf8_hex": "7b22223a312c2261223a327d",
+      "case_id": "empty_string_key",
+      "note": "空字符串键合法且排在最前",
+      "payload": {
+        "": 1,
+        "a": 2
+      }
+    },
+    {
+      "canonical_sha256": "f52407bf559329a29b3d05b7f120852ce0b6876952b8a6248c29642d266108da",
+      "canonical_utf8_hex": "7b22617574686f726974795f6d6f64656c223a7b22736861323536223a2261616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161222c2274797065223a22646566696e6974696f6e227d2c22636f6e7472616374223a7b22736861323536223a2264646464646464646464646464646464646464646464646464646464646464646464646464646464646464646464646464646464646464646464646464646464222c2274797065223a22636f6e74726163743a6e6f6e653a7631227d2c22696e737472756d656e746174696f6e223a7b22736861323536223a2263636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363222c2274797065223a22696e737472756d656e746174696f6e3a6e6f6e653a7631227d2c22736368656d615f76657273696f6e223a22646566696e6974696f6e2d62756e646c653a7631222c2274656d706c617465223a7b22736861323536223a2262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262222c2274797065223a22646566696e6974696f6e227d7d",
+      "case_id": "definition_bundle_shape",
+      "note": "definition bundle canonical payload 的真实形态（含 typed null marker）",
+      "payload": {
+        "authority_model": {
+          "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "type": "definition"
+        },
+        "contract": {
+          "sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+          "type": "contract:none:v1"
+        },
+        "instrumentation": {
+          "sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "type": "instrumentation:none:v1"
+        },
+        "schema_version": "definition-bundle:v1",
+        "template": {
+          "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "type": "definition"
+        }
+      }
+    }
+  ],
+  "generator": "backend/scripts/gen/generate_workpaper_sync_canonical_golden.py",
+  "max_safe_integer": 9007199254740991,
+  "python_canonicalizer": "app.services.workpaper_sync.definitions.canonical_json_bytes",
+  "reject_cases": [
+    {
+      "case_id": "nan",
+      "languages": [
+        "python",
+        "typescript"
+      ],
+      "note": "XL-1 NaN"
+    },
+    {
+      "case_id": "positive_infinity",
+      "languages": [
+        "python",
+        "typescript"
+      ],
+      "note": "XL-1 +Infinity"
+    },
+    {
+      "case_id": "negative_infinity",
+      "languages": [
+        "python",
+        "typescript"
+      ],
+      "note": "XL-1 -Infinity"
+    },
+    {
+      "case_id": "negative_zero",
+      "languages": [
+        "python",
+        "typescript"
+      ],
+      "note": "XL-2 负零"
+    },
+    {
+      "case_id": "unsafe_integer",
+      "languages": [
+        "python",
+        "typescript"
+      ],
+      "note": "XL-3 超出 MAX_SAFE_INTEGER 的整数"
+    },
+    {
+      "case_id": "lone_surrogate",
+      "languages": [
+        "python",
+        "typescript"
+      ],
+      "note": "XL-4 孤立代理项"
+    },
+    {
+      "case_id": "non_string_key",
+      "languages": [
+        "python"
+      ],
+      "note": "XL-5 非字符串对象键（只存在于 Python）"
+    },
+    {
+      "case_id": "undefined_value",
+      "languages": [
+        "typescript"
+      ],
+      "note": "undefined（只存在于 TypeScript）"
+    },
+    {
+      "case_id": "non_json_type",
+      "languages": [
+        "python",
+        "typescript"
+      ],
+      "note": "非 JSON 基本类型（Python: set / TS: Date）"
+    },
+    {
+      "case_id": "plain_float",
+      "languages": [
+        "python",
+        "typescript"
+      ],
+      "note": "XL-6 普通非整数浮点"
+    },
+    {
+      "case_id": "exponential_float",
+      "languages": [
+        "python",
+        "typescript"
+      ],
+      "note": "XL-6 指数浮点 1e-7（Python `1e-07` vs JS `1e-7`）"
+    }
+  ],
+  "schema_version": 1,
+  "typescript_canonicalizer": "audit-platform/frontend/src/components/workpaper/sync/canonicalJson.ts"
+}

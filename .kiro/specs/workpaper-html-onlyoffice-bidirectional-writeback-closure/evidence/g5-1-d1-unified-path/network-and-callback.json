@@ -1,0 +1,140 @@
+{
+  "script": "e2e/g5-1-d1-unified-path.spec.ts",
+  "captured_at": "2026-09-12T08:10:05.578Z",
+  "scope": {
+    "project_id": "0ec33ac9-3de5-4e65-b3bf-f9dccd7b2a49",
+    "wp_id": "68c7740e-dc48-4787-a788-2e77f8560673",
+    "entry_id": "xlsx/gt-d1-notes-receivable"
+  },
+  "predicates": {
+    "user_sync_requests": [
+      {
+        "method": "GET",
+        "path": "/api/projects/0ec33ac9-3de5-4e65-b3bf-f9dccd7b2a49/workpapers/68c7740e-dc48-4787-a788-2e77f8560673/sync/entries/xlsx/gt-d1-notes-receivable/store-projection",
+        "status": 200
+      },
+      {
+        "method": "POST",
+        "path": "/api/projects/0ec33ac9-3de5-4e65-b3bf-f9dccd7b2a49/workpapers/68c7740e-dc48-4787-a788-2e77f8560673/sync/entries/xlsx/gt-d1-notes-receivable/pending-mutations",
+        "status": 200
+      },
+      {
+        "method": "POST",
+        "path": "/api/projects/0ec33ac9-3de5-4e65-b3bf-f9dccd7b2a49/workpapers/68c7740e-dc48-4787-a788-2e77f8560673/sync/entries/xlsx/gt-d1-notes-receivable/materialize",
+        "status": 200
+      }
+    ],
+    "forcesave_hits": [
+      {
+        "method": "POST",
+        "path": "/api/projects/0ec33ac9-3de5-4e65-b3bf-f9dccd7b2a49/workpapers/68c7740e-dc48-4787-a788-2e77f8560673/sync/entries/xlsx/gt-d1-notes-receivable/rooms/84a220aa-9f68-4cf8-accf-2c47c0f653f2/forcesave",
+        "status": 202
+      }
+    ],
+    "d2_sync_hits": 0,
+    "callback_url_keys": [
+      "doc_key",
+      "generation",
+      "room_id",
+      "route_credential_id",
+      "route_token"
+    ],
+    "callback_url_redacted": "http://host.docker.internal:9980/api/workpaper-sync/rooms/84a220aa-9f68-4cf8-accf-2c47c0f653f2/onlyoffice-callback?room_id=%3Credacted%3E&generation=%3Credacted%3E&doc_key=%3Credacted%3E&route_credential_id=%3Credacted%3E&route_token=%3Credacted%3E",
+    "host_mounted": true,
+    "confirm_descriptor_200": true,
+    "forcesave_clicked": true,
+    "oo_cell_dirty_attempted": true,
+    "host_dirty_before_forcesave": false,
+    "forcesave_cs_error": 0,
+    "forcesave_cs_outcome": "accepted",
+    "forcesave_http_status": 202,
+    "forcesave_body_keys": [
+      "forcesave_request_id",
+      "operation_id",
+      "request_sequence",
+      "state",
+      "poll_after_ms",
+      "replayed",
+      "dispatch_error",
+      "cs_error",
+      "cs_outcome",
+      "callback_expected"
+    ],
+    "materialize_room_id": "84a220aa-9f68-4cf8-accf-2c47c0f653f2",
+    "materialize_has_jwt_token": true,
+    "doc_editor_called": false,
+    "doc_editor_has_root_token": false,
+    "doc_editor_document_mutable": false,
+    "host_status": "",
+    "host_error": "",
+    "confirm_forcesave_error": null,
+    "html_dom_roundtrip": {
+      "attempted": true,
+      "marker": "g5h513994",
+      "switched_to_html": true,
+      "marker_visible": true,
+      "store_mirrored": true,
+      "dom_probe": {
+        "by_exact_text": 0,
+        "input_prop_hits": 1,
+        "search_value": "g5h513994",
+        "tracked_operation_id": "c4e08aca-b84f-4afb-9abd-0420491a2fa8"
+      }
+    },
+    "oo_write_target": "A11",
+    "oo_cell_edit_probe": {
+      "ok": true,
+      "target": "A11",
+      "attempt": 1,
+      "hasInsert": "function",
+      "hasEnter": "function",
+      "hasPaste": "function",
+      "hasFind": "function",
+      "sheetNames": [
+        "底稿目录",
+        "应收票据审计程序表D1A",
+        "审定表D1-1",
+        "附注披露信息（上市公司）",
+        "附注披露信息（国企）",
+        "原值明细表（按类别）D1-2",
+        "原值明细表（按客户）D1-3",
+        "坏账准备明细表D1-4",
+        "调整分录汇总表D1-5",
+        "应收票据业务模式分析D1-6",
+        "应收票据备查簿核对D1-7",
+        "应收票据贴现、票据已背书未到期明细表D1-8",
+        "应收票据贴息检查表D1-9",
+        "应收票据监盘D1-10",
+        "关联方关系及交易检查表D1-11",
+        "应收票据质押检查表D1-12",
+        "应收票据检查表D1-13",
+        "应收票据坏账准备会计政策检查D1-14",
+        "应收票据坏账准备测试表D1-15",
+        "坏账准备转回、核销检查表D1-16",
+        "应收票据业务模式分析提示",
+        "_GT_SYNC"
+      ],
+      "activeSheet": "原值明细表（按客户）D1-3",
+      "inserted": true,
+      "entered": true,
+      "pasted": true,
+      "closeRet": true,
+      "closed": true,
+      "cellText": "g5h513994",
+      "modified": true,
+      "saveRet": true,
+      "saved": true,
+      "cellTextAfterSave": "g5h513994"
+    }
+  },
+  "notes": [
+    "token/JWT/route_credential 值已脱敏",
+    "OO 写格：Asc.editor 写受管 A11(customer_name)；权威判据是 forcesave 响应 cs_error（0=有变更，4=no_changes）",
+    "application applied / revision+1 由同目录 DB 核查脚本补齐（tmp_d1_e2e_db_verify.py）",
+    "§9.6 条件 6：切回结构化视图后 D1TabDetailCustomer DOM 应出现 marker（getByText / input.value，排除搜索框）",
+    "Phase 5 首个非 pilot canary：走 harness 无关的独立 entry 双向路径（phase5_d1_notes_receivable）"
+  ],
+  "auth_probe": {
+    "has_token": true
+  }
+}

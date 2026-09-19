@@ -157,6 +157,14 @@ class FormulaResult(BaseModel):
     value: Any = None
     cached: bool = False
     error: str | None = None
+    #: 取数口径等非阻断告警。
+    #:
+    #: spec: formula-management-runtime-closure Task 15（Requirements 7.4, 7.5）
+    #: 🔴 **必须显式声明** —— pydantic 默认忽略额外字段，`FormulaEngine.execute`
+    #: 返回体里的 `warnings` 不进 schema 就会被**静默丢弃**（又一个 dead output；
+    #: 同理既有的 `formula` 键至今就是这样被丢掉的）。
+    #: additive 且有默认值 ⇒ 既有调用方零改动（R9.4 响应形状只增不减）。
+    warnings: list[str] = Field(default_factory=list)
 
 
 # ===================================================================

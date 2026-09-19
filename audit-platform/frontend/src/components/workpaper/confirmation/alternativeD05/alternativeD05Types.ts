@@ -1,0 +1,199 @@
+/**
+ * alternativeD05Types.ts — D0-5 合同负债及销售替代程序 类型定义
+ *
+ * 核心设计：
+ * - 多公司 master-detail：每公司一组 4 区块检查宽表
+ * - 4 区块各自列结构不同（10-30 列），由 BLOCK_COLUMN_CONFIGS 驱动
+ * - 检查比例自动计算：区块③④合计 / 本期销售额
+ * - 从 D0-1 带入未回函公司，从 D0-4 带入未达账项
+ * - 经理复核红线：异常行 / 区块空 / 比例低
+ */
+
+// ─── 检查行（通用结构，各区块共享） ─────────────────────────────────────────
+
+export interface CheckRow {
+  /** 内部行 ID（UUID，前端生成） */
+  _row_id?: string
+  /** 序号 */
+  seq?: number
+  /** 数据来源（auto/manual/import） */
+  _source?: string
+  /** 是否异常 */
+  is_abnormal?: string  // '是'/'否'
+  /** 索引号 */
+  ref_index?: string
+  /**
+   * 借贷方向（confirmation-alternative-structure-alignment 决策 1）。
+   * 仅 splitByDirection 区块（K0-5/K0-6/L0-5/G0-6 的「本期发生额」）使用；
+   * 旧行为 undefined → 渲染层归入「待归位」提示（Property 2，不猜方向）。
+   */
+  direction?: 'debit' | 'credit'
+  /** 动态字段（各区块列结构不同，存为扁平 key-value） */
+  [key: string]: any
+}
+
+/**
+ * L0-5 期初余额一致性核对（confirmation-alternative-structure-alignment 决策 2）。
+ * 源模板 L0-5 第 3 项「检查期初余额是否与上期期末余额一致」，单项核对（非动态行）。
+ * 作 payload 顶层字段，渲染为独立卡片。
+ */
+export interface OpeningConsistency {
+  /** 本期期初余额（可从平台取或手工） */
+  current_opening?: number
+  /** 上期期末余额 */
+  prior_closing?: number
+  /** 是否一致 */
+  is_consistent?: '一致' | '不一致' | '待核对'
+  /** 说明（判定不一致时要求填，Requirement 2.4） */
+  note?: string
+}
+
+// ─── 区块类型枚举 ───────────────────────────────────────────────────────────
+
+export type BlockType = 'block1' | 'block2' | 'block3' | 'block4'
+
+export const BLOCK_LABELS: Record<BlockType, string> = {
+  block1: '①合同负债检查-检查期后结转',
+  block2: '②合同负债检查-形成期末余额的合同、订单、银行收款凭单等支持性证据检查',
+  block3: '③销售检查-本期收款检查',
+  block4: '④销售检查-本期出库的合同、出库单、运输单、验收单等支持性证据检查',
+}
+
+// ─── 抽样配置 ───────────────────────────────────────────────────────────────
+
+export interface SamplingConfig {
+  /** 测试范围 */
+  test_scope?: string
+  /** 特定样本 */
+  specific_samples?: string
+  /** 抽样总体 */
+  sampling_population?: string
+  /** 确定的抽样样本量 */
+  sample_size?: string
+  /** 抽样方法（随机选样/系统选样/货币单元抽样/随意选样） */
+  sampling_method?: string
+  /** 抽样过程 */
+  sampling_process?: string
+  /**
+   * 「本期发生额」抽样标准（**G0-6 专属**，源 `替代程序检查表G0-6!C15`）。
+   *
+   * 源模板在 `2.检查本期发生额` 标题行右侧另有一组 5 点选项
+   * `大额（）关联方（）大额交易频繁（）异常（）其他（）`（**末项是「其他」不是「全部」**，
+   * 与 `A7 测试范围` 的 `B7` 只差最后一项），改造前平台完全没有该录入位置。
+   *
+   * additive 可选字段：其余六枢纽从不设值 → 逐字节零影响（与 `BalanceSummary` 里
+   * `current_addition`(H0-5) / `purchase_amount`(F0-5) 的循环专属字段同一范式）。
+   */
+  occurrence_sampling_scope?: string
+}
+
+// ─── 余额汇总 ───────────────────────────────────────────────────────────────
+
+export interface BalanceSummary {
+  /** 函证项目名称 */
+  item_name?: string
+  /** 年初余额 */
+  opening_balance?: number
+  /** 借方发生额 */
+  debit_amount?: number
+  /** 贷方发生额 */
+  credit_amount?: number
+  /** 期末余额（自动或手填） */
+  closing_balance?: number
+  /** 本期销售金额 */
+  sales_amount?: number
+  /** 本期新增金额（H0-5 固定资产使用） */
+  current_addition?: number
+  /** 本期采购金额（F0-5 预付账款使用） */
+  purchase_amount?: number
+  /** 本期收款检查比例（自动：block3合计/sales_amount） */
+  receipt_check_ratio?: number | null
+  /** 本期出库检查比例（自动：block4合计/sales_amount） */
+  shipment_check_ratio?: number | null
+}
+
+// ─── 审计结论 ───────────────────────────────────────────────────────────────
+
+export interface AuditConclusion {
+  /** 审计说明 */
+  audit_note?: string
+  /** 结论类型 A/B/C */
+  conclusion_type?: 'A' | 'B' | 'C'
+  /** 结论文本 */
+  conclusion_text?: string
+}
+
+// ─── 单个公司（master-detail 中的 detail） ──────────────────────────────────
+
+export interface AlternativeCompany {
+  /** 公司内部 ID */
+  _company_id?: string
+  /** 序号 */
+  seq?: number
+  /** 供应商/客户名称 */
+  entity_name?: string
+  /** 函证索引号（来自 D0-1） */
+  confirm_index?: string
+  /** 数据来源（auto/manual） */
+  _source?: string
+
+  /**
+   * 期末余额取数来源（供 UI 溯源）：
+   * `aux` = 辅助余额表精确账面值 / `summary` = 汇总表发函金额（抽样口径）。
+   *
+   * 🔴 由 `coordination/importFromSummary.mapSummaryToAlternativeCompany` 产出。
+   * optional 故不传时其余替代程序套别（D05/H05/K05/K06/L05/G06）逐字零回归。
+   * 未声明前该字段在 `importCompanies` 白名单里被静默丢弃 → 落库恒 null，
+   * 审计师看不出某家余额是账面精确值还是发函金额（2026-08-04 实测）。
+   */
+  _balance_source?: 'aux' | 'summary'
+
+  /** 抽样配置 */
+  sampling?: SamplingConfig
+  /** 余额汇总 */
+  balance?: BalanceSummary
+
+  /** 4 区块行数据 */
+  block1_rows?: CheckRow[]
+  block2_rows?: CheckRow[]
+  block3_rows?: CheckRow[]
+  block4_rows?: CheckRow[]
+
+  /**
+   * 检查过程自由记录（对应源模板「二、检查过程记录」的空白自由区）。
+   * H0-5 首个消费者（键语义见 `alternativeH05/h05SourceFidelity.H05_CHECK_RECORD_FREE_KEY`）；
+   * optional 故其余替代程序套别零回归。
+   */
+  check_record_free?: string
+
+  /** 审计结论 */
+  conclusion?: AuditConclusion
+}
+
+// ─── 看板指标 ───────────────────────────────────────────────────────────────
+
+export interface AlternativeD05Metrics {
+  /** 总公司数 */
+  total_companies: number
+  /** 已完成公司数（4 区块均有记录） */
+  completed_companies: number
+  /** 有异常公司数 */
+  abnormal_companies: number
+  /** 检查比例分布（各公司收款/出库比例） */
+  ratio_distribution: Array<{
+    entity_name: string
+    receipt_ratio: number | null
+    shipment_ratio: number | null
+  }>
+  /** 完成率 */
+  completion_rate: number
+}
+
+// ─── 持久化 payload ─────────────────────────────────────────────────────────
+
+export interface AlternativeD05Payload {
+  /** 格式版本标识 */
+  _format: 'alternative-d05-v1'
+  /** 公司列表 */
+  companies: AlternativeCompany[]
+}

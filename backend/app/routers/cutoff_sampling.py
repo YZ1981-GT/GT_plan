@@ -1,0 +1,328 @@
+"""截止测试自动提取 API 路由
+
+- POST /api/projects/{pid}/sampling/cutoff-extract  — 按条件提取凭证
+- GET  /api/projects/{pid}/sampling/cutoff-history  — 提取历史列表
+- POST /api/projects/{pid}/sampling/cutoff-undo     — 撤销提取
+- POST /api/projects/{pid}/sampling/cutoff-fill     — 记录填充日志
+
+Validates: Requirements 2.1, 2.12, 5.2, 5.5, 5.6
+"""
+
+from __future__ import annotations
+
+import logging
+from datetime import timedelta
+from typing import Optional
+from uuid import UUID
+
+from fastapi import APIRouter, Depends, HTTPException, Query
+from pydantic import BaseModel, Field
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.core.database import get_db
+from app.deps import get_current_user
+from app.models.audit_platform_models import WorkpaperExtractionLog
+from app.models.core import User
+from app.services.ledger_sampling_service import (
+    CutoffExtractRequest,
+    ExtractionLogCreate,
+    LedgerQueryFilters,
+    LedgerSamplingService,
+)
+from app.services.sampling_registry_service import (
+    register_sampled_vouchers,
+    register_sampling_batch,
+    resolve_project_year,
+)
+from app.services.version_trail_service import VersionTrailService
+
+logger = logging.getLogger(__name__)
+
+router = APIRouter(
+    prefix="/api/projects/{pid}/sampling",
+    tags=["sampling"],
+)
+
+
+# ─── Request / Response schemas ──────────────────────────────────────────────
+
+
+class CutoffFillRequest(BaseModel):
+    """截止测试填充请求 — 记录日志
+
+    extraction_criteria 为自由格式 JSON，除既有截止条件外，向后兼容承接抽样方法学
+    留痕字段（均可选，前端按需写入，后端原样持久化、不校验、不拒绝）：
+      - confidence_level      置信度/信赖水平
+      - tolerable_misstatement 可容忍错报
+      - expected_misstatement  预期错报
+      - suggested_sample_size  系统建议样本量
+      - resample_reason        重抽原因
+      - sampling_interval      MUS 抽样间隔
+    这些字段随 extraction_criteria 一并存入 workpaper_extraction_log，供
+    voucher-history 回显与版本链留痕使用。
+    """
+
+    workpaper_id: UUID
+    extraction_type: str = "cutoff"
+    extraction_criteria: dict
+    total_matched: int
+    filled_count: int
+    fill_mode: str  # "append" | "replace" | "merge"
+    before_data: Optional[list[dict]] = None
+    filled_voucher_nos: list[str] = Field(default_factory=list)
+
+
+# ─── POST /cutoff-extract ─────────────────────────────────────────────────────
+
+
+@router.post("/cutoff-extract")
+async def cutoff_extract(
+    pid: UUID,
+    req: CutoffExtractRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """按截止测试条件提取凭证
+
+    日期窗口计算：cutoff_date - days_before 至 cutoff_date + days_after
+    exclude_extracted=true 时排除已填充的凭证号
+    """
+    try:
+        # 1. 计算日期窗口
+        date_start = req.cutoff_date - timedelta(days=req.days_before)
+        date_end = req.cutoff_date + timedelta(days=req.days_after)
+
+        # 2. 排除已提取凭证号（从 workpaper_extraction_log 获取）
+        exclude_voucher_nos: list[str] = []
+        if req.exclude_extracted:
+            exclude_voucher_nos = await _get_extracted_voucher_nos(
+                db, req.workpaper_id
+            )
+
+        # 3. 构建过滤条件
+        filters = LedgerQueryFilters(
+            date_start=date_start,
+            date_end=date_end,
+            account_codes=req.account_codes,
+            amount_threshold=req.amount_threshold,
+            direction_filter=req.direction_filter,
+            voucher_type_filter=req.voucher_type_filter,
+            summary_keyword=req.summary_keyword,
+            exclude_voucher_nos=exclude_voucher_nos,
+        )
+
+        # 4. 构建查询（year 从 cutoff_date 推导）
+        year = req.cutoff_date.year
+        query = await LedgerSamplingService.build_ledger_query(
+            db, pid, year, filters
+        )
+
+        # 5. 执行查询并获取统计
+        items, stats = await LedgerSamplingService.execute_with_stats(
+            db, query, req.page, req.page_size
+        )
+
+        return {
+            "items": items,
+            "stats": stats.model_dump(),
+            "page": req.page,
+            "page_size": req.page_size,
+        }
+
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+# ─── GET /cutoff-history ──────────────────────────────────────────────────────
+
+
+@router.get("/cutoff-history")
+async def cutoff_history(
+    pid: UUID,
+    wp_id: UUID = Query(..., description="底稿ID"),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """获取指定底稿的提取历史列表（按时间倒序，仅截止测试类型）"""
+    try:
+        history = await LedgerSamplingService.get_extraction_history(
+            db, wp_id, extraction_type="cutoff"
+        )
+        return history
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+# ─── POST /cutoff-undo ────────────────────────────────────────────────────────
+
+
+@router.post("/cutoff-undo")
+async def cutoff_undo(
+    pid: UUID,
+    log_id: UUID = Query(..., description="要撤销的日志记录ID"),
+    wp_id: UUID = Query(..., description="底稿ID"),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """撤销指定提取记录，返回 before_data（仅截止测试类型范围内判定最新）"""
+    try:
+        result = await LedgerSamplingService.undo_extraction(
+            db, log_id, wp_id, extraction_type="cutoff"
+        )
+        await db.commit()
+        return result
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+# ─── POST /cutoff-fill ────────────────────────────────────────────────────────
+
+
+@router.post("/cutoff-fill")
+async def cutoff_fill(
+    pid: UUID,
+    req: CutoffFillRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """记录填充日志（含 before_data 快照）
+
+    filled_voucher_nos 存入 extraction_criteria 以支持 exclude_extracted 功能
+    """
+    try:
+        # ── 版本链：填充前自动快照 ──
+        snapshot_type = "auto_sampling"
+        desc_parts = [f"截止测试填充: {req.extraction_type}"]
+        if req.filled_count:
+            desc_parts.append(f"填充{req.filled_count}笔")
+        if req.fill_mode:
+            desc_parts.append(f"模式={req.fill_mode}")
+        await VersionTrailService.create_snapshot_fire_and_forget(
+            db=db,
+            project_id=pid,
+            workpaper_id=req.workpaper_id,
+            user_id=current_user.id,
+            snapshot_type=snapshot_type,
+            description="，".join(desc_parts),
+        )
+
+        # 将 filled_voucher_nos 合并到 extraction_criteria 中
+        criteria = dict(req.extraction_criteria)
+        if req.filled_voucher_nos:
+            criteria["filled_voucher_nos"] = req.filled_voucher_nos
+
+        # ── R2.5：回填时随带的抽样评价必须与 /voucher-evaluation 走**同一归一器** ──
+        # 否则该路径写进去的 evaluation 缺 `evaluated_at` / `evaluated_by`
+        # （两者是服务端权威字段，客户端不传）→ 前端 `evaluationSourceHint` 因
+        # `evaluatedAt` 为空而不渲染「读自批次 X（… 评价）」标注，R2.7 的
+        # 「标注来源批次与评价时间」就落不了地（实测形态）。
+        # 局部 import：`voucher_sampling` 与本模块此前无依赖边，放模块级会新增
+        # 一条仅为一个纯函数而存在的耦合。
+        if isinstance(criteria.get("evaluation"), dict):
+            from app.routers.voucher_sampling import _normalize_evaluation
+
+            criteria["evaluation"] = _normalize_evaluation(
+                criteria["evaluation"], actor_id=current_user.id
+            )
+
+        log_data = ExtractionLogCreate(
+            project_id=pid,
+            workpaper_id=req.workpaper_id,
+            user_id=current_user.id,
+            extraction_type=req.extraction_type,
+            extraction_criteria=criteria,
+            total_matched=req.total_matched,
+            filled_count=req.filled_count,
+            fill_mode=req.fill_mode,
+            before_data=req.before_data,
+        )
+
+        result = await LedgerSamplingService.record_extraction_log(db, log_data)
+
+        # ── R5：抽凭批次落库后写 CAS 1314 记录表投影（仅抽凭类型）──────────────
+        # 权威留痕是 workpaper_extraction_log.extraction_criteria；这里写的
+        # sampling_records / sampled_vouchers 是**可查询侧投影**，支撑项目级/QC 级
+        # 「所有抽样是否都有总体描述/样本量依据/结论」与「同一凭证被哪些底稿抽过」。
+        # 两个 register_* 均 fail-open（内部 warning），不让投影失败打掉审计师的回填。
+        if req.extraction_type == "voucher_sampling":
+            log_row = await _load_log_row(db, result)
+            if log_row is not None:
+                record_id = await register_sampling_batch(
+                    db, log=log_row, created_by=current_user.id
+                )
+                year = await resolve_project_year(db, pid)
+                if year is not None:
+                    await register_sampled_vouchers(
+                        db, log=log_row, year=year, sampling_record_id=record_id
+                    )
+                else:
+                    logger.warning(
+                        "项目审计年度无法反解，跳过已抽凭证登记（不猜年度）project=%s",
+                        pid,
+                    )
+
+        await db.commit()
+        return result
+
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+# ─── Helper ───────────────────────────────────────────────────────────────────
+
+
+async def _load_log_row(
+    db: AsyncSession,
+    record_result: dict,
+) -> WorkpaperExtractionLog | None:
+    """按 `record_extraction_log` 返回的 id 取回 ORM 行（供抽样登记投影使用）。
+
+    该服务返回的是精简 dict（id / created_at / batch_id），而登记需要
+    project_id / workpaper_id / extraction_criteria / total_matched / filled_count，
+    故此处回读一次。取不到返回 None（调用方跳过投影，不影响权威留痕）。
+    """
+    log_id = record_result.get("id") if isinstance(record_result, dict) else None
+    if not log_id:
+        return None
+    try:
+        return (
+            await db.execute(
+                select(WorkpaperExtractionLog).where(
+                    WorkpaperExtractionLog.id == UUID(str(log_id))
+                )
+            )
+        ).scalar_one_or_none()
+    except Exception:  # noqa: BLE001 — 回读失败只跳过投影
+        logger.warning("抽样登记回读批次行失败 log_id=%s", log_id)
+        return None
+
+
+async def _get_extracted_voucher_nos(
+    db: AsyncSession,
+    workpaper_id: UUID,
+) -> list[str]:
+    """从非撤销的提取日志中收集所有已填充的凭证号
+
+    查询 workpaper_extraction_log 中 is_undone=False 的记录，
+    从 extraction_criteria.filled_voucher_nos 提取凭证号列表。
+    """
+    stmt = select(
+        WorkpaperExtractionLog.extraction_criteria
+    ).where(
+        WorkpaperExtractionLog.workpaper_id == workpaper_id,
+        WorkpaperExtractionLog.extraction_type == "cutoff",
+        WorkpaperExtractionLog.is_undone == False,  # noqa: E712
+    )
+    result = await db.execute(stmt)
+    rows = result.scalars().all()
+
+    voucher_nos: list[str] = []
+    for criteria in rows:
+        if criteria and isinstance(criteria, dict):
+            filled = criteria.get("filled_voucher_nos", [])
+            if isinstance(filled, list):
+                voucher_nos.extend(filled)
+
+    # 去重
+    return list(set(voucher_nos))

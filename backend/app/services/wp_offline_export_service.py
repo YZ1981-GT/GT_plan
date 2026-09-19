@@ -516,7 +516,9 @@ class WpOfflineExportService:
                 "year": getattr(wp, "year", ""),
                 "parsed_data": wp.parsed_data or {},
             }
-        except Exception:
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).warning("离线导出查询底稿数据失败 wp_id=%s: %s", wp_id, e)
             return {}
 
     def _extract_sheets(
@@ -553,5 +555,7 @@ class WpOfflineExportService:
                 sa_select(Project.name).where(Project.id == project_id)
             )
             return result.scalar_one_or_none() or ""
-        except Exception:
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).debug("离线导出获取项目名失败: %s", e)
             return ""

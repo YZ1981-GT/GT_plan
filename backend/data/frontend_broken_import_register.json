@@ -1,0 +1,88 @@
+{
+  "schema_version": "frontend-broken-import-register:v1",
+  "why_this_file_exists": "把门禁引入一个已有存量债的代码库时，必须区分「新引入的断边」与「门禁上线前就断的」。本表逐条署名登记后者：门禁对新断边一律打红，对登记项放行但不隐藏。",
+  "two_invariants": [
+    "只能减不能增：出现任何不在表内的断边即失败。",
+    "登记项若已不再断（被修好了），门禁同样失败 —— 必须把它从表里删掉。这条防止本表退化成垃圾场，也保证表里每一行都还是真问题。"
+  ],
+  "not_a_whitelist": "每条都带 importer / target / name / owner / reason，读者能直接看到坏在哪、归谁。计数式基线（只记条数）才是抬基线，本表刻意用逐条形态。",
+  "entries": [
+    {
+      "importer": "src/components/workpaper/__tests__/b23ProcessControl.pbt.spec.ts",
+      "target": "src/components/workpaper/composables/useB23ProcessControl.ts",
+      "name": "suggestProcessConclusion",
+      "owner": "b23 流程控制",
+      "reason": "模块已重命名为 suggestCycleConclusion（Process 改 Cycle 且加 B23 前缀），3 个 spec 未跟上；对应关系需该 spec 的人确认，不擅自猜"
+    },
+    {
+      "importer": "src/components/workpaper/__tests__/b23ProcessControl.pbt.spec.ts",
+      "target": "src/components/workpaper/composables/useB23ProcessControl.ts",
+      "name": "STANDARD_PROCESSES",
+      "owner": "b23 流程控制",
+      "reason": "模块里无任何对应导出，疑为已删 API，spec 可能在测已下线的能力"
+    },
+    {
+      "importer": "src/components/workpaper/__tests__/b23ProcessControl.pbt.spec.ts",
+      "target": "src/components/workpaper/composables/useB23ProcessControl.ts",
+      "name": "ProcessConclusion",
+      "owner": "b23 流程控制",
+      "reason": "疑对应 CycleConclusion"
+    },
+    {
+      "importer": "src/components/workpaper/__tests__/b23ProcessControl.pbt.spec.ts",
+      "target": "src/components/workpaper/composables/useB23ProcessControl.ts",
+      "name": "WalkthroughConclusion",
+      "owner": "b23 流程控制",
+      "reason": "模块里无对应导出，只有 B23WalkthroughTest"
+    },
+    {
+      "importer": "src/components/workpaper/__tests__/b23ProcessControl.pbt.spec.ts",
+      "target": "src/components/workpaper/composables/useB23ProcessControl.ts",
+      "name": "ControlPoint",
+      "owner": "b23 流程控制",
+      "reason": "疑对应 B23ControlPoint"
+    },
+    {
+      "importer": "src/components/workpaper/__tests__/b23ProcessControl.pbt.spec.ts",
+      "target": "src/components/workpaper/composables/useB23ProcessControl.ts",
+      "name": "ProcessCard",
+      "owner": "b23 流程控制",
+      "reason": "疑对应 B23CycleCard"
+    },
+    {
+      "importer": "src/components/workpaper/__tests__/samplingHostMethodologyCoverage.spec.ts",
+      "target": "src/components/workpaper/composables/useF3VoucherCheck.ts",
+      "name": "useX",
+      "owner": "抽样宿主方法论覆盖",
+      "reason": "useX 像是占位名，需该 spec 的人确认本意"
+    },
+    {
+      "importer": "src/components/workpaper/composables/__tests__/dCycleAmountControl.spec.ts",
+      "target": "src/stores/displayPrefs.ts",
+      "name": "fmtAmount",
+      "owner": "D 循环金额管控",
+      "reason": "平台级已知坑：fmtAmount 是 store 成员不是模块级导出，这么 import 取到 undefined；正解是取 store 实例后 displayPrefs.fmtAmount(v)，或直接用 utils/formatters.fmtAmountUnit"
+    },
+    {
+      "importer": "src/composables/__tests__/useAutoSave.pbt.spec.ts",
+      "target": "src/composables/useAutoSave.ts",
+      "name": "buildDisclosureDraftKey",
+      "owner": "披露加固",
+      "reason": "目标模块无此导出"
+    },
+    {
+      "importer": "src/composables/__tests__/useAutoSave.pbt.spec.ts",
+      "target": "src/composables/useAutoSave.ts",
+      "name": "DraftContext",
+      "owner": "披露加固",
+      "reason": "DraftContext 实际定义在 composables/__tests__/generators/hardening-generators.ts，import 路径写错"
+    },
+    {
+      "importer": "src/composables/__tests__/fixtures/disclosure-hardening-fixtures.ts",
+      "target": "src/composables/useAutoSave.ts",
+      "name": "DraftContext",
+      "owner": "披露加固",
+      "reason": "DraftContext 实际定义在 composables/__tests__/generators/hardening-generators.ts，import 路径写错"
+    }
+  ]
+}

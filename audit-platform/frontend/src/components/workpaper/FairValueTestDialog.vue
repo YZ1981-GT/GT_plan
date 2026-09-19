@@ -231,9 +231,9 @@
         <el-descriptions :column="2" size="small" border>
           <el-descriptions-item label="层级">Level {{ result.level }}</el-descriptions-item>
           <el-descriptions-item label="金融工具">{{ result.instrument_type }}</el-descriptions-item>
-          <el-descriptions-item label="面值/数量">¥ {{ formatAmount(result.face_value) }}</el-descriptions-item>
+          <el-descriptions-item label="面值/数量">¥ {{ prefs.fmt(result.face_value) }}</el-descriptions-item>
           <el-descriptions-item label="公允价值">
-            <span class="amt-highlight">¥ {{ formatAmount(result.fair_value) }}</span>
+            <span class="amt-highlight">¥ {{ prefs.fmt(result.fair_value) }}</span>
           </el-descriptions-item>
           <el-descriptions-item label="估值方法" :span="2">
             <span class="valuation-method">{{ result.valuation_method }}</span>
@@ -250,11 +250,11 @@
         >
           <el-table-column label="期数" prop="period" width="120" align="center" />
           <el-table-column label="现金流" width="160" align="right">
-            <template #default="{ row }">¥ {{ formatAmount(row.cash_flow) }}</template>
+            <template #default="{ row }">¥ {{ prefs.fmt(row.cash_flow) }}</template>
           </el-table-column>
           <el-table-column label="折现因子" prop="discount_factor" width="140" align="right" />
           <el-table-column label="现值" width="160" align="right">
-            <template #default="{ row }">¥ {{ formatAmount(row.present_value) }}</template>
+            <template #default="{ row }">¥ {{ prefs.fmt(row.present_value) }}</template>
           </el-table-column>
         </el-table>
       </div>
@@ -288,6 +288,7 @@ import { reactive, ref, computed, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import { api } from '@/services/apiProxy'
 import { handleApiError } from '@/utils/errorHandler'
+import { useDisplayPrefsStore } from '@/stores/displayPrefs'
 
 interface Props {
   visible: boolean
@@ -412,11 +413,8 @@ const resultAlertType = computed<'success' | 'warning' | 'error'>(() => {
   return 'success'
 })
 
-function formatAmount(s: string | number) {
-  const n = Number(s)
-  if (!Number.isFinite(n)) return String(s)
-  return n.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-}
+const prefs = useDisplayPrefsStore()
+
 
 function buildRequestBody(applySheet?: string): Record<string, any> {
   const body: Record<string, any> = {
@@ -452,7 +450,7 @@ async function onAnalyze() {
       buildRequestBody(),
     )
     result.value = resp
-    ElMessage.success(`分析完成：公允价值 ¥${formatAmount(resp.fair_value)}`)
+    ElMessage.success(`分析完成：公允价值 ¥${prefs.fmt(resp.fair_value)}`)
   } catch (e: any) {
     handleApiError(e, '公允价值测试')
   } finally {

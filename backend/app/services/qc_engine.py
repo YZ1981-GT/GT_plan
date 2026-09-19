@@ -372,35 +372,75 @@ class AuditProcedureStatusRule(QCRule):
 
 
 class SamplingCompletenessRule(QCRule):
-    """Rule 12: 抽样记录完整（项目级有抽样配置则必须有记录）。
+    """Rule 12: 抽样记录完整（CAS 1314 记录要求）。
 
-    注：SamplingConfig 是项目级模型，不与单个 working_paper 绑定，
-    因此按 project_id 匹配；适用于"项目整体抽样配置是否有对应记录"检查。
+    判据于 sampling-evaluation-and-governance-closure R7 重写。**不再依赖
+    `SamplingConfig`** —— 该表真实库 0 行且已软弃用，且新写入的 `SamplingRecord`
+    的 `sampling_config_id` 恒为 NULL，旧判据双重失效（详见
+    `services/sampling_qc_rules.py` 模块头）。
+
+    新判据：本底稿存在**未撤销**的 `voucher_sampling` 批次，但缺评价 / 结论未确认 /
+    抽样框已变更 → 产出 finding。无批次时零 finding（不适用 ≠ 不合规）。
+
+    判定逻辑委托 `evaluate_sampling_completeness`（纯函数，与归档完整性检查共用同一判据）。
     """
     severity = "warning"
     rule_id = "QC-12"
 
     async def check(self, context: QCContext) -> list[QCFindingItem]:
-        from app.models.workpaper_models import SamplingConfig, SamplingRecord
-        configs = (await context.db.execute(
-            sa.select(SamplingConfig).where(
-                SamplingConfig.project_id == context.working_paper.project_id,
-                SamplingConfig.is_deleted == sa.false(),
+        from app.models.audit_platform_models import WorkpaperExtractionLog
+        from app.services.dataset_query import get_active_dataset_id_or_none
+        from app.services.sampling_qc_rules import (
+            SamplingBatchView,
+            evaluate_sampling_completeness,
+        )
+
+        wp = context.working_paper
+        rows = (await context.db.execute(
+            sa.select(
+                WorkpaperExtractionLog.batch_id,
+                WorkpaperExtractionLog.extraction_criteria,
+            ).where(
+                WorkpaperExtractionLog.workpaper_id == wp.id,
+                WorkpaperExtractionLog.extraction_type == "voucher_sampling",
+                WorkpaperExtractionLog.is_undone == sa.false(),
             )
-        )).scalars().all()
-        findings = []
-        for cfg in configs:
-            records = (await context.db.execute(
-                sa.select(sa.func.count()).select_from(SamplingRecord).where(
-                    SamplingRecord.sampling_config_id == cfg.id,
+        )).all()
+
+        if not rows:
+            return []
+
+        # 抽样框版本比对：取不到当前 active 时不报 stale（无法判定 ⇒ 不报告）
+        try:
+            current_dataset = await get_active_dataset_id_or_none(
+                context.db, wp.project_id, "tb_ledger"
+            )
+        except Exception:  # noqa: BLE001 — stale 判定是增强，取不到不阻断本规则其余判据
+            logger.warning("[QC-12] 抽样框当前版本取不到，本次不判定 dataset_stale")
+            current_dataset = None
+
+        batches: list[SamplingBatchView] = []
+        for batch_id, criteria in rows:
+            crit = criteria if isinstance(criteria, dict) else {}
+            recorded = crit.get("dataset_id")
+            stale = bool(
+                recorded
+                and current_dataset
+                and str(recorded) != str(current_dataset)
+            )
+            batches.append(
+                SamplingBatchView(
+                    batch_id=str(batch_id) if batch_id else None,
+                    criteria=crit,
+                    dataset_stale=stale,
+                    wp_code=getattr(context, "wp_code", None),
                 )
-            )).scalar() or 0
-            if records == 0:
-                findings.append(QCFindingItem(
-                    rule_id=self.rule_id, severity=self.severity,
-                    message=f"抽样配置 {cfg.id} 已创建但无抽样记录",
-                ))
-        return findings
+            )
+
+        return [
+            QCFindingItem(rule_id=self.rule_id, severity=self.severity, message=msg)
+            for msg in evaluate_sampling_completeness(batches)
+        ]
 
 
 class AdjustmentRecordedRule(QCRule):
@@ -680,32 +720,73 @@ class QCEngine:
         ]
 
     async def _get_enabled_rule_codes(self, db: AsyncSession) -> set[str]:
-        """读取 qc_rule_definitions 表中 enabled=true 的 rule_code 集合。
+        """解析本次应执行的规则集合（三态，sampling-evaluation-and-governance-closure R7）。
 
-        非 python 类型规则记 warning 日志并跳过。
+        ## 改造前的平台级 P0
+
+        原实现把返回值当「启用白名单」：只有出现在 `qc_rule_definitions` 且 `enabled=true`
+        的 rule_code 才执行。而真实库 **`qc_rule_definitions` 是空表**（表存在、0 行），
+        于是走的是「查询成功 + rows 为空」这条路 → `enabled_codes = set()` →
+        调用方 `active_rules = []` ⇒ **全部 20 条内置 QC 规则静默不执行**，
+        且没有任何 WARNING（日志只写在 `except` 分支里，空表不进 except）。
+
+        底稿质量自检因此长期整体空转，这也是「修好 QC-12 判据也不会生效」的原因。
+
+        ## 三态语义
+
+        - 查询失败（表不存在等）→ 全部执行 + WARNING（既有行为，保留）
+        - 查询成功但 0 行 → **全部执行 + WARNING**：空表是「尚未配置」，不是「全部禁用」
+        - 查询成功且有行 → 只排除**显式 `enabled=false`** 的规则；
+          未登记的内置规则视为启用（登记表是**禁用清单**而非准入白名单）
+
+        非 python 类型规则不参与 python 规则的启停判定（它们由别的执行器处理）。
         """
         from app.models.qc_rule_models import QcRuleDefinition
+
+        all_rule_ids = {rule.rule_id for rule in self.rules}
 
         try:
             result = await db.execute(
                 sa.select(
                     QcRuleDefinition.rule_code,
                     QcRuleDefinition.expression_type,
-                ).where(QcRuleDefinition.enabled == sa.true())
+                    QcRuleDefinition.enabled,
+                )
             )
             rows = result.all()
         except Exception as e:
             # 表不存在或查询失败时降级：不过滤，全部执行
             logger.warning("[QCEngine] Failed to load qc_rule_definitions, running all rules: %s", e)
-            return {rule.rule_id for rule in self.rules}
+            return all_rule_ids
 
-        enabled_codes: set[str] = set()
-        for rule_code, expression_type in rows:
+        if not rows:
+            # 空表 = 尚未配置，不是「全部禁用」。改造前这里返回空集导致全部规则不执行。
+            logger.warning(
+                "[QCEngine] qc_rule_definitions 为空表，按「未配置即全部启用」执行全部 %d 条内置规则"
+                "（如需关闭某条规则，请在该表登记 rule_code 并置 enabled=false）",
+                len(all_rule_ids),
+            )
+            return all_rule_ids
+
+        disabled_codes: set[str] = set()
+        registered: set[str] = set()
+        for rule_code, expression_type, enabled in rows:
             if expression_type != "python":
-                logger.warning("R6 stub: non-python rule ignored: %s (type=%s)", rule_code, expression_type)
+                logger.warning(
+                    "R6 stub: non-python rule ignored: %s (type=%s)", rule_code, expression_type
+                )
                 continue
-            enabled_codes.add(rule_code)
-        return enabled_codes
+            registered.add(rule_code)
+            if not enabled:
+                disabled_codes.add(rule_code)
+
+        unregistered = all_rule_ids - registered
+        if unregistered:
+            logger.info(
+                "[QCEngine] 以下内置规则未在 qc_rule_definitions 登记，按启用处理：%s",
+                ", ".join(sorted(unregistered)),
+            )
+        return all_rule_ids - disabled_codes
 
     async def check(
         self,

@@ -68,10 +68,13 @@ except ImportError:
     print("ERROR: pyyaml not installed. Run: pip install pyyaml", file=sys.stderr)
     sys.exit(1)
 
-# 复用 analyze_wp_templates 的归类逻辑
+# 复用 analyze_wp_templates 的归类逻辑（analyze_wp_templates 位于 scripts/analyze 兄弟目录）
 SCRIPT_DIR = Path(__file__).resolve().parent
 if str(SCRIPT_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPT_DIR))
+_ANALYZE_DIR = SCRIPT_DIR.parent / "analyze"
+if _ANALYZE_DIR.exists() and str(_ANALYZE_DIR) not in sys.path:
+    sys.path.insert(0, str(_ANALYZE_DIR))
 
 from analyze_wp_templates import (  # noqa: E402
     classify_sheet,
@@ -184,28 +187,12 @@ DEFAULT_TEMPLATE_ROOT = WORKSPACE_ROOT / "backend" / "wp_templates"
 DEFAULT_OUTPUT_DIR = WORKSPACE_ROOT / "backend" / "data" / "wp_render_schema" / "generated"
 HANDCRAFTED_DIR = WORKSPACE_ROOT / "backend" / "data" / "wp_render_schema"
 
-# ─── 9 类 → componentType 映射（与 wp_classification_service 一致） ───
-_CLASS_TO_COMPONENT: dict[str, str] = {
-    "A-": "a-program-console",
-    "B-": "b-index",
-    "C-": "c-note-table",
-    "E-": "e-control-test",
-    "F-": "univer",
-    "G-": "univer",
-    "H-": "h-static-doc",
-    "I-": "skip",
-}
+# 将 backend 加入 sys.path 以支持 from app.services.* 导入
+_BACKEND_DIR = str(WORKSPACE_ROOT / "backend")
+if _BACKEND_DIR not in sys.path:
+    sys.path.insert(0, _BACKEND_DIR)
 
-_D_SUB_ROUTING: dict[str, str] = {
-    "D-函证": "d-form-confirmation",
-    "D-盘点": "d-form-confirmation",
-    "D-访谈": "d-form-confirmation",
-    "D-政策检查": "d-form-paragraph",
-    "D-业务模式": "d-form-qa",
-    "D-复核记录": "d-form-review",
-}
-
-_D_DEFAULT = "d-form-table"
+from app.services.wp_component_type_mapping import class_code_to_component  # noqa: E402
 
 # ─── wp_code 提取（从文件名前缀） ──────────────────────────────
 # 支持多级子序号：A17-5-1, B22A-4-4-1, D2-1 等
@@ -213,15 +200,15 @@ _WP_CODE_PATTERN = re.compile(r"^([A-Z]\d+[A-Z]?(?:-\d+)*)")
 
 
 def derive_component_type(class_code: str | None) -> str:
-    """归类 → componentType 映射（D 类有子路由）"""
+    """从 class_code 推导 componentType。未匹配时 fallback 'univer'。
+
+    委托给共享纯函数 class_code_to_component（单一真源），
+    None 时返回 "univer"（脚本场景无需抛异常）。
+    """
     if not class_code:
         return "univer"
-    if class_code.startswith("D-"):
-        return _D_SUB_ROUTING.get(class_code, _D_DEFAULT)
-    for prefix, ctype in _CLASS_TO_COMPONENT.items():
-        if class_code.startswith(prefix):
-            return ctype
-    return "univer"
+    result = class_code_to_component(class_code)
+    return result if result is not None else "univer"
 
 
 def extract_wp_code_from_filename(filename: str) -> str | None:
@@ -610,6 +597,35 @@ def write_yaml(schema: dict[str, Any], output_path: Path) -> None:
     output_path.write_text(header + body, encoding="utf-8")
 
 
+def preserve_reviewed_sheets(schema: dict[str, Any], output_path: Path) -> int:
+    """人工审定保护：若既有输出 YAML 中某 sheet 标 `_reviewed: true`，
+    则用其（人工审定的 columns/字段）覆盖本次自动检测结果，避免重新生成冲掉审定成果。
+
+    Requirement 2.2/7.4（e0-send-list-components）：重新生成不得覆盖 `_reviewed` sheet。
+
+    Returns: 被保留的 sheet 数量。
+    """
+    if not output_path.exists():
+        return 0
+    try:
+        existing = yaml.safe_load(output_path.read_text(encoding="utf-8"))
+    except Exception as e:  # noqa: BLE001
+        logger.warning("加载既有 YAML 失败（跳过 _reviewed 保护）%s: %s", output_path, e)
+        return 0
+    if not isinstance(existing, dict):
+        return 0
+    existing_sheets = existing.get("sheets") or {}
+    target_sheets = schema.get("sheets")
+    if not isinstance(existing_sheets, dict) or not isinstance(target_sheets, dict):
+        return 0
+    preserved = 0
+    for sheet_name, sheet_data in existing_sheets.items():
+        if isinstance(sheet_data, dict) and sheet_data.get("_reviewed") is True:
+            target_sheets[sheet_name] = sheet_data
+            preserved += 1
+    return preserved
+
+
 def collect_handcrafted_wp_codes() -> set[str]:
     """收集手工 YAML 已覆盖的 wp_code（避免覆盖手工成果）"""
     if not HANDCRAFTED_DIR.exists():
@@ -809,6 +825,11 @@ def main(argv: list[str] | None = None) -> int:
 
             schema = merged_schema
             stats = merged_stats
+
+            # 人工审定保护：保留既有 `_reviewed: true` sheet（不被自动检测覆盖）
+            _preserved = preserve_reviewed_sheets(schema, output_path)
+            if _preserved:
+                logger.info("  ⛨ 保留 %d 个人工审定 sheet（_reviewed: true）", _preserved)
 
             # 统计 class_code
             for sheet_data in schema.get("sheets", {}).values():

@@ -90,30 +90,42 @@
         }
       },
       "key_rows": {
-        "total": {
-          "row": 9,
-          "label": "合计",
+        "fv_total": {
+          "row": 14,
+          "label": "其他债权投资公允价值合计",
+          "is_total": true
+        },
+        "carrying_total": {
+          "row": 60,
+          "label": "其他债权投资账面价值合计",
           "is_total": true,
           "report_row": "BS-020"
         },
         "tb": {
-          "row": 11,
+          "row": 61,
           "label": "试算平衡表数"
         },
         "diff": {
-          "row": 12,
-          "label": "差异数"
+          "row": 62,
+          "label": "差异数",
+          "formula_note": "差异数=账面价值合计-试算平衡表数"
         }
       },
+      "structure_notes": [
+        "一、公允价值（明细来自G6-2）→小计→减一年内到期→公允价值合计",
+        "二、摊余成本：（一）投资成本（二）利息调整（三）账面余额=成本+利息（四）减值准备（五）账面价值=余额-减值",
+        "成本/利息层「单项/按组合计提坏账准备」为按ECL评估方式归类的余额标签，非减值金额本身",
+        "变动率超过30%需填写原因分析"
+      ],
       "detail_discovery": {
         "mode": "auto",
-        "start_row": 7,
-        "end_rule": "before_first_total",
+        "start_row": 8,
+        "end_rule": "before_label",
+        "end_label": "小计",
         "skip_empty": true,
-        "description": "自动识别第7行到合计行之间的所有非空明细行",
+        "description": "公允价值区明细行（链接明细表G6-2）",
         "example_labels": [
           "债券投资",
-          "其他",
           "国债",
           "企业债券"
         ]
@@ -127,17 +139,60 @@
     {
       "exact_name": "附注披露信息（国企）",
       "type": "note_disclosure",
-      "code": "附注披露信息（国企）"
+      "code": "附注披露信息（国企）",
+      "rows": 95,
+      "columns": 6,
+      "note_section": {
+        "soe_standalone": "八、16",
+        "soe_consolidated": "五、17"
+      },
+      "sections": {
+        "balance_overview": "8:12",
+        "important_investments": "14:20",
+        "stage_1": "23:40",
+        "stage_2": "41:57",
+        "stage_3": "58:74",
+        "impairment_walkforward": "75:89",
+        "preparation_notes": "90:95"
+      },
+      "structure_notes": [
+        "公允价值分类余额取自G6-1，重要投资逐项信息取自G6-2",
+        "三阶段减值按摊余成本口径分析，减值准备合计与G6-3期末审定数勾稽",
+        "减值准备滚动：期末=期初+阶段转移+计提-转回-转销-核销+其他",
+        "保存后单向同步至附注模块国企其他债权投资章节"
+      ]
     },
     {
       "exact_name": "明细表G6-2",
       "type": "detail",
-      "code": "G6-2"
+      "code": "G6-2",
+      "columns": 33,
+      "structure_notes": [
+        "A–F 基础信息：投资种类/项目/面值/票面利率/实际利率/到期日",
+        "G–Q 期初：成本+利息调整+应计利息→小计；公允价值+调整数→审定；减超过一年→期初报表数",
+        "R–U 本期变动（借方正数）：成本/利息调整/应计利息→小计",
+        "V–AG 期末：分项=期初+变动；公允价值+调整→审定；减一年内到期→期末报表数；发函情况",
+        "分类：购入一年内到期（其他流动资产）/ 到期超过一年"
+      ],
+      "key_formulas": {
+        "opening_subtotal": "成本+利息调整+应计利息",
+        "opening_audited": "公允价值+调整数",
+        "opening_report": "审定数-超过一年到期的部分",
+        "closing_component": "期初+本期变动",
+        "closing_audited": "公允价值+调整数",
+        "closing_report": "审定数-一年内到期余额"
+      }
     },
     {
       "exact_name": "坏账准备明细表G6-3",
       "type": "detail",
-      "code": "G6-3"
+      "code": "G6-3",
+      "structure_notes": [
+        "滚动态：期初(未审|调整|审定) → 本期增加(计提|其他) → 本期减少(转回|转销|其他) → 期末(未审|调整|审定)",
+        "分组：按单项评估计提 / 信用风险组合计提 / 合计",
+        "期末未审=期初未审+增加-减少；期末审定=期末未审+期末调整",
+        "ECL损失率测算在G6-12，本表聚焦滚动与G6-1减值勾稽"
+      ]
     },
     {
       "exact_name": "调整分录汇总G6-4",

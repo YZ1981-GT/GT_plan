@@ -1,0 +1,481 @@
+{
+  "contract_id": "d3.prepaid_receipts_detail",
+  "document_type": "xlsx",
+  "identity_carriers": [
+    "hidden_sheet",
+    "defined_name",
+    "excel_table",
+    "hidden_uuid_column"
+  ],
+  "instrumentation_definition_sha256": "15370ee891da981073d5d87b6cafbb8c9858ce366ed4753906cb4b419ae8b3e6",
+  "review": {
+    "authority_root": "backend/wp_templates",
+    "entry_id": "xlsx/gt-d3-prepaid-accounts",
+    "html_store": {
+      "item_id": "D3-det-rows",
+      "note": "整张预收账款明细表存成这一条 item 的 remark（JSON 数组字符串，useD3Detail 的 JSON.stringify(rows)）。本契约按 stable field + row rowId 拆开，禁止把整 JSON 当一个字段比较（对齐 D2 AC 6.9 / 6.12）。账龄为 nested keyed（agingPrior/agingAudited，段来自 useAgingConfig D3 默认 THREE_YEAR 的 4 段），json_pointer 用 /rows/{uuid}/agingPrior/within1",
+      "row_identity_key": "rowId",
+      "shape": "json_array_of_row_objects",
+      "table": "checklist_responses"
+    },
+    "pilot_class": "phase5_prepaid_receipts",
+    "reviewed_basis": "openpyxl 逐 sheet 直读净化后权威模板 D/D3 预收账款.xlsx（外链净化后 sha256 699a9be0），只取受管 sheet 预收账款明细表D3-2：两级表头 行 10（组标题）/ 行 11（账龄子标题 1年以下/1～2/２～3/3年以上），27 列 A-AA，数据区 12-23，H/O/Q/T 四列逐行公式 =E+F+G / =E+N-M（贷方科目）/ =O+P / =Q+R+S，A24「合计」footer（纯两字无空格）；19 标量列 + 两个账龄组各 4 段（I-L 期初 / U-X 期末审定）；字段键与前端 useD3Detail.DetailRow 逐字段锁死。wp_code=D3（载荷落点：sibling D3-vc-current-rows 落 D3；D3-det-rows 全库 0 行但 D3 wp 未删除有 file_path，同 H1 空表单情形；非 D3P 幻影码 / 非 D3-2 名义码）"
+  },
+  "review_status": "reviewed",
+  "schema_version": "contract-definition:v1",
+  "semantic_version": "1.0.0",
+  "sheets": [
+    {
+      "excel_name": "预收账款明细表D3-2",
+      "locator": {
+        "anchor": "excel_table_sheet_association"
+      },
+      "sheet_key": "d32-managed",
+      "tables": [
+        {
+          "anchor": "A10",
+          "delete_policy": "tombstone",
+          "fields": [
+            {
+              "cell": {
+                "column": "A",
+                "row_from": "row_identity"
+              },
+              "column_key": "customer_name",
+              "header_source_ref": "源xlsx!预收账款明细表D3-2!A10",
+              "header_text": "对方单位名称",
+              "json_pointer": "/rows/{row_uuid}/customerName",
+              "mode": "editable",
+              "source_ref": "源xlsx!预收账款明细表D3-2!A12",
+              "stable_field_key": "prepaid_receipts_detail_rows/{row_uuid}/customer_name",
+              "store_item_id": "D3-det-rows",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "B",
+                "row_from": "row_identity"
+              },
+              "column_key": "company_code",
+              "header_source_ref": "源xlsx!预收账款明细表D3-2!B10",
+              "header_text": "公司代码",
+              "json_pointer": "/rows/{row_uuid}/companyCode",
+              "mode": "editable",
+              "source_ref": "源xlsx!预收账款明细表D3-2!B12",
+              "stable_field_key": "prepaid_receipts_detail_rows/{row_uuid}/company_code",
+              "store_item_id": "D3-det-rows",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "C",
+                "row_from": "row_identity"
+              },
+              "column_key": "nature",
+              "header_source_ref": "源xlsx!预收账款明细表D3-2!C10",
+              "header_text": "款项性质",
+              "json_pointer": "/rows/{row_uuid}/nature",
+              "mode": "editable",
+              "source_ref": "源xlsx!预收账款明细表D3-2!C12",
+              "stable_field_key": "prepaid_receipts_detail_rows/{row_uuid}/nature",
+              "store_item_id": "D3-det-rows",
+              "value_type": "enum"
+            },
+            {
+              "cell": {
+                "column": "D",
+                "row_from": "row_identity"
+              },
+              "column_key": "relation_type",
+              "header_source_ref": "源xlsx!预收账款明细表D3-2!D10",
+              "header_text": "关联方类型",
+              "json_pointer": "/rows/{row_uuid}/relationType",
+              "mode": "editable",
+              "source_ref": "源xlsx!预收账款明细表D3-2!D12",
+              "stable_field_key": "prepaid_receipts_detail_rows/{row_uuid}/relation_type",
+              "store_item_id": "D3-det-rows",
+              "value_type": "enum"
+            },
+            {
+              "cell": {
+                "column": "E",
+                "row_from": "row_identity"
+              },
+              "column_key": "prior_unadjusted",
+              "header_source_ref": "源xlsx!预收账款明细表D3-2!E10",
+              "header_text": "期初未审余额",
+              "json_pointer": "/rows/{row_uuid}/priorUnadjusted",
+              "mode": "editable",
+              "source_ref": "源xlsx!预收账款明细表D3-2!E12",
+              "stable_field_key": "prepaid_receipts_detail_rows/{row_uuid}/prior_unadjusted",
+              "store_item_id": "D3-det-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "F",
+                "row_from": "row_identity"
+              },
+              "column_key": "prior_adjustment",
+              "header_source_ref": "源xlsx!预收账款明细表D3-2!F10",
+              "header_text": "期初账项调整",
+              "json_pointer": "/rows/{row_uuid}/priorAdjustment",
+              "mode": "editable",
+              "source_ref": "源xlsx!预收账款明细表D3-2!F12",
+              "stable_field_key": "prepaid_receipts_detail_rows/{row_uuid}/prior_adjustment",
+              "store_item_id": "D3-det-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "G",
+                "row_from": "row_identity"
+              },
+              "column_key": "prior_reclass",
+              "header_source_ref": "源xlsx!预收账款明细表D3-2!G10",
+              "header_text": "期初重分类调整",
+              "json_pointer": "/rows/{row_uuid}/priorReclass",
+              "mode": "editable",
+              "source_ref": "源xlsx!预收账款明细表D3-2!G12",
+              "stable_field_key": "prepaid_receipts_detail_rows/{row_uuid}/prior_reclass",
+              "store_item_id": "D3-det-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "H",
+                "row_from": "row_identity"
+              },
+              "column_key": "prior_audited",
+              "header_source_ref": "源xlsx!预收账款明细表D3-2!H10",
+              "header_text": "期初审定余额",
+              "json_pointer": "/rows/{row_uuid}/priorAudited",
+              "mode": "formula",
+              "source_ref": "源xlsx!预收账款明细表D3-2!H12",
+              "stable_field_key": "prepaid_receipts_detail_rows/{row_uuid}/prior_audited",
+              "store_item_id": "D3-det-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "I",
+                "row_from": "row_identity"
+              },
+              "column_key": "aging_prior_within1",
+              "group_source_ref": "源xlsx!预收账款明细表D3-2!I10",
+              "header_source_ref": "源xlsx!预收账款明细表D3-2!I11",
+              "header_text": "1年以下",
+              "json_pointer": "/rows/{row_uuid}/agingPrior/within1",
+              "mode": "editable",
+              "source_ref": "源xlsx!预收账款明细表D3-2!I12",
+              "stable_field_key": "prepaid_receipts_detail_rows/{row_uuid}/aging_prior_within1",
+              "store_item_id": "D3-det-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "J",
+                "row_from": "row_identity"
+              },
+              "column_key": "aging_prior_y1to2",
+              "group_source_ref": "源xlsx!预收账款明细表D3-2!I10",
+              "header_source_ref": "源xlsx!预收账款明细表D3-2!J11",
+              "header_text": "1～2年",
+              "json_pointer": "/rows/{row_uuid}/agingPrior/y1to2",
+              "mode": "editable",
+              "source_ref": "源xlsx!预收账款明细表D3-2!J12",
+              "stable_field_key": "prepaid_receipts_detail_rows/{row_uuid}/aging_prior_y1to2",
+              "store_item_id": "D3-det-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "K",
+                "row_from": "row_identity"
+              },
+              "column_key": "aging_prior_y2to3",
+              "group_source_ref": "源xlsx!预收账款明细表D3-2!I10",
+              "header_source_ref": "源xlsx!预收账款明细表D3-2!K11",
+              "header_text": "２～3年",
+              "json_pointer": "/rows/{row_uuid}/agingPrior/y2to3",
+              "mode": "editable",
+              "source_ref": "源xlsx!预收账款明细表D3-2!K12",
+              "stable_field_key": "prepaid_receipts_detail_rows/{row_uuid}/aging_prior_y2to3",
+              "store_item_id": "D3-det-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "L",
+                "row_from": "row_identity"
+              },
+              "column_key": "aging_prior_over3",
+              "group_source_ref": "源xlsx!预收账款明细表D3-2!I10",
+              "header_source_ref": "源xlsx!预收账款明细表D3-2!L11",
+              "header_text": "3年以上",
+              "json_pointer": "/rows/{row_uuid}/agingPrior/over3",
+              "mode": "editable",
+              "source_ref": "源xlsx!预收账款明细表D3-2!L12",
+              "stable_field_key": "prepaid_receipts_detail_rows/{row_uuid}/aging_prior_over3",
+              "store_item_id": "D3-det-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "M",
+                "row_from": "row_identity"
+              },
+              "column_key": "debit",
+              "header_source_ref": "源xlsx!预收账款明细表D3-2!M10",
+              "header_text": "借方发生",
+              "json_pointer": "/rows/{row_uuid}/debit",
+              "mode": "editable",
+              "source_ref": "源xlsx!预收账款明细表D3-2!M12",
+              "stable_field_key": "prepaid_receipts_detail_rows/{row_uuid}/debit",
+              "store_item_id": "D3-det-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "N",
+                "row_from": "row_identity"
+              },
+              "column_key": "credit",
+              "header_source_ref": "源xlsx!预收账款明细表D3-2!N10",
+              "header_text": "贷方发生",
+              "json_pointer": "/rows/{row_uuid}/credit",
+              "mode": "editable",
+              "source_ref": "源xlsx!预收账款明细表D3-2!N12",
+              "stable_field_key": "prepaid_receipts_detail_rows/{row_uuid}/credit",
+              "store_item_id": "D3-det-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "O",
+                "row_from": "row_identity"
+              },
+              "column_key": "end_balance",
+              "header_source_ref": "源xlsx!预收账款明细表D3-2!O10",
+              "header_text": "期末余额",
+              "json_pointer": "/rows/{row_uuid}/endBalance",
+              "mode": "formula",
+              "source_ref": "源xlsx!预收账款明细表D3-2!O12",
+              "stable_field_key": "prepaid_receipts_detail_rows/{row_uuid}/end_balance",
+              "store_item_id": "D3-det-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "P",
+                "row_from": "row_identity"
+              },
+              "column_key": "entity_reclass",
+              "header_source_ref": "源xlsx!预收账款明细表D3-2!P10",
+              "header_text": "被审计单位重分类调整",
+              "json_pointer": "/rows/{row_uuid}/entityReclass",
+              "mode": "editable",
+              "source_ref": "源xlsx!预收账款明细表D3-2!P12",
+              "stable_field_key": "prepaid_receipts_detail_rows/{row_uuid}/entity_reclass",
+              "store_item_id": "D3-det-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "Q",
+                "row_from": "row_identity"
+              },
+              "column_key": "end_unadjusted",
+              "header_source_ref": "源xlsx!预收账款明细表D3-2!Q10",
+              "header_text": "期末未审余额",
+              "json_pointer": "/rows/{row_uuid}/endUnadjusted",
+              "mode": "formula",
+              "source_ref": "源xlsx!预收账款明细表D3-2!Q12",
+              "stable_field_key": "prepaid_receipts_detail_rows/{row_uuid}/end_unadjusted",
+              "store_item_id": "D3-det-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "R",
+                "row_from": "row_identity"
+              },
+              "column_key": "end_aje",
+              "header_source_ref": "源xlsx!预收账款明细表D3-2!R10",
+              "header_text": "期末账项调整",
+              "json_pointer": "/rows/{row_uuid}/endAje",
+              "mode": "editable",
+              "source_ref": "源xlsx!预收账款明细表D3-2!R12",
+              "stable_field_key": "prepaid_receipts_detail_rows/{row_uuid}/end_aje",
+              "store_item_id": "D3-det-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "S",
+                "row_from": "row_identity"
+              },
+              "column_key": "end_rje",
+              "header_source_ref": "源xlsx!预收账款明细表D3-2!S10",
+              "header_text": "期末重分类调整",
+              "json_pointer": "/rows/{row_uuid}/endRje",
+              "mode": "editable",
+              "source_ref": "源xlsx!预收账款明细表D3-2!S12",
+              "stable_field_key": "prepaid_receipts_detail_rows/{row_uuid}/end_rje",
+              "store_item_id": "D3-det-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "T",
+                "row_from": "row_identity"
+              },
+              "column_key": "end_audited",
+              "header_source_ref": "源xlsx!预收账款明细表D3-2!T10",
+              "header_text": "期末审定数",
+              "json_pointer": "/rows/{row_uuid}/endAudited",
+              "mode": "formula",
+              "source_ref": "源xlsx!预收账款明细表D3-2!T12",
+              "stable_field_key": "prepaid_receipts_detail_rows/{row_uuid}/end_audited",
+              "store_item_id": "D3-det-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "U",
+                "row_from": "row_identity"
+              },
+              "column_key": "aging_audited_within1",
+              "group_source_ref": "源xlsx!预收账款明细表D3-2!U10",
+              "header_source_ref": "源xlsx!预收账款明细表D3-2!U11",
+              "header_text": "1年以下",
+              "json_pointer": "/rows/{row_uuid}/agingAudited/within1",
+              "mode": "editable",
+              "source_ref": "源xlsx!预收账款明细表D3-2!U12",
+              "stable_field_key": "prepaid_receipts_detail_rows/{row_uuid}/aging_audited_within1",
+              "store_item_id": "D3-det-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "V",
+                "row_from": "row_identity"
+              },
+              "column_key": "aging_audited_y1to2",
+              "group_source_ref": "源xlsx!预收账款明细表D3-2!U10",
+              "header_source_ref": "源xlsx!预收账款明细表D3-2!V11",
+              "header_text": "1～2年",
+              "json_pointer": "/rows/{row_uuid}/agingAudited/y1to2",
+              "mode": "editable",
+              "source_ref": "源xlsx!预收账款明细表D3-2!V12",
+              "stable_field_key": "prepaid_receipts_detail_rows/{row_uuid}/aging_audited_y1to2",
+              "store_item_id": "D3-det-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "W",
+                "row_from": "row_identity"
+              },
+              "column_key": "aging_audited_y2to3",
+              "group_source_ref": "源xlsx!预收账款明细表D3-2!U10",
+              "header_source_ref": "源xlsx!预收账款明细表D3-2!W11",
+              "header_text": "２～3年",
+              "json_pointer": "/rows/{row_uuid}/agingAudited/y2to3",
+              "mode": "editable",
+              "source_ref": "源xlsx!预收账款明细表D3-2!W12",
+              "stable_field_key": "prepaid_receipts_detail_rows/{row_uuid}/aging_audited_y2to3",
+              "store_item_id": "D3-det-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "X",
+                "row_from": "row_identity"
+              },
+              "column_key": "aging_audited_over3",
+              "group_source_ref": "源xlsx!预收账款明细表D3-2!U10",
+              "header_source_ref": "源xlsx!预收账款明细表D3-2!X11",
+              "header_text": "3年以上",
+              "json_pointer": "/rows/{row_uuid}/agingAudited/over3",
+              "mode": "editable",
+              "source_ref": "源xlsx!预收账款明细表D3-2!X12",
+              "stable_field_key": "prepaid_receipts_detail_rows/{row_uuid}/aging_audited_over3",
+              "store_item_id": "D3-det-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "Y",
+                "row_from": "row_identity"
+              },
+              "column_key": "is_confirmed",
+              "header_source_ref": "源xlsx!预收账款明细表D3-2!Y10",
+              "header_text": "是否发函",
+              "json_pointer": "/rows/{row_uuid}/isConfirmed",
+              "mode": "editable",
+              "source_ref": "源xlsx!预收账款明细表D3-2!Y12",
+              "stable_field_key": "prepaid_receipts_detail_rows/{row_uuid}/is_confirmed",
+              "store_item_id": "D3-det-rows",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "Z",
+                "row_from": "row_identity"
+              },
+              "column_key": "post_period_settlement",
+              "header_source_ref": "源xlsx!预收账款明细表D3-2!Z10",
+              "header_text": "期后结转",
+              "json_pointer": "/rows/{row_uuid}/postPeriodSettlement",
+              "mode": "editable",
+              "source_ref": "源xlsx!预收账款明细表D3-2!Z12",
+              "stable_field_key": "prepaid_receipts_detail_rows/{row_uuid}/post_period_settlement",
+              "store_item_id": "D3-det-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "AA",
+                "row_from": "row_identity"
+              },
+              "column_key": "remark",
+              "header_source_ref": "源xlsx!预收账款明细表D3-2!AA10",
+              "header_text": "备注",
+              "json_pointer": "/rows/{row_uuid}/remark",
+              "mode": "editable",
+              "source_ref": "源xlsx!预收账款明细表D3-2!AA12",
+              "stable_field_key": "prepaid_receipts_detail_rows/{row_uuid}/remark",
+              "store_item_id": "D3-det-rows",
+              "value_type": "text"
+            }
+          ],
+          "footer_anchor": {
+            "carries_total_formula": true,
+            "marker": "合计",
+            "note": "footer 行 A24「合计」（纯两字无空格）。声明为真使结构性插行有权按声明位移量扩张该区间（同 D7，但 D3 marker 无空格）",
+            "search_column": "A"
+          },
+          "formula_mask": [
+            "H12:H23",
+            "O12:O23",
+            "Q12:Q23",
+            "T12:T23"
+          ],
+          "header_rows": 2,
+          "row_identity": {
+            "json_pointer": "/rows/*/rowId",
+            "kind": "field"
+          },
+          "table_key": "prepaid_receipts_detail_rows"
+        }
+      ]
+    }
+  ],
+  "template": {
+    "normalized_structure_hash": "d1532efd756786cb388f8fb172c30b42dbe673284808abe4a6ecce9d665c067f",
+    "relative_path": "D/D3 预收账款.xlsx",
+    "template_sha256": "699a9be0e7da639f3e5cd3a2d3bfdf38f7e777b330f9ec6959f5cc390fb6c2d2"
+  },
+  "template_definition_sha256": "8e3177b8669e7b73a1c1684b724a7882a03b9b5d9952e6144faf12c05ed5a1c4"
+}

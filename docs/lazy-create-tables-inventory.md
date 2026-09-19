@@ -1,66 +1,102 @@
-# 全仓懒建表扫描清单（CREATE TABLE IF NOT EXISTS）
+# 懒建表清单（CREATE TABLE IF NOT EXISTS 全仓扫描）
 
-> 扫描日期：2026-06-01
-> 排除目录：`migrations/`、`tests/`、`.hypothesis/`、`node_modules/`
-> 关联 Bug 条件：C5（懒建表绕 D6，drift detector 盲区）
-> 关联属性：H4（懒建表入 D6）
+> **判据来源**：`backend/tests/test_cleanup_h4_lazy_table_scan.py`（Property H4 / Requirements C5）。
+> 本文档与该测试里的分类常量**双向锁死** —— 改一处必须改另一处，否则测试打红。
+>
+> **最近实测**：2026-09-06 扫描 `backend/app` + `backend/scripts` 共 **2735** 个 py 文件，
+> 发现 **6** 张懒建表（排除 `migrations/` `tests/` `.hypothesis/` 等目录）。
 
-## 一、业务路由懒建表（需治理）
+## 为什么要有这份清单
 
-以下文件在运行时通过 `ensure_table()` 函数执行 `CREATE TABLE IF NOT EXISTS`，绕开 D6 MigrationRunner：
+平台的 schema 真源是 `backend/migrations/V*.sql`（由 `MigrationRunner` 在启动时跑）。
+业务代码里写 `CREATE TABLE IF NOT EXISTS` 会绕过这条唯一通道，后果有三：
 
-| # | 表名 | 文件路径 | 处理归属 |
-|---|------|----------|----------|
-| 1 | `formula_audit_log` | `backend/app/routers/formula_audit_log.py` | **formula-engine-unification spec** |
-| 2 | `account_note_mapping` | `backend/app/routers/account_note_mapping.py` | **本 spec（global-modules-cleanup Task 8）** |
-| 3 | `consol_cell_comments` | `backend/app/routers/consol_cell_comments.py` | **本 spec（global-modules-cleanup Task 8）** |
-| 4 | `consol_worksheet_data` | `backend/app/routers/consol_worksheet_data.py` | **本 spec（V041 迁移，ensure_table 已删）** |
-| 5 | `consol_note_data` | `backend/app/routers/consol_note_sections.py` | **本 spec（V041 迁移，ensure_table 已删）** |
+- **schema 漂移检测失效**：`SchemaDriftDetector` 比对 ORM ↔ DB，懒建表两侧都不在，漂移无感；
+- **多环境不一致**：表结构取决于「哪个端点先被调用过」，而不是迁移版本号；
+- **回滚无路**：迁移有配对的 `R*.sql`，懒建没有。
 
-## 二、基础设施表（合理使用，无需治理）
+所以懒建表默认视为债务，只有下面明确分类的才算合法存在。
 
-以下是 D6 MigrationRunner 自身的基础设施表，属于 bootstrap 阶段必须的自举建表，不算"绕开 D6"：
+## 分类总览
 
-| # | 表名 | 文件路径 | 说明 |
-|---|------|----------|------|
-| 6 | `schema_version` | `backend/app/core/migration_runner.py` | MigrationRunner 自身版本追踪表（自举） |
-| 7 | `schema_migration_failures` | `backend/app/core/migration_runner.py` | 迁移失败记录表（自举） |
-| 8 | `schema_drift_log` | `backend/app/core/schema_drift_detector.py` | drift detector 日志表（V026 兜底安全网） |
+| 分类 | 张数 | 是否债务 | 说明 |
+|---|---|---|---|
+| 业务路由懒建（`KNOWN_LAZY_TABLES`） | 0 | 是 | 当前已全部收口/迁移，为空 |
+| 基础设施（`INFRA_TABLES`） | 3 | 否 | 迁移系统自身依赖，无法用迁移创建 |
+| 一次性运维脚本（`ONE_OFF_SCRIPT_TABLES`） | 3 | 否 | 仅人工执行脚本时建，生产路径永不触达 |
+| 已迁移入 D6（`MIGRATED_TO_D6_TABLES`） | 4 | 已清 | V040/V041 收口 |
+| 已彻底消除（`ELIMINATED_LAZY_TABLES`） | 1 | 已清 | 收口哈希链后删除懒建 |
 
-## 三、工具/生成器（合理使用，无需治理）
+## 一、业务路由懒建表（`KNOWN_LAZY_TABLES`）
 
-| # | 文件路径 | 说明 |
-|---|----------|------|
-| 9 | `backend/scripts/gen/gen_schema_sync_migration.py` | 迁移 SQL 生成器（输出 D6 迁移文件，非运行时懒建） |
+**当前为空** —— 历史上的业务懒建表已全部收口，见下面第四、五节。
 
-## 四、文档中的 DDL 示例（仅文档，无需治理）
+新增业务表**不得**走懒建：写迁移 `V*.sql` + 配对 `R*.sql`，并在 ORM 里声明模型
+（若有意不映射 ORM，须在 `SchemaDriftDetector.KNOWN_ALLOWLIST` 登记并写明设计裁决理由）。
 
-- `docs/proposals/workpaper-development-v2.md` — 合并报表设计文档中的 SQL 示例
-- `docs/proposals/global-modules-status-and-improvement-2026-05-31.md` — 盘点文档引用
-- `docs/adr/ADR-CONSOL-003-v027-baseline-migration.md` — ADR 文档
+## 二、基础设施表（`INFRA_TABLES`，合法）
 
-## 五、处理计划
+这三张是**迁移系统自身**的依赖，存在鸡生蛋问题：它们必须在任何迁移执行**之前**就位，
+因此只能懒建。
 
-### 本 spec 处理（Task 8 + 复盘补充）
-- `account_note_mapping` → V040 迁移 ✅
-- `consol_cell_comments` → V040 迁移 ✅
-- `consol_worksheet_data` → V041 迁移 ✅
-- `consol_note_data` → V041 迁移 ✅
+| 表 | 建表位置 | 用途 |
+|---|---|---|
+| `schema_version` | `backend/app/core/migration_runner.py` | 已应用迁移的版本台账 |
+| `schema_migration_failures` | `backend/app/core/migration_runner.py` | 迁移失败记录（供 `/api/health` 暴露） |
+| `schema_drift_log` | `backend/app/core/schema_drift_detector.py` | 每次启动覆写的漂移快照 |
 
-### formula-engine-unification spec 处理
-- `formula_audit_log` → 该 spec 审计收口时统一迁移
+## 三、一次性运维脚本表（`ONE_OFF_SCRIPT_TABLES`，合法）
 
-### 待评估（合并模块后续）
-- ~~`consol_worksheet_data`~~ — 已入 V041 迁移
-- ~~`consol_note_data`~~ — 已入 V041 迁移
+判据（**三条全满足**才归此类，否则应收口进迁移）：
 
-> 注：合并模块的 `consol_worksheet_data` 和 `consol_note_data` 两表已有 ORM 模型但懒建未入 D6，
-> 建议在合并模块下一轮维护时统一纳入迁移。本 spec 不处理以避免跨 spec 冲突。
+1. 建表语句在 `backend/scripts/` 下，`backend/app/` 内**零引用**；
+2. 脚本是一次性/自愈用途（清理、诊断、补齐），不是业务功能；
+3. 该表已在 `SchemaDriftDetector.KNOWN_ALLOWLIST` 登记，或其列集与 ORM 单一真源对齐
+   （不构成第二套 schema 真源）。
 
-## 六、结论
+| 表 | 建表脚本 | 性质 |
+|---|---|---|
+| `_note_ai_text_backup` | `backend/scripts/fix/_fix_clear_stale_ai_text_content.py` | 清理「已底稿同步章节的残留 AI 草稿 `text_content`」前的回滚备份 |
+| `_note_text_markdown_backup` | `backend/scripts/diagnose_note_text_markdown.py` | 清理 `text_content` 里 markdown 残留（`###`/`**`）前的回滚备份 |
+| `custom_query_templates` | `backend/scripts/_ensure_custom_query_tables.py` | 旧库/新环境缺表时的**幂等自愈**，非新建语义 |
 
-全仓共发现 **5 处业务路由懒建表**（绕 D6）：
-- 1 处归 formula-engine-unification spec
-- 4 处归本 spec（V040 + V041 迁移，ensure_table 全部删除）✅
+两张 `_note_*_backup` 的清理动作已完成，但脚本的 `--rollback` 分支依赖它们，故**保留不删**；
+两者均已在 `SchemaDriftDetector.KNOWN_ALLOWLIST` 登记（否则启动会报 `db_extra` 漂移噪音）。
 
-基础设施表（schema_version / schema_migration_failures / schema_drift_log）属于 D6 自举，合理使用。
+`custom_query_templates` 属特殊情形：它**本来就有迁移**（V033 建表 + V051 补 4 列 +
+V101 加 `shared_project_ids`），脚本只是为「模板功能报表不存在」这类单点故障提供快速自愈。
+脚本头部显式写了 R10.5 单一真源约束，要求其列集/索引集与 ORM
+`CustomQueryTemplate` 及上述三个迁移保持一致 —— 改任一处必须同步。
+
+## 四、已迁移入 D6（`MIGRATED_TO_D6_TABLES`，债务已清）
+
+| 表 | 原懒建位置 | 收口迁移 |
+|---|---|---|
+| `account_note_mapping` | `backend/app/routers/account_note_mapping.py` | V040 |
+| `consol_cell_comments` | `backend/app/routers/consol_cell_comments.py` | V040 |
+| `consol_worksheet_data` | `backend/app/routers/consol_worksheet_data.py` | V041 |
+| `consol_note_data` | `backend/app/routers/consol_note_sections.py` | V041 |
+
+其中 `account_note_mapping` + `consol_cell_comments` 是本 spec（cleanup / Task 8）处理的表；
+`consol_worksheet_data` + `consol_note_data` 由实施后复盘补充迁移。
+
+测试 `test_migrated_tables_no_longer_lazy_created` 断言这四张**不再**出现在扫描结果里。
+
+## 五、已彻底消除懒建（`ELIMINATED_LAZY_TABLES`，债务已清）
+
+| 表 | 原懒建位置 | 处置 |
+|---|---|---|
+| `formula_audit_log` | `backend/app/routers/formula_audit_log.py` | 由 **formula-engine-unification** spec 收口哈希链（2026-06-01 复盘），rollback 端点最后一处 `ensure_table` 已删 |
+
+测试 `test_eliminated_tables_no_longer_lazy_created` 与 `test_formula_audit_log_delegated`
+共同锁死这条：既要求扫描结果里没有它，也要求本文档提到 `formula-engine`。
+
+## 维护约定
+
+- **新增懒建表 = 先问能不能写迁移**。能就写迁移，不要往清单里加。
+- 确需归入第三类，必须逐条对照那三个判据，并在本文档表格里写明性质与脚本路径。
+- 分类常量与本文档是**双向锁死**关系：
+  `test_no_unknown_lazy_tables` 保证「扫描到的都已登记」，
+  `test_inventory_contains_all_known_tables` / `test_this_spec_tables_identified` /
+  `test_formula_audit_log_delegated` 保证「登记的都写进了本文档」。
+  只改一侧必然打红 —— 这是有意的。

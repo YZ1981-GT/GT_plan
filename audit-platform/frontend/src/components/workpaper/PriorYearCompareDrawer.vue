@@ -95,6 +95,7 @@ import { ElMessage } from 'element-plus'
 import { confirmDangerous } from '@/utils/confirm'
 import { Loading } from '@element-plus/icons-vue'
 import { api } from '@/services/apiProxy'
+import { useDisplayPrefsStore } from '@/stores/displayPrefs'
 
 interface PriorYearData {
   wp_id: string
@@ -214,13 +215,11 @@ function handleClose(done: () => void) {
   done()
 }
 
+const prefs = useDisplayPrefsStore()
+
 function formatAmount(amount: number | null | undefined): string {
   if (amount == null) return '—'
-  return amount.toLocaleString('zh-CN', {
-    style: 'currency',
-    currency: 'CNY',
-    minimumFractionDigits: 2,
-  })
+  return prefs.fmt(amount)
 }
 
 // 暴露 open 方法供父组件调用

@@ -157,6 +157,20 @@ class AssignmentService:
         # 自动同步 project_users 表（解决委派与权限脱节问题）
         await self._sync_project_users(project_id, created)
 
+        # procedure-delegation-visibility-isolation Task 7 / Req 14.20：
+        # 项目成员/角色变更必须在同一事务内持久递增 policy epoch 并写 invalidation outbox
+        # （不能提交后 best-effort 才失效）；随 router 单次 commit 原子生效。
+        from app.services.wp_visibility.delegation_transaction import (
+            DelegationTransactionService,
+        )
+
+        await DelegationTransactionService(self.db).bump_policy_epoch(
+            project_id,
+            "membership",
+            actor_user_id=assigned_by,
+            detail={"kind": "assignment", "count": len(created)},
+        )
+
         # 发送通知给被委派人员
         await self._send_assignment_notifications(project_id, created)
 

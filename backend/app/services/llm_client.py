@@ -1,11 +1,13 @@
-"""LLM 客户端 — 统一的 vLLM/OpenAI 兼容 API 调用 + 熔断器
+"""LLM 客户端 — 统一的 vLLM/OpenAI 兼容 API 调用 + 熔断器 + 并发限流
 
 Phase 9: 从 stub 升级为实际 vLLM 调用
 熔断器：连续 N 次失败后自动熔断，冷却期内直接返回降级响应，避免拖垮后端。
+Semaphore：限制同时最多 N 个请求并发到 LLM，其余排队等待。
 """
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import time
 from typing import AsyncGenerator
@@ -19,6 +21,10 @@ logger = logging.getLogger(__name__)
 _BASE_URL = settings.LLM_BASE_URL
 _API_KEY = settings.LLM_API_KEY
 _MODEL = settings.DEFAULT_CHAT_MODEL
+
+# --- 并发限流 ---
+_LLM_MAX_CONCURRENCY = 5  # 最多同时 5 个请求打到 LLM
+_llm_semaphore = asyncio.Semaphore(_LLM_MAX_CONCURRENCY)
 
 # --- 熔断器配置 ---
 _CIRCUIT_FAILURE_THRESHOLD = 3   # 连续失败 N 次后熔断
@@ -70,6 +76,7 @@ async def chat_completion(
     max_tokens: int = 2000,
     stream: bool = False,
     context_documents: list[str] | None = None,
+    enable_thinking: bool | None = None,
 ) -> str | AsyncGenerator[str, None]:
     """调用 LLM chat completion API
 
@@ -91,23 +98,21 @@ async def chat_completion(
         if len(context_text) > max_context_chars:
             context_text = context_text[:max_context_chars] + "\n\n[...参照文档已截断...]"
 
-        context_msg = {
-            "role": "system",
-            "content": f"以下是参照文档，请在生成内容时参考：\n\n{context_text}",
-        }
-        # 插入到 messages 的第一条 system 消息之后（或最前面）
+        context_suffix = f"\n\n以下是参照文档，请在生成内容时参考：\n\n{context_text}"
+        # 合并到第一条 system 消息（vLLM + Qwen3.5 仅允许一条 system）
         if messages and messages[0].get("role") == "system":
-            messages = [messages[0], context_msg] + messages[1:]
+            messages = [{"role": "system", "content": messages[0]["content"] + context_suffix}] + messages[1:]
         else:
-            messages = [context_msg] + messages
+            messages = [{"role": "system", "content": context_suffix.strip()}] + messages
 
+    thinking = settings.LLM_ENABLE_THINKING if enable_thinking is None else enable_thinking
     payload = {
         "model": model or _MODEL,
         "messages": messages,
         "temperature": temperature,
         "max_tokens": max_tokens,
         "stream": stream,
-        "chat_template_kwargs": {"enable_thinking": settings.LLM_ENABLE_THINKING},
+        "chat_template_kwargs": {"enable_thinking": thinking},
     }
 
     if stream:
@@ -117,40 +122,41 @@ async def chat_completion(
 
 
 async def _sync_completion(payload: dict) -> str:
-    """同步调用（非流式），含熔断检查"""
+    """同步调用（非流式），含熔断检查 + 并发限流"""
     if _breaker.is_open:
         return "[LLM 服务熔断中，请稍后重试]"
 
-    try:
-        async with httpx.AsyncClient(timeout=_LLM_TIMEOUT_SYNC, mounts={}, trust_env=False) as client:
-            resp = await client.post(
-                f"{_BASE_URL}/chat/completions",
-                json=payload,
-                headers={"Authorization": f"Bearer {_API_KEY}"},
-            )
-            resp.raise_for_status()
-            data = resp.json()
-            _breaker.record_success()
-            choice = data["choices"][0]
-            content = choice["message"].get("content")
-            finish_reason = choice.get("finish_reason")
-            if content is None and finish_reason == "length":
-                return "⚠️ 思考超出 token 限制，请简化提问或增大 max_tokens 设置。"
-            if content is None:
-                return "⚠️ LLM 未返回有效内容，请重试。"
-            return content
-    except httpx.ConnectError:
-        _breaker.record_failure()
-        logger.warning("LLM 服务不可用（连接失败），返回占位回复")
-        return "[LLM 服务暂不可用，请检查 vLLM 是否启动]"
-    except httpx.TimeoutException:
-        _breaker.record_failure()
-        logger.warning("LLM 调用超时（%ds）", _LLM_TIMEOUT_SYNC)
-        return "[LLM 调用超时，请稍后重试]"
-    except Exception as e:
-        _breaker.record_failure()
-        logger.error(f"LLM 调用失败: {e}")
-        return f"[LLM 调用失败: {e}]"
+    async with _llm_semaphore:
+        try:
+            async with httpx.AsyncClient(timeout=_LLM_TIMEOUT_SYNC, mounts={}, trust_env=False) as client:
+                resp = await client.post(
+                    f"{_BASE_URL}/chat/completions",
+                    json=payload,
+                    headers={"Authorization": f"Bearer {_API_KEY}"},
+                )
+                resp.raise_for_status()
+                data = resp.json()
+                _breaker.record_success()
+                choice = data["choices"][0]
+                content = choice["message"].get("content")
+                finish_reason = choice.get("finish_reason")
+                if content is None and finish_reason == "length":
+                    return "⚠️ 思考超出 token 限制，请简化提问或增大 max_tokens 设置。"
+                if content is None:
+                    return "⚠️ LLM 未返回有效内容，请重试。"
+                return content
+        except httpx.ConnectError:
+            _breaker.record_failure()
+            logger.warning("LLM 服务不可用（连接失败），返回占位回复")
+            return "[LLM 服务暂不可用，请检查 vLLM 是否启动]"
+        except httpx.TimeoutException:
+            _breaker.record_failure()
+            logger.warning("LLM 调用超时（%ds）", _LLM_TIMEOUT_SYNC)
+            return "[LLM 调用超时，请稍后重试]"
+        except Exception as e:
+            _breaker.record_failure()
+            logger.error(f"LLM 调用失败: {e}")
+            return f"[LLM 调用失败: {e}]"
 
 
 async def _stream_completion(payload: dict) -> AsyncGenerator[str, None]:

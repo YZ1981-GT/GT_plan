@@ -1,0 +1,116 @@
+# B50-3.yaml — 风险汇总表：认定层次重大错报风险（各循环）
+# componentType: d-form-table + render_hint: risk_level
+# Requirements: G7 风险评估汇总 — B50-3 认定层次风险数据联动 D~N 循环
+# Design: §4.3 B50→D~N 联动（风险传递）
+
+wp_code: B50-3
+template_path: backend/wp_templates/B/B50-3 风险汇总表（认定层次-各循环）.xlsx
+template_version: v2025-R5
+
+sheets:
+  认定层次风险_各循环:
+    component_type: d-form-table
+    form_type: table
+    title: 认定层次重大错报风险汇总—各循环
+    description: 按审计循环汇总认定层次的重大错报风险，联动各循环程序表
+
+    fields:
+      - field: entity_name
+        label: 被审计单位
+        type: text
+        source: project.client_name
+        readonly: true
+      - field: assessment_date
+        label: 评估日期
+        type: date
+        format: 'YYYY-MM-DD'
+
+    dynamic_table:
+      start_row: 5
+      end_row: dynamic
+      header_row: 4
+      add_row_button: true
+      max_rows: 60
+      columns:
+        seq:
+          field: seq
+          type: number
+          label: 序号
+          width: 50
+        cycle_code:
+          field: cycle_code
+          type: text
+          label: 循环代号
+          width: 80
+        cycle_name:
+          field: cycle_name
+          type: text
+          label: 循环名称
+          width: 120
+        account_item:
+          field: account_item
+          type: text
+          label: 报表项目/科目
+          width: 150
+        assertion:
+          field: assertion
+          type: text
+          label: 相关认定
+          width: 120
+        risk_description:
+          field: risk_description
+          type: textarea
+          label: 已识别风险
+          width: 200
+        risk_level:
+          field: risk_level
+          type: enum
+          label: 风险等级
+          width: 90
+          dict_source: risk_level_dict
+          render_hint: risk_level
+        significant_risk:
+          field: significant_risk
+          type: enum
+          label: 重大风险
+          width: 80
+          dict_source: yes_no_dict
+        planned_response:
+          field: planned_response
+          type: textarea
+          label: 计划的进一步审计程序
+          width: 200
+        reference:
+          field: reference
+          type: text
+          label: 程序表索引
+          width: 100
+          render: index_chip
+
+    dictionaries:
+      risk_level_dict:
+        - value: high
+          label: 高
+          color: red
+        - value: medium
+          label: 中
+          color: yellow
+        - value: low
+          label: 低
+          color: green
+      yes_no_dict:
+        - value: "yes"
+          label: 是
+        - value: "no"
+          label: 否
+
+    conclusion:
+      mode: composite
+      audit_explanation_field:
+        name: audit_explanation
+        label: 审计说明
+        type: textarea
+      overall_conclusion_field:
+        name: overall_conclusion
+        label: 各循环认定层次风险汇总结论
+        type: textarea

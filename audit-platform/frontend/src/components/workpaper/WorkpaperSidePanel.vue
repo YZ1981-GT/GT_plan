@@ -21,10 +21,6 @@
           </span>
         </template>
         <el-tabs v-model="assistTab" type="card" class="gt-wp-side-inner-tabs">
-          <el-tab-pane label="AI" name="ai" lazy>
-            <AiAssistantSidebar v-if="wpId" :project-id="projectId" :wp-id="wpId" />
-            <div v-else class="gt-wp-side-placeholder">请先选择底稿</div>
-          </el-tab-pane>
           <el-tab-pane label="程序" name="procedures" lazy>
             <ProcedurePanel v-if="wpId" :project-id="projectId" :wp-id="wpId" @completion-change="onProcedureCompletionChange" />
             <div v-else class="gt-wp-side-placeholder">请先选择底稿</div>
@@ -80,8 +76,11 @@
             <div v-else class="gt-wp-side-placeholder">请先选择底稿</div>
           </el-tab-pane>
           <el-tab-pane label="公式" name="formulas" lazy>
-            <FormulaStatusPanel v-if="wpId" :project-id="projectId" :wp-id="wpId" />
+            <FormulaStatusPanel v-if="wpId" :project-id="projectId" :wp-id="wpId" :year="currentYear" />
             <div v-else class="gt-wp-side-placeholder">请先选择底稿</div>
+          </el-tab-pane>
+          <el-tab-pane label="裁决" name="decision-trace" lazy>
+            <WpDecisionTracePanel :trace="decisionTrace" />
           </el-tab-pane>
           <el-tab-pane name="review-marks" lazy>
             <template #label>
@@ -153,6 +152,11 @@
         <template #label>
           <span class="gt-group-label">历史版本</span>
         </template>
+        <WpVersionHistoryPanel
+          v-if="wpId"
+          :project-id="projectId"
+          :wp-id="wpId"
+        />
         <SnapshotCompare v-if="wpId" :snapshots="[]" :changes="[]" />
         <div v-else class="gt-wp-side-placeholder">请先选择底稿</div>
       </el-tab-pane>
@@ -162,7 +166,6 @@
 
 <script setup lang="ts">
 import { ref, watch, computed } from 'vue'
-import AiAssistantSidebar from '@/components/workpaper/AiAssistantSidebar.vue'
 import AttachmentTabPanel from '@/components/workpaper/AttachmentTabPanel.vue'
 import ProgramRequirementsSidebar from '@/components/workpaper/ProgramRequirementsSidebar.vue'
 import ProcedurePanel from '@/components/workpaper/ProcedurePanel.vue'
@@ -173,9 +176,12 @@ import FormulaStatusPanel from '@/components/workpaper/FormulaStatusPanel.vue'
 import EvidenceLinkPanel from '@/components/workpaper/EvidenceLinkPanel.vue'
 import PbcCollectionTab from '@/components/workpaper/PbcCollectionTab.vue'
 import SnapshotCompare from '@/components/workpaper/SnapshotCompare.vue'
+import WpVersionHistoryPanel from '@/components/workpaper/WpVersionHistoryPanel.vue'
 import QualityScoreBadge from '@/components/workpaper/QualityScoreBadge.vue'
+import WpDecisionTracePanel from '@/components/workpaper/WpDecisionTracePanel.vue'
 import { api } from '@/services/apiProxy'
 import { eventBus } from '@/utils/eventBus'
+import type { RenderDecisionWire } from '@/types/renderConfig'
 
 interface FineCheckResult {
   rule_code: string
@@ -200,6 +206,7 @@ const props = defineProps<{
   projectId: string
   wpId?: string
   wpCode?: string
+  decisionTrace?: RenderDecisionWire[] | null
 }>()
 
 const emit = defineEmits<{
@@ -210,7 +217,7 @@ const emit = defineEmits<{
 // ─── 一级组 Tab ──────────────────────────────
 const activeGroup = ref('assist')
 // ─── 二级 Tab ──────────────────────────────
-const assistTab = ref('ai')
+const assistTab = ref('procedures')
 const qualityTab = ref('finecheck')
 const traceTab = ref('attachments')
 

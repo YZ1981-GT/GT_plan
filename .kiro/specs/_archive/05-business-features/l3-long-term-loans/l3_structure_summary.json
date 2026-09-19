@@ -1,0 +1,4537 @@
+{
+  "source_file": "d:\\GT_plan\\数据\\致同通用审计程序及底稿模板（2025年修订）\\1.致同审计程序及底稿模板（2025年）\\4.风险应对-实质性程序（D-N）\\L 债务循环\\L3 长期借款.xlsx",
+  "total_sheets": 14,
+  "sheet_names": [
+    "底稿目录",
+    "长期借款实质性程序表L3A",
+    "审定表L3-1",
+    "附注披露信息核对（上市公司）",
+    "附注披露（国企）信息核对",
+    "明细表L3-2",
+    "调整分录汇总L3-3",
+    "征信报告核对表L3-4",
+    "利息测算表L3-5",
+    "贷款合同检查L3-6",
+    "逾期贷款检查表L3-7",
+    "抵质押资产检查表L3-8",
+    "长期借款检查表L3-9",
+    "GT_Custom"
+  ],
+  "sheets": {
+    "底稿目录": {
+      "title": "底稿目录",
+      "dimensions": "A1:G21",
+      "max_row": 21,
+      "max_column": 7,
+      "row_count": 21,
+      "col_count": 7,
+      "merged_cells": [
+        "A14:A16",
+        "A17:A19",
+        "A10:A13"
+      ],
+      "headers": [
+        {
+          "row": 1,
+          "cells": [
+            {
+              "col": "A",
+              "col_idx": 1,
+              "value": "底稿开列时，可先在以下单元格填写有关内容，以便其他底稿引用有关数据：",
+              "is_formula": false
+            }
+          ]
+        },
+        {
+          "row": 2,
+          "cells": [
+            {
+              "col": "A",
+              "col_idx": 1,
+              "value": "被审计单位：",
+              "is_formula": false
+            }
+          ]
+        },
+        {
+          "row": 3,
+          "cells": [
+            {
+              "col": "A",
+              "col_idx": 1,
+              "value": "截止日：202X年12月31日",
+              "is_formula": false
+            },
+            {
+              "col": "D",
+              "col_idx": 4,
+              "value": "序号",
+              "is_formula": false
+            },
+            {
+              "col": "E",
+              "col_idx": 5,
+              "value": "内容",
+              "is_formula": false
+            },
+            {
+              "col": "F",
+              "col_idx": 6,
+              "value": "索引号",
+              "is_formula": false
+            }
+          ]
+        },
+        {
+          "row": 4,
+          "cells": [
+            {
+              "col": "A",
+              "col_idx": 1,
+              "value": "编制人：",
+              "is_formula": false
+            },
+            {
+              "col": "D",
+              "col_idx": 4,
+              "value": "1",
+              "is_formula": false
+            },
+            {
+              "col": "E",
+              "col_idx": 5,
+              "value": "长期借款实质性程序表",
+              "is_formula": false
+            },
+            {
+              "col": "F",
+              "col_idx": 6,
+              "value": "L3A",
+              "is_formula": false
+            }
+          ]
+        },
+        {
+          "row": 5,
+          "cells": [
+            {
+              "col": "A",
+              "col_idx": 1,
+              "value": "编制日期：",
+              "is_formula": false
+            },
+            {
+              "col": "D",
+              "col_idx": 4,
+              "value": "2",
+              "is_formula": false
+            },
+            {
+              "col": "E",
+              "col_idx": 5,
+              "value": "长期借款审定表",
+              "is_formula": false
+            },
+            {
+              "col": "F",
+              "col_idx": 6,
+              "value": "L3-1",
+              "is_formula": false
+            }
+          ]
+        }
+      ],
+      "formulas": [],
+      "sample_data": [
+        {
+          "row": 6,
+          "cells": [
+            {
+              "col": "A",
+              "value": "复核人：",
+              "is_formula": false
+            },
+            {
+              "col": "D",
+              "value": "3",
+              "is_formula": false
+            },
+            {
+              "col": "E",
+              "value": "长期借款附注披露（上市公司）信息核对表",
+              "is_formula": false
+            },
+            {
+              "col": "G",
+              "value": "无需打印",
+              "is_formula": false
+            }
+          ]
+        },
+        {
+          "row": 7,
+          "cells": [
+            {
+              "col": "A",
+              "value": "复核日期：",
+              "is_formula": false
+            },
+            {
+              "col": "D",
+              "value": "4",
+              "is_formula": false
+            },
+            {
+              "col": "E",
+              "value": "长期借款附注披露（国企）信息核对表",
+              "is_formula": false
+            },
+            {
+              "col": "G",
+              "value": "无需打印",
+              "is_formula": false
+            }
+          ]
+        },
+        {
+          "row": 8,
+          "cells": [
+            {
+              "col": "D",
+              "value": "5",
+              "is_formula": false
+            },
+            {
+              "col": "E",
+              "value": "长期借款明细表",
+              "is_formula": false
+            },
+            {
+              "col": "F",
+              "value": "L3-2",
+              "is_formula": false
+            }
+          ]
+        },
+        {
+          "row": 9,
+          "cells": [
+            {
+              "col": "A",
+              "value": "关于工作底稿与审计程序索引号对应的说明",
+              "is_formula": false
+            },
+            {
+              "col": "D",
+              "value": "6",
+              "is_formula": false
+            },
+            {
+              "col": "E",
+              "value": "调整分录汇总",
+              "is_formula": false
+            },
+            {
+              "col": "F",
+              "value": "L3-3",
+              "is_formula": false
+            }
+          ]
+        },
+        {
+          "row": 10,
+          "cells": [
+            {
+              "col": "A",
+              "value": "1.编制的审计工作底稿应与审计程序对应。审计项目组应根据被审计单位实际情况和风险评估情况在实质性程序表中裁剪、修改或增加审计程序，根据实际执行的审计程序完成相应审计工作底稿，编制的工作底稿中应按自然顺",
+              "is_formula": false
+            },
+            {
+              "col": "D",
+              "value": "7",
+              "is_formula": false
+            },
+            {
+              "col": "E",
+              "value": "征信报告核对表",
+              "is_formula": false
+            },
+            {
+              "col": "F",
+              "value": "L3-4",
+              "is_formula": false
+            }
+          ]
+        }
+      ],
+      "formula_count": 0,
+      "formula_samples": []
+    },
+    "长期借款实质性程序表L3A": {
+      "title": "长期借款实质性程序表L3A",
+      "dimensions": "A1:R26",
+      "max_row": 26,
+      "max_column": 18,
+      "row_count": 26,
+      "col_count": 18,
+      "merged_cells": [
+        "G10:I10",
+        "G13:I13",
+        "A12:F12",
+        "A2:I2",
+        "A8:F8",
+        "B15:B16",
+        "A10:F10",
+        "A13:F13",
+        "J18:R18",
+        "A9:F9",
+        "G9:I9",
+        "G12:I12",
+        "G11:I11",
+        "A11:F11",
+        "D15:H15",
+        "J19:R19",
+        "A15:A16",
+        "A1:I1",
+        "G8:I8",
+        "C15:C16",
+        "I15:I16"
+      ],
+      "headers": [
+        {
+          "row": 1,
+          "cells": [
+            {
+              "col": "A",
+              "col_idx": 1,
+              "value": "致同会计师事务所",
+              "is_formula": false
+            }
+          ]
+        },
+        {
+          "row": 2,
+          "cells": [
+            {
+              "col": "A",
+              "col_idx": 1,
+              "value": "长期借款实质性程序",
+              "is_formula": false
+            }
+          ]
+        },
+        {
+          "row": 3,
+          "cells": [
+            {
+              "col": "A",
+              "col_idx": 1,
+              "value": "=底稿目录!A2",
+              "is_formula": true
+            },
+            {
+              "col": "C",
+              "col_idx": 3,
+              "value": "=底稿目录!A4",
+              "is_formula": true
+            },
+            {
+              "col": "E",
+              "col_idx": 5,
+              "value": "=底稿目录!A5",
+              "is_formula": true
+            },
+            {
+              "col": "H",
+              "col_idx": 8,
+              "value": "索引号：",
+              "is_formula": false
+            },
+            {
+              "col": "I",
+              "col_idx": 9,
+              "value": "L3A",
+              "is_formula": false
+            }
+          ]
+        },
+        {
+          "row": 4,
+          "cells": [
+            {
+              "col": "A",
+              "col_idx": 1,
+              "value": "=底稿目录!A3",
+              "is_formula": true
+            },
+            {
+              "col": "C",
+              "col_idx": 3,
+              "value": "=底稿目录!A6",
+              "is_formula": true
+            },
+            {
+              "col": "E",
+              "col_idx": 5,
+              "value": "=底稿目录!A7",
+              "is_formula": true
+            },
+            {
+              "col": "H",
+              "col_idx": 8,
+              "value": "页  次：",
+              "is_formula": false
+            }
+          ]
+        },
+        {
+          "row": 5,
+          "cells": [
+            {
+              "col": "A",
+              "col_idx": 1,
+              "value": "一、本账户涉及的科目",
+              "is_formula": false
+            }
+          ]
+        }
+      ],
+      "formulas": [],
+      "sample_data": [
+        {
+          "row": 6,
+          "cells": [
+            {
+              "col": "A",
+              "value": "长期借款",
+              "is_formula": false
+            }
+          ]
+        },
+        {
+          "row": 7,
+          "cells": [
+            {
+              "col": "A",
+              "value": "二、审计目标与认定的对应关系",
+              "is_formula": false
+            }
+          ]
+        },
+        {
+          "row": 8,
+          "cells": [
+            {
+              "col": "A",
+              "value": "审计目标",
+              "is_formula": false
+            },
+            {
+              "col": "G",
+              "value": "财务报表的认定　",
+              "is_formula": false
+            }
+          ]
+        },
+        {
+          "row": 9,
+          "cells": [
+            {
+              "col": "A",
+              "value": "A. 资产负债表中记录的长期借款是存在的，且已记录于恰当的账户",
+              "is_formula": false
+            },
+            {
+              "col": "G",
+              "value": "存在",
+              "is_formula": false
+            }
+          ]
+        },
+        {
+          "row": 10,
+          "cells": [
+            {
+              "col": "A",
+              "value": "B. 所有应记录的长期借款均已记录，所有应当包括在财务报表中的相关披露均已包括",
+              "is_formula": false
+            },
+            {
+              "col": "G",
+              "value": "完整性",
+              "is_formula": false
+            }
+          ]
+        }
+      ],
+      "formula_count": 6,
+      "formula_samples": [
+        {
+          "cell": "A3",
+          "formula": "=底稿目录!A2"
+        },
+        {
+          "cell": "C3",
+          "formula": "=底稿目录!A4"
+        },
+        {
+          "cell": "E3",
+          "formula": "=底稿目录!A5"
+        },
+        {
+          "cell": "A4",
+          "formula": "=底稿目录!A3"
+        },
+        {
+          "cell": "C4",
+          "formula": "=底稿目录!A6"
+        },
+        {
+          "cell": "E4",
+          "formula": "=底稿目录!A7"
+        }
+      ]
+    },
+    "审定表L3-1": {
+      "title": "审定表L3-1",
+      "dimensions": "A1:R41",
+      "max_row": 41,
+      "max_column": 18,
+      "row_count": 41,
+      "col_count": 18,
+      "merged_cells": [
+        "A5:A6",
+        "C12:D12",
+        "R5:R6",
+        "B5:G5",
+        "H5:M5",
+        "A2:R2",
+        "A1:R1",
+        "P5:Q5",
+        "N5:O5"
+      ],
+      "headers": [
+        {
+          "row": 1,
+          "cells": [
+            {
+              "col": "A",
+              "col_idx": 1,
+              "value": "致同会计师事务所",
+              "is_formula": false
+            }
+          ]
+        },
+        {
+          "row": 2,
+          "cells": [
+            {
+              "col": "A",
+              "col_idx": 1,
+              "value": "长期借款审定表",
+              "is_formula": false
+            }
+          ]
+        },
+        {
+          "row": 3,
+          "cells": [
+            {
+              "col": "A",
+              "col_idx": 1,
+              "value": "=底稿目录!A2",
+              "is_formula": true
+            },
+            {
+              "col": "E",
+              "col_idx": 5,
+              "value": "=底稿目录!A4",
+              "is_formula": true
+            },
+            {
+              "col": "K",
+              "col_idx": 11,
+              "value": "=底稿目录!A5",
+              "is_formula": true
+            },
+            {
+              "col": "Q",
+              "col_idx": 17,
+              "value": "索引：",
+              "is_formula": false
+            },
+            {
+              "col": "R",
+              "col_idx": 18,
+              "value": "=底稿目录!F5",
+              "is_formula": true
+            }
+          ]
+        },
+        {
+          "row": 4,
+          "cells": [
+            {
+              "col": "A",
+              "col_idx": 1,
+              "value": "=底稿目录!A3",
+              "is_formula": true
+            },
+            {
+              "col": "E",
+              "col_idx": 5,
+              "value": "=底稿目录!A6",
+              "is_formula": true
+            },
+            {
+              "col": "K",
+              "col_idx": 11,
+              "value": "=底稿目录!A7",
+              "is_formula": true
+            },
+            {
+              "col": "Q",
+              "col_idx": 17,
+              "value": "页次：",
+              "is_formula": false
+            }
+          ]
+        },
+        {
+          "row": 5,
+          "cells": [
+            {
+              "col": "A",
+              "col_idx": 1,
+              "value": "项目",
+              "is_formula": false
+            },
+            {
+              "col": "B",
+              "col_idx": 2,
+              "value": "期初数",
+              "is_formula": false
+            },
+            {
+              "col": "H",
+              "col_idx": 8,
+              "value": "期末数",
+              "is_formula": false
+            },
+            {
+              "col": "N",
+              "col_idx": 14,
+              "value": "本期未审数与上期\n审定数的比较",
+              "is_formula": false
+            },
+            {
+              "col": "P",
+              "col_idx": 16,
+              "value": "本期审定数与上期\n审定数的比较",
+              "is_formula": false
+            },
+            {
+              "col": "R",
+              "col_idx": 18,
+              "value": "原因分析",
+              "is_formula": false
+            }
+          ]
+        }
+      ],
+      "formulas": [],
+      "sample_data": [
+        {
+          "row": 6,
+          "cells": [
+            {
+              "col": "B",
+              "value": "未审数",
+              "is_formula": false
+            },
+            {
+              "col": "C",
+              "value": "账项调整",
+              "is_formula": false
+            },
+            {
+              "col": "D",
+              "value": "重分类调整",
+              "is_formula": false
+            },
+            {
+              "col": "E",
+              "value": "审定数",
+              "is_formula": false
+            },
+            {
+              "col": "F",
+              "value": "减：一年内到期的长期借款",
+              "is_formula": false
+            },
+            {
+              "col": "G",
+              "value": "披露审定数",
+              "is_formula": false
+            },
+            {
+              "col": "H",
+              "value": "未审数",
+              "is_formula": false
+            },
+            {
+              "col": "I",
+              "value": "账项调整",
+              "is_formula": false
+            },
+            {
+              "col": "J",
+              "value": "重分类调整",
+              "is_formula": false
+            },
+            {
+              "col": "K",
+              "value": "审定数",
+              "is_formula": false
+            },
+            {
+              "col": "L",
+              "value": "减：一年内到期的长期借款",
+              "is_formula": false
+            },
+            {
+              "col": "M",
+              "value": "披露审定数",
+              "is_formula": false
+            },
+            {
+              "col": "N",
+              "value": "变动额",
+              "is_formula": false
+            },
+            {
+              "col": "O",
+              "value": "变动率",
+              "is_formula": false
+            },
+            {
+              "col": "P",
+              "value": "变动额",
+              "is_formula": false
+            },
+            {
+              "col": "Q",
+              "value": "变动率",
+              "is_formula": false
+            }
+          ]
+        },
+        {
+          "row": 7,
+          "cells": [
+            {
+              "col": "A",
+              "value": "质押借款",
+              "is_formula": false
+            },
+            {
+              "col": "B",
+              "value": "=SUMIF('明细表L3-2'!B:B,A7,'明细表L3-2'!H:H)",
+              "is_formula": true
+            },
+            {
+              "col": "C",
+              "value": "=SUMIF('明细表L3-2'!B:B,A7,'明细表L3-2'!L:L)",
+              "is_formula": true
+            },
+            {
+              "col": "D",
+              "value": "=SUMIF('明细表L3-2'!B:B,A7,'明细表L3-2'!M:M)",
+              "is_formula": true
+            },
+            {
+              "col": "E",
+              "value": "=B7+C7+D7",
+              "is_formula": true
+            },
+            {
+              "col": "F",
+              "value": "=SUMIF('明细表L3-2'!B:B,A7,'明细表L3-2'!V:V)",
+              "is_formula": true
+            },
+            {
+              "col": "G",
+              "value": "=E7-F7",
+              "is_formula": true
+            },
+            {
+              "col": "H",
+              "value": "=SUMIF('明细表L3-2'!B:B,A7,'明细表L3-2'!K:K)",
+              "is_formula": true
+            },
+            {
+              "col": "I",
+              "value": "=SUMIF('明细表L3-2'!B:B,A7,'明细表L3-2'!N:N)-SUMIF('明细表L3-2'!B:B,A7,'明细表L3-2'!O:O)",
+              "is_formula": true
+            },
+            {
+              "col": "J",
+              "value": "=SUMIF('明细表L3-2'!B:B,A7,'明细表L3-2'!P:P)-SUMIF('明细表L3-2'!B:B,A7,'明细表L3-2'!Q:Q)",
+              "is_formula": true
+            },
+            {
+              "col": "K",
+              "value": "=H7+I7+J7",
+              "is_formula": true
+            },
+            {
+              "col": "L",
+              "value": "=SUMIF('明细表L3-2'!B:B,A7,'明细表L3-2'!W:W)",
+              "is_formula": true
+            },
+            {
+              "col": "M",
+              "value": "=K7-L7",
+              "is_formula": true
+            },
+            {
+              "col": "N",
+              "value": "=H7-B7",
+              "is_formula": true
+            },
+            {
+              "col": "O",
+              "value": "=IF(AND(B7=0,N7=0),0,IF(AND(B7=0,N7>0),1,N7/B7))",
+              "is_formula": true
+            },
+            {
+              "col": "P",
+              "value": "=K7-E7",
+              "is_formula": true
+            },
+            {
+              "col": "Q",
+              "value": "=IF(AND(E7=0,P7=0),0,IF(AND(E7=0,P7>0),1,P7/E7))",
+              "is_formula": true
+            }
+          ]
+        },
+        {
+          "row": 8,
+          "cells": [
+            {
+              "col": "A",
+              "value": "抵押借款",
+              "is_formula": false
+            },
+            {
+              "col": "B",
+              "value": "=SUMIF('明细表L3-2'!B:B,A8,'明细表L3-2'!H:H)",
+              "is_formula": true
+            },
+            {
+              "col": "C",
+              "value": "=SUMIF('明细表L3-2'!B:B,A8,'明细表L3-2'!L:L)",
+              "is_formula": true
+            },
+            {
+              "col": "D",
+              "value": "=SUMIF('明细表L3-2'!B:B,A8,'明细表L3-2'!M:M)",
+              "is_formula": true
+            },
+            {
+              "col": "E",
+              "value": "=B8+C8+D8",
+              "is_formula": true
+            },
+            {
+              "col": "F",
+              "value": "=SUMIF('明细表L3-2'!B:B,A8,'明细表L3-2'!V:V)",
+              "is_formula": true
+            },
+            {
+              "col": "G",
+              "value": "=E8-F8",
+              "is_formula": true
+            },
+            {
+              "col": "H",
+              "value": "=SUMIF('明细表L3-2'!B:B,A8,'明细表L3-2'!K:K)",
+              "is_formula": true
+            },
+            {
+              "col": "I",
+              "value": "=SUMIF('明细表L3-2'!B:B,A8,'明细表L3-2'!N:N)-SUMIF('明细表L3-2'!B:B,A8,'明细表L3-2'!O:O)",
+              "is_formula": true
+            },
+            {
+              "col": "J",
+              "value": "=SUMIF('明细表L3-2'!B:B,A8,'明细表L3-2'!P:P)-SUMIF('明细表L3-2'!B:B,A8,'明细表L3-2'!Q:Q)",
+              "is_formula": true
+            },
+            {
+              "col": "K",
+              "value": "=H8+I8+J8",
+              "is_formula": true
+            },
+            {
+              "col": "L",
+              "value": "=SUMIF('明细表L3-2'!B:B,A8,'明细表L3-2'!W:W)",
+              "is_formula": true
+            },
+            {
+              "col": "M",
+              "value": "=K8-L8",
+              "is_formula": true
+            },
+            {
+              "col": "N",
+              "value": "=H8-B8",
+              "is_formula": true
+            },
+            {
+              "col": "O",
+              "value": "=IF(AND(B8=0,N8=0),0,IF(AND(B8=0,N8>0),1,N8/B8))",
+              "is_formula": true
+            },
+            {
+              "col": "P",
+              "value": "=K8-E8",
+              "is_formula": true
+            },
+            {
+              "col": "Q",
+              "value": "=IF(AND(E8=0,P8=0),0,IF(AND(E8=0,P8>0),1,P8/E8))",
+              "is_formula": true
+            }
+          ]
+        },
+        {
+          "row": 9,
+          "cells": [
+            {
+              "col": "A",
+              "value": "保证借款",
+              "is_formula": false
+            },
+            {
+              "col": "B",
+              "value": "=SUMIF('明细表L3-2'!B:B,A9,'明细表L3-2'!H:H)",
+              "is_formula": true
+            },
+            {
+              "col": "C",
+              "value": "=SUMIF('明细表L3-2'!B:B,A9,'明细表L3-2'!L:L)",
+              "is_formula": true
+            },
+            {
+              "col": "D",
+              "value": "=SUMIF('明细表L3-2'!B:B,A9,'明细表L3-2'!M:M)",
+              "is_formula": true
+            },
+            {
+              "col": "E",
+              "value": "=B9+C9+D9",
+              "is_formula": true
+            },
+            {
+              "col": "F",
+              "value": "=SUMIF('明细表L3-2'!B:B,A9,'明细表L3-2'!V:V)",
+              "is_formula": true
+            },
+            {
+              "col": "G",
+              "value": "=E9-F9",
+              "is_formula": true
+            },
+            {
+              "col": "H",
+              "value": "=SUMIF('明细表L3-2'!B:B,A9,'明细表L3-2'!K:K)",
+              "is_formula": true
+            },
+            {
+              "col": "I",
+              "value": "=SUMIF('明细表L3-2'!B:B,A9,'明细表L3-2'!N:N)-SUMIF('明细表L3-2'!B:B,A9,'明细表L3-2'!O:O)",
+              "is_formula": true
+            },
+            {
+              "col": "J",
+              "value": "=SUMIF('明细表L3-2'!B:B,A9,'明细表L3-2'!P:P)-SUMIF('明细表L3-2'!B:B,A9,'明细表L3-2'!Q:Q)",
+              "is_formula": true
+            },
+            {
+              "col": "K",
+              "value": "=H9+I9+J9",
+              "is_formula": true
+            },
+            {
+              "col": "L",
+              "value": "=SUMIF('明细表L3-2'!B:B,A9,'明细表L3-2'!W:W)",
+              "is_formula": true
+            },
+            {
+              "col": "M",
+              "value": "=K9-L9",
+              "is_formula": true
+            },
+            {
+              "col": "N",
+              "value": "=H9-B9",
+              "is_formula": true
+            },
+            {
+              "col": "O",
+              "value": "=IF(AND(B9=0,N9=0),0,IF(AND(B9=0,N9>0),1,N9/B9))",
+              "is_formula": true
+            },
+            {
+              "col": "P",
+              "value": "=K9-E9",
+              "is_formula": true
+            },
+            {
+              "col": "Q",
+              "value": "=IF(AND(E9=0,P9=0),0,IF(AND(E9=0,P9>0),1,P9/E9))",
+              "is_formula": true
+            }
+          ]
+        },
+        {
+          "row": 10,
+          "cells": [
+            {
+              "col": "A",
+              "value": "信用借款",
+              "is_formula": false
+            },
+            {
+              "col": "B",
+              "value": "=SUMIF('明细表L3-2'!B:B,A10,'明细表L3-2'!H:H)",
+              "is_formula": true
+            },
+            {
+              "col": "C",
+              "value": "=SUMIF('明细表L3-2'!B:B,A10,'明细表L3-2'!L:L)",
+              "is_formula": true
+            },
+            {
+              "col": "D",
+              "value": "=SUMIF('明细表L3-2'!B:B,A10,'明细表L3-2'!M:M)",
+              "is_formula": true
+            },
+            {
+              "col": "E",
+              "value": "=B10+C10+D10",
+              "is_formula": true
+            },
+            {
+              "col": "F",
+              "value": "=SUMIF('明细表L3-2'!B:B,A10,'明细表L3-2'!V:V)",
+              "is_formula": true
+            },
+            {
+              "col": "G",
+              "value": "=E10-F10",
+              "is_formula": true
+            },
+            {
+              "col": "H",
+              "value": "=SUMIF('明细表L3-2'!B:B,A10,'明细表L3-2'!K:K)",
+              "is_formula": true
+            },
+            {
+              "col": "I",
+              "value": "=SUMIF('明细表L3-2'!B:B,A10,'明细表L3-2'!N:N)-SUMIF('明细表L3-2'!B:B,A10,'明细表L3-2'!O:O)",
+              "is_formula": true
+            },
+            {
+              "col": "J",
+              "value": "=SUMIF('明细表L3-2'!B:B,A10,'明细表L3-2'!P:P)-SUMIF('明细表L3-2'!B:B,A10,'明细表L3-2'!Q:Q)",
+              "is_formula": true
+            },
+            {
+              "col": "K",
+              "value": "=H10+I10+J10",
+              "is_formula": true
+            },
+            {
+              "col": "L",
+              "value": "=SUMIF('明细表L3-2'!B:B,A10,'明细表L3-2'!W:W)",
+              "is_formula": true
+            },
+            {
+              "col": "M",
+              "value": "=K10-L10",
+              "is_formula": true
+            },
+            {
+              "col": "N",
+              "value": "=H10-B10",
+              "is_formula": true
+            },
+            {
+              "col": "O",
+              "value": "=IF(AND(B10=0,N10=0),0,IF(AND(B10=0,N10>0),1,N10/B10))",
+              "is_formula": true
+            },
+            {
+              "col": "P",
+              "value": "=K10-E10",
+              "is_formula": true
+            },
+            {
+              "col": "Q",
+              "value": "=IF(AND(E10=0,P10=0),0,IF(AND(E10=0,P10>0),1,P10/E10))",
+              "is_formula": true
+            }
+          ]
+        }
+      ],
+      "formula_count": 87,
+      "formula_samples": [
+        {
+          "cell": "A3",
+          "formula": "=底稿目录!A2"
+        },
+        {
+          "cell": "E3",
+          "formula": "=底稿目录!A4"
+        },
+        {
+          "cell": "K3",
+          "formula": "=底稿目录!A5"
+        },
+        {
+          "cell": "R3",
+          "formula": "=底稿目录!F5"
+        },
+        {
+          "cell": "A4",
+          "formula": "=底稿目录!A3"
+        },
+        {
+          "cell": "E4",
+          "formula": "=底稿目录!A6"
+        },
+        {
+          "cell": "K4",
+          "formula": "=底稿目录!A7"
+        },
+        {
+          "cell": "B7",
+          "formula": "=SUMIF('明细表L3-2'!B:B,A7,'明细表L3-2'!H:H)"
+        },
+        {
+          "cell": "C7",
+          "formula": "=SUMIF('明细表L3-2'!B:B,A7,'明细表L3-2'!L:L)"
+        },
+        {
+          "cell": "D7",
+          "formula": "=SUMIF('明细表L3-2'!B:B,A7,'明细表L3-2'!M:M)"
+        },
+        {
+          "cell": "E7",
+          "formula": "=B7+C7+D7"
+        },
+        {
+          "cell": "F7",
+          "formula": "=SUMIF('明细表L3-2'!B:B,A7,'明细表L3-2'!V:V)"
+        },
+        {
+          "cell": "G7",
+          "formula": "=E7-F7"
+        },
+        {
+          "cell": "H7",
+          "formula": "=SUMIF('明细表L3-2'!B:B,A7,'明细表L3-2'!K:K)"
+        },
+        {
+          "cell": "I7",
+          "formula": "=SUMIF('明细表L3-2'!B:B,A7,'明细表L3-2'!N:N)-SUMIF('明细表L3-2'!B:B,A7,'明细表L3-2'!O:O)"
+        }
+      ]
+    },
+    "附注披露信息核对（上市公司）": {
+      "title": "附注披露信息核对（上市公司）",
+      "dimensions": "A1:L25",
+      "max_row": 25,
+      "max_column": 12,
+      "row_count": 25,
+      "col_count": 12,
+      "merged_cells": [
+        "A2:E2",
+        "F2:L2",
+        "A1:E1"
+      ],
+      "headers": [
+        {
+          "row": 1,
+          "cells": [
+            {
+              "col": "A",
+              "col_idx": 1,
+              "value": "致同会计师事务所",
+              "is_formula": false
+            }
+          ]
+        },
+        {
+          "row": 2,
+          "cells": [
+            {
+              "col": "A",
+              "col_idx": 1,
+              "value": "长期借款附注披露信息",
+              "is_formula": false
+            }
+          ]
+        },
+        {
+          "row": 3,
+          "cells": [
+            {
+              "col": "A",
+              "col_idx": 1,
+              "value": "=底稿目录!A2",
+              "is_formula": true
+            },
+            {
+              "col": "B",
+              "col_idx": 2,
+              "value": "=底稿目录!A4",
+              "is_formula": true
+            },
+            {
+              "col": "C",
+              "col_idx": 3,
+              "value": "=底稿目录!A5",
+              "is_formula": true
+            },
+            {
+              "col": "E",
+              "col_idx": 5,
+              "value": "索引号：",
+              "is_formula": false
+            }
+          ]
+        },
+        {
+          "row": 4,
+          "cells": [
+            {
+              "col": "A",
+              "col_idx": 1,
+              "value": "=底稿目录!A3",
+              "is_formula": true
+            },
+            {
+              "col": "B",
+              "col_idx": 2,
+              "value": "=底稿目录!A6",
+              "is_formula": true
+            },
+            {
+              "col": "C",
+              "col_idx": 3,
+              "value": "=底稿目录!A7",
+              "is_formula": true
+            },
+            {
+              "col": "E",
+              "col_idx": 5,
+              "value": "页次：",
+              "is_formula": false
+            }
+          ]
+        },
+        {
+          "row": 5,
+          "cells": [
+            {
+              "col": "A",
+              "col_idx": 1,
+              "value": "附注披露信息（上市公司）：",
+              "is_formula": false
+            }
+          ]
+        }
+      ],
+      "formulas": [],
+      "sample_data": [
+        {
+          "row": 6,
+          "cells": [
+            {
+              "col": "A",
+              "value": "长期借款",
+              "is_formula": false
+            }
+          ]
+        },
+        {
+          "row": 7,
+          "cells": [
+            {
+              "col": "A",
+              "value": "项  目",
+              "is_formula": false
+            },
+            {
+              "col": "B",
+              "value": "期末余额",
+              "is_formula": false
+            },
+            {
+              "col": "C",
+              "value": "利率区间",
+              "is_formula": false
+            },
+            {
+              "col": "D",
+              "value": "上年年末余额",
+              "is_formula": false
+            },
+            {
+              "col": "E",
+              "value": "利率区间",
+              "is_formula": false
+            }
+          ]
+        },
+        {
+          "row": 8,
+          "cells": [
+            {
+              "col": "A",
+              "value": "质押借款",
+              "is_formula": false
+            },
+            {
+              "col": "B",
+              "value": "=SUMIF('明细表L3-2'!B:B,'附注披露信息核对（上市公司）'!A8,'明细表L3-2'!U:U)",
+              "is_formula": true
+            },
+            {
+              "col": "D",
+              "value": "=SUMIF('明细表L3-2'!B:B,'附注披露信息核对（上市公司）'!A8,'明细表L3-2'!R:R)",
+              "is_formula": true
+            }
+          ]
+        },
+        {
+          "row": 9,
+          "cells": [
+            {
+              "col": "A",
+              "value": "抵押借款",
+              "is_formula": false
+            },
+            {
+              "col": "B",
+              "value": "=SUMIF('明细表L3-2'!B:B,'附注披露信息核对（上市公司）'!A9,'明细表L3-2'!U:U)",
+              "is_formula": true
+            },
+            {
+              "col": "D",
+              "value": "=SUMIF('明细表L3-2'!B:B,'附注披露信息核对（上市公司）'!A9,'明细表L3-2'!R:R)",
+              "is_formula": true
+            }
+          ]
+        },
+        {
+          "row": 10,
+          "cells": [
+            {
+              "col": "A",
+              "value": "保证借款",
+              "is_formula": false
+            },
+            {
+              "col": "B",
+              "value": "=SUMIF('明细表L3-2'!B:B,'附注披露信息核对（上市公司）'!A10,'明细表L3-2'!U:U)",
+              "is_formula": true
+            },
+            {
+              "col": "D",
+              "value": "=SUMIF('明细表L3-2'!B:B,'附注披露信息核对（上市公司）'!A10,'明细表L3-2'!R:R)",
+              "is_formula": true
+            }
+          ]
+        }
+      ],
+      "formula_count": 30,
+      "formula_samples": [
+        {
+          "cell": "A3",
+          "formula": "=底稿目录!A2"
+        },
+        {
+          "cell": "B3",
+          "formula": "=底稿目录!A4"
+        },
+        {
+          "cell": "C3",
+          "formula": "=底稿目录!A5"
+        },
+        {
+          "cell": "A4",
+          "formula": "=底稿目录!A3"
+        },
+        {
+          "cell": "B4",
+          "formula": "=底稿目录!A6"
+        },
+        {
+          "cell": "C4",
+          "formula": "=底稿目录!A7"
+        },
+        {
+          "cell": "B8",
+          "formula": "=SUMIF('明细表L3-2'!B:B,'附注披露信息核对（上市公司）'!A8,'明细表L3-2'!U:U)"
+        },
+        {
+          "cell": "D8",
+          "formula": "=SUMIF('明细表L3-2'!B:B,'附注披露信息核对（上市公司）'!A8,'明细表L3-2'!R:R)"
+        },
+        {
+          "cell": "B9",
+          "formula": "=SUMIF('明细表L3-2'!B:B,'附注披露信息核对（上市公司）'!A9,'明细表L3-2'!U:U)"
+        },
+        {
+          "cell": "D9",
+          "formula": "=SUMIF('明细表L3-2'!B:B,'附注披露信息核对（上市公司）'!A9,'明细表L3-2'!R:R)"
+        },
+        {
+          "cell": "B10",
+          "formula": "=SUMIF('明细表L3-2'!B:B,'附注披露信息核对（上市公司）'!A10,'明细表L3-2'!U:U)"
+        },
+        {
+          "cell": "D10",
+          "formula": "=SUMIF('明细表L3-2'!B:B,'附注披露信息核对（上市公司）'!A10,'明细表L3-2'!R:R)"
+        },
+        {
+          "cell": "B11",
+          "formula": "=SUMIF('明细表L3-2'!B:B,'附注披露信息核对（上市公司）'!A11,'明细表L3-2'!U:U)"
+        },
+        {
+          "cell": "D11",
+          "formula": "=SUMIF('明细表L3-2'!B:B,'附注披露信息核对（上市公司）'!A11,'明细表L3-2'!R:R)"
+        },
+        {
+          "cell": "B12",
+          "formula": "=SUM(B8:B11)"
+        }
+      ]
+    },
+    "附注披露（国企）信息核对": {
+      "title": "附注披露（国企）信息核对",
+      "dimensions": "A1:H26",
+      "max_row": 26,
+      "max_column": 8,
+      "row_count": 26,
+      "col_count": 8,
+      "merged_cells": [
+        "A2:E2",
+        "A1:E1"
+      ],
+      "headers": [
+        {
+          "row": 1,
+          "cells": [
+            {
+              "col": "A",
+              "col_idx": 1,
+              "value": "致同会计师事务所",
+              "is_formula": false
+            }
+          ]
+        },
+        {
+          "row": 2,
+          "cells": [
+            {
+              "col": "A",
+              "col_idx": 1,
+              "value": "长期借款附注披露信息",
+              "is_formula": false
+            }
+          ]
+        },
+        {
+          "row": 3,
+          "cells": [
+            {
+              "col": "A",
+              "col_idx": 1,
+              "value": "=底稿目录!A2",
+              "is_formula": true
+            },
+            {
+              "col": "B",
+              "col_idx": 2,
+              "value": "=底稿目录!A4",
+              "is_formula": true
+            },
+            {
+              "col": "C",
+              "col_idx": 3,
+              "value": "=底稿目录!A5",
+              "is_formula": true
+            },
+            {
+              "col": "E",
+              "col_idx": 5,
+              "value": "索引号：",
+              "is_formula": false
+            }
+          ]
+        },
+        {
+          "row": 4,
+          "cells": [
+            {
+              "col": "A",
+              "col_idx": 1,
+              "value": "=底稿目录!A3",
+              "is_formula": true
+            },
+            {
+              "col": "B",
+              "col_idx": 2,
+              "value": "=底稿目录!A6",
+              "is_formula": true
+            },
+            {
+              "col": "C",
+              "col_idx": 3,
+              "value": "=底稿目录!A7",
+              "is_formula": true
+            },
+            {
+              "col": "E",
+              "col_idx": 5,
+              "value": "页次：",
+              "is_formula": false
+            }
+          ]
+        },
+        {
+          "row": 5,
+          "cells": [
+            {
+              "col": "A",
+              "col_idx": 1,
+              "value": "附注披露信息（国企）：",
+              "is_formula": false
+            }
+          ]
+        }
+      ],
+      "formulas": [],
+      "sample_data": [
+        {
+          "row": 6,
+          "cells": [
+            {
+              "col": "A",
+              "value": "长期借款",
+              "is_formula": false
+            }
+          ]
+        },
+        {
+          "row": 7,
+          "cells": [
+            {
+              "col": "A",
+              "value": "（1）长期借款分类",
+              "is_formula": false
+            }
+          ]
+        },
+        {
+          "row": 8,
+          "cells": [
+            {
+              "col": "A",
+              "value": "借款类别",
+              "is_formula": false
+            },
+            {
+              "col": "B",
+              "value": "期末余额",
+              "is_formula": false
+            },
+            {
+              "col": "C",
+              "value": "利率区间",
+              "is_formula": false
+            },
+            {
+              "col": "D",
+              "value": "期初余额",
+              "is_formula": false
+            },
+            {
+              "col": "E",
+              "value": "利率区间",
+              "is_formula": false
+            }
+          ]
+        },
+        {
+          "row": 9,
+          "cells": [
+            {
+              "col": "A",
+              "value": "质押借款",
+              "is_formula": false
+            },
+            {
+              "col": "B",
+              "value": "=SUMIF('明细表L3-2'!B:B,A9,'明细表L3-2'!U:U)",
+              "is_formula": true
+            },
+            {
+              "col": "D",
+              "value": "=SUMIF('明细表L3-2'!B:B,A9,'明细表L3-2'!R:R)",
+              "is_formula": true
+            }
+          ]
+        },
+        {
+          "row": 10,
+          "cells": [
+            {
+              "col": "A",
+              "value": "抵押借款",
+              "is_formula": false
+            },
+            {
+              "col": "B",
+              "value": "=SUMIF('明细表L3-2'!B:B,A10,'明细表L3-2'!U:U)",
+              "is_formula": true
+            },
+            {
+              "col": "D",
+              "value": "=SUMIF('明细表L3-2'!B:B,A10,'明细表L3-2'!R:R)",
+              "is_formula": true
+            }
+          ]
+        }
+      ],
+      "formula_count": 30,
+      "formula_samples": [
+        {
+          "cell": "A3",
+          "formula": "=底稿目录!A2"
+        },
+        {
+          "cell": "B3",
+          "formula": "=底稿目录!A4"
+        },
+        {
+          "cell": "C3",
+          "formula": "=底稿目录!A5"
+        },
+        {
+          "cell": "A4",
+          "formula": "=底稿目录!A3"
+        },
+        {
+          "cell": "B4",
+          "formula": "=底稿目录!A6"
+        },
+        {
+          "cell": "C4",
+          "formula": "=底稿目录!A7"
+        },
+        {
+          "cell": "B9",
+          "formula": "=SUMIF('明细表L3-2'!B:B,A9,'明细表L3-2'!U:U)"
+        },
+        {
+          "cell": "D9",
+          "formula": "=SUMIF('明细表L3-2'!B:B,A9,'明细表L3-2'!R:R)"
+        },
+        {
+          "cell": "B10",
+          "formula": "=SUMIF('明细表L3-2'!B:B,A10,'明细表L3-2'!U:U)"
+        },
+        {
+          "cell": "D10",
+          "formula": "=SUMIF('明细表L3-2'!B:B,A10,'明细表L3-2'!R:R)"
+        },
+        {
+          "cell": "B11",
+          "formula": "=SUMIF('明细表L3-2'!B:B,A11,'明细表L3-2'!U:U)"
+        },
+        {
+          "cell": "D11",
+          "formula": "=SUMIF('明细表L3-2'!B:B,A11,'明细表L3-2'!R:R)"
+        },
+        {
+          "cell": "B12",
+          "formula": "=SUMIF('明细表L3-2'!B:B,A12,'明细表L3-2'!U:U)"
+        },
+        {
+          "cell": "D12",
+          "formula": "=SUMIF('明细表L3-2'!B:B,A12,'明细表L3-2'!R:R)"
+        },
+        {
+          "cell": "B13",
+          "formula": "=SUMIF('明细表L3-2'!B:B,A13,'明细表L3-2'!U:U)"
+        }
+      ]
+    },
+    "明细表L3-2": {
+      "title": "明细表L3-2",
+      "dimensions": "A1:AF35",
+      "max_row": 35,
+      "max_column": 32,
+      "row_count": 35,
+      "col_count": 32,
+      "merged_cells": [
+        "R1:AB1",
+        "E8:E9",
+        "G8:G9",
+        "AC8:AC9",
+        "B22:C22",
+        "B8:B9",
+        "X8:Y8",
+        "A1:Q1",
+        "AE8:AE9",
+        "F8:F9",
+        "H8:K8",
+        "R8:U8",
+        "D6:Q6",
+        "P8:Q8",
+        "Z8:Z9",
+        "AB8:AB9",
+        "L8:M8",
+        "N8:O8",
+        "A8:A9",
+        "C8:C9",
+        "W8:W9",
+        "A2:Q2",
+        "D8:D9",
+        "AA8:AA9",
+        "V8:V9",
+        "AD8:AD9",
+        "R2:AB2"
+      ],
+      "headers": [
+        {
+          "row": 1,
+          "cells": [
+            {
+              "col": "A",
+              "col_idx": 1,
+              "value": "致同会计师事务所",
+              "is_formula": false
+            },
+            {
+              "col": "R",
+              "col_idx": 18,
+              "value": "致同会计师事务所",
+              "is_formula": false
+            }
+          ]
+        },
+        {
+          "row": 2,
+          "cells": [
+            {
+              "col": "A",
+              "col_idx": 1,
+              "value": "长期借款明细表",
+              "is_formula": false
+            },
+            {
+              "col": "R",
+              "col_idx": 18,
+              "value": "长期借款明细表",
+              "is_formula": false
+            }
+          ]
+        },
+        {
+          "row": 3,
+          "cells": [
+            {
+              "col": "A",
+              "col_idx": 1,
+              "value": "=底稿目录!A2",
+              "is_formula": true
+            },
+            {
+              "col": "F",
+              "col_idx": 6,
+              "value": "=底稿目录!A4",
+              "is_formula": true
+            },
+            {
+              "col": "J",
+              "col_idx": 10,
+              "value": "=底稿目录!A5",
+              "is_formula": true
+            },
+            {
+              "col": "P",
+              "col_idx": 16,
+              "value": "索引号：",
+              "is_formula": false
+            },
+            {
+              "col": "Q",
+              "col_idx": 17,
+              "value": "=底稿目录!F8",
+              "is_formula": true
+            },
+            {
+              "col": "T",
+              "col_idx": 20,
+              "value": "=F3",
+              "is_formula": true
+            },
+            {
+              "col": "X",
+              "col_idx": 24,
+              "value": "=J3",
+              "is_formula": true
+            },
+            {
+              "col": "AD",
+              "col_idx": 30,
+              "value": "索引号：",
+              "is_formula": false
+            },
+            {
+              "col": "AE",
+              "col_idx": 31,
+              "value": "=底稿目录!F8",
+              "is_formula": true
+            }
+          ]
+        },
+        {
+          "row": 4,
+          "cells": [
+            {
+              "col": "A",
+              "col_idx": 1,
+              "value": "=底稿目录!A3",
+              "is_formula": true
+            },
+            {
+              "col": "F",
+              "col_idx": 6,
+              "value": "=底稿目录!A6",
+              "is_formula": true
+            },
+            {
+              "col": "J",
+              "col_idx": 10,
+              "value": "=底稿目录!A7",
+              "is_formula": true
+            },
+            {
+              "col": "P",
+              "col_idx": 16,
+              "value": "页次：",
+              "is_formula": false
+            },
+            {
+              "col": "T",
+              "col_idx": 20,
+              "value": "=F4",
+              "is_formula": true
+            },
+            {
+              "col": "X",
+              "col_idx": 24,
+              "value": "=J4",
+              "is_formula": true
+            },
+            {
+              "col": "AD",
+              "col_idx": 30,
+              "value": "页次：",
+              "is_formula": false
+            }
+          ]
+        },
+        {
+          "row": 5,
+          "cells": [
+            {
+              "col": "A",
+              "col_idx": 1,
+              "value": "一、审计目标:",
+              "is_formula": false
+            }
+          ]
+        }
+      ],
+      "formulas": [],
+      "sample_data": [
+        {
+          "row": 6,
+          "cells": [
+            {
+              "col": "D",
+              "value": "1.资产负债表中记录的长期借款是存在的，且已经记录在恰当的账户中；2. 所有应记录的长期借款均已记录，所有应当包括在财务报表中的相关披露均已包括；3.应付利息以恰当的金额包括在财务报表中，与之相关的计",
+              "is_formula": false
+            }
+          ]
+        },
+        {
+          "row": 7,
+          "cells": [
+            {
+              "col": "A",
+              "value": "二、审计过程：",
+              "is_formula": false
+            }
+          ]
+        },
+        {
+          "row": 8,
+          "cells": [
+            {
+              "col": "A",
+              "value": "序号",
+              "is_formula": false
+            },
+            {
+              "col": "B",
+              "value": "借款种类",
+              "is_formula": false
+            },
+            {
+              "col": "C",
+              "value": "贷款单位",
+              "is_formula": false
+            },
+            {
+              "col": "D",
+              "value": "起始日期",
+              "is_formula": false
+            },
+            {
+              "col": "E",
+              "value": "讫止日期",
+              "is_formula": false
+            },
+            {
+              "col": "F",
+              "value": "年利率",
+              "is_formula": false
+            },
+            {
+              "col": "G",
+              "value": "固定/浮动利率",
+              "is_formula": false
+            },
+            {
+              "col": "H",
+              "value": "未审数",
+              "is_formula": false
+            },
+            {
+              "col": "L",
+              "value": "期初调整",
+              "is_formula": false
+            },
+            {
+              "col": "N",
+              "value": "账项调整",
+              "is_formula": false
+            },
+            {
+              "col": "P",
+              "value": "重分类调整",
+              "is_formula": false
+            },
+            {
+              "col": "R",
+              "value": "审定数",
+              "is_formula": false
+            }
+          ]
+        },
+        {
+          "row": 9,
+          "cells": [
+            {
+              "col": "H",
+              "value": "期初余额",
+              "is_formula": false
+            },
+            {
+              "col": "I",
+              "value": "本期增加",
+              "is_formula": false
+            },
+            {
+              "col": "J",
+              "value": "本期减少",
+              "is_formula": false
+            },
+            {
+              "col": "K",
+              "value": "期末余额",
+              "is_formula": false
+            },
+            {
+              "col": "L",
+              "value": "账项调整",
+              "is_formula": false
+            },
+            {
+              "col": "M",
+              "value": "重分类调整",
+              "is_formula": false
+            },
+            {
+              "col": "N",
+              "value": "本期增加",
+              "is_formula": false
+            },
+            {
+              "col": "O",
+              "value": "本期减少",
+              "is_formula": false
+            },
+            {
+              "col": "P",
+              "value": "本期增加",
+              "is_formula": false
+            },
+            {
+              "col": "Q",
+              "value": "本期减少",
+              "is_formula": false
+            },
+            {
+              "col": "R",
+              "value": "期初余额",
+              "is_formula": false
+            },
+            {
+              "col": "S",
+              "value": "本期增加",
+              "is_formula": false
+            }
+          ]
+        },
+        {
+          "row": 10,
+          "cells": [
+            {
+              "col": "A",
+              "value": "1",
+              "is_formula": false
+            },
+            {
+              "col": "K",
+              "value": "=H10+I10-J10",
+              "is_formula": true
+            },
+            {
+              "col": "R",
+              "value": "=H10+L10+M10",
+              "is_formula": true
+            },
+            {
+              "col": "S",
+              "value": "=I10+N10+P10",
+              "is_formula": true
+            }
+          ]
+        }
+      ],
+      "formula_count": 114,
+      "formula_samples": [
+        {
+          "cell": "A3",
+          "formula": "=底稿目录!A2"
+        },
+        {
+          "cell": "F3",
+          "formula": "=底稿目录!A4"
+        },
+        {
+          "cell": "J3",
+          "formula": "=底稿目录!A5"
+        },
+        {
+          "cell": "Q3",
+          "formula": "=底稿目录!F8"
+        },
+        {
+          "cell": "T3",
+          "formula": "=F3"
+        },
+        {
+          "cell": "X3",
+          "formula": "=J3"
+        },
+        {
+          "cell": "AE3",
+          "formula": "=底稿目录!F8"
+        },
+        {
+          "cell": "A4",
+          "formula": "=底稿目录!A3"
+        },
+        {
+          "cell": "F4",
+          "formula": "=底稿目录!A6"
+        },
+        {
+          "cell": "J4",
+          "formula": "=底稿目录!A7"
+        },
+        {
+          "cell": "T4",
+          "formula": "=F4"
+        },
+        {
+          "cell": "X4",
+          "formula": "=J4"
+        },
+        {
+          "cell": "K10",
+          "formula": "=H10+I10-J10"
+        },
+        {
+          "cell": "R10",
+          "formula": "=H10+L10+M10"
+        },
+        {
+          "cell": "S10",
+          "formula": "=I10+N10+P10"
+        }
+      ]
+    },
+    "调整分录汇总L3-3": {
+      "title": "调整分录汇总L3-3",
+      "dimensions": "A1:J23",
+      "max_row": 23,
+      "max_column": 10,
+      "row_count": 23,
+      "col_count": 10,
+      "merged_cells": [
+        "A1:J1",
+        "A23:J23",
+        "A2:J2"
+      ],
+      "headers": [
+        {
+          "row": 1,
+          "cells": [
+            {
+              "col": "A",
+              "col_idx": 1,
+              "value": "致同会计师事务所",
+              "is_formula": false
+            }
+          ]
+        },
+        {
+          "row": 2,
+          "cells": [
+            {
+              "col": "A",
+              "col_idx": 1,
+              "value": "长期借款调整分录汇总表",
+              "is_formula": false
+            }
+          ]
+        },
+        {
+          "row": 3,
+          "cells": [
+            {
+              "col": "A",
+              "col_idx": 1,
+              "value": "客户名称：",
+              "is_formula": false
+            },
+            {
+              "col": "D",
+              "col_idx": 4,
+              "value": "编制人：",
+              "is_formula": false
+            },
+            {
+              "col": "G",
+              "col_idx": 7,
+              "value": "编制日期：",
+              "is_formula": false
+            },
+            {
+              "col": "I",
+              "col_idx": 9,
+              "value": "索引：",
+              "is_formula": false
+            },
+            {
+              "col": "J",
+              "col_idx": 10,
+              "value": "=底稿目录!F9",
+              "is_formula": true
+            }
+          ]
+        },
+        {
+          "row": 4,
+          "cells": [
+            {
+              "col": "A",
+              "col_idx": 1,
+              "value": "截止日：202X年12月31日",
+              "is_formula": false
+            },
+            {
+              "col": "D",
+              "col_idx": 4,
+              "value": "复核人：",
+              "is_formula": false
+            },
+            {
+              "col": "G",
+              "col_idx": 7,
+              "value": "复核日期：",
+              "is_formula": false
+            },
+            {
+              "col": "I",
+              "col_idx": 9,
+              "value": "页次：",
+              "is_formula": false
+            }
+          ]
+        },
+        {
+          "row": 5,
+          "cells": [
+            {
+              "col": "A",
+              "col_idx": 1,
+              "value": "调整事项说明",
+              "is_formula": false
+            },
+            {
+              "col": "B",
+              "col_idx": 2,
+              "value": "类别（报表调整/账项调整/其他）",
+              "is_formula": false
+            },
+            {
+              "col": "C",
+              "col_idx": 3,
+              "value": "报表项目",
+              "is_formula": false
+            },
+            {
+              "col": "D",
+              "col_idx": 4,
+              "value": "科目名称",
+              "is_formula": false
+            },
+            {
+              "col": "E",
+              "col_idx": 5,
+              "value": "附注项目",
+              "is_formula": false
+            },
+            {
+              "col": "F",
+              "col_idx": 6,
+              "value": "……",
+              "is_formula": false
+            },
+            {
+              "col": "G",
+              "col_idx": 7,
+              "value": "借方调整金额",
+              "is_formula": false
+            },
+            {
+              "col": "H",
+              "col_idx": 8,
+              "value": "贷方调整金额",
+              "is_formula": false
+            },
+            {
+              "col": "I",
+              "col_idx": 9,
+              "value": "索引",
+              "is_formula": false
+            },
+            {
+              "col": "J",
+              "col_idx": 10,
+              "value": "备注",
+              "is_formula": false
+            }
+          ]
+        }
+      ],
+      "formulas": [],
+      "sample_data": [],
+      "formula_count": 1,
+      "formula_samples": [
+        {
+          "cell": "J3",
+          "formula": "=底稿目录!F9"
+        }
+      ]
+    },
+    "征信报告核对表L3-4": {
+      "title": "征信报告核对表L3-4",
+      "dimensions": "A1:AD31",
+      "max_row": 31,
+      "max_column": 30,
+      "row_count": 31,
+      "col_count": 30,
+      "merged_cells": [
+        "A1:T1",
+        "A21:H21",
+        "C7:T7",
+        "A8:T8",
+        "A2:T2"
+      ],
+      "headers": [
+        {
+          "row": 1,
+          "cells": [
+            {
+              "col": "A",
+              "col_idx": 1,
+              "value": "致同会计师事务所",
+              "is_formula": false
+            }
+          ]
+        },
+        {
+          "row": 2,
+          "cells": [
+            {
+              "col": "A",
+              "col_idx": 1,
+              "value": "征信报告核对表",
+              "is_formula": false
+            }
+          ]
+        },
+        {
+          "row": 3,
+          "cells": [
+            {
+              "col": "A",
+              "col_idx": 1,
+              "value": "=底稿目录!A2",
+              "is_formula": true
+            },
+            {
+              "col": "G",
+              "col_idx": 7,
+              "value": "=底稿目录!A4",
+              "is_formula": true
+            },
+            {
+              "col": "N",
+              "col_idx": 14,
+              "value": "=底稿目录!A5",
+              "is_formula": true
+            },
+            {
+              "col": "S",
+              "col_idx": 19,
+              "value": "索引号：",
+              "is_formula": false
+            },
+            {
+              "col": "T",
+              "col_idx": 20,
+              "value": "=底稿目录!F10",
+              "is_formula": true
+            }
+          ]
+        },
+        {
+          "row": 4,
+          "cells": [
+            {
+              "col": "A",
+              "col_idx": 1,
+              "value": "=底稿目录!A3",
+              "is_formula": true
+            },
+            {
+              "col": "G",
+              "col_idx": 7,
+              "value": "=底稿目录!A6",
+              "is_formula": true
+            },
+            {
+              "col": "N",
+              "col_idx": 14,
+              "value": "=底稿目录!A7",
+              "is_formula": true
+            },
+            {
+              "col": "S",
+              "col_idx": 19,
+              "value": "页次",
+              "is_formula": false
+            }
+          ]
+        },
+        {
+          "row": 5,
+          "cells": [
+            {
+              "col": "A",
+              "col_idx": 1,
+              "value": "一、审计目标:",
+              "is_formula": false
+            }
+          ]
+        }
+      ],
+      "formulas": [],
+      "sample_data": [
+        {
+          "row": 6,
+          "cells": [
+            {
+              "col": "A",
+              "value": "1.资产负债表中记录的长期借款是存在的，且已经记录在恰当的账户中；2. 所有应记录的长期借款均已记录，所有应当包括在财务报表中的相关披露均已包括",
+              "is_formula": false
+            }
+          ]
+        },
+        {
+          "row": 7,
+          "cells": [
+            {
+              "col": "A",
+              "value": "二、审计过程：",
+              "is_formula": false
+            }
+          ]
+        },
+        {
+          "row": 8,
+          "cells": [
+            {
+              "col": "A",
+              "value": "获取企业征信报告并：1.考虑审查文件（如董事会/财务委员会会议纪要和信件）、定期存单原件，并在银行询证函中注明该定期存单是否已被质押或冻结；2.考虑检查房屋建筑物或土地使用权等权证的原件，如果被审计单",
+              "is_formula": false
+            }
+          ]
+        },
+        {
+          "row": 9,
+          "cells": [
+            {
+              "col": "A",
+              "value": "1、核对过程",
+              "is_formula": false
+            }
+          ]
+        },
+        {
+          "row": 10,
+          "cells": [
+            {
+              "col": "A",
+              "value": "类别",
+              "is_formula": false
+            },
+            {
+              "col": "B",
+              "value": "授信机构",
+              "is_formula": false
+            },
+            {
+              "col": "C",
+              "value": "业务种类",
+              "is_formula": false
+            },
+            {
+              "col": "D",
+              "value": "开立日期",
+              "is_formula": false
+            },
+            {
+              "col": "E",
+              "value": "到期日",
+              "is_formula": false
+            },
+            {
+              "col": "F",
+              "value": "币种",
+              "is_formula": false
+            },
+            {
+              "col": "G",
+              "value": "借款金额",
+              "is_formula": false
+            },
+            {
+              "col": "H",
+              "value": "发放形式",
+              "is_formula": false
+            },
+            {
+              "col": "I",
+              "value": "担保方式",
+              "is_formula": false
+            },
+            {
+              "col": "J",
+              "value": "企业信用查询记录信息余额",
+              "is_formula": false
+            },
+            {
+              "col": "K",
+              "value": "逾期总额",
+              "is_formula": false
+            },
+            {
+              "col": "L",
+              "value": "逾期本金",
+              "is_formula": false
+            },
+            {
+              "col": "M",
+              "value": "逾期月数",
+              "is_formula": false
+            },
+            {
+              "col": "N",
+              "value": "查询日到财务报表日减少金额",
+              "is_formula": false
+            },
+            {
+              "col": "O",
+              "value": "查询日到财务报表日增加金额",
+              "is_formula": false
+            },
+            {
+              "col": "P",
+              "value": "财务报表日的倒轧余额",
+              "is_formula": false
+            },
+            {
+              "col": "Q",
+              "value": "账面借款金额",
+              "is_formula": false
+            },
+            {
+              "col": "R",
+              "value": "征信报告信息与账面数据差异",
+              "is_formula": false
+            },
+            {
+              "col": "S",
+              "value": "差异原因",
+              "is_formula": false
+            }
+          ]
+        }
+      ],
+      "formula_count": 19,
+      "formula_samples": [
+        {
+          "cell": "A3",
+          "formula": "=底稿目录!A2"
+        },
+        {
+          "cell": "G3",
+          "formula": "=底稿目录!A4"
+        },
+        {
+          "cell": "N3",
+          "formula": "=底稿目录!A5"
+        },
+        {
+          "cell": "T3",
+          "formula": "=底稿目录!F10"
+        },
+        {
+          "cell": "A4",
+          "formula": "=底稿目录!A3"
+        },
+        {
+          "cell": "G4",
+          "formula": "=底稿目录!A6"
+        },
+        {
+          "cell": "N4",
+          "formula": "=底稿目录!A7"
+        },
+        {
+          "cell": "P11",
+          "formula": "=J11+N11-O11"
+        },
+        {
+          "cell": "R11",
+          "formula": "=P11-Q11"
+        },
+        {
+          "cell": "P12",
+          "formula": "=J12+N12-O12"
+        },
+        {
+          "cell": "R12",
+          "formula": "=P12-Q12"
+        },
+        {
+          "cell": "P13",
+          "formula": "=J13+N13-O13"
+        },
+        {
+          "cell": "R13",
+          "formula": "=P13-Q13"
+        },
+        {
+          "cell": "P14",
+          "formula": "=J14+N14-O14"
+        },
+        {
+          "cell": "R14",
+          "formula": "=P14-Q14"
+        }
+      ]
+    },
+    "利息测算表L3-5": {
+      "title": "利息测算表L3-5",
+      "dimensions": "A1:T29",
+      "max_row": 29,
+      "max_column": 20,
+      "row_count": 29,
+      "col_count": 20,
+      "merged_cells": [
+        "A1:T1",
+        "A23:J23",
+        "A22:J22",
+        "A2:T2",
+        "A21:C21",
+        "A24:J24",
+        "A25:J25"
+      ],
+      "headers": [
+        {
+          "row": 1,
+          "cells": [
+            {
+              "col": "A",
+              "col_idx": 1,
+              "value": "致同会计师事务所",
+              "is_formula": false
+            }
+          ]
+        },
+        {
+          "row": 2,
+          "cells": [
+            {
+              "col": "A",
+              "col_idx": 1,
+              "value": "长期借款利息测算表",
+              "is_formula": false
+            }
+          ]
+        },
+        {
+          "row": 3,
+          "cells": [
+            {
+              "col": "A",
+              "col_idx": 1,
+              "value": "=底稿目录!A2",
+              "is_formula": true
+            },
+            {
+              "col": "J",
+              "col_idx": 10,
+              "value": "=底稿目录!A4",
+              "is_formula": true
+            },
+            {
+              "col": "N",
+              "col_idx": 14,
+              "value": "=底稿目录!A5",
+              "is_formula": true
+            },
+            {
+              "col": "S",
+              "col_idx": 19,
+              "value": "索引号：",
+              "is_formula": false
+            },
+            {
+              "col": "T",
+              "col_idx": 20,
+              "value": "=底稿目录!F11",
+              "is_formula": true
+            }
+          ]
+        },
+        {
+          "row": 4,
+          "cells": [
+            {
+              "col": "A",
+              "col_idx": 1,
+              "value": "=底稿目录!A3",
+              "is_formula": true
+            },
+            {
+              "col": "J",
+              "col_idx": 10,
+              "value": "=底稿目录!A6",
+              "is_formula": true
+            },
+            {
+              "col": "N",
+              "col_idx": 14,
+              "value": "=底稿目录!A7",
+              "is_formula": true
+            },
+            {
+              "col": "S",
+              "col_idx": 19,
+              "value": "页 次：",
+              "is_formula": false
+            }
+          ]
+        },
+        {
+          "row": 5,
+          "cells": [
+            {
+              "col": "A",
+              "col_idx": 1,
+              "value": "一、审计目标:",
+              "is_formula": false
+            }
+          ]
+        }
+      ],
+      "formulas": [],
+      "sample_data": [
+        {
+          "row": 6,
+          "cells": [
+            {
+              "col": "A",
+              "value": "长期借款以恰当的金额包括在财务报表中，与之相关的计价或分摊调整已恰当记录，相关披露已得到恰当计量和描述 ",
+              "is_formula": false
+            }
+          ]
+        },
+        {
+          "row": 7,
+          "cells": [
+            {
+              "col": "A",
+              "value": "二、审计过程：",
+              "is_formula": false
+            }
+          ]
+        },
+        {
+          "row": 8,
+          "cells": [
+            {
+              "col": "A",
+              "value": "对长期借款的利息进行测算，并检查会计处理是否正确",
+              "is_formula": false
+            }
+          ]
+        },
+        {
+          "row": 9,
+          "cells": [
+            {
+              "col": "C",
+              "value": "报告期间",
+              "is_formula": false
+            },
+            {
+              "col": "D",
+              "value": "2025-01-01 00:00:00",
+              "is_formula": false
+            },
+            {
+              "col": "E",
+              "value": "2025-12-31 00:00:00",
+              "is_formula": false
+            }
+          ]
+        },
+        {
+          "row": 10,
+          "cells": [
+            {
+              "col": "A",
+              "value": "序号",
+              "is_formula": false
+            },
+            {
+              "col": "B",
+              "value": "借款种类",
+              "is_formula": false
+            },
+            {
+              "col": "C",
+              "value": "贷款单位",
+              "is_formula": false
+            },
+            {
+              "col": "D",
+              "value": "借款起始日期",
+              "is_formula": false
+            },
+            {
+              "col": "E",
+              "value": "借款讫止日期",
+              "is_formula": false
+            },
+            {
+              "col": "F",
+              "value": "结息日",
+              "is_formula": false
+            },
+            {
+              "col": "G",
+              "value": "起算时点",
+              "is_formula": false
+            },
+            {
+              "col": "H",
+              "value": "截止时点",
+              "is_formula": false
+            },
+            {
+              "col": "I",
+              "value": "年利率",
+              "is_formula": false
+            },
+            {
+              "col": "J",
+              "value": "借款本金",
+              "is_formula": false
+            },
+            {
+              "col": "K",
+              "value": "本期实计利息①",
+              "is_formula": false
+            },
+            {
+              "col": "L",
+              "value": "本期应计息天数",
+              "is_formula": false
+            },
+            {
+              "col": "M",
+              "value": "本期应计利息",
+              "is_formula": false
+            },
+            {
+              "col": "N",
+              "value": "差异",
+              "is_formula": false
+            },
+            {
+              "col": "O",
+              "value": "财务费用-利息支出②",
+              "is_formula": false
+            },
+            {
+              "col": "P",
+              "value": "资本化利息支出③",
+              "is_formula": false
+            },
+            {
+              "col": "Q",
+              "value": "本期未付利息天数",
+              "is_formula": false
+            },
+            {
+              "col": "R",
+              "value": "本期应付利息账面数",
+              "is_formula": false
+            },
+            {
+              "col": "S",
+              "value": "本期应付利测算",
+              "is_formula": false
+            }
+          ]
+        }
+      ],
+      "formula_count": 78,
+      "formula_samples": [
+        {
+          "cell": "A3",
+          "formula": "=底稿目录!A2"
+        },
+        {
+          "cell": "J3",
+          "formula": "=底稿目录!A4"
+        },
+        {
+          "cell": "N3",
+          "formula": "=底稿目录!A5"
+        },
+        {
+          "cell": "T3",
+          "formula": "=底稿目录!F11"
+        },
+        {
+          "cell": "A4",
+          "formula": "=底稿目录!A3"
+        },
+        {
+          "cell": "J4",
+          "formula": "=底稿目录!A6"
+        },
+        {
+          "cell": "N4",
+          "formula": "=底稿目录!A7"
+        },
+        {
+          "cell": "G11",
+          "formula": "=IF(D11<=$D$9,$D$9,D11)"
+        },
+        {
+          "cell": "H11",
+          "formula": "=IF(E11<=$E$9,E11,$E$9)"
+        },
+        {
+          "cell": "L11",
+          "formula": "=IF(G11=0,0,IF((H11-G11)=365,H11-G11,H11-G11+1))"
+        },
+        {
+          "cell": "M11",
+          "formula": "=J11*I11/365*L11"
+        },
+        {
+          "cell": "N11",
+          "formula": "=M11-K11"
+        },
+        {
+          "cell": "O11",
+          "formula": "=M11-P11"
+        },
+        {
+          "cell": "Q11",
+          "formula": "=IF(F11=0,0,IF((H11-F11)=365,H11-F11,H11-F11+1))"
+        },
+        {
+          "cell": "S11",
+          "formula": "=J11*I11/365*R11"
+        }
+      ]
+    },
+    "贷款合同检查L3-6": {
+      "title": "贷款合同检查L3-6",
+      "dimensions": "A1:AF23",
+      "max_row": 23,
+      "max_column": 32,
+      "row_count": 23,
+      "col_count": 32,
+      "merged_cells": [
+        "R2:W2",
+        "A1:M1",
+        "B8:M8",
+        "B9:M9",
+        "R1:W1",
+        "A2:M2"
+      ],
+      "headers": [
+        {
+          "row": 1,
+          "cells": [
+            {
+              "col": "A",
+              "col_idx": 1,
+              "value": "致同会计师事务所",
+              "is_formula": false
+            },
+            {
+              "col": "R",
+              "col_idx": 18,
+              "value": "致同会计师事务所",
+              "is_formula": false
+            }
+          ]
+        },
+        {
+          "row": 2,
+          "cells": [
+            {
+              "col": "A",
+              "col_idx": 1,
+              "value": "贷款合同检查表",
+              "is_formula": false
+            },
+            {
+              "col": "R",
+              "col_idx": 18,
+              "value": "贷款合同检查表",
+              "is_formula": false
+            }
+          ]
+        },
+        {
+          "row": 3,
+          "cells": [
+            {
+              "col": "B",
+              "col_idx": 2,
+              "value": "=底稿目录!A2",
+              "is_formula": true
+            },
+            {
+              "col": "D",
+              "col_idx": 4,
+              "value": "=底稿目录!A4",
+              "is_formula": true
+            },
+            {
+              "col": "G",
+              "col_idx": 7,
+              "value": "=底稿目录!A6",
+              "is_formula": true
+            },
+            {
+              "col": "L",
+              "col_idx": 12,
+              "value": "索引号：",
+              "is_formula": false
+            },
+            {
+              "col": "M",
+              "col_idx": 13,
+              "value": "=底稿目录!F12",
+              "is_formula": true
+            },
+            {
+              "col": "N",
+              "col_idx": 14,
+              "value": "=B3",
+              "is_formula": true
+            },
+            {
+              "col": "R",
+              "col_idx": 18,
+              "value": "=D3",
+              "is_formula": true
+            },
+            {
+              "col": "W",
+              "col_idx": 23,
+              "value": "=G3",
+              "is_formula": true
+            },
+            {
+              "col": "Y",
+              "col_idx": 25,
+              "value": "索引号：",
+              "is_formula": false
+            },
+            {
+              "col": "Z",
+              "col_idx": 26,
+              "value": "=M3",
+              "is_formula": true
+            }
+          ]
+        },
+        {
+          "row": 4,
+          "cells": [
+            {
+              "col": "B",
+              "col_idx": 2,
+              "value": "=底稿目录!A3",
+              "is_formula": true
+            },
+            {
+              "col": "D",
+              "col_idx": 4,
+              "value": "=底稿目录!A5",
+              "is_formula": true
+            },
+            {
+              "col": "G",
+              "col_idx": 7,
+              "value": "=底稿目录!A7",
+              "is_formula": true
+            },
+            {
+              "col": "L",
+              "col_idx": 12,
+              "value": "页次：",
+              "is_formula": false
+            },
+            {
+              "col": "N",
+              "col_idx": 14,
+              "value": "=B4",
+              "is_formula": true
+            },
+            {
+              "col": "R",
+              "col_idx": 18,
+              "value": "=D4",
+              "is_formula": true
+            },
+            {
+              "col": "W",
+              "col_idx": 23,
+              "value": "=G4",
+              "is_formula": true
+            },
+            {
+              "col": "Y",
+              "col_idx": 25,
+              "value": "页次：",
+              "is_formula": false
+            }
+          ]
+        },
+        {
+          "row": 5,
+          "cells": [
+            {
+              "col": "B",
+              "col_idx": 2,
+              "value": "一、审计目标:",
+              "is_formula": false
+            }
+          ]
+        }
+      ],
+      "formulas": [],
+      "sample_data": [
+        {
+          "row": 6,
+          "cells": [
+            {
+              "col": "B",
+              "value": "1. 记录的长期借款是被审计单位应当履行的偿还义务; 2.长期借款已被恰当地汇总或分解且表述清楚，相关披露在按照企业会计准则的编制基础下是相关的、可理解的",
+              "is_formula": false
+            }
+          ]
+        },
+        {
+          "row": 7,
+          "cells": [
+            {
+              "col": "B",
+              "value": "二、审计过程:",
+              "is_formula": false
+            }
+          ]
+        },
+        {
+          "row": 8,
+          "cells": [
+            {
+              "col": "B",
+              "value": "1.获取债务协议，复核关键或重要项，如本金、利息、到期日、抵押、规定的付息日及债务契约，汇总检查协议时注意到的重要信息。；2.检查被审计单位用于借款的抵押资产的所有权是否属于被审计单位，其价值和实际状",
+              "is_formula": false
+            }
+          ]
+        },
+        {
+          "row": 9,
+          "cells": [
+            {
+              "col": "B",
+              "value": "3.如果存在有违反债务协议约定或者条款的情况：确定违反相关协议和其他协议（如：连带违约）的影响，确定和记录任何额外执行的程序（如，企业获得书面的豁免，如果需要，或签订合同，以保证违规在债务宽限期内修正",
+              "is_formula": false
+            }
+          ]
+        },
+        {
+          "row": 10,
+          "cells": [
+            {
+              "col": "B",
+              "value": "借款/授信/保证/抵押/质押等合同信息",
+              "is_formula": false
+            }
+          ]
+        }
+      ],
+      "formula_count": 14,
+      "formula_samples": [
+        {
+          "cell": "B3",
+          "formula": "=底稿目录!A2"
+        },
+        {
+          "cell": "D3",
+          "formula": "=底稿目录!A4"
+        },
+        {
+          "cell": "G3",
+          "formula": "=底稿目录!A6"
+        },
+        {
+          "cell": "M3",
+          "formula": "=底稿目录!F12"
+        },
+        {
+          "cell": "N3",
+          "formula": "=B3"
+        },
+        {
+          "cell": "R3",
+          "formula": "=D3"
+        },
+        {
+          "cell": "W3",
+          "formula": "=G3"
+        },
+        {
+          "cell": "Z3",
+          "formula": "=M3"
+        },
+        {
+          "cell": "B4",
+          "formula": "=底稿目录!A3"
+        },
+        {
+          "cell": "D4",
+          "formula": "=底稿目录!A5"
+        },
+        {
+          "cell": "G4",
+          "formula": "=底稿目录!A7"
+        },
+        {
+          "cell": "N4",
+          "formula": "=B4"
+        },
+        {
+          "cell": "R4",
+          "formula": "=D4"
+        },
+        {
+          "cell": "W4",
+          "formula": "=G4"
+        }
+      ]
+    },
+    "逾期贷款检查表L3-7": {
+      "title": "逾期贷款检查表L3-7",
+      "dimensions": "A1:V28",
+      "max_row": 28,
+      "max_column": 22,
+      "row_count": 28,
+      "col_count": 22,
+      "merged_cells": [
+        "G16:I16",
+        "A2:Q2",
+        "A15:D15",
+        "A16:D16",
+        "A1:Q1"
+      ],
+      "headers": [
+        {
+          "row": 1,
+          "cells": [
+            {
+              "col": "A",
+              "col_idx": 1,
+              "value": "致同会计师事务所",
+              "is_formula": false
+            }
+          ]
+        },
+        {
+          "row": 2,
+          "cells": [
+            {
+              "col": "A",
+              "col_idx": 1,
+              "value": "逾期贷款检查表",
+              "is_formula": false
+            }
+          ]
+        },
+        {
+          "row": 3,
+          "cells": [
+            {
+              "col": "A",
+              "col_idx": 1,
+              "value": "=底稿目录!A2",
+              "is_formula": true
+            },
+            {
+              "col": "G",
+              "col_idx": 7,
+              "value": "=底稿目录!A4",
+              "is_formula": true
+            },
+            {
+              "col": "J",
+              "col_idx": 10,
+              "value": "=底稿目录!A5",
+              "is_formula": true
+            },
+            {
+              "col": "P",
+              "col_idx": 16,
+              "value": "索引号：",
+              "is_formula": false
+            },
+            {
+              "col": "Q",
+              "col_idx": 17,
+              "value": "=底稿目录!F13",
+              "is_formula": true
+            }
+          ]
+        },
+        {
+          "row": 4,
+          "cells": [
+            {
+              "col": "A",
+              "col_idx": 1,
+              "value": "=底稿目录!A3",
+              "is_formula": true
+            },
+            {
+              "col": "G",
+              "col_idx": 7,
+              "value": "=底稿目录!A6",
+              "is_formula": true
+            },
+            {
+              "col": "J",
+              "col_idx": 10,
+              "value": "=底稿目录!A7",
+              "is_formula": true
+            },
+            {
+              "col": "P",
+              "col_idx": 16,
+              "value": "页次：",
+              "is_formula": false
+            }
+          ]
+        },
+        {
+          "row": 5,
+          "cells": [
+            {
+              "col": "A",
+              "col_idx": 1,
+              "value": "一、审计目标:",
+              "is_formula": false
+            }
+          ]
+        }
+      ],
+      "formulas": [],
+      "sample_data": [
+        {
+          "row": 6,
+          "cells": [
+            {
+              "col": "A",
+              "value": "1. 记录的长期借款是被审计单位应当履行的偿还义务;2.长期借款已被恰当地汇总或分解且表述清楚，相关披露在按照企业会计准则的编制基础下是相关的、可理解的",
+              "is_formula": false
+            }
+          ]
+        },
+        {
+          "row": 7,
+          "cells": [
+            {
+              "col": "A",
+              "value": "二、审计过程：",
+              "is_formula": false
+            }
+          ]
+        },
+        {
+          "row": 8,
+          "cells": [
+            {
+              "col": "A",
+              "value": "1.未能办理转期手续的是否引发了诉讼事项，如确引发了诉讼事项，取得贷款人的诉状；2.分析逾期借款占公司全部借款的比例，对公司持续经营的影响程度。",
+              "is_formula": false
+            }
+          ]
+        },
+        {
+          "row": 9,
+          "cells": [
+            {
+              "col": "G",
+              "value": "报告期间",
+              "is_formula": false
+            },
+            {
+              "col": "H",
+              "value": "2025-01-01 00:00:00",
+              "is_formula": false
+            },
+            {
+              "col": "I",
+              "value": "2025-12-31 00:00:00",
+              "is_formula": false
+            }
+          ]
+        },
+        {
+          "row": 10,
+          "cells": [
+            {
+              "col": "A",
+              "value": "序号",
+              "is_formula": false
+            },
+            {
+              "col": "B",
+              "value": "贷款单位",
+              "is_formula": false
+            },
+            {
+              "col": "C",
+              "value": "贷款类别",
+              "is_formula": false
+            },
+            {
+              "col": "D",
+              "value": "贷款资金用途",
+              "is_formula": false
+            },
+            {
+              "col": "E",
+              "value": "贷款金额",
+              "is_formula": false
+            },
+            {
+              "col": "F",
+              "value": "借款利率",
+              "is_formula": false
+            },
+            {
+              "col": "G",
+              "value": "逾期利率（日）",
+              "is_formula": false
+            },
+            {
+              "col": "H",
+              "value": "借款日期",
+              "is_formula": false
+            },
+            {
+              "col": "I",
+              "value": "借款到期日期",
+              "is_formula": false
+            },
+            {
+              "col": "J",
+              "value": "累计逾期时间（天）",
+              "is_formula": false
+            },
+            {
+              "col": "K",
+              "value": "本期计息天数",
+              "is_formula": false
+            },
+            {
+              "col": "L",
+              "value": "本期应计利息",
+              "is_formula": false
+            },
+            {
+              "col": "M",
+              "value": "累计应付利息",
+              "is_formula": false
+            },
+            {
+              "col": "N",
+              "value": "是否涉诉",
+              "is_formula": false
+            },
+            {
+              "col": "O",
+              "value": "未按期偿还的原因",
+              "is_formula": false
+            },
+            {
+              "col": "P",
+              "value": "预计还款期",
+              "is_formula": false
+            },
+            {
+              "col": "Q",
+              "value": "备注",
+              "is_formula": false
+            }
+          ]
+        }
+      ],
+      "formula_count": 28,
+      "formula_samples": [
+        {
+          "cell": "A3",
+          "formula": "=底稿目录!A2"
+        },
+        {
+          "cell": "G3",
+          "formula": "=底稿目录!A4"
+        },
+        {
+          "cell": "J3",
+          "formula": "=底稿目录!A5"
+        },
+        {
+          "cell": "Q3",
+          "formula": "=底稿目录!F13"
+        },
+        {
+          "cell": "A4",
+          "formula": "=底稿目录!A3"
+        },
+        {
+          "cell": "G4",
+          "formula": "=底稿目录!A6"
+        },
+        {
+          "cell": "J4",
+          "formula": "=底稿目录!A7"
+        },
+        {
+          "cell": "J11",
+          "formula": "=IF(I11=0,0,$I$9-I11)"
+        },
+        {
+          "cell": "K11",
+          "formula": "=IF(#REF!=0,0,IF((#REF!-#REF!)=365,#REF!-#REF!,#REF!-#REF!+1))"
+        },
+        {
+          "cell": "L11",
+          "formula": "=E11*G11*K11"
+        },
+        {
+          "cell": "M11",
+          "formula": "=E11*G11*J11"
+        },
+        {
+          "cell": "J12",
+          "formula": "=IF(I12=0,0,$I$9-I12)"
+        },
+        {
+          "cell": "K12",
+          "formula": "=IF(#REF!=0,0,IF((#REF!-#REF!)=365,#REF!-#REF!,#REF!-#REF!+1))"
+        },
+        {
+          "cell": "L12",
+          "formula": "=K12*G12"
+        },
+        {
+          "cell": "M12",
+          "formula": "=E12*G12*J12"
+        }
+      ]
+    },
+    "抵质押资产检查表L3-8": {
+      "title": "抵质押资产检查表L3-8",
+      "dimensions": "A1:P20",
+      "max_row": 20,
+      "max_column": 16,
+      "row_count": 20,
+      "col_count": 16,
+      "merged_cells": [
+        "A2:M2",
+        "A1:M1"
+      ],
+      "headers": [
+        {
+          "row": 1,
+          "cells": [
+            {
+              "col": "A",
+              "col_idx": 1,
+              "value": "致同会计师事务所",
+              "is_formula": false
+            }
+          ]
+        },
+        {
+          "row": 2,
+          "cells": [
+            {
+              "col": "A",
+              "col_idx": 1,
+              "value": "抵/质押资产检查表",
+              "is_formula": false
+            }
+          ]
+        },
+        {
+          "row": 3,
+          "cells": [
+            {
+              "col": "A",
+              "col_idx": 1,
+              "value": "=底稿目录!A2",
+              "is_formula": true
+            },
+            {
+              "col": "E",
+              "col_idx": 5,
+              "value": "=底稿目录!A4",
+              "is_formula": true
+            },
+            {
+              "col": "I",
+              "col_idx": 9,
+              "value": "=底稿目录!A5",
+              "is_formula": true
+            },
+            {
+              "col": "L",
+              "col_idx": 12,
+              "value": "索引号：",
+              "is_formula": false
+            },
+            {
+              "col": "M",
+              "col_idx": 13,
+              "value": "=底稿目录!F14",
+              "is_formula": true
+            }
+          ]
+        },
+        {
+          "row": 4,
+          "cells": [
+            {
+              "col": "A",
+              "col_idx": 1,
+              "value": "=底稿目录!A3",
+              "is_formula": true
+            },
+            {
+              "col": "E",
+              "col_idx": 5,
+              "value": "=底稿目录!A6",
+              "is_formula": true
+            },
+            {
+              "col": "I",
+              "col_idx": 9,
+              "value": "=底稿目录!A7",
+              "is_formula": true
+            },
+            {
+              "col": "L",
+              "col_idx": 12,
+              "value": "页次：",
+              "is_formula": false
+            }
+          ]
+        },
+        {
+          "row": 5,
+          "cells": [
+            {
+              "col": "A",
+              "col_idx": 1,
+              "value": "一、审计目标:",
+              "is_formula": false
+            }
+          ]
+        }
+      ],
+      "formulas": [],
+      "sample_data": [
+        {
+          "row": 6,
+          "cells": [
+            {
+              "col": "A",
+              "value": "长期借款已被恰当地汇总或分解且表述清楚，相关披露在按照企业会计准则的编制基础下是相关的、可理解的",
+              "is_formula": false
+            }
+          ]
+        },
+        {
+          "row": 7,
+          "cells": [
+            {
+              "col": "A",
+              "value": "二、审计过程：",
+              "is_formula": false
+            }
+          ]
+        },
+        {
+          "row": 8,
+          "cells": [
+            {
+              "col": "A",
+              "value": "检查被审计单位用于借款的抵/质押资产的所有权是否属于被审计单位，其价值和实际状况是否与协议中的规定一致。",
+              "is_formula": false
+            }
+          ]
+        },
+        {
+          "row": 9,
+          "cells": [
+            {
+              "col": "A",
+              "value": "抵/质押合同号",
+              "is_formula": false
+            },
+            {
+              "col": "B",
+              "value": "资产状态",
+              "is_formula": false
+            },
+            {
+              "col": "C",
+              "value": "抵/质押贷款额",
+              "is_formula": false
+            },
+            {
+              "col": "D",
+              "value": "抵/质押资产评估价值",
+              "is_formula": false
+            },
+            {
+              "col": "E",
+              "value": "抵/质押资产权证号",
+              "is_formula": false
+            },
+            {
+              "col": "F",
+              "value": "资产明细索引号",
+              "is_formula": false
+            },
+            {
+              "col": "G",
+              "value": "抵/质押资产所属报表科目",
+              "is_formula": false
+            },
+            {
+              "col": "H",
+              "value": "抵/质押资产账面原值",
+              "is_formula": false
+            },
+            {
+              "col": "I",
+              "value": "抵/质押资产折旧或摊销",
+              "is_formula": false
+            },
+            {
+              "col": "J",
+              "value": "抵/质押资产账面净值",
+              "is_formula": false
+            },
+            {
+              "col": "K",
+              "value": "抵/质押资产所有权是否归属于被审计单位",
+              "is_formula": false
+            },
+            {
+              "col": "L",
+              "value": "抵/质押资产状况",
+              "is_formula": false
+            },
+            {
+              "col": "M",
+              "value": "备注",
+              "is_formula": false
+            }
+          ]
+        },
+        {
+          "row": 10,
+          "cells": [
+            {
+              "col": "J",
+              "value": "=H10-I10",
+              "is_formula": true
+            }
+          ]
+        }
+      ],
+      "formula_count": 14,
+      "formula_samples": [
+        {
+          "cell": "A3",
+          "formula": "=底稿目录!A2"
+        },
+        {
+          "cell": "E3",
+          "formula": "=底稿目录!A4"
+        },
+        {
+          "cell": "I3",
+          "formula": "=底稿目录!A5"
+        },
+        {
+          "cell": "M3",
+          "formula": "=底稿目录!F14"
+        },
+        {
+          "cell": "A4",
+          "formula": "=底稿目录!A3"
+        },
+        {
+          "cell": "E4",
+          "formula": "=底稿目录!A6"
+        },
+        {
+          "cell": "I4",
+          "formula": "=底稿目录!A7"
+        },
+        {
+          "cell": "J10",
+          "formula": "=H10-I10"
+        },
+        {
+          "cell": "J11",
+          "formula": "=H11-I11"
+        },
+        {
+          "cell": "J12",
+          "formula": "=H12-I12"
+        },
+        {
+          "cell": "J13",
+          "formula": "=H13-I13"
+        },
+        {
+          "cell": "J14",
+          "formula": "=H14-I14"
+        },
+        {
+          "cell": "J15",
+          "formula": "=H15-I15"
+        },
+        {
+          "cell": "J16",
+          "formula": "=H16-I16"
+        }
+      ]
+    },
+    "长期借款检查表L3-9": {
+      "title": "长期借款检查表L3-9",
+      "dimensions": "A1:AH29",
+      "max_row": 29,
+      "max_column": 34,
+      "row_count": 29,
+      "col_count": 34,
+      "merged_cells": [
+        "P10:P11",
+        "N10:N11",
+        "O10:O11",
+        "A23:C23",
+        "A1:P1",
+        "A22:C22",
+        "I10:M10",
+        "C5:T5",
+        "A21:C21",
+        "H10:H11",
+        "A10:G10",
+        "A2:P2"
+      ],
+      "headers": [
+        {
+          "row": 1,
+          "cells": [
+            {
+              "col": "A",
+              "col_idx": 1,
+              "value": "致同会计师事务所",
+              "is_formula": false
+            }
+          ]
+        },
+        {
+          "row": 2,
+          "cells": [
+            {
+              "col": "A",
+              "col_idx": 1,
+              "value": "长期借款针对性测试底稿",
+              "is_formula": false
+            }
+          ]
+        },
+        {
+          "row": 3,
+          "cells": [
+            {
+              "col": "A",
+              "col_idx": 1,
+              "value": "=底稿目录!A2",
+              "is_formula": true
+            },
+            {
+              "col": "F",
+              "col_idx": 6,
+              "value": "=底稿目录!A4",
+              "is_formula": true
+            },
+            {
+              "col": "J",
+              "col_idx": 10,
+              "value": "=底稿目录!A5",
+              "is_formula": true
+            },
+            {
+              "col": "O",
+              "col_idx": 15,
+              "value": "索引号：",
+              "is_formula": false
+            },
+            {
+              "col": "P",
+              "col_idx": 16,
+              "value": "=底稿目录!F21",
+              "is_formula": true
+            }
+          ]
+        },
+        {
+          "row": 4,
+          "cells": [
+            {
+              "col": "A",
+              "col_idx": 1,
+              "value": "=底稿目录!A3",
+              "is_formula": true
+            },
+            {
+              "col": "F",
+              "col_idx": 6,
+              "value": "=底稿目录!A6",
+              "is_formula": true
+            },
+            {
+              "col": "J",
+              "col_idx": 10,
+              "value": "=底稿目录!A7",
+              "is_formula": true
+            },
+            {
+              "col": "O",
+              "col_idx": 15,
+              "value": "页次：",
+              "is_formula": false
+            }
+          ]
+        },
+        {
+          "row": 5,
+          "cells": [
+            {
+              "col": "A",
+              "col_idx": 1,
+              "value": "一.审计目标：",
+              "is_formula": false
+            }
+          ]
+        }
+      ],
+      "formulas": [],
+      "sample_data": [
+        {
+          "row": 6,
+          "cells": [
+            {
+              "col": "A",
+              "value": "1.资产负债表中记录的长期借款是存在的，且已经记录在恰当的账户中；     2.记录的长期借款由被审计单位拥有或控制；",
+              "is_formula": false
+            }
+          ]
+        },
+        {
+          "row": 7,
+          "cells": [
+            {
+              "col": "A",
+              "value": "3.长期借款以恰当的金额包括在财务报表中，与之相关的计价或分摊调整已恰当记录，相关披露已得到恰当计量和描述 ",
+              "is_formula": false
+            }
+          ]
+        },
+        {
+          "row": 8,
+          "cells": [
+            {
+              "col": "A",
+              "value": "二、测试：",
+              "is_formula": false
+            },
+            {
+              "col": "C",
+              "value": "测试原因：大额（）关联方（）大额交易频繁（）异常（）其他（）",
+              "is_formula": false
+            }
+          ]
+        },
+        {
+          "row": 9,
+          "cells": [
+            {
+              "col": "A",
+              "value": "测试内容说明：1.原始凭证是否齐全； 2.记账凭证与原始凭证是否相符；3.账务处理是否正确；4.是否记录于恰当的会计期间；5.……",
+              "is_formula": false
+            }
+          ]
+        },
+        {
+          "row": 10,
+          "cells": [
+            {
+              "col": "A",
+              "value": "记账凭证",
+              "is_formula": false
+            },
+            {
+              "col": "H",
+              "value": "支持性文件",
+              "is_formula": false
+            },
+            {
+              "col": "I",
+              "value": "核对内容",
+              "is_formula": false
+            },
+            {
+              "col": "N",
+              "value": "索引号",
+              "is_formula": false
+            },
+            {
+              "col": "O",
+              "value": "是否异常",
+              "is_formula": false
+            },
+            {
+              "col": "P",
+              "value": "备注说明",
+              "is_formula": false
+            }
+          ]
+        }
+      ],
+      "formula_count": 13,
+      "formula_samples": [
+        {
+          "cell": "A3",
+          "formula": "=底稿目录!A2"
+        },
+        {
+          "cell": "F3",
+          "formula": "=底稿目录!A4"
+        },
+        {
+          "cell": "J3",
+          "formula": "=底稿目录!A5"
+        },
+        {
+          "cell": "P3",
+          "formula": "=底稿目录!F21"
+        },
+        {
+          "cell": "A4",
+          "formula": "=底稿目录!A3"
+        },
+        {
+          "cell": "F4",
+          "formula": "=底稿目录!A6"
+        },
+        {
+          "cell": "J4",
+          "formula": "=底稿目录!A7"
+        },
+        {
+          "cell": "F21",
+          "formula": "=SUM(F12:F20)"
+        },
+        {
+          "cell": "G21",
+          "formula": "=SUM(G12:G20)"
+        },
+        {
+          "cell": "F22",
+          "formula": "='明细表L3-2'!T22"
+        },
+        {
+          "cell": "G22",
+          "formula": "='明细表L3-2'!S22"
+        },
+        {
+          "cell": "F23",
+          "formula": "=F21/F22"
+        },
+        {
+          "cell": "G23",
+          "formula": "=G21/G22"
+        }
+      ]
+    },
+    "GT_Custom": {
+      "title": "GT_Custom",
+      "dimensions": "A1:B8",
+      "max_row": 8,
+      "max_column": 2,
+      "row_count": 8,
+      "col_count": 2,
+      "merged_cells": [],
+      "headers": [
+        {
+          "row": 1,
+          "cells": [
+            {
+              "col": "A",
+              "col_idx": 1,
+              "value": "C1",
+              "is_formula": false
+            },
+            {
+              "col": "B",
+              "col_idx": 2,
+              "value": "Custom 1",
+              "is_formula": false
+            }
+          ]
+        },
+        {
+          "row": 2,
+          "cells": [
+            {
+              "col": "A",
+              "col_idx": 1,
+              "value": "C2",
+              "is_formula": false
+            },
+            {
+              "col": "B",
+              "col_idx": 2,
+              "value": "Custom 2",
+              "is_formula": false
+            }
+          ]
+        },
+        {
+          "row": 3,
+          "cells": [
+            {
+              "col": "A",
+              "col_idx": 1,
+              "value": "C3",
+              "is_formula": false
+            },
+            {
+              "col": "B",
+              "col_idx": 2,
+              "value": "Custom 3",
+              "is_formula": false
+            }
+          ]
+        },
+        {
+          "row": 4,
+          "cells": [
+            {
+              "col": "A",
+              "col_idx": 1,
+              "value": "C4",
+              "is_formula": false
+            },
+            {
+              "col": "B",
+              "col_idx": 2,
+              "value": "Custom 4",
+              "is_formula": false
+            }
+          ]
+        },
+        {
+          "row": 5,
+          "cells": [
+            {
+              "col": "A",
+              "col_idx": 1,
+              "value": "C5",
+              "is_formula": false
+            },
+            {
+              "col": "B",
+              "col_idx": 2,
+              "value": "Custom 5",
+              "is_formula": false
+            }
+          ]
+        }
+      ],
+      "formulas": [],
+      "sample_data": [
+        {
+          "row": 6,
+          "cells": [
+            {
+              "col": "A",
+              "value": "C6",
+              "is_formula": false
+            },
+            {
+              "col": "B",
+              "value": "Custom 6",
+              "is_formula": false
+            }
+          ]
+        },
+        {
+          "row": 7,
+          "cells": [
+            {
+              "col": "A",
+              "value": "C7",
+              "is_formula": false
+            },
+            {
+              "col": "B",
+              "value": "Custom 7",
+              "is_formula": false
+            }
+          ]
+        },
+        {
+          "row": 8,
+          "cells": [
+            {
+              "col": "A",
+              "value": "C8",
+              "is_formula": false
+            },
+            {
+              "col": "B",
+              "value": "Custom 8",
+              "is_formula": false
+            }
+          ]
+        }
+      ],
+      "formula_count": 0,
+      "formula_samples": []
+    }
+  },
+  "confirmation": {
+    "l3_5_interest_calc": {
+      "found": true,
+      "sheet_name": "利息测算表L3-5",
+      "details": {
+        "rows": 29,
+        "cols": 20,
+        "headers_row1": [
+          {
+            "col": "A",
+            "value": "致同会计师事务所"
+          }
+        ],
+        "headers_row2": [
+          {
+            "col": "A",
+            "value": "长期借款利息测算表"
+          }
+        ],
+        "has_principal_col": false,
+        "has_rate_col": false,
+        "has_days_col": false,
+        "has_interest_calc_col": true
+      }
+    },
+    "l3_2_detail": {
+      "found": true,
+      "sheet_name": "明细表L3-2",
+      "details": {
+        "rows": 35,
+        "cols": 32,
+        "all_headers": [
+          {
+            "row": 1,
+            "col": "A",
+            "col_idx": 1,
+            "value": "致同会计师事务所"
+          },
+          {
+            "row": 1,
+            "col": "R",
+            "col_idx": 18,
+            "value": "致同会计师事务所"
+          },
+          {
+            "row": 2,
+            "col": "A",
+            "col_idx": 1,
+            "value": "长期借款明细表"
+          },
+          {
+            "row": 2,
+            "col": "R",
+            "col_idx": 18,
+            "value": "长期借款明细表"
+          },
+          {
+            "row": 3,
+            "col": "A",
+            "col_idx": 1,
+            "value": "=底稿目录!A2"
+          },
+          {
+            "row": 3,
+            "col": "F",
+            "col_idx": 6,
+            "value": "=底稿目录!A4"
+          },
+          {
+            "row": 3,
+            "col": "J",
+            "col_idx": 10,
+            "value": "=底稿目录!A5"
+          },
+          {
+            "row": 3,
+            "col": "P",
+            "col_idx": 16,
+            "value": "索引号："
+          },
+          {
+            "row": 3,
+            "col": "Q",
+            "col_idx": 17,
+            "value": "=底稿目录!F8"
+          },
+          {
+            "row": 3,
+            "col": "T",
+            "col_idx": 20,
+            "value": "=F3"
+          },
+          {
+            "row": 3,
+            "col": "X",
+            "col_idx": 24,
+            "value": "=J3"
+          },
+          {
+            "row": 3,
+            "col": "AD",
+            "col_idx": 30,
+            "value": "索引号："
+          },
+          {
+            "row": 3,
+            "col": "AE",
+            "col_idx": 31,
+            "value": "=底稿目录!F8"
+          },
+          {
+            "row": 4,
+            "col": "A",
+            "col_idx": 1,
+            "value": "=底稿目录!A3"
+          },
+          {
+            "row": 4,
+            "col": "F",
+            "col_idx": 6,
+            "value": "=底稿目录!A6"
+          },
+          {
+            "row": 4,
+            "col": "J",
+            "col_idx": 10,
+            "value": "=底稿目录!A7"
+          },
+          {
+            "row": 4,
+            "col": "P",
+            "col_idx": 16,
+            "value": "页次："
+          },
+          {
+            "row": 4,
+            "col": "T",
+            "col_idx": 20,
+            "value": "=F4"
+          },
+          {
+            "row": 4,
+            "col": "X",
+            "col_idx": 24,
+            "value": "=J4"
+          },
+          {
+            "row": 4,
+            "col": "AD",
+            "col_idx": 30,
+            "value": "页次："
+          }
+        ],
+        "has_due_date_col": false,
+        "has_current_portion_col": false,
+        "has_loan_type_col": false,
+        "has_rate_col": false,
+        "has_begin_balance_col": false,
+        "has_end_balance_col": false
+      }
+    }
+  },
+  "summary": {
+    "total_formulas": 434,
+    "sheets_with_formulas": [
+      {
+        "name": "长期借款实质性程序表L3A",
+        "formula_count": 6
+      },
+      {
+        "name": "审定表L3-1",
+        "formula_count": 87
+      },
+      {
+        "name": "附注披露信息核对（上市公司）",
+        "formula_count": 30
+      },
+      {
+        "name": "附注披露（国企）信息核对",
+        "formula_count": 30
+      },
+      {
+        "name": "明细表L3-2",
+        "formula_count": 114
+      },
+      {
+        "name": "调整分录汇总L3-3",
+        "formula_count": 1
+      },
+      {
+        "name": "征信报告核对表L3-4",
+        "formula_count": 19
+      },
+      {
+        "name": "利息测算表L3-5",
+        "formula_count": 78
+      },
+      {
+        "name": "贷款合同检查L3-6",
+        "formula_count": 14
+      },
+      {
+        "name": "逾期贷款检查表L3-7",
+        "formula_count": 28
+      },
+      {
+        "name": "抵质押资产检查表L3-8",
+        "formula_count": 14
+      },
+      {
+        "name": "长期借款检查表L3-9",
+        "formula_count": 13
+      }
+    ],
+    "key_findings": [
+      "✅ L3-5利息测算表已确认: 利息测算表L3-5 (29行×20列, 78公式)",
+      "  ✅ 列头(row10): 序号|借款种类|贷款单位|借款起始日期|借款讫止日期|结息日|起算时点|截止时点|年利率|借款本金|本期实计利息①|本期应计息天数|本期应计利息|差异|财务费用-利息支出②|资本化利息支出③|本期未付利息天数|本期应付利息账面数|本期应付利测算|备注",
+      "  🔴 计息惯例=365天制！公式: M11=J11*I11/365*L11 (非360天)",
+      "  ✅ 天数计算: L11=IF(G11=0,0,IF((H11-G11)=365,H11-G11,H11-G11+1))",
+      "  ✅ 差异: N11=M11-K11",
+      "  ✅ 应付利息测算: S11=J11*I11/365*R11",
+      "  ✅ 财务费用: O11=M11-P11 (总利息-资本化)",
+      "✅ L3-2明细表已确认: 明细表L3-2 (35行×32列=A-AF, 114公式)",
+      "  ✅ 含'一年内到期'列: V8='减：期初一年内到期的长期借款', W8='减：期末一年内到期的长期借款'",
+      "  ✅ 二级表头(row8): 序号|借款种类|贷款单位|起始日期|讫止日期|年利率|固定/浮动利率|未审数(HIJK)|期初调整(LM)|账项调整(NO)|重分类调整(PQ)|审定数(RSTU)|减一年内到期(VW)|披露审定数(XY)|保证人/抵质押|合同索引|逾期/展期|询证函|贷款卡核对|备注",
+      "  ✅ 二级表头(row9-未审数): 期初余额H|本期增加I|本期减少J|期末余额K",
+      "  ✅ 二级表头(row9-审定): 期初余额R|本期增加S|本期偿还T|期末余额U",
+      "  ✅ 公式: K=H+I-J(期末=期初+增-减), U=R+S-T, X=R-V(披露=审定-一年内期初), Y=U-W(披露=审定-一年内期末)",
+      "✅ L3-1审定表: 41行×18列, 87公式, 按借款类型(质押/抵押/保证/信用)SUMIF明细, E=B+C+D, G=E-F(披露=审定-一年内到期)",
+      "✅ L3-4征信报告核对: 31行×30列, 19公式",
+      "✅ L3-7逾期贷款检查: 28行×22列, 列头=贷款单位|类别|资金用途|金额|利率|逾期利率(日)|借款日期|到期日|逾期天数|计息天数|应计利息|累计应付利息|涉诉|原因|预计还款期, J11=$I$9-I11(逾期天数=报告日-到期日)",
+      "✅ L3-8抵质押资产检查: 20行×16列, 列头=合同号|资产状态|贷款额|评估价值|权证号|索引号|报表科目|账面原值|折旧摊销|账面净值|所有权|资产状况|备注, J=H-I(净值=原值-折旧)",
+      "📊 总公式数: 434",
+      "🔴 重要差异: requirements设计360天制, 但源模板实际为365天制! 需以xlsx为准修正"
+    ]
+  },
+  "deep_analysis": {
+    "l3_2_full_columns": {
+      "row8_headers": ["序号A", "借款种类B", "贷款单位C", "起始日期D", "讫止日期E", "年利率F", "固定/浮动利率G", "未审数H-K", "期初调整L-M", "账项调整N-O", "重分类调整P-Q", "审定数R-U", "减期初一年内到期V", "减期末一年内到期W", "披露审定数X-Y", "保证人/抵质押物Z", "借款合同索引AA", "逾期/展期索引AB", "询证函索引AC", "与贷款卡核对AD", "备注AE"],
+      "row9_sub_headers": {
+        "未审数": ["期初余额H", "本期增加I", "本期减少J", "期末余额K"],
+        "期初调整": ["账项调整L", "重分类调整M"],
+        "账项调整": ["本期增加N", "本期减少O"],
+        "重分类调整": ["本期增加P", "本期减少Q"],
+        "审定数": ["期初余额R", "本期增加S", "本期偿还T", "期末余额U"],
+        "披露审定数": ["期初余额X", "期末余额Y"]
+      },
+      "key_formulas": {
+        "K": "=H+I-J (期末未审=期初+增-减)",
+        "R": "=H+L+M (审定期初=未审期初+账项调整+重分类)",
+        "S": "=I+N+P (审定增加=未审增+账项增+重分类增)",
+        "T": "=J+O+Q (审定偿还=未审减+账项减+重分类减)",
+        "U": "=R+S-T (审定期末=期初+增-偿还)",
+        "X": "=R-V (披露期初=审定期初-一年内到期期初)",
+        "Y": "=U-W (披露期末=审定期末-一年内到期期末)"
+      },
+      "一年内到期": {
+        "V8": "减：期初一年内到期的长期借款",
+        "W8": "减：期末一年内到期的长期借款",
+        "l3_1_reference_F": "=SUMIF('明细表L3-2'!B:B,A7,'明细表L3-2'!V:V) (期初一年内到期)",
+        "l3_1_reference_L": "=SUMIF('明细表L3-2'!B:B,A7,'明细表L3-2'!W:W) (期末一年内到期)"
+      }
+    },
+    "l3_5_interest_formulas": {
+      "convention": "365天制 (非360天!)",
+      "interest": "M=J*I/365*L (本金×年利率/365×天数)",
+      "days_calc": "L=IF(G=0,0,IF((H-G)=365,H-G,H-G+1)) (起止区间天数含首日)",
+      "start_point": "G=IF(D<=$D$9,$D$9,D) (起算=max(借款起始日,报告期初))",
+      "end_point": "H=IF(E<=$E$9,E,$E$9) (截止=min(借款到期日,报告期末))",
+      "diff": "N=M-K (测算-实计=差异)",
+      "finance_expense": "O=M-P (财务费用=总利息-资本化)",
+      "unpaid_interest": "S=J*I/365*R (应付利息测算=本金×利率/365×未付天数)",
+      "unpaid_days": "Q=IF(F=0,0,IF((H-F)=365,H-F,H-F+1)) (截止-结息日)"
+    },
+    "l3_7_overdue_formulas": {
+      "overdue_days": "J=$I$9-I (报告日-到期日)",
+      "interest": "L=E*G*K (金额×逾期日利率×计息天数)",
+      "cum_interest": "M=E*G*J (金额×逾期日利率×逾期天数)"
+    },
+    "l3_8_pledge_formulas": {
+      "net_value": "J=H-I (账面净值=原值-折旧)"
+    },
+    "architecture_notes": {
+      "l3_1_to_l3_2": "审定表L3-1按借款种类(质押/抵押/保证/信用)SUMIF明细表L3-2，验证: E=B+C+D, K=H+I+J, G=E-F(披露=审定-一年内到期)",
+      "l3_2_to_l3_5": "明细表按合同与利息测算表一一对应",
+      "l3_5_to_l2_l8": "利息测算合计→L2应付利息/L8财务费用(EventBus)",
+      "l3_2_reclass": "V/W列一年内到期金额→L3-1的F/L列→RJE重分类",
+      "l3_4_to_l3_2": "征信核对→明细合计验证完整性"
+    }
+  }
+}

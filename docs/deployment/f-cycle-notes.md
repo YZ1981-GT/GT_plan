@@ -38,6 +38,19 @@ Sprint 2 Task 2.15 已通过一次性脚本追加 35 条 F 循环跨底稿引用
 - [ ] 确认 `backend/data/cross_wp_references.json` 总条目 ≥ 210
 - [ ] 确认 `backend/data/f_cycle_validation_rules.json` 存在且含 4 条 VR-F5/F2 规则
 - [ ] 部署后调用 `GET /api/linkage-bus/graph?rebuild=true` 重建依赖图
+
+## 4. F2 保留未实现 sheet（明示策略）
+
+以下编号在致同源模板中可能出现，但当前 `wp_code_overrides.json` **未注册**、无 Vue 路由，
+复核提示词拆分亦不创建对应文件，直至业务确认补实现：
+
+| 保留号 | 说明 |
+|--------|------|
+| F2-15 / F2-17 | 主表包跳号 |
+| F2-27 / F2-28 | 监盘与截止之间跳号 |
+| F2-36 / F2-37 / F2-45 / F2-46 / F2-50 / F2-51 | 计价/减值包跳号 |
+
+科目约定（与 CAS / `_f2_inventory_main` 一致）：**商品进销差价=1412**，**存货跌价准备=1471**。
 - [ ] 跑回归测试：`python -m pytest backend/tests/test_f_cross_wp_refs.py
       backend/tests/test_f5_validation_rules.py
       backend/tests/test_f0_f2_confirmation_callback.py -v`

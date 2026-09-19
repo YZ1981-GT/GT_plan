@@ -115,12 +115,11 @@ export function useWpFunctionalActions(projectId: Ref<string>, wpId: Ref<string>
     // 通过 eventBus 发送 locate-cell 事件
     // 定位到 action_data 区域的第一行
     try {
-      import('@/services/eventBus').then(({ eventBus }) => {
-        eventBus.emit('locate-cell', {
-          wp_id: wpId.value,
-          sheet_name: null, // 当前 sheet
-          cell_ref: null,   // 滚动到顶部新数据区
-          component_type: null,
+      import('@/utils/eventBus').then(({ eventBus }) => {
+        eventBus.emit('workpaper:locate-cell', {
+          wpId: wpId.value,
+          sheetName: undefined, // 当前 sheet
+          cellRef: 'A1',        // 滚动到顶部新数据区
         })
       })
     } catch {

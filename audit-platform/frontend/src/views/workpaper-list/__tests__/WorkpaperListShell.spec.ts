@@ -32,6 +32,38 @@ vi.mock('@/composables/useAuditContext', () => ({
   useAuditContext: () => ({ onContextChange: vi.fn() }),
 }))
 
+// ─── Mock useProjectStore (P0-6.2) ──────────────────────────────────────────
+vi.mock('@/stores/project', () => ({
+  useProjectStore: () => ({
+    projectId: 'test-proj',
+    year: 2025,
+    clientName: 'Test Corp',
+    projectStatus: 'active',
+    auditScope: 'standalone',
+    roleInProject: null,
+    currentProjectContext: {
+      projectId: 'test-proj',
+      projectName: 'Test Corp',
+      year: 2025,
+      applicableStandard: 'soe',
+      auditScope: 'standalone',
+      projectStatus: 'active',
+      roleInProject: null,
+    },
+  }),
+}))
+
+// ─── Mock usePermissionMatrix (P0-6.2) ──────────────────────────────────────
+vi.mock('@/composables/usePermissionMatrix', () => ({
+  usePermissionMatrix: () => ({
+    can: () => true,
+    whyCannot: () => null,
+    currentRole: computed(() => 'admin'),
+    allowedOperations: computed(() => new Set()),
+    canRole: () => true,
+  }),
+}))
+
 // ─── Mock services ───────────────────────────────────────────────────────────
 vi.mock('@/services/workpaperApi', () => ({
   listWorkpapers: vi.fn().mockResolvedValue([]),

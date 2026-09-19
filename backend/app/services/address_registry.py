@@ -12,6 +12,7 @@
   - tb://1001#审定数               → 试算表科目
   - aux://1001.成本中心.001#期末   → 辅助余额
 """
+import asyncio
 import json
 import re
 import logging
@@ -46,7 +47,7 @@ class AddressEntry:
 
 _URI_PATTERN = re.compile(
     r'^(?P<domain>report|note|wp|tb|aux)://'
-    r'(?P<source>[^/]+)'
+    r'(?P<source>[^/#]+)'
     r'(?:/(?P<path>[^#]*))?'
     r'(?:#(?P<cell>.+))?$'
 )
@@ -79,17 +80,7 @@ def build_uri(domain: str, source: str, path: str = '', cell: str = '') -> str:
 # 公式引用语法 ↔ URI 互转
 # ═══════════════════════════════════════════
 
-_FORMULA_PATTERNS = {
-    'TB': re.compile(r"TB\(\s*'([^']+)'\s*,\s*'([^']+)'\s*\)"),
-    'SUM_TB': re.compile(r"SUM_TB\(\s*'([^']+)'\s*,\s*'([^']+)'\s*\)"),
-    'ROW': re.compile(r"ROW\(\s*'([^']+)'\s*\)"),
-    'SUM_ROW': re.compile(r"SUM_ROW\(\s*'([^']+)'\s*,\s*'([^']+)'\s*\)"),
-    'REPORT': re.compile(r"REPORT\(\s*'([^']+)'\s*,\s*'([^']+)'\s*\)"),
-    'NOTE': re.compile(r"NOTE\(\s*'([^']+)'\s*,\s*'([^']+)'\s*(?:,\s*'([^']+)')?\s*\)"),
-    'WP': re.compile(r"WP\(\s*'([^']+)'\s*,\s*'([^']+)'\s*\)"),
-    'AUX': re.compile(r"AUX\(\s*'([^']+)'\s*,\s*'([^']+)'\s*(?:,\s*'([^']+)')?\s*\)"),
-    'PREV': re.compile(r"PREV\(\s*'([^']+)'\s*,\s*'([^']+)'\s*\)"),
-}
+from app.services.formula_grammar import RELAXED_FORMULA_PATTERNS as _FORMULA_PATTERNS
 
 
 def formula_ref_to_uri(formula_ref: str) -> Optional[str]:
@@ -104,8 +95,16 @@ def formula_ref_to_uri(formula_ref: str) -> Optional[str]:
             continue
         groups = [g for g in m.groups() if g is not None]
 
-        if fn_name in ('TB', 'SUM_TB', 'PREV'):
+        if fn_name in ('TB', 'SUM_TB'):
             return build_uri('tb', groups[0], cell=groups[1])
+        elif fn_name == 'PREV':
+            # PREV has dual semantics per grammar_v1:
+            # 2-arg PREV('code','col') → tb domain (prior year balance)
+            # 3-arg PREV('parent','sheet','cell') → wp domain (prior year workpaper)
+            if len(groups) >= 3 and groups[2]:
+                return build_uri('wp', groups[0], path=groups[1], cell=groups[2])
+            else:
+                return build_uri('tb', groups[0], cell=groups[1])
         elif fn_name in ('ROW', 'SUM_ROW'):
             # ROW('BS-002') → report://BS/BS-002
             code = groups[0]
@@ -121,7 +120,16 @@ def formula_ref_to_uri(formula_ref: str) -> Optional[str]:
             col_label = groups[2] if len(groups) > 2 else '期末'
             return build_uri('note', section, row_label, col_label)
         elif fn_name == 'WP':
-            return build_uri('wp', groups[0], cell=groups[1])
+            # R10.3: 保留第三参（语义名/cell 不丢弃）
+            # 3 参 standard: WP('parent','sheet_name','cell|semantic') → wp://parent/sheet_name#cell
+            # 2 参 custom_flat: WP('wp_code','cell') → wp://wp_code/cell
+            # 2 参 standard sheet-level: WP('parent','sheet_name') → wp://parent/sheet_name
+            if len(groups) >= 3 and groups[2]:
+                # 3 参：wp://parent/sheet_name#cell_or_semantic
+                return build_uri('wp', groups[0], path=groups[1], cell=groups[2])
+            else:
+                # 2 参：单元格/列名走 path
+                return build_uri('wp', groups[0], path=groups[1])
         elif fn_name == 'AUX':
             account = groups[0]
             dim = groups[1] if len(groups) > 1 else ''
@@ -157,7 +165,19 @@ def uri_to_formula_ref(uri: str) -> Optional[str]:
         else:
             return f"NOTE('{source}','{path}')"
     elif domain == 'wp':
-        return f"WP('{source}','{cell}')"
+        if path == 'xref' and cell:
+            return None
+        if cell and path:
+            # 3 参 standard: wp://parent/sheet_name#cell → WP('parent','sheet_name','cell')
+            return f"WP('{source}','{path}','{cell}')"
+        if not path and not cell:
+            rest = uri.split('://', 1)[-1]
+            if '#' in rest and '/' not in rest.split('#', 1)[0]:
+                wp_source, _, addr = rest.partition('#')
+                return f"WP('{wp_source}','{addr}')"
+        # 2 参: path only (custom_flat or standard sheet-level)
+        addr = cell or path
+        return f"WP('{source}','{addr}')"
     elif domain == 'aux':
         return f"AUX('{source}','{path}','{cell}')"
     return None
@@ -265,8 +285,48 @@ async def build_report_entries(db, project_id: str, year: int) -> list[AddressEn
                     tags=[rt_label, cfg.row_name or ''],
                 ))
     except Exception as e:
-        logger.warning(f"build_report_entries error: {e}")
+        logger.error(f"build_report_entries error: {e}", exc_info=True)
     return entries
+
+
+#: tb 域登记的列名 —— **由求值器的列名注册表派生**（单一真源）。
+#:
+#: 🔴 **为什么不能硬编码**（spec formula-management-runtime-closure Task 18，
+#: 2026-08-07 真实库实测）：改造前这里写死 5 项
+#: ``['未审数','审定数','AJE调整','RJE调整','期初余额']``，而 ``COLUMN_ALIASES``
+#: 有 14 键 ⇒ **9 个已注册列名在地址目录里不存在**（`期末余额` / `年初余额` /
+#: `本期发生额` / `本期借方` / `本期贷方` / `借方发生额` / `贷方发生额` 及两个长别名）。
+#:
+#: 后果（逐条实测，项目 0ec33ac9 / year 2025 / tb 域 980 条目 / 196 科目）：
+#: ``validate_formula_refs`` 按「ref 文本转 URI 后是否在 uri_set 里」判定，
+#: 而 `PUT /formulas` 与 `PUT /user-formulas` 都在写库前跑该校验 ⇒
+#: **任何用这 9 个列名写的可编辑公式保存时必被 422 `FORMULA_REF_NOT_FOUND` 拒绝**，
+#: 报错文案还是「引用地址在当前项目中不存在」（指向数据缺失，实为目录缺列 = 误导）。
+#: 而 `期末余额` 恰是预设里用得最多的列（`prefill_formula_mapping.json` 实测 280 格），
+#: D1 的 Tier A 预设本体就是 ``TB('1121','期末余额') - TB('1231-01','期末余额')``
+#: ⇒ 审计师在公式管理面板里**改任何一条 Tier A 公式都存不进去**。
+#:
+#: 🔴 **该改动是纯 additive**：它只往 ``uri_set`` 里**增加**条目，
+#: 而校验只在「URI 不在集合里」时报 issue ⇒ 校验只会变宽松、不可能产生新的 422。
+#: 这是零回归的**结构性保证**，不依赖回归测试碰运气。
+#: 守卫见 ``backend/tests/test_formula_column_alias_coverage.py``
+#: （断言 tb 域列名 ⊇ ``COLUMN_ALIASES`` 键集 + 原 5 项仍在册）。
+_TB_LEGACY_COLUMNS: tuple[str, ...] = ('未审数', '审定数', 'AJE调整', 'RJE调整', '期初余额')
+
+
+def trial_balance_address_columns() -> list[str]:
+    """tb 域应登记的列名集合 = ``COLUMN_ALIASES`` 键集 ∪ 历史 5 项。
+
+    实测历史 5 项全部是 ``COLUMN_ALIASES`` 的键（差集为空），故并集只是
+    「防将来有人从别名表里删掉其中之一」的保险；顺序固定以便快照稳定。
+    """
+    from app.services.formula_engine import COLUMN_ALIASES
+
+    ordered = list(_TB_LEGACY_COLUMNS)
+    for col in COLUMN_ALIASES:
+        if col not in ordered:
+            ordered.append(col)
+    return ordered
 
 
 async def build_trial_balance_entries(db, project_id: str, year: int) -> list[AddressEntry]:
@@ -275,7 +335,7 @@ async def build_trial_balance_entries(db, project_id: str, year: int) -> list[Ad
     from app.models.audit_platform_models import TrialBalance
 
     entries = []
-    columns = ['未审数', '审定数', 'AJE调整', 'RJE调整', '期初余额']
+    columns = trial_balance_address_columns()
     try:
         result = await db.execute(
             select(TrialBalance).where(
@@ -304,7 +364,7 @@ async def build_trial_balance_entries(db, project_id: str, year: int) -> list[Ad
                     tags=['试算表', name, row.account_category or ''],
                 ))
     except Exception as e:
-        logger.warning(f"build_trial_balance_entries error: {e}")
+        logger.error(f"build_trial_balance_entries error: {e}", exc_info=True)
     return entries
 
 
@@ -352,7 +412,355 @@ async def build_note_entries(db, project_id: str, year: int,
                             tags=['附注', title],
                         ))
     except Exception as e:
-        logger.warning(f"build_note_entries error: {e}")
+        logger.error(f"build_note_entries error: {e}", exc_info=True)
+    return entries
+
+
+# ── 自定义底稿 parsed_data 单元格提取（custom-workpaper-formula-binding）──
+
+_CELL_ADDRESS_RE = re.compile(r"^[A-Z]+\d+$")
+
+_PARSED_DATA_META_KEYS = frozenset({
+    "html_data",
+    "user_formulas",
+    "conclusion",
+    "schema_version",
+    "_version",
+    "last_modified_by",
+    "last_modified_at",
+    "changed_sheets_last_save",
+    "cells",
+})
+
+
+@dataclass
+class CellRecord:
+    """parsed_data 提取出的单元格（集成点 2 纯函数产物）。"""
+    sheet: str
+    cell: str
+    row_label: str
+    value: object = None
+
+
+def _cell_scalar_value(raw: object) -> object:
+    """标量或 dict cell 取值。"""
+    if isinstance(raw, dict):
+        for key in ("v", "value", "val"):
+            if key in raw:
+                return raw[key]
+        label = raw.get("label") or raw.get("name")
+        if label is not None:
+            return label
+        return None
+    return raw
+
+
+def _row_label_for_cell(
+    cells_map: dict,
+    sheet: str,
+    cell_ref: str,
+) -> str:
+    """同行 A 列文本作 row_label；cell 自带 label/name 优先。"""
+    from app.services.note_wp_data_resolver import _split_cell_ref
+
+    parsed = _split_cell_ref(cell_ref)
+    if parsed is None:
+        return ""
+    _col, row_num = parsed
+    a_ref = f"A{row_num}"
+
+    def _lookup(ref: str) -> str:
+        flat_key = f"{sheet}!{ref}"
+        if flat_key in cells_map:
+            v = _cell_scalar_value(cells_map[flat_key])
+            return str(v).strip() if v is not None else ""
+        sheet_block = cells_map.get(sheet)
+        if isinstance(sheet_block, dict) and ref in sheet_block:
+            v = _cell_scalar_value(sheet_block[ref])
+            return str(v).strip() if v is not None else ""
+        return ""
+
+    nested_html = cells_map.get("__html_sheet_cells__")
+    if isinstance(nested_html, dict):
+        sheet_cells = nested_html.get(sheet)
+        if isinstance(sheet_cells, dict):
+            if cell_ref in sheet_cells:
+                raw = sheet_cells[cell_ref]
+                if isinstance(raw, dict):
+                    lbl = raw.get("label") or raw.get("name")
+                    if lbl:
+                        return str(lbl).strip()
+            if a_ref in sheet_cells:
+                v = _cell_scalar_value(sheet_cells[a_ref])
+                if v is not None:
+                    return str(v).strip()
+
+    return _lookup(a_ref)
+
+
+def _append_cell_record(
+    out: list[CellRecord],
+    seen: set[tuple[str, str]],
+    sheet: str,
+    cell_ref: str,
+    raw: object,
+    cells_lookup: dict,
+) -> None:
+    cell_up = cell_ref.strip().upper()
+    if not _CELL_ADDRESS_RE.match(cell_up):
+        return
+    key = (sheet, cell_up)
+    if key in seen:
+        return
+    seen.add(key)
+    row_label = ""
+    if isinstance(raw, dict):
+        row_label = str(raw.get("label") or raw.get("name") or "").strip()
+    if not row_label:
+        row_label = _row_label_for_cell(cells_lookup, sheet, cell_up)
+    out.append(
+        CellRecord(
+            sheet=sheet,
+            cell=cell_up,
+            row_label=row_label,
+            value=_cell_scalar_value(raw),
+        )
+    )
+
+
+def extract_custom_cells(parsed_data: dict | None) -> list[CellRecord]:
+    """从 working_paper.parsed_data 提取自定义底稿单元格坐标。
+
+    兼容：
+    - 嵌套：``html_data[sheet].cells[cell]``（标量或 ``{value,v,label,name}``）
+    - 扁平：``parsed_data[sheet][field]``（field 为单元格地址）
+    - 顶层 ``cells`` 扁平/嵌套（与 note_wp_data_resolver 对齐）
+
+    None / {} / 结构异常 → 返回 []，不抛异常。
+    """
+    if not parsed_data or not isinstance(parsed_data, dict):
+        return []
+
+    records: list[CellRecord] = []
+    seen: set[tuple[str, str]] = set()
+    cells_lookup: dict = {}
+
+    if isinstance(parsed_data.get("cells"), dict):
+        cells_lookup.update(parsed_data["cells"])
+
+    html_data = parsed_data.get("html_data")
+    if isinstance(html_data, dict):
+        nested_store: dict[str, dict] = {}
+        for sheet_name, sheet_data in html_data.items():
+            if not isinstance(sheet_name, str) or not sheet_name:
+                continue
+            if not isinstance(sheet_data, dict):
+                continue
+            sheet_cells = sheet_data.get("cells")
+            if isinstance(sheet_cells, dict):
+                nested_store[sheet_name] = sheet_cells
+                # 须在遍历 cells 前写入，供 _row_label_for_cell 读同行 A 列
+                cells_lookup["__html_sheet_cells__"] = nested_store
+                for cell_ref, raw in sheet_cells.items():
+                    if isinstance(cell_ref, str):
+                        _append_cell_record(
+                            records, seen, sheet_name, cell_ref, raw, cells_lookup
+                        )
+
+    for sheet_name, sheet_data in parsed_data.items():
+        if sheet_name in _PARSED_DATA_META_KEYS:
+            continue
+        if not isinstance(sheet_name, str) or not sheet_name:
+            continue
+        if not isinstance(sheet_data, dict):
+            continue
+        for field, raw in sheet_data.items():
+            if isinstance(field, str) and _CELL_ADDRESS_RE.match(field.strip().upper()):
+                _append_cell_record(
+                    records, seen, sheet_name, field, raw, cells_lookup
+                )
+
+    return records
+
+
+async def _build_custom_wp_cell_entries(
+    db, project_id: str, year: int
+) -> list[AddressEntry]:
+    """从 working_paper.parsed_data 构建自定义底稿 WP 域条目。"""
+    import uuid as _uuid
+
+    import sqlalchemy as sa
+
+    from app.models.workpaper_models import WorkingPaper, WpIndex
+
+    entries: list[AddressEntry] = []
+    try:
+        pid = _uuid.UUID(str(project_id))
+    except (ValueError, TypeError):
+        return entries
+
+    try:
+        rows = (
+            await db.execute(
+                sa.select(
+                    WorkingPaper.id,
+                    WorkingPaper.parsed_data,
+                    WpIndex.wp_code,
+                    WpIndex.wp_name,
+                )
+                .join(WpIndex, WpIndex.id == WorkingPaper.wp_index_id)
+                .where(
+                    WorkingPaper.project_id == pid,
+                    WorkingPaper.is_deleted == False,  # noqa: E712
+                    WpIndex.is_deleted == False,  # noqa: E712
+                )
+            )
+        ).all()
+    except Exception as e:
+        logger.warning("_build_custom_wp_cell_entries query error: %s", e)
+        return entries
+
+    for wp_id, parsed_data, wp_code, wp_name in rows:
+        if not wp_code:
+            continue
+        custom_cells: list[dict] = []
+        try:
+            for rec in extract_custom_cells(parsed_data):
+                uri = build_uri("wp", wp_code, path=rec.cell)
+                wp_display = (wp_name or wp_code).strip()
+                label_parts = [f"底稿 > {wp_code} {wp_display}"]
+                if rec.row_label:
+                    label_parts.append(f"> {rec.row_label}")
+                label_parts.append(f"（{rec.cell}）")
+                entries.append(
+                    AddressEntry(
+                        uri=uri,
+                        domain="wp",
+                        source=wp_code,
+                        path=rec.cell,
+                        cell=rec.cell,
+                        label=" ".join(label_parts),
+                        wp_code=wp_code,
+                        formula_ref=f"WP('{wp_code}','{rec.cell}')",
+                        jump_route=build_jump_route(uri, project_id, year),
+                        tags=["底稿", "自定义", rec.row_label] if rec.row_label else ["底稿", "自定义"],
+                    )
+                )
+                # 收集 cells 供 ACNR L3 runtime 登记（custom_flat profile）
+                custom_cells.append(
+                    {
+                        "cell_address": rec.cell,
+                        "wp_code": wp_code,
+                        "semantic_label": rec.row_label or "",
+                    }
+                )
+        except Exception as e:
+            logger.warning(
+                "custom wp cell entries skip wp_code=%s: %s", wp_code, e
+            )
+            continue
+
+        # ── ACNR L3 runtime 登记（strangler-fig 附加，不删旧路径）──────────
+        # 在 legacy AddressEntry 产出后追加调 register_custom，使自定义格可经
+        # full_resolve(formula_ref=WP('wp','wp','cell')) 命中（Req 12.1-12.4）。
+        # 单 wp 失败仅 warning + continue，绝不影响其余 wp 或已产出的 legacy 条目。
+        if custom_cells and wp_id is not None:
+            try:
+                from app.services.acnr.runtime import (
+                    register_custom as _acnr_register_custom,
+                )
+
+                await _acnr_register_custom(
+                    db,
+                    str(project_id),
+                    str(wp_id),
+                    custom_cells,
+                    addr_profile="custom_flat",
+                )
+            except Exception as e:
+                logger.warning(
+                    "ACNR L3 register_custom skip wp_code=%s: %s", wp_code, e
+                )
+
+    return entries
+
+
+def _merge_catalog_cell_entries(
+    entries: list[AddressEntry], project_id: str, year: int
+) -> list[AddressEntry]:
+    """合并 ACNR catalog 的 CellCatalogEntry 到现有地址条目。
+
+    使 D 循环 473 种子坐标在公式选址器可被搜索到。
+    按 formula_ref 去重，避免与已有条目产生重复。
+
+    Requirements: R4.2, R4.5
+    """
+    try:
+        from app.services.acnr.catalog import get_catalog
+    except ImportError:
+        logger.debug("ACNR catalog 模块不可用，跳过 catalog merge")
+        return entries
+
+    try:
+        cat = get_catalog()
+    except Exception as e:
+        logger.warning("ACNR catalog 加载失败，跳过 merge: %s", e)
+        return entries
+
+    if not cat.cells_by_addr_id:
+        return entries
+
+    # 构建已有条目的 formula_ref 集合用于去重
+    existing_refs: set[str] = {e.formula_ref for e in entries if e.formula_ref}
+
+    for cell in cat.cells_by_addr_id.values():
+        formula_ref = cell.get("formula_ref", "")
+        if not formula_ref or formula_ref in existing_refs:
+            continue
+
+        # 从 parent sheet 获取展示信息
+        parent_addr_id = cell.get("parent_addr_id", "")
+        parent_sheet = cat.sheets_by_addr_id.get(parent_addr_id, {})
+        parent_wp_code = parent_sheet.get("parent_wp_code", "") or cell.get("addr_id", "").split("/")[0]
+        sheet_name = parent_sheet.get("sheet_name", "")
+        sheet_code = parent_sheet.get("sheet_code", "")
+        cycle = parent_sheet.get("cycle", "")
+
+        cell_address = cell.get("cell_address", "")
+        semantic_label = cell.get("semantic_label", "")
+        uri = cell.get("uri", "") or build_uri("wp", parent_wp_code, path=sheet_name, cell=cell_address)
+
+        # 构建人类可读 label
+        label_parts = [f"底稿 > {parent_wp_code}"]
+        if sheet_name:
+            label_parts.append(f"> {sheet_name}")
+        if semantic_label:
+            label_parts.append(f"> {semantic_label}")
+        elif cell_address:
+            label_parts.append(f"> {cell_address}")
+        label = " ".join(label_parts)
+
+        # 构建 tags
+        tags = ["底稿", "种子坐标"]
+        if cycle:
+            tags.append(cycle)
+        if sheet_name:
+            tags.append(sheet_name)
+
+        entries.append(AddressEntry(
+            uri=uri,
+            domain="wp",
+            source=parent_wp_code,
+            path=sheet_code or sheet_name,
+            cell=cell_address or semantic_label,
+            label=label,
+            wp_code=parent_wp_code,
+            formula_ref=formula_ref,
+            jump_route=build_jump_route(uri, project_id, year),
+            tags=tags,
+        ))
+        existing_refs.add(formula_ref)
+
     return entries
 
 
@@ -377,7 +785,7 @@ async def build_workpaper_entries(db, project_id: str, year: int) -> list[Addres
             wp_code = m.get('wp_code', '')
             wp_name = m.get('wp_name', '')
             for col in columns:
-                uri = build_uri('wp', wp_code, cell=col)
+                uri = build_uri('wp', wp_code, path=col)
                 entries.append(AddressEntry(
                     uri=uri,
                     domain='wp',
@@ -425,6 +833,108 @@ async def build_workpaper_entries(db, project_id: str, year: int) -> list[Addres
     except Exception as e:
         logger.warning(f"build_workpaper_entries xref error: {e}")
 
+    try:
+        custom_entries = await _build_custom_wp_cell_entries(db, project_id, year)
+        entries.extend(custom_entries)
+    except Exception as e:
+        logger.warning(f"build_workpaper_entries custom cells error: {e}")
+
+    # M1: 合并 ACNR catalog 的 CellCatalogEntry，使 D 循环 473 种子坐标
+    # 在公式选址器可被搜索到 (R4.2, R4.5)
+    try:
+        entries = _merge_catalog_cell_entries(entries, project_id, year)
+    except Exception as e:
+        logger.warning(f"build_workpaper_entries catalog merge error: {e}")
+
+    return entries
+
+
+async def build_aux_entries(db, project_id: str, year: int) -> list[AddressEntry]:
+    """从辅助余额表构建 aux 域地址条目。
+
+    URI 格式：``aux://{account_code}/{dimension}#{column}``，与
+    ``formula_ref_to_uri`` 对 ``AUX('科目','维度','列名')`` 的产出对齐。
+
+    维度（dimension）取 ``aux_name``（人类可读）优先，缺失降级 ``aux_code``。
+    按 (account_code, aux_type, aux_code) 去重（memory 铁律：辅助维度须按
+    aux_type 维度聚合，避免同一三元组重复注册）。
+    """
+    import uuid as _uuid
+
+    import sqlalchemy as sa
+
+    from app.models.audit_platform_models import TbAuxBalance
+
+    entries: list[AddressEntry] = []
+    # 列维度：aux 余额表为原始维度数据，仅含期初/期末（opening/closing），
+    # 无 trial_balance 的 审定/未审/AJE/RJE 审计调整列；且 _handle_aux 取值
+    # 仅按 (account, dimension) 查 aux_data，列名为期间标签不参与取值。
+    # 故按 aux 真实数据性质生成期末/期初 + 其规范别名（COLUMN_ALIASES 中
+    # 映射到 期末余额/年初余额 的常用写法），避免 validate_formula_refs 对
+    # 合理列写法误报悬空，又不凭空注册 aux 不存在的审计调整列地址。
+    columns = ['期末', '期末余额', '期初', '期初余额']
+    try:
+        pid = _uuid.UUID(str(project_id))
+    except (ValueError, TypeError):
+        return entries
+
+    try:
+        result = await db.execute(
+            sa.select(
+                TbAuxBalance.account_code,
+                TbAuxBalance.account_name,
+                TbAuxBalance.aux_type,
+                TbAuxBalance.aux_type_name,
+                TbAuxBalance.aux_code,
+                TbAuxBalance.aux_name,
+            )
+            .where(
+                TbAuxBalance.project_id == pid,
+                TbAuxBalance.year == year,
+                TbAuxBalance.is_deleted == sa.false(),
+            )
+            .group_by(
+                TbAuxBalance.account_code,
+                TbAuxBalance.account_name,
+                TbAuxBalance.aux_type,
+                TbAuxBalance.aux_type_name,
+                TbAuxBalance.aux_code,
+                TbAuxBalance.aux_name,
+            )
+        )
+        rows = result.all()
+    except Exception as e:
+        logger.error("build_aux_entries query error: %s", e, exc_info=True)
+        return entries
+
+    seen: set[tuple[str, str]] = set()
+    for row in rows:
+        code = row.account_code or ''
+        if not code:
+            continue
+        acc_name = row.account_name or code
+        dimension = (row.aux_name or row.aux_code or '').strip()
+        if not dimension:
+            continue
+        key = (code, dimension)
+        if key in seen:
+            continue
+        seen.add(key)
+        aux_type_label = row.aux_type_name or row.aux_type or ''
+        for col in columns:
+            uri = build_uri('aux', code, dimension, col)
+            entries.append(AddressEntry(
+                uri=uri,
+                domain='aux',
+                source=code,
+                path=dimension,
+                cell=col,
+                label=f"辅助余额 > {code} {acc_name} > {dimension} > {col}",
+                account_code=code,
+                formula_ref=f"AUX('{code}','{dimension}','{col}')",
+                jump_route=build_jump_route(uri, project_id, year),
+                tags=['辅助余额', acc_name, aux_type_label] if aux_type_label else ['辅助余额', acc_name],
+            ))
     return entries
 
 
@@ -471,6 +981,8 @@ class AddressRegistryService:
     def __init__(self):
         # key = "project_id:year:template_type:domain"
         self._slots: dict[str, _CacheSlot] = {}
+        # single-flight: per-slot_key asyncio.Lock 防缓存踩踏
+        self._flight_locks: dict[str, asyncio.Lock] = {}
 
     # ------------------------------------------------------------------
     # Redis L2 helpers
@@ -578,15 +1090,19 @@ class AddressRegistryService:
 
     async def _get_domain(self, db, project_id: str, year: int,
                           template_type: str, domain: str) -> list[AddressEntry]:
-        """获取单个域的地址条目（L1 内存 → L2 Redis → DB 构建）"""
+        """获取单个域的地址条目（L1 内存 → L2 Redis → single-flight DB 构建）
+
+        single-flight 模式：并发 cache miss 时仅 1 个请求执行 DB 构建，
+        其余请求等待完成后 double-check L1 命中。避免缓存踩踏。
+        """
         key = self._slot_key(project_id, year, template_type, domain)
 
-        # L1: 内存缓存
+        # L1: 内存缓存（无锁快路径）
         slot = self._slots.get(key)
         if slot and not self._is_expired(slot):
             return slot.entries
 
-        # L2: Redis 缓存
+        # L2: Redis 缓存（无锁快路径）
         redis_entries = await self._redis_get(key)
         if redis_entries is not None:
             # 回填 L1
@@ -596,33 +1112,55 @@ class AddressRegistryService:
             )
             return redis_entries
 
-        # DB 构建
-        entries: list[AddressEntry] = []
-        if domain == 'report':
-            entries = await build_report_entries(db, project_id, year)
-        elif domain == 'tb':
-            entries = await build_trial_balance_entries(db, project_id, year)
-        elif domain == 'note':
-            entries = await build_note_entries(db, project_id, year, template_type)
-        elif domain == 'wp':
-            entries = await build_workpaper_entries(db, project_id, year)
+        # Single-flight: 获取 per-slot_key 锁
+        if key not in self._flight_locks:
+            self._flight_locks[key] = asyncio.Lock()
+        lock = self._flight_locks[key]
 
-        # 回写 L1
-        self._evict_if_needed()
-        self._slots[key] = _CacheSlot(
-            entries=entries, built_at=_time.time(), domain=domain
-        )
+        async with lock:
+            # Double-check: 另一个协程可能已完成构建
+            slot = self._slots.get(key)
+            if slot and not self._is_expired(slot):
+                return slot.entries
 
-        # 回写 L2 Redis
-        await self._redis_set(key, entries, domain)
+            # L2 double-check
+            redis_entries = await self._redis_get(key)
+            if redis_entries is not None:
+                self._evict_if_needed()
+                self._slots[key] = _CacheSlot(
+                    entries=redis_entries, built_at=_time.time(), domain=domain
+                )
+                return redis_entries
 
-        return entries
+            # DB 构建（仅此 1 个请求执行）
+            entries: list[AddressEntry] = []
+            if domain == 'report':
+                entries = await build_report_entries(db, project_id, year)
+            elif domain == 'tb':
+                entries = await build_trial_balance_entries(db, project_id, year)
+            elif domain == 'note':
+                entries = await build_note_entries(db, project_id, year, template_type)
+            elif domain == 'wp':
+                entries = await build_workpaper_entries(db, project_id, year)
+            elif domain == 'aux':
+                entries = await build_aux_entries(db, project_id, year)
+
+            # 回写 L1
+            self._evict_if_needed()
+            self._slots[key] = _CacheSlot(
+                entries=entries, built_at=_time.time(), domain=domain
+            )
+
+            # 回写 L2 Redis
+            await self._redis_set(key, entries, domain)
+
+            return entries
 
     async def get_all(self, db, project_id: str, year: int,
                       template_type: str = 'soe') -> list[AddressEntry]:
         """获取项目所有可引用地址（按域分别缓存）"""
         all_entries: list[AddressEntry] = []
-        for domain in ('report', 'tb', 'note', 'wp'):
+        for domain in ('report', 'tb', 'note', 'wp', 'aux'):
             all_entries.extend(
                 await self._get_domain(db, project_id, year, template_type, domain)
             )
@@ -654,6 +1192,17 @@ class AddressRegistryService:
                        kw in e.row_code.lower()]
 
         return results[:limit]
+
+    async def exists(self, db, project_id: str, year: int,
+                     domain: str, uri: str,
+                     template_type: str = 'soe') -> bool:
+        """定点检查：指定域+URI 是否存在（不物化全域）
+
+        用于 validate_formula_refs 优化：wp 域只查目标 wp_code 的
+        cell 是否存在，避免全域 build。
+        """
+        entries = await self._get_domain(db, project_id, year, template_type, domain)
+        return any(e.uri == uri for e in entries)
 
     async def resolve(self, db, project_id: str, year: int,
                       uri: str, template_type: str = 'soe') -> Optional[AddressEntry]:
@@ -754,12 +1303,54 @@ class AddressRegistryService:
                      f"(pid={project_id}, year={year}, domain={domain}, tpl={template_type})")
 
     async def invalidate_async(self, project_id: str, year: int = 0,
-                               domain: str = '', template_type: str = ''):
+                               domain: str = '', template_type: str = '',
+                               wp_id: str = ''):
         """精准失效缓存（L1 内存 + L2 Redis 同步删除）— async 版本
 
         与 invalidate 相同逻辑，但同步删除 Redis keys。
         推荐在 async 上下文中使用此方法。
+
+        新增 wp_id 参数：仅对 wp 域进行增量失效，只移除包含
+        该 wp_id 条目的缓存槽中受影响的条目，而非整域清空。
         """
+        # 增量失效：wp 域指定 wp_id → 仅清除该 wp_id 相关条目
+        if wp_id and domain == 'wp':
+            affected_keys = []
+            for key in list(self._slots.keys()):
+                parts = key.split(':')
+                if len(parts) != 4:
+                    continue
+                k_pid, k_year, k_tpl, k_dom = parts
+                if k_pid != project_id:
+                    continue
+                if year and k_year != str(year):
+                    continue
+                if template_type and k_tpl != template_type:
+                    continue
+                if k_dom != 'wp':
+                    continue
+
+                # 过滤掉该 wp_id 的条目（增量失效）
+                slot = self._slots[key]
+                filtered = [e for e in slot.entries
+                            if not (hasattr(e, 'source_id') and str(getattr(e, 'source_id', '')) == wp_id)
+                            and not (wp_id in e.uri)]
+                if len(filtered) < len(slot.entries):
+                    # 有条目被移除 → 标记需要重建
+                    affected_keys.append(key)
+                    del self._slots[key]
+
+            # 删除 Redis L2 受影响的 keys（让下次查询重建）
+            await self._redis_delete_many(affected_keys)
+
+            logger.debug(
+                "address_registry invalidate_async (incremental wp): "
+                "removed %d slots (pid=%s, wp_id=%s)",
+                len(affected_keys), project_id, wp_id,
+            )
+            return
+
+        # 全量失效（原逻辑）
         to_remove = []
         for key in list(self._slots.keys()):
             parts = key.split(':')

@@ -1,7 +1,38 @@
 <!-- GtCNoteTable.vue — C 类附注披露嵌套表 shell -->
 
 <template>
-  <div class="gt-c-note-table">
+  <div class="gt-c-note-table" :class="{ 'gt-fullscreen': isFullscreen }">
+    <!-- 空态：schema 未配置时显示提示 -->
+    <el-empty
+      v-if="!allSubTables.length && !contextFields.length"
+      :image-size="80"
+      description="附注披露表尚未配置，请等待模板初始化完成"
+      class="gt-cnt__empty"
+    />
+
+    <template v-else>
+    <!-- 工具栏：全屏/公式/导入/导出 -->
+    <div class="gt-cnt__toolbar">
+      <div class="gt-cnt__toolbar-title">附注披露</div>
+      <div class="gt-cnt__toolbar-actions">
+        <el-button size="small" @click="toggleFullscreen">
+          {{ isFullscreen ? '⬜ 退出全屏' : '⛶ 全屏' }}
+        </el-button>
+        <el-button size="small" :disabled="readonly" @click="onOpenFormula">
+          ƒx 公式
+        </el-button>
+        <el-button size="small" @click="onExportTemplate">
+          📥 导出模板
+        </el-button>
+        <el-button size="small" @click="onExportData">
+          📥 导出数据
+        </el-button>
+        <el-button size="small" :disabled="readonly" @click="triggerImport">
+          📤 导入
+        </el-button>
+      </div>
+    </div>
+
     <header class="gt-cnt__header">
       <div class="gt-cnt__header-meta">
         <span v-if="entityName" class="gt-cnt__entity">{{ entityName }}</span>
@@ -173,6 +204,21 @@
             @click="onJumpToReference(refItem.target_wp || '')"
           />
           <span class="gt-cnt__ref-desc">{{ refItem.description }}</span>
+          <!-- auto_pull 拉取值展示 -->
+          <template v-if="autoPullData[refItem.ref_id]">
+            <span
+              v-if="autoPullData[refItem.ref_id].available"
+              class="gt-cnt__ref-pulled"
+              :title="`来源: ${autoPullData[refItem.ref_id].source_label}`"
+            >
+              <span class="gt-cnt__ref-pulled-label">自动取数</span>
+              <span class="gt-cnt__ref-pulled-value">{{ autoPullData[refItem.ref_id].value ?? '-' }}</span>
+            </span>
+            <span v-else class="gt-cnt__ref-unavailable">
+              取数不可用：{{ autoPullData[refItem.ref_id].reason || '来源缺失' }}
+            </span>
+          </template>
+          <span v-else-if="isAutoPullLoading" class="gt-cnt__ref-loading">加载中…</span>
         </li>
       </ul>
     </section>
@@ -197,11 +243,44 @@
         <el-icon class="gt-cnt__hint-icon"><InfoFilled /></el-icon>
       </el-tooltip>
     </footer>
+
+    <!-- 隐藏文件选择器（导入触发） -->
+    <input
+      ref="fileInputRef"
+      type="file"
+      accept=".xlsx,.xls"
+      style="display: none"
+      @change="onFileImport"
+    />
+
+    <!-- 导入预览弹窗 -->
+    <el-dialog
+      v-model="importVisible"
+      title="导入附注披露数据"
+      width="640px"
+      append-to-body
+    >
+      <div v-if="importStats">
+        <p>
+          解析结果：匹配 <b>{{ importStats.matched }}</b> 行，跳过 <b>{{ importStats.skipped }}</b> 行
+        </p>
+        <el-table v-if="importPreviewRows.length" :data="importPreviewRows" border size="small" max-height="250">
+          <el-table-column v-for="(val, key) in importPreviewRows[0]" :key="String(key)" :prop="String(key)" :label="String(key)" min-width="120" show-overflow-tooltip />
+        </el-table>
+      </div>
+      <el-empty v-else description="未解析到有效数据" :image-size="60" />
+      <template #footer>
+        <el-button @click="importVisible = false">取消</el-button>
+        <el-button type="primary" :disabled="!importStats?.matched" @click="confirmImport">确认导入</el-button>
+      </template>
+    </el-dialog>
+
+    </template>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, toRef } from 'vue'
+import { ref, computed, watch, toRef, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import {
   ElMessageBox,
@@ -217,6 +296,7 @@ import CNoteInheritanceBadge from './cnote/CNoteInheritanceBadge.vue'
 import { formatAmount } from '@/utils/formatAmount'
 import { handleApiError } from '@/utils/errorHandler'
 import { api } from '@/services/apiProxy'
+import { fetchNoteAutoPull } from '@/services/commonApi'
 import type {
   SubClass,
   ColumnDefWithKey,
@@ -238,6 +318,8 @@ import {
 import { useCNoteFormula } from './cnote/composables/useCNoteFormula'
 import { useCNoteInheritance } from './cnote/composables/useCNoteInheritance'
 import { useCNotePersist } from './cnote/composables/useCNotePersist'
+import { useFullscreen } from '@/composables/useFullscreen'
+import { useExcelIO, type ExcelColumn } from '@/composables/useExcelIO'
 
 const props = withDefaults(defineProps<{
   wpId: string
@@ -255,6 +337,7 @@ const emit = defineEmits<{
   'sync-to-disclosure-notes': [payload: SyncPayload]
   'jump-to-reference': [refCode: string]
   'save': [data: CNoteTableHtmlData]
+  'open-formula': [payload: { sheetName: string }]
 }>()
 
 const subTableData = ref<Record<string, RowData[]>>({})
@@ -343,6 +426,309 @@ function dynamicRowsView(st: SubTableSchema): RowData[] { return subTableData.va
 
 const { initData, buildSavePayload, debounceSave } = useCNotePersist({ props, subTableData, hiddenSubtables, currentStandardSubClass, contextData, activeCollapse, sectionId, allSubTables, contextFields, visibleSubTables, labelColumnField: (st: SubTableSchema) => labelColumnField(st, visibleColumns(st)), emit })
 
+// ─── auto_pull 取数：加载时自动从后端拉取联动值 ─────────────────────────
+const autoPullData = ref<Record<string, { value: any; source_label: string; available: boolean; reason: string }>>({})
+const isAutoPullLoading = ref(false)
+
+async function loadAutoPullValues() {
+  const projectId = route.params?.projectId as string | undefined
+  const yearRaw = Number(route.query?.year)
+  const yearVal = Number.isFinite(yearRaw) && yearRaw > 2000 ? yearRaw : new Date().getFullYear()
+  const section = sectionId.value
+  if (!projectId || !section || autoPullRefs.value.length === 0) return
+  isAutoPullLoading.value = true
+  try {
+    const refs = await fetchNoteAutoPull(projectId, yearVal, section)
+    const map: Record<string, { value: any; source_label: string; available: boolean; reason: string }> = {}
+    for (const r of refs) {
+      map[r.ref_id] = { value: r.value, source_label: r.source_label, available: r.available, reason: r.reason }
+    }
+    autoPullData.value = map
+  } catch {
+    // 取数失败静默降级，不阻断渲染
+  } finally {
+    isAutoPullLoading.value = false
+  }
+}
+
+onMounted(() => { loadAutoPullValues() })
+watch(() => sectionId.value, () => { loadAutoPullValues() })
+
+// ─── 工具栏：全屏 / 公式 / 导入导出 ─────────────────────────────────────
+const { isFullscreen, toggleFullscreen } = useFullscreen()
+const { exportTemplate: _exportTemplate, onFileSelected: _onFileSelected } = useExcelIO()
+const fileInputRef = ref<HTMLInputElement | null>(null)
+const importVisible = ref(false)
+const importStats = ref<{ matched: number; skipped: number } | null>(null)
+const importPreviewRows = ref<any[]>([])
+const importParsedMap = ref<Map<string, { stId: string; rows: Record<string, any>[] }>>(new Map())
+
+function onOpenFormula() {
+  if (props.readonly) return
+  emit('open-formula', { sheetName: props.sheetName })
+}
+
+/** 构建所有可见子表的导出行（含子表标题分隔） */
+function _buildExportRows(includeData: boolean): { rows: any[][]; maxCols: number; columns: ExcelColumn[] } {
+  let maxCols = 1
+  const rows: any[][] = []
+  // 先计算最大列数
+  for (const st of visibleSubTables.value) {
+    const cols = visibleColumns(st)
+    if (cols.length > maxCols) maxCols = cols.length
+  }
+  for (const st of visibleSubTables.value) {
+    const cols = visibleColumns(st)
+    // 子表标题行（作为段落分隔，填满列避免样式越界）
+    const titleRow: any[] = [`【${st.title}】`]
+    while (titleRow.length < maxCols) titleRow.push('')
+    rows.push(titleRow)
+    // 子表说明（description 作为填写指引）
+    if (st.description) {
+      const descRow: any[] = [`说明：${st.description}`]
+      while (descRow.length < maxCols) descRow.push('')
+      rows.push(descRow)
+    }
+    // 列标题行（补齐到 maxCols）
+    const headerRow = cols.map(c => c.label)
+    while (headerRow.length < maxCols) headerRow.push('')
+    rows.push(headerRow)
+    if (includeData) {
+      // 带数据导出：填入当前子表数据
+      const data = st.type === 'static_rows' ? getStaticRowsView(st) : dynamicRowsView(st)
+      for (const r of data) {
+        const row = cols.map(c => r[c.field] ?? '')
+        while (row.length < maxCols) row.push('')
+        rows.push(row)
+      }
+    } else {
+      // 空模板：静态行填行名，动态行留空占位 + 提示
+      if (st.type === 'static_rows' && st.static_rows) {
+        for (const sr of st.static_rows) {
+          const row: any[] = [sr.label]
+          while (row.length < maxCols) row.push('')
+          rows.push(row)
+        }
+      } else {
+        // 动态行：留 3 行空占位
+        for (let i = 0; i < 3; i++) {
+          const row: any[] = []
+          while (row.length < maxCols) row.push('')
+          rows.push(row)
+        }
+        const tipRow: any[] = [`（可按需增加行，列名请勿修改）`]
+        while (tipRow.length < maxCols) tipRow.push('')
+        rows.push(tipRow)
+      }
+    }
+    // 空行分隔（补齐）
+    const emptyRow: any[] = []
+    while (emptyRow.length < maxCols) emptyRow.push('')
+    rows.push(emptyRow)
+  }
+  // 构建 columns 定义（第一列宽，其余窄）
+  const columns: ExcelColumn[] = Array.from({ length: maxCols }, (_, i) => ({
+    key: String.fromCharCode(65 + (i % 26)) + (i >= 26 ? String(Math.floor(i / 26)) : ''),
+    header: i === 0 ? '项目' : `列${i + 1}`,
+    width: i === 0 ? 30 : 16,
+  }))
+  return { rows, maxCols, columns }
+}
+
+/**
+ * 导出空模板：带子表说明 + 列标题 + 填写指引，供离线填写。
+ * 静态行带行名预填（如"银行承兑汇票"/"合计"），动态行留空占位。
+ */
+async function onExportTemplate() {
+  const { rows, columns } = _buildExportRows(false)
+  await _exportTemplate({
+    columns,
+    sheetName: '附注披露模板',
+    fileName: `附注披露模板_${props.sheetName || sectionId.value || '模板'}.xlsx`,
+    existingData: rows,
+    includeNoteRow: false,
+    applyStyles: false,
+    includeInstructions: true,
+    instructionTitle: '附注披露 — 填写说明',
+    instructionRows: [
+      ['1. 每个【子表标题】下方是一张独立的披露表，按列标题填写金额'],
+      ['2. 静态行（银行承兑汇票/商业承兑汇票/合计等）已预填行名，请勿修改行名，直接填数字'],
+      ['3. 动态行（单项计提明细/核销明细等）可自由增删行，系统按列名匹配导入'],
+      ['4. 金额列填数字（不带逗号/货币符号），百分比列填数字（如 5 表示 5%）'],
+      ['5. 导入时系统按【子表标题】定位到对应子表，按行名或新增行匹配写回'],
+    ],
+  })
+}
+
+/**
+ * 导出数据：带当前已填金额的完整披露表（含所有子表当前值）。
+ */
+async function onExportData() {
+  const { rows, columns } = _buildExportRows(true)
+  await _exportTemplate({
+    columns,
+    sheetName: '附注披露',
+    fileName: `附注披露_${props.sheetName || sectionId.value || '导出'}.xlsx`,
+    existingData: rows,
+    includeNoteRow: false,
+    applyStyles: false,
+    includeInstructions: false,
+  })
+}
+
+function triggerImport() {
+  if (props.readonly) return
+  fileInputRef.value?.click()
+}
+
+/**
+ * 导入解析：按【子表标题】定位目标子表 → 按列名匹配 → 静态行按行名写回，动态行新增。
+ * 支持一个 xlsx 同时含多张子表数据（子表标题行分隔）。
+ */
+async function onFileImport(e: Event) {
+  if (props.readonly) return
+  await _onFileSelected(
+    e,
+    (result) => {
+      let matched = 0
+      let skipped = 0
+      const parsed = new Map<string, { stId: string; rows: Record<string, any>[] }>()
+
+      // 解析策略：扫描行，遇到【子表标题】→ 切换目标子表 → 后续行按列名匹配
+      let currentSt: SubTableSchema | null = null
+      let currentCols: ColumnDefWithKey[] = []
+      let headerRow: string[] = []
+      let expectHeader = false
+
+      for (const r of result.rows) {
+        const firstCell = String(r[result.headers[0]] ?? '').trim()
+
+        // 检测子表标题行（形如「【子表标题】」或以 ── 开头）
+        if (firstCell.startsWith('【') && firstCell.endsWith('】')) {
+          const title = firstCell.slice(1, -1)
+          currentSt = visibleSubTables.value.find(st => st.title === title) || null
+          if (currentSt) {
+            currentCols = visibleColumns(currentSt)
+            if (!parsed.has(currentSt.id)) {
+              parsed.set(currentSt.id, { stId: currentSt.id, rows: [] })
+            }
+          }
+          expectHeader = true
+          continue
+        }
+
+        // 跳过说明行（"说明：..."）
+        if (firstCell.startsWith('说明：') || firstCell.startsWith('（可按需')) {
+          continue
+        }
+
+        // 列标题行（匹配后设为当前 header mapping）
+        if (expectHeader && currentSt) {
+          // 检测当前行是否像列标题（至少 2 个 header 标签命中）
+          const rowVals = result.headers.map(h => String(r[h] ?? '').trim())
+          const hitCount = rowVals.filter(v => currentCols.some(c => c.label === v)).length
+          if (hitCount >= 2) {
+            headerRow = rowVals
+            expectHeader = false
+            continue
+          }
+        }
+
+        // 数据行：按列标题映射到字段
+        if (currentSt && headerRow.length && currentCols.length) {
+          const row: Record<string, any> = {}
+          let hasData = false
+          for (let i = 0; i < headerRow.length; i++) {
+            const colLabel = headerRow[i]
+            const col = currentCols.find(c => c.label === colLabel)
+            if (!col) continue
+            const val = r[result.headers[i]]
+            if (val != null && val !== '') {
+              row[col.field] = val
+              hasData = true
+            }
+          }
+          if (hasData) {
+            parsed.get(currentSt.id)!.rows.push(row)
+            matched++
+          } else {
+            skipped++
+          }
+        } else {
+          skipped++
+        }
+      }
+
+      importParsedMap.value = parsed
+      importStats.value = { matched, skipped }
+      // 预览：取前 10 行跨所有子表
+      const preview: any[] = []
+      for (const [stId, { rows: pRows }] of parsed) {
+        const st = visibleSubTables.value.find(s => s.id === stId)
+        for (const r of pRows.slice(0, 5)) {
+          preview.push({ _子表: st?.title || stId, ...r })
+        }
+      }
+      importPreviewRows.value = preview.slice(0, 10)
+      importVisible.value = true
+    },
+    { sheetName: '附注披露模板', skipRows: 0 },
+  )
+}
+
+/**
+ * 确认导入：按子表 ID 写回数据。
+ * - 静态行：按行名（labelColumnField）匹配已有行并覆盖数值列；
+ * - 动态行：全部追加为新行（或按名称列去重覆盖）。
+ */
+function confirmImport() {
+  if (props.readonly) return
+  let totalImported = 0
+
+  for (const [stId, { rows: importRows }] of importParsedMap.value) {
+    const st = visibleSubTables.value.find(s => s.id === stId)
+    if (!st) continue
+    const cols = visibleColumns(st)
+    const labelField = labelColumnField(st, cols)
+
+    if (!subTableData.value[stId]) subTableData.value[stId] = []
+
+    if (st.type === 'static_rows' && labelField) {
+      // 静态行：按 label 匹配覆盖数值列
+      for (const importRow of importRows) {
+        const label = importRow[labelField]
+        if (!label) continue
+        const existing = subTableData.value[stId].find(r => r[labelField] === label)
+        if (existing) {
+          // 覆盖数值列（非 label/id/readonly）
+          for (const col of cols) {
+            if (col.field === labelField || col.readonly) continue
+            if (importRow[col.field] != null && importRow[col.field] !== '') {
+              existing[col.field] = importRow[col.field]
+            }
+          }
+          totalImported++
+        }
+      }
+    } else {
+      // 动态行：追加
+      for (const importRow of importRows) {
+        const newRow = buildEmptyRow(st, cols, subTableData.value[stId].length)
+        Object.assign(newRow, importRow)
+        subTableData.value[stId].push(newRow)
+        totalImported++
+      }
+    }
+  }
+
+  importVisible.value = false
+  importStats.value = null
+  importParsedMap.value = new Map()
+  importPreviewRows.value = []
+  debounceSave()
+  ElMessage.success(`已导入 ${totalImported} 行数据到对应子表`)
+}
+
 function onCellChange(_st: SubTableSchema, _row: RowData, _col: ColumnDefWithKey) { debounceSave() }
 
 function onAddDynamicRow(st: SubTableSchema) {
@@ -397,9 +783,36 @@ async function onStandardSwitch(newSub: string | number | boolean | undefined) {
   debounceSave()
 }
 function onJumpToReference(refCode: string) { if (refCode) emit('jump-to-reference', refCode) }
+
+/**
+ * 派生 _columns 列头元数据（spec disclosure-table-sync-convergence Task 8）：
+ * 直接取 schema 的 sub_tables[].columns[]（label 即对照源模板编制的中文列头，天然复用零杜撰）。
+ * key=field（与行对象键一致），is_label 由 labelColumnField 判定，format 由 render/format 映射。
+ */
+function buildSyncColumns(): Record<string, Array<{ key: string; label: string; is_label?: boolean; format?: string }>> {
+  const out: Record<string, Array<{ key: string; label: string; is_label?: boolean; format?: string }>> = {}
+  for (const st of allSubTables.value) {
+    if (!(st.id in subTableData.value)) continue
+    const vcols = visibleColumns(st)
+    if (!vcols.length) continue
+    const labelField = labelColumnField(st, vcols)
+    out[st.id] = vcols.map((c) => {
+      const render = String(c.render ?? '')
+      const fmt = /amount/.test(render) ? 'amount' : /percent/.test(render) ? 'percent' : undefined
+      return {
+        key: c.field,
+        label: c.label,
+        ...(c.field === labelField ? { is_label: true } : {}),
+        ...(fmt ? { format: fmt } : {}),
+      }
+    })
+  }
+  return out
+}
+
 async function onSyncToDisclosureNotes() {
   if (!sectionId.value) { ElMessage.warning('未配置附注章节号（section_id），无法同步'); return }
-  const payload: SyncPayload = { wp_id: props.wpId, sheet_name: props.sheetName, section_id: sectionId.value, sub_table_data: { ...subTableData.value }, current_standard: deriveStandardFromSubClass(currentStandardSubClass.value, contextData.value._current_standard as string) }
+  const payload: SyncPayload = { wp_id: props.wpId, sheet_name: props.sheetName, section_id: sectionId.value, sub_table_data: { ...subTableData.value }, columns: buildSyncColumns(), current_standard: deriveStandardFromSubClass(currentStandardSubClass.value, contextData.value._current_standard as string) }
   emit('sync-to-disclosure-notes', payload)
   const projectId = route.params?.projectId as string | undefined
   if (!projectId) return
@@ -435,7 +848,10 @@ watch(() => props.schema, () => { initData() }, { deep: true })
 
 <style scoped>
 .gt-c-note-table { display: flex; flex-direction: column; gap: 14px; padding: 16px; }
-.gt-cnt__header { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; padding: 10px 14px; background: var(--gt-color-bg-soft, #f5f7fa); border-radius: 6px; font-size: 13px; }
+.gt-cnt__toolbar { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; margin-bottom: 4px; }
+.gt-cnt__toolbar-title { font-size: var(--gt-font-size-base, 14px); font-weight: 600; color: var(--gt-color-primary); }
+.gt-cnt__toolbar-actions { display: flex; align-items: center; gap: 8px; }
+.gt-cnt__header { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; padding: 10px 14px; background: var(--gt-color-bg-soft, #f5f7fa); border-radius: 6px; font-size: var(--wp-font-size, 13px); }
 .gt-cnt__header-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 16px; }
 .gt-cnt__entity { font-weight: 600; color: var(--el-text-color-primary); }
 .gt-cnt__period, .gt-cnt__section, .gt-cnt__index { color: var(--el-text-color-regular); font-size: 12px; }
@@ -457,10 +873,15 @@ watch(() => props.schema, () => { initData() }, { deep: true })
 .gt-cnt__sub-toggle { margin-left: auto; margin-right: 8px; color: var(--el-color-warning); }
 .gt-cnt__sub-desc { margin: 0 0 10px 0; padding: 6px 10px; background: var(--el-color-info-light-9); border-left: 3px solid var(--el-color-info-light-3); border-radius: 0 4px 4px 0; color: var(--el-text-color-regular); font-size: 12px; line-height: 1.5; }
 .gt-cnt__refs { border: 1px solid var(--el-border-color-light); border-radius: 6px; padding: 10px 14px; background: var(--el-color-info-light-9); }
-.gt-cnt__refs-title { margin: 0 0 8px 0; font-size: 13px; font-weight: 600; color: var(--el-text-color-regular); }
+.gt-cnt__refs-title { margin: 0 0 8px 0; font-size: var(--wp-font-size, 13px); font-weight: 600; color: var(--el-text-color-regular); }
 .gt-cnt__refs-list { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 6px; }
-.gt-cnt__ref-item { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--el-text-color-regular); }
+.gt-cnt__ref-item { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--el-text-color-regular); flex-wrap: wrap; }
 .gt-cnt__ref-desc { flex: 1; }
+.gt-cnt__ref-pulled { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 4px; background: var(--gt-color-primary-bg, #f4f0fa); border: 1px solid var(--gt-color-border-purple-light, #d8b8ee); font-size: 12px; white-space: nowrap; }
+.gt-cnt__ref-pulled-label { color: var(--gt-color-primary, #4b2d77); font-size: 11px; font-weight: 500; }
+.gt-cnt__ref-pulled-value { color: var(--gt-color-primary, #4b2d77); font-weight: 600; font-variant-numeric: tabular-nums; }
+.gt-cnt__ref-unavailable { color: var(--el-text-color-placeholder, #a8abb2); font-size: 11px; font-style: italic; }
+.gt-cnt__ref-loading { color: var(--el-text-color-placeholder, #a8abb2); font-size: 11px; }
 .gt-cnt__footer-actions { display: flex; align-items: center; gap: 8px; padding-top: 8px; }
 .gt-cnt__hint-icon { color: var(--el-color-info); font-size: 14px; }
 </style>

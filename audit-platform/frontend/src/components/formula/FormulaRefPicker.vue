@@ -86,6 +86,53 @@
           </el-table-column>
         </el-table>
       </el-tab-pane>
+
+      <!-- 底稿单元格引用（ACNR WP 域） -->
+      <el-tab-pane label="🧾 底稿单元格" name="wp">
+        <div class="gt-ref-filter">
+          <el-select
+            v-model="selectedWpSheetAddrId"
+            filterable
+            clearable
+            placeholder="选择底稿 Sheet"
+            size="small"
+            style="width: 320px"
+            :loading="wpSheetsLoading"
+            @change="onWpSheetChange"
+          >
+            <el-option
+              v-for="s in wpSheets"
+              :key="s.addr_id"
+              :label="`[${s.parent_wp_code}] ${s.sheet_name || s.sheet_code}`"
+              :value="s.addr_id"
+            />
+          </el-select>
+          <el-input v-model="wpCellSearch" placeholder="搜索坐标/语义/引用..." size="small" clearable style="width: 220px" />
+        </div>
+        <el-table
+          v-if="filteredWpCells.length"
+          v-loading="wpCellsLoading"
+          :data="filteredWpCells"
+          size="small"
+          max-height="300"
+          highlight-current-row
+          @row-click="onSelectWpCell"
+          style="cursor: pointer"
+        >
+          <el-table-column label="坐标" width="100">
+            <template #default="{ row }">{{ row.cell_address || '—' }}</template>
+          </el-table-column>
+          <el-table-column label="语义标签" min-width="180">
+            <template #default="{ row }">{{ row.semantic_label }}</template>
+          </el-table-column>
+          <el-table-column label="引用" min-width="200">
+            <template #default="{ row }">
+              <code style="font-size: var(--gt-font-size-xs); color: var(--gt-color-text-secondary)">{{ row.formula_ref }}</code>
+            </template>
+          </el-table-column>
+        </el-table>
+        <el-empty v-else :description="wpEmptyDescription" :image-size="72" />
+      </el-tab-pane>
     </el-tabs>
 
     <!-- 预览区 -->
@@ -105,11 +152,13 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { fmtAmount } from '@/utils/formatters'
 import { useAddressRegistry } from '@/stores/addressRegistry'
+import { useAcnr, type AcnrSheetEntry, type AcnrCellEntry } from '@/services/acnr/useAcnr'
 
 const addrStore = useAddressRegistry()
+const acnr = useAcnr()
 
 const props = defineProps<{
   modelValue: boolean
@@ -138,6 +187,126 @@ const notePeriod = ref('期末')
 
 const selectedFormula = ref('')
 const selectedLabel = ref('')
+
+// ─── WP 域（ACNR 底稿单元格）───
+interface WpCellRow {
+  cell_address: string
+  semantic_label: string
+  formula_ref: string
+  parent_wp_code: string
+  sheet_code: string
+}
+
+const wpSheets = ref<AcnrSheetEntry[]>([])
+const wpSheetsLoading = ref(false)
+const selectedWpSheetAddrId = ref('')
+const wpCells = ref<AcnrCellEntry[]>([])
+const wpCellsLoading = ref(false)
+const wpCellSearch = ref('')
+let wpSheetsLoaded = false
+
+const selectedWpSheet = computed(
+  () => wpSheets.value.find(s => s.addr_id === selectedWpSheetAddrId.value) || null,
+)
+// ACNR 是否可用：listSheets 有结果。为空则回退 legacy store 的 wp 域地址。
+const wpAcnrAvailable = computed(() => wpSheets.value.length > 0)
+
+/** 兜底构造 grammar_v1 3 参 WP 引用（AcnrCellEntry.formula_ref 缺失时）。 */
+function buildWpFormulaRef(parent: string, sheet: string, cell: string): string {
+  return `WP('${parent}','${sheet}','${cell}')`
+}
+
+// 单元格候选：ACNR 命中用 listCells，否则回退 legacy store 的 wp 域 cell 条目。
+const filteredWpCells = computed<WpCellRow[]>(() => {
+  const kw = wpCellSearch.value.toLowerCase()
+  let rows: WpCellRow[]
+  if (wpAcnrAvailable.value) {
+    const sheet = selectedWpSheet.value
+    if (!sheet) return []
+    rows = wpCells.value.map(c => {
+      const cellAddr = c.cell_address || ''
+      return {
+        cell_address: cellAddr,
+        semantic_label: c.semantic_label || cellAddr || c.addr_id,
+        // R14.5: 优先用 ACNR 条目自带的 grammar_v1 formula_ref（含 custom_flat），
+        // 缺失时兜底构造 3 参 WP('parent','sheet','cell')。
+        formula_ref: c.formula_ref || buildWpFormulaRef(sheet.parent_wp_code, sheet.sheet_code, cellAddr),
+        parent_wp_code: sheet.parent_wp_code,
+        sheet_code: sheet.sheet_code,
+      }
+    })
+  } else {
+    // 回退 legacy store（R14.4，无回归）：wp 域 cell 级条目自带 formula_ref。
+    rows = addrStore.wpAddresses
+      .filter(e => e.formula_ref)
+      .map(e => ({
+        cell_address: e.cell || '',
+        semantic_label: e.label || e.cell || e.uri,
+        formula_ref: e.formula_ref,
+        parent_wp_code: e.wp_code || '',
+        sheet_code: e.sheet_code || '',
+      }))
+  }
+  if (!kw) return rows
+  return rows.filter(r =>
+    (r.cell_address || '').toLowerCase().includes(kw) ||
+    (r.semantic_label || '').toLowerCase().includes(kw) ||
+    (r.formula_ref || '').toLowerCase().includes(kw),
+  )
+})
+
+const wpEmptyDescription = computed(() => {
+  if (wpAcnrAvailable.value && !selectedWpSheet.value) return '请选择底稿 Sheet'
+  return '暂无可用底稿单元格'
+})
+
+async function ensureWpSheets() {
+  if (wpSheetsLoaded) return
+  wpSheetsLoading.value = true
+  try {
+    wpSheets.value = await acnr.listSheets()
+  } catch {
+    wpSheets.value = []
+  } finally {
+    wpSheetsLoading.value = false
+    wpSheetsLoaded = true
+  }
+}
+
+async function onWpSheetChange(addrId: string | null) {
+  wpCells.value = []
+  const s = wpSheets.value.find(x => x.addr_id === addrId)
+  if (!s) return
+  wpCellsLoading.value = true
+  try {
+    wpCells.value = await acnr.listCells(s.parent_wp_code, s.sheet_code)
+  } catch {
+    wpCells.value = []
+  } finally {
+    wpCellsLoading.value = false
+  }
+}
+
+function onSelectWpCell(row: WpCellRow) {
+  if (!row.formula_ref) return
+  selectedFormula.value = row.formula_ref
+  const codeTag = row.parent_wp_code ? `[${row.parent_wp_code}] ` : ''
+  selectedLabel.value = `底稿 ${codeTag}${row.semantic_label}`
+}
+
+// WP tab 首次激活时懒加载 sheet 目录
+watch(activeTab, (t) => {
+  if (t === 'wp') ensureWpSheets()
+})
+
+// 弹窗关闭时重置 WP 选择态（sheet 目录缓存保留，避免重复请求）
+watch(visible, (v) => {
+  if (!v) {
+    selectedWpSheetAddrId.value = ''
+    wpCells.value = []
+    wpCellSearch.value = ''
+  }
+})
 
 // ─── 数据源：优先 store，回退 props ───
 

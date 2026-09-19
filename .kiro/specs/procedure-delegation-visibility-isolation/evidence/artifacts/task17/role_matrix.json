@@ -1,0 +1,61 @@
+{
+  "both_denied_invariant": "scope-internal-not-delegated AND scope-external-delegated both 404 for lead/assignee/reviewer/history/restricted",
+  "families_covered": [
+    "render_config",
+    "checklist",
+    "attachment",
+    "ai_context",
+    "version_list",
+    "editor_config",
+    "checklist_save",
+    "ai_generate",
+    "version_restore",
+    "editor_write",
+    "review_comment",
+    "list"
+  ],
+  "method": "api_gate_integration_real_app_services_postgresql",
+  "roles": {
+    "admin": {
+      "cross_project_denied": true,
+      "delegated_allow": true
+    },
+    "assignee": {
+      "mapped_page_allow": true,
+      "mapped_write_allow": true,
+      "other_page_denied": true,
+      "scope_external_delegated_denied": true,
+      "scope_internal_not_delegated_denied": true
+    },
+    "history_lead": {
+      "readonly_allow": true,
+      "scope_external_denied": true,
+      "scope_internal_not_delegated_denied": true,
+      "write_denied": true
+    },
+    "history_row": {
+      "page_isolation": true,
+      "readonly_mapped_allow": true,
+      "write_denied": true
+    },
+    "lead": {
+      "delegated_allow": true,
+      "scope_external_delegated_denied": true,
+      "scope_internal_not_delegated_denied": true,
+      "write_allow": true
+    },
+    "restricted": {
+      "all_denied": true
+    },
+    "reviewer": {
+      "content_write_denied": true,
+      "mapped_read_allow": true,
+      "review_comment_allow": true,
+      "scope_internal_not_delegated_denied": true
+    },
+    "supervisor": {
+      "scope_external_denied": true,
+      "scope_internal_allow": true
+    }
+  }
+}

@@ -97,13 +97,16 @@ class EventCascadeHealthService:
         try:
             sql = sa_text(
                 f"""
+                -- import_event_outbox 无 updated_at 列（只有 created_at /
+                -- published_at）。processing 态尚未 published，故「卡住时长」
+                -- 以 created_at 为基准 —— 语义上就是「入队至今仍未处理完」。
                 SELECT id::text AS outbox_id,
                        event_type,
-                       EXTRACT(EPOCH FROM (now() - updated_at))::INT / 60 AS stuck_for_minutes
+                       EXTRACT(EPOCH FROM (now() - created_at))::INT / 60 AS stuck_for_minutes
                 FROM import_event_outbox
                 WHERE status = 'processing'
-                  AND updated_at < now() - INTERVAL '{_STUCK_HANDLER_MINUTES} minutes'
-                ORDER BY updated_at ASC
+                  AND created_at < now() - INTERVAL '{_STUCK_HANDLER_MINUTES} minutes'
+                ORDER BY created_at ASC
                 LIMIT 10
                 """
             )

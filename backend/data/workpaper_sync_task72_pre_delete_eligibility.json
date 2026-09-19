@@ -1,0 +1,1942 @@
+{
+  "artifact_git_status": {
+    "backend/data/workpaper_sync_task72_pre_delete_eligibility.json": "??",
+    "backend/scripts/check/check_task72_pre_delete_eligibility_gate.py": "??",
+    "backend/scripts/diagnose/mutate_task72_pre_delete_eligibility_guards.py": "??",
+    "backend/tests/workpaper_sync_predelete/test_task72_pre_delete_eligibility.py": "??"
+  },
+  "blocking_points": [
+    {
+      "disposition": "UNVERIFIABLE，保持未验收",
+      "id": "BP-72-1",
+      "measured": {
+        "agrees_with_task70_self_report": true,
+        "named_scenarios_not_executed": [
+          "close_leader_revoked_no_successor_recovery_required",
+          "close_leader_revoked_successor_exactly_one",
+          "cross_participant_idempotency_409",
+          "opaque_version_rollback_no_numeric_collision",
+          "quarantined_rejects_application_and_engine",
+          "same_application_higher_sequence_fold"
+        ],
+        "tier_histogram_recomputed": {
+          "unrunnable_today": 3016,
+          "upstream_implementation_gap": 274
+        }
+      },
+      "measured_how": "Task 70 报告 `scenario_execution.entries[].scenarios[].execution_tier` 逐行现算，再与它的 `verdict.executed_end_to_end` 自述比对",
+      "owner_task": "70",
+      "relation_to_upstream": "与 BP-70-2 / BP-71-4 同一组环境前提",
+      "statement": "真实 OO required scenario 一条都没真跑：逐行现算 0 / 3290 行落在已执行档；正文点名的 6 / 6 个 scenario 全部未执行 ⇒ Stage A 红。",
+      "why_not_fixed_here": "三条环境前提一条都不成立：3030 未监听、无 OO 活动编辑会话、evidence 五表 0 行。本门造 evidence 行等于伪造证据。"
+    },
+    {
+      "adjudication_owner_task": "71",
+      "disposition": "仍阻塞",
+      "id": "BP-72-2",
+      "measured": {
+        "multi_resolver_rows_measured": [
+          "app.routers.wp_onlyoffice_router::get_sheet_onlyoffice_config",
+          "app.routers.wp_onlyoffice_router::get_sheet_wopi_contents",
+          "app.routers.wp_onlyoffice_router::get_whole_excel_grid",
+          "app.routers.wp_onlyoffice_router::post_sheet_onlyoffice_callback"
+        ],
+        "rows_still_deferred": [
+          "get_sheet_onlyoffice_config",
+          "get_sheet_wopi_contents",
+          "get_whole_excel_grid",
+          "post_sheet_onlyoffice_callback"
+        ],
+        "writer_gate_criteria": {
+          "after_save_still_increments_revision": 0,
+          "artifact_snapshot_writer_not_verifiable": 0,
+          "bypasses_unified_commit": 261,
+          "keeps_legacy_write_path_beside_unified_commit": 0,
+          "missing_required_domain": 0,
+          "multi_resolver": 4,
+          "non_canonical_resolver_only": 63,
+          "owns_direct_commit": 105,
+          "representation_upgrade_increments_business_revision": 0,
+          "retired_writer_not_verifiable": 0,
+          "unadjudicated_resolver": 0,
+          "unadjudicated_writer": 0,
+          "writer_without_characterization_test": 208,
+          "writes_legacy_version_field": 5
+        }
+      },
+      "measured_how": "live 重算 writer matrix（不写盘）+ Task 12 矩阵逐行现读",
+      "owner_task": "36",
+      "relation_to_upstream": "BP-71-1 的独立复核（移交链 Task 20 → 30 → 71）",
+      "statement": "`multi_resolver` live 重算 = 4（≠0），且 Task 12 矩阵那 4 条 resolver 行仍全部 `status=deferred` ⇒ `legacy_delete` gate 不放行 Stage B 的全局 legacy 删除。",
+      "why_not_fixed_here": "四条行的剩余阻塞是 Task 36 的逐 entry 供给；在任一 entry 拿到 approved bundle 之前改 router 会让全部底稿的 OO 入口 fail closed。"
+    },
+    {
+      "disposition": "仍阻塞（解除动作 = 把替代面与 usePilotBridgeAdapter.ts 入库）",
+      "id": "BP-72-3",
+      "measured": {
+        "failing_subjects": [
+          {
+            "failure_reasons": [
+              "digest_drift"
+            ],
+            "item_id": "legacy_composable:audit-platform/frontend/src/components/workpaper/composables/useG7LonTerDualMode.ts",
+            "path": "audit-platform/frontend/src/components/workpaper/composables/useG7LonTerDualMode.ts",
+            "rollback_mode": "git_blob_at_plan_commit",
+            "tracked_at_plan_commit": true
+          },
+          {
+            "failure_reasons": [
+              "rollback_not_recoverable"
+            ],
+            "item_id": "legacy_local_storage_key:workpaper-sync-mode:@duplicate_writer:audit-platform/frontend/src/components/workpaper/sync/usePilotBridgeAdapter.ts",
+            "path": "audit-platform/frontend/src/components/workpaper/sync/usePilotBridgeAdapter.ts",
+            "rollback_mode": "pre_delete_snapshot_required",
+            "tracked_at_plan_commit": false
+          },
+          {
+            "failure_reasons": [
+              "rollback_not_recoverable"
+            ],
+            "item_id": "legacy_state_machine:audit-platform/frontend/src/components/workpaper/sync/usePilotBridgeAdapter.ts",
+            "path": "audit-platform/frontend/src/components/workpaper/sync/usePilotBridgeAdapter.ts",
+            "rollback_mode": "pre_delete_snapshot_required",
+            "tracked_at_plan_commit": false
+          }
+        ],
+        "paths_untracked_at_plan_commit": [
+          "audit-platform/frontend/src/components/workpaper/sync/usePilotBridgeAdapter.ts"
+        ],
+        "replacement_surface_untracked_live_count": 22,
+        "task66_rollback_isolation_failing_checks": [
+          "every_pending_delete_has_a_recoverable_rollback_target",
+          "replacement_surface_is_itself_recoverable"
+        ]
+      },
+      "measured_how": "逐 subject 现算五个绑定 + 磁盘 sha256 + `git ls-tree <plan_commit>`；替代面逐模块 `git ls-files --error-unmatch` 现测",
+      "owner_task": "72",
+      "relation_to_upstream": "BP-66-2（owner 72）+ BP-66-1（owner 67）的独立复核",
+      "statement": "「唯一命中 path/digest/owner/rollback plan」在 **rollback plan** 维度不成立：3 个待删 subject `recoverable_from_git=false`（路径 ['audit-platform/frontend/src/components/workpaper/sync/usePilotBridgeAdapter.ts'] 在 plan commit 上未跟踪），且 22 / 22 个替代面模块 git 未跟踪 ⇒ Task 66 的 rollback 隔离门 verdict = blocked。",
+      "upstream_bp_present": [
+        "BP-66-1",
+        "BP-66-2",
+        "BP-66-3"
+      ],
+      "why_not_fixed_here": "替代面入库属各推进方的产物归属，不该由本门替别人 commit；且入库会改 source commit，让 Task 70 的 evidence 全部 stale。"
+    },
+    {
+      "disposition": "如实登记 —— 判据已把它算成不可采纳，不是遗漏",
+      "id": "BP-72-4",
+      "measured": {
+        "admissible": false,
+        "denominator": 0,
+        "denominator_empty": true,
+        "reason": "vacuous_zero_empty_denominator",
+        "value": 0,
+        "zero": true
+      },
+      "measured_how": "Task 67 逐 entry 现算分母 + Task 70 的 DB 行数现读，喂 `count_admissibility`",
+      "owner_task": "70",
+      "relation_to_upstream": "Task 67 已把该分母为空显式写出并交给 Task 70；本门只是把它变成**不可采纳**而不是一个看起来已达标的 0。",
+      "statement": "`evidence stale = 0` 是空分母下的 vacuous zero，不能当成「已刷新」：`evidence_stale_is_measurable` 逐 entry 现算 = 0，`working_paper_sync_test_run` = 0 行。",
+      "why_not_fixed_here": "分母要靠真实 OO 场景产生 test run 行才会非空；这是 Task 70 的职责。"
+    },
+    {
+      "disposition": "如实登记，不改上游产物",
+      "id": "BP-72-5",
+      "measured": {
+        "task70_scanned_test_files_on_disk": 2340,
+        "upstream_bp_present": true
+      },
+      "measured_how": "现数 `backend/tests` 全树 `test_*.py` 并与 Task 70 报告登记值比对",
+      "owner_task": "70",
+      "relation_to_upstream": "BP-71-8",
+      "statement": "本门新增守卫文件让 Task 70 的全树 test 文件计数锁再次 stale（既存脆弱性，不是本门引入的缺陷）。Task 71 已把它登记为 BP-71-8 并实测过隔离法。",
+      "why_not_fixed_here": "改 Task 70 的产物即重生成上游 evidence（禁止）；把守卫挪出 `backend/tests` 会让它不进 CI。两害相权取如实登记。"
+    },
+    {
+      "disposition": "引用既存登记，本门零改动",
+      "id": "BP-72-6",
+      "measured": {
+        "inventory_on_disk_is_stale": false,
+        "task68_bp_ids": [
+          "BP-68-1",
+          "BP-68-2",
+          "BP-68-3",
+          "BP-68-4"
+        ],
+        "task71_bp_ids": [
+          "BP-71-1",
+          "BP-71-2",
+          "BP-71-3",
+          "BP-71-4",
+          "BP-71-5",
+          "BP-71-6",
+          "BP-71-7",
+          "BP-71-8"
+        ]
+      },
+      "measured_how": "上游报告的 blocking_points 逐条现读 + inventory digest 现算比对",
+      "owner_task": "22",
+      "relation_to_upstream": "BP-68-1 / BP-71-3 / BP-71-5 / BP-70-6",
+      "statement": "既存缺陷原样转记，不在本门顺手修：BP-71-3 / BP-68-1（`pre-durable rejected + application_id` 同时通过 DDL 与 `assert_delivery_ownership` 不变量，owner 22）、BP-70-6（Task 69 四把锁里的 1 红）、BP-71-5（磁盘 writer inventory stale，owner 20）。",
+      "why_not_fixed_here": "修它们要改生产代码或重生成上游基线文件 ⇒ 改 source commit ⇒ Task 70 的 evidence 全部 stale 并打红上游四把锁。"
+    },
+    {
+      "disposition": "UNVERIFIABLE / BLOCKED，如实登记",
+      "id": "BP-72-7",
+      "measured": {
+        "all_evidence_tables_empty": true,
+        "frontend_3030_listening": false,
+        "missing_preconditions": [
+          "business_data_in_evidence_tables",
+          "frontend_3030_listening",
+          "onlyoffice_live_editing_session"
+        ],
+        "onlyoffice_8080_listening": true
+      },
+      "measured_how": "socket 现测三个端口 + Task 70 的 DB 行数现读",
+      "owner_task": "72",
+      "relation_to_upstream": "BP-71-2 / BP-70-2",
+      "statement": "Stage C / Stage D 的最终门与容量真实负载今天无从供给：3030 未监听（现测 False）、无 OO 活动编辑会话、evidence 五表全 0 行。",
+      "why_not_fixed_here": "8080 healthcheck 通不等于有活动编辑会话（forcesave 对不存在 doc key 回 error 1）。合成 measurement 不能冒充容量门通过 —— 生产 `capacity_profile` 就是为防这件事写的。"
+    },
+    {
+      "disposition": "如实登记，不改上游产物",
+      "id": "BP-72-8",
+      "measured": {
+        "isolation": "两把锁各自「移出 rc=0 / 放回 rc=1」",
+        "task67_affected_tests": 2,
+        "task67_inbound_rows_on_disk": 12,
+        "task71_affected_tests": 2
+      },
+      "measured_how": "现跑 Task 67 生成器的 `collect_inbound_obligations()` 与磁盘清单求差集，再用移出/放回法隔离那两条测试",
+      "owner_task": "67",
+      "relation_to_upstream": "BP-71-8 的同类（不同锁）",
+      "statement": "**本门新发现**：Task 67 的逐字节锁把 `inbound_obligations` 普查（扫 `backend/data/**` 与源码里对「Task 67」的引用）锁了进去 ⇒ 任何新落盘且正文提到 Task 67 的产物都会顶掉它。本门报告 JSON 一落盘，该普查 12 → 13 行，Task 67 的锁多出 2 条红。与 BP-71-8 同类（全树普查进逐字节锁），但是**另一把锁、另一个 owner**。",
+      "why_not_fixed_here": "重跑 Task 67 的 `--write` 即重生成上游产物（明令禁止，且会让 Task 70 的 evidence 全部 stale）；把报告挪到别的目录只是躲开一次普查，下一个产物还会踩 —— 该修的是那条普查判据本身。"
+    }
+  ],
+  "counterfactual_arms": {
+    "all_green_probe_state": "green",
+    "arm_count": 8,
+    "arms": [
+      {
+        "arm_id": "flip::unadjudicated_is_admissibly_zero",
+        "conclusion_changes": false,
+        "flipped_predicate": "unadjudicated_is_admissibly_zero",
+        "from_value": false,
+        "state": "red",
+        "to_value": true,
+        "why": "该谓词是今天为红的原因之一 ⇒ 翻成 True 后若仍红说明还有别的红（正常）；本臂只要求它**参与**结论，即在全绿基线上翻成 False 必须让结论变红。"
+      },
+      {
+        "arm_id": "flip::fake_bidirectional_is_admissibly_zero",
+        "conclusion_changes": false,
+        "flipped_predicate": "fake_bidirectional_is_admissibly_zero",
+        "from_value": false,
+        "state": "red",
+        "to_value": true,
+        "why": "该谓词是今天为红的原因之一 ⇒ 翻成 True 后若仍红说明还有别的红（正常）；本臂只要求它**参与**结论，即在全绿基线上翻成 False 必须让结论变红。"
+      },
+      {
+        "arm_id": "flip::bidirectional_unaccepted_is_admissibly_zero",
+        "conclusion_changes": false,
+        "flipped_predicate": "bidirectional_unaccepted_is_admissibly_zero",
+        "from_value": false,
+        "state": "red",
+        "to_value": true,
+        "why": "该谓词是今天为红的原因之一 ⇒ 翻成 True 后若仍红说明还有别的红（正常）；本臂只要求它**参与**结论，即在全绿基线上翻成 False 必须让结论变红。"
+      },
+      {
+        "arm_id": "flip::evidence_stale_is_admissibly_zero",
+        "conclusion_changes": false,
+        "flipped_predicate": "evidence_stale_is_admissibly_zero",
+        "from_value": false,
+        "state": "red",
+        "to_value": true,
+        "why": "该谓词是今天为红的原因之一 ⇒ 翻成 True 后若仍红说明还有别的红（正常）；本臂只要求它**参与**结论，即在全绿基线上翻成 False 必须让结论变红。"
+      },
+      {
+        "arm_id": "flip::every_pending_delete_uniquely_lands_in_plan",
+        "conclusion_changes": false,
+        "flipped_predicate": "every_pending_delete_uniquely_lands_in_plan",
+        "from_value": false,
+        "state": "red",
+        "to_value": true,
+        "why": "该谓词是今天为红的原因之一 ⇒ 翻成 True 后若仍红说明还有别的红（正常）；本臂只要求它**参与**结论，即在全绿基线上翻成 False 必须让结论变红。"
+      },
+      {
+        "arm_id": "flip::named_required_scenarios_really_executed",
+        "conclusion_changes": false,
+        "flipped_predicate": "named_required_scenarios_really_executed",
+        "from_value": false,
+        "state": "red",
+        "to_value": true,
+        "why": "该谓词是今天为红的原因之一 ⇒ 翻成 True 后若仍红说明还有别的红（正常）；本臂只要求它**参与**结论，即在全绿基线上翻成 False 必须让结论变红。"
+      },
+      {
+        "arm_id": "flip::multi_resolver_criterion_passes",
+        "conclusion_changes": false,
+        "flipped_predicate": "multi_resolver_criterion_passes",
+        "from_value": false,
+        "state": "red",
+        "to_value": true,
+        "why": "该谓词是今天为红的原因之一 ⇒ 翻成 True 后若仍红说明还有别的红（正常）；本臂只要求它**参与**结论，即在全绿基线上翻成 False 必须让结论变红。"
+      },
+      {
+        "arm_id": "flip::deletion_plan_is_current_with_head",
+        "conclusion_changes": false,
+        "flipped_predicate": "deletion_plan_is_current_with_head",
+        "from_value": true,
+        "state": "red",
+        "to_value": false,
+        "why": "该谓词是今天为红的原因之一 ⇒ 翻成 True 后若仍红说明还有别的红（正常）；本臂只要求它**参与**结论，即在全绿基线上翻成 False 必须让结论变红。"
+      }
+    ],
+    "baseline_state": "red",
+    "every_predicate_alone_can_turn_it_red": true,
+    "gate_can_go_green": true,
+    "single_red_arms": [
+      {
+        "arm_id": "only_red::unadjudicated_is_admissibly_zero",
+        "flips_green_to_red": true,
+        "state": "red"
+      },
+      {
+        "arm_id": "only_red::fake_bidirectional_is_admissibly_zero",
+        "flips_green_to_red": true,
+        "state": "red"
+      },
+      {
+        "arm_id": "only_red::bidirectional_unaccepted_is_admissibly_zero",
+        "flips_green_to_red": true,
+        "state": "red"
+      },
+      {
+        "arm_id": "only_red::evidence_stale_is_admissibly_zero",
+        "flips_green_to_red": true,
+        "state": "red"
+      },
+      {
+        "arm_id": "only_red::every_pending_delete_uniquely_lands_in_plan",
+        "flips_green_to_red": true,
+        "state": "red"
+      },
+      {
+        "arm_id": "only_red::named_required_scenarios_really_executed",
+        "flips_green_to_red": true,
+        "state": "red"
+      },
+      {
+        "arm_id": "only_red::multi_resolver_criterion_passes",
+        "flips_green_to_red": true,
+        "state": "red"
+      },
+      {
+        "arm_id": "only_red::deletion_plan_is_current_with_head",
+        "flips_green_to_red": true,
+        "state": "red"
+      }
+    ],
+    "statement": "Stage A 的红是被实测撑起来的，不是写死的：全绿输入下本门返回 green，任一谓词单独为假即返回 red。",
+    "vocabulary_is_enforced": {
+      "extra_predicate_raises": true,
+      "missing_predicate_raises": true,
+      "why": "`stage_a_state` 对谓词集合做封闭词表校验：偷偷加一条（如 unreachable=0）或摘掉一条（如 evidence stale）都直接抛，而不是静静算出一个更好看的结论。"
+    }
+  },
+  "design_property_titles": {
+    "1": "入口清册覆盖源码挂载点",
+    "2": "能力态取值封闭",
+    "3": "未注册 adapter 不得宣称双向",
+    "46": "bridge 状态转换封闭",
+    "47": "编辑器只消费 descriptor 并暴露 durable API",
+    "48": "同步失败不被成功文案覆盖",
+    "51": "manifest/evidence 收口五个零",
+    "57": "变异四态准确",
+    "69": "evidence 由逐 scenario 实体与服务端重算闭合",
+    "70": "scenario/evidence 不得跨 entry 或跨场景复用",
+    "71": "evidence 随环境、runner 与 immutable definition bundle 变化失效",
+    "72": "量化容量模型可重复"
+  },
+  "elapsed_seconds": 22.95,
+  "environment_preconditions": {
+    "agrees_with_task69_on_3030": true,
+    "all_evidence_tables_empty": true,
+    "backend_9980_listening": true,
+    "evidence_table_rows": {
+      "working_paper_content_representation": 0,
+      "working_paper_content_version": 0,
+      "working_paper_entry_evidence_scenario": 0,
+      "working_paper_sync_entry_state": 0,
+      "working_paper_sync_test_run": 0
+    },
+    "frontend_3030_listening": false,
+    "measured_by": "本门 socket 现测 + Task 70 报告的 DB 行数现读",
+    "missing_preconditions": [
+      "business_data_in_evidence_tables",
+      "frontend_3030_listening",
+      "onlyoffice_live_editing_session"
+    ],
+    "onlyoffice_8080_listening": true,
+    "oo_forcesave_requires_live_session": true,
+    "task69_recorded_3030_listening": false,
+    "why_it_matters": "OO 8080 healthcheck 通与「有活动编辑会话」是两件事：forcesave 对不存在的 doc key 回 error 1（Task 70 实测）。8080 在听**不能**当成场景可跑。"
+  },
+  "five_counts": {
+    "admissibility": {
+      "evidence_stale": {
+        "admissible": false,
+        "denominator": 0,
+        "denominator_empty": true,
+        "reason": "vacuous_zero_empty_denominator",
+        "value": 0,
+        "zero": true
+      },
+      "fake_bidirectional": {
+        "admissible": false,
+        "denominator": 142,
+        "denominator_empty": false,
+        "reason": "nonzero",
+        "value": 141,
+        "zero": false
+      },
+      "unaccepted": {
+        "admissible": false,
+        "denominator": 142,
+        "denominator_empty": false,
+        "reason": "nonzero",
+        "value": 142,
+        "zero": false
+      },
+      "unadjudicated": {
+        "admissible": false,
+        "denominator": 142,
+        "denominator_empty": false,
+        "reason": "nonzero",
+        "value": 136,
+        "zero": false
+      }
+    },
+    "all_recomputes_agree": true,
+    "denominators": {
+      "evidence_stale_denominator": 0,
+      "evidence_stale_denominator_why": "逐 entry 现算 `verdicts.evidence_stale_is_measurable`；今天为 0，与 Task 70 实录的`working_paper_sync_test_run` = 0 行同源 —— 没有 evidence 可以过期。",
+      "independent_entry_total": 142,
+      "manifest_entry_total": 186,
+      "parent_duplicate_total": 44,
+      "primary_denominator": "independent_entry_total",
+      "primary_denominator_why": "正文「父入口不重复计数」",
+      "sync_test_run_rows_measured_by_task70": 0
+    },
+    "four_zeros_all_admissible": false,
+    "labels": {
+      "evidence_stale": "evidence stale",
+      "fake_bidirectional": "假双向",
+      "unaccepted": "bidirectional 未验收",
+      "unadjudicated": "未裁决",
+      "unreachable": "unreachable（Stage D 条件，非 Stage A 前置）"
+    },
+    "recompute_agrees_with_task67_all": {
+      "evidence_stale": true,
+      "fake_bidirectional": true,
+      "unaccepted": true,
+      "unadjudicated": true,
+      "unreachable": true
+    },
+    "recompute_agrees_with_task67_primary": {
+      "evidence_stale": true,
+      "fake_bidirectional": true,
+      "unaccepted": true,
+      "unadjudicated": true,
+      "unreachable": true
+    },
+    "recomputed_over_all_entries": {
+      "evidence_stale": 0,
+      "fake_bidirectional": 141,
+      "unaccepted": 186,
+      "unadjudicated": 136,
+      "unreachable": 1
+    },
+    "recomputed_primary": {
+      "evidence_stale": 0,
+      "fake_bidirectional": 141,
+      "unaccepted": 142,
+      "unadjudicated": 136,
+      "unreachable": 0
+    },
+    "task67_self_reported_over_all_entries": {
+      "evidence_stale": 0,
+      "fake_bidirectional": 141,
+      "planned_delete": 186,
+      "unaccepted": 186,
+      "unadjudicated": 136,
+      "unreachable": 1
+    },
+    "task67_self_reported_primary": {
+      "evidence_stale": 0,
+      "fake_bidirectional": 141,
+      "planned_delete": 142,
+      "unaccepted": 142,
+      "unadjudicated": 136,
+      "unreachable": 0
+    },
+    "unreachable_is_not_a_stage_a_precondition": "AC 12.13 逐字禁止把「待删 unreachable 已为 0」当 Stage A 前置；此处只报计数（主口径 0 / 全口径 1）。"
+  },
+  "forward_recompute": {
+    "all_agree": true,
+    "disagreeing_cases": [],
+    "has_positive_case": true,
+    "row_count": 14,
+    "rows": [
+      {
+        "actual": {
+          "admissible": true,
+          "denominator": 142,
+          "denominator_empty": false,
+          "reason": "admissible_zero",
+          "value": 0,
+          "zero": true
+        },
+        "agrees": true,
+        "case": "count_admissibility::real_zero",
+        "expected": {
+          "admissible": true,
+          "reason": "admissible_zero"
+        },
+        "input": {
+          "denominator": 142,
+          "value": 0
+        }
+      },
+      {
+        "actual": {
+          "admissible": false,
+          "denominator": 0,
+          "denominator_empty": true,
+          "reason": "vacuous_zero_empty_denominator",
+          "value": 0,
+          "zero": true
+        },
+        "agrees": true,
+        "case": "count_admissibility::vacuous_zero",
+        "expected": {
+          "admissible": false,
+          "reason": "vacuous_zero_empty_denominator"
+        },
+        "input": {
+          "denominator": 0,
+          "value": 0
+        }
+      },
+      {
+        "actual": {
+          "admissible": false,
+          "denominator": 142,
+          "denominator_empty": false,
+          "reason": "nonzero",
+          "value": 136,
+          "zero": false
+        },
+        "agrees": true,
+        "case": "count_admissibility::nonzero",
+        "expected": {
+          "admissible": false,
+          "reason": "nonzero"
+        },
+        "input": {
+          "denominator": 142,
+          "value": 136
+        }
+      },
+      {
+        "actual": {
+          "executed_rows": 137,
+          "really_executed": true,
+          "rows": 137,
+          "tier_histogram": {
+            "executed_end_to_end": 137
+          },
+          "unexecuted_rows": 0
+        },
+        "agrees": true,
+        "case": "family_execution_state::fully_executed",
+        "expected": {
+          "really_executed": true
+        },
+        "input": {
+          "executed_end_to_end": 137
+        }
+      },
+      {
+        "actual": {
+          "executed_rows": 100,
+          "really_executed": false,
+          "rows": 137,
+          "tier_histogram": {
+            "executed_end_to_end": 100,
+            "unrunnable_today": 37
+          },
+          "unexecuted_rows": 37
+        },
+        "agrees": true,
+        "case": "family_execution_state::partially_executed",
+        "expected": {
+          "really_executed": false
+        },
+        "input": {
+          "executed_end_to_end": 100,
+          "unrunnable_today": 37
+        }
+      },
+      {
+        "actual": {
+          "executed_rows": 0,
+          "really_executed": false,
+          "rows": 0,
+          "tier_histogram": {},
+          "unexecuted_rows": 0
+        },
+        "agrees": true,
+        "case": "family_execution_state::empty_family_is_not_a_pass",
+        "expected": {
+          "really_executed": false
+        },
+        "input": {}
+      },
+      {
+        "actual": {
+          "failure_reasons": [],
+          "missing_bindings": [],
+          "uniquely_landed": true
+        },
+        "agrees": true,
+        "case": "pending_delete_landing_verdict::clean",
+        "expected": {
+          "uniquely_landed": true
+        },
+        "input": {
+          "bindings": "all",
+          "count": 1,
+          "digest": true,
+          "rollback": true
+        }
+      },
+      {
+        "actual": {
+          "failure_reasons": [
+            "rollback_not_recoverable"
+          ],
+          "missing_bindings": [],
+          "uniquely_landed": false
+        },
+        "agrees": true,
+        "case": "pending_delete_landing_verdict::rollback_not_recoverable",
+        "expected": {
+          "uniquely_landed": false
+        },
+        "input": {
+          "bindings": "all",
+          "count": 1,
+          "digest": true,
+          "rollback": false
+        }
+      },
+      {
+        "actual": {
+          "failure_reasons": [
+            "digest_drift"
+          ],
+          "missing_bindings": [],
+          "uniquely_landed": false
+        },
+        "agrees": true,
+        "case": "pending_delete_landing_verdict::digest_drift",
+        "expected": {
+          "uniquely_landed": false
+        },
+        "input": {
+          "bindings": "all",
+          "count": 1,
+          "digest": false,
+          "rollback": true
+        }
+      },
+      {
+        "actual": {
+          "failure_reasons": [
+            "plan_item_count=2"
+          ],
+          "missing_bindings": [],
+          "uniquely_landed": false
+        },
+        "agrees": true,
+        "case": "pending_delete_landing_verdict::two_plan_items_for_one_subject",
+        "expected": {
+          "uniquely_landed": false
+        },
+        "input": {
+          "bindings": "all",
+          "count": 2,
+          "digest": true,
+          "rollback": true
+        }
+      },
+      {
+        "actual": {
+          "passes": true
+        },
+        "agrees": true,
+        "case": "multi_resolver_criterion_passes::cleared",
+        "expected": {
+          "passes": true
+        },
+        "input": {
+          "deferred": [],
+          "rows": []
+        }
+      },
+      {
+        "actual": {
+          "passes": false
+        },
+        "agrees": true,
+        "case": "multi_resolver_criterion_passes::zero_count_but_still_deferred",
+        "expected": {
+          "passes": false
+        },
+        "input": {
+          "deferred": [
+            "get_whole_excel_grid"
+          ],
+          "rows": []
+        }
+      },
+      {
+        "actual": {
+          "decision": "run"
+        },
+        "agrees": true,
+        "case": "stage_d_run_decision::green_runs",
+        "expected": {
+          "decision": "run"
+        },
+        "input": {
+          "stage_a": "green"
+        }
+      },
+      {
+        "actual": {
+          "decision": "not_run_because_stage_a_red"
+        },
+        "agrees": true,
+        "case": "stage_d_run_decision::red_is_not_skip",
+        "expected": {
+          "decision": "not_run_because_stage_a_red"
+        },
+        "input": {
+          "stage_a": "red"
+        }
+      }
+    ],
+    "why": "只有负例的判据可能恒假（永远说红），只有正例的可能恒真。每个谓词两侧都给，正负都能复现才算判据。"
+  },
+  "generated_at": "2026-09-02T09:06:10+0800",
+  "generated_by": "backend/scripts/check/check_task72_pre_delete_eligibility_gate.py",
+  "multi_resolver_live": {
+    "adjudication_owner_tasks": [
+      "71"
+    ],
+    "agrees_with_task71": true,
+    "blocking_tasks": [
+      "21,25,26,36"
+    ],
+    "consequence_if_not_zero": "`legacy_delete` gate 不放行 Task 72 的全局 legacy 删除（Task 71 正文逐字）。",
+    "criterion_passes": false,
+    "inventory_on_disk_is_stale": false,
+    "inventory_source_digest_live": "d6733eff67e264bc2efbf4339315cf50735d69e6663e551271ab1e9701afb4c4",
+    "inventory_source_digest_on_disk": "d6733eff67e264bc2efbf4339315cf50735d69e6663e551271ab1e9701afb4c4",
+    "inventory_stale_owner_task": "20",
+    "measured_from": "live 重算：`load_generator()` → `collect_source_facts()` → `build_inventory(overlay)` → `evaluate_gate()`；**不写盘**、不改 inventory",
+    "measured_rows_match_named": true,
+    "multi_resolver_count": 4,
+    "multi_resolver_is_zero": false,
+    "multi_resolver_rows_measured": [
+      "app.routers.wp_onlyoffice_router::get_sheet_onlyoffice_config",
+      "app.routers.wp_onlyoffice_router::get_sheet_wopi_contents",
+      "app.routers.wp_onlyoffice_router::get_whole_excel_grid",
+      "app.routers.wp_onlyoffice_router::post_sheet_onlyoffice_callback"
+    ],
+    "named_rows": [
+      "get_sheet_onlyoffice_config",
+      "get_sheet_wopi_contents",
+      "get_whole_excel_grid",
+      "post_sheet_onlyoffice_callback"
+    ],
+    "real_blocking_reason": "四条行的剩余阻塞是 Task 36 的逐 entry 供给：任一 entry 拿到 approved bundle 之前，把 router 改成只经 substrate 取数会让全部底稿的 OO 入口 fail closed。",
+    "real_blocking_task": "36",
+    "resolver_matrix": {
+      "get_sheet_onlyoffice_config": {
+        "adjudication_owner_task": "71",
+        "blocking_task": "21,25,26,36",
+        "intended_status": "deferred",
+        "present_in_matrix": true,
+        "status": "deferred"
+      },
+      "get_sheet_wopi_contents": {
+        "adjudication_owner_task": "71",
+        "blocking_task": "21,25,26,36",
+        "intended_status": "deferred",
+        "present_in_matrix": true,
+        "status": "deferred"
+      },
+      "get_whole_excel_grid": {
+        "adjudication_owner_task": "71",
+        "blocking_task": "21,25,26,36",
+        "intended_status": "deferred",
+        "present_in_matrix": true,
+        "status": "deferred"
+      },
+      "post_sheet_onlyoffice_callback": {
+        "adjudication_owner_task": "71",
+        "blocking_task": "21,25,26,36",
+        "intended_status": "deferred",
+        "present_in_matrix": true,
+        "status": "deferred"
+      }
+    },
+    "rows_still_deferred": [
+      "get_sheet_onlyoffice_config",
+      "get_sheet_wopi_contents",
+      "get_whole_excel_grid",
+      "post_sheet_onlyoffice_callback"
+    ],
+    "task71_self_reported_count": 4,
+    "writer_gate_criteria": {
+      "after_save_still_increments_revision": 0,
+      "artifact_snapshot_writer_not_verifiable": 0,
+      "bypasses_unified_commit": 261,
+      "keeps_legacy_write_path_beside_unified_commit": 0,
+      "missing_required_domain": 0,
+      "multi_resolver": 4,
+      "non_canonical_resolver_only": 63,
+      "owns_direct_commit": 105,
+      "representation_upgrade_increments_business_revision": 0,
+      "retired_writer_not_verifiable": 0,
+      "unadjudicated_resolver": 0,
+      "unadjudicated_writer": 0,
+      "writer_without_characterization_test": 208,
+      "writes_legacy_version_field": 5
+    },
+    "writer_gate_criteria_count": 14
+  },
+  "mutation_state_machine": {
+    "error_counts_as_hit": true,
+    "exit_code_is_not_evidence": "只看退出码会把 GREEN / ANCHOR-MISS / WRONG-TEST 三态全误判成 RED。",
+    "mutation_script": "backend/scripts/diagnose/mutate_task72_pre_delete_eligibility_guards.py",
+    "mutation_script_present": true,
+    "script_collects_errors_too": true,
+    "script_has_check_anchors": true,
+    "script_reads_and_writes_bytes": true,
+    "state_semantics": {
+      "ANCHOR-MISS": "脚本缺陷 —— 锚点未命中或命中 >1（含 CRLF 下的跨行锚点）",
+      "GREEN": "守卫缺陷 —— 改了行为却无判据变红；修守卫不删变异",
+      "RED": "打红且正是预期那条测试",
+      "WRONG-TEST": "打红了但不是预期项 —— 污染残留或锚点错行"
+    },
+    "state_vocabulary": [
+      "RED",
+      "GREEN",
+      "ANCHOR-MISS",
+      "WRONG-TEST"
+    ],
+    "why_bytes_not_text": "`read_text` 做换行翻译 ⇒ 写回时 `\\n` 变 `\\r\\n`，逐文件 md5 复原校验必失败（表现为 RestoreFailed 而文件其实没坏）。"
+  },
+  "owner_task": "72",
+  "pending_delete_landing": {
+    "all_subjects_uniquely_landed": false,
+    "digest_drift_paths": [
+      "audit-platform/frontend/src/components/workpaper/composables/useG7LonTerDualMode.ts"
+    ],
+    "failing_subjects": [
+      {
+        "failure_reasons": [
+          "digest_drift"
+        ],
+        "item_id": "legacy_composable:audit-platform/frontend/src/components/workpaper/composables/useG7LonTerDualMode.ts",
+        "path": "audit-platform/frontend/src/components/workpaper/composables/useG7LonTerDualMode.ts",
+        "rollback_mode": "git_blob_at_plan_commit",
+        "tracked_at_plan_commit": true
+      },
+      {
+        "failure_reasons": [
+          "rollback_not_recoverable"
+        ],
+        "item_id": "legacy_local_storage_key:workpaper-sync-mode:@duplicate_writer:audit-platform/frontend/src/components/workpaper/sync/usePilotBridgeAdapter.ts",
+        "path": "audit-platform/frontend/src/components/workpaper/sync/usePilotBridgeAdapter.ts",
+        "rollback_mode": "pre_delete_snapshot_required",
+        "tracked_at_plan_commit": false
+      },
+      {
+        "failure_reasons": [
+          "rollback_not_recoverable"
+        ],
+        "item_id": "legacy_state_machine:audit-platform/frontend/src/components/workpaper/sync/usePilotBridgeAdapter.ts",
+        "path": "audit-platform/frontend/src/components/workpaper/sync/usePilotBridgeAdapter.ts",
+        "rollback_mode": "pre_delete_snapshot_required",
+        "tracked_at_plan_commit": false
+      }
+    ],
+    "failure_reason_histogram": {
+      "digest_drift": 1,
+      "rollback_not_recoverable": 2
+    },
+    "paths_missing_from_disk": [
+      "audit-platform/frontend/src/components/workpaper/composables/useG7LonTerDualMode.ts"
+    ],
+    "paths_untracked_at_plan_commit": [
+      "audit-platform/frontend/src/components/workpaper/sync/usePilotBridgeAdapter.ts"
+    ],
+    "pending_delete_distinct_path_total": 125,
+    "pending_delete_subject_total": 207,
+    "plan_commit": "d330d7cea6bb112709edce5bf287877df0a5f60c",
+    "recompute_agrees_with_task66_isolation": true,
+    "replacement_surface_total": 22,
+    "replacement_surface_unreachable_count": 19,
+    "replacement_surface_unreachable_from_production_host": [
+      "audit-platform/frontend/src/components/workpaper/sync/WorkpaperSyncConflictDialog.vue",
+      "audit-platform/frontend/src/components/workpaper/sync/WorkpaperSyncContentRefreshBanner.vue",
+      "audit-platform/frontend/src/components/workpaper/sync/WorkpaperSyncDetailsDrawer.vue",
+      "audit-platform/frontend/src/components/workpaper/sync/WorkpaperSyncEditorHost.vue",
+      "audit-platform/frontend/src/components/workpaper/sync/WorkpaperSyncRecoveryPanel.vue",
+      "audit-platform/frontend/src/components/workpaper/sync/WorkpaperSyncStatusBar.vue",
+      "audit-platform/frontend/src/components/workpaper/sync/canonicalJson.ts",
+      "audit-platform/frontend/src/components/workpaper/sync/useWorkpaperSyncBridge.ts",
+      "audit-platform/frontend/src/components/workpaper/sync/workpaperSyncApi.ts",
+      "audit-platform/frontend/src/components/workpaper/sync/workpaperSyncBridgeMachine.ts",
+      "audit-platform/frontend/src/components/workpaper/sync/workpaperSyncContentRefresh.ts",
+      "audit-platform/frontend/src/components/workpaper/sync/workpaperSyncContract.generated.ts",
+      "audit-platform/frontend/src/components/workpaper/sync/workpaperSyncDto.ts",
+      "audit-platform/frontend/src/components/workpaper/sync/workpaperSyncEditorHostRuntime.ts",
+      "audit-platform/frontend/src/components/workpaper/sync/workpaperSyncLegacyBaseline.generated.ts",
+      "audit-platform/frontend/src/components/workpaper/sync/workpaperSyncManifest.generated.ts",
+      "audit-platform/frontend/src/components/workpaper/sync/workpaperSyncModeStorage.ts",
+      "audit-platform/frontend/src/components/workpaper/sync/workpaperSyncOperationTracker.ts",
+      "audit-platform/frontend/src/components/workpaper/sync/workpaperSyncPresentation.ts"
+    ],
+    "replacement_surface_untracked_live": [
+      "audit-platform/frontend/src/components/workpaper/sync/GtEntrySyncCapabilityNotice.vue",
+      "audit-platform/frontend/src/components/workpaper/sync/WorkpaperSyncConflictDialog.vue",
+      "audit-platform/frontend/src/components/workpaper/sync/WorkpaperSyncContentRefreshBanner.vue",
+      "audit-platform/frontend/src/components/workpaper/sync/WorkpaperSyncDetailsDrawer.vue",
+      "audit-platform/frontend/src/components/workpaper/sync/WorkpaperSyncEditorHost.vue",
+      "audit-platform/frontend/src/components/workpaper/sync/WorkpaperSyncRecoveryPanel.vue",
+      "audit-platform/frontend/src/components/workpaper/sync/WorkpaperSyncStatusBar.vue",
+      "audit-platform/frontend/src/components/workpaper/sync/canonicalJson.ts",
+      "audit-platform/frontend/src/components/workpaper/sync/useWorkpaperSyncBridge.ts",
+      "audit-platform/frontend/src/components/workpaper/sync/workpaperEntrySyncNotice.ts",
+      "audit-platform/frontend/src/components/workpaper/sync/workpaperSyncApi.ts",
+      "audit-platform/frontend/src/components/workpaper/sync/workpaperSyncBridgeMachine.ts",
+      "audit-platform/frontend/src/components/workpaper/sync/workpaperSyncContentRefresh.ts",
+      "audit-platform/frontend/src/components/workpaper/sync/workpaperSyncContract.generated.ts",
+      "audit-platform/frontend/src/components/workpaper/sync/workpaperSyncDto.ts",
+      "audit-platform/frontend/src/components/workpaper/sync/workpaperSyncEditorHostRuntime.ts",
+      "audit-platform/frontend/src/components/workpaper/sync/workpaperSyncLegacyBaseline.generated.ts",
+      "audit-platform/frontend/src/components/workpaper/sync/workpaperSyncManifest.generated.ts",
+      "audit-platform/frontend/src/components/workpaper/sync/workpaperSyncModeStorage.ts",
+      "audit-platform/frontend/src/components/workpaper/sync/workpaperSyncOperationTracker.ts",
+      "audit-platform/frontend/src/components/workpaper/sync/workpaperSyncPresentation.ts",
+      "backend/app/routers/wp_sync_router.py"
+    ],
+    "replacement_surface_untracked_live_count": 22,
+    "subject_granularity": "item_id",
+    "subjects_failing": 3,
+    "subjects_uniquely_landed": 204,
+    "task66_rollback_isolation_failing_checks": [
+      "every_pending_delete_has_a_recoverable_rollback_target",
+      "replacement_surface_is_itself_recoverable"
+    ],
+    "task66_rollback_isolation_verdict": "blocked",
+    "why_not_path": "80 条路径承载 >1 个 item（最多 4）—— 按 path 判唯一性会把它们全打成重复命中，那是判据错不是计划错。",
+    "why_replacement_surface_matters": "「删 legacy 保 replacement」是一笔事务：替代面自身未入库（实测 22/22 `??`）时，删完无法回到可用状态 ⇒ rollback plan 维度不成立。另有 19/22 不可从生产宿主到达（BP-66-1），删掉 legacy 后没有活的替代路径。"
+  },
+  "properties": {
+    "all_declared_have_landing": true,
+    "declared_count": 12,
+    "every_unverified_has_owner": true,
+    "extra_landings": [],
+    "gate_can_go_green": true,
+    "landing_count": 12,
+    "missing_landings": [],
+    "rows": {
+      "1": {
+        "how": "Task 67 逐 entry 现算 186 个挂载点入口，与它自述的分母比对",
+        "landing": "counts.denominators.manifest_entry_total",
+        "tier": "structural_side_only",
+        "title": "入口清册覆盖源码挂载点"
+      },
+      "2": {
+        "how": "capability 取值只出现在四值封闭词表里（Task 67 现读）",
+        "landing": "counts.recomputed_primary",
+        "tier": "structural_side_only",
+        "title": "能力态取值封闭"
+      },
+      "3": {
+        "how": "假双向实测 141 ≠ 0",
+        "landing": "stage_a.predicate_detail.fake_bidirectional_is_admissibly_zero",
+        "tier": "structural_side_only",
+        "title": "未注册 adapter 不得宣称双向"
+      },
+      "46": {
+        "how": "bridge 状态封闭由 Task 69 独立断言；本门不重复造",
+        "landing": "upstream_inputs.task69_frontend_regression",
+        "owner_task": "69",
+        "tier": "unverifiable",
+        "title": "bridge 状态转换封闭"
+      },
+      "47": {
+        "how": "19/22 替代面模块不可从生产宿主到达 ⇒ 「编辑器只消费 descriptor」在生产链上今天无处观测（BP-66-1，owner 67）",
+        "landing": "pending_delete_landing.replacement_surface_unreachable_from_production_host",
+        "owner_task": "67",
+        "tier": "unverifiable",
+        "title": "编辑器只消费 descriptor 并暴露 durable API"
+      },
+      "48": {
+        "how": "fail-open 文案禁令由 Task 69 独立断言；本门只引用其 verdict",
+        "landing": "upstream_inputs.task69_frontend_regression",
+        "owner_task": "69",
+        "tier": "unverifiable",
+        "title": "同步失败不被成功文案覆盖"
+      },
+      "51": {
+        "how": "五个零的口径、vacuous zero 的不可采纳性、以及「Stage A 不得要求 unreachable=0」三件事全部由纯谓词现算并有正负例",
+        "landing": "stage_a + stage_d.post_delete_five_zeros",
+        "tier": "verified_on_pure_predicates",
+        "title": "manifest/evidence 收口五个零"
+      },
+      "57": {
+        "how": "变异脚本存在、四态词表齐备、`--check-anchors` 只读体检口存在",
+        "landing": "mutation_state_machine",
+        "tier": "structural_side_only",
+        "title": "变异四态准确"
+      },
+      "69": {
+        "how": "3290 行 required scenario 中 0 行执行过",
+        "landing": "required_scenario_execution",
+        "owner_task": "70",
+        "tier": "unverifiable",
+        "title": "evidence 由逐 scenario 实体与服务端重算闭合"
+      },
+      "70": {
+        "how": "evidence 五表 0 行 ⇒ 「跨 entry 复用」在今天的分母上无处落脚",
+        "landing": "required_scenario_execution.per_named_scenario",
+        "owner_task": "70",
+        "tier": "unverifiable",
+        "title": "scenario/evidence 不得跨 entry 或跨场景复用"
+      },
+      "71": {
+        "how": "source commit 是 stale 轴的锁：本门把它排除在 VOLATILE_KEYS 之外，并现算 HEAD 与上游五份报告的 source commit 全等",
+        "landing": "stage_c.source_commit_unchanged_since_upstream_runs",
+        "tier": "verified_on_pure_predicates",
+        "title": "evidence 随环境、runner 与 immutable definition bundle 变化失效"
+      },
+      "72": {
+        "how": "容量真实负载三条前提一条都不成立（BP-71-2，owner 72 → 环境）",
+        "landing": "stage_d.final_gates.capacity",
+        "owner_task": "72",
+        "tier": "unverifiable",
+        "title": "量化容量模型可重复"
+      }
+    },
+    "tier_histogram": {
+      "structural_side_only": 4,
+      "unverifiable": 6,
+      "verified_on_pure_predicates": 2
+    },
+    "tier_vocabulary": [
+      "verified_on_pure_predicates",
+      "structural_side_only",
+      "unverifiable"
+    ],
+    "unverified_without_owner": [],
+    "verified_here_count": 6
+  },
+  "radiation_surface": {
+    "digest": "f0c573c6b2bd8943e07c93370a60d20f0a4a8487428e93f5f1891b17d2193771",
+    "how": "扫 `backend/tests` 全树里对本门三个产物名的实际引用（不是猜辐射面）",
+    "own_guard_included": true,
+    "referencing_test_file_count": 1,
+    "referencing_test_files": {
+      "backend/tests/workpaper_sync_predelete/test_task72_pre_delete_eligibility.py": [
+        "check_task72_pre_delete_eligibility_gate",
+        "workpaper_sync_task72_pre_delete_eligibility",
+        "mutate_task72_pre_delete_eligibility_guards"
+      ]
+    },
+    "subjects": [
+      "check_task72_pre_delete_eligibility_gate",
+      "workpaper_sync_task72_pre_delete_eligibility",
+      "mutate_task72_pre_delete_eligibility_guards"
+    ],
+    "why_not_full_suite": "`backend/tests` 根下 1500+ 测试文件，前台跑数分钟无输出会被当卡死；按引用关系反查是本 spec 的既定做法。"
+  },
+  "report_digest": "e69ef8e90079a26a9a2d9a19a5e5d6acd3d9b43b618cc28cf747fd05bf018e4f",
+  "required_scenario_execution": {
+    "agrees_with_task70_self_report": true,
+    "all_named_really_executed": false,
+    "entry_rows_scanned": 142,
+    "executed_rows_recomputed": 0,
+    "executed_tier_vocabulary": [
+      "executed_end_to_end"
+    ],
+    "measured_from": "Task 70 报告 `scenario_execution.entries[].scenarios[].execution_tier` 逐行现算",
+    "named_required_scenario_count": 6,
+    "named_required_scenarios": [
+      "same_application_higher_sequence_fold",
+      "cross_participant_idempotency_409",
+      "quarantined_rejects_application_and_engine",
+      "opaque_version_rollback_no_numeric_collision",
+      "close_leader_revoked_successor_exactly_one",
+      "close_leader_revoked_no_successor_recovery_required"
+    ],
+    "named_scenarios_missing_from_task70": [],
+    "named_scenarios_not_executed": [
+      "close_leader_revoked_no_successor_recovery_required",
+      "close_leader_revoked_successor_exactly_one",
+      "cross_participant_idempotency_409",
+      "opaque_version_rollback_no_numeric_collision",
+      "quarantined_rejects_application_and_engine",
+      "same_application_higher_sequence_fold"
+    ],
+    "named_scenarios_really_executed": [],
+    "other_scenario_id_count": 20,
+    "other_scenario_ids_in_task70": [
+      "authorization_first_recovery_claim",
+      "b_close_after_a_forcesave_terminal",
+      "b_close_before_a_forcesave_terminal",
+      "browser_crash_no_userdata_recovery_case",
+      "close_reconciler_reentrant_exactly_one_capture",
+      "different_field_merge",
+      "download_only_zero_three_entities",
+      "frozen_base_status_6_2_dedupe",
+      "html_to_oo",
+      "identity_retention",
+      "oo_to_html",
+      "refresh_required_reopen",
+      "rollback",
+      "same_field_conflict_resolve",
+      "single_participant_close",
+      "two_user_close_order_a_then_b",
+      "two_user_close_order_b_then_a",
+      "word_free_body_isolation",
+      "word_sdt_tag_row_uuid_retention",
+      "wrong_prior_confirmation_bundle_fence_contributor_rejected"
+    ],
+    "per_named_scenario": {
+      "close_leader_revoked_no_successor_recovery_required": {
+        "executed_rows": 0,
+        "really_executed": false,
+        "rows": 137,
+        "tier_histogram": {
+          "unrunnable_today": 137
+        },
+        "unexecuted_rows": 137
+      },
+      "close_leader_revoked_successor_exactly_one": {
+        "executed_rows": 0,
+        "really_executed": false,
+        "rows": 137,
+        "tier_histogram": {
+          "unrunnable_today": 137
+        },
+        "unexecuted_rows": 137
+      },
+      "cross_participant_idempotency_409": {
+        "executed_rows": 0,
+        "really_executed": false,
+        "rows": 137,
+        "tier_histogram": {
+          "unrunnable_today": 137
+        },
+        "unexecuted_rows": 137
+      },
+      "opaque_version_rollback_no_numeric_collision": {
+        "executed_rows": 0,
+        "really_executed": false,
+        "rows": 137,
+        "tier_histogram": {
+          "unrunnable_today": 137
+        },
+        "unexecuted_rows": 137
+      },
+      "quarantined_rejects_application_and_engine": {
+        "executed_rows": 0,
+        "really_executed": false,
+        "rows": 137,
+        "tier_histogram": {
+          "unrunnable_today": 137
+        },
+        "unexecuted_rows": 137
+      },
+      "same_application_higher_sequence_fold": {
+        "executed_rows": 0,
+        "really_executed": false,
+        "rows": 137,
+        "tier_histogram": {
+          "upstream_implementation_gap": 137
+        },
+        "unexecuted_rows": 137
+      }
+    },
+    "required_scenario_rows_recomputed": 3290,
+    "task70_self_reported_executed_end_to_end": 0,
+    "task70_self_reported_required_scenario_rows": 3290,
+    "tier_histogram_recomputed": {
+      "unrunnable_today": 3016,
+      "upstream_implementation_gap": 274
+    },
+    "why_named_scenarios_gate_stage_a": "Task 72 正文逐字：「same-app fold、跨 participant 幂等冲突、quarantined 拒绝、opaque version UUID、leader successor/no-successor 任一 required scenario 未真实执行即保持 UNVERIFIABLE 并使 Stage A 为红」。",
+    "zero_scenarios_is_not_all_passed": "家族行数为 0 时判未执行 —— 「零场景全部通过」不是通过（与 Task 70 的 forbidden claim 同款）。"
+  },
+  "requirement_clauses": {
+    "ac_12_13_forbids_requiring_unreachable_zero_upfront": true,
+    "ac_12_13_names_four_zeros": true,
+    "ac_12_13_requires_unique_plan_landing": true,
+    "ac_14_7_requires_four_state_mutation": true,
+    "ac_1_7_forbids_deprecated_tombstone": true,
+    "ac_text": {
+      "1.7": "不可达旧桩 SHALL 删除；不得以豁免或 `DEPRECATED` 注释长期保留。",
+      "12.13": "全局 legacy 删除 SHALL 使用两阶段门：删除前可先执行 structural pre-reconcile，报告未裁决、假双向、bidirectional 未验收、unreachable 与 evidence stale，但该报告不得把 stale=0 当成结构检查前置条件或 deletion eligibility。所有保留入口完成全 entry required scenario rerun、服务端 evidence recomputation 后，真正 pre-delete eligibility 才 SHALL 要求未裁决、假双向、bidirectional 未验收与 evidence stale 为 0，且每个仍存在的 `unreachable` 唯一命中 source-backed deletion plan；不得把“待本次删除的 unreachable 已为 0”作为启动前提。删除后 SHALL 重新生成 manifest/registry，并因 source commit 变化将受影响 evidence 标 stale，完整重跑其 required scenario set 与服务端 recomputation。只有最终未裁决、假双向、bidirectional 未验收、unreachable、evidence stale 五类计数全为 0，才允许归档 spec。",
+      "14.16": "真实 OO probe、pilot 和 bulk evidence SHALL 记录 OnlyOffice 精确 build、浏览器版本、authority model definition digest、immutable definition bundle id/digest 及其 template/instrumentation/contract typed child identities、runner/source commit 与运行时间；环境、source commit、runner、bundle 或任一非-null definition child 变化后 SHALL 按 stale policy 失效。structural pre-reconcile MAY 报告 stale 而不把 fresh=0 当作结构检查前提；真正 pre-delete eligibility 只能在全 entry required scenario rerun 与服务端 recomputation 后判定。删除 legacy/不可达桩造成 source commit 变化后，相关 entry 必须生成新的 test run，完整重跑 required scenario set并通过服务端 recomputation；post-delete smoke 不得替代。",
+      "14.7": "守卫 SHALL 以行为、结构、真实执行或 DOM 为判据并做变异；必须区分 RED/GREEN/ANCHOR-MISS/WRONG-TEST，后三者任一非零不得通过。"
+    }
+  },
+  "schema_version": "task72-pre-delete-eligibility:v1",
+  "source_commit": "d330d7cea6bb112709edce5bf287877df0a5f60c",
+  "spec": "workpaper-html-onlyoffice-bidirectional-writeback-closure",
+  "stage_a": {
+    "failing_predicate_count": 7,
+    "failing_predicates": [
+      "bidirectional_unaccepted_is_admissibly_zero",
+      "every_pending_delete_uniquely_lands_in_plan",
+      "evidence_stale_is_admissibly_zero",
+      "fake_bidirectional_is_admissibly_zero",
+      "multi_resolver_criterion_passes",
+      "named_required_scenarios_really_executed",
+      "unadjudicated_is_admissibly_zero"
+    ],
+    "forbidden_claims": [
+      "不得宣称任何真实 OO probe 已通过",
+      "不得把 vacuous zero（空分母）当成已清零",
+      "不得用文档/离线测试/smoke 代替真实 OO 场景",
+      "不得要求待删 unreachable 在删除前已为 0"
+    ],
+    "means": "Stage A 为红 ⇒ Stage B 一个字节都不许删；Stage C 无前置条件；Stage D 的最终门不运行。本门把每条红的实测数字、计算来源与 owner 逐条固化，供 orchestrator 登记阻塞。",
+    "owner_tasks_of_failing": [
+      "36",
+      "67",
+      "70",
+      "72"
+    ],
+    "passing_predicates": [
+      "deletion_plan_is_current_with_head"
+    ],
+    "predicate_detail": {
+      "bidirectional_unaccepted_is_admissibly_zero": {
+        "measured": {
+          "admissible": false,
+          "denominator": 142,
+          "denominator_empty": false,
+          "reason": "nonzero",
+          "value": 142,
+          "zero": false
+        },
+        "owner_task": "70",
+        "statement": "bidirectional 未验收实测 142 个 entry —— evidence 五表 0 行，没有任何 entry 通过验收"
+      },
+      "deletion_plan_is_current_with_head": {
+        "measured": {
+          "equal": true,
+          "head_commit": "d330d7cea6bb112709edce5bf287877df0a5f60c",
+          "plan_commit": "d330d7cea6bb112709edce5bf287877df0a5f60c"
+        },
+        "owner_task": "66",
+        "statement": "deletion plan 的 plan_commit 与当前 HEAD 相等 ⇒ 计划里的 digest/rollback 基线仍对得上磁盘"
+      },
+      "every_pending_delete_uniquely_lands_in_plan": {
+        "measured": {
+          "failure_reason_histogram": {
+            "digest_drift": 1,
+            "rollback_not_recoverable": 2
+          },
+          "replacement_surface_untracked_live_count": 22,
+          "subjects_failing": 3,
+          "subjects_total": 207,
+          "subjects_uniquely_landed": 204,
+          "task66_rollback_isolation_verdict": "blocked"
+        },
+        "owner_task": "72",
+        "statement": "3 / 207 个待删 subject 未唯一命中（rollback 不可回滚）；另有 22 / 22 个替代面模块 git 未跟踪 ⇒ Task 66 的 rollback 隔离门 verdict = blocked"
+      },
+      "evidence_stale_is_admissibly_zero": {
+        "measured": {
+          "admissible": false,
+          "denominator": 0,
+          "denominator_empty": true,
+          "reason": "vacuous_zero_empty_denominator",
+          "value": 0,
+          "zero": true
+        },
+        "owner_task": "70",
+        "statement": "evidence stale 计数为 0，但**分母为空**（`evidence_stale_is_measurable` 逐 entry 现算 = 0，`working_paper_sync_test_run` = 0 行） ⇒ vacuous zero，不可采纳",
+        "why_not_green": "「零 + 空分母」是空集恒真（假绿第⑥源）：没有 evidence 可以过期不等于 evidence 已刷新。honest 读法是 142 个 entry 全在未验收里。"
+      },
+      "fake_bidirectional_is_admissibly_zero": {
+        "measured": {
+          "admissible": false,
+          "denominator": 142,
+          "denominator_empty": false,
+          "reason": "nonzero",
+          "value": 141,
+          "zero": false
+        },
+        "owner_task": "36",
+        "statement": "假双向实测 141 个 entry —— capability 全是 single_onlyoffice / 0 个 bidirectional，adapter 注册数 0"
+      },
+      "multi_resolver_criterion_passes": {
+        "measured": {
+          "agrees_with_task71": true,
+          "multi_resolver_count": 4,
+          "multi_resolver_rows_measured": [
+            "app.routers.wp_onlyoffice_router::get_sheet_onlyoffice_config",
+            "app.routers.wp_onlyoffice_router::get_sheet_wopi_contents",
+            "app.routers.wp_onlyoffice_router::get_whole_excel_grid",
+            "app.routers.wp_onlyoffice_router::post_sheet_onlyoffice_callback"
+          ],
+          "rows_still_deferred": [
+            "get_sheet_onlyoffice_config",
+            "get_sheet_wopi_contents",
+            "get_whole_excel_grid",
+            "post_sheet_onlyoffice_callback"
+          ]
+        },
+        "owner_task": "36",
+        "statement": "live 重算 `multi_resolver` = 4（≠0）且 4 条行仍 `deferred` ⇒ `legacy_delete` gate 不放行"
+      },
+      "named_required_scenarios_really_executed": {
+        "measured": {
+          "agrees_with_task70_self_report": true,
+          "executed_rows_recomputed": 0,
+          "named_scenarios_not_executed": [
+            "close_leader_revoked_no_successor_recovery_required",
+            "close_leader_revoked_successor_exactly_one",
+            "cross_participant_idempotency_409",
+            "opaque_version_rollback_no_numeric_collision",
+            "quarantined_rejects_application_and_engine",
+            "same_application_higher_sequence_fold"
+          ],
+          "required_scenario_rows_recomputed": 3290,
+          "tier_histogram_recomputed": {
+            "unrunnable_today": 3016,
+            "upstream_implementation_gap": 274
+          }
+        },
+        "owner_task": "70",
+        "statement": "逐行现算 0 / 3290 行落在已执行档；正文点名的 6 / 6 个 scenario 一条都没真跑"
+      },
+      "unadjudicated_is_admissibly_zero": {
+        "measured": {
+          "admissible": false,
+          "denominator": 142,
+          "denominator_empty": false,
+          "reason": "nonzero",
+          "value": 136,
+          "zero": false
+        },
+        "owner_task": "67",
+        "statement": "未裁决实测 136 / 142 个独立 entry"
+      }
+    },
+    "predicate_ids": [
+      "unadjudicated_is_admissibly_zero",
+      "fake_bidirectional_is_admissibly_zero",
+      "bidirectional_unaccepted_is_admissibly_zero",
+      "evidence_stale_is_admissibly_zero",
+      "every_pending_delete_uniquely_lands_in_plan",
+      "named_required_scenarios_really_executed",
+      "multi_resolver_criterion_passes",
+      "deletion_plan_is_current_with_head"
+    ],
+    "predicates": {
+      "bidirectional_unaccepted_is_admissibly_zero": false,
+      "deletion_plan_is_current_with_head": true,
+      "every_pending_delete_uniquely_lands_in_plan": false,
+      "evidence_stale_is_admissibly_zero": false,
+      "fake_bidirectional_is_admissibly_zero": false,
+      "multi_resolver_criterion_passes": false,
+      "named_required_scenarios_really_executed": false,
+      "unadjudicated_is_admissibly_zero": false
+    },
+    "state": "red",
+    "state_vocabulary": [
+      "red",
+      "green"
+    ],
+    "vocabulary_check": {
+      "excludes_unreachable_zero": true,
+      "offending_predicate_ids": [],
+      "predicate_ids": [
+        "unadjudicated_is_admissibly_zero",
+        "fake_bidirectional_is_admissibly_zero",
+        "bidirectional_unaccepted_is_admissibly_zero",
+        "evidence_stale_is_admissibly_zero",
+        "every_pending_delete_uniquely_lands_in_plan",
+        "named_required_scenarios_really_executed",
+        "multi_resolver_criterion_passes",
+        "deletion_plan_is_current_with_head"
+      ],
+      "why": "AC 12.13 逐字「不得把『待本次删除的 unreachable 已为 0』作为」Stage A 前置条件；提前要求会让删除门永久不可达（要删的东西必须先不存在）。"
+    }
+  },
+  "stage_b": {
+    "blocked_by": [
+      "stage_a_red"
+    ],
+    "bytes_deleted": 0,
+    "executed": false,
+    "files_deleted": 0,
+    "no_deprecated_tombstone_left": {
+      "ac": "1.7",
+      "measurable_today": false,
+      "statement": "本门没有执行删除，因此不存在「删了但留 DEPRECATED 墓碑」的形态；该判据的真正落点在 Stage B 真执行那一轮。"
+    },
+    "non_execution_proof": {
+      "digest_drift_paths": [
+        "audit-platform/frontend/src/components/workpaper/composables/useG7LonTerDualMode.ts"
+      ],
+      "disk_matches_plan_digest_everywhere": true,
+      "out_of_band_removed_paths": [
+        "audit-platform/frontend/src/components/workpaper/composables/useG7LonTerDualMode.ts"
+      ],
+      "paths_missing_from_disk": [
+        "audit-platform/frontend/src/components/workpaper/composables/useG7LonTerDualMode.ts"
+      ],
+      "pending_delete_paths_checked": 125,
+      "unexplained_digest_drift_paths": [],
+      "unexplained_paths_missing_from_disk": [],
+      "why_this_is_the_proof": "计划登记的 sha256 是 plan commit 时的内容指纹。除已具名登记的 out-of-band 移除外，逐条现算全等 ⇒ 没有任何待删对象被改或被删；未登记的缺失文件数为 0 ⇒ 没有整文件删除。登记本身要过三条现场核验，见 `out_of_band_removals`。"
+    },
+    "out_of_band_removals": {
+      "all_valid": true,
+      "invalid_records": [],
+      "records": [
+        {
+          "counts_as_stage_b_execution": "false",
+          "directive": "用户点名清理（2026-09-02，Task 74 会话内的 out-of-band 请求）",
+          "expected_category": "legacy_composable",
+          "expected_disposition": "pending_delete",
+          "path": "audit-platform/frontend/src/components/workpaper/composables/useG7LonTerDualMode.ts",
+          "plan_category": [
+            "legacy_composable"
+          ],
+          "plan_disposition": [
+            "pending_delete"
+          ],
+          "plan_item_ids": [
+            "legacy_composable:audit-platform/frontend/src/components/workpaper/composables/useG7LonTerDualMode.ts"
+          ],
+          "problems": [],
+          "valid": true,
+          "why": "整个文件只有一条 `@deprecated` 别名 re-export，且它 re-export 的 `./useG7DualMode` 已由 Task 45 删除 ⇒ 指向已删模块的死墓碑（实测 `tsc --noEmit` 报 TS2307 `Cannot find module './useG7DualMode'`），全仓库对 `useG7LonTerDualMode` 零 importer（只有它自己与 Task 66 计划 JSON 提到这个名字）。AC 1.7 逐字禁止以 `DEPRECATED` 注释长期保留不可达旧桩。"
+        }
+      ],
+      "registered_paths": [
+        "audit-platform/frontend/src/components/workpaper/composables/useG7LonTerDualMode.ts"
+      ],
+      "valid_paths": [
+        "audit-platform/frontend/src/components/workpaper/composables/useG7LonTerDualMode.ts"
+      ],
+      "why_this_is_not_an_exemption": "登记只解释「这一条计划内路径为什么已经不在盘上」，不解释「磁盘可以随便动」：三条现场核验（在计划待删集合里 / 磁盘上确实已不在 / 计划登记的 disposition·category 与声明一致）任一不成立即进 structural_errors。塞一条还在盘上的路径进来会被 `registered_but_still_on_disk` 打红。"
+    },
+    "self_ast_boundary": {
+      "delete_primitive_vocabulary": [
+        "removedirs",
+        "rmdir",
+        "rmtree",
+        "unlink"
+      ],
+      "delete_primitives_found": [],
+      "judged_by": "AST + 接收者限定 —— 只看方法名会被 `str.replace` 撞成假红（本门首版实测），只看子串会被说明文字撞成假红（Task 62 实测）",
+      "no_delete_primitive": true,
+      "qualified_delete_primitive_vocabulary": [
+        "os.remove",
+        "os.rename",
+        "os.replace",
+        "os.unlink",
+        "shutil.move",
+        "shutil.rmtree"
+      ],
+      "scanned": "backend/scripts/check/check_task72_pre_delete_eligibility_gate.py",
+      "write_call_targets": [
+        "OUTPUT_PATH"
+      ],
+      "write_calls_only_output_path": true
+    },
+    "state": "blocked",
+    "state_vocabulary": [
+      "blocked",
+      "eligible",
+      "executed",
+      "rolled_back"
+    ],
+    "what_stage_b_needs": [
+      "Stage A 八条谓词全绿（当前 red）",
+      "Task 66 rollback 隔离门 verdict 从 blocked 变 open（替代面入库 + 可回滚）",
+      "替代面 22 个模块入库且至少被生产宿主真消费（BP-66-1，owner 67）"
+    ]
+  },
+  "stage_c": {
+    "executed": false,
+    "forbidden_substitutes": [
+      "离线测试",
+      "smoke",
+      "文档声明",
+      "合成 measurement"
+    ],
+    "missing_preconditions": [
+      "business_data_in_evidence_tables",
+      "frontend_3030_listening",
+      "onlyoffice_live_editing_session"
+    ],
+    "new_test_runs_created": 0,
+    "not_a_silent_skip": true,
+    "reason": "stage_b_not_executed",
+    "required_scenario_rows_that_would_need_rerun": 3290,
+    "scenarios_rerun": 0,
+    "smoke_cannot_restore_verified": "正文逐字「smoke 只能附加，不能恢复 verified」。本门的 verdict 词表里没有 `passed`/`verified` 态，smoke 无处把结论顶回去。",
+    "source_commit_head": "d330d7cea6bb112709edce5bf287877df0a5f60c",
+    "source_commit_unchanged_since_upstream_runs": true,
+    "state": "unverifiable",
+    "state_vocabulary": [
+      "unverifiable",
+      "refreshed",
+      "failed"
+    ],
+    "upstream_report_source_commits": {
+      "backend/data/workpaper_sync_task67_structural_pre_reconcile.json": "d330d7cea6bb112709edce5bf287877df0a5f60c",
+      "backend/data/workpaper_sync_task68_backend_chain_regression.json": "d330d7cea6bb112709edce5bf287877df0a5f60c",
+      "backend/data/workpaper_sync_task69_frontend_regression.json": "d330d7cea6bb112709edce5bf287877df0a5f60c",
+      "backend/data/workpaper_sync_task70_oo_scenario_refresh.json": "d330d7cea6bb112709edce5bf287877df0a5f60c",
+      "backend/data/workpaper_sync_task71_mutation_capacity_recovery.json": "d330d7cea6bb112709edce5bf287877df0a5f60c"
+    },
+    "what_stage_c_needs": [
+      "Stage B 真执行过并因此改变 source commit（当前未执行）",
+      "3030 前端在听（当前未监听）",
+      "真实 OnlyOffice 活动编辑会话（forcesave 对不存在 doc key 回 error 1）",
+      "生产库有业务数据（evidence 五表实测全 0 行）"
+    ],
+    "why_unchanged_matters": "Stage C 的触发条件逐字是「source commit 变化后」。HEAD 与上游五份报告的 source commit全等 ⇒ 既没删也没改，没有任何 entry 需要新 test run。这不是跳过，是触发条件不成立。"
+  },
+  "stage_d": {
+    "archive": {
+      "archived": false,
+      "index_updated": false,
+      "reason": "not_run_because_stage_a_red",
+      "what_archive_needs": [
+        "Stage A 八条谓词全绿",
+        "Stage B 按计划精确删除并逐项核对 rollback",
+        "Stage C 为全部受影响 entry 建新 test run 并跑完 required scenarios",
+        "Stage D 五个零全部**可采纳**为零（非空分母）",
+        "机器核对全部 AC/Properties/DAG/gate/禁止文件边界（AC 14.15）"
+      ]
+    },
+    "final_gates": {
+      "alerts": {
+        "measurable_today": false,
+        "not_a_silent_skip": true,
+        "reason": "not_run_because_stage_a_red",
+        "run": false,
+        "stage_a_precondition_met": false,
+        "why_not_run": "正文逐字「仅在 post-delete 五类计数全为 0 后运行最终 CI/容量/retention/redaction/alerts/tracked-files 门」；Stage A 红 ⇒ 前置条件不成立。"
+      },
+      "capacity": {
+        "measurable_today": false,
+        "not_a_silent_skip": true,
+        "reason": "not_run_because_stage_a_red",
+        "run": false,
+        "stage_a_precondition_met": false,
+        "why_not_run": "正文逐字「仅在 post-delete 五类计数全为 0 后运行最终 CI/容量/retention/redaction/alerts/tracked-files 门」；Stage A 红 ⇒ 前置条件不成立。"
+      },
+      "ci": {
+        "measurable_today": false,
+        "not_a_silent_skip": true,
+        "reason": "not_run_because_stage_a_red",
+        "run": false,
+        "stage_a_precondition_met": false,
+        "why_not_run": "正文逐字「仅在 post-delete 五类计数全为 0 后运行最终 CI/容量/retention/redaction/alerts/tracked-files 门」；Stage A 红 ⇒ 前置条件不成立。"
+      },
+      "redaction": {
+        "measurable_today": false,
+        "not_a_silent_skip": true,
+        "reason": "not_run_because_stage_a_red",
+        "run": false,
+        "stage_a_precondition_met": false,
+        "why_not_run": "正文逐字「仅在 post-delete 五类计数全为 0 后运行最终 CI/容量/retention/redaction/alerts/tracked-files 门」；Stage A 红 ⇒ 前置条件不成立。"
+      },
+      "retention": {
+        "measurable_today": false,
+        "not_a_silent_skip": true,
+        "reason": "not_run_because_stage_a_red",
+        "run": false,
+        "stage_a_precondition_met": false,
+        "why_not_run": "正文逐字「仅在 post-delete 五类计数全为 0 后运行最终 CI/容量/retention/redaction/alerts/tracked-files 门」；Stage A 红 ⇒ 前置条件不成立。"
+      },
+      "tracked_files": {
+        "measurable_today": true,
+        "not_a_silent_skip": true,
+        "reason": "not_run_because_stage_a_red",
+        "run": false,
+        "stage_a_precondition_met": false,
+        "why_not_run": "正文逐字「仅在 post-delete 五类计数全为 0 后运行最终 CI/容量/retention/redaction/alerts/tracked-files 门」；Stage A 红 ⇒ 前置条件不成立。"
+      }
+    },
+    "final_gates_run_count": 0,
+    "final_gates_silently_skipped_count": 0,
+    "landing_reference": {
+      "pending_delete_subject_total": 207,
+      "task66_rollback_isolation_verdict": "blocked"
+    },
+    "post_delete_five_zeros": {
+      "bidirectional_unaccepted": {
+        "admissible": false,
+        "denominator": 142,
+        "denominator_empty": false,
+        "reason": "nonzero",
+        "value": 142,
+        "zero": false
+      },
+      "evidence_stale": {
+        "admissible": false,
+        "denominator": 0,
+        "denominator_empty": true,
+        "reason": "vacuous_zero_empty_denominator",
+        "value": 0,
+        "zero": true
+      },
+      "fake_bidirectional": {
+        "admissible": false,
+        "denominator": 142,
+        "denominator_empty": false,
+        "reason": "nonzero",
+        "value": 141,
+        "zero": false
+      },
+      "unadjudicated": {
+        "admissible": false,
+        "denominator": 142,
+        "denominator_empty": false,
+        "reason": "nonzero",
+        "value": 136,
+        "zero": false
+      },
+      "unreachable": {
+        "admissible": false,
+        "denominator": 186,
+        "denominator_empty": false,
+        "reason": "nonzero",
+        "value": 1,
+        "zero": false
+      }
+    },
+    "post_delete_five_zeros_all_admissible": false,
+    "post_delete_is_pre_delete_today": "Stage B 未执行 ⇒ post-delete 计数 == pre-delete 计数。此处如实标明二者今天同源，不假装做过一轮 post-delete 度量。",
+    "run_decision_has_no_skip_state": true,
+    "state": "not_run_because_stage_a_red",
+    "state_vocabulary": [
+      "run",
+      "not_run_because_stage_a_red"
+    ],
+    "unreachable_note": "unreachable 在 Stage D 才要求为 0（全口径实测 1）；Stage A 不得提前要求它。"
+  },
+  "sub_bullets": {
+    "1": "Stage A —— 真正 pre-delete eligibility（本门唯一执行的阶段）",
+    "2": "Stage B —— 精确删除（Stage A 红 ⇒ 禁止执行，本门反证磁盘未动）",
+    "3": "Stage C —— source commit 变化后完整重跑（无前置条件 ⇒ UNVERIFIABLE）",
+    "4": "Stage D —— 最终五个零与归档（Stage A 红 ⇒ 未运行，非静默 skip）"
+  },
+  "task": "72. 执行真正 pre-delete eligibility、删除全局 legacy、post-delete 全场景重验与归档",
+  "task_declarations": {
+    "body_digest": "ead50caff0482775af8062b0a06f358118c8bf9e63f197531774879ea6277487",
+    "body_digest_checkbox_normalized": true,
+    "declared_properties": [
+      1,
+      2,
+      3,
+      46,
+      47,
+      48,
+      51,
+      57,
+      69,
+      70,
+      71,
+      72
+    ],
+    "properties_in_task_text": [
+      1,
+      2,
+      3,
+      46,
+      47,
+      48,
+      51,
+      57,
+      69,
+      70,
+      71,
+      72
+    ],
+    "properties_match": true,
+    "requirement_count": 23,
+    "requirements_in_task_text": [
+      "1.1",
+      "1.3",
+      "1.4",
+      "1.5",
+      "1.7",
+      "11.1",
+      "11.2",
+      "11.5",
+      "11.8",
+      "11.10",
+      "12.7",
+      "12.8",
+      "12.9",
+      "12.10",
+      "12.12",
+      "12.13",
+      "12.14",
+      "14.7",
+      "14.10",
+      "14.13",
+      "14.14",
+      "14.15",
+      "14.16"
+    ],
+    "sub_bullet_count_declared": 4,
+    "sub_bullet_count_in_task_text": 5,
+    "sub_bullet_count_match": false,
+    "why_normalized": "BP-70-6：不归一化时编排器把 `[-]` 翻成 `[x]` 会让逐字节锁必红而正文零变化。"
+  },
+  "upstream_artifacts_untouched": {
+    "digests": {
+      "backend/data/workpaper_sync_task66_legacy_deletion_plan.json": "b22a2232e387e28afdfff087084020fdd56d945eeb5e0785d65b1328cfe9fe47",
+      "backend/data/workpaper_sync_task67_structural_pre_reconcile.json": "1ce645666747d4bb8bd979346fa9fdbd45f410c99c6f62c6176ef14f94c45371",
+      "backend/data/workpaper_sync_task68_backend_chain_regression.json": "9d0ad3667ba0103736e4267726cecc3ae6ff0d5cc84cb52f48ac74b73aca212f",
+      "backend/data/workpaper_sync_task69_frontend_regression.json": "1c7b84936fe008b849db46be2b401359464da295badc644d1543036aee1adcf2",
+      "backend/data/workpaper_sync_task70_oo_scenario_refresh.json": "20f24e9bfd36ef4cd42906ad697a9de92819c285d2e834fd12c6ff6f085ffb63",
+      "backend/data/workpaper_sync_task71_mutation_capacity_recovery.json": "789a7c32f2b60b6b835f3189f4fb1b2d7f7e4e30be0b4e4bcb3a1cce9c98162c"
+    },
+    "statement": "上游六份报告只读消费，本门零改动。",
+    "why": "重生成上游产物会改 source commit ⇒ Task 70 的 evidence 全部 stale 并打红上游四把锁（BP-71-5 已踩过）。发现上游缺陷只登记 BP，不改文件。"
+  },
+  "upstream_inputs": {
+    "task66_legacy_deletion_plan": {
+      "blocking_precondition_ids": [
+        "BP-66-1",
+        "BP-66-2",
+        "BP-66-3"
+      ],
+      "how_this_gate_uses_it": "Stage A 的「唯一命中 path/digest/owner/rollback plan」逐 subject 现算它的 items；Stage B 的「磁盘未动」反证也拿它的登记 digest 做基线。",
+      "item_total": 215,
+      "path": "backend/data/workpaper_sync_task66_legacy_deletion_plan.json",
+      "plan_commit": "d330d7cea6bb112709edce5bf287877df0a5f60c",
+      "rollback_isolation_verdict": "blocked"
+    },
+    "task67_structural_pre_reconcile": {
+      "entry_count": 186,
+      "how_this_gate_uses_it": "五类计数的分子分母全部从它的 `entries[].verdicts` **逐行现算**，不读它的`counters` 自述 —— 自述与逐行现算是两个来源，只有两侧一致才算复核过。",
+      "path": "backend/data/workpaper_sync_task67_structural_pre_reconcile.json",
+      "report_digest": "ecde1f1d6947189af147693d2767ee06e6446e4a98ba9c7364be782d2588dc9f",
+      "source_commit": "d330d7cea6bb112709edce5bf287877df0a5f60c",
+      "verdict": "structural_errors_reported"
+    },
+    "task68_backend_chain_regression": {
+      "blocking_point_ids": [
+        "BP-68-1",
+        "BP-68-2",
+        "BP-68-3",
+        "BP-68-4"
+      ],
+      "how_this_gate_uses_it": "Stage A 正文要求「先消费 Tasks 68/69 独立回归」：本门核对它的 verdict 与既存 BP 清单，并把 BP-68-1 的 owner（Task 22）原样转记，不在本门顺手修。",
+      "path": "backend/data/workpaper_sync_task68_backend_chain_regression.json",
+      "report_digest": "b5d75a354ca98c2cb6c0d642c86239b6f5516cb6cb11472b65706d08e32f4985",
+      "source_commit": "d330d7cea6bb112709edce5bf287877df0a5f60c",
+      "verdict": "passed"
+    },
+    "task69_frontend_regression": {
+      "blocking_point_ids": [
+        "BP-69-1",
+        "BP-69-2",
+        "BP-69-3",
+        "BP-69-4",
+        "BP-69-5",
+        "BP-69-6",
+        "BP-69-7"
+      ],
+      "how_this_gate_uses_it": "Stage C 的前置条件清单引用它实录的「3030 未监听」；本门另做一次独立 socket 现测，两侧一致才写进报告。",
+      "path": "backend/data/workpaper_sync_task69_frontend_regression.json",
+      "port_3030_listening": false,
+      "report_digest": "6bd9241f38f6c234e5beca148629a4494b9c77c3e0ec444edbdedcf3abf08bb4",
+      "source_commit": "d330d7cea6bb112709edce5bf287877df0a5f60c",
+      "verdict": "passed"
+    },
+    "task70_oo_scenario_refresh": {
+      "how_this_gate_uses_it": "Stage A 最重的一条判据。本门**不读**它的 `executed_end_to_end` 自述来下结论，而是逐 `scenario_execution.entries[].scenarios[]` 现算执行档，再与自述比对：两侧不一致本身就是结构错误。",
+      "path": "backend/data/workpaper_sync_task70_oo_scenario_refresh.json",
+      "report_digest": "7e19de44fea4e118cf6a037c939b0af02084e4746cfd7c5a1f7a0b46b2af70ad",
+      "self_reported_executed_end_to_end": 0,
+      "self_reported_required_scenario_rows": 3290,
+      "source_commit": "d330d7cea6bb112709edce5bf287877df0a5f60c",
+      "verdict": "unverifiable"
+    },
+    "task71_mutation_capacity_recovery": {
+      "blocking_point_ids": [
+        "BP-71-1",
+        "BP-71-2",
+        "BP-71-3",
+        "BP-71-4",
+        "BP-71-5",
+        "BP-71-6",
+        "BP-71-7",
+        "BP-71-8"
+      ],
+      "how_this_gate_uses_it": "`legacy_delete` gate 的放行位。本门独立 live 重算 writer matrix 与 Task 12 矩阵，再与它的自述比对；同时原样转记 BP-71-3 / BP-71-8 两条既存缺陷的 owner。",
+      "legacy_delete_released": false,
+      "path": "backend/data/workpaper_sync_task71_mutation_capacity_recovery.json",
+      "report_digest": "c9087b04915872ef8df53600799e7935682f28dbbd51d2add8c2af45ebe50732",
+      "self_reported_multi_resolver_count": 4,
+      "source_commit": "d330d7cea6bb112709edce5bf287877df0a5f60c",
+      "verdict": "unverifiable"
+    }
+  },
+  "upstream_lock_impact": {
+    "baseline_locks": [
+      {
+        "baseline_failed": 0,
+        "baseline_passed": 66,
+        "guard": "backend/tests/workpaper_sync/test_task67_structural_pre_reconcile.py",
+        "task": "67"
+      },
+      {
+        "baseline_failed": 0,
+        "baseline_passed": 87,
+        "guard": "backend/tests/workpaper_sync/test_task68_backend_chain_regression.py",
+        "task": "68"
+      },
+      {
+        "baseline_failed": 1,
+        "baseline_passed": 78,
+        "guard": "backend/tests/workpaper_sync_frontend/test_task69_frontend_regression.py",
+        "task": "69"
+      },
+      {
+        "baseline_failed": 0,
+        "baseline_passed": 84,
+        "guard": "backend/tests/workpaper_sync_oo/test_task70_oo_scenario_gate.py",
+        "task": "70"
+      }
+    ],
+    "disposition": "如实登记，不改上游产物、不为让它变绿而绕过它",
+    "guard_dir_is_outside_upstream_census_dirs": {
+      "guard_dir": "backend/tests/workpaper_sync_predelete",
+      "outside": true,
+      "upstream_census_dir": "backend/tests/workpaper_sync",
+      "why": "BP-69-6：Task 68 的逐字节锁把 `backend/tests/workpaper_sync/` 做成目录普查，往里新增文件会额外打红它 1~3 条。本门与 Tasks 69/70/71 一样自开目录。"
+    },
+    "known_defect_id": "BP-71-8",
+    "known_defect_owner_task": "70",
+    "known_preexisting_red": {
+      "backend/tests/workpaper_sync_frontend/test_task69_frontend_regression.py": "TestReportIsFreshAndByteLocked::test_gate_check_passes —— BP-70-6 的复选框根因，本门起手基线即为红，非本门引入"
+    },
+    "statement": "Task 70 的逐字节锁把 `backend/tests` **全树**的 test 文件计数锁进比对 ⇒ 仓库任意位置新增一个 `test_*.py` 都让它 stale。本门新增守卫必然再顶它一次。",
+    "task67_inbound_census": {
+      "affected_tests": [
+        "test_task67_structural_pre_reconcile.py::TestInboundObligationsAndBlockingPreconditions::test_inbound_scan_recomputes_and_contains_the_real_targets",
+        "test_task67_structural_pre_reconcile.py::TestGeneratorIsIdempotentAndCheckIsStrict::test_check_matches_the_file_on_disk"
+      ],
+      "isolation_method": "把本门报告 JSON 临时移出 `backend/data/` 再跑 Task 67 那两条测试：移出 rc=0、放回 rc=1 ⇒ 该红只由本门产物的存在引起，与 Task 67 自身漂移无关。",
+      "new_defect_id": "BP-72-8",
+      "owner_task": "67",
+      "rows_on_disk": 12,
+      "same_class_as": "BP-71-8（全树普查进逐字节锁），但是**另一把锁、另一个 owner**",
+      "statement": "Task 67 的 `collect_inbound_obligations` 普查 `backend/data/**` 与源码里对自己的引用并把结果锁进逐字节比对 ⇒ 任何新落盘的、正文提到 Task 67 的产物都会顶掉它。本门的报告 JSON 就是这样的产物。",
+      "this_gate_report_is_in_the_census": true,
+      "why_not_fixed_here": "重跑 Task 67 的 `--write` 就是重生成上游产物（Task 66/70 正文明令禁止，且会让Task 70 的 evidence 全部 stale）。改本门报告的落盘位置只是把普查躲开一次，下一个产物还会踩 —— 该修的是那条普查判据本身。"
+    },
+    "task70_lock_already_red_before_this_gate": true,
+    "task70_scanned_test_files_live": 2343,
+    "task70_scanned_test_files_on_disk": 2340,
+    "task71_own_lock": {
+      "affected_tests": [
+        "test_task71_chaos_gate.py::TestReportIsFreshAndByteLocked::test_gate_check_passes",
+        "test_task71_chaos_gate.py::TestGuardPlacement::test_upstream_lock_impact_is_measured_and_owned"
+      ],
+      "disposition": "如实登记，不改上游产物",
+      "isolation_method": "把本门守卫 + 报告一起临时移出再跑那两条：移出 rc=0、放回 rc=1 ⇒ 只由本门产物的存在引起。",
+      "owner_task": "71",
+      "same_class_as": "BP-71-8（传递到 Task 71 自己的锁上）",
+      "statement": "Task 71 自有的那把锁也被顶红 2 条：它把 Task 70 的全树 test 计数 live 值（`upstream_lock_impact.task70_scanned_test_files_live`）写进了自己的逐字节锁 ⇒ 本门新增守卫让那个 live 值 +1，它随之 stale。"
+    },
+    "task71_recorded_live_count": 2341,
+    "why_unavoidable": "`scanned_test_files` 是全树计数，与文件内容无关 ⇒ 换目录、不写模块路径字面量都躲不开。唯一的「规避」是不写守卫，那等于放弃本门的判据。"
+  },
+  "verdict": {
+    "forbidden_claims": [
+      "不得宣称任何真实 OO probe 已通过",
+      "不得把 vacuous zero（空分母）当成已清零",
+      "不得用文档/离线测试/smoke 代替真实 OO 场景",
+      "不得要求待删 unreachable 在删除前已为 0"
+    ],
+    "forbidden_record_keys_found": [],
+    "gate_can_go_green": true,
+    "legacy_delete_gate_released": false,
+    "means": "Stage A 八条谓词里 7 条为假 ⇒ 红。Stage B 未执行且有磁盘反证；Stage C 触发条件不成立（source commit 未变）；Stage D 的六个最终门**因 Stage A 红而未运行**，静默 skip 计数为 0。Task 72 不可完成。",
+    "stage_a": "red",
+    "stage_a_failing_predicates": [
+      "bidirectional_unaccepted_is_admissibly_zero",
+      "every_pending_delete_uniquely_lands_in_plan",
+      "evidence_stale_is_admissibly_zero",
+      "fake_bidirectional_is_admissibly_zero",
+      "multi_resolver_criterion_passes",
+      "named_required_scenarios_really_executed",
+      "unadjudicated_is_admissibly_zero"
+    ],
+    "stage_a_owner_tasks": [
+      "36",
+      "67",
+      "70",
+      "72"
+    ],
+    "stage_b": "blocked",
+    "stage_c": "unverifiable",
+    "stage_d": "not_run_because_stage_a_red",
+    "state": "stage_a_red",
+    "state_vocabulary": [
+      "stage_a_red",
+      "stage_a_green_stage_b_pending",
+      "archived"
+    ],
+    "structural_error_count": 0,
+    "structural_errors": [],
+    "task_72_completable": false,
+    "what_is_not_claimed": [
+      "不宣称任何真实 OO probe 已通过",
+      "不宣称已删除任何 legacy",
+      "不宣称五个零已达成",
+      "不宣称已归档"
+    ]
+  },
+  "wave": 7,
+  "why_this_gate_only_runs_stage_a": "Stage A 为红 ⇒ Stage B 一个字节都不许删，Stage C 的触发条件（source commit 变化）不成立，Stage D 的最终门不运行。本门把 Stage A 的每条判据做成可复跑的纯谓词 + 现算事实，并对 Stage B/C/D 如实登记 BLOCKED / UNVERIFIABLE，而不是留空。"
+}

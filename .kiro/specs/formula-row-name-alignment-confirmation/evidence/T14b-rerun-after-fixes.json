@@ -1,0 +1,31 @@
+{
+  "context": "复盘 5 项修复后的真栈端到端复测（连真库 audit_platform，项目 a7fc75e5/2025，科目 1221 客户维度）",
+  "fixes_verified": {
+    "#3_dataset_id_wired": true,
+    "candidate_dataset_ids": ["38bf9d9c-fc3c-42d4-9dfb-f0ae33f9d409"],
+    "note": "修复前候选 dataset_id 恒 null，stale 判定生产环境永不触发；修复后 build_candidates 主动查 DatasetService.get_active_dataset_id 注入真实 active dataset"
+  },
+  "steps": [
+    {
+      "step": "确认后",
+      "match_state": "user_confirmed",
+      "amount": "238921879.36",
+      "chosen_name": "重庆医药（集团）股份有限公司",
+      "identity_match": "rematch 命中，金额=账套真实值（非零）"
+    },
+    {
+      "step": "#3 stale 生效验证",
+      "action": "把已落库映射目标 dataset 改成 ds-OLD-gone",
+      "classify_state": "unmatched",
+      "stale_reason": "1 个已确认目标在当前账套已失效（数据集变化 / 科目或维度不一致 / 明细名消失），需重新确认",
+      "note": "dataset_id 恒 null 时此路径永不触发；接通后 Property 2 生产可用"
+    }
+  ],
+  "regression": {
+    "backend_tests": "41 passed（原 36 + candidates 5）",
+    "frontend_dialog_tests": "9 passed（原 6 + #1 生命周期 1 + #4 接线 2）",
+    "mutation": "4 锚点全 RED，pass:true",
+    "diagnostics": "全部改动文件零诊断"
+  },
+  "verdict": "PASS"
+}

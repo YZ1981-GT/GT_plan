@@ -71,6 +71,7 @@ function makeOptions(overrides: Partial<UseEditorUniverOptions> = {}): UseEditor
     wpDetail: ref(null),
     sheetNavFacade: {
       refresh: vi.fn(),
+      bindUniverApi: vi.fn(),
     } as any,
     ...overrides,
   }
@@ -154,12 +155,24 @@ describe('useEditorUniver — initUniver 主要行为', () => {
     expect(result.univerAPI.value).not.toBe(null)
     expect(result.univerAPI.value.createWorkbook).toBeDefined()
 
-    // createWorkbook 被调用
+    // createWorkbook 被调用，且 Shell 的导航 facade 绑定到同一真实 API。
     expect(result.univerAPI.value.createWorkbook).toHaveBeenCalledTimes(1)
+    expect(opts.sheetNavFacade.bindUniverApi).toHaveBeenCalledWith(result.univerAPI.value)
 
     // loading 设为 false
     expect(result.loading.value).toBe(false)
     expect(result.loadingHint.value).toBe('')
+  })
+
+  it('dispose 同时释放 composable 与导航 facade 的 API 引用', async () => {
+    const opts = makeOptions()
+    const result = useEditorUniver(opts)
+    await result.initUniver()
+
+    result.dispose()
+
+    expect(result.univerAPI.value).toBeNull()
+    expect(opts.sheetNavFacade.bindUniverApi).toHaveBeenLastCalledWith(null)
   })
 
   it('initUniver 在 containerRef 为 null 时直接返回', async () => {
@@ -182,5 +195,35 @@ describe('useEditorUniver — initUniver 主要行为', () => {
     expect(result.loadErrorMessage.value).toContain('UUID')
     expect(result.loading.value).toBe(false)
     expect(createUniver).not.toHaveBeenCalled()
+  })
+})
+
+
+describe('useEditorUniver — 原生 sheet tab 事件', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    vi.useFakeTimers()
+    vi.mocked(httpApi.get).mockResolvedValue({
+      id: 'wb-native-tab',
+      sheets: { sheet0: { id: 'sheet0', name: 'Sheet1', rowCount: 10, columnCount: 10, cellData: {} } },
+      sheetOrder: ['sheet0'],
+    })
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  it('Univer set-worksheet-activate 命令会刷新 facade active sheet', async () => {
+    const opts = makeOptions()
+    const result = useEditorUniver(opts)
+    await result.initUniver()
+
+    const commandHandler = vi.mocked(result.univerAPI.value.onCommandExecuted).mock.calls[0][0]
+    expect(commandHandler).toBeTypeOf('function')
+    commandHandler({ id: 'sheet.command.set-worksheet-activate' })
+
+    expect(opts.sheetNavFacade.refresh).toHaveBeenCalledTimes(1)
+    expect(result.dirty.value).toBe(false)
   })
 })

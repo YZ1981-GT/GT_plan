@@ -8,13 +8,15 @@
  *
  * 使用：
  * ```ts
- * const stale = useStaleStatus(projectId)
+ * const stale = useStaleStatus(projectId)          // year 取 projectStore.year
+ * const stale = useStaleStatus(projectId, year)    // 或显式传入
  * // 模板：v-if="stale.isStale.value" 显示提示横幅
  * ```
  */
-import { ref, watch, onMounted, onUnmounted, type Ref } from 'vue'
+import { ref, watch, onMounted, onUnmounted, type Ref, type ComputedRef } from 'vue'
 import { eventBus } from '@/utils/eventBus'
 import { api } from '@/services/apiProxy'
+import { useProjectStore } from '@/stores/project'
 
 export interface StaleItem {
   id: string
@@ -23,7 +25,17 @@ export interface StaleItem {
   stale_reason?: string | null
 }
 
-export function useStaleStatus(projectId: Ref<string>) {
+/** 重算后的 stale 收敛结果（后端 /trial-balance/recalc 返回） */
+export interface StaleResolution {
+  cleared: number
+  refilled: number
+  kept_stale: number
+}
+
+export function useStaleStatus(
+  projectId: Ref<string>,
+  year?: Ref<number> | ComputedRef<number>,
+) {
   const isStale = ref(false)
   const staleCount = ref(0)
   const staleItems = ref<StaleItem[]>([])
@@ -39,10 +51,10 @@ export function useStaleStatus(projectId: Ref<string>) {
     }
     loading.value = true
     try {
-      const data: any = await api.get(
-        `/api/projects/${projectId.value}/stale-summary`,
-        { validateStatus: (s: number) => s < 600 },
-      )
+      // 不传 config：apiProxy 仅对「无 config 的纯 GET」做 in-flight 共享。
+      // 此前带 validateStatus 走了非共享分支，与 DefaultLayout 的同 URL 轮询撞上
+      // http.ts 的 GET 去重（abort 前一个），导致本次 check 被取消 → 横幅随机不渲染。
+      const data: any = await api.get(`/api/projects/${projectId.value}/stale-summary`)
       staleCount.value = data?.stale_count || 0
       staleItems.value = data?.items || []
       isStale.value = staleCount.value > 0
@@ -54,17 +66,35 @@ export function useStaleStatus(projectId: Ref<string>) {
     }
   }
 
-  async function recalc() {
-    if (!projectId.value) return
+  /** 解析重算年度：显式入参 > projectStore.year > 上一自然年（store 惰性读取，避免脱离 pinia 报错） */
+  function resolveYear(): number {
+    if (year?.value) return year.value
+    try {
+      const storeYear = useProjectStore().year
+      if (storeYear) return storeYear
+    } catch { /* 无 pinia 上下文时降级 */ }
+    return new Date().getFullYear() - 1
+  }
+
+  /**
+   * 触发试算表全量重算并复查 stale 状态。
+   *
+   * 注意：后端 `POST /trial-balance/recalc` 的 `year` 是**必填** Query 参数，
+   * 漏传会 422。此前这里既不传 year 又用 `validateStatus: s < 600` 吞掉了非 2xx，
+   * 导致「点击重算」实际从未执行、横幅永远不消失。
+   */
+  async function recalc(): Promise<StaleResolution | null> {
+    if (!projectId.value) return null
     loading.value = true
     try {
-      await api.post(
+      const resp: any = await api.post(
         `/api/projects/${projectId.value}/trial-balance/recalc`,
         {},
-        { validateStatus: (s: number) => s < 600 },
+        { params: { year: resolveYear() } },
       )
       // 重算完成后重新查 stale 状态
       await check()
+      return (resp?.stale_resolution as StaleResolution) ?? null
     } finally {
       loading.value = false
     }

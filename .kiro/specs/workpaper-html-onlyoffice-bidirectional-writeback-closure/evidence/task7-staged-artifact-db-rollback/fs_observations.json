@@ -1,0 +1,546 @@
+{
+  "fs1": {
+    "case_id": "fs1",
+    "title": "流式 staging 写入 + fsync（含目录 fsync 能力）",
+    "status": "ok",
+    "started_at": "2026-08-24T16:35:52.060062+00:00",
+    "finished_at": "2026-08-24T16:35:52.071061+00:00",
+    "same_volume_as_project": true,
+    "staging_drive": "D:",
+    "seed_sha256": "fd4d5d61b151d9b5e46eb38d632153f0362b49fd3bfa0221c8fe3591acb1e870",
+    "streaming_sha256": "fd4d5d61b151d9b5e46eb38d632153f0362b49fd3bfa0221c8fe3591acb1e870",
+    "reread_sha256": "fd4d5d61b151d9b5e46eb38d632153f0362b49fd3bfa0221c8fe3591acb1e870",
+    "streaming_hash_matches_reread": true,
+    "streaming_hash_matches_seed": true,
+    "chunks_written": 1,
+    "size_bytes": 12620,
+    "file_fsync_ok": true,
+    "directory_fsync": {
+      "supported": false,
+      "stage": "open",
+      "exc_type": "PermissionError",
+      "errno": 13,
+      "winerror": null,
+      "strerror": "Permission denied"
+    },
+    "staging_dir": "D:\\GT_plan\\tmp_task7_probe_20260824T163552Z-ded0a7\\storage\\0baed696-cd9e-4eea-9faa-d7a6cab48ab6\\workpapers\\.staging\\b77602c8-9ad3-43af-9b8b-516a766204b9\\c0ade39a-4e1f-4429-93e1-da98815dcf24"
+  },
+  "fs2": {
+    "case_id": "fs2",
+    "title": "content-addressed publish 幂等（同内容同名同 hash；异内容不覆盖）",
+    "status": "ok",
+    "started_at": "2026-08-24T16:35:52.071061+00:00",
+    "finished_at": "2026-08-24T16:35:52.081063+00:00",
+    "publishes": [
+      {
+        "attempt": 1,
+        "target_name": "000000001-fd4d5d61b151.xlsx",
+        "target_sha256": "fd4d5d61b151d9b5e46eb38d632153f0362b49fd3bfa0221c8fe3591acb1e870",
+        "staging_removed": true,
+        "file_index": 1125899907582099
+      },
+      {
+        "attempt": 2,
+        "target_name": "000000001-fd4d5d61b151.xlsx",
+        "target_sha256": "fd4d5d61b151d9b5e46eb38d632153f0362b49fd3bfa0221c8fe3591acb1e870",
+        "staging_removed": true,
+        "file_index": 1125899907582105
+      }
+    ],
+    "target_path_identical": true,
+    "target_sha_identical": true,
+    "target_sha_equals_content_hash": true,
+    "file_index_changed_on_republish": true,
+    "divergent_content_target_name": "000000001-c28e75b33aae.xlsx",
+    "divergent_target_differs": true,
+    "first_target_survives_divergent_publish": true,
+    "versions_namespace": [
+      "b77602c8-9ad3-43af-9b8b-516a766204b9/representations/A31.sheet1/000000001-c28e75b33aae.xlsx",
+      "b77602c8-9ad3-43af-9b8b-516a766204b9/representations/A31.sheet1/000000001-fd4d5d61b151.xlsx"
+    ]
+  },
+  "fs3": {
+    "case_id": "fs3",
+    "title": "os.replace 同卷原子性（size 采样 + content 采样双判据）",
+    "status": "ok",
+    "started_at": "2026-08-24T16:35:52.081063+00:00",
+    "finished_at": "2026-08-24T16:35:52.694827+00:00",
+    "rounds_per_segment": 60,
+    "size_sampling": {
+      "observations": 5315,
+      "distinct_sizes_observed": [
+        524288,
+        786432
+      ],
+      "expected_sizes": [
+        524288,
+        786432
+      ],
+      "intermediate_sizes_observed": [],
+      "stat_missing": 0,
+      "stat_other_error": 0,
+      "replace_retry_count": 2,
+      "replace_permanently_failed": 0,
+      "no_intermediate_size": true,
+      "never_missing": true
+    },
+    "content_sampling": {
+      "reader_share_mode": "FILE_SHARE_READ|WRITE|DELETE",
+      "observations": 968,
+      "tally": {
+        "missing": 0,
+        "partial": 0,
+        "read_denied": 0,
+        "full_old": 435,
+        "full_new": 533
+      },
+      "full_reads": 968,
+      "torn_reads": 0,
+      "missing_reads": 0,
+      "read_denied": 0,
+      "replace_retry_count": 122,
+      "replace_permanently_failed": 0,
+      "no_torn_read": true
+    },
+    "atomic_no_partial_or_missing": true,
+    "concurrent_open_handle_forces_replace_retry": true
+  },
+  "fs4": {
+    "case_id": "fs4",
+    "title": "os.replace 跨卷失败 + shutil.move 跨卷可观测 partial",
+    "status": "ok",
+    "started_at": "2026-08-24T16:35:52.694827+00:00",
+    "finished_at": "2026-08-24T16:35:52.791038+00:00",
+    "source_volume": "C:",
+    "target_volume": "D:",
+    "cross_volume_confirmed": true,
+    "os_replace": {
+      "raised": true,
+      "exc_type": "OSError",
+      "errno": 18,
+      "winerror": 17,
+      "strerror": "系统无法将文件移到不同的磁盘驱动器。"
+    },
+    "source_survived_after_failure": true,
+    "target_absent_after_failure": true,
+    "shutil_move_size_bytes": 33554432,
+    "shutil_move_attempts": [
+      {
+        "attempt": 0,
+        "observations": 132,
+        "absent_observations": 27,
+        "full_size_observations": 90,
+        "incomplete_size_count": 1,
+        "incomplete_sizes_sample": [
+          0
+        ],
+        "incomplete_size_max": 0
+      },
+      {
+        "attempt": 1,
+        "observations": 111,
+        "absent_observations": 10,
+        "full_size_observations": 100,
+        "incomplete_size_count": 1,
+        "incomplete_sizes_sample": [
+          0
+        ],
+        "incomplete_size_max": 0
+      },
+      {
+        "attempt": 2,
+        "observations": 106,
+        "absent_observations": 16,
+        "full_size_observations": 89,
+        "incomplete_size_count": 1,
+        "incomplete_sizes_sample": [
+          0
+        ],
+        "incomplete_size_max": 0
+      }
+    ],
+    "shutil_move_distinct_incomplete_sizes_max": 1,
+    "shutil_move_destination_visible_while_incomplete": true
+  },
+  "fs5": {
+    "case_id": "fs5",
+    "title": "文件占用矩阵：六种 share 模式 + 目标不预先存在分支",
+    "status": "ok",
+    "started_at": "2026-08-24T16:35:52.791038+00:00",
+    "finished_at": "2026-08-24T16:35:53.774418+00:00",
+    "cases": {
+      "target_held_none": {
+        "hold_mode": "none",
+        "held_file": "target",
+        "os_replace": {
+          "raised": true,
+          "exc_type": "PermissionError",
+          "errno": 13,
+          "winerror": 5,
+          "strerror": "拒绝访问。"
+        },
+        "target_is_old_content": true,
+        "target_is_new_content": false,
+        "source_survived": true
+      },
+      "target_held_read": {
+        "hold_mode": "read",
+        "held_file": "target",
+        "os_replace": {
+          "raised": true,
+          "exc_type": "PermissionError",
+          "errno": 13,
+          "winerror": 5,
+          "strerror": "拒绝访问。"
+        },
+        "target_is_old_content": true,
+        "target_is_new_content": false,
+        "source_survived": true
+      },
+      "target_held_read_write": {
+        "hold_mode": "read_write",
+        "held_file": "target",
+        "os_replace": {
+          "raised": true,
+          "exc_type": "PermissionError",
+          "errno": 13,
+          "winerror": 5,
+          "strerror": "拒绝访问。"
+        },
+        "target_is_old_content": true,
+        "target_is_new_content": false,
+        "source_survived": true
+      },
+      "target_held_read_delete": {
+        "hold_mode": "read_delete",
+        "held_file": "target",
+        "os_replace": {
+          "raised": true,
+          "exc_type": "PermissionError",
+          "errno": 13,
+          "winerror": 5,
+          "strerror": "拒绝访问。"
+        },
+        "target_is_old_content": true,
+        "target_is_new_content": false,
+        "source_survived": true
+      },
+      "target_held_read_write_delete": {
+        "hold_mode": "read_write_delete",
+        "held_file": "target",
+        "os_replace": {
+          "raised": true,
+          "exc_type": "PermissionError",
+          "errno": 13,
+          "winerror": 5,
+          "strerror": "拒绝访问。"
+        },
+        "target_is_old_content": true,
+        "target_is_new_content": false,
+        "source_survived": true
+      },
+      "target_held_delete_only": {
+        "hold_mode": "delete_only",
+        "held_file": "target",
+        "os_replace": {
+          "raised": true,
+          "exc_type": "PermissionError",
+          "errno": 13,
+          "winerror": 5,
+          "strerror": "拒绝访问。"
+        },
+        "target_is_old_content": true,
+        "target_is_new_content": false,
+        "source_survived": true
+      },
+      "source_held_read_write": {
+        "hold_mode": "read_write",
+        "held_file": "source",
+        "os_replace": {
+          "raised": true,
+          "exc_type": "PermissionError",
+          "errno": 13,
+          "winerror": 32,
+          "strerror": "另一个程序正在使用此文件，进程无法访问。"
+        },
+        "target_is_old_content": true,
+        "target_is_new_content": false,
+        "source_survived": true
+      },
+      "fresh_target_while_old_current_held": {
+        "hold_mode": "read",
+        "held_file": "previous_current_artifact",
+        "target_preexisting": false,
+        "os_replace": {
+          "raised": false
+        },
+        "target_exists_after": true,
+        "old_current_intact": true
+      }
+    },
+    "share_modes_tested": [
+      "none",
+      "read",
+      "read_write",
+      "read_delete",
+      "read_write_delete",
+      "delete_only"
+    ],
+    "occupied_target_blocks_replace_in_all_share_modes": true,
+    "occupied_target_winerrors": [
+      5
+    ],
+    "share_delete_does_not_help": true,
+    "occupied_source_blocks_replace": true,
+    "occupied_source_winerror": 32,
+    "old_content_preserved_on_failure": true,
+    "fresh_target_publish_succeeds_while_old_current_held": true,
+    "architectural_consequence": "os.replace 无法在目标被占用时替换（任何 share 模式都不行）⇒ 固定路径覆盖式发布在 Windows 天然脆弱；content-addressed 不可变目标名从不预先存在，publish 因此不受占用影响，current 切换改由 DB pointer 承担"
+  },
+  "fs6": {
+    "case_id": "fs6",
+    "title": "写 staging 途中 kill / staging 完成后 kill 的残留归类",
+    "status": "ok",
+    "started_at": "2026-08-24T16:35:53.774418+00:00",
+    "finished_at": "2026-08-24T16:35:54.272676+00:00",
+    "mid_write_kill": {
+      "child_returncode": 1,
+      "child_stderr_tail": "",
+      "verdict_source": "disk_state_not_exit_code",
+      "staging_exists": true,
+      "staging_size_bytes": 1310720,
+      "expected_total_bytes": 4194304,
+      "is_partial": true,
+      "residue_sha256": "9f45e7da8357d41f23e267b4460c788200ddba0a8c8bd2922dbcccede7d69053",
+      "expected_full_sha256": "16d39eabac06ff50805be1abb7031c813fca6f836805a8f344e2604c712a1bd7",
+      "residue_hash_differs_from_full": true,
+      "residue_in_staging_namespace": true,
+      "resolver_namespace_files": [
+        "b77602c8-9ad3-43af-9b8b-516a766204b9/representations/A31.sheet1/000000001-c28e75b33aae.xlsx",
+        "b77602c8-9ad3-43af-9b8b-516a766204b9/representations/A31.sheet1/000000001-fd4d5d61b151.xlsx"
+      ],
+      "publish_gate_refuses_residue": true
+    },
+    "post_stage_pre_publish_kill": {
+      "child_returncode": 1,
+      "child_stderr_tail": "",
+      "verdict_source": "disk_state_not_exit_code",
+      "staging_exists": true,
+      "staging_size_bytes": 1048576,
+      "staging_sha256": "65c4c25b4fa49650f12c329bcc2465a1a17bd0821a16698f525d24f03902595b",
+      "staging_hash_valid": true,
+      "published_anything": false,
+      "resolver_namespace_excludes_staging": true,
+      "classification": "orphan_candidate_invisible_to_resolver"
+    },
+    "os_replace_interruption_note": {
+      "independently_injected": false,
+      "derived_from": "fs3",
+      "reason": "os.replace 是单次 MoveFileExW 元数据操作，无法在用户态注入「半个 rename」；原子性判据取 fs3 的并发观测（partial=0 且 missing=0）"
+    }
+  },
+  "fs7": {
+    "case_id": "fs7",
+    "title": "路径安全：穿越/绝对路径/UNC/软链接越界/跨项目复用/扩展名伪装",
+    "status": "ok",
+    "started_at": "2026-08-24T16:35:54.273679+00:00",
+    "finished_at": "2026-08-24T16:35:54.288677+00:00",
+    "cases": {
+      "traversal_relative": {
+        "relative": "..\\..\\..\\outside.xlsx",
+        "accepted": false,
+        "reject_reason": "outside_project_root",
+        "root_resolved": "D:\\GT_plan\\tmp_task7_probe_20260824T163552Z-ded0a7\\storage\\0baed696-cd9e-4eea-9faa-d7a6cab48ab6\\workpapers",
+        "path_resolved": "D:\\GT_plan\\tmp_task7_probe_20260824T163552Z-ded0a7\\outside.xlsx"
+      },
+      "traversal_nested": {
+        "relative": "wp\\..\\..\\..\\..\\outside.xlsx",
+        "accepted": false,
+        "reject_reason": "outside_project_root",
+        "root_resolved": "D:\\GT_plan\\tmp_task7_probe_20260824T163552Z-ded0a7\\storage\\0baed696-cd9e-4eea-9faa-d7a6cab48ab6\\workpapers",
+        "path_resolved": "D:\\GT_plan\\tmp_task7_probe_20260824T163552Z-ded0a7\\outside.xlsx"
+      },
+      "traversal_posix_style": {
+        "relative": "../../../outside.xlsx",
+        "accepted": false,
+        "reject_reason": "outside_project_root",
+        "root_resolved": "D:\\GT_plan\\tmp_task7_probe_20260824T163552Z-ded0a7\\storage\\0baed696-cd9e-4eea-9faa-d7a6cab48ab6\\workpapers",
+        "path_resolved": "D:\\GT_plan\\tmp_task7_probe_20260824T163552Z-ded0a7\\outside.xlsx"
+      },
+      "absolute_outside": {
+        "relative": "C:\\Windows\\Temp\\tmp_task7_evil.xlsx",
+        "accepted": false,
+        "reject_reason": "outside_project_root",
+        "root_resolved": "D:\\GT_plan\\tmp_task7_probe_20260824T163552Z-ded0a7\\storage\\0baed696-cd9e-4eea-9faa-d7a6cab48ab6\\workpapers",
+        "path_resolved": "C:\\Windows\\Temp\\tmp_task7_evil.xlsx"
+      },
+      "unc_path": {
+        "relative": "\\\\127.0.0.1\\C$\\tmp_task7_evil.xlsx",
+        "accepted": false,
+        "reject_reason": "outside_project_root",
+        "root_resolved": "D:\\GT_plan\\tmp_task7_probe_20260824T163552Z-ded0a7\\storage\\0baed696-cd9e-4eea-9faa-d7a6cab48ab6\\workpapers",
+        "path_resolved": "\\\\127.0.0.1\\C$\\tmp_task7_evil.xlsx"
+      },
+      "inside_ok": {
+        "relative": "wp\\artifact.xlsx",
+        "accepted": true,
+        "reject_reason": null,
+        "root_resolved": "D:\\GT_plan\\tmp_task7_probe_20260824T163552Z-ded0a7\\storage\\0baed696-cd9e-4eea-9faa-d7a6cab48ab6\\workpapers",
+        "path_resolved": "D:\\GT_plan\\tmp_task7_probe_20260824T163552Z-ded0a7\\storage\\0baed696-cd9e-4eea-9faa-d7a6cab48ab6\\workpapers\\wp\\artifact.xlsx"
+      },
+      "cross_project_absolute": {
+        "relative": "D:\\GT_plan\\tmp_task7_probe_20260824T163552Z-ded0a7\\storage\\cad11dcc-dfe3-499f-baee-efd72701b06d\\workpapers\\wp\\artifact.xlsx",
+        "accepted": false,
+        "reject_reason": "outside_project_root",
+        "root_resolved": "D:\\GT_plan\\tmp_task7_probe_20260824T163552Z-ded0a7\\storage\\0baed696-cd9e-4eea-9faa-d7a6cab48ab6\\workpapers",
+        "path_resolved": "D:\\GT_plan\\tmp_task7_probe_20260824T163552Z-ded0a7\\storage\\cad11dcc-dfe3-499f-baee-efd72701b06d\\workpapers\\wp\\artifact.xlsx"
+      },
+      "cross_project_traversal": {
+        "relative": "..\\..\\cad11dcc-dfe3-499f-baee-efd72701b06d\\workpapers\\wp\\artifact.xlsx",
+        "accepted": false,
+        "reject_reason": "outside_project_root",
+        "root_resolved": "D:\\GT_plan\\tmp_task7_probe_20260824T163552Z-ded0a7\\storage\\0baed696-cd9e-4eea-9faa-d7a6cab48ab6\\workpapers",
+        "path_resolved": "D:\\GT_plan\\tmp_task7_probe_20260824T163552Z-ded0a7\\storage\\cad11dcc-dfe3-499f-baee-efd72701b06d\\workpapers\\wp\\artifact.xlsx"
+      },
+      "symlink_escape": {
+        "relative": "escape-link\\artifact.xlsx",
+        "covered": true,
+        "mechanism": "os.symlink",
+        "accepted": false,
+        "reject_reason": "outside_project_root",
+        "root_resolved": "D:\\GT_plan\\tmp_task7_probe_20260824T163552Z-ded0a7\\storage\\0baed696-cd9e-4eea-9faa-d7a6cab48ab6\\workpapers",
+        "path_resolved": "C:\\Users\\Administrator\\AppData\\Local\\Temp\\tmp_task7_probe_escape_m0orsvme\\artifact.xlsx"
+      }
+    },
+    "escape_cases_rejected": [
+      "absolute_outside",
+      "cross_project_absolute",
+      "cross_project_traversal",
+      "symlink_escape",
+      "traversal_nested",
+      "traversal_posix_style",
+      "traversal_relative",
+      "unc_path"
+    ],
+    "inside_path_accepted": true,
+    "cross_project_same_relative_resolves_differently": true,
+    "cross_project_resolved_a": "D:\\GT_plan\\tmp_task7_probe_20260824T163552Z-ded0a7\\storage\\0baed696-cd9e-4eea-9faa-d7a6cab48ab6\\workpapers\\wp\\artifact.xlsx",
+    "cross_project_resolved_b": "D:\\GT_plan\\tmp_task7_probe_20260824T163552Z-ded0a7\\storage\\cad11dcc-dfe3-499f-baee-efd72701b06d\\workpapers\\wp\\artifact.xlsx",
+    "symlink_escape_covered": true,
+    "masquerade": {
+      "non_zip_with_xlsx_ext": {
+        "magic_ok": false,
+        "magic_head_hex": "3c68746d",
+        "detected": null
+      },
+      "xlsx_bytes_with_docx_ext": {
+        "magic_ok": true,
+        "magic_head_hex": "504b0304",
+        "detected": "xlsx"
+      },
+      "non_zip_rejected": true,
+      "ext_type_mismatch_detected": true
+    }
+  },
+  "fs8": {
+    "case_id": "fs8",
+    "title": "校验门注入（zip/OOXML/roundtrip）失败后 current hash/pointer/revision 不变",
+    "status": "ok",
+    "started_at": "2026-08-24T16:35:54.288677+00:00",
+    "finished_at": "2026-08-24T16:35:54.301679+00:00",
+    "current_artifact": "000000001-fd4d5d61b151.xlsx",
+    "current_sha256_before": "fd4d5d61b151d9b5e46eb38d632153f0362b49fd3bfa0221c8fe3591acb1e870",
+    "declared_sheet_names": [
+      "审计标识A31"
+    ],
+    "injections": {
+      "zip_structure": {
+        "injection_point": "zip_structure",
+        "staged_sha256": "a670b656e977e8520fd87aadd4524eaffc28cb30a7a3c414d7e2e4b3819e0179",
+        "gates": [
+          {
+            "gate": "zip_structure",
+            "passed": false,
+            "detail": "BadZipFile:File is not a zip file"
+          }
+        ],
+        "first_failed_gate": "zip_structure",
+        "published": false,
+        "current_sha_after": "fd4d5d61b151d9b5e46eb38d632153f0362b49fd3bfa0221c8fe3591acb1e870",
+        "current_sha_unchanged": true,
+        "pointer_after": {
+          "generation": 1,
+          "revision": 1,
+          "artifact_sha256": "fd4d5d61b151d9b5e46eb38d632153f0362b49fd3bfa0221c8fe3591acb1e870"
+        },
+        "pointer_unchanged": true,
+        "versions_namespace_unchanged": true,
+        "staging_residue_exists": true
+      },
+      "ooxml_parts": {
+        "injection_point": "ooxml_parts",
+        "staged_sha256": "bb9166336276b1d9d6a715a948246fd0d7ab29a49ee12493cae00e3b80a282db",
+        "gates": [
+          {
+            "gate": "zip_structure",
+            "passed": true,
+            "detail": "ok"
+          },
+          {
+            "gate": "ooxml_parts",
+            "passed": false,
+            "detail": "missing_parts:[Content_Types].xml"
+          }
+        ],
+        "first_failed_gate": "ooxml_parts",
+        "published": false,
+        "current_sha_after": "fd4d5d61b151d9b5e46eb38d632153f0362b49fd3bfa0221c8fe3591acb1e870",
+        "current_sha_unchanged": true,
+        "pointer_after": {
+          "generation": 1,
+          "revision": 1,
+          "artifact_sha256": "fd4d5d61b151d9b5e46eb38d632153f0362b49fd3bfa0221c8fe3591acb1e870"
+        },
+        "pointer_unchanged": true,
+        "versions_namespace_unchanged": true,
+        "staging_residue_exists": true
+      },
+      "roundtrip_equivalence": {
+        "injection_point": "roundtrip_equivalence",
+        "staged_sha256": "3f256fc054549e0e57a9c312cc5a0e9beb74623ac09375627cc62bd18128862f",
+        "gates": [
+          {
+            "gate": "zip_structure",
+            "passed": true,
+            "detail": "ok"
+          },
+          {
+            "gate": "ooxml_parts",
+            "passed": true,
+            "detail": "ok"
+          },
+          {
+            "gate": "roundtrip_equivalence",
+            "passed": false,
+            "detail": "sheet_names_mismatch:['PROBE_DRIFT']!=['审计标识A31']"
+          }
+        ],
+        "first_failed_gate": "roundtrip_equivalence",
+        "published": false,
+        "current_sha_after": "fd4d5d61b151d9b5e46eb38d632153f0362b49fd3bfa0221c8fe3591acb1e870",
+        "current_sha_unchanged": true,
+        "pointer_after": {
+          "generation": 1,
+          "revision": 1,
+          "artifact_sha256": "fd4d5d61b151d9b5e46eb38d632153f0362b49fd3bfa0221c8fe3591acb1e870"
+        },
+        "pointer_unchanged": true,
+        "versions_namespace_unchanged": true,
+        "staging_residue_exists": true
+      }
+    },
+    "all_injections_blocked_publish": true,
+    "all_injections_left_current_unchanged": true,
+    "all_injections_left_pointer_unchanged": true
+  }
+}

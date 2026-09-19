@@ -1,0 +1,53 @@
+{
+  "metadata": {
+    "description": "ACNR Consumer Coverage Ledger — 记录 backend/app/ 下 address_registry. 直接消费者 allowlist",
+    "purpose": "CI 扫描器依据此文件判断直接消费是否已登记；未登记新增消费阻断 PR",
+    "maintained_by": "acnr-runtime-convergence spec, Task 13",
+    "requirement": "Req-11",
+    "last_updated": "2026-07-16"
+  },
+  "allowlist": [
+    {
+      "file": "services/event_handlers/_impl.py",
+      "reason": "EventBus handler 委托 address_registry.invalidate_async（strangler-fig 过渡）",
+      "migration_target": "P6",
+      "notes": "待收敛到 acnr.events.invalidate_domain 统一入口"
+    },
+    {
+      "file": "services/formula_engine.py",
+      "reason": "extract_custom_cells 用于注册自定义格到 address_registry",
+      "migration_target": "P5",
+      "notes": "待迁移到 acnr.runtime.register_custom"
+    },
+    {
+      "file": "services/wp_structure_bridge.py",
+      "reason": "build_uri / build_jump_route 用于产出 legacy AddressEntry 兼容条目",
+      "migration_target": "P8",
+      "notes": "待迁移经 ACNR canonical addr_id 体系"
+    },
+    {
+      "file": "services/wp_parsed_data_service.py",
+      "reason": "注释引用 address_registry.invalidate_async（实际已收敛到 acnr.events.invalidate）",
+      "migration_target": "P6",
+      "notes": "纯注释引用，运行时已走 ACNR"
+    },
+    {
+      "file": "routers/wp_structure.py",
+      "reason": "失效地址缓存 address_registry.invalidate_async",
+      "migration_target": "P6",
+      "notes": "待收敛到 acnr.events.invalidate"
+    },
+    {
+      "file": "routers/query_builder.py",
+      "reason": "注释引用 address_registry.formula_ref_to_uri（运行时不调用）",
+      "migration_target": "P9",
+      "notes": "纯注释，构造经 ACNR grammar"
+    },
+    {
+      "file": "router_registry/system.py",
+      "reason": "include_router 注册 address_registry 路由（基础设施）",
+      "migration_target": "P12",
+      "notes": "路由注册无法迁移，最终 address_registry router 会退役"
+    }
+  ]
+}

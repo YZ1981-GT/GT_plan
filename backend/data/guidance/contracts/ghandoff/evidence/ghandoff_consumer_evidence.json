@@ -1,0 +1,50 @@
+{
+  "contractVersion": "1.0",
+  "evidenceId": "evidence-ghandoff-consumer-1",
+  "runId": "run-ghandoff-consumer-1",
+  "subject": {
+    "kind": "contract",
+    "contractId": "G-HANDOFF-CONSUMER"
+  },
+  "contractVersions": {
+    "G-C0": "1.0",
+    "G-HANDOFF-CONSUMER": "1.0"
+  },
+  "inventoryDigest": null,
+  "sourceDigests": {
+    "module": "99bb29b2321796419a9bad07109f57ea018bb2d9ec1f65595c93f2ed4f955c5f"
+  },
+  "operationIds": {
+    "publish": "op-publish-ghandoff-consumer-2026-09-08"
+  },
+  "artifacts": [
+    {
+      "kind": "report",
+      "uri": "backend/app/services/guidance_handoff_consumer_service.py",
+      "sha256": "99bb29b2321796419a9bad07109f57ea018bb2d9ec1f65595c93f2ed4f955c5f"
+    }
+  ],
+  "verdict": "PASS",
+  "recordedAt": "2026-09-08T00:00:00Z",
+  "consumerVersion": "guid-consumer-1.0.0",
+  "idempotencyKey": [
+    "handoff_id",
+    "handoff_digest",
+    "consumer",
+    "consumer_version"
+  ],
+  "sagaContract": {
+    "order": [
+      "PENDING_visibility",
+      "durable_ACK_ledger",
+      "producer_commit_visibility"
+    ],
+    "ackFailVisibility": 0,
+    "candidateVerdict": "review_pending",
+    "finalizedVerdicts": [
+      "ACCEPTED",
+      "REJECTED"
+    ],
+    "crossSystemAcid": false
+  }
+}

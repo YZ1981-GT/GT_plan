@@ -1,0 +1,1459 @@
+[
+  {
+    "id": "M01",
+    "side": "be",
+    "want": "test_task21_room_service.py::TestDocKeyIsMtimeFree::test_probe_reports_mtime_free_and_really_changed_mtime",
+    "why": "往 doc_key 派生链路注入一次 mtime 读取 ⇒ 退回生产实况（`hash(wp_code + st_mtime_ns)`）的形态：一次写盘就轮转 doc_key、切断进行中的协同会话。「与 mtime 解耦」是否定式承诺，只能靠注入反例 falsify",
+    "verdict": "RED",
+    "summary": "3 failed, 151 passed in 17.44s",
+    "added": [
+      "test_task21_room_service.py::TestDocKeyIsMtimeFree::test_entry_function_list_is_not_empty",
+      "test_task21_room_service.py::TestDocKeyIsMtimeFree::test_probe_facts_pass_registry_room_gate",
+      "test_task21_room_service.py::TestDocKeyIsMtimeFree::test_probe_reports_mtime_free_and_really_changed_mtime"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task21_room_service.py::TestDocKeyIsMtimeFree::test_entry_function_list_is_not_empty",
+      "test_task21_room_service.py::TestDocKeyIsMtimeFree::test_probe_facts_pass_registry_room_gate",
+      "test_task21_room_service.py::TestDocKeyIsMtimeFree::test_probe_reports_mtime_free_and_really_changed_mtime"
+    ],
+    "added_files": [
+      "test_task21_room_service.py"
+    ],
+    "restored": true,
+    "seconds": 20.7
+  },
+  {
+    "id": "M02",
+    "side": "be",
+    "want": "test_task21_room_service.py::TestDocKeyIsMtimeFree::test_generation_rotation_rotates_doc_key",
+    "why": "doc_key 不再随 generation 轮转 ⇒ AC 2.8「发布新 generation 显式 supersede 旧 room」失效：OO 会把新旧代际当同一文档，旧会话继续往新代际里写",
+    "verdict": "RED",
+    "summary": "14 failed, 140 passed in 17.09s",
+    "added": [
+      "test_task21_room_service.py::TestDocKeyIsMtimeFree::test_doc_key_shape_and_roundtrip",
+      "test_task21_room_service.py::TestDocKeyIsMtimeFree::test_generation_rotation_rotates_doc_key",
+      "test_task21_room_service.py::TestDocKeyIsMtimeFree::test_probe_facts_pass_registry_room_gate",
+      "test_task21_room_service.py::TestDocKeyIsMtimeFree::test_probe_reports_mtime_free_and_really_changed_mtime",
+      "test_task21_room_service_pg.py::test_ac_2_8_same_generation_reuses_room_instead_of_creating_second",
+      "test_task21_room_service_pg.py::test_ac_2_8_supersede_rotates_doc_key_for_new_generation",
+      "test_task21_room_service_pg.py::test_application_room_and_generation_are_db_immutable",
+      "test_task21_room_service_pg.py::test_fence_refuses_application_outside_this_room[cross_generation_error]",
+      "test_task21_room_service_pg.py::test_fence_refuses_application_outside_this_room[cross_room_error]",
+      "test_task21_room_service_pg.py::test_fence_refuses_application_outside_this_room[missing_application_error]",
+      "test_task21_room_service_pg.py::test_historical_generation_is_rejected_by_the_publication_gate",
+      "test_task21_room_service_pg.py::test_no_happy_path_phase_crashed_during_collection",
+      "test_task21_room_service_pg.py::test_route_credential_is_minted_from_the_room_row_not_the_caller",
+      "test_task21_room_service_pg.py::test_route_credential_of_another_generation_is_rejected"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task21_room_service.py::TestDocKeyIsMtimeFree::test_doc_key_shape_and_roundtrip",
+      "test_task21_room_service.py::TestDocKeyIsMtimeFree::test_generation_rotation_rotates_doc_key",
+      "test_task21_room_service_pg.py::test_ac_2_8_supersede_rotates_doc_key_for_new_generation"
+    ],
+    "added_files": [
+      "test_task21_room_service.py",
+      "test_task21_room_service_pg.py"
+    ],
+    "restored": true,
+    "seconds": 20.3
+  },
+  {
+    "id": "M03",
+    "side": "be",
+    "want": "test_task21_room_service.py::TestDocKeyIsMtimeFree::test_entry_function_list_is_not_empty",
+    "why": "掏空 AST 入口清单 ⇒ `len(pending) != len(entries)` 变成 `0 != 0`，循环一次都不进，`_doc_key_source_is_mtime_free()` 恒返回 True。这是 vacuous truth 型失效：结构、调用点、日志全都正常，只有判据没了",
+    "verdict": "RED",
+    "summary": "4 failed, 150 passed in 17.29s",
+    "added": [
+      "test_task21_room_service.py::TestDocKeyIsMtimeFree::test_ast_check_catches_mtime_read_via_helper",
+      "test_task21_room_service.py::TestDocKeyIsMtimeFree::test_entry_function_list_is_not_empty",
+      "test_task21_room_service.py::TestDocKeyIsMtimeFree::test_probe_facts_pass_registry_room_gate",
+      "test_task21_room_service.py::TestDocKeyIsMtimeFree::test_probe_reports_mtime_free_and_really_changed_mtime"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task21_room_service.py::TestDocKeyIsMtimeFree::test_entry_function_list_is_not_empty"
+    ],
+    "added_files": [
+      "test_task21_room_service.py"
+    ],
+    "restored": true,
+    "seconds": 20.5
+  },
+  {
+    "id": "M04",
+    "side": "be",
+    "want": "test_task21_room_service.py::TestDocKeyIsMtimeFree::test_empty_entry_list_makes_the_check_fail_not_pass",
+    "why": "去掉「清单非空」这道防线本身 ⇒ M03 那类改动重新变得不可见。专门检验防线不是装饰性的",
+    "verdict": "RED",
+    "summary": "1 failed, 153 passed in 17.51s",
+    "added": [
+      "test_task21_room_service.py::TestDocKeyIsMtimeFree::test_empty_entry_list_makes_the_check_fail_not_pass"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task21_room_service.py::TestDocKeyIsMtimeFree::test_empty_entry_list_makes_the_check_fail_not_pass"
+    ],
+    "added_files": [
+      "test_task21_room_service.py"
+    ],
+    "restored": true,
+    "seconds": 20.7
+  },
+  {
+    "id": "M05",
+    "side": "be",
+    "want": "test_task21_room_service_pg.py::test_ac_2_9_unequal_merge_forces_refresh_required_and_blocks_next_request",
+    "why": "把 refresh_required 放进允许集 ⇒ live OO 可以拿旧 incoming 继续 forcesave，把服务器已合并的值回退掉（AC 2.9 / 4.11 要防的正是这个）",
+    "verdict": "RED",
+    "summary": "1 failed, 153 passed in 17.17s",
+    "added": [
+      "test_task21_room_service.py::TestServiceDoesNotDuplicateRepository::test_allowed_states_include_barrier_and_closing"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task21_room_service.py::TestServiceDoesNotDuplicateRepository::test_allowed_states_include_barrier_and_closing"
+    ],
+    "added_files": [
+      "test_task21_room_service.py"
+    ],
+    "restored": true,
+    "seconds": 20.4
+  },
+  {
+    "id": "M06",
+    "side": "be",
+    "want": "test_task21_room_service.py::TestServiceDoesNotDuplicateRepository::test_allowed_states_include_barrier_and_closing",
+    "why": "被撤销的 participant 仍可发起 request ⇒ Property 44「只读/被撤销 contributor 零内容版本」失效",
+    "verdict": "RED",
+    "summary": "1 failed, 153 passed in 17.29s",
+    "added": [
+      "test_task21_room_service.py::TestServiceDoesNotDuplicateRepository::test_allowed_states_include_barrier_and_closing"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task21_room_service.py::TestServiceDoesNotDuplicateRepository::test_allowed_states_include_barrier_and_closing"
+    ],
+    "added_files": [
+      "test_task21_room_service.py"
+    ],
+    "restored": true,
+    "seconds": 20.5
+  },
+  {
+    "id": "M07",
+    "side": "be",
+    "want": "test_task21_room_service_pg.py::test_property_15_every_rejection_branch_has_its_own_error_type[view_mode-ParticipantNotWritableError]",
+    "why": "只读会话可以发起写请求 ⇒ view participant 也能产生内容版本（Property 44）",
+    "verdict": "RED",
+    "summary": "1 failed, 153 passed in 17.23s",
+    "added": [
+      "test_task21_room_service_pg.py::test_property_15_every_rejection_branch_has_its_own_error_type[view_mode-ParticipantNotWritableError]"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task21_room_service_pg.py::test_property_15_every_rejection_branch_has_its_own_error_type[view_mode-ParticipantNotWritableError]"
+    ],
+    "added_files": [
+      "test_task21_room_service_pg.py"
+    ],
+    "restored": true,
+    "seconds": 20.2
+  },
+  {
+    "id": "M08",
+    "side": "be",
+    "want": "test_task21_room_service_pg.py::test_property_15_every_rejection_branch_has_its_own_error_type[participant_joined_at_older_fence-WriteFenceStaleError]",
+    "why": "participant 加入时的 fence 不再比对 ⇒ 有人被撤销后旧会话照样能写，聚合 artifact 会继续带上被撤销用户的贡献（AC 4.7 / Property 63）。判据必须用「只有这一条能生效」的场景（room/confirmation fence 都不变、只调低 participant 的 joined fence）—— 否则第 ⑥ 条 confirmation-fence 会先打红把它遮蔽",
+    "verdict": "RED",
+    "summary": "1 failed, 153 passed in 16.53s",
+    "added": [
+      "test_task21_room_service_pg.py::test_property_15_every_rejection_branch_has_its_own_error_type[participant_joined_at_older_fence-WriteFenceStaleError]"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task21_room_service_pg.py::test_property_15_every_rejection_branch_has_its_own_error_type[participant_joined_at_older_fence-WriteFenceStaleError]"
+    ],
+    "added_files": [
+      "test_task21_room_service_pg.py"
+    ],
+    "restored": true,
+    "seconds": 19.4
+  },
+  {
+    "id": "M09",
+    "side": "be",
+    "want": "test_task21_room_service_pg.py::test_property_15_every_rejection_branch_has_its_own_error_type[stale_descriptor_fence-WriteFenceStaleError]",
+    "why": "descriptor 携带的 fence 不再校验 ⇒ 陈旧 descriptor 可以发起 forcesave（AC 3.7 明确要求拒绝 stale generation/representation/bundle/fence）",
+    "verdict": "RED",
+    "summary": "1 failed, 153 passed in 16.42s",
+    "added": [
+      "test_task21_room_service_pg.py::test_property_15_every_rejection_branch_has_its_own_error_type[stale_descriptor_fence-WriteFenceStaleError]"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task21_room_service_pg.py::test_property_15_every_rejection_branch_has_its_own_error_type[stale_descriptor_fence-WriteFenceStaleError]"
+    ],
+    "added_files": [
+      "test_task21_room_service_pg.py"
+    ],
+    "restored": true,
+    "seconds": 19.4
+  },
+  {
+    "id": "M10",
+    "side": "be",
+    "want": "test_task21_room_service_pg.py::test_property_15_every_rejection_branch_has_its_own_error_type[invalidated_confirmation-DescriptorNotConfirmedError]",
+    "why": "已作废的 confirmation 仍被当成有效 ⇒ fence 提升后作废的确认可以继续用来冻结 base，绕过 generation 轮转",
+    "verdict": "RED",
+    "summary": "1 failed, 153 passed in 16.62s",
+    "added": [
+      "test_task21_room_service_pg.py::test_property_15_every_rejection_branch_has_its_own_error_type[invalidated_confirmation-DescriptorNotConfirmedError]"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task21_room_service_pg.py::test_property_15_every_rejection_branch_has_its_own_error_type[invalidated_confirmation-DescriptorNotConfirmedError]"
+    ],
+    "added_files": [
+      "test_task21_room_service_pg.py"
+    ],
+    "restored": true,
+    "seconds": 19.5
+  },
+  {
+    "id": "M11",
+    "side": "be",
+    "want": "test_task21_room_service_pg.py::test_property_15_every_rejection_branch_has_its_own_error_type[close_capture_from_client-RoomPolicyError]",
+    "why": "客户端可以直接创建 kind=close_capture ⇒ 绕过 `reconcile_close_intents()` 的exactly-one CAS，一个 generation 可能出现多条 close-capture（契约 clean_close.forbidden[0]）",
+    "verdict": "RED",
+    "summary": "2 failed, 152 passed in 16.50s",
+    "added": [
+      "test_task21_room_service.py::TestServiceDoesNotDuplicateRepository::test_close_capture_cannot_be_requested_by_client",
+      "test_task21_room_service_pg.py::test_property_15_every_rejection_branch_has_its_own_error_type[close_capture_from_client-RoomPolicyError]"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task21_room_service_pg.py::test_property_15_every_rejection_branch_has_its_own_error_type[close_capture_from_client-RoomPolicyError]"
+    ],
+    "added_files": [
+      "test_task21_room_service.py",
+      "test_task21_room_service_pg.py"
+    ],
+    "restored": true,
+    "seconds": 19.4
+  },
+  {
+    "id": "M12",
+    "side": "be",
+    "want": "test_task21_room_service_pg.py::test_property_15_every_rejection_branch_has_its_own_error_type[cross_room_participant-ParticipantNotWritableError]",
+    "why": "跨 room 复用 participant id 不再被拒 ⇒ 横向越权（Property 45），且能用别的 room 的 lease 冻结本 room 的 request",
+    "verdict": "RED",
+    "summary": "1 failed, 153 passed in 16.37s",
+    "added": [
+      "test_task21_room_service_pg.py::test_property_15_every_rejection_branch_has_its_own_error_type[cross_room_participant-ParticipantNotWritableError]"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task21_room_service_pg.py::test_property_15_every_rejection_branch_has_its_own_error_type[cross_room_participant-ParticipantNotWritableError]"
+    ],
+    "added_files": [
+      "test_task21_room_service_pg.py"
+    ],
+    "restored": true,
+    "seconds": 19.3
+  },
+  {
+    "id": "M13",
+    "side": "be",
+    "want": "test_task21_room_service_pg.py::test_property_15_every_rejection_branch_has_its_own_error_type[expired_lease-ParticipantNotWritableError]",
+    "why": "过期 lease 仍可写 ⇒ TTL 形同虚设，长期挂着的浏览器标签页能在授权早已失效后继续回写",
+    "verdict": "RED",
+    "summary": "1 failed, 153 passed in 16.52s",
+    "added": [
+      "test_task21_room_service_pg.py::test_property_15_every_rejection_branch_has_its_own_error_type[expired_lease-ParticipantNotWritableError]"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task21_room_service_pg.py::test_property_15_every_rejection_branch_has_its_own_error_type[expired_lease-ParticipantNotWritableError]"
+    ],
+    "added_files": [
+      "test_task21_room_service_pg.py"
+    ],
+    "restored": true,
+    "seconds": 19.4
+  },
+  {
+    "id": "M14",
+    "side": "be",
+    "want": "test_task21_room_service_pg.py::test_ac_3_7_forcesave_blocked_before_descriptor_confirmation",
+    "why": "room 仍 opening 时不再给出「去 confirm-descriptor」这个可操作诊断 ⇒ 退化成笼统的 room_not_writable，前端无从下手（AC 3.7）",
+    "verdict": "RED",
+    "summary": "1 failed, 153 passed in 16.12s",
+    "added": [
+      "test_task21_room_service_pg.py::test_ac_3_7_forcesave_blocked_before_descriptor_confirmation"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task21_room_service_pg.py::test_ac_3_7_forcesave_blocked_before_descriptor_confirmation"
+    ],
+    "added_files": [
+      "test_task21_room_service_pg.py"
+    ],
+    "restored": true,
+    "seconds": 18.8
+  },
+  {
+    "id": "M15",
+    "side": "be",
+    "want": "test_task21_room_service_pg.py::test_property_15_every_rejection_branch_has_its_own_error_type[new_editor_after_barrier-RoomNotWritableError]",
+    "why": "close barrier 冻结后仍允许新 editor 加入该 generation ⇒ active 数刚归零又被拉起来，close-capture 的 leader 仲裁永远等不到条件成立（AC 4.10）",
+    "verdict": "RED",
+    "summary": "1 failed, 153 passed in 16.30s",
+    "added": [
+      "test_task21_room_service_pg.py::test_property_15_every_rejection_branch_has_its_own_error_type[new_editor_after_barrier-RoomNotWritableError]"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task21_room_service_pg.py::test_property_15_every_rejection_branch_has_its_own_error_type[new_editor_after_barrier-RoomNotWritableError]"
+    ],
+    "added_files": [
+      "test_task21_room_service_pg.py"
+    ],
+    "restored": true,
+    "seconds": 19.0
+  },
+  {
+    "id": "M16",
+    "side": "be",
+    "want": "test_task21_room_service_pg.py::test_property_62_server_last_applied_advances_unconditionally",
+    "why": "推进 server last-applied 时顺手把 client 基线也改掉 ⇒ 第二次 forcesave 的三方 merge 会以服务器合并结果为 base，编辑器里真实存在的旧值被当成「用户没改过」而静默丢弃。这是 Property 62 存在的唯一理由",
+    "verdict": "RED",
+    "summary": "1 failed, 153 passed in 16.17s",
+    "added": [
+      "test_task21_room_service_pg.py::test_property_62_server_last_applied_advances_unconditionally"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task21_room_service_pg.py::test_property_62_server_last_applied_advances_unconditionally"
+    ],
+    "added_files": [
+      "test_task21_room_service_pg.py"
+    ],
+    "restored": true,
+    "seconds": 18.9
+  },
+  {
+    "id": "M17",
+    "side": "be",
+    "want": "test_task21_room_service_pg.py::test_ac_2_9_unequal_merge_forces_refresh_required_and_blocks_next_request",
+    "why": "merged≠incoming 时也推进 client 基线 ⇒ 把服务器结果冒充成「客户端已确认基线」，AC 4.11 明令禁止",
+    "verdict": "RED",
+    "summary": "1 failed, 153 passed in 16.12s",
+    "added": [
+      "test_task21_room_service_pg.py::test_ac_2_9_unequal_merge_forces_refresh_required_and_blocks_next_request"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task21_room_service_pg.py::test_ac_2_9_unequal_merge_forces_refresh_required_and_blocks_next_request"
+    ],
+    "added_files": [
+      "test_task21_room_service_pg.py"
+    ],
+    "restored": true,
+    "seconds": 18.9
+  },
+  {
+    "id": "M18",
+    "side": "be",
+    "want": "test_task21_room_service_pg.py::test_ac_2_9_unequal_merge_forces_refresh_required_and_blocks_next_request",
+    "why": "只写 `refresh_required_at` 而不推进 room state ⇒ room 停在 active、`refresh_required` 在状态机与 UI 上都不可见（前端状态条与 close 仲裁都读 state）。这条专门检验判据看的是**状态**而不是「某个时间戳非空」",
+    "verdict": "RED",
+    "summary": "2 failed, 152 passed in 17.13s",
+    "added": [
+      "test_task21_room_service_pg.py::test_ac_2_9_unequal_merge_forces_refresh_required_and_blocks_next_request",
+      "test_task21_room_service_pg.py::test_property_63_writer_revocation_bumps_fence_and_cancels_requests"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task21_room_service_pg.py::test_ac_2_9_unequal_merge_forces_refresh_required_and_blocks_next_request"
+    ],
+    "added_files": [
+      "test_task21_room_service_pg.py"
+    ],
+    "restored": true,
+    "seconds": 19.9
+  },
+  {
+    "id": "M19",
+    "side": "be",
+    "want": "test_task21_room_service_pg.py::test_property_15_every_rejection_branch_has_its_own_error_type[settle_with_blank_digest-RoomPolicyError]",
+    "why": "缺一侧 digest 时不再 fail closed ⇒ 空串 == 空串 会被判成「等值」并推进基线（缺 incoming 就默认等值，是最典型的 fail-open）",
+    "verdict": "RED",
+    "summary": "1 failed, 153 passed in 17.17s",
+    "added": [
+      "test_task21_room_service_pg.py::test_property_15_every_rejection_branch_has_its_own_error_type[settle_with_blank_digest-RoomPolicyError]"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task21_room_service_pg.py::test_property_15_every_rejection_branch_has_its_own_error_type[settle_with_blank_digest-RoomPolicyError]"
+    ],
+    "added_files": [
+      "test_task21_room_service_pg.py"
+    ],
+    "restored": true,
+    "seconds": 20.2
+  },
+  {
+    "id": "M20",
+    "side": "be",
+    "want": "test_task21_room_service.py::TestRoomBaselinesProjection::test_half_missing_snapshot_is_not_established",
+    "why": "半缺快照被当成已建立 ⇒ forcesave 会冻结出一个没有 projection digest 的 client base，三方 merge 的 base 侧直接失真",
+    "verdict": "RED",
+    "summary": "1 failed, 153 passed in 17.01s",
+    "added": [
+      "test_task21_room_service.py::TestRoomBaselinesProjection::test_half_missing_snapshot_is_not_established[client_confirmed_projection_sha256]"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task21_room_service.py::TestRoomBaselinesProjection::test_half_missing_snapshot_is_not_established[client_confirmed_projection_sha256]"
+    ],
+    "added_files": [
+      "test_task21_room_service.py"
+    ],
+    "restored": true,
+    "seconds": 20.0
+  },
+  {
+    "id": "M21",
+    "side": "be",
+    "want": "test_task21_room_service_pg.py::test_property_63_writer_revocation_bumps_fence_and_cancels_requests",
+    "why": "撤销 writer 不提升 write fence ⇒ 其余用户的旧会话仍然合法，聚合文档继续接收可能含被撤销贡献的内容（Task 4 实证 drop 不证明内容已移除）",
+    "verdict": "RED",
+    "summary": "1 failed, 153 passed in 16.87s",
+    "added": [
+      "test_task21_room_service_pg.py::test_property_63_writer_revocation_bumps_fence_and_cancels_requests"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task21_room_service_pg.py::test_property_63_writer_revocation_bumps_fence_and_cancels_requests"
+    ],
+    "added_files": [
+      "test_task21_room_service_pg.py"
+    ],
+    "restored": true,
+    "seconds": 19.9
+  },
+  {
+    "id": "M22",
+    "side": "be",
+    "want": "test_task21_room_service_pg.py::test_property_63_writer_revocation_bumps_fence_and_cancels_requests",
+    "why": "不取消 outstanding request ⇒ 撤销后仍在飞的 forcesave 的 callback 回来时会被正常 correlate 并应用（AC 4.7 要求撤销时取消 outstanding）",
+    "verdict": "RED",
+    "summary": "1 failed, 153 passed in 17.03s",
+    "added": [
+      "test_task21_room_service_pg.py::test_property_63_writer_revocation_bumps_fence_and_cancels_requests"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task21_room_service_pg.py::test_property_63_writer_revocation_bumps_fence_and_cancels_requests"
+    ],
+    "added_files": [
+      "test_task21_room_service_pg.py"
+    ],
+    "restored": true,
+    "seconds": 20.1
+  },
+  {
+    "id": "M23",
+    "side": "be",
+    "want": "test_task21_room_service_pg.py::test_view_participant_revocation_does_not_rotate_generation",
+    "why": "把只读会话撤销也当成 writer 撤销 ⇒ 每次踢掉一个旁观者都要旋转 generation、让所有人重开编辑器（过度反应，且会被误当成「同步一直在断」）",
+    "verdict": "RED",
+    "summary": "2 failed, 152 passed in 16.97s",
+    "added": [
+      "test_task21_room_service_pg.py::test_property_63_writer_revocation_bumps_fence_and_cancels_requests",
+      "test_task21_room_service_pg.py::test_view_participant_revocation_does_not_rotate_generation"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task21_room_service_pg.py::test_view_participant_revocation_does_not_rotate_generation"
+    ],
+    "added_files": [
+      "test_task21_room_service_pg.py"
+    ],
+    "restored": true,
+    "seconds": 20.1
+  },
+  {
+    "id": "M24",
+    "side": "be",
+    "want": "test_task21_room_service.py::TestCallbackContractHasProductionConsumer::test_service_reads_the_revocation_decision_from_the_contract",
+    "why": "撤销裁决在代码里写死而不再读契约 ⇒ 契约被改回 participant-bound 时生产行为不变、也不再 fail closed，真值表退回「只有守卫在读」的死代码状态",
+    "verdict": "RED",
+    "summary": "1 failed, 153 passed in 16.95s",
+    "added": [
+      "test_task21_room_service.py::TestCallbackContractHasProductionConsumer::test_service_reads_the_revocation_decision_from_the_contract"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task21_room_service.py::TestCallbackContractHasProductionConsumer::test_service_reads_the_revocation_decision_from_the_contract"
+    ],
+    "added_files": [
+      "test_task21_room_service.py"
+    ],
+    "restored": true,
+    "seconds": 20.1
+  },
+  {
+    "id": "M25",
+    "side": "be",
+    "want": "test_task21_room_service_pg.py::test_property_63_writer_revocation_bumps_fence_and_cancels_requests",
+    "why": "不记录 OO drop 取证时间 ⇒ 「会话确实被逐出」这条唯一可用证据在审计里消失（契约 status=1 的 actions 是唯一 drop 取证来源）",
+    "verdict": "RED",
+    "summary": "1 failed, 153 passed in 17.14s",
+    "added": [
+      "test_task21_room_service_pg.py::test_property_63_writer_revocation_bumps_fence_and_cancels_requests"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task21_room_service_pg.py::test_property_63_writer_revocation_bumps_fence_and_cancels_requests"
+    ],
+    "added_files": [
+      "test_task21_room_service_pg.py"
+    ],
+    "restored": true,
+    "seconds": 20.2
+  },
+  {
+    "id": "M26",
+    "side": "be",
+    "want": "test_task21_room_service_pg.py::test_ac_2_8_same_generation_reuses_room_instead_of_creating_second",
+    "why": "退化成「总是新建 room」⇒ 第二个用户进来时撞 uq_wpoor_generation，AC 2.8「同一 generation 的协同用户可进入同一 active room」直接 500",
+    "verdict": "RED",
+    "summary": "11 failed, 143 passed in 16.89s",
+    "added": [
+      "test_task21_room_service_pg.py::test_ac_2_8_same_generation_reuses_room_instead_of_creating_second",
+      "test_task21_room_service_pg.py::test_ac_2_8_supersede_rotates_doc_key_for_new_generation",
+      "test_task21_room_service_pg.py::test_application_room_and_generation_are_db_immutable",
+      "test_task21_room_service_pg.py::test_fence_refuses_application_outside_this_room[cross_generation_error]",
+      "test_task21_room_service_pg.py::test_fence_refuses_application_outside_this_room[cross_room_error]",
+      "test_task21_room_service_pg.py::test_fence_refuses_application_outside_this_room[missing_application_error]",
+      "test_task21_room_service_pg.py::test_historical_generation_is_rejected_by_the_publication_gate",
+      "test_task21_room_service_pg.py::test_no_happy_path_phase_crashed_during_collection",
+      "test_task21_room_service_pg.py::test_route_credential_is_minted_from_the_room_row_not_the_caller",
+      "test_task21_room_service_pg.py::test_route_credential_of_another_generation_is_rejected",
+      "test_task21_room_service_pg.py::test_superseded_generation_cannot_be_reopened"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task21_room_service_pg.py::test_ac_2_8_same_generation_reuses_room_instead_of_creating_second",
+      "test_task21_room_service_pg.py::test_superseded_generation_cannot_be_reopened"
+    ],
+    "added_files": [
+      "test_task21_room_service_pg.py"
+    ],
+    "restored": true,
+    "seconds": 20.0
+  },
+  {
+    "id": "M27",
+    "side": "be",
+    "want": "test_task21_room_service_pg.py::test_superseded_generation_cannot_be_reopened",
+    "why": "已 superseded 的代际被当成可复用 ⇒ 撤销后重开会拿到那个已作废的 room，fence/refresh 状态全部带过来，用户看到「打开成功但永远存不上」",
+    "verdict": "RED",
+    "summary": "1 failed, 153 passed in 16.93s",
+    "added": [
+      "test_task21_room_service_pg.py::test_superseded_generation_cannot_be_reopened"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task21_room_service_pg.py::test_superseded_generation_cannot_be_reopened"
+    ],
+    "added_files": [
+      "test_task21_room_service_pg.py"
+    ],
+    "restored": true,
+    "seconds": 20.1
+  },
+  {
+    "id": "M28",
+    "side": "be",
+    "want": "test_task21_room_service_pg.py::test_room_cannot_reuse_representation_of_another_entry",
+    "why": "room 可以拿别的 entry 的 representation ⇒ doc_key 指向的入口与实际打开的文件不是一回事，回写会落到错误入口",
+    "verdict": "RED",
+    "summary": "1 failed, 153 passed in 17.16s",
+    "added": [
+      "test_task21_room_service_pg.py::test_room_cannot_reuse_representation_of_another_entry"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task21_room_service_pg.py::test_room_cannot_reuse_representation_of_another_entry"
+    ],
+    "added_files": [
+      "test_task21_room_service_pg.py"
+    ],
+    "restored": true,
+    "seconds": 20.3
+  },
+  {
+    "id": "M29",
+    "side": "be",
+    "want": "test_task21_room_service_pg.py::test_confirm_descriptor_activates_room_and_sets_client_baseline",
+    "why": "confirm-descriptor 不再写 client-confirmed 基线 ⇒ 后续 forcesave 因「基线未建立」被永久拒绝，或（更糟）退回用 room.opened_base 当客户端基线",
+    "verdict": "RED",
+    "summary": "35 failed, 119 passed in 16.50s",
+    "added": [
+      "test_task21_room_service_pg.py::test_ac_2_9_unequal_merge_forces_refresh_required_and_blocks_next_request",
+      "test_task21_room_service_pg.py::test_ac_4_1_request_freeze_uses_confirmed_base_and_stable_fingerprint",
+      "test_task21_room_service_pg.py::test_accepted_request_creates_pre_correlation_shell_only",
+      "test_task21_room_service_pg.py::test_application_room_and_generation_are_db_immutable",
+      "test_task21_room_service_pg.py::test_confirm_descriptor_activates_room_and_sets_client_baseline",
+      "test_task21_room_service_pg.py::test_contributor_rows_carry_source_and_confidence_per_task4_evidence",
+      "test_task21_room_service_pg.py::test_descriptor_confirmation_freezes_typed_slot_inventory",
+      "test_task21_room_service_pg.py::test_fence_refuses_application_outside_this_room[cross_generation_error]",
+      "test_task21_room_service_pg.py::test_fence_refuses_application_outside_this_room[cross_room_error]",
+      "test_task21_room_service_pg.py::test_fence_refuses_application_outside_this_room[missing_application_error]",
+      "test_task21_room_service_pg.py::test_foreign_participant_does_not_leak_object_existence",
+      "test_task21_room_service_pg.py::test_freeze_base_follows_the_settled_snapshot_not_the_confirmation_row",
+      "test_task21_room_service_pg.py::test_freeze_covers_every_repository_parameter",
+      "test_task21_room_service_pg.py::test_initiator_route_and_contributor_land_in_three_separate_places",
+      "test_task21_room_service_pg.py::test_lower_request_sequence_never_regresses_effective_sequence",
+      "test_task21_room_service_pg.py::test_no_happy_path_phase_crashed_during_collection",
+      "test_task21_room_service_pg.py::test_property_15_every_rejection_branch_has_its_own_error_type[cross_room_participant-ParticipantNotWritableError]",
+      "test_task21_room_service_pg.py::test_property_15_every_rejection_branch_has_its_own_error_type[expired_lease-ParticipantNotWritableError]",
+      "test_task21_room_service_pg.py::test_property_15_every_rejection_branch_has_its_own_error_type[foreign_participant-ParticipantNotWritableError]",
+      "test_task21_room_service_pg.py::test_property_15_every_rejection_branch_has_its_own_error_type[invalidated_confirmation-DescriptorNotConfirmedError]",
+      "test_task21_room_service_pg.py::test_property_15_every_rejection_branch_has_its_own_error_type[participant_joined_at_older_fence-WriteFenceStaleError]",
+      "test_task21_room_service_pg.py::test_property_15_every_rejection_branch_has_its_own_error_type[revoked_participant-ParticipantNotWritableError]",
+      "test_task21_room_service_pg.py::test_property_15_every_rejection_branch_has_its_own_error_type[room_fence_bumped-WriteFenceStaleError]",
+      "test_task21_room_service_pg.py::test_property_15_every_rejection_branch_has_its_own_error_type[stale_descriptor_fence-WriteFenceStaleError]",
+      "test_task21_room_service_pg.py::test_property_15_every_rejection_branch_has_its_own_error_type[view_mode-ParticipantNotWritableError]",
+      "test_task21_room_service_pg.py::test_property_62_client_baseline_advances_only_on_equivalence",
+      "test_task21_room_service_pg.py::test_property_62_server_last_applied_advances_unconditionally",
+      "test_task21_room_service_pg.py::test_property_63_writer_revocation_bumps_fence_and_cancels_requests",
+      "test_task21_room_service_pg.py::test_same_application_higher_request_only_folds_effective_sequence",
+      "test_task21_room_service_pg.py::test_same_canonical_application_cannot_self_supersede",
+      "test_task21_room_service_pg.py::test_server_advance_also_points_room_canonical_fence_at_that_application",
+      "test_task21_room_service_pg.py::test_stale_descriptor_bundle_identity_is_rejected",
+      "test_task21_room_service_pg.py::test_view_participant_cannot_be_the_initiator",
+      "test_task21_room_service_pg.py::test_view_participant_is_never_recorded_as_contributor",
+      "test_task21_room_service_pg.py::test_view_participant_revocation_does_not_rotate_generation"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task21_room_service_pg.py::test_ac_4_1_request_freeze_uses_confirmed_base_and_stable_fingerprint",
+      "test_task21_room_service_pg.py::test_confirm_descriptor_activates_room_and_sets_client_baseline"
+    ],
+    "added_files": [
+      "test_task21_room_service_pg.py"
+    ],
+    "restored": true,
+    "seconds": 19.6
+  },
+  {
+    "id": "M30",
+    "side": "be",
+    "want": "test_task21_room_service_pg.py::test_stale_descriptor_bundle_identity_is_rejected",
+    "why": "descriptor 回传的 bundle identity 不再逐项比对 ⇒ 只比 representation_id 的话，同 representation 上被 alias 换掉的 bundle 不会被发现（AC 3.7 / P28）",
+    "verdict": "RED",
+    "summary": "2 failed, 152 passed in 17.02s",
+    "added": [
+      "test_task21_room_service_pg.py::test_property_15_every_rejection_branch_has_its_own_error_type[unconfirmed_second_participant-DescriptorNotConfirmedError]",
+      "test_task21_room_service_pg.py::test_stale_descriptor_bundle_identity_is_rejected"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task21_room_service_pg.py::test_stale_descriptor_bundle_identity_is_rejected"
+    ],
+    "added_files": [
+      "test_task21_room_service_pg.py"
+    ],
+    "restored": true,
+    "seconds": 20.1
+  },
+  {
+    "id": "M31",
+    "side": "be",
+    "want": "test_task21_room_service_pg.py::test_ac_2_6_participant_lease_is_per_user_in_shared_room",
+    "why": "所有人的 lease token hash 相同 ⇒ 逐人 lease 退化成共享凭证，「同 room 用户的 forcesave 发起权限逐人校验」失去载体（AC 2.6）",
+    "verdict": "RED",
+    "summary": "1 failed, 153 passed in 17.42s",
+    "added": [
+      "test_task21_room_service_pg.py::test_ac_2_6_participant_lease_is_per_user_in_shared_room"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task21_room_service_pg.py::test_ac_2_6_participant_lease_is_per_user_in_shared_room"
+    ],
+    "added_files": [
+      "test_task21_room_service_pg.py"
+    ],
+    "restored": true,
+    "seconds": 20.5
+  },
+  {
+    "id": "M32",
+    "side": "be",
+    "want": "test_task21_room_service_pg.py::test_ac_4_1_request_freeze_uses_confirmed_base_and_stable_fingerprint",
+    "why": "contributor 集合不进 fingerprint ⇒ 不同贡献者集合的两次请求被判成同一次重放并返回旧 request（Requirement 4.1 要求 contributor digest 参与等值比对）",
+    "verdict": "RED",
+    "summary": "1 failed, 153 passed in 20.00s",
+    "added": [
+      "test_task21_room_service_pg.py::test_ac_4_1_request_freeze_uses_confirmed_base_and_stable_fingerprint"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task21_room_service_pg.py::test_ac_4_1_request_freeze_uses_confirmed_base_and_stable_fingerprint"
+    ],
+    "added_files": [
+      "test_task21_room_service_pg.py"
+    ],
+    "restored": true,
+    "seconds": 23.7
+  },
+  {
+    "id": "M33",
+    "side": "be",
+    "want": "test_task21_room_service.py::TestBundleSlotsDigest::test_digest_is_deterministic_and_order_independent",
+    "why": "按 dict 插入序算 typed-slot digest ⇒ 同一 bundle 在 repository 构造与 descriptor 构造两条路径上算出不同值，表现为「明明同一个 bundle 却报 identity 漂移」，而两边都没错",
+    "verdict": "RED",
+    "summary": "2 failed, 152 passed in 16.96s",
+    "added": [
+      "test_task21_room_service.py::TestBundleSlotsDigest::test_digest_is_deterministic_and_order_independent",
+      "test_task21_room_service.py::TestBundleSlotsDigest::test_slot_omission_fails_closed"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task21_room_service.py::TestBundleSlotsDigest::test_digest_is_deterministic_and_order_independent"
+    ],
+    "added_files": [
+      "test_task21_room_service.py"
+    ],
+    "restored": true,
+    "seconds": 20.1
+  },
+  {
+    "id": "M34",
+    "side": "be",
+    "want": "test_task21_room_service.py::TestBundleSlotsDigest::test_slot_omission_fails_closed",
+    "why": "slot 缺席被静默跳过 ⇒ 「缺 instrumentation」与「有 instrumentation」算出同一个 digest，slot omission 不再 fail closed（Requirement 2.3）",
+    "verdict": "RED",
+    "summary": "1 failed, 153 passed in 17.19s",
+    "added": [
+      "test_task21_room_service.py::TestBundleSlotsDigest::test_slot_omission_fails_closed"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task21_room_service.py::TestBundleSlotsDigest::test_slot_omission_fails_closed"
+    ],
+    "added_files": [
+      "test_task21_room_service.py"
+    ],
+    "restored": true,
+    "seconds": 20.3
+  },
+  {
+    "id": "M35",
+    "side": "be",
+    "want": "test_task21_room_service.py::TestContributorSnapshotDigest::test_order_and_case_insensitive_but_membership_sensitive",
+    "why": "contributor 按到达序入 digest ⇒ OO 的 history.changes 顺序随编辑时序变化，同一批贡献者算出不同 digest，合法重放被误判 409",
+    "verdict": "RED",
+    "summary": "2 failed, 152 passed in 16.98s",
+    "added": [
+      "test_task21_room_service.py::TestContributorSnapshotDigest::test_order_and_case_insensitive_but_membership_sensitive",
+      "test_task21_room_service_pg.py::test_ac_4_1_request_freeze_uses_confirmed_base_and_stable_fingerprint"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task21_room_service.py::TestContributorSnapshotDigest::test_order_and_case_insensitive_but_membership_sensitive",
+      "test_task21_room_service_pg.py::test_ac_4_1_request_freeze_uses_confirmed_base_and_stable_fingerprint"
+    ],
+    "added_files": [
+      "test_task21_room_service.py",
+      "test_task21_room_service_pg.py"
+    ],
+    "restored": true,
+    "seconds": 20.1
+  },
+  {
+    "id": "M36",
+    "side": "be",
+    "want": "test_task21_room_service.py::TestCallbackContractHasProductionConsumer::test_loader_rejects_drifted_schema_version",
+    "why": "真值表版本漂移不再 fail closed ⇒ 按已知字段「尽力解析」一个未知版本的契约，未定义语义被静默当成旧语义处理",
+    "verdict": "RED",
+    "summary": "1 failed, 153 passed in 17.17s",
+    "added": [
+      "test_task21_room_service.py::TestCallbackContractHasProductionConsumer::test_loader_rejects_drifted_schema_version"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task21_room_service.py::TestCallbackContractHasProductionConsumer::test_loader_rejects_drifted_schema_version"
+    ],
+    "added_files": [
+      "test_task21_room_service.py"
+    ],
+    "restored": true,
+    "seconds": 20.3
+  },
+  {
+    "id": "M37",
+    "side": "be",
+    "want": "test_task21_room_service.py::TestCallbackContractHasProductionConsumer::test_loader_rejects_redirect_following",
+    "why": "下载策略允许跟随 3xx ⇒ allowlist 与已校验 IP 全部被绕过（SSRF 面重开，Requirement 5.6）",
+    "verdict": "RED",
+    "summary": "1 failed, 153 passed in 17.37s",
+    "added": [
+      "test_task21_room_service.py::TestCallbackContractHasProductionConsumer::test_loader_rejects_redirect_following"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task21_room_service.py::TestCallbackContractHasProductionConsumer::test_loader_rejects_redirect_following"
+    ],
+    "added_files": [
+      "test_task21_room_service.py"
+    ],
+    "restored": true,
+    "seconds": 20.5
+  },
+  {
+    "id": "M38",
+    "side": "be",
+    "want": "test_task21_room_service.py::TestCallbackContractHasProductionConsumer::test_loader_rejects_participant_bound_authorization",
+    "why": "participant-bound callback 授权不再被拒 ⇒ 把 route participant 当成聚合 artifact 的唯一作者，Task 4 已实证三者不同一（Property 63）",
+    "verdict": "RED",
+    "summary": "1 failed, 153 passed in 17.12s",
+    "added": [
+      "test_task21_room_service.py::TestCallbackContractHasProductionConsumer::test_loader_rejects_participant_bound_authorization"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task21_room_service.py::TestCallbackContractHasProductionConsumer::test_loader_rejects_participant_bound_authorization"
+    ],
+    "added_files": [
+      "test_task21_room_service.py"
+    ],
+    "restored": true,
+    "seconds": 20.2
+  },
+  {
+    "id": "M39",
+    "side": "be",
+    "want": "test_task21_room_service.py::TestCallbackContractHasProductionConsumer::test_loader_rejects_grace_swallowing_timeout",
+    "why": "grace 可以大于等于 callback 等待超时 ⇒ grace 永远吃掉超时判定，operation 不可能落可重试 timeout，前端永久 loading（Requirement 4.4）",
+    "verdict": "RED",
+    "summary": "1 failed, 153 passed in 17.24s",
+    "added": [
+      "test_task21_room_service.py::TestCallbackContractHasProductionConsumer::test_loader_rejects_grace_swallowing_timeout"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task21_room_service.py::TestCallbackContractHasProductionConsumer::test_loader_rejects_grace_swallowing_timeout"
+    ],
+    "added_files": [
+      "test_task21_room_service.py"
+    ],
+    "restored": true,
+    "seconds": 20.4
+  },
+  {
+    "id": "M40",
+    "side": "be",
+    "want": "test_task21_room_service.py::TestCallbackContractHasProductionConsumer::test_loader_rejects_emptied_status_table",
+    "why": "status 真值表被削空也能加载 ⇒ 所有 status 都变成「未知」，全部 callback 落 error；或（若 unknown 分支也被放宽）静默 error=0 不留痕",
+    "verdict": "RED",
+    "summary": "1 failed, 153 passed in 17.27s",
+    "added": [
+      "test_task21_room_service.py::TestCallbackContractHasProductionConsumer::test_loader_rejects_emptied_status_table"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task21_room_service.py::TestCallbackContractHasProductionConsumer::test_loader_rejects_emptied_status_table"
+    ],
+    "added_files": [
+      "test_task21_room_service.py"
+    ],
+    "restored": true,
+    "seconds": 20.4
+  },
+  {
+    "id": "M41",
+    "side": "be",
+    "want": "test_task21_room_service.py::TestCallbackContractHasProductionConsumer::test_loader_rejects_application_without_download",
+    "why": "允许「不下载却能建 application」⇒ application 可以建在不存在的 substrate 上，违反「只能以 durable incoming 为 substrate」",
+    "verdict": "RED",
+    "summary": "1 failed, 153 passed in 17.06s",
+    "added": [
+      "test_task21_room_service.py::TestCallbackContractHasProductionConsumer::test_loader_rejects_application_without_download"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task21_room_service.py::TestCallbackContractHasProductionConsumer::test_loader_rejects_application_without_download"
+    ],
+    "added_files": [
+      "test_task21_room_service.py"
+    ],
+    "restored": true,
+    "seconds": 20.1
+  },
+  {
+    "id": "M42",
+    "side": "be",
+    "want": "test_task21_room_service.py::TestCallbackContractHasProductionConsumer::test_normalize_callback_status_never_coerces",
+    "why": "用 `int()` 强转不可信 JSON 的 status ⇒ `int(\"6\")`/`int(6.0)` 会把未知形态猜成已知 status，正是契约 unknown_status_policy.forbidden[1]「按最近似 status 猜测处理」禁止的行为",
+    "verdict": "RED",
+    "summary": "3 failed, 151 passed in 17.10s",
+    "added": [
+      "test_task21_room_service.py::TestCallbackContractHasProductionConsumer::test_normalize_callback_status_never_coerces",
+      "test_task21_room_service.py::TestCallbackContractHasProductionConsumer::test_unknown_status_fails_visible[6.0]",
+      "test_task21_room_service.py::TestCallbackContractHasProductionConsumer::test_unknown_status_fails_visible[bad7]"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task21_room_service.py::TestCallbackContractHasProductionConsumer::test_normalize_callback_status_never_coerces",
+      "test_task21_room_service.py::TestCallbackContractHasProductionConsumer::test_unknown_status_fails_visible[6.0]",
+      "test_task21_room_service.py::TestCallbackContractHasProductionConsumer::test_unknown_status_fails_visible[bad7]"
+    ],
+    "added_files": [
+      "test_task21_room_service.py"
+    ],
+    "restored": true,
+    "seconds": 20.2
+  },
+  {
+    "id": "M43",
+    "side": "be",
+    "want": "test_task21_room_service.py::TestDocKeyIsMtimeFree::test_production_routers_no_longer_derive_doc_key_from_mtime",
+    "why": "把 sheet 端点的 doc_key 退回 mtime 形态 ⇒ 一次写盘就轮转 doc_key、切断进行中的协同会话，且两个用户在不同时刻打开同一底稿会各自进一间房、最后保存的人静默覆盖另一个人的改动。RG-17 的 mtime 门必须立刻在**真实 manifest** 上打红",
+    "verdict": "RED",
+    "summary": "4 failed, 150 passed in 17.14s",
+    "added": [
+      "test_task21_room_service.py::TestDocKeyIsMtimeFree::test_production_routers_no_longer_derive_doc_key_from_mtime",
+      "test_task21_room_service.py::TestDocKeyIsMtimeFree::test_rg17_is_clear_on_the_real_manifest",
+      "test_task21_room_service.py::TestDocKeyIsMtimeFree::test_rg17_still_reds_when_wiring_disappears",
+      "test_task21_room_service.py::TestDocKeyIsMtimeFree::test_room_service_is_wired_into_production_outside_the_package"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task21_room_service.py::TestDocKeyIsMtimeFree::test_production_routers_no_longer_derive_doc_key_from_mtime",
+      "test_task21_room_service.py::TestDocKeyIsMtimeFree::test_rg17_is_clear_on_the_real_manifest"
+    ],
+    "added_files": [
+      "test_task21_room_service.py"
+    ],
+    "restored": true,
+    "seconds": 20.2
+  },
+  {
+    "id": "M44",
+    "side": "be",
+    "want": "test_task21_room_service.py::TestDocKeyIsMtimeFree::test_room_service_is_wired_into_production_outside_the_package",
+    "why": "sheet 端点不再调 room service，改成本地拼一个 key ⇒ room 身份退回「路由各自发明」的状态。这条与 M43 分工不同：M43 检验「mtime 是否回来了」，本条检验「接线判据看的是**真实调用点**而不是 import 存在」—— 只 import 不调用就是additive 死代码（假绿第①源），而本地拼 key 恰好不含 mtime，故 M43 的判据对它完全不敏感，只有接线判据能抓到",
+    "verdict": "RED",
+    "summary": "1 failed, 153 passed in 17.36s",
+    "added": [
+      "test_task21_room_service.py::TestDocKeyIsMtimeFree::test_room_service_is_wired_into_production_outside_the_package"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task21_room_service.py::TestDocKeyIsMtimeFree::test_room_service_is_wired_into_production_outside_the_package"
+    ],
+    "added_files": [
+      "test_task21_room_service.py"
+    ],
+    "restored": true,
+    "seconds": 20.5
+  },
+  {
+    "id": "M45",
+    "side": "be",
+    "want": "test_task21_room_service.py::TestDocKeyIsMtimeFree::test_seam_does_not_use_file_version_or_prefill_state",
+    "why": "Word 端点退回用 `file_version` 当文档身份 ⇒ Requirement 2.1 明文禁止它充当跨通道同步版本；且 `file_version` 由文件生命周期驱动，会在与内容无关的时刻轮转 doc_key",
+    "verdict": "RED",
+    "summary": "2 failed, 152 passed in 16.98s",
+    "added": [
+      "test_task21_room_service.py::TestDocKeyIsMtimeFree::test_room_service_is_wired_into_production_outside_the_package",
+      "test_task21_room_service.py::TestDocKeyIsMtimeFree::test_seam_does_not_use_file_version_or_prefill_state"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task21_room_service.py::TestDocKeyIsMtimeFree::test_seam_does_not_use_file_version_or_prefill_state"
+    ],
+    "added_files": [
+      "test_task21_room_service.py"
+    ],
+    "restored": true,
+    "seconds": 20.1
+  },
+  {
+    "id": "M46",
+    "side": "be",
+    "want": "test_task21_room_service.py::TestDocKeyIsMtimeFree::test_seam_entry_id_separates_sheet_whole_workbook_and_word",
+    "why": "所有 sheet 与整册视图共享一个 entry_id ⇒ 整册视图会拿到缓存的单 sheet 副本（其余 sheet 已被 openpyxl 隐藏），用户看到的「完整 Excel」只有一张表。旧实现正是靠 mtime 轮转掩盖这一点",
+    "verdict": "RED",
+    "summary": "1 failed, 153 passed in 17.20s",
+    "added": [
+      "test_task21_room_service.py::TestDocKeyIsMtimeFree::test_seam_entry_id_separates_sheet_whole_workbook_and_word"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task21_room_service.py::TestDocKeyIsMtimeFree::test_seam_entry_id_separates_sheet_whole_workbook_and_word"
+    ],
+    "added_files": [
+      "test_task21_room_service.py"
+    ],
+    "restored": true,
+    "seconds": 20.3
+  },
+  {
+    "id": "M47",
+    "side": "be",
+    "want": "test_task21_room_service.py::TestDocKeyIsMtimeFree::test_seam_entry_id_separates_sheet_whole_workbook_and_word",
+    "why": "空 sheet 名不再 fail closed ⇒ 所有「拿不到 sheet 名」的请求撞进同一个 room身份，回写会落到错误入口",
+    "verdict": "RED",
+    "summary": "1 failed, 153 passed in 16.96s",
+    "added": [
+      "test_task21_room_service.py::TestDocKeyIsMtimeFree::test_seam_entry_id_separates_sheet_whole_workbook_and_word"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task21_room_service.py::TestDocKeyIsMtimeFree::test_seam_entry_id_separates_sheet_whole_workbook_and_word"
+    ],
+    "added_files": [
+      "test_task21_room_service.py"
+    ],
+    "restored": true,
+    "seconds": 20.0
+  },
+  {
+    "id": "M48",
+    "side": "be",
+    "want": "test_task21_room_service_pg.py::test_only_published_non_candidate_drift_free_representation_enters_room[no_pointer-representation_not_published]",
+    "why": "没有 current pointer 也能开 room ⇒ 「有 representation 行」被当成「已发布」，AC 2.5 要求的是 published representation",
+    "verdict": "RED",
+    "summary": "7 failed, 147 passed in 16.85s",
+    "added": [
+      "test_task21_room_service_pg.py::test_admission_gate_lets_the_published_representation_through",
+      "test_task21_room_service_pg.py::test_database_itself_refuses_representation_row_drift",
+      "test_task21_room_service_pg.py::test_no_happy_path_phase_crashed_during_collection",
+      "test_task21_room_service_pg.py::test_only_published_non_candidate_drift_free_representation_enters_room[alias_drift-bundle_alias_drift]",
+      "test_task21_room_service_pg.py::test_only_published_non_candidate_drift_free_representation_enters_room[authority_drift-bundle_alias_drift]",
+      "test_task21_room_service_pg.py::test_only_published_non_candidate_drift_free_representation_enters_room[no_pointer-representation_not_published]",
+      "test_task21_room_service_pg.py::test_only_published_non_candidate_drift_free_representation_enters_room[staged_candidate-representation_not_published]"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task21_room_service_pg.py::test_only_published_non_candidate_drift_free_representation_enters_room[no_pointer-representation_not_published]"
+    ],
+    "added_files": [
+      "test_task21_room_service_pg.py"
+    ],
+    "restored": true,
+    "seconds": 19.9
+  },
+  {
+    "id": "M49",
+    "side": "be",
+    "want": "test_task21_room_service_pg.py::test_historical_generation_is_rejected_by_the_publication_gate",
+    "why": "历史代际（已被新代际取代）仍可开 room ⇒ 旧 generation 的 room 被重新挂给 OO，旧会话继续往已作废代际里写",
+    "verdict": "RED",
+    "summary": "1 failed, 153 passed in 17.17s",
+    "added": [
+      "test_task21_room_service_pg.py::test_historical_generation_is_rejected_by_the_publication_gate"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task21_room_service_pg.py::test_historical_generation_is_rejected_by_the_publication_gate"
+    ],
+    "added_files": [
+      "test_task21_room_service_pg.py"
+    ],
+    "restored": true,
+    "seconds": 20.3
+  },
+  {
+    "id": "M50",
+    "side": "be",
+    "want": "test_task21_room_service_pg.py::test_only_published_non_candidate_drift_free_representation_enters_room[staged_candidate-representation_not_published]",
+    "why": "未 finalize 的 upgrade candidate 的 staged 产物可以进 room ⇒ 违反「candidate 的 resolver/room/current pointer 均不得读取」，编辑器会打开一份尚未验收的升级产物",
+    "verdict": "RED",
+    "summary": "1 failed, 153 passed in 16.97s",
+    "added": [
+      "test_task21_room_service_pg.py::test_only_published_non_candidate_drift_free_representation_enters_room[staged_candidate-representation_not_published]"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task21_room_service_pg.py::test_only_published_non_candidate_drift_free_representation_enters_room[staged_candidate-representation_not_published]"
+    ],
+    "added_files": [
+      "test_task21_room_service_pg.py"
+    ],
+    "restored": true,
+    "seconds": 20.0
+  },
+  {
+    "id": "M51",
+    "side": "be",
+    "want": "test_task21_room_service_pg.py::test_only_published_non_candidate_drift_free_representation_enters_room[alias_drift-bundle_alias_drift]",
+    "why": "representation 冻结的 bundle digest 不再与 bundle 行比对 ⇒ bundle 被 registry alias 换过内容时，descriptor 会冻结一份「id 相同、内容已换」的假身份（AC 2.10「历史读取不得按当前 registry alias 重组 bundle」）",
+    "verdict": "RED",
+    "summary": "1 failed, 153 passed in 16.58s",
+    "added": [
+      "test_task21_room_service_pg.py::test_only_published_non_candidate_drift_free_representation_enters_room[alias_drift-bundle_alias_drift]"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task21_room_service_pg.py::test_only_published_non_candidate_drift_free_representation_enters_room[alias_drift-bundle_alias_drift]"
+    ],
+    "added_files": [
+      "test_task21_room_service_pg.py"
+    ],
+    "restored": true,
+    "seconds": 19.4
+  },
+  {
+    "id": "M52",
+    "side": "be",
+    "want": "test_task21_room_service_pg.py::test_only_published_non_candidate_drift_free_representation_enters_room[authority_drift-bundle_alias_drift]",
+    "why": "authority model definition 被换成另一份也不再被发现 ⇒ 权威模型漂移（projection_contract ↔ custom_authoritative_ooxml）会静默改变整条回写语义",
+    "verdict": "RED",
+    "summary": "1 failed, 153 passed in 24.11s",
+    "added": [
+      "test_task21_room_service_pg.py::test_only_published_non_candidate_drift_free_representation_enters_room[authority_drift-bundle_alias_drift]"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task21_room_service_pg.py::test_only_published_non_candidate_drift_free_representation_enters_room[authority_drift-bundle_alias_drift]"
+    ],
+    "added_files": [
+      "test_task21_room_service_pg.py"
+    ],
+    "restored": true,
+    "seconds": 26.9
+  },
+  {
+    "id": "M53",
+    "side": "be",
+    "want": "test_task21_room_service.py::TestRouteCredentialIsRoomScoped::test_deterministic_and_bound_to_all_three_components",
+    "why": "凭证只绑 room ⇒ generation 旋转后旧 callback 仍然合法，AC 2.8 的 supersede 形同虚设；doc_key 相同而 room 被重建的情形也无法区分",
+    "verdict": "RED",
+    "summary": "3 failed, 151 passed in 16.17s",
+    "added": [
+      "test_task21_room_service.py::TestRouteCredentialIsRoomScoped::test_assert_route_credential_rejects_foreign_credential",
+      "test_task21_room_service.py::TestRouteCredentialIsRoomScoped::test_deterministic_and_bound_to_all_three_components",
+      "test_task21_room_service_pg.py::test_route_credential_of_another_generation_is_rejected"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task21_room_service.py::TestRouteCredentialIsRoomScoped::test_deterministic_and_bound_to_all_three_components"
+    ],
+    "added_files": [
+      "test_task21_room_service.py",
+      "test_task21_room_service_pg.py"
+    ],
+    "restored": true,
+    "seconds": 18.9
+  },
+  {
+    "id": "M54",
+    "side": "be",
+    "want": "test_task21_room_service.py::TestRouteCredentialIsRoomScoped::test_assert_route_credential_rejects_foreign_credential",
+    "why": "任何 credential 都被接受 ⇒ callback 的 room/generation 绑定失效，攻击者可自选凭证（Requirement 5.1）",
+    "verdict": "RED",
+    "summary": "2 failed, 152 passed in 16.35s",
+    "added": [
+      "test_task21_room_service.py::TestRouteCredentialIsRoomScoped::test_assert_route_credential_rejects_foreign_credential",
+      "test_task21_room_service_pg.py::test_route_credential_of_another_generation_is_rejected"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task21_room_service.py::TestRouteCredentialIsRoomScoped::test_assert_route_credential_rejects_foreign_credential",
+      "test_task21_room_service_pg.py::test_route_credential_of_another_generation_is_rejected"
+    ],
+    "added_files": [
+      "test_task21_room_service.py",
+      "test_task21_room_service_pg.py"
+    ],
+    "restored": true,
+    "seconds": 19.1
+  },
+  {
+    "id": "M55",
+    "side": "be",
+    "want": "test_task21_room_service_pg.py::test_route_credential_is_minted_from_the_room_row_not_the_caller",
+    "why": "凭证的 generation 不再取自 room 行 ⇒ 所有代际共用一个凭证，旧代际 callback 永久合法",
+    "verdict": "RED",
+    "summary": "1 failed, 153 passed in 16.22s",
+    "added": [
+      "test_task21_room_service_pg.py::test_route_credential_is_minted_from_the_room_row_not_the_caller"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task21_room_service_pg.py::test_route_credential_is_minted_from_the_room_row_not_the_caller"
+    ],
+    "added_files": [
+      "test_task21_room_service_pg.py"
+    ],
+    "restored": true,
+    "seconds": 19.0
+  },
+  {
+    "id": "M56",
+    "side": "be",
+    "want": "test_task21_room_service.py::TestContributorDomainMatchesSchemaAndContract::test_room_service_reads_contributor_source_from_the_contract",
+    "why": "contributor 来源不再从 Task 4 契约读 ⇒ 退回「只有守卫在读真值表」的死代码状态；且 `users` 在 status 6 只含最后编辑者一人，审计快照会丢掉全部并发贡献者",
+    "verdict": "RED",
+    "summary": "6 failed, 148 passed in 16.28s",
+    "added": [
+      "test_task21_room_service.py::TestContributorDomainMatchesSchemaAndContract::test_room_service_reads_contributor_source_from_the_contract",
+      "test_task21_room_service_pg.py::test_contributor_rows_carry_source_and_confidence_per_task4_evidence",
+      "test_task21_room_service_pg.py::test_initiator_route_and_contributor_land_in_three_separate_places",
+      "test_task21_room_service_pg.py::test_no_happy_path_phase_crashed_during_collection",
+      "test_task21_room_service_pg.py::test_view_participant_cannot_be_the_initiator",
+      "test_task21_room_service_pg.py::test_view_participant_is_never_recorded_as_contributor"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task21_room_service.py::TestContributorDomainMatchesSchemaAndContract::test_room_service_reads_contributor_source_from_the_contract",
+      "test_task21_room_service_pg.py::test_initiator_route_and_contributor_land_in_three_separate_places"
+    ],
+    "added_files": [
+      "test_task21_room_service.py",
+      "test_task21_room_service_pg.py"
+    ],
+    "restored": true,
+    "seconds": 19.1
+  },
+  {
+    "id": "M57",
+    "side": "be",
+    "want": "test_task21_room_service_pg.py::test_contributor_rows_carry_source_and_confidence_per_task4_evidence",
+    "why": "OO 派生的 contributor 被标成 `exact` ⇒ 把审计快照当授权凭据用。Task 4 §4 实证`history.changes` 在用户被 `c=drop` 之后**仍然列出该用户**，所以它永远达不到 exact（契约 contributor_snapshot_caveat）",
+    "verdict": "RED",
+    "summary": "1 failed, 153 passed in 16.12s",
+    "added": [
+      "test_task21_room_service_pg.py::test_contributor_rows_carry_source_and_confidence_per_task4_evidence"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task21_room_service_pg.py::test_contributor_rows_carry_source_and_confidence_per_task4_evidence"
+    ],
+    "added_files": [
+      "test_task21_room_service_pg.py"
+    ],
+    "restored": true,
+    "seconds": 18.9
+  },
+  {
+    "id": "M58",
+    "side": "be",
+    "want": "test_task21_room_service_pg.py::test_view_participant_is_never_recorded_as_contributor",
+    "why": "只读会话被记成 contributor ⇒ Property 44「只读或被撤销 contributor 零内容版本」失效，审计上会出现「旁观者贡献了内容」",
+    "verdict": "RED",
+    "summary": "1 failed, 153 passed in 16.24s",
+    "added": [
+      "test_task21_room_service_pg.py::test_view_participant_is_never_recorded_as_contributor"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task21_room_service_pg.py::test_view_participant_is_never_recorded_as_contributor"
+    ],
+    "added_files": [
+      "test_task21_room_service_pg.py"
+    ],
+    "restored": true,
+    "seconds": 18.9
+  },
+  {
+    "id": "M59",
+    "side": "be",
+    "want": "test_task21_room_service_pg.py::test_view_participant_cannot_be_the_initiator",
+    "why": "只读 participant 可以当 forcesave initiator ⇒ view 会话间接产生内容版本",
+    "verdict": "RED",
+    "summary": "1 failed, 153 passed in 16.10s",
+    "added": [
+      "test_task21_room_service_pg.py::test_view_participant_cannot_be_the_initiator"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task21_room_service_pg.py::test_view_participant_cannot_be_the_initiator"
+    ],
+    "added_files": [
+      "test_task21_room_service_pg.py"
+    ],
+    "restored": true,
+    "seconds": 18.8
+  },
+  {
+    "id": "M60",
+    "side": "be",
+    "want": "test_task21_room_service.py::TestContributorDomainMatchesSchemaAndContract::test_source_and_confidence_enums_equal_the_v151_check_domains",
+    "why": "Python 侧封闭域多出一个值而 V151 的 CHECK 不认 ⇒ 写库在生产才炸；两处真源必须双向锁死",
+    "verdict": "RED",
+    "summary": "1 failed, 153 passed in 16.16s",
+    "added": [
+      "test_task21_room_service.py::TestContributorDomainMatchesSchemaAndContract::test_source_and_confidence_enums_equal_the_v151_check_domains"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task21_room_service.py::TestContributorDomainMatchesSchemaAndContract::test_source_and_confidence_enums_equal_the_v151_check_domains"
+    ],
+    "added_files": [
+      "test_task21_room_service.py"
+    ],
+    "restored": true,
+    "seconds": 19.0
+  },
+  {
+    "id": "M61",
+    "side": "be",
+    "want": "test_task21_room_service_pg.py::test_lower_request_sequence_never_regresses_effective_sequence",
+    "why": "不再取 GREATEST ⇒ 迟到的**较低** sequence 会把 effective 拉回去，Task 27 的 resolve 于是把更新的裁决判成 stale",
+    "verdict": "RED",
+    "summary": "8 failed, 146 passed in 16.12s",
+    "added": [
+      "test_task21_room_service_pg.py::test_application_room_and_generation_are_db_immutable",
+      "test_task21_room_service_pg.py::test_fence_refuses_application_outside_this_room[cross_generation_error]",
+      "test_task21_room_service_pg.py::test_fence_refuses_application_outside_this_room[cross_room_error]",
+      "test_task21_room_service_pg.py::test_fence_refuses_application_outside_this_room[missing_application_error]",
+      "test_task21_room_service_pg.py::test_lower_request_sequence_never_regresses_effective_sequence",
+      "test_task21_room_service_pg.py::test_no_happy_path_phase_crashed_during_collection",
+      "test_task21_room_service_pg.py::test_same_application_higher_request_only_folds_effective_sequence",
+      "test_task21_room_service_pg.py::test_same_canonical_application_cannot_self_supersede"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task21_room_service_pg.py::test_lower_request_sequence_never_regresses_effective_sequence"
+    ],
+    "added_files": [
+      "test_task21_room_service_pg.py"
+    ],
+    "restored": true,
+    "seconds": 18.9
+  },
+  {
+    "id": "M62",
+    "side": "be",
+    "want": "test_task21_room_service_pg.py::test_same_application_higher_request_only_folds_effective_sequence",
+    "why": "同 application key 的较高 request 不再抬高 `effective_request_sequence` ⇒ fold 语义整条丢失，后续 request 会被当成「更旧」而被 supersede",
+    "verdict": "RED",
+    "summary": "2 failed, 152 passed in 16.12s",
+    "added": [
+      "test_task21_room_service_pg.py::test_lower_request_sequence_never_regresses_effective_sequence",
+      "test_task21_room_service_pg.py::test_same_application_higher_request_only_folds_effective_sequence"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task21_room_service_pg.py::test_same_application_higher_request_only_folds_effective_sequence"
+    ],
+    "added_files": [
+      "test_task21_room_service_pg.py"
+    ],
+    "restored": true,
+    "seconds": 18.9
+  },
+  {
+    "id": "M63",
+    "side": "be",
+    "want": "test_task21_room_service_pg.py::test_fence_refuses_application_outside_this_room[cross_room_error]",
+    "why": "别的 room 的 application 可以推进本 room 的 fence ⇒ 等价于「用别的文档的 durable 事实给本房间放行」。判据必须用**同 generation** 的另一个 room，否则 generation 判据会先命中并遮蔽本条",
+    "verdict": "RED",
+    "summary": "2 failed, 152 passed in 16.28s",
+    "added": [
+      "test_task21_room_service_pg.py::test_fence_refuses_application_outside_this_room[cross_generation_error]",
+      "test_task21_room_service_pg.py::test_fence_refuses_application_outside_this_room[cross_room_error]"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task21_room_service_pg.py::test_fence_refuses_application_outside_this_room[cross_generation_error]",
+      "test_task21_room_service_pg.py::test_fence_refuses_application_outside_this_room[cross_room_error]"
+    ],
+    "added_files": [
+      "test_task21_room_service_pg.py"
+    ],
+    "restored": true,
+    "seconds": 19.2
+  },
+  {
+    "id": "M64",
+    "side": "be",
+    "want": "test_task21_room_service_pg.py::test_fence_refuses_application_outside_this_room[missing_application_error]",
+    "why": "不存在的 application 静默通过 ⇒ room 的 `latest_durable_application_id` 会被指向一个悬空 FK（或直接 AttributeError 500）。原 M64 的落点已被证明是死代码，见上方注释",
+    "verdict": "RED",
+    "summary": "2 failed, 152 passed in 17.17s",
+    "added": [
+      "test_task21_room_service_pg.py::test_fence_refuses_application_outside_this_room[missing_application_error]",
+      "test_task21_room_service_pg.py::test_no_happy_path_phase_crashed_during_collection"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task21_room_service_pg.py::test_fence_refuses_application_outside_this_room[missing_application_error]"
+    ],
+    "added_files": [
+      "test_task21_room_service_pg.py"
+    ],
+    "restored": true,
+    "seconds": 20.2
+  },
+  {
+    "id": "M65",
+    "side": "be",
+    "want": "test_task21_room_service_pg.py::test_server_advance_also_points_room_canonical_fence_at_that_application",
+    "why": "传 0 给 room fence ⇒ 仓储侧的单调守卫直接 return，room 的 `latest_durable_application_id/latest_durable_sequence` 永不推进。于是出现「server 已推进、canonical fence 还指着上一个 application」的中间态，Task 27 的 resolve 读到它会把一次合法 resolve 判成 stale（AC 10.11 要求二者在同一 room lock 事务内原子决定）",
+    "verdict": "RED",
+    "summary": "1 failed, 153 passed in 16.86s",
+    "added": [
+      "test_task21_room_service_pg.py::test_same_application_higher_request_only_folds_effective_sequence"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task21_room_service_pg.py::test_same_application_higher_request_only_folds_effective_sequence"
+    ],
+    "added_files": [
+      "test_task21_room_service_pg.py"
+    ],
+    "restored": true,
+    "seconds": 19.8
+  },
+  {
+    "id": "M66",
+    "side": "be",
+    "want": "test_task21_room_service_pg.py::test_freeze_base_follows_the_settled_snapshot_not_the_confirmation_row",
+    "why": "退回从 immutable 的 confirmation 行取 base ⇒ `settle_client_baseline` 推进过快照之后，第二次 forcesave 的三方 merge 仍以「打开时那一版」为 base，第一次已合并进去的改动会被当成本次新改动**再合一遍**；若第一次做过冲突裁决，裁决结果会被这次重放覆盖（AC 4.11「后续 request 从该确认快照冻结 bundle/base」）",
+    "verdict": "RED",
+    "summary": "1 failed, 153 passed in 16.87s",
+    "added": [
+      "test_task21_room_service_pg.py::test_freeze_base_follows_the_settled_snapshot_not_the_confirmation_row"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task21_room_service_pg.py::test_freeze_base_follows_the_settled_snapshot_not_the_confirmation_row"
+    ],
+    "added_files": [
+      "test_task21_room_service_pg.py"
+    ],
+    "restored": true,
+    "seconds": 19.9
+  },
+  {
+    "id": "M67",
+    "side": "be",
+    "want": "test_task21_room_service_pg.py::test_freeze_base_follows_the_settled_snapshot_not_the_confirmation_row",
+    "why": "projection digest 仍取旧 confirmation ⇒ base 版本对了但 projection 摘要没跟上，三方 merge 的 base 侧失真（比整体不跟进更难查：版本号看着是对的）",
+    "verdict": "RED",
+    "summary": "1 failed, 153 passed in 17.58s",
+    "added": [
+      "test_task21_room_service_pg.py::test_freeze_base_follows_the_settled_snapshot_not_the_confirmation_row"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task21_room_service_pg.py::test_freeze_base_follows_the_settled_snapshot_not_the_confirmation_row"
+    ],
+    "added_files": [
+      "test_task21_room_service_pg.py"
+    ],
+    "restored": true,
+    "seconds": 20.6
+  }
+]

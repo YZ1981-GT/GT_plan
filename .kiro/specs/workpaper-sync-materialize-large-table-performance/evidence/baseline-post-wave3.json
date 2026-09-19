@@ -1,0 +1,53 @@
+{
+  "script": "profile_materialize_large_table.py",
+  "spec": "workpaper-sync-materialize-large-table-performance",
+  "task": "Wave 0 Task 1",
+  "engine": "materialize_projection",
+  "template": "D/D2-1至D2-4  应收账款- 审定表明细表（Leap-常规程序）.xlsx",
+  "template_sha256": "31e7992ba1e83952620e1777d108b46f7e7817dcdc9484c07f079f1dd3af0afa",
+  "samples": [
+    {
+      "rows": 10,
+      "seconds": 0.4454,
+      "seconds_per_row": 0.044541,
+      "field_count": 390,
+      "artifact_sha256": "c0e20106044225911169b421fa7a5eb3acdf1a49a6f76d9adb3465e5b670567f",
+      "write_strategy": "ExcelWriteStrategy.zip_patch"
+    },
+    {
+      "rows": 50,
+      "seconds": 0.7873,
+      "seconds_per_row": 0.015746,
+      "field_count": 1950,
+      "artifact_sha256": "de917e6a92d4d46556e1ee5f09663ee8a3944f7179ca6bacec06629532e8b2b8",
+      "write_strategy": "ExcelWriteStrategy.zip_patch"
+    },
+    {
+      "rows": 200,
+      "seconds": 1.8478,
+      "seconds_per_row": 0.009239,
+      "field_count": 7800,
+      "artifact_sha256": "c87d7aa3bbc7bbd7614567b10f05ce682690dc2a816428b4b01aa68d449d2141",
+      "write_strategy": "ExcelWriteStrategy.zip_patch"
+    },
+    {
+      "rows": 729,
+      "seconds": 5.6397,
+      "seconds_per_row": 0.007736,
+      "field_count": 28431,
+      "artifact_sha256": "11c54be5d6c5d20c1eb2bb5f139b53a09532736dc062010e1b8d2ef383b8f8df",
+      "write_strategy": "ExcelWriteStrategy.zip_patch"
+    }
+  ],
+  "linearity": {
+    "passed": true,
+    "ref_rows": 200,
+    "max_rows": 729,
+    "ref_seconds_per_row": 0.009239,
+    "max_seconds_per_row": 0.007736,
+    "tolerance": 1.15,
+    "limit": 0.010625,
+    "ratio": 0.8373,
+    "reason": "seconds_per_row[729]=0.007736 <= seconds_per_row[200]×1.15=0.010625"
+  }
+}

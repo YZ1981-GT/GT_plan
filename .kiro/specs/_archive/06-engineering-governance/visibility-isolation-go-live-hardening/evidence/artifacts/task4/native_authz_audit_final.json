@@ -1,0 +1,43 @@
+{
+  "baseline_native_authz_total": 72,
+  "classification": {
+    "gated": 19,
+    "justified_allowlist": 52,
+    "leak_risk_deferred": 0,
+    "worker_justified": 1
+  },
+  "classified_total": 72,
+  "component": "H3 NativeAuthzAuditor",
+  "flip_condition_met": true,
+  "flip_condition_note": "Task 4 marker flips ONLY when leak_risk_deferred==0 AND unaudited==0 (every native_authz entry gated-or-allowlisted with guard enforcing). leak_risk_deferred entries are honest, recorded GAPs (not silent pass) with precise remediation; they block the flip until wired to Wp_Bound_Gate.",
+  "gated_routes": [
+    "DELETE /api/attachments/{attachment_id}/link/{link_id}",
+    "GET /api/attachments/{attachment_id}/links",
+    "GET /api/attachments/{attachment_id}/preview-pdf",
+    "GET /api/process-record/attachments/{attachment_id}/workpapers",
+    "GET /api/projects/{project_id}/bulk-tab/export/{task_id}/download",
+    "GET /api/projects/{project_id}/workpapers/search",
+    "POST /api/attachments/{attachment_id}/link",
+    "POST /api/attachments/{attachment_id}/ocr-fields",
+    "POST /api/projects/{project_id}/bulk-tab/import/rollback",
+    "POST /api/projects/{project_id}/excel-html/sync-from-onlyoffice/{file_stem}",
+    "POST /api/projects/{project_id}/working-papers/batch-export",
+    "POST /api/projects/{project_id}/working-papers/batch-export-async",
+    "POST /api/projects/{project_id}/working-papers/download-pack",
+    "POST /api/projects/{project_id}/workpapers/batch-export",
+    "POST /api/projects/{project_id}/workpapers/batch-export-enhanced",
+    "POST /api/projects/{project_id}/workpapers/batch-prefill",
+    "POST /api/projects/{project_id}/workpapers/download-pack",
+    "POST /api/projects/{project_id}/workpapers/import-enhanced",
+    "POST /api/projects/{project_id}/workpapers/import/resolve"
+  ],
+  "leak_risk_deferred_routes": [],
+  "live_native_authz_http_remaining": 52,
+  "reviewer": "visibility-isolation-go-live-hardening/task4-native-authz-auditor",
+  "spec": "visibility-isolation-go-live-hardening",
+  "task_id": "4. 审计 72 条 native_authz 入口（R3）",
+  "unaudited_http": 0,
+  "worker_routes": [
+    "app.workers.procedure_dispatcher_worker:run"
+  ]
+}

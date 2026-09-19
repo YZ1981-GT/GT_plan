@@ -356,3 +356,79 @@ async def test_bulk_copy_vs_insert_results_identical(session_factory):
     assert insert_row.company_code == copy_row.company_code
     assert insert_row.year == copy_row.year
     assert insert_row.is_deleted == copy_row.is_deleted
+
+
+@pytest.mark.asyncio
+async def test_bulk_copy_staged_injects_tenant_id_when_missing(session_factory):
+    """回归：rows 不含 tenant_id 时 COPY 路径必须注入 'default'（COPY 跳过 server_default）。
+
+    根因（2026-06-08）：asyncpg copy_records_to_table 写 raw 数据不触发 PG server_default，
+    tenant_id NOT NULL 列若不显式注入会 NULL violation 导致整批 COPY 失败降级 INSERT。
+    """
+    rows = [
+        {
+            "account_code": "TENANT_COPY_1",
+            "account_name": "no-tenant",
+            "closing_balance": Decimal("1"),
+            "company_code": "001",
+        },
+    ]
+    dataset_id = uuid.uuid4()
+    n = await bulk_copy_staged(
+        session_factory,
+        TbBalance,
+        rows,
+        project_id=_TEST_PROJECT_ID,
+        year=_TEST_YEAR,
+        dataset_id=dataset_id,
+    )
+    assert n == 1
+
+    async with session_factory() as db:
+        row = (
+            await db.execute(
+                sa.select(TbBalance).where(
+                    TbBalance.project_id == _TEST_PROJECT_ID,
+                    TbBalance.account_code == "TENANT_COPY_1",
+                )
+            )
+        ).scalar_one()
+    assert row.tenant_id == "default"
+
+
+@pytest.mark.asyncio
+async def test_bulk_insert_staged_injects_tenant_id_when_missing(session_factory):
+    """回归：rows 不含 tenant_id 时 INSERT 降级路径也必须注入 'default'。
+
+    防御纵深：bulk_copy_staged 失败降级到 bulk_insert_staged 时，
+    若 INSERT 路径不注入 tenant_id 则 fallback 仍 NULL violation（用户实测踩坑）。
+    """
+    rows = [
+        {
+            "account_code": "TENANT_INSERT_1",
+            "account_name": "no-tenant",
+            "closing_balance": Decimal("1"),
+            "company_code": "001",
+        },
+    ]
+    dataset_id = uuid.uuid4()
+    n = await bulk_insert_staged(
+        session_factory,
+        TbBalance,
+        rows,
+        project_id=_TEST_PROJECT_ID,
+        year=_TEST_YEAR,
+        dataset_id=dataset_id,
+    )
+    assert n == 1
+
+    async with session_factory() as db:
+        row = (
+            await db.execute(
+                sa.select(TbBalance).where(
+                    TbBalance.project_id == _TEST_PROJECT_ID,
+                    TbBalance.account_code == "TENANT_INSERT_1",
+                )
+            )
+        ).scalar_one()
+    assert row.tenant_id == "default"

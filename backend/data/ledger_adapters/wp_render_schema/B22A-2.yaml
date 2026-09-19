@@ -1,0 +1,86 @@
+# B22A-2.yaml — 企业层面控制：管理层凌驾控制之上的风险
+# componentType: d-form-table
+# Requirements: G5 企业层面控制 — 每项控制=一行，结论列+引用依据列
+# Design: §1.1 B22A-2 → d-form-table
+
+wp_code: B22A-2
+template_path: backend/wp_templates/B/B22A-2 企业层面控制（管理层凌驾）.xlsx
+template_version: v2025-R5
+
+sheets:
+  管理层凌驾:
+    component_type: d-form-table
+    form_type: table
+    title: 企业层面控制—管理层凌驾控制之上的风险
+    description: 评价管理层凌驾内部控制的风险及相关防范措施
+
+    fields:
+      - field: entity_name
+        label: 被审计单位
+        type: text
+        source: project.client_name
+        readonly: true
+      - field: assessment_period
+        label: 评估期间
+        type: text
+        source: project.audit_year
+        readonly: true
+
+    dynamic_table:
+      start_row: 5
+      end_row: dynamic
+      header_row: 4
+      add_row_button: true
+      max_rows: 50
+      columns:
+        seq:
+          field: seq
+          type: number
+          label: 序号
+          width: 50
+        control_point:
+          field: control_point
+          type: text
+          label: 控制要点
+          width: 200
+        control_description:
+          field: control_description
+          type: textarea
+          label: 控制活动描述
+          width: 280
+        conclusion:
+          field: conclusion
+          type: enum
+          label: 结论
+          width: 100
+          dict_source: conclusion_dict
+        reference:
+          field: reference
+          type: text
+          label: 参考依据/索引
+          width: 120
+          render: index_chip
+
+    dictionaries:
+      conclusion_dict:
+        - value: effective
+          label: 有效
+        - value: ineffective
+          label: 无效
+        - value: not_applicable
+          label: 不适用
+
+    conclusion:
+      mode: composite
+      audit_explanation_field:
+        name: audit_explanation
+        label: 审计说明
+        type: textarea
+      overall_conclusion_field:
+        name: overall_conclusion
+        label: 管理层凌驾风险控制整体结论
+        type: enum
+        enum:
+          - { value: effective, label: 相关控制有效 }
+          - { value: partially_effective, label: 部分有效 }
+          - { value: ineffective, label: 控制无效—存在重大风险 }

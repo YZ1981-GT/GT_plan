@@ -1,0 +1,37 @@
+# S32 IPO 专项核查 — 通用 d-form-table 渲染 schema
+# 适用：S32-1 ~ S32-13（13 个底稿共用同一结构）
+# 各底稿仅 title 不同，字段结构完全一致
+#
+# 匹配规则：wp_code LIKE 'S32-%'
+
+wp_code_pattern: "S32-*"
+wp_name_template: "IPO专项核查-{topic}"
+component_type: d-form-table
+applicable_when:
+  business_category: [ipo, listed, neeq]
+
+sections:
+  - name: 核查事项
+    group_key: verification_items
+    row_type: dynamic_rows
+    allow_add_rows: true
+    fields:
+      - { field: item_no, label: 序号, type: number, readonly: true }
+      - { field: verification_procedure, label: 核查程序, type: textarea }
+      - { field: verification_scope, label: 核查范围, type: text }
+      - { field: data_source, label: 数据来源, type: text }
+      - { field: verification_result, label: 核查结果, type: textarea }
+      - { field: is_abnormal, label: 是否异常, type: select, options: ["正常", "异常", "不适用"] }
+      - { field: abnormal_description, label: 异常情况说明, type: textarea }
+      - { field: follow_up_action, label: 后续措施, type: textarea }
+      - { field: conclusion, label: 核查结论, type: select, options: ["通过", "需关注", "存在问题", "不适用"] }
+      - { field: ref_workpaper, label: 参考底稿索引, type: text }
+
+  - name: 总体结论
+    group_key: overall_conclusion
+    row_type: conclusion
+    fields:
+      - { field: overall_result, label: 总体核查结论, type: select, options: ["未发现异常", "存在异常已解决", "存在异常需披露", "不适用"] }
+      - { field: conclusion_note, label: 结论说明, type: textarea }
+      - { field: auditor_signature, label: 编制人, type: text }
+      - { field: review_signature, label: 复核人, type: text }

@@ -1,0 +1,158 @@
+{
+  "version": 1,
+  "description": "长期待摊费用摊销政策——公开年报附注摘录库（示意起步数据，引用前须核对原年报）",
+  "updated_at": "2025-12-31",
+  "industries": [
+    {
+      "id": "retail",
+      "label": "零售/连锁",
+      "peers": [
+        {
+          "name": "永辉超市",
+          "stock_code": "601933.SH",
+          "year": 2024,
+          "source": "2024年报附注·长期待摊费用",
+          "source_url": "https://www.cninfo.com.cn/",
+          "policies": {
+            "装修费": { "benefitPeriod": "租赁期与受益期孰短", "amortMethod": "直线法" },
+            "租赁改良": { "benefitPeriod": "租赁剩余期限", "amortMethod": "直线法" }
+          }
+        },
+        {
+          "name": "红旗连锁",
+          "stock_code": "002264.SZ",
+          "year": 2024,
+          "source": "2024年报附注·长期待摊费用",
+          "source_url": "https://www.cninfo.com.cn/",
+          "policies": {
+            "装修费": { "benefitPeriod": "租赁期", "amortMethod": "直线法" },
+            "租赁改良": { "benefitPeriod": "租赁期", "amortMethod": "直线法" }
+          }
+        },
+        {
+          "name": "家家悦",
+          "stock_code": "603708.SH",
+          "year": 2024,
+          "source": "2024年报附注·长期待摊费用",
+          "source_url": "https://www.cninfo.com.cn/",
+          "policies": {
+            "装修费": { "benefitPeriod": "3-5年", "amortMethod": "直线法" },
+            "租赁改良": { "benefitPeriod": "租赁剩余期限", "amortMethod": "直线法" }
+          }
+        },
+        {
+          "name": "步步高",
+          "stock_code": "002251.SZ",
+          "year": 2023,
+          "source": "2023年报附注·长期待摊费用",
+          "source_url": "https://www.cninfo.com.cn/",
+          "policies": {
+            "装修费": { "benefitPeriod": "租赁期孰短", "amortMethod": "直线法" },
+            "租赁改良": { "benefitPeriod": "租赁期", "amortMethod": "直线法" }
+          }
+        }
+      ]
+    },
+    {
+      "id": "manufacturing",
+      "label": "制造业",
+      "peers": [
+        {
+          "name": "三一重工",
+          "stock_code": "600031.SH",
+          "year": 2024,
+          "source": "2024年报附注·长期待摊费用",
+          "source_url": "https://www.cninfo.com.cn/",
+          "policies": {
+            "装修费": { "benefitPeriod": "5年", "amortMethod": "直线法" },
+            "开办费": { "benefitPeriod": "3-5年", "amortMethod": "直线法" },
+            "其他": { "benefitPeriod": "受益期", "amortMethod": "直线法" }
+          }
+        },
+        {
+          "name": "中联重科",
+          "stock_code": "000157.SZ",
+          "year": 2024,
+          "source": "2024年报附注·长期待摊费用",
+          "source_url": "https://www.cninfo.com.cn/",
+          "policies": {
+            "装修费": { "benefitPeriod": "3-5年", "amortMethod": "直线法" },
+            "开办费": { "benefitPeriod": "5年", "amortMethod": "直线法" }
+          }
+        },
+        {
+          "name": "海螺水泥",
+          "stock_code": "600585.SH",
+          "year": 2024,
+          "source": "2024年报附注·长期待摊费用",
+          "source_url": "https://www.cninfo.com.cn/",
+          "policies": {
+            "装修费": { "benefitPeriod": "5年", "amortMethod": "直线法" },
+            "其他": { "benefitPeriod": "受益期", "amortMethod": "直线法" }
+          }
+        },
+        {
+          "name": "徐工机械",
+          "stock_code": "000425.SZ",
+          "year": 2024,
+          "source": "2024年报附注·长期待摊费用",
+          "source_url": "https://www.cninfo.com.cn/",
+          "policies": {
+            "装修费": { "benefitPeriod": "3-10年", "amortMethod": "直线法" },
+            "开办费": { "benefitPeriod": "5年", "amortMethod": "直线法" }
+          }
+        }
+      ]
+    },
+    {
+      "id": "property",
+      "label": "物业/商业地产",
+      "peers": [
+        {
+          "name": "万科企业",
+          "stock_code": "000002.SZ",
+          "year": 2024,
+          "source": "2024年报附注·长期待摊费用",
+          "source_url": "https://www.cninfo.com.cn/",
+          "policies": {
+            "装修费": { "benefitPeriod": "租赁期/3-5年孰短", "amortMethod": "直线法" },
+            "租赁改良": { "benefitPeriod": "租赁剩余期限", "amortMethod": "直线法" }
+          }
+        },
+        {
+          "name": "保利发展",
+          "stock_code": "600048.SH",
+          "year": 2024,
+          "source": "2024年报附注·长期待摊费用",
+          "source_url": "https://www.cninfo.com.cn/",
+          "policies": {
+            "装修费": { "benefitPeriod": "租赁期孰短", "amortMethod": "直线法" },
+            "租赁改良": { "benefitPeriod": "租赁期", "amortMethod": "直线法" }
+          }
+        },
+        {
+          "name": "华润置地",
+          "stock_code": "01109.HK",
+          "year": 2024,
+          "source": "2024年报附注·长期待摊费用",
+          "source_url": "https://www.hkexnews.hk/",
+          "policies": {
+            "装修费": { "benefitPeriod": "租赁期", "amortMethod": "直线法" },
+            "租赁改良": { "benefitPeriod": "租赁期", "amortMethod": "直线法" }
+          }
+        },
+        {
+          "name": "龙湖集团",
+          "stock_code": "00960.HK",
+          "year": 2024,
+          "source": "2024年报附注·长期待摊费用",
+          "source_url": "https://www.hkexnews.hk/",
+          "policies": {
+            "装修费": { "benefitPeriod": "3-5年", "amortMethod": "直线法" },
+            "租赁改良": { "benefitPeriod": "租赁期孰短", "amortMethod": "直线法" }
+          }
+        }
+      ]
+    }
+  ]
+}

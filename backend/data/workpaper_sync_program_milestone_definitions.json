@@ -1,0 +1,944 @@
+{
+  "schema_version": "workpaper-sync-program-milestone-definitions/v1",
+  "review_status": "reviewed",
+  "program_id": "workpaper-html-onlyoffice-bidirectional-writeback",
+  "master_control": "docs/operations/workpaper-html-onlyoffice-bidirectional-writeback-master-control.md",
+  "work_package": {
+    "id": "G0-1",
+    "name": "program milestone registry、generator 与 guard",
+    "owner": "workpaper-html-onlyoffice-bidirectional-writeback-closure:program-governance",
+    "producer_spec": "workpaper-html-onlyoffice-bidirectional-writeback-closure",
+    "input_gates": [
+      "master-control-active",
+      "eight-spec-task-graphs-readable",
+      "source-backed-manifest-readable",
+      "writer-inventory-readable"
+    ],
+    "output_artifact": "backend/data/workpaper_sync_program_milestones.json",
+    "modified_files": [
+      "backend/data/workpaper_sync_program_milestone_definitions.json",
+      "backend/data/workpaper_sync_program_milestones.json",
+      "backend/scripts/gen/generate_workpaper_sync_program_milestones.py",
+      "backend/tests/workpaper_sync/test_workpaper_sync_program_milestones.py",
+      ".github/workflows/governance-checks.yml",
+      ".kiro/specs/workpaper-html-onlyoffice-bidirectional-writeback-closure/evidence/g0-1-program-milestones/README.md"
+    ],
+    "targeted_tests": [
+      "python backend/scripts/gen/generate_workpaper_sync_program_milestones.py --check",
+      "python -m pytest backend/tests/workpaper_sync/test_workpaper_sync_program_milestones.py -q"
+    ],
+    "real_scenarios": [
+      "对当前 8 个 spec 工作树重算任务状态、内部 DAG 与跨 spec producer/consumer DAG",
+      "对当前 manifest 与 writer inventory 做 source-backed freshness 检查，不复制 tasks.md 中的旧数字",
+      "证明 manifest capability 或单个 [x] 不能把 HOST-CONSUMES-UNIFIED-PATH 或任一 milestone 推成 CLOSED",
+      "证据缺 digest、producer 绑定冲突或输入漂移时自动投影为 STALE/BLOCKED，而不是假成功"
+    ],
+    "rollback": {
+      "strategy": "删除 G0-1 新增定义、投影、生成器、守卫和 evidence，并仅移除 governance-checks.yml 中 workpaper-sync-program-milestones 独立 job；不涉及数据库、迁移或生产业务数据",
+      "data_migration": false,
+      "reversible": true
+    },
+    "evidence_path": ".kiro/specs/workpaper-html-onlyoffice-bidirectional-writeback-closure/evidence/g0-1-program-milestones/README.md"
+  },
+  "specs": [
+    "workpaper-html-onlyoffice-bidirectional-writeback-closure",
+    "published-representation-production-path-and-lane-adjudication",
+    "excel-structural-row-insertion-and-shift-aware-verification",
+    "excel-workbook-wide-row-change-propagation",
+    "custom-workpaper-template-ingestion-and-sync-closure",
+    "excel-template-override-layer-and-onlyoffice-template-editor",
+    "workpaper-guidance-content-closure",
+    "workpaper-page-formula-toolbar-closure"
+  ],
+  "database_probes": [
+    {
+      "id": "durable-application-schema",
+      "relations": {
+        "working_paper_content_application": {
+          "columns": [
+            "id",
+            "wp_id",
+            "entry_id",
+            "room_id",
+            "generation",
+            "origin_request_id",
+            "application_key",
+            "state",
+            "result_revision",
+            "incoming_artifact_id",
+            "definition_bundle_id"
+          ],
+          "constraints": [
+            "working_paper_content_application_application_key_key",
+            "ck_wpca_state",
+            "ck_wpca_applied_requires_result"
+          ]
+        },
+        "working_paper_sync_operation": {
+          "columns": [
+            "id",
+            "wp_id",
+            "entry_id",
+            "application_id",
+            "forcesave_request_id",
+            "direction",
+            "state",
+            "definition_bundle_id"
+          ],
+          "constraints": [
+            "uq_wpso_application",
+            "uq_wpso_request",
+            "ck_wpso_bound_requires_application",
+            "ck_wpso_not_both_owners"
+          ]
+        },
+        "working_paper_content_version": {
+          "columns": [
+            "id",
+            "wp_id",
+            "revision",
+            "source",
+            "operation_id"
+          ],
+          "constraints": [
+            "uq_wpcv_wp_revision",
+            "fk_wpcv_operation",
+            "ck_wpcv_source"
+          ]
+        },
+        "working_paper_callback_delivery": {
+          "columns": [
+            "id",
+            "room_id",
+            "operation_id",
+            "application_id",
+            "forcesave_request_id",
+            "incoming_artifact_id",
+            "state",
+            "durable_at",
+            "response_error"
+          ],
+          "constraints": [
+            "ck_wpcd_durable_exactly_one_owner",
+            "ck_wpcd_durable_requires_incoming",
+            "ck_wpcd_durable_state_requires_fact"
+          ]
+        }
+      }
+    },
+    {
+      "id": "unified-room-schema",
+      "relations": {
+        "working_paper_oo_room": {
+          "columns": [
+            "id",
+            "wp_id",
+            "entry_id",
+            "doc_key",
+            "generation",
+            "latest_request_sequence",
+            "latest_durable_sequence",
+            "latest_durable_application_id",
+            "write_fence_epoch",
+            "state"
+          ],
+          "constraints": [
+            "uq_wpoor_doc_key",
+            "uq_wpoor_generation",
+            "fk_wpoor_latest_durable_application",
+            "ck_wpoor_durable_fence_pair"
+          ]
+        },
+        "working_paper_forcesave_request": {
+          "columns": [
+            "id",
+            "room_id",
+            "generation",
+            "request_sequence",
+            "initiated_by_participant_id",
+            "idempotency_key",
+            "frozen_request_fingerprint",
+            "state"
+          ],
+          "constraints": [
+            "uq_wpfr_idempotency",
+            "uq_wpfr_sequence",
+            "ck_wpfr_state"
+          ]
+        },
+        "working_paper_oo_close_intent": {
+          "columns": [
+            "id",
+            "room_id",
+            "generation",
+            "participant_id",
+            "intent_sequence",
+            "barrier_epoch",
+            "ordinary_forcesave_request_id",
+            "promoted_request_id",
+            "state"
+          ],
+          "constraints": [
+            "uq_wpoci_sequence",
+            "ck_wpoci_promoted_pair",
+            "ck_wpoci_state"
+          ]
+        }
+      }
+    }
+  ],
+  "milestones": [
+    {
+      "id": "SYNC-ENTRY-NAMESPACE",
+      "scope": "global",
+      "producers": [
+        {
+          "spec": "workpaper-html-onlyoffice-bidirectional-writeback-closure",
+          "tasks": [
+            "1",
+            "13",
+            "28",
+            "73",
+            "75"
+          ]
+        }
+      ],
+      "consumers": [
+        {
+          "spec": "custom-workpaper-template-ingestion-and-sync-closure",
+          "tasks": [
+            "10",
+            "14"
+          ],
+          "required_state": "REQUEST_PATH_VERIFIED"
+        }
+      ],
+      "predicates": [
+        {
+          "id": "entry-namespace.manifest-integrity",
+          "type": "manifest_integrity"
+        },
+        {
+          "id": "entry-namespace.registry-api",
+          "type": "python_symbols",
+          "required_symbols": [
+            {
+              "path": "backend/app/services/workpaper_sync/adapters/registry.py",
+              "symbols": [
+                "WorkpaperSyncAdapterRegistry.register_from_manifest",
+                "WorkpaperSyncAdapterRegistry.resolve_for_entry",
+                "build_production_registry"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "entry-namespace.request-path-evidence",
+          "type": "runtime_evidence_required",
+          "reason_code": "request_path_registry_evidence_missing"
+        }
+      ]
+    },
+    {
+      "id": "SYNC-MULTI-RESOLVER",
+      "scope": "global",
+      "producers": [
+        {
+          "spec": "workpaper-html-onlyoffice-bidirectional-writeback-closure",
+          "tasks": [
+            "12",
+            "71",
+            "74"
+          ]
+        }
+      ],
+      "consumers": [
+        {
+          "spec": "custom-workpaper-template-ingestion-and-sync-closure",
+          "tasks": [
+            "10",
+            "14"
+          ],
+          "required_state": "CLOSED"
+        }
+      ],
+      "predicates": [
+        {
+          "id": "multi-resolver.writer-gate-zero",
+          "type": "writer_gate_issue_zero",
+          "issue": "multi_resolver"
+        },
+        {
+          "id": "multi-resolver.canonical-service",
+          "type": "python_symbols",
+          "required_symbols": [
+            {
+              "path": "backend/app/services/workpaper_sync/resolution.py",
+              "symbols": [
+                "CanonicalResolutionService"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "SYNC-DURABLE-APPLICATION",
+      "scope": "global",
+      "producers": [
+        {
+          "spec": "workpaper-html-onlyoffice-bidirectional-writeback-closure",
+          "tasks": [
+            "22",
+            "23",
+            "26",
+            "29",
+            "30"
+          ]
+        }
+      ],
+      "consumers": [
+        {
+          "spec": "custom-workpaper-template-ingestion-and-sync-closure",
+          "tasks": [
+            "14"
+          ],
+          "required_state": "ONLYOFFICE_VERIFIED"
+        }
+      ],
+      "predicates": [
+        {
+          "id": "durable-application.kernel-symbols",
+          "type": "python_symbols",
+          "required_symbols": [
+            {
+              "path": "backend/app/services/workpaper_sync/callback_delivery.py",
+              "symbols": [
+                "CallbackDeliveryService"
+              ]
+            },
+            {
+              "path": "backend/app/services/workpaper_sync/request_application.py",
+              "symbols": [
+                "RequestApplicationService"
+              ]
+            },
+            {
+              "path": "backend/app/services/workpaper_sync/oo_to_html.py",
+              "symbols": [
+                "OoToHtmlCoordinator"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "durable-application.database-schema",
+          "type": "database_readonly_schema",
+          "probe_id": "durable-application-schema"
+        },
+        {
+          "id": "durable-application.real-callback-evidence",
+          "type": "runtime_evidence_required",
+          "reason_code": "durable_callback_application_evidence_missing"
+        }
+      ]
+    },
+    {
+      "id": "SYNC-UNIFIED-ROOM",
+      "scope": "global",
+      "producers": [
+        {
+          "spec": "workpaper-html-onlyoffice-bidirectional-writeback-closure",
+          "tasks": [
+            "21",
+            "22",
+            "23",
+            "24",
+            "25",
+            "26",
+            "27",
+            "28",
+            "29",
+            "30"
+          ]
+        }
+      ],
+      "consumers": [
+        {
+          "spec": "custom-workpaper-template-ingestion-and-sync-closure",
+          "tasks": [
+            "14"
+          ],
+          "required_state": "ONLYOFFICE_VERIFIED"
+        }
+      ],
+      "predicates": [
+        {
+          "id": "unified-room.kernel-symbols",
+          "type": "python_symbols",
+          "required_symbols": [
+            {
+              "path": "backend/app/services/workpaper_sync/rooms.py",
+              "symbols": [
+                "RoomService"
+              ]
+            },
+            {
+              "path": "backend/app/services/workpaper_sync/command_service.py",
+              "symbols": [
+                "CommandServiceClient"
+              ]
+            },
+            {
+              "path": "backend/app/services/workpaper_sync/materialize_coordinator.py",
+              "symbols": [
+                "MaterializeCoordinator"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "unified-room.database-schema",
+          "type": "database_readonly_schema",
+          "probe_id": "unified-room-schema"
+        },
+        {
+          "id": "unified-room.real-room-evidence",
+          "type": "runtime_evidence_required",
+          "reason_code": "real_room_forcesave_close_evidence_missing"
+        }
+      ]
+    },
+    {
+      "id": "PUBLISHED-ENTRY-READY",
+      "scope": "global",
+      "producers": [
+        {
+          "spec": "published-representation-production-path-and-lane-adjudication",
+          "tasks": [
+            "12"
+          ]
+        },
+        {
+          "spec": "workpaper-html-onlyoffice-bidirectional-writeback-closure",
+          "tasks": [
+            "75",
+            "76"
+          ]
+        }
+      ],
+      "consumers": [
+        {
+          "spec": "custom-workpaper-template-ingestion-and-sync-closure",
+          "tasks": [
+            "10",
+            "14"
+          ],
+          "required_state": "REQUEST_PATH_VERIFIED"
+        }
+      ],
+      "predicates": [
+        {
+          "id": "published-entry.manifest-integrity",
+          "type": "manifest_integrity"
+        },
+        {
+          "id": "published-entry.request-path-symbols",
+          "type": "python_symbols",
+          "required_symbols": [
+            {
+              "path": "backend/app/services/workpaper_sync/published_identity_observer.py",
+              "symbols": [
+                "PublishedIdentityObserver.observe"
+              ]
+            },
+            {
+              "path": "backend/app/services/workpaper_sync/adapters/registry.py",
+              "symbols": [
+                "WorkpaperSyncAdapterRegistry.register_from_manifest",
+                "WorkpaperSyncAdapterRegistry.resolve_for_entry",
+                "build_production_registry"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "published-entry.render-materialize-extract-evidence",
+          "type": "runtime_evidence_required",
+          "reason_code": "per_entry_request_path_evidence_missing"
+        }
+      ]
+    },
+    {
+      "id": "ROW-MUTATION-READY",
+      "scope": "global",
+      "producers": [
+        {
+          "spec": "excel-structural-row-insertion-and-shift-aware-verification",
+          "tasks": [
+            "19",
+            "20",
+            "21",
+            "22"
+          ]
+        }
+      ],
+      "consumers": [
+        {
+          "spec": "excel-workbook-wide-row-change-propagation",
+          "tasks": [
+            "24",
+            "25",
+            "26",
+            "29"
+          ],
+          "required_state": "CLOSED"
+        },
+        {
+          "spec": "published-representation-production-path-and-lane-adjudication",
+          "tasks": [],
+          "required_state": "CLOSED"
+        }
+      ],
+      "predicates": [
+        {
+          "id": "row-mutation.engine-symbols",
+          "type": "python_symbols",
+          "required_symbols": [
+            {
+              "path": "backend/app/services/workpaper_sync/excel_row_shift.py",
+              "symbols": [
+                "RowShiftPlan",
+                "shift_sheet_rows",
+                "assert_shift_handlers_cover_structures"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "WORKBOOK-PROPAGATION-READY",
+      "scope": "global",
+      "producers": [
+        {
+          "spec": "excel-workbook-wide-row-change-propagation",
+          "tasks": [
+            "24",
+            "25",
+            "26",
+            "29"
+          ]
+        }
+      ],
+      "consumers": [
+        {
+          "spec": "workpaper-html-onlyoffice-bidirectional-writeback-closure",
+          "tasks": [
+            "46",
+            "47",
+            "48",
+            "49",
+            "50",
+            "51",
+            "52",
+            "53",
+            "54",
+            "55",
+            "56",
+            "57"
+          ],
+          "required_state": "CLOSED"
+        }
+      ],
+      "predicates": [
+        {
+          "id": "workbook-propagation.engine-symbols",
+          "type": "python_symbols",
+          "required_symbols": [
+            {
+              "path": "backend/app/services/workpaper_sync/excel_workbook_row_change.py",
+              "symbols": [
+                "WorkbookRowChangePlan",
+                "build_insert_plan",
+                "build_delete_plan",
+                "apply_workbook_row_change"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "workbook-propagation.production-evidence",
+          "type": "runtime_evidence_required",
+          "reason_code": "production_row_change_evidence_missing"
+        }
+      ]
+    },
+    {
+      "id": "G-C0",
+      "scope": "global",
+      "producers": [
+        {
+          "spec": "workpaper-guidance-content-closure",
+          "tasks": [
+            "3"
+          ]
+        }
+      ],
+      "consumers": [
+        {
+          "spec": "workpaper-page-formula-toolbar-closure",
+          "tasks": [
+            "1"
+          ],
+          "required_state": "CLOSED"
+        },
+        {
+          "spec": "custom-workpaper-template-ingestion-and-sync-closure",
+          "tasks": [
+            "2",
+            "9"
+          ],
+          "required_state": "CLOSED"
+        }
+      ],
+      "predicates": [
+        {
+          "id": "g-c0.evidence",
+          "type": "evidence_bundle",
+          "paths": [
+            "backend/data/guidance/contracts/gc0/evidence/gc0_evidence.json"
+          ],
+          "grants_state": "CLOSED",
+          "require_producer_binding": true,
+          "require_consumer_binding": true,
+          "require_artifact_digests": true
+        }
+      ]
+    },
+    {
+      "id": "G-ID",
+      "scope": "global",
+      "producers": [
+        {
+          "spec": "workpaper-guidance-content-closure",
+          "tasks": [
+            "4"
+          ]
+        }
+      ],
+      "consumers": [
+        {
+          "spec": "workpaper-page-formula-toolbar-closure",
+          "tasks": [
+            "4"
+          ],
+          "required_state": "CLOSED"
+        },
+        {
+          "spec": "custom-workpaper-template-ingestion-and-sync-closure",
+          "tasks": [
+            "8",
+            "10"
+          ],
+          "required_state": "CLOSED"
+        }
+      ],
+      "predicates": [
+        {
+          "id": "g-id.evidence",
+          "type": "evidence_bundle",
+          "paths": [
+            "backend/data/guidance/contracts/gid/evidence/gid_evidence.json"
+          ],
+          "grants_state": "CLOSED",
+          "require_producer_binding": true,
+          "require_consumer_binding": true,
+          "require_artifact_digests": true
+        }
+      ]
+    },
+    {
+      "id": "G-RAIL",
+      "scope": "global",
+      "producers": [
+        {
+          "spec": "workpaper-guidance-content-closure",
+          "tasks": [
+            "15"
+          ]
+        }
+      ],
+      "consumers": [
+        {
+          "spec": "workpaper-page-formula-toolbar-closure",
+          "tasks": [
+            "11"
+          ],
+          "required_state": "CLOSED"
+        }
+      ],
+      "predicates": [
+        {
+          "id": "g-rail.evidence",
+          "type": "evidence_bundle",
+          "paths": [
+            ".kiro/specs/workpaper-guidance-content-closure/evidence/G-RAIL/adapter-behavior.json"
+          ],
+          "grants_state": "CLOSED",
+          "require_producer_binding": true,
+          "require_consumer_binding": true,
+          "require_artifact_digests": true
+        }
+      ]
+    },
+    {
+      "id": "G-HANDOFF-CONSUMER",
+      "scope": "global",
+      "producers": [
+        {
+          "spec": "workpaper-guidance-content-closure",
+          "tasks": [
+            "16"
+          ]
+        }
+      ],
+      "consumers": [
+        {
+          "spec": "custom-workpaper-template-ingestion-and-sync-closure",
+          "tasks": [
+            "11"
+          ],
+          "required_state": "CLOSED"
+        }
+      ],
+      "predicates": [
+        {
+          "id": "g-handoff-consumer.evidence",
+          "type": "evidence_bundle",
+          "paths": [
+            "backend/data/guidance/contracts/ghandoff/evidence/ghandoff_consumer_evidence.json"
+          ],
+          "grants_state": "CLOSED",
+          "require_producer_binding": true,
+          "require_consumer_binding": true,
+          "require_artifact_digests": true
+        }
+      ]
+    },
+    {
+      "id": "F-SHELL",
+      "scope": "global",
+      "producers": [
+        {
+          "spec": "workpaper-page-formula-toolbar-closure",
+          "tasks": [
+            "13"
+          ]
+        }
+      ],
+      "consumers": [
+        {
+          "spec": "workpaper-guidance-content-closure",
+          "tasks": [
+            "20"
+          ],
+          "required_state": "CLOSED"
+        },
+        {
+          "spec": "custom-workpaper-template-ingestion-and-sync-closure",
+          "tasks": [
+            "12",
+            "18"
+          ],
+          "required_state": "CLOSED"
+        }
+      ],
+      "predicates": [
+        {
+          "id": "f-shell.evidence",
+          "type": "evidence_bundle",
+          "paths": [
+            ".kiro/specs/workpaper-page-formula-toolbar-closure/evidence/F-SHELL/contract.json",
+            ".kiro/specs/workpaper-page-formula-toolbar-closure/evidence/F-SHELL/envelope.json"
+          ],
+          "grants_state": "CLOSED",
+          "require_producer_binding": true,
+          "require_consumer_binding": true,
+          "require_artifact_digests": true
+        }
+      ]
+    },
+    {
+      "id": "X-HANDOFF-CONFORMANCE",
+      "scope": "global",
+      "producers": [
+        {
+          "spec": "custom-workpaper-template-ingestion-and-sync-closure",
+          "tasks": [
+            "19"
+          ]
+        }
+      ],
+      "consumers": [
+        {
+          "spec": "workpaper-guidance-content-closure",
+          "tasks": [
+            "22"
+          ],
+          "required_state": "CLOSED"
+        }
+      ],
+      "predicates": [
+        {
+          "id": "x-handoff-conformance.evidence",
+          "type": "evidence_bundle",
+          "paths": [
+            ".kiro/specs/custom-workpaper-template-ingestion-and-sync-closure/evidence/X-HANDOFF-CONFORMANCE.json"
+          ],
+          "grants_state": "CLOSED",
+          "require_producer_binding": false,
+          "require_consumer_binding": false,
+          "require_artifact_digests": false
+        }
+      ]
+    },
+    {
+      "id": "X-RUNTIME-EVIDENCE",
+      "scope": "global",
+      "producers": [
+        {
+          "spec": "custom-workpaper-template-ingestion-and-sync-closure",
+          "tasks": [
+            "19"
+          ]
+        }
+      ],
+      "consumers": [
+        {
+          "spec": "workpaper-guidance-content-closure",
+          "tasks": [
+            "23"
+          ],
+          "required_state": "CLOSED"
+        }
+      ],
+      "predicates": [
+        {
+          "id": "x-runtime-evidence.bundle",
+          "type": "evidence_bundle",
+          "paths": [
+            ".kiro/specs/custom-workpaper-template-ingestion-and-sync-closure/evidence/X-RUNTIME-EVIDENCE.json"
+          ],
+          "grants_state": "CLOSED",
+          "require_producer_binding": false,
+          "require_consumer_binding": false,
+          "require_artifact_digests": false
+        }
+      ]
+    },
+    {
+      "id": "TEMPLATE-OVERRIDE-CHANGED",
+      "scope": "global",
+      "producers": [
+        {
+          "spec": "excel-template-override-layer-and-onlyoffice-template-editor",
+          "tasks": []
+        }
+      ],
+      "consumers": [
+        {
+          "spec": "workpaper-guidance-content-closure",
+          "tasks": [],
+          "required_state": "CLOSED"
+        }
+      ],
+      "predicates": [
+        {
+          "id": "template-override-changed.producer-contract",
+          "type": "declared_blocker",
+          "reason_code": "producer_contract_missing",
+          "detail": "Template override spec 尚未声明 durable event/outbox producer task 与 Guidance ACK contract"
+        }
+      ]
+    },
+    {
+      "id": "HOST-CONSUMES-UNIFIED-PATH",
+      "scope": "per_entry",
+      "producers": [
+        {
+          "spec": "workpaper-html-onlyoffice-bidirectional-writeback-closure",
+          "tasks": [
+            "33"
+          ]
+        }
+      ],
+      "consumers": [
+        {
+          "spec": "workpaper-html-onlyoffice-bidirectional-writeback-closure",
+          "tasks": [
+            "40",
+            "41",
+            "42",
+            "43",
+            "70",
+            "72"
+          ],
+          "required_state": "ONLYOFFICE_VERIFIED"
+        }
+      ],
+      "entry_projection": {
+        "state_policy": "host-consumes-unified-path/v1",
+        "denominator": [
+          "xlsx/gt-d2-accounts-receivable",
+          "xlsx/gt-h1-fixed-assets",
+          "xlsx/gt-g7-long-term-equity-main",
+          "xlsx/b60/gt-b60-bundle"
+        ],
+        "evidence_index": ".kiro/specs/workpaper-html-onlyoffice-bidirectional-writeback-closure/evidence/g0-4-host-consumes-unified-path/index.json"
+      },
+      "predicates": [
+        {
+          "id": "host-consumes-unified-path.1-user-sync-prefix-request",
+          "type": "host_path_entry_fact",
+          "fact": "user_sync_prefix_request"
+        },
+        {
+          "id": "host-consumes-unified-path.2-no-legacy-bypass",
+          "type": "host_path_entry_fact",
+          "fact": "no_legacy_bypass"
+        },
+        {
+          "id": "host-consumes-unified-path.3-callback-url-bound",
+          "type": "host_path_entry_fact",
+          "fact": "callback_url_bound"
+        },
+        {
+          "id": "host-consumes-unified-path.4-application-applied",
+          "type": "host_path_entry_fact",
+          "fact": "application_applied"
+        },
+        {
+          "id": "host-consumes-unified-path.5-operation-terminal-bound",
+          "type": "host_path_entry_fact",
+          "fact": "operation_terminal_bound"
+        },
+        {
+          "id": "host-consumes-unified-path.6-onlyoffice-content-version",
+          "type": "host_path_entry_fact",
+          "fact": "onlyoffice_content_version"
+        },
+        {
+          "id": "host-consumes-unified-path.7-no-secondary-revision-domain",
+          "type": "host_path_entry_fact",
+          "fact": "no_secondary_revision_domain"
+        },
+        {
+          "id": "host-consumes-unified-path.8-server-computed-capability",
+          "type": "host_path_entry_fact",
+          "fact": "server_computed_capability"
+        }
+      ]
+    }
+  ]
+}

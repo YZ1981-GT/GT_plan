@@ -1,0 +1,188 @@
+[
+  {
+    "id": "M01",
+    "side": "fe",
+    "want": "分隔符 `/` 原样进入 URL",
+    "why": "把逐段 encode 改成整串 encode ⇒ 多段 entry_id 里的 `/` 变 `%2F`。Task 28 的 B01 已证明默认转换器下每个端点恒 404；`%2F` 是同一个缺陷的客户端侧对偶（Starlette 解出的 entry_id 不再等于原值）。此处必须用真实四段 entry 才能测出",
+    "verdict": "RED",
+    "summary": "148/169 passed, numFailedTestSuites=3",
+    "added": [
+      "多段 entry_id 的 URL 拼接 docx：分隔符 `/` 原样进入 URL",
+      "多段 entry_id 的 URL 拼接 four-segment：分隔符 `/` 原样进入 URL",
+      "多段 entry_id 的 URL 拼接 two-segment：分隔符 `/` 原样进入 URL",
+      "多段 entry_id 的 URL 拼接 前缀里三段 scope 全在，且 entry 段保留斜杠",
+      "多段 entry_id 的 URL 拼接 段内特殊字符仍被转义（逐段 encode）",
+      "生成的路由表与 client 一一对应 claim_recovery_case 真实打到 POST + 生成的 suffix 模板",
+      "生成的路由表与 client 一一对应 confirm_descriptor 真实打到 POST + 生成的 suffix 模板",
+      "生成的路由表与 client 一一对应 create_close_intent 真实打到 POST + 生成的 suffix 模板",
+      "生成的路由表与 client 一一对应 create_pending_mutation 真实打到 POST + 生成的 suffix 模板",
+      "生成的路由表与 client 一一对应 download_recovery_artifact 真实打到 GET + 生成的 suffix 模板",
+      "生成的路由表与 client 一一对应 get_operation 真实打到 GET + 生成的 suffix 模板",
+      "生成的路由表与 client 一一对应 get_operation_conflicts 真实打到 GET + 生成的 suffix 模板",
+      "生成的路由表与 client 一一对应 get_operation_timeline 真实打到 GET + 生成的 suffix 模板",
+      "生成的路由表与 client 一一对应 get_recovery_case_timeline 真实打到 GET + 生成的 suffix 模板",
+      "生成的路由表与 client 一一对应 list_recovery_cases 真实打到 GET + 生成的 suffix 模板",
+      "生成的路由表与 client 一一对应 materialize 真实打到 POST + 生成的 suffix 模板",
+      "生成的路由表与 client 一一对应 request_forcesave 真实打到 POST + 生成的 suffix 模板",
+      "生成的路由表与 client 一一对应 resolve_conflicts 真实打到 POST + 生成的 suffix 模板",
+      "生成的路由表与 client 一一对应 retry_operation 真实打到 POST + 生成的 suffix 模板",
+      "生成的路由表与 client 一一对应 rollback_version 真实打到 POST + 生成的 suffix 模板",
+      "生成的路由表与 client 一一对应 terminate_recovery_download_only 真实打到 POST + 生成的 suffix 模板"
+    ],
+    "gone": [],
+    "hit": [
+      "多段 entry_id 的 URL 拼接 docx：分隔符 `/` 原样进入 URL",
+      "多段 entry_id 的 URL 拼接 four-segment：分隔符 `/` 原样进入 URL",
+      "多段 entry_id 的 URL 拼接 two-segment：分隔符 `/` 原样进入 URL"
+    ],
+    "added_files": [
+      "workpaperSyncApi.spec.ts"
+    ],
+    "restored": true,
+    "seconds": 2.7
+  },
+  {
+    "id": "M02",
+    "side": "fe",
+    "want": "的请求带非空 Idempotency-Key",
+    "why": "服务端把七个端点的 header 声明为必填（Task 28 已证明改可选时零测试失败，后果是复合幂等键最后一项恒空、同 participant 两次 forcesave 折叠成一次）。客户端不发 header 是同一缺陷的客户端侧对偶，只断言「函数被调用」的判据抓不到",
+    "verdict": "RED",
+    "summary": "161/169 passed, numFailedTestSuites=2",
+    "added": [
+      "Idempotency-Key 是必发 header（不是「约定」） claim_recovery_case 的请求带非空 Idempotency-Key",
+      "Idempotency-Key 是必发 header（不是「约定」） confirm_descriptor 的请求带非空 Idempotency-Key",
+      "Idempotency-Key 是必发 header（不是「约定」） create_close_intent 的请求带非空 Idempotency-Key",
+      "Idempotency-Key 是必发 header（不是「约定」） create_pending_mutation 的请求带非空 Idempotency-Key",
+      "Idempotency-Key 是必发 header（不是「约定」） materialize 的请求带非空 Idempotency-Key",
+      "Idempotency-Key 是必发 header（不是「约定」） request_forcesave 的请求带非空 Idempotency-Key",
+      "Idempotency-Key 是必发 header（不是「约定」） resolve_conflicts 的请求带非空 Idempotency-Key",
+      "Idempotency-Key 是必发 header（不是「约定」） 调用点自带的 key 被逐字使用（重放同一 key 是协议能力）"
+    ],
+    "gone": [],
+    "hit": [
+      "Idempotency-Key 是必发 header（不是「约定」） claim_recovery_case 的请求带非空 Idempotency-Key",
+      "Idempotency-Key 是必发 header（不是「约定」） confirm_descriptor 的请求带非空 Idempotency-Key",
+      "Idempotency-Key 是必发 header（不是「约定」） create_close_intent 的请求带非空 Idempotency-Key",
+      "Idempotency-Key 是必发 header（不是「约定」） create_pending_mutation 的请求带非空 Idempotency-Key",
+      "Idempotency-Key 是必发 header（不是「约定」） materialize 的请求带非空 Idempotency-Key",
+      "Idempotency-Key 是必发 header（不是「约定」） request_forcesave 的请求带非空 Idempotency-Key",
+      "Idempotency-Key 是必发 header（不是「约定」） resolve_conflicts 的请求带非空 Idempotency-Key"
+    ],
+    "added_files": [
+      "workpaperSyncApi.spec.ts"
+    ],
+    "restored": true,
+    "seconds": 2.7
+  },
+  {
+    "id": "M03",
+    "side": "fe",
+    "want": "numeric revision ⇒ 发出前拒绝拼 route",
+    "why": "删掉 opaque UUID 门 ⇒ numeric revision 直接拼进 `versions/{id}/rollback`。两个不同 wp 都有 revision 1，用它作 scope key 会在授权索引里碰撞成同一行（AC 10.6 / 8.7），而服务端只会回一个统一 404，UI 分辨不出",
+    "verdict": "RED",
+    "summary": "165/169 passed, numFailedTestSuites=2",
+    "added": [
+      "rollback 的 versionId 只能是 opaque immutable UUID numeric revision ⇒ 发出前拒绝拼 route",
+      "rollback 的 versionId 只能是 opaque immutable UUID revision 1 ⇒ 发出前拒绝拼 route",
+      "rollback 的 versionId 只能是 opaque immutable UUID 短 hex ⇒ 发出前拒绝拼 route",
+      "rollback 的 versionId 只能是 opaque immutable UUID 空串 ⇒ 发出前拒绝拼 route"
+    ],
+    "gone": [],
+    "hit": [
+      "rollback 的 versionId 只能是 opaque immutable UUID numeric revision ⇒ 发出前拒绝拼 route"
+    ],
+    "added_files": [
+      "workpaperSyncApi.spec.ts"
+    ],
+    "restored": true,
+    "seconds": 2.8
+  },
+  {
+    "id": "M04",
+    "side": "fe",
+    "want": "claim body 是白名单构造，不含任何 client 指定的 base",
+    "why": "给 claim body 塞一个客户端指定的 base ⇒ design §API 明文「客户端不得提交任意 base/bundle」被破坏。白名单交叉锁死是唯一能抓到「随手多塞一个字段」的判据；只断言「必填项都在」的判据对多余字段全绿",
+    "verdict": "RED",
+    "summary": "165/169 passed, numFailedTestSuites=4",
+    "added": [
+      "Idempotency-Key 是必发 header（不是「约定」） claim_recovery_case 的请求带非空 Idempotency-Key",
+      "recovery client 的显式 scope 与白名单 body claim body 是白名单构造，不含任何 client 指定的 base",
+      "recovery client 的显式 scope 与白名单 body claim 的 case_id 走 route 段而不是 body",
+      "生成的路由表与 client 一一对应 claim_recovery_case 真实打到 POST + 生成的 suffix 模板"
+    ],
+    "gone": [],
+    "hit": [
+      "recovery client 的显式 scope 与白名单 body claim body 是白名单构造，不含任何 client 指定的 base",
+      "recovery client 的显式 scope 与白名单 body claim 的 case_id 走 route 段而不是 body"
+    ],
+    "added_files": [
+      "workpaperSyncApi.spec.ts"
+    ],
+    "restored": true,
+    "seconds": 2.7
+  },
+  {
+    "id": "M05",
+    "side": "fe",
+    "want": "载荷仍是 {code,message,data} 时 fail visible，不再解一层",
+    "why": "在 API 层之外再解一次 envelope ⇒ 「拦截器某天停止解包」与「响应本来就长这样」两种情形都静默通过，而两者的正确处理完全不同。这条变异正是 Requirement 「平台 envelope 只在 API 层解一次」的反面",
+    "verdict": "RED",
+    "summary": "166/169 passed, numFailedTestSuites=4",
+    "added": [
+      "envelope 解包边界 仍是 {code,message,data} 的载荷 fail visible，而不是再解一层",
+      "envelope 解包边界 只带 code 或只带 data 的业务载荷不误判为 envelope",
+      "平台 envelope 只在 API 层解一次 载荷仍是 {code,message,data} 时 fail visible，不再解一层"
+    ],
+    "gone": [],
+    "hit": [
+      "envelope 解包边界 只带 code 或只带 data 的业务载荷不误判为 envelope",
+      "平台 envelope 只在 API 层解一次 载荷仍是 {code,message,data} 时 fail visible，不再解一层"
+    ],
+    "added_files": [
+      "workpaperSyncApi.spec.ts",
+      "workpaperSyncDto.spec.ts"
+    ],
+    "restored": true,
+    "seconds": 2.7
+  },
+  {
+    "id": "M06",
+    "side": "fe",
+    "want": "同时带 application 与 duplicate 指针 ⇒ 拒绝",
+    "why": "删掉 primary/duplicate 互斥门 ⇒ 一个同时绑定 application 与 duplicate 指针的 operation 会被判成 duplicate。AC 5.5 明令二者互斥；后端 `classify_operation_shape` 在同一位置抛 `DuplicateLinkError`，前端投影不得比它宽松",
+    "verdict": "RED",
+    "summary": "168/169 passed, numFailedTestSuites=2",
+    "added": [
+      "operation shape 三态互斥且穷尽 同时带 application 与 duplicate 指针 ⇒ 拒绝"
+    ],
+    "gone": [],
+    "hit": [
+      "operation shape 三态互斥且穷尽 同时带 application 与 duplicate 指针 ⇒ 拒绝"
+    ],
+    "added_files": [
+      "workpaperSyncDto.spec.ts"
+    ],
+    "restored": true,
+    "seconds": 2.7
+  },
+  {
+    "id": "M07",
+    "side": "fe",
+    "want": "未知 operation state fail visible，不得兜底成 error",
+    "why": "把封闭域临时扩成「包含本次收到的任何值」⇒ 未知状态静默通过。AC 4.9 明文「未知状态 SHALL fail visible」；兜底成 error 会让审计师去点一个协议上不允许的重试",
+    "verdict": "RED",
+    "summary": "168/169 passed, numFailedTestSuites=2",
+    "added": [
+      "operation 快照解析 未知 operation state fail visible，不得兜底成 error"
+    ],
+    "gone": [],
+    "hit": [
+      "operation 快照解析 未知 operation state fail visible，不得兜底成 error"
+    ],
+    "added_files": [
+      "workpaperSyncDto.spec.ts"
+    ],
+    "restored": true,
+    "seconds": 2.7
+  }
+]

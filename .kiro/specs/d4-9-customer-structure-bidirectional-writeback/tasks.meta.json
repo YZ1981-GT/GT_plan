@@ -1,0 +1,120 @@
+{
+  "pbtResults": {},
+  "executionHistory": {
+    "1. 修 instrumentation 支持同 sheet 双区（design 阻塞项，动共享内核）": [
+      {
+        "executionId": "129514cc-5e42-406e-95fb-938843354de2",
+        "chatSessionId": "sess_ff332740-502c-45df-ab6d-144ec68b00d1",
+        "timestamp": 1789825035110
+      },
+      {
+        "executionId": "129514cc-5e42-406e-95fb-938843354de2",
+        "chatSessionId": "sess_ff332740-502c-45df-ab6d-144ec68b00d1",
+        "timestamp": 1789825590470
+      }
+    ],
+    "2. 前端 store 行补 rowId + 迁移（后端投影 fail-closed 前提）": [
+      {
+        "executionId": "9fc0f2ae-1f7b-4fac-8858-23a04dc717a3",
+        "chatSessionId": "sess_60dae1fd-da52-4aec-9b28-4af11dc09753",
+        "timestamp": 1789833719526
+      },
+      {
+        "executionId": "9fc0f2ae-1f7b-4fac-8858-23a04dc717a3",
+        "chatSessionId": "sess_60dae1fd-da52-4aec-9b28-4af11dc09753",
+        "timestamp": 1789833729582
+      }
+    ],
+    "3. D4-9 per-entry contract + 生成器 + 磁盘锁死": [
+      {
+        "executionId": "9fc0f2ae-1f7b-4fac-8858-23a04dc717a3",
+        "chatSessionId": "sess_60dae1fd-da52-4aec-9b28-4af11dc09753",
+        "timestamp": 1789833719574
+      }
+    ],
+    "4. bridge 模块 store 投影 / 合并 / 身份": [
+      {
+        "executionId": "9fc0f2ae-1f7b-4fac-8858-23a04dc717a3",
+        "chatSessionId": "sess_60dae1fd-da52-4aec-9b28-4af11dc09753",
+        "timestamp": 1789833719610
+      }
+    ],
+    "5. instrumentation / definitions / 选型 / registry attach": [
+      {
+        "executionId": "9fc0f2ae-1f7b-4fac-8858-23a04dc717a3",
+        "chatSessionId": "sess_60dae1fd-da52-4aec-9b28-4af11dc09753",
+        "timestamp": 1789833719638
+      }
+    ],
+    "6. manifest entry + reviewed overlay 裁决 capability": [
+      {
+        "executionId": "9fc0f2ae-1f7b-4fac-8858-23a04dc717a3",
+        "chatSessionId": "sess_60dae1fd-da52-4aec-9b28-4af11dc09753",
+        "timestamp": 1789833719701
+      }
+    ],
+    "7. materialize / extract / OO→HTML 镜像": [
+      {
+        "executionId": "9fc0f2ae-1f7b-4fac-8858-23a04dc717a3",
+        "chatSessionId": "sess_60dae1fd-da52-4aec-9b28-4af11dc09753",
+        "timestamp": 1789833719734
+      }
+    ],
+    "8. 前端宿主接入 + 移除 legacy 单向入口": [
+      {
+        "executionId": "9fc0f2ae-1f7b-4fac-8858-23a04dc717a3",
+        "chatSessionId": "sess_60dae1fd-da52-4aec-9b28-4af11dc09753",
+        "timestamp": 1789833719762
+      }
+    ],
+    "9. 用户公式管理（wp_formula + 保护区 + 血缘）": [
+      {
+        "executionId": "9fc0f2ae-1f7b-4fac-8858-23a04dc717a3",
+        "chatSessionId": "sess_60dae1fd-da52-4aec-9b28-4af11dc09753",
+        "timestamp": 1789833719827
+      }
+    ],
+    "10. 导入导出修复（本期/上期 + 总额 + 专用 parser）": [
+      {
+        "executionId": "9fc0f2ae-1f7b-4fac-8858-23a04dc717a3",
+        "chatSessionId": "sess_60dae1fd-da52-4aec-9b28-4af11dc09753",
+        "timestamp": 1789833719873
+      }
+    ],
+    "11. 后端守卫 + 变异检验": [
+      {
+        "executionId": "9fc0f2ae-1f7b-4fac-8858-23a04dc717a3",
+        "chatSessionId": "sess_60dae1fd-da52-4aec-9b28-4af11dc09753",
+        "timestamp": 1789833719915
+      }
+    ],
+    "12. 前端守卫（vitest）": [
+      {
+        "executionId": "9fc0f2ae-1f7b-4fac-8858-23a04dc717a3",
+        "chatSessionId": "sess_60dae1fd-da52-4aec-9b28-4af11dc09753",
+        "timestamp": 1789833719977
+      }
+    ],
+    "13. 真栈实测（Playwright + 真实 OO）+ 收口": [
+      {
+        "executionId": "9fc0f2ae-1f7b-4fac-8858-23a04dc717a3",
+        "chatSessionId": "sess_60dae1fd-da52-4aec-9b28-4af11dc09753",
+        "timestamp": 1789833720001
+      }
+    ],
+    "14. C0-C4 alignment：按总纲验证wp_id身份、共享sync、公式状态、真实DAG/联动与逐表gate；durable ack不等于applied，公式同步不是TB/A13。": [
+      {
+        "executionId": "9fc0f2ae-1f7b-4fac-8858-23a04dc717a3",
+        "chatSessionId": "sess_60dae1fd-da52-4aec-9b28-4af11dc09753",
+        "timestamp": 1789833720041
+      }
+    ],
+    "15. C4逐D4-9验收：source/template evidence、三table identity、formula mask、roundtrip、权限、Playwright和变异；只门控D4-9相关产物。": [
+      {
+        "executionId": "9fc0f2ae-1f7b-4fac-8858-23a04dc717a3",
+        "chatSessionId": "sess_60dae1fd-da52-4aec-9b28-4af11dc09753",
+        "timestamp": 1789833720074
+      }
+    ]
+  }
+}

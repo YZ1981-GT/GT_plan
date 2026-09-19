@@ -1,0 +1,128 @@
+[
+  {
+    "id": "M09",
+    "side": "be",
+    "want": "test_task73_entry_profile_manifest.py::TestSourceFactsAreObservedNotAssumed::test_unreachable_host_is_derived_from_zero_inbound_references",
+    "why": "🔴 首版这条打在**模板标签**边上，实测 GREEN：当前 185 个宿主 tag-only 为 0（57 both / 127 import-only），删掉标签边对真实数据行为不变 = 无效变异。load-bearing 的是 import 边：删掉它 127 个宿主立刻零入边、被判不可达，editability 批量变 unreachable。标签边的能力另由合成索引判据锁住",
+    "verdict": "RED",
+    "summary": "8 failed, 275 passed, 6 errors in 64.11s (0:01:04)",
+    "added": [
+      "test_task73_entry_profile_manifest.py::TestCrossRulesRunAgainstTheRealManifest::test_descriptor_is_absent_exactly_for_unreachable_hosts",
+      "test_task73_entry_profile_manifest.py::TestCrossRulesRunAgainstTheRealManifest::test_rg16_fires_where_a_single_capability_host_still_offers_both_modes",
+      "test_task73_entry_profile_manifest.py::TestDerivationIsIndependentOfBusinessAdjudication::test_flipping_every_capability_leaves_the_profile_byte_identical",
+      "test_task73_entry_profile_manifest.py::TestGeneratorFailsClosed::test_a_dropped_profile_field_is_rejected",
+      "test_task73_entry_profile_manifest.py::TestGeneratorFailsClosed::test_missing_expected_profile_is_rejected",
+      "test_task73_entry_profile_manifest.py::TestGeneratorFailsClosed::test_reviewed_expectation_mismatch_is_rejected",
+      "test_task73_entry_profile_manifest.py::TestGeneratorFailsClosed::test_stale_reviewed_expectation_is_rejected",
+      "test_task73_entry_profile_manifest.py::TestSourceFactsAreObservedNotAssumed::test_unreachable_host_is_derived_from_zero_inbound_references"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task73_entry_profile_manifest.py::TestSourceFactsAreObservedNotAssumed::test_unreachable_host_is_derived_from_zero_inbound_references"
+    ],
+    "added_files": [
+      "test_task73_entry_profile_manifest.py"
+    ],
+    "restored": true,
+    "seconds": 67.1
+  },
+  {
+    "id": "M10",
+    "side": "be",
+    "want": "test_task73_entry_profile_manifest.py::TestSourceFactsAreObservedNotAssumed::test_unreachable_host_is_derived_from_zero_inbound_references",
+    "why": "🔴 首版把 `if candidate.is_file()` 改成 `if True`，实测 GREEN：`'./GtX.vue'` 的第一个候选本来就是正确路径，改了也照样命中 = 无效变异。改成解析恒失败才真的掏空 import 边",
+    "verdict": "RED",
+    "summary": "9 failed, 274 passed, 6 errors in 62.05s (0:01:02)",
+    "added": [
+      "test_task73_entry_profile_manifest.py::TestCrossRulesRunAgainstTheRealManifest::test_descriptor_is_absent_exactly_for_unreachable_hosts",
+      "test_task73_entry_profile_manifest.py::TestCrossRulesRunAgainstTheRealManifest::test_rg16_fires_where_a_single_capability_host_still_offers_both_modes",
+      "test_task73_entry_profile_manifest.py::TestDerivationIsIndependentOfBusinessAdjudication::test_flipping_every_capability_leaves_the_profile_byte_identical",
+      "test_task73_entry_profile_manifest.py::TestGeneratorFailsClosed::test_a_dropped_profile_field_is_rejected",
+      "test_task73_entry_profile_manifest.py::TestGeneratorFailsClosed::test_missing_expected_profile_is_rejected",
+      "test_task73_entry_profile_manifest.py::TestGeneratorFailsClosed::test_reviewed_expectation_mismatch_is_rejected",
+      "test_task73_entry_profile_manifest.py::TestGeneratorFailsClosed::test_stale_reviewed_expectation_is_rejected",
+      "test_task73_entry_profile_manifest.py::TestSourceFactsAreObservedNotAssumed::test_template_tag_edge_counts_even_without_an_import",
+      "test_task73_entry_profile_manifest.py::TestSourceFactsAreObservedNotAssumed::test_unreachable_host_is_derived_from_zero_inbound_references"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task73_entry_profile_manifest.py::TestSourceFactsAreObservedNotAssumed::test_unreachable_host_is_derived_from_zero_inbound_references"
+    ],
+    "added_files": [
+      "test_task73_entry_profile_manifest.py"
+    ],
+    "restored": true,
+    "seconds": 65.0
+  },
+  {
+    "id": "M12",
+    "side": "be",
+    "want": "test_task73_entry_profile_manifest.py::TestSourceFactsAreObservedNotAssumed::test_doc_key_provider_probe_finds_both_real_routes",
+    "why": "静态看表达式里有没有 `st_mtime` 会被注释/间接 helper 骗过（rooms.py 已记录过同一个坑）。判据要求 xlsx provider 必须是 `probe_kind == behavioral`",
+    "verdict": "GREEN",
+    "summary": "1 error in 1.13s",
+    "added": [],
+    "gone": [],
+    "hit": [],
+    "added_files": [],
+    "restored": true,
+    "seconds": 3.9
+  },
+  {
+    "id": "M13",
+    "side": "be",
+    "want": "test_task73_entry_profile_manifest.py::TestSourceFactsAreObservedNotAssumed::test_comment_only_endpoints_are_not_counted",
+    "why": "`GtB60DocxPane.vue` 文件头注释里写着「切到在线编辑前先 GET onlyoffice-config」，不剥注释会把它当成真实请求端点 ⇒ 该 entry 的 room_model 得到假事实（实测踩过）",
+    "verdict": "RED",
+    "summary": "17 failed, 266 passed, 6 errors in 61.45s (0:01:01)",
+    "added": [
+      "test_task13_contract_registry.py::TestRegistryReportHasAProductionConsumer::test_closure_gate_consumes_the_registry_report",
+      "test_task73_entry_profile_manifest.py::TestClosureGateConsumesProfileDrift::test_profile_drift_is_a_registered_blocking_fact",
+      "test_task73_entry_profile_manifest.py::TestCrossRulesRunAgainstTheRealManifest::test_descriptor_is_absent_exactly_for_unreachable_hosts",
+      "test_task73_entry_profile_manifest.py::TestCrossRulesRunAgainstTheRealManifest::test_drift_shrinks_to_the_rg15_layer_under_conformant_facts",
+      "test_task73_entry_profile_manifest.py::TestCrossRulesRunAgainstTheRealManifest::test_report_has_no_missing_profile_and_real_drift",
+      "test_task73_entry_profile_manifest.py::TestCrossRulesRunAgainstTheRealManifest::test_rg16_fires_where_a_single_capability_host_still_offers_both_modes",
+      "test_task73_entry_profile_manifest.py::TestCrossRulesRunAgainstTheRealManifest::test_rg17_exercises_two_distinct_branches_on_real_data",
+      "test_task73_entry_profile_manifest.py::TestDerivationIsIndependentOfBusinessAdjudication::test_flipping_every_capability_leaves_the_profile_byte_identical",
+      "test_task73_entry_profile_manifest.py::TestDerivationIsIndependentOfBusinessAdjudication::test_room_observation_ignores_the_manifest_room_model",
+      "test_task73_entry_profile_manifest.py::TestGeneratorFailsClosed::test_a_dropped_profile_field_is_rejected",
+      "test_task73_entry_profile_manifest.py::TestGeneratorFailsClosed::test_missing_expected_profile_is_rejected",
+      "test_task73_entry_profile_manifest.py::TestGeneratorFailsClosed::test_reachability_and_reviewed_unreachable_rule_must_agree",
+      "test_task73_entry_profile_manifest.py::TestGeneratorFailsClosed::test_reviewed_expectation_mismatch_is_rejected",
+      "test_task73_entry_profile_manifest.py::TestGeneratorFailsClosed::test_stale_reviewed_expectation_is_rejected",
+      "test_task73_entry_profile_manifest.py::TestSourceFactsAreObservedNotAssumed::test_comment_only_endpoints_are_not_counted",
+      "test_task73_entry_profile_manifest.py::TestSourceFactsAreObservedNotAssumed::test_editability_falls_back_to_the_component_prop_default",
+      "test_task73_entry_profile_manifest.py::TestSourceFactsAreObservedNotAssumed::test_room_service_is_still_unwired_and_reported_as_such"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task73_entry_profile_manifest.py::TestSourceFactsAreObservedNotAssumed::test_comment_only_endpoints_are_not_counted"
+    ],
+    "added_files": [
+      "test_task13_contract_registry.py",
+      "test_task73_entry_profile_manifest.py"
+    ],
+    "restored": true,
+    "seconds": 64.4
+  },
+  {
+    "id": "M14",
+    "side": "be",
+    "want": "test_task73_entry_profile_manifest.py::TestSourceFactsAreObservedNotAssumed::test_endpoint_regex_never_spans_lines",
+    "why": "首版就是这个正则：一对跨 12 行的引号把整段注释吞成「端点」，b60 entry 因此被判`frontend_endpoint_without_backend_route` ⇒ room_model 假事实。⚠️ 它的**行为**后果被 `startswith(\"/\")` 过滤器挡住（吞出来的串以 `>` 开头），所以只能用针对正则本身的判据打红 —— 那个过滤器是纵深防御，单独删它行为不变",
+    "verdict": "RED",
+    "summary": "1 failed, 288 passed in 61.66s (0:01:01)",
+    "added": [
+      "test_task73_entry_profile_manifest.py::TestSourceFactsAreObservedNotAssumed::test_endpoint_regex_never_spans_lines"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task73_entry_profile_manifest.py::TestSourceFactsAreObservedNotAssumed::test_endpoint_regex_never_spans_lines"
+    ],
+    "added_files": [
+      "test_task73_entry_profile_manifest.py"
+    ],
+    "restored": true,
+    "seconds": 64.5
+  }
+]

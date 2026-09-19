@@ -696,7 +696,10 @@ function initData() {
   const ctxIn = data.context && typeof data.context === 'object' ? data.context : {}
   const ctxOut: Record<string, any> = {}
   for (const f of contextFields.value) {
-    ctxOut[f.name] = (ctxIn as Record<string, any>)[f.name] ?? ''
+    // 优先使用已有数据，其次 schema 中的 default 值，最后空字符串
+    ctxOut[f.name] = (ctxIn as Record<string, any>)[f.name]
+      ?? (f as any).default
+      ?? ''
   }
   contextData.value = ctxOut
 
@@ -816,7 +819,7 @@ defineExpose({ scrollToRow })
   padding: 10px 14px;
   background: var(--gt-color-bg-soft, #f5f7fa);
   border-radius: 6px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 .gt-dft__header-meta {
   display: flex;

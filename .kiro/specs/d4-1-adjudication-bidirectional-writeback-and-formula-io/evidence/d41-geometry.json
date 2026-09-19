@@ -1,0 +1,326 @@
+{
+  "measured_at": "2026-09-19",
+  "tool": "openpyxl data_only=False",
+  "spec": "d4-1-adjudication-bidirectional-writeback-and-formula-io",
+  "task": "1 几何核定与 mapping_digest 冻结",
+  "template_path": "backend/wp_templates/D/D4 收入底稿.xlsx",
+  "template_sha256": "b8fb92d4c22cd5d639e415403a12cb61650639153f136a5330c930b880167b5f",
+  "managed_sheet": "营业收入审定表D4-1",
+  "dimensions": "A1:I80",
+  "dec0": "同 sheet 双区动态行（主营 R8 起 / 其他 R14 起），参照 D4-9",
+  "header_rows": [
+    5,
+    6
+  ],
+  "header_layout": {
+    "R5": "项目 / 本期数(B–E) / 上期数(F–I)",
+    "R6": "未审数 / 账项调整 / 重分类调整 / 审定数（本期与上期各一组）"
+  },
+  "regions": {
+    "main_revenue": {
+      "table_key": "adjudication_main_rows",
+      "section_key": "main-revenue",
+      "title_row": 7,
+      "title_marker": "主营业务收入：",
+      "first_data_row": 8,
+      "last_data_row": 11,
+      "reserved_rows": 4,
+      "subtotal_row": 12,
+      "subtotal_marker": "小计",
+      "uuid_col": "W",
+      "expandable": true
+    },
+    "other_revenue": {
+      "table_key": "adjudication_other_rows",
+      "section_key": "other-revenue",
+      "title_row": 13,
+      "title_marker": "其他业务收入：",
+      "first_data_row": 14,
+      "last_data_row": 17,
+      "reserved_rows": 4,
+      "subtotal_row": 18,
+      "subtotal_marker": "小计",
+      "uuid_col": "X",
+      "expandable": true
+    }
+  },
+  "footer_rows": {
+    "total_row": 19,
+    "tb_row": 20,
+    "diff_row": 21,
+    "audit_note_start_row": 22
+  },
+  "managed_columns": [
+    "A",
+    "B",
+    "C",
+    "D",
+    "F",
+    "G",
+    "H"
+  ],
+  "field_map": [
+    {
+      "col": "A",
+      "column_key": "label",
+      "mode": "editable",
+      "value_type": "text",
+      "store_key": "label",
+      "header": "项目",
+      "contract": true
+    },
+    {
+      "col": "B",
+      "column_key": "current_unadjusted",
+      "mode": "editable",
+      "value_type": "amount",
+      "store_key": "currentUnadjusted",
+      "header": "本期未审数",
+      "contract": true
+    },
+    {
+      "col": "C",
+      "column_key": "current_aje",
+      "mode": "editable",
+      "value_type": "amount",
+      "store_key": "currentAje",
+      "header": "本期账项调整",
+      "contract": true
+    },
+    {
+      "col": "D",
+      "column_key": "current_rje",
+      "mode": "editable",
+      "value_type": "amount",
+      "store_key": "currentRje",
+      "header": "本期重分类调整",
+      "contract": true
+    },
+    {
+      "col": "F",
+      "column_key": "prior_unadjusted",
+      "mode": "editable",
+      "value_type": "amount",
+      "store_key": "priorUnadjusted",
+      "header": "上期未审数",
+      "contract": true
+    },
+    {
+      "col": "G",
+      "column_key": "prior_aje",
+      "mode": "editable",
+      "value_type": "amount",
+      "store_key": "priorAje",
+      "header": "上期账项调整",
+      "contract": true
+    },
+    {
+      "col": "H",
+      "column_key": "prior_rje",
+      "mode": "editable",
+      "value_type": "amount",
+      "store_key": "priorRje",
+      "header": "上期重分类调整",
+      "contract": true
+    }
+  ],
+  "frontend_alignment": {
+    "composable": "useD4Adjudication.ts / d4AdjudicationRows.ts",
+    "store_item_id": "D4-1-rows",
+    "per_field_key_pattern": "D4-1-{rowId}-{field}",
+    "value_fields": [
+      "currentUnadjusted",
+      "currentAje",
+      "currentRje",
+      "priorUnadjusted",
+      "priorAje",
+      "priorRje"
+    ],
+    "aligned": true
+  },
+  "formula_mask": {
+    "cells": [
+      "E8",
+      "I8",
+      "E9",
+      "I9",
+      "E10",
+      "I10",
+      "E11",
+      "I11",
+      "E14",
+      "I14",
+      "E15",
+      "I15",
+      "E16",
+      "I16",
+      "E17",
+      "I17",
+      "B12",
+      "C12",
+      "D12",
+      "E12",
+      "F12",
+      "G12",
+      "H12",
+      "I12",
+      "B18",
+      "C18",
+      "D18",
+      "E18",
+      "F18",
+      "G18",
+      "H18",
+      "I18",
+      "B19",
+      "C19",
+      "D19",
+      "E19",
+      "F19",
+      "G19",
+      "H19",
+      "I19",
+      "B21",
+      "C21",
+      "D21",
+      "E21",
+      "F21",
+      "G21",
+      "H21",
+      "I21"
+    ],
+    "note": "E/I 审定数（=SUM(B:D)/=SUM(F:H)）+ 行 12/18/19/21 的 B–I （小计/合计/差异全为 Excel 内部公式）；普通值投影不覆盖"
+  },
+  "tb_check": {
+    "keys": [
+      "D4-1-adj-tb-6001",
+      "D4-1-adj-tb-6051"
+    ],
+    "note": "试算平衡表数（R20）只读回显，不入受管；仅标量走 Tier A 公式"
+  },
+  "prefill_note": "未审数不从四表库填（presets.py R3.4：TB 6001/6051 只有科目总额、无产品/项目维度）；明细行由 D4-2/D4-3 SUMIF 派生 + 人工",
+  "digest_payload": {
+    "managed_sheet": "营业收入审定表D4-1",
+    "template_relative_path": "backend/wp_templates/D/D4 收入底稿.xlsx",
+    "template_sha256": "b8fb92d4c22cd5d639e415403a12cb61650639153f136a5330c930b880167b5f",
+    "header_rows": [
+      5,
+      6
+    ],
+    "regions": [
+      {
+        "table_key": "adjudication_main_rows",
+        "section_key": "main-revenue",
+        "title_row": 7,
+        "first_data_row": 8,
+        "last_data_row": 11,
+        "subtotal_row": 12,
+        "uuid_col": "W"
+      },
+      {
+        "table_key": "adjudication_other_rows",
+        "section_key": "other-revenue",
+        "title_row": 13,
+        "first_data_row": 14,
+        "last_data_row": 17,
+        "subtotal_row": 18,
+        "uuid_col": "X"
+      }
+    ],
+    "total_row": 19,
+    "tb_row": 20,
+    "diff_row": 21,
+    "contract_fields": [
+      {
+        "col": "A",
+        "store_key": "label",
+        "value_type": "text"
+      },
+      {
+        "col": "B",
+        "store_key": "currentUnadjusted",
+        "value_type": "amount"
+      },
+      {
+        "col": "C",
+        "store_key": "currentAje",
+        "value_type": "amount"
+      },
+      {
+        "col": "D",
+        "store_key": "currentRje",
+        "value_type": "amount"
+      },
+      {
+        "col": "F",
+        "store_key": "priorUnadjusted",
+        "value_type": "amount"
+      },
+      {
+        "col": "G",
+        "store_key": "priorAje",
+        "value_type": "amount"
+      },
+      {
+        "col": "H",
+        "store_key": "priorRje",
+        "value_type": "amount"
+      }
+    ],
+    "formula_mask": [
+      "E8",
+      "I8",
+      "E9",
+      "I9",
+      "E10",
+      "I10",
+      "E11",
+      "I11",
+      "E14",
+      "I14",
+      "E15",
+      "I15",
+      "E16",
+      "I16",
+      "E17",
+      "I17",
+      "B12",
+      "C12",
+      "D12",
+      "E12",
+      "F12",
+      "G12",
+      "H12",
+      "I12",
+      "B18",
+      "C18",
+      "D18",
+      "E18",
+      "F18",
+      "G18",
+      "H18",
+      "I18",
+      "B19",
+      "C19",
+      "D19",
+      "E19",
+      "F19",
+      "G19",
+      "H19",
+      "I19",
+      "B21",
+      "C21",
+      "D21",
+      "E21",
+      "F21",
+      "G21",
+      "H21",
+      "I21"
+    ],
+    "tb_check_keys": [
+      "D4-1-adj-tb-6001",
+      "D4-1-adj-tb-6051"
+    ]
+  },
+  "mapping_digest": "94e813e067d7160e3e1f51b83922025d7f0fd293cffe7ddd6ac490e7477b2bff"
+}

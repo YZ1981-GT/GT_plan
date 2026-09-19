@@ -146,6 +146,182 @@ _DICTS: dict[str, list[dict[str, str]]] = {
         {"value": "medium", "label": "中风险", "color": "warning"},
         {"value": "low",    "label": "低风险", "color": "success"},
     ],
+    # ── P1-3.1: AI 内容确认状态 ──
+    "ai_content_status": [
+        {"value": "pending",   "label": "待确认", "color": "warning"},
+        {"value": "confirmed", "label": "已确认", "color": "success"},
+        {"value": "rejected",  "label": "已拒绝", "color": "danger"},
+        {"value": "expired",   "label": "已过期", "color": "info"},
+    ],
+    # ── P1-3.1: 归档状态 ──
+    "archive_status": [
+        {"value": "not_archived",    "label": "未归档",   "color": "info"},
+        {"value": "archiving",       "label": "归档中",   "color": "warning"},
+        {"value": "archived",        "label": "已归档",   "color": "success"},
+        {"value": "archive_failed",  "label": "归档失败", "color": "danger"},
+    ],
+    # ── 函证模块枚举（D0 系列底稿共用） ──
+    "confirmation_account_type": [
+        {"value": "accounts_receivable",    "label": "应收账款",     "color": ""},
+        {"value": "contract_liability",     "label": "合同负债",     "color": ""},
+        {"value": "other_receivable",       "label": "其他应收款",   "color": ""},
+        {"value": "prepayment",             "label": "预付账款",     "color": ""},
+        {"value": "accounts_payable",       "label": "应付账款",     "color": ""},
+        {"value": "other_payable",          "label": "其他应付款",   "color": ""},
+        {"value": "short_term_loan",        "label": "短期借款",     "color": ""},
+        {"value": "long_term_loan",         "label": "长期借款",     "color": ""},
+        {"value": "bank_deposit",           "label": "银行存款",     "color": ""},
+        {"value": "time_deposit",           "label": "定期存款",     "color": ""},
+        {"value": "financial_product",      "label": "理财产品",     "color": ""},
+        {"value": "other_monetary",         "label": "其他货币资金", "color": ""},
+        # ── H 循环（固定资产循环函证 H0）品种 ──
+        # 🔴 标签逐字取 wp_system_map.json 的 business_cycles[固定资产循环].accounts，
+        #    不得自拟简称（H0-1 下区矩阵按本列 SUMIF 分品种，品种名不在此枚举内则永远聚合不到行）。
+        #    「资产处置损益」(H10) 是损益类不函证，故不在此列。
+        #    spec: h0-confirmation-source-fidelity-and-linkage R1.1/R1.2/R1.6
+        {"value": "fixed_assets",                "label": "固定资产",       "color": ""},
+        {"value": "construction_in_progress",    "label": "在建工程",       "color": ""},
+        {"value": "investment_property",         "label": "投资性房地产",   "color": ""},
+        {"value": "engineering_materials",       "label": "工程物资",       "color": ""},
+        {"value": "oil_gas_assets",              "label": "油气资产",       "color": ""},
+        {"value": "fixed_assets_clearing",       "label": "固定资产清理",   "color": ""},
+        {"value": "productive_biological_assets", "label": "生产性生物资产", "color": ""},
+        {"value": "right_of_use_assets",         "label": "使用权资产",     "color": ""},
+        {"value": "lease_liabilities",           "label": "租赁负债",       "color": ""},
+        {"value": "other",                  "label": "其他",         "color": "info"},
+    ],
+    "confirmation_method": [
+        # 🔴 这是准则 1312 的**程序层面**概念（X0A 程序 1「以积极方式…进行函证」），
+        #    与源模板 X0-2!C7 的「函证方式」（发函渠道）是两个不同维度 —— 后者见
+        #    confirmation_send_channel。两者都保留，不得互相替代。
+        {"value": "positive",  "label": "积极式", "color": ""},
+        {"value": "negative",  "label": "消极式", "color": "info"},
+    ],
+    # ── 发函渠道（源模板 X0-2!C7 数据验证，D0/F0/G0/H0/K0/L0 六枢纽取值完全同构） ──
+    # X0-1 的「函证方式」列由 VLOOKUP 自 X0-2!C 列带入 → 两处必须绑定同一枚举。
+    "confirmation_send_channel": [
+        {"value": "mail",       "label": "邮寄",     "color": ""},
+        {"value": "followup",   "label": "跟函",     "color": "success"},
+        {"value": "electronic", "label": "电子函证", "color": "info"},
+        {"value": "other",      "label": "其他",     "color": "info"},
+    ],
+    # ── 选取样本目的（源模板 X0-1!C8 数据验证，六枢纽同构） ──
+    # 🔴 标签逐字保留源模板的空格与标点不一致（"A. 大额" 有空格 / "B.异常" 无空格）。
+    "confirmation_sample_purpose": [
+        {"value": "large_amount",         "label": "A. 大额",   "color": "warning"},
+        {"value": "abnormal",             "label": "B.异常",    "color": "danger"},
+        {"value": "zero_balance",         "label": "C.余额为0", "color": "info"},
+        {"value": "long_aging",           "label": "D.账龄长",  "color": "warning"},
+        {"value": "random",               "label": "E.随机",    "color": ""},
+    ],
+    # ── 地址不一致的核实方式（源模板 X0-2!L7 数据验证，六枢纽同构） ──
+    "confirmation_addr_verify": [
+        {"value": "invoice_contract",     "label": "发票/合同地址核实", "color": ""},
+        {"value": "phone",                "label": "电话核实",          "color": ""},
+        {"value": "website_announcement", "label": "官网/公告查询",     "color": ""},
+        {"value": "map",                  "label": "地图查询",          "color": ""},
+        {"value": "email",                "label": "邮件确认",          "color": ""},
+        {"value": "other",                "label": "其他方式",          "color": "info"},
+    ],
+    "confirmation_reply_method": [
+        {"value": "original_mail", "label": "原件寄回", "color": ""},
+        {"value": "fax",           "label": "传真",     "color": "info"},
+        {"value": "email",         "label": "电子邮件", "color": "info"},
+        {"value": "in_person",     "label": "当面确认", "color": ""},
+        # ── 源模板取值（X0-2!P7「回函方式」，六枢纽同构） ──
+        # spec: h0-confirmation-source-fidelity-and-linkage R7.6
+        {"value": "paper_original",     "label": "纸质原件", "color": ""},
+        {"value": "electronic_platform", "label": "电子函证", "color": "info"},
+        {"value": "other_medium",       "label": "其他介质", "color": "info"},
+    ],
+    "yes_no": [
+        {"value": "yes", "label": "是", "color": "success"},
+        {"value": "no",  "label": "否", "color": "danger"},
+    ],
+    "confirmation_match": [
+        {"value": "matched",   "label": "相符",   "color": "success"},
+        {"value": "unmatched", "label": "不符",   "color": "danger"},
+        {"value": "no_reply",  "label": "未回函", "color": "warning"},
+    ],
+    "sampling_method": [
+        {"value": "statistical",     "label": "统计抽样",   "color": ""},
+        {"value": "non_statistical", "label": "非统计抽样", "color": ""},
+        {"value": "all",             "label": "全部发函",   "color": ""},
+        {"value": "other",           "label": "其他",       "color": "info"},
+    ],
+    # ── D0-2 核实被函证单位信息 额外枚举 ──
+    "confirmation_send_result": [
+        {"value": "delivered",  "label": "送抵", "color": "success"},
+        {"value": "returned",   "label": "退回", "color": "danger"},
+    ],
+    "consistency_status": [
+        {"value": "consistent",   "label": "一致",   "color": "success"},
+        {"value": "inconsistent", "label": "不一致", "color": "danger"},
+        {"value": "pending",      "label": "待核实", "color": "warning"},
+    ],
+    # ── D0-3 跟函函证过程控制 额外枚举 ──
+    "confirmation_followup_scenario": [
+        {"value": "immediate",    "label": "现场即时确认",       "color": "success"},
+        {"value": "later_follow", "label": "无法即时确认留函",   "color": "warning"},
+    ],
+    "yes_no_na": [
+        {"value": "yes", "label": "是",     "color": "success"},
+        {"value": "no",  "label": "否",     "color": "danger"},
+        {"value": "na",  "label": "不适用", "color": "info"},
+    ],
+    # ── D0-4 函证差异调节表 额外枚举 ──
+    "confirmation_subject": [
+        {"value": "应收账款",     "label": "应收账款",     "color": ""},
+        {"value": "合同负债",     "label": "合同负债",     "color": ""},
+        {"value": "销售收入",     "label": "销售收入",     "color": ""},
+        {"value": "应收票据",     "label": "应收票据",     "color": ""},
+        {"value": "合同资产",     "label": "合同资产",     "color": ""},
+        {"value": "预付账款",     "label": "预付账款",     "color": ""},
+        {"value": "应付账款",     "label": "应付账款",     "color": ""},
+        {"value": "预收账款",     "label": "预收账款",     "color": ""},
+        {"value": "其他应收款",   "label": "其他应收款",   "color": ""},
+        {"value": "其他应付款",   "label": "其他应付款",   "color": ""},
+        {"value": "银行存款",     "label": "银行存款",     "color": ""},
+        {"value": "短期借款",     "label": "短期借款",     "color": ""},
+        {"value": "长期借款",     "label": "长期借款",     "color": ""},
+        # ── H 循环（固定资产循环函证 H0-4 差异核对表）品种 ──
+        # 与 confirmation_account_type 的 H 类 9 项标签逐字一致（同一份品种，两个字典）。
+        # spec: h0-confirmation-source-fidelity-and-linkage R1.4
+        {"value": "固定资产",       "label": "固定资产",       "color": ""},
+        {"value": "在建工程",       "label": "在建工程",       "color": ""},
+        {"value": "投资性房地产",   "label": "投资性房地产",   "color": ""},
+        {"value": "工程物资",       "label": "工程物资",       "color": ""},
+        {"value": "油气资产",       "label": "油气资产",       "color": ""},
+        {"value": "固定资产清理",   "label": "固定资产清理",   "color": ""},
+        {"value": "生产性生物资产", "label": "生产性生物资产", "color": ""},
+        {"value": "使用权资产",     "label": "使用权资产",     "color": ""},
+        {"value": "租赁负债",       "label": "租赁负债",       "color": ""},
+    ],
+    "confirmation_diff_type": [
+        {"value": "time",       "label": "时间性差异", "color": "info"},
+        {"value": "accounting", "label": "记账差异",   "color": "warning"},
+        {"value": "unrecorded", "label": "未达账项",   "color": "danger"},
+        {"value": "other",      "label": "其他差异",   "color": ""},
+    ],
+    # ── D0-5 合同负债及销售替代程序 额外枚举 ──
+    "sampling_selection_method": [
+        {"value": "random",        "label": "随机选样",                    "color": ""},
+        {"value": "systematic",    "label": "系统选样",                    "color": ""},
+        {"value": "mus",           "label": "货币单元抽样",                "color": ""},
+        {"value": "judgmental",    "label": "随意选样（非统计抽样适用）",   "color": "info"},
+    ],
+    # ── D0-7 回函可靠性验证 额外枚举 ──
+    "reply_reliability_conclusion": [
+        {"value": "可靠",             "label": "可靠",             "color": "success"},
+        {"value": "部分可靠需补充",   "label": "部分可靠需补充",   "color": "warning"},
+        {"value": "不可靠",           "label": "不可靠",           "color": "danger"},
+    ],
+    "reliability_identity_method": [
+        {"value": "电话确认", "label": "电话确认", "color": ""},
+        {"value": "邮件确认", "label": "邮件确认", "color": ""},
+        {"value": "见面确认", "label": "见面确认", "color": ""},
+        {"value": "系统确认", "label": "系统确认", "color": ""},
+    ],
 }
 
 
@@ -256,6 +432,17 @@ _USAGE_COUNT_QUERIES: dict[str, dict[str, str]] = {
         "where": "",
     },
     "risk_level": {
+        "table": "",
+        "column": "",
+        "where": "",
+    },
+    # P1-3.1 扩展
+    "ai_content_status": {
+        "table": "",
+        "column": "",
+        "where": "",
+    },
+    "archive_status": {
         "table": "",
         "column": "",
         "where": "",

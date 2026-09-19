@@ -1,0 +1,106 @@
+{
+  "schema_version": "pilot-deletion-plan:v1",
+  "task": "Task 45",
+  "spec": "workpaper-html-onlyoffice-bidirectional-writeback-closure",
+  "description": "Source-backed deletion plan for four pilot hosts' legacy dual-mode composables, localStorage keys, and success messages. Each pilot host must transition from its legacy composable to useWorkpaperSyncBridge. Deletion changes source commit and invalidates Task 44 evidence.",
+  "gate_dependency": "Task 44 completed with UNVERIFIABLE status (expected: real OO 9.4 not run yet). Gate infrastructure solid (111 tests, 18 mutations).",
+  "pilots": [
+    {
+      "pilot_class": "simple_checklist",
+      "entry_id": "xlsx/b60/gt-b60-bundle",
+      "adapter_id": "b60.bundle",
+      "legacy_composable": {
+        "file": "audit-platform/frontend/src/components/workpaper/b60/composables/useB60DualMode.ts",
+        "type": "standalone",
+        "localStorage_prefix": "b60-dual-mode:",
+        "endpoint_called": "/api/workpapers/{wpId}/sheets/{sn}/onlyoffice-config",
+        "health_endpoint": "/api/workpapers/onlyoffice/health",
+        "consumers": [
+          "audit-platform/frontend/src/components/workpaper/b60/GtB60Bundle.vue",
+          "audit-platform/frontend/src/components/workpaper/b60/GtB60DocxPane.vue"
+        ]
+      },
+      "action": "delete_composable_and_update_hosts"
+    },
+    {
+      "pilot_class": "d2_large_json",
+      "entry_id": "xlsx/gt-d2-accounts-receivable",
+      "adapter_id": "d2.accounts.receivable",
+      "legacy_composable": {
+        "file": "audit-platform/frontend/src/components/workpaper/composables/useD2EntryDualMode.ts",
+        "type": "wrapper_of_useWorkpaperEntryDualMode",
+        "localStorage_prefix": "wp-entry-dual-mode:",
+        "endpoint_called": "/api/workpapers/{wpId}/sheets/{sn}/onlyoffice-config (via useWorkpaperEntryDualMode)",
+        "health_endpoint": "/api/workpapers/onlyoffice/health (via useWorkpaperEntryDualMode)",
+        "base_composable_shared": true,
+        "base_composable": "useWorkpaperEntryDualMode",
+        "base_composable_note": "NOT deleted — shared by D1/D3/D4/D5/D6/D7/G2/J2/J3/M10 and other non-pilot entries",
+        "consumers": [
+          "audit-platform/frontend/src/components/workpaper/GtD2AccountsReceivable.vue"
+        ]
+      },
+      "action": "delete_composable_and_update_host",
+      "extra_exports": {
+        "getSheetNameFromD2Code": "move_to_d2SheetLabels_or_keep_inline"
+      }
+    },
+    {
+      "pilot_class": "h1_grouped_dynamic",
+      "entry_id": "xlsx/gt-h1-fixed-assets",
+      "adapter_id": "h1.fixed.assets",
+      "legacy_composable": {
+        "file": "audit-platform/frontend/src/components/workpaper/composables/useH1DualMode.ts",
+        "type": "standalone",
+        "localStorage_prefix": "h1-dual-mode:",
+        "endpoint_called": "fetch('/api/workpapers/onlyoffice/health') directly",
+        "health_endpoint": "/api/workpapers/onlyoffice/health",
+        "consumers": [
+          "audit-platform/frontend/src/components/workpaper/GtH1FixedAssets.vue"
+        ]
+      },
+      "action": "delete_composable_and_update_host"
+    },
+    {
+      "pilot_class": "g7_two_level_dynamic",
+      "entry_id": "xlsx/gt-g7-long-term-equity-main",
+      "adapter_id": "g7.long.term.equity.main",
+      "legacy_composable": {
+        "file": "audit-platform/frontend/src/components/workpaper/composables/useG7DualMode.ts",
+        "type": "standalone",
+        "localStorage_prefix": "g7-main-mode-",
+        "endpoint_called": "/api/workpapers/{wpId}/sheets/{sn}/onlyoffice-config",
+        "health_endpoint": "/api/workpapers/onlyoffice/health",
+        "consumers": [
+          "audit-platform/frontend/src/components/workpaper/GtG7LongTermEquityMain.vue"
+        ]
+      },
+      "action": "delete_composable_and_update_host"
+    }
+  ],
+  "shared_deletions": {
+    "localStorage_keys_migrated_by_bridge": [
+      "b60-dual-mode:{wpId}:{sheetName}",
+      "wp-entry-dual-mode:{wpId}",
+      "h1-dual-mode:{wpId}",
+      "g7-main-mode-{wpId}"
+    ],
+    "success_messages_removed": [
+      "切换到在线编辑模式成功",
+      "OO 服务不可用，已回退到结构化视图"
+    ],
+    "endpoints_no_longer_called_by_pilot_hosts": [
+      "/api/workpapers/{wpId}/sheets/{sn}/onlyoffice-config",
+      "/api/workpapers/onlyoffice/health"
+    ],
+    "note": "These endpoints still exist for non-pilot hosts. Only the pilot hosts stop calling them directly."
+  },
+  "post_delete_actions": {
+    "regenerate_manifest": true,
+    "regenerate_registry": true,
+    "evidence_stale_reason": "source_commit_changed — deletion changes source files tracked by evidence freshness",
+    "new_test_runs_required": true,
+    "migration_paradigm_freeze": "After post-delete all-green, the deletion pattern becomes the reusable template for Tasks 46-57"
+  },
+  "properties_verified": [47, 48, 51, 69, 71],
+  "requirements_covered": ["11.1", "11.5", "11.8", "11.10", "11.12", "12.10", "12.13", "12.14", "14.16"]
+}

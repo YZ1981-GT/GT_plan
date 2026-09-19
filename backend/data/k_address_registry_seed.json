@@ -1,0 +1,100 @@
+{
+  "description": "K 类管理循环 audit-sheet 底稿关键坐标注册（OnlyOffice 地址名称落位）",
+  "version": "1.0.0",
+  "cycle": "K",
+  "entries": [
+    {
+      "wp_code": "K1-2",
+      "sheet_name": "其他应收款明细",
+      "coordinates": [
+        {"cell_address": "F30", "description": "其他应收款明细合计", "purpose": "receivable_detail"},
+        {"cell_address": "G30", "description": "账面余额合计", "purpose": "receivable_detail"},
+        {"cell_address": "H30", "description": "坏账准备合计", "purpose": "receivable_detail"},
+        {"cell_address": "I30", "description": "账面价值合计", "purpose": "receivable_detail"}
+      ]
+    },
+    {
+      "wp_code": "K1-3",
+      "sheet_name": "其他应收款账龄分析",
+      "coordinates": [
+        {"cell_address": "C20", "description": "1年以内金额", "purpose": "aging_analysis"},
+        {"cell_address": "D20", "description": "1-2年金额", "purpose": "aging_analysis"},
+        {"cell_address": "E20", "description": "2-3年金额", "purpose": "aging_analysis"},
+        {"cell_address": "F20", "description": "3年以上金额", "purpose": "aging_analysis"},
+        {"cell_address": "G20", "description": "账龄合计", "purpose": "aging_total"}
+      ]
+    },
+    {
+      "wp_code": "K3-2",
+      "sheet_name": "其他应付款明细",
+      "coordinates": [
+        {"cell_address": "F25", "description": "其他应付款明细合计", "purpose": "payable_detail"},
+        {"cell_address": "G25", "description": "账面余额合计", "purpose": "payable_detail"},
+        {"cell_address": "H25", "description": "本期增加合计", "purpose": "payable_detail"},
+        {"cell_address": "I25", "description": "本期减少合计", "purpose": "payable_detail"}
+      ]
+    },
+    {
+      "wp_code": "K3-3",
+      "sheet_name": "其他应付款账龄分析",
+      "coordinates": [
+        {"cell_address": "C20", "description": "1年以内金额", "purpose": "aging_analysis"},
+        {"cell_address": "D20", "description": "1-2年金额", "purpose": "aging_analysis"},
+        {"cell_address": "E20", "description": "2-3年金额", "purpose": "aging_analysis"},
+        {"cell_address": "F20", "description": "3年以上金额", "purpose": "aging_analysis"},
+        {"cell_address": "G20", "description": "账龄合计", "purpose": "aging_total"}
+      ]
+    },
+    {
+      "wp_code": "K5-4",
+      "sheet_name": "最佳估计数计算",
+      "coordinates": [
+        {"cell_address": "C8", "description": "金额区间下限", "purpose": "best_estimate"},
+        {"cell_address": "D8", "description": "金额区间上限", "purpose": "best_estimate"},
+        {"cell_address": "E8", "description": "最佳估计数（加权平均）", "purpose": "best_estimate"},
+        {"cell_address": "F8", "description": "已计提金额", "purpose": "best_estimate"},
+        {"cell_address": "G8", "description": "差异（=最佳估计-已计提）", "purpose": "best_estimate_variance"}
+      ]
+    },
+    {
+      "wp_code": "K8-2",
+      "sheet_name": "销售费用明细",
+      "coordinates": [
+        {"cell_address": "D30", "description": "本期发生额合计", "purpose": "expense_detail"},
+        {"cell_address": "E30", "description": "上年同期发生额合计", "purpose": "expense_detail"},
+        {"cell_address": "F30", "description": "变动额合计", "purpose": "expense_detail"},
+        {"cell_address": "G30", "description": "变动率", "purpose": "expense_variance"}
+      ]
+    },
+    {
+      "wp_code": "K8-3",
+      "sheet_name": "销售费用分析",
+      "coordinates": [
+        {"cell_address": "C15", "description": "同比变动率", "purpose": "expense_trend"},
+        {"cell_address": "D15", "description": "环比变动率", "purpose": "expense_trend"},
+        {"cell_address": "E15", "description": "异常波动标识", "purpose": "expense_trend"},
+        {"cell_address": "F15", "description": "波动原因说明", "purpose": "expense_trend"}
+      ]
+    },
+    {
+      "wp_code": "K9-2",
+      "sheet_name": "管理费用明细",
+      "coordinates": [
+        {"cell_address": "D35", "description": "本期发生额合计", "purpose": "expense_detail"},
+        {"cell_address": "E35", "description": "上年同期发生额合计", "purpose": "expense_detail"},
+        {"cell_address": "F35", "description": "变动额合计", "purpose": "expense_detail"},
+        {"cell_address": "G35", "description": "变动率", "purpose": "expense_variance"}
+      ]
+    },
+    {
+      "wp_code": "K9-3",
+      "sheet_name": "管理费用分析",
+      "coordinates": [
+        {"cell_address": "C15", "description": "同比变动率", "purpose": "expense_trend"},
+        {"cell_address": "D15", "description": "环比变动率", "purpose": "expense_trend"},
+        {"cell_address": "E15", "description": "异常波动标识", "purpose": "expense_trend"},
+        {"cell_address": "F15", "description": "波动原因说明", "purpose": "expense_trend"}
+      ]
+    }
+  ]
+}

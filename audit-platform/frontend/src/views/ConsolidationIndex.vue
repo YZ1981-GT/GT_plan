@@ -1,18 +1,5 @@
 <template>
   <div class="gt-consol gt-fade-in">
-    <!-- P3 防误用标记：开发中警告 banner -->
-    <el-alert
-      v-if="consolDevMode"
-      type="warning"
-      :closable="false"
-      show-icon
-      style="margin-bottom: 12px"
-    >
-      <template #title>
-        <span style="font-weight: 600">开发中，不可用于正式合并报告</span>
-      </template>
-    </el-alert>
-
     <!-- F5 合并页 stale 实时感知（需求 7 / ADR-CONSOL-304）：子公司数据变更后 SSE 提示，warning 不阻断 -->
     <el-alert
       v-if="consolStale"
@@ -194,33 +181,21 @@
               <el-button size="small" @click="exportConsolReport">📤 导出</el-button>
             </div>
           </div>
-          <!-- 权益变动表 — el-table 矩阵视图 -->
-          <div v-if="consolReportType === 'equity_statement' && consolReportRows.length" v-loading="consolReportLoading">
-            <el-table :data="consolReportRows" border size="small" max-height="calc(100vh - 280px)" style="width:100%"
-              :header-cell-style="{ background: '#f4f0fa', fontSize: '12px', whiteSpace: 'nowrap' }"
-              :cell-style="{ padding: '2px 8px', fontSize: '13px' }"
-              :row-class-name="eqRowClassName"
-              :span-method="eqSpanMethod">
-              <el-table-column prop="row_name" label="项目" fixed="left" min-width="200">
-                <template #default="{ row }">
-                  <span style="white-space:nowrap" :style="{ paddingLeft: (row.indent_level || 0) * 14 + 'px' }">{{ row.row_name }}</span>
-                </template>
-              </el-table-column>
-              <el-table-column label="本年金额">
-                <el-table-column v-for="col in consolEqCols" :key="'cv-' + col" :label="eqColLabel(col)" min-width="100" align="right">
-                  <template #default="{ row }">
-                    <span class="gt-amt" style="white-space:nowrap">{{ fmtAmt(row['current_' + col]) }}</span>
-                  </template>
-                </el-table-column>
-              </el-table-column>
-              <el-table-column label="上年金额">
-                <el-table-column v-for="col in consolEqCols" :key="'pv-' + col" :label="eqColLabel(col)" min-width="100" align="right">
-                  <template #default="{ row }">
-                    <span class="gt-amt" style="white-space:nowrap">{{ fmtAmt(row['prior_' + col]) }}</span>
-                  </template>
-                </el-table-column>
-              </el-table-column>
-            </el-table>
+          <!-- 权益变动表 — 与单户 ReportEquityTable 共用 eq_matrix 契约 -->
+          <div v-if="consolReportType === 'equity_statement' && consolReportRows.length" v-loading="consolReportLoading" class="gt-consol-equity-matrix">
+            <ReportEquityTable
+              :rows="consolReportRows"
+              :eq-columns="eqColumns"
+              :eq-total-cols="eqTotalCols"
+              :year="projectInfo.year"
+              :table-max-height="consolEquityTableHeight"
+              :cell-class-name="() => ''"
+              :font-size="displayPrefs.fontConfig.tableFont"
+              :equity-span-method="equitySpanMethod"
+              :eq-row-class-name="eqRowClassName"
+              :eq-cell-val="eqCellVal"
+              :is-consolidated="true"
+            />
           </div>
 
           <!-- 资产减值准备表 — el-table 矩阵视图 -->
@@ -286,7 +261,14 @@
             @cell-contextmenu="onReportCellContextMenu">
             <el-table-column prop="row_code" label="行次" width="80" align="center">
               <template #default="{ row }">
-                <span style="white-space:nowrap">{{ row.row_code }}</span>
+                <!-- 报表行 account 引用经 ACNR TB 域可解析 → GtIndexChip（REPORT/TB 域，Req 20.1/20.2）；miss 回退纯文本（Req 20.7/20.9） -->
+                <GtIndexChip
+                  v-if="reportAccountChip(row)"
+                  :value="reportAccountChip(row) as string"
+                  :context-project-id="projectId"
+                  context="经 ACNR TB 域解析跳转到试算表科目"
+                />
+                <span v-else style="white-space:nowrap">{{ row.row_code }}</span>
               </template>
             </el-table-column>
             <el-table-column prop="row_name" label="项目" min-width="300">
@@ -375,6 +357,10 @@
           <el-button size="small" @click="copyDrillDownTable">📋 复制</el-button>
         </el-tooltip>
         <el-button size="small" @click="exportDrillDown">📤 导出</el-button>
+        <!-- consolBreakdown drill：经 ACNR TB 域解析取 jump_route 后跳转到试算表科目（Req 20.1）；miss 时不显示 -->
+        <el-tooltip v-if="drillDownJumpRoute" content="经 ACNR TB 域跳转到该科目试算表" placement="bottom">
+          <el-button size="small" type="primary" @click="onConsolBreakdownJump">🔗 跳转科目</el-button>
+        </el-tooltip>
       </div>
 
       <!-- 正常视图 -->
@@ -456,10 +442,44 @@
       @compare="onConsolCtxCompare"
     >
       <div class="gt-ucell-ctx-item" @click="onConsolCtxDrillDown"><span class="gt-ucell-ctx-icon">📊</span> 汇总穿透</div>
+      <div class="gt-ucell-ctx-item" @click="onConsolCtxCellTrace"><span class="gt-ucell-ctx-icon">🔍</span> 数字溯源</div>
     </CellContextMenu>
 
     <!-- 选中区域状态栏 -->
     <SelectionBar :stats="consolCtx.selectionStats()" />
+
+    <!-- 数字溯源弹窗（lineage endpoint） -->
+    <el-dialog v-model="consolTraceDialogVisible" title="🔍 数字溯源" width="700px" append-to-body destroy-on-close>
+      <div v-loading="consolTraceLoading" style="min-height:120px">
+        <template v-if="consolTraceResult">
+          <div v-if="consolTraceResult.upstream.length || consolTraceResult.downstream.length">
+            <h4 style="margin:0 0 8px">上游来源</h4>
+            <el-table v-if="consolTraceResult.upstream.length" :data="consolTraceResult.upstream" size="small" border stripe max-height="200">
+              <el-table-column prop="wp_code" label="底稿编码" width="120" />
+              <el-table-column prop="label" label="描述" min-width="200" />
+              <el-table-column label="操作" width="80">
+                <template #default="{ row }">
+                  <el-button size="small" link type="primary" @click="onConsolTraceLocate(row)">定位</el-button>
+                </template>
+              </el-table-column>
+            </el-table>
+            <el-empty v-else description="无上游来源" :image-size="40" />
+            <h4 style="margin:16px 0 8px">下游引用</h4>
+            <el-table v-if="consolTraceResult.downstream.length" :data="consolTraceResult.downstream" size="small" border stripe max-height="200">
+              <el-table-column prop="wp_code" label="底稿编码" width="120" />
+              <el-table-column prop="label" label="描述" min-width="200" />
+              <el-table-column label="操作" width="80">
+                <template #default="{ row }">
+                  <el-button size="small" link type="primary" @click="onConsolTraceLocate(row)">定位</el-button>
+                </template>
+              </el-table-column>
+            </el-table>
+            <el-empty v-else description="无下游引用" :image-size="40" />
+          </div>
+          <el-empty v-else description="该数字暂无溯源信息" :image-size="60" />
+        </template>
+      </div>
+    </el-dialog>
 
   </div>
 </template>
@@ -468,13 +488,14 @@
 import { ref, reactive, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElNotification } from 'element-plus'
+import { exportMultiSheetData } from '@/composables/useExcelIO'
 import {
   getWorksheetTree,
 } from '@/services/consolidationApi'
 import { listChildProjects } from '@/services/commonApi'
 import { api } from '@/services/apiProxy'
-import { projects as P_proj, reportConfig as P_rc, reportMapping as P_rm, consolNoteSections as P_cn, reports, consolidation as P_consol, events as P_events } from '@/services/apiPaths'
-import { createSSE, type SSEConnection } from '@/utils/sse'
+import { projects as P_proj, reportConfig as P_rc, reportMapping as P_rm, consolNoteSections as P_cn, reports, consolidation as P_consol } from '@/services/apiPaths'
+import { subscribeProjectEvent, type ProjectEventSubscription } from '@/services/sse/projectEventStream'
 import ConsolWorksheetTabs from '@/components/consolidation/worksheets/ConsolWorksheetTabs.vue'
 import ConsolNoteTab from '@/components/consolidation/ConsolNoteTab.vue'
 import ConsolTrialBalanceTab from '@/components/consolidation/ConsolTrialBalanceTab.vue'
@@ -494,6 +515,10 @@ import GtPageHeader from '@/components/common/GtPageHeader.vue'
 import GtInfoBar from '@/components/common/GtInfoBar.vue'
 import GtToolbar from '@/components/common/GtToolbar.vue'
 import GtAmountCell from '@/components/common/GtAmountCell.vue'
+import GtIndexChip from '@/components/workpaper/GtIndexChip.vue'
+import { useConsolReportAddress } from '@/components/consolidation/composables/useConsolReportAddress'
+import ReportEquityTable from '@/components/report/ReportEquityTable.vue'
+import { useReportColumns } from '@/views/composables/useReportColumns'
 import { handleApiError } from '@/utils/errorHandler'
 import { useDecimalCalc } from '@/composables/useDecimalCalc'
 import { useNavigationStack } from '@/composables/useNavigationStack'
@@ -515,9 +540,6 @@ const activeTab = ref('worksheets')
 const consolNoteTabRef = ref<InstanceType<typeof ConsolNoteTab> | null>(null)
 const consolTbTabRef = ref<InstanceType<typeof ConsolTrialBalanceTab> | null>(null)
 
-// ─── P3 防误用标记 ────────────────────────────────────────────────────────────
-const consolDevMode = ref(false)
-
 // ─── F5 合并页 stale 实时感知（需求 7 / ADR-CONSOL-304）────────────────────────
 const consolStale = ref(false)
 
@@ -527,12 +549,13 @@ const reaggregateLoading = ref(false)
 const refreshProgress = reactive({ visible: false, step: '', current: 0, total: 0, node: '' })
 // 一键刷新进度 SSE 连接（用 createSSE 直接订阅 events/stream，按 project_id/year 过滤 consol.refresh.* 事件；
 // 全局 ThreeColumnLayout 的 SSE 处理器会丢弃 broadcast_raw 的无 event_type 裸事件，故此处独立订阅）
-let refreshSSE: SSEConnection | null = null
+let refreshSubs: ProjectEventSubscription[] = []
 let refreshPollTimer: ReturnType<typeof setTimeout> | null = null
 
-/** 关闭一键刷新进度 SSE + 轮询兜底连接 */
+/** 关闭一键刷新进度 SSE 订阅 + 轮询兜底 */
 function _stopRefreshTracking() {
-  if (refreshSSE) { refreshSSE.close(); refreshSSE = null }
+  for (const s of refreshSubs) s.close()
+  refreshSubs = []
   if (refreshPollTimer) { clearTimeout(refreshPollTimer); refreshPollTimer = null }
 }
 
@@ -581,10 +604,11 @@ function _startRefreshTracking(jobId: string) {
     }
   }
 
-  // SSE 进度订阅（按 project_id/year 过滤 consol.refresh.* 事件）
+  // SSE 进度订阅：迁移到项目事件流单例总线（frontend-sse-connection-consolidation）；
+  // 订阅共享连接的 consol.refresh.* 事件，按 job_id 客户端过滤（不再自建连接；
+  // 原 URL 的 ?year= 服务端过滤由 job_id 唯一性替代）。
   try {
-    refreshSSE = createSSE(`${P_events.stream(projectId.value)}?year=${year.value}`)
-    refreshSSE.onMessage((data: any, event?: string) => {
+    const onConsolEvent = (data: any, event?: string) => {
       if (!data || (data.job_id && jobId && data.job_id !== jobId)) return
       if (event === 'consol.refresh.progress') {
         refreshProgress.step = data.step || ''
@@ -597,9 +621,12 @@ function _startRefreshTracking(jobId: string) {
       } else if (event === 'consol.refresh.error') {
         finish(false, `一键刷新失败：${data.error || '未知错误'}`)
       }
-    })
+    }
+    for (const ev of ['consol.refresh.progress', 'consol.refresh.completed', 'consol.refresh.error']) {
+      refreshSubs.push(subscribeProjectEvent(projectId.value, ev, onConsolEvent))
+    }
   } catch {
-    // SSE 创建失败不致命，靠轮询兜底
+    // 订阅失败不致命，靠轮询兜底
   }
 
   // 轮询兜底（EH6）：SSE 断开也能感知最终状态
@@ -663,13 +690,14 @@ async function onReaggregateNotes() {
 const consolidationType = ref<'subsidiary' | 'branch'>('subsidiary')
 const consolTypeSaving = ref(false)
 
-async function onConsolidationTypeChange(val: 'subsidiary' | 'branch') {
+async function onConsolidationTypeChange(val: string | number | boolean | undefined) {
+  const t = String(val)
   consolTypeSaving.value = true
   try {
     await api.put(`/api/projects/${projectId.value}/config`, {
-      consolidation_type: val,
+      consolidation_type: t,
     })
-    ElMessage.success(val === 'branch' ? '已切换为总分汇总（直接加总，无抵销）' : '已切换为母子合并（含抵销）')
+    ElMessage.success(t === 'branch' ? '已切换为总分汇总（直接加总，无抵销）' : '已切换为母子合并（含抵销）')
   } catch {
     ElMessage.error('合并类型保存失败')
   } finally {
@@ -714,6 +742,9 @@ const showCellDrillDown = ref(false)
 const drillDownLoading = ref(false)
 const drillDownLevel = ref<'direct' | 'leaf'>('direct')
 const drillDownCell = reactive({ itemName: '', colName: '', totalValue: 0 as number | null, sectionId: '', rowIdx: -1, colIdx: -1 })
+// consolBreakdown drill：当前穿透科目的 ACNR TB 域 jump_route（Req 20.1），miss 时为 null
+const drillDownAccountCode = ref('')
+const drillDownJumpRoute = ref<string | null>(null)
 const drillDownDirectRows = ref<any[]>([])
 const drillDownLeafRows = ref<any[]>([])
 const drillDownTransposed = ref(false)
@@ -750,26 +781,9 @@ const drillDownTitle = computed(() => {
   return `汇总穿透 — ${drillDownCell.itemName} / ${drillDownCell.colName}`
 })
 
-// ─── 权益变动表 el-table 辅助 ──────────────────────────────────────────────
-const EQ_COL_LABELS: Record<string, string> = {
-  paid_in_capital: '实收资本', preferred_stock: '优先股', perpetual_bond: '永续债',
-  other_equity_instruments: '其他', capital_reserve: '资本公积', treasury_stock: '减：库存股',
-  other_comprehensive_income: '其他综合收益', special_reserve: '专项储备',
-  surplus_reserve: '盈余公积', general_risk_reserve: '一般风险准备',
-  retained_earnings: '未分配利润', subtotal: '小计',
-  minority_interest: '少数股东权益', total: '所有者权益合计',
-}
-function eqColLabel(col: string): string {
-  return EQ_COL_LABELS[col] || col
-}
-function eqRowClassName({ row }: { row: any }): string {
-  if (row.is_total_row) return 'gt-cm-total-row'
-  if (row.indent_level === 0) return 'gt-cm-category'
-  return ''
-}
-function eqSpanMethod(): { rowspan: number; colspan: number } | undefined {
-  // el-table nested columns handle the multi-row header automatically
-  return undefined
+const consolEquityTableHeight = ref(600)
+function updateConsolEquityTableHeight() {
+  consolEquityTableHeight.value = Math.max(400, window.innerHeight - 280)
 }
 function impairRowClassName({ row }: { row: any }): string {
   if (row.is_total_row) return 'gt-cm-total-row'
@@ -847,6 +861,9 @@ function openCellDrillDown() {
 }
 
 async function loadDrillDownData() {
+  // 每次穿透先清空 consolBreakdown drill 的 jump_route（避免上次残留，Req 20.1）
+  drillDownJumpRoute.value = null
+  drillDownAccountCode.value = ''
   if (!drillDownCell.itemName || drillDownCell.itemName.startsWith('请')) {
     drillDownDirectRows.value = []
     drillDownLeafRows.value = []
@@ -856,13 +873,20 @@ async function loadDrillDownData() {
   try {
     // 确定当前查看的报表类型和行次
     const reportType = activeTab.value === 'consol_tb' ? consolTbType.value : consolReportType.value
-    const rowCode = selectedCells.value.length ? (() => {
-      const cell = selectedCells.value[0]
-      // 从试算表或报表行中提取 row_code
-      const sourceRows = activeTab.value === 'consol_tb' ? consolTbRows.value : consolReportRows.value
-      return sourceRows[cell.row]?.row_code || ''
-    })() : ''
+    const sourceRows = activeTab.value === 'consol_tb' ? consolTbRows.value : consolReportRows.value
+    const selectedRow = selectedCells.value.length ? sourceRows[selectedCells.value[0].row] : null
+    const rowCode = selectedRow?.row_code || ''
     const colField = drillDownCell.colName?.includes('上期') ? 'prior_period_amount' : 'current_period_amount'
+
+    // consolBreakdown drill：account_code 经 ACNR TB 域解析取 jump_route（Req 20.1）。
+    // 数值穿透仍走既有 P_rc.drillDown（逻辑不变，Req 20.9）；此处仅附加地址跳转能力，miss 回退纯文本。
+    const acctCode = consolReportAddr.accountForRow(selectedRow) || (activeTab.value === 'consol_tb' ? (selectedRow?.standard_account_code || '') : '')
+    drillDownAccountCode.value = acctCode
+    if (acctCode) {
+      consolReportAddr.resolveAccountJump(acctCode).then((r) => {
+        drillDownJumpRoute.value = r.found ? r.jumpRoute : null
+      }).catch(() => { drillDownJumpRoute.value = null })
+    }
 
     // 调用后端真实穿透 API
     const data = await api.post(P_rc.drillDown, {
@@ -918,6 +942,18 @@ async function loadDrillDownData() {
   finally { drillDownLoading.value = false }
 }
 
+/**
+ * consolBreakdown drill 跳转：使用 ACNR TB 域解析得到的 jump_route 打开试算表科目（Req 20.1/20.2）。
+ * jump_route 由 `resolveAccountJump` 经 ACNR 统一出口取得（不自行拼底稿路由，R7.3 铁律）；
+ * 含 {project_id} 占位符则替换。miss 时按钮不显示，故此处 route 必非空。
+ */
+function onConsolBreakdownJump() {
+  const route = drillDownJumpRoute.value
+  if (!route) { ElMessage.warning('该科目地址已失效'); return }
+  const finalRoute = route.replace('{project_id}', projectId.value)
+  window.open(finalRoute, '_blank', 'noopener')
+}
+
 function drillDownSummary({ columns, data }: any) {
   const sums: string[] = []
   columns.forEach((col: any, idx: number) => {
@@ -954,8 +990,6 @@ function copyDrillDownTable() {
 async function exportDrillDown() {
   const rows = currentDrillDownRows.value
   if (!rows.length) return
-  const XLSX = await import('xlsx')
-  const wb = XLSX.utils.book_new()
   const isLeaf = drillDownLevel.value === 'leaf'
   const headers = isLeaf
     ? ['序号', '末级企业', '企业代码', '上级单位', '金额', '占比']
@@ -964,10 +998,17 @@ async function exportDrillDown() {
     ? [i + 1, r.company_name, r.company_code, r.parent_name, r.amount, `${r.ratio}%`]
     : [i + 1, r.company_name, r.company_code, r.amount, `${r.ratio}%`, r.source]
   )
-  const ws = XLSX.utils.aoa_to_sheet([headers, ...dataRows])
-  ws['!cols'] = headers.map(() => ({ wch: 16 }))
-  XLSX.utils.book_append_sheet(wb, ws, '汇总穿透')
-  XLSX.writeFile(wb, `汇总穿透_${drillDownCell.itemName}.xlsx`)
+  // 走 useExcelIO 单一入口（B7 批）。
+  await exportMultiSheetData({
+    sheets: [{
+      sheetName: '汇总穿透',
+      rows: [headers, ...dataRows],
+      colWidths: headers.map(() => ({ wch: 16 })),
+    }],
+    fileName: `汇总穿透_${drillDownCell.itemName}.xlsx`,
+    applyStyles: false,
+    successMessage: false,
+  })
   ElMessage.success('已导出')
 }
 
@@ -979,6 +1020,13 @@ async function loadProjectInfo() {
       projectInfo.clientName = p.client_name || p.name || ''
       projectInfo.year = p.audit_year || year.value
       projectInfo.standard = (p.applicable_standard || '').includes('listed') ? 'listed' : 'soe'
+      // 非合并项目不应进入合并模块，弹提示并跳回
+      const scope = p.report_scope || p.scope || ''
+      if (scope && scope !== 'consolidated') {
+        ElMessage.warning('当前为单体项目，无合并报表功能')
+        router.push(`/projects/${projectId.value}`)
+        return
+      }
     }
   } catch { /* ignore */ }
 }
@@ -1165,17 +1213,32 @@ const currentReportLabel = computed(() => {
   return reportNavItems.find(i => i.key === consolReportType.value)?.label || '合并报表'
 })
 const consolReportRows = ref<any[]>([])
+
+// ─── 合并报表 报表行 / account 引用 → ACNR REPORT/TB 域（Req 20.1/20.2/20.7/20.9）──
+// 报表行地址/坐标名称真源收敛到 ACNR-backed 注册表；account 引用经 TB 域解析取 jump_route。
+// 仅改地址/跳转来源，不改报表数值/生成/balance-check 逻辑（Req 20.9）。
+const consolReportAddr = useConsolReportAddress()
+/** 报表行 行次 单元格：可经 ACNR TB 域解析的 account 引用 → GtIndexChip 索引语法；否则 null 回退纯文本。 */
+function reportAccountChip(row: any): string | null {
+  return consolReportAddr.accountIndexRef(consolReportAddr.accountForRow(row))
+}
+
 const showConsolConversion = ref(false)
 const consolMappingLoading = ref(false)
 const consolMappingRules = ref<any[]>([])
 
-// 权益变动表列 key（合并版：含小计+少数股东）
-const consolEqCols = [
-  'paid_in_capital', 'other_equity_preferred', 'other_equity_perpetual', 'other_equity_other',
-  'capital_reserve', 'treasury_stock', 'oci', 'special_reserve',
-  'surplus_reserve', 'general_risk', 'retained_earnings',
-  'subtotal', 'minority', 'total',
-]
+const consolIsConsolidated = computed(() => true)
+const {
+  eqColumns,
+  eqTotalCols,
+  equitySpanMethod,
+  eqRowClassName,
+  eqCellVal,
+} = useReportColumns({
+  isConsolidated: consolIsConsolidated,
+  activeTab: consolReportType,
+  rows: consolReportRows,
+})
 
 // ─── 前端缓存：按 entity+reportType 缓存，切换秒开，刷新时清缓存 ──────────
 const reportCache = new Map<string, any[]>()
@@ -1268,6 +1331,54 @@ function onConsolCtxDrillDown() {
   openCellDrillDown()
 }
 
+// ─── 数字溯源：调 lineage 端点展示 upstream/downstream ───
+const consolTraceDialogVisible = ref(false)
+const consolTraceLoading = ref(false)
+const consolTraceResult = ref<{ upstream: any[]; downstream: any[] } | null>(null)
+
+async function onConsolCtxCellTrace() {
+  consolCtx.closeContextMenu()
+  const row = consolCtx.contextMenu.rowData as any
+  const objectType = row?.row_code ? 'report_row' : row?.standard_account_code ? 'tb_row' : null
+  const objectId = row?.row_code || row?.standard_account_code
+  if (!objectType || !objectId) {
+    ElMessage.info('请在数据行上右键')
+    return
+  }
+  consolTraceDialogVisible.value = true
+  consolTraceLoading.value = true
+  consolTraceResult.value = null
+  try {
+    const data: any = await api.get(
+      `/api/projects/${projectId.value}/lineage`,
+      { params: { object_type: objectType, object_id: objectId, direction: 'both' } },
+    )
+    const upstream = data?.upstream || []
+    const downstream = data?.downstream || []
+    consolTraceResult.value = { upstream, downstream }
+    if (!upstream.length && !downstream.length) {
+      consolTraceDialogVisible.value = false
+      ElMessage.info('该数字暂无溯源信息')
+    }
+  } catch (e: any) {
+    consolTraceDialogVisible.value = false
+    handleApiError(e, '数字溯源')
+  } finally {
+    consolTraceLoading.value = false
+  }
+}
+
+function onConsolTraceLocate(node: any) {
+  consolTraceDialogVisible.value = false
+  if (node.wp_code) {
+    eventBus.emit('workpaper:locate-cell', {
+      wpId: node.wp_code,
+      sheetName: node.sheet_name || undefined,
+      cellRef: node.cell_ref || '',
+    })
+  }
+}
+
 function onConsolCtxFormula() {
   consolCtx.closeContextMenu()
   eventBus.emit('open-formula-manager', {})
@@ -1296,27 +1407,21 @@ async function loadConsolReport(forceRefresh = false) {
   }
   consolReportLoading.value = true
   try {
-    const standard = `${consolReportTemplateType.value}_consolidated`
-    const params: Record<string, any> = {
-      report_type: consolReportType.value,
-      applicable_standard: standard,
-      project_id: projectId.value,
-    }
-    if (currentConsolEntity.value.code && currentConsolEntity.value.code !== 'root') {
-      params.company_code = currentConsolEntity.value.code
-    }
-    const data = await api.get(P_rc.list, {
-      params,
-      validateStatus: (s: number) => s < 600,
-    })
-    const rows = data ?? []
+    const rows = await api.get(
+      P_consol.reports.list(projectId.value, projectInfo.year),
+      { params: { report_type: consolReportType.value } },
+    )
     const result = Array.isArray(rows) ? rows : []
     consolReportRows.value = result
-    // 写入缓存
     reportCache.set(cacheKey, result)
-    // 加载批注/复核标记
     consolComments.loadComments(`report_${consolReportType.value}`)
-  } catch { consolReportRows.value = [] }
+  } catch (err: any) {
+    if (err?.response?.status === 404) {
+      consolReportRows.value = []
+    } else {
+      consolReportRows.value = []
+    }
+  }
   finally { consolReportLoading.value = false }
 }
 
@@ -1479,7 +1584,32 @@ function onConsolTreeSelect(data: ConsolTreeSelectPayload) {
   }
 }
 
+// route.query.tab 别名 → 真实 el-tab-pane name（A3 中控台 route: chip 跳转用）
+const TAB_ALIAS: Record<string, string> = {
+  scope: 'structure',
+  structure: 'structure',
+  eliminations: 'worksheets',
+  'internal-trade': 'worksheets',
+  worksheets: 'worksheets',
+  trial: 'consol_tb',
+  consol_tb: 'consol_tb',
+  report: 'consol_report',
+  consol_report: 'consol_report',
+  notes: 'consol_note',
+  consol_note: 'consol_note',
+}
+
+function syncTabFromQuery() {
+  const q = route.query.tab
+  if (typeof q === 'string' && TAB_ALIAS[q]) {
+    activeTab.value = TAB_ALIAS[q]
+  }
+}
+
 onMounted(async () => {
+  syncTabFromQuery()
+  updateConsolEquityTableHeight()
+  window.addEventListener('resize', updateConsolEquityTableHeight)
   await loadProjectInfo()
   // 默认合并主体为项目本身（集团层面）
   currentConsolEntity.value = { code: '', name: projectInfo.clientName || '' }
@@ -1487,7 +1617,7 @@ onMounted(async () => {
   // P3 防误用标记：获取模块开发状态
   try {
     const status = await api.get(`/api/consolidation/${projectId.value}/module-status`)
-    consolDevMode.value = !!status?.dev_mode
+    // dev_mode banner removed — module is production-ready
   } catch {
     // 静默忽略（端点不可用时不影响页面）
   }
@@ -1508,6 +1638,7 @@ onMounted(async () => {
 })
 
 onUnmounted(() => {
+  window.removeEventListener('resize', updateConsolEquityTableHeight)
   eventBus.off('consol-tree-select', onConsolTreeSelect)
   eventBus.off('consol-catalog-select', onConsolCatalogSelect)
   eventBus.off('consol-refresh-entity', onConsolRefreshEntity)
@@ -1575,6 +1706,9 @@ watch(activeTab, (tab) => {
   if (tab === 'consol_note' && !consolNoteTree.value.length) loadConsolNoteTree()
   if (tab === 'consol_tb' && !consolTbRows.value.length) loadConsolTb()
 })
+
+// 在合并页内通过 route: chip 二次跳转（query.tab 变化但组件不重挂载）时同步 Tab
+watch(() => route.query.tab, syncTabFromQuery)
 </script>
 
 <style>

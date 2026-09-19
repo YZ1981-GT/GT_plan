@@ -341,11 +341,12 @@ async def recommend_workpapers(project_id: UUID, db: AsyncSession = Depends(get_
         from sqlalchemy import text
         import json
 
-        # 获取项目底稿概况
+        # 获取项目底稿概况（wp_code 在 wp_index，经 wp_index_id 关联）
         result = await db.execute(text("""
-            SELECT wp.wp_code, wp.status, wp.review_status,
+            SELECT i.wp_code, wp.status, wp.review_status,
                    (wp.parsed_data->>'audited_amount')::numeric as amount
             FROM working_paper wp
+            JOIN wp_index i ON i.id = wp.wp_index_id
             WHERE wp.project_id = :pid AND wp.is_deleted = false
             ORDER BY (wp.parsed_data->>'audited_amount')::numeric DESC NULLS LAST
             LIMIT 20

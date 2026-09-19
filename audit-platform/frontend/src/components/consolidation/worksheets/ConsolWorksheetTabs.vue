@@ -12,6 +12,18 @@
         <span>当前为<b>总分汇总</b>模式：分公司为非独立法人，直接加总各分公司试算表即可，<b>无需填写以下抵销底稿</b>（合并数 = 各分公司本体加总）。如需母子合并请在顶部切换合并类型。</span>
       </template>
     </el-alert>
+    <!-- G7 合并联动 stale 常驻提示（Task 6.1；失败静默降级 Property 12） -->
+    <el-alert
+      v-if="linkageStale.stale.value"
+      type="warning"
+      :closable="false"
+      show-icon
+      class="cw-linkage-stale-notice"
+      title="G7 长期股权投资联动结果已过期，请从 G7 底稿重新联动或重新导入"
+      :description="linkageStale.staleSheets.value.length
+        ? `受影响底稿：${linkageStale.staleSheets.value.join('、')}`
+        : ''"
+    />
     <!-- 左侧：表样导航 -->
     <aside class="cw-nav" :style="{ width: navWidth + 'px' }">
       <div class="cw-nav-header">
@@ -50,6 +62,29 @@
     <div class="cw-resizer" @mousedown="startResize" />
     <!-- 右侧：表样内容 -->
     <main class="cw-content">
+      <!-- 导入导出工具栏（合并工作底稿 Phase 1） -->
+      <div class="cw-ie-toolbar">
+        <el-button size="small" type="success" plain :loading="g7LinkageLoading" @click="openG7Linkage">
+          从 G7 联动
+        </el-button>
+        <el-dropdown v-if="canImportExport" trigger="click" @command="(cmd: string) => {
+          if (cmd === 'export-template') handleExportTemplate()
+          else if (cmd === 'export-data') handleExportData()
+          else if (cmd === 'import-data') handleImportClick()
+        }">
+          <el-button size="small" type="primary" plain>
+            导入导出 ▾
+          </el-button>
+          <template #dropdown>
+            <el-dropdown-menu>
+              <el-dropdown-item command="export-template">↓ 导出模板</el-dropdown-item>
+              <el-dropdown-item command="export-data">↓ 导出数据</el-dropdown-item>
+              <el-dropdown-item command="import-data" divided>↑ 导入数据</el-dropdown-item>
+            </el-dropdown-menu>
+          </template>
+        </el-dropdown>
+        <input ref="importFileRef" type="file" accept=".xlsx,.xls" style="display:none" @change="handleImportFile" />
+      </div>
       <SubsidiaryInfoSheet v-if="activeSheet === 'info'" v-model="data.subsidiaryInfo"
         @save="onSave('基本信息表', $event)" @open-share-change="onOpenShareChange" @open-formula="onOpenFormula" />
       <InvestmentCostSheet v-else-if="activeSheet === 'cost'" v-model="data.investmentCost"
@@ -67,7 +102,7 @@
         :equity-rows="data.elimEquity" :income-rows="data.elimIncome" :cross-rows="data.elimCross"
         :imported-entries="allImportedEntries"
         @save="onSave('合并抵消分录', $event)" @open-formula="onOpenFormula"
-        @goto-sheet="(k: string) => activeSheet = k" />
+        @goto-sheet="onGotoSheet" />
       <CapitalReserveSheet v-else-if="activeSheet === 'capital'" :companies="companyColumns"
         v-model="data.capitalReserve" :elimination-data="elimSummaryForCapital"
         @save="onSave('资本公积变动', $event)" @open-formula="onOpenFormula" />
@@ -78,23 +113,24 @@
         :companies="activeShareChangeCompanies"
         :all-companies="companyColumns"
         :indirect-companies="indirectCompanyList"
+        :initial-data="shareChangeData[activeSheet] || []"
         @save="onShareChangeSave" @open-formula="onOpenFormula" />
       <!-- 汇总计算表 -->
       <PostElimInvestSheet v-else-if="activeSheet === 'post_invest'"
         :companies="companyColumns" :investment-cost="data.investmentCost"
         :investment-equity="data.investmentEquity" :equity-sim-direct="data.equitySimDirect"
         :elim-equity="data.elimEquity" @save="onSave('抵消后长投', $event)" @open-formula="onOpenFormula"
-        @goto-sheet="(k: string) => activeSheet = k" />
+        @goto-sheet="onGotoSheet" />
       <PostElimIncomeSheet v-else-if="activeSheet === 'post_income'"
         :companies="companyColumns" :investment-cost="data.investmentCost"
         :equity-sim-direct="data.equitySimDirect" :elim-income="data.elimIncome"
         @save="onSave('抵消后投资收益', $event)"
-        @goto-sheet="(k: string) => activeSheet = k" @open-formula="onOpenFormula" />
+        @goto-sheet="onGotoSheet" @open-formula="onOpenFormula" />
       <MinorityInterestSheet v-else-if="activeSheet === 'minority'"
         :companies="companyColumns" :net-asset-data="data.netAsset"
         :equity-sim-direct="data.equitySimDirect" :elim-equity="data.elimEquity"
         :elim-income="data.elimIncome" @save="onSave('少数股东权益损益', $event)"
-        @goto-sheet="(k: string) => activeSheet = k" @open-formula="onOpenFormula" />
+        @goto-sheet="onGotoSheet" @open-formula="onOpenFormula" />
       <!-- 内部抵消表 -->
       <InternalArApSheet v-else-if="activeSheet === 'internal_arap'"
         :companies="companyColumns" @save="onSave('内部往来抵消', $event)" @open-formula="onOpenFormula"
@@ -105,7 +141,232 @@
       <InternalCashFlowSheet v-else-if="activeSheet === 'internal_cashflow'"
         :companies="companyColumns" @save="onSave('内部现金流抵消', $event)" @open-formula="onOpenFormula"
         @entries-changed="(e: any[]) => internalEntries.cashflow = e" />
+      <!-- G7 建议草稿（只读；由 G7 联动勾选建议后写入，不参与合并计算） -->
+      <G7SuggestionDraftSheet v-else-if="activeSheet === 'g7_suggestions'"
+        :rows="g7SuggestionDraft.rows" :note="g7SuggestionDraft.note"
+        :imported-at="g7SuggestionDraft.importedAt"
+        @goto-sheet="onGotoSheet" @refresh="loadAllData" />
     </main>
+
+    <el-dialog v-model="g7LinkageVisible" title="G7 → 合并工作底稿联动" width="920px" destroy-on-close>
+      <el-alert
+        v-if="g7LinkagePreview && !g7LinkagePreview.source_wp_id"
+        type="warning"
+        :closable="false"
+        title="当前项目未找到 G7 工作底稿"
+      />
+      <template v-else-if="g7LinkagePreview">
+        <el-descriptions :column="3" border size="small" class="g7-linkage-summary">
+          <el-descriptions-item label="来源底稿">G7</el-descriptions-item>
+          <el-descriptions-item label="已识别源表">{{ g7LinkagePreview.sources_used.join('、') || '无' }}</el-descriptions-item>
+          <el-descriptions-item label="更新时间">{{ formatLinkageTime(g7LinkagePreview.source_updated_at) }}</el-descriptions-item>
+          <el-descriptions-item label="基本信息">
+            {{ g7LinkagePreview.counts.info?.importable || 0 }}/{{ g7LinkagePreview.counts.info?.candidate || 0 }} 可导入
+          </el-descriptions-item>
+          <el-descriptions-item label="成本法明细">
+            {{ g7LinkagePreview.counts.cost?.importable || 0 }}/{{ g7LinkagePreview.counts.cost?.candidate || 0 }} 可导入
+          </el-descriptions-item>
+          <el-descriptions-item label="权益法明细">
+            {{ g7LinkagePreview.counts.equity_inv?.importable || 0 }}/{{ g7LinkagePreview.counts.equity_inv?.candidate || 0 }} 可导入
+          </el-descriptions-item>
+          <el-descriptions-item label="净资产表">
+            {{ g7LinkagePreview.counts.net_asset?.importable || 0 }}/{{ g7LinkagePreview.counts.net_asset?.candidate || 0 }} 可导入
+          </el-descriptions-item>
+          <el-descriptions-item label="字段差异">
+            新增 {{ g7LinkagePreview.diff_summary?.added || 0 }} /
+            变更 {{ g7LinkagePreview.diff_summary?.changed || 0 }} /
+            冲突 {{ g7LinkagePreview.diff_summary?.conflict || 0 }}
+          </el-descriptions-item>
+          <el-descriptions-item label="建议草稿">
+            {{ g7LinkagePreview.suggestions?.length || 0 }} 条（G7-9/10/3/16）
+          </el-descriptions-item>
+        </el-descriptions>
+
+        <el-alert type="info" :closable="false" class="g7-linkage-note">
+          默认只填充合并底稿空值，并保存 G7 来源信息；不会自动生成正式抵消分录。
+          勾选「基本信息」才会同步合并范围，且不覆盖已有纳入状态。
+          商誉/少数股东仅作建议草稿，需单独勾选后写入。
+        </el-alert>
+
+        <el-alert
+          v-if="g7LinkagePreview.linkage_stale"
+          type="error"
+          :closable="false"
+          class="g7-linkage-note"
+          :title="`G7 源数据已变更，以下合并底稿联动过期：${(g7LinkagePreview.stale_sheets || []).join('、') || '相关表'}。请重新确认导入。`"
+        />
+
+        <el-alert
+          v-if="(g7LinkagePreview.skipped_net_asset_fields?.length || 0) > 0"
+          type="warning"
+          :closable="false"
+          class="g7-linkage-note"
+          :title="`净资产有 ${g7LinkagePreview.skipped_net_asset_fields?.length} 项无对应行已跳过（如公允价值调整/内部交易），未并入未分配利润`"
+        />
+
+        <el-alert
+          v-if="(g7LinkagePreview.ambiguous_companies?.length || 0) > 0"
+          type="warning"
+          :closable="false"
+          class="g7-linkage-note"
+          title="存在同名企业，请手动选择企业代码后才能导入"
+        />
+
+        <div v-if="g7PendingMappings.length" class="g7-linkage-mapping">
+          <div class="g7-linkage-title">待确认主体映射</div>
+          <el-table :data="g7PendingMappings" border size="small" max-height="220">
+            <el-table-column label="原因" width="100">
+              <template #default="{ row }">
+                <el-tag size="small" :type="row.reason === 'ambiguous' ? 'warning' : 'info'">
+                  {{ row.reason === 'ambiguous' ? '同名冲突' : '未匹配' }}
+                </el-tag>
+              </template>
+            </el-table-column>
+            <el-table-column label="G7 被投资单位" min-width="200">
+              <template #default="{ row }">{{ row.name }}</template>
+            </el-table-column>
+            <el-table-column label="合并企业代码" min-width="320">
+              <template #default="{ row }">
+                <el-select v-model="g7CompanyMappings[row.name]" clearable filterable placeholder="选择匹配企业；留空则本次跳过">
+                  <el-option
+                    v-for="company in g7LinkagePreview.available_companies"
+                    :key="company.company_code"
+                    :label="`${company.company_name}（${company.company_code}）`"
+                    :value="company.company_code"
+                  />
+                </el-select>
+              </template>
+            </el-table-column>
+          </el-table>
+        </div>
+
+        <div v-if="g7EditableDiffs.length" class="g7-linkage-mapping">
+          <div class="g7-linkage-title">
+            字段差异确认
+            <el-button link type="primary" size="small" @click="selectAllDiffs(true)">全选可写入</el-button>
+            <el-button link size="small" @click="selectAllDiffs(false)">清空</el-button>
+          </div>
+          <el-table :data="g7EditableDiffs" border size="small" max-height="260">
+            <el-table-column width="52" align="center">
+              <template #default="{ row }">
+                <el-checkbox
+                  v-model="row.selected"
+                  :disabled="row.status === 'conflict' && !g7Overwrite"
+                />
+              </template>
+            </el-table-column>
+            <el-table-column label="表" width="100" prop="sheet_key" />
+            <el-table-column label="企业" min-width="120">
+              <template #default="{ row }">{{ row.company_name || row.identity }}</template>
+            </el-table-column>
+            <el-table-column label="字段" width="130" prop="field" />
+            <el-table-column label="原值" min-width="100">
+              <template #default="{ row }">{{ formatDiffValue(row.old_value) }}</template>
+            </el-table-column>
+            <el-table-column label="G7 新值" min-width="100">
+              <template #default="{ row }">{{ formatDiffValue(row.new_value) }}</template>
+            </el-table-column>
+            <el-table-column label="状态" width="90">
+              <template #default="{ row }">
+                <el-tag
+                  size="small"
+                  :type="row.status === 'conflict' ? 'danger' : row.status === 'added' ? 'success' : 'warning'"
+                >
+                  {{ diffStatusLabel(row.status) }}
+                </el-tag>
+              </template>
+            </el-table-column>
+          </el-table>
+        </div>
+
+        <div v-if="g7UnrecognizedMetaRows.length" class="g7-linkage-mapping">
+          <div class="g7-linkage-title">G7-16 未确认损失备查（结构化，不入正式抵消）</div>
+          <el-table :data="g7UnrecognizedMetaRows" border size="small" max-height="200">
+            <el-table-column label="企业" min-width="140" prop="company_name" />
+            <el-table-column label="超额亏损" width="110" align="right">
+              <template #default="{ row }">{{ formatDiffValue(row.excess_loss) }}</template>
+            </el-table-column>
+            <el-table-column label="未确认损失" width="110" align="right">
+              <template #default="{ row }">{{ formatDiffValue(row.unrecognized_loss) }}</template>
+            </el-table-column>
+            <el-table-column label="上期累计" width="110" align="right">
+              <template #default="{ row }">{{ formatDiffValue(row.prior_cumulative) }}</template>
+            </el-table-column>
+            <el-table-column label="本期变动" width="110" align="right">
+              <template #default="{ row }">{{ formatDiffValue(row.current_change) }}</template>
+            </el-table-column>
+            <el-table-column label="G7-14其他调整" width="120" align="right">
+              <template #default="{ row }">{{ formatDiffValue(row.other_adj) }}</template>
+            </el-table-column>
+          </el-table>
+        </div>
+
+        <div v-if="(g7LinkagePreview.suggestions?.length || 0) > 0" class="g7-linkage-mapping">
+          <div class="g7-linkage-title">
+            建议草稿（G7-3/6/9/10/13/15/16，不自动入正式抵消；确认后可在左侧「G7 建议草稿」查看）
+          </div>
+          <el-table :data="g7LinkagePreview.suggestions" border size="small" max-height="240">
+            <el-table-column width="52" align="center">
+              <template #default="{ row }">
+                <el-checkbox v-model="g7SuggestionSelected[row.id]" />
+              </template>
+            </el-table-column>
+            <el-table-column label="来源" width="70" prop="source_sheet" />
+            <el-table-column label="类型" width="120">
+              <template #default="{ row }">{{ suggestionTypeLabel(row.type) }}</template>
+            </el-table-column>
+            <el-table-column label="企业/科目" min-width="140">
+              <template #default="{ row }">
+                {{ row.company_name || row.account_name || '—' }}
+              </template>
+            </el-table-column>
+            <el-table-column label="摘要" min-width="160" show-overflow-tooltip>
+              <template #default="{ row }">
+                {{ row.change_type || row.description || row.note || '—' }}
+              </template>
+            </el-table-column>
+            <el-table-column label="关键金额" width="120">
+              <template #default="{ row }">
+                {{ formatDiffValue(
+                  row.goodwill_amount
+                    ?? row.equity_adjustment
+                    ?? row.debit_amount
+                    ?? row.credit_amount
+                    ?? row.unrecognized_loss
+                    ?? row.current_change
+                    ?? row.amount,
+                ) }}
+              </template>
+            </el-table-column>
+          </el-table>
+        </div>
+
+        <div class="g7-linkage-options">
+          <el-checkbox-group v-model="g7SelectedSheets">
+            <el-checkbox value="info">基本信息/合并范围</el-checkbox>
+            <el-checkbox value="cost">成本法投资明细</el-checkbox>
+            <el-checkbox value="equity_inv">权益法投资明细</el-checkbox>
+            <el-checkbox value="net_asset">净资产表（G7-14）</el-checkbox>
+          </el-checkbox-group>
+          <el-switch
+            v-model="g7Overwrite"
+            active-text="覆盖已有非空值（谨慎）"
+            @change="onG7OverwriteChange"
+          />
+        </div>
+      </template>
+      <template #footer>
+        <el-button @click="g7LinkageVisible = false">取消</el-button>
+        <el-button
+          type="primary"
+          :loading="g7LinkageImporting"
+          :disabled="!g7LinkagePreview?.source_wp_id || g7SelectedSheets.length === 0"
+          @click="confirmG7Linkage"
+        >
+          确认联动
+        </el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -115,8 +376,16 @@ import { useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { List, Coin, TrendCharts, DataBoard, SetUp, Tickets, PieChart } from '@element-plus/icons-vue'
 import { getConsolScope } from '@/services/consolidationApi'
-import { loadAllWorksheetData, saveWorksheetData } from '@/services/consolWorksheetDataApi'
+import {
+  importG7Linkage,
+  loadAllWorksheetData,
+  previewG7Linkage,
+  saveWorksheetData,
+  type G7LinkageFieldDiff,
+  type G7LinkagePreview,
+} from '@/services/consolWorksheetDataApi'
 import { api } from '@/services/apiProxy'
+import { useG7ConsolLinkageEntry } from '@/components/workpaper/composables/g7ConsolLinkageEntry'
 import SubsidiaryInfoSheet from './SubsidiaryInfoSheet.vue'
 import InvestmentCostSheet from './InvestmentCostSheet.vue'
 import InvestmentEquitySheet from './InvestmentEquitySheet.vue'
@@ -131,9 +400,146 @@ import MinorityInterestSheet from './MinorityInterestSheet.vue'
 import InternalArApSheet from './InternalArApSheet.vue'
 import InternalTradeSheet from './InternalTradeSheet.vue'
 import InternalCashFlowSheet from './InternalCashFlowSheet.vue'
+import G7SuggestionDraftSheet from './G7SuggestionDraftSheet.vue'
 import { eventBus } from '@/utils/eventBus'
 import type { FormulaChangedPayload } from '@/utils/eventBus'
 import { handleApiError } from '@/utils/errorHandler'
+import { useExcelIO, type ExcelColumn } from '@/composables/useExcelIO'
+import { loadWorksheetData } from '@/services/consolWorksheetDataApi'
+
+// ─── 合并工作底稿导入导出列定义 ─────────────────────────────────────────────
+const CONSOL_SHEET_COLS: Record<string, ExcelColumn[]> = {
+  info: [
+    { key: 'company_name', header: '企业名称', width: 20 },
+    { key: 'company_code', header: '企业代码', width: 12 },
+    { key: 'parent_code', header: '上级企业代码', width: 12 },
+    { key: 'ultimate_controller', header: '最终控制方', width: 16 },
+    { key: 'accounting_method', header: '核算方式', width: 10 },
+    { key: 'holding_type', header: '持股方式', width: 8 },
+    { key: 'non_common_ratio', header: '非同一控制持股比例', width: 14 },
+    { key: 'common_ratio', header: '同一控制持股比例', width: 14 },
+    { key: 'acquisition_date', header: '取得日', width: 12 },
+    { key: 'merge_type', header: '合并类型', width: 10 },
+    { key: 'first_consol_date', header: '首次合并日', width: 12 },
+  ],
+  cost: [
+    { key: 'sub_name', header: '被投资单位', width: 20 },
+    { key: 'sub_code', header: '企业代码', width: 12 },
+    { key: 'initial_cost', header: '初始投资成本', width: 14 },
+    { key: 'book_value', header: '账面价值', width: 14 },
+    { key: 'fair_value', header: '公允价值', width: 14 },
+    { key: 'dividend_received', header: '已收股利', width: 14 },
+    { key: 'impairment', header: '减值准备', width: 14 },
+  ],
+  equity_inv: [
+    { key: 'sub_name', header: '被投资单位', width: 20 },
+    { key: 'sub_code', header: '企业代码', width: 12 },
+    { key: 'initial_cost', header: '初始投资成本', width: 14 },
+    { key: 'share_ratio', header: '持股比例', width: 10 },
+    { key: 'net_profit_share', header: '损益调整', width: 14 },
+    { key: 'other_ci_share', header: '其他综合收益', width: 14 },
+    { key: 'book_value', header: '账面价值', width: 14 },
+    { key: 'impairment', header: '减值准备', width: 14 },
+  ],
+  net_asset: [
+    { key: 'subject', header: '项目', width: 20 },
+    { key: 'begin_amount', header: '期初数', width: 14 },
+    { key: 'end_amount', header: '期末数', width: 14 },
+    { key: 'remark', header: '备注', width: 16 },
+  ],
+  equity_sim: [
+    { key: 'sub_name', header: '被投资单位', width: 20 },
+    { key: 'ratio', header: '持股比例', width: 10 },
+    { key: 'begin_equity', header: '期初净资产', width: 14 },
+    { key: 'end_equity', header: '期末净资产', width: 14 },
+    { key: 'net_profit', header: '本期净利润份额', width: 14 },
+    { key: 'other_ci', header: '其他综合收益份额', width: 14 },
+    { key: 'simulated_value', header: '模拟权益法金额', width: 14 },
+  ],
+  capital: [
+    { key: 'item', header: '项目', width: 20 },
+    { key: 'begin_amount', header: '期初数', width: 14 },
+    { key: 'increase', header: '本期增加', width: 14 },
+    { key: 'decrease', header: '本期减少', width: 14 },
+    { key: 'end_amount', header: '期末数', width: 14 },
+    { key: 'remark', header: '备注', width: 16 },
+  ],
+  // ── Phase 1 扩展：剩余 10 张表 ──────────────────────────────────────────
+  post_invest: [
+    { key: 'sub_name', header: '被投资单位', width: 20 },
+    { key: 'sub_code', header: '企业代码', width: 12 },
+    { key: 'method', header: '核算方式', width: 10 },
+    { key: 'cost_book_value', header: '账面价值（投资）', width: 16 },
+    { key: 'equity_sim_value', header: '模拟权益法金额', width: 16 },
+    { key: 'elim_amount', header: '抵消金额', width: 14 },
+    { key: 'post_elim_value', header: '抵消后长投', width: 14 },
+    { key: 'remark', header: '备注', width: 16 },
+  ],
+  post_income: [
+    { key: 'sub_name', header: '被投资单位', width: 20 },
+    { key: 'sub_code', header: '企业代码', width: 12 },
+    { key: 'cost_income', header: '成本法投资收益', width: 16 },
+    { key: 'equity_income', header: '权益法投资收益', width: 16 },
+    { key: 'elim_income', header: '抵消投资收益', width: 14 },
+    { key: 'post_elim_income', header: '抵消后投资收益', width: 16 },
+    { key: 'remark', header: '备注', width: 16 },
+  ],
+  minority: [
+    { key: 'sub_name', header: '被投资单位', width: 20 },
+    { key: 'sub_code', header: '企业代码', width: 12 },
+    { key: 'minority_ratio', header: '少数股东比例', width: 14 },
+    { key: 'begin_equity', header: '期初少数股东权益', width: 16 },
+    { key: 'net_profit_share', header: '少数股东损益', width: 14 },
+    { key: 'other_ci_share', header: '其他综合收益份额', width: 16 },
+    { key: 'dividend', header: '分红', width: 14 },
+    { key: 'end_equity', header: '期末少数股东权益', width: 16 },
+  ],
+  internal_arap: [
+    { key: 'from_company', header: '债务方', width: 16 },
+    { key: 'to_company', header: '债权方', width: 16 },
+    { key: 'subject', header: '科目', width: 16 },
+    { key: 'amount', header: '金额', width: 14 },
+    { key: 'direction', header: '借贷', width: 8 },
+    { key: 'confirmed', header: '已确认', width: 8 },
+    { key: 'diff_amount', header: '差异金额', width: 14 },
+    { key: 'remark', header: '说明', width: 16 },
+  ],
+  internal_trade: [
+    { key: 'seller', header: '销售方', width: 16 },
+    { key: 'buyer', header: '购买方', width: 16 },
+    { key: 'trade_type', header: '交易类型', width: 12 },
+    { key: 'revenue_amount', header: '收入金额', width: 14 },
+    { key: 'cost_amount', header: '成本金额', width: 14 },
+    { key: 'unrealized_profit', header: '未实现利润', width: 14 },
+    { key: 'direction', header: '借贷', width: 8 },
+    { key: 'remark', header: '说明', width: 16 },
+  ],
+  internal_cashflow: [
+    { key: 'from_company', header: '付款方', width: 16 },
+    { key: 'to_company', header: '收款方', width: 16 },
+    { key: 'cashflow_type', header: '现金流类型', width: 14 },
+    { key: 'amount', header: '金额', width: 14 },
+    { key: 'direction', header: '借贷', width: 8 },
+    { key: 'remark', header: '说明', width: 16 },
+  ],
+  elimination: [
+    { key: 'source', header: '来源', width: 10 },
+    { key: 'direction', header: '借贷', width: 8 },
+    { key: 'subject', header: '科目', width: 20 },
+    { key: 'detail', header: '二级明细', width: 16 },
+    { key: 'amount', header: '金额', width: 16 },
+    { key: 'desc', header: '说明', width: 24 },
+  ],
+  share_change: [
+    { key: 'company_name', header: '企业名称', width: 20 },
+    { key: 'change_date', header: '变动日期', width: 12 },
+    { key: 'before_ratio', header: '变动前比例', width: 12 },
+    { key: 'after_ratio', header: '变动后比例', width: 12 },
+    { key: 'change_type', header: '变动类型', width: 12 },
+    { key: 'amount', header: '变动金额', width: 14 },
+    { key: 'remark', header: '备注', width: 16 },
+  ],
+}
 
 interface SubsidiaryInfoRow {
   company_name: string; company_code: string; parent_code: string
@@ -189,6 +595,7 @@ const staticSheets = [
   { key: 'internal_arap', label: '内部往来抵消', desc: '债务方×债权方·账龄·坏账', icon: markRaw(Tickets), tag: '抵消', tagType: 'warning' as const },
   { key: 'internal_trade', label: '内部交易抵消', desc: '卖方×买方·未实现利润', icon: markRaw(Tickets), tag: '抵消', tagType: 'warning' as const },
   { key: 'internal_cashflow', label: '内部现金流抵消', desc: '按现金流量表项目配对', icon: markRaw(Tickets), tag: '抵消', tagType: 'warning' as const },
+  { key: 'g7_suggestions', label: 'G7 建议草稿', desc: '商誉/股比/调整分录建议·需复核', icon: markRaw(Tickets), tag: '草稿', tagType: 'warning' as const },
 ]
 
 // 从基本信息表提取有股比变动的企业，动态生成导航项
@@ -251,7 +658,7 @@ const navGroups = computed(() => [
   {
     key: 'g5', label: '合并抵消', step: '5',
     collapsed: groupCollapsed.g5,
-    sheets: sheetList.value.filter(s => ['elimination', 'capital'].includes(s.key)),
+    sheets: sheetList.value.filter(s => ['elimination', 'capital', 'g7_suggestions'].includes(s.key)),
   },
   {
     key: 'g6', label: '汇总核查', step: '✓',
@@ -266,7 +673,212 @@ const activeSheet = ref('info')
 const route = useRoute()
 const projectId = computed(() => route.params.projectId as string)
 const year = computed(() => Number(route.query.year) || new Date().getFullYear() - 1)
+
+// ─── G7 联动 stale 常驻提示（Task 6.1；失败静默降级 Property 12） ────────────
+const linkageStale = useG7ConsolLinkageEntry(projectId, year)
+
 const scopeCompanies = ref<{ name: string; code: string; ratio: number }[]>([])
+const g7LinkageVisible = ref(false)
+const g7LinkageLoading = ref(false)
+const g7LinkageImporting = ref(false)
+const g7LinkagePreview = ref<G7LinkagePreview | null>(null)
+const g7CompanyMappings = reactive<Record<string, string>>({})
+const g7SelectedSheets = ref<string[]>(['info', 'cost', 'equity_inv', 'net_asset'])
+const g7Overwrite = ref(false)
+const g7EditableDiffs = ref<G7LinkageFieldDiff[]>([])
+const g7SuggestionSelected = reactive<Record<string, boolean>>({})
+/** 已写入的 G7 建议草稿（sheet_key='g7_suggestions'，只读展示，不参与合并计算） */
+const g7SuggestionDraft = reactive<{
+  rows: Record<string, any>[]
+  note: string
+  importedAt: string
+}>({ rows: [], note: '', importedAt: '' })
+
+/** 从 importable equity_inv 提取 G7-16 结构化备查字段 */
+const g7UnrecognizedMetaRows = computed(() => {
+  const inv = g7LinkagePreview.value?.importable?.equity_inv
+  if (!Array.isArray(inv)) return [] as Array<Record<string, unknown>>
+  return inv
+    .filter((r: any) =>
+      r?._g7_unrecognized_loss != null
+      || r?._g7_excess_loss != null
+      || r?._g7_current_change != null
+      || r?._g7_g7_16,
+    )
+    .map((r: any) => ({
+      company_name: r.company_name || r.company_code || '—',
+      excess_loss: r._g7_excess_loss,
+      unrecognized_loss: r._g7_unrecognized_loss,
+      prior_cumulative: r._g7_prior_cumulative,
+      current_change: r._g7_current_change,
+      other_adj: r._g7_other_adj,
+    }))
+})
+
+const g7PendingMappings = computed(() => {
+  const preview = g7LinkagePreview.value
+  if (!preview) return [] as Array<{ name: string; reason: 'unresolved' | 'ambiguous' }>
+  const rows: Array<{ name: string; reason: 'unresolved' | 'ambiguous' }> = []
+  for (const name of preview.ambiguous_companies || []) {
+    rows.push({ name, reason: 'ambiguous' })
+  }
+  for (const name of preview.unresolved_companies || []) {
+    if (!(preview.ambiguous_companies || []).includes(name)) {
+      rows.push({ name, reason: 'unresolved' })
+    }
+  }
+  return rows
+})
+
+function formatLinkageTime(value?: string | null): string {
+  if (!value) return '—'
+  const date = new Date(value)
+  return Number.isNaN(date.getTime()) ? value : date.toLocaleString('zh-CN')
+}
+
+function formatDiffValue(value: unknown): string {
+  if (value === null || value === undefined || value === '') return '—'
+  if (typeof value === 'object') return JSON.stringify(value)
+  return String(value)
+}
+
+function diffStatusLabel(status: string): string {
+  if (status === 'added') return '新增'
+  if (status === 'changed') return '变更'
+  if (status === 'conflict') return '冲突'
+  return '相同'
+}
+
+function suggestionTypeLabel(type: string): string {
+  if (type === 'goodwill_nci') return '商誉/NCI'
+  if (type === 'share_change_capital') return '股比/资本公积'
+  if (type === 'consol_adjustment_draft') return '调整草稿'
+  if (type === 'unrecognized_loss') return '未确认损失'
+  return type || '建议'
+}
+
+function syncDiffSelectionsFromPreview() {
+  const diffs = (g7LinkagePreview.value?.field_diffs || []).filter(
+    (d) => d.status !== 'unchanged',
+  )
+  g7EditableDiffs.value = diffs.map((d) => ({
+    ...d,
+    selected:
+      d.status === 'added'
+      || d.status === 'changed'
+      || (g7Overwrite.value && d.status === 'conflict'),
+  }))
+}
+
+function selectAllDiffs(selected: boolean) {
+  for (const row of g7EditableDiffs.value) {
+    if (row.status === 'conflict' && !g7Overwrite.value) {
+      row.selected = false
+      continue
+    }
+    row.selected = selected
+  }
+}
+
+function onG7OverwriteChange() {
+  for (const row of g7EditableDiffs.value) {
+    if (row.status === 'conflict') {
+      row.selected = g7Overwrite.value
+    }
+  }
+}
+
+function resetSuggestionSelections() {
+  Object.keys(g7SuggestionSelected).forEach((key) => delete g7SuggestionSelected[key])
+  for (const item of g7LinkagePreview.value?.suggestions || []) {
+    g7SuggestionSelected[item.id] = !!item.selected_default
+  }
+}
+
+async function openG7Linkage() {
+  if (!projectId.value) {
+    ElMessage.warning('项目ID缺失')
+    return
+  }
+  g7LinkageLoading.value = true
+  try {
+    g7LinkagePreview.value = await previewG7Linkage(projectId.value, year.value)
+    Object.keys(g7CompanyMappings).forEach(key => delete g7CompanyMappings[key])
+    syncDiffSelectionsFromPreview()
+    resetSuggestionSelections()
+    g7LinkageVisible.value = true
+  } catch (error: any) {
+    handleApiError(error, 'G7 联动预览失败')
+  } finally {
+    g7LinkageLoading.value = false
+  }
+}
+
+async function confirmG7Linkage() {
+  if (!projectId.value || !g7LinkagePreview.value) return
+  g7LinkageImporting.value = true
+  try {
+    const mappings = Object.fromEntries(
+      Object.entries(g7CompanyMappings).filter(([, code]) => !!code),
+    )
+    const selectedDiffs = g7EditableDiffs.value
+      .filter((d) => d.selected)
+      .map((d) => ({
+        sheet_key: d.sheet_key,
+        identity: d.identity,
+        field: d.field,
+      }))
+    const applySuggestionIds = Object.entries(g7SuggestionSelected)
+      .filter(([, on]) => on)
+      .map(([id]) => id)
+    // 有新映射时差异表尚未覆盖这些主体；无差异时走整表填空合并
+    const useSelectiveDiffs = Object.keys(mappings).length === 0
+      && g7EditableDiffs.value.length > 0
+    const result = await importG7Linkage(projectId.value, year.value, {
+      company_mappings: mappings,
+      sheet_keys: g7SelectedSheets.value,
+      overwrite: g7Overwrite.value,
+      expected_versions: g7LinkagePreview.value.item_versions || {},
+      selected_diffs: useSelectiveDiffs ? selectedDiffs : undefined,
+      apply_suggestion_ids: applySuggestionIds,
+    })
+    await Promise.all([loadAllData(), loadConsolScope()])
+    g7LinkageVisible.value = false
+    // Task 6.1: 成功导入后刷新 stale 状态（Property 12：清除两侧提示）
+    void linkageStale.refreshStale()
+    const imported = Object.values(result.imported || {}).reduce(
+      (rowCount, currentCount) => rowCount + Number(currentCount || 0),
+      0,
+    )
+    const skipped = (result.unresolved_companies?.length || 0)
+      + (result.ambiguous_companies?.length || 0)
+    const scopeNote = result.scope_synced
+      ? `，范围同步 ${result.scope_synced} 家`
+      : ''
+    const draftNote = result.suggestions_applied
+      ? `，建议草稿 ${result.suggestions_applied} 条（见左侧「G7 建议草稿」）`
+      : ''
+    ElMessage.success(
+      `G7 联动完成：导入 ${imported} 行${scopeNote}${draftNote}${skipped ? `，仍有 ${skipped} 个主体未匹配` : ''}`,
+    )
+  } catch (error: any) {
+    const status = error?.response?.status || error?.status
+    if (status === 409) {
+      ElMessage.warning('G7 源数据已变更，请重新预览后再导入')
+      try {
+        g7LinkagePreview.value = await previewG7Linkage(projectId.value, year.value)
+        syncDiffSelectionsFromPreview()
+        resetSuggestionSelections()
+      } catch {
+        /* ignore refresh failure */
+      }
+    } else {
+      handleApiError(error, 'G7 联动导入失败')
+    }
+  } finally {
+    g7LinkageImporting.value = false
+  }
+}
 
 // 合并类型：branch=总分汇总（无需抵销底稿）/ subsidiary=母子合并
 const isBranchMode = ref(false)
@@ -309,40 +921,57 @@ async function loadConsolScope() {
   } catch { /* ignore */ }
 }
 
+async function loadAllData() {
+  if (!projectId.value) return
+  try {
+    const saved = await loadAllWorksheetData(projectId.value, year.value)
+    if (saved.info?.rows) data.subsidiaryInfo = saved.info.rows
+    if (saved.cost?.rows) data.investmentCost = saved.cost.rows
+    if (saved.equity_inv?.rows) data.investmentEquity = saved.equity_inv.rows
+    if (saved.net_asset?.rows) data.netAsset = saved.net_asset.rows
+    if (saved.equity_sim?.rows) {
+      if (saved.equity_sim.rows.direct) data.equitySimDirect = saved.equity_sim.rows.direct
+      if (saved.equity_sim.rows.indirect) data.equitySimIndirect = saved.equity_sim.rows.indirect
+    }
+    if (saved.elimination?.rows) {
+      if (saved.elimination.rows.equity) data.elimEquity = saved.elimination.rows.equity
+      if (saved.elimination.rows.income) data.elimIncome = saved.elimination.rows.income
+      if (saved.elimination.rows.cross) data.elimCross = saved.elimination.rows.cross
+    }
+    if (saved.capital?.rows) data.capitalReserve = saved.capital.rows
+    // G7 建议草稿（只读；由 G7 联动勾选建议写入）
+    const draft = saved.g7_suggestions
+    g7SuggestionDraft.rows = Array.isArray(draft?.rows) ? draft.rows : []
+    g7SuggestionDraft.note = typeof draft?.note === 'string' ? draft.note : ''
+    g7SuggestionDraft.importedAt = typeof draft?.imported_at === 'string' ? draft.imported_at : ''
+    // 恢复动态股比变动表（share_change_1/2/3）
+    for (const times of [1, 2, 3] as const) {
+      const key = `share_change_${times}`
+      const rows = saved[key]?.rows
+      if (Array.isArray(rows)) shareChangeData[key] = rows
+    }
+  } catch { /* 首次使用无数据，忽略 */ }
+}
+
 onMounted(async () => {
   loadConsolScope()
   loadConsolidationType()
   eventBus.on('formula-changed', onFormulaChanged)
   // 从后端加载已保存的工作底稿数据
-  if (projectId.value) {
-    try {
-      const saved = await loadAllWorksheetData(projectId.value, year.value)
-      if (saved.info?.rows) data.subsidiaryInfo = saved.info.rows
-      if (saved.cost?.rows) data.investmentCost = saved.cost.rows
-      if (saved.equity_inv?.rows) data.investmentEquity = saved.equity_inv.rows
-      if (saved.net_asset?.rows) data.netAsset = saved.net_asset.rows
-      if (saved.equity_sim?.rows) {
-        if (saved.equity_sim.rows.direct) data.equitySimDirect = saved.equity_sim.rows.direct
-        if (saved.equity_sim.rows.indirect) data.equitySimIndirect = saved.equity_sim.rows.indirect
-      }
-      if (saved.elimination?.rows) {
-        if (saved.elimination.rows.equity) data.elimEquity = saved.elimination.rows.equity
-        if (saved.elimination.rows.income) data.elimIncome = saved.elimination.rows.income
-        if (saved.elimination.rows.cross) data.elimCross = saved.elimination.rows.cross
-      }
-      if (saved.capital?.rows) data.capitalReserve = saved.capital.rows
-    } catch { /* 首次使用无数据，忽略 */ }
-  }
+  await loadAllData()
+  // Task 6.1: 挂载时刷新 stale 状态（Property 12：失败静默降级）
+  void linkageStale.refreshStale()
 })
 onUnmounted(() => {
   eventBus.off('formula-changed', onFormulaChanged)
 })
 
-function onFormulaChanged(_payload: FormulaChangedPayload) {
-  // 公式保存/应用后，重新加载合并范围数据（公式可能影响计算结果）
-  ElMessage.info('公式已更新，数据同步中...')
-  loadConsolScope()
-  // TODO: 后续接入公式引擎后，这里触发重算各表的公式列
+async function onFormulaChanged(_payload: FormulaChangedPayload) {
+  // 公式变更后重新加载已保存的合并数据（各表持久化值）。
+  // 注：按新公式的完整重算需走「一键刷新」（后端 recalc_full）；前端仅重载展示，
+  // 不在此处虚假声称"重算"（原实现只 loadConsolScope 却提示"数据同步中"=误导）。
+  ElMessage.info('公式已更新，正在重新加载合并数据；如需按新公式重算请使用「一键刷新」')
+  await Promise.all([loadConsolScope(), loadAllData()])
 }
 
 // ─── 拖拽 ─────────────────────────────────────────────────────────────────────
@@ -483,6 +1112,9 @@ const data = reactive({
   capitalReserve: buildCapitalReserve(),
 })
 
+/** 股比变动表本地缓存（按 share_change_1/2/3），避免刷新丢失 */
+const shareChangeData = reactive<Record<string, any[]>>({})
+
 // 子企业列：优先从合并范围树获取，降级从基本信息表获取
 const companyColumns = computed(() => {
   if (scopeCompanies.value.length) return scopeCompanies.value
@@ -555,6 +1187,7 @@ function onOpenShareChange(_row: SubsidiaryInfoRow, times: number) {
 }
 function onShareChangeSave(d: any) {
   const key = `share_change_${activeShareChangeTimes.value}`
+  shareChangeData[key] = d
   doSave(key, d)
 }
 async function onSave(sheet: string, payload: any) {
@@ -569,6 +1202,10 @@ async function onSave(sheet: string, payload: any) {
   await doSave(key, payload)
   // 基本信息表保存后刷新合并范围（影响子企业列）
   if (key === 'info') loadConsolScope()
+  // #4: 抵消分录保存后同步自定义分录到后端 elimination_entries 表
+  if (key === 'elimination') {
+    _syncEliminationEntries(payload)
+  }
 }
 async function doSave(sheetKey: string, payload: any) {
   if (!projectId.value) { ElMessage.warning('项目ID缺失'); return }
@@ -582,6 +1219,191 @@ async function doSave(sheetKey: string, payload: any) {
   } catch (err: any) {
     handleApiError(err, '保存异常')
   }
+}
+
+// ─── #4: 抵消分录 → 后端 elimination_entries 表同步 ─────────────────────────
+/**
+ * 将 EliminationSheet 保存的自定义分录**双向同步（diff）**到后端 elimination_entries 表，
+ * 使 recalc_full 的 _batch_load_eliminations 能读取到这些分录参与差额表计算。
+ *
+ * 策略（对齐 D2/ShareChangeSheet 从单向 append 升级为 diff 的范式）：
+ *   1. 拉取后端已托管的 custom 分录（description 以固定前缀 `自定义抵消：` 开头）
+ *   2. 前端已移除的 → DELETE（修复原"逐条 POST 已有忽略"导致删除/修改不反映的单向 append）
+ *   3. 金额/方向变化的 → 删旧建新；未变的 → 跳过（保留后端记录不重建）
+ *   4. 新增的 → POST
+ * description 统一加前缀，保证所有托管分录可被 list 捕获、diff 一致。
+ * 端点：GET/POST /api/consolidation/eliminations，DELETE /{entry_id}?project_id=xxx
+ */
+const _CUSTOM_ELIM_PREFIX = '自定义抵消：'
+async function _syncEliminationEntries(payload: any) {
+  if (!projectId.value) return
+  const entries: any[] = Array.isArray(payload) ? payload : (payload?.rows || [])
+  // 只同步自定义分录（_custom=true），自动分录由 recalc_full 自行处理
+  const customEntries = entries.filter((r: any) => r._custom && r.subject && (Number(r.amount) || 0) !== 0)
+
+  // 统一 description：始终加前缀，使托管分录可被 list 全量捕获并做 diff
+  const descOf = (e: any) => `${_CUSTOM_ELIM_PREFIX}${e.desc || e.subject}`
+
+  try {
+    // 1. 拉取后端已托管的 custom 分录（前缀匹配）
+    const existing: any[] = (await api.get('/api/consolidation/eliminations', {
+      params: { project_id: projectId.value, year: year.value },
+    })) || []
+    const managedByDesc = new Map<string, any>()
+    for (const e of existing) {
+      if (typeof e?.description === 'string' && e.description.startsWith(_CUSTOM_ELIM_PREFIX)) {
+        managedByDesc.set(e.description, e)
+      }
+    }
+
+    // 2. 前端当前 desired
+    const desiredByDesc = new Map<string, any>()
+    for (const e of customEntries) desiredByDesc.set(descOf(e), e)
+
+    const doDelete = (id: string) =>
+      api.delete(`/api/consolidation/eliminations/${id}`, {
+        params: { project_id: projectId.value }, _silent: true,
+      } as any)
+    const doCreate = (desc: string, entry: any) => {
+      const amount = Math.abs(Number(entry.amount) || 0)
+      const isDebit = entry.direction === '借'
+      return api.post('/api/consolidation/eliminations', {
+        year: year.value,
+        entry_type: entry.source || 'custom',
+        description: desc,
+        lines: [{
+          account_code: entry.subject,
+          account_name: entry.subject,
+          debit_amount: isDebit ? amount : 0,
+          credit_amount: isDebit ? 0 : amount,
+        }],
+        related_company_codes: [],
+      }, {
+        params: { project_id: projectId.value }, _silent: true,
+      } as any)
+    }
+
+    // 3. 后端有、前端已移除 → 删除
+    for (const [desc, rec] of managedByDesc) {
+      if (!desiredByDesc.has(desc) && rec?.id) await doDelete(rec.id)
+    }
+
+    // 4. 新增 / 变化（删旧建新）/ 未变（跳过）
+    for (const [desc, entry] of desiredByDesc) {
+      const amount = Math.abs(Number(entry.amount) || 0)
+      const isDebit = entry.direction === '借'
+      const rec = managedByDesc.get(desc)
+      if (rec) {
+        const exDebit = Number(rec.lines?.[0]?.debit_amount) || 0
+        const exCredit = Number(rec.lines?.[0]?.credit_amount) || 0
+        const same = Math.abs(exDebit - (isDebit ? amount : 0)) < 0.005
+          && Math.abs(exCredit - (isDebit ? 0 : amount)) < 0.005
+        if (same) continue
+        if (rec.id) await doDelete(rec.id)
+      }
+      await doCreate(desc, entry)
+    }
+  } catch {
+    // 同步失败不阻断 JSON 保存（降级：前端 JSON 存储仍为真源，后端表为副本）
+  }
+}
+
+// ─── 合并工作底稿导入导出（Phase 1：前端 useExcelIO 统一） ──────────────────
+const { exportTemplate: _ioExportTemplate, exportData: _ioExportData, onFileSelected: _ioOnFileSelected } = useExcelIO()
+const importFileRef = ref<HTMLInputElement | null>(null)
+
+/** 当前 activeSheet 是否支持导入导出 */
+const canImportExport = computed(() => {
+  if (activeSheet.value in CONSOL_SHEET_COLS) return true
+  // 动态股比变动表 share_change_1, share_change_2... 统一用 share_change 列定义
+  if (activeSheet.value.startsWith('share_change_')) return true
+  return false
+})
+
+/** 当前 sheet 的中文名 */
+const activeSheetLabel = computed(() => {
+  const map: Record<string, string> = {
+    info: '基本信息表', cost: '投资明细-成本法', equity_inv: '投资明细-权益法',
+    net_asset: '净资产表', equity_sim: '模拟权益法', capital: '资本公积变动',
+    post_invest: '抵消后长投', post_income: '抵消后投资收益', minority: '少数股东权益损益',
+    internal_arap: '内部往来抵消', internal_trade: '内部交易抵消',
+    internal_cashflow: '内部现金流抵消', elimination: '合并抵消分录', share_change: '股比变动表',
+  }
+  return map[activeSheet.value] || activeSheet.value
+})
+
+async function handleExportTemplate() {
+  const colKey = activeSheet.value.startsWith('share_change_') ? 'share_change' : activeSheet.value
+  const cols = CONSOL_SHEET_COLS[colKey]
+  if (!cols) return
+  await _ioExportTemplate({
+    columns: cols,
+    fileName: `合并底稿_${activeSheetLabel.value}_模板.xlsx`,
+    includeNoteRow: false,
+  })
+}
+
+async function handleExportData() {
+  const colKey = activeSheet.value.startsWith('share_change_') ? 'share_change' : activeSheet.value
+  const cols = CONSOL_SHEET_COLS[colKey]
+  if (!cols) return
+  // 从后端加载当前 sheet 数据
+  const saved = await loadWorksheetData(projectId.value, year.value, activeSheet.value)
+  const rows = saved?.rows || []
+  if (!rows.length) {
+    ElMessage.info('当前表暂无数据可导出')
+    return
+  }
+  await _ioExportData({
+    data: rows,
+    columns: cols,
+    sheetName: activeSheetLabel.value,
+    fileName: `合并底稿_${activeSheetLabel.value}_数据.xlsx`,
+  })
+}
+
+function handleImportClick() {
+  importFileRef.value?.click()
+}
+
+async function handleImportFile(e: Event) {
+  const colKey = activeSheet.value.startsWith('share_change_') ? 'share_change' : activeSheet.value
+  const cols = CONSOL_SHEET_COLS[colKey]
+  if (!cols) return
+  await _ioOnFileSelected(e, async (result) => {
+    if (!result.rows.length) {
+      ElMessage.warning('未识别到有效数据行')
+      return
+    }
+    // 将 Excel 行映射为目标 JSON 格式（按 header→key 映射）
+    const headerToKey: Record<string, string> = {}
+    for (const col of cols) headerToKey[col.header] = col.key
+
+    const mapped = result.rows.map((raw: Record<string, any>) => {
+      const row: Record<string, any> = {}
+      for (const [header, key] of Object.entries(headerToKey)) {
+        if (raw[header] != null) row[key] = raw[header]
+      }
+      return row
+    }).filter((r: Record<string, any>) => Object.keys(r).length > 0)
+
+    if (!mapped.length) {
+      ElMessage.warning('导入数据为空，请检查列头是否匹配')
+      return
+    }
+
+    // 保存到后端
+    const ok = await saveWorksheetData(projectId.value, year.value, activeSheet.value, { rows: mapped })
+    if (ok) {
+      ElMessage.success(`已导入 ${mapped.length} 行到「${activeSheetLabel.value}」`)
+      // 触发前端数据刷新
+      await loadAllData()
+    } else {
+      ElMessage.error('导入保存失败')
+    }
+  }, { skipRows: 0 })
+  // 重置 file input
+  if (importFileRef.value) importFileRef.value.value = ''
 }
 
 // ─── 内部抵消分录汇总 ────────────────────────────────────────────────────────
@@ -639,8 +1461,23 @@ const allImportedEntries = computed(() => [
   ...internalEntries.cashflow,
 ])
 
+// ─── 公式 / 跨表导航统一接线（acnr-consumer-wiring Req 20.5/20.6/20.7, task 31.3）──
+// 单一父级接线点：所有 ~15 个子 worksheet 的 `open-formula` 事件都绑定到此处，
+// 经 EventBus `open-formula-manager` → ThreeColumnLayout 顶层挂载的全局
+// FormulaManagerDialog → FormulaEditDialog（已于 task 18.3 迁移到 ACNR：
+// useAcnr().listSheets/listCells + mapAcnrCellsToPickerRows）。
+// 因此「一处接线惠及全部 worksheet」：子组件无需各自接 ACNR picker。
+// miss/picker 不可用时由 FormulaEditDialog 内部回退 legacy 地址注册表（Req 20.7 无回归）。
 function onOpenFormula(sheetKey: string) {
   eventBus.emit('open-formula-manager', { nodeKey: sheetKey })
+}
+
+// `goto-sheet`：合并工作底稿模块内部的表样切换（如 elimination→net_asset），
+// 目标为本模块内的本地 sheet key（非跨底稿 wp_code），按 Req 20.5 合并模块内
+// 跳转合法保持本地切换；真正的跨底稿跳转由 GtIndexChip / ACNR resolve 承载
+// （本模块 worksheet 未产生跨底稿目标）。
+function onGotoSheet(k: string) {
+  activeSheet.value = k
 }
 </script>
 
@@ -692,4 +1529,10 @@ function onOpenFormula(sheetKey: string) {
 }
 .cw-resizer:hover, .cw-resizer:active { background: var(--gt-color-primary-lighter, #d8d0e8); }
 .cw-content { flex: 1; min-width: 0; overflow: auto; padding: 16px; background: var(--gt-color-bg-white); }
+.cw-ie-toolbar { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; padding-bottom: 8px; border-bottom: 1px dashed var(--gt-color-border-light, #e8e4f0); }
+.g7-linkage-summary { margin-bottom: 12px; }
+.g7-linkage-note { margin-bottom: 14px; }
+.g7-linkage-mapping { margin-top: 14px; }
+.g7-linkage-title { margin-bottom: 8px; font-size: var(--gt-font-size-sm); font-weight: 600; color: var(--gt-color-text-primary); display: flex; align-items: center; gap: 8px; }
+.g7-linkage-options { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--gt-color-border-light, #e8e4f0); }
 </style>

@@ -134,4 +134,27 @@ describe('useWpDetailGuard', () => {
     expect(guard.loading.value).toBe(false)
     expect(guard.state.value).toBe('ready')
   })
+
+  // ⑨ CanceledError 短路：请求去重层 abort 旧请求时，不得弹「加载底稿失败/canceled」假失败屏。
+  //   快速切底稿/重进编辑器（如切 sheet 触发新 refresh）会 abort 在飞的详情请求。
+  it('⑨ axios CanceledError（message=canceled）→ 保持 loading，不置 error', async () => {
+    const canceled: any = new Error('canceled')
+    canceled.code = 'ERR_CANCELED'
+    canceled.name = 'CanceledError'
+    mockGet.mockRejectedValueOnce(canceled)
+    const guard = useWpDetailGuard(projectId, wpId)
+    await new Promise(r => setTimeout(r, 50))
+    // 不落 error 假失败屏；保持 loading（有新请求在路上/交后续收敛）
+    expect(guard.state.value).toBe('loading')
+    expect(guard.errorMessage.value).toBe('')
+  })
+
+  // ⑩ 反向守卫：只认 canceled 三种标记；不带这些标记的普通 abort 文案仍须置 error（防短路过宽）
+  it('⑩ 普通错误（无 canceled 标记）仍置 error（反向验证短路不过宽）', async () => {
+    mockGet.mockRejectedValueOnce(new Error('ECONNRESET'))
+    const guard = useWpDetailGuard(projectId, wpId)
+    await new Promise(r => setTimeout(r, 50))
+    expect(guard.state.value).toBe('error')
+    expect(guard.errorMessage.value).toContain('ECONNRESET')
+  })
 })

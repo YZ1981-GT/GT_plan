@@ -200,7 +200,7 @@ def test_router_paths_registered():
 
 
 def test_response_models_have_expected_fields(schemas):
-    """ImpairmentAnalysisResponse 必须含 LLM stub 标识 + 计提合计字段"""
+    """ImpairmentAnalysisResponse：确定性规则引擎 → is_llm_stub 默认 False"""
     resp = schemas["ImpairmentAnalysisResponse"](
         method="lower_of_cost_or_nrv",
         total_products=0,
@@ -208,7 +208,7 @@ def test_response_models_have_expected_fields(schemas):
         summary="empty",
         total_suggested_provision="0",
     )
-    assert resp.is_llm_stub is True
+    assert resp.is_llm_stub is False
     assert resp.total_suggested_provision == "0"
     # P0-3 写回字段：默认 None
     assert resp.applied_to_sheet is None

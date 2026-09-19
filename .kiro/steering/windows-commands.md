@@ -1,3 +1,7 @@
+---
+inclusion: always
+---
+
 # Windows 命令执行规范
 
 ## Python 执行路径

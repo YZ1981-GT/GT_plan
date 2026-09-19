@@ -110,16 +110,23 @@ async def get_benchmark(
     project_id: UUID,
     year: int = Query(...),
     benchmark_type: str = Query(...),
+    calc_basis: str = Query("unadjusted"),
     company_code: str = Query("001"),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """从试算表自动取基准金额"""
+    """从试算表自动取基准金额
+
+    calc_basis:
+    - unadjusted: 年末未审数（当年 unadjusted_amount）
+    - average_3y: 三年平均数（year-2 ~ year 的 unadjusted_amount 平均）
+    - forecast: 本年预测数（需手工填入，返回 null 提示）
+    """
     svc = MaterialityService(db)
     try:
-        amount = await svc.auto_populate_benchmark(
-            project_id, year, benchmark_type, company_code
+        result = await svc.auto_populate_benchmark_with_trend(
+            project_id, year, benchmark_type, calc_basis, company_code
         )
-        return {"benchmark_type": benchmark_type, "benchmark_amount": str(amount)}
+        return result
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))

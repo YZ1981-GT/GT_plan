@@ -221,7 +221,7 @@ watch(
   margin: 0;
   padding-left: 20px;
   color: var(--el-color-warning-dark-2);
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   line-height: 1.8;
 }
 .missing-list li {

@@ -257,7 +257,7 @@ defineExpose({
 .reasoning-text {
   white-space: pre-wrap;
   font-family: var(--el-font-family);
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   color: var(--el-text-color-regular);
   margin: 0;
   line-height: 1.6;

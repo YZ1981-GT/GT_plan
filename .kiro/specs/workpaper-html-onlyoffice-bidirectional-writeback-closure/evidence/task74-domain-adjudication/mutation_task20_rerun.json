@@ -1,0 +1,472 @@
+[
+  {
+    "id": "M01",
+    "side": "be",
+    "want": "test_task20_writer_gate.py::test_a_same_named_call_on_an_unrelated_receiver_credits_nothing",
+    "why": "把接收者解析换成「文件里随便一个被导入的符号」⇒ 复现 false credit #2：`session.rollback()` 会被记成 `WpMigrationService.rollback` 的调用点。只按 leaf 名匹配调用点仍是名称就近，只是名字换了一层",
+    "verdict": "RED",
+    "summary": "5 failed, 66 passed, 5 warnings in 114.99s (0:01:54)",
+    "added": [
+      "test_task20_writer_gate.py::test_a_same_named_call_on_an_unrelated_receiver_credits_nothing",
+      "test_task20_writer_gate.py::test_every_credit_in_the_inventory_re_derives_from_its_test_file",
+      "test_task20_writer_gate.py::test_the_frozen_red_baseline_is_derived_from_the_live_gate",
+      "test_task20_writer_gate.py::test_the_lane_is_part_of_the_freshness_contract",
+      "test_workpaper_writer_inventory.py::test_inventory_on_disk_matches_the_ast"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task20_writer_gate.py::test_a_same_named_call_on_an_unrelated_receiver_credits_nothing",
+      "test_workpaper_writer_inventory.py::test_inventory_on_disk_matches_the_ast"
+    ],
+    "added_files": [
+      "test_task20_writer_gate.py",
+      "test_workpaper_writer_inventory.py"
+    ],
+    "restored": true,
+    "seconds": 118.2
+  },
+  {
+    "id": "M02",
+    "side": "be",
+    "want": "test_task20_writer_gate.py::test_a_sibling_in_the_same_module_is_not_credited",
+    "why": "把取证退回「同模块任一 key 命中」⇒ 复现 false credit #1：一条只调用 `save_version` 的守卫会连没被碰过的 `list_versions` 一起点亮",
+    "verdict": "RED",
+    "summary": "4 failed, 67 passed, 5 warnings in 117.99s (0:01:57)",
+    "added": [
+      "test_task20_writer_gate.py::test_a_sibling_in_the_same_module_is_not_credited",
+      "test_task20_writer_gate.py::test_the_frozen_red_baseline_is_derived_from_the_live_gate",
+      "test_task20_writer_gate.py::test_the_lane_is_part_of_the_freshness_contract",
+      "test_workpaper_writer_inventory.py::test_inventory_on_disk_matches_the_ast"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task20_writer_gate.py::test_a_sibling_in_the_same_module_is_not_credited",
+      "test_workpaper_writer_inventory.py::test_inventory_on_disk_matches_the_ast"
+    ],
+    "added_files": [
+      "test_task20_writer_gate.py",
+      "test_workpaper_writer_inventory.py"
+    ],
+    "restored": true,
+    "seconds": 121.3
+  },
+  {
+    "id": "M03",
+    "side": "be",
+    "want": "test_task20_writer_gate.py::test_a_mention_without_a_call_site_credits_nothing",
+    "why": "把「导入即算证据」加回去 ⇒ 提及/导入不再需要调用点。这是旧谓词最宽的那一档，也是「有测试」这条证据能被 import 一行伪造的形态",
+    "verdict": "RED",
+    "summary": "4 failed, 67 passed, 5 warnings in 112.60s (0:01:52)",
+    "added": [
+      "test_task20_writer_gate.py::test_a_mention_without_a_call_site_credits_nothing",
+      "test_task20_writer_gate.py::test_the_frozen_red_baseline_is_derived_from_the_live_gate",
+      "test_task20_writer_gate.py::test_the_lane_is_part_of_the_freshness_contract",
+      "test_workpaper_writer_inventory.py::test_inventory_on_disk_matches_the_ast"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task20_writer_gate.py::test_a_mention_without_a_call_site_credits_nothing",
+      "test_workpaper_writer_inventory.py::test_inventory_on_disk_matches_the_ast"
+    ],
+    "added_files": [
+      "test_task20_writer_gate.py",
+      "test_workpaper_writer_inventory.py"
+    ],
+    "restored": true,
+    "seconds": 115.9
+  },
+  {
+    "id": "M04",
+    "side": "be",
+    "want": "*",
+    "why": "对照组（**预期无效变异**）：`ast.Import` 分支本来就登记了同样的绑定，这条只是把它重写一遍。它存在的意义是证明判定不是「改任何一行都红」—— 报告里它应当 GREEN，且归因为无效变异而非守卫缺陷",
+    "verdict": "GREEN",
+    "summary": "71 passed, 5 warnings in 112.67s (0:01:52)",
+    "added": [],
+    "gone": [],
+    "hit": [],
+    "added_files": [],
+    "restored": true,
+    "seconds": 115.8
+  },
+  {
+    "id": "M05",
+    "side": "be",
+    "want": "test_task20_writer_gate.py::test_one_authoritative_write_removes_the_category",
+    "why": "`all` → `any`：只要有**一次**快照写就给类别 ⇒ 一个同时改写权威 artifact 的 writer 也能靠「顺手存了个备份」离开门。这正是类别最容易被放宽成豁免的那一步",
+    "verdict": "RED",
+    "summary": "1 failed, 70 passed, 5 warnings in 118.18s (0:01:58)",
+    "added": [
+      "test_task20_writer_gate.py::test_one_authoritative_write_removes_the_category"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task20_writer_gate.py::test_one_authoritative_write_removes_the_category"
+    ],
+    "added_files": [
+      "test_task20_writer_gate.py"
+    ],
+    "restored": true,
+    "seconds": 121.4
+  },
+  {
+    "id": "M06",
+    "side": "be",
+    "want": "test_task20_writer_gate.py::test_the_snapshot_category_is_exactly_the_snapshot_destination_writers",
+    "why": "去掉「零业务内容」这一项 ⇒ `save_univer_data`（artifact 写全落 `.versions/`，但同时推进 `file_version` 并写 `working_paper`）会拿到类别、离开门。首轮此条判WRONG-TEST，归因是**判据缺陷**而非脚本缺陷：两条清册级判据当时读的是**磁盘**上的清册，而变异只改生成器、不重生成 ⇒ 它们看到的还是旧文件。现已改读 `regenerated`（现场从源码推导），本条因此能直接命中爆炸半径判据",
+    "verdict": "RED",
+    "summary": "6 failed, 65 passed, 5 warnings in 118.37s (0:01:58)",
+    "added": [
+      "test_task20_writer_gate.py::test_a_snapshot_writer_that_invents_a_version_blocks_again",
+      "test_task20_writer_gate.py::test_the_frozen_red_baseline_is_derived_from_the_live_gate",
+      "test_task20_writer_gate.py::test_the_lane_is_part_of_the_freshness_contract",
+      "test_task20_writer_gate.py::test_the_snapshot_category_is_exactly_the_snapshot_destination_writers",
+      "test_task20_writer_gate.py::test_writers_that_also_snapshot_do_not_get_the_category",
+      "test_workpaper_writer_inventory.py::test_inventory_on_disk_matches_the_ast"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task20_writer_gate.py::test_a_snapshot_writer_that_invents_a_version_blocks_again",
+      "test_task20_writer_gate.py::test_the_snapshot_category_is_exactly_the_snapshot_destination_writers",
+      "test_task20_writer_gate.py::test_writers_that_also_snapshot_do_not_get_the_category",
+      "test_workpaper_writer_inventory.py::test_inventory_on_disk_matches_the_ast"
+    ],
+    "added_files": [
+      "test_task20_writer_gate.py",
+      "test_workpaper_writer_inventory.py"
+    ],
+    "restored": true,
+    "seconds": 121.6
+  },
+  {
+    "id": "M07",
+    "side": "be",
+    "want": "test_task20_writer_gate.py::test_one_authoritative_write_removes_the_category",
+    "why": "让类别不再影响 bypass 派生 ⇒ 快照行重新被记成「绕过统一 commit」。方向相反的falsifier：证明类别**确实**在改判据结果，而不是一个装饰性的布尔",
+    "verdict": "RED",
+    "summary": "4 failed, 67 passed, 5 warnings in 114.88s (0:01:54)",
+    "added": [
+      "test_task20_writer_gate.py::test_one_authoritative_write_removes_the_category",
+      "test_task20_writer_gate.py::test_the_frozen_red_baseline_is_derived_from_the_live_gate",
+      "test_task20_writer_gate.py::test_the_lane_is_part_of_the_freshness_contract",
+      "test_workpaper_writer_inventory.py::test_inventory_on_disk_matches_the_ast"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task20_writer_gate.py::test_one_authoritative_write_removes_the_category",
+      "test_workpaper_writer_inventory.py::test_inventory_on_disk_matches_the_ast"
+    ],
+    "added_files": [
+      "test_task20_writer_gate.py",
+      "test_workpaper_writer_inventory.py"
+    ],
+    "restored": true,
+    "seconds": 118.1
+  },
+  {
+    "id": "M08",
+    "side": "be",
+    "want": "test_task20_writer_gate.py::test_the_snapshot_writer_carries_its_own_positive_obligations",
+    "why": "拿掉「快照名必须跟随统一计数器」这条正面义务 ⇒ 一个把快照名改回 `file_version` 的writer 仍算合格。类别一旦没有可打红的义务，就退化成豁免",
+    "verdict": "RED",
+    "summary": "1 failed, 70 passed, 5 warnings in 115.25s (0:01:55)",
+    "added": [
+      "test_task20_writer_gate.py::test_the_snapshot_writer_carries_its_own_positive_obligations"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task20_writer_gate.py::test_the_snapshot_writer_carries_its_own_positive_obligations"
+    ],
+    "added_files": [
+      "test_task20_writer_gate.py"
+    ],
+    "restored": true,
+    "seconds": 118.5
+  },
+  {
+    "id": "M09",
+    "side": "be",
+    "want": "test_task20_writer_gate.py::test_a_private_write_path_beside_the_unified_commit_is_reported",
+    "why": "把「第二个事务边界」从双 revision 准则里去掉 ⇒ 注入一个裸 `db.commit()` 不再打红。它既不写 legacy 字段也不写 content_revision，是三种注入里唯一只能靠 commit 事实抓到的一种（Requirement 2.4 / 13.1）",
+    "verdict": "RED",
+    "summary": "1 failed, 70 passed, 5 warnings in 116.33s (0:01:56)",
+    "added": [
+      "test_task20_writer_gate.py::test_a_private_write_path_beside_the_unified_commit_is_reported[direct_commit]"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task20_writer_gate.py::test_a_private_write_path_beside_the_unified_commit_is_reported[direct_commit]"
+    ],
+    "added_files": [
+      "test_task20_writer_gate.py"
+    ],
+    "restored": true,
+    "seconds": 119.6
+  },
+  {
+    "id": "M10",
+    "side": "be",
+    "want": "test_task20_writer_gate.py::test_the_double_revision_criterion_has_a_real_denominator",
+    "why": "拿掉空分母拒绝 ⇒ 「零个 writer 经过统一入口」时这条准则恒为零、报绿。恒真的准则比没有准则更糟：它在报告里长得和「已经清零」一样",
+    "verdict": "RED",
+    "summary": "1 failed, 70 passed, 5 warnings in 108.96s (0:01:48)",
+    "added": [
+      "test_task20_writer_gate.py::test_the_double_revision_criterion_has_a_real_denominator"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task20_writer_gate.py::test_the_double_revision_criterion_has_a_real_denominator"
+    ],
+    "added_files": [
+      "test_task20_writer_gate.py"
+    ],
+    "restored": true,
+    "seconds": 112.1
+  },
+  {
+    "id": "M11",
+    "side": "be",
+    "want": "test_task20_writer_gate.py::test_an_empty_upgrade_lane_is_refused_not_reported_green",
+    "why": "同上，另一条空分母：升级器一旦从发现面消失（改名/换 marker），Property 4 的「纯表示升级不得增业务 revision」就在空集上评估",
+    "verdict": "RED",
+    "summary": "1 failed, 70 passed, 5 warnings in 110.51s (0:01:50)",
+    "added": [
+      "test_task20_writer_gate.py::test_an_empty_upgrade_lane_is_refused_not_reported_green"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task20_writer_gate.py::test_an_empty_upgrade_lane_is_refused_not_reported_green"
+    ],
+    "added_files": [
+      "test_task20_writer_gate.py"
+    ],
+    "restored": true,
+    "seconds": 113.5
+  },
+  {
+    "id": "M12",
+    "side": "be",
+    "want": "test_task20_writer_gate.py::test_the_lane_is_part_of_the_freshness_contract",
+    "why": "拿掉 lane 的新鲜度比对 ⇒ 手改 lane（或升级器的版本事实漂移）后门照旧评估。lane 不在 `entries` 里，没有这条比对它就完全不受源码约束",
+    "verdict": "RED",
+    "summary": "1 failed, 70 passed, 5 warnings in 112.91s (0:01:52)",
+    "added": [
+      "test_task20_writer_gate.py::test_the_lane_is_part_of_the_freshness_contract"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task20_writer_gate.py::test_the_lane_is_part_of_the_freshness_contract"
+    ],
+    "added_files": [
+      "test_task20_writer_gate.py"
+    ],
+    "restored": true,
+    "seconds": 116.0
+  },
+  {
+    "id": "M13",
+    "side": "be",
+    "want": "test_task20_writer_gate.py::test_the_gate_evaluates_every_criterion_task20_names",
+    "why": "删掉一条准则的 key ⇒ 报告里它「消失」而不是「为零」。Task 20 正文点名五条，门少评一条与「评过且为零」在输出里无法区分，这就是最省事的一种造绿",
+    "verdict": "WRONG-TEST",
+    "summary": "4 failed, 67 passed, 5 warnings in 114.41s (0:01:54)",
+    "added": [
+      "test_task20_writer_gate.py::test_a_revision_bump_inside_the_upgrade_lane_is_reported",
+      "test_task20_writer_gate.py::test_the_frozen_red_baseline_is_derived_from_the_live_gate",
+      "test_task20_writer_gate.py::test_the_gate_evaluates_exactly_the_criteria_the_spec_names",
+      "test_workpaper_writer_inventory.py::test_representation_upgrade_lane_does_not_increment_business_revision"
+    ],
+    "gone": [],
+    "hit": [],
+    "added_files": [
+      "test_task20_writer_gate.py",
+      "test_workpaper_writer_inventory.py"
+    ],
+    "restored": true,
+    "seconds": 117.6
+  },
+  {
+    "id": "M15",
+    "side": "be",
+    "want": "test_task20_writer_gate.py::test_the_gate_still_evaluates_the_relocated_criterion",
+    "why": "`多 resolver writer=0` 已从 Task 20 移交给 Task 30、再由 Task 30 移交给 Task 71（两跳的成环理由见 tasks.md），门必须**继续算** `multi_resolver` —— 当前归属方靠它验零。这条把判定短路成 `if False`：key 还在、计数恒为零，报告与「已清零」逐字相同，M13 那种「键是否存在」的判据抓不到。所以移交侧的守卫必须是行为级的（喂一条真的多 resolver 行看它被点名），「移交」才不会静默变成「无人守」",
+    "verdict": "RED",
+    "summary": "4 failed, 67 passed, 5 warnings in 114.48s (0:01:54)",
+    "added": [
+      "test_task20_writer_gate.py::test_the_frozen_red_baseline_is_derived_from_the_live_gate",
+      "test_task20_writer_gate.py::test_the_gate_names_exactly_the_rows_the_owner_must_clear",
+      "test_task20_writer_gate.py::test_the_gate_still_evaluates_the_relocated_criterion",
+      "test_workpaper_writer_inventory.py::test_multi_resolver_stays_in_has_debt_even_when_other_criteria_cleared"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task20_writer_gate.py::test_the_gate_names_exactly_the_rows_the_owner_must_clear",
+      "test_task20_writer_gate.py::test_the_gate_still_evaluates_the_relocated_criterion"
+    ],
+    "added_files": [
+      "test_task20_writer_gate.py",
+      "test_workpaper_writer_inventory.py"
+    ],
+    "restored": true,
+    "seconds": 117.7
+  },
+  {
+    "id": "M16",
+    "side": "be",
+    "want": "test_task20_writer_gate.py::test_the_writer_denominator_is_every_production_module_under_backend_app",
+    "why": "把发现面收窄到单个包 ⇒ services 侧的 writer 整批离开分母。这是「改小分母」最直接的一刀，且改完清册照旧能生成、门照旧能跑，只是数字变小",
+    "verdict": "RED",
+    "summary": "5 failed, 62 passed, 5 warnings, 4 errors in 76.50s (0:01:16)",
+    "added": [
+      "test_task20_writer_gate.py::test_the_lane_is_part_of_the_freshness_contract",
+      "test_task20_writer_gate.py::test_the_writer_denominator_is_every_production_module_under_backend_app",
+      "test_workpaper_writer_inventory.py::test_dropping_a_row_cannot_make_the_gate_greener",
+      "test_workpaper_writer_inventory.py::test_generator_refuses_an_unverifiable_retirement",
+      "test_workpaper_writer_inventory.py::test_stale_inventory_is_rejected_rather_than_evaluated"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task20_writer_gate.py::test_the_writer_denominator_is_every_production_module_under_backend_app"
+    ],
+    "added_files": [
+      "test_task20_writer_gate.py",
+      "test_workpaper_writer_inventory.py"
+    ],
+    "restored": true,
+    "seconds": 79.7
+  },
+  {
+    "id": "M17",
+    "side": "be",
+    "want": "test_task20_writer_gate.py::test_the_production_source_predicate_excludes_exactly_the_non_shipping_trees",
+    "why": "给「非交付目录」排除表加一个**业务**包 ⇒ 同样是把生产 writer 移出分母，但伪装成一条看起来无害的排除规则。判据必须双向断言（该挡的挡住 + 不该挡的没挡），只断言前者时这条会 GREEN",
+    "verdict": "RED",
+    "summary": "6 failed, 61 passed, 5 warnings, 4 errors in 98.69s (0:01:38)",
+    "added": [
+      "test_task20_writer_gate.py::test_the_lane_is_part_of_the_freshness_contract",
+      "test_task20_writer_gate.py::test_the_production_source_predicate_excludes_exactly_the_non_shipping_trees",
+      "test_task20_writer_gate.py::test_the_writer_denominator_is_every_production_module_under_backend_app",
+      "test_workpaper_writer_inventory.py::test_dropping_a_row_cannot_make_the_gate_greener",
+      "test_workpaper_writer_inventory.py::test_generator_refuses_an_unverifiable_retirement",
+      "test_workpaper_writer_inventory.py::test_stale_inventory_is_rejected_rather_than_evaluated"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task20_writer_gate.py::test_the_production_source_predicate_excludes_exactly_the_non_shipping_trees",
+      "test_task20_writer_gate.py::test_the_writer_denominator_is_every_production_module_under_backend_app"
+    ],
+    "added_files": [
+      "test_task20_writer_gate.py",
+      "test_workpaper_writer_inventory.py"
+    ],
+    "restored": true,
+    "seconds": 102.6
+  },
+  {
+    "id": "M18",
+    "side": "be",
+    "want": "test_task20_writer_gate.py::test_both_workpaper_content_stores_stay_in_the_denominator",
+    "why": "删掉第二个内容存储 ⇒ 97 行写 `checklist_responses.remark/conclusion` 的 writer 一次性离开分母。Requirement 9.11 点名的「第二权威」正是这张没有版本列的表，把它从内容存储表里拿掉等于把该 AC 的实证面删掉",
+    "verdict": "RED",
+    "summary": "7 failed, 60 passed, 5 warnings, 4 errors in 114.86s (0:01:54)",
+    "added": [
+      "test_task20_writer_gate.py::test_both_workpaper_content_stores_stay_in_the_denominator",
+      "test_task20_writer_gate.py::test_the_lane_is_part_of_the_freshness_contract",
+      "test_workpaper_writer_inventory.py::test_dropping_a_row_cannot_make_the_gate_greener",
+      "test_workpaper_writer_inventory.py::test_generator_refuses_an_unverifiable_retirement",
+      "test_workpaper_writer_inventory.py::test_raw_sql_content_writes_are_discovered",
+      "test_workpaper_writer_inventory.py::test_single_hop_delegation_resolves_same_module_and_imported_callees",
+      "test_workpaper_writer_inventory.py::test_stale_inventory_is_rejected_rather_than_evaluated"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task20_writer_gate.py::test_both_workpaper_content_stores_stay_in_the_denominator"
+    ],
+    "added_files": [
+      "test_task20_writer_gate.py",
+      "test_workpaper_writer_inventory.py"
+    ],
+    "restored": true,
+    "seconds": 118.0
+  },
+  {
+    "id": "M19",
+    "side": "be",
+    "want": "test_task20_writer_gate.py::test_the_universal_scope_is_the_specs_own_definition_not_this_files",
+    "why": "把 `template_provisioning` 收进门的必需 domain 集 ⇒ 「Task 3 自己裁决进了正文枚举之外的 lane」这条反证消失（`adjudicated - required` 变空），窄读法就再没有实证反驳了。它不改任何计数，只抹掉**反驳窄读法的那条证据** —— 这类变异最难察觉",
+    "verdict": "GREEN",
+    "summary": "71 passed, 5 warnings in 105.92s (0:01:45)",
+    "added": [],
+    "gone": [],
+    "hit": [],
+    "added_files": [],
+    "restored": true,
+    "seconds": 108.8
+  },
+  {
+    "id": "M20",
+    "side": "be",
+    "want": "test_task20_writer_gate.py::test_the_universal_scope_is_the_specs_own_definition_not_this_files",
+    "why": "直接改 spec 原话，把「所有 writer」换成自指的「清册内 writer」（窄读法的落脚点）。provenance 判据存在的意义就是让收窄 scope 这个动作**必须先改 spec** ⇒ 浮到人面前。标题仍是 `### Property 61:` 形态，所以不是靠格式校验红的",
+    "verdict": "RED",
+    "summary": "1 failed, 70 passed, 5 warnings in 103.06s (0:01:43)",
+    "added": [
+      "test_task20_writer_gate.py::test_the_universal_scope_is_the_specs_own_definition_not_this_files"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task20_writer_gate.py::test_the_universal_scope_is_the_specs_own_definition_not_this_files"
+    ],
+    "added_files": [
+      "test_task20_writer_gate.py"
+    ],
+    "restored": true,
+    "seconds": 105.9
+  },
+  {
+    "id": "M14",
+    "side": "be",
+    "want": "test_workpaper_writer_inventory.py::test_inventory_on_disk_matches_the_ast",
+    "why": "往已迁移的快照 writer 里注入旧 `file_version` 计数器，且**不**重生成清册 ⇒ 证明「源码动了清册没跟上」是 fail-closed 的，同时让重新推导出的清册丢掉快照类别。初版锚在 `wp_html_save.py` 的 `try:` 行上，插入落进 try 块内层缩进 ⇒ 源码SyntaxError ⇒ 生成器直接抛、守卫全变 ERROR 而不是 FAIL（首轮 WRONG-TEST 的真因，是**脚本缺陷**）。改锚到一条同缩进的独立语句后成立。门的准则侧证据由 `inject_task20_legacy_version_paths.py` 给（那条会重生成后量准则计数）",
+    "verdict": "RED",
+    "summary": "5 failed, 66 passed, 5 warnings in 105.95s (0:01:45)",
+    "added": [
+      "test_task20_writer_gate.py::test_the_frozen_red_baseline_is_derived_from_the_live_gate",
+      "test_task20_writer_gate.py::test_the_lane_is_part_of_the_freshness_contract",
+      "test_task20_writer_gate.py::test_the_snapshot_category_is_exactly_the_snapshot_destination_writers",
+      "test_workpaper_writer_inventory.py::test_dropping_a_row_cannot_make_the_gate_greener",
+      "test_workpaper_writer_inventory.py::test_inventory_on_disk_matches_the_ast"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task20_writer_gate.py::test_the_snapshot_category_is_exactly_the_snapshot_destination_writers",
+      "test_workpaper_writer_inventory.py::test_inventory_on_disk_matches_the_ast"
+    ],
+    "added_files": [
+      "test_task20_writer_gate.py",
+      "test_workpaper_writer_inventory.py"
+    ],
+    "restored": true,
+    "seconds": 108.8
+  },
+  {
+    "id": "M21",
+    "side": "be",
+    "want": "test_task20_writer_gate.py::test_the_criteria_homing_agrees_with_tasks_md",
+    "why": "把全量归属行里 `multi_resolver` 的归属从 Task 71 改成 Task 30（14 个 key 一个不少，只动一个数字）⇒ tasks.md 对「谁负责清零」给出两个各自自洽的答案：**全量归属行**（当前状态）说 30，**显式交接语**（`已移交/自 Task N 移交至本门`，交接事件）推出 71。两套派生此前从未互相核对过 —— `_gate_criteria_homing_from_tasks_md()` 的 docstring 写着「两者在同一个 key 上不一致即红（见 test_the_criteria_homing_agrees_with_tasks_md）」，而那条判据里根本没调用它，承诺是空的。本变异证明补上的那条断言承重。🔴 它替代的是旧判据 `key not in set(_TASK20_CRITERIA.values())`：那条用「从基线里消失」冒充「换了归属」，与 fail-open 同形，且在准则表从 5 条扩到 14 条（`multi_resolver` 必须留在冻结基线里报出实测计数 4）之后自相矛盾、恒红",
+    "verdict": "RED",
+    "summary": "1 failed, 70 passed, 5 warnings in 114.69s (0:01:54)",
+    "added": [
+      "test_task20_writer_gate.py::test_the_criteria_homing_agrees_with_tasks_md"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task20_writer_gate.py::test_the_criteria_homing_agrees_with_tasks_md"
+    ],
+    "added_files": [
+      "test_task20_writer_gate.py"
+    ],
+    "restored": true,
+    "seconds": 117.9
+  }
+]

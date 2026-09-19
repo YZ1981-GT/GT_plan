@@ -17,6 +17,7 @@ from sqlalchemy import (
     Text,
     text,
 )
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.sql import func
 
@@ -61,6 +62,13 @@ class WorkHourEntry(Base):
     rejected_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(server_default=func.now())
+
+    # V131: 工时自动采集+二次编辑扩展
+    source: Mapped[str] = mapped_column(String(20), server_default=text("'manual'"), nullable=False)
+    source_ref: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    edit_history: Mapped[dict | None] = mapped_column(JSONB, server_default=text("'[]'"), nullable=True)
+    activity_type: Mapped[str | None] = mapped_column(String(30), nullable=True)
+    time_slots: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
 
     __table_args__ = (
         Index("idx_whe_user_date", "user_id", "date"),

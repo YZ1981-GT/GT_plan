@@ -54,12 +54,12 @@ class ExportIntegrityService:
         export_id: str,
         file_checks: list[dict],
     ) -> None:
-        """批量写入 evidence_hash_checks"""
+        """批量写入 evidence_hash_checks（export_id 为字符串标识符，不做 UUID 转换）"""
         import uuid as _uuid
         for fc in file_checks:
             check = EvidenceHashCheck(
                 id=_uuid.uuid4(),
-                export_id=_uuid.UUID(export_id) if isinstance(export_id, str) else export_id,
+                export_id=str(export_id),
                 file_path=fc["file_path"],
                 sha256=fc["sha256"],
                 check_status="passed",
@@ -114,15 +114,19 @@ class ExportIntegrityService:
         # 失败时写 trace
         if not all_passed:
             try:
+                import uuid as _uuid
                 trace_id = generate_trace_id()
+                # export_id 是字符串标识符，trace_events 相关列为 UUID；
+                # 用 uuid5 从 export_id 派生确定性 UUID，保证可写入且可回溯。
+                eid_uuid = _uuid.uuid5(_uuid.NAMESPACE_URL, f"export:{export_id}")
                 await trace_event_service.write(
                     db=db,
-                    project_id=checks[0].export_id,  # 用 export_id 代替
+                    project_id=eid_uuid,
                     event_type="integrity_check_failed",
                     object_type="export",
-                    object_id=checks[0].export_id,
-                    actor_id=checks[0].export_id,
-                    action=f"verify_package:failed:{len(mismatched)}_files",
+                    object_id=eid_uuid,
+                    actor_id=eid_uuid,
+                    action=f"verify_package:failed:{len(mismatched)}_files:export_id={export_id}",
                     decision="block",
                     trace_id=trace_id,
                 )

@@ -496,3 +496,65 @@ def test_format_amount():
     assert _format_amount(None) == "-"
     assert _format_amount("") == "-"
     assert _format_amount(100.5) == "100.50"
+
+
+# ---------------------------------------------------------------------------
+# Test: export mode guard (Task 10.1)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_export_template_mode_no_longer_raises_guard():
+    """Task 10.2: template mode 已实现，不再抛 NotImplementedError 守卫.
+
+    0.6.2 打标完成后启用；这里验证 mode='template' 走 _export_template_mode
+    且能从真实 variant 模板产出 docx（无 notes 时全部章节按原貌保留 + 清理标记）。
+    """
+    from app.services.note_word_exporter import NoteWordExporter
+
+    mock_db = AsyncMock(spec=AsyncSession)
+    mock_result = MagicMock()
+    mock_result.scalars.return_value.all.return_value = []
+    mock_db.execute = AsyncMock(return_value=mock_result)
+    # report_scope 解析回退
+    exporter = NoteWordExporter(mock_db)
+
+    buf = await exporter.export(
+        project_id=uuid4(),
+        year=2025,
+        template_type="soe",
+        report_scope="standalone",
+        mode="template",
+    )
+    data = buf.getvalue()
+    assert len(data) > 0
+    # 标记清理：导出物不应残留 ##SECTION 标记
+    import zipfile
+    from io import BytesIO
+
+    with zipfile.ZipFile(BytesIO(data)) as z:
+        xml = z.read("word/document.xml").decode("utf-8")
+    assert "##SECTION" not in xml
+
+
+@pytest.mark.asyncio
+async def test_export_default_mode_is_programmatic():
+    """Verify export() defaults to programmatic mode (no behavior change)."""
+    from app.services.note_word_exporter import NoteWordExporter
+
+    notes = [
+        FakeDisclosureNote(
+            note_section="1",
+            section_title="货币资金",
+            text_content="有内容的章节",
+        ),
+    ]
+    mock_db = AsyncMock(spec=AsyncSession)
+    mock_result = MagicMock()
+    mock_result.scalars.return_value.all.return_value = notes
+    mock_db.execute = AsyncMock(return_value=mock_result)
+
+    exporter = NoteWordExporter(mock_db)
+    # Should not raise — default programmatic path
+    output = await exporter.export(project_id=uuid4(), year=2025)
+    assert output is not None

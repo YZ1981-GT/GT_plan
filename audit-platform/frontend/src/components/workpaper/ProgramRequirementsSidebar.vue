@@ -119,7 +119,6 @@ import { ElMessage } from 'element-plus'
 import { handleApiError } from '@/utils/errorHandler'
 import { Refresh } from '@element-plus/icons-vue'
 import http from '@/utils/http'
-import { updateProcedureTrim } from '@/services/commonApi'
 
 // ─── Props ───
 const props = defineProps<{
@@ -241,15 +240,12 @@ async function markAsCompleted(proc: ProcedureItem) {
   if (!props.projectId) return
   proc._marking = true
   try {
-    // 从 procedure_code 推断 audit_cycle（编号首字母）
-    const cycle = proc.procedure_code?.charAt(0)?.toUpperCase() || ''
-    if (!cycle) {
-      ElMessage.warning('无法确定程序所属循环')
-      return
-    }
-    await updateProcedureTrim(props.projectId, cycle, [
-      { id: proc.id, status: proc.status || 'execute', execution_status: 'completed' },
-    ])
+    // 程序完成状态只走 ProcedureRowTask 状态机（procedure-mainline-convergence 需求 3）。
+    // ProgramRequirementsSidebar 是底稿内视图，proc.id 是 ProcedureInstance（底稿范围粒度），
+    // 不是 ProcedureRowTask。执行完成语义应由助理在程序表控制台按行 submit，此处只做 UI 标记。
+    // 旧实现调 updateProcedureTrim 写 execution_status 字段但后端静默不做任何有效更新（
+    // 该字段不在 save_trim 的 .values 里），故此操作历来是空写 = 纯前端标记。
+    // 现在改为纯本地标记（不发请求），行为等价且不依赖已下线的旧写链。
     proc.execution_status = 'completed'
     ElMessage.success(`${proc.procedure_code} 已标记为完成`)
   } catch (e: any) {

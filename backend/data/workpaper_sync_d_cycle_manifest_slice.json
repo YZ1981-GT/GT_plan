@@ -1,0 +1,1074 @@
+{
+  "schema_version": "manifest-slice:v1",
+  "task": "Task 46",
+  "spec": "workpaper-html-onlyoffice-bidirectional-writeback-closure",
+  "description": "D 循环 Excel 独立 entry 的冻结 manifest slice。**2026-08-30 收口重写**：首轮把 7 个 entry 全裁成 single_onlyoffice，理由是「还没有 bidirectional adapter / contract / bundle」—— 那正是本任务要交付的产物，用它当理由是 AP-1 circular_justification（范式 JSON 已把这 7 条登记为 Task 46 待回填债务）。本次按 AC 12.8 的真判据「有没有 HTML 对端」逐 entry 实测重裁：7/7 都有 HTML 对端 ⇒ 一条都不能是 single_onlyoffice。同时补齐 slice_schema 要求的字段集、逐文件模板 digest、阻断前置与 cross-entry 隔离断言。",
+  "frozen_at": "Task 46 收口重写（2026-08-30）",
+  "supersedes": {
+    "what": "Task 46 首轮冻结的同名 slice（7 条 single_onlyoffice + 一句英文散文理由 + 零 source ref）",
+    "why": "裁决判据用错 AC：拿「本任务应交付的产物尚不存在」证明「应裁 single」。反例是 D2 —— 它的 per-entry contract 里明确记着 HTML 对端。",
+    "registered_as": "backend/data/workpaper_sync_migration_paradigm.json#adjudication_criteria.anti_patterns[AP-1].known_debt_inventory.entries（7 条 D 债务）"
+  },
+  "source_manifest": "backend/data/workpaper_sync_entry_manifest.json",
+  "paradigm_ref": "backend/data/workpaper_sync_migration_paradigm.json",
+  "sibling_slices": [
+    "backend/data/workpaper_sync_e_cycle_manifest_slice.json"
+  ],
+  "slice_scope": {
+    "cycle": "D",
+    "document_type": "xlsx",
+    "selection_rule": "source_manifest 的 entries 中同时满足三条的：① document_type == 'xlsx' ② wp_match.wp_code_patterns 任一以 'D' 开头 ③ independent_entry is True。实算：命中 wp_code 前缀 D 的共 38 条，其中 independent 7 条、parent_duplicate 31 条。",
+    "independent_entry_count": 7,
+    "parent_duplicate_count": 31,
+    "parent_duplicate_note": "31 条是 D4 的 sub-tab entry（xlsx/d4/... ，migration_state == 'parent_duplicate'、independent_entry == false），全部指向 xlsx/gt-d4-operating-revenue。按 AC 1.6 不得被重复计为已迁移 adapter，也不各自建 contract/evidence。",
+    "excluded_from_slice": [
+      {
+        "what": "confirmation/d0-* 函证组件族（D0 收入循环函证）",
+        "template_ref": "D/D0 收入循环函证.xlsx",
+        "reason": "D0 函证是跨循环共享模块（D0 的 9 个 confirmation-* 组件被 E0/F0/G0/H0/K0/L0 复用），纯 HTML 无 GtOnlyOfficeSheet 挂载点 ⇒ 不在 source manifest 的 186 条 entry 里，归 Task 57。本 slice 不为它伪造 entry。"
+      },
+      {
+        "what": "D 循环各 sub-tab 的 dual-mode composable（useD1DualMode / useD3DualMode / useD4DualMode）",
+        "reason": "它们是 sub-tab 级而非 entry 级 composable，不产生独立 manifest entry；删除归 Task 66/72 的 legacy 清册，本 slice 只登记 entry 级事实。"
+      }
+    ]
+  },
+  "independent_entries": [
+    {
+      "entry_id": "xlsx/gt-d1-notes-receivable",
+      "wp_code_pattern": "D1N",
+      "document_type": "xlsx",
+      "host": "GtD1NotesReceivable.vue",
+      "host_path": "audit-platform/frontend/src/components/workpaper/GtD1NotesReceivable.vue",
+      "capability": null,
+      "capability_verdict_stage": "pipeline_entry_pending_definition_delivery",
+      "capability_target": "bidirectional",
+      "capability_target_blocked_by": [
+        "BP-1",
+        "BP-2",
+        "BP-3",
+        "BP-4",
+        "BP-5"
+      ],
+      "capability_enum_note": "AC 1.3 的四个枚举值当下没有一个成立（见 adjudication.reason）⇒ 不填枚举值而记 null + `capability_verdict_stage`，并在 slice_counters.unadjudicated 如实计数。填 single_onlyoffice 会违反 AC 12.8（有 HTML 对端），填 bidirectional 会违反 AC 12.1 与 slice_schema 的 SR-6（五个身份字段全为 null）。",
+      "migration_state": "legacy_fake_bidirectional",
+      "adapter_id": null,
+      "authority_model": null,
+      "definition_bundle": null,
+      "instrumentation_candidate": null,
+      "published_representation": null,
+      "template_ref": "D/D1 应收票据.xlsx",
+      "mount_count": 2,
+      "scenario_profile_id": "xlsx.editable.shared.single.room_service_wired.v1",
+      "editability": "editable",
+      "room_model": "shared",
+      "canonical_resolver": "legacy_sheet_onlyoffice_router",
+      "html_counterpart_verdict": "exists",
+      "html_counterpart": {
+        "store": "checklist_responses",
+        "store_kind": "relational_row_per_item_id",
+        "endpoint_read": "GET /api/workpapers/{wp_id}/checklist-responses",
+        "endpoint_write": "PUT /api/workpapers/{wp_id}/checklist-responses",
+        "endpoint_source": "backend/app/routers/checklist_responses.py#L84 / #L132",
+        "payload_column": "remark",
+        "shape": "json_array_of_row_objects",
+        "row_identity_key": "rowId",
+        "row_identity_generator": "generateRowId()",
+        "forbidden_row_identity_kinds": [
+          "array_index",
+          "ordinal",
+          "position",
+          "mutable_chinese_label"
+        ],
+        "table_keys": [
+          "D1-cust-rows"
+        ],
+        "table_keys_note": "这里只登记 primary managed table（三边锁的对象）。本 entry 的宿主目录里另有 19 个 `*-rows` 形态的 JSON 行表键（含 primary），它们的逐字段 contract 属 step 6 的活，本次不伪造。",
+        "primary_table": {
+          "item_id": "D1-cust-rows",
+          "owner_module": "audit-platform/frontend/src/components/workpaper/composables/useD1DetailCustomer.ts",
+          "owner_constant": "STORAGE_KEY",
+          "owner_declaration_kind": "module_constant",
+          "what_it_holds": "应收票据原值按客户明细（D1-3）整表 —— 客户名称/公司代码/关联关系/期初未审·调整·审定/本期增减/期末",
+          "template_relative_path": "D/D1 应收票据.xlsx",
+          "template_sheet": "原值明细表（按客户）D1-3",
+          "identity_cell": "A10",
+          "identity_text": "客户名称"
+        },
+        "html_persistence_composable": "audit-platform/frontend/src/components/workpaper/composables/useD1FormData.ts#L47(GET)/#L73(PUT)"
+      },
+      "html_counterpart_source_refs": [
+        "audit-platform/frontend/src/components/workpaper/GtD1NotesReceivable.vue#L27",
+        "audit-platform/frontend/src/components/workpaper/composables/useD1FormData.ts",
+        "audit-platform/frontend/src/components/workpaper/composables/useD1DetailCustomer.ts",
+        "backend/app/routers/checklist_responses.py#L84",
+        "backend/app/routers/checklist_responses.py#L132",
+        "backend/app/routers/wp_render_strategies/_d1_notes_receivable.py",
+        "backend/wp_templates/D/D1 应收票据.xlsx!原值明细表（按客户）D1-3!A10 = '客户名称'"
+      ],
+      "manifest_mirror": {
+        "capability": "single_onlyoffice",
+        "html_store": "unresolved",
+        "legacy_reasons": [
+          "template_only_open",
+          "no_durable_forcesave_ack",
+          "missing_adapter"
+        ],
+        "divergence_from_slice": "capability / html_store 两项与本 slice 不一致，见 BP-6"
+      },
+      "adjudication": {
+        "honest_capability": null,
+        "reason": "step 3 逐 entry 实测：本 entry 的业务内容**真实存在于 HTML 侧** —— 宿主把结构化 Tab 的录入经 `PUT /api/workpapers/{wp_id}/checklist-responses` 落到 `checklist_responses`，整张受管表存成一条 item 的 `remark`（JSON 行数组），行身份是 `rowId`（`generateRowId()` 生成，不是数组下标）。因此 `html_counterpart_verdict == \"exists\"`，按 AC 12.8 该 entry **不得**标 single_onlyoffice —— AC 12.8 的判据是「有没有 HTML 对端」。同时 OO 侧不是空白模板切换入口（`_resolve_wp_file` 项目存储优先、callback 落盘、模板含真实业务 sheet），故不适用 AC 12.9 的 single_html；宿主在 `htmlRendererRegistry.ts` 有真实入边，故不是 unreachable。而 AC 12.1 要求的 approved authority model / 人工审核 per-entry contract / non-null approved bundle / Task 36 finalize 出的 published representation / 注册 adapter / 逐 scenario evidence 六件事尚未交付，故也**不得**标 bidirectional。四个枚举值当下都不成立 ⇒ capability 终态未定，如实计入 `slice_counters.unadjudicated`，缺什么逐条写进 `blocking_preconditions`。",
+        "not_single_html_because": "OO 侧有真实业务价值，不是「空白模板切换入口」（AC 12.9 的判据）：① 后端 `wp_onlyoffice_router.get_sheet_onlyoffice_config`（L624）经 `_resolve_wp_file(project_id, wp_code, template_path, visible_sheet=sheet_name)` **项目存储优先**解析文件，首开才从权威模板复制；② `post_sheet_onlyoffice_callback`（L1128）把 OO 编辑落盘进那份项目文件，编辑不是丢弃；③ 权威模板本身含真实业务 sheet（本 entry 的 primary_table.template_sheet 已逐格核验）。所以问题不是「OO 侧空白」，而是「OO 侧那份文件与 HTML 侧的 checklist_responses 互不投影」。",
+        "not_bidirectional_because": "Wave 5 前置（tasks.md「Tasks 46–57 标准 Excel entry 启用前置」）六件事一件都没落地，且这**不是**裁 single 的理由、只是「还不能标 bidirectional」的理由（AC 12.1 的正向条件未满足）：逐条见 blocking_preconditions BP-1..BP-5。真实 OnlyOffice 9.4 required scenario set 亦未对本 entry 执行 ⇒ evidence 保持 UNVERIFIABLE。",
+        "criterion_source": "backend/data/workpaper_sync_migration_paradigm.json#adjudication_criteria.verdicts"
+      },
+      "evidence": {
+        "browser_case": null,
+        "contract_test": "backend/tests/workpaper_sync/test_task46_d_cycle_migration.py",
+        "sync_test_run_id": null,
+        "required_scenario_set_digest": null,
+        "verification_state": "UNVERIFIABLE",
+        "unverifiable_reasons": [
+          "no_instrumentation_candidate_for_this_entry",
+          "no_non_null_approved_definition_bundle",
+          "no_published_result_representation",
+          "no_registered_sync_adapter",
+          "no_real_onlyoffice_94_probe_run_for_this_entry"
+        ]
+      }
+    },
+    {
+      "entry_id": "xlsx/gt-d2-accounts-receivable",
+      "wp_code_pattern": "D2A",
+      "document_type": "xlsx",
+      "host": "GtD2AccountsReceivable.vue",
+      "host_path": "audit-platform/frontend/src/components/workpaper/GtD2AccountsReceivable.vue",
+      "capability": null,
+      "capability_verdict_stage": "pipeline_entry_pending_definition_delivery",
+      "capability_target": "bidirectional",
+      "capability_target_blocked_by": [
+        "BP-1",
+        "BP-2",
+        "BP-3",
+        "BP-4",
+        "BP-5"
+      ],
+      "capability_enum_note": "AC 1.3 的四个枚举值当下没有一个成立（见 adjudication.reason）⇒ 不填枚举值而记 null + `capability_verdict_stage`，并在 slice_counters.unadjudicated 如实计数。填 single_onlyoffice 会违反 AC 12.8（有 HTML 对端），填 bidirectional 会违反 AC 12.1 与 slice_schema 的 SR-6（五个身份字段全为 null）。",
+      "migration_state": "legacy_fake_bidirectional",
+      "adapter_id": null,
+      "authority_model": null,
+      "definition_bundle": null,
+      "instrumentation_candidate": null,
+      "published_representation": null,
+      "template_ref": "D/D2-1至D2-4  应收账款- 审定表明细表（Leap-常规程序）.xlsx",
+      "mount_count": 2,
+      "scenario_profile_id": "xlsx.editable.shared.single.room_service_wired.v1",
+      "editability": "editable",
+      "room_model": "shared",
+      "canonical_resolver": "legacy_sheet_onlyoffice_router",
+      "html_counterpart_verdict": "exists",
+      "html_counterpart": {
+        "store": "checklist_responses",
+        "store_kind": "relational_row_per_item_id",
+        "endpoint_read": "GET /api/workpapers/{wp_id}/checklist-responses",
+        "endpoint_write": "PUT /api/workpapers/{wp_id}/checklist-responses",
+        "endpoint_source": "backend/app/routers/checklist_responses.py#L84 / #L132",
+        "payload_column": "remark",
+        "shape": "json_array_of_row_objects",
+        "row_identity_key": "rowId",
+        "row_identity_generator": "generateRowId()",
+        "forbidden_row_identity_kinds": [
+          "array_index",
+          "ordinal",
+          "position",
+          "mutable_chinese_label"
+        ],
+        "table_keys": [
+          "D2-detail-rows"
+        ],
+        "table_keys_note": "这里只登记 primary managed table（三边锁的对象）。本 entry 的宿主目录里另有 12 个 `*-rows` 形态的 JSON 行表键（含 primary），它们的逐字段 contract 属 step 6 的活，本次不伪造。",
+        "primary_table": {
+          "item_id": "D2-detail-rows",
+          "owner_module": "audit-platform/frontend/src/components/workpaper/composables/useD2Detail.ts",
+          "owner_constant": null,
+          "owner_declaration_kind": "inline_literal",
+          "what_it_holds": "应收账款客户明细（D2-2）整表 39 列 —— Task 41 pilot 实测 906,239 字节 / 1260 行，已拆成 49,140 个 stable field",
+          "template_relative_path": "D/D2-1至D2-4  应收账款- 审定表明细表（Leap-常规程序）.xlsx",
+          "template_sheet": "明细表D2-2",
+          "identity_cell": "B11",
+          "identity_text": "客户名称"
+        },
+        "html_persistence_composable": "audit-platform/frontend/src/components/workpaper/composables/useD2FormData.ts"
+      },
+      "html_counterpart_source_refs": [
+        "audit-platform/frontend/src/components/workpaper/GtD2AccountsReceivable.vue#L76",
+        "audit-platform/frontend/src/components/workpaper/composables/useD2FormData.ts",
+        "audit-platform/frontend/src/components/workpaper/composables/useD2Detail.ts",
+        "backend/app/routers/checklist_responses.py#L84",
+        "backend/app/routers/checklist_responses.py#L132",
+        "backend/app/routers/wp_render_strategies/_d2_accounts_receivable.py",
+        "backend/wp_templates/D/D2-1至D2-4  应收账款- 审定表明细表（Leap-常规程序）.xlsx!明细表D2-2!B11 = '客户名称'"
+      ],
+      "manifest_mirror": {
+        "capability": "single_onlyoffice",
+        "html_store": "unresolved",
+        "legacy_reasons": [
+          "template_only_open",
+          "no_durable_forcesave_ack",
+          "missing_adapter"
+        ],
+        "divergence_from_slice": "capability / html_store 两项与本 slice 不一致，见 BP-6"
+      },
+      "adjudication": {
+        "honest_capability": null,
+        "reason": "step 3 逐 entry 实测：本 entry 的业务内容**真实存在于 HTML 侧** —— 宿主把结构化 Tab 的录入经 `PUT /api/workpapers/{wp_id}/checklist-responses` 落到 `checklist_responses`，整张受管表存成一条 item 的 `remark`（JSON 行数组），行身份是 `rowId`（`generateRowId()` 生成，不是数组下标）。因此 `html_counterpart_verdict == \"exists\"`，按 AC 12.8 该 entry **不得**标 single_onlyoffice —— AC 12.8 的判据是「有没有 HTML 对端」。同时 OO 侧不是空白模板切换入口（`_resolve_wp_file` 项目存储优先、callback 落盘、模板含真实业务 sheet），故不适用 AC 12.9 的 single_html；宿主在 `htmlRendererRegistry.ts` 有真实入边，故不是 unreachable。而 AC 12.1 要求的 approved authority model / 人工审核 per-entry contract / non-null approved bundle / Task 36 finalize 出的 published representation / 注册 adapter / 逐 scenario evidence 六件事尚未交付，故也**不得**标 bidirectional。四个枚举值当下都不成立 ⇒ capability 终态未定，如实计入 `slice_counters.unadjudicated`，缺什么逐条写进 `blocking_preconditions`。",
+        "not_single_html_because": "OO 侧有真实业务价值，不是「空白模板切换入口」（AC 12.9 的判据）：① 后端 `wp_onlyoffice_router.get_sheet_onlyoffice_config`（L624）经 `_resolve_wp_file(project_id, wp_code, template_path, visible_sheet=sheet_name)` **项目存储优先**解析文件，首开才从权威模板复制；② `post_sheet_onlyoffice_callback`（L1128）把 OO 编辑落盘进那份项目文件，编辑不是丢弃；③ 权威模板本身含真实业务 sheet（本 entry 的 primary_table.template_sheet 已逐格核验）。所以问题不是「OO 侧空白」，而是「OO 侧那份文件与 HTML 侧的 checklist_responses 互不投影」。",
+        "not_bidirectional_because": "Wave 5 前置（tasks.md「Tasks 46–57 标准 Excel entry 启用前置」）六件事一件都没落地，且这**不是**裁 single 的理由、只是「还不能标 bidirectional」的理由（AC 12.1 的正向条件未满足）：逐条见 blocking_preconditions BP-1..BP-5。真实 OnlyOffice 9.4 required scenario set 亦未对本 entry 执行 ⇒ evidence 保持 UNVERIFIABLE。",
+        "criterion_source": "backend/data/workpaper_sync_migration_paradigm.json#adjudication_criteria.verdicts"
+      },
+      "evidence": {
+        "browser_case": null,
+        "contract_test": "backend/tests/workpaper_sync/test_task46_d_cycle_migration.py",
+        "sync_test_run_id": null,
+        "required_scenario_set_digest": null,
+        "verification_state": "UNVERIFIABLE",
+        "unverifiable_reasons": [
+          "no_instrumentation_candidate_for_this_entry",
+          "no_non_null_approved_definition_bundle",
+          "no_published_result_representation",
+          "no_registered_sync_adapter",
+          "no_real_onlyoffice_94_probe_run_for_this_entry"
+        ]
+      },
+      "pilot_status": "pilot_contract_published_task_41_adapter_not_registered",
+      "per_entry_contract": {
+        "path": "backend/data/workpaper_sync_contracts/d2.receivable_detail.json",
+        "contract_id": "d2.receivable_detail",
+        "review_status": "reviewed",
+        "delivered_by_task": "41",
+        "adapter_registered": false,
+        "adapter_registered_source": "backend/app/services/workpaper_sync/adapters/registry.py#DELIVERED_PER_ENTRY_CONTRACTS[d2.receivable_detail].adapter_registered",
+        "why_this_is_the_decisive_counterexample": "该契约的 `review.html_store` 逐字记着 HTML 对端（table=checklist_responses / item_id=D2-detail-rows / shape=json_array_of_row_objects / row_identity_key=rowId），`workpaper_sync_migration_paradigm.json#pilot_classes_validated` 也把 `d2_large_json (D2)` 标为已验证 ⇒ D2 有 HTML 对端这件事在 Task 46 首轮裁决之前就已落盘。首轮仍裁 single_onlyoffice，理由写「D2 is already a pilot… No bidirectional adapter yet」，正是 AP-1 circular_justification。",
+        "digests_recomputable": true,
+        "digest_recompute_source": "template_sha256 = hashlib.sha256(权威模板字节)；normalized_structure_hash = app.services.workpaper_sync.excel_instrumentation.normalized_structure_hash(权威模板字节)"
+      }
+    },
+    {
+      "entry_id": "xlsx/gt-d3-prepaid-accounts",
+      "wp_code_pattern": "D3P",
+      "document_type": "xlsx",
+      "host": "GtD3PrepaidAccounts.vue",
+      "host_path": "audit-platform/frontend/src/components/workpaper/GtD3PrepaidAccounts.vue",
+      "capability": null,
+      "capability_verdict_stage": "pipeline_entry_pending_definition_delivery",
+      "capability_target": "bidirectional",
+      "capability_target_blocked_by": [
+        "BP-1",
+        "BP-2",
+        "BP-3",
+        "BP-4",
+        "BP-5"
+      ],
+      "capability_enum_note": "AC 1.3 的四个枚举值当下没有一个成立（见 adjudication.reason）⇒ 不填枚举值而记 null + `capability_verdict_stage`，并在 slice_counters.unadjudicated 如实计数。填 single_onlyoffice 会违反 AC 12.8（有 HTML 对端），填 bidirectional 会违反 AC 12.1 与 slice_schema 的 SR-6（五个身份字段全为 null）。",
+      "migration_state": "legacy_fake_bidirectional",
+      "adapter_id": null,
+      "authority_model": null,
+      "definition_bundle": null,
+      "instrumentation_candidate": null,
+      "published_representation": null,
+      "template_ref": "D/D3 预收账款.xlsx",
+      "mount_count": 1,
+      "scenario_profile_id": "xlsx.editable.shared.single.room_service_wired.v1",
+      "editability": "editable",
+      "room_model": "shared",
+      "canonical_resolver": "legacy_sheet_onlyoffice_router",
+      "html_counterpart_verdict": "exists",
+      "html_counterpart": {
+        "store": "checklist_responses",
+        "store_kind": "relational_row_per_item_id",
+        "endpoint_read": "GET /api/workpapers/{wp_id}/checklist-responses",
+        "endpoint_write": "PUT /api/workpapers/{wp_id}/checklist-responses",
+        "endpoint_source": "backend/app/routers/checklist_responses.py#L84 / #L132",
+        "payload_column": "remark",
+        "shape": "json_array_of_row_objects",
+        "row_identity_key": "rowId",
+        "row_identity_generator": "generateRowId()",
+        "forbidden_row_identity_kinds": [
+          "array_index",
+          "ordinal",
+          "position",
+          "mutable_chinese_label"
+        ],
+        "table_keys": [
+          "D3-det-rows"
+        ],
+        "table_keys_note": "这里只登记 primary managed table（三边锁的对象）。本 entry 的宿主目录里另有 8 个 `*-rows` 形态的 JSON 行表键（含 primary），它们的逐字段 contract 属 step 6 的活，本次不伪造。",
+        "primary_table": {
+          "item_id": "D3-det-rows",
+          "owner_module": "audit-platform/frontend/src/components/workpaper/composables/useD3Detail.ts",
+          "owner_constant": "ITEM_ID_ROWS",
+          "owner_declaration_kind": "module_constant",
+          "what_it_holds": "预收账款明细（D3-2）整表 —— 对方单位/款项性质/关联方类型/期初三调/动态账龄段",
+          "template_relative_path": "D/D3 预收账款.xlsx",
+          "template_sheet": "预收账款明细表D3-2",
+          "identity_cell": "A10",
+          "identity_text": "对方单位名称"
+        },
+        "html_persistence_composable": "audit-platform/frontend/src/components/workpaper/composables/useD3FormData.ts#L52(GET)/#L113(PUT)"
+      },
+      "html_counterpart_source_refs": [
+        "audit-platform/frontend/src/components/workpaper/GtD3PrepaidAccounts.vue#L13",
+        "audit-platform/frontend/src/components/workpaper/composables/useD3FormData.ts",
+        "audit-platform/frontend/src/components/workpaper/composables/useD3Detail.ts",
+        "backend/app/routers/checklist_responses.py#L84",
+        "backend/app/routers/checklist_responses.py#L132",
+        "backend/app/routers/wp_render_strategies/_d3_prepaid_accounts.py",
+        "backend/wp_templates/D/D3 预收账款.xlsx!预收账款明细表D3-2!A10 = '对方单位名称'"
+      ],
+      "manifest_mirror": {
+        "capability": "single_onlyoffice",
+        "html_store": "unresolved",
+        "legacy_reasons": [
+          "template_only_open",
+          "no_durable_forcesave_ack",
+          "missing_adapter"
+        ],
+        "divergence_from_slice": "capability / html_store 两项与本 slice 不一致，见 BP-6"
+      },
+      "adjudication": {
+        "honest_capability": null,
+        "reason": "step 3 逐 entry 实测：本 entry 的业务内容**真实存在于 HTML 侧** —— 宿主把结构化 Tab 的录入经 `PUT /api/workpapers/{wp_id}/checklist-responses` 落到 `checklist_responses`，整张受管表存成一条 item 的 `remark`（JSON 行数组），行身份是 `rowId`（`generateRowId()` 生成，不是数组下标）。因此 `html_counterpart_verdict == \"exists\"`，按 AC 12.8 该 entry **不得**标 single_onlyoffice —— AC 12.8 的判据是「有没有 HTML 对端」。同时 OO 侧不是空白模板切换入口（`_resolve_wp_file` 项目存储优先、callback 落盘、模板含真实业务 sheet），故不适用 AC 12.9 的 single_html；宿主在 `htmlRendererRegistry.ts` 有真实入边，故不是 unreachable。而 AC 12.1 要求的 approved authority model / 人工审核 per-entry contract / non-null approved bundle / Task 36 finalize 出的 published representation / 注册 adapter / 逐 scenario evidence 六件事尚未交付，故也**不得**标 bidirectional。四个枚举值当下都不成立 ⇒ capability 终态未定，如实计入 `slice_counters.unadjudicated`，缺什么逐条写进 `blocking_preconditions`。",
+        "not_single_html_because": "OO 侧有真实业务价值，不是「空白模板切换入口」（AC 12.9 的判据）：① 后端 `wp_onlyoffice_router.get_sheet_onlyoffice_config`（L624）经 `_resolve_wp_file(project_id, wp_code, template_path, visible_sheet=sheet_name)` **项目存储优先**解析文件，首开才从权威模板复制；② `post_sheet_onlyoffice_callback`（L1128）把 OO 编辑落盘进那份项目文件，编辑不是丢弃；③ 权威模板本身含真实业务 sheet（本 entry 的 primary_table.template_sheet 已逐格核验）。所以问题不是「OO 侧空白」，而是「OO 侧那份文件与 HTML 侧的 checklist_responses 互不投影」。",
+        "not_bidirectional_because": "Wave 5 前置（tasks.md「Tasks 46–57 标准 Excel entry 启用前置」）六件事一件都没落地，且这**不是**裁 single 的理由、只是「还不能标 bidirectional」的理由（AC 12.1 的正向条件未满足）：逐条见 blocking_preconditions BP-1..BP-5。真实 OnlyOffice 9.4 required scenario set 亦未对本 entry 执行 ⇒ evidence 保持 UNVERIFIABLE。",
+        "criterion_source": "backend/data/workpaper_sync_migration_paradigm.json#adjudication_criteria.verdicts"
+      },
+      "evidence": {
+        "browser_case": null,
+        "contract_test": "backend/tests/workpaper_sync/test_task46_d_cycle_migration.py",
+        "sync_test_run_id": null,
+        "required_scenario_set_digest": null,
+        "verification_state": "UNVERIFIABLE",
+        "unverifiable_reasons": [
+          "no_instrumentation_candidate_for_this_entry",
+          "no_non_null_approved_definition_bundle",
+          "no_published_result_representation",
+          "no_registered_sync_adapter",
+          "no_real_onlyoffice_94_probe_run_for_this_entry"
+        ]
+      }
+    },
+    {
+      "entry_id": "xlsx/gt-d4-operating-revenue",
+      "wp_code_pattern": "D4O",
+      "document_type": "xlsx",
+      "host": "GtD4OperatingRevenue.vue",
+      "host_path": "audit-platform/frontend/src/components/workpaper/GtD4OperatingRevenue.vue",
+      "capability": null,
+      "capability_verdict_stage": "pipeline_entry_pending_definition_delivery",
+      "capability_target": "bidirectional",
+      "capability_target_blocked_by": [
+        "BP-1",
+        "BP-2",
+        "BP-3",
+        "BP-4",
+        "BP-5"
+      ],
+      "capability_enum_note": "AC 1.3 的四个枚举值当下没有一个成立（见 adjudication.reason）⇒ 不填枚举值而记 null + `capability_verdict_stage`，并在 slice_counters.unadjudicated 如实计数。填 single_onlyoffice 会违反 AC 12.8（有 HTML 对端），填 bidirectional 会违反 AC 12.1 与 slice_schema 的 SR-6（五个身份字段全为 null）。",
+      "migration_state": "legacy_fake_bidirectional",
+      "adapter_id": null,
+      "authority_model": null,
+      "definition_bundle": null,
+      "instrumentation_candidate": null,
+      "published_representation": null,
+      "template_ref": "D/D4-1至D4-4 营业收入 - 审定表明细表（Leap-常规程序）.xlsx",
+      "mount_count": 1,
+      "scenario_profile_id": "xlsx.editable.shared.single.room_service_wired.v1",
+      "editability": "editable",
+      "room_model": "shared",
+      "canonical_resolver": "legacy_sheet_onlyoffice_router",
+      "html_counterpart_verdict": "exists",
+      "html_counterpart": {
+        "store": "checklist_responses",
+        "store_kind": "relational_row_per_item_id",
+        "endpoint_read": "GET /api/workpapers/{wp_id}/checklist-responses",
+        "endpoint_write": "PUT /api/workpapers/{wp_id}/checklist-responses",
+        "endpoint_source": "backend/app/routers/checklist_responses.py#L84 / #L132",
+        "payload_column": "remark",
+        "shape": "json_array_of_row_objects",
+        "row_identity_key": "rowId",
+        "row_identity_generator": "generateRowId()",
+        "forbidden_row_identity_kinds": [
+          "array_index",
+          "ordinal",
+          "position",
+          "mutable_chinese_label"
+        ],
+        "table_keys": [
+          "D4-4-rows"
+        ],
+        "table_keys_note": "这里只登记 primary managed table（三边锁的对象）。本 entry 的宿主目录里另有 13 个 `*-rows` 形态的 JSON 行表键（含 primary），它们的逐字段 contract 属 step 6 的活，本次不伪造。",
+        "primary_table": {
+          "item_id": "D4-4-rows",
+          "owner_module": "audit-platform/frontend/src/components/workpaper/composables/useD4Adjustment.ts",
+          "owner_constant": "STORAGE_KEY",
+          "owner_declaration_kind": "module_constant",
+          "what_it_holds": "营业收入调整分录汇总（D4-4）整表 —— 调整事项/类别/报表项目/科目/借贷金额/索引",
+          "template_relative_path": "D/D4-1至D4-4 营业收入 - 审定表明细表（Leap-常规程序）.xlsx",
+          "template_sheet": "营业收入调整分录汇总D4-4",
+          "identity_cell": "A5",
+          "identity_text": "调整事项说明"
+        },
+        "html_persistence_composable": "audit-platform/frontend/src/components/workpaper/composables/useD4FormData.ts#L62(GET)/#L125(PUT)"
+      },
+      "html_counterpart_source_refs": [
+        "audit-platform/frontend/src/components/workpaper/GtD4OperatingRevenue.vue#L15",
+        "audit-platform/frontend/src/components/workpaper/composables/useD4FormData.ts",
+        "audit-platform/frontend/src/components/workpaper/composables/useD4Adjustment.ts",
+        "backend/app/routers/checklist_responses.py#L84",
+        "backend/app/routers/checklist_responses.py#L132",
+        "backend/app/routers/wp_render_strategies/_d4_operating_revenue.py",
+        "backend/wp_templates/D/D4-1至D4-4 营业收入 - 审定表明细表（Leap-常规程序）.xlsx!营业收入调整分录汇总D4-4!A5 = '调整事项说明'"
+      ],
+      "manifest_mirror": {
+        "capability": "single_onlyoffice",
+        "html_store": "unresolved",
+        "legacy_reasons": [
+          "template_only_open",
+          "no_durable_forcesave_ack",
+          "missing_adapter"
+        ],
+        "divergence_from_slice": "capability / html_store 两项与本 slice 不一致，见 BP-6"
+      },
+      "adjudication": {
+        "honest_capability": null,
+        "reason": "step 3 逐 entry 实测：本 entry 的业务内容**真实存在于 HTML 侧** —— 宿主把结构化 Tab 的录入经 `PUT /api/workpapers/{wp_id}/checklist-responses` 落到 `checklist_responses`，整张受管表存成一条 item 的 `remark`（JSON 行数组），行身份是 `rowId`（`generateRowId()` 生成，不是数组下标）。因此 `html_counterpart_verdict == \"exists\"`，按 AC 12.8 该 entry **不得**标 single_onlyoffice —— AC 12.8 的判据是「有没有 HTML 对端」。同时 OO 侧不是空白模板切换入口（`_resolve_wp_file` 项目存储优先、callback 落盘、模板含真实业务 sheet），故不适用 AC 12.9 的 single_html；宿主在 `htmlRendererRegistry.ts` 有真实入边，故不是 unreachable。而 AC 12.1 要求的 approved authority model / 人工审核 per-entry contract / non-null approved bundle / Task 36 finalize 出的 published representation / 注册 adapter / 逐 scenario evidence 六件事尚未交付，故也**不得**标 bidirectional。四个枚举值当下都不成立 ⇒ capability 终态未定，如实计入 `slice_counters.unadjudicated`，缺什么逐条写进 `blocking_preconditions`。",
+        "not_single_html_because": "OO 侧有真实业务价值，不是「空白模板切换入口」（AC 12.9 的判据）：① 后端 `wp_onlyoffice_router.get_sheet_onlyoffice_config`（L624）经 `_resolve_wp_file(project_id, wp_code, template_path, visible_sheet=sheet_name)` **项目存储优先**解析文件，首开才从权威模板复制；② `post_sheet_onlyoffice_callback`（L1128）把 OO 编辑落盘进那份项目文件，编辑不是丢弃；③ 权威模板本身含真实业务 sheet（本 entry 的 primary_table.template_sheet 已逐格核验）。所以问题不是「OO 侧空白」，而是「OO 侧那份文件与 HTML 侧的 checklist_responses 互不投影」。",
+        "not_bidirectional_because": "Wave 5 前置（tasks.md「Tasks 46–57 标准 Excel entry 启用前置」）六件事一件都没落地，且这**不是**裁 single 的理由、只是「还不能标 bidirectional」的理由（AC 12.1 的正向条件未满足）：逐条见 blocking_preconditions BP-1..BP-5。真实 OnlyOffice 9.4 required scenario set 亦未对本 entry 执行 ⇒ evidence 保持 UNVERIFIABLE。",
+        "criterion_source": "backend/data/workpaper_sync_migration_paradigm.json#adjudication_criteria.verdicts"
+      },
+      "evidence": {
+        "browser_case": null,
+        "contract_test": "backend/tests/workpaper_sync/test_task46_d_cycle_migration.py",
+        "sync_test_run_id": null,
+        "required_scenario_set_digest": null,
+        "verification_state": "UNVERIFIABLE",
+        "unverifiable_reasons": [
+          "no_instrumentation_candidate_for_this_entry",
+          "no_non_null_approved_definition_bundle",
+          "no_published_result_representation",
+          "no_registered_sync_adapter",
+          "no_real_onlyoffice_94_probe_run_for_this_entry"
+        ]
+      },
+      "parent_duplicate_count": 31
+    },
+    {
+      "entry_id": "xlsx/gt-d5-receivables-financing",
+      "wp_code_pattern": "D5R",
+      "document_type": "xlsx",
+      "host": "GtD5ReceivablesFinancing.vue",
+      "host_path": "audit-platform/frontend/src/components/workpaper/GtD5ReceivablesFinancing.vue",
+      "capability": null,
+      "capability_verdict_stage": "pipeline_entry_pending_definition_delivery",
+      "capability_target": "bidirectional",
+      "capability_target_blocked_by": [
+        "BP-1",
+        "BP-2",
+        "BP-3",
+        "BP-4",
+        "BP-5"
+      ],
+      "capability_enum_note": "AC 1.3 的四个枚举值当下没有一个成立（见 adjudication.reason）⇒ 不填枚举值而记 null + `capability_verdict_stage`，并在 slice_counters.unadjudicated 如实计数。填 single_onlyoffice 会违反 AC 12.8（有 HTML 对端），填 bidirectional 会违反 AC 12.1 与 slice_schema 的 SR-6（五个身份字段全为 null）。",
+      "migration_state": "legacy_fake_bidirectional",
+      "adapter_id": null,
+      "authority_model": null,
+      "definition_bundle": null,
+      "instrumentation_candidate": null,
+      "published_representation": null,
+      "template_ref": "D/D5 应收款项融资.xlsx",
+      "mount_count": 1,
+      "scenario_profile_id": "xlsx.editable.shared.single.room_service_wired.v1",
+      "editability": "editable",
+      "room_model": "shared",
+      "canonical_resolver": "legacy_sheet_onlyoffice_router",
+      "html_counterpart_verdict": "exists",
+      "html_counterpart": {
+        "store": "checklist_responses",
+        "store_kind": "relational_row_per_item_id",
+        "endpoint_read": "GET /api/workpapers/{wp_id}/checklist-responses",
+        "endpoint_write": "PUT /api/workpapers/{wp_id}/checklist-responses",
+        "endpoint_source": "backend/app/routers/checklist_responses.py#L84 / #L132",
+        "payload_column": "remark",
+        "shape": "json_array_of_row_objects",
+        "row_identity_key": "rowId",
+        "row_identity_generator": "generateRowId()",
+        "forbidden_row_identity_kinds": [
+          "array_index",
+          "ordinal",
+          "position",
+          "mutable_chinese_label"
+        ],
+        "table_keys": [
+          "D5-2-rows"
+        ],
+        "table_keys_note": "这里只登记 primary managed table（三边锁的对象）。本 entry 的宿主目录里另有 3 个 `*-rows` 形态的 JSON 行表键（含 primary），它们的逐字段 contract 属 step 6 的活，本次不伪造。",
+        "primary_table": {
+          "item_id": "D5-2-rows",
+          "owner_module": "audit-platform/frontend/src/components/workpaper/composables/useD5Detail.ts",
+          "owner_constant": "ITEM_ID_ROWS",
+          "owner_declaration_kind": "module_constant",
+          "what_it_holds": "应收款项融资明细（D5-2）整表 17 列 A~Q —— 类别/明细项目/期初三调/OCI 减值/本期增减/期末",
+          "template_relative_path": "D/D5 应收款项融资.xlsx",
+          "template_sheet": "应收款项融资明细表D5-2",
+          "identity_cell": "B10",
+          "identity_text": "明细项目"
+        },
+        "html_persistence_composable": "audit-platform/frontend/src/components/workpaper/composables/useD5FormData.ts#L51(GET)/#L97(PUT)"
+      },
+      "html_counterpart_source_refs": [
+        "audit-platform/frontend/src/components/workpaper/GtD5ReceivablesFinancing.vue#L13",
+        "audit-platform/frontend/src/components/workpaper/composables/useD5FormData.ts",
+        "audit-platform/frontend/src/components/workpaper/composables/useD5Detail.ts",
+        "backend/app/routers/checklist_responses.py#L84",
+        "backend/app/routers/checklist_responses.py#L132",
+        "backend/app/routers/wp_render_strategies/_d5_receivables_financing.py",
+        "backend/wp_templates/D/D5 应收款项融资.xlsx!应收款项融资明细表D5-2!B10 = '明细项目'"
+      ],
+      "manifest_mirror": {
+        "capability": "single_onlyoffice",
+        "html_store": "unresolved",
+        "legacy_reasons": [
+          "template_only_open",
+          "no_durable_forcesave_ack",
+          "missing_adapter"
+        ],
+        "divergence_from_slice": "capability / html_store 两项与本 slice 不一致，见 BP-6"
+      },
+      "adjudication": {
+        "honest_capability": null,
+        "reason": "step 3 逐 entry 实测：本 entry 的业务内容**真实存在于 HTML 侧** —— 宿主把结构化 Tab 的录入经 `PUT /api/workpapers/{wp_id}/checklist-responses` 落到 `checklist_responses`，整张受管表存成一条 item 的 `remark`（JSON 行数组），行身份是 `rowId`（`generateRowId()` 生成，不是数组下标）。因此 `html_counterpart_verdict == \"exists\"`，按 AC 12.8 该 entry **不得**标 single_onlyoffice —— AC 12.8 的判据是「有没有 HTML 对端」。同时 OO 侧不是空白模板切换入口（`_resolve_wp_file` 项目存储优先、callback 落盘、模板含真实业务 sheet），故不适用 AC 12.9 的 single_html；宿主在 `htmlRendererRegistry.ts` 有真实入边，故不是 unreachable。而 AC 12.1 要求的 approved authority model / 人工审核 per-entry contract / non-null approved bundle / Task 36 finalize 出的 published representation / 注册 adapter / 逐 scenario evidence 六件事尚未交付，故也**不得**标 bidirectional。四个枚举值当下都不成立 ⇒ capability 终态未定，如实计入 `slice_counters.unadjudicated`，缺什么逐条写进 `blocking_preconditions`。",
+        "not_single_html_because": "OO 侧有真实业务价值，不是「空白模板切换入口」（AC 12.9 的判据）：① 后端 `wp_onlyoffice_router.get_sheet_onlyoffice_config`（L624）经 `_resolve_wp_file(project_id, wp_code, template_path, visible_sheet=sheet_name)` **项目存储优先**解析文件，首开才从权威模板复制；② `post_sheet_onlyoffice_callback`（L1128）把 OO 编辑落盘进那份项目文件，编辑不是丢弃；③ 权威模板本身含真实业务 sheet（本 entry 的 primary_table.template_sheet 已逐格核验）。所以问题不是「OO 侧空白」，而是「OO 侧那份文件与 HTML 侧的 checklist_responses 互不投影」。",
+        "not_bidirectional_because": "Wave 5 前置（tasks.md「Tasks 46–57 标准 Excel entry 启用前置」）六件事一件都没落地，且这**不是**裁 single 的理由、只是「还不能标 bidirectional」的理由（AC 12.1 的正向条件未满足）：逐条见 blocking_preconditions BP-1..BP-5。真实 OnlyOffice 9.4 required scenario set 亦未对本 entry 执行 ⇒ evidence 保持 UNVERIFIABLE。",
+        "criterion_source": "backend/data/workpaper_sync_migration_paradigm.json#adjudication_criteria.verdicts"
+      },
+      "evidence": {
+        "browser_case": null,
+        "contract_test": "backend/tests/workpaper_sync/test_task46_d_cycle_migration.py",
+        "sync_test_run_id": null,
+        "required_scenario_set_digest": null,
+        "verification_state": "UNVERIFIABLE",
+        "unverifiable_reasons": [
+          "no_instrumentation_candidate_for_this_entry",
+          "no_non_null_approved_definition_bundle",
+          "no_published_result_representation",
+          "no_registered_sync_adapter",
+          "no_real_onlyoffice_94_probe_run_for_this_entry"
+        ]
+      }
+    },
+    {
+      "entry_id": "xlsx/gt-d6-contract-assets",
+      "wp_code_pattern": "D6C",
+      "document_type": "xlsx",
+      "host": "GtD6ContractAssets.vue",
+      "host_path": "audit-platform/frontend/src/components/workpaper/GtD6ContractAssets.vue",
+      "capability": null,
+      "capability_verdict_stage": "pipeline_entry_pending_definition_delivery",
+      "capability_target": "bidirectional",
+      "capability_target_blocked_by": [
+        "BP-1",
+        "BP-2",
+        "BP-3",
+        "BP-4",
+        "BP-5"
+      ],
+      "capability_enum_note": "AC 1.3 的四个枚举值当下没有一个成立（见 adjudication.reason）⇒ 不填枚举值而记 null + `capability_verdict_stage`，并在 slice_counters.unadjudicated 如实计数。填 single_onlyoffice 会违反 AC 12.8（有 HTML 对端），填 bidirectional 会违反 AC 12.1 与 slice_schema 的 SR-6（五个身份字段全为 null）。",
+      "migration_state": "legacy_fake_bidirectional",
+      "adapter_id": null,
+      "authority_model": null,
+      "definition_bundle": null,
+      "instrumentation_candidate": null,
+      "published_representation": null,
+      "template_ref": "D/D6 合同资产.xlsx",
+      "mount_count": 1,
+      "scenario_profile_id": "xlsx.editable.shared.single.room_service_wired.v1",
+      "editability": "editable",
+      "room_model": "shared",
+      "canonical_resolver": "legacy_sheet_onlyoffice_router",
+      "html_counterpart_verdict": "exists",
+      "html_counterpart": {
+        "store": "checklist_responses",
+        "store_kind": "relational_row_per_item_id",
+        "endpoint_read": "GET /api/workpapers/{wp_id}/checklist-responses",
+        "endpoint_write": "PUT /api/workpapers/{wp_id}/checklist-responses",
+        "endpoint_source": "backend/app/routers/checklist_responses.py#L84 / #L132",
+        "payload_column": "remark",
+        "shape": "json_array_of_row_objects",
+        "row_identity_key": "rowId",
+        "row_identity_generator": "generateRowId()",
+        "forbidden_row_identity_kinds": [
+          "array_index",
+          "ordinal",
+          "position",
+          "mutable_chinese_label"
+        ],
+        "table_keys": [
+          "D6-2-rows"
+        ],
+        "table_keys_note": "这里只登记 primary managed table（三边锁的对象）。本 entry 的宿主目录里另有 7 个 `*-rows` 形态的 JSON 行表键（含 primary），它们的逐字段 contract 属 step 6 的活，本次不伪造。",
+        "primary_table": {
+          "item_id": "D6-2-rows",
+          "owner_module": "audit-platform/frontend/src/components/workpaper/composables/useD6Detail.ts",
+          "owner_constant": "ITEM_ID_ROWS",
+          "owner_declaration_kind": "module_constant",
+          "what_it_holds": "合同资产明细（D6-2）整表 —— 序号/合同或项目名称/类型/客户/关联关系/期初三调/1 年以上收款权",
+          "template_relative_path": "D/D6 合同资产.xlsx",
+          "template_sheet": "明细表D6-2",
+          "identity_cell": "B12",
+          "identity_text": "合同名称/项目名称"
+        },
+        "html_persistence_composable": "audit-platform/frontend/src/components/workpaper/composables/useD6FormData.ts#L53(GET)/#L122(PUT)"
+      },
+      "html_counterpart_source_refs": [
+        "audit-platform/frontend/src/components/workpaper/GtD6ContractAssets.vue#L13",
+        "audit-platform/frontend/src/components/workpaper/composables/useD6FormData.ts",
+        "audit-platform/frontend/src/components/workpaper/composables/useD6Detail.ts",
+        "backend/app/routers/checklist_responses.py#L84",
+        "backend/app/routers/checklist_responses.py#L132",
+        "backend/app/routers/wp_render_strategies/_d6_contract_assets.py",
+        "backend/wp_templates/D/D6 合同资产.xlsx!明细表D6-2!B12 = '合同名称/项目名称'"
+      ],
+      "manifest_mirror": {
+        "capability": "single_onlyoffice",
+        "html_store": "unresolved",
+        "legacy_reasons": [
+          "template_only_open",
+          "no_durable_forcesave_ack",
+          "missing_adapter"
+        ],
+        "divergence_from_slice": "capability / html_store 两项与本 slice 不一致，见 BP-6"
+      },
+      "adjudication": {
+        "honest_capability": null,
+        "reason": "step 3 逐 entry 实测：本 entry 的业务内容**真实存在于 HTML 侧** —— 宿主把结构化 Tab 的录入经 `PUT /api/workpapers/{wp_id}/checklist-responses` 落到 `checklist_responses`，整张受管表存成一条 item 的 `remark`（JSON 行数组），行身份是 `rowId`（`generateRowId()` 生成，不是数组下标）。因此 `html_counterpart_verdict == \"exists\"`，按 AC 12.8 该 entry **不得**标 single_onlyoffice —— AC 12.8 的判据是「有没有 HTML 对端」。同时 OO 侧不是空白模板切换入口（`_resolve_wp_file` 项目存储优先、callback 落盘、模板含真实业务 sheet），故不适用 AC 12.9 的 single_html；宿主在 `htmlRendererRegistry.ts` 有真实入边，故不是 unreachable。而 AC 12.1 要求的 approved authority model / 人工审核 per-entry contract / non-null approved bundle / Task 36 finalize 出的 published representation / 注册 adapter / 逐 scenario evidence 六件事尚未交付，故也**不得**标 bidirectional。四个枚举值当下都不成立 ⇒ capability 终态未定，如实计入 `slice_counters.unadjudicated`，缺什么逐条写进 `blocking_preconditions`。",
+        "not_single_html_because": "OO 侧有真实业务价值，不是「空白模板切换入口」（AC 12.9 的判据）：① 后端 `wp_onlyoffice_router.get_sheet_onlyoffice_config`（L624）经 `_resolve_wp_file(project_id, wp_code, template_path, visible_sheet=sheet_name)` **项目存储优先**解析文件，首开才从权威模板复制；② `post_sheet_onlyoffice_callback`（L1128）把 OO 编辑落盘进那份项目文件，编辑不是丢弃；③ 权威模板本身含真实业务 sheet（本 entry 的 primary_table.template_sheet 已逐格核验）。所以问题不是「OO 侧空白」，而是「OO 侧那份文件与 HTML 侧的 checklist_responses 互不投影」。",
+        "not_bidirectional_because": "Wave 5 前置（tasks.md「Tasks 46–57 标准 Excel entry 启用前置」）六件事一件都没落地，且这**不是**裁 single 的理由、只是「还不能标 bidirectional」的理由（AC 12.1 的正向条件未满足）：逐条见 blocking_preconditions BP-1..BP-5。真实 OnlyOffice 9.4 required scenario set 亦未对本 entry 执行 ⇒ evidence 保持 UNVERIFIABLE。",
+        "criterion_source": "backend/data/workpaper_sync_migration_paradigm.json#adjudication_criteria.verdicts"
+      },
+      "evidence": {
+        "browser_case": null,
+        "contract_test": "backend/tests/workpaper_sync/test_task46_d_cycle_migration.py",
+        "sync_test_run_id": null,
+        "required_scenario_set_digest": null,
+        "verification_state": "UNVERIFIABLE",
+        "unverifiable_reasons": [
+          "no_instrumentation_candidate_for_this_entry",
+          "no_non_null_approved_definition_bundle",
+          "no_published_result_representation",
+          "no_registered_sync_adapter",
+          "no_real_onlyoffice_94_probe_run_for_this_entry"
+        ]
+      }
+    },
+    {
+      "entry_id": "xlsx/gt-d7-contract-liabilities",
+      "wp_code_pattern": "D7C",
+      "document_type": "xlsx",
+      "host": "GtD7ContractLiabilities.vue",
+      "host_path": "audit-platform/frontend/src/components/workpaper/GtD7ContractLiabilities.vue",
+      "capability": null,
+      "capability_verdict_stage": "pipeline_entry_pending_definition_delivery",
+      "capability_target": "bidirectional",
+      "capability_target_blocked_by": [
+        "BP-1",
+        "BP-2",
+        "BP-3",
+        "BP-4",
+        "BP-5"
+      ],
+      "capability_enum_note": "AC 1.3 的四个枚举值当下没有一个成立（见 adjudication.reason）⇒ 不填枚举值而记 null + `capability_verdict_stage`，并在 slice_counters.unadjudicated 如实计数。填 single_onlyoffice 会违反 AC 12.8（有 HTML 对端），填 bidirectional 会违反 AC 12.1 与 slice_schema 的 SR-6（五个身份字段全为 null）。",
+      "migration_state": "legacy_fake_bidirectional",
+      "adapter_id": null,
+      "authority_model": null,
+      "definition_bundle": null,
+      "instrumentation_candidate": null,
+      "published_representation": null,
+      "template_ref": "D/D7 合同负债.xlsx",
+      "mount_count": 1,
+      "scenario_profile_id": "xlsx.editable.shared.single.room_service_wired.v1",
+      "editability": "editable",
+      "room_model": "shared",
+      "canonical_resolver": "legacy_sheet_onlyoffice_router",
+      "html_counterpart_verdict": "exists",
+      "html_counterpart": {
+        "store": "checklist_responses",
+        "store_kind": "relational_row_per_item_id",
+        "endpoint_read": "GET /api/workpapers/{wp_id}/checklist-responses",
+        "endpoint_write": "PUT /api/workpapers/{wp_id}/checklist-responses",
+        "endpoint_source": "backend/app/routers/checklist_responses.py#L84 / #L132",
+        "payload_column": "remark",
+        "shape": "json_array_of_row_objects",
+        "row_identity_key": "rowId",
+        "row_identity_generator": "generateRowId()",
+        "forbidden_row_identity_kinds": [
+          "array_index",
+          "ordinal",
+          "position",
+          "mutable_chinese_label"
+        ],
+        "table_keys": [
+          "D7-2-rows"
+        ],
+        "table_keys_note": "这里只登记 primary managed table（三边锁的对象）。本 entry 的宿主目录里另有 6 个 `*-rows` 形态的 JSON 行表键（含 primary），它们的逐字段 contract 属 step 6 的活，本次不伪造。",
+        "primary_table": {
+          "item_id": "D7-2-rows",
+          "owner_module": "audit-platform/frontend/src/components/workpaper/composables/useD7Detail.ts",
+          "owner_constant": "ITEM_ID_ROWS",
+          "owner_declaration_kind": "module_constant",
+          "what_it_holds": "合同负债明细（D7-2）整表 —— 合同或项目名称/单位/公司代码/关联关系/类型/期初三调/审定账龄",
+          "template_relative_path": "D/D7 合同负债.xlsx",
+          "template_sheet": "明细表D7-2",
+          "identity_cell": "A8",
+          "identity_text": "合同名称/项目名称"
+        },
+        "html_persistence_composable": "audit-platform/frontend/src/components/workpaper/composables/useD7FormData.ts#L55(GET)/#L137(PUT)"
+      },
+      "html_counterpart_source_refs": [
+        "audit-platform/frontend/src/components/workpaper/GtD7ContractLiabilities.vue#L13",
+        "audit-platform/frontend/src/components/workpaper/composables/useD7FormData.ts",
+        "audit-platform/frontend/src/components/workpaper/composables/useD7Detail.ts",
+        "backend/app/routers/checklist_responses.py#L84",
+        "backend/app/routers/checklist_responses.py#L132",
+        "backend/app/routers/wp_render_strategies/_d7_contract_liabilities.py",
+        "backend/wp_templates/D/D7 合同负债.xlsx!明细表D7-2!A8 = '合同名称/项目名称'"
+      ],
+      "manifest_mirror": {
+        "capability": "single_onlyoffice",
+        "html_store": "unresolved",
+        "legacy_reasons": [
+          "template_only_open",
+          "no_durable_forcesave_ack",
+          "missing_adapter"
+        ],
+        "divergence_from_slice": "capability / html_store 两项与本 slice 不一致，见 BP-6"
+      },
+      "adjudication": {
+        "honest_capability": null,
+        "reason": "step 3 逐 entry 实测：本 entry 的业务内容**真实存在于 HTML 侧** —— 宿主把结构化 Tab 的录入经 `PUT /api/workpapers/{wp_id}/checklist-responses` 落到 `checklist_responses`，整张受管表存成一条 item 的 `remark`（JSON 行数组），行身份是 `rowId`（`generateRowId()` 生成，不是数组下标）。因此 `html_counterpart_verdict == \"exists\"`，按 AC 12.8 该 entry **不得**标 single_onlyoffice —— AC 12.8 的判据是「有没有 HTML 对端」。同时 OO 侧不是空白模板切换入口（`_resolve_wp_file` 项目存储优先、callback 落盘、模板含真实业务 sheet），故不适用 AC 12.9 的 single_html；宿主在 `htmlRendererRegistry.ts` 有真实入边，故不是 unreachable。而 AC 12.1 要求的 approved authority model / 人工审核 per-entry contract / non-null approved bundle / Task 36 finalize 出的 published representation / 注册 adapter / 逐 scenario evidence 六件事尚未交付，故也**不得**标 bidirectional。四个枚举值当下都不成立 ⇒ capability 终态未定，如实计入 `slice_counters.unadjudicated`，缺什么逐条写进 `blocking_preconditions`。",
+        "not_single_html_because": "OO 侧有真实业务价值，不是「空白模板切换入口」（AC 12.9 的判据）：① 后端 `wp_onlyoffice_router.get_sheet_onlyoffice_config`（L624）经 `_resolve_wp_file(project_id, wp_code, template_path, visible_sheet=sheet_name)` **项目存储优先**解析文件，首开才从权威模板复制；② `post_sheet_onlyoffice_callback`（L1128）把 OO 编辑落盘进那份项目文件，编辑不是丢弃；③ 权威模板本身含真实业务 sheet（本 entry 的 primary_table.template_sheet 已逐格核验）。所以问题不是「OO 侧空白」，而是「OO 侧那份文件与 HTML 侧的 checklist_responses 互不投影」。",
+        "not_bidirectional_because": "Wave 5 前置（tasks.md「Tasks 46–57 标准 Excel entry 启用前置」）六件事一件都没落地，且这**不是**裁 single 的理由、只是「还不能标 bidirectional」的理由（AC 12.1 的正向条件未满足）：逐条见 blocking_preconditions BP-1..BP-5。真实 OnlyOffice 9.4 required scenario set 亦未对本 entry 执行 ⇒ evidence 保持 UNVERIFIABLE。",
+        "criterion_source": "backend/data/workpaper_sync_migration_paradigm.json#adjudication_criteria.verdicts"
+      },
+      "evidence": {
+        "browser_case": null,
+        "contract_test": "backend/tests/workpaper_sync/test_task46_d_cycle_migration.py",
+        "sync_test_run_id": null,
+        "required_scenario_set_digest": null,
+        "verification_state": "UNVERIFIABLE",
+        "unverifiable_reasons": [
+          "no_instrumentation_candidate_for_this_entry",
+          "no_non_null_approved_definition_bundle",
+          "no_published_result_representation",
+          "no_registered_sync_adapter",
+          "no_real_onlyoffice_94_probe_run_for_this_entry"
+        ]
+      }
+    }
+  ],
+  "authoritative_templates": {
+    "root": "backend/wp_templates/D",
+    "reference_copy_status": "absent_from_working_tree",
+    "reference_copy_note": "平台铁律要求「读模板前先比对 backend/wp_templates/ 与参考副本两处 size」。本次实扫工作树根下 `基础数据/` 目录**不存在** ⇒ 参考副本无法比对，运行时权威目录是唯一来源（与 E slice 同一实测结论）。",
+    "lock_file_policy": "枚举时跳过 `~$` 前缀的 Office 锁文件；本次实扫 0 个锁文件",
+    "index_authority": "backend/wp_templates/_index.json 是运行时 finder 的索引真源（D 循环 17 条）。不在索引里的文件 find_template_file_any() 永不返回 —— D4收入底稿.xlsx 就是这种情况。",
+    "files": [
+      {
+        "name": "D0 收入循环函证.xlsx",
+        "size": 153802,
+        "sha256": "23d46c846640ab8d0931a79f4451605b6ead1c905b98fe5a728c6c3b70d66977",
+        "belongs_to_entry": null,
+        "read_with": "openpyxl data_only",
+        "excluded_reason": "D0 函证是跨循环共享模块（confirmation-* 组件族，D0 的 9 个组件被 E0/F0/G0/H0/K0/L0 复用），在 source manifest 的 186 条 entry 里没有独立 xlsx entry ⇒ 归 Task 57「A/B/C/S 与跨循环共享 Excel entry」。本 slice 不为它伪造 entry。"
+      },
+      {
+        "name": "D1 应收票据.xlsx",
+        "size": 138008,
+        "sha256": "e6e8dcf28ba6e7f6fdf9867c3ac43b2f1a72e1a1b6f2aa477f58dfca39097577",
+        "belongs_to_entry": "xlsx/gt-d1-notes-receivable",
+        "read_with": "openpyxl data_only"
+      },
+      {
+        "name": "D2-1至D2-4  应收账款- 审定表明细表（Leap-常规程序）.xlsx",
+        "size": 123162,
+        "sha256": "31e7992ba1e83952620e1777d108b46f7e7817dcdc9484c07f079f1dd3af0afa",
+        "belongs_to_entry": "xlsx/gt-d2-accounts-receivable",
+        "read_with": "openpyxl data_only"
+      },
+      {
+        "name": "D2-5  应收账款 -分析程序（Leap应对措施-分析程序）.xlsx",
+        "size": 102990,
+        "sha256": "50b52a4e1638918d5fef52d99f8d361a60a0541816d85fbca8304ee61f8eeabf",
+        "belongs_to_entry": "xlsx/gt-d2-accounts-receivable",
+        "read_with": "openpyxl data_only"
+      },
+      {
+        "name": "D2-6至D2-13  应收账款 -检查（Leap应对措施-检查）.xlsx",
+        "size": 357051,
+        "sha256": "9e833af0fceb9af2ada456a34f109709464798d37eb2b431be1da5b66f5c3f6f",
+        "belongs_to_entry": "xlsx/gt-d2-accounts-receivable",
+        "read_with": "openpyxl data_only"
+      },
+      {
+        "name": "D3 预收账款.xlsx",
+        "size": 133116,
+        "sha256": "8a27614bd761c1a8a2d3c6bb2a6f1264138881f86bfd59a99309207cf8d1e5ae",
+        "belongs_to_entry": "xlsx/gt-d3-prepaid-accounts",
+        "read_with": "openpyxl data_only"
+      },
+      {
+        "name": "D4-12 营业收入-合同检查（Leap-常规程序）.xlsx",
+        "size": 66754,
+        "sha256": "9189b3a9dfcf9535a39cdf7ad33d2d4d332dcc590ac22174697e01ff096ca136",
+        "belongs_to_entry": "xlsx/gt-d4-operating-revenue",
+        "read_with": "openpyxl data_only"
+      },
+      {
+        "name": "D4-13至D4-20主营业务收入-检查（Leap应对措施-检查）.xlsx",
+        "size": 115295,
+        "sha256": "1201b80cfa861ba3d7ed26af14cdef06d5561a620ec8d9284ea5e537737049ea",
+        "belongs_to_entry": "xlsx/gt-d4-operating-revenue",
+        "read_with": "openpyxl data_only"
+      },
+      {
+        "name": "D4-1至D4-4 营业收入 - 审定表明细表（Leap-常规程序）.xlsx",
+        "size": 168102,
+        "sha256": "fa69c92d1af6548974fb3fe1a0a45236ddf1c64037b4ac811d7e084de934340b",
+        "belongs_to_entry": "xlsx/gt-d4-operating-revenue",
+        "read_with": "openpyxl data_only"
+      },
+      {
+        "name": "D4-21营业收入-关联方检查（Leap-常规程序）.xlsx",
+        "size": 79380,
+        "sha256": "1581f215c0dd5cce2a7d7a828e190c0900b6cd10197b02c720fe1792371d003a",
+        "belongs_to_entry": "xlsx/gt-d4-operating-revenue",
+        "read_with": "openpyxl data_only"
+      },
+      {
+        "name": "D4-22至D4-32营业收入-IPO 上市 新三板 重组 舞弊应对.xlsx",
+        "size": 152077,
+        "sha256": "3058be79f74fd0ce8ff82ac15c0f65c0a8a64d583a74def23444a3f4c6c85c07",
+        "belongs_to_entry": "xlsx/gt-d4-operating-revenue",
+        "read_with": "openpyxl data_only"
+      },
+      {
+        "name": "D4-33至D4-36 其他业务收入.xlsx",
+        "size": 84726,
+        "sha256": "76684ebd9f31c47932accf2f6da36831d0aa13f1438bd97cb862f554700147f0",
+        "belongs_to_entry": "xlsx/gt-d4-operating-revenue",
+        "read_with": "openpyxl data_only"
+      },
+      {
+        "name": "D4-5 营业收入-会计政策（Leap-常规程序）.xlsx",
+        "size": 16848,
+        "sha256": "3b11284bcc6ba44173c0c2f07b34d436a3b68693186f88764bb0c1c9097ab0f3",
+        "belongs_to_entry": "xlsx/gt-d4-operating-revenue",
+        "read_with": "openpyxl data_only"
+      },
+      {
+        "name": "D4-6至D4-11营业收入 - 分析程序（Leap应对措施-分析程序）.xlsx",
+        "size": 49772,
+        "sha256": "ff279a8b06691ac1ebc33be13f7387987dc6afc79e64a5daccebf424c8983158",
+        "belongs_to_entry": "xlsx/gt-d4-operating-revenue",
+        "read_with": "openpyxl data_only"
+      },
+      {
+        "name": "D4收入底稿.xlsx",
+        "size": 352950,
+        "sha256": "ecac5d56775e10b0285a0b82b5541037bfeada4513f9a09c0d8a74a6c9d2a155",
+        "belongs_to_entry": null,
+        "read_with": "openpyxl data_only",
+        "excluded_reason": "🔴 不在 backend/wp_templates/_index.json 里（D 循环 17 条索引全部指向按程序拆分的文件），故 wp_template_finder.find_template_file_any() 对任何 D4 码都**永不返回**它 ⇒ 运行时不可达，不是任何 entry 的权威模板。Task 46 首轮把 D4 的 template_ref 写成它，是照文件名猜的。"
+      },
+      {
+        "name": "D5 应收款项融资.xlsx",
+        "size": 113287,
+        "sha256": "53cd7518f45072b405e0c96cf5508749299db0b90e94b77a2c20dbcc9a25f70e",
+        "belongs_to_entry": "xlsx/gt-d5-receivables-financing",
+        "read_with": "openpyxl data_only"
+      },
+      {
+        "name": "D6 合同资产.xlsx",
+        "size": 421708,
+        "sha256": "591d4c682a420820e80d6597c75dc0ddf6a82b4f3bce184ebc76fd4cbef7f996",
+        "belongs_to_entry": "xlsx/gt-d6-contract-assets",
+        "read_with": "openpyxl data_only"
+      },
+      {
+        "name": "D7 合同负债.xlsx",
+        "size": 379551,
+        "sha256": "d522ac9fc60d12fb665335f4df9518cc4edf4886bb4c3b46819e08a177e221df",
+        "belongs_to_entry": "xlsx/gt-d7-contract-liabilities",
+        "read_with": "openpyxl data_only"
+      }
+    ]
+  },
+  "blocking_preconditions": [
+    {
+      "id": "BP-1",
+      "blocks": "bidirectional",
+      "what": "7 个 entry 都没有 Task 17 的 non-current instrumentation candidate",
+      "consequence": "Task 36 的 ExcelEntryFinalizeGate.finalize_candidate 无 candidate 可 finalize ⇒ 不可能产出 published representation ⇒ resolver/room/current/evidence 拿不到身份",
+      "status": "REGISTERED_NOT_FIXED",
+      "must_fix_before": "把任一 D entry 标 bidirectional 或注册 adapter 之前",
+      "owner_task": "Task 17 + Task 36（本任务不伪造 candidate finalize）",
+      "source_refs": [
+        "backend/app/services/workpaper_sync/excel_entry_gate.py",
+        "backend/app/services/workpaper_sync/adapters/registry.py#DELIVERED_PER_ENTRY_CONTRACTS"
+      ]
+    },
+    {
+      "id": "BP-2",
+      "blocks": "bidirectional",
+      "what": "6 个 entry（D1/D3/D4/D5/D6/D7）没有人工审核的 per-entry contract；workpaper_sync_contracts/ 下只有 d2.receivable_detail.json 一条 D 契约",
+      "consequence": "projection_contract bundle 的 contract slot 必须是 approved definition，缺失即 PerEntryContractUnapprovedError；typed null marker 不得冒充",
+      "status": "REGISTERED_NOT_FIXED",
+      "must_fix_before": "把这 6 个 entry 标 bidirectional 之前",
+      "owner_task": "Task 46 后续（step 6，逐 entry 人工审核发布，禁止跨 entry 复用 D2 契约）",
+      "source_refs": [
+        "backend/data/workpaper_sync_contracts/d2.receivable_detail.json",
+        "backend/app/services/workpaper_sync/contracts.py"
+      ]
+    },
+    {
+      "id": "BP-3",
+      "blocks": "bidirectional",
+      "what": "7 个 entry 都没有 approved authority model 与 non-null approved definition bundle",
+      "consequence": "Requirement 2.3：bundle 的 typed slots 不得用 SQL NULL / 空串 / 全零 hash 代替",
+      "status": "REGISTERED_NOT_FIXED",
+      "must_fix_before": "把任一 D entry 标 bidirectional 之前",
+      "owner_task": "Task 46 后续（step 5 / step 7）",
+      "source_refs": [
+        "backend/app/services/workpaper_sync/adapters/registry.py#DELIVERED_PER_ENTRY_CONTRACTS"
+      ]
+    },
+    {
+      "id": "BP-4",
+      "blocks": "bidirectional",
+      "what": "没有为任一 D entry 跑过真实 OnlyOffice 9.4 的 required scenario set",
+      "consequence": "AC 12.12：任一缺失、失败、UNVERIFIABLE 均保持未验收；evidence 只能是 UNVERIFIABLE",
+      "status": "REGISTERED_NOT_FIXED",
+      "must_fix_before": "把任一 D entry 从 UNVERIFIABLE 提为 verified 之前",
+      "owner_task": "Task 44 同型的真实 OO gate（D 循环侧尚未立项）",
+      "source_refs": [
+        "backend/tests/workpaper_sync/test_task44_oo94_excel_pilot_gate.py"
+      ]
+    },
+    {
+      "id": "BP-5",
+      "blocks": "single_onlyoffice 与 bidirectional 的 sheet 定位可靠性",
+      "what": "D4 的 entry 级 OO sheet 解析会落到错文件：`get_sheet_onlyoffice_config` 先按 sheet 名尾码取独立 wp_code，取不到才回落整册 wp_code。回落到 'D4' 时 `find_template_file_any('D4')` 返回 `D4-12 营业收入-合同检查（Leap-常规程序）.xlsx` —— 索引里 8 个 D4 文件中按文件名排序的第一个，不是审定表明细表。",
+      "consequence": "D4 的 OO 侧在回落路径上打开的是另一本工作簿 ⇒ 该 entry 的 OO 通道当前不可靠，既不能作为 bidirectional 的 materialize 基底，也让「切到在线编辑看到的是本表」这个用户预期在回落时不成立。",
+      "observable_consequences": [
+        "宿主未传 sheetName（或 sheet 名尾码提不出 D4-n）时，OO 侧打开的是「合同检查表D4-12」那本工作簿，与用户当前所在的 D4-1/D4-2/D4-4 无关",
+        "sheet 名尾码能提出 D4-1/D4-2/D4-3/D4-4 时解析正确（实测四者都命中 D4-1至D4-4 审定表明细表），故该缺陷只在回落路径暴露 —— 是巧合正确，不是设计正确"
+      ],
+      "status": "REGISTERED_NOT_FIXED",
+      "why_not_fixed_here": "修它要给 D4 的 46 个 sheet 建一份 sheet→模板映射（或把解析下沉到 render-config 下发的真实 sheets 列表），影响所有走 `_sheet_wp_code` 回落的循环；Task 46 的正文范围是 D 循环 entry 的裁决/契约/证据，不含重写 OO sheet 解析。已登记为阻断项并由守卫双向锁死。",
+      "must_fix_before": "把 D4 标 bidirectional 或注册 adapter 之前",
+      "owner_task": "待立项（与 E slice 的 G1 sheet 解析缺陷同型）",
+      "source_refs": [
+        "backend/app/routers/wp_onlyoffice_router.py#L624",
+        "backend/app/services/wp_template_finder.py",
+        "backend/wp_templates/_index.json"
+      ]
+    },
+    {
+      "id": "BP-6",
+      "blocks": "slice 与 source manifest 的一致性",
+      "what": "source manifest 里 7 条 D entry 的 `capability` 仍是 'single_onlyoffice'、`html_store` 仍是 'unresolved'，与本 slice 重裁后的结论不一致。这两个值不是逐 entry 裁决，而是 `workpaper_sync_entry_overlay.json` 的 `defaults_by_component.GtOnlyOfficeSheet` **组件级默认值**（全 186 条里 180 条 html_store 都是 'unresolved'）。",
+      "consequence": "manifest 的 capability 统计当前反映的是 overlay 默认值而非裁决结果；本 slice 的守卫因此断言「两者**必须**不一致且该不一致已登记」，而不是断言相等 —— 后者会把 overlay 默认值当成裁决真源",
+      "status": "REGISTERED_NOT_FIXED",
+      "why_not_fixed_here": "改 overlay 的 `defaults_by_component` 会同时翻掉 180 条 GtOnlyOfficeSheet entry 的 capability（远超 D 循环），还要改 `approved_source_digest` 并重生成 manifest —— manifest_digest 变化会波及 Task 73 / closure check / legacy baseline 等多个并发在途的判据。正确做法是 overlay 支持 per-entry override 后由回填任务统一切换。",
+      "must_fix_before": "Task 67 的 structural pre-reconcile 消费 manifest capability 统计之前",
+      "owner_task": "待立项（overlay per-entry override + 重生成 manifest）",
+      "source_refs": [
+        "backend/data/workpaper_sync_entry_overlay.json#defaults_by_component.GtOnlyOfficeSheet",
+        "backend/scripts/gen/generate_workpaper_sync_manifest.py"
+      ]
+    },
+    {
+      "id": "BP-7",
+      "blocks": "AC 1.4 / AC 1.5 的 UI 义务完全收口",
+      "what": "本次已兑现 AC 1.4 的「显示可操作原因」（7 个宿主的模式工具栏挂 GtEntrySyncCapabilityNotice，常显一行摘要 + tooltip 完整原因）。仍未删除的是 7 个 entry 级 legacy dual-mode composable 与 sub-tab 级 composable。",
+      "consequence": "AC 1.5 的触发条件是「入口被裁决为纯 OO 或纯 HTML」—— 重裁后这 7 个 entry 都不是 single_*，所以 AC 1.5 不适用，切换按钮也不该被收掉（OO 侧是真实可用的独立编辑通道）。真正待做的是 legacy composable 删除，归 Task 66（生成计划）/ Task 72（执行删除）。",
+      "status": "PARTIALLY_FIXED_AC_1_4_DONE",
+      "must_fix_before": "Task 72 的 Stage B 精确删除",
+      "owner_task": "Task 66 / Task 72",
+      "source_refs": [
+        "audit-platform/frontend/src/components/workpaper/sync/workpaperEntrySyncNotice.ts",
+        "audit-platform/frontend/src/components/workpaper/sync/GtEntrySyncCapabilityNotice.vue",
+        "backend/data/workpaper_sync_d_cycle_deletion_plan.json"
+      ]
+    }
+  ],
+  "cross_entry_isolation": {
+    "rule": "不得跨 entry 复用 contract / bundle / candidate / evidence / scenario（Property 70）",
+    "assertions": [
+      "本 slice 的 7 条 entry 与 E slice 的 xlsx/gt-e1-monetary-fund 无交集",
+      "D2 的 per-entry contract（d2.receivable_detail）只登记在 D2 名下，D1/D3~D7 的 per_entry_contract 字段不存在",
+      "D1/D3/D4/D5/D6/D7 在 workpaper_sync_contracts/ 下没有任何文件 —— 未交付 contract 的 entry 不伪造 contract",
+      "31 条 D4 parent_duplicate 不进 independent_entries，也不各自建 adapter/contract/evidence",
+      "7 条 entry 的 evidence.contract_test 都指向本 Task 46 的守卫文件，不引用任何 pilot 的 scenario 实体或 evidence id"
+    ]
+  },
+  "honest_adjudication_summary": {
+    "total_independent": 7,
+    "pilot_contract_published": 1,
+    "adjudicated_as_bidirectional": 0,
+    "adjudicated_as_single_onlyoffice": 0,
+    "adjudicated_as_single_html": 0,
+    "adjudicated_as_unreachable": 0,
+    "capability_verdict_pending": 7,
+    "html_counterpart_exists": 7,
+    "html_counterpart_none": 0,
+    "finalized_published_representations": 0,
+    "entries_left_unverifiable": 7,
+    "reason": "7 条 entry 逐条实测都有 HTML 对端（checklist_responses + JSON 行数组 + rowId 行身份），按 AC 12.8 一条都不能标 single_onlyoffice；OO 侧有真实业务价值且入口可达，故也不是 single_html / unreachable；AC 12.1 的六件前置未交付，故不得标 bidirectional。四个枚举值当下都不成立 ⇒ capability 记 null 并如实计入 unadjudicated=7。**这个 7 是把首轮的假 0 改回真值**，不是新增欠账。",
+    "slice_counters": {
+      "unadjudicated": 7,
+      "fake_bidirectional_claimed_verified": 0,
+      "bidirectional_unverified": 0,
+      "stale_evidence": 0,
+      "note": "unadjudicated=7 的含义是「本 slice 有 7 条 entry 的 capability 终态尚未确定」，缺什么已逐条落在 blocking_preconditions。首轮这里是 0，那个 0 建立在 7 条违反 AC 12.8 的裁决之上 —— 归零不是进度。fake_bidirectional_claimed_verified=0 的分母是真的：7 条 evidence.verification_state 全为 UNVERIFIABLE 且各带非空 unverifiable_reasons。"
+    }
+  },
+  "properties_verified": [
+    20,
+    21,
+    28,
+    69,
+    70
+  ],
+  "requirements_covered": [
+    "1.4",
+    "6.1",
+    "6.2",
+    "6.10",
+    "9.1",
+    "12.1",
+    "12.4",
+    "12.8",
+    "12.9",
+    "12.10",
+    "12.11",
+    "12.12",
+    "14.1"
+  ],
+  "paradigm_schema_conflict": {
+    "what": "范式 JSON 内部两处对 Task 46 的要求不一致：`definition_producer_paradigm.applies_to_tasks` **包含 46**，其 step 3 要求 slice 必须有 `html_counterpart_verdict` + `html_counterpart_source_refs`；而 `slice_schema.applies_to_tasks` 是 [48..57]、`slice_schema.effective_from_task_48.why_not_retroactive` 明写「D / E 两个 slice … 本次不追溯改写它们的字节」，把这两个字段推给 48 之后。",
+    "how_resolved_here": "按 `definition_producer_paradigm`（含 46）+ AP-1 的 known_debt_inventory（明确把 7 条 D 债务的 owner 写成「Task 46 D 循环回填」）执行：本 slice 现在满足 slice_schema.required_* 的全部字段，并额外满足 effective_from_task_48 的两个字段。",
+    "residual_inconsistency": "✅ 2026-08-31 已由范式 owner 收口（缺口编号 G1），本条不再是待办：① 本 slice 的 7 条 `capability: null` 待裁决态已被范式接纳为合法一等公民 —— `slice_schema.behavioral_rules` 的 **SR-3 改成蕴含式**「capability 落在 `capability_enum` 内 **或**（为 null 且 `required_pending_verdict_fields` 三字段按 `pending_verdict_field_semantics` 齐备）」，新增 SR-9 管住「待裁决条目数 == `slice_counters.unadjudicated`」；`capability_enum` 的四个值一个没动（AC 1.3 原文派生），未定态不是第五个枚举值，理由写在 `adjudication_criteria.capability_enum_note`。实测本 slice 经 `slice_schema.validator` 违规数 **0**（此前 7 条 SR-3），`test_slice_schema_validator_coverage.py` 的 `_UNJUDGED_SLICES` 登记随之删除。② 曾要求范式 owner 更新的那两句散文（`effective_from_task_48.why_not_retroactive` 的「本次不追溯改写它们的字节」、`why_e_slice_is_the_baseline` 的「字段集更薄／不追溯改写」）已各加 `*_amendment` 更正为历史陈述。③ 仍**未**变的一件事：`reference_instance` / `derived_from` 依旧指 E slice（不是遗漏 —— 反例参数化的宿主 getter 挂在它的具体结构上，且 SR-3 左支的正例只有终态已定的 E slice 能作证），本 slice 由 `test_every_scanned_slice_passes_the_schema` 与覆盖面守卫的参数化进入同一份校验器的分母。",
+    "e_slice_conflicts": "与 E slice 无字段级冲突：本 slice 是 E slice 字段集的超集（多 html_counterpart* / capability_verdict_stage / manifest_mirror / paradigm_schema_conflict）。唯一形态差异是 capability：E slice 填 'single_onlyoffice' 且 html_store 未解，本 slice 填 null 且 verdict='exists' —— E 的那条仍是 AP-1 债务清单里的第 8 条，owner 是「E 循环回填任务（待立项）」，本任务未改 E slice 字节。"
+  }
+}

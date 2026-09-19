@@ -1,0 +1,39 @@
+{
+  "entry_id": "xlsx/gt-d4-operating-revenue",
+  "mode": "apply",
+  "force": true,
+  "current": {
+    "representation_id": "2fd10551-5c9e-4973-810e-65eb0a897e5c",
+    "wp_id": "b3ab3c46-828f-4f48-950e-aee9bbdc923f",
+    "project_id": "0ec33ac9-3de5-4e65-b3bf-f9dccd7b2a49",
+    "bundle_sha256": "59bd162c95fa9fdd0d06abdfced72878810ecba918e6781c095678d1a35db6dc",
+    "generation": 14
+  },
+  "desired_bundle": {
+    "id": "4f42cd43-cba6-433c-8749-5fe653171230",
+    "sha256": "b29e1288e4b0c8e3f75bb972d4f9a65556f1b87d5252636cdb8cdafce1811026"
+  },
+  "store_bytes": {
+    "D4-2-rows": 2249,
+    "D4-3-rows": 1010,
+    "D4-5-policy-groups": 252,
+    "D4-21-rows": 2,
+    "D4-22-rows": 2,
+    "D4-23-rows": 2,
+    "D4-24-rows": 2,
+    "D4-25-rows": 2,
+    "D4-26-rows": 2,
+    "D4-27-rows": 2,
+    "D4-28-rows": 2,
+    "D4-5-biz-scene": 0,
+    "D4-5-biz-order": 0,
+    "D4-5-biz-produce": 0,
+    "D4-5-biz-sales": 0,
+    "D4-5-biz-pricing": 0,
+    "D4-5-biz-delivery": 0
+  },
+  "status": "rematerialized",
+  "new_representation_id": "480d470b-cbbe-44b2-bfd9-32918d444b4b",
+  "new_generation": 15,
+  "new_revision": 39
+}

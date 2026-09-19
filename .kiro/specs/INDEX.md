@@ -1,399 +1,621 @@
 # 致同审计作业平台 — Spec 开发索引
 
-**最后更新**：2026-06-01  
-**当前分支**：`main`（HEAD = 85b362d5）  
-**技术栈**：FastAPI + PostgreSQL + Redis / Vue 3 + Element Plus + Univer  
-**目标规模**：6000 并发用户
+**最后更新**：2026-09-14
+**当前分支**：`work/2026-09-14-d4-dual-mode-p0-fixes`
+**统计**：Active **17**（2026-09-13 逐目录实扫 `.kiro/specs/*/` 且**带 tasks.md** 口径；目录数 20，其中 3 个为空壳：`audit-evidence-attachment-preview-format-expansion` / `procedure-delegation-visibility-isolation` / `visibility-isolation-go-live-hardening`） / Archived **566**（`_archive/*/*` 实扫）
+> **2026-09-14 完成待归档｜`tb-writeback-explicit-publish-gate`（21/21 全绿，含 2 个 `*` 外部依赖任务已做实降级）**：把 `d4-dual-mode-formula-governance` R4.2 在 D4-1 确立的「审定数回写试算表须显式确认 + 幂等 + 权限」范式，按方案 B 逐组件推广到 **D~N 全 11 个循环**。census 只读盘点先行把早期「100 文件」高估修正为 **48 活路径 + 40 死代码 + 2 产品决策**，避免盲目工作量。交付：①M0 端点扩展 `publish-to-tb` 支持 `writeback_rows` 预算行与 occurrence 发生额形态，向后兼容 D4-1 三分量路径；②D/F/L/M/N/K/H/G/I/E1/J1 全部改走显式发布门，各配 gate 测试（确认→post 命中／取消→无副作用／只读→无请求／不调旧端点／仍 emit `substantive:adjudicated`）；③消除全部隐式自动回写（N1 debounce watcher、M watcher、H3 1.5s debounce、H10 mount/跨wp 三处自动写、E1 flushSave+watch、G7 保存即写、I2 onAfterSave）；④Task 17 三批死代码清理（J2 孤儿链、createChecklistFormData 工厂、D4 残留监听器、G6 变体端点、H8 断链、各 FormData duplicate）；⑤Task 19 **删除旧端点** `trial_balance.py::PUT /writeback` + `TBWritebackBody`（三面零调用方实证：前端零、后端仅 S 类独立 service 正交、测试零）。**过程中根因修复 5 个真 bug**：G7 return 残留已删符号的孤儿 export（模块加载即 ReferenceError）· G5 `isReadonly` 对 Ref 恒真（发布门永久失效）· H9 ComputedRef 未解包（科目码传成对象）· consolidation 式 K5 假回写提示 · Task 18 收口 grep 抓出 `useH7FormData` 遗漏的活直调死代码。**口径实证纠偏**：H7(1621) 被设计阶段按循环名猜成 occurrence，运行时实证是余额类 **balance**；假回写清单从 K5/K7 扩到 **H6(1606)/H10(6115)/I2** 三处（I2 的 per-wp 端点后端**根本无路由**，catch 吞 404 = 运行时 no-op）。**验证**：各循环 gate 测试合计数百用例全绿；Task 20* 新增 `test_publish_to_tb_synthetic_e2e_chain.py` 用隔离合成项目（year=2098）在**真实 PG 进程内**跑通「端点→WORKPAPER_SAVED→handler→trial_balance 落库」12 passed（非 mock，测后 purge 0 残留），覆盖 balance 单/多科目 + occurrence + 幂等不双写 + 普通保存 no-op；Task 21* **真实 Playwright UI 全链路**（隔离 E2E 项目 D4-1）5 验证点全绿含真 PG 断言。**两道 CI 守卫**（均接入 `governance-checks.yml` 同 job，自测合计 43）：`check_tb_writeback_no_direct_call.py` 断言前端零旧端点/变体端点活调用（先剥注释再匹配调用点，收口注释与测试断言不误报）；`check_tb_publish_confirm_gate.py`（**第二轮复盘补的缺口**）断言 publish-to-tb 必经确认门（直接门 46／同循环 Adjudication 间接门 29，只认文件名含 Adjudication 的 confirm 以防误配 AI/OCR 确认）+ 禁 watch/watchEffect/onMounted/setTimeout/setInterval 回调体内发布。**铁律已沉淀进 `#conventions`**（TB 回写铁律章：唯一合法路径 + 四条硬约束 + 两守卫 + 新增组件自检清单）。design.md 末尾有 append-only 「实施回填与复盘」章（6 条修正/补强，凡与上文冲突以该章为准），requirements.md 末尾有第二轮复盘补充验收标准 9.4。**头号方法教训**：`getDiagnostics 0 + ESLint 0` 不足以证明运行时正确 —— G7/G5 两个致命 bug 纯静态检查全绿，只有 `@vue/test-utils` mount 真实点击才暴露。
+>
+
+> **2026-09-14 新建+完成｜`multi-sheet-materialize-defined-name-shift-normalization`（bugfix，10/10 核心 + live e2e 通过）**：修多 sheet materialize 的「保留缺口」——一次 materialize 多趟叠写多张受管 sheet，只保留主 binding 的位移声明，sibling（真实场景 D4-22/D4-23）各趟对 ① workbook.xml own-sheet defined-name（`GT_FOOTER_ANCHOR_D42x`/`_xlnm.Print_Area`）② 自身 worksheet part（`managed_sheet_unmanaged_cells`/`_structure`）的合法插行位移声明被丢，verify 逐字节判 `adapter_unmanaged_region_drift`。**根因单点**=`adapters/excel.py::materialize` 的 `dataclasses.replace(primary_result,…)` 只带主 binding 的 `row_shift`/`workbook_row_change`，而**主 binding 不一定是插行的 sheet**（真实 D4-2 未插、D4-22/D4-23 插）。修复:①新增只读聚合 `MaterializeWorkbookChangeSet`+`merge_workbook_row_change_propagations`（并集去重+冲突检测）把全趟 workbook.xml 位移声明喂 verify;②`MaterializeResult.per_table_shift`（table_key→(row_shift,total_formula_rows)）+ verify 按 `region.table_key` 分派各表自己的 shift。verify/`unmanaged_region_digest`/`normalise_propagated_part` 只读 `.propagations` 故鸭子兼容,无需改。真实 PG+gen-26+`d4-29-managed`（151 行,D4-22/D4-23 各 12 orphan）**materialize 200 replayed=False**;live 守卫 `tests/test_multi_sheet_materialize_e2e_live.py`（三修复任一回退即红）。焦点回归 272 passed,失败全 pre-existing。不砍任何校验（归一化用写盘前冻结声明非 after 观测,篡改仍判漂移）。**同时修复其前置** `oo-html-writeback-performance` 的 sibling footer 扩张 bug（`_plan_row_shift` 按 `region.table_key` 的 sheet_key 取 `GT_FOOTER_ROW_{TID}` 而非裸主键;守卫加在 `test_d4_dual_sheet_managed_tables.py` 4 测试）。
+>
+> **2026-09-13 新建｜`d4-1-adjudication-bidirectional-writeback-and-formula-io`（D4-1 营业收入审定表，0/13）**：D4 循环**枢纽底稿**三块能力同步闭合。现状经逐文件核实（非推断）：①**双向回写断裂**——`GtD4OperatingRevenue.vue` L259-263 的 `D4_SHEET_KEY_BY_CODE` 只含 `D4-2/D4-3/D4-6/D4-7`，D4-1 走 legacy `GtOnlyOfficeSheet` 但**OO→HTML 镜像写回通道只 D4-2 canary 接了** `useWorkpaperSyncBridge.flushHtml → readStoreProjection`（L517-540），D4-1 在 OO 里改数后**从未同步**回 `checklist_responses`；HTML 侧 `publishAdjudicated()` 只发 `d4:writeback-trial-balance` 事件是**单向**写。②**公式从未求值**——`prefill_formula_mapping.json` 里 `营业收入审定表D4-1` 块已登记 10 条公式（`TB_SUM`/`ADJ`/`PREV`/`WP` 四类，`test_d4_formula_presets.py` Req 7.1/7.3/7.7/7.8 五类守卫全绿），但**运行时从未求值**：前端 `useD4Adjudication.ts` 的 `currentAudited`/`priorAudited`/小计/合计/变动率全靠内联 `calcAuditedAmount(currentUnadjusted, aje, rje)` + `calcSubtotal(...)`；下游（K9 等）用 `WP('D4','营业收入审定表D4-1','审定数')` 引用能画出依赖图但**取不到值**。③**TB 核对行恒 0 = 假红基线**——前端 `trialBalanceRow` 读 `D4-1-adj-tb-6001`/`D4-1-adj-tb-6051` 两个 item_id，**这两个键在生产代码里从未被写入**（`publishAdjudicated` 不回写 TB 核对数，`seedFromPrefill` 只写 `D4-1-rows` + per-field 金额）⇒ `trialBalanceRow.total` 恒 0 ⇒ `differenceRow = 审定合计 - 0 = 审定合计` ⇒ 恒触发「差异 N 元」红色横幅；后端 `build_d4_tb_values` 早已算好 TB 值（`{"tb_revenue_total": ...}`）但前端不消费。④**导入导出旧键错位**——`_d4_import_export.py` L533/L939 `item_id = "D4-1-adj-rows"`（旧 JSON 行模型），前端已切到 `dynamicAdjudicationRows` 新模型（`D4_ADJ_ROWS_SPEC.prefix='D4-1'`，`rowsItemId`= `D4-1-rows` + per-field 键）⇒ 导入落旧键，前端 `initRows()` 读新键 miss → 走 `migrateLegacyD4Rows()` 迁移，但**迁移路径的 `LegacyRow` interface 里没有 `accountCode` 字段** ⇒ 其他业务收入段数据静默丢失（`isOtherRevenueCode('') = false` 全部归主营段）。三块能力：①双向回写 = 复用 `useWorkpaperSyncBridge`（`D4_SHEET_KEY_BY_CODE` 加 `'D4-1': 'd41-managed'` 一行即可，不新建 canary entry，DEC-1）②公式管理 = `prefill_formula_mapping.json` 补全 9 类 cell_ref + 前端新增 `useD4FormulaEngine.evaluateD41Cell` 作为**表间取数与表内计算的单一真源**（复用 `prefill_formula_mapping` 单一真源 + `workpaper_field_overrides` 做 cell_ref 粒度 override，DEC-2/DEC-3）③导入导出 = 删 `D4-1-adj-rows` 特判 + `_SHEET_HEADERS` 加 `科目码` 列 + `_parse_d4_1_row` 输出新 `DynamicAdjRow` 结构 + per-field 键（DEC-5）④TB 核对行修复 = `trialBalanceRow` 消费 `htmlData.tb_values` + 后端 `build_d4_tb_values` 扩展返回三键（DEC-4）。**边界（用户点名参照 D2-2 双向回写，此处明确）**：D2 的「底稿→附注 `sync-from-workpaper` 推送」链路**不复制**——D4-1 无独立附注章节、`note_workpaper_sync_registry.json` 零命中（收入披露由 `D4TabDisclosureListed/Soe.vue` 覆盖），强行造 payload 会自造披露内容；仅借鉴其「写侧/读侧分离、反向校对绝不反写、POST 成功才 markSynced、fail-open 不得掩盖接线错误」四条门控纪律并写进守卫（Property 6/7）。**5 Requirement / 42 AC / 9 Property / 13 Task / 6 Wave**，DEC-1~5 已裁决（DEC-1 复用 `xlsx/gt-d4-operating-revenue` entry 不新建；DEC-2 前端求值 + 后端 preset 双通道；DEC-3 复用 V076 `workpaper_field_overrides` 无新迁移；DEC-4 TB 核对行只读回显不写库；DEC-5 导入导出对齐新键删旧键特判）。🔴 **前置阻塞**：Task 1 需先确认 `xlsx/gt-d4-operating-revenue` entry manifest 已挂 `d41-managed` sheet key；若未挂 Wave 4 Task 7 标 `[-]`，其余 Wave 2/3 后端/公式工作可继续。🔴 本 spec 目录当前为 git `??` 未跟踪，Task 13.4 收口前必入库（蒸发风险同 browserless）。
+>
+> **2026-09-13 新建｜`d4-cutoff-return-writeback-formula-io`（D4-17/18/19/20，0/8）**：与姊妹 spec `d4-inspection-writeback-formula-io`（D4-13/14/15/16，0/8）平行的第二批检查类底稿治理。现状经逐文件核实（非推断）：**后端 `_SHEET_HEADERS`/`_SUPPORTED_SHEETS` 已登记 D4-17~20 列头，但 import/export 分发对这四张表全部落到 generic 兜底**（`_parse_generic_row` + `[data_row.get(h) for h in headers]`），与前端英文 key / 嵌套子表结构彼此读不通 ⇒ 「有按钮实则断裂」的死链路（同 D4-15/16 修复前形态）。**D4-20 四重断裂**：① 子表键错位——组件存 `D4-20-current-returns`/`-post-returns`（带 `-returns` 后缀），后端 sheet 键是 `D4-20-current`/`D4-20-post`，兜底 item_id 变 `D4-20-current-rows` ⇒ 导入落库前端读不到；② `D4-20-provision` 键虽一致但无专用 parser；③ 主 sheet `D4-20`（16 列）在组件无对应存储（6 区多子表，无 `D4-20-rows`）⇒ 死配置；④ 文本/结构化子区无通道。三块能力：导入导出修复（专用 parser/export + item_id 修正 + 死配置清理）· 双向回写（复用姊妹 spec 已产出的 `useD4InspectionWriteback` → `a13:push-misstatement` + `D4-1-adj-note`）· 公式管理统一（替换组件内联 `checkCutoff`/`calcRate`/`calcProvision`/`calcSummaryRates` 为 `useD4FormulaEngine` 既有纯函数调用——`isCrossPeriod`/`calcCrossPeriodDays` **已在库内却从未被消费**，属接线而非新增逻辑）。**边界（用户点名参照 D2-2 双向回写，此处明确）**：D2 的「底稿→附注 `sync-from-workpaper` 推送」链路**不复制**——四表是检查类、`note_workpaper_sync_registry.json` 零命中、无独立附注章节（收入披露 五、62/八、64 已由 `D4TabDisclosureListed/Soe.vue` 覆盖），强行造 payload 会自造披露内容；仅借鉴其「写侧/读侧分离、反向校对绝不反写、POST 成功才 markSynced、fail-open 不得掩盖接线错误」四条门控纪律并写进守卫。**5 Requirement / 42 AC / 9 Property / 8 Task / 5 Wave**，三件套机器校验全绿（Property 序号全整数、Validates 9 处全 `X.Y` 零 BAD、waves JSON 可解析、8 任务 AC 引用齐全）；DEC-1~5 已裁决（DEC-1 主 sheet `D4-20` 死配置**删除**而非报错短路；DEC-2 item_id 错位**改后端映射不改前端键**——前端键已被 6 处引用、后端两键当前零消费者）。🔴 本 spec 目录当前为 git `??` 未跟踪，蒸发风险同 browserless。
+>
+
+> **🔴 2026-09-12 实扫两条与本表不一致的事实（报数请以此为准）**：
+> ① **`browserless-headless-integration` 已彻底蒸发** —— 磁盘无该目录，且 `git log --all` / `git ls-files` 对该路径**零记录**。它此前登记为 0/25、目录状态自述「仍为 git `??`」⇒ 12 Req / 145 AC / 27 Property / 25 Task 的三件套连同两轮镜像实测结论**全部丢失，无法从 git 恢复**。本表下方它那行保留作史实与教训，不代表目录还在。这是「spec 目录未入库 ⇒ 丢工作树即蒸发」的第一个实证案例。
+> ② **本表未收录 4 个真实在办 spec**（实扫存在且带 tasks.md）：`excel-structural-row-insertion-and-shift-aware-verification` / `excel-template-override-layer-and-onlyoffice-template-editor` / `excel-workbook-wide-row-change-propagation` / `workpaper-sync-materialize-large-table-performance`；同时本表仍列着 4 条已物理归档的（`platform-architecture-convergence` / `advanced-query-hardening-wiring-closure` / `dsh-agent-panel-integration` / `audit-evidence-…`）。⇒ **报 Active 数必须现扫目录，不能读本表行数。**
+>
+> **未入库（`git ls-files` 为空）的 spec 目录**（2026-09-12 实扫，蒸发风险同 browserless）：`custom-workpaper-template-ingestion-and-sync-closure`（15/19）· `workpaper-page-formula-toolbar-closure`（15/15，且是本日新建 `formula-row-name-alignment-confirmation` 的 F-SHELL 红基线依赖对象）· `workpaper-sync-materialize-large-table-performance` · `audit-evidence-…` 空壳。本日新建的 3 个 spec 已随本次改动一并入库。
+
+> **2026-09-09 归档｜附件预览格式扩展最终收口**：`audit-evidence-attachment-preview-format-expansion` **20/20** 已归档至 `_archive/05-business-features/`。Route B（fflate / postal-mime / msgreader / dxf-parser）+ Worker 按需 chunk，单一逻辑宿主 `AttachmentPreviewCore` + 弹窗/抽屉薄壳。Archive 完成 ZIP 单条 ratio、受限 PAX/GNU、sparse fail-closed、GZIP CRC/ISIZE/尾随数据与普通 `.gz`/`.tgz` 分流；DXF 全实体预扫 + 10 秒真 deadline；Email CID URL 统一归宿主 scope。最终守卫前端 **180/180**、后端 **23/23**、变异 **47/47 RED**（16/16 守卫文件命中、全部恢复）、Playwright **2 passed / 0 skipped / 0 flaky**。artifact manifest **55 条**均存在；xlsx / attachment-hub 两项 debt 继续 `in_scope=false`，dual-host debt 已 `resolved=true`。CI：`apfe-attachment-preview-frontend-guards` / `apfe-attachment-preview-backend-guards`。
+
+> **2026-09-08 归档**：`advanced-query-hardening-wiring-closure` 三件套复核通过后归档至 `_archive/05-business-features/`。实扫 tasks.md（行首锚定 `^\s*-\s\[([ x~-])\]\s+\d+`）为 **64/83**：64 条实际子任务（含全部 `*` 测试/验证任务、Checkpoint 17、真库+Playwright 实测 18、变异检验+收口 19）全绿；剩 19 个 `[ ]` 均为无小数编号的顶层分组标题，按该 spec Notes 约定「顶层任务与 Checkpoint 不纳入依赖图」不计入验收。产物工作树 + HEAD 双查：`backend/app/services/custom_query/*`（execution_guard / pagination / business_fetchers / builder_scope 等）+ 前端 `useQueryBuilderAccess.ts` / `queryFieldTiers.ts` + baseline JSON + 幂等脚本均已跟踪，`git status --porcelain` 对全部产物路径及 spec 目录返回空，无游离改动。此前 INDEX 记的「62/64」「64/83 在办」两条判定就此收口。
+
+> **2026-09-08 归档**：`dsh-agent-panel-integration` 假绿核验通过后归档至 `_archive/04-infra-architecture/`（与 `doc-level-ai-chat` 同族）。tasks.md 实扫 **35/35** 全绿。归档前对 CLOSURE §8 记的 3 条 Playwright failed 逐条查生产代码定性：**A · AC 1.7「面板打开焦点进输入区」= 唯一真假绿/真缺陷** —— `PlatformAiChatPanel.vue` 里 `focus`/`autofocus`/`activeElement` 生产代码零命中，面板打开从不聚焦输入区，Property 37（挂 Task 11）只测 focus trap 漏了初始焦点，故任务标 [x] 却浏览器恒红；已修（visible watch 可见且 hostAvailable 时 nextTick 聚焦 textarea + fail-safe）并补 2 条 jsdom 可复现守卫，变异两态干净 RED（移除 focus 调用 / 移除门控各打红对应守卫），commit `3c450703`。**B · AC 3.4 / C · AC 4.10 = 非假绿**：B 生产代码正确（ChatReviewModeBar 始终渲染 + global_knowledge 宿主输出中文 disabledReason），`PhaseBGateGuards` P23 已严格覆盖含变异锚点 FE-P23-D；C 前端信任后端 history 顺序不重排、排序由后端 Property 10 保证；两条 e2e failed 均系后端不可用致环境依赖，非生产缺陷，据此更正 CLOSURE §8 对 B 的「守卫层级不够」定性。**26 条零 Property 覆盖**（CLOSURE §10）经实扫属实但多数是「未挂 Property 号」而非「行为坏的假绿」（如 AC 1.1 有 iframe 静态守卫），与 CLOSURE §10 自评「分布问题不是密度问题」一致，非归档阻断项；AC 12.3（无 egress）为运行时真空但 DSH feature flag 关闭 / Phase C 零生产流量、实际风险为零。原 35 任务产物已于 commit `55c5e0fe` + `ad1b241c` 入库，本次收口补丁（focus 修复 + 2 守卫 + tasks.md 收口记录）commit `3c450703`。归档核验在分支 `work/2026-09-08-pac-review-followups` 进行，工作树混入并发会话在途改动（后端 38 + 前端 DshPanel/guidancePanelStore 的 guidance context 新功能），按「同一文件禁与并发会话并行编辑」仅提交本 spec 明确产物；`WorkpaperEditor.vue` 守卫在工作树红系并发会话删了 AI 接线所致，HEAD 交付基线 `55c5e0fe` 版含接线该条绿。
+>
+> **2026-08-24 当前实扫**：
+> `workpaper-html-onlyoffice-bidirectional-writeback-closure` **70/77**（2026-09-03 实扫；Task 74 / 75 / 76 三处假绿更正后 -3）。
+> `published-representation-production-path-and-lane-adjudication` **0/28**（2026-09-03 新建，design 优先；下详）。
+> 双向回写 spec 当前生成事实为 185 个物理宿主/276 个挂载点/186 个 entry；2026-08-24 独立协议语义复审进行中；当前修订采用单次 business commit、content/representation 分层、immutable authority model + definition bundle、`template → instrumentation → contract → bundle → representation` 发布链、non-current upgrade candidate、frozen forcesave/recovery request、server/client 双基线、room 级多人 callback 与 close-intent singleton、authorization-before-resource/cache、incoming sequence fence及逐 scenario evidence。严格校验现为 **14 Req / 170 AC / 72 Property / 72 Task / 8 Wave**，AC task coverage **170/170**、Property 实现+独立验证双覆盖 **72/72**、DAG 无环；进度 **70/77**（2026-09-03 实扫复选框；Tasks 74 / 75 / 76 均由 [x] 退回 [-]，见各自正文实测）。
+>
+> **2026-09-02 入库与修复（分支 `work/2026-09-02-workpaper-sync-closure`，3 个 commit 已推）**：
+> ① 该 spec 的 Task 1~77 全量产物此前一直未提交（235 项 `??` + 99 项 `M` 摞在别人分支的工作树上），已入库 854 个文件；② 修掉「仓库级普查冻进逐字节锁」这一类判据缺陷（同型 5 处：BP-71-8 全树 test 计数 / BP-72-8 `backend/data` 入向普查 / BP-74-1 引用派生辐射面 / Task 71 的传递 / 新发现的 `artifact_git_status`），新增共享模块 `backend/scripts/_census_lock.py`，普查量剔除但**仍现算并断言语义性质**，`report_digest` 改在剔除后内容上算；③ 补掉 5 条 GREEN 变异暴露的守卫洞（等价变异：判据只在合规数据上跑），改成「纯函数 + 合成不合规输入 + 注入口」，5 条全转 RED；④ 修 pre-commit 的假红（残缺 venv 抢 PATH 让行数门从未运行却报超限）。
+>
+>
+> **2026-09-03 BP-61-1 解除（Task 61 的绑定约束，用户明确授权「只限测试夹具项目」）**：
+> Task 61 的三臂反事实此前把绑定约束钉在 **BP-61-1**「published representation 供给平台级为 0」（`working_paper_sync_entry_state` / `working_paper_content_version` / `working_paper_content_representation` 三表实测 `0 / 0 / 0`，186 个 planned entry 一个都注册不上）。本轮把它**真解除**了：三表现为 `1 / 1 / 1`，`working_paper_artifact` 19→20。
+> 环的出口是 **opaque/custom lane**：`ContentMutationService.commit()` 走 `_stage_authoritative` 时不 materialize、不反读、**不需要 adapter**，权威 OOXML 字节本身即内容；生产侧装配面早已存在（`writer_migration.AuthoritativeContentWriter.commit_bytes(lane_id=...)`，lane 真源 `opaque_entry_gate.OPAQUE_AUTHORITY_LANES`）。故**未新增一行生产代码**，只加了宿主脚本 `backend/scripts/fix/fix_task61_bootstrap_first_published_representation.py`（`--check` / `--apply`，已引导时 no-op 幂等）。
+> 写入面**恰好**是登记的那些：canonical artifact 行 + content_version + representation + entry pointer + outbox 一行，加夹具底稿自己的 `content_revision`（0→1）与 `current_content_version_id`。40 个真实客户项目**零改动**（`non_fixture_business_rows: []`）。
+> 夹具门做成**不可绕过的纯函数** `fixture_violations`（`client_name=测试客户` 且 `status=created` 且项目底稿数 ≤5 且目标 `content_revision=0`，四条任一不满足即 `FixtureGuardError`，无 `--force`）；权威字节走「approved 契约 → definition blob → 运行时权威模板库」三段 digest 逐段对齐，不 glob 不猜。守卫 `backend/tests/workpaper_sync/test_task61_first_published_representation_bootstrap.py` **31 passed**，变异 `backend/scripts/diagnose/mutate_task61_bootstrap_guards.py` **11/11 全 RED**，台账 `evidence/task61-oo94-word-pilot-gate/first_published_representation_bootstrap.json`（14 条判据全 True、单事务单 commit）。
+> 🔴 **Task 61 仍是 `[-]`**：BP-61-1 是链条第一环，解除后压在后面的仍有 **BP-61-2**（F2 缺 `document_type=docx` 的 manifest 挂载点，属 Task 60 的 descriptor 段）与 **BP-61-3**（`adapters/word.py` 无构造点，建了即死代码），gate 重跑仍 `{failed:60, passed:11, unverifiable:4}`、`entries_verified=[]`、Tasks 62–64 保持阻塞。**每个 manifest entry 需要自己的 published representation**，本轮产出的是 opaque writer scope 的 `opaque-{wp_id}`，不是那 186 条中的任何一条 —— 这条区分务必别记糊。
+> 🔴 **一条通用教训（变异 harness 自身的假绿）**：变异脚本首版把「还原」放在单条变异的 `try/finally` 里，而 `ANCHOR-MISS` 分支 `continue` 跳过了还原 ⇒ 上一轮的变异被留在盘上，下一轮把「已被变异的文件」当 pristine 快照，于是每轮「还原」都把变异写回，级联出一串 GREEN/ANCHOR-MISS 假结论（实测连中两轮，且每轮 GREEN 的条目还不一样，看着像环境抖动）。修法两条：①pristine 快照统一在起手拍、`finally` 里无条件全量写回；②**起手基线门** —— 变异前先跑一遍基线，红了就报 `HARNESS-DIRTY-TREE` 拒绝拍快照。另有一条：判 GREEN 前必须读回确认变异真的落盘，否则把 harness 自己的写失败记成「守卫有洞」。
+> **剩余 7 个任务为 `[-]`（2026-09-03 复核：Task 74 / 75 / 76 三处因**自述验收判据未兑现**由 `[x]` 退回 `[-]`，故不是 4 个），阻塞均有实测依据**：`61`（真实 OO 9.4 F2 Word gate）、`63`（9 个 B 子码错型 + S33-REV）、`71`（容量 6000 会话真实负载：3030 未监听 / 无 OO 活动编辑会话 / evidence 五表 0 行）、`72`（Stage A 红：0/3290 required scenario 未真跑、`multi_resolver`=4、Task 66 rollback 隔离门 blocked）。
+>
+> **2026-09-02 关键路径进展**：定位并绕开了 wp_code **幻影码**缺陷 —— manifest 的 `_source_match()` 用正则从宿主 Vue 文件名 CamelCase 抽码，末尾可选字母吞掉下一个词首字母，产出 `D2A`/`G7L`/`H1F`（`wp_index` 里 **0 命中**），导致 Task 76 provisioner 对四份契约全部 unresolved 且给出的原因是错的（宿主底稿其实很多）。**未改那条正则**（一改三个 G7 宿主的码同时收敛到 `G7`，撞 RG-3 `MatcherOverlapError`，需先把 matcher 从「按 wp_code 路由」改成「按 entry 路由」）；改为新增显式裁决 `backend/data/workpaper_sync_entry_wp_code_adjudication.json`（真源 = 契约里冻结的 `template.relative_path` + 受管 `excel_name`），provisioner 改读裁决并 fail-closed。结果：宿主解析从 0/4 变 **3/4**（b60→`B60-1`、d2→`D2-2`、h1→`H1`；g7 按登记原因诚实 unresolved），definition 供给从 **4 契约/1 供给** 变 **4 契约/3 供给**（bundle 3→5、definition artifact 6→14，全 `approved` 且三槽真 definition，业务行一行未改）。
+> **首个 published representation（该段写于 2026-09-02，已于 2026-09-03 被上文 BP-61-1 段落取代）**：当时为 0，根因是**数据库外键层面的循环依赖** —— candidate 的 `content_version_id`/`source_representation_id` 都是 NOT NULL 外键指向 0 行的表，故 `finalizeCandidate` 结构上只能给既有 representation 加 generation；唯一首版生产者 `ContentMutationService.commit()` 又要求 adapter（要 representation）或合法 substrate（`canonical/published` 同为循环，或 `incoming/durable` = **一次真实 OO 往返**）。⇒ Task 70 的 0/3290 是这个环的**上游入口**，不是下游。🔴 2026-09-03 更正：环已被 opaque/custom lane 打开（不需要 adapter、也不需要真实 OO 往返，`_stage_authoritative` 只要权威字节），三表已 `1/1/1`；「必须一次真实 OO 往返」这个判断是错的。另：`fake_bidirectional`=141 读的是 manifest 的 `migration_state`，与 representation 行数无关，产出首版**不会**让它变 140。
+> V153 已应用（`working_paper_representation_candidate_event` 13 列在位）。不得把 spec 修订或 definition 供给当作生产验证。
+> **Active 数一律以目录实扫为准，禁按增量推算**（本文件 §四「凭印象禁令」）。
+
+> **2026-08-15 实扫结果（9 个目录逐一，供下一轮比对）**：
+> ~~`e-cycle-…completion` **24/24**~~（**本日第二个归档** → `_archive/08-disclosure-notes/`） ·
+> `i-cycle-…closure` **23/24**（`[ ]`1） ·
+> `k-cycle-…closure` **19/25**（`[ ]`6） · `l-cycle-…completion` 3/26 ·
+> ~~`procedure-trim-report-line-account-resolution` 16/16~~（**本日第三个归档** → `_archive/05-business-features/`） ·
+> `workpaper-import-export-lifecycle-closure` 24/25（`[-]`1） ·
+> ~~`x3-adjustment-entry-import-export` 33/53~~（**2026-08-16 归档，见上**） ·
+> ~~`g7-column-alignment-and-extraction-closure` 24/24~~（**本轮已归档** → `_archive/08-disclosure-notes/`）
+>
+> 🔴 **2026-08-15 实扫又打翻两处旧记载**：①上一轮表头写「8 个目录全部带 tasks.md、无空壳」
+> **不成立** —— `procedure-delegation-visibility-isolation` 与 `visibility-isolation-go-live-hardening`
+> 两个空壳目录**又出现在 `.kiro/specs/` 下且 git 里是 `??` 未跟踪**（2026-08-12 曾记它们
+> 「早在 2026-08-05 清理入归档区」）。故 Active 的准确表述必须区分「目录数 9」与
+> 「带 tasks.md 的 spec 数 7」。②下表三行进度数严重过时：`i-cycle` 表内 9/25 而实扫 **23/24**、
+> `k-cycle` 表内 5/25 而实扫 **19/25**、`x3` 表内无行而实扫 **33/53**。
+> 均属并发会话在办，**未擅自改其详情行**以免与正在写的内容打架，只在此处如实登记实扫值。
+> ~~`e-cycle-…completion` 已 **24/24** 全完成，可评估归档（属并发会话，留给其推进方裁决）。~~
+> **已于同日（2026-08-15）复盘后归档** —— 复盘按十二维实证而非只看复选框：产物 47 路径
+> untracked **0**（主交付 commit `2ee7929e`）· CI 7 个 E job 的 **37/37** 文件引用 exists+tracked
+> · 后端 312 passed / 前端 294 passed · 变异**锚点 29/29 OK 0 MISS**（体系未漂移可复现）·
+> 3 个幂等 `--check` 全 0 欠账 · 11 Req / **83 AC 零悬挂** · 41 Property 全被 tasks 引用 ·
+> design 提到的 16 个符号全在生产代码可定位 · 三件套机器校验零诊断。
+> 工作树当时的 4 个 dirty 文件（`governance-checks.yml` / `E1TabDisclosure.vue` /
+> `note_template_soe.json` / `_note_structure_kit.py`）经 diff **逐一归因为并发 K 循环在途**
+> （`carry_row_codes()` / `rowScopeFailure` 共享件 / K job step），非 E 遗留 ⇒ 未随本次归档提交。
+> 🔴 **2026-08-12 实扫修正了表头三处过时记载**：①Active 写 6 而真实是 7；②「另有 3 个无 tasks.md 的空壳目录」已不成立 —— 其中两个（`procedure-delegation-visibility-isolation` / `visibility-isolation-go-live-hardening`）早在 2026-08-05 清理入归档区，而 `workpaper-import-export-lifecycle-closure` **有 tasks.md 且进度 3/25**，把它记成空壳会让一个在办 spec 从索引上消失；③Archived 549 → 550（本轮归档 `procedure-trimming-and-delegation-intelligence`）。再次印证本文件 §四 的「凭印象禁令」：完成度与数量一律实扫，别信上一轮写下的数。
+**最高迁移**：**V150**（磁盘 `backend/migrations/V*.sql` 于 2026-08-24 实扫；V147~V150 为 AI chat/地址坐标相关迁移。新迁移实施前仍须再次实扫，`R1xx__` 是配对回滚脚本非同号冲突）
+**技术栈**：FastAPI + PostgreSQL + Redis / Vue 3 + Element Plus + Univer
 
 ---
 
-## 一、平台已实现功能全景
+## 〇、如何使用本索引
 
-按审计业务流程排列，标注对应 spec 来源。
+每个 spec 是一个目录，包含三件套文档：
 
-### 1.1 项目管理与基础设施
+| 文件 | 用途 | 何时读 |
+|------|------|--------|
+| `requirements.md` | 需求（用户故事 + 验收准则） | "要解决什么问题" |
+| `design.md` | 设计（架构、数据模型、接口） | "怎么实现的" |
+| `tasks.md` | 任务清单（`[x]`=完成 / `[ ]`=未做 / `[ ]*`=可选） | "做到哪了" |
 
-| 功能 | 说明 | 来源 spec |
-|------|------|-----------|
-| 项目向导 | 创建项目 → 配置 → 派单 → 启动 | phase0/phase1a |
-| 角色体系 | 6 角色（auditor/manager/qc/partner/eqcr/admin）+ 动态导航 + 权限矩阵 | role-based-view-switching / R5 |
-| 人员档案 | StaffMember + ProjectAssignment + 工时追踪 | phase1a / R4 |
-| 通知中心 | SSE 推送 + 轮询 + 分类 Tab + 免打扰 | R7 / R9 |
-| 编辑锁 | 乐观锁 + heartbeat + 强制接管 | R4 / R7 |
-| 审计日志 | 哈希链 + 事件溯源 + DLQ | phase14 / R3 |
-
-### 1.2 账表数据（四表体系）
-
-| 功能 | 说明 | 来源 spec |
-|------|------|-----------|
-| 智能导入 v2 | 9 家企业验证 / 自动识别表类型 / 7 适配器 / GBK+UTF-8 | ledger-import-unification |
-| B' 视图重构 | activate <1s（metadata 切换替代 200 万行 UPDATE） | ledger-import-view-refactor |
-| 四表联查 | 余额表 / 序时账 / 辅助余额 / 辅助明细 + 全屏 + 右键穿透 | phase1a / R9 |
-| 科目映射 | 自动匹配 + 手动调整 + 跨项目复用 fingerprint | e2e-business-flow |
-| 数据管理 | 软删除回收站 / 增量追加 / 跨年度并存 | ledger-import-view-refactor S7 |
-| 上传安全 | MIME 校验 / zip bomb 检测 / 宏拦截 / 规模预警 | ledger-import-view-refactor S7 |
-
-### 1.3 试算平衡表
-
-| 功能 | 说明 | 来源 spec |
-|------|------|-----------|
-| 自动生成 | 从 tb_balance 聚合 + 父级汇总行补齐 | phase1a / e2e-business-flow |
-| 科目标准库 | CAS 166 标准科目 + 国企/上市版映射 | phase1a |
-| 公式引擎 | TB()/SUM_TB()/ROW() 三类公式 + 全量重算 | report-module-enhancement |
-| 借贷平衡校验 | 含损益结转 + Decimal 精度 | global-refinement-v3 |
-
-### 1.4 报表模块
-
-| 功能 | 说明 | 来源 spec |
-|------|------|-----------|
-| 6 类报表 | BS / IS / CFS / EQ / CFS 附表 / 减值准备 | phase1c / report-module-enhancement |
-| 国企+上市双版 | 303 行 / 214 行配置驱动 | report-module-enhancement |
-| 事件联动 | TB 变更 → 报表自动 stale → 重算 | phase3 / R7 |
-| 签字状态机 | draft → review → eqcr_approved → final | R5 |
-| PDF/Word 导出 | LibreOffice headless 转换 | phase13 / production-readiness |
-
-### 1.5 底稿模块
-
-| 功能 | 说明 | 来源 spec |
-|------|------|-----------|
-| 1788 单体底稿 | 致同 D/F/K/N 等 15 循环全覆盖 | 11 审计循环 spec |
-| HTML 渲染器 | 9 类 componentType + 禁止 Univer 兜底 | workpaper-html-renderer |
-| Univer 在线编辑 | F/G 循环 558 sheet 保留 Univer | workpaper-editor-slimdown |
-| 程序裁剪 | 智能裁剪 + 自定义裁剪 + 自定义新增 | procedure-applicability-trimming |
-| 底稿生命周期 | 生命周期视图 + 委派矩阵 + 依赖图 + 看板 | workpaper-completion-foundation |
-| 预填充 | TB/WP/REPORT 批量取数 + provenance 溯源 | workpaper-editor-slimdown S4 |
-| 离线导出/导入 | 4 色 cell + _meta_ binding + AES 加密 | workpaper-editor-slimdown S4 |
-
-### 1.6 附注模块
-
-| 功能 | 说明 | 来源 spec |
-|------|------|-----------|
-| 单体附注生成 | 173 章节（首汽租车实测）/ 自动裁剪 40 章节 | disclosure-note-full-revamp |
-| 合并附注 | 7 章节基础生成 + 子公司汇总 | disclosure-note-full-revamp B.0-B.2 |
-| Word 导出 | 致同模板 + python-docx | disclosure-note-full-revamp S2 |
-| 离线分发 | xlsx 4 色语义 + _meta_ + AES + 一键导入 diff | note-dynamic-tables D15 |
-| 公式 DSL | REGION/PRIOR/SUM_TB 等 + 三式联动 | disclosure-note-full-revamp S1.5 |
-
-### 1.7 复核与质控
-
-| 功能 | 说明 | 来源 spec |
-|------|------|-----------|
-| 复核工作台 | ReviewWorkbench + 批注 + 工单转换 | R1 / R6 |
-| Gate Engine | 签字门禁 + 22 条规则 + 可配置 | phase14 / R3 / R6 |
-| QC 规则引擎 | 22 条 seed 规则 + DSL(python/jsonpath) | R3 / R6 |
-| EQCR 独立复核 | 5 域聚合 + 影子计算 + 备忘录 + 工时 | R5 |
-| 归档包 | 插件化章节(00-99) + SHA-256 水印 + 断点续传 | R1 / R5 |
-
-### 1.8 高级查询与穿透
-
-| 功能 | 说明 | 来源 spec |
-|------|------|-----------|
-| 高级查询 | 16 表白名单 + JOIN + 底稿树 + 单元格选区 | advanced-query-enhancements-p1p2 |
-| 正向穿透 | 5 套端点（报表→TB→序时账→凭证） | phase1a / R4 |
-| 反向溯源 | report_trace + trace replay | R4 / v4 复盘 |
-| 跨模块跳转 | 11 命名空间 4 层级 + Backspace 返回 | enterprise-linkage |
-
-### 1.9 运维与工程
-
-| 功能 | 说明 | 来源 spec |
-|------|------|-----------|
-| D6 迁移系统 | V*.sql + MigrationRunner + 失败追踪 + schema drift | migration-runner-resilience |
-| CI 卡点 | vue-tsc / vitest / file-size / API hardcode / B' guard | R6 / R9 / ledger-import-view-refactor |
-| Git 工作流 | 5 类分支命名 + pre-push hook + 6 维核查 CLI | repo-git-workflow-unification |
-| 性能基线 | YG2101 128MB/11min / calamine 3.4× 加速 | ledger-import-view-refactor |
+**定位路径**：
+- Active spec：`.kiro/specs/{name}/`
+- Archived spec：`.kiro/specs/_archive/{分类}/{name}/`
 
 ---
 
-## 二、进行中 / 待启动 Spec（active）
+## 一、Active Specs
 
-> 状态图例：📌 占位 stub（仅 README，无 tasks.md，代码未动）/ ⏳ 实施中 / ✅ 核心完成
-> 核心已闭环的 spec 均已归档到 `_archive/`，根目录只保留尚未启动的真 stub 或进行中 spec。
+| spec | 进度 | 一句话 |
+|------|------|--------|
+| `d4-revenue-matrix-bidirectional` | **0/12** | **D4 收入矩阵型底稿双向回写**（2026-09-12 新建，三件套齐）。D 循环 5 个 canary（D1/D3/D5/D6/D7）全 `bidirectional_verified` 后，D4 是唯一未做实的 —— partial 评估结论「技术可行但不复用现成八步」，故单立。<br>**与已做实 5 家的三点结构性差异**：① store 行是 `months[12]` **位置数组**（product×12 月矩阵，B~M 列按数组下标映射），而 D3/D7 的 nested 账龄是 dict 键 ⇒ **数组下标 json_pointer 是未验证的新形态** ② 模板 **270 个公式格**，D4-2 的 N 列 `=SUM(B:M)` 是合法内部公式**不能删**，净化必须区分外链 vs 内部公式（D7 只有 6 处） ③ **46 sheet** 且 `D4-2-rows` **有真载荷**（2 行 1739B，落 wp `b3ab3c46`@project `0ec33ac9` + wp `21d8089b`@project `c8621493`）⇒ 非空首版，materialize 更复杂。工作量约单 canary 的 2–3 倍。<br>**DEC-D4-1**：12 个月做 **12 条独立 field**，不做 1 条 array field（后者退回「把整 JSON 当一字段比较」，违反 D2 的 AC 6.9/6.12）。**DEC-D4-2**：若共享 extract 侧不支持数组段，则升级为先改 `contracts.py` 的前置任务并通知其余 canary owner。<br>🔴 **Task 2（位置数组往返等值）是阻塞门**，不过则 Wave 2 起全停。做实后可辐射 I6-2 / J1 月度 / E1 现金月度等 `months[]` 型底稿。**5 Req / 24 AC 零悬挂 / 6 Property / 12 Task / 5 Wave**。 |
+| `formula-row-name-alignment-confirmation` | **15/15 ✅** | **公式取数行名对齐确认弹窗**（2026-09-12 新建并实现完成，三件套齐 + evidence 全）。<br>**交付**：后端名称对齐层 `four_table/row_name_alignment.py`（classify 四态 + build_candidates 复用 aux_aggregation/select_leaves 不重写定位 + resolve_amounts 多对一告警/无值语义）；存储层 V160 `workpaper_row_name_mapping`(+_target 伴生表可查询身份) + `RowNameMappingService`（单事务全回滚/幂等/版本冲突409/superseded_from 留痕/dataset_fingerprint 判 stale）；wire `row_name_alignment_wire.build_alignment_wire`(固定11字段) + 两端点（`/row-name-alignment` 只读、`/row-name-mapping/confirm` 写）扩展进 wp_render_config router；前端 `GtRowNameAlignmentDialog`(两栏连线/多对一二次确认/取消零写入) + `GtRowNameAlignmentTag`(行内标识+溯源+直达) + `GtWpRenderer` compatibility slot 注入「刷新取数」(消费 F-SHELL outlet，未改 GtWpToolbar) + `GtRefreshScopeDialog` DEC-4 汇总告警。<br>**验证**：后端 36 passed（含 3 隔离守卫）+ 前端 6 passed + 隔离 2；变异 4 锚点全 RED（`pass:true`，过程真实发现修复 2 守卫缺陷）；真栈端到端 PASS（真库 a7fc75e5/2025，行金额 null→238921879.36 与 SQL 快照逐字对齐，二次从服务端重读不弹窗一致）。V160 由 MigrationRunner 正常应用（schema_version=160）。<br>🔴 **遗留（如实记录，非假绿）**：① 纯浏览器 DOM Playwright 未做完整（无登录态 + 样板底稿子组件 `getRowNameAlignmentRows()` 未接到具体 SFC，逐底稿增强）；② 后端全局刷新产出「行名未匹配」告警字符串属既有 draft-refresh 编排增强，本 spec 只做前端展示能力。evidence T01~T14 齐。<br>**原始设计摘要**：四态状态机 `auto_matched`/`ambiguous`/`unmatched`/`user_confirmed`；名称归一只用于候选生成，归一后非唯一命中一律 ambiguous 不得当精确命中。把「名称对齐」从隐式猜测变成一次显式、可持久化、可追溯的用户裁决：点刷新时若有对不上的行名就弹窗人工确认，支持一对多 / 多对一 / 多对多，确认结果落库并在后续刷新复用。解决的是「刷新了但没数 / 某行恒 0」到底是"真没这笔"还是"名字没对上"分不清。<br>**四态状态机** `auto_matched` / `ambiguous` / `unmatched` / `user_confirmed`；名称归一（空白/全半角/公司后缀）**只用于候选生成**，归一后非唯一命中一律 `ambiguous` 不得当精确命中出数。<br>🔴 **两条红基线**：① 刷新入口**必须消费 `workpaper-page-formula-toolbar-closure` 的 `F-SHELL` outlet**，不得在 `GtWpToolbar.vue` 新建第二个按钮 owner（该 spec 已确认 `GtWpToolbar.vue` 只有 `.gt-wp-toolbar__right` CSS 容器、**无 Vue slot**）；outlet 不可用则 Task 11 显式 BLOCKED，禁止「先临时加个按钮」绕过 ② 不与 `GtRefreshScopeDialog.vue`（合伙人全局一键刷新选范围）合并 —— 前者解决"名字怎么对上"、后者解决"刷哪些作用域"，不同关注点。科目定位真源 `four_table/report_line_accounts.py` 不改，只在**名称维度**补一层。<br>**待确认**：DEC-1 样板底稿（用户红框图未获取到，建议 D3-1 审定表或 F1 附注）· DEC-2 存储形态（倾向新建 `workpaper_row_name_mapping` 表，因 `workpaper_field_overrides`（V076）是「单 scope 单字段值」形态、承载 N:M `target_names` 会退化成塞 JSON 丧失可查询性，但 **Task 1 必须先出书面评估结论**不得跳过）。DEC-3 多对一默认不去重但必须显式告警重复引用；DEC-4 全局一键刷新遇 unmatched **不弹窗**只产「N 行待确认」汇总告警。**5 Req / 23 AC 零悬挂 / 6 Property / 15 Task / 5 Wave**。 |
+| `four-table-extraction-entry-completion` | **16/16 ✅** | **四表库取数入口补齐 + 两套实现收敛 + 账龄空骨架/枚举联动（Phase 2）**（2026-09-12 新建；Tasks 1–10 Phase 1 全交付，Tasks 11–15 Phase 2 全交付，收口完成）。两条主线：横向补齐缺前端键的明细表、纵向把两套 aux 取数实现合成一套；Phase 2 修复 K1 账龄活体伪造并让账龄骨架配置驱动、随账龄枚举联动。<br>🔴 **Phase 2 交付摘要（Tasks 11–15）**：① **修 K1 账龄伪造**——`four_table/k1_aux_detail.py` 删 `_aging()` 整额落首段 + `["within1"]` 硬编码兜底，改 `_empty_aging(seg_keys)`（每段 0）；`_k1_import_export.py` 新增 `_resolve_k1_segments` → `get_effective_segments(project_id,"K1",db)`（读失败按 subject 默认 preset 兜底、不回退单段），message 改「账龄留空，请按实际账龄人工填列」② **D 循环账龄骨架对齐**——D3/D7/`d_aux_import.py` 端点账龄留空 + 段键由 `get_effective_segments` 生成（证据 `evidence/task12-d-cycle-aging-skeleton-audit.md`；D5 N/A、D6 deferred 平键）③ **前端骨架同键 + 枚举切换重映射**——`useK1Detail.ts` 用 `useAgingConfig(projectId,"K1")` 取 segments/bands、监听 `aging-config:changed` → `remapRowAgingData`；审定/披露与骨架同一 `effective_segments` 真源 ④ **守卫 + 变异**——后端 `tests/four_table/test_aging_skeleton_properties.py`（Property 5 `sum(agingAudited)==0` + Property 8 键集==`get_effective_segments`）+ `tests/d_cycle_extraction/test_d_cycle_aging_skeleton.py` + 变异 `scripts/diagnose/mutate_aging_skeleton_guards.py`（塞首段/硬编码段键必红）；前端 `composables/__tests__/agingSkeletonSync.guard.spec.ts` + `.../composables/__tests__/fourTableAgingSkeletonSameKey.smoke.spec.ts` ⑤ **真栈实测 Task 15**（证据 `evidence/task15-aging-skeleton-realstack.json`）：真栈 K1 wp `6e6348d0`（重庆和平药房_2024）新取 400 行**全段 aging 恒 0**（`max_abs_aging_value=0`、无段 == 余额，Property 5/8 实证 + UI 侧「账龄合计0 ≠ 期末」告警佐证）；手动录 `y2to3=4800` 重取不被覆盖/不重复（Requirement 3.4/7.4）；项目账龄枚举 FIVE_YEAR→THREE_YEAR（`PUT /api/projects/{id}/aging/config` 广播 `aging-config:changed`）后 `effective_segments` 6→4、K1-2「账龄区段」列同步渲染「1年以内/1-2年/2-3年/3年以上」、共享段 y2to3=4800 经 `useAgingMigration` 重映射保留（Requirement 7.2/7.4/7.5），测后已还原 FIVE_YEAR。**Phase 2 收口**：三件套 `get_diagnostics` 全 clean；Phase 2 产物（5 守卫/测试 + 改动端点/服务 + 2 证据 + 三件套）已 `git add` 暂存无 `??` 漏登记（未 commit）；未产生 `tmp_*`/`_wip_*`。**⚠️ 已知遗留（不在本 spec 修）**：THREE_YEAR 末段键 `over3` 与 FIVE_YEAR `over5` 不同 ⇒ 末段值在三↔五切换时会掉（`PRESET_SEGMENTS` 固有，非本 spec 缺陷；建议单立 spec 统一末段键或让 `useAgingMigration` 按位置映射末段）。<br>**Phase 1 交付摘要（收口 Task 10 登记）**：① 共享件 `four_table/aux_aggregation.py` 新增 `aggregate_aux_by_name_ex(...) -> AuxAggregationResult`（entries/aux_type/total_units/reason 六值 `ok\|no_prefixes\|no_aux_type\|no_rows\|error`，异常记 ERROR 治 fail-open 假绿），旧 `aggregate_aux_by_name` 改薄壳（4 消费者零改动，有守卫断言）② 新建共享 helper `d_cycle_extraction/d_aux_import.py`（`aggregate_d_cycle_aux` + `aux_reason_message`，科目前缀走报表映射 `BS-006/046/007/011/047` 解析、兜底常量注 `source_ref`，账龄留空不塞全额）③ **5 个 G-C 端点迁移到共享件**（`_d3/_d5/_d6/_d7_import_export.py` 删各自裸 SQL；`_d2_import_export.py` **新建** `POST /{wp_id}/d2/import-aux-balance` 替代前端第 5 套客户端 GROUP BY + 硬编码 1122）④ **K1 G-A 补手动入口**（`k1/core/K1TabDetail.vue`「从余额表导入」，与 AutoSeed 语义区分）⑤ 前端 reason→中文提示单一真源 `composables/fourTableAuxImportFeedback.ts`（各循环 composable 统一消费）⑥ 后端守卫 `tests/four_table/test_four_table_entry_guards.py` + 变异 `scripts/diagnose/mutate_four_table_entry_guards.py`（≥3 锚点四态判定）⑦ 前端守卫 `composables/__tests__/fourTableAuxImportEntry.guard.spec.ts` + `fourTableAuxImportFeedback.spec.ts`（端点 URL 字面量 + reason 映射全分支 + 改错循环前缀必打红）⑧ **真栈 Playwright 实测**证据 `evidence/task9-realstack-playwright.json`。<br>**长期资产**：缺口清册 `evidence/gap-inventory.{md,json}`（G-A={K1} / G-B={} / G-C={D2,D3,D5,D6,D7} / G-D={} / 合规基线={D1,F1,G7}，含 source_digest 冻结 `sha256:da5aeae6…`）落 spec `evidence/` 作唯一真源。**收口 Task 10**：三件套 get_diagnostics 无 error（tasks.md 仅 3 条 cosmetic「recommended section」warning，Property/Validates/waves JSON 全合规）；8 个 `??` 未跟踪产物已 `git add` 暂存（evidence×7 + tasks.meta.json + d_aux_import.py + 2 后端测试/变异 + 3 前端 composable/守卫 = 14 files），无 `??` 漏登记；本 spec 未产生 `tmp_*`/`_wip_*`（诊断产物直接落 evidence）。<br>**原始基线（实扫）**：已有 8 个后端端点 `POST /api/workpapers/{wp_id}/{d1\|d3\|d5\|d6\|d7\|f1\|g7\|k1}/import-aux-balance`；已有可见「从余额表导入」按钮的宿主 8 个（F1/D7/D6/D3/D5/D2/D1/G7 TabDetail）；**K1 只有 AutoSeed 无手动按钮**（空表自动 seed，用户动过数据后无法重取）＝既有缺口样本。<br>🔴 **纠正一条已过期的红基线**：G7 与 `four_table/aux_aggregation.py` 的注释都写「禁止照 D3/D5/D6/D7 历史版本（其 SQL 引用不存在的列 `period_type`/`balance`，运行必 500）」—— 实扫 `period_type` 在 `wp_render_strategies/**` 下**只出现在那句注释本身**，四家实际用的是 `aux_name`/`opening_balance`/`closing_balance`/`account_code`/`is_deleted`，**列都存在不会 500**。真实缺陷是：① 裸写 `is_deleted = false` **不走 `get_active_filter`** ⇒ 跨数据集版本双算（实测 2×）② 直接 `GROUP BY aux_name` **未先锁定单一 `aux_type`** ⇒ 多维度挂账双算 ③ 科目码**硬编码**（`'2203%'`/`'1124%'`/`'2205%'`/`'1141%'`）不从报表映射解析 ④ 把余额全额塞进账龄首段（`agingPrior.within1`）＝**伪造账龄分布**。四家 `get_active_filter`/`pick_aux_type`/`aux_aggregation` 全部零引用（grep 实证）⇒ 结论仍成立、理由必须改写。<br>**收敛目标**：全部走 `four_table.aux_aggregation.aggregate_aux_by_name`，禁止第 5 套归集 SQL。并治一处 **fail-open 假绿** —— 现版 `except Exception: return [], None, 0` 连 `rollback` 也吞，接线错误会伪装成「本项目无此数据」⇒ 新增 `aggregate_aux_by_name_ex` 带 `reason` 码（`ok`/`no_prefixes`/`no_aux_type`/`no_rows`/`error`）且异常记 ERROR，旧函数改薄壳保持既有 4 消费者零改动。<br>**缺口清单必须结构性推导**（registry / RENDERER_DISPATCH / render-config / `wp_code_overrides.json`），**禁 grep 按钮文案或写死页面数量**；gap 分 G-A（缺前端）/ G-B（缺端点）/ G-C（违铁律待迁移）/ G-D（不适合，登记理由不动代码）。**6 Req / 31 AC 零悬挂 / 7 Property / 11 Task / 5 Wave**。 |
+| ~~`audit-evidence-attachment-preview-format-expansion`~~ | **已归档** | → `_archive/05-business-features/`（2026-09-09 最终复盘归档，20/20）。**压缩包 / 邮件 / DXF 浏览器内预览扩展**：Route B + Worker；单一 `AttachmentPreviewCore` + 两容器薄壳；前端 **180** / 后端 **23**；变异 **47/47 RED**；Playwright **2 passed / 0 skipped / 0 flaky**；55 条 artifact 全存在。 |
+| `platform-architecture-convergence` | **22/22 ✅归档** | **平台架构六项收敛（已归档 → `_archive/06-engineering-governance/`，2026-09-08 复核+8项改进后归档）**。Render：capability manifest 220 + wire golden + 七阶段 planner + 真实 registry→DOM。Startup：有序 registry + 12 workers + health.startup。Governance：domain-boundaries 22 domains + debt baseline **现网 905**（904 forbidden + 1 SCC cycle；cycle identity 改 SCC 节点集后 baseline 2.0MB→345KB；~5349/4761/1042/1024 作废；残留=两轴混淆待独立 redesign，见 `DOMAIN_DEBT_BURNDOWN.md`/`T23`）。Events：CanonicalEventEnvelopeV1 + **idempotency_key 等值**去重（T01 冻结时仍是 `trace_id.like` 红基线史实）。Frontend：router 11 domains + registry 6 arrays（216）+ integrity/projection。Task 21：定向 121+39 绿、变异 **8/8 RED**；隔离 probe + CI `pac-skeleton-typecheck` OK。Task 22：Playwright **4 passed** + console 闸门硬化。遗留移交：reserved `guidance`/`sign_status`/`permissions`/`scope`→邻域；confirmation light-stub→分批冒烟；domain 债 burn-down SLA→`DOMAIN_DEBT_BURNDOWN`+PR 模板。证据 `basis/T01`…`T22-*` + `T23-post-closure-followups`。三件套 **12 Req / 80 AC / 24 Property / 22 Task**，进度 **22/22**。**2026-09-08 复核后 8 项改进**：提取器计数判据 / T22 产物清单 / forms 真挂载(AC3.5) / domain 策略补正 905 + SCC cycle identity(baseline 2.0MB→345KB) / typecheck spec 覆盖 11域6entry / exemptions 机器派生 62 + checker 硬化 / 变异 8→11 锚点全 RED / 残留清理。 |
+| `workpaper-guidance-content-closure` | **19/23** | **逐 sheet 编制说明内容闭环**（2026-09-09）。T19 **clean-checkout PASS**（commit `196753f1b`，566 files；提交前 245 passed / 变异 11/11 RED / 前端 37 passed；为过行数门禁把 guidance inventory·source_refs·chat router 抽成伴生模块；并修好 G-C0 反向重复扫描器，findings 8→0）。T7 批次：高置信别名 promote **149** 段（unmapped 308→159）+ SourceRef 可行性核算（294 可挂 / 1158 段仍无 ref）；C1 仍 FAIL pending=373。仍 `[~]`：T7 内容/SourceRef/publication、T21 PASS、T22/23（custom X PARTIAL）。 |
+| `workpaper-page-formula-toolbar-closure` | **15/15** | **workpaper route 公式入口与公共能力壳层闭环**（2026-09-09 Task 15 全量清册门 PASS）。`F-SHELL` 已发布且 `inventoryDigest` 非空；五宿主裁决 html/univer/onlyoffice/word reachable + grid formal exemption；forbidden capability duplicates=0；evidence `evidence/F-SHELL/INDEX.md` + `basis/T15-*`；变异 T15 3/3 RED；Playwright T14 4/4。三件套 **13 Req / 74 AC / 22 Property / 15 Task**。待物理归档至 `_archive/`（可独立于 custom 实例复现）。 |
+| `custom-workpaper-template-ingestion-and-sync-closure` | **15/19** | **自定义 Excel 模板摄取与整册同步闭环**（2026-09-09）。已交付整册 `ProjectWorkbookInstance`、finalize saga、F-SHELL 摄取向导、staging CAS、merge/remap、publication/retention；T18 模块变异 **5/5 RED**（`basis/T18-mutation-report.json`）。**诚实 `[~]`**：Task 10/14/18/19 仍卡 SYNC 四 gate（`multi_resolver_count=4`）与 OO Playwright；X evidence 仍 PARTIAL。 |
+| `browserless-headless-integration` | **0/25** | **Browserless 无头浏览器接入**（2026-09-07 新建并完成两轮仓库/镜像复盘；本轮只修订三件套，不实现生产代码）。终版结构 **12 Req / 145 AC 零悬挂 / 27 Property 全被任务承接 / 25 Task / 7 Wave**。<br>🔴 **不可变运行基线已实测**：最新稳定版 `v2.56.4`，有效镜像固定为 `ghcr.io/browserless/chromium:v2.56.4@sha256:5252f0d0bb947acec41c39f4507fab4af15f9f9337267ca1a97fa026197df8e6`（无前导 `v` 的 `:2.56.4` 为 manifest unknown）；镜像内有 curl/wget/Node 24/Chrome 151/Noto CJK。匿名 `/active`=401、带 token=204、`/health`=404，因此 healthcheck 必须是 `/active?token=$${TOKEN}`。根路径与 `/chromium/*` 均可用，但生产只保留后者单一映射；`/scrape` 真协议必须带 `elements=[{selector:'body'}]`，content 是 UTF-8 HTML。中文 PNG/PDF/content 全通过，PDF 可提取完整中文与金额；ready selector 真等待成功。<br>🔴 **安全地基二次推翻**：真实镜像在 `DISABLE_BLOCKLIST=false/true` 两态都能访问 `host.docker.internal:9980`，metadata 失败只是 `ERR_CONNECTION_REFUSED`，故上游 blocklist **绝不是 SSRF 防线**。外部 API 删除 raw URL/raw HTML，改 `self_check XOR render_ticket`；内部只收 `Validated_Render_Target` / `Trusted_Render_HTML`，前置边界为目标注册表 + 精确 origin（禁 startswith）+ 全 A/AAAA + metadata 永拒 + private-origin 显式子集 + 每跳 redirect，后置再校验 `X-Response-Code/URL/IP`。受保护 SPA 的 token 在 sessionStorage，新 Chromium 必落 `/login`，因此新增 TTL≤60s、一次消费、绑定用户/项目/目标/operation、Redis nonce、只读 context 的 render ticket；ticket 通过 v2.56.4 已实证的 host/path scoped HttpOnly cookie 注入（Browserless 日志显示 `[redacted]`，目标 URL 零 ticket），禁止透传 access/refresh token、密码或持久 profile。另实测镜像默认 debug 会在 Chromium 启动时明文打印环境 `TOKEN`，故 compose 仅启用 info/error；收窄后日志 token/ticket/env dump 均 0 命中。<br>🔴 **拓扑与性能按实况收敛**：后端默认跑宿主 9980，Browserless 发布 `127.0.0.1:3001`，docker-backend 才用 `browserless:3000`；Vite 当前只监听 `::1`，`extra_hosts` 不足，须 dev-only host + 精确 allowedHosts（禁 `true`）并验真实嵌套路由。Docker Desktop 会注入失效的 `127.0.0.1:7897` 代理，容器清六变量，httpx 用 `mounts={}, trust_env=False`。实测 `CONCURRENT=2/QUEUED=2` 下 8×2s 为 4 成功+4 个 429、峰值 running=2/queued=2/rejected=4，负载后约 999MB、5秒回落约485MiB；首版固定 2+2 + Redis CapacityGate/5s等待预算，不沿用无证据的 10/50，补取消传播、输出预算、pressure、低基数指标和冷/热/两波/内存回落发布门。<br>UI 新建 `components/system/BrowserlessSelfCheck.vue`，620 行 `SystemSettings.vue` 仅 admin Tab 懒挂载；内置可信中文样例、紧凑健康条、四操作结果、截图/PDF预览、pressure、六类错误态、390/1440与亮暗色，截图/PDF ObjectURL 分别做到新值前/失败/unmount 三阶段 revoke，HTML/text 禁 `v-html`。不碰 OnlyOffice 和三条既有非 URL PDF 管线，不新增迁移。四层验收 = 静态契约 + 行为测试 + 固定真实镜像 + Playwright；变异四态只认 RED。目录仍为 git `??`，设计期已拉镜像不等于 Task 2 完成（永久诊断脚本尚未交付），故进度真实保持 0/25。 |
+| `workpaper-html-onlyoffice-bidirectional-writeback-closure` | **70/77** | **底稿 HTML ↔ OnlyOffice Excel/Word 真双向回写收口**（2026-08-24 新建，三件套处于 **2026-08-24 独立协议语义复审进行中**）。当前 source-backed 事实为 **185 个物理宿主 / 276 个挂载点 / 186 个 entry / 142 个独立入口 / 43 个父级重复入口 / 1 个不可达旧桩**；现存多数仍是 template-only/reload-only，保持假双向红基线。修订方案采用单次 business `ContentMutationService` commit、content revision ↔ representation generation 分离、template/instrumentation/contract immutable definition artifacts、shared OO room + per-user lease + room 级 callback route、frozen forcesave/close request、server last-applied ↔ client-confirmed 双基线、incoming sequence fence、staged artifact + DB pointer + orphan GC，以及 merged≠incoming 后 refresh/reopen。平台自有 Excel 模板允许受控 instrumentation，但 Excel identity、Word tagged SDT、真实两用户 callback/撤销语义均须先过 OO 9.4 黑盒门。每个 bidirectional entry 必须有持久化 test run、逐 scenario operation/version/representation/trace bundle 与服务端重算 evidence；全局 legacy 删除严格晚于 Task 70。**14 Req / 170 AC / 72 Property / 72 Task / 8 Wave**；当前仅 Task 1/2 的 discovery/characterization 标绿，生产开发继续暂停于 Wave 0 Task 3。终态要求未裁决、假双向、bidirectional 未验收、unreachable、evidence stale 五项全部为 0。；**2026-09-02**：全量产物已入库（分支 `work/2026-09-02-workpaper-sync-closure`，3 commit 已推）；剩余 5 个任务全 `[-]`（61/63/71/72/74），阻塞均有实测依据；definition 供给 4 契约/**3** 供给（bundle 5 条，3 条 projection_contract 全 approved）；published representation 仍 **0**（外键层面循环依赖，入口是 Task 70 的真实 OO 往返） |
+| `published-representation-production-path-and-lane-adjudication` | **0/28** | **projection lane 首版 published representation 的生产调用点 + lane 选路裁决**（2026-09-03 新建，design 优先）。性质是**解除一个没有 owner 的平台级瓶颈**：平台从未在生产路径上为任何 manifest entry 产出过 published representation，而双向回写 spec 的 7 个 `[-]`（61/63/71/72/74/75/76）全部收敛到这一点，相关任务正文各自把它排除在自己范围外。<br>🔴 **立项时的破环假设被实证推翻**：`working_paper_representation_upgrade_candidate.source_representation_id` 是 **NOT NULL + FK → `working_paper_content_representation`**，candidate 结构上必须先有既存 representation ⇒ Task 17 + Task 36 那条路**永远产不出首版**，只能产同 content version 新代际；candidate 表 0 行不是「upgrader 从未被调用」而是「从来没有可供升级的 representation」的必然结果。<br>**真破环点** = `FrozenEntryDefinitions` 的第二个生产者：`ExcelEntryDefinitionLoader.load()` 的八个入参**一个都不是 representation**，不在环内 ⇒ `approved bundle + instrument_workbook_bytes(权威模板)` → `loader.load()` → `build_excel_adapter` → `commit(adapter=…)`，不放宽任何判据。<br>**三道门而非一道**（立项材料只提了一道）：①供给门 `_describe_entry_supply` ②**capability 门** —— 四个 pilot 的 `attach_pilot_adapters()` 头两行是 `if not manifest_capability_enabled(): return ()`，而四个 entry 的 capability 实测**全是** `single_onlyoffice` ⇒ `adapter_registered` False→True 需要**首版 representation 与 capability 裁决同时成立** ③注册门 RG-1~RG-19。<br>**首版可行域只剩 2 个**：B60 权威模板含 `xl/externalLinks/`，被 OOXML 安全门以 `gate=external_relationships` **硬拒**（Task 61 正文「B60 是最短路径」对 Excel lane 不成立，Task 75 采集器早已因同一原因弃用 B60 改用 G7）；G7 库里**无 approved bundle** ⇒ 目标顺序 H1（最干净）→ D2（判据 C 的活证人，其 wp 已有 opaque representation）。B60/G7 落 blocked 格作为「判据真在跑」的负例。<br>**lane 裁决**：L1~L5 顺序门（L1 排第一不可交换，否则 opaque entry_id 先撞 L2 的 `undecided`，L1 恒 GREEN）+ **四条互相独立的供给判据 A/B/C/D**（取数来源两两不同：definition 表 / entry pointer 表 / representation→bundle 反查 / 磁盘契约↔slot digest；`supply_satisfied = A∧B∧C∧D`，A 真 B 假时诊断须**同时**点名两者 —— 这是 D2 那类情形的直接落点）。<br>**12 Req / 95 AC 零悬挂 / 35 Property 全被 tasks 引用 / 31 leaf 任务分 15 波**（机器自检通过）。**不新增数据库迁移**（磁盘实为 **V153**）。<br>**明确不并入**（7 项各附理由）：Task 74 的 642 行 writer 迁移 · Task 71 的 `multi_resolver` 归零 · 任何 Word adapter · 放宽 `allow_external_relationships` · 给供给门/pilot attach 加 project/wp scope · 合并 opaque lane 内部 entry_id 命名空间分叉（owner = Task 67）· 新增迁移。<br>**Open Gates 3 项待实施确认**：manifest 能否重生成（BP-67-1 当前拒绝当前源码，若确拒则 `adapter_registered` 目标拆两阶段）· overlay 是否支持逐 entry capability 覆盖（现为 file_glob 粒度）· H1 的 instrumented 字节能否通过 loader 全部九步（Task 75 只在 G7 上端到端证明过）。 |
+| ~~`advanced-query-hardening-wiring-closure`~~ | **已归档** | → `_archive/05-business-features/`（2026-09-08 三件套复核通过后归档，全交付 **64/64** 实际子任务；剩 19 个 [ ] 均为无小数编号顶层分组标题，按该 spec Notes 不计入验收）。**高级查询硬化接线收口**（2026-08-23 新建）：把 custom_query 包中 7 个 router 零引用模块接进生产链路（收口后仅剩 param_sql_builder / cross_sheet_trace_orchestrator 两个零引用，已作遗留建议单独裁决），并关闭只读端点认证、构建器项目作用域、稳定分页、JOIN 安全与复杂度预算、技术列/PII 分层、语句超时、fail-open except、模板作用域治理、回写预览、指标树懒加载、前端契约十处缺口。红基线 **后端 75 + 前端 5 → 0**；spec 守卫 272 passed；**30 条 Hypothesis PBT 覆盖全部 24 Property**；**变异 48/48 全 RED**；真库 + Playwright 端到端实证（三只读端点 200→401 / 构建器结果首列 UUID→年度 / 指标树首屏 578KB→3.2KB / 业务视图可翻第 2 页 / 违规 JOIN 移除后无笛卡尔积回归）。过程抓出 11 个立项时未预料的缺陷并修复，另修自身守卫缺陷 4 处。产物工作树 + HEAD 双查已入库，git status 对全部产物路径与 spec 目录返回空。**遗留**：param_sql_builder 与 cross_sheet_trace_orchestrator 仍零引用（功能各与 _build_select / cross_sheet_resolver 重复），建议单独立任务裁决删除或明确定位；year 默认取当年使 2025 数据查询恒 0 行，非本 spec 引入。 |
+| ~~`dsh-agent-panel-integration`~~ | **已归档** | → `_archive/04-infra-architecture/`（2026-09-08 假绿核验通过后归档，与 `doc-level-ai-chat` 同族，tasks.md 实扫 **35/35** 全绿）。**DSH Agent 面板平台化集成**（2026-08-21 新建）：右侧 AI 面板从「iframe 嵌 dsh 原生 Web UI」改为「平台自建 UI + 后端受控引擎」，补 @mention/附件 OCR/选中转存笔记/复核提示词注入四块能力；native/dsh 双引擎经 feature flag；MCP server 零直连 DB 全走 scoped token REST 回调。原 35 任务产物 commit `55c5e0fe` + `ad1b241c` 入库。<br>**归档假绿核验**：CLOSURE §8 记的 3 条 Playwright failed 逐条查生产代码 —— **A·AC 1.7「面板打开焦点进输入区」= 唯一真缺陷**（生产代码 focus/autofocus/activeElement 零命中、Property 37 只测 focus trap 漏初始焦点，任务标 [x] 却浏览器恒红），已修（visible watch nextTick 聚焦 textarea + fail-safe）+ 补 2 条 jsdom 可复现守卫、变异两态干净 RED，commit `3c450703`；**B·AC 3.4 / C·AC 4.10 = 非假绿**（生产正确 + 现有守卫覆盖，e2e failed 系后端环境依赖），更正 CLOSURE §8 对 B 的「守卫层级不够」定性。**26 条零 Property 覆盖**（CLOSURE §10）经实扫属实但多数是「未挂 Property 号」非「行为坏假绿」（AC 1.1 有 iframe 静态守卫等），非归档阻断项；AC 12.3 无 egress 为真空但 DSH flag 关闭/零生产流量、风险为零。<br>**遗留**：三个 CI job 中 backend/mcp-data 曾 failure（已定位并本地修 pgvector/psycopg2/mcp 版本上界，runner 上待复跑）；6000 并发未负载测试；DSH allowlist 空（Phase C 零生产流量）。归档核验在分支 `work/2026-09-08-pac-review-followups` 进行，工作树混并发在途改动，仅提交本 spec 明确产物；`WorkpaperEditor.vue` 守卫工作树红系并发会话删 AI 接线所致，HEAD 交付基线 `55c5e0fe` 版含接线该条绿。 |
+| ~~`e-cycle-extraction-formula-and-disclosure-completion`~~ | **已归档** | → `_archive/08-disclosure-notes/`（2026-08-15 复盘后归档，全交付 24/24，主交付 commit `2ee7929e`）。E 类（E0/E1）取数/公式/披露收口。**账户级取数**走 `tb_aux_balance` 的 `aux_type='银行账户'` 维度（此前叶子口径恒 1 行「银行存款」汇总，客户 1002 不分户）⇒ E1-3 出 **22 行逐户**（含开户银行 + 账号，同账号跨行按账号聚合）、E1-10 **保留零余额账户**与金额明细的全零过滤口径显式分离。<br>**浏览器实测抓到两处真实缺陷**：① Property 28 端到端失效（`resolveRestrictedRows` 末尾按**数组下标**重算全部行 id，把 `nextRestrictedSeq` 算好的稳定序号覆盖掉 ⇒ 删 `custom_甲_2` 再新增 `custom_乙` 落库 id 仍是 `_2`，按 row id 索引的历史 reason/金额**串到新类别**上）—— **已修**，原 42 例守卫全绿而缺陷仍在，因为没有一条把纯函数结果串到 `resolveRestrictedRows` 输出；② E1-3 multi 版金额被静默抹零（先点`仅人民币`再点`人民币及外币` ⇒ 22 行金额全变 `-` + 一条错的「审定合计 0.00 ≠ TB 4467536.12」横幅）—— **登记未修**，根因是宿主 `seedFromFourTable()` 只在 `onMounted` 跑一次且 `seedRowsKey` 有 persist-first 短路，种子形态一会话内只按当时 variant 定型一次；**非本 spec 引入**（改造前叶子口径在任何路径下都被抹零，本 spec 把它改善为「先开 multi 即正确」＝部分修复），改法要动种子键按 variant 分离＋新守卫，建议单独立任务。<br>**变异检验 29 条全 RED**，且靠**覆盖面分母**（`SPEC_GUARD_FILES` 17 个守卫文件）抓出一个隐蔽欠账：首轮「21 条全 RED」时仍有 **7 个前端守卫文件从未被任何变异打红** ⇒「变异全红」与「全部守卫都被反证过」是两件事，补 M22~M29 补齐。<br>**Property 34 字面冲突查清**：任务原文「原币/汇率列留空」**对本位币账户不成立且必须不成立**（不下发 `openingFc` 会被 multi recalc 抹零，`fxRate:1` 是恒等事实非反推）；只有非本位币才留 0 + `note` 提示。载荷侧键集实测**根本无原币字段可反推**（全库 308 行 `currency_code` 全 CNY、`opening_fc` 全 NULL）。<br>**终态**：后端 `-k "e1 or e_cycle"` **368 passed** / 1 skipped · 前端 137 suites **568 passed** · CI 挂 `e-cycle-extraction` + `e-cycle-frontend` 两个 job（另有 5 个既有 E job）。<br>**listed 侧 4 项 UNVERIFIABLE 如实登记**（全库 8 个项目 `entity_type` 全 `soe`，listed 披露 Tab 恒显「当前项目不适用」，按约束未改任何项目的 `applicable_standard_v2`）＋ 各配 3~4 类替代证据。收口**零写库**（基线/收尾双 SELECT md5 逐条相同 + `updated_at` 全早于会话 + 网络层 181 条无业务写请求三重证据），清掉本 spec 276 个 `_wip_e_*`。 |
+| ~~`i-cycle-extraction-formula-and-disclosure-closure`~~ | **已归档** | → `_archive/08-disclosure-notes/`（2026-08-15 复盘后归档，全交付 **26/26**）。<br>🔴 **归档前复盘（Task 25）先解掉一个阻断项：本 spec 的两个 CI job 在干净 checkout 下必红** —— Task 10 的数据产出（4 张表补 `columns`）从未入库（HEAD 里仍 `cols=0`），且 **7 个正式产物 `??` 未跟踪**，其中 4 个被 CI 直接引用（`test_i_cycle_row_code_evidence.py` / `test_i5_absent_account.py` / `iCycleDynamicRows.spec.ts` / `iCycleAdjudicationSeed.spec.ts`）⇒ pytest/vitest 遇不存在路径整 job 红。Task 21 的 CI 接线守卫用 `Path.exists()` 判**工作树**故抓不到，已登记「应改判 `git ls-files --error-unmatch`」。<br>🔴 **复盘抓出 3 个真错：行维度三向从来没人比过**。原三向（Property 16）只比**列**、`_SRC_DYNAMIC_MARK_COUNT` 只锁**源侧**扩位数，于是 ① I1 上市「无形资产情况」第 33/34 行是 `（2）其他减少` + `……`，源模板 `A43:A44` 是 `（2）失效且终止确认的部分` + `（3）其他减少` ⇒ **减值准备减少段丢了一个真实披露项、并凭空多出第 4 个可扩位**（账面原值与累计摊销两层都有该行，只减值准备层没有 = 从 H1 模型复制漏改；`h1/h7/h8ListedDisclosureModel.ts` 同形态，已登记给 H 循环）；② I1 国企同表是 **48 行 / 10 个类别**（缺「其他」、「矿产权」被拆成「采矿权+探矿权」、「特许经营权」写成「特许权」、首类别是「软件」）⇒ 新建项目附注开局即错类别（运行态推送的 52 行是对的，错的只有 seed 路径）；③ `I1_LISTED_DEFAULT_CATEGORIES` 是**第二份类别真源**且 3 个 label 与源模板不符，而**生产消费的正是这份错的**（`useI1Disclosure`×5 + `I1TabDisclosureListed`×2），Task 12 交付的 `resolveI1Categories()` 反倒**生产零消费方 = 死代码**。<br>**为什么全部逃过 38 张列契约 + 12 条扩位基线 + 14 条变异**：前端行模型与模板 rows 是**同一处错**（同批生成）⇒ 任何「模板 ↔ 载荷」自洽型判据两侧一起错、仍自洽。只有拿源 xlsx 当第三边才抓得到。<br>**修复**：前端行模型 + `impairDec` 求和项 + 类别默认值改为派生（key 走 `I1_STANDARD_TO_LEGACY` 保留历史短 key）；幂等脚本新增 `_I1_LISTED_TABLE1_ROW_LABELS`（38 条）+ `_normalize_i1_listed_table1_rows()` **独立前置步**（共享 kit 的 `carry_expandable_rows` 在「新骨架扩位 < 旧数」时会把多出的旧扩位插回来且无 opt-out，而本 spec 边界禁改共享 kit）+ `_i1_soe_table1_rows()`（52 行，类别由 `i1_asset_categories` 派生，脚本内零类别字面量）。<br>**守卫 +16**（后端 Property 43 七条 → 199 passed；前端 Property 44/45 九条 → 24 passed），**免断言项 10 条逐条登记实证理由**（「源侧标记 ↔ 模板 expandable」实测**不是** 1:1，写成断言即锁死错值；我第一版 4 条空话理由被自己的 ≥20 字理由闸打红）。**变异 14 → 19 条，新增 5/5 全 RED**、恢复后零残留。<br>**零回归用归因型判据**（禁 stash/HEAD-swap）：后端辐射面 60 文件 AFTER 32 red / BEFORE 39 red ⇒ 新增 **0**、**顺带修好 7 条**，其中 `test_note_k_row_code_evidence::test_shared_table_manifest_has_no_drift` 是 **K 循环的守卫本来红着被我这处 soe 行修复带绿**（「修对了而不只是自洽」的独立印证）；前端辐射面 94 文件 / 3133 tests，5 个失败文件回退我的改动后失败数完全相同（19/341）⇒ 全属并发会话域。<br>**入库按归因型分区暂存**（`git hash-object -w` + `update-index`，不动工作树）：`note_template_{listed,soe}.json` 只入 I 循环 5 个章节（另 33 个并发会话域章节不带）· `prefill_formula_mapping.json` **在 HEAD 上重放本 spec 幂等脚本**得 desired（工作树里该文件 394 个块跨全循环变动，一个不带）· `wp_code_overrides.json` 只入 `市场平均收益率2017: skip`（不带 L 循环两处）。**入库前用「模拟干净 checkout」跑两个 job 的完整命令，汇总 rc=0**。<br>**另修三件套 10 处错基线**（含 requirements.md **两个重复的 `## Glossary` 段**、「6/6 全部错」实为 11/12、「12 类」实为 11 类、「I3~I6 各 0 处扩位」漏了 I5 两版各 1 处、「`=#REF!` 15 格」实为 20 格、design 把两个**已存在**的 `fix_*` 脚本写成「新建」、`columns` 位置写错、`iCycleAccountScope` 复用工厂的**有意偏离**未登记），新增 AC 5.8/5.9/6.5/7.7 与 Property 43/44/45 承接本轮修复。<br>**如实登记**：Task 6 的 `diagnose_i_cycle_rowcode.py` 磁盘与 git 历史双查皆无（推测当时以 `_wip_*` 形态写、被 Task 24 清理删掉），不被任何 CI 引用且职能已被 `verify_i_cycle_live.py` 的 D1/D4 覆盖 ⇒ 按「功能已覆盖」结案，不为凑文件名重建空壳。<br>**Task 24 的 5 项补测抓出 6 个缺陷**（3 个用户可见）：① 平台级共享件 `adjudicationPrefillPlan` 在**四表余额全为 0** 时谎报「补填 18 格」并把 18 个 0 写库 —— 模块头第 3 条「本项目无此科目 ≠ 为 0，不写 0」只堵了入口 A（槽未命中），漏了入口 B（**槽命中但金额为 0**），新增 `zeroSkipped` 桶，受益 11 个审定表 Tab；② I1 soe「+ 增加资产类别」**四重静默**（无提示/无新行/无库写入/控制台无 error）—— `addI1SoeCategory` 返回 `{layers,key,seq}` 被当数组用抛 `TypeError: layers is not iterable`，再被裸 `catch { /* cancelled */ }` 吞掉；③ I2 上市「删除费用性质」**整页白屏** —— `useI2Disclosure` 写了 `removeNatureRow` 实现却漏在 return 清单，崩溃还打断 debounce 保存致用户刚录的行丢失；④ I5 溯源面板 absent 态被「禁空洞卡片」整块隐藏（两个面板都修，新增平台级三态判据 `isTbSourceAbsent`，注意 I5 实测 `resolved_from` 是 `'fallback'` 不是 `'none'`）；⑤ I1 listed 空名兜底成「其他」造重复列；⑥ `autoFillFromSources` 返回类型漏 `unmatched`/`fuzzyMatched`。<br>**守卫 4 文件 / 72 tests，变异检验全 RED**（`i1DisclosureAddCategory` 的变异复现出**精确异常字符串**）。**新增假绿形态：测了 model 层就以为接通了** —— `iCycleDynamicRows.spec.ts` 把 model 层测足且用法全对，但 composable 层零测试；新建 `iCycleComposableExports.spec.ts` 用「从 SFC 抽真实解构键 → 与 composable return 键做包含断言」锁死。<br>🔴 **工具链两条硬实证**：`get_diagnostics` 对**类型不匹配漏报**两次（TS2345×2 / TS2353×1 全报 No diagnostics），`tsc --noEmit` 精确报出行号（全量 2059 → 2056）；但 `tsc` **不解析 `.vue`**（本仓 805 个 TS2307 即此因）⇒ SFC 解构未导出成员这类**整页崩溃**需 `vue-tsc` 或运行时守卫。<br>**方法论纠正**：一度跑前端全量（1999 files / 483s）得「73 files failed」虚惊，抽样单独复跑只剩 1 真红 ⇒ 绝大多数是 4-worker 资源竞争 flaky；改串行辐射面 230 files / 224 passed，剩 5 红经 `git status` 归因于并发会话改了 `note_template_{listed,soe}.json`（→ 已单独立项 `guard-assertion-attribution-refactor`）。<br>**遗留登记**：I1-10/I1-11 可编辑金额列未接 `WpAmountInput`（同行 `50000.00` 与 `9,871.40` 两种格式）→ 已单独立项 `amount-input-migration-and-column-typing`。实测数据 4 次 `--restore` + `--diff` 全「无漂移」。 |
+| ~~`guard-assertion-attribution-refactor`~~ | **已归档** | → `_archive/06-engineering-governance/`（2026-08-16 全交付 **8/8**；收口 commit `9f97e6a2`+`a5040e55`）。**变异 18/18 全 RED**、串行验收 264 passed、后端对照组 61 passed。Task 4 修了初版一个真实假绿：l2l4 用 `stripComments` 全文件 `includes` 对巨型墓碑块不可靠（`raw=2/stripped=2`）⇒ 改 `declaredNoSyncInCoverage` 只截活跃数组体；并发 L2 接线后 `[类A]` 正确变红即真实世界验证。**🔴 Task 4 的 l2l4 修复寄居 l-cycle 未跟踪文件（带其 23 个 TDD 待办红）、不由本 spec 引入 git，随 l-cycle 提交落地**。**守卫判据归因化改造**（全局等值型 → 归因型）。立项直因：`disclosureSharedTableRowScope.spec.ts` **7 条断言全 RED**（`{listed:23,soe:6}` vs 实测 `{24,8}`、29 vs 32、15 vs 18、15 vs 26、4 vs 2…），因果链已实证 —— 2026-08-12 K 循环 `fix_note_k_report_row_codes.py` 改了真源 `note_shared_table_segments.json`，改动方同步了生成器 `EXPECTED_COUNTS` 与后端 `test_note_shared_table_segments.py`（都在后端视野内），**前端守卫属于另两个 spec，改动方 CI 视野里没有它** ⇒ 同一数字 3 处副本、**3 个 blocking job 在干净 checkout 下必挂**、且一条规模数字打死同 `it` 内 6 条仍然成立的归因断言。<br>判据形态分级：A 违规清单为空 / B 地板天花板 / C 包含式重点项（可用）· D 全局等值 / E 跨文件抠数字再等值（**禁用**）。核心替换是把 `counts).toEqual({23,6})` + `tables.length).toBe(29)` 换成**结构不变式** `counts.listed + counts.soe === tables.length`（替代两个硬编码且判据更强）。另拆 `MISSING_SYNC_PATH`（6 = 4 永久豁免 + 2 真实缺口）使「真实缺口应为 0」成为可收敛目标，并解耦 `l2l4DisclosureWiring` 用正则抠数字的形态 E。**4 个被改文件里 3 个属于别的 spec**（判据缺陷的固有属性）。 |
+| ~~`amount-input-migration-and-column-typing`~~ | **已归档** | → `_archive/06-engineering-governance/`。**可编辑金额控件迁移与列类型判据**。存量实测：`el-input-number` **4260 处 / 798 文件**，其中带 `:formatter`（EP 2.13.6 无此 prop ⇒ 确定空操作）**80 处 / 13 文件**（memory 记「40+」，实际翻倍）；`WpAmountInput` 已覆盖 682 处 / 118 文件；疑似金额列违规 **1064 处**（粗判候选）。<br>🔴 **判据必须先行**，两条理由都来自 I1-10 浏览器实测：① **旧探针盲区** —— I 循环 Task 18 结论是「`:formatter` 命中 0 处，合规」，而 I1-10/I1-11 用的是 `el-input-number` + `:precision="2"` **根本没写 `:formatter`**，判据应是「金额语义列是否用了非 `WpAmountInput` 控件」（假绿第②源）；② **反向边界是碰巧成立** —— 「年限列不带千分符」成立的原因是 `el-input-number` 对所有列都不做千分符，一换 `WpAmountInput` 就会把「使用期限 1000 年」渲染成 `1,000.00`，而现有反向断言在未迁移代码上**恒真、无区分能力**。<br>实测证据：同一行内 `50000.00`（可编辑）与 `9,871.40`（只读派生）**并排两种格式**。分批：批 1 = 80 处 formatter 空操作 · 批 2 = I1-10/I1-11 · 批 3+ 按循环。探针禁用固定字符窗口（Task 18 首版 400 字符窗口误报 22 处，全是 `width:100%` 的 `%`），一律按 `el-table-column` 块配对扫描。`:precision` 不擅改（`使用期限(年)` 显示 `10.00`，年限是否允许小数待业务确认）。 |
+| ~~`k-cycle-extraction-formula-and-disclosure-closure`~~ | **已归档** | → `_archive/08-disclosure-notes/`（2026-08-12 全交付 25/25）。K 循环（K0~K13）「四表入库 → 底稿取数 → 披露表 → 附注模块」全链收口。改正 **9 处 row_code + 4 处方向声明**（分级：4 ACTIVE_WRONG / 1 SILENT_EMPTY / 其余 TRACE_ONLY），K1/K2 收进声明真源，K6 补 `adjudication_prefill`，K1/K2/K4/K6 补三口径 `parent_check`（**真实库当场抓到某项目 `trial_balance` recalc 父子双算，正好 2.00~3.48 倍**，两口径版本查不出 —— 这是三口径存在的全部理由），公式预设 66 项改正 + 26 个披露块建块，附注段首码 4 张共享主表补 6 码（**利息行四准则零命中故不造码**），`expandable` 标记补 26 行（源 29 处，差额 3 处逐处登记），列头两版分变体 12 张**正向锁死差异**，K11「披露表按负数填列」**从零实现**（原状只有注释与界面文案、代码零翻转）。<br>**守卫 24 个文件 / 变异 110 条全 RED**（0 GREEN / 0 ANCHOR-MISS / 0 WRONG-TEST），CI 挂 `k-cycle-extraction-formula-closure` + `k-cycle-frontend` 两个 job；八个幂等脚本 `--check` 同时归零。<br>**浏览器实测（Task 25）抓到 2 处真缺陷**：① K4 两张表标签列 key 是 `bond_name`（连库查落库 **0 行** ⇒ 改成 `label`；K7 的 `grant_item` 落库 **2 行** ⇒ 登记豁免不改，一刀切会让那 2 个附注的该列数据读不出来且不报错）② 平台共享判据 `isTbSourceAbsent` 漏判 `empty_reason` ⇒ K6 的「本项目无此科目」被伪装成一片 `0.00`（后端算对了、前端判据是另一套，**四层守卫全绿只有浏览器暴露**）。<br>**两项登记待裁决（不在本 spec 作业面）**：`disclosure_notes` 全库 `expandable` 行 = 0（模板 147 个未回填既有 293 个 note，Task 18 成果对既有 8 个项目不可见）· `sync-from-workpaper` 的 409 `STANDARD_MISMATCH` 与 200 都无可见提示（后端话术完全可操作但前端丢掉了）。<br>**🔴 归档 commit 有意不含两个共享数据文件**：`backend/data/prefill_formula_mapping.json`（工作树 +2516 行）与 `note_template_soe.json`（+364 行）混着并发会话对子公司权益章节的列 key 改名（`registeredPlace`/`principalPlace`/`holdingRatio` 等，`_aligned_at` 为 08-09/08-10）—— 那是**行为性**改动、须由其自己的守卫验证，替它提交无法归因（同 g7 归档时的处置）。**代价与恢复手段**：干净 checkout 下 K 循环的数据类守卫会红，跑七个幂等脚本 `--apply` 即可从任意基线重放（`fix_k_cycle_prefill_presets` / `fix_k_cycle_disclosure_presets` / `fix_note_k_report_row_codes` / `fix_note_k_pl_structure` / `fix_note_k_liability_structure` / `fix_note_k_complex_structure` / `fix_note_k_expandable_rows`，本轮已验证从被变异污染的状态一次恢复且 `--check` 全归零）。 |
+| ~~`g7-column-alignment-and-extraction-closure`~~ | **已归档** | → `_archive/08-disclosure-notes/`（2026-08-15 全交付 24/24，commit `83ccf630`）。G7 长期股权投资列结构对齐与取数闭合。补上「源 xlsx ↔ 模板 seed ↔ 运行时载荷」三向锁死的第三条边（56 个偏差点 → 0），并新增立项时不存在的**第四边：渲染层**（浏览器实测发现两级表头 **0/38 张从未渲染** —— 模型的 `group` 是 additive 死代码，任何 `.vue` 零引用；修复后 20 张）。契约覆盖面 **11 → 38 张**全部运行时表，顺带修掉 15 处此前三条守卫**结构性看不见**的标签列头原文偏差。<br>**修掉一个平台级假绿**：`_note_structure_kit` 的 `--check` 弱于 `--dry-run`（24 个幂等脚本共用）—— 改坏模板一格从报 0 欠账变为报 2 欠账，此前该假绿让所有幂等证空转。<br>**收口复盘追加修 1 项 fail-open**：两个披露 Tab 的 `syncToDisclosureNotes()` 把真同步与收尾刷新塞进同一个 `try`，同步失败会被收尾的成功文案盖成「同步成功」⇒ 拆两段 try（真同步失败 `console.error` + `ElMessage.error` + **return**），错误文案下沉共享 helper `g7DisclosureSyncFeedback.ts`。<br>**终态**：前端 G7 全域 49 文件 **887 passed** · 后端 G7 主域 **2297 passed**（2 例失败已三层归因为并发 K 循环在途）· 变异 **12/12 全 RED**（GREEN=0/MISS=0/WRONG=0）· `--list` **15 锚点**静态自检通过 · CI 挂 `g7-column-alignment` + `g7-column-alignment-frontend` 两个 job。<br>**立项时记的「10 个正式产物 `??` 未跟踪」已解除**（commit 含 16 个新文件，facts JSON 与全部守卫本体已入库，干净 checkout 下 CI 可跑）。 |
+| ~~`l-cycle-extraction-formula-and-disclosure-completion`~~ | **已归档** | → `_archive/08-disclosure-notes/`（2026-08-16 全交付 **26/26**；数据修复 commit `cd298ad1`、脚本健壮性 `445b540b`，此前 `aa51f7b3`/`69fffdfe`/`5ff15c02` 三个 commit 交付守卫与实现）。L 类（L0~L8 借款/应付债券/长期应付款/递延收益）取数公式与披露收口。**改正 5 处审定表科目码错位**（L2 2501→**2231**、L4 2601→**2502**、L5 2502→**2701**、L6 2701→**2711**，L7 2801→**4 × PLACEHOLDER**：递延收益在 L7 无 TB 科目可依，按「宁缺勿造」不硬凑）+ **2 块整块迁移**（`明细表L5-2`→`L4/应付债券明细表L4-2`、`明细表L6-2`→`L5/明细表L5-2`，cells 逐字不动 —— 它们对新归属本就正确）+ **删 1 个幽灵块** `L1/分析程序L1-3`（sheet 在源 xlsx 的 13 张 visible tab 内不存在，真实 tab 是 `调整分录汇总L1-3`；且 `TB_SUM('2001~2501')` 是病态区间，横跨 L1/L2/L3 会把 2231 应付利息扫进「债务合计」= 跨循环双算）。附注侧 13 项：`五、46 t04` **5→9 列** + 四组 `_column_groups`、`八、45`/`八、46` 中文 key → 稳定 ascii key、`八、57` 结构对齐源模板。<br>🔴 **立项直因是一个平台级假绿**：`build_plan()` 只校验 `wp_name`/`account_codes`/`sheet` 三个字段，而 `_build_adjudication_cells()` 虽已定义却**从未被调用**（additive 死代码 = 假绿第①源）⇒ `--check` 长期报「0 项欠账」rc=0，真正错的 `cells[].formula` 实参与 `cells[].description` 科目中文名一处未改。<br>**守卫 189 passed**（判据层 `_l_preset_criteria.py` 520 行 / 用例层 `test_l_preset_account_coherence.py` 624 行，按 800 行门禁**拆分而非加白名单** —— 白名单表头写的是「历史大文件」，新增文件套用属滥用；import 清单由脚本按 tail 实际引用用 `ast` 算出，拒绝手写，漏名 = collection error = 39 断言零执行）+ 前端 **148 passed**。`OUT_OF_SCOPE_WP_CODES` 按 **wp_code 粒度**豁免 L0（先试按块 `("L0","审定表L0-1")` 但配「登记不得过期」自检后无法同时对工作树与 HEAD 成立），配 3 条闸门：理由 ≥20 字且必须含 owner · 登记表必须**恰为** `{'L0'}` · 传空登记表重算证明未盖住 L1~L8；变异塞 `"L3"` → 2 条 RED。<br>**零回归钉死**：L1/L3/L8 三块要求逐字节不变，由 `assert_untouched_blocks_are_healthy()` 独立断言（只校验「公式实参恰为本块 account_codes」这一不变量，不比对 description 措辞）。<br>**复盘查出 4 处真实缺陷**：`lCycleNoteSubtableContract.spec.ts` 4 条 FAIL 锁着旧值（L4 三处旧表名 + L7 列序）⇒ **诚实改写为新值并加反向断言「旧名不得复活」**，而非绕过；L2 label 归一化（模板是 `优先股\永续债利息`、底稿是 `优先股/永续债利息`，半角斜杠 → 反斜杠）+ 按模板行集 `filter`（listed 模板无「其他」行，原实现多推一行）。<br>🔴 **入库过程本身是一课**：数据修复无法从共享工作树 `git add` —— 三份数据文件混着并发 D/K 披露流的 **49 增/6 删/40 改**（prefill）、21 处（soe）、12 处（listed），JSON 无法文件级拆分（`git add -p` 对 1MB JSON 不可靠）⇒ 改为**在干净 worktree 上重放本 spec 的 4 个幂等脚本**，产出「远端基底 + 只有我的改动」，归因确认 prefill **1 增/2 删/6 改全部 L 循环、0 个非 L 块**后提交。中途一次判断被自己推翻：曾据一个「自己先跑过脚本的 worktree」的读数断言「并发 commit 把我的数据修复回退了」，改用 `663488b0..5ff15c02` **逐 commit 探测**后证明**从未回退、五个 commit 数据一直是原始破损态**（教训：判 HEAD 内容必须用 `git show <ref>:<path>`，不能用可能被自己污染的工作树）。另修 `fix_l_cycle_prefill_presets.py` 在 GBK 控制台打印 U+21D2 `⇒` 抛 `UnicodeEncodeError` 直接崩掉整个 `--check`（表现像「脚本坏了」而非「控制台编码不够」），stdlib 一行 `reconfigure(encoding="utf-8", errors="replace")` 收口。<br>**终态**：4 个幂等脚本 `--check` 全部 **0 欠账**（含此前长期报「2 项欠账」的 v1 —— 真相是它声明的目标态里 `八、53`/`五、48` guidance 带 markdown 粗体而盘上没有，每次都「修」一遍却从未入库）· 干净 checkout 复验 189 passed · CI 挂 2 个 job。<br>**遗留登记（非本 spec 作业面）**：L0 两处缺陷（sheet 名不实 + 病态区间）owner = `l0-confirmation-source-alignment` 待另立；`mutate_l_cycle_guards.py` 3 条 ANCHOR-MISS + 2 条 GREEN 待修锚点。 |
+| ~~`workpaper-import-export-lifecycle-closure`~~ | **已归档** | → `_archive/05-business-features/`（历史行；归档状态以目录实扫为准）。底稿导入导出生命周期收口（**此前被表头误记为「无 tasks.md 的空壳」，2026-08-12 实扫纠正**） |
+| ~~`frontend-excel-io-single-entry-convergence`~~ | **已归档** | → `_archive/06-engineering-governance/`（2026-08-14 收敛完成 46 → 0，commit `f049a11f`）。**登记的 4 处既有缺陷已处置：2 修 / 1 撤回误判 / 1 整链删除**（`batchExport.ts` 孤儿链「合并导出」用户不可达，用户裁决删）。动因是 `xlsx@0.18.5` 带两个永不会修的 CVE（SheetJS 已撤出 npm），25 处读上传文件各是独立攻击面。性质为**行为等价重构**，迁移默认姿势是三个显式关闭（`applyStyles`/`includeNoteRow` 两个默认 true 会给 42 个原本无样式的产物加三线表、并在表头前插行）。<br>**两处立项假设被实测推翻**：B5 不是换引擎批而是「入口收两个引擎」（换 SheetJS 要对齐五处语义差异且写不出冻结窗格）；B3 不能用 `parseFile` 而须另开低层薄封装。<br>**顺带修掉三个既有缺陷**：`parseFile` 列索引错位 · 样式模板写出非法 OOXML `vertical:'middle'` 致 openpyxl 打不开文件（影响 12 个走默认样式的调用点，后端 674 处 openpyxl 连带）· 本轮改造引入的括号不配平致 Vite 500（`get_diagnostics`/vitest/变异三层全绿，只有浏览器暴露 ⇒ 已固化成 `check_vite_transform.mjs` 守卫）。<br>**提交前发现的清单漏记（最贵一课）**：B2 那批 13 个 confirmation 文件只写在基线 `note` 的自然语言里、`files` 数组为空 ⇒ 按 files 精确 stage 的脚本漏掉它们（远端仍带裸 import，CI 必红）+ Vite 编译扫描只覆盖 33/46 + 进度失真。**此前所有守卫都在验「代码符不符合清单」，没有一条验「清单本身完不完整」** ⇒ 补 R6.7 / Property 38 + 2 条守卫 + 3 条变异（M18/M19/M20 全 RED）。同域次级坑两个：对账脚本不剥注释会漏检 `import(/* @vite-ignore */ 'exceljs')`；「数量相等 ≠ 集合相等」（曾出现基线 46 / HEAD 46 但各差一个元素）。<br>**终态**：守卫 8 文件 **119** 例全绿 · 变异 **18/18** 全 RED（静态自检 18/18）· Vite 编译 **46/46** · 三件套机器校验零 warning。剩 3 个 `[-]` 均在 tasks.md `## Notes` 写明阻塞原因：Task 2（迁移前快照窗口已关闭，事后补抓＝把错值当基线）· Task 16（变异 18/38 Property，缺口三类各有判据形态原因）· Task 18（B4 需多公司合并数据、C24-4 空态不渲染导出入口） |
+| ~~`e1-variant-recalc-and-mutation-denominator-closure`~~ | **已归档** | → `_archive/08-disclosure-notes/`。**2026-08-15 新建**（承接 `e-cycle-…completion` 归档时登记未修的两项）。**A 组**修 E1-3 `multi` 口径抹零：`recalcRow` 的 multi 分支无条件由原币列派生（`useE1BankDetail.ts` L105~L119），而 `loadFromResponses` 对 `fxRate` 缺失回落 **1**、对 `openingFc` 等回落 **0**（L176~L179 不对称）⇒ 只有本位币列的行切到 multi 版后真实金额被 0 覆盖。<br>**立项新查三项超出原登记**：①影响面含**审计师手工录入的行**（不止种子行）②`USER_FIELDS`（L92~L98）同含本位币四列与原币五列 ⇒ `serializeRows` 把 0 落库、原值**不可恢复**，触发条件仅「切一次 variant + 改任一格 + 2 秒」；`syncCrossSheetTotals` 的 watch 带 `immediate:true` ⇒ E1-1 审定表 TB 核对基准同步归零（实测横幅「审定合计 0.00 ≠ TB 4467536.12」）③叶子口径 `buildBankSeedRows` 无条件给 `fxRate:1` + fc 全 0 ⇒ **aux 侧无银行账户数据的项目在 multi 版金额恒零，连 variant 都不用切**（改造前的存量缺陷，账户级取数只是把它改善为「先开 multi 即正确」）。<br>修复落在**消费侧**（三形态判定 `base-identity`/`foreign-pending`/`fc-authoritative`，判据用 `fxCurrency` 而非 `fxRate` —— 用 fxRate 会把「外币待录入」误判成「本位币恒等」从而臆造汇率 1，违反 Property 34），种子侧一行不动（AC 1.9 的 variant 字段集差异已被守卫锁死）。<br>**B 组**推广 `mutate_e_cycle_guards.py` 的**覆盖面分母**范式：平台 17 个变异脚本 / 9657 行，分母 **3/17** · 静态锚点自检 **1/17** · 冻结基线 **1/17**，仅 e-cycle 那个 11/11。收敛成 `backend/scripts/_mutation_kit/`（8 模块），`run_cli` 的 `guard_files` 设**必填**让「没有分母」在签名层面不可能。<br>🔴 **顺带修一个已归档 spec 的产物欠账**：7 个 `mutate_task*.py` 属已归档 `procedure-trimming-and-delegation-intelligence`(26/26)，归档 commit 只带了 `mutate_trim_decision_guards.py`，这 7 个至今 `??` 未入库。<br>在办 spec 的 3 个脚本（`k_cycle`/`i_cycle`/`ie_lifecycle`）**不迁只登记豁免**，豁免表带失效检测（spec 一归档即提示撤销）。 |
 
-| Spec | 状态 | 说明 |
-|------|------|------|
-| `retrieval-kernel-unification/` | ✅ | 检索/知识层统一架构：三套收敛为单内核（C 升级）+ 知识文件接入向量索引 + VectorStore Protocol + pgvector 迁移（ivfflat）+ feature flag 切换；阶段 1 删 B + 阶段 2 IndexSource 注册表+联动钩子+权限过滤 + 阶段 3 pgvector 等价验证；PBT R1~R4 全绿；ADR-RETRIEVAL-001（pgvector vs ChromaDB）；完成日期 2026-06-01 |
-| `doc-level-ai-chat/` | ✅ | 文档/文件夹级 LLM 知识库对话；ContextBuilder + 对话端点 + 前端面板 + 采纳确认流；72 测试全绿（含 D1~D4 PBT + 全链路集成）；残留仅 Playwright UAT 待环境 |
-| `global-modules-cleanup/` | ✅ | 全局模块多源澄清+死文件清理+联动补全（6 小修打包）：F1 删 33MB 死文件 L1 + F2 V1/V2 命名澄清 + F3 底稿模板 JSON→registry 联动 + F4 枚举字典陈旧注释 + F5 懒建表入 D6（V040 迁移）；35 测试全绿（H1~H4 PBT + 确定性）+ app import OK |
-| `global-modules-p2-polish/` | ✅ | 全局模块 P2/P3 体验与性能增强（文档改进项 100% 覆盖）：地址库 Redis 二级缓存 + 地址校验接公式保存流 + 公式变更时间线 UI + 枚举扩展业务枚举（EliminationEntryType/审计循环代号/风险等级）+ 高级查询 Redis 缓存+流式导出 + enum_dict_overrides 入 D6（V042）+ content_text 填充保障（MinerU OCR）+ note_template DB 化评估暂缓；57 测试全绿（P1~P4 PBT + 确定性）+ app import OK；完成日期 2026-06 |
-| `wp-ai-review-ux-fix/` | ✅ | 底稿 AI 复核弹窗 UX 缺陷修复：C1 复核发现卡片显示底稿编号 tag + C2 useCellLocate 定位跳转接线 + C3 复核按钮显示底稿名 + 后端 wp_code 注入；36 vitest 全绿（含 TsjReviewFindings + SideStandardsTab）；残留仅 Playwright 实测待环境 |
-| `consol-note-three-level-drilldown/` | 📌 | 合并附注三级穿透；前置 = 真实合并母子项目数据（PG 当前 0 个 consolidated 项目）；待并入 Phase 3 |
-| `formula-engine-unification/` | ✅ | 4 套报表公式求值器→单内核 + 审计收口哈希链；4 阶段 19 任务全部完成；Q1~Q5 PBT 全绿；剩 Task 19 Playwright 待环境 |
-| `report-config-baseline/` | ✅ | 报表配置主模板回填 + 克隆项目 stale 联动；3 阶段 11 任务完成；E1~E4 PBT 全绿；ADR-REPORT-CONFIG-001；剩 Task 11 Playwright 待环境 |
+> 🔴 g7 与 e-cycle 双双归档后，上表**剩下的 5 个活行全部由并发会话推进**（tasks.md mtime
+> 秒/分钟级刷新）。`x3-adjustment-entry-import-export` 已于 2026-08-16 全交付 **63/63** 归档
+> → `_archive/05-business-features/`（复盘撕掉 5 处假绿后重做：15.2 挖出并修复 L6-3 刷新即崩、
+> 8 条变异 `--run` 全 RED、全量收口跑前端 239 + 后端 537 passed；4 个 commit 落
+> `work/2026-08-16-amount-input-migration-typing`）。
+> 跨会话协作时不要并行推进同一 spec（memory 已实证并发会话会互相回退同一文件）。
+> **`g7-column-alignment-and-extraction-closure`(24/24)** 与
+> **`e-cycle-extraction-formula-and-disclosure-completion`(24/24)** 均已于 2026-08-15 归档（见下）。
+> 🔴 **本日 5 个活行（含 2 个空壳）在 git 里全是 `??` 未跟踪** —— 2026-08-15 归档 e-cycle 时
+> `git status` 实录：`i-cycle` / `k-cycle` / `l-cycle` / `x3` 四个**在办 spec 目录**连同两个空壳
+> 目录一并未入库。含义是**它们一旦丢工作树即全部蒸发**，且 INDEX 里登记的进度数无法从 HEAD 复核。
+> 已归档 spec 不受影响（`_archive/**` 已跟踪）。
+> 🔴 **判 Active 数量一律行首锚定正则实扫 `.kiro/specs/*/tasks.md`，别信本表旧数** ——
+> 2026-08-10 实扫发现表头写「Active 4」而真实是 6 个带 tasks.md 的活 spec
+> （`i-cycle` / `k-cycle` / `l-cycle` 三个漏登记）。
+> `f0`(144/144) / `parent-company`(18/18) / `report-config`(12/12) /
+> `sampling-evaluation-and-governance-closure`(19/19) / `k0`(18/18) /
+> **`sampling-compliance-closure`(25/25)** 已于 2026-08-08 归档（见 §二）；
+> **`soe-listed-note-conversion-correctness`(19/19)** 已于 2026-08-09 归档。
+> **`note-template-columns-and-legacy-snapshot-closure`(23/23)** 已于 2026-08-09 归档（见 §二）。
+> **`h-cycle-extraction-formula-and-disclosure-completion`(18/18)** 已于 2026-08-10 归档（见 §二）。
+> **`procedure-trimming-and-delegation-intelligence`(26/26)** 已于 2026-08-12 归档（见 §二）。
 
-> 注：`workpaper-fill-service-split` 已 `git rm`（目标 WorkpaperFillService 经 grep 实证为 0 业务调用方的死代码，拆分无意义）；`gt-c-note-table-shrink` 已于 2026-05-30 完成并归档至 07-workpaper-slimdown（GtCNoteTable 1803→450 + GtEControlTest 1414→344，90 测试全绿；残留 R3 Playwright 目视待环境，非代码缺口）。
-> 注（2026-05-31）：merge work 分支带入 13 个底稿 spec 的 active 双份残留，经代码实证全部完成度 100%，已 `git rm` 删除 active 残留，仅保留 `_archive/` 权威版。
-> 注（2026-05-31）：合并模块四阶段 spec（consol-phase0~3）全部代码+测试完成（147 passed/0 failed + 封板全链路集成测试 4 passed），归档至 `_archive/09-consolidation-phases/`。
+**2026-08-15 归档（3 个：2 → `08-disclosure-notes`、1 → `05-business-features`）**：
 
 ---
 
-## 三、已归档 Spec（`_archive/`，94 个）
+**其三**（后继于同域 `procedure-trimming-and-delegation-intelligence`(26/26)，归入 `_archive/05-business-features/`）：
 
-> 已完成且不再演进的 spec，保留审计轨迹。归档不删文件。
-> **物理结构**：`_archive/` 下按功能 + 开发先后分 10 个分类目录，每个目录含 README 说明。
-> （active spec 保持 `.kiro/specs/` 根目录扁平存放——Kiro spec 工作流依赖固定路径 `.kiro/specs/{name}/`，不可嵌套。）
-> **归档标准**：代码实证核心已闭环（声称产物文件真实存在 + 测试通过），剩余仅外部依赖 UAT/文档的，归档；纯 README stub（代码未动）留 active。
+`procedure-trim-report-line-account-resolution`(**16/16**) —— 裁剪判据的科目金额定位从「程序名 ↔ 科目名子串匹配」改为「程序 → 报表行 → 报表公式 → 金额」。
+
+**立项缺陷已修复（浏览器实测）**：E 循环改造前 **0 条**金额类建议（程序名一律「货币资金 …」而 `trial_balance` 只有明细「银行存款」「其他货币资金」⇒ 单向子串匹配全落空 ⇒ 金额恒 `null`⇒ 重要性判据整体空转）→ 现 **4 条**「金额低于实际执行重要性」，金额 **8,607,977.04**，溯源含报表行编码 + 行名 + 公式原文。零漂移（基线工具 verify 差异 0 项 + 独立同口径交叉核实 6 域全一致）。
+
+**净新增 = 2 后端模块 + 1 前端纯函数模块**：三段映射每段都委托既有真源（`four_table/*_cycle_specs.py` 的 `row_code` · `report_config.formula` · `ReportFormulaParser`），索引**零 `BS-*`/`IS-*`/`IMP-*` 字面量** + 与 11 个 per-cycle 声明逐字交叉锁死。
+
+**design 未预见的实现判定 —— 两组准则字段分叉时宁缺勿造**：平台有 `applicable_standard_v2`（权威真源）与 `template_type`+`report_scope`（**报表页实际用的**，缺失时兜底 `soe_standalone`）两组，实测 32 个项目 24 未设 / 7 一致 / **1 分叉**（`0ec33ac9` 331 条程序，`v2=soe_standalone` 而 `template_type=listed`）⇒ 分叉时返 `standard_unset` + ERROR 日志、**不出数**（报表页必须出报表所以兜底，而裁剪判据是自动裁掉审计程序的依据，用说不清的准则算出的金额去裁程序风险高得多）。连带：`derive_applicable_standards` **永不为空**，故 R3.3 的「未设置」不能靠它判。
+
+**浏览器实测暴露并已修的缺陷**：汇总闸按 `accountName` 去重，而报表行映射生效后该键退化成 `wp_code` ⇒ 4 条程序落同一报表行（同一笔 8,607,977.04）被算成 4 个科目 **34,431,908.16（虚高 4 倍）** ⇒ 超实际执行重要性 ⇒ **过度阻断批量确认**。改造前被数据掩盖（金额是 `null` 计 0，合计恒 0、闸门不亮）。修法 = 新增 `aggregateGateKey`（报表行 → 科目名 → 底稿编号退化）+ 5 条守卫含反向自检（旧键必复现虚高与误触）。
+
+**归档复盘补齐三项**：①删死代码 `traceArgsOf`（零消费方）②新建**常驻** CI 接线守卫 `test_report_line_ci_wiring.py`(12 例) —— 原用一次性脚本校验致 **Property 22 无常驻判据**，将来重名 job 被 yaml 静默去重 / 门控 PATTERN 写坏致 job 恒跳过 / 引用未入库测试都不会被发现而 CI 一片绿；含内存内变异自检（不对共享热点 yml 做磁盘变异）③扫全部新增导出符号消费方 ⇒ 死代码 **0**、22 个 Property **全部**有守卫引用。
+
+**终态**：后端 `procedure_trim` **419 passed**（新增 94 例）/ 前端 10 文件 **360 passed** / 变异 **17/17 RED**（每条命中的正是预期判据、还原 md5 一致、`.bak` 零残留）/ 真实库验收 **PASS**（36 项独立算术复核全一致，独立复核走「极简线性符号解析器 + 直接 SQL 聚合」与 `ReportFormulaParser` 实现路径完全不同）/ 准则变体 `soe_standalone` VERIFIED、`listed_*` 与 `soe_consolidated` **UNVERIFIABLE**（库中无该变体项目，不用构造数据冒充）。
+
+🔴 **顺带修复上游 spec 的入库欠账（否则本 spec 的 CI job 在干净 checkout 下必挂）**：已 commit 的 `procedureTrimDecision.ts` import 的 `completenessExemption.ts`（连同 `b50Completeness.ts`）**在 HEAD 中不存在** —— 归属 `procedure-trimming-and-delegation-intelligence`(标记 26/26 但从未入库)，导致**既有的** `procedure-trim-intelligence-frontend` job 也已必挂。本轮连同各自配套测试一并入库（39 例全绿），CI 依赖闭包复查 **160 文件 / 0 未跟踪**。
+
+**登记的既有问题（非本 spec 引入）**：`BS-055` 跨准则同码异义（listed「应付股利」/ soe「短期借款」，`m_cycle_specs.M1` 指向它 ⇒ 国企项目行名不符，但两变体 `formula` 均为 `None` ⇒ 返 `formula_unavailable` **不出数**，验收脚本分级 LOW）· J1/J2 声明的 `row_code` 与循环语义不符（`BS-051` 实为持有待售负债、`BS-069` 实为非流动负债合计且公式全 `ROW()`，索引如实跟随声明正是零字面量的设计目的）· `test_task23_zero_regression::test_linkage_module_is_new_not_a_rewrite` 恒红（判据 `_git_show(...) is None` 而该文件已进 HEAD 396 行，只读 HEAD 不依赖工作树 ⇒ 与本 spec 无关）。
+
+**新登记的坑**：前端 vitest 里 `await import('字面量')` 被 Vite 在**转换期**解析，模块不存在 → 整文件 collection error + `Tests no tests`（零断言执行）⇒ 说明符存变量 + `/* @vite-ignore */` · `fs_append` 的内容会被并发会话的完整重写覆盖（实测 85 秒内被整段重写）⇒ 加挂后必须**立即**用不依赖行号的归因型判据复验 · PowerShell 的 `Measure-Object -Line` **不计空行**，据它切字节区间必错位 · 交叉核实自己会造假漂移（本轮两次：漏 `is_deleted=false` 过滤、快照键名写错）· 变异脚本运行期间**不能并行**跑同一组测试（会读到变异中间态而假红）。
+
+---
+
+**其二**（与前身 `e1-four-table-extraction-and-disclosure-alignment` / `e1-orphan-components-wiring`
+同域，与同命名范式的 `h-cycle-extraction-formula-and-disclosure-completion` 同批）：
+
+`e-cycle-extraction-formula-and-disclosure-completion`(**24/24**) —— E 类（E0/E1）取数 / 公式预设 /
+附注披露收口，主交付 commit **`2ee7929e`**（2026-08-12）。交付内容见 §一 该行；本节只记**归档复盘的判据与教训**。
+
+**归档不是看复选框，是十二维实证**（2026-08-15 复盘轮，零改代码）：产物 47 路径 untracked **0** ·
+CI 7 个 E job 的 **37/37** 文件引用 exists+tracked（干净 checkout 可跑）· 后端 312 passed /
+前端 294 passed（9 文件）· 变异**锚点自检 29/29 OK、0 MISS** · 3 个幂等 `--check` 全 0 欠账 ·
+11 Req / **83 AC 零悬挂** · 41 Property 全被 tasks 引用 · design 提到的 16 个符号全在生产代码
+可定位 · 三件套机器校验零诊断。
+
+🔴 **本轮复盘沉淀的两条通用做法**：
+①**变异锚点自检（`--check-anchors`）是「已归档 spec 是否还可复现」的最便宜判据** —— 只读、不改
+生产代码、秒级完成，却能一次性证明「29 处生产代码结构未漂移 + 变异体系仍然有效」。相比之下
+重跑全量变异要改包含并发在途改动的文件（本 spec 的 M09/M10/M29 锚在 `note_template_soe.json`，
+而该文件当时正带并发 K 循环 +150/-98 未提交改动），风险收益不对称 ⇒ **复盘轮用锚点自检，
+不重跑全量变异**。
+②**工作树 dirty 文件必须逐个 diff 归因，不能按文件名猜归属** —— 本轮 4 个 dirty 文件里
+`E1TabDisclosure.vue`（名字明确是 E 循环的文件）实际是**并发 K 循环**改的（引入 `rowScopeFailure`
+共享件，把 fail-closed 提示从「哪张表」升级为「为什么」），`note_template_soe.json` 改的是少数
+股东权益/合并范围表的动态列稳定 key（H7 范式）而非 E1 货币资金段 —— 靠 `fix_note_e1_monetary_fund_structure.py --check`
+的 4 段全「已对齐」反证了 K 的改动没碰 E 的段。按文件名归属会把别人的在途成果误提交或误回退。
+
+**该 spec 自身最值得复用的一条**：`mutate_e_cycle_guards.py` 把「变异全红」与「守卫全被反证」
+拆成两个判据 —— 用 `SPEC_GUARD_FILES`（17 个守卫文件）作**覆盖面分母**，在 21 条变异全 RED 的
+情况下仍报出 **7 个前端守卫文件从未被任何变异打红**，据此补了 M22~M29。新增守卫文件时若不同步
+加变异，报告末尾会直接显示欠账。**这是 memory 假绿第①源「additive 注入即死代码」在守卫层的
+对应防法**，建议后续 spec 的变异脚本一律照此带分母。
+
+**两处遗留已在 tasks.md 登记**（未修，非本 spec 引入）：E1-3 multi 版 variant 切换抹零（见 §一）·
+E1-10 交叉核对把科目码当账号比对 ⇒ 建议合并进存量口径回填 spec。
+
+---
+
+**其一**（与前身 `g7-four-table-extraction-and-disclosure-alignment` /
+`g7-linkage-extraction-completion` 同域）：
+
+`g7-column-alignment-and-extraction-closure`(**24/24**) —— G7 长期股权投资列结构对齐与取数闭合，
+commit `83ccf630`（分支 `work/2026-08-12-g7-column-alignment-closure`，22 文件 / 16 个新文件）。
+补上「源 xlsx ↔ 模板 seed ↔ 运行时载荷」三向锁死的**第三条边**（56 个偏差点 → 0），
+并新增立项时不存在的**第四边：渲染层** —— 浏览器实测发现两级表头 **0/38 张从未渲染**
+（模型里的 `group` 是 additive 死代码，任何 `.vue` 零引用），修复后 20 张真出两级表头。
+契约覆盖面 **11 → 38 张**全部运行时表，并顺带修掉 15 处此前三条守卫**结构性看不见**的
+标签列头原文偏差。
+**修掉一个平台级假绿**：`_note_structure_kit` 的 `--check` 弱于 `--dry-run`（24 个幂等脚本共用）
+—— 改坏模板一格，`--check` 从报 0 欠账变为报 2 欠账；此前该假绿让**所有幂等证空转**
+（常规轮「0 变更 ⇒ 第二次写入 md5 不变」是恒真的，故补了从不对齐态出发的强化轮）。
+**收口复盘追加修 1 项 fail-open**：两个披露 Tab 的 `syncToDisclosureNotes()` 把真同步与收尾
+刷新塞进同一个 `try`，同步失败会被收尾的成功文案盖成「同步成功」⇒ 拆两段 try（真同步失败
+`console.error` + `ElMessage.error` + **return**；收尾失败降级 `warning`），错误文案下沉共享
+helper `g7DisclosureSyncFeedback.ts`，补守卫 5 例 + 变异 2 锚点。
+**终态**：前端 G7 全域 49 文件 **887 passed** · 后端 G7 主域 **2297 passed**（2 例失败三层归因为
+并发 K 循环在途）· 变异检验前端 **12/12 全 RED**（GREEN=0 / MISS=0 / WRONG=0）· `--list`
+**15 锚点**静态自检通过 · CI 挂 `g7-column-alignment` + `g7-column-alignment-frontend` 两个 job。
+**本轮沉淀的通用教训（已写入 memory `#conventions`）**：①`--list` 只打印不校验 ⇒ CI 里恒绿，
+必须加「锚点命中恰好 1 次 + `replacement != anchor` + `expect_test` 可定位 + 无残留 `.bak`」；
+②多 spec 混改同一 yml 的「只加不动」验收必须用**归因型判据**（变动是否落在我的字节区间内），
+全局等值型在并发下必假红；③`stamp()` 写的 `section._aligned_at` 使任何「模板 JSON md5 逐字节
+不变」判据必假红 ⇒ 收敛比对用剔时间戳的稳定 md5、两次写入一致仍用裸 md5；
+④别跑全量 `backend/tests`（1522 文件、前台无中间输出会被误判卡死），按引用关系反查辐射面。
+**三条登记在册但不在本 spec 半径的遗留**（未动，已写入 tasks.md 实录）：`account_mapping`
+auto_fuzzy 备抵错映射（1525/1526/1527 全 → 1521）· H2 `('eng_mat','1604','1605')` 6 项目 +
+H7 `('accum_dep','1621','1622')` 5 项目 · `fix_note_l_cycle_structure.py --check` 2 项 guidance 欠账。
+
+**2026-08-12 归档（1 个，→ `05-business-features`，与前身 `procedure-applicability-trimming` /
+`procedure-delegation-notification` 同分类）**：
+
+`procedure-trimming-and-delegation-intelligence`(**26/26**) —— 程序裁剪三维判据（风险评估 →
+重要性 → 数据存在性）+ 人员委派智能化。把裁剪从「单维（科目有无余额）」升级为九档短路的
+决策内核（`procedureTrimDecision.decideTrim`）+ 汇总闸（`trimAggregateGate`）+ 完整性豁免
+（`completenessExemption`，11 个循环各带 ≥20 字 rationale）+ 建议态/确认/驳回三态 +
+理由码真源统一（`TrimReasonCode` 扩 4 值，canonical trim entry additive 扩 `reason_code?`）+
+裁剪充分性复核视图 + 附注反向联动（复用 `disclosure_notes.is_empty`，不新建第二套不适用字段）+
+委派建议分配算法（按风险降序 × 加权负载最小）。
+**Task 26 浏览器实测收口（2026-08-12）**：只读部分 5 passed / 写库项两轮各 2 passed。
+**核心链路在真实库首次完整跑通** —— 用 Task 14 的覆盖开关把 D 循环改判为完整性不敏感后，
+D3 预收账款 13,656,018.02 < 实际执行重要性 26,104,487.00 ⇒ 档 8 产出 `below_materiality`，
+逐条确认后落库 `suggestion_state={'reason_code':'below_materiality'}`（`jsonb_typeof=object`，
+未踩「写成 JSON 字符串标量」那个坑）+ 含判据数值的 `skip_reason` 并列同事务；汇总闸真算出
+「建议裁剪科目 1 个（已按科目去重），金额合计 13,656,018.02 元，低于实际执行重要性
+26,104,487.00 元」。**顺带修掉一个真产品缺陷**：Task 14 的写入端点
+`PUT /procedure-trim/completeness-scope` 在真实库上**恒 500** —— `CAST(:ts AS timestamptz)`
+配 `now.isoformat()` 触发 asyncpg `DataError`（**UUID 与 timestamptz 的正确写法方向相反**：
+UUID 是 `CAST + str`，timestamptz 是 `CAST + datetime 对象`）；而该模块 112 例守卫
+（56 后端 + 56 前端）+ 14/14 变异全绿，因为写入 9 例全走替身而**替身不做参数编码** ⇒
+补 3 条守卫（连库真写往返 INSERT/UPDATE/list/DELETE 末尾 rollback · 反向自检钉死驱动行为事实 ·
+源码级），变异检验双双 RED。**实测 5 条失败全是判据缺陷无一产品缺陷**（按文案猜按钮 ——
+真实是「保存覆盖」/「撤销覆盖」· `.el-message--success` 被前置步骤自己满足 ⇒ 改用网络请求作硬判据 ·
+复核端点漏 cycle 段 · `locator.click()` 命中假阳性 ⇒ 改 `page.mouse.click` 真实输入事件 ·
+交叉核实查询漏 `is_deleted` 过滤差点误报漂移）。数据按基线复原并经 postgres 只读交叉核实
+（已裁剪 0 / `suggestion_state` 0 / `B50-T3-*` 0 行 / `row_tasks` 27 全部回到基线）。
+**遗留议题已立后继 spec** `procedure-trim-report-line-account-resolution`（见 §一）。
+
+**2026-08-10 归档（1 个，→ `08-disclosure-notes`，与前序 `h-cycle-four-table-extraction-and-account-mapping` /
+`h-cycle-legacy-cleanup-and-platform-hygiene` 同分类）**：
+
+`h-cycle-extraction-formula-and-disclosure-completion`(18/18) —— H 类（H1~H10）取数 / 公式 /
+披露收口。**双族并存取数**（新族 `1651`/`1652` 使用权资产与旧族 `1641`/`1642` 在同一项目内互斥，
+真源 `four_table/dual_family_codes.py` + 迁移 **V145** 改 `report_config` 公式为并取）+
+`h_cycle_adjudication_prefill` 共享件（H1~H4 审定表段预填，四个 render 策略共用）+
+H3 前端槽真源 `h3AccountScope.ts` + 金额控件登记 `hCycleAmountControlRegistry.ts` +
+会计政策章 + 八、26 `text_sections`。真实库 **80 组合验收 0 违规**
+（`verify_h_cycle_extraction_live.py`，9 项目 × 10 循环）。
+**Task 18 浏览器实测 5/5 全过**（2026-08-10，实测项目 `2aa00f57` 重庆和平药房_2025 / soe）：
+H8 审定表 TB 核对块出 `352,406,145.74` · H3 溯源面板四槽全渲染 · H1 溯源面板出数 +
+预填按钮 enabled · 披露推送后附注「八、26 使用权资产」`last_sync_at` 由 NULL 前移且
+`sub_table_data['使用权资产']` 25 行列结构未压扁 · 金额控件千分符生效。
+**实测修正 tasks 原文三处**：H1 按钮真实文案是「从TB子科目预填」（非「从四表库带入未审数」，
+后者宿主是 N1/N3/N4/N5·K1/K2·J1/J2·G8/G9·H2/H4）· H3 用 `WpFourTableSourcePanel`
+而 H1/H2/H4/E1 用 `WpSemanticAccountSourcePanel`（DOM 与展开方式都不同）·
+立项预设「三个底稿是空底稿」被推翻（实为已有 37 行 `checklist_responses`）。
+**登记未修两项**：H8-1 四个金额列用裸 `el-input-number` 未传 `formatter`（EP 2.13.6 无该 prop，
+A/B 对照实测确认千分符不生效，属存量替换待单独 spec）· `H8TabDisclosureSoe.syncToNotes()`
+裸 `catch {}` 在 HTTP 全 200 时仍弹「同步附注失败」（fail-open 误报）。
+实测后按基线**逐字节复原**并双重核实（脚本 verify `diff_count=0` + 独立 SQL 直查九项吻合），
+复原后重跑验收脚本仍 0 违规。
+
+**2026-08-08 归档（1 个，→ `05-business-features`，与 `voucher-sampling-*` /
+`cutoff-test-*` / `voucher-check-sampling-integration` 同分类）**：
+
+`sampling-evaluation-and-governance-closure`(19/19) —— 抽样评价与治理闭环
+（`sampling-compliance-closure` 的后继）。四波：**Wave 1** 撤销回填同步软删两张投影表
++ 合规判据修正（特定项目占比不再用勾选数、MUS 样本量改比系统建议值）+ 覆盖率阈值
+单一真源（底稿 > 项目 > 平台默认 0.60，显式标注"非准则数字"）· **Wave 2** CAS 1314
+四条评价缺口（未检查样本二选一处置 / 偏差性质结构化复用 C 类口径 / 完整性核对阻断 +
+≥10 字理由放行 / 分层层内评价灰度）· **Wave 3** 平台级 P0 —— `qc_rule_definitions`
+**0 行**使 `_get_enabled_rule_codes` 返回空集 ⇒ **20 条 QC 规则全部静默不执行**，
+门控语义改「禁用黑名单过滤」三态后真实库实测恢复 **20/20** 条；QC-12 判据重写为
+不依赖已软弃用的 `SamplingConfig`；新增归档章节 `06-抽样记录汇总.txt` + 归档完整性
+第 5 类（非阻断）· **Wave 4** 属性抽样接线控制测试 + 抽样引擎复核入口 + CI 两 job +
+真实库只读验收（PASS=10 / FAIL=0 / SKIP=2）+ 浏览器实测。
+**收口期修掉一个只有浏览器 + 独立算术复核才会暴露的真缺陷**：`alternative_performed`
+的样本 `checkResult` 仍为空 ⇒ 被 `inferMisstatement` 的既有过滤整体排除 ⇒ 既不进
+分子也不进分母，推断错报被**放大 2.26 倍**（真实库落库取证 3,412,422.05 vs 正确
+1,511,272.73），不符 R3.3 且方向是虚高；修法 = 新增 `applyAlternativeTreatment` +
+统一入口 `applyUncheckedDisposition`（留痕计数读原数组、逐位不变），
+Property 28 守卫 8 例 + **变异检验 5/5 全 RED**。
+
+**2026-08-05 空壳目录清理（2 个，Active 区不再有非 spec 目录）**：
+
+`procedure-delegation-visibility-isolation` / `visibility-isolation-go-live-hardening` 两个目录只剩
+`evidence/artifacts/`（无三件套、**未被 git 跟踪**），其 spec 文档早已完整归档在
+`_archive/06-engineering-governance/`（86 个 tracked 文件）。逐文件哈希比对确认这批 evidence 是
+**更早且已被取代的测量轮次**（canonical 是 6000 请求 / 64 并发，空壳里是 1500 / 48，项目 UUID 亦不同），
+其中 6 个文件与两份归档副本都不同 ⇒ **不删除**，整体移入
+`_archive/06-engineering-governance/{spec}/evidence/artifacts-superseded-run/`（零覆盖、移动前后哈希逐一相等）。
+Archived 计数不变（未新增 spec，只是归位证据产物）。
+> 🟡 `_archive/99-superseded/` 下另有这两个 spec 的**同名 evidence-only 目录**（24 个 tracked 文件，
+> 其中 `visibility-isolation-go-live-hardening` 还嵌套了一层同名目录）—— 是更早一次未完成的归档搬移残留。
+> 清理它需要删除 tracked 文件，留待确认。
+
+**2026-08-05 归档（1 个，→ `05-business-features`）**：
+
+`deliverable-lineage-wiring-and-writeback-closure`(25/25 + 40 个复选框全 `[x]`) —— 交付件溯源接线与回填闭环。
+立项时的实证基线：`write_section_anchors` / `snapshot_on_confirm` / `_classify_change` 三者**生产零调用方**
+⇒ 溯源/stale/刷新/回填整条链空转（前序 spec 22/22 全绿是**假绿**，测试自己合成带锚点的 docx）。
+四波交付：**Wave 1** 锚点写入 + 章节状态落库 + 回填 rowcount 五桶 + 就地刷新 + 能力矩阵单一真源（真实链路验收 **12/12**，
+真实项目写入 141 个锚点、`/section-states` 从全库 0 行变 141 行）· **Wave 2** 快照继承 + `doc_key` 去时间戳 +
+真实编辑人（V142）+ 护栏接线（**实证席位从来没真正释放过**：占用用 `current_user.id`、释放用 `created_by`
+且版本号取的是 OO 内部号，全靠 1h TTL 自愈）· **Wave 3** 报告正文段落级回填（真实链路验收 **18/18**，
+发现 Word 模板模式下 `report_body_json` 只有 6 个元数据键、段落文字只在 docx 里 ⇒ 补 additive `sections`）·
+**Wave 4** xlsx 差异告警（V143）+ 溯源可视化（版本链 `is_stale` 三态 + 三件套三列对照 + 列表行级溯源抽屉）。
+**收尾修正推翻了自己上一轮的归因**：真实库那 22 处「Cell_Mapping 配置错位」实为**检测器自身缺陷** ——
+资产负债表拆「主表 + 续表」而 JSON 两侧共用 `balance_sheet` 键且坐标重叠，按 `sheet_aliases` 取第一个匹配
+sheet 会让续表 49 个 row_code 去主表取值；改为与 exporter 同源（逐 sheet 扫内联 `{{row:}}` 占位符 +
+按真实 sheet 名取值）后 22→5 处（逐格核对确认真差异），另一真实报表变 `checked=452 / diffs=0` 完全一致。
+真实库跑 detect 还揪出 naive/aware datetime 裸比较抛 `TypeError` 被 fail-open 吞成「无数据」的真 bug。
+**遗留**：浏览器层肉眼实测（后端真实链路验收已 12/12 + 18/18 通过）· 尚未 commit。
+
+**2026-08-04 归档（3 个，→ `11-confirmation-d0-module`）**：
+
+`g0-confirmation-source-alignment`(23/23) —— G0 投资循环函证源模板对齐。逐格精读 10 张 sheet（全 visible）后
+补齐 G0-1 下区四块（8 品种×8 指标矩阵「有就显示没有隐藏」+ 防死锁开关 / 样本选择 6 项 / 审计说明 5 段 / 审计结论）、
+按循环解析跨表导航（删写死 `D0-*`）、G0A 补回 12 条 `program_category`（备选与 IPO 专项不再默认勾选）、
+公式预设从「审定表口径 + `TB_SUM('1101~1511')`」改为 8 条 PLACEHOLDER、G0-6 三区块按源模板重排（删自造记账凭证列、
+`support_doc` 拆成支持性文件 1/2 各三列）、9 条源模板缺陷显式登记并在 UI 逐条可追溯。
+**顺带修掉两个真实数字/口径错误**：证券差异表三列方向全反（源 `M=J−G` 与表头 `③=①−②` 矛盾，平台照抄了缺陷方向 →
+统一为账面 − 回函，两张差异表此前互相矛盾）· 该表组表头字面遗留 `差异（②−①)` 与派生方向自相矛盾（Task 23 浏览器实测抓出）。
+**Task 23 实测 8 项 7 通过**，1 项受阻于平台级孤儿组件（`CrossWorkpaperNav.vue` 全仓零渲染宿主 →
+Task 11 的修复正确但用户不可达；Property 13 只断言了链条上游有消费方，整条链仍是死的）。
+遗留两条平台级议题已登记该 spec §Notes：孤儿导航组件接线（建议与 `e1-orphan-components-wiring` 合并）·
+替代程序区块 `CheckBlock.vue` 可编辑金额列用 `el-input type="number"` 致千分符结构上不可能出现（七枢纽同款）。
+
+`h0-confirmation-source-fidelity-and-linkage`(24/24) —— H0 固定资产循环函证源模板保真度与联动补齐。
+逐格精读 9 张 sheet（**全 visible**）后修掉三个 P0（「账户/交易」下拉三处互不一致且无 H 类科目 /
+H0-1 下区四块完全缺失 / H0-5 四段编号与源模板全部错位），并在真实库直跑与浏览器实测中挖出
+**6 个额外缺陷**（其中 2 个是活的错数：H3 裸通名兜底把固定资产累计折旧扣进投资性房地产致账面金额为负；
+H0 聚合忽略 `closing_direction` 把 contra 子科目加成正数）。
+
+**2026-08-03 归档（4 个，→ `08-disclosure-notes`）**：
+`h-cycle-four-table-extraction-and-account-mapping`(25/25) ·
+`d4-four-table-extraction-and-disclosure-alignment`(33/33) ·
+`n-cycle-note-template-and-disclosure-completion`(13/13) ·
+**`semantic-account-resolver-full-rollout`(31/31)** —— 结论是「应立即迁移的策略 = 0 个」，
+交付物是**三道守卫**而非批量迁移：定向裁决交叉锁死（未迁移清单 ⊆ 已登记裁决理由，
+33 条逐条带实证）· 旧制编码数据触发守卫（旧制码一带非零余额即打红，把「该迁移了」
+交给数据判断）· F2 展示元数据错码纠正。
+
+新建 spec 放 `.kiro/specs/{name}/`（扁平，不可嵌套）。
+
+---
+
+## 二、已归档 Spec（556 个，15 分类）
 
 ```
 _archive/
-├── 01-phase-foundation/        平台地基（Phase 0~16，24 个）
-├── 02-workpaper-cycles/        审计循环业务内容（11 循环 + 5 底稿基础，16 个）
-├── 03-refinement-rounds/       五角色轮转打磨（R1~R9，9 个）
-├── 04-infra-architecture/      基础设施 / 全局架构（9 个）
-├── 05-business-features/       业务专项功能（12 个）
-├── 06-engineering-governance/  工程治理（4 个）
-├── 07-workpaper-slimdown/      底稿模块瘦身系列（6 个）
-├── 08-disclosure-notes/        附注模块系列（2 个）
-├── 09-consolidation-phases/    合并模块四阶段（4 个）
-└── 99-superseded/              已被取代 / 合并（4 个）
+├── 01-phase-foundation/              24
+├── 02-workpaper-cycles/              16
+├── 03-refinement-rounds/              9
+├── 04-infra/                          3
+├── 04-infra-architecture/            39
+├── 05-business-features/            239
+├── 06-engineering-governance/        14
+├── 07-workpaper-slimdown/            22
+├── 08-disclosure-notes/              81   ← 2026-08-15 实扫（本轮归档 g7-column-alignment-* +1）
+├── 09-consolidation-phases/           5
+├── 10-A~S-workpaper-all-cycles-complete/  31
+├── 11-confirmation-d0-module/        17
+├── 12-2026-06-23-batch/              12
+├── 13-2026-06-29-batch/              33
+└── 99-superseded/                     7
 ```
 
-### 3.1 `01-phase-foundation/` — 平台地基建设（24 个）
+### 最近归档（2026-08-15）
 
-平台最早期地基（Phase 0~16），按时间顺序构建。
+**→ 08-disclosure-notes（+2，本日该分类第 2 个：G7 长期股权投资 + I 循环收口）**
 
-`phase0-infrastructure` · `phase1a-core` · `phase1b-workpaper` · `phase1c-report` · `phase1-experience-gap-fix` · `phase2-consolidation` · `phase2-role-experience-boost` · `phase3-collaboration` · `phase3-system-enhancement` · `phase4-ai` · `phase4-long-term-governance` · `phase5-extension` · `phase5-operational-excellence` · `phase6-integration` · `phase6-precision-and-security` · `phase7-enhancement` · `phase7-role-experience-closure` · `phase8` · `phase11-system-hardening` · `phase12-workpaper-deep` · `phase13-word-export` · `phase14-gate-engine-governance` · `phase15-task-tree-and-event-orchestration` · `phase16-evidence-package-and-versionline`
-
-### 3.2 `02-workpaper-cycles/` — 审计循环业务内容（16 个）
-
-11 审计循环主体 + 5 底稿基础。548/548 tasks 全部完成。
-
-致同审计循环代号：A=报表/调整 · B=控制了解 · C=控制测试 · D=销售收入 · E=货币资金 · F=采购存货 · G=投资 · H=固定资产 · I=无形资产 · J=职工薪酬 · K=管理 · L=筹资 · M=股东权益 · N=税费 · S=专项
-
-**11 循环主体**：`workpaper-d-sales-cycle` · `workpaper-e1-cash-optimization` · `workpaper-f-purchase-inventory` · `workpaper-g-investment-cycle` · `workpaper-h-fixed-assets-cycle` · `workpaper-i-intangible-assets-cycle` · `workpaper-j-payroll-cycle` · `workpaper-k-admin-cycle` · `workpaper-l-debt-cycle` · `workpaper-m-equity-cycle` · `workpaper-n-tax-cycle`
-
-**5 底稿基础**：`workpaper-completion-foundation` · `workpaper-cycle-d-revenue` · `workpaper-collaboration-presence` · `workpaper-editor-refactor` · `workpaper-deep-optimization`
-
-### 3.3 `03-refinement-rounds/` — 五角色轮转打磨（9 个）
-
-合伙人 → 项目经理 → 质控 → 审计助理 → EQCR 独立复核 → 跨角色优化 → 全局打磨 → 深度收口 → 全局深度复盘
-
-`refinement-round1-review-closure` · `refinement-round2-project-manager` · `refinement-round3-quality-control` · `refinement-round4-audit-assistant` · `refinement-round5-independent-review` · `refinement-round6-cross-role-optimization` · `refinement-round7-global-polish` · `refinement-round8-deep-closure` · `refinement-round9-global-deep-review`
-
-### 3.4 `04-infra-architecture/` — 基础设施 / 全局架构（9 个）
-
-`global-linkage-bus` · `global-platform-enhancement` · `production-readiness` · `table-unification-el-table` · `v3-linkage-stale-propagation` · `v3-r10-linkage-and-tokens` · `v3-r10-editor-resilience` · `global-refinement-v3`（全平台一致性治理：金额 Decimal 化 + 表单校验 + 归档只读 + 年度联动；143/147，剩合伙人 UAT） · `vllm-httpx-bugfix`（2026-05-30，httpx trust_env=False 全仓 20 处 + chat_template_kwargs 顶层 + finish_reason=length 处理；12 测试全绿 + vLLM 直调验证通过）
-
-### 3.5 `05-business-features/` — 业务专项功能（12 个）
-
-`proposal-remaining-18` · `e2e-business-flow` · `template-library-coordination` · `audit-chain-generation` · `enterprise-linkage` · `ledger-import-view-refactor` · `advanced-query-enhancements-p1p2` · `k-admin-cycle-post-review-fix` · `partner-dashboard` · `procedure-applicability-trimming` · `role-based-view-switching` · `report-module-enhancement`
-
-### 3.6 `06-engineering-governance/` — 工程治理（4 个）
-
-`repo-frontend-layout-unification`（删仓库根 frontend/ 空壳 + pre-commit hook 防回归）  
-`repo-git-workflow-unification`（5 类分支命名 + GIT_MODE 双模式 + 6 维核查 CLI + pre-push hook + ADR-027/028）  
-`pytest-residual-failures-cleanup`（SQLite vs PG 测试残留失败治理，2026-05-28 闭环）  
-`migration-runner-resilience`（D6 MigrationRunner 韧性化：批不中断 + schema drift 自检 + alembic 清理；V025/V026 + schema_drift_detector.py 381 行；Sprint 1-4 完成，剩 Sprint 5 UAT）
-
-### 3.7 `07-workpaper-slimdown/` — 底稿模块瘦身系列（6 个）
-
-底稿渲染 HTML 化 + 超长 .vue 拆分。
-
-| Spec | 成果 |
+| Spec | 说明 |
 |------|------|
-| `workpaper-html-renderer` | 1788 单体底稿切 HTML，9 类组件，40/40 tasks，413 tests |
-| `workpaper-editor-slimdown` | WorkpaperEditor 2748→758 行 + 8 子 SFC + 2 composable，59/59 tasks |
-| `workpaper-list-shrink` | WorkpaperList 3463→1151 行（净减 67%）+ 5 子 SFC，36 vitest + e2e |
-| `workpaper-editor-shrink-phase2` | WorkpaperEditor 收尾瘦身至 837 行 + 8 子 SFC + 2 composable，36/36 tasks |
-| `gt-c-note-table-shrink` | GtCNoteTable 1803→450 行 + GtEControlTest 1414→344 行；C 类 3 子组件 + 3 composable / E 类 5 子组件 + 2 composable；90 测试全绿（36 spec 零断言 + 54 新单测）+ vue-tsc 0；残留 R3 Playwright 目视待环境 |
-| `gtdform-test-and-shrink` | D 类「先测后拆」：GtDFormReview 1670→390 / GtDFormConfirmation 1434→366 / GtDFormParagraph 878→345 行 + 6 composable；9/9 tasks + 116 vitest 全绿（含集成 + 边界 + 真实 markdown/XSS）+ vue-tsc 0 + HARD_CAPS 防退化 + evalFormula 安全解析器（复盘 6 改进已落地）|
+| i-cycle-extraction-formula-and-disclosure-closure | I 类（I1 无形资产 / I2 开发支出 / I3 商誉 / I4 长期待摊 / I5 其他非流动资产 / I6 研发费用）取数、公式预设与披露附注收口（**26/26**，主交付 commit `e085d324` + 归档前复盘 Task 25）。<br>🔴 **归档前复盘先解掉一个阻断项：两个 CI job 在干净 checkout 下必红** —— Task 10 的数据产出（4 张表补 `columns`）从未入库、**7 个正式产物 `??` 未跟踪**且 4 个被 CI 直接引用。Task 21 的 CI 接线守卫用 `Path.exists()` 判**工作树**故结构上抓不到，已登记「应改判 `git ls-files --error-unmatch`（已入库）而不是「本机存在」」。<br>🔴 **复盘抓出 3 个真错：行维度三向从来没人比过** —— 原三向（Property 16）只比**列**、`_SRC_DYNAMIC_MARK_COUNT` 只锁**源侧**扩位数：① I1 上市「无形资产情况」减值准备减少段**丢了「（2）失效且终止确认的部分」并凭空多出第 4 个可扩位**（账面原值/累计摊销两层都有该行，只减值准备层没有 = 从 H1 复制漏改；`h1/h7/h8ListedDisclosureModel.ts` 同形态，已登记给 H 循环）② I1 国企同表 **48 行 / 10 个错类别**（缺「其他」、「矿产权」拆成「采矿权+探矿权」、「特许经营权」→「特许权」、首类别是「软件」）⇒ 新建项目附注开局即错类别 ③ `I1_LISTED_DEFAULT_CATEGORIES` 是**第二份类别真源**且 3 个 label 错，而**生产消费的正是这份错的**，Task 12 交付的 `resolveI1Categories()` 反倒**生产零消费方 = 死代码**。<br>**为什么全部逃过 38 张列契约 + 12 条扩位基线 + 14 条变异**：前端行模型与模板 rows 是**同一处错**（同批生成）⇒「模板 ↔ 载荷」自洽型判据两侧一起错、仍自洽。**只有拿源 xlsx 当第三边才抓得到**（与 G7「第四边 = 渲染层」同族的方法论）。<br>**守卫 +16**（后端 Property 43 七条 → 199 passed · 前端 Property 44/45 九条 → 24 passed），**免断言项 10 条逐条登记实证理由**（「源侧标记 ↔ 模板 expandable」实测**不是** 1:1，写成断言即锁死错值；第一版 4 条空话理由被自己的 ≥20 字理由闸打红）。**变异 14 → 19 条，新增 5/5 全 RED**。<br>**零回归归因型**（禁 stash / HEAD-swap）：后端辐射面 60 文件 AFTER 32 red / BEFORE 39 red ⇒ 新增 **0**、**顺带修好 7 条**，其中 `test_note_k_row_code_evidence::test_shared_table_manifest_has_no_drift` 是 **K 循环守卫本来红着被这处 soe 行修复带绿**（「修对了而不只是自洽」的独立印证）；前端 94 文件 / 3133 tests，5 个红文件在回退我的改动后失败数完全相同 ⇒ 全属并发会话域。<br>**入库归因型分区暂存**（`git hash-object -w` + `update-index`，不动工作树）：两个 `note_template_*.json` 只入 I 循环 5 个章节（另 33 个并发章节不带）· `prefill_formula_mapping.json` **在 HEAD 上重放本 spec 幂等脚本**得 desired（工作树该文件 394 个块跨全循环变动，一个不带）· `wp_code_overrides.json` 只入 `市场平均收益率2017: skip`。**入库前用「模拟干净 checkout」跑两个 job 的完整命令，汇总 rc=0** —— 这是本轮最该沉淀的做法：**验的必须是「即将提交的字节」，不是当前工作树**。<br>**另修三件套 10 处错基线**（含 requirements.md 两个重复 `## Glossary` 段、「6/6 全错」实为 11/12、「12 类」实为 11 类、「I3~I6 各 0 处扩位」漏了 I5 两版各 1 处、「`=#REF!` 15 格」实为 20 格、design 把两个**已存在**的 `fix_*` 脚本写成「新建」、`columns` 位置写错、`iCycleAccountScope` 不复用工厂的**有意偏离**未登记），新增 AC 5.8/5.9/6.5/7.7 与 Property 43/44/45 承接。<br>**如实登记**：Task 6 的 `diagnose_i_cycle_rowcode.py` 磁盘与 git 历史双查皆无（推测以 `_wip_*` 形态写、被 Task 24 清理删掉），不被 CI 引用且职能已被 `verify_i_cycle_live.py` 的 D1/D4 覆盖 ⇒ 按「功能已覆盖」结案，不为凑文件名重建空壳。 |
+| g7-column-alignment-and-extraction-closure | G7 列结构对齐与取数闭合（**24/24**，commit `83ccf630`，分支 `work/2026-08-12-g7-column-alignment-closure`，22 文件 / 16 个新文件）。补上「源 xlsx ↔ 模板 seed ↔ 运行时载荷」三向锁死的**第三条边**（56 偏差 → 0），并新增立项时不存在的**第四边：渲染层** —— 浏览器实测发现两级表头 **0/38 张从未渲染**（模型的 `group` 是 additive 死代码，任何 `.vue` 零引用），修复后 20 张。契约覆盖面 **11 → 38 张**全部运行时表，顺带修掉 15 处三条守卫**结构性看不见**的标签列头原文偏差。<br>**修掉一个平台级假绿**：`_note_structure_kit` 的 `--check` 弱于 `--dry-run`（24 个幂等脚本共用）—— 改坏模板一格从报 0 欠账变为报 2 欠账；此前该假绿让所有幂等证空转（「0 变更 ⇒ 二次写入 md5 不变」恒真 ⇒ 补了从不对齐态出发的强化轮）。<br>**收口复盘追加修 1 项 fail-open**：两个披露 Tab 的 `syncToDisclosureNotes()` 把真同步与收尾刷新塞进同一 `try`，同步失败被收尾成功文案盖成「同步成功」⇒ 拆两段 try（真同步失败 `console.error` + `ElMessage.error` + **return**），文案下沉 helper `g7DisclosureSyncFeedback.ts`。<br>**终态**：前端 G7 全域 49 文件 **887 passed** · 后端 G7 主域 **2297 passed**（2 例失败三层归因为并发 K 循环在途）· 变异 **12/12 全 RED**（GREEN/MISS/WRONG 各 0）· `--list` **15 锚点**静态自检通过 · CI 挂 2 个 job。<br>**沉淀的通用教训 4 条**：`--list` 只打印不校验 ⇒ CI 恒绿（须加锚点命中恰好 1 次 + `replacement != anchor` + `expect_test` 可定位 + 无残留 `.bak`）· 多 spec 混改同一 yml 的「只加不动」验收须用**归因型判据**（全局等值型在并发下必假红）· `stamp()` 写的 `_aligned_at` 使「md5 逐字节不变」判据必假红 ⇒ 收敛比对剔时间戳、两次写入一致用裸 md5 · 别跑全量 `backend/tests`（1522 文件前台无输出会被误判卡死），按引用关系反查辐射面。<br>与同域 `g7-four-table-extraction-and-disclosure-alignment` / `g7-linkage-extraction-completion` 承接 |
 
-### 3.8 `08-disclosure-notes/` — 附注模块系列（2 个）
+### 归档（2026-08-14）
 
-| Spec | 成果 |
+**→ 06-engineering-governance（+1，前端工程治理域第 4 个 spec）**
+
+| Spec | 说明 |
 |------|------|
-| `disclosure-note-full-revamp` | 附注重写：173 章节生成 + 自动裁剪 + Word 导出 + 公式 DSL；46/47（剩外部 UAT/文档）；note_formula_generator 1331 行 + 50 note 测试 |
-| `note-dynamic-tables-and-template-inheritance` | 全维度增强 v0.6.2（D1~D15 共 15 维度）；实测 166/182≈90%（剩 16 项外部依赖）；10 核心 service 实跑全绿 |
+| frontend-excel-io-single-entry-convergence | 前端 Excel 库调用收敛到单一入口（**15/18**，commit `f049a11f`）。**46 个生产文件 / 93 处裸 import → 0，`exempt[]` 为空、无一豁免**。动因：`xlsx@0.18.5` 是 SheetJS 在 npm 的最后一版（已撤出 npm 改 CDN 分发），带 CVE-2023-30533（原型污染）与 CVE-2024-22363（ReDoS），**两个修复版永远不会进 npm**，而项目有 25 处在读用户上传的 xlsx ⇒ 25 个独立攻击面。收敛后防护单点化。<br>性质是**行为等价重构**（产物逐格不变），迁移默认姿势是三个显式关闭 —— `applyStyles`/`includeNoteRow` 两个默认 true 会给 42 个原本无样式的文件加三线表并插行。<br>**顺带修 2 个既有缺陷**：样式模板写非法 OOXML `vertical:'middle'` 致 openpyxl 打不开产出文件 · `ConsolNoteTab.uniqueSheetName` 只 add 不 check（去重是死参数，撞名则整批导出失败）。<br>**删除 2 类零消费方代码**（用户裁决「没用就删」）：`batchExport.ts` + `BatchQueryResultGroup.vue` 整条孤儿链（「合并导出」用户不可达）连带 `headerStyle` 覆写通道 · `sheetMatcher` / `customInstructionSheet` 两项 API（各被后来补出的 `readWorkbookAoa` / 多 sheet 纯 AOA 覆盖，属设计冗余）。<br>🔴 **最贵一课在提交前才发现**：基线 `_progress[].files` 漏记 13 个 confirmation 文件（只写在 `note` 的自然语言里）⇒ 精确 stage 漏文件 + Vite 编译扫描只覆盖 33/46 + 进度失真。**此前全部守卫都在验「代码符不符合清单」，无一验「清单本身完不完整」** ⇒ 补 R6.7 / Property 38 + 2 守卫 + 3 变异。<br>终态：守卫 **119** 例全绿 · 变异 **18/18** RED · Vite 编译 **46/46** · 三件套零 warning。与同分类 `frontend-consistency-m1` / `dev-tooling-modernization` / `workpaper-maintainability-convergence` 同域 |
 
-### 3.9 `09-consolidation-phases/` — 合并模块四阶段（4 个）
+### 归档（2026-08-12）
 
-合并报表模块完整开发周期，从止血到前端穿透。147 测试全绿 + 封板全链路集成测试 4 passed + 16 ADR + 24 consol service。
+**→ 05-business-features（+1，程序裁剪/委派域第 3 个 spec）**
 
-| Spec | 成果 |
+| Spec | 说明 |
 |------|------|
-| `consol-phase0-core-pipeline` | Phase 0 止血：B1 汇总 + B2 对账 + schema 基线 V027 + 锁定闭环 + ADR-CONSOL-001~003；PBT P1~P7 全绿 |
-| `consol-phase1-arch-lock` | Phase 1 架构锁定：AmountResolver 统一引擎 + ELIMINATION_APPROVED 事件重算 + 全端点锁定 + B6 负商誉 + B7 少数股东 + A3 async；ADR-CONSOL-101~106；Q1~Q7 PBT 全绿 |
-| `consol-phase2-orchestration` | Phase 2 编排接线：cascade_refresh DAG + refresh-all SSE + V2 附注 flag + 自动抵销 draft + 报表穿透 + cross_template + 公式联动 + 签字冻结；S1~S8 共 55 PBT + ADR-CONSOL-201~206 |
-| `consol-phase3-frontend-drilldown` | Phase 3 前端穿透：ConsolBreakdownDialog + provenance V039 + 双向导航 + 自动建树 + 完整度校验 + stale SSE；vitest 7 + 后端 26 测试 + ADR-CONSOL-301~304 |
+| procedure-trimming-and-delegation-intelligence | 程序裁剪三维判据 + 委派智能化（**26/26 全完成** + 浏览器实测 + 数据复原经 postgres 只读交叉核实）。详见 §一「2026-08-12 归档」段。要点：九档决策内核 + 汇总闸 + 完整性豁免 + 建议态三态 + 理由码真源统一 + 复核视图 + 附注反向联动；**真实库历史上第一次产生裁剪结果**（`procedure_instances` 此前 436 行全为 `execute`、0 条已裁剪 ⇒ 「裁剪→委派联动」逻辑正确但从未有数据流经过）；收口期修掉 Task 14 写入端点恒 500 的真产品缺陷（asyncpg timestamptz 参数编码，112 例守卫因替身不做参数编码而全绿）。与同分类前身 `procedure-applicability-trimming`、`procedure-delegation-notification` 同域；后继 spec = `procedure-trim-report-line-account-resolution` |
 
-### 3.10 `99-superseded/` — 已被取代 / 合并（4 个）
+### 归档（2026-08-09）
 
-| 旧 spec | 取代者 |
-|---------|--------|
-| `ledger-import-unification` | → `ledger-import-view-refactor`（在 05-business-features） |
-| `post-enhancement-bugfix` | → R9 + global-refinement-v3（在 04-infra-architecture） |
-| `note-account-mapping-seed` | → 合并入 `disclosure-note-full-revamp`（在 08-disclosure-notes） |
-| `linkage-panorama-graph` | → 合并入 `enterprise-linkage`（在 05-business-features） |
+**→ 08-disclosure-notes（+1）**
 
----
-
-## 四、开发历程时间线
-
-平台采用 PDCA 迭代模式：建议 → spec 三件套（requirements + design + tasks）→ 实施 → 复盘 → 下一轮。
-
-| 阶段 | 主题 | 产出 |
-|------|------|------|
-| **Phase 0-1** | 平台地基 | 基础设施 + 核心数据模型 + 底稿/报表骨架 |
-| **Phase 2-4** | 合并 / 协作 / AI | 合并报表 + 多人协作 + AI 引擎接入框架 |
-| **Phase 5-8** | 扩展 / 集成 / 加固 | 系统扩展 + 第三方集成 + 系统硬化 |
-| **Phase 11-16** | 深度治理 | 底稿深化 + Word 导出 + Gate 引擎 + 任务树 + 证据包 |
-| **11 审计循环** | 业务内容填充 | D~N 全循环 548 任务 + 致同 2025 编码体系 |
-| **Refinement R1-R9** | 五角色轮转打磨 | 合伙人/PM/质控/助理/EQCR 视角逐轮收口 |
-| **账表导入 v2** | 数据引擎重写 | 9 家企业验证 + B' 视图架构（activate <1s） |
-| **底稿渲染器** | HTML 化 | 1788 单体底稿从 Univer 切 HTML + 9 类组件 |
-| **附注全栈** | 附注模块重写 | 173 章节生成 + 离线分发 + Word 导出 |
-| **V3 全平台收尾** | 一致性治理 | 金额 Decimal 化 + 表单校验 + 归档只读 + 年度联动 |
-| **工程治理** | 仓库/迁移/Git | 前端路径统一 + D6 迁移韧性 + Git 工作流规约 |
-
----
-
-## 五、程序规模快照（2026-05-29 实测）
-
-| 维度 | 值 |
-|------|---|
-| 后端 routers | 273 |
-| 后端 services | 403 |
-| 后端 models | 58 |
-| 后端 tests | 588 |
-| 前端 views | 99 |
-| 前端 components | 353 |
-| 前端 composables | 81 |
-| 前端 .vue 总数 | 498 |
-| 前端 .ts 总数 | 379 |
-| PG 表数 | 188 |
-| 底稿模板 | 456 |
-| cross_wp_references | 400 条 |
-| prefill_formula_mapping | 1035 cells |
-| validation_rules | 114 条 |
-| D6 SQL 迁移 | V001-V040（V040 = account_note_mapping + consol_cell_comments 懒建表入 D6） |
-| **Spec 总数** | **active 2（consol-note stub + global-modules-p2-polish ✅）+ archived 94（详见 §三）** |
-
----
-
-## 六、模块打磨待办（按 ROI 排序）
-
-| 优先级 | 模块 | 当前 | 目标 | 依赖 |
-|--------|------|------|------|------|
-| P0 | WorkpaperEditor.vue | 815 行 | ≤1200 | 抽 useUniverEditor composable |
-| P1 | WorkpaperList.vue | 519 行 | ≤1500 | 抽 useStandardTable 复用 6 view |
-| P1 | TrialBalance.vue | 2494 行 | ≤1500 | 同上 |
-| P2 | DisclosureEditor.vue | 2468 行 | ≤1500 | 编辑器主体未拆 |
-| P2 | LedgerPenetration.vue | 3794 行 | ≤1500 | 需新建 spec |
-| P3 | ReportView.vue | 2317 行 | ≤1500 | 需新建 spec |
-| P0 | service ≤800 行卡点 | smart_import 2786 等 8 个 | pre-commit hook | 已有 check_file_size.py |
-| P2 | 6000 并发压测 | 外部依赖 | 真实验证 | PG 大数据量 + Locust |
-| P3 | LLM 真实接入 | 6 stub 引擎 | 一键切换 | WP_AI_SERVICE_ENABLED 已就位 |
-
----
-
-## 六-A、归档 spec 完成度核查（2026-05-30，逐 spec 代码实证，防伪绿）
-
-> 逐个 spec 读 tasks.md + fileSearch/grepSearch 实证产物真实存在。**结论：已核查 13 个 spec 无伪绿**。
-
-### 已完成逐 spec 实证核查
-
-**06-engineering-governance（4 个，全部核查）**：
-| spec | 判定 | 实证 |
-|------|------|------|
-| migration-runner-resilience | ⏳核心完成收尾待补 | Sprint1-4 全✅（emoji格式）；Sprint5 ADR-024/025 实际已存在（tasks.md 滞后标⏳）；真缺口仅 5.2/5.3 Playwright 截图（.playwright-mcp/ 不存在，需启动后端=外部依赖） |
-| pytest-residual-failures-cleanup | ✅真完成 | 残留 7 项全是父任务未勾+子任务全[x]（误报源③）；_test_auth_helper.py + override_auth 接入 + test_smoke_e2e skipif 全存在 |
-| repo-frontend-layout-unification | ✅真完成 | emoji格式 ✅23；check_no_root_frontend.py 存在+已注册 pre-commit；仓库根 frontend/ git tracked 0 文件；ADR-026 存在 |
-| repo-git-workflow-unification | ✅真完成（伪红） | tasks.md 12 项全标⏳但产物 100% 存在=最隐蔽伪红；check_git_sync_state.py(129行)/check_git_branch_naming.py(77)/check_hotspot_files.py(81)/.git-hooks/pre-push(53)/install.ps1(26)/git-workflow.md(110)/ADR-027(33)/ADR-028(42) 全部 fileSearch 确认 |
-
-**04-infra-architecture（8 个，全部核查）**：
-| spec | 判定 | 实证 |
-|------|------|------|
-| global-linkage-bus | ✅真完成 | linkage_graph_builder/stale_propagation_engine/formula_reverse_index 全存在 |
-| global-platform-enhancement | ✅真完成 | 7 残留全是收尾杂务框漏勾（误报源③）；GtAmountCell/GtEditableTable/eventBus(mitt)/migration_runner 全存在 |
-| global-refinement-v3 | ⏳核心完成收尾待补 | useAuditContext/ai_content_log_service/conflict_resolution_service/time_machine_service/trust_score_service/allowed_actions_service + 7 ESLint 规则全存在；真缺口仅 Task14.4 合伙人 UAT（外部依赖） |
-| production-readiness | ✅真完成 | 1 残留=父任务未勾子全done（误报源③）；migration_runner/sla_worker/import_recover_worker/outbox_replay_worker 全存在 |
-| table-unification-el-table | ✅真完成 | GtTableExtended/GtFormTable/gt-tokens.css 全存在 |
-| v3-linkage-stale-propagation | ⏳核心完成收尾待补 | stale_summary_aggregate.py 存在；残留=UAT 手动验收 8 项 pending（需真人执行） |
-| v3-r10-editor-resilience | ⏳核心完成收尾待补 | event_cascade_health_service/workers/worker_helpers 存在；残留=UAT 5 项 pending（需运维/真人） |
-| v3-r10-linkage-and-tokens | ⏳核心完成收尾待补 | GtTableExtended/gt-tokens.css/CI 4 道卡点全存在；残留=UAT 8 项设计师视觉回归截图（需真人） |
-
-**05-business-features（1 个已核查）**：
-| spec | 判定 | 实证 |
-|------|------|------|
-| procedure-applicability-trimming | ✅真完成 | 3 残留=Sprint/Checkpoint 汇总框（非实质任务）+11 可选 PBT；chain_orchestrator 步骤5b/5c 裁剪逻辑(548-579行)+ProcedureTrimming.vue+QC-19/20/24 门禁规则全存在 |
-
-### 待核查（剩余 71 个）
-
-### 已核查（续）— 05/01/03/07/08 标红项逐一实证
-
-**05-business-features 标红项**：
-| spec | 判定 | 实证 |
-|------|------|------|
-| procedure-applicability-trimming | ✅真完成 | 3 残留=Sprint/Checkpoint 汇总框+11 可选 PBT；chain_orchestrator 步骤5b/5c+ProcedureTrimming.vue+QC-19/20/24 全存在 |
-| advanced-query-enhancements-p1p2 | ✅真完成 | 2 残留=父任务未勾子全done（误报③）；custom_query.py+query_builder.py JOIN_WHITELIST 存在 |
-| partner-dashboard | ✅真完成 | 1 残留=父任务未勾（误报③）；PartnerDashboard.vue 存在 |
-| report-module-enhancement | ✅真完成 | 必需 15/15；13 可选 PBT 不影响；audit_logs §127+validate_formula_coverage.py 存在 |
-| 其余 8 个抽查 | ✅ | chain_orchestrator/enterprise_linkage_models/LedgerImportHistory.vue/TemplateLibraryMgmt.vue 等产物全存在 |
-
-**01-phase-foundation 标红项（Python 脚本误报，PowerShell 复核）**：
-| spec | 判定 | 实证 |
-|------|------|------|
-| phase3-system-enhancement | ✅真完成 | 2 残留=UAT-3(LLM 接入)+UAT-5(6000 并发)，均外部依赖 |
-| phase7-enhancement | ✅真完成 | PowerShell grep 209/209 全[x]（Python 脚本编码/正则 bug 误报 32/51）|
-| phase8 | ✅真完成 | PowerShell grep 209/209 全[x]（同上误报 50/75）|
-
-**03-refinement-rounds 标红项**：
-| spec | 判定 | 实证 |
-|------|------|------|
-| refinement-round1-review-closure | ⏳核心完成收尾待补 | 12 残留=UAT-1~6 真人验收+Round2 候选 2+已知妥协 4，全是外部依赖/后续候选/技术债 |
-
-**07/08 补充核查**：
-| spec | 判定 | 实证 |
-|------|------|------|
-| workpaper-html-renderer | ✅真完成（伪红）| 1 残留 Task1.6 标[ ]但 wp_classification_service.get_classification 真实存在 |
-| workpaper-list-shrink | ✅真完成 | 9 残留全父任务未勾（误报③）；产物全存在 |
-| disclosure-note-full-revamp | ✅真完成 | 6 残留=P-1~3 外部+1.7 UAT+F-2/3 文档收口；note_formula_generator.py 存在 |
-| note-dynamic-tables | ✅真完成 | 16 可选/外部 UAT；dynamic_region_engine+consol_note_aggregation 存在 |
-
-### 核查汇总（PowerShell 准确计数 + fileSearch 实证）
-
-**全部 84 个归档 spec 已用 PowerShell `Select-String "^\s*-\s*\[x\]"` 精确计数**（避开 Python re.M bug），有 unchecked 任务的逐一读 tasks.md + fileSearch 实证：
-
-| 判定 | 说明 |
+| Spec | 说明 |
 |------|------|
-| ✅ 真完成（绝大多数）| 代码产物全部 fileSearch/grep 实证存在；unchecked 全是：可选 `[ ]*` / 父任务汇总框未勾（子任务全[x]）/ emoji 标题格式 / 伪红（标⏳产物已存在）|
-| ⏳ 核心完成收尾待补 | migration-runner(Playwright 截图) / global-refinement-v3(合伙人 UAT) / v3-linkage-stale / v3-r10-editor-resilience / v3-r10-linkage-tokens / refinement-round1(真人 UAT) / phase6-precision(部分被 global-refinement-v3 取代) / phase7-role-closure(汇总框+UAT) / round7-global-polish(触碰即修债+UAT) — 残留**全是外部依赖（真人 UAT/Playwright/设计师视觉）或被后续 spec 取代**|
-| ⚠️ 伪绿 | **0 个** — 无一 spec 声称完成但代码产物缺失 |
+| soe-listed-note-conversion-correctness | 国企↔上市附注转换正确性（**19/19 全完成**，守卫 549 passed / 0 failed）。修「生产 6 步里 3 步空操作 + v2 映射是孤儿」：`_map_disclosure_notes` 原先只 `SELECT count(*)` 一行不改却把该数报成 `mapped_notes` = **假成功反馈**；`_map_report_rows` / `_update_formula_references` 是 `return 0`。四处立项判断被实证推翻 —— ①跨变体 row_code 必须按 `(entity, scope)` **四象限**统计（按 entity 合并会虚构出「78 条一码两义」）②「同义两码」standalone **14** 条 / consolidated **13** 条（非 12），且 `EQ-030`/`EQ-033` 两 scope 目标码冲突 ⇒ 映射常量必须 `dict[scope, list]`③需求 3.8「两清单互斥」按字面**不成立**（14 条映射的 listed 目标码全部属「一码两义」，正因两侧异名才需要改写）→ 真不变量 = 「改写源不得落在该 scope 禁止清单里」④公式改写在 `report_config` 域内**零可改写对象**（该表无 `project_id` 列 = 纯模板表 / 全库 formula 对那批 row_code 引用 0 条 / `wp_formula` 0 行 / 附注 `binding_id` 是「章节号.行标签.列键」不含 row_code）⇒ 保留 `return 0` 但补原因码 `no_mapping_needed`。Task 10 裁决 = **删除 v2 不接线**（生产 Step 4 已调 `_map_disclosure_notes`、v2 零调用方且生产版严格更强），21 条断言迁移到生产测试 + 52 例移除守卫。Task 19 达成状态是**诚实输出「无法验收（缺授权）」**（`eligibility=NO_CANDIDATE` + rc=1，需求 10.7 明确允许）—— 8 个 live 项目里技术可切换 4 个、已授权 0 个，建议 `c8621493`（规模最小）。新建件：`note_conversion_row_codes.py` / `note_section_matcher.py`（5 对别名穷举 + 禁止匹配对 + 零相似度实现）/ `note_variant_matrix_null_audit.py`（35 条 null 三态裁决）/ `fix_variant_matrix_false_nulls.py`（三闸门：撞码 / 落点形态 / additive）/ `verify_note_conversion_live.py`；CI job `note-conversion-correctness`（jobs 136→137）。5 个生产文件收尾 md5 与开工基线逐字节一致 = 零净改动 |
 
-**有 unchecked 的 spec 逐一定性**（PowerShell 实测）：
-- 01 类：phase3-system-enhancement(2=外部UAT) / phase6-precision(19=汇总框+1.3b被v3取代+UAT) / phase7-role-closure(25=汇总框+UAT)；其余含 phase7-enhancement/phase8 经 PowerShell 复核实为 209/209 全[x]（Python 误报）
-- 02 类：16 个仅 workpaper-editor-refactor(残留=被 editor-slimdown/phase2 取代) + workpaper-deep-optimization(1 可选)；其余 14 个 notdone=0
-- 03 类：round1(12=真人UAT+技术债) / round2(3=Sprint 验收框) / round7(32=触碰即修债+UAT) / round8(7) / round9(8)；其余 round3-6 notdone=0
-- 04 类：8 个全核查（前文表格）
-- 05 类：4 标红项 + 8 抽查全 ✅
-- 06 类：4 个全核查（前文表格）
-- 07 类：5 个全核查 ✅
-- 08 类：2 个全 ✅
-- 99 类：4 个 superseded（被取代不必 100%）
+### 归档（2026-08-08）
 
-**剩余可深入**：03 类 round8/round9 的残留性质（sprint-split 格式）+ 99 superseded 细节，但均低风险。
+**→ 05-business-features（+1，抽样域第 5 个 spec）**
 
-### 正则统计四大误报源（核查方法论）
-1. **可选 `[ ]*`**：带星号未做不影响完成定性
-2. **emoji 标题格式 `### Task X ✅`**：非 checkbox 被误报 0/N
-3. **父任务未勾 + 子任务全完成**：父项汇总忘勾
-4. **伪红**：tasks.md 全标 ⏳ 但产物 100% 存在（repo-git-workflow-unification）
+| Spec | 说明 |
+|------|------|
+| sampling-compliance-closure | 抽样/抽凭合规闭环（**25/25 全完成** + 浏览器实测 + 数据逐项复原）。四波：dataset 版本绑定（抽样查询原先只走 `get_active_filter`，序时账重导后同 seed 同参数得到不同样本且无提示 ⇒「seed 可复现」是假的）· 推断错报持久化 + A13 **`projected`** 通路（改造前 `misstatement_type` 硬编码 `factual`，PG enum 的 `judgmental`/`projected` 是死枚举 ⇒ CAS 1314 的核心输出进不了错报汇总）· 删 legacy `wp_sampling_engine`（金额口径 `debit+credit` 与 canonical 的 `GREATEST` 不同、分层权重写死、不落 log 不可撤销）+ V139/V140 迁移（**加唯一索引前必先查既有唯一约束** —— `uq_sampled_voucher_project_year_no` 全局唯一会让引擎登记撞它并被 fail-open 吞成 WARNING）· 78 宿主 methodology 收口（字段集判据按行模型语义分层：凭证明细型强制四要素 / 合规检查·计价测试型只要求样本可回溯，源模板实证 F2-33 只有源单据日期号、H4-5 只有入账凭证号，加「凭证日期」列属自造底稿列）。**用户裁决**：同一凭证被多底稿抽取必须弹窗人工确认（三出口 + 处置随回填留痕），不由配置项静默决定。**Task 24 收口修掉 4 个前端 dead output 缺陷**（`filled` 载荷缺 `batchId`/`datasetId` 致 bar 恒显「未绑定账套版本」· `wpCode` 是死 prop（78/78 宿主未传）致 `source_wp_code` 恒 null → 改 setup 顶层 `inject(WorkpaperRuntimeContextKey)` 传 getter · 回读态卡片被 `sampledVouchers.length > 0` 藏起来 · A13 描述批次号与样本量/种子不同源）+ 2 处后端修正（`cutoff_fill` 复用 `_normalize_evaluation` · `record_extraction_log` 两条幂等重放分支补回 `batch_id`）。新增 Property 22 + 守卫 46 例，**变异检验三轮 21/21 全 RED**，数据复原后独立只读查询逐项相符。与同分类 `sampling-evaluation-and-governance-closure`（其后继）、`voucher-sampling-engine`、`voucher-sampling-hardening`、`voucher-check-sampling-integration`、`cutoff-test-*` 同域 |
 
-> ⚠ Python 正则脚本本身也有 bug（phase7/phase8 误报 32/51、50/75，实际 209/209）——**PowerShell `Select-String "^\s*-\s*\[x\]"` 直接 grep 比 Python re.M 更可靠**。最终判定一律靠 fileSearch/grep 实证产物文件存在，不信文档自述、不信扫描数字。
+**→ 11-confirmation-d0-module（+2）**
+
+| Spec | 说明 |
+|------|------|
+| k0-confirmation-source-alignment | K0 管理循环函证源模板对齐（18/18 全完成 + 浏览器实测 + 数据逐字复原）。**接手时三件套在工作树里被并发会话删掉**（`git checkout HEAD --` 恢复；恢复出的是 7/18 旧快照而磁盘产物远超它 ⇒ 「spec 文档被删导致进度记载整体回退」是新的一种假红成因）。**归档副本此前已被并发会话扫进 `d720d522`（无关 spec 的 commit）带进 HEAD，而 active 副本也还在 HEAD ⇒ 两份重复**；本轮按「以归档副本为基底、逐条施加增量」合并（保留并发会话两段实录，10 项结构性核验）后 `git rm` 掉 active 重复副本。**本轮唯一真缺口 = Property 22/23 无守卫**（design 的 Testing Strategy 表点名 `k0LowerZone.spec.ts` 而该文件不存在，Property 覆盖矩阵实扫「22 零引用、23 只被 H0 的同号 Property 偶然命中」）→ 新建 20 例守卫、**变异 6/6 全 RED + md5 逐字节还原**。另修三处三件套缺陷：悬挂引用（补 design 的 Property 24/25）· Testing Strategy 表路径漂移（`x0SummaryMatrix` 已随泛化内核撤回而不存在）· AC 11.1 无人引用。浏览器实测证实 29 叶子列六段分组 / 8 指标出数 / 账面金额自动取数 87,794,660.16（K1 BS-009 净额口径）/ 手工覆盖优先 / 下区键落 `checklist_responses`（**立项写的 `html_data` 是错的**）。新登记两个平台级缺口：保存后切走再切回回到 render-config 初始载荷（潜在数据丢失路径）· 详情面板不套用列剔除与 label 覆盖 |
+| f0-confirmation-linkage-and-structural-enhancement | F0 存货循环函证联动增强（144/144 全完成）。矩阵自动聚合（三行取数 + 五派生比例 + 勾稽）+ F0-5/F0-6 供应商自动带入 + B50/A13 推送 + F0-7 邮箱域名可靠性 + F0-3 工号字段。Wave 7 九项返工其中三项修法与立项相反（舞弊迹象/矩阵取值/AI prompt 均按源模板忠实实现或撤回自造）；Task 20/21/22 浏览器实测于 2026-08-05/08-06 三轮补做全通（含 http 客户端形态错配、请求去重 abort、三循环键名各异三个只有浏览器能发现的缺陷）。与同分类 g0/h0/confirmation-orphan 同域 |
+
+**→ 08-disclosure-notes（+1）**
+
+| Spec | 说明 |
+|------|------|
+| parent-company-note-chapter-and-sourcing | 母公司附注章节结构与取数修复（18/18 全完成 + 已 push 8 个分层 commit）。判据真源 = `docs/模版/` 两份源 docx。修 5 类缺陷：soe 第 12 章标题误为「股份支付」+ slug 错、母公司 93 张表 columns/guidance/report_row_code 全缺、长期股权投资三表两级表头压扁、listed 表名首格泄漏且重名、母公司章 100% 无数据来源。核心件 `parent_company_note_sections.py`（母公司口径单一真源，按章节号逐字相等匹配）。收尾修 3 条守卫红（docstring 剥注释 / removed 键基线由 HEAD 名集推导 / 中间名留痕降级为条件断言），13/13 变异 RED |
+
+**→ 04-infra-architecture（+1）**
+
+| Spec | 说明 |
+|------|------|
+| report-config-account-code-integrity | `report_config` 科目码完整性（12/12 全完成）。全表对账 132 条 `TB()` 引用扫出 16 行错码（本 spec 修 V138 13 行 + V144 3 行），远超此前手工发现的 6 处。Task 7 挖出立项未见的第二写入路径 `ReportFormulaService.fill_all_formulas()`（按行名索引 + 只填 NULL 行 = 恰是 V138 置 NULL 那批 ⇒ 不修等于白做）+ 未完成重构残留副本 `fill_report_formulas.py`。修 6701/6702 互换 6 处（约 1.5 亿）。核心交付 = 平台级一致性守卫（此前零校验，错码可静默存在数年，先打红 13 行再改数据）+ CI job。V138/V144 均已应用真实库。撤 4 个已到期的 `trust_report_config=False`（零回归双证：40 组合仅 3 组变 resolved_from、码不变） |
+
+**→ 05-business-features（+1）**
+
+| Spec | 说明 |
+|------|------|
+| sampling-evaluation-and-governance-closure | 抽样评价与治理闭环（19/19 全完成 + 真实库只读验收 PASS=10/FAIL=0/SKIP=2 + 浏览器实测 + 数据逐位复原）。**Wave 3 是平台级 P0**：`qc_rule_definitions` **0 行** ⇒ `_get_enabled_rule_codes` 返回空集 ⇒ **20 条 QC 规则全部静默不执行**（非 except 分支、连 WARNING 都没有），门控语义改「禁用黑名单过滤」三态后真实库恢复 20/20。另修：撤销回填从不清两张投影表（撤销的凭证永久抽不到 + 项目级统计虚高）· 合规判据把「有没有全选」当准则风险 · 60% 覆盖率阈值写死在函数体 · CAS 1314 四条评价缺口（未检查样本处置 / 偏差性质 / 完整性阻断 / 分层层内评价）· 归档完整性完全不感知抽样。**收口期浏览器实测挖出并修掉一个数字级缺陷**：`alternative_performed` 样本被静默挤出比率估计基数、推断错报放大 2.26 倍（真实库落库取证 3,412,422.05 vs 正确 1,511,272.73），Property 28 + 变异 5/5 全 RED。**两项诚实登记未做浏览器实测**：分层明细（灰度默认关，开启需重启共享 dev server）与撤销后重复提示（会在真实批次留下不可逐字节复原的软删痕迹），均由守卫 + 只读脚本 SKIP 承担 |
+
+### 归档（2026-08-07）
+
+**→ 04-infra-architecture（+2）**
+
+| Spec | 说明 |
+|------|------|
+| prefill-wp-prev-resolution-repair | `WP()`/`PREV()` 死链修复（17/17）。两个 resolver 读 `parsed_data['cells']`，该键真实库**零命中**（407 个非空 parsed_data 中 0 条）⇒ 337 条预设恒返 `None` 且 fail-soft 无告警。新建声明式真源 `prefill_anchor_map.py`（三元组键 `(wp_code, sheet, cell_ref)` → `AnchorSpec`，四种聚合 + **六态** `AnchorReadStatus`），取值改走 `checklist_responses(wp_id, item_id).remark`。**核心守卫 Property 4**：读前端 composable 源码抽 `serializeRows()` 持久化字段集与映射列键交叉锁死 ⇒ 「后端复刻前端派生列公式」这一双真源风险变成编译期可检测（D1-2 一族派生列因此进待对齐清单，宁缺勿造）。`PREV()` 改 **fail-closed** 恒返 `None`（`working_paper`/`wp_index` 都无 year 列，取本年值填「上年数」列属数字级错误，161 条里 118 条是「上年审定数」）。**落地时抓到 1 个 P0**：取值层 SQL 写 `checklist_responses.workpaper_id` 而真实列名是 `wp_id` ⇒ 被 `except Exception` 吞成 WARNING、8 条已对齐锚点全部仍返 None，而源码守卫/纯函数单测/characterization 三层全绿（characterization 恰好与「已修好」不可区分）⇒ 新增 **Property 17 真实执行守卫**。另修 `PL` 灰区（`WP('PL','利润表','净利润')` 目标是**报表**不是底稿，硬编码字母表 `"EFGHIJKLMN"` 结构上表达不了 ⇒ 改预设实时派生 + 独立登记表，Property 18）。实测 **6 HIT / 0 ERROR**，`624,025,343.06`（1260 行）经独立 SQL 交叉核对同值同行数；**10/10 变异 RED**；零回归双证（6 个未触碰 resolver 与 HEAD 逐字节相同 + 广域两侧失败集合逐条相同 126 条）。 |
+| formula-management-runtime-closure | 公式管理运行层闭环（18/18 + 归档前双轮复核）。修六类实证缺陷：**48 格数字错**（`COLUMN_ALIASES` 缺 4 个发生额列名，两条求值路径静默回退期末余额 → 现 8→14 键 + 三态 helper `_resolve_tb_column`，未注册列名格数 48→**0**）· 用户公式与 Tier A **两套存储收敛**进 `wp_formula`（0 行 = 零迁移压力，GET 保留读兼容分支且守卫钉死）· `logic_check` 结果落库 `cross_check_results` · 删 **4 个同族孤儿**（`useFormulaStatus.ts` / `FormulaTooltip.vue` / `FormulaSourceDrawer.vue` / `FormulaDependencyGraph.vue`，均 0 消费方 + 调后端零命中端点）· 底稿公式面板补 issue/hint/计算时间/中文类型标签 · 27 处硬编码 URL 收敛进 `apiPaths/formula.ts` + **平台级「前端公式 URL ⊆ 后端真实路由」守卫**。另修 3 处 spec 未记缺陷（`SUM_TB` 丢弃列名 / `_COLUMN_MAP` 把发生额映到无该列的 `TrialBalance` 静默返 0，24 个消费方 / TB 正则缺词边界误匹配 `SUM_TB` 后半段）。归档复核再修 2 处：**`test_wp_formula_layer_contract.py` 恒红零信号**（列清单只到 V100 而 V104 又加 3 列 → 判据改为扫全部 `V*.sql` 抽取，自动跟随迁移）· `draftRefresh` 漏进 `apiPaths` barrel（+ barrel 完整性守卫）。后端守卫 133 passed / 前端 60 passed / 变异 6/6 RED。与同分类 `formula-engine-unification`、`formula-runtime-convergence` 同族 |
+
+### 归档（2026-08-05）
+
+**→ 05-business-features（+1）**
+
+| Spec | 说明 |
+|------|------|
+| deliverable-lineage-wiring-and-writeback-closure | 交付件溯源接线与回填闭环（25/25，四波全收口 + 两次真实链路验收 12/12、18/18）。与同分类的 `deliverable-lineage-and-writeback`（被它修的前序 spec）、`deliverable-lineage-content-control`、`audit-report-deliverable-center` 同域 |
+
+### 归档（2026-08-03）
+
+**→ 08-disclosure-notes（+3）**
+
+| Spec | 说明 |
+|------|------|
+| h-cycle-four-table-extraction-and-account-mapping | H1~H10 语义科目定位收口（25/25 + 复盘 5 项 + 浏览器实测）：修 3 个「取错整个科目族」P0（H3 `1503/1504`→`1521/1525/1526/1527`、H8 `1901` 待处理财产损溢→`1641/1642/1643`、H9 `2205` 合同负债→`2601/2602`）；实测挖出 `parent_check` 揭示的 `trial_balance` 父子双算平台级缺陷 |
+| d4-four-table-extraction-and-disclosure-alignment | D4 营业收入四表取数与披露/附注对齐（33/33） |
+| n-cycle-note-template-and-disclosure-completion | N 循环附注模板与披露收口（13/13） |
+
+### 归档（2026-08-01，第四批）
+
+**→ 08-disclosure-notes（+14）**
+
+| Spec | 说明 |
+|------|------|
+| f1-four-table-extraction-and-disclosure-alignment | F1 预付款项四表库取数链路根治+披露/附注收尾（28/28 全完成+实测） |
+| f1-extraction-chain-and-disclosure-source-fidelity | F1 取数链路数据源忠实度（16/17，仅缺浏览器活测；实现已完成） |
+| h3-investment-property-disclosure-alignment | H3 投资性房地产披露对齐（11/11 全完成+实测） |
+| h5-oil-gas-disclosure-alignment | H5 油气资产披露对齐（8/8 全完成+实测） |
+| h7-biological-assets-disclosure-rebuild | H7 生产性生物资产披露重建（12/12 全完成+浏览器实测） |
+| h8-right-of-use-disclosure-alignment | H8 使用权资产披露对齐（7/7 全完成+实测） |
+| h9-h10-remaining-disclosure-alignment | H9 租赁负债 + H10 资产处置损益披露对齐（9/9 全完成+实测） |
+| k1-extraction-chain-and-note-alignment | K1 其他应收款取数级联第二轮收口（28/28 全完成+实测） |
+| k1-four-table-extraction-and-disclosure-alignment | K1 四表库取数口径根治+披露/附注结构对齐（27/27 全完成+实测） |
+| k2-four-table-extraction-and-dynamic-rows | K2 其他流动资产四表取数+动态行（13/13 全完成+实测） |
+| n1-four-table-extraction-and-disclosure-alignment | N1 递延所得税资产四表取数+披露对齐（24/24 全完成+实测） |
+| n2-disclosure-and-extraction-alignment | N2 应交税费披露与取数对齐（19/19 全完成+实测） |
+| n2-vat-calc-source-alignment | N2 增值税计算源模板对齐（19/19 全完成+实测） |
+| n345-four-table-extraction-alignment | N3/N4/N5 四表取数对齐（26/26 全完成+实测） |
+
+**→ 99-superseded（+1）**
+
+| Spec | 说明 |
+|------|------|
+| n2-source-alignment | 被 `n2-disclosure-and-extraction-alignment` 取代（仅含未落盘的 implementation-checklist） |
+
+**清理空壳（2个）**
+
+| Spec | 说明 |
+|------|------|
+| procedure-delegation-visibility-isolation | 早已归档（2026-07-18），残余 evidence 目录清除 |
+| visibility-isolation-go-live-hardening | 残余 evidence 目录清除 |
+
+### 2026-07-31 归档
+
+**→ 08-disclosure-notes（+19，含并发会话完成的 spec）**
+
+| Spec | 说明 |
+|------|------|
+| h2-construction-in-progress-disclosure-alignment | H2 在建工程披露结构对齐（7/7 全完成+实测）：两级表头重建 + 「项  目」→「工程物资」改名 + 10 表 columns/guidance + 契约守卫 + CI job + 浏览器实测通过 |
+| d2-ar-disclosure-template-alignment | D2 应收账款上市披露三层对齐（31/31 全完成+实测+已提交） |
+| d2-ar-disclosure-soe-alignment | D2 应收账款国企披露结构对齐（25/25 全完成） |
+| f2-inventory-disclosure-template-alignment | F2 存货披露对齐（Sprint 1~8 全完成+已提交） |
+| f1-prepayment-disclosure-template-alignment | F1 预付款项披露对齐（全完成+实测+待 commit） |
+| disclosure-columns-coverage-rollout | 披露表 columns 覆盖推广（Task 1~16 全完成+已提交） |
+| j1-disclosure-template-alignment | J1 应付职工薪酬披露对齐（61/61 全完成+待 commit） |
+| k2-other-current-assets-disclosure-alignment | K2 其他流动资产披露对齐（22/22 全完成+实测） |
+| n1-deferred-tax-disclosure-template-alignment | N1 递延所得税资产披露对齐（57/61 实现+实测完成） |
+| n-cycle-tax-disclosure-alignment | N 循环税务类披露对齐（N2/N4/N5 全完成+实测） |
+| d-cycle-remaining-disclosure-alignment | D3/D5/D6/D7 披露结构对齐（Task 1~9 全完成+实测） |
+| k-cycle-disclosure-alignment | K1~K13 三批披露对齐（全完成+实测） |
+| d1-notes-receivable-disclosure-alignment | D1 应收票据披露对齐（四阶段全完成+实测） |
+| f-cycle-disclosure-parity | F 类披露复盘对齐（R1~R9 全完成） |
+| applicable-standards-frontend-wiring | 准则前端全链接通（全完成+实测） |
+| applicable-standards-runtime-and-sync-guard | 准则运行时守卫（全完成+实测） |
+
+**→ 05-business-features（+2）**
+
+| Spec | 说明 |
+|------|------|
+| f1-prepayment | F1 预付款项（含四表库自动取数补齐） |
+| k2-other-current-assets | K2 其他流动资产 |
+
+**→ 06-engineering-governance（+1，清理空壳）**
+
+| Spec | 说明 |
+|------|------|
+| procedure-delegation-visibility-isolation | 服务端底稿可见性隔离（18/18，2026-07-18 已归档，空壳清理） |
+
+### 2026-07-29 归档（12 个，详见 git log）
+
+**→ 05-business-features（+9）**
+
+| Spec | 说明 |
+|------|------|
+| advanced-query-consolidation | 高级查询模块合并收敛（12/12） |
+| attachment-workpaper-linkage-convergence | 附件↔底稿联动收敛（23/23） |
+| f2-adjudication-import-export | F2 审定表导入导出（9/9） |
+| f2-detail-ledger-pull | F2 明细表序时账取数（11/11） |
+| f2-four-table-extraction-refresh | F2 四表取数刷新（22/22） |
+| hi-cycle-four-table-extraction | H/I 循环四表取数（14/14） |
+| lmn-four-table-extraction | L/M/N 循环四表取数（12/12） |
+| template-library-formula-preset-custom | 模板库公式预设（16/16） |
+| work-hours-auto-collect-and-edit | 工时自动采集与编辑（18/18） |
+
+**→ 08-disclosure-notes（+1）**
+
+| Spec | 说明 |
+|------|------|
+| d-cycle-disclosure-note-enhancement | D3-D7 审定↔披露差异告警（13/13） |
+
+**→ 09-consolidation-phases（+1）**
+
+| Spec | 说明 |
+|------|------|
+| consol-disclosure-note-persistence | 合并附注 V2 按项目灰度（9/9） |
+
+**→ 11-confirmation-d0-module（+4）**
+
+| Spec | 说明 |
+|------|------|
+| confirmation-linkage-completion | 函证两价值孤儿正式做完（19/19） |
+| h0-confirmation-source-fidelity-and-linkage | H0 固定资产循环函证源模板保真度与联动（24/24） |
+| g0-confirmation-source-alignment | G0 投资循环函证源模板对齐与联动补齐（23/23） |
+| confirmation-orphan-and-amount-format-closure | 函证域孤儿件与金额格式收口（13/13）：删 3 个 G0 零消费方 composable · `CrossWorkpaperNav.vue` 挂上首个渲染宿主（改造前全仓零宿主 = 用户不可达）· `BlockColumnDef.render:'amount'` + 七枢纽 76 个金额列标注 + 17 个非金额列登记 · 新增平台守卫「渲染宿主存在性」（组件基线 2 / 模块基线 23，只许缩短） |
 
 ---
 
-## 七、索引规约
+## 三、运维命令速查
 
-1. 新建 spec 默认放 `.kiro/specs/`（active 根目录，**扁平存放**），完成后审议是否归档
-2. **active spec 不可嵌套子目录** —— Kiro spec 工作流依赖固定路径 `.kiro/specs/{name}/tasks.md`
-3. 完成 spec 时填完成日期 + 关键 commit
-4. 归档时 `git mv` 到 `_archive/{分类目录}/`，按功能归入 7 个分类之一，不删文件保留审计轨迹
-5. 归档分类目录：01 地基 / 02 循环 / 03 打磨 / 04 架构 / 05 业务 / 06 工程 / 99 取代
-6. 废弃 spec 移入 `99-superseded/` + 记录取代者
-7. **凭印象禁令**：完成度 / 日期必须有 grep 证据，凭印象写视为漏审
+| 需求 | 命令 |
+|------|------|
+| 代码规模 | `codegraph status` |
+| 超标文件 | `python backend/scripts/check/check_file_size.py` |
+| 最高迁移 | `ls backend/migrations/V*.sql \| sort \| tail -1` |
+| 三件套完整性 | 扫描 `_archive/` 各 spec 目录是否含 requirements.md + design.md + tasks.md |
 
-### 迁移系统提示（D6 唯一入口）
+---
 
-- 当前迁移系统 = `backend/migrations/V*.sql` + `R*.sql`（启动时 MigrationRunner 自动执行）
-- alembic 已废弃（2026-05-29 删除）
-- 新加迁移：写 `V0XX__xxx.sql` + `R0XX__rollback_xxx.sql` 配对，必须 `IF NOT EXISTS` 幂等
+## 四、索引规约
+
+1. 新建 spec 放 `.kiro/specs/{name}/`（扁平，不可嵌套）
+2. 完成 spec 归档移到 `_archive/{分类}/`，同步更新本文件
+3. 分类：01地基 / 02循环 / 03打磨 / 04架构 / 05业务 / 06工程 / 07底稿瘦身 / 08附注 / 09合并 / 10全循环 / 11函证 / 12 2023-06-23批 / 13 2026-06-29批 / 99取代
+4. **凭印象禁令**：完成度必须实证
+5. 迁移系统 = `backend/migrations/V*.sql`（MigrationRunner），新加必须 `IF NOT EXISTS` 幂等
+> **2026-09-13 新建｜`d4-ipo-fraud-writeback-formula-io`（D4-29/30/31/32 IPO 舞弊域，0/11）**：第三批检查类底稿治理，与 `d4-inspection-writeback-formula-io`（D4-13/14/15/16）、`d4-cutoff-return-writeback-formula-io`（D4-17/18/19/20）平行。**关键差异（与姊妹 spec 相反）**：四表的 `_SUPPORTED_SHEETS`/`_SHEET_HEADERS` **已登记**（`_d4_import_export.py` 第 38–46 / 49–255 行）⇒ **不报 400**，是更隐蔽的**静默断裂**——点了按钮、没报错、就是空的。五处断裂根因排序：① **item_id 两端默认 `f"{sheet}-rows"`** 而前端持久化键是 `D4-30-customers`/`D4-31-interview`/`D4-32-groups`（D4-29 巧合一致）⇒ 单向断裂；② **无专用 export 行构造** ⇒ 落 generic `data_row.get(中文列头)` 产出全空行；③ **无专用 parser** ⇒ 落 `_parse_generic_row` 产出中文键、前端英文 key 读不出；④ D4-30 前端 sheet 字面量是 `'D4-30-客户访谈记录汇总表'` 而后端只登记裸码 ⇒ **这张反而触发 400**（唯一不静默的）；⑤ D4-31 **无「导入导出 ▾」下拉入口**。四表**均无 `eventBus.emit`**，无 A13 回写、无 D4-1 说明。三块能力：导入导出修复（专用 parser/exporter + item_id 两处映射 + 前端 sheet 字面量与入口）· 双向回写（复用 `useD4InspectionWriteback` → `a13:push-misstatement` + `d4:save-items` 落 `D4-1-adj-note`）· 公式管理统一（D4-29 删内联 `calcChangePct` 改调 `calcChangeRate`，**除零语义有差需显式分支**；D4-32 删内联 `computeFlags`/`rowAnomaly` 改调 `calcAnomalyRate`/`calcProportion` 并**接线 `isSuspiciousFundFlow`**——该函数注释写「D4-32 使用」但零组件引用，属 additive 死代码）。**边界（同姊妹 spec）**：D2 的「底稿→附注 `sync-from-workpaper` 推送」链路**不复制**——四表无独立附注章节，仅借鉴其写侧/读侧分离与 fail-open 纪律；D4-29 从 D2-2 取数是**单向喂入**（照 `useD2RelatedParty.importFromDetail` 范式），非双向同步（两表语义不同源，会互相覆盖）。**7 Requirement / 53 AC / 5 Property / 11 Task / 6 Wave**，三件套机器校验全绿（Property 1~5 全整数、5 处 Validates 全 `X.Y`、waves JSON 可解析、**53 AC 定义与 53 AC 任务引用完全对称，零悬空零漏覆盖**）；DEC-1~9 已裁决（DEC-1 列头不动、四表登记降级为**回归锚点断言**；DEC-2 回写仅 A13+D4-1、不回写 `trial_balance`；DEC-3 D4-32 分组标识必须成为 xlsx 一列，否则分组无法还原；DEC-4 D4-31 单对象导入必须单行门控、拒绝多行、不静默截断；DEC-5 D4-30 纵向扁平 15 列为 xlsx 真源；DEC-6 共享件只许扩展可选参数 `sourceSheet`；DEC-7 D4-30 字面量改裸码后**不留兼容别名**；DEC-8 `cross_wp_references.json` **不新增**引用，只修 D4-32 工具栏 `wp:E1-31` 跨循环错引；DEC-9 D4-29 取数单向喂入）。🔴 本 spec 目录当前为 git `??` 未跟踪，蒸发风险同 browserless-headless-integration。

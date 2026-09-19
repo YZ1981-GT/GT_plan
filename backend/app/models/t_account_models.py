@@ -5,7 +5,7 @@
 """
 
 import uuid
-from datetime import datetime
+from datetime import date, datetime
 from decimal import Decimal
 
 import sqlalchemy as sa
@@ -52,6 +52,12 @@ class TAccountEntry(Base):
     reference_id: Mapped[uuid.UUID | None] = mapped_column(PG_UUID(as_uuid=True), nullable=True)
     is_deleted: Mapped[bool] = mapped_column(server_default=text("false"), nullable=False)
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
+    # DB 扩展列（现金流量表编制用）
+    debit_amount: Mapped[Decimal | None] = mapped_column(sa.Numeric(20, 2), nullable=True)
+    credit_amount: Mapped[Decimal | None] = mapped_column(sa.Numeric(20, 2), nullable=True)
+    entry_date: Mapped[date | None] = mapped_column(sa.Date, nullable=True)
+    cfs_category: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    counterpart_account: Mapped[str | None] = mapped_column(String(100), nullable=True)
 
     __table_args__ = (
         Index("idx_t_account_entries_account", "t_account_id"),

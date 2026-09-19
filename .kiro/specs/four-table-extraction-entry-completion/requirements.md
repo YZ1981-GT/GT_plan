@@ -1,0 +1,145 @@
+# Requirements Document
+
+## Introduction
+
+明细表可以从四表库（`tb_balance` / `tb_aux_balance` / `tb_ledger` / `tb_aux_balance` 辅助维度）一键取数，但**前端入口只在少数循环补齐**，其余底稿的明细表要么只能手工录几十上百行，要么只有"空表自动 seed"、用户改过数据后想重取无入口。本 spec 要做两件事：
+
+1. **补齐入口**：逐一分析哪些明细表具备四表库取数能力但缺前端键，按统一范式补上。
+2. **收敛实现**：现存 aux 取数有**两套**实现（F1/G7/K1/D1 的正确范式 vs D3/D5/D6/D7 的历史版本），后者违反四表库铁律。补入口的同时把历史版本迁到共享件，不允许再抄第 5 套。
+
+### 基线：已有的 8 个后端 aux 取数端点（实扫 `wp_bound_entry_coverage.json`）
+
+`POST /api/workpapers/{wp_id}/{d1|d3|d5|d6|d7|f1|g7|k1}/import-aux-balance`
+
+前端调用方：`useD1DetailCustomer.ts` / `useD3ImportExport.ts` + `useD3Detail.ts` / `useD5Detail.ts` / `useD6Detail.ts` / `useD7Detail.ts` / `useF1Detail.ts` + `useF1DetailAutoSeed.ts` / `g7AuxExtraction.ts` + `G7TabDetail.vue` / `useK1DetailAutoSeed.ts`。
+
+已有可见按钮「从余额表导入」的宿主（实扫 `.vue`）：`F1TabDetail` / `D7TabDetail` / `D6TabDetail` / `D3TabDetail` / `D5TabDetail` / `D2TabDetail` / `D1TabDetailCustomer` / `G7TabDetail`。**K1 只有 AutoSeed 无手动按钮** —— 空表自动 seed，用户动过数据后无法重取，属既有缺口样本。
+
+### 🔴 红基线（必须先核实，不得照抄注释里的旧结论）
+
+`_g7_long_term_equity_main_import_export.py:720` 与 `four_table/aux_aggregation.py` 的模块 docstring 都写着「禁止照 D3/D5/D6/D7 历史 aux 版本（其 SQL 引用不存在的列 `period_type`/`balance`，运行必 500）」。**本轮实扫结论：该理由已过期** —— `period_type` 在 `wp_render_strategies/**` 下**只出现在那句注释本身**；D3/D5/D7 的 SQL 实际用的是 `aux_name` / `opening_balance` / `closing_balance` / `account_code` / `is_deleted`，列都存在、不会 500。
+
+历史版本的**真实**缺陷是（实读 `_d3_import_export.py:458` / `_d5_import_export.py:344` / `_d7_import_export.py:581` / `d_cycle_extraction/detail_aggregation.py:45`）：
+
+- ① 裸写 `is_deleted = false`，**不走 `get_active_filter`** ⇒ 跨数据集版本双算（aux 冗余实测 2×）
+- ② 直接 `GROUP BY aux_name`，**未先锁定单一 `aux_type`** ⇒ 同一科目挂多维度时金额双算
+- ③ 科目码**硬编码**（`'2203%'` / `'1124%'` / `'2205%'` / `'1141%'`），不从报表映射解析
+- ④ 把期初/期末全额塞进账龄首段（`agingPrior.within1 = prior_balance`）⇒ **伪造账龄分布**
+
+⇒ 这四家全部 `get_active_filter` / `pick_aux_type` / `aux_aggregation` **零引用**（grep 实证）。
+
+## Requirements
+
+### Requirement 1: 缺口清单必须结构性推导
+
+**User Story:** 作为审计师，我要知道到底还有哪些明细表能从四表库取数但没有按钮，而不是凭印象补几个。
+
+#### Acceptance Criteria
+
+1. WHEN 枚举候选底稿 THEN 必须从 `htmlRendererRegistry` + 后端 `RENDERER_DISPATCH` / render-config / `wp_code_overrides.json` 推导已挂载宿主集合，**禁止**用 grep 按钮文案或写死页面数量
+2. WHEN 判定某明细表"具备四表库取数能力" THEN 判据必须是可核验的三元组：该 wp 的报表行能解析出科目码（`ReportLineAccountSpec` 或等效映射）+ 该科目在真库有对应四表数据 + 该明细表存在可承载的行结构（store item + 字段）
+3. WHEN 产出清单 THEN 每条必须给 wp_code → 宿主组件 → store item_id → 现有入口（后端端点有/无、前端按钮有/无、AutoSeed 有/无）五列，并标注 gap 类型
+4. WHEN 某底稿评估为"不适合取数" THEN 必须写明理由（如源模板无对应列、数据在序时账而非余额表），宁缺勿造，不得为凑数补入口
+5. WHEN 清单落地 THEN 必须是可复核产物（JSON 或 md 表）并作为后续任务的唯一真源
+6. WHEN 后续任务读取缺口清单 THEN 必须校验清单的 source digest 与当前 renderer registry / render-config 快照一致；不一致时必须阻塞实现，不得沿用过期清单
+
+### Requirement 2: 红基线纠偏与历史实现迁移
+
+**User Story:** 作为维护者，我不想每个新循环都从一句过期注释里继承错误理由，也不想平台同时跑两套四表库取数。
+
+#### Acceptance Criteria
+
+1. WHEN 核实历史端点 THEN 必须实测确认 D3/D5/D6/D7 端点当前是否真会 500（跑真库或读 SQL 列 vs schema），并把结论写进 spec evidence
+2. WHEN 确认「`period_type`/`balance` 必 500」理由已过期 THEN 必须修正 `aux_aggregation.py` docstring 与 G7/K1/D1 注释里的该表述，改为真实缺陷（①②③④），不得留错误理由继续繁殖
+3. WHEN 迁移历史端点 THEN D3/D5/D6/D7 必须改为复用 `four_table.aux_aggregation.aggregate_aux_by_name`（含 `get_active_filter` + `pick_aux_type`），删除各自的裸 SQL
+4. WHEN 迁移后 THEN 科目码必须从报表映射解析（保留硬编码仅作显式兜底且必须注明来源），不得继续裸硬编码
+5. WHEN 取数触及账龄字段（含 D3/D5/D6/D7 迁移端点**与 K1 端点**）THEN 不得把余额全额塞进账龄首段（含 `bucket[first_key]=amount` 这类整额落首档）；四表库无账龄源 ⇒ 账龄由审计师手动录入，取数只生成**空账龄骨架**（每段值=0/缺省）并在返回 message 提示需人工填账龄。🔴 K1 现状 `build_k1_detail_rows_from_aux` 的 `_aging()` 把余额整笔落首段，属本条要修的活体违规
+6. WHEN 迁移完成 THEN `get_active_filter` / `pick_aux_type` 在这四个文件中必须可 grep 到真实调用（不是注释），且旧裸 SQL 零残留
+
+### Requirement 3: 统一取数范式（禁止第 5 套）
+
+**User Story:** 作为维护者，新增入口时我要有一条唯一正确的路，不用去猜照哪家抄。
+
+#### Acceptance Criteria
+
+1. WHEN 新增或改造任一 aux 取数端点 THEN 必须复用 `four_table.aux_aggregation`（或有充分理由时扩展它），**禁止**新写第 5 份归集 SQL
+2. WHEN 归集逻辑不足以覆盖新场景 THEN 必须**扩展共享件**并同步既有消费者，不得在端点内分叉
+3. WHEN 端点返回行 THEN 只写**录入列**，派生列（合计/审定/账龄合计等）留给前端 recalc，不得双写
+4. WHEN 写入 store THEN 默认 merge 语义：已有行按业务键不覆盖，只追加新单位；覆盖必须由显式参数（如 `overwrite=true`）驱动并在 UI 上二次确认
+5. WHEN 端点涉及 `tb_aux_balance` THEN 三条铁律必须全部落地：active dataset 过滤 / 单一 `aux_type` 锁定 / 科目前缀匹配（非精确等值）
+
+### Requirement 4: 前端入口一致性
+
+**User Story:** 作为审计师，每张明细表的取数按钮应该长得一样、行为一样。
+
+#### Acceptance Criteria
+
+1. WHEN 补前端入口 THEN 位置与文案沿用既有范式（明细表 toolbar 的「从余额表导入」，与 `+ 添加行` 同排），宿主已有「导入导出 ▾」下拉时并入该下拉，不得再造第三种摆法
+2. WHEN 只读态（`isReadonly`）THEN 入口必须禁用
+3. WHEN 取数进行中 THEN 必须有 loading 态，且禁止重复提交
+4. WHEN 取数返回 0 行 THEN 必须给出可辨别原因的中文提示（未找到该科目辅助余额 / 该科目未按维度挂账 / 数据集未激活），不得只说"导入 0 行"
+5. WHEN 底稿已有 AutoSeed（如 K1/F1）THEN 仍必须提供手动入口，二者语义区分：AutoSeed 仅空表触发、手动入口可在非空表上按 merge 语义追加
+6. WHEN 入口触发成功 THEN 必须刷新受影响的级联（明细 → 审定表 → 附注读同一 store 的路径），不得只改本 Tab 内存态
+
+### Requirement 5: 不伪造、不静默（fail-open 治理）
+
+**User Story:** 作为质控复核人，我要能区分"真的没有这笔数"和"取数代码接错了被吞掉"。
+
+#### Acceptance Criteria
+
+1. WHEN 共享件 `aggregate_aux_by_name` 捕获异常 THEN 不得只 fail-open 返回空：必须以 ERROR 级别记录异常（含科目前缀 / project / year），使"接线错误"与"真无数据"在日志上可分辨
+2. WHEN 端点返回 0 行 THEN 响应必须携带可区分的原因码（无候选 `aux_type` / 无匹配科目 / 无 active dataset / 异常），前端按原因码给不同提示
+3. WHEN 某字段无四表来源 THEN 必须留空，不得用 0、上期值或把总额塞进首段账龄伪装成已取数
+4. WHEN 取数结果写库 THEN 必须可追溯来源（至少能判断某行是取数产生还是手工录入）。来源标记的承载形式由 DEC-4 定夺：**本 spec 不新增统一 `source_kind`/`source_dataset_id` 列**（会动 5+ 循环的 store 形态与契约 digest），而是用各循环行已有的 `remark` 字段携带中文来源标记（如 K1 写 “由辅助余额表(1221·客户)导入”）以区分取数行与手工录入；`source_dataset_id` 在端点响应与证据中记录（Task 9 证据 JSON），不落入行。统一列是 **deferred 增强**（已在缺口清册 blocked/deferred 登记），不阻塞取数本身。若某循环连取数行本身都无法承载（行结构缺失），该循环必须标 blocked/deferred 并从最终完成数中排除
+
+### Requirement 7: 账龄骨架与账龄枚举联动（不伪造前提下同步）
+
+**User Story:** 作为审计师，取数进来的往来单位行必须带着与项目账龄枚举（三年段/五年段/自定义）一致的账龄段骨架，让我能立刻在正确段位手动录账龄；项目切换枚举时已录的账龄不能丢。
+
+#### Acceptance Criteria
+
+1. WHEN 取数端点构建账龄骨架 THEN 账龄段键集必须来自项目级账龄配置 `aging_config_service.get_effective_segments(project_id, subject, db)`（subject-scoped：K1/D2→FIVE_YEAR、D3/F1→THREE_YEAR 等默认，subject_overrides 优先），**禁止**硬编码段键或写死 `["within1"]` 兜底
+2. WHEN 项目账龄枚举为三年段/五年段/自定义 THEN 取数生成的骨架段键必须逐项与该枚举 `effective_segments[].key` 一致（3-period 科目含 agingPrior/agingCurrent/agingAudited 三组，2-period 科目含 agingPrior/agingAudited 两组）
+3. WHEN 生成账龄骨架 THEN 每段值必须为 0/缺省（空骨架），**永不**由取数写入任何账龄金额（Property 5 不伪造）
+4. WHEN 项目切换账龄枚举（三年↔五年↔自定义）THEN 已存在明细行的账龄数据必须经 `useAgingMigration` 重映射到新段键，不得丢弃或错位已录数据；无对应新段的旧段数据按既有迁移规则归并
+5. WHEN 取数骨架落库后 THEN 明细表 UI 列（`useAgingConfig` 派生的 bands）、审定表账龄汇总、附注账龄披露必须与骨架同键（同一 `effective_segments` 真源），不得三处各写一套段
+6. WHEN 账龄配置读取失败 THEN 按 subject 默认 preset 兜底（K1/D2→FIVE_YEAR、D3→THREE_YEAR），并在 message/日志提示，**不得**回退到写死单段 `["within1"]`
+
+### Requirement 6: 守卫、变异检验与真栈实测
+
+**User Story:** 作为维护者，我要证据证明这些入口真的接上了，而不是又一批死代码。
+
+#### Acceptance Criteria
+
+1. WHEN 新增/改造端点 THEN 必须有守卫测试断言三条铁律真实生效（active filter 生效 / 单一 `aux_type` / 前缀匹配），且断言的是**行为**（SQL 结果或调用轨迹）而非"函数存在"
+2. WHEN 编写守卫 THEN 必须做变异检验并四态判定（RED / GREEN=守卫缺陷 / ANCHOR-MISS / WRONG-TEST）；锚点至少含：去掉 active filter · 去掉 `aux_type` 锁定 · 把 merge 改成 overwrite
+3. WHEN 补前端入口 THEN 必须有 vitest 断言按钮存在且 disabled 受 `isReadonly` 控制、点击真调对应端点（不是只 mock 通过）
+4. WHEN 全部交付 THEN 必须至少一次浏览器真栈实测：某张此前无入口的明细表，点新按钮后行数从 0 变为账套真实户数，且金额与只读 SQL 快照逐字对齐
+5. WHEN 迁移历史端点 THEN 必须实测迁移前后金额差异并解释（若原来双算，迁移后金额下降是**预期**修正，须在证据里写明倍数）
+
+### Requirement 8: D4-6/D4-7 上下游数据联动（表间公式驱动）
+
+**User Story:** 作为审计师，D4-6 重要指标分析表的 12 项指标数值（应收账款/总资产、应收账款周转天数等）应能从 trial_balance 自动预填，而不是每项都手抄科目余额再人工计算；D4-7 毛利率月度分析表的月度收入/成本应能从 D4-2 主营明细表汇总联动，按产品毛利应能从后端 segment_prefill 预填——这两张表是分析程序的核心，数据断链会迫使审计师在 4 张表之间手动抄录同一组数字。
+
+#### Acceptance Criteria
+
+1. WHEN D4-6 加载指标表 THEN 后端 render 策略必须在 `html_data` 中下发 `indicator_prefill: Record<string, {current: number, prior: number}>`，按指标 key 从 `trial_balance` / `tb_balance` 取数计算（如 `ar-to-assets` = 科目1122审定数 / 资产总计审定数），前端 `loadIndicators()` 在指标值为 0 且有 prefill 时自动填入
+2. WHEN D4-6 指标需要跨科目组合计算 THEN 取数逻辑必须复用 `four_table/` 的 `select_leaves` / `aggregate_leaves` 现有函数（禁止另写裸 SQL），科目码从 `DEFAULT_INDICATORS[].source` 的 TB 科目标注解析
+3. WHEN D4-6 指标涉及非 TB 数据（如"员工总数"来自 project_info）THEN 该指标的 prefill 留空，不伪造；前端 tooltip 提示"需手动填写"
+4. WHEN D4-7 月度毛利分析加载 THEN 如果 `D4-7-monthly` 未持久化（首次进入），前端必须从 `allResponses.get('D4-2-rows')` 读取 D4-2 主营明细的各产品 × 12 月数据，按月 SUM 汇总作为收入行 seed；如 D4-2 无数据则留空不伪造
+5. WHEN D4-7 按产品毛利分析加载 THEN 如果 `D4-7-products` 未持久化（首次进入），前端必须从 `html_data.segment_prefill`（后端已产出含 `label`/`current_revenue`/`current_cost`/`prior_revenue`/`prior_cost`）预填产品行；已有持久化数据时不覆盖
+6. WHEN D4-7 月度数据导入导出 THEN 必须支持月度毛利分析部分（12 个月 ×（收入+成本）+ 上期收入 + 上期成本 = 26 列）的导入导出，不只导出产品毛利分析部分
+7. WHEN D4-7 后端导入解析 `_parse_d4_7_row` THEN 必须包含 `上期数量` 列（当前默认 0 导致上期平均单价和单位成本计算全 0）
+
+## Glossary
+
+| 术语 | 含义 |
+|------|------|
+| aux 取数 | 从 `tb_aux_balance`（辅助余额表）按往来单位/维度归集取数，四表库取数的一种 |
+| 共享件 | `backend/app/services/four_table/aux_aggregation.py`，平台唯一正确 aux 归集实现 |
+| `aggregate_aux_by_name` | 旧三元组返回函数（现为薄壳）；`_ex` 版返回 `AuxAggregationResult` 带 reason 码 |
+| reason 码 | `ok`/`no_prefixes`/`no_aux_type`/`no_rows`/`no_active_dataset`/`error`，区分“接线错误”与“真无数据” |
+| 三条铁律 | ① `get_active_filter` 只取 active dataset；② `pick_aux_type` 锁单一维度；③ 科目前缀 LIKE 区配（非精确等值） |
+| G-A/G-B/G-C/G-D | 缺口分类：后端有/前端无・两侧都无・两侧有但违铁律・不适合取数 |
+| merge 语义 | 已有业务键（往来单位名）不覆盖，只追加新行；overwrite 需显式参数驱动 |
+| 录入列 | 端点只写的非派生列（合计/审定/账龄合计等派生列留前端 recalc） |

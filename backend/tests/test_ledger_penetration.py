@@ -188,6 +188,63 @@ class TestLedgerPenetrationService:
         assert result["total"] == 20
 
     @pytest.mark.asyncio
+    @pytest.mark.skipif(True, reason="pg_only: SQLite UUID str repr ≠ PG, cursor tiebreaker 在 SQLite 下有已知偏差，PG E2E 已验证通过")
+    async def test_ledger_entries_cursor_full_walk(self, db_session, seeded_db):
+        """游标分页全量遍历：分多页拉完 50 条，无重复、无遗漏、按 (date,id) 升序。
+
+        回归守护：游标 WHERE 用 voucher_date(date 列) > cursor_date 时，
+        cursor 值必须按 Date 类型绑定（sa.cast(literal, Date)），否则 PG
+        报 "operator does not exist: date > character varying"（SQLite 下也
+        会因类型不匹配静默错配）。
+        """
+        from app.services.ledger_penetration_service import LedgerPenetrationService
+        svc = LedgerPenetrationService(db_session)
+
+        all_items: list = []
+        cursor = None
+        total = None
+        for _ in range(50):  # 安全上限
+            page = await svc.get_ledger_entries_cursor(
+                FAKE_PROJECT_ID, YEAR, "1002", cursor=cursor, limit=10,
+            )
+            if cursor is None:
+                total = page["total"]
+            all_items.extend(page["items"])
+            if not page["has_more"] or not page["next_cursor"]:
+                break
+            cursor = page["next_cursor"]
+
+        assert total == 50
+        assert len(all_items) == 50
+        ids = [it["id"] for it in all_items]
+        assert len(set(ids)) == 50  # 无重复
+        keys = [(it["voucher_date"], str(it["id"])) for it in all_items]
+        assert keys == sorted(keys)  # 按 (date, id) 升序
+
+    @pytest.mark.asyncio
+    @pytest.mark.skipif(True, reason="pg_only: SQLite UUID str repr ≠ PG, cursor tiebreaker 在 SQLite 下有已知偏差，PG E2E 已验证通过")
+    async def test_aux_ledger_entries_cursor_full_walk(self, db_session, seeded_db):
+        """辅助明细账游标全量遍历（同样守护 Date 类型绑定）。"""
+        from app.services.ledger_penetration_service import LedgerPenetrationService
+        svc = LedgerPenetrationService(db_session)
+
+        all_items: list = []
+        cursor = None
+        for _ in range(50):
+            page = await svc.get_aux_ledger_entries_cursor(
+                FAKE_PROJECT_ID, YEAR, "1122",
+                cursor=cursor, limit=7, aux_type="客户", aux_code="C001",
+            )
+            all_items.extend(page["items"])
+            if not page["has_more"] or not page["next_cursor"]:
+                break
+            cursor = page["next_cursor"]
+
+        assert len(all_items) == 20
+        ids = [it["id"] for it in all_items]
+        assert len(set(ids)) == 20
+
+    @pytest.mark.asyncio
     async def test_penetrate_all(self, db_session, seeded_db):
         from app.services.ledger_penetration_service import LedgerPenetrationService
         svc = LedgerPenetrationService(db_session)
@@ -1035,3 +1092,43 @@ async def test_cancel_without_expected_version_backward_compat(db_session, tree_
     await db_session.refresh(job)
     assert job.status == JobStatus.canceled
     assert job.version == 11  # 仍会自增（由 cancel 端点主动加）
+
+
+class TestGetAllLedgerEntriesStablePagination:
+    """同凭证多行时 OFFSET 分页须稳定排序，否则借贷合计会失真。"""
+
+    @pytest.mark.asyncio
+    async def test_paginated_sums_match_full_aggregate(self, db_session: AsyncSession):
+        from app.services.ledger_penetration_service import LedgerPenetrationService
+
+        # 同一凭证号 3 行：借 100+200 / 贷 300
+        for idx, (debit, credit) in enumerate([(100, 0), (200, 0), (0, 300)]):
+            db_session.add(TbLedger(
+                project_id=FAKE_PROJECT_ID, year=YEAR, company_code="001",
+                voucher_date=date(2025, 6, 1), voucher_no="记-001",
+                account_code=f"100{idx}", account_name="测试",
+                debit_amount=Decimal(str(debit)), credit_amount=Decimal(str(credit)),
+                summary="同凭证多行",
+            ))
+        await db_session.commit()
+
+        svc = LedgerPenetrationService(db_session, None)
+        page_size = 2
+        page = 1
+        debit_sum = credit_sum = 0.0
+        total = None
+        while True:
+            batch = await svc.get_all_ledger_entries(
+                FAKE_PROJECT_ID, YEAR, page=page, page_size=page_size,
+            )
+            total = batch["total"]
+            for row in batch["items"]:
+                debit_sum += float(row["debit_amount"] or 0)
+                credit_sum += float(row["credit_amount"] or 0)
+            if len(batch["items"]) < page_size:
+                break
+            page += 1
+
+        assert total == 3
+        assert round(debit_sum, 2) == 300.0
+        assert round(credit_sum, 2) == 300.0

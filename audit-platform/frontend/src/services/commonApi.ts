@@ -5,6 +5,7 @@
 import http from '@/utils/http'
 import {
   projects as P_proj, staff as P_staff, procedures as P_proc,
+  procedureRowTasks as P_prt, workpaperLeads as P_leads,
   dashboard as P_dash, disclosureNotes as P_dn, users as P_usr,
   system as P_sys, recycleBin as P_rb, knowledge as P_kb,
   admin as P_admin, auth as P_auth, attachments as P_att,
@@ -18,6 +19,7 @@ import {
   sampling as P_samp, processRecord as P_pr, wpAI as P_wpai,
   projects as P_projects, jobs as P_jobs,
   aiPlugins as P_aip, gtCoding as P_gtc,
+  riskAssessments as P_risk,
 } from '@/services/apiPaths'
 
 // ── 项目 ──
@@ -34,8 +36,29 @@ export async function listProjectsWithProgress(): Promise<any[]> {
 }
 
 export async function getProjectWizardState(projectId: string): Promise<any> {
-  const { data } = await http.get(P_proj.wizard(projectId))
+  const { data } = await http.get(P_proj.wizard(projectId), { _silent: true } as any)
   return data
+}
+
+// ── 企业子类型推荐（audit-report-template-integration 需求 7.6） ──
+
+export interface TemplateRecommendation {
+  subtype: string | null
+  confidence: string
+  candidates: string[]
+  matched_rules: string[]
+  source: string
+  // 需求 1.7/1.8/14.3：项目当前已保存值（用户手动优先）+「待确认」横幅标志
+  current_subtype?: string | null
+  needs_confirmation?: boolean
+}
+
+/** 根据项目属性获取企业子类型（模板 A/B/C/D）推荐。 */
+export async function fetchTemplateRecommendation(projectId: string): Promise<TemplateRecommendation> {
+  const { data } = await http.get(P_proj.templateRecommendation(projectId), {
+    validateStatus: () => true,
+  })
+  return data as TemplateRecommendation
 }
 
 // ── 人员 ──
@@ -71,6 +94,652 @@ export async function getProcedures(projectId: string, cycle: string): Promise<a
 
 export async function updateProcedureTrim(projectId: string, cycle: string, items: any[]): Promise<void> {
   await http.put(P_proc.trim(projectId, cycle), { items })
+}
+
+// ── 程序行任务（procedure-delegation-notification / Task 12，V105 真源） ──
+
+export interface ProcedureRowTaskItem {
+  task_id: string
+  project_id: string
+  wp_index_id: string
+  wp_id: string | null
+  definition_key: string
+  sheet_key: string
+  wp_code: string | null
+  sheet_name: string | null
+  program_no: string | null
+  procedure_text: string | null
+  audit_cycle_snapshot: string
+  applicability_status: string
+  workflow_status: string
+  assignee_staff_id: string | null
+  reviewer_staff_id: string | null
+  assignment_version: number
+  lock_version: number
+  due_at: string | null
+  overdue: boolean
+  materialization_required: boolean
+  my_role: 'assignee' | 'reviewer' | null
+  created_at?: string | null
+  updated_at?: string | null
+}
+
+export interface ProcedureRowTaskPage {
+  items: ProcedureRowTaskItem[]
+  pagination: { page: number; page_size: number; total: number; total_pages: number }
+}
+
+export interface ProcedureRowTaskQuery {
+  projectId?: string
+  cycle?: string
+  wpIndexId?: string
+  workflowStatus?: string
+  role?: 'assignee' | 'reviewer'
+  overdueOnly?: boolean
+  page?: number
+  pageSize?: number
+}
+
+function _rowTaskParams(q: ProcedureRowTaskQuery): Record<string, any> {
+  const params: Record<string, any> = {}
+  if (q.cycle) params.cycle = q.cycle
+  if (q.wpIndexId) params.wp_index_id = q.wpIndexId
+  if (q.workflowStatus) params.workflow_status = q.workflowStatus
+  if (q.role) params.role = q.role
+  if (q.overdueOnly) params.overdue_only = true
+  if (q.page) params.page = q.page
+  if (q.pageSize) params.page_size = q.pageSize
+  return params
+}
+
+/** 跨项目"我的程序任务"分页查询（V105 任务真源，纯读）。 */
+export async function listMyProcedureRowTasks(q: ProcedureRowTaskQuery = {}): Promise<ProcedureRowTaskPage> {
+  const params = _rowTaskParams(q)
+  if (q.projectId) params.project_id = q.projectId
+  const { data } = await http.get(P_prt.listMine(), { params, validateStatus: () => true })
+  return (data?.data ?? data) as ProcedureRowTaskPage
+}
+
+/** 项目级"我的程序任务"分页查询（纯读）。 */
+export async function listProjectProcedureRowTasks(projectId: string, q: ProcedureRowTaskQuery = {}): Promise<ProcedureRowTaskPage> {
+  const { data } = await http.get(P_prt.listByProject(projectId), {
+    params: _rowTaskParams(q), validateStatus: () => true,
+  })
+  return (data?.data ?? data) as ProcedureRowTaskPage
+}
+
+/** 单任务详情 + 深链定位 key（纯读）。 */
+export async function getProcedureRowTaskDetail(projectId: string, taskId: string): Promise<ProcedureRowTaskItem> {
+  const { data } = await http.get(P_prt.detail(projectId, taskId))
+  return (data?.data ?? data) as ProcedureRowTaskItem
+}
+
+export interface ProcedureRowTaskTransition {
+  action: 'acknowledge' | 'start' | 'submit' | 'request_changes' | 'review' | 'assign' | 'reassign' | 'cancel' | 'reopen'
+  request_id?: string
+  expected_lock_version?: number
+  expected_assignment_version?: number
+  reason?: string
+  execution_summary?: string
+  evidence_snapshot?: any[]
+  open_issue_count?: number
+}
+
+/**
+ * 程序行任务状态转换（单一状态机入口）。
+ * payload 必须携带 request_id + expected 版本（乐观锁 / assignment_version），
+ * 绝不再走 updateProcedureTrim 提交 execution_status（旧 bug 已修）。
+ */
+export async function transitionProcedureRowTask(
+  projectId: string, taskId: string, body: ProcedureRowTaskTransition,
+): Promise<any> {
+  const { data } = await http.post(P_prt.transition(projectId, taskId), body)
+  return data?.data ?? data
+}
+
+// ── 两层裁剪 / 方案 preview-apply（Task 6，一次性 preview 凭证 + 真实统计） ──
+
+export interface TrimSchemeEntry {
+  kind: 'scope' | 'row'
+  cycle?: string
+  wp_index_code?: string
+  target_status?: string
+  template_code?: string
+  sheet_key?: string
+  definition_key?: string
+  target_applicability?: string
+}
+
+/** 裁剪方案预览：解析计划 + 创建一次性 preview 凭证（返回 preview_id/token、目标统计、TTL）。 */
+export async function previewProcedureTrim(
+  projectId: string, entries: TrimSchemeEntry[], schemeId?: string,
+): Promise<any> {
+  const { data } = await http.post(P_prt.trimPreview(projectId), {
+    entries, scheme_id: schemeId ?? null,
+  })
+  return data?.data ?? data
+}
+
+/** 裁剪方案应用：消费 preview，返回真实 applied/unchanged/conflict；篡改/过期/版本变化 → 409。 */
+export async function applyProcedureTrim(
+  projectId: string, previewId: string, requestId: string, entries: TrimSchemeEntry[], schemeId?: string,
+): Promise<any> {
+  const { data } = await http.post(P_prt.trimApply(projectId), {
+    preview_id: previewId, request_id: requestId, entries, scheme_id: schemeId ?? null,
+  })
+  return data?.data ?? data
+}
+
+// ── canonical 粗裁（ProcedureTrimming.vue 主链入口）────────────────────────────
+// 与 previewProcedureTrim/applyProcedureTrim 走同一端点，但签名更贴合粗裁页调用方。
+// entries 里每条包含 kind/cycle/wp_index_code/target_status/skip_reason/reason_code。
+//
+// 🔴 `reason_code` 是 additive 可选字段（procedure-trimming-and-delegation-intelligence
+//    Task 12）。它必须与 `target_status` **同一次请求**提交 —— 不得「先 apply 状态
+//    再补写理由码」：一次性 preview 凭证不覆盖第二次写入，且会产生「状态已改、
+//    理由码未写」的中间态。
+//
+// 🔴 不传该字段时请求体与扩展前**逐字节相同**（后端归一函数条件性写入该键），
+//    故存量调用方零影响。传了则后端同事务写 `procedure_instances.suggestion_state.reason_code`。
+
+/** canonical 粗裁 scope entry（`reason_code` 为 additive 可选字段）。 */
+export interface CanonicalTrimScopeEntry {
+  kind: string
+  cycle: string
+  wp_index_code: string
+  target_status: string
+  skip_reason?: string | null
+  /** 结构化裁剪理由码（取值域见 composables/trimReasonCodes.ts，与后端 TrimReasonCode 交叉锁死）。 */
+  reason_code?: string | null
+}
+
+/** 粗裁 canonical preview：构造 scope entries → 创建一次性 preview 凭证。 */
+export async function canonicalTrimPreview(
+  projectId: string,
+  entries: CanonicalTrimScopeEntry[],
+): Promise<any> {
+  const { data } = await http.post(P_prt.trimPreview(projectId), { entries })
+  return data?.data ?? data
+}
+
+/**
+ * 驳回裁剪建议：写 `suggestion_state.rejected`，**不改 status/skip_reason**。
+ *
+ * 🔴 与「确认裁剪」走的是两条不同路径，不可混用：
+ * - 确认 → canonical trim preview/apply（改适用性状态 + 写理由码）
+ * - 驳回 → 本端点（只标记「不接受建议」，程序仍保留在原状态）
+ *
+ * 驳回后决策内核恒判 `keep`（`procedureTrimDecision` 档 2），不再重复提示（R6.4）。
+ */
+export async function rejectTrimSuggestions(
+  projectId: string,
+  cycle: string,
+  wpIndexCodes: string[],
+  reason?: string | null,
+): Promise<{ rejected: number; not_found: string[] }> {
+  const { data } = await http.post(P_prt.trimRejectSuggestions(projectId), {
+    cycle,
+    wp_index_codes: wpIndexCodes,
+    reason: reason ?? null,
+  })
+  const p = data?.data ?? data
+  return {
+    rejected: Number(p?.rejected ?? 0),
+    not_found: Array.isArray(p?.not_found) ? p.not_found : [],
+  }
+}
+
+/** 粗裁 canonical apply：消费 preview + request_id 幂等。 */
+export async function canonicalTrimApply(
+  projectId: string,
+  entries: CanonicalTrimScopeEntry[],
+  previewId: string,
+  requestId: string,
+): Promise<any> {
+  const { data } = await http.post(P_prt.trimApply(projectId), {
+    entries, preview_id: previewId, request_id: requestId,
+  })
+  return data?.data ?? data
+}
+
+// ── 三粒度委派 preview-apply（Task 8，materialize 前置 + 一次性 preview 凭证） ──
+
+export interface DelegationSelector {
+  kind: 'cycle' | 'workpaper' | 'row'
+  cycle?: string
+  wp_index_ids?: string[]
+  task_ids?: string[]
+}
+
+export interface DelegationPreviewBody {
+  selector: DelegationSelector
+  assignee_staff_id: string
+  reviewer_staff_id?: string | null
+  unassigned_only?: boolean
+  conflict_policy?: string
+  reason?: string
+  best_effort?: boolean
+  due_at?: string | null
+}
+
+/** 委派预览：materialize 前置 job + 目标/冲突分类 + 一次性 preview 凭证（status=ready/materialization_pending）。 */
+export async function previewProcedureDelegation(
+  projectId: string, body: DelegationPreviewBody,
+): Promise<any> {
+  const { data } = await http.post(P_prt.delegationPreview(projectId), body)
+  return data?.data ?? data
+}
+
+/** 委派应用：消费 preview，真实 assign/reassign；默认整批原子（冲突 409），best_effort 逐任务结果。 */
+export async function applyProcedureDelegation(
+  projectId: string, previewId: string, requestId: string, body: DelegationPreviewBody,
+): Promise<any> {
+  const { data } = await http.post(P_prt.delegationApply(projectId), {
+    ...body, preview_id: previewId, request_id: requestId,
+  })
+  return data?.data ?? data
+}
+
+/**
+ * 成员负载批量视图（只读）。
+ *
+ * 口径 = 各执行人当前**非终态任务数**，与委派 preview 返回的
+ * `membership_load.active_task_count` 同源（后端同一 service 方法族）。
+ *
+ * 🔴 前端**不得**再自行按"底稿张数"聚合一份负载 —— 那是双真源且口径不同
+ * （历史实现还依赖先打开全项目概览才有值）。
+ *
+ * 未出现在返回 `loads` 里的成员 = 当前无非终态任务（负载 0）；
+ * 请求失败时调用方须显示"负载未知"而非 0（0 会误导为"这个人很空闲"）。
+ */
+export async function fetchDelegationMemberLoads(
+  projectId: string,
+): Promise<Record<string, number>> {
+  const { data } = await http.get(P_prt.delegationMemberLoads(projectId))
+  const payload = data?.data ?? data
+  const loads = payload?.loads
+  return loads && typeof loads === 'object' ? loads as Record<string, number> : {}
+}
+
+/**
+ * B50 认定层次风险行（只读）。
+ *
+ * 复用**既有**端点 `GET /api/b60/b50-risk-rows`（本为 B60 六/七章一键带入而建），
+ * 它直接返回 `load_b50_accounts()` 输出 ⇒ 裁剪页取 B50 完成度**零后端改动**。
+ *
+ * 🔴 不要为此新建 `/api/b50/risk-rows` 之类的第二个端点 —— 那会让「B50 认定层次
+ * 数据」出现两个读取口径，两侧下次各自演进即漂移。
+ *
+ * B50 未编制 / 查询失败时后端返回空列表（不报错），故调用方拿到 `[]` 时**不能**
+ * 断定「B50 未填」—— 只能断定「读不到数据」；两者在裁剪页都显示为「未开始」，
+ * 但请求本身失败要另标「状态未知」。
+ */
+export async function fetchB50RiskRows(projectId: string): Promise<{
+  fs_risks: any[]
+  assertion_risks: any[]
+  accounts: any[]
+}> {
+  const { data } = await http.get(P_risk.b50RiskRows(), { params: { project_id: projectId } })
+  const payload = data?.data ?? data
+  return {
+    fs_risks: Array.isArray(payload?.fs_risks) ? payload.fs_risks : [],
+    assertion_risks: Array.isArray(payload?.assertion_risks) ? payload.assertion_risks : [],
+    accounts: Array.isArray(payload?.accounts) ? payload.accounts : [],
+  }
+}
+
+// ── 裁剪三维判据上下文（Task 9，只读） ──
+
+/** 降级标注：`cause` 是 accounts 维度**专属**可选字段（其余维度只有 dimension+reason）。 */
+export interface TrimDecisionDegradation {
+  dimension:
+    | 'accounts'
+    | 'materiality'
+    | 'risk'
+    | 'completeness_override'
+    | 'workpaper_entry'
+    /** 报表行取数维度（spec procedure-trim-report-line-account-resolution Task 7） */
+    | 'report_line'
+  reason: string
+  /** 仅 accounts 维度出现：query_failed / not_imported / no_material_accounts */
+  cause?: 'query_failed' | 'not_imported' | 'no_material_accounts'
+}
+
+/**
+ * 一条底稿的报表行科目金额（后端 `trim_report_line_amounts.ReportLineAmount`）。
+ *
+ * 🔴 `status !== 'resolved'` 时 `amount` 恒为 `null`，**绝不为 `0`** —— 编造 0 会让
+ * 该程序被误判成「低于任何阈值」而产生裁剪建议，而正确结论是「这个判据对它不可用」。
+ * 消费方一律先判 `status`，不要直接用 `amount ?? 0`。
+ *
+ * 四态成因各自可区分（`reason` 写明细节）：
+ * - `no_report_line`：该底稿没有报表行落点（未登记 / 声明为空 / 非科目余额驱动循环）
+ * - `formula_unavailable`：报表行存在但公式缺失、含 `ROW()` 引用、或求值失败
+ * - `standard_unset`：项目适用准则未确定（未设置 / 两处声明分叉 / 无对应配置）
+ */
+export interface TrimReportLineAmount {
+  status: 'resolved' | 'no_report_line' | 'formula_unavailable' | 'standard_unset'
+  /** 🔴 非 resolved 态恒 null */
+  amount: number | null
+  /** 报表行编码（如 BS-002），溯源用 */
+  row_code: string
+  /** 报表行名（如 货币资金）—— 审计师据它发现「行名与循环语义不符」 */
+  row_name: string
+  /** 命中的取数公式原文 */
+  formula: string | null
+  /** 参与计算的标准科目码 */
+  standard_codes: string[]
+  /** 实际使用的准则变体 */
+  applicable_standard: string
+  /** 报表行编码的取值出处（如 e_cycle_specs.E1_REPORT_ROW_CODE） */
+  source_symbol: string
+  /** 非 resolved 态的中文原因 */
+  reason: string
+}
+
+export interface TrimDecisionContext {
+  /** {科目名: {amount, cycle}}；空 dict ⇒ 数据存在性判据不可用 ⇒ 不得裁剪 */
+  accounts: Record<string, { amount: number; cycle: string }>
+  /**
+   * 两键齐全或整体 null，**不会半开**。
+   * 🔴 后端刻意不下发 `overall_materiality` —— 前端也不得自行按比例推算实际执行重要性
+   * （那是会计判断，Requirement 4.6）。
+   */
+  materiality: { performance_materiality: number; trivial_threshold: number } | null
+  /** {科目名: B50 科目项（cells / max_risk / has_special / balance / category / is_estimate…）} */
+  risk: Record<string, any>
+  /** 「至少一个认定有 rmm」即为 true（不是「六认定全填」，两个口径有意不统一） */
+  risk_dimension_available: boolean
+  /** {cycle: bool}；键不存在 ⇒ 该循环未覆盖，退回平台默认清单。null ⇒ 读取失败 */
+  completeness_override: Record<string, boolean> | null
+  /** {wp_code: bool}；空 dict 必伴随一条 workpaper_entry degradation */
+  workpaper_entry: Record<string, boolean>
+  /**
+   * {wp_code: 报表行科目金额}；空 dict 必伴随一条 `report_line` degradation。
+   *
+   * 键是 `procedure_instances.wp_code` **原样**（含 `D2-1至D2-4` 这类区间型），
+   * 故按 `p.wp_code` 直接查即命中；`resolveAccountAmount` 另有归一兜底
+   * （防后端将来改成按底稿主码下发）。
+   *
+   * 🔴 消费方一律经 `trimAmountSource.resolveAccountAmount()` 取金额，不要自己读这个
+   * 字段 —— 裁剪页与复核视图各读一次就会分叉，而复核者无从知道该信哪个。
+   */
+  report_line_amounts: Record<string, TrimReportLineAmount>
+  /** 🔴 前端摘要降级标注的**唯一来源** —— 不要自行判断「某维度是不是空的」 */
+  degradations: TrimDecisionDegradation[]
+}
+
+/**
+ * 裁剪三维判据上下文（只读）：风险评估 / 重要性 / 数据存在性 + 完整性豁免覆盖 + 底稿录入探测。
+ *
+ * 供前端决策内核 `procedureTrimDecision.ts` 消费。后端 fail-soft：任一维度取数失败 →
+ * 该维度置 null/空 + `degradations` 记一条，**不抛异常也不伪造默认值**。
+ *
+ * 🔴 本函数**不吞**请求级错误（网络/权限/500）：整体拿不到判据时必须让调用方 catch 并
+ * 显示「判据不可用，已阻断裁剪」。若在此吞成空上下文，前端决策内核会看到 `accounts={}`
+ * 且 `degradations=[]` ⇒ 与「后端说没有任何降级」不可区分，可能被误判为"可以裁"。
+ *
+ * @param cycles 循环代号数组；空数组 = 全部科目余额驱动循环（不过滤）
+ */
+export async function fetchTrimDecisionContext(
+  projectId: string,
+  year: number,
+  cycles: string[] = [],
+): Promise<TrimDecisionContext> {
+  const params: Record<string, any> = { year }
+  const list = (cycles || []).map(c => String(c).trim()).filter(Boolean)
+  if (list.length) params.cycles = list.join(',')
+  const { data } = await http.get(P_proc.trimDecisionContext(projectId), { params })
+  const p = data?.data ?? data
+  const asObj = (v: any) => (v && typeof v === 'object' && !Array.isArray(v) ? v : {})
+  return {
+    accounts: asObj(p?.accounts),
+    // null 与 {} 语义不同（缺失 vs 齐全），故不套 asObj 兜底
+    materiality: p?.materiality ?? null,
+    risk: asObj(p?.risk),
+    risk_dimension_available: p?.risk_dimension_available === true,
+    completeness_override: p?.completeness_override ?? null,
+    workpaper_entry: asObj(p?.workpaper_entry),
+    // 🔴 缺失时兜成 `{}` 而不是留 `undefined`：让每个调用方各自兜底会产生
+    //    「一处判 undefined、一处判空对象」的不一致。空对象的语义已由
+    //    `report_line` degradation 承载（后端保证空 dict 必伴随标注）。
+    report_line_amounts: asObj(p?.report_line_amounts),
+    degradations: Array.isArray(p?.degradations) ? p.degradations : [],
+  }
+}
+
+// ── 完整性敏感清单的项目级覆盖（Task 14，R5.5 / R5.6 / R5.7） ──
+
+/**
+ * 一条项目级覆盖（落 `checklist_responses` 的 `B50-T3-cscope-{cycle}`）。
+ *
+ * 🔴 承载表**只保留当前值** —— `updated_by_name` / `updated_at` 是**最后一次**修改的
+ * 留痕，不是变更历史。需要完整历史属另一议题（R5.5 明确只要求最后一次的 who/when/why）。
+ */
+export interface CompletenessScopeOverride {
+  /** 循环代号（大写单字母，如 `L`） */
+  cycle: string
+  /** true = 本项目确认该循环属完整性敏感（豁免金额判据）；false = 确认不属 */
+  sensitive: boolean
+  /** 覆盖理由（写入时必填，供质控与项目质量控制复核人评价其适当性） */
+  reason: string
+  /** 最后一次修改时间（ISO 字符串）；null = 后端未记录 */
+  updated_at: string | null
+  /** 最后一次修改人用户名；null = 关联用户已删或未记录 */
+  updated_by_name: string | null
+}
+
+/**
+ * 读回本项目全部完整性敏感清单覆盖（含理由与留痕）。
+ *
+ * 🔴 **未出现在返回里的循环 = 未覆盖**（前端据此退回平台默认清单
+ * `completenessExemption.COMPLETENESS_CYCLE_RULES` 并标注「使用平台默认，未经本项目确认」）。
+ * 故本函数**不吞**请求级错误：吞成空数组会让「读不到」与「一条都没覆盖过」不可区分，
+ * 从而把技术故障显示成「全部使用平台默认」这一实质结论。
+ */
+export async function fetchCompletenessScopeOverrides(
+  projectId: string,
+): Promise<CompletenessScopeOverride[]> {
+  const { data } = await http.get(P_prt.trimCompletenessScope(projectId))
+  const payload = data?.data ?? data
+  const list = Array.isArray(payload?.overrides) ? payload.overrides : []
+  return list.map((o: any) => ({
+    cycle: String(o?.cycle ?? '').toUpperCase(),
+    sensitive: o?.sensitive === true,
+    reason: String(o?.reason ?? ''),
+    updated_at: o?.updated_at ?? null,
+    updated_by_name: o?.updated_by_name ?? null,
+  })).filter((o: CompletenessScopeOverride) => o.cycle !== '')
+}
+
+/**
+ * 写一条项目级覆盖（`sensitive` 为 `true`/`false` **都算已表态**）。
+ *
+ * 🔴 `reason` 必填且后端按空白串拒绝（400）—— 覆盖平台默认清单是一项要向质控解释的
+ * 职业判断，无理由的覆盖在复核时无法评价其适当性。调用方须在发请求前自行校验并给出
+ * 可操作提示，不要靠 400 兜底（那会把可预期的校验显示成"保存失败"）。
+ */
+export async function saveCompletenessScopeOverride(
+  projectId: string,
+  cycle: string,
+  sensitive: boolean,
+  reason: string,
+): Promise<{ cycle: string; sensitive: boolean; created: boolean; updated: boolean }> {
+  const { data } = await http.put(P_prt.trimCompletenessScope(projectId), {
+    cycle, sensitive, reason,
+  })
+  const p = data?.data ?? data
+  return {
+    cycle: String(p?.cycle ?? cycle).toUpperCase(),
+    sensitive: p?.sensitive === true,
+    created: p?.created === true,
+    updated: p?.updated === true,
+  }
+}
+
+/**
+ * 撤销某循环的项目级覆盖 → 该循环退回平台默认清单。
+ *
+ * 🔴 走 `DELETE` 删行而不是 `PUT` 写空值：读取侧以「该循环是否出现在返回里」区分
+ * 「已表态」与「未覆盖」，写空值会留一条既非表态也非缺失的脏记录。
+ */
+export async function clearCompletenessScopeOverride(
+  projectId: string,
+  cycle: string,
+): Promise<{ cycle: string; deleted: number }> {
+  const { data } = await http.delete(P_prt.trimCompletenessScopeItem(projectId, cycle))
+  const p = data?.data ?? data
+  return { cycle: String(p?.cycle ?? cycle).toUpperCase(), deleted: Number(p?.deleted ?? 0) }
+}
+
+// ── 附注反向联动（Task 21，R13.1 / R13.2 / R13.3 / R13.4 / R13.6） ──
+
+/** 联动清单里的一条附注章节。 */
+export interface NoteLinkageItem {
+  /** 章节号（如 `五、42`），真源 = `note_workpaper_sync_registry.json` */
+  note_section: string
+  /** 该章节对应的底稿编码（可多个：registry 实测有跨循环共有章节） */
+  owners: string[]
+  /** 这些底稿所属循环 */
+  cycles: string[]
+  /** 面向审计师的一句话判据说明 */
+  narrative: string
+  /** 附注侧章节标题；null = 后端未取到 */
+  section_title: string | null
+  /** 仅 `conflicts` 项有：该章节当前是否已被标为不适用 */
+  currently_marked?: boolean
+  /** 仅 `conflicts` / `unlocatable` / `skipped_foreign_mark` 项有 */
+  reason?: string
+}
+
+export interface NoteLinkageView {
+  /** 将被标为「本期不适用」的章节 */
+  to_mark: NoteLinkageItem[]
+  /** 已处于该状态（幂等，无需再写） */
+  already_marked: NoteLinkageItem[]
+  /**
+   * 命中裁剪但**已有内容** → 只提示，两个方向都不自动动（R13.4）。
+   *
+   * 🔴 「不自动撤销」也是刻意的：撤销同样是自动动作。有人工内容时由审计师在附注侧决定。
+   */
+  conflicts: NoteLinkageItem[]
+  /** 裁剪已撤销 → 本联动标过的标注将相应撤销（R13.3） */
+  to_revoke: NoteLinkageItem[]
+  /** 附注侧没有该章节行 → 跳过并记录，不阻断裁剪保存（R13.6） */
+  unlocatable: NoteLinkageItem[]
+  /** 审计师手工标的不适用（无 provenance 面包屑）→ 本联动无权撤销 */
+  skipped_foreign_mark: NoteLinkageItem[]
+  /** 取数降级（registry 不可用 / 映射为空 / 单章节写入失败） */
+  degradations: { stage: string; reason: string; note_section?: string }[]
+  /** 本项目已被整体裁剪的循环 */
+  cycles_fully_trimmed: string[]
+  summary: {
+    to_mark: number
+    already_marked: number
+    conflicts: number
+    to_revoke: number
+    unlocatable: number
+  }
+}
+
+const _emptyNoteLinkage = (): NoteLinkageView => ({
+  to_mark: [], already_marked: [], conflicts: [], to_revoke: [],
+  unlocatable: [], skipped_foreign_mark: [], degradations: [],
+  cycles_fully_trimmed: [],
+  summary: { to_mark: 0, already_marked: 0, conflicts: 0, to_revoke: 0, unlocatable: 0 },
+})
+
+function _normalizeNoteLinkage(raw: any): NoteLinkageView {
+  const arr = (v: any): NoteLinkageItem[] => (Array.isArray(v) ? v : [])
+  const base = _emptyNoteLinkage()
+  const view: NoteLinkageView = {
+    to_mark: arr(raw?.to_mark),
+    already_marked: arr(raw?.already_marked),
+    conflicts: arr(raw?.conflicts),
+    to_revoke: arr(raw?.to_revoke),
+    unlocatable: arr(raw?.unlocatable),
+    skipped_foreign_mark: arr(raw?.skipped_foreign_mark),
+    degradations: Array.isArray(raw?.degradations) ? raw.degradations : [],
+    cycles_fully_trimmed: Array.isArray(raw?.cycles_fully_trimmed) ? raw.cycles_fully_trimmed : [],
+    summary: { ...base.summary, ...(raw?.summary && typeof raw.summary === 'object' ? raw.summary : {}) },
+  }
+  return view
+}
+
+/**
+ * 只读预览：本次程序裁剪会把哪些附注章节标为本期不适用 / 撤销 / 只提示。
+ *
+ * 🔴 `year` 必传：`procedure_instances` 没有 year 列，而 `disclosure_notes` 按
+ * `(project, year, note_section)` 唯一 —— 缺 year 后端定位不到章节行，整份联动会返回空
+ * （表现为「这个项目没有可标注的章节」这一实质结论）。
+ */
+export async function fetchTrimNoteLinkage(
+  projectId: string,
+  year: number,
+): Promise<NoteLinkageView> {
+  const { data } = await http.get(P_prt.trimNoteLinkage(projectId), { params: { year } })
+  return _normalizeNoteLinkage(data?.data ?? data)
+}
+
+/**
+ * 应用联动：后端**只写** `disclosure_notes.is_empty` + provenance 面包屑。
+ *
+ * 幂等：可反复调用，已处于目标态的章节零写入。
+ */
+export async function applyTrimNoteLinkage(
+  projectId: string,
+  year: number,
+): Promise<NoteLinkageView & { marked: number; revoked: number }> {
+  const { data } = await http.post(P_prt.trimNoteLinkageApply(projectId), { year })
+  const raw = data?.data ?? data
+  return {
+    ..._normalizeNoteLinkage(raw),
+    marked: Number(raw?.marked ?? 0),
+    revoked: Number(raw?.revoked ?? 0),
+  }
+}
+
+/** 查询 materialize job 状态（delegation preview 前置 job）。 */
+export async function getProcedureMaterializeJob(projectId: string, jobId: string): Promise<any> {
+  const { data } = await http.get(P_prt.materializeJobStatus(projectId, jobId), { validateStatus: () => true })
+  return data?.data ?? data
+}
+
+// ── 程序行一级复核（Task 13，ReviewConversation + IssueTicket） ──
+
+export interface ProcedureConversationView {
+  task_id: string
+  cell_ref: string
+  conversation: any | null
+  messages: any[]
+  open_issue_count: number
+  issues: any[]
+  access?: string
+  readonly?: boolean
+}
+
+/** 只读复核视图（对话 + 消息稳定排序 + 未解决 IssueTicket 数 + 问题单列表 + 访问级别）。 */
+export async function getProcedureConversation(
+  projectId: string, taskId: string,
+): Promise<ProcedureConversationView> {
+  const { data } = await http.get(P_prt.conversation(projectId, taskId), { validateStatus: () => true })
+  return (data?.data ?? data) as ProcedureConversationView
+}
+
+/** 追加程序行复核消息（仅当前参与者可写；历史只读参与者 403）。 */
+export async function postProcedureMessage(
+  projectId: string, taskId: string, content: string,
+): Promise<any> {
+  const { data } = await http.post(P_prt.messages(projectId, taskId), { content })
+  return data?.data ?? data
+}
+
+/** 关闭程序行 review_comment IssueTicket（review 前置门槛的解除动作）。 */
+export async function closeProcedureIssue(
+  projectId: string, taskId: string, issueId: string,
+): Promise<any> {
+  const { data } = await http.post(P_prt.closeIssue(projectId, taskId, issueId), {})
+  return data?.data ?? data
 }
 
 /** 聚合端点：一次获取当前用户所有被委派的程序（避免逐循环请求） */
@@ -125,8 +794,101 @@ export async function getConsistencyCheck(projectId: string, year = 2025): Promi
 
 // ── 附注 ──
 
-export async function refreshDisclosureFromWorkpapers(projectId: string, year: number): Promise<void> {
-  await http.post(P_dn.refreshFromWorkpapers(projectId, year))
+export interface RefreshFromWorkpapersResult {
+  refreshed: number
+  total_notes: number
+  sections_recomputed: string[]
+  text_only_sections: string[]
+  errors: string[]
+  cells_updated: number
+}
+
+export async function refreshDisclosureFromWorkpapers(projectId: string, year: number): Promise<RefreshFromWorkpapersResult> {
+  const { data } = await http.post(P_dn.refreshFromWorkpapers(projectId, year))
+  return data as RefreshFromWorkpapersResult
+}
+
+/** 只重算单个章节（当前页面刷新）— 后端仅动该节，前后端一致 */
+export async function refreshDisclosureSection(projectId: string, year: number, section: string): Promise<RefreshFromWorkpapersResult> {
+  const { data } = await http.post(P_dn.refreshSectionFromWorkpaper(projectId, year, section))
+  return data as RefreshFromWorkpapersResult
+}
+
+// ── 附注就绪度看板（附注联动复盘 P0-1，只读）──
+
+export interface NoteReadinessSection {
+  note_section: string
+  section_title: string
+  account_name: string
+  has_data: boolean
+  is_stale: boolean
+  stale_source: string | null
+  last_sync_at: string | null
+  last_sync_source: string | null
+  last_sync_wp_id: string | null
+  /** 该章节应由哪些底稿维护（生成自前端 *NoteSectionMap.ts 的注册表） */
+  wp_codes: string[]
+  /** wp_code → working_paper.id（仅已生成底稿，用于跳转） */
+  wp_ids: Record<string, string>
+  /** 底稿披露 sheet 真实 tab 名（跳转带 ?sheet=） */
+  wp_sheet: string | null
+  /** 有底稿映射但从未同步过 */
+  needs_sync: boolean
+  findings: { error: number; warning: number }
+}
+
+export interface NoteReadinessSummary {
+  total: number
+  with_data: number
+  empty: number
+  syncable: number
+  never_synced: number
+  stale: number
+  stale_report: number
+  stale_report_fallback?: number
+  error_sections: number
+  warning_sections: number
+  validated_at: string | null
+  validation_ran: boolean
+  formula_enabled: boolean
+}
+
+export interface NoteReadinessResult {
+  summary: NoteReadinessSummary
+  sections: NoteReadinessSection[]
+}
+
+export async function getDisclosureReadiness(
+  projectId: string,
+  year: number,
+): Promise<NoteReadinessResult> {
+  const { data } = await http.get(P_dn.readiness(projectId, year))
+  return (data?.data ?? data) as NoteReadinessResult
+}
+
+/**
+ * 获取附注章节的 auto_pull 联动取数结果。
+ * 原生 http 调用，手动解 {code,message,data} 信封取 body.data（铁律）。
+ */
+export interface AutoPullRefResult {
+  ref_id: string
+  target_wp: string | null
+  source_label: string
+  value: number | string | null
+  available: boolean
+  reason: string
+}
+
+export async function fetchNoteAutoPull(
+  projectId: string,
+  year: number,
+  section: string,
+): Promise<AutoPullRefResult[]> {
+  const { data: body } = await http.get(P_dn.autoPull(projectId, year, section))
+  // 手动解 {code, message, data} 信封
+  const envelope = body as any
+  const payload = envelope?.data ?? envelope
+  return payload?.refs ?? []
 }
 
 // ── 附注 LLM 辅助 ──
@@ -178,8 +940,8 @@ export async function createSubsequentEvent(projectId: string, body: any): Promi
 
 // ── 用户管理 ──
 
-export async function listUsers(): Promise<any[]> {
-  const { data } = await http.get(P_usr.list)
+export async function listUsers(projectId?: string): Promise<any[]> {
+  const { data } = await http.get(P_usr.list, projectId ? { params: { project_id: projectId } } : undefined)
   return Array.isArray(data) ? data : []
 }
 
@@ -343,9 +1105,19 @@ export async function searchAttachments(projectId: string, query: string): Promi
   return Array.isArray(data) ? data : []
 }
 
-export async function uploadAttachment(projectId: string, formData: FormData): Promise<any> {
+export async function uploadAttachment(
+  projectId: string,
+  formData: FormData,
+  onProgress?: (percent: number) => void,
+): Promise<any> {
   const { data } = await http.post(P_att.upload(projectId), formData, {
     headers: { 'Content-Type': 'multipart/form-data' },
+    onUploadProgress: onProgress
+      ? (e: any) => {
+          const percent = e.total ? Math.round((e.loaded / e.total) * 100) : 0
+          onProgress(percent)
+        }
+      : undefined,
   })
   return data
 }
@@ -367,6 +1139,19 @@ export async function applyProcedureScheme(projectId: string, cycle: string, sou
     params: { source_project_id: sourceProjectId },
   })
   return data
+}
+
+/** 设置底稿主编（Workpaper Lead API，替代旧 procedures/assign）。
+ *
+ * 调用新端点 PUT /api/projects/{pid}/workpaper-leads（procedure-mainline-convergence 需求 5）。
+ * 兼容旧签名以便 ProcedureTrimming.vue onAssigneeChange 零改动消费。
+ */
+export async function assignProcedures(
+  projectId: string,
+  assignments: { procedure_id: string; staff_id: string | null; request_id?: string }[],
+): Promise<{ updated: number }> {
+  const { data } = await http.put(P_leads.set(projectId), { assignments })
+  return data?.data ?? data
 }
 
 // ── 知识库（全局+项目级） ──

@@ -8,6 +8,7 @@ import axios, { type AxiosResponse, type InternalAxiosRequestConfig, type AxiosE
 import NProgress from 'nprogress'
 import { ElMessage } from 'element-plus'
 import { useAuthStore } from '@/stores/auth'
+import { versionBridge } from '@/composables/useVersionCheck'
 
 // ── NProgress 活跃请求计数器 ──────────────────────────────
 let activeRequests = 0
@@ -65,7 +66,7 @@ export function _resetNetworkStats() {
 
 const http = axios.create({
   baseURL: '/',
-  timeout: 120000,
+  timeout: 180000,
 })
 
 // ── 请求去重：相同 GET 请求在飞行中不重复发送 ──────────────
@@ -89,6 +90,8 @@ function getRequestKey(config: InternalAxiosRequestConfig): string {
 }
 
 function addPending(config: InternalAxiosRequestConfig) {
+  // 附件预览等调用方可显式关闭去重：不进 pendingMap，且保留调用方 signal
+  if ((config as any)._dedupe === false) return
   const key = getRequestKey(config)
   // 跳过 FormData 上传请求（文件上传不参与去重）
   if (config.data instanceof FormData) return
@@ -148,7 +151,14 @@ async function extractErrorDetail(responseData: unknown): Promise<string> {
   if (responseData && typeof responseData === 'object') {
     const d = (responseData as any)?.detail ?? (responseData as any)?.message ?? ''
     if (typeof d === 'string') return d
-    if (d && typeof d === 'object') return d.message || d.msg || JSON.stringify(d)
+    if (Array.isArray(d)) {
+      // FastAPI 422 validation errors: [{msg: "...", loc: [...], ...}]
+      return d.map((item: any) => item?.msg || item?.message || JSON.stringify(item)).join('；')
+    }
+    if (d && typeof d === 'object') {
+      const base = d.message || d.msg || JSON.stringify(d)
+      return d.item_id ? `${base}（ID: ${d.item_id}）` : base
+    }
     return String(d || '')
   }
 
@@ -182,12 +192,38 @@ let refreshQueue: Array<{
   reject: (error: unknown) => void
 }> = []
 
+// ── 5xx 重试提示单例（多并发请求共用一个 toast，避免弹窗堆叠）──
+let _retryMsgHandle: ReturnType<typeof ElMessage> | null = null
+let _retryInflight = 0
+function _showRetryToast(attempt: number) {
+  _retryInflight++
+  if (_retryMsgHandle) return
+  _retryMsgHandle = ElMessage.warning({
+    message: `服务器暂时异常，正在重试...`,
+    duration: 0,
+    showClose: true,
+    onClose: () => { _retryMsgHandle = null },
+  })
+}
+function _hideRetryToast() {
+  _retryInflight = Math.max(0, _retryInflight - 1)
+  if (_retryInflight === 0 && _retryMsgHandle) {
+    _retryMsgHandle.close()
+    _retryMsgHandle = null
+  }
+}
+
 // ── 响应拦截器 ──────────────────────────────────────────
 http.interceptors.response.use(
   (response: AxiosResponse) => {
     removePending(response.config as InternalAxiosRequestConfig)
     // R7-S2-11: 存储 trace id
     _lastTraceId = response.headers?.['x-request-id'] || ''
+    // 版本协商：读 X-App-Version 头推送到 versionBridge
+    const appVersion = response.headers?.['x-app-version']
+    if (appVersion) {
+      versionBridge.push(appVersion)
+    }
     // R10 Spec C: 5xx 环形缓冲区记录响应
     _trackResponse(response.status)
     // NProgress：所有请求完成后结束进度条
@@ -246,36 +282,12 @@ http.interceptors.response.use(
     // 请求被取消（去重导致）不弹错误
     if (axios.isCancel(error)) return Promise.reject(error)
 
-    // R8-S1-05：超时专门处理
-    if (error.code === 'ECONNABORTED') {
-      const { feedback } = await import('./feedback')
-      feedback.notify({
-        type: 'warning',
-        title: '请求超时',
-        message: '网络连接缓慢，已停止等待。建议检查网络或稍后重试。',
-        duration: 6000,
-      })
-      return Promise.reject(error)
-    }
-
-    // R8-S1-05：断网专门处理
-    if (!error.response && !navigator.onLine) {
-      const { feedback } = await import('./feedback')
-      feedback.notify({
-        type: 'warning',
-        title: '网络已断开',
-        message: '当前离线，部分操作可能无法完成。恢复网络后请重试。',
-        duration: 8000,
-      })
-      return Promise.reject(error)
-    }
-
     const originalRequest = error.config as InternalAxiosRequestConfig & { _retry?: boolean; _retryCount?: number }
     const authStore = useAuthStore()
     const status = error.response?.status
 
-    // 401 → 刷新令牌
-    if (status === 401 && !originalRequest._retry) {
+    // 401 → 优先刷新令牌（须在 _silent 之前，避免 silent health/ACNR 跳过刷新导致后续鉴权连环失败）
+    if (status === 401 && originalRequest && !originalRequest._retry) {
       if (!authStore.refreshToken) {
         authStore.logout()
         window.location.href = '/login'
@@ -314,17 +326,62 @@ http.interceptors.response.use(
       }
     }
 
-    // 500/502/503 自动重试（最多 2 次）+ loading 提示
-    if (status && status >= 500 && (originalRequest._retryCount ?? 0) < 2) {
-      originalRequest._retryCount = (originalRequest._retryCount ?? 0) + 1
-      const retryMsg = ElMessage.info({
-        message: `服务器暂时异常，正在第 ${originalRequest._retryCount} 次重试...`,
-        duration: 0,
-        showClose: true,
+    // 401 刷新后仍失败：静默拒绝并登出，不弹「无效的认证凭据」干扰底稿操作
+    if (status === 401) {
+      if (authStore.token || authStore.refreshToken) {
+        authStore.logout()
+        window.location.href = '/login'
+      }
+      return Promise.reject(error)
+    }
+
+    // _silent 模式：调用方自行处理错误，不弹全局 toast
+    if ((error.config as any)?._silent) return Promise.reject(error)
+
+    // R8-S1-05：超时专门处理（大文件导入期间完全抑制超时弹窗）
+    if (error.code === 'ECONNABORTED') {
+      // 全局抑制标志：大文件上传/detect 进行中时不弹超时（避免 worker 阻塞导致的误报）
+      if ((globalThis as any).__suppressTimeoutToast) {
+        return Promise.reject(error)
+      }
+      const now = Date.now()
+      const lastTimeoutTs = (globalThis as any).__lastTimeoutNotify || 0
+      // 60 秒防抖
+      if (now - lastTimeoutTs > 60000) {
+        (globalThis as any).__lastTimeoutNotify = now
+        const { feedback } = await import('./feedback')
+        feedback.notify({
+          type: 'warning',
+          title: '请求超时',
+          message: '网络连接缓慢，已停止等待。建议检查网络或稍后重试。',
+          duration: 6000,
+        })
+      }
+      return Promise.reject(error)
+    }
+
+    // R8-S1-05：断网专门处理
+    if (!error.response && !navigator.onLine) {
+      const { feedback } = await import('./feedback')
+      feedback.notify({
+        type: 'warning',
+        title: '网络已断开',
+        message: '当前离线，部分操作可能无法完成。恢复网络后请重试。',
+        duration: 8000,
       })
-      await new Promise((r) => setTimeout(r, 1000 * originalRequest._retryCount!))
-      retryMsg.close()
-      return http(originalRequest)
+      return Promise.reject(error)
+    }
+
+    // 500/502/503 自动重试（最多 2 次）+ loading 提示
+    if (status && status >= 500 && originalRequest && (originalRequest._retryCount ?? 0) < 2) {
+      originalRequest._retryCount = (originalRequest._retryCount ?? 0) + 1
+      _showRetryToast(originalRequest._retryCount)
+      try {
+        await new Promise((r) => setTimeout(r, 1000 * originalRequest._retryCount!))
+        return await http(originalRequest)
+      } finally {
+        _hideRetryToast()
+      }
     }
 
     // 分级错误提示
@@ -374,7 +431,9 @@ http.interceptors.response.use(
       return Promise.reject(error)
     }
 
-    const displayMsg = requestId ? `${msg}（ID: ${requestId}）` : msg
+    const displayMsg = requestId && !msg.includes('（ID:')
+      ? `${msg}（ID: ${requestId}）`
+      : msg
     if (status && status >= 500) {
       // R8-S1-05：5xx 最终失败用持续性通知卡片（重试已耗尽）
       const { feedback } = await import('./feedback')
@@ -431,12 +490,16 @@ export async function downloadFile(
     data?: any
     params?: Record<string, any>
     fileName?: string
+    /** 抑制全局错误 toast，由调用方自行处理（如预期的 404） */
+    silent?: boolean
   },
 ) {
   const method = options?.method ?? 'get'
+  const cfg: any = { params: options?.params, responseType: 'blob' }
+  if (options?.silent) cfg._silent = true
   const response = method === 'post'
-    ? await http.post(url, options?.data ?? null, { params: options?.params, responseType: 'blob' })
-    : await http.get(url, { params: options?.params, responseType: 'blob' })
+    ? await http.post(url, options?.data ?? null, cfg)
+    : await http.get(url, cfg)
 
   const contentDisposition = response.headers?.['content-disposition'] as string | undefined
   const resolvedFileName = extractFileNameFromDisposition(contentDisposition, options?.fileName || 'download')

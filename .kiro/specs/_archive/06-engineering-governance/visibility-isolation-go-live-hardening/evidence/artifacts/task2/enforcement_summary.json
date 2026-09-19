@@ -1,0 +1,119 @@
+{
+  "cases": [
+    {
+      "status": "passed",
+      "test": "tests.visibility_go_live_hardening.test_task2_editor_enforcement.TestCallbackReverify::test_callback_reverify_action_mismatch_and_pass"
+    },
+    {
+      "status": "passed",
+      "test": "tests.visibility_go_live_hardening.test_task2_editor_enforcement.TestCallbackReverify::test_callback_reverify_readonly_token_write"
+    },
+    {
+      "status": "passed",
+      "test": "tests.visibility_go_live_hardening.test_task2_editor_enforcement.TestCallbackReverify::test_callback_reverify_revoked_session"
+    },
+    {
+      "status": "passed",
+      "test": "tests.visibility_go_live_hardening.test_task2_editor_enforcement.TestCallbackReverify::test_callback_reverify_version_conflict"
+    },
+    {
+      "status": "passed",
+      "test": "tests.visibility_go_live_hardening.test_task2_editor_enforcement.TestEditorGateEnforceStates::test_bad_token_enforce_false_dev_passthrough"
+    },
+    {
+      "status": "passed",
+      "test": "tests.visibility_go_live_hardening.test_task2_editor_enforcement.TestEditorGateEnforceStates::test_bad_token_enforce_true_404[bad_signature]"
+    },
+    {
+      "status": "passed",
+      "test": "tests.visibility_go_live_hardening.test_task2_editor_enforcement.TestEditorGateEnforceStates::test_bad_token_enforce_true_404[claim_mismatch]"
+    },
+    {
+      "status": "passed",
+      "test": "tests.visibility_go_live_hardening.test_task2_editor_enforcement.TestEditorGateEnforceStates::test_bad_token_enforce_true_404[expired]"
+    },
+    {
+      "status": "passed",
+      "test": "tests.visibility_go_live_hardening.test_task2_editor_enforcement.TestEditorGateEnforceStates::test_gate_deny_enforce_false_dev_passthrough"
+    },
+    {
+      "status": "passed",
+      "test": "tests.visibility_go_live_hardening.test_task2_editor_enforcement.TestEditorGateEnforceStates::test_gate_deny_enforce_true_returns_404"
+    },
+    {
+      "status": "passed",
+      "test": "tests.visibility_go_live_hardening.test_task2_editor_enforcement.TestEditorGateEnforceStates::test_secret_missing_fail_closed_enforce_true"
+    },
+    {
+      "status": "passed",
+      "test": "tests.visibility_go_live_hardening.test_task2_editor_enforcement.TestEditorGateEnforceStates::test_valid_token_lead_allowed_enforce_true"
+    },
+    {
+      "status": "passed",
+      "test": "tests.visibility_go_live_hardening.test_task2_editor_enforcement.TestEnvGatedEnforcement::test_default_runtime_import_is_dev_false"
+    },
+    {
+      "status": "passed",
+      "test": "tests.visibility_go_live_hardening.test_task2_editor_enforcement.TestEnvGatedEnforcement::test_dev_defaults_false"
+    },
+    {
+      "status": "passed",
+      "test": "tests.visibility_go_live_hardening.test_task2_editor_enforcement.TestEnvGatedEnforcement::test_explicit_true_enables_in_dev"
+    },
+    {
+      "status": "passed",
+      "test": "tests.visibility_go_live_hardening.test_task2_editor_enforcement.TestEnvGatedEnforcement::test_prod_staging_derives_true[prod]"
+    },
+    {
+      "status": "passed",
+      "test": "tests.visibility_go_live_hardening.test_task2_editor_enforcement.TestEnvGatedEnforcement::test_prod_staging_derives_true[production]"
+    },
+    {
+      "status": "passed",
+      "test": "tests.visibility_go_live_hardening.test_task2_editor_enforcement.TestEnvGatedEnforcement::test_prod_staging_derives_true[staging]"
+    },
+    {
+      "status": "passed",
+      "test": "tests.visibility_go_live_hardening.test_task2_editor_enforcement.TestEnvGatedEnforcement::test_rollback_path_explicit_false_in_prod"
+    }
+  ],
+  "component": "H1 EnforcementEnabler",
+  "criterion_ids": [
+    "1.1",
+    "1.2",
+    "1.3",
+    "1.4",
+    "1.5",
+    "1.6",
+    "1.7",
+    "1.8",
+    "1.9",
+    "1.10",
+    "1.11",
+    "1.12"
+  ],
+  "enablement_method": {
+    "config_key": "ONLYOFFICE_JWT_ENFORCE",
+    "derivation": "未显式设置时按 APP_ENV 求值：prod/production/staging→True；dev→False",
+    "editor_security_logic_changed": false,
+    "env_field": "APP_ENV",
+    "explicit_override": "env/.env 显式 ONLYOFFICE_JWT_ENFORCE=true|false 完全尊重原值",
+    "hard_flip_default": false
+  },
+  "enforce_matrix": {
+    "dev": false,
+    "dev_explicit_true": true,
+    "prod": true,
+    "prod_explicit_false": false,
+    "production": true,
+    "staging": true
+  },
+  "rollback_path": "置 ONLYOFFICE_JWT_ENFORCE=false（纯配置，不需代码回滚）恢复启用前行为",
+  "spec": "visibility-isolation-go-live-hardening",
+  "task_id": "2. 启用编辑器令牌强制（R1）并验证 LIVE 与回退",
+  "totals": {
+    "failed": 0,
+    "passed": 19,
+    "total": 19
+  }
+}

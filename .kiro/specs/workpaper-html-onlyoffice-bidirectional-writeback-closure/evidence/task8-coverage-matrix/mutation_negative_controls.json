@@ -1,0 +1,64 @@
+{
+  "generated_by": "backend/scripts/_mutation_kit/span.py::run_cli",
+  "mode": "run",
+  "pytest_args": [
+    "backend/tests/test_workpaper_ac_coverage_matrix.py",
+    "-q",
+    "--tb=no",
+    "-rf",
+    "-p",
+    "no:randomly"
+  ],
+  "tally": {
+    "GREEN": 1,
+    "WRONG-TEST": 1,
+    "ANCHOR-MISS": 1
+  },
+  "mutations": [
+    {
+      "id": "N01-GREEN",
+      "path": "backend/scripts/gen/generate_workpaper_ac_coverage_matrix.py",
+      "want": "test_matrix_on_disk_matches_the_spec_documents",
+      "why": "只加一句注释，没有任何守卫应该因此打红；期望判 GREEN 而不是 RED",
+      "verdict": "GREEN",
+      "summary": "50 passed in 0.60s",
+      "added": [],
+      "gone": [],
+      "hit": [],
+      "added_files": [],
+      "restored": true,
+      "restored_sha256": "2d2844ed9c6f9b9568a1fa736aa995f7c567965b8ac802694e1651c3574a4e50",
+      "seconds": 3.1
+    },
+    {
+      "id": "N02-WRONG",
+      "path": "backend/scripts/check/check_workpaper_ac_coverage_gate.py",
+      "want": "test_ac_without_any_task_is_reported_as_dangling",
+      "why": "故意把 want 写成另一条测试：真正打红的是 gate 红/绿那条，期望判 WRONG-TEST",
+      "verdict": "WRONG-TEST",
+      "summary": "1 failed, 49 passed in 0.62s",
+      "added": [
+        "test_workpaper_ac_coverage_matrix.py::test_gate_is_red_while_any_defect_remains"
+      ],
+      "gone": [],
+      "hit": [],
+      "added_files": [
+        "test_workpaper_ac_coverage_matrix.py"
+      ],
+      "restored": true,
+      "restored_sha256": "c976069eade3d9a66321927df4e5fc2b30337f8e239fc6ad567d564505980884",
+      "seconds": 3.0
+    },
+    {
+      "id": "N03-MISS",
+      "path": "backend/scripts/gen/generate_workpaper_ac_coverage_matrix.py",
+      "want": "test_matrix_on_disk_matches_the_spec_documents",
+      "why": "锚点在目标文件中零命中，期望判 ANCHOR-MISS 而不是 RED（什么都没跑过）",
+      "verdict": "ANCHOR-MISS",
+      "detail": "锚点 0 命中（已按 '\\n' 升级）：'def this_function_does_not_exist():\\n    return None'",
+      "restored": true,
+      "restored_sha256": "2d2844ed9c6f9b9568a1fa736aa995f7c567965b8ac802694e1651c3574a4e50",
+      "seconds": 0.0
+    }
+  ]
+}

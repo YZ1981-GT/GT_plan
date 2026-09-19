@@ -1,0 +1,91 @@
+{
+  "contractVersion": "1.0",
+  "evidenceId": "evidence-fshell-t14-playwright-1",
+  "runId": "run-t14-2026-09-08",
+  "subject": {
+    "kind": "contract",
+    "contractId": "F-SHELL"
+  },
+  "contractVersions": {
+    "F-SHELL": "1.0",
+    "G-C0": "1.0"
+  },
+  "inventoryDigest": null,
+  "sourceDigests": {},
+  "operationIds": {
+    "playwright": "op-t14-playwright"
+  },
+  "artifacts": [
+    {
+      "kind": "host_matrix",
+      "path": "basis/T14-playwright/host-matrix.json"
+    },
+    {
+      "kind": "host_run",
+      "path": "basis/T14-playwright/host-run-results.json"
+    },
+    {
+      "kind": "keyboard",
+      "path": "basis/T14-playwright/keyboard-escape.json"
+    }
+  ],
+  "verdict": "PASS",
+  "recordedAt": "2026-09-08T16:42:05.474Z",
+  "hostMatrix": [
+    {
+      "host": "html",
+      "wp_code": "B50-1",
+      "wp_id": "68b35347-4e3a-43aa-a91d-c611149df9d2",
+      "status": "reachable",
+      "sheet_types": [
+        "h-static-doc",
+        "h-static-doc"
+      ]
+    },
+    {
+      "host": "univer",
+      "wp_code": "A1-13",
+      "wp_id": "085ae719-d662-4e93-a282-a03c407cf871",
+      "status": "reachable",
+      "sheet_types": [
+        "univer",
+        "univer",
+        "univer",
+        "univer",
+        "univer"
+      ]
+    },
+    {
+      "host": "onlyoffice",
+      "wp_code": "A14-4",
+      "wp_id": "342e8635-0a43-4c9a-b656-b1d7c879ef66",
+      "status": "reachable",
+      "sheet_types": [
+        "onlyoffice-sheet",
+        "h-static-doc",
+        "h-static-doc",
+        "h-static-doc",
+        "d-form-table",
+        "h-static-doc",
+        "h-static-doc",
+        "h-static-doc"
+      ]
+    },
+    {
+      "host": "grid",
+      "wp_code": "",
+      "wp_id": "",
+      "status": "skipped",
+      "reason": "no reachable representative in project inventory this run"
+    },
+    {
+      "host": "word",
+      "wp_code": "A26-1",
+      "wp_id": "94a6056e-d533-4965-ae4e-bce9641d9342",
+      "status": "reachable",
+      "sheet_types": [
+        "word-template"
+      ]
+    }
+  ]
+}

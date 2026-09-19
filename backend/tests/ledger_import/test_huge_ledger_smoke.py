@@ -20,7 +20,6 @@ from decimal import Decimal
 import pytest
 
 from app.services.ledger_import.converter import convert_ledger_rows
-from app.services.ledger_import.detection_types import TableType
 from app.services.ledger_import.validator import validate_l1
 
 
@@ -97,7 +96,7 @@ def test_huge_ledger_pipeline_2m_rows():
         # Phase 1: validate_l1
         findings, cleaned = validate_l1(
             batch,
-            TableType.LEDGER,
+            "ledger",
             col_mapping,
             file_name="synthetic_huge.xlsx",
             sheet_name="序时账",

@@ -56,36 +56,39 @@ class TemplateDiff:
 
 
 def _read_template_structure(file_path: str | Path) -> dict[str, list[str]]:
-    """纯函数：openpyxl 读 xlsx → 返回 {sheet_name: [column_headers]}
+    """纯函数：读 xlsx → 返回 {sheet_name: [column_headers]}
 
     读取每个 sheet 第一行作为列标题。
+    使用 read_sheet_values 统一适配器（calamine/openpyxl 自动切换）。
     无 DB、无副作用。
     """
-    import openpyxl
+    from app.services.xlsx_read_adapter import list_sheet_names, read_sheet_values
 
     file_path = Path(file_path)
     if not file_path.exists() or file_path.stat().st_size == 0:
         return {}
 
     try:
-        wb = openpyxl.load_workbook(str(file_path), read_only=True, data_only=True)
+        sheet_names = list_sheet_names(file_path)
     except Exception as e:
         logger.warning("无法加载模板文件 %s: %s", file_path, e)
         return {}
 
     structure: dict[str, list[str]] = {}
 
-    for sheet_name in wb.sheetnames:
-        ws = wb[sheet_name]
+    for sheet_name in sheet_names:
+        try:
+            rows = read_sheet_values(file_path, sheet_name)
+        except Exception:
+            structure[sheet_name] = []
+            continue
         headers: list[str] = []
-        # 读取第一行作为列标题
-        for row in ws.iter_rows(min_row=1, max_row=1):
-            for cell in row:
-                if cell.value is not None:
-                    headers.append(str(cell.value).strip())
+        if rows and rows[0]:
+            for cell in rows[0]:
+                if cell is not None:
+                    headers.append(str(cell).strip())
         structure[sheet_name] = headers
 
-    wb.close()
     return structure
 
 

@@ -1,0 +1,2543 @@
+{
+  "source_file": "d:\\GT_plan\\基础数据\\致同通用审计程序及底稿模板（2025年修订）\\1.致同审计程序及底稿模板（2025年）\\4.风险应对-实质性程序（D-N）\\H 固定资产循环\\H6 固定资产清理.xlsx",
+  "sheet_count": 8,
+  "sheet_names": [
+    "底稿目录",
+    "固定资产清理实质性程序表H6A",
+    "审定表H6-1",
+    "附注披露信息（上市公司）",
+    "附注披露信息（国有企业）",
+    "明细表H6-2",
+    "调整分录汇总H6-3",
+    "检查表H6-4"
+  ],
+  "sheets": [
+    {
+      "sheet_name": "底稿目录",
+      "dimensions": "A1:H19",
+      "max_row": 19,
+      "max_column": 8,
+      "column_headers": [
+        {
+          "column": "A",
+          "col_index": 1,
+          "value": "底稿开列时，可先在以下单元格填写有关内容，以便其他底稿引用有关数据：",
+          "data_type": "s"
+        },
+        {
+          "column": "B",
+          "col_index": 2,
+          "value": null,
+          "data_type": "n"
+        },
+        {
+          "column": "C",
+          "col_index": 3,
+          "value": null,
+          "data_type": "n"
+        },
+        {
+          "column": "D",
+          "col_index": 4,
+          "value": null,
+          "data_type": "n"
+        },
+        {
+          "column": "E",
+          "col_index": 5,
+          "value": null,
+          "data_type": "n"
+        },
+        {
+          "column": "F",
+          "col_index": 6,
+          "value": null,
+          "data_type": "n"
+        },
+        {
+          "column": "G",
+          "col_index": 7,
+          "value": null,
+          "data_type": "n"
+        },
+        {
+          "column": "H",
+          "col_index": 8,
+          "value": null,
+          "data_type": "n"
+        }
+      ],
+      "formula_cells": [
+        {
+          "cell": "D6",
+          "row": 6,
+          "column": 4,
+          "formula": "=D5+1"
+        },
+        {
+          "cell": "D7",
+          "row": 7,
+          "column": 4,
+          "formula": "=D6+1"
+        },
+        {
+          "cell": "D8",
+          "row": 8,
+          "column": 4,
+          "formula": "=D7+1"
+        },
+        {
+          "cell": "D9",
+          "row": 9,
+          "column": 4,
+          "formula": "=D8+1"
+        },
+        {
+          "cell": "D10",
+          "row": 10,
+          "column": 4,
+          "formula": "=D9+1"
+        }
+      ],
+      "merged_areas": [
+        "A14:A16",
+        "A17:A19",
+        "A10:A13"
+      ],
+      "data_types": {
+        "string": 29,
+        "numeric": 118,
+        "formula": 5
+      },
+      "sample_data": [
+        {
+          "row": 1,
+          "cells": {
+            "A": {
+              "value": "底稿开列时，可先在以下单元格填写有关内容，以便其他底稿引用有关数据：",
+              "type": "s"
+            }
+          }
+        },
+        {
+          "row": 2,
+          "cells": {
+            "A": {
+              "value": "被审计单位：",
+              "type": "s"
+            }
+          }
+        },
+        {
+          "row": 3,
+          "cells": {
+            "A": {
+              "value": "截止日：202X年12月31日",
+              "type": "s"
+            },
+            "D": {
+              "value": "序号",
+              "type": "s"
+            },
+            "E": {
+              "value": "内容",
+              "type": "s"
+            },
+            "F": {
+              "value": "索引号",
+              "type": "s"
+            },
+            "G": {
+              "value": "备注",
+              "type": "s"
+            }
+          }
+        },
+        {
+          "row": 4,
+          "cells": {
+            "A": {
+              "value": "编制人：",
+              "type": "s"
+            },
+            "E": {
+              "value": "固定资产清理实质性程序表",
+              "type": "s"
+            },
+            "F": {
+              "value": "H6A",
+              "type": "s"
+            }
+          }
+        },
+        {
+          "row": 5,
+          "cells": {
+            "A": {
+              "value": "复核人：",
+              "type": "s"
+            },
+            "D": {
+              "value": "1",
+              "type": "n"
+            },
+            "E": {
+              "value": "审定表",
+              "type": "s"
+            },
+            "F": {
+              "value": "H6-1",
+              "type": "s"
+            }
+          }
+        }
+      ],
+      "row2_headers": [
+        {
+          "column": "A",
+          "col_index": 1,
+          "value": "被审计单位：",
+          "data_type": "s"
+        }
+      ],
+      "formula_count": 5,
+      "merged_count": 3
+    },
+    {
+      "sheet_name": "固定资产清理实质性程序表H6A",
+      "dimensions": "A1:L23",
+      "max_row": 23,
+      "max_column": 12,
+      "column_headers": [
+        {
+          "column": "A",
+          "col_index": 1,
+          "value": "致同会计师事务所",
+          "data_type": "s"
+        },
+        {
+          "column": "B",
+          "col_index": 2,
+          "value": null,
+          "data_type": "n"
+        },
+        {
+          "column": "C",
+          "col_index": 3,
+          "value": null,
+          "data_type": "n"
+        },
+        {
+          "column": "D",
+          "col_index": 4,
+          "value": null,
+          "data_type": "n"
+        },
+        {
+          "column": "E",
+          "col_index": 5,
+          "value": null,
+          "data_type": "n"
+        },
+        {
+          "column": "F",
+          "col_index": 6,
+          "value": null,
+          "data_type": "n"
+        },
+        {
+          "column": "G",
+          "col_index": 7,
+          "value": null,
+          "data_type": "n"
+        },
+        {
+          "column": "H",
+          "col_index": 8,
+          "value": null,
+          "data_type": "n"
+        },
+        {
+          "column": "I",
+          "col_index": 9,
+          "value": null,
+          "data_type": "n"
+        },
+        {
+          "column": "J",
+          "col_index": 10,
+          "value": null,
+          "data_type": "n"
+        },
+        {
+          "column": "K",
+          "col_index": 11,
+          "value": null,
+          "data_type": "n"
+        },
+        {
+          "column": "L",
+          "col_index": 12,
+          "value": null,
+          "data_type": "n"
+        }
+      ],
+      "formula_cells": [
+        {
+          "cell": "A3",
+          "row": 3,
+          "column": 1,
+          "formula": "=底稿目录!A2"
+        },
+        {
+          "cell": "C3",
+          "row": 3,
+          "column": 3,
+          "formula": "=底稿目录!A4"
+        },
+        {
+          "cell": "E3",
+          "row": 3,
+          "column": 5,
+          "formula": "=底稿目录!A6"
+        },
+        {
+          "cell": "A4",
+          "row": 4,
+          "column": 1,
+          "formula": "=底稿目录!A3"
+        },
+        {
+          "cell": "C4",
+          "row": 4,
+          "column": 3,
+          "formula": "=底稿目录!A5"
+        },
+        {
+          "cell": "E4",
+          "row": 4,
+          "column": 5,
+          "formula": "=底稿目录!A7"
+        }
+      ],
+      "merged_areas": [
+        "G10:I10",
+        "G13:I13",
+        "A12:F12",
+        "A2:I2",
+        "A8:F8",
+        "B15:B16",
+        "A10:F10",
+        "A13:F13",
+        "J18:L18",
+        "A9:F9",
+        "A5:B5",
+        "G9:I9",
+        "A14:B14",
+        "G12:I12",
+        "G11:I11",
+        "A11:F11",
+        "D15:H15",
+        "J19:L19",
+        "A1:I1",
+        "G8:I8",
+        "A15:A16",
+        "C15:C16",
+        "I15:I16"
+      ],
+      "data_types": {
+        "string": 82,
+        "numeric": 188,
+        "formula": 6
+      },
+      "sample_data": [
+        {
+          "row": 1,
+          "cells": {
+            "A": {
+              "value": "致同会计师事务所",
+              "type": "s"
+            }
+          }
+        },
+        {
+          "row": 2,
+          "cells": {
+            "A": {
+              "value": "固定资产清理实质性程序表",
+              "type": "s"
+            }
+          }
+        },
+        {
+          "row": 3,
+          "cells": {
+            "A": {
+              "value": "=底稿目录!A2",
+              "type": "f"
+            },
+            "C": {
+              "value": "=底稿目录!A4",
+              "type": "f"
+            },
+            "E": {
+              "value": "=底稿目录!A6",
+              "type": "f"
+            },
+            "H": {
+              "value": "索引号：",
+              "type": "s"
+            },
+            "I": {
+              "value": "H6A",
+              "type": "s"
+            }
+          }
+        },
+        {
+          "row": 4,
+          "cells": {
+            "A": {
+              "value": "=底稿目录!A3",
+              "type": "f"
+            },
+            "C": {
+              "value": "=底稿目录!A5",
+              "type": "f"
+            },
+            "E": {
+              "value": "=底稿目录!A7",
+              "type": "f"
+            },
+            "H": {
+              "value": "页  次：",
+              "type": "s"
+            }
+          }
+        },
+        {
+          "row": 5,
+          "cells": {
+            "A": {
+              "value": "一、本账户涉及的科目",
+              "type": "s"
+            }
+          }
+        }
+      ],
+      "row2_headers": [
+        {
+          "column": "A",
+          "col_index": 1,
+          "value": "固定资产清理实质性程序表",
+          "data_type": "s"
+        }
+      ],
+      "formula_count": 6,
+      "merged_count": 23
+    },
+    {
+      "sheet_name": "审定表H6-1",
+      "dimensions": "A1:I51",
+      "max_row": 51,
+      "max_column": 9,
+      "column_headers": [
+        {
+          "column": "A",
+          "col_index": 1,
+          "value": "致同会计师事务所",
+          "data_type": "s"
+        },
+        {
+          "column": "B",
+          "col_index": 2,
+          "value": null,
+          "data_type": "n"
+        },
+        {
+          "column": "C",
+          "col_index": 3,
+          "value": null,
+          "data_type": "n"
+        },
+        {
+          "column": "D",
+          "col_index": 4,
+          "value": null,
+          "data_type": "n"
+        },
+        {
+          "column": "E",
+          "col_index": 5,
+          "value": null,
+          "data_type": "n"
+        },
+        {
+          "column": "F",
+          "col_index": 6,
+          "value": null,
+          "data_type": "n"
+        },
+        {
+          "column": "G",
+          "col_index": 7,
+          "value": null,
+          "data_type": "n"
+        },
+        {
+          "column": "H",
+          "col_index": 8,
+          "value": null,
+          "data_type": "n"
+        },
+        {
+          "column": "I",
+          "col_index": 9,
+          "value": null,
+          "data_type": "n"
+        }
+      ],
+      "formula_cells": [
+        {
+          "cell": "A3",
+          "row": 3,
+          "column": 1,
+          "formula": "=底稿目录!A2"
+        },
+        {
+          "cell": "D3",
+          "row": 3,
+          "column": 4,
+          "formula": "=底稿目录!A4"
+        },
+        {
+          "cell": "F3",
+          "row": 3,
+          "column": 6,
+          "formula": "=底稿目录!A6"
+        },
+        {
+          "cell": "A4",
+          "row": 4,
+          "column": 1,
+          "formula": "=底稿目录!A3"
+        },
+        {
+          "cell": "D4",
+          "row": 4,
+          "column": 4,
+          "formula": "=底稿目录!A5"
+        },
+        {
+          "cell": "F4",
+          "row": 4,
+          "column": 6,
+          "formula": "=底稿目录!A7"
+        },
+        {
+          "cell": "A7",
+          "row": 7,
+          "column": 1,
+          "formula": "='明细表H6-2'!A11"
+        },
+        {
+          "cell": "B7",
+          "row": 7,
+          "column": 2,
+          "formula": "='明细表H6-2'!B11"
+        },
+        {
+          "cell": "C7",
+          "row": 7,
+          "column": 3,
+          "formula": "='明细表H6-2'!F11"
+        },
+        {
+          "cell": "D7",
+          "row": 7,
+          "column": 4,
+          "formula": "=B7+C7"
+        },
+        {
+          "cell": "E7",
+          "row": 7,
+          "column": 5,
+          "formula": "='明细表H6-2'!E11"
+        },
+        {
+          "cell": "F7",
+          "row": 7,
+          "column": 6,
+          "formula": "='明细表H6-2'!F11+'明细表H6-2'!G11-'明细表H6-2'!H11"
+        },
+        {
+          "cell": "G7",
+          "row": 7,
+          "column": 7,
+          "formula": "=E7+F7"
+        },
+        {
+          "cell": "H7",
+          "row": 7,
+          "column": 8,
+          "formula": "=G7-D7"
+        },
+        {
+          "cell": "I7",
+          "row": 7,
+          "column": 9,
+          "formula": "=IF(AND(D7=0,H7=0),0,IF(AND(D7=0,H7>0),1,H7/D7))"
+        },
+        {
+          "cell": "A8",
+          "row": 8,
+          "column": 1,
+          "formula": "='明细表H6-2'!A12"
+        },
+        {
+          "cell": "B8",
+          "row": 8,
+          "column": 2,
+          "formula": "='明细表H6-2'!B12"
+        },
+        {
+          "cell": "C8",
+          "row": 8,
+          "column": 3,
+          "formula": "='明细表H6-2'!F12"
+        },
+        {
+          "cell": "D8",
+          "row": 8,
+          "column": 4,
+          "formula": "=B8+C8"
+        },
+        {
+          "cell": "E8",
+          "row": 8,
+          "column": 5,
+          "formula": "='明细表H6-2'!E12"
+        },
+        {
+          "cell": "F8",
+          "row": 8,
+          "column": 6,
+          "formula": "='明细表H6-2'!F12+'明细表H6-2'!G12-'明细表H6-2'!H12"
+        },
+        {
+          "cell": "G8",
+          "row": 8,
+          "column": 7,
+          "formula": "=E8+F8"
+        },
+        {
+          "cell": "H8",
+          "row": 8,
+          "column": 8,
+          "formula": "=G8-D8"
+        },
+        {
+          "cell": "I8",
+          "row": 8,
+          "column": 9,
+          "formula": "=IF(AND(D8=0,H8=0),0,IF(AND(D8=0,H8>0),1,H8/D8))"
+        },
+        {
+          "cell": "A9",
+          "row": 9,
+          "column": 1,
+          "formula": "='明细表H6-2'!A13"
+        },
+        {
+          "cell": "B9",
+          "row": 9,
+          "column": 2,
+          "formula": "='明细表H6-2'!B13"
+        },
+        {
+          "cell": "C9",
+          "row": 9,
+          "column": 3,
+          "formula": "='明细表H6-2'!F13"
+        },
+        {
+          "cell": "D9",
+          "row": 9,
+          "column": 4,
+          "formula": "=B9+C9"
+        },
+        {
+          "cell": "E9",
+          "row": 9,
+          "column": 5,
+          "formula": "='明细表H6-2'!E13"
+        },
+        {
+          "cell": "F9",
+          "row": 9,
+          "column": 6,
+          "formula": "='明细表H6-2'!F13+'明细表H6-2'!G13-'明细表H6-2'!H13"
+        },
+        {
+          "cell": "G9",
+          "row": 9,
+          "column": 7,
+          "formula": "=E9+F9"
+        },
+        {
+          "cell": "H9",
+          "row": 9,
+          "column": 8,
+          "formula": "=G9-D9"
+        },
+        {
+          "cell": "I9",
+          "row": 9,
+          "column": 9,
+          "formula": "=IF(AND(D9=0,H9=0),0,IF(AND(D9=0,H9>0),1,H9/D9))"
+        },
+        {
+          "cell": "A10",
+          "row": 10,
+          "column": 1,
+          "formula": "='明细表H6-2'!A14"
+        },
+        {
+          "cell": "B10",
+          "row": 10,
+          "column": 2,
+          "formula": "='明细表H6-2'!B14"
+        },
+        {
+          "cell": "C10",
+          "row": 10,
+          "column": 3,
+          "formula": "='明细表H6-2'!F14"
+        },
+        {
+          "cell": "D10",
+          "row": 10,
+          "column": 4,
+          "formula": "=B10+C10"
+        },
+        {
+          "cell": "E10",
+          "row": 10,
+          "column": 5,
+          "formula": "='明细表H6-2'!E14"
+        },
+        {
+          "cell": "F10",
+          "row": 10,
+          "column": 6,
+          "formula": "='明细表H6-2'!F14+'明细表H6-2'!G14-'明细表H6-2'!H14"
+        },
+        {
+          "cell": "G10",
+          "row": 10,
+          "column": 7,
+          "formula": "=E10+F10"
+        },
+        {
+          "cell": "H10",
+          "row": 10,
+          "column": 8,
+          "formula": "=G10-D10"
+        },
+        {
+          "cell": "I10",
+          "row": 10,
+          "column": 9,
+          "formula": "=IF(AND(D10=0,H10=0),0,IF(AND(D10=0,H10>0),1,H10/D10))"
+        },
+        {
+          "cell": "A11",
+          "row": 11,
+          "column": 1,
+          "formula": "='明细表H6-2'!A15"
+        },
+        {
+          "cell": "B11",
+          "row": 11,
+          "column": 2,
+          "formula": "='明细表H6-2'!B15"
+        },
+        {
+          "cell": "C11",
+          "row": 11,
+          "column": 3,
+          "formula": "='明细表H6-2'!F15"
+        },
+        {
+          "cell": "D11",
+          "row": 11,
+          "column": 4,
+          "formula": "=B11+C11"
+        },
+        {
+          "cell": "E11",
+          "row": 11,
+          "column": 5,
+          "formula": "='明细表H6-2'!E15"
+        },
+        {
+          "cell": "F11",
+          "row": 11,
+          "column": 6,
+          "formula": "='明细表H6-2'!F15+'明细表H6-2'!G15-'明细表H6-2'!H15"
+        },
+        {
+          "cell": "G11",
+          "row": 11,
+          "column": 7,
+          "formula": "=E11+F11"
+        },
+        {
+          "cell": "H11",
+          "row": 11,
+          "column": 8,
+          "formula": "=G11-D11"
+        },
+        {
+          "cell": "I11",
+          "row": 11,
+          "column": 9,
+          "formula": "=IF(AND(D11=0,H11=0),0,IF(AND(D11=0,H11>0),1,H11/D11))"
+        },
+        {
+          "cell": "B12",
+          "row": 12,
+          "column": 2,
+          "formula": "=SUM(B7:B11)"
+        },
+        {
+          "cell": "C12",
+          "row": 12,
+          "column": 3,
+          "formula": "=SUM(C7:C11)"
+        },
+        {
+          "cell": "D12",
+          "row": 12,
+          "column": 4,
+          "formula": "=SUM(D7:D11)"
+        },
+        {
+          "cell": "E12",
+          "row": 12,
+          "column": 5,
+          "formula": "=SUM(E7:E11)"
+        },
+        {
+          "cell": "F12",
+          "row": 12,
+          "column": 6,
+          "formula": "=SUM(F7:F11)"
+        },
+        {
+          "cell": "G12",
+          "row": 12,
+          "column": 7,
+          "formula": "=SUM(G7:G11)"
+        },
+        {
+          "cell": "H12",
+          "row": 12,
+          "column": 8,
+          "formula": "=G12-D12"
+        },
+        {
+          "cell": "I12",
+          "row": 12,
+          "column": 9,
+          "formula": "=IF(AND(D12=0,H12=0),0,IF(AND(D12=0,H12>0),1,H12/D12))"
+        },
+        {
+          "cell": "B22",
+          "row": 22,
+          "column": 2,
+          "formula": "=G12"
+        },
+        {
+          "cell": "C22",
+          "row": 22,
+          "column": 3,
+          "formula": "=D12"
+        },
+        {
+          "cell": "B23",
+          "row": 23,
+          "column": 2,
+          "formula": "=B21+B22"
+        },
+        {
+          "cell": "C23",
+          "row": 23,
+          "column": 3,
+          "formula": "=C21+C22"
+        },
+        {
+          "cell": "B25",
+          "row": 25,
+          "column": 2,
+          "formula": "=B23-B24"
+        },
+        {
+          "cell": "C25",
+          "row": 25,
+          "column": 3,
+          "formula": "=C23-C24"
+        }
+      ],
+      "merged_areas": [
+        "A5:A6",
+        "B5:D5",
+        "A2:I2",
+        "E5:G5",
+        "A1:I1",
+        "H5:I5"
+      ],
+      "data_types": {
+        "string": 32,
+        "numeric": 362,
+        "formula": 65
+      },
+      "sample_data": [
+        {
+          "row": 1,
+          "cells": {
+            "A": {
+              "value": "致同会计师事务所",
+              "type": "s"
+            }
+          }
+        },
+        {
+          "row": 2,
+          "cells": {
+            "A": {
+              "value": "固定资产清理审定表",
+              "type": "s"
+            }
+          }
+        },
+        {
+          "row": 3,
+          "cells": {
+            "A": {
+              "value": "=底稿目录!A2",
+              "type": "f"
+            },
+            "D": {
+              "value": "=底稿目录!A4",
+              "type": "f"
+            },
+            "F": {
+              "value": "=底稿目录!A6",
+              "type": "f"
+            },
+            "H": {
+              "value": "索引号：",
+              "type": "s"
+            },
+            "I": {
+              "value": "H6-1",
+              "type": "s"
+            }
+          }
+        },
+        {
+          "row": 4,
+          "cells": {
+            "A": {
+              "value": "=底稿目录!A3",
+              "type": "f"
+            },
+            "D": {
+              "value": "=底稿目录!A5",
+              "type": "f"
+            },
+            "F": {
+              "value": "=底稿目录!A7",
+              "type": "f"
+            },
+            "H": {
+              "value": "页  次：",
+              "type": "s"
+            }
+          }
+        },
+        {
+          "row": 5,
+          "cells": {
+            "A": {
+              "value": "项目",
+              "type": "s"
+            },
+            "B": {
+              "value": "期初数",
+              "type": "s"
+            },
+            "E": {
+              "value": "期末数",
+              "type": "s"
+            },
+            "H": {
+              "value": "本期审定数与上期\n审定数的比较",
+              "type": "s"
+            }
+          }
+        }
+      ],
+      "row2_headers": [
+        {
+          "column": "A",
+          "col_index": 1,
+          "value": "固定资产清理审定表",
+          "data_type": "s"
+        }
+      ],
+      "formula_count": 65,
+      "merged_count": 6
+    },
+    {
+      "sheet_name": "附注披露信息（上市公司）",
+      "dimensions": "A1:E18",
+      "max_row": 18,
+      "max_column": 5,
+      "column_headers": [
+        {
+          "column": "A",
+          "col_index": 1,
+          "value": "致同会计师事务所",
+          "data_type": "s"
+        },
+        {
+          "column": "B",
+          "col_index": 2,
+          "value": null,
+          "data_type": "n"
+        },
+        {
+          "column": "C",
+          "col_index": 3,
+          "value": null,
+          "data_type": "n"
+        },
+        {
+          "column": "D",
+          "col_index": 4,
+          "value": null,
+          "data_type": "n"
+        },
+        {
+          "column": "E",
+          "col_index": 5,
+          "value": null,
+          "data_type": "n"
+        }
+      ],
+      "formula_cells": [
+        {
+          "cell": "A3",
+          "row": 3,
+          "column": 1,
+          "formula": "=底稿目录!A2"
+        },
+        {
+          "cell": "B3",
+          "row": 3,
+          "column": 2,
+          "formula": "=底稿目录!A4"
+        },
+        {
+          "cell": "C3",
+          "row": 3,
+          "column": 3,
+          "formula": "=底稿目录!A6"
+        },
+        {
+          "cell": "A4",
+          "row": 4,
+          "column": 1,
+          "formula": "=底稿目录!A3"
+        },
+        {
+          "cell": "B4",
+          "row": 4,
+          "column": 2,
+          "formula": "=底稿目录!A5"
+        },
+        {
+          "cell": "C4",
+          "row": 4,
+          "column": 3,
+          "formula": "=底稿目录!A7"
+        }
+      ],
+      "merged_areas": [
+        "A1:D1",
+        "A2:D2"
+      ],
+      "data_types": {
+        "string": 24,
+        "numeric": 60,
+        "formula": 6
+      },
+      "sample_data": [
+        {
+          "row": 1,
+          "cells": {
+            "A": {
+              "value": "致同会计师事务所",
+              "type": "s"
+            }
+          }
+        },
+        {
+          "row": 2,
+          "cells": {
+            "A": {
+              "value": "附注披露表（上市公司）",
+              "type": "s"
+            }
+          }
+        },
+        {
+          "row": 3,
+          "cells": {
+            "A": {
+              "value": "=底稿目录!A2",
+              "type": "f"
+            },
+            "B": {
+              "value": "=底稿目录!A4",
+              "type": "f"
+            },
+            "C": {
+              "value": "=底稿目录!A6",
+              "type": "f"
+            },
+            "D": {
+              "value": "索引号：",
+              "type": "s"
+            }
+          }
+        },
+        {
+          "row": 4,
+          "cells": {
+            "A": {
+              "value": "=底稿目录!A3",
+              "type": "f"
+            },
+            "B": {
+              "value": "=底稿目录!A5",
+              "type": "f"
+            },
+            "C": {
+              "value": "=底稿目录!A7",
+              "type": "f"
+            },
+            "D": {
+              "value": "页  次：",
+              "type": "s"
+            },
+            "E": {
+              "value": "返回目录",
+              "type": "s"
+            }
+          }
+        },
+        {
+          "row": 5,
+          "cells": {
+            "A": {
+              "value": "【固定资产与固定资产清理的合计数披露详见H1-1】",
+              "type": "s"
+            }
+          }
+        }
+      ],
+      "row2_headers": [
+        {
+          "column": "A",
+          "col_index": 1,
+          "value": "附注披露表（上市公司）",
+          "data_type": "s"
+        }
+      ],
+      "formula_count": 6,
+      "merged_count": 2
+    },
+    {
+      "sheet_name": "附注披露信息（国有企业）",
+      "dimensions": "A1:E18",
+      "max_row": 18,
+      "max_column": 5,
+      "column_headers": [
+        {
+          "column": "A",
+          "col_index": 1,
+          "value": "致同会计师事务所",
+          "data_type": "s"
+        },
+        {
+          "column": "B",
+          "col_index": 2,
+          "value": null,
+          "data_type": "n"
+        },
+        {
+          "column": "C",
+          "col_index": 3,
+          "value": null,
+          "data_type": "n"
+        },
+        {
+          "column": "D",
+          "col_index": 4,
+          "value": null,
+          "data_type": "n"
+        },
+        {
+          "column": "E",
+          "col_index": 5,
+          "value": null,
+          "data_type": "n"
+        }
+      ],
+      "formula_cells": [
+        {
+          "cell": "A3",
+          "row": 3,
+          "column": 1,
+          "formula": "=底稿目录!A2"
+        },
+        {
+          "cell": "B3",
+          "row": 3,
+          "column": 2,
+          "formula": "=底稿目录!A4"
+        },
+        {
+          "cell": "C3",
+          "row": 3,
+          "column": 3,
+          "formula": "=底稿目录!A6"
+        },
+        {
+          "cell": "A4",
+          "row": 4,
+          "column": 1,
+          "formula": "=底稿目录!A3"
+        },
+        {
+          "cell": "B4",
+          "row": 4,
+          "column": 2,
+          "formula": "=底稿目录!A5"
+        },
+        {
+          "cell": "C4",
+          "row": 4,
+          "column": 3,
+          "formula": "=底稿目录!A7"
+        }
+      ],
+      "merged_areas": [
+        "A1:D1",
+        "A2:D2"
+      ],
+      "data_types": {
+        "string": 23,
+        "numeric": 61,
+        "formula": 6
+      },
+      "sample_data": [
+        {
+          "row": 1,
+          "cells": {
+            "A": {
+              "value": "致同会计师事务所",
+              "type": "s"
+            }
+          }
+        },
+        {
+          "row": 2,
+          "cells": {
+            "A": {
+              "value": "附注披露表（国有企业）",
+              "type": "s"
+            }
+          }
+        },
+        {
+          "row": 3,
+          "cells": {
+            "A": {
+              "value": "=底稿目录!A2",
+              "type": "f"
+            },
+            "B": {
+              "value": "=底稿目录!A4",
+              "type": "f"
+            },
+            "C": {
+              "value": "=底稿目录!A6",
+              "type": "f"
+            },
+            "D": {
+              "value": "索引号：",
+              "type": "s"
+            }
+          }
+        },
+        {
+          "row": 4,
+          "cells": {
+            "A": {
+              "value": "=底稿目录!A3",
+              "type": "f"
+            },
+            "B": {
+              "value": "=底稿目录!A5",
+              "type": "f"
+            },
+            "C": {
+              "value": "=底稿目录!A7",
+              "type": "f"
+            },
+            "D": {
+              "value": "页  次：",
+              "type": "s"
+            },
+            "E": {
+              "value": "返回目录",
+              "type": "s"
+            }
+          }
+        },
+        {
+          "row": 5,
+          "cells": {
+            "A": {
+              "value": "【固定资产与固定资产清理的合计数披露详见H1-1】",
+              "type": "s"
+            }
+          }
+        }
+      ],
+      "row2_headers": [
+        {
+          "column": "A",
+          "col_index": 1,
+          "value": "附注披露表（国有企业）",
+          "data_type": "s"
+        }
+      ],
+      "formula_count": 6,
+      "merged_count": 2
+    },
+    {
+      "sheet_name": "明细表H6-2",
+      "dimensions": "A1:Y36",
+      "max_row": 36,
+      "max_column": 25,
+      "column_headers": [
+        {
+          "column": "A",
+          "col_index": 1,
+          "value": "致同会计师事务所",
+          "data_type": "s"
+        },
+        {
+          "column": "B",
+          "col_index": 2,
+          "value": null,
+          "data_type": "n"
+        },
+        {
+          "column": "C",
+          "col_index": 3,
+          "value": null,
+          "data_type": "n"
+        },
+        {
+          "column": "D",
+          "col_index": 4,
+          "value": null,
+          "data_type": "n"
+        },
+        {
+          "column": "E",
+          "col_index": 5,
+          "value": null,
+          "data_type": "n"
+        },
+        {
+          "column": "F",
+          "col_index": 6,
+          "value": null,
+          "data_type": "n"
+        },
+        {
+          "column": "G",
+          "col_index": 7,
+          "value": null,
+          "data_type": "n"
+        },
+        {
+          "column": "H",
+          "col_index": 8,
+          "value": null,
+          "data_type": "n"
+        },
+        {
+          "column": "I",
+          "col_index": 9,
+          "value": null,
+          "data_type": "n"
+        },
+        {
+          "column": "J",
+          "col_index": 10,
+          "value": null,
+          "data_type": "n"
+        },
+        {
+          "column": "K",
+          "col_index": 11,
+          "value": null,
+          "data_type": "n"
+        },
+        {
+          "column": "L",
+          "col_index": 12,
+          "value": null,
+          "data_type": "n"
+        },
+        {
+          "column": "M",
+          "col_index": 13,
+          "value": null,
+          "data_type": "n"
+        },
+        {
+          "column": "N",
+          "col_index": 14,
+          "value": null,
+          "data_type": "n"
+        },
+        {
+          "column": "O",
+          "col_index": 15,
+          "value": null,
+          "data_type": "n"
+        },
+        {
+          "column": "P",
+          "col_index": 16,
+          "value": null,
+          "data_type": "n"
+        },
+        {
+          "column": "Q",
+          "col_index": 17,
+          "value": null,
+          "data_type": "n"
+        },
+        {
+          "column": "R",
+          "col_index": 18,
+          "value": null,
+          "data_type": "n"
+        },
+        {
+          "column": "S",
+          "col_index": 19,
+          "value": null,
+          "data_type": "n"
+        },
+        {
+          "column": "T",
+          "col_index": 20,
+          "value": null,
+          "data_type": "n"
+        },
+        {
+          "column": "U",
+          "col_index": 21,
+          "value": null,
+          "data_type": "n"
+        },
+        {
+          "column": "V",
+          "col_index": 22,
+          "value": null,
+          "data_type": "n"
+        },
+        {
+          "column": "W",
+          "col_index": 23,
+          "value": null,
+          "data_type": "n"
+        },
+        {
+          "column": "X",
+          "col_index": 24,
+          "value": null,
+          "data_type": "n"
+        },
+        {
+          "column": "Y",
+          "col_index": 25,
+          "value": null,
+          "data_type": "n"
+        }
+      ],
+      "formula_cells": [
+        {
+          "cell": "A3",
+          "row": 3,
+          "column": 1,
+          "formula": "=底稿目录!A2"
+        },
+        {
+          "cell": "E3",
+          "row": 3,
+          "column": 5,
+          "formula": "=底稿目录!A4"
+        },
+        {
+          "cell": "I3",
+          "row": 3,
+          "column": 9,
+          "formula": "=底稿目录!A6"
+        },
+        {
+          "cell": "A4",
+          "row": 4,
+          "column": 1,
+          "formula": "=底稿目录!A3"
+        },
+        {
+          "cell": "E4",
+          "row": 4,
+          "column": 5,
+          "formula": "=底稿目录!A5"
+        },
+        {
+          "cell": "I4",
+          "row": 4,
+          "column": 9,
+          "formula": "=底稿目录!A7"
+        },
+        {
+          "cell": "E11",
+          "row": 11,
+          "column": 5,
+          "formula": "=SUM(B11:C11)-D11"
+        },
+        {
+          "cell": "I11",
+          "row": 11,
+          "column": 9,
+          "formula": "=B11+F11"
+        },
+        {
+          "cell": "J11",
+          "row": 11,
+          "column": 10,
+          "formula": "=C11+G11"
+        },
+        {
+          "cell": "K11",
+          "row": 11,
+          "column": 11,
+          "formula": "=D11+H11"
+        },
+        {
+          "cell": "L11",
+          "row": 11,
+          "column": 12,
+          "formula": "=I11+J11-K11"
+        },
+        {
+          "cell": "E12",
+          "row": 12,
+          "column": 5,
+          "formula": "=SUM(B12:C12)-D12"
+        },
+        {
+          "cell": "I12",
+          "row": 12,
+          "column": 9,
+          "formula": "=B12+F12"
+        },
+        {
+          "cell": "J12",
+          "row": 12,
+          "column": 10,
+          "formula": "=C12+G12"
+        },
+        {
+          "cell": "K12",
+          "row": 12,
+          "column": 11,
+          "formula": "=D12+H12"
+        },
+        {
+          "cell": "L12",
+          "row": 12,
+          "column": 12,
+          "formula": "=I12+J12-K12"
+        },
+        {
+          "cell": "E13",
+          "row": 13,
+          "column": 5,
+          "formula": "=SUM(B13:C13)-D13"
+        },
+        {
+          "cell": "I13",
+          "row": 13,
+          "column": 9,
+          "formula": "=B13+F13"
+        },
+        {
+          "cell": "J13",
+          "row": 13,
+          "column": 10,
+          "formula": "=C13+G13"
+        },
+        {
+          "cell": "K13",
+          "row": 13,
+          "column": 11,
+          "formula": "=D13+H13"
+        },
+        {
+          "cell": "L13",
+          "row": 13,
+          "column": 12,
+          "formula": "=I13+J13-K13"
+        },
+        {
+          "cell": "E14",
+          "row": 14,
+          "column": 5,
+          "formula": "=SUM(B14:C14)-D14"
+        },
+        {
+          "cell": "I14",
+          "row": 14,
+          "column": 9,
+          "formula": "=B14+F14"
+        },
+        {
+          "cell": "J14",
+          "row": 14,
+          "column": 10,
+          "formula": "=C14+G14"
+        },
+        {
+          "cell": "K14",
+          "row": 14,
+          "column": 11,
+          "formula": "=D14+H14"
+        },
+        {
+          "cell": "L14",
+          "row": 14,
+          "column": 12,
+          "formula": "=I14+J14-K14"
+        },
+        {
+          "cell": "E15",
+          "row": 15,
+          "column": 5,
+          "formula": "=SUM(B15:C15)-D15"
+        },
+        {
+          "cell": "I15",
+          "row": 15,
+          "column": 9,
+          "formula": "=B15+F15"
+        },
+        {
+          "cell": "J15",
+          "row": 15,
+          "column": 10,
+          "formula": "=C15+G15"
+        },
+        {
+          "cell": "K15",
+          "row": 15,
+          "column": 11,
+          "formula": "=D15+H15"
+        },
+        {
+          "cell": "L15",
+          "row": 15,
+          "column": 12,
+          "formula": "=I15+J15-K15"
+        },
+        {
+          "cell": "B16",
+          "row": 16,
+          "column": 2,
+          "formula": "=SUM(B11:B15)"
+        },
+        {
+          "cell": "C16",
+          "row": 16,
+          "column": 3,
+          "formula": "=SUM(C11:C15)"
+        },
+        {
+          "cell": "D16",
+          "row": 16,
+          "column": 4,
+          "formula": "=SUM(D11:D15)"
+        },
+        {
+          "cell": "E16",
+          "row": 16,
+          "column": 5,
+          "formula": "=SUM(E11:E15)"
+        },
+        {
+          "cell": "F16",
+          "row": 16,
+          "column": 6,
+          "formula": "=SUM(F11:F15)"
+        },
+        {
+          "cell": "G16",
+          "row": 16,
+          "column": 7,
+          "formula": "=SUM(G11:G15)"
+        },
+        {
+          "cell": "H16",
+          "row": 16,
+          "column": 8,
+          "formula": "=SUM(H11:H15)"
+        },
+        {
+          "cell": "I16",
+          "row": 16,
+          "column": 9,
+          "formula": "=SUM(I11:I15)"
+        },
+        {
+          "cell": "J16",
+          "row": 16,
+          "column": 10,
+          "formula": "=SUM(J11:J15)"
+        },
+        {
+          "cell": "K16",
+          "row": 16,
+          "column": 11,
+          "formula": "=SUM(K11:K15)"
+        },
+        {
+          "cell": "L16",
+          "row": 16,
+          "column": 12,
+          "formula": "=SUM(L11:L15)"
+        }
+      ],
+      "merged_areas": [
+        "B9:E9",
+        "F9:F10",
+        "I9:L9",
+        "A9:A10",
+        "A1:P1",
+        "P9:P10",
+        "M9:M10",
+        "N9:N10",
+        "O9:O10",
+        "G9:H9",
+        "A2:P2"
+      ],
+      "data_types": {
+        "string": 37,
+        "numeric": 821,
+        "formula": 42
+      },
+      "sample_data": [
+        {
+          "row": 1,
+          "cells": {
+            "A": {
+              "value": "致同会计师事务所",
+              "type": "s"
+            }
+          }
+        },
+        {
+          "row": 2,
+          "cells": {
+            "A": {
+              "value": "固定资产清理明细表",
+              "type": "s"
+            }
+          }
+        },
+        {
+          "row": 3,
+          "cells": {
+            "A": {
+              "value": "=底稿目录!A2",
+              "type": "f"
+            },
+            "E": {
+              "value": "=底稿目录!A4",
+              "type": "f"
+            },
+            "I": {
+              "value": "=底稿目录!A6",
+              "type": "f"
+            },
+            "O": {
+              "value": "索引号：",
+              "type": "s"
+            },
+            "P": {
+              "value": "H6-2",
+              "type": "s"
+            }
+          }
+        },
+        {
+          "row": 4,
+          "cells": {
+            "A": {
+              "value": "=底稿目录!A3",
+              "type": "f"
+            },
+            "E": {
+              "value": "=底稿目录!A5",
+              "type": "f"
+            },
+            "I": {
+              "value": "=底稿目录!A7",
+              "type": "f"
+            },
+            "O": {
+              "value": "页  次：",
+              "type": "s"
+            }
+          }
+        },
+        {
+          "row": 5,
+          "cells": {
+            "A": {
+              "value": "一、审计目标：",
+              "type": "s"
+            }
+          }
+        }
+      ],
+      "row2_headers": [
+        {
+          "column": "A",
+          "col_index": 1,
+          "value": "固定资产清理明细表",
+          "data_type": "s"
+        }
+      ],
+      "formula_count": 42,
+      "merged_count": 11
+    },
+    {
+      "sheet_name": "调整分录汇总H6-3",
+      "dimensions": "A1:J21",
+      "max_row": 21,
+      "max_column": 10,
+      "column_headers": [
+        {
+          "column": "A",
+          "col_index": 1,
+          "value": "致同会计师事务所",
+          "data_type": "s"
+        },
+        {
+          "column": "B",
+          "col_index": 2,
+          "value": null,
+          "data_type": "n"
+        },
+        {
+          "column": "C",
+          "col_index": 3,
+          "value": null,
+          "data_type": "n"
+        },
+        {
+          "column": "D",
+          "col_index": 4,
+          "value": null,
+          "data_type": "n"
+        },
+        {
+          "column": "E",
+          "col_index": 5,
+          "value": null,
+          "data_type": "n"
+        },
+        {
+          "column": "F",
+          "col_index": 6,
+          "value": null,
+          "data_type": "n"
+        },
+        {
+          "column": "G",
+          "col_index": 7,
+          "value": null,
+          "data_type": "n"
+        },
+        {
+          "column": "H",
+          "col_index": 8,
+          "value": null,
+          "data_type": "n"
+        },
+        {
+          "column": "I",
+          "col_index": 9,
+          "value": null,
+          "data_type": "n"
+        },
+        {
+          "column": "J",
+          "col_index": 10,
+          "value": null,
+          "data_type": "n"
+        }
+      ],
+      "formula_cells": [
+        {
+          "cell": "A3",
+          "row": 3,
+          "column": 1,
+          "formula": "=底稿目录!A2"
+        },
+        {
+          "cell": "D3",
+          "row": 3,
+          "column": 4,
+          "formula": "=底稿目录!A4"
+        },
+        {
+          "cell": "G3",
+          "row": 3,
+          "column": 7,
+          "formula": "=底稿目录!A6"
+        },
+        {
+          "cell": "A4",
+          "row": 4,
+          "column": 1,
+          "formula": "=底稿目录!A3"
+        },
+        {
+          "cell": "D4",
+          "row": 4,
+          "column": 4,
+          "formula": "=底稿目录!A5"
+        },
+        {
+          "cell": "G4",
+          "row": 4,
+          "column": 7,
+          "formula": "=底稿目录!A7"
+        }
+      ],
+      "merged_areas": [
+        "A1:J1",
+        "A2:J2"
+      ],
+      "data_types": {
+        "string": 16,
+        "numeric": 188,
+        "formula": 6
+      },
+      "sample_data": [
+        {
+          "row": 1,
+          "cells": {
+            "A": {
+              "value": "致同会计师事务所",
+              "type": "s"
+            }
+          }
+        },
+        {
+          "row": 2,
+          "cells": {
+            "A": {
+              "value": "固定资产清理调整分录汇总表",
+              "type": "s"
+            }
+          }
+        },
+        {
+          "row": 3,
+          "cells": {
+            "A": {
+              "value": "=底稿目录!A2",
+              "type": "f"
+            },
+            "D": {
+              "value": "=底稿目录!A4",
+              "type": "f"
+            },
+            "G": {
+              "value": "=底稿目录!A6",
+              "type": "f"
+            },
+            "I": {
+              "value": "索引号：",
+              "type": "s"
+            },
+            "J": {
+              "value": "H6-3",
+              "type": "s"
+            }
+          }
+        },
+        {
+          "row": 4,
+          "cells": {
+            "A": {
+              "value": "=底稿目录!A3",
+              "type": "f"
+            },
+            "D": {
+              "value": "=底稿目录!A5",
+              "type": "f"
+            },
+            "G": {
+              "value": "=底稿目录!A7",
+              "type": "f"
+            },
+            "I": {
+              "value": "页  次：",
+              "type": "s"
+            }
+          }
+        },
+        {
+          "row": 5,
+          "cells": {
+            "A": {
+              "value": "调整事项说明",
+              "type": "s"
+            },
+            "B": {
+              "value": "类别（报表调整/账项调整/其他）",
+              "type": "s"
+            },
+            "C": {
+              "value": "报表项目",
+              "type": "s"
+            },
+            "D": {
+              "value": "科目名称",
+              "type": "s"
+            },
+            "E": {
+              "value": "附注项目",
+              "type": "s"
+            },
+            "F": {
+              "value": "……",
+              "type": "s"
+            },
+            "G": {
+              "value": "借方调整金额",
+              "type": "s"
+            },
+            "H": {
+              "value": "贷方调整金额",
+              "type": "s"
+            },
+            "I": {
+              "value": "索引",
+              "type": "s"
+            },
+            "J": {
+              "value": "备注",
+              "type": "s"
+            }
+          }
+        }
+      ],
+      "row2_headers": [
+        {
+          "column": "A",
+          "col_index": 1,
+          "value": "固定资产清理调整分录汇总表",
+          "data_type": "s"
+        }
+      ],
+      "formula_count": 6,
+      "merged_count": 2
+    },
+    {
+      "sheet_name": "检查表H6-4",
+      "dimensions": "A1:R34",
+      "max_row": 34,
+      "max_column": 18,
+      "column_headers": [
+        {
+          "column": "A",
+          "col_index": 1,
+          "value": "致同会计师事务所",
+          "data_type": "s"
+        },
+        {
+          "column": "B",
+          "col_index": 2,
+          "value": null,
+          "data_type": "n"
+        },
+        {
+          "column": "C",
+          "col_index": 3,
+          "value": null,
+          "data_type": "n"
+        },
+        {
+          "column": "D",
+          "col_index": 4,
+          "value": null,
+          "data_type": "n"
+        },
+        {
+          "column": "E",
+          "col_index": 5,
+          "value": null,
+          "data_type": "n"
+        },
+        {
+          "column": "F",
+          "col_index": 6,
+          "value": null,
+          "data_type": "n"
+        },
+        {
+          "column": "G",
+          "col_index": 7,
+          "value": null,
+          "data_type": "n"
+        },
+        {
+          "column": "H",
+          "col_index": 8,
+          "value": null,
+          "data_type": "n"
+        },
+        {
+          "column": "I",
+          "col_index": 9,
+          "value": null,
+          "data_type": "n"
+        },
+        {
+          "column": "J",
+          "col_index": 10,
+          "value": null,
+          "data_type": "n"
+        },
+        {
+          "column": "K",
+          "col_index": 11,
+          "value": null,
+          "data_type": "n"
+        },
+        {
+          "column": "L",
+          "col_index": 12,
+          "value": null,
+          "data_type": "n"
+        },
+        {
+          "column": "M",
+          "col_index": 13,
+          "value": null,
+          "data_type": "n"
+        },
+        {
+          "column": "N",
+          "col_index": 14,
+          "value": null,
+          "data_type": "n"
+        },
+        {
+          "column": "O",
+          "col_index": 15,
+          "value": null,
+          "data_type": "n"
+        },
+        {
+          "column": "P",
+          "col_index": 16,
+          "value": null,
+          "data_type": "n"
+        },
+        {
+          "column": "Q",
+          "col_index": 17,
+          "value": null,
+          "data_type": "n"
+        },
+        {
+          "column": "R",
+          "col_index": 18,
+          "value": null,
+          "data_type": "n"
+        }
+      ],
+      "formula_cells": [
+        {
+          "cell": "A3",
+          "row": 3,
+          "column": 1,
+          "formula": "=底稿目录!A2"
+        },
+        {
+          "cell": "F3",
+          "row": 3,
+          "column": 6,
+          "formula": "=底稿目录!A4"
+        },
+        {
+          "cell": "L3",
+          "row": 3,
+          "column": 12,
+          "formula": "=底稿目录!A6"
+        },
+        {
+          "cell": "A4",
+          "row": 4,
+          "column": 1,
+          "formula": "=底稿目录!A3"
+        },
+        {
+          "cell": "F4",
+          "row": 4,
+          "column": 6,
+          "formula": "=底稿目录!A5"
+        },
+        {
+          "cell": "L4",
+          "row": 4,
+          "column": 12,
+          "formula": "=底稿目录!A7"
+        },
+        {
+          "cell": "H12",
+          "row": 12,
+          "column": 8,
+          "formula": "=E12-F12-G12"
+        },
+        {
+          "cell": "K12",
+          "row": 12,
+          "column": 11,
+          "formula": "=J12-I12-H12"
+        },
+        {
+          "cell": "H13",
+          "row": 13,
+          "column": 8,
+          "formula": "=E13-F13-G13"
+        },
+        {
+          "cell": "K13",
+          "row": 13,
+          "column": 11,
+          "formula": "=J13-I13-H13"
+        },
+        {
+          "cell": "H14",
+          "row": 14,
+          "column": 8,
+          "formula": "=E14-F14-G14"
+        },
+        {
+          "cell": "H15",
+          "row": 15,
+          "column": 8,
+          "formula": "=E15-F15-G15"
+        },
+        {
+          "cell": "H16",
+          "row": 16,
+          "column": 8,
+          "formula": "=E16-F16-G16"
+        },
+        {
+          "cell": "H17",
+          "row": 17,
+          "column": 8,
+          "formula": "=E17-F17-G17"
+        },
+        {
+          "cell": "H18",
+          "row": 18,
+          "column": 8,
+          "formula": "=E18-F18-G18"
+        },
+        {
+          "cell": "H19",
+          "row": 19,
+          "column": 8,
+          "formula": "=E19-F19-G19"
+        },
+        {
+          "cell": "H20",
+          "row": 20,
+          "column": 8,
+          "formula": "=E20-F20-G20"
+        },
+        {
+          "cell": "K20",
+          "row": 20,
+          "column": 11,
+          "formula": "=J20-I20-H20"
+        },
+        {
+          "cell": "H21",
+          "row": 21,
+          "column": 8,
+          "formula": "=E21-F21-G21"
+        },
+        {
+          "cell": "K21",
+          "row": 21,
+          "column": 11,
+          "formula": "=J21-I21-H21"
+        },
+        {
+          "cell": "H22",
+          "row": 22,
+          "column": 8,
+          "formula": "=E22-F22-G22"
+        },
+        {
+          "cell": "K22",
+          "row": 22,
+          "column": 11,
+          "formula": "=J22-I22-H22"
+        },
+        {
+          "cell": "E23",
+          "row": 23,
+          "column": 5,
+          "formula": "=SUM(E12:E22)"
+        },
+        {
+          "cell": "F23",
+          "row": 23,
+          "column": 6,
+          "formula": "=SUM(F12:F22)"
+        },
+        {
+          "cell": "G23",
+          "row": 23,
+          "column": 7,
+          "formula": "=SUM(G12:G22)"
+        },
+        {
+          "cell": "H23",
+          "row": 23,
+          "column": 8,
+          "formula": "=SUM(H12:H22)"
+        },
+        {
+          "cell": "I23",
+          "row": 23,
+          "column": 9,
+          "formula": "=SUM(I12:I22)"
+        },
+        {
+          "cell": "J23",
+          "row": 23,
+          "column": 10,
+          "formula": "=SUM(J12:J22)"
+        },
+        {
+          "cell": "K23",
+          "row": 23,
+          "column": 11,
+          "formula": "=SUM(K12:K22)"
+        },
+        {
+          "cell": "L23",
+          "row": 23,
+          "column": 12,
+          "formula": "=SUM(L12:L22)"
+        },
+        {
+          "cell": "M23",
+          "row": 23,
+          "column": 13,
+          "formula": "=SUM(M12:M22)"
+        },
+        {
+          "cell": "H24",
+          "row": 24,
+          "column": 8,
+          "formula": "='明细表H6-2'!K16"
+        },
+        {
+          "cell": "H25",
+          "row": 25,
+          "column": 8,
+          "formula": "=H23/H24"
+        }
+      ],
+      "merged_areas": [
+        "P10:P11",
+        "N10:N11",
+        "A23:D23",
+        "Q10:Q11",
+        "O10:O11",
+        "D10:D11",
+        "L10:L11",
+        "K10:K11",
+        "A10:A11",
+        "A2:Q2",
+        "A25:D25",
+        "A24:D24",
+        "C10:C11",
+        "B10:B11",
+        "A1:Q1",
+        "I10:I11",
+        "M10:M11",
+        "J10:J11"
+      ],
+      "data_types": {
+        "string": 36,
+        "numeric": 543,
+        "formula": 33
+      },
+      "sample_data": [
+        {
+          "row": 1,
+          "cells": {
+            "A": {
+              "value": "致同会计师事务所",
+              "type": "s"
+            }
+          }
+        },
+        {
+          "row": 2,
+          "cells": {
+            "A": {
+              "value": "固定资产清理检查表",
+              "type": "s"
+            }
+          }
+        },
+        {
+          "row": 3,
+          "cells": {
+            "A": {
+              "value": "=底稿目录!A2",
+              "type": "f"
+            },
+            "F": {
+              "value": "=底稿目录!A4",
+              "type": "f"
+            },
+            "L": {
+              "value": "=底稿目录!A6",
+              "type": "f"
+            },
+            "P": {
+              "value": "索引号：",
+              "type": "s"
+            },
+            "Q": {
+              "value": "H6-4",
+              "type": "s"
+            }
+          }
+        },
+        {
+          "row": 4,
+          "cells": {
+            "A": {
+              "value": "=底稿目录!A3",
+              "type": "f"
+            },
+            "F": {
+              "value": "=底稿目录!A5",
+              "type": "f"
+            },
+            "L": {
+              "value": "=底稿目录!A7",
+              "type": "f"
+            },
+            "P": {
+              "value": "页  次：",
+              "type": "s"
+            }
+          }
+        },
+        {
+          "row": 5,
+          "cells": {
+            "A": {
+              "value": "一、审计目标：",
+              "type": "s"
+            }
+          }
+        }
+      ],
+      "row2_headers": [
+        {
+          "column": "A",
+          "col_index": 1,
+          "value": "固定资产清理检查表",
+          "data_type": "s"
+        }
+      ],
+      "formula_count": 33,
+      "merged_count": 18
+    }
+  ],
+  "validation": {
+    "total_sheets": 8,
+    "expected_sheets": 8,
+    "sheets_match": true,
+    "sheet_name_mapping": {
+      "底稿目录": "Tab_Index",
+      "固定资产清理实质性程序表H6A": "Procedure_Table_H6A",
+      "审定表H6-1": "Adjudication_H6_1",
+      "附注披露信息（上市公司）": "Disclosure_Listed",
+      "附注披露信息（国有企业）": "Disclosure_SOE",
+      "明细表H6-2": "Detail_H6_2",
+      "调整分录汇总H6-3": "Adjustment_H6_3",
+      "检查表H6-4": "Check_H6_4"
+    },
+    "issues": [],
+    "warnings": [
+      "审定表H6-1 (→Adjudication_H6_1): 实际公式数=65, spec预期=59",
+      "明细表H6-2 (→Detail_H6_2): 实际公式数=42, spec预期=16",
+      "检查表H6-4 (→Check_H6_4): 实际公式数=33, spec预期=8"
+    ],
+    "is_valid": true
+  }
+}

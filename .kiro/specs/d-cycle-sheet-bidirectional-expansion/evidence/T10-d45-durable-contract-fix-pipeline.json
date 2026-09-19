@@ -1,0 +1,104 @@
+{
+  "old_hint": {
+    "note": "pre-fix disk often 5a1143… with d4-29; source-without-d429 is 6a430eaa…",
+    "old_instrumentation_with_d429_example": "b36fb1e331c25f5403f5694952c9412912148f0e9130b31ff54f1a8537530adf"
+  },
+  "regen": {
+    "contract_digest": "6a430eaa0ee13e9079714bb26629dcd883f586cd34252d7f24281dc16c0f19ca",
+    "instrumentation_definition_sha256": "2e0298975ae26e2ece728372b4e18c845b497b5dbd4fa2a7f1dcf7f9f3e0b7c3",
+    "path": "D:\\GT_plan\\backend\\data\\workpaper_sync_contracts\\d4.revenue_detail.json",
+    "has_d4_29": false
+  },
+  "provision_d4": {
+    "target": {
+      "entry_id": "xlsx/gt-d4-operating-revenue",
+      "contract_id": "d4.revenue_detail",
+      "provider_module": "app.services.workpaper_sync.phase5_d4_revenue_detail",
+      "wp_codes": [
+        "D4"
+      ],
+      "project_id": "0ec33ac9-3de5-4e65-b3bf-f9dccd7b2a49",
+      "wp_id": "b3ab3c46-828f-4f48-950e-aee9bbdc923f",
+      "wp_code": "D4",
+      "store_bytes": 2051,
+      "resolved": true,
+      "unresolved_reason": null
+    },
+    "status": "ok",
+    "outcome": {
+      "project_id": "0ec33ac9-3de5-4e65-b3bf-f9dccd7b2a49",
+      "wp_id": "b3ab3c46-828f-4f48-950e-aee9bbdc923f",
+      "entry_id": "xlsx/gt-d4-operating-revenue",
+      "contract_id": "d4.revenue_detail",
+      "authority_model": "projection_contract",
+      "authority_model_definition_id": "55d819d8-cc0d-46fd-89fb-3de394f3183e",
+      "authority_model_definition_sha256": "134884caa91f67c946c546ede8495c58be68e4776e266acc2ebc1cea8cb02f64",
+      "template_definition_id": "c52dad1f-06f8-4869-abac-6a53c8c76ae3",
+      "template_definition_sha256": "7b1c91f81e62daa1b002b0c6b3ef14784a87f6817a7eaf93f2c03b54bcf4d3c6",
+      "instrumentation_definition_id": "14345d3d-c0de-4c55-ac39-1b0e4700a626",
+      "instrumentation_definition_sha256": "2e0298975ae26e2ece728372b4e18c845b497b5dbd4fa2a7f1dcf7f9f3e0b7c3",
+      "contract_definition_id": "bc51edcc-7585-472d-9b60-19b216be439c",
+      "contract_definition_sha256": "6a430eaa0ee13e9079714bb26629dcd883f586cd34252d7f24281dc16c0f19ca",
+      "definition_bundle_id": "4f42cd43-cba6-433c-8749-5fe653171230",
+      "definition_bundle_sha256": "b29e1288e4b0c8e3f75bb972d4f9a65556f1b87d5252636cdb8cdafce1811026",
+      "created_stages": [],
+      "reused_stages": [
+        "authority_model",
+        "template",
+        "instrumentation",
+        "contract",
+        "bundle"
+      ],
+      "representation_settlement": "blocked",
+      "representation_reason": "entry xlsx/gt-d4-operating-revenue 没有 `state=awaiting_contract` 的 representation upgrade candidate 可绑定。approved bundle 已就位，缺的是**表示**侧供给：①该 entry 若还没有任何 content version/representation，首版只能由 `ContentMutationService.commit(...)`（唯一能推进 content_revision 的业务事务）产生；②已有 representation 时，纯 definitions 升级须先由 Task 17 的 instrumentation upgrader 登记 non-current candidate。本 provisioner **不**自建第三条 representation 写入路径（会伪造业务 projection 并绕过 `assert_candidate_finalizable`，Property 4 / 67 双打红）",
+      "attached_candidate_id": null,
+      "attach": null,
+      "content_revision_before": 38,
+      "content_revision_after": 38,
+      "revision_unchanged": true,
+      "entry_pointer_before": "2fd10551-5c9e-4973-810e-65eb0a897e5c",
+      "entry_pointer_after": "2fd10551-5c9e-4973-810e-65eb0a897e5c",
+      "created_anything": false
+    }
+  },
+  "rematerialize": {
+    "entry_id": "xlsx/gt-d4-operating-revenue",
+    "mode": "apply",
+    "force": true,
+    "current": {
+      "representation_id": "2fd10551-5c9e-4973-810e-65eb0a897e5c",
+      "wp_id": "b3ab3c46-828f-4f48-950e-aee9bbdc923f",
+      "project_id": "0ec33ac9-3de5-4e65-b3bf-f9dccd7b2a49",
+      "bundle_sha256": "59bd162c95fa9fdd0d06abdfced72878810ecba918e6781c095678d1a35db6dc",
+      "generation": 14
+    },
+    "desired_bundle": {
+      "id": "4f42cd43-cba6-433c-8749-5fe653171230",
+      "sha256": "b29e1288e4b0c8e3f75bb972d4f9a65556f1b87d5252636cdb8cdafce1811026"
+    },
+    "store_bytes": {
+      "D4-2-rows": 2249,
+      "D4-3-rows": 1010,
+      "D4-5-policy-groups": 252,
+      "D4-21-rows": 2,
+      "D4-22-rows": 2,
+      "D4-23-rows": 2,
+      "D4-24-rows": 2,
+      "D4-25-rows": 2,
+      "D4-26-rows": 2,
+      "D4-27-rows": 2,
+      "D4-28-rows": 2,
+      "D4-5-biz-scene": 0,
+      "D4-5-biz-order": 0,
+      "D4-5-biz-produce": 0,
+      "D4-5-biz-sales": 0,
+      "D4-5-biz-pricing": 0,
+      "D4-5-biz-delivery": 0
+    },
+    "status": "rematerialized",
+    "new_representation_id": "480d470b-cbbe-44b2-bfd9-32918d444b4b",
+    "new_generation": 15,
+    "new_revision": 39
+  },
+  "flag_file": "False"
+}

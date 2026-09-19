@@ -1,0 +1,103 @@
+{
+  "version": "2025-v1",
+  "source": "年度审计报告模板使用对照表.xlsx",
+  "description": "企业子类型（type_a/b/c/d）推荐规则。规则按 priority 从高到低评估，匹配项目属性（entity_type / scenario / template_type / industry / company_name 关键词）。无匹配时按 fallback 兜底（requirements §1.4）。",
+  "fallback": {
+    "listed": "type_a",
+    "non_listed": "type_d"
+  },
+  "rules": [
+    {
+      "id": "A_listed_public_debt",
+      "subtype": "type_a",
+      "label": "模板A",
+      "description": "上市公司、三板创新层及公开发债",
+      "priority": 40,
+      "match": {
+        "scenario": [
+          "listed",
+          "ipo"
+        ],
+        "entity_type": [
+          "listed"
+        ],
+        "template_type": [
+          "listed"
+        ],
+        "keywords": [
+          "上市",
+          "创新层",
+          "三板创新",
+          "公开发行债券",
+          "公开发债",
+          "发债",
+          "公开发行公司债"
+        ]
+      },
+      "source_note": "模板A【简、详（含解释性说明段】，含关键审计事项及其他信息"
+    },
+    {
+      "id": "B_basic_layer_financial",
+      "subtype": "type_b",
+      "label": "模板B",
+      "description": "三板基础层、银行、保险、期货、证券",
+      "priority": 40,
+      "match": {
+        "scenario": [],
+        "entity_type": [],
+        "template_type": [],
+        "keywords": [
+          "基础层",
+          "三板基础",
+          "银行",
+          "保险",
+          "期货",
+          "证券",
+          "农村信用",
+          "村镇银行",
+          "合作银行"
+        ]
+      },
+      "source_note": "模板B【简、详（含解释说明段）】，含其他信息）"
+    },
+    {
+      "id": "C_other_pie",
+      "subtype": "type_c",
+      "label": "模板C",
+      "description": "其他公众利益实体（含中央企业集团公司）",
+      "priority": 30,
+      "match": {
+        "scenario": [],
+        "entity_type": [],
+        "template_type": [],
+        "keywords": [
+          "中央企业",
+          "央企",
+          "中央企业集团",
+          "公众利益实体",
+          "国有资产监督管理",
+          "吸收公众存款",
+          "公众"
+        ]
+      },
+      "source_note": "模板C【简、详（含解释说明段）】，不含其他信息）"
+    },
+    {
+      "id": "D_non_pie",
+      "subtype": "type_d",
+      "label": "模板D",
+      "description": "非公众利益实体（其他企业）",
+      "priority": 10,
+      "match": {
+        "scenario": [],
+        "entity_type": [],
+        "template_type": [],
+        "keywords": [
+          "非公众利益实体",
+          "非公众"
+        ]
+      },
+      "source_note": "模板D【简、详（含解释说明段）】"
+    }
+  ]
+}

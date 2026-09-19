@@ -1,0 +1,124 @@
+{
+  "adapter_id": "g7.soe_subsidiary_disclosure",
+  "aggregate_result_without_real_onlyoffice": "failed (含 UNVERIFIABLE 黑盒场景，无一条 passed)",
+  "bundle": {
+    "authority_model": "projection_contract",
+    "bundle_sha256": "889fcb95ddeda77d14150bf3c0a84d6271c05cddd0bd56512a4da784aabc1606",
+    "canonical_payload": {
+      "authority_model": {
+        "sha256": "1824bd59cf106b44544d01d47a8da8fc12d6a7578a085f122475615e222dba4b",
+        "type": "definition"
+      },
+      "contract": {
+        "sha256": "aa2caa887fd7c3d6413d5a2becce90f2189dbdaf66f9a0c64b2e338985a0567f",
+        "type": "definition"
+      },
+      "instrumentation": {
+        "sha256": "3e05ff630b65790573e952715273f8edc7066db302693facc55b6af489cf1f50",
+        "type": "definition"
+      },
+      "schema_version": "definition-bundle:v1",
+      "template": {
+        "sha256": "e3e7e96ab9350819dd1a0e444a3c2129099ba0a943741360340c60878241ac03",
+        "type": "definition"
+      }
+    },
+    "reproducible_offline": true,
+    "reproducible_offline_why": "bundle canonical payload 只含 schema_version + 四个 sha256，没有 definition 行的 uuid ⇒ 同一批 payload 在不同发布里算出同一个 digest。本判据用两组不同 uuid 各构一次并比对，把「可复现」变成实测事实",
+    "slot_types": {
+      "contract": "definition",
+      "instrumentation": "definition",
+      "template": "definition"
+    },
+    "substrate_policy": "metadata sheet / candidate / 其他 entry 的 bundle 均不作为运行态 substrate：本 bundle 的四个 child 全是本 entry 自己发布的 definition（slot type 全为 definition，无 marker 冒充），且 contract 未声明 metadata sheet"
+  },
+  "capability_enabled": false,
+  "digests": {
+    "authority_model_definition": "1824bd59cf106b44544d01d47a8da8fc12d6a7578a085f122475615e222dba4b",
+    "contract_canonical": "aa2caa887fd7c3d6413d5a2becce90f2189dbdaf66f9a0c64b2e338985a0567f",
+    "instrumentation_definition": "3e05ff630b65790573e952715273f8edc7066db302693facc55b6af489cf1f50",
+    "normalized_structure_hash": "f7b996619429669be75300d0621a8679383a4c516ddb85f585d8f95491704706",
+    "template_definition": "e3e7e96ab9350819dd1a0e444a3c2129099ba0a943741360340c60878241ac03"
+  },
+  "entry_id": "xlsx/gt-g7-long-term-equity-main",
+  "finalize_status": "blocked_by_UPSTREAM_DEBT_PUBLISHED_IDENTITY_OBSERVER",
+  "harness_version": "task39-harness/1",
+  "managed_sheet": "附注披露信息（国企）",
+  "pilot_class": "g7_two_level_dynamic",
+  "property_oracle_landing": {
+    "P22": [
+      "different_field_merge"
+    ],
+    "P28": [
+      "oo_to_html",
+      "html_to_oo"
+    ],
+    "P49": [
+      "identity_retention"
+    ],
+    "P66": [
+      "identity_retention"
+    ],
+    "P69": [
+      "single_participant_close"
+    ]
+  },
+  "registered_upstream_debts": {
+    "UPSTREAM_DEBT_DYNAMIC_FAMILY_GATED_ON_MOUNT_CARDINALITY": "Task 43 欠账（Task 41 首次登记、Task 42 复现，本 entry 上最刺眼）：`evidence.derive_for_manifest_entry` 只在 `scenario_profile.mount_cardinality == \"dynamic\"` 时追加 DYNAMIC_SCENARIOS，而该字段量的是**前端宿主挂载基数**（v-for 挂几个 OO 编辑器），不是「受管表有没有动态行/动态列」。实测全 manifest 186 条里只有 1 条为 dynamic 且是 docx ⇒ `dynamic_column_stable_keys`（AC 6.4）与 `dynamic_row_add_delete_reorder_copy`（AC 6.9）对**任何 xlsx entry** 都进不了 required set —— 包括本 G7 pilot，而它是四类 pilot 里**唯一**真有 `{slot}_{seq}` 动态列的那个（10 列共用 2 个重复 label）。修法需要把 contract 的 dynamic_columns / row_identity 声明喂进 required-set 推导（会改动 B60/D2/H1/G7 四个 required digest），属设计级变更。owner 建议归 evidence 推导侧（Task 39 后续）；在此之前 Property 22 落在 required set 里真实存在的 merge 家族场景上，并在**真实契约形态**上跑 oracle（真实 10 列绑定 + 真实重复 label），而不是为了让它进分母去改 profile",
+    "UPSTREAM_DEBT_LEGACY_COLUMN_KEYS_STRANDED": "Task 43 欠账（真实库实证）：改造前持久化的矩阵列键 `c{n}Current` / `c{n}Prior` 没有迁移。真实库里 `G7-main-disclosure-soe-v2` 共 3 条，2 条用改造后的 `{slot}_{seq}_{subKey}`、1 条（字节最大的那条）仍是历史键 ⇒ 该底稿的重要非全资子公司主要财务信息在当前 UI 上整块读不出来。归档 spec g7-four-table-extraction-and-disclosure-alignment Task 5.6 只改了生成端、没写存量 upgrader。本 pilot 不自造 `c1Current → minority-fs-company_1_current` 的映射（Requirement 6.1；且 `c{n}` 与实体序号的对应关系无可验证来源），`build_store_projection` 对这类载荷 fail closed 并点名历史键。修法：写一次性 store upgrader（按 entitySlots 顺序重键）并留迁移记录。owner 建议归 G7 披露底稿 owner；engine 侧不做兼容层",
+    "UPSTREAM_DEBT_PUBLISHED_IDENTITY_OBSERVER": "Task 43 欠账（与 Task 40/41/42 同一条，但本 entry 上更贵）：缺「published representation artifact → FrozenEntryDefinitions」的公共观测器。`excel_entry_gate.ExcelEntryDefinitionLoader.load()` 的 identity_inventory / observed_structure / observed_business_sheets / observed_dynamic_columns 四个入参今天只能由 Task 17 的 candidate evidence 在 finalize 时刻提供；请求时刻没有等价来源。本 entry 是四类 pilot 里唯一真有动态列的那个 ⇒ observed_dynamic_columns 必须非空，缺观测器时 `_assert_dynamic_columns_declared` 会直接 fail closed，Property 22 的生产判据在请求路径上跑不起来。⇒ 请求路径上的 adapter 组装只能 fail closed。owner 建议归 engine 侧（Task 38 后续）",
+    "UPSTREAM_DEBT_RENDER_ROW_IDS_ARE_POSITIONAL": "Task 43 欠账：`g7SoeDisclosureModel` 的 `blankRows()` / `metricRows()` 用 `${prefix}-${index + 1}` 生成披露行 id ⇒ 对**可增删**的披露表（former-subsidiary-basic / lte-movement 等）等于用数组下标作持久化身份（AC 6.5 明禁）：删第 2 行再新增会复用 `-2`，历史值串到新行。对本 pilot 的 10 个固定 metric 行无害（语义序号），故本契约的矩阵按 metric id 寻址、记录表的 row_identity 走注入的 rowUuid 而不是渲染层 id。修法：渲染层可增删表改用一次性随机 rowId（H1 的 `disp-mrgi0qg1-fwwm` 范式）并在 store 里持久化。owner 建议归 G7 披露底稿 owner；engine 侧不做兼容层",
+    "UPSTREAM_DEBT_SLOT_SUBCOLUMN_KEY_SPACE_SPLIT": "Task 43 欠账：Excel 侧与渲染层的动态列键空间不同 —— 契约只能用 `{slot}_{seq}`（`contracts._parse_dynamic_columns` 对 identity != \"{slot}_{seq}\" 直接拒，且 `excel_materialize` 的绑定形态是「一键一列」)，而渲染层 `g7SlotColumns.buildG7SlotColumns` 对带子列的表产出 `{slot}_{seq}_{subKey}`（一实体两子列）。两者各自正确，但双射今天由每个 pilot 自己写（本 pilot 的 render_column_key_for_seq 是唯一换算处）。风险：下一个「实体 × 子列」矩阵 entry 会写第二份换算 ⇒ 第二真源。修法：`dynamic_columns` 增加 `sub_columns` 声明，由契约校验器统一派生两套键并把双射固定进 canonical payload。owner 建议归 contract schema 侧（Task 13 后续）",
+    "UPSTREAM_DEBT_TWO_LEVEL_MATRIX_MODE_IS_PER_COLUMN": "Task 43 欠账：per-entry contract 的 `mode` 是按 field（=按列）声明的，而「实体作列头」的两级动态矩阵其公式/可编辑性在源模板里按**行**分布 ⇒ 把矩阵当动态行表时行级受保护语义在读写两侧同时丢失。实证：上市侧同构表 `重要联营企业主要财务信息`（源 A169:G187）6 列 × 17 行共 102 格全是公式，其中 B173:G173 / B176:G176 是 =SUM(...)、其余是跨 sheet 引用；把它写成动态行表只能给 6 个列字段各一个 mode。本 pilot 因此把矩阵声明成**静态块**（字段 = (metric, column) 逐格，mode 精确到格），并选国企侧 100 格全空、全 editable 的那张表，使 merge 家族两条 required scenario 可满足。修法：schema 侧允许 row_identity 表按行覆盖 mode（如 row_mode_overrides），并同步 Requirement 6.6 / design §Contract schema 的措辞。owner 建议归 contract schema 侧（Task 13 后续）"
+  },
+  "required_scenario_set": {
+    "capability": "single_onlyoffice",
+    "close_required": true,
+    "digest": "8fc41bfbb268373d3610564975e598730d0471d1cad4817792c9b7cf614b185c",
+    "distinct_from_other_pilots": true,
+    "dynamic_family_excluded": [
+      "dynamic_column_stable_keys",
+      "dynamic_row_add_delete_reorder_copy"
+    ],
+    "other_pilots_digests": {
+      "xlsx/b60/gt-b60-bundle": "984681c2c537d0ec064889de625323f79152f6a7c8a27794961de2f46a796ce6",
+      "xlsx/gt-d2-accounts-receivable": "76d494560e931d51ef91c328e97348cf5d5a274599be8338c428f26aba590fdc",
+      "xlsx/gt-h1-fixed-assets": "319d10b4d610df67b105761f48abd78c1db6bd7f69d722f286b559addd8f67f7"
+    },
+    "scenario_ids": [
+      "authorization_first_recovery_claim",
+      "b_close_after_a_forcesave_terminal",
+      "b_close_before_a_forcesave_terminal",
+      "browser_crash_no_userdata_recovery_case",
+      "close_leader_revoked_no_successor_recovery_required",
+      "close_leader_revoked_successor_exactly_one",
+      "close_reconciler_reentrant_exactly_one_capture",
+      "cross_participant_idempotency_409",
+      "different_field_merge",
+      "download_only_zero_three_entities",
+      "frozen_base_status_6_2_dedupe",
+      "html_to_oo",
+      "identity_retention",
+      "oo_to_html",
+      "opaque_version_rollback_no_numeric_collision",
+      "quarantined_rejects_application_and_engine",
+      "refresh_required_reopen",
+      "rollback",
+      "same_application_higher_sequence_fold",
+      "same_field_conflict_resolve",
+      "single_participant_close",
+      "two_user_close_order_a_then_b",
+      "two_user_close_order_b_then_a",
+      "wrong_prior_confirmation_bundle_fence_contributor_rejected"
+    ],
+    "scenario_profile_digest": "ea224b8a4aac1d69f75cb5335a9c3323fbc2eeefa62c4ed3a89fc56950ff35f9",
+    "size": 24,
+    "substituted": false
+  },
+  "template_id": "G7N",
+  "template_sha256": "6bf9e2ebcdf50a1c4a32f8733353dd1de994e7dc483232ad43680043577c3335",
+  "wp_code_family": "G7",
+  "wp_code_patterns": [
+    "G7L"
+  ]
+}

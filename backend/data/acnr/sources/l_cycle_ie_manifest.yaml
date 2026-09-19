@@ -1,0 +1,68 @@
+# ═══════════════════════════════════════════════════════════════════════════════
+# ACNR L 循环 Import/Export 手维清单（l_cycle_ie_manifest.yaml）
+# ═══════════════════════════════════════════════════════════════════════════════
+#
+# 用途：ACNR 生成器（generate_catalog.py）的 L 循环 import_export 输入源
+#       （design.md「Generator pipeline」/ R1.2 / R18.6 / R-ROUTE）。
+#
+# 铁律：本文件为「手工整理」，禁止 AST 自动扫描 import_export 模块。
+#
+# 数据来源（唯一真源 = Key_Ledger，逐字段抄，不新造键）：
+#   backend/data/adjustment_ie_contract.json  (sheets[<X-3>]，md5 fc5d54650a2a4b3b2486fc060576d6c8)
+#     sheet_code    ← sheets 段的键
+#     item_id       ← sheets[<X-3>].item_id
+#     storage_field ← sheets[<X-3>].storage_field（由 mechanism 推导：
+#                     adjustment_savebatch ⇒ remark · formdata_setfield ⇒ conclusion）
+#     api_prefix    ← sheets[<X-3>].cycle 小写（已与 evidence/route_matrix_x3.json 的
+#                     adapter_hit.api_prefix 与 target_after_spec.api_prefix 三向核对一致）
+#   备注字段 key_family 亦取自 Key_Ledger（single_json / per_field / per_field_plus_data）。
+#
+# 字段说明：同 d_cycle_ie_manifest.yaml。本文件按任务 8.1 只写七个字段
+#   （sheet_code / api_prefix / item_id / storage_field / import_order /
+#     depends_on_sheets / notes）；不写 storage_mode —— 该词表（row_json /
+#   keyed_fields）在 Key_Ledger 中不存在，键族事实由 key_family 承载并写进 notes，
+#   避免同一事实两套词表。
+#
+# 逐条风险登记与口径见文件内 notes: 段（可被守卫读取，不藏在注释里）：
+#   backend/tests/test_x3_ie_manifest_registration.py
+# ═══════════════════════════════════════════════════════════════════════════════
+
+version: "1"
+cycle: L
+
+# 本文件只登记本 spec 作业面（见 notes.partial_scope）
+partial: true
+
+notes:
+  partial_scope: >-
+    partial: true —— 本文件只登记 spec x3-adjustment-entry-import-export 的作业面（该循环的 X-3 调整分录汇总表），不是本循环 I/E 的全量清单；本循环 catalog 中未被本文件覆盖的启用条目由 check_ie_catalog_sync 的部分登记模式（任务 8.2）报告，不由本文件承担（把未经核验的存量条目抄进真源 = 把错值锁成基线）。
+  item_id_is_catalog_only: >-
+    逐字段族下 item_id 是族键通配串、bulk 不按它取数（取数由共享实现依 key_family 决定），此处仅作目录/溯源用途 —— 否则下一轮会有人误以为 catalog item_id 是取数键。整表单键族（single_json）的 item_id 是真实单键、不带通配符，但同样不是 bulk 的取数依据。
+  registrar_must_not_map_x2_to_x3_prefix: >-
+    登记器不得把 {X}-2 映到 X-3 短前缀 —— 实测经短前缀取既有 {X}-2 一律 400（不支持的sheet: M2-2。支持: ['M2-3']，16/16），取自家 X-3 则 16/16 成功。今天 catalog 零启用故非 R1.6 意义上的回归，但 8.1 接上 manifest 的同刻它变成用户可见。来源：任务 17.1 实录（该轮 evidence/deviation_registry.json 与本文件均不存在，故无处可写，明确交接给 8.1）。
+  candidate_surface_drift_x2_not_derivable: >-
+    candidate_surface_drift 实测 m2~m10（含 m10）的 {X}-2 已派生不出来（专属 router 里没有既有业务表常量，sheet 配置在 service 侧）；m1 多出 M1-4 / M1-5、n2 多出 N2-6 / N2-8 / N2-9 / N2-10。⇒ 本 manifest 只登记 16 张 X-3，不把 {X}-2 一起登记进去。来源：任务 17.3 实录 + evidence/task_17_3_zero_regression_compare.json 的 candidate_surface_drift（judged=false，11 个长前缀有派生面漂移）。
+  depends_on_sheets_empty_rationale: >-
+    depends_on_sheets 一律为空：①Key_Ledger 没有依赖字段，写 [{X}-2] 属凭空造值；②X-3 调整分录不依赖 X-2 取数，数据流方向相反（调整分录汇总进审定表）；③写上 {X}-2 等于邀请下一轮把它登记到 X-3 短前缀下 —— 正是上面 registrar_must_not_map_x2_to_x3_prefix 那条 400 陷阱；④行为等价：wp_bulk_tab_export._topological_sort 对不在 entries 集里的依赖直接跳过（`for dep in deps: if dep in graph`），故空与写 [{X}-2] 今天的排序结果逐条相同。
+  import_order_rationale: >-
+    import_order 一律 20：沿用 design.md「manifest 条目」示例（M4-3 → 20）与既有 k/h manifest 的「每 api_prefix 从 10 起、步长 10；审定表/明细表先行」约定 —— X-3 是其前缀组内第三张，10 号位留给尚未登记的 X-2 业务表。每个 api_prefix 在本文件内恰有 1 条，故 20 不与任何条目撞号。
+
+entries:
+  # ───────────────────────── L2-3（api_prefix: l2，key_family: single_json） ─────────────────────────
+  - sheet_code: L2-3
+    api_prefix: l2
+    item_id: "L2-L2-3-entries"
+    storage_field: remark
+    import_order: 20
+    depends_on_sheets: []
+    notes: >-
+        single_json 整表单键族：item_id 是真实单键（不带通配符）。bulk 不按 item_id 取数（取数由共享实现 _x3_adjustment_import_export 依 key_family 决定），此处 item_id 仅作目录/溯源用途。真源 = backend/data/adjustment_ie_contract.json 的 sheets[L2-3]。
+  # ───────────────────────── L6-3（api_prefix: l6，key_family: per_field） ─────────────────────────
+  - sheet_code: L6-3
+    api_prefix: l6
+    item_id: "L6-L6-3-entry-*"
+    storage_field: remark
+    import_order: 20
+    depends_on_sheets: []
+    notes: >-
+        per_field 逐字段族（无 -data 键）：item_id 是族键通配串。bulk 不按 item_id 取数（取数由共享实现 _x3_adjustment_import_export 依 key_family 决定），此处 item_id 仅作目录/溯源用途。真源 = backend/data/adjustment_ie_contract.json 的 sheets[L6-3]。

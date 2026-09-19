@@ -1,0 +1,1403 @@
+{
+  "baseline": "inventory_before.json",
+  "stats_before": {
+    "by_content_store": {
+      "<artifact_or_delegated_only>": 113,
+      "checklist_responses": 83,
+      "working_paper": 75
+    },
+    "by_domain": {
+      "custom": 6,
+      "dedicated_router": 6,
+      "export_storage_resolver": 14,
+      "f2_word_sync": 6,
+      "history_restore": 2,
+      "html_save": 1,
+      "oo_callback": 1,
+      "rollback": 2,
+      "template_provisioning": 6,
+      "unadjudicated": 270,
+      "upload_import": 4,
+      "wopi": 3
+    },
+    "by_kind": {
+      "resolver": 51,
+      "writer": 249,
+      "writer_resolver": 21
+    },
+    "bypasses_unified_commit_count": 269,
+    "direct_commit_writer_count": 108,
+    "legacy_version_field_writer_count": 9,
+    "multi_resolver_count": 4,
+    "non_canonical_resolver_only_count": 64,
+    "resolver_count": 72,
+    "retired_by_domain": {
+      "orchestrator_side_effect": 1
+    },
+    "retired_writer_count": 1,
+    "row_count": 321,
+    "save_orchestrator_writer_count": 4,
+    "swallowing_writer_count": 114,
+    "unadjudicated_count": 270,
+    "unadjudicated_writer_count": 236,
+    "version_field_write_histogram": {
+      "file_version": 9,
+      "parsed_data.schema_version": 1
+    },
+    "writer_count": 270,
+    "writer_without_characterization_test_count": 167,
+    "writes_unified_content_revision_count": 1
+  },
+  "stats_after": {
+    "by_content_store": {
+      "<artifact_or_delegated_only>": 116,
+      "checklist_responses": 83,
+      "working_paper": 71
+    },
+    "by_domain": {
+      "custom": 5,
+      "dedicated_router": 6,
+      "export_storage_resolver": 14,
+      "f2_word_sync": 6,
+      "history_restore": 2,
+      "html_save": 1,
+      "oo_callback": 1,
+      "rollback": 2,
+      "template_provisioning": 6,
+      "unadjudicated": 270,
+      "upload_import": 4,
+      "wopi": 3
+    },
+    "by_kind": {
+      "resolver": 51,
+      "writer": 248,
+      "writer_resolver": 21
+    },
+    "bypasses_unified_commit_count": 262,
+    "direct_commit_writer_count": 105,
+    "legacy_version_field_writer_count": 5,
+    "multi_resolver_count": 4,
+    "non_canonical_resolver_only_count": 64,
+    "resolver_count": 72,
+    "retired_by_domain": {
+      "custom": 1,
+      "orchestrator_side_effect": 1
+    },
+    "retired_writer_count": 2,
+    "row_count": 320,
+    "save_orchestrator_writer_count": 4,
+    "swallowing_writer_count": 114,
+    "unadjudicated_count": 270,
+    "unadjudicated_writer_count": 236,
+    "version_field_write_histogram": {
+      "file_version": 5,
+      "parsed_data.schema_version": 1
+    },
+    "writer_count": 269,
+    "writer_without_characterization_test_count": 165,
+    "writes_unified_content_revision_count": 1
+  },
+  "added": [],
+  "removed": [
+    {
+      "writer_id": "app.routers.custom_workpaper_cells::update_custom_cells",
+      "attribution": "MINE",
+      "attribution_reason": "本次直接改造的 writer / 裁决说明",
+      "source_path": "backend/app/routers/custom_workpaper_cells.py",
+      "kind": "writer",
+      "domain": "custom",
+      "now_retired": true
+    }
+  ],
+  "changed": [
+    {
+      "writer_id": "app.routers.excel_html::rollback_file_version",
+      "attribution": "MINE",
+      "attribution_reason": "本次直接改造的 writer / 裁决说明",
+      "source_path": "backend/app/routers/excel_html.py",
+      "deltas": {
+        "adjudication": {
+          "before": {
+            "domain": "rollback",
+            "status": "adjudicated",
+            "version_domain_note": "Rolls back the excel_html second-authority artifact and rewrites derived HTML with no database write and no version field; independent of working_paper history."
+          },
+          "after": {
+            "domain": "rollback",
+            "status": "adjudicated",
+            "version_domain_note": "BLOCKED for Task 19, not migrated. This endpoint rolls back storage/projects/{pid}/excel_html/{file_stem}.structure.json and rewrites the derived HTML. It cannot enter the unified protocol as written, for two reasons that are facts about its signature rather than judgements: (1) it has no wp_id at all -- it is keyed by file_stem, so there is no workpaper scope to open a content version against, and no content_revision to advance; (2) its route uses the numeric version as a resource key (POST /versions/{file_stem}/rollback/{version}), which Requirement 10.6 forbids outright. The whole excel_html module is a live parallel authority (its own structure.json, its own version snapshots, its own edit lock, its own xlsx writeback) reachable through router_registry. Resolving it means either binding the store to workpaper identity or deleting the sidecar under Requirement 12.9 -- a product decision with no equivalence evidence yet, which Requirement 12.7's 'equivalent evidence and a rollback point before deletion' explicitly gates. Recorded here so Task 20's gate sees a reason rather than an unexplained red row."
+          }
+        }
+      }
+    },
+    {
+      "writer_id": "app.routers.wp_render_strategies._f2_stocktake_plan_sync::_ensure_template",
+      "attribution": "MINE-LINE-SHIFT",
+      "attribution_reason": "同文件内纯行号位移（新增 import/docstring 把后续代码推下去），抹平行号字段后 facts 逐字节相等",
+      "source_path": "backend/app/routers/wp_render_strategies/_f2_stocktake_plan_sync.py",
+      "deltas": {
+        "facts": {
+          "before": {
+            "ad_hoc_paths": [],
+            "after_save_calls": [],
+            "artifact_writes": [],
+            "commit_receivers": [],
+            "content_fields_written": [],
+            "flush_receivers": [],
+            "resolver_calls": [
+              "find_template_file_any"
+            ],
+            "side_effects": [],
+            "sql_update_columns": [],
+            "swallowed_exception_lines": [
+              62
+            ],
+            "unified_commit_calls": [],
+            "version_fields_read": [],
+            "version_fields_written": []
+          },
+          "after": {
+            "ad_hoc_paths": [],
+            "after_save_calls": [],
+            "artifact_writes": [],
+            "commit_receivers": [],
+            "content_fields_written": [],
+            "flush_receivers": [],
+            "resolver_calls": [
+              "find_template_file_any"
+            ],
+            "side_effects": [],
+            "sql_update_columns": [],
+            "swallowed_exception_lines": [
+              73
+            ],
+            "unified_commit_calls": [],
+            "version_fields_read": [],
+            "version_fields_written": []
+          }
+        }
+      }
+    },
+    {
+      "writer_id": "app.routers.wp_render_strategies._f2_stocktake_plan_sync::_onlyoffice_dir",
+      "attribution": "MINE-LINE-SHIFT",
+      "attribution_reason": "同文件内纯行号位移（新增 import/docstring 把后续代码推下去），抹平行号字段后 facts 逐字节相等",
+      "source_path": "backend/app/routers/wp_render_strategies/_f2_stocktake_plan_sync.py",
+      "deltas": {
+        "facts": {
+          "before": {
+            "ad_hoc_paths": [
+              {
+                "line": 37,
+                "literal": "workpapers"
+              }
+            ],
+            "after_save_calls": [],
+            "artifact_writes": [],
+            "commit_receivers": [],
+            "content_fields_written": [],
+            "flush_receivers": [],
+            "resolver_calls": [],
+            "side_effects": [],
+            "sql_update_columns": [],
+            "swallowed_exception_lines": [],
+            "unified_commit_calls": [],
+            "version_fields_read": [],
+            "version_fields_written": []
+          },
+          "after": {
+            "ad_hoc_paths": [
+              {
+                "line": 48,
+                "literal": "workpapers"
+              }
+            ],
+            "after_save_calls": [],
+            "artifact_writes": [],
+            "commit_receivers": [],
+            "content_fields_written": [],
+            "flush_receivers": [],
+            "resolver_calls": [],
+            "side_effects": [],
+            "sql_update_columns": [],
+            "swallowed_exception_lines": [],
+            "unified_commit_calls": [],
+            "version_fields_read": [],
+            "version_fields_written": []
+          }
+        }
+      }
+    },
+    {
+      "writer_id": "app.routers.wp_render_strategies._f2_stocktake_plan_sync::_save_fields",
+      "attribution": "MINE",
+      "attribution_reason": "本次直接改造的 writer / 裁决说明",
+      "source_path": "backend/app/routers/wp_render_strategies/_f2_stocktake_plan_sync.py",
+      "deltas": {
+        "facts": {
+          "before": {
+            "ad_hoc_paths": [],
+            "after_save_calls": [],
+            "artifact_writes": [],
+            "commit_receivers": [
+              "db"
+            ],
+            "content_fields_written": [],
+            "flush_receivers": [],
+            "resolver_calls": [],
+            "side_effects": [],
+            "sql_update_columns": [
+              "checklist_responses.conclusion",
+              "checklist_responses.remark"
+            ],
+            "swallowed_exception_lines": [],
+            "unified_commit_calls": [],
+            "version_fields_read": [],
+            "version_fields_written": []
+          },
+          "after": {
+            "ad_hoc_paths": [],
+            "after_save_calls": [],
+            "artifact_writes": [],
+            "commit_receivers": [],
+            "content_fields_written": [],
+            "flush_receivers": [],
+            "resolver_calls": [],
+            "side_effects": [],
+            "sql_update_columns": [
+              "checklist_responses.conclusion",
+              "checklist_responses.remark"
+            ],
+            "swallowed_exception_lines": [],
+            "unified_commit_calls": [
+              "build_content_mutation_service_writer"
+            ],
+            "version_fields_read": [],
+            "version_fields_written": []
+          }
+        },
+        "verdicts": {
+          "before": {
+            "bypasses_unified_commit": true,
+            "delegates_content_write": false,
+            "has_characterization_test": false,
+            "multi_resolver": false,
+            "non_canonical_resolver_only": false,
+            "owns_direct_commit": true,
+            "swallows_exceptions": false,
+            "uses_save_orchestrator": false,
+            "writes_legacy_version_field": false,
+            "writes_unified_content_revision": false
+          },
+          "after": {
+            "bypasses_unified_commit": false,
+            "delegates_content_write": false,
+            "has_characterization_test": false,
+            "multi_resolver": false,
+            "non_canonical_resolver_only": false,
+            "owns_direct_commit": false,
+            "swallows_exceptions": false,
+            "uses_save_orchestrator": false,
+            "writes_legacy_version_field": false,
+            "writes_unified_content_revision": false
+          }
+        },
+        "adjudication": {
+          "before": {
+            "domain": "f2_word_sync",
+            "status": "adjudicated",
+            "version_domain_note": "F2-22 field persistence upserts checklist_responses.remark as a JSON blob and commits, entirely outside the working_paper version domain; no version field is read or written."
+          },
+          "after": {
+            "domain": "f2_word_sync",
+            "status": "adjudicated",
+            "version_domain_note": "Task 19: F2-22 field persistence no longer owns a transaction. The fields upsert and the docx body that produced it are now committed together through AuthoritativeContentWriter.commit_bytes -> ContentMutationService.commit(...) under an approved opaque_single_onlyoffice bundle. The lane follows a manifest fact rather than a preference: workpaper_sync_entry_manifest.json pins the F2 entry (xlsx/gt-f2-stocktake-bundle) at capability=single_onlyoffice, so the OOXML body is the authority (Requirement 2.11) and the projection lane refuses it by construction. The fields JSON in checklist_responses stays a derived view and is never submitted as content. Capability and the second to/from-OO flow are both untouched -- Requirement 12.7's deletion of the half-loop is Task 60. entry_id carries the sheet code so F2-22 and F2-23 cannot overwrite each other's representation generation."
+          }
+        }
+      }
+    },
+    {
+      "writer_id": "app.routers.wp_render_strategies._f2_stocktake_plan_sync::f2_st_plan_sync_from_oo",
+      "attribution": "MINE",
+      "attribution_reason": "本次直接改造的 writer / 裁决说明",
+      "source_path": "backend/app/routers/wp_render_strategies/_f2_stocktake_plan_sync.py",
+      "deltas": {
+        "adjudication": {
+          "before": {
+            "domain": "f2_word_sync",
+            "status": "adjudicated",
+            "version_domain_note": "F2-22 from-OO endpoint: resolves the OnlyOffice docx cache directory itself, extracts fields and delegates persistence to _save_fields. It does not wait for a callback, so it reads whatever is on disk at request time with no base or sequence."
+          },
+          "after": {
+            "domain": "f2_word_sync",
+            "status": "adjudicated",
+            "version_domain_note": "F2-22 from-OO endpoint: resolves the OnlyOffice docx cache directory itself, extracts fields and delegates persistence to _save_fields, which as of Task 19 submits both the fields row and the authoritative docx body through the unified commit boundary. What remains here is the resolver fork and the missing callback: it still reads whatever is on disk at request time with no frozen base or request sequence, which is Wave 2 (rooms / durable callback) work, not a version-domain fact. A concurrent save is now translated to 409 by a narrow RevisionConflictError handler placed ahead of the pre-existing broad catch."
+          }
+        }
+      }
+    },
+    {
+      "writer_id": "app.routers.wp_render_strategies._f2_stocktake_plan_sync::f2_st_plan_sync_to_oo",
+      "attribution": "MINE",
+      "attribution_reason": "本次直接改造的 writer / 裁决说明",
+      "source_path": "backend/app/routers/wp_render_strategies/_f2_stocktake_plan_sync.py",
+      "deltas": {
+        "facts": {
+          "before": {
+            "ad_hoc_paths": [],
+            "after_save_calls": [],
+            "artifact_writes": [],
+            "commit_receivers": [],
+            "content_fields_written": [],
+            "flush_receivers": [],
+            "resolver_calls": [
+              "_onlyoffice_dir"
+            ],
+            "side_effects": [],
+            "sql_update_columns": [],
+            "swallowed_exception_lines": [
+              159
+            ],
+            "unified_commit_calls": [],
+            "version_fields_read": [],
+            "version_fields_written": []
+          },
+          "after": {
+            "ad_hoc_paths": [],
+            "after_save_calls": [],
+            "artifact_writes": [],
+            "commit_receivers": [],
+            "content_fields_written": [],
+            "flush_receivers": [],
+            "resolver_calls": [
+              "_onlyoffice_dir"
+            ],
+            "side_effects": [],
+            "sql_update_columns": [],
+            "swallowed_exception_lines": [
+              213
+            ],
+            "unified_commit_calls": [],
+            "version_fields_read": [],
+            "version_fields_written": []
+          }
+        }
+      }
+    },
+    {
+      "writer_id": "app.routers.wp_render_strategies._f2_stocktake_summary_sync::_ensure_template",
+      "attribution": "MINE-LINE-SHIFT",
+      "attribution_reason": "同文件内纯行号位移（新增 import/docstring 把后续代码推下去），抹平行号字段后 facts 逐字节相等",
+      "source_path": "backend/app/routers/wp_render_strategies/_f2_stocktake_summary_sync.py",
+      "deltas": {
+        "facts": {
+          "before": {
+            "ad_hoc_paths": [],
+            "after_save_calls": [],
+            "artifact_writes": [],
+            "commit_receivers": [],
+            "content_fields_written": [],
+            "flush_receivers": [],
+            "resolver_calls": [
+              "find_template_file_any"
+            ],
+            "side_effects": [],
+            "sql_update_columns": [],
+            "swallowed_exception_lines": [
+              61
+            ],
+            "unified_commit_calls": [],
+            "version_fields_read": [],
+            "version_fields_written": []
+          },
+          "after": {
+            "ad_hoc_paths": [],
+            "after_save_calls": [],
+            "artifact_writes": [],
+            "commit_receivers": [],
+            "content_fields_written": [],
+            "flush_receivers": [],
+            "resolver_calls": [
+              "find_template_file_any"
+            ],
+            "side_effects": [],
+            "sql_update_columns": [],
+            "swallowed_exception_lines": [
+              72
+            ],
+            "unified_commit_calls": [],
+            "version_fields_read": [],
+            "version_fields_written": []
+          }
+        }
+      }
+    },
+    {
+      "writer_id": "app.routers.wp_render_strategies._f2_stocktake_summary_sync::_onlyoffice_dir",
+      "attribution": "MINE-LINE-SHIFT",
+      "attribution_reason": "同文件内纯行号位移（新增 import/docstring 把后续代码推下去），抹平行号字段后 facts 逐字节相等",
+      "source_path": "backend/app/routers/wp_render_strategies/_f2_stocktake_summary_sync.py",
+      "deltas": {
+        "facts": {
+          "before": {
+            "ad_hoc_paths": [
+              {
+                "line": 36,
+                "literal": "workpapers"
+              }
+            ],
+            "after_save_calls": [],
+            "artifact_writes": [],
+            "commit_receivers": [],
+            "content_fields_written": [],
+            "flush_receivers": [],
+            "resolver_calls": [],
+            "side_effects": [],
+            "sql_update_columns": [],
+            "swallowed_exception_lines": [],
+            "unified_commit_calls": [],
+            "version_fields_read": [],
+            "version_fields_written": []
+          },
+          "after": {
+            "ad_hoc_paths": [
+              {
+                "line": 47,
+                "literal": "workpapers"
+              }
+            ],
+            "after_save_calls": [],
+            "artifact_writes": [],
+            "commit_receivers": [],
+            "content_fields_written": [],
+            "flush_receivers": [],
+            "resolver_calls": [],
+            "side_effects": [],
+            "sql_update_columns": [],
+            "swallowed_exception_lines": [],
+            "unified_commit_calls": [],
+            "version_fields_read": [],
+            "version_fields_written": []
+          }
+        }
+      }
+    },
+    {
+      "writer_id": "app.routers.wp_render_strategies._f2_stocktake_summary_sync::_save_fields",
+      "attribution": "MINE",
+      "attribution_reason": "本次直接改造的 writer / 裁决说明",
+      "source_path": "backend/app/routers/wp_render_strategies/_f2_stocktake_summary_sync.py",
+      "deltas": {
+        "facts": {
+          "before": {
+            "ad_hoc_paths": [],
+            "after_save_calls": [],
+            "artifact_writes": [],
+            "commit_receivers": [
+              "db"
+            ],
+            "content_fields_written": [],
+            "flush_receivers": [],
+            "resolver_calls": [],
+            "side_effects": [],
+            "sql_update_columns": [
+              "checklist_responses.conclusion",
+              "checklist_responses.remark"
+            ],
+            "swallowed_exception_lines": [],
+            "unified_commit_calls": [],
+            "version_fields_read": [],
+            "version_fields_written": []
+          },
+          "after": {
+            "ad_hoc_paths": [],
+            "after_save_calls": [],
+            "artifact_writes": [],
+            "commit_receivers": [],
+            "content_fields_written": [],
+            "flush_receivers": [],
+            "resolver_calls": [],
+            "side_effects": [],
+            "sql_update_columns": [
+              "checklist_responses.conclusion",
+              "checklist_responses.remark"
+            ],
+            "swallowed_exception_lines": [],
+            "unified_commit_calls": [
+              "build_content_mutation_service_writer"
+            ],
+            "version_fields_read": [],
+            "version_fields_written": []
+          }
+        },
+        "verdicts": {
+          "before": {
+            "bypasses_unified_commit": true,
+            "delegates_content_write": false,
+            "has_characterization_test": false,
+            "multi_resolver": false,
+            "non_canonical_resolver_only": false,
+            "owns_direct_commit": true,
+            "swallows_exceptions": false,
+            "uses_save_orchestrator": false,
+            "writes_legacy_version_field": false,
+            "writes_unified_content_revision": false
+          },
+          "after": {
+            "bypasses_unified_commit": false,
+            "delegates_content_write": false,
+            "has_characterization_test": false,
+            "multi_resolver": false,
+            "non_canonical_resolver_only": false,
+            "owns_direct_commit": false,
+            "swallows_exceptions": false,
+            "uses_save_orchestrator": false,
+            "writes_legacy_version_field": false,
+            "writes_unified_content_revision": false
+          }
+        },
+        "adjudication": {
+          "before": {
+            "domain": "f2_word_sync",
+            "status": "adjudicated",
+            "version_domain_note": "F2-23 field persistence upserts checklist_responses.remark and commits, outside the working_paper version domain."
+          },
+          "after": {
+            "domain": "f2_word_sync",
+            "status": "adjudicated",
+            "version_domain_note": "Task 19: F2-23 field persistence migrated identically to F2-22 (same lane, same manifest-pinned capability=single_onlyoffice, same per-sheet entry_id, same opaque_single_onlyoffice bundle): the fields upsert and the authoritative docx body commit together through the unified entry, and the endpoint no longer owns a db.commit(). Capability and the second flow are preserved for Task 60."
+          }
+        }
+      }
+    },
+    {
+      "writer_id": "app.routers.wp_render_strategies._f2_stocktake_summary_sync::f2_st_summary_sync_from_oo",
+      "attribution": "MINE",
+      "attribution_reason": "本次直接改造的 writer / 裁决说明",
+      "source_path": "backend/app/routers/wp_render_strategies/_f2_stocktake_summary_sync.py",
+      "deltas": {
+        "adjudication": {
+          "before": {
+            "domain": "f2_word_sync",
+            "status": "adjudicated",
+            "version_domain_note": "F2-23 from-OO endpoint mirroring the F2-22 shape: own docx cache resolver, no callback wait, delegated persistence."
+          },
+          "after": {
+            "domain": "f2_word_sync",
+            "status": "adjudicated",
+            "version_domain_note": "F2-23 from-OO endpoint mirroring the F2-22 shape: own docx cache resolver, no callback wait, persistence delegated to _save_fields, which as of Task 19 routes through the unified commit boundary. The resolver fork and the missing frozen base remain Wave 2 work; a concurrent save is translated to 409 ahead of the broad catch."
+          }
+        }
+      }
+    },
+    {
+      "writer_id": "app.routers.wp_render_strategies._f2_stocktake_summary_sync::f2_st_summary_sync_to_oo",
+      "attribution": "MINE",
+      "attribution_reason": "本次直接改造的 writer / 裁决说明",
+      "source_path": "backend/app/routers/wp_render_strategies/_f2_stocktake_summary_sync.py",
+      "deltas": {
+        "facts": {
+          "before": {
+            "ad_hoc_paths": [],
+            "after_save_calls": [],
+            "artifact_writes": [],
+            "commit_receivers": [],
+            "content_fields_written": [],
+            "flush_receivers": [],
+            "resolver_calls": [
+              "_onlyoffice_dir"
+            ],
+            "side_effects": [],
+            "sql_update_columns": [],
+            "swallowed_exception_lines": [
+              158
+            ],
+            "unified_commit_calls": [],
+            "version_fields_read": [],
+            "version_fields_written": []
+          },
+          "after": {
+            "ad_hoc_paths": [],
+            "after_save_calls": [],
+            "artifact_writes": [],
+            "commit_receivers": [],
+            "content_fields_written": [],
+            "flush_receivers": [],
+            "resolver_calls": [
+              "_onlyoffice_dir"
+            ],
+            "side_effects": [],
+            "sql_update_columns": [],
+            "swallowed_exception_lines": [
+              204
+            ],
+            "unified_commit_calls": [],
+            "version_fields_read": [],
+            "version_fields_written": []
+          }
+        }
+      }
+    },
+    {
+      "writer_id": "app.services.version_trail_service::VersionTrailService.rollback_to_snapshot",
+      "attribution": "MINE",
+      "attribution_reason": "本次直接改造的 writer / 裁决说明",
+      "source_path": "backend/app/services/version_trail_service.py",
+      "deltas": {
+        "facts": {
+          "before": {
+            "ad_hoc_paths": [],
+            "after_save_calls": [],
+            "artifact_writes": [],
+            "commit_receivers": [],
+            "content_fields_written": [],
+            "flush_receivers": [
+              "db"
+            ],
+            "resolver_calls": [],
+            "side_effects": [],
+            "sql_update_columns": [
+              "checklist_responses.<delete>",
+              "checklist_responses.conclusion",
+              "checklist_responses.remark"
+            ],
+            "swallowed_exception_lines": [],
+            "unified_commit_calls": [],
+            "version_fields_read": [],
+            "version_fields_written": []
+          },
+          "after": {
+            "ad_hoc_paths": [],
+            "after_save_calls": [],
+            "artifact_writes": [],
+            "commit_receivers": [],
+            "content_fields_written": [],
+            "flush_receivers": [
+              "db"
+            ],
+            "resolver_calls": [],
+            "side_effects": [],
+            "sql_update_columns": [
+              "checklist_responses.<delete>",
+              "checklist_responses.conclusion",
+              "checklist_responses.remark"
+            ],
+            "swallowed_exception_lines": [],
+            "unified_commit_calls": [
+              "build_content_mutation_service_writer"
+            ],
+            "version_fields_read": [],
+            "version_fields_written": []
+          }
+        },
+        "verdicts": {
+          "before": {
+            "bypasses_unified_commit": true,
+            "delegates_content_write": false,
+            "has_characterization_test": true,
+            "multi_resolver": false,
+            "non_canonical_resolver_only": false,
+            "owns_direct_commit": false,
+            "swallows_exceptions": false,
+            "uses_save_orchestrator": false,
+            "writes_legacy_version_field": false,
+            "writes_unified_content_revision": false
+          },
+          "after": {
+            "bypasses_unified_commit": false,
+            "delegates_content_write": false,
+            "has_characterization_test": true,
+            "multi_resolver": false,
+            "non_canonical_resolver_only": false,
+            "owns_direct_commit": false,
+            "swallows_exceptions": false,
+            "uses_save_orchestrator": false,
+            "writes_legacy_version_field": false,
+            "writes_unified_content_revision": false
+          }
+        },
+        "adjudication": {
+          "before": {
+            "domain": "history_restore",
+            "status": "adjudicated",
+            "version_domain_note": "Deletes and reinserts the workpaper's checklist_responses rows from workpaper_snapshots.data_json. This is the workpaper content restore path and it advances no working_paper version field, so a restore cannot be distinguished from no change by any version reader."
+          },
+          "after": {
+            "domain": "history_restore",
+            "status": "adjudicated",
+            "version_domain_note": "Task 19: the checklist restore (delete-all + reinsert from workpaper_snapshots.data_json) now advances the single business content_revision through ContentMutationService.commit_html_projection(...). Before the migration a restore was invisible to every version reader, so a concurrent editor kept submitting against the pre-rollback base and wrote the rolled-back content straight back. Projection lane for the same reason as the template rollback: the restored content is structured rows, not an OOXML body. The rollback snapshot row is added before the only commit outlet so content, audit snapshot, content version, revision and outbox live and die together. It writes no version field and owns no commit."
+          }
+        }
+      }
+    },
+    {
+      "writer_id": "app.services.wopi_service::WOPIHostService.put_file",
+      "attribution": "MINE",
+      "attribution_reason": "本次直接改造的 writer / 裁决说明",
+      "source_path": "backend/app/services/wopi_service.py",
+      "deltas": {
+        "delegates_to_content_writer": {
+          "before": [],
+          "after": [
+            "app.services.wopi_service::WOPIHostService.put_file._auto_fine_extract"
+          ]
+        },
+        "facts": {
+          "before": {
+            "ad_hoc_paths": [],
+            "after_save_calls": [],
+            "artifact_writes": [
+              "copy2",
+              "write_bytes"
+            ],
+            "commit_receivers": [],
+            "content_fields_written": [],
+            "flush_receivers": [
+              "db"
+            ],
+            "resolver_calls": [],
+            "side_effects": [
+              "<sets prefill_stale>",
+              "<sets updated_at>",
+              "event_bus.publish"
+            ],
+            "sql_update_columns": [],
+            "swallowed_exception_lines": [
+              317,
+              399,
+              418,
+              435,
+              458,
+              507,
+              530,
+              533,
+              552
+            ],
+            "unified_commit_calls": [],
+            "version_fields_read": [
+              "file_version"
+            ],
+            "version_fields_written": [
+              "file_version"
+            ]
+          },
+          "after": {
+            "ad_hoc_paths": [],
+            "after_save_calls": [],
+            "artifact_writes": [
+              "copy2",
+              "write_bytes"
+            ],
+            "commit_receivers": [],
+            "content_fields_written": [],
+            "flush_receivers": [
+              "db"
+            ],
+            "resolver_calls": [],
+            "side_effects": [
+              "<sets prefill_stale>",
+              "<sets updated_at>",
+              "event_bus.publish"
+            ],
+            "sql_update_columns": [],
+            "swallowed_exception_lines": [
+              317,
+              442,
+              483,
+              500,
+              523,
+              572,
+              595,
+              598,
+              617
+            ],
+            "unified_commit_calls": [
+              "build_content_mutation_service_writer"
+            ],
+            "version_fields_read": [],
+            "version_fields_written": []
+          }
+        },
+        "verdicts": {
+          "before": {
+            "bypasses_unified_commit": true,
+            "delegates_content_write": false,
+            "has_characterization_test": true,
+            "multi_resolver": false,
+            "non_canonical_resolver_only": false,
+            "owns_direct_commit": false,
+            "swallows_exceptions": true,
+            "uses_save_orchestrator": false,
+            "writes_legacy_version_field": true,
+            "writes_unified_content_revision": false
+          },
+          "after": {
+            "bypasses_unified_commit": false,
+            "delegates_content_write": true,
+            "has_characterization_test": true,
+            "multi_resolver": false,
+            "non_canonical_resolver_only": false,
+            "owns_direct_commit": false,
+            "swallows_exceptions": true,
+            "uses_save_orchestrator": false,
+            "writes_legacy_version_field": false,
+            "writes_unified_content_revision": false
+          }
+        },
+        "adjudication": {
+          "before": {
+            "domain": "wopi",
+            "status": "adjudicated",
+            "version_domain_note": "WOPI PutFile increments working_paper.file_version inline, snapshots the previous artifact, writes new bytes and publishes an event without the orchestrator; content_hash idempotency is decided before the version bump."
+          },
+          "after": {
+            "domain": "wopi",
+            "status": "adjudicated",
+            "version_domain_note": "Task 19: PutFile itself now submits the hash-verified OOXML body through AuthoritativeContentWriter.commit_bytes -> ContentMutationService.commit(...) under an approved opaque_single_onlyoffice bundle; it writes no version field and owns no commit, and the .versions snapshot name follows the pre-save content revision. Remaining debt is delegated, not local: the nested background coroutine put_file._auto_fine_extract still writes parsed_data on an independent session and commit, so this row stays in the writer set until that coroutine is migrated."
+          }
+        },
+        "content_stores_written": {
+          "before": [
+            "working_paper"
+          ],
+          "after": []
+        }
+      }
+    },
+    {
+      "writer_id": "app.services.wopi_service::WOPIHostService.put_file._auto_fine_extract",
+      "attribution": "MINE",
+      "attribution_reason": "本次直接改造的 writer / 裁决说明",
+      "source_path": "backend/app/services/wopi_service.py",
+      "deltas": {
+        "facts": {
+          "before": {
+            "ad_hoc_paths": [],
+            "after_save_calls": [],
+            "artifact_writes": [],
+            "commit_receivers": [
+              "fine_db"
+            ],
+            "content_fields_written": [
+              "parsed_data"
+            ],
+            "flush_receivers": [],
+            "resolver_calls": [],
+            "side_effects": [],
+            "sql_update_columns": [],
+            "swallowed_exception_lines": [
+              503
+            ],
+            "unified_commit_calls": [],
+            "version_fields_read": [],
+            "version_fields_written": []
+          },
+          "after": {
+            "ad_hoc_paths": [],
+            "after_save_calls": [],
+            "artifact_writes": [],
+            "commit_receivers": [
+              "fine_db"
+            ],
+            "content_fields_written": [
+              "parsed_data"
+            ],
+            "flush_receivers": [],
+            "resolver_calls": [],
+            "side_effects": [],
+            "sql_update_columns": [],
+            "swallowed_exception_lines": [
+              568
+            ],
+            "unified_commit_calls": [],
+            "version_fields_read": [],
+            "version_fields_written": []
+          }
+        }
+      }
+    },
+    {
+      "writer_id": "app.services.wopi_service::WOPIHostService.put_file._auto_parse",
+      "attribution": "MINE",
+      "attribution_reason": "本次直接改造的 writer / 裁决说明",
+      "source_path": "backend/app/services/wopi_service.py",
+      "deltas": {
+        "facts": {
+          "before": {
+            "ad_hoc_paths": [],
+            "after_save_calls": [],
+            "artifact_writes": [],
+            "commit_receivers": [
+              "parse_db"
+            ],
+            "content_fields_written": [],
+            "flush_receivers": [],
+            "resolver_calls": [],
+            "side_effects": [],
+            "sql_update_columns": [],
+            "swallowed_exception_lines": [
+              431
+            ],
+            "unified_commit_calls": [],
+            "version_fields_read": [],
+            "version_fields_written": []
+          },
+          "after": {
+            "ad_hoc_paths": [],
+            "after_save_calls": [],
+            "artifact_writes": [],
+            "commit_receivers": [
+              "parse_db"
+            ],
+            "content_fields_written": [],
+            "flush_receivers": [],
+            "resolver_calls": [],
+            "side_effects": [],
+            "sql_update_columns": [],
+            "swallowed_exception_lines": [
+              496
+            ],
+            "unified_commit_calls": [],
+            "version_fields_read": [],
+            "version_fields_written": []
+          }
+        }
+      }
+    },
+    {
+      "writer_id": "app.services.wp_download_service::WpUploadService.upload_file",
+      "attribution": "MINE",
+      "attribution_reason": "本次直接改造的 writer / 裁决说明",
+      "source_path": "backend/app/services/wp_download_service.py",
+      "deltas": {
+        "delegates_to_content_writer": {
+          "before": [],
+          "after": [
+            "app.services.prefill_engine::parse_workpaper_real"
+          ]
+        },
+        "facts": {
+          "before": {
+            "ad_hoc_paths": [
+              {
+                "line": 409,
+                "literal": "storage"
+              }
+            ],
+            "after_save_calls": [],
+            "artifact_writes": [
+              "write_bytes"
+            ],
+            "commit_receivers": [],
+            "content_fields_written": [],
+            "flush_receivers": [
+              "db"
+            ],
+            "resolver_calls": [],
+            "side_effects": [
+              "<sets prefill_stale>",
+              "<sets updated_at>",
+              "event_bus.publish"
+            ],
+            "sql_update_columns": [],
+            "swallowed_exception_lines": [
+              411,
+              423,
+              426,
+              436,
+              449,
+              463,
+              484
+            ],
+            "unified_commit_calls": [],
+            "version_fields_read": [
+              "file_version"
+            ],
+            "version_fields_written": [
+              "file_version"
+            ]
+          },
+          "after": {
+            "ad_hoc_paths": [
+              {
+                "line": 466,
+                "literal": "storage"
+              }
+            ],
+            "after_save_calls": [],
+            "artifact_writes": [
+              "write_bytes"
+            ],
+            "commit_receivers": [],
+            "content_fields_written": [],
+            "flush_receivers": [
+              "db"
+            ],
+            "resolver_calls": [],
+            "side_effects": [
+              "<sets prefill_stale>",
+              "<sets updated_at>",
+              "event_bus.publish"
+            ],
+            "sql_update_columns": [],
+            "swallowed_exception_lines": [
+              437,
+              468,
+              480,
+              483,
+              493,
+              506,
+              526,
+              547
+            ],
+            "unified_commit_calls": [
+              "build_content_mutation_service_writer"
+            ],
+            "version_fields_read": [],
+            "version_fields_written": []
+          }
+        },
+        "verdicts": {
+          "before": {
+            "bypasses_unified_commit": true,
+            "delegates_content_write": false,
+            "has_characterization_test": true,
+            "multi_resolver": false,
+            "non_canonical_resolver_only": true,
+            "owns_direct_commit": false,
+            "swallows_exceptions": true,
+            "uses_save_orchestrator": false,
+            "writes_legacy_version_field": true,
+            "writes_unified_content_revision": false
+          },
+          "after": {
+            "bypasses_unified_commit": false,
+            "delegates_content_write": true,
+            "has_characterization_test": true,
+            "multi_resolver": false,
+            "non_canonical_resolver_only": true,
+            "owns_direct_commit": false,
+            "swallows_exceptions": true,
+            "uses_save_orchestrator": false,
+            "writes_legacy_version_field": false,
+            "writes_unified_content_revision": false
+          }
+        },
+        "adjudication": {
+          "before": {
+            "domain": "upload_import",
+            "status": "adjudicated",
+            "version_domain_note": "Offline upload increments working_paper.file_version inline, publishes an event and writes the artifact bytes, all outside the orchestrator; the file write and version bump are not one atomic unit."
+          },
+          "after": {
+            "domain": "upload_import",
+            "status": "adjudicated",
+            "version_domain_note": "Task 19: the offline upload itself now submits the uploaded OOXML body through AuthoritativeContentWriter.commit_bytes -> ContentMutationService.commit(...), and its conflict pre-check compares working_paper.content_revision instead of the shared file_version counter. Remaining debt is delegated, not local: it still calls prefill_engine.parse_workpaper_real, which writes workpaper content on its own, so this row stays in the writer set until the prefill writer is migrated."
+          }
+        },
+        "content_stores_written": {
+          "before": [
+            "working_paper"
+          ],
+          "after": []
+        }
+      }
+    },
+    {
+      "writer_id": "app.services.wp_migration_service::WpMigrationService.migrate_workpaper",
+      "attribution": "MINE-LINE-SHIFT",
+      "attribution_reason": "同文件内纯行号位移（新增 import/docstring 把后续代码推下去），抹平行号字段后 facts 逐字节相等",
+      "source_path": "backend/app/services/wp_migration_service.py",
+      "deltas": {
+        "facts": {
+          "before": {
+            "ad_hoc_paths": [],
+            "after_save_calls": [],
+            "artifact_writes": [],
+            "commit_receivers": [],
+            "content_fields_written": [],
+            "flush_receivers": [
+              "self.db"
+            ],
+            "resolver_calls": [],
+            "side_effects": [
+              "<sets working_paper.updated_at>"
+            ],
+            "sql_update_columns": [
+              "working_paper.parsed_data"
+            ],
+            "swallowed_exception_lines": [
+              265
+            ],
+            "unified_commit_calls": [],
+            "version_fields_read": [
+              "parsed_data._migrated_at"
+            ],
+            "version_fields_written": []
+          },
+          "after": {
+            "ad_hoc_paths": [],
+            "after_save_calls": [],
+            "artifact_writes": [],
+            "commit_receivers": [],
+            "content_fields_written": [],
+            "flush_receivers": [
+              "self.db"
+            ],
+            "resolver_calls": [],
+            "side_effects": [
+              "<sets working_paper.updated_at>"
+            ],
+            "sql_update_columns": [
+              "working_paper.parsed_data"
+            ],
+            "swallowed_exception_lines": [
+              349
+            ],
+            "unified_commit_calls": [],
+            "version_fields_read": [
+              "parsed_data._migrated_at"
+            ],
+            "version_fields_written": []
+          }
+        }
+      }
+    },
+    {
+      "writer_id": "app.services.wp_migration_service::WpMigrationService.rollback",
+      "attribution": "MINE",
+      "attribution_reason": "本次直接改造的 writer / 裁决说明",
+      "source_path": "backend/app/services/wp_migration_service.py",
+      "deltas": {
+        "facts": {
+          "before": {
+            "ad_hoc_paths": [],
+            "after_save_calls": [],
+            "artifact_writes": [],
+            "commit_receivers": [],
+            "content_fields_written": [],
+            "flush_receivers": [
+              "self.db"
+            ],
+            "resolver_calls": [],
+            "side_effects": [
+              "<sets working_paper.updated_at>"
+            ],
+            "sql_update_columns": [
+              "working_paper.parsed_data"
+            ],
+            "swallowed_exception_lines": [],
+            "unified_commit_calls": [],
+            "version_fields_read": [],
+            "version_fields_written": []
+          },
+          "after": {
+            "ad_hoc_paths": [],
+            "after_save_calls": [],
+            "artifact_writes": [],
+            "commit_receivers": [],
+            "content_fields_written": [],
+            "flush_receivers": [],
+            "resolver_calls": [],
+            "side_effects": [
+              "<sets working_paper.updated_at>"
+            ],
+            "sql_update_columns": [
+              "working_paper.parsed_data"
+            ],
+            "swallowed_exception_lines": [],
+            "unified_commit_calls": [
+              "build_content_mutation_service_writer"
+            ],
+            "version_fields_read": [],
+            "version_fields_written": []
+          }
+        },
+        "verdicts": {
+          "before": {
+            "bypasses_unified_commit": true,
+            "delegates_content_write": false,
+            "has_characterization_test": true,
+            "multi_resolver": false,
+            "non_canonical_resolver_only": false,
+            "owns_direct_commit": false,
+            "swallows_exceptions": false,
+            "uses_save_orchestrator": false,
+            "writes_legacy_version_field": false,
+            "writes_unified_content_revision": false
+          },
+          "after": {
+            "bypasses_unified_commit": false,
+            "delegates_content_write": false,
+            "has_characterization_test": true,
+            "multi_resolver": false,
+            "non_canonical_resolver_only": false,
+            "owns_direct_commit": false,
+            "swallows_exceptions": false,
+            "uses_save_orchestrator": false,
+            "writes_legacy_version_field": false,
+            "writes_unified_content_revision": false
+          }
+        },
+        "adjudication": {
+          "before": {
+            "domain": "rollback",
+            "status": "adjudicated",
+            "version_domain_note": "Restores working_paper.parsed_data from wp_migration_snapshots through raw SQL and only flushes; no version increment, so a rollback is invisible to every version consumer and to the editor base."
+          },
+          "after": {
+            "domain": "rollback",
+            "status": "adjudicated",
+            "version_domain_note": "Task 19: the template-migration rollback now writes working_paper.parsed_data and advances the single business content_revision inside one transaction whose only commit outlet is ContentMutationService.commit_html_projection(...). It picks the projection lane because the content it restores IS the structured projection -- there are no OOXML bytes to publish as a representation, and fabricating a blank xlsx is what Requirement 3.9 forbids. capability=single_html is declared at the call site, so the plan-level refusal stays reachable; a workpaper that really has a published OO representation is refused by the database-fact check instead of silently forking its JSON projection behind the authoritative OOXML (Requirement 2.11). It writes no version field and owns no commit. Remaining debt is delegated, not local: the sibling migrate_workpaper() still writes parsed_data on its own and is unadjudicated -- template migration is not one of this task's six domains."
+          }
+        }
+      }
+    },
+    {
+      "writer_id": "app.services.wp_storage_service::WpStorageService.list_versions",
+      "attribution": "MINE-COLLATERAL",
+      "attribution_reason": "🔴 生成器的 characterization-test 发现面是**按名称就近**匹配的：新写的守卫提到了这个模块，于是同模块的其它函数也被记成「有 characterization 测试」。这是判据的 fail-open（高估覆盖），不是真的为它写了测试。",
+      "source_path": "backend/app/services/wp_storage_service.py",
+      "deltas": {
+        "verdicts": {
+          "before": {
+            "bypasses_unified_commit": false,
+            "delegates_content_write": false,
+            "has_characterization_test": false,
+            "multi_resolver": false,
+            "non_canonical_resolver_only": false,
+            "owns_direct_commit": false,
+            "swallows_exceptions": false,
+            "uses_save_orchestrator": false,
+            "writes_legacy_version_field": false,
+            "writes_unified_content_revision": false
+          },
+          "after": {
+            "bypasses_unified_commit": false,
+            "delegates_content_write": false,
+            "has_characterization_test": true,
+            "multi_resolver": false,
+            "non_canonical_resolver_only": false,
+            "owns_direct_commit": false,
+            "swallows_exceptions": false,
+            "uses_save_orchestrator": false,
+            "writes_legacy_version_field": false,
+            "writes_unified_content_revision": false
+          }
+        }
+      }
+    },
+    {
+      "writer_id": "app.services.wp_storage_service::WpStorageService.save_version",
+      "attribution": "MINE",
+      "attribution_reason": "本次直接改造的 writer / 裁决说明",
+      "source_path": "backend/app/services/wp_storage_service.py",
+      "deltas": {
+        "facts": {
+          "before": {
+            "ad_hoc_paths": [],
+            "after_save_calls": [],
+            "artifact_writes": [
+              "copy2"
+            ],
+            "commit_receivers": [],
+            "content_fields_written": [],
+            "flush_receivers": [
+              "self.db"
+            ],
+            "resolver_calls": [
+              "resolve_wp_file"
+            ],
+            "side_effects": [],
+            "sql_update_columns": [],
+            "swallowed_exception_lines": [],
+            "unified_commit_calls": [],
+            "version_fields_read": [
+              "file_version"
+            ],
+            "version_fields_written": [
+              "file_version"
+            ]
+          },
+          "after": {
+            "ad_hoc_paths": [],
+            "after_save_calls": [],
+            "artifact_writes": [
+              "copy2"
+            ],
+            "commit_receivers": [],
+            "content_fields_written": [],
+            "flush_receivers": [],
+            "resolver_calls": [
+              "resolve_wp_file"
+            ],
+            "side_effects": [],
+            "sql_update_columns": [],
+            "swallowed_exception_lines": [],
+            "unified_commit_calls": [],
+            "version_fields_read": [
+              "content_revision"
+            ],
+            "version_fields_written": []
+          }
+        },
+        "verdicts": {
+          "before": {
+            "bypasses_unified_commit": true,
+            "delegates_content_write": false,
+            "has_characterization_test": false,
+            "multi_resolver": false,
+            "non_canonical_resolver_only": false,
+            "owns_direct_commit": false,
+            "swallows_exceptions": false,
+            "uses_save_orchestrator": false,
+            "writes_legacy_version_field": true,
+            "writes_unified_content_revision": false
+          },
+          "after": {
+            "bypasses_unified_commit": true,
+            "delegates_content_write": false,
+            "has_characterization_test": true,
+            "multi_resolver": false,
+            "non_canonical_resolver_only": false,
+            "owns_direct_commit": false,
+            "swallows_exceptions": false,
+            "uses_save_orchestrator": false,
+            "writes_legacy_version_field": false,
+            "writes_unified_content_revision": false
+          }
+        },
+        "adjudication": {
+          "before": {
+            "domain": "history_restore",
+            "status": "adjudicated",
+            "version_domain_note": "Copies the current artifact into a .versions snapshot and increments working_paper.file_version itself; the snapshot name is derived from the pre-increment version, so snapshot naming and the version counter are coupled to increment order."
+          },
+          "after": {
+            "domain": "history_restore",
+            "status": "adjudicated",
+            "version_domain_note": "Task 19: this method is no longer a version owner and no longer a content writer. It copies the CURRENT artifact into a .versions snapshot -- not one byte of content changes -- yet it used to run working_paper.file_version += 1, which both invented a version indistinguishable from its predecessor and made a fourth writer contend for the same counter as WOPI PutFile, the offline upload and the structure save. The snapshot name now follows the counter that actually moves (content_revision, advanced only by the ContentMutationService CAS) and this method only reads it. The return payload reports content_revision / snapshot_of_revision instead of a new_version it invented; there is no frontend caller of POST /save-version, and the only backend consumer returns the dict verbatim."
+          }
+        },
+        "content_stores_written": {
+          "before": [
+            "working_paper"
+          ],
+          "after": []
+        }
+      }
+    }
+  ],
+  "retired_added": [
+    {
+      "writer_id": "app.routers.custom_workpaper_cells::update_custom_cells",
+      "attribution": "MINE",
+      "attribution_reason": "本次直接改造的 writer / 裁决说明",
+      "source_path": null,
+      "domain": "custom",
+      "source_state": "present_and_clean"
+    }
+  ],
+  "unattributed_rows": 0,
+  "unattributed_sample": []
+}

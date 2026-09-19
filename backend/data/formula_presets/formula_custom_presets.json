@@ -1,0 +1,5 @@
+{
+  "description": "公式预设库自定义条目（用户在致同通用基线之上新增，与 formula_presets_seed.json 隔离，平台级共享）。",
+  "version": "2025-R1",
+  "presets": []
+}

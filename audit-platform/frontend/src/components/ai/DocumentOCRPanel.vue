@@ -139,6 +139,7 @@
 <script setup>
 import { ref, computed } from 'vue'
 import { ocrApi } from '@/services/aiApi'
+import { useDisplayPrefsStore } from '@/stores/displayPrefs'
 
 const props = defineProps({ projectId: { type: String, required: true } })
 
@@ -304,9 +305,11 @@ function matchResultLabel(r) {
   return m[r] || r
 }
 
+const prefs = useDisplayPrefsStore()
+
 function formatCurrency(val) {
   if (val == null) return '-'
-  return Number(val).toLocaleString('zh-CN', { style: 'currency', currency: 'CNY' })
+  return prefs.fmt(val)
 }
 </script>
 

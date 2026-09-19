@@ -1,0 +1,320 @@
+# backend/data/ledger_adapters/wp_render_schema/k6-held-for-sale.yaml
+# K6 持有待售资产和负债 — 专属组件渲染 schema
+# componentType: k6-held-for-sale
+# 科目 1481 持有待售资产（借方/资产类） + 2605 持有待售负债（贷方/负债类）
+# Template: K6 持有待售资产和负债.xlsx（11 sheets: 1索引+10业务）
+# 公式特征：资产类期末=期初+增加-减少-减值；负债类期末=期初+增加-减少
+#           CAS42五条件分类 + 减值孰低法（公允价值净额 vs 账面价值）
+# 创建: 2026-07-30
+
+wp_code: K6
+wp_name: 持有待售资产和负债
+component_type: k6-held-for-sale
+selfLoad: true
+template_path: backend/wp_templates/K/K6 持有待售资产和负债.xlsx
+template_version: v2025-R5
+applicable_standards: [soe_standalone, listed_standalone, soe_consolidated, listed_consolidated]
+account_codes: ['1481', '2605']
+related_accounts:
+  - code: '1481'
+    name: 持有待售资产
+    direction: debit
+    category: asset
+  - code: '2605'
+    name: 持有待售负债
+    direction: credit
+    category: liability
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# AI 辅助生成 sections
+# ═══════════════════════════════════════════════════════════════════════════════
+ai_sections:
+  - classification-conclusion
+  - impairment-conclusion
+  - no-longer-eval
+  - overall-opinion
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 跨底稿交叉引用（cross_wp_references）
+# ═══════════════════════════════════════════════════════════════════════════════
+cross_wp_references:
+  - ref_id: CW-K6-001
+    source_wp: K6-1
+    target_wp: TB:1481
+    description: '审定表审定数→回写 trial_balance(1481 持有待售资产)'
+    direction: outbound
+    event: "substantive:adjudicated"
+
+  - ref_id: CW-K6-002
+    source_wp: K6-1
+    target_wp: TB:2605
+    description: '审定表审定数→回写 trial_balance(2605 持有待售负债)'
+    direction: outbound
+    event: "substantive:adjudicated"
+
+  - ref_id: CW-K6-003
+    source_wp: K6-3
+    target_wp: A13
+    description: '调整分录→A13错报汇总（adjustment:created）'
+    direction: outbound
+    event: "adjustment:created"
+
+  - ref_id: CW-K6-004
+    source_wp: K6-1
+    target_wp: 附注
+    description: '审定表→附注披露自动刷新（substantive:adjudicated）'
+    direction: outbound
+    event: "substantive:adjudicated"
+
+  - ref_id: CW-K6-005
+    source_wp: K6-2
+    target_wp: K6-1
+    description: '明细表合计→审定表交叉验证'
+    direction: outbound
+
+  - ref_id: CW-K6-006
+    source_wp: K6-5
+    target_wp: K6-1
+    description: '减值测试→审定表减值准备交叉验证'
+    direction: outbound
+
+  - ref_id: CW-K6-007
+    source_wp: K6-6
+    target_wp: K6-5
+    description: '处置组减值分摊→K6-5减值测试交叉验证'
+    direction: outbound
+
+  - ref_id: CW-K6-008
+    source_wp: K6-4
+    target_wp: K6-2
+    description: '分类判断→明细表分类日联动'
+    direction: outbound
+
+  - ref_id: CW-K6-009
+    source_wp: B50
+    target_wp: K6A
+    description: 'B50风险评估→K6实质性程序'
+    direction: inbound
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Sheet 定义（11 sheets）
+# ═══════════════════════════════════════════════════════════════════════════════
+
+sheets:
+  # ─────────────────────────────────────────────────────────────────────────
+  # Sheet 1: 底稿目录
+  # ─────────────────────────────────────────────────────────────────────────
+  底稿目录:
+    code: 底稿目录
+    group: core
+    component: K6TabIndex
+    class_code: B-底稿目录
+    progress_bar: true
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Sheet 2: 持有待售实质性程序表K6A
+  # ─────────────────────────────────────────────────────────────────────────
+  持有待售实质性程序表K6A:
+    code: K6A
+    group: core
+    component: a-program-console
+    class_code: A-实质性程序
+    integrations:
+      - voucher_sampling_engine: { mode: dialog }
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Sheet 3: 审定表K6-1 (22行×14列, 45公式, 资产+负债双区块！)
+  # ─────────────────────────────────────────────────────────────────────────
+  审定表K6-1:
+    code: K6-1
+    group: core
+    dimensions: "22×14"
+    component: K6TabAdjudication
+    class_code: F-审定表
+    account_codes: ['1481', '2605']
+    formula_count: 45
+    sections:
+      - name: 持有待售资产
+        account_code: '1481'
+        direction: debit
+        balance_formula: "期末=期初+增加-减少-减值"
+      - name: 持有待售负债
+        account_code: '2605'
+        direction: credit
+        balance_formula: "期末=期初+增加-减少"
+    formulas:
+      - { name: calcAuditedAmount, target: audited_amount, expr: "unadjusted + aje + rje" }
+      - { name: calcAssetEndBalance, target: asset_closing, expr: "opening + increase - decrease - impairment" }
+      - { name: calcLiabilityEndBalance, target: liability_closing, expr: "opening + increase - decrease" }
+      - { name: calcTriangleReconciliation, target: triangle_diff, expr: "closing - calculated_closing" }
+    highlights:
+      - { condition: "triangle_diff != 0", style: red, tooltip: "三角勾稽不平" }
+    writeback:
+      target: trial_balance.audited_amount
+      trigger: WORKPAPER_SAVED
+      key_field: account_code
+      value_field: audited_amount
+      accounts: ['1481', '2605']
+    event_bus:
+      publish:
+        - { event: "substantive:adjudicated", payload: "{accountCode:'1481', adjudicatedAmount}" }
+        - { event: "substantive:adjudicated", payload: "{accountCode:'2605', adjudicatedAmount}" }
+    ai_section: overall-opinion
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Sheet 4: 附注披露信息（上市公司）(79行×11列)
+  # ─────────────────────────────────────────────────────────────────────────
+  附注披露信息（上市公司）:
+    code: 附注-上市
+    group: core
+    dimensions: "79×11"
+    component: K6TabDisclosureListed
+    class_code: D-附注披露
+    variant: listed
+    event_bus:
+      subscribe:
+        - { event: "substantive:adjudicated", action: "refresh" }
+        - { event: "adjustment:created", action: "refresh" }
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Sheet 5: 附注披露信息（国有企业）(61行×8列)
+  # ─────────────────────────────────────────────────────────────────────────
+  附注披露信息（国有企业）:
+    code: 附注-国企
+    group: core
+    dimensions: "61×8"
+    component: K6TabDisclosureSoe
+    class_code: D-附注披露
+    variant: soe
+    event_bus:
+      subscribe:
+        - { event: "substantive:adjudicated", action: "refresh" }
+        - { event: "adjustment:created", action: "refresh" }
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Sheet 6: 明细表K6-2 (40行×15列, 12公式, 动态行)
+  # ─────────────────────────────────────────────────────────────────────────
+  明细表K6-2:
+    code: K6-2
+    group: core
+    dimensions: "40×15"
+    component: K6TabDetail
+    class_code: F-明细表
+    dynamic_rows: true
+    max_rows: 500
+    formula_count: 12
+    formulas:
+      - { name: calcBookValue, target: book_value, expr: "originalCost - accDepreciation - impairment" }
+      - { name: calcFairValueNet, target: fair_value_net, expr: "fairValue - sellingCost" }
+    highlights:
+      - { condition: "bookValue > fairValueNet && fairValueNet > 0", style: orange_bg, tooltip: "账面超公允净额,需计提减值" }
+    import_export: true
+    add_row_prompt: assetName
+    cross_verify:
+      target_sheet: K6-1
+      target_field: closing_balance
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Sheet 7: 调整分录汇总K6-3
+  # ─────────────────────────────────────────────────────────────────────────
+  调整分录汇总K6-3:
+    code: K6-3
+    group: core
+    component: K6TabAdjustment
+    class_code: F-调整分录
+    dynamic_rows: true
+    import_export: true
+    event_bus:
+      publish:
+        - { event: "adjustment:created", payload: "{entryType, accountCode, amount}" }
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Sheet 8: 初始确认检查表K6-4 (CAS42五条件分类判断)
+  # ─────────────────────────────────────────────────────────────────────────
+  初始确认检查表K6-4:
+    code: K6-4
+    group: impairment
+    component: K6TabInitialRecognition
+    class_code: D-段落检查
+    layout_type: checklist
+    classification_engine: true
+    check_items:
+      - { id: canSellImmediately, label: 可立即出售（当前状态下可立即出售）, type: conclusion }
+      - { id: decisionMade, label: 已就出售作出决议（管理层书面决议）, type: conclusion }
+      - { id: agreementSigned, label: 已与购买方签订不可撤销转让协议, type: conclusion }
+      - { id: withinOneYear, label: 出售预计一年内完成, type: conclusion }
+      - { id: priceReasonable, label: 售价合理，不太可能变更或撤销, type: conclusion }
+    highlights:
+      - { condition: "anyConditionFailed", style: red, tooltip: "CAS42五条件不全满足,不得分类为持有待售" }
+    ai_section: classification-conclusion
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Sheet 9: 减值准备测试表K6-5 (23行×14列, 16公式, 孰低法)
+  # ─────────────────────────────────────────────────────────────────────────
+  减值准备测试表K6-5:
+    code: K6-5
+    group: impairment
+    dimensions: "23×14"
+    component: K6TabImpairmentTest
+    class_code: F-减值测试
+    formula_count: 16
+    virtual_scroll: true
+    impairment_engine: true
+    formulas:
+      - { name: calcFairValueNet, target: fair_value_net, expr: "fairValue - sellingCost" }
+      - { name: calcImpairment, target: impairment_amount, expr: "MAX(0, bookValue - fairValueNet)" }
+      - { name: calcAdditionalProvision, target: additional_provision, expr: "impairmentAmount - existingProvision" }
+    highlights:
+      - { condition: "impairmentAmount > 0", style: orange_bg, tooltip: "需计提减值" }
+      - { condition: "additionalProvision > 0", style: red_bg, tooltip: "需补提减值" }
+    cross_verify:
+      target_sheet: K6-1
+      target_row: 减值准备
+    ai_section: impairment-conclusion
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Sheet 10: 处置组减值测试表K6-6 (55行×11列, 13公式)
+  # ─────────────────────────────────────────────────────────────────────────
+  处置组减值测试表K6-6:
+    code: K6-6
+    group: impairment
+    dimensions: "55×11"
+    component: K6TabGroupImpairment
+    class_code: F-减值测试
+    dynamic_rows: true
+    formula_count: 13
+    virtual_scroll: true
+    import_export: true
+    formulas:
+      - { name: calcAllocationRatio, target: allocation_ratio, expr: "itemBook / groupBook" }
+      - { name: calcAllocatedImpairment, target: allocated_impairment, expr: "(groupImpairment - goodwillDeduction) × allocationRatio" }
+      - { name: calcPostAllocationBook, target: post_allocation_book, expr: "bookValue - allocatedImpairment" }
+    highlights:
+      - { condition: "postAllocationBook < impairmentFloor", style: red, tooltip: "分摊后低于减值下限" }
+    cross_verify:
+      target_sheet: K6-5
+      target_field: impairment_amount
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Sheet 11: 检查表(不再满足持有待售)K6-7
+  # ─────────────────────────────────────────────────────────────────────────
+  检查表(不再满足持有待售)K6-7:
+    code: K6-7
+    group: impairment
+    component: K6TabNoLongerCheck
+    class_code: D-段落检查
+    layout_type: checklist
+    check_items:
+      - { id: noLongerReason, label: 不再满足原因, type: select, options: [出售计划变更, 协议解除, 超出一年, 市场变化, 其他] }
+      - { id: reclassificationDate, label: 重分类日, type: date }
+      - { id: recoverableAmount, label: 可收回金额, type: number }
+      - { id: hypotheticalBookValue, label: 假设从未分类的账面价值, type: number }
+      - { id: measurementAmount, label: 按较低者计量金额, type: number }
+      - { id: adjustmentToProfit, label: 差额计入当期损益, type: number }
+      - { id: depreciationResumed, label: 后续是否恢复折旧/摊销, type: conclusion }
+      - { id: overallConclusion, label: 终止确认处理是否合规, type: conclusion }
+    highlights:
+      - { condition: "overallConclusion == '不合规'", style: red, tooltip: "不再满足处理不合规" }
+    integrations:
+      - voucher_sampling_engine: { mode: dialog }
+    ai_section: no-longer-eval

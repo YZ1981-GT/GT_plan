@@ -173,6 +173,10 @@ async def get_progress_stream(
 
     Requirements: 2.1-2.7
     支持多客户端同时订阅同一 execution_id。
+
+    TODO [zero-downtime-deployment Task 8.1]: 接入 sse_registry
+    - 进入 event_generator 时 register，退出时 unregister
+    - from app.core.sse_registry import sse_registry
     """
     queue: asyncio.Queue = asyncio.Queue(maxsize=100)
     subscribers = _get_subscribers(execution_id)
@@ -294,12 +298,17 @@ async def export_package(
     project = result.scalar_one_or_none()
     company_short = get_company_short_name(project) if project else "未知公司"
     zip_filename = sanitize_filename(f"{company_short}_{body.year}年度审计终稿.zip")
+    # 中文文件名需 RFC5987 编码（HTTP 头按 latin-1，直接放中文会 UnicodeEncodeError）
+    from urllib.parse import quote
+    ascii_name = zip_filename.encode("ascii", "ignore").decode() or "audit_package.zip"
+    utf8_name = quote(zip_filename, safe="")
+    disposition = f"attachment; filename=\"{ascii_name}\"; filename*=UTF-8''{utf8_name}"
 
     return StreamingResponse(
         output,
         media_type="application/zip",
         headers={
-            "Content-Disposition": f'attachment; filename="{zip_filename}"',
+            "Content-Disposition": disposition,
             "Content-Type": "application/zip",
         },
     )

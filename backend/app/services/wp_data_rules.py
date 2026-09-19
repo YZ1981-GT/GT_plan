@@ -286,17 +286,17 @@ async def _get_adjustment_details(
             Adjustment.project_id == project_id,
             Adjustment.year == year,
             Adjustment.is_deleted == sa.false(),
-            AdjustmentEntry.account_code.in_(account_codes),
+            AdjustmentEntry.standard_account_code.in_(account_codes),
         )
-        .order_by(Adjustment.entry_number)
+        .order_by(Adjustment.adjustment_no)
     )
     rows = result.all()
     return [
         {
-            "entry_number": adj.entry_number,
-            "entry_type": adj.entry_type,
+            "entry_number": adj.adjustment_no,
+            "entry_type": adj.adjustment_type.value if adj.adjustment_type else None,
             "description": adj.description or "",
-            "account_code": entry.account_code,
+            "account_code": entry.standard_account_code,
             "debit_amount": str(entry.debit_amount or 0),
             "credit_amount": str(entry.credit_amount or 0),
         }

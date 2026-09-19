@@ -18,51 +18,76 @@ from __future__ import annotations
 
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, File, HTTPException, Query, Request, UploadFile
+from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
 from fastapi.responses import StreamingResponse
-from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 import sqlalchemy as sa
 
-from app.core.config import settings
 from app.core.database import get_db
-from app.core.field_selection import parse_fields, DEFAULT_SUMMARY_FIELDS, BLOCKED_FIELDS
 from app.deps import require_project_access, check_consol_lock
-from app.models.ai_models import AIConfirmationStatus, AIContent
 from app.models.core import User
 from app.models.phase10_schemas import DownloadPackRequest
-from app.services.feature_flags import get_feature_maturity, is_enabled
-from app.services.wopi_service import WOPIHostService
 from app.services.working_paper_service import WorkingPaperService
+from app.services.project_audit_year import fetch_project_audit_year
 from app.services.wp_download_service import WpDownloadService, WpUploadService
 from app.models.workpaper_models import WpIndex, WpCrossRef, WorkingPaper, WpFileStatus
+
+# 共享请求模型已抽到 schemas/workpaper_requests.py（供子 router 复用，避免反向依赖）。
+# 此处 re-export 保持 `from app.routers.working_paper import UploadRequest` 等向后兼容。
+from app.schemas.workpaper_requests import (
+    UploadRequest,
+    StatusUpdateRequest,
+    AssignRequest,
+    ReviewStatusRequest,
+)
+
+# 在线编辑域端点已拆到 wp_editor_router.py（含 _prefill_word_template /
+# _push_representation_letter_date helper）。此处 re-export 保持
+# `from app.routers.working_paper import _push_representation_letter_date` 等向后兼容
+# （test_a16_cw76_sign_date.py 依赖）。
+from app.routers.wp_editor_router import (  # noqa: F401
+    _prefill_word_template,
+    _push_representation_letter_date,
+    save_univer_data,
+)
+
+# 复核+分配域端点已拆到 wp_review_router.py（含 _send_reassignment_notifications helper，
+# 随唯一调用方 assign_workpaper 同模块）。此处 re-export 保持
+# `from app.routers.working_paper import _send_reassignment_notifications` 等向后兼容
+# （test_reassignment_notifications.py 依赖）。
+from app.routers.wp_review_router import (  # noqa: F401
+    _send_reassignment_notifications,
+    assign_workpaper,
+    submit_review,
+    update_review_status,
+)
+
+# 批量+看板域端点已拆到 wp_batch_router.py（含 BatchAssignRequest / BatchSubmitRequest 模型）。
+# 此处 re-export 保持 `from app.routers.working_paper import batch_assign` 等向后兼容。
+from app.routers.wp_batch_router import (  # noqa: F401
+    BatchAssignRequest,
+    BatchSubmitRequest,
+    get_workpapers_kanban,
+    batch_assign,
+    batch_submit_review,
+    batch_export_zip,
+    get_edit_time,
+)
+
+# 关系/索引域端点已拆到 wp_relation_router.py。此处 re-export 保持
+# `from app.routers.working_paper import list_wp_index` 等向后兼容。
+from app.routers.wp_relation_router import (  # noqa: F401
+    list_wp_index,
+    list_wp_cross_refs,
+    get_cross_links,
+    get_wp_relation_graph,
+    sync_procedure_status,
+)
 
 router = APIRouter(
     prefix="/api/projects/{project_id}",
     tags=["working-papers"],
 )
-
-
-# ---------------------------------------------------------------------------
-# Request schemas
-# ---------------------------------------------------------------------------
-
-class UploadRequest(BaseModel):
-    recorded_version: int
-
-
-class StatusUpdateRequest(BaseModel):
-    status: str
-
-
-class AssignRequest(BaseModel):
-    assigned_to: UUID | None = None
-    reviewer: UUID | None = None
-
-
-class ReviewStatusRequest(BaseModel):
-    review_status: str
-    reason: str | None = None  # 退回时必填
 
 
 # ---------------------------------------------------------------------------
@@ -73,54 +98,98 @@ class ReviewStatusRequest(BaseModel):
 async def list_workpapers(
     project_id: UUID,
     audit_cycle: str | None = None,
-    status: str | None = None,
+    index_status: str | None = Query(None, description="索引层状态过滤（WpIndex.status）"),
+    file_status: str | None = Query(None, description="文件/编制层状态过滤（WorkingPaper.status）"),
     assigned_to: UUID | None = None,
-    fields: str | None = Query(None, description="逗号分隔的字段名，如 id,wp_code,status"),
+    page: int = Query(1, description="页码（正整数）；非法值在底稿查询前返回 422"),
+    page_size: int = Query(20, description="每页大小（1..100）；非法值在底稿查询前返回 422"),
+    sort: str = Query("wp_code", description="排序字段（已登记：wp_code/audit_cycle/index_status/file_status/created_at/updated_at）"),
+    sort_dir: str = Query("asc", description="排序方向 asc/desc"),
+    visibility_mode: str | None = Query(None, description="展示模式（仅 UX，不参与授权）"),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_project_access("readonly")),
 ):
-    """底稿列表（支持筛选，需项目成员权限）。自动按用户 scope_cycles 过滤。"""
-    # 获取用户的循环范围限制
-    scope_cycles = None
-    if current_user.role.value not in ("admin", "partner"):
-        from app.models.core import ProjectUser
-        pu = (await db.execute(
-            sa.select(ProjectUser.scope_cycles).where(
-                ProjectUser.project_id == project_id,
-                ProjectUser.user_id == current_user.id,
-                ProjectUser.is_deleted == False,
-            )
-        )).scalar()
-        if pu and isinstance(pu, str) and pu.strip():
-            scope_cycles = [c.strip() for c in pu.split(",") if c.strip()]
+    """底稿列表（服务端强制可见性 + 正式分页 / 状态拆分）。
 
-    svc = WorkingPaperService()
-    items = await svc.list_workpapers(
-        db=db,
-        project_id=project_id,
-        audit_cycle=audit_cycle,
-        status=status,
-        assigned_to=assigned_to,
-        scope_cycles=scope_cycles,
+    Feature: procedure-delegation-visibility-isolation · Task 8（组件 C13）。
+    - 授权只来自服务端角色分类 + scope + grants（``visibility_mode`` / 客户端身份不改变授权，
+      Req 12.1–12.3 / Property 15）。
+    - 固定 SQL 顺序：参数校验 → grants → 业务过滤 → 去重 → total/stats → 稳定排序 → 分页。
+    - 响应仅 ``{items,total,stats,page,page_size}``（Req 11.6）；拆 ``index_status``/``file_status``。
+    - 非法 page/page_size/sort 在底稿查询前返回 HTTP 422（Req 11.7）。
+    """
+    from app.services.wp_visibility import (
+        InvalidListParams,
+        VisibilityRoleClassifier,
+        WorkpaperListFilters,
+        WorkpaperListQueryService,
     )
 
-    # 字段选择：过滤返回字段
-    requested_fields = parse_fields(fields)
-    if requested_fields is not None:
-        # 移除屏蔽字段
-        allowed = requested_fields - BLOCKED_FIELDS
-        # 确保至少包含 id
-        allowed.add("id")
-        items = [
-            {k: v for k, v in item.items() if k in allowed}
-            for item in items
-        ]
-    else:
-        # 默认行为：使用默认摘要字段集排除大字段
-        # 保持向后兼容 — 现有返回字段不含 parsed_data，无需额外过滤
-        pass
+    context = await VisibilityRoleClassifier(db).classify(current_user, project_id)
+    svc = WorkpaperListQueryService(db)
+    try:
+        return await svc.list_workpapers(
+            context,
+            page=page,
+            page_size=page_size,
+            sort=sort,
+            sort_dir=sort_dir,
+            filters=WorkpaperListFilters(
+                audit_cycle=audit_cycle,
+                index_status=index_status,
+                file_status=file_status,
+                assigned_to=assigned_to,
+            ),
+        )
+    except InvalidListParams as exc:
+        # 非法分页/排序：在任何底稿数据查询之前返回 422（Req 11.7）
+        raise HTTPException(status_code=422, detail=str(exc))
 
-    return items
+
+@router.get("/my-lead-workpapers")
+async def list_my_lead_workpapers(
+    project_id: UUID,
+    audit_cycle: str | None = None,
+    index_status: str | None = Query(None),
+    file_status: str | None = Query(None),
+    page: int = Query(1),
+    page_size: int = Query(20),
+    sort: str = Query("wp_code"),
+    sort_dir: str = Query("asc"),
+    visibility_mode: str | None = Query(None, description="展示模式（仅 UX，不参与授权）"),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_project_access("readonly")),
+):
+    """我的主编底稿（MyLeadWorkpapers，组件 C13 / Req 11.12–11.13）。
+
+    仅返回当前用户作为 Workpaper_Lead（authoritative ``WorkingPaper.assigned_to``）的底稿；
+    与"我的程序任务"（assignee/reviewer）为两个独立身份视图，复用同一分页/去重/stats/排序契约。
+    响应仅 ``{items,total,stats,page,page_size}``；非法 page/page_size/sort → 422（先于底稿查询）。
+    """
+    from app.services.wp_visibility import (
+        InvalidListParams,
+        VisibilityRoleClassifier,
+        WorkpaperListFilters,
+        WorkpaperListQueryService,
+    )
+
+    context = await VisibilityRoleClassifier(db).classify(current_user, project_id)
+    svc = WorkpaperListQueryService(db)
+    try:
+        return await svc.list_lead_workpapers(
+            context,
+            page=page,
+            page_size=page_size,
+            sort=sort,
+            sort_dir=sort_dir,
+            filters=WorkpaperListFilters(
+                audit_cycle=audit_cycle,
+                index_status=index_status,
+                file_status=file_status,
+            ),
+        )
+    except InvalidListParams as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
 
 
 @router.post("/working-papers/download-pack")
@@ -130,12 +199,22 @@ async def download_workpaper_pack(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_project_access("readonly")),
 ):
+    # Wp_Bound_Gate（Task 4 / R3）：打包底稿正文前用可见集过滤 wp_ids
+    # （make_bulk_visible_filter）；不可见/跨项目/未委派/scope 外底稿静默剔除，
+    # 不泄露存在性，绝不进入 ZIP（manifest 只由可见集构建）。
+    from app.services.wp_visibility.entry_integration import make_bulk_visible_filter
+
+    _visible = make_bulk_visible_filter(
+        db, current_user, entrypoint="workpaper.detail", action="read_detail",
+        method="GET", entry_family="download",
+    )
+    visible_wp_ids = [wid for wid in body.wp_ids if await _visible(wid, None)]
     svc = WpDownloadService()
     try:
         buf = await svc.download_pack(
             db=db,
             project_id=project_id,
-            wp_ids=body.wp_ids,
+            wp_ids=visible_wp_ids,
             include_prefill=body.include_prefill,
         )
         return StreamingResponse(
@@ -155,6 +234,17 @@ async def get_workpaper(
     current_user: User = Depends(require_project_access("readonly")),
 ):
     """底稿详情（需项目成员权限）"""
+    from app.routers._wp_gate import enforce_wp_gate
+
+    # Wp_Bound_Gate：读取底稿详情正文之前完成授权判定（Req 8.1/8.5）。read_detail 只读族；
+    # 不可见/跨项目/越权/不存在统一 External_Not_Found（404）。无 project_id 时 gate 从 wp_id 反查。
+    await enforce_wp_gate(
+        db, current_user,
+        entrypoint="workpaper.detail", action="read_detail", method="GET",
+        wp_id=wp_id, project_id=project_id, entry_family="detail",
+        route_name="/api/projects/{project_id}/working-papers/{wp_id}",
+    )
+
     svc = WorkingPaperService()
     detail = await svc.get_workpaper(db=db, wp_id=wp_id, project_id=project_id)
     if detail is None:
@@ -162,273 +252,10 @@ async def get_workpaper(
     return detail
 
 
-@router.get("/working-papers/{wp_id}/online-session")
-async def get_online_edit_session(
-    project_id: UUID,
-    wp_id: UUID,
-    request: Request,
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_project_access("edit")),
-):
-    """获取在线编辑会话配置。
-
-    在线编辑使用 Univer 纯前端方案；此端点保留向后兼容。
-    """
-    wp_result = await db.execute(
-        sa.select(WorkingPaper.id).where(
-            WorkingPaper.id == wp_id,
-            WorkingPaper.project_id == project_id,
-            WorkingPaper.is_deleted == sa.false(),
-        )
-    )
-    if wp_result.scalar_one_or_none() is None:
-        raise HTTPException(status_code=404, detail="底稿不存在")
-
-    maturity = get_feature_maturity().get("online_editing", "pilot")
-    enabled = is_enabled("online_editing", project_id)
-    if not enabled:
-        return {
-            "enabled": False,
-            "maturity": maturity,
-            "preferred_mode": "offline",
-            "wopi_src": None,
-            "access_token": None,
-            "editor_base_url": None,
-        }
-
-    access_token = WOPIHostService.generate_access_token(
-        user_id=current_user.id,
-        project_id=project_id,
-        file_id=wp_id,
-    )
-    wopi_base_url = settings.WOPI_BASE_URL.rstrip("/")
-    wopi_src = f"{wopi_base_url}/files/{wp_id}?access_token={access_token}"
-
-    # 构造编辑器 URL（向后兼容，前端已使用 Univer）
-    onlyoffice_url = getattr(settings, "ONLYOFFICE_URL", "http://localhost:8080").rstrip("/")
-    editor_url = f"{onlyoffice_url}/hosting/wopi/cell/edit?WOPISrc={wopi_src}"
-
-    return {
-        "enabled": True,
-        "maturity": maturity,
-        "preferred_mode": "online",
-        "wopi_src": wopi_src,
-        "access_token": access_token,
-        "editor_url": editor_url,
-        "editor_base_url": str(request.base_url).rstrip("/"),
-        "onlyoffice_url": onlyoffice_url,
-    }
 
 
-@router.get("/working-papers/{wp_id}/univer-data")
-async def get_univer_data(
-    project_id: UUID,
-    wp_id: UUID,
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_project_access("readonly")),
-):
-    """获取底稿的 Univer IWorkbookData 格式数据（含所有 Sheet、样式、公式）"""
-    result = await db.execute(
-        sa.select(WorkingPaper).where(
-            WorkingPaper.id == wp_id,
-            WorkingPaper.project_id == project_id,
-            WorkingPaper.is_deleted == sa.false(),
-        )
-    )
-    wp = result.scalar_one_or_none()
-    if not wp:
-        raise HTTPException(status_code=404, detail="底稿不存在")
-
-    if not wp.file_path:
-        raise HTTPException(status_code=404, detail="底稿文件不存在")
-
-    from app.services.xlsx_to_univer import xlsx_to_univer_data
-    data = xlsx_to_univer_data(wp.file_path)
-    return data
 
 
-@router.post("/working-papers/{wp_id}/univer-save")
-async def save_univer_data(
-    project_id: UUID,
-    wp_id: UUID,
-    body: dict,
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_project_access("edit")),
-    _lock_check=Depends(check_consol_lock),
-):
-    """Univer 编辑器保存 — 完整保存链路
-
-    接收 Univer IWorkbookData snapshot，执行：
-    1. xlsx 回写（保留样式/公式/多Sheet）
-    2. parsed_data['univer_snapshot'] JSONB 落库（三式联动权威数据源）
-    3. 版本递增 + 审计留痕
-    4. 事件发布（触发五环联动）
-    5. 自动解析 parsed_data
-    """
-    import hashlib
-    import json
-    import shutil
-    from datetime import datetime, timezone
-    from pathlib import Path
-
-    snapshot = body.get("snapshot")
-    if not snapshot or not snapshot.get("sheets"):
-        raise HTTPException(status_code=400, detail="缺少 snapshot 数据")
-
-    result = await db.execute(
-        sa.select(WorkingPaper).where(
-            WorkingPaper.id == wp_id,
-            WorkingPaper.project_id == project_id,
-            WorkingPaper.is_deleted == sa.false(),
-        )
-    )
-    wp = result.scalar_one_or_none()
-    if not wp:
-        raise HTTPException(status_code=404, detail="底稿不存在")
-
-    # 需求 45.1/45.2：并发编辑版本冲突检测
-    expected_version = body.get("expected_version")
-    if expected_version is not None and wp.file_version != expected_version:
-        raise HTTPException(
-            status_code=409,
-            detail={
-                "error_code": "VERSION_CONFLICT",
-                "message": "底稿已被他人修改，请刷新后重试",
-                "server_version": wp.file_version,
-                "expected_version": expected_version,
-            },
-        )
-
-    if not wp.file_path:
-        raise HTTPException(status_code=400, detail="底稿文件路径为空")
-
-    fp = Path(wp.file_path)
-
-    # 1. 版本快照（保存前备份）
-    if fp.exists():
-        snapshot_dir = fp.parent / ".versions"
-        snapshot_dir.mkdir(exist_ok=True)
-        snapshot_name = f"{fp.stem}_v{wp.file_version}{fp.suffix}"
-        shutil.copy2(fp, snapshot_dir / snapshot_name)
-
-    # 2. xlsx 回写
-    from app.services.univer_to_xlsx import univer_data_to_xlsx
-    write_result = univer_data_to_xlsx(snapshot, str(fp))
-
-    # 3. [Req 6 单源化] structure.json 写入已移除
-    #    权威数据源 = parsed_data['univer_snapshot'] JSONB（步骤 5 写入）
-    #    三式联动读取路径已改为从 JSONB 解析，不再依赖 structure.json 文件
-
-    # 4. 哈希校验
-    content_hash = hashlib.sha256(fp.read_bytes()).hexdigest()
-
-    # 5. DB 更新（同时把 Univer snapshot 落到 parsed_data 供高级查询零计算读取，
-    #    snapshot 已含公式 + Univer 计算后的 v 值，按 sheet/row/col 精确索引）
-    old_version = wp.file_version
-    wp.file_version += 1
-    wp.updated_at = datetime.now(timezone.utc)
-    wp.prefill_stale = True
-    # 提取轻量化的 cellData（只保留 v 和 f，剥离样式 s 减小 JSONB 体积）
-    try:
-        from sqlalchemy.orm.attributes import flag_modified
-        from app.services.univer_snapshot_helper import build_slim_snapshot, merge_snapshot_incremental, SNAPSHOT_TOO_LARGE
-        existing = dict(wp.parsed_data) if isinstance(wp.parsed_data, dict) else {}
-        prev_snap = existing.get("univer_snapshot") if isinstance(existing.get("univer_snapshot"), dict) else None
-        # P0-1 + P0-2: slim 化 + 增量合并 + 体积保护
-        new_snap = build_slim_snapshot(snapshot, wp.file_version)
-        if new_snap is SNAPSHOT_TOO_LARGE:
-            # 单次保存的 sheet 太大（> 5MB / > 50K cells），降级只存元数据
-            existing["univer_snapshot"] = {
-                "sheets": {},
-                "sheet_order_names": list((snapshot.get("sheets") or {}).keys()),
-                "saved_at": datetime.now(timezone.utc).isoformat(),
-                "version": wp.file_version,
-                "skipped_reason": "single_save_too_large",
-            }
-        else:
-            existing["univer_snapshot"] = merge_snapshot_incremental(prev_snap, new_snap)
-        wp.parsed_data = existing
-        flag_modified(wp, "parsed_data")
-    except Exception as exc:
-        # snapshot 缓存失败不阻塞保存主流程，但要记录便于追查
-        import logging as _logging
-        _logging.getLogger(__name__).warning("univer_snapshot 落库失败 wp=%s: %s", wp_id, exc)
-    await db.flush()
-
-    # 6. 审计留痕
-    try:
-        from app.models.core import Log
-        log = Log(
-            user_id=current_user.id,
-            action_type="workpaper_univer_save",
-            object_type="working_paper",
-            object_id=wp_id,
-            new_value={
-                "old_version": old_version,
-                "new_version": wp.file_version,
-                "content_hash": content_hash,
-                "sheets": write_result.get("sheets", 0),
-                "cells": write_result.get("cells", 0),
-            },
-        )
-        db.add(log)
-        await db.flush()
-    except Exception:
-        pass
-
-    # 7. 事件发布（触发五环联动）
-    try:
-        import asyncio
-        from app.services.event_bus import event_bus
-        payload = {
-            "event_type": "WORKPAPER_SAVED",
-            "project_id": project_id,
-            "extra": {
-                "wp_id": str(wp_id),
-                "file_version": wp.file_version,
-                "trigger": "univer_save",
-                "content_hash": content_hash,
-            },
-        }
-        asyncio.create_task(event_bus.publish(payload))
-    except Exception:
-        pass
-
-    # 8. 自动解析（非阻塞）
-    try:
-        import asyncio
-        from app.services.prefill_engine import parse_workpaper_real
-
-        async def _auto_parse():
-            try:
-                from app.core.database import async_session
-                async with async_session() as parse_db:
-                    await parse_workpaper_real(parse_db, project_id, wp_id)
-                    await parse_db.commit()
-            except Exception:
-                pass
-
-        asyncio.create_task(_auto_parse())
-    except Exception:
-        pass
-
-    await db.commit()
-
-    # 获取索引信息
-    idx_result = await db.execute(
-        sa.select(WpIndex.wp_code).where(WpIndex.id == wp.wp_index_id)
-    )
-    wp_code = idx_result.scalar_one_or_none() or ""
-
-    return {
-        "success": True,
-        "version": wp.file_version,
-        "content_hash": content_hash,
-        "wp_code": wp_code,
-        "sheets": write_result.get("sheets", 0),
-        "cells": write_result.get("cells", 0),
-        "message": f"保存成功 v{wp.file_version}",
-    }
 
 
 @router.get("/working-papers/{wp_id}/download")
@@ -464,78 +291,65 @@ async def download_workpaper(
         raise HTTPException(status_code=404, detail=str(e))
 
 
-@router.get("/working-papers/{wp_id}/export-pdf")
-async def export_workpaper_pdf(
+# ─── A16 声明书专用端点（file-info / sign-status / onlyoffice-config） ──────
+
+
+@router.get("/working-papers/{wp_id}/file-info")
+async def get_workpaper_file_info(
     project_id: UUID,
     wp_id: UUID,
+    version: str | None = None,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_project_access("readonly")),
+    _user: User = Depends(require_project_access("readonly")),
 ):
-    """导出底稿为 PDF（使用 LibreOffice headless 转换）— 需求 16"""
-    import shutil
-    import subprocess
-    import tempfile
-    from pathlib import Path
-    from urllib.parse import quote
-    from fastapi import Response
-
-    # 1. 查底稿 + 校验文件存在
-    result = await db.execute(
+    """返回底稿文件信息 + 签发状态（A16 声明书用；optional version 按子码隔离）"""
+    wp = (await db.execute(
         sa.select(WorkingPaper).where(
             WorkingPaper.id == wp_id,
             WorkingPaper.project_id == project_id,
             WorkingPaper.is_deleted == sa.false(),
         )
-    )
-    wp = result.scalar_one_or_none()
-    if not wp or not wp.file_path:
+    )).scalar_one_or_none()
+    if not wp:
         raise HTTPException(status_code=404, detail="底稿不存在")
 
-    fp = Path(wp.file_path)
-    if not fp.exists():
-        raise HTTPException(status_code=404, detail=f"底稿文件不存在: {fp}")
+    # 签发状态从 field_overrides 读取（scope=word_template:A16, field=value）
+    from app.services.field_override_service import FieldOverrideService
+    from app.models.workpaper_models import WpIndex
 
-    # 2. LibreOffice 可用性检查
-    soffice = shutil.which("libreoffice") or shutil.which("soffice")
-    if soffice is None:
-        raise HTTPException(
-            status_code=500,
-            detail="LibreOffice 不可用，无法转换为 PDF。请在服务器安装 libreoffice 或 soffice。",
-        )
+    wp_index = (await db.execute(
+        sa.select(WpIndex.wp_code).where(WpIndex.id == wp.wp_index_id)
+    )).scalar_one_or_none()
+    wp_code = wp_index or ""
 
-    # 3. 使用临时目录作为输出目录（LibreOffice 不支持指定输出文件名，只支持 --outdir）
-    with tempfile.TemporaryDirectory(prefix="wp_pdf_") as tmpdir:
-        try:
-            proc = subprocess.run(
-                [soffice, "--headless", "--convert-to", "pdf", "--outdir", tmpdir, str(fp)],
-                capture_output=True,
-                timeout=60,
-            )
-        except subprocess.TimeoutExpired:
-            raise HTTPException(status_code=500, detail="PDF 转换超时（60s）")
-        if proc.returncode != 0:
-            raise HTTPException(
-                status_code=500,
-                detail=f"PDF 转换失败: {proc.stderr.decode('utf-8', errors='ignore')[:500]}",
-            )
+    svc = FieldOverrideService(db)
+    year_val = await fetch_project_audit_year(db, project_id) or 0
 
-        pdf_path = Path(tmpdir) / f"{fp.stem}.pdf"
-        if not pdf_path.exists():
-            raise HTTPException(status_code=500, detail="LibreOffice 未生成 PDF 文件")
+    sign_status = None
+    if year_val:
+        if version and wp_code == "A16":
+            scope = f"word_template:A16:{version}"
+        else:
+            scope = f"word_template:{wp_code}"
+        sign_status = await svc.get(project_id, year_val, scope, "sign_status", "value")
 
-        pdf_bytes = pdf_path.read_bytes()
+    return {
+        "file_name": wp.file_path.split("/")[-1] if wp.file_path else f"{version or wp_code} 声明书.docx",
+        "file_path": wp.file_path,
+        "file_version": wp.file_version,
+        "sign_status": sign_status or "pending",
+        "version": version,
+    }
 
-    # 4. 构造文件名（中文用 RFC 5987 编码）
-    display_name = f"{wp.wp_code or 'workpaper'}_{wp.wp_name or ''}.pdf".strip()
-    ascii_name = display_name.encode("ascii", "ignore").decode() or "workpaper.pdf"
-    utf8_name = quote(display_name, safe="")
-    disposition = f"attachment; filename=\"{ascii_name}\"; filename*=UTF-8''{utf8_name}"
 
-    return Response(
-        content=pdf_bytes,
-        media_type="application/pdf",
-        headers={"Content-Disposition": disposition},
-    )
+
+
+
+
+
+
+
+
 
 
 @router.post("/working-papers/{wp_id}/upload")
@@ -590,6 +404,46 @@ async def upload_workpaper_file(
         raise HTTPException(status_code=400, detail=str(e))
 
 
+@router.put("/working-papers/{wp_id}/parsed-data")
+async def update_parsed_data(
+    project_id: UUID,
+    wp_id: UUID,
+    payload: dict,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_project_access("edit")),
+):
+    """更新底稿 parsed_data（结构化组件数据持久化）。
+
+    合并语义：payload 会 shallow merge 到现有 parsed_data 上，
+    不覆盖 univer_snapshot 等其他键。
+    """
+    from sqlalchemy.orm.attributes import flag_modified
+    from app.routers._wp_gate import enforce_wp_gate
+
+    # Wp_Bound_Gate：写 parsed_data 前完成授权判定（Req 8.1/8.5）。save_parsed_data 内容写；
+    # reviewer/History_Only 被拒（矩阵与 grant 保证）。
+    await enforce_wp_gate(
+        db, current_user,
+        entrypoint="workpaper.parsed_data_write", action="save_parsed_data", method="PUT",
+        wp_id=wp_id, project_id=project_id, entry_family="save",
+        route_name="/api/projects/{project_id}/working-papers/{wp_id}/parsed-data",
+    )
+
+    wp = (await db.execute(
+        sa.select(WorkingPaper).where(WorkingPaper.id == wp_id, WorkingPaper.is_deleted == False)
+    )).scalar_one_or_none()
+    if not wp:
+        raise HTTPException(status_code=404, detail="底稿不存在")
+
+    existing = dict(wp.parsed_data) if isinstance(wp.parsed_data, dict) else {}
+    existing.update(payload)
+    wp.parsed_data = existing
+    flag_modified(wp, "parsed_data")
+    await db.flush()
+    await db.commit()
+    return {"ok": True}
+
+
 @router.put("/working-papers/{wp_id}/status")
 async def update_status(
     project_id: UUID,
@@ -604,6 +458,30 @@ async def update_status(
     编制状态流转由 WorkingPaperService.update_status 严格校验。
     提交复核请使用 POST /submit-review 专用端点（含4项门禁）。
     """
+    from app.routers._wp_gate import enforce_wp_gate
+
+    # Wp_Bound_Gate：file_status 迁移（写副作用）之前完成授权判定
+    # （Req 8.5 / status 入口族 / Part A 已把矩阵状态对齐真实 WpFileStatus）。
+    # source_state = 当前 file_status，target_state = 请求状态；仅 lead/admin/supervisor_scope
+    # 的完整允许项覆盖真实迁移，assignee/reviewer/History_Only 被拒；越权/不存在统一 404。
+    _cur = (
+        await db.execute(
+            sa.select(WorkingPaper.status).where(
+                WorkingPaper.id == wp_id,
+                WorkingPaper.project_id == project_id,
+                WorkingPaper.is_deleted == sa.false(),
+            )
+        )
+    ).scalar_one_or_none()
+    _src = (_cur.value if hasattr(_cur, "value") else str(_cur)) if _cur is not None else "none"
+    await enforce_wp_gate(
+        db, current_user,
+        entrypoint="workpaper.status_transition", action="status_transition",
+        method="POST", wp_id=wp_id, project_id=project_id, entry_family="status",
+        route_name="/api/projects/{project_id}/working-papers/{wp_id}/status",
+        source_state=_src, target_state=str(data.status),
+    )
+
     svc = WorkingPaperService()
     try:
         result = await svc.update_status(db=db, wp_id=wp_id, new_status=data.status, project_id=project_id)
@@ -611,943 +489,3 @@ async def update_status(
         return result
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
-
-
-# ---------------------------------------------------------------------------
-# 重新分配通知辅助函数
-# ---------------------------------------------------------------------------
-
-
-async def _send_reassignment_notifications(
-    db: AsyncSession,
-    project_id: UUID,
-    wp_id: UUID,
-    old_assignee_id: UUID,
-    new_assignee_id: UUID,
-) -> None:
-    """重新分配底稿后，通知原编制人和新编制人。
-
-    - 原编制人收到"底稿 {wp_code} 已被重新分配"
-    - 新编制人收到"项目「{project_name}」的底稿 {wp_code} 已转交给您"
-    """
-    import logging
-    from app.services.notification_service import NotificationService
-    from app.services.notification_types import ASSIGNMENT_CREATED, WORKPAPER_REMINDER
-    from app.models.core import Project
-
-    logger = logging.getLogger(__name__)
-    notif_svc = NotificationService(db)
-
-    # 获取底稿编号（wp_code）
-    wp_row = (await db.execute(
-        sa.select(WorkingPaper.wp_index_id).where(WorkingPaper.id == wp_id)
-    )).scalar_one_or_none()
-
-    wp_code = "未知底稿"
-    if wp_row:
-        idx_row = (await db.execute(
-            sa.select(WpIndex.wp_code).where(WpIndex.id == wp_row)
-        )).scalar_one_or_none()
-        if idx_row:
-            wp_code = idx_row
-
-    # 获取项目名称
-    project_name = (await db.execute(
-        sa.select(Project.name).where(Project.id == project_id)
-    )).scalar_one_or_none() or "未知项目"
-
-    # 通知原编制人："底稿 {wp_code} 已被重新分配"
-    await notif_svc.send_notification(
-        user_id=old_assignee_id,
-        notification_type=WORKPAPER_REMINDER,
-        title="底稿已被重新分配",
-        content=f"底稿 {wp_code} 已被重新分配给其他人员",
-        metadata={
-            "object_type": "working_paper",
-            "object_id": str(wp_id),
-            "project_id": str(project_id),
-        },
-    )
-
-    # 通知新编制人："项目「{project_name}」的底稿 {wp_code} 已转交给您"
-    await notif_svc.send_notification(
-        user_id=new_assignee_id,
-        notification_type=ASSIGNMENT_CREATED,
-        title="底稿已转交给您",
-        content=f"项目「{project_name}」的底稿 {wp_code} 已转交给您，请及时处理",
-        metadata={
-            "object_type": "working_paper",
-            "object_id": str(wp_id),
-            "project_id": str(project_id),
-        },
-    )
-
-    logger.info(
-        "[REASSIGN] wp=%s old=%s new=%s project=%s",
-        wp_id, old_assignee_id, new_assignee_id, project_id,
-    )
-
-
-@router.put("/working-papers/{wp_id}/assign")
-async def assign_workpaper(
-    project_id: UUID,
-    wp_id: UUID,
-    data: AssignRequest,
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_project_access("review")),
-    _lock_check=Depends(check_consol_lock),
-):
-    """分配编制人/复核人（需 review 权限）
-
-    重新分配时发送通知：
-    - 原编制人收到"底稿已被重新分配"
-    - 新编制人收到"项目 X 底稿 Y 已转交给您"
-    """
-    svc = WorkingPaperService()
-
-    # ── 记录原编制人（用于重新分配通知） ──
-    old_assigned_to: UUID | None = None
-    if data.assigned_to is not None:
-        wp_row = (await db.execute(
-            sa.select(WorkingPaper.assigned_to).where(
-                WorkingPaper.id == wp_id,
-                WorkingPaper.project_id == project_id,
-                WorkingPaper.is_deleted == sa.false(),
-            )
-        )).scalar_one_or_none()
-        old_assigned_to = wp_row  # 可能为 None（首次分配）
-
-    try:
-        result = await svc.assign_workpaper(
-            db=db, wp_id=wp_id, project_id=project_id,
-            assigned_to=data.assigned_to,
-            reviewer=data.reviewer,
-        )
-        await db.commit()
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-
-    # ── 重新分配通知（仅当 assigned_to 变更且原编制人存在时） ──
-    if (
-        data.assigned_to is not None
-        and old_assigned_to is not None
-        and old_assigned_to != data.assigned_to
-    ):
-        try:
-            await _send_reassignment_notifications(
-                db=db,
-                project_id=project_id,
-                wp_id=wp_id,
-                old_assignee_id=old_assigned_to,
-                new_assignee_id=data.assigned_to,
-            )
-            await db.commit()
-        except Exception:
-            # 通知发送失败不阻断主流程
-            pass
-
-    return result
-
-
-@router.post("/working-papers/{wp_id}/submit-review")
-async def submit_review(
-    project_id: UUID,
-    wp_id: UUID,
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_project_access("edit")),
-    _lock_check=Depends(check_consol_lock),
-):
-    """专用提交复核端点 — 统一校验 5 项门禁后流转复核状态
-
-    门禁：1.复核人已分配 2.QC阻断=0 3.未解决批注=0 4.AI未确认=0 5.open复核意见已回复
-    全部通过后：
-      - 编制状态 → under_review
-      - 复核状态 → pending_level1
-    """
-    wp_result = await db.execute(
-        sa.select(WorkingPaper).where(
-            WorkingPaper.id == wp_id,
-            WorkingPaper.project_id == project_id,
-            WorkingPaper.is_deleted == sa.false(),
-        )
-    )
-    wp = wp_result.scalar_one_or_none()
-    if not wp:
-        raise HTTPException(status_code=404, detail="底稿不存在")
-
-    # 只有 edit_complete 或 revision_required→edit_complete 后才能提交
-    if wp.status != WpFileStatus.edit_complete:
-        current_s = wp.status.value if wp.status else "unknown"
-        raise HTTPException(
-            status_code=400,
-            detail=f"当前编制状态 {current_s} 不允许提交复核，需先完成编制（edit_complete）",
-        )
-
-    # ── Phase 14: 统一门禁引擎评估 ──
-    try:
-        from app.services.gate_engine import gate_engine as _gate_engine
-        gate_result = await _gate_engine.evaluate(
-            db=db,
-            gate_type="submit_review",
-            project_id=project_id,
-            wp_id=wp_id,
-            actor_id=current_user.id,
-            context={"wp_status": wp.status, "year": getattr(wp, 'year', None)},
-        )
-        if gate_result.decision == "block":
-            return {
-                "status": "blocked",
-                "blocking_reasons": [
-                    f"[{h.rule_code}] {h.message}" for h in gate_result.hit_rules
-                    if h.severity == "blocking"
-                ],
-                "hit_rules": [
-                    {
-                        "rule_code": h.rule_code,
-                        "error_code": h.error_code,
-                        "severity": h.severity,
-                        "message": h.message,
-                        "location": h.location,
-                        "suggested_action": h.suggested_action,
-                    }
-                    for h in gate_result.hit_rules
-                ],
-                "can_submit": False,
-                "trace_id": gate_result.trace_id,
-            }
-    except Exception as _gate_err:
-        import logging
-        logging.getLogger(__name__).warning(f"[GATE] submit_review gate eval failed: {_gate_err}")
-        # 门禁引擎故障不阻断，降级走原有门禁逻辑
-
-    # ── Phase 14: SoD 职责分离校验 ──
-    try:
-        from app.services.sod_guard_service import sod_guard_service as _sod_svc
-        sod_result = await _sod_svc.check(
-            db=db,
-            project_id=project_id,
-            wp_id=wp_id,
-            actor_id=current_user.id,
-            target_role="reviewer",
-        )
-        if not sod_result.allowed:
-            raise HTTPException(status_code=403, detail={
-                "error_code": "SOD_CONFLICT_DETECTED",
-                "message": sod_result.conflict_type,
-                "policy_code": sod_result.policy_code,
-                "trace_id": sod_result.trace_id,
-            })
-    except HTTPException:
-        raise
-    except Exception as _sod_err:
-        import logging
-        logging.getLogger(__name__).warning(f"[SOD] submit_review sod check failed: {_sod_err}")
-
-    blocking_reasons = []
-
-    # 门禁 1：复核人已分配
-    if not wp.reviewer:
-        blocking_reasons.append("复核人未分配")
-
-    # 门禁 2：阻断级 QC 通过
-    from app.models.workpaper_models import WpQcResult
-    qc_result = await db.execute(
-        sa.select(WpQcResult).where(WpQcResult.working_paper_id == wp_id)
-        .order_by(WpQcResult.check_timestamp.desc()).limit(1)
-    )
-    qc = qc_result.scalar_one_or_none()
-    if qc is None:
-        blocking_reasons.append("未执行质量自检")
-    elif qc.blocking_count > 0:
-        blocking_reasons.append(f"存在 {qc.blocking_count} 个阻断级 QC 问题")
-
-    # 门禁 3：无未解决复核意见
-    try:
-        from app.models.phase10_models import CellAnnotation
-        ann_result = await db.execute(
-            sa.select(sa.func.count()).select_from(CellAnnotation).where(
-                CellAnnotation.project_id == project_id,
-                CellAnnotation.object_type == "workpaper",
-                CellAnnotation.object_id == wp_id,
-                CellAnnotation.status != "resolved",
-                CellAnnotation.is_deleted == sa.false(),
-            )
-        )
-        unresolved = ann_result.scalar() or 0
-        if unresolved > 0:
-            blocking_reasons.append(f"{unresolved} 条未解决复核意见")
-    except Exception:
-        pass
-
-    # 门禁 4：无未确认 AI 内容
-    ai_pending_result = await db.execute(
-        sa.select(sa.func.count()).select_from(AIContent).where(
-            AIContent.project_id == project_id,
-            AIContent.workpaper_id == wp_id,
-            AIContent.confirmation_status == AIConfirmationStatus.pending,
-            AIContent.is_deleted == sa.false(),
-        )
-    )
-    unconfirmed_ai_count = ai_pending_result.scalar() or 0
-    if unconfirmed_ai_count > 0:
-        blocking_reasons.append(f"{unconfirmed_ai_count} 项未确认的 AI 生成内容")
-
-    # 门禁 5：所有 open 状态的复核意见必须已被 replied
-    from app.models.workpaper_models import ReviewRecord, ReviewCommentStatus
-    open_unreplied = await db.execute(
-        sa.select(sa.func.count()).select_from(ReviewRecord).where(
-            ReviewRecord.working_paper_id == wp_id,
-            ReviewRecord.status == ReviewCommentStatus.open,
-            ReviewRecord.is_deleted == sa.false(),
-        )
-    )
-    unreplied_count = open_unreplied.scalar() or 0
-    if unreplied_count > 0:
-        blocking_reasons.append(f"{unreplied_count} 条复核意见未回复（状态仍为 open）")
-
-    if blocking_reasons:
-        return {
-            "status": "blocked",
-            "blocking_reasons": blocking_reasons,
-            "can_submit": False,
-        }
-
-    # 全部通过 → 流转复核状态
-    svc = WorkingPaperService()
-    try:
-        result = await svc.update_review_status(
-            db=db, wp_id=wp_id, new_review_status="pending_level1", project_id=project_id,
-        )
-        await db.commit()
-
-        # 自动同步程序状态（底稿提交复核→程序标记completed）
-        try:
-            from app.models.procedure_models import ProcedureInstance
-            wp_result = await db.execute(
-                sa.select(WpIndex.wp_code).where(WpIndex.id == (
-                    sa.select(WorkingPaper.wp_index_id).where(WorkingPaper.id == wp_id).scalar_subquery()
-                ))
-            )
-            wp_code_row = wp_result.scalar_one_or_none()
-            if wp_code_row:
-                await db.execute(
-                    sa.update(ProcedureInstance).where(
-                        ProcedureInstance.project_id == project_id,
-                        ProcedureInstance.wp_code == wp_code_row,
-                        ProcedureInstance.is_deleted == sa.false(),
-                    ).values(execution_status="completed")
-                )
-                await db.commit()
-        except Exception:
-            pass  # 程序联动失败不阻断提交
-
-        return {
-            "status": "submitted",
-            "can_submit": True,
-            "blocking_reasons": [],
-            "wp_status": result.get("status"),
-            "review_status": result.get("review_status"),
-        }
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-
-
-@router.put("/working-papers/{wp_id}/review-status")
-async def update_review_status(
-    project_id: UUID,
-    wp_id: UUID,
-    data: ReviewStatusRequest,
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_project_access("review")),
-    _lock_check=Depends(check_consol_lock),
-):
-    """更新底稿复核任务状态（需 review 权限）
-
-    复核人操作：
-      pending_level1 → level1_in_progress → level1_passed/level1_rejected
-      pending_level2 → level2_in_progress → level2_passed/level2_rejected
-    """
-    svc = WorkingPaperService()
-    try:
-        result = await svc.update_review_status(
-            db=db, wp_id=wp_id, new_review_status=data.review_status,
-            project_id=project_id, reason=data.reason,
-            rejected_by_id=current_user.id,
-        )
-        await db.commit()
-        return result
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-
-
-@router.post("/working-papers/{wp_id}/prefill")
-async def prefill_workpaper(
-    project_id: UUID,
-    wp_id: UUID,
-    year: int = 2025,
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_project_access("edit")),
-    _lock_check=Depends(check_consol_lock),
-):
-    """手动触发预填充（需编辑权限）— 真正打开 .xlsx 扫描公式并写入
-
-    使用 Redis 缓存优化：key=wp_id+tb_version，避免重复计算。
-    """
-    from app.services.prefill_engine import prefill_workpaper_real
-    from app.services.cache_service import CacheService
-    from app.core.redis import redis_client
-
-    # 计算 TB 版本标识（用于缓存 key）
-    tb_version = CacheService.compute_tb_version(project_id, year)
-    cache_svc = CacheService(redis_client)
-
-    # 尝试从缓存获取
-    cached = await cache_svc.get_prefill_cache(wp_id, tb_version)
-    if cached is not None and cached.get("status") == "ok":
-        return cached
-
-    # 缓存未命中，执行 prefill
-    result = await prefill_workpaper_real(db=db, project_id=project_id, year=year, wp_id=wp_id)
-    await db.commit()
-
-    # 写入缓存（仅成功结果）
-    if result.get("status") == "ok":
-        await cache_svc.set_prefill_cache(wp_id, tb_version, result)
-
-    return result
-
-
-@router.post("/working-papers/{wp_id}/parse")
-async def parse_workpaper(
-    project_id: UUID,
-    wp_id: UUID,
-    dry_run: bool = Query(False, description="仅预览解析结果，不写入 parsed_data"),
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_project_access("edit")),
-    _lock_check=Depends(check_consol_lock),
-):
-    """手动触发解析回写（需编辑权限）— 真正打开 .xlsx 提取关键数据
-
-    dry_run=true：仅返回解析预览，不写入 parsed_data（用于两步确认流程步骤1）
-    dry_run=false（默认）：解析并写入 parsed_data（用于步骤2用户确认后）
-    """
-    from app.services.prefill_engine import parse_workpaper_real
-    result = await parse_workpaper_real(db=db, project_id=project_id, wp_id=wp_id, dry_run=dry_run)
-    if not dry_run:
-        await db.commit()
-    return result
-
-
-# ---------------------------------------------------------------------------
-# WP Index & Cross-ref endpoints
-# ---------------------------------------------------------------------------
-
-@router.get("/wp-index")
-async def list_wp_index(
-    project_id: UUID,
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_project_access("readonly")),
-):
-    """底稿索引列表（需项目成员权限）"""
-    result = await db.execute(
-        sa.select(WpIndex)
-        .where(WpIndex.project_id == project_id, WpIndex.is_deleted == sa.false())
-        .order_by(WpIndex.wp_code)
-    )
-    items = result.scalars().all()
-    return [
-        {
-            "id": str(i.id),
-            "wp_code": i.wp_code,
-            "wp_name": i.wp_name,
-            "audit_cycle": i.audit_cycle,
-            "status": i.status.value if i.status else None,
-            "assigned_to": str(i.assigned_to) if i.assigned_to else None,
-            "reviewer": str(i.reviewer) if i.reviewer else None,
-        }
-        for i in items
-    ]
-
-
-@router.get("/wp-cross-refs")
-async def list_wp_cross_refs(
-    project_id: UUID,
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_project_access("readonly")),
-):
-    """交叉索引关系（需项目成员权限）"""
-    result = await db.execute(
-        sa.select(WpCrossRef)
-        .where(WpCrossRef.project_id == project_id)
-        .order_by(WpCrossRef.created_at)
-    )
-    items = result.scalars().all()
-    return [
-        {
-            "id": str(i.id),
-            "source_wp_id": str(i.source_wp_id),
-            "target_wp_code": i.target_wp_code,
-            "cell_reference": i.cell_reference,
-        }
-        for i in items
-    ]
-
-
-# ═══ 底稿看板视图 + 批量操作 + 编制时间 + 程序联动 ═══
-
-class BatchAssignRequest(BaseModel):
-    wp_ids: list[str]
-    assigned_to: UUID | None = None
-    reviewer: UUID | None = None
-
-
-class BatchSubmitRequest(BaseModel):
-    wp_ids: list[str]
-
-
-@router.get("/working-papers-kanban")
-async def get_workpapers_kanban(
-    project_id: UUID,
-    audit_cycle: str | None = Query(None),
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_project_access("readonly")),
-):
-    """底稿看板视图 — 按状态分组统计
-
-    返回4列看板数据：待编制 / 编制中 / 待复核 / 已通过
-    每列包含底稿列表（编号/名称/负责人/天数）
-    """
-    query = sa.select(WpIndex, WorkingPaper).outerjoin(
-        WorkingPaper, sa.and_(
-            WorkingPaper.wp_index_id == WpIndex.id,
-            WorkingPaper.is_deleted == sa.false(),
-        )
-    ).where(
-        WpIndex.project_id == project_id,
-        WpIndex.is_deleted == sa.false(),
-    )
-    if audit_cycle:
-        query = query.where(WpIndex.audit_cycle == audit_cycle)
-    query = query.order_by(WpIndex.wp_code)
-
-    result = await db.execute(query)
-    rows = result.all()
-
-    kanban = {
-        "not_started": [],   # 待编制
-        "in_progress": [],   # 编制中
-        "under_review": [],  # 待复核
-        "completed": [],     # 已通过
-    }
-
-    for idx_row, wp in rows:
-        status = wp.status.value if wp and wp.status else "not_started"
-        item = {
-            "wp_id": str(wp.id) if wp else None,
-            "wp_code": idx_row.wp_code,
-            "wp_name": idx_row.wp_name,
-            "audit_cycle": idx_row.audit_cycle,
-            "status": status,
-            "assigned_to": str(wp.assigned_to) if wp and wp.assigned_to else None,
-            "reviewer": str(wp.reviewer) if wp and hasattr(wp, 'reviewer') and wp.reviewer else None,
-        }
-
-        if status in ("not_started",):
-            kanban["not_started"].append(item)
-        elif status in ("draft", "edit_complete"):
-            kanban["in_progress"].append(item)
-        elif status in ("under_review", "review_level1", "review_level2"):
-            kanban["under_review"].append(item)
-        elif status in ("review_passed", "archived"):
-            kanban["completed"].append(item)
-        else:
-            kanban["in_progress"].append(item)
-
-    # 统计
-    stats = {k: len(v) for k, v in kanban.items()}
-    stats["total"] = sum(stats.values())
-    stats["completion_rate"] = round(stats["completed"] / max(stats["total"], 1) * 100, 1)
-
-    return {"kanban": kanban, "stats": stats}
-
-
-@router.post("/working-papers/batch-assign")
-async def batch_assign(
-    project_id: UUID,
-    data: BatchAssignRequest,
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_project_access("review")),
-):
-    """批量分配底稿（编制人/复核人）"""
-    updated = 0
-    for wp_id_str in data.wp_ids:
-        wp_id = UUID(wp_id_str)
-        result = await db.execute(
-            sa.select(WorkingPaper).where(WorkingPaper.id == wp_id, WorkingPaper.is_deleted == sa.false())
-        )
-        wp = result.scalar_one_or_none()
-        if not wp:
-            continue
-        if data.assigned_to is not None:
-            wp.assigned_to = data.assigned_to
-        if data.reviewer is not None:
-            wp.reviewer = data.reviewer
-        updated += 1
-
-    await db.flush()
-    await db.commit()
-    return {"updated": updated, "message": f"已批量分配 {updated} 个底稿"}
-
-
-@router.post("/working-papers/batch-submit")
-async def batch_submit_review(
-    project_id: UUID,
-    data: BatchSubmitRequest,
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_project_access("edit")),
-):
-    """批量提交复核（跳过不满足条件的底稿）"""
-    submitted = 0
-    skipped = []
-
-    for wp_id_str in data.wp_ids:
-        wp_id = UUID(wp_id_str)
-        result = await db.execute(
-            sa.select(WorkingPaper).where(WorkingPaper.id == wp_id, WorkingPaper.is_deleted == sa.false())
-        )
-        wp = result.scalar_one_or_none()
-        if not wp:
-            skipped.append({"wp_id": wp_id_str, "reason": "不存在"})
-            continue
-        if wp.status != WpFileStatus.edit_complete:
-            skipped.append({"wp_id": wp_id_str, "reason": f"状态为{wp.status.value}，需先完成编制"})
-            continue
-
-        # 简化门禁：检查复核人是否已分配
-        if not wp.reviewer:
-            skipped.append({"wp_id": wp_id_str, "reason": "未分配复核人"})
-            continue
-
-        wp.status = WpFileStatus.under_review
-        submitted += 1
-
-    await db.flush()
-    await db.commit()
-    return {"submitted": submitted, "skipped": skipped, "message": f"已提交 {submitted} 个，跳过 {len(skipped)} 个"}
-
-
-@router.post("/working-papers/batch-export")
-async def batch_export_zip(
-    project_id: UUID,
-    data: BatchSubmitRequest,  # 复用 wp_ids 字段
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_project_access("readonly")),
-):
-    """批量导出底稿为 ZIP"""
-    import io
-    import zipfile
-    from pathlib import Path
-
-    buffer = io.BytesIO()
-    with zipfile.ZipFile(buffer, 'w', zipfile.ZIP_DEFLATED) as zf:
-        for wp_id_str in data.wp_ids:
-            wp_id = UUID(wp_id_str)
-            result = await db.execute(
-                sa.select(WorkingPaper, WpIndex)
-                .join(WpIndex, WorkingPaper.wp_index_id == WpIndex.id)
-                .where(WorkingPaper.id == wp_id, WorkingPaper.is_deleted == sa.false())
-            )
-            row = result.first()
-            if not row:
-                continue
-            wp, idx = row
-            if wp.file_path:
-                fp = Path(wp.file_path)
-                if fp.exists():
-                    arcname = f"{idx.audit_cycle or 'OTHER'}/{idx.wp_code}.xlsx"
-                    zf.write(fp, arcname)
-
-    buffer.seek(0)
-    return StreamingResponse(
-        buffer,
-        media_type="application/zip",
-        headers={"Content-Disposition": f"attachment; filename=workpapers_{project_id}.zip"},
-    )
-
-
-@router.get("/working-papers/{wp_id}/edit-time")
-async def get_edit_time(
-    project_id: UUID,
-    wp_id: UUID,
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_project_access("readonly")),
-):
-    """获取底稿编制时间统计
-
-    从审计日志中提取编辑时间段（首次编辑→提交复核）。
-    """
-    from app.models.core import Log
-
-    # 查找该底稿的编辑相关日志
-    result = await db.execute(
-        sa.select(Log.created_at, Log.action).where(
-            sa.or_(
-                sa.and_(Log.action == "workpaper_online_open", Log.new_value.contains(str(wp_id))),
-                sa.and_(Log.action == "workpaper_online_save", Log.new_value.contains(str(wp_id))),
-            )
-        ).order_by(Log.created_at)
-    )
-    logs = result.all()
-
-    if not logs:
-        return {"wp_id": str(wp_id), "total_minutes": 0, "sessions": 0, "message": "无编辑记录"}
-
-    # 计算编辑时间（相邻 open-save 配对）
-    total_minutes = 0
-    sessions = 0
-    first_edit = logs[0][0] if logs else None
-    last_edit = logs[-1][0] if logs else None
-
-    # 简化计算：总时长 = 最后一次操作 - 第一次操作
-    if first_edit and last_edit and first_edit != last_edit:
-        diff = (last_edit - first_edit).total_seconds() / 60
-        total_minutes = round(diff, 1)
-        sessions = len([l for l in logs if l[1] == "workpaper_online_open"])
-
-    return {
-        "wp_id": str(wp_id),
-        "total_minutes": total_minutes,
-        "sessions": sessions,
-        "first_edit": first_edit.isoformat() if first_edit else None,
-        "last_edit": last_edit.isoformat() if last_edit else None,
-    }
-
-
-@router.get("/working-papers/{wp_id}/cross-links")
-async def get_cross_links(
-    project_id: UUID,
-    wp_id: UUID,
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_project_access("readonly")),
-):
-    """获取底稿间可点击的穿透链接
-
-    返回当前底稿引用的其他底稿列表（含跳转URL）。
-    基于 wp_account_mapping.json 的同循环关联 + 交叉索引。
-    """
-    from app.services.wp_data_rules import get_mapping_for_wp, _load_mapping
-
-    # 获取当前底稿信息
-    result = await db.execute(
-        sa.select(WpIndex).where(WpIndex.id == (
-            sa.select(WorkingPaper.wp_index_id).where(WorkingPaper.id == wp_id).scalar_subquery()
-        ))
-    )
-    idx = result.scalar_one_or_none()
-    if not idx:
-        return {"links": []}
-
-    wp_code = idx.wp_code
-    cycle = idx.audit_cycle
-
-    # 同循环的其他底稿
-    mappings = _load_mapping()
-    same_cycle = [m for m in mappings if m.get("cycle") == cycle and m.get("wp_code") != wp_code]
-
-    links = []
-    for m in same_cycle:
-        # 查找该底稿是否存在
-        target_result = await db.execute(
-            sa.select(WpIndex.id, WorkingPaper.id).outerjoin(
-                WorkingPaper, WorkingPaper.wp_index_id == WpIndex.id
-            ).where(
-                WpIndex.project_id == project_id,
-                WpIndex.wp_code == m["wp_code"],
-                WpIndex.is_deleted == sa.false(),
-            ).limit(1)
-        )
-        target = target_result.first()
-        links.append({
-            "wp_code": m["wp_code"],
-            "wp_name": m.get("wp_name", ""),
-            "exists": target is not None,
-            "wp_id": str(target[1]) if target and target[1] else None,
-            "jump_url": f"/projects/{project_id}/workpapers?code={m['wp_code']}",
-            "relation": "同循环关联",
-        })
-
-    # 审定表 ↔ 附注链接
-    mapping = get_mapping_for_wp(wp_code)
-    if mapping and mapping.get("note_section"):
-        links.append({
-            "wp_code": f"附注{mapping['note_section']}",
-            "wp_name": f"附注 {mapping['note_section']} {mapping.get('account_name', '')}",
-            "exists": True,
-            "jump_url": f"/projects/{project_id}/disclosure-notes?section={mapping['note_section']}",
-            "relation": "对应附注",
-        })
-
-    # 审定表 ↔ 报表行次链接
-    if mapping and mapping.get("report_row"):
-        links.append({
-            "wp_code": mapping["report_row"],
-            "wp_name": f"报表行次 {mapping['report_row']}",
-            "exists": True,
-            "jump_url": f"/projects/{project_id}/reports?row={mapping['report_row']}",
-            "relation": "对应报表",
-        })
-
-    return {"wp_code": wp_code, "links": links, "count": len(links)}
-
-
-@router.get("/working-papers/{wp_id}/relation-graph")
-async def get_wp_relation_graph(
-    project_id: UUID,
-    wp_id: UUID,
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_project_access("readonly")),
-):
-    """获取底稿关系图数据（基于 cross_wp_references.json）
-
-    返回当前底稿的上游（被引用）和下游（引用其他）关系，
-    用于 WorkpaperAuditNav 的关系图 SVG 渲染。
-    """
-    import json
-    from pathlib import Path
-
-    # 1. 获取当前底稿编号
-    result = await db.execute(
-        sa.select(WpIndex)
-        .join(WorkingPaper, WorkingPaper.wp_index_id == WpIndex.id)
-        .where(WorkingPaper.id == wp_id, WorkingPaper.is_deleted == sa.false())
-    )
-    idx = result.scalar_one_or_none()
-    if not idx:
-        return {"wp_code": "", "current": None, "upstream": [], "downstream": []}
-
-    wp_code = idx.wp_code
-    # 当前底稿 cycle 前缀（如 D2 → D, E1A → E, H1-13 → H）
-    cycle_prefix = wp_code[0] if wp_code else ""
-
-    # 2. 加载 cross_wp_references.json
-    cwr_path = Path(__file__).resolve().parents[2] / "data" / "cross_wp_references.json"
-    if not cwr_path.exists():
-        return {"wp_code": wp_code, "current": {"code": wp_code, "name": idx.wp_name}, "upstream": [], "downstream": []}
-
-    try:
-        cwr_data = json.loads(cwr_path.read_text(encoding="utf-8"))
-        all_refs = cwr_data.get("references", [])
-    except Exception:
-        return {"wp_code": wp_code, "current": {"code": wp_code, "name": idx.wp_name}, "upstream": [], "downstream": []}
-
-    # 3. 找上游（其他底稿是 source，本底稿是 target）
-    # 4. 找下游（本底稿是 source，其他底稿是 target）
-    # 匹配规则：wp_code 完全匹配，或 wp_code 是子表（如 D2 匹配 D2-1, D2-12）
-    def _matches(ref_code: str, my_code: str) -> bool:
-        if not ref_code or not my_code:
-            return False
-        return ref_code == my_code or ref_code.startswith(my_code + "-") or my_code.startswith(ref_code + "-")
-
-    upstream: dict[str, dict] = {}  # wp_code → {code, description}
-    downstream: dict[str, dict] = {}
-
-    for ref in all_refs:
-        src = ref.get("source_wp", "")
-        targets = ref.get("targets", [])
-        target_codes = [t.get("wp_code", "") for t in targets if t.get("wp_code")]
-        desc = ref.get("description", "")
-        severity = ref.get("severity", "info")
-
-        # 本底稿出现在 targets 中 → src 是上游
-        if any(_matches(tc, wp_code) for tc in target_codes) and src and src != wp_code:
-            if src not in upstream:
-                upstream[src] = {"code": src, "description": desc, "severity": severity}
-
-        # 本底稿是 source → targets 是下游
-        if _matches(src, wp_code):
-            for tc in target_codes:
-                if tc and tc != wp_code and tc not in downstream:
-                    downstream[tc] = {"code": tc, "description": desc, "severity": severity}
-
-    # 5. 查询数据库获取这些 wp_code 是否在项目中存在 + 取名称
-    all_codes = list(set(list(upstream.keys()) + list(downstream.keys())))
-    if all_codes:
-        idx_result = await db.execute(
-            sa.select(WpIndex.wp_code, WpIndex.wp_name).where(
-                WpIndex.project_id == project_id,
-                WpIndex.wp_code.in_(all_codes),
-                WpIndex.is_deleted == sa.false(),
-            )
-        )
-        existing = {row[0]: row[1] for row in idx_result.all()}
-        for code, info in upstream.items():
-            info["name"] = existing.get(code, "")
-            info["exists"] = code in existing
-        for code, info in downstream.items():
-            info["name"] = existing.get(code, "")
-            info["exists"] = code in existing
-
-    return {
-        "wp_code": wp_code,
-        "current": {"code": wp_code, "name": idx.wp_name, "cycle": cycle_prefix},
-        "upstream": sorted(upstream.values(), key=lambda x: x["code"]),
-        "downstream": sorted(downstream.values(), key=lambda x: x["code"]),
-    }
-
-
-@router.post("/working-papers/{wp_id}/sync-procedure")
-async def sync_procedure_status(
-    project_id: UUID,
-    wp_id: UUID,
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_project_access("edit")),
-    _lock_check=Depends(check_consol_lock),
-):
-    """底稿状态与审计程序联动
-
-    底稿提交复核时 → 对应程序实例标记为 completed
-    底稿退回时 → 对应程序实例标记为 in_progress
-    """
-    from app.models.procedure_models import ProcedureInstance
-
-    # 获取底稿编号
-    result = await db.execute(
-        sa.select(WorkingPaper, WpIndex)
-        .join(WpIndex, WorkingPaper.wp_index_id == WpIndex.id)
-        .where(WorkingPaper.id == wp_id, WorkingPaper.is_deleted == sa.false())
-    )
-    row = result.first()
-    if not row:
-        raise HTTPException(status_code=404, detail="底稿不存在")
-
-    wp, idx = row
-    wp_code = idx.wp_code
-    wp_status = wp.status.value if wp.status else "draft"
-
-    # 映射底稿状态到程序执行状态
-    if wp_status in ("under_review", "review_passed", "archived"):
-        exec_status = "completed"
-    elif wp_status in ("revision_required",):
-        exec_status = "in_progress"
-    elif wp_status in ("draft", "edit_complete"):
-        exec_status = "in_progress"
-    else:
-        exec_status = "not_started"
-
-    # 更新对应的程序实例
-    updated = await db.execute(
-        sa.update(ProcedureInstance).where(
-            ProcedureInstance.project_id == project_id,
-            ProcedureInstance.wp_code == wp_code,
-            ProcedureInstance.is_deleted == sa.false(),
-        ).values(execution_status=exec_status)
-    )
-
-    await db.flush()
-    await db.commit()
-    return {
-        "wp_code": wp_code,
-        "wp_status": wp_status,
-        "procedure_status": exec_status,
-        "updated": updated.rowcount,
-    }

@@ -1,0 +1,154 @@
+{
+  "title": "LinkageContract",
+  "description": "统一数据联动契约  描述审计平台中任意两个对象之间的数据引用关系",
+  "type": "object",
+  "required": [
+    "source_type",
+    "source_id",
+    "target_type",
+    "target_id",
+    "status",
+    "confidence"
+  ],
+  "properties": {
+    "source_type": {
+      "type": "string",
+      "enum": [
+        "trial_balance",
+        "ledger",
+        "audit_sheet",
+        "workpaper",
+        "adjustment",
+        "report",
+        "note",
+        "attachment",
+        "ai"
+      ],
+      "description": "来源对象类型"
+    },
+    "source_id": {
+      "type": "string",
+      "description": "来源对象 ID"
+    },
+    "source_cell": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "description": "来源单元格或字段"
+    },
+    "target_type": {
+      "type": "string",
+      "enum": [
+        "trial_balance",
+        "ledger",
+        "audit_sheet",
+        "workpaper",
+        "adjustment",
+        "report",
+        "note",
+        "attachment",
+        "ai"
+      ],
+      "description": "目标对象类型"
+    },
+    "target_id": {
+      "type": "string",
+      "description": "目标对象 ID"
+    },
+    "target_cell": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "description": "目标单元格或字段"
+    },
+    "amount": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "description": "Decimal 金额字符串"
+    },
+    "basis": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "description": "取数口径说明"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "current",
+        "stale",
+        "conflict",
+        "manual_override"
+      ],
+      "description": "联动状态"
+    },
+    "confidence": {
+      "type": "string",
+      "enum": [
+        "system",
+        "manual",
+        "ai_suggested",
+        "ai_confirmed"
+      ],
+      "description": "置信度"
+    },
+    "route": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "description": "前端可跳转路由"
+    },
+    "audit_log_id": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "description": "留痕 ID"
+    },
+    "conflict_id": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "description": "关联冲突记录 ID"
+    }
+  },
+  "examples": [
+    {
+      "source_type": "trial_balance",
+      "source_id": "tb-row-id",
+      "source_cell": "audited_amount",
+      "target_type": "workpaper",
+      "target_id": "wp-id",
+      "target_cell": "D12",
+      "amount": "123456.78",
+      "basis": "TB audited_amount  WP cell",
+      "status": "current",
+      "confidence": "system",
+      "route": "/projects/{pid}/workpapers/{wp_id}",
+      "audit_log_id": "log-id",
+      "conflict_id": null
+    },
+    {
+      "source_type": "workpaper",
+      "source_id": "wp-id",
+      "source_cell": "审定数",
+      "target_type": "note",
+      "target_id": "note-section-id",
+      "target_cell": "table-1.row-3.col-2",
+      "amount": "99999.00",
+      "basis": "WP 审定数  附注单元格",
+      "status": "stale",
+      "confidence": "system",
+      "route": "/projects/{pid}/disclosure-notes?section=note-section-id",
+      "audit_log_id": null,
+      "conflict_id": null
+    }
+  ]
+}

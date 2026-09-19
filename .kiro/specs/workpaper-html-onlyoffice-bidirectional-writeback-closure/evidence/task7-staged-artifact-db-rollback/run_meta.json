@@ -1,0 +1,93 @@
+{
+  "probe": "backend/scripts/diagnose/probe_task7_staged_artifact_boundaries.py",
+  "spec": "workpaper-html-onlyoffice-bidirectional-writeback-closure",
+  "task": 7,
+  "run_id": "20260824T163552Z-ded0a7",
+  "mode": "all",
+  "generated_at": "2026-08-24T16:35:55.403468+00:00",
+  "host": {
+    "platform": "Windows-10-10.0.19045-SP0",
+    "python": "3.12.8",
+    "repo_drive": "D:",
+    "temp_drive": "C:"
+  },
+  "probe_status": "ok",
+  "harness_errors": [],
+  "case_ids": [
+    "db1",
+    "db2",
+    "db3",
+    "db4",
+    "db5",
+    "db6",
+    "fs1",
+    "fs2",
+    "fs3",
+    "fs4",
+    "fs5",
+    "fs6",
+    "fs7",
+    "fs8"
+  ],
+  "case_status": {
+    "db1": "ok",
+    "db2": "ok",
+    "db3": "ok",
+    "db4": "ok",
+    "db5": "ok",
+    "db6": "ok",
+    "fs1": "ok",
+    "fs2": "ok",
+    "fs3": "ok",
+    "fs4": "ok",
+    "fs5": "ok",
+    "fs6": "ok",
+    "fs7": "ok",
+    "fs8": "ok"
+  },
+  "fs_meta": {
+    "seed_template": "backend/wp_templates/A/A31 审计标识一览表.xlsx",
+    "seed_sha256": "fd4d5d61b151d9b5e46eb38d632153f0362b49fd3bfa0221c8fe3591acb1e870",
+    "seed_sheet_names": [
+      "审计标识A31"
+    ],
+    "project_a": "0baed696-cd9e-4eea-9faa-d7a6cab48ab6",
+    "project_b": "cad11dcc-dfe3-499f-baee-efd72701b06d",
+    "wp_id": "b77602c8-9ad3-43af-9b8b-516a766204b9",
+    "entry_id": "A31.sheet1",
+    "work_root": "D:\\GT_plan\\tmp_task7_probe_20260824T163552Z-ded0a7",
+    "layout": {
+      "base": "D:\\GT_plan\\tmp_task7_probe_20260824T163552Z-ded0a7\\storage\\0baed696-cd9e-4eea-9faa-d7a6cab48ab6\\workpapers",
+      "staging": "D:\\GT_plan\\tmp_task7_probe_20260824T163552Z-ded0a7\\storage\\0baed696-cd9e-4eea-9faa-d7a6cab48ab6\\workpapers\\.staging",
+      "versions": "D:\\GT_plan\\tmp_task7_probe_20260824T163552Z-ded0a7\\storage\\0baed696-cd9e-4eea-9faa-d7a6cab48ab6\\workpapers\\.versions",
+      "incoming": "D:\\GT_plan\\tmp_task7_probe_20260824T163552Z-ded0a7\\storage\\0baed696-cd9e-4eea-9faa-d7a6cab48ab6\\workpapers\\.incoming",
+      "candidates": "D:\\GT_plan\\tmp_task7_probe_20260824T163552Z-ded0a7\\storage\\0baed696-cd9e-4eea-9faa-d7a6cab48ab6\\workpapers\\.upgrade-candidates"
+    }
+  },
+  "db_meta": {
+    "schema": "tmp_task7_probe_2e922c226dc4",
+    "database": "audit_platform",
+    "server_version": "PostgreSQL 16.14 (Debian 16.14-1.pgdg12+1) on x86_64-pc-linux-gnu, compiled by gcc (Debian 12.2.0-14+deb12u1) 12.2.0, 64-bit",
+    "baseline": {
+      "resolver": [
+        {
+          "artifact_sha256": "5a5ae459a566df1a360eeeaf9791aa5d980aded47d43f273e91e1113a1cdef70",
+          "relative_path": "storage/0baed696-cd9e-4eea-9faa-d7a6cab48ab6/workpapers/.versions/500916fb-ae4e-4352-876d-b8d618006c95/representations/A31.sheet1/000000001-5a5ae459a566.xlsx",
+          "artifact_state": "published",
+          "generation": 1,
+          "revision": 1
+        }
+      ],
+      "counts": {
+        "working_paper_artifact": 1,
+        "working_paper_content_version": 1,
+        "working_paper_content_representation": 1,
+        "working_paper_sync_entry_state": 1,
+        "working_paper_artifact_gc_audit": 0
+      },
+      "old_artifact_sha256": "5a5ae459a566df1a360eeeaf9791aa5d980aded47d43f273e91e1113a1cdef70",
+      "old_artifact_exists_on_disk": true
+    },
+    "sql_log_total": 134
+  }
+}

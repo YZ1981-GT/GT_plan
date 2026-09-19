@@ -93,6 +93,51 @@ async def stale_impact(
     return result
 
 
+@router.get("/impact-by-addr")
+async def stale_impact_by_addr(
+    addr_id: str = Query("", description="ACNR addr_id，如 D2/D2-2/E100"),
+    max_depth: int = Query(3, ge=1, le=10, description="最大 BFS 深度"),
+    project_id: str = Query(..., description="项目 ID"),
+    year: int = Query(0, description="年度（可选）"),
+    current_user: User = Depends(get_current_user),
+) -> dict[str, Any]:
+    """按 ACNR addr_id 查询下游影响（BFS 传播分析）。
+
+    addr_id 格式直通 StalePropagationEngine.on_change，执行 BFS 传播并返回
+    受影响 addr_id 列表。addr_id 缺失 → 400；引擎降级 → 503。
+    """
+    if not addr_id or not addr_id.strip():
+        raise HTTPException(status_code=400, detail="addr_id is required")
+
+    if stale_engine.is_degraded:
+        raise HTTPException(
+            status_code=503,
+            detail="Stale propagation engine is in degraded mode",
+        )
+
+    result = await stale_engine.on_change(
+        source_uri=addr_id,  # addr_id 格式直通
+        project_id=project_id,
+        year=year,
+    )
+
+    # 格式化响应
+    affected_list = []
+    for i, uri in enumerate(result.get("affected", [])):
+        affected_list.append({
+            "addr_id": uri,
+            "depth": min(i + 1, max_depth),  # 近似深度
+            "via_ref": None,
+            "match_type": "graph_edge",
+        })
+
+    return {
+        "addr_id": addr_id,
+        "total_affected": result.get("total", 0),
+        "affected": affected_list,
+    }
+
+
 @router.get("/graph")
 async def get_unified_graph(
     rebuild: bool = Query(False, description="是否强制重新构建"),
@@ -342,13 +387,14 @@ async def health_check(
 
 @router.get("/formula-usage")
 async def get_formula_usage(
-    formula_uri: str = Query(..., description="公式 URI，如 TB:1122::期末余额"),
+    formula_uri: str = Query(..., description="公式 URI 或 addr_id，如 TB:1122::期末余额 或 D2/D2-2/E100"),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> dict[str, Any]:
     """从公式找引用方：查询谁引用了指定 URI。
 
     使用 FormulaReverseIndex 查询反向索引，返回引用方列表。
+    支持 addr_id 格式（D2/D2-2/E100）和旧格式（WP:D2:明细表D2-2:E100）。
     """
     from app.services.formula_reverse_index import get_reverse_index
 
@@ -357,20 +403,34 @@ async def get_formula_usage(
     referencing_uris = index.query(formula_uri)
 
     # Parse each URI into structured reference info
+    # 支持 addr_id 格式和旧 colon 格式
     references = []
     for uri in referencing_uris:
-        parts = uri.split(":", 3)
-        module = parts[0] if len(parts) > 0 else ""
-        code = parts[1] if len(parts) > 1 else ""
-        sheet = parts[2] if len(parts) > 2 else ""
-        label = parts[3] if len(parts) > 3 else ""
-        references.append({
-            "uri": uri,
-            "module": module,
-            "code": code,
-            "sheet": sheet,
-            "label": label,
-        })
+        if "/" in uri and ":" not in uri:
+            # addr_id 格式: D2/D2-2/E100
+            addr_parts = uri.split("/")
+            references.append({
+                "uri": uri,
+                "addr_id": uri,
+                "module": "WP",
+                "code": addr_parts[0] if len(addr_parts) > 0 else "",
+                "sheet": addr_parts[1] if len(addr_parts) > 1 else "",
+                "label": addr_parts[2] if len(addr_parts) > 2 else "",
+            })
+        else:
+            # 旧格式或非 wp 域: TB:1122::期末余额
+            parts = uri.split(":", 3)
+            module = parts[0] if len(parts) > 0 else ""
+            code = parts[1] if len(parts) > 1 else ""
+            sheet = parts[2] if len(parts) > 2 else ""
+            label = parts[3] if len(parts) > 3 else ""
+            references.append({
+                "uri": uri,
+                "module": module,
+                "code": code,
+                "sheet": sheet,
+                "label": label,
+            })
 
     return {
         "uri": formula_uri,
@@ -497,14 +557,27 @@ async def get_cell_detail(
     index = await get_reverse_index(db=db)
     reverse_refs = index.query(cell_uri)
     for ref_uri in reverse_refs:
-        parts = ref_uri.split(":", 3)
-        ref_entry = {
-            "uri": ref_uri,
-            "module": parts[0] if len(parts) > 0 else "",
-            "code": parts[1] if len(parts) > 1 else "",
-            "sheet": parts[2] if len(parts) > 2 else "",
-            "label": parts[3] if len(parts) > 3 else "",
-        }
+        if "/" in ref_uri and ":" not in ref_uri:
+            # addr_id 格式
+            addr_parts = ref_uri.split("/")
+            ref_entry = {
+                "uri": ref_uri,
+                "addr_id": ref_uri,
+                "module": "WP",
+                "code": addr_parts[0] if len(addr_parts) > 0 else "",
+                "sheet": addr_parts[1] if len(addr_parts) > 1 else "",
+                "label": addr_parts[2] if len(addr_parts) > 2 else "",
+            }
+        else:
+            # 旧格式或非 wp 域
+            parts = ref_uri.split(":", 3)
+            ref_entry = {
+                "uri": ref_uri,
+                "module": parts[0] if len(parts) > 0 else "",
+                "code": parts[1] if len(parts) > 1 else "",
+                "sheet": parts[2] if len(parts) > 2 else "",
+                "label": parts[3] if len(parts) > 3 else "",
+            }
         # Avoid duplicates
         if ref_entry not in downstream:
             downstream.append(ref_entry)

@@ -15,6 +15,7 @@
       :project-id="projectId"
       :wp-id="wpId"
       @link-created="onLinkCreated"
+      @ocr-ready="onOcrReady"
     >
       <div class="gt-attach-tab__hint">
         <el-icon><Paperclip /></el-icon>
@@ -35,6 +36,23 @@
             <div class="gt-attach-tab__name" :title="att.file_name">{{ att.file_name }}</div>
             <div class="gt-attach-tab__meta">
               {{ humanSize(att.file_size) }} · {{ shortTime(att.created_at) }}
+              <!-- 关联底稿计数 badge -->
+              <el-popover
+                v-if="att._linked_wps && att._linked_wps.length > 1"
+                placement="bottom"
+                trigger="hover"
+                :width="200"
+              >
+                <template #reference>
+                  <span class="gt-attach-tab__link-badge">📋 ×{{ att._linked_wps.length }}</span>
+                </template>
+                <div class="gt-attach-tab__link-list">
+                  <div v-for="wp in att._linked_wps" :key="wp.wp_id" class="gt-attach-tab__link-item" @click.stop="jumpToWp(wp.wp_id)">
+                    <span class="gt-attach-tab__link-code">{{ wp.wp_code }}</span>
+                    <span class="gt-attach-tab__link-name">{{ wp.wp_name }}</span>
+                  </div>
+                </div>
+              </el-popover>
             </div>
           </div>
           <el-tag v-if="isOffice(att.file_name)" size="small" type="info" round>Office</el-tag>
@@ -43,16 +61,30 @@
     </AttachmentDropZone>
 
     <AttachmentPreviewDrawer v-model="drawerOpen" :attachment="selected" />
+
+    <!-- OCR 确认弹窗（底稿内上传同样走确认流程） -->
+    <OcrConfirmDialog
+      v-model="ocrDialogVisible"
+      :payload="ocrPayload"
+      @confirmed="onOcrConfirmed"
+      @rejected="onOcrRejected"
+    />
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, watch } from 'vue'
+import { ref, watch, onUnmounted } from 'vue'
+import { useRouter } from 'vue-router'
 import { Paperclip } from '@element-plus/icons-vue'
 import AttachmentDropZone from '@/components/workpaper/AttachmentDropZone.vue'
 import AttachmentPreviewDrawer, {
   type AttachmentForPreview,
 } from '@/components/common/AttachmentPreviewDrawer.vue'
+import {
+  LEGACY_CAPABILITIES,
+} from '@/components/attachment/preview/attachmentPreviewFormats'
+import OcrConfirmDialog from '@/components/attachment/OcrConfirmDialog.vue'
+import type { OcrConfirmPayload } from '@/components/attachment/OcrConfirmDialog.vue'
 import { api as httpApi } from '@/services/apiProxy'
 import { processRecord as P_pr, attachments as P_att } from '@/services/apiPaths'
 
@@ -62,6 +94,8 @@ interface AttachmentRow {
   file_size: number | null
   file_type: string | null
   created_at: string | null
+  ocr_status?: 'ok' | 'processing' | 'failed' | 'pending' | null
+  ocr_text?: string | null
 }
 
 const props = defineProps<{
@@ -69,12 +103,13 @@ const props = defineProps<{
   wpId: string
 }>()
 
+const router = useRouter()
 const list = ref<AttachmentRow[]>([])
 const loading = ref(false)
 const drawerOpen = ref(false)
 const selected = ref<AttachmentForPreview | null>(null)
 
-const OFFICE_EXTS = ['.doc', '.docx', '.xls', '.xlsx', '.ppt', '.pptx']
+const OFFICE_EXTS = LEGACY_CAPABILITIES.attachmentTab.office
 
 function getExt(name: string): string {
   const idx = name.lastIndexOf('.')
@@ -82,16 +117,17 @@ function getExt(name: string): string {
 }
 
 function isOffice(name: string): boolean {
-  return OFFICE_EXTS.includes(getExt(name))
+  return (OFFICE_EXTS as readonly string[]).includes(getExt(name))
 }
 
 function iconFor(name: string): string {
   const ext = getExt(name)
-  if (ext === '.pdf') return '📄'
-  if (['.png', '.jpg', '.jpeg', '.gif'].includes(ext)) return '🖼️'
-  if (['.doc', '.docx'].includes(ext)) return '📝'
-  if (['.xls', '.xlsx'].includes(ext)) return '📊'
-  if (['.ppt', '.pptx'].includes(ext)) return '📽️'
+  const groups = LEGACY_CAPABILITIES.attachmentTab.iconGroups
+  if ((groups.pdf as readonly string[]).includes(ext)) return '📄'
+  if ((groups.image as readonly string[]).includes(ext)) return '🖼️'
+  if ((groups.word as readonly string[]).includes(ext)) return '📝'
+  if ((groups.excel as readonly string[]).includes(ext)) return '📊'
+  if ((groups.ppt as readonly string[]).includes(ext)) return '📽️'
   return '📎'
 }
 
@@ -115,7 +151,16 @@ async function loadList() {
   loading.value = true
   try {
     const data: any = await httpApi.get(P_pr.attachments(props.projectId, props.wpId))
-    list.value = Array.isArray(data) ? data : data?.items || []
+    const items = Array.isArray(data) ? data : data?.items || []
+    // 加载每个附件的关联底稿列表（批量）
+    for (const att of items) {
+      att._linked_wps = []
+      try {
+        const linked: any = await httpApi.get(P_pr.attachmentWorkpapers(att.id))
+        att._linked_wps = Array.isArray(linked) ? linked : linked?.items || []
+      } catch { /* 单个失败不阻塞 */ }
+    }
+    list.value = items
   } catch {
     list.value = []
   } finally {
@@ -123,13 +168,21 @@ async function loadList() {
   }
 }
 
+function jumpToWp(wpId: string) {
+  if (wpId) {
+    router.push(`/projects/${props.projectId}/workpapers/${wpId}`)
+  }
+}
+
 function onPreview(att: AttachmentRow) {
   selected.value = {
     id: att.id,
     name: att.file_name,
-    mime_type: att.file_type || '',
+    type_hint: att.file_type || '',
     preview_url: P_att.preview(att.id),
     download_url: P_att.download(att.id),
+    ocr_status: att.ocr_status || undefined,
+    ocr_text: att.ocr_text || undefined,
   }
   drawerOpen.value = true
 }
@@ -138,11 +191,74 @@ function onLinkCreated() {
   loadList()
 }
 
+// ─── OCR 确认弹窗 ───
+const ocrDialogVisible = ref(false)
+const ocrPayload = ref<OcrConfirmPayload | null>(null)
+
+function onOcrReady(payload: { attachmentId: string; fileName: string; fileType: string; ocrText: string; confidence?: number }) {
+  ocrPayload.value = {
+    attachmentId: payload.attachmentId,
+    fileName: payload.fileName,
+    fileType: payload.fileType,
+    previewUrl: P_att.preview(payload.attachmentId),
+    ocrText: payload.ocrText,
+    confidence: payload.confidence,
+  }
+  ocrDialogVisible.value = true
+}
+
+function onOcrConfirmed() {
+  loadList()
+}
+
+function onOcrRejected() {
+  // 用户放弃，不影响列表（附件已上传已关联，仅 OCR 文本不入库）
+}
+
 watch(
   () => [props.projectId, props.wpId],
   () => loadList(),
   { immediate: true },
 )
+
+// #4: OCR 状态轮询 — processing 状态的附件每 5s 检查一次直到完成
+let _ocrPollTimer: ReturnType<typeof setInterval> | null = null
+
+function _startOcrPolling() {
+  _stopOcrPolling()
+  const hasPending = list.value.some((a: any) => a.ocr_status === 'processing' || a.ocr_status === 'pending')
+  if (!hasPending) return
+  _ocrPollTimer = setInterval(async () => {
+    const pending = list.value.filter((a: any) => a.ocr_status === 'processing' || a.ocr_status === 'pending')
+    if (!pending.length) { _stopOcrPolling(); return }
+    // 逐个检查更新（轻量 GET）
+    let anyUpdated = false
+    for (const att of pending) {
+      try {
+        const detail: any = await httpApi.get(`/api/attachments/${att.id}`, { _silent: true } as any)
+        if (detail?.ocr_status && detail.ocr_status !== (att as any).ocr_status) {
+          ;(att as any).ocr_status = detail.ocr_status
+          ;(att as any).ocr_text = detail.ocr_text
+          anyUpdated = true
+        }
+      } catch { /* 单个轮询失败不阻塞 */ }
+    }
+    if (anyUpdated) {
+      // 全部完成则停止轮询
+      const stillPending = list.value.some((a: any) => a.ocr_status === 'processing' || a.ocr_status === 'pending')
+      if (!stillPending) _stopOcrPolling()
+    }
+  }, 5000)
+}
+
+function _stopOcrPolling() {
+  if (_ocrPollTimer) { clearInterval(_ocrPollTimer); _ocrPollTimer = null }
+}
+
+onUnmounted(() => _stopOcrPolling())
+
+// loadList 完成后启动轮询
+watch(list, () => _startOcrPolling(), { deep: false })
 </script>
 
 <style scoped>
@@ -180,5 +296,37 @@ watch(
 .gt-attach-tab__meta {
   font-size: var(--gt-font-size-xs);
   color: var(--gt-color-text-tertiary);
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }
+.gt-attach-tab__link-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0 6px;
+  border-radius: 10px;
+  background: var(--gt-purple-light, #f4f0fa);
+  color: var(--gt-purple, #4b2d77);
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.gt-attach-tab__link-badge:hover {
+  background: var(--gt-purple, #4b2d77);
+  color: #fff;
+}
+.gt-attach-tab__link-list { display: flex; flex-direction: column; gap: 4px; }
+.gt-attach-tab__link-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 4px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.gt-attach-tab__link-item:hover { background: var(--gt-color-primary-bg, #f4f0fa); }
+.gt-attach-tab__link-code { font-weight: 600; font-size: 12px; color: var(--gt-purple, #4b2d77); }
+.gt-attach-tab__link-name { font-size: 11px; color: var(--gt-color-text-tertiary); }
 </style>

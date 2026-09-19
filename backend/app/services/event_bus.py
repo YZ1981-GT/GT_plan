@@ -33,8 +33,50 @@ EventHandler = Callable[[EventPayload], Coroutine[Any, Any, None]]
 
 # Redis Stream 配置
 _STREAM_KEY = "audit:events"
+#: 公开别名。**replay 读取方必须与写入方同一个键。**
+#:
+#: spec workpaper-html-onlyoffice-bidirectional-writeback-closure · Task 35：
+#: `GET /api/projects/{pid}/events/since` 原来自己写死了 `"events:stream"`，而写入侧
+#: 一直是 `"audit:events"` —— 那个 replay 端点读的是一条**没有任何写入方**的 stream，
+#: 因此断线补拉恒返回空列表。两处各写一份字面量正是这类缺陷的成因，故这里给出唯一真源。
+EVENT_STREAM_KEY = _STREAM_KEY
 _STREAM_MAX_LEN = 10000  # 保留最近 1 万条事件
+#: Requirement 13.2 / Property 53：整份 EventPayload 的 canonical JSON。
+#:
+#: 旧实现只往 Stream 写 event_type/project_id/year/account_codes 四个扁平字段，
+#: ``extra``（wp_id / revision / operation_id / source / adapter_id /
+#: artifact_sha256）与 batch_id / entry_group_id 在**写入这一步**就已经蒸发，replay
+#: 侧再怎么读也重建不出来 —— 所以修点在写入侧，不在 replay 侧。扁平字段保留，让
+#: 本次改动之前已经躺在 Stream 里的旧条目仍可降级重建。
+_STREAM_PAYLOAD_FIELD = "payload_json"
 _CONSUMER_GROUP = "event_handlers"
+
+
+def serialize_payload_for_stream(payload: EventPayload) -> str:
+    """把整份 ``EventPayload`` 序列化成 Redis Stream 字段值（Requirement 13.2）。
+
+    纯函数、无 Redis 依赖，便于守卫直接做 round-trip 断言。UUID / Enum 由 pydantic
+    自己按 JSON 模式序列化，因此 ``project_id`` / ``batch_id`` / ``entry_group_id``
+    与 ``extra`` 内嵌的值都能原样回来。
+    """
+    return payload.model_dump_json()
+
+
+def deserialize_payload_from_stream(data: dict[str, Any]) -> EventPayload:
+    """从 Stream 条目重建 ``EventPayload``。
+
+    优先读 :data:`_STREAM_PAYLOAD_FIELD`（本次改动后写入的完整 payload）；缺失时按旧
+    扁平字段降级重建 —— 那些条目本来就没有 ``extra``，降级不会"丢"任何已存在的东西。
+    """
+    raw = data.get(_STREAM_PAYLOAD_FIELD)
+    if raw:
+        return EventPayload.model_validate_json(raw)
+    return EventPayload(
+        event_type=EventType(data.get("event_type", "")),
+        project_id=data.get("project_id") or None,
+        year=int(data["year"]) if data.get("year") else None,
+        account_codes=json.loads(data.get("account_codes", "[]")) or None,
+    )
 
 
 class EventBus:
@@ -55,6 +97,9 @@ class EventBus:
             "success_count": 0,
             "failed_count": 0,
             "acked_count": 0,
+            # 与 replay_pending_events 的 report 保持同一形状：首次重放之前 /metrics
+            # 也会读这个字典，缺键会直接 KeyError。
+            "dropped_unparseable_count": 0,
             "last_error": None,
         }
 
@@ -250,6 +295,8 @@ class EventBus:
                 "project_id": str(payload.project_id) if payload.project_id else "",
                 "year": str(payload.year) if payload.year else "",
                 "account_codes": json.dumps(payload.account_codes) if payload.account_codes else "[]",
+                # Requirement 13.2 / Property 53：typed replay 必须原样保留整份 payload。
+                _STREAM_PAYLOAD_FIELD: serialize_payload_for_stream(payload),
             }
             await redis.xadd(_STREAM_KEY, event_data, maxlen=_STREAM_MAX_LEN)
         except Exception as e:
@@ -268,6 +315,9 @@ class EventBus:
             "success_count": 0,
             "failed_count": 0,
             "acked_count": 0,
+            # Requirement 13.9：无法解析而被 ACK 跳过的条目必须可观测。旧实现把它们
+            # 直接 xack 丢掉且只并入 failed_count，运维看不出"事件被丢弃"这件事。
+            "dropped_unparseable_count": 0,
             "last_error": None,
         }
         redis = await self._get_redis()
@@ -296,13 +346,8 @@ class EventBus:
                 for msg_id, data in entries:
                     report["read_count"] += 1
                     try:
-                        event_type = EventType(data.get("event_type", ""))
-                        payload = EventPayload(
-                            event_type=event_type,
-                            project_id=data.get("project_id") or None,
-                            year=int(data["year"]) if data.get("year") else None,
-                            account_codes=json.loads(data.get("account_codes", "[]")) or None,
-                        )
+                        payload = deserialize_payload_from_stream(data)
+                        event_type = payload.event_type
                         # 直接分发，不再持久化（避免循环）
                         handlers = self._handlers.get(event_type, [])
                         for handler in handlers:
@@ -318,8 +363,17 @@ class EventBus:
                         count += 1
                     except Exception as item_exc:
                         report["failed_count"] += 1
+                        report["dropped_unparseable_count"] += 1
                         report["last_error"] = str(item_exc)
-                        # 无法解析的消息直接 ACK 跳过
+                        # 仍然 ACK：不 ACK 会让 consumer group 队头永久阻塞。但必须记
+                        # ERROR + 单独计数，否则"事件被丢弃"这件事在日志和 /metrics 里
+                        # 都不可见（Requirement 13.9）。
+                        logger.error(
+                            "EventBus: 丢弃无法解析的 Stream 条目 msg_id=%s fields=%s: %s",
+                            msg_id,
+                            sorted(data.keys()) if isinstance(data, dict) else type(data).__name__,
+                            item_exc,
+                        )
                         await redis.xack(_STREAM_KEY, _CONSUMER_GROUP, msg_id)
                         report["acked_count"] += 1
 

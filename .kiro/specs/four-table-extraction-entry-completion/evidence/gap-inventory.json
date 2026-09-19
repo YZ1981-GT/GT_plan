@@ -1,0 +1,284 @@
+{
+  "artifact": "gap-inventory.json",
+  "spec": "four-table-extraction-entry-completion",
+  "task": "Task 1 — 缺口清册（结构性推导）",
+  "generated_by": "manual structural derivation (read-only)",
+  "generated_at_note": "Snapshot digests below are the freshness gate for all downstream tasks (Requirement 1.6).",
+  "requirements_covered": [
+    "1.1",
+    "1.2",
+    "1.3",
+    "1.4",
+    "1.5",
+    "1.6",
+    "5.4"
+  ],
+  "derivation_method": {
+    "host_enumeration": "Mounted hosts derived structurally from htmlRendererRegistry barrel (registry/entries/{core,forms,reports,programs,confirmations,specialized}.ts) — the explicit HtmlRendererEntry[] arrays are membership itself (no startsWith classifier). wp_code→componentType via backend/app/data/wp_code_overrides.json (_WP_CODE_OVERRIDE). NO grep of button text / page counts was used to enumerate candidates.",
+    "endpoint_enumeration": "Backend aux endpoints enumerated from backend/app/security/wp_bound_entry_coverage.json (reconcile_ledger inventory) by matching route == /api/workpapers/{wp_id}/{x}/import-aux-balance. Exactly 8 present: d1,d3,d5,d6,d7,f1,g7,k1.",
+    "capability_tuple": "A detail table is judged 'four-table-capable' only if ALL THREE hold: (T1) report line resolves account-code prefixes via ReportLineAccountSpec / equivalent report mapping (report_line_accounts.resolve_report_line_accounts); (T2) that account has real four-table data in tb_aux_balance for the aux (往来单位/维度) grain; (T3) the detail table has a carriable row structure (store item_id + fields).",
+    "button_probe_note": "Button presence was read from .vue toolbars ONLY to fill the 'frontend button' column of an already-derived host — never to decide candidacy."
+  },
+  "source_snapshot": {
+    "note": "Downstream tasks MUST recompute these sha256 digests and abort if any drifts (Requirement 1.6). aggregate_digest = sha256 over the concatenation of per-file 'sha256:size:relpath' lines in the order listed.",
+    "files": [
+      {
+        "path": "audit-platform/frontend/src/components/workpaper/registry/entries/forms.ts",
+        "sha256": "961be1df1836c2dc48de3f3eb36eef0c2a79a6308ffe7538fc698c2c51d05c34",
+        "size": 3213
+      },
+      {
+        "path": "audit-platform/frontend/src/components/workpaper/registry/entries/specialized.ts",
+        "sha256": "b27cd92661f5fe804d85f7c29d62a3584ebcc8714af8e32c68e7252b80b4ab2b",
+        "size": 25520
+      },
+      {
+        "path": "backend/app/data/wp_code_overrides.json",
+        "sha256": "ecb63b62f82c7d1eb563a6c0f8f1a3a031e5f53bd6601f4dfa476fc51d3c9394",
+        "size": 54190
+      },
+      {
+        "path": "backend/app/security/wp_bound_entry_coverage.json",
+        "sha256": "1392d1a5175b05f55fee0f4257e12d963ee9598b5eb45191896ff7b8c2a15bdc",
+        "size": 1456197
+      },
+      {
+        "path": "backend/app/services/four_table/aux_aggregation.py",
+        "sha256": "e03009840c952f7bf7319d9567eed3f8c022806f1bf4bdc13add657f942198c1",
+        "size": 7809
+      }
+    ],
+    "aggregate_digest": "sha256:da5aeae67f2edbb333d6449061f18c09e13de59d813bcda8c52f3a176c0b3651"
+  },
+  "backend_aux_endpoints_baseline": {
+    "count": 8,
+    "routes": [
+      "/api/workpapers/{wp_id}/d1/import-aux-balance",
+      "/api/workpapers/{wp_id}/d3/import-aux-balance",
+      "/api/workpapers/{wp_id}/d5/import-aux-balance",
+      "/api/workpapers/{wp_id}/d6/import-aux-balance",
+      "/api/workpapers/{wp_id}/d7/import-aux-balance",
+      "/api/workpapers/{wp_id}/f1/import-aux-balance",
+      "/api/workpapers/{wp_id}/g7/import-aux-balance",
+      "/api/workpapers/{wp_id}/k1/import-aux-balance"
+    ],
+    "source": "wp_bound_entry_coverage.json (family=import)",
+    "d2_note": "There is NO /api/workpapers/{wp_id}/d2/import-aux-balance route (confirms DEC-2 premise)."
+  },
+  "gap_type_legend": {
+    "G-A": "Backend endpoint EXISTS + frontend manual button ABSENT → only add frontend entry.",
+    "G-B": "Backend endpoint ABSENT + four-table-capable → add both endpoint (via shared aux_aggregation) + button.",
+    "G-C": "Both sides present but implementation violates the 3 铁律 (active-dataset filter / single aux_type lock / account prefix from report mapping) → migrate to shared component.",
+    "G-D": "Evaluated NOT suitable for aux extraction (no source column / data only in journal / no aux dimension) → register reason only, touch no code."
+  },
+  "inventory": [
+    {
+      "wp_code": "D1",
+      "host_component": "D1TabDetailCustomer.vue (child of GtD1NotesReceivable, componentType d1-notes-receivable)",
+      "store_item_id": "D1-2 detail rows (useD1DetailCustomer)",
+      "existing_entry": {
+        "backend_endpoint": true,
+        "frontend_button": true,
+        "autoseed": false
+      },
+      "endpoint": "/api/workpapers/{wp_id}/d1/import-aux-balance",
+      "gap_type": "COMPLIANT (baseline correct paradigm)",
+      "capability_tuple": {
+        "T1_account_resolvable": true,
+        "T2_real_db_data": "expected (票据/往来 grain)",
+        "T3_carriable_rows": true
+      },
+      "notes": "Listed in requirements as one of the 8 correct-paradigm endpoints. Not a gap. useD1DetailCustomer.importFromAuxBalance() = manual (手工优先 merge)."
+    },
+    {
+      "wp_code": "F1",
+      "host_component": "F1TabDetail.vue (child of GtF1Prepayment, componentType f1-prepayment)",
+      "store_item_id": "F1-det-rows",
+      "existing_entry": {
+        "backend_endpoint": true,
+        "frontend_button": true,
+        "autoseed": true
+      },
+      "endpoint": "/api/workpapers/{wp_id}/f1/import-aux-balance",
+      "gap_type": "COMPLIANT (canonical paradigm)",
+      "capability_tuple": {
+        "T1_account_resolvable": true,
+        "T2_real_db_data": "yes (BS-008/1123)",
+        "T3_carriable_rows": true
+      },
+      "notes": "F1_REPORT_LINE_SPEC(BS-008, fallback 1123). Has AutoSeed (useF1DetailAutoSeed) AND manual button — the reference for Requirement 4.5."
+    },
+    {
+      "wp_code": "G7",
+      "host_component": "G7TabDetail.vue (child of GtG7LongTermEquityMain, componentType g7-long-term-equity-main)",
+      "store_item_id": "G7 detail rows (g7AuxExtraction)",
+      "existing_entry": {
+        "backend_endpoint": true,
+        "frontend_button": true,
+        "autoseed": false
+      },
+      "endpoint": "/api/workpapers/{wp_id}/g7/import-aux-balance",
+      "gap_type": "COMPLIANT (imports shared pick_aux_type)",
+      "capability_tuple": {
+        "T1_account_resolvable": true,
+        "T2_real_db_data": "yes (1511 grain)",
+        "T3_carriable_rows": true
+      },
+      "notes": "Correct-paradigm baseline; already consumes four_table shared component."
+    },
+    {
+      "wp_code": "K1",
+      "host_component": "GtK1OtherReceivables.vue detail sheet (componentType k1-other-receivables)",
+      "store_item_id": "K1-2-detail-rows",
+      "existing_entry": {
+        "backend_endpoint": true,
+        "frontend_button": false,
+        "autoseed": true
+      },
+      "endpoint": "/api/workpapers/{wp_id}/k1/import-aux-balance",
+      "gap_type": "G-A",
+      "capability_tuple": {
+        "T1_account_resolvable": true,
+        "T2_real_db_data": "yes (K1_ACCOUNT_SPEC BS-009, fallback 1221)",
+        "T3_carriable_rows": true
+      },
+      "notes": "CANONICAL G-A. useK1DetailAutoSeed.ts POSTs /k1/import-aux-balance ONLY when table empty (returns skipped:true if non-empty); NO 从余额表导入 button in any K1 .vue/.ts. User who edited data cannot re-extract. Task 7 must add manual button (merge semantics), keep AutoSeed, distinguish semantics (Requirement 4.5)."
+    },
+    {
+      "wp_code": "D2",
+      "host_component": "D2TabDetail.vue (child of GtD2AccountsReceivable, componentType d2-accounts-receivable)",
+      "store_item_id": "D2 detail rows (useD2Detail)",
+      "existing_entry": {
+        "backend_endpoint": false,
+        "frontend_button": true,
+        "autoseed": false
+      },
+      "endpoint_actual": "GET /api/projects/{project_id}/ledger/aux-balance-detail?account_code=1122&dim_type=客户&year={Y}  (ledger_penetration.get_aux_balance_detail)",
+      "gap_type": "G-C",
+      "dec2_resolution": "useD2Detail.importFromAuxBalance(projectId) does NOT hit any d2/import-aux-balance endpoint. It calls the GENERIC read endpoint /ledger/aux-balance-detail with a HARDCODED account_code=1122 and dim_type=客户, then aggregates by aux_name CLIENT-SIDE (a 5th归集 copy in TypeScript). The read endpoint itself IS铁律-compliant (get_active_filter + aux_type==dim_type + account_code LIKE prefix). The violations live in the D2 FRONTEND: (③) hardcoded 1122 instead of resolving from report mapping (D2_SPEC/BS-006 already exists in d_account_resolver.py), and it bypasses the shared aggregate_aux_by_name pipeline. Therefore D2 = G-C: migrate to a proper POST /api/workpapers/{wp_id}/d2/import-aux-balance backend endpoint built on the shared component, drive account prefix from D2_SPEC(BS-006), and remove the client-side aggregation.",
+      "capability_tuple": {
+        "T1_account_resolvable": true,
+        "T2_real_db_data": "yes (BS-006/1122 客户 grain)",
+        "T3_carriable_rows": true
+      }
+    },
+    {
+      "wp_code": "D3",
+      "host_component": "D3TabDetail.vue (child of GtD3PrepaidAccounts, componentType d3-prepaid-accounts)",
+      "store_item_id": "D3-2 detail rows (useD3Detail / useD3ImportExport)",
+      "existing_entry": {
+        "backend_endpoint": true,
+        "frontend_button": true,
+        "autoseed": false
+      },
+      "endpoint": "/api/workpapers/{wp_id}/d3/import-aux-balance",
+      "gap_type": "G-C",
+      "capability_tuple": {
+        "T1_account_resolvable": true,
+        "T2_real_db_data": "yes (D3_SPEC BS-046, fallback 2203)",
+        "T3_carriable_rows": true
+      },
+      "notes": "Historical implementation. Violations (per requirements 红基线 ①②③④): 裸 is_deleted=false (no get_active_filter), GROUP BY aux_name without single aux_type lock, hardcoded '2203%', aging first-bucket stuffing. Migrate in Task 4 to shared aggregate_aux_by_name; resolve prefix via D3_SPEC(BS-046)."
+    },
+    {
+      "wp_code": "D5",
+      "host_component": "D5TabDetail.vue (child of GtD5ReceivablesFinancing, componentType d5-receivables-financing)",
+      "store_item_id": "D5-2 detail rows (useD5Detail)",
+      "existing_entry": {
+        "backend_endpoint": true,
+        "frontend_button": true,
+        "autoseed": false
+      },
+      "endpoint": "/api/workpapers/{wp_id}/d5/import-aux-balance",
+      "gap_type": "G-C",
+      "capability_tuple": {
+        "T1_account_resolvable": true,
+        "T2_real_db_data": "yes (D5_SPEC BS-007, fallback 1124)",
+        "T3_carriable_rows": true
+      },
+      "notes": "Historical implementation, hardcoded '1124%'. Migrate in Task 4; resolve prefix via D5_SPEC(BS-007)."
+    },
+    {
+      "wp_code": "D6",
+      "host_component": "D6TabDetail.vue (child of GtD6ContractAssets, componentType d6-contract-assets)",
+      "store_item_id": "D6-2 detail rows (useD6Detail)",
+      "existing_entry": {
+        "backend_endpoint": true,
+        "frontend_button": true,
+        "autoseed": false
+      },
+      "endpoint": "/api/workpapers/{wp_id}/d6/import-aux-balance",
+      "gap_type": "G-C",
+      "capability_tuple": {
+        "T1_account_resolvable": true,
+        "T2_real_db_data": "yes (D6_SPEC BS-011, fallback 1141)",
+        "T3_carriable_rows": true
+      },
+      "notes": "Historical implementation;裸 SQL abstracted into d_cycle_extraction/detail_aggregation.py (_D6_AUX_SQL) but still裸 SQL. account 1141 (correct per BS-011). Migrate in Task 4; delete _D6_AUX_SQL."
+    },
+    {
+      "wp_code": "D7",
+      "host_component": "D7TabDetail.vue (child of GtD7ContractLiabilities, componentType d7-contract-liabilities)",
+      "store_item_id": "D7-2 detail rows (useD7Detail)",
+      "existing_entry": {
+        "backend_endpoint": true,
+        "frontend_button": true,
+        "autoseed": false
+      },
+      "endpoint": "/api/workpapers/{wp_id}/d7/import-aux-balance",
+      "gap_type": "G-C",
+      "capability_tuple": {
+        "T1_account_resolvable": true,
+        "T2_real_db_data": "yes (D7_SPEC BS-047, fallback 2205)",
+        "T3_carriable_rows": true
+      },
+      "notes": "Historical implementation, hardcoded '2205%'. Migrate in Task 4; resolve prefix via D7_SPEC(BS-047)."
+    }
+  ],
+  "gap_summary": {
+    "G-A": [
+      "K1"
+    ],
+    "G-B": [],
+    "G-C": [
+      "D2",
+      "D3",
+      "D5",
+      "D6",
+      "D7"
+    ],
+    "G-D": [],
+    "compliant_baseline": [
+      "D1",
+      "F1",
+      "G7"
+    ],
+    "g_b_count": 0,
+    "dec5_batch_note": "G-B count is 0, so DEC-5 batch-splitting (>6 G-B) does not apply."
+  },
+  "blocked_deferred": {
+    "requirement": "5.4 (unified source metadata carriage) + DEC-4",
+    "finding": "The detail-row persistence subsets for D1/D2/D3/D5/D6/D7/F1/K1 do NOT carry unified source metadata (source_kind / source_dataset_id). Grep across use{D1,D2,D3,D5,D6,D7,F1}Detail.ts + useK1DetailAutoSeed.ts found NONE. Only useK1Adjustment.ts carries sourceKind, and that is the K1 ADJUSTMENT-entries item — a different store item, not the detail rows this spec touches.",
+    "decision": "Per design DEC-4, this spec does NOT add unified source metadata to detail rows (it would alter 5+ cycle store shapes and contract digests). Therefore, per Requirement 5.4, ALL G-A/G-B/G-C rows are delivered WITHOUT unified source_kind/source_dataset_id and this capability is registered here as a DEFERRED enhancement (not a blocker for extraction itself). Downstream Task 9 evidence should record source_dataset_id from the endpoint response context even though it is not persisted in the row.",
+    "escalation_condition": "If Task 4/5/7 discovers that a target cycle CANNOT even carry the extraction rows themselves (row structure absent), that cycle must be marked blocked/deferred and EXCLUDED from the final completion count. As of this inventory, all listed hosts satisfy T3 (carriable rows), so none is blocked on that basis."
+  },
+  "g_d_register": {
+    "note": "No wp_code in the aux-balance detail-table family was classified G-D in this inventory. The spec scope (per design) is the aux-balance (往来单位/维度) detail-table hosts. Hosts outside this family (e.g. pure journal-based P&L cycles, confirmation bundles K0, report/summary components) are OUT OF SCOPE for aux extraction and are intentionally not enumerated as candidates — they fail capability tuple T2/T3 for the aux grain (data in tb_ledger not tb_aux_balance, or no per-单位 row structure). Registering an explicit empty G-D honors 宁缺勿造: no host was force-fit an entry."
+  },
+  "downstream_contract": {
+    "single_source_of_truth": "This file (gap-inventory.json) is the唯一真源 for Tasks 4/4.1/5/6/7/8/9 (Requirement 1.5).",
+    "freshness_gate": "Before implementing, each downstream task MUST recompute source_snapshot.files digests and compare to source_snapshot.aggregate_digest. On any drift, BLOCK implementation and re-derive the inventory (Requirement 1.6).",
+    "task4_targets": [
+      "D2 (build new d2/import-aux-balance)",
+      "D3",
+      "D5",
+      "D6",
+      "D7"
+    ],
+    "task7_targets": [
+      "K1 (G-A manual button)",
+      "any G-C host whose frontend needs the standard toolbar button after migration"
+    ],
+    "note_task4_vs_task5": "D2 is G-C but has NO backend endpoint yet; its migration under Task 4 must CREATE the d2/import-aux-balance endpoint (shared-component-based) rather than rewrite an existing one — treat as G-C-with-endpoint-creation, still消费 shared aux_aggregation, still gated by Task 4.1 baseline for the 4 existing endpoints (D2 has no prior双算 baseline to freeze since it aggregated client-side; record its pre/post separately)."
+  }
+}

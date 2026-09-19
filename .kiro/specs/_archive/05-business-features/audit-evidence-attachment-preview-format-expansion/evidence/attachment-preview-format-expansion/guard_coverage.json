@@ -1,0 +1,652 @@
+{
+  "spec": "audit-evidence-attachment-preview-format-expansion",
+  "task": 17,
+  "recorded_at": "2026-09-09T03:48:52.754Z",
+  "denominator": "property_nodeid_not_file_count",
+  "mutation_coverage": {
+    "total_properties": 32,
+    "properties_with_mutation": 27,
+    "meta_properties_deferred": [
+      26,
+      27,
+      28,
+      30,
+      32
+    ],
+    "behavioural_props_missing_mutation": [],
+    "known_mutation_ids": [
+      "M01",
+      "M02",
+      "M03",
+      "M04",
+      "M05",
+      "M06",
+      "M07",
+      "M08",
+      "M08b",
+      "M09",
+      "M10",
+      "M11",
+      "M12",
+      "M13",
+      "M14",
+      "M15",
+      "M16",
+      "M17",
+      "M18",
+      "M19",
+      "M20",
+      "M21",
+      "M22",
+      "M23",
+      "M24",
+      "M25",
+      "M29",
+      "M31",
+      "M32",
+      "M33",
+      "M34",
+      "M35",
+      "M36",
+      "M37",
+      "M38",
+      "M39",
+      "M40",
+      "M41",
+      "M42",
+      "M43",
+      "M44",
+      "M45",
+      "M46",
+      "M47",
+      "M48",
+      "M49",
+      "M50"
+    ],
+    "existence_asserted": true
+  },
+  "frontend_passed": 180,
+  "frontend_failed": 0,
+  "backend_passed": 23,
+  "frontend_nodeid_count": 180,
+  "backend_nodeid_groups": 7,
+  "requirement_8_1_surfaces": [
+    "registry",
+    "dual_host_dispatch",
+    "byte_channel",
+    "json_trap",
+    "http_cancel_dedupe",
+    "archive_five_limits",
+    "path_traversal",
+    "email_sanitizer",
+    "csp_network_zero",
+    "cid_isolation"
+  ],
+  "properties": {
+    "1": {
+      "title": "判族确定、归一、封闭且 Type_Hint 只在无扩展名时作受限回退",
+      "nodeids": [
+        "attachmentPreviewFormats.spec.ts::扩展名优先且大小写/空白稳定",
+        "attachmentPreviewFormats.spec.ts::未知扩展名不被 Type_Hint 覆盖",
+        "attachmentPreviewFormats.spec.ts::无扩展名时 Type_Hint MIME/分类词/别名受限回退"
+      ],
+      "mutation_ids": [
+        "M01"
+      ]
+    },
+    "2": {
+      "title": "legacy 归族、宿主能力矩阵与 Byte_Channel 均由 registry 单向派生",
+      "nodeids": [
+        "attachmentPreviewFormats.spec.ts::legacy 走 preview 通道",
+        "attachmentPreviewFormats.spec.ts::Preview 图片不含 svg；Drawer Office 10 项；Tab 6 项"
+      ],
+      "mutation_ids": [
+        "M02"
+      ]
+    },
+    "3": {
+      "title": "registry 外无第二份清单，跨族重复或 dwg 入族均 fail closed",
+      "nodeids": [
+        "attachmentPreviewFormats.spec.ts::跨族冲突 fail closed",
+        "attachmentPreviewFormats.spec.ts::dwg 入族 fail closed"
+      ],
+      "mutation_ids": [
+        "M03"
+      ]
+    },
+    "4": {
+      "title": "新增三类只走 Download_Endpoint，两个宿主 legacy URL 逐字不变",
+      "nodeids": [
+        "ExtendedFormatPreview.spec.ts::dev/Vitest 也走真实协议 fake module Worker",
+        "extendedPreviewRequest.spec.ts::下载请求固定 _dedupe:false",
+        "AttachmentPreviewOfficeIframe.spec.ts::docx uses previewPdf",
+        "task1LegacyBaseline.spec.ts::fileName="
+      ],
+      "mutation_ids": [
+        "M04"
+      ]
+    },
+    "5": {
+      "title": "JSON_Blob_Trap 记无敏感内容的 ERROR，403/404/其他失败互斥",
+      "nodeids": [
+        "extendedPreviewRequest.spec.ts::JSON content-type → wiring_error",
+        "extendedPreviewRequest.spec.ts::403/404 互斥映射"
+      ],
+      "mutation_ids": [
+        "M05"
+      ]
+    },
+    "6": {
+      "title": "close/switch/unmount 取消请求、终止 worker、释放 URL 与监听器",
+      "nodeids": [
+        "previewResourceScope.spec.ts",
+        "EmailMessageView.spec.ts",
+        "ExtendedFormatPreview.spec.ts::Email CID"
+      ],
+      "mutation_ids": [
+        "M06",
+        "M45",
+        "M47"
+      ]
+    },
+    "7": {
+      "title": "_dedupe:false 保留调用方 signal，同 URL 双宿主互不取消，代际栅栏丢弃迟到结果",
+      "nodeids": [
+        "ExtendedFormatPreview.spec.ts::_dedupe: false",
+        "extendedPreviewRequest.spec.ts"
+      ],
+      "mutation_ids": [
+        "M07"
+      ]
+    },
+    "8": {
+      "title": "archive 清单展示实际大小且全部不可信解析在零网络、零落盘 Worker 内完成",
+      "nodeids": [
+        "archiveNoNetwork.spec.ts",
+        "ExtendedFormatPreview.spec.ts::zip 走 download 并渲染清单",
+        "archiveFixtures.spec.ts"
+      ],
+      "mutation_ids": [
+        "M08",
+        "M32",
+        "M33",
+        "M34",
+        "M35",
+        "M37",
+        "M40",
+        "M41",
+        "M42",
+        "M48",
+        "M49"
+      ]
+    },
+    "9": {
+      "title": "五项上限各自可触发，zip bomb 只按实际流式输出中止",
+      "nodeids": [
+        "archiveLimits.spec.ts::各限可独立触发",
+        "archiveFixtures.spec.ts::maxEntries 触发"
+      ],
+      "mutation_ids": [
+        "M09",
+        "M36",
+        "M38",
+        "M39",
+        "M50"
+      ]
+    },
+    "10": {
+      "title": "路径穿越被标记且解析图无写出接口",
+      "nodeids": [
+        "archiveFixtures.spec.ts",
+        "archiveLimits.spec.ts"
+      ],
+      "mutation_ids": [
+        "M10",
+        "M08b"
+      ]
+    },
+    "11": {
+      "title": "编码回退、加密提示、内容嗅探、unsupported 容器/方法分层",
+      "nodeids": [
+        "archiveFixtures.spec.ts"
+      ],
+      "mutation_ids": [
+        "M11"
+      ]
+    },
+    "12": {
+      "title": "eml/msg 在受限 Worker 中归一并展示头、正文与轻量附件清单",
+      "nodeids": [
+        "emailDxf.spec.ts::解析头与正文"
+      ],
+      "mutation_ids": [
+        "M12"
+      ]
+    },
+    "13": {
+      "title": "HTML 默认展示且可切文本，主动标签/属性与危险协议全部移除",
+      "nodeids": [
+        "emailDxf.spec.ts::移除 script/事件并阻断外链图片",
+        "EmailMessageView.spec.ts::跨邮件按当前安全正文复位"
+      ],
+      "mutation_ids": [
+        "M13",
+        "M46"
+      ]
+    },
+    "14": {
+      "title": "sanitizer 资源重写与 sandbox/CSP 双层阻断全部自动加载向量",
+      "nodeids": [
+        "emailDxf.spec.ts::移除 script/事件并阻断外链图片"
+      ],
+      "mutation_ids": [
+        "M14"
+      ]
+    },
+    "15": {
+      "title": "CID 仅安全栅格且跨邮件隔离，中文头可读，失败不污染下一封",
+      "nodeids": [
+        "emailDxf.spec.ts::CID 仅在 magic 匹配时转 blob",
+        "emailDxf.spec.ts::CID magic 不匹配时拒绝转 blob",
+        "emailDxf.spec.ts::trim / 尖括号"
+      ],
+      "mutation_ids": [
+        "M15"
+      ]
+    },
+    "16": {
+      "title": "两宿主各自 legacy DOM/文案/URL 不变且 Office 转 PDF 不受影响",
+      "nodeids": [
+        "task1LegacyBaseline.spec.ts",
+        "AttachmentPreviewOfficeIframe.spec.ts"
+      ],
+      "mutation_ids": [
+        "M16"
+      ]
+    },
+    "17": {
+      "title": "OCR 通过真实 DTO 链在新增视图可达，所有失败态保留下载",
+      "nodeids": [
+        "task1LegacyBaseline.spec.ts::Drawer OCR badge/text",
+        "test_list_projection_includes_ocr_fields",
+        "ExtendedFormatPreview.spec.ts::dwg 不取字节"
+      ],
+      "mutation_ids": [
+        "M17"
+      ]
+    },
+    "18": {
+      "title": "preview/upload 行为契约不变且上传无扩展名白名单事实入账",
+      "nodeids": [
+        "test_whitelist_frozen_and_includes_svg",
+        "test_upload_handler_has_size_gate_no_extension_whitelist"
+      ],
+      "mutation_ids": [
+        "M18"
+      ]
+    },
+    "19": {
+      "title": "任一解析异常都被状态机隔离且宿主仍可关闭",
+      "nodeids": [
+        "emailParseIsolation.spec.ts::eml 解析器抛 → parse_failed 不 reject",
+        "emailParseIsolation.spec.ts::msg 解析器构造抛 → parse_failed 不 reject",
+        "emailDxf.spec.ts::损坏邮件 parse_failed 且不抛到外层",
+        "ExtendedFormatPreview.spec.ts"
+      ],
+      "mutation_ids": [
+        "M19"
+      ]
+    },
+    "20": {
+      "title": "drawing 仅 dxf，dwg 永不创建 worker并显示专用文案",
+      "nodeids": [
+        "attachmentPreviewFormats.spec.ts::dwg 仅 cad_download_only",
+        "ExtendedFormatPreview.spec.ts::dwg 不取字节",
+        "task1LegacyBaseline.spec.ts::LibreOffice 降级文案与 DWG",
+        "dxfModel.spec.ts::所有 ENTITIES/BLOCKS 实体类型都参与预扫",
+        "ExtendedFormatPreview.spec.ts::drawing Worker 消费单一真源"
+      ],
+      "mutation_ids": [
+        "M20",
+        "M43",
+        "M44"
+      ]
+    },
+    "21": {
+      "title": "产品 chunk 许可证白名单、精确依赖清单与 lockfile 版本均可复核",
+      "nodeids": [
+        "bundleBudget.spec.ts",
+        "dependency_licenses.json"
+      ],
+      "mutation_ids": [
+        "M21"
+      ],
+      "evidence": [
+        "dependency_licenses.json"
+      ]
+    },
+    "22": {
+      "title": "drawing 超门时完整退出并重建，不通过改阈值伪绿",
+      "nodeids": [
+        "bundleBudget.spec.ts::drawing 超门 → drawing_drop"
+      ],
+      "mutation_ids": [
+        "M22"
+      ]
+    },
+    "23": {
+      "title": "Route_Eligibility 先于真实生产构建体积裁决",
+      "nodeids": [
+        "bundleBudget.spec.ts::A 资格失败时即使体积更小也不得入选"
+      ],
+      "mutation_ids": [
+        "M23"
+      ]
+    },
+    "24": {
+      "title": "首屏与各按需 chunk 分别报告且解析/worker 模块零字节归属首屏",
+      "nodeids": [
+        "task16_production_bundle_gate.json"
+      ],
+      "mutation_ids": [
+        "M24"
+      ],
+      "evidence": [
+        "task16_production_bundle_gate.json"
+      ]
+    },
+    "25": {
+      "title": "预算、基线 digest 与实测可复核",
+      "nodeids": [
+        "bundleBudget.spec.ts",
+        "task16_production_bundle_gate.json"
+      ],
+      "mutation_ids": [
+        "M25"
+      ]
+    },
+    "26": {
+      "title": "守卫覆盖全部判据面且行为/DOM/网络优先于字符串存在",
+      "nodeids": [
+        "guard_coverage.json"
+      ],
+      "mutation_ids": [],
+      "self": true
+    },
+    "27": {
+      "title": "每条 Property/test nodeid 有变异，四态按预期测试差集判读",
+      "nodeids": [
+        "mutation_verdicts.json"
+      ],
+      "mutation_ids": [],
+      "deferred_to": "task18"
+    },
+    "28": {
+      "title": "strict baseline、全目标快照/锁、finally 所有权安全还原",
+      "nodeids": [
+        "mutation_verdicts.json"
+      ],
+      "mutation_ids": [],
+      "deferred_to": "task18"
+    },
+    "29": {
+      "title": "两宿主以真实 Type_Hint/DTO 接线，完整 render tree 的三要素均可观察",
+      "nodeids": [
+        "task1LegacyBaseline.spec.ts::zip/eml/msg/dxf",
+        "ExtendedFormatPreview.spec.ts::ArchiveEntryList",
+        "task1LegacyBaseline.spec.ts::源码把 file_type 写入 type_hint"
+      ],
+      "mutation_ids": [
+        "M29"
+      ]
+    },
+    "30": {
+      "title": "artifact manifest 逐项证明 tracked，CI 引用在干净检出存在",
+      "nodeids": [
+        "artifact_manifest.json"
+      ],
+      "mutation_ids": [],
+      "deferred_to": "task20"
+    },
+    "31": {
+      "title": "xlsx 告警、AttachmentHub 待办与两宿主成本均登记且明确不夹带修复",
+      "nodeids": [
+        "test_three_debts_out_of_scope"
+      ],
+      "mutation_ids": [
+        "M31"
+      ]
+    },
+    "32": {
+      "title": "本会话临时诊断产物按归属清除",
+      "nodeids": [
+        "task20 cleanup"
+      ],
+      "mutation_ids": [],
+      "deferred_to": "task20"
+    }
+  },
+  "frontend_nodeids": [
+    "src/__tests__/AttachmentPreviewOfficeIframe.spec.ts::AT-2 apiPaths previewPdf path",
+    "src/__tests__/AttachmentPreviewOfficeIframe.spec.ts::AT-2 apiPaths officePreview.health path",
+    "src/__tests__/AttachmentPreviewOfficeIframe.spec.ts::AT-2 apiPaths preview and previewPdf differ",
+    "src/__tests__/AttachmentPreviewOfficeIframe.spec.ts::AT-2 AttachmentPreviewDrawer routing docx uses previewPdf",
+    "src/__tests__/AttachmentPreviewOfficeIframe.spec.ts::AT-2 AttachmentPreviewDrawer routing xlsx uses previewPdf",
+    "src/__tests__/AttachmentPreviewOfficeIframe.spec.ts::AT-2 AttachmentPreviewDrawer routing pdf keeps preview_url",
+    "src/__tests__/AttachmentPreviewOfficeIframe.spec.ts::AT-2 AttachmentPreviewDrawer routing image renders img",
+    "src/__tests__/AttachmentPreviewOfficeIframe.spec.ts::AT-2 AttachmentPreviewDrawer routing zip mounts ExtendedFormatPreview",
+    "src/__tests__/AttachmentPreviewOfficeIframe.spec.ts::AT-2 AttachmentPreviewDrawer routing pptx uses previewPdf",
+    "src/utils/__tests__/httpDedupe.signal.spec.ts::http _dedupe:false contract 预先 aborted signal 不发请求（_dedupe:false）",
+    "src/utils/__tests__/httpDedupe.signal.spec.ts::http _dedupe:false contract 同 URL 两个 _dedupe:false 均成功；取消一个不影响另一个",
+    "src/utils/__tests__/httpDedupe.signal.spec.ts::http _dedupe:false contract 未传 _dedupe 的存量 GET 仍取消先发请求",
+    "src/components/attachment/preview/__tests__/archiveFixtures.spec.ts::archive fixtures corpus 全部夹具可生成且 digest 稳定",
+    "src/components/attachment/preview/__tests__/archiveFixtures.spec.ts::archive fixtures corpus utf8 zip 可解析且 size 为实际值",
+    "src/components/attachment/preview/__tests__/archiveFixtures.spec.ts::archive fixtures corpus 穿越路径标记 suspicious",
+    "src/components/attachment/preview/__tests__/archiveFixtures.spec.ts::archive fixtures corpus 加密 bit → encrypted",
+    "src/components/attachment/preview/__tests__/archiveFixtures.spec.ts::archive fixtures corpus 伪声明 size 是容器结构失败，不接受歧义元数据",
+    "src/components/attachment/preview/__tests__/archiveFixtures.spec.ts::archive fixtures corpus unsupported method → container_unsupported",
+    "src/components/attachment/preview/__tests__/archiveFixtures.spec.ts::archive fixtures corpus classic data descriptor 有/无签名、stored/deflate 均安全解析",
+    "src/components/attachment/preview/__tests__/archiveFixtures.spec.ts::archive fixtures corpus classic data descriptor 字段、布局或边界不闭合时 fail closed",
+    "src/components/attachment/preview/__tests__/archiveFixtures.spec.ts::archive fixtures corpus 截断 EOCD → parse_failed",
+    "src/components/attachment/preview/__tests__/archiveFixtures.spec.ts::archive fixtures corpus EOCD comment 必须精确闭合，disk entry 数必须一致",
+    "src/components/attachment/preview/__tests__/archiveFixtures.spec.ts::archive fixtures corpus central 区间与消费长度必须精确",
+    "src/components/attachment/preview/__tests__/archiveFixtures.spec.ts::archive fixtures corpus local/central flags、method、name、CRC、size 任一不一致均容器级失败",
+    "src/components/attachment/preview/__tests__/archiveFixtures.spec.ts::archive fixtures corpus local/data 不得覆盖下一 local 或 central",
+    "src/components/attachment/preview/__tests__/archiveFixtures.spec.ts::archive fixtures corpus entry 数据跨度必须与下一结构精确闭合",
+    "src/components/attachment/preview/__tests__/archiveFixtures.spec.ts::archive fixtures corpus 复用 zip_bad_crc：实际 CRC 失败必须容器级 parse_failed",
+    "src/components/attachment/preview/__tests__/archiveFixtures.spec.ts::archive fixtures corpus stored 命中限额后不进入最终 CRC 校验",
+    "src/components/attachment/preview/__tests__/archiveFixtures.spec.ts::archive fixtures corpus path depth 9 在 ZIP/TAR 真实解析中触发 maxPathDepth",
+    "src/components/attachment/preview/__tests__/archiveFixtures.spec.ts::archive fixtures corpus TAR 路径门不被头阶段 ratio 遮蔽，普通/PAX/GNU 大正文均 fail closed",
+    "src/components/attachment/preview/__tests__/archiveFixtures.spec.ts::archive fixtures corpus maxEntries 触发",
+    "src/components/attachment/preview/__tests__/archiveFixtures.spec.ts::archive fixtures corpus ratio 门可用降低阈值触发",
+    "src/components/attachment/preview/__tests__/archiveFixtures.spec.ts::archive fixtures corpus 前置 stored 条目不能稀释后续单条 deflate bomb 的压缩比",
+    "src/components/attachment/preview/__tests__/archiveFixtures.spec.ts::archive fixtures corpus deflate 越限后停止继续 push；callback 逻辑超调有界为 4KiB",
+    "src/components/attachment/preview/__tests__/archiveFixtures.spec.ts::archive fixtures corpus tar/tgz ok",
+    "src/components/attachment/preview/__tests__/archiveFixtures.spec.ts::archive fixtures corpus 受限 PAX/GNU long-name 只作用于真实条目，并解析 header/PAX mtime",
+    "src/components/attachment/preview/__tests__/archiveFixtures.spec.ts::archive fixtures corpus TAR sparse、PAX sparse 与异常扩展均 fail closed 为 container_unsupported",
+    "src/components/attachment/preview/__tests__/archiveFixtures.spec.ts::archive fixtures corpus gzip trailer CRC、ISIZE、截断与拼接 member 均 fail closed",
+    "src/components/attachment/preview/__tests__/archiveFixtures.spec.ts::archive fixtures corpus gzip 可选 header 不计入压缩比分母",
+    "src/components/attachment/preview/__tests__/archiveFixtures.spec.ts::archive fixtures corpus TAR 目录条目不得携带正文绕过实际量门",
+    "src/components/attachment/preview/__tests__/archiveFixtures.spec.ts::archive fixtures corpus 普通 .gz 按 hint 返回单条实际元数据；tgz/无 hint 仍要求 TAR",
+    "src/components/attachment/preview/__tests__/archiveFixtures.spec.ts::archive fixtures corpus TGZ Inflate 越限后停止继续 push，不聚合后续 TAR 正文",
+    "src/components/attachment/preview/__tests__/archiveFixtures.spec.ts::archive fixtures corpus tar bad checksum fail closed",
+    "src/components/attachment/preview/__tests__/archiveFixtures.spec.ts::archive fixtures corpus ZIP64 marker → container_unsupported（不按普通损坏或强解）",
+    "src/components/attachment/preview/__tests__/archiveFixtures.spec.ts::archive fixtures corpus 超长 EOCD comment 不影响 EOCD 定位",
+    "src/components/attachment/preview/__tests__/archiveFixtures.spec.ts::archive fixtures corpus GBK 名单条坏名不中断整包（编码回退产出条目）",
+    "src/components/attachment/preview/__tests__/archiveFixtures.spec.ts::archive fixtures corpus 单条实际解压超 32MiB → 在隔离 ratio 门时触发 maxEntryUncompressedBytes",
+    "src/components/attachment/preview/__tests__/archiveFixtures.spec.ts::archive fixtures corpus 合计实际解压超 64MiB → 只触发 maxTotalUncompressedBytes 门",
+    "src/components/attachment/preview/__tests__/archiveLimits.spec.ts::ARCHIVE_LIMITS 五项单一真源数值",
+    "src/components/attachment/preview/__tests__/archiveLimits.spec.ts::ARCHIVE_LIMITS 各限可独立触发",
+    "src/components/attachment/preview/__tests__/archiveLimits.spec.ts::ARCHIVE_LIMITS 接受注入 limits，边界相等不触发、增加 1 立即触发",
+    "src/components/attachment/preview/__tests__/archiveLimits.spec.ts::ARCHIVE_LIMITS 路径穿越与注入深度",
+    "src/components/attachment/preview/__tests__/archiveLimits.spec.ts::ARCHIVE_LIMITS 加密与 unsupported method",
+    "src/components/attachment/preview/__tests__/archiveNoNetwork.spec.ts::archive module 零网络/落盘结构守卫 archive 目录源码不含 fetch/XHR/http/fs 写出",
+    "src/components/attachment/preview/__tests__/attachmentPreviewFormats.spec.ts::Format_Registry resolvePreviewFamily 扩展名优先且大小写/空白稳定",
+    "src/components/attachment/preview/__tests__/attachmentPreviewFormats.spec.ts::Format_Registry resolvePreviewFamily 未知扩展名不被 Type_Hint 覆盖",
+    "src/components/attachment/preview/__tests__/attachmentPreviewFormats.spec.ts::Format_Registry resolvePreviewFamily 无扩展名时 Type_Hint MIME/分类词/别名受限回退",
+    "src/components/attachment/preview/__tests__/attachmentPreviewFormats.spec.ts::Format_Registry resolvePreviewFamily dwg 仅 cad_download_only，不入可渲染族",
+    "src/components/attachment/preview/__tests__/attachmentPreviewFormats.spec.ts::Format_Registry resolvePreviewFamily legacy 走 preview 通道",
+    "src/components/attachment/preview/__tests__/attachmentPreviewFormats.spec.ts::Format_Registry resolvePreviewFamily 重复判定确定",
+    "src/components/attachment/preview/__tests__/attachmentPreviewFormats.spec.ts::Format_Registry fail-closed table 跨族冲突 fail closed",
+    "src/components/attachment/preview/__tests__/attachmentPreviewFormats.spec.ts::Format_Registry fail-closed table dwg 入族 fail closed",
+    "src/components/attachment/preview/__tests__/attachmentPreviewFormats.spec.ts::LEGACY_CAPABILITIES 宿主专属不求并集 Preview 图片不含 svg；Drawer Office 10 项；Tab 6 项",
+    "src/components/attachment/preview/__tests__/attachmentPreviewFormats.spec.ts::inlineExtensionListViolations 合成坏源码打红，剥注释后仍可见",
+    "src/components/attachment/preview/__tests__/attachmentPreviewFormats.spec.ts::inlineExtensionListViolations 反向自检：干净源码无违规",
+    "src/components/attachment/preview/__tests__/bundleBudget.spec.ts::decideRoute capability-before-budget entryParserBytes 预算真源为 0",
+    "src/components/attachment/preview/__tests__/bundleBudget.spec.ts::decideRoute capability-before-budget A 资格失败时即使体积更小也不得入选",
+    "src/components/attachment/preview/__tests__/bundleBudget.spec.ts::decideRoute capability-before-budget A eligible 但首屏超门 → B",
+    "src/components/attachment/preview/__tests__/bundleBudget.spec.ts::decideRoute capability-before-budget drawing 超门 → drawing_drop 且 drawingInScope=false",
+    "src/components/attachment/preview/__tests__/bundleBudget.spec.ts::decideRoute capability-before-budget 无合资格路线 → ineligible",
+    "src/components/attachment/preview/__tests__/bundleBudget.spec.ts::decideRoute capability-before-budget 按需 chunk 合计超门 → subset_required（各 chunk 分别核算总量）",
+    "src/components/attachment/preview/__tests__/bundleBudget.spec.ts::decideRoute capability-before-budget entryGzipDelta 首屏增量门为 8 KiB 单一真源",
+    "src/components/attachment/preview/__tests__/DxfDrawingView.spec.ts::DxfDrawingView 按弧度渲染跨 0 与大 ARC，并在 Y 翻转后使用正确 sweep",
+    "src/components/attachment/preview/__tests__/DxfDrawingView.spec.ts::DxfDrawingView 完整 ELLIPSE 使用 ellipse，部分椭圆弧使用 path 且保留旋转轴",
+    "src/components/attachment/preview/__tests__/DxfDrawingView.spec.ts::DxfDrawingView 以递归 g 保留 INSERT children，并应用 base point、平移、缩放与旋转",
+    "src/components/attachment/preview/__tests__/DxfDrawingView.spec.ts::DxfDrawingView closed polyline 真正输出 polygon，并覆盖 union 的每个渲染分支",
+    "src/components/attachment/preview/__tests__/DxfDrawingView.spec.ts::DxfDrawingView 把 INSERT 循环或深度限制显式呈现为截断提示",
+    "src/components/attachment/preview/__tests__/dxfModel.spec.ts::dxfModel scene graph 所有 ENTITIES/BLOCKS 实体类型都参与预扫，unsupported flood 在 parser 前被拒绝",
+    "src/components/attachment/preview/__tests__/dxfModel.spec.ts::dxfModel scene graph 保留 ARC 弧度、ELLIPSE start/end 与 closed polyline，并给椭圆弧安全 bounds",
+    "src/components/attachment/preview/__tests__/dxfModel.spec.ts::dxfModel scene graph INSERT 保留嵌套 children，应用 block base point 与组合变换计算 bounds",
+    "src/components/attachment/preview/__tests__/dxfModel.spec.ts::dxfModel scene graph 循环 INSERT 保留可见节点并标记 truncated，而不是无限展开或静默丢失",
+    "src/components/attachment/preview/__tests__/dxfModel.spec.ts::dxfModel scene graph 超过 INSERT 深度时保留已展开场景并标记 maxInsertDepth",
+    "src/components/attachment/preview/__tests__/dxfModel.spec.ts::dxfModel scene graph bounds 覆盖放大 INSERT 内 POINT 半径与文本字形安全盒",
+    "src/components/attachment/preview/__tests__/emailDxf.spec.ts::email CID canonicalize trim / 尖括号 / percent / lowercase",
+    "src/components/attachment/preview/__tests__/emailDxf.spec.ts::email eml parse 解析头与正文",
+    "src/components/attachment/preview/__tests__/emailDxf.spec.ts::email eml parse 损坏邮件 parse_failed 且不抛到外层",
+    "src/components/attachment/preview/__tests__/emailDxf.spec.ts::email sanitizer 移除 script/事件并阻断外链图片",
+    "src/components/attachment/preview/__tests__/emailDxf.spec.ts::email sanitizer CID 仅在 magic 匹配时转 blob",
+    "src/components/attachment/preview/__tests__/emailDxf.spec.ts::email sanitizer CID magic 不匹配时拒绝转 blob（声明 png 但字节非 png）",
+    "src/components/attachment/preview/__tests__/emailDxf.spec.ts::email sanitizer CID 仅有 PNG 短前缀而完整 signature 错误时拒绝转 blob",
+    "src/components/attachment/preview/__tests__/emailDxf.spec.ts::email sanitizer SVG data URI 大小写不敏感地阻断",
+    "src/components/attachment/preview/__tests__/emailDxf.spec.ts::dxf model 解析 LINE 为 typed entity，无 v-html 字符串拼装",
+    "src/components/attachment/preview/__tests__/EmailMessageView.spec.ts::EmailMessageView resource ownership CID URL 纳入 PreviewResourceScope，换邮件与卸载时成对释放",
+    "src/components/attachment/preview/__tests__/EmailMessageView.spec.ts::EmailMessageView resource ownership 跨邮件按当前安全正文复位 HTML/text mode，空 HTML 时禁用按钮",
+    "src/components/attachment/preview/__tests__/emailParseIsolation.spec.ts::raw MIME 预扫与 PostalMime 限额 root=1，499 个 text parts 可进入 PostalMime，501 个零附件 text parts 在构造/parse 前返回 limit",
+    "src/components/attachment/preview/__tests__/emailParseIsolation.spec.ts::raw MIME 预扫与 PostalMime 限额 重复 Content-Type/参数与 quoted-pair boundary 不能让 501 parts 绕过预扫",
+    "src/components/attachment/preview/__tests__/emailParseIsolation.spec.ts::raw MIME 预扫与 PostalMime 限额 累计 header bytes 超限时在 PostalMime 前返回 limit",
+    "src/components/attachment/preview/__tests__/emailParseIsolation.spec.ts::raw MIME 预扫与 PostalMime 限额 declared boundary 超过 70 bytes 时在 PostalMime 前返回 limit",
+    "src/components/attachment/preview/__tests__/emailParseIsolation.spec.ts::raw MIME 预扫与 PostalMime 限额 嵌套结构超过深度上限时在 PostalMime 前返回 limit",
+    "src/components/attachment/preview/__tests__/emailParseIsolation.spec.ts::raw MIME 预扫与 PostalMime 限额 显式配置 PostalMime 三项资源门，RFC822 递归深度为 0",
+    "src/components/attachment/preview/__tests__/emailParseIsolation.spec.ts::raw MIME 预扫与 PostalMime 限额 PostalMime 已知限额异常保留 limit，未知异常才是 parse_failed",
+    "src/components/attachment/preview/__tests__/emailParseIsolation.spec.ts::raw MIME 预扫与 PostalMime 限额 解析后二次 inline 字节门仍返回 limit，不降级为 parse_failed",
+    "src/components/attachment/preview/__tests__/emailParseIsolation.spec.ts::MSG descriptor、recipient 与 CID 提取 按 recipType 分 to/cc 并按 smtpAddress/email/name 回退，不产生 [object Object]",
+    "src/components/attachment/preview/__tests__/emailParseIsolation.spec.ts::MSG descriptor、recipient 与 CID 提取 只对唯一 CID raster descriptor 取 bytes，并精确切出 Uint8Array 视图",
+    "src/components/attachment/preview/__tests__/emailParseIsolation.spec.ts::MSG descriptor、recipient 与 CID 提取 magic 与 declared MIME 不一致时不产生 inline part",
+    "src/components/attachment/preview/__tests__/emailParseIsolation.spec.ts::MSG descriptor、recipient 与 CID 提取 仅匹配 PNG 短前缀但完整 signature 错误时拒绝 inline part",
+    "src/components/attachment/preview/__tests__/emailParseIsolation.spec.ts::MSG descriptor、recipient 与 CID 提取 重复 CID 全部剔除，且不为歧义项取 bytes",
+    "src/components/attachment/preview/__tests__/emailParseIsolation.spec.ts::MSG descriptor、recipient 与 CID 提取 顶层与 embedded attachment descriptor 累计有界",
+    "src/components/attachment/preview/__tests__/emailParseIsolation.spec.ts::MSG descriptor、recipient 与 CID 提取 MSG inline descriptor/实际字节超限保留 limit",
+    "src/components/attachment/preview/__tests__/emailParseIsolation.spec.ts::MSG descriptor、recipient 与 CID 提取 MSGReader 错误/未知异常归一为 parse_failed，不 reject",
+    "src/components/attachment/preview/__tests__/ExtendedFormatPreview.spec.ts::ArchiveEntryList render tree 三要素 N 条模型 → N 行；字段嵌套在行内",
+    "src/components/attachment/preview/__tests__/ExtendedFormatPreview.spec.ts::ArchiveEntryList render tree 三要素 空列表 → 0 行",
+    "src/components/attachment/preview/__tests__/ExtendedFormatPreview.spec.ts::ExtendedFormatPreview dev/Vitest 也走真实协议 fake module Worker，匹配 requestId 后渲染 zip 清单",
+    "src/components/attachment/preview/__tests__/ExtendedFormatPreview.spec.ts::ExtendedFormatPreview email 传入输入上限并直接 transfer 原始 buffer，不 slice",
+    "src/components/attachment/preview/__tests__/ExtendedFormatPreview.spec.ts::ExtendedFormatPreview Email CID object URL 由宿主 PreviewResourceScope 统一持有并在卸载释放",
+    "src/components/attachment/preview/__tests__/ExtendedFormatPreview.spec.ts::ExtendedFormatPreview Worker 响应 requestId 不匹配时拒绝结果并进入 parse_failed",
+    "src/components/attachment/preview/__tests__/ExtendedFormatPreview.spec.ts::ExtendedFormatPreview email blob.size 超过 EMAIL_LIMITS 时不调用 arrayBuffer/Worker",
+    "src/components/attachment/preview/__tests__/ExtendedFormatPreview.spec.ts::ExtendedFormatPreview drawing Worker 消费单一真源的 10 秒 deadline",
+    "src/components/attachment/preview/__tests__/ExtendedFormatPreview.spec.ts::ExtendedFormatPreview dwg 不取字节也不建 Worker，显示下载提示",
+    "src/components/attachment/preview/__tests__/extendedPreviewRequest.spec.ts::fetchExtendedBytes application/json → wiring_error，且日志不含正文",
+    "src/components/attachment/preview/__tests__/extendedPreviewRequest.spec.ts::fetchExtendedBytes application/problem+json → wiring_error，且日志不含正文",
+    "src/components/attachment/preview/__tests__/extendedPreviewRequest.spec.ts::fetchExtendedBytes vendor/vnd.gt+json → wiring_error，且日志不含正文",
+    "src/components/attachment/preview/__tests__/extendedPreviewRequest.spec.ts::fetchExtendedBytes 仅 blob.type 为 +json 时也触发 JSON trap",
+    "src/components/attachment/preview/__tests__/extendedPreviewRequest.spec.ts::fetchExtendedBytes blob.size 超限时在 arrayBuffer 前返回 limit_reached",
+    "src/components/attachment/preview/__tests__/extendedPreviewRequest.spec.ts::fetchExtendedBytes 无可信 size 时仍在 arrayBuffer 后执行最终字节守卫",
+    "src/components/attachment/preview/__tests__/extendedPreviewRequest.spec.ts::fetchExtendedBytes 边界大小可 ready，并保留同一 ArrayBuffer",
+    "src/components/attachment/preview/__tests__/extendedPreviewRequest.spec.ts::fetchExtendedBytes 下载请求固定 _dedupe:false 并保留调用方 signal",
+    "src/components/attachment/preview/__tests__/extendedPreviewRequest.spec.ts::fetchExtendedBytes preview URL 硬拒绝，不发起请求",
+    "src/components/attachment/preview/__tests__/extendedPreviewRequest.spec.ts::fetchExtendedBytes 403/404/500 互斥映射",
+    "src/components/attachment/preview/__tests__/extendedPreviewRequest.spec.ts::fetchExtendedBytes cancel → cancelled；stale generation → stale",
+    "src/components/attachment/preview/__tests__/previewResourceScope.spec.ts::PreviewResourceScope releaseAll 幂等且 late-track 资源立即释放",
+    "src/components/attachment/preview/__tests__/previewResourceScope.spec.ts::createWorkerLease 匹配 requestId 后 resolve，并清 listener/timer/登记且 terminate 一次",
+    "src/components/attachment/preview/__tests__/previewResourceScope.spec.ts::createWorkerLease 响应 requestId 不匹配时拒绝并 finalize",
+    "src/components/attachment/preview/__tests__/previewResourceScope.spec.ts::createWorkerLease error、deadline 和 stale message 都走同一 finalize",
+    "src/components/attachment/preview/__tests__/previewResourceScope.spec.ts::createWorkerLease 已释放 scope 上创建 lease 时只 terminate 一次，post 立即 AbortError",
+    "src/components/attachment/preview/__tests__/previewResourceScope.spec.ts::createWorkerLease scope dispose 与显式 terminate 立即以 AbortError 结算 pending Promise",
+    "src/components/attachment/preview/__tests__/task1LegacyBaseline.spec.ts::Task13 OCR DTO projection process-record 投影含 ocr_status/ocr_text",
+    "src/components/attachment/preview/__tests__/task1LegacyBaseline.spec.ts::Task1/14 Preview_Host legacy matrix 图片集合冻结不含 svg",
+    "src/components/attachment/preview/__tests__/task1LegacyBaseline.spec.ts::Task1/14 Preview_Host legacy matrix fileName='a.docx' fileType='word' → 'docx'",
+    "src/components/attachment/preview/__tests__/task1LegacyBaseline.spec.ts::Task1/14 Preview_Host legacy matrix fileName='a.docx' fileType='' → 'docx'",
+    "src/components/attachment/preview/__tests__/task1LegacyBaseline.spec.ts::Task1/14 Preview_Host legacy matrix fileName='a.doc' fileType=null → 'docx'",
+    "src/components/attachment/preview/__tests__/task1LegacyBaseline.spec.ts::Task1/14 Preview_Host legacy matrix fileName='b.xlsx' fileType='excel' → 'excel'",
+    "src/components/attachment/preview/__tests__/task1LegacyBaseline.spec.ts::Task1/14 Preview_Host legacy matrix fileName='b.xls' fileType='' → 'excel'",
+    "src/components/attachment/preview/__tests__/task1LegacyBaseline.spec.ts::Task1/14 Preview_Host legacy matrix fileName='b.csv' fileType='' → 'excel'",
+    "src/components/attachment/preview/__tests__/task1LegacyBaseline.spec.ts::Task1/14 Preview_Host legacy matrix fileName='c.pdf' fileType='' → 'pdf'",
+    "src/components/attachment/preview/__tests__/task1LegacyBaseline.spec.ts::Task1/14 Preview_Host legacy matrix fileName='c.PDF' fileType='' → 'pdf'",
+    "src/components/attachment/preview/__tests__/task1LegacyBaseline.spec.ts::Task1/14 Preview_Host legacy matrix fileName='c.pdf' fileType='pdf' → 'pdf'",
+    "src/components/attachment/preview/__tests__/task1LegacyBaseline.spec.ts::Task1/14 Preview_Host legacy matrix fileName='d.png' fileType='image' → 'image'",
+    "src/components/attachment/preview/__tests__/task1LegacyBaseline.spec.ts::Task1/14 Preview_Host legacy matrix fileName='d.jpg' fileType='' → 'image'",
+    "src/components/attachment/preview/__tests__/task1LegacyBaseline.spec.ts::Task1/14 Preview_Host legacy matrix fileName='d.webp' fileType='' → 'image'",
+    "src/components/attachment/preview/__tests__/task1LegacyBaseline.spec.ts::Task1/14 Preview_Host legacy matrix fileName='d.bmp' fileType='' → 'image'",
+    "src/components/attachment/preview/__tests__/task1LegacyBaseline.spec.ts::Task1/14 Preview_Host legacy matrix fileName='d.svg' fileType='' → 'unsupported'",
+    "src/components/attachment/preview/__tests__/task1LegacyBaseline.spec.ts::Task1/14 Preview_Host legacy matrix fileName='d.svg' fileType='image' → 'image'",
+    "src/components/attachment/preview/__tests__/task1LegacyBaseline.spec.ts::Task1/14 Preview_Host legacy matrix fileName='e.dwg' fileType='' → 'unsupported'",
+    "src/components/attachment/preview/__tests__/task1LegacyBaseline.spec.ts::Task1/14 Preview_Host legacy matrix fileName='noext' fileType='' → 'unsupported'",
+    "src/components/attachment/preview/__tests__/task1LegacyBaseline.spec.ts::Task1/14 Preview_Host legacy matrix fileName='noext' fileType='word' → 'docx'",
+    "src/components/attachment/preview/__tests__/task1LegacyBaseline.spec.ts::Task1/14 Preview_Host legacy matrix zip/eml/msg/dxf 挂 ExtendedFormatPreview",
+    "src/components/attachment/preview/__tests__/task1LegacyBaseline.spec.ts::Task1/14 Drawer_Host matrix Office 10 项冻结",
+    "src/components/attachment/preview/__tests__/task1LegacyBaseline.spec.ts::Task1/14 Drawer_Host matrix name='report.docx' type_hint='' → 'office'",
+    "src/components/attachment/preview/__tests__/task1LegacyBaseline.spec.ts::Task1/14 Drawer_Host matrix name='data.xlsx' type_hint='' → 'office'",
+    "src/components/attachment/preview/__tests__/task1LegacyBaseline.spec.ts::Task1/14 Drawer_Host matrix name='slides.pptx' type_hint='' → 'office'",
+    "src/components/attachment/preview/__tests__/task1LegacyBaseline.spec.ts::Task1/14 Drawer_Host matrix name='legacy.odt' type_hint='' → 'office'",
+    "src/components/attachment/preview/__tests__/task1LegacyBaseline.spec.ts::Task1/14 Drawer_Host matrix name='legacy.rtf' type_hint='' → 'office'",
+    "src/components/attachment/preview/__tests__/task1LegacyBaseline.spec.ts::Task1/14 Drawer_Host matrix name='doc.pdf' type_hint='application/pdf' → 'pdf'",
+    "src/components/attachment/preview/__tests__/task1LegacyBaseline.spec.ts::Task1/14 Drawer_Host matrix name='doc.pdf' type_hint='' → 'pdf'",
+    "src/components/attachment/preview/__tests__/task1LegacyBaseline.spec.ts::Task1/14 Drawer_Host matrix name='doc.PDF' type_hint='' → 'unsupported'",
+    "src/components/attachment/preview/__tests__/task1LegacyBaseline.spec.ts::Task1/14 Drawer_Host matrix name='doc.PDF' type_hint='application/pdf' → 'pdf'",
+    "src/components/attachment/preview/__tests__/task1LegacyBaseline.spec.ts::Task1/14 Drawer_Host matrix name='photo.png' type_hint='image/png' → 'image'",
+    "src/components/attachment/preview/__tests__/task1LegacyBaseline.spec.ts::Task1/14 Drawer_Host matrix name='photo.png' type_hint='image' → 'unsupported'",
+    "src/components/attachment/preview/__tests__/task1LegacyBaseline.spec.ts::Task1/14 Drawer_Host matrix name='photo.svg' type_hint='image/svg+xml' → 'image'",
+    "src/components/attachment/preview/__tests__/task1LegacyBaseline.spec.ts::Task1/14 Drawer_Host matrix name='archive.zip' type_hint='application/zip' → 'extended'",
+    "src/components/attachment/preview/__tests__/task1LegacyBaseline.spec.ts::Task1/14 Drawer_Host matrix name='mail.eml' type_hint='eml' → 'extended'",
+    "src/components/attachment/preview/__tests__/task1LegacyBaseline.spec.ts::Task1/14 Drawer_Host matrix name='mail.msg' type_hint='msg' → 'extended'",
+    "src/components/attachment/preview/__tests__/task1LegacyBaseline.spec.ts::Task1/14 Drawer_Host matrix name='plan.dxf' type_hint='dxf' → 'extended'",
+    "src/components/attachment/preview/__tests__/task1LegacyBaseline.spec.ts::Task1/14 Drawer_Host matrix name='plan.dwg' type_hint='dwg' → 'unsupported'",
+    "src/components/attachment/preview/__tests__/task1LegacyBaseline.spec.ts::Task13/14 AttachmentTabPanel 接线 源码把 file_type 写入 type_hint，并传递 OCR",
+    "src/components/attachment/preview/__tests__/task1LegacyBaseline.spec.ts::Task13/14 AttachmentTabPanel 接线 Office 读 LEGACY_CAPABILITIES.attachmentTab",
+    "src/components/attachment/preview/__tests__/task1LegacyBaseline.spec.ts::Task15 OCR + Office health copy regression Drawer OCR badge/text 仍可见，不改变旧字段",
+    "src/components/attachment/preview/__tests__/task1LegacyBaseline.spec.ts::Task15 OCR + Office health copy regression LibreOffice 降级文案与 DWG 文案冻结（收敛后单一真源 = AttachmentPreviewCore）",
+    "src/components/attachment/preview/__tests__/task1LegacyBaseline.spec.ts::Task15 OCR + Office health copy regression Preview_Host unsupported 原文不变（收敛后单一真源 = AttachmentPreviewCore）"
+  ],
+  "backend_nodeid_prefixes": [
+    "tests/attachment_preview_format_expansion/test_task1_legacy_api_dto_baseline.py::TestPreviewWhitelistContract::test_whitelist_frozen_and_includes_svg",
+    "tests/attachment_preview_format_expansion/test_task1_legacy_api_dto_baseline.py::TestPreviewWhitelistContract::test_non_whitelist_json_shape_keys_documented",
+    "tests/attachment_preview_format_expansion/test_task1_legacy_api_dto_baseline.py::TestPreviewWhitelistContract::test_upload_handler_has_size_gate_no_extension_whitelist",
+    "tests/attachment_preview_format_expansion/test_task1_legacy_api_dto_baseline.py::TestGuessFileTypeProductionShape::test_guess_file_type_matrix",
+    "tests/attachment_preview_format_expansion/test_task1_legacy_api_dto_baseline.py::TestProcessRecordDtoProjection::test_list_projection_includes_ocr_fields",
+    "tests/attachment_preview_format_expansion/test_task1_legacy_api_dto_baseline.py::TestProcessRecordDtoProjection::test_sql_select_list_includes_ocr",
+    "tests/attachment_preview_format_expansion/test_task1_legacy_api_dto_baseline.py::TestRegisteredDebtLedger::test_three_debts_out_of_scope"
+  ],
+  "gaps": [
+    {
+      "property": 26,
+      "kind": "meta",
+      "note": "守卫覆盖矩阵自证（本文件 + 存在性断言）"
+    },
+    {
+      "property": 27,
+      "kind": "meta",
+      "deferred_to": "task18",
+      "note": "四态判读由变异脚本落 mutation_verdicts.json"
+    },
+    {
+      "property": 28,
+      "kind": "meta",
+      "deferred_to": "task18",
+      "note": "strict baseline + O_EXCL 锁由变异脚本外层证明"
+    },
+    {
+      "property": 30,
+      "kind": "meta",
+      "deferred_to": "task20",
+      "note": "artifact manifest + CI job 在收口证明"
+    },
+    {
+      "property": 32,
+      "kind": "meta",
+      "deferred_to": "task20",
+      "note": "临时诊断产物收口清理"
+    }
+  ],
+  "gate": "PASS"
+}

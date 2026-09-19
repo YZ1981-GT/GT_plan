@@ -46,8 +46,15 @@ class TestCompletenessReportStructure:
     """报告结构不变量测试。"""
 
     @pytest.mark.asyncio
-    async def test_report_always_has_4_categories(self):
-        """报告始终包含固定 4 类。"""
+    async def test_report_always_has_5_categories(self):
+        """报告始终包含固定 5 类。
+
+        第 5 类 `sampling_records`（抽样记录不完整）由
+        sampling-evaluation-and-governance-closure R8.4 加入：改造前归档包完全不感知
+        抽样（三个归档服务的 sampling/抽样/抽凭 提及数均为 0），而 CAS 1314 的记录要求
+        本身是归档件的组成部分。该类别**非阻断**（补齐抽样记录是审计判断，
+        硬卡会让存量项目全线阻塞归档）。
+        """
         project_id = uuid4()
 
         # Mock DB session that returns empty results
@@ -58,9 +65,18 @@ class TestCompletenessReportStructure:
 
         result = await get_archive_completeness_report(db=mock_db, project_id=project_id)
 
-        assert len(result.categories) == 4
+        assert len(result.categories) == 5
         category_names = {cat.category for cat in result.categories}
-        assert category_names == {"missing", "unsigned", "unresolved_reviews", "stale"}
+        assert category_names == {
+            "missing",
+            "unsigned",
+            "unresolved_reviews",
+            "stale",
+            "sampling_records",
+        }
+        # 抽样记录类别非阻断：其余四类保持阻断语义不变
+        blocking = {cat.category for cat in result.categories if cat.is_blocking}
+        assert blocking == {"missing", "unsigned", "unresolved_reviews", "stale"}
 
     @pytest.mark.asyncio
     async def test_can_proceed_true_when_all_empty(self):
@@ -348,3 +364,98 @@ class TestArchiveBlockingLogicPBT:
         # If any count > 0 (all are blocking), can_proceed must be False
         if any(c > 0 for c in counts):
             assert can_proceed is False
+
+
+# ---------------------------------------------------------------------------
+# 底稿编号自然排序（A1→A2→...→A10，不跳号）
+# ---------------------------------------------------------------------------
+
+
+class TestWpCodeSortKey:
+    """_wp_sort_key 自然排序：字母前缀 + 数字升序。"""
+
+    def test_numeric_order_within_prefix(self):
+        from app.services.archive_completeness_service import _wp_sort_key
+
+        codes = ["A22", "A5", "A1", "A10", "A2", "A30", "A7"]
+        ordered = sorted(codes, key=_wp_sort_key)
+        assert ordered == ["A1", "A2", "A5", "A7", "A10", "A22", "A30"]
+
+    def test_letter_prefix_order_a_to_t(self):
+        from app.services.archive_completeness_service import _wp_sort_key
+
+        codes = ["K1", "A1", "D2", "B10", "C3"]
+        ordered = sorted(codes, key=_wp_sort_key)
+        assert ordered == ["A1", "B10", "C3", "D2", "K1"]
+
+    def test_suffix_codes_sorted_by_prefix_number(self):
+        from app.services.archive_completeness_service import _wp_sort_key
+
+        codes = ["D2-1", "D1-1", "D2-2", "D10-1"]
+        ordered = sorted(codes, key=_wp_sort_key)
+        assert ordered == ["D1-1", "D2-1", "D2-2", "D10-1"]
+
+    def test_unparseable_codes_sorted_last(self):
+        from app.services.archive_completeness_service import _wp_sort_key
+
+        codes = ["PWXD6AS9", "A1", "B2"]
+        ordered = sorted(codes, key=_wp_sort_key)
+        assert ordered == ["A1", "B2", "PWXD6AS9"]
+
+
+# ---------------------------------------------------------------------------
+# 责任人 UUID → 中文姓名解析
+# ---------------------------------------------------------------------------
+
+
+class TestResolveAssigneeNames:
+    """_resolve_assignee_names：staff_members.name 优先，降级 users.username。"""
+
+    @pytest.mark.asyncio
+    async def test_resolves_to_staff_name(self):
+        from app.services.archive_completeness_service import (
+            _resolve_assignee_names,
+        )
+
+        uid = uuid4()
+        items = [CheckItem(wp_code="A1", wp_name="x", assignee=str(uid), status="stale")]
+
+        mock_db = AsyncMock()
+        staff_result = MagicMock()
+        staff_result.all.return_value = [(uid, "张三")]
+        mock_db.execute.return_value = staff_result
+
+        await _resolve_assignee_names(mock_db, items)
+        assert items[0].assignee == "张三"
+
+    @pytest.mark.asyncio
+    async def test_falls_back_to_username(self):
+        from app.services.archive_completeness_service import (
+            _resolve_assignee_names,
+        )
+
+        uid = uuid4()
+        items = [CheckItem(wp_code="A1", wp_name="x", assignee=str(uid), status="stale")]
+
+        mock_db = AsyncMock()
+        staff_result = MagicMock()
+        staff_result.all.return_value = []  # 无 staff 记录
+        user_result = MagicMock()
+        user_result.all.return_value = [(uid, "admin")]
+        mock_db.execute.side_effect = [staff_result, user_result]
+
+        await _resolve_assignee_names(mock_db, items)
+        assert items[0].assignee == "admin"
+
+    @pytest.mark.asyncio
+    async def test_no_assignee_no_query(self):
+        from app.services.archive_completeness_service import (
+            _resolve_assignee_names,
+        )
+
+        items = [CheckItem(wp_code="A1", wp_name="x", assignee=None, status="stale")]
+        mock_db = AsyncMock()
+
+        await _resolve_assignee_names(mock_db, items)
+        assert items[0].assignee is None
+        mock_db.execute.assert_not_called()

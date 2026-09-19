@@ -138,6 +138,8 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
+
+import { exportMultiSheetData } from '@/composables/useExcelIO'
 import { api } from '@/services/apiProxy'
 import { useLazyEdit } from '@/composables/useLazyEdit'
 import { fmtAmount } from '@/utils/formatters'
@@ -276,18 +278,27 @@ async function saveConsolTb() {
 
 async function exportConsolTb() {
   if (!consolTbRows.value.length) return
-  const XLSX = await import('xlsx')
-  const wb = XLSX.utils.book_new()
   const headers = ['行次', '项目', '审定汇总', '权益抵消-借', '权益抵消-贷', '往来抵消-借', '往来抵消-贷', '报表调整-借', '报表调整-贷', '合并审定数']
   const rows = consolTbRows.value.map((r: any) => [
     r.row_code, r.row_name, r.summary, r.equity_dr, r.equity_cr,
     r.trade_dr, r.trade_cr, r.adj_dr, r.adj_cr, r.audited,
   ])
-  const ws = XLSX.utils.aoa_to_sheet([headers, ...rows])
-  ws['!cols'] = headers.map((_, i) => ({ wch: i < 2 ? 20 : 14 }))
-  XLSX.utils.book_append_sheet(wb, ws, '试算平衡表')
   const label = tbReportTypes.find(t => t.key === consolTbType.value)?.label || ''
-  XLSX.writeFile(wb, `合并试算平衡表_${label}_${tbPeriod.value}.xlsx`)
+
+  // 走 useExcelIO 单一入口（B4 批）。单 sheet 纯 AOA，rows 与 colWidths 原样传。
+  // successMessage:false 因本函数自弹「已导出」（下一行），开着会双弹。
+  await exportMultiSheetData({
+    sheets: [
+      {
+        sheetName: '试算平衡表',
+        rows: [headers, ...rows],
+        colWidths: headers.map((_, i) => ({ wch: i < 2 ? 20 : 14 })),
+      },
+    ],
+    fileName: `合并试算平衡表_${label}_${tbPeriod.value}.xlsx`,
+    applyStyles: false,
+    successMessage: false,
+  })
   ElMessage.success('已导出')
 }
 

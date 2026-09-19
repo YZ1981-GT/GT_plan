@@ -15,7 +15,7 @@
     >
       <template #default>
         基于成本与可变现净值孰低法，结合库龄分析，AI 给出每个产品的跌价计提建议。
-        当前 LLM 接入为 stub 实现，分析结果作为辅助参考，最终金额需审计师确认。
+        分析结果基于 CAS1 成本与可变现净值孰低规则引擎，供辅助参考，最终金额需审计师确认。
         <strong>「采纳并写回」会把分析结果写入当前底稿 parsed_data，便于后续溯源。</strong>
       </template>
     </el-alert>
@@ -51,12 +51,12 @@
       </el-table-column>
       <el-table-column label="账面成本" width="140">
         <template #default="{ row }">
-          <el-input-number v-model="row.cost" :min="0" :step="100" controls-position="right" size="small" />
+          <WpAmountInput v-model="row.cost" :step="100" controls-position="right" size="small" />
         </template>
       </el-table-column>
       <el-table-column label="可变现净值" width="140">
         <template #default="{ row }">
-          <el-input-number v-model="row.nrv" :min="0" :step="100" controls-position="right" size="small" />
+          <WpAmountInput v-model="row.nrv" :step="100" controls-position="right" size="small" />
         </template>
       </el-table-column>
       <el-table-column label="库龄(月)" width="110">
@@ -107,7 +107,7 @@
       </el-table>
       <div class="total-line">
         建议合计计提：
-        <span class="amt">¥ {{ formatAmount(result.total_suggested_provision) }}</span>
+        <span class="amt">¥ {{ prefs.fmt(result.total_suggested_provision) }}</span>
       </div>
     </div>
 
@@ -130,10 +130,12 @@
 </template>
 
 <script setup lang="ts">
+import WpAmountInput from './shared/WpAmountInput.vue'
 import { reactive, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import { api } from '@/services/apiProxy'
 import { handleApiError } from '@/utils/errorHandler'
+import { useDisplayPrefsStore } from '@/stores/displayPrefs'
 
 interface Props {
   visible: boolean
@@ -205,11 +207,8 @@ function riskLabel(r: string) {
   return { high: '高', medium: '中', low: '低' }[r] || r
 }
 
-function formatAmount(s: string) {
-  const n = Number(s)
-  if (!Number.isFinite(n)) return s
-  return n.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-}
+const prefs = useDisplayPrefsStore()
+
 
 async function onAnalyze() {
   // 过滤空行
@@ -232,7 +231,7 @@ async function onAnalyze() {
     if (resp?.is_llm_stub) {
       ElMessage.success('AI 分析完成（stub 模式）')
     } else {
-      ElMessage.success('AI 分析完成')
+      ElMessage.success('跌价分析完成（CAS1 孰低规则）')
     }
   } catch (e: any) {
     handleApiError(e, 'AI 分析')

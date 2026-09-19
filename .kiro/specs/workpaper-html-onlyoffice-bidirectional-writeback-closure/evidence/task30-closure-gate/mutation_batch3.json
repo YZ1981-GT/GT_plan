@@ -1,0 +1,144 @@
+{
+  "generated_by": "backend/scripts/_mutation_kit/span.py::run_cli",
+  "mode": "run",
+  "pytest_args": [
+    "backend/tests/workpaper_sync/test_task30_closure_gate.py",
+    "backend/tests/workpaper_sync/test_task30_closure_gate_pg.py",
+    "backend/tests/workpaper_sync/test_task21_room_service.py",
+    "backend/tests/workpaper_sync/test_task22_callback_claim.py",
+    "backend/tests/workpaper_sync/test_task24_close_intent.py",
+    "-q",
+    "--no-header",
+    "-p",
+    "no:cacheprovider",
+    "-p",
+    "no:randomly"
+  ],
+  "tally": {
+    "RED": 3,
+    "GREEN": 3
+  },
+  "mutations": [
+    {
+      "id": "M13",
+      "path": "backend/app/services/workpaper_sync/callback_delivery.py",
+      "want": "test_task30_closure_gate.py::test_the_quarantine_boundary_itself_is_verified_not_deferred",
+      "why": "quarantined 进 application：AC 5.6 明文禁止。放开后被隔离的可疑 OOXML 会成为一次业务内容应用的 substrate。",
+      "verdict": "RED",
+      "summary": "2 failed, 321 passed, 1 warning in 47.93s",
+      "added": [
+        "test_task22_callback_claim.py::test_every_forbidden_quarantine_operation_rejected[application]",
+        "test_task30_closure_gate.py::test_the_quarantine_boundary_itself_is_verified_not_deferred"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task30_closure_gate.py::test_the_quarantine_boundary_itself_is_verified_not_deferred"
+      ],
+      "added_files": [
+        "test_task22_callback_claim.py",
+        "test_task30_closure_gate.py"
+      ],
+      "restored": true,
+      "restored_sha256": "5e8e8c71c09fcd45bee1591320c6391bb76a968e1009da74c8a4cc1da31022b0",
+      "seconds": 51.2
+    },
+    {
+      "id": "M14",
+      "path": "backend/app/services/workpaper_sync/callback_delivery.py",
+      "want": "test_task30_closure_gate.py::test_the_quarantine_boundary_itself_is_verified_not_deferred",
+      "why": "quarantined release：允许解除隔离 ⇒ 隔离变成可撤销的建议，AC 5.6 的「永不」失效。",
+      "verdict": "RED",
+      "summary": "2 failed, 321 passed, 1 warning in 48.01s",
+      "added": [
+        "test_task22_callback_claim.py::test_every_forbidden_quarantine_operation_rejected[release]",
+        "test_task30_closure_gate.py::test_the_quarantine_boundary_itself_is_verified_not_deferred"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task30_closure_gate.py::test_the_quarantine_boundary_itself_is_verified_not_deferred"
+      ],
+      "added_files": [
+        "test_task22_callback_claim.py",
+        "test_task30_closure_gate.py"
+      ],
+      "restored": true,
+      "restored_sha256": "5e8e8c71c09fcd45bee1591320c6391bb76a968e1009da74c8a4cc1da31022b0",
+      "seconds": 51.2
+    },
+    {
+      "id": "M15",
+      "path": "backend/app/services/workpaper_sync/repository.py",
+      "want": "test_task30_closure_gate_pg.py::test_quarantined_incoming_is_refused_at_the_application_entry",
+      "why": "库层那道 quarantine 门短路：`state != durable` 那条兜底仍会拒，但错误类型漂成`IncomingNotDurableError` ⇒ 「隔离永不解除」这条判据本身不可达（本 spec 已为「两分支共享异常类型」形态付过代价，此处正是它的反面验证）。",
+      "verdict": "GREEN",
+      "summary": "322 passed, 1 warning in 45.24s",
+      "added": [],
+      "gone": [],
+      "hit": [],
+      "added_files": [],
+      "restored": true,
+      "restored_sha256": "bb0200a36ccea2019667414520c74853332956e54bf57403ba5b0ce765f6a444",
+      "seconds": 48.3
+    },
+    {
+      "id": "M16",
+      "path": "backend/app/services/workpaper_sync/close_intent.py",
+      "want": "test_task24_close_intent.py::test_leader_is_highest_sequence_even_when_it_is_neither_first_nor_last_inserted",
+      "why": "close comparator 丢掉 sequence（等价于按插入/时间序）：AC 4.10 要求按最高 `(intent_sequence, id)` 选 leader；退化成只看 id 后，双跑账会在 tiebreak 上分叉。",
+      "verdict": "RED",
+      "summary": "9 failed, 313 passed, 1 warning in 45.00s",
+      "added": [
+        "test_task24_close_intent.py::test_leader_is_highest_sequence_even_when_it_is_neither_first_nor_last_inserted",
+        "test_task24_close_intent.py::test_leader_is_invariant_under_input_order_permutations",
+        "test_task24_close_intent.py::test_stale_leader_yields_successor_by_the_same_comparator",
+        "test_task30_closure_gate_pg.py::test_close_yields_exactly_one_capture[order_ba]",
+        "test_task30_closure_gate_pg.py::test_leader_revoked_before_promotion_yields_a_legitimate_successor",
+        "test_task30_closure_gate_pg.py::test_no_capture_exists_before_predecessors_are_terminal[order_ba]",
+        "test_task30_closure_gate_pg.py::test_no_phase_crashed_during_collection",
+        "test_task30_closure_gate_pg.py::test_no_successor_lands_recovery_required_with_zero_capture",
+        "test_task30_closure_gate_pg.py::test_reconciler_is_reentrant_and_keeps_the_same_leader[order_ba]"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task24_close_intent.py::test_leader_is_highest_sequence_even_when_it_is_neither_first_nor_last_inserted"
+      ],
+      "added_files": [
+        "test_task24_close_intent.py",
+        "test_task30_closure_gate_pg.py"
+      ],
+      "restored": true,
+      "restored_sha256": "267ff8d23d291c5d0a6fca3349e057f90a159b3540eb1860b7d1f8a56a021617",
+      "seconds": 48.0
+    },
+    {
+      "id": "M17",
+      "path": "backend/app/services/workpaper_sync/repository.py",
+      "want": "test_task30_closure_gate_pg.py::test_leader_revoked_before_promotion_yields_a_legitimate_successor",
+      "why": "撤权不再使 leader 失格 ⇒ 已被撤权的用户仍能被提升为 close leader 并发出 forcesave，`authorization_stale` 审计一条都不写。",
+      "verdict": "GREEN",
+      "summary": "322 passed, 1 warning in 45.21s",
+      "added": [],
+      "gone": [],
+      "hit": [],
+      "added_files": [],
+      "restored": true,
+      "restored_sha256": "bb0200a36ccea2019667414520c74853332956e54bf57403ba5b0ce765f6a444",
+      "seconds": 48.3
+    },
+    {
+      "id": "M18",
+      "path": "backend/app/services/workpaper_sync/repository.py",
+      "want": "test_task30_closure_gate_pg.py::test_no_successor_lands_recovery_required_with_zero_capture",
+      "why": "closing 仍计 active（反面）：不再要求 participant 处于 `closing` ⇒ 活跃编辑者的 intent 也算合格候选，close barrier 的语义塌掉。",
+      "verdict": "GREEN",
+      "summary": "322 passed, 1 warning in 45.38s",
+      "added": [],
+      "gone": [],
+      "hit": [],
+      "added_files": [],
+      "restored": true,
+      "restored_sha256": "bb0200a36ccea2019667414520c74853332956e54bf57403ba5b0ce765f6a444",
+      "seconds": 48.5
+    }
+  ]
+}

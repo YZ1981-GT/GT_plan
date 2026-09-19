@@ -200,6 +200,39 @@ class LedgerImportUploadService:
         return manifest
 
     @classmethod
+    def cache_detection_meta(
+        cls, project_id: UUID, upload_token: str, total_rows_estimate: int
+    ) -> None:
+        """detect 阶段把 total_rows_estimate 缓存到 manifest，submit 复用避免重算。
+
+        失败不抛异常（缓存是优化非必需，submit 端点缓存缺失时回退重算）。
+        """
+        try:
+            manifest_path = cls._manifest_path(project_id, upload_token)
+            if not manifest_path.exists():
+                return
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+            manifest["total_rows_estimate"] = int(total_rows_estimate)
+            manifest_path.write_text(
+                json.dumps(manifest, ensure_ascii=False, indent=2),
+                encoding="utf-8",
+            )
+        except Exception:
+            pass
+
+    @classmethod
+    def get_cached_total_rows(
+        cls, project_id: UUID, upload_token: str
+    ) -> int | None:
+        """读取 detect 缓存的 total_rows_estimate，无则返回 None。"""
+        try:
+            manifest = cls.load_manifest(project_id, upload_token)
+            val = manifest.get("total_rows_estimate")
+            return int(val) if val is not None else None
+        except Exception:
+            return None
+
+    @classmethod
     def get_bundle_files(cls, project_id: UUID, upload_token: str) -> list[tuple[str, Path]]:
         manifest = cls.load_manifest(project_id, upload_token)
         bundle_dir = cls._bundle_dir(project_id, upload_token)

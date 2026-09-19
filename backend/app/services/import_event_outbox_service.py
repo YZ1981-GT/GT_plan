@@ -51,19 +51,59 @@ class ImportEventOutboxService:
         return result.scalar_one_or_none()
 
     @staticmethod
+    async def _deliver(db: AsyncSession, item: ImportEventOutbox) -> bool:
+        """把一条 outbox 行的副作用派发出去（in-process handler 链 + SSE）。
+
+        **唯一派发口**。`publish_one` 与 `replay_pending` 都只经这里，否则
+        Requirement 13.3 的 fan-out 闸门会被其中一条路径绕过 —— 那种缺陷从行为上看是
+        "服务重启/重试后下游被刷了两遍"，很难归因。
+
+        Returns:
+            ``False`` 表示这条事件的副作用**此前已经派发过**，本次按 Requirement 13.3
+            跳过（不重复刷新、不重复 after-save、不重复生成 artifact）。``True`` 表示
+            本次真的派发了。
+
+        Raises:
+            Exception: 派发失败原样上抛，由调用方按 Requirement 13.4 落
+                pending/failed/DLQ。抛之前已把派发权归还，重放能重新抢到。
+
+        spec: workpaper-html-onlyoffice-bidirectional-writeback-closure · Task 16
+        """
+        from app.services.workpaper_sync.outbox import DurableEventOutboxService
+
+        event_extra = dict(item.payload or {})
+        event_extra.setdefault("__event_id", str(item.id))
+        payload = EventPayload(
+            event_type=EventType(item.event_type),
+            project_id=item.project_id,
+            year=item.year,
+            extra=event_extra,
+        )
+        gated = DurableEventOutboxService.is_fanout_gated(item.event_type)
+        if gated and not await DurableEventOutboxService.begin_fanout(
+            db, event_id=item.id, project_id=item.project_id, year=item.year
+        ):
+            logger.info(
+                "[outbox] fan-out 已消费过，跳过重复派发 outbox_id=%s event_type=%s",
+                item.id,
+                item.event_type,
+            )
+            return False
+        try:
+            await event_bus.publish_immediate(payload)
+        except Exception:
+            if gated:
+                await DurableEventOutboxService.abort_fanout(db, event_id=item.id)
+            raise
+        return True
+
+    @staticmethod
     async def publish_one(db: AsyncSession, outbox_id: UUID) -> bool:
         item = await ImportEventOutboxService.get(db, outbox_id)
         if item is None or item.status == OutboxStatus.published:
             return False
         try:
-            event_extra = dict(item.payload or {})
-            event_extra.setdefault("__event_id", str(item.id))
-            await event_bus.publish_immediate(EventPayload(
-                event_type=EventType(item.event_type),
-                project_id=item.project_id,
-                year=item.year,
-                extra=event_extra,
-            ))
+            await ImportEventOutboxService._deliver(db, item)
             item.status = OutboxStatus.published
             item.published_at = datetime.now(timezone.utc)
             item.last_error = None
@@ -116,6 +156,8 @@ class ImportEventOutboxService:
             "read_count": len(items),
             "published_count": 0,
             "failed_count": 0,
+            # Requirement 13.3：本轮有多少行因"副作用已派发过"被闸门跳过。
+            "deduplicated_fanout_count": 0,
             "last_error": None,
             "skipped_exhausted_count": 0,
             "exhausted_total_count": 0,
@@ -164,14 +206,11 @@ class ImportEventOutboxService:
             try:
                 item.status = OutboxStatus.pending
                 item.attempt_count = int(item.attempt_count or 0) + 1
-                event_extra = dict(item.payload or {})
-                event_extra.setdefault("__event_id", str(item.id))
-                await event_bus.publish_immediate(EventPayload(
-                    event_type=EventType(item.event_type),
-                    project_id=item.project_id,
-                    year=item.year,
-                    extra=event_extra,
-                ))
+                if not await ImportEventOutboxService._deliver(db, item):
+                    # Requirement 13.3 / 13.9：副作用此前已派发过，本轮只把行收敛成
+                    # published，并让"去重"这件事在报告里可见（否则运维看到的是
+                    # published_count 涨了却没有任何下游动作）。
+                    report["deduplicated_fanout_count"] += 1
                 item.status = OutboxStatus.published
                 item.published_at = datetime.now(timezone.utc)
                 item.last_error = None

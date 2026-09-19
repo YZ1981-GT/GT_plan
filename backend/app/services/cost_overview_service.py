@@ -66,6 +66,13 @@ _FUZZY_KEYWORDS: list[tuple[str, str]] = [
 async def _get_hourly_rates(db: AsyncSession) -> dict[str, int]:
     """从 system_settings 表读取 hourly_rates 配置，失败回退默认值。"""
     try:
+        # system_settings 表可能不存在 → 先 to_regclass 探测，避免对不存在表的
+        # 查询失败污染外层事务（InFailedSQLTransactionError 级联致后续 work_hours 查询全崩）。
+        exists = (await db.execute(
+            sa_text("SELECT to_regclass('public.system_settings')")
+        )).scalar()
+        if exists is None:
+            return DEFAULT_HOURLY_RATES.copy()
         result = await db.execute(
             sa_text("SELECT value FROM system_settings WHERE key = 'hourly_rates' LIMIT 1")
         )

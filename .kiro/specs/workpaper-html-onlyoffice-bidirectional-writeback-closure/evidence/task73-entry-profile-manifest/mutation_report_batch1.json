@@ -1,0 +1,150 @@
+[
+  {
+    "id": "M01",
+    "side": "be",
+    "want": "test_task73_entry_profile_manifest.py::TestDerivationIsIndependentOfBusinessAdjudication::test_flipping_every_capability_leaves_the_profile_byte_identical",
+    "why": "这就是本任务被反复警告的陷阱：从 capability 派生 room_model 后，`_CAPABILITY_ROOM_MODEL` 与 RG-15/16/17 变成恒真重言式，守卫从此永远绿，比原来的欠账更糟（假绿第③源）。是最现实的「让 RG-15 别再报错」的错误改法",
+    "verdict": "RED",
+    "summary": "3 failed, 284 passed in 63.53s (0:01:03)",
+    "added": [
+      "test_task73_entry_profile_manifest.py::TestDerivationIsIndependentOfBusinessAdjudication::test_flipping_every_capability_leaves_the_profile_byte_identical",
+      "test_task73_entry_profile_manifest.py::TestGeneratorFailsClosed::test_a_dropped_profile_field_is_rejected",
+      "test_workpaper_sync_manifest_contract.py::test_manifest_and_frontend_projection_are_current"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task73_entry_profile_manifest.py::TestDerivationIsIndependentOfBusinessAdjudication::test_flipping_every_capability_leaves_the_profile_byte_identical",
+      "test_workpaper_sync_manifest_contract.py::test_manifest_and_frontend_projection_are_current"
+    ],
+    "added_files": [
+      "test_task73_entry_profile_manifest.py",
+      "test_workpaper_sync_manifest_contract.py"
+    ],
+    "restored": true,
+    "seconds": 66.3
+  },
+  {
+    "id": "M02",
+    "side": "be",
+    "want": "test_task73_entry_profile_manifest.py::TestDerivationIsIndependentOfBusinessAdjudication::test_ast_guard_rejects_a_derivation_that_reads_capability",
+    "why": "反重言式判据的字面量分支被掏空 ⇒ `entry[\"capability\"]` 这种最常见的重言式写法不再 fail closed。判据靠合成源码双向验证，因此这条能真的打红",
+    "verdict": "RED",
+    "summary": "1 failed, 286 passed in 63.62s (0:01:03)",
+    "added": [
+      "test_task73_entry_profile_manifest.py::TestDerivationIsIndependentOfBusinessAdjudication::test_ast_guard_rejects_a_derivation_that_reads_capability[dict_key]"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task73_entry_profile_manifest.py::TestDerivationIsIndependentOfBusinessAdjudication::test_ast_guard_rejects_a_derivation_that_reads_capability[dict_key]"
+    ],
+    "added_files": [
+      "test_task73_entry_profile_manifest.py"
+    ],
+    "restored": true,
+    "seconds": 66.6
+  },
+  {
+    "id": "M03",
+    "side": "be",
+    "want": "test_task73_entry_profile_manifest.py::TestDerivationIsIndependentOfBusinessAdjudication::test_ast_guard_rejects_a_derivation_that_reads_capability",
+    "why": "属性形态（`host.capability`）与字面量形态是两条独立分支；合成一条时删掉任一都会被另一条遮蔽 ⇒ 变异判 GREEN。这条证明两个分支各自有判据",
+    "verdict": "RED",
+    "summary": "2 failed, 285 passed in 66.38s (0:01:06)",
+    "added": [
+      "test_task73_entry_profile_manifest.py::TestDerivationIsIndependentOfBusinessAdjudication::test_ast_guard_rejects_a_derivation_that_reads_capability[attribute]",
+      "test_task73_entry_profile_manifest.py::TestDerivationIsIndependentOfBusinessAdjudication::test_ast_guard_rejects_a_derivation_that_reads_capability[indirect_helper]"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task73_entry_profile_manifest.py::TestDerivationIsIndependentOfBusinessAdjudication::test_ast_guard_rejects_a_derivation_that_reads_capability[attribute]",
+      "test_task73_entry_profile_manifest.py::TestDerivationIsIndependentOfBusinessAdjudication::test_ast_guard_rejects_a_derivation_that_reads_capability[indirect_helper]"
+    ],
+    "added_files": [
+      "test_task73_entry_profile_manifest.py"
+    ],
+    "restored": true,
+    "seconds": 69.4
+  },
+  {
+    "id": "M04",
+    "side": "be",
+    "want": "test_task73_entry_profile_manifest.py::TestDerivationIsIndependentOfBusinessAdjudication::test_ast_guard_rejects_a_derivation_that_reads_capability",
+    "why": "加一个 `_sneak(host)` helper 再从 derive_* 调用，就能绕过只看直接函数体的检查。传递闭包是这条门唯一能拦住间接重言式的机制",
+    "verdict": "RED",
+    "summary": "1 failed, 286 passed in 66.48s (0:01:06)",
+    "added": [
+      "test_task73_entry_profile_manifest.py::TestDerivationIsIndependentOfBusinessAdjudication::test_ast_guard_rejects_a_derivation_that_reads_capability[indirect_helper]"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task73_entry_profile_manifest.py::TestDerivationIsIndependentOfBusinessAdjudication::test_ast_guard_rejects_a_derivation_that_reads_capability[indirect_helper]"
+    ],
+    "added_files": [
+      "test_task73_entry_profile_manifest.py"
+    ],
+    "restored": true,
+    "seconds": 69.5
+  },
+  {
+    "id": "M05",
+    "side": "be",
+    "want": "test_task73_entry_profile_manifest.py::TestDerivationIsIndependentOfBusinessAdjudication::test_generator_calls_the_guard_before_deriving",
+    "why": "守卫只剩测试在调 ⇒ 它自己成了 additive 死代码（假绿第①源）。「新增能力是否真被生产消费」正是本任务要证明的那类判据",
+    "verdict": "RED",
+    "summary": "1 failed, 286 passed in 66.27s (0:01:06)",
+    "added": [
+      "test_task73_entry_profile_manifest.py::TestDerivationIsIndependentOfBusinessAdjudication::test_generator_calls_the_guard_before_deriving"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task73_entry_profile_manifest.py::TestDerivationIsIndependentOfBusinessAdjudication::test_generator_calls_the_guard_before_deriving"
+    ],
+    "added_files": [
+      "test_task73_entry_profile_manifest.py"
+    ],
+    "restored": true,
+    "seconds": 69.3
+  },
+  {
+    "id": "M06",
+    "side": "be",
+    "want": "test_task73_entry_profile_manifest.py::TestDerivationIsIndependentOfBusinessAdjudication::test_room_observation_ignores_the_manifest_room_model",
+    "why": "RG-17 比的是「冻结的 manifest 裁决 ↔ 运行时真实行为」。把另一侧也改成读 manifest 后，它退化成自我比对：doc_key 实现漂移（mtime 回归、lease 消失）永远发现不了",
+    "verdict": "RED",
+    "summary": "3 failed, 284 passed in 64.78s (0:01:04)",
+    "added": [
+      "test_task73_entry_profile_manifest.py::TestCrossRulesRunAgainstTheRealManifest::test_report_has_no_missing_profile_and_real_drift",
+      "test_task73_entry_profile_manifest.py::TestCrossRulesRunAgainstTheRealManifest::test_rg17_exercises_two_distinct_branches_on_real_data",
+      "test_task73_entry_profile_manifest.py::TestSourceFactsAreObservedNotAssumed::test_room_service_is_still_unwired_and_reported_as_such"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task73_entry_profile_manifest.py::TestCrossRulesRunAgainstTheRealManifest::test_rg17_exercises_two_distinct_branches_on_real_data"
+    ],
+    "added_files": [
+      "test_task73_entry_profile_manifest.py"
+    ],
+    "restored": true,
+    "seconds": 67.8
+  },
+  {
+    "id": "M07",
+    "side": "be",
+    "want": "test_task73_entry_profile_manifest.py::TestDerivationIsIndependentOfBusinessAdjudication::test_descriptor_observation_never_reads_capability_tainted_baseline_flags",
+    "why": "红基线的 `flags.single_mode_switch_visible` = `capability ∈ {single_*} AND mode_evidence`，已经把 capability 揉进去了；拿它当 descriptor 事实会让 RG-16 部分重言。行为上两者数量接近（132 vs 176）⇒ 只有结构判据能拦住",
+    "verdict": "RED",
+    "summary": "1 failed, 286 passed in 64.82s (0:01:04)",
+    "added": [
+      "test_task73_entry_profile_manifest.py::TestDerivationIsIndependentOfBusinessAdjudication::test_descriptor_observation_never_reads_capability_tainted_baseline_flags"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task73_entry_profile_manifest.py::TestDerivationIsIndependentOfBusinessAdjudication::test_descriptor_observation_never_reads_capability_tainted_baseline_flags"
+    ],
+    "added_files": [
+      "test_task73_entry_profile_manifest.py"
+    ],
+    "restored": true,
+    "seconds": 67.9
+  }
+]

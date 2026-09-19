@@ -1,0 +1,625 @@
+<template>
+  <div class="g1-adjudication" data-testid="g1-adjudication">
+    <div class="section-head">
+      <h3 class="sheet-title">G1-1 交易性金融资产审定表</h3>
+      <div class="head-actions tab-toolbar">
+        <el-tooltip :content="fourTableHint" placement="top">
+          <el-button
+            size="small"
+            :disabled="isReadonly || !hasFourTablePrefill"
+            :loading="seeding"
+            @click="onPullFromFourTable"
+          >
+            从四表库带入未审数
+          </el-button>
+        </el-tooltip>
+        <el-button size="small" type="primary" plain :loading="adjPull.loading.value" @click="handleOpenBringIn">
+          <el-icon><Download /></el-icon>带入调整
+        </el-button>
+        <G1ImportExportDropdown
+          v-if="wpId"
+          :wp-id="wpId"
+          sheet="G1-1"
+          :disabled="isReadonly"
+          @imported="emit('imported')"
+        />
+        <el-button size="small" :disabled="isReadonly" @click="onSyncDetail">从 G1-2 汇总未审</el-button>
+        <span class="chip-wrap"><GtIndexChip value="wp:G1-2" /></span>
+        <span class="chip-wrap"><GtIndexChip value="wp:G1-3" /></span>
+        <el-button size="small" @click="openReviewDialog('G1-1-conclusion')">💬复核</el-button>
+      </div>
+    </div>
+
+    <el-alert
+      type="info"
+      :closable="false"
+      title="审计目标：核实交易性金融资产（科目1501）投资成本、累计公允价值变动及账面余额的准确与完整，确认分类（交易性/划分为/指定为）列报恰当，为资产负债表及附注披露提供审定依据。"
+      class="objective-alert"
+    />
+
+    <el-alert
+      v-if="lastWritebackNet !== 0"
+      type="success"
+      :closable="false"
+      class="writeback-alert"
+      :title="`已自 G1-3 回写期末账项调整 ${fmt(lastWritebackNet)}（默认行：投资成本·交易性·其他）`"
+    >
+      <div class="writeback-actions">
+        <span>多分类/多品种时请分摊，避免审定集中在「其他」。</span>
+        <el-button
+          size="small"
+          type="primary"
+          plain
+          :disabled="isReadonly"
+          @click="openAllocDialog"
+        >
+          分摊到明细行
+        </el-button>
+      </div>
+    </el-alert>
+
+    <el-dialog
+      v-model="allocVisible"
+      title="G1-3 回写净额分摊"
+      width="560px"
+      append-to-body
+      destroy-on-close
+    >
+      <p class="alloc-hint">
+        将净额 <b>{{ fmt(lastWritebackNet) }}</b> 分摊至「投资成本 · 交易性」下各品种。
+        合计须接近净额；差额自动留在默认「其他」行。
+      </p>
+      <!-- 四表库取数溯源（口径：期末余额） -->
+      <WpFourTableSourcePanel
+        :source-codes="tbSourceCodes"
+        gross-label="交易性金融资产"
+        fallback-row-code="BS-003"
+      />
+
+      <el-table :data="allocRows" border size="small" max-height="360">
+        <el-table-column prop="label" label="目标行" min-width="220" />
+        <el-table-column label="分摊金额" width="160">
+          <template #default="{ row }">
+            <WpAmountInput
+              v-model="row.amount"
+              size="small"
+              :disabled="isReadonly"
+              class="alloc-input"
+            />
+          </template>
+        </el-table-column>
+      </el-table>
+      <div class="alloc-sum">
+        已填合计 {{ fmt(allocSum) }}
+        <span :class="{ warn: Math.abs(allocSum - lastWritebackNet) > 0.05 }">
+          （差额 {{ fmt(allocSum - lastWritebackNet) }}）
+        </span>
+      </div>
+      <template #footer>
+        <el-button @click="allocVisible = false">取消</el-button>
+        <el-button type="primary" :disabled="isReadonly" @click="onApplyAlloc">应用分摊</el-button>
+      </template>
+    </el-dialog>
+    <details class="prep-hint">
+      <summary>📋 编制提示</summary>
+      <ul>
+        <li>结构对齐模板：（一）投资成本 →（二）累计公允价值变动 →（三）账面余额＝成本＋累计 FV。</li>
+        <li>可「从 G1-2 汇总未审」按会计分类×投资品种自动填入未审数，已有账项调整与原因分析保留。</li>
+        <li>G1-3「确认调整」后，1501 净调整默认回写至「投资成本·交易性·其他」；可用「分摊到明细行」拆到债务/权益等品种。</li>
+        <li>每层按「交易性 / 划分为 FVTPL / 指定为 FVTPL」× 品种明细展开；分类行与小计自动汇总。</li>
+        <li>审定＝未审＋账项调整；变动额／变动率自动计算；|变动率|&gt;{{ Math.round(G1_CHANGE_RATE_THRESHOLD * 100) }}% 时原因分析必填。</li>
+        <li>账面余额合计（减一年以上到期）应与试算平衡表 1501 勾稽，差异为 0。</li>
+        <li>「带入调整」：可从集中登记按科目 1501 拉取调整分录，逐笔分配到各成本/公允价值明细行的期末账项调整，带入后审定数自动更新并联动附注。</li>
+        <li>「带入调整」会自动排除已在 G1-3 明细行中同步过的分录（避免与 G1-3「确认调整」净额回写重复计入）；如需重新分摊，请在 G1-3 调整即可，无需再从此处带入。</li>
+      </ul>
+    </details>
+
+    <el-table
+      :data="rows"
+      border
+      size="small"
+      :row-class-name="rowClassName"
+      :max-height="tableMaxHeight"
+      style="width: 100%"
+    >
+      <el-table-column label="项目" min-width="280" fixed>
+        <template #default="{ row }">
+          <span :style="{ paddingLeft: `${(row.indent || 0) * 14}px` }" :class="{ 'label-strong': row.kind !== 'leaf' }">
+            {{ row.label }}
+          </span>
+        </template>
+      </el-table-column>
+
+      <el-table-column label="期初数" align="center">
+        <el-table-column label="未审数" width="100" align="right">
+          <template #default="{ row }">
+            <WpAmountInput
+              v-if="row.editable && !isReadonly"
+              :model-value="row.openingUnadjusted"
+              size="small"
+              style="width: 100%"
+              @update:model-value="(v: number) => updateField(row.rowKey, 'openingUnadjusted', v ?? 0)"
+            />
+            <span v-else :class="{ 'formula-cell': !row.editable }">{{ fmt(row.openingUnadjusted) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="账项调整" width="96" align="right">
+          <template #default="{ row }">
+            <WpAmountInput
+              v-if="row.editable && !isReadonly"
+              :model-value="row.openingAdjustment"
+              size="small"
+              style="width: 100%"
+              @update:model-value="(v: number) => updateField(row.rowKey, 'openingAdjustment', v ?? 0)"
+            />
+            <span v-else :class="{ 'formula-cell': !row.editable }">{{ fmt(row.openingAdjustment) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="审定数" width="100" align="right" class-name="auto-calc-col">
+          <template #default="{ row }">
+            <span class="formula-cell" title="审定 = 未审 + 账项调整">{{ fmt(row.openingAudited) }}</span>
+          </template>
+        </el-table-column>
+      </el-table-column>
+
+      <el-table-column label="期末数" align="center">
+        <el-table-column label="未审数" width="100" align="right">
+          <template #default="{ row }">
+            <WpAmountInput
+              v-if="row.editable && !isReadonly"
+              :model-value="row.closingUnadjusted"
+              size="small"
+              style="width: 100%"
+              @update:model-value="(v: number) => updateField(row.rowKey, 'closingUnadjusted', v ?? 0)"
+            />
+            <span v-else :class="{ 'formula-cell': !row.editable }">{{ fmt(row.closingUnadjusted) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="账项调整" width="96" align="right">
+          <template #default="{ row }">
+            <WpAmountInput
+              v-if="row.editable && !isReadonly"
+              :model-value="row.closingAdjustment"
+              size="small"
+              style="width: 100%"
+              @update:model-value="(v: number) => updateField(row.rowKey, 'closingAdjustment', v ?? 0)"
+            />
+            <span v-else :class="{ 'formula-cell': !row.editable }">{{ fmt(row.closingAdjustment) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="审定数" width="100" align="right" class-name="auto-calc-col">
+          <template #default="{ row }">
+            <span class="formula-cell" title="审定 = 未审 + 账项调整">{{ fmt(row.closingAudited) }}</span>
+          </template>
+        </el-table-column>
+      </el-table-column>
+
+      <el-table-column label="本期与上期审定数比较" align="center">
+        <el-table-column label="变动额" width="96" align="right" class-name="auto-calc-col">
+          <template #default="{ row }">
+            <span class="formula-cell">{{ fmt(row.changeAmount) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="变动率" width="80" align="right" class-name="auto-calc-col">
+          <template #default="{ row }">
+            <span v-if="row.changeRate === 'N/A'">N/A</span>
+            <span v-else-if="row.changeRate === ''">—</span>
+            <span v-else :class="{ 'rate-warn': row.changeRateHighlight }">
+              {{ (Number(row.changeRate) * 100).toFixed(1) }}%
+            </span>
+          </template>
+        </el-table-column>
+      </el-table-column>
+
+      <el-table-column label="原因分析" min-width="140">
+        <template #default="{ row }">
+          <el-input
+            v-if="row.editable && !isReadonly"
+            :model-value="row.reasonAnalysis"
+            size="small"
+            :class="{ 'reason-required': row.reasonRequired && !row.reasonAnalysis }"
+            :placeholder="row.reasonRequired ? `|变动率|>${Math.round(G1_CHANGE_RATE_THRESHOLD * 100)}% 必填` : ''"
+            @change="(v: string) => updateField(row.rowKey, 'reasonAnalysis', v)"
+          />
+          <span v-else>{{ row.reasonAnalysis || '—' }}</span>
+        </template>
+      </el-table-column>
+    </el-table>
+
+    <div class="tb-diff-row">
+      <span>试算平衡表数（1501）：
+        <el-input-number
+          :model-value="trialBalanceAmount"
+          size="small"
+          :controls="false"
+          :disabled="isReadonly"
+          @update:model-value="(v: number) => updateTrialBalance(v ?? 0)"
+        />
+      </span>
+      <span :class="{ 'diff-red': trialBalanceDiff !== 0 }">
+        差异数：{{ fmt(trialBalanceDiff) }}
+        <template v-if="trialBalanceDiff === 0"> ✓</template>
+        <template v-else> ✗</template>
+      </span>
+      <span class="book-total-hint">账面余额合计审定：{{ fmt(totalRow.closingAudited) }}</span>
+      <el-button
+        size="small"
+        type="warning"
+        :loading="publishing"
+        :disabled="isReadonly"
+        data-testid="g1-publish-tb"
+        @click="handlePublishToTb"
+      >
+        发布到试算表
+      </el-button>
+    </div>
+
+    <G1AuditTextCards
+      :wp-id="wpId"
+      :is-readonly="isReadonly"
+      v-model:note="auditNote"
+      v-model:conclusion="conclusion"
+      note-ai-section="adjudication-note"
+      conclusion-ai-section="adjudication-conclusion"
+      note-placeholder="交易性金融资产审定说明（成本与累计 FV 构成、分类依据、重大波动原因、与试算表核对等）..."
+      note-hint="评价投资成本、累计公允价值变动、分类列报及与试算表勾稽。"
+      conclusion-hint="按 A/B/C 口径评价科目 1501 列报是否公允。"
+    />
+
+    <AdjudicationBringInDialog
+      v-model="bringInVisible"
+      :matches="bringInMatchesFiltered"
+      :row-options="bringInRowOptions"
+      subject-label="1501 交易性金融资产"
+      :loading="adjPull.loading.value"
+      @apply="onBringInApply"
+    />
+  </div>
+</template>
+
+<script setup lang="ts">
+import WpAmountInput from '../../shared/WpAmountInput.vue'
+import { computed, toRef, inject, ref } from 'vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import { Download } from '@element-plus/icons-vue'
+import { useG1Adjudication } from '../../composables/useG1Adjudication'
+import type { ChecklistResponse } from '../../composables/useF1FormData'
+import { useAuditContext } from '@/composables/useAuditContext'
+import { useAdjudicationBringIn } from '../../composables/useAdjudicationBringIn'
+import {
+  G1_SEED_SPEC,
+  buildGSeedCells,
+  normalizeGAdjPrefill,
+} from '../../composables/gCycleAdjudicationSeed'
+import {
+  describeAdjPrefillConflicts,
+  describeAdjPrefillPlan,
+  planAdjudicationPrefill,
+  planHasWork,
+  resolveAdjPrefillWrites,
+} from '../../composables/shared/adjudicationPrefillPlan'
+import AdjudicationBringInDialog from '@/components/adjustment/AdjudicationBringInDialog.vue'
+import GtIndexChip from '../../GtIndexChip.vue'
+import G1AuditTextCards from '../G1AuditTextCards.vue'
+import G1ImportExportDropdown from '../G1ImportExportDropdown.vue'
+import WpFourTableSourcePanel from '../../shared/WpFourTableSourcePanel.vue'
+
+const props = defineProps<{
+  allResponses: Map<string, ChecklistResponse>
+  isReadonly: boolean
+  debouncedSave: (itemId: string, data: Partial<ChecklistResponse>) => void
+  wpId?: string
+  htmlData?: any
+}>()
+
+
+/**
+ * 四表库取数溯源（消费 render 下发的 `tb_source_codes`，消除 dead output）。
+ *
+ * 科目由后端按**科目名**逐项目解析（`four_table/g_cycle_specs.G1_SPEC`），
+ * 取数口径 = 期末余额。前端单一真源见 `composables/gCycleAccountScope.ts`。
+ */
+const tbSourceCodes = computed(() => props.htmlData?.tb_source_codes ?? null)
+const emit = defineEmits<{ imported: [] }>()
+
+const wpId = computed(() => props.wpId ?? '')
+const tableMaxHeight = computed(() => Math.max(420, window.innerHeight - 320))
+const openReviewDialog = inject<(sectionId: string) => void>('openReviewDialog', () => {})
+
+const {
+  rows,
+  totalRow,
+  trialBalanceAmount,
+  trialBalanceDiff,
+  auditNote,
+  conclusion,
+  updateField,
+  updateTrialBalance,
+  syncFromDetail,
+  lastWritebackNet,
+  allocateWriteback,
+  writebackAllocTargets,
+  rowClassName,
+  G1_CHANGE_RATE_THRESHOLD,
+} = useG1Adjudication({
+  allResponses: toRef(props, 'allResponses'),
+  debouncedSave: props.debouncedSave,
+  isReadonly: toRef(props, 'isReadonly'),
+  htmlData: toRef(props, 'htmlData'),
+})
+
+// spec: tb-writeback-explicit-publish-gate Task 12 / Req 2。
+// 发布到试算表经显式确认门：中文二次确认 → POST /workpapers/{wpId}/audit-determination/publish-to-tb
+// （sheet_name 审定表G1-1 + writeback_rows 科目1501 余额口径）。数据变化只 emit substantive:adjudicated
+// 不写 TB（useG1Adjudication.publishAdjudicated 已改 emit-only）。取消/只读 → 无副作用。
+const publishing = ref(false)
+async function handlePublishToTb(): Promise<void> {
+  if (props.isReadonly || publishing.value) return
+  try {
+    await ElMessageBox.confirm(
+      '发布后将把交易性金融资产审定数（科目 1501）写入试算表（trial_balance），'
+      + '并触发报表/错报评价等下游重算。确认发布？',
+      '发布到试算表确认',
+      { confirmButtonText: '确认发布', cancelButtonText: '取消', type: 'warning' },
+    )
+  } catch {
+    return // 用户取消 → 无副作用
+  }
+  if (!wpId.value) {
+    ElMessage.error('缺少底稿标识，无法发布')
+    return
+  }
+  publishing.value = true
+  try {
+    const { api } = await import('@/services/apiProxy')
+    const resp: any = await api.post(
+      `/api/workpapers/${wpId.value}/audit-determination/publish-to-tb`,
+      {
+        sheet_name: '审定表G1-1',
+        writeback_rows: [
+          { account_code: '1501', audited_amount: totalRow.value.closingAudited, amount_kind: 'balance' },
+        ],
+      },
+    )
+    ElMessage.success(resp?.message || '已发布到试算表')
+  } catch (err: any) {
+    ElMessage.error(err?.response?.data?.detail || err?.message || '发布失败，请重试')
+  } finally {
+    publishing.value = false
+  }
+}
+
+// ─── 从集中登记带入调整（1501 交易性金融资产，资产借方；带入期末账项调整，单列合并 AJE/RJE） ───
+const bringInRows = computed(() =>
+  rows.value
+    .filter((r) => r.editable && (r.section === 'cost' || r.section === 'fv'))
+    .map((r) => ({ rowKey: r.rowKey, name: r.label, aje: r.closingAdjustment, rje: r.closingAdjustment })),
+)
+const {
+  adjPull,
+  visible: bringInVisible,
+  rowOptions: bringInRowOptions,
+  open: openBringInAdjustment,
+  apply: onBringInApply,
+} = useAdjudicationBringIn({
+  projectId: (() =>
+    props.htmlData?.project_context?.project_id
+    ?? props.htmlData?.projectContext?.project_id
+    ?? '') as any,
+  year: useAuditContext().year as any,
+  subjectPrefix: '1501',
+  direction: 'debit',
+  subjectCode: '1501',
+  wpCode: 'G1',
+  subjectLabel: '交易性金融资产(1501)',
+  rows: bringInRows,
+  updateCell: (rowKey: string, _field: any, value: number) =>
+    updateField(rowKey, 'closingAdjustment', value),
+  totalAudited: () => totalRow.value.closingAudited,
+})
+
+// ─── 重复计算防护：G1-3「从调整分录模块同步」也会按 sourceGroupId 拉取集中登记的同一批分录，
+// 若该分录已作为 G1-3 明细行存在（sourceGroupId 命中），此处「带入」再累加到审定表会造成
+// 同一笔调整被计两次（G1-3 明细合计 + 审定表账项调整）。过滤掉已在 G1-3 同步过的分录组，
+// 并提示用户改为在 G1-3「确认调整」后自动回写（G1-3 已有的净额回写链路见 publishAdjustment）。
+const g1_3SyncedGroupIds = computed<Set<string>>(() => {
+  const ids = new Set<string>()
+  try {
+    const raw = props.allResponses?.get?.('G1-3-rows')
+    const jsonStr = raw?.remark || raw?.conclusion
+    if (!jsonStr) return ids
+    const parsed = JSON.parse(jsonStr)
+    if (Array.isArray(parsed)) {
+      for (const r of parsed) {
+        if (r?.sourceGroupId) ids.add(String(r.sourceGroupId))
+      }
+    }
+  } catch {
+    /* silent */
+  }
+  return ids
+})
+
+const bringInDuplicateCount = computed(
+  () => adjPull.matches.value.filter((m) => g1_3SyncedGroupIds.value.has(m.entry_group_id)).length,
+)
+
+/** 过滤掉已在 G1-3 明细行中存在（sourceGroupId 命中）的分录，避免与审定表重复计算 */
+const bringInMatchesFiltered = computed(() =>
+  adjPull.matches.value.filter((m) => !g1_3SyncedGroupIds.value.has(m.entry_group_id)),
+)
+
+async function handleOpenBringIn() {
+  await openBringInAdjustment()
+  if (!bringInVisible.value) return // 无命中分录（open() 内已提示），无需继续
+  if (bringInMatchesFiltered.value.length === 0 && bringInDuplicateCount.value > 0) {
+    // 全部命中分录均已在 G1-3 同步过，无可带入项：关闭弹窗并提示改用 G1-3 净额回写
+    bringInVisible.value = false
+    ElMessage.warning(
+      `命中的 ${bringInDuplicateCount.value} 笔调整分录均已在 G1-3 明细行中同步，`
+      + '请在 G1-3 点击「确认调整」按净额自动回写审定表，避免重复计算',
+    )
+    return
+  }
+  if (bringInDuplicateCount.value > 0) {
+    ElMessage.warning(
+      `已自动排除 ${bringInDuplicateCount.value} 笔已在 G1-3 明细行中同步的分录，避免重复计算`,
+    )
+  }
+}
+
+// ─── 从四表库带入未审数（1101 期初+期末，按子科目名判段，默认「投资成本·交易性·其他」）───
+//
+// G1 三维度中 section（成本/FV变动）可从子科目名推断，class（交易性/划分为/指定为）
+// 与 product（股票/债券等）是会计判断 → 默认 trading + other。
+// 多分类/多品种时须审计师用分摊对话框分配。
+
+const seeding = ref(false)
+
+const fourTablePrefill = computed(() =>
+  normalizeGAdjPrefill(props.htmlData?.adjudication_prefill),
+)
+
+const seedResult = computed(() => buildGSeedCells(fourTablePrefill.value, {
+  ...G1_SEED_SPEC,
+  labelOf: (k) => rows.value.find((r) => r.rowKey === k)?.label ?? k,
+}))
+
+const hasFourTablePrefill = computed(() => seedResult.value.cells.length > 0)
+
+const fourTableHint = computed(() =>
+  hasFourTablePrefill.value
+    ? '把四表库（tb_balance 交易性金融资产叶子余额）带入对应行的期初/期末未审数；已录入的格不覆盖'
+    : '四表库暂无交易性金融资产科目数据（需先导入余额表）',
+)
+
+function readCurrentCellG1(cell: { rowKey: string; field: string }): number | null {
+  const row = rows.value.find((r) => r.rowKey === cell.rowKey)
+  if (!row) return null
+  const v = (row as unknown as Record<string, unknown>)[cell.field]
+  return v == null || v === 0 ? null : Number(v)
+}
+
+async function onPullFromFourTable(): Promise<void> {
+  if (props.isReadonly) return
+  const { cells, unclassified, absentSlots } = seedResult.value
+  if (!cells.length) {
+    ElMessage.info('四表库暂无交易性金融资产科目数据可带入')
+    return
+  }
+  const plan = planAdjudicationPrefill(cells, readCurrentCellG1, { unclassified, absentSlots })
+  if (!planHasWork(plan)) {
+    ElMessage.info(describeAdjPrefillPlan(plan))
+    return
+  }
+
+  let mode: 'fill-blank' | 'overwrite' = 'fill-blank'
+  if (plan.conflicts.length) {
+    try {
+      const action = await ElMessageBox.confirm(
+        `以下 ${plan.conflicts.length} 格已有录入且与四表不一致：\n`
+        + `${describeAdjPrefillConflicts(plan)}\n\n`
+        + '「覆盖」以四表数据替换；「仅补空值」保留已录入数据、只填空白格。',
+        '从四表库带入未审数',
+        {
+          confirmButtonText: '覆盖',
+          cancelButtonText: '仅补空值',
+          distinguishCancelAndClose: true,
+          type: 'warning',
+        },
+      )
+      if (action === 'confirm') mode = 'overwrite'
+    } catch (e) {
+      if (e === 'close') return
+      mode = 'fill-blank'
+    }
+  }
+
+  seeding.value = true
+  try {
+    for (const w of resolveAdjPrefillWrites(plan, mode)) {
+      updateField(w.rowKey, w.field as 'openingUnadjusted' | 'closingUnadjusted', w.amount)
+    }
+    ElMessage.success(describeAdjPrefillPlan(plan))
+  } finally {
+    seeding.value = false
+  }
+}
+
+const allocVisible = ref(false)
+const allocRows = ref<Array<{ rowKey: string; label: string; amount: number }>>([])
+const allocSum = computed(() =>
+  allocRows.value.reduce((s, r) => s + (Number(r.amount) || 0), 0),
+)
+
+function openAllocDialog() {
+  const net = lastWritebackNet.value
+  allocRows.value = writebackAllocTargets.map((t) => ({
+    rowKey: t.rowKey,
+    label: t.label,
+    amount: t.rowKey.endsWith('-other') ? net : 0,
+  }))
+  allocVisible.value = true
+}
+
+function onApplyAlloc() {
+  const res = allocateWriteback(
+    allocRows.value.map((r) => ({ rowKey: r.rowKey, amount: Number(r.amount) || 0 })),
+  )
+  if (!res.ok) {
+    ElMessage.warning(res.message)
+    return
+  }
+  ElMessage.success('已按明细行分摊回写净额')
+  allocVisible.value = false
+}
+
+function onSyncDetail() {
+  const n = syncFromDetail()
+  if (!n) {
+    ElMessage.warning('G1-2 无可用明细')
+    return
+  }
+  ElMessage.success(`已汇总 ${n} 组分类×品种未审数（保留原调整）`)
+}
+
+function fmt(n: number): string {
+  if (n === 0) return '—'
+  return n.toLocaleString('zh-CN', { maximumFractionDigits: 2 })
+}
+</script>
+
+<style scoped>
+.g1-adjudication { padding: 12px; font-size: var(--wp-font-size, 13px); }
+.g1-adjudication :deep(.el-table) { --el-table-font-size: var(--wp-font-size, 13px); font-size: var(--wp-font-size, 13px); }
+.g1-adjudication :deep(.el-table .cell) { font-size: var(--wp-font-size, 13px); }
+.section-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+.sheet-title { margin: 0; font-size: 15px; }
+.head-actions { display: flex; gap: 8px; align-items: center; }
+.chip-wrap { display: inline-flex; align-items: center; }
+.objective-alert { margin-bottom: 12px; }
+.writeback-alert { margin-bottom: 10px; }
+.writeback-actions {
+  display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+  margin-top: 6px; font-size: 12px;
+}
+.alloc-hint { margin: 0 0 12px; font-size: 13px; color: #606266; }
+.alloc-input { width: 140px; }
+.alloc-sum { margin-top: 10px; font-size: 13px; }
+.alloc-sum .warn { color: #e6a23c; font-weight: 600; }
+.prep-hint { margin: 0 0 12px; font-size: 12px; color: #606266; }
+.prep-hint summary { cursor: pointer; color: #4b2d77; font-weight: 500; }
+.prep-hint ul { margin: 8px 0 0; padding-left: 18px; }
+.label-strong { font-weight: 600; }
+.tb-diff-row { display: flex; flex-wrap: wrap; gap: 24px; margin: 16px 0; align-items: center; }
+.diff-red { color: #f56c6c; font-weight: 600; }
+.book-total-hint { color: #606266; }
+.formula-cell { border-bottom: 1px dashed #909399; cursor: help; }
+.rate-warn { color: #e6a23c; font-weight: 600; }
+.reason-required :deep(.el-input__wrapper) { box-shadow: 0 0 0 1px #e6a23c inset; }
+:deep(.auto-calc-col) { background-color: #f5f7fa; }
+:deep(.row-section-header) { background: #f4f0fa !important; font-weight: 600; }
+:deep(.row-class-header) { background: #faf8fc !important; }
+:deep(.row-subtotal) { background: #f0f2f5 !important; font-weight: 600; }
+:deep(.row-footer) { background: #fafafa !important; }
+</style>

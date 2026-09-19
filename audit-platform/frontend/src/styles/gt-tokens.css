@@ -34,6 +34,24 @@
   --gt-gradient-surface: linear-gradient(180deg, #ffffff 0%, #f8f7fc 100%);
   --gt-gradient-sidebar: linear-gradient(180deg, #f8f7fc 0%, #f0edf5 100%);
 
+  /* ── 审计循环色板（与 constants/cyclePalette.ts 同源，禁止在组件内另定义） ── */
+  --gt-cycle-A: #26A69A;
+  --gt-cycle-B: #7E57C2;
+  --gt-cycle-C: #5C6BC0;
+  --gt-cycle-D: #1976D2;
+  --gt-cycle-E: #00ACC1;
+  --gt-cycle-F: #43A047;
+  --gt-cycle-G: #FDD835;
+  --gt-cycle-H: #FB8C00;
+  --gt-cycle-I: #3949AB;
+  --gt-cycle-J: #EC407A;
+  --gt-cycle-K: #78909C;
+  --gt-cycle-L: #8D6E63;
+  --gt-cycle-M: #AB47BC;
+  --gt-cycle-N: #E53935;
+  --gt-cycle-S: #FFA726;
+  --gt-cycle-other: #909399;
+
   /* ── 中性色 ── */
   --gt-color-text: #1d1d1f;
   --gt-color-text-secondary: #6e6e73;

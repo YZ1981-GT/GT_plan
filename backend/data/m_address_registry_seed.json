@@ -1,0 +1,55 @@
+{
+  "description": "M 类股东权益循环 audit-sheet 底稿关键坐标注册（OnlyOffice 地址名称落位）",
+  "version": "1.0.0",
+  "cycle": "M",
+  "entries": [
+    {
+      "wp_code": "M6-2",
+      "sheet_name": "未分配利润勾稽表",
+      "coordinates": [
+        {"cell_address": "C5", "description": "期初未分配利润", "purpose": "reconciliation_opening"},
+        {"cell_address": "C6", "description": "本年净利润", "purpose": "reconciliation_net_income"},
+        {"cell_address": "C7", "description": "提取法定盈余公积", "purpose": "reconciliation_statutory"},
+        {"cell_address": "C8", "description": "提取任意盈余公积", "purpose": "reconciliation_discretionary"},
+        {"cell_address": "C9", "description": "分配现金股利", "purpose": "reconciliation_dividend"},
+        {"cell_address": "C10", "description": "以前年度损益调整", "purpose": "reconciliation_prior_adj"},
+        {"cell_address": "C11", "description": "期末未分配利润（公式）", "purpose": "reconciliation_closing"},
+        {"cell_address": "D11", "description": "账面期末余额", "purpose": "reconciliation_book_balance"},
+        {"cell_address": "E11", "description": "勾稽差异", "purpose": "reconciliation_variance"}
+      ]
+    },
+    {
+      "wp_code": "M6-5",
+      "sheet_name": "损益联动验证",
+      "coordinates": [
+        {"cell_address": "C5", "description": "D~N 损益科目审定额合计（收入）", "purpose": "income_total"},
+        {"cell_address": "C6", "description": "D~N 损益科目审定额合计（费用）", "purpose": "expense_total"},
+        {"cell_address": "C7", "description": "本年净利润（收入-费用）", "purpose": "net_income_calculated"},
+        {"cell_address": "D7", "description": "利润表净利润", "purpose": "net_income_report"},
+        {"cell_address": "E7", "description": "差异", "purpose": "income_variance"}
+      ]
+    },
+    {
+      "wp_code": "M2-2",
+      "sheet_name": "实收资本明细表",
+      "coordinates": [
+        {"cell_address": "B5", "description": "股东名称", "purpose": "shareholder_name"},
+        {"cell_address": "C5", "description": "持股比例", "purpose": "shareholding_ratio"},
+        {"cell_address": "D5", "description": "认缴出资额", "purpose": "subscribed_amount"},
+        {"cell_address": "E5", "description": "实缴出资额", "purpose": "paid_in_amount"},
+        {"cell_address": "F5", "description": "出资方式", "purpose": "contribution_type"}
+      ]
+    },
+    {
+      "wp_code": "M9-2",
+      "sheet_name": "其他综合收益明细表",
+      "coordinates": [
+        {"cell_address": "B5", "description": "OCI来源分类", "purpose": "oci_category"},
+        {"cell_address": "C5", "description": "期初余额", "purpose": "oci_opening"},
+        {"cell_address": "D5", "description": "本期变动", "purpose": "oci_movement"},
+        {"cell_address": "E5", "description": "转入损益", "purpose": "oci_reclassified"},
+        {"cell_address": "F5", "description": "期末余额", "purpose": "oci_closing"}
+      ]
+    }
+  ]
+}

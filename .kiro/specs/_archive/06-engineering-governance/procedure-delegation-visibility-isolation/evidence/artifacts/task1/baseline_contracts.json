@@ -1,0 +1,35 @@
+{
+  "spec": "procedure-delegation-visibility-isolation",
+  "migration_head": "V112",
+  "migration_note": "Task 2 must re-scan head and use next free version; never static V113.",
+  "tables": {
+    "working_paper": "singular",
+    "wp_index": "wp_code lives here (JOIN with working_paper)",
+    "procedure_instances": "Workpaper_Lead staff projection (non authoritative)",
+    "procedure_row_tasks": "row-level assignee/reviewer authority",
+    "staff_members": "unique active staff<->user mapping source",
+    "project_assignments": "project role authority",
+    "project_users": "project scope_cycles authority"
+  },
+  "forbidden_table_names": [
+    "working_papers"
+  ],
+  "fields": {
+    "WorkingPaper.assigned_to": "user_id (users.id) — Workpaper_Lead authority",
+    "ProcedureInstance.assigned_to": "staff_id (staff_members.id) — lead Staff_Projection only",
+    "ProcedureRowTask.assignee_staff_id": "staff_id — Row_Assignee authority",
+    "ProcedureRowTask.reviewer_staff_id": "staff_id — Operation_Reviewer authority"
+  },
+  "known_gaps": {
+    "wp_bound_gate": "unmigrated",
+    "action_matrix": "unmigrated",
+    "render_config": "gap",
+    "ai": "gap",
+    "attachment": "gap",
+    "onlyoffice_wopi": "gap",
+    "checklist_responses": "gap",
+    "procedure_task": "gap",
+    "traceback_temp_log": "risk"
+  },
+  "traceback_temp_log": "_render_config_500.log"
+}

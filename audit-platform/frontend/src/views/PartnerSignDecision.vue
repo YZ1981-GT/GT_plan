@@ -29,6 +29,17 @@
           :loading="readinessLoading"
         />
         <el-empty v-else description="未获取到就绪检查数据" />
+
+        <!-- P2-2: 签发一致性清单 -->
+        <div class="gt-psd-section-title" style="margin-top: 16px">签发一致性清单</div>
+        <SignoffChecklist
+          v-if="projectId"
+          :project-id="projectId"
+          :user-id="currentUserId"
+          :auto-load="true"
+          @signoff="onSign"
+          @jump="onChecklistJump"
+        />
       </div>
 
       <!-- 中栏：报告预览（降级 HTML） -->
@@ -215,6 +226,7 @@ import { fmtAmount as fmtAmt } from '@/utils/formatters'
 import { useAuthStore } from '@/stores/auth'
 // Spec A R3：项目状态摘要区块（5 个指标卡片）
 import { useStaleSummaryFull } from '@/composables/useStaleSummaryFull'
+import SignoffChecklist from '@/components/common/SignoffChecklist.vue'
 
 interface RiskSummaryData {
   high_findings: Array<{ id: string; title: string; severity: string; status: string; category: string; created_at: string | null }>
@@ -237,6 +249,7 @@ const router = useRouter()
 const authStore = useAuthStore()
 
 const projectId = computed(() => route.params.projectId as string)
+const currentUserId = computed(() => String(authStore.user?.id || ''))
 const year = computed(() => Number(route.params.year) || new Date().getFullYear() - 1)
 
 // Spec A R3：项目状态摘要数据
@@ -433,6 +446,9 @@ function goToNotes() {
 }
 function goToMisstatements() {
   router.push({ name: 'Misstatements', params: { projectId: projectId.value }, query: { year: String(year.value) } })
+}
+function onChecklistJump(route: string) {
+  router.push(route)
 }
 function onShowConsistency() {
   if (!consistencyChecks.value.length) {

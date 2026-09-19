@@ -1,0 +1,160 @@
+{
+  "pbtResults": {},
+  "executionHistory": {
+    "1.1 建 `LaneVerdict` 枚举、`LaneSupplyFacts` 数据类与 L1~L5 裁决 (F1)": [
+      {
+        "executionId": "eeb91ed5-a34e-4055-b7e7-5d57c2bdb0ad",
+        "chatSessionId": "sess_c4474481-e2f7-4b06-b909-9f9189c05b0c",
+        "timestamp": 1788419323755
+      },
+      {
+        "executionId": "eeb91ed5-a34e-4055-b7e7-5d57c2bdb0ad",
+        "chatSessionId": "sess_c4474481-e2f7-4b06-b909-9f9189c05b0c",
+        "timestamp": 1788419337948
+      },
+      {
+        "executionId": "eeb91ed5-a34e-4055-b7e7-5d57c2bdb0ad",
+        "chatSessionId": "sess_c4474481-e2f7-4b06-b909-9f9189c05b0c",
+        "timestamp": 1788419819230
+      }
+    ],
+    "1.3 建与既有真源的双向锁及无第二真源守卫 (F1)": [
+      {
+        "executionId": "eeb91ed5-a34e-4055-b7e7-5d57c2bdb0ad",
+        "chatSessionId": "sess_c4474481-e2f7-4b06-b909-9f9189c05b0c",
+        "timestamp": 1788419323805
+      },
+      {
+        "executionId": "eeb91ed5-a34e-4055-b7e7-5d57c2bdb0ad",
+        "chatSessionId": "sess_c4474481-e2f7-4b06-b909-9f9189c05b0c",
+        "timestamp": 1788419833449
+      }
+    ],
+    "2.1 实现 `observe_lane_supply` 与 `describe_supply_gap` (F1)": [
+      {
+        "executionId": "eeb91ed5-a34e-4055-b7e7-5d57c2bdb0ad",
+        "chatSessionId": "sess_c4474481-e2f7-4b06-b909-9f9189c05b0c",
+        "timestamp": 1788419323843
+      }
+    ],
+    "3. Checkpoint - 裁决层完成": [
+      {
+        "executionId": "eeb91ed5-a34e-4055-b7e7-5d57c2bdb0ad",
+        "chatSessionId": "sess_c4474481-e2f7-4b06-b909-9f9189c05b0c",
+        "timestamp": 1788419323882
+      }
+    ],
+    "4.1 建 `FirstPublicationPlan` 与 `resolve_plan` 五条准入 (F2)": [
+      {
+        "executionId": "eeb91ed5-a34e-4055-b7e7-5d57c2bdb0ad",
+        "chatSessionId": "sess_c4474481-e2f7-4b06-b909-9f9189c05b0c",
+        "timestamp": 1788419323913
+      }
+    ],
+    "4.3 实现 `stage_instrumented_substrate` (F2)": [
+      {
+        "executionId": "eeb91ed5-a34e-4055-b7e7-5d57c2bdb0ad",
+        "chatSessionId": "sess_c4474481-e2f7-4b06-b909-9f9189c05b0c",
+        "timestamp": 1788419323940
+      }
+    ],
+    "4.5 实现 `publish_first_generation`（loader → adapter → commit）(F2)": [
+      {
+        "executionId": "eeb91ed5-a34e-4055-b7e7-5d57c2bdb0ad",
+        "chatSessionId": "sess_c4474481-e2f7-4b06-b909-9f9189c05b0c",
+        "timestamp": 1788419323972
+      }
+    ],
+    "5. Checkpoint - 服务层完成": [
+      {
+        "executionId": "eeb91ed5-a34e-4055-b7e7-5d57c2bdb0ad",
+        "chatSessionId": "sess_c4474481-e2f7-4b06-b909-9f9189c05b0c",
+        "timestamp": 1788419324012
+      }
+    ],
+    "6.1 建 `--check` 只读预演与封闭结算词表 (F3)": [
+      {
+        "executionId": "eeb91ed5-a34e-4055-b7e7-5d57c2bdb0ad",
+        "chatSessionId": "sess_c4474481-e2f7-4b06-b909-9f9189c05b0c",
+        "timestamp": 1788419324040
+      }
+    ],
+    "6.3 建 `--apply` 逐 entry 独立事务 (F3)": [
+      {
+        "executionId": "eeb91ed5-a34e-4055-b7e7-5d57c2bdb0ad",
+        "chatSessionId": "sess_c4474481-e2f7-4b06-b909-9f9189c05b0c",
+        "timestamp": 1788419324071
+      }
+    ],
+    "7.1 建真实 PG 临时 schema 夹具 (F8)": [
+      {
+        "executionId": "eeb91ed5-a34e-4055-b7e7-5d57c2bdb0ad",
+        "chatSessionId": "sess_c4474481-e2f7-4b06-b909-9f9189c05b0c",
+        "timestamp": 1788419324103
+      }
+    ],
+    "8. Checkpoint - 首版已在真实库落成": [
+      {
+        "executionId": "eeb91ed5-a34e-4055-b7e7-5d57c2bdb0ad",
+        "chatSessionId": "sess_c4474481-e2f7-4b06-b909-9f9189c05b0c",
+        "timestamp": 1788419324137
+      }
+    ],
+    "9.1 建 `check_projection_lane_adjudication.py` 回归门 (F4)": [
+      {
+        "executionId": "eeb91ed5-a34e-4055-b7e7-5d57c2bdb0ad",
+        "chatSessionId": "sess_c4474481-e2f7-4b06-b909-9f9189c05b0c",
+        "timestamp": 1788419324175
+      }
+    ],
+    "9.3 更正 BP-61-1 判据字面量 (F11)": [
+      {
+        "executionId": "eeb91ed5-a34e-4055-b7e7-5d57c2bdb0ad",
+        "chatSessionId": "sess_c4474481-e2f7-4b06-b909-9f9189c05b0c",
+        "timestamp": 1788419324205
+      }
+    ],
+    "9.5 更正 `ENTRY_ID_NAMESPACE_SPLIT_NOTE` 过期读数 (F10)": [
+      {
+        "executionId": "eeb91ed5-a34e-4055-b7e7-5d57c2bdb0ad",
+        "chatSessionId": "sess_c4474481-e2f7-4b06-b909-9f9189c05b0c",
+        "timestamp": 1788419324235
+      }
+    ],
+    "10.1 建 `mutate_projection_first_publication_guards.py` (F5)": [
+      {
+        "executionId": "eeb91ed5-a34e-4055-b7e7-5d57c2bdb0ad",
+        "chatSessionId": "sess_c4474481-e2f7-4b06-b909-9f9189c05b0c",
+        "timestamp": 1788419324265
+      }
+    ],
+    "10.3 执行全部变异并把非 RED 判读修到 RED (F5 与各守卫)": [
+      {
+        "executionId": "eeb91ed5-a34e-4055-b7e7-5d57c2bdb0ad",
+        "chatSessionId": "sess_c4474481-e2f7-4b06-b909-9f9189c05b0c",
+        "timestamp": 1788419324315
+      }
+    ],
+    "11.1 把回归门与锚点自检挂进 CI (F12)": [
+      {
+        "executionId": "eeb91ed5-a34e-4055-b7e7-5d57c2bdb0ad",
+        "chatSessionId": "sess_c4474481-e2f7-4b06-b909-9f9189c05b0c",
+        "timestamp": 1788419324373
+      }
+    ],
+    "11.2 逐产物核对 git 跟踪状态并清理临时产物": [
+      {
+        "executionId": "eeb91ed5-a34e-4055-b7e7-5d57c2bdb0ad",
+        "chatSessionId": "sess_c4474481-e2f7-4b06-b909-9f9189c05b0c",
+        "timestamp": 1788419324402
+      }
+    ],
+    "12. Final checkpoint - 全部判据收敛": [
+      {
+        "executionId": "eeb91ed5-a34e-4055-b7e7-5d57c2bdb0ad",
+        "chatSessionId": "sess_c4474481-e2f7-4b06-b909-9f9189c05b0c",
+        "timestamp": 1788419324431
+      }
+    ]
+  }
+}

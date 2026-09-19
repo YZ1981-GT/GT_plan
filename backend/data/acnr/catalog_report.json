@@ -1,0 +1,283 @@
+{
+  "acknowledged_conflicts": [],
+  "alias_conflicts": [
+    {
+      "action": "blocked",
+      "alias": "附注披露信息（上市公司）",
+      "reason": "one-to-many conflict: alias maps to multiple sheet_codes",
+      "sheet_codes": [
+        "D4-附注上市",
+        "D5-附注上市",
+        "附注上市"
+      ]
+    },
+    {
+      "action": "blocked",
+      "alias": "附注披露信息（国有企业）",
+      "reason": "one-to-many conflict: alias maps to multiple sheet_codes",
+      "sheet_codes": [
+        "D4-附注国企",
+        "附注国企"
+      ]
+    },
+    {
+      "action": "blocked",
+      "alias": "附注披露信息（国企）",
+      "reason": "one-to-many conflict: alias maps to multiple sheet_codes",
+      "sheet_codes": [
+        "D5-附注国企",
+        "附注国企"
+      ]
+    },
+    {
+      "action": "blocked",
+      "alias": "访谈记录与核对示例",
+      "reason": "one-to-many conflict: alias maps to multiple sheet_codes",
+      "sheet_codes": [
+        "D4-31T",
+        "D4-访谈模板"
+      ]
+    },
+    {
+      "action": "blocked",
+      "alias": "底稿目录",
+      "reason": "one-to-many conflict: alias maps to multiple sheet_codes",
+      "sheet_codes": [
+        "D5",
+        "D5-目录",
+        "D6",
+        "D6-目录",
+        "D7",
+        "D7-目录",
+        "G10",
+        "G10-目录",
+        "G11",
+        "G11-目录",
+        "G12",
+        "G12-目录",
+        "G13",
+        "G13-目录",
+        "G14",
+        "G14-目录",
+        "G8",
+        "G8-目录",
+        "G9",
+        "G9-目录",
+        "H10",
+        "H10-目录"
+      ]
+    }
+  ],
+  "gaps": [],
+  "generated_at": "2026-08-01T01:48:23.805345+00:00",
+  "manifest_blocked": false,
+  "registry_version": "20260727115337",
+  "summary": {
+    "acknowledged_conflict_count": 0,
+    "alias_conflict_count": 5,
+    "gap_count": 33,
+    "sheets_with_skip_reason": 0,
+    "total_cells": 474,
+    "total_sheets": 1215,
+    "unregistered_alias_count": 28
+  },
+  "unregistered_aliases": [
+    {
+      "aliases": [
+        "附注披露信息（上市公司）"
+      ],
+      "reason": "sheet_code not found in classification catalog",
+      "sheet_code": "附注上市"
+    },
+    {
+      "aliases": [
+        "附注披露信息（国有企业）",
+        "附注披露信息（国企）"
+      ],
+      "reason": "sheet_code not found in classification catalog",
+      "sheet_code": "附注国企"
+    },
+    {
+      "aliases": [
+        "D4"
+      ],
+      "reason": "sheet_code not found in classification catalog",
+      "sheet_code": "D4-目录"
+    },
+    {
+      "aliases": [
+        "营业收入审计程序表D4A"
+      ],
+      "reason": "sheet_code not found in classification catalog",
+      "sheet_code": "D4A"
+    },
+    {
+      "aliases": [
+        "程序表D4-22A"
+      ],
+      "reason": "sheet_code not found in classification catalog",
+      "sheet_code": "D4-22A"
+    },
+    {
+      "aliases": [
+        "访谈记录与核对示例"
+      ],
+      "reason": "sheet_code not found in classification catalog",
+      "sheet_code": "D4-31T"
+    },
+    {
+      "aliases": [
+        "访谈记录与核对示例"
+      ],
+      "reason": "sheet_code not found in classification catalog",
+      "sheet_code": "D4-访谈模板"
+    },
+    {
+      "aliases": [
+        "附注披露信息（上市公司）"
+      ],
+      "reason": "sheet_code not found in classification catalog",
+      "sheet_code": "D4-附注上市"
+    },
+    {
+      "aliases": [
+        "附注披露信息（国有企业）"
+      ],
+      "reason": "sheet_code not found in classification catalog",
+      "sheet_code": "D4-附注国企"
+    },
+    {
+      "aliases": [
+        "底稿目录"
+      ],
+      "reason": "sheet_code not found in classification catalog",
+      "sheet_code": "D5-目录"
+    },
+    {
+      "aliases": [
+        "应收款项融资审定表D5-1"
+      ],
+      "reason": "sheet_code not found in classification catalog",
+      "sheet_code": "D5-1"
+    },
+    {
+      "aliases": [
+        "附注披露信息（上市公司）"
+      ],
+      "reason": "sheet_code not found in classification catalog",
+      "sheet_code": "D5-附注上市"
+    },
+    {
+      "aliases": [
+        "附注披露信息（国企）"
+      ],
+      "reason": "sheet_code not found in classification catalog",
+      "sheet_code": "D5-附注国企"
+    },
+    {
+      "aliases": [
+        "底稿目录"
+      ],
+      "reason": "sheet_code not found in classification catalog",
+      "sheet_code": "D6-目录"
+    },
+    {
+      "aliases": [
+        "合同资产附注披露信息（上市公司）"
+      ],
+      "reason": "sheet_code not found in classification catalog",
+      "sheet_code": "D6-附注上市"
+    },
+    {
+      "aliases": [
+        "合同资产附注披露信息（国企）"
+      ],
+      "reason": "sheet_code not found in classification catalog",
+      "sheet_code": "D6-附注国企"
+    },
+    {
+      "aliases": [
+        "底稿目录"
+      ],
+      "reason": "sheet_code not found in classification catalog",
+      "sheet_code": "D7-目录"
+    },
+    {
+      "aliases": [
+        "合同负债附注披露信息（上市公司）"
+      ],
+      "reason": "sheet_code not found in classification catalog",
+      "sheet_code": "D7-附注上市"
+    },
+    {
+      "aliases": [
+        "合同负债附注披露信息（国企）"
+      ],
+      "reason": "sheet_code not found in classification catalog",
+      "sheet_code": "D7-附注国企"
+    },
+    {
+      "aliases": [
+        "底稿目录"
+      ],
+      "reason": "sheet_code not found in classification catalog",
+      "sheet_code": "G10-目录"
+    },
+    {
+      "aliases": [
+        "底稿目录"
+      ],
+      "reason": "sheet_code not found in classification catalog",
+      "sheet_code": "G11-目录"
+    },
+    {
+      "aliases": [
+        "底稿目录"
+      ],
+      "reason": "sheet_code not found in classification catalog",
+      "sheet_code": "G12-目录"
+    },
+    {
+      "aliases": [
+        "底稿目录"
+      ],
+      "reason": "sheet_code not found in classification catalog",
+      "sheet_code": "G13-目录"
+    },
+    {
+      "aliases": [
+        "底稿目录"
+      ],
+      "reason": "sheet_code not found in classification catalog",
+      "sheet_code": "G14-目录"
+    },
+    {
+      "aliases": [
+        "底稿目录"
+      ],
+      "reason": "sheet_code not found in classification catalog",
+      "sheet_code": "G8-目录"
+    },
+    {
+      "aliases": [
+        "参考中证协《非上市公司股权估值指引》"
+      ],
+      "reason": "sheet_code not found in classification catalog",
+      "sheet_code": "参考中证协"
+    },
+    {
+      "aliases": [
+        "底稿目录"
+      ],
+      "reason": "sheet_code not found in classification catalog",
+      "sheet_code": "G9-目录"
+    },
+    {
+      "aliases": [
+        "底稿目录"
+      ],
+      "reason": "sheet_code not found in classification catalog",
+      "sheet_code": "H10-目录"
+    }
+  ]
+}

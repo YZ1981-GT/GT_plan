@@ -1,0 +1,216 @@
+[
+  {
+    "id": "M01",
+    "side": "be",
+    "want": "test_reverse_selfcheck_closure_is_transitive",
+    "why": "闭包不再传递 —— 真实图里 Task 27 是经 26 才够到门的（27 的直接依赖是 14/15/26），只看直接依赖会把 Wave 2 一半的下游漏掉，判据随之少报",
+    "verdict": "RED",
+    "summary": "3 failed, 13 passed, 1 xfailed, 1 warning in 1.08s",
+    "added": [
+      "test_downstream_base_reliability_gate.py::test_no_task_behind_the_bulk_adapter_gate_is_completed_while_the_door_is_blocked",
+      "test_downstream_base_reliability_gate.py::test_reverse_selfcheck_closure_is_transitive",
+      "test_downstream_base_reliability_gate.py::test_the_downstream_set_is_derived_not_enumerated"
+    ],
+    "gone": [],
+    "hit": [
+      "test_downstream_base_reliability_gate.py::test_reverse_selfcheck_closure_is_transitive"
+    ],
+    "added_files": [
+      "test_downstream_base_reliability_gate.py"
+    ],
+    "restored": true,
+    "seconds": 3.9
+  },
+  {
+    "id": "M02",
+    "side": "be",
+    "want": "test_the_downstream_set_is_derived_not_enumerated",
+    "why": "把「下游」退化成「wave 更大」= 手写名单的等价形态：Tasks 21–24 就在门之后的 wave 里却不依赖门，会被误报；这类误报最后总是靠放宽判据消掉",
+    "verdict": "RED",
+    "summary": "4 failed, 11 passed, 2 xfailed, 1 warning in 1.08s",
+    "added": [
+      "test_downstream_base_reliability_gate.py::test_reverse_selfcheck_a_blocked_door_with_a_verified_claim_is_stopped",
+      "test_downstream_base_reliability_gate.py::test_reverse_selfcheck_an_unchecked_downstream_task_is_not_a_claim",
+      "test_downstream_base_reliability_gate.py::test_reverse_selfcheck_the_gate_owner_debt_is_also_a_claim_blocker",
+      "test_downstream_base_reliability_gate.py::test_the_downstream_set_is_derived_not_enumerated"
+    ],
+    "gone": [],
+    "hit": [
+      "test_downstream_base_reliability_gate.py::test_the_downstream_set_is_derived_not_enumerated"
+    ],
+    "added_files": [
+      "test_downstream_base_reliability_gate.py"
+    ],
+    "restored": true,
+    "seconds": 4.0
+  },
+  {
+    "id": "M03",
+    "side": "be",
+    "want": "test_reverse_selfcheck_a_blocked_door_with_a_verified_claim_is_stopped",
+    "why": "本门不再认领任何闸 ⇒ 类别 B 恒绿。`gates` 块是「任何 adapter pilot 不得宣称」那半句的唯一真源，认领集合空掉后越门执行永远查不出来",
+    "verdict": "RED",
+    "summary": "2 failed, 14 passed, 1 xfailed, 1 warning in 1.08s",
+    "added": [
+      "test_downstream_base_reliability_gate.py::test_no_task_behind_the_bulk_adapter_gate_is_completed_while_the_door_is_blocked",
+      "test_downstream_base_reliability_gate.py::test_reverse_selfcheck_a_blocked_door_with_a_verified_claim_is_stopped"
+    ],
+    "gone": [],
+    "hit": [
+      "test_downstream_base_reliability_gate.py::test_reverse_selfcheck_a_blocked_door_with_a_verified_claim_is_stopped"
+    ],
+    "added_files": [
+      "test_downstream_base_reliability_gate.py"
+    ],
+    "restored": true,
+    "seconds": 4.0
+  },
+  {
+    "id": "M04",
+    "side": "be",
+    "want": "test_a_relocated_criterion_still_blocks_the_door",
+    "why": "**本轮最要防的 fail-open**：只按归属 Task 20 的准则判门。实测归属 Task 20 的六条全为 0（912 归 74、4 归 71），这样一改整个守卫立刻恒绿，而门自己仍 exit 1",
+    "verdict": "RED",
+    "summary": "3 failed, 13 passed, 1 xfailed, 1 warning in 1.09s",
+    "added": [
+      "test_downstream_base_reliability_gate.py::test_a_relocated_criterion_still_blocks_the_door",
+      "test_downstream_base_reliability_gate.py::test_no_task_behind_the_bulk_adapter_gate_is_completed_while_the_door_is_blocked",
+      "test_downstream_base_reliability_gate.py::test_reverse_selfcheck_a_blocked_door_with_a_verified_claim_is_stopped"
+    ],
+    "gone": [],
+    "hit": [
+      "test_downstream_base_reliability_gate.py::test_a_relocated_criterion_still_blocks_the_door"
+    ],
+    "added_files": [
+      "test_downstream_base_reliability_gate.py"
+    ],
+    "restored": true,
+    "seconds": 4.0
+  },
+  {
+    "id": "M05",
+    "side": "be",
+    "want": "test_reverse_selfcheck_an_owner_in_the_same_wave_is_not_scheduled_after",
+    "why": "「归属方排在更晚的 wave」这一支被摘掉 ⇒ 类别 A 只剩「归属方反过来依赖宣称方」一支，而当前 200 条违规全部来自 wave 序（Task 74/71 在 Wave 7）⇒ 恒绿",
+    "verdict": "RED",
+    "summary": "2 failed, 13 passed, 2 xfailed, 1 warning in 1.09s",
+    "added": [
+      "test_downstream_base_reliability_gate.py::test_reverse_selfcheck_a_blocked_door_with_a_verified_claim_is_stopped",
+      "test_downstream_base_reliability_gate.py::test_reverse_selfcheck_an_owner_in_the_same_wave_is_not_scheduled_after"
+    ],
+    "gone": [],
+    "hit": [
+      "test_downstream_base_reliability_gate.py::test_reverse_selfcheck_an_owner_in_the_same_wave_is_not_scheduled_after"
+    ],
+    "added_files": [
+      "test_downstream_base_reliability_gate.py"
+    ],
+    "restored": true,
+    "seconds": 4.0
+  },
+  {
+    "id": "M06",
+    "side": "be",
+    "want": "test_reverse_selfcheck_the_gate_owner_debt_is_also_a_claim_blocker",
+    "why": "摘掉「归属就是本门」那一支 ⇒ Task 20 自有准则一旦非零反而没人拦。「已移交的不该让门背锅」不等于「门自己的也不用管」",
+    "verdict": "RED",
+    "summary": "1 failed, 14 passed, 2 xfailed, 1 warning in 1.09s",
+    "added": [
+      "test_downstream_base_reliability_gate.py::test_reverse_selfcheck_the_gate_owner_debt_is_also_a_claim_blocker"
+    ],
+    "gone": [],
+    "hit": [
+      "test_downstream_base_reliability_gate.py::test_reverse_selfcheck_the_gate_owner_debt_is_also_a_claim_blocker"
+    ],
+    "added_files": [
+      "test_downstream_base_reliability_gate.py"
+    ],
+    "restored": true,
+    "seconds": 4.0
+  },
+  {
+    "id": "M07",
+    "side": "be",
+    "want": "test_reverse_selfcheck_the_evidence_predicate_is_fail_closed_on_unknown_states",
+    "why": "把「≠ 不可验证」换成「== VERIFIED」—— 换个词（CLOSED / PASSED / 已闭环）就能绕过。这是白名单式判据的典型 fail-open 形态",
+    "verdict": "RED",
+    "summary": "1 failed, 14 passed, 2 xfailed, 1 warning in 1.10s",
+    "added": [
+      "test_downstream_base_reliability_gate.py::test_reverse_selfcheck_the_evidence_predicate_is_fail_closed_on_unknown_states"
+    ],
+    "gone": [],
+    "hit": [
+      "test_downstream_base_reliability_gate.py::test_reverse_selfcheck_the_evidence_predicate_is_fail_closed_on_unknown_states"
+    ],
+    "added_files": [
+      "test_downstream_base_reliability_gate.py"
+    ],
+    "restored": true,
+    "seconds": 4.0
+  },
+  {
+    "id": "M08",
+    "side": "be",
+    "want": "test_reverse_selfcheck_an_identity_field_on_an_entry_is_a_claim",
+    "why": "复刻**本轮实际发生过的缺陷**：漏掉 SR-5/SR-6 的 capability 前提后，task40/42/43 三份 pilot 执行记录（有 entry_id + adapter_id、无 capability、明写 capability_enabled=false）被误报成宣称 —— 判据越出规则自己的作用域",
+    "verdict": "RED",
+    "summary": "2 failed, 13 passed, 2 xfailed, 1 warning in 1.09s",
+    "added": [
+      "test_downstream_base_reliability_gate.py::test_no_evidence_artifact_asserts_a_verified_base_while_the_door_is_blocked",
+      "test_downstream_base_reliability_gate.py::test_reverse_selfcheck_an_identity_field_on_an_entry_is_a_claim"
+    ],
+    "gone": [],
+    "hit": [
+      "test_downstream_base_reliability_gate.py::test_reverse_selfcheck_an_identity_field_on_an_entry_is_a_claim"
+    ],
+    "added_files": [
+      "test_downstream_base_reliability_gate.py"
+    ],
+    "restored": true,
+    "seconds": 4.0
+  },
+  {
+    "id": "M09",
+    "side": "be",
+    "want": "test_the_evidence_scan_has_a_real_denominator",
+    "why": "entry 递归只剩数组分支 ⇒ 嵌在 dict 下的 entry（slice 的 `independent_entries` 之外还有 `parent_duplicate_summary` 等）扫不到，类别 C 的分母静默缩小。分母判据必须能拦住这种缩水",
+    "verdict": "RED",
+    "summary": "3 failed, 12 passed, 2 xfailed, 1 warning in 1.06s",
+    "added": [
+      "test_downstream_base_reliability_gate.py::test_reverse_selfcheck_a_blocked_door_with_a_verified_claim_is_stopped",
+      "test_downstream_base_reliability_gate.py::test_reverse_selfcheck_a_green_door_lets_every_claim_through",
+      "test_downstream_base_reliability_gate.py::test_the_evidence_scan_has_a_real_denominator"
+    ],
+    "gone": [],
+    "hit": [
+      "test_downstream_base_reliability_gate.py::test_the_evidence_scan_has_a_real_denominator"
+    ],
+    "added_files": [
+      "test_downstream_base_reliability_gate.py"
+    ],
+    "restored": true,
+    "seconds": 4.0
+  },
+  {
+    "id": "M10",
+    "side": "be",
+    "want": "test_reverse_selfcheck_an_unchecked_downstream_task_is_not_a_claim",
+    "why": "把未勾选/进行中/阻塞态也算成「宣称完成」⇒ 判据变成「有欠账就打红所有下游」的恒红装饰，复核者只会去删这条守卫。恒红与恒绿一样是失效",
+    "verdict": "RED",
+    "summary": "3 failed, 12 passed, 2 xfailed, 1 warning in 1.09s",
+    "added": [
+      "test_downstream_base_reliability_gate.py::test_reverse_selfcheck_a_blocked_door_with_a_verified_claim_is_stopped",
+      "test_downstream_base_reliability_gate.py::test_reverse_selfcheck_an_unchecked_downstream_task_is_not_a_claim",
+      "test_downstream_base_reliability_gate.py::test_reverse_selfcheck_the_gate_owner_debt_is_also_a_claim_blocker"
+    ],
+    "gone": [],
+    "hit": [
+      "test_downstream_base_reliability_gate.py::test_reverse_selfcheck_an_unchecked_downstream_task_is_not_a_claim"
+    ],
+    "added_files": [
+      "test_downstream_base_reliability_gate.py"
+    ],
+    "restored": true,
+    "seconds": 3.9
+  }
+]

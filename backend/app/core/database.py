@@ -4,17 +4,39 @@ from collections.abc import AsyncGenerator
 from uuid import UUID
 
 from sqlalchemy import text
+from sqlalchemy.engine import make_url
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.orm import Session, sessionmaker
+from sqlalchemy.pool import NullPool
 
 from app.core.config import settings
 
 # 任务 14.1：根据数据库类型配置不同的连接池参数
 # - PostgreSQL 生产：pool_size=20 / max_overflow=80（总计 100 连接），recycle 30 分钟
 # - SQLite 开发：轻量配置，recycle 1 小时
+# - PgBouncer：NullPool + statement_cache_size=0（pg-pooling-and-load-test spec）
 _is_postgres = settings.DATABASE_URL.startswith("postgresql")
 
-if _is_postgres:
+if _is_postgres and settings.DB_USE_PGBOUNCER:
+    _pg_url = make_url(settings.DATABASE_URL).set(
+        host=settings.DB_PGBOUNCER_HOST,
+        port=settings.DB_PGBOUNCER_PORT,
+    )
+    _pgbouncer_connect_args = {
+        "statement_cache_size": 0,
+        "prepared_statement_cache_size": 0,
+    }
+    if settings.DB_DISABLE_SSL:
+        # 禁用 asyncpg SSL 协商（无 TLS 部署，避免 Windows 下握手被中止）
+        _pgbouncer_connect_args["ssl"] = False
+    engine = create_async_engine(
+        _pg_url,
+        poolclass=NullPool,
+        connect_args=_pgbouncer_connect_args,
+        pool_pre_ping=True,
+        echo=False,
+    )
+elif _is_postgres:
     engine = create_async_engine(
         settings.DATABASE_URL,
         pool_size=max(settings.DB_POOL_SIZE, 20),
@@ -23,6 +45,7 @@ if _is_postgres:
         pool_pre_ping=True,
         pool_recycle=1800,  # 30 分钟，与 PG idle_in_transaction_session_timeout 协调
         echo=False,
+        connect_args={"ssl": False} if settings.DB_DISABLE_SSL else {},
     )
 else:
     engine = create_async_engine(
@@ -45,8 +68,38 @@ async_session = async_sessionmaker(
 async_engine = engine
 
 # 同步引擎和会话工厂（供同步 service 函数使用）
-_sync_engine = engine.sync_engine
-SyncSession = sessionmaker(bind=_sync_engine, expire_on_commit=False)
+# 延迟初始化：模块 import 时勿访问 AsyncEngine.sync_engine，否则在 uvicorn
+# lifespan 的 greenlet 上下文中首次 connect 会触发 maximum recursion depth exceeded。
+_sync_engine = None
+_sync_session_factory = None
+
+
+def _get_sync_engine():
+    global _sync_engine
+    if _sync_engine is None:
+        _sync_engine = engine.sync_engine
+    return _sync_engine
+
+
+def _get_sync_session_factory():
+    global _sync_session_factory
+    if _sync_session_factory is None:
+        _sync_session_factory = sessionmaker(
+            bind=_get_sync_engine(), expire_on_commit=False
+        )
+    return _sync_session_factory
+
+
+# 向后兼容：旧代码 `from app.core.database import SyncSession` 仍可用
+class _SyncSessionProxy:
+    def __call__(self, *args, **kwargs):
+        return _get_sync_session_factory()(*args, **kwargs)
+
+    def __getattr__(self, name):
+        return getattr(_get_sync_session_factory(), name)
+
+
+SyncSession = _SyncSessionProxy()
 
 
 async def get_db() -> AsyncGenerator[AsyncSession, None]:

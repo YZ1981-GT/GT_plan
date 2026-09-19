@@ -1,11 +1,6 @@
 <template>
   <div class="gt-penetration" :class="{ 'gt-penetration--fullscreen': isFullscreen }" ref="penetrationRef">
     <!-- 全屏模式下的退出提示 -->
-    <div v-if="isFullscreen" class="gt-fullscreen-topbar">
-      <span>{{ currentProject?.client_name || '—' }} · 账簿查询</span>
-      <div style="flex:1" />
-      <el-button size="small" @click="toggleFullscreen">退出全屏</el-button>
-    </div>
     <!-- 账套信息栏 -->
     <div class="gt-ledger-header">
       <div class="gt-ledger-title">
@@ -36,6 +31,7 @@
           <el-option v-for="y in yearOptions" :key="y" :value="y">
             <span>{{ y }}年</span>
             <el-tag v-if="availableYears.includes(y)" size="small" type="success" style="margin-left: 6px; transform: scale(0.85)">有数据</el-tag>
+            <el-tag v-else-if="siblingYearMap[y]" size="small" type="warning" style="margin-left: 6px; transform: scale(0.85)">{{ siblingYearMap[y] }}</el-tag>
           </el-option>
         </el-select>
         <el-button size="small" @click="goToImport">
@@ -47,6 +43,9 @@
         </el-button>
         <el-button size="small" @click="runValidation" :loading="validating" type="warning" plain>
           <el-icon style="margin-right: 2px"><Warning /></el-icon> 数据校验
+        </el-button>
+        <el-button size="small" @click="runDedup" :loading="deduping" type="danger" plain>
+          <el-icon style="margin-right: 2px"><Delete /></el-icon> 数据去重
         </el-button>
       </div>
     </div>
@@ -133,8 +132,16 @@
           <el-button size="small" style="margin-top: 12px" @click="refresh">刷新查看</el-button>
         </template>
         <template v-else>
-          <p style="font-size: var(--gt-font-size-base); color: var(--gt-color-text-tertiary)">暂无科目余额数据</p>
-          <p style="font-size: var(--gt-font-size-sm); color: var(--gt-color-text-placeholder)">请点击右上角「导入数据」上传包含余额表的 Excel/CSV 文件</p>
+          <el-empty description="暂无账套数据，请先导入账套" :image-size="120">
+            <div style="display: flex; flex-direction: column; align-items: center; gap: 8px">
+              <el-button type="primary" @click="navigateToLedgerImport">
+                <el-icon style="margin-right: 4px"><Upload /></el-icon> 前往导入账套
+              </el-button>
+              <p style="font-size: var(--gt-font-size-sm); color: var(--gt-color-text-placeholder); margin: 0">
+                支持上传包含科目余额表和序时账的 Excel/CSV 文件
+              </p>
+            </div>
+          </el-empty>
         </template>
       </div>
 
@@ -148,6 +155,7 @@
         :default-expand-all="false"
         border
         size="small"
+        class="gt-account-balance-table"
         :max-height="tableHeight"
         style="width: 100%"
         highlight-current-row
@@ -164,8 +172,18 @@
           </template>
         </el-table-column>
         <el-table-column prop="account_name" label="科目名称" min-width="180" show-overflow-tooltip />
+        <el-table-column label="方向" width="60" align="center">
+          <template #default="{ row }">
+            {{ resolveDir(row, 'opening') }}
+          </template>
+        </el-table-column>
         <el-table-column prop="opening_balance" label="期初余额" width="200" min-width="180" align="right" sortable :sort-method="numericSortMethod('opening_balance')">
-          <template #default="{ row }"><GtAmountCell :value="row.opening_balance" /></template>
+          <template #default="{ row }">
+            <el-tooltip v-if="balanceTip(row, 'opening')" :content="balanceTip(row, 'opening')" placement="top" :show-after="200">
+              <span class="gt-tip-wrap"><GtAmountCell :value="row.opening_balance" /></span>
+            </el-tooltip>
+            <GtAmountCell v-else :value="row.opening_balance" />
+          </template>
         </el-table-column>
         <el-table-column prop="debit_amount" label="借方发生额" width="200" min-width="180" align="right" sortable :sort-method="numericSortMethod('debit_amount')">
           <template #default="{ row }"><GtAmountCell :value="row.debit_amount" /></template>
@@ -173,9 +191,17 @@
         <el-table-column prop="credit_amount" label="贷方发生额" width="200" min-width="180" align="right" sortable :sort-method="numericSortMethod('credit_amount')">
           <template #default="{ row }"><GtAmountCell :value="row.credit_amount" /></template>
         </el-table-column>
+        <el-table-column label="方向" width="60" align="center">
+          <template #default="{ row }">
+            {{ resolveDir(row, 'closing') }}
+          </template>
+        </el-table-column>
         <el-table-column prop="closing_balance" label="期末余额" width="200" min-width="180" align="right" sortable :sort-method="numericSortMethod('closing_balance')">
           <template #default="{ row }">
-            <GtAmountCell :value="row.closing_balance" :clickable="true" @click="drillToLedger(row)" />
+            <el-tooltip v-if="balanceTip(row, 'closing')" :content="balanceTip(row, 'closing')" placement="top" :show-after="200">
+              <span class="gt-tip-wrap"><GtAmountCell :value="row.closing_balance" :clickable="true" @click="drillToLedger(row)" /></span>
+            </el-tooltip>
+            <GtAmountCell v-else :value="row.closing_balance" :clickable="true" @click="drillToLedger(row)" />
           </template>
         </el-table-column>
       </el-table>
@@ -254,8 +280,11 @@
             <el-button size="small" style="margin-top: 12px" @click="loadAllAuxBalance">刷新查看</el-button>
           </template>
           <template v-else>
-            <p style="font-size: var(--gt-font-size-base); color: var(--gt-color-text-tertiary)">暂无辅助余额数据</p>
-            <p style="font-size: var(--gt-font-size-sm); color: var(--gt-color-text-placeholder)">请点击右上角「导入数据」重新上传包含辅助账的 Excel/CSV 文件</p>
+            <el-empty description="暂无辅助余额数据，请先导入账套" :image-size="100">
+              <el-button type="primary" size="small" @click="navigateToLedgerImport">
+                <el-icon style="margin-right: 4px"><Upload /></el-icon> 前往导入账套
+              </el-button>
+            </el-empty>
           </template>
         </div>
 
@@ -271,6 +300,7 @@
           :default-expand-all="auxAllExpanded"
           border
           size="small"
+          class="gt-aux-balance-table"
           :max-height="tableHeight"
           style="width: 100%"
           highlight-current-row
@@ -319,7 +349,10 @@
           </el-table-column>
           <el-table-column prop="opening_balance" label="期初余额" width="200" min-width="180" align="right" sortable :sort-method="numericSortMethod('opening_balance')">
             <template #default="{ row }">
-              <GtAmountCell :value="row.opening_balance" />
+              <el-tooltip v-if="balanceTip(row, 'opening')" :content="balanceTip(row, 'opening')" placement="top" :show-after="200">
+                <span class="gt-tip-wrap"><GtAmountCell :value="row.opening_balance" /></span>
+              </el-tooltip>
+              <GtAmountCell v-else :value="row.opening_balance" />
             </template>
           </el-table-column>
           <el-table-column prop="debit_amount" label="借方发生额" width="200" min-width="180" align="right" sortable :sort-method="numericSortMethod('debit_amount')">
@@ -334,7 +367,10 @@
           </el-table-column>
           <el-table-column prop="closing_balance" label="期末余额" width="200" min-width="180" align="right" sortable :sort-method="numericSortMethod('closing_balance')">
             <template #default="{ row }">
-              <GtAmountCell v-if="!row._isGroup" :value="row.closing_balance" :clickable="true" @click="drillToAuxLedgerFromBalance(row)" />
+              <el-tooltip v-if="!row._isGroup && balanceTip(row, 'closing')" :content="balanceTip(row, 'closing')" placement="top" :show-after="200">
+                <span class="gt-tip-wrap"><GtAmountCell :value="row.closing_balance" :clickable="true" @click="drillToAuxLedgerFromBalance(row)" /></span>
+              </el-tooltip>
+              <GtAmountCell v-else-if="!row._isGroup" :value="row.closing_balance" :clickable="true" @click="drillToAuxLedgerFromBalance(row)" />
               <GtAmountCell v-else :value="row.closing_balance" />
             </template>
           </el-table-column>
@@ -373,6 +409,23 @@
         <el-button size="small" @click="loadLedger" :loading="loading">刷新</el-button>
         <el-button size="small" plain @click="copySelectedRows" :disabled="selectedRows.length === 0" title="复制选中行到剪贴板">复制选中</el-button>
         <el-button size="small" plain @click="exportLedgerExcel">导出Excel</el-button>
+        <el-popover v-if="ledgerExtraAllKeys.length" placement="bottom-end" :width="220" trigger="click">
+          <template #reference>
+            <el-button size="small" plain title="额外列显隐设置">⚙ 额外列</el-button>
+          </template>
+          <div class="gt-extra-col-prefs">
+            <div class="gt-extra-col-prefs__head">
+              <span>额外列显隐</span>
+              <el-button size="small" text type="primary" @click="showAllExtraCols">全显</el-button>
+            </div>
+            <el-checkbox
+              v-for="k in ledgerExtraAllKeys"
+              :key="k"
+              :model-value="!hiddenExtraCols.has(k)"
+              @change="(v) => toggleExtraCol(k, v as boolean)"
+            >{{ k }}</el-checkbox>
+          </div>
+        </el-popover>
         <el-button size="small" plain @click="toggleFullscreen" :title="isFullscreen ? '退出全屏' : '全屏查看'">{{ isFullscreen ? '退出全屏' : '全屏' }}</el-button>
       </div>
       <!-- V3 Req 12.2.1: 虚拟滚动模式（数据量 > 1000 行时自动切换 el-table-v2） -->
@@ -445,7 +498,7 @@
             <span v-if="row._type === 'normal'" class="gt-link gt-amt" @click.stop="drillToVoucher(row)">{{ row.voucher_no }}</span>
           </template>
         </el-table-column>
-        <el-table-column prop="summary" label="摘要" min-width="200" show-overflow-tooltip>
+        <el-table-column prop="summary" label="摘要" min-width="180" show-overflow-tooltip>
           <template #default="{ row }"><span class="gt-amt">{{ row.summary }}</span></template>
         </el-table-column>
         <el-table-column prop="debit_amount" label="借方" width="200" min-width="180" align="right">
@@ -459,19 +512,22 @@
             <GtAmountCell :value="row.balance" />
           </template>
         </el-table-column>
+        <!-- 非关键列（导入时保留的 raw_extra 业务字段）动态列 -->
+        <el-table-column
+          v-for="k in ledgerExtraColumns"
+          :key="`ef-${k}`"
+          :label="k"
+          :prop="`extra_fields.${k}`"
+          min-width="120"
+          show-overflow-tooltip
+          class-name="gt-ef-col"
+          label-class-name="gt-ef-col-hd"
+        >
+          <template #default="{ row }"><span class="gt-ef-cell">{{ fmtExtraCell(row.extra_fields?.[k]) }}</span></template>
+        </el-table-column>
       </el-table>
-      <div class="gt-pagination" v-if="ledgerTotal > ledgerPageSize">
-        <el-pagination
-          v-model:current-page="ledgerPage"
-          v-model:page-size="ledgerPageSize"
-          :page-sizes="ledgerPageSizeOptions"
-          :total="ledgerTotal"
-          layout="sizes, total, prev, pager, next, jumper"
-          size="small"
-          @size-change="onLedgerPageSizeChange"
-          @current-change="onLedgerPageChange"
-        />
-      </div>
+      <!-- 明细账已全量加载（运行余额/月小计需跨整账计算），≤1000 行用普通表，
+           >1000 行自动切虚拟滚动；不再做服务端分页（按页算余额会错）。 -->
     </template>
 
     <!-- ═══ 第三层：凭证分录 ═══ -->
@@ -479,7 +535,27 @@
       <div class="gt-filter-row">
         <div class="gt-filter-spacer" />
         <el-tag type="info" size="small">凭证 {{ currentVoucher }}</el-tag>
+        <el-button size="small" plain @click="copyCurrentVoucher" title="复制本凭证所有分录到剪贴板">复制本凭证</el-button>
+        <el-button size="small" type="primary" plain @click="sampleCurrentVoucher" title="将本凭证标记为抽样凭证">抽中本凭证</el-button>
+        <el-button size="small" type="warning" plain @click="attachCurrentVoucher" title="将本凭证挂入某张底稿的凭证检查表">挂凭到底稿</el-button>
         <el-button size="small" plain @click="copySelectedRows()" :disabled="selectedRows.length === 0" title="复制选中行到剪贴板">复制选中</el-button>
+        <el-popover v-if="voucherExtraAllKeys.length" placement="bottom-end" :width="220" trigger="click">
+          <template #reference>
+            <el-button size="small" plain title="额外列显隐设置">⚙ 额外列</el-button>
+          </template>
+          <div class="gt-extra-col-prefs">
+            <div class="gt-extra-col-prefs__head">
+              <span>额外列显隐</span>
+              <el-button size="small" text type="primary" @click="showAllExtraCols">全显</el-button>
+            </div>
+            <el-checkbox
+              v-for="k in voucherExtraAllKeys"
+              :key="k"
+              :model-value="!hiddenExtraCols.has(k)"
+              @change="(v) => toggleExtraCol(k, v as boolean)"
+            >{{ k }}</el-checkbox>
+          </div>
+        </el-popover>
         <el-button size="small" plain @click="toggleFullscreen" :title="isFullscreen ? '退出全屏' : '全屏查看'">{{ isFullscreen ? '退出全屏' : '全屏' }}</el-button>
       </div>
       <el-table
@@ -505,6 +581,19 @@
         </el-table-column>
         <el-table-column prop="summary" label="摘要" min-width="200" show-overflow-tooltip>
           <template #default="{ row }"><span class="gt-amt">{{ row.summary }}</span></template>
+        </el-table-column>
+        <!-- 非关键列（导入时保留的 raw_extra 业务字段）动态列 -->
+        <el-table-column
+          v-for="k in voucherExtraColumns"
+          :key="`ef-${k}`"
+          :label="k"
+          :prop="`extra_fields.${k}`"
+          min-width="120"
+          show-overflow-tooltip
+          class-name="gt-ef-col"
+          label-class-name="gt-ef-col-hd"
+        >
+          <template #default="{ row }"><span class="gt-ef-cell">{{ fmtExtraCell(row.extra_fields?.[k]) }}</span></template>
         </el-table-column>
       </el-table>
     </template>
@@ -548,6 +637,23 @@
         <el-tag type="info" size="small">{{ currentAccount }} / {{ currentAuxCode }} 辅助明细</el-tag>
         <el-button size="small" @click="loadAuxLedger" :loading="loading">刷新</el-button>
         <el-button size="small" plain @click="copySelectedRows" :disabled="selectedRows.length === 0" title="复制选中行到剪贴板">复制选中</el-button>
+        <el-popover v-if="auxLedgerExtraAllKeys.length" placement="bottom-end" :width="220" trigger="click">
+          <template #reference>
+            <el-button size="small" plain title="额外列显隐设置">⚙ 额外列</el-button>
+          </template>
+          <div class="gt-extra-col-prefs">
+            <div class="gt-extra-col-prefs__head">
+              <span>额外列显隐</span>
+              <el-button size="small" text type="primary" @click="showAllExtraCols">全显</el-button>
+            </div>
+            <el-checkbox
+              v-for="k in auxLedgerExtraAllKeys"
+              :key="k"
+              :model-value="!hiddenExtraCols.has(k)"
+              @change="(v) => toggleExtraCol(k, v as boolean)"
+            >{{ k }}</el-checkbox>
+          </div>
+        </el-popover>
         <el-button size="small" plain @click="toggleFullscreen" :title="isFullscreen ? '退出全屏' : '全屏查看'">{{ isFullscreen ? '退出全屏' : '全屏' }}</el-button>
       </div>
       <el-table
@@ -586,17 +692,21 @@
             <GtAmountCell :value="row.balance" />
           </template>
         </el-table-column>
+        <!-- 非关键列（导入时保留的 raw_extra 业务字段）动态列 -->
+        <el-table-column
+          v-for="k in auxLedgerExtraColumns"
+          :key="`ef-${k}`"
+          :label="k"
+          :prop="`extra_fields.${k}`"
+          min-width="120"
+          show-overflow-tooltip
+          class-name="gt-ef-col"
+          label-class-name="gt-ef-col-hd"
+        >
+          <template #default="{ row }"><span class="gt-ef-cell">{{ fmtExtraCell(row.extra_fields?.[k]) }}</span></template>
+        </el-table-column>
       </el-table>
-      <div class="gt-pagination" v-if="auxLedgerTotal > 100">
-        <el-pagination
-          v-model:current-page="auxLedgerPage"
-          :page-size="100"
-          :total="auxLedgerTotal"
-          layout="prev, pager, next, total"
-          size="small"
-          @current-change="loadAuxLedger"
-        />
-      </div>
+      <!-- 辅助明细账已全量加载（运行余额/月小计需跨整账计算），不再做服务端分页。 -->
     </template>
 
   </div>
@@ -617,10 +727,18 @@
       </div>
       <div class="gt-context-menu__item gt-context-menu__divider" />
       <div class="gt-context-menu__item" @click="onContextAction('voucher')">
-        抽凭到底稿（开发中）
+        挂凭到底稿
       </div>
     </div>
   </Teleport>
+
+  <!-- ── 挂凭到底稿弹窗 ── -->
+  <AttachVoucherToWpDialog
+    v-model="attachDialogVisible"
+    :project-id="projectId"
+    :year="year"
+    :vouchers="attachVouchers"
+  />
 
   <!-- ── 智能导入弹窗 ── -->
   <el-dialog
@@ -987,11 +1105,11 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted, onBeforeUnmount, watch, provide, h } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { Search, Upload, Loading, Warning, Setting } from '@element-plus/icons-vue'
+import { Search, Upload, Loading, Warning, Setting, Delete } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox, ElNotification } from 'element-plus'
 import { api } from '@/services/apiProxy'
 import { ledger as P_ledger, projects as P_proj, materiality as P_mat } from '@/services/apiPaths'
-import { fmtAmount } from '@/utils/formatters'
+import { fmtAmount, fmtAmountUnit } from '@/utils/formatters'
 import { IMPORT_JOB_STATUS } from '@/constants/statusEnum'
 import ImportCompletionSummary from '@/components/ImportCompletionSummary.vue'
 import LedgerDataManager from '@/components/ledger-import/LedgerDataManager.vue'
@@ -1007,7 +1125,14 @@ import { usePenetrate } from '@/composables/usePenetrate'
 import { useFullscreen } from '@/composables/useFullscreen'
 import { useDecimalCalc } from '@/composables/useDecimalCalc'
 import { numericSortMethod } from '@/utils/numericSort'
+import { buildLedgerDisplay, buildLedgerFilteredDisplay } from '@/utils/ledgerDisplay'
+import { buildExtraColumns, buildClipboardTable, fmtExtraCell } from '@/views/ledgerExtraColumns'
 import GtAmountCell from '@/components/common/GtAmountCell.vue'
+import AttachVoucherToWpDialog from '@/views/ledger/AttachVoucherToWpDialog.vue'
+// Domain-split composables (platform-global-hardening Req 6.1/6.3)
+import { useLedgerImport } from '@/views/composables/useLedgerImport'
+import { useLedgerBalance, resolveDir as _resolveDir, balanceTip as _balanceTip } from '@/views/composables/useLedgerBalance'
+import { useLedgerNavigation } from '@/views/composables/useLedgerNavigation'
 
 import { handleApiError } from '@/utils/errorHandler'
 import { logger } from '@/utils/logger'
@@ -1042,24 +1167,56 @@ const currentProject = ref<ProjectInfo | null>(null)
 const selectedProjectId = ref('')
 const selectedYear = ref(2025)
 
+// 保持 selectedYear 与路由 query.year 同步（切换年度后选择器显示正确年份）
+watch(year, (newYear) => {
+  if (newYear !== selectedYear.value) {
+    selectedYear.value = newYear
+  }
+}, { immediate: true })
+
 const yearOptions = computed(() => {
   const cur = new Date().getFullYear()
   const defaultYears = Array.from({ length: 5 }, (_, i) => cur - i)
-  // 合并实际有数据的年度
-  const all = new Set([...defaultYears, ...availableYears.value])
+  // 合并实际有数据的年度 + 同客户其他项目有数据的年度
+  const siblingYearNums = siblingYears.value.map(s => s.year)
+  const all = new Set([...defaultYears, ...availableYears.value, ...siblingYearNums])
   return [...all].sort((a, b) => b - a)
 })
 
 const availableYears = ref<number[]>([])
+const siblingYears = ref<Array<{ year: number; project_id: string; project_name: string }>>([])
+
+// 同客户其他项目年份映射（供年度选择器显示"其他项目"提示）
+const siblingYearMap = computed(() => {
+  const map: Record<number, string> = {}
+  for (const s of siblingYears.value) {
+    if (!availableYears.value.includes(s.year)) {
+      // 取项目名最后的年份部分去掉，只显示简短标识
+      map[s.year] = '其他项目'
+    }
+  }
+  return map
+})
 
 async function loadAvailableYears() {
   if (!projectId.value) return
   try {
-    const data = await api.get(P_ledger.years(projectId.value))
+    const data = await api.get(P_ledger.years(projectId.value), {
+      validateStatus: (s: number) => s === 200 || s === 404,
+    })
+    // 404 = 新项目无数据，静默处理
+    if (!data || data?.detail) {
+      availableYears.value = []
+      siblingYears.value = []
+      return
+    }
     const result = data
     availableYears.value = result?.years ?? []
+    siblingYears.value = result?.sibling_years ?? []
+    // 把同客户其他项目的年份也加入 yearOptions（通过合并进 availableYears 的计算）
   } catch {
     availableYears.value = []
+    siblingYears.value = []
   }
 }
 
@@ -1125,13 +1282,34 @@ function onProjectChange(newId: string) {
   }
 }
 
-function onYearChange(newYear: number) {
+async function onYearChange(newYear: number) {
+  // 如果选择的年份在同客户其他项目中（而非当前项目）→ 确认跳转
+  const sibling = siblingYears.value.find(s => s.year === newYear)
+  if (sibling && !availableYears.value.includes(newYear)) {
+    try {
+      await ElMessageBox.confirm(
+        `${newYear} 年数据在项目「${sibling.project_name}」中，是否跳转到该项目查看？`,
+        '跨项目年度切换',
+        { confirmButtonText: '跳转', cancelButtonText: '取消', type: 'info' },
+      )
+      router.push({ path: `/projects/${sibling.project_id}/ledger`, query: { year: String(newYear) } })
+    } catch {
+      // 用户取消，恢复原年度
+      selectedYear.value = year.value
+    }
+    return
+  }
   selectedYear.value = newYear
   router.push({ path: `/projects/${projectId.value}/ledger`, query: { year: String(newYear) } })
 }
 
 function goToImport() {
   openImportDialog()
+}
+
+/** 跳转到独立账套导入页 */
+function navigateToLedgerImport() {
+  router.push(`/projects/${projectId.value}/ledger-import`)
 }
 
 function goToImportHistory() {
@@ -1233,6 +1411,58 @@ async function runValidation() {
     handleApiError(e, '校验')
   } finally {
     validating.value = false
+  }
+}
+
+// ── 数据去重 ──
+const deduping = ref(false)
+
+async function runDedup() {
+  if (!projectId.value) return
+  deduping.value = true
+  try {
+    // 1. 先 dry_run 预览将删除的重复行数
+    const preview: any = await api.post(P_ledger.data.dedup(projectId.value), {
+      year: selectedYear.value,
+      dry_run: true,
+    })
+    const total = preview?.total_deleted ?? 0
+    if (total === 0) {
+      ElMessage.success('未检测到重复数据，无需去重')
+      return
+    }
+    const detail = ['tb_balance', 'tb_ledger', 'tb_aux_balance', 'tb_aux_ledger']
+      .map((t) => {
+        const label = { tb_balance: '余额表', tb_ledger: '序时账', tb_aux_balance: '辅助余额', tb_aux_ledger: '辅助明细' }[t]
+        return preview[t] ? `${label}: ${preview[t].toLocaleString()} 行` : null
+      })
+      .filter(Boolean)
+      .join('，')
+    // 2. 确认
+    await ElMessageBox.confirm(
+      `检测到 ${total.toLocaleString()} 行整行完全相同的重复数据（${detail}）。\n` +
+        `去重将保留每组首条、删除其余完全相同的行（任一字段有差异的行不会被删，删除的数据进回收站可恢复）。是否继续？`,
+      '数据去重确认',
+      { type: 'warning', confirmButtonText: '确认去重', cancelButtonText: '取消' }
+    )
+    // 3. 实际执行（默认软删，进回收站可恢复）
+    const result: any = await api.post(P_ledger.data.dedup(projectId.value), {
+      year: selectedYear.value,
+      dry_run: false,
+    })
+    const deleted = result?.total_deleted ?? 0
+    ElMessage.success(
+      `去重完成，共清理 ${deleted.toLocaleString()} 行重复数据（已进回收站，可在"数据管理"中恢复）`
+    )
+    // 刷新当前视图
+    if (currentLevel.value === 'balance') {
+      await loadBalance()
+    }
+  } catch (e: any) {
+    if (e === 'cancel' || e === 'close') return
+    handleApiError(e, '去重')
+  } finally {
+    deduping.value = false
   }
 }
 const importStep = ref<'upload' | 'preview' | 'importing' | 'done'>('upload')
@@ -1374,7 +1604,6 @@ const STANDARD_FIELDS = [
   { value: 'direction', label: '借贷方向' },
   { value: 'preparer', label: '制单人' },
   { value: 'accounting_period', label: '会计期间' },
-  { value: 'counterpart_account', label: '对方科目' },
 ]
 
 function initColumnMapping() {
@@ -1591,6 +1820,16 @@ function onImportFileChange(file: any) {
   if (file?.raw) {
     uploadToken.value = ''
     importFiles.value.push(file.raw)
+    // 百万行优化：大文件提示建议使用 CSV 格式（Excel 全量加载内存，CSV 可流式处理）
+    const sizeMB = (file.raw.size || 0) / (1024 * 1024)
+    const isExcel = /\.xlsx?$/i.test(file.raw.name || '')
+    if (sizeMB > 50 && isExcel) {
+      ElMessage.warning({
+        message: `文件较大（${sizeMB.toFixed(0)} MB），建议将 Excel 另存为 CSV 格式后上传，可显著加快导入速度并降低内存占用`,
+        duration: 8000,
+        showClose: true,
+      })
+    }
   }
 }
 
@@ -1598,12 +1837,9 @@ async function doPreview() {
   if (!importFiles.value.length) return
   previewing.value = true
   importProgressPct.value = 0
-  const progressTimer = setInterval(() => {
-    if (importProgressPct.value < 90) {
-      importProgressPct.value += Math.random() * 12 + 3
-      if (importProgressPct.value > 90) importProgressPct.value = 90
-    }
-  }, 400)
+  ;(globalThis as any).__suppressTimeoutToast = true
+  // 上传进度占 0~70%，后端解析占 70~100%
+  const parseTimer = { id: null as ReturnType<typeof setInterval> | null }
   try {
     const formData = buildImportPreviewFormData(importFiles.value)
     const url = buildImportPreviewUrl({
@@ -1611,7 +1847,25 @@ async function doPreview() {
       year: importYear.value,
       previewRows: 50,
     })
-    const data = await smartPreviewLedgerImport(projectId.value, url, formData)
+    const data = await api.post(url, formData, {
+      timeout: 600000,
+      _silent: true,
+      onUploadProgress: (evt: any) => {
+        // 上传阶段：0~70%
+        if (evt.total) {
+          importProgressPct.value = Math.min(70, Math.round((evt.loaded / evt.total) * 70))
+        }
+      },
+    } as any)
+    // 上传完成，后端解析中 70~95%（模拟，因为无法获取后端进度）
+    importProgressPct.value = 75
+    parseTimer.id = setInterval(() => {
+      if (importProgressPct.value < 95) {
+        importProgressPct.value += 2
+      }
+    }, 500)
+    // 实际结果已返回
+    if (parseTimer.id) clearInterval(parseTimer.id)
     importProgressPct.value = 100
     const previewSuccess = resolveImportPreviewSuccess({
       result: data,
@@ -1637,9 +1891,10 @@ async function doPreview() {
       handleApiError(e, '解析')
     }
   } finally {
-    clearInterval(progressTimer)
+    if (parseTimer.id) clearInterval(parseTimer.id)
     importProgressPct.value = 0
     previewing.value = false
+    ;(globalThis as any).__suppressTimeoutToast = false
   }
 }
 
@@ -1930,28 +2185,95 @@ function onContextAction(action: string) {
   } else if (action === 'copy') {
     copySelectedRows(row)
   } else if (action === 'voucher') {
-    // TODO: 抽凭联动到底稿（后续实现）
+    openAttachToWorkpaper(row)
   }
 }
+
+// ── 挂凭到底稿（序时账 ↔ 底稿凭证检查联动）──
+const attachDialogVisible = ref(false)
+const attachVouchers = ref<Array<{ voucherNo: string; accountCode?: string | null }>>([])
+
+/** 从当前行/选中行/当前凭证收集待挂凭证并打开弹窗 */
+function openAttachToWorkpaper(fallbackRow?: any) {
+  // 候选行：优先选中行 → 回退右键行；凭证层则用当前凭证
+  const pool: any[] = selectedRows.value.length > 0
+    ? selectedRows.value
+    : (fallbackRow ? [fallbackRow] : [])
+
+  const seen = new Set<string>()
+  const list: Array<{ voucherNo: string; accountCode?: string | null }> = []
+  for (const r of pool) {
+    const vno = String(r?.voucher_no || '').trim()
+    if (!vno || seen.has(vno)) continue
+    seen.add(vno)
+    list.push({ voucherNo: vno, accountCode: r?.account_code || currentAccount.value || null })
+  }
+  // 凭证层：右键行无 voucher_no 时用当前凭证兜底
+  if (list.length === 0 && currentLevel.value === 'voucher' && currentVoucher.value) {
+    list.push({ voucherNo: currentVoucher.value, accountCode: currentAccount.value || null })
+  }
+
+  if (list.length === 0) {
+    ElMessage.warning('请在明细账/凭证层选择带凭证号的行后再挂凭')
+    return
+  }
+  attachVouchers.value = list
+  attachDialogVisible.value = true
+}
+
+/** 挂凭到当前凭证（凭证层工具栏按钮） */
+function attachCurrentVoucher() {
+  if (!currentVoucher.value) {
+    ElMessage.warning('请先穿透到某张凭证')
+    return
+  }
+  attachVouchers.value = [{ voucherNo: currentVoucher.value, accountCode: currentAccount.value || null }]
+  attachDialogVisible.value = true
+}
+
+/** 复制/导出排除的内部字段（含 raw_extra / extra_fields 对象本身，避免 [object Object]）。 */
+const COPY_EXCLUDE_KEYS = ['_type', '_isGroup', '_isSubtotal', '_tree_key', '_hasChildren', 'children', 'id', 'project_id', 'dataset_id', 'is_deleted', 'company_code', 'currency_code', 'raw_extra', 'extra_fields']
 
 /** 复制选中行到剪贴板（Tab 分隔，可直接粘贴到 Excel） */
 function copySelectedRows(fallbackRow?: any) {
   const rows = selectedRows.value.length > 0 ? selectedRows.value : (fallbackRow ? [fallbackRow] : [])
   if (rows.length === 0) return
-  // 提取可见字段（排除内部字段）
-  const excludeKeys = new Set(['_type', '_isGroup', '_isSubtotal', '_tree_key', '_hasChildren', 'children', 'id', 'project_id', 'dataset_id', 'is_deleted', 'company_code', 'currency_code', 'raw_extra'])
-  const keys = Object.keys(rows[0]).filter(k => !excludeKeys.has(k) && !k.startsWith('_'))
-  const lines = rows.map(r => keys.map(k => {
-    const v = r[k]
-    return v == null ? '' : String(v)
-  }).join('\t'))
+  const { lines } = buildClipboardTable(rows, COPY_EXCLUDE_KEYS)
   const text = lines.join('\n')
   navigator.clipboard?.writeText(text).then(() => {
     ElMessage.success(`已复制 ${rows.length} 行`)
   })
 }
 
-// ── 导航状态 ──
+/** 复制本凭证全部分录到剪贴板（Tab 分隔，可直接粘贴到 Excel） */
+function copyCurrentVoucher() {
+  const rows = voucherItems.value.filter(r => r._type !== 'subtotal' && r._type !== 'view_subtotal')
+  if (rows.length === 0) {
+    ElMessage.warning('本凭证无分录可复制')
+    return
+  }
+  const { header, lines } = buildClipboardTable(rows, COPY_EXCLUDE_KEYS)
+  const text = [header, ...lines].join('\n')
+  navigator.clipboard?.writeText(text).then(() => {
+    ElMessage.success(`已复制凭证 ${currentVoucher.value} 共 ${rows.length} 条分录`)
+  })
+}
+
+/** 抽中本凭证：标记为抽样凭证（用于审计抽凭） */
+async function sampleCurrentVoucher() {
+  if (!currentVoucher.value) return
+  try {
+    await api.post(`/api/projects/${projectId.value}/ledger/sample-voucher`, {
+      year: year.value,
+      voucher_no: currentVoucher.value,
+      account_code: currentAccount.value || null,
+    })
+    ElMessage.success(`已将凭证 ${currentVoucher.value} 加入抽样`)
+  } catch (e: any) {
+    // 后端端点未就绪时降级为本地提示（不阻断）
+    ElMessage.warning(`抽样登记失败：${e?.message || '功能待后端支持'}`)
+  }
+}
 type Level = 'balance' | 'ledger' | 'voucher' | 'aux_balance' | 'aux_ledger'
 const currentLevel = ref<Level>('balance')
 const currentAccount = ref('')
@@ -1978,10 +2300,6 @@ const breadcrumbs = ref<Crumb[]>([{ label: '账簿查询', level: 'balance' }])
 const balanceData = ref<any[]>([])
 const ledgerItems = ref<any[]>([])
 const ledgerTotal = ref(0)
-const ledgerPage = ref(1)
-const ledgerPageSize = ref(100)
-const ledgerPageSizeOptions = [50, 100, 200, 500]
-
 // V3 Req 12.2.1: el-table-v2 虚拟滚动列定义（数据量 > 1000 行时启用）
 // V3 Req 12.2.2: 支持列宽拖拽 / 行选择 / 右键菜单 / 排序 / 筛选
 const tableWidth = ref(1200)
@@ -1991,7 +2309,8 @@ const ledgerColumnWidths = ref<Record<string, number>>({
   __selection: 44,
   voucher_date: 110,
   voucher_no: 100,
-  summary: 320,
+  summary: 240,
+  counterpart_account: 120,
   debit_amount: 160,
   credit_amount: 160,
   balance: 160,
@@ -2038,12 +2357,44 @@ const ledgerVirtualColumns = computed(() => {
     makeResizableCol('voucher_date', '日期', w.voucher_date, sortKey),
     makeResizableCol('voucher_no', '凭证号', w.voucher_no, sortKey),
     makeResizableCol('summary', '摘要', w.summary, sortKey, { flexGrow: 1 }),
-    makeResizableCol('debit_amount', '借方', w.debit_amount, sortKey, { align: 'right' }),
-    makeResizableCol('credit_amount', '贷方', w.credit_amount, sortKey, { align: 'right' }),
-    makeResizableCol('balance', '余额', w.balance, sortKey, { align: 'right' }),
+    makeResizableCol('debit_amount', '借方', w.debit_amount, sortKey, { align: 'right', cellRenderer: amountCellRenderer }),
+    makeResizableCol('credit_amount', '贷方', w.credit_amount, sortKey, { align: 'right', cellRenderer: amountCellRenderer }),
+    makeResizableCol('balance', '余额', w.balance, sortKey, { align: 'right', cellRenderer: amountCellRenderer }),
+    // 非关键列（导入时保留的 raw_extra 业务字段）动态列：固定列（余额）后追加；空数组自然不产出
+    ...ledgerExtraColumns.value.map((k) =>
+      makeResizableCol(`ef_${k}`, k, w[`ef_${k}`] ?? 140, sortKey, {
+        // 额外列纯展示：不排序（避免 onLedgerColumnSort 传入 buildLedgerFilteredDisplay 不认的 key）
+        sortable: false,
+        // 额外列视觉区分（Task 8.3*）：与固定列不同底色 class
+        class: 'gt-ef-vcell',
+        headerClass: 'gt-ef-vcell-hd',
+        // el-table-v2 的 dataKey 浅取字段不解析点路径，必须用 cellRenderer 从 rowData.extra_fields 取值渲染为文本；
+        // 合成行（期初/月小计）无 extra_fields → fmtExtraCell(undefined) 返回空；非标量值 JSON.stringify（Task 8.3*）
+        cellRenderer: ({ rowData }: any) =>
+          h('span', { class: 'gt-amt gt-ef-cell' }, fmtExtraCell(rowData?.extra_fields?.[k])),
+      }),
+    ),
   ]
   return cols
 })
+
+/**
+ * 虚拟滚动金额单元格渲染器：千分位 + 跟随 displayPrefs 单位/小数位。
+ * el-table-v2 不走 <template>，必须用 cellRenderer 显式格式化，
+ * 否则直接渲染原始数值（无千分符）。与标准表 GtAmountCell 口径一致。
+ */
+function amountCellRenderer({ cellData }: any) {
+  const txt = fmtAmountUnit(cellData, displayPrefs.amountUnit as any, displayPrefs.decimals, displayPrefs.showZero)
+  const negative = typeof cellData === 'number' ? cellData < 0 : Number(cellData) < 0
+  return h(
+    'span',
+    {
+      class: ['gt-amt', { 'gt-amount--negative': displayPrefs.negativeRed && negative }],
+      style: { fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' },
+    },
+    txt,
+  )
+}
 
 /** 构造可调整列宽的列定义（headerCellRenderer 注入 resize handle） */
 function makeResizableCol(
@@ -2180,188 +2531,83 @@ function clearLedgerFilters() {
 
 function ledgerVirtualRowClass({ rowData }: { rowData: any }) {
   if (rowData._type === 'opening') return 'gt-ledger-opening'
-  if (rowData._type === 'subtotal') return 'gt-ledger-subtotal'
+  if (rowData._type === 'subtotal' || rowData._type === 'view_subtotal') return 'gt-ledger-subtotal'
   return ''
 }
 
 /** 序时账增强显示：期初行 + 每笔余额 + 月小计行 */
-const ledgerDisplay = computed(() => {
-  const items = ledgerItems.value
-  if (items.length === 0) return []
+const ledgerDisplay = computed(() =>
+  buildLedgerDisplay(ledgerItems.value, currentAccountOpening.value, {
+    syntheticExtra: { counterpart_account: '', account_code: '' },
+  }),
+)
 
-  const rows: any[] = []
-  let balance = currentAccountOpening.value
-  let monthDebit = 0
-  let monthCredit = 0
-  let lastMonth = ''
-
-  // 期初余额行
-  rows.push({
-    _type: 'opening',
-    voucher_date: '',
-    voucher_no: '',
-    summary: '期初余额',
-    debit_amount: null,
-    credit_amount: null,
-    balance,
-    counterpart_account: '',
-    account_code: '',
-  })
-
-  for (let i = 0; i < items.length; i++) {
-    const item = items[i]
-    const d = num(item.debit_amount)
-    const c = num(item.credit_amount)
-    balance = Number(decSub(String(decAdd(String(balance), String(d))), String(c)))
-    monthDebit = Number(decAdd(String(monthDebit), String(d)))
-    monthCredit = Number(decAdd(String(monthCredit), String(c)))
-
-    const month = (item.voucher_date || '').substring(0, 7) // "2025-01"
-    if (!lastMonth) lastMonth = month
-
-    // 月份变化时插入上月小计
-    if (month !== lastMonth && lastMonth) {
-      rows.push({
-        _type: 'subtotal',
-        voucher_date: '',
-        voucher_no: '',
-        summary: `${lastMonth} 本月合计`,
-        debit_amount: monthDebit,
-        credit_amount: monthCredit,
-        balance,
-        counterpart_account: '',
-        account_code: '',
-      })
-      monthDebit = d
-      monthCredit = c
-      lastMonth = month
-    }
-
-    rows.push({ ...item, _type: 'normal', balance })
-  }
-
-  // 最后一个月的小计
-  if (items.length > 0) {
-    rows.push({
-      _type: 'subtotal',
-      voucher_date: '',
-      voucher_no: '',
-      summary: `${lastMonth} 本月合计`,
-      debit_amount: monthDebit,
-      credit_amount: monthCredit,
-      balance,
-      counterpart_account: '',
-      account_code: '',
-    })
-  }
-
-  return rows
-})
+/** 虚拟滚动专用展示：筛选子集重算月小计；排序时附「当前视图合计」 */
+const ledgerVirtualDisplay = computed(() =>
+  buildLedgerFilteredDisplay(ledgerItems.value, currentAccountOpening.value, {
+    keyword: ledgerSearchKeyword.value,
+    amountDir: ledgerAmountDir.value,
+    sort: ledgerSort.value,
+    syntheticExtra: { counterpart_account: '', account_code: '' },
+  }),
+)
 
 /**
- * 虚拟滚动专用展示数据：在 ledgerDisplay 之上叠加排序 + 筛选
- * 期初/小计行始终保留位置，仅对 normal 业务行排序/筛选
+ * 额外列（extra_fields 业务键）显隐偏好：存「隐藏键集合」到 localStorage（新键默认显示）。
+ * 序时账/凭证/辅助明细三处表格共用同一可见集合（Task 8.1*）。
  */
-const ledgerVirtualDisplay = computed(() => {
-  const all = ledgerDisplay.value
-  if (all.length === 0) return all
-  const kw = ledgerSearchKeyword.value.trim().toLowerCase()
-  const dir = ledgerAmountDir.value
-  const sort = ledgerSort.value
+const EXTRA_COL_PREFS_KEY = 'ledger-extra-column-prefs'
+const hiddenExtraCols = ref<Set<string>>(new Set())
+try {
+  const raw = localStorage.getItem(EXTRA_COL_PREFS_KEY)
+  if (raw) hiddenExtraCols.value = new Set(JSON.parse(raw))
+} catch { /* ignore corrupt prefs */ }
+function persistExtraColPrefs() {
+  try { localStorage.setItem(EXTRA_COL_PREFS_KEY, JSON.stringify([...hiddenExtraCols.value])) } catch { /* ignore */ }
+}
+/** 过滤掉被隐藏的额外列键（默认全显）。 */
+function visibleExtra(keys: string[]): string[] {
+  return hiddenExtraCols.value.size === 0 ? keys : keys.filter((k) => !hiddenExtraCols.value.has(k))
+}
+/** 切换某额外列显隐并持久化。 */
+function toggleExtraCol(key: string, visible: boolean) {
+  const next = new Set(hiddenExtraCols.value)
+  if (visible) next.delete(key)
+  else next.add(key)
+  hiddenExtraCols.value = next
+  persistExtraColPrefs()
+}
+/** 全部额外列显示（清空隐藏集合）。 */
+function showAllExtraCols() {
+  hiddenExtraCols.value = new Set()
+  persistExtraColPrefs()
+}
 
-  // 1. 拆分为业务行和锚点行（期初/小计）
-  const normals = all.filter((r) => r._type === 'normal' || !r._type)
-  const anchors = all.filter((r) => r._type === 'opening' || r._type === 'subtotal')
-
-  // 2. 筛选
-  let filtered = normals
-  if (kw) {
-    filtered = filtered.filter((r) => {
-      const summary = String(r.summary || '').toLowerCase()
-      const voucherNo = String(r.voucher_no || '').toLowerCase()
-      return summary.includes(kw) || voucherNo.includes(kw)
-    })
-  }
-  if (dir === 'debit') filtered = filtered.filter((r) => num(r.debit_amount) > 0)
-  else if (dir === 'credit') filtered = filtered.filter((r) => num(r.credit_amount) > 0)
-
-  // 3. 排序（无排序时保留原顺序 + 锚点）
-  if (!sort) {
-    if (kw || dir !== 'all') return filtered // 筛选时只返回业务行（锚点不再有意义）
-    return all // 无筛选无排序，原序返回（含锚点）
-  }
-  const factor = sort.order === 'desc' ? -1 : 1
-  const sorted = filtered.slice().sort((a: any, b: any) => {
-    const av = a[sort.key]
-    const bv = b[sort.key]
-    // 数字优先按数字比较
-    const an = typeof av === 'number' ? av : parseFloat(av)
-    const bn = typeof bv === 'number' ? bv : parseFloat(bv)
-    if (Number.isFinite(an) && Number.isFinite(bn)) return (an - bn) * factor
-    return String(av ?? '').localeCompare(String(bv ?? '')) * factor
-  })
-
-  // 排序时不再展示锚点（小计语义不再成立）
-  return [anchors[0], ...sorted].filter(Boolean)
-})
+/** 序时账明细「非关键列」全部键（未过滤，供 ⚙ 显隐设置列表）。 */
+const ledgerExtraAllKeys = computed(() => buildExtraColumns(ledgerItems.value))
+/** 序时账明细「非关键列」动态列：键并集经显隐过滤（固定列后追加，空则不追加）。 */
+const ledgerExtraColumns = computed(() => visibleExtra(ledgerExtraAllKeys.value))
 
 const voucherItems = ref<any[]>([])
+/** 凭证明细「非关键列」全部键（未过滤，供 ⚙ 显隐设置列表）。 */
+const voucherExtraAllKeys = computed(() => buildExtraColumns(voucherItems.value))
+/** 凭证明细「非关键列」动态列：键并集经显隐过滤（固定列后追加，空则不追加）。 */
+const voucherExtraColumns = computed(() => visibleExtra(voucherExtraAllKeys.value))
 const auxBalanceItems = ref<any[]>([])
 const auxLedgerItems = ref<any[]>([])
 const auxLedgerTotal = ref(0)
-const auxLedgerPage = ref(1)
 
 /** 辅助明细账增强显示：期初行 + 每笔余额 + 月小计行 */
-const auxLedgerDisplay = computed(() => {
-  const items = auxLedgerItems.value
-  if (items.length === 0) return []
+/** 辅助明细账「非关键列」全部键（未过滤，供 ⚙ 显隐设置列表）。 */
+const auxLedgerExtraAllKeys = computed(() => buildExtraColumns(auxLedgerItems.value))
+/** 辅助明细账「非关键列」动态列：键并集经显隐过滤（固定列后追加，空则不追加）。 */
+const auxLedgerExtraColumns = computed(() => visibleExtra(auxLedgerExtraAllKeys.value))
 
-  const rows: any[] = []
-  let balance = currentAuxOpening.value
-  let monthDebit = 0
-  let monthCredit = 0
-  let lastMonth = ''
-
-  rows.push({
-    _type: 'opening', voucher_date: '', voucher_no: '', aux_name: '',
-    summary: '期初余额', debit_amount: null, credit_amount: null,
-    balance, account_code: '',
-  })
-
-  for (const item of items) {
-    const d = num(item.debit_amount)
-    const c = num(item.credit_amount)
-    balance = Number(decSub(String(decAdd(String(balance), String(d))), String(c)))
-    monthDebit = Number(decAdd(String(monthDebit), String(d)))
-    monthCredit = Number(decAdd(String(monthCredit), String(c)))
-
-    const month = (item.voucher_date || '').substring(0, 7)
-    if (!lastMonth) lastMonth = month
-
-    if (month !== lastMonth && lastMonth) {
-      rows.push({
-        _type: 'subtotal', voucher_date: '', voucher_no: '', aux_name: '',
-        summary: `${lastMonth} 本月合计`, debit_amount: monthDebit,
-        credit_amount: monthCredit, balance, account_code: '',
-      })
-      monthDebit = d
-      monthCredit = c
-      lastMonth = month
-    }
-
-    rows.push({ ...item, _type: 'normal', balance })
-  }
-
-  if (items.length > 0) {
-    rows.push({
-      _type: 'subtotal', voucher_date: '', voucher_no: '', aux_name: '',
-      summary: `${lastMonth} 本月合计`, debit_amount: monthDebit,
-      credit_amount: monthCredit, balance, account_code: '',
-    })
-  }
-
-  return rows
-})
+const auxLedgerDisplay = computed(() =>
+  buildLedgerDisplay(auxLedgerItems.value, currentAuxOpening.value, {
+    syntheticExtra: { aux_name: '', account_code: '' },
+  }),
+)
 
 // ── 余额表筛选 + 树形构建 ──
 const balanceTableRef = ref<any>(null)
@@ -2532,6 +2778,48 @@ const treeBalance = computed(() => {
 
 function num(v: any): number { return Number(v) || 0 }
 
+/**
+ * 余额方向判定（显示用）：
+ * 优先级 1. 后端 direction 字段（导入时从源文件提取的权威方向）
+ *        2. 字段为空（旧数据）→ 按科目编码类别推断：负债/权益/收入类(2/3/4/6开头)默认贷，其余默认借
+ *        3. 同时参考余额正负（红字冲销等异常方向）
+ */
+function resolveDir(row: any, period: 'opening' | 'closing'): string {
+  const dirField = row[`${period}_direction`]
+  if (dirField === 'credit') return '贷'
+  if (dirField === 'debit') return '借'
+  // 字段为空（旧数据）→ 按科目类别推断默认方向
+  const code = String(row.account_code || '')
+  const firstChar = code.charAt(0)
+  // 负债(2)、共同(3)、权益(4/所有者权益)、损益贷方类常为贷方科目
+  const creditCategory = firstChar === '2' || firstChar === '3' || firstChar === '4'
+  const bal = row[`${period}_balance`] ?? 0
+  if (creditCategory) {
+    // 贷方类：余额>=0 显示贷，<0（异常借方）显示借
+    return bal >= 0 ? '贷' : '借'
+  }
+  // 借方类（资产1/成本5/费用6借方）：余额>=0 借，<0 贷
+  return bal >= 0 ? '借' : '贷'
+}
+
+/**
+ * 余额负值含义说明（悬停提示）：
+ * tb_balance 存储采用"类别自然正数"口径——正常方向的余额存正数，
+ * 当科目出现与正常方向相反的余额（如资产类出现贷方余额、负债类出现借方余额）时，
+ * 归一后为负数。此时方向列已显示实际方向（贷/借），负号是与"科目正常方向"相反的标记。
+ * 返回空串表示无需提示（正常正值）。
+ */
+function balanceTip(row: any, period: 'opening' | 'closing'): string {
+  const bal = num(row[`${period}_balance`])
+  if (bal >= 0) return ''
+  const dir = resolveDir(row, period)
+  const periodLabel = period === 'opening' ? '期初' : '期末'
+  const absStr = fmtAmount(Math.abs(bal))
+  // 科目正常方向（与实际方向相反）
+  const normalDir = dir === '贷' ? '借' : '贷'
+  return `${periodLabel}实际为${dir}方余额 ${absStr} 元。该科目正常为${normalDir}方，出现${dir}方余额属异常方向（如红字冲销/多收退款等），负号仅表示与科目正常方向相反，金额绝对值即为${dir}方实际余额。`
+}
+
 const fmtAmt = fmtAmount
 
 /** 从原始维度字符串中提取当前维度以外的其他维度信息 */
@@ -2555,7 +2843,7 @@ function formatOtherDims(raw: string, currentDimType: string): string {
 
 function ledgerRowClass({ row }: { row: any }): string {
   if (row._type === 'opening') return 'gt-ledger-opening'
-  if (row._type === 'subtotal') return 'gt-ledger-subtotal'
+  if (row._type === 'subtotal' || row._type === 'view_subtotal') return 'gt-ledger-subtotal'
   if (row._type !== 'normal') return ''
 
   const classes: string[] = []
@@ -2613,7 +2901,14 @@ async function loadBalance() {
   try {
     const data = await api.get(P_ledger.balance(projectId.value), {
       params: { year: year.value },
+      validateStatus: (s: number) => s === 200 || s === 404,
     })
+    // 404 = 新项目无账套数据，静默处理（不弹 toast）
+    if (!data || data?.detail || (data?.status === 404)) {
+      balanceData.value = []
+      checkImportActive()
+      return
+    }
     balanceData.value = data ?? []
     // 数据为空时检测是否有正在进行的导入
     if (balanceData.value.length === 0) {
@@ -2623,7 +2918,13 @@ async function loadBalance() {
       // 加载金额单位（从 active dataset 的 source_summary 读取）
       loadAmountUnit()
     }
-  } catch (e) {
+  } catch (e: any) {
+    // 404 静默处理（新项目无数据）
+    if (e?.response?.status === 404 || e?.status === 404) {
+      balanceData.value = []
+      checkImportActive()
+      return
+    }
     logger.error('[Ledger] loadBalance failed:', e)
     balanceData.value = []
     checkImportActive()
@@ -2650,44 +2951,65 @@ async function checkImportActive() {
   try {
     const resp: any = await api.get(
       P_ledger.import.activeJob(projectId.value),
+      { validateStatus: (s: number) => s === 200 || s === 404 },
     )
+    // 404 = 新项目无导入任务，静默处理
+    if (!resp || resp?.detail) {
+      isImportActive.value = false
+      return
+    }
     isImportActive.value = resp?.status === 'processing' || resp?.status === 'queued'
   } catch {
     isImportActive.value = false
   }
 }
 
-async function loadLedger() {
-  loading.value = true
-  try {
-    const params: any = { year: year.value, page: ledgerPage.value, page_size: ledgerPageSize.value }
+/**
+ * 全量拉取某科目的序时账（游标分页循环）。
+ *
+ * 明细账的运行余额/月小计必须基于**整个科目本期全部分录**计算，
+ * 不能按页（offset 分页第 2 页起会从期初重算余额→全错）。
+ * 后端 get_ledger_entries_cursor 是 keyset 分页，10 万+行性能稳定；
+ * 首页返回 total，后续页靠 next_cursor 续取。
+ */
+async function fetchAllLedgerEntries(
+  account: string,
+): Promise<{ items: any[]; total: number }> {
+  const all: any[] = []
+  let cursor: string | null = null
+  let total = 0
+  const PAGE = 1000
+  const MAX_PAGES = 200 // 安全上限 20 万行，防异常数据死循环
+  for (let i = 0; i < MAX_PAGES; i++) {
+    const params: any = { year: year.value, limit: PAGE }
+    if (cursor) params.cursor = cursor
     if (dateRange.value?.length === 2) {
       params.date_from = dateRange.value[0]
       params.date_to = dateRange.value[1]
     }
-    // 首次加载时从后端获取期初余额（确保 running_balance 准确）
-    const [data, obData] = await Promise.all([
-      api.get(P_ledger.entries(projectId.value, currentAccount.value), { params }),
+    const data: any = await api.get(P_ledger.entries(projectId.value, account), { params })
+    const items = data?.items ?? []
+    all.push(...items)
+    if (data?.total != null) total = data.total
+    if (!data?.has_more || !data?.next_cursor) break
+    cursor = data.next_cursor
+  }
+  return { items: all, total: total || all.length }
+}
+
+async function loadLedger() {
+  loading.value = true
+  try {
+    // 先取期初余额（整期，确保运行余额起点准确），再全量取该科目分录
+    const [obData, { items, total }] = await Promise.all([
       api.get(P_ledger.openingBalance(projectId.value, currentAccount.value), { params: { year: year.value } }),
+      fetchAllLedgerEntries(currentAccount.value),
     ])
-    const result = data
-    const obResult = obData
-    currentAccountOpening.value = num(obResult?.opening_balance)
-    ledgerItems.value = result.items ?? result ?? []
-    ledgerTotal.value = result.total ?? ledgerItems.value.length
+    currentAccountOpening.value = num((obData as any)?.opening_balance)
+    ledgerItems.value = items
+    ledgerTotal.value = total
   } catch { ledgerItems.value = [] }
   finally { loading.value = false }
-}
-
-function onLedgerPageChange(page: number) {
-  ledgerPage.value = page
-  loadLedger()
-}
-
-function onLedgerPageSizeChange(size: number) {
-  ledgerPageSize.value = size
-  ledgerPage.value = 1
-  loadLedger()
 }
 
 async function loadVoucher() {
@@ -3108,8 +3430,14 @@ async function loadAllAuxBalance() {
     // 只加载维度类型列表（轻量，不加载全部汇总行）
     const summaryData = await api.get(
       P_ledger.auxBalanceSummary(projectId.value),
-      { params: { year: year.value, dim_type: '__types_only__' } }
+      { params: { year: year.value, dim_type: '__types_only__' }, validateStatus: (s: number) => s === 200 || s === 404 }
     )
+    // 404 = 新项目无数据，静默处理
+    if (!summaryData || summaryData?.detail) {
+      auxDimTypesFromServer.value = []
+      auxSummaryData.value = []; auxPagedRows.value = []
+      return
+    }
     const summary = summaryData
     auxDimTypesFromServer.value = summary.dim_types || []
 
@@ -3123,7 +3451,12 @@ async function loadAllAuxBalance() {
     await loadAuxSummaryForDim()
     // 加载扁平视图第一页
     await loadAuxBalancePage()
-  } catch (e) {
+  } catch (e: any) {
+    // 404 静默处理（新项目无数据）
+    if (e?.response?.status === 404 || e?.status === 404) {
+      auxSummaryData.value = []; auxPagedRows.value = []
+      return
+    }
     logger.error('loadAllAuxBalance error:', e)
     auxSummaryData.value = []; auxPagedRows.value = []
   }
@@ -3150,8 +3483,13 @@ async function loadAuxSummaryForDim() {
     loading.value = true
     const data = await api.get(
       P_ledger.auxBalanceSummary(projectId.value),
-      { params }
+      { params, validateStatus: (s: number) => s === 200 || s === 404 }
     )
+    // 404 = 新项目无数据，静默处理
+    if (!data || data?.detail) {
+      auxSummaryData.value = []
+      return
+    }
     const result = data
     auxSummaryData.value = result.rows || []
     // 同时更新维度类型列表
@@ -3181,8 +3519,14 @@ async function loadAuxBalancePage() {
 
     const data = await api.get(
       P_ledger.auxBalancePaged(projectId.value),
-      { params }
+      { params, validateStatus: (s: number) => s === 200 || s === 404 }
     )
+    // 404 = 新项目无数据，静默处理
+    if (!data || data?.detail) {
+      auxPagedRows.value = []
+      auxPagedTotal.value = 0
+      return
+    }
     const result = data
     auxPagedRows.value = result.rows || []
     auxPagedTotal.value = result.total || 0
@@ -3295,7 +3639,6 @@ function drillToAuxLedgerFromBalance(row: any) {
   currentAuxCode.value = row.aux_code || ''
   currentAuxOpening.value = num(row.opening_balance)
   currentLevel.value = 'aux_ledger'
-  auxLedgerPage.value = 1
   breadcrumbs.value = [
     { label: '账簿查询', level: 'balance' },
     {
@@ -3312,13 +3655,28 @@ function drillToAuxLedgerFromBalance(row: any) {
 async function loadAuxLedger() {
   loading.value = true
   try {
-    const data = await api.get(
-      P_ledger.auxEntries(projectId.value, currentAccount.value),
-      { params: { year: year.value, aux_type: currentAuxType.value, aux_code: currentAuxCode.value, page: auxLedgerPage.value, page_size: 100 } }
-    )
-    const result = data
-    auxLedgerItems.value = result.items ?? result ?? []
-    auxLedgerTotal.value = result.total ?? 0
+    // 全量拉取（运行余额/月小计需跨整账计算，不能按页）
+    const all: any[] = []
+    let cursor: string | null = null
+    let total = 0
+    const PAGE = 1000
+    const MAX_PAGES = 200
+    for (let i = 0; i < MAX_PAGES; i++) {
+      const params: any = {
+        year: year.value, aux_type: currentAuxType.value,
+        aux_code: currentAuxCode.value, limit: PAGE,
+      }
+      if (cursor) params.cursor = cursor
+      const data: any = await api.get(
+        P_ledger.auxEntries(projectId.value, currentAccount.value), { params },
+      )
+      all.push(...(data?.items ?? []))
+      if (data?.total != null) total = data.total
+      if (!data?.has_more || !data?.next_cursor) break
+      cursor = data.next_cursor
+    }
+    auxLedgerItems.value = all
+    auxLedgerTotal.value = total || all.length
   } catch { auxLedgerItems.value = [] }
   finally { loading.value = false }
 }
@@ -3334,7 +3692,6 @@ function drillToLedger(row: any) {
   currentAccount.value = hasChildren ? code + '*' : code
   currentAccountOpening.value = num(row.opening_balance)
   currentLevel.value = 'ledger'
-  ledgerPage.value = 1
   dateRange.value = null
   // V3 Req 12.2.2: 切换账户时清虚拟滚动状态
   resetLedgerVirtualState()
@@ -3382,7 +3739,6 @@ function drillToAuxLedger(row: any) {
   currentAuxCode.value = row.aux_code
   currentAuxOpening.value = num(row.opening_balance)
   currentLevel.value = 'aux_ledger'
-  auxLedgerPage.value = 1
   breadcrumbs.value.push({
     label: `${row.aux_name || row.aux_code}`,
     level: 'aux_ledger',
@@ -3468,6 +3824,7 @@ onBeforeUnmount(() => {
 </script>
 
 <style scoped>
+.gt-tip-wrap { display: inline-block; }
 .gt-penetration { padding: var(--gt-space-4); height: 100%; display: flex; flex-direction: column; }
 
 /* 全屏模式 */
@@ -3691,6 +4048,28 @@ onBeforeUnmount(() => {
   margin-bottom: var(--gt-space-2);
 }
 
+/* 辅助余额表字体统一 12px（表头 + 单元格） */
+:deep(.gt-aux-balance-table .el-table__cell) {
+  font-size: 12px /* allow-px: special */;
+}
+:deep(.gt-aux-balance-table .el-table__cell .cell) {
+  font-size: 12px /* allow-px: special */;
+}
+:deep(.gt-aux-balance-table .gt-amt) {
+  font-size: 12px /* allow-px: special */;
+}
+
+/* 科目余额表字体统一 12px（表头 + 单元格） */
+:deep(.gt-account-balance-table .el-table__cell) {
+  font-size: 12px /* allow-px: special */;
+}
+:deep(.gt-account-balance-table .el-table__cell .cell) {
+  font-size: 12px /* allow-px: special */;
+}
+:deep(.gt-account-balance-table .gt-amt) {
+  font-size: 12px /* allow-px: special */;
+}
+
 /* 选中行样式：浅蓝背景，无左边框竖线 */
 :deep(.el-table__body tr.current-row > td.el-table__cell) {
   background: var(--gt-bg-info) !important;
@@ -3778,6 +4157,46 @@ onBeforeUnmount(() => {
   font-size: var(--gt-font-size-xs);
   color: var(--gt-color-info);
   line-height: 1.5;
+}
+
+/* 额外列（extra_fields 业务字段）视觉区分 —— 与固定列不同底色，标识为「扩展」列（Task 8.3*） */
+:deep(.gt-ef-col-hd) {
+  background: var(--gt-color-fill-light, #f5f7fa) !important;
+  color: var(--gt-color-info, #909399) !important;
+}
+:deep(.gt-ef-col) {
+  background: var(--gt-color-fill-lighter, #fafcff) !important;
+}
+.gt-ef-cell {
+  color: var(--gt-color-text-regular, #606266);
+}
+/* el-table-v2 虚拟滚动额外列表头/单元格视觉区分 */
+:deep(.gt-ef-vcell-hd) {
+  background: var(--gt-color-fill-light, #f5f7fa);
+  color: var(--gt-color-info, #909399);
+}
+:deep(.gt-ef-vcell) {
+  background: var(--gt-color-fill-lighter, #fafcff);
+}
+
+/* 额外列显隐设置 popover（Task 8.1*） */
+.gt-extra-col-prefs {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: 320px;
+  overflow-y: auto;
+}
+.gt-extra-col-prefs__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: var(--gt-font-size-sm, 13px);
+  font-weight: 600;
+  color: var(--gt-color-text-primary);
+  padding-bottom: 6px;
+  margin-bottom: 4px;
+  border-bottom: 1px solid var(--gt-color-border-lighter, #ebeef5);
 }
 </style>
 

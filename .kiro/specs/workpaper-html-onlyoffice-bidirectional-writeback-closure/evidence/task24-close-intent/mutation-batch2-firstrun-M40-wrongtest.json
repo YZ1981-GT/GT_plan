@@ -1,0 +1,687 @@
+[
+  {
+    "id": "M15",
+    "side": "be",
+    "want": "test_task24_close_intent_pg.py::test_first_closer_gets_a_predecessor_and_last_closer_does_not[order_ab__none]",
+    "why": "仍有其他 active editor 时不再为先关闭者建普通 forcesave predecessor ⇒ 该用户此前的编辑没有任何 request 承载（AC 4.10「非 leader closing participant 只执行普通 forcesave」）",
+    "verdict": "RED",
+    "summary": "24 failed, 158 passed in 24.23s",
+    "added": [
+      "test_task24_close_intent_pg.py::test_accepted_shell_has_no_application_before_dispatch",
+      "test_task24_close_intent_pg.py::test_created_at_does_not_decide_the_leader[order_ab__sequence_reversed]",
+      "test_task24_close_intent_pg.py::test_created_at_does_not_decide_the_leader[order_ba__sequence_reversed]",
+      "test_task24_close_intent_pg.py::test_deterministic_leader_is_neither_first_inserted_nor_latest_created_at",
+      "test_task24_close_intent_pg.py::test_first_closer_gets_a_predecessor_and_last_closer_does_not[order_ab__both]",
+      "test_task24_close_intent_pg.py::test_first_closer_gets_a_predecessor_and_last_closer_does_not[order_ab__created_reversed]",
+      "test_task24_close_intent_pg.py::test_first_closer_gets_a_predecessor_and_last_closer_does_not[order_ab__none]",
+      "test_task24_close_intent_pg.py::test_first_closer_gets_a_predecessor_and_last_closer_does_not[order_ab__sequence_reversed]",
+      "test_task24_close_intent_pg.py::test_first_closer_gets_a_predecessor_and_last_closer_does_not[order_ba__both]",
+      "test_task24_close_intent_pg.py::test_first_closer_gets_a_predecessor_and_last_closer_does_not[order_ba__created_reversed]",
+      "test_task24_close_intent_pg.py::test_first_closer_gets_a_predecessor_and_last_closer_does_not[order_ba__none]",
+      "test_task24_close_intent_pg.py::test_first_closer_gets_a_predecessor_and_last_closer_does_not[order_ba__sequence_reversed]",
+      "test_task24_close_intent_pg.py::test_intent_records_its_predecessor_link_and_timeline",
+      "test_task24_close_intent_pg.py::test_leader_is_the_highest_sequence_id_in_every_scenario[deterministic_leader_discriminating]",
+      "test_task24_close_intent_pg.py::test_leader_is_the_highest_sequence_id_in_every_scenario[order_ab__both]",
+      "test_task24_close_intent_pg.py::test_leader_is_the_highest_sequence_id_in_every_scenario[order_ab__sequence_reversed]",
+      "test_task24_close_intent_pg.py::test_leader_is_the_highest_sequence_id_in_every_scenario[order_ba__both]",
+      "test_task24_close_intent_pg.py::test_leader_is_the_highest_sequence_id_in_every_scenario[order_ba__sequence_reversed]",
+      "test_task24_close_intent_pg.py::test_no_capture_before_predecessors_are_terminal[order_ab__both]",
+      "test_task24_close_intent_pg.py::test_no_capture_before_predecessors_are_terminal[order_ab__created_reversed]",
+      "test_task24_close_intent_pg.py::test_no_capture_before_predecessors_are_terminal[order_ab__none]",
+      "test_task24_close_intent_pg.py::test_no_capture_before_predecessors_are_terminal[order_ab__sequence_reversed]",
+      "test_task24_close_intent_pg.py::test_no_phase_crashed_during_collection",
+      "test_task24_close_intent_pg.py::test_predecessor_dispatch_carries_room_doc_key_and_frozen_request_id"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task24_close_intent_pg.py::test_first_closer_gets_a_predecessor_and_last_closer_does_not[order_ab__none]",
+      "test_task24_close_intent_pg.py::test_no_capture_before_predecessors_are_terminal[order_ab__none]"
+    ],
+    "added_files": [
+      "test_task24_close_intent_pg.py"
+    ],
+    "restored": true,
+    "seconds": 27.7
+  },
+  {
+    "id": "M16",
+    "side": "be",
+    "want": "test_task24_close_intent_pg.py::test_intent_records_its_predecessor_link_and_timeline",
+    "why": "不写 `ordinary_forcesave_request_id` ⇒ intent 与它的 barrier predecessor 之间没有可审计对应关系。该列在 Task 24 之前**没有任何生产代码写过**，只断言「建了一条 forcesave」的判据抓不到这条",
+    "verdict": "RED",
+    "summary": "9 failed, 173 passed in 25.46s",
+    "added": [
+      "test_task24_close_intent_pg.py::test_first_closer_gets_a_predecessor_and_last_closer_does_not[order_ab__both]",
+      "test_task24_close_intent_pg.py::test_first_closer_gets_a_predecessor_and_last_closer_does_not[order_ab__created_reversed]",
+      "test_task24_close_intent_pg.py::test_first_closer_gets_a_predecessor_and_last_closer_does_not[order_ab__none]",
+      "test_task24_close_intent_pg.py::test_first_closer_gets_a_predecessor_and_last_closer_does_not[order_ab__sequence_reversed]",
+      "test_task24_close_intent_pg.py::test_first_closer_gets_a_predecessor_and_last_closer_does_not[order_ba__both]",
+      "test_task24_close_intent_pg.py::test_first_closer_gets_a_predecessor_and_last_closer_does_not[order_ba__created_reversed]",
+      "test_task24_close_intent_pg.py::test_first_closer_gets_a_predecessor_and_last_closer_does_not[order_ba__none]",
+      "test_task24_close_intent_pg.py::test_first_closer_gets_a_predecessor_and_last_closer_does_not[order_ba__sequence_reversed]",
+      "test_task24_close_intent_pg.py::test_intent_records_its_predecessor_link_and_timeline"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task24_close_intent_pg.py::test_first_closer_gets_a_predecessor_and_last_closer_does_not[order_ab__none]",
+      "test_task24_close_intent_pg.py::test_intent_records_its_predecessor_link_and_timeline"
+    ],
+    "added_files": [
+      "test_task24_close_intent_pg.py"
+    ],
+    "restored": true,
+    "seconds": 29.0
+  },
+  {
+    "id": "M17",
+    "side": "be",
+    "want": "test_task24_close_intent_pg.py::test_intent_records_its_predecessor_link_and_timeline",
+    "why": "R03 回归：predecessor 转换不写自己的 append-only 事件（写成别的 to_state）。首轮按 intent 的**当前 state** 断言 `ordinary_forcesaving` —— 而 reconciler 随后会把它推到 `waiting_barrier`，于是断言本身是错的，也就掩盖了「事件没写对」。改成断言 timeline 后这条才有判据（current state 只是 timeline 的投影，AC 5.10）",
+    "verdict": "RED",
+    "summary": "1 failed, 181 passed in 25.36s",
+    "added": [
+      "test_task24_close_intent_pg.py::test_intent_records_its_predecessor_link_and_timeline"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task24_close_intent_pg.py::test_intent_records_its_predecessor_link_and_timeline"
+    ],
+    "added_files": [
+      "test_task24_close_intent_pg.py"
+    ],
+    "restored": true,
+    "seconds": 28.8
+  },
+  {
+    "id": "M18",
+    "side": "be",
+    "want": "test_task24_close_intent.py::test_more_than_one_open_capture_is_refused[two]",
+    "why": "服务入口不再拒绝 >1 条 open close-capture。🔴 这条之所以可证伪，是因为该判据被抽成了模块级纯函数：内嵌在服务方法里时正确实现下 `count` 恒为 0/1，短路它不会有任何测试变红（不可证伪 = 假绿入口）",
+    "verdict": "RED",
+    "summary": "2 failed, 180 passed in 25.33s",
+    "added": [
+      "test_task24_close_intent.py::test_more_than_one_open_capture_is_refused[five]",
+      "test_task24_close_intent.py::test_more_than_one_open_capture_is_refused[two]"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task24_close_intent.py::test_more_than_one_open_capture_is_refused[five]",
+      "test_task24_close_intent.py::test_more_than_one_open_capture_is_refused[two]"
+    ],
+    "added_files": [
+      "test_task24_close_intent.py"
+    ],
+    "restored": true,
+    "seconds": 28.8
+  },
+  {
+    "id": "M19",
+    "side": "be",
+    "want": "test_task24_close_intent.py::test_live_intent_after_no_successor_is_refused[one_live]",
+    "why": "no-successor 终结后仍有 live intent 时不再拒 ⇒ 「零 capture 且永久阻塞」变成可接受态。partial unique 对「一条 capture 都没有」毫无意见，这是 Task 24 正文「无 successor 仍 blocked 必须打红」的生产判据",
+    "verdict": "RED",
+    "summary": "2 failed, 180 passed in 25.16s",
+    "added": [
+      "test_task24_close_intent.py::test_live_intent_after_no_successor_is_refused[one_live]",
+      "test_task24_close_intent.py::test_live_intent_after_no_successor_is_refused[three_live]"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task24_close_intent.py::test_live_intent_after_no_successor_is_refused[one_live]",
+      "test_task24_close_intent.py::test_live_intent_after_no_successor_is_refused[three_live]"
+    ],
+    "added_files": [
+      "test_task24_close_intent.py"
+    ],
+    "restored": true,
+    "seconds": 28.7
+  },
+  {
+    "id": "M20",
+    "side": "be",
+    "want": "test_task24_close_intent.py::test_zero_permission_epoch_and_zero_fence_are_valid",
+    "why": "把「非空」判据写成真值判断 ⇒ `permission_epoch=0`（合法值）被当成缺失，刚建 room 的正常 close 一律被拒。五条冻结身份判据里只有这一条能被「0 vs None」区分，所以它需要自己的边界用例",
+    "verdict": "RED",
+    "summary": "1 failed, 181 passed in 25.65s",
+    "added": [
+      "test_task24_close_intent.py::test_zero_permission_epoch_and_zero_fence_are_valid"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task24_close_intent.py::test_zero_permission_epoch_and_zero_fence_are_valid"
+    ],
+    "added_files": [
+      "test_task24_close_intent.py"
+    ],
+    "restored": true,
+    "seconds": 29.2
+  },
+  {
+    "id": "M21",
+    "side": "be",
+    "want": "test_task24_close_intent_pg.py::test_created_at_does_not_decide_the_leader[order_ab__created_reversed]",
+    "why": "🔴 Task 24 正文点名第一条：comparator 改回 `created_at`。判别性来自扰动 —— `created_reversed` 让最先插入的 intent 拿到最晚时间戳，于是「最高 sequence」与「最晚 created_at」是不同两条。若不做这个扰动，二者恒为同一条，本变异必判 GREEN",
+    "verdict": "RED",
+    "summary": "28 failed, 154 passed in 24.64s",
+    "added": [
+      "test_task24_close_intent_pg.py::test_capture_scenario_yields_exactly_one_close_capture[deterministic_leader_discriminating]",
+      "test_task24_close_intent_pg.py::test_capture_scenario_yields_exactly_one_close_capture[order_ab__created_reversed]",
+      "test_task24_close_intent_pg.py::test_capture_scenario_yields_exactly_one_close_capture[order_ab__sequence_reversed]",
+      "test_task24_close_intent_pg.py::test_capture_scenario_yields_exactly_one_close_capture[order_ba__created_reversed]",
+      "test_task24_close_intent_pg.py::test_capture_scenario_yields_exactly_one_close_capture[order_ba__sequence_reversed]",
+      "test_task24_close_intent_pg.py::test_concurrent_closes_still_yield_exactly_one_capture",
+      "test_task24_close_intent_pg.py::test_created_at_does_not_decide_the_leader[order_ab__created_reversed]",
+      "test_task24_close_intent_pg.py::test_created_at_does_not_decide_the_leader[order_ab__sequence_reversed]",
+      "test_task24_close_intent_pg.py::test_created_at_does_not_decide_the_leader[order_ba__created_reversed]",
+      "test_task24_close_intent_pg.py::test_created_at_does_not_decide_the_leader[order_ba__sequence_reversed]",
+      "test_task24_close_intent_pg.py::test_deterministic_leader_is_neither_first_inserted_nor_latest_created_at",
+      "test_task24_close_intent_pg.py::test_every_scenario_produced_a_measurement",
+      "test_task24_close_intent_pg.py::test_first_closer_gets_a_predecessor_and_last_closer_does_not[order_ab__created_reversed]",
+      "test_task24_close_intent_pg.py::test_first_closer_gets_a_predecessor_and_last_closer_does_not[order_ab__sequence_reversed]",
+      "test_task24_close_intent_pg.py::test_first_closer_gets_a_predecessor_and_last_closer_does_not[order_ba__created_reversed]",
+      "test_task24_close_intent_pg.py::test_first_closer_gets_a_predecessor_and_last_closer_does_not[order_ba__sequence_reversed]",
+      "test_task24_close_intent_pg.py::test_leader_is_the_highest_sequence_id_in_every_scenario[deterministic_leader_discriminating]",
+      "test_task24_close_intent_pg.py::test_leader_is_the_highest_sequence_id_in_every_scenario[order_ab__created_reversed]",
+      "test_task24_close_intent_pg.py::test_leader_is_the_highest_sequence_id_in_every_scenario[order_ab__sequence_reversed]",
+      "test_task24_close_intent_pg.py::test_leader_is_the_highest_sequence_id_in_every_scenario[order_ba__created_reversed]",
+      "test_task24_close_intent_pg.py::test_leader_is_the_highest_sequence_id_in_every_scenario[order_ba__sequence_reversed]",
+      "test_task24_close_intent_pg.py::test_no_capture_before_predecessors_are_terminal[order_ab__created_reversed]",
+      "test_task24_close_intent_pg.py::test_no_capture_before_predecessors_are_terminal[order_ab__sequence_reversed]",
+      "test_task24_close_intent_pg.py::test_no_phase_crashed_during_collection",
+      "test_task24_close_intent_pg.py::test_reconciler_is_reentrant_without_a_second_capture[order_ab__created_reversed]",
+      "test_task24_close_intent_pg.py::test_reconciler_is_reentrant_without_a_second_capture[order_ab__sequence_reversed]",
+      "test_task24_close_intent_pg.py::test_reconciler_is_reentrant_without_a_second_capture[order_ba__created_reversed]",
+      "test_task24_close_intent_pg.py::test_reconciler_is_reentrant_without_a_second_capture[order_ba__sequence_reversed]"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task24_close_intent_pg.py::test_created_at_does_not_decide_the_leader[order_ab__created_reversed]",
+      "test_task24_close_intent_pg.py::test_deterministic_leader_is_neither_first_inserted_nor_latest_created_at",
+      "test_task24_close_intent_pg.py::test_no_phase_crashed_during_collection"
+    ],
+    "added_files": [
+      "test_task24_close_intent_pg.py"
+    ],
+    "restored": true,
+    "seconds": 28.1
+  },
+  {
+    "id": "M22",
+    "side": "be",
+    "want": "test_task24_close_intent_pg.py::test_repeat_reconcile_in_one_eligibility_snapshot_keeps_the_leader[revoked]",
+    "why": "🔴 Task 24 正文点名第二条：同一 eligibility snapshot 内换 leader。注入「round-robin」形态 —— 选 leader 时把**当前** leader 排除掉（只剩它时回退到全集，以免退化成崩溃而非选错）。于是第一次 reconcile 选出 L 之后，同一 snapshot 的第二次 reconcile 必然改选另一条：eligible 集合、eligibility epoch 与 digest 全都没变，leader 却换了人。首轮此处写的是「排序键依赖 reconciler 自己写的 `reconciled_at`」，实测判 GREEN 且**归因为无效变异**：每条 intent 在它自己那次 close 的reconcile 里就成了当时的最高 sequence ⇒ 都被写上 `reconciled_at`，注入的键分量在整个 eligible 集合上恒为同值、完全不影响 max()。唯一它非空的时刻（新 intent 尚未 reconcile）那条恰好也是 sequence 最高的，两种 comparator 选同一个人 —— 不可证伪",
+    "verdict": "RED",
+    "summary": "28 failed, 154 passed in 24.10s",
+    "added": [
+      "test_task24_close_intent_pg.py::test_capture_scenario_yields_exactly_one_close_capture[order_ab__created_reversed]",
+      "test_task24_close_intent_pg.py::test_capture_scenario_yields_exactly_one_close_capture[order_ab__none]",
+      "test_task24_close_intent_pg.py::test_capture_scenario_yields_exactly_one_close_capture[order_ba__created_reversed]",
+      "test_task24_close_intent_pg.py::test_capture_scenario_yields_exactly_one_close_capture[order_ba__none]",
+      "test_task24_close_intent_pg.py::test_concurrent_closes_really_overlapped",
+      "test_task24_close_intent_pg.py::test_concurrent_closes_still_yield_exactly_one_capture",
+      "test_task24_close_intent_pg.py::test_created_at_does_not_decide_the_leader[order_ab__created_reversed]",
+      "test_task24_close_intent_pg.py::test_created_at_does_not_decide_the_leader[order_ba__created_reversed]",
+      "test_task24_close_intent_pg.py::test_every_scenario_produced_a_measurement",
+      "test_task24_close_intent_pg.py::test_first_closer_gets_a_predecessor_and_last_closer_does_not[order_ab__created_reversed]",
+      "test_task24_close_intent_pg.py::test_first_closer_gets_a_predecessor_and_last_closer_does_not[order_ab__none]",
+      "test_task24_close_intent_pg.py::test_first_closer_gets_a_predecessor_and_last_closer_does_not[order_ba__created_reversed]",
+      "test_task24_close_intent_pg.py::test_first_closer_gets_a_predecessor_and_last_closer_does_not[order_ba__none]",
+      "test_task24_close_intent_pg.py::test_leader_disqualified_before_promotion_yields_a_legitimate_successor[expired]",
+      "test_task24_close_intent_pg.py::test_leader_disqualified_before_promotion_yields_a_legitimate_successor[revoked]",
+      "test_task24_close_intent_pg.py::test_leader_is_the_highest_sequence_id_in_every_scenario[order_ab__created_reversed]",
+      "test_task24_close_intent_pg.py::test_leader_is_the_highest_sequence_id_in_every_scenario[order_ab__none]",
+      "test_task24_close_intent_pg.py::test_leader_is_the_highest_sequence_id_in_every_scenario[order_ba__created_reversed]",
+      "test_task24_close_intent_pg.py::test_leader_is_the_highest_sequence_id_in_every_scenario[order_ba__none]",
+      "test_task24_close_intent_pg.py::test_no_capture_before_predecessors_are_terminal[order_ab__created_reversed]",
+      "test_task24_close_intent_pg.py::test_no_capture_before_predecessors_are_terminal[order_ab__none]",
+      "test_task24_close_intent_pg.py::test_no_phase_crashed_during_collection",
+      "test_task24_close_intent_pg.py::test_reconciler_is_reentrant_without_a_second_capture[order_ab__created_reversed]",
+      "test_task24_close_intent_pg.py::test_reconciler_is_reentrant_without_a_second_capture[order_ab__none]",
+      "test_task24_close_intent_pg.py::test_reconciler_is_reentrant_without_a_second_capture[order_ba__created_reversed]",
+      "test_task24_close_intent_pg.py::test_reconciler_is_reentrant_without_a_second_capture[order_ba__none]",
+      "test_task24_close_intent_pg.py::test_repeat_reconcile_in_one_eligibility_snapshot_keeps_the_leader[expired]",
+      "test_task24_close_intent_pg.py::test_repeat_reconcile_in_one_eligibility_snapshot_keeps_the_leader[revoked]"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task24_close_intent_pg.py::test_no_phase_crashed_during_collection",
+      "test_task24_close_intent_pg.py::test_repeat_reconcile_in_one_eligibility_snapshot_keeps_the_leader[expired]",
+      "test_task24_close_intent_pg.py::test_repeat_reconcile_in_one_eligibility_snapshot_keeps_the_leader[revoked]"
+    ],
+    "added_files": [
+      "test_task24_close_intent_pg.py"
+    ],
+    "restored": true,
+    "seconds": 27.6
+  },
+  {
+    "id": "M23",
+    "side": "be",
+    "want": "test_task24_close_intent_pg.py::test_leader_disqualified_before_promotion_yields_a_legitimate_successor[revoked]",
+    "why": "🔴 Task 24 正文点名第三条：漏写 `authorization_stale`。失格的 leader 不再被审计、eligibility epoch 不再推进 ⇒ 撤权用户的 intent 仍挂在 room 的leader 指针上，且没有任何 append-only 记录说明它为何被换掉",
+    "verdict": "RED",
+    "summary": "9 failed, 173 passed in 25.10s",
+    "added": [
+      "test_task24_close_intent_pg.py::test_every_scenario_produced_a_measurement",
+      "test_task24_close_intent_pg.py::test_leader_disqualified_before_promotion_yields_a_legitimate_successor[expired]",
+      "test_task24_close_intent_pg.py::test_leader_disqualified_before_promotion_yields_a_legitimate_successor[revoked]",
+      "test_task24_close_intent_pg.py::test_no_phase_crashed_during_collection",
+      "test_task24_close_intent_pg.py::test_no_successor_leaves_no_live_intent_so_it_is_never_permanently_blocked",
+      "test_task24_close_intent_pg.py::test_no_successor_records_the_stale_audit_before_superseding",
+      "test_task24_close_intent_pg.py::test_no_successor_supersedes_generation_with_zero_captures",
+      "test_task24_close_intent_pg.py::test_repeat_reconcile_in_one_eligibility_snapshot_keeps_the_leader[expired]",
+      "test_task24_close_intent_pg.py::test_repeat_reconcile_in_one_eligibility_snapshot_keeps_the_leader[revoked]"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task24_close_intent_pg.py::test_leader_disqualified_before_promotion_yields_a_legitimate_successor[expired]",
+      "test_task24_close_intent_pg.py::test_leader_disqualified_before_promotion_yields_a_legitimate_successor[revoked]",
+      "test_task24_close_intent_pg.py::test_no_successor_records_the_stale_audit_before_superseding"
+    ],
+    "added_files": [
+      "test_task24_close_intent_pg.py"
+    ],
+    "restored": true,
+    "seconds": 28.6
+  },
+  {
+    "id": "M24",
+    "side": "be",
+    "want": "test_task24_close_intent_pg.py::test_capture_scenario_yields_exactly_one_close_capture[order_ab__none]",
+    "why": "🔴 Task 24 正文点名第四条：存在 successor 时仍 blocked。barrier 永不放行 ⇒ leader 永远停在 `waiting_barrier`，capture 一条都不产生。partial unique 对此毫无意见（它只防第二条），所以只有行为测试的「最终恰一条」能抓到",
+    "verdict": "RED",
+    "summary": "50 failed, 132 passed in 25.07s",
+    "added": [
+      "test_task24_close_intent_pg.py::test_capture_is_created_when_predecessor_terminal_precedes_second_close[terminal_before__both]",
+      "test_task24_close_intent_pg.py::test_capture_is_created_when_predecessor_terminal_precedes_second_close[terminal_before__created_reversed]",
+      "test_task24_close_intent_pg.py::test_capture_is_created_when_predecessor_terminal_precedes_second_close[terminal_before__none]",
+      "test_task24_close_intent_pg.py::test_capture_is_created_when_predecessor_terminal_precedes_second_close[terminal_before__sequence_reversed]",
+      "test_task24_close_intent_pg.py::test_capture_scenario_yields_exactly_one_close_capture[deterministic_leader_discriminating]",
+      "test_task24_close_intent_pg.py::test_capture_scenario_yields_exactly_one_close_capture[order_ab__both]",
+      "test_task24_close_intent_pg.py::test_capture_scenario_yields_exactly_one_close_capture[order_ab__created_reversed]",
+      "test_task24_close_intent_pg.py::test_capture_scenario_yields_exactly_one_close_capture[order_ab__none]",
+      "test_task24_close_intent_pg.py::test_capture_scenario_yields_exactly_one_close_capture[order_ab__sequence_reversed]",
+      "test_task24_close_intent_pg.py::test_capture_scenario_yields_exactly_one_close_capture[order_ba__both]",
+      "test_task24_close_intent_pg.py::test_capture_scenario_yields_exactly_one_close_capture[order_ba__created_reversed]",
+      "test_task24_close_intent_pg.py::test_capture_scenario_yields_exactly_one_close_capture[order_ba__none]",
+      "test_task24_close_intent_pg.py::test_capture_scenario_yields_exactly_one_close_capture[order_ba__sequence_reversed]",
+      "test_task24_close_intent_pg.py::test_capture_scenario_yields_exactly_one_close_capture[single__both]",
+      "test_task24_close_intent_pg.py::test_capture_scenario_yields_exactly_one_close_capture[single__created_reversed]",
+      "test_task24_close_intent_pg.py::test_capture_scenario_yields_exactly_one_close_capture[single__none]",
+      "test_task24_close_intent_pg.py::test_capture_scenario_yields_exactly_one_close_capture[single__sequence_reversed]",
+      "test_task24_close_intent_pg.py::test_capture_scenario_yields_exactly_one_close_capture[terminal_before__both]",
+      "test_task24_close_intent_pg.py::test_capture_scenario_yields_exactly_one_close_capture[terminal_before__created_reversed]",
+      "test_task24_close_intent_pg.py::test_capture_scenario_yields_exactly_one_close_capture[terminal_before__none]",
+      "test_task24_close_intent_pg.py::test_capture_scenario_yields_exactly_one_close_capture[terminal_before__sequence_reversed]",
+      "test_task24_close_intent_pg.py::test_concurrent_closes_still_yield_exactly_one_capture",
+      "test_task24_close_intent_pg.py::test_deterministic_leader_is_neither_first_inserted_nor_latest_created_at",
+      "test_task24_close_intent_pg.py::test_leader_disqualified_before_promotion_yields_a_legitimate_successor[expired]",
+      "test_task24_close_intent_pg.py::test_leader_disqualified_before_promotion_yields_a_legitimate_successor[revoked]",
+      "test_task24_close_intent_pg.py::test_no_capture_before_predecessors_are_terminal[order_ab__both]",
+      "test_task24_close_intent_pg.py::test_no_capture_before_predecessors_are_terminal[order_ab__created_reversed]",
+      "test_task24_close_intent_pg.py::test_no_capture_before_predecessors_are_terminal[order_ab__none]",
+      "test_task24_close_intent_pg.py::test_no_capture_before_predecessors_are_terminal[order_ab__sequence_reversed]",
+      "test_task24_close_intent_pg.py::test_perturbation_after_promotion_never_changes_the_leader[terminal_before__both]",
+      "test_task24_close_intent_pg.py::test_perturbation_after_promotion_never_changes_the_leader[terminal_before__created_reversed]",
+      "test_task24_close_intent_pg.py::test_perturbation_after_promotion_never_changes_the_leader[terminal_before__none]",
+      "test_task24_close_intent_pg.py::test_perturbation_after_promotion_never_changes_the_leader[terminal_before__sequence_reversed]",
+      "test_task24_close_intent_pg.py::test_reconciler_is_reentrant_without_a_second_capture[order_ab__both]",
+      "test_task24_close_intent_pg.py::test_reconciler_is_reentrant_without_a_second_capture[order_ab__created_reversed]",
+      "test_task24_close_intent_pg.py::test_reconciler_is_reentrant_without_a_second_capture[order_ab__none]",
+      "test_task24_close_intent_pg.py::test_reconciler_is_reentrant_without_a_second_capture[order_ab__sequence_reversed]",
+      "test_task24_close_intent_pg.py::test_reconciler_is_reentrant_without_a_second_capture[order_ba__both]",
+      "test_task24_close_intent_pg.py::test_reconciler_is_reentrant_without_a_second_capture[order_ba__created_reversed]",
+      "test_task24_close_intent_pg.py::test_reconciler_is_reentrant_without_a_second_capture[order_ba__none]",
+      "test_task24_close_intent_pg.py::test_reconciler_is_reentrant_without_a_second_capture[order_ba__sequence_reversed]",
+      "test_task24_close_intent_pg.py::test_reconciler_is_reentrant_without_a_second_capture[single__both]",
+      "test_task24_close_intent_pg.py::test_reconciler_is_reentrant_without_a_second_capture[single__created_reversed]",
+      "test_task24_close_intent_pg.py::test_reconciler_is_reentrant_without_a_second_capture[single__none]",
+      "test_task24_close_intent_pg.py::test_reconciler_is_reentrant_without_a_second_capture[single__sequence_reversed]",
+      "test_task24_close_intent_pg.py::test_reconciler_is_reentrant_without_a_second_capture[terminal_before__both]",
+      "test_task24_close_intent_pg.py::test_reconciler_is_reentrant_without_a_second_capture[terminal_before__created_reversed]",
+      "test_task24_close_intent_pg.py::test_reconciler_is_reentrant_without_a_second_capture[terminal_before__none]",
+      "test_task24_close_intent_pg.py::test_reconciler_is_reentrant_without_a_second_capture[terminal_before__sequence_reversed]",
+      "test_task24_close_intent_pg.py::test_single_close_needs_no_predecessor"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task24_close_intent_pg.py::test_capture_scenario_yields_exactly_one_close_capture[order_ab__none]",
+      "test_task24_close_intent_pg.py::test_capture_scenario_yields_exactly_one_close_capture[single__none]"
+    ],
+    "added_files": [
+      "test_task24_close_intent_pg.py"
+    ],
+    "restored": true,
+    "seconds": 28.6
+  },
+  {
+    "id": "M25",
+    "side": "be",
+    "want": "test_task24_close_intent.py::test_precreated_application_is_refused_before_any_network_call",
+    "why": "跳过凭据自证 ⇒ 「库里已有 application」或「shell 已绑定」时照样出站，AC 4.1「accepted 前不得预建 application」失去执法点。该断言是「已落库」的唯一凭证，跳过它等于回到「先调 OO 再落库」",
+    "verdict": "RED",
+    "summary": "2 failed, 180 passed in 25.28s",
+    "added": [
+      "test_task24_close_intent.py::test_bound_shell_is_refused_before_any_network_call",
+      "test_task24_close_intent.py::test_precreated_application_is_refused_before_any_network_call"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task24_close_intent.py::test_bound_shell_is_refused_before_any_network_call",
+      "test_task24_close_intent.py::test_precreated_application_is_refused_before_any_network_call"
+    ],
+    "added_files": [
+      "test_task24_close_intent.py"
+    ],
+    "restored": true,
+    "seconds": 28.8
+  },
+  {
+    "id": "M26",
+    "side": "be",
+    "want": "test_task24_close_intent.py::test_non_credential_argument_is_refused_before_any_network_call",
+    "why": "不再要求 Task 23 的凭据类型 ⇒ 「没落库就调 Command Service」在类型层重新可表达（AC 4.1 的顺序判据）",
+    "verdict": "RED",
+    "summary": "1 failed, 181 passed in 25.42s",
+    "added": [
+      "test_task24_close_intent.py::test_non_credential_argument_is_refused_before_any_network_call"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task24_close_intent.py::test_non_credential_argument_is_refused_before_any_network_call"
+    ],
+    "added_files": [
+      "test_task24_close_intent.py"
+    ],
+    "restored": true,
+    "seconds": 29.0
+  },
+  {
+    "id": "M27",
+    "side": "be",
+    "want": "test_task24_close_intent.py::test_target_must_belong_to_the_frozen_request_generation[other_room]",
+    "why": "doc_key 与凭据里 request 的 room/generation 不再校验 ⇒ 用 A 的 request id 配 B 的 doc_key 会强存 B 的文档却记在 A 的 request 上（两个值单看都合法，DB 层也拦不住）",
+    "verdict": "RED",
+    "summary": "2 failed, 180 passed in 25.32s",
+    "added": [
+      "test_task24_close_intent.py::test_target_must_belong_to_the_frozen_request_generation[other_generation]",
+      "test_task24_close_intent.py::test_target_must_belong_to_the_frozen_request_generation[other_room]"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task24_close_intent.py::test_target_must_belong_to_the_frozen_request_generation[other_generation]",
+      "test_task24_close_intent.py::test_target_must_belong_to_the_frozen_request_generation[other_room]"
+    ],
+    "added_files": [
+      "test_task24_close_intent.py"
+    ],
+    "restored": true,
+    "seconds": 28.9
+  },
+  {
+    "id": "M28",
+    "side": "be",
+    "want": "test_task24_close_intent.py::test_null_initiator_is_refused_before_the_command_service_call",
+    "why": "null initiator 不再在出站前被拒 ⇒ system/route identity 可以冒充用户授权（AC 10.10 明令禁止）",
+    "verdict": "RED",
+    "summary": "1 failed, 181 passed in 25.46s",
+    "added": [
+      "test_task24_close_intent.py::test_null_initiator_is_refused_before_the_command_service_call"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task24_close_intent.py::test_null_initiator_is_refused_before_the_command_service_call"
+    ],
+    "added_files": [
+      "test_task24_close_intent.py"
+    ],
+    "restored": true,
+    "seconds": 29.0
+  },
+  {
+    "id": "M29",
+    "side": "be",
+    "want": "test_task24_close_intent.py::test_non_200_is_a_transport_failure_not_a_return_code",
+    "why": "非 200 不再归传输层异常 ⇒ 网关/反代返回的 502 会被送进 JSON 解析并按「返回码」处理，诊断方向完全错（契约实测 OO 9.4 恒返 200）",
+    "verdict": "RED",
+    "summary": "1 failed, 181 passed in 24.31s",
+    "added": [
+      "test_task24_close_intent.py::test_non_200_is_a_transport_failure_not_a_return_code"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task24_close_intent.py::test_non_200_is_a_transport_failure_not_a_return_code"
+    ],
+    "added_files": [
+      "test_task24_close_intent.py"
+    ],
+    "restored": true,
+    "seconds": 27.8
+  },
+  {
+    "id": "M30",
+    "side": "be",
+    "want": "test_task24_close_intent.py::test_unreadable_or_unknown_return_code_fails_visible[missing_error_key]",
+    "why": "body 缺 `error` 不再拒 ⇒ 变成 `rule_for(None)`，抛的是「未知返回码」而不是「读不出 error」。两种未知的诊断动作不同（查网关 vs 补契约行），所以它们必须分型",
+    "verdict": "RED",
+    "summary": "1 failed, 181 passed in 23.72s",
+    "added": [
+      "test_task24_close_intent.py::test_unreadable_or_unknown_return_code_fails_visible[missing_error_key]"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task24_close_intent.py::test_unreadable_or_unknown_return_code_fails_visible[missing_error_key]"
+    ],
+    "added_files": [
+      "test_task24_close_intent.py"
+    ],
+    "restored": true,
+    "seconds": 27.1
+  },
+  {
+    "id": "M31",
+    "side": "be",
+    "want": "test_task24_close_intent.py::test_unreadable_or_unknown_return_code_fails_visible[error_is_bool]",
+    "why": "`bool` 不再被拒 ⇒ `{'error': true}` 因 `True == 1` 被读成 error 1，「doc 不在线」的语义凭空出现。契约禁止按最近似码猜处理",
+    "verdict": "RED",
+    "summary": "1 failed, 181 passed in 23.88s",
+    "added": [
+      "test_task24_close_intent.py::test_unreadable_or_unknown_return_code_fails_visible[error_is_bool]"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task24_close_intent.py::test_unreadable_or_unknown_return_code_fails_visible[error_is_bool]"
+    ],
+    "added_files": [
+      "test_task24_close_intent.py"
+    ],
+    "restored": true,
+    "seconds": 27.2
+  },
+  {
+    "id": "M32",
+    "side": "be",
+    "want": "test_task24_close_intent.py::test_missing_jwt_secret_fails_closed_instead_of_signing_nothing",
+    "why": "无 secret 时不再拒 ⇒ 回到平台旧实现的 fail-open（`return \"\"`，等于把鉴权降级成可选）。契约 `command_service.jwt.required=true`",
+    "verdict": "RED",
+    "summary": "1 failed, 181 passed in 23.71s",
+    "added": [
+      "test_task24_close_intent.py::test_missing_jwt_secret_fails_closed_instead_of_signing_nothing"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task24_close_intent.py::test_missing_jwt_secret_fails_closed_instead_of_signing_nothing"
+    ],
+    "added_files": [
+      "test_task24_close_intent.py"
+    ],
+    "restored": true,
+    "seconds": 27.0
+  },
+  {
+    "id": "M33",
+    "side": "be",
+    "want": "test_task24_close_intent.py::test_outbound_request_carries_doc_key_request_id_and_signed_short_ttl_jwt",
+    "why": "不再按契约 `platform_rule` 点名的 shape 签名：契约点名 payload_wrapped，实现却签成 flat body。Task 4 实测 OO 对 flat 也放行 ⇒ 这条在真实 OO 上**不会**报错，只能由守卫解码 JWT 并断言 `claims['payload']` 抓到。🔴 锚点刻意落在 claims 构造行而不是 `if claim_shape ==` 判定行：短路后者会掉进 `else: raise`，于是每一条出站测试一起挂 —— 判定仍是 RED 但「守卫是否真校验了 shape」被稀释掉了",
+    "verdict": "RED",
+    "summary": "1 failed, 181 passed in 23.96s",
+    "added": [
+      "test_task24_close_intent.py::test_outbound_request_carries_doc_key_request_id_and_signed_short_ttl_jwt"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task24_close_intent.py::test_outbound_request_carries_doc_key_request_id_and_signed_short_ttl_jwt"
+    ],
+    "added_files": [
+      "test_task24_close_intent.py"
+    ],
+    "restored": true,
+    "seconds": 27.3
+  },
+  {
+    "id": "M34",
+    "side": "be",
+    "want": "test_task24_close_intent.py::test_empty_onlyoffice_url_is_refused_instead_of_defaulting",
+    "why": "`ONLYOFFICE_URL` 为空时不再拒 ⇒ 端点退化成相对路径，出站目标由环境决定。与 callback 下载同一条 Task 4 实证 gap：空配置不得回退成「放行一切」",
+    "verdict": "RED",
+    "summary": "1 failed, 181 passed in 23.76s",
+    "added": [
+      "test_task24_close_intent.py::test_empty_onlyoffice_url_is_refused_instead_of_defaulting"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task24_close_intent.py::test_empty_onlyoffice_url_is_refused_instead_of_defaulting"
+    ],
+    "added_files": [
+      "test_task24_close_intent.py"
+    ],
+    "restored": true,
+    "seconds": 27.0
+  },
+  {
+    "id": "M35",
+    "side": "be",
+    "want": "test_task24_close_intent.py::test_outbound_request_carries_doc_key_request_id_and_signed_short_ttl_jwt",
+    "why": "超时与 token TTL 改成代码里的字面量 ⇒ 契约 `timers.notes[0]`「实现必须从本文件读取，不得在代码里另写常量」被违反，契约调整后实现悄悄不跟",
+    "verdict": "RED",
+    "summary": "2 failed, 180 passed in 24.66s",
+    "added": [
+      "test_task24_close_intent.py::test_outbound_request_carries_doc_key_request_id_and_signed_short_ttl_jwt",
+      "test_task24_close_intent_pg.py::test_predecessor_dispatch_carries_room_doc_key_and_frozen_request_id"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task24_close_intent.py::test_outbound_request_carries_doc_key_request_id_and_signed_short_ttl_jwt",
+      "test_task24_close_intent_pg.py::test_predecessor_dispatch_carries_room_doc_key_and_frozen_request_id"
+    ],
+    "added_files": [
+      "test_task24_close_intent.py",
+      "test_task24_close_intent_pg.py"
+    ],
+    "restored": true,
+    "seconds": 28.1
+  },
+  {
+    "id": "M36",
+    "side": "be",
+    "want": "test_task24_close_intent.py::test_retryable_error_is_checked_before_fsm_terminality",
+    "why": "可重试错误不再先判 ⇒ `RequestState.rejected`（FSM terminal）会被读成「已终结，放心走」，可重试的失败当场丢内容。这条判据的顺序本身是判据",
+    "verdict": "RED",
+    "summary": "2 failed, 180 passed in 25.25s",
+    "added": [
+      "test_task24_close_intent.py::test_editor_destroy_gate_branches[retryable_keeps_oo]",
+      "test_task24_close_intent.py::test_retryable_error_is_checked_before_fsm_terminality"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task24_close_intent.py::test_editor_destroy_gate_branches[retryable_keeps_oo]",
+      "test_task24_close_intent.py::test_retryable_error_is_checked_before_fsm_terminality"
+    ],
+    "added_files": [
+      "test_task24_close_intent.py"
+    ],
+    "restored": true,
+    "seconds": 28.7
+  },
+  {
+    "id": "M37",
+    "side": "be",
+    "want": "test_task24_close_intent.py::test_timeout_never_permits_reload_html",
+    "why": "超时不再单独成态 ⇒ Property 13「超时保持 OO、reloadHtml 次数为 0」失去执法点，前端会把超时当成「仍在等」而无限轮询、或直接切回 HTML",
+    "verdict": "RED",
+    "summary": "2 failed, 180 passed in 25.20s",
+    "added": [
+      "test_task24_close_intent.py::test_editor_destroy_gate_branches[timeout_keeps_oo]",
+      "test_task24_close_intent.py::test_timeout_never_permits_reload_html"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task24_close_intent.py::test_editor_destroy_gate_branches[timeout_keeps_oo]",
+      "test_task24_close_intent.py::test_timeout_never_permits_reload_html"
+    ],
+    "added_files": [
+      "test_task24_close_intent.py"
+    ],
+    "restored": true,
+    "seconds": 28.7
+  },
+  {
+    "id": "M38",
+    "side": "be",
+    "want": "test_task24_close_intent.py::test_editor_destroy_gate_branches[crash_durable_but_no_case_refused]",
+    "why": "崩溃/OO 自发 close 的放行条件由合取松成析取 ⇒ incoming 已 durable 但还没建recovery case 时也允许销毁编辑器，durable incoming 成为无所有者死路（AC 5.4/5.8 明令禁止）",
+    "verdict": "RED",
+    "summary": "1 failed, 181 passed in 25.25s",
+    "added": [
+      "test_task24_close_intent.py::test_editor_destroy_gate_branches[crash_durable_but_no_case_refused]"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task24_close_intent.py::test_editor_destroy_gate_branches[crash_durable_but_no_case_refused]"
+    ],
+    "added_files": [
+      "test_task24_close_intent.py"
+    ],
+    "restored": true,
+    "seconds": 28.8
+  },
+  {
+    "id": "M39",
+    "side": "be",
+    "want": "test_task24_close_intent.py::test_every_contract_return_code_has_a_closed_outcome",
+    "why": "error 4「无新变更」被登记成可重试服务器错误 ⇒ 契约明写「直接放行离开；不得无限等 callback」的那条处置消失，用户会卡在等 callback",
+    "verdict": "RED",
+    "summary": "2 failed, 180 passed in 25.33s",
+    "added": [
+      "test_task24_close_intent.py::test_every_contract_return_code_has_a_closed_outcome",
+      "test_task24_close_intent.py::test_http_200_with_nonzero_error_is_never_accepted[error4]"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task24_close_intent.py::test_every_contract_return_code_has_a_closed_outcome"
+    ],
+    "added_files": [
+      "test_task24_close_intent.py"
+    ],
+    "restored": true,
+    "seconds": 28.9
+  },
+  {
+    "id": "M40",
+    "side": "be",
+    "want": "test_task24_close_intent.py::test_every_contract_return_code_has_a_closed_outcome",
+    "why": "error 3 由「可重试、保持 OO」降级成配置故障 ⇒ 本可重试的失败被当成终态告警。与 M39 成对：证明 outcome 与 retryable 两列都真的被消费",
+    "verdict": "WRONG-TEST",
+    "summary": "1 failed, 181 passed in 24.93s",
+    "added": [
+      "test_task24_close_intent.py::test_http_200_with_nonzero_error_is_never_accepted[error3]"
+    ],
+    "gone": [],
+    "hit": [],
+    "added_files": [
+      "test_task24_close_intent.py"
+    ],
+    "restored": true,
+    "seconds": 28.5
+  }
+]

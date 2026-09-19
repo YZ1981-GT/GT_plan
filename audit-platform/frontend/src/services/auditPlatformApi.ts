@@ -3,11 +3,12 @@
   * 封装所有后端 API 调用
   */
  import http from '@/utils/http'
+ import { resolveAuditYearFromProject } from '@/utils/resolveAuditYear'
  import {
    projects as P_proj, trialBalance as P_tb, adjustments as P_adj,
    materiality as P_mat, misstatements as P_mis, reports as P_rpt,
    cfsWorksheet as P_cfs, disclosureNotes as P_dn, auditReport as P_ar,
-   exportTask as P_exp, workpaperSummary as P_ws, events as P_evt,
+   exportTask as P_exp, workpaperSummary as P_ws,
  } from '@/services/apiPaths'
 
  export interface ProjectListItem {
@@ -15,6 +16,8 @@
    name?: string | null
    client_name?: string | null
    audit_year?: number | string | null
+   audit_period_end?: string | null
+   audit_period_start?: string | null
  }
 
  export async function listProjects(): Promise<ProjectListItem[]> {
@@ -29,8 +32,7 @@
 
 export async function getProjectAuditYear(projectId: string): Promise<number | null> {
   const project = await getProject(projectId)
-  const auditYear = Number(project?.audit_year)
-  return Number.isFinite(auditYear) && auditYear > 2000 ? auditYear : null
+  return resolveAuditYearFromProject(project)
 }
 
 // ─── Trial Balance ───
@@ -53,7 +55,11 @@ export async function getTrialBalance(projectId: string, year: number, companyCo
   const params: Record<string, any> = { year }
   if (companyCode) params.company_code = companyCode
   const { data } = await http.get(P_tb.get(projectId), { params })
-  return data
+  // 后端过渡期语义（sign_convention readiness）返回 {data, warning} 对象而非纯数组
+  if (data && !Array.isArray(data) && Array.isArray(data.data)) {
+    return data.data
+  }
+  return Array.isArray(data) ? data : []
 }
 
 export async function recalcTrialBalance(projectId: string, year: number) {
@@ -114,12 +120,40 @@ export interface AccountOption {
 
 export async function listAdjustments(
   projectId: string, year: number,
-  opts?: { adjustment_type?: string; review_status?: string; page?: number; page_size?: number }
+  opts?: { adjustment_type?: string; review_status?: string; origin?: string; page?: number; page_size?: number }
 ) {
   const { data } = await http.get(P_adj.list(projectId), {
     params: { year, ...opts },
   })
   return data
+}
+
+/** 底稿调整分录组 → 集中登记（workpaper-adjustment-centralization） */
+export async function syncAdjustmentFromWorkpaper(projectId: string, body: {
+  year: number
+  wp_id: string
+  item_id: string
+  source_wp_code: string
+  description?: string
+  adjustment_type: 'aje' | 'rje'
+  company_code?: string
+  line_items: Array<{
+    standard_account_code?: string; account_name?: string; report_line_code?: string
+    debit_amount: number; credit_amount: number
+  }>
+}) {
+  const { data } = await http.post(P_adj.syncFromWorkpaper(projectId), body)
+  return data
+}
+
+/** 按 source_ref 回流集中登记复核状态（底稿侧只读展示） */
+export async function getAdjustmentBySourceRef(projectId: string, sourceRef: string) {
+  const { data } = await http.get(P_adj.bySourceRef(projectId), { params: { source_ref: sourceRef } })
+  return data as {
+    entry_group_id?: string; adjustment_no?: string; adjustment_type?: string
+    review_status?: string; rejection_reason?: string | null; source_wp_code?: string
+    collaboration_status?: string | null
+  }
 }
 
 export async function createAdjustment(projectId: string, body: {
@@ -137,6 +171,64 @@ export async function createAdjustment(projectId: string, body: {
 
 export async function batchCommitAdjustments(projectId: string, year: number) {
   const { data } = await http.post(P_adj.batchCommit(projectId), null, { params: { year } })
+  return data
+}
+
+// ── 调整分录协作接力（adjustment-collaboration-and-propagation） ──
+
+export interface AdjCollabLineItem {
+  standard_account_code?: string; account_name?: string; report_line_code?: string
+  debit_amount: number; credit_amount: number
+}
+
+/** 转派/重派分录组给项目成员补充 */
+export async function assignAdjustmentCollaboration(
+  projectId: string, entryGroupId: string, body: { assignee_id: string; year: number; note?: string }
+) {
+  const { data } = await http.post(P_adj.collabAssign(projectId, entryGroupId), body)
+  return data
+}
+
+/** 分录组当前协作 + 事件时间线 */
+export async function getGroupCollaboration(projectId: string, entryGroupId: string) {
+  const { data } = await http.get(P_adj.collabByGroup(projectId, entryGroupId))
+  return data as {
+    collaboration: null | {
+      id: string; entry_group_id: string; status: string; round: number
+      initiator_id: string; assignee_id: string; note?: string | null; rejection_reason?: string | null
+    }
+    timeline: Array<{ id: string; event_type: string; actor_id: string; payload: any; created_at: string | null }>
+  }
+}
+
+/** 被指派人待办 */
+export async function getCollaborationInbox(projectId: string) {
+  const { data } = await http.get(P_adj.collabInbox(projectId))
+  return data as Array<{
+    id: string; entry_group_id: string; status: string; round: number
+    initiator_id: string; note?: string | null; updated_at: string | null
+  }>
+}
+
+export async function acknowledgeCollaboration(projectId: string, cid: string) {
+  const { data } = await http.post(P_adj.collabAcknowledge(projectId, cid))
+  return data
+}
+
+export async function contributeCollaboration(
+  projectId: string, cid: string, body: { line_items: AdjCollabLineItem[]; note?: string }
+) {
+  const { data } = await http.post(P_adj.collabContribute(projectId, cid), body)
+  return data
+}
+
+export async function confirmCollaboration(projectId: string, cid: string) {
+  const { data } = await http.post(P_adj.collabConfirm(projectId, cid))
+  return data
+}
+
+export async function rejectCollaboration(projectId: string, cid: string, reason: string) {
+  const { data } = await http.post(P_adj.collabReject(projectId, cid), { reason })
   return data
 }
 
@@ -256,20 +348,17 @@ export async function getMaterialityHistory(projectId: string, year: number) {
   return data
 }
 
-export async function getMaterialityBenchmark(projectId: string, year: number, benchmarkType: string) {
+export async function getMaterialityBenchmark(projectId: string, year: number, benchmarkType: string, calcBasis: string = 'unadjusted') {
   const { data } = await http.get(P_mat.benchmark(projectId), {
-    params: { year, benchmark_type: benchmarkType },
+    params: { year, benchmark_type: benchmarkType, calc_basis: calcBasis },
   })
   return data
 }
 
 // ─── Events SSE ───
-// createSSE（fetch+ReadableStream）在 ThreeColumnLayout.vue 中直接使用，token 通过 Authorization header 传输
-// createEventSource 保留为兼容接口（当前无调用方）
-
-export function createEventSource(projectId: string) {
-  return import('@/utils/sse').then(({ createSSE }) => createSSE(P_evt.stream(projectId)))
-}
+// 项目事件流统一走单例总线 `services/sse/projectEventStream`（每项目一条共享连接）。
+// 旧 createEventSource 兼容包装（无调用方）已移除以避免绕过总线直连 /events/stream
+// （frontend-sse-connection-consolidation R6.3）。
 
 
 // ─── Misstatements (未更正错报) ───
@@ -286,6 +375,7 @@ export interface MisstatementItem {
   misstatement_type: string
   management_reason: string | null
   auditor_evaluation: string | null
+  source_wp_code?: string | null
   is_carried_forward: boolean
   prior_year_id: string | null
   created_by: string | null
@@ -508,6 +598,12 @@ export interface DisclosureNoteTreeItem {
   content_type: string
   status: string
   sort_order: number
+  /** 是否过期（stale 标记，后端 query_builder 路径下发；树端点可能不含 → 可选） */
+  is_stale?: boolean
+  /** 是否空章节（前端离线导出按此判定 has_data；后端树端点可能不含 → 可选） */
+  is_empty?: boolean
+  /** 最新校验 findings 计数（树端点 additive 附加；P0-4 校验落库后后端注入） */
+  findings?: { error: number; warning: number }
 }
 
 export interface DisclosureNoteDetail {
@@ -518,6 +614,7 @@ export interface DisclosureNoteDetail {
   content_type: string
   table_data: any
   text_content: string | null
+  guidance_text?: string | null
   status: string
 }
 
@@ -551,14 +648,23 @@ export async function updateDisclosureNote(noteId: string, body: Record<string, 
   return data
 }
 
-export async function validateDisclosureNotes(projectId: string, year: number) {
-  const { data } = await http.post(P_dn.validate(projectId, year))
+export async function validateDisclosureNotes(
+  projectId: string,
+  year: number,
+  templateType?: 'soe' | 'listed',
+) {
+  // 后端仅接受 soe/listed（决定预设公式集）；custom 等其他值不传，用后端默认
+  const url = P_dn.validate(projectId, year)
+  const finalUrl = templateType ? `${url}?template_type=${templateType}` : url
+  const { data } = await http.post(finalUrl)
   return data
 }
 
 export async function getValidationResults(projectId: string, year: number): Promise<NoteValidationFinding[]> {
   const { data } = await http.get(P_dn.validationResults(projectId, year))
-  return data
+  // 后端返回 { findings: [...] } 结构化对象；兼容直接返回数组的旧形态
+  if (Array.isArray(data)) return data
+  return (data?.findings ?? []) as NoteValidationFinding[]
 }
 
 // ─── Audit Report (审计报告) ───

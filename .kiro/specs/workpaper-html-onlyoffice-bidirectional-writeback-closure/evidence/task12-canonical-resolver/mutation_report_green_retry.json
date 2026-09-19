@@ -1,0 +1,102 @@
+[
+  {
+    "id": "M20",
+    "side": "be",
+    "want": "test_task12_canonical_resolver.py::TestProperty28BundleCanonicalizerFailClosed::test_fc6_malformed_digest",
+    "why": "关掉 digest 形态检查（FC-6）⇒ 大写 hex / 长度不符也放行。🔴 锚点落在 `models.validate_bundle_slot`（唯一实现）：改造前 `definitions._normalize_slot_input` 自带一份重合副本，短路任一侧都不改行为 ⇒ 首轮变异实测 GREEN。已删掉副本、改为委托",
+    "verdict": "RED",
+    "summary": "1 failed, 126 passed in 11.18s",
+    "added": [
+      "test_task12_canonical_resolver.py::TestProperty28BundleCanonicalizerFailClosed::test_fc6_malformed_digest"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task12_canonical_resolver.py::TestProperty28BundleCanonicalizerFailClosed::test_fc6_malformed_digest"
+    ],
+    "added_files": [
+      "test_task12_canonical_resolver.py"
+    ],
+    "restored": true,
+    "seconds": 14.9
+  },
+  {
+    "id": "M22",
+    "side": "be",
+    "want": "test_task12_canonical_resolver.py::TestProperty28BundleCanonicalizerFailClosed::test_fc10_malformed_definition_ref",
+    "why": "关掉 `definition:<uuid>` ref 形态检查（FC-10）。同 M20：锚点必须落在唯一实现上，`definitions` 侧的重合副本已删除",
+    "verdict": "RED",
+    "summary": "1 failed, 126 passed in 11.20s",
+    "added": [
+      "test_task12_canonical_resolver.py::TestProperty28BundleCanonicalizerFailClosed::test_fc10_malformed_definition_ref"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task12_canonical_resolver.py::TestProperty28BundleCanonicalizerFailClosed::test_fc10_malformed_definition_ref"
+    ],
+    "added_files": [
+      "test_task12_canonical_resolver.py"
+    ],
+    "restored": true,
+    "seconds": 14.9
+  },
+  {
+    "id": "M23",
+    "side": "be",
+    "want": "test_task12_canonical_resolver.py::TestProperty28BundleCanonicalizerFailClosed::test_fc13_invalid_authority_digest",
+    "why": "关掉 authority model digest 检查（FC-13）。`definitions.normalize_authority_digest` 现在只做 NULL 判定 + 归一，形态判据单点在此",
+    "verdict": "RED",
+    "summary": "1 failed, 126 passed in 11.54s",
+    "added": [
+      "test_task12_canonical_resolver.py::TestProperty28BundleCanonicalizerFailClosed::test_fc13_invalid_authority_digest"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task12_canonical_resolver.py::TestProperty28BundleCanonicalizerFailClosed::test_fc13_invalid_authority_digest"
+    ],
+    "added_files": [
+      "test_task12_canonical_resolver.py"
+    ],
+    "restored": true,
+    "seconds": 14.7
+  },
+  {
+    "id": "M34",
+    "side": "be",
+    "want": "test_task12_resolution_pg.py::TestHistoricalReadsUseFrozenBundle::test_historical_intents_reject_missing_frozen_identity",
+    "why": "关掉历史意图的 frozen identity 门（服务层本体）",
+    "verdict": "RED",
+    "summary": "1 failed, 126 passed in 10.16s",
+    "added": [
+      "test_task12_resolution_pg.py::TestHistoricalReadsUseFrozenBundle::test_historical_intents_reject_missing_frozen_identity"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task12_resolution_pg.py::TestHistoricalReadsUseFrozenBundle::test_historical_intents_reject_missing_frozen_identity"
+    ],
+    "added_files": [
+      "test_task12_resolution_pg.py"
+    ],
+    "restored": true,
+    "seconds": 13.0
+  },
+  {
+    "id": "M43",
+    "side": "be",
+    "want": "test_task12_canonical_resolver.py::TestResolverMigrationMatrix::test_status_derivation_truth_table",
+    "why": "把「意图 ∧ 证据」退化成「意图」⇒ 手写 migrated 就永远绿，任务书要求的「旧调用点已真的指向统一入口」失去判据（假绿第②源）。🔴 判定已抽成纯函数 `derive_status` 并由真值表守卫锁死：内联在 `build_matrix` 时，因当前矩阵零 regressed 行，短路后输出不变 ⇒ 首轮实测 GREEN",
+    "verdict": "RED",
+    "summary": "1 failed, 126 passed in 10.16s",
+    "added": [
+      "test_task12_canonical_resolver.py::TestResolverMigrationMatrix::test_status_derivation_truth_table"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task12_canonical_resolver.py::TestResolverMigrationMatrix::test_status_derivation_truth_table"
+    ],
+    "added_files": [
+      "test_task12_canonical_resolver.py"
+    ],
+    "restored": true,
+    "seconds": 12.8
+  }
+]

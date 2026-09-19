@@ -1,0 +1,322 @@
+{
+  "schema_version": "manifest-slice:v1",
+  "task": "Task 47",
+  "spec": "workpaper-html-onlyoffice-bidirectional-writeback-closure",
+  "description": "Frozen manifest slice for E-cycle Excel independent entries. E 循环在冻结 manifest 里只有一个独立 Excel entry（xlsx/gt-e1-monetary-fund）；本 slice 冻结它的迁移范围、逐项诚实裁决、账户动态行 identity 模型、币种 variant 模型与阻断 bidirectional 的前置条件。",
+  "frozen_at": "Task 47 execution",
+  "source_manifest": "backend/data/workpaper_sync_entry_manifest.json",
+  "paradigm_ref": "backend/data/workpaper_sync_migration_paradigm.json",
+  "sibling_slices": [
+    "backend/data/workpaper_sync_d_cycle_manifest_slice.json"
+  ],
+  "slice_scope": {
+    "cycle": "E",
+    "document_type": "xlsx",
+    "selection_rule": "source_manifest 中 wp_match.wp_code_patterns 任一以 'E' 开头、或 host 组件名匹配 ^GtE\\d 的 xlsx entry",
+    "independent_entry_count": 1,
+    "parent_duplicate_count": 0,
+    "parent_duplicate_note": "E1 的 30+ 子 sheet 由同一个宿主 GtE1MonetaryFund.vue 按 currentSheet 分发到结构化子组件，子组件里没有第二个 GtOnlyOfficeSheet 挂载点 ⇒ manifest 里不产生 parent_duplicate 条目（与 D4 的 31 条 parent_duplicate 形态不同）。",
+    "excluded_from_slice": [
+      {
+        "what": "confirmation/e0-send-list/GtE0SendListE0{3,4,5}.vue",
+        "template_ref": "E/E0 货币资金 - 函证（Leap应对措施-函证）.xlsx",
+        "reason": "E0 函证是跨循环共享模块（D0 的 confirmation-* 组件族），纯 HTML 无 OnlyOffice 挂载点 ⇒ 不在 source manifest 的 186 条 entry 里，归 Task 57「A/B/C/S 与跨循环共享 Excel entry」。本 slice 不为它伪造 entry。"
+      }
+    ]
+  },
+  "independent_entries": [
+    {
+      "entry_id": "xlsx/gt-e1-monetary-fund",
+      "wp_code_pattern": "E1M",
+      "document_type": "xlsx",
+      "host": "GtE1MonetaryFund.vue",
+      "host_path": "audit-platform/frontend/src/components/workpaper/GtE1MonetaryFund.vue",
+      "capability": "single_onlyoffice",
+      "migration_state": "legacy_fake_bidirectional",
+      "adapter_id": null,
+      "authority_model": null,
+      "definition_bundle": null,
+      "instrumentation_candidate": null,
+      "published_representation": null,
+      "template_ref": "E/E1-1至E1-11 货币资金- 审定表明细表（Leap-常规程序）.xlsx",
+      "mount_count": 2,
+      "scenario_profile_id": "xlsx.editable.shared.single.room_service_wired.v1",
+      "editability": "editable",
+      "room_model": "shared",
+      "canonical_resolver": "legacy_sheet_onlyoffice_router",
+      "adjudication": {
+        "honest_capability": "single_onlyoffice",
+        "reason": "无 bidirectional adapter / 无 per-entry contract / 无 authority model / 无 non-null definition bundle / 无 Task 17 instrumentation candidate / 无 durable forcesave+ack 管道。HTML 侧走 checklist_responses（PUT /api/workpapers/{id}/checklist-responses），OO 侧只按 sheet_name 打开模板副本；两侧没有字段级投影对端，切回 HTML 靠重读 responses_snapshot。",
+        "manifest_legacy_reasons": [
+          "template_only_open",
+          "no_durable_forcesave_ack",
+          "missing_adapter"
+        ],
+        "not_single_html_because": "OO 侧挂载真实可达：宿主两处 GtOnlyOfficeSheet 挂载点由 dualMode.currentMode 门控，后端 /api/workpapers/{wp}/sheets/{sheet}/onlyoffice-config 存在（wp_onlyoffice_router.py#L704），doc_key 为 wp 维度服务端 key（scenario_profile.doc_key_defects 为空）⇒ 不是「空白模板切换入口」，不适用 12.9 的 single_html。",
+        "not_bidirectional_because": "Wave 5 前置的五件事（approved authority model / 人工审核 per-entry contract / non-null approved bundle / Task 17 non-current candidate / Task 36 finalize 出 published representation）一件都不存在，真实 OO 9.4 required scenarios 也未执行。"
+      },
+      "evidence": {
+        "browser_case": null,
+        "contract_test": null,
+        "sync_test_run_id": null,
+        "required_scenario_set_digest": null,
+        "verification_state": "UNVERIFIABLE",
+        "unverifiable_reasons": [
+          "no_instrumentation_candidate_for_this_entry",
+          "no_approved_per_entry_contract",
+          "no_non_null_approved_definition_bundle",
+          "no_real_onlyoffice_94_probe_run_for_this_entry",
+          "no_published_result_representation"
+        ]
+      }
+    }
+  ],
+  "authoritative_templates": {
+    "root": "backend/wp_templates/E",
+    "reference_copy_status": "absent_from_working_tree",
+    "reference_copy_note": "平台铁律要求「读模板前先比对 backend/wp_templates/ 与参考副本两处 size」。本次实扫工作树根下 `基础数据/` 目录**不存在** ⇒ 参考副本无法比对，运行时权威目录是唯一来源。本 slice 因此直接冻结权威目录的 size+sha256，任一漂移由 Task 47 守卫 fail closed（Requirement 6.10）。",
+    "lock_file_policy": "枚举时跳过 `~$` 前缀的 Office 锁文件（用户开着 WPS 时会出现，不是模板）",
+    "files": [
+      {
+        "name": "E1-1至E1-11 货币资金- 审定表明细表（Leap-常规程序）.xlsx",
+        "size": 145434,
+        "sha256": "8317e2bac2e57a70778755923332450bd07634e1ff68eb8c14e74d259e58a9ea",
+        "sheet_count": 16,
+        "belongs_to_entry": "xlsx/gt-e1-monetary-fund",
+        "read_with": "openpyxl read_only data_only"
+      },
+      {
+        "name": "E1-14至E1-15  货币资金 -分析程序（Leap应对措施-分析程序）.xlsx",
+        "size": 38096,
+        "sha256": "c8ee99bddd417e12a94f88aaa66e43c24ab1eaafd4bdb9fbce58d422a70181ef",
+        "sheet_count": 4,
+        "belongs_to_entry": "xlsx/gt-e1-monetary-fund"
+      },
+      {
+        "name": "E1-18至E1-23  货币资金 -检查（Leap应对措施-检查）.xlsx",
+        "size": 203485,
+        "sha256": "4e88aa0ebc538ad9681f27c4cb401284fa11187d63acc88bbd7b2ff6a0e32be5",
+        "sheet_count": 7,
+        "belongs_to_entry": "xlsx/gt-e1-monetary-fund"
+      },
+      {
+        "name": "E1-26至E1-32  货币资金-IPO 上市 新三板 重组 舞弊应对.xlsx",
+        "size": 117568,
+        "sha256": "4c2756b3e0c9413670d365e3e17a09ead602b34b6d31c978d7370de141d9adb5",
+        "sheet_count": 9,
+        "belongs_to_entry": "xlsx/gt-e1-monetary-fund"
+      },
+      {
+        "name": "E0 货币资金 - 函证（Leap应对措施-函证）.xlsx",
+        "size": 1011488,
+        "sha256": "9073e46f0761f87d7744d11193126a94d73d7840c1755a96e701a247e3f0b738",
+        "sheet_count": 20,
+        "belongs_to_entry": null,
+        "excluded_reason": "E0 函证跨循环共享，归 Task 57"
+      }
+    ]
+  },
+  "dynamic_row_identity": {
+    "why_this_section_exists": "Task 47 正文要求「处理账户动态行、币种变体和稳定账号/UUID」。E1 的两张动态行表（E1-3 银行存款明细 / E1-10 已开立银行账户清单）行数由客户账户数决定，不可写死；行身份必须是账号而不是数组下标。",
+    "source_of_truth": "tb_aux_balance 的 aux_type='银行账户' 维度（后端 _e1_monetary_fund.py 的 _build_account_prefill）",
+    "why_not_leaf": "客户的 1002 银行存款在 tb_balance 里不分户，叶子口径恒 1 行汇总 ⇒ 逐户列示与账户完整性核对只能走 aux 维度。E1-3 正确结果是逐户 N 行（实测客户数据 22 行），不是 1 行。",
+    "forbidden_identity_kinds": [
+      "array_index",
+      "ordinal",
+      "row_number",
+      "position",
+      "mutable_chinese_label"
+    ],
+    "forbidden_row_count_patterns": [
+      "blankRows(p, 3|5|10) 之类的写死骨架行数",
+      "按公司/账户横向展开却写死列数"
+    ],
+    "tables": [
+      {
+        "table_key": "e1_3_bank_detail",
+        "persistence_key": "E1-bank-detail-rows",
+        "seed_builder": "buildBankSeedRowsFromAccounts",
+        "seed_builder_path": "audit-platform/frontend/src/components/workpaper/composables/e1BankAccountPrefill.ts",
+        "consumer": "useE1BankDetail",
+        "consumer_path": "audit-platform/frontend/src/components/workpaper/composables/useE1BankDetail.ts",
+        "row_identity": {
+          "kind": "field",
+          "template": "bank-{section}-{group}-acct-{account_no}",
+          "identity_field": "account_no",
+          "identity_fallback_field": "account_code",
+          "duplicate_policy": "同账号重复出现时追加 `-{n}` 后缀（uniqueId），不改用下标",
+          "runtime_added_row_identity": "generateRowId() = bank-{section}-{group}-{Date.now()}-{random36}，删除后不复用已删 id",
+          "source_ref": "backend/wp_templates/E/E1-1至E1-11 货币资金- 审定表明细表（Leap-常规程序）.xlsx!银行存款及其他货币资金明细表(仅人民币)E1-3!C9 = '银行账号'"
+        },
+        "variant_independent_identity": true
+      },
+      {
+        "table_key": "e1_10_account_list",
+        "persistence_key": "E1-account-list-rows",
+        "seed_builder": "buildAccountListSeedRowsFromAccounts",
+        "seed_builder_path": "audit-platform/frontend/src/components/workpaper/composables/e1BankAccountPrefill.ts",
+        "consumer": "useE1AccountList",
+        "consumer_path": "audit-platform/frontend/src/components/workpaper/composables/useE1AccountList.ts",
+        "row_identity": {
+          "kind": "field",
+          "template": "acct-a-{account_no}",
+          "identity_field": "account_no",
+          "identity_fallback_field": "account_code",
+          "duplicate_policy": "同账号重复出现时追加 `-{n}` 后缀（uniqueId），不改用下标",
+          "zero_balance_rows_retained": true,
+          "zero_balance_reason": "E1-10 是账户完整性核对表，「本年新开立但期末为 0」的账户恰是体外账户排查对象",
+          "source_ref": "backend/wp_templates/E/E1-1至E1-11 货币资金- 审定表明细表（Leap-常规程序）.xlsx!已开立银行账户清单核对表E1-10!A11:K12 两级表头"
+        },
+        "variant_independent_identity": true
+      }
+    ]
+  },
+  "currency_variant_model": {
+    "why_this_section_exists": "E 循环币种变体是已登记的假绿源：E1-3 有两张同尾码 sheet，宿主按 sheetName 分流成 rmb / multi，**两版共用同一持久化键**。一旦「种子的 variant」与「消费它的 Tab 的 variant」不一致，金额会被静默抹成 0（界面显示 `-`）—— 比取不到更坏。",
+    "variants": [
+      {
+        "variant": "rmb",
+        "template_sheet": "银行存款及其他货币资金明细表(仅人民币)E1-3",
+        "identity_header_row": 9,
+        "header_rows": [9, 10],
+        "max_column": 28,
+        "dimensions": "A1:AB92",
+        "has_foreign_currency_columns": false,
+        "foreign_currency_labels_scanned_rows": [1, 11],
+        "identity_columns": {
+          "A9": "开户银行",
+          "B9": "总账银行名称",
+          "C9": "银行账号",
+          "D9": "账户性质/主要用途"
+        }
+      },
+      {
+        "variant": "multi",
+        "template_sheet": "银行存款及其他货币资金明细表(人民币及外币)E1-3",
+        "identity_header_row": 8,
+        "header_rows": [8, 9, 10],
+        "max_column": 41,
+        "dimensions": "A1:AO89",
+        "has_foreign_currency_columns": true,
+        "foreign_currency_labels_scanned_rows": [1, 11],
+        "foreign_currency_columns": {
+          "E8": "原币币种",
+          "F8": "期末汇率",
+          "G10/H10": "未审期初 原币/人民币 成对子列（本期增加/减少/期末同形）"
+        },
+        "identity_columns": {
+          "A8": "开户银行",
+          "B8": "总账银行名称",
+          "C8": "银行账号",
+          "D8": "账户性质/主要用途"
+        }
+      }
+    ],
+    "decoupling_rule": {
+      "statement": "stable field key（行身份）必须与 variant 完全解耦：两个 variant 的 identity 列在权威模板里逐字相同（A..D，账号在 C 列），只有金额列集不同。因此种子行 id 在两个 variant 下必须逐项相等，行数也必须相等；variant 只允许影响**字段集**。",
+      "source_backed_by": "上表两个 template_sheet 的 identity_columns 逐字相同 / max_column 不同（28 vs 41）/ 原币·汇率 label 只在 multi 版出现",
+      "seed_field_sets": {
+        "shared_field_count": 20,
+        "multi_only_fields": [
+          "fxCurrency",
+          "fxRate",
+          "openingFc",
+          "increaseFc",
+          "decreaseFc",
+          "adjustmentFc"
+        ],
+        "multi_field_count": 26
+      }
+    },
+    "zeroing_defect": {
+      "registered_symptom": "E1-3 先打开「仅人民币」再切「人民币及外币」⇒ 逐户行金额全变 `-`，并冒出一条错的「审定合计 0.00 ≠ TB」横幅。",
+      "root_cause_chain": [
+        "宿主 seedFromFourTable() 只在 onMounted 与 htmlData watch 里跑，seedRowsKey 又有 persist-first 短路 ⇒ 种子形态一会话内按当时 variant 定型",
+        "rmb 形态种子按设计不下发 fxRate/openingFc 等原币列",
+        "recalcRow(row,'multi') 若无条件由「原币 × fxRate」派生本位币六列，rmb 形态种子恒得 0",
+        "displayPrefs.fmtAmount(0) 在 showZero=false 下渲染为 `-` ⇒ 表面像「取不到数」"
+      ],
+      "current_status": "FIXED_AND_GUARDED",
+      "fix_location": "useE1BankDetail.classifyFxForm + recalcRow 的 multi 分支：先按 fxCurrency 判 base-identity / foreign-pending / fc-authoritative 三态，base-identity（只有本位币列）保留本位币输入值并把原币小计镜像成本位币，不再反向派生",
+      "fix_reason_notes": "判据用 fxCurrency 而不是 fxRate —— fxRate 缺失经 loadFromResponses 会回落 1，拿它区分会把「外币待录入（fxRate 显式 0）」误判成 base-identity，等于由本位币反推原币",
+      "cross_variant_guard": {
+        "path": "audit-platform/frontend/src/components/workpaper/composables/__tests__/e1BankVariantIntegrity.spec.ts",
+        "what_it_locks": "写入侧 variant × 消费侧 variant 全组合的本位币金额守恒 + 运行时切 variant 三次一致 + 落库值不被派生结果污染 + 跨 sheet 聚合键不因 variant 改变",
+        "observed_test_count": 29
+      },
+      "identity_guard": {
+        "path": "audit-platform/frontend/src/components/workpaper/composables/__tests__/e1SyncEntryRowIdentity.spec.ts",
+        "what_it_locks": "本 Task 47 新增：两个 variant 的种子行 id 逐项相等（身份与 variant 解耦）、id 由账号派生而非下标、删除+新增不复用已删 id、旧行数据不串到新行、rmb 种子被 multi Tab 消费时身份与金额同时保住",
+        "owner_task": "Task 47"
+      }
+    }
+  },
+  "blocking_preconditions": [
+    {
+      "id": "BP-1",
+      "blocks": "bidirectional",
+      "what": "本 entry 没有 Task 17 的 non-current instrumentation candidate",
+      "consequence": "Task 36 的 ExcelEntryFinalizeGate.finalize_candidate 无 candidate 可 finalize ⇒ 不可能产出 published representation"
+    },
+    {
+      "id": "BP-2",
+      "blocks": "bidirectional",
+      "what": "backend/data/workpaper_sync_contracts/ 下没有本 entry 的 per-entry contract（e*.json 零文件）",
+      "consequence": "PerEntryContractUnapprovedError —— projection_contract bundle 的 contract slot 必须是 approved definition，marker 不得冒充"
+    },
+    {
+      "id": "BP-3",
+      "blocks": "bidirectional",
+      "what": "没有为本 entry 跑过真实 OnlyOffice 9.4 identity 载体探针",
+      "consequence": "Requirement 6.16 未过门 ⇒ 不得建设依赖该载体的 engine；candidate evidence 的 probe_gate.onlyoffice_build 无从填写（伪填即 CandidateEvidenceError）"
+    },
+    {
+      "id": "BP-4",
+      "blocks": "single_onlyoffice 的 sheet 定位可靠性",
+      "what": "E1 的 OO sheet 名解析复用 G1 专属解析器：useG1DualMode.resolveOoSheetName() 在 currentSheet 为空/底稿目录时返回 `sheetName || 'G1-1'`，非空时走 resolveG1SheetLabel(code, availableSheets, sheetName)，而宿主把 availableSheets 传成 computed(() => [])。",
+      "observable_consequences": [
+        "E1 宿主未收到 sheetName 时，dualMode 会去请求一个名为 `G1-1` 的 sheet 的 onlyoffice-config（E1 底稿上不存在该 sheet）⇒ 拉取失败、switchMode 静默回退 html，在线编辑入口对用户表现为「点了没反应」",
+        "extractG1SheetCode 对含「调整分录」的 sheet 名先命中 /调整分录/ 返回 'G1-3' ⇒ E1-5『调整分录汇总E1-5』的 code 归一结果属于 G1 命名空间（当前因 resolveG1SheetLabel 末尾回落 fallbackSheetName 而未表现为错 sheet，是巧合不是设计）"
+      ],
+      "source_refs": [
+        "audit-platform/frontend/src/components/workpaper/composables/useG1DualMode.ts#resolveOoSheetName",
+        "audit-platform/frontend/src/components/workpaper/composables/g1SheetLabels.ts#resolveG1SheetLabel",
+        "audit-platform/frontend/src/components/workpaper/composables/g1SheetLabels.ts#extractG1SheetCode",
+        "audit-platform/frontend/src/components/workpaper/GtE1MonetaryFund.vue#availableSheets"
+      ],
+      "status": "REGISTERED_NOT_FIXED",
+      "why_not_fixed_here": "修它要为 E1 的 30+ sheet 新建一份 sheet label 解析器（或把解析下沉到 render-config 下发的真实 sheets 列表），跨 entry 影响 G1；Task 47 的正文范围是 E 循环 entry 的裁决/契约/证据，不含重写 dual-mode sheet 解析。已登记为阻断项，由 Task 47 守卫双向锁死（缺陷消失但登记未更新也打红）。",
+      "must_fix_before": "把本 entry 标 bidirectional 或注册 adapter 之前"
+    }
+  ],
+  "cross_entry_isolation": {
+    "rule": "不得跨 entry 复用 contract / bundle / candidate / evidence / scenario",
+    "assertions": [
+      "本 slice 不引用任何 D/G/H/B60 pilot 的 contract_id、definition_bundle、candidate 或 evidence id",
+      "本 slice 的 entry 不出现在 workpaper_sync_d_cycle_manifest_slice.json 里",
+      "workpaper_sync_contracts/ 下不存在 e*.json —— 裁决为 single 的 entry 不伪造 contract",
+      "本 entry 的 cross_variant_guard 与 identity_guard 各自绑定本 entry 的真实 composable，不复用 pilot 的 scenario 实体"
+    ]
+  },
+  "honest_adjudication_summary": {
+    "total_independent": 1,
+    "pilot_already_migrated": 0,
+    "to_migrate_this_task": 1,
+    "adjudicated_as_bidirectional": 0,
+    "adjudicated_as_single_onlyoffice": 1,
+    "adjudicated_as_single_html": 0,
+    "adjudicated_as_unreachable": 0,
+    "finalized_published_representations": 0,
+    "entries_left_unverifiable": 1,
+    "reason": "E 循环唯一的独立 Excel entry 没有真实 bidirectional adapter、contract、definition bundle、instrumentation candidate 或 durable forcesave/ack 管道，也没有为它跑过真实 OO 9.4 探针 ⇒ 诚实裁决 single_onlyoffice、evidence 保持 UNVERIFIABLE。本任务不为凑数伪造 contract 或 finalize candidate。",
+    "slice_counters": {
+      "unadjudicated": 0,
+      "fake_bidirectional_claimed_verified": 0,
+      "bidirectional_unverified": 0,
+      "stale_evidence": 0,
+      "note": "四个计数为 0 的含义是「本 slice 里没有未裁决/假双向已验收/bidirectional 未验收/stale evidence 的条目」，不是「本 entry 已具备双向能力」。"
+    }
+  },
+  "properties_verified": [23, 69, 70],
+  "requirements_covered": ["6.5", "12.1", "12.4", "12.10", "12.11", "12.12", "14.1"]
+}

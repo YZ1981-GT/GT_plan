@@ -1,0 +1,42 @@
+[
+  {
+    "id": "M30",
+    "side": "fe",
+    "want": "recovery 期间即便裁决可重试也不给普通重试",
+    "why": "recovery 期间也给普通重试 ⇒ AC 5.8 末句明文 nullable operation 的 recovery case不得进入普通 operation retry",
+    "verdict": "RED",
+    "summary": "186/187 passed, numFailedTestSuites=2",
+    "added": [
+      "classifySyncFailure 的三个布尔各有一个消费方 recovery 期间即便裁决可重试也不给普通重试（AC 5.8 末句）"
+    ],
+    "gone": [],
+    "hit": [
+      "classifySyncFailure 的三个布尔各有一个消费方 recovery 期间即便裁决可重试也不给普通重试（AC 5.8 末句）"
+    ],
+    "added_files": [
+      "WorkpaperSyncStatusBar.spec.ts"
+    ],
+    "restored": true,
+    "seconds": 4.5
+  },
+  {
+    "id": "M31",
+    "side": "fe",
+    "want": "没有 requested operation 时也不给普通重试",
+    "why": "没有 requested operation 也给重试 ⇒ 点下去桥会拒（`bridge_no_requested_operation`），而 crash 早于 forcesave 时本来就没有可重试的 operation",
+    "verdict": "RED",
+    "summary": "186/187 passed, numFailedTestSuites=2",
+    "added": [
+      "classifySyncFailure 的三个布尔各有一个消费方 没有 requested operation 时也不给普通重试（crash 早于 forcesave）"
+    ],
+    "gone": [],
+    "hit": [
+      "classifySyncFailure 的三个布尔各有一个消费方 没有 requested operation 时也不给普通重试（crash 早于 forcesave）"
+    ],
+    "added_files": [
+      "WorkpaperSyncStatusBar.spec.ts"
+    ],
+    "restored": true,
+    "seconds": 4.7
+  }
+]

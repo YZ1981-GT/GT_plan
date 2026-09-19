@@ -36,6 +36,10 @@ module.exports = {
     'gt-audit/no-amount-toFixed': 'warn',
     'gt-audit/no-amount-unit-in-script': 'warn',
     'gt-audit/no-dialog-without-append': 'warn',
+    // Feature: platform-global-hardening — Wp_Kit 等价手写结构检测（先 warn 级）
+    'gt-audit/no-adhoc-wp-structure': 'warn',
+    // Feature: platform-global-hardening — 底稿禁止直接调用取数 URL（先 warn 级）
+    'gt-audit/no-direct-audit-fetch': 'warn',
   },
   overrides: [
     {

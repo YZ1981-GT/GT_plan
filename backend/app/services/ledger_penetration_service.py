@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+from datetime import date, datetime
 from decimal import Decimal
 from typing import Any
 from uuid import UUID
@@ -31,6 +32,32 @@ from app.models.audit_platform_models import (
     TbLedger,
 )
 from app.services.dataset_query import get_active_filter
+
+
+def _stable_ledger_order(tbl) -> tuple:
+    """序时账分页稳定排序：同凭证多行须用 id 打破并列，否则 OFFSET 分页会漏/重行。"""
+    return (tbl.c.voucher_date, tbl.c.voucher_no, tbl.c.id)
+
+
+_SYSTEM_KEY_PREFIX = "_"  # 系统标记统一 _ 前缀
+
+
+def _attach_extra_fields(rows: list[dict]) -> list[dict]:
+    """将每行 dict 的 raw_extra 展开为 extra_fields（过滤 _ 前缀系统标记），
+    并移除原始 raw_extra 键。就地修改并返回同一列表。
+
+    - raw_extra 为 None / 空 / 非 dict / 仅含 _ 前缀键 → extra_fields = {}
+    - 业务键值原样保留、保持 dict 迭代顺序（Python3.7+ 插入序 = 导入列序）
+    """
+    for row in rows:
+        raw = row.pop("raw_extra", None)
+        if isinstance(raw, dict):
+            row["extra_fields"] = {
+                k: v for k, v in raw.items() if not k.startswith(_SYSTEM_KEY_PREFIX)
+            }
+        else:
+            row["extra_fields"] = {}
+    return rows
 
 
 class DecimalEncoder(json.JSONEncoder):
@@ -83,6 +110,25 @@ def _get_level(code: str) -> int:
     return 3
 
 
+def _parse_cursor_date(value: str) -> date | str:
+    """把游标中的日期串解析成 Python date 对象。
+
+    游标 WHERE 比较 voucher_date(date 列) 时，必须绑定 date 对象——
+    不能用 SQL CAST(literal AS Date)：
+    - PG 下 `date > 'str'` 报 "operator does not exist: date > character varying"；
+    - SQLite 下 CAST('2025-01-05' AS DATE) 走 NUMERIC affinity 变成 2025，
+      text>numeric 恒真 → 游标失效（每页都从头返回，死循环）。
+    绑定 Python date 对象后 SQLAlchemy 按各方言正确序列化，两边都对。
+    解析失败则原样返回字符串（调用方 try/except 兜底）。
+    """
+    for fmt in ("%Y-%m-%d", "%Y-%m-%dT%H:%M:%S", "%Y-%m-%d %H:%M:%S"):
+        try:
+            return datetime.strptime(value, fmt).date()
+        except ValueError:
+            continue
+    return value
+
+
 class LedgerPenetrationService:
     """穿透查询服务"""
 
@@ -114,6 +160,8 @@ class LedgerPenetrationService:
                 tbl.c.debit_amount,
                 tbl.c.credit_amount,
                 tbl.c.closing_balance,
+                tbl.c.opening_direction,
+                tbl.c.closing_direction,
             )
             .where(active_filter)
             .order_by(tbl.c.account_code)
@@ -185,6 +233,11 @@ class LedgerPenetrationService:
             ]
             name = child_names[0].split("_")[0] if child_names else parent_code
 
+            # 方向：取第一个有方向的子级（同一父级下子科目方向一致）
+            child_rows = [r for r in rows if _is_child_of(r["account_code"], parent_code)]
+            open_dir = next((r.get("opening_direction") for r in child_rows if r.get("opening_direction")), None)
+            close_dir = next((r.get("closing_direction") for r in child_rows if r.get("closing_direction")), None)
+
             level = _get_level(parent_code)
             return {
                 "account_code": parent_code,
@@ -194,6 +247,8 @@ class LedgerPenetrationService:
                 "debit_amount": float(debit) if debit else None,
                 "credit_amount": float(credit) if credit else None,
                 "closing_balance": float(closing) if closing else None,
+                "opening_direction": open_dir,
+                "closing_direction": close_dir,
                 "_is_synthetic": True,  # 标记为合成行
             }
 
@@ -227,6 +282,51 @@ class LedgerPenetrationService:
         result = await self.db.execute(stmt)
         return result.scalar() or Decimal(0)
 
+    async def get_all_ledger_entries(
+        self, project_id: UUID, year: int,
+        date_from: str | None = None, date_to: str | None = None,
+        page: int = 1, page_size: int = 2000,
+    ) -> dict:
+        """全量序时账分录（不限科目）— 供 C24 会计分录细节测试
+
+        返回 {items, total, page, page_size}。不筛科目，返回全年全部分录。
+        优化：page > 1 时跳过 COUNT 查询（前端使用首页返回的 total）。
+        """
+        tbl = TbLedger.__table__
+        active_filter = await get_active_filter(self.db, tbl, project_id, year)
+        base = (
+            sa.select(
+                tbl.c.id, tbl.c.voucher_date, tbl.c.voucher_no,
+                tbl.c.account_code, tbl.c.account_name,
+                tbl.c.debit_amount, tbl.c.credit_amount,
+                tbl.c.summary, tbl.c.preparer,
+                tbl.c.raw_extra,
+            )
+            .where(active_filter)
+        )
+        if date_from:
+            base = base.where(tbl.c.voucher_date >= date_from)
+        if date_to:
+            base = base.where(tbl.c.voucher_date <= date_to)
+
+        # 总数 — 仅首页查询（后续页前端已缓存 total，跳过避免重复 COUNT）
+        total = 0
+        if page <= 1:
+            count_stmt = sa.select(sa.func.count()).select_from(base.subquery())
+            total = (await self.db.execute(count_stmt)).scalar() or 0
+
+        # 分页
+        offset = (page - 1) * page_size
+        data_stmt = (
+            base.order_by(*_stable_ledger_order(tbl))
+            .offset(offset).limit(page_size)
+        )
+        result = await self.db.execute(data_stmt)
+        items = [dict(r._mapping) for r in result.fetchall()]
+        items = _attach_extra_fields(items)
+
+        return {"items": items, "total": total, "page": page, "page_size": page_size}
+
     async def get_ledger_entries(
         self, project_id: UUID, year: int, account_code: str,
         date_from: str | None = None, date_to: str | None = None,
@@ -252,6 +352,7 @@ class LedgerPenetrationService:
                 tbl.c.account_code, tbl.c.account_name,
                 tbl.c.debit_amount, tbl.c.credit_amount,
                 tbl.c.counterpart_account, tbl.c.summary,
+                tbl.c.raw_extra,
             )
             .where(active_filter, code_filter)
         )
@@ -267,11 +368,12 @@ class LedgerPenetrationService:
         # 分页
         offset = (page - 1) * page_size
         data_stmt = (
-            base.order_by(tbl.c.voucher_date, tbl.c.voucher_no)
+            base.order_by(*_stable_ledger_order(tbl))
             .offset(offset).limit(page_size)
         )
         result = await self.db.execute(data_stmt)
         items = [dict(r._mapping) for r in result.fetchall()]
+        items = _attach_extra_fields(items)
 
         return {"items": items, "total": total, "page": page, "page_size": page_size}
 
@@ -287,12 +389,13 @@ class LedgerPenetrationService:
                 tbl.c.account_code, tbl.c.account_name,
                 tbl.c.debit_amount, tbl.c.credit_amount,
                 tbl.c.summary,
+                tbl.c.raw_extra,
             )
             .where(active_filter, tbl.c.voucher_no == voucher_no)
             .order_by(tbl.c.account_code)
         )
         result = await self.db.execute(stmt)
-        return [dict(r._mapping) for r in result.fetchall()]
+        return _attach_extra_fields([dict(r._mapping) for r in result.fetchall()])
 
     async def get_all_aux_balance(
         self, project_id: UUID, year: int,
@@ -318,16 +421,37 @@ class LedgerPenetrationService:
         self, project_id: UUID, year: int, account_code: str,
         aux_type: str | None = None,
     ) -> list[dict]:
-        """辅助余额（按科目穿透到辅助维度）"""
+        """辅助余额（按科目穿透到辅助维度）
+
+        🔴 一级科目码按**前缀**匹配（`1123` → `1123.01` / `1123.03` …），
+        含点号的子科目码按精确等值。
+
+        依据（三方一致，本方法此前是唯一的例外）：
+        - `four_table/aux_aggregation.py` 铁律 3 —— 「账套里科目通常落在子科目，
+          故用前缀匹配而非精确等值」
+        - 同族端点 `GET /ledger/aux-balance-detail` 早已是这个判据（逐字同款表达式）
+        - 全库实测（2026-08-04）：`tb_aux_balance` 落在子科目的 **810,884 行**，
+          落在精确四位码的仅 **1,507 行** → 精确等值漏掉 99.8% 的数据
+
+        修复前的实证后果：`1123`/`2202`/`1503`/`1519`/`2101` 等一级码在多数项目
+        **一条都查不到**（该项目 1123 只有 `1123.01`/`1123.03`），四个前端消费方
+        （F0-5/F0-6 替代程序 aux 精确余额 + G8/G9/G10 辅助核算取数）全部静默取空。
+        """
         tbl = TbAuxBalance.__table__
         active_filter = await get_active_filter(self.db, tbl, project_id, year)
+        code_predicate = (
+            tbl.c.account_code == account_code
+            if "." in account_code
+            else tbl.c.account_code.like(account_code + "%")
+        )
         stmt = (
             sa.select(
                 tbl.c.aux_type, tbl.c.aux_code, tbl.c.aux_name,
                 tbl.c.opening_balance, tbl.c.debit_amount,
                 tbl.c.credit_amount, tbl.c.closing_balance,
+                tbl.c.account_code,
             )
-            .where(active_filter, tbl.c.account_code == account_code)
+            .where(active_filter, code_predicate)
             .order_by(tbl.c.aux_type, tbl.c.aux_code)
         )
         if aux_type:
@@ -350,6 +474,7 @@ class LedgerPenetrationService:
                 tbl.c.account_code, tbl.c.aux_type, tbl.c.aux_code,
                 tbl.c.aux_name, tbl.c.debit_amount, tbl.c.credit_amount,
                 tbl.c.summary,
+                tbl.c.raw_extra,
             )
             .where(active_filter, tbl.c.account_code == account_code)
         )
@@ -363,11 +488,12 @@ class LedgerPenetrationService:
 
         offset = (page - 1) * page_size
         data_stmt = (
-            base.order_by(tbl.c.voucher_date, tbl.c.voucher_no)
+            base.order_by(*_stable_ledger_order(tbl))
             .offset(offset).limit(page_size)
         )
         result = await self.db.execute(data_stmt)
         items = [dict(r._mapping) for r in result.fetchall()]
+        items = _attach_extra_fields(items)
 
         return {"items": items, "total": total, "page": page, "page_size": page_size}
 
@@ -448,7 +574,7 @@ class LedgerPenetrationService:
 
         offset = (page - 1) * page_size
         data_stmt = (
-            led_base.order_by(led_tbl.c.voucher_date, led_tbl.c.voucher_no)
+            led_base.order_by(*_stable_ledger_order(led_tbl))
             .offset(offset).limit(page_size)
         )
         led_result = await self.db.execute(data_stmt)
@@ -532,19 +658,56 @@ class LedgerPenetrationService:
             )
             total = (await self.db.execute(count_base)).scalar() or 0
 
-        # 解析游标: "date|id" 格式
-        cursor_clauses = list(where_clauses)
+        opening = await self.get_account_opening_balance(project_id, year, account_code)
+        opening_val = float(opening)
+
+        order_date = tbl.c.voucher_date
+        order_id_str = sa.cast(tbl.c.id, sa.String)
+        running_balance_expr = (
+            sa.literal(opening_val)
+            + sa.func.coalesce(
+                sa.func.sum(sa.func.coalesce(tbl.c.debit_amount, 0)).over(
+                    order_by=(order_date, order_id_str),
+                ),
+                0,
+            )
+            - sa.func.coalesce(
+                sa.func.sum(sa.func.coalesce(tbl.c.credit_amount, 0)).over(
+                    order_by=(order_date, order_id_str),
+                ),
+                0,
+            )
+        ).label("running_balance")
+
+        ledger_sq = (
+            sa.select(
+                tbl.c.id, tbl.c.voucher_date, tbl.c.voucher_no,
+                tbl.c.account_code, tbl.c.account_name,
+                tbl.c.debit_amount, tbl.c.credit_amount,
+                tbl.c.counterpart_account, tbl.c.summary,
+                tbl.c.accounting_period, tbl.c.voucher_type,
+                tbl.c.raw_extra,  # passthrough 列，不参与 window/游标排序
+                running_balance_expr,
+            )
+            .where(*where_clauses)
+            .order_by(order_date, order_id_str)
+            .subquery("ledger_with_rb")
+        )
+
+        # 解析游标: "date|id" 格式（在含 running_balance 的子查询上过滤）
+        outer_clauses: list = []
         if cursor:
             try:
                 parts = cursor.split("|", 1)
                 cursor_date = parts[0]
                 cursor_id = parts[1] if len(parts) > 1 else ""
-                cursor_clauses.append(
+                cursor_date_val = _parse_cursor_date(cursor_date)
+                outer_clauses.append(
                     sa.or_(
-                        tbl.c.voucher_date > cursor_date,
+                        ledger_sq.c.voucher_date > cursor_date_val,
                         sa.and_(
-                            tbl.c.voucher_date == cursor_date,
-                            sa.cast(tbl.c.id, sa.String) > cursor_id,
+                            ledger_sq.c.voucher_date == cursor_date_val,
+                            sa.cast(ledger_sq.c.id, sa.String) > cursor_id,
                         ),
                     )
                 )
@@ -552,15 +715,9 @@ class LedgerPenetrationService:
                 pass
 
         stmt = (
-            sa.select(
-                tbl.c.id, tbl.c.voucher_date, tbl.c.voucher_no,
-                tbl.c.account_code, tbl.c.account_name,
-                tbl.c.debit_amount, tbl.c.credit_amount,
-                tbl.c.counterpart_account, tbl.c.summary,
-                tbl.c.accounting_period, tbl.c.voucher_type,
-            )
-            .where(*cursor_clauses)
-            .order_by(tbl.c.voucher_date, tbl.c.id)
+            sa.select(ledger_sq)
+            .where(*outer_clauses)
+            .order_by(ledger_sq.c.voucher_date, sa.cast(ledger_sq.c.id, sa.String))
             .limit(limit + 1)
         )
 
@@ -576,6 +733,8 @@ class LedgerPenetrationService:
             vd = last.get("voucher_date")
             vd_str = vd.isoformat() if hasattr(vd, "isoformat") else str(vd)
             next_cursor = f"{vd_str}|{last['id']}"
+
+        items = _attach_extra_fields(items)
 
         resp = {
             "items": items,
@@ -609,11 +768,13 @@ class LedgerPenetrationService:
                 parts = cursor.split("|", 1)
                 cursor_date = parts[0]
                 cursor_id = parts[1] if len(parts) > 1 else ""
+                # voucher_date 是 date 列：绑定 Python date 对象（同主序时账游标）。
+                cursor_date_val = _parse_cursor_date(cursor_date)
                 where_clauses.append(
                     sa.or_(
-                        tbl.c.voucher_date > cursor_date,
+                        tbl.c.voucher_date > cursor_date_val,
                         sa.and_(
-                            tbl.c.voucher_date == cursor_date,
+                            tbl.c.voucher_date == cursor_date_val,
                             sa.cast(tbl.c.id, sa.String) > cursor_id,
                         ),
                     )
@@ -627,9 +788,11 @@ class LedgerPenetrationService:
                 tbl.c.account_code, tbl.c.aux_type, tbl.c.aux_code,
                 tbl.c.aux_name, tbl.c.debit_amount, tbl.c.credit_amount,
                 tbl.c.summary,
+                tbl.c.raw_extra,
             )
             .where(*where_clauses)
-            .order_by(tbl.c.voucher_date, tbl.c.id)
+            # 同主序时账游标：ORDER BY 与 tiebreaker 用同一 cast(id, String) 表达式。
+            .order_by(tbl.c.voucher_date, sa.cast(tbl.c.id, sa.String))
             .limit(limit + 1)
         )
 
@@ -645,6 +808,8 @@ class LedgerPenetrationService:
             vd = last.get("voucher_date")
             vd_str = vd.isoformat() if hasattr(vd, "isoformat") else str(vd)
             next_cursor = f"{vd_str}|{last['id']}"
+
+        items = _attach_extra_fields(items)
 
         return {
             "items": items,

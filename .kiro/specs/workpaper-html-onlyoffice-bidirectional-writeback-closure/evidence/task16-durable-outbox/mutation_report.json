@@ -1,0 +1,877 @@
+[
+  {
+    "id": "M01",
+    "side": "be",
+    "want": "test_task16_durable_outbox_wiring.py::test_enqueue_only_flushes_and_never_commits",
+    "why": "enqueue 自己提交 ⇒ 调用方回滚后耐久行仍在、审计日志与版本递增也一起提交，Property 52「事务 rollback 时无事件」直接失效",
+    "verdict": "RED",
+    "summary": "6 failed, 49 passed in 7.03s",
+    "added": [
+      "test_task16_durable_outbox_pg.py::test_commit_then_publish_emits_exactly_one_complete_event",
+      "test_task16_durable_outbox_pg.py::test_enqueue_happens_inside_the_caller_transaction",
+      "test_task16_durable_outbox_pg.py::test_replay_never_moves_a_version_field",
+      "test_task16_durable_outbox_pg.py::test_republish_and_worker_replay_do_not_duplicate_the_event",
+      "test_task16_durable_outbox_pg.py::test_rollback_leaves_no_event_and_no_durable_row",
+      "test_task16_durable_outbox_wiring.py::test_enqueue_only_flushes_and_never_commits"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task16_durable_outbox_pg.py::test_enqueue_happens_inside_the_caller_transaction",
+      "test_task16_durable_outbox_pg.py::test_rollback_leaves_no_event_and_no_durable_row",
+      "test_task16_durable_outbox_wiring.py::test_enqueue_only_flushes_and_never_commits"
+    ],
+    "added_files": [
+      "test_task16_durable_outbox_pg.py",
+      "test_task16_durable_outbox_wiring.py"
+    ],
+    "restored": true,
+    "seconds": 10.1
+  },
+  {
+    "id": "M02",
+    "side": "be",
+    "want": "test_task16_durable_outbox_pg.py::test_missing_project_id_fails_closed",
+    "why": "关掉 project_id fail-closed ⇒ 退回旧行为（EventPayload 校验异常被吞成 warning，表现为「保存成功但下游联动永久静默」）；现在会变成模糊的 IntegrityError 而不是可定位的 DurableOutboxError",
+    "verdict": "RED",
+    "summary": "1 failed, 54 passed in 7.58s",
+    "added": [
+      "test_task16_durable_outbox_pg.py::test_missing_project_id_fails_closed"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task16_durable_outbox_pg.py::test_missing_project_id_fails_closed"
+    ],
+    "added_files": [
+      "test_task16_durable_outbox_pg.py"
+    ],
+    "restored": true,
+    "seconds": 10.7
+  },
+  {
+    "id": "M03",
+    "side": "be",
+    "want": "test_task16_durable_outbox_pg.py::test_enqueue_happens_inside_the_caller_transaction",
+    "why": "待发布句柄不登记 ⇒ 调用方 commit 后 publish_pending 找不到任何待发布项，事件只能等 30s 一轮的 worker 补偿，下游刷新被静默延迟",
+    "verdict": "RED",
+    "summary": "8 failed, 47 passed in 6.88s",
+    "added": [
+      "test_task16_durable_outbox_pg.py::test_commit_then_publish_emits_exactly_one_complete_event",
+      "test_task16_durable_outbox_pg.py::test_enqueue_happens_inside_the_caller_transaction",
+      "test_task16_durable_outbox_pg.py::test_fanout_failure_returns_the_ticket_so_replay_can_deliver",
+      "test_task16_durable_outbox_pg.py::test_import_domain_replay_semantics_are_untouched",
+      "test_task16_durable_outbox_pg.py::test_publish_failure_is_durable_and_replayable",
+      "test_task16_durable_outbox_pg.py::test_replayed_event_does_not_fan_out_its_side_effects_twice",
+      "test_task16_durable_outbox_pg.py::test_republish_and_worker_replay_do_not_duplicate_the_event",
+      "test_task16_durable_outbox_pg.py::test_rollback_leaves_no_event_and_no_durable_row"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task16_durable_outbox_pg.py::test_commit_then_publish_emits_exactly_one_complete_event",
+      "test_task16_durable_outbox_pg.py::test_enqueue_happens_inside_the_caller_transaction"
+    ],
+    "added_files": [
+      "test_task16_durable_outbox_pg.py"
+    ],
+    "restored": true,
+    "seconds": 10.0
+  },
+  {
+    "id": "M04",
+    "side": "be",
+    "want": "test_task16_durable_outbox_pg.py::test_republish_and_worker_replay_do_not_duplicate_the_event",
+    "why": "去掉「已 published 不重发」⇒ 重复调用 publish_pending 会把同一事件再派发一次，Property 52「恰有一个事件、重放不重复副作用」失效",
+    "verdict": "RED",
+    "summary": "1 failed, 54 passed in 7.12s",
+    "added": [
+      "test_task16_durable_outbox_pg.py::test_republish_and_worker_replay_do_not_duplicate_the_event"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task16_durable_outbox_pg.py::test_republish_and_worker_replay_do_not_duplicate_the_event"
+    ],
+    "added_files": [
+      "test_task16_durable_outbox_pg.py"
+    ],
+    "restored": true,
+    "seconds": 10.3
+  },
+  {
+    "id": "M05",
+    "side": "be",
+    "want": "test_task16_durable_outbox_pg.py::test_rollback_leaves_no_event_and_no_durable_row",
+    "why": "把「入队事务已回滚（行不存在）」当成普通失败 ⇒ 报告里分不清 rolled_back 与 failed，回滚场景会被当作待重试项反复处理",
+    "verdict": "RED",
+    "summary": "1 failed, 54 passed in 7.33s",
+    "added": [
+      "test_task16_durable_outbox_pg.py::test_rollback_leaves_no_event_and_no_durable_row"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task16_durable_outbox_pg.py::test_rollback_leaves_no_event_and_no_durable_row"
+    ],
+    "added_files": [
+      "test_task16_durable_outbox_pg.py"
+    ],
+    "restored": true,
+    "seconds": 10.4
+  },
+  {
+    "id": "M06",
+    "side": "be",
+    "want": "test_task16_durable_outbox_pg.py::test_commit_then_publish_emits_exactly_one_complete_event",
+    "why": "发布后不清待发布清单 ⇒ 同一 session 内下一次 publish_pending 会重复处理旧句柄，长连接下清单无界增长",
+    "verdict": "RED",
+    "summary": "1 failed, 54 passed in 6.97s",
+    "added": [
+      "test_task16_durable_outbox_pg.py::test_commit_then_publish_emits_exactly_one_complete_event"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task16_durable_outbox_pg.py::test_commit_then_publish_emits_exactly_one_complete_event"
+    ],
+    "added_files": [
+      "test_task16_durable_outbox_pg.py"
+    ],
+    "restored": true,
+    "seconds": 10.1
+  },
+  {
+    "id": "M07",
+    "side": "be",
+    "want": "test_task16_durable_outbox_pg.py::test_publish_failure_is_durable_and_replayable",
+    "why": "把发布失败当成功计数 ⇒ 调用方与 /metrics 都看不到失败，Property 54 的「不静默丢失」判据失效",
+    "verdict": "RED",
+    "summary": "2 failed, 53 passed in 7.06s",
+    "added": [
+      "test_task16_durable_outbox_pg.py::test_fanout_failure_returns_the_ticket_so_replay_can_deliver",
+      "test_task16_durable_outbox_pg.py::test_publish_failure_is_durable_and_replayable"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task16_durable_outbox_pg.py::test_publish_failure_is_durable_and_replayable"
+    ],
+    "added_files": [
+      "test_task16_durable_outbox_pg.py"
+    ],
+    "restored": true,
+    "seconds": 10.2
+  },
+  {
+    "id": "M08",
+    "side": "be",
+    "want": "test_task16_durable_outbox_pg.py::test_publish_failure_is_durable_and_replayable",
+    "why": "发布失败后把行标成 published ⇒ 行再也不会被 replay_pending 选出来，事件永久丢失（正是 Requirement 13.4 禁止的形态）",
+    "verdict": "RED",
+    "summary": "2 failed, 53 passed in 6.93s",
+    "added": [
+      "test_task16_durable_outbox_pg.py::test_fanout_failure_returns_the_ticket_so_replay_can_deliver",
+      "test_task16_durable_outbox_pg.py::test_publish_failure_is_durable_and_replayable"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task16_durable_outbox_pg.py::test_publish_failure_is_durable_and_replayable"
+    ],
+    "added_files": [
+      "test_task16_durable_outbox_pg.py"
+    ],
+    "restored": true,
+    "seconds": 10.1
+  },
+  {
+    "id": "M09",
+    "side": "be",
+    "want": "test_task16_durable_outbox_pg.py::test_exhausted_retries_escalate_to_dlq",
+    "why": "关掉 DLQ 升级条件 ⇒ 重试耗尽的事件只留 failed 行，运维看不到死信、无法手工重投（Requirement 13.4 的 DLQ 分支）",
+    "verdict": "RED",
+    "summary": "1 failed, 54 passed in 7.02s",
+    "added": [
+      "test_task16_durable_outbox_pg.py::test_exhausted_retries_escalate_to_dlq"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task16_durable_outbox_pg.py::test_exhausted_retries_escalate_to_dlq"
+    ],
+    "added_files": [
+      "test_task16_durable_outbox_pg.py"
+    ],
+    "restored": true,
+    "seconds": 10.1
+  },
+  {
+    "id": "M10",
+    "side": "be",
+    "want": "test_task16_durable_outbox_pg.py::test_consumption_is_idempotent_per_event_and_handler_version",
+    "why": "幂等键丢掉 handler 版本 ⇒ handler 语义升级后无法按新语义重跑一次（Requirement 13.3 的 handler version 半边失效）。锚点用 scope 相对定位：`key = ...handler_key(...)` 在 claim / release 两处各出现一次",
+    "verdict": "RED",
+    "summary": "4 failed, 51 passed in 7.00s",
+    "added": [
+      "test_task16_durable_outbox_pg.py::test_consumption_is_idempotent_per_event_and_handler_version",
+      "test_task16_durable_outbox_pg.py::test_fanout_failure_returns_the_ticket_so_replay_can_deliver",
+      "test_task16_durable_outbox_pg.py::test_publish_failure_is_durable_and_replayable",
+      "test_task16_durable_outbox_pg.py::test_replayed_event_does_not_fan_out_its_side_effects_twice"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task16_durable_outbox_pg.py::test_consumption_is_idempotent_per_event_and_handler_version"
+    ],
+    "added_files": [
+      "test_task16_durable_outbox_pg.py"
+    ],
+    "restored": true,
+    "seconds": 10.1
+  },
+  {
+    "id": "M11",
+    "side": "be",
+    "want": "test_task16_durable_outbox_pg.py::test_consumption_is_idempotent_per_event_and_handler_version",
+    "why": "唯一索引冲突后仍返回「抢到了」⇒ 重复投递会重复执行副作用，幂等闸门形同虚设。锚点用 scope 相对定位：`return False` 在本文件出现两次",
+    "verdict": "RED",
+    "summary": "2 failed, 53 passed in 7.11s",
+    "added": [
+      "test_task16_durable_outbox_pg.py::test_consumption_is_idempotent_per_event_and_handler_version",
+      "test_task16_durable_outbox_pg.py::test_replayed_event_does_not_fan_out_its_side_effects_twice"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task16_durable_outbox_pg.py::test_consumption_is_idempotent_per_event_and_handler_version"
+    ],
+    "added_files": [
+      "test_task16_durable_outbox_pg.py"
+    ],
+    "restored": true,
+    "seconds": 10.2
+  },
+  {
+    "id": "M12",
+    "side": "be",
+    "want": "test_task16_durable_outbox_wiring.py::test_persist_to_stream_writes_the_whole_payload",
+    "why": "删掉 Stream 的 payload 载体字段 ⇒ 退回原缺陷：extra（wp_id/revision/operation_id/source/adapter_id/artifact_sha256）与 batch_id 在**写入这一步**就蒸发，replay 侧再怎么读都恢复不出来",
+    "verdict": "RED",
+    "summary": "3 failed, 52 passed in 7.06s",
+    "added": [
+      "test_task16_durable_outbox_wiring.py::test_persist_to_stream_writes_the_whole_payload",
+      "test_task16_durable_outbox_wiring.py::test_replay_restores_the_whole_payload_and_counts_dropped_entries",
+      "test_task16_durable_outbox_wiring.py::test_stream_payload_field_is_json_and_self_describing"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task16_durable_outbox_wiring.py::test_persist_to_stream_writes_the_whole_payload",
+      "test_task16_durable_outbox_wiring.py::test_replay_restores_the_whole_payload_and_counts_dropped_entries",
+      "test_task16_durable_outbox_wiring.py::test_stream_payload_field_is_json_and_self_describing"
+    ],
+    "added_files": [
+      "test_task16_durable_outbox_wiring.py"
+    ],
+    "restored": true,
+    "seconds": 10.3
+  },
+  {
+    "id": "M13",
+    "side": "be",
+    "want": "test_task16_durable_outbox_wiring.py::test_persist_to_stream_writes_the_whole_payload",
+    "why": "序列化时排除 extra ⇒ 字段还在、内容空了。这条专门检验判据是「逐项相等」而不是「字段存在」（后者会被空 payload 满足）",
+    "verdict": "RED",
+    "summary": "4 failed, 51 passed in 6.84s",
+    "added": [
+      "test_task16_durable_outbox_pg.py::test_stream_entry_preserves_every_payload_field",
+      "test_task16_durable_outbox_wiring.py::test_persist_to_stream_writes_the_whole_payload",
+      "test_task16_durable_outbox_wiring.py::test_replay_restores_the_whole_payload_and_counts_dropped_entries",
+      "test_task16_durable_outbox_wiring.py::test_stream_payload_field_is_json_and_self_describing"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task16_durable_outbox_pg.py::test_stream_entry_preserves_every_payload_field",
+      "test_task16_durable_outbox_wiring.py::test_persist_to_stream_writes_the_whole_payload",
+      "test_task16_durable_outbox_wiring.py::test_stream_payload_field_is_json_and_self_describing"
+    ],
+    "added_files": [
+      "test_task16_durable_outbox_pg.py",
+      "test_task16_durable_outbox_wiring.py"
+    ],
+    "restored": true,
+    "seconds": 10.0
+  },
+  {
+    "id": "M14",
+    "side": "be",
+    "want": "test_task16_durable_outbox_wiring.py::test_persist_to_stream_writes_the_whole_payload",
+    "why": "replay 强制走旧扁平字段降级路径 ⇒ 即使写入侧带了完整 payload 也读不出来；检验「写入 + 读出」两侧各自都有判据，不是只测一半",
+    "verdict": "RED",
+    "summary": "3 failed, 52 passed in 7.05s",
+    "added": [
+      "test_task16_durable_outbox_pg.py::test_stream_entry_preserves_every_payload_field",
+      "test_task16_durable_outbox_wiring.py::test_persist_to_stream_writes_the_whole_payload",
+      "test_task16_durable_outbox_wiring.py::test_replay_restores_the_whole_payload_and_counts_dropped_entries"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task16_durable_outbox_pg.py::test_stream_entry_preserves_every_payload_field",
+      "test_task16_durable_outbox_wiring.py::test_persist_to_stream_writes_the_whole_payload",
+      "test_task16_durable_outbox_wiring.py::test_replay_restores_the_whole_payload_and_counts_dropped_entries"
+    ],
+    "added_files": [
+      "test_task16_durable_outbox_pg.py",
+      "test_task16_durable_outbox_wiring.py"
+    ],
+    "restored": true,
+    "seconds": 10.3
+  },
+  {
+    "id": "M15",
+    "side": "be",
+    "want": "test_task16_durable_outbox_wiring.py::test_replay_restores_the_whole_payload_and_counts_dropped_entries",
+    "why": "丢弃计数不再自增 ⇒ 「事件被 ACK 丢掉」这件事在日志与 /metrics 里再次不可见（Requirement 13.9 的告警可见性）",
+    "verdict": "RED",
+    "summary": "1 failed, 54 passed in 6.96s",
+    "added": [
+      "test_task16_durable_outbox_wiring.py::test_replay_restores_the_whole_payload_and_counts_dropped_entries"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task16_durable_outbox_wiring.py::test_replay_restores_the_whole_payload_and_counts_dropped_entries"
+    ],
+    "added_files": [
+      "test_task16_durable_outbox_wiring.py"
+    ],
+    "restored": true,
+    "seconds": 10.1
+  },
+  {
+    "id": "M16",
+    "side": "be",
+    "want": "test_task16_durable_outbox_wiring.py::test_replay_restores_the_whole_payload_and_counts_dropped_entries",
+    "why": "丢弃分支不再 ACK ⇒ consumer group 队头被这条永久阻塞，后续事件全都读不到。锚点用 scope 相对定位：xack 在本函数出现两次（成功分支/丢弃分支）",
+    "verdict": "RED",
+    "summary": "1 failed, 54 passed in 7.02s",
+    "added": [
+      "test_task16_durable_outbox_wiring.py::test_replay_restores_the_whole_payload_and_counts_dropped_entries"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task16_durable_outbox_wiring.py::test_replay_restores_the_whole_payload_and_counts_dropped_entries"
+    ],
+    "added_files": [
+      "test_task16_durable_outbox_wiring.py"
+    ],
+    "restored": true,
+    "seconds": 10.1
+  },
+  {
+    "id": "M17",
+    "side": "be",
+    "want": "test_task16_durable_outbox_wiring.py::test_after_save_enqueues_instead_of_publishing_inside_the_transaction",
+    "why": "往事务内注入一次 publish ⇒ 恢复幽灵事件（回滚后事件已发出）。「函数体内没有 publish 调用」是否定式承诺，只能靠注入反例来证明判据可falsify —— 短路式变异改不动「不存在」",
+    "verdict": "RED",
+    "summary": "7 failed, 48 passed in 7.18s",
+    "added": [
+      "test_task16_durable_outbox_pg.py::test_commit_then_publish_emits_exactly_one_complete_event",
+      "test_task16_durable_outbox_pg.py::test_enqueue_happens_inside_the_caller_transaction",
+      "test_task16_durable_outbox_pg.py::test_missing_project_id_fails_closed",
+      "test_task16_durable_outbox_pg.py::test_publish_failure_is_durable_and_replayable",
+      "test_task16_durable_outbox_pg.py::test_republish_and_worker_replay_do_not_duplicate_the_event",
+      "test_task16_durable_outbox_pg.py::test_rollback_leaves_no_event_and_no_durable_row",
+      "test_task16_durable_outbox_wiring.py::test_after_save_enqueues_instead_of_publishing_inside_the_transaction"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task16_durable_outbox_pg.py::test_enqueue_happens_inside_the_caller_transaction",
+      "test_task16_durable_outbox_wiring.py::test_after_save_enqueues_instead_of_publishing_inside_the_transaction"
+    ],
+    "added_files": [
+      "test_task16_durable_outbox_pg.py",
+      "test_task16_durable_outbox_wiring.py"
+    ],
+    "restored": true,
+    "seconds": 10.3
+  },
+  {
+    "id": "M18",
+    "side": "be",
+    "want": "test_task16_durable_outbox_wiring.py::test_after_save_no_longer_swallows_its_own_side_effects",
+    "why": "注入一个把副作用降级成 warning 的 except ⇒ 恢复 Requirement 13.4 明令禁止的形态。同 M17：「零 except 分支」只能靠注入falsify",
+    "verdict": "RED",
+    "summary": "1 failed, 54 passed in 7.05s",
+    "added": [
+      "test_task16_durable_outbox_wiring.py::test_after_save_no_longer_swallows_its_own_side_effects"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task16_durable_outbox_wiring.py::test_after_save_no_longer_swallows_its_own_side_effects"
+    ],
+    "added_files": [
+      "test_task16_durable_outbox_wiring.py"
+    ],
+    "restored": true,
+    "seconds": 10.1
+  },
+  {
+    "id": "M19",
+    "side": "be",
+    "want": "test_task16_durable_outbox_wiring.py::test_html_save_no_longer_crosses_the_version_domains",
+    "why": "把跨版本域的 expected_version 加回去 ⇒ `body.data_version`（parsed_data['_version'] 域）又被拿去和 `wp.file_version` 比，第二次带 data_version 的保存起必然假冲突；这正是本任务修掉的真实缺陷",
+    "verdict": "RED",
+    "summary": "2 failed, 53 passed in 7.05s",
+    "added": [
+      "test_task16_durable_outbox_wiring.py::test_html_save_no_longer_crosses_the_version_domains",
+      "test_wp_html_save.py::test_save_200_force_overwrite_bypasses_version_check"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task16_durable_outbox_wiring.py::test_html_save_no_longer_crosses_the_version_domains"
+    ],
+    "added_files": [
+      "test_task16_durable_outbox_wiring.py",
+      "test_wp_html_save.py"
+    ],
+    "restored": true,
+    "seconds": 10.1
+  },
+  {
+    "id": "M20",
+    "side": "be",
+    "want": "test_task16_durable_outbox_wiring.py::test_publish_pending_runs_after_the_content_commit",
+    "why": "在 commit **之前**插一次发布 ⇒ 回滚时事件已经出去了。这条检验次序判据是「行号次序」而不是「文件里出现过 publish_pending」—— 后者挪不挪都绿",
+    "verdict": "RED",
+    "summary": "1 failed, 54 passed in 7.00s",
+    "added": [
+      "test_task16_durable_outbox_wiring.py::test_publish_pending_runs_after_the_content_commit[app/routers/custom_query_writeback.py]"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task16_durable_outbox_wiring.py::test_publish_pending_runs_after_the_content_commit[app/routers/custom_query_writeback.py]"
+    ],
+    "added_files": [
+      "test_task16_durable_outbox_wiring.py"
+    ],
+    "restored": true,
+    "seconds": 10.1
+  },
+  {
+    "id": "M21",
+    "side": "be",
+    "want": "test_task16_durable_outbox_wiring.py::test_publish_pending_runs_after_the_content_commit",
+    "why": "删掉 univer 保存路径的发布接线 ⇒ 耐久行只能等 worker 补偿，前端保存后 30s 内看不到联动刷新（接线缺失类缺陷）",
+    "verdict": "RED",
+    "summary": "1 failed, 54 passed in 7.01s",
+    "added": [
+      "test_task16_durable_outbox_wiring.py::test_publish_pending_runs_after_the_content_commit[app/routers/wp_editor_router.py]"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task16_durable_outbox_wiring.py::test_publish_pending_runs_after_the_content_commit[app/routers/wp_editor_router.py]"
+    ],
+    "added_files": [
+      "test_task16_durable_outbox_wiring.py"
+    ],
+    "restored": true,
+    "seconds": 10.1
+  },
+  {
+    "id": "M22",
+    "side": "be",
+    "want": "test_task16_durable_outbox_wiring.py::test_publish_pending_runs_after_the_content_commit",
+    "why": "删掉 OO callback 的发布接线 ⇒ OnlyOffice 回写后的下游联动只能等补偿",
+    "verdict": "RED",
+    "summary": "1 failed, 54 passed in 6.54s",
+    "added": [
+      "test_task16_durable_outbox_wiring.py::test_publish_pending_runs_after_the_content_commit[app/routers/wp_onlyoffice_router.py]"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task16_durable_outbox_wiring.py::test_publish_pending_runs_after_the_content_commit[app/routers/wp_onlyoffice_router.py]"
+    ],
+    "added_files": [
+      "test_task16_durable_outbox_wiring.py"
+    ],
+    "restored": true,
+    "seconds": 9.5
+  },
+  {
+    "id": "M23",
+    "side": "be",
+    "want": "test_task16_durable_outbox_wiring.py::test_facade_delegates_replay_and_dlq_to_the_legacy_service",
+    "why": "facade 自己造一份重放结果 ⇒ 违反 design「不新建第二套、复用现有 outbox/DLQ 能力」，DLQ 升级与 FOR UPDATE SKIP LOCKED 的并发安全全部失去",
+    "verdict": "RED",
+    "summary": "6 failed, 49 passed in 6.67s",
+    "added": [
+      "test_task16_durable_outbox_pg.py::test_exhausted_retries_escalate_to_dlq",
+      "test_task16_durable_outbox_pg.py::test_fanout_failure_returns_the_ticket_so_replay_can_deliver",
+      "test_task16_durable_outbox_pg.py::test_import_domain_replay_semantics_are_untouched",
+      "test_task16_durable_outbox_pg.py::test_publish_failure_is_durable_and_replayable",
+      "test_task16_durable_outbox_pg.py::test_replayed_event_does_not_fan_out_its_side_effects_twice",
+      "test_task16_durable_outbox_wiring.py::test_facade_delegates_replay_and_dlq_to_the_legacy_service"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task16_durable_outbox_pg.py::test_exhausted_retries_escalate_to_dlq",
+      "test_task16_durable_outbox_pg.py::test_publish_failure_is_durable_and_replayable",
+      "test_task16_durable_outbox_wiring.py::test_facade_delegates_replay_and_dlq_to_the_legacy_service"
+    ],
+    "added_files": [
+      "test_task16_durable_outbox_pg.py",
+      "test_task16_durable_outbox_wiring.py"
+    ],
+    "restored": true,
+    "seconds": 9.4
+  },
+  {
+    "id": "M24",
+    "side": "be",
+    "want": "test_task16_durable_outbox_wiring.py::test_the_replayable_path_writes_no_version_field",
+    "why": "往重放路径注入 version 赋值 ⇒ Requirement 2.12「handler 重试不得再次递增 content revision」失效。同 M17/M18 是注入型：「整模块零 version 赋值」是否定式承诺",
+    "verdict": "RED",
+    "summary": "1 failed, 54 passed in 15.74s",
+    "added": [
+      "test_task16_durable_outbox_wiring.py::test_the_replayable_path_writes_no_version_field"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task16_durable_outbox_wiring.py::test_the_replayable_path_writes_no_version_field"
+    ],
+    "added_files": [
+      "test_task16_durable_outbox_wiring.py"
+    ],
+    "restored": true,
+    "seconds": 18.8
+  },
+  {
+    "id": "M25",
+    "side": "be",
+    "want": "test_task16_durable_outbox_wiring.py::test_after_save_callers_are_exactly_the_adjudicated_four",
+    "why": "让 custom_query 回写路径不再经统一后处理 ⇒ 该路径的耐久事件整条消失，而两个 router 的 publish_pending 变成空转（接线断裂但看起来一切正常）",
+    "verdict": "RED",
+    "summary": "1 failed, 54 passed in 6.64s",
+    "added": [
+      "test_task16_durable_outbox_wiring.py::test_after_save_callers_are_exactly_the_adjudicated_four"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task16_durable_outbox_wiring.py::test_after_save_callers_are_exactly_the_adjudicated_four"
+    ],
+    "added_files": [
+      "test_task16_durable_outbox_wiring.py"
+    ],
+    "restored": true,
+    "seconds": 9.6
+  },
+  {
+    "id": "M26",
+    "side": "be",
+    "want": "test_task16_durable_outbox_wiring.py::test_after_save_call_sites_do_not_swallow_the_durability_failure",
+    "why": "耐久入队失败不再 re-raise ⇒ 回写落库但下游联动永久断开，只在返回体里留一条 warning（Requirement 13.4 禁止的 best-effort 形态）",
+    "verdict": "RED",
+    "summary": "1 failed, 54 passed in 6.57s",
+    "added": [
+      "test_task16_durable_outbox_wiring.py::test_after_save_call_sites_do_not_swallow_the_durability_failure[app/services/custom_query/snapshot_writer.py]"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task16_durable_outbox_wiring.py::test_after_save_call_sites_do_not_swallow_the_durability_failure[app/services/custom_query/snapshot_writer.py]"
+    ],
+    "added_files": [
+      "test_task16_durable_outbox_wiring.py"
+    ],
+    "restored": true,
+    "seconds": 9.3
+  },
+  {
+    "id": "M27",
+    "side": "be",
+    "want": "test_task16_durable_outbox_wiring.py::test_after_save_call_sites_do_not_swallow_the_durability_failure",
+    "why": "把 ack-OO 豁免分支的顶层诊断从 ERROR 降回 warning ⇒ 「callback 后处理失败」在日志里看不见。锚点用 scope 相对定位：`logger.error(` 在本文件出现 4 次，且判据必须只看 handler **顶层语句**（嵌套 rollback 分支里还有一处 logger.error 会把 walk 式判据顶掉）",
+    "verdict": "RED",
+    "summary": "1 failed, 54 passed in 6.69s",
+    "added": [
+      "test_task16_durable_outbox_wiring.py::test_after_save_call_sites_do_not_swallow_the_durability_failure[app/routers/wp_onlyoffice_router.py]"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task16_durable_outbox_wiring.py::test_after_save_call_sites_do_not_swallow_the_durability_failure[app/routers/wp_onlyoffice_router.py]"
+    ],
+    "added_files": [
+      "test_task16_durable_outbox_wiring.py"
+    ],
+    "restored": true,
+    "seconds": 9.6
+  },
+  {
+    "id": "M28",
+    "side": "be",
+    "want": "test_task16_durable_outbox_wiring.py::test_after_save_call_sites_do_not_swallow_the_durability_failure",
+    "why": "豁免分支不再回滚被污染的事务 ⇒ 后续代码在一个已失效的 session 上继续跑，错误被放大成难以归因的连锁失败",
+    "verdict": "RED",
+    "summary": "1 failed, 54 passed in 6.70s",
+    "added": [
+      "test_task16_durable_outbox_wiring.py::test_after_save_call_sites_do_not_swallow_the_durability_failure[app/routers/wp_onlyoffice_router.py]"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task16_durable_outbox_wiring.py::test_after_save_call_sites_do_not_swallow_the_durability_failure[app/routers/wp_onlyoffice_router.py]"
+    ],
+    "added_files": [
+      "test_task16_durable_outbox_wiring.py"
+    ],
+    "restored": true,
+    "seconds": 9.4
+  },
+  {
+    "id": "M29",
+    "side": "be",
+    "want": "test_task16_durable_outbox_wiring.py::test_deliver_is_the_only_fanout_site",
+    "why": "给 replay_pending 加回一处**内联**派发 ⇒ 闸门只管得住 _deliver 那条路径，worker 重放仍会把整片 handler 再跑一遍。「只有一个派发口」是否定式承诺，只能靠注入第二个派发口来 falsify",
+    "verdict": "RED",
+    "summary": "5 failed, 50 passed in 6.79s",
+    "added": [
+      "test_task16_durable_outbox_pg.py::test_fanout_failure_returns_the_ticket_so_replay_can_deliver",
+      "test_task16_durable_outbox_pg.py::test_import_domain_replay_semantics_are_untouched",
+      "test_task16_durable_outbox_pg.py::test_publish_failure_is_durable_and_replayable",
+      "test_task16_durable_outbox_pg.py::test_replayed_event_does_not_fan_out_its_side_effects_twice",
+      "test_task16_durable_outbox_wiring.py::test_deliver_is_the_only_fanout_site"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task16_durable_outbox_pg.py::test_replayed_event_does_not_fan_out_its_side_effects_twice",
+      "test_task16_durable_outbox_wiring.py::test_deliver_is_the_only_fanout_site"
+    ],
+    "added_files": [
+      "test_task16_durable_outbox_pg.py",
+      "test_task16_durable_outbox_wiring.py"
+    ],
+    "restored": true,
+    "seconds": 9.7
+  },
+  {
+    "id": "M30",
+    "side": "be",
+    "want": "test_task16_durable_outbox_wiring.py::test_fanout_gate_precedes_the_dispatch_and_is_released_on_failure",
+    "why": "把派发挪到闸门**之前** ⇒ 判重发生时副作用已经做完了，闸门只剩装饰作用。这条检验次序判据落在行号次序上，而不是「文件里出现过 begin_fanout」",
+    "verdict": "RED",
+    "summary": "7 failed, 48 passed in 6.59s",
+    "added": [
+      "test_task16_durable_outbox_pg.py::test_commit_then_publish_emits_exactly_one_complete_event",
+      "test_task16_durable_outbox_pg.py::test_fanout_failure_returns_the_ticket_so_replay_can_deliver",
+      "test_task16_durable_outbox_pg.py::test_import_domain_replay_semantics_are_untouched",
+      "test_task16_durable_outbox_pg.py::test_publish_failure_is_durable_and_replayable",
+      "test_task16_durable_outbox_pg.py::test_replayed_event_does_not_fan_out_its_side_effects_twice",
+      "test_task16_durable_outbox_pg.py::test_republish_and_worker_replay_do_not_duplicate_the_event",
+      "test_task16_durable_outbox_wiring.py::test_fanout_gate_precedes_the_dispatch_and_is_released_on_failure"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task16_durable_outbox_pg.py::test_replayed_event_does_not_fan_out_its_side_effects_twice",
+      "test_task16_durable_outbox_wiring.py::test_fanout_gate_precedes_the_dispatch_and_is_released_on_failure"
+    ],
+    "added_files": [
+      "test_task16_durable_outbox_pg.py",
+      "test_task16_durable_outbox_wiring.py"
+    ],
+    "restored": true,
+    "seconds": 9.4
+  },
+  {
+    "id": "M31",
+    "side": "be",
+    "want": "test_task16_durable_outbox_pg.py::test_fanout_failure_returns_the_ticket_so_replay_can_deliver",
+    "why": "派发失败不归还派发权 ⇒ 重放被自己的闸门挡下，事件永久静默丢失。这正是Requirement 13.4 禁止的形态，也是「闸门」与「Property 54 可重放」互相打架的唯一危险点",
+    "verdict": "RED",
+    "summary": "3 failed, 52 passed in 6.72s",
+    "added": [
+      "test_task16_durable_outbox_pg.py::test_fanout_failure_returns_the_ticket_so_replay_can_deliver",
+      "test_task16_durable_outbox_pg.py::test_publish_failure_is_durable_and_replayable",
+      "test_task16_durable_outbox_wiring.py::test_fanout_gate_precedes_the_dispatch_and_is_released_on_failure"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task16_durable_outbox_pg.py::test_fanout_failure_returns_the_ticket_so_replay_can_deliver",
+      "test_task16_durable_outbox_wiring.py::test_fanout_gate_precedes_the_dispatch_and_is_released_on_failure"
+    ],
+    "added_files": [
+      "test_task16_durable_outbox_pg.py",
+      "test_task16_durable_outbox_wiring.py"
+    ],
+    "restored": true,
+    "seconds": 9.7
+  },
+  {
+    "id": "M32",
+    "side": "be",
+    "want": "test_task16_durable_outbox_wiring.py::test_the_gate_covers_the_two_workpaper_sync_event_types_only",
+    "why": "闸门范围清空 ⇒ 退回原行为（重放重复刷新）。代码结构、调用点、日志全都还在，只有行为变了 —— 用来证明判据不是在测「代码里有没有闸门」",
+    "verdict": "RED",
+    "summary": "3 failed, 52 passed in 6.53s",
+    "added": [
+      "test_task16_durable_outbox_pg.py::test_fanout_failure_returns_the_ticket_so_replay_can_deliver",
+      "test_task16_durable_outbox_pg.py::test_replayed_event_does_not_fan_out_its_side_effects_twice",
+      "test_task16_durable_outbox_wiring.py::test_the_gate_covers_the_two_workpaper_sync_event_types_only"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task16_durable_outbox_pg.py::test_replayed_event_does_not_fan_out_its_side_effects_twice",
+      "test_task16_durable_outbox_wiring.py::test_the_gate_covers_the_two_workpaper_sync_event_types_only"
+    ],
+    "added_files": [
+      "test_task16_durable_outbox_pg.py",
+      "test_task16_durable_outbox_wiring.py"
+    ],
+    "restored": true,
+    "seconds": 9.4
+  },
+  {
+    "id": "M33",
+    "side": "be",
+    "want": "test_task16_durable_outbox_pg.py::test_import_domain_replay_semantics_are_untouched",
+    "why": "闸门**越界**扩到导入域 ⇒ 改掉了 ledger-import spec 拥有的重放语义（那边的handler 依赖「重放会重新派发」）。范围判据必须双向可 falsify：只测「底稿域被管住」的话，顺手扩张不会被任何守卫发现",
+    "verdict": "RED",
+    "summary": "2 failed, 53 passed in 6.79s",
+    "added": [
+      "test_task16_durable_outbox_pg.py::test_import_domain_replay_semantics_are_untouched",
+      "test_task16_durable_outbox_wiring.py::test_the_gate_covers_the_two_workpaper_sync_event_types_only"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task16_durable_outbox_pg.py::test_import_domain_replay_semantics_are_untouched",
+      "test_task16_durable_outbox_wiring.py::test_the_gate_covers_the_two_workpaper_sync_event_types_only"
+    ],
+    "added_files": [
+      "test_task16_durable_outbox_pg.py",
+      "test_task16_durable_outbox_wiring.py"
+    ],
+    "restored": true,
+    "seconds": 9.5
+  },
+  {
+    "id": "M34",
+    "side": "be",
+    "want": "test_task16_durable_outbox_wiring.py::test_the_gate_covers_the_two_workpaper_sync_event_types_only",
+    "why": "只认枚举、不认字符串 ⇒ `import_event_outbox.event_type` 是 VARCHAR 列，派发口拿到的永远是 str，闸门在生产里恒为 False。这是**最隐蔽**的一类失效：结构、单测（若只传枚举）与日志全都正常",
+    "verdict": "RED",
+    "summary": "3 failed, 52 passed in 6.74s",
+    "added": [
+      "test_task16_durable_outbox_pg.py::test_fanout_failure_returns_the_ticket_so_replay_can_deliver",
+      "test_task16_durable_outbox_pg.py::test_replayed_event_does_not_fan_out_its_side_effects_twice",
+      "test_task16_durable_outbox_wiring.py::test_the_gate_covers_the_two_workpaper_sync_event_types_only"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task16_durable_outbox_pg.py::test_replayed_event_does_not_fan_out_its_side_effects_twice",
+      "test_task16_durable_outbox_wiring.py::test_the_gate_covers_the_two_workpaper_sync_event_types_only"
+    ],
+    "added_files": [
+      "test_task16_durable_outbox_pg.py",
+      "test_task16_durable_outbox_wiring.py"
+    ],
+    "restored": true,
+    "seconds": 10.0
+  },
+  {
+    "id": "M35",
+    "side": "be",
+    "want": "test_task16_durable_outbox_pg.py::test_fanout_failure_returns_the_ticket_so_replay_can_deliver",
+    "why": "归还派发权不再真的删行（改成一次 SELECT，rowcount 仍返回真值）⇒ 行为与「不归还」完全一样。检验判据看的是**DELETE 这个动作**，不是「函数被调用过」",
+    "verdict": "RED",
+    "summary": "3 failed, 52 passed in 6.58s",
+    "added": [
+      "test_task16_durable_outbox_pg.py::test_fanout_failure_returns_the_ticket_so_replay_can_deliver",
+      "test_task16_durable_outbox_pg.py::test_publish_failure_is_durable_and_replayable",
+      "test_task16_durable_outbox_wiring.py::test_release_consumption_actually_deletes_the_row"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task16_durable_outbox_pg.py::test_fanout_failure_returns_the_ticket_so_replay_can_deliver",
+      "test_task16_durable_outbox_wiring.py::test_release_consumption_actually_deletes_the_row"
+    ],
+    "added_files": [
+      "test_task16_durable_outbox_pg.py",
+      "test_task16_durable_outbox_wiring.py"
+    ],
+    "restored": true,
+    "seconds": 9.2
+  },
+  {
+    "id": "M36",
+    "side": "be",
+    "want": "test_task16_durable_outbox_pg.py::test_replayed_event_does_not_fan_out_its_side_effects_twice",
+    "why": "去重不再计数 ⇒ 运维看到 published_count 涨了却没有任何下游动作，且分不清「真派发」与「被闸门跳过」（Requirement 13.9 的可见性）",
+    "verdict": "RED",
+    "summary": "1 failed, 54 passed in 6.63s",
+    "added": [
+      "test_task16_durable_outbox_pg.py::test_replayed_event_does_not_fan_out_its_side_effects_twice"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task16_durable_outbox_pg.py::test_replayed_event_does_not_fan_out_its_side_effects_twice"
+    ],
+    "added_files": [
+      "test_task16_durable_outbox_pg.py"
+    ],
+    "restored": true,
+    "seconds": 9.5
+  },
+  {
+    "id": "M37",
+    "side": "be",
+    "want": "test_task16_durable_outbox_wiring.py::test_the_version_write_is_confined_to_the_pre_commit_half",
+    "why": "在**入队之后**再加一次 version 递增 ⇒ 耐久 payload 里的 file_version 与实际写入的值不一致，下游按错版本刷新。「恰一处且在 enqueue 之前」是边界承诺，只能靠注入第二处来 falsify",
+    "verdict": "RED",
+    "summary": "3 failed, 52 passed in 6.64s",
+    "added": [
+      "test_task16_durable_outbox_pg.py::test_replay_never_moves_a_version_field",
+      "test_task16_durable_outbox_wiring.py::test_the_version_write_is_confined_to_the_pre_commit_half",
+      "test_wp_html_save.py::test_save_200_success"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task16_durable_outbox_wiring.py::test_the_version_write_is_confined_to_the_pre_commit_half"
+    ],
+    "added_files": [
+      "test_task16_durable_outbox_pg.py",
+      "test_task16_durable_outbox_wiring.py",
+      "test_wp_html_save.py"
+    ],
+    "restored": true,
+    "seconds": 9.6
+  },
+  {
+    "id": "M38",
+    "side": "be",
+    "want": "test_wp_html_save.py::test_save_200_success",
+    "why": "让后处理整段不执行，但**语法结构原样保留**（`if False:` 后跟隐式续行的多行调用是合法 Python，AST 里 after_save 调用节点仍在）。原来这个调用点被 `except Exception: logger.warning` 包着，替身缺 file_version 抛的 AttributeError 被吞掉，于是 test_save_200_success 实际断言的是「后处理整段被跳过后接口仍返回 200」—— 只看状态码的判据在这条变异下照样绿。故该测试补了 file_version/prefill_stale 两条可观察写入断言，本变异就是它的 falsifier",
+    "verdict": "RED",
+    "summary": "1 failed, 54 passed in 6.87s",
+    "added": [
+      "test_wp_html_save.py::test_save_200_success"
+    ],
+    "gone": [],
+    "hit": [
+      "test_wp_html_save.py::test_save_200_success"
+    ],
+    "added_files": [
+      "test_wp_html_save.py"
+    ],
+    "restored": true,
+    "seconds": 9.9
+  },
+  {
+    "id": "M39",
+    "side": "be",
+    "want": "test_task16_durable_outbox_wiring.py::test_after_save_call_sites_do_not_swallow_the_durability_failure[app/routers/wp_html_save.py]",
+    "why": "把 Requirement 13.4 明令禁止的 best-effort 形态注入回 html_save 调用点。「该模块没有 swallowing try」是否定式承诺，短路式变异改不动「不存在」，只能注入反例。这条同时补上原变异集的一处空白：no-swallow 判据的 snapshot_writer / OO callback 两个参数化实例有变异（M26/M27/M28），wp_html_save 那个实例此前无人 falsify",
+    "verdict": "RED",
+    "summary": "3 failed, 52 passed in 6.68s",
+    "added": [
+      "test_task16_durable_outbox_wiring.py::test_after_save_call_sites_do_not_swallow_the_durability_failure[app/routers/wp_html_save.py]",
+      "test_task16_durable_outbox_wiring.py::test_html_save_no_longer_crosses_the_version_domains",
+      "test_wp_html_save.py::test_save_200_success"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task16_durable_outbox_wiring.py::test_after_save_call_sites_do_not_swallow_the_durability_failure[app/routers/wp_html_save.py]"
+    ],
+    "added_files": [
+      "test_task16_durable_outbox_wiring.py",
+      "test_wp_html_save.py"
+    ],
+    "restored": true,
+    "seconds": 9.6
+  }
+]

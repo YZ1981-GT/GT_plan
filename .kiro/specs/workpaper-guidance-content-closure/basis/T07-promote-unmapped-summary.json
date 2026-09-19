@@ -1,0 +1,50 @@
+{
+  "task": 7,
+  "batch": "T07-promote-unmapped-aliases",
+  "recordedAt": "2026-09-09T07:20:00+00:00",
+  "policy": "no_invented_body_or_source_refs",
+  "aliasExpansion": {
+    "purpose": ["本表用途", "本表目的"],
+    "evidence": ["与其他底稿的关联", "与其他底稿关联"],
+    "steps": ["测试方法与程序", "测试方法"],
+    "formulas": ["偏差率计算"],
+    "judgments": ["常见波动原因分类"]
+  },
+  "promotion": {
+    "filesChanged": 85,
+    "sectionsPromoted": 149,
+    "script": "backend/scripts/fix/promote_unmapped_guidance_sections.py"
+  },
+  "migrateCheckAfter": {
+    "files": 373,
+    "changed": 0,
+    "unmapped": 159,
+    "errors": 0,
+    "priorUnmapped": 308
+  },
+  "pilotHosts": {
+    "A1-13": {
+      "mappedCanonicalKeys": ["purpose", "steps", "judgments", "evidence", "common_errors"],
+      "unmappedTitles": []
+    },
+    "A14-4": {
+      "mappedCanonicalKeys": ["purpose", "steps", "evidence", "common_errors"],
+      "unmappedTitles": []
+    }
+  },
+  "stillBlockedForExact": [
+    "empty source_refs on promoted/existing sections",
+    "missing materials/data_sources/formulas/completion on most sheets",
+    "no independent methodology publication"
+  ],
+  "c1": {
+    "verdict": "FAIL",
+    "effective": 373,
+    "complete": 0,
+    "pending": 373
+  },
+  "notes": [
+    "Structural promotion of real legacy text only; T7/[C1] stay [~]",
+    "unmapped title frequency: basis/T07-unmapped-title-freq.json"
+  ]
+}

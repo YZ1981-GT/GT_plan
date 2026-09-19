@@ -1,0 +1,109 @@
+{
+  "wp_code": "J3",
+  "name": "股份支付",
+  "version": "2025-R5",
+  "_note": "此JSON配置为简化版本，实际底稿结构可能更复杂。实施时需根据yaml文件中的实际sheet结构进行详细配置。参考yaml文件：backend/data/ledger_adapters/wp_render_schema/generated/J3.yaml",
+  "account_codes": [
+    "2711"
+  ],
+  "source_files": [
+    {
+      "file": "J3 股份支付.xlsx",
+      "sheets": [
+        "底稿目录",
+        "股份支付实质性程序表J3A",
+        "审定表J3-1",
+        "附注披露信息（上市公司）",
+        "附注披露信息（国有企业）",
+        "明细表J3-2",
+        "调整分录汇总J3-3",
+        "股份支付测算表J3-4",
+        "检查表J3-5"
+      ]
+    }
+  ],
+  "sheet_rules": [
+    {
+      "exact_name": "股份支付实质性程序表J3A",
+      "code": "J3A",
+      "type": "procedure"
+    },
+    {
+      "exact_name": "审定表J3-1",
+      "code": "J3-1",
+      "type": "summary",
+      "header_rows": [
+        5,
+        6
+      ],
+      "data_start_row": 7,
+      "key_rows": {
+        "total": {
+          "row": 12,
+          "label": "合计",
+          "is_total": true,
+          "report_row": "BS-L10"
+        }
+      },
+      "layout": {
+        "label_col": 1,
+        "columns": {
+          "opening_balance": {
+            "col": 2,
+            "label": "期初余额"
+          },
+          "increase": {
+            "col": 3,
+            "label": "本期增加"
+          },
+          "decrease": {
+            "col": 4,
+            "label": "本期减少"
+          },
+          "closing_balance": {
+            "col": 5,
+            "label": "期末余额"
+          },
+          "audit_adjustment": {
+            "col": 6,
+            "label": "审计调整"
+          },
+          "closing_audited": {
+            "col": 7,
+            "label": "期末审定数"
+          }
+        }
+      }
+    },
+    {
+      "exact_name": "附注披露信息（上市公司）",
+      "code": "J3-listed",
+      "type": "disclosure_listed"
+    },
+    {
+      "exact_name": "附注披露信息（国有企业）",
+      "code": "J3-soe",
+      "type": "disclosure_soe"
+    },
+    {
+      "exact_name": "明细表J3-2",
+      "code": "J3-2",
+      "type": "detail"
+    },
+    {
+      "exact_name": "调整分录汇总J3-3",
+      "code": "J3-3",
+      "type": "adjustment"
+    },
+    {
+      "exact_name": "股份支付测算表J3-4",
+      "code": "J3-4",
+      "type": "calculation"
+    },
+    {
+      "exact_name": "检查表J3-5",
+      "code": "J3-5",
+      "type": "check"
+    }
+  ]
+}

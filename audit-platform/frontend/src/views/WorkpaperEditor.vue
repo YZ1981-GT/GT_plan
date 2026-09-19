@@ -1,4 +1,6 @@
 <template>
+  <!-- [platform-ui-editing-consistency MVP-4]
+       TODO: Replace manual dirty/saving state with useEditStateMachine() -->
   <!-- 横幅区（归档/AI/冲突/信任度/状态机/编辑锁/前置状态/stale） -->
   <EditorBanners
     :project-id="projectId"
@@ -15,28 +17,81 @@
     @update:show-stale-impact-panel="showStaleImpactPanel = $event"
   />
 
+  <!-- useStaleRefresh：上游变更事件横幅 -->
+  <div v-if="wpStaleRefresh.isStale.value" class="gt-stale-banner" style="margin: 4px 12px 8px">
+    <span class="gt-stale-text">上游数据已变更，底稿取数可能过时</span>
+    <el-button size="small" type="primary" @click="wpStaleRefresh.refresh()">刷新数据</el-button>
+  </div>
+
   <!-- V3 Req 11.6: 时光机面板 -->
   <TimeMachineDrawer ref="tmDrawerRef" module="workpaper" :instance-id="wpId" @restored="onTimeMachineRestored" />
 
-  <!-- HTML 渲染器路由分发（A/B/C/D/E/H/skip 优先级最高） -->
-  <GtWpRenderer
-    v-if="useHtmlRenderer"
-    :wp-id="wpId"
-    @save-success="onChildSaved"
-    @trigger-procedure-trimming-suggestion="onHtmlTrimmingSuggestion"
-    @cross-ref-update="onHtmlCrossRefUpdate"
-    @sync-to-disclosure-notes="onHtmlSyncToDisclosureNotes"
-    @jump-to-reference="onHtmlJumpToReference"
-  />
+  <!-- 主内容区 + WorkpaperCapabilityShell（rail/location/capability 唯一 owner） -->
+  <WorkpaperCapabilityShell
+    class="gt-wp-editor-with-guidance"
+    :owner-epoch="shellOwnerEpoch"
+    :capability-epoch="shellCapabilityEpoch"
+    :snapshot="shellCapabilitySnapshot"
+    :location="shellLocation"
+    :guidance-controller="shellGuidanceController"
+    :shell-error="shellError"
+    :open-dsh="openShellDsh"
+    :close-dsh="closeShellDsh"
+  >
+    <!-- 主内容区（flex: 1） -->
+    <div class="gt-wp-editor-main">
+      <!-- 底稿标题栏（HTML 渲染器路径）。导出/导入移至各 sheet 内工具栏；
+           底稿切换由 GtWpRenderer 内「🗂️ 切换底稿」树形弹窗承载，此处不再冗余。 -->
+      <div v-if="useHtmlRenderer && wpDetail" class="gt-wp-io-toolbar">
+        <el-button text @click="goBack">← 返回</el-button>
+        <span class="gt-wp-editor-code">{{ wpDetail.wp_code }}</span>
+        <span class="gt-wp-editor-name">{{ displayWpName }}</span>
+        <div class="gt-wp-io-toolbar__actions">
+          <!-- 函证枢纽（D0/E0/F0/G0/H0/K0/L0）：底稿内逐 sheet 编制，台账由此入口跳转。 -->
+          <el-button
+            v-if="isConfirmationHubWorkbook"
+            size="small"
+            type="primary"
+            plain
+            @click="goConfirmationHub"
+          >
+            ✉️ 函证管理中心
+          </el-button>
+          <el-button size="small" @click="onShowVersions">
+            <el-icon><Clock /></el-icon> 版本历史
+          </el-button>
+          <!-- HTML 路径此前无「面板」入口；SidePanel/AttachmentTabPanel 仅挂在 Univer 分支会导致 Drawer_Host 不可达 -->
+          <el-badge :value="fineCheckFailCount" :max="99" :hidden="fineCheckFailCount === 0" type="danger">
+            <el-button size="small" @click="showSidePanel = !showSidePanel">📋 面板</el-button>
+          </el-badge>
+        </div>
+      </div>
 
-  <!-- 默认 Univer 编辑器（component_type='univer' 或未配置时） -->
-  <div v-else class="gt-wp-editor gt-fade-in">
+      <!-- HTML 渲染器路由分发（A/B/C/D/E/H/skip 优先级最高） -->
+      <GtWpRenderer
+        ref="wpRendererRef"
+        v-if="useHtmlRenderer"
+        :wp-id="wpId"
+        :initial-sheet="initialSheetFromQuery"
+        @save-success="onChildSaved"
+        @saved-notify="onChildSaved"
+        @trigger-procedure-trimming-suggestion="onHtmlTrimmingSuggestion"
+        @cross-ref-update="onHtmlCrossRefUpdate"
+        @sync-to-disclosure-notes="onHtmlSyncToDisclosureNotes"
+        @jump-to-reference="onHtmlJumpToReference"
+        @open-formula="onHtmlOpenFormula"
+        @open-attachment="onOpenAttachment"
+        @sheet-change="onHtmlSheetChange"
+      />
+
+      <!-- 默认 Univer 编辑器（component_type='univer' 或未配置时） -->
+      <div v-else class="gt-wp-editor gt-fade-in">
     <!-- 顶部工具栏 -->
     <div class="gt-wp-editor-toolbar">
       <div class="gt-wp-editor-toolbar-left">
         <el-button text @click="goBack">← 返回</el-button>
         <span class="gt-wp-editor-code" v-if="wpDetail">{{ wpDetail.wp_code }}</span>
-        <span class="gt-wp-editor-name" v-if="wpDetail">{{ wpDetail.wp_name }}</span>
+        <span class="gt-wp-editor-name" v-if="wpDetail">{{ displayWpName }}</span>
         <el-tag v-if="wpDetail" :type="(statusTagType(wpDetail.status)) || undefined" size="small">
           {{ statusLabel(wpDetail.status) }}
         </el-tag>
@@ -57,6 +112,15 @@
           @click="showAuditNavDrawer = true"
           style="margin-right: 8px"
         >🧭 审计导航图</el-button>
+        <WpExportButton
+          v-if="wpDetail"
+          :project-id="projectId"
+          :wp-id="wpId"
+          size="small"
+          button-type=""
+          label="导出"
+        />
+        <el-button size="small" @click="showWpImportEnhanced = true">导入</el-button>
         <!-- 关键操作组：保存 / 一键填充 / 提交复核 — V3 Req 12.1.1 配置驱动 -->
         <el-button-group class="gt-wp-toolbar-primary">
           <el-tooltip
@@ -104,8 +168,32 @@
         <el-badge :value="fineCheckFailCount" :max="99" :hidden="fineCheckFailCount === 0" type="danger">
           <el-button size="small" @click="showSidePanel = !showSidePanel">📋 面板</el-button>
         </el-badge>
-        <!-- AI 文档对话入口 -->
-        <el-button size="small" @click="showDocAiChat = true">💬 AI 对话</el-button>
+        <!-- 复核对话入口 -->
+        <el-popover
+          placement="bottom"
+          :width="260"
+          trigger="click"
+          popper-class="review-thread-popover"
+        >
+          <template #reference>
+            <el-badge :value="reviewThreadCount" :max="9" :hidden="reviewThreadCount === 0" type="warning">
+              <el-button size="small">📝 复核对话</el-button>
+            </el-badge>
+          </template>
+          <div class="review-thread-list">
+            <div v-if="reviewThreadList.length === 0" class="review-thread-empty">暂无活跃复核对话</div>
+            <div
+              v-for="item in reviewThreadList"
+              :key="item.section_id"
+              class="review-thread-item"
+              @click="onOpenReviewThread(item)"
+            >
+              <span class="review-thread-dot" :class="item.has_unread ? 'dot-red' : 'dot-blue'" />
+              <span class="review-thread-label">{{ item.section_id }}</span>
+              <span v-if="item.has_unread" class="review-thread-unread">未读</span>
+            </div>
+          </div>
+        </el-popover>
         <!-- 独立按钮组（刷新取数等） -->
         <el-tooltip
           v-for="btn in toolbarButtons.filter((b) => b.group === 'standalone')"
@@ -164,7 +252,6 @@
       @saved="onChildSaved"
       @dirty-change="onDirtyChange"
       @sheet-switch="onSwitchSheet"
-      @locate-cell="onLocateCell"
     />
 
     <!-- Sprint 5.5: 查看公式详情弹窗 -->
@@ -177,23 +264,41 @@
       @navigate="onCellDetailNavigate"
     />
 
-    <!-- R7-S3-05 Task 25：底稿右栏面板（抽屉模式） -->
-    <el-drawer
-      v-model="showSidePanel"
-      direction="rtl"
-      size="400px"
-      :with-header="false"
-      :modal="false"
-      append-to-body
-    >
-      <WorkpaperSidePanel
-        :project-id="projectId"
-        :wp-id="wpId"
-        :wp-code="wpDetail?.wp_code"
-        @finecheck-update="fineCheckFailCount = $event"
-      />
-    </el-drawer>
+    <!-- 公式编辑弹窗（HTML 渲染器子组件 open-formula 事件触发） -->
+    <FormulaEditDialog
+      v-model="showHtmlFormulaDialog"
+      :row="htmlFormulaDialogRow"
+      :project-id="projectId"
+      :year="currentYear"
+      :wp-context="htmlFormulaWpContext"
+      @save="onHtmlFormulaSave"
+    />
+
   </div>
+    </div><!-- /gt-wp-editor-main -->
+
+    <!-- 编制说明面板内容（trigger/placement 由 shell 拥有；G-RAIL adapter） -->
+    <template #guidance-panel>
+      <WpGuidancePanel
+        v-if="wpDetail"
+        shell-owned
+        :wp-id="wpId"
+        :wp-code="wpDetail.wp_code || ''"
+        :wp-name="wpDetail.wp_name || ''"
+        :component-type="componentType || ''"
+        :project-id="projectId"
+        :year="projectYear || new Date().getFullYear() - 1"
+        :sheet-code="activeSheetContext.sheetCode"
+        :sheet-name="activeSheetContext.sheetName"
+        :sheet-uid="activeSheetContext.sheetUid"
+        :sheet-uid-null-reason="activeSheetContext.sheetUidNullReason"
+        :host="activeSheetContext.host"
+        :whole-workbook="activeSheetContext.wholeWorkbook"
+        :owner-epoch="activeSheetContext.ownerEpoch ?? 0"
+        :context-revision="activeSheetContext.contextRevision ?? 0"
+      />
+    </template>
+  </WorkpaperCapabilityShell>
 
   <!-- 弹窗/抽屉（条件渲染，不占主布局） -->
   <CycleDialogHost
@@ -215,6 +320,15 @@
     @jump="onVersionSearchJump"
   />
 
+  <!-- 非 HTML 编辑器仍使用编辑器级 Host；HTML 路径由 GtWpRenderer Runtime Boundary 唯一承载。 -->
+  <GtWpVersionTrail
+    v-if="!useHtmlRenderer"
+    ref="versionTrailRef"
+    :workpaper-id="wpId"
+    :project-id="projectId"
+    @rollback-completed="onVersionTrailRollbackCompleted"
+  />
+
   <AuditNavDialog
     :project-id="projectId"
     :wp-id="wpId"
@@ -232,9 +346,14 @@
     @marked="onReviewMarked"
   />
 
-  <!-- 非 Univer 编辑器的侧面板（共享） -->
+  <WpImportDialog
+    v-model="showWpImportEnhanced"
+    :project-id="projectId"
+    @imported="onWpImportEnhanced"
+  />
+
+  <!-- R7-S3-05 Task 25：底稿右栏面板（抽屉模式）— 提到 HTML/Univer 共用，供 AttachmentTabPanel → Drawer_Host -->
   <el-drawer
-    v-if="!useHtmlRenderer && componentType && componentType !== 'univer'"
     v-model="showSidePanel"
     direction="rtl"
     size="400px"
@@ -246,24 +365,17 @@
       :project-id="projectId"
       :wp-id="wpId"
       :wp-code="wpDetail?.wp_code"
+      :decision-trace="renderConfig?.decision_trace ?? null"
       @finecheck-update="fineCheckFailCount = $event"
     />
   </el-drawer>
-
-  <!-- AI 文档对话面板 -->
-  <DocAiChatPanel
-    :doc-type="'workpaper'"
-    :doc-id="wpId"
-    :project-id="projectId"
-    :year="projectYear || new Date().getFullYear() - 1"
-    :visible="showDocAiChat"
-    @update:visible="showDocAiChat = $event"
-    @close="showDocAiChat = false"
-    @adopt="onDocAiAdopt"
-  />
 </template>
 
 <script setup lang="ts">
+// [platform-context-permission-foundation P0-6.1]
+// ProjectContext + PermissionMatrix facade 已接入
+// TODO(P1): 逐步替换下方 route.params 直接解析为 projectContext 读取
+
 /**
  * WorkpaperEditor — 底稿编辑器 Shell 容器
  *
@@ -272,13 +384,27 @@
  *
  * @see .kiro/specs/workpaper-editor-shrink-phase2/design.md §4.2
  */
-import { ref, computed, provide, onMounted, onUnmounted, nextTick } from 'vue'
+import { ref, computed, provide, onMounted, onUnmounted, nextTick, watch, inject } from 'vue'
+import { useProjectStore } from '@/stores/project'
+import { usePermissionMatrix } from '@/composables/usePermissionMatrix'
 import { useRoute, useRouter, onBeforeRouteLeave } from 'vue-router'
 import { confirmLeave } from '@/utils/confirm'
 import { eventBus, type WorkpaperSavedPayload } from '@/utils/eventBus'
+import { ElMessage } from 'element-plus'
+import { handleApiError } from '@/utils/errorHandler'
 import { useAuditContext } from '@/composables/useAuditContext'
+import { useA13MisstatementBridge } from '@/composables/useA13MisstatementBridge'
+import { useStaleRefresh } from '@/composables/useStaleRefresh'
 import { useCycleType } from '@/composables/useCycleType'
 import { useEditorMode } from '@/composables/useEditorMode'
+import {
+  resolveUniverSheetContext,
+  useWpRenderer,
+  type RenderConfig,
+  type SheetRenderConfig,
+  type WorkpaperSheetContext,
+} from '@/composables/useWpRenderer'
+import { createHtmlStableContextEmitter } from '@/composables/htmlStableContextEmitter'
 import { useEditorToolbar } from '@/composables/useEditorToolbar'
 import { useEditorCycles } from '@/composables/useEditorCycles'
 import { useSheetNavFacade } from '@/composables/useSheetNavFacade'
@@ -297,6 +423,7 @@ import GtWpRenderer from '@/components/workpaper/GtWpRenderer.vue'
 import WorkpaperSidePanel from '@/components/workpaper/WorkpaperSidePanel.vue'
 import ReviewLayerBadges from '@/components/workpaper/ReviewLayerBadges.vue'
 import CellFormulaDetail from '@/components/CellFormulaDetail.vue'
+import FormulaEditDialog from '@/components/formula/FormulaEditDialog.vue'
 import TimeMachineDrawer from '@/components/time_machine/TimeMachineDrawer.vue'
 import UniverEditorCore from './workpaper-editor/UniverEditorCore.vue'
 import EditorBanners from './workpaper-editor/EditorBanners.vue'
@@ -304,7 +431,21 @@ import CycleDialogHost from './workpaper-editor/CycleDialogHost.vue'
 import VersionHistoryDrawer from './workpaper-editor/VersionHistoryDrawer.vue'
 import AuditNavDialog from './workpaper-editor/AuditNavDialog.vue'
 import ReviewMarkDialog from './workpaper-editor/ReviewMarkDialog.vue'
-import DocAiChatPanel from '@/components/DocAiChatPanel.vue'
+import WpExportButton from '@/components/workpaper/WpExportButton.vue'
+import WpImportDialog from '@/components/workpaper/WpImportDialog.vue'
+import WpGuidancePanel from '@/components/workpaper/WpGuidancePanel.vue'
+import GtWpVersionTrail from '@/components/workpaper/version-trail/GtWpVersionTrail.vue'
+import WorkpaperCapabilityShell from '@/shell/formula/WorkpaperCapabilityShell.vue'
+import { GC0_CONTRACT_VERSION, type CanonicalWorkpaperLocation } from '@/shared/contracts/gc0'
+import type { WorkpaperCapabilitySnapshot, CapabilityDecision } from '@/shell/formula/workpaperCapabilitySnapshot'
+import { fetchWorkpaperCapabilitySnapshot } from '@/shell/formula/fetchCapabilitySnapshot'
+import { DSH_ASSIST_BRIDGE_KEY } from '@/shell/formula/dshAssistBridge'
+import {
+  createShellStructuredError,
+  type ShellStructuredError,
+} from '@/shell/formula/shellStructuredError'
+import { useGuidancePanelStore } from '@/stores/guidancePanelStore'
+import { Clock } from '@element-plus/icons-vue'
 
 // ─── 路由解析 ────────────────────────────────────────────────────────────────
 const route = useRoute()
@@ -312,6 +453,32 @@ const router = useRouter()
 const { canEdit } = useAuditContext()
 const projectId = computed(() => route.params.projectId as string)
 const wpId = computed(() => route.params.wpId as string)
+const { renderConfig } = useWpRenderer(wpId)
+// 深链 ?sheet= 初始激活底稿页签（无 ?cell= 的纯 Tab 导航，如附注→披露表跳转）。
+// GtWpRenderer 仅 initialSheet + locate-cell 事件切页；此前未接线导致纯 ?sheet= 被忽略回退底稿目录。
+const initialSheetFromQuery = computed<string | undefined>(() => {
+  const q = route.query.sheet
+  const v = Array.isArray(q) ? q[0] : q
+  return v ? String(v) : undefined
+})
+
+// ─── P0-6.1: ProjectContext + PermissionMatrix facade ────────────────────────
+const projectStore = useProjectStore()
+const projectContext = computed(() => projectStore.currentProjectContext)
+const { can: canOp, whyCannot } = usePermissionMatrix()
+// DEPRECATED: 旧 canEdit 仍保留，后续逐步替换为 canOp('wp:edit')
+
+
+// ─── A13 错报推送桥：底稿"推送错报至A13错报汇总"事件的唯一消费者 ──────────────
+// 各底稿子组件 emit('a13:push-misstatement') → 本桥归一化后写入未更正错报汇总表 + 溯源。
+useA13MisstatementBridge()
+
+// ─── useStaleRefresh：试算表/调整变更后提示底稿数据可能过时 ──────────────────
+const wpStaleRefresh = useStaleRefresh(projectId, {
+  events: ['trial-balance:updated', 'adjustment:saved'],
+  mode: 'prompt',
+  onRefresh: () => onManualRefresh(),
+})
 
 // ─── 核心数据 ref ────────────────────────────────────────────────────────────
 const wpDetail = ref<WorkpaperDetail | null>(null)
@@ -326,9 +493,59 @@ const reviewDialogCell = ref<{ sheet: string; cellRef: string }>({ sheet: '', ce
 const showCellFormulaDetail = ref(false)
 const cellDetailSheet = ref('')
 const cellDetailLabel = ref('')
+
+// ─── HTML 渲染器公式编辑弹窗状态（open-formula 事件触发）───
+const showHtmlFormulaDialog = ref(false)
+const htmlFormulaDialogRow = ref<Record<string, string>>({})
+const currentYear = computed(() => new Date().getFullYear())
+const htmlFormulaWpContext = computed(() => {
+  if (!projectId.value) return undefined
+  return {
+    wpId: wpId.value,
+    wpCode: wpDetail.value?.wp_code || '',
+    sheetName: htmlFormulaDialogRow.value.sheet_name || '',
+    projectId: projectId.value,
+    year: currentYear.value,
+    cells: [],
+  }
+})
 const showStaleImpactPanel = ref(false)
-const showDocAiChat = ref(false)
+const showWpImportEnhanced = ref(false)
+
+// ─── 复核对话线程列表（工具栏 popover）──────────────────────────────────────
+const reviewThreadList = ref<{ section_id: string; has_unread: boolean }[]>([])
+const reviewThreadCount = computed(() => reviewThreadList.value.length)
+
+async function loadReviewThreadList() {
+  if (!wpId.value) return
+  try {
+    const res = await httpApi.get('/api/review-threads/active', {
+      params: { wp_id: wpId.value },
+      _silent: true,
+    } as any)
+    const data = res?.data?.data || res?.data || []
+    if (Array.isArray(data)) {
+      reviewThreadList.value = data
+    }
+  } catch { /* silent */ }
+}
+
+function onOpenReviewThread(item: { section_id: string }) {
+  // 触发 provide 下的 openReviewDialog（通过 eventBus）
+  eventBus.emit('review-dialog:open', {
+    wpId: wpId.value,
+    sectionId: item.section_id,
+    sectionLabel: item.section_id,
+  })
+}
 const univerEditorCoreRef = ref<InstanceType<typeof UniverEditorCore> | null>(null)
+const wpRendererRef = ref<InstanceType<typeof GtWpRenderer> | null>(null)
+const versionTrailRef = ref<InstanceType<typeof GtWpVersionTrail> | null>(null)
+
+function onWpImportEnhanced() {
+  showWpImportEnhanced.value = false
+  eventBus.emit('workpaper-refresh')
+}
 
 // ─── 模式分发（useEditorMode） ──────────────────────────────────────────────
 const {
@@ -338,9 +555,37 @@ const {
   fetchComponentType,
 } = useEditorMode({ wpId, projectId, wpDetail })
 
+// ─── 函证枢纽（D0/E0/F0/G0/H0/K0/L0） ──────────────────────────────────────
+// workbook 级 componentType 为 confirmation-hub：底稿在编辑器内按源模板逐 sheet 编制
+// （底稿目录 / X0A 程序表 / X0-1 汇总 / X0-2~X0-8），函证管理中心台账由入口按钮跳转，
+// 二者通过 X0-1「同步到函证中心」与回函 confirmation:received 事件双向联动。
+const isConfirmationHubWorkbook = computed<boolean>(() =>
+  componentType.value === 'confirmation-hub'
+  || wpClassification.componentType?.value === 'confirmation-hub',
+)
+
+function goConfirmationHub() {
+  router.push({ name: 'ConfirmationHub', params: { projectId: projectId.value } })
+}
+
 // ─── 循环类型 ────────────────────────────────────────────────────────────────
 const cycleType = useCycleType(wpDetail)
 const { isDCycle, isFCycle, isGCycle, isHCycle, isICycle, isKCycle, isLCycle, isMCycle, isNCycle } = cycleType
+
+// ─── 底稿标题规范化（多 sheet 科目底稿显示纯科目名） ─────────────────────────
+// D~N 多 sheet 底稿（如 D2 含 目录/程序表/审定表/明细/附注）是整个科目的工作底稿集合，
+// 标题应显示科目名（如"应收账款"）而非单个 sheet 名（"应收账款审定表"）。
+// 去掉常见的 sheet 级后缀，保留科目主体。
+const displayWpName = computed(() => {
+  const raw = wpDetail.value?.wp_name || ''
+  if (!raw) return ''
+  return raw
+    .replace(/审定表及明细表$/, '')
+    .replace(/及明细表$/, '')
+    .replace(/审定表$/, '')
+    .replace(/明细表$/, '')
+    .trim() || raw
+})
 
 // ─── Sheet 导航 facade ──────────────────────────────────────────────────────
 const univerAPIRef = ref<any>(null)
@@ -356,6 +601,50 @@ const scenarioFilter = computed(() => {
 const measurementModelRef = computed(() => projectMeta.value?.measurement_model || 'cost')
 const sheetNavFacade = useSheetNavFacade(univerAPIRef, wpDetail, cycleType, scenarioFilter, measurementModelRef)
 const sheetNavActiveId = sheetNavFacade.activeSheetId
+const univerRenderSheets = ref<SheetRenderConfig[]>([])
+const univerSheetIdentityReady = ref(false)
+const univerWpCode = ref<string | null>(null)
+/** Univer/OnlyOffice host shares the same revision-owner contract as HTML Task 11. */
+const univerContextEmitter = createHtmlStableContextEmitter()
+let univerIdentityRequestId = 0
+
+/** Univer 不挂载 GtWpRenderer，故单独读取同一 render-config identity 目录。 */
+async function loadUniverSheetIdentityCatalog(): Promise<void> {
+  const requestId = ++univerIdentityRequestId
+  const requestedWpId = wpId.value
+  univerRenderSheets.value = []
+  univerWpCode.value = null
+  univerSheetIdentityReady.value = false
+  if (!requestedWpId || useHtmlRenderer.value) return
+  try {
+    const config = await httpApi.get<RenderConfig>(
+      `/api/workpapers/${requestedWpId}/render-config`,
+    )
+    if (requestId !== univerIdentityRequestId || requestedWpId !== wpId.value) return
+    univerRenderSheets.value = Array.isArray(config?.sheets) ? config.sheets : []
+    univerWpCode.value = config?.wp_code ?? null
+  } catch {
+    if (requestId !== univerIdentityRequestId || requestedWpId !== wpId.value) return
+    // 目录不可用时仍允许以真实 engine name 请求，后端 guidance membership 继续 fail-closed。
+    univerRenderSheets.value = []
+    univerWpCode.value = null
+  } finally {
+    if (requestId === univerIdentityRequestId && requestedWpId === wpId.value) {
+      univerSheetIdentityReady.value = true
+    }
+  }
+}
+
+// 路由复用同一 Shell 时重建目录；切回 HTML 时使在途 Univer 响应失效。
+watch([wpId, useHtmlRenderer], ([, isHtml], [oldWpId, wasHtml]) => {
+  if (isHtml) {
+    univerIdentityRequestId += 1
+    univerRenderSheets.value = []
+    univerSheetIdentityReady.value = false
+  } else if (wpId.value !== oldWpId || wasHtml) {
+    void loadUniverSheetIdentityCatalog()
+  }
+})
 
 // ─── useEditorCycles 实例化 ─────────────────────────────────────────────────
 const { cycleDialogs, fCycle, iCycle, gCycle, kCycle, lCycle, mCycle, nCycle } = useEditorCycles({
@@ -500,7 +789,27 @@ provide(EDITOR_CONTEXT_KEY, {
 
 // ─── Event handlers ─────────────────────────────────────────────────────────
 
-function onChildSaved() {
+function onChildSaved(payload?: { sheet_name: string; html_data: Record<string, any>; schema_version?: string }) {
+  // HTML 渲染器（A~E 类）保存：持久化 html_data 到后端 parsed_data
+  // （Univer/子编辑器走自身保存通道，调用本函数时不带 payload，仅刷新）
+  if (payload && payload.sheet_name) {
+    httpApi.post(`/api/workpapers/${wpId.value}/save`, {
+      sheet_name: payload.sheet_name,
+      html_data: payload.html_data,
+      schema_version: payload.schema_version || 'v2025-R5',
+    }).catch((e) => {
+      // 409 是业务状态冲突，必须给用户明确指引；其余失败静默告警不阻断 UI。
+      // 🔴 原先这里只有 console.warn，用户会以为「保存成功」—— 实际数据一行都没落库
+      // （D2-2 这类已绑定 OO 的双向底稿，走本通道必然 409）。
+      const status = e?.response?.status ?? e?.status
+      const detail = e?.response?.data?.detail
+      if (status === 409) {
+        ElMessage.error(detail?.message || '该底稿已绑定在线编辑，请切换到「在线编辑」模式保存')
+      } else {
+        console.warn('[WorkpaperEditor] HTML 底稿保存失败:', e)
+      }
+    })
+  }
   eventBus.emit('workpaper:saved', {
     projectId: projectId.value,
     wpId: wpId.value,
@@ -515,12 +824,23 @@ function onDirtyChange(val: boolean) {
   dirty.value = val
 }
 
-function onSwitchSheet(_sheetId: string) {
-  // Sheet 切换由 UniverEditorCore 内部处理
+function updateUniverSheetContext(sheetId: string) {
+  if (!univerSheetIdentityReady.value) return
+  const context = resolveUniverSheetContext(
+    sheetNavFacade.flatSheets.value,
+    sheetId,
+    univerRenderSheets.value,
+    wpDetail.value?.wp_code || univerWpCode.value || null,
+  )
+  if (!context) return
+  // Univer native/custom/locate converge here — same revision owner as HTML emitter contract.
+  const publication = univerContextEmitter.publish(context)
+  if (publication) activeSheetContext.value = publication.context
 }
 
-function onLocateCell(_payload: { sheetName?: string; cellRef: string }) {
-  // 定位由 UniverEditorCore 内部处理
+function onSwitchSheet(sheetId: string) {
+  // Must publish; no-op would leave guidance/shell on stale sheet (Req 10.3).
+  updateUniverSheetContext(sheetId)
 }
 
 function onDialogApplied(_sheet: string) {
@@ -529,7 +849,25 @@ function onDialogApplied(_sheet: string) {
 }
 
 function onShowVersions() {
-  showVersionDrawer.value = true
+  // HTML 路径委托 Runtime Boundary，非 HTML 路径保留编辑器级 Host。
+  if (useHtmlRenderer.value) wpRendererRef.value?.openVersionHistory()
+  else versionTrailRef.value?.openDrawer()
+}
+
+/** 版本回滚完成后刷新底稿数据 */
+async function onVersionTrailRollbackCompleted() {
+  // 重新加载底稿详情
+  try {
+    const d = await getWorkpaper(projectId.value, wpId.value)
+    if (d) wpDetail.value = d
+  } catch { /* ignore */ }
+  // 通知子组件/事件总线刷新
+  eventBus.emit('workpaper-refresh')
+  eventBus.emit('workpaper:saved', {
+    projectId: projectId.value,
+    wpId: wpId.value,
+  } as WorkpaperSavedPayload)
+  ElMessage.success('底稿数据已刷新')
 }
 
 function onVersionSearchJump(payload: { versionId: string; sheet: string; cellRef: string }) {
@@ -544,14 +882,6 @@ function onVersionSearchJump(payload: { versionId: string; sheet: string; cellRe
 
 function onReviewMarked() {
   eventBus.emit('review-mark:changed', { projectId: projectId.value, wpId: wpId.value })
-}
-
-// ─── AI 文档对话采纳 ─────────────────────────────────────────────────────────
-function onDocAiAdopt(payload: { content: string; messageId: string }) {
-  // 采纳事件由 DocAiChatPanel 内部调用 adoptContent API（走确认流）
-  // 父组件可在此做额外处理（如刷新底稿内容）
-  // D4: AI 内容已经过 wrap_ai_output_with_log → pending 状态，不直接写入
-  onChildSaved()
 }
 
 function onConflictResolved(_id: string, _resolution: string) {
@@ -609,6 +939,168 @@ function onHtmlSyncToDisclosureNotes(_payload: Record<string, any>) {
   // C 附注组件已直接调用 API，此处仅占位
 }
 
+// ─── 结构化 sheet 上下文（guidance/公式/导航共用）────────────────────────────
+const activeSheetContext = ref<WorkpaperSheetContext>({
+  sheetName: '',
+  sheetCode: null,
+  sheetUid: null,
+  sheetUidNullReason: 'sheet_uid_unavailable',
+  host: 'univer',
+  wholeWorkbook: false,
+  ownerEpoch: 1,
+  contextRevision: 0,
+})
+
+/** Task 12 shell bridge — live capability snapshot + DSH inject. */
+const shellOwnerEpoch = ref(1)
+const shellCapabilityEpoch = ref(1)
+const shellError = ref<ShellStructuredError | null>(null)
+const _deny: CapabilityDecision = {
+  allowed: false,
+  reasonCode: 'snapshot_uninitialized',
+  owner: 'workpaper-capability-matrix',
+  nextAction: '刷新后重试',
+  zhMessage: '能力快照尚未就绪，请稍候。',
+}
+const shellCapabilitySnapshot = ref<WorkpaperCapabilitySnapshot>({
+  snapshotVersion: '1.0',
+  subjectDigest: '',
+  ownerEpoch: 1,
+  expiresAt: '1970-01-01T00:00:00Z',
+  formulaView: _deny,
+  formulaEditUser: _deny,
+  formulaHistory: _deny,
+  aiReviewPage: _deny,
+  aiReviewBatch: _deny,
+  aiAssistChat: _deny,
+  humanReviewRead: _deny,
+  humanReviewWrite: _deny,
+  guidanceRead: _deny,
+})
+
+async function refreshShellCapability(): Promise<void> {
+  try {
+    const snap = await fetchWorkpaperCapabilitySnapshot({
+      wpId: wpId.value,
+      projectId: projectId.value,
+      ownerEpoch: shellOwnerEpoch.value,
+      sheetUid: activeSheetContext.value.sheetUid,
+    })
+    if (!snap) {
+      shellError.value = createShellStructuredError({
+        domain: 'capability',
+        reasonCode: 'snapshot_parse_failed',
+        zhMessage: '能力快照不可用，公共操作已暂时阻断。',
+        ownerEpoch: shellOwnerEpoch.value,
+        capabilityEpoch: shellCapabilityEpoch.value,
+      })
+      return
+    }
+    shellCapabilitySnapshot.value = snap
+    shellCapabilityEpoch.value = snap.ownerEpoch
+    shellError.value = null
+  } catch (err) {
+    shellError.value = createShellStructuredError({
+      domain: 'capability',
+      reasonCode: 'snapshot_fetch_failed',
+      zhMessage: '能力快照加载失败，请稍后重试。',
+      ownerEpoch: shellOwnerEpoch.value,
+      capabilityEpoch: shellCapabilityEpoch.value,
+      operation: 'capability-snapshot',
+    })
+    void err
+  }
+}
+
+watch(
+  () => [wpId.value, projectId.value, shellOwnerEpoch.value, activeSheetContext.value.sheetUid, activeSheetContext.value.wholeWorkbook] as const,
+  () => {
+    void refreshShellCapability()
+  },
+  { immediate: true },
+)
+
+const shellLocation = computed<CanonicalWorkpaperLocation | null>(() => {
+  if (!wpDetail.value) return null
+  const ctx = activeSheetContext.value
+  const host = (ctx.host === 'onlyoffice' || ctx.host === 'word' || ctx.host === 'grid' || ctx.host === 'html' || ctx.host === 'univer')
+    ? ctx.host
+    : 'html'
+  // G-ID: never invent sheetUid from display name; fall back to page/whole-workbook.
+  const sheetUid = ctx.sheetUid?.trim() || null
+  return {
+    contractVersion: GC0_CONTRACT_VERSION,
+    organizationId: projectId.value,
+    projectId: projectId.value,
+    fiscalYear: projectYear.value || new Date().getFullYear() - 1,
+    wpId: wpId.value,
+    wpCode: wpDetail.value.wp_code || '',
+    entryId: null,
+    host,
+    anchor: ctx.wholeWorkbook
+      ? { kind: 'whole_workbook' }
+      : sheetUid
+        ? { kind: 'sheet', sheetUid, sheetCode: ctx.sheetCode }
+        : { kind: 'page' },
+    display: { sheetName: ctx.sheetName || null, sectionLabel: null },
+    ownerEpoch: ctx.ownerEpoch ?? shellOwnerEpoch.value,
+    contextRevision: ctx.contextRevision ?? 1,
+  }
+})
+
+const guidancePanelStore = useGuidancePanelStore()
+const shellGuidanceController = computed(() => ({
+  isOpen: guidancePanelStore.isOpen,
+  hasDraft: false,
+  guidanceVersion: guidancePanelStore.guidanceData?.guidance_version ?? null,
+  open: () => guidancePanelStore.open(),
+  close: (_opts: { preserveDraft: boolean }) => guidancePanelStore.close(),
+}))
+
+const dshBridge = inject(DSH_ASSIST_BRIDGE_KEY, null)
+
+function openShellDsh(): void {
+  dshBridge?.open()
+}
+
+function closeShellDsh(opts: { preserveDraft: boolean }): void {
+  dshBridge?.close(opts)
+}
+
+function onHtmlSheetChange(context: WorkpaperSheetContext) {
+  activeSheetContext.value = context
+}
+
+// Univer custom nav、原生 tab 与 locate 最终都会更新 facade.activeSheetId；
+// engine id/name 在此与 render-config identity 目录合流，禁止前端正则猜 code。
+watch(
+  () => [
+    useHtmlRenderer.value,
+    univerSheetIdentityReady.value,
+    sheetNavActiveId.value,
+    sheetNavFacade.flatSheets.value.map((sheet) => `${sheet.id}:${sheet.name}`).join('|'),
+    univerRenderSheets.value.map((sheet) => `${sheet.sheet_name}:${sheet.sheet_code ?? ''}`).join('|'),
+  ] as const,
+  ([isHtml, identityReady, activeId]) => {
+    if (!isHtml && identityReady && activeId) updateUniverSheetContext(activeId)
+  },
+  { immediate: true },
+)
+
+watch(wpId, (nextId) => {
+  univerContextEmitter.resetOwner(`wp:${nextId || 'pending'}`)
+  activeSheetContext.value = {
+    sheetName: '',
+    sheetCode: null,
+    sheetUid: null,
+    sheetUidNullReason: 'sheet_uid_unavailable',
+    host: useHtmlRenderer.value ? 'html' : 'univer',
+    wholeWorkbook: false,
+    ownerEpoch: univerContextEmitter.getOwnerEpoch(),
+    contextRevision: 0,
+  }
+})
+
 function onHtmlJumpToReference(refCode: string) {
   if (!refCode) return
   router.push({
@@ -635,6 +1127,58 @@ function onUpload() {
     params: { projectId: projectId.value },
     query: { upload: wpId.value },
   })
+}
+
+// ─── HTML 渲染器附件/证据打开（open-attachment 事件）──────────────────────
+
+function onOpenAttachment(_payload: { wpId: string; sheetName: string; rowRef: string }) {
+  // 打开侧面板（附件 Tab 由 WorkpaperSidePanel 内部管理）
+  showSidePanel.value = true
+}
+
+// ─── HTML 渲染器公式编辑（open-formula 事件）─────────────────────────────
+
+function onHtmlOpenFormula(payload: { wpId: string; sheetName: string }) {
+  htmlFormulaDialogRow.value = {
+    row_code: `WP:${payload.wpId}:${payload.sheetName}`,
+    row_name: payload.sheetName,
+    sheet_name: payload.sheetName,
+  }
+  showHtmlFormulaDialog.value = true
+}
+
+async function onHtmlFormulaSave(payload: {
+  formula: string
+  category: string
+  description: string
+  target_cell?: string
+}) {
+  if (!payload.formula?.trim()) {
+    ElMessage.warning('公式表达式不能为空')
+    return
+  }
+  const target = (payload.target_cell || '').trim()
+  const cellMatch = target.match(/([A-Z]+\d+)/i)
+  const targetCell = cellMatch ? cellMatch[1].toUpperCase() : ''
+  if (!targetCell) {
+    ElMessage.warning('请先选择目标单元格（如 B5）')
+    return
+  }
+  try {
+    await httpApi.put(`/api/workpapers/${wpId.value}/formulas`, {
+      sheet_name: htmlFormulaDialogRow.value.sheet_name || '',
+      target_cell: targetCell,
+      expression: payload.formula,
+      year: currentYear.value,
+      template_type: 'soe',
+      category: payload.category || '',
+      description: payload.description || '',
+    })
+    ElMessage.success('公式已保存')
+    showHtmlFormulaDialog.value = false
+  } catch (e) {
+    handleApiError(e, '保存公式失败')
+  }
 }
 
 // ─── Cell formula detail ────────────────────────────────────────────────────
@@ -695,14 +1239,28 @@ onBeforeRouteLeave(async (_to, _from, next) => {
 onMounted(() => {
   ;(async () => {
     await fetchComponentType()
+
+    // 先加载归类：detail 端点不返回 component_type（fetchComponentType 会回退成 'univer'），
+    // 函证枢纽等的真实 componentType 需由归类结果派生（derive_component_type 应用
+    // _WP_CODE_OVERRIDE，E0/D0/F0/G0/H0/K0/L0 → confirmation-hub）。必须在
+    // useHtmlRenderer 判定之前完成，否则 confirmation-hub 会落 Univer 路径。
     try {
       await wpClassification.load()
     } catch { /* 静默：归类失败回退到 Univer/子编辑器路径 */ }
+
+    // D0/E0/F0/G0/H0/K0/L0 函证枢纽：**不再整体重定向到函证管理中心**。
+    // 这些底稿是多 sheet 工作簿（底稿目录 / X0A 程序表 / X0-1 函证结果汇总 /
+    // X0-2 核实被函证单位 / X0-3 跟函过程控制 / X0-4 差异调节 / X0-5·X0-6 替代程序 /
+    // X0-7 回函可靠性 / X0-8 舞弊风险），每个 sheet 都有已注册的专属组件，
+    // 须在底稿编辑器内按源模板逐 sheet 编制；函证管理中心台账改由标题栏入口按钮跳转。
+    // （confirmation-hub 已加入 HTML_RENDERER_ROUTE_SET，故 useHtmlRenderer 为 true。）
 
     if (useHtmlRenderer.value) {
       loading.value = false
       return
     }
+
+    await loadUniverSheetIdentityCatalog()
     if (componentType.value === 'univer' || !componentType.value) {
       // UniverEditorCore 内部处理 initUniver
       loading.value = false
@@ -717,14 +1275,16 @@ onMounted(() => {
   // 加载项目元数据
   loadProjectMeta()
 
-  // 订阅 workpaper:locate-cell 事件
-  eventBus.on('workpaper:locate-cell', onLocateCellEvent)
+  // 加载复核对话线程列表
+  loadReviewThreadList()
 
   // wp-locate-foundation Task 4.2: 读 route.query.sheet / cell → 触发定位
   // 使用 nextTick + 短延迟确保 GtWpRenderer 已挂载
+  // 注意：仅 queryCell 存在时触发 locate-cell（定位单元格）。
+  // 单独 querySheet 无 cell 时，是 Tab 导航请求，由 bundle 组件内部 watcher 处理。
   const querySheet = route.query.sheet as string | undefined
   const queryCell = route.query.cell as string | undefined
-  if (querySheet || queryCell) {
+  if (queryCell) {
     nextTick(() => {
       setTimeout(() => {
         eventBus.emit('workpaper:locate-cell', {
@@ -741,7 +1301,6 @@ onMounted(() => {
 })
 
 onUnmounted(() => {
-  eventBus.off('workpaper:locate-cell', onLocateCellEvent)
   window.removeEventListener('beforeunload', onBeforeUnload)
 })
 
@@ -767,14 +1326,29 @@ function onBeforeUnload(e: BeforeUnloadEvent) {
     e.returnValue = ''
   }
 }
-
-function onLocateCellEvent(payload: { wpId: string; sheetName?: string; cellRef: string }) {
-  if (payload.wpId !== wpId.value) return
-  // 委托给 UniverEditorCore 处理
-}
 </script>
 
 <style scoped>
+.gt-wp-editor-with-guidance {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+.gt-wp-editor-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  transition: margin-right 0.3s ease;
+}
+.gt-wp-io-toolbar {
+  display: flex; align-items: center; gap: 10px;
+  padding: 8px 16px; background: var(--gt-color-bg-light, #f8f7fc);
+  border-bottom: 1px solid var(--gt-color-border, #e8e5f0);
+}
+.gt-wp-io-toolbar__actions { margin-left: auto; display: flex; gap: 8px; align-items: center; }
 .gt-wp-editor {
   display: flex; flex-direction: column; height: 100vh;
   background: var(--gt-color-bg);
@@ -838,4 +1412,19 @@ function onLocateCellEvent(payload: { wpId: string; sheetName?: string; cellRef:
 .gt-audit-nav-dialog__actions { display: flex; gap: 4px; }
 .gt-audit-nav-dialog__actions .el-button { color: #fff !important; }
 .gt-audit-nav-dialog__actions .el-button:hover { background: rgba(255,255,255,0.15) !important; }
+
+/* 复核对话线程 popover */
+.review-thread-list { max-height: 240px; overflow-y: auto; }
+.review-thread-empty { text-align: center; color: #999; font-size: 13px; padding: 12px 0; }
+.review-thread-item {
+  display: flex; align-items: center; gap: 8px;
+  padding: 8px 12px; cursor: pointer; border-radius: 4px;
+  font-size: 13px; transition: background 0.15s;
+}
+.review-thread-item:hover { background: #f5f7fa; }
+.review-thread-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.review-thread-dot.dot-blue { background: #409eff; }
+.review-thread-dot.dot-red { background: #f56c6c; }
+.review-thread-label { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #303133; }
+.review-thread-unread { font-size: 11px; color: #f56c6c; flex-shrink: 0; }
 </style>

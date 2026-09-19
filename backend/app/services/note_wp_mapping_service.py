@@ -15,19 +15,68 @@ from app.models.report_models import DisclosureNote
 
 logger = logging.getLogger(__name__)
 
-# 默认附注-底稿映射（章节编号 → 底稿编号前缀）
-DEFAULT_WP_MAPPING = {
-    "五、1": "E1",    # 货币资金
-    "五、2": "E2",    # 应收票据
-    "五、3": "D1",    # 应收账款
-    "五、6": "F1",    # 存货
-    "五、7": "G1",    # 长期股权投资
-    "五、9": "H1",    # 固定资产
-    "五、12": "I1",   # 无形资产
-    "五、16": "L1",   # 短期借款
-    "五、19": "J1",   # 应付职工薪酬
-    "五、29": "D1",   # 营业收入
+# ─── 附注章节 → 底稿编号映射 ────────────────────────────────────────────────
+# 权威真源：backend/data/note_workpaper_sync_registry.json（由
+# scripts/gen_note_wp_sync_registry.py 从前端 *NoteSectionMap.ts 生成）。
+# 早期硬编码 DEFAULT_WP_MAPPING 的编号与 wp_code 双重错乱（如 "五、2"→"E2"[不存在]、
+# "五、3"→"D1"[应收账款实为 D2/五、5]、"五、9"→"H1"[固定资产实为 五、22]），
+# 被 note_validation_executors（完整性）/ note_stale_service（stale 标记）/
+# disclosure_notes（schema 反查）三处直接消费 → 校验/标记/取数按错误映射进行。
+# 现改为从 registry 派生 section→wp_code（listed + soe 双编号，权威），
+# registry 不可用时 fail-open 回退旧值（保 import 不崩，极端情况行为=改动前）。
+
+# 旧硬编码（错乱，仅作 registry 不可用时的 fail-open 回退，勿再据此判断）
+_LEGACY_DEFAULT_WP_MAPPING = {
+    "五、1": "E1",
+    "五、2": "E2",
+    "五、3": "D1",
+    "五、6": "F1",
+    "五、7": "G1",
+    "五、9": "H1",
+    "五、12": "I1",
+    "五、16": "L1",
+    "五、19": "J1",
+    "五、29": "D1",
 }
+
+
+def _build_default_wp_mapping() -> dict[str, str]:
+    """从权威 registry 派生 ``note_section → wp_code``（listed+soe 双编号，首个赢）。
+
+    与 note_readiness_service.section_workpaper_map 同源（同一 JSON），此处产出
+    单值形态（section→wp_code）供 stale/completeness/schema 三处消费者直接使用。
+    读取失败 → fail-open 回退 _LEGACY_DEFAULT_WP_MAPPING（保底不崩）。
+    """
+    try:
+        import json
+        from pathlib import Path
+
+        p = (
+            Path(__file__).resolve().parent.parent.parent
+            / "data"
+            / "note_workpaper_sync_registry.json"
+        )
+        raw = json.loads(p.read_text(encoding="utf-8"))
+        out: dict[str, str] = {}
+        for e in raw.get("entries", []):
+            if not isinstance(e, dict):
+                continue
+            code = str(e.get("wp_code") or "").strip()
+            if not code:
+                continue
+            for key in ("listed", "soe"):
+                sec = e.get(key)
+                if isinstance(sec, str) and sec.strip():
+                    out.setdefault(sec.strip(), code)  # 首个赢，避免一 section 多 wp 覆盖
+        if out:
+            return out
+    except Exception:  # pragma: no cover — registry 缺失/损坏时安全降级
+        logger.warning("note_wp_mapping: registry unavailable, using legacy fallback")
+    return dict(_LEGACY_DEFAULT_WP_MAPPING)
+
+
+# 默认附注-底稿映射（章节编号 → 底稿编号），派生自权威 registry
+DEFAULT_WP_MAPPING = _build_default_wp_mapping()
 
 
 class NoteWpMappingService:
@@ -77,50 +126,66 @@ class NoteWpMappingService:
             return mapping
 
     async def refresh_from_workpapers(self, project_id: UUID, year: int) -> dict:
-        """从底稿重新提数到附注"""
-        from app.models.workpaper_models import WorkingPaper, WpIndex
+        """从底稿重新提数到附注 — 委托 DisclosureEngine.refill_sections 真实重算。
 
-        # 获取所有有 parsed_data 的底稿
-        wp_q = (
-            sa.select(WpIndex.wp_code, WorkingPaper.parsed_data)
-            .join(WorkingPaper, WorkingPaper.wp_index_id == WpIndex.id)
-            .where(
-                WpIndex.project_id == project_id,
-                WpIndex.is_deleted == False,  # noqa
-                WorkingPaper.is_deleted == False,  # noqa
-                WorkingPaper.parsed_data.isnot(None),
-            )
-        )
-        wps = (await self.db.execute(wp_q)).all()
-        wp_data = {r.wp_code: r.parsed_data for r in wps}
+        按 DEFAULT_WP_MAPPING 命中的 sections 委托填充链重算，
+        返回向后兼容的响应体（保留 refreshed/total_notes 键）。
+        只 flush 不 commit（铁律：router 统一 commit）。
 
-        # 获取附注
-        note_q = sa.select(DisclosureNote).where(
+        Validates: Requirements 2.1, 2.2, 2.7, 1.3
+        """
+        from app.services.disclosure_engine import DisclosureEngine
+
+        # 1. 获取映射，确定受影响的 note_section 列表
+        mapping = await self.get_mapping(project_id)
+
+        # 收集映射中有底稿前缀的所有 section
+        affected_sections: list[str] = list(mapping.keys())
+
+        # 2. 获取附注总数（向后兼容 total_notes）
+        note_count_q = sa.select(sa.func.count()).select_from(DisclosureNote).where(
             DisclosureNote.project_id == project_id,
             DisclosureNote.year == year,
         )
-        notes = (await self.db.execute(note_q)).scalars().all()
+        total_notes = (await self.db.execute(note_count_q)).scalar() or 0
 
-        refreshed = 0
-        mapping = await self.get_mapping(project_id)
+        # 3. 委托 DisclosureEngine.refill_sections 执行真实重算
+        engine = DisclosureEngine(self.db)
+        report = await engine.refill_sections(
+            project_id, year, affected_sections, skip_manual=True
+        )
 
-        for note in notes:
-            section = note.note_section
-            wp_prefix = mapping.get(section)
-            if not wp_prefix:
-                continue
+        # 4. 构造向后兼容的响应体
+        return {
+            "refreshed": report.cells_updated,
+            "total_notes": total_notes,
+            "sections_recomputed": report.sections_recomputed,
+            "text_only_sections": report.text_only_sections,
+            "errors": report.errors,
+        }
 
-            # 查找匹配的底稿数据
-            for wp_code, pd in wp_data.items():
-                if wp_code.startswith(wp_prefix):
-                    # 更新附注 table_data 中的自动提数单元格
-                    # 保留 mode=manual 的单元格不覆盖
-                    if note.table_data and isinstance(note.table_data, dict):
-                        # 简化：标记为已刷新
-                        refreshed += 1
-                    break
+    async def refresh_section_from_workpapers(
+        self, project_id: UUID, year: int, note_section: str
+    ) -> dict:
+        """只从底稿重算「单个章节」的科目数据（当前页面刷新用）。
 
-        return {"refreshed": refreshed, "total_notes": len(notes)}
+        与 refresh_from_workpapers（项目级全量）区别：仅重算传入的 note_section，
+        使「刷新当前页面」的前后端行为一致（后端只动当前节，不再全量写库）。
+        委托 DisclosureEngine.refill_sections 传单元素列表；只 flush 不 commit。
+        """
+        from app.services.disclosure_engine import DisclosureEngine
+
+        engine = DisclosureEngine(self.db)
+        report = await engine.refill_sections(
+            project_id, year, [note_section], skip_manual=True
+        )
+        return {
+            "refreshed": report.cells_updated,
+            "total_notes": 1,
+            "sections_recomputed": report.sections_recomputed,
+            "text_only_sections": report.text_only_sections,
+            "errors": report.errors,
+        }
 
     async def toggle_cell_mode(
         self, note_id: UUID, row_label: str, col_index: int, mode: str, manual_value: float | None = None

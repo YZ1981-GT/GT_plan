@@ -1,0 +1,66 @@
+{
+  "audit-platform/frontend/src/components/attachment/preview/attachmentPreviewFormats.ts": {
+    "sha1": "1c7eab56ce6c2e23ff4949b942a55b45c38d177e",
+    "bytes": 9908
+  },
+  "audit-platform/frontend/src/components/attachment/preview/extendedPreviewRequest.ts": {
+    "sha1": "d408e3684bb81a515b78eff28512ad03f1ac8159",
+    "bytes": 4129
+  },
+  "audit-platform/frontend/src/components/attachment/preview/previewResourceScope.ts": {
+    "sha1": "452511aa406a3fd98e7dc3dcea3ba77d43bd4648",
+    "bytes": 6786
+  },
+  "audit-platform/frontend/src/utils/http.ts": {
+    "sha1": "c69413a0d1a53f8bd9e24072d2ef164263a05c9b",
+    "bytes": 20015
+  },
+  "audit-platform/frontend/src/components/attachment/preview/archive/archiveLimits.ts": {
+    "sha1": "dc41360512ce247b1dca3e68c73c7fcfe0a4a175",
+    "bytes": 2765
+  },
+  "audit-platform/frontend/src/components/attachment/preview/archive/archiveContainer.ts": {
+    "sha1": "cafc6d956a1a387317d74542aa197908536c0006",
+    "bytes": 39953
+  },
+  "audit-platform/frontend/src/components/attachment/preview/email/emailSanitizer.ts": {
+    "sha1": "053d55500156389e31823d4998356a895c81acd5",
+    "bytes": 5951
+  },
+  "audit-platform/frontend/src/components/attachment/preview/AttachmentPreviewCore.vue": {
+    "sha1": "c61912753b3528725296acbbad1531c540ad4342",
+    "bytes": 12944
+  },
+  "backend/app/services/process_record_service.py": {
+    "sha1": "dbce20845dcf6806f1a8a9a5cb2d2d3139b7e44f",
+    "bytes": 9583
+  },
+  "audit-platform/frontend/src/components/attachment/preview/bundleBudget.ts": {
+    "sha1": "9b13d7e32302e6f75805fde2c883cc09f98af8f0",
+    "bytes": 4821
+  },
+  "audit-platform/frontend/src/components/attachment/preview/ExtendedFormatPreview.vue": {
+    "sha1": "4376a21bda017e5947ca558518c4e02da3ff75aa",
+    "bytes": 9788
+  },
+  "audit-platform/frontend/src/components/attachment/preview/email/emailParser.ts": {
+    "sha1": "7d2d2013a7bc7b3f241d5e1be9790c2d4d15d964",
+    "bytes": 16977
+  },
+  ".kiro/specs/_archive/05-business-features/audit-evidence-attachment-preview-format-expansion/evidence/attachment-preview-format-expansion/backend_preview_api_contract.json": {
+    "sha1": "00a73612345af2b1ab0b69d13eecf88705612268",
+    "bytes": 1060
+  },
+  "audit-platform/frontend/src/components/attachment/preview/drawing/dxfModel.ts": {
+    "sha1": "68a6931ecd8159adffb1d12934e858284d40f647",
+    "bytes": 12303
+  },
+  "audit-platform/frontend/src/components/attachment/preview/email/EmailMessageView.vue": {
+    "sha1": "bbabcc35bc423dbc00070c508a8bfee737f558ff",
+    "bytes": 3578
+  },
+  ".kiro/specs/_archive/05-business-features/audit-evidence-attachment-preview-format-expansion/evidence/attachment-preview-format-expansion/registered_debt.json": {
+    "sha1": "a5a083369631860c21345369cfe7d955ac34ac4c",
+    "bytes": 3586
+  }
+}

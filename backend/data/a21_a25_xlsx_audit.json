@@ -1,0 +1,2197 @@
+[
+  {
+    "wp_code": "A21-1",
+    "enterprise_variant": null,
+    "filename": "A21-1 项目现场负责人复核表及复核记录（适用于财报审计）.xlsx",
+    "runtime": "review-checklist",
+    "role": "field_lead",
+    "role_label": "项目现场负责人",
+    "audit_type": "financial",
+    "applicable_categories": [
+      "A",
+      "B",
+      "C"
+    ],
+    "sheets": {
+      "checklist": {
+        "name": "项目现场负责人复核（适用于财报审计）",
+        "header_row": 5,
+        "column_roles": {
+          "yes": "F",
+          "no": "G",
+          "na": "H",
+          "record_ref": "I"
+        },
+        "item_count": 19,
+        "items": [
+          {
+            "row": 7,
+            "seq": 1,
+            "seq_label": "1",
+            "item_id": "A21-1-chk-01",
+            "content": "（1）具体审计计划已经实施，已完成的工作底稿与具体审计计划的交叉索引。",
+            "content_preview": "（1）具体审计计划已经实施，已完成的工作底稿与具体审计计划的交叉索引。",
+            "auto_na_condition": null
+          },
+          {
+            "row": 8,
+            "seq": 2,
+            "seq_label": "2",
+            "item_id": "A21-1-chk-02",
+            "content": "（2）工作底稿的审计结论已有清晰的表述，并且有相关审计证据的适当支持。",
+            "content_preview": "（2）工作底稿的审计结论已有清晰的表述，并且有相关审计证据的适当支持。",
+            "auto_na_condition": null
+          },
+          {
+            "row": 9,
+            "seq": 3,
+            "seq_label": "3",
+            "item_id": "A21-1-chk-03",
+            "content": "（3）全部财务报表项目的审计工作底稿已正确、完整地编制，报表及其相关数字计算准确，相互之间勾稽关系正确；财务报表中的每一项数据应追索到试算平衡表工作底稿与相关审定表工作底稿。",
+            "content_preview": "（3）全部财务报表项目的审计工作底稿已正确、完整地编制，报表及其相关数字计算准确，相互之间勾稽关系正确；财务报表中的每一项数据应追索到试算平衡表工作底稿与相关审定表工作底稿。",
+            "auto_na_condition": null
+          },
+          {
+            "row": 10,
+            "seq": 4,
+            "seq_label": "4",
+            "item_id": "A21-1-chk-04",
+            "content": "（4）项目组对债务重组、关联方交易、非货币性交易、或有事项、期后事项、持续经营能力、重要会计政策、会计估计的变更及前期差错更正等方面的工作已形成恰当记录。",
+            "content_preview": "（4）项目组对债务重组、关联方交易、非货币性交易、或有事项、期后事项、持续经营能力、重要会计政策、会计估计的变更及前期差错更正等方面的工作已形成恰当记录。",
+            "auto_na_condition": null
+          },
+          {
+            "row": 12,
+            "seq": 5,
+            "seq_label": "1",
+            "item_id": "A21-1-chk-05",
+            "content": "（1）恰当地完成并编制审计工作底稿，审计工作底稿提供了充分、适当的记录，作为审计报告的基础；",
+            "content_preview": "（1）恰当地完成并编制审计工作底稿，审计工作底稿提供了充分、适当的记录，作为审计报告的基础；",
+            "auto_na_condition": null
+          },
+          {
+            "row": 13,
+            "seq": 6,
+            "seq_label": "2",
+            "item_id": "A21-1-chk-06",
+            "content": "（2）通过实施风险评估程序，了解了被审计单位业务的具体情况;",
+            "content_preview": "（2）通过实施风险评估程序，了解了被审计单位业务的具体情况;",
+            "auto_na_condition": null
+          },
+          {
+            "row": 14,
+            "seq": 7,
+            "seq_label": "3",
+            "item_id": "A21-1-chk-07",
+            "content": "（3）恰当运用了选样的方法(如:测试全部项目、判断选样或审计抽样)；",
+            "content_preview": "（3）恰当运用了选样的方法(如:测试全部项目、判断选样或审计抽样)；",
+            "auto_na_condition": null
+          },
+          {
+            "row": 15,
+            "seq": 8,
+            "seq_label": "4",
+            "item_id": "A21-1-chk-08",
+            "content": "（4）审计工作已按照中国注册会计师执业准则和事务所的要求实施;",
+            "content_preview": "（4）审计工作已按照中国注册会计师执业准则和事务所的要求实施;",
+            "auto_na_condition": null
+          },
+          {
+            "row": 16,
+            "seq": 9,
+            "seq_label": "5",
+            "item_id": "A21-1-chk-09",
+            "content": "（5）对重大错报风险评估的结果及对相关认定采取的应对措施是恰当的；",
+            "content_preview": "（5）对重大错报风险评估的结果及对相关认定采取的应对措施是恰当的；",
+            "auto_na_condition": null
+          },
+          {
+            "row": 17,
+            "seq": 10,
+            "seq_label": "6",
+            "item_id": "A21-1-chk-10",
+            "content": "（6）所有识别的内部控制缺陷已完整记录在控制缺陷汇总表中；",
+            "content_preview": "（6）所有识别的内部控制缺陷已完整记录在控制缺陷汇总表中；",
+            "auto_na_condition": null
+          },
+          {
+            "row": 18,
+            "seq": 11,
+            "seq_label": "7",
+            "item_id": "A21-1-chk-11",
+            "content": "（7）作出的重大职业判断恰当、合理；",
+            "content_preview": "（7）作出的重大职业判断恰当、合理；",
+            "auto_na_condition": null
+          },
+          {
+            "row": 19,
+            "seq": 12,
+            "seq_label": "8",
+            "item_id": "A21-1-chk-12",
+            "content": "（8）提出的建议调整事项恰当，审计调整分录正确；",
+            "content_preview": "（8）提出的建议调整事项恰当，审计调整分录正确；",
+            "auto_na_condition": null
+          },
+          {
+            "row": 20,
+            "seq": 13,
+            "seq_label": "9",
+            "item_id": "A21-1-chk-13",
+            "content": "（9）在未更正错报汇总中加总被审计单位确认的错报调整事项，包括以前年度未更正错报的影响，未更正错报无论是单独还是汇总起来对财务报表整体均不具有重大影响；",
+            "content_preview": "（9）在未更正错报汇总中加总被审计单位确认的错报调整事项，包括以前年度未更正错报的影响，未更正错报无论是单独还是汇总起来对财务报表整体均不具有重大影响；",
+            "auto_na_condition": null
+          },
+          {
+            "row": 21,
+            "seq": 14,
+            "seq_label": "10",
+            "item_id": "A21-1-chk-14",
+            "content": "（10）对于利用组成部分注册会计师的工作，已获取了独立性等声明，取得了有关书面沟通文件，并对他们工作的适当性进行了评价；",
+            "content_preview": "（10）对于利用组成部分注册会计师的工作，已获取了独立性等声明，取得了有关书面沟通文件，并对他们工作的适当性进行了评价；",
+            "auto_na_condition": "no_component_auditor"
+          },
+          {
+            "row": 22,
+            "seq": 15,
+            "seq_label": "11",
+            "item_id": "A21-1-chk-15",
+            "content": "（11）已获取股东大会及董事会会议纪要、与客户的沟通记录及重要会谈记录、律师询证函复函；",
+            "content_preview": "（11）已获取股东大会及董事会会议纪要、与客户的沟通记录及重要会谈记录、律师询证函复函；",
+            "auto_na_condition": null
+          },
+          {
+            "row": 23,
+            "seq": 16,
+            "seq_label": "12",
+            "item_id": "A21-1-chk-16",
+            "content": "（12）获取已根据项目实际情况厘定内容及日期的管理层声明书；",
+            "content_preview": "（12）获取已根据项目实际情况厘定内容及日期的管理层声明书；",
+            "auto_na_condition": null
+          },
+          {
+            "row": 24,
+            "seq": 17,
+            "seq_label": "13",
+            "item_id": "A21-1-chk-17",
+            "content": "（13）在业务委派和完成阶段，所有项目组成员已签订了独立性承诺函；",
+            "content_preview": "（13）在业务委派和完成阶段，所有项目组成员已签订了独立性承诺函；",
+            "auto_na_condition": null
+          },
+          {
+            "row": 25,
+            "seq": 18,
+            "seq_label": "14",
+            "item_id": "A21-1-chk-18",
+            "content": "（14）确定你或在你指导下的项目组成员所知悉的任何疑难和分歧事项，均已经根据事务所的质量管理流程得到了解决；",
+            "content_preview": "（14）确定你或在你指导下的项目组成员所知悉的任何疑难和分歧事项，均已经根据事务所的质量管理流程得到了解决；",
+            "auto_na_condition": null
+          },
+          {
+            "row": 26,
+            "seq": 19,
+            "seq_label": "15",
+            "item_id": "A21-1-chk-19",
+            "content": "（15）基于我们实施的审计程序和取得的审计证据，我确信本事务所及相关人员业务的执行遵守了中国注册会计师执业准则和职业道德规范的规定以及本事务所质量管理制度。",
+            "content_preview": "（15）基于我们实施的审计程序和取得的审计证据，我确信本事务所及相关人员业务的执行遵守了中国注册会计师执业准则和职业道德规范的规定以及本事务所质量管理制度。",
+            "auto_na_condition": null
+          }
+        ],
+        "sign_rows": [
+          27
+        ]
+      },
+      "record": {
+        "name": "复核记录"
+      },
+      "cover": "底稿目录"
+    },
+    "parser_ready": true,
+    "notes": "检查项 19 条；item_id A21-1-chk-{seq:02d}"
+  },
+  {
+    "wp_code": "A21-2",
+    "enterprise_variant": null,
+    "filename": "A21-2 项目现场负责人复核表及复核记录（适用于内控审计）.xlsx",
+    "runtime": "review-checklist",
+    "role": "field_lead",
+    "role_label": "项目现场负责人",
+    "audit_type": "internal_control",
+    "applicable_categories": [
+      "A",
+      "B",
+      "C"
+    ],
+    "sheets": {
+      "checklist": {
+        "name": "项目现场负责人复核（适用于内控审计）",
+        "header_row": 5,
+        "column_roles": {
+          "yes": "F",
+          "no": "G",
+          "na": "H",
+          "record_ref": "I"
+        },
+        "item_count": 25,
+        "items": [
+          {
+            "row": 7,
+            "seq": 1,
+            "seq_label": "1",
+            "item_id": "A21-2-chk-01",
+            "content": "（1）单独签订的内部控制审计业务约定书；",
+            "content_preview": "（1）单独签订的内部控制审计业务约定书；",
+            "auto_na_condition": null
+          },
+          {
+            "row": 8,
+            "seq": 2,
+            "seq_label": "2",
+            "item_id": "A21-2-chk-02",
+            "content": "（2）已完成的审计计划，以及导致对审计计划作出重大修改的事项；",
+            "content_preview": "（2）已完成的审计计划，以及导致对审计计划作出重大修改的事项；",
+            "auto_na_condition": null
+          },
+          {
+            "row": 9,
+            "seq": 3,
+            "seq_label": "3",
+            "item_id": "A21-2-chk-03",
+            "content": "（3）对关键控制流程的控制测试底稿；",
+            "content_preview": "（3）对关键控制流程的控制测试底稿；",
+            "auto_na_condition": null
+          },
+          {
+            "row": 10,
+            "seq": 4,
+            "seq_label": "4",
+            "item_id": "A21-2-chk-04",
+            "content": "（4）识别出的控制偏差和缺陷评价底稿；",
+            "content_preview": "（4）识别出的控制偏差和缺陷评价底稿；",
+            "auto_na_condition": null
+          },
+          {
+            "row": 11,
+            "seq": 5,
+            "seq_label": "5",
+            "item_id": "A21-2-chk-05",
+            "content": "（5）相关重大事项；",
+            "content_preview": "（5）相关重大事项；",
+            "auto_na_condition": null
+          },
+          {
+            "row": 12,
+            "seq": 6,
+            "seq_label": "6",
+            "item_id": "A21-2-chk-06",
+            "content": "（6）提出的管理建议；",
+            "content_preview": "（6）提出的管理建议；",
+            "auto_na_condition": null
+          },
+          {
+            "row": 13,
+            "seq": 7,
+            "seq_label": "7",
+            "item_id": "A21-2-chk-07",
+            "content": "（7）管理层声明书，股东大会、董事会相关会议纪要，与客户的沟通记录及重要会谈记录，律师询证函复函；",
+            "content_preview": "（7）管理层声明书，股东大会、董事会相关会议纪要，与客户的沟通记录及重要会谈记录，律师询证函复函；",
+            "auto_na_condition": null
+          },
+          {
+            "row": 14,
+            "seq": 8,
+            "seq_label": "8",
+            "item_id": "A21-2-chk-08",
+            "content": "（8）企业内部控制评价报告和拟出具的内部控制审计报告。",
+            "content_preview": "（8）企业内部控制评价报告和拟出具的内部控制审计报告。",
+            "auto_na_condition": null
+          },
+          {
+            "row": 16,
+            "seq": 9,
+            "seq_label": "1",
+            "item_id": "A21-2-chk-09",
+            "content": "（1）恰当地完成并编制审计工作底稿，审计工作底稿提供了充分、适当的记录，作为审计报告的基础？",
+            "content_preview": "（1）恰当地完成并编制审计工作底稿，审计工作底稿提供了充分、适当的记录，作为审计报告的基础？",
+            "auto_na_condition": null
+          },
+          {
+            "row": 17,
+            "seq": 10,
+            "seq_label": "2",
+            "item_id": "A21-2-chk-10",
+            "content": "（2）完成或更新了对被审计单位内部控制的了解，并评价了其设计有效性和运行有效性。",
+            "content_preview": "（2）完成或更新了对被审计单位内部控制的了解，并评价了其设计有效性和运行有效性。",
+            "auto_na_condition": null
+          },
+          {
+            "row": 18,
+            "seq": 11,
+            "seq_label": "3",
+            "item_id": "A21-2-chk-11",
+            "content": "（3）恰当运用了选样的方法(如:测试全部项目、判断选样或审计抽样)。",
+            "content_preview": "（3）恰当运用了选样的方法(如:测试全部项目、判断选样或审计抽样)。",
+            "auto_na_condition": null
+          },
+          {
+            "row": 19,
+            "seq": 12,
+            "seq_label": "4",
+            "item_id": "A21-2-chk-12",
+            "content": "(4）审计工作已按照中国注册会计师执业准则、企业内部控制审计指引、企业内部控制审计指引实施意见和事务所的要求实施。",
+            "content_preview": "(4）审计工作已按照中国注册会计师执业准则、企业内部控制审计指引、企业内部控制审计指引实施意见和事务所的要求实施。",
+            "auto_na_condition": null
+          },
+          {
+            "row": 20,
+            "seq": 13,
+            "seq_label": "5",
+            "item_id": "A21-2-chk-13",
+            "content": "(5）对重大账户、列报及相关认定的识别及选取的进行测试的控制是恰当的。",
+            "content_preview": "(5）对重大账户、列报及相关认定的识别及选取的进行测试的控制是恰当的。",
+            "auto_na_condition": null
+          },
+          {
+            "row": 21,
+            "seq": 14,
+            "seq_label": "6",
+            "item_id": "A21-2-chk-14",
+            "content": "(6）所有识别的内部控制缺陷已完整记录在控制缺陷汇总表中。",
+            "content_preview": "(6）所有识别的内部控制缺陷已完整记录在控制缺陷汇总表中。",
+            "auto_na_condition": null
+          },
+          {
+            "row": 22,
+            "seq": 15,
+            "seq_label": "7",
+            "item_id": "A21-2-chk-15",
+            "content": "(7）对内部控制缺陷严重程度的评价是适当的，并得出了恰当的审计意见。",
+            "content_preview": "(7）对内部控制缺陷严重程度的评价是适当的，并得出了恰当的审计意见。",
+            "auto_na_condition": null
+          },
+          {
+            "row": 23,
+            "seq": 16,
+            "seq_label": "8",
+            "item_id": "A21-2-chk-16",
+            "content": "(8）作出的重大判断恰当合理？",
+            "content_preview": "(8）作出的重大判断恰当合理？",
+            "auto_na_condition": null
+          },
+          {
+            "row": 24,
+            "seq": 17,
+            "seq_label": "9",
+            "item_id": "A21-2-chk-17",
+            "content": "(9）提出的建议整改事项和管理建议适当。",
+            "content_preview": "(9）提出的建议整改事项和管理建议适当。",
+            "auto_na_condition": null
+          },
+          {
+            "row": 25,
+            "seq": 18,
+            "seq_label": "10",
+            "item_id": "A21-2-chk-18",
+            "content": "(10）如果利用组成部分事务所的工作，已获取了独立性和其他声明，取得了有关书面沟通文件，并对他们工作的适当性进行了评价。",
+            "content_preview": "(10）如果利用组成部分事务所的工作，已获取了独立性和其他声明，取得了有关书面沟通文件，并对他们工作的适当性进行了评价。",
+            "auto_na_condition": null
+          },
+          {
+            "row": 26,
+            "seq": 19,
+            "seq_label": "11",
+            "item_id": "A21-2-chk-19",
+            "content": "(11）获取已根据企业实际情况合理修订模版内容及日期的管理层声明书。",
+            "content_preview": "(11）获取已根据企业实际情况合理修订模版内容及日期的管理层声明书。",
+            "auto_na_condition": null
+          },
+          {
+            "row": 27,
+            "seq": 20,
+            "seq_label": "12",
+            "item_id": "A21-2-chk-20",
+            "content": "(12）企业内部控制评价报告对相关法律法规规定的要素的列报是否完整和恰当？",
+            "content_preview": "(12）企业内部控制评价报告对相关法律法规规定的要素的列报是否完整和恰当？",
+            "auto_na_condition": null
+          },
+          {
+            "row": 28,
+            "seq": 21,
+            "seq_label": "13",
+            "item_id": "A21-2-chk-21",
+            "content": "(13）对于重大缺陷和重要缺陷，已经以书面形式与管理层和治理层沟通。",
+            "content_preview": "(13）对于重大缺陷和重要缺陷，已经以书面形式与管理层和治理层沟通。",
+            "auto_na_condition": null
+          },
+          {
+            "row": 29,
+            "seq": 22,
+            "seq_label": "14",
+            "item_id": "A21-2-chk-22",
+            "content": "(14）拟出具的审计报告措辞恰当，已按照企业内部控制审计指引、企业内部控制审计指引实施意见的规定发表了恰当的审计意见。",
+            "content_preview": "(14）拟出具的审计报告措辞恰当，已按照企业内部控制审计指引、企业内部控制审计指引实施意见的规定发表了恰当的审计意见。",
+            "auto_na_condition": null
+          },
+          {
+            "row": 30,
+            "seq": 23,
+            "seq_label": "15",
+            "item_id": "A21-2-chk-23",
+            "content": "(15）在业务委派和完成阶段，所有项目组成员已签订了独立性承诺函；",
+            "content_preview": "(15）在业务委派和完成阶段，所有项目组成员已签订了独立性承诺函；",
+            "auto_na_condition": null
+          },
+          {
+            "row": 31,
+            "seq": 24,
+            "seq_label": "16",
+            "item_id": "A21-2-chk-24",
+            "content": "(16）确定你或在你指导下的项目组成员所知悉的任何疑难和分歧事项，均已经根据事务所的质量管理流程得到了解决；",
+            "content_preview": "(16）确定你或在你指导下的项目组成员所知悉的任何疑难和分歧事项，均已经根据事务所的质量管理流程得到了解决；",
+            "auto_na_condition": null
+          },
+          {
+            "row": 32,
+            "seq": 25,
+            "seq_label": "17",
+            "item_id": "A21-2-chk-25",
+            "content": "(17）基于所实施的审计程序和获取的审计证据，我确信已按照中国注册会计师执业准则、职业道德规范以及本事务所质量管理制度的规定执行了工作。。",
+            "content_preview": "(17）基于所实施的审计程序和获取的审计证据，我确信已按照中国注册会计师执业准则、职业道德规范以及本事务所质量管理制度的规定执行了工作。。",
+            "auto_na_condition": null
+          }
+        ],
+        "sign_rows": [
+          33
+        ]
+      },
+      "record": {
+        "name": "复核记录参考模板"
+      },
+      "cover": "底稿目录"
+    },
+    "parser_ready": true,
+    "notes": "检查项 25 条；item_id A21-2-chk-{seq:02d}"
+  },
+  {
+    "wp_code": "A22-1",
+    "enterprise_variant": null,
+    "filename": "A22-1 项目负责经理复核(适用于财报审计).xlsx",
+    "runtime": "review-checklist",
+    "role": "manager",
+    "role_label": "项目负责经理",
+    "audit_type": "financial",
+    "applicable_categories": [
+      "A",
+      "B",
+      "C"
+    ],
+    "sheets": {
+      "checklist": {
+        "name": "A22-1 项目负责经理复核(适用于财报审计)",
+        "header_row": 5,
+        "column_roles": {
+          "yes": "E",
+          "no": "F",
+          "na": "G",
+          "record_ref": "H"
+        },
+        "item_count": 13,
+        "items": [
+          {
+            "row": 7,
+            "seq": 1,
+            "seq_label": "1",
+            "item_id": "A22-1-chk-01",
+            "content": "（1）遵循了LEAP审计方法论的要求，规范使用审计作业平台和其他效率工具；",
+            "content_preview": "（1）遵循了LEAP审计方法论的要求，规范使用审计作业平台和其他效率工具；",
+            "auto_na_condition": null
+          },
+          {
+            "row": 8,
+            "seq": 2,
+            "seq_label": "2",
+            "item_id": "A22-1-chk-02",
+            "content": "（2）需要执行业务咨询程序的事项已进行适当咨询、记录并执行咨询结果。",
+            "content_preview": "（2）需要执行业务咨询程序的事项已进行适当咨询、记录并执行咨询结果。",
+            "auto_na_condition": null
+          },
+          {
+            "row": 12,
+            "seq": 3,
+            "seq_label": "1",
+            "item_id": "A22-1-chk-03",
+            "content": "（1）风险评估程序和进一步审计程序已执行，并获取了充分、适当的审计证据。",
+            "content_preview": "（1）风险评估程序和进一步审计程序已执行，并获取了充分、适当的审计证据。",
+            "auto_na_condition": null
+          },
+          {
+            "row": 13,
+            "seq": 4,
+            "seq_label": "2",
+            "item_id": "A22-1-chk-04",
+            "content": "（2）已经对被审计单位所处行业的监管政策或法律法规要求做出了必要的考虑。",
+            "content_preview": "（2）已经对被审计单位所处行业的监管政策或法律法规要求做出了必要的考虑。",
+            "auto_na_condition": null
+          },
+          {
+            "row": 14,
+            "seq": 5,
+            "seq_label": "3",
+            "item_id": "A22-1-chk-05",
+            "content": "（3）与重大错报风险相关的事项已经过了妥善的考虑、解决和记录。",
+            "content_preview": "（3）与重大错报风险相关的事项已经过了妥善的考虑、解决和记录。",
+            "auto_na_condition": null
+          },
+          {
+            "row": 15,
+            "seq": 6,
+            "seq_label": "4",
+            "item_id": "A22-1-chk-06",
+            "content": "（4）债务重组、关联交易、非货币性交易、或有事项、期后事项、持续经营能力、重要会计政策、会计估计的变更等涉及重大职业判断的事项已经过了妥善的考虑、解决和记录。",
+            "content_preview": "（4）债务重组、关联交易、非货币性交易、或有事项、期后事项、持续经营能力、重要会计政策、会计估计的变更等涉及重大职业判断的事项已经过了妥善的考虑、解决和记录。",
+            "auto_na_condition": null
+          },
+          {
+            "row": 16,
+            "seq": 7,
+            "seq_label": "5",
+            "item_id": "A22-1-chk-07",
+            "content": "（5）已经执行和记录了适当的分析程序，包括对重大变动原因的检查。",
+            "content_preview": "（5）已经执行和记录了适当的分析程序，包括对重大变动原因的检查。",
+            "auto_na_condition": null
+          },
+          {
+            "row": 17,
+            "seq": 8,
+            "seq_label": "6",
+            "item_id": "A22-1-chk-08",
+            "content": "（6）已考虑汇总的未更正错报对财务报表审计意见的影响。",
+            "content_preview": "（6）已考虑汇总的未更正错报对财务报表审计意见的影响。",
+            "auto_na_condition": null
+          },
+          {
+            "row": 18,
+            "seq": 9,
+            "seq_label": "7",
+            "item_id": "A22-1-chk-09",
+            "content": "（7）已考虑持续经营能力对财务报表审计意见的影响。",
+            "content_preview": "（7）已考虑持续经营能力对财务报表审计意见的影响。",
+            "auto_na_condition": null
+          },
+          {
+            "row": 19,
+            "seq": 10,
+            "seq_label": "8",
+            "item_id": "A22-1-chk-10",
+            "content": "（8）与重要审计领域相关工作底稿的记录完整、适当。",
+            "content_preview": "（8）与重要审计领域相关工作底稿的记录完整、适当。",
+            "auto_na_condition": null
+          },
+          {
+            "row": 20,
+            "seq": 11,
+            "seq_label": "9",
+            "item_id": "A22-1-chk-11",
+            "content": "（9）针对识别出存在值得关注的内控缺陷的相关交易类别、账户余额和披露，已实施了适当的实质性程序。",
+            "content_preview": "（9）针对识别出存在值得关注的内控缺陷的相关交易类别、账户余额和披露，已实施了适当的实质性程序。",
+            "auto_na_condition": null
+          },
+          {
+            "row": 21,
+            "seq": 12,
+            "seq_label": "10",
+            "item_id": "A22-1-chk-12",
+            "content": "（10）建议调整的事项恰当，相关调整分录正确。",
+            "content_preview": "（10）建议调整的事项恰当，相关调整分录正确。",
+            "auto_na_condition": null
+          },
+          {
+            "row": 22,
+            "seq": 13,
+            "seq_label": "11",
+            "item_id": "A22-1-chk-13",
+            "content": "（11）重大事项概要已经完成，并不存在未解决的问题。",
+            "content_preview": "（11）重大事项概要已经完成，并不存在未解决的问题。",
+            "auto_na_condition": null
+          }
+        ],
+        "sign_rows": [
+          34
+        ]
+      },
+      "record": {
+        "name": " A22-1-1 复核记录"
+      },
+      "cover": "底稿目录"
+    },
+    "parser_ready": true,
+    "notes": "检查项 13 条；item_id A22-1-chk-{seq:02d}"
+  },
+  {
+    "wp_code": "A22-2",
+    "enterprise_variant": null,
+    "filename": "A22-2 项目负责经理复核表（适用于内控审计）.xlsx",
+    "runtime": "review-checklist",
+    "role": "manager",
+    "role_label": "项目负责经理",
+    "audit_type": "internal_control",
+    "applicable_categories": [
+      "A",
+      "B",
+      "C"
+    ],
+    "sheets": {
+      "checklist": {
+        "name": "A22-2项目负责经理复核表（适用于内控审计）",
+        "header_row": 5,
+        "column_roles": {
+          "yes": "F",
+          "no": "G",
+          "na": "H",
+          "record_ref": "I"
+        },
+        "item_count": 18,
+        "items": [
+          {
+            "row": 6,
+            "seq": 1,
+            "seq_label": "1",
+            "item_id": "A22-2-chk-01",
+            "content": "确定遵循了事务所业务质量管理政策和程序。",
+            "content_preview": "确定遵循了事务所业务质量管理政策和程序。",
+            "auto_na_condition": null
+          },
+          {
+            "row": 7,
+            "seq": 2,
+            "seq_label": "2",
+            "item_id": "A22-2-chk-02",
+            "content": "确保已签订单独的内部控制审计业务约定书。",
+            "content_preview": "确保已签订单独的内部控制审计业务约定书。",
+            "auto_na_condition": null
+          },
+          {
+            "row": 8,
+            "seq": 3,
+            "seq_label": "3",
+            "item_id": "A22-2-chk-03",
+            "content": "确保咨询行业专家、鉴证业务负责人和其他人的事项已按事务所政策进行了记录。",
+            "content_preview": "确保咨询行业专家、鉴证业务负责人和其他人的事项已按事务所政策进行了记录。",
+            "auto_na_condition": null
+          },
+          {
+            "row": 9,
+            "seq": 4,
+            "seq_label": "4",
+            "item_id": "A22-2-chk-04",
+            "content": "确定项目经理和专家已经完成了复核程序。",
+            "content_preview": "确定项目经理和专家已经完成了复核程序。",
+            "auto_na_condition": null
+          },
+          {
+            "row": 13,
+            "seq": 5,
+            "seq_label": "6",
+            "item_id": "A22-2-chk-05",
+            "content": "确定以下事项已得到满意解决并恰当记录：",
+            "content_preview": "确定以下事项已得到满意解决并恰当记录：",
+            "auto_na_condition": null
+          },
+          {
+            "row": 22,
+            "seq": 6,
+            "seq_label": "7",
+            "item_id": "A22-2-chk-06",
+            "content": "如存在需合伙人关注事项，复核与该等事项相关的底稿，以确定讨论了恰当的事项，包括与主管业务合伙人所讨论的结论。",
+            "content_preview": "如存在需合伙人关注事项，复核与该等事项相关的底稿，以确定讨论了恰当的事项，包括与主管业务合伙人所讨论的结论。",
+            "auto_na_condition": null
+          },
+          {
+            "row": 23,
+            "seq": 7,
+            "seq_label": "8",
+            "item_id": "A22-2-chk-07",
+            "content": "确定企业内部控制评价报告对相关法律法规规定的要素的列报完整和恰当。",
+            "content_preview": "确定企业内部控制评价报告对相关法律法规规定的要素的列报完整和恰当。",
+            "auto_na_condition": null
+          },
+          {
+            "row": 24,
+            "seq": 8,
+            "seq_label": "9",
+            "item_id": "A22-2-chk-08",
+            "content": "确定已经完成了事务所的（或其他适当的）审计工作完成核对表。",
+            "content_preview": "确定已经完成了事务所的（或其他适当的）审计工作完成核对表。",
+            "auto_na_condition": null
+          },
+          {
+            "row": 25,
+            "seq": 9,
+            "seq_label": "10",
+            "item_id": "A22-2-chk-09",
+            "content": "复核重要的决定和对异常事项的处理方案（如果存在），包括审计项目组的意见分歧和提请项目负责人重点复核、督导的事项。",
+            "content_preview": "复核重要的决定和对异常事项的处理方案（如果存在），包括审计项目组的意见分歧和提请项目负责人重点复核、督导的事项。",
+            "auto_na_condition": null
+          },
+          {
+            "row": 26,
+            "seq": 10,
+            "seq_label": "11",
+            "item_id": "A22-2-chk-10",
+            "content": "确定本事务所和项目负责人根据具体情况出具了恰当的审计报告。",
+            "content_preview": "确定本事务所和项目负责人根据具体情况出具了恰当的审计报告。",
+            "auto_na_condition": null
+          },
+          {
+            "row": 27,
+            "seq": 11,
+            "seq_label": "12",
+            "item_id": "A22-2-chk-11",
+            "content": "如果存在与客户管理层之间应报告的意见分歧，确信向主管业务合伙人进行了咨询并且这些问题已得到适当记录与沟通。",
+            "content_preview": "如果存在与客户管理层之间应报告的意见分歧，确信向主管业务合伙人进行了咨询并且这些问题已得到适当记录与沟通。",
+            "auto_na_condition": null
+          },
+          {
+            "row": 28,
+            "seq": 12,
+            "seq_label": "13",
+            "item_id": "A22-2-chk-12",
+            "content": "确保按照事务所咨询程序，向专业技术合伙人和专业技术委员会进行咨询。",
+            "content_preview": "确保按照事务所咨询程序，向专业技术合伙人和专业技术委员会进行咨询。",
+            "auto_na_condition": null
+          },
+          {
+            "row": 29,
+            "seq": 13,
+            "seq_label": "14",
+            "item_id": "A22-2-chk-13",
+            "content": "对于A类业务，完成项目质量复核合伙人复核，并取得复核记录。",
+            "content_preview": "对于A类业务，完成项目质量复核合伙人复核，并取得复核记录。",
+            "auto_na_condition": null
+          },
+          {
+            "row": 30,
+            "seq": 14,
+            "seq_label": "15",
+            "item_id": "A22-2-chk-14",
+            "content": "对于A类、B类业务，完成质量控制复核人复核，并取得复核记录。",
+            "content_preview": "对于A类、B类业务，完成质量控制复核人复核，并取得复核记录。",
+            "auto_na_condition": null
+          },
+          {
+            "row": 31,
+            "seq": 15,
+            "seq_label": "16",
+            "item_id": "A22-2-chk-15",
+            "content": "确保所有的复核意见都已经得到解决并且工作底稿中包含了充分恰当的审计证据。",
+            "content_preview": "确保所有的复核意见都已经得到解决并且工作底稿中包含了充分恰当的审计证据。",
+            "auto_na_condition": null
+          },
+          {
+            "row": 32,
+            "seq": 16,
+            "seq_label": "17",
+            "item_id": "A22-2-chk-16",
+            "content": "确保合理编写管理层声明书模版中的内容及日期，并且在声明书上签署和加上日期以证明批准。",
+            "content_preview": "确保合理编写管理层声明书模版中的内容及日期，并且在声明书上签署和加上日期以证明批准。",
+            "auto_na_condition": null
+          },
+          {
+            "row": 33,
+            "seq": 17,
+            "seq_label": "18",
+            "item_id": "A22-2-chk-17",
+            "content": "确定在审计期间所有可能影响客户关系保持的任何因素都已经得到了考虑。",
+            "content_preview": "确定在审计期间所有可能影响客户关系保持的任何因素都已经得到了考虑。",
+            "auto_na_condition": null
+          },
+          {
+            "row": 34,
+            "seq": 18,
+            "seq_label": "19",
+            "item_id": "A22-2-chk-18",
+            "content": "基于我们实施的审计程序和取得的审计证据，确信本事务所及相关人员遵守了中国注册会计师执业准则、内部控制审计指引和职业道德守则的规定以及本事务所的质量管理制度，出具了恰当的内部控制审计报告。",
+            "content_preview": "基于我们实施的审计程序和取得的审计证据，确信本事务所及相关人员遵守了中国注册会计师执业准则、内部控制审计指引和职业道德守则的规定以及本事务所的质量管理制度，出具了恰当的内部控制审计报告。",
+            "auto_na_condition": null
+          }
+        ],
+        "sign_rows": [
+          35
+        ]
+      },
+      "record": {
+        "name": "复核记录参考模板"
+      },
+      "cover": "底稿目录"
+    },
+    "parser_ready": true,
+    "notes": "检查项 18 条；item_id A22-2-chk-{seq:02d}"
+  },
+  {
+    "wp_code": "A23-1",
+    "enterprise_variant": null,
+    "filename": "A23-1 项目合伙人复核(适用于财报审计).xlsx",
+    "runtime": "review-checklist",
+    "role": "partner",
+    "role_label": "项目合伙人",
+    "audit_type": "financial",
+    "applicable_categories": [
+      "A",
+      "B"
+    ],
+    "sheets": {
+      "checklist": {
+        "name": "A23-1 项目合伙人复核（适用于财报审计）",
+        "header_row": 5,
+        "column_roles": {
+          "yes": "E",
+          "no": "F",
+          "na": "G",
+          "record_ref": "H"
+        },
+        "item_count": 12,
+        "items": [
+          {
+            "row": 6,
+            "seq": 1,
+            "seq_label": "1",
+            "item_id": "A23-1-chk-01",
+            "content": "是否在审计过程的适当阶段及时实施了以下复核工作：",
+            "content_preview": "是否在审计过程的适当阶段及时实施了以下复核工作：",
+            "auto_na_condition": null
+          },
+          {
+            "row": 7,
+            "seq": 2,
+            "seq_label": "1.1",
+            "item_id": "A23-1-chk-02",
+            "content": "已完成的审计计划，以及导致对审计计划作出重大修改的事项；",
+            "content_preview": "已完成的审计计划，以及导致对审计计划作出重大修改的事项；",
+            "auto_na_condition": null
+          },
+          {
+            "row": 8,
+            "seq": 3,
+            "seq_label": "1.2",
+            "item_id": "A23-1-chk-03",
+            "content": "项目组讨论、审计小结及涉及的相关重大事项；",
+            "content_preview": "项目组讨论、审计小结及涉及的相关重大事项；",
+            "auto_na_condition": null
+          },
+          {
+            "row": 9,
+            "seq": 4,
+            "seq_label": "1.3",
+            "item_id": "A23-1-chk-04",
+            "content": "风险评估汇总表，存在特别风险的审计领域，以及采取的应对措施；",
+            "content_preview": "风险评估汇总表，存在特别风险的审计领域，以及采取的应对措施；",
+            "auto_na_condition": null
+          },
+          {
+            "row": 10,
+            "seq": 5,
+            "seq_label": "1.4",
+            "item_id": "A23-1-chk-05",
+            "content": "项目组作出的重大判断；",
+            "content_preview": "项目组作出的重大判断；",
+            "auto_na_condition": null
+          },
+          {
+            "row": 11,
+            "seq": 6,
+            "seq_label": "1.5",
+            "item_id": "A23-1-chk-06",
+            "content": "利用专家工作相关底稿，包括管理层利用专家工作获取的报告、管理层评价意见（如适用）；",
+            "content_preview": "利用专家工作相关底稿，包括管理层利用专家工作获取的报告、管理层评价意见（如适用）；",
+            "auto_na_condition": null
+          },
+          {
+            "row": 13,
+            "seq": 7,
+            "seq_label": "1.7",
+            "item_id": "A23-1-chk-07",
+            "content": "被审计单位确认的未更正错报汇总表；",
+            "content_preview": "被审计单位确认的未更正错报汇总表；",
+            "auto_na_condition": null
+          },
+          {
+            "row": 14,
+            "seq": 8,
+            "seq_label": "1.8",
+            "item_id": "A23-1-chk-08",
+            "content": "控制测试缺陷汇总表；",
+            "content_preview": "控制测试缺陷汇总表；",
+            "auto_na_condition": null
+          },
+          {
+            "row": 15,
+            "seq": 9,
+            "seq_label": "1.9",
+            "item_id": "A23-1-chk-09",
+            "content": "对于整合审计项目，项目合伙人应完成以下复核；",
+            "content_preview": "对于整合审计项目，项目合伙人应完成以下复核；",
+            "auto_na_condition": null
+          },
+          {
+            "row": 16,
+            "seq": 10,
+            "seq_label": "1.9.1",
+            "item_id": "A23-1-chk-10",
+            "content": "项目组所完成的与所有重大账户有关的流程记录的详尽程度能够满足了解可能导致错报的来源；",
+            "content_preview": "项目组所完成的与所有重大账户有关的流程记录的详尽程度能够满足了解可能导致错报的来源；",
+            "auto_na_condition": null
+          },
+          {
+            "row": 17,
+            "seq": 11,
+            "seq_label": "1.9.2",
+            "item_id": "A23-1-chk-11",
+            "content": "对在循环中针对合理可能的风险所选择的关键控制点与所执行的控制测试是恰当的；",
+            "content_preview": "对在循环中针对合理可能的风险所选择的关键控制点与所执行的控制测试是恰当的；",
+            "auto_na_condition": null
+          },
+          {
+            "row": 18,
+            "seq": 12,
+            "seq_label": "1.9.3",
+            "item_id": "A23-1-chk-12",
+            "content": "对重大错报风险，相关内控流程已经得到了恰当的记录、关键控制点已经得到恰当识别并执行了测试以降低风险；",
+            "content_preview": "对重大错报风险，相关内控流程已经得到了恰当的记录、关键控制点已经得到恰当识别并执行了测试以降低风险；",
+            "auto_na_condition": null
+          }
+        ],
+        "sign_rows": [
+          76
+        ]
+      },
+      "record": {
+        "name": "复核记录"
+      },
+      "cover": "底稿目录"
+    },
+    "parser_ready": true,
+    "notes": "检查项 12 条；item_id A23-1-chk-{seq:02d}"
+  },
+  {
+    "wp_code": "A23-2",
+    "enterprise_variant": null,
+    "filename": "A23-2 项目合伙人复核表（适用于内控审计）.xlsx",
+    "runtime": "review-checklist",
+    "role": "partner",
+    "role_label": "项目合伙人",
+    "audit_type": "internal_control",
+    "applicable_categories": [
+      "A",
+      "B"
+    ],
+    "sheets": {
+      "checklist": {
+        "name": "A23-2 项目合伙人复核表（适用于内控审计）",
+        "header_row": 5,
+        "column_roles": {
+          "yes": "F",
+          "no": "G",
+          "na": "H",
+          "record_ref": "I"
+        },
+        "item_count": 24,
+        "items": [
+          {
+            "row": 6,
+            "seq": 1,
+            "seq_label": "1",
+            "item_id": "A23-2-chk-01",
+            "content": "是否在审计过程的适当阶段及时实施了以下复核工作：",
+            "content_preview": "是否在审计过程的适当阶段及时实施了以下复核工作：",
+            "auto_na_condition": null
+          },
+          {
+            "row": 7,
+            "seq": 2,
+            "seq_label": "1.1",
+            "item_id": "A23-2-chk-02",
+            "content": "单独签订的内部控制审计业务约定书。",
+            "content_preview": "单独签订的内部控制审计业务约定书。",
+            "auto_na_condition": null
+          },
+          {
+            "row": 8,
+            "seq": 3,
+            "seq_label": "1.2",
+            "item_id": "A23-2-chk-03",
+            "content": "已完成的审计计划，以及导致对审计计划作出重大修改的事项。",
+            "content_preview": "已完成的审计计划，以及导致对审计计划作出重大修改的事项。",
+            "auto_na_condition": null
+          },
+          {
+            "row": 9,
+            "seq": 4,
+            "seq_label": "1.3",
+            "item_id": "A23-2-chk-04",
+            "content": "项目组讨论、审计小结及涉及的相关重大事项。",
+            "content_preview": "项目组讨论、审计小结及涉及的相关重大事项。",
+            "auto_na_condition": null
+          },
+          {
+            "row": 10,
+            "seq": 5,
+            "seq_label": "1.4",
+            "item_id": "A23-2-chk-05",
+            "content": "控制缺陷汇总表和重大缺陷评价的结论。",
+            "content_preview": "控制缺陷汇总表和重大缺陷评价的结论。",
+            "auto_na_condition": null
+          },
+          {
+            "row": 11,
+            "seq": 6,
+            "seq_label": "1.5",
+            "item_id": "A23-2-chk-06",
+            "content": "项目组作出的重大判断。",
+            "content_preview": "项目组作出的重大判断。",
+            "auto_na_condition": null
+          },
+          {
+            "row": 12,
+            "seq": 7,
+            "seq_label": "1.6",
+            "item_id": "A23-2-chk-07",
+            "content": "管理层声明书，股东大会、董事会相关会议纪要，与被审计单位的管理层、治理层或相关监管机构的正式书面沟通文件，律师询证函复函。",
+            "content_preview": "管理层声明书，股东大会、董事会相关会议纪要，与被审计单位的管理层、治理层或相关监管机构的正式书面沟通文件，律师询证函复函。",
+            "auto_na_condition": null
+          },
+          {
+            "row": 13,
+            "seq": 8,
+            "seq_label": "1.7",
+            "item_id": "A23-2-chk-08",
+            "content": "审计工作完成核对表。",
+            "content_preview": "审计工作完成核对表。",
+            "auto_na_condition": null
+          },
+          {
+            "row": 14,
+            "seq": 9,
+            "seq_label": "1.8",
+            "item_id": "A23-2-chk-09",
+            "content": "已核对企业内部控制评价报告和拟出具的内部控制审计报告。",
+            "content_preview": "已核对企业内部控制评价报告和拟出具的内部控制审计报告。",
+            "auto_na_condition": null
+          },
+          {
+            "row": 16,
+            "seq": 10,
+            "seq_label": "1.10",
+            "item_id": "A23-2-chk-10",
+            "content": "复核重要的决定和对异常事项的处理方案（如果存在），包括审计项目组的意见分歧和提请项目合伙人重点复核、督导的事项。",
+            "content_preview": "复核重要的决定和对异常事项的处理方案（如果存在），包括审计项目组的意见分歧和提请项目合伙人重点复核、督导的事项。",
+            "auto_na_condition": null
+          },
+          {
+            "row": 17,
+            "seq": 11,
+            "seq_label": "1.11",
+            "item_id": "A23-2-chk-11",
+            "content": "现场项目负责经理编制的工作底稿及审计说明。",
+            "content_preview": "现场项目负责经理编制的工作底稿及审计说明。",
+            "auto_na_condition": null
+          },
+          {
+            "row": 18,
+            "seq": 12,
+            "seq_label": "2",
+            "item_id": "A23-2-chk-12",
+            "content": "实施上述复核后，是否可以确定下列事项：",
+            "content_preview": "实施上述复核后，是否可以确定下列事项：",
+            "auto_na_condition": null
+          },
+          {
+            "row": 19,
+            "seq": 13,
+            "seq_label": "2.1",
+            "item_id": "A23-2-chk-13",
+            "content": "对现场项目负责经理实施的复核结果满意，并且工作底稿中记录了充分适当的审计证据。",
+            "content_preview": "对现场项目负责经理实施的复核结果满意，并且工作底稿中记录了充分适当的审计证据。",
+            "auto_na_condition": null
+          },
+          {
+            "row": 20,
+            "seq": 14,
+            "seq_label": "2.2",
+            "item_id": "A23-2-chk-14",
+            "content": "复核项目组讨论和审计小结、重大事项概要，确保缺陷评价的专业判断恰当。",
+            "content_preview": "复核项目组讨论和审计小结、重大事项概要，确保缺陷评价的专业判断恰当。",
+            "auto_na_condition": null
+          },
+          {
+            "row": 21,
+            "seq": 15,
+            "seq_label": "2.3",
+            "item_id": "A23-2-chk-15",
+            "content": "对重大账户、列报及其相关认定的识别及选取的进行测试的控制是恰当的，控制测试得到有效执行，且得出了恰当的审计结论；",
+            "content_preview": "对重大账户、列报及其相关认定的识别及选取的进行测试的控制是恰当的，控制测试得到有效执行，且得出了恰当的审计结论；",
+            "auto_na_condition": null
+          },
+          {
+            "row": 22,
+            "seq": 16,
+            "seq_label": "2.4",
+            "item_id": "A23-2-chk-16",
+            "content": "提出的管理建议事项恰当合理，发现的未构成缺陷的控制偏差不属于系统性偏差（在相似情形下，预计都会发生的错误）；",
+            "content_preview": "提出的管理建议事项恰当合理，发现的未构成缺陷的控制偏差不属于系统性偏差（在相似情形下，预计都会发生的错误）；",
+            "auto_na_condition": null
+          },
+          {
+            "row": 23,
+            "seq": 17,
+            "seq_label": "2.5",
+            "item_id": "A23-2-chk-17",
+            "content": "如果与被审计单位管理层存在意见分歧，确保分歧已经解决，且已适当记录。",
+            "content_preview": "如果与被审计单位管理层存在意见分歧，确保分歧已经解决，且已适当记录。",
+            "auto_na_condition": null
+          },
+          {
+            "row": 24,
+            "seq": 18,
+            "seq_label": "2.6",
+            "item_id": "A23-2-chk-18",
+            "content": "确定审计期间已充分考虑了可能影响保持客户关系的任何风险因素。",
+            "content_preview": "确定审计期间已充分考虑了可能影响保持客户关系的任何风险因素。",
+            "auto_na_condition": null
+          },
+          {
+            "row": 25,
+            "seq": 19,
+            "seq_label": "2.7",
+            "item_id": "A23-2-chk-19",
+            "content": "根据本事务所的质量管理政策和程序以及对被审计单位和项目团队的了解，并未发现任何情况显示事务所在审计期间未能保持独立性。",
+            "content_preview": "根据本事务所的质量管理政策和程序以及对被审计单位和项目团队的了解，并未发现任何情况显示事务所在审计期间未能保持独立性。",
+            "auto_na_condition": null
+          },
+          {
+            "row": 26,
+            "seq": 20,
+            "seq_label": "2.8",
+            "item_id": "A23-2-chk-20",
+            "content": "确定所有重大缺陷、审计事项已经与项目质量复核合伙人进行了讨论。",
+            "content_preview": "确定所有重大缺陷、审计事项已经与项目质量复核合伙人进行了讨论。",
+            "auto_na_condition": null
+          },
+          {
+            "row": 27,
+            "seq": 21,
+            "seq_label": "2.9",
+            "item_id": "A23-2-chk-21",
+            "content": "对于A类业务，完成项目质量复核合伙人复核，并取得复核记录。",
+            "content_preview": "对于A类业务，完成项目质量复核合伙人复核，并取得复核记录。",
+            "auto_na_condition": null
+          },
+          {
+            "row": 28,
+            "seq": 22,
+            "seq_label": "2.1",
+            "item_id": "A23-2-chk-22",
+            "content": "对于A类、B类业务，完成质量控制复核人复核，并取得复核记录。",
+            "content_preview": "对于A类、B类业务，完成质量控制复核人复核，并取得复核记录。",
+            "auto_na_condition": null
+          },
+          {
+            "row": 29,
+            "seq": 23,
+            "seq_label": "2.11",
+            "item_id": "A23-2-chk-23",
+            "content": "企业内部控制评价报告的编制符合企业内部控制评价指引的规定。",
+            "content_preview": "企业内部控制评价报告的编制符合企业内部控制评价指引的规定。",
+            "auto_na_condition": null
+          },
+          {
+            "row": 30,
+            "seq": 24,
+            "seq_label": "2.12",
+            "item_id": "A23-2-chk-24",
+            "content": "基于所实施的审计程序和获取的审计证据，我确信已按照中国注册会计师执业准则、内部控制审计指引和职业道德守则以及本事务所的质量管理制度的规定执行了工作，并出具了恰当的内部控制审计报告。",
+            "content_preview": "基于所实施的审计程序和获取的审计证据，我确信已按照中国注册会计师执业准则、内部控制审计指引和职业道德守则以及本事务所的质量管理制度的规定执行了工作，并出具了恰当的内部控制审计报告。",
+            "auto_na_condition": null
+          }
+        ],
+        "sign_rows": [
+          31
+        ]
+      },
+      "record": {
+        "name": "复核记录参考模板"
+      },
+      "cover": "底稿目录"
+    },
+    "parser_ready": true,
+    "notes": "检查项 24 条；item_id A23-2-chk-{seq:02d}"
+  },
+  {
+    "wp_code": "A24-1",
+    "enterprise_variant": "large_soe",
+    "filename": "A24-1 项目质量复核合伙人复核表及记录（财务报表审计-适用大型国企）.xlsx",
+    "runtime": "review-checklist",
+    "role": "quality_reviewer",
+    "role_label": "质量复核合伙人",
+    "audit_type": "financial",
+    "applicable_categories": [
+      "A"
+    ],
+    "sheets": {
+      "checklist": {
+        "name": "项目质量复核合伙人复核表（独立复核）A24-1-2",
+        "header_row": 5,
+        "column_roles": {
+          "yes": "F",
+          "no": "G",
+          "na": "H",
+          "record_ref": "I"
+        },
+        "item_count": 4,
+        "items": [
+          {
+            "row": 6,
+            "seq": 1,
+            "seq_label": "1",
+            "item_id": "A24-1-chk-01",
+            "content": "本人未承担项目合伙人、任何分支机构、福利计划、关联实体的审计责任。",
+            "content_preview": "本人未承担项目合伙人、任何分支机构、福利计划、关联实体的审计责任。",
+            "auto_na_condition": null
+          },
+          {
+            "row": 7,
+            "seq": 2,
+            "seq_label": "2",
+            "item_id": "A24-1-chk-02",
+            "content": "本人符合定期轮换要求。",
+            "content_preview": "本人符合定期轮换要求。",
+            "auto_na_condition": null
+          },
+          {
+            "row": 8,
+            "seq": 3,
+            "seq_label": "3",
+            "item_id": "A24-1-chk-03",
+            "content": "本人对项目合伙人是独立的。",
+            "content_preview": "本人对项目合伙人是独立的。",
+            "auto_na_condition": null
+          },
+          {
+            "row": 9,
+            "seq": 4,
+            "seq_label": "4",
+            "item_id": "A24-1-chk-04",
+            "content": "本人对上市实体客户及其关联实体（或非上市实体客户及其控制的实体）没有任何承诺或自我利益等对独立性产生不利影响的因素。",
+            "content_preview": "本人对上市实体客户及其关联实体（或非上市实体客户及其控制的实体）没有任何承诺或自我利益等对独立性产生不利影响的因素。",
+            "auto_na_condition": null
+          }
+        ],
+        "sign_rows": [
+          37
+        ]
+      },
+      "record": {
+        "name": "项目质量复核合伙人复核记录A24-1-2-1"
+      },
+      "cover": "底稿目录"
+    },
+    "parser_ready": true,
+    "notes": "检查项 4 条；item_id A24-1-chk-{seq:02d}"
+  },
+  {
+    "wp_code": "A24-1",
+    "enterprise_variant": "non_soe",
+    "filename": "A24-1  项目质量复核合伙人复核表及记录（财务报表审计-适用非大型国企）.xlsx",
+    "runtime": "review-checklist",
+    "role": "quality_reviewer",
+    "role_label": "质量复核合伙人",
+    "audit_type": "financial",
+    "applicable_categories": [
+      "A"
+    ],
+    "sheets": {
+      "checklist": {
+        "name": "项目质量复核合伙人复核表（独立复核）A24-1-1",
+        "header_row": 5,
+        "column_roles": {
+          "yes": "F",
+          "no": "G",
+          "na": "H",
+          "record_ref": "I"
+        },
+        "item_count": 4,
+        "items": [
+          {
+            "row": 6,
+            "seq": 1,
+            "seq_label": "1",
+            "item_id": "A24-1-chk-01",
+            "content": "本人未承担项目合伙人、任何分支机构、福利计划、关联实体的审计责任。",
+            "content_preview": "本人未承担项目合伙人、任何分支机构、福利计划、关联实体的审计责任。",
+            "auto_na_condition": null
+          },
+          {
+            "row": 7,
+            "seq": 2,
+            "seq_label": "2",
+            "item_id": "A24-1-chk-02",
+            "content": "本人符合定期轮换要求。",
+            "content_preview": "本人符合定期轮换要求。",
+            "auto_na_condition": null
+          },
+          {
+            "row": 8,
+            "seq": 3,
+            "seq_label": "3",
+            "item_id": "A24-1-chk-03",
+            "content": "本人对项目合伙人是独立的。",
+            "content_preview": "本人对项目合伙人是独立的。",
+            "auto_na_condition": null
+          },
+          {
+            "row": 9,
+            "seq": 4,
+            "seq_label": "4",
+            "item_id": "A24-1-chk-04",
+            "content": "本人对上市实体客户及其关联实体（或非上市实体客户及其控制的实体）没有任何承诺或自我利益等对独立性产生不利影响的因素。",
+            "content_preview": "本人对上市实体客户及其关联实体（或非上市实体客户及其控制的实体）没有任何承诺或自我利益等对独立性产生不利影响的因素。",
+            "auto_na_condition": null
+          }
+        ],
+        "sign_rows": [
+          35
+        ]
+      },
+      "record": {
+        "name": "项目质量复核合伙人复核记录A24-1-1-1"
+      },
+      "cover": "底稿目录"
+    },
+    "parser_ready": true,
+    "notes": "检查项 4 条；item_id A24-1-chk-{seq:02d}"
+  },
+  {
+    "wp_code": "A24-2",
+    "enterprise_variant": null,
+    "filename": "A24-2 项目质量复核合伙人复核(适用于内控审计).xlsx",
+    "runtime": "review-checklist",
+    "role": "quality_reviewer",
+    "role_label": "质量复核合伙人",
+    "audit_type": "internal_control",
+    "applicable_categories": [
+      "A"
+    ],
+    "sheets": {
+      "checklist": {
+        "name": "项目质量复核合伙人复核表-适用于内控审计A24-2",
+        "header_row": 5,
+        "column_roles": {
+          "yes": "F",
+          "no": "G",
+          "na": "H",
+          "record_ref": "I"
+        },
+        "item_count": 5,
+        "items": [
+          {
+            "row": 6,
+            "seq": 1,
+            "seq_label": "1",
+            "item_id": "A24-2-chk-01",
+            "content": "本人未承担项目合伙人、任何分支机构、福利计划、关联实体的审计责任。",
+            "content_preview": "本人未承担项目合伙人、任何分支机构、福利计划、关联实体的审计责任。",
+            "auto_na_condition": null
+          },
+          {
+            "row": 7,
+            "seq": 2,
+            "seq_label": "2",
+            "item_id": "A24-2-chk-02",
+            "content": "本人符合定期轮换要求。",
+            "content_preview": "本人符合定期轮换要求。",
+            "auto_na_condition": null
+          },
+          {
+            "row": 8,
+            "seq": 3,
+            "seq_label": "3",
+            "item_id": "A24-2-chk-03",
+            "content": "本人对项目合伙人是独立的。",
+            "content_preview": "本人对项目合伙人是独立的。",
+            "auto_na_condition": null
+          },
+          {
+            "row": 9,
+            "seq": 4,
+            "seq_label": "4",
+            "item_id": "A24-2-chk-04",
+            "content": "本人对上市实体客户及其关联实体（或非上市实体客户及其控制的实体）没有任何承诺或自我利益等对独立性产生不利影响的因素。",
+            "content_preview": "本人对上市实体客户及其关联实体（或非上市实体客户及其控制的实体）没有任何承诺或自我利益等对独立性产生不利影响的因素。",
+            "auto_na_condition": null
+          },
+          {
+            "row": 10,
+            "seq": 5,
+            "seq_label": "5",
+            "item_id": "A24-2-chk-05",
+            "content": "项目质量复核之前进行的复核是否均已得到满意的执行？",
+            "content_preview": "项目质量复核之前进行的复核是否均已得到满意的执行？",
+            "auto_na_condition": null
+          }
+        ],
+        "sign_rows": [
+          26
+        ]
+      },
+      "record": {
+        "name": "复核记录参考模板A24-2-1"
+      },
+      "cover": "底稿目录"
+    },
+    "parser_ready": true,
+    "notes": "检查项 5 条；item_id A24-2-chk-{seq:02d}"
+  },
+  {
+    "wp_code": "A25-1",
+    "enterprise_variant": "large_soe",
+    "filename": "A25-1 质量控制复核人复核表及复核记录(适用于财报审计-适用大型国企).xlsx",
+    "runtime": "review-checklist",
+    "role": "eqcr",
+    "role_label": "质量控制复核人",
+    "audit_type": "financial",
+    "applicable_categories": [
+      "A"
+    ],
+    "sheets": {
+      "checklist": {
+        "name": "质量控制复核人复核表A25-1",
+        "header_row": 5,
+        "column_roles": {
+          "yes": "F",
+          "no": "G",
+          "na": "H"
+        },
+        "item_count": 34,
+        "items": [
+          {
+            "row": 6,
+            "seq": 1,
+            "seq_label": "1",
+            "item_id": "A25-1-chk-01",
+            "content": "本人对项目合伙人是独立的。本人对上市实体客户及其关联实体（或非上市实体客户及其控制的实体）没有任何承诺或自我利益等对独立性产生不利影响的因素。",
+            "content_preview": "本人对项目合伙人是独立的。本人对上市实体客户及其关联实体（或非上市实体客户及其控制的实体）没有任何承诺或自我利益等对独立性产生不利影响的因素。",
+            "auto_na_condition": null
+          },
+          {
+            "row": 7,
+            "seq": 2,
+            "seq_label": "2",
+            "item_id": "A25-1-chk-02",
+            "content": "项目内各级复核是否均已得到满意的执行并保留复核记录？",
+            "content_preview": "项目内各级复核是否均已得到满意的执行并保留复核记录？",
+            "auto_na_condition": null
+          },
+          {
+            "row": 8,
+            "seq": 3,
+            "seq_label": "3",
+            "item_id": "A25-1-chk-03",
+            "content": "项目质量复核合伙人复核是否已得到满意的执行并记录？项目质量复核合伙人要求跟进的问题项目组是否已恰当解决并回复？",
+            "content_preview": "项目质量复核合伙人复核是否已得到满意的执行并记录？项目质量复核合伙人要求跟进的问题项目组是否已恰当解决并回复？",
+            "auto_na_condition": null
+          },
+          {
+            "row": 9,
+            "seq": 4,
+            "seq_label": "4",
+            "item_id": "A25-1-chk-04",
+            "content": "是否阅读并了解IMS系统流转过来的业务承接或保持评价相关资料，与项目组沟通项目和被审计单位的性质和具体情况？",
+            "content_preview": "是否阅读并了解IMS系统流转过来的业务承接或保持评价相关资料，与项目组沟通项目和被审计单位的性质和具体情况？",
+            "auto_na_condition": null
+          },
+          {
+            "row": 10,
+            "seq": 5,
+            "seq_label": "5",
+            "item_id": "A25-1-chk-05",
+            "content": "是否获取并阅读事务所对该项目的内部质量控制检查报告（如适用），特别是针对可能与项目组的重大判断相关或影响该重大判断的领域识别出的缺陷进行沟通？",
+            "content_preview": "是否获取并阅读事务所对该项目的内部质量控制检查报告（如适用），特别是针对可能与项目组的重大判断相关或影响该重大判断的领域识别出的缺陷进行沟通？",
+            "auto_na_condition": null
+          },
+          {
+            "row": 11,
+            "seq": 6,
+            "seq_label": "6",
+            "item_id": "A25-1-chk-06",
+            "content": "是否已与项目合伙人、项目组其他成员（如适用）讨论：重大事项和在业务计划、实施和报告阶段作出的重大判断？",
+            "content_preview": "是否已与项目合伙人、项目组其他成员（如适用）讨论：重大事项和在业务计划、实施和报告阶段作出的重大判断？",
+            "auto_na_condition": null
+          },
+          {
+            "row": 12,
+            "seq": 7,
+            "seq_label": "7",
+            "item_id": "A25-1-chk-07",
+            "content": "总体审计策略、重大事项概要是否恰当反映了项目组作出的重大职业判断、实施的审计程序、获取的审计证据以及支持拟发表审计意见的结果？",
+            "content_preview": "总体审计策略、重大事项概要是否恰当反映了项目组作出的重大职业判断、实施的审计程序、获取的审计证据以及支持拟发表审计意见的结果？",
+            "auto_na_condition": null
+          },
+          {
+            "row": 13,
+            "seq": 8,
+            "seq_label": "8",
+            "item_id": "A25-1-chk-08",
+            "content": "项目组是否已就疑难问题或分歧事项进行适当咨询，并已按照咨询的结果执行？",
+            "content_preview": "项目组是否已就疑难问题或分歧事项进行适当咨询，并已按照咨询的结果执行？",
+            "auto_na_condition": null
+          },
+          {
+            "row": 14,
+            "seq": 9,
+            "seq_label": "9",
+            "item_id": "A25-1-chk-09",
+            "content": "是否依据事务所审计程序要求完成对收入的分析程序？是否针对不同的收入来源，检查主营业务收入的确认原则、方法是否符合企业会计准则规定的收入实现条件，以及前后期是否一致？",
+            "content_preview": "是否依据事务所审计程序要求完成对收入的分析程序？是否针对不同的收入来源，检查主营业务收入的确认原则、方法是否符合企业会计准则规定的收入实现条件，以及前后期是否一致？",
+            "auto_na_condition": null
+          },
+          {
+            "row": 15,
+            "seq": 10,
+            "seq_label": "10",
+            "item_id": "A25-1-chk-10",
+            "content": "项目组是否已进行实地监盘，并对异地存放、盘点过程存在特殊困难或由第三方保管或控制的存货执行了适当的审计程序？如实施监盘确有困难，项目组是否实施有效替代程序，否则是否考虑对审计意见的影响？",
+            "content_preview": "项目组是否已进行实地监盘，并对异地存放、盘点过程存在特殊困难或由第三方保管或控制的存货执行了适当的审计程序？如实施监盘确有困难，项目组是否实施有效替代程序，否则是否考虑对审计意见的影响？",
+            "auto_na_condition": null
+          },
+          {
+            "row": 16,
+            "seq": 11,
+            "seq_label": "11",
+            "item_id": "A25-1-chk-11",
+            "content": "项目组对项目的银行存款、往来款项等函证程序是否执行到位？",
+            "content_preview": "项目组对项目的银行存款、往来款项等函证程序是否执行到位？",
+            "auto_na_condition": null
+          },
+          {
+            "row": 17,
+            "seq": 12,
+            "seq_label": "12",
+            "item_id": "A25-1-chk-12",
+            "content": "项目组对重大资产减值测试底稿是否完成？",
+            "content_preview": "项目组对重大资产减值测试底稿是否完成？",
+            "auto_na_condition": null
+          },
+          {
+            "row": 18,
+            "seq": 13,
+            "seq_label": "13",
+            "item_id": "A25-1-chk-13",
+            "content": "项目组对成本费用真实性检查、截止性测试底稿是否完成？",
+            "content_preview": "项目组对成本费用真实性检查、截止性测试底稿是否完成？",
+            "auto_na_condition": null
+          },
+          {
+            "row": 19,
+            "seq": 14,
+            "seq_label": "14",
+            "item_id": "A25-1-chk-14",
+            "content": "金融资产的确认计量底稿、减值测试底稿是否完善？",
+            "content_preview": "金融资产的确认计量底稿、减值测试底稿是否完善？",
+            "auto_na_condition": null
+          },
+          {
+            "row": 20,
+            "seq": 15,
+            "seq_label": "15",
+            "item_id": "A25-1-chk-15",
+            "content": "项目组是否已取得并检查相关证据以确定被审计单位的客户、供应商（含外协厂商）与被审计单位实际控制人、董事、监事、高级管理人员及关系密切的家庭成员是否存在关联方关系?（仅适用A类）",
+            "content_preview": "项目组是否已取得并检查相关证据以确定被审计单位的客户、供应商（含外协厂商）与被审计单位实际控制人、董事、监事、高级管理人员及关系密切的家庭成员是否存在关联方关系?（仅适用A类）",
+            "auto_na_condition": null
+          },
+          {
+            "row": 21,
+            "seq": 16,
+            "seq_label": "16",
+            "item_id": "A25-1-chk-16",
+            "content": "项目组是否对被审计单位主要客户和供应商（例如前十名客户或供应商）情况进行核查？",
+            "content_preview": "项目组是否对被审计单位主要客户和供应商（例如前十名客户或供应商）情况进行核查？",
+            "auto_na_condition": null
+          },
+          {
+            "row": 22,
+            "seq": 17,
+            "seq_label": "17",
+            "item_id": "A25-1-chk-17",
+            "content": "对于集团审计项目，确定的重要性水平是否恰当？重要组成部分判断是否正确？是否复核组成部分注册会计师工作，对不符合要求的情况采取恰当应对措施？",
+            "content_preview": "对于集团审计项目，确定的重要性水平是否恰当？重要组成部分判断是否正确？是否复核组成部分注册会计师工作，对不符合要求的情况采取恰当应对措施？",
+            "auto_na_condition": "no_component_auditor"
+          },
+          {
+            "row": 23,
+            "seq": 18,
+            "seq_label": "18",
+            "item_id": "A25-1-chk-18",
+            "content": "项目组是否遵循审计准则和LEAP审计方法论？是否恰当识别了重大类别的交易、账户余额或披露（SCOT+）？",
+            "content_preview": "项目组是否遵循审计准则和LEAP审计方法论？是否恰当识别了重大类别的交易、账户余额或披露（SCOT+）？",
+            "auto_na_condition": null
+          },
+          {
+            "row": 24,
+            "seq": 19,
+            "seq_label": "19",
+            "item_id": "A25-1-chk-19",
+            "content": "重要底稿是否恰当完成？如独立性相关工作底稿、项目组讨论及与治理层、管理层的沟通、项目质量复核合伙人与项目合伙人参加风险评估讨论会、项目总结会的会议记录等。",
+            "content_preview": "重要底稿是否恰当完成？如独立性相关工作底稿、项目组讨论及与治理层、管理层的沟通、项目质量复核合伙人与项目合伙人参加风险评估讨论会、项目总结会的会议记录等。",
+            "auto_na_condition": null
+          },
+          {
+            "row": 25,
+            "seq": 20,
+            "seq_label": "20",
+            "item_id": "A25-1-chk-20",
+            "content": "项目组对重大错报风险和特别风险事项的判断、分歧事项、重大职业判断的处理是否恰当？",
+            "content_preview": "项目组对重大错报风险和特别风险事项的判断、分歧事项、重大职业判断的处理是否恰当？",
+            "auto_na_condition": null
+          },
+          {
+            "row": 26,
+            "seq": 21,
+            "seq_label": "21",
+            "item_id": "A25-1-chk-21",
+            "content": "项目组是否通过实施风险评估程序，结合被审计单位的业务模式恰当记录了信息技术环境？是否识别了信息技术一般控制和信息处理控制？",
+            "content_preview": "项目组是否通过实施风险评估程序，结合被审计单位的业务模式恰当记录了信息技术环境？是否识别了信息技术一般控制和信息处理控制？",
+            "auto_na_condition": "no_it_audit"
+          },
+          {
+            "row": 27,
+            "seq": 22,
+            "seq_label": "22",
+            "item_id": "A25-1-chk-22",
+            "content": "项目组是否恰当评估了使用信息技术导致的风险，并且与信息技术导致的风险相关的内部控制测试已被妥善的设计并执行？",
+            "content_preview": "项目组是否恰当评估了使用信息技术导致的风险，并且与信息技术导致的风险相关的内部控制测试已被妥善的设计并执行？",
+            "auto_na_condition": "no_it_audit"
+          },
+          {
+            "row": 28,
+            "seq": 23,
+            "seq_label": "23",
+            "item_id": "A25-1-chk-23",
+            "content": "项目组是否依据IT复杂因素判断要素完成了IT复杂性判断底稿？出具报告前已完成IT审计并获取IT审计总结备忘录？已充分评价并应对信息技术相关控制缺陷？",
+            "content_preview": "项目组是否依据IT复杂因素判断要素完成了IT复杂性判断底稿？出具报告前已完成IT审计并获取IT审计总结备忘录？已充分评价并应对信息技术相关控制缺陷？",
+            "auto_na_condition": "no_it_audit"
+          },
+          {
+            "row": 29,
+            "seq": 24,
+            "seq_label": "24",
+            "item_id": "A25-1-chk-24",
+            "content": "项目组对税务事项复杂性或风险的判断是否恰当？出具报告前已完成了税务复核并已恰当解决相关税务问题？",
+            "content_preview": "项目组对税务事项复杂性或风险的判断是否恰当？出具报告前已完成了税务复核并已恰当解决相关税务问题？",
+            "auto_na_condition": null
+          },
+          {
+            "row": 30,
+            "seq": 25,
+            "seq_label": "25",
+            "item_id": "A25-1-chk-25",
+            "content": "项目组关于合并会计报表范围及其变化的判断是否恰当？是否对合并范围内关联交易、关联往来抵消的充分性执行了审计程序？",
+            "content_preview": "项目组关于合并会计报表范围及其变化的判断是否恰当？是否对合并范围内关联交易、关联往来抵消的充分性执行了审计程序？",
+            "auto_na_condition": null
+          },
+          {
+            "row": 31,
+            "seq": 26,
+            "seq_label": "26",
+            "item_id": "A25-1-chk-26",
+            "content": "项目组对企业内部控制缺陷的判断、披露以及相关建议是否恰当？",
+            "content_preview": "项目组对企业内部控制缺陷的判断、披露以及相关建议是否恰当？",
+            "auto_na_condition": null
+          },
+          {
+            "row": 32,
+            "seq": 27,
+            "seq_label": "27",
+            "item_id": "A25-1-chk-27",
+            "content": "是否已完成和国资委计划和总结阶段的沟通？",
+            "content_preview": "是否已完成和国资委计划和总结阶段的沟通？",
+            "auto_na_condition": null
+          },
+          {
+            "row": 33,
+            "seq": 28,
+            "seq_label": "28",
+            "item_id": "A25-1-chk-28",
+            "content": "相关报告对客户商业模式、经营方式和特殊业务所蕴含风险是否充分揭示？",
+            "content_preview": "相关报告对客户商业模式、经营方式和特殊业务所蕴含风险是否充分揭示？",
+            "auto_na_condition": null
+          },
+          {
+            "row": 34,
+            "seq": 29,
+            "seq_label": "29",
+            "item_id": "A25-1-chk-29",
+            "content": "是否执行业务质量控制委员会或专业技术委员会审核程序，且审核意见已适当落实？",
+            "content_preview": "是否执行业务质量控制委员会或专业技术委员会审核程序，且审核意见已适当落实？",
+            "auto_na_condition": null
+          },
+          {
+            "row": 35,
+            "seq": 30,
+            "seq_label": "30",
+            "item_id": "A25-1-chk-30",
+            "content": "评价项目合伙人的以下方面工作：\n（1）对整个审计过程的参与程度是否充分和恰当；\n（2）确定独立性要求已得到遵循的依据是否充分。",
+            "content_preview": "评价项目合伙人的以下方面工作：\n（1）对整个审计过程的参与程度是否充分和恰当；\n（2）确定独立性要求已得到遵循的依据是否充分。",
+            "auto_na_condition": null
+          },
+          {
+            "row": 36,
+            "seq": 31,
+            "seq_label": "31",
+            "item_id": "A25-1-chk-31",
+            "content": "审计报告正文及经审计的财务报表等是否与准则规定及事务所规范的内容和格式一致？",
+            "content_preview": "审计报告正文及经审计的财务报表等是否与准则规定及事务所规范的内容和格式一致？",
+            "auto_na_condition": null
+          },
+          {
+            "row": 37,
+            "seq": 32,
+            "seq_label": "32",
+            "item_id": "A25-1-chk-32",
+            "content": "已经复核审计报告相关的其他鉴证报告、专项意见和说明，并确定：（1）报告中数据与已审计财务报表勾稽一致；（2）审计报告及财务报表的内容与获取的审计证据相一致；（3）被审计单位已经履行财务报表报出的审批手续；（4）依据准则及相关法规要求签章。",
+            "content_preview": "已经复核审计报告相关的其他鉴证报告、专项意见和说明，并确定：（1）报告中数据与已审计财务报表勾稽一致；（2）审计报告及财务报表的内容与获取的审计证据相一致；（3）被审计单位已经履行财务报表报出的审批手续；（4）依据准则及相关法规要求签章。",
+            "auto_na_condition": null
+          },
+          {
+            "row": 38,
+            "seq": 33,
+            "seq_label": "33",
+            "item_id": "A25-1-chk-33",
+            "content": "是否复核管理层关于审计报告日后公布的其他信息的书面声明、其他信息比对记录和最终版本的年度报告（如适用）？",
+            "content_preview": "是否复核管理层关于审计报告日后公布的其他信息的书面声明、其他信息比对记录和最终版本的年度报告（如适用）？",
+            "auto_na_condition": null
+          },
+          {
+            "row": 39,
+            "seq": 34,
+            "seq_label": "34",
+            "item_id": "A25-1-chk-34",
+            "content": "本人已经按照《质量控制复核实施办法》实施了质量控制复核，所有复核意见均已得到解决。本人没有注意到存在任何尚未解决的、可能使本人认为项目组作出的重大判断和得出的结论不适当的事项。",
+            "content_preview": "本人已经按照《质量控制复核实施办法》实施了质量控制复核，所有复核意见均已得到解决。本人没有注意到存在任何尚未解决的、可能使本人认为项目组作出的重大判断和得出的结论不适当的事项。",
+            "auto_na_condition": null
+          }
+        ],
+        "sign_rows": [
+          40
+        ]
+      },
+      "record": {
+        "name": "复核记录A25-1-1"
+      },
+      "cover": "底稿目录"
+    },
+    "parser_ready": true,
+    "notes": "检查项 34 条；item_id A25-1-chk-{seq:02d}"
+  },
+  {
+    "wp_code": "A25-1",
+    "enterprise_variant": "non_soe",
+    "filename": "A25-1 质量控制复核表及复核记录(适用于财报审计-适用非大型国企).xlsx",
+    "runtime": "review-checklist",
+    "role": "eqcr",
+    "role_label": "质量控制复核人",
+    "audit_type": "financial",
+    "applicable_categories": [
+      "A"
+    ],
+    "sheets": {
+      "checklist": {
+        "name": "质量控制复核人复核表A25-1",
+        "header_row": 5,
+        "column_roles": {
+          "yes": "F",
+          "no": "G",
+          "na": "H"
+        },
+        "item_count": 19,
+        "items": [
+          {
+            "row": 6,
+            "seq": 1,
+            "seq_label": "1",
+            "item_id": "A25-1-chk-01",
+            "content": "本人对项目合伙人是独立的。本人对上市实体客户及其关联实体（或非上市实体客户及其控制的实体）没有任何承诺或自我利益等对独立性产生不利影响的因素。",
+            "content_preview": "本人对项目合伙人是独立的。本人对上市实体客户及其关联实体（或非上市实体客户及其控制的实体）没有任何承诺或自我利益等对独立性产生不利影响的因素。",
+            "auto_na_condition": null
+          },
+          {
+            "row": 7,
+            "seq": 2,
+            "seq_label": "2",
+            "item_id": "A25-1-chk-02",
+            "content": "项目内各级复核是否均已得到满意的执行并保留复核记录？",
+            "content_preview": "项目内各级复核是否均已得到满意的执行并保留复核记录？",
+            "auto_na_condition": null
+          },
+          {
+            "row": 8,
+            "seq": 3,
+            "seq_label": "3",
+            "item_id": "A25-1-chk-03",
+            "content": "项目质量复核合伙人复核是否已得到满意的执行并记录？项目质量复核合伙人要求跟进的问题项目组是否已恰当解决并回复？",
+            "content_preview": "项目质量复核合伙人复核是否已得到满意的执行并记录？项目质量复核合伙人要求跟进的问题项目组是否已恰当解决并回复？",
+            "auto_na_condition": null
+          },
+          {
+            "row": 9,
+            "seq": 4,
+            "seq_label": "4",
+            "item_id": "A25-1-chk-04",
+            "content": "业务承接或保持相关底稿是否已完成？鉴证业务分类是否正确？若存在分歧，是否已按照分歧解决程序处理？",
+            "content_preview": "业务承接或保持相关底稿是否已完成？鉴证业务分类是否正确？若存在分歧，是否已按照分歧解决程序处理？",
+            "auto_na_condition": null
+          },
+          {
+            "row": 10,
+            "seq": 5,
+            "seq_label": "5",
+            "item_id": "A25-1-chk-05",
+            "content": "是否阅读并了解IMS系统流转过来的业务承接或保持评价相关资料，与项目组沟通项目和被审计单位的性质和具体情况？",
+            "content_preview": "是否阅读并了解IMS系统流转过来的业务承接或保持评价相关资料，与项目组沟通项目和被审计单位的性质和具体情况？",
+            "auto_na_condition": null
+          },
+          {
+            "row": 11,
+            "seq": 6,
+            "seq_label": "6",
+            "item_id": "A25-1-chk-06",
+            "content": "是否获取并阅读事务所对该项目的内部质量控制检查报告（如适用），特别是针对可能与项目组的重大判断相关或影响该重大判断的领域识别出的缺陷进行沟通？",
+            "content_preview": "是否获取并阅读事务所对该项目的内部质量控制检查报告（如适用），特别是针对可能与项目组的重大判断相关或影响该重大判断的领域识别出的缺陷进行沟通？",
+            "auto_na_condition": null
+          },
+          {
+            "row": 12,
+            "seq": 7,
+            "seq_label": "7",
+            "item_id": "A25-1-chk-07",
+            "content": "是否已与项目合伙人、项目组其他成员（如适用）讨论重大事项，以及在业务计划、实施和报告阶段作出的重大判断？",
+            "content_preview": "是否已与项目合伙人、项目组其他成员（如适用）讨论重大事项，以及在业务计划、实施和报告阶段作出的重大判断？",
+            "auto_na_condition": null
+          },
+          {
+            "row": 13,
+            "seq": 8,
+            "seq_label": "8",
+            "item_id": "A25-1-chk-08",
+            "content": "总体审计策略、重大事项概要是否恰当反映了项目组作出的重大职业判断、实施的审计程序、获取的审计证据以及支持拟发表审计意见的结果？",
+            "content_preview": "总体审计策略、重大事项概要是否恰当反映了项目组作出的重大职业判断、实施的审计程序、获取的审计证据以及支持拟发表审计意见的结果？",
+            "auto_na_condition": null
+          },
+          {
+            "row": 14,
+            "seq": 9,
+            "seq_label": "9",
+            "item_id": "A25-1-chk-09",
+            "content": "项目组是否已就疑难问题或分歧事项进行适当咨询，并已按照咨询的结果执行？",
+            "content_preview": "项目组是否已就疑难问题或分歧事项进行适当咨询，并已按照咨询的结果执行？",
+            "auto_na_condition": null
+          },
+          {
+            "row": 15,
+            "seq": 10,
+            "seq_label": "10",
+            "item_id": "A25-1-chk-10",
+            "content": "收入确认原则是否符合企业会计准则的要求？对于附带特殊条款的合同，收入确认政策是否恰当？如营业收入和净利润在会计期间内出现较大幅度波动、营业毛利或净利润的增长幅度明显高于营业收入的增长幅度，项目组是否已取得充分审计证据以确定其真实性？",
+            "content_preview": "收入确认原则是否符合企业会计准则的要求？对于附带特殊条款的合同，收入确认政策是否恰当？如营业收入和净利润在会计期间内出现较大幅度波动、营业毛利或净利润的增长幅度明显高于营业收入的增长幅度，项目组是否已取得充分审计证据以确定其真实性？",
+            "auto_na_condition": null
+          },
+          {
+            "row": 16,
+            "seq": 11,
+            "seq_label": "11",
+            "item_id": "A25-1-chk-11",
+            "content": "项目组是否已进行实地监盘，并对异地存放、盘点过程存在特殊困难或由第三方保管或控制的存货执行了适当的审计程序？如实施监盘确有困难，项目组是否实施有效替代程序，否则是否考虑对审计意见的影响？",
+            "content_preview": "项目组是否已进行实地监盘，并对异地存放、盘点过程存在特殊困难或由第三方保管或控制的存货执行了适当的审计程序？如实施监盘确有困难，项目组是否实施有效替代程序，否则是否考虑对审计意见的影响？",
+            "auto_na_condition": null
+          },
+          {
+            "row": 17,
+            "seq": 12,
+            "seq_label": "12",
+            "item_id": "A25-1-chk-12",
+            "content": "项目组对项目的银行存款、往来款项等函证程序是否执行到位？",
+            "content_preview": "项目组对项目的银行存款、往来款项等函证程序是否执行到位？",
+            "auto_na_condition": null
+          },
+          {
+            "row": 18,
+            "seq": 13,
+            "seq_label": "13",
+            "item_id": "A25-1-chk-13",
+            "content": "项目组是否已取得并检查相关证据以确定被审计单位的客户、供应商（含外协厂商）与被审计单位实际控制人、董事、监事、高级管理人员及关系密切的家庭成员是否存在关联方关系?（仅适用A类）",
+            "content_preview": "项目组是否已取得并检查相关证据以确定被审计单位的客户、供应商（含外协厂商）与被审计单位实际控制人、董事、监事、高级管理人员及关系密切的家庭成员是否存在关联方关系?（仅适用A类）",
+            "auto_na_condition": null
+          },
+          {
+            "row": 19,
+            "seq": 14,
+            "seq_label": "14",
+            "item_id": "A25-1-chk-14",
+            "content": "项目组是否对被审计单位主要客户和供应商（例如前十名客户或供应商）情况进行核查？对于IPO项目，根据重要性原则实地走访或核查，并将上述核查情况记录在工作底稿中?（仅适用A类）",
+            "content_preview": "项目组是否对被审计单位主要客户和供应商（例如前十名客户或供应商）情况进行核查？对于IPO项目，根据重要性原则实地走访或核查，并将上述核查情况记录在工作底稿中?（仅适用A类）",
+            "auto_na_condition": null
+          },
+          {
+            "row": 20,
+            "seq": 15,
+            "seq_label": "15",
+            "item_id": "A25-1-chk-15",
+            "content": "对于IPO项目，项目组核查发行人与其客户、供应商之间关联方关系时，是否不仅查阅了书面资料，而且采取了实地走访，核对工商、税务、银行等部门提供的资料，以确定客户和供应商的实际控制人及关键经办人员与发行人是否存在关联方关系?",
+            "content_preview": "对于IPO项目，项目组核查发行人与其客户、供应商之间关联方关系时，是否不仅查阅了书面资料，而且采取了实地走访，核对工商、税务、银行等部门提供的资料，以确定客户和供应商的实际控制人及关键经办人员与发行人是否存在关联方关系?",
+            "auto_na_condition": null
+          },
+          {
+            "row": 21,
+            "seq": 16,
+            "seq_label": "16",
+            "item_id": "A25-1-chk-16",
+            "content": "对于集团审计项目，确定的重要性水平是否恰当？重要组成部分判断是否正确？是否复核组成部分注册会计师工作，对不符合要求的情况采取恰当应对措施？",
+            "content_preview": "对于集团审计项目，确定的重要性水平是否恰当？重要组成部分判断是否正确？是否复核组成部分注册会计师工作，对不符合要求的情况采取恰当应对措施？",
+            "auto_na_condition": "no_component_auditor"
+          },
+          {
+            "row": 22,
+            "seq": 17,
+            "seq_label": "17",
+            "item_id": "A25-1-chk-17",
+            "content": "项目合伙人及项目质量复核合伙人是否复核了项目组执行的内部控制审计程序？",
+            "content_preview": "项目合伙人及项目质量复核合伙人是否复核了项目组执行的内部控制审计程序？",
+            "auto_na_condition": null
+          },
+          {
+            "row": 23,
+            "seq": 18,
+            "seq_label": "18",
+            "item_id": "A25-1-chk-18",
+            "content": "项目组所完成的与所有重大交易类别、账户余额和披露有关的内控流程记录的详尽程度能够了解可能导致错报的来源。",
+            "content_preview": "项目组所完成的与所有重大交易类别、账户余额和披露有关的内控流程记录的详尽程度能够了解可能导致错报的来源。",
+            "auto_na_condition": null
+          },
+          {
+            "row": 24,
+            "seq": 19,
+            "seq_label": "19",
+            "item_id": "A25-1-chk-19",
+            "content": "对在内部控制流程中针对重大错报风险所选择的关键控制点与所执行的控制测试是恰当的。",
+            "content_preview": "对在内部控制流程中针对重大错报风险所选择的关键控制点与所执行的控制测试是恰当的。",
+            "auto_na_condition": null
+          }
+        ],
+        "sign_rows": [
+          40
+        ]
+      },
+      "record": {
+        "name": "复核记录A25-1-1"
+      },
+      "cover": "底稿目录"
+    },
+    "parser_ready": true,
+    "notes": "检查项 19 条；item_id A25-1-chk-{seq:02d}"
+  },
+  {
+    "wp_code": "A25-2",
+    "enterprise_variant": null,
+    "filename": "A25-2 质量控制复核表及复核记录(适用于内控审计).xlsx",
+    "runtime": "review-checklist",
+    "role": "eqcr",
+    "role_label": "质量控制复核人",
+    "audit_type": "internal_control",
+    "applicable_categories": [
+      "A"
+    ],
+    "sheets": {
+      "checklist": {
+        "name": "质量控制复核人复核表A25-2",
+        "header_row": 5,
+        "column_roles": {
+          "yes": "F",
+          "no": "G",
+          "na": "H",
+          "record_ref": "I"
+        },
+        "item_count": 18,
+        "items": [
+          {
+            "row": 6,
+            "seq": 1,
+            "seq_label": "1",
+            "item_id": "A25-2-chk-01",
+            "content": "本人对项目合伙人是独立的。本人对上市实体客户及其关联实体（或非上市实体客户及其控制的实体）没有任何承诺或自我利益等对独立性产生不利影响的因素。",
+            "content_preview": "本人对项目合伙人是独立的。本人对上市实体客户及其关联实体（或非上市实体客户及其控制的实体）没有任何承诺或自我利益等对独立性产生不利影响的因素。",
+            "auto_na_condition": null
+          },
+          {
+            "row": 7,
+            "seq": 2,
+            "seq_label": "2",
+            "item_id": "A25-2-chk-02",
+            "content": "项目组内各级复核是否均已得到满意的执行并保留复核记录？",
+            "content_preview": "项目组内各级复核是否均已得到满意的执行并保留复核记录？",
+            "auto_na_condition": null
+          },
+          {
+            "row": 8,
+            "seq": 3,
+            "seq_label": "3",
+            "item_id": "A25-2-chk-03",
+            "content": "项目质量复核合伙人复核是否已得到满意的执行并记录？项目质量复核合伙人要求跟进的问题项目组是否已恰当解决并回复？",
+            "content_preview": "项目质量复核合伙人复核是否已得到满意的执行并记录？项目质量复核合伙人要求跟进的问题项目组是否已恰当解决并回复？",
+            "auto_na_condition": null
+          },
+          {
+            "row": 9,
+            "seq": 4,
+            "seq_label": "4",
+            "item_id": "A25-2-chk-04",
+            "content": "是否确定项目组已就存在的意见分歧、其他疑难问题或争议事项进行适当咨询，且咨询得出的结论是恰当的？",
+            "content_preview": "是否确定项目组已就存在的意见分歧、其他疑难问题或争议事项进行适当咨询，且咨询得出的结论是恰当的？",
+            "auto_na_condition": null
+          },
+          {
+            "row": 10,
+            "seq": 5,
+            "seq_label": "5",
+            "item_id": "A25-2-chk-05",
+            "content": "是否阅读并了解IMS系统流转过来的业务承接或保持评价相关资料，与项目组沟通项目和被审计单位的性质和具体情况？",
+            "content_preview": "是否阅读并了解IMS系统流转过来的业务承接或保持评价相关资料，与项目组沟通项目和被审计单位的性质和具体情况？",
+            "auto_na_condition": null
+          },
+          {
+            "row": 11,
+            "seq": 6,
+            "seq_label": "6",
+            "item_id": "A25-2-chk-06",
+            "content": "是否获取并阅读事务所对该项目的内部质量控制检查报告（如适用），特别是针对可能与项目组的重大判断相关或影响该重大判断的领域识别出的缺陷进行沟通？",
+            "content_preview": "是否获取并阅读事务所对该项目的内部质量控制检查报告（如适用），特别是针对可能与项目组的重大判断相关或影响该重大判断的领域识别出的缺陷进行沟通？",
+            "auto_na_condition": null
+          },
+          {
+            "row": 12,
+            "seq": 7,
+            "seq_label": "7",
+            "item_id": "A25-2-chk-07",
+            "content": "是否已与项目合伙人、项目组其他成员（如适用）讨论重大事项，以及在业务计划、实施和报告阶段作出的重大判断？",
+            "content_preview": "是否已与项目合伙人、项目组其他成员（如适用）讨论重大事项，以及在业务计划、实施和报告阶段作出的重大判断？",
+            "auto_na_condition": null
+          },
+          {
+            "row": 13,
+            "seq": 8,
+            "seq_label": "8",
+            "item_id": "A25-2-chk-08",
+            "content": "是否认为所复核的总体审计策略、审计小结反映了项目组针对重大判断执行的工作，且能够支持拟发表的内部控制审计意见？",
+            "content_preview": "是否认为所复核的总体审计策略、审计小结反映了项目组针对重大判断执行的工作，且能够支持拟发表的内部控制审计意见？",
+            "auto_na_condition": null
+          },
+          {
+            "row": 14,
+            "seq": 9,
+            "seq_label": "9",
+            "item_id": "A25-2-chk-09",
+            "content": "评价项目组是否已就疑难问题或争议事项、涉及意见分歧的事项进行适当咨询，并检查是否已按照咨询的结果执行？",
+            "content_preview": "评价项目组是否已就疑难问题或争议事项、涉及意见分歧的事项进行适当咨询，并检查是否已按照咨询的结果执行？",
+            "auto_na_condition": null
+          },
+          {
+            "row": 15,
+            "seq": 10,
+            "seq_label": "10",
+            "item_id": "A25-2-chk-10",
+            "content": "是否已签订单独的内部控制审计业务约定书？",
+            "content_preview": "是否已签订单独的内部控制审计业务约定书？",
+            "auto_na_condition": null
+          },
+          {
+            "row": 16,
+            "seq": 11,
+            "seq_label": "11",
+            "item_id": "A25-2-chk-11",
+            "content": "是否已复核项目组就审计中识别的内部控制缺陷的重要程度作出的判断，并认为相应的处理是恰当的？",
+            "content_preview": "是否已复核项目组就审计中识别的内部控制缺陷的重要程度作出的判断，并认为相应的处理是恰当的？",
+            "auto_na_condition": null
+          },
+          {
+            "row": 17,
+            "seq": 12,
+            "seq_label": "12",
+            "item_id": "A25-2-chk-12",
+            "content": "复核审计工作完成核对表，确定审计工作已完成。",
+            "content_preview": "复核审计工作完成核对表，确定审计工作已完成。",
+            "auto_na_condition": null
+          },
+          {
+            "row": 18,
+            "seq": 13,
+            "seq_label": "13",
+            "item_id": "A25-2-chk-13",
+            "content": "确定内部控制审计报告已履行了事务所适当的质量控制复核程序，没有文字、数字或编辑错误。",
+            "content_preview": "确定内部控制审计报告已履行了事务所适当的质量控制复核程序，没有文字、数字或编辑错误。",
+            "auto_na_condition": null
+          },
+          {
+            "row": 19,
+            "seq": 14,
+            "seq_label": "14",
+            "item_id": "A25-2-chk-14",
+            "content": "检查企业内部控制评价报告中重要事项的披露，以确定要素的列报是否完整和恰当。",
+            "content_preview": "检查企业内部控制评价报告中重要事项的披露，以确定要素的列报是否完整和恰当。",
+            "auto_na_condition": null
+          },
+          {
+            "row": 20,
+            "seq": 15,
+            "seq_label": "15",
+            "item_id": "A25-2-chk-15",
+            "content": "确定审计中发现的重大缺陷已在企业内部控制评价报告或内部控制审计报告中进行了适当的披露。",
+            "content_preview": "确定审计中发现的重大缺陷已在企业内部控制评价报告或内部控制审计报告中进行了适当的披露。",
+            "auto_na_condition": null
+          },
+          {
+            "row": 21,
+            "seq": 16,
+            "seq_label": "16",
+            "item_id": "A25-2-chk-16",
+            "content": "确定已识别的关键控制流程的测试、重大缺陷评价已经得到了恰当的处理。",
+            "content_preview": "确定已识别的关键控制流程的测试、重大缺陷评价已经得到了恰当的处理。",
+            "auto_na_condition": null
+          },
+          {
+            "row": 22,
+            "seq": 17,
+            "seq_label": "17",
+            "item_id": "A25-2-chk-17",
+            "content": "是否已复核企业内部控制评价报告和拟出具的内部控制审计报告及管理建议书，认为企业内部控制评价报告在所有重大方面按照企业内部控制评价指引的规定编制，拟出具的审计报告已按照中国注册会计师审计准则、企业内部控制审计指引、企业内部控制审计指引实施意见的规定发表了恰当的审计意见？",
+            "content_preview": "是否已复核企业内部控制评价报告和拟出具的内部控制审计报告及管理建议书，认为企业内部控制评价报告在所有重大方面按照企业内部控制评价指引的规定编制，拟出具的审计报告已按照中国注册会计师审计准则、企业内部控制审计指引、企业内部控制审计指引实施意见的规定发表了恰当的审计意见？",
+            "auto_na_condition": null
+          },
+          {
+            "row": 23,
+            "seq": 18,
+            "seq_label": "18",
+            "item_id": "A25-2-chk-18",
+            "content": "本人已经按照《项目质量复核实施办法》实施了质量控制复核，所有复核意见均已得到解决。本人没有注意到存在任何尚未解决的、可能使本人认为项目组作出的重大判断和得出的结论不适当的事项。",
+            "content_preview": "本人已经按照《项目质量复核实施办法》实施了质量控制复核，所有复核意见均已得到解决。本人没有注意到存在任何尚未解决的、可能使本人认为项目组作出的重大判断和得出的结论不适当的事项。",
+            "auto_na_condition": null
+          }
+        ],
+        "sign_rows": [
+          24
+        ]
+      },
+      "record": {
+        "name": "复核记录参考模板A25-2-1"
+      },
+      "cover": "底稿目录"
+    },
+    "parser_ready": true,
+    "notes": "检查项 18 条；item_id A25-2-chk-{seq:02d}"
+  }
+]

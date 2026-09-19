@@ -28,7 +28,7 @@ async def get_due_this_month(
     current_user: User = Depends(get_current_user),
 ):
     """返回本月应抽查的项目列表"""
-    from app.models.project_models import Project
+    from app.models.core import Project
 
     now = datetime.now(timezone.utc)
     month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)

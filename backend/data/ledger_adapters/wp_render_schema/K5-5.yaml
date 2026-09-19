@@ -1,0 +1,69 @@
+# backend/data/wp_render_schema/K5-5.yaml
+# 律师函回函分析表 — d-form-table 渲染 schema
+# Requirements: §5.5（K5 预计负债 — 律师函回函）
+# Design: §2 componentType=d-form-table（结构化分析）
+# Template: K5 预计负债.xlsx
+
+wp_code: K5-5
+wp_name: 律师函回函分析表
+component_type: d-form-table
+template_path: backend/wp_templates/K/K5 预计负债.xlsx
+template_version: v2025-R5
+applicable_standards: [soe_standalone, listed_standalone, soe_consolidated, listed_consolidated]
+related_accounts:
+  - code: '2801'
+    name: 预计负债
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 律师函回函分析 — 逐函分析
+# ═══════════════════════════════════════════════════════════════════════════════
+
+sections:
+  - name: 律师函回函清单
+    group_key: legal_responses
+    row_type: dynamic_rows
+    allow_add_rows: true
+    fields:
+      - { field: item_no, label: 序号, type: number, readonly: true }
+      - { field: law_firm, label: 律师事务所名称, type: text }
+      - { field: lawyer_name, label: 经办律师, type: text }
+      - { field: send_date, label: 发函日期, type: date }
+      - { field: receive_date, label: 收函日期, type: date }
+      - { field: case_description, label: 案件描述, type: textarea }
+      - { field: case_amount, label: 涉案金额, type: number }
+      - { field: case_stage, label: 案件阶段, type: select, options: ["一审进行中", "一审已判", "二审进行中", "二审已判", "执行阶段", "调解/和解", "其他"] }
+      - { field: lawyer_opinion, label: 律师意见, type: textarea }
+      - { field: estimated_outcome, label: 预计结果, type: select, options: ["胜诉可能性大", "败诉可能性大", "结果不确定", "已和解"] }
+      - { field: estimated_loss, label: 预计损失金额, type: number }
+      - { field: management_response, label: 管理层回应, type: textarea }
+      - { field: audit_evaluation, label: 审计评价, type: select, options: ["律师意见充分可靠", "律师意见与管理层判断一致", "律师意见与管理层判断不一致", "需补充询证"] }
+      - { field: ref_k5_3, label: 关联K5-3事项号, type: text, ref_target: "K5-3" }
+
+  # ─── 汇总 ──────────────────────────────────────────────────────────────────
+  - name: 回函汇总
+    row_type: summary
+    fields:
+      - { field: total_sent, label: 发函总数, type: number }
+      - { field: total_received, label: 回函总数, type: number }
+      - { field: response_rate, label: 回函率, type: percent, formula: "total_received / total_sent" }
+      - { field: total_case_amount, label: 涉案总金额, type: number, formula: "SUM(legal_responses.case_amount)" }
+      - { field: total_estimated_loss, label: 预计损失总额, type: number, formula: "SUM(legal_responses.estimated_loss)" }
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 跨底稿引用
+# ═══════════════════════════════════════════════════════════════════════════════
+
+cross_refs:
+  - ref_id: CW-K5-5-001
+    target_wp: K5-3
+    target_field: 或有事项评估
+    description: '律师函意见 → K5-3 或有事项可能性判断依据'
+    severity: required
+    direction: outbound
+
+  - ref_id: CW-K5-5-002
+    target_wp: K5-4
+    target_field: 最佳估计数
+    description: '预计损失 → K5-4 最佳估计数参考'
+    severity: info
+    direction: outbound

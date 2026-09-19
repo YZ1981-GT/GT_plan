@@ -1,0 +1,32 @@
+[
+  {
+    "id": "M45",
+    "side": "be",
+    "want": "test_task41_d2_large_json_pilot.py::TestOrderingGate::test_attach_is_a_no_op_before_enablement_and_never_raises",
+    "why": "未启用时不再提前返回 ⇒ 接线会去读库并抛异常，`_registration` / `_apply_durable_incoming` 对**所有** entry 都 500（辐射面实测：Task 28 的路由守卫 8 例打红，因为它的 fixture 用的正是本 pilot 冻结的 entry）",
+    "verdict": "RED",
+    "summary": "1 failed, 151 passed in 33.89s",
+    "added": [
+      "test_task41_d2_large_json_pilot.py::TestOrderingGate::test_attach_is_a_no_op_before_enablement_and_never_raises"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task41_d2_large_json_pilot.py::TestOrderingGate::test_attach_is_a_no_op_before_enablement_and_never_raises"
+    ],
+    "added_files": [
+      "test_task41_d2_large_json_pilot.py"
+    ],
+    "restored": true,
+    "seconds": 37.3
+  },
+  {
+    "id": "M46",
+    "side": "be",
+    "want": "test_task41_d2_large_json_pilot.py::TestOrderingGate::test_capability_predicate_agrees_with_the_ordering_gate",
+    "why": "真值判定与顺序门给出相反结论仍绿 ⇒ 「接线路径放行、顺序门仍红」的不一致可以悄悄发生：manifest 说单向、接线却往下走到注册",
+    "verdict": "ANCHOR-MISS",
+    "detail": "scope+offset 指向的 L1447 不是 anchor\n  期望 '        return False'\n  实为 '    except PilotSelectionError:'",
+    "restored": true,
+    "seconds": 0.0
+  }
+]

@@ -113,6 +113,7 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
 import { ElMessage } from 'element-plus'
+import { readWorkbookAoa } from '@/composables/useExcelIO'
 import { handleApiError } from '@/utils/errorHandler'
 
 /* ── Props ── */
@@ -180,27 +181,26 @@ async function onFileChange(e: Event) {
   fileSelected.value = true
 
   try {
-    const XLSX = await import('xlsx')
-    const buf = await file.arrayBuffer()
-    const wb = XLSX.read(buf, { type: 'array' })
+    // 走 useExcelIO 单一入口（B7 批）。这里用 readWorkbookAoa 而非 readSheetAoa：
+    // 本组件的降级规则是「取**最后一个** sheet（跳过可能的填写说明）」，而封装的
+    // 统一口径是降级取**第一个** —— 两者不同，故自己选 sheet 名。
+    const { sheetNames, sheets } = await readWorkbookAoa(file)
 
     // 查找目标 sheet
     let targetSheet = ''
     if (props.sheetName) {
-      targetSheet = wb.SheetNames.find(n => n === props.sheetName) || ''
+      targetSheet = sheetNames.find(n => n === props.sheetName) || ''
     }
     if (!targetSheet) {
       // 取最后一个 sheet（跳过可能的"填写说明"）
-      targetSheet = wb.SheetNames[wb.SheetNames.length - 1]
+      targetSheet = sheetNames[sheetNames.length - 1]
     }
 
-    const ws = wb.Sheets[targetSheet]
-    if (!ws) {
+    const jsonData: any[][] = sheets[targetSheet]
+    if (!jsonData) {
       ElMessage.error(`未找到工作表"${props.sheetName || targetSheet}"`)
       return
     }
-
-    const jsonData: any[][] = XLSX.utils.sheet_to_json(ws, { header: 1 })
 
     if (jsonData.length <= props.skipRows) {
       ElMessage.warning('文件中没有数据行')

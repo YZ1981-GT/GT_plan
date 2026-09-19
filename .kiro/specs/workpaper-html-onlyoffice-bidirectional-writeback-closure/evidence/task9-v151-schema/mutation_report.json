@@ -1,0 +1,859 @@
+[
+  {
+    "id": "M01",
+    "side": "be",
+    "want": "test_property_4_business_revision_orthogonal_to_representation",
+    "why": "把 (wp_id,revision) 唯一键加宽成含 id ⇒ 同 wp 可插两条 revision=1，业务 revision 不再单调唯一；不能直接删约束行（下方还有多条 CONSTRAINT，删行不影响语法但会让 P4-dup-revision 与 uq 名断言同时红，判据不清）",
+    "verdict": "RED",
+    "summary": "1 failed, 18 passed in 24.74s",
+    "added": [
+      "test_v151_schema_contract.py::test_property_4_business_revision_orthogonal_to_representation"
+    ],
+    "gone": [],
+    "hit": [
+      "test_v151_schema_contract.py::test_property_4_business_revision_orthogonal_to_representation"
+    ],
+    "added_files": [
+      "test_v151_schema_contract.py"
+    ],
+    "restored": true,
+    "seconds": 27.6
+  },
+  {
+    "id": "M02",
+    "side": "be",
+    "want": "test_property_4_business_revision_orthogonal_to_representation",
+    "why": "把 immutable 守卫的触发时机从 UPDATE 改成 DELETE ⇒ 历史 content version 可被原地改写（P4-content-version-immutable 不再被拒）。改时机而不是改函数体，是为了保持 plpgsql 合法、不牵连迁移应用失败",
+    "verdict": "RED",
+    "summary": "1 failed, 18 passed in 24.17s",
+    "added": [
+      "test_v151_schema_contract.py::test_property_4_business_revision_orthogonal_to_representation"
+    ],
+    "gone": [],
+    "hit": [
+      "test_v151_schema_contract.py::test_property_4_business_revision_orthogonal_to_representation"
+    ],
+    "added_files": [
+      "test_v151_schema_contract.py"
+    ],
+    "restored": true,
+    "seconds": 27.1
+  },
+  {
+    "id": "M03",
+    "side": "be",
+    "want": "test_property_4_business_revision_orthogonal_to_representation",
+    "why": "representation generation 唯一键加宽 ⇒ 同 (wp,entry,version,generation) 可重复，representation 代际不再确定（P4-dup-generation 不再被拒）",
+    "verdict": "RED",
+    "summary": "1 failed, 18 passed in 24.47s",
+    "added": [
+      "test_v151_schema_contract.py::test_property_4_business_revision_orthogonal_to_representation"
+    ],
+    "gone": [],
+    "hit": [
+      "test_v151_schema_contract.py::test_property_4_business_revision_orthogonal_to_representation"
+    ],
+    "added_files": [
+      "test_v151_schema_contract.py"
+    ],
+    "restored": true,
+    "seconds": 27.3
+  },
+  {
+    "id": "M04",
+    "side": "be",
+    "want": "test_property_4_business_revision_orthogonal_to_representation",
+    "why": "回填台账允许非 0 revision ⇒ 回填可伪造历史业务版本（P4-backfill-ledger-non-zero 不再被拒）",
+    "verdict": "RED",
+    "summary": "1 failed, 18 passed in 24.44s",
+    "added": [
+      "test_v151_schema_contract.py::test_property_4_business_revision_orthogonal_to_representation"
+    ],
+    "gone": [],
+    "hit": [
+      "test_v151_schema_contract.py::test_property_4_business_revision_orthogonal_to_representation"
+    ],
+    "added_files": [
+      "test_v151_schema_contract.py"
+    ],
+    "restored": true,
+    "seconds": 27.3
+  },
+  {
+    "id": "M05",
+    "side": "be",
+    "want": "test_property_5_no_dangling_visible_state",
+    "why": "放开 incoming 可 published ⇒ resolver 能解析到 incoming、incoming 可直接晋升为可见 artifact（P5-incoming-published 不再被拒）",
+    "verdict": "RED",
+    "summary": "1 failed, 18 passed in 23.82s",
+    "added": [
+      "test_v151_schema_contract.py::test_property_5_no_dangling_visible_state"
+    ],
+    "gone": [],
+    "hit": [
+      "test_v151_schema_contract.py::test_property_5_no_dangling_visible_state"
+    ],
+    "added_files": [
+      "test_v151_schema_contract.py"
+    ],
+    "restored": true,
+    "seconds": 26.6
+  },
+  {
+    "id": "M06",
+    "side": "be",
+    "want": "test_property_5_no_dangling_visible_state",
+    "why": "关掉 `.incoming/{wp}/{delivery}/` 路径 sealing 校验 ⇒ incoming 路径可绑到任意目录/任意实体（P5-incoming-path-not-sealed 不再被拒）",
+    "verdict": "RED",
+    "summary": "1 failed, 18 passed in 23.31s",
+    "added": [
+      "test_v151_schema_contract.py::test_property_5_no_dangling_visible_state"
+    ],
+    "gone": [],
+    "hit": [
+      "test_v151_schema_contract.py::test_property_5_no_dangling_visible_state"
+    ],
+    "added_files": [
+      "test_v151_schema_contract.py"
+    ],
+    "restored": true,
+    "seconds": 26.1
+  },
+  {
+    "id": "M07",
+    "side": "be",
+    "want": "test_property_5_no_dangling_visible_state",
+    "why": "entry current pointer 不再要求 published artifact ⇒ 出现「pointer 指向未发布/候选 artifact」的悬空可见态（P5-entry-pointer-to-staged-artifact 不再被拒）",
+    "verdict": "RED",
+    "summary": "1 failed, 18 passed in 23.45s",
+    "added": [
+      "test_v151_schema_contract.py::test_property_5_no_dangling_visible_state"
+    ],
+    "gone": [],
+    "hit": [
+      "test_v151_schema_contract.py::test_property_5_no_dangling_visible_state"
+    ],
+    "added_files": [
+      "test_v151_schema_contract.py"
+    ],
+    "restored": true,
+    "seconds": 26.1
+  },
+  {
+    "id": "M08",
+    "side": "be",
+    "want": "test_property_5_no_dangling_visible_state",
+    "why": "关掉 incoming 的 durable/quarantined 互转禁令 ⇒ quarantined 可被 release 成 durable 并进入 engine（P5-incoming-quarantined-to-durable / -durable-to-quarantined 不再被拒）",
+    "verdict": "RED",
+    "summary": "2 failed, 17 passed in 23.18s",
+    "added": [
+      "test_v151_schema_contract.py::test_property_5_no_dangling_visible_state",
+      "test_v151_schema_contract.py::test_property_64_application_identity_uses_frozen_bundle_without_status"
+    ],
+    "gone": [],
+    "hit": [
+      "test_v151_schema_contract.py::test_property_5_no_dangling_visible_state"
+    ],
+    "added_files": [
+      "test_v151_schema_contract.py"
+    ],
+    "restored": true,
+    "seconds": 25.9
+  },
+  {
+    "id": "M09",
+    "side": "be",
+    "want": "test_property_10_single_commit_and_representation_idempotency",
+    "why": "pending mutation 幂等键加宽 ⇒ 同 token 可重复创建，flush→commit 会二次提交（P10-pending-mutation-dup-key 不再被拒）",
+    "verdict": "RED",
+    "summary": "1 failed, 18 passed in 23.25s",
+    "added": [
+      "test_v151_schema_contract.py::test_property_10_single_commit_and_representation_idempotency"
+    ],
+    "gone": [],
+    "hit": [
+      "test_v151_schema_contract.py::test_property_10_single_commit_and_representation_idempotency"
+    ],
+    "added_files": [
+      "test_v151_schema_contract.py"
+    ],
+    "restored": true,
+    "seconds": 25.9
+  },
+  {
+    "id": "M10",
+    "side": "be",
+    "want": "test_property_10_single_commit_and_representation_idempotency",
+    "why": "去掉 application_key 唯一性 ⇒ 同一 frozen identity 可产生多个 application，「frozen application 恰好一次」失效（P10-duplicate-application-key 不再被拒）",
+    "verdict": "RED",
+    "summary": "1 failed, 18 passed in 23.40s",
+    "added": [
+      "test_v151_schema_contract.py::test_property_10_single_commit_and_representation_idempotency"
+    ],
+    "gone": [],
+    "hit": [
+      "test_v151_schema_contract.py::test_property_10_single_commit_and_representation_idempotency"
+    ],
+    "added_files": [
+      "test_v151_schema_contract.py"
+    ],
+    "restored": true,
+    "seconds": 26.1
+  },
+  {
+    "id": "M11",
+    "side": "be",
+    "want": "test_property_10_single_commit_and_representation_idempotency",
+    "why": "未 committed 也可预留 result_operation/result_version ⇒ 重放会返回尚未提交的伪结果（P10-pending-uncommitted-with-result 不再被拒）",
+    "verdict": "RED",
+    "summary": "1 failed, 18 passed in 23.37s",
+    "added": [
+      "test_v151_schema_contract.py::test_property_10_single_commit_and_representation_idempotency"
+    ],
+    "gone": [],
+    "hit": [
+      "test_v151_schema_contract.py::test_property_10_single_commit_and_representation_idempotency"
+    ],
+    "added_files": [
+      "test_v151_schema_contract.py"
+    ],
+    "restored": true,
+    "seconds": 26.1
+  },
+  {
+    "id": "M12",
+    "side": "be",
+    "want": "test_property_11_unique_descriptor_and_ready_confirmation",
+    "why": "active confirmation 的 partial unique 键加宽 ⇒ 同 (room,participant,generation) 可有多个有效 descriptor 确认，「唯一 descriptor」失效（P11-duplicate-active-confirmation 不再被拒）",
+    "verdict": "RED",
+    "summary": "1 failed, 18 passed in 23.33s",
+    "added": [
+      "test_v151_schema_contract.py::test_property_11_unique_descriptor_and_ready_confirmation"
+    ],
+    "gone": [],
+    "hit": [
+      "test_v151_schema_contract.py::test_property_11_unique_descriptor_and_ready_confirmation"
+    ],
+    "added_files": [
+      "test_v151_schema_contract.py"
+    ],
+    "restored": true,
+    "seconds": 26.0
+  },
+  {
+    "id": "M13",
+    "side": "be",
+    "want": "test_property_11_unique_descriptor_and_ready_confirmation",
+    "why": "关掉 confirmation 的 identity 校验触发器 ⇒ 陈旧 generation/错 bundle 的 descriptor 也能确认（P11-confirmation-stale-generation / -bundle-not-locked 不再被拒）",
+    "verdict": "RED",
+    "summary": "1 failed, 18 passed in 23.36s",
+    "added": [
+      "test_v151_schema_contract.py::test_property_11_unique_descriptor_and_ready_confirmation"
+    ],
+    "gone": [],
+    "hit": [
+      "test_v151_schema_contract.py::test_property_11_unique_descriptor_and_ready_confirmation"
+    ],
+    "added_files": [
+      "test_v151_schema_contract.py"
+    ],
+    "restored": true,
+    "seconds": 26.2
+  },
+  {
+    "id": "M14",
+    "side": "be",
+    "want": "test_property_18_many_deliveries_one_frozen_application",
+    "why": "operation.application_id 不再唯一 ⇒ 一个 application 可被多个 primary 绑定，「1 primary + N-1 duplicates」失效（P18-two-primaries-same-application 不再被拒）",
+    "verdict": "RED",
+    "summary": "1 failed, 18 passed in 23.36s",
+    "added": [
+      "test_v151_schema_contract.py::test_property_18_many_deliveries_one_frozen_application"
+    ],
+    "gone": [],
+    "hit": [
+      "test_v151_schema_contract.py::test_property_18_many_deliveries_one_frozen_application"
+    ],
+    "added_files": [
+      "test_v151_schema_contract.py"
+    ],
+    "restored": true,
+    "seconds": 26.1
+  },
+  {
+    "id": "M16",
+    "side": "be",
+    "want": "test_property_18_many_deliveries_one_frozen_application",
+    "why": "duplicate 不再强制 terminal + application 空 ⇒ loser shell 可继续流转甚至绑定application（P18-duplicate-state-not-terminal 不再被拒）",
+    "verdict": "RED",
+    "summary": "1 failed, 18 passed in 23.23s",
+    "added": [
+      "test_v151_schema_contract.py::test_property_18_many_deliveries_one_frozen_application"
+    ],
+    "gone": [],
+    "hit": [
+      "test_v151_schema_contract.py::test_property_18_many_deliveries_one_frozen_application"
+    ],
+    "added_files": [
+      "test_v151_schema_contract.py"
+    ],
+    "restored": true,
+    "seconds": 26.0
+  },
+  {
+    "id": "M17",
+    "side": "be",
+    "want": "test_property_18_many_deliveries_one_frozen_application",
+    "why": "durable delivery 不再要求恰一个 owner ⇒ durable incoming 可成为无所有者死路（P18-durable-delivery-zero-owner 不再被拒）",
+    "verdict": "RED",
+    "summary": "1 failed, 18 passed in 23.13s",
+    "added": [
+      "test_v151_schema_contract.py::test_property_18_many_deliveries_one_frozen_application"
+    ],
+    "gone": [],
+    "hit": [
+      "test_v151_schema_contract.py::test_property_18_many_deliveries_one_frozen_application"
+    ],
+    "added_files": [
+      "test_v151_schema_contract.py"
+    ],
+    "restored": true,
+    "seconds": 25.8
+  },
+  {
+    "id": "M18",
+    "side": "be",
+    "want": "test_property_18_many_deliveries_one_frozen_application",
+    "why": "close-capture partial unique 的 open-state 集合被换空 ⇒ 同 generation 可有多个 open close_capture，at-most-one 失效（P18-two-open-close-captures 不再被拒）",
+    "verdict": "RED",
+    "summary": "1 failed, 18 passed in 23.55s",
+    "added": [
+      "test_v151_schema_contract.py::test_property_18_many_deliveries_one_frozen_application"
+    ],
+    "gone": [],
+    "hit": [
+      "test_v151_schema_contract.py::test_property_18_many_deliveries_one_frozen_application"
+    ],
+    "added_files": [
+      "test_v151_schema_contract.py"
+    ],
+    "restored": true,
+    "seconds": 26.3
+  },
+  {
+    "id": "M19",
+    "side": "be",
+    "want": "test_property_18_many_deliveries_one_frozen_application",
+    "why": "recovery case claim 前可携带 operation/application/request ⇒ 「claim 前零三实体」与 download-only 恒空失效（P18-recovery-pre-claim-has-operation 不再被拒）",
+    "verdict": "RED",
+    "summary": "1 failed, 18 passed in 23.52s",
+    "added": [
+      "test_v151_schema_contract.py::test_property_18_many_deliveries_one_frozen_application"
+    ],
+    "gone": [],
+    "hit": [
+      "test_v151_schema_contract.py::test_property_18_many_deliveries_one_frozen_application"
+    ],
+    "added_files": [
+      "test_v151_schema_contract.py"
+    ],
+    "restored": true,
+    "seconds": 26.3
+  },
+  {
+    "id": "M20",
+    "side": "be",
+    "want": "test_property_62_server_last_applied_not_conflated_with_client_base",
+    "why": "关掉 room 单调 fence 守卫 ⇒ durable/request sequence、write fence、eligibility epoch 可回退，旧会话能覆盖新内容（P62-room-durable-sequence-regress 等不再被拒）",
+    "verdict": "RED",
+    "summary": "1 failed, 18 passed in 23.57s",
+    "added": [
+      "test_v151_schema_contract.py::test_property_62_server_last_applied_not_conflated_with_client_base"
+    ],
+    "gone": [],
+    "hit": [
+      "test_v151_schema_contract.py::test_property_62_server_last_applied_not_conflated_with_client_base"
+    ],
+    "added_files": [
+      "test_v151_schema_contract.py"
+    ],
+    "restored": true,
+    "seconds": 26.4
+  },
+  {
+    "id": "M21",
+    "side": "be",
+    "want": "test_property_62_server_last_applied_not_conflated_with_client_base",
+    "why": "client-confirmed 快照可半缺（bundle id 有、digest 无）⇒ 服务端会按 revision 猜客户端内容，两套指针混同（P62-room-partial-client-confirmed 不再被拒）",
+    "verdict": "RED",
+    "summary": "1 failed, 18 passed in 23.33s",
+    "added": [
+      "test_v151_schema_contract.py::test_property_62_server_last_applied_not_conflated_with_client_base"
+    ],
+    "gone": [],
+    "hit": [
+      "test_v151_schema_contract.py::test_property_62_server_last_applied_not_conflated_with_client_base"
+    ],
+    "added_files": [
+      "test_v151_schema_contract.py"
+    ],
+    "restored": true,
+    "seconds": 26.0
+  },
+  {
+    "id": "M22",
+    "side": "be",
+    "want": "test_property_64_application_identity_uses_frozen_bundle_without_status",
+    "why": "关掉 application identity 不可变 + effective sequence 单调守卫 ⇒ application_key/origin sequence 可被改写、effective sequence 可回退（P64-application-key-mutated 等不再被拒）",
+    "verdict": "RED",
+    "summary": "1 failed, 18 passed in 23.58s",
+    "added": [
+      "test_v151_schema_contract.py::test_property_64_application_identity_uses_frozen_bundle_without_status"
+    ],
+    "gone": [],
+    "hit": [
+      "test_v151_schema_contract.py::test_property_64_application_identity_uses_frozen_bundle_without_status"
+    ],
+    "added_files": [
+      "test_v151_schema_contract.py"
+    ],
+    "restored": true,
+    "seconds": 26.3
+  },
+  {
+    "id": "M23",
+    "side": "be",
+    "want": "test_property_64_application_identity_uses_frozen_bundle_without_status",
+    "why": "forcesave 复合幂等键加宽 ⇒ 同 (room,generation,initiator,kind,key) 可重复创建 request，重放不再返回同一 request/operation（P64-request-idempotency-reuse-same-participant 不再被拒）",
+    "verdict": "RED",
+    "summary": "1 failed, 18 passed in 23.53s",
+    "added": [
+      "test_v151_schema_contract.py::test_property_64_application_identity_uses_frozen_bundle_without_status"
+    ],
+    "gone": [],
+    "hit": [
+      "test_v151_schema_contract.py::test_property_64_application_identity_uses_frozen_bundle_without_status"
+    ],
+    "added_files": [
+      "test_v151_schema_contract.py"
+    ],
+    "restored": true,
+    "seconds": 26.3
+  },
+  {
+    "id": "M24",
+    "side": "be",
+    "want": "test_property_64_application_identity_uses_frozen_bundle_without_status",
+    "why": "application 的 incoming 不再要求 state=durable ⇒ quarantined incoming 可创建 application 并进入 engine（P64-application-on-quarantined-incoming 不再被拒）",
+    "verdict": "RED",
+    "summary": "1 failed, 18 passed in 23.62s",
+    "added": [
+      "test_v151_schema_contract.py::test_property_64_application_identity_uses_frozen_bundle_without_status"
+    ],
+    "gone": [],
+    "hit": [
+      "test_v151_schema_contract.py::test_property_64_application_identity_uses_frozen_bundle_without_status"
+    ],
+    "added_files": [
+      "test_v151_schema_contract.py"
+    ],
+    "restored": true,
+    "seconds": 26.4
+  },
+  {
+    "id": "M25",
+    "side": "be",
+    "want": "test_property_68_timeline_complete_and_append_only",
+    "why": "operation timeline 的 (operation_id,sequence_no) 不再唯一 ⇒ 同一 sequence 可写多条伪 event，timeline 不再单调（P68-operation-event-dup-sequence 不再被拒）",
+    "verdict": "RED",
+    "summary": "1 failed, 18 passed in 22.86s",
+    "added": [
+      "test_v151_schema_contract.py::test_property_68_timeline_complete_and_append_only"
+    ],
+    "gone": [],
+    "hit": [
+      "test_v151_schema_contract.py::test_property_68_timeline_complete_and_append_only"
+    ],
+    "added_files": [
+      "test_v151_schema_contract.py"
+    ],
+    "restored": true,
+    "seconds": 25.5
+  },
+  {
+    "id": "M26",
+    "side": "be",
+    "want": "test_property_68_timeline_complete_and_append_only",
+    "why": "operation timeline 的 append-only 守卫不再覆盖 UPDATE ⇒ 既有 event 可被改写，「current state 只是 timeline 投影」失效（P68-operation-event-update 不再被拒）",
+    "verdict": "RED",
+    "summary": "1 failed, 18 passed in 22.85s",
+    "added": [
+      "test_v151_schema_contract.py::test_property_68_timeline_complete_and_append_only"
+    ],
+    "gone": [],
+    "hit": [
+      "test_v151_schema_contract.py::test_property_68_timeline_complete_and_append_only"
+    ],
+    "added_files": [
+      "test_v151_schema_contract.py"
+    ],
+    "restored": true,
+    "seconds": 25.3
+  },
+  {
+    "id": "M27",
+    "side": "be",
+    "want": "test_property_68_timeline_complete_and_append_only",
+    "why": "同 request 对同 application 可 fold 多次 ⇒ 幂等重放会产生第二个 sequence_folded event（P68-fold-same-request-twice 不再被拒）",
+    "verdict": "RED",
+    "summary": "1 failed, 18 passed in 22.02s",
+    "added": [
+      "test_v151_schema_contract.py::test_property_68_timeline_complete_and_append_only"
+    ],
+    "gone": [],
+    "hit": [
+      "test_v151_schema_contract.py::test_property_68_timeline_complete_and_append_only"
+    ],
+    "added_files": [
+      "test_v151_schema_contract.py"
+    ],
+    "restored": true,
+    "seconds": 24.3
+  },
+  {
+    "id": "M28",
+    "side": "be",
+    "want": "test_property_68_timeline_complete_and_append_only",
+    "why": "close intent 可声称 promoted 而不携带 close_capture request ⇒ leader 提升不再exactly-once 可审计（P68-close-intent-promoted-without-request 不再被拒）",
+    "verdict": "RED",
+    "summary": "1 failed, 18 passed in 22.10s",
+    "added": [
+      "test_v151_schema_contract.py::test_property_68_timeline_complete_and_append_only"
+    ],
+    "gone": [],
+    "hit": [
+      "test_v151_schema_contract.py::test_property_68_timeline_complete_and_append_only"
+    ],
+    "added_files": [
+      "test_v151_schema_contract.py"
+    ],
+    "restored": true,
+    "seconds": 24.3
+  },
+  {
+    "id": "M29",
+    "side": "be",
+    "want": "test_property_69_evidence_closed_by_per_scenario_entities",
+    "why": "download-only scenario 可携带 operation/application ⇒ 「download-only 零三实体」判据失效，evidence 可用一条 applied operation 冒充全部场景（P69-download-only-with-operation 不再被拒）",
+    "verdict": "RED",
+    "summary": "1 failed, 18 passed in 22.69s",
+    "added": [
+      "test_v151_schema_contract.py::test_property_69_evidence_closed_by_per_scenario_entities"
+    ],
+    "gone": [],
+    "hit": [
+      "test_v151_schema_contract.py::test_property_69_evidence_closed_by_per_scenario_entities"
+    ],
+    "added_files": [
+      "test_v151_schema_contract.py"
+    ],
+    "restored": true,
+    "seconds": 25.0
+  },
+  {
+    "id": "M30",
+    "side": "be",
+    "want": "test_property_69_evidence_closed_by_per_scenario_entities",
+    "why": "scenario 的 (run,scenario,ordinal) 不再唯一 ⇒ 同一场景可被替换/重复登记（P69-scenario-dup-ordinal 不再被拒）",
+    "verdict": "RED",
+    "summary": "1 failed, 18 passed in 22.02s",
+    "added": [
+      "test_v151_schema_contract.py::test_property_69_evidence_closed_by_per_scenario_entities"
+    ],
+    "gone": [],
+    "hit": [
+      "test_v151_schema_contract.py::test_property_69_evidence_closed_by_per_scenario_entities"
+    ],
+    "added_files": [
+      "test_v151_schema_contract.py"
+    ],
+    "restored": true,
+    "seconds": 24.3
+  },
+  {
+    "id": "M31",
+    "side": "be",
+    "want": "test_property_69_evidence_closed_by_per_scenario_entities",
+    "why": "room_model 退回自由文本 ⇒ scenario profile 可被人手写覆盖，required scenario set 推导失去机器真源（P69-test-run-free-text-room-model 不再被拒）",
+    "verdict": "RED",
+    "summary": "1 failed, 18 passed in 22.06s",
+    "added": [
+      "test_v151_schema_contract.py::test_property_69_evidence_closed_by_per_scenario_entities"
+    ],
+    "gone": [],
+    "hit": [
+      "test_v151_schema_contract.py::test_property_69_evidence_closed_by_per_scenario_entities"
+    ],
+    "added_files": [
+      "test_v151_schema_contract.py"
+    ],
+    "restored": true,
+    "seconds": 24.5
+  },
+  {
+    "id": "M32",
+    "side": "be",
+    "want": "test_definition_bundle_typed_slots_are_locked",
+    "why": "digest 单一真源放开全零 hash ⇒ 全零 hash 可充当 bundle/authority/application 身份（BUNDLE-zero-slot-digest 等不再被拒）",
+    "verdict": "RED",
+    "summary": "1 failed, 18 passed in 26.65s",
+    "added": [
+      "test_v151_schema_contract.py::test_definition_bundle_typed_slots_are_locked"
+    ],
+    "gone": [],
+    "hit": [
+      "test_v151_schema_contract.py::test_definition_bundle_typed_slots_are_locked"
+    ],
+    "added_files": [
+      "test_v151_schema_contract.py"
+    ],
+    "restored": true,
+    "seconds": 28.9
+  },
+  {
+    "id": "M33",
+    "side": "be",
+    "want": "test_definition_bundle_typed_slots_are_locked",
+    "why": "bundle 的 definition child 不再要求 approved ⇒ candidate child 可组成 approved bundle 并 finalize representation（BUNDLE-slot-child-not-approved 不再被拒）",
+    "verdict": "RED",
+    "summary": "1 failed, 18 passed in 22.98s",
+    "added": [
+      "test_v151_schema_contract.py::test_definition_bundle_typed_slots_are_locked"
+    ],
+    "gone": [],
+    "hit": [
+      "test_v151_schema_contract.py::test_definition_bundle_typed_slots_are_locked"
+    ],
+    "added_files": [
+      "test_v151_schema_contract.py"
+    ],
+    "restored": true,
+    "seconds": 25.5
+  },
+  {
+    "id": "M34",
+    "side": "be",
+    "want": "test_definition_bundle_typed_slots_are_locked",
+    "why": "projection_contract 不再强制三 child 全为 approved definition ⇒ 可用 typed null marker 冒充 per-entry contract（BUNDLE-projection-contract-with-marker 不再被拒）",
+    "verdict": "RED",
+    "summary": "1 failed, 18 passed in 23.24s",
+    "added": [
+      "test_v151_schema_contract.py::test_definition_bundle_typed_slots_are_locked"
+    ],
+    "gone": [],
+    "hit": [
+      "test_v151_schema_contract.py::test_definition_bundle_typed_slots_are_locked"
+    ],
+    "added_files": [
+      "test_v151_schema_contract.py"
+    ],
+    "restored": true,
+    "seconds": 25.8
+  },
+  {
+    "id": "M35",
+    "side": "be",
+    "want": "test_definition_bundle_typed_slots_are_locked",
+    "why": "marker digest 不再与 registry 比对 ⇒ 可伪造 typed null digest 进入 bundle canonical bytes（BUNDLE-marker-digest-forged 不再被拒）",
+    "verdict": "RED",
+    "summary": "1 failed, 18 passed in 23.14s",
+    "added": [
+      "test_v151_schema_contract.py::test_definition_bundle_typed_slots_are_locked"
+    ],
+    "gone": [],
+    "hit": [
+      "test_v151_schema_contract.py::test_definition_bundle_typed_slots_are_locked"
+    ],
+    "added_files": [
+      "test_v151_schema_contract.py"
+    ],
+    "restored": true,
+    "seconds": 25.7
+  },
+  {
+    "id": "M36",
+    "side": "be",
+    "want": "test_definition_bundle_typed_slots_are_locked",
+    "why": "回归变异：删掉显式 IS NOT NULL 后 CHECK 退回三值逻辑形态 —— kind='authority_model' 而 type=NULL 时 `NULL IN (...)` 使整条 CHECK 求值为 NULL（= 视为满足）而被静默放行。这条 bug 正是本任务用行为守卫抓出来的，grep 式守卫（只查 CHECK 存在）永远看不见",
+    "verdict": "RED",
+    "summary": "1 failed, 18 passed in 23.37s",
+    "added": [
+      "test_v151_schema_contract.py::test_definition_bundle_typed_slots_are_locked"
+    ],
+    "gone": [],
+    "hit": [
+      "test_v151_schema_contract.py::test_definition_bundle_typed_slots_are_locked"
+    ],
+    "added_files": [
+      "test_v151_schema_contract.py"
+    ],
+    "restored": true,
+    "seconds": 26.0
+  },
+  {
+    "id": "M37",
+    "side": "be",
+    "want": "test_scope_index_is_authorization_only_and_tombstoned",
+    "why": "scope key 放开纯数字 ⇒ numeric revision 可作 resource_id，不同 wp 的 revision 1 会在 authorization 索引里碰撞（SCOPE-numeric-revision-as-resource-id 不再被拒）",
+    "verdict": "RED",
+    "summary": "1 failed, 18 passed in 23.34s",
+    "added": [
+      "test_v151_schema_contract.py::test_scope_index_is_authorization_only_and_tombstoned"
+    ],
+    "gone": [],
+    "hit": [
+      "test_v151_schema_contract.py::test_scope_index_is_authorization_only_and_tombstoned"
+    ],
+    "added_files": [
+      "test_v151_schema_contract.py"
+    ],
+    "restored": true,
+    "seconds": 26.0
+  },
+  {
+    "id": "M38",
+    "side": "be",
+    "want": "test_scope_index_is_authorization_only_and_tombstoned",
+    "why": "tombstone 可被清空 ⇒ retired 的 resource id 能复活并被跨 scope 复用（SCOPE-tombstone-cleared 不再被拒）",
+    "verdict": "RED",
+    "summary": "1 failed, 18 passed in 23.40s",
+    "added": [
+      "test_v151_schema_contract.py::test_scope_index_is_authorization_only_and_tombstoned"
+    ],
+    "gone": [],
+    "hit": [
+      "test_v151_schema_contract.py::test_scope_index_is_authorization_only_and_tombstoned"
+    ],
+    "added_files": [
+      "test_v151_schema_contract.py"
+    ],
+    "restored": true,
+    "seconds": 26.0
+  },
+  {
+    "id": "M39",
+    "side": "be",
+    "want": "test_scope_index_is_authorization_only_and_tombstoned",
+    "why": "物理删除禁令的触发时机换成 TRUNCATE（FOR EACH ROW 在 TRUNCATE 下不触发）⇒ scope row 可被 DELETE，防 id 复用的 tombstone 机制失效（SCOPE-physical-delete 不再被拒）",
+    "verdict": "RED",
+    "summary": "17 failed, 2 passed in 2.97s",
+    "added": [
+      "test_v151_schema_contract.py::test_backfill_touches_no_business_values",
+      "test_v151_schema_contract.py::test_conflict_and_participant_lease_constraints",
+      "test_v151_schema_contract.py::test_deferred_constraint_triggers_exist",
+      "test_v151_schema_contract.py::test_definition_bundle_typed_slots_are_locked",
+      "test_v151_schema_contract.py::test_migration_applies_and_is_idempotent",
+      "test_v151_schema_contract.py::test_property_10_single_commit_and_representation_idempotency",
+      "test_v151_schema_contract.py::test_property_11_unique_descriptor_and_ready_confirmation",
+      "test_v151_schema_contract.py::test_property_18_many_deliveries_one_frozen_application",
+      "test_v151_schema_contract.py::test_property_4_business_revision_orthogonal_to_representation",
+      "test_v151_schema_contract.py::test_property_5_no_dangling_visible_state",
+      "test_v151_schema_contract.py::test_property_62_server_last_applied_not_conflated_with_client_base",
+      "test_v151_schema_contract.py::test_property_64_application_identity_uses_frozen_bundle_without_status",
+      "test_v151_schema_contract.py::test_property_68_timeline_complete_and_append_only",
+      "test_v151_schema_contract.py::test_property_69_evidence_closed_by_per_scenario_entities",
+      "test_v151_schema_contract.py::test_ran_on_real_postgresql_in_scratch_schema",
+      "test_v151_schema_contract.py::test_rollback_and_reapply",
+      "test_v151_schema_contract.py::test_scope_index_is_authorization_only_and_tombstoned"
+    ],
+    "gone": [],
+    "hit": [
+      "test_v151_schema_contract.py::test_scope_index_is_authorization_only_and_tombstoned"
+    ],
+    "added_files": [
+      "test_v151_schema_contract.py"
+    ],
+    "restored": true,
+    "seconds": 5.7
+  },
+  {
+    "id": "M40",
+    "side": "be",
+    "want": "test_conflict_and_participant_lease_constraints",
+    "why": "冲突唯一键加宽 ⇒ 重复 callback 会为同一字段生成重复冲突记录（R81-conflict-duplicate-field 不再被拒）",
+    "verdict": "RED",
+    "summary": "1 failed, 18 passed in 23.20s",
+    "added": [
+      "test_v151_schema_contract.py::test_conflict_and_participant_lease_constraints"
+    ],
+    "gone": [],
+    "hit": [
+      "test_v151_schema_contract.py::test_conflict_and_participant_lease_constraints"
+    ],
+    "added_files": [
+      "test_v151_schema_contract.py"
+    ],
+    "restored": true,
+    "seconds": 25.8
+  },
+  {
+    "id": "M41",
+    "side": "be",
+    "want": "test_conflict_and_participant_lease_constraints",
+    "why": "active lease 的 partial unique 键加宽 ⇒ 同 room 同 user 可有多个未终结 lease，逐人授权租约失效（R26-duplicate-active-lease 不再被拒）",
+    "verdict": "RED",
+    "summary": "1 failed, 18 passed in 23.27s",
+    "added": [
+      "test_v151_schema_contract.py::test_conflict_and_participant_lease_constraints"
+    ],
+    "gone": [],
+    "hit": [
+      "test_v151_schema_contract.py::test_conflict_and_participant_lease_constraints"
+    ],
+    "added_files": [
+      "test_v151_schema_contract.py"
+    ],
+    "restored": true,
+    "seconds": 25.9
+  },
+  {
+    "id": "M43",
+    "side": "be",
+    "want": "test_property_18_many_deliveries_one_frozen_application",
+    "why": "关掉「duplicate 目标必须是 direct primary」的唯一断言 ⇒ loser shell 可指向另一个 duplicate（链/环）或指向未绑定 application 的 shell（stranded），P18-duplicate-chain 与 P18-duplicate-target-unbound 同时不再被拒。该断言在迁移里刻意合并成一条：行级 CHECK 已强制「凡 duplicate 必 application 空」，拆成两条会让其中一条永远被另一条遮蔽而成为不可达分支（实测判 GREEN）",
+    "verdict": "RED",
+    "summary": "1 failed, 18 passed in 23.75s",
+    "added": [
+      "test_v151_schema_contract.py::test_property_18_many_deliveries_one_frozen_application"
+    ],
+    "gone": [],
+    "hit": [
+      "test_v151_schema_contract.py::test_property_18_many_deliveries_one_frozen_application"
+    ],
+    "added_files": [
+      "test_v151_schema_contract.py"
+    ],
+    "restored": true,
+    "seconds": 26.4
+  },
+  {
+    "id": "M42",
+    "side": "be",
+    "want": "test_property_4_business_revision_orthogonal_to_representation",
+    "why": "回填台账可声称创建了 content version/representation ⇒ 回填能伪造历史业务版本（P4-backfill-ledger-claims-entities 不再被拒）",
+    "verdict": "RED",
+    "summary": "1 failed, 18 passed in 23.41s",
+    "added": [
+      "test_v151_schema_contract.py::test_property_4_business_revision_orthogonal_to_representation"
+    ],
+    "gone": [],
+    "hit": [
+      "test_v151_schema_contract.py::test_property_4_business_revision_orthogonal_to_representation"
+    ],
+    "added_files": [
+      "test_v151_schema_contract.py"
+    ],
+    "restored": true,
+    "seconds": 26.1
+  }
+]

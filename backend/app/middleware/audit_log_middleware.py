@@ -52,10 +52,10 @@ SKIP_PATHS = (
 
 # HTTP 方法 → operation_type 映射
 METHOD_OP_MAP = {
-    "POST": OpType.create,
-    "PUT": OpType.update,
-    "PATCH": OpType.update,
-    "DELETE": OpType.delete,
+    "POST": OpType.CREATE,
+    "PUT": OpType.UPDATE,
+    "PATCH": OpType.UPDATE,
+    "DELETE": OpType.DELETE,
 }
 
 # UUID 正则
@@ -145,7 +145,7 @@ class AuditLogMiddleware(BaseHTTPMiddleware):
                 user_id = await _extract_user_id(request)
                 project_id = getattr(request.state, "project_id", None)
                 
-                operation = METHOD_OP_MAP.get(request.method, OpType.update)
+                operation = METHOD_OP_MAP.get(request.method, OpType.UPDATE)
 
                 log_entry = Log(
                     user_id=user_id,

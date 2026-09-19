@@ -59,7 +59,17 @@ async def batch_prefill(
     current_user: User = Depends(get_current_user),
 ):
     """批量预填充 — 并行执行多个底稿的预填充"""
-    from app.services.wp_batch_prefill import WpBatchPrefillService
+    from app.services.wp_visibility.entry_integration import make_bulk_preflight
+
+    # Wp_Bound_Gate（Task 4 / R3）：把 TB 派生值写入底稿正文前，逐资源 preflight
+    # （make_bulk_preflight，save_parsed_data 写族）；任一目标不可见/跨项目/未委派 →
+    # 抛 ExternalNotFound(404)，整请求原子失败于任何副作用前（不 fail-soft 跳过）。
+    preflight = make_bulk_preflight(
+        db, current_user, entrypoint="workpaper.parsed_data_write",
+        action="save_parsed_data", method="PUT", entry_family="prefill",
+    )
+    for wp_id in body.wp_ids:
+        await preflight(wp_id, None)
 
     results = []
     success = 0
@@ -101,9 +111,19 @@ async def batch_export_pdf(
     完整实现需要 LibreOffice headless 环境。
     此处返回一个包含占位 PDF 的 ZIP 文件。
     """
+    from app.services.wp_visibility.entry_integration import make_bulk_visible_filter
+
+    # Wp_Bound_Gate（Task 4 / R3）：渲染打包底稿正文前用可见集过滤 wp_ids；
+    # 不可见/跨项目/未委派/scope 外底稿静默剔除，manifest 只由可见集构建。
+    _visible = make_bulk_visible_filter(
+        db, current_user, entrypoint="workpaper.detail", action="read_detail",
+        method="GET", entry_family="export",
+    )
+    visible_wp_ids = [wid for wid in body.wp_ids if await _visible(wid, None)]
+
     buffer = io.BytesIO()
     with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as zf:
-        for wp_id in body.wp_ids:
+        for wp_id in visible_wp_ids:
             # Stub: 实际实现调用 soffice --headless --convert-to pdf
             placeholder = f"PDF placeholder for workpaper {wp_id}\n"
             zf.writestr(f"{wp_id}.pdf", placeholder.encode())

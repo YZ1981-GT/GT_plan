@@ -191,8 +191,10 @@ import { ref, computed, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import { Download, UploadFilled, Loading, CircleClose, Warning } from '@element-plus/icons-vue'
 import type { UploadInstance } from 'element-plus'
+import { useRoute } from 'vue-router'
 import { api } from '@/services/apiProxy'
 import { handleApiError } from '@/utils/errorHandler'
+import { resolveTemplateDownloadPlan, BARE_TEMPLATE_WARNING } from './importTemplateDownload'
 
 const props = defineProps<{
   modelValue: boolean
@@ -223,6 +225,14 @@ const visible = computed({
 })
 
 const typeLabel = computed(() => TYPE_LABELS[props.importType] || props.importType)
+
+const route = useRoute()
+/** 项目上下文：props 优先，其次路由参数 */
+const effectiveProjectId = computed<string | undefined>(() => {
+  if (props.projectId) return props.projectId
+  const fromRoute = route?.params?.projectId
+  return typeof fromRoute === 'string' && fromRoute ? fromRoute : undefined
+})
 
 const step = ref(0)
 const uploadRef = ref<UploadInstance>()
@@ -263,8 +273,15 @@ function onFileRemove() {
 
 async function downloadTemplate() {
   downloading.value = true
+  // 调整分录 + 有项目上下文 → 项目感知富模板（含项目科目库 sheet / 科目下拉 / 编码名称联动）
+  const plan = resolveTemplateDownloadPlan({
+    importType: props.importType,
+    typeLabel: typeLabel.value,
+    projectId: effectiveProjectId.value,
+    year: props.year,
+  })
   try {
-    const blob = await api.get(`/api/import-templates/${props.importType}/download`, {
+    const blob = await api.get(plan.url, {
       responseType: 'blob',
     }) as unknown as Blob
     const blobObj = new Blob([blob], {
@@ -273,9 +290,12 @@ async function downloadTemplate() {
     const url = URL.createObjectURL(blobObj)
     const a = document.createElement('a')
     a.href = url
-    a.download = `${typeLabel.value}导入模板.xlsx`
+    a.download = plan.filename
     a.click()
     URL.revokeObjectURL(url)
+    if (props.importType === 'adjustments' && !plan.rich) {
+      ElMessage.warning(BARE_TEMPLATE_WARNING)
+    }
   } catch (e) {
     handleApiError(e, '导入')
   } finally {

@@ -1,0 +1,48 @@
+{
+  "dryRun": false,
+  "keyVersion": "1.0",
+  "scanned": 4,
+  "mapped": 1,
+  "collisions": 2,
+  "orphans": 1,
+  "rows": [
+    {
+      "legacyKey": "wp-a:sec-1",
+      "canonicalWire": "demo-project/wp-a/page/sec-1",
+      "status": "collision",
+      "detail": "collision among wp-a:sec-1, wp-a:sec-1"
+    },
+    {
+      "legacyKey": "wp-a:sec-1",
+      "canonicalWire": "demo-project/wp-a/page/sec-1",
+      "status": "collision",
+      "detail": "collision among wp-a:sec-1, wp-a:sec-1"
+    },
+    {
+      "legacyKey": "wp-b:sec-2",
+      "canonicalWire": "demo-project/wp-b/page/sec-2",
+      "status": "mapped",
+      "detail": "applied"
+    },
+    {
+      "legacyKey": "orphan",
+      "canonicalWire": null,
+      "status": "orphan",
+      "detail": "unparseable legacy key"
+    }
+  ],
+  "rollbackEvidence": [
+    {
+      "legacyKey": "wp-a:sec-1",
+      "previousCanonical": null
+    },
+    {
+      "legacyKey": "wp-a:sec-1",
+      "previousCanonical": null
+    },
+    {
+      "legacyKey": "wp-b:sec-2",
+      "previousCanonical": null
+    }
+  ]
+}

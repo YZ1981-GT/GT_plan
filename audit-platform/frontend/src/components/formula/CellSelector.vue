@@ -104,13 +104,35 @@
 
       <!-- 底稿选择 -->
       <div v-if="activeSource === 'workpaper'" class="source-panel">
-        <el-input v-model="wpCode" placeholder="底稿编号如E1-1" size="small" style="width: 150px; margin-bottom: 8px" />
-        <el-select v-model="wpDataKey" size="small" style="width: 150px">
-          <el-option value="audited_amount" label="审定数" />
-          <el-option value="unadjusted_amount" label="未审数" />
-          <el-option value="opening_balance" label="期初" />
-        </el-select>
-        <el-button size="small" type="primary" @click="selectWpCell">添加</el-button>
+        <!-- ACNR 底稿 Sheet 选择（同源 ACNR，空则回退手填）R14.4 -->
+        <div v-if="wpSheetOptions.length" class="wp-acnr-row">
+          <el-select
+            v-model="wpSelectedSheetAddrId"
+            filterable
+            clearable
+            placeholder="从 ACNR 选择底稿 Sheet"
+            size="small"
+            style="width: 300px"
+            :loading="wpSheetsLoading"
+            @change="onWpSheetPick"
+          >
+            <el-option
+              v-for="s in wpSheetOptions"
+              :key="s.addr_id"
+              :label="`[${s.parent_wp_code}] ${s.sheet_name || s.sheet_code}`"
+              :value="s.addr_id"
+            />
+          </el-select>
+        </div>
+        <div class="wp-manual-row">
+          <el-input v-model="wpCode" placeholder="底稿编号如E1-1" size="small" style="width: 150px" />
+          <el-select v-model="wpDataKey" size="small" style="width: 150px">
+            <el-option value="audited_amount" label="审定数" />
+            <el-option value="unadjusted_amount" label="未审数" />
+            <el-option value="opening_balance" label="期初" />
+          </el-select>
+          <el-button size="small" type="primary" @click="selectWpCell">添加</el-button>
+        </div>
       </div>
 
       <!-- 描述 -->
@@ -131,8 +153,10 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
 import { useAddressRegistry } from '@/stores/addressRegistry'
+import { useAcnr, type AcnrSheetEntry } from '@/services/acnr/useAcnr'
 
 const addrStore = useAddressRegistry()
+const acnr = useAcnr()
 
 const props = defineProps<{
   modelValue: boolean
@@ -151,11 +175,34 @@ const visible = computed({
   set: (v) => emit('update:modelValue', v),
 })
 
-// 弹窗打开时，如果 store 已加载则优先使用 store 数据
-watch(visible, (v) => {
-  if (v && addrStore.loaded) {
-    // store 数据可用，无需额外操作
+// ─── ACNR 底稿 Sheet 选项（R14.4：同源 ACNR，空则回退手填）───
+const wpSheetOptions = ref<AcnrSheetEntry[]>([])
+const wpSheetsLoading = ref(false)
+const wpSelectedSheetAddrId = ref('')
+let wpSheetsLoaded = false
+
+async function ensureWpSheets() {
+  if (wpSheetsLoaded) return
+  wpSheetsLoading.value = true
+  try {
+    wpSheetOptions.value = await acnr.listSheets()
+  } catch {
+    wpSheetOptions.value = []
+  } finally {
+    wpSheetsLoading.value = false
+    wpSheetsLoaded = true
   }
+}
+
+// 选中 ACNR 底稿 Sheet → 回填底稿编号（保持既有 workpaper 取数规则 emit 契约不变）
+function onWpSheetPick(addrId: string | null) {
+  const s = wpSheetOptions.value.find(x => x.addr_id === addrId)
+  if (s) wpCode.value = s.parent_wp_code
+}
+
+// 弹窗打开时预取 ACNR 底稿目录（供 workpaper 源选择）；store 数据由各域 computed 自动使用
+watch(visible, (v) => {
+  if (v) ensureWpSheets()
 })
 
 const activeSource = ref('trial_balance')
@@ -326,5 +373,7 @@ function onClose() {
 .source-panel { min-height: 200px; }
 .hint { font-size: var(--gt-font-size-xs); color: var(--gt-color-info); margin: 4px 0; }
 .aux-form { display: flex; gap: 8px; align-items: center; }
+.wp-acnr-row { margin-bottom: 8px; }
+.wp-manual-row { display: flex; gap: 8px; align-items: center; }
 .desc-input { margin-top: 12px; }
 </style>

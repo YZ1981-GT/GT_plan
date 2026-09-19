@@ -1,0 +1,3901 @@
+{
+  "source_file": "d:\\GT_plan\\数据\\致同通用审计程序及底稿模板（2025年修订）\\1.致同审计程序及底稿模板（2025年）\\4.风险应对-实质性程序（D-N）\\L 债务循环\\L6 专项应付款.xlsx",
+  "total_sheets": 9,
+  "sheet_names": [
+    "底稿目录",
+    "专项应付款实质性程序表L6A",
+    "审定表L6-1",
+    "附注披露（上市公司）信息",
+    "附注披露（国企）信息",
+    "明细表L6-2",
+    "调整分录汇总L6-3",
+    "检查表L6-4",
+    "GT_Custom"
+  ],
+  "sheets": {
+    "底稿目录": {
+      "title": "底稿目录",
+      "dimensions": "A1:G20",
+      "max_row": 20,
+      "max_column": 7,
+      "dims_display": "20×7",
+      "merged_cells": [
+        "A14:A16",
+        "A17:A19",
+        "A10:A13"
+      ],
+      "merged_cells_count": 3,
+      "headers": [
+        {
+          "row": 1,
+          "cells": [
+            {
+              "col": "A",
+              "col_idx": 1,
+              "value": "底稿开列时，可先在以下单元格填写有关内容，以便其他底稿引用有关数据：",
+              "is_formula": false
+            }
+          ]
+        },
+        {
+          "row": 2,
+          "cells": [
+            {
+              "col": "A",
+              "col_idx": 1,
+              "value": "被审计单位：",
+              "is_formula": false
+            }
+          ]
+        },
+        {
+          "row": 3,
+          "cells": [
+            {
+              "col": "A",
+              "col_idx": 1,
+              "value": "截止日：202X年12月31日",
+              "is_formula": false
+            },
+            {
+              "col": "D",
+              "col_idx": 4,
+              "value": "序号",
+              "is_formula": false
+            },
+            {
+              "col": "E",
+              "col_idx": 5,
+              "value": "内容",
+              "is_formula": false
+            },
+            {
+              "col": "F",
+              "col_idx": 6,
+              "value": "索引号",
+              "is_formula": false
+            }
+          ]
+        },
+        {
+          "row": 4,
+          "cells": [
+            {
+              "col": "A",
+              "col_idx": 1,
+              "value": "编制人：",
+              "is_formula": false
+            },
+            {
+              "col": "D",
+              "col_idx": 4,
+              "value": "1",
+              "is_formula": false
+            },
+            {
+              "col": "E",
+              "col_idx": 5,
+              "value": "专项应付款循环实质性程序",
+              "is_formula": false
+            },
+            {
+              "col": "F",
+              "col_idx": 6,
+              "value": "L6A",
+              "is_formula": false
+            }
+          ]
+        },
+        {
+          "row": 5,
+          "cells": [
+            {
+              "col": "A",
+              "col_idx": 1,
+              "value": "编制日期：",
+              "is_formula": false
+            },
+            {
+              "col": "D",
+              "col_idx": 4,
+              "value": "2",
+              "is_formula": false
+            },
+            {
+              "col": "E",
+              "col_idx": 5,
+              "value": "专项应付款审定表",
+              "is_formula": false
+            },
+            {
+              "col": "F",
+              "col_idx": 6,
+              "value": "L6-1",
+              "is_formula": false
+            }
+          ]
+        }
+      ],
+      "formulas": [],
+      "formula_count": 0,
+      "sample_data": [
+        {
+          "row": 6,
+          "cells": [
+            {
+              "col": "A",
+              "value": "复核人：",
+              "is_formula": false
+            },
+            {
+              "col": "D",
+              "value": "3",
+              "is_formula": false
+            },
+            {
+              "col": "E",
+              "value": "专项应付款附注披露（上市公司）信息核对表",
+              "is_formula": false
+            },
+            {
+              "col": "G",
+              "value": "无需打印",
+              "is_formula": false
+            }
+          ]
+        },
+        {
+          "row": 7,
+          "cells": [
+            {
+              "col": "A",
+              "value": "复核日期：",
+              "is_formula": false
+            },
+            {
+              "col": "D",
+              "value": "4",
+              "is_formula": false
+            },
+            {
+              "col": "E",
+              "value": "专项应付款附注披露（国企）信息核对表",
+              "is_formula": false
+            },
+            {
+              "col": "G",
+              "value": "无需打印",
+              "is_formula": false
+            }
+          ]
+        },
+        {
+          "row": 8,
+          "cells": [
+            {
+              "col": "D",
+              "value": "5",
+              "is_formula": false
+            },
+            {
+              "col": "E",
+              "value": "专项应付款明细表",
+              "is_formula": false
+            },
+            {
+              "col": "F",
+              "value": "L6-2",
+              "is_formula": false
+            }
+          ]
+        },
+        {
+          "row": 9,
+          "cells": [
+            {
+              "col": "A",
+              "value": "关于工作底稿与审计程序索引号对应的说明",
+              "is_formula": false
+            },
+            {
+              "col": "D",
+              "value": "6",
+              "is_formula": false
+            },
+            {
+              "col": "E",
+              "value": "专项应付款调整分录汇总表",
+              "is_formula": false
+            },
+            {
+              "col": "F",
+              "value": "L6-3",
+              "is_formula": false
+            }
+          ]
+        },
+        {
+          "row": 10,
+          "cells": [
+            {
+              "col": "A",
+              "value": "1.编制的审计工作底稿应与审计程序对应。审计项目组应根据被审计单位实际情况和风险评估情况在实质性程序表中裁剪、修改或增加审计程序，根据实际执行的审计程序完成相应审计工作底稿，编制的工作底稿中应按自然顺",
+              "is_formula": false
+            },
+            {
+              "col": "D",
+              "value": "7",
+              "is_formula": false
+            },
+            {
+              "col": "E",
+              "value": "专项应付款检查表",
+              "is_formula": false
+            },
+            {
+              "col": "F",
+              "value": "L6-4",
+              "is_formula": false
+            }
+          ]
+        }
+      ]
+    },
+    "专项应付款实质性程序表L6A": {
+      "title": "专项应付款实质性程序表L6A",
+      "dimensions": "A1:Q23",
+      "max_row": 23,
+      "max_column": 17,
+      "dims_display": "23×17",
+      "merged_cells": [
+        "G10:I10",
+        "G13:I13",
+        "J19:Q19",
+        "A12:F12",
+        "A2:I2",
+        "A8:F8",
+        "B15:B16",
+        "A10:F10",
+        "A13:F13",
+        "A9:F9",
+        "G9:I9",
+        "G12:I12",
+        "G11:I11",
+        "A11:F11",
+        "D15:H15",
+        "A1:I1",
+        "G8:I8",
+        "A15:A16",
+        "C15:C16",
+        "I15:I16",
+        "J18:Q18"
+      ],
+      "merged_cells_count": 21,
+      "headers": [
+        {
+          "row": 1,
+          "cells": [
+            {
+              "col": "A",
+              "col_idx": 1,
+              "value": "致同会计师事务所",
+              "is_formula": false
+            }
+          ]
+        },
+        {
+          "row": 2,
+          "cells": [
+            {
+              "col": "A",
+              "col_idx": 1,
+              "value": "专项应付款实质性程序",
+              "is_formula": false
+            }
+          ]
+        },
+        {
+          "row": 3,
+          "cells": [
+            {
+              "col": "A",
+              "col_idx": 1,
+              "value": "=底稿目录!A2",
+              "is_formula": true
+            },
+            {
+              "col": "C",
+              "col_idx": 3,
+              "value": "=底稿目录!A4",
+              "is_formula": true
+            },
+            {
+              "col": "E",
+              "col_idx": 5,
+              "value": "=底稿目录!A5",
+              "is_formula": true
+            },
+            {
+              "col": "H",
+              "col_idx": 8,
+              "value": "索引号：",
+              "is_formula": false
+            },
+            {
+              "col": "I",
+              "col_idx": 9,
+              "value": "L6A",
+              "is_formula": false
+            }
+          ]
+        },
+        {
+          "row": 4,
+          "cells": [
+            {
+              "col": "A",
+              "col_idx": 1,
+              "value": "=底稿目录!A3",
+              "is_formula": true
+            },
+            {
+              "col": "C",
+              "col_idx": 3,
+              "value": "=底稿目录!A6",
+              "is_formula": true
+            },
+            {
+              "col": "E",
+              "col_idx": 5,
+              "value": "=底稿目录!A7",
+              "is_formula": true
+            },
+            {
+              "col": "H",
+              "col_idx": 8,
+              "value": "页  次：",
+              "is_formula": false
+            }
+          ]
+        },
+        {
+          "row": 5,
+          "cells": [
+            {
+              "col": "A",
+              "col_idx": 1,
+              "value": "一、本账户涉及的科目",
+              "is_formula": false
+            }
+          ]
+        }
+      ],
+      "formulas": [
+        {
+          "cell": "A3",
+          "formula": "=底稿目录!A2"
+        },
+        {
+          "cell": "C3",
+          "formula": "=底稿目录!A4"
+        },
+        {
+          "cell": "E3",
+          "formula": "=底稿目录!A5"
+        },
+        {
+          "cell": "A4",
+          "formula": "=底稿目录!A3"
+        },
+        {
+          "cell": "C4",
+          "formula": "=底稿目录!A6"
+        },
+        {
+          "cell": "E4",
+          "formula": "=底稿目录!A7"
+        }
+      ],
+      "formula_count": 6,
+      "sample_data": [
+        {
+          "row": 6,
+          "cells": [
+            {
+              "col": "A",
+              "value": "专项应付款",
+              "is_formula": false
+            }
+          ]
+        },
+        {
+          "row": 7,
+          "cells": [
+            {
+              "col": "A",
+              "value": "二、审计目标与认定的对应关系",
+              "is_formula": false
+            }
+          ]
+        },
+        {
+          "row": 8,
+          "cells": [
+            {
+              "col": "A",
+              "value": "审计目标",
+              "is_formula": false
+            },
+            {
+              "col": "G",
+              "value": "财务报表的认定　",
+              "is_formula": false
+            }
+          ]
+        },
+        {
+          "row": 9,
+          "cells": [
+            {
+              "col": "A",
+              "value": "A. 资产负债表中记录的专项应付款是存在的，且已记录于恰当的账户",
+              "is_formula": false
+            },
+            {
+              "col": "G",
+              "value": "存在",
+              "is_formula": false
+            }
+          ]
+        },
+        {
+          "row": 10,
+          "cells": [
+            {
+              "col": "A",
+              "value": "B. 所有应记录的专项应付款均已记录，所有应当包括在财务报表中的相关披露均已包括",
+              "is_formula": false
+            },
+            {
+              "col": "G",
+              "value": "完整性",
+              "is_formula": false
+            }
+          ]
+        }
+      ]
+    },
+    "审定表L6-1": {
+      "title": "审定表L6-1",
+      "dimensions": "A1:L30",
+      "max_row": 30,
+      "max_column": 12,
+      "dims_display": "30×12",
+      "merged_cells": [
+        "A5:A6",
+        "J5:K5",
+        "A2:K2",
+        "B5:E5",
+        "F5:I5",
+        "A1:K1"
+      ],
+      "merged_cells_count": 6,
+      "headers": [
+        {
+          "row": 1,
+          "cells": [
+            {
+              "col": "A",
+              "col_idx": 1,
+              "value": "致同会计师事务所",
+              "is_formula": false
+            }
+          ]
+        },
+        {
+          "row": 2,
+          "cells": [
+            {
+              "col": "A",
+              "col_idx": 1,
+              "value": "专项应付款审定表",
+              "is_formula": false
+            }
+          ]
+        },
+        {
+          "row": 3,
+          "cells": [
+            {
+              "col": "A",
+              "col_idx": 1,
+              "value": "=底稿目录!A2",
+              "is_formula": true
+            },
+            {
+              "col": "E",
+              "col_idx": 5,
+              "value": "=底稿目录!A4",
+              "is_formula": true
+            },
+            {
+              "col": "H",
+              "col_idx": 8,
+              "value": "=底稿目录!A5",
+              "is_formula": true
+            },
+            {
+              "col": "J",
+              "col_idx": 10,
+              "value": "索引号：",
+              "is_formula": false
+            },
+            {
+              "col": "K",
+              "col_idx": 11,
+              "value": "=底稿目录!F5",
+              "is_formula": true
+            }
+          ]
+        },
+        {
+          "row": 4,
+          "cells": [
+            {
+              "col": "A",
+              "col_idx": 1,
+              "value": "=底稿目录!A3",
+              "is_formula": true
+            },
+            {
+              "col": "E",
+              "col_idx": 5,
+              "value": "=底稿目录!A6",
+              "is_formula": true
+            },
+            {
+              "col": "H",
+              "col_idx": 8,
+              "value": "=底稿目录!A7",
+              "is_formula": true
+            },
+            {
+              "col": "J",
+              "col_idx": 10,
+              "value": "页次：",
+              "is_formula": false
+            }
+          ]
+        },
+        {
+          "row": 5,
+          "cells": [
+            {
+              "col": "A",
+              "col_idx": 1,
+              "value": "项 目",
+              "is_formula": false
+            },
+            {
+              "col": "B",
+              "col_idx": 2,
+              "value": "期初数",
+              "is_formula": false
+            },
+            {
+              "col": "F",
+              "col_idx": 6,
+              "value": "期末数",
+              "is_formula": false
+            },
+            {
+              "col": "J",
+              "col_idx": 10,
+              "value": "本期审定数与上期\n审定数的比较",
+              "is_formula": false
+            }
+          ]
+        }
+      ],
+      "formulas": [
+        {
+          "cell": "A3",
+          "formula": "=底稿目录!A2"
+        },
+        {
+          "cell": "E3",
+          "formula": "=底稿目录!A4"
+        },
+        {
+          "cell": "H3",
+          "formula": "=底稿目录!A5"
+        },
+        {
+          "cell": "K3",
+          "formula": "=底稿目录!F5"
+        },
+        {
+          "cell": "A4",
+          "formula": "=底稿目录!A3"
+        },
+        {
+          "cell": "E4",
+          "formula": "=底稿目录!A6"
+        },
+        {
+          "cell": "H4",
+          "formula": "=底稿目录!A7"
+        },
+        {
+          "cell": "A7",
+          "formula": "='明细表L6-2'!B10"
+        },
+        {
+          "cell": "B7",
+          "formula": "='明细表L6-2'!C10"
+        },
+        {
+          "cell": "C7",
+          "formula": "='明细表L6-2'!H10"
+        },
+        {
+          "cell": "D7",
+          "formula": "='明细表L6-2'!I10"
+        },
+        {
+          "cell": "E7",
+          "formula": "=B7+C7+D7"
+        },
+        {
+          "cell": "F7",
+          "formula": "='明细表L6-2'!G10"
+        },
+        {
+          "cell": "G7",
+          "formula": "='明细表L6-2'!H10+'明细表L6-2'!J10-'明细表L6-2'!K10-'明细表L6-2'!L10"
+        },
+        {
+          "cell": "H7",
+          "formula": "='明细表L6-2'!I10+'明细表L6-2'!M10-'明细表L6-2'!N10-'明细表L6-2'!O10"
+        }
+      ],
+      "formula_count": 133,
+      "sample_data": [
+        {
+          "row": 6,
+          "cells": [
+            {
+              "col": "B",
+              "value": "未审数",
+              "is_formula": false
+            },
+            {
+              "col": "C",
+              "value": "账项调整",
+              "is_formula": false
+            },
+            {
+              "col": "D",
+              "value": "重分类调整",
+              "is_formula": false
+            },
+            {
+              "col": "E",
+              "value": "审定数",
+              "is_formula": false
+            },
+            {
+              "col": "F",
+              "value": "未审数",
+              "is_formula": false
+            },
+            {
+              "col": "G",
+              "value": "账项调整",
+              "is_formula": false
+            },
+            {
+              "col": "H",
+              "value": "重分类调整",
+              "is_formula": false
+            },
+            {
+              "col": "I",
+              "value": "审定数",
+              "is_formula": false
+            },
+            {
+              "col": "J",
+              "value": "变动额",
+              "is_formula": false
+            },
+            {
+              "col": "K",
+              "value": "变动率",
+              "is_formula": false
+            }
+          ]
+        },
+        {
+          "row": 7,
+          "cells": [
+            {
+              "col": "A",
+              "value": "='明细表L6-2'!B10",
+              "is_formula": true
+            },
+            {
+              "col": "B",
+              "value": "='明细表L6-2'!C10",
+              "is_formula": true
+            },
+            {
+              "col": "C",
+              "value": "='明细表L6-2'!H10",
+              "is_formula": true
+            },
+            {
+              "col": "D",
+              "value": "='明细表L6-2'!I10",
+              "is_formula": true
+            },
+            {
+              "col": "E",
+              "value": "=B7+C7+D7",
+              "is_formula": true
+            },
+            {
+              "col": "F",
+              "value": "='明细表L6-2'!G10",
+              "is_formula": true
+            },
+            {
+              "col": "G",
+              "value": "='明细表L6-2'!H10+'明细表L6-2'!J10-'明细表L6-2'!K10-'明细表L6-2'!L10",
+              "is_formula": true
+            },
+            {
+              "col": "H",
+              "value": "='明细表L6-2'!I10+'明细表L6-2'!M10-'明细表L6-2'!N10-'明细表L6-2'!O10",
+              "is_formula": true
+            },
+            {
+              "col": "I",
+              "value": "=F7+G7+H7",
+              "is_formula": true
+            },
+            {
+              "col": "J",
+              "value": "=I7-E7",
+              "is_formula": true
+            },
+            {
+              "col": "K",
+              "value": "=IF(AND(E7=0,J7=0),0,IF(AND(E7=0,J7>0),1,J7/E7))",
+              "is_formula": true
+            }
+          ]
+        },
+        {
+          "row": 8,
+          "cells": [
+            {
+              "col": "A",
+              "value": "='明细表L6-2'!B11",
+              "is_formula": true
+            },
+            {
+              "col": "B",
+              "value": "='明细表L6-2'!C11",
+              "is_formula": true
+            },
+            {
+              "col": "C",
+              "value": "='明细表L6-2'!H11",
+              "is_formula": true
+            },
+            {
+              "col": "D",
+              "value": "='明细表L6-2'!I11",
+              "is_formula": true
+            },
+            {
+              "col": "E",
+              "value": "=B8+C8+D8",
+              "is_formula": true
+            },
+            {
+              "col": "F",
+              "value": "='明细表L6-2'!G11",
+              "is_formula": true
+            },
+            {
+              "col": "G",
+              "value": "='明细表L6-2'!H11+'明细表L6-2'!J11-'明细表L6-2'!K11-'明细表L6-2'!L11",
+              "is_formula": true
+            },
+            {
+              "col": "H",
+              "value": "='明细表L6-2'!I11+'明细表L6-2'!M11-'明细表L6-2'!N11-'明细表L6-2'!O11",
+              "is_formula": true
+            },
+            {
+              "col": "I",
+              "value": "=F8+G8+H8",
+              "is_formula": true
+            },
+            {
+              "col": "J",
+              "value": "=I8-E8",
+              "is_formula": true
+            },
+            {
+              "col": "K",
+              "value": "=IF(AND(E8=0,J8=0),0,IF(AND(E8=0,J8>0),1,J8/E8))",
+              "is_formula": true
+            }
+          ]
+        },
+        {
+          "row": 9,
+          "cells": [
+            {
+              "col": "A",
+              "value": "='明细表L6-2'!B12",
+              "is_formula": true
+            },
+            {
+              "col": "B",
+              "value": "='明细表L6-2'!C12",
+              "is_formula": true
+            },
+            {
+              "col": "C",
+              "value": "='明细表L6-2'!H12",
+              "is_formula": true
+            },
+            {
+              "col": "D",
+              "value": "='明细表L6-2'!I12",
+              "is_formula": true
+            },
+            {
+              "col": "E",
+              "value": "=B9+C9+D9",
+              "is_formula": true
+            },
+            {
+              "col": "F",
+              "value": "='明细表L6-2'!G12",
+              "is_formula": true
+            },
+            {
+              "col": "G",
+              "value": "='明细表L6-2'!H12+'明细表L6-2'!J12-'明细表L6-2'!K12-'明细表L6-2'!L12",
+              "is_formula": true
+            },
+            {
+              "col": "H",
+              "value": "='明细表L6-2'!I12+'明细表L6-2'!M12-'明细表L6-2'!N12-'明细表L6-2'!O12",
+              "is_formula": true
+            },
+            {
+              "col": "I",
+              "value": "=F9+G9+H9",
+              "is_formula": true
+            },
+            {
+              "col": "J",
+              "value": "=I9-E9",
+              "is_formula": true
+            },
+            {
+              "col": "K",
+              "value": "=IF(AND(E9=0,J9=0),0,IF(AND(E9=0,J9>0),1,J9/E9))",
+              "is_formula": true
+            }
+          ]
+        },
+        {
+          "row": 10,
+          "cells": [
+            {
+              "col": "A",
+              "value": "='明细表L6-2'!B13",
+              "is_formula": true
+            },
+            {
+              "col": "B",
+              "value": "='明细表L6-2'!C13",
+              "is_formula": true
+            },
+            {
+              "col": "C",
+              "value": "='明细表L6-2'!H13",
+              "is_formula": true
+            },
+            {
+              "col": "D",
+              "value": "='明细表L6-2'!I13",
+              "is_formula": true
+            },
+            {
+              "col": "E",
+              "value": "=B10+C10+D10",
+              "is_formula": true
+            },
+            {
+              "col": "F",
+              "value": "='明细表L6-2'!G13",
+              "is_formula": true
+            },
+            {
+              "col": "G",
+              "value": "='明细表L6-2'!H13+'明细表L6-2'!J13-'明细表L6-2'!K13-'明细表L6-2'!L13",
+              "is_formula": true
+            },
+            {
+              "col": "H",
+              "value": "='明细表L6-2'!I13+'明细表L6-2'!M13-'明细表L6-2'!N13-'明细表L6-2'!O13",
+              "is_formula": true
+            },
+            {
+              "col": "I",
+              "value": "=F10+G10+H10",
+              "is_formula": true
+            },
+            {
+              "col": "J",
+              "value": "=I10-E10",
+              "is_formula": true
+            },
+            {
+              "col": "K",
+              "value": "=IF(AND(E10=0,J10=0),0,IF(AND(E10=0,J10>0),1,J10/E10))",
+              "is_formula": true
+            }
+          ]
+        }
+      ]
+    },
+    "附注披露（上市公司）信息": {
+      "title": "附注披露（上市公司）信息",
+      "dimensions": "A1:G19",
+      "max_row": 19,
+      "max_column": 7,
+      "dims_display": "19×7",
+      "merged_cells": [
+        "A2:F2",
+        "A1:F1"
+      ],
+      "merged_cells_count": 2,
+      "headers": [
+        {
+          "row": 1,
+          "cells": [
+            {
+              "col": "A",
+              "col_idx": 1,
+              "value": "致同会计师事务所",
+              "is_formula": false
+            }
+          ]
+        },
+        {
+          "row": 2,
+          "cells": [
+            {
+              "col": "A",
+              "col_idx": 1,
+              "value": "专项应付款附注披露信息",
+              "is_formula": false
+            },
+            {
+              "col": "G",
+              "col_idx": 7,
+              "value": "返回目录",
+              "is_formula": false
+            }
+          ]
+        },
+        {
+          "row": 3,
+          "cells": [
+            {
+              "col": "A",
+              "col_idx": 1,
+              "value": "=底稿目录!A2",
+              "is_formula": true
+            },
+            {
+              "col": "B",
+              "col_idx": 2,
+              "value": "='审定表L6-1'!E3",
+              "is_formula": true
+            },
+            {
+              "col": "D",
+              "col_idx": 4,
+              "value": "=底稿目录!A5",
+              "is_formula": true
+            },
+            {
+              "col": "F",
+              "col_idx": 6,
+              "value": "索引号：",
+              "is_formula": false
+            }
+          ]
+        },
+        {
+          "row": 4,
+          "cells": [
+            {
+              "col": "A",
+              "col_idx": 1,
+              "value": "=底稿目录!A3",
+              "is_formula": true
+            },
+            {
+              "col": "B",
+              "col_idx": 2,
+              "value": "=底稿目录!A6",
+              "is_formula": true
+            },
+            {
+              "col": "D",
+              "col_idx": 4,
+              "value": "=底稿目录!A7",
+              "is_formula": true
+            },
+            {
+              "col": "F",
+              "col_idx": 6,
+              "value": "页次：",
+              "is_formula": false
+            }
+          ]
+        },
+        {
+          "row": 5,
+          "cells": [
+            {
+              "col": "A",
+              "col_idx": 1,
+              "value": "附注披露信息（上市公司）",
+              "is_formula": false
+            }
+          ]
+        }
+      ],
+      "formulas": [
+        {
+          "cell": "A3",
+          "formula": "=底稿目录!A2"
+        },
+        {
+          "cell": "B3",
+          "formula": "='审定表L6-1'!E3"
+        },
+        {
+          "cell": "D3",
+          "formula": "=底稿目录!A5"
+        },
+        {
+          "cell": "A4",
+          "formula": "=底稿目录!A3"
+        },
+        {
+          "cell": "B4",
+          "formula": "=底稿目录!A6"
+        },
+        {
+          "cell": "D4",
+          "formula": "=底稿目录!A7"
+        },
+        {
+          "cell": "A9",
+          "formula": "='明细表L6-2'!B10"
+        },
+        {
+          "cell": "B9",
+          "formula": "='明细表L6-2'!P10"
+        },
+        {
+          "cell": "C9",
+          "formula": "='明细表L6-2'!Q10"
+        },
+        {
+          "cell": "D9",
+          "formula": "='明细表L6-2'!R10+'明细表L6-2'!S10"
+        },
+        {
+          "cell": "E9",
+          "formula": "='明细表L6-2'!T10"
+        },
+        {
+          "cell": "A10",
+          "formula": "='明细表L6-2'!B11"
+        },
+        {
+          "cell": "B10",
+          "formula": "='明细表L6-2'!P11"
+        },
+        {
+          "cell": "C10",
+          "formula": "='明细表L6-2'!Q11"
+        },
+        {
+          "cell": "D10",
+          "formula": "='明细表L6-2'!R11+'明细表L6-2'!S11"
+        }
+      ],
+      "formula_count": 60,
+      "sample_data": [
+        {
+          "row": 6,
+          "cells": [
+            {
+              "col": "A",
+              "value": "【长期应付款与专项应付款的合计数披露详见P5-1】",
+              "is_formula": false
+            }
+          ]
+        },
+        {
+          "row": 7,
+          "cells": [
+            {
+              "col": "A",
+              "value": "（2）专项应付款",
+              "is_formula": false
+            }
+          ]
+        },
+        {
+          "row": 8,
+          "cells": [
+            {
+              "col": "A",
+              "value": "项目",
+              "is_formula": false
+            },
+            {
+              "col": "B",
+              "value": "期初数",
+              "is_formula": false
+            },
+            {
+              "col": "C",
+              "value": "本期增加",
+              "is_formula": false
+            },
+            {
+              "col": "D",
+              "value": "本期减少",
+              "is_formula": false
+            },
+            {
+              "col": "E",
+              "value": "期末数",
+              "is_formula": false
+            },
+            {
+              "col": "F",
+              "value": "形成原因",
+              "is_formula": false
+            }
+          ]
+        },
+        {
+          "row": 9,
+          "cells": [
+            {
+              "col": "A",
+              "value": "='明细表L6-2'!B10",
+              "is_formula": true
+            },
+            {
+              "col": "B",
+              "value": "='明细表L6-2'!P10",
+              "is_formula": true
+            },
+            {
+              "col": "C",
+              "value": "='明细表L6-2'!Q10",
+              "is_formula": true
+            },
+            {
+              "col": "D",
+              "value": "='明细表L6-2'!R10+'明细表L6-2'!S10",
+              "is_formula": true
+            },
+            {
+              "col": "E",
+              "value": "='明细表L6-2'!T10",
+              "is_formula": true
+            }
+          ]
+        },
+        {
+          "row": 10,
+          "cells": [
+            {
+              "col": "A",
+              "value": "='明细表L6-2'!B11",
+              "is_formula": true
+            },
+            {
+              "col": "B",
+              "value": "='明细表L6-2'!P11",
+              "is_formula": true
+            },
+            {
+              "col": "C",
+              "value": "='明细表L6-2'!Q11",
+              "is_formula": true
+            },
+            {
+              "col": "D",
+              "value": "='明细表L6-2'!R11+'明细表L6-2'!S11",
+              "is_formula": true
+            },
+            {
+              "col": "E",
+              "value": "='明细表L6-2'!T11",
+              "is_formula": true
+            }
+          ]
+        }
+      ]
+    },
+    "附注披露（国企）信息": {
+      "title": "附注披露（国企）信息",
+      "dimensions": "A1:F16",
+      "max_row": 16,
+      "max_column": 6,
+      "dims_display": "16×6",
+      "merged_cells": [
+        "A2:E2",
+        "A1:E1"
+      ],
+      "merged_cells_count": 2,
+      "headers": [
+        {
+          "row": 1,
+          "cells": [
+            {
+              "col": "A",
+              "col_idx": 1,
+              "value": "致同会计师事务所",
+              "is_formula": false
+            }
+          ]
+        },
+        {
+          "row": 2,
+          "cells": [
+            {
+              "col": "A",
+              "col_idx": 1,
+              "value": "专项应付款附注披露信息",
+              "is_formula": false
+            },
+            {
+              "col": "F",
+              "col_idx": 6,
+              "value": "返回目录",
+              "is_formula": false
+            }
+          ]
+        },
+        {
+          "row": 3,
+          "cells": [
+            {
+              "col": "A",
+              "col_idx": 1,
+              "value": "=底稿目录!A2",
+              "is_formula": true
+            },
+            {
+              "col": "B",
+              "col_idx": 2,
+              "value": "='审定表L6-1'!E3",
+              "is_formula": true
+            },
+            {
+              "col": "D",
+              "col_idx": 4,
+              "value": "=底稿目录!A5",
+              "is_formula": true
+            },
+            {
+              "col": "E",
+              "col_idx": 5,
+              "value": "索引号：",
+              "is_formula": false
+            }
+          ]
+        },
+        {
+          "row": 4,
+          "cells": [
+            {
+              "col": "A",
+              "col_idx": 1,
+              "value": "=底稿目录!A3",
+              "is_formula": true
+            },
+            {
+              "col": "B",
+              "col_idx": 2,
+              "value": "=底稿目录!A6",
+              "is_formula": true
+            },
+            {
+              "col": "D",
+              "col_idx": 4,
+              "value": "=底稿目录!A7",
+              "is_formula": true
+            },
+            {
+              "col": "E",
+              "col_idx": 5,
+              "value": "页次：",
+              "is_formula": false
+            }
+          ]
+        },
+        {
+          "row": 5,
+          "cells": [
+            {
+              "col": "A",
+              "col_idx": 1,
+              "value": "附注披露信息（国企）",
+              "is_formula": false
+            }
+          ]
+        }
+      ],
+      "formulas": [
+        {
+          "cell": "A3",
+          "formula": "=底稿目录!A2"
+        },
+        {
+          "cell": "B3",
+          "formula": "='审定表L6-1'!E3"
+        },
+        {
+          "cell": "D3",
+          "formula": "=底稿目录!A5"
+        },
+        {
+          "cell": "A4",
+          "formula": "=底稿目录!A3"
+        },
+        {
+          "cell": "B4",
+          "formula": "=底稿目录!A6"
+        },
+        {
+          "cell": "D4",
+          "formula": "=底稿目录!A7"
+        },
+        {
+          "cell": "A10",
+          "formula": "='明细表L6-2'!B10"
+        },
+        {
+          "cell": "B10",
+          "formula": "='明细表L6-2'!P10"
+        },
+        {
+          "cell": "C10",
+          "formula": "='明细表L6-2'!Q10"
+        },
+        {
+          "cell": "D10",
+          "formula": "='明细表L6-2'!R10+'明细表L6-2'!S10"
+        },
+        {
+          "cell": "E10",
+          "formula": "='明细表L6-2'!T10"
+        },
+        {
+          "cell": "A11",
+          "formula": "='明细表L6-2'!B11"
+        },
+        {
+          "cell": "B11",
+          "formula": "='明细表L6-2'!P11"
+        },
+        {
+          "cell": "C11",
+          "formula": "='明细表L6-2'!Q11"
+        },
+        {
+          "cell": "D11",
+          "formula": "='明细表L6-2'!R11+'明细表L6-2'!S11"
+        }
+      ],
+      "formula_count": 39,
+      "sample_data": [
+        {
+          "row": 6,
+          "cells": [
+            {
+              "col": "A",
+              "value": "【长期应付款与专项应付款的合计数披露详见P5-1】",
+              "is_formula": false
+            }
+          ]
+        },
+        {
+          "row": 7,
+          "cells": [
+            {
+              "col": "A",
+              "value": "（2）专项应付款",
+              "is_formula": false
+            }
+          ]
+        },
+        {
+          "row": 8,
+          "cells": [
+            {
+              "col": "A",
+              "value": "（说明：分项披露专项应付款年末余额最大的前五项）",
+              "is_formula": false
+            }
+          ]
+        },
+        {
+          "row": 9,
+          "cells": [
+            {
+              "col": "A",
+              "value": "项目",
+              "is_formula": false
+            },
+            {
+              "col": "B",
+              "value": "201X.01.01",
+              "is_formula": false
+            },
+            {
+              "col": "C",
+              "value": "本期增加",
+              "is_formula": false
+            },
+            {
+              "col": "D",
+              "value": "本期减少",
+              "is_formula": false
+            },
+            {
+              "col": "E",
+              "value": "201X.12.31",
+              "is_formula": false
+            }
+          ]
+        },
+        {
+          "row": 10,
+          "cells": [
+            {
+              "col": "A",
+              "value": "='明细表L6-2'!B10",
+              "is_formula": true
+            },
+            {
+              "col": "B",
+              "value": "='明细表L6-2'!P10",
+              "is_formula": true
+            },
+            {
+              "col": "C",
+              "value": "='明细表L6-2'!Q10",
+              "is_formula": true
+            },
+            {
+              "col": "D",
+              "value": "='明细表L6-2'!R10+'明细表L6-2'!S10",
+              "is_formula": true
+            },
+            {
+              "col": "E",
+              "value": "='明细表L6-2'!T10",
+              "is_formula": true
+            }
+          ]
+        }
+      ]
+    },
+    "明细表L6-2": {
+      "title": "明细表L6-2",
+      "dimensions": "A1:AG37",
+      "max_row": 37,
+      "max_column": 33,
+      "dims_display": "37×33",
+      "merged_cells": [
+        "A2:L2",
+        "A20:B20",
+        "A8:A9",
+        "U8:U9",
+        "M1:V1",
+        "A1:L1",
+        "W8:W9",
+        "V8:V9",
+        "X8:X9",
+        "P8:T8",
+        "J8:L8",
+        "B8:B9",
+        "M8:O8",
+        "M2:V2",
+        "H8:I8",
+        "C8:G8"
+      ],
+      "merged_cells_count": 16,
+      "headers": [
+        {
+          "row": 1,
+          "cells": [
+            {
+              "col": "A",
+              "col_idx": 1,
+              "value": "致同会计师事务所",
+              "is_formula": false
+            },
+            {
+              "col": "M",
+              "col_idx": 13,
+              "value": "致同会计师事务所",
+              "is_formula": false
+            }
+          ]
+        },
+        {
+          "row": 2,
+          "cells": [
+            {
+              "col": "A",
+              "col_idx": 1,
+              "value": "专项应付款明细表",
+              "is_formula": false
+            },
+            {
+              "col": "M",
+              "col_idx": 13,
+              "value": "专项应付款明细表",
+              "is_formula": false
+            }
+          ]
+        },
+        {
+          "row": 3,
+          "cells": [
+            {
+              "col": "A",
+              "col_idx": 1,
+              "value": "=底稿目录!A2",
+              "is_formula": true
+            },
+            {
+              "col": "E",
+              "col_idx": 5,
+              "value": "=底稿目录!A4",
+              "is_formula": true
+            },
+            {
+              "col": "G",
+              "col_idx": 7,
+              "value": "=底稿目录!A5",
+              "is_formula": true
+            },
+            {
+              "col": "K",
+              "col_idx": 11,
+              "value": "索引号：",
+              "is_formula": false
+            },
+            {
+              "col": "L",
+              "col_idx": 12,
+              "value": "=底稿目录!F8",
+              "is_formula": true
+            },
+            {
+              "col": "O",
+              "col_idx": 15,
+              "value": "=E3",
+              "is_formula": true
+            },
+            {
+              "col": "S",
+              "col_idx": 19,
+              "value": "=G3",
+              "is_formula": true
+            },
+            {
+              "col": "W",
+              "col_idx": 23,
+              "value": "索引号：",
+              "is_formula": false
+            },
+            {
+              "col": "X",
+              "col_idx": 24,
+              "value": "=底稿目录!F8",
+              "is_formula": true
+            }
+          ]
+        },
+        {
+          "row": 4,
+          "cells": [
+            {
+              "col": "A",
+              "col_idx": 1,
+              "value": "=底稿目录!A3",
+              "is_formula": true
+            },
+            {
+              "col": "E",
+              "col_idx": 5,
+              "value": "=底稿目录!A6",
+              "is_formula": true
+            },
+            {
+              "col": "G",
+              "col_idx": 7,
+              "value": "=底稿目录!A7",
+              "is_formula": true
+            },
+            {
+              "col": "K",
+              "col_idx": 11,
+              "value": "页次：",
+              "is_formula": false
+            },
+            {
+              "col": "O",
+              "col_idx": 15,
+              "value": "=E4",
+              "is_formula": true
+            },
+            {
+              "col": "S",
+              "col_idx": 19,
+              "value": "=G4",
+              "is_formula": true
+            },
+            {
+              "col": "W",
+              "col_idx": 23,
+              "value": "页次：",
+              "is_formula": false
+            }
+          ]
+        },
+        {
+          "row": 5,
+          "cells": [
+            {
+              "col": "A",
+              "col_idx": 1,
+              "value": "一、审计目标:",
+              "is_formula": false
+            },
+            {
+              "col": "C",
+              "col_idx": 3,
+              "value": "1、资产负债表中记录的专项应付款是存在的，且已经记录在恰当的账户中；2、 所有应记录的短期借款均已记录，所有应当包括在财务报表中的相关披露均已包括；",
+              "is_formula": false
+            },
+            {
+              "col": "M",
+              "col_idx": 13,
+              "value": "1、资产负债表中记录的专项应付款是存在的，且已经记录在恰当的账户中；2、 所有应记录的短期借款均已记录，所有应当包括在财务报表中的相关披露均已包括；",
+              "is_formula": false
+            }
+          ]
+        }
+      ],
+      "formulas": [
+        {
+          "cell": "A3",
+          "formula": "=底稿目录!A2"
+        },
+        {
+          "cell": "E3",
+          "formula": "=底稿目录!A4"
+        },
+        {
+          "cell": "G3",
+          "formula": "=底稿目录!A5"
+        },
+        {
+          "cell": "L3",
+          "formula": "=底稿目录!F8"
+        },
+        {
+          "cell": "O3",
+          "formula": "=E3"
+        },
+        {
+          "cell": "S3",
+          "formula": "=G3"
+        },
+        {
+          "cell": "X3",
+          "formula": "=底稿目录!F8"
+        },
+        {
+          "cell": "A4",
+          "formula": "=底稿目录!A3"
+        },
+        {
+          "cell": "E4",
+          "formula": "=底稿目录!A6"
+        },
+        {
+          "cell": "G4",
+          "formula": "=底稿目录!A7"
+        },
+        {
+          "cell": "O4",
+          "formula": "=E4"
+        },
+        {
+          "cell": "S4",
+          "formula": "=G4"
+        },
+        {
+          "cell": "G10",
+          "formula": "=C10+D10-E10-F10"
+        },
+        {
+          "cell": "P10",
+          "formula": "=C10+H10+I10"
+        },
+        {
+          "cell": "Q10",
+          "formula": "=D10+J10+M10"
+        }
+      ],
+      "formula_count": 90,
+      "sample_data": [
+        {
+          "row": 6,
+          "cells": [
+            {
+              "col": "C",
+              "value": "3、专项应付款以恰当的金额包括在财务报表中，与之相关的计价或分摊调整已恰当记录，相关披露已得到恰当计量和描述",
+              "is_formula": false
+            },
+            {
+              "col": "M",
+              "value": "3、专项应付款以恰当的金额包括在财务报表中，与之相关的计价或分摊调整已恰当记录，相关披露已得到恰当计量和描述",
+              "is_formula": false
+            }
+          ]
+        },
+        {
+          "row": 7,
+          "cells": [
+            {
+              "col": "A",
+              "value": "二、审计过程：",
+              "is_formula": false
+            }
+          ]
+        },
+        {
+          "row": 8,
+          "cells": [
+            {
+              "col": "A",
+              "value": "序号",
+              "is_formula": false
+            },
+            {
+              "col": "B",
+              "value": "项目",
+              "is_formula": false
+            },
+            {
+              "col": "C",
+              "value": "未审数",
+              "is_formula": false
+            },
+            {
+              "col": "H",
+              "value": "期初调整",
+              "is_formula": false
+            },
+            {
+              "col": "J",
+              "value": "账项调整",
+              "is_formula": false
+            },
+            {
+              "col": "M",
+              "value": "重分类调整",
+              "is_formula": false
+            },
+            {
+              "col": "P",
+              "value": "审定数",
+              "is_formula": false
+            },
+            {
+              "col": "U",
+              "value": "文件依据",
+              "is_formula": false
+            },
+            {
+              "col": "V",
+              "value": "索引号",
+              "is_formula": false
+            },
+            {
+              "col": "W",
+              "value": "拨款项目的完成情况",
+              "is_formula": false
+            },
+            {
+              "col": "X",
+              "value": "备注",
+              "is_formula": false
+            }
+          ]
+        },
+        {
+          "row": 9,
+          "cells": [
+            {
+              "col": "C",
+              "value": "期初余额",
+              "is_formula": false
+            },
+            {
+              "col": "D",
+              "value": "本期拨入",
+              "is_formula": false
+            },
+            {
+              "col": "E",
+              "value": "本期结转",
+              "is_formula": false
+            },
+            {
+              "col": "F",
+              "value": "本期返还",
+              "is_formula": false
+            },
+            {
+              "col": "G",
+              "value": "期末余额",
+              "is_formula": false
+            },
+            {
+              "col": "H",
+              "value": "账项调整",
+              "is_formula": false
+            },
+            {
+              "col": "I",
+              "value": "重分类调整",
+              "is_formula": false
+            },
+            {
+              "col": "J",
+              "value": "本期拨入",
+              "is_formula": false
+            },
+            {
+              "col": "K",
+              "value": "本期结转",
+              "is_formula": false
+            },
+            {
+              "col": "L",
+              "value": "本期返还",
+              "is_formula": false
+            },
+            {
+              "col": "M",
+              "value": "本期拨入",
+              "is_formula": false
+            },
+            {
+              "col": "N",
+              "value": "本期结转",
+              "is_formula": false
+            },
+            {
+              "col": "O",
+              "value": "本期返还",
+              "is_formula": false
+            },
+            {
+              "col": "P",
+              "value": "期初余额",
+              "is_formula": false
+            },
+            {
+              "col": "Q",
+              "value": "本期拨入",
+              "is_formula": false
+            },
+            {
+              "col": "R",
+              "value": "本期结转",
+              "is_formula": false
+            },
+            {
+              "col": "S",
+              "value": "本期返还",
+              "is_formula": false
+            },
+            {
+              "col": "T",
+              "value": "期末余额",
+              "is_formula": false
+            }
+          ]
+        },
+        {
+          "row": 10,
+          "cells": [
+            {
+              "col": "A",
+              "value": "1",
+              "is_formula": false
+            },
+            {
+              "col": "G",
+              "value": "=C10+D10-E10-F10",
+              "is_formula": true
+            },
+            {
+              "col": "P",
+              "value": "=C10+H10+I10",
+              "is_formula": true
+            },
+            {
+              "col": "Q",
+              "value": "=D10+J10+M10",
+              "is_formula": true
+            },
+            {
+              "col": "R",
+              "value": "=E10+K10+N10",
+              "is_formula": true
+            },
+            {
+              "col": "S",
+              "value": "=F10+L10+O10",
+              "is_formula": true
+            },
+            {
+              "col": "T",
+              "value": "=P10+Q10-R10-S10",
+              "is_formula": true
+            }
+          ]
+        }
+      ]
+    },
+    "调整分录汇总L6-3": {
+      "title": "调整分录汇总L6-3",
+      "dimensions": "A1:K23",
+      "max_row": 23,
+      "max_column": 11,
+      "dims_display": "23×11",
+      "merged_cells": [
+        "A22:J22",
+        "A1:J1",
+        "A23:J23",
+        "A2:J2"
+      ],
+      "merged_cells_count": 4,
+      "headers": [
+        {
+          "row": 1,
+          "cells": [
+            {
+              "col": "A",
+              "col_idx": 1,
+              "value": "致同会计师事务所",
+              "is_formula": false
+            }
+          ]
+        },
+        {
+          "row": 2,
+          "cells": [
+            {
+              "col": "A",
+              "col_idx": 1,
+              "value": "专项应付款调整分录汇总表",
+              "is_formula": false
+            }
+          ]
+        },
+        {
+          "row": 3,
+          "cells": [
+            {
+              "col": "A",
+              "col_idx": 1,
+              "value": "=底稿目录!A2",
+              "is_formula": true
+            },
+            {
+              "col": "D",
+              "col_idx": 4,
+              "value": "=底稿目录!A4",
+              "is_formula": true
+            },
+            {
+              "col": "G",
+              "col_idx": 7,
+              "value": "=底稿目录!A5",
+              "is_formula": true
+            },
+            {
+              "col": "I",
+              "col_idx": 9,
+              "value": "索引：",
+              "is_formula": false
+            },
+            {
+              "col": "J",
+              "col_idx": 10,
+              "value": "=底稿目录!F9",
+              "is_formula": true
+            }
+          ]
+        },
+        {
+          "row": 4,
+          "cells": [
+            {
+              "col": "A",
+              "col_idx": 1,
+              "value": "=底稿目录!A3",
+              "is_formula": true
+            },
+            {
+              "col": "D",
+              "col_idx": 4,
+              "value": "=底稿目录!A6",
+              "is_formula": true
+            },
+            {
+              "col": "G",
+              "col_idx": 7,
+              "value": "=底稿目录!A7",
+              "is_formula": true
+            },
+            {
+              "col": "I",
+              "col_idx": 9,
+              "value": "页次：",
+              "is_formula": false
+            }
+          ]
+        },
+        {
+          "row": 5,
+          "cells": [
+            {
+              "col": "A",
+              "col_idx": 1,
+              "value": "调整事项说明",
+              "is_formula": false
+            },
+            {
+              "col": "B",
+              "col_idx": 2,
+              "value": "类别（报表调整/账项调整/其他）",
+              "is_formula": false
+            },
+            {
+              "col": "C",
+              "col_idx": 3,
+              "value": "报表项目",
+              "is_formula": false
+            },
+            {
+              "col": "D",
+              "col_idx": 4,
+              "value": "科目名称",
+              "is_formula": false
+            },
+            {
+              "col": "E",
+              "col_idx": 5,
+              "value": "附注项目",
+              "is_formula": false
+            },
+            {
+              "col": "F",
+              "col_idx": 6,
+              "value": "……",
+              "is_formula": false
+            },
+            {
+              "col": "G",
+              "col_idx": 7,
+              "value": "借方调整金额",
+              "is_formula": false
+            },
+            {
+              "col": "H",
+              "col_idx": 8,
+              "value": "贷方调整金额",
+              "is_formula": false
+            },
+            {
+              "col": "I",
+              "col_idx": 9,
+              "value": "索引",
+              "is_formula": false
+            },
+            {
+              "col": "J",
+              "col_idx": 10,
+              "value": "备注",
+              "is_formula": false
+            }
+          ]
+        }
+      ],
+      "formulas": [
+        {
+          "cell": "A3",
+          "formula": "=底稿目录!A2"
+        },
+        {
+          "cell": "D3",
+          "formula": "=底稿目录!A4"
+        },
+        {
+          "cell": "G3",
+          "formula": "=底稿目录!A5"
+        },
+        {
+          "cell": "J3",
+          "formula": "=底稿目录!F9"
+        },
+        {
+          "cell": "A4",
+          "formula": "=底稿目录!A3"
+        },
+        {
+          "cell": "D4",
+          "formula": "=底稿目录!A6"
+        },
+        {
+          "cell": "G4",
+          "formula": "=底稿目录!A7"
+        }
+      ],
+      "formula_count": 7,
+      "sample_data": []
+    },
+    "检查表L6-4": {
+      "title": "检查表L6-4",
+      "dimensions": "A1:T29",
+      "max_row": 29,
+      "max_column": 20,
+      "dims_display": "29×20",
+      "merged_cells": [
+        "P10:P11",
+        "Q10:Q11",
+        "O10:O11",
+        "A20:D20",
+        "A21:D21",
+        "C5:Q5",
+        "A2:Q2",
+        "J10:N10",
+        "A19:D19",
+        "B10:H10",
+        "A10:A11",
+        "A1:Q1",
+        "I10:I11"
+      ],
+      "merged_cells_count": 13,
+      "headers": [
+        {
+          "row": 1,
+          "cells": [
+            {
+              "col": "A",
+              "col_idx": 1,
+              "value": "致同会计师事务所",
+              "is_formula": false
+            }
+          ]
+        },
+        {
+          "row": 2,
+          "cells": [
+            {
+              "col": "A",
+              "col_idx": 1,
+              "value": "专项应付款检查表",
+              "is_formula": false
+            }
+          ]
+        },
+        {
+          "row": 3,
+          "cells": [
+            {
+              "col": "A",
+              "col_idx": 1,
+              "value": "=底稿目录!A2",
+              "is_formula": true
+            },
+            {
+              "col": "F",
+              "col_idx": 6,
+              "value": "=底稿目录!A4",
+              "is_formula": true
+            },
+            {
+              "col": "K",
+              "col_idx": 11,
+              "value": "=底稿目录!A5",
+              "is_formula": true
+            },
+            {
+              "col": "P",
+              "col_idx": 16,
+              "value": "索引号：",
+              "is_formula": false
+            },
+            {
+              "col": "Q",
+              "col_idx": 17,
+              "value": "=底稿目录!F10",
+              "is_formula": true
+            }
+          ]
+        },
+        {
+          "row": 4,
+          "cells": [
+            {
+              "col": "A",
+              "col_idx": 1,
+              "value": "=底稿目录!A3",
+              "is_formula": true
+            },
+            {
+              "col": "F",
+              "col_idx": 6,
+              "value": "=底稿目录!A6",
+              "is_formula": true
+            },
+            {
+              "col": "K",
+              "col_idx": 11,
+              "value": "=底稿目录!A7",
+              "is_formula": true
+            },
+            {
+              "col": "P",
+              "col_idx": 16,
+              "value": "页次：",
+              "is_formula": false
+            }
+          ]
+        },
+        {
+          "row": 5,
+          "cells": [
+            {
+              "col": "A",
+              "col_idx": 1,
+              "value": "一、审计目标:",
+              "is_formula": false
+            }
+          ]
+        }
+      ],
+      "formulas": [
+        {
+          "cell": "A3",
+          "formula": "=底稿目录!A2"
+        },
+        {
+          "cell": "F3",
+          "formula": "=底稿目录!A4"
+        },
+        {
+          "cell": "K3",
+          "formula": "=底稿目录!A5"
+        },
+        {
+          "cell": "Q3",
+          "formula": "=底稿目录!F10"
+        },
+        {
+          "cell": "A4",
+          "formula": "=底稿目录!A3"
+        },
+        {
+          "cell": "F4",
+          "formula": "=底稿目录!A6"
+        },
+        {
+          "cell": "K4",
+          "formula": "=底稿目录!A7"
+        },
+        {
+          "cell": "G19",
+          "formula": "=SUM(G12:G18)"
+        },
+        {
+          "cell": "H19",
+          "formula": "=SUM(H12:H18)"
+        },
+        {
+          "cell": "G20",
+          "formula": "='明细表L6-2'!R20+'明细表L6-2'!S20"
+        },
+        {
+          "cell": "H20",
+          "formula": "='明细表L6-2'!Q20"
+        },
+        {
+          "cell": "G21",
+          "formula": "=G19/G20"
+        },
+        {
+          "cell": "H21",
+          "formula": "=H19/H20"
+        }
+      ],
+      "formula_count": 13,
+      "sample_data": [
+        {
+          "row": 6,
+          "cells": [
+            {
+              "col": "A",
+              "value": "1.资产负债表中记录的专项应付款是存在的，且已经记录在恰当的账户中；     2.记录的专项应付款由被审计单位拥有或控制；",
+              "is_formula": false
+            }
+          ]
+        },
+        {
+          "row": 7,
+          "cells": [
+            {
+              "col": "A",
+              "value": "3.专项应付款以恰当的金额包括在财务报表中，与之相关的计价或分摊调整已恰当记录，相关披露已得到恰当计量和描述 ",
+              "is_formula": false
+            }
+          ]
+        },
+        {
+          "row": 8,
+          "cells": [
+            {
+              "col": "A",
+              "value": "二、测试：",
+              "is_formula": false
+            },
+            {
+              "col": "C",
+              "value": "测试原因：大额（）关联方（）大额交易频繁（）异常（）其他（）",
+              "is_formula": false
+            }
+          ]
+        },
+        {
+          "row": 9,
+          "cells": [
+            {
+              "col": "A",
+              "value": "测试内容说明：1.原始凭证是否齐全； 2.记账凭证与原始凭证是否相符；3.账务处理是否正确；4.是否记录于恰当的会计期间；5.……",
+              "is_formula": false
+            }
+          ]
+        },
+        {
+          "row": 10,
+          "cells": [
+            {
+              "col": "A",
+              "value": "项目",
+              "is_formula": false
+            },
+            {
+              "col": "B",
+              "value": "记账凭证",
+              "is_formula": false
+            },
+            {
+              "col": "I",
+              "value": "支持性文件",
+              "is_formula": false
+            },
+            {
+              "col": "J",
+              "value": "核对内容",
+              "is_formula": false
+            },
+            {
+              "col": "O",
+              "value": "索引号",
+              "is_formula": false
+            },
+            {
+              "col": "P",
+              "value": "是否异常",
+              "is_formula": false
+            },
+            {
+              "col": "Q",
+              "value": "备注说明",
+              "is_formula": false
+            }
+          ]
+        }
+      ]
+    },
+    "GT_Custom": {
+      "title": "GT_Custom",
+      "dimensions": "A1:B8",
+      "max_row": 8,
+      "max_column": 2,
+      "dims_display": "8×2",
+      "merged_cells": [],
+      "merged_cells_count": 0,
+      "headers": [
+        {
+          "row": 1,
+          "cells": [
+            {
+              "col": "A",
+              "col_idx": 1,
+              "value": "C1",
+              "is_formula": false
+            },
+            {
+              "col": "B",
+              "col_idx": 2,
+              "value": "Custom 1",
+              "is_formula": false
+            }
+          ]
+        },
+        {
+          "row": 2,
+          "cells": [
+            {
+              "col": "A",
+              "col_idx": 1,
+              "value": "C2",
+              "is_formula": false
+            },
+            {
+              "col": "B",
+              "col_idx": 2,
+              "value": "Custom 2",
+              "is_formula": false
+            }
+          ]
+        },
+        {
+          "row": 3,
+          "cells": [
+            {
+              "col": "A",
+              "col_idx": 1,
+              "value": "C3",
+              "is_formula": false
+            },
+            {
+              "col": "B",
+              "col_idx": 2,
+              "value": "Custom 3",
+              "is_formula": false
+            }
+          ]
+        },
+        {
+          "row": 4,
+          "cells": [
+            {
+              "col": "A",
+              "col_idx": 1,
+              "value": "C4",
+              "is_formula": false
+            },
+            {
+              "col": "B",
+              "col_idx": 2,
+              "value": "Custom 4",
+              "is_formula": false
+            }
+          ]
+        },
+        {
+          "row": 5,
+          "cells": [
+            {
+              "col": "A",
+              "col_idx": 1,
+              "value": "C5",
+              "is_formula": false
+            },
+            {
+              "col": "B",
+              "col_idx": 2,
+              "value": "Custom 5",
+              "is_formula": false
+            }
+          ]
+        }
+      ],
+      "formulas": [],
+      "formula_count": 0,
+      "sample_data": [
+        {
+          "row": 6,
+          "cells": [
+            {
+              "col": "A",
+              "value": "C6",
+              "is_formula": false
+            },
+            {
+              "col": "B",
+              "value": "Custom 6",
+              "is_formula": false
+            }
+          ]
+        },
+        {
+          "row": 7,
+          "cells": [
+            {
+              "col": "A",
+              "value": "C7",
+              "is_formula": false
+            },
+            {
+              "col": "B",
+              "value": "Custom 7",
+              "is_formula": false
+            }
+          ]
+        },
+        {
+          "row": 8,
+          "cells": [
+            {
+              "col": "A",
+              "value": "C8",
+              "is_formula": false
+            },
+            {
+              "col": "B",
+              "value": "Custom 8",
+              "is_formula": false
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "confirmation": {
+    "l6_1_adjudication": {
+      "found": true,
+      "sheet_name": "审定表L6-1",
+      "details": {
+        "rows": 30,
+        "cols": 12,
+        "dims": "30×12",
+        "all_headers": [
+          {
+            "row": 1,
+            "col": "A",
+            "col_idx": 1,
+            "value": "致同会计师事务所"
+          },
+          {
+            "row": 2,
+            "col": "A",
+            "col_idx": 1,
+            "value": "专项应付款审定表"
+          },
+          {
+            "row": 3,
+            "col": "A",
+            "col_idx": 1,
+            "value": "=底稿目录!A2"
+          },
+          {
+            "row": 3,
+            "col": "E",
+            "col_idx": 5,
+            "value": "=底稿目录!A4"
+          },
+          {
+            "row": 3,
+            "col": "H",
+            "col_idx": 8,
+            "value": "=底稿目录!A5"
+          },
+          {
+            "row": 3,
+            "col": "J",
+            "col_idx": 10,
+            "value": "索引号："
+          },
+          {
+            "row": 3,
+            "col": "K",
+            "col_idx": 11,
+            "value": "=底稿目录!F5"
+          },
+          {
+            "row": 4,
+            "col": "A",
+            "col_idx": 1,
+            "value": "=底稿目录!A3"
+          },
+          {
+            "row": 4,
+            "col": "E",
+            "col_idx": 5,
+            "value": "=底稿目录!A6"
+          },
+          {
+            "row": 4,
+            "col": "H",
+            "col_idx": 8,
+            "value": "=底稿目录!A7"
+          },
+          {
+            "row": 4,
+            "col": "J",
+            "col_idx": 10,
+            "value": "页次："
+          },
+          {
+            "row": 5,
+            "col": "A",
+            "col_idx": 1,
+            "value": "项 目"
+          },
+          {
+            "row": 5,
+            "col": "B",
+            "col_idx": 2,
+            "value": "期初数"
+          },
+          {
+            "row": 5,
+            "col": "F",
+            "col_idx": 6,
+            "value": "期末数"
+          },
+          {
+            "row": 5,
+            "col": "J",
+            "col_idx": 10,
+            "value": "本期审定数与上期\n审定数的比较"
+          },
+          {
+            "row": 6,
+            "col": "B",
+            "col_idx": 2,
+            "value": "未审数"
+          },
+          {
+            "row": 6,
+            "col": "C",
+            "col_idx": 3,
+            "value": "账项调整"
+          },
+          {
+            "row": 6,
+            "col": "D",
+            "col_idx": 4,
+            "value": "重分类调整"
+          },
+          {
+            "row": 6,
+            "col": "E",
+            "col_idx": 5,
+            "value": "审定数"
+          },
+          {
+            "row": 6,
+            "col": "F",
+            "col_idx": 6,
+            "value": "未审数"
+          },
+          {
+            "row": 6,
+            "col": "G",
+            "col_idx": 7,
+            "value": "账项调整"
+          },
+          {
+            "row": 6,
+            "col": "H",
+            "col_idx": 8,
+            "value": "重分类调整"
+          },
+          {
+            "row": 6,
+            "col": "I",
+            "col_idx": 9,
+            "value": "审定数"
+          },
+          {
+            "row": 6,
+            "col": "J",
+            "col_idx": 10,
+            "value": "变动额"
+          },
+          {
+            "row": 6,
+            "col": "K",
+            "col_idx": 11,
+            "value": "变动率"
+          },
+          {
+            "row": 7,
+            "col": "A",
+            "col_idx": 1,
+            "value": "='明细表L6-2'!B10"
+          },
+          {
+            "row": 7,
+            "col": "B",
+            "col_idx": 2,
+            "value": "='明细表L6-2'!C10"
+          },
+          {
+            "row": 7,
+            "col": "C",
+            "col_idx": 3,
+            "value": "='明细表L6-2'!H10"
+          },
+          {
+            "row": 7,
+            "col": "D",
+            "col_idx": 4,
+            "value": "='明细表L6-2'!I10"
+          },
+          {
+            "row": 7,
+            "col": "E",
+            "col_idx": 5,
+            "value": "=B7+C7+D7"
+          },
+          {
+            "row": 7,
+            "col": "F",
+            "col_idx": 6,
+            "value": "='明细表L6-2'!G10"
+          },
+          {
+            "row": 7,
+            "col": "G",
+            "col_idx": 7,
+            "value": "='明细表L6-2'!H10+'明细表L6-2'!J10-'明细表L6-2'!K10-'明细表L6-2'!L10"
+          },
+          {
+            "row": 7,
+            "col": "H",
+            "col_idx": 8,
+            "value": "='明细表L6-2'!I10+'明细表L6-2'!M10-'明细表L6-2'!N10-'明细表L6-2'!O10"
+          },
+          {
+            "row": 7,
+            "col": "I",
+            "col_idx": 9,
+            "value": "=F7+G7+H7"
+          },
+          {
+            "row": 7,
+            "col": "J",
+            "col_idx": 10,
+            "value": "=I7-E7"
+          },
+          {
+            "row": 7,
+            "col": "K",
+            "col_idx": 11,
+            "value": "=IF(AND(E7=0,J7=0),0,IF(AND(E7=0,J7>0),1,J7/E7))"
+          },
+          {
+            "row": 8,
+            "col": "A",
+            "col_idx": 1,
+            "value": "='明细表L6-2'!B11"
+          },
+          {
+            "row": 8,
+            "col": "B",
+            "col_idx": 2,
+            "value": "='明细表L6-2'!C11"
+          },
+          {
+            "row": 8,
+            "col": "C",
+            "col_idx": 3,
+            "value": "='明细表L6-2'!H11"
+          },
+          {
+            "row": 8,
+            "col": "D",
+            "col_idx": 4,
+            "value": "='明细表L6-2'!I11"
+          },
+          {
+            "row": 8,
+            "col": "E",
+            "col_idx": 5,
+            "value": "=B8+C8+D8"
+          },
+          {
+            "row": 8,
+            "col": "F",
+            "col_idx": 6,
+            "value": "='明细表L6-2'!G11"
+          },
+          {
+            "row": 8,
+            "col": "G",
+            "col_idx": 7,
+            "value": "='明细表L6-2'!H11+'明细表L6-2'!J11-'明细表L6-2'!K11-'明细表L6-2'!L11"
+          },
+          {
+            "row": 8,
+            "col": "H",
+            "col_idx": 8,
+            "value": "='明细表L6-2'!I11+'明细表L6-2'!M11-'明细表L6-2'!N11-'明细表L6-2'!O11"
+          },
+          {
+            "row": 8,
+            "col": "I",
+            "col_idx": 9,
+            "value": "=F8+G8+H8"
+          },
+          {
+            "row": 8,
+            "col": "J",
+            "col_idx": 10,
+            "value": "=I8-E8"
+          },
+          {
+            "row": 8,
+            "col": "K",
+            "col_idx": 11,
+            "value": "=IF(AND(E8=0,J8=0),0,IF(AND(E8=0,J8>0),1,J8/E8))"
+          },
+          {
+            "row": 9,
+            "col": "A",
+            "col_idx": 1,
+            "value": "='明细表L6-2'!B12"
+          },
+          {
+            "row": 9,
+            "col": "B",
+            "col_idx": 2,
+            "value": "='明细表L6-2'!C12"
+          },
+          {
+            "row": 9,
+            "col": "C",
+            "col_idx": 3,
+            "value": "='明细表L6-2'!H12"
+          },
+          {
+            "row": 9,
+            "col": "D",
+            "col_idx": 4,
+            "value": "='明细表L6-2'!I12"
+          },
+          {
+            "row": 9,
+            "col": "E",
+            "col_idx": 5,
+            "value": "=B9+C9+D9"
+          },
+          {
+            "row": 9,
+            "col": "F",
+            "col_idx": 6,
+            "value": "='明细表L6-2'!G12"
+          },
+          {
+            "row": 9,
+            "col": "G",
+            "col_idx": 7,
+            "value": "='明细表L6-2'!H12+'明细表L6-2'!J12-'明细表L6-2'!K12-'明细表L6-2'!L12"
+          },
+          {
+            "row": 9,
+            "col": "H",
+            "col_idx": 8,
+            "value": "='明细表L6-2'!I12+'明细表L6-2'!M12-'明细表L6-2'!N12-'明细表L6-2'!O12"
+          },
+          {
+            "row": 9,
+            "col": "I",
+            "col_idx": 9,
+            "value": "=F9+G9+H9"
+          },
+          {
+            "row": 9,
+            "col": "J",
+            "col_idx": 10,
+            "value": "=I9-E9"
+          },
+          {
+            "row": 9,
+            "col": "K",
+            "col_idx": 11,
+            "value": "=IF(AND(E9=0,J9=0),0,IF(AND(E9=0,J9>0),1,J9/E9))"
+          },
+          {
+            "row": 10,
+            "col": "A",
+            "col_idx": 1,
+            "value": "='明细表L6-2'!B13"
+          },
+          {
+            "row": 10,
+            "col": "B",
+            "col_idx": 2,
+            "value": "='明细表L6-2'!C13"
+          },
+          {
+            "row": 10,
+            "col": "C",
+            "col_idx": 3,
+            "value": "='明细表L6-2'!H13"
+          },
+          {
+            "row": 10,
+            "col": "D",
+            "col_idx": 4,
+            "value": "='明细表L6-2'!I13"
+          },
+          {
+            "row": 10,
+            "col": "E",
+            "col_idx": 5,
+            "value": "=B10+C10+D10"
+          },
+          {
+            "row": 10,
+            "col": "F",
+            "col_idx": 6,
+            "value": "='明细表L6-2'!G13"
+          },
+          {
+            "row": 10,
+            "col": "G",
+            "col_idx": 7,
+            "value": "='明细表L6-2'!H13+'明细表L6-2'!J13-'明细表L6-2'!K13-'明细表L6-2'!L13"
+          },
+          {
+            "row": 10,
+            "col": "H",
+            "col_idx": 8,
+            "value": "='明细表L6-2'!I13+'明细表L6-2'!M13-'明细表L6-2'!N13-'明细表L6-2'!O13"
+          },
+          {
+            "row": 10,
+            "col": "I",
+            "col_idx": 9,
+            "value": "=F10+G10+H10"
+          },
+          {
+            "row": 10,
+            "col": "J",
+            "col_idx": 10,
+            "value": "=I10-E10"
+          },
+          {
+            "row": 10,
+            "col": "K",
+            "col_idx": 11,
+            "value": "=IF(AND(E10=0,J10=0),0,IF(AND(E10=0,J10>0),1,J10/E10))"
+          },
+          {
+            "row": 11,
+            "col": "A",
+            "col_idx": 1,
+            "value": "='明细表L6-2'!B14"
+          },
+          {
+            "row": 11,
+            "col": "B",
+            "col_idx": 2,
+            "value": "='明细表L6-2'!C14"
+          },
+          {
+            "row": 11,
+            "col": "C",
+            "col_idx": 3,
+            "value": "='明细表L6-2'!H14"
+          },
+          {
+            "row": 11,
+            "col": "D",
+            "col_idx": 4,
+            "value": "='明细表L6-2'!I14"
+          },
+          {
+            "row": 11,
+            "col": "E",
+            "col_idx": 5,
+            "value": "=B11+C11+D11"
+          },
+          {
+            "row": 11,
+            "col": "F",
+            "col_idx": 6,
+            "value": "='明细表L6-2'!G14"
+          },
+          {
+            "row": 11,
+            "col": "G",
+            "col_idx": 7,
+            "value": "='明细表L6-2'!H14+'明细表L6-2'!J14-'明细表L6-2'!K14-'明细表L6-2'!L14"
+          },
+          {
+            "row": 11,
+            "col": "H",
+            "col_idx": 8,
+            "value": "='明细表L6-2'!I14+'明细表L6-2'!M14-'明细表L6-2'!N14-'明细表L6-2'!O14"
+          },
+          {
+            "row": 11,
+            "col": "I",
+            "col_idx": 9,
+            "value": "=F11+G11+H11"
+          },
+          {
+            "row": 11,
+            "col": "J",
+            "col_idx": 10,
+            "value": "=I11-E11"
+          },
+          {
+            "row": 11,
+            "col": "K",
+            "col_idx": 11,
+            "value": "=IF(AND(E11=0,J11=0),0,IF(AND(E11=0,J11>0),1,J11/E11))"
+          },
+          {
+            "row": 12,
+            "col": "A",
+            "col_idx": 1,
+            "value": "='明细表L6-2'!B15"
+          },
+          {
+            "row": 12,
+            "col": "B",
+            "col_idx": 2,
+            "value": "='明细表L6-2'!C15"
+          },
+          {
+            "row": 12,
+            "col": "C",
+            "col_idx": 3,
+            "value": "='明细表L6-2'!H15"
+          },
+          {
+            "row": 12,
+            "col": "D",
+            "col_idx": 4,
+            "value": "='明细表L6-2'!I15"
+          },
+          {
+            "row": 12,
+            "col": "E",
+            "col_idx": 5,
+            "value": "=B12+C12+D12"
+          },
+          {
+            "row": 12,
+            "col": "F",
+            "col_idx": 6,
+            "value": "='明细表L6-2'!G15"
+          },
+          {
+            "row": 12,
+            "col": "G",
+            "col_idx": 7,
+            "value": "='明细表L6-2'!H15+'明细表L6-2'!J15-'明细表L6-2'!K15-'明细表L6-2'!L15"
+          },
+          {
+            "row": 12,
+            "col": "H",
+            "col_idx": 8,
+            "value": "='明细表L6-2'!I15+'明细表L6-2'!M15-'明细表L6-2'!N15-'明细表L6-2'!O15"
+          },
+          {
+            "row": 12,
+            "col": "I",
+            "col_idx": 9,
+            "value": "=F12+G12+H12"
+          },
+          {
+            "row": 12,
+            "col": "J",
+            "col_idx": 10,
+            "value": "=I12-E12"
+          },
+          {
+            "row": 12,
+            "col": "K",
+            "col_idx": 11,
+            "value": "=IF(AND(E12=0,J12=0),0,IF(AND(E12=0,J12>0),1,J12/E12))"
+          }
+        ],
+        "has_project_col": false,
+        "has_begin_balance_col": true,
+        "has_credit_col": false,
+        "has_debit_col": false,
+        "has_end_balance_col": true,
+        "has_unadjusted_col": true,
+        "has_aje_col": true,
+        "has_rje_col": true,
+        "has_audited_col": true,
+        "has_subtotal_row": true,
+        "formula_count": 133,
+        "formula_samples": [
+          {
+            "cell": "A3",
+            "formula": "=底稿目录!A2"
+          },
+          {
+            "cell": "E3",
+            "formula": "=底稿目录!A4"
+          },
+          {
+            "cell": "H3",
+            "formula": "=底稿目录!A5"
+          },
+          {
+            "cell": "K3",
+            "formula": "=底稿目录!F5"
+          },
+          {
+            "cell": "A4",
+            "formula": "=底稿目录!A3"
+          },
+          {
+            "cell": "E4",
+            "formula": "=底稿目录!A6"
+          },
+          {
+            "cell": "H4",
+            "formula": "=底稿目录!A7"
+          },
+          {
+            "cell": "A7",
+            "formula": "='明细表L6-2'!B10"
+          },
+          {
+            "cell": "B7",
+            "formula": "='明细表L6-2'!C10"
+          },
+          {
+            "cell": "C7",
+            "formula": "='明细表L6-2'!H10"
+          },
+          {
+            "cell": "D7",
+            "formula": "='明细表L6-2'!I10"
+          },
+          {
+            "cell": "E7",
+            "formula": "=B7+C7+D7"
+          },
+          {
+            "cell": "F7",
+            "formula": "='明细表L6-2'!G10"
+          },
+          {
+            "cell": "G7",
+            "formula": "='明细表L6-2'!H10+'明细表L6-2'!J10-'明细表L6-2'!K10-'明细表L6-2'!L10"
+          },
+          {
+            "cell": "H7",
+            "formula": "='明细表L6-2'!I10+'明细表L6-2'!M10-'明细表L6-2'!N10-'明细表L6-2'!O10"
+          }
+        ],
+        "column_structure": {
+          "A": "=底稿目录!A3 | 项 目 | ='明细表L6-2'!B10",
+          "B": "期初数 | 未审数 | ='明细表L6-2'!C10",
+          "C": "账项调整 | ='明细表L6-2'!H10",
+          "D": "重分类调整 | ='明细表L6-2'!I10",
+          "E": "=底稿目录!A6 | 审定数 | =B7+C7+D7",
+          "F": "期末数 | 未审数 | ='明细表L6-2'!G10",
+          "G": "账项调整 | ='明细表L6-2'!H10+'明细表L6-2'!J10-'明细表L6-2'!K10-'明细表L6-2'!L10",
+          "H": "=底稿目录!A7 | 重分类调整 | ='明细表L6-2'!I10+'明细表L6-2'!M10-'明细表L6-2'!N10-'明细表L6-2'!O10",
+          "I": "审定数 | =F7+G7+H7",
+          "J": "页次： | 本期审定数与上期\n审定数的比较 | 变动额 | =I7-E7",
+          "K": "变动率 | =IF(AND(E7=0,J7=0),0,IF(AND(E7=0,J7>0),1,J7/E7))"
+        }
+      }
+    },
+    "l6_2_detail": {
+      "found": true,
+      "sheet_name": "明细表L6-2",
+      "details": {
+        "rows": 37,
+        "cols": 33,
+        "dims": "37×33",
+        "all_headers": [
+          {
+            "row": 1,
+            "col": "A",
+            "col_idx": 1,
+            "value": "致同会计师事务所"
+          },
+          {
+            "row": 1,
+            "col": "M",
+            "col_idx": 13,
+            "value": "致同会计师事务所"
+          },
+          {
+            "row": 2,
+            "col": "A",
+            "col_idx": 1,
+            "value": "专项应付款明细表"
+          },
+          {
+            "row": 2,
+            "col": "M",
+            "col_idx": 13,
+            "value": "专项应付款明细表"
+          },
+          {
+            "row": 3,
+            "col": "A",
+            "col_idx": 1,
+            "value": "=底稿目录!A2"
+          },
+          {
+            "row": 3,
+            "col": "E",
+            "col_idx": 5,
+            "value": "=底稿目录!A4"
+          },
+          {
+            "row": 3,
+            "col": "G",
+            "col_idx": 7,
+            "value": "=底稿目录!A5"
+          },
+          {
+            "row": 3,
+            "col": "K",
+            "col_idx": 11,
+            "value": "索引号："
+          },
+          {
+            "row": 3,
+            "col": "L",
+            "col_idx": 12,
+            "value": "=底稿目录!F8"
+          },
+          {
+            "row": 3,
+            "col": "O",
+            "col_idx": 15,
+            "value": "=E3"
+          },
+          {
+            "row": 3,
+            "col": "S",
+            "col_idx": 19,
+            "value": "=G3"
+          },
+          {
+            "row": 3,
+            "col": "W",
+            "col_idx": 23,
+            "value": "索引号："
+          },
+          {
+            "row": 3,
+            "col": "X",
+            "col_idx": 24,
+            "value": "=底稿目录!F8"
+          },
+          {
+            "row": 4,
+            "col": "A",
+            "col_idx": 1,
+            "value": "=底稿目录!A3"
+          },
+          {
+            "row": 4,
+            "col": "E",
+            "col_idx": 5,
+            "value": "=底稿目录!A6"
+          },
+          {
+            "row": 4,
+            "col": "G",
+            "col_idx": 7,
+            "value": "=底稿目录!A7"
+          },
+          {
+            "row": 4,
+            "col": "K",
+            "col_idx": 11,
+            "value": "页次："
+          },
+          {
+            "row": 4,
+            "col": "O",
+            "col_idx": 15,
+            "value": "=E4"
+          },
+          {
+            "row": 4,
+            "col": "S",
+            "col_idx": 19,
+            "value": "=G4"
+          },
+          {
+            "row": 4,
+            "col": "W",
+            "col_idx": 23,
+            "value": "页次："
+          },
+          {
+            "row": 5,
+            "col": "A",
+            "col_idx": 1,
+            "value": "一、审计目标:"
+          },
+          {
+            "row": 5,
+            "col": "C",
+            "col_idx": 3,
+            "value": "1、资产负债表中记录的专项应付款是存在的，且已经记录在恰当的账户中；2、 所有应记录的短期借款均已记录，所有应当包括在财务报表中的相关披露均已包括；"
+          },
+          {
+            "row": 5,
+            "col": "M",
+            "col_idx": 13,
+            "value": "1、资产负债表中记录的专项应付款是存在的，且已经记录在恰当的账户中；2、 所有应记录的短期借款均已记录，所有应当包括在财务报表中的相关披露均已包括；"
+          },
+          {
+            "row": 6,
+            "col": "C",
+            "col_idx": 3,
+            "value": "3、专项应付款以恰当的金额包括在财务报表中，与之相关的计价或分摊调整已恰当记录，相关披露已得到恰当计量和描述"
+          },
+          {
+            "row": 6,
+            "col": "M",
+            "col_idx": 13,
+            "value": "3、专项应付款以恰当的金额包括在财务报表中，与之相关的计价或分摊调整已恰当记录，相关披露已得到恰当计量和描述"
+          },
+          {
+            "row": 7,
+            "col": "A",
+            "col_idx": 1,
+            "value": "二、审计过程："
+          },
+          {
+            "row": 8,
+            "col": "A",
+            "col_idx": 1,
+            "value": "序号"
+          },
+          {
+            "row": 8,
+            "col": "B",
+            "col_idx": 2,
+            "value": "项目"
+          },
+          {
+            "row": 8,
+            "col": "C",
+            "col_idx": 3,
+            "value": "未审数"
+          },
+          {
+            "row": 8,
+            "col": "H",
+            "col_idx": 8,
+            "value": "期初调整"
+          },
+          {
+            "row": 8,
+            "col": "J",
+            "col_idx": 10,
+            "value": "账项调整"
+          },
+          {
+            "row": 8,
+            "col": "M",
+            "col_idx": 13,
+            "value": "重分类调整"
+          },
+          {
+            "row": 8,
+            "col": "P",
+            "col_idx": 16,
+            "value": "审定数"
+          },
+          {
+            "row": 8,
+            "col": "U",
+            "col_idx": 21,
+            "value": "文件依据"
+          },
+          {
+            "row": 8,
+            "col": "V",
+            "col_idx": 22,
+            "value": "索引号"
+          },
+          {
+            "row": 8,
+            "col": "W",
+            "col_idx": 23,
+            "value": "拨款项目的完成情况"
+          },
+          {
+            "row": 8,
+            "col": "X",
+            "col_idx": 24,
+            "value": "备注"
+          },
+          {
+            "row": 9,
+            "col": "C",
+            "col_idx": 3,
+            "value": "期初余额"
+          },
+          {
+            "row": 9,
+            "col": "D",
+            "col_idx": 4,
+            "value": "本期拨入"
+          },
+          {
+            "row": 9,
+            "col": "E",
+            "col_idx": 5,
+            "value": "本期结转"
+          },
+          {
+            "row": 9,
+            "col": "F",
+            "col_idx": 6,
+            "value": "本期返还"
+          },
+          {
+            "row": 9,
+            "col": "G",
+            "col_idx": 7,
+            "value": "期末余额"
+          },
+          {
+            "row": 9,
+            "col": "H",
+            "col_idx": 8,
+            "value": "账项调整"
+          },
+          {
+            "row": 9,
+            "col": "I",
+            "col_idx": 9,
+            "value": "重分类调整"
+          },
+          {
+            "row": 9,
+            "col": "J",
+            "col_idx": 10,
+            "value": "本期拨入"
+          },
+          {
+            "row": 9,
+            "col": "K",
+            "col_idx": 11,
+            "value": "本期结转"
+          },
+          {
+            "row": 9,
+            "col": "L",
+            "col_idx": 12,
+            "value": "本期返还"
+          },
+          {
+            "row": 9,
+            "col": "M",
+            "col_idx": 13,
+            "value": "本期拨入"
+          },
+          {
+            "row": 9,
+            "col": "N",
+            "col_idx": 14,
+            "value": "本期结转"
+          },
+          {
+            "row": 9,
+            "col": "O",
+            "col_idx": 15,
+            "value": "本期返还"
+          },
+          {
+            "row": 9,
+            "col": "P",
+            "col_idx": 16,
+            "value": "期初余额"
+          },
+          {
+            "row": 9,
+            "col": "Q",
+            "col_idx": 17,
+            "value": "本期拨入"
+          },
+          {
+            "row": 9,
+            "col": "R",
+            "col_idx": 18,
+            "value": "本期结转"
+          },
+          {
+            "row": 9,
+            "col": "S",
+            "col_idx": 19,
+            "value": "本期返还"
+          },
+          {
+            "row": 9,
+            "col": "T",
+            "col_idx": 20,
+            "value": "期末余额"
+          },
+          {
+            "row": 10,
+            "col": "A",
+            "col_idx": 1,
+            "value": "1"
+          },
+          {
+            "row": 10,
+            "col": "G",
+            "col_idx": 7,
+            "value": "=C10+D10-E10-F10"
+          },
+          {
+            "row": 10,
+            "col": "P",
+            "col_idx": 16,
+            "value": "=C10+H10+I10"
+          },
+          {
+            "row": 10,
+            "col": "Q",
+            "col_idx": 17,
+            "value": "=D10+J10+M10"
+          },
+          {
+            "row": 10,
+            "col": "R",
+            "col_idx": 18,
+            "value": "=E10+K10+N10"
+          },
+          {
+            "row": 10,
+            "col": "S",
+            "col_idx": 19,
+            "value": "=F10+L10+O10"
+          },
+          {
+            "row": 10,
+            "col": "T",
+            "col_idx": 20,
+            "value": "=P10+Q10-R10-S10"
+          },
+          {
+            "row": 11,
+            "col": "A",
+            "col_idx": 1,
+            "value": "2"
+          },
+          {
+            "row": 11,
+            "col": "G",
+            "col_idx": 7,
+            "value": "=C11+D11-E11-F11"
+          },
+          {
+            "row": 11,
+            "col": "P",
+            "col_idx": 16,
+            "value": "=C11+H11+I11"
+          },
+          {
+            "row": 11,
+            "col": "Q",
+            "col_idx": 17,
+            "value": "=D11+J11+M11"
+          },
+          {
+            "row": 11,
+            "col": "R",
+            "col_idx": 18,
+            "value": "=E11+K11+N11"
+          },
+          {
+            "row": 11,
+            "col": "S",
+            "col_idx": 19,
+            "value": "=F11+L11+O11"
+          },
+          {
+            "row": 11,
+            "col": "T",
+            "col_idx": 20,
+            "value": "=P11+Q11-R11-S11"
+          },
+          {
+            "row": 12,
+            "col": "A",
+            "col_idx": 1,
+            "value": "3"
+          },
+          {
+            "row": 12,
+            "col": "G",
+            "col_idx": 7,
+            "value": "=C12+D12-E12-F12"
+          },
+          {
+            "row": 12,
+            "col": "P",
+            "col_idx": 16,
+            "value": "=C12+H12+I12"
+          },
+          {
+            "row": 12,
+            "col": "Q",
+            "col_idx": 17,
+            "value": "=D12+J12+M12"
+          },
+          {
+            "row": 12,
+            "col": "R",
+            "col_idx": 18,
+            "value": "=E12+K12+N12"
+          },
+          {
+            "row": 12,
+            "col": "S",
+            "col_idx": 19,
+            "value": "=F12+L12+O12"
+          },
+          {
+            "row": 12,
+            "col": "T",
+            "col_idx": 20,
+            "value": "=P12+Q12-R12-S12"
+          }
+        ],
+        "has_project_name_col": true,
+        "has_source_col": true,
+        "has_approval_col": false,
+        "has_purpose_col": false,
+        "has_begin_balance_col": true,
+        "has_credit_in_col": true,
+        "has_debit_use_col": false,
+        "has_end_balance_col": true,
+        "has_carry_forward_col": true,
+        "formula_count": 90,
+        "formula_samples": [
+          {
+            "cell": "A3",
+            "formula": "=底稿目录!A2"
+          },
+          {
+            "cell": "E3",
+            "formula": "=底稿目录!A4"
+          },
+          {
+            "cell": "G3",
+            "formula": "=底稿目录!A5"
+          },
+          {
+            "cell": "L3",
+            "formula": "=底稿目录!F8"
+          },
+          {
+            "cell": "O3",
+            "formula": "=E3"
+          },
+          {
+            "cell": "S3",
+            "formula": "=G3"
+          },
+          {
+            "cell": "X3",
+            "formula": "=底稿目录!F8"
+          },
+          {
+            "cell": "A4",
+            "formula": "=底稿目录!A3"
+          },
+          {
+            "cell": "E4",
+            "formula": "=底稿目录!A6"
+          },
+          {
+            "cell": "G4",
+            "formula": "=底稿目录!A7"
+          },
+          {
+            "cell": "O4",
+            "formula": "=E4"
+          },
+          {
+            "cell": "S4",
+            "formula": "=G4"
+          },
+          {
+            "cell": "G10",
+            "formula": "=C10+D10-E10-F10"
+          },
+          {
+            "cell": "P10",
+            "formula": "=C10+H10+I10"
+          },
+          {
+            "cell": "Q10",
+            "formula": "=D10+J10+M10"
+          }
+        ],
+        "column_structure": {
+          "A": "=底稿目录!A3 | 一、审计目标: | 二、审计过程： | 序号",
+          "B": "项目",
+          "C": "1、资产负债表中记录的专项应付款是存在的，且已经记录在恰当的账户中；2、 所有应记录的短期借款均已记录，所有应当包括在财 | 3、专项应付款以恰当的金额包括在财务报表中，与之相关的计价或分摊调整已恰当记录，相关披露已得到恰当计量和描述 | 未审数 | 期初余额",
+          "D": "本期拨入",
+          "E": "=底稿目录!A6 | 本期结转",
+          "F": "本期返还",
+          "G": "=底稿目录!A7 | 期末余额",
+          "H": "期初调整 | 账项调整",
+          "I": "重分类调整",
+          "J": "账项调整 | 本期拨入",
+          "K": "页次： | 本期结转",
+          "L": "本期返还",
+          "M": "1、资产负债表中记录的专项应付款是存在的，且已经记录在恰当的账户中；2、 所有应记录的短期借款均已记录，所有应当包括在财 | 3、专项应付款以恰当的金额包括在财务报表中，与之相关的计价或分摊调整已恰当记录，相关披露已得到恰当计量和描述 | 重分类调整 | 本期拨入",
+          "N": "本期结转",
+          "O": "=E4 | 本期返还",
+          "P": "审定数 | 期初余额",
+          "Q": "本期拨入",
+          "R": "本期结转",
+          "S": "=G4 | 本期返还",
+          "T": "期末余额",
+          "U": "文件依据",
+          "V": "索引号",
+          "W": "页次： | 拨款项目的完成情况",
+          "X": "备注"
+        }
+      }
+    }
+  },
+  "validations": {
+    "total_sheets": 9,
+    "expected_8_sheets": true,
+    "l6_1_found": true,
+    "l6_1_formula_count": 133,
+    "l6_1_expected_73_formulas": false,
+    "l6_2_found": true,
+    "l6_2_dims": "37×33",
+    "account_code": "2601",
+    "account_direction": "贷方/负债类",
+    "formula": "期末=期初+贷方-借方"
+  },
+  "summary": {
+    "total_formulas": 348,
+    "sheets_with_formulas": [
+      {
+        "name": "专项应付款实质性程序表L6A",
+        "formula_count": 6
+      },
+      {
+        "name": "审定表L6-1",
+        "formula_count": 133
+      },
+      {
+        "name": "附注披露（上市公司）信息",
+        "formula_count": 60
+      },
+      {
+        "name": "附注披露（国企）信息",
+        "formula_count": 39
+      },
+      {
+        "name": "明细表L6-2",
+        "formula_count": 90
+      },
+      {
+        "name": "调整分录汇总L6-3",
+        "formula_count": 7
+      },
+      {
+        "name": "检查表L6-4",
+        "formula_count": 13
+      }
+    ],
+    "key_findings": [
+      "📊 总sheet数: 9",
+      "📊 总公式数: 348",
+      "📊 科目: 2601专项应付款（贷方/负债类）",
+      "📊 公式铁律: 期末=期初+贷方-借方",
+      "✅ L6-1审定表已确认: 审定表L6-1 (30×12)",
+      "  📊 公式数: 133 (预期~73)",
+      "  ✅ 含期初列",
+      "  ✅ 含期末列",
+      "  ✅ 含未审数列",
+      "  ✅ 含账项调整列",
+      "  ✅ 含重分类调整列",
+      "  ✅ 含审定数列",
+      "  ✅ 含合计/小计行",
+      "✅ L6-2明细表已确认: 明细表L6-2 (37×33)",
+      "  📊 公式数: 90",
+      "  ✅ 含专项项目列",
+      "  ✅ 含拨款来源列",
+      "  ✅ 含期初余额列",
+      "  ✅ 含本期拨入列",
+      "  ✅ 含本期结转列",
+      "  ✅ 含期末余额列"
+    ]
+  }
+}

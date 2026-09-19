@@ -30,12 +30,14 @@ def register_system_routers(app: FastAPI) -> None:
     # ═══ §1. 基础设施（认证/健康/WOPI） ═══
     from app.api.auth import router as auth_router
     from app.api.health import router as health_router
+    from app.api.probes import router as probes_router
     from app.api.users import router as users_router
     from app.api.wopi import router as wopi_router
 
     app.include_router(auth_router, prefix="/api/auth", tags=["认证"])
     app.include_router(users_router, prefix="/api/users", tags=["用户"])
     app.include_router(health_router, prefix="/api", tags=["健康检查"])
+    app.include_router(probes_router, tags=["探针"])  # /livez, /readyz at root (no /api prefix)
     app.include_router(wopi_router, prefix="/wopi", tags=["WOPI"])
 
     # ═══ §103. Phase 6 F6: 二次密码验证 ═══
@@ -44,6 +46,7 @@ def register_system_routers(app: FastAPI) -> None:
 
     # ═══ §2. 项目与向导 ═══
     from app.routers.project_wizard import router as project_wizard_router
+    from app.routers.batch_project import router as batch_project_router
     from app.routers.account_chart import router as account_chart_router
     from app.routers.mapping import router as mapping_router
     from app.routers.report_line_mapping import router as rlm_router
@@ -53,8 +56,8 @@ def register_system_routers(app: FastAPI) -> None:
     from app.routers.ledger_datasets import router as ledger_datasets_router
     from app.routers.dataset_force_unbind import router as dataset_force_unbind_router
 
-    for r in [project_wizard_router, account_chart_router, mapping_router,
-              rlm_router, data_import_router, data_lifecycle_router,
+    for r in [batch_project_router, project_wizard_router, account_chart_router,
+              mapping_router, rlm_router, data_import_router, data_lifecycle_router,
               continuous_audit_router, ledger_datasets_router,
               dataset_force_unbind_router]:
         app.include_router(r, tags=["项目与数据"])
@@ -84,9 +87,14 @@ def register_system_routers(app: FastAPI) -> None:
               dv_router, consistency_router]:
         app.include_router(r, tags=["查账与试算"])
 
+    # ═══ §3b. 通用 auto_data_source resolver API ═══
+    from app.routers.auto_data import router as auto_data_router
+    app.include_router(auto_data_router, tags=["auto-data"])
+
     # ═══ §6. 合并报表 ═══
     from app.routers.consolidation import router as consol_router
     from app.routers.consol_scope import router as cs_router
+    from app.routers.consol_scope_diff import router as csd_router
     from app.routers.consol_trial import router as ct_router
     from app.routers.internal_trade import router as it_router
     from app.routers.component_auditor import router as ca_router
@@ -109,8 +117,18 @@ def register_system_routers(app: FastAPI) -> None:
     for r in [consol_router, cs_router, ct_router, it_router, ca_router,
               gw_router, fx_router, mi_router, cn_router, cr_router,
               cw_router, cwd_router, cns_router, ccc_router, anm_router, fal_router, cq_router, qb_router,
-              crf_router, crb_router]:
+              crf_router, crb_router, csd_router]:
         app.include_router(r, tags=["合并报表"])
+
+    # ═══ §7.1 高级查询：底稿回写预览 / 确认（custom_query 的伴生 router） ═══
+    # 🔴 custom_query.py 只 re-export 了 writeback_preview / writeback_confirm 两个**函数**
+    #    （给契约测试直调与 monkeypatch 用），并未 include 伴生模块自己的 APIRouter。
+    #    结果 POST /api/custom-query/writeback-preview|writeback-confirm 从未挂上路由树，
+    #    `WritebackPreviewService`（30KB）+ `WritebackConfirmationGate` 对用户仍是 404 —— 
+    #    与该模块 docstring 自称的「本模块是其唯一生产入口」相矛盾。此处补注册。
+    #    tags 保留 router 自身声明的 ["custom-query"]（不套用「合并报表」）。
+    from app.routers.custom_query_writeback import router as cqw_router
+    app.include_router(cqw_router)
 
     # ═══ §8. 系统管理与扩展 ═══
     from app.routers.gt_coding import router as gtc_router
@@ -159,6 +177,10 @@ def register_system_routers(app: FastAPI) -> None:
     app.include_router(ledger_import_v2_router, tags=["ledger-import-v2"])
     app.include_router(ledger_raw_extra_router, tags=["ledger-import-v2"])
 
+    # ═══ §24b. 符号约定方向 API ═══
+    from app.routers.sign_convention import router as sign_convention_router
+    app.include_router(sign_convention_router, tags=["符号约定"])
+
     # ═══ §25. 账表数据管理 ═══
     from app.routers.ledger_data import router as ledger_data_router
     app.include_router(ledger_data_router, tags=["ledger-data"])
@@ -186,6 +208,22 @@ def register_system_routers(app: FastAPI) -> None:
     # ═══ §53. Sprint 11：项目级配置中心 ═══
     from app.routers.project_config import router as project_config_router
     app.include_router(project_config_router, tags=["project-config"])
+
+    # ═══ §53b. 项目级账龄配置（AgingConfigService 增强版） ═══
+    from app.routers.aging_config import router as aging_config_router
+    app.include_router(aging_config_router, tags=["aging-config"])
+
+    # ═══ §53c. B60 适用性矩阵 / 计划更新 / 质控 ═══
+    from app.routers.b60_plan import router as b60_plan_router
+    app.include_router(b60_plan_router, tags=["b60-plan"])
+
+    # ═══ §53d. B60 章节定义 API ═══
+    from app.routers.b60_chapters import router as b60_chapters_router
+    app.include_router(b60_chapters_router, tags=["b60-chapters"])
+
+    # ═══ §53e. B50-3 确定审计范围：试算表重要科目预填 ═══
+    from app.routers.b50_scope import router as b50_scope_router
+    app.include_router(b50_scope_router, tags=["b50-scope"])
 
     # ═══ §54. template-library-coordination：模板库管理 ═══
     from app.routers.template_library_mgmt import router as template_library_mgmt_router
@@ -217,6 +255,16 @@ def register_system_routers(app: FastAPI) -> None:
     from app.routers.doc_ai_chat import router as doc_ai_chat_router
     app.include_router(doc_ai_chat_router, tags=["文档级AI对话"])
 
+    # ═══ §130.1 MCP scoped REST（dsh-agent-panel-integration Task 25 / Req 11.5~11.9） ═══
+    # 🔴 6 个 /api/ai-chat/mcp/* 端点（tokens / tokens/child / tokens/revoke /
+    #    tools / tools/call / budget/{run_id}）此前从未 include → 整套 MCP scoped token
+    #    能力（ResourceAccessResolver 校验 + ExportMaskService 脱敏 + 预算 + 哈希链审计）
+    #    对调用方是 404。前缀 /api/ai-chat/mcp 与 doc_ai_chat 的静态段/`/doc/{..}` 路径
+    #    不重叠，注册顺序无歧义。全部端点均已带鉴权依赖
+    #    （get_current_user 或 _validate_mcp_token），不新增未认证入口。
+    from app.routers.ai_chat_mcp import router as ai_chat_mcp_router
+    app.include_router(ai_chat_mcp_router, tags=["AI Chat MCP"])
+
     # ═══ §123. V3 Req 7.4: 跨模块冲突调解（list_pending / list / resolve） ═══
     from app.routers.cross_module_conflicts import router as cross_module_conflicts_router
     app.include_router(cross_module_conflicts_router, tags=["跨模块冲突调解"])
@@ -232,6 +280,10 @@ def register_system_routers(app: FastAPI) -> None:
     # ═══ §126. V3 Req 11.3: 时光机自动快照 ═══
     from app.routers.time_machine import router as time_machine_router
     app.include_router(time_machine_router, tags=["时光机"])
+
+    # ═══ §126b. 试算表版本快照 ═══
+    from app.routers.tb_snapshot import router as tb_snapshot_router
+    app.include_router(tb_snapshot_router, tags=["trial-balance-snapshots"])
 
     # ═══ §127. 审计日志哈希链校验 ═══
     from app.routers.audit_logs import router as audit_logs_router
@@ -250,6 +302,10 @@ def register_system_routers(app: FastAPI) -> None:
     from app.routers.workpaper_remind import router as workpaper_remind_router
 
     # 自带完整 /api 前缀的 router（直接注册，不加额外前缀）
+    # Task 16 CROSS-CUTTING-WP-GATE：含 {wp_id} 的 router（workpaper_remind/batch_assign_enhanced）
+    # 经 include_router_with_wp_gate 附加 dedicated_wp_gate（对无 wp_id 路由安全 no-op）。
+    from app.routers._wp_gate import include_router_with_wp_gate as _inc_wp_gate
+
     for r in [
         archive_router,              # /api/projects/{project_id}/archive/*
         batch_assign_enhanced_router,  # /api/workpapers/batch-assign-enhanced
@@ -259,7 +315,64 @@ def register_system_routers(app: FastAPI) -> None:
         workhour_approve_router,     # /api/workhours/batch-approve
         workpaper_remind_router,     # /api/projects/{project_id}/workpapers/*
     ]:
-        app.include_router(r)
+        _inc_wp_gate(app, r)
 
     # rotation_router 内部 prefix="/rotation"，需补 /api 前缀 → /api/rotation/*
     app.include_router(rotation_router, prefix="/api")
+
+    # ═══ §136. review-prompt-sheet-level-split: 底稿级复核提示词 ═══
+    from app.routers.review_prompt import router as review_prompt_router
+    app.include_router(review_prompt_router, tags=["review-prompt"])
+
+    # ═══ §131. platform-linkage-contract-stale P0-3: 路由解析 ═══
+    from app.routers.linkage_resolve import router as linkage_resolve_router
+    app.include_router(linkage_resolve_router, tags=["linkage"])
+
+    # ═══ §132. platform-linkage-contract-stale P1-1: 统一穿透查询 ═══
+    from app.routers.linkage_trace import router as linkage_trace_router
+    app.include_router(linkage_trace_router, tags=["linkage"])
+
+    # ═══ §133. ACNR 地址坐标名称注册中心（M0 只读 lookup/resolve） ═══
+    from app.routers.acnr import router as acnr_router
+    app.include_router(acnr_router, tags=["ACNR"])
+
+    # ═══ §133. zero-downtime-deployment: DB-backed Feature Flags V2 (灰度) ═══
+    from app.api.feature_flags import router as feature_flags_v2_router
+    app.include_router(feature_flags_v2_router, tags=["Feature Flags V2"])
+
+    # ═══ §134. 底稿编制指导面板 ═══
+    from app.routers.wp_guidance_chat import router as wp_guidance_chat_router
+    _inc_wp_gate(app, wp_guidance_chat_router, tags=["底稿编制指导"])
+
+    # ═══ §135. evidence-governance: Facade + Ref + OCR ═══
+    from app.routers.evidence_governance import router as evidence_governance_router
+    from app.routers.evidence_governance import (
+        attachments_router as evidence_governance_attachments_router,
+    )
+    from app.routers.evidence_governance import (
+        observability_router as evidence_governance_observability_router,
+    )
+    from app.routers.evidence_ref_router import router as evidence_ref_router
+    from app.routers.ocr_governance_router import router as ocr_governance_router
+
+    # Wave 9 HTTP 接线：AI 门禁 / Citation / Review / Archive / Legal Hold thin routers
+    # （委托既有 evidence_governance 服务；UAT-09/10/11/12/13 经网络契约可达）。
+    from app.routers.ai_evidence_gate_router import router as ai_evidence_gate_router
+    from app.routers.citation_router import router as citation_router
+    from app.routers.review_evidence_router import router as review_evidence_router
+    from app.routers.archive_manifest_router import router as archive_manifest_router
+    from app.routers.legal_hold_router import router as legal_hold_router
+
+    for r in (
+        evidence_governance_router,
+        evidence_governance_observability_router,
+        evidence_governance_attachments_router,
+        evidence_ref_router,
+        ocr_governance_router,
+        ai_evidence_gate_router,
+        citation_router,
+        review_evidence_router,
+        archive_manifest_router,
+        legal_hold_router,
+    ):
+        app.include_router(r)

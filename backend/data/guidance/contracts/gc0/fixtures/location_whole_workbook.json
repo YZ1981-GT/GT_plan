@@ -1,0 +1,19 @@
+{
+  "contractVersion": "1.0",
+  "organizationId": "org-001",
+  "projectId": "proj-2026-001",
+  "fiscalYear": 2026,
+  "wpId": "wp-00000001",
+  "wpCode": "G4-1",
+  "entryId": "entry-0001",
+  "host": "onlyoffice",
+  "anchor": {
+    "kind": "whole_workbook"
+  },
+  "display": {
+    "sheetName": null,
+    "sectionLabel": null
+  },
+  "ownerEpoch": 1,
+  "contextRevision": 0
+}

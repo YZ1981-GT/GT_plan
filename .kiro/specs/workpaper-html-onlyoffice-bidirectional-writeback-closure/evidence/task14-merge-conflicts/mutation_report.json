@@ -1,0 +1,1811 @@
+[
+  {
+    "id": "M01",
+    "side": "be",
+    "want": "test_task14_merge_conflicts.py::TestMissingSentinel::test_normalize_returns_missing_identically_for_every_value_type",
+    "why": "`normalize_value` 把 MISSING 折叠成 None ⇒ 「行/载体被删」与「用户清空这个格」规范化后同值，HTML projection / 回滚 / 审计轨迹里再也分不开",
+    "verdict": "RED",
+    "summary": "20 failed, 157 passed, 1 warning in 2.43s",
+    "added": [
+      "test_task14_merge_conflicts.py::TestMissingSentinel::test_missing_vs_none_is_never_equal[amount]",
+      "test_task14_merge_conflicts.py::TestMissingSentinel::test_missing_vs_none_is_never_equal[boolean]",
+      "test_task14_merge_conflicts.py::TestMissingSentinel::test_missing_vs_none_is_never_equal[date]",
+      "test_task14_merge_conflicts.py::TestMissingSentinel::test_missing_vs_none_is_never_equal[datetime]",
+      "test_task14_merge_conflicts.py::TestMissingSentinel::test_missing_vs_none_is_never_equal[enum]",
+      "test_task14_merge_conflicts.py::TestMissingSentinel::test_missing_vs_none_is_never_equal[integer]",
+      "test_task14_merge_conflicts.py::TestMissingSentinel::test_missing_vs_none_is_never_equal[json]",
+      "test_task14_merge_conflicts.py::TestMissingSentinel::test_missing_vs_none_is_never_equal[rate]",
+      "test_task14_merge_conflicts.py::TestMissingSentinel::test_missing_vs_none_is_never_equal[ratio]",
+      "test_task14_merge_conflicts.py::TestMissingSentinel::test_missing_vs_none_is_never_equal[text]",
+      "test_task14_merge_conflicts.py::TestMissingSentinel::test_normalize_returns_missing_identically_for_every_value_type[amount]",
+      "test_task14_merge_conflicts.py::TestMissingSentinel::test_normalize_returns_missing_identically_for_every_value_type[boolean]",
+      "test_task14_merge_conflicts.py::TestMissingSentinel::test_normalize_returns_missing_identically_for_every_value_type[date]",
+      "test_task14_merge_conflicts.py::TestMissingSentinel::test_normalize_returns_missing_identically_for_every_value_type[datetime]",
+      "test_task14_merge_conflicts.py::TestMissingSentinel::test_normalize_returns_missing_identically_for_every_value_type[enum]",
+      "test_task14_merge_conflicts.py::TestMissingSentinel::test_normalize_returns_missing_identically_for_every_value_type[integer]",
+      "test_task14_merge_conflicts.py::TestMissingSentinel::test_normalize_returns_missing_identically_for_every_value_type[json]",
+      "test_task14_merge_conflicts.py::TestMissingSentinel::test_normalize_returns_missing_identically_for_every_value_type[rate]",
+      "test_task14_merge_conflicts.py::TestMissingSentinel::test_normalize_returns_missing_identically_for_every_value_type[ratio]",
+      "test_task14_merge_conflicts.py::TestMissingSentinel::test_normalize_returns_missing_identically_for_every_value_type[text]"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task14_merge_conflicts.py::TestMissingSentinel::test_missing_vs_none_is_never_equal[amount]",
+      "test_task14_merge_conflicts.py::TestMissingSentinel::test_missing_vs_none_is_never_equal[boolean]",
+      "test_task14_merge_conflicts.py::TestMissingSentinel::test_missing_vs_none_is_never_equal[date]",
+      "test_task14_merge_conflicts.py::TestMissingSentinel::test_missing_vs_none_is_never_equal[datetime]",
+      "test_task14_merge_conflicts.py::TestMissingSentinel::test_missing_vs_none_is_never_equal[enum]",
+      "test_task14_merge_conflicts.py::TestMissingSentinel::test_missing_vs_none_is_never_equal[integer]",
+      "test_task14_merge_conflicts.py::TestMissingSentinel::test_missing_vs_none_is_never_equal[json]",
+      "test_task14_merge_conflicts.py::TestMissingSentinel::test_missing_vs_none_is_never_equal[rate]",
+      "test_task14_merge_conflicts.py::TestMissingSentinel::test_missing_vs_none_is_never_equal[ratio]",
+      "test_task14_merge_conflicts.py::TestMissingSentinel::test_missing_vs_none_is_never_equal[text]",
+      "test_task14_merge_conflicts.py::TestMissingSentinel::test_normalize_returns_missing_identically_for_every_value_type[amount]",
+      "test_task14_merge_conflicts.py::TestMissingSentinel::test_normalize_returns_missing_identically_for_every_value_type[boolean]",
+      "test_task14_merge_conflicts.py::TestMissingSentinel::test_normalize_returns_missing_identically_for_every_value_type[date]",
+      "test_task14_merge_conflicts.py::TestMissingSentinel::test_normalize_returns_missing_identically_for_every_value_type[datetime]",
+      "test_task14_merge_conflicts.py::TestMissingSentinel::test_normalize_returns_missing_identically_for_every_value_type[enum]",
+      "test_task14_merge_conflicts.py::TestMissingSentinel::test_normalize_returns_missing_identically_for_every_value_type[integer]",
+      "test_task14_merge_conflicts.py::TestMissingSentinel::test_normalize_returns_missing_identically_for_every_value_type[json]",
+      "test_task14_merge_conflicts.py::TestMissingSentinel::test_normalize_returns_missing_identically_for_every_value_type[rate]",
+      "test_task14_merge_conflicts.py::TestMissingSentinel::test_normalize_returns_missing_identically_for_every_value_type[ratio]",
+      "test_task14_merge_conflicts.py::TestMissingSentinel::test_normalize_returns_missing_identically_for_every_value_type[text]"
+    ],
+    "added_files": [
+      "test_task14_merge_conflicts.py"
+    ],
+    "restored": true,
+    "seconds": 5.3
+  },
+  {
+    "id": "M02",
+    "side": "be",
+    "want": "test_task14_merge_conflicts.py::TestMissingSentinel::test_missing_vs_none_is_never_equal",
+    "why": "`values_equal` 让 MISSING 与任何值判等 ⇒ 删除侧恒判「未改动」，delete/update 冲突永不产生（AC 6.9 失效）",
+    "verdict": "RED",
+    "summary": "10 failed, 167 passed, 1 warning in 2.44s",
+    "added": [
+      "test_task14_merge_conflicts.py::TestMissingSentinel::test_missing_vs_none_is_never_equal[amount]",
+      "test_task14_merge_conflicts.py::TestMissingSentinel::test_missing_vs_none_is_never_equal[boolean]",
+      "test_task14_merge_conflicts.py::TestMissingSentinel::test_missing_vs_none_is_never_equal[date]",
+      "test_task14_merge_conflicts.py::TestMissingSentinel::test_missing_vs_none_is_never_equal[datetime]",
+      "test_task14_merge_conflicts.py::TestMissingSentinel::test_missing_vs_none_is_never_equal[enum]",
+      "test_task14_merge_conflicts.py::TestMissingSentinel::test_missing_vs_none_is_never_equal[integer]",
+      "test_task14_merge_conflicts.py::TestMissingSentinel::test_missing_vs_none_is_never_equal[json]",
+      "test_task14_merge_conflicts.py::TestMissingSentinel::test_missing_vs_none_is_never_equal[rate]",
+      "test_task14_merge_conflicts.py::TestMissingSentinel::test_missing_vs_none_is_never_equal[ratio]",
+      "test_task14_merge_conflicts.py::TestMissingSentinel::test_missing_vs_none_is_never_equal[text]"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task14_merge_conflicts.py::TestMissingSentinel::test_missing_vs_none_is_never_equal[amount]",
+      "test_task14_merge_conflicts.py::TestMissingSentinel::test_missing_vs_none_is_never_equal[boolean]",
+      "test_task14_merge_conflicts.py::TestMissingSentinel::test_missing_vs_none_is_never_equal[date]",
+      "test_task14_merge_conflicts.py::TestMissingSentinel::test_missing_vs_none_is_never_equal[datetime]",
+      "test_task14_merge_conflicts.py::TestMissingSentinel::test_missing_vs_none_is_never_equal[enum]",
+      "test_task14_merge_conflicts.py::TestMissingSentinel::test_missing_vs_none_is_never_equal[integer]",
+      "test_task14_merge_conflicts.py::TestMissingSentinel::test_missing_vs_none_is_never_equal[json]",
+      "test_task14_merge_conflicts.py::TestMissingSentinel::test_missing_vs_none_is_never_equal[rate]",
+      "test_task14_merge_conflicts.py::TestMissingSentinel::test_missing_vs_none_is_never_equal[ratio]",
+      "test_task14_merge_conflicts.py::TestMissingSentinel::test_missing_vs_none_is_never_equal[text]"
+    ],
+    "added_files": [
+      "test_task14_merge_conflicts.py"
+    ],
+    "restored": true,
+    "seconds": 5.3
+  },
+  {
+    "id": "M03",
+    "side": "be",
+    "want": "test_task14_merge_conflicts.py::TestMissingSentinel::test_envelope_absent_and_present_null_have_different_jsonb",
+    "why": "落库形态把 absent 写成 present-but-null ⇒ `base_value` 落库后无法区分「会话打开时没有这个字段」与「会话打开时它是 null」，裁决界面与回滚都无从下手",
+    "verdict": "RED",
+    "summary": "1 failed, 176 passed, 1 warning in 2.46s",
+    "added": [
+      "test_task14_merge_conflicts.py::TestMissingSentinel::test_envelope_absent_and_present_null_have_different_jsonb"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task14_merge_conflicts.py::TestMissingSentinel::test_envelope_absent_and_present_null_have_different_jsonb"
+    ],
+    "added_files": [
+      "test_task14_merge_conflicts.py"
+    ],
+    "restored": true,
+    "seconds": 5.5
+  },
+  {
+    "id": "M04",
+    "side": "be",
+    "want": "test_task14_merge_conflicts.py::TestMissingSentinel::test_envelopes_equal_never_folds_absent_into_null",
+    "why": "信封级比较不再看 present ⇒ absent 与 present-but-null 在**比较层**折叠。与 M01/M02 是三个不同层级（规范化 / 值比较 / 信封比较），任一层折叠都足以致命",
+    "verdict": "RED",
+    "summary": "7 failed, 170 passed, 1 warning in 2.42s",
+    "added": [
+      "test_task14_merge_conflicts.py::TestMergeOutcomeDerivedJudgements::test_incoming_managed_keys_and_deleted_keys",
+      "test_task14_merge_conflicts.py::TestMissingSentinel::test_deleted_and_cleared_produce_different_merged_results",
+      "test_task14_merge_conflicts.py::TestMissingSentinel::test_envelopes_equal_never_folds_absent_into_null",
+      "test_task14_merge_conflicts.py::TestProperty24ProtectedField::test_row_deleted_in_oo_does_not_conflict_on_its_protected_cells",
+      "test_task14_merge_conflicts.py::TestProperty27DeleteUpdate::test_plain_row_delete_is_accepted_without_conflict",
+      "test_task14_merge_conflicts.py::TestThreeWayTruthTable::test_current_delete_vs_incoming_update_is_delete_update_not_value",
+      "test_task14_merge_conflicts.py::TestThreeWayTruthTable::test_row_scoped_field_deleted_on_both_sides_agrees_without_conflict"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task14_merge_conflicts.py::TestMissingSentinel::test_envelopes_equal_never_folds_absent_into_null"
+    ],
+    "added_files": [
+      "test_task14_merge_conflicts.py"
+    ],
+    "restored": true,
+    "seconds": 5.3
+  },
+  {
+    "id": "M05",
+    "side": "be",
+    "want": "test_task14_merge_conflicts.py::TestMissingSentinel::test_missing_is_truthy_so_if_value_cannot_swallow_it",
+    "why": "给哨兵加 falsy 真值 ⇒ 生产代码里一句 `if value:` 就会把 MISSING 与 None/\"\"/0 一起当空值，这正是本域要防的折叠（刻意不实现 __bool__ 的理由）",
+    "verdict": "RED",
+    "summary": "1 failed, 176 passed, 1 warning in 2.52s",
+    "added": [
+      "test_task14_merge_conflicts.py::TestMissingSentinel::test_missing_is_truthy_so_if_value_cannot_swallow_it"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task14_merge_conflicts.py::TestMissingSentinel::test_missing_is_truthy_so_if_value_cannot_swallow_it"
+    ],
+    "added_files": [
+      "test_task14_merge_conflicts.py"
+    ],
+    "restored": true,
+    "seconds": 5.5
+  },
+  {
+    "id": "M06",
+    "side": "be",
+    "want": "test_task14_merge_conflicts.py::TestMissingSentinel::test_missing_survives_copy_deepcopy_and_pickle",
+    "why": "去掉 pickle 支持 ⇒ 反序列化出**另一个** _Missing 实例，身份相等失效，跨进程/跨缓存边界后 `value is MISSING` 恒 False（outbox 重放会踩到）",
+    "verdict": "RED",
+    "summary": "1 failed, 176 passed, 1 warning in 2.45s",
+    "added": [
+      "test_task14_merge_conflicts.py::TestMissingSentinel::test_missing_survives_copy_deepcopy_and_pickle"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task14_merge_conflicts.py::TestMissingSentinel::test_missing_survives_copy_deepcopy_and_pickle"
+    ],
+    "added_files": [
+      "test_task14_merge_conflicts.py"
+    ],
+    "restored": true,
+    "seconds": 5.4
+  },
+  {
+    "id": "M07",
+    "side": "be",
+    "want": "test_task14_merge_conflicts.py::TestTypeNormalization::test_amount_rejects_non_numeric_inputs",
+    "why": "金额字段不再拒绝 bool ⇒ `True` 被当 1、`False` 被当 0，「勾选」与「金额 1 元」判等",
+    "verdict": "RED",
+    "summary": "2 failed, 175 passed, 1 warning in 2.43s",
+    "added": [
+      "test_task14_merge_conflicts.py::TestTypeNormalization::test_amount_rejects_non_numeric_inputs[False]",
+      "test_task14_merge_conflicts.py::TestTypeNormalization::test_amount_rejects_non_numeric_inputs[True]"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task14_merge_conflicts.py::TestTypeNormalization::test_amount_rejects_non_numeric_inputs[False]",
+      "test_task14_merge_conflicts.py::TestTypeNormalization::test_amount_rejects_non_numeric_inputs[True]"
+    ],
+    "added_files": [
+      "test_task14_merge_conflicts.py"
+    ],
+    "restored": true,
+    "seconds": 5.3
+  },
+  {
+    "id": "M08",
+    "side": "be",
+    "want": "test_task14_merge_conflicts.py::TestTypeNormalization::test_amount_representations_that_are_the_same_number_are_equal",
+    "why": "float 直接进 Decimal ⇒ `Decimal(0.1)` 带二进制误差尾巴，`0.1` 与 `\"0.1\"` 判不等 ⇒ 未改动的金额格被误判成冲突",
+    "verdict": "RED",
+    "summary": "1 failed, 176 passed, 1 warning in 2.41s",
+    "added": [
+      "test_task14_merge_conflicts.py::TestTypeNormalization::test_amount_representations_that_are_the_same_number_are_equal[0.1-0.1]"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task14_merge_conflicts.py::TestTypeNormalization::test_amount_representations_that_are_the_same_number_are_equal[0.1-0.1]"
+    ],
+    "added_files": [
+      "test_task14_merge_conflicts.py"
+    ],
+    "restored": true,
+    "seconds": 5.3
+  },
+  {
+    "id": "M09",
+    "side": "be",
+    "want": "test_task14_merge_conflicts.py::TestTypeNormalization::test_amount_rejects_non_numeric_inputs",
+    "why": "空串静默变 0（典型 fail-open）⇒ 「这一格没填」与「这一格是 0」判等。🔴 这里**不能**用 `if False:` 短路空串判据：`Decimal(\"\")` 仍会抛 `InvalidOperation` 并被收成同一个 `ValueNormalizationError` ⇒ 行为不变 = 无效变异",
+    "verdict": "RED",
+    "summary": "2 failed, 175 passed, 1 warning in 2.44s",
+    "added": [
+      "test_task14_merge_conflicts.py::TestTypeNormalization::test_amount_rejects_non_numeric_inputs[",
+      "test_task14_merge_conflicts.py::TestTypeNormalization::test_amount_rejects_non_numeric_inputs[]"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task14_merge_conflicts.py::TestTypeNormalization::test_amount_rejects_non_numeric_inputs[",
+      "test_task14_merge_conflicts.py::TestTypeNormalization::test_amount_rejects_non_numeric_inputs[]"
+    ],
+    "added_files": [
+      "test_task14_merge_conflicts.py"
+    ],
+    "restored": true,
+    "seconds": 5.3
+  },
+  {
+    "id": "M10",
+    "side": "be",
+    "want": "test_task14_merge_conflicts.py::TestTypeNormalization::test_text_normalizes_only_line_endings_and_bom",
+    "why": "文本规范化多做一步 trim ⇒ 用户有意义的前后空格被抹平，`\"a \"` 与 `\"a\"` 判等（design 明文「不 trim 用户有意义空格」）",
+    "verdict": "RED",
+    "summary": "2 failed, 175 passed, 1 warning in 2.44s",
+    "added": [
+      "test_task14_merge_conflicts.py::TestTypeNormalization::test_text_normalizes_only_line_endings_and_bom[",
+      "test_task14_merge_conflicts.py::TestTypeNormalization::test_text_normalizes_only_line_endings_and_bom[a"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task14_merge_conflicts.py::TestTypeNormalization::test_text_normalizes_only_line_endings_and_bom[",
+      "test_task14_merge_conflicts.py::TestTypeNormalization::test_text_normalizes_only_line_endings_and_bom[a"
+    ],
+    "added_files": [
+      "test_task14_merge_conflicts.py"
+    ],
+    "restored": true,
+    "seconds": 5.3
+  },
+  {
+    "id": "M11",
+    "side": "be",
+    "want": "test_task14_merge_conflicts.py::TestTypeNormalization::test_text_normalizes_only_line_endings_and_bom",
+    "why": "把 NBSP 也归一成普通空格 ⇒ OO 粘贴进来的 NBSP 与手输空格判等。与 M10 是两个方向：多 trim vs 多折叠不可见字符，只测一条时另一条不会红",
+    "verdict": "RED",
+    "summary": "1 failed, 176 passed, 1 warning in 2.41s",
+    "added": [
+      "test_task14_merge_conflicts.py::TestTypeNormalization::test_text_normalizes_only_line_endings_and_bom[a\\xa0b-a"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task14_merge_conflicts.py::TestTypeNormalization::test_text_normalizes_only_line_endings_and_bom[a\\xa0b-a"
+    ],
+    "added_files": [
+      "test_task14_merge_conflicts.py"
+    ],
+    "restored": true,
+    "seconds": 5.2
+  },
+  {
+    "id": "M12",
+    "side": "be",
+    "want": "test_task14_merge_conflicts.py::TestTypeNormalization::test_date_and_datetime_do_not_fold_into_each_other",
+    "why": "date 分支不再先拒 datetime ⇒ `datetime` 是 `date` 的子类，会被当同一个值。「日期」与「时点」折叠后，OO 回来的 datetime 覆盖服务端的 date 不产生冲突",
+    "verdict": "RED",
+    "summary": "1 failed, 176 passed, 1 warning in 2.42s",
+    "added": [
+      "test_task14_merge_conflicts.py::TestTypeNormalization::test_date_and_datetime_do_not_fold_into_each_other"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task14_merge_conflicts.py::TestTypeNormalization::test_date_and_datetime_do_not_fold_into_each_other"
+    ],
+    "added_files": [
+      "test_task14_merge_conflicts.py"
+    ],
+    "restored": true,
+    "seconds": 5.2
+  },
+  {
+    "id": "M13",
+    "side": "be",
+    "want": "test_task14_merge_conflicts.py::TestTypeNormalization::test_boolean_rejects_zero_one_and_capitalised_strings",
+    "why": "布尔字段接受 0/1 ⇒ `0` 与 `False`、`1` 与 `True` 折叠，「未勾选」与「数值 0」在审计底稿里不是一件事",
+    "verdict": "RED",
+    "summary": "2 failed, 175 passed, 1 warning in 2.42s",
+    "added": [
+      "test_task14_merge_conflicts.py::TestTypeNormalization::test_boolean_rejects_zero_one_and_capitalised_strings",
+      "test_task14_merge_conflicts.py::TestTypeNormalization::test_normalization_failure_messages_name_the_value_type"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task14_merge_conflicts.py::TestTypeNormalization::test_boolean_rejects_zero_one_and_capitalised_strings"
+    ],
+    "added_files": [
+      "test_task14_merge_conflicts.py"
+    ],
+    "restored": true,
+    "seconds": 5.3
+  },
+  {
+    "id": "M14",
+    "side": "be",
+    "want": "test_task14_merge_conflicts.py::TestTypeNormalization::test_enum_is_case_sensitive",
+    "why": "枚举做大小写折叠 ⇒ `Listed` 与 `listed` 判等。枚举值是 identity，折叠后 OO 侧改大小写不再产生冲突而被静默采纳",
+    "verdict": "RED",
+    "summary": "1 failed, 176 passed, 1 warning in 2.43s",
+    "added": [
+      "test_task14_merge_conflicts.py::TestTypeNormalization::test_enum_is_case_sensitive"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task14_merge_conflicts.py::TestTypeNormalization::test_enum_is_case_sensitive"
+    ],
+    "added_files": [
+      "test_task14_merge_conflicts.py"
+    ],
+    "restored": true,
+    "seconds": 5.3
+  },
+  {
+    "id": "M15",
+    "side": "be",
+    "want": "test_task14_merge_conflicts.py::TestTypeNormalization::test_json_is_key_order_insensitive_but_value_sensitive",
+    "why": "json 字段不走 Task 12 的 canonical 字节而用 `repr` ⇒ 键序变化被当值变化，OO 一次往返就产生整片假冲突",
+    "verdict": "RED",
+    "summary": "1 failed, 176 passed, 1 warning in 2.46s",
+    "added": [
+      "test_task14_merge_conflicts.py::TestTypeNormalization::test_json_is_key_order_insensitive_but_value_sensitive"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task14_merge_conflicts.py::TestTypeNormalization::test_json_is_key_order_insensitive_but_value_sensitive"
+    ],
+    "added_files": [
+      "test_task14_merge_conflicts.py"
+    ],
+    "restored": true,
+    "seconds": 5.3
+  },
+  {
+    "id": "M16",
+    "side": "be",
+    "want": "test_task14_merge_conflicts.py::TestTypeNormalization::test_normalization_failure_messages_name_the_value_type",
+    "why": "规范化失败文案不再点名自己的 value_type ⇒ 七类失败原因不可分辨，短路其中一类时另一类会把它遮蔽（Task 12/13 实测的 GREEN 成因）",
+    "verdict": "RED",
+    "summary": "1 failed, 176 passed, 1 warning in 2.38s",
+    "added": [
+      "test_task14_merge_conflicts.py::TestTypeNormalization::test_normalization_failure_messages_name_the_value_type"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task14_merge_conflicts.py::TestTypeNormalization::test_normalization_failure_messages_name_the_value_type"
+    ],
+    "added_files": [
+      "test_task14_merge_conflicts.py"
+    ],
+    "restored": true,
+    "seconds": 5.3
+  },
+  {
+    "id": "M17",
+    "side": "be",
+    "want": "test_task14_merge_conflicts.py::TestProperty24ProtectedField::test_oo_edit_on_protected_field_yields_protected_conflict",
+    "why": "关掉保护判据 ⇒ OO 改公式格后走 took_incoming，公式结果被 OO 值覆盖（AC 6.6 明令禁止）",
+    "verdict": "RED",
+    "summary": "4 failed, 173 passed, 1 warning in 2.41s",
+    "added": [
+      "test_task14_merge_conflicts.py::TestProperty24ProtectedField::test_oo_edit_on_protected_field_yields_protected_conflict[masked_note-read_only_masked_cell-onlyoffice_cell]",
+      "test_task14_merge_conflicts.py::TestProperty24ProtectedField::test_oo_edit_on_protected_field_yields_protected_conflict[subtotal-read_only_formula-server_formula]",
+      "test_task14_merge_conflicts.py::TestProperty24ProtectedField::test_oo_edit_on_protected_field_yields_protected_conflict[tb_amount-read_only_auto_source-auto_data_source]",
+      "test_task14_merge_conflicts.py::TestProperty24ProtectedField::test_protected_conflict_cannot_be_resolved_by_taking_incoming"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task14_merge_conflicts.py::TestProperty24ProtectedField::test_oo_edit_on_protected_field_yields_protected_conflict[masked_note-read_only_masked_cell-onlyoffice_cell]",
+      "test_task14_merge_conflicts.py::TestProperty24ProtectedField::test_oo_edit_on_protected_field_yields_protected_conflict[subtotal-read_only_formula-server_formula]",
+      "test_task14_merge_conflicts.py::TestProperty24ProtectedField::test_oo_edit_on_protected_field_yields_protected_conflict[tb_amount-read_only_auto_source-auto_data_source]"
+    ],
+    "added_files": [
+      "test_task14_merge_conflicts.py"
+    ],
+    "restored": true,
+    "seconds": 5.4
+  },
+  {
+    "id": "M18",
+    "side": "be",
+    "want": "test_task14_merge_conflicts.py::TestProperty24ProtectedField::test_oo_edit_on_protected_field_yields_protected_conflict",
+    "why": "把「mask 覆盖的受保护单元格」从保护集合里摘掉 ⇒ AC 6.6 的第三类只读来源失守。三类保护是三条独立判据，合并成两条时第三类永不被测到",
+    "verdict": "RED",
+    "summary": "1 failed, 176 passed, 1 warning in 2.46s",
+    "added": [
+      "test_task14_merge_conflicts.py::TestProperty24ProtectedField::test_oo_edit_on_protected_field_yields_protected_conflict[masked_note-read_only_masked_cell-onlyoffice_cell]"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task14_merge_conflicts.py::TestProperty24ProtectedField::test_oo_edit_on_protected_field_yields_protected_conflict[masked_note-read_only_masked_cell-onlyoffice_cell]"
+    ],
+    "added_files": [
+      "test_task14_merge_conflicts.py"
+    ],
+    "restored": true,
+    "seconds": 5.3
+  },
+  {
+    "id": "M19",
+    "side": "be",
+    "want": "test_task14_merge_conflicts.py::TestProperty24ProtectedField::test_oo_edit_on_protected_field_yields_protected_conflict",
+    "why": "不再按 `formula_mask` 判「受保护单元格」⇒ 契约里 editable 但落在 mask 内的格（OO 侧是受保护格）被当普通可编辑格。与 M18 是两处：分类真源 vs 分类结果",
+    "verdict": "RED",
+    "summary": "1 failed, 176 passed, 1 warning in 2.37s",
+    "added": [
+      "test_task14_merge_conflicts.py::TestProperty24ProtectedField::test_oo_edit_on_protected_field_yields_protected_conflict[masked_note-read_only_masked_cell-onlyoffice_cell]"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task14_merge_conflicts.py::TestProperty24ProtectedField::test_oo_edit_on_protected_field_yields_protected_conflict[masked_note-read_only_masked_cell-onlyoffice_cell]"
+    ],
+    "added_files": [
+      "test_task14_merge_conflicts.py"
+    ],
+    "restored": true,
+    "seconds": 5.2
+  },
+  {
+    "id": "M20",
+    "side": "be",
+    "want": "test_task14_merge_conflicts.py::TestProperty24ProtectedField::test_new_row_added_in_oo_does_not_conflict_on_its_formula_cell",
+    "why": "保护判据不再要求 base 侧存在 ⇒ OO 新增行时其公式格（base 里本来没有）被误报 protected 冲突，正常插行变成必须人工裁决",
+    "verdict": "RED",
+    "summary": "1 failed, 176 passed, 1 warning in 2.42s",
+    "added": [
+      "test_task14_merge_conflicts.py::TestProperty24ProtectedField::test_new_row_added_in_oo_does_not_conflict_on_its_formula_cell"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task14_merge_conflicts.py::TestProperty24ProtectedField::test_new_row_added_in_oo_does_not_conflict_on_its_formula_cell"
+    ],
+    "added_files": [
+      "test_task14_merge_conflicts.py"
+    ],
+    "restored": true,
+    "seconds": 5.2
+  },
+  {
+    "id": "M21",
+    "side": "be",
+    "want": "test_task14_merge_conflicts.py::TestProperty24ProtectedField::test_protected_conflict_cannot_be_resolved_by_taking_incoming",
+    "why": "裁决层不再拦「受保护字段取 incoming」⇒ 冲突虽然报了，人工一点 take_incoming 仍能覆盖公式。检测与裁决是两道门，缺一道等于没有",
+    "verdict": "RED",
+    "summary": "1 failed, 176 passed, 1 warning in 2.42s",
+    "added": [
+      "test_task14_merge_conflicts.py::TestProperty24ProtectedField::test_protected_conflict_cannot_be_resolved_by_taking_incoming"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task14_merge_conflicts.py::TestProperty24ProtectedField::test_protected_conflict_cannot_be_resolved_by_taking_incoming"
+    ],
+    "added_files": [
+      "test_task14_merge_conflicts.py"
+    ],
+    "restored": true,
+    "seconds": 5.3
+  },
+  {
+    "id": "M22",
+    "side": "be",
+    "want": "test_task14_merge_conflicts.py::TestProperty24ProtectedField::test_protected_record_with_editable_policy_is_rejected",
+    "why": "冲突记录不再自检「protected 冲突的 protection_policy 必须真是受保护」⇒ 自相矛盾的记录可落库，裁决界面按 editable 渲染出可覆盖按钮",
+    "verdict": "RED",
+    "summary": "1 failed, 176 passed, 1 warning in 2.43s",
+    "added": [
+      "test_task14_merge_conflicts.py::TestProperty24ProtectedField::test_protected_record_with_editable_policy_is_rejected"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task14_merge_conflicts.py::TestProperty24ProtectedField::test_protected_record_with_editable_policy_is_rejected"
+    ],
+    "added_files": [
+      "test_task14_merge_conflicts.py"
+    ],
+    "restored": true,
+    "seconds": 5.3
+  },
+  {
+    "id": "M23",
+    "side": "be",
+    "want": "test_task14_merge_conflicts.py::TestProperty25DifferentFieldsAutoMerge::test_current_changes_a_incoming_changes_b",
+    "why": "真值表第 6 行（仅 OO 改 ⇒ 采 incoming）被短路 ⇒ 不同字段的并行修改全部变成冲突，AC 6.8「自动合并」彻底失效",
+    "verdict": "RED",
+    "summary": "18 failed, 159 passed, 1 warning in 6.27s",
+    "added": [
+      "test_task14_merge_conflicts.py::TestMergeOutcomeDerivedJudgements::test_incoming_managed_keys_and_deleted_keys",
+      "test_task14_merge_conflicts.py::TestMergeOutcomeDerivedJudgements::test_requires_client_refresh_is_false_when_merged_equals_incoming",
+      "test_task14_merge_conflicts.py::TestMissingSentinel::test_deleted_and_cleared_produce_different_merged_results",
+      "test_task14_merge_conflicts.py::TestProperty24ProtectedField::test_new_row_added_in_oo_does_not_conflict_on_its_formula_cell",
+      "test_task14_merge_conflicts.py::TestProperty24ProtectedField::test_row_deleted_in_oo_does_not_conflict_on_its_protected_cells",
+      "test_task14_merge_conflicts.py::TestProperty25And26Hypothesis::test_property_disjoint_field_edits_merge_without_conflict",
+      "test_task14_merge_conflicts.py::TestProperty25DifferentFieldsAutoMerge::test_current_changes_a_incoming_changes_b",
+      "test_task14_merge_conflicts.py::TestProperty25DifferentFieldsAutoMerge::test_footer_shift_after_row_insert_is_not_a_conflict",
+      "test_task14_merge_conflicts.py::TestProperty25DifferentFieldsAutoMerge::test_parallel_edits_on_different_rows_of_the_same_table",
+      "test_task14_merge_conflicts.py::TestProperty27DeleteUpdate::test_current_deletes_row_incoming_updates_it",
+      "test_task14_merge_conflicts.py::TestProperty27DeleteUpdate::test_incoming_deletes_row_current_updates_it",
+      "test_task14_merge_conflicts.py::TestProperty27DeleteUpdate::test_plain_row_delete_is_accepted_without_conflict",
+      "test_task14_merge_conflicts.py::TestProperty32WordDuplicateInstances::test_consistent_instances_collapse_to_one_field",
+      "test_task14_merge_conflicts.py::TestStructuralConflicts::test_key_level_anomaly_blocks_only_that_key",
+      "test_task14_merge_conflicts.py::TestStructuralConflicts::test_reported_row_identity_anomaly_blocks_only_that_row",
+      "test_task14_merge_conflicts.py::TestThreeWayTruthTable::test_row[10-10-30-took_incoming-30]",
+      "test_task14_merge_conflicts.py::TestThreeWayTruthTable::test_row[10-10-None-took_incoming-None]",
+      "test_task14_merge_conflicts.py::TestThreeWayTruthTable::test_row[b5-c5-30-took_incoming-30]"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task14_merge_conflicts.py::TestProperty25And26Hypothesis::test_property_disjoint_field_edits_merge_without_conflict",
+      "test_task14_merge_conflicts.py::TestProperty25DifferentFieldsAutoMerge::test_current_changes_a_incoming_changes_b",
+      "test_task14_merge_conflicts.py::TestProperty25DifferentFieldsAutoMerge::test_parallel_edits_on_different_rows_of_the_same_table",
+      "test_task14_merge_conflicts.py::TestThreeWayTruthTable::test_row[10-10-30-took_incoming-30]",
+      "test_task14_merge_conflicts.py::TestThreeWayTruthTable::test_row[10-10-None-took_incoming-None]",
+      "test_task14_merge_conflicts.py::TestThreeWayTruthTable::test_row[b5-c5-30-took_incoming-30]"
+    ],
+    "added_files": [
+      "test_task14_merge_conflicts.py"
+    ],
+    "restored": true,
+    "seconds": 9.1
+  },
+  {
+    "id": "M24",
+    "side": "be",
+    "want": "test_task14_merge_conflicts.py::TestThreeWayTruthTable::test_unchanged_incoming_preserves_newer_server_value",
+    "why": "真值表第 5 行（OO 未改 ⇒ 保 current）被短路 ⇒ 服务端新值被打回或变成冲突，AC 6.7「仅 current 变更则保 current」失效",
+    "verdict": "RED",
+    "summary": "10 failed, 167 passed, 1 warning in 8.51s",
+    "added": [
+      "test_task14_merge_conflicts.py::TestProperty24ProtectedField::test_protected_field_untouched_by_oo_keeps_recomputed_server_value",
+      "test_task14_merge_conflicts.py::TestProperty25And26Hypothesis::test_property_disjoint_field_edits_merge_without_conflict",
+      "test_task14_merge_conflicts.py::TestProperty25And26Hypothesis::test_property_untouched_incoming_preserves_current_everywhere",
+      "test_task14_merge_conflicts.py::TestProperty25DifferentFieldsAutoMerge::test_current_changes_a_incoming_changes_b",
+      "test_task14_merge_conflicts.py::TestProperty25DifferentFieldsAutoMerge::test_parallel_edits_on_different_rows_of_the_same_table",
+      "test_task14_merge_conflicts.py::TestThreeWayTruthTable::test_row[10-10-10-kept_current-10]",
+      "test_task14_merge_conflicts.py::TestThreeWayTruthTable::test_row[10-20-10-kept_current-20]",
+      "test_task14_merge_conflicts.py::TestThreeWayTruthTable::test_row[10-None-10-kept_current-None]",
+      "test_task14_merge_conflicts.py::TestThreeWayTruthTable::test_row[10-c6-10-kept_current-expected6]",
+      "test_task14_merge_conflicts.py::TestThreeWayTruthTable::test_unchanged_incoming_preserves_newer_server_value"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task14_merge_conflicts.py::TestProperty25And26Hypothesis::test_property_untouched_incoming_preserves_current_everywhere",
+      "test_task14_merge_conflicts.py::TestThreeWayTruthTable::test_unchanged_incoming_preserves_newer_server_value"
+    ],
+    "added_files": [
+      "test_task14_merge_conflicts.py"
+    ],
+    "restored": true,
+    "seconds": 11.5
+  },
+  {
+    "id": "M25",
+    "side": "be",
+    "want": "test_task14_merge_conflicts.py::TestProperty25DifferentFieldsAutoMerge::test_row_reorder_alone_produces_no_conflict_and_no_value_change",
+    "why": "merged 行序改成以 current 为主 ⇒ 用户在 OO 里的重排在回写后被打回原序，「重排只改展示顺序」变成「重排被丢弃」",
+    "verdict": "RED",
+    "summary": "1 failed, 176 passed, 1 warning in 2.45s",
+    "added": [
+      "test_task14_merge_conflicts.py::TestProperty25DifferentFieldsAutoMerge::test_row_reorder_alone_produces_no_conflict_and_no_value_change"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task14_merge_conflicts.py::TestProperty25DifferentFieldsAutoMerge::test_row_reorder_alone_produces_no_conflict_and_no_value_change"
+    ],
+    "added_files": [
+      "test_task14_merge_conflicts.py"
+    ],
+    "restored": true,
+    "seconds": 5.3
+  },
+  {
+    "id": "M26",
+    "side": "be",
+    "want": "test_task14_merge_conflicts.py::TestProperty25DifferentFieldsAutoMerge::test_row_reorder_alone_produces_no_conflict_and_no_value_change",
+    "why": "🔴 **注入**：让行序差异本身产出一个 delete_update_conflict 行决策。「不得把位置变化误判为整表覆盖」（AC 6.9）是否定式承诺 —— 源码里没有「比较位置」的语句可短路，只能注入反例证明判据可 falsify",
+    "verdict": "RED",
+    "summary": "1 failed, 176 passed, 1 warning in 2.58s",
+    "added": [
+      "test_task14_merge_conflicts.py::TestProperty25DifferentFieldsAutoMerge::test_row_reorder_alone_produces_no_conflict_and_no_value_change"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task14_merge_conflicts.py::TestProperty25DifferentFieldsAutoMerge::test_row_reorder_alone_produces_no_conflict_and_no_value_change"
+    ],
+    "added_files": [
+      "test_task14_merge_conflicts.py"
+    ],
+    "restored": true,
+    "seconds": 5.4
+  },
+  {
+    "id": "M27",
+    "side": "be",
+    "want": "test_task14_merge_conflicts.py::TestProperty26SameFieldDifferentValues::test_both_sides_changed_to_the_same_value_merges",
+    "why": "真值表第 7 行（两侧改成同值 ⇒ 合并）被短路 ⇒ 两边都填了同一个数也要人工裁决，冲突预览被无意义条目淹没",
+    "verdict": "RED",
+    "summary": "3 failed, 174 passed, 1 warning in 2.42s",
+    "added": [
+      "test_task14_merge_conflicts.py::TestProperty26SameFieldDifferentValues::test_both_sides_changed_to_the_same_value_merges",
+      "test_task14_merge_conflicts.py::TestThreeWayTruthTable::test_row[10-40-40-both_sides_agree-40]",
+      "test_task14_merge_conflicts.py::TestThreeWayTruthTable::test_row_scoped_field_deleted_on_both_sides_agrees_without_conflict"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task14_merge_conflicts.py::TestProperty26SameFieldDifferentValues::test_both_sides_changed_to_the_same_value_merges",
+      "test_task14_merge_conflicts.py::TestThreeWayTruthTable::test_row[10-40-40-both_sides_agree-40]",
+      "test_task14_merge_conflicts.py::TestThreeWayTruthTable::test_row_scoped_field_deleted_on_both_sides_agrees_without_conflict"
+    ],
+    "added_files": [
+      "test_task14_merge_conflicts.py"
+    ],
+    "restored": true,
+    "seconds": 5.3
+  },
+  {
+    "id": "M28",
+    "side": "be",
+    "want": "test_task14_merge_conflicts.py::TestProperty26SameFieldDifferentValues::test_unresolved_conflict_blocks_apply",
+    "why": "缺裁决不再拦 ⇒ `apply_resolutions` 静默返回「hold 在 current」的快照当成裁决结果，AC 4.6「不得自动选 incoming 或 current」被绕过（虽然选的是 current，但那是**未经人确认**的自动选边）",
+    "verdict": "RED",
+    "summary": "3 failed, 174 passed, 1 warning in 2.61s",
+    "added": [
+      "test_task14_merge_conflicts.py::TestProperty25And26Hypothesis::test_property_same_field_three_values_never_auto_picks_a_side",
+      "test_task14_merge_conflicts.py::TestProperty26SameFieldDifferentValues::test_missing_and_unknown_resolutions_are_two_distinguishable_types",
+      "test_task14_merge_conflicts.py::TestProperty26SameFieldDifferentValues::test_unresolved_conflict_blocks_apply"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task14_merge_conflicts.py::TestProperty25And26Hypothesis::test_property_same_field_three_values_never_auto_picks_a_side",
+      "test_task14_merge_conflicts.py::TestProperty26SameFieldDifferentValues::test_missing_and_unknown_resolutions_are_two_distinguishable_types",
+      "test_task14_merge_conflicts.py::TestProperty26SameFieldDifferentValues::test_unresolved_conflict_blocks_apply"
+    ],
+    "added_files": [
+      "test_task14_merge_conflicts.py"
+    ],
+    "restored": true,
+    "seconds": 5.5
+  },
+  {
+    "id": "M29",
+    "side": "be",
+    "want": "test_task14_merge_conflicts.py::TestProperty26SameFieldDifferentValues::test_resolution_pointing_at_a_nonexistent_conflict_is_rejected",
+    "why": "裁决指向不存在的冲突不再拒 ⇒ stale 冲突集（已被 supersede/rebase）的裁决被静默接受。🔴 这条能打红的前提是守卫**同时给上真实裁决** —— 否则 missing 分支（M28）会先抛，把本条遮蔽",
+    "verdict": "RED",
+    "summary": "1 failed, 176 passed, 1 warning in 2.44s",
+    "added": [
+      "test_task14_merge_conflicts.py::TestProperty26SameFieldDifferentValues::test_resolution_pointing_at_a_nonexistent_conflict_is_rejected"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task14_merge_conflicts.py::TestProperty26SameFieldDifferentValues::test_resolution_pointing_at_a_nonexistent_conflict_is_rejected"
+    ],
+    "added_files": [
+      "test_task14_merge_conflicts.py"
+    ],
+    "restored": true,
+    "seconds": 5.3
+  },
+  {
+    "id": "M30",
+    "side": "be",
+    "want": "test_task14_merge_conflicts.py::TestProperty26SameFieldDifferentValues::test_duplicate_resolutions_for_one_conflict_are_rejected",
+    "why": "同一冲突被裁决两次不再拒 ⇒ 后者静默覆盖前者，批量裁决界面的重复提交无法被发现（审计轨迹里只留下最后一次选择）",
+    "verdict": "RED",
+    "summary": "1 failed, 176 passed, 1 warning in 2.44s",
+    "added": [
+      "test_task14_merge_conflicts.py::TestProperty26SameFieldDifferentValues::test_duplicate_resolutions_for_one_conflict_are_rejected"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task14_merge_conflicts.py::TestProperty26SameFieldDifferentValues::test_duplicate_resolutions_for_one_conflict_are_rejected"
+    ],
+    "added_files": [
+      "test_task14_merge_conflicts.py"
+    ],
+    "restored": true,
+    "seconds": 5.3
+  },
+  {
+    "id": "M31",
+    "side": "be",
+    "want": "test_task14_merge_conflicts.py::TestProperty27DeleteUpdate::test_incoming_deletes_row_current_updates_it",
+    "why": "OO 删行 + 服务端改同一行 ⇒ 不再报 delete_update 冲突而直接接受删除，服务端的改动被静默丢弃",
+    "verdict": "RED",
+    "summary": "2 failed, 175 passed, 1 warning in 2.44s",
+    "added": [
+      "test_task14_merge_conflicts.py::TestProperty27DeleteUpdate::test_incoming_deletes_row_current_updates_it",
+      "test_task14_merge_conflicts.py::TestProperty27DeleteUpdate::test_resolving_delete_update_as_keep_current_retains_the_row"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task14_merge_conflicts.py::TestProperty27DeleteUpdate::test_incoming_deletes_row_current_updates_it"
+    ],
+    "added_files": [
+      "test_task14_merge_conflicts.py"
+    ],
+    "restored": true,
+    "seconds": 5.3
+  },
+  {
+    "id": "M32",
+    "side": "be",
+    "want": "test_task14_merge_conflicts.py::TestProperty27DeleteUpdate::test_current_deletes_row_incoming_updates_it",
+    "why": "服务端删行 + OO 改同一行 ⇒ 同上但方向相反。与 M31 是两个方向，只测一条时删另一条不会红",
+    "verdict": "RED",
+    "summary": "1 failed, 176 passed, 1 warning in 2.42s",
+    "added": [
+      "test_task14_merge_conflicts.py::TestProperty27DeleteUpdate::test_current_deletes_row_incoming_updates_it"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task14_merge_conflicts.py::TestProperty27DeleteUpdate::test_current_deletes_row_incoming_updates_it"
+    ],
+    "added_files": [
+      "test_task14_merge_conflicts.py"
+    ],
+    "restored": true,
+    "seconds": 5.3
+  },
+  {
+    "id": "M33",
+    "side": "be",
+    "want": "test_task14_merge_conflicts.py::TestStructuralConflicts::test_reported_row_identity_anomaly_blocks_only_that_row",
+    "why": "把封锁面从「出问题的那一行」扩大到**全部行** ⇒ 一处行身份坏了就整表 hold 在 current，正是 AC 6.9 明令禁止的「整表覆盖」的镜像形态",
+    "verdict": "RED",
+    "summary": "20 failed, 157 passed, 1 warning in 9.79s",
+    "added": [
+      "test_task14_merge_conflicts.py::TestMergeOutcomeDerivedJudgements::test_incoming_managed_keys_and_deleted_keys",
+      "test_task14_merge_conflicts.py::TestMissingSentinel::test_deleted_and_cleared_produce_different_merged_results",
+      "test_task14_merge_conflicts.py::TestProperty24ProtectedField::test_new_row_added_in_oo_does_not_conflict_on_its_formula_cell",
+      "test_task14_merge_conflicts.py::TestProperty24ProtectedField::test_oo_edit_on_protected_field_yields_protected_conflict[masked_note-read_only_masked_cell-onlyoffice_cell]",
+      "test_task14_merge_conflicts.py::TestProperty24ProtectedField::test_oo_edit_on_protected_field_yields_protected_conflict[subtotal-read_only_formula-server_formula]",
+      "test_task14_merge_conflicts.py::TestProperty24ProtectedField::test_oo_edit_on_protected_field_yields_protected_conflict[tb_amount-read_only_auto_source-auto_data_source]",
+      "test_task14_merge_conflicts.py::TestProperty24ProtectedField::test_protected_conflict_cannot_be_resolved_by_taking_incoming",
+      "test_task14_merge_conflicts.py::TestProperty24ProtectedField::test_row_deleted_in_oo_does_not_conflict_on_its_protected_cells",
+      "test_task14_merge_conflicts.py::TestProperty25And26Hypothesis::test_property_disjoint_field_edits_merge_without_conflict",
+      "test_task14_merge_conflicts.py::TestProperty25And26Hypothesis::test_property_same_field_three_values_never_auto_picks_a_side",
+      "test_task14_merge_conflicts.py::TestProperty25DifferentFieldsAutoMerge::test_footer_shift_after_row_insert_is_not_a_conflict",
+      "test_task14_merge_conflicts.py::TestProperty25DifferentFieldsAutoMerge::test_parallel_edits_on_different_rows_of_the_same_table",
+      "test_task14_merge_conflicts.py::TestProperty27DeleteUpdate::test_current_deletes_row_incoming_updates_it",
+      "test_task14_merge_conflicts.py::TestProperty27DeleteUpdate::test_incoming_deletes_row_current_updates_it",
+      "test_task14_merge_conflicts.py::TestProperty27DeleteUpdate::test_plain_row_delete_is_accepted_without_conflict",
+      "test_task14_merge_conflicts.py::TestProperty27DeleteUpdate::test_resolving_delete_update_as_delete_removes_the_whole_row",
+      "test_task14_merge_conflicts.py::TestProperty35ConflictTraceability::test_every_conflict_carries_both_side_locations_and_three_values",
+      "test_task14_merge_conflicts.py::TestStructuralConflicts::test_reported_row_identity_anomaly_blocks_only_that_row",
+      "test_task14_merge_conflicts.py::TestStructuralConflicts::test_type_normalization_failure_keeps_raw_values_for_adjudication",
+      "test_task14_merge_conflicts.py::TestThreeWayTruthTable::test_row_scoped_field_deleted_on_both_sides_agrees_without_conflict"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task14_merge_conflicts.py::TestProperty25DifferentFieldsAutoMerge::test_parallel_edits_on_different_rows_of_the_same_table",
+      "test_task14_merge_conflicts.py::TestProperty27DeleteUpdate::test_incoming_deletes_row_current_updates_it",
+      "test_task14_merge_conflicts.py::TestStructuralConflicts::test_reported_row_identity_anomaly_blocks_only_that_row"
+    ],
+    "added_files": [
+      "test_task14_merge_conflicts.py"
+    ],
+    "restored": true,
+    "seconds": 12.9
+  },
+  {
+    "id": "M34",
+    "side": "be",
+    "want": "test_task14_merge_conflicts.py::TestThreeWayTruthTable::test_current_delete_vs_incoming_update_is_delete_update_not_value",
+    "why": "delete/update 被降级成普通 value 冲突 ⇒ 裁决界面显示「两个值二选一」，而实际语义是「要不要保留这一行」，选项本身就是错的",
+    "verdict": "RED",
+    "summary": "1 failed, 176 passed, 1 warning in 2.42s",
+    "added": [
+      "test_task14_merge_conflicts.py::TestThreeWayTruthTable::test_current_delete_vs_incoming_update_is_delete_update_not_value"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task14_merge_conflicts.py::TestThreeWayTruthTable::test_current_delete_vs_incoming_update_is_delete_update_not_value"
+    ],
+    "added_files": [
+      "test_task14_merge_conflicts.py"
+    ],
+    "restored": true,
+    "seconds": 5.2
+  },
+  {
+    "id": "M35",
+    "side": "be",
+    "want": "test_task14_merge_conflicts.py::TestProperty27DeleteUpdate::test_delete_update_record_requires_exactly_one_absent_side",
+    "why": "不再自检「delete_update 要求恰好一侧缺失」⇒ 两侧都有值也能标成 delete_update，落库后 UI 拿不到可删的那一侧",
+    "verdict": "RED",
+    "summary": "1 failed, 176 passed, 1 warning in 2.50s",
+    "added": [
+      "test_task14_merge_conflicts.py::TestProperty27DeleteUpdate::test_delete_update_record_requires_exactly_one_absent_side"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task14_merge_conflicts.py::TestProperty27DeleteUpdate::test_delete_update_record_requires_exactly_one_absent_side"
+    ],
+    "added_files": [
+      "test_task14_merge_conflicts.py"
+    ],
+    "restored": true,
+    "seconds": 5.5
+  },
+  {
+    "id": "M36",
+    "side": "be",
+    "want": "test_task14_merge_conflicts.py::TestProperty27DeleteUpdate::test_resolving_delete_update_as_delete_removes_the_whole_row",
+    "why": "「整行冲突全裁决为缺失 ⇒ 删整行」不再成立 ⇒ 用户明确选了删除，行里其余字段仍留在 projection 里成为半截幽灵行",
+    "verdict": "RED",
+    "summary": "1 failed, 176 passed, 1 warning in 2.50s",
+    "added": [
+      "test_task14_merge_conflicts.py::TestProperty27DeleteUpdate::test_resolving_delete_update_as_delete_removes_the_whole_row"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task14_merge_conflicts.py::TestProperty27DeleteUpdate::test_resolving_delete_update_as_delete_removes_the_whole_row"
+    ],
+    "added_files": [
+      "test_task14_merge_conflicts.py"
+    ],
+    "restored": true,
+    "seconds": 6.2
+  },
+  {
+    "id": "M37",
+    "side": "be",
+    "want": "test_task14_merge_conflicts.py::TestProperty32WordDuplicateInstances::test_divergent_instances_yield_duplicate_conflict_with_every_xpath",
+    "why": "同 tag 多实例恒判「值一致」⇒ 异值实例被静默取 XPath 序第一个，另外几处的内容悄悄丢失（AC 7.4 要求生成 duplicate 冲突并列全部位置）",
+    "verdict": "RED",
+    "summary": "2 failed, 175 passed, 1 warning in 2.61s",
+    "added": [
+      "test_task14_merge_conflicts.py::TestProperty32WordDuplicateInstances::test_divergent_instances_yield_duplicate_conflict_with_every_xpath",
+      "test_task14_merge_conflicts.py::TestProperty32WordDuplicateInstances::test_take_incoming_is_ambiguous_and_must_be_rejected"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task14_merge_conflicts.py::TestProperty32WordDuplicateInstances::test_divergent_instances_yield_duplicate_conflict_with_every_xpath"
+    ],
+    "added_files": [
+      "test_task14_merge_conflicts.py"
+    ],
+    "restored": true,
+    "seconds": 5.7
+  },
+  {
+    "id": "M38",
+    "side": "be",
+    "want": "test_task14_merge_conflicts.py::TestProperty32WordDuplicateInstances::test_divergent_instances_yield_duplicate_conflict_with_every_xpath",
+    "why": "只列前两个实例位置（仍满足 ≥2 的自检）⇒ 第三处及以后的 XPath 不出现在裁决界面，AC 7.4「列出全部 OO 位置」被悄悄削减",
+    "verdict": "RED",
+    "summary": "1 failed, 176 passed, 1 warning in 2.56s",
+    "added": [
+      "test_task14_merge_conflicts.py::TestProperty32WordDuplicateInstances::test_divergent_instances_yield_duplicate_conflict_with_every_xpath"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task14_merge_conflicts.py::TestProperty32WordDuplicateInstances::test_divergent_instances_yield_duplicate_conflict_with_every_xpath"
+    ],
+    "added_files": [
+      "test_task14_merge_conflicts.py"
+    ],
+    "restored": true,
+    "seconds": 5.7
+  },
+  {
+    "id": "M39",
+    "side": "be",
+    "want": "test_task14_merge_conflicts.py::TestProperty32WordDuplicateInstances::test_all_equal_instances_cannot_be_recorded_as_duplicate_conflict",
+    "why": "全部实例值相同也能标成 duplicate 冲突 ⇒ AC 7.4 前半句（值一致时合并为一个字段）失效，Word 底稿每次回写都刷出一批假冲突",
+    "verdict": "RED",
+    "summary": "1 failed, 176 passed, 1 warning in 2.62s",
+    "added": [
+      "test_task14_merge_conflicts.py::TestProperty32WordDuplicateInstances::test_all_equal_instances_cannot_be_recorded_as_duplicate_conflict"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task14_merge_conflicts.py::TestProperty32WordDuplicateInstances::test_all_equal_instances_cannot_be_recorded_as_duplicate_conflict"
+    ],
+    "added_files": [
+      "test_task14_merge_conflicts.py"
+    ],
+    "restored": true,
+    "seconds": 5.8
+  },
+  {
+    "id": "M40",
+    "side": "be",
+    "want": "test_task14_merge_conflicts.py::TestProperty32WordDuplicateInstances::test_all_equal_instances_cannot_be_recorded_as_duplicate_conflict",
+    "why": "单实例也能标成 duplicate 冲突 ⇒ 记录自相矛盾。与 M39 是同一个 `__post_init__` 的两条不同判据（实例数 vs 值分歧），必须分别覆盖",
+    "verdict": "RED",
+    "summary": "1 failed, 176 passed, 1 warning in 2.57s",
+    "added": [
+      "test_task14_merge_conflicts.py::TestProperty32WordDuplicateInstances::test_all_equal_instances_cannot_be_recorded_as_duplicate_conflict"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task14_merge_conflicts.py::TestProperty32WordDuplicateInstances::test_all_equal_instances_cannot_be_recorded_as_duplicate_conflict"
+    ],
+    "added_files": [
+      "test_task14_merge_conflicts.py"
+    ],
+    "restored": true,
+    "seconds": 5.8
+  },
+  {
+    "id": "M41",
+    "side": "be",
+    "want": "test_task14_merge_conflicts.py::TestProperty32WordDuplicateInstances::test_take_incoming_is_ambiguous_and_must_be_rejected",
+    "why": "多实例异值时 `take_incoming` 不再被拒 ⇒ 系统替用户挑了 XPath 序第一个实例，AC 7.4 要求的「显式指明取哪个实例」被绕过",
+    "verdict": "RED",
+    "summary": "1 failed, 176 passed, 1 warning in 2.62s",
+    "added": [
+      "test_task14_merge_conflicts.py::TestProperty32WordDuplicateInstances::test_take_incoming_is_ambiguous_and_must_be_rejected"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task14_merge_conflicts.py::TestProperty32WordDuplicateInstances::test_take_incoming_is_ambiguous_and_must_be_rejected"
+    ],
+    "added_files": [
+      "test_task14_merge_conflicts.py"
+    ],
+    "restored": true,
+    "seconds": 5.8
+  },
+  {
+    "id": "M42",
+    "side": "be",
+    "want": "test_task14_merge_conflicts.py::TestProperty32WordDuplicateInstances::test_duplicate_xpath_in_observation_is_rejected",
+    "why": "实例 XPath 重复不再拒 ⇒ 同一位置被登记两次，裁决界面出现两个一模一样的选项",
+    "verdict": "RED",
+    "summary": "1 failed, 176 passed, 1 warning in 2.54s",
+    "added": [
+      "test_task14_merge_conflicts.py::TestProperty32WordDuplicateInstances::test_duplicate_xpath_in_observation_is_rejected"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task14_merge_conflicts.py::TestProperty32WordDuplicateInstances::test_duplicate_xpath_in_observation_is_rejected"
+    ],
+    "added_files": [
+      "test_task14_merge_conflicts.py"
+    ],
+    "restored": true,
+    "seconds": 5.6
+  },
+  {
+    "id": "M43",
+    "side": "be",
+    "want": "test_task14_merge_conflicts.py::TestProperty32WordDuplicateInstances::test_word_only_field_never_enters_the_html_projection",
+    "why": "`word_only` 字段进 HTML projection ⇒ Word 权威的自由文本被写进 HTML 底稿（AC 7.3），并让 `requires_client_refresh` 恒判需要重载",
+    "verdict": "RED",
+    "summary": "2 failed, 175 passed, 1 warning in 2.54s",
+    "added": [
+      "test_task14_merge_conflicts.py::TestMergeOutcomeDerivedJudgements::test_word_only_keys_are_excluded_from_the_refresh_comparison",
+      "test_task14_merge_conflicts.py::TestProperty32WordDuplicateInstances::test_word_only_field_never_enters_the_html_projection"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task14_merge_conflicts.py::TestMergeOutcomeDerivedJudgements::test_word_only_keys_are_excluded_from_the_refresh_comparison",
+      "test_task14_merge_conflicts.py::TestProperty32WordDuplicateInstances::test_word_only_field_never_enters_the_html_projection"
+    ],
+    "added_files": [
+      "test_task14_merge_conflicts.py"
+    ],
+    "restored": true,
+    "seconds": 5.5
+  },
+  {
+    "id": "M44",
+    "side": "be",
+    "want": "test_task14_merge_conflicts.py::TestStructuralConflicts::test_missing_static_carrier_in_incoming_fails_closed",
+    "why": "静态受管格在 incoming 里消失时不再 fail closed ⇒ 载体（单元格/SDT）被删掉会被当成「合法删除」，而静态格本不该消失。这条与动态行的合法删除是两条判据",
+    "verdict": "RED",
+    "summary": "2 failed, 175 passed, 1 warning in 2.42s",
+    "added": [
+      "test_task14_merge_conflicts.py::TestStructuralConflicts::test_missing_static_carrier_in_incoming_fails_closed",
+      "test_task14_merge_conflicts.py::TestThreeWayTruthTable::test_row[10-c7-i7-conflict_schema-expected7]"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task14_merge_conflicts.py::TestStructuralConflicts::test_missing_static_carrier_in_incoming_fails_closed",
+      "test_task14_merge_conflicts.py::TestThreeWayTruthTable::test_row[10-c7-i7-conflict_schema-expected7]"
+    ],
+    "added_files": [
+      "test_task14_merge_conflicts.py"
+    ],
+    "restored": true,
+    "seconds": 5.3
+  },
+  {
+    "id": "M45",
+    "side": "be",
+    "want": "test_task14_merge_conflicts.py::TestStructuralConflicts::test_identity_anomaly_cannot_be_resolved_by_picking_a_side",
+    "why": "把身份类结构异常也标成「可靠选边收敛」⇒ 行 UUID 空/重复时选 current 或 incoming都只是把坏结构固化下来（AC 6.15 要求先修结构）",
+    "verdict": "RED",
+    "summary": "3 failed, 174 passed, 1 warning in 2.49s",
+    "added": [
+      "test_task14_merge_conflicts.py::TestStructuralConflicts::test_identity_anomaly_cannot_be_resolved_by_picking_a_side",
+      "test_task14_merge_conflicts.py::TestStructuralConflicts::test_reported_row_identity_anomaly_blocks_only_that_row",
+      "test_task14_merge_conflicts.py::TestStructuralConflicts::test_schema_conflict_without_anomaly_kind_is_rejected"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task14_merge_conflicts.py::TestStructuralConflicts::test_identity_anomaly_cannot_be_resolved_by_picking_a_side"
+    ],
+    "added_files": [
+      "test_task14_merge_conflicts.py"
+    ],
+    "restored": true,
+    "seconds": 5.4
+  },
+  {
+    "id": "M46",
+    "side": "be",
+    "want": "test_task14_merge_conflicts.py::TestStructuralConflicts::test_identity_anomaly_cannot_be_resolved_by_picking_a_side",
+    "why": "裁决层不再拦身份类结构冲突。与 M45 是分类真源 vs 执行守卫两处，只测一条时另一条被遮蔽",
+    "verdict": "RED",
+    "summary": "1 failed, 176 passed, 1 warning in 2.46s",
+    "added": [
+      "test_task14_merge_conflicts.py::TestStructuralConflicts::test_identity_anomaly_cannot_be_resolved_by_picking_a_side"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task14_merge_conflicts.py::TestStructuralConflicts::test_identity_anomaly_cannot_be_resolved_by_picking_a_side"
+    ],
+    "added_files": [
+      "test_task14_merge_conflicts.py"
+    ],
+    "restored": true,
+    "seconds": 5.7
+  },
+  {
+    "id": "M47",
+    "side": "be",
+    "want": "test_task14_merge_conflicts.py::TestStructuralConflicts::test_schema_conflict_without_anomaly_kind_is_rejected",
+    "why": "schema 冲突不再强制给出 `schema_anomaly` ⇒ 「结构哪里坏了」不可诊断（AC 5.12），而 `adjudicable_by_value_choice` 会在 assert 上炸",
+    "verdict": "RED",
+    "summary": "1 failed, 176 passed, 1 warning in 2.52s",
+    "added": [
+      "test_task14_merge_conflicts.py::TestStructuralConflicts::test_schema_conflict_without_anomaly_kind_is_rejected"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task14_merge_conflicts.py::TestStructuralConflicts::test_schema_conflict_without_anomaly_kind_is_rejected"
+    ],
+    "added_files": [
+      "test_task14_merge_conflicts.py"
+    ],
+    "restored": true,
+    "seconds": 5.7
+  },
+  {
+    "id": "M48",
+    "side": "be",
+    "want": "test_task14_merge_conflicts.py::TestStructuralConflicts::test_key_level_anomaly_blocks_only_that_key",
+    "why": "**键级**封锁失效 ⇒ 报了 schema 冲突却仍按三方规则把 incoming 写进那个键，fail closed 变成 fail open。🔴 首轮两次踩坑：先判 GREEN（当时只有行级封锁的守卫，`blocked_keys` 这条路径根本没有判据），补了 key 级守卫后又因 want 仍写着行级测试而判 WRONG-TEST。两条封锁路径必须各有自己的 want（另一条见 M81）",
+    "verdict": "RED",
+    "summary": "1 failed, 176 passed, 1 warning in 2.49s",
+    "added": [
+      "test_task14_merge_conflicts.py::TestStructuralConflicts::test_key_level_anomaly_blocks_only_that_key"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task14_merge_conflicts.py::TestStructuralConflicts::test_key_level_anomaly_blocks_only_that_key"
+    ],
+    "added_files": [
+      "test_task14_merge_conflicts.py"
+    ],
+    "restored": true,
+    "seconds": 5.7
+  },
+  {
+    "id": "M81",
+    "side": "be",
+    "want": "test_task14_merge_conflicts.py::TestStructuralConflicts::test_reported_row_identity_anomaly_blocks_only_that_row",
+    "why": "**行级**封锁失效 ⇒ 行身份坏了却只封锁报错那一个键，同行其他字段仍按三方规则采纳 incoming（`blocks_row_key` 的语义就是「这一行整体不可信」）。与 M48 成对：键级 vs 行级是两条独立语句、两条独立判据",
+    "verdict": "RED",
+    "summary": "1 failed, 176 passed, 1 warning in 2.54s",
+    "added": [
+      "test_task14_merge_conflicts.py::TestStructuralConflicts::test_reported_row_identity_anomaly_blocks_only_that_row"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task14_merge_conflicts.py::TestStructuralConflicts::test_reported_row_identity_anomaly_blocks_only_that_row"
+    ],
+    "added_files": [
+      "test_task14_merge_conflicts.py"
+    ],
+    "restored": true,
+    "seconds": 5.7
+  },
+  {
+    "id": "M49",
+    "side": "be",
+    "want": "test_task14_merge_conflicts.py::TestStructuralConflicts::test_anomaly_outside_the_contract_must_bring_its_own_traceability",
+    "why": "契约外的结构异常不再要求自带 label/pointer/OO 地址 ⇒ 落库出空标签空地址的冲突记录，AC 8.1/8.2 的可追溯性断链",
+    "verdict": "RED",
+    "summary": "1 failed, 176 passed, 1 warning in 2.50s",
+    "added": [
+      "test_task14_merge_conflicts.py::TestStructuralConflicts::test_anomaly_outside_the_contract_must_bring_its_own_traceability"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task14_merge_conflicts.py::TestStructuralConflicts::test_anomaly_outside_the_contract_must_bring_its_own_traceability"
+    ],
+    "added_files": [
+      "test_task14_merge_conflicts.py"
+    ],
+    "restored": true,
+    "seconds": 5.5
+  },
+  {
+    "id": "M50",
+    "side": "be",
+    "want": "test_task14_merge_conflicts.py::TestStructuralConflicts::test_contract_index_rejects_prefix_only_matches",
+    "why": "`ContractIndex.resolve` 对契约未登记的 key 不再抛 `UnknownStableKeyError` ⇒ 落到 `matches[0]` 的 IndexError，诊断信息丢失（Requirement 6.20 的 fail closed 退化成崩溃）。🔴 首轮把 want 写成 `test_unknown_stable_key_in_a_projection_fails_closed` 判了 WRONG-TEST —— 那条测试实际由 Task 13 的 `Projection.assert_matches_contract` 在**更早**的入口拦下，与本判据不是同一道门。判据归属写错就是脚本缺陷，不是守卫缺陷",
+    "verdict": "RED",
+    "summary": "2 failed, 175 passed, 1 warning in 2.52s",
+    "added": [
+      "test_task14_merge_conflicts.py::TestStructuralConflicts::test_anomaly_outside_the_contract_must_bring_its_own_traceability",
+      "test_task14_merge_conflicts.py::TestStructuralConflicts::test_contract_index_rejects_prefix_only_matches"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task14_merge_conflicts.py::TestStructuralConflicts::test_anomaly_outside_the_contract_must_bring_its_own_traceability",
+      "test_task14_merge_conflicts.py::TestStructuralConflicts::test_contract_index_rejects_prefix_only_matches"
+    ],
+    "added_files": [
+      "test_task14_merge_conflicts.py"
+    ],
+    "restored": true,
+    "seconds": 5.6
+  },
+  {
+    "id": "M51",
+    "side": "be",
+    "want": "test_task14_merge_conflicts.py::TestStructuralConflicts::test_contract_index_rejects_prefix_only_matches",
+    "why": "键匹配退化成「只比前缀 / 段数不限」⇒ `equity_changes/{row_uuid}/closing_amount` 会误配到任何同前缀键，D2 那类大表直接串数据（Task 13 已用替身实证过这个形态）",
+    "verdict": "RED",
+    "summary": "1 failed, 176 passed, 1 warning in 2.56s",
+    "added": [
+      "test_task14_merge_conflicts.py::TestStructuralConflicts::test_contract_index_rejects_prefix_only_matches"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task14_merge_conflicts.py::TestStructuralConflicts::test_contract_index_rejects_prefix_only_matches"
+    ],
+    "added_files": [
+      "test_task14_merge_conflicts.py"
+    ],
+    "restored": true,
+    "seconds": 5.7
+  },
+  {
+    "id": "M52",
+    "side": "be",
+    "want": "test_task14_merge_conflicts.py::TestStructuralConflicts::test_contract_index_rejects_row_key_disagreement",
+    "why": "`FieldValue.row_key` 与 stable key 里的行身份段不一致时不再拒 ⇒ 行身份有两个真源且可互相矛盾，删行/重排后数据串到别的行",
+    "verdict": "RED",
+    "summary": "1 failed, 176 passed, 1 warning in 2.57s",
+    "added": [
+      "test_task14_merge_conflicts.py::TestStructuralConflicts::test_contract_index_rejects_row_key_disagreement"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task14_merge_conflicts.py::TestStructuralConflicts::test_contract_index_rejects_row_key_disagreement"
+    ],
+    "added_files": [
+      "test_task14_merge_conflicts.py"
+    ],
+    "restored": true,
+    "seconds": 5.6
+  },
+  {
+    "id": "M53",
+    "side": "be",
+    "want": "test_task14_merge_conflicts.py::TestStructuralConflicts::test_type_normalization_failure_keeps_raw_values_for_adjudication",
+    "why": "`_comparable` 不再跳过会抛规范化错误的键 ⇒ 行级「是否改动过」的比较里抛出未捕获的 `ValueNormalizationError`，整次 merge 崩掉而不是收成 schema 冲突",
+    "verdict": "RED",
+    "summary": "8 failed, 169 passed, 1 warning in 2.61s",
+    "added": [
+      "test_task14_merge_conflicts.py::TestConflictSetDigest::test_digest_is_deterministic_and_order_insensitive",
+      "test_task14_merge_conflicts.py::TestMergeOutcomeDerivedJudgements::test_of_kind_partitions_the_conflict_set",
+      "test_task14_merge_conflicts.py::TestProperty35ConflictTraceability::test_dedupe_key_matches_the_unique_constraint",
+      "test_task14_merge_conflicts.py::TestProperty35ConflictTraceability::test_duplicate_dedupe_key_in_a_set_is_rejected",
+      "test_task14_merge_conflicts.py::TestProperty35ConflictTraceability::test_every_conflict_carries_both_side_locations_and_three_values",
+      "test_task14_merge_conflicts.py::TestProperty35ConflictTraceability::test_grouped_by_sheet_table_row_for_the_preview",
+      "test_task14_merge_conflicts.py::TestProperty35ConflictTraceability::test_row_covers_every_ac81_column",
+      "test_task14_merge_conflicts.py::TestStructuralConflicts::test_type_normalization_failure_keeps_raw_values_for_adjudication"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task14_merge_conflicts.py::TestStructuralConflicts::test_type_normalization_failure_keeps_raw_values_for_adjudication"
+    ],
+    "added_files": [
+      "test_task14_merge_conflicts.py"
+    ],
+    "restored": true,
+    "seconds": 5.7
+  },
+  {
+    "id": "M54",
+    "side": "be",
+    "want": "test_task14_merge_conflicts.py::TestProperty35ConflictTraceability::test_duplicate_dedupe_key_in_a_set_is_rejected",
+    "why": "同一 `(stable_field_key, row_key, oo_location)` 出现两条冲突不再拒 ⇒ 落库时撞 `uq_wpsc_field`，重复 callback 变成 500 而不是幂等",
+    "verdict": "RED",
+    "summary": "1 failed, 176 passed, 1 warning in 2.55s",
+    "added": [
+      "test_task14_merge_conflicts.py::TestProperty35ConflictTraceability::test_duplicate_dedupe_key_in_a_set_is_rejected"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task14_merge_conflicts.py::TestProperty35ConflictTraceability::test_duplicate_dedupe_key_in_a_set_is_rejected"
+    ],
+    "added_files": [
+      "test_task14_merge_conflicts.py"
+    ],
+    "restored": true,
+    "seconds": 5.7
+  },
+  {
+    "id": "M55",
+    "side": "be",
+    "want": "test_task14_merge_conflicts.py::TestConflictSetDigest::test_digest_is_deterministic_and_order_insensitive",
+    "why": "冲突集不再确定性排序 ⇒ `conflict_set_digest` 随插入顺序变化，resolve fence 会把「同一批冲突」误判成 `conflict_set_changed`（AC 8.5 恒 409）",
+    "verdict": "RED",
+    "summary": "1 failed, 176 passed, 1 warning in 2.53s",
+    "added": [
+      "test_task14_merge_conflicts.py::TestConflictSetDigest::test_digest_is_deterministic_and_order_insensitive"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task14_merge_conflicts.py::TestConflictSetDigest::test_digest_is_deterministic_and_order_insensitive"
+    ],
+    "added_files": [
+      "test_task14_merge_conflicts.py"
+    ],
+    "restored": true,
+    "seconds": 5.7
+  },
+  {
+    "id": "M56",
+    "side": "be",
+    "want": "test_task14_merge_conflicts.py::TestConflictSetDigest::test_digest_changes_when_any_of_the_three_values_changes",
+    "why": "摘要不再含 base 值 ⇒ 只有 base 变化的冲突集算出同一个 digest，stale 冲突集通不过 fence 却被判「没变」",
+    "verdict": "RED",
+    "summary": "2 failed, 175 passed, 1 warning in 2.64s",
+    "added": [
+      "test_task14_merge_conflicts.py::TestConflictSetDigest::test_digest_changes_when_any_of_the_three_values_changes",
+      "test_task14_merge_conflicts.py::TestMergeOutcomeDerivedJudgements::test_digest_payload_carries_the_three_values_and_kind"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task14_merge_conflicts.py::TestConflictSetDigest::test_digest_changes_when_any_of_the_three_values_changes"
+    ],
+    "added_files": [
+      "test_task14_merge_conflicts.py"
+    ],
+    "restored": true,
+    "seconds": 5.8
+  },
+  {
+    "id": "M57",
+    "side": "be",
+    "want": "test_task14_merge_conflicts.py::TestResolveFence::test_each_fence_break_has_its_own_reason",
+    "why": "不再校验「请求的 canonical application == 服务端锁定的 application」⇒ 对着另一个 application 的冲突集提交裁决",
+    "verdict": "RED",
+    "summary": "1 failed, 176 passed, 1 warning in 2.48s",
+    "added": [
+      "test_task14_merge_conflicts.py::TestResolveFence::test_each_fence_break_has_its_own_reason[req_over0-app_over0-room_over0-canonical_application_mismatch]"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task14_merge_conflicts.py::TestResolveFence::test_each_fence_break_has_its_own_reason[req_over0-app_over0-room_over0-canonical_application_mismatch]"
+    ],
+    "added_files": [
+      "test_task14_merge_conflicts.py"
+    ],
+    "restored": true,
+    "seconds": 5.5
+  },
+  {
+    "id": "M58",
+    "side": "be",
+    "want": "test_task14_merge_conflicts.py::TestResolveFence::test_each_fence_break_has_its_own_reason",
+    "why": "room generation 已轮转仍允许裁决 ⇒ 基于过期基线的选择被写进新 generation",
+    "verdict": "RED",
+    "summary": "1 failed, 176 passed, 1 warning in 2.54s",
+    "added": [
+      "test_task14_merge_conflicts.py::TestResolveFence::test_each_fence_break_has_its_own_reason[req_over1-app_over1-room_over1-room_generation_changed]"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task14_merge_conflicts.py::TestResolveFence::test_each_fence_break_has_its_own_reason[req_over1-app_over1-room_over1-room_generation_changed]"
+    ],
+    "added_files": [
+      "test_task14_merge_conflicts.py"
+    ],
+    "restored": true,
+    "seconds": 5.6
+  },
+  {
+    "id": "M59",
+    "side": "be",
+    "want": "test_task14_merge_conflicts.py::TestResolveFence::test_each_fence_break_has_its_own_reason",
+    "why": "write fence epoch 已提升（有 participant 被撤销/超时）仍放行 ⇒ 被撤销的 writer 的改动经裁决路径回到底稿",
+    "verdict": "RED",
+    "summary": "1 failed, 176 passed, 1 warning in 2.50s",
+    "added": [
+      "test_task14_merge_conflicts.py::TestResolveFence::test_each_fence_break_has_its_own_reason[req_over2-app_over2-room_over2-write_fence_changed]"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task14_merge_conflicts.py::TestResolveFence::test_each_fence_break_has_its_own_reason[req_over2-app_over2-room_over2-write_fence_changed]"
+    ],
+    "added_files": [
+      "test_task14_merge_conflicts.py"
+    ],
+    "restored": true,
+    "seconds": 5.6
+  },
+  {
+    "id": "M60",
+    "side": "be",
+    "want": "test_task14_merge_conflicts.py::TestResolveFence::test_each_fence_break_has_its_own_reason",
+    "why": "发起人权限 epoch 已变仍放行 ⇒ 权限被收回后旧授权仍可提交裁决（authorization-first 失效）",
+    "verdict": "RED",
+    "summary": "1 failed, 176 passed, 1 warning in 2.51s",
+    "added": [
+      "test_task14_merge_conflicts.py::TestResolveFence::test_each_fence_break_has_its_own_reason[req_over3-app_over3-room_over3-permission_epoch_changed]"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task14_merge_conflicts.py::TestResolveFence::test_each_fence_break_has_its_own_reason[req_over3-app_over3-room_over3-permission_epoch_changed]"
+    ],
+    "added_files": [
+      "test_task14_merge_conflicts.py"
+    ],
+    "restored": true,
+    "seconds": 5.5
+  },
+  {
+    "id": "M61",
+    "side": "be",
+    "want": "test_task14_merge_conflicts.py::TestResolveFence::test_each_fence_break_has_its_own_reason",
+    "why": "客户端编辑轮次已变仍放行 ⇒ 冲突预览基于过期快照，用户看到的三值不是当前真值",
+    "verdict": "RED",
+    "summary": "1 failed, 176 passed, 1 warning in 2.54s",
+    "added": [
+      "test_task14_merge_conflicts.py::TestResolveFence::test_each_fence_break_has_its_own_reason[req_over4-app_over4-room_over4-client_edit_epoch_changed]"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task14_merge_conflicts.py::TestResolveFence::test_each_fence_break_has_its_own_reason[req_over4-app_over4-room_over4-client_edit_epoch_changed]"
+    ],
+    "added_files": [
+      "test_task14_merge_conflicts.py"
+    ],
+    "restored": true,
+    "seconds": 5.6
+  },
+  {
+    "id": "M62",
+    "side": "be",
+    "want": "test_task14_merge_conflicts.py::TestResolveFence::test_each_fence_break_has_its_own_reason",
+    "why": "room 处于 refresh-required 仍放行 ⇒ 上次 merged 与 incoming 不等值还没让编辑器确认新基线，就在旧基线上继续裁决",
+    "verdict": "RED",
+    "summary": "1 failed, 176 passed, 1 warning in 2.49s",
+    "added": [
+      "test_task14_merge_conflicts.py::TestResolveFence::test_each_fence_break_has_its_own_reason[req_over5-app_over5-room_over5-room_refresh_required]"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task14_merge_conflicts.py::TestResolveFence::test_each_fence_break_has_its_own_reason[req_over5-app_over5-room_over5-room_refresh_required]"
+    ],
+    "added_files": [
+      "test_task14_merge_conflicts.py"
+    ],
+    "restored": true,
+    "seconds": 5.6
+  },
+  {
+    "id": "M63",
+    "side": "be",
+    "want": "test_task14_merge_conflicts.py::TestResolveFence::test_each_fence_break_has_its_own_reason",
+    "why": "冲突集摘要不再比对 ⇒ 冲突列表已变（多/少了条目）仍按旧列表落裁决",
+    "verdict": "RED",
+    "summary": "1 failed, 176 passed, 1 warning in 2.51s",
+    "added": [
+      "test_task14_merge_conflicts.py::TestResolveFence::test_each_fence_break_has_its_own_reason[req_over6-app_over6-room_over6-conflict_set_changed]"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task14_merge_conflicts.py::TestResolveFence::test_each_fence_break_has_its_own_reason[req_over6-app_over6-room_over6-conflict_set_changed]"
+    ],
+    "added_files": [
+      "test_task14_merge_conflicts.py"
+    ],
+    "restored": true,
+    "seconds": 5.5
+  },
+  {
+    "id": "M64",
+    "side": "be",
+    "want": "test_task14_merge_conflicts.py::TestResolveFence::test_same_application_higher_sequence_folds_and_never_supersedes_itself",
+    "why": "同一 canonical application 的更高 request sequence 不再做单调 fold ⇒ 自己把自己判 stale/superseded（AC 8.5 明文禁止 self-supersede）",
+    "verdict": "RED",
+    "summary": "1 failed, 176 passed, 1 warning in 2.55s",
+    "added": [
+      "test_task14_merge_conflicts.py::TestResolveFence::test_same_application_higher_sequence_folds_and_never_supersedes_itself"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task14_merge_conflicts.py::TestResolveFence::test_same_application_higher_sequence_folds_and_never_supersedes_itself"
+    ],
+    "added_files": [
+      "test_task14_merge_conflicts.py"
+    ],
+    "restored": true,
+    "seconds": 5.6
+  },
+  {
+    "id": "M65",
+    "side": "be",
+    "want": "test_task14_merge_conflicts.py::TestResolveFence::test_newer_different_canonical_application_supersedes",
+    "why": "room latest durable 指向另一个**更新**的 application 时不再判 superseded ⇒ 旧 operation 的裁决覆盖新 application 的结果",
+    "verdict": "RED",
+    "summary": "1 failed, 176 passed, 1 warning in 2.56s",
+    "added": [
+      "test_task14_merge_conflicts.py::TestResolveFence::test_newer_different_canonical_application_supersedes"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task14_merge_conflicts.py::TestResolveFence::test_newer_different_canonical_application_supersedes"
+    ],
+    "added_files": [
+      "test_task14_merge_conflicts.py"
+    ],
+    "restored": true,
+    "seconds": 5.6
+  },
+  {
+    "id": "M66",
+    "side": "be",
+    "want": "test_task14_merge_conflicts.py::TestResolveFence::test_current_revision_change_rebases",
+    "why": "content revision 已推进仍按旧 current 落裁决 ⇒ 丢掉期间的服务端改动（AC 8.5 要求返回 409 `CONFLICT_REBASED` 并以 frozen base 重跑三方 merge）",
+    "verdict": "RED",
+    "summary": "1 failed, 176 passed, 1 warning in 2.55s",
+    "added": [
+      "test_task14_merge_conflicts.py::TestResolveFence::test_current_revision_change_rebases"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task14_merge_conflicts.py::TestResolveFence::test_current_revision_change_rebases"
+    ],
+    "added_files": [
+      "test_task14_merge_conflicts.py"
+    ],
+    "restored": true,
+    "seconds": 5.6
+  },
+  {
+    "id": "M67",
+    "side": "be",
+    "want": "test_task14_merge_conflicts.py::TestResolveFence::test_invalid_duplicate_link_is_rejected_before_canonicalize",
+    "why": "把「duplicate 目标必须已绑定本次 canonical application」改成自比 ⇒ `None != None` 恒假，stranded shell（未绑定 application 的 pre-correlation 壳）被当合法 primary。🔴 这条能被抓到，靠的是守卫按 `broken` 参数断言各自的可分辨文案 —— 只断言异常类型时会被另外五条禁令遮蔽",
+    "verdict": "RED",
+    "summary": "1 failed, 176 passed, 1 warning in 2.48s",
+    "added": [
+      "test_task14_merge_conflicts.py::TestResolveFence::test_invalid_duplicate_link_is_rejected_before_canonicalize[stranded-stranded]"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task14_merge_conflicts.py::TestResolveFence::test_invalid_duplicate_link_is_rejected_before_canonicalize[stranded-stranded]"
+    ],
+    "added_files": [
+      "test_task14_merge_conflicts.py"
+    ],
+    "restored": true,
+    "seconds": 5.7
+  },
+  {
+    "id": "M68",
+    "side": "be",
+    "want": "test_task14_merge_conflicts.py::TestResolveFence::test_duplicate_link_requires_a_terminal_duplicate_requested_operation",
+    "why": "`duplicate_link` 的前置条件（requested 必须是 terminal duplicate）不再校验 ⇒ primary 自己被当 duplicate 去校验直指关系，调用方用法错被静默接受",
+    "verdict": "RED",
+    "summary": "1 failed, 176 passed, 1 warning in 2.46s",
+    "added": [
+      "test_task14_merge_conflicts.py::TestResolveFence::test_duplicate_link_requires_a_terminal_duplicate_requested_operation"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task14_merge_conflicts.py::TestResolveFence::test_duplicate_link_requires_a_terminal_duplicate_requested_operation"
+    ],
+    "added_files": [
+      "test_task14_merge_conflicts.py"
+    ],
+    "restored": true,
+    "seconds": 5.5
+  },
+  {
+    "id": "M69",
+    "side": "be",
+    "want": "test_task14_merge_conflicts.py::TestResolveFence::test_every_reason_message_is_pairwise_distinct",
+    "why": "删掉一条 reason 文案 ⇒ `FENCE_REASON_MESSAGES` 与 `FenceReason` 不再一一对应，`FenceEvaluation.message` 在该 reason 上 KeyError",
+    "verdict": "RED",
+    "summary": "1 failed, 176 passed, 1 warning in 2.46s",
+    "added": [
+      "test_task14_merge_conflicts.py::TestResolveFence::test_every_reason_message_is_pairwise_distinct"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task14_merge_conflicts.py::TestResolveFence::test_every_reason_message_is_pairwise_distinct"
+    ],
+    "added_files": [
+      "test_task14_merge_conflicts.py"
+    ],
+    "restored": true,
+    "seconds": 5.4
+  },
+  {
+    "id": "M70",
+    "side": "be",
+    "want": "test_task14_merge_conflicts.py::TestResolveFence::test_every_reason_message_is_pairwise_distinct",
+    "why": "让两条 reason 共用同一句文案 ⇒ 「哪条判据在起作用」不可分辨，短路其中一条时另一条会把它遮蔽（本 spec 已两次实测到的 GREEN 成因）",
+    "verdict": "RED",
+    "summary": "1 failed, 176 passed, 1 warning in 2.44s",
+    "added": [
+      "test_task14_merge_conflicts.py::TestResolveFence::test_every_reason_message_is_pairwise_distinct"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task14_merge_conflicts.py::TestResolveFence::test_every_reason_message_is_pairwise_distinct"
+    ],
+    "added_files": [
+      "test_task14_merge_conflicts.py"
+    ],
+    "restored": true,
+    "seconds": 5.4
+  },
+  {
+    "id": "M71",
+    "side": "be",
+    "want": "test_task14_merge_conflicts.py::TestResolveFence::test_newer_different_canonical_application_supersedes",
+    "why": "`may_apply` 恒真 ⇒ rejected/superseded/rebase 三种判定照样产出 merged projection，整个 fence 变成只记录不拦截",
+    "verdict": "RED",
+    "summary": "9 failed, 168 passed, 1 warning in 2.46s",
+    "added": [
+      "test_task14_merge_conflicts.py::TestResolveFence::test_current_revision_change_rebases",
+      "test_task14_merge_conflicts.py::TestResolveFence::test_each_fence_break_has_its_own_reason[req_over0-app_over0-room_over0-canonical_application_mismatch]",
+      "test_task14_merge_conflicts.py::TestResolveFence::test_each_fence_break_has_its_own_reason[req_over1-app_over1-room_over1-room_generation_changed]",
+      "test_task14_merge_conflicts.py::TestResolveFence::test_each_fence_break_has_its_own_reason[req_over2-app_over2-room_over2-write_fence_changed]",
+      "test_task14_merge_conflicts.py::TestResolveFence::test_each_fence_break_has_its_own_reason[req_over3-app_over3-room_over3-permission_epoch_changed]",
+      "test_task14_merge_conflicts.py::TestResolveFence::test_each_fence_break_has_its_own_reason[req_over4-app_over4-room_over4-client_edit_epoch_changed]",
+      "test_task14_merge_conflicts.py::TestResolveFence::test_each_fence_break_has_its_own_reason[req_over5-app_over5-room_over5-room_refresh_required]",
+      "test_task14_merge_conflicts.py::TestResolveFence::test_each_fence_break_has_its_own_reason[req_over6-app_over6-room_over6-conflict_set_changed]",
+      "test_task14_merge_conflicts.py::TestResolveFence::test_newer_different_canonical_application_supersedes"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task14_merge_conflicts.py::TestResolveFence::test_current_revision_change_rebases",
+      "test_task14_merge_conflicts.py::TestResolveFence::test_each_fence_break_has_its_own_reason[req_over0-app_over0-room_over0-canonical_application_mismatch]",
+      "test_task14_merge_conflicts.py::TestResolveFence::test_each_fence_break_has_its_own_reason[req_over1-app_over1-room_over1-room_generation_changed]",
+      "test_task14_merge_conflicts.py::TestResolveFence::test_each_fence_break_has_its_own_reason[req_over2-app_over2-room_over2-write_fence_changed]",
+      "test_task14_merge_conflicts.py::TestResolveFence::test_each_fence_break_has_its_own_reason[req_over3-app_over3-room_over3-permission_epoch_changed]",
+      "test_task14_merge_conflicts.py::TestResolveFence::test_each_fence_break_has_its_own_reason[req_over4-app_over4-room_over4-client_edit_epoch_changed]",
+      "test_task14_merge_conflicts.py::TestResolveFence::test_each_fence_break_has_its_own_reason[req_over5-app_over5-room_over5-room_refresh_required]",
+      "test_task14_merge_conflicts.py::TestResolveFence::test_each_fence_break_has_its_own_reason[req_over6-app_over6-room_over6-conflict_set_changed]",
+      "test_task14_merge_conflicts.py::TestResolveFence::test_newer_different_canonical_application_supersedes"
+    ],
+    "added_files": [
+      "test_task14_merge_conflicts.py"
+    ],
+    "restored": true,
+    "seconds": 5.4
+  },
+  {
+    "id": "M72",
+    "side": "be",
+    "want": "test_task14_merge_conflicts.py::TestResolveFence::test_request_rejects_malformed_digest_and_negative_counters",
+    "why": "全零 hash / 非法 digest 进 fence 请求 ⇒ 与「摘要一致」的比较可能因两边都是全零而通过（Task 12 已登记的 typed-null 反例形态）",
+    "verdict": "RED",
+    "summary": "1 failed, 176 passed, 1 warning in 2.43s",
+    "added": [
+      "test_task14_merge_conflicts.py::TestResolveFence::test_request_rejects_malformed_digest_and_negative_counters"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task14_merge_conflicts.py::TestResolveFence::test_request_rejects_malformed_digest_and_negative_counters"
+    ],
+    "added_files": [
+      "test_task14_merge_conflicts.py"
+    ],
+    "restored": true,
+    "seconds": 5.4
+  },
+  {
+    "id": "M73",
+    "side": "be",
+    "want": "test_task14_merge_conflicts.py::TestResolveFence::test_request_rejects_malformed_digest_and_negative_counters",
+    "why": "负数 generation/epoch/sequence 进 fence 请求 ⇒ 单调 fold 的比较基准可以被负值污染（`fold_effective_sequence` 取 GREATEST）",
+    "verdict": "RED",
+    "summary": "1 failed, 176 passed, 1 warning in 2.46s",
+    "added": [
+      "test_task14_merge_conflicts.py::TestResolveFence::test_request_rejects_malformed_digest_and_negative_counters"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task14_merge_conflicts.py::TestResolveFence::test_request_rejects_malformed_digest_and_negative_counters"
+    ],
+    "added_files": [
+      "test_task14_merge_conflicts.py"
+    ],
+    "restored": true,
+    "seconds": 5.4
+  },
+  {
+    "id": "M74",
+    "side": "be",
+    "want": "test_task14_merge_conflicts.py::TestThreeWayTruthTable::test_never_last_write_wins",
+    "why": "🔴 **注入**：往 value/delete_update 冲突分支写入 incoming ⇒ 直接实现 last-write-wins。「同字段冲突不自动选边」是否定式承诺 —— 源码里没有「选 incoming」的语句可短路，只能注入反例（同 Task 12 的 M51 / Task 13 的 M40~M43）",
+    "verdict": "RED",
+    "summary": "4 failed, 173 passed, 1 warning in 2.66s",
+    "added": [
+      "test_task14_merge_conflicts.py::TestProperty25And26Hypothesis::test_property_same_field_three_values_never_auto_picks_a_side",
+      "test_task14_merge_conflicts.py::TestProperty26SameFieldDifferentValues::test_three_values_are_complete_and_neither_side_applied",
+      "test_task14_merge_conflicts.py::TestThreeWayTruthTable::test_never_last_write_wins",
+      "test_task14_merge_conflicts.py::TestThreeWayTruthTable::test_row[10-20-30-conflict_value-20]"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task14_merge_conflicts.py::TestProperty25And26Hypothesis::test_property_same_field_three_values_never_auto_picks_a_side",
+      "test_task14_merge_conflicts.py::TestProperty26SameFieldDifferentValues::test_three_values_are_complete_and_neither_side_applied",
+      "test_task14_merge_conflicts.py::TestThreeWayTruthTable::test_never_last_write_wins",
+      "test_task14_merge_conflicts.py::TestThreeWayTruthTable::test_row[10-20-30-conflict_value-20]"
+    ],
+    "added_files": [
+      "test_task14_merge_conflicts.py"
+    ],
+    "restored": true,
+    "seconds": 5.6
+  },
+  {
+    "id": "M75",
+    "side": "be",
+    "want": "test_task14_merge_conflicts.py::TestMissingSentinel::test_deleted_and_cleared_produce_different_merged_results",
+    "why": "🔴 **注入**：在写入 merged 的唯一出口把 absent 折叠成显式 null ⇒ 「行/载体被删」与「在 OO 里清空这一格」产出同一个 merged。「MISSING 永不折叠成 None」是否定式承诺，短路无从下手 —— 与 M01（规范化层）、M02（值比较层）、M04（信封比较层）合起来把四个层级都证明可 falsify",
+    "verdict": "RED",
+    "summary": "9 failed, 168 passed, 1 warning in 8.64s",
+    "added": [
+      "test_task14_merge_conflicts.py::TestMergeOutcomeDerivedJudgements::test_incoming_managed_keys_and_deleted_keys",
+      "test_task14_merge_conflicts.py::TestMissingSentinel::test_deleted_and_cleared_produce_different_merged_results",
+      "test_task14_merge_conflicts.py::TestProperty24ProtectedField::test_row_deleted_in_oo_does_not_conflict_on_its_protected_cells",
+      "test_task14_merge_conflicts.py::TestProperty25And26Hypothesis::test_property_untouched_incoming_preserves_current_everywhere",
+      "test_task14_merge_conflicts.py::TestProperty26SameFieldDifferentValues::test_resolution_can_pick_either_side_or_a_manual_value",
+      "test_task14_merge_conflicts.py::TestProperty27DeleteUpdate::test_plain_row_delete_is_accepted_without_conflict",
+      "test_task14_merge_conflicts.py::TestThreeWayTruthTable::test_row[10-c6-10-kept_current-expected6]",
+      "test_task14_merge_conflicts.py::TestThreeWayTruthTable::test_row[10-c7-i7-conflict_schema-expected7]",
+      "test_task14_merge_conflicts.py::TestThreeWayTruthTable::test_row_scoped_field_deleted_on_both_sides_agrees_without_conflict"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task14_merge_conflicts.py::TestMergeOutcomeDerivedJudgements::test_incoming_managed_keys_and_deleted_keys",
+      "test_task14_merge_conflicts.py::TestMissingSentinel::test_deleted_and_cleared_produce_different_merged_results",
+      "test_task14_merge_conflicts.py::TestThreeWayTruthTable::test_row[10-c6-10-kept_current-expected6]",
+      "test_task14_merge_conflicts.py::TestThreeWayTruthTable::test_row[10-c7-i7-conflict_schema-expected7]",
+      "test_task14_merge_conflicts.py::TestThreeWayTruthTable::test_row_scoped_field_deleted_on_both_sides_agrees_without_conflict"
+    ],
+    "added_files": [
+      "test_task14_merge_conflicts.py"
+    ],
+    "restored": true,
+    "seconds": 11.6
+  },
+  {
+    "id": "M76",
+    "side": "be",
+    "want": "test_task14_merge_conflicts.py::TestTask14ScopeBoundary::test_no_carrier_library_or_persistence_surface",
+    "why": "🔴 **注入**：给纯域加载体库依赖。「本任务零 openpyxl/python-docx」是否定式承诺。刻意包在 `if False:` 里 —— 真执行 import 会变成 collect ERROR，判定退化成 WRONG-TEST 而不是 RED（同时也证明判据扫的是源码结构不是运行时）",
+    "verdict": "RED",
+    "summary": "1 failed, 176 passed, 1 warning in 2.42s",
+    "added": [
+      "test_task14_merge_conflicts.py::TestTask14ScopeBoundary::test_no_carrier_library_or_persistence_surface"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task14_merge_conflicts.py::TestTask14ScopeBoundary::test_no_carrier_library_or_persistence_surface"
+    ],
+    "added_files": [
+      "test_task14_merge_conflicts.py"
+    ],
+    "restored": true,
+    "seconds": 5.5
+  },
+  {
+    "id": "M77",
+    "side": "be",
+    "want": "test_task14_merge_conflicts.py::TestTask14ScopeBoundary::test_blocking_task_15_is_registered_and_its_target_does_not_exist_yet",
+    "why": "🔴 **注入**：让 blocking_task=15 的目标（Task 15 的唯一 commit 入口）提前出现。判据必须是**类定义**而不是词出现 —— `ContentMutationService` 现在被 6 个模块的注释/文案提到，按词判会得出「已经有了」的错误结论",
+    "verdict": "RED",
+    "summary": "1 failed, 176 passed, 1 warning in 2.51s",
+    "added": [
+      "test_task14_merge_conflicts.py::TestTask14ScopeBoundary::test_blocking_task_15_is_registered_and_its_target_does_not_exist_yet"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task14_merge_conflicts.py::TestTask14ScopeBoundary::test_blocking_task_15_is_registered_and_its_target_does_not_exist_yet"
+    ],
+    "added_files": [
+      "test_task14_merge_conflicts.py"
+    ],
+    "restored": true,
+    "seconds": 5.5
+  },
+  {
+    "id": "M78",
+    "side": "be",
+    "want": "test_task14_merge_conflicts.py::TestTask14ScopeBoundary::test_merge_domain_has_no_production_consumer_yet",
+    "why": "🔴 **注入**：在生产包 `__init__.py` 里真接一次 merge 域。「当前零生产消费方」是本任务最关键的否定式承诺 —— 一个零消费方、只有 fixture 测试的域就是假绿第①源（additive 死代码），除非这条边界可 falsify。本条一红即证明：有人接线时守卫会立刻要求同步退役 `DEFERRED_CONSUMERS` 登记",
+    "verdict": "RED",
+    "summary": "1 failed, 176 passed, 1 warning in 2.48s",
+    "added": [
+      "test_task14_merge_conflicts.py::TestTask14ScopeBoundary::test_merge_domain_has_no_production_consumer_yet"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task14_merge_conflicts.py::TestTask14ScopeBoundary::test_merge_domain_has_no_production_consumer_yet"
+    ],
+    "added_files": [
+      "test_task14_merge_conflicts.py"
+    ],
+    "restored": true,
+    "seconds": 5.4
+  },
+  {
+    "id": "M79",
+    "side": "be",
+    "want": "test_task14_merge_conflicts.py::TestTask14ScopeBoundary::test_deferred_consumers_registration_is_complete",
+    "why": "延后登记丢掉 `blocking_task` ⇒ 「以后再说」不再是可核对的登记，没人知道该等哪个任务来接线（收口任务也无法机器核对）",
+    "verdict": "RED",
+    "summary": "2 failed, 175 passed, 1 warning in 2.20s",
+    "added": [
+      "test_task14_merge_conflicts.py::TestTask14ScopeBoundary::test_blocking_task_15_is_registered_and_its_target_does_not_exist_yet",
+      "test_task14_merge_conflicts.py::TestTask14ScopeBoundary::test_deferred_consumers_registration_is_complete"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task14_merge_conflicts.py::TestTask14ScopeBoundary::test_blocking_task_15_is_registered_and_its_target_does_not_exist_yet",
+      "test_task14_merge_conflicts.py::TestTask14ScopeBoundary::test_deferred_consumers_registration_is_complete"
+    ],
+    "added_files": [
+      "test_task14_merge_conflicts.py"
+    ],
+    "restored": true,
+    "seconds": 5.1
+  },
+  {
+    "id": "M80",
+    "side": "be",
+    "want": "test_task14_merge_conflicts.py::TestTask14ScopeBoundary::test_no_carrier_library_or_persistence_surface",
+    "why": "🔴 **注入**：在登记表**之外**放一处真 `session.commit()` 面。M76 证明的是「载体库依赖会被抓」，本条证明的是「剔除登记表文案的定界没有把真副作用面一起吞掉」—— `_cut_registration_block` 若改用固定字符窗口或 `index()` 算边界，就会剔错范围而让本条变 GREEN",
+    "verdict": "RED",
+    "summary": "1 failed, 176 passed, 1 warning in 2.48s",
+    "added": [
+      "test_task14_merge_conflicts.py::TestTask14ScopeBoundary::test_no_carrier_library_or_persistence_surface"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task14_merge_conflicts.py::TestTask14ScopeBoundary::test_no_carrier_library_or_persistence_surface"
+    ],
+    "added_files": [
+      "test_task14_merge_conflicts.py"
+    ],
+    "restored": true,
+    "seconds": 5.4
+  }
+]

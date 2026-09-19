@@ -149,6 +149,7 @@ class ReportConfig(Base):
     )
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(server_default=func.now())
+    updated_by: Mapped[uuid.UUID | None] = mapped_column(PG_UUID(as_uuid=True), nullable=True)
 
     __table_args__ = (
         Index(
@@ -344,6 +345,7 @@ class DisclosureNote(Base):
     )
     table_data: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
     text_content: Mapped[str | None] = mapped_column(Text, nullable=True)
+    guidance_text: Mapped[str | None] = mapped_column(Text, nullable=True)
     source_template: Mapped[SourceTemplate | None] = mapped_column(
         sa.Enum(SourceTemplate, name="source_template", create_type=False),
         nullable=True,
@@ -361,6 +363,9 @@ class DisclosureNote(Base):
     is_stale: Mapped[bool] = mapped_column(
         server_default=text("false"), nullable=False
     )
+    # V129（附注联动复盘 P0-3）：stale 来源标注，供前端提示与诊断区分
+    # report / report_fallback / workpaper / trial_balance；NULL=未标注（历史数据）
+    stale_source: Mapped[str | None] = mapped_column(String(32), nullable=True)
     # F50 / Sprint 8.16: 下游快照绑定（创建时绑定当前 active dataset）
     bound_dataset_id: Mapped[uuid.UUID | None] = mapped_column(
         PG_UUID(as_uuid=True),
@@ -574,12 +579,83 @@ class AuditReport(Base):
     updated_by: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("users.id"), nullable=True
     )
+    # deliverable-center V059
+    report_body_json: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    is_pie: Mapped[bool | None] = mapped_column(
+        server_default=text("false"), nullable=True
+    )
+    prior_period_info: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    # audit-report-template-integration V066: 企业子类型 + 模板详简版 + manifest 模板版本
+    company_subtype: Mapped[str | None] = mapped_column(String(10), nullable=True)
+    template_variant: Mapped[str | None] = mapped_column(
+        String(10), server_default=text("'simple'"), nullable=True
+    )
+    template_version: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    # V086 CW-76: 管理层声明书签署日期（A16 signed 时用户必填，push 到此处）
+    representation_letter_date: Mapped[date | None] = mapped_column(sa.Date, nullable=True)
 
     __table_args__ = (
         Index(
             "uq_audit_report_project_year",
             "project_id", "year",
             unique=True,
+        ),
+    )
+
+
+# ---------------------------------------------------------------------------
+# FillPreviewSession 模型（报告正文两阶段生成 preview 会话）
+# ---------------------------------------------------------------------------
+
+
+class FillPreviewSession(Base):
+    """报告正文模板填充 preview 会话（audit-report-template-integration V066）
+
+    两阶段 API 的 preview 步骤产物：copy 模板 → 替换占位符 → 扫描 OPT 后，
+    将工作副本路径 + 可选段落清单 + 待补充字段缓存至此表，confirm 阶段按
+    preview_session_id 取回。TTL 24h（expires_at），confirm 后或定时清理删除。
+
+    三层一致：DDL `V066__template_fill_columns.sql` + 本 ORM + TemplateFillService。
+    created_at/updated_at 对应 DDL `TIMESTAMPTZ NOT NULL DEFAULT now()`。
+    """
+
+    __tablename__ = "fill_preview_sessions"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        PG_UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    project_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("projects.id"), nullable=False
+    )
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("users.id"), nullable=False
+    )
+    year: Mapped[int] = mapped_column(sa.Integer, nullable=False)
+    opinion_type: Mapped[str | None] = mapped_column(String(30), nullable=True)
+    company_subtype: Mapped[str | None] = mapped_column(String(10), nullable=True)
+    template_variant: Mapped[str | None] = mapped_column(String(10), nullable=True)
+    template_version: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    working_path: Mapped[str | None] = mapped_column(Text, nullable=True)
+    optional_sections_json: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    missing_fields: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    expires_at: Mapped[datetime | None] = mapped_column(
+        sa.DateTime(timezone=True), nullable=True
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        sa.DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        sa.DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+    __table_args__ = (
+        Index(
+            "idx_fill_preview_sessions_project_year",
+            "project_id", "year",
+        ),
+        Index(
+            "idx_fill_preview_sessions_expires_at",
+            "expires_at",
         ),
     )
 

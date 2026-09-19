@@ -1,0 +1,2413 @@
+{
+  "description": "公式预设库 Preset Inventory：逐页登记承载公式的页面/sheet（page_key + preset_status + formula_count）。由 seed_formula_presets.py 从 formula_presets_seed.json + 收敛源（prefill/check/wide_table）去重物化。",
+  "version": "2025-R1",
+  "generated_by": "backend/scripts/seed/seed_formula_presets.py",
+  "summary": {
+    "total_pages": 232,
+    "total_formulas": 3939,
+    "by_scope": {
+      "note": {
+        "pages": 131,
+        "formula_count": 2607
+      },
+      "report": {
+        "pages": 7,
+        "formula_count": 357
+      },
+      "workpaper": {
+        "pages": 94,
+        "formula_count": 975
+      }
+    }
+  },
+  "pages": [
+    {
+      "page_key": "note:三、在合营安排或联营",
+      "scope": "note",
+      "preset_status": "presetted",
+      "formula_count": 6,
+      "sources": [
+        "note_formula_derivation"
+      ]
+    },
+    {
+      "page_key": "note:三、在未纳入合并财务",
+      "scope": "note",
+      "preset_status": "presetted",
+      "formula_count": 1,
+      "sources": [
+        "note_formula_derivation"
+      ]
+    },
+    {
+      "page_key": "note:三、工程物资【不适用",
+      "scope": "note",
+      "preset_status": "presetted",
+      "formula_count": 2,
+      "sources": [
+        "note_formula_derivation"
+      ]
+    },
+    {
+      "page_key": "note:三、现金流量表项目注",
+      "scope": "note",
+      "preset_status": "presetted",
+      "formula_count": 2,
+      "sources": [
+        "note_formula_derivation"
+      ]
+    },
+    {
+      "page_key": "note:三、计入递延收益的政",
+      "scope": "note",
+      "preset_status": "presetted",
+      "formula_count": 18,
+      "sources": [
+        "note_formula_derivation"
+      ]
+    },
+    {
+      "page_key": "note:三、采用净额法冲减相",
+      "scope": "note",
+      "preset_status": "presetted",
+      "formula_count": 6,
+      "sources": [
+        "note_formula_derivation"
+      ]
+    },
+    {
+      "page_key": "note:三、金融资产转移",
+      "scope": "note",
+      "preset_status": "presetted",
+      "formula_count": 24,
+      "sources": [
+        "note_formula_derivation"
+      ]
+    },
+    {
+      "page_key": "note:三、长期待摊费用",
+      "scope": "note",
+      "preset_status": "presetted",
+      "formula_count": 5,
+      "sources": [
+        "note_formula_derivation"
+      ]
+    },
+    {
+      "page_key": "note:三、长期股权投资",
+      "scope": "note",
+      "preset_status": "presetted",
+      "formula_count": 2,
+      "sources": [
+        "note_formula_derivation"
+      ]
+    },
+    {
+      "page_key": "note:三、预计负债",
+      "scope": "note",
+      "preset_status": "presetted",
+      "formula_count": 2,
+      "sources": [
+        "note_formula_derivation"
+      ]
+    },
+    {
+      "page_key": "note:三、风险管理目标和政",
+      "scope": "note",
+      "preset_status": "presetted",
+      "formula_count": 4,
+      "sources": [
+        "note_formula_derivation"
+      ]
+    },
+    {
+      "page_key": "note:五、0",
+      "scope": "note",
+      "preset_status": "presetted",
+      "formula_count": 4,
+      "sources": [
+        "check_presets"
+      ]
+    },
+    {
+      "page_key": "note:五、1",
+      "scope": "note",
+      "preset_status": "presetted",
+      "formula_count": 95,
+      "sources": [
+        "check_presets",
+        "note_formula_derivation",
+        "note_report_cross_check"
+      ]
+    },
+    {
+      "page_key": "note:五、10",
+      "scope": "note",
+      "preset_status": "presetted",
+      "formula_count": 47,
+      "sources": [
+        "check_presets",
+        "note_formula_derivation",
+        "note_report_cross_check"
+      ]
+    },
+    {
+      "page_key": "note:五、11",
+      "scope": "note",
+      "preset_status": "presetted",
+      "formula_count": 41,
+      "sources": [
+        "check_presets",
+        "note_formula_derivation",
+        "note_report_cross_check"
+      ]
+    },
+    {
+      "page_key": "note:五、12",
+      "scope": "note",
+      "preset_status": "presetted",
+      "formula_count": 47,
+      "sources": [
+        "check_presets",
+        "note_formula_derivation",
+        "note_report_cross_check"
+      ]
+    },
+    {
+      "page_key": "note:五、13",
+      "scope": "note",
+      "preset_status": "presetted",
+      "formula_count": 15,
+      "sources": [
+        "check_presets",
+        "note_formula_derivation",
+        "note_report_cross_check"
+      ]
+    },
+    {
+      "page_key": "note:五、14",
+      "scope": "note",
+      "preset_status": "presetted",
+      "formula_count": 85,
+      "sources": [
+        "check_presets",
+        "note_formula_derivation",
+        "note_report_cross_check"
+      ]
+    },
+    {
+      "page_key": "note:五、15",
+      "scope": "note",
+      "preset_status": "presetted",
+      "formula_count": 72,
+      "sources": [
+        "check_presets",
+        "note_formula_derivation",
+        "note_report_cross_check"
+      ]
+    },
+    {
+      "page_key": "note:五、16",
+      "scope": "note",
+      "preset_status": "presetted",
+      "formula_count": 46,
+      "sources": [
+        "check_presets",
+        "note_formula_derivation",
+        "note_report_cross_check"
+      ]
+    },
+    {
+      "page_key": "note:五、17",
+      "scope": "note",
+      "preset_status": "presetted",
+      "formula_count": 40,
+      "sources": [
+        "check_presets",
+        "note_formula_derivation",
+        "note_report_cross_check"
+      ]
+    },
+    {
+      "page_key": "note:五、18",
+      "scope": "note",
+      "preset_status": "presetted",
+      "formula_count": 15,
+      "sources": [
+        "check_presets",
+        "note_formula_derivation",
+        "note_report_cross_check"
+      ]
+    },
+    {
+      "page_key": "note:五、19",
+      "scope": "note",
+      "preset_status": "presetted",
+      "formula_count": 7,
+      "sources": [
+        "check_presets",
+        "note_report_cross_check"
+      ]
+    },
+    {
+      "page_key": "note:五、2",
+      "scope": "note",
+      "preset_status": "presetted",
+      "formula_count": 35,
+      "sources": [
+        "check_presets",
+        "note_formula_derivation",
+        "note_report_cross_check"
+      ]
+    },
+    {
+      "page_key": "note:五、20",
+      "scope": "note",
+      "preset_status": "presetted",
+      "formula_count": 41,
+      "sources": [
+        "check_presets",
+        "note_formula_derivation",
+        "note_report_cross_check"
+      ]
+    },
+    {
+      "page_key": "note:五、21",
+      "scope": "note",
+      "preset_status": "presetted",
+      "formula_count": 57,
+      "sources": [
+        "check_presets",
+        "note_report_cross_check"
+      ]
+    },
+    {
+      "page_key": "note:五、22",
+      "scope": "note",
+      "preset_status": "presetted",
+      "formula_count": 48,
+      "sources": [
+        "check_presets",
+        "note_formula_derivation",
+        "note_report_cross_check"
+      ]
+    },
+    {
+      "page_key": "note:五、23",
+      "scope": "note",
+      "preset_status": "presetted",
+      "formula_count": 24,
+      "sources": [
+        "check_presets",
+        "note_formula_derivation",
+        "note_report_cross_check"
+      ]
+    },
+    {
+      "page_key": "note:五、24",
+      "scope": "note",
+      "preset_status": "presetted",
+      "formula_count": 11,
+      "sources": [
+        "check_presets",
+        "note_report_cross_check"
+      ]
+    },
+    {
+      "page_key": "note:五、25",
+      "scope": "note",
+      "preset_status": "presetted",
+      "formula_count": 17,
+      "sources": [
+        "check_presets",
+        "note_report_cross_check"
+      ]
+    },
+    {
+      "page_key": "note:五、26",
+      "scope": "note",
+      "preset_status": "presetted",
+      "formula_count": 45,
+      "sources": [
+        "check_presets",
+        "note_report_cross_check"
+      ]
+    },
+    {
+      "page_key": "note:五、27",
+      "scope": "note",
+      "preset_status": "presetted",
+      "formula_count": 14,
+      "sources": [
+        "check_presets",
+        "note_report_cross_check"
+      ]
+    },
+    {
+      "page_key": "note:五、28",
+      "scope": "note",
+      "preset_status": "presetted",
+      "formula_count": 23,
+      "sources": [
+        "check_presets",
+        "note_formula_derivation",
+        "note_report_cross_check"
+      ]
+    },
+    {
+      "page_key": "note:五、29",
+      "scope": "note",
+      "preset_status": "presetted",
+      "formula_count": 13,
+      "sources": [
+        "check_presets",
+        "note_formula_derivation",
+        "note_report_cross_check"
+      ]
+    },
+    {
+      "page_key": "note:五、3",
+      "scope": "note",
+      "preset_status": "presetted",
+      "formula_count": 17,
+      "sources": [
+        "check_presets",
+        "note_report_cross_check"
+      ]
+    },
+    {
+      "page_key": "note:五、30",
+      "scope": "note",
+      "preset_status": "presetted",
+      "formula_count": 29,
+      "sources": [
+        "check_presets",
+        "note_formula_derivation",
+        "note_report_cross_check"
+      ]
+    },
+    {
+      "page_key": "note:五、31",
+      "scope": "note",
+      "preset_status": "presetted",
+      "formula_count": 10,
+      "sources": [
+        "check_presets",
+        "note_formula_derivation",
+        "note_report_cross_check"
+      ]
+    },
+    {
+      "page_key": "note:五、32",
+      "scope": "note",
+      "preset_status": "presetted",
+      "formula_count": 11,
+      "sources": [
+        "check_presets",
+        "note_formula_derivation",
+        "note_report_cross_check"
+      ]
+    },
+    {
+      "page_key": "note:五、33",
+      "scope": "note",
+      "preset_status": "presetted",
+      "formula_count": 10,
+      "sources": [
+        "check_presets",
+        "note_formula_derivation",
+        "note_report_cross_check"
+      ]
+    },
+    {
+      "page_key": "note:五、34",
+      "scope": "note",
+      "preset_status": "presetted",
+      "formula_count": 14,
+      "sources": [
+        "check_presets",
+        "note_formula_derivation",
+        "note_report_cross_check"
+      ]
+    },
+    {
+      "page_key": "note:五、35",
+      "scope": "note",
+      "preset_status": "presetted",
+      "formula_count": 9,
+      "sources": [
+        "check_presets",
+        "note_report_cross_check"
+      ]
+    },
+    {
+      "page_key": "note:五、36",
+      "scope": "note",
+      "preset_status": "presetted",
+      "formula_count": 19,
+      "sources": [
+        "check_presets",
+        "note_formula_derivation",
+        "note_report_cross_check"
+      ]
+    },
+    {
+      "page_key": "note:五、37",
+      "scope": "note",
+      "preset_status": "presetted",
+      "formula_count": 19,
+      "sources": [
+        "check_presets",
+        "note_formula_derivation",
+        "note_report_cross_check"
+      ]
+    },
+    {
+      "page_key": "note:五、38",
+      "scope": "note",
+      "preset_status": "presetted",
+      "formula_count": 18,
+      "sources": [
+        "check_presets",
+        "note_formula_derivation",
+        "note_report_cross_check"
+      ]
+    },
+    {
+      "page_key": "note:五、39",
+      "scope": "note",
+      "preset_status": "presetted",
+      "formula_count": 31,
+      "sources": [
+        "check_presets",
+        "note_formula_derivation",
+        "note_report_cross_check"
+      ]
+    },
+    {
+      "page_key": "note:五、4",
+      "scope": "note",
+      "preset_status": "presetted",
+      "formula_count": 112,
+      "sources": [
+        "check_presets",
+        "note_formula_derivation",
+        "note_report_cross_check",
+        "note_report_reconciliation"
+      ]
+    },
+    {
+      "page_key": "note:五、40",
+      "scope": "note",
+      "preset_status": "presetted",
+      "formula_count": 48,
+      "sources": [
+        "check_presets",
+        "note_formula_derivation",
+        "note_report_cross_check"
+      ]
+    },
+    {
+      "page_key": "note:五、41",
+      "scope": "note",
+      "preset_status": "presetted",
+      "formula_count": 43,
+      "sources": [
+        "check_presets",
+        "note_formula_derivation",
+        "note_report_cross_check"
+      ]
+    },
+    {
+      "page_key": "note:五、42",
+      "scope": "note",
+      "preset_status": "presetted",
+      "formula_count": 15,
+      "sources": [
+        "check_presets",
+        "note_formula_derivation",
+        "note_report_cross_check"
+      ]
+    },
+    {
+      "page_key": "note:五、43",
+      "scope": "note",
+      "preset_status": "presetted",
+      "formula_count": 36,
+      "sources": [
+        "check_presets",
+        "note_formula_derivation",
+        "note_report_cross_check"
+      ]
+    },
+    {
+      "page_key": "note:五、44",
+      "scope": "note",
+      "preset_status": "presetted",
+      "formula_count": 9,
+      "sources": [
+        "check_presets",
+        "note_formula_derivation",
+        "note_report_cross_check"
+      ]
+    },
+    {
+      "page_key": "note:五、45",
+      "scope": "note",
+      "preset_status": "presetted",
+      "formula_count": 13,
+      "sources": [
+        "check_presets",
+        "note_formula_derivation",
+        "note_report_cross_check"
+      ]
+    },
+    {
+      "page_key": "note:五、46",
+      "scope": "note",
+      "preset_status": "presetted",
+      "formula_count": 25,
+      "sources": [
+        "check_presets",
+        "note_formula_derivation",
+        "note_report_cross_check"
+      ]
+    },
+    {
+      "page_key": "note:五、47",
+      "scope": "note",
+      "preset_status": "presetted",
+      "formula_count": 12,
+      "sources": [
+        "check_presets",
+        "note_formula_derivation",
+        "note_report_cross_check"
+      ]
+    },
+    {
+      "page_key": "note:五、48",
+      "scope": "note",
+      "preset_status": "presetted",
+      "formula_count": 25,
+      "sources": [
+        "check_presets",
+        "note_formula_derivation",
+        "note_report_cross_check"
+      ]
+    },
+    {
+      "page_key": "note:五、49",
+      "scope": "note",
+      "preset_status": "presetted",
+      "formula_count": 34,
+      "sources": [
+        "check_presets",
+        "note_formula_derivation",
+        "note_report_cross_check"
+      ]
+    },
+    {
+      "page_key": "note:五、5",
+      "scope": "note",
+      "preset_status": "presetted",
+      "formula_count": 110,
+      "sources": [
+        "check_presets",
+        "note_formula_derivation",
+        "note_report_cross_check",
+        "note_report_reconciliation"
+      ]
+    },
+    {
+      "page_key": "note:五、50",
+      "scope": "note",
+      "preset_status": "presetted",
+      "formula_count": 9,
+      "sources": [
+        "check_presets",
+        "note_formula_derivation",
+        "note_report_cross_check"
+      ]
+    },
+    {
+      "page_key": "note:五、51",
+      "scope": "note",
+      "preset_status": "presetted",
+      "formula_count": 28,
+      "sources": [
+        "check_presets",
+        "note_formula_derivation",
+        "note_report_cross_check"
+      ]
+    },
+    {
+      "page_key": "note:五、52",
+      "scope": "note",
+      "preset_status": "presetted",
+      "formula_count": 7,
+      "sources": [
+        "check_presets",
+        "note_report_cross_check"
+      ]
+    },
+    {
+      "page_key": "note:五、53",
+      "scope": "note",
+      "preset_status": "presetted",
+      "formula_count": 10,
+      "sources": [
+        "check_presets",
+        "note_report_cross_check"
+      ]
+    },
+    {
+      "page_key": "note:五、54",
+      "scope": "note",
+      "preset_status": "presetted",
+      "formula_count": 14,
+      "sources": [
+        "check_presets",
+        "note_formula_derivation",
+        "note_report_cross_check"
+      ]
+    },
+    {
+      "page_key": "note:五、55",
+      "scope": "note",
+      "preset_status": "presetted",
+      "formula_count": 17,
+      "sources": [
+        "check_presets",
+        "note_formula_derivation",
+        "note_report_cross_check"
+      ]
+    },
+    {
+      "page_key": "note:五、56",
+      "scope": "note",
+      "preset_status": "presetted",
+      "formula_count": 9,
+      "sources": [
+        "check_presets",
+        "note_report_cross_check"
+      ]
+    },
+    {
+      "page_key": "note:五、57",
+      "scope": "note",
+      "preset_status": "presetted",
+      "formula_count": 33,
+      "sources": [
+        "check_presets",
+        "note_formula_derivation",
+        "note_report_cross_check"
+      ]
+    },
+    {
+      "page_key": "note:五、58",
+      "scope": "note",
+      "preset_status": "presetted",
+      "formula_count": 26,
+      "sources": [
+        "check_presets",
+        "note_formula_derivation",
+        "note_report_cross_check"
+      ]
+    },
+    {
+      "page_key": "note:五、59",
+      "scope": "note",
+      "preset_status": "presetted",
+      "formula_count": 9,
+      "sources": [
+        "note_formula_derivation",
+        "note_report_cross_check"
+      ]
+    },
+    {
+      "page_key": "note:五、6",
+      "scope": "note",
+      "preset_status": "presetted",
+      "formula_count": 33,
+      "sources": [
+        "check_presets",
+        "note_formula_derivation",
+        "note_report_cross_check"
+      ]
+    },
+    {
+      "page_key": "note:五、60",
+      "scope": "note",
+      "preset_status": "presetted",
+      "formula_count": 1,
+      "sources": [
+        "note_report_cross_check"
+      ]
+    },
+    {
+      "page_key": "note:五、61",
+      "scope": "note",
+      "preset_status": "presetted",
+      "formula_count": 1,
+      "sources": [
+        "note_report_cross_check"
+      ]
+    },
+    {
+      "page_key": "note:五、7",
+      "scope": "note",
+      "preset_status": "presetted",
+      "formula_count": 45,
+      "sources": [
+        "check_presets",
+        "note_formula_derivation",
+        "note_report_cross_check"
+      ]
+    },
+    {
+      "page_key": "note:五、71",
+      "scope": "note",
+      "preset_status": "presetted",
+      "formula_count": 2,
+      "sources": [
+        "note_formula_derivation"
+      ]
+    },
+    {
+      "page_key": "note:五、74",
+      "scope": "note",
+      "preset_status": "presetted",
+      "formula_count": 4,
+      "sources": [
+        "note_formula_derivation"
+      ]
+    },
+    {
+      "page_key": "note:五、8",
+      "scope": "note",
+      "preset_status": "presetted",
+      "formula_count": 170,
+      "sources": [
+        "check_presets",
+        "note_formula_derivation",
+        "note_report_cross_check"
+      ]
+    },
+    {
+      "page_key": "note:五、9",
+      "scope": "note",
+      "preset_status": "presetted",
+      "formula_count": 67,
+      "sources": [
+        "check_presets",
+        "note_formula_derivation",
+        "note_report_cross_check"
+      ]
+    },
+    {
+      "page_key": "note:八、10",
+      "scope": "note",
+      "preset_status": "presetted",
+      "formula_count": 16,
+      "sources": [
+        "note_formula_derivation"
+      ]
+    },
+    {
+      "page_key": "note:八、12",
+      "scope": "note",
+      "preset_status": "presetted",
+      "formula_count": 10,
+      "sources": [
+        "note_formula_derivation"
+      ]
+    },
+    {
+      "page_key": "note:八、13",
+      "scope": "note",
+      "preset_status": "presetted",
+      "formula_count": 2,
+      "sources": [
+        "note_formula_derivation"
+      ]
+    },
+    {
+      "page_key": "note:八、14",
+      "scope": "note",
+      "preset_status": "presetted",
+      "formula_count": 2,
+      "sources": [
+        "note_formula_derivation"
+      ]
+    },
+    {
+      "page_key": "note:八、15",
+      "scope": "note",
+      "preset_status": "presetted",
+      "formula_count": 14,
+      "sources": [
+        "note_formula_derivation"
+      ]
+    },
+    {
+      "page_key": "note:八、17",
+      "scope": "note",
+      "preset_status": "presetted",
+      "formula_count": 8,
+      "sources": [
+        "note_formula_derivation"
+      ]
+    },
+    {
+      "page_key": "note:八、18",
+      "scope": "note",
+      "preset_status": "presetted",
+      "formula_count": 18,
+      "sources": [
+        "note_formula_derivation"
+      ]
+    },
+    {
+      "page_key": "note:八、2",
+      "scope": "note",
+      "preset_status": "presetted",
+      "formula_count": 2,
+      "sources": [
+        "note_formula_derivation"
+      ]
+    },
+    {
+      "page_key": "note:八、21",
+      "scope": "note",
+      "preset_status": "presetted",
+      "formula_count": 32,
+      "sources": [
+        "note_formula_derivation"
+      ]
+    },
+    {
+      "page_key": "note:八、22",
+      "scope": "note",
+      "preset_status": "presetted",
+      "formula_count": 18,
+      "sources": [
+        "note_formula_derivation"
+      ]
+    },
+    {
+      "page_key": "note:八、23",
+      "scope": "note",
+      "preset_status": "presetted",
+      "formula_count": 6,
+      "sources": [
+        "note_formula_derivation"
+      ]
+    },
+    {
+      "page_key": "note:八、24",
+      "scope": "note",
+      "preset_status": "presetted",
+      "formula_count": 16,
+      "sources": [
+        "note_formula_derivation"
+      ]
+    },
+    {
+      "page_key": "note:八、25",
+      "scope": "note",
+      "preset_status": "presetted",
+      "formula_count": 13,
+      "sources": [
+        "note_formula_derivation"
+      ]
+    },
+    {
+      "page_key": "note:八、26",
+      "scope": "note",
+      "preset_status": "presetted",
+      "formula_count": 16,
+      "sources": [
+        "note_formula_derivation"
+      ]
+    },
+    {
+      "page_key": "note:八、27",
+      "scope": "note",
+      "preset_status": "presetted",
+      "formula_count": 12,
+      "sources": [
+        "note_formula_derivation"
+      ]
+    },
+    {
+      "page_key": "note:八、28",
+      "scope": "note",
+      "preset_status": "presetted",
+      "formula_count": 5,
+      "sources": [
+        "note_formula_derivation"
+      ]
+    },
+    {
+      "page_key": "note:八、30",
+      "scope": "note",
+      "preset_status": "presetted",
+      "formula_count": 2,
+      "sources": [
+        "note_formula_derivation"
+      ]
+    },
+    {
+      "page_key": "note:八、31",
+      "scope": "note",
+      "preset_status": "presetted",
+      "formula_count": 8,
+      "sources": [
+        "note_formula_derivation"
+      ]
+    },
+    {
+      "page_key": "note:八、32",
+      "scope": "note",
+      "preset_status": "presetted",
+      "formula_count": 2,
+      "sources": [
+        "note_formula_derivation"
+      ]
+    },
+    {
+      "page_key": "note:八、33",
+      "scope": "note",
+      "preset_status": "presetted",
+      "formula_count": 2,
+      "sources": [
+        "note_formula_derivation"
+      ]
+    },
+    {
+      "page_key": "note:八、34",
+      "scope": "note",
+      "preset_status": "presetted",
+      "formula_count": 5,
+      "sources": [
+        "note_formula_derivation"
+      ]
+    },
+    {
+      "page_key": "note:八、36",
+      "scope": "note",
+      "preset_status": "presetted",
+      "formula_count": 2,
+      "sources": [
+        "note_formula_derivation"
+      ]
+    },
+    {
+      "page_key": "note:八、37",
+      "scope": "note",
+      "preset_status": "presetted",
+      "formula_count": 2,
+      "sources": [
+        "note_formula_derivation"
+      ]
+    },
+    {
+      "page_key": "note:八、38",
+      "scope": "note",
+      "preset_status": "presetted",
+      "formula_count": 2,
+      "sources": [
+        "note_formula_derivation"
+      ]
+    },
+    {
+      "page_key": "note:八、4",
+      "scope": "note",
+      "preset_status": "presetted",
+      "formula_count": 20,
+      "sources": [
+        "note_formula_derivation"
+      ]
+    },
+    {
+      "page_key": "note:八、40",
+      "scope": "note",
+      "preset_status": "presetted",
+      "formula_count": 34,
+      "sources": [
+        "note_formula_derivation"
+      ]
+    },
+    {
+      "page_key": "note:八、41",
+      "scope": "note",
+      "preset_status": "presetted",
+      "formula_count": 2,
+      "sources": [
+        "note_formula_derivation"
+      ]
+    },
+    {
+      "page_key": "note:八、42",
+      "scope": "note",
+      "preset_status": "presetted",
+      "formula_count": 8,
+      "sources": [
+        "note_formula_derivation"
+      ]
+    },
+    {
+      "page_key": "note:八、43",
+      "scope": "note",
+      "preset_status": "presetted",
+      "formula_count": 3,
+      "sources": [
+        "note_formula_derivation"
+      ]
+    },
+    {
+      "page_key": "note:八、44",
+      "scope": "note",
+      "preset_status": "presetted",
+      "formula_count": 2,
+      "sources": [
+        "note_formula_derivation"
+      ]
+    },
+    {
+      "page_key": "note:八、45",
+      "scope": "note",
+      "preset_status": "presetted",
+      "formula_count": 2,
+      "sources": [
+        "note_formula_derivation"
+      ]
+    },
+    {
+      "page_key": "note:八、48",
+      "scope": "note",
+      "preset_status": "presetted",
+      "formula_count": 2,
+      "sources": [
+        "note_formula_derivation"
+      ]
+    },
+    {
+      "page_key": "note:八、49",
+      "scope": "note",
+      "preset_status": "presetted",
+      "formula_count": 6,
+      "sources": [
+        "note_formula_derivation"
+      ]
+    },
+    {
+      "page_key": "note:八、5",
+      "scope": "note",
+      "preset_status": "presetted",
+      "formula_count": 14,
+      "sources": [
+        "note_formula_derivation"
+      ]
+    },
+    {
+      "page_key": "note:八、50",
+      "scope": "note",
+      "preset_status": "presetted",
+      "formula_count": 2,
+      "sources": [
+        "note_formula_derivation"
+      ]
+    },
+    {
+      "page_key": "note:八、51",
+      "scope": "note",
+      "preset_status": "presetted",
+      "formula_count": 8,
+      "sources": [
+        "note_formula_derivation"
+      ]
+    },
+    {
+      "page_key": "note:八、53",
+      "scope": "note",
+      "preset_status": "presetted",
+      "formula_count": 16,
+      "sources": [
+        "note_formula_derivation"
+      ]
+    },
+    {
+      "page_key": "note:八、54",
+      "scope": "note",
+      "preset_status": "presetted",
+      "formula_count": 8,
+      "sources": [
+        "note_formula_derivation"
+      ]
+    },
+    {
+      "page_key": "note:八、55",
+      "scope": "note",
+      "preset_status": "presetted",
+      "formula_count": 2,
+      "sources": [
+        "note_formula_derivation"
+      ]
+    },
+    {
+      "page_key": "note:八、56",
+      "scope": "note",
+      "preset_status": "presetted",
+      "formula_count": 5,
+      "sources": [
+        "note_formula_derivation"
+      ]
+    },
+    {
+      "page_key": "note:八、57",
+      "scope": "note",
+      "preset_status": "presetted",
+      "formula_count": 2,
+      "sources": [
+        "note_formula_derivation"
+      ]
+    },
+    {
+      "page_key": "note:八、6",
+      "scope": "note",
+      "preset_status": "presetted",
+      "formula_count": 2,
+      "sources": [
+        "note_formula_derivation"
+      ]
+    },
+    {
+      "page_key": "note:八、60",
+      "scope": "note",
+      "preset_status": "presetted",
+      "formula_count": 7,
+      "sources": [
+        "note_formula_derivation"
+      ]
+    },
+    {
+      "page_key": "note:八、61",
+      "scope": "note",
+      "preset_status": "presetted",
+      "formula_count": 7,
+      "sources": [
+        "note_formula_derivation"
+      ]
+    },
+    {
+      "page_key": "note:八、62",
+      "scope": "note",
+      "preset_status": "presetted",
+      "formula_count": 9,
+      "sources": [
+        "note_formula_derivation"
+      ]
+    },
+    {
+      "page_key": "note:八、7",
+      "scope": "note",
+      "preset_status": "presetted",
+      "formula_count": 4,
+      "sources": [
+        "note_formula_derivation"
+      ]
+    },
+    {
+      "page_key": "note:八、81",
+      "scope": "note",
+      "preset_status": "presetted",
+      "formula_count": 3,
+      "sources": [
+        "note_formula_derivation"
+      ]
+    },
+    {
+      "page_key": "note:八、9",
+      "scope": "note",
+      "preset_status": "presetted",
+      "formula_count": 23,
+      "sources": [
+        "note_formula_derivation"
+      ]
+    },
+    {
+      "page_key": "note:八、91",
+      "scope": "note",
+      "preset_status": "presetted",
+      "formula_count": 2,
+      "sources": [
+        "note_formula_derivation"
+      ]
+    },
+    {
+      "page_key": "note:十二、其他应收款",
+      "scope": "note",
+      "preset_status": "presetted",
+      "formula_count": 23,
+      "sources": [
+        "note_formula_derivation"
+      ]
+    },
+    {
+      "page_key": "note:十二、应收账款",
+      "scope": "note",
+      "preset_status": "presetted",
+      "formula_count": 14,
+      "sources": [
+        "note_formula_derivation"
+      ]
+    },
+    {
+      "page_key": "note:十二、长期股权投资",
+      "scope": "note",
+      "preset_status": "presetted",
+      "formula_count": 15,
+      "sources": [
+        "note_formula_derivation"
+      ]
+    },
+    {
+      "page_key": "note:十六、其他应收款",
+      "scope": "note",
+      "preset_status": "presetted",
+      "formula_count": 30,
+      "sources": [
+        "note_formula_derivation"
+      ]
+    },
+    {
+      "page_key": "note:十六、应收票据",
+      "scope": "note",
+      "preset_status": "presetted",
+      "formula_count": 18,
+      "sources": [
+        "note_formula_derivation"
+      ]
+    },
+    {
+      "page_key": "note:十六、应收账款",
+      "scope": "note",
+      "preset_status": "presetted",
+      "formula_count": 19,
+      "sources": [
+        "note_formula_derivation"
+      ]
+    },
+    {
+      "page_key": "note:十六、长期股权投资",
+      "scope": "note",
+      "preset_status": "presetted",
+      "formula_count": 12,
+      "sources": [
+        "note_formula_derivation"
+      ]
+    },
+    {
+      "page_key": "report:balance_sheet",
+      "scope": "report",
+      "preset_status": "presetted",
+      "formula_count": 124,
+      "sources": [
+        "bs_preset_generator"
+      ]
+    },
+    {
+      "page_key": "report:cash_flow_statement",
+      "scope": "report",
+      "preset_status": "presetted",
+      "formula_count": 31,
+      "sources": [
+        "report_preset_generator"
+      ]
+    },
+    {
+      "page_key": "report:cash_flow_supplement",
+      "scope": "report",
+      "preset_status": "presetted",
+      "formula_count": 27,
+      "sources": [
+        "cfss_preset_generator"
+      ]
+    },
+    {
+      "page_key": "report:cross_check",
+      "scope": "report",
+      "preset_status": "presetted",
+      "formula_count": 93,
+      "sources": [
+        "cross_check_generator",
+        "report_cross_check"
+      ]
+    },
+    {
+      "page_key": "report:equity_statement",
+      "scope": "report",
+      "preset_status": "presetted",
+      "formula_count": 33,
+      "sources": [
+        "eq_preset_generator"
+      ]
+    },
+    {
+      "page_key": "report:impairment_provision",
+      "scope": "report",
+      "preset_status": "presetted",
+      "formula_count": 19,
+      "sources": [
+        "imp_preset_generator"
+      ]
+    },
+    {
+      "page_key": "report:income_statement",
+      "scope": "report",
+      "preset_status": "presetted",
+      "formula_count": 30,
+      "sources": [
+        "report_preset_generator"
+      ]
+    },
+    {
+      "page_key": "workpaper:D0",
+      "scope": "workpaper",
+      "preset_status": "presetted",
+      "formula_count": 6,
+      "cycle": "D",
+      "wp_code": "D0",
+      "sources": [
+        "prefill_formula_mapping"
+      ]
+    },
+    {
+      "page_key": "workpaper:D1",
+      "scope": "workpaper",
+      "preset_status": "presetted",
+      "formula_count": 9,
+      "cycle": "D",
+      "wp_code": "D1",
+      "sources": [
+        "d_cycle_audited_structure",
+        "prefill_formula_mapping"
+      ]
+    },
+    {
+      "page_key": "workpaper:D2",
+      "scope": "workpaper",
+      "preset_status": "presetted",
+      "formula_count": 28,
+      "cycle": "D",
+      "wp_code": "D2",
+      "sources": [
+        "d_cycle_audited_structure",
+        "prefill_formula_mapping"
+      ]
+    },
+    {
+      "page_key": "workpaper:D3",
+      "scope": "workpaper",
+      "preset_status": "presetted",
+      "formula_count": 6,
+      "cycle": "D",
+      "wp_code": "D3",
+      "sources": [
+        "prefill_formula_mapping"
+      ]
+    },
+    {
+      "page_key": "workpaper:D4",
+      "scope": "workpaper",
+      "preset_status": "presetted",
+      "formula_count": 23,
+      "cycle": "D",
+      "wp_code": "D4",
+      "sources": [
+        "d_cycle_audited_structure",
+        "prefill_formula_mapping"
+      ]
+    },
+    {
+      "page_key": "workpaper:D5",
+      "scope": "workpaper",
+      "preset_status": "presetted",
+      "formula_count": 8,
+      "cycle": "D",
+      "wp_code": "D5",
+      "sources": [
+        "prefill_formula_mapping"
+      ]
+    },
+    {
+      "page_key": "workpaper:D6",
+      "scope": "workpaper",
+      "preset_status": "presetted",
+      "formula_count": 6,
+      "cycle": "D",
+      "wp_code": "D6",
+      "sources": [
+        "prefill_formula_mapping"
+      ]
+    },
+    {
+      "page_key": "workpaper:D7",
+      "scope": "workpaper",
+      "preset_status": "presetted",
+      "formula_count": 6,
+      "cycle": "D",
+      "wp_code": "D7",
+      "sources": [
+        "prefill_formula_mapping"
+      ]
+    },
+    {
+      "page_key": "workpaper:E0",
+      "scope": "workpaper",
+      "preset_status": "presetted",
+      "formula_count": 2,
+      "cycle": "E",
+      "wp_code": "E0",
+      "sources": [
+        "prefill_formula_mapping"
+      ]
+    },
+    {
+      "page_key": "workpaper:E1",
+      "scope": "workpaper",
+      "preset_status": "presetted",
+      "formula_count": 21,
+      "cycle": "E",
+      "wp_code": "E1",
+      "sources": [
+        "prefill_formula_mapping"
+      ]
+    },
+    {
+      "page_key": "workpaper:F0",
+      "scope": "workpaper",
+      "preset_status": "presetted",
+      "formula_count": 2,
+      "cycle": "F",
+      "wp_code": "F0",
+      "sources": [
+        "prefill_formula_mapping"
+      ]
+    },
+    {
+      "page_key": "workpaper:F1",
+      "scope": "workpaper",
+      "preset_status": "presetted",
+      "formula_count": 5,
+      "cycle": "F",
+      "wp_code": "F1",
+      "sources": [
+        "prefill_formula_mapping"
+      ]
+    },
+    {
+      "page_key": "workpaper:F2",
+      "scope": "workpaper",
+      "preset_status": "presetted",
+      "formula_count": 64,
+      "cycle": "F",
+      "wp_code": "F2",
+      "sources": [
+        "prefill_formula_mapping"
+      ]
+    },
+    {
+      "page_key": "workpaper:F3",
+      "scope": "workpaper",
+      "preset_status": "presetted",
+      "formula_count": 10,
+      "cycle": "F",
+      "wp_code": "F3",
+      "sources": [
+        "prefill_formula_mapping"
+      ]
+    },
+    {
+      "page_key": "workpaper:F4",
+      "scope": "workpaper",
+      "preset_status": "presetted",
+      "formula_count": 10,
+      "cycle": "F",
+      "wp_code": "F4",
+      "sources": [
+        "prefill_formula_mapping"
+      ]
+    },
+    {
+      "page_key": "workpaper:F5",
+      "scope": "workpaper",
+      "preset_status": "presetted",
+      "formula_count": 9,
+      "cycle": "F",
+      "wp_code": "F5",
+      "sources": [
+        "prefill_formula_mapping"
+      ]
+    },
+    {
+      "page_key": "workpaper:G0",
+      "scope": "workpaper",
+      "preset_status": "presetted",
+      "formula_count": 2,
+      "cycle": "G",
+      "wp_code": "G0",
+      "sources": [
+        "prefill_formula_mapping"
+      ]
+    },
+    {
+      "page_key": "workpaper:G1",
+      "scope": "workpaper",
+      "preset_status": "presetted",
+      "formula_count": 16,
+      "cycle": "G",
+      "wp_code": "G1",
+      "sources": [
+        "prefill_formula_mapping"
+      ]
+    },
+    {
+      "page_key": "workpaper:G10",
+      "scope": "workpaper",
+      "preset_status": "presetted",
+      "formula_count": 5,
+      "cycle": "G",
+      "wp_code": "G10",
+      "sources": [
+        "prefill_formula_mapping"
+      ]
+    },
+    {
+      "page_key": "workpaper:G11",
+      "scope": "workpaper",
+      "preset_status": "presetted",
+      "formula_count": 11,
+      "cycle": "G",
+      "wp_code": "G11",
+      "sources": [
+        "prefill_formula_mapping"
+      ]
+    },
+    {
+      "page_key": "workpaper:G12",
+      "scope": "workpaper",
+      "preset_status": "presetted",
+      "formula_count": 5,
+      "cycle": "G",
+      "wp_code": "G12",
+      "sources": [
+        "prefill_formula_mapping"
+      ]
+    },
+    {
+      "page_key": "workpaper:G13",
+      "scope": "workpaper",
+      "preset_status": "presetted",
+      "formula_count": 8,
+      "cycle": "G",
+      "wp_code": "G13",
+      "sources": [
+        "prefill_formula_mapping"
+      ]
+    },
+    {
+      "page_key": "workpaper:G14",
+      "scope": "workpaper",
+      "preset_status": "presetted",
+      "formula_count": 8,
+      "cycle": "G",
+      "wp_code": "G14",
+      "sources": [
+        "prefill_formula_mapping"
+      ]
+    },
+    {
+      "page_key": "workpaper:G2",
+      "scope": "workpaper",
+      "preset_status": "presetted",
+      "formula_count": 5,
+      "cycle": "G",
+      "wp_code": "G2",
+      "sources": [
+        "prefill_formula_mapping"
+      ]
+    },
+    {
+      "page_key": "workpaper:G3",
+      "scope": "workpaper",
+      "preset_status": "presetted",
+      "formula_count": 5,
+      "cycle": "G",
+      "wp_code": "G3",
+      "sources": [
+        "prefill_formula_mapping"
+      ]
+    },
+    {
+      "page_key": "workpaper:G4",
+      "scope": "workpaper",
+      "preset_status": "presetted",
+      "formula_count": 8,
+      "cycle": "G",
+      "wp_code": "G4",
+      "sources": [
+        "prefill_formula_mapping"
+      ]
+    },
+    {
+      "page_key": "workpaper:G5",
+      "scope": "workpaper",
+      "preset_status": "presetted",
+      "formula_count": 5,
+      "cycle": "G",
+      "wp_code": "G5",
+      "sources": [
+        "prefill_formula_mapping"
+      ]
+    },
+    {
+      "page_key": "workpaper:G6",
+      "scope": "workpaper",
+      "preset_status": "presetted",
+      "formula_count": 12,
+      "cycle": "G",
+      "wp_code": "G6",
+      "sources": [
+        "prefill_formula_mapping"
+      ]
+    },
+    {
+      "page_key": "workpaper:G7",
+      "scope": "workpaper",
+      "preset_status": "presetted",
+      "formula_count": 17,
+      "cycle": "G",
+      "wp_code": "G7",
+      "sources": [
+        "prefill_formula_mapping"
+      ]
+    },
+    {
+      "page_key": "workpaper:G8",
+      "scope": "workpaper",
+      "preset_status": "presetted",
+      "formula_count": 9,
+      "cycle": "G",
+      "wp_code": "G8",
+      "sources": [
+        "prefill_formula_mapping"
+      ]
+    },
+    {
+      "page_key": "workpaper:G9",
+      "scope": "workpaper",
+      "preset_status": "presetted",
+      "formula_count": 5,
+      "cycle": "G",
+      "wp_code": "G9",
+      "sources": [
+        "prefill_formula_mapping"
+      ]
+    },
+    {
+      "page_key": "workpaper:H0",
+      "scope": "workpaper",
+      "preset_status": "presetted",
+      "formula_count": 2,
+      "cycle": "H",
+      "wp_code": "H0",
+      "sources": [
+        "prefill_formula_mapping"
+      ]
+    },
+    {
+      "page_key": "workpaper:H1",
+      "scope": "workpaper",
+      "preset_status": "presetted",
+      "formula_count": 39,
+      "cycle": "H",
+      "wp_code": "H1",
+      "sources": [
+        "prefill_formula_mapping"
+      ]
+    },
+    {
+      "page_key": "workpaper:H10",
+      "scope": "workpaper",
+      "preset_status": "presetted",
+      "formula_count": 12,
+      "cycle": "H",
+      "wp_code": "H10",
+      "sources": [
+        "prefill_formula_mapping"
+      ]
+    },
+    {
+      "page_key": "workpaper:H2",
+      "scope": "workpaper",
+      "preset_status": "presetted",
+      "formula_count": 13,
+      "cycle": "H",
+      "wp_code": "H2",
+      "sources": [
+        "prefill_formula_mapping"
+      ]
+    },
+    {
+      "page_key": "workpaper:H3",
+      "scope": "workpaper",
+      "preset_status": "presetted",
+      "formula_count": 13,
+      "cycle": "H",
+      "wp_code": "H3",
+      "sources": [
+        "prefill_formula_mapping"
+      ]
+    },
+    {
+      "page_key": "workpaper:H4",
+      "scope": "workpaper",
+      "preset_status": "presetted",
+      "formula_count": 5,
+      "cycle": "H",
+      "wp_code": "H4",
+      "sources": [
+        "prefill_formula_mapping"
+      ]
+    },
+    {
+      "page_key": "workpaper:H5",
+      "scope": "workpaper",
+      "preset_status": "presetted",
+      "formula_count": 5,
+      "cycle": "H",
+      "wp_code": "H5",
+      "sources": [
+        "prefill_formula_mapping"
+      ]
+    },
+    {
+      "page_key": "workpaper:H6",
+      "scope": "workpaper",
+      "preset_status": "presetted",
+      "formula_count": 5,
+      "cycle": "H",
+      "wp_code": "H6",
+      "sources": [
+        "prefill_formula_mapping"
+      ]
+    },
+    {
+      "page_key": "workpaper:H7",
+      "scope": "workpaper",
+      "preset_status": "presetted",
+      "formula_count": 5,
+      "cycle": "H",
+      "wp_code": "H7",
+      "sources": [
+        "prefill_formula_mapping"
+      ]
+    },
+    {
+      "page_key": "workpaper:H8",
+      "scope": "workpaper",
+      "preset_status": "presetted",
+      "formula_count": 12,
+      "cycle": "H",
+      "wp_code": "H8",
+      "sources": [
+        "prefill_formula_mapping"
+      ]
+    },
+    {
+      "page_key": "workpaper:H9",
+      "scope": "workpaper",
+      "preset_status": "presetted",
+      "formula_count": 16,
+      "cycle": "H",
+      "wp_code": "H9",
+      "sources": [
+        "prefill_formula_mapping"
+      ]
+    },
+    {
+      "page_key": "workpaper:I1",
+      "scope": "workpaper",
+      "preset_status": "presetted",
+      "formula_count": 24,
+      "cycle": "I",
+      "wp_code": "I1",
+      "sources": [
+        "prefill_formula_mapping"
+      ]
+    },
+    {
+      "page_key": "workpaper:I2",
+      "scope": "workpaper",
+      "preset_status": "presetted",
+      "formula_count": 15,
+      "cycle": "I",
+      "wp_code": "I2",
+      "sources": [
+        "prefill_formula_mapping"
+      ]
+    },
+    {
+      "page_key": "workpaper:I3",
+      "scope": "workpaper",
+      "preset_status": "presetted",
+      "formula_count": 14,
+      "cycle": "I",
+      "wp_code": "I3",
+      "sources": [
+        "prefill_formula_mapping"
+      ]
+    },
+    {
+      "page_key": "workpaper:I4",
+      "scope": "workpaper",
+      "preset_status": "presetted",
+      "formula_count": 14,
+      "cycle": "I",
+      "wp_code": "I4",
+      "sources": [
+        "prefill_formula_mapping"
+      ]
+    },
+    {
+      "page_key": "workpaper:I5",
+      "scope": "workpaper",
+      "preset_status": "presetted",
+      "formula_count": 5,
+      "cycle": "I",
+      "wp_code": "I5",
+      "sources": [
+        "prefill_formula_mapping"
+      ]
+    },
+    {
+      "page_key": "workpaper:I6",
+      "scope": "workpaper",
+      "preset_status": "presetted",
+      "formula_count": 11,
+      "cycle": "I",
+      "wp_code": "I6",
+      "sources": [
+        "prefill_formula_mapping"
+      ]
+    },
+    {
+      "page_key": "workpaper:J1",
+      "scope": "workpaper",
+      "preset_status": "presetted",
+      "formula_count": 40,
+      "cycle": "J",
+      "wp_code": "J1",
+      "sources": [
+        "prefill_formula_mapping"
+      ]
+    },
+    {
+      "page_key": "workpaper:J2",
+      "scope": "workpaper",
+      "preset_status": "presetted",
+      "formula_count": 8,
+      "cycle": "J",
+      "wp_code": "J2",
+      "sources": [
+        "prefill_formula_mapping"
+      ]
+    },
+    {
+      "page_key": "workpaper:J3",
+      "scope": "workpaper",
+      "preset_status": "presetted",
+      "formula_count": 9,
+      "cycle": "J",
+      "wp_code": "J3",
+      "sources": [
+        "prefill_formula_mapping"
+      ]
+    },
+    {
+      "page_key": "workpaper:K0",
+      "scope": "workpaper",
+      "preset_status": "presetted",
+      "formula_count": 2,
+      "cycle": "K",
+      "wp_code": "K0",
+      "sources": [
+        "prefill_formula_mapping"
+      ]
+    },
+    {
+      "page_key": "workpaper:K1",
+      "scope": "workpaper",
+      "preset_status": "presetted",
+      "formula_count": 11,
+      "cycle": "K",
+      "wp_code": "K1",
+      "sources": [
+        "prefill_formula_mapping"
+      ]
+    },
+    {
+      "page_key": "workpaper:K10",
+      "scope": "workpaper",
+      "preset_status": "presetted",
+      "formula_count": 5,
+      "cycle": "K",
+      "wp_code": "K10",
+      "sources": [
+        "prefill_formula_mapping"
+      ]
+    },
+    {
+      "page_key": "workpaper:K11",
+      "scope": "workpaper",
+      "preset_status": "presetted",
+      "formula_count": 5,
+      "cycle": "K",
+      "wp_code": "K11",
+      "sources": [
+        "prefill_formula_mapping"
+      ]
+    },
+    {
+      "page_key": "workpaper:K12",
+      "scope": "workpaper",
+      "preset_status": "presetted",
+      "formula_count": 5,
+      "cycle": "K",
+      "wp_code": "K12",
+      "sources": [
+        "prefill_formula_mapping"
+      ]
+    },
+    {
+      "page_key": "workpaper:K13",
+      "scope": "workpaper",
+      "preset_status": "presetted",
+      "formula_count": 5,
+      "cycle": "K",
+      "wp_code": "K13",
+      "sources": [
+        "prefill_formula_mapping"
+      ]
+    },
+    {
+      "page_key": "workpaper:K14",
+      "scope": "workpaper",
+      "preset_status": "presetted",
+      "formula_count": 5,
+      "cycle": "K",
+      "wp_code": "K14",
+      "sources": [
+        "prefill_formula_mapping"
+      ]
+    },
+    {
+      "page_key": "workpaper:K15",
+      "scope": "workpaper",
+      "preset_status": "presetted",
+      "formula_count": 5,
+      "cycle": "K",
+      "wp_code": "K15",
+      "sources": [
+        "prefill_formula_mapping"
+      ]
+    },
+    {
+      "page_key": "workpaper:K16",
+      "scope": "workpaper",
+      "preset_status": "presetted",
+      "formula_count": 5,
+      "cycle": "K",
+      "wp_code": "K16",
+      "sources": [
+        "prefill_formula_mapping"
+      ]
+    },
+    {
+      "page_key": "workpaper:K17",
+      "scope": "workpaper",
+      "preset_status": "presetted",
+      "formula_count": 5,
+      "cycle": "K",
+      "wp_code": "K17",
+      "sources": [
+        "prefill_formula_mapping"
+      ]
+    },
+    {
+      "page_key": "workpaper:K18",
+      "scope": "workpaper",
+      "preset_status": "presetted",
+      "formula_count": 5,
+      "cycle": "K",
+      "wp_code": "K18",
+      "sources": [
+        "prefill_formula_mapping"
+      ]
+    },
+    {
+      "page_key": "workpaper:K2",
+      "scope": "workpaper",
+      "preset_status": "presetted",
+      "formula_count": 5,
+      "cycle": "K",
+      "wp_code": "K2",
+      "sources": [
+        "prefill_formula_mapping"
+      ]
+    },
+    {
+      "page_key": "workpaper:K3",
+      "scope": "workpaper",
+      "preset_status": "presetted",
+      "formula_count": 11,
+      "cycle": "K",
+      "wp_code": "K3",
+      "sources": [
+        "prefill_formula_mapping"
+      ]
+    },
+    {
+      "page_key": "workpaper:K4",
+      "scope": "workpaper",
+      "preset_status": "presetted",
+      "formula_count": 5,
+      "cycle": "K",
+      "wp_code": "K4",
+      "sources": [
+        "prefill_formula_mapping"
+      ]
+    },
+    {
+      "page_key": "workpaper:K5",
+      "scope": "workpaper",
+      "preset_status": "presetted",
+      "formula_count": 9,
+      "cycle": "K",
+      "wp_code": "K5",
+      "sources": [
+        "prefill_formula_mapping"
+      ]
+    },
+    {
+      "page_key": "workpaper:K6",
+      "scope": "workpaper",
+      "preset_status": "presetted",
+      "formula_count": 5,
+      "cycle": "K",
+      "wp_code": "K6",
+      "sources": [
+        "prefill_formula_mapping"
+      ]
+    },
+    {
+      "page_key": "workpaper:K7",
+      "scope": "workpaper",
+      "preset_status": "presetted",
+      "formula_count": 5,
+      "cycle": "K",
+      "wp_code": "K7",
+      "sources": [
+        "prefill_formula_mapping"
+      ]
+    },
+    {
+      "page_key": "workpaper:K8",
+      "scope": "workpaper",
+      "preset_status": "presetted",
+      "formula_count": 22,
+      "cycle": "K",
+      "wp_code": "K8",
+      "sources": [
+        "prefill_formula_mapping"
+      ]
+    },
+    {
+      "page_key": "workpaper:K9",
+      "scope": "workpaper",
+      "preset_status": "presetted",
+      "formula_count": 18,
+      "cycle": "K",
+      "wp_code": "K9",
+      "sources": [
+        "prefill_formula_mapping"
+      ]
+    },
+    {
+      "page_key": "workpaper:L0",
+      "scope": "workpaper",
+      "preset_status": "presetted",
+      "formula_count": 2,
+      "cycle": "L",
+      "wp_code": "L0",
+      "sources": [
+        "prefill_formula_mapping"
+      ]
+    },
+    {
+      "page_key": "workpaper:L1",
+      "scope": "workpaper",
+      "preset_status": "presetted",
+      "formula_count": 23,
+      "cycle": "L",
+      "wp_code": "L1",
+      "sources": [
+        "prefill_formula_mapping"
+      ]
+    },
+    {
+      "page_key": "workpaper:L2",
+      "scope": "workpaper",
+      "preset_status": "presetted",
+      "formula_count": 5,
+      "cycle": "L",
+      "wp_code": "L2",
+      "sources": [
+        "prefill_formula_mapping"
+      ]
+    },
+    {
+      "page_key": "workpaper:L3",
+      "scope": "workpaper",
+      "preset_status": "presetted",
+      "formula_count": 18,
+      "cycle": "L",
+      "wp_code": "L3",
+      "sources": [
+        "prefill_formula_mapping"
+      ]
+    },
+    {
+      "page_key": "workpaper:L4",
+      "scope": "workpaper",
+      "preset_status": "presetted",
+      "formula_count": 5,
+      "cycle": "L",
+      "wp_code": "L4",
+      "sources": [
+        "prefill_formula_mapping"
+      ]
+    },
+    {
+      "page_key": "workpaper:L5",
+      "scope": "workpaper",
+      "preset_status": "presetted",
+      "formula_count": 10,
+      "cycle": "L",
+      "wp_code": "L5",
+      "sources": [
+        "prefill_formula_mapping"
+      ]
+    },
+    {
+      "page_key": "workpaper:L6",
+      "scope": "workpaper",
+      "preset_status": "presetted",
+      "formula_count": 10,
+      "cycle": "L",
+      "wp_code": "L6",
+      "sources": [
+        "prefill_formula_mapping"
+      ]
+    },
+    {
+      "page_key": "workpaper:L7",
+      "scope": "workpaper",
+      "preset_status": "presetted",
+      "formula_count": 5,
+      "cycle": "L",
+      "wp_code": "L7",
+      "sources": [
+        "prefill_formula_mapping"
+      ]
+    },
+    {
+      "page_key": "workpaper:L8",
+      "scope": "workpaper",
+      "preset_status": "presetted",
+      "formula_count": 10,
+      "cycle": "L",
+      "wp_code": "L8",
+      "sources": [
+        "prefill_formula_mapping"
+      ]
+    },
+    {
+      "page_key": "workpaper:M1",
+      "scope": "workpaper",
+      "preset_status": "presetted",
+      "formula_count": 6,
+      "cycle": "M",
+      "wp_code": "M1",
+      "sources": [
+        "prefill_formula_mapping"
+      ]
+    },
+    {
+      "page_key": "workpaper:M10",
+      "scope": "workpaper",
+      "preset_status": "presetted",
+      "formula_count": 9,
+      "cycle": "M",
+      "wp_code": "M10",
+      "sources": [
+        "prefill_formula_mapping"
+      ]
+    },
+    {
+      "page_key": "workpaper:M2",
+      "scope": "workpaper",
+      "preset_status": "presetted",
+      "formula_count": 14,
+      "cycle": "M",
+      "wp_code": "M2",
+      "sources": [
+        "prefill_formula_mapping"
+      ]
+    },
+    {
+      "page_key": "workpaper:M3",
+      "scope": "workpaper",
+      "preset_status": "presetted",
+      "formula_count": 5,
+      "cycle": "M",
+      "wp_code": "M3",
+      "sources": [
+        "prefill_formula_mapping"
+      ]
+    },
+    {
+      "page_key": "workpaper:M4",
+      "scope": "workpaper",
+      "preset_status": "presetted",
+      "formula_count": 11,
+      "cycle": "M",
+      "wp_code": "M4",
+      "sources": [
+        "prefill_formula_mapping"
+      ]
+    },
+    {
+      "page_key": "workpaper:M5",
+      "scope": "workpaper",
+      "preset_status": "presetted",
+      "formula_count": 9,
+      "cycle": "M",
+      "wp_code": "M5",
+      "sources": [
+        "prefill_formula_mapping"
+      ]
+    },
+    {
+      "page_key": "workpaper:M6",
+      "scope": "workpaper",
+      "preset_status": "presetted",
+      "formula_count": 13,
+      "cycle": "M",
+      "wp_code": "M6",
+      "sources": [
+        "prefill_formula_mapping"
+      ]
+    },
+    {
+      "page_key": "workpaper:M7",
+      "scope": "workpaper",
+      "preset_status": "presetted",
+      "formula_count": 5,
+      "cycle": "M",
+      "wp_code": "M7",
+      "sources": [
+        "prefill_formula_mapping"
+      ]
+    },
+    {
+      "page_key": "workpaper:M8",
+      "scope": "workpaper",
+      "preset_status": "presetted",
+      "formula_count": 5,
+      "cycle": "M",
+      "wp_code": "M8",
+      "sources": [
+        "prefill_formula_mapping"
+      ]
+    },
+    {
+      "page_key": "workpaper:M9",
+      "scope": "workpaper",
+      "preset_status": "presetted",
+      "formula_count": 9,
+      "cycle": "M",
+      "wp_code": "M9",
+      "sources": [
+        "prefill_formula_mapping"
+      ]
+    },
+    {
+      "page_key": "workpaper:N1",
+      "scope": "workpaper",
+      "preset_status": "presetted",
+      "formula_count": 13,
+      "cycle": "N",
+      "wp_code": "N1",
+      "sources": [
+        "prefill_formula_mapping"
+      ]
+    },
+    {
+      "page_key": "workpaper:N2",
+      "scope": "workpaper",
+      "preset_status": "presetted",
+      "formula_count": 15,
+      "cycle": "N",
+      "wp_code": "N2",
+      "sources": [
+        "prefill_formula_mapping"
+      ]
+    },
+    {
+      "page_key": "workpaper:N3",
+      "scope": "workpaper",
+      "preset_status": "presetted",
+      "formula_count": 8,
+      "cycle": "N",
+      "wp_code": "N3",
+      "sources": [
+        "prefill_formula_mapping"
+      ]
+    },
+    {
+      "page_key": "workpaper:N4",
+      "scope": "workpaper",
+      "preset_status": "presetted",
+      "formula_count": 10,
+      "cycle": "N",
+      "wp_code": "N4",
+      "sources": [
+        "prefill_formula_mapping"
+      ]
+    },
+    {
+      "page_key": "workpaper:N5",
+      "scope": "workpaper",
+      "preset_status": "presetted",
+      "formula_count": 14,
+      "cycle": "N",
+      "wp_code": "N5",
+      "sources": [
+        "prefill_formula_mapping"
+      ]
+    }
+  ]
+}

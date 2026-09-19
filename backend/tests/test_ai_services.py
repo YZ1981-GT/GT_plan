@@ -202,18 +202,6 @@ class TestKnowledgeIndexService:
         assert service is not None
 
 
-class TestAIChatService:
-    """测试 AI 聊天服务"""
-
-    def test_service_initialization(self):
-        """测试服务初始化"""
-        from app.services.ai_chat_service import AIChatService
-
-        db = AsyncMock()
-        service = AIChatService(db)
-        assert service.db is db
-
-
 class TestAIModels:
     """测试 AI 模型定义"""
 

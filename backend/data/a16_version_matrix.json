@@ -1,0 +1,15 @@
+{
+  "main_versions": [
+    {"code": "A16-3", "label": "IPO申报报表审计", "match": {"business_category": ["A2"]}, "confidence": "high"},
+    {"code": "A16-5", "label": "新三板申报报表审计", "match": {"business_category": ["B1"]}, "confidence": "high"},
+    {"code": "A16-6", "label": "企业债（企业会计准则）", "match": {"business_category": ["B2"]}, "confidence": "high"},
+    {"code": "A16-2", "label": "整合审计", "match": {"signals": ["integrated_audit"]}, "confidence": "medium"},
+    {"code": "A16-4", "label": "IPO季度财务报表审阅", "match": {"signals": ["ipo_quarterly_review"]}, "confidence": "low"},
+    {"code": "A16-1", "label": "一般财报（企业会计准则）", "match": {"default": true}, "confidence": "high"}
+  ],
+  "supplement": {
+    "code": "A16-7",
+    "label": "管理层关联交易声明书",
+    "match": {"related_party_txn_count_gt": 0}
+  }
+}

@@ -10,7 +10,7 @@ export {
   trialBalance, adjustments, materiality, misstatements,
   sampling, aging, ledger, accountChart, accountMapping,
   reportLineMapping, columnMappings, dataLifecycle, importIntelligence,
-  ledgerImportValidationRules, tAccounts, formula, formulaAuditLog, dataValidation, fineChecks,
+  ledgerImportValidationRules, tAccounts, formula, formulaAuditLog, dataValidation, fineChecks, auditChecks,
 } from './accounting'
 
 export {
@@ -22,16 +22,22 @@ export {
 
 export {
   workpapers, wpReviews, wpMapping, wpAI, wpFineRules, wpManuals,
-  wpDependencies, workpaperSummary, templates, procedures, reviews,
+  wpDependencies, workpaperSummary, templates, procedures, procedureRowTasks, reviews,
   templateLibrary, templateLibraryMgmt, customTemplates, sharedConfig,
-  excelHtml, jobs,
+  excelHtml, jobs, workpaperLeads,
 } from './workpaper'
 
 export {
-  staff, workHours, notifications, pbc, confirmations,
+  staff, workHours, workHourEntries, notifications, pbc, confirmations,
   annotations, reviewConversations, forum, events, presence,
   sync, independenceDeclarations, my,
 } from './collaboration'
+
+// 公式管理域（spec formula-management-runtime-closure Task 14）
+export {
+  wpFormula, wpUserFormula, projectFormula, formulaScope,
+  formulaPresets, reportConfigFormula, draftRefresh, noteFormula, formulaApi,
+} from './formula'
 
 export {
   auth, users, system, recycleBin, knowledge, knowledgeLibrary,
@@ -42,7 +48,7 @@ export {
   governance, eqcr, signatures, rotation, archive, subsequentEvents,
   goingConcern, riskAssessments, auditPrograms, findings, managementLetter,
   linkage, linkageBus, conflictGuard, chainWorkflow, dataLock,
-  addressRegistry, customQuery, systemDicts, adminLogs,
+  addressRegistry, acnr, customQuery, systemDicts, adminLogs,
   officePreview,
 } from './system'
 
@@ -55,7 +61,7 @@ import {
   trialBalance, adjustments, materiality, misstatements,
   sampling, aging, ledger, accountChart, accountMapping,
   reportLineMapping, columnMappings, dataLifecycle, importIntelligence,
-  ledgerImportValidationRules, tAccounts, formula, formulaAuditLog, dataValidation, fineChecks,
+  ledgerImportValidationRules, tAccounts, formula, formulaAuditLog, dataValidation, fineChecks, auditChecks,
 } from './accounting'
 import {
   reports, reportConfig, reportMapping, noteTemplates, noteCustomTemplate, consolNoteSections,
@@ -67,10 +73,10 @@ import {
   workpapers, wpReviews, wpMapping, wpAI, wpFineRules, wpManuals,
   wpDependencies, workpaperSummary, templates, procedures, reviews,
   templateLibrary, templateLibraryMgmt, customTemplates, sharedConfig,
-  excelHtml, jobs,
+  excelHtml, jobs, workpaperLeads,
 } from './workpaper'
 import {
-  staff, workHours, notifications, pbc, confirmations,
+  staff, workHours, workHourEntries, notifications, pbc, confirmations,
   annotations, reviewConversations, forum, events, presence,
   sync, independenceDeclarations, my,
 } from './collaboration'
@@ -83,7 +89,7 @@ import {
   governance, eqcr, signatures, rotation, archive, subsequentEvents,
   goingConcern, riskAssessments, auditPrograms, findings, managementLetter,
   linkage, linkageBus, conflictGuard, chainWorkflow, dataLock,
-  addressRegistry, customQuery, systemDicts, adminLogs,
+  addressRegistry, acnr, customQuery, systemDicts, adminLogs,
   officePreview,
 } from './system'
 
@@ -101,8 +107,8 @@ export const API = {
   forum, reportReview, ai, aiModels, aiProject, processRecord,
   attachments, ledger, tAccounts, sharedConfig, customTemplates,
   templateLibrary, reportFormatTemplates, excelHtml, importIntelligence,
-  addressRegistry, workHours, aging, regulatory, aiPlugins, gtCoding,
-  dataValidation, fineChecks, projectIssues, ledgerImportValidationRules,
+  addressRegistry, workHours, workHourEntries, aging, regulatory, aiPlugins, gtCoding,
+  dataValidation, fineChecks, auditChecks, projectIssues, ledgerImportValidationRules,
   accountChart, accountMapping, reportLineMapping, columnMappings, dataLifecycle, independenceDeclarations,
   admin, my, partner, qcDashboard, qcRules, qcInspections, qcCases,
   qcAnnualReports, qcAuditLogCompliance, qcArchiveReadiness,
@@ -111,7 +117,7 @@ export const API = {
   noteLocks, dataLock, noteGroupTemplate, noteCustomSections,
   templateLibraryMgmt,
   customQuery, systemDicts, adminLogs,
-  officePreview,
+  officePreview, acnr, workpaperLeads,
 } as const
 
 export default API

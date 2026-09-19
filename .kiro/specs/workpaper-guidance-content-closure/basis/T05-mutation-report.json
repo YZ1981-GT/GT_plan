@@ -1,0 +1,22 @@
+{
+  "task": 5,
+  "recordedAt": "2026-09-09T11:06:55.571275+00:00",
+  "cases": [
+    {
+      "id": "T5-M01-effective-includes-exempted",
+      "verdict": "RED",
+      "rc": 1
+    },
+    {
+      "id": "T5-M02-overwrite-immutable-snapshot",
+      "verdict": "RED",
+      "rc": 1
+    },
+    {
+      "id": "T5-M03-health-ignores-blocked",
+      "verdict": "RED",
+      "rc": 1
+    }
+  ],
+  "allRed": true
+}

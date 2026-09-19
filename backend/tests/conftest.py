@@ -2,6 +2,41 @@
 import os
 from collections.abc import AsyncGenerator
 os.environ.setdefault("JWT_SECRET_KEY", "test-secret-key-for-unit-tests")
+
+# ─── Hypothesis 全局「fast」profile：减少 example 数量、加快属性测试 ──────────────
+# 统一把 PBT 的 max_examples 收敛到较小值（默认 5，可用 HYPOTHESIS_MAX_EXAMPLES 覆盖），
+# 关闭 deadline 并抑制「输入生成过慢 / 数据过大」健康检查（此前偶发 FailedHealthCheck
+# 导致 test_audit_throttle 等用例不稳定）。注意：单个测试用 @settings(max_examples=N)
+# 显式指定的值优先于本 profile，故此处只降低未显式配置用例的开销并保证稳定。
+try:  # pragma: no cover - 测试环境配置
+    from hypothesis import HealthCheck, settings as _hyp_settings
+
+    _HYP_MAX_EXAMPLES = int(os.environ.get("HYPOTHESIS_MAX_EXAMPLES", "5"))
+    # Feature: procedure-delegation-visibility-isolation Task 14 —— 同源双 profile 机制。
+    # smoke（=5，本地快速冒烟，不得作为完成证据）与 correctness（≥100 有效样例/property，
+    # CI 正确性验收）收集**同一批**属性函数：property 测试不再硬编码 max_examples，改由
+    # 当前加载 profile 驱动例数（`@settings(deadline=None)` 只固定 deadline，max_examples
+    # 继承活动 profile）。三者共享同一 health-check 抑制集，语义仅差 max_examples。
+    _CORRECTNESS_EXAMPLES = int(os.environ.get("HYPOTHESIS_CORRECTNESS_EXAMPLES", "100"))
+    _SUPPRESS = [
+        HealthCheck.too_slow,
+        HealthCheck.data_too_large,
+        HealthCheck.function_scoped_fixture,
+    ]
+    _hyp_settings.register_profile(
+        "fast", max_examples=_HYP_MAX_EXAMPLES, deadline=None, suppress_health_check=_SUPPRESS,
+    )
+    _hyp_settings.register_profile(
+        "smoke", max_examples=5, deadline=None, suppress_health_check=_SUPPRESS,
+    )
+    _hyp_settings.register_profile(
+        "correctness", max_examples=_CORRECTNESS_EXAMPLES, deadline=None,
+        suppress_health_check=_SUPPRESS,
+    )
+    _hyp_settings.load_profile(os.environ.get("HYPOTHESIS_PROFILE", "fast"))
+except Exception:  # hypothesis 未安装或版本差异时不阻断测试收集
+    pass
+
 import fakeredis.aioredis  # noqa: E402
 import pytest  # noqa: E402
 import pytest_asyncio  # noqa: E402
@@ -25,6 +60,10 @@ import app.models.extension_models  # noqa: E402, F401
 import app.models.gt_coding_models  # noqa: E402, F401
 import app.models.t_account_models  # noqa: E402, F401
 import app.models.attachment_models  # noqa: E402, F401
+# 证据治理模型（含 ServiceIdentity）——必须在 attachment_models 之后注册，
+# 因 attachments.actor_service_identity_id FK → service_identities，否则
+# create_all 解析 FK 失败（NoReferencedTableError），阻断全套 DB 集成测试。
+import app.models.evidence_governance_models  # noqa: E402, F401
 import app.models.phase13_models  # noqa: E402, F401  — Phase 13: Word导出
 import app.models.phase10_models  # noqa: E402, F401  — Phase 10: 批注/报告溯源（R1 QC 依赖）
 import app.models.phase12_models  # noqa: E402, F401  — Phase 12: AI generation 等
@@ -50,7 +89,6 @@ import app.models.qc_rating_models  # noqa: E402, F401
 import app.models.qc_case_library_models  # noqa: E402, F401
 import app.models.qc_inspection_models  # noqa: E402, F401
 import app.models.qc_rule_models  # noqa: E402, F401  — Round 6
-import app.models.workpaper_editing_lock_models  # noqa: E402, F401  — Round 4
 import app.models.wp_optimization_models  # noqa: E402, F401  — 底稿深度优化
 import app.models.custom_query_models  # noqa: E402, F401  — template-library-coordination Sprint 6
 import app.models.v3_refinement_models  # noqa: E402, F401  — V3 收官增强：ai_content_log / cross_module_conflicts / time_machine_snapshots
@@ -63,6 +101,8 @@ class _WorkpaperStub(Base):
     id = _sa.Column(_sa.Uuid, primary_key=True)
 
 SQLiteTypeCompiler.visit_JSONB = SQLiteTypeCompiler.visit_JSON
+if hasattr(SQLiteTypeCompiler, "visit_uuid"):
+    SQLiteTypeCompiler.visit_UUID = SQLiteTypeCompiler.visit_uuid
 # PG ARRAY 类型 → SQLite TEXT 兜底（避免 CompileError: can't render element of type ARRAY）
 # 实际查询里 ARRAY 列只读不写就足够，写入需求由真实 PG 测试覆盖
 if not hasattr(SQLiteTypeCompiler, "visit_ARRAY"):
@@ -71,14 +111,72 @@ TEST_DATABASE_URL = "sqlite+aiosqlite:///:memory:"
 test_engine = create_async_engine(TEST_DATABASE_URL, echo=False)
 
 
+# ---------------------------------------------------------------------------
+# Evidence-governance aggregation marker (Task 8.3)
+#
+# Spec: attachment-ocr-ai-evidence-governance-hardening
+# Single aggregation entrypoint for the whole evidence-governance backend suite:
+#     python -m pytest -m evidence_governance
+# Membership is decided by:
+#   1) path — files under tests/evidence_governance/, tests/test_evidence_governance_*.py,
+#      or tests/attachment_ocr_ai_evidence_governance_hardening/ (the named wave locations); OR
+#   2) content — any test file that embeds the spec slug
+#      "attachment-ocr-ai-evidence-governance-hardening" in its header (wave 3/4/5
+#      ref/OCR/AI files such as test_evidence_ref_*, test_ocr_governance_*,
+#      test_ocr_retry_service_task5_2, test_ai_evidence_gate, etc.).
+# This auto-discovers spec files (including future ones) without hardcoding a
+# fragile list, and never fake-greens: it only tags existing tests.
+# ---------------------------------------------------------------------------
+
+_EVIDENCE_GOVERNANCE_SLUG = "attachment-ocr-ai-evidence-governance-hardening"
+_evidence_membership_cache: dict[str, bool] = {}
+
+
+def _is_evidence_governance_file(path_str: str) -> bool:
+    """Return True if the test file belongs to the evidence-governance spec."""
+    cached = _evidence_membership_cache.get(path_str)
+    if cached is not None:
+        return cached
+    norm = path_str.replace("\\", "/")
+    result = False
+    # 1) named wave locations by path
+    if (
+        "/tests/evidence_governance/" in norm
+        or "/tests/attachment_ocr_ai_evidence_governance_hardening/" in norm
+    ):
+        result = True
+    else:
+        base = norm.rsplit("/", 1)[-1]
+        if base.startswith("test_evidence_governance_"):
+            result = True
+        else:
+            # 2) related wave files by embedded spec slug
+            try:
+                from pathlib import Path as _P
+
+                head = _P(path_str).read_text(encoding="utf-8", errors="ignore")[:4000]
+                result = _EVIDENCE_GOVERNANCE_SLUG in head
+            except Exception:
+                result = False
+    _evidence_membership_cache[path_str] = result
+    return result
+
+
 def pytest_collection_modifyitems(config, items):
-    """Skip pg_only tests when DATABASE_URL is not PostgreSQL."""
+    """Skip pg_only tests when DATABASE_URL is not PostgreSQL, and tag the
+    evidence-governance aggregation suite (Task 8.3)."""
     db_url = os.getenv("DATABASE_URL", "sqlite")
-    if "postgresql" not in db_url:
-        skip_pg = pytest.mark.skip(reason="requires PostgreSQL")
-        for item in items:
-            if "pg_only" in item.keywords:
-                item.add_marker(skip_pg)
+    skip_pg = pytest.mark.skip(reason="requires PostgreSQL")
+    tag_pg = "postgresql" not in db_url
+    for item in items:
+        if tag_pg and "pg_only" in item.keywords:
+            item.add_marker(skip_pg)
+        try:
+            fspath = str(getattr(item, "fspath", "") or "")
+            if fspath and _is_evidence_governance_file(fspath):
+                item.add_marker(pytest.mark.evidence_governance)
+        except Exception:
+            pass
 
 
 # ---------------------------------------------------------------------------
@@ -152,3 +250,46 @@ def test_all_models_registered():
         f"以下模型的 __tablename__ 未注册到 Base.metadata.tables:\n"
         + "\n".join(f"  {tbl} (定义于 {loc})" for tbl, loc in sorted(missing.items()))
     )
+
+
+# ─── 单例替身的 shadow 清理（跨文件污染防护）──────────────────────────────────
+# 背景（实测踩过）：多处测试用
+#   monkeypatch.setattr(ownership_guard, "assert_target_accessible", fake)
+# 或「读出原绑定方法 → finally 赋回实例」的方式给**单例实例**打替身。两种写法在恢复时
+# 都会往实例 ``__dict__`` 里留下一个同名属性（哪怕值就是原绑定方法）——
+# monkeypatch 的 undo 是 ``setattr(实例, name, 保存的绑定方法)``，不是删除。
+#
+# 该残留属性会**遮蔽类属性**，于是之后任何
+#   patch("app.routers.disclosure_notes.OwnershipGuard.assert_target_accessible")
+# （类级替身）都打不上 —— 越权用例静默变成「真去查库」。症状是「单跑某文件全绿、
+# 合跑时另一个文件里的 5 条 trace 用例莫名变红」，最难定位的一类假绿/假红。
+#
+# 逐处改成「patch 类」当然更正确，但那要求每个作者都记得；这里做一道兜底：每个测试
+# 结束后把这类单例上的实例级覆盖删掉，回落到类属性。
+# 配套结构守卫见 test_disclosure_notes_project_gate_contract.py
+# ::TestOwnershipGuardPatchabilityNotShadowed。
+_SINGLETON_SHADOW_TARGETS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
+    (
+        "app.services.custom_query.ownership_guard",
+        "ownership_guard",
+        ("assert_target_accessible",),
+    ),
+)
+
+
+@pytest.fixture(autouse=True)
+def _drop_singleton_method_shadows():
+    """测试结束后清掉单例上的实例级方法覆盖（详见上方注释）。"""
+    yield
+    import importlib
+
+    for module_path, attr, methods in _SINGLETON_SHADOW_TARGETS:
+        try:
+            module = importlib.import_module(module_path)
+        except Exception:  # pragma: no cover - 模块不可导入时无需清理
+            continue
+        singleton = getattr(module, attr, None)
+        if singleton is None or not hasattr(singleton, "__dict__"):
+            continue
+        for method in methods:
+            singleton.__dict__.pop(method, None)

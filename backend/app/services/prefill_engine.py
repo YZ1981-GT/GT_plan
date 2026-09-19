@@ -23,6 +23,7 @@ import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.workpaper_models import WorkingPaper
+from app.services.prefill_anchor_map import read_anchor_value, resolve_anchor
 
 _logger = logging.getLogger(__name__)
 
@@ -128,29 +129,50 @@ def _parse_args(raw: str) -> list[str]:
 async def _resolve_wp_formula(
     db: AsyncSession, project_id: UUID, year: int, args: list[str]
 ) -> Decimal | None:
-    """=WP('wp_code', 'sheet', 'cell') → 从其他底稿 parsed_data 取值"""
+    """``=WP('wp_code','sheet','cell_ref')`` → 从被引底稿的 ``checklist_responses`` 取值。
+
+    改造前本函数读 ``working_paper.parsed_data`` 的 ``cells`` 键，而该键在当前平台的
+    **任何写入路径下都不产生**（真实库 407 个 ``parsed_data`` 非空底稿中零命中）
+    ⇒ 176 条 ``WP()`` 预设恒返 ``None`` 且 fail-soft 无告警。底稿录入值的真实落点是
+    ``checklist_responses(wp_id, item_id).remark``。
+
+    第三参 ``cell_ref`` 是**中文业务锚点名**（``期末合计`` / ``全年收入合计``），与
+    ``item_id`` 的英文 kebab 键零重叠 ⇒ 必须经声明式映射表
+    :mod:`app.services.prefill_anchor_map` 解析，禁字符串启发式。
+
+    **底稿定位不依赖** ``parsed_data['wp_code']``（该键仅 63/407 存在），改经
+    ``wp_index`` JOIN；同 wp_code 多份记录时按 ``updated_at DESC, id ASC`` 确定性选取
+    （见 ``prefill_anchor_map.read_anchor_value``）。
+
+    对外契约不变：命中返 ``Decimal``，其余一切情形返 ``None``（fail-soft）。
+    六态诊断信息只在 :func:`prefill_anchor_map.read_anchor_value` 的返回值里，
+    供诊断脚本区分「未编制」「未对齐」「确实为空」—— 三者合并成「无数据」正是
+    本缺陷长期潜伏的机理。
+    """
     if len(args) < 3:
         return None
     wp_code, sheet_name, cell_ref = args[0], args[1], args[2]
-    from app.models.wp_optimization_models import WpTemplateMetadata
-    # 通过 wp_code 找到对应底稿
-    result = await db.execute(
-        sa.select(WorkingPaper).where(
-            WorkingPaper.project_id == project_id,
-            WorkingPaper.is_deleted == False,  # noqa: E712
+
+    spec = resolve_anchor(wp_code, sheet_name, cell_ref)
+    if spec is None:
+        _logger.warning(
+            "WP() 锚点未对齐，返回 None：wp_code=%s sheet=%s cell_ref=%s"
+            "（需在 prefill_anchor_map.ANCHOR_MAP 登记，或确认已在 UNALIGNED 清单）",
+            wp_code,
+            sheet_name,
+            cell_ref,
         )
-    )
-    workpapers = result.scalars().all()
-    # 匹配 wp_code（从 wp_index 或 template_metadata）
-    for wp in workpapers:
-        if wp.parsed_data and wp.parsed_data.get("wp_code") == wp_code:
-            cell_data = wp.parsed_data.get("cells", {}).get(f"{sheet_name}!{cell_ref}")
-            if cell_data is not None:
-                try:
-                    return Decimal(str(cell_data))
-                except Exception:
-                    return None
-    return None
+        return None
+
+    try:
+        res = await read_anchor_value(db, project_id, wp_code, spec)
+    except Exception:
+        # fail-soft 但**必须留日志** —— 静默吞异常会把接线错误伪装成「本项目无此数据」
+        _logger.warning(
+            "WP() 取值失败：wp_code=%s item_id=%s", wp_code, spec.item_id, exc_info=True
+        )
+        return None
+    return res.value
 
 
 async def _resolve_ledger_formula(
@@ -214,57 +236,66 @@ async def _resolve_aux_formula(
 async def _resolve_prev_formula(
     db: AsyncSession, project_id: UUID, year: int, args: list[str]
 ) -> Decimal | None:
-    """=PREV('wp_code', 'sheet', 'cell') → 从上年底稿取值"""
-    if len(args) < 3:
-        return None
-    wp_code, sheet_name, cell_ref = args[0], args[1], args[2]
-    # 查上年底稿（同项目 year-1）
-    result = await db.execute(
-        sa.select(WorkingPaper).where(
-            WorkingPaper.project_id == project_id,
-            WorkingPaper.is_deleted == False,  # noqa: E712
-        )
-    )
-    workpapers = result.scalars().all()
-    for wp in workpapers:
-        if wp.parsed_data and wp.parsed_data.get("wp_code") == wp_code:
-            # 尝试从 parsed_data.cells 取值
-            cell_data = wp.parsed_data.get("cells", {}).get(f"{sheet_name}!{cell_ref}")
-            if cell_data is not None:
-                try:
-                    return Decimal(str(cell_data))
-                except Exception:
-                    return None
+    """``=PREV('wp_code','sheet','cell_ref')`` → **恒返 None**（fail-closed）。
+
+    🔴 **当前数据模型无法表达「上年底稿」** —— ``working_paper`` 与 ``wp_index``
+    **都没有 year 列**（实测），底稿的年度维度只在 project 层。
+
+    改造前的实现声称「从上年底稿取值（同项目 year-1）」，而其查询里**没有任何 year
+    条件**，取值又走真实库零命中的 ``parsed_data['cells']`` ⇒ 表面恒返 ``None``。
+    危险在于：一旦有人把 ``cells`` 链「修通」而不修年度维度，它会取到**本年**值并
+    显示在「上年数」列 —— 161 条 ``PREV()`` 里 **118 条**第三参是「审定数」
+    （即「上年审定数」类预设），那是数字级错误，比现在的恒空更危险。
+
+    故本函数 fail-closed：宁缺勿造，**绝不回退本年值**。跨年度取数需数据模型变更，
+    已登记在 :data:`app.services.prefill_anchor_map.OUT_OF_SCOPE_CHANGES` 的
+    ``prev_year_dimension`` 条目，另立 spec。
+
+    参数保留完整签名（``_FORMULA_RESOLVERS`` 的统一契约），实参不使用。
+    """
     return None
 
 
 async def _resolve_adj_formula(
     db: AsyncSession, project_id: UUID, year: int, args: list[str]
 ) -> Decimal | None:
-    """=ADJ('code', 'type') → 从 adjustments 表取调整金额"""
+    """=ADJ('code', 'type') → 从 adjustments 表取调整金额。
+
+    v2 符号约定（ledger-sign-convention-unify）：返回值按 direction_resolver 归一到
+    科目自然方向（贷方类取反），与 trial_balance.aje_adjustment/rje_adjustment 及
+    CrossCheckService._get_adj_value 同口径，避免贷方类预填反号。
+    """
     if len(args) < 2:
         return None
     account_code, adj_type = args[0], args[1]
     from app.models.phase10_models import Adjustment, AdjustmentEntry
+    from app.services.ledger_import.direction_resolver import resolve_account_direction
 
     # adj_type: AJE / RJE
     q = sa.select(
         sa.func.coalesce(
             sa.func.sum(AdjustmentEntry.debit_amount - AdjustmentEntry.credit_amount), 0
-        )
+        ),
+        sa.func.max(AdjustmentEntry.account_name),
     ).join(Adjustment, AdjustmentEntry.adjustment_id == Adjustment.id).where(
         Adjustment.project_id == project_id,
         Adjustment.year == year,
         Adjustment.is_deleted == False,  # noqa: E712
-        AdjustmentEntry.account_code == account_code,
+        AdjustmentEntry.standard_account_code == account_code,
     )
     if adj_type.upper() in ("AJE", "审计调整"):
         q = q.where(Adjustment.adjustment_type == "aje")
     elif adj_type.upper() in ("RJE", "重分类"):
         q = q.where(Adjustment.adjustment_type == "rje")
     result = await db.execute(q)
-    val = result.scalar()
-    return Decimal(str(val)) if val is not None else Decimal("0")
+    row = result.first()
+    if row is None or row[0] is None:
+        return Decimal("0")
+    raw_net = Decimal(str(row[0]))
+    account_name = row[1] or ""
+    direction, _src = resolve_account_direction(account_code, account_name)
+    sign = Decimal("-1") if direction == "credit" else Decimal("1")
+    return sign * raw_net
 
 
 async def _resolve_note_formula(
@@ -274,19 +305,19 @@ async def _resolve_note_formula(
     if len(args) < 3:
         return None
     section, row_key, col_key = args[0], args[1], args[2]
-    from app.models.phase15_models import DisclosureNote
+    from app.models.report_models import DisclosureNote
 
     result = await db.execute(
         sa.select(DisclosureNote).where(
             DisclosureNote.project_id == project_id,
             DisclosureNote.year == year,
-            DisclosureNote.section_code == section,
+            DisclosureNote.note_section == section,
         )
     )
     note = result.scalar_one_or_none()
-    if note and note.content_data:
-        # content_data 是 JSONB，按 row/col 索引取值
-        rows = note.content_data.get("rows", [])
+    if note and note.table_data:
+        # table_data 是 JSONB，按 row/col 索引取值
+        rows = note.table_data.get("rows", [])
         for r in rows:
             if str(r.get("key", "")) == row_key or str(r.get("label", "")) == row_key:
                 val = r.get("values", {}).get(col_key)
@@ -949,24 +980,140 @@ async def parse_workpaper_real(
 
 # ---------------------------------------------------------------------------
 # mark_stale — 标记底稿预填数据为过期（从 prefill_service_v2 迁移）
+# 内部层：由 wp_auto_fill_service 独立调用，勿作为对外 stale 入口。
+# 详见 backend/docs/STALE-PROPAGATION-LAYERS.md
 # ---------------------------------------------------------------------------
+
+# 「持有已落库派生值」的 parsed_data 键：只有这些底稿才可能过期。
+#   html_data       — HTML 底稿保存后的正文（含公式算出的金额，持久化后渲染不再覆盖）
+#   univer_snapshot — Univer/xlsx 底稿的单元格快照（prefill 写入的值）
+#   cell_provenance — 预填公式溯源（存在即说明曾按公式落值）
+# 未编辑过的底稿在 render 时实时取数（TB/tb_balance），不存在「过期」状态。
+_PERSISTED_VALUE_KEYS: tuple[str, ...] = ("html_data", "univer_snapshot", "cell_provenance")
+
+
+def _holds_persisted_values():
+    """SQL 条件：底稿是否持有已落库的派生值（含 prefill 时的 TB 快照）。
+
+    用 ``col[key] IS NOT NULL`` 而非 PG 专属的 ``has_key``（``?`` 运算符）：
+    后者在 sqlite 上编译成裸 ``?`` 与占位符冲突，测试库会直接语法错误。
+    """
+    conds = [WorkingPaper.parsed_data[k].isnot(None) for k in _PERSISTED_VALUE_KEYS]
+    conds.append(WorkingPaper.prefill_tb_snapshot.isnot(None))
+    return sa.or_(*conds)
+
 
 async def mark_stale(
     db: AsyncSession,
     project_id: UUID,
     account_codes: list[str] | None = None,
 ) -> int:
-    """标记底稿预填数据为过期"""
-    q = (
-        sa.update(WorkingPaper)
-        .where(
-            WorkingPaper.project_id == project_id,
-            WorkingPaper.is_deleted == False,  # noqa: E712
+    """标记底稿预填数据为过期。
+
+    只标记「持有已落库派生值」的底稿（见 ``_holds_persisted_values``）。此前无条件
+    全量标记，导致从未编辑过的底稿也常亮 stale（实测 340/340），且平台无任何清除
+    路径 → 横幅永久显示。
+
+    ``account_codes`` 非空时进一步收窄：有 ``prefill_tb_snapshot`` 的底稿只在快照
+    引用了变动科目时才标脏；无快照的底稿无法判定，保守标脏。
+    """
+    where = [
+        WorkingPaper.project_id == project_id,
+        WorkingPaper.is_deleted == False,  # noqa: E712
+        _holds_persisted_values(),
+    ]
+    if account_codes:
+        where.append(
+            sa.or_(
+                WorkingPaper.prefill_tb_snapshot.is_(None),
+                sa.or_(
+                    *[
+                        WorkingPaper.prefill_tb_snapshot[code].isnot(None)
+                        for code in account_codes
+                    ]
+                ),
+            )
         )
-        .values(prefill_stale=True)
+    result = await db.execute(
+        sa.update(WorkingPaper).where(*where).values(prefill_stale=True)
     )
-    result = await db.execute(q)
-    return result.rowcount
+    return int(result.rowcount or 0)
+
+
+async def clear_stale(
+    db: AsyncSession,
+    project_id: UUID,
+    wp_ids: list[UUID] | None = None,
+) -> int:
+    """清除底稿的 prefill_stale 标记（``wp_ids=None`` 表示项目全量）。"""
+    where = [
+        WorkingPaper.project_id == project_id,
+        WorkingPaper.is_deleted == False,  # noqa: E712
+    ]
+    if wp_ids is not None:
+        if not wp_ids:
+            return 0
+        where.append(WorkingPaper.id.in_(wp_ids))
+    result = await db.execute(
+        sa.update(WorkingPaper).where(*where).values(prefill_stale=False)
+    )
+    return int(result.rowcount or 0)
+
+
+async def resolve_stale_after_recalc(
+    db: AsyncSession,
+    project_id: UUID,
+    year: int,
+) -> dict[str, int]:
+    """试算表全量重算后收敛底稿 stale 标记（供「一键重算 / 点击重算」闭环）。
+
+    按底稿实际持有的派生值分三类处理：
+
+    1. 有公式快照（``univer_snapshot`` / ``cell_provenance``）→ 重跑 prefill，成功即清除；
+    2. 无任何已落库派生值 → 渲染时实时取数，重算后即最新，直接清除；
+    3. 仅有 ``html_data``（人工保存的正文）→ 保留 stale，需在底稿内手工刷新后重存。
+
+    Returns: ``{"cleared": n, "refilled": n, "kept_stale": n}``
+    """
+    rows = (
+        await db.execute(
+            sa.select(WorkingPaper.id, WorkingPaper.parsed_data).where(
+                WorkingPaper.project_id == project_id,
+                WorkingPaper.is_deleted == False,  # noqa: E712
+                WorkingPaper.prefill_stale == True,  # noqa: E712
+            )
+        )
+    ).all()
+
+    to_clear: list[UUID] = []
+    refilled = 0
+    kept = 0
+
+    for wp_id, parsed in rows:
+        pd = parsed if isinstance(parsed, dict) else {}
+        if pd.get("univer_snapshot") or pd.get("cell_provenance"):
+            try:
+                result = await prefill_workpaper_real(db, project_id, year, wp_id)
+            except Exception as exc:  # noqa: BLE001 — 单张失败不阻断其余
+                _logger.warning("resolve_stale: prefill 失败 wp=%s err=%s", wp_id, exc)
+                result = {"status": "error"}
+            if result.get("status") == "ok":
+                refilled += 1
+                to_clear.append(wp_id)
+            else:
+                kept += 1
+        elif pd.get("html_data"):
+            # 人工保存的正文不会被重算覆盖 → 仍需人工在底稿内刷新
+            kept += 1
+        else:
+            to_clear.append(wp_id)
+
+    cleared = await clear_stale(db, project_id, to_clear)
+    _logger.info(
+        "resolve_stale_after_recalc: project=%s cleared=%d refilled=%d kept=%d",
+        project_id, cleared, refilled, kept,
+    )
+    return {"cleared": cleared, "refilled": refilled, "kept_stale": kept}
 
 
 # ---------------------------------------------------------------------------

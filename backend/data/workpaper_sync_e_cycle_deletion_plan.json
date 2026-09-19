@@ -1,0 +1,94 @@
+{
+  "schema_version": "e-cycle-deletion-plan:v1",
+  "task": "Task 47",
+  "spec": "workpaper-html-onlyoffice-bidirectional-writeback-closure",
+  "description": "E 循环 Excel 独立 entry 的 legacy dual-mode 删除计划。复用 Task 45 冻结的迁移范式。E 循环只有一个独立 entry（xlsx/gt-e1-monetary-fund），它的 legacy 双模式路径分成两类：①**死代码** useE1DualMode.ts（生产入边为 0，本任务执行删除）；②**在用**的 useG1DualMode（与 G1 共享，删除被 G1 迁移与真实 OO gate 双重阻塞，本任务只登记不删）。",
+  "paradigm_ref": "backend/data/workpaper_sync_migration_paradigm.json",
+  "slice_ref": "backend/data/workpaper_sync_e_cycle_manifest_slice.json",
+  "sibling_plan_ref": "backend/data/workpaper_sync_d_cycle_deletion_plan.json",
+  "shared_base_preserved": {
+    "file": "audit-platform/frontend/src/components/workpaper/composables/useG1DualMode.ts",
+    "reason": "E1 与 G1 共用这一个 dual-mode composable（两处 import，均为生产宿主）。删它会同时拆掉 G1 入口，而 G1 属 Task 49「G 循环除 G7 外」的范围。",
+    "remaining_consumers_after_e_cycle": [
+      "audit-platform/frontend/src/components/workpaper/GtE1MonetaryFund.vue",
+      "audit-platform/frontend/src/components/workpaper/GtG1TradingFinancialAssets.vue"
+    ],
+    "localStorage_prefix": "g1-dual-mode:",
+    "localStorage_key_shape": "g1-dual-mode:{wpId}",
+    "localStorage_collision_verdict": "no_actual_collision",
+    "localStorage_collision_reason": "key 以 wpId 收尾，E1 与 G1 是不同底稿 ⇒ 不会互相覆盖模式偏好。前缀名跨循环复用只是命名气味，不是数据缺陷 —— 如实记录，不夸大成 bug。"
+  },
+  "entries": [
+    {
+      "entry_id": "xlsx/gt-e1-monetary-fund",
+      "wp_code_pattern": "E1M",
+      "host_component": "audit-platform/frontend/src/components/workpaper/GtE1MonetaryFund.vue",
+      "capability_adjudication": "single_onlyoffice",
+      "adjudication_reason": "HTML 侧存 checklist_responses、OO 侧只按 sheet_name 打开模板副本，切回 HTML 靠重读 responses_snapshot。无 bidirectional adapter / contract / definition bundle / durable forcesave ack。",
+      "legacy_composables_to_delete": [
+        {
+          "file": "audit-platform/frontend/src/components/workpaper/composables/useE1DualMode.ts",
+          "type": "orphan_legacy_dual_mode",
+          "consumers": [],
+          "inbound_production_reference_count": 0,
+          "companion_spec": "audit-platform/frontend/src/components/workpaper/composables/__tests__/useE1DualMode.spec.ts",
+          "delete_justification": [
+            "全前端 grep `useE1DualMode` 只命中它自身与它的 spec —— 零生产消费方（宿主 import 的是 useG1DualMode）",
+            "auto-imports.d.ts 未收录该符号 ⇒ 删除不影响自动导入类型",
+            "它的模式词汇是 `structured | online-edit`，与平台在用的 `html | onlyoffice` 是两套值 —— 正是 Task 45 范式第 5 步 `unify_mode_values` 要消灭的双轨形态",
+            "平台铁律：死代码立即删除，不留 DEPRECATED 注释（否则每次复盘重复提议）"
+          ],
+          "action": "delete_dead_composable_and_its_spec",
+          "action_status": "executed_in_task_47",
+          "gated_on_real_oo_verification": false,
+          "gate_exemption_reason": "删除在用的双向/单向切换路径才需要真实 OO gate（Task 45 范式）。本文件不被任何宿主消费 ⇒ 删除不改变任何用户可见行为，无需 gate；等价性由「入边为 0」这一 source-backed 事实提供。"
+        }
+      ],
+      "legacy_paths_deferred": [
+        {
+          "file": "audit-platform/frontend/src/components/workpaper/composables/useG1DualMode.ts",
+          "type": "shared_live_dual_mode",
+          "consumed_by_this_entry": true,
+          "action": "defer",
+          "defer_reasons": [
+            "与 G1 共享 —— 迁移它必须与 Task 49 的 G 循环一起做，否则 G1 入口断裂",
+            "本 entry 的真实 OO required scenarios 未执行（evidence UNVERIFIABLE）⇒ Task 45 范式禁止在 gate 前删除在用路径",
+            "它承载 BP-4（E1 的 OO sheet 名由 G1 专属解析器解析、availableSheets 传空、兜底字面量 'G1-1'）—— 删除前必须先把 sheet 解析下沉到 render-config 的真实 sheets 列表"
+          ],
+          "unblock_preconditions": [
+            "Task 49 完成 G1 entry 的裁决与迁移",
+            "本 entry 的 required scenario set 在真实 OnlyOffice 9.4 上跑通并由服务端重算 evidence",
+            "BP-4 修复：E1 的 OO sheet 名解析不再走 G1 命名空间"
+          ]
+        }
+      ],
+      "legacy_composables_preserved": [
+        {
+          "file": "audit-platform/frontend/src/components/workpaper/composables/useE1BankDetail.ts",
+          "reason": "E1-3 的业务模型（行身份/币种三态/跨 sheet 聚合），不是 dual-mode 基础设施。它承载 Property 23 的行身份与 variant 解耦判据，必须保留。"
+        },
+        {
+          "file": "audit-platform/frontend/src/components/workpaper/composables/e1BankAccountPrefill.ts",
+          "reason": "账户级取数归一与种子构造（tb_aux_balance 的 aux_type='银行账户' 口径），是行身份真源，必须保留。"
+        }
+      ],
+      "no_legacy_backend_endpoint_to_delete": {
+        "verdict": true,
+        "reason": "本 entry 的 HTML 持久化走平台通用 PUT /api/workpapers/{id}/checklist-responses，OO 侧走通用 /api/workpapers/{wp}/sheets/{sheet}/onlyoffice-config —— 没有 E1 专属的第二套半闭环端点（对比 F2-22/F2-23 的专属 to/from 端点，那属 Requirement 12.7 / Task 62）。"
+      }
+    }
+  ],
+  "post_delete_verification": {
+    "required": [
+      "前端 vitest：E1 相关 spec 子集全绿（含本任务新增的 e1SyncEntryRowIdentity.spec.ts 与既有 e1BankVariantIntegrity.spec.ts）",
+      "被删 composable 的 spec 一并删除，vitest 不留孤儿 import",
+      "Task 47 后端守卫断言 useE1DualMode.ts 与其 spec 均已不存在，且宿主仍只 import useG1DualMode"
+    ],
+    "not_claimed": [
+      "本任务未执行真实 OnlyOffice 9.4 场景，evidence 保持 UNVERIFIABLE",
+      "本任务未删除在用的 useG1DualMode 路径"
+    ]
+  },
+  "properties_verified": [23, 69, 70],
+  "requirements_covered": ["6.5", "12.1", "12.4", "12.10", "12.11", "12.12", "14.1"]
+}

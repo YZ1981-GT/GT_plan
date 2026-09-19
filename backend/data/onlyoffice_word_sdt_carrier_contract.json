@@ -1,0 +1,347 @@
+{
+  "contract_id": "onlyoffice.word.sdt.carrier",
+  "schema_version": "1.0.0",
+  "spec": "workpaper-html-onlyoffice-bidirectional-writeback-closure",
+  "task": "6",
+  "validates": {
+    "properties": ["Property 33"],
+    "requirements": ["7.2", "7.5", "7.6", "14.4", "14.16"]
+  },
+  "scope_and_non_claims": {
+    "what_this_contract_decides": "只决定 Word tagged SDT 各候选载体在真实 OO 9.4 往返后的保留能力（tag 集合 / 实例计数 / 层级 / row_uuid / SDT 外正文），以及若干候选锚点是否被证伪。",
+    "explicitly_not_claimed": [
+      "未宣称生产 Word extractor 已实现（Task 59 承接）",
+      "未宣称 tag 缺失 fail-closed 已实现（Task 59/68 承接）",
+      "未宣称 operation 回写 / merge / rematerialize 已实现（Task 61/68 承接）",
+      "未宣称 F2 pilot 门已通过（design §OO 9.4 pilot 门 的 6/7 两步 extract/merge 与二次 materialize 不在本探针范围）",
+      "未取证 MS Word 桌面端行为；全部结论只覆盖 OnlyOffice 9.4.0-129",
+      "未取证多用户并发下的载体保留（Task 4 负责多人语义，本探针单用户）",
+      "未取证 <w:lock> 保护下的行为 —— 注入刻意不加锁，见 lock_policy"
+    ],
+    "lock_policy": "no_w_lock_injected",
+    "lock_policy_why": "加 <w:lock w:val=\"sdtLocked\"/> 会阻止 OO 删除 SDT，等于替载体作弊；本探针要的是无保护下 OO 是否自发保留 tag。"
+  },
+  "environment": {
+    "oo_build": "9.4.0-129",
+    "oo_package": "onlyoffice-documentserver",
+    "oo_container": "audit-onlyoffice",
+    "oo_jwt_enabled": true,
+    "browser": "Chrome/151.0.0.0 (Playwright Chromium, Windows NT 10.0 x64)",
+    "runner": "backend/scripts/diagnose/probe_oo94_word_sdt.py",
+    "runner_run_id": "task6-r1",
+    "source_commit": "d330d7cea6bb112709edce5bf287877df0a5f60c",
+    "source_branch": "work/2026-08-23-advanced-query-hardening-closure",
+    "captured_at": "2026-08-24T23:18:07Z/2026-08-24T23:54:00Z",
+    "evidence_dir": ".kiro/specs/workpaper-html-onlyoffice-bidirectional-writeback-closure/evidence/task6-oo94-word-tagged-sdt",
+    "stale_policy": "environment / source_commit / runner / probe 文档模板 sha256 任一变化即本裁决失效，必须重跑探针后重新裁决"
+  },
+  "probe_docs": [
+    {
+      "doc": "f222",
+      "wp_code": "F2-22",
+      "template_rel": "backend/wp_templates/F/F2-22 存货监盘计划.docx",
+      "template_sha256": "f19aa64a9daa01022231d91f43d342a4ae973088dbd42b58459ad65c206662ba",
+      "role": "Requirement 7.6 指定 Word pilot（field 载体全场景）",
+      "has_tables": false,
+      "row_carrier_probeable": false,
+      "expected_tag_count": 8,
+      "expected_sdt_count": 9
+    },
+    {
+      "doc": "f223",
+      "wp_code": "F2-23",
+      "template_rel": "backend/wp_templates/F/F2-23 存货监盘小结.docx",
+      "template_sha256": "09106818415ea72d51d14441b4f3fa544c8ae7d8a1f20b5b1f6956bc9232b080",
+      "role": "Requirement 7.6 第二 pilot（证明 field 结论非单文档偶然）",
+      "has_tables": false,
+      "row_carrier_probeable": false,
+      "expected_tag_count": 4,
+      "expected_sdt_count": 4
+    },
+    {
+      "doc": "b30112",
+      "wp_code": "B30-11-2",
+      "template_rel": "backend/wp_templates/B/B30-11-2 内部控制缺陷汇总与评估.docx",
+      "template_sha256": "b4facd6b7d31b1419eb102ede582e7e77b1a5c685a3f9513bb546b9de0bbb247",
+      "role": "row 级 SDT + row_uuid 取证（F2-22/F2-23 零表格，行载体在 pilot 文档上不可取证）",
+      "has_tables": true,
+      "row_carrier_probeable": true,
+      "expected_tag_count": 7,
+      "expected_sdt_count": 7
+    }
+  ],
+  "pilot_template_row_carrier_gap": {
+    "fact": "F2-22 与 F2-23 的 word/document.xml 里 w:tbl / w:tr 计数均为 0",
+    "consequence": "Requirement 7.2 的 row-level SDT + row_uuid 无法在 Requirement 7.6 指定的两个 pilot 文档上取证",
+    "action_taken": "另取平台真实模板 B30-11-2（表头 + 3 个同构重复数据行 / 10 列）做行载体取证",
+    "why_it_matters": "若不显式记录这个缺口，'Word pilot 通过' 会被误读成 '行载体也通过'"
+  },
+  "requirement_7_5_scenarios": {
+    "why": "Requirement 7.5 的三种硬场景必须逐条落到具体注入记录上。只报全局集合会留下缺口：某文档的 scenario 被改名时，另一份文档仍然贡献同名场景，集合判据照样通过（变异 M34 实测因此 GREEN）。",
+    "instrumented": {
+      "cross_run": [
+        {"doc": "f222", "inj_id": "F02", "run_split": 3},
+        {"doc": "f223", "inj_id": "G02", "run_split": 2}
+      ],
+      "same_paragraph_multi": [
+        {"doc": "f222", "inj_id": "F03", "run_split": 1},
+        {"doc": "f222", "inj_id": "F04", "run_split": 1}
+      ],
+      "duplicate_instance": [
+        {"doc": "f222", "inj_id": "F03", "run_split": 1},
+        {"doc": "f222", "inj_id": "F05", "run_split": 1}
+      ]
+    }
+  },
+  "carriers": [
+    {
+      "carrier": "field_sdt_inline",
+      "description": "run 级 w:sdt（位于 w:p 内），含跨 run 值、同段多实例、同 stable key 多实例、表格单元格内实例",
+      "probe_verdict": "passed",
+      "may_enter_word_engine": true,
+      "expected_artifacts_examined": 26,
+      "expected_artifacts_retaining_all_inline_tags": 26,
+      "scenarios_covered": [
+        "single_run",
+        "cross_run",
+        "same_paragraph_multi+duplicate_instance",
+        "same_paragraph_multi",
+        "duplicate_instance",
+        "nested_block_over_inline",
+        "inline_with_preserved_label_prefix",
+        "single_run_outside_table",
+        "row_level_sdt_with_row_uuid"
+      ],
+      "evidence": {
+        "cross_run_value_readable_after_oo": true,
+        "cross_run_run_split_rewritten_by_oo": {
+          "tag": "gt:field:f2.stocktake.plan:plan/scope",
+          "run_count_at_injection": 3,
+          "run_count_after_oo": 2,
+          "meaning": "OO 会重排 run，读值必须合并 sdtContent 内全部 w:t；run 序号不可作锚点"
+        },
+        "duplicate_stable_key_instances_retained": {
+          "tag": "gt:field:f2.stocktake.plan:plan/entity_name",
+          "instances": 2,
+          "independently_editable": true,
+          "distinct_values_observed": ["GT-F03-EDITED", "GT-F05-REOPENED"]
+        },
+        "same_paragraph_siblings_independent": {
+          "edited": "gt:field:f2.stocktake.plan:plan/entity_name",
+          "untouched_sibling": "gt:field:f2.stocktake.plan:plan/bs_date",
+          "paragraph_index_at_injection": 4
+        }
+      }
+    },
+    {
+      "carrier": "field_sdt_block",
+      "description": "block 级 w:sdt（位于 w:body，w:sdtContent 内含整个 w:p），内层再嵌 inline field SDT ⇒ depth=2 层级",
+      "probe_verdict": "passed",
+      "may_enter_word_engine": true,
+      "expected_block_injection_docs": ["f222", "f223"],
+      "expected_artifacts_examined": 17,
+      "expected_artifacts_retaining_all_block_tags": 17,
+      "expected_hierarchy_regressions": 0,
+      "evidence": {
+        "block_tags": [
+          "gt:block:f2.stocktake.plan:plan/warehouses",
+          "gt:block:f2.stocktake.summary:summary/conclusion"
+        ],
+        "nested_child_tags": [
+          "gt:field:f2.stocktake.plan:plan/warehouses",
+          "gt:field:f2.stocktake.summary:summary/conclusion"
+        ],
+        "meaning": "层级（祖先 tag 链）在 OO 9.4 往返后逐条保留，可用于「区块内字段」建模"
+      }
+    },
+    {
+      "carrier": "row_sdt",
+      "description": "row 级 w:sdt（位于 w:tbl，w:sdtContent 内含 w:tr），tag 内含稳定 row_uuid",
+      "probe_verdict": "failed",
+      "may_enter_word_engine": false,
+      "expected_probe_doc": "b30112",
+      "expected_artifacts_examined": 9,
+      "expected_artifacts_retaining_any_row_tag": 0,
+      "expected_rows_wrapped_in_sdt_after_oo": 0,
+      "expected_row_sdt_injected_at_instrumentation": 3,
+      "failure": {
+        "symptom": "OO 9.4 在**首次序列化时**就把 w:tbl 下的 w:sdt 拆掉，w:tr 原样留在表里但 SDT 包装与其 w:tag 一并消失",
+        "stripped_at_baseline": true,
+        "stripped_at_baseline_meaning": "baseline 格（只打开 + 一次净零编辑 + forcesave，未做任何行操作）已经 0 个 row tag ⇒ 不是某个行操作触发的，而是加载/保存路径固有行为",
+        "table_rows_survived": true,
+        "table_rows_survived_meaning": "行本身没丢（表仍 4 行），丢的只是 SDT 包装 ⇒ 属于载体不被支持，不是数据损坏",
+        "row_tags_lost": [
+          "gt:row:b30.11.2.deficiencies:rows:36cd5ee6-a95a-4101-a45c-8289857322a7",
+          "gt:row:b30.11.2.deficiencies:rows:86f54ae5-f4d8-4f31-ae95-b9e60e656a50",
+          "gt:row:b30.11.2.deficiencies:rows:bd7e5233-6d56-4c5a-addc-07d0a4024dfe"
+        ]
+      },
+      "design_action_required": "回到 design §Word SDT Engine 换行身份载体：本探针已同时取证一个可行替代（见 row_identity_fallback_measured），但选定与验收属于 design 修订 + 后续任务，本 probe 不代替裁决"
+    },
+    {
+      "carrier": "sdt_external_body",
+      "description": "SDT 外正文（Word-only 自由正文）在 OO 往返后是否逐字保留",
+      "probe_verdict": "passed",
+      "may_enter_word_engine": true,
+      "expected_artifacts_examined": 26,
+      "expected_artifacts_with_digest_unchanged": 11,
+      "expected_ops_with_digest_unchanged": [
+        "b30112/baseline",
+        "b30112/edit_in_sdt",
+        "f222/baseline",
+        "f222/edit_in_sdt",
+        "f223/baseline",
+        "f223/download",
+        "f223/edit_in_sdt",
+        "f223/forcesave",
+        "f223/reopen"
+      ],
+      "expected_ops_with_digest_unchanged_note": "去重后的 doc/op 集合；f223/reopen 有 3 个 artifact（status 2 / 6 / 2）都未变",
+      "evidence": {
+        "sdt_internal_edit_leaves_external_body_bit_identical": true,
+        "declared_free_text_edits_account_for_all_changes": [
+          "f222/edit_outside_sdt：把「9．特别关注事项：」改成「9．特别关注事项（审计师现场补充）：」并在文末追加 WORDONLY-FREE-TEXT-A",
+          "f222/insert_paragraph：文首插入 GT-PROBE-INSERTED-PARA-1/2",
+          "f222/delete_paragraph：删掉上述插入段并清掉一段原模板自由正文行",
+          "b30112/insert_row：OO 新增行首格键入 GT-NEWROW-NO-UUID"
+        ],
+        "meaning": "只改结构化岛时自由正文 digest 逐字不变；所有 digest 变化都能对上一次显式的自由正文编辑，没有 OO 自发改写"
+      }
+    }
+  ],
+  "row_identity_fallback_measured": {
+    "candidate": "cell_level_field_sdt_tag_carrying_row_uuid",
+    "description": "把 row_uuid 写进**单元格内 inline field SDT** 的 tag（gt:field:{contract}:rows/{row_uuid}/{column_key}），不依赖 row 级 SDT 包装",
+    "probe_verdict": "passed",
+    "expected_artifacts_examined": 9,
+    "expected_row_uuids_from_field_tags_before_user_delete": 3,
+    "expected_row_uuids_from_field_tags_after_user_delete": 2,
+    "expected_ops_before_user_delete": ["baseline", "edit_in_sdt", "insert_row"],
+    "expected_ops_after_user_delete": ["delete_row", "forcesave", "reopen", "download"],
+    "evidence": {
+      "survives_row_sdt_stripping": true,
+      "survives_oo_row_insert": true,
+      "user_row_delete_removes_exactly_that_rows_uuid": {
+        "deleted_injection": "R02",
+        "deleted_row_uuid": "86f54ae5-f4d8-4f31-ae95-b9e60e656a50",
+        "surviving_row_uuids": [
+          "36cd5ee6-a95a-4101-a45c-8289857322a7",
+          "bd7e5233-6d56-4c5a-addc-07d0a4024dfe"
+        ]
+      },
+      "oo_created_row_has_no_uuid": {
+        "observed": true,
+        "marker_text": "GT-NEWROW-NO-UUID",
+        "table_row_count_before": 4,
+        "table_row_count_after": 5,
+        "row_uuids_from_field_tags_unchanged": 3,
+        "meaning": "OO 内新增行不携带任何 identity ⇒ 对应 Requirement 6.15 的 Word 侧同类问题，contract 必须显式分类为「分配新 ID / 结构冲突 / 拒绝」，不得静默猜测"
+      }
+    },
+    "status": "probe 级已取证可行；是否采纳为正式行身份协议属 design 修订，本 contract 不代替裁决"
+  },
+  "anchors": [
+    {
+      "anchor": "w_tag",
+      "description": "w:sdtPr/w:tag/@w:val —— Requirement 7.1 指定的唯一正式协议锚点",
+      "probe_verdict": "passed",
+      "admissible_as_identity_anchor": true,
+      "admissible_scope": ["field_sdt_inline", "field_sdt_block"],
+      "inadmissible_scope": ["row_sdt"],
+      "why": "field 层级 26/26 artifact 全保留、block 层级 17/17 全保留；row 层级 0/9 保留（载体本身被剥离，与 tag 机制无关）"
+    },
+    {
+      "anchor": "alias_display_name",
+      "description": "w:sdtPr/w:alias/@w:val（内容控件展示名）",
+      "probe_verdict": "passed",
+      "admissible_as_identity_anchor": false,
+      "why": "OO 9.4 往返后确实保留（26/26 artifact 稳定），但它是可重复的展示字符串、可被审计师在 UI 改名，且 Requirement 7.1 已把正式协议限定为 w:tag；只能作辅助展示，不能作定位键",
+      "retention_measured": true,
+      "expected_artifacts_stable": 26,
+      "expected_artifacts_examined": 26
+    },
+    {
+      "anchor": "sdt_id",
+      "description": "w:sdtPr/w:id/@w:val（编辑器分配的整数 id）",
+      "probe_verdict": "passed",
+      "admissible_as_identity_anchor": false,
+      "why": "本探针内 OO 9.4 未重编号（26/26 artifact 稳定），但同一 stable key 的两个实例被注入了**相同** w:id 且 OO 原样接受 ⇒ 该值在本协议下不唯一，无法定位实例；且它无业务含义，MS Word 侧行为未取证",
+      "retention_measured": true,
+      "expected_artifacts_stable": 26,
+      "expected_artifacts_examined": 26,
+      "duplicate_ids_observed": true,
+      "duplicate_id_tag": "gt:field:f2.stocktake.plan:plan/entity_name"
+    },
+    {
+      "anchor": "paragraph_index",
+      "description": "段落绝对序号（Requirement 7.1 明令禁止作回写协议）",
+      "probe_verdict": "failed",
+      "admissible_as_identity_anchor": false,
+      "why": "文首插入 2 段后，同一 tag 的段落绝对序号整体位移 ⇒ 任何按段落序号定位的提取器都会读错字段",
+      "expected_artifacts_examined": 26,
+      "expected_artifacts_unstable": 1,
+      "counterexample": {
+        "doc": "f222",
+        "op": "insert_paragraph",
+        "paragraph_index_stable": false,
+        "inserted_paragraphs": ["GT-PROBE-INSERTED-PARA-1", "GT-PROBE-INSERTED-PARA-2"]
+      }
+    },
+    {
+      "anchor": "run_index",
+      "description": "SDT 内 run 序号 / run 切分形态",
+      "probe_verdict": "failed",
+      "admissible_as_identity_anchor": false,
+      "why": "注入时切成 3 个 run 的值，经 OO 一次往返后变成 2 个 run（内容不变）⇒ run 切分由 OO 自行重排，不可作定位或等值判据",
+      "counterexample": {
+        "doc": "f222",
+        "tag": "gt:field:f2.stocktake.plan:plan/scope",
+        "run_count_at_injection": 3,
+        "run_count_after_oo": 2
+      }
+    }
+  ],
+  "downstream_gate": {
+    "carriers_allowed_into_word_engine": [
+      "field_sdt_inline",
+      "field_sdt_block",
+      "sdt_external_body"
+    ],
+    "carriers_blocked": ["row_sdt"],
+    "blocked_consequence": "Requirement 7.2 当前设计（row-level SDT 携带 row_uuid）在 OO 9.4 上不成立，Tasks 59/60/61/62/63/64 里任何依赖 row 级 SDT 的部分必须先经 design 换载体",
+    "anchors_allowed": ["w_tag"],
+    "anchors_blocked": ["alias_display_name", "sdt_id", "paragraph_index", "run_index"]
+  },
+  "not_covered": [
+    {
+      "aspect": "multi_user_concurrent_editing",
+      "probe_verdict": "not_covered",
+      "why": "本探针单用户；多人语义由 Task 4 负责"
+    },
+    {
+      "aspect": "ms_word_desktop_roundtrip",
+      "probe_verdict": "not_covered",
+      "why": "平台链路只经 OO；桌面 Word 不在双向回写路径上"
+    },
+    {
+      "aspect": "sdt_with_w_lock",
+      "probe_verdict": "not_covered",
+      "why": "刻意不加锁，见 scope_and_non_claims.lock_policy"
+    },
+    {
+      "aspect": "sdt_databinding_customxml",
+      "probe_verdict": "not_covered",
+      "why": "design 已裁决正式协议只认 w:tag，不走 dataBinding；未取证不等于可用"
+    },
+    {
+      "aspect": "extract_merge_rematerialize_roundtrip",
+      "probe_verdict": "not_covered",
+      "why": "design §OO 9.4 pilot 门 第 6/7 步，由 Tasks 59/61 承接"
+    },
+    {
+      "aspect": "tag_missing_fail_closed_in_production",
+      "probe_verdict": "not_covered",
+      "why": "Property 34 / Requirement 7.8 的生产行为由 Tasks 59/68 承接；本探针只测载体保留"
+    }
+  ]
+}

@@ -50,6 +50,7 @@ FILL_REQUIRED = PatternFill(start_color="FF99FF99", end_color="FF99FF99", fill_t
 FONT_HEADER = Font(bold=True, size=12)
 FONT_TITLE = Font(bold=True, size=14)
 FONT_NORMAL = Font(size=10)
+FONT_GUIDANCE = Font(italic=True, size=9, color="808080")  # 提示性文字：灰色斜体小字
 ALIGN_CENTER = Alignment(horizontal="center", vertical="center", wrap_text=True)
 ALIGN_LEFT = Alignment(horizontal="left", vertical="center", wrap_text=True)
 BORDER_THIN = Border(
@@ -261,20 +262,25 @@ def _build_toc_sheet(ws: Worksheet, sections: list[dict[str, Any]]) -> None:
 
 
 def _calc_completeness(section: dict[str, Any]) -> int:
-    """Calculate section completeness percentage."""
-    table_data = section.get("table_data", {})
-    rows = table_data.get("rows", [])
-    if not rows:
-        return 0
+    """Calculate section completeness percentage.
+
+    真实结构：rows[].values（非 cells），多表则遍历 _tables。
+    """
+    table_data = section.get("table_data", {}) or {}
+    tables = table_data.get("_tables")
+    if not isinstance(tables, list) or not tables:
+        tables = [table_data]
 
     total_cells = 0
     filled_cells = 0
-    for row in rows:
-        cells = row.get("cells", [])
-        for cell_val in cells:
-            total_cells += 1
-            if cell_val is not None and cell_val != "" and cell_val != "-":
-                filled_cells += 1
+    for tbl in tables:
+        if not isinstance(tbl, dict):
+            continue
+        for row in tbl.get("rows", []) or []:
+            for cell_val in row.get("values", []) or []:
+                total_cells += 1
+                if cell_val is not None and cell_val != "" and cell_val != "-":
+                    filled_cells += 1
 
     return int((filled_cells / total_cells * 100) if total_cells > 0 else 0)
 
@@ -296,15 +302,28 @@ def _build_section_sheet(
     include_formulas: bool = True,
     include_provenance: bool = True,
 ) -> None:
-    """Build a single section sheet with data + 4-color + comments (C.0.2/3/4)."""
+    """Build a single section sheet with data + 4-color + comments (C.0.2/3/4).
+
+    真实 ``table_data`` 结构（与 DisclosureNote 一致）：
+        {
+          "name": "货币资金",
+          "headers": ["期末余额", "期初余额"],   # 可缺省（默认两列）
+          "rows": [
+            {"label": "库存现金", "values": [0.0, 0.0], "is_total": false,
+             "row_type": "data",
+             "_cell_meta": {"0": {...}, "1": {...}}, "_cell_modes": {"0":"auto"}}
+          ],
+          "_tables": [ ...多表... ]   # 多表章节
+        }
+
+    注意：单元格值字段是 **``values``**（非 ``cells``），且行级 ``_cell_meta`` /
+    ``_cell_modes`` 按 **列索引** 键（"0"/"1"...）内嵌在每行；首列是 ``label``，
+    其后才是 ``values`` 各列。早期版本误读 ``cells`` / section 级 ``_cell_meta``
+    导致导出表格全空（2026-06-13 修）。
+    """
     section_id = section.get("section_id", "")
     title = section.get("section_title", "")
-    table_data = section.get("table_data", {})
-    headers = table_data.get("headers", [])
-    rows = table_data.get("rows", [])
-    cell_meta = section.get("_cell_meta", {})
-    formulas = section.get("_formulas", {})
-    provenance = section.get("_cell_provenance", {})
+    table_data = section.get("table_data", {}) or {}
 
     # Row 1: section title (metadata)
     ws.cell(row=1, column=1, value=f"章节: {title}")
@@ -314,71 +333,167 @@ def _build_section_sheet(
     ws.cell(row=2, column=1, value=f"section_id:{section_id}")
     ws.row_dimensions[2].hidden = True
 
-    # Row 3: headers
-    for col_idx, header in enumerate(headers, start=1):
-        cell = ws.cell(row=3, column=col_idx, value=header)
-        cell.font = FONT_HEADER
-        cell.alignment = ALIGN_CENTER
-        cell.border = BORDER_THIN
-        ws.column_dimensions[get_column_letter(col_idx)].width = max(12, len(str(header)) * 2)
+    # 多表章节：_tables 优先；否则单表用顶层 table_data
+    tables = table_data.get("_tables")
+    if not isinstance(tables, list) or not tables:
+        tables = [table_data]
 
-    # Data rows (starting row 4)
-    for row_idx, row_data in enumerate(rows, start=4):
-        row_type = row_data.get("row_type", "data")
-        cells = row_data.get("cells", [])
-        label = row_data.get("label", "")
+    cur_row = 3
 
-        # Dynamic row marker
-        is_dynamic = row_type.startswith("dynamic_")
+    # 章节级 guidance_text：在所有表格前输出一次（灰色斜体小字，跨全宽）
+    section_guidance = section.get("guidance_text") or ""
+    if section_guidance.strip():
+        total_cols = 1  # 至少 1 列
+        for tbl_probe in tables:
+            if isinstance(tbl_probe, dict):
+                for r in tbl_probe.get("rows") or []:
+                    vals = r.get("values")
+                    if isinstance(vals, list):
+                        total_cols = max(total_cols, len(vals) + 1)
+        ws.merge_cells(
+            start_row=cur_row, start_column=1,
+            end_row=cur_row, end_column=max(total_cols, 2),
+        )
+        g_cell = ws.cell(row=cur_row, column=1, value=section_guidance)
+        g_cell.font = FONT_GUIDANCE
+        g_cell.alignment = ALIGN_LEFT
+        cur_row += 1
 
-        for col_idx, cell_val in enumerate(cells, start=1):
-            cell = ws.cell(row=row_idx, column=col_idx, value=cell_val)
-            cell.border = BORDER_THIN
-
-            # Cell key for metadata lookup
-            cell_key = f"{row_idx - 4}:{col_idx - 1}"
-
-            # Determine cell type and apply fill (C.0.3)
-            meta = cell_meta.get(cell_key, {})
-            cell_type = _classify_cell(meta)
-            cell.fill = _get_fill_for_type(cell_type)
-
-            # Protection: lock formula/locked cells
-            if cell_type in ("formula", "locked"):
-                cell.protection = Protection(locked=True)
-            else:
-                cell.protection = Protection(locked=False)
-
-            # Comments (C.0.4)
-            comment_parts = []
-            if include_formulas and cell_key in formulas:
-                formula_info = formulas[cell_key]
-                expr = formula_info.get("expression", "")
-                comment_parts.append(f"公式: {expr}")
-
-            if include_provenance and cell_key in provenance:
-                prov = provenance[cell_key]
-                source = prov.get("source", "")
-                if source == "wp_data":
-                    wp_code = prov.get("wp_code", "")
-                    comment_parts.append(f"数据源: wp_data ({wp_code})")
-                elif source == "trial_balance":
-                    accounts = prov.get("account_codes", [])
-                    comment_parts.append(f"数据源: 试算表 ({', '.join(accounts)})")
-                elif source != "manual" and source:
-                    comment_parts.append(f"数据源: {source}")
-
-            if comment_parts:
-                cell.comment = Comment("\n".join(comment_parts), "系统")
-
-        # Mark dynamic rows with ★ in first cell
-        if is_dynamic and cells:
-            existing = ws.cell(row=row_idx, column=1).value or ""
-            ws.cell(row=row_idx, column=1, value=f"★ {existing}")
+    for t_idx, tbl in enumerate(tables):
+        if not isinstance(tbl, dict):
+            continue
+        cur_row = _render_section_table(
+            ws, tbl, start_row=cur_row,
+            include_formulas=include_formulas,
+            include_provenance=include_provenance,
+        )
+        cur_row += 1  # 表间空一行
 
     # Enable sheet protection (allow editing unlocked cells)
     ws.protection.sheet = True
     ws.protection.enable()
+
+
+def _render_section_table(
+    ws: Worksheet,
+    tbl: dict[str, Any],
+    *,
+    start_row: int,
+    include_formulas: bool,
+    include_provenance: bool,
+) -> int:
+    """渲染单张附注表到 worksheet，返回下一可用行号。
+
+    列布局：第 1 列 = 行标签（label），其后 = ``values`` 各列。
+    表头 = ["项目"] + headers（headers 缺省时按 values 列数生成"列1/列2"）。
+    """
+    name = tbl.get("name") or ""
+    headers = tbl.get("headers") or []
+    rows = tbl.get("rows") or []
+
+    # 推断数据列数（取各行 values 最大长度）
+    n_value_cols = 0
+    for r in rows:
+        vals = r.get("values")
+        if isinstance(vals, list):
+            n_value_cols = max(n_value_cols, len(vals))
+    if not n_value_cols and headers:
+        n_value_cols = max(0, len(headers) - 1)
+
+    # headers 约定：第 1 个元素是 label 列表头（如"项目"），其余对应 values 各列。
+    # 容错：若 headers 长度==n_value_cols（无 label 头），则 label 头用默认"项目"。
+    if len(headers) == n_value_cols:
+        label_header = "项目"
+        value_headers = list(headers)
+    else:
+        label_header = str(headers[0]).replace("<br/>", "").replace("<br>", "") if headers else "项目"
+        value_headers = list(headers[1:]) if len(headers) > 1 else []
+
+    row_cursor = start_row
+
+    # 表名行（可选）
+    if name:
+        cell = ws.cell(row=row_cursor, column=1, value=name)
+        cell.font = FONT_HEADER
+        row_cursor += 1
+
+    # per-table guidance 行（灰色斜体小字，跨全宽）
+    table_guidance = tbl.get("guidance") or ""
+    if table_guidance.strip():
+        total_cols = max(n_value_cols + 1, 2)  # label 列 + value 列
+        ws.merge_cells(
+            start_row=row_cursor, start_column=1,
+            end_row=row_cursor, end_column=total_cols,
+        )
+        g_cell = ws.cell(row=row_cursor, column=1, value=table_guidance)
+        g_cell.font = FONT_GUIDANCE
+        g_cell.alignment = ALIGN_LEFT
+        row_cursor += 1
+
+    # 表头行：第 1 列 label 头 + value 列头
+    header_cell = ws.cell(row=row_cursor, column=1, value=label_header)
+    header_cell.font = FONT_HEADER
+    header_cell.alignment = ALIGN_CENTER
+    header_cell.border = BORDER_THIN
+    ws.column_dimensions["A"].width = max(ws.column_dimensions["A"].width or 0, 30)
+    for c in range(n_value_cols):
+        raw = value_headers[c] if c < len(value_headers) else f"列{c + 1}"
+        htext = str(raw).replace("<br/>", "").replace("<br>", "")
+        cell = ws.cell(row=row_cursor, column=c + 2, value=htext)
+        cell.font = FONT_HEADER
+        cell.alignment = ALIGN_CENTER
+        cell.border = BORDER_THIN
+        col_letter = get_column_letter(c + 2)
+        ws.column_dimensions[col_letter].width = max(
+            ws.column_dimensions[col_letter].width or 0, 16
+        )
+    row_cursor += 1
+
+    # 数据行
+    for row_data in rows:
+        if not isinstance(row_data, dict):
+            continue
+        label = row_data.get("label", "")
+        values = row_data.get("values") or []
+        is_total = row_data.get("is_total", False)
+        row_type = row_data.get("row_type", "data")
+        cell_meta = row_data.get("_cell_meta") or {}
+        cell_modes = row_data.get("_cell_modes") or {}
+        is_dynamic = isinstance(row_type, str) and row_type.startswith("dynamic_")
+
+        # 第 1 列：label（动态行加 ★）
+        label_text = f"★ {label}" if is_dynamic else label
+        lcell = ws.cell(row=row_cursor, column=1, value=label_text)
+        lcell.border = BORDER_THIN
+        if is_total:
+            lcell.font = FONT_HEADER
+
+        # 数据列：values
+        for c in range(n_value_cols):
+            val = values[c] if c < len(values) else None
+            cell = ws.cell(row=row_cursor, column=c + 2, value=val)
+            cell.border = BORDER_THIN
+            if is_total:
+                cell.font = FONT_HEADER
+
+            col_meta = cell_meta.get(str(c), {}) if isinstance(cell_meta, dict) else {}
+            mode = cell_modes.get(str(c)) if isinstance(cell_modes, dict) else None
+            # 分类着色：mode=auto / 有 binding_id → 锁定（来自系统取数）
+            has_binding = bool(col_meta.get("binding_id"))
+            if has_binding or mode in ("auto", "formula"):
+                cell.fill = _get_fill_for_type("locked" if has_binding else "formula")
+                cell.protection = Protection(locked=True)
+            else:
+                cell.fill = _get_fill_for_type("editable")
+                cell.protection = Protection(locked=False)
+
+            # 注：不再写 openpyxl Comment（legacy VML 批注 + sheet protection 组合
+            # 在 WPS 下会触发"无法打开指定的文件"。绑定/公式溯源信息已通过 4 色语义
+            # + 隐藏 _meta_ sheet 完整承载，批注为冗余提示，移除以保 WPS 兼容）。
+
+        row_cursor += 1
+
+    return row_cursor
 
 
 # ---------------------------------------------------------------------------
@@ -399,6 +514,7 @@ def _build_meta_sheet(ws: Worksheet, sections: list[dict[str, Any]]) -> None:
             "cell_modes": section.get("_cell_modes", {}),
             "cell_meta": section.get("_cell_meta", {}),
             "dynamic_regions": section.get("_dynamic_regions", []),
+            "guidance_text": section.get("guidance_text") or "",
         }
 
     # Compress and store
@@ -425,6 +541,44 @@ def _build_meta_sheet(ws: Worksheet, sections: list[dict[str, Any]]) -> None:
     # A5: version
     ws.cell(row=5, column=1, value="format_version")
     ws.cell(row=5, column=2, value="1.0")
+
+
+# ---------------------------------------------------------------------------
+# Navigation Hyperlinks (TOC ↔ Section sheets)
+# ---------------------------------------------------------------------------
+
+FONT_LINK = Font(color="0000FF", underline="single", size=10)
+FONT_BACK_LINK = Font(color="0000FF", underline="single", size=9)
+
+
+def _add_navigation_links(
+    ws_toc: Worksheet,
+    section_sheet_names: list[str],
+    sections: list[dict[str, Any]],
+) -> None:
+    """Add bidirectional hyperlinks between TOC and section sheets.
+
+    - TOC: title column cells link to corresponding section sheet A1
+    - Each section sheet: row 1 right side gets a "← 返回目录" link back to TOC
+    """
+    from openpyxl.utils import quote_sheetname
+
+    # TOC → section sheets (title is column B, starting row 2)
+    for idx, sheet_name in enumerate(section_sheet_names):
+        toc_row = idx + 2  # row 1 is header
+        cell = ws_toc.cell(row=toc_row, column=2)
+        # Internal hyperlink format: #'Sheet Name'!A1
+        cell.hyperlink = f"#'{sheet_name}'!A1"
+        cell.font = FONT_LINK
+
+    # Section sheets → back to TOC
+    for sheet_name in section_sheet_names:
+        # Find the worksheet by name
+        ws = ws_toc.parent[sheet_name]
+        # Add "← 返回目录" in column D row 1 (after the title)
+        back_cell = ws.cell(row=1, column=4, value="← 返回目录")
+        back_cell.hyperlink = "#'章节清单'!A1"
+        back_cell.font = FONT_BACK_LINK
 
 
 # ---------------------------------------------------------------------------
@@ -494,19 +648,26 @@ def export_sections_to_xlsx(
     ws_toc = wb.create_sheet("章节清单")
     _build_toc_sheet(ws_toc, filtered)
 
-    # C.0.2: Section sheets
-    for section in filtered:
+    # C.0.2: Section sheets — track sheet_name mapping for hyperlinks
+    section_sheet_names: list[str] = []
+    for idx, section in enumerate(filtered, start=1):
         section_id = section.get("section_id", "unknown")
         title = section.get("section_title", section_id)
-        sheet_name = _truncate_sheet_name(title)
+        # 使用序号+标题作为 sheet 名，更直观
+        numbered_title = f"{idx:02d}_{title}"
+        sheet_name = _truncate_sheet_name(numbered_title)
 
         # Ensure unique sheet name
         existing_names = [ws.title for ws in wb.worksheets]
         if sheet_name in existing_names:
             sheet_name = _truncate_sheet_name(f"{title[:25]}_{section_id[:5]}")
 
+        section_sheet_names.append(sheet_name)
         ws_section = wb.create_sheet(sheet_name)
         _build_section_sheet(ws_section, section, include_formulas, include_provenance)
+
+    # Add hyperlinks: TOC → section sheets, section sheets → TOC
+    _add_navigation_links(ws_toc, section_sheet_names, filtered)
 
     # C.0.5: _meta_ sheet (last, hidden)
     ws_meta = wb.create_sheet("_meta_")
@@ -585,7 +746,7 @@ class NoteOfflineExportService:
         if self.db is None:
             return []
 
-        from sqlalchemy import select as sa_select
+        from sqlalchemy import or_, select as sa_select
 
         from app.models.report_models import DisclosureNote
 
@@ -593,9 +754,16 @@ class NoteOfflineExportService:
             DisclosureNote.project_id == project_id,
             DisclosureNote.year == year,
             DisclosureNote.is_deleted == False,  # noqa: E712
-        )
+        ).order_by(DisclosureNote.sort_order.asc().nulls_last(), DisclosureNote.note_section.asc())
         if section_ids:
-            query = query.where(DisclosureNote.section_id.in_(section_ids))
+            # 前端自定义勾选传的是 note_section（如"八、1"），且 DB section_id 列多为空，
+            # 故按 note_section 过滤（兼容极少数 section_id 有值的情况）。
+            query = query.where(
+                or_(
+                    DisclosureNote.note_section.in_(section_ids),
+                    DisclosureNote.section_id.in_(section_ids),
+                )
+            )
 
         result = await self.db.execute(query)
         notes = result.scalars().all()
@@ -605,6 +773,7 @@ class NoteOfflineExportService:
             section_dict = {
                 "section_id": note.section_id or note.note_section or "",
                 "section_title": note.section_title or "",
+                "guidance_text": note.guidance_text or "",
                 "table_data": note.table_data or {},
                 "_formulas": (note.table_data or {}).get("_formulas", {}),
                 "_cell_provenance": (note.table_data or {}).get("_cell_provenance", {}),

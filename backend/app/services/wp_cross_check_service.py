@@ -361,8 +361,8 @@ class CrossCheckService:
         # 数字字面量
         try:
             return Decimal(token)
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug("[CROSS_CHECK] token 非数字字面量: %s (%s)", token, e)
 
         logger.warning(f"[CROSS_CHECK] Cannot eval token: {token}")
         return None
@@ -374,16 +374,18 @@ class CrossCheckService:
     ) -> Decimal | None:
         """从底稿 parsed_data 取值"""
         try:
+            # working_paper 无 year 列（年度经由 project / wp_index 维度），不可按 wp.year 过滤
             q = sa.text("""
                 SELECT wp.parsed_data
                 FROM working_paper wp
                 JOIN wp_index wi ON wi.id = wp.wp_index_id
-                WHERE wi.project_id = :pid AND wp.year = :year
+                WHERE wi.project_id = :pid
                   AND wi.wp_code = :wp_code
+                  AND wp.is_deleted = false
                 LIMIT 1
             """)
             result = await self.db.execute(q, {
-                "pid": str(project_id), "year": year, "wp_code": wp_code
+                "pid": str(project_id), "wp_code": wp_code
             })
             row = result.first()
             if not row or not row[0]:
@@ -407,13 +409,15 @@ class CrossCheckService:
     ) -> Decimal | None:
         """从试算表取值"""
         try:
+            # trial_balance 真实列：unadjusted_amount/aje_adjustment/rje_adjustment/
+            # audited_amount/opening_balance（无 closing_balance）。
             col_map = {
-                "审定数": "closing_balance",
-                "期末余额": "closing_balance",
-                "未审数": "closing_balance",
+                "审定数": "audited_amount",
+                "期末余额": "audited_amount",
+                "未审数": "unadjusted_amount",
                 "期初余额": "opening_balance",
             }
-            db_col = col_map.get(column, "closing_balance")
+            db_col = col_map.get(column, "audited_amount")
 
             q = sa.text(f"""
                 SELECT {db_col}
@@ -439,12 +443,12 @@ class CrossCheckService:
         """从试算表范围求和"""
         try:
             col_map = {
-                "审定数": "closing_balance",
-                "期末余额": "closing_balance",
-                "未审数": "closing_balance",
+                "审定数": "audited_amount",
+                "期末余额": "audited_amount",
+                "未审数": "unadjusted_amount",
                 "期初余额": "opening_balance",
             }
-            db_col = col_map.get(column, "closing_balance")
+            db_col = col_map.get(column, "audited_amount")
 
             # 解析范围 "1001~1999"
             parts = range_str.split("~")
@@ -474,34 +478,42 @@ class CrossCheckService:
     async def _get_adj_value(
         self, project_id: UUID, year: int, account_code: str, adj_type: str
     ) -> Decimal | None:
-        """从调整分录取值"""
+        """从调整分录取值。
+
+        v2 符号约定（ledger-sign-convention-unify）：返回值须与
+        trial_balance.aje_adjustment/rje_adjustment 口径一致——即按科目自然方向归一
+        （借方类用 debit-credit，贷方类取反 credit-debit），与
+        trial_balance_service.recalc_adjustments 使用同一 direction_resolver。
+        否则贷方类（负债/权益/收入）的 ADJ() 取值会与审定数推导反号。
+        """
+        from app.services.ledger_import.direction_resolver import (
+            resolve_account_direction,
+        )
+
         try:
-            if adj_type == "aje_net":
-                q = sa.text("""
-                    SELECT COALESCE(SUM(ae.debit_amount - ae.credit_amount), 0)
-                    FROM adjustment_entries ae
-                    JOIN adjustments a ON a.id = ae.adjustment_id
-                    WHERE a.project_id = :pid AND a.year = :year
-                      AND ae.account_code = :code
-                      AND a.adjustment_type = 'aje'
-                      AND a.status != 'rejected'
-                """)
-            else:
-                q = sa.text("""
-                    SELECT COALESCE(SUM(ae.debit_amount - ae.credit_amount), 0)
-                    FROM adjustment_entries ae
-                    JOIN adjustments a ON a.id = ae.adjustment_id
-                    WHERE a.project_id = :pid AND a.year = :year
-                      AND ae.account_code = :code
-                      AND a.adjustment_type = 'rje'
-                      AND a.status != 'rejected'
-                """)
+            adj_type_filter = "aje" if adj_type == "aje_net" else "rje"
+            q = sa.text("""
+                SELECT COALESCE(SUM(ae.debit_amount - ae.credit_amount), 0),
+                       MAX(ae.account_name)
+                FROM adjustment_entries ae
+                JOIN adjustments a ON a.id = ae.adjustment_id
+                WHERE a.project_id = :pid AND a.year = :year
+                  AND ae.standard_account_code = :code
+                  AND a.adjustment_type = :atype
+                  AND a.review_status != 'rejected'
+            """)
             result = await self.db.execute(q, {
                 "pid": str(project_id), "year": year, "code": account_code,
+                "atype": adj_type_filter,
             })
             row = result.first()
             if row and row[0] is not None:
-                return Decimal(str(row[0]))
+                raw_net = Decimal(str(row[0]))
+                account_name = row[1] or ""
+                # 按科目自然方向归一（与 recalc_adjustments 口径一致）
+                direction, _src = resolve_account_direction(account_code, account_name)
+                sign = Decimal("-1") if direction == "credit" else Decimal("1")
+                return sign * raw_net
             return Decimal("0")
         except Exception as e:
             logger.debug(f"[CROSS_CHECK] ADJ value error: {account_code}/{adj_type}: {e}")
@@ -515,7 +527,7 @@ class CrossCheckService:
         """获取试算表审定余额（标准科目编码→金额）"""
         try:
             q = sa.text("""
-                SELECT standard_account_code, closing_balance
+                SELECT standard_account_code, audited_amount
                 FROM trial_balance
                 WHERE project_id = :pid AND year = :year
             """)
@@ -524,7 +536,8 @@ class CrossCheckService:
                 row[0]: Decimal(str(row[1])) for row in result.fetchall()
                 if row[0] and row[1] is not None
             }
-        except Exception:
+        except Exception as e:
+            logger.warning("[CROSS_CHECK] 查询试算表审定数失败 pid=%s year=%s: %s", project_id, year, e)
             return {}
 
     async def _get_trial_balance_full(
@@ -533,7 +546,8 @@ class CrossCheckService:
         """获取试算表完整数据（含未审数/AJE/RJE/审定数）"""
         try:
             q = sa.text("""
-                SELECT standard_account_code, closing_balance, opening_balance
+                SELECT standard_account_code, unadjusted_amount, opening_balance,
+                       aje_adjustment, rje_adjustment, audited_amount
                 FROM trial_balance
                 WHERE project_id = :pid AND year = :year
             """)
@@ -544,13 +558,14 @@ class CrossCheckService:
                 if not code:
                     continue
                 data[code] = {
-                    "audited": row[1] or 0,
-                    "unadjusted": row[1] or 0,  # 简化：未审数≈审定数
-                    "aje_net": 0,
-                    "rje_net": 0,
+                    "audited": row[5] or 0,
+                    "unadjusted": row[1] or 0,
+                    "aje_net": row[3] or 0,
+                    "rje_net": row[4] or 0,
                 }
             return data
-        except Exception:
+        except Exception as e:
+            logger.warning("[CROSS_CHECK] 查询试算表完整数据失败 pid=%s year=%s: %s", project_id, year, e)
             return {}
 
     async def _get_workpaper_audited_amounts(
@@ -581,7 +596,8 @@ class CrossCheckService:
                         rules.append(rule_def)
                         seen.add(rule_def["rule_id"])
             return rules
-        except Exception:
+        except Exception as e:
+            logger.warning("[CROSS_CHECK] 加载项目自定义规则失败 pid=%s: %s", project_id, e)
             return []
 
     # ─── 结果持久化 ───────────────────────────────────────────────────────────

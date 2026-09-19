@@ -1,0 +1,341 @@
+{
+  "schema_version": "i-cycle-deletion-plan:v1",
+  "task": "Task 51",
+  "spec": "workpaper-html-onlyoffice-bidirectional-writeback-closure",
+  "description": "I 循环 Excel 独立 entry 的 legacy dual-mode composable 删除清册。裁决字段逐条与 backend/data/workpaper_sync_i_cycle_manifest_slice.json 同源（capability 全为 null、html_counterpart_verdict 全为 exists），理由按 AC 12.8 的真判据（有无 HTML 对端）写，不得出现「无 adapter / 无 contract / 无 bundle」这类循环论证。删除动作本身归 Task 66（生成计划）/ Task 72（执行删除）—— 本计划只是清册，不在 Task 51 内执行删除。🔴 I 循环有三处与 D/F/G/H 都不同、直接决定删除动作能否安全执行的事实：① **6 个 dual-mode composable 各有且仅有 1 个生产消费方（自己的宿主）**，无一 orphan、无一被子 Tab 错位消费 —— 这比 H（5 条零消费或错位）干净得多，删 composable + 改宿主的常规套路在这里是安全的；② **但另有 2 个 FormData composable 生产零消费**（useI4FormData 394 行 / useI6FormData 448 行，都含完整 checklist GET/PUT + trial-balance writeback 管道），它们**不是** dual-mode 载体、不在本次删除范围内，却极易被误当成「I4/I6 的持久化载体」而接线 —— 已在 orphan_production_formdata_composables 一节逐条落到文件级，并登记为 slice 的 BP-5；③ **4 处注释提及会被符号名 grep 误报成 composable→composable 的消费边**（`* - Follow useI{n}DualMode pattern`），判消费方一律用 import 路径字面量。",
+  "paradigm_ref": "backend/data/workpaper_sync_migration_paradigm.json",
+  "adjudication_source_of_truth": "backend/data/workpaper_sync_i_cycle_manifest_slice.json#independent_entries",
+  "deletion_execution_owner": "Task 66（plan）/ Task 72（execute）",
+  "pilot_already_migrated": null,
+  "pilot_already_migrated_note": "🔴 I 循环**没有** pilot，故本键为 null 而不是像 H 那样填一条。实证：四个 pilot 是 B60（Task 40）/ D2（Task 41）/ H1（Task 42）/ G7（Task 43），逐文件读 backend/data/workpaper_sync_contracts/*.json 的 `review.entry_id`，无一条以 'xlsx/gt-i' 开头；且 tasks.md 的 Task 51 正文没有「除 X 外」限定语。本清册因此覆盖 I 循环全部 6 条独立 entry，没有「pilot 的 legacy 删除归 Task 45」这条分流。",
+  "shared_base_preserved": {
+    "file": "audit-platform/frontend/src/components/workpaper/composables/useWorkpaperEntryDualMode.ts",
+    "reason": "共享基类被大量非 I 模块使用，按 legacy_deletion_paradigm 的 shared_base_preserved 约束不删。",
+    "i_cycle_does_not_consume_it": "🔴 实测 I 循环 6 个 dual-mode composable **无一** import useWorkpaperEntryDualMode（wraps_shared_base 全为 false）—— 它们是 6 份各自独立的实现（114~148 行），localStorage 前缀分别是 i1-dual-mode: .. i6-dual-mode:。故删除 I 循环的 6 个 composable 不会触及共享基类，也不会与 D/M/J 那些 wrapper 撞车。",
+    "verification_recipe": "对 6 个 useI{n}DualMode.ts 逐文件断言不含 `useWorkpaperEntryDualMode` 的 import 路径字面量（`from '...useWorkpaperEntryDualMode'`）。这是 import 边口径，不是符号名口径。"
+  },
+  "host_inlined_second_implementation": {
+    "why_this_key_exists": "H 循环有 4 个宿主没有消费自己的 dual-mode composable、而在宿主里内联了等价实现，于是「删了 composable、测试全绿」不能证明任何事。本任务对 I 循环做同一项实测，结论是**没有**该形态 —— 但「没有」必须落成可复算判据，否则后来者要么重复调查，要么误以为 I 也有。",
+    "result": "none",
+    "measured": "6 个宿主逐个实测：GtI1IntangibleAssets.vue#L273 / GtI2DevelopmentExpenditure.vue#L374 / GtI3Goodwill.vue#L223 / GtI4LongTermPrepaid.vue#L201 / GtI5OtherNoncurrentAssets.vue#L165 / GtI6ResearchDevelopmentExpense.vue#L193 各自 `import { useI{n}DualMode } from './composables/useI{n}DualMode'`，并在 setup 里 `const dualMode = useI{n}DualMode({...})`（#L339 / #L461 / #L284 / #L249 / #L224 / #L252）。模板里的模式判断全部走 `dualMode.currentMode.value`（I2 走它导出的 `dualMode.mode` 别名 #L465），没有第二份内联的 mode ref / localStorage 读写 / OO 健康探测。",
+    "invariant": "对每个 entry，宿主里 `dualMode` 的来源必须是自己那个 composable 的返回值，且宿主自身不得出现 `localStorage.getItem/setItem` 对 `*-dual-mode:` 前缀键的直接读写（实测 6 个宿主该形态 0 命中；6 处读写全在各自 composable 内）。",
+    "why_it_matters_that_it_is_none": "这意味着 I 循环的删除动作**可以**用常规判据验收：删 composable + 改宿主 import 后，模式切换行为真的会变（因为宿主确实依赖它）。H 循环那 4 条不行。"
+  },
+  "orphan_production_formdata_composables": {
+    "why_this_key_exists": "🔴 这一节**不是**删除清单，是「删除时最容易误接的东西」清单。两个 FormData composable 生产零消费但都含完整的持久化管道，长得比真载体更像载体。Task 72 执行改线时若把 adapter 接到它们身上，宿主行为一点不变而守卫因为「文件确实被改了」全绿 —— 假绿第①源。",
+    "in_scope_of_this_deletion_plan": false,
+    "why_not_in_scope": "本清册的对象是 legacy **dual-mode** composable（legacy_deletion_paradigm step 3 的删除对象）。FormData composable 是持久化载体，属另一类；且🔴 实扫 `.kiro/specs/` 顶层只有 5 个在办目录，`i-cycle-extraction-formula-and-disclosure-closure` **已归档** ⇒ 没有在办 spec 会来接手它们，它们是无主的生产死代码（useI4FormData 顶部自带 `@deprecated` 注释，写明「壳层已自管 selfLoad / handleChildSave / TB 取数，勿在页面中挂载」）。按 AC 1.7 它们是删除候选，但删除决策不在本任务。已登记为 slice 的 BP-5。",
+    "modules": [
+      {
+        "module": "audit-platform/frontend/src/components/workpaper/composables/useI4FormData.ts",
+        "lines": 393,
+        "entry_id": "xlsx/gt-i4-long-term-prepaid",
+        "production_consumers": [],
+        "test_only_consumers": [],
+        "mention_only": ["audit-platform/frontend/src/components/workpaper/GtI4LongTermPrepaid.vue"],
+        "pipeline_it_contains": [
+          "PUT /api/workpapers/{wpId}/checklist-responses (#L93)",
+          "PUT /api/projects/{projectId}/trial-balance/writeback (#L209)",
+          "GET /api/workpapers/{wpId}/render-config (#L230)",
+          "GET /api/workpapers/{wpId}/checklist-responses (#L238)",
+          "GET /api/projects/{projectId} (#L280)",
+          "GET /api/projects/{projectId}/trial-balance (#L312)"
+        ],
+        "real_carrier_instead": "audit-platform/frontend/src/components/workpaper/GtI4LongTermPrepaid.vue#L296（宿主内联 http.put）"
+      },
+      {
+        "module": "audit-platform/frontend/src/components/workpaper/composables/useI6FormData.ts",
+        "lines": 447,
+        "entry_id": "xlsx/gt-i6-research-development-expense",
+        "production_consumers": [],
+        "test_only_consumers": [],
+        "mention_only": [
+          "audit-platform/frontend/src/components/workpaper/composables/useI6CrossSheet.ts",
+          "audit-platform/frontend/src/components/workpaper/composables/factories/createChecklistFormData.ts"
+        ],
+        "pipeline_it_contains": [
+          "PUT /api/workpapers/{wpId}/checklist-responses (#L118)",
+          "GET /api/workpapers/{wpId}/render-config (#L222)",
+          "GET /api/workpapers/{wpId}/checklist-responses (#L230)",
+          "GET /api/projects/{projectId} (#L261)",
+          "GET /api/projects/{projectId}/trial-balance (#L301)",
+          "PUT /api/projects/{projectId}/trial-balance/writeback (#L355)"
+        ],
+        "real_carrier_instead": "audit-platform/frontend/src/components/workpaper/GtI6ResearchDevelopmentExpense.vue#L292 与 #L311（宿主内联 http.put，单项 + 批量两处）"
+      }
+    ],
+    "non_orphan_formdata_modules_for_contrast": [
+      { "module": "composables/useI1FormData.ts", "lines": 499, "production_consumers": 5, "consumed_by_host": false },
+      { "module": "composables/useI2FormData.ts", "lines": 527, "production_consumers": 4, "consumed_by_host": true },
+      { "module": "composables/useI3FormData.ts", "lines": 367, "production_consumers": 2, "consumed_by_host": false },
+      { "module": "composables/useI5FormData.ts", "lines": 426, "production_consumers": 1, "consumed_by_host": true }
+    ],
+    "verification_recipe": "判消费方一律用 import 路径字面量三形态之一：`from '<...mod>'` / `import('<...mod>')` / `vi.mock('<...mod>')`。**两侧都断言**：声称零消费的 2 个真零（生产与测试都零），声称有消费方的 4 个真有且条数相等。全量扫描面 = audit-platform/frontend/src 下 .ts/.vue（实测 7186 个文件）。"
+  },
+  "comment_only_pseudo_consumer_edges": {
+    "why_this_key_exists": "🔴 符号名 grep 会把这 4 处注释报成 composable→composable 的消费边（实测：按 `useI1DualMode` 全文搜命中 3 个文件，其中 1 个是注释）。删除时若据此认为「useI1DualMode 还被 useI3DualMode 用着」，就会保留本该删的文件；反过来若据此以为「删 useI1DualMode 会连带打断 I3」，就会漏删。",
+    "edges": [
+      { "mentioned_module": "useI1DualMode", "mentioned_in": "audit-platform/frontend/src/components/workpaper/composables/useI3DualMode.ts#L8", "text": "* - Follow useI1DualMode pattern", "is_import_edge": false },
+      { "mentioned_module": "useI3DualMode", "mentioned_in": "audit-platform/frontend/src/components/workpaper/composables/useI4DualMode.ts#L9", "text": "* - Follow useI3DualMode pattern", "is_import_edge": false },
+      { "mentioned_module": "useI4DualMode", "mentioned_in": "audit-platform/frontend/src/components/workpaper/composables/useI5DualMode.ts#L9", "text": "* - Follow useI4DualMode pattern", "is_import_edge": false },
+      { "mentioned_module": "useI5DualMode", "mentioned_in": "audit-platform/frontend/src/components/workpaper/composables/useI6DualMode.ts#L9", "text": "* - Follow useI5DualMode pattern", "is_import_edge": false }
+    ],
+    "verification_recipe": "对这 4 处反向断言：该文件里出现了被提及模块的名字，但**没有**指向它的 import 路径字面量。守卫两侧都验（符号名命中数 > 0 且 import 边命中数 == 0），否则判据回到符号名口径。"
+  },
+  "entries": [
+    {
+      "entry_id": "xlsx/gt-i1-intangible-assets",
+      "wp_code_pattern": "I1I",
+      "host_component": "audit-platform/frontend/src/components/workpaper/GtI1IntangibleAssets.vue",
+      "capability_adjudication": null,
+      "capability_verdict_stage": "pipeline_entry_pending_definition_delivery",
+      "capability_target": "bidirectional",
+      "html_counterpart_verdict": "exists",
+      "adjudication_reason": "按 AC 12.8 的真判据（有无 HTML 对端）实测：本 entry 的业务内容真实存在于 checklist_responses（primary managed table `I1-2-rows` 存 JSON 行数组，owner 常量 ITEM_ID_ROWS 在 useI1Detail.ts#L164，行身份 rowId 由 #L307 生成为 `row-${Date.now()}-${Math.random()...}`），写入点是宿主内联的 `http.put`(#L380)，读走 props.htmlData.allResponses 优先 + render-config 兜底(#L418-445)；模板依据 `I/I1 无形资产、累计摊销及减值准备.xlsx!明细表I1-2!A8` = '无形资产项目' 与分类真源 `底稿目录!A9:A19`（11 类逐格与 i1CategoryScope.I1_DEFAULT_CATEGORIES 相等）均已 openpyxl 逐格核验 ⇒ html_counterpart_verdict = exists ⇒ **不得**标 single_onlyoffice。同时 AC 12.1 的六件前置未交付 ⇒ 也不得标 bidirectional，capability 终态未定（见 slice 的 blocking_preconditions BP-1..BP-4，本 entry 另叠加 BP-6 的 1 处与 BP-7）。",
+      "html_counterpart_source_refs": [
+        "audit-platform/frontend/src/components/workpaper/GtI1IntangibleAssets.vue#L271",
+        "audit-platform/frontend/src/components/workpaper/GtI1IntangibleAssets.vue#L380",
+        "audit-platform/frontend/src/components/workpaper/GtI1IntangibleAssets.vue#L418",
+        "audit-platform/frontend/src/components/workpaper/composables/useI1Detail.ts#L164",
+        "backend/app/routers/checklist_responses.py",
+        "backend/app/routers/wp_render_strategies/_i1_intangible_assets.py",
+        "backend/wp_templates/I/I1 无形资产、累计摊销及减值准备.xlsx!明细表I1-2!A8 = '无形资产项目'",
+        "backend/wp_templates/I/I1 无形资产、累计摊销及减值准备.xlsx!底稿目录!A9 = '土地使用权'"
+      ],
+      "legacy_composables_to_delete": [
+        {
+          "file": "audit-platform/frontend/src/components/workpaper/composables/useI1DualMode.ts",
+          "type": "standalone_dual_mode_implementation",
+          "lines": 142,
+          "wraps_shared_base": false,
+          "consumers": ["audit-platform/frontend/src/components/workpaper/GtI1IntangibleAssets.vue"],
+          "test_only_consumers": ["audit-platform/frontend/src/components/workpaper/__tests__/GtI1IntangibleAssets.test.ts"],
+          "test_consumer_note": "该 spec 用 `vi.mock('../composables/useI1DualMode', ...)`(#L23-24) 打桩 —— 删除 composable 时这个 mock 路径会失效，必须同步改（否则 vitest 报 `Cannot find module`）。这是全 slice 唯一带 vi.mock 的一条。"
+        }
+      ],
+      "legacy_composables_preserved": [],
+      "localStorage_prefix": "i1-dual-mode:",
+      "action": "delete_entry_composable_and_update_host"
+    },
+    {
+      "entry_id": "xlsx/gt-i2-development-expenditure",
+      "wp_code_pattern": "I2D",
+      "host_component": "audit-platform/frontend/src/components/workpaper/GtI2DevelopmentExpenditure.vue",
+      "capability_adjudication": null,
+      "capability_verdict_stage": "pipeline_entry_pending_definition_delivery",
+      "capability_target": "bidirectional",
+      "html_counterpart_verdict": "exists",
+      "adjudication_reason": "按 AC 12.8 的真判据实测：业务内容真实存在于 checklist_responses（primary managed table `I2-2-rows`，owner 常量 ITEM_ID_ROWS 在 useI2Detail.ts#L145，行身份 rowId 由 #L162 的 generateRowId 生成），写入点是宿主内联的 `http.put`(#L486)，**另有第二条写路径** useI2FormData.ts#L185（被宿主 + useI2Adjudication + useI2Impairment + I2TabAdjudication.vue 四方消费），读走 props.htmlData 优先 + render-config 兜底(#L496-523)；模板依据 `I/I2 开发支出.xlsx!明细表I2-2!A10` = '研究开发项目名称' 已 openpyxl 逐格核验 ⇒ html_counterpart_verdict = exists ⇒ **不得**标 single_onlyoffice。AC 12.1 六件前置未交付 ⇒ 也不得标 bidirectional。",
+      "html_counterpart_source_refs": [
+        "audit-platform/frontend/src/components/workpaper/GtI2DevelopmentExpenditure.vue#L371",
+        "audit-platform/frontend/src/components/workpaper/GtI2DevelopmentExpenditure.vue#L486",
+        "audit-platform/frontend/src/components/workpaper/GtI2DevelopmentExpenditure.vue#L496",
+        "audit-platform/frontend/src/components/workpaper/composables/useI2Detail.ts#L145",
+        "audit-platform/frontend/src/components/workpaper/composables/useI2FormData.ts#L185",
+        "backend/app/routers/checklist_responses.py",
+        "backend/app/routers/wp_render_strategies/_i2_development_expenditure.py",
+        "backend/wp_templates/I/I2 开发支出.xlsx!明细表I2-2!A10 = '研究开发项目名称'"
+      ],
+      "legacy_composables_to_delete": [
+        {
+          "file": "audit-platform/frontend/src/components/workpaper/composables/useI2DualMode.ts",
+          "type": "standalone_dual_mode_implementation",
+          "lines": 113,
+          "wraps_shared_base": false,
+          "consumers": ["audit-platform/frontend/src/components/workpaper/GtI2DevelopmentExpenditure.vue"],
+          "test_only_consumers": [],
+          "host_alias_note": "🔴 宿主把 composable 的返回值**改名转出**：`const currentMode = dualMode.mode`(#L465) / `const modeOptions = dualMode.modeOptions`(#L466) / `onModeChange` 包一层(#L470)，模板里用的是这三个别名而不是 `dualMode.*`。改线时若只搜模板里的 `dualMode` 会以为宿主没用它 —— 必须按 import 边判归属。这与其余 5 个宿主（模板直接 `dualMode.currentMode.value`）不同形。"
+        }
+      ],
+      "legacy_composables_preserved": [],
+      "localStorage_prefix": "i2-dual-mode:",
+      "action": "delete_entry_composable_and_update_host",
+      "extra_ui_action_required": "🔴 本 entry 的工具栏**没有** el-segmented 的二级门控 `v-if=\"dualMode.isOoAvailable\"`、也没有 `仅结构化视图` 兜底 tag（其余 5 条都有）⇒ 改线时必须同时补上 AC 1.4/1.5 的门控与可操作原因，否则删了 legacy 仍然是「OO 不可用也显示切换按钮」。见 slice 的 i_cycle_form_differences.ID-5 与 BP-10。"
+    },
+    {
+      "entry_id": "xlsx/gt-i3-goodwill",
+      "wp_code_pattern": "I3G",
+      "host_component": "audit-platform/frontend/src/components/workpaper/GtI3Goodwill.vue",
+      "capability_adjudication": null,
+      "capability_verdict_stage": "pipeline_entry_pending_definition_delivery",
+      "capability_target": "bidirectional",
+      "html_counterpart_verdict": "exists",
+      "adjudication_reason": "按 AC 12.8 的真判据实测：业务内容真实存在于 checklist_responses（primary managed table `I3-2-rows`，owner 常量 ITEM_ID_ROWS 在 useI3Detail.ts#L186，行身份 rowId 由 #L274 生成），写入点是宿主内联的 `http.put`(#L319，失败时 ElMessage.error 报错而非静默)，读走 props.htmlData 优先 + render-config 兜底(#L355-382)；模板依据 `I/I3 商誉.xlsx!明细表I3-2!A10` = '被投资单位名称或形成商誉的事项' 已 openpyxl 逐格核验；披露表行标签在源模板里本身是指向明细表的公式（`附注披露（上市公司）!A9` = `='明细表I3-2'!A14`），即源模板自己声明「披露行由明细行派生」⇒ html_counterpart_verdict = exists ⇒ **不得**标 single_onlyoffice。AC 12.1 六件前置未交付 ⇒ 也不得标 bidirectional。本 entry 是 BP-6 的主要承载者（6 处位置化命中里 5 处在此）。",
+      "html_counterpart_source_refs": [
+        "audit-platform/frontend/src/components/workpaper/GtI3Goodwill.vue#L220",
+        "audit-platform/frontend/src/components/workpaper/GtI3Goodwill.vue#L319",
+        "audit-platform/frontend/src/components/workpaper/GtI3Goodwill.vue#L355",
+        "audit-platform/frontend/src/components/workpaper/composables/useI3Detail.ts#L186",
+        "audit-platform/frontend/src/components/workpaper/composables/useI3Disclosure.ts#L488",
+        "backend/app/routers/checklist_responses.py",
+        "backend/app/routers/wp_render_strategies/_i3_goodwill.py",
+        "backend/wp_templates/I/I3 商誉.xlsx!明细表I3-2!A10 = '被投资单位名称或形成商誉的事项'",
+        "backend/wp_templates/I/I3 商誉.xlsx!附注披露（上市公司）!A9 = \"='明细表I3-2'!A14\""
+      ],
+      "legacy_composables_to_delete": [
+        {
+          "file": "audit-platform/frontend/src/components/workpaper/composables/useI3DualMode.ts",
+          "type": "standalone_dual_mode_implementation",
+          "lines": 141,
+          "wraps_shared_base": false,
+          "consumers": ["audit-platform/frontend/src/components/workpaper/GtI3Goodwill.vue"],
+          "test_only_consumers": [],
+          "mention_only_non_consumers": ["audit-platform/frontend/src/components/workpaper/composables/useI4DualMode.ts#L9（注释，不是 import 边）"]
+        }
+      ],
+      "legacy_composables_preserved": [],
+      "localStorage_prefix": "i3-dual-mode:",
+      "action": "delete_entry_composable_and_update_host",
+      "must_fix_before_wiring": "BP-6 —— `useI3Disclosure.ts#L488` 的 `rowId: \\`cgu-${i}\\`` 经 `_persistSection('cgu_allocation')` 真落库到 `I3-disc-{listed|soe}-cgu_allocation-rows`；接 adapter 前必须先改成稳定身份并对已有数据做一次迁移，否则 roundtrip 的 stable field key 无法保持。"
+    },
+    {
+      "entry_id": "xlsx/gt-i4-long-term-prepaid",
+      "wp_code_pattern": "I4L",
+      "host_component": "audit-platform/frontend/src/components/workpaper/GtI4LongTermPrepaid.vue",
+      "capability_adjudication": null,
+      "capability_verdict_stage": "pipeline_entry_pending_definition_delivery",
+      "capability_target": "bidirectional",
+      "html_counterpart_verdict": "exists",
+      "adjudication_reason": "按 AC 12.8 的真判据实测：业务内容真实存在于 checklist_responses（primary managed table `I4-2-rows`，owner 常量 ITEM_ID_ROWS 在 useI4Detail.ts#L180，行身份 rowId 由 #L210 的 generateRowId 生成，持久化在 composable 内先 JSON.stringify #L588），写入点是宿主内联的 `http.put`(#L296) 且**按 item_id 形态分流写列**（`/-(completion|completion-ok)$/` 命中时同时写 conclusion 与 remark，#L288-292），读走 props.htmlData 优先 + render-config 兜底(#L338-365)；模板依据 `I/I4 长期待摊费用.xlsx!明细表I4-2!A8` = '项目名称' 已 openpyxl 逐格核验 ⇒ html_counterpart_verdict = exists ⇒ **不得**标 single_onlyoffice。AC 12.1 六件前置未交付 ⇒ 也不得标 bidirectional。",
+      "html_counterpart_source_refs": [
+        "audit-platform/frontend/src/components/workpaper/GtI4LongTermPrepaid.vue#L199",
+        "audit-platform/frontend/src/components/workpaper/GtI4LongTermPrepaid.vue#L288",
+        "audit-platform/frontend/src/components/workpaper/GtI4LongTermPrepaid.vue#L296",
+        "audit-platform/frontend/src/components/workpaper/GtI4LongTermPrepaid.vue#L338",
+        "audit-platform/frontend/src/components/workpaper/composables/useI4Detail.ts#L180",
+        "backend/app/routers/checklist_responses.py",
+        "backend/app/routers/wp_render_strategies/_i4_long_term_prepaid.py",
+        "backend/wp_templates/I/I4 长期待摊费用.xlsx!明细表I4-2!A8 = '项目名称'"
+      ],
+      "legacy_composables_to_delete": [
+        {
+          "file": "audit-platform/frontend/src/components/workpaper/composables/useI4DualMode.ts",
+          "type": "standalone_dual_mode_implementation",
+          "lines": 147,
+          "wraps_shared_base": false,
+          "consumers": ["audit-platform/frontend/src/components/workpaper/GtI4LongTermPrepaid.vue"],
+          "test_only_consumers": [],
+          "mention_only_non_consumers": ["audit-platform/frontend/src/components/workpaper/composables/useI5DualMode.ts#L9（注释，不是 import 边）"],
+          "storage_key_helper_note": "本 composable 与 useI5/useI6 一样用 `_storageKey()` 私有函数拼键（不是 useI1/useI2 的 `STORAGE_PREFIX + wpId` 直接拼），前缀常量仍是 `i4-dual-mode:`。删除时 localStorage 旧键的幂等迁移由 workpaperSyncModeStorage.ts 承担（legacy_deletion_paradigm step 5）。"
+        }
+      ],
+      "legacy_composables_preserved": [],
+      "localStorage_prefix": "i4-dual-mode:",
+      "action": "delete_entry_composable_and_update_host",
+      "must_not_wire_to": "audit-platform/frontend/src/components/workpaper/composables/useI4FormData.ts —— 394 行、生产零消费、宿主只在注释里提到它（见 orphan_production_formdata_composables 与 slice BP-5）。真载体是宿主 #L296。"
+    },
+    {
+      "entry_id": "xlsx/gt-i5-other-noncurrent-assets",
+      "wp_code_pattern": "I5O",
+      "host_component": "audit-platform/frontend/src/components/workpaper/GtI5OtherNoncurrentAssets.vue",
+      "capability_adjudication": null,
+      "capability_verdict_stage": "pipeline_entry_pending_definition_delivery",
+      "capability_target": "bidirectional",
+      "html_counterpart_verdict": "exists",
+      "adjudication_reason": "按 AC 12.8 的真判据实测：业务内容真实存在于 checklist_responses，但载体与其余 5 条不同 —— **宿主完全没有 http/api 的 import**，读写全由 useI5FormData.ts 承担（PUT #L109 / GET render-config #L280）；primary managed table `I5-2-rows` 的 owner 常量 ITEM_ID_ROWS 在 useI5Detail.ts#L180，行身份 rowId 由 #L211 的 generateRowId 生成。模板依据 `I/I5 其他非流动资产.xlsx!明细表I5-2!A8` = '项目' 已 openpyxl 逐格核验，且 **10 条内置分类 A11:A20 逐格与 useI5Detail.I5_BUILTIN_CATEGORIES 完全相等**（含全角顿号）—— 本 entry 是全 slice 分类真源派生的正例 ⇒ html_counterpart_verdict = exists ⇒ **不得**标 single_onlyoffice。AC 12.1 六件前置未交付 ⇒ 也不得标 bidirectional。本 entry 无本次新查出的形态缺陷。",
+      "html_counterpart_source_refs": [
+        "audit-platform/frontend/src/components/workpaper/GtI5OtherNoncurrentAssets.vue#L161",
+        "audit-platform/frontend/src/components/workpaper/composables/useI5FormData.ts#L109",
+        "audit-platform/frontend/src/components/workpaper/composables/useI5FormData.ts#L280",
+        "audit-platform/frontend/src/components/workpaper/composables/useI5Detail.ts#L180",
+        "audit-platform/frontend/src/components/workpaper/composables/useI5Detail.ts#L185",
+        "backend/app/routers/checklist_responses.py",
+        "backend/app/routers/wp_render_strategies/_i5_other_noncurrent_assets.py",
+        "backend/wp_templates/I/I5 其他非流动资产.xlsx!明细表I5-2!A8 = '项目'",
+        "backend/wp_templates/I/I5 其他非流动资产.xlsx!明细表I5-2!A11 = '预付土地出让金'"
+      ],
+      "legacy_composables_to_delete": [
+        {
+          "file": "audit-platform/frontend/src/components/workpaper/composables/useI5DualMode.ts",
+          "type": "standalone_dual_mode_implementation",
+          "lines": 147,
+          "wraps_shared_base": false,
+          "consumers": ["audit-platform/frontend/src/components/workpaper/GtI5OtherNoncurrentAssets.vue"],
+          "test_only_consumers": [],
+          "mention_only_non_consumers": ["audit-platform/frontend/src/components/workpaper/composables/useI6DualMode.ts#L9（注释，不是 import 边）"]
+        }
+      ],
+      "legacy_composables_preserved": [
+        {
+          "file": "audit-platform/frontend/src/components/workpaper/composables/useI5FormData.ts",
+          "lines": 426,
+          "reason": "🔴 **不删** —— 这是本 entry 的真持久化载体（全 slice 唯一的 formdata_composable 载体，宿主自己没有 client import）。它与 dual-mode 无关，删它会直接打断 I5 的读写。改线时 adapter 的 flush/reload 回调要接到它的导出上。"
+        }
+      ],
+      "localStorage_prefix": "i5-dual-mode:",
+      "action": "delete_entry_composable_and_update_host",
+      "wiring_note": "本 entry 是全 slice 唯一「宿主无 client import」的一条 ⇒ step 9 改线的验收判据不能写成「宿主里 legacy import 不在了且宿主直接调 bridge」，必须允许「宿主转发到 useI5FormData、由它调 bridge」这条形态。写死前者会对本 entry 假红。"
+    },
+    {
+      "entry_id": "xlsx/gt-i6-research-development-expense",
+      "wp_code_pattern": "I6R",
+      "host_component": "audit-platform/frontend/src/components/workpaper/GtI6ResearchDevelopmentExpense.vue",
+      "capability_adjudication": null,
+      "capability_verdict_stage": "pipeline_entry_pending_definition_delivery",
+      "capability_target": "bidirectional",
+      "html_counterpart_verdict": "exists",
+      "adjudication_reason": "按 AC 12.8 的真判据实测：业务内容真实存在于 checklist_responses（primary managed table `I6-2-detail-rows` —— 键与身份字段**双双与其余 5 条不同**：owner 常量是 STORAGE_KEY 在 useI6Detail.ts#L152，`LEGACY_STORAGE_KEY='I6-2-rows'`(#L155) 仍在读路径兼容，行身份字段是 `id` 而非 `rowId`，由 #L250 生成为 `detail-${Date.now()}-${Math.random()...}`），写入点是宿主内联的两处 `http.put`（单项 #L292 / 批量 #L311），读走 props.htmlData 优先 + render-config 兜底(#L350-377)；模板依据 `I/I6 研发费用.xlsx!明细表I6-2!A8` = '类别' 与 `A9` = '人工费' 已 openpyxl 逐格核验 ⇒ html_counterpart_verdict = exists ⇒ **不得**标 single_onlyoffice。AC 12.1 六件前置未交付 ⇒ 也不得标 bidirectional。本 entry 另背 BP-5（useI6FormData 448 行零消费）与 BP-8（默认 8 类里后 4 类无任何真源）。",
+      "html_counterpart_source_refs": [
+        "audit-platform/frontend/src/components/workpaper/GtI6ResearchDevelopmentExpense.vue#L190",
+        "audit-platform/frontend/src/components/workpaper/GtI6ResearchDevelopmentExpense.vue#L292",
+        "audit-platform/frontend/src/components/workpaper/GtI6ResearchDevelopmentExpense.vue#L311",
+        "audit-platform/frontend/src/components/workpaper/GtI6ResearchDevelopmentExpense.vue#L350",
+        "audit-platform/frontend/src/components/workpaper/composables/useI6Detail.ts#L152",
+        "audit-platform/frontend/src/components/workpaper/composables/useI6Detail.ts#L163",
+        "backend/app/routers/checklist_responses.py",
+        "backend/app/routers/wp_render_strategies/_i6_research_development_expense.py",
+        "backend/wp_templates/I/I6 研发费用.xlsx!明细表I6-2!A8 = '类别'",
+        "backend/wp_templates/I/I6 研发费用.xlsx!明细表I6-2!A9 = '人工费'"
+      ],
+      "legacy_composables_to_delete": [
+        {
+          "file": "audit-platform/frontend/src/components/workpaper/composables/useI6DualMode.ts",
+          "type": "standalone_dual_mode_implementation",
+          "lines": 133,
+          "wraps_shared_base": false,
+          "consumers": ["audit-platform/frontend/src/components/workpaper/GtI6ResearchDevelopmentExpense.vue"],
+          "test_only_consumers": ["audit-platform/frontend/src/components/workpaper/__tests__/i6Integration.spec.ts"],
+          "test_consumer_note": "该 spec 用真 import（不是 vi.mock）引用本 composable ⇒ 删除时 spec 必须同步改，否则 vitest 编译期报错。"
+        }
+      ],
+      "legacy_composables_preserved": [],
+      "localStorage_prefix": "i6-dual-mode:",
+      "action": "delete_entry_composable_and_update_host",
+      "must_not_wire_to": "audit-platform/frontend/src/components/workpaper/composables/useI6FormData.ts —— 448 行、生产零消费（见 orphan_production_formdata_composables 与 slice BP-5）。真载体是宿主 #L292 与 #L311 两处。",
+      "must_fix_before_wiring": "BP-8 —— 默认类别 8 条里后 4 条（设计费/装备调试费/委外研发费/其他）在 6 本 I 循环权威模板与两份 note_template 中命中数全为 0；接 adapter 前须把它们降级为可编辑空占位或补真源声明，否则 contract 的这 4 个 stable field key 在 OO 侧无行可锚（源模板 A13:A18 是无名空白）。"
+    }
+  ],
+  "excluded_from_plan": [
+    {
+      "what": "6 个 `useI{n}FormData.ts` 持久化 composable",
+      "reason": "它们是持久化载体而非 legacy dual-mode 实现，不在 legacy_deletion_paradigm step 3 的删除对象内。其中 useI5FormData 是 I5 的真载体（**绝不能删**，见该 entry 的 legacy_composables_preserved）；useI4FormData / useI6FormData 生产零消费（AC 1.7 的删除候选；🔴 原打算「与 i-cycle-extraction spec owner 确认」，实扫该 spec 已归档、无在办 owner ⇒ 需新立任务或并入 Task 72，已登记 slice BP-5）；useI1/useI2/useI3FormData 各有 2~5 个生产消费方。"
+    },
+    {
+      "what": "6 个宿主的子 Tab 组件（i1/ 15 个 + i2/ 18 个 + i3/ 11 个 + i4/ 11 个 + i5/ 8 个 + i6/ 10 个）",
+      "reason": "它们是同一 entry 内的 sheet 分发组件，没有自己的 GtOnlyOfficeSheet 挂载点，不在 manifest 的 186 条 entry 里，也不持有 dual-mode 状态（模式由宿主统一管）。唯一例外是 `i3/impairment/I3TabRecoverableTest.vue#L686` 有一处位置化行身份 —— 那是 BP-6 的一条命中，不是删除对象。"
+    },
+    {
+      "what": "`useWorkpaperEntryDualMode.ts` 共享基类",
+      "reason": "见 shared_base_preserved。I 循环 6 个 composable 无一 import 它，删除本清册的 6 个文件不触及它。"
+    },
+    {
+      "what": "I 循环的附注同步链路与四表取数链路",
+      "reason": "两个原 owner spec（disclosure-sync-path-buildout / i-cycle-extraction-formula-and-disclosure-closure）**都已归档**（实扫 .kiro/specs/ 顶层只剩 5 个在办目录）⇒ BP-7 / BP-8 的修复没有在办 owner，须新立任务。本清册只登记「接线前必须先修」的前后关系。"
+    }
+  ],
+  "counters": {
+    "entries": 6,
+    "composables_to_delete": 6,
+    "composables_preserved": 1,
+    "orphan_production_formdata_composables": 2,
+    "comment_only_pseudo_consumer_edges": 4,
+    "hosts_with_inlined_second_implementation": 0,
+    "test_files_requiring_sync_change": 2,
+    "entries_with_extra_ui_action_required": 1,
+    "entries_with_must_fix_before_wiring": 2,
+    "entries_with_must_not_wire_to": 2,
+    "counting_recipe": "守卫从 entries[] 现算全部计数并与本键等值比对（抄错或凑数即红）：composables_to_delete = Σ len(legacy_composables_to_delete)；composables_preserved = Σ len(legacy_composables_preserved)；test_files_requiring_sync_change = Σ len(test_only_consumers) over 待删文件；entries_with_* 三项按对应键是否存在计数。"
+  },
+  "properties_verified": [20, 28, 69, 70],
+  "requirements_covered": ["1.4", "1.7", "6.1", "6.2", "6.10", "11.1", "12.1", "12.4", "12.8", "12.10", "12.11", "12.12", "14.1"]
+}

@@ -1,0 +1,12 @@
+﻿tests/workpaper_sync/test_task20_writer_gate.py::test_the_lane_is_part_of_the_freshness_contract
+tests/workpaper_sync/test_task30_closure_gate.py::test_recomputation_and_the_gate_agree_on_the_multi_resolver_rows
+  D:\GT_plan\backend\tests\test_ledger_keyword_escape.py:1: SyntaxWarning: invalid escape sequence '\%'
+    """关键词 LIKE 元字符转义测试（voucher-sampling-hardening Task 6）
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ===========================
+FAILED backend\tests\integration\test_render_pipeline_e2e.py::TestHandcraftedSchemaLoading::test_render_schema_service_loads_all_handcrafted
+FAILED backend\tests\integration\test_render_pipeline_e2e.py::TestAllSchemasSmokeLoad::test_all_handcrafted_yamls_load_successfully
+FAILED backend\tests\integration\test_render_pipeline_e2e.py::TestAllSchemasSmokeLoad::test_total_schema_count_matches_expected
+FAILED backend\tests\integration\test_render_pipeline_e2e.py::TestComponentTypeWhitelistCoverage::test_whitelist_no_unexpected_extras
+4 failed, 2460 passed, 45 skipped, 6 warnings in 405.37s (0:06:45)

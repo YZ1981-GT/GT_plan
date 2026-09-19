@@ -2,6 +2,10 @@ import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { authApi, notificationApi } from '@/services/collaborationApi'
 import { eventBus } from '@/utils/eventBus'
+import {
+  isProcedureTaskSseEvent,
+  ingestProcedureTaskEvent,
+} from '@/composables/useProcedureTaskSse'
 
 export const useCollaborationStore = defineStore('collaboration', () => {
   // Auth state — 统一使用 'token' 键名（与 auth.ts 一致）
@@ -65,8 +69,16 @@ export const useCollaborationStore = defineStore('collaboration', () => {
     sseSubscribed = true
 
     // 监听 SSE 同步事件 — 当有新的复核/工单/底稿事件时，可能产生新通知
-    eventBus.on('sse:sync-event', (_payload) => {
-      // 收到任何 SSE 事件时刷新未读数（轻量请求）
+    eventBus.on('sse:sync-event', (payload: any) => {
+      // 程序行任务事件（procedure_task.event）：按 event_id LRU 幂等，重复事件不重复刷新
+      // （Task 11 / Req 10.6）。新事件才刷新未读数；任务列表由 MyProcedureTasks 订阅刷新。
+      if (isProcedureTaskSseEvent(payload)) {
+        if (ingestProcedureTaskEvent(payload)) {
+          refreshUnreadCount()
+        }
+        return
+      }
+      // 其它 SSE 事件：收到即刷新未读数（轻量请求）
       refreshUnreadCount()
     })
   }

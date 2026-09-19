@@ -1,0 +1,24 @@
+{
+  "contractVersion": "1.0",
+  "organizationId": "org-001",
+  "projectId": "proj-2026-001",
+  "fiscalYear": 2026,
+  "wpId": "wp-00000001",
+  "wpCode": "G4-1",
+  "entryId": "entry-0001",
+  "host": "univer",
+  "anchor": {
+    "kind": "cell",
+    "sheetUid": "sheet_g4_1",
+    "addrId": "G4-1/sheet_g4_1/row-3-col-2",
+    "rowKey": "row-3",
+    "columnKey": "column-2",
+    "a1": "B4"
+  },
+  "display": {
+    "sheetName": "固定资产",
+    "sectionLabel": "审定"
+  },
+  "ownerEpoch": 1,
+  "contextRevision": 0
+}

@@ -1,0 +1,99 @@
+# B1-2.yaml — 风险评估表（适用于保持）
+# componentType: d-form-table
+# Requirements: G1 业务承接与保持 — 同 B1-1 结构，保持场景
+# Design: §1.1 B1-2 → d-form-table
+
+wp_code: B1-2
+template_path: backend/wp_templates/B/B1-2 风险评估表（适用于保持）.xlsx
+template_version: v2025-R5
+
+sheets:
+  风险评估矩阵:
+    component_type: d-form-table
+    form_type: table
+    title: 风险评估表（适用于保持）
+    description: 业务保持阶段风险评估矩阵，对各风险因素进行评分并得出综合结论
+
+    fields:
+      - field: assessment_scope
+        label: 评估范围
+        type: text
+        readonly: true
+        default: 业务保持
+      - field: assessment_date
+        label: 评估日期
+        type: date
+        format: 'YYYY-MM-DD'
+      - field: assessor
+        label: 评估人
+        type: text
+        source: user_profile.display_name
+      - field: prior_year_risk_level
+        label: 上年度风险等级
+        type: enum
+        enum: [低, 中, 高]
+        hint: 从上一年度项目自动获取（如有）
+
+    dynamic_table:
+      start_row: 5
+      end_row: dynamic
+      header_row: 4
+      add_row_button: true
+      max_rows: 30
+      columns:
+        seq:
+          field: seq
+          type: number
+          label: 序号
+          width: 50
+        risk_factor:
+          field: risk_factor
+          type: text
+          label: 风险因素
+          width: 180
+        risk_description:
+          field: risk_description
+          type: textarea
+          label: 风险描述
+          width: 250
+        risk_level:
+          field: risk_level
+          type: enum
+          label: 风险等级
+          width: 90
+          dict_source: risk_level_dict
+          render_hint: risk_badge
+        risk_response:
+          field: risk_response
+          type: textarea
+          label: 应对措施
+          width: 200
+        conclusion:
+          field: conclusion
+          type: textarea
+          label: 结论
+          width: 180
+
+    dictionaries:
+      risk_level_dict:
+        - value: low
+          label: 低
+        - value: medium
+          label: 中
+        - value: high
+          label: 高
+
+    conclusion:
+      mode: composite
+      audit_explanation_field:
+        name: audit_explanation
+        label: 综合评估说明
+        type: textarea
+      overall_conclusion_field:
+        name: overall_conclusion
+        label: 总体风险评估结论
+        type: enum
+        enum:
+          - { value: low_risk, label: 低风险—继续保持 }
+          - { value: medium_risk, label: 中风险—需进一步评估 }
+          - { value: high_risk, label: 高风险—建议解除业务关系 }

@@ -1,0 +1,238 @@
+{
+  "contractVersion": "1.0",
+  "handoffId": "handoff-finalized-001",
+  "organizationId": "org-001",
+  "projectId": "proj-2026-001",
+  "wpId": "wp-00000001",
+  "wpCode": "G4-1",
+  "entryId": "entry-0001",
+  "sheetUid": "sheet_g4_1",
+  "sheetCode": "G4-1",
+  "mappingVersion": "map-v3",
+  "formulaBoundaryVersion": "fb-v2",
+  "guidanceRevision": "guid-v2",
+  "sections": [
+    {
+      "contractVersion": "1.0",
+      "key": "purpose",
+      "title": "purpose",
+      "content": "content of purpose for handoff fixture",
+      "sourceRefs": [
+        {
+          "contractVersion": "1.0",
+          "refId": "ref-purpose-1",
+          "locator": {
+            "kind": "methodology_publication",
+            "publicationId": "pub-G4-1",
+            "version": 3,
+            "sectionKey": "purpose"
+          },
+          "authorityDigest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "contentDigest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        }
+      ]
+    },
+    {
+      "contractVersion": "1.0",
+      "key": "materials",
+      "title": "materials",
+      "content": "content of materials for handoff fixture",
+      "sourceRefs": [
+        {
+          "contractVersion": "1.0",
+          "refId": "ref-materials-1",
+          "locator": {
+            "kind": "methodology_publication",
+            "publicationId": "pub-G4-1",
+            "version": 3,
+            "sectionKey": "materials"
+          },
+          "authorityDigest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "contentDigest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        }
+      ]
+    },
+    {
+      "contractVersion": "1.0",
+      "key": "data_sources",
+      "title": "data_sources",
+      "content": "content of data_sources for handoff fixture",
+      "sourceRefs": [
+        {
+          "contractVersion": "1.0",
+          "refId": "ref-data_sources-1",
+          "locator": {
+            "kind": "methodology_publication",
+            "publicationId": "pub-G4-1",
+            "version": 3,
+            "sectionKey": "data_sources"
+          },
+          "authorityDigest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "contentDigest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        }
+      ]
+    },
+    {
+      "contractVersion": "1.0",
+      "key": "steps",
+      "title": "steps",
+      "content": "content of steps for handoff fixture",
+      "sourceRefs": [
+        {
+          "contractVersion": "1.0",
+          "refId": "ref-steps-1",
+          "locator": {
+            "kind": "methodology_publication",
+            "publicationId": "pub-G4-1",
+            "version": 3,
+            "sectionKey": "steps"
+          },
+          "authorityDigest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "contentDigest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        }
+      ]
+    },
+    {
+      "contractVersion": "1.0",
+      "key": "formulas",
+      "title": "formulas",
+      "content": "content of formulas for handoff fixture",
+      "sourceRefs": [
+        {
+          "contractVersion": "1.0",
+          "refId": "ref-formulas-1",
+          "locator": {
+            "kind": "methodology_publication",
+            "publicationId": "pub-G4-1",
+            "version": 3,
+            "sectionKey": "formulas"
+          },
+          "authorityDigest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "contentDigest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        }
+      ]
+    },
+    {
+      "contractVersion": "1.0",
+      "key": "judgments",
+      "title": "judgments",
+      "content": "content of judgments for handoff fixture",
+      "sourceRefs": [
+        {
+          "contractVersion": "1.0",
+          "refId": "ref-judgments-1",
+          "locator": {
+            "kind": "methodology_publication",
+            "publicationId": "pub-G4-1",
+            "version": 3,
+            "sectionKey": "judgments"
+          },
+          "authorityDigest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "contentDigest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        }
+      ]
+    },
+    {
+      "contractVersion": "1.0",
+      "key": "evidence",
+      "title": "evidence",
+      "content": "content of evidence for handoff fixture",
+      "sourceRefs": [
+        {
+          "contractVersion": "1.0",
+          "refId": "ref-evidence-1",
+          "locator": {
+            "kind": "methodology_publication",
+            "publicationId": "pub-G4-1",
+            "version": 3,
+            "sectionKey": "evidence"
+          },
+          "authorityDigest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "contentDigest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        }
+      ]
+    },
+    {
+      "contractVersion": "1.0",
+      "key": "common_errors",
+      "title": "common_errors",
+      "content": "content of common_errors for handoff fixture",
+      "sourceRefs": [
+        {
+          "contractVersion": "1.0",
+          "refId": "ref-common_errors-1",
+          "locator": {
+            "kind": "methodology_publication",
+            "publicationId": "pub-G4-1",
+            "version": 3,
+            "sectionKey": "common_errors"
+          },
+          "authorityDigest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "contentDigest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        }
+      ]
+    },
+    {
+      "contractVersion": "1.0",
+      "key": "completion",
+      "title": "completion",
+      "content": "content of completion for handoff fixture",
+      "sourceRefs": [
+        {
+          "contractVersion": "1.0",
+          "refId": "ref-completion-1",
+          "locator": {
+            "kind": "methodology_publication",
+            "publicationId": "pub-G4-1",
+            "version": 3,
+            "sectionKey": "completion"
+          },
+          "authorityDigest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "contentDigest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        }
+      ]
+    }
+  ],
+  "staleFingerprint": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "supersedes": "handoff-candidate-001",
+  "evidence": {
+    "contractVersion": "1.0",
+    "evidenceId": "evidence-handoff-001",
+    "runId": "run-handoff-2026-09-07",
+    "subject": {
+      "kind": "runtime_entry",
+      "organizationId": "org-001",
+      "projectId": "proj-2026-001",
+      "wpId": "wp-00000001",
+      "entryId": "entry-0001",
+      "sheetUid": "sheet_g4_1"
+    },
+    "contractVersions": {
+      "G-C0": "1.0"
+    },
+    "inventoryDigest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "sourceDigests": {},
+    "operationIds": {},
+    "artifacts": [],
+    "verdict": "PASS",
+    "recordedAt": "2026-09-07T00:00:00Z"
+  },
+  "phase": "finalized",
+  "authority": {
+    "contractVersion": "1.0",
+    "phase": "finalized",
+    "scope": "project",
+    "organizationId": "org-001",
+    "projectId": "proj-2026-001",
+    "templateId": "tmpl-cust-001",
+    "templateVersionId": "tmplv-1",
+    "finalizationId": "fin-001",
+    "workbookLineageId": "lineage-cust-001",
+    "artifactSha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "policyVersion": "policy-v2",
+    "manifestVersion": "man-v1"
+  },
+  "finalizationId": "fin-001",
+  "confirmedBy": "reviewer-001",
+  "confirmedAt": "2026-09-07T00:00:00Z"
+}

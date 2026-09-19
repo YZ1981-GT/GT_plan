@@ -1,0 +1,1341 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "contractId": "G-C0",
+  "contractVersion": "1.0",
+  "description": "G-C0 shared wire contract bundle. Single source of truth for the eight top-level types shared between workpaper-guidance-content-closure (C1/C2), workpaper-page-formula-toolbar-closure (F1) and workpaper-custom-excel-ingestion-closure (X2). See .kiro/specs/workpaper-guidance-content-closure/design.md §1.",
+  "topLevelTypes": [
+    "CanonicalWorkpaperLocation",
+    "GuidanceSection",
+    "SourceRef",
+    "TemplateAuthorityIdentity",
+    "CustomGuidanceHandoff",
+    "ConsumerAck",
+    "GuidanceRailAdapter",
+    "EvidenceEnvelope"
+  ],
+  "definitions": {
+    "GuidanceSectionKey": {
+      "type": "string",
+      "description": "Nine stable section keys. Never reorder or add without bumping contractVersion.",
+      "enum": [
+        "purpose",
+        "materials",
+        "data_sources",
+        "steps",
+        "formulas",
+        "judgments",
+        "evidence",
+        "common_errors",
+        "completion"
+      ]
+    },
+    "DocxAnchor": {
+      "type": "object",
+      "description": "Stable, non-mutating anchor into a .docx template.",
+      "required": [
+        "kind",
+        "value"
+      ],
+      "properties": {
+        "kind": {
+          "type": "string",
+          "enum": [
+            "bookmark",
+            "heading",
+            "paragraph_hash"
+          ]
+        },
+        "value": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "additionalProperties": false
+    },
+    "_SourceLocator_xlsx": {
+      "type": "object",
+      "description": "xlsx locator. templateLineageId + templateVersionId + stable sheetUid + bounded A1 range.",
+      "required": [
+        "kind",
+        "templateLineageId",
+        "templateVersionId",
+        "path",
+        "sheetUid",
+        "range"
+      ],
+      "properties": {
+        "kind": {
+          "const": "xlsx"
+        },
+        "templateLineageId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "templateVersionId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "path": {
+          "type": "string",
+          "minLength": 1
+        },
+        "sheetUid": {
+          "type": "string",
+          "minLength": 1
+        },
+        "range": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "^[A-Z]{1,3}\\d{1,7}(?::[A-Z]{1,3}\\d{1,7})?$"
+        }
+      },
+      "additionalProperties": false
+    },
+    "_SourceLocator_docx": {
+      "type": "object",
+      "required": [
+        "kind",
+        "templateLineageId",
+        "templateVersionId",
+        "path",
+        "anchor"
+      ],
+      "properties": {
+        "kind": {
+          "const": "docx"
+        },
+        "templateLineageId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "templateVersionId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "path": {
+          "type": "string",
+          "minLength": 1
+        },
+        "anchor": {
+          "$ref": "#/definitions/DocxAnchor"
+        }
+      },
+      "additionalProperties": false
+    },
+    "_SourceLocator_bcd_markdown": {
+      "type": "object",
+      "required": [
+        "kind",
+        "path",
+        "headingPath",
+        "anchor"
+      ],
+      "properties": {
+        "kind": {
+          "const": "bcd_markdown"
+        },
+        "path": {
+          "type": "string",
+          "minLength": 1
+        },
+        "headingPath": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "anchor": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "additionalProperties": false
+    },
+    "_SourceLocator_methodology_publication": {
+      "type": "object",
+      "description": "Authoritative exact can ONLY come from an active methodology_publication locator (Req 4.3 / design §7).",
+      "required": [
+        "kind",
+        "publicationId",
+        "version",
+        "sectionKey"
+      ],
+      "properties": {
+        "kind": {
+          "const": "methodology_publication"
+        },
+        "publicationId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "version": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "sectionKey": {
+          "$ref": "#/definitions/GuidanceSectionKey"
+        }
+      },
+      "additionalProperties": false
+    },
+    "_SourceLocator_project_evidence": {
+      "type": "object",
+      "required": [
+        "kind",
+        "projectId",
+        "evidenceId",
+        "revision"
+      ],
+      "properties": {
+        "kind": {
+          "const": "project_evidence"
+        },
+        "projectId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "evidenceId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "revision": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "additionalProperties": false
+    },
+    "_SourceLocator_custom_artifact": {
+      "type": "object",
+      "description": "Custom authority. Never expose physical storage path; only authorityId + artifactSha256 + sheetUid + logical locator.",
+      "required": [
+        "kind",
+        "authorityId",
+        "artifactSha256",
+        "sheetUid",
+        "locator"
+      ],
+      "properties": {
+        "kind": {
+          "const": "custom_artifact"
+        },
+        "authorityId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "artifactSha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "sheetUid": {
+          "type": "string",
+          "minLength": 1
+        },
+        "locator": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "additionalProperties": false
+    },
+    "SourceLocator": {
+      "oneOf": [
+        {
+          "$ref": "#/definitions/_SourceLocator_xlsx"
+        },
+        {
+          "$ref": "#/definitions/_SourceLocator_docx"
+        },
+        {
+          "$ref": "#/definitions/_SourceLocator_bcd_markdown"
+        },
+        {
+          "$ref": "#/definitions/_SourceLocator_methodology_publication"
+        },
+        {
+          "$ref": "#/definitions/_SourceLocator_project_evidence"
+        },
+        {
+          "$ref": "#/definitions/_SourceLocator_custom_artifact"
+        }
+      ]
+    },
+    "SourceRef": {
+      "type": "object",
+      "description": "Single authoritative reference into an immutable source. Digests must match the current authority snapshot; otherwise the ref becomes invalid/stale (design §5).",
+      "required": [
+        "contractVersion",
+        "refId",
+        "locator",
+        "authorityDigest",
+        "contentDigest"
+      ],
+      "properties": {
+        "contractVersion": {
+          "const": "1.0"
+        },
+        "refId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "locator": {
+          "$ref": "#/definitions/SourceLocator"
+        },
+        "authorityDigest": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "contentDigest": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        }
+      },
+      "additionalProperties": false
+    },
+    "GuidanceSection": {
+      "type": "object",
+      "description": "One of the nine canonical guidance sections. All nine MUST appear exactly once for a complete entry (design §3, §5).",
+      "required": [
+        "contractVersion",
+        "key",
+        "title",
+        "content",
+        "sourceRefs"
+      ],
+      "properties": {
+        "contractVersion": {
+          "const": "1.0"
+        },
+        "key": {
+          "$ref": "#/definitions/GuidanceSectionKey"
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1
+        },
+        "content": {
+          "type": "string",
+          "minLength": 1
+        },
+        "sourceRefs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/SourceRef"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "_TemplateAuthorityIdentity_candidate": {
+      "type": "object",
+      "description": "Candidate identity. MUST NOT require or carry templateId/finalizationId; those would be fabricated fields (Req 1.4, design §1.2).",
+      "required": [
+        "contractVersion",
+        "phase",
+        "scope",
+        "organizationId",
+        "projectId",
+        "candidateId",
+        "candidateRevision",
+        "workbookLineageId",
+        "artifactSha256",
+        "policyVersion"
+      ],
+      "properties": {
+        "contractVersion": {
+          "const": "1.0"
+        },
+        "phase": {
+          "const": "candidate"
+        },
+        "scope": {
+          "type": "string",
+          "enum": [
+            "organization",
+            "project"
+          ]
+        },
+        "organizationId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "projectId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "candidateId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "candidateRevision": {
+          "type": "string",
+          "minLength": 1
+        },
+        "workbookLineageId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "artifactSha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "policyVersion": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "additionalProperties": false
+    },
+    "_TemplateAuthorityIdentity_finalized": {
+      "type": "object",
+      "description": "Finalized identity. MUST NOT reference mutable candidateRevision as current authority; the finalized variant carries templateId/finalizationId/manifestVersion.",
+      "required": [
+        "contractVersion",
+        "phase",
+        "scope",
+        "organizationId",
+        "projectId",
+        "templateId",
+        "templateVersionId",
+        "finalizationId",
+        "workbookLineageId",
+        "artifactSha256",
+        "policyVersion",
+        "manifestVersion"
+      ],
+      "properties": {
+        "contractVersion": {
+          "const": "1.0"
+        },
+        "phase": {
+          "const": "finalized"
+        },
+        "scope": {
+          "type": "string",
+          "enum": [
+            "organization",
+            "project"
+          ]
+        },
+        "organizationId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "projectId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "templateId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "templateVersionId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "finalizationId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "workbookLineageId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "artifactSha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "policyVersion": {
+          "type": "string",
+          "minLength": 1
+        },
+        "manifestVersion": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "additionalProperties": false
+    },
+    "TemplateAuthorityIdentity": {
+      "oneOf": [
+        {
+          "$ref": "#/definitions/_TemplateAuthorityIdentity_candidate"
+        },
+        {
+          "$ref": "#/definitions/_TemplateAuthorityIdentity_finalized"
+        }
+      ]
+    },
+    "_Anchor_page": {
+      "type": "object",
+      "required": [
+        "kind"
+      ],
+      "properties": {
+        "kind": {
+          "const": "page"
+        }
+      },
+      "additionalProperties": false
+    },
+    "_Anchor_sheet": {
+      "type": "object",
+      "required": [
+        "kind",
+        "sheetUid"
+      ],
+      "properties": {
+        "kind": {
+          "const": "sheet"
+        },
+        "sheetUid": {
+          "type": "string",
+          "minLength": 1
+        },
+        "sheetCode": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "_Anchor_section": {
+      "type": "object",
+      "required": [
+        "kind",
+        "sectionId"
+      ],
+      "properties": {
+        "kind": {
+          "const": "section"
+        },
+        "sheetUid": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "sectionId": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "additionalProperties": false
+    },
+    "_Anchor_cell": {
+      "type": "object",
+      "required": [
+        "kind",
+        "sheetUid"
+      ],
+      "properties": {
+        "kind": {
+          "const": "cell"
+        },
+        "sheetUid": {
+          "type": "string",
+          "minLength": 1
+        },
+        "addrId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "rowKey": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "columnKey": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "a1": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "_Anchor_document": {
+      "type": "object",
+      "required": [
+        "kind"
+      ],
+      "properties": {
+        "kind": {
+          "const": "document"
+        },
+        "anchorId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "_Anchor_whole_workbook": {
+      "type": "object",
+      "description": "OnlyOffice whole-workbook boundary: no reliable per-sheet event, so the anchor degrades to the workbook level.",
+      "required": [
+        "kind"
+      ],
+      "properties": {
+        "kind": {
+          "const": "whole_workbook"
+        }
+      },
+      "additionalProperties": false
+    },
+    "StableLocationAnchor": {
+      "description": "Stable anchor into a workpaper. Discriminator = 'kind'. Never use array indexes, DOM traversal, or polling (design §8).",
+      "oneOf": [
+        {
+          "$ref": "#/definitions/_Anchor_page"
+        },
+        {
+          "$ref": "#/definitions/_Anchor_sheet"
+        },
+        {
+          "$ref": "#/definitions/_Anchor_section"
+        },
+        {
+          "$ref": "#/definitions/_Anchor_cell"
+        },
+        {
+          "$ref": "#/definitions/_Anchor_document"
+        },
+        {
+          "$ref": "#/definitions/_Anchor_whole_workbook"
+        }
+      ]
+    },
+    "CanonicalWorkpaperLocation": {
+      "type": "object",
+      "description": "Host-agnostic location identity. 'display' never carries identity. Formula spec owns runtime state/reducer/provider; this bundle owns the wire contract only (design §1.3, §8).",
+      "required": [
+        "contractVersion",
+        "organizationId",
+        "projectId",
+        "fiscalYear",
+        "wpId",
+        "wpCode",
+        "entryId",
+        "host",
+        "anchor",
+        "display",
+        "ownerEpoch",
+        "contextRevision"
+      ],
+      "properties": {
+        "contractVersion": {
+          "const": "1.0"
+        },
+        "organizationId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "projectId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "fiscalYear": {
+          "type": "integer",
+          "minimum": 1900,
+          "maximum": 2100
+        },
+        "wpId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "wpCode": {
+          "type": "string",
+          "minLength": 1
+        },
+        "entryId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "host": {
+          "type": "string",
+          "enum": [
+            "html",
+            "univer",
+            "onlyoffice",
+            "grid",
+            "word"
+          ]
+        },
+        "anchor": {
+          "$ref": "#/definitions/StableLocationAnchor"
+        },
+        "display": {
+          "type": "object",
+          "description": "Presentation-only. Never used for identity.",
+          "required": [
+            "sheetName",
+            "sectionLabel"
+          ],
+          "properties": {
+            "sheetName": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "sectionLabel": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          "additionalProperties": false
+        },
+        "ownerEpoch": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "contextRevision": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "additionalProperties": false
+    },
+    "_EvidenceSubject_contract": {
+      "type": "object",
+      "required": [
+        "kind",
+        "contractId"
+      ],
+      "properties": {
+        "kind": {
+          "const": "contract"
+        },
+        "contractId": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "additionalProperties": false
+    },
+    "_EvidenceSubject_catalog_entry": {
+      "type": "object",
+      "required": [
+        "kind",
+        "templateLineageId",
+        "templateVersionId",
+        "wpCode",
+        "sheetUid"
+      ],
+      "properties": {
+        "kind": {
+          "const": "catalog_entry"
+        },
+        "templateLineageId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "templateVersionId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "wpCode": {
+          "type": "string",
+          "minLength": 1
+        },
+        "sheetUid": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "_EvidenceSubject_runtime_entry": {
+      "type": "object",
+      "required": [
+        "kind",
+        "organizationId",
+        "projectId",
+        "wpId",
+        "entryId",
+        "sheetUid"
+      ],
+      "properties": {
+        "kind": {
+          "const": "runtime_entry"
+        },
+        "organizationId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "projectId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "wpId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "entryId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "sheetUid": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "_EvidenceSubject_operation": {
+      "type": "object",
+      "required": [
+        "kind",
+        "organizationId",
+        "projectId",
+        "operationId"
+      ],
+      "properties": {
+        "kind": {
+          "const": "operation"
+        },
+        "organizationId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "projectId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "operationId": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "additionalProperties": false
+    },
+    "EvidenceSubject": {
+      "description": "Discriminator = 'kind'. Organization-level contract/finalization evidence MUST use 'contract' (never fabricate projectId/wpId).",
+      "oneOf": [
+        {
+          "$ref": "#/definitions/_EvidenceSubject_contract"
+        },
+        {
+          "$ref": "#/definitions/_EvidenceSubject_catalog_entry"
+        },
+        {
+          "$ref": "#/definitions/_EvidenceSubject_runtime_entry"
+        },
+        {
+          "$ref": "#/definitions/_EvidenceSubject_operation"
+        }
+      ]
+    },
+    "EvidenceArtifact": {
+      "type": "object",
+      "required": [
+        "kind",
+        "uri",
+        "sha256"
+      ],
+      "properties": {
+        "kind": {
+          "type": "string",
+          "enum": [
+            "trace",
+            "screenshot",
+            "report",
+            "mutation"
+          ]
+        },
+        "uri": {
+          "type": "string",
+          "minLength": 1
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        }
+      },
+      "additionalProperties": false
+    },
+    "EvidenceEnvelope": {
+      "type": "object",
+      "required": [
+        "contractVersion",
+        "evidenceId",
+        "runId",
+        "subject",
+        "contractVersions",
+        "inventoryDigest",
+        "sourceDigests",
+        "operationIds",
+        "artifacts",
+        "verdict",
+        "recordedAt"
+      ],
+      "properties": {
+        "contractVersion": {
+          "const": "1.0"
+        },
+        "evidenceId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "runId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "subject": {
+          "$ref": "#/definitions/EvidenceSubject"
+        },
+        "contractVersions": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "inventoryDigest": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "sourceDigests": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "operationIds": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "artifacts": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/EvidenceArtifact"
+          }
+        },
+        "verdict": {
+          "type": "string",
+          "enum": [
+            "PASS",
+            "FAIL",
+            "BLOCKED",
+            "STALE"
+          ]
+        },
+        "recordedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "additionalProperties": false
+    },
+    "_CustomGuidanceHandoff_base": {
+      "type": "object",
+      "required": [
+        "contractVersion",
+        "handoffId",
+        "organizationId",
+        "projectId",
+        "wpId",
+        "wpCode",
+        "entryId",
+        "sheetUid",
+        "sheetCode",
+        "mappingVersion",
+        "formulaBoundaryVersion",
+        "guidanceRevision",
+        "sections",
+        "staleFingerprint",
+        "supersedes",
+        "evidence"
+      ],
+      "properties": {
+        "contractVersion": {
+          "const": "1.0"
+        },
+        "handoffId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "organizationId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "projectId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "wpId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "wpCode": {
+          "type": "string",
+          "minLength": 1
+        },
+        "entryId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "sheetUid": {
+          "type": "string",
+          "minLength": 1
+        },
+        "sheetCode": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "mappingVersion": {
+          "type": "string",
+          "minLength": 1
+        },
+        "formulaBoundaryVersion": {
+          "type": "string",
+          "minLength": 1
+        },
+        "guidanceRevision": {
+          "type": "string",
+          "minLength": 1
+        },
+        "sections": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/definitions/GuidanceSection"
+          }
+        },
+        "staleFingerprint": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "supersedes": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "evidence": {
+          "$ref": "#/definitions/EvidenceEnvelope"
+        }
+      }
+    },
+    "_CustomGuidanceHandoff_candidate": {
+      "allOf": [
+        {
+          "$ref": "#/definitions/_CustomGuidanceHandoff_base"
+        },
+        {
+          "type": "object",
+          "required": [
+            "phase",
+            "authority",
+            "submittedBy",
+            "submittedAt"
+          ],
+          "properties": {
+            "phase": {
+              "const": "candidate"
+            },
+            "authority": {
+              "$ref": "#/definitions/_TemplateAuthorityIdentity_candidate"
+            },
+            "submittedBy": {
+              "type": "string",
+              "minLength": 1
+            },
+            "submittedAt": {
+              "type": "string",
+              "format": "date-time"
+            }
+          }
+        }
+      ],
+      "description": "Candidate handoff. MUST NOT carry finalizationId/confirmedBy/confirmedAt (Req 1.4, design §1.5)."
+    },
+    "_CustomGuidanceHandoff_finalized": {
+      "allOf": [
+        {
+          "$ref": "#/definitions/_CustomGuidanceHandoff_base"
+        },
+        {
+          "type": "object",
+          "required": [
+            "phase",
+            "authority",
+            "finalizationId",
+            "confirmedBy",
+            "confirmedAt"
+          ],
+          "properties": {
+            "phase": {
+              "const": "finalized"
+            },
+            "authority": {
+              "$ref": "#/definitions/_TemplateAuthorityIdentity_finalized"
+            },
+            "finalizationId": {
+              "type": "string",
+              "minLength": 1
+            },
+            "confirmedBy": {
+              "type": "string",
+              "minLength": 1
+            },
+            "confirmedAt": {
+              "type": "string",
+              "format": "date-time"
+            }
+          }
+        }
+      ],
+      "description": "Finalized handoff. Durable ACK gates visibility switch PENDING→ACTIVE (design §11)."
+    },
+    "CustomGuidanceHandoff": {
+      "description": "Discriminator = 'phase'. Candidate MUST NOT require finalizationId/confirmedBy/confirmedAt (Req 1.4).",
+      "oneOf": [
+        {
+          "$ref": "#/definitions/_CustomGuidanceHandoff_candidate"
+        },
+        {
+          "$ref": "#/definitions/_CustomGuidanceHandoff_finalized"
+        }
+      ]
+    },
+    "ConsumerAck": {
+      "type": "object",
+      "description": "Idempotent & durable over (handoffId, handoffDigest, consumer, consumerVersion) — design §1.5, §11.",
+      "required": [
+        "contractVersion",
+        "ackId",
+        "handoffId",
+        "handoffDigest",
+        "consumer",
+        "consumerVersion",
+        "verdict",
+        "validatedDigests",
+        "reasonCodes",
+        "recordedAt"
+      ],
+      "properties": {
+        "contractVersion": {
+          "const": "1.0"
+        },
+        "ackId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "handoffId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "handoffDigest": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "consumer": {
+          "type": "string",
+          "enum": [
+            "guidance",
+            "renderer",
+            "public_shell",
+            "entry_namespace"
+          ]
+        },
+        "consumerVersion": {
+          "type": "string",
+          "minLength": 1
+        },
+        "verdict": {
+          "type": "string",
+          "enum": [
+            "ACCEPTED",
+            "REJECTED"
+          ]
+        },
+        "validatedDigests": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "reasonCodes": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "recordedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "additionalProperties": false
+    },
+    "GuidanceRailAdapter": {
+      "type": "object",
+      "description": "Behavioral adapter. open()/close() are declared but not validated at the schema layer (methods are TS-only; the schema captures the shape contract only). F-SHELL owns DOM/CSS placement — design §1.6, §10.",
+      "required": [
+        "contractVersion",
+        "id",
+        "visible",
+        "disabledReason",
+        "location",
+        "guidanceVersion",
+        "hasDraft",
+        "open",
+        "close"
+      ],
+      "properties": {
+        "contractVersion": {
+          "const": "1.0"
+        },
+        "id": {
+          "const": "guidance"
+        },
+        "visible": {
+          "type": "boolean"
+        },
+        "disabledReason": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "location": {
+          "$ref": "#/definitions/CanonicalWorkpaperLocation"
+        },
+        "guidanceVersion": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "hasDraft": {
+          "type": "boolean"
+        },
+        "open": {
+          "type": "string",
+          "description": "Method reference. Signature: () => void | Promise<void>.",
+          "const": "() => void | Promise<void>"
+        },
+        "close": {
+          "type": "string",
+          "description": "Method reference. Signature: (options: { preserveDraft: boolean }) => void | Promise<void>.",
+          "const": "(options: { preserveDraft: boolean }) => void | Promise<void>"
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "discriminators": {
+    "EvidenceSubject": {
+      "property": "kind",
+      "variants": [
+        "contract",
+        "catalog_entry",
+        "runtime_entry",
+        "operation"
+      ]
+    },
+    "StableLocationAnchor": {
+      "property": "kind",
+      "variants": [
+        "page",
+        "sheet",
+        "section",
+        "cell",
+        "document",
+        "whole_workbook"
+      ]
+    },
+    "SourceLocator": {
+      "property": "kind",
+      "variants": [
+        "xlsx",
+        "docx",
+        "bcd_markdown",
+        "methodology_publication",
+        "project_evidence",
+        "custom_artifact"
+      ]
+    },
+    "TemplateAuthorityIdentity": {
+      "property": "phase",
+      "variants": [
+        "candidate",
+        "finalized"
+      ]
+    },
+    "CustomGuidanceHandoff": {
+      "property": "phase",
+      "variants": [
+        "candidate",
+        "finalized"
+      ]
+    }
+  },
+  "$defs": {
+    "CanonicalWorkpaperLocation": {
+      "$ref": "#/definitions/CanonicalWorkpaperLocation"
+    },
+    "GuidanceSection": {
+      "$ref": "#/definitions/GuidanceSection"
+    },
+    "SourceRef": {
+      "$ref": "#/definitions/SourceRef"
+    },
+    "TemplateAuthorityIdentity": {
+      "$ref": "#/definitions/TemplateAuthorityIdentity"
+    },
+    "CustomGuidanceHandoff": {
+      "$ref": "#/definitions/CustomGuidanceHandoff"
+    },
+    "ConsumerAck": {
+      "$ref": "#/definitions/ConsumerAck"
+    },
+    "GuidanceRailAdapter": {
+      "$ref": "#/definitions/GuidanceRailAdapter"
+    },
+    "EvidenceEnvelope": {
+      "$ref": "#/definitions/EvidenceEnvelope"
+    }
+  }
+}

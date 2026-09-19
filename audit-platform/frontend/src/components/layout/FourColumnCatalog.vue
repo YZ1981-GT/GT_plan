@@ -70,16 +70,24 @@
 
     <!-- 附注目录 -->
     <div v-if="activeTab === 'notes'" class="gt-catalog-list">
-      <div
-        v-for="section in noteSections"
-        :key="section.code"
-        class="gt-catalog-item"
-        :class="{ 'gt-catalog-item--active': selectedKey === `note:${section.code}` }"
-        @click="selectItem('note', section)"
-      >
-        {{ section.code }} {{ section.title }}
+      <div v-for="chapter in noteChapters" :key="chapter.prefix" class="gt-catalog-group">
+        <div class="gt-catalog-group-title" @click="toggleGroup('note-' + chapter.prefix)">
+          <span>{{ expanded['note-' + chapter.prefix] ? '−' : '+' }}</span>
+          <span>{{ chapter.prefix }}、{{ chapter.label }} ({{ chapter.items.length }})</span>
+        </div>
+        <div v-if="expanded['note-' + chapter.prefix]" class="gt-catalog-group-items">
+          <div
+            v-for="section in chapter.items"
+            :key="section.code"
+            class="gt-catalog-item"
+            :class="{ 'gt-catalog-item--active': selectedKey === `note:${section.code}` }"
+            @click="selectItem('note', section)"
+          >
+            {{ section.shortLabel || section.title }}
+          </div>
+        </div>
       </div>
-      <el-empty v-if="!noteSections.length" description="暂无附注数据" :image-size="40" />
+      <el-empty v-if="!noteChapters.length" description="暂无附注数据" :image-size="40" />
     </div>
 
     <!-- 底稿目录 -->
@@ -128,10 +136,11 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, watch, computed } from 'vue'
+import { ref, reactive, watch, computed, onUnmounted } from 'vue'
 import { DataLine, Notebook, Document, TrendCharts, FolderOpened, Connection } from '@element-plus/icons-vue'
 import { api } from '@/services/apiProxy'
 import * as P from '@/services/apiPaths'
+import { eventBus } from '@/utils/eventBus'
 
 const props = defineProps<{
   project: any
@@ -145,13 +154,53 @@ const emit = defineEmits<{
 
 const activeTab = ref(props.activeCatalog || 'reports')
 
+// ─── Task 2.1: 内部状态 + 防抖 ──────────────────────────────────────────────
+const loadingProjectId = ref<string | null>(null)
+const isNavigating = ref(false)
+let debounceTimer: ReturnType<typeof setTimeout> | null = null
+
+/** 300ms 防抖工具函数 */
+function debounce(fn: () => void) {
+  if (debounceTimer) {
+    clearTimeout(debounceTimer)
+  }
+  debounceTimer = setTimeout(() => {
+    debounceTimer = null
+    fn()
+  }, 300)
+}
+
+// ─── Task 2.2: onSwitchProject（防抖 + loading + isNavigating 守卫） ─────────
 // 单位/集团树
 const relatedProjects = ref<any[]>([])
 
 function onSwitchProject(rp: any) {
-  if (rp.id !== props.project?.id) {
-    emit('select', { type: 'switch_project', project_id: rp.id, name: rp.name })
-  }
+  // 同项目不操作（Req 1.4）
+  if (rp.id === props.project?.id) return
+  // 导航进行中禁用交互（Req 4.4）
+  if (isNavigating.value) return
+
+  // 设置 loading 状态（Req 4.1）
+  loadingProjectId.value = rp.id
+  isNavigating.value = true
+
+  // 安全超时：5s 内若 project.id watch 未触发（路由失败），自动解锁
+  setTimeout(() => {
+    if (isNavigating.value && loadingProjectId.value === rp.id) {
+      isNavigating.value = false
+      loadingProjectId.value = null
+    }
+  }, 5000)
+
+  // 防抖 300ms（Req 4.3）
+  debounce(() => {
+    emit('select', {
+      type: 'switch_project',
+      project_id: rp.id,
+      year: rp.audit_year || rp.year,
+      name: rp.name,
+    })
+  })
 }
 
 // 按集团分组项目
@@ -195,6 +244,9 @@ watch(activeTab, (v) => emit('tab-change', v))
 const selectedKey = ref('')
 const expanded = reactive<Record<string, boolean>>({})
 
+// ─── 导出内部状态供测试使用 ─────────────────────────────────────────────────
+defineExpose({ selectedKey, loadingProjectId, isNavigating })
+
 const tabs = [
   { key: 'reports', label: '报表', icon: TrendCharts },
   { key: 'notes', label: '附注', icon: Notebook },
@@ -215,6 +267,53 @@ const reportTypes = [
 // 附注
 const noteSections = ref<any[]>([])
 
+// 按大章分组附注（与右侧编辑器树一致）
+// 大章标题映射：与 useNoteTree.ts 中 SOE_LABELS 保持一致
+const CHAPTER_LABELS: Record<string, string> = {
+  '一': '公司基本情况',
+  '二': '财务报表编制基础',
+  '三': '遵循企业会计准则的声明',
+  '四': '重要会计政策、会计估计',
+  '五': '会计政策变更及差错更正',
+  '六': '税项',
+  '七': '企业合并及合并财务报表',
+  '八': '财务报表主要项目注释',
+  '九': '或有事项',
+  '十': '资产负债表日后事项',
+  '十一': '关联方关系及其交易',
+  '十二': '母公司财务报表附注',
+  '十三': '其他披露内容',
+  '十四': '财务报表之批准',
+  '十五': '其他重要事项',
+  '十六': '公司财务报表主要项目注释',
+  '十七': '补充资料',
+}
+const CHAPTER_PREFIXES = ['一', '二', '三', '四', '五', '六', '七', '八', '九', '十', '十一', '十二', '十三', '十四', '十五', '十六', '十七']
+
+const noteChapters = computed(() => {
+  if (!noteSections.value.length) return []
+  const chapters: Array<{ prefix: string; label: string; items: any[] }> = []
+
+  for (const prefix of CHAPTER_PREFIXES) {
+    const items: any[] = []
+    noteSections.value.forEach((s) => {
+      const code = s.code as string
+      if (!code.startsWith(prefix + '、')) return
+      // 避免 "十" 误匹配 "十一、" ~ "十七、"
+      if (prefix === '十' && /^十[一二三四五六七]/.test(code)) return
+      items.push(s)
+    })
+    if (items.length > 0) {
+      // 大章标题从映射表取，确保与右侧树完全一致
+      const label = CHAPTER_LABELS[prefix] || prefix
+      chapters.push({ prefix, label, items })
+    }
+  }
+
+  // 无法按中文章节号归类的条目不在四栏目录显示（右侧树也不单独展示这些）
+  return chapters
+})
+
 // 底稿
 const wpCycles = ref<any[]>([])
 
@@ -225,17 +324,37 @@ function toggleGroup(key: string) {
   expanded[key] = !expanded[key]
 }
 
+// ─── Task 2.3: selectItem — 附注章节点击 debounce + 乐观更新 + 同章节守卫 ───
 function selectItem(type: string, data: any) {
-  selectedKey.value = type === 'report' ? `report:${data.year}:${data.type}`
+  // 导航进行中禁用交互（Req 4.4）
+  if (isNavigating.value) return
+
+  const newKey = type === 'report' ? `report:${data.year}:${data.type}`
     : type === 'note' ? `note:${data.code}`
     : type === 'workpaper' ? `wp:${data.id}`
     : `tb:${data.code}`
-  // 报表需要把原始 type（如 balance_sheet）改名为 type_key，避免和外层 type（report）冲突
-  const payload = { type, ...data }
+
+  // 同项已选中则 no-op（Req 1.4, 2.4）
+  if (selectedKey.value === newKey) return
+
+  // 乐观更新 selectedKey（Req 4.2 — 同步更新不等 async）
+  selectedKey.value = newKey
+
+  // 构建 payload
+  const payload: any = { type, ...data }
   if (type === 'report') {
     payload.type_key = data.type
   }
-  emit('select', payload)
+
+  if (type === 'note') {
+    // 附注章节点击：debounce 后 emit（Req 4.3）
+    debounce(() => {
+      emit('select', { type: 'note', code: data.code })
+    })
+  } else {
+    // 非附注类型直接 emit（报表/底稿/试算表保持即时响应）
+    emit('select', payload)
+  }
 }
 
 // 默认展开第一组
@@ -256,10 +375,14 @@ watch(() => props.project?.id, async (pid) => {
     })
     if (data) {
       const d = data
-      noteSections.value = Array.isArray(d) ? d.map((s: any) => ({
-        code: s.note_section || s.section_code || s.code || '',
-        title: s.section_title || s.title || '',
-      })) : []
+      noteSections.value = Array.isArray(d) ? d.map((s: any) => {
+        const code = s.note_section || s.section_code || s.code || ''
+        const title = s.section_title || s.title || ''
+        // shortLabel: 去掉大章前缀，只显示子编号+标题（如 "一、1 xx" → "1 xx"）
+        const subMatch = code.match(/^[一二三四五六七八九十]+、(.+)$/)
+        const shortLabel = subMatch ? `${subMatch[1]} ${title}` : title
+        return { code, title, shortLabel }
+      }) : []
     }
   } catch { noteSections.value = [] }
 
@@ -321,6 +444,35 @@ watch(() => props.project?.id, async (pid) => {
     relatedProjects.value = all
   } catch { relatedProjects.value = [] }
 }, { immediate: true })
+
+// ─── Task 2.4: eventBus 监听 + project.id 变化清除 + unmount 清理 ────────────
+
+// 监听 DisclosureEditor 反向通知：更新 selectedKey（Req 3.1）
+function onSectionChanged({ noteSection }: { noteSection: string }) {
+  if (noteSection) {
+    selectedKey.value = `note:${noteSection}`
+  }
+}
+eventBus.on('note:section-changed', onSectionChanged)
+
+// 项目切换完成：清除选中状态 + 重置导航态（Req 3.4）
+watch(() => props.project?.id, (_newId, oldId) => {
+  // 仅在项目实际变化时清除（非初始化）
+  if (oldId && _newId !== oldId) {
+    selectedKey.value = ''
+    loadingProjectId.value = null
+    isNavigating.value = false
+  }
+})
+
+// 组件卸载时清理 eventBus 监听和 debounce timer
+onUnmounted(() => {
+  eventBus.off('note:section-changed', onSectionChanged)
+  if (debounceTimer) {
+    clearTimeout(debounceTimer)
+    debounceTimer = null
+  }
+})
 </script>
 
 <style scoped>

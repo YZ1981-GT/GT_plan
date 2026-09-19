@@ -1,0 +1,73 @@
+{
+  "spec": "audit-evidence-attachment-preview-format-expansion",
+  "task": 19,
+  "recorded_at": "2026-09-09T03:49:17.866Z",
+  "project_id": "2aa00f57-1df4-4fe8-9840-2d65d0fd8749",
+  "uploaded": {
+    "archive": {
+      "id": "cc57dc97-95d6-431b-b071-d8f791397aa8",
+      "download_url": "/api/attachments/cc57dc97-95d6-431b-b071-d8f791397aa8/download"
+    },
+    "email": {
+      "id": "872ee7b3-7a5f-4fdf-917a-2ac7a76ca207",
+      "download_url": "/api/attachments/872ee7b3-7a5f-4fdf-917a-2ac7a76ca207/download"
+    },
+    "drawing": {
+      "id": "35d2ae4e-8403-4c56-bb38-1b056b623e8a",
+      "download_url": "/api/attachments/35d2ae4e-8403-4c56-bb38-1b056b623e8a/download"
+    },
+    "cad": {
+      "id": "0af6b2ec-e2c3-41e3-8c1d-bf4e1d3d7fe7",
+      "download_url": "/api/attachments/0af6b2ec-e2c3-41e3-8c1d-bf4e1d3d7fe7/download"
+    }
+  },
+  "drawer_attachment_id": "50d2ad2b-a927-4e68-887f-13996dcd392e",
+  "drawer_zip_name": "apfe-e2e-drawer-1788925753129.zip",
+  "drawer_wp_id": "1380e6fd-b8f0-40db-8e9f-fcb7e5fceb58",
+  "drawer_detail": "wp=B50-1;assoc_status=200;drawer_preview_ok",
+  "digests": {
+    "zip": "10043abf092d2697dccce40f269650f629b93ae6186ea8f0835272a63818d2f1",
+    "eml": "2ef00665b81e0fc926cf8e44a4ca8cf5f1f5f8f8206aac12ca5fed8dd5ad18c6",
+    "dxf": "f829b7aee653ce75115167fe19c0150d38421b695d4ca232b8ba9d103da5449e",
+    "dwg": "ff33d8b71d069fa6fd929754b68468fcec43f7189c17d8480ae0ad2374945a92"
+  },
+  "preview_endpoint_hits_for_extended": [],
+  "download_hits": 4,
+  "external_hosts": [],
+  "page_errors": [],
+  "drawer_host_exercised": true,
+  "conclusions": {
+    "preview_host_ok": true,
+    "drawer_host_ok": true,
+    "zero_external_email_hosts": true,
+    "page_errors_zero": true
+  },
+  "scenarios": {
+    "resource_release_x5": {
+      "max_live_after_close": {
+        "objectUrls": 0,
+        "workers": 0,
+        "controllers": 0,
+        "cleanups": 0
+      },
+      "worker_events": {
+        "created": 5,
+        "message": 5,
+        "disposed": 5
+      },
+      "passed": true
+    },
+    "json_blob_trap": {
+      "logger_error_no_body_leak": true,
+      "saw": "[Audit] attachment_preview_json_blob_trap {attachmentId: 98b9bf79-510d-49d1-a107-a931d04b3f8c, family: archive, contentType: application/json, requestId: null}"
+    },
+    "email_csp_srcdoc": {
+      "has_default_src_none": true,
+      "sandbox_empty": true
+    },
+    "zero_external_host": {
+      "evil_example_requested": false
+    }
+  },
+  "scenarios_recorded_at": "2026-09-09T03:49:29.039Z"
+}

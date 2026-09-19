@@ -1,0 +1,38 @@
+{
+  "contractVersion": "1.0",
+  "evidenceId": "evidence-gid-milestone-1",
+  "runId": "run-gid-milestone-1",
+  "subject": {
+    "kind": "contract",
+    "contractId": "G-ID"
+  },
+  "contractVersions": {
+    "G-C0": "1.0",
+    "G-ID": "1.0"
+  },
+  "inventoryDigest": null,
+  "sourceDigests": {
+    "registered_kinds": "590399fc1a54865789402f7e4b28c358d4f78b5255454612f5f46f0275610fb4",
+    "module": "1a1538ce4760c6195bfaa8d358989a6bd686ecd11d232260ace5fc9037645ba1"
+  },
+  "operationIds": {
+    "publish": "op-publish-gid-2026-09-08"
+  },
+  "artifacts": [
+    {
+      "kind": "report",
+      "uri": "backend/app/services/guidance_gid.py",
+      "sha256": "1a1538ce4760c6195bfaa8d358989a6bd686ecd11d232260ace5fc9037645ba1"
+    }
+  ],
+  "verdict": "PASS",
+  "recordedAt": "2026-09-08T00:00:00Z",
+  "registeredKinds": [
+    "bcd_markdown",
+    "custom_artifact",
+    "docx",
+    "methodology_publication",
+    "project_evidence",
+    "xlsx"
+  ]
+}

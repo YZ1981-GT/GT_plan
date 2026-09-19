@@ -26,6 +26,7 @@ from app.models.audit_platform_models import (
     AccountSource,
     Adjustment,
     AdjustmentType,
+    AuditCheckSignoff,
     ImportBatch,
     ImportStatus,
     MappingType,
@@ -61,6 +62,7 @@ from app.models.report_models import (
     ExportTask,
     ExportTaskStatus,
     ExportTaskType,
+    FillPreviewSession,
     FinancialReport,
     FinancialReportType,
     NoteStatus,
@@ -111,6 +113,69 @@ from app.models.account_note_mapping_models import AccountNoteMapping  # noqa: F
 from app.models.consol_cell_comment_models import ConsolCellComment  # noqa: F401
 from app.models.consol_worksheet_data_models import ConsolWorksheetData  # noqa: F401
 from app.models.consol_note_data_models import ConsolNoteData  # noqa: F401
+from app.models.editing_lock_models import EditingLock  # noqa: F401
+from app.models.confirmation_models import Confirmation, ConfirmationType, ConfirmationStatus  # noqa: F401
+from app.models.account_package_models import AccountPackageProgramStatus  # noqa: F401
+from app.models.bad_debt_models import (  # noqa: F401
+    BadDebtDetailRow,
+    ProvisionMethod,
+    PROVISION_METHOD_LABELS,
+)
+from app.models.wp_export_models import (  # noqa: F401
+    WpExportSnapshot,
+    WpVersionArchive,
+)
+from app.models.procedure_models import (  # noqa: F401
+    ProcedureInstance,
+    ProcedureOperationPreview,
+    ProcedureRowDefinition,
+    ProcedureRowTask,
+    ProcedureRowTaskHistory,
+    ProcedureTrimScheme,
+)
+from app.models.wp_visibility_models import (  # noqa: F401
+    WorkpaperDelegationHistory,
+    WpAccessSecurityOutbox,
+    WpVisibilityInvalidationOutbox,
+    WpVisibilityPolicyEpoch,
+)
+from app.models.acnr_overlay_model import AcnrProjectOverlay  # noqa: F401
+from app.models.acnr_invalidation_model import (  # noqa: F401
+    AcnrInvalidationEpoch,
+    AcnrInvalidationOutbox,
+)
+# 底稿 HTML ↔ OnlyOffice 双向回写同步域（迁移 V151 的 28 张表）
+from app.models.workpaper_sync_models import (  # noqa: F401
+    WORKPAPER_SYNC_TABLES,
+    WorkpaperArtifact,
+    WorkpaperCallbackDelivery,
+    WorkpaperCallbackRecoveryCase,
+    WorkpaperCallbackRecoveryCaseEvent,
+    WorkpaperContentApplication,
+    WorkpaperContentApplicationEvent,
+    WorkpaperContentRepresentation,
+    WorkpaperContentRevisionBackfillLedger,
+    WorkpaperContentVersion,
+    WorkpaperEntryEvidenceScenario,
+    WorkpaperForcesaveRequest,
+    WorkpaperOoClientConfirmation,
+    WorkpaperOoCloseIntent,
+    WorkpaperOoCloseIntentEvent,
+    WorkpaperOoParticipant,
+    WorkpaperOoRoom,
+    WorkpaperPendingMutation,
+    WorkpaperRepresentationUpgradeCandidate,
+    WorkpaperSyncConflict,
+    WorkpaperSyncDefinitionArtifact,
+    WorkpaperSyncDefinitionBundle,
+    WorkpaperSyncDefinitionNullMarker,
+    WorkpaperSyncEntryState,
+    WorkpaperSyncOperation,
+    WorkpaperSyncOperationContributor,
+    WorkpaperSyncOperationEvent,
+    WorkpaperSyncScopeIndex,
+    WorkpaperSyncTestRun,
+)
 
 __all__ = [
     # --- base ---
@@ -150,6 +215,7 @@ __all__ = [
     "TbAuxBalance",
     "TbAuxLedger",
     "Adjustment",
+    "AuditCheckSignoff",
     "TrialBalance",
     "Materiality",
     "ImportBatch",
@@ -180,6 +246,7 @@ __all__ = [
     "AuditReportTemplate",
     "ExportTask",
     "NoteValidationResult",
+    "FillPreviewSession",
     # --- attachment models ---
     "Attachment",
     "AttachmentWorkingPaper",
@@ -229,4 +296,35 @@ __all__ = [
     "ConsolCellComment",
     "ConsolWorksheetData",
     "ConsolNoteData",
+    # --- 通用编辑锁 (V057) ---
+    "EditingLock",
+    # --- 函证管理 (V058) ---
+    "Confirmation",
+    "ConfirmationType",
+    "ConfirmationStatus",
+    # --- 科目工作包程序状态 (V063) ---
+    "AccountPackageProgramStatus",
+    # --- 坏账准备明细表嵌套子表 D2-3 (V070) ---
+    "BadDebtDetailRow",
+    "ProvisionMethod",
+    "PROVISION_METHOD_LABELS",
+    # --- 底稿导出快照与版本归档 (V071) ---
+    "WpExportSnapshot",
+    "WpVersionArchive",
+    # --- 审计程序裁剪/委派 (Phase9) + V105 程序行任务模型 ---
+    "ProcedureInstance",
+    "ProcedureTrimScheme",
+    "ProcedureRowDefinition",
+    "ProcedureRowTask",
+    "ProcedureRowTaskHistory",
+    "ProcedureOperationPreview",
+    # --- 底稿可见性隔离 (procedure-delegation-visibility-isolation / V113) ---
+    "WorkpaperDelegationHistory",
+    "WpAccessSecurityOutbox",
+    "WpVisibilityPolicyEpoch",
+    "WpVisibilityInvalidationOutbox",
+    # --- ACNR Overlay + 失效 durable (acnr-invalidation-overlay-hardening / V122) ---
+    "AcnrProjectOverlay",
+    "AcnrInvalidationEpoch",
+    "AcnrInvalidationOutbox",
 ]

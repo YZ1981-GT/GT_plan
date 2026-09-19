@@ -11,11 +11,11 @@ from datetime import date, datetime
 from decimal import Decimal
 
 import sqlalchemy as sa
-from sqlalchemy import ForeignKey, Index, String, Text, func, text
+from sqlalchemy import ForeignKey, Index, String, Text, UniqueConstraint, func, text
 from sqlalchemy.dialects.postgresql import JSONB, UUID as PG_UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
-from app.models.base import Base
+from app.models.base import Base, TimestampMixin
 
 
 # ---------------------------------------------------------------------------
@@ -130,6 +130,11 @@ class ImportBatch(Base):
         ForeignKey("users.id"), nullable=True
     )
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
+    updated_at: Mapped[datetime | None] = mapped_column(nullable=True)
+    is_deleted: Mapped[bool | None] = mapped_column(
+        server_default=text("false"), nullable=True
+    )
+    deleted_at: Mapped[datetime | None] = mapped_column(nullable=True)
 
     __table_args__ = (
         Index("idx_import_batches_project_year", "project_id", "year"),
@@ -181,6 +186,7 @@ class AccountChart(Base):
     is_deleted: Mapped[bool] = mapped_column(
         server_default=text("false"), nullable=False
     )
+    deleted_at: Mapped[datetime | None] = mapped_column(nullable=True)
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(server_default=func.now())
 
@@ -224,6 +230,7 @@ class AccountMapping(Base):
     is_deleted: Mapped[bool] = mapped_column(
         server_default=text("false"), nullable=False
     )
+    deleted_at: Mapped[datetime | None] = mapped_column(nullable=True)
     created_by: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("users.id"), nullable=True
     )
@@ -284,9 +291,17 @@ class TbBalance(Base):
     dataset_id: Mapped[uuid.UUID | None] = mapped_column(
         PG_UUID(as_uuid=True), nullable=True, index=True
     )  # Phase 17: 关联 ledger_datasets，读路径统一后用此字段过滤
+    # V064: 符号约定方向字段
+    opening_direction: Mapped[str | None] = mapped_column(String(10), nullable=True)
+    opening_direction_source: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    closing_direction: Mapped[str | None] = mapped_column(String(10), nullable=True)
+    closing_direction_source: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    sign_convention_version: Mapped[str | None] = mapped_column(String(30), nullable=True)
+    sign_anomaly_flags: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
     is_deleted: Mapped[bool] = mapped_column(
         server_default=text("false"), nullable=False
     )
+    deleted_at: Mapped[datetime | None] = mapped_column(nullable=True)
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(server_default=func.now())
 
@@ -358,9 +373,13 @@ class TbLedger(Base):
     dataset_id: Mapped[uuid.UUID | None] = mapped_column(
         PG_UUID(as_uuid=True), nullable=True, index=True
     )  # Phase 17: 关联 ledger_datasets
+    # V064: 符号约定方向字段
+    entry_direction: Mapped[str | None] = mapped_column(String(10), nullable=True)
+    entry_direction_source: Mapped[str | None] = mapped_column(String(50), nullable=True)
     is_deleted: Mapped[bool] = mapped_column(
         server_default=text("false"), nullable=False
     )
+    deleted_at: Mapped[datetime | None] = mapped_column(nullable=True)
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(server_default=func.now())
 
@@ -418,6 +437,7 @@ class TbAuxBalance(Base):
     aux_type_name: Mapped[str | None] = mapped_column(String, nullable=True)  # 核算项目类型名称
     aux_code: Mapped[str | None] = mapped_column(String, nullable=True)
     aux_name: Mapped[str | None] = mapped_column(String, nullable=True)
+    aux_dimensions_raw: Mapped[str | None] = mapped_column(String, nullable=True)  # 多维核算原始串（金融机构:..;银行账户:..）
     opening_balance: Mapped[Decimal | None] = mapped_column(sa.Numeric(20, 2), nullable=True)
     opening_debit: Mapped[Decimal | None] = mapped_column(sa.Numeric(20, 2), nullable=True)
     opening_credit: Mapped[Decimal | None] = mapped_column(sa.Numeric(20, 2), nullable=True)
@@ -438,9 +458,18 @@ class TbAuxBalance(Base):
     dataset_id: Mapped[uuid.UUID | None] = mapped_column(
         PG_UUID(as_uuid=True), nullable=True, index=True
     )  # Phase 17: 关联 ledger_datasets
+    # V064: 符号约定方向字段
+    opening_direction: Mapped[str | None] = mapped_column(String(10), nullable=True)
+    opening_direction_source: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    closing_direction: Mapped[str | None] = mapped_column(String(10), nullable=True)
+    closing_direction_source: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    sign_convention_version: Mapped[str | None] = mapped_column(String(30), nullable=True)
+    sign_anomaly_flags: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
     is_deleted: Mapped[bool] = mapped_column(
         server_default=text("false"), nullable=False
     )
+    deleted_at: Mapped[datetime | None] = mapped_column(nullable=True)
+    accounting_period: Mapped[int | None] = mapped_column(sa.Integer, nullable=True)
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(server_default=func.now())
     aux_dimensions_raw: Mapped[str | None] = mapped_column(Text, nullable=True)  # 原始维度组合字符串
@@ -526,9 +555,13 @@ class TbAuxLedger(Base):
     dataset_id: Mapped[uuid.UUID | None] = mapped_column(
         PG_UUID(as_uuid=True), nullable=True, index=True
     )  # Phase 17: 关联 ledger_datasets
+    # V064: 符号约定方向字段
+    entry_direction: Mapped[str | None] = mapped_column(String(10), nullable=True)
+    entry_direction_source: Mapped[str | None] = mapped_column(String(50), nullable=True)
     is_deleted: Mapped[bool] = mapped_column(
         server_default=text("false"), nullable=False
     )
+    deleted_at: Mapped[datetime | None] = mapped_column(nullable=True)
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(server_default=func.now())
     aux_dimensions_raw: Mapped[str | None] = mapped_column(Text, nullable=True)  # 原始维度组合字符串
@@ -557,6 +590,45 @@ class TbAuxLedger(Base):
             "idx_tb_aux_ledger_tenant_project_year",
             "tenant_id", "project_id", "year",
         ),
+    )
+
+
+# ---------------------------------------------------------------------------
+# DirectionOverride 模型 (V064)
+# ---------------------------------------------------------------------------
+
+
+class DirectionOverride(Base):
+    """方向覆盖 overlay 表 — 用户确认/修正方向时记录，不改写原始四表导入行。"""
+
+    __tablename__ = "direction_override"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        PG_UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    project_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("projects.id"), nullable=False
+    )
+    dataset_id: Mapped[uuid.UUID] = mapped_column(
+        PG_UUID(as_uuid=True), nullable=False
+    )
+    table_name: Mapped[str] = mapped_column(String(30), nullable=False)
+    record_id: Mapped[uuid.UUID] = mapped_column(
+        PG_UUID(as_uuid=True), nullable=False
+    )
+    original_direction: Mapped[str | None] = mapped_column(String(10), nullable=True)
+    override_direction: Mapped[str] = mapped_column(String(10), nullable=False)
+    override_reason: Mapped[str] = mapped_column(Text, nullable=False)
+    override_by: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("staff_members.id"), nullable=True
+    )
+    override_at: Mapped[datetime] = mapped_column(server_default=func.now())
+    created_at: Mapped[datetime] = mapped_column(server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(server_default=func.now())
+
+    __table_args__ = (
+        Index("idx_direction_override_project_table", "project_id", "table_name"),
+        Index("idx_direction_override_record", "record_id"),
     )
 
 
@@ -605,9 +677,21 @@ class Adjustment(Base):
     )
     reviewed_at: Mapped[datetime | None] = mapped_column(nullable=True)
     rejection_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # V078: passed（未更正错报）相关
+    passed_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # DB 列为 TIMESTAMPTZ（V078），service 写入完整 datetime，故 ORM 用 datetime 对齐
+    passed_communication_date: Mapped[datetime | None] = mapped_column(nullable=True)
+    # V124: 底稿调整汇聚（workpaper-adjustment-centralization）
+    #   origin='manual'（手工录入，默认）/ 'workpaper'（底稿汇聚）
+    #   source_ref='{wp_id}:{item_id}' 溯源+幂等键（origin='workpaper' 时非空）
+    origin: Mapped[str] = mapped_column(
+        String(20), server_default=text("'manual'"), nullable=False
+    )
+    source_ref: Mapped[str | None] = mapped_column(String(120), nullable=True)
     is_deleted: Mapped[bool] = mapped_column(
         server_default=text("false"), nullable=False
     )
+    deleted_at: Mapped[datetime | None] = mapped_column(nullable=True)
     created_by: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("users.id"), nullable=False
     )
@@ -682,6 +766,7 @@ class TrialBalance(Base):
     is_deleted: Mapped[bool] = mapped_column(
         server_default=text("false"), nullable=False
     )
+    deleted_at: Mapped[datetime | None] = mapped_column(nullable=True)
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(server_default=func.now())
 
@@ -694,6 +779,45 @@ class TrialBalance(Base):
         Index(
             "idx_trial_balance_project_year_std_code",
             "project_id", "year", "standard_account_code",
+        ),
+    )
+
+
+class TbPublishAck(Base):
+    """审定表→试算表"发布"耐久确认/幂等表（对应迁移 V162）。
+
+    ``_on_d_audit_determination_saved`` handler 以本表做耐久幂等 ack：同一发布确认
+    （``publish_token`` 唯一）重复投递只回写 TB 一次。``accounts_updated`` 回填实际
+    更新行数供审计。
+    """
+
+    __tablename__ = "tb_publish_ack"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        PG_UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    project_id: Mapped[uuid.UUID] = mapped_column(
+        PG_UUID(as_uuid=True), nullable=False
+    )
+    year: Mapped[int] = mapped_column(sa.Integer, nullable=False)
+    wp_code: Mapped[str] = mapped_column(String(32), nullable=False)
+    # 幂等键：同一确认重复投递共用同一 token
+    publish_token: Mapped[str] = mapped_column(
+        String(128), nullable=False, unique=True
+    )
+    # 发布确认者（服务端可校验其权限）
+    confirmed_by: Mapped[uuid.UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True), nullable=True
+    )
+    accounts_updated: Mapped[int] = mapped_column(
+        sa.Integer, server_default=text("0"), nullable=False
+    )
+    created_at: Mapped[datetime] = mapped_column(server_default=func.now())
+
+    __table_args__ = (
+        Index(
+            "idx_tb_publish_ack_project_year",
+            "project_id", "year",
         ),
     )
 
@@ -749,6 +873,7 @@ class Materiality(Base):
     is_deleted: Mapped[bool] = mapped_column(
         server_default=text("false"), nullable=False
     )
+    deleted_at: Mapped[datetime | None] = mapped_column(nullable=True)
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(server_default=func.now())
 
@@ -786,6 +911,11 @@ class ReportLineMapping(Base):
     report_line_name: Mapped[str] = mapped_column(String, nullable=False)
     report_line_level: Mapped[int] = mapped_column(sa.Integer, nullable=False)
     parent_line_code: Mapped[str | None] = mapped_column(String, nullable=True)
+    # 行次聚合方向：'add' 加项 / 'subtract' 减项(备抵科目，如累计折旧/减值/库存股)。
+    # v2 符号约定下备抵科目存自然正数，聚合到报表行次时须减去，否则净值虚增。
+    mapping_sign: Mapped[str] = mapped_column(
+        String, server_default=text("'add'"), nullable=False
+    )
     mapping_type: Mapped[ReportLineMappingType] = mapped_column(
         sa.Enum(ReportLineMappingType, name="report_line_mapping_type", create_type=False),
         nullable=False,
@@ -831,6 +961,10 @@ class AdjustmentEntry(Base):
     )
     line_no: Mapped[int] = mapped_column(sa.Integer, nullable=False)
     standard_account_code: Mapped[str] = mapped_column(String, nullable=False)
+    # 明细/二级科目码（V127）：审计师原始选定的明细科目，可空。
+    # NULL = 无更细明细，按一级 standard_account_code 处理。仅用于精确推送到底稿明细表，
+    # 不参与科目校验/试算表 recalc/报表（recalc 按 adjustments 头表 account_code 聚合）。
+    detail_account_code: Mapped[str | None] = mapped_column(String, nullable=True)
     account_name: Mapped[str | None] = mapped_column(String, nullable=True)
     report_line_code: Mapped[str | None] = mapped_column(String, nullable=True)
     debit_amount: Mapped[Decimal] = mapped_column(
@@ -842,6 +976,7 @@ class AdjustmentEntry(Base):
     is_deleted: Mapped[bool] = mapped_column(
         server_default=text("false"), nullable=False
     )
+    deleted_at: Mapped[datetime | None] = mapped_column(nullable=True)
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(server_default=func.now())
 
@@ -852,6 +987,137 @@ class AdjustmentEntry(Base):
     __table_args__ = (
         Index("idx_adjustment_entries_adjustment_id", "adjustment_id"),
         Index("idx_adjustment_entries_entry_group_id", "entry_group_id"),
+    )
+
+
+# ---------------------------------------------------------------------------
+# AdjustmentCollaboration 模型（调整分录协作接力，V125）
+# ---------------------------------------------------------------------------
+
+
+class AdjustmentCollaboration(Base):
+    """调整分录协作记录（分录组级转派→知晓→补充→确认）。
+
+    spec: adjustment-collaboration-and-propagation
+    锚点 = 集中登记分录组 entry_group_id；协作是受控多人编辑通道。
+    """
+
+    __tablename__ = "adjustment_collaboration"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        PG_UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    project_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("projects.id"), nullable=False
+    )
+    year: Mapped[int] = mapped_column(sa.Integer, nullable=False)
+    entry_group_id: Mapped[uuid.UUID] = mapped_column(
+        PG_UUID(as_uuid=True), nullable=False
+    )
+    source_ref: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    initiator_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("users.id"), nullable=False
+    )
+    assignee_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("users.id"), nullable=False
+    )
+    # pending/acknowledged/contributed/confirmed/closed/rejected
+    status: Mapped[str] = mapped_column(
+        String(20), server_default=text("'pending'"), nullable=False
+    )
+    round: Mapped[int] = mapped_column(
+        sa.Integer, server_default=text("1"), nullable=False
+    )
+    note: Mapped[str | None] = mapped_column(Text, nullable=True)
+    rejection_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
+    is_deleted: Mapped[bool] = mapped_column(
+        server_default=text("false"), nullable=False
+    )
+    deleted_at: Mapped[datetime | None] = mapped_column(nullable=True)
+    created_by: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("users.id"), nullable=True
+    )
+    created_at: Mapped[datetime] = mapped_column(server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(server_default=func.now())
+
+    def soft_delete(self) -> None:
+        self.is_deleted = True
+
+    __table_args__ = (
+        Index("idx_adj_collab_project_group", "project_id", "entry_group_id"),
+        Index("idx_adj_collab_assignee_status", "assignee_id", "status"),
+        Index("idx_adj_collab_project_status", "project_id", "status"),
+    )
+
+
+class AdjustmentCollaborationEvent(Base):
+    """协作历史事件（append-only，仅 INSERT）。"""
+
+    __tablename__ = "adjustment_collaboration_event"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        PG_UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    collaboration_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("adjustment_collaboration.id"), nullable=False
+    )
+    actor_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("users.id"), nullable=False
+    )
+    # assigned/reassigned/acknowledged/contributed/confirmed/rejected/commented/closed
+    event_type: Mapped[str] = mapped_column(String(20), nullable=False)
+    payload: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(server_default=func.now())
+
+    __table_args__ = (
+        Index("idx_adj_collab_event_collab_time", "collaboration_id", "created_at"),
+    )
+
+
+class AuditCheckSignoff(Base):
+    """审计检查复核门禁签认（audit-check-review-gate-hardening / V126）。
+
+    项目概览「审计检查」作为完成复核最后一次检查的签认留痕：
+    每次签认记录当时的汇总快照 summary_snapshot 与是否存在未处理阻断项
+    blocking_present（只提示不阻断，Req8.3/P14）。
+    """
+
+    __tablename__ = "audit_check_signoff"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        PG_UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    project_id: Mapped[uuid.UUID] = mapped_column(
+        PG_UUID(as_uuid=True), nullable=False
+    )
+    year: Mapped[int] = mapped_column(sa.Integer, nullable=False)
+    signed_by: Mapped[uuid.UUID] = mapped_column(
+        PG_UUID(as_uuid=True), nullable=False
+    )
+    signed_by_name: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    signed_at: Mapped[datetime] = mapped_column(
+        sa.DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    # {decided,passed,failed,uncovered,pass_rate,blocking_count}
+    summary_snapshot: Mapped[dict] = mapped_column(JSONB, nullable=False)
+    blocking_present: Mapped[bool] = mapped_column(
+        server_default=text("false"), nullable=False
+    )
+    note: Mapped[str | None] = mapped_column(Text, nullable=True)
+    is_deleted: Mapped[bool] = mapped_column(
+        server_default=text("false"), nullable=False
+    )
+
+    def soft_delete(self) -> None:
+        self.is_deleted = True
+
+    __table_args__ = (
+        Index(
+            "idx_audit_check_signoff_proj_year",
+            "project_id",
+            "year",
+            postgresql_where=text("is_deleted = false"),
+        ),
     )
 
 
@@ -893,9 +1159,18 @@ class UnadjustedMisstatement(Base):
     prior_year_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("unadjusted_misstatements.id"), nullable=True
     )
+    # V092: A13 聚合 - 上年结转状态
+    prior_year_status: Mapped[str] = mapped_column(
+        String(20), server_default=text("'new'"), nullable=False
+    )
+    # V092: A13 聚合 - 来源底稿编码
+    source_wp_code: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    # V164 / B3: durable 幂等键（底稿推送错报来源身份串，同项目唯一，软删除除外）
+    source_identity: Mapped[str | None] = mapped_column(String(200), nullable=True)
     is_deleted: Mapped[bool] = mapped_column(
         server_default=text("false"), nullable=False
     )
+    deleted_at: Mapped[datetime | None] = mapped_column(nullable=True)
     # F50 / Sprint 8.16: 下游快照绑定（创建时绑定当前 active dataset）
     bound_dataset_id: Mapped[uuid.UUID | None] = mapped_column(
         PG_UUID(as_uuid=True),
@@ -919,5 +1194,222 @@ class UnadjustedMisstatement(Base):
         Index(
             "idx_unadjusted_misstatements_source_adj",
             "source_adjustment_id",
+        ),
+        # V164 / B3: durable 幂等 —— 同项目 + 同 source_identity 唯一（软删除/NULL 除外）。
+        Index(
+            "uq_misstatement_source_identity",
+            "project_id", "source_identity",
+            unique=True,
+            postgresql_where=text("source_identity IS NOT NULL AND is_deleted = false"),
+        ),
+    )
+
+
+# ---------------------------------------------------------------------------
+# FeatureFlag 模型（zero-downtime-deployment 组件 8）
+# ---------------------------------------------------------------------------
+
+
+class FeatureFlag(Base, TimestampMixin):
+    """Feature flag 功能开关（zero-downtime-deployment 组件 8）。"""
+
+    __tablename__ = "feature_flags"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        PG_UUID(as_uuid=True), primary_key=True, server_default=text("gen_random_uuid()")
+    )
+    flag_key: Mapped[str] = mapped_column(String(128), unique=True, nullable=False)
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    enabled: Mapped[bool] = mapped_column(
+        sa.Boolean, nullable=False, server_default=text("false")
+    )
+    rollout_percentage: Mapped[int] = mapped_column(
+        sa.SmallInteger, nullable=False, server_default=text("0")
+    )
+    whitelist_user_ids: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+
+
+# ---------------------------------------------------------------------------
+# DeliverableSectionState 模型（deliverable-lineage-and-writeback, V067）
+# ---------------------------------------------------------------------------
+
+
+class DeliverableSectionState(Base, TimestampMixin):
+    """出品物章节级状态承载表（V067）。
+
+    身份键 word_export_task_id 绑 task 级（跨版本稳定），
+    version_no 仅记录列不入主键/唯一约束。
+    字段不绑死附注 doc_type，未来报表/报告正文出品物可复用同表。
+    """
+
+    __tablename__ = "deliverable_section_state"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        PG_UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    word_export_task_id: Mapped[uuid.UUID] = mapped_column(
+        PG_UUID(as_uuid=True), nullable=False
+    )
+    version_no: Mapped[int | None] = mapped_column(
+        sa.Integer, nullable=True
+    )  # 记录列，不入主键/唯一约束
+    project_id: Mapped[uuid.UUID] = mapped_column(
+        PG_UUID(as_uuid=True), nullable=False
+    )
+    year: Mapped[int] = mapped_column(sa.Integer, nullable=False)
+    section_code: Mapped[str] = mapped_column(String(64), nullable=False)
+    source_snapshot_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    is_stale: Mapped[bool] = mapped_column(
+        sa.Boolean, default=False, nullable=False
+    )
+    last_writeback_baseline_hash: Mapped[str | None] = mapped_column(
+        String(64), nullable=True
+    )
+    anchor_name: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    #: Rendered_Block_Hash（V141）：生成/刷新时写入块内文字的规范化 sha256。
+    #: 与 source_snapshot_hash **哈希域不同**（后者是 DB 源数据域）—— 二者不可互换，
+    #: 历史缺陷正是拿 source_snapshot_hash 去比块内文字致刷新恒要求确认覆盖。
+    #: 计算入口单一真源 = section_anchor_utils.block_text_hash；NULL=存量交付件。
+    rendered_block_hash: Mapped[str | None] = mapped_column(
+        String(64), nullable=True
+    )
+
+    __table_args__ = (
+        UniqueConstraint(
+            "word_export_task_id", "section_code",
+            name="uq_deliverable_section",
+        ),
+    )
+
+
+# ---------------------------------------------------------------------------
+# WorkpaperExtractionLog 模型（cutoff-test-auto-sampling, V096）
+# ---------------------------------------------------------------------------
+
+
+class WorkpaperExtractionLog(Base):
+    """底稿提取日志 — 记录截止测试/抽凭引擎的执行留痕和填充前快照，支持撤销功能。"""
+
+    __tablename__ = "workpaper_extraction_log"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        PG_UUID(as_uuid=True), primary_key=True, server_default=text("gen_random_uuid()")
+    )
+    project_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("projects.id"), nullable=False
+    )
+    workpaper_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("working_paper.id"), nullable=False
+    )
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        PG_UUID(as_uuid=True), nullable=False
+    )
+    extraction_type: Mapped[str] = mapped_column(
+        String(50), nullable=False
+    )
+    extraction_criteria: Mapped[dict] = mapped_column(
+        JSONB, nullable=False
+    )
+    total_matched: Mapped[int] = mapped_column(
+        sa.Integer, nullable=False
+    )
+    filled_count: Mapped[int] = mapped_column(
+        sa.Integer, nullable=False
+    )
+    fill_mode: Mapped[str] = mapped_column(
+        String(20), nullable=False
+    )
+    before_data: Mapped[dict | None] = mapped_column(
+        JSONB, nullable=True
+    )
+    is_undone: Mapped[bool] = mapped_column(
+        sa.Boolean, server_default=text("false"), nullable=False
+    )
+    # ─── 抽样批次治理（V123）─────────────────────────────────────────────
+    batch_id: Mapped[uuid.UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True), nullable=True
+    )
+    idempotency_key: Mapped[str | None] = mapped_column(Text, nullable=True)
+    row_version: Mapped[int] = mapped_column(
+        sa.Integer, server_default=text("1"), nullable=False
+    )
+    status: Mapped[str] = mapped_column(
+        Text, server_default=text("'filled'"), nullable=False
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        sa.DateTime, server_default=func.now(), nullable=False
+    )
+
+    __table_args__ = (
+        Index(
+            "idx_extraction_log_wp_created",
+            "workpaper_id", sa.text("created_at DESC"),
+        ),
+        Index(
+            "idx_extraction_log_project",
+            "project_id",
+        ),
+    )
+
+
+# ---------------------------------------------------------------------------
+# WorkpaperSnapshot 模型（workpaper-version-trail, V097）
+# ---------------------------------------------------------------------------
+
+
+class WorkpaperSnapshot(Base):
+    """底稿版本快照 — field-level 数据版本历史，支持时间线展示、diff 对比、回滚。"""
+
+    __tablename__ = "workpaper_snapshots"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        PG_UUID(as_uuid=True), primary_key=True, server_default=text("gen_random_uuid()")
+    )
+    project_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("projects.id"), nullable=False
+    )
+    workpaper_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("working_paper.id"), nullable=False
+    )
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        PG_UUID(as_uuid=True), nullable=False
+    )
+    snapshot_type: Mapped[str] = mapped_column(
+        String(50), nullable=False
+    )
+    description: Mapped[str | None] = mapped_column(
+        Text, nullable=True
+    )
+    change_summary: Mapped[str | None] = mapped_column(
+        Text, nullable=True
+    )
+    data_json: Mapped[dict] = mapped_column(
+        JSONB, nullable=False
+    )
+    item_count: Mapped[int] = mapped_column(
+        sa.Integer, server_default=text("0"), nullable=False
+    )
+    data_size_bytes: Mapped[int] = mapped_column(
+        sa.Integer, server_default=text("0"), nullable=False
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        sa.DateTime, server_default=func.now(), nullable=False
+    )
+    # V033 遗留列 — schema漂移修复
+    is_locked: Mapped[bool] = mapped_column(
+        sa.Boolean, server_default=text("false"), nullable=False
+    )
+    bound_dataset_id: Mapped[uuid.UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True), nullable=True
+    )
+
+    __table_args__ = (
+        Index(
+            "idx_wp_snapshots_wp_created",
+            "workpaper_id", sa.text("created_at DESC"),
+        ),
+        Index(
+            "idx_wp_snapshots_project",
+            "project_id",
         ),
     )

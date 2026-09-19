@@ -6,6 +6,12 @@
         <el-button type="primary" size="small" @click="$router.push('/projects/new')">
           <el-icon><Plus /></el-icon> 新建项目
         </el-button>
+        <el-button size="small" plain @click="showBatchImport = true">
+          <el-icon><Upload /></el-icon> 批量导入
+        </el-button>
+        <el-button size="small" plain @click="$router.push('/projects/full')">
+          全屏
+        </el-button>
         <el-button
           v-if="checkedIds.length > 0"
           size="small"
@@ -62,17 +68,21 @@
       </div>
       <el-empty v-if="!loading && filteredTree.length === 0" description="暂无项目" :image-size="60" />
     </div>
+
+    <!-- 批量导入弹窗 -->
+    <BatchImportDialog v-model="showBatchImport" @success="loadProjects" />
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { Plus, Search, Delete } from '@element-plus/icons-vue'
+import { Plus, Search, Delete, Upload } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { confirmDelete, confirmBatch } from '@/utils/confirm'
 import { api } from '@/services/apiProxy'
 import ProjectTreeNode from './ProjectTreeNode.vue'
+import BatchImportDialog from '@/components/wizard/BatchImportDialog.vue'
 import * as P from '@/services/apiPaths'
 
 interface ProjectItem {
@@ -97,6 +107,7 @@ const searchText = ref('')
 const filterStatus = ref('')
 const filterYear = ref<number | null>(null)
 const checkedIds = ref<string[]>([])
+const showBatchImport = ref(false)
 
 const currentYear = new Date().getFullYear()
 const yearOptions = Array.from({ length: 5 }, (_, i) => currentYear - i)

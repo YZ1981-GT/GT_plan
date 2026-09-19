@@ -34,14 +34,14 @@ class TestProjectsColumnContract:
     def test_render_config_no_select_year_from_projects(self):
         src = _src(_RENDER_CONFIG)
         assert "SELECT year FROM projects" not in src, (
-            "projects 表无 year 列；年度须用 EXTRACT(YEAR FROM audit_period_end)"
+            "projects 表无 year 列；年度须走 project_audit_year 通用规则"
         )
 
     def test_prefill_context_no_select_year_from_projects(self):
         src = _src(_PREFILL_CTX)
-        # 允许 EXTRACT(YEAR FROM audit_period_end) AS year，但不得裸 SELECT name, year
+        # 不得裸 SELECT name, year；年度解析见 app.services.project_audit_year
         assert "name, year," not in src, (
-            "projects 表无 year 列；年度须用 EXTRACT(YEAR FROM audit_period_end)"
+            "projects 表无 year 列；年度须走 project_audit_year 通用规则"
         )
 
     def test_prefill_context_no_materiality_level_column(self):

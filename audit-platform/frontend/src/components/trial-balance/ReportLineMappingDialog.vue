@@ -156,13 +156,20 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { exportMultiSheetData, readSheetObjects } from '@/composables/useExcelIO'
 import { api } from '@/services/apiProxy'
-import { reportLineMapping } from '@/services/apiPaths'
+import { reportLineMapping, accountMapping } from '@/services/apiPaths'
 import { useProjectStore } from '@/stores/project'
 import { handleApiError } from '@/utils/errorHandler'
 import { confirmDelete } from '@/utils/confirm'
 
-const props = defineProps<{ modelValue: boolean; projectId: string; accountRows?: any[] }>()
+const props = defineProps<{
+  modelValue: boolean
+  projectId: string
+  accountRows?: any[]
+  /** 6.1: 诊断跳转传入，用于高亮定位到未匹配科目 */
+  highlightAccountCode?: string
+}>()
 const emit = defineEmits<{ (e: 'update:modelValue', v: boolean): void }>()
 const projectStore = useProjectStore()
 
@@ -289,89 +296,101 @@ const unmatchedCount = computed(() => mergedRows.value.filter(r => !r.mapped).le
 const confirmedCount = computed(() => mappings.value.filter(m => m.is_confirmed).length)
 const unconfirmedIds = computed(() => mappings.value.filter(m => !m.is_confirmed).map(m => m.id))
 
-function rowClassName({ row }: { row: any }) { return row.mapped ? '' : 'rlm-row-unmatched' }
+function rowClassName({ row }: { row: any }) {
+  const classes: string[] = []
+  if (!row.mapped) classes.push('rlm-row-unmatched')
+  // 6.1: 诊断跳转高亮
+  if (props.highlightAccountCode && row.account_code === props.highlightAccountCode) {
+    classes.push('rlm-row-highlight')
+  }
+  return classes.join(' ')
+}
 
 // ─── 加载 ───
 async function loadMappings() {
   if (!props.projectId) return
   loading.value = true
   try {
-    const [mapData, linesData] = await Promise.all([
+    const [mapData, bsLines, isLines] = await Promise.all([
       api.get(reportLineMapping.list(props.projectId)),
-      api.get(`/api/projects/${props.projectId}/report-line-mapping/report-lines`).catch(() => []),
+      // 真实报表行次全集（按项目维度解析 applicable_standard）：资产负债表 + 利润表
+      api.get(`/api/report-config?project_id=${props.projectId}&report_type=balance_sheet`).catch(() => []),
+      api.get(`/api/report-config?project_id=${props.projectId}&report_type=income_statement`).catch(() => []),
     ])
     mappings.value = Array.isArray(mapData) ? mapData : []
-    // 报表行次选项：始终用完整标准行次（确保未分配利润等不遗漏）
-    // 后端返回的只是已用过的子集，不能作为可选全集
-    reportLineOptions.value = _buildDefaultReportLines()
+    // 报表行次选项：用真实 report_config 全集（row_code=BS-XXX/IS-XXX），
+    // 非合计行、非分类行才可作为科目映射目标。后端无数据时回退内置兜底。
+    const lines: any[] = []
+    for (const [rows, rt] of [[bsLines, 'balance_sheet'], [isLines, 'income_statement']] as const) {
+      if (Array.isArray(rows)) {
+        for (const r of rows) {
+          if (r.is_total_row) continue  // 合计行不作为映射目标
+          lines.push({
+            report_line_code: r.row_code,
+            report_line_name: r.row_name,
+            report_type: rt,
+          })
+        }
+      }
+    }
+    reportLineOptions.value = lines.length > 0 ? lines : _buildDefaultReportLines()
   } catch (e) { handleApiError(e, '加载映射规则') }
   finally { loading.value = false }
 }
 watch(visible, (v) => { if (v && props.projectId) { loadMappings(); projectStore.loadProjectOptions() } })
 
-// 预设标准报表行次（当后端无数据时的兜底）
+// 兜底：后端 report_config 无数据时返回空（不再硬编码旧格式行次，
+// 避免 BS001 与真实 BS-002 不一致导致选错行次）。正常情况走 report_config 全集。
 function _buildDefaultReportLines() {
-  return [
-    { report_line_code: 'BS001', report_line_name: '货币资金', report_type: 'balance_sheet' },
-    { report_line_code: 'BS002', report_line_name: '交易性金融资产', report_type: 'balance_sheet' },
-    { report_line_code: 'BS003', report_line_name: '应收票据', report_type: 'balance_sheet' },
-    { report_line_code: 'BS004', report_line_name: '应收账款', report_type: 'balance_sheet' },
-    { report_line_code: 'BS005', report_line_name: '预付款项', report_type: 'balance_sheet' },
-    { report_line_code: 'BS006', report_line_name: '应收利息', report_type: 'balance_sheet' },
-    { report_line_code: 'BS007', report_line_name: '应收股利', report_type: 'balance_sheet' },
-    { report_line_code: 'BS008', report_line_name: '其他应收款', report_type: 'balance_sheet' },
-    { report_line_code: 'BS009', report_line_name: '存货', report_type: 'balance_sheet' },
-    { report_line_code: 'BS010', report_line_name: '持有待售资产', report_type: 'balance_sheet' },
-    { report_line_code: 'BS011', report_line_name: '长期股权投资', report_type: 'balance_sheet' },
-    { report_line_code: 'BS012', report_line_name: '固定资产', report_type: 'balance_sheet' },
-    { report_line_code: 'BS013', report_line_name: '无形资产', report_type: 'balance_sheet' },
-    { report_line_code: 'BS014', report_line_name: '长期待摊费用', report_type: 'balance_sheet' },
-    { report_line_code: 'BS015', report_line_name: '在建工程', report_type: 'balance_sheet' },
-    { report_line_code: 'BS016', report_line_name: '开发支出', report_type: 'balance_sheet' },
-    { report_line_code: 'BS017', report_line_name: '商誉', report_type: 'balance_sheet' },
-    { report_line_code: 'BS022', report_line_name: '递延所得税资产', report_type: 'balance_sheet' },
-    { report_line_code: 'BS101', report_line_name: '短期借款', report_type: 'balance_sheet' },
-    { report_line_code: 'BS102', report_line_name: '应付票据', report_type: 'balance_sheet' },
-    { report_line_code: 'BS103', report_line_name: '应付账款', report_type: 'balance_sheet' },
-    { report_line_code: 'BS104', report_line_name: '预收款项', report_type: 'balance_sheet' },
-    { report_line_code: 'BS105', report_line_name: '应付职工薪酬', report_type: 'balance_sheet' },
-    { report_line_code: 'BS106', report_line_name: '应交税费', report_type: 'balance_sheet' },
-    { report_line_code: 'BS107', report_line_name: '其他应付款', report_type: 'balance_sheet' },
-    { report_line_code: 'BS108', report_line_name: '长期借款', report_type: 'balance_sheet' },
-    { report_line_code: 'BS109', report_line_name: '应付债券', report_type: 'balance_sheet' },
-    { report_line_code: 'BS110', report_line_name: '长期应付款', report_type: 'balance_sheet' },
-    { report_line_code: 'BS115', report_line_name: '预计负债', report_type: 'balance_sheet' },
-    { report_line_code: 'BS116', report_line_name: '递延所得税负债', report_type: 'balance_sheet' },
-    { report_line_code: 'BS201', report_line_name: '实收资本（股本）', report_type: 'balance_sheet' },
-    { report_line_code: 'BS202', report_line_name: '资本公积', report_type: 'balance_sheet' },
-    { report_line_code: 'BS203', report_line_name: '盈余公积', report_type: 'balance_sheet' },
-    { report_line_code: 'BS204', report_line_name: '未分配利润', report_type: 'balance_sheet' },
-    { report_line_code: 'BS205', report_line_name: '其他综合收益', report_type: 'balance_sheet' },
-    { report_line_code: 'BS206', report_line_name: '库存股', report_type: 'balance_sheet' },
-    { report_line_code: 'BS207', report_line_name: '专项储备', report_type: 'balance_sheet' },
-    { report_line_code: 'BS209', report_line_name: '其他权益工具', report_type: 'balance_sheet' },
-    { report_line_code: 'IS001', report_line_name: '营业收入', report_type: 'income_statement' },
-    { report_line_code: 'IS002', report_line_name: '营业成本', report_type: 'income_statement' },
-    { report_line_code: 'IS003', report_line_name: '税金及附加', report_type: 'income_statement' },
-    { report_line_code: 'IS004', report_line_name: '销售费用', report_type: 'income_statement' },
-    { report_line_code: 'IS005', report_line_name: '管理费用', report_type: 'income_statement' },
-    { report_line_code: 'IS006', report_line_name: '研发费用', report_type: 'income_statement' },
-    { report_line_code: 'IS007', report_line_name: '财务费用', report_type: 'income_statement' },
-    { report_line_code: 'IS008', report_line_name: '资产减值损失', report_type: 'income_statement' },
-    { report_line_code: 'IS009', report_line_name: '信用减值损失', report_type: 'income_statement' },
-    { report_line_code: 'IS010', report_line_name: '资产处置收益', report_type: 'income_statement' },
-    { report_line_code: 'IS011', report_line_name: '其他收益', report_type: 'income_statement' },
-    { report_line_code: 'IS012', report_line_name: '投资收益', report_type: 'income_statement' },
-    { report_line_code: 'IS013', report_line_name: '公允价值变动收益', report_type: 'income_statement' },
-    { report_line_code: 'IS014', report_line_name: '营业外收入', report_type: 'income_statement' },
-    { report_line_code: 'IS015', report_line_name: '营业外支出', report_type: 'income_statement' },
-    { report_line_code: 'IS016', report_line_name: '所得税费用', report_type: 'income_statement' },
-  ]
+  console.warn('[ReportLineMapping] report_config 无数据，报表行次下拉为空，请先生成/加载报表配置')
+  return [] as { report_line_code: string; report_line_name: string; report_type: string }[]
 }
 
 // ─── 一键预设（生成 + 自动确认） ───
 async function onPreset() {
   if (!props.projectId) { ElMessage.warning('请先选择项目'); return }
+
+  // 前置校验：科目映射（客户科目→标准科目）未完成时，报表映射（余额表科目→报表项目）
+  // 只能匹配到极少数科目（试算表为空），会让用户误以为功能坏了。此处检测映射完成度，
+  // 未完成则提示先做科目映射，并提供"自动完成科目映射并继续"一键补做。
+  try {
+    const cr: any = await api.get(accountMapping.completionRate(props.projectId))
+    const totalClient = cr?.total_count ?? cr?.total ?? 0
+    const mappedCount = cr?.mapped_count ?? cr?.mapped ?? 0
+    const rate = cr?.rate ?? cr?.completion_rate ?? (totalClient > 0 ? (mappedCount / totalClient * 100) : 0)
+    if (totalClient === 0 || mappedCount === 0 || rate < 1) {
+      let doAutoMap = false
+      try {
+        await ElMessageBox.confirm(
+          '检测到「科目映射」（客户科目 → 标准科目）尚未完成。\n\n' +
+          '报表映射依赖科目映射生成的试算表，未完成时只能匹配到极少数科目。\n\n' +
+          '是否现在自动完成科目映射（并生成试算表）后再继续报表映射？',
+          '请先完成科目映射',
+          { confirmButtonText: '自动完成科目映射并继续', cancelButtonText: '取消', type: 'warning' }
+        )
+        doAutoMap = true
+      } catch {
+        ElMessage.info('已取消。请先在「科目映射」页完成「自动匹配」，再执行报表映射一键预设。')
+        return
+      }
+      if (doAutoMap) {
+        presetLoading.value = true
+        try {
+          const mr: any = await api.post(accountMapping.autoMatch(props.projectId), {})
+          const savedN = mr?.data?.saved ?? mr?.saved ?? mr?.matched ?? 0
+          ElMessage.success(`科目映射已自动完成（新增 ${savedN} 条），继续报表映射…`)
+        } catch (e) {
+          presetLoading.value = false
+          handleApiError(e, '自动完成科目映射')
+          return
+        }
+        presetLoading.value = false
+      }
+    }
+  } catch (e) {
+    // 完成度查询失败不阻断主流程（best-effort 前置校验）
+    console.warn('[ReportLineMapping] 科目映射前置校验失败，继续:', e)
+  }
 
   // 检测是否有老格式记录,有则提示用户是否强制刷新
   const oldFormatCount = mappings.value.filter(m =>
@@ -504,97 +523,101 @@ async function onReferenceCopy() {
 }
 
 // ─── 导出映射模板（Excel，含必填标注 + 预设库 sheet） ───
-function onExportTemplate() {
-  import('xlsx').then(XLSX => {
-    const wb = XLSX.utils.book_new()
-
-    // Sheet 1：映射规则（当前数据）
-    const data = mergedRows.value.map(r => ({
-      '*科目编码（必填）': r.account_code,
-      '科目名称': r.account_name,
-      '*报表行次编码（必填）': r.report_line_code || '',
-      '*报表行次名称（必填）': r.report_line_name || '',
-      '*报表类型（必填）': r.report_type ? reportTypeLabel(r.report_type) : '',
-      '状态': r.mapped ? (r.is_confirmed ? '已确认' : '待确认') : '⚠未映射-请填写',
-    }))
-    const ws = XLSX.utils.json_to_sheet(data)
-    ws['!cols'] = [{ wch: 18 }, { wch: 20 }, { wch: 20 }, { wch: 22 }, { wch: 18 }, { wch: 16 }]
-    XLSX.utils.book_append_sheet(wb, ws, '映射规则')
-
-    // Sheet 2：预设库（所有可选的报表行次，供用户复制粘贴）
-    const presetData = reportLineOptions.value.map((l: any) => ({
-      '报表行次编码': l.report_line_code,
-      '报表行次名称': l.report_line_name,
-      '报表类型': reportTypeLabel(l.report_type),
-    }))
-    const ws2 = XLSX.utils.json_to_sheet(presetData)
-    ws2['!cols'] = [{ wch: 16 }, { wch: 24 }, { wch: 14 }]
-    XLSX.utils.book_append_sheet(wb, ws2, '可选报表行次（预设库）')
-
-    // Sheet 3：填写说明
-    const instructions = [
-      { '说明': '【填写规则】' },
-      { '说明': '1. 带 * 号的列为必填项' },
-      { '说明': '2. "科目编码"为余额表中的一级科目编码（4位）' },
-      { '说明': '3. "报表行次编码"和"报表行次名称"请从"可选报表行次"sheet中选择' },
-      { '说明': '4. "报表类型"可选值：资产负债表 / 利润表' },
-      { '说明': '5. 已有映射的行无需修改，只需补充"⚠未映射"的行' },
-      { '说明': '6. 编辑完成后保存，回到系统点击"导入模板"上传即可' },
-      { '说明': '' },
-      { '说明': '【注意事项】' },
-      { '说明': '- 导入时已存在的映射不会被覆盖' },
-      { '说明': '- 如需修改已有映射，请先在系统中删除再导入' },
-      { '说明': '- 同一科目编码只能映射到一个报表行次' },
-    ]
-    const ws3 = XLSX.utils.json_to_sheet(instructions)
-    ws3['!cols'] = [{ wch: 60 }]
-    XLSX.utils.book_append_sheet(wb, ws3, '填写说明')
-
-    XLSX.writeFile(wb, `映射规则模板_${props.projectId.slice(0, 8)}.xlsx`)
-    ElMessage.success('已导出映射模板（含预设库和填写说明）')
+async function onExportTemplate() {
+  // Sheet 1：映射规则（当前数据）
+  const data = mergedRows.value.map(r => ({
+    '*科目编码（必填）': r.account_code,
+    '科目名称': r.account_name,
+    '*报表行次编码（必填）': r.report_line_code || '',
+    '*报表行次名称（必填）': r.report_line_name || '',
+    '*报表类型（必填）': r.report_type ? reportTypeLabel(r.report_type) : '',
+    '状态': r.mapped ? (r.is_confirmed ? '已确认' : '待确认') : '⚠未映射-请填写',
+  }))
+  // Sheet 2：预设库（所有可选的报表行次，供用户复制粘贴）
+  const presetData = reportLineOptions.value.map((l: any) => ({
+    '报表行次编码': l.report_line_code,
+    '报表行次名称': l.report_line_name,
+    '报表类型': reportTypeLabel(l.report_type),
+  }))
+  // Sheet 3：填写说明
+  const instructions = [
+    { '说明': '【填写规则】' },
+    { '说明': '1. 带 * 号的列为必填项' },
+    { '说明': '2. "科目编码"为余额表中的一级科目编码（4位）' },
+    { '说明': '3. "报表行次编码"和"报表行次名称"请从"可选报表行次"sheet中选择' },
+    { '说明': '4. "报表类型"可选值：资产负债表 / 利润表' },
+    { '说明': '5. 已有映射的行无需修改，只需补充"⚠未映射"的行' },
+    { '说明': '6. 编辑完成后保存，回到系统点击"导入模板"上传即可' },
+    { '说明': '' },
+    { '说明': '【注意事项】' },
+    { '说明': '- 导入时已存在的映射不会被覆盖' },
+    { '说明': '- 如需修改已有映射，请先在系统中删除再导入' },
+    { '说明': '- 同一科目编码只能映射到一个报表行次' },
+  ]
+  // 走 useExcelIO 单一入口（B7 批）。三个 sheet 原本都是 json_to_sheet(对象数组)，
+  // 用 json 形态原样透传 —— 表头由 json_to_sheet 按键并集生成，手写 AOA 不等价。
+  await exportMultiSheetData({
+    sheets: [
+      { sheetName: '映射规则', json: data, colWidths: [{ wch: 18 }, { wch: 20 }, { wch: 20 }, { wch: 22 }, { wch: 18 }, { wch: 16 }] },
+      { sheetName: '可选报表行次（预设库）', json: presetData, colWidths: [{ wch: 16 }, { wch: 24 }, { wch: 14 }] },
+      { sheetName: '填写说明', json: instructions, colWidths: [{ wch: 60 }] },
+    ],
+    fileName: `映射规则模板_${props.projectId.slice(0, 8)}.xlsx`,
+    applyStyles: false,
+  successMessage: false,
   })
+  ElMessage.success('已导出映射模板（含预设库和填写说明）')
 }
 
 // ─── 导入映射模板（Excel） ───
+/**
+ * el-upload 的 `before-upload` 钩子 —— **必须同步返回 false** 阻止自动上传
+ *
+ * 原写法是 `import('xlsx').then(async XLSX => {...}); return false`：不等待解析、
+ * 立刻返回 false。若把本函数改成 async，返回值会变成 resolved Promise，
+ * Element Plus 视为「允许上传」，就会真的往 action（这里未设置 = 当前地址）POST
+ * 一个无效请求。故保持同步外壳，解析放到下面的 async 实现里。
+ */
 function onImportTemplate(file: File) {
-  import('xlsx').then(async XLSX => {
-    const buf = await file.arrayBuffer()
-    const wb = XLSX.read(buf)
-    const ws = wb.Sheets[wb.SheetNames[0]]
-    const rows: any[] = XLSX.utils.sheet_to_json(ws)
-
-    if (!rows.length) {
-      ElMessage.warning('文件为空')
-      return
-    }
-
-    // 解析并批量创建映射（兼容带*号和不带*号的列名）
-    const typeMap: Record<string, string> = { '资产负债表': 'balance_sheet', '利润表': 'income_statement', '现金流量表': 'cash_flow', '权益变动表': 'equity_change' }
-    let created = 0
-    let skipped = 0
-    for (const row of rows) {
-      const code = String(row['*科目编码（必填）'] || row['科目编码'] || '').trim()
-      const lineCode = String(row['*报表行次编码（必填）'] || row['报表行次编码'] || '').trim()
-      const lineName = String(row['*报表行次名称（必填）'] || row['报表行次名称'] || '').trim()
-      const typeStr = String(row['*报表类型（必填）'] || row['报表类型'] || '').trim()
-      if (!code || !lineCode || !lineName) { skipped++; continue }
-
-      const reportType = typeMap[typeStr] || 'balance_sheet'
-      try {
-        const res: any = await api.post(`/api/projects/${props.projectId}/report-line-mapping/manual`, {
-          standard_account_code: code,
-          report_type: reportType,
-          report_line_code: lineCode,
-          report_line_name: lineName,
-        })
-        if (res?.created) created++
-        else skipped++
-      } catch { skipped++ }
-    }
-    ElMessage.success(`导入完成：新增 ${created} 条，跳过 ${skipped} 条（已存在或无效）`)
-    await loadMappings()
-  })
+  void doImportTemplate(file)
   return false
+}
+
+async function doImportTemplate(file: File) {
+  // 走 useExcelIO 单一入口（B7 批）。原先 XLSX.read(buf) 不传 type（SheetJS 自行
+  // 按 ArrayBuffer 推断为 'array'）+ sheet_to_json(ws) 对象模式无选项，等价。
+  const { rows } = await readSheetObjects<any>(file)
+
+  if (!rows.length) {
+    ElMessage.warning('文件为空')
+    return
+  }
+
+  // 解析并批量创建映射（兼容带*号和不带*号的列名）
+  const typeMap: Record<string, string> = { '资产负债表': 'balance_sheet', '利润表': 'income_statement', '现金流量表': 'cash_flow', '权益变动表': 'equity_change' }
+  let created = 0
+  let skipped = 0
+  for (const row of rows) {
+    const code = String(row['*科目编码（必填）'] || row['科目编码'] || '').trim()
+    const lineCode = String(row['*报表行次编码（必填）'] || row['报表行次编码'] || '').trim()
+    const lineName = String(row['*报表行次名称（必填）'] || row['报表行次名称'] || '').trim()
+    const typeStr = String(row['*报表类型（必填）'] || row['报表类型'] || '').trim()
+    if (!code || !lineCode || !lineName) { skipped++; continue }
+
+    const reportType = typeMap[typeStr] || 'balance_sheet'
+    try {
+      const res: any = await api.post(`/api/projects/${props.projectId}/report-line-mapping/manual`, {
+        standard_account_code: code,
+        report_type: reportType,
+        report_line_code: lineCode,
+        report_line_name: lineName,
+      })
+      if (res?.created) created++
+      else skipped++
+    } catch { skipped++ }
+  }
+  ElMessage.success(`导入完成：新增 ${created} 条，跳过 ${skipped} 条（已存在或无效）`)
+  await loadMappings()
 }
 
 // ─── 辅助 ───

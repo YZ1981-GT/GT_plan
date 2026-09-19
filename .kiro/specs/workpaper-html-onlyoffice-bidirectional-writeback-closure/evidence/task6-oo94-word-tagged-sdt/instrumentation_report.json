@@ -1,0 +1,1337 @@
+{
+  "run_id": "task6-r1",
+  "generated_at": "2026-08-24T23:57:57.800523+00:00",
+  "docs": {
+    "f222": {
+      "template_rel": "backend/wp_templates/F/F2-22 存货监盘计划.docx",
+      "template_sha256": "f19aa64a9daa01022231d91f43d342a4ae973088dbd42b58459ad65c206662ba",
+      "instrumented_sha256": "92ab4885347e852b314f0237284c6daa91d2963d07f3723e9f1ff2075e82c8b6",
+      "instrumented_document_xml_sha256": "edcf7340a963dac24e1a44189161b0aab5f9fd3350fb03c6aacdfcdbb2423fe1",
+      "zip_determinism": "fixed_entry_datetime=(2026, 1, 1, 0, 0, 0)",
+      "note": "Requirement 7.6 指定的 Word pilot。实测 0 表格 / 0 既有 SDT / 33 段单 run ${token} ⇒ field 载体的全部 7.5 场景都能在此取证，但 row 载体不可取证。",
+      "manifest": {
+        "run_id": "task6-r1",
+        "doc": "f222",
+        "wp_code": "F2-22",
+        "contract_id": "f2.stocktake.plan",
+        "template_rel": "backend/wp_templates/F/F2-22 存货监盘计划.docx",
+        "sdt_schema_version": "1.0.0-probe6",
+        "lock_policy": "no_w_lock_injected",
+        "lock_policy_why": "加 <w:lock w:val=\"sdtLocked\"/> 会让 OO 无法删除 SDT，等于替载体作弊；本探针要证明的是 OO 在无保护下是否自发保留 tag。",
+        "declared_operations": [
+          "baseline",
+          "edit_in_sdt",
+          "edit_outside_sdt",
+          "insert_paragraph",
+          "delete_paragraph",
+          "forcesave",
+          "download",
+          "reopen"
+        ],
+        "fields": [
+          {
+            "inj_id": "F05",
+            "level": "inline",
+            "tag": "gt:field:f2.stocktake.plan:plan/entity_name",
+            "alias": "",
+            "sdt_id": 164556402,
+            "stable_field_key": "plan/entity_name",
+            "scenario": "duplicate_instance",
+            "seed_text": "GT-F05-SEED",
+            "run_split": 1,
+            "paragraph_index_at_injection": 1,
+            "replaced_token": "${entityName}",
+            "wrap_block": false
+          },
+          {
+            "inj_id": "F03",
+            "level": "inline",
+            "tag": "gt:field:f2.stocktake.plan:plan/entity_name",
+            "alias": "",
+            "sdt_id": 164556402,
+            "stable_field_key": "plan/entity_name",
+            "scenario": "same_paragraph_multi+duplicate_instance",
+            "seed_text": "GT-F03-SEED",
+            "run_split": 1,
+            "paragraph_index_at_injection": 4,
+            "replaced_token": "${entityName}",
+            "wrap_block": false
+          },
+          {
+            "inj_id": "F04",
+            "level": "inline",
+            "tag": "gt:field:f2.stocktake.plan:plan/bs_date",
+            "alias": "",
+            "sdt_id": 103589422,
+            "stable_field_key": "plan/bs_date",
+            "scenario": "same_paragraph_multi",
+            "seed_text": "GT-F04-SEED",
+            "run_split": 1,
+            "paragraph_index_at_injection": 4,
+            "replaced_token": "${bsDate}",
+            "wrap_block": false
+          },
+          {
+            "inj_id": "F01",
+            "level": "inline",
+            "tag": "gt:field:f2.stocktake.plan:plan/purpose",
+            "alias": "监盘目的",
+            "sdt_id": 124631788,
+            "stable_field_key": "plan/purpose",
+            "scenario": "single_run",
+            "seed_text": "GT-F01-SEED",
+            "run_split": 1,
+            "paragraph_index_at_injection": 6,
+            "replaced_token": "${purpose}",
+            "wrap_block": false
+          },
+          {
+            "inj_id": "F02",
+            "level": "inline",
+            "tag": "gt:field:f2.stocktake.plan:plan/scope",
+            "alias": "",
+            "sdt_id": 248238135,
+            "stable_field_key": "plan/scope",
+            "scenario": "cross_run",
+            "seed_text": "GT-F02-SEED",
+            "run_split": 3,
+            "paragraph_index_at_injection": 8,
+            "replaced_token": "${scope}",
+            "wrap_block": false
+          },
+          {
+            "inj_id": "F06",
+            "level": "inline_inside_block",
+            "tag": "gt:field:f2.stocktake.plan:plan/warehouses",
+            "alias": "监盘地点",
+            "sdt_id": 120188436,
+            "stable_field_key": "plan/warehouses",
+            "scenario": "nested_block_over_inline",
+            "seed_text": "GT-F06-SEED",
+            "run_split": 1,
+            "paragraph_index_at_injection": 10,
+            "replaced_token": "${warehouses}",
+            "wrap_block": true,
+            "block_tag": "gt:block:f2.stocktake.plan:plan/warehouses",
+            "block_sdt_id": 185879840
+          },
+          {
+            "inj_id": "F07",
+            "level": "inline",
+            "tag": "gt:field:f2.stocktake.plan:plan/auditors",
+            "alias": "",
+            "sdt_id": 6470079,
+            "stable_field_key": "plan/auditors",
+            "scenario": "inline_with_preserved_label_prefix",
+            "seed_text": "GT-F07-SEED",
+            "run_split": 1,
+            "paragraph_index_at_injection": 14,
+            "replaced_token": "${auditors}",
+            "wrap_block": false
+          },
+          {
+            "inj_id": "F08",
+            "level": "inline",
+            "tag": "gt:field:f2.stocktake.plan:plan/requirements",
+            "alias": "",
+            "sdt_id": 34819294,
+            "stable_field_key": "plan/requirements",
+            "scenario": "single_run",
+            "seed_text": "GT-F08-SEED",
+            "run_split": 1,
+            "paragraph_index_at_injection": 26,
+            "replaced_token": "${requirements}",
+            "wrap_block": false
+          }
+        ],
+        "rows": [],
+        "expected_tags": [
+          "gt:block:f2.stocktake.plan:plan/warehouses",
+          "gt:field:f2.stocktake.plan:plan/auditors",
+          "gt:field:f2.stocktake.plan:plan/bs_date",
+          "gt:field:f2.stocktake.plan:plan/entity_name",
+          "gt:field:f2.stocktake.plan:plan/purpose",
+          "gt:field:f2.stocktake.plan:plan/requirements",
+          "gt:field:f2.stocktake.plan:plan/scope",
+          "gt:field:f2.stocktake.plan:plan/warehouses"
+        ],
+        "expected_tag_multiset": {
+          "gt:block:f2.stocktake.plan:plan/warehouses": 1,
+          "gt:field:f2.stocktake.plan:plan/auditors": 1,
+          "gt:field:f2.stocktake.plan:plan/bs_date": 1,
+          "gt:field:f2.stocktake.plan:plan/entity_name": 2,
+          "gt:field:f2.stocktake.plan:plan/purpose": 1,
+          "gt:field:f2.stocktake.plan:plan/requirements": 1,
+          "gt:field:f2.stocktake.plan:plan/scope": 1,
+          "gt:field:f2.stocktake.plan:plan/warehouses": 1
+        },
+        "expected_row_uuids": [],
+        "expected_hierarchy": {
+          "gt:block:f2.stocktake.plan:plan/warehouses": [],
+          "gt:field:f2.stocktake.plan:plan/auditors": [],
+          "gt:field:f2.stocktake.plan:plan/bs_date": [],
+          "gt:field:f2.stocktake.plan:plan/entity_name": [],
+          "gt:field:f2.stocktake.plan:plan/purpose": [],
+          "gt:field:f2.stocktake.plan:plan/requirements": [],
+          "gt:field:f2.stocktake.plan:plan/scope": [],
+          "gt:field:f2.stocktake.plan:plan/warehouses": [
+            "gt:block:f2.stocktake.plan:plan/warehouses"
+          ]
+        },
+        "note": "Requirement 7.6 指定的 Word pilot。实测 0 表格 / 0 既有 SDT / 33 段单 run ${token} ⇒ field 载体的全部 7.5 场景都能在此取证，但 row 载体不可取证。"
+      },
+      "pre_injection_inventory": {
+        "sdt_count": 0,
+        "tags_sorted": [],
+        "body_paragraph_count": 33,
+        "tables": [],
+        "external_body_digest": "07b6df8c7f4869e0e8efb4f534c134dd7b61ad870a01a3fb1c48a8ea6f3e165a",
+        "external_body_line_count": 31
+      },
+      "post_injection_inventory": {
+        "sdt_count": 9,
+        "tags_sorted": [
+          "gt:block:f2.stocktake.plan:plan/warehouses",
+          "gt:field:f2.stocktake.plan:plan/auditors",
+          "gt:field:f2.stocktake.plan:plan/bs_date",
+          "gt:field:f2.stocktake.plan:plan/entity_name",
+          "gt:field:f2.stocktake.plan:plan/purpose",
+          "gt:field:f2.stocktake.plan:plan/requirements",
+          "gt:field:f2.stocktake.plan:plan/scope",
+          "gt:field:f2.stocktake.plan:plan/warehouses"
+        ],
+        "tag_multiset": {
+          "gt:block:f2.stocktake.plan:plan/warehouses": 1,
+          "gt:field:f2.stocktake.plan:plan/auditors": 1,
+          "gt:field:f2.stocktake.plan:plan/bs_date": 1,
+          "gt:field:f2.stocktake.plan:plan/entity_name": 2,
+          "gt:field:f2.stocktake.plan:plan/purpose": 1,
+          "gt:field:f2.stocktake.plan:plan/requirements": 1,
+          "gt:field:f2.stocktake.plan:plan/scope": 1,
+          "gt:field:f2.stocktake.plan:plan/warehouses": 1
+        },
+        "instances": [
+          {
+            "tag": "gt:field:f2.stocktake.plan:plan/entity_name",
+            "alias": null,
+            "sdt_id": "164556402",
+            "level": "inline",
+            "ancestor_tags": [],
+            "depth": 0,
+            "text": "GT-F05-SEED",
+            "run_count": 1,
+            "body_paragraph_index": 1
+          },
+          {
+            "tag": "gt:field:f2.stocktake.plan:plan/entity_name",
+            "alias": null,
+            "sdt_id": "164556402",
+            "level": "inline",
+            "ancestor_tags": [],
+            "depth": 0,
+            "text": "GT-F03-SEED",
+            "run_count": 1,
+            "body_paragraph_index": 4
+          },
+          {
+            "tag": "gt:field:f2.stocktake.plan:plan/bs_date",
+            "alias": null,
+            "sdt_id": "103589422",
+            "level": "inline",
+            "ancestor_tags": [],
+            "depth": 0,
+            "text": "GT-F04-SEED",
+            "run_count": 1,
+            "body_paragraph_index": 4
+          },
+          {
+            "tag": "gt:field:f2.stocktake.plan:plan/purpose",
+            "alias": "监盘目的",
+            "sdt_id": "124631788",
+            "level": "inline",
+            "ancestor_tags": [],
+            "depth": 0,
+            "text": "GT-F01-SEED",
+            "run_count": 1,
+            "body_paragraph_index": 6
+          },
+          {
+            "tag": "gt:field:f2.stocktake.plan:plan/scope",
+            "alias": null,
+            "sdt_id": "248238135",
+            "level": "inline",
+            "ancestor_tags": [],
+            "depth": 0,
+            "text": "GT-F02-SEED",
+            "run_count": 3,
+            "body_paragraph_index": 8
+          },
+          {
+            "tag": "gt:block:f2.stocktake.plan:plan/warehouses",
+            "alias": "监盘地点",
+            "sdt_id": "185879840",
+            "level": "block",
+            "ancestor_tags": [],
+            "depth": 0,
+            "text": "GT-F06-SEED",
+            "run_count": 1,
+            "body_paragraph_index": null
+          },
+          {
+            "tag": "gt:field:f2.stocktake.plan:plan/warehouses",
+            "alias": "监盘地点",
+            "sdt_id": "120188436",
+            "level": "inline",
+            "ancestor_tags": [
+              "gt:block:f2.stocktake.plan:plan/warehouses"
+            ],
+            "depth": 1,
+            "text": "GT-F06-SEED",
+            "run_count": 1,
+            "body_paragraph_index": 10
+          },
+          {
+            "tag": "gt:field:f2.stocktake.plan:plan/auditors",
+            "alias": null,
+            "sdt_id": "6470079",
+            "level": "inline",
+            "ancestor_tags": [],
+            "depth": 0,
+            "text": "GT-F07-SEED",
+            "run_count": 1,
+            "body_paragraph_index": 14
+          },
+          {
+            "tag": "gt:field:f2.stocktake.plan:plan/requirements",
+            "alias": null,
+            "sdt_id": "34819294",
+            "level": "inline",
+            "ancestor_tags": [],
+            "depth": 0,
+            "text": "GT-F08-SEED",
+            "run_count": 1,
+            "body_paragraph_index": 26
+          }
+        ],
+        "by_tag": {
+          "gt:block:f2.stocktake.plan:plan/warehouses": [
+            {
+              "tag": "gt:block:f2.stocktake.plan:plan/warehouses",
+              "alias": "监盘地点",
+              "sdt_id": "185879840",
+              "level": "block",
+              "ancestor_tags": [],
+              "depth": 0,
+              "text": "GT-F06-SEED",
+              "run_count": 1,
+              "body_paragraph_index": null
+            }
+          ],
+          "gt:field:f2.stocktake.plan:plan/auditors": [
+            {
+              "tag": "gt:field:f2.stocktake.plan:plan/auditors",
+              "alias": null,
+              "sdt_id": "6470079",
+              "level": "inline",
+              "ancestor_tags": [],
+              "depth": 0,
+              "text": "GT-F07-SEED",
+              "run_count": 1,
+              "body_paragraph_index": 14
+            }
+          ],
+          "gt:field:f2.stocktake.plan:plan/bs_date": [
+            {
+              "tag": "gt:field:f2.stocktake.plan:plan/bs_date",
+              "alias": null,
+              "sdt_id": "103589422",
+              "level": "inline",
+              "ancestor_tags": [],
+              "depth": 0,
+              "text": "GT-F04-SEED",
+              "run_count": 1,
+              "body_paragraph_index": 4
+            }
+          ],
+          "gt:field:f2.stocktake.plan:plan/entity_name": [
+            {
+              "tag": "gt:field:f2.stocktake.plan:plan/entity_name",
+              "alias": null,
+              "sdt_id": "164556402",
+              "level": "inline",
+              "ancestor_tags": [],
+              "depth": 0,
+              "text": "GT-F05-SEED",
+              "run_count": 1,
+              "body_paragraph_index": 1
+            },
+            {
+              "tag": "gt:field:f2.stocktake.plan:plan/entity_name",
+              "alias": null,
+              "sdt_id": "164556402",
+              "level": "inline",
+              "ancestor_tags": [],
+              "depth": 0,
+              "text": "GT-F03-SEED",
+              "run_count": 1,
+              "body_paragraph_index": 4
+            }
+          ],
+          "gt:field:f2.stocktake.plan:plan/purpose": [
+            {
+              "tag": "gt:field:f2.stocktake.plan:plan/purpose",
+              "alias": "监盘目的",
+              "sdt_id": "124631788",
+              "level": "inline",
+              "ancestor_tags": [],
+              "depth": 0,
+              "text": "GT-F01-SEED",
+              "run_count": 1,
+              "body_paragraph_index": 6
+            }
+          ],
+          "gt:field:f2.stocktake.plan:plan/requirements": [
+            {
+              "tag": "gt:field:f2.stocktake.plan:plan/requirements",
+              "alias": null,
+              "sdt_id": "34819294",
+              "level": "inline",
+              "ancestor_tags": [],
+              "depth": 0,
+              "text": "GT-F08-SEED",
+              "run_count": 1,
+              "body_paragraph_index": 26
+            }
+          ],
+          "gt:field:f2.stocktake.plan:plan/scope": [
+            {
+              "tag": "gt:field:f2.stocktake.plan:plan/scope",
+              "alias": null,
+              "sdt_id": "248238135",
+              "level": "inline",
+              "ancestor_tags": [],
+              "depth": 0,
+              "text": "GT-F02-SEED",
+              "run_count": 3,
+              "body_paragraph_index": 8
+            }
+          ],
+          "gt:field:f2.stocktake.plan:plan/warehouses": [
+            {
+              "tag": "gt:field:f2.stocktake.plan:plan/warehouses",
+              "alias": "监盘地点",
+              "sdt_id": "120188436",
+              "level": "inline",
+              "ancestor_tags": [
+                "gt:block:f2.stocktake.plan:plan/warehouses"
+              ],
+              "depth": 1,
+              "text": "GT-F06-SEED",
+              "run_count": 1,
+              "body_paragraph_index": 10
+            }
+          ]
+        },
+        "row_uuids": [],
+        "row_uuids_from_row_sdt": [],
+        "row_uuids_from_field_tags": [],
+        "hierarchy": {
+          "gt:block:f2.stocktake.plan:plan/warehouses": [
+            []
+          ],
+          "gt:field:f2.stocktake.plan:plan/auditors": [
+            []
+          ],
+          "gt:field:f2.stocktake.plan:plan/bs_date": [
+            []
+          ],
+          "gt:field:f2.stocktake.plan:plan/entity_name": [
+            []
+          ],
+          "gt:field:f2.stocktake.plan:plan/purpose": [
+            []
+          ],
+          "gt:field:f2.stocktake.plan:plan/requirements": [
+            []
+          ],
+          "gt:field:f2.stocktake.plan:plan/scope": [
+            []
+          ],
+          "gt:field:f2.stocktake.plan:plan/warehouses": [
+            [
+              "gt:block:f2.stocktake.plan:plan/warehouses"
+            ]
+          ]
+        },
+        "levels": {
+          "gt:block:f2.stocktake.plan:plan/warehouses": [
+            "block"
+          ],
+          "gt:field:f2.stocktake.plan:plan/auditors": [
+            "inline"
+          ],
+          "gt:field:f2.stocktake.plan:plan/bs_date": [
+            "inline"
+          ],
+          "gt:field:f2.stocktake.plan:plan/entity_name": [
+            "inline"
+          ],
+          "gt:field:f2.stocktake.plan:plan/purpose": [
+            "inline"
+          ],
+          "gt:field:f2.stocktake.plan:plan/requirements": [
+            "inline"
+          ],
+          "gt:field:f2.stocktake.plan:plan/scope": [
+            "inline"
+          ],
+          "gt:field:f2.stocktake.plan:plan/warehouses": [
+            "inline"
+          ]
+        },
+        "body_paragraph_count": 33,
+        "tables": [],
+        "external_body_line_count": 28,
+        "external_body_digest": "7f3592ff6497b989a08b28d61034b93c0fbdddadd88d6401ed1827786fef860a",
+        "external_body_concat": "索引号：G2-6-2${auditYear}年存货监盘计划根据《中国注册会计师审计准则第1311号——存货监盘》的要求，为了对（以下简称该公司或公司）资产负债表上存货的存在性、所有权、品质状况等情况进行验证，我所决定对该公司存货进行监盘，特制定本监盘计划。1．监盘目的：2．监盘范围：3．监盘地点：4．监盘时间：${countDate}5．参与人员及分工：项目组监盘人员：被审计单位配合人员：${clientStaff}分工：${assignment}6．监盘前准备工作：${prep}（4）经分析了解存货构成：${inventoryComposition}7．监盘方式：${countMethod}【提示：存货盘点需审计人员现场亲自监盘；如因特殊情况需要视频盘点，应详细说明原因和合理性，并详细记录监盘过程、项目地理位置和坐标信息，核实视频中盘点人员身份，确保视频监盘程序的有效性。】8．监盘要求：9．特别关注事项：${specialNotes}致同会计师事务所${teamName}${planDate}",
+        "external_body_lines": [
+          "索引号：G2-6-2",
+          "${auditYear}年存货监盘计划",
+          "根据《中国注册会计师审计准则第1311号——存货监盘》的要求，为了对",
+          "（以下简称该公司或公司）",
+          "资产负债表上存货的存在性、所有权、品质状况等情况进行验证，我所决定对该公司存货进行监盘，特制定本监盘计划。",
+          "1．监盘目的：",
+          "2．监盘范围：",
+          "3．监盘地点：",
+          "4．监盘时间：",
+          "${countDate}",
+          "5．参与人员及分工：",
+          "项目组监盘人员：",
+          "被审计单位配合人员：${clientStaff}",
+          "分工：",
+          "${assignment}",
+          "6．监盘前准备工作：",
+          "${prep}",
+          "（4）经分析了解存货构成：",
+          "${inventoryComposition}",
+          "7．监盘方式：",
+          "${countMethod}",
+          "【提示：存货盘点需审计人员现场亲自监盘；如因特殊情况需要视频盘点，应详细说明原因和合理性，并详细记录监盘过程、项目地理位置和坐标信息，核实视频中盘点人员身份，确保视频监盘程序的有效性。】",
+          "8．监盘要求：",
+          "9．特别关注事项：",
+          "${specialNotes}",
+          "致同会计师事务所",
+          "${teamName}",
+          "${planDate}"
+        ],
+        "full_text_concat": "索引号：G2-6-2GT-F05-SEED${auditYear}年存货监盘计划根据《中国注册会计师审计准则第1311号——存货监盘》的要求，为了对GT-F03-SEED（以下简称该公司或公司）GT-F04-SEED资产负债表上存货的存在性、所有权、品质状况等情况进行验证，我所决定对该公司存货进行监盘，特制定本监盘计划。1．监盘目的：GT-F01-SEED2．监盘范围：GT-F02-SEED3．监盘地点：GT-F06-SEED4．监盘时间：${countDate}5．参与人员及分工：项目组监盘人员：GT-F07-SEED被审计单位配合人员：${clientStaff}分工：${assignment}6．监盘前准备工作：${prep}（4）经分析了解存货构成：${inventoryComposition}7．监盘方式：${countMethod}【提示：存货盘点需审计人员现场亲自监盘；如因特殊情况需要视频盘点，应详细说明原因和合理性，并详细记录监盘过程、项目地理位置和坐标信息，核实视频中盘点人员身份，确保视频监盘程序的有效性。】8．监盘要求：GT-F08-SEED9．特别关注事项：${specialNotes}致同会计师事务所${teamName}${planDate}",
+        "full_text_digest": "5883e951272c508c0dbf8a2aa92d6771c99369ee826bdd415576bf980b322c40",
+        "errors": []
+      },
+      "zip_reopen_verification": {
+        "tags_match_manifest": true,
+        "tag_multiset_match": true,
+        "row_uuids_match": true,
+        "hierarchy_match": true,
+        "visible_skeleton_preserved": true,
+        "visible_skeleton_digest": "7f3592ff6497b989a08b28d61034b93c0fbdddadd88d6401ed1827786fef860a",
+        "pre_injection_sdt_count": 0,
+        "post_injection_sdt_count": 9,
+        "collection_errors": []
+      }
+    },
+    "f223": {
+      "template_rel": "backend/wp_templates/F/F2-23 存货监盘小结.docx",
+      "template_sha256": "09106818415ea72d51d14441b4f3fa544c8ae7d8a1f20b5b1f6956bc9232b080",
+      "instrumented_sha256": "da08fd764fc8fb50688ac55eebc6fc084ba73bd71434ca09b67871d6d3c0f5e1",
+      "instrumented_document_xml_sha256": "29351618ec691d122369f55c635b285f7214fa40781310cb629a277f95caf6ed",
+      "zip_determinism": "fixed_entry_datetime=(2026, 1, 1, 0, 0, 0)",
+      "note": "Requirement 7.6 的第二个 pilot 文档。作用是证明 field 载体结论不是单文档偶然，只跑 7.6 明列的 打开/编辑/forcesave/callback/重开 五步。",
+      "manifest": {
+        "run_id": "task6-r1",
+        "doc": "f223",
+        "wp_code": "F2-23",
+        "contract_id": "f2.stocktake.summary",
+        "template_rel": "backend/wp_templates/F/F2-23 存货监盘小结.docx",
+        "sdt_schema_version": "1.0.0-probe6",
+        "lock_policy": "no_w_lock_injected",
+        "lock_policy_why": "加 <w:lock w:val=\"sdtLocked\"/> 会让 OO 无法删除 SDT，等于替载体作弊；本探针要证明的是 OO 在无保护下是否自发保留 tag。",
+        "declared_operations": [
+          "baseline",
+          "edit_in_sdt",
+          "forcesave",
+          "download",
+          "reopen"
+        ],
+        "fields": [
+          {
+            "inj_id": "G01",
+            "level": "inline",
+            "tag": "gt:field:f2.stocktake.summary:summary/purpose",
+            "alias": "监盘目的",
+            "sdt_id": 127078965,
+            "stable_field_key": "summary/purpose",
+            "scenario": "single_run",
+            "seed_text": "GT-G01-SEED",
+            "run_split": 1,
+            "paragraph_index_at_injection": 6,
+            "replaced_token": "${purpose}",
+            "wrap_block": false
+          },
+          {
+            "inj_id": "G02",
+            "level": "inline",
+            "tag": "gt:field:f2.stocktake.summary:summary/count_date",
+            "alias": "",
+            "sdt_id": 151296015,
+            "stable_field_key": "summary/count_date",
+            "scenario": "cross_run",
+            "seed_text": "GT-G02-SEED",
+            "run_split": 2,
+            "paragraph_index_at_injection": 12,
+            "replaced_token": "${countDate}",
+            "wrap_block": false
+          },
+          {
+            "inj_id": "G03",
+            "level": "inline_inside_block",
+            "tag": "gt:field:f2.stocktake.summary:summary/conclusion",
+            "alias": "",
+            "sdt_id": 142182207,
+            "stable_field_key": "summary/conclusion",
+            "scenario": "nested_block_over_inline",
+            "seed_text": "GT-G03-SEED",
+            "run_split": 1,
+            "paragraph_index_at_injection": 25,
+            "replaced_token": "${conclusionBlock}",
+            "wrap_block": true,
+            "block_tag": "gt:block:f2.stocktake.summary:summary/conclusion",
+            "block_sdt_id": 7952472
+          }
+        ],
+        "rows": [],
+        "expected_tags": [
+          "gt:block:f2.stocktake.summary:summary/conclusion",
+          "gt:field:f2.stocktake.summary:summary/conclusion",
+          "gt:field:f2.stocktake.summary:summary/count_date",
+          "gt:field:f2.stocktake.summary:summary/purpose"
+        ],
+        "expected_tag_multiset": {
+          "gt:block:f2.stocktake.summary:summary/conclusion": 1,
+          "gt:field:f2.stocktake.summary:summary/conclusion": 1,
+          "gt:field:f2.stocktake.summary:summary/count_date": 1,
+          "gt:field:f2.stocktake.summary:summary/purpose": 1
+        },
+        "expected_row_uuids": [],
+        "expected_hierarchy": {
+          "gt:block:f2.stocktake.summary:summary/conclusion": [],
+          "gt:field:f2.stocktake.summary:summary/conclusion": [
+            "gt:block:f2.stocktake.summary:summary/conclusion"
+          ],
+          "gt:field:f2.stocktake.summary:summary/count_date": [],
+          "gt:field:f2.stocktake.summary:summary/purpose": []
+        },
+        "note": "Requirement 7.6 的第二个 pilot 文档。作用是证明 field 载体结论不是单文档偶然，只跑 7.6 明列的 打开/编辑/forcesave/callback/重开 五步。"
+      },
+      "pre_injection_inventory": {
+        "sdt_count": 0,
+        "tags_sorted": [],
+        "body_paragraph_count": 32,
+        "tables": [],
+        "external_body_digest": "5503fc1ba0f07bd59cc41c45eb85ed72b3ea7cf7fbb669c3cd8f172fe164ee39",
+        "external_body_line_count": 29
+      },
+      "post_injection_inventory": {
+        "sdt_count": 4,
+        "tags_sorted": [
+          "gt:block:f2.stocktake.summary:summary/conclusion",
+          "gt:field:f2.stocktake.summary:summary/conclusion",
+          "gt:field:f2.stocktake.summary:summary/count_date",
+          "gt:field:f2.stocktake.summary:summary/purpose"
+        ],
+        "tag_multiset": {
+          "gt:block:f2.stocktake.summary:summary/conclusion": 1,
+          "gt:field:f2.stocktake.summary:summary/conclusion": 1,
+          "gt:field:f2.stocktake.summary:summary/count_date": 1,
+          "gt:field:f2.stocktake.summary:summary/purpose": 1
+        },
+        "instances": [
+          {
+            "tag": "gt:field:f2.stocktake.summary:summary/purpose",
+            "alias": "监盘目的",
+            "sdt_id": "127078965",
+            "level": "inline",
+            "ancestor_tags": [],
+            "depth": 0,
+            "text": "GT-G01-SEED",
+            "run_count": 1,
+            "body_paragraph_index": 6
+          },
+          {
+            "tag": "gt:field:f2.stocktake.summary:summary/count_date",
+            "alias": null,
+            "sdt_id": "151296015",
+            "level": "inline",
+            "ancestor_tags": [],
+            "depth": 0,
+            "text": "GT-G02-SEED",
+            "run_count": 2,
+            "body_paragraph_index": 12
+          },
+          {
+            "tag": "gt:block:f2.stocktake.summary:summary/conclusion",
+            "alias": null,
+            "sdt_id": "7952472",
+            "level": "block",
+            "ancestor_tags": [],
+            "depth": 0,
+            "text": "GT-G03-SEED",
+            "run_count": 1,
+            "body_paragraph_index": null
+          },
+          {
+            "tag": "gt:field:f2.stocktake.summary:summary/conclusion",
+            "alias": null,
+            "sdt_id": "142182207",
+            "level": "inline",
+            "ancestor_tags": [
+              "gt:block:f2.stocktake.summary:summary/conclusion"
+            ],
+            "depth": 1,
+            "text": "GT-G03-SEED",
+            "run_count": 1,
+            "body_paragraph_index": 25
+          }
+        ],
+        "by_tag": {
+          "gt:block:f2.stocktake.summary:summary/conclusion": [
+            {
+              "tag": "gt:block:f2.stocktake.summary:summary/conclusion",
+              "alias": null,
+              "sdt_id": "7952472",
+              "level": "block",
+              "ancestor_tags": [],
+              "depth": 0,
+              "text": "GT-G03-SEED",
+              "run_count": 1,
+              "body_paragraph_index": null
+            }
+          ],
+          "gt:field:f2.stocktake.summary:summary/conclusion": [
+            {
+              "tag": "gt:field:f2.stocktake.summary:summary/conclusion",
+              "alias": null,
+              "sdt_id": "142182207",
+              "level": "inline",
+              "ancestor_tags": [
+                "gt:block:f2.stocktake.summary:summary/conclusion"
+              ],
+              "depth": 1,
+              "text": "GT-G03-SEED",
+              "run_count": 1,
+              "body_paragraph_index": 25
+            }
+          ],
+          "gt:field:f2.stocktake.summary:summary/count_date": [
+            {
+              "tag": "gt:field:f2.stocktake.summary:summary/count_date",
+              "alias": null,
+              "sdt_id": "151296015",
+              "level": "inline",
+              "ancestor_tags": [],
+              "depth": 0,
+              "text": "GT-G02-SEED",
+              "run_count": 2,
+              "body_paragraph_index": 12
+            }
+          ],
+          "gt:field:f2.stocktake.summary:summary/purpose": [
+            {
+              "tag": "gt:field:f2.stocktake.summary:summary/purpose",
+              "alias": "监盘目的",
+              "sdt_id": "127078965",
+              "level": "inline",
+              "ancestor_tags": [],
+              "depth": 0,
+              "text": "GT-G01-SEED",
+              "run_count": 1,
+              "body_paragraph_index": 6
+            }
+          ]
+        },
+        "row_uuids": [],
+        "row_uuids_from_row_sdt": [],
+        "row_uuids_from_field_tags": [],
+        "hierarchy": {
+          "gt:block:f2.stocktake.summary:summary/conclusion": [
+            []
+          ],
+          "gt:field:f2.stocktake.summary:summary/conclusion": [
+            [
+              "gt:block:f2.stocktake.summary:summary/conclusion"
+            ]
+          ],
+          "gt:field:f2.stocktake.summary:summary/count_date": [
+            []
+          ],
+          "gt:field:f2.stocktake.summary:summary/purpose": [
+            []
+          ]
+        },
+        "levels": {
+          "gt:block:f2.stocktake.summary:summary/conclusion": [
+            "block"
+          ],
+          "gt:field:f2.stocktake.summary:summary/conclusion": [
+            "inline"
+          ],
+          "gt:field:f2.stocktake.summary:summary/count_date": [
+            "inline"
+          ],
+          "gt:field:f2.stocktake.summary:summary/purpose": [
+            "inline"
+          ]
+        },
+        "body_paragraph_count": 32,
+        "tables": [],
+        "external_body_line_count": 26,
+        "external_body_digest": "c12d413756bb195225990ea23e443afa0e13bd039415264cfc5806f8859eb2a7",
+        "external_body_concat": "索引号：G2-6-1${entityName}${auditYear}年存货监盘小结根据《中国注册会计师审计准则第1311号——存货监盘》的要求，为了对${entityName}（以下简称该公司或公司）${bsDate}资产负债表上存货的存在性、所有权、品质状况等情况进行验证，项目组对该公司存货实施了监盘，现将监盘情况小结如下。1．监盘目的：2．监盘范围：${scope}3．监盘地点：${warehouses}4．监盘时间：5．参与人员及分工：盘点人员：${clientStaff}项目组监盘人员：${auditors}分工：${assignment}6．公司存货盘点方法：${countMethod}7．监盘情况汇总：${summaryBlock}8．具体监盘情况：${resultByLocation}9．监盘结论：附：各分厂抽盘明细表致同会计师事务所${teamName}${summaryDate}",
+        "external_body_lines": [
+          "索引号：G2-6-1",
+          "${entityName}",
+          "${auditYear}年存货监盘小结",
+          "根据《中国注册会计师审计准则第1311号——存货监盘》的要求，为了对${entityName}（以下简称该公司或公司）${bsDate}资产负债表上存货的存在性、所有权、品质状况等情况进行验证，项目组对该公司存货实施了监盘，现将监盘情况小结如下。",
+          "1．监盘目的：",
+          "2．监盘范围：",
+          "${scope}",
+          "3．监盘地点：",
+          "${warehouses}",
+          "4．监盘时间：",
+          "5．参与人员及分工：",
+          "盘点人员：${clientStaff}",
+          "项目组监盘人员：${auditors}",
+          "分工：",
+          "${assignment}",
+          "6．公司存货盘点方法：",
+          "${countMethod}",
+          "7．监盘情况汇总：",
+          "${summaryBlock}",
+          "8．具体监盘情况：",
+          "${resultByLocation}",
+          "9．监盘结论：",
+          "附：各分厂抽盘明细表",
+          "致同会计师事务所",
+          "${teamName}",
+          "${summaryDate}"
+        ],
+        "full_text_concat": "索引号：G2-6-1${entityName}${auditYear}年存货监盘小结根据《中国注册会计师审计准则第1311号——存货监盘》的要求，为了对${entityName}（以下简称该公司或公司）${bsDate}资产负债表上存货的存在性、所有权、品质状况等情况进行验证，项目组对该公司存货实施了监盘，现将监盘情况小结如下。1．监盘目的：GT-G01-SEED2．监盘范围：${scope}3．监盘地点：${warehouses}4．监盘时间：GT-G02-SEED5．参与人员及分工：盘点人员：${clientStaff}项目组监盘人员：${auditors}分工：${assignment}6．公司存货盘点方法：${countMethod}7．监盘情况汇总：${summaryBlock}8．具体监盘情况：${resultByLocation}9．监盘结论：GT-G03-SEED附：各分厂抽盘明细表致同会计师事务所${teamName}${summaryDate}",
+        "full_text_digest": "3327282f810fd438e10617e2ac38c8d491f5392c39df6547d603d02e9611eef7",
+        "errors": []
+      },
+      "zip_reopen_verification": {
+        "tags_match_manifest": true,
+        "tag_multiset_match": true,
+        "row_uuids_match": true,
+        "hierarchy_match": true,
+        "visible_skeleton_preserved": true,
+        "visible_skeleton_digest": "c12d413756bb195225990ea23e443afa0e13bd039415264cfc5806f8859eb2a7",
+        "pre_injection_sdt_count": 0,
+        "post_injection_sdt_count": 4,
+        "collection_errors": []
+      }
+    },
+    "b30112": {
+      "template_rel": "backend/wp_templates/B/B30-11-2 内部控制缺陷汇总与评估.docx",
+      "template_sha256": "b4facd6b7d31b1419eb102ede582e7e77b1a5c685a3f9513bb546b9de0bbb247",
+      "instrumented_sha256": "baac3913cd624753ec1b403201645be6e137a89474e56a07ae0eba35bb7ce7c5",
+      "instrumented_document_xml_sha256": "42b288d39146c5d23c0030272fdcf56cb6e51316f0c21e00bc1f3bb7ebe5cbcd",
+      "zip_determinism": "fixed_entry_datetime=(2026, 1, 1, 0, 0, 0)",
+      "note": "F2-22/F2-23 零表格 ⇒ Requirement 7.2 的 row-level SDT + row_uuid 必须换一个真有重复行的平台模板取证。tbl0 = 表头 + 3 个同构空数据行（10 列）。",
+      "manifest": {
+        "run_id": "task6-r1",
+        "doc": "b30112",
+        "wp_code": "B30-11-2",
+        "contract_id": "b30.11.2.deficiencies",
+        "template_rel": "backend/wp_templates/B/B30-11-2 内部控制缺陷汇总与评估.docx",
+        "sdt_schema_version": "1.0.0-probe6",
+        "lock_policy": "no_w_lock_injected",
+        "lock_policy_why": "加 <w:lock w:val=\"sdtLocked\"/> 会让 OO 无法删除 SDT，等于替载体作弊；本探针要证明的是 OO 在无保护下是否自发保留 tag。",
+        "declared_operations": [
+          "baseline",
+          "edit_in_sdt",
+          "insert_row",
+          "delete_row",
+          "forcesave",
+          "download",
+          "reopen"
+        ],
+        "fields": [
+          {
+            "inj_id": "H01",
+            "level": "inline",
+            "tag": "gt:field:b30.11.2.deficiencies:deficiencies/title",
+            "alias": "",
+            "sdt_id": 124000155,
+            "stable_field_key": "deficiencies/title",
+            "scenario": "single_run_outside_table",
+            "seed_text": "GT-H01-SEED",
+            "run_split": 1,
+            "paragraph_index_at_injection": 1,
+            "replaced_token": "内部控制缺陷汇总与评估",
+            "wrap_block": false
+          }
+        ],
+        "rows": [
+          {
+            "inj_id": "R01",
+            "level": "row",
+            "row_tag": "gt:row:b30.11.2.deficiencies:rows:36cd5ee6-a95a-4101-a45c-8289857322a7",
+            "row_sdt_id": 19371981,
+            "row_uuid": "36cd5ee6-a95a-4101-a45c-8289857322a7",
+            "field_tag": "gt:field:b30.11.2.deficiencies:rows/36cd5ee6-a95a-4101-a45c-8289857322a7/deficiency",
+            "field_sdt_id": 18418674,
+            "seed_text": "GT-R01-SEED",
+            "table_index_at_injection": 0,
+            "row_index_at_injection": 1,
+            "cell_index_at_injection": 1,
+            "scenario": "row_level_sdt_with_row_uuid"
+          },
+          {
+            "inj_id": "R02",
+            "level": "row",
+            "row_tag": "gt:row:b30.11.2.deficiencies:rows:86f54ae5-f4d8-4f31-ae95-b9e60e656a50",
+            "row_sdt_id": 69517844,
+            "row_uuid": "86f54ae5-f4d8-4f31-ae95-b9e60e656a50",
+            "field_tag": "gt:field:b30.11.2.deficiencies:rows/86f54ae5-f4d8-4f31-ae95-b9e60e656a50/deficiency",
+            "field_sdt_id": 152162414,
+            "seed_text": "GT-R02-SEED",
+            "table_index_at_injection": 0,
+            "row_index_at_injection": 2,
+            "cell_index_at_injection": 1,
+            "scenario": "row_level_sdt_with_row_uuid"
+          },
+          {
+            "inj_id": "R03",
+            "level": "row",
+            "row_tag": "gt:row:b30.11.2.deficiencies:rows:bd7e5233-6d56-4c5a-addc-07d0a4024dfe",
+            "row_sdt_id": 93818692,
+            "row_uuid": "bd7e5233-6d56-4c5a-addc-07d0a4024dfe",
+            "field_tag": "gt:field:b30.11.2.deficiencies:rows/bd7e5233-6d56-4c5a-addc-07d0a4024dfe/deficiency",
+            "field_sdt_id": 258345467,
+            "seed_text": "GT-R03-SEED",
+            "table_index_at_injection": 0,
+            "row_index_at_injection": 3,
+            "cell_index_at_injection": 1,
+            "scenario": "row_level_sdt_with_row_uuid"
+          }
+        ],
+        "expected_tags": [
+          "gt:field:b30.11.2.deficiencies:deficiencies/title",
+          "gt:field:b30.11.2.deficiencies:rows/36cd5ee6-a95a-4101-a45c-8289857322a7/deficiency",
+          "gt:field:b30.11.2.deficiencies:rows/86f54ae5-f4d8-4f31-ae95-b9e60e656a50/deficiency",
+          "gt:field:b30.11.2.deficiencies:rows/bd7e5233-6d56-4c5a-addc-07d0a4024dfe/deficiency",
+          "gt:row:b30.11.2.deficiencies:rows:36cd5ee6-a95a-4101-a45c-8289857322a7",
+          "gt:row:b30.11.2.deficiencies:rows:86f54ae5-f4d8-4f31-ae95-b9e60e656a50",
+          "gt:row:b30.11.2.deficiencies:rows:bd7e5233-6d56-4c5a-addc-07d0a4024dfe"
+        ],
+        "expected_tag_multiset": {
+          "gt:field:b30.11.2.deficiencies:deficiencies/title": 1,
+          "gt:field:b30.11.2.deficiencies:rows/36cd5ee6-a95a-4101-a45c-8289857322a7/deficiency": 1,
+          "gt:field:b30.11.2.deficiencies:rows/86f54ae5-f4d8-4f31-ae95-b9e60e656a50/deficiency": 1,
+          "gt:field:b30.11.2.deficiencies:rows/bd7e5233-6d56-4c5a-addc-07d0a4024dfe/deficiency": 1,
+          "gt:row:b30.11.2.deficiencies:rows:36cd5ee6-a95a-4101-a45c-8289857322a7": 1,
+          "gt:row:b30.11.2.deficiencies:rows:86f54ae5-f4d8-4f31-ae95-b9e60e656a50": 1,
+          "gt:row:b30.11.2.deficiencies:rows:bd7e5233-6d56-4c5a-addc-07d0a4024dfe": 1
+        },
+        "expected_row_uuids": [
+          "36cd5ee6-a95a-4101-a45c-8289857322a7",
+          "86f54ae5-f4d8-4f31-ae95-b9e60e656a50",
+          "bd7e5233-6d56-4c5a-addc-07d0a4024dfe"
+        ],
+        "expected_hierarchy": {
+          "gt:field:b30.11.2.deficiencies:deficiencies/title": [],
+          "gt:field:b30.11.2.deficiencies:rows/36cd5ee6-a95a-4101-a45c-8289857322a7/deficiency": [
+            "gt:row:b30.11.2.deficiencies:rows:36cd5ee6-a95a-4101-a45c-8289857322a7"
+          ],
+          "gt:field:b30.11.2.deficiencies:rows/86f54ae5-f4d8-4f31-ae95-b9e60e656a50/deficiency": [
+            "gt:row:b30.11.2.deficiencies:rows:86f54ae5-f4d8-4f31-ae95-b9e60e656a50"
+          ],
+          "gt:field:b30.11.2.deficiencies:rows/bd7e5233-6d56-4c5a-addc-07d0a4024dfe/deficiency": [
+            "gt:row:b30.11.2.deficiencies:rows:bd7e5233-6d56-4c5a-addc-07d0a4024dfe"
+          ],
+          "gt:row:b30.11.2.deficiencies:rows:36cd5ee6-a95a-4101-a45c-8289857322a7": [],
+          "gt:row:b30.11.2.deficiencies:rows:86f54ae5-f4d8-4f31-ae95-b9e60e656a50": [],
+          "gt:row:b30.11.2.deficiencies:rows:bd7e5233-6d56-4c5a-addc-07d0a4024dfe": []
+        },
+        "note": "F2-22/F2-23 零表格 ⇒ Requirement 7.2 的 row-level SDT + row_uuid 必须换一个真有重复行的平台模板取证。tbl0 = 表头 + 3 个同构空数据行（10 列）。"
+      },
+      "pre_injection_inventory": {
+        "sdt_count": 0,
+        "tags_sorted": [],
+        "body_paragraph_count": 14,
+        "tables": [
+          {
+            "row_count": 4,
+            "cells_per_row": [
+              10,
+              10,
+              10,
+              10
+            ],
+            "rows_wrapped_in_sdt": 0
+          }
+        ],
+        "external_body_digest": "dbc39be7499122a9f1ffc5532cd3b36c4a1e990b1bced19e7fcaaa96634ec9c6",
+        "external_body_line_count": 44
+      },
+      "post_injection_inventory": {
+        "sdt_count": 7,
+        "tags_sorted": [
+          "gt:field:b30.11.2.deficiencies:deficiencies/title",
+          "gt:field:b30.11.2.deficiencies:rows/36cd5ee6-a95a-4101-a45c-8289857322a7/deficiency",
+          "gt:field:b30.11.2.deficiencies:rows/86f54ae5-f4d8-4f31-ae95-b9e60e656a50/deficiency",
+          "gt:field:b30.11.2.deficiencies:rows/bd7e5233-6d56-4c5a-addc-07d0a4024dfe/deficiency",
+          "gt:row:b30.11.2.deficiencies:rows:36cd5ee6-a95a-4101-a45c-8289857322a7",
+          "gt:row:b30.11.2.deficiencies:rows:86f54ae5-f4d8-4f31-ae95-b9e60e656a50",
+          "gt:row:b30.11.2.deficiencies:rows:bd7e5233-6d56-4c5a-addc-07d0a4024dfe"
+        ],
+        "tag_multiset": {
+          "gt:field:b30.11.2.deficiencies:deficiencies/title": 1,
+          "gt:field:b30.11.2.deficiencies:rows/36cd5ee6-a95a-4101-a45c-8289857322a7/deficiency": 1,
+          "gt:field:b30.11.2.deficiencies:rows/86f54ae5-f4d8-4f31-ae95-b9e60e656a50/deficiency": 1,
+          "gt:field:b30.11.2.deficiencies:rows/bd7e5233-6d56-4c5a-addc-07d0a4024dfe/deficiency": 1,
+          "gt:row:b30.11.2.deficiencies:rows:36cd5ee6-a95a-4101-a45c-8289857322a7": 1,
+          "gt:row:b30.11.2.deficiencies:rows:86f54ae5-f4d8-4f31-ae95-b9e60e656a50": 1,
+          "gt:row:b30.11.2.deficiencies:rows:bd7e5233-6d56-4c5a-addc-07d0a4024dfe": 1
+        },
+        "instances": [
+          {
+            "tag": "gt:field:b30.11.2.deficiencies:deficiencies/title",
+            "alias": null,
+            "sdt_id": "124000155",
+            "level": "inline",
+            "ancestor_tags": [],
+            "depth": 0,
+            "text": "GT-H01-SEED",
+            "run_count": 1,
+            "body_paragraph_index": 1
+          },
+          {
+            "tag": "gt:row:b30.11.2.deficiencies:rows:36cd5ee6-a95a-4101-a45c-8289857322a7",
+            "alias": null,
+            "sdt_id": "19371981",
+            "level": "row",
+            "ancestor_tags": [],
+            "depth": 0,
+            "text": "GT-R01-SEED",
+            "run_count": 1,
+            "body_paragraph_index": null
+          },
+          {
+            "tag": "gt:field:b30.11.2.deficiencies:rows/36cd5ee6-a95a-4101-a45c-8289857322a7/deficiency",
+            "alias": null,
+            "sdt_id": "18418674",
+            "level": "inline",
+            "ancestor_tags": [
+              "gt:row:b30.11.2.deficiencies:rows:36cd5ee6-a95a-4101-a45c-8289857322a7"
+            ],
+            "depth": 1,
+            "text": "GT-R01-SEED",
+            "run_count": 1,
+            "body_paragraph_index": null
+          },
+          {
+            "tag": "gt:row:b30.11.2.deficiencies:rows:86f54ae5-f4d8-4f31-ae95-b9e60e656a50",
+            "alias": null,
+            "sdt_id": "69517844",
+            "level": "row",
+            "ancestor_tags": [],
+            "depth": 0,
+            "text": "GT-R02-SEED",
+            "run_count": 1,
+            "body_paragraph_index": null
+          },
+          {
+            "tag": "gt:field:b30.11.2.deficiencies:rows/86f54ae5-f4d8-4f31-ae95-b9e60e656a50/deficiency",
+            "alias": null,
+            "sdt_id": "152162414",
+            "level": "inline",
+            "ancestor_tags": [
+              "gt:row:b30.11.2.deficiencies:rows:86f54ae5-f4d8-4f31-ae95-b9e60e656a50"
+            ],
+            "depth": 1,
+            "text": "GT-R02-SEED",
+            "run_count": 1,
+            "body_paragraph_index": null
+          },
+          {
+            "tag": "gt:row:b30.11.2.deficiencies:rows:bd7e5233-6d56-4c5a-addc-07d0a4024dfe",
+            "alias": null,
+            "sdt_id": "93818692",
+            "level": "row",
+            "ancestor_tags": [],
+            "depth": 0,
+            "text": "GT-R03-SEED",
+            "run_count": 1,
+            "body_paragraph_index": null
+          },
+          {
+            "tag": "gt:field:b30.11.2.deficiencies:rows/bd7e5233-6d56-4c5a-addc-07d0a4024dfe/deficiency",
+            "alias": null,
+            "sdt_id": "258345467",
+            "level": "inline",
+            "ancestor_tags": [
+              "gt:row:b30.11.2.deficiencies:rows:bd7e5233-6d56-4c5a-addc-07d0a4024dfe"
+            ],
+            "depth": 1,
+            "text": "GT-R03-SEED",
+            "run_count": 1,
+            "body_paragraph_index": null
+          }
+        ],
+        "by_tag": {
+          "gt:field:b30.11.2.deficiencies:deficiencies/title": [
+            {
+              "tag": "gt:field:b30.11.2.deficiencies:deficiencies/title",
+              "alias": null,
+              "sdt_id": "124000155",
+              "level": "inline",
+              "ancestor_tags": [],
+              "depth": 0,
+              "text": "GT-H01-SEED",
+              "run_count": 1,
+              "body_paragraph_index": 1
+            }
+          ],
+          "gt:field:b30.11.2.deficiencies:rows/36cd5ee6-a95a-4101-a45c-8289857322a7/deficiency": [
+            {
+              "tag": "gt:field:b30.11.2.deficiencies:rows/36cd5ee6-a95a-4101-a45c-8289857322a7/deficiency",
+              "alias": null,
+              "sdt_id": "18418674",
+              "level": "inline",
+              "ancestor_tags": [
+                "gt:row:b30.11.2.deficiencies:rows:36cd5ee6-a95a-4101-a45c-8289857322a7"
+              ],
+              "depth": 1,
+              "text": "GT-R01-SEED",
+              "run_count": 1,
+              "body_paragraph_index": null
+            }
+          ],
+          "gt:field:b30.11.2.deficiencies:rows/86f54ae5-f4d8-4f31-ae95-b9e60e656a50/deficiency": [
+            {
+              "tag": "gt:field:b30.11.2.deficiencies:rows/86f54ae5-f4d8-4f31-ae95-b9e60e656a50/deficiency",
+              "alias": null,
+              "sdt_id": "152162414",
+              "level": "inline",
+              "ancestor_tags": [
+                "gt:row:b30.11.2.deficiencies:rows:86f54ae5-f4d8-4f31-ae95-b9e60e656a50"
+              ],
+              "depth": 1,
+              "text": "GT-R02-SEED",
+              "run_count": 1,
+              "body_paragraph_index": null
+            }
+          ],
+          "gt:field:b30.11.2.deficiencies:rows/bd7e5233-6d56-4c5a-addc-07d0a4024dfe/deficiency": [
+            {
+              "tag": "gt:field:b30.11.2.deficiencies:rows/bd7e5233-6d56-4c5a-addc-07d0a4024dfe/deficiency",
+              "alias": null,
+              "sdt_id": "258345467",
+              "level": "inline",
+              "ancestor_tags": [
+                "gt:row:b30.11.2.deficiencies:rows:bd7e5233-6d56-4c5a-addc-07d0a4024dfe"
+              ],
+              "depth": 1,
+              "text": "GT-R03-SEED",
+              "run_count": 1,
+              "body_paragraph_index": null
+            }
+          ],
+          "gt:row:b30.11.2.deficiencies:rows:36cd5ee6-a95a-4101-a45c-8289857322a7": [
+            {
+              "tag": "gt:row:b30.11.2.deficiencies:rows:36cd5ee6-a95a-4101-a45c-8289857322a7",
+              "alias": null,
+              "sdt_id": "19371981",
+              "level": "row",
+              "ancestor_tags": [],
+              "depth": 0,
+              "text": "GT-R01-SEED",
+              "run_count": 1,
+              "body_paragraph_index": null
+            }
+          ],
+          "gt:row:b30.11.2.deficiencies:rows:86f54ae5-f4d8-4f31-ae95-b9e60e656a50": [
+            {
+              "tag": "gt:row:b30.11.2.deficiencies:rows:86f54ae5-f4d8-4f31-ae95-b9e60e656a50",
+              "alias": null,
+              "sdt_id": "69517844",
+              "level": "row",
+              "ancestor_tags": [],
+              "depth": 0,
+              "text": "GT-R02-SEED",
+              "run_count": 1,
+              "body_paragraph_index": null
+            }
+          ],
+          "gt:row:b30.11.2.deficiencies:rows:bd7e5233-6d56-4c5a-addc-07d0a4024dfe": [
+            {
+              "tag": "gt:row:b30.11.2.deficiencies:rows:bd7e5233-6d56-4c5a-addc-07d0a4024dfe",
+              "alias": null,
+              "sdt_id": "93818692",
+              "level": "row",
+              "ancestor_tags": [],
+              "depth": 0,
+              "text": "GT-R03-SEED",
+              "run_count": 1,
+              "body_paragraph_index": null
+            }
+          ]
+        },
+        "row_uuids": [
+          "36cd5ee6-a95a-4101-a45c-8289857322a7",
+          "86f54ae5-f4d8-4f31-ae95-b9e60e656a50",
+          "bd7e5233-6d56-4c5a-addc-07d0a4024dfe"
+        ],
+        "row_uuids_from_row_sdt": [
+          "36cd5ee6-a95a-4101-a45c-8289857322a7",
+          "86f54ae5-f4d8-4f31-ae95-b9e60e656a50",
+          "bd7e5233-6d56-4c5a-addc-07d0a4024dfe"
+        ],
+        "row_uuids_from_field_tags": [
+          "36cd5ee6-a95a-4101-a45c-8289857322a7",
+          "86f54ae5-f4d8-4f31-ae95-b9e60e656a50",
+          "bd7e5233-6d56-4c5a-addc-07d0a4024dfe"
+        ],
+        "hierarchy": {
+          "gt:field:b30.11.2.deficiencies:deficiencies/title": [
+            []
+          ],
+          "gt:field:b30.11.2.deficiencies:rows/36cd5ee6-a95a-4101-a45c-8289857322a7/deficiency": [
+            [
+              "gt:row:b30.11.2.deficiencies:rows:36cd5ee6-a95a-4101-a45c-8289857322a7"
+            ]
+          ],
+          "gt:field:b30.11.2.deficiencies:rows/86f54ae5-f4d8-4f31-ae95-b9e60e656a50/deficiency": [
+            [
+              "gt:row:b30.11.2.deficiencies:rows:86f54ae5-f4d8-4f31-ae95-b9e60e656a50"
+            ]
+          ],
+          "gt:field:b30.11.2.deficiencies:rows/bd7e5233-6d56-4c5a-addc-07d0a4024dfe/deficiency": [
+            [
+              "gt:row:b30.11.2.deficiencies:rows:bd7e5233-6d56-4c5a-addc-07d0a4024dfe"
+            ]
+          ],
+          "gt:row:b30.11.2.deficiencies:rows:36cd5ee6-a95a-4101-a45c-8289857322a7": [
+            []
+          ],
+          "gt:row:b30.11.2.deficiencies:rows:86f54ae5-f4d8-4f31-ae95-b9e60e656a50": [
+            []
+          ],
+          "gt:row:b30.11.2.deficiencies:rows:bd7e5233-6d56-4c5a-addc-07d0a4024dfe": [
+            []
+          ]
+        },
+        "levels": {
+          "gt:field:b30.11.2.deficiencies:deficiencies/title": [
+            "inline"
+          ],
+          "gt:field:b30.11.2.deficiencies:rows/36cd5ee6-a95a-4101-a45c-8289857322a7/deficiency": [
+            "inline"
+          ],
+          "gt:field:b30.11.2.deficiencies:rows/86f54ae5-f4d8-4f31-ae95-b9e60e656a50/deficiency": [
+            "inline"
+          ],
+          "gt:field:b30.11.2.deficiencies:rows/bd7e5233-6d56-4c5a-addc-07d0a4024dfe/deficiency": [
+            "inline"
+          ],
+          "gt:row:b30.11.2.deficiencies:rows:36cd5ee6-a95a-4101-a45c-8289857322a7": [
+            "row"
+          ],
+          "gt:row:b30.11.2.deficiencies:rows:86f54ae5-f4d8-4f31-ae95-b9e60e656a50": [
+            "row"
+          ],
+          "gt:row:b30.11.2.deficiencies:rows:bd7e5233-6d56-4c5a-addc-07d0a4024dfe": [
+            "row"
+          ]
+        },
+        "body_paragraph_count": 14,
+        "tables": [
+          {
+            "row_count": 4,
+            "cells_per_row": [
+              10,
+              10,
+              10,
+              10
+            ],
+            "rows_wrapped_in_sdt": 3
+          }
+        ],
+        "external_body_line_count": 43,
+        "external_body_digest": "24f0da8fe6ae50ad921df20cd5801b7825a25eb300ee9853108499f570a948dd",
+        "external_body_concat": "索引号：B30-11-2（用于集团审计）致同会计师事务所（特殊普通合伙）：根据收到的关于ABC集团公司的审计指令函，我们对组成部分财务信息审计中发现的内部控制缺陷汇总与评估如下：序号内部控制缺陷缺陷的简要描述对财务报表影响相关潜在错报/认定控制目标/重大风险控制缺陷是否构成当地公司的重大缺陷？记录一般计算机控制记录集团性控制发现内控缺陷的阶段（了解阶段/测试阶段）备注：1、（说明每个控制的缺陷是否有一个补偿控制可以满足我们对经营管理有效性的依赖。）2、（说明针对控制缺陷与管理层沟通的情况，包括：沟通时间、地点及结论。）事务所名称和所在城市合伙人日期",
+        "external_body_lines": [
+          "索引号：",
+          "B",
+          "30",
+          "-",
+          "11",
+          "-",
+          "2",
+          "（",
+          "用于集团审计",
+          "）",
+          "致同会计师事务所",
+          "（特殊普通合伙）",
+          "：",
+          "根据收到的关于ABC集团公司的审计指令函，我们对组成部分财务信息审计中发现的内部控制缺陷汇总与评估如下：",
+          "序号",
+          "内部控制缺陷",
+          "缺陷的简要描述",
+          "对财务报表影响",
+          "相关潜在错报",
+          "/",
+          "认定",
+          "控制目标",
+          "/",
+          "重大风险",
+          "控制缺陷是否构成当地公司的重大缺陷？",
+          "记录一般计算机控制",
+          "记录集团性控制",
+          "发现内控缺陷的阶段",
+          "（了解阶段",
+          "/",
+          "测试阶段）",
+          "备注：",
+          "1",
+          "、",
+          "（",
+          "说明每个控制的缺陷是否有一个补偿控制可以满足我们对经营管理有效性的依赖",
+          "。）",
+          "2",
+          "、",
+          "（说明针对控制缺陷与管理层沟通的情况，包括：沟通时间、地点及结论。）",
+          "事务所名称和所在城市",
+          "合伙人",
+          "日期"
+        ],
+        "full_text_concat": "索引号：B30-11-2GT-H01-SEED（用于集团审计）致同会计师事务所（特殊普通合伙）：根据收到的关于ABC集团公司的审计指令函，我们对组成部分财务信息审计中发现的内部控制缺陷汇总与评估如下：序号内部控制缺陷缺陷的简要描述对财务报表影响相关潜在错报/认定控制目标/重大风险控制缺陷是否构成当地公司的重大缺陷？记录一般计算机控制记录集团性控制发现内控缺陷的阶段（了解阶段/测试阶段）GT-R01-SEEDGT-R02-SEEDGT-R03-SEED备注：1、（说明每个控制的缺陷是否有一个补偿控制可以满足我们对经营管理有效性的依赖。）2、（说明针对控制缺陷与管理层沟通的情况，包括：沟通时间、地点及结论。）事务所名称和所在城市合伙人日期",
+        "full_text_digest": "90d658f522d01d1cdb15893a6f9c02994e0729f6c618ac62ffa483c6450b8826",
+        "errors": []
+      },
+      "zip_reopen_verification": {
+        "tags_match_manifest": true,
+        "tag_multiset_match": true,
+        "row_uuids_match": true,
+        "hierarchy_match": true,
+        "visible_skeleton_preserved": true,
+        "visible_skeleton_digest": "711f225043e5c3ed3c177b074fc91127db7202f403916e0a33c75b49961f263b",
+        "pre_injection_sdt_count": 0,
+        "post_injection_sdt_count": 7,
+        "collection_errors": []
+      }
+    }
+  }
+}

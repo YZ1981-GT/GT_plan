@@ -1,0 +1,2 @@
+-- Rollback for V068__feature_flags.sql
+DROP TABLE IF EXISTS feature_flags;

@@ -1,0 +1,169 @@
+{
+  "pbtResults": {},
+  "executionHistory": {
+    "13. 裁剪页接线：建议态、确认驳回、汇总闸、降级标注": [
+      {
+        "executionId": "08ee5f12-ab79-4475-926f-4954791ceb59",
+        "chatSessionId": "sess_27b83e52-1839-4df7-8eba-ab3554e67a4c",
+        "timestamp": 1786327423153
+      },
+      {
+        "executionId": "08ee5f12-ab79-4475-926f-4954791ceb59",
+        "chatSessionId": "sess_27b83e52-1839-4df7-8eba-ab3554e67a4c",
+        "timestamp": 1786327451374
+      }
+    ],
+    "14. 完整性清单项目级覆盖入口": [
+      {
+        "executionId": "08ee5f12-ab79-4475-926f-4954791ceb59",
+        "chatSessionId": "sess_27b83e52-1839-4df7-8eba-ab3554e67a4c",
+        "timestamp": 1786327423318
+      },
+      {
+        "executionId": "e07730cc-60e4-4336-9e9d-7f14e3a6ec1a",
+        "chatSessionId": "sess_b952b7a7-c2ce-49f2-963a-537683d69d58",
+        "timestamp": 1786350154764
+      },
+      {
+        "executionId": "e1b46f0e-0c96-42de-8de3-6221d42cac62",
+        "chatSessionId": "sess_b952b7a7-c2ce-49f2-963a-537683d69d58",
+        "timestamp": 1786355397656
+      }
+    ],
+    "17. 建议分配算法纯函数": [
+      {
+        "executionId": "08ee5f12-ab79-4475-926f-4954791ceb59",
+        "chatSessionId": "sess_27b83e52-1839-4df7-8eba-ab3554e67a4c",
+        "timestamp": 1786327423419
+      },
+      {
+        "executionId": "08ee5f12-ab79-4475-926f-4954791ceb59",
+        "chatSessionId": "sess_27b83e52-1839-4df7-8eba-ab3554e67a4c",
+        "timestamp": 1786327531388
+      }
+    ],
+    "18. 建议分配表组件": [
+      {
+        "executionId": "08ee5f12-ab79-4475-926f-4954791ceb59",
+        "chatSessionId": "sess_27b83e52-1839-4df7-8eba-ab3554e67a4c",
+        "timestamp": 1786327423466
+      }
+    ],
+    "19. 建议分配应用走既有委派路径": [
+      {
+        "executionId": "08ee5f12-ab79-4475-926f-4954791ceb59",
+        "chatSessionId": "sess_27b83e52-1839-4df7-8eba-ab3554e67a4c",
+        "timestamp": 1786327423501
+      },
+      {
+        "executionId": "e1b46f0e-0c96-42de-8de3-6221d42cac62",
+        "chatSessionId": "sess_b952b7a7-c2ce-49f2-963a-537683d69d58",
+        "timestamp": 1786355411915
+      },
+      {
+        "executionId": "e1b46f0e-0c96-42de-8de3-6221d42cac62",
+        "chatSessionId": "sess_b952b7a7-c2ce-49f2-963a-537683d69d58",
+        "timestamp": 1786357656736
+      }
+    ],
+    "20. 裁剪充分性复核视图": [
+      {
+        "executionId": "08ee5f12-ab79-4475-926f-4954791ceb59",
+        "chatSessionId": "sess_27b83e52-1839-4df7-8eba-ab3554e67a4c",
+        "timestamp": 1786327423540
+      },
+      {
+        "executionId": "e1b46f0e-0c96-42de-8de3-6221d42cac62",
+        "chatSessionId": "sess_b952b7a7-c2ce-49f2-963a-537683d69d58",
+        "timestamp": 1786357671286
+      },
+      {
+        "executionId": "e1b46f0e-0c96-42de-8de3-6221d42cac62",
+        "chatSessionId": "sess_b952b7a7-c2ce-49f2-963a-537683d69d58",
+        "timestamp": 1786360238729
+      }
+    ],
+    "21. 附注反向联动": [
+      {
+        "executionId": "08ee5f12-ab79-4475-926f-4954791ceb59",
+        "chatSessionId": "sess_27b83e52-1839-4df7-8eba-ab3554e67a4c",
+        "timestamp": 1786327423570
+      },
+      {
+        "executionId": "e1b46f0e-0c96-42de-8de3-6221d42cac62",
+        "chatSessionId": "sess_b952b7a7-c2ce-49f2-963a-537683d69d58",
+        "timestamp": 1786360275484
+      },
+      {
+        "executionId": "49f7ce3f-97e1-4c2a-9b8d-b2024cdd2e3b",
+        "chatSessionId": "sess_b952b7a7-c2ce-49f2-963a-537683d69d58",
+        "timestamp": 1786367063447
+      }
+    ],
+    "22. 变异检验": [
+      {
+        "executionId": "08ee5f12-ab79-4475-926f-4954791ceb59",
+        "chatSessionId": "sess_27b83e52-1839-4df7-8eba-ab3554e67a4c",
+        "timestamp": 1786327423611
+      },
+      {
+        "executionId": "42031718-f676-41d3-89e1-5da9d13f7211",
+        "chatSessionId": "sess_b952b7a7-c2ce-49f2-963a-537683d69d58",
+        "timestamp": 1786367252934
+      }
+    ],
+    "23. 零回归验证": [
+      {
+        "executionId": "08ee5f12-ab79-4475-926f-4954791ceb59",
+        "chatSessionId": "sess_27b83e52-1839-4df7-8eba-ab3554e67a4c",
+        "timestamp": 1786327423664
+      },
+      {
+        "executionId": "6675962c-5643-407c-bbf5-615b99df9d79",
+        "chatSessionId": "sess_19c72eb2-f97c-40e4-be07-bed16e009ede",
+        "timestamp": 1786421761731
+      },
+      {
+        "executionId": "6675962c-5643-407c-bbf5-615b99df9d79",
+        "chatSessionId": "sess_19c72eb2-f97c-40e4-be07-bed16e009ede",
+        "timestamp": 1786421775674
+      }
+    ],
+    "24. CI job": [
+      {
+        "executionId": "08ee5f12-ab79-4475-926f-4954791ceb59",
+        "chatSessionId": "sess_27b83e52-1839-4df7-8eba-ab3554e67a4c",
+        "timestamp": 1786327423710
+      },
+      {
+        "executionId": "6675962c-5643-407c-bbf5-615b99df9d79",
+        "chatSessionId": "sess_19c72eb2-f97c-40e4-be07-bed16e009ede",
+        "timestamp": 1786421762020
+      }
+    ],
+    "25. 真实库验收": [
+      {
+        "executionId": "08ee5f12-ab79-4475-926f-4954791ceb59",
+        "chatSessionId": "sess_27b83e52-1839-4df7-8eba-ab3554e67a4c",
+        "timestamp": 1786327423746
+      },
+      {
+        "executionId": "6675962c-5643-407c-bbf5-615b99df9d79",
+        "chatSessionId": "sess_19c72eb2-f97c-40e4-be07-bed16e009ede",
+        "timestamp": 1786421762099
+      }
+    ],
+    "26. 浏览器实测与数据复原": [
+      {
+        "executionId": "08ee5f12-ab79-4475-926f-4954791ceb59",
+        "chatSessionId": "sess_27b83e52-1839-4df7-8eba-ab3554e67a4c",
+        "timestamp": 1786327423780
+      },
+      {
+        "executionId": "6675962c-5643-407c-bbf5-615b99df9d79",
+        "chatSessionId": "sess_19c72eb2-f97c-40e4-be07-bed16e009ede",
+        "timestamp": 1786421762152
+      }
+    ]
+  }
+}

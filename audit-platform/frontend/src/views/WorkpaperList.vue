@@ -3,7 +3,7 @@
     <!-- 页面横幅 -->
     <GtPageHeader :title="projectName ? `${projectName} — 底稿管理` : '底稿管理'" @back="$router.push('/projects')" variant="default">
       <template #actions>
-        <GtToolbar :show-import="true" import-label="Excel导入" @import="showWpImport = true">
+        <GtToolbar :show-import="false">
           <template #left>
             <div v-if="hasData" class="gt-wp-view-toggle">
               <el-radio-group v-model="viewMode" size="small">
@@ -11,16 +11,101 @@
                   {{ tab.label }}
                 </el-radio-button>
               </el-radio-group>
+              <!-- 更多视图下拉 -->
+              <el-dropdown trigger="click" @command="(cmd: string) => { viewMode = cmd }" style="margin-left: 4px">
+                <el-button size="small" :type="isMoreTabActive ? 'primary' : ''" plain>
+                  {{ isMoreTabActive ? moreTabActiveLabel : '更多视图' }}
+                  <el-icon class="el-icon--right"><ArrowDown /></el-icon>
+                </el-button>
+                <template #dropdown>
+                  <el-dropdown-menu>
+                    <el-dropdown-item
+                      v-for="tab in moreTabOptions"
+                      :key="tab.value"
+                      :command="tab.value"
+                      :class="{ 'is-active-item': viewMode === tab.value }"
+                    >
+                      {{ tab.label }}
+                    </el-dropdown-item>
+                  </el-dropdown-menu>
+                </template>
+              </el-dropdown>
             </div>
           </template>
           <template #right>
-            <el-button @click="fetchWpIndex" :loading="loading" size="small">刷新</el-button>
-            <el-button type="primary" size="small" @click="onBatchDownload" :loading="downloadLoading">
-              批量下载 ({{ selectedWpIds.length || '全部' }})
-            </el-button>
-            <el-button type="warning" size="small" :disabled="selectedWpIds.length === 0" @click="showBatchAssign = true">
-              批量委派 ({{ selectedWpIds.length }})
-            </el-button>
+            <!-- 常用操作（所有角色可见） -->
+            <el-tooltip content="重新加载底稿列表数据" placement="bottom">
+              <el-button @click="fetchWpIndex" :loading="loading" size="small">
+                🔄 刷新
+              </el-button>
+            </el-tooltip>
+            <el-tooltip content="选择模板集 → 配置裁剪范围 → 批量创建本项目底稿" placement="bottom">
+              <el-button type="success" size="small" @click="onGenerateWorkpapers" :loading="generateLoading">
+                ⬇️ 生成底稿
+              </el-button>
+            </el-tooltip>
+
+            <!-- 📥 导入导出 收敛为一个下拉 -->
+            <!-- 🔴 文案与真实能力对齐（2026-08-09）：改造前 tooltip 写「含模板、数据包、
+                 ZIP下载」，让人以为「批量下载 ZIP」导出的包能原样从「Excel 导入 /
+                 增强导入」传回来 —— 那两个入口只收**单份** .xlsx/.docx，传 zip 必被拒。
+                 能收 ZIP 数据包的只有「Tab 数据包」。此处只改描述，不动 command。 -->
+            <el-tooltip content="底稿的批量导出与导入。导出：ZIP 整包 / 元数据快照；导入：单份 Excel（xlsx·docx）或 Tab 数据包（zip）" placement="bottom">
+              <el-dropdown trigger="click" @command="onImportExportCommand">
+              <el-button size="small">
+                📥 导入导出 <el-icon class="el-icon--right"><ArrowDown /></el-icon>
+              </el-button>
+              <template #dropdown>
+                <el-dropdown-menu>
+                  <el-dropdown-item command="excel-import">
+                    <span style="display:flex;align-items:center;gap:6px">
+                      📄 Excel 导入
+                      <span style="color:var(--el-text-color-secondary);font-size:11px">单份 xlsx，覆盖该底稿</span>
+                    </span>
+                  </el-dropdown-item>
+                  <el-dropdown-item command="enhanced-import">
+                    <span style="display:flex;align-items:center;gap:6px">
+                      📋 增强导入
+                      <span style="color:var(--el-text-color-secondary);font-size:11px">单份 xlsx/docx，带校验与冲突处理</span>
+                    </span>
+                  </el-dropdown-item>
+                  <el-dropdown-item divided command="batch-download">
+                    <span style="display:flex;align-items:center;gap:6px">
+                      📦 批量下载 ZIP
+                      <span style="color:var(--el-text-color-secondary);font-size:11px">{{ selectedWpIds.length ? `已选 ${selectedWpIds.length} 份 · 仅下载` : '全部底稿 · 仅下载' }}</span>
+                    </span>
+                  </el-dropdown-item>
+                  <el-dropdown-item command="batch-export-meta">
+                    <span style="display:flex;align-items:center;gap:6px">
+                      📊 元数据导出
+                      <span style="color:var(--el-text-color-secondary);font-size:11px">按循环筛选 · 含 manifest</span>
+                    </span>
+                  </el-dropdown-item>
+                  <el-dropdown-item command="bulk-tab">
+                    <span style="display:flex;align-items:center;gap:6px">
+                      🗂️ Tab 数据包
+                      <span style="color:var(--el-text-color-secondary);font-size:11px">唯一支持 zip 导入的入口</span>
+                    </span>
+                  </el-dropdown-item>
+                </el-dropdown-menu>
+              </template>
+            </el-dropdown>
+            </el-tooltip>
+
+            <!-- 管理操作（仅 manager/partner/admin 可见） -->
+            <template v-if="canManageWp">
+              <el-tooltip content="从其他项目复制底稿模板配置" placement="bottom">
+                <el-button size="small" @click="showTemplateCopy = true">📋 模板复制</el-button>
+              </el-tooltip>
+              <el-tooltip content="粘贴清单或上传 Excel，一次创建多份自定义底稿" placement="bottom">
+                <el-button size="small" @click="showCustomBatch = true">➕ 批量自定义底稿</el-button>
+              </el-tooltip>
+              <el-tooltip content="将选中底稿批量委派给项目组成员" placement="bottom">
+                <el-button type="warning" size="small" :disabled="selectedWpIds.length === 0" @click="showBatchAssign = true">
+                  👥 批量委派 ({{ selectedWpIds.length }})
+                </el-button>
+              </el-tooltip>
+            </template>
           </template>
         </GtToolbar>
       </template>
@@ -57,6 +142,16 @@
         <el-option label="全部" value="" />
         <el-option v-for="u in userOptions" :key="u.id" :label="u.full_name || u.username" :value="u.id" />
       </el-select>
+      <!-- 联动状态横条「查看详情」跳转 ?filter=stale 落到这里 -->
+      <el-tooltip
+        content="仅显示上游数据变更后预填待重算的底稿；重算不覆盖已保存的底稿正文，需打开底稿刷新后重新保存"
+        placement="top"
+        :show-after="300"
+      >
+        <el-checkbox v-model="filterStale" size="default" class="gt-wp-filter-bar__stale">
+          仅看待重算<span v-if="staleCount > 0" class="gt-wp-filter-bar__stale-count">{{ staleCount }}</span>
+        </el-checkbox>
+      </el-tooltip>
     </div>
 
     <!-- 进度指示器 -->
@@ -76,6 +171,7 @@
         @navigate="onNavigate"
         @refresh="fetchWpIndex"
         @mutate="onMutate"
+        @wp-selection-change="onChildSelectionChange"
       />
     </keep-alive>
 
@@ -92,8 +188,45 @@
     <UnifiedImportDialog
       v-if="showWpImport"
       v-model="showWpImport"
+      import-type="workpaper"
       :project-id="projectId"
-      @success="fetchWpIndex"
+      @imported="fetchWpIndex"
+    />
+
+    <!-- 底稿统一导入导出（workpaper-unified-import-export） -->
+    <WpImportDialog
+      v-model="showWpImportEnhanced"
+      :project-id="projectId"
+      @imported="fetchWpIndex"
+    />
+    <WpBatchExportDialog
+      v-model="showBatchExportEnhanced"
+      :project-id="projectId"
+    />
+    <!-- 项目级底稿批量 Tab 导入导出（结构化数据包，与整份文件导出并列） -->
+    <WpBulkDialog
+      v-model="showBulkTab"
+      :project-id="projectId"
+      @imported="fetchWpIndex"
+    />
+    <WpTemplateCopyDialog
+      v-model="showTemplateCopy"
+      :project-id="projectId"
+      @copied="fetchWpIndex"
+    />
+
+    <!-- 批量新建自定义底稿（粘贴清单 / 上传 Excel） -->
+    <GtCustomWpBatchDialog
+      v-model="showCustomBatch"
+      :project-id="projectId"
+      @created="fetchWpIndex"
+    />
+
+    <!-- 底稿裁剪确认弹窗（生成前选择范围） -->
+    <WorkpaperTrimDialog
+      v-model="showTrimDialog"
+      :project-id="projectId"
+      @confirm="(codes: string[]) => { trimDialogResolve?.(codes); showTrimDialog = false }"
     />
   </div>
 </template>
@@ -111,7 +244,7 @@
  *
  * Requirements: 1.1-1.8, 4.1-4.5, 5.1-5.6
  */
-import { ref, computed, provide, watch, onMounted, defineAsyncComponent } from 'vue'
+import { ref, computed, provide, watch, onMounted, defineAsyncComponent, h } from 'vue'
 import type { Component } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
@@ -129,6 +262,10 @@ import { api } from '@/services/apiProxy'
 import { handleApiError } from '@/utils/errorHandler'
 import { useAuthStore } from '@/stores/auth'
 import { useAuditContext } from '@/composables/useAuditContext'
+import { useProjectStore } from '@/stores/project'
+import { useDictStore } from '@/stores/dict'
+import { usePermissionMatrix } from '@/composables/usePermissionMatrix'
+import { ArrowDown } from '@element-plus/icons-vue'
 import GtPageHeader from '@/components/common/GtPageHeader.vue'
 import GtToolbar from '@/components/common/GtToolbar.vue'
 import ArchivedBanner from '@/components/common/ArchivedBanner.vue'
@@ -136,6 +273,12 @@ import ConsolLockedBanner from '@/components/common/ConsolLockedBanner.vue'
 import BatchActionBar from '@/components/workpaper/BatchActionBar.vue'
 import BatchAssignDialog from '@/components/assignment/BatchAssignDialog.vue'
 import UnifiedImportDialog from '@/components/import/UnifiedImportDialog.vue'
+import WpImportDialog from '@/components/workpaper/WpImportDialog.vue'
+import WpBatchExportDialog from '@/components/workpaper/WpBatchExportDialog.vue'
+import WpBulkDialog from '@/components/workpaper/bulk-tab/WpBulkDialog.vue'
+import WpTemplateCopyDialog from '@/components/workpaper/WpTemplateCopyDialog.vue'
+import WorkpaperTrimDialog from '@/components/workpaper/WorkpaperTrimDialog.vue'
+import GtCustomWpBatchDialog from '@/components/workpaper/custom/GtCustomWpBatchDialog.vue'
 
 defineOptions({ name: 'WorkpaperList' })
 
@@ -144,6 +287,12 @@ const route = useRoute()
 const router = useRouter()
 const authStore = useAuthStore()
 const { onContextChange } = useAuditContext()
+
+// ─── P0-6.2: ProjectContext + PermissionMatrix facade ────────────────────────
+const projectStore = useProjectStore()
+const projectContext = computed(() => projectStore.currentProjectContext)
+const { can: canOp, whyCannot } = usePermissionMatrix()
+// DEPRECATED: 旧 authStore.user?.role 直接判断仍保留，后续逐步替换为 canOp()
 
 const projectId = computed(() => route.params.projectId as string)
 const currentYear = computed(() => Number(route.query.year) || new Date().getFullYear())
@@ -157,15 +306,55 @@ const viewMode = ref('workbench')
 const searchKeyword = ref('')
 const filterCycle = ref('')
 const filterStatus = ref('')
+/** 仅看「预填待重算」底稿（?filter=stale 或筛选栏勾选） */
+const filterStale = ref(false)
 const filterAssignee = ref('')
 const selectedWpId = ref('')
 const selectedWpIds = ref<string[]>([])
 const userOptions = ref<any[]>([])
 const showWpImport = ref(false)
+const showWpImportEnhanced = ref(false)
+const showBatchExportEnhanced = ref(false)
+const showBulkTab = ref(false)
+const showTemplateCopy = ref(false)
+/** 批量新建自定义底稿弹窗（custom-workpaper-dual-mode-formula-and-batch Task 21） */
+const showCustomBatch = ref(false)
 const showBatchAssign = ref(false)
 const downloadLoading = ref(false)
+const generateLoading = ref(false)
+const showTrimDialog = ref(false)
+const trimDialogResolve = ref<((codes: string[]) => void) | null>(null)
+const trimDialogReject = ref<(() => void) | null>(null)
 
 const hasData = computed(() => wpIndex.value.length > 0 || wpList.value.length > 0)
+
+// ─── 角色门控（管理操作按钮可见性） ────────────────────────────────────────────
+const MANAGE_ROLES = new Set(['admin', 'partner', 'signing_partner', 'manager'])
+const canManageWp = computed(() => {
+  const role = authStore.user?.role
+  return role ? MANAGE_ROLES.has(role) : false
+})
+
+// ─── 导入导出下拉命令分派 ─────────────────────────────────────────────────────
+function onImportExportCommand(command: string) {
+  switch (command) {
+    case 'excel-import':
+      showWpImport.value = true
+      break
+    case 'enhanced-import':
+      showWpImportEnhanced.value = true
+      break
+    case 'batch-download':
+      onBatchDownload()
+      break
+    case 'batch-export-meta':
+      showBatchExportEnhanced.value = true
+      break
+    case 'bulk-tab':
+      showBulkTab.value = true
+      break
+  }
+}
 
 // ─── 进度计算 ─────────────────────────────────────────────────────────────────
 const COMPLETED_STATUSES = new Set(['review_passed', 'archived'])
@@ -176,27 +365,46 @@ const totalProgress = computed<ProgressInfo>(() => {
   return { total, completed, percent }
 })
 
+/** 待重算底稿数（筛选栏「仅看待重算」角标；与联动状态横条计数同源字段 prefill_stale） */
+const staleCount = computed(() => wpList.value.filter((w) => w.prefill_stale === true).length)
+
 // ─── Tab 可见性（角色控制） ─────────────────────────────────────────────────────
 interface TabDef { value: string; label: string; hidden?: boolean }
 
-const ALL_TABS: TabDef[] = [
+// 核心视图（所有角色直接显示）
+const PRIMARY_TABS: TabDef[] = [
   { value: 'lifecycle', label: '生命周期' },
-  { value: 'matrix', label: '委派矩阵' },
-  { value: 'list', label: '列表' },
   { value: 'workbench', label: '工作台' },
-  { value: 'kanban', label: '看板' },
-  { value: 'graph', label: '依赖图' },
+  { value: 'list', label: '列表' },
   { value: 'guide', label: '手册' },
 ]
 
+// 更多视图（收进下拉，按角色过滤）
+const MORE_TABS: TabDef[] = [
+  { value: 'matrix', label: '委派矩阵' },
+  { value: 'kanban', label: '看板' },
+  { value: 'graph', label: '依赖图' },
+]
+
+const ALL_TABS: TabDef[] = [...PRIMARY_TABS, ...MORE_TABS]
+
 const visibleTabs = computed(() => {
-  const role = authStore.role
+  // 核心 Tab 直接显示在 radio-group
+  return PRIMARY_TABS
+})
+
+const moreTabOptions = computed(() => {
+  const role = authStore.user?.role
   // auditor / qc 隐藏 DelegationMatrix
   if (role === 'auditor' || role === 'qc') {
-    return ALL_TABS.filter(t => t.value !== 'matrix')
+    return MORE_TABS.filter(t => t.value !== 'matrix')
   }
-  return ALL_TABS
+  return MORE_TABS
 })
+
+/** 当前是否选中了"更多视图"中的某个 */
+const isMoreTabActive = computed(() => MORE_TABS.some(t => t.value === viewMode.value))
+const moreTabActiveLabel = computed(() => MORE_TABS.find(t => t.value === viewMode.value)?.label || '更多视图')
 
 // ─── viewMode → 子 SFC 路由表 ─────────────────────────────────────────────────
 const WorkbenchView = defineAsyncComponent(() => import('./workpaper-list/WorkpaperWorkbenchView.vue'))
@@ -286,6 +494,12 @@ async function fetchWpIndex() {
         reviewer: matchedWorkpaper?.reviewer ?? item.reviewer,
       }
     })
+  } catch (err: any) {
+    // 请求被取消不是错误：query 变更（如 ?filter=stale 补 view=list）会让
+    // DefaultLayout 按 fullPath 重建本视图，新实例的同 URL GET 触发 http.ts 去重
+    // abort 旧实例在飞的请求。此处吞掉，否则 CanceledError 冒泡到 ErrorBoundary。
+    if (err?.code === 'ERR_CANCELED' || err?.name === 'CanceledError') return
+    throw err
   } finally {
     loading.value = false
   }
@@ -314,6 +528,7 @@ const ctx: WpListContext = {
   filterCycle,
   filterStatus,
   filterAssignee,
+  filterStale,
   showTrimmedFilter,
   selectedWpId,
   totalProgress,
@@ -328,6 +543,10 @@ provide(WP_LIST_CONTEXT_KEY, ctx)
 // ─── 子 SFC 事件处理 ─────────────────────────────────────────────────────────
 function onNavigate(wpId: string) {
   router.push({ name: 'WorkpaperEditor', params: { projectId: projectId.value, wpId } })
+}
+
+function onChildSelectionChange(wpIds: string[]) {
+  selectedWpIds.value = wpIds
 }
 
 async function onMutate(payload: MutatePayload) {
@@ -386,6 +605,133 @@ const batchAssignWpList = computed(() => {
 
 function onBatchAssigned() {
   fetchWpIndex()
+}
+
+async function onGenerateWorkpapers() {
+  generateLoading.value = true
+  try {
+    // 0. 确保模板集编码是最新的（幂等 seed，会自动更新旧的占位编码）
+    try { await api.post('/api/template-sets/seed', {}, { _silent: true } as any) } catch { /* ignore */ }
+    // 1. 获取模板集列表
+    const { listTemplateSets } = await import('@/services/workpaperApi')
+    let sets = await listTemplateSets()
+    if (!sets || sets.length === 0) {
+      // 尝试自动初始化内置模板集（国企版+上市版）
+      try {
+        await api.post('/api/template-sets/seed')
+        sets = await listTemplateSets()
+      } catch { /* ignore */ }
+      if (!sets || sets.length === 0) {
+        ElMessage.warning('暂无可用模板集，请在「模板库」中创建')
+        return
+      }
+    }
+    // 2. 过滤：只显示"标准年审" + 用户自建模板集（去掉 IPO/上市/附注/精简等内置占位）
+    const SHOW_BUILTIN = new Set(['标准年审'])
+    const filteredSets = sets.filter(s =>
+      SHOW_BUILTIN.has(s.set_name) || !['IPO', '上市公司', '上市附注', '国企附注', '精简版'].includes(s.set_name)
+    )
+    if (filteredSets.length === 0) {
+      ElMessage.warning('暂无可用模板集')
+      return
+    }
+    // 3. 弹窗让用户选择模板集
+    const options = filteredSets.map(s => ({ label: s.set_name, value: s.id }))
+    const selectedSetId = await new Promise<string>((resolve, reject) => {
+      ElMessageBox({
+        title: '📋 第一步：选择底稿模板集',
+        message: () => {
+          return h('div', { style: 'padding: 8px 0' }, [
+            h('p', { style: 'margin: 0 0 8px; color: var(--el-text-color-secondary); font-size: 13px; line-height: 1.5' },
+              '模板集决定生成哪些底稿。选择后进入下一步配置裁剪范围。'),
+            h('p', { style: 'margin: 0 0 12px; color: var(--el-text-color-placeholder); font-size: 12px' },
+              `共 ${filteredSets.length} 个可用模板集`),
+            h('select', {
+              id: '__wp_tpl_select',
+              style: 'width: 100%; padding: 10px 14px; border: 1px solid var(--el-border-color); border-radius: 8px; font-size: 14px; outline: none; background: var(--el-fill-color-blank); color: var(--el-text-color-primary); cursor: pointer; transition: border-color .2s;',
+              onfocus: 'this.style.borderColor="var(--el-color-primary)"',
+              onblur: 'this.style.borderColor="var(--el-border-color)"',
+            }, options.map(o => h('option', { value: o.value }, o.label))),
+          ])
+        },
+        confirmButtonText: '下一步：配置裁剪',
+        cancelButtonText: '取消',
+        showCancelButton: true,
+        beforeClose: (action, instance, done) => {
+          if (action === 'confirm') {
+            const el = document.getElementById('__wp_tpl_select') as HTMLSelectElement | null
+            const val = el?.value || options[0]?.value
+            if (val) { resolve(val); done() }
+          } else {
+            reject('cancel'); done()
+          }
+        },
+      }).catch(() => reject('cancel'))
+    })
+    // 3. 弹出裁剪确认弹窗（WorkpaperTrimDialog），让用户确认生成范围
+    const { getTemplateSet } = await import('@/services/workpaperApi')
+    const selectedSet = await getTemplateSet(selectedSetId)
+    const allCodes: string[] = selectedSet?.template_codes || []
+    let confirmedCodes: string[] = allCodes
+
+    if (allCodes.length > 0) {
+      try {
+        confirmedCodes = await new Promise<string[]>((resolve, reject) => {
+          trimDialogResolve.value = resolve
+          trimDialogReject.value = reject
+          showTrimDialog.value = true
+          // 监听弹窗关闭（用户点取消时 modelValue 变 false 但 resolve 没被调）
+          const unwatch = watch(showTrimDialog, (v) => {
+            if (!v && trimDialogResolve.value) {
+              reject()
+              unwatch()
+            }
+          })
+        })
+      } catch {
+        return
+      } finally {
+        trimDialogResolve.value = null
+        trimDialogReject.value = null
+      }
+    }
+
+    if (confirmedCodes.length === 0) {
+      ElMessage.warning('未选择任何底稿')
+      return
+    }
+
+    // 4. 调用生成 API（传裁剪后的编码列表）
+    let result: any
+    try {
+      result = await api.post(
+        `/api/projects/${projectId.value}/working-papers/generate`,
+        { template_set_id: selectedSetId, year: currentYear.value, selected_templates: confirmedCodes },
+      )
+    } catch (genErr: any) {
+      if (genErr?.response?.status >= 500) {
+        try {
+          result = await api.post(
+            `/api/projects/${projectId.value}/working-papers/generate-from-codes`,
+            { wp_codes: confirmedCodes, year: currentYear.value },
+          )
+        } catch {
+          throw genErr
+        }
+      } else {
+        throw genErr
+      }
+    }
+    const created = (result as any)?.created || (result as any)?.count || 0
+    ElMessage.success(`底稿生成完成，共创建 ${created} 份底稿`)
+    // 4. 刷新列表
+    await fetchWpIndex()
+  } catch (e: any) {
+    if (String(e).includes('cancel')) return
+    handleApiError(e, '生成底稿')
+  } finally {
+    generateLoading.value = false
+  }
 }
 
 async function onBatchDownload() {
@@ -447,23 +793,64 @@ const cycleOptions = [
   { value: 'S', label: 'S类 专项程序' },
 ]
 
-const statusOptions = [
-  { value: 'draft', label: '待编' },
-  { value: 'in_progress', label: '编制中' },
-  { value: 'edit_complete', label: '已完成' },
-  { value: 'pending_review', label: '待复核' },
-  { value: 'reviewed', label: '已复核' },
-  { value: 'approved', label: '已通过' },
-]
+const statusOptions = computed(() => {
+  const dictStore = useDictStore()
+  const dictOptions = dictStore.options('wp_status')
+  if (dictOptions.length > 0) {
+    return dictOptions.map(e => ({ value: e.value, label: e.label }))
+  }
+  // fallback 硬编码（字典未加载时）
+  return [
+    { value: 'draft', label: '待编' },
+    { value: 'in_progress', label: '编制中' },
+    { value: 'edit_complete', label: '已完成' },
+    { value: 'pending_review', label: '待复核' },
+    { value: 'reviewed', label: '已复核' },
+    { value: 'approved', label: '已通过' },
+  ]
+})
 
 // ─── 生命周期 ─────────────────────────────────────────────────────────────────
 watch([filterCycle, filterStatus, filterAssignee], () => fetchWpIndex())
 
+// filterStale 纯前端过滤（prefill_stale 已在列表响应里），无需重拉；仅同步 URL 便于分享/刷新保留
+watch(filterStale, (on) => {
+  const q = { ...route.query }
+  if (on) {
+    if (q.filter === 'stale') return
+    q.filter = 'stale'
+  } else {
+    if (q.filter !== 'stale') return
+    delete q.filter
+  }
+  router.replace({ query: q })
+}, { flush: 'post' })
+
 onMounted(async () => {
+  // 预热 OnlyOffice api.js（仅 preload 不初始化 DocsAPI）
+  const baseUrl = import.meta.env.VITE_ONLYOFFICE_URL || ''
+  if (baseUrl) {
+    const preloadHref = `${baseUrl.replace(/\/$/, '')}/web-apps/apps/api/documents/api.js`
+    // 避免重复插入
+    if (!document.head.querySelector(`link[rel="preload"][href="${preloadHref}"]`)) {
+      const link = document.createElement('link')
+      link.rel = 'preload'
+      link.setAttribute('as', 'script')
+      link.href = preloadHref
+      document.head.appendChild(link)
+    }
+  }
+
   // 从 URL query 读取视图模式
   const queryView = route.query.view as string
   if (queryView && VIEW_MODE_WHITELIST.has(queryView)) {
     viewMode.value = queryView
+  }
+  // ?filter=stale（联动状态横条「查看详情」）→ 开启待重算过滤并强制列表视图
+  // （筛选栏只在 list 视图渲染，落到工作台视图会让用户看不到自己被过滤了）
+  if (route.query.filter === 'stale') {
+    filterStale.value = true
+    viewMode.value = 'list'
   }
   await fetchWpIndex()
   // 加载项目名称
@@ -505,8 +892,29 @@ onContextChange(async () => {
   flex-wrap: nowrap;
   overflow-x: auto;
 }
+.gt-wp-filter-bar__stale {
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+.gt-wp-filter-bar__stale-count {
+  display: inline-block;
+  margin-left: 4px;
+  padding: 0 6px;
+  border-radius: 9px;
+  background: var(--el-color-warning-light-8, #faecd8);
+  color: var(--el-color-warning, #e6a23c);
+  font-size: 12px;
+  font-weight: 600;
+}
 .gt-wp-view-toggle {
   margin: 0 12px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.gt-wp-view-toggle :deep(.is-active-item) {
+  color: var(--el-color-primary);
+  font-weight: 600;
 }
 .gt-wp-progress-bar {
   display: flex;

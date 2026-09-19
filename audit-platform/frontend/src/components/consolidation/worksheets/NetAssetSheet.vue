@@ -107,7 +107,7 @@ import { ElMessage } from 'element-plus'
 import { confirmBatch, confirmDangerous } from '@/utils/confirm'
 import { useFullscreen } from '@/composables/useFullscreen'
 import { useDisplayPrefsStore } from '@/stores/displayPrefs'
-import { useExcelIO } from '@/composables/useExcelIO'
+import { exportMultiSheetData, useExcelIO } from '@/composables/useExcelIO'
 
 interface CompanyCol {
   name: string    // 子企业名称
@@ -267,7 +267,8 @@ const importParsedMap = ref<Map<string, any>>(new Map())
 const { exportData: _exportData, onFileSelected: _onFileSelected } = useExcelIO()
 
 async function exportTemplate() {
-  const XLSX = await import('xlsx'); const wb = XLSX.utils.book_new()
+  // 走 useExcelIO 单一入口（B4 批）。原本因「说明 sheet + 数据 sheet」两 sheet 组合
+  // 而裸用 xlsx，现在 exportMultiSheetData 支持纯 AOA 形态的 sheet。
   const instrRows = [['净资产表 — 填写说明'], [],
     ['⚠ 重要提示：'],
     ['1. 在"数据填写"工作表填写，不要修改sheet名称'],
@@ -275,18 +276,27 @@ async function exportTemplate() {
     ['3. 紫色背景行为自动计算行，无需填写'],
     ['4. 金额填数字，不要带逗号或货币符号'],
   ]
-  const wsI = XLSX.utils.aoa_to_sheet(instrRows); wsI['!cols'] = [{ wch: 80 }]
-  XLSX.utils.book_append_sheet(wb, wsI, '填写说明')
+
   const headers = ['序号', '项目', '合计', '母公司', ...companies.value.map(c => `${c.name}\n(${c.ratio}%)`)]
   const dataRows = tableData.value.map(row => {
     const vals = [row.seq, row.item, row.total ?? '', row.parent ?? '']
     for (let i = 0; i < companies.value.length; i++) vals.push(row.values?.[i] ?? '')
     return vals
   })
-  const wsD = XLSX.utils.aoa_to_sheet([headers, ...dataRows])
-  wsD['!cols'] = [{ wch: 6 }, { wch: 28 }, { wch: 14 }, { wch: 14 }, ...companies.value.map(() => ({ wch: 14 }))]
-  XLSX.utils.book_append_sheet(wb, wsD, '数据填写')
-  XLSX.writeFile(wb, '净资产表_模板.xlsx'); ElMessage.success('模板已导出')
+  await exportMultiSheetData({
+    sheets: [
+      { sheetName: '填写说明', rows: instrRows, colWidths: [{ wch: 80 }] },
+      {
+        sheetName: '数据填写',
+        rows: [headers, ...dataRows],
+        colWidths: [{ wch: 6 }, { wch: 28 }, { wch: 14 }, { wch: 14 }, ...companies.value.map(() => ({ wch: 14 }))],
+      },
+    ],
+    fileName: '净资产表_模板.xlsx',
+    applyStyles: false,
+    successMessage: false,
+  })
+  ElMessage.success('模板已导出')
 }
 
 async function exportData() {

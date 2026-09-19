@@ -1,0 +1,314 @@
+[
+  {
+    "id": "M49",
+    "side": "fe",
+    "want": "三实体取自 recovery case timeline",
+    "why": "三实体自己编 ⇒ claim 的 202 回执里**没有** request id，桥也没保存它；编造出来的三个 id 全指向同一个 operation，而真值来自 recovery case timeline",
+    "verdict": "RED",
+    "summary": "184/187 passed, numFailedTestSuites=2",
+    "added": [
+      "authorization-first claim 成功后三实体同时出现 timeline 的 operation 与桥跟踪的不一致 ⇒ 可见失败，不显示「已认领」",
+      "authorization-first claim 成功后三实体同时出现 三实体取自 recovery case timeline（claim 回执没有 request id，不许猜）",
+      "authorization-first claim 成功后三实体同时出现 成功后三实体同时渲染，并显式声明仍跟踪原回写任务"
+    ],
+    "gone": [],
+    "hit": [
+      "authorization-first claim 成功后三实体同时出现 三实体取自 recovery case timeline（claim 回执没有 request id，不许猜）",
+      "authorization-first claim 成功后三实体同时出现 成功后三实体同时渲染，并显式声明仍跟踪原回写任务"
+    ],
+    "added_files": [
+      "WorkpaperSyncRecoveryPanel.spec.ts"
+    ],
+    "restored": true,
+    "seconds": 4.6
+  },
+  {
+    "id": "M50",
+    "side": "fe",
+    "want": "终结后显式声明未执行结构化回写",
+    "why": "download-only 显示「回写完成」⇒ Task 34 逐字禁止；它永不创建 request/application/operation（AC 5.8）",
+    "verdict": "RED",
+    "summary": "184/187 passed, numFailedTestSuites=3",
+    "added": [
+      "download-only 只下载并终结 下载动作带上服务端签发的短期 claim，并展示文件摘要与大小",
+      "download-only 只下载并终结 终结后显式声明未执行结构化回写，且整块 DOM 不含「回写完成」",
+      "结构判据 源码里没有「回写完成」字样（download-only 分支不可能写出它）"
+    ],
+    "gone": [],
+    "hit": [
+      "download-only 只下载并终结 终结后显式声明未执行结构化回写，且整块 DOM 不含「回写完成」",
+      "结构判据 源码里没有「回写完成」字样（download-only 分支不可能写出它）"
+    ],
+    "added_files": [
+      "WorkpaperSyncRecoveryPanel.spec.ts"
+    ],
+    "restored": true,
+    "seconds": 4.6
+  },
+  {
+    "id": "M51",
+    "side": "fe",
+    "want": "宿主传错底稿 id",
+    "why": "不核对显式 scope 与桥实际 scope ⇒ 宿主传错底稿 id 时面板照着错的 scope 显示，而 list/claim 用的是桥的 scope —— 界面与动作对象不是一回事",
+    "verdict": "RED",
+    "summary": "186/187 passed, numFailedTestSuites=2",
+    "added": [
+      "显式 scope 与桥实际 scope 交叉核对 宿主传错底稿 id ⇒ 显式漂移提示 + 停用认领（不静默按错 scope 操作）"
+    ],
+    "gone": [],
+    "hit": [
+      "显式 scope 与桥实际 scope 交叉核对 宿主传错底稿 id ⇒ 显式漂移提示 + 停用认领（不静默按错 scope 操作）"
+    ],
+    "added_files": [
+      "WorkpaperSyncRecoveryPanel.spec.ts"
+    ],
+    "restored": true,
+    "seconds": 4.9
+  },
+  {
+    "id": "M52",
+    "side": "fe",
+    "want": "宿主没给冻结身份 ⇒ 摘要显示「未提供」、claim 禁用",
+    "why": "claim 门不看阻断原因 ⇒ 阻断原因列在界面上、按钮却亮着，用户点下去才由服务端拒（且拒绝原因未必可读）",
+    "verdict": "GREEN",
+    "summary": "187/187 passed, numFailedTestSuites=0",
+    "added": [],
+    "gone": [],
+    "hit": [],
+    "added_files": [],
+    "restored": true,
+    "seconds": 4.8
+  },
+  {
+    "id": "M53",
+    "side": "fe",
+    "want": "没选候选就点 claim",
+    "why": "不要求先选候选确认 ⇒ claim 会带一个 undefined 的 prior confirmation id，而 AC 5.8 要求 claim 必须引用同 room/代际的既有确认",
+    "verdict": "RED",
+    "summary": "186/187 passed, numFailedTestSuites=2",
+    "added": [
+      "authorization-first claim 成功后三实体同时出现 没选候选就点 claim ⇒ 按钮本就禁用，claim API 零调用"
+    ],
+    "gone": [],
+    "hit": [
+      "authorization-first claim 成功后三实体同时出现 没选候选就点 claim ⇒ 按钮本就禁用，claim API 零调用"
+    ],
+    "added_files": [
+      "WorkpaperSyncRecoveryPanel.spec.ts"
+    ],
+    "restored": true,
+    "seconds": 4.8
+  },
+  {
+    "id": "M54",
+    "side": "fe",
+    "want": "五项已登记缺口只渲染占位符",
+    "why": "已登记缺口被相邻字段顶替 ⇒ 用发出侧 artifact 摘要充当回传摘要，「回来的文件就是我发出去的那份」凭空成立（Task 33 抓过同形态）",
+    "verdict": "RED",
+    "summary": "185/187 passed, numFailedTestSuites=2",
+    "added": [
+      "追溯事实逐项落在 DOM 上 五项已登记缺口只渲染占位符，绝不出现数字或 digest",
+      "追溯事实逐项落在 DOM 上 回传 incoming 摘要那一行不得被发出侧 artifact 摘要顶替"
+    ],
+    "gone": [],
+    "hit": [
+      "追溯事实逐项落在 DOM 上 五项已登记缺口只渲染占位符，绝不出现数字或 digest",
+      "追溯事实逐项落在 DOM 上 回传 incoming 摘要那一行不得被发出侧 artifact 摘要顶替"
+    ],
+    "added_files": [
+      "WorkpaperSyncDetailsDrawer.spec.ts"
+    ],
+    "restored": true,
+    "seconds": 4.8
+  },
+  {
+    "id": "M55",
+    "side": "fe",
+    "want": "确认后请求体逐字",
+    "why": "用 numeric revision 拼 rollback 路由 ⇒ 两个不同底稿都存在 revision 1，会在授权索引里撞成同一行（AC 8.7 / 10.6）",
+    "verdict": "RED",
+    "summary": "185/187 passed, numFailedTestSuites=3",
+    "added": [
+      "rollback 提交 opaque versionId，numeric revision 只作乐观锁 确认后请求体逐字：versionId 是 UUID，revision 只进 expected_current",
+      "结构判据 rollback 只提交 versionId：源码里没有把 revision 拼进任何标识的写法"
+    ],
+    "gone": [],
+    "hit": [
+      "rollback 提交 opaque versionId，numeric revision 只作乐观锁 确认后请求体逐字：versionId 是 UUID，revision 只进 expected_current",
+      "结构判据 rollback 只提交 versionId：源码里没有把 revision 拼进任何标识的写法"
+    ],
+    "added_files": [
+      "WorkpaperSyncDetailsDrawer.spec.ts"
+    ],
+    "restored": true,
+    "seconds": 4.8
+  },
+  {
+    "id": "M56",
+    "side": "fe",
+    "want": "二次确认真的是两步",
+    "why": "回滚一步到位 ⇒ 一次误点就改写 current pointer。design §API 明文 rollback 需编辑权限和二次确认",
+    "verdict": "RED",
+    "summary": "183/187 passed, numFailedTestSuites=3",
+    "added": [
+      "rollback 提交 opaque versionId，numeric revision 只作乐观锁 二次确认真的是两步：只点第一下时 rollback API 零调用",
+      "rollback 提交 opaque versionId，numeric revision 只作乐观锁 服务端拒绝回滚 ⇒ 显示具体码、不 emit rolledBack",
+      "rollback 提交 opaque versionId，numeric revision 只作乐观锁 确认后请求体逐字：versionId 是 UUID，revision 只进 expected_current",
+      "抽屉开关 关闭按钮与遮罩都只 emit update:visible(false)，并收起未完成的二次确认"
+    ],
+    "gone": [],
+    "hit": [
+      "rollback 提交 opaque versionId，numeric revision 只作乐观锁 二次确认真的是两步：只点第一下时 rollback API 零调用"
+    ],
+    "added_files": [
+      "WorkpaperSyncDetailsDrawer.spec.ts"
+    ],
+    "restored": true,
+    "seconds": 4.8
+  },
+  {
+    "id": "M57",
+    "side": "fe",
+    "want": "抽屉自己的门先拦住",
+    "why": "抽屉自己的 opaque 门失效 ⇒ 非 UUID 目标一路传到 API 层才被拒，用户得到的是一个契约错误而不是可读原因",
+    "verdict": "RED",
+    "summary": "186/187 passed, numFailedTestSuites=2",
+    "added": [
+      "rollback 提交 opaque versionId，numeric revision 只作乐观锁 用 numeric revision 冒充 versionId ⇒ 抽屉自己的门先拦住（本层专属码 + 零调用）"
+    ],
+    "gone": [],
+    "hit": [
+      "rollback 提交 opaque versionId，numeric revision 只作乐观锁 用 numeric revision 冒充 versionId ⇒ 抽屉自己的门先拦住（本层专属码 + 零调用）"
+    ],
+    "added_files": [
+      "WorkpaperSyncDetailsDrawer.spec.ts"
+    ],
+    "restored": true,
+    "seconds": 4.8
+  },
+  {
+    "id": "M58",
+    "side": "fe",
+    "want": "抽屉自己的门先拦住",
+    "why": "两层门共用一个码 ⇒ 删掉抽屉那层看不出差别（API 层照样抛同一个码），于是外层门的判据永远 GREEN。本 spec 的变异运行已三次抓到这个形态",
+    "verdict": "RED",
+    "summary": "186/187 passed, numFailedTestSuites=2",
+    "added": [
+      "rollback 提交 opaque versionId，numeric revision 只作乐观锁 用 numeric revision 冒充 versionId ⇒ 抽屉自己的门先拦住（本层专属码 + 零调用）"
+    ],
+    "gone": [],
+    "hit": [
+      "rollback 提交 opaque versionId，numeric revision 只作乐观锁 用 numeric revision 冒充 versionId ⇒ 抽屉自己的门先拦住（本层专属码 + 零调用）"
+    ],
+    "added_files": [
+      "WorkpaperSyncDetailsDrawer.spec.ts"
+    ],
+    "restored": true,
+    "seconds": 4.8
+  },
+  {
+    "id": "M59",
+    "side": "fe",
+    "want": "有恢复项 ⇒ 单独加载 recovery timeline",
+    "why": "recovery timeline 走 operation 端点 ⇒ 两条流被合成一条，claim 之前的 recovery 事件必须借一个 operation id 才挂得上（P68 明令禁止）",
+    "verdict": "RED",
+    "summary": "185/187 passed, numFailedTestSuites=3",
+    "added": [
+      "operation 与 recovery 两条 timeline 各走各的端点 有恢复项 ⇒ 单独加载 recovery timeline，且它结构上没有 operation 事件",
+      "结构判据 抽屉零 HTTP：不 import 任何请求面"
+    ],
+    "gone": [],
+    "hit": [
+      "operation 与 recovery 两条 timeline 各走各的端点 有恢复项 ⇒ 单独加载 recovery timeline，且它结构上没有 operation 事件"
+    ],
+    "added_files": [
+      "WorkpaperSyncDetailsDrawer.spec.ts"
+    ],
+    "restored": true,
+    "seconds": 4.8
+  },
+  {
+    "id": "M60",
+    "side": "fe",
+    "want": "证据关联标识取自已加载事件的最后一个非空 correlation_id",
+    "why": "没加载事件时编一个证据关联标识 ⇒ 审计追溯拿到一个不存在的 correlation id，而它只能来自已加载的 append-only 事件",
+    "verdict": "RED",
+    "summary": "185/187 passed, numFailedTestSuites=3",
+    "added": [
+      "operation 与 recovery 两条 timeline 各走各的端点 证据关联标识取自已加载事件的最后一个非空 correlation_id（未加载时是缺口）",
+      "追溯事实逐项落在 DOM 上 还没有 descriptor 时每条事实都是占位符（不给 0 / 空串）"
+    ],
+    "gone": [],
+    "hit": [
+      "operation 与 recovery 两条 timeline 各走各的端点 证据关联标识取自已加载事件的最后一个非空 correlation_id（未加载时是缺口）"
+    ],
+    "added_files": [
+      "WorkpaperSyncDetailsDrawer.spec.ts"
+    ],
+    "restored": true,
+    "seconds": 4.9
+  },
+  {
+    "id": "M61",
+    "side": "fe",
+    "want": "refresh_required 状态下该行渲染「是」",
+    "why": "refresh-required 恒显「否」⇒ 服务端已合并、需要重开代际时追溯面板说不需要，而 AC 11.11 要求 refresh-required 可追溯",
+    "verdict": "RED",
+    "summary": "186/187 passed, numFailedTestSuites=2",
+    "added": [
+      "追溯事实逐项落在 DOM 上 refresh_required 状态下该行渲染「是」"
+    ],
+    "gone": [],
+    "hit": [
+      "追溯事实逐项落在 DOM 上 refresh_required 状态下该行渲染「是」"
+    ],
+    "added_files": [
+      "WorkpaperSyncDetailsDrawer.spec.ts"
+    ],
+    "restored": true,
+    "seconds": 4.8
+  },
+  {
+    "id": "M62",
+    "side": "fe",
+    "want": "未加载时两张表都不渲染事件行",
+    "why": "未加载也当已加载 ⇒ 渲染一张空表，用户以为「这个回写任务没有事件」，而实际只是没点加载",
+    "verdict": "RED",
+    "summary": "164/187 passed, numFailedTestSuites=6",
+    "added": [
+      "operation 与 recovery 两条 timeline 各走各的端点 timeline 加载失败 ⇒ 显示具体码并保持未加载，不画半张表",
+      "operation 与 recovery 两条 timeline 各走各的端点 加载 operation timeline ⇒ 两条流合并渲染，各行带 stream 与序号",
+      "operation 与 recovery 两条 timeline 各走各的端点 有恢复项 ⇒ 单独加载 recovery timeline，且它结构上没有 operation 事件",
+      "operation 与 recovery 两条 timeline 各走各的端点 未加载时两张表都不渲染事件行，只有提示",
+      "operation 与 recovery 两条 timeline 各走各的端点 没有恢复项 ⇒ recovery 表不渲染、加载按钮禁用，并说明 claim 前没有回写任务",
+      "operation 与 recovery 两条 timeline 各走各的端点 证据关联标识取自已加载事件的最后一个非空 correlation_id（未加载时是缺口）",
+      "rollback 提交 opaque versionId，numeric revision 只作乐观锁 两个值分开展示：不透明 UUID 与「仅展示」修订号",
+      "rollback 提交 opaque versionId，numeric revision 只作乐观锁 二次确认真的是两步：只点第一下时 rollback API 零调用",
+      "rollback 提交 opaque versionId，numeric revision 只作乐观锁 合法 UUID 目标下不渲染阻断提示（正反两侧都驱动到）",
+      "rollback 提交 opaque versionId，numeric revision 只作乐观锁 服务端拒绝回滚 ⇒ 显示具体码、不 emit rolledBack",
+      "rollback 提交 opaque versionId，numeric revision 只作乐观锁 未指定回滚目标 ⇒ 按钮禁用并说明「历史版本清单没有读取面」",
+      "rollback 提交 opaque versionId，numeric revision 只作乐观锁 用 numeric revision 冒充 versionId ⇒ 抽屉自己的门先拦住（本层专属码 + 零调用）",
+      "rollback 提交 opaque versionId，numeric revision 只作乐观锁 确认后请求体逐字：versionId 是 UUID，revision 只进 expected_current",
+      "抽屉开关 关闭按钮与遮罩都只 emit update:visible(false)，并收起未完成的二次确认",
+      "追溯事实逐项落在 DOM 上 effective 序号来自桥的 fold 观测面；未观测时是占位符",
+      "追溯事实逐项落在 DOM 上 refresh_required 状态下该行渲染「是」",
+      "追溯事实逐项落在 DOM 上 五项已登记缺口只渲染占位符，绝不出现数字或 digest",
+      "追溯事实逐项落在 DOM 上 内容修订号逐字标注「仅展示/乐观锁」（禁止被读成资源键）",
+      "追溯事实逐项落在 DOM 上 十九条有读取面的事实逐项渲染真实值",
+      "追溯事实逐项落在 DOM 上 回传 incoming 摘要那一行不得被发出侧 artifact 摘要顶替",
+      "追溯事实逐项落在 DOM 上 还没有 descriptor 时每条事实都是占位符（不给 0 / 空串）",
+      "零消费方判决 defineExpose 的两个入口都被真的调用过，且 gapIds 与登记表一致",
+      "零消费方判决 组件声明的 emit 集合逐字等于本文件真正触发过的集合"
+    ],
+    "gone": [],
+    "hit": [
+      "operation 与 recovery 两条 timeline 各走各的端点 未加载时两张表都不渲染事件行，只有提示"
+    ],
+    "added_files": [
+      "WorkpaperSyncDetailsDrawer.spec.ts",
+      "WorkpaperSyncStatusBar.spec.ts"
+    ],
+    "restored": true,
+    "seconds": 4.7
+  }
+]

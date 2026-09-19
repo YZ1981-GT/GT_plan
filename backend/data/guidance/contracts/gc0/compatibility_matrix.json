@@ -1,0 +1,89 @@
+{
+  "contractVersion": "1.0",
+  "supportedMajors": [
+    "1"
+  ],
+  "supportedMinorRange": {
+    "max": 0
+  },
+  "unknownMajorPolicy": "fail-closed-blocked",
+  "missingCapabilityPolicy": "rejected-ack-for-handoff, blocked-for-contract",
+  "versionNegotiation": {
+    "consumer": "degrade-with-warning",
+    "producer": "blocked"
+  },
+  "capabilityMatrix": [
+    {
+      "producer": "G-C0 location/evidence/section/ref",
+      "consumer": "1.x consumer",
+      "outcome": "ACCEPT",
+      "note": "Declared minor is accepted per minor capability matrix."
+    },
+    {
+      "producer": "G-C0 location/evidence/section/ref",
+      "consumer": "unknown major",
+      "outcome": "BLOCKED",
+      "note": "Fail-closed on unknown major; identity cannot be negotiated."
+    },
+    {
+      "producer": "G-C0 location/evidence/section/ref",
+      "consumer": "missing required capability",
+      "outcome": "BLOCKED",
+      "note": "Contract-level capability gaps are hard blockers."
+    },
+    {
+      "producer": "custom candidate handoff",
+      "consumer": "1.x consumer",
+      "outcome": "ACCEPT",
+      "note": "Only creates review_pending projection; no authoritative exact."
+    },
+    {
+      "producer": "custom candidate handoff",
+      "consumer": "unknown major",
+      "outcome": "BLOCKED",
+      "note": "Fail-closed; candidate visibility never switches to ACTIVE."
+    },
+    {
+      "producer": "custom candidate handoff",
+      "consumer": "missing required capability",
+      "outcome": "REJECTED",
+      "note": "Return REJECTED ACK; producer keeps visibility=0."
+    },
+    {
+      "producer": "custom finalized handoff",
+      "consumer": "1.x consumer",
+      "outcome": "ACCEPT",
+      "note": "May enter full validation and switch PENDING→ACTIVE on durable ACK."
+    },
+    {
+      "producer": "custom finalized handoff",
+      "consumer": "unknown major",
+      "outcome": "BLOCKED",
+      "note": "Fail-closed; visibility saga compensation fires."
+    },
+    {
+      "producer": "custom finalized handoff",
+      "consumer": "missing required capability",
+      "outcome": "REJECTED",
+      "note": "Return REJECTED ACK; finalization cannot be committed as visible."
+    },
+    {
+      "producer": "rail adapter → shell",
+      "consumer": "1.x consumer",
+      "outcome": "DEGRADED",
+      "note": "Capability negotiation: degrade with warning rather than fail."
+    },
+    {
+      "producer": "rail adapter → shell",
+      "consumer": "unknown major",
+      "outcome": "BLOCKED",
+      "note": "Adapter is not mounted; F-SHELL shows disabled reason."
+    },
+    {
+      "producer": "rail adapter → shell",
+      "consumer": "missing required capability",
+      "outcome": "DEGRADED",
+      "note": "Panel renders in disabled state with explicit reason."
+    }
+  ]
+}

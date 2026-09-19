@@ -1,0 +1,52 @@
+{
+  "captured_at": "2026-09-10T11:26:45.884Z",
+  "marker": "g4e03804",
+  "result": {
+    "hasApi": true,
+    "enterTextType": "function",
+    "insertInCellType": "function",
+    "findCellType": "function",
+    "setActiveCellType": "undefined",
+    "onEditCellType": "undefined",
+    "getCellInfoType": "function",
+    "closeCellEditorType": "function",
+    "pasteDataType": "function",
+    "asc_findCell_ok": true,
+    "asc_findCell_ret": "undefined",
+    "asc_setActiveCell_skip": "not-fn",
+    "asc_onEditCell_skip": "not-fn",
+    "asc_enterText_ok": true,
+    "asc_enterText_ret": false,
+    "asc_closeCellEditor_ok": true,
+    "asc_closeCellEditor_ret": true,
+    "asc_insertInCell_ok": true,
+    "asc_insertInCell_ret": "undefined",
+    "cellInfo": {
+      "text": "g4e03804",
+      "keys": [
+        "xfs",
+        "text",
+        "merge",
+        "selectionType",
+        "multiselect",
+        "lockText",
+        "innertext",
+        "hyperlink",
+        "comment",
+        "isLocked",
+        "isLockedTable",
+        "isLockedSparkline",
+        "isLockedPivotTable",
+        "styleName",
+        "autoFilterInfo",
+        "formatTableInfo",
+        "sparklineInfo",
+        "pivotTableInfo",
+        "dataValidation",
+        "selectedColsCount"
+      ]
+    }
+  },
+  "dirty": "0",
+  "host_status": "OnlyOffice 编辑中"
+}
