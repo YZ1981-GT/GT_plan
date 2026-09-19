@@ -1768,13 +1768,22 @@ class TestTask15ScopeBoundary:
         )
 
     def test_no_router_or_carrier_library_in_this_task(self) -> None:
-        """本任务不注册路由（归 Task 27/28）、不引入载体库（归 Tasks 36~38 / 59~61）。"""
+        """本任务不注册路由（归 Task 27/28）、不引入载体库（归 Tasks 36~38 / 59~61）。
+
+        🔴 载体库标记用 **`python-docx`**（精确指 Word 解析库）而非裸 `docx`：
+        Word 双向落地后 `content_mutation.py` 合法出现 `document_type == "docx"` 的
+        **类型标签分派**（Excel 读最终坐标 / Word 保持独立 hash），它不 import 任何
+        载体库。裸子串 `docx` 会误伤这个合法类型判断（`_stripped` 只剥注释/docstring、
+        不剥字符串字面量）。真实载体库依赖由 `openpyxl` / `python-docx` / `import docx`
+        精确覆盖，约束不放松。
+        """
         for path in (_CM_PY, _REP_PY):
             body = _stripped(path)
             for forbidden in (
                 "openpyxl",
                 "python-docx",
-                "docx",
+                "import docx",
+                "from docx",
                 "APIRouter",
                 "@router.",
                 "Depends(",
