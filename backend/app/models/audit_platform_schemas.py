@@ -971,6 +971,8 @@ class MisstatementCreate(BaseModel):
     # 溯源：来源底稿编码（如 K9/D4/G8-6），供 A13 错报汇总反查来源底稿。
     # 底稿"推送错报至A13"时携带，写入 unadjusted_misstatements.source_wp_code。
     source_wp_code: str | None = None
+    # V164 / B3: durable 幂等键（来源身份串）。携带时同项目下重复推送不新增，返回既有记录。
+    source_identity: str | None = None
 
 
 class MisstatementUpdate(BaseModel):
@@ -1000,10 +1002,13 @@ class MisstatementResponse(BaseModel):
     management_reason: str | None = None
     auditor_evaluation: str | None = None
     source_wp_code: str | None = None
+    source_identity: str | None = None
     is_carried_forward: bool = False
     prior_year_id: UUID | None = None
     created_by: UUID | None = None
     created_at: datetime | None = None
+    # V164 / B3: 本次请求是否命中 durable 幂等（True=返回既有记录未新增）。
+    deduplicated: bool = False
 
 
 class MisstatementCategorySummary(BaseModel):

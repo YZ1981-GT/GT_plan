@@ -1165,6 +1165,8 @@ class UnadjustedMisstatement(Base):
     )
     # V092: A13 聚合 - 来源底稿编码
     source_wp_code: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    # V164 / B3: durable 幂等键（底稿推送错报来源身份串，同项目唯一，软删除除外）
+    source_identity: Mapped[str | None] = mapped_column(String(200), nullable=True)
     is_deleted: Mapped[bool] = mapped_column(
         server_default=text("false"), nullable=False
     )
@@ -1192,6 +1194,13 @@ class UnadjustedMisstatement(Base):
         Index(
             "idx_unadjusted_misstatements_source_adj",
             "source_adjustment_id",
+        ),
+        # V164 / B3: durable 幂等 —— 同项目 + 同 source_identity 唯一（软删除/NULL 除外）。
+        Index(
+            "uq_misstatement_source_identity",
+            "project_id", "source_identity",
+            unique=True,
+            postgresql_where=text("source_identity IS NOT NULL AND is_deleted = false"),
         ),
     )
 

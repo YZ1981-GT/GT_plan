@@ -192,6 +192,9 @@ export function useA13MisstatementBridge(): void {
           misstatement_amount: d.amount,
           misstatement_type: d.misstatementType,
           source_wp_code: (d.wpCode || '').slice(0, 20) || null,
+          // V164 / B3 durable 幂等：来源身份串（与 draftHash 同字段）落库，后端同项目唯一去重，
+          // 跨会话/刷新永久生效，替代 recentHashes 的 5s 内存窗口（内存窗口保留作快速双击防抖）。
+          source_identity: draftHash(d).slice(0, 200),
         })
         ok += 1
       } catch {

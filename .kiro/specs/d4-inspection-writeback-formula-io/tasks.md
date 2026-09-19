@@ -58,6 +58,9 @@
 - [ ] B2 [blocked] 前端把 D4-14/15/16 从裸 `GtOnlyOfficeSheet` 迁到平台 `useWorkpaperSyncBridge` + `WorkpaperSyncEditorHost` + `capabilityForEntry(父级 entry)` 现算 + `flushHtml`(先 flushPendingSave 再 readStoreProjection)，对齐 D4-35 蓝本；删除 `ContentMutationService` 这一不存在的设施引用。
   - 阻塞原因：依赖 B1 的后端契约；`ContentMutationService` 不存在需先由治理 spec 澄清真实设施名。
   - _Requirements: 2.1, 2.2, 2.3_
-- [ ] B3 [blocked] durable ack 加固：A13 推送从 best-effort try/catch 升级为持久 ack + 幂等 source identity + 独立重试队列（当前仅 `useA13MisstatementBridge` 逐笔 try/catch + ElMessage）。
-  - 阻塞原因：durable 队列/重试是平台级基础设施，非单 spec 范围；需与治理 spec c3_linkage_contract 对齐后统一落。
+- [x] B3 durable 幂等已做实（2026-09-19）：A13 推送去重从前端 5s 内存 Map 升级为**服务端 DB durable 幂等**。
+  - 交付：V164 迁移（`unadjusted_misstatements.source_identity` + 部分唯一索引，真实 PG schema_version=164）+ 模型/schema/service（pre-check + savepoint 并发硬化）+ 前端 `useA13MisstatementBridge` POST 携 `source_identity`（=draftHash 同字段，跨会话/刷新永久去重）。
+  - 证据：`evidence/b3-durable-ack.md`。service 守卫 `test_misstatement_source_identity_dedup.py` 4 passed；无回归（misstatements 22 passed / 前端 a13 29 passed）；变异 `mutate_misstatement_dedup_guards.py` 3/3 RED；**真栈实测**（运行后端+真 PG，隔离项目 2099）同 identity 两次 POST（间隔 24s>旧5s窗）→ DB 恰 1 行。
+  - 覆盖全平台 ~35 个推送点（useA13MisstatementBridge 唯一消费者）。
+  - 🔴 **剩余未做（如实登记）**：「失败重试队列 / 持久 outbox」属更重的异步基础设施，本次未做 —— A13 是同步 POST，失败即时返回由前端 try/catch 计 fail；durable 幂等已消除重复错报这一真栈实测印证的主要痛点。
   - _Requirements: 3.3_
