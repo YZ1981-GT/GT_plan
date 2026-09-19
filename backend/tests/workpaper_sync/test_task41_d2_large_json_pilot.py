@@ -1824,7 +1824,11 @@ class TestBooleanCellRoundTripsThroughARealOoxmlBooleanCell:
         exported = [n for n in (P.__all__ or ()) if n.startswith("UPSTREAM_DEBT_")]
         assert "UPSTREAM_DEBT_BOOLEAN_CELL_ROUNDTRIP" not in exported
 
-    def test_merge_refuses_to_fold_the_written_shape(self) -> None:
+    def test_merge_accepts_spreadsheet_bool_but_not_capitalised_true(self) -> None:
+        # 🔴 2026-09-19 修正：D2 的修法（写入侧落真布尔格，不靠折叠）**不变**；但 boolean
+        #    列的 read/normalize 侧现接受电子表格天然的 1/0 / '1'/'0'（勾选=1）——因为全平台
+        #    boolean 列只有 D4 IPO 勾选列在用，而它们的 store/导入/历史值本就是 1/'1'。
+        #    'True'（首字母大写）这类模糊串仍拒（该在写入侧归一，不在此隐式折叠）。
         from app.services.workpaper_sync.contracts import ValueType
         from app.services.workpaper_sync.merge import (
             ValueNormalizationError,
@@ -1832,7 +1836,11 @@ class TestBooleanCellRoundTripsThroughARealOoxmlBooleanCell:
         )
 
         assert normalize_value(True, ValueType.boolean) is True
-        for written in (1, 0, "1", "True"):
+        assert normalize_value(1, ValueType.boolean) is True
+        assert normalize_value(0, ValueType.boolean) is False
+        assert normalize_value("1", ValueType.boolean) is True
+        assert normalize_value("0", ValueType.boolean) is False
+        for written in ("True", "TRUE", "yes"):
             with pytest.raises(ValueNormalizationError):
                 normalize_value(written, ValueType.boolean)
 

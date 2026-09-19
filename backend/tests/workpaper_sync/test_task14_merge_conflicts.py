@@ -478,9 +478,15 @@ class TestTypeNormalization:
         with pytest.raises(M.ValueNormalizationError, match="非整值"):
             M.normalize_value(2.5, C.ValueType.integer)
 
-    def test_boolean_rejects_zero_one_and_capitalised_strings(self) -> None:
+    def test_boolean_accepts_spreadsheet_1_0_but_rejects_ambiguous_strings(self) -> None:
+        # 🔴 2026-09-19：boolean 列（全平台仅 D4 IPO 勾选列在用）接受电子表格天然的
+        #    1/0 / '1'/'0'（勾选=1）；'True'/'FALSE'/'yes'/其它数字仍拒（该在写入侧归一）。
         assert M.values_equal("true", True, C.ValueType.boolean) is True
-        for bad in (1, 0, "True", "FALSE", "yes"):
+        assert M.normalize_value(1, C.ValueType.boolean) is True
+        assert M.normalize_value(0, C.ValueType.boolean) is False
+        assert M.normalize_value("1", C.ValueType.boolean) is True
+        assert M.normalize_value("0", C.ValueType.boolean) is False
+        for bad in ("True", "FALSE", "yes", 2, "01"):
             with pytest.raises(M.ValueNormalizationError):
                 M.normalize_value(bad, C.ValueType.boolean)
 
@@ -542,7 +548,7 @@ class TestTypeNormalization:
             C.ValueType.integer: 2.5,
             C.ValueType.date: "not-a-date",
             C.ValueType.datetime: "not-a-time",
-            C.ValueType.boolean: 1,
+            C.ValueType.boolean: "yes",  # 1/0 现是合法（勾选=1）；'yes' 仍非法
             C.ValueType.enum: 5,
             C.ValueType.text: 1,
         }

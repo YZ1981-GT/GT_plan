@@ -533,9 +533,19 @@ def normalize_value(value: Any, value_type: ValueType) -> Any:
             return value
         if isinstance(value, str) and value in ("true", "false"):
             return value == "true"
+        # 🔴 电子表格里勾选框天然是 1/0（未勾常留空），boolean 列同时接受这些数字形态。
+        #    背景：全平台 boolean value_type **只有** D4 IPO 20 个勾选列在用（grep 实证），
+        #    而勾选框在 Excel/导入/历史 store 里就是 1/'1'/0/'0'。若这里只认真 bool，
+        #    「用旧口径落过盘或从导入进来的 1」在 boolean 契约下 materialize/extract 必抛
+        #    （真实回归：checkbox 列 text→boolean 后，store 里的 '1' 撞这条）。
+        #    仅折叠 1/0 / '1'/'0'（精确等值），不放宽到 'yes'/'是' 等模糊值 —— 那些该在
+        #    写入侧归一。`True == 1` 已被上面的 isinstance(bool) 先接走，不会误判。
+        if isinstance(value, int) and value in (0, 1):
+            return value == 1
+        if isinstance(value, str) and value.strip() in ("0", "1"):
+            return value.strip() == "1"
         raise ValueNormalizationError(
-            f"boolean 字段只接受真 bool 或 'true'/'false'，实得 {value!r} —— "
-            "0/1 与 'True' 都不折叠"
+            f"boolean 字段只接受真 bool / 'true'/'false' / 1/0（含 '1'/'0'），实得 {value!r}"
         )
     if value_type is ValueType.enum:
         if isinstance(value, str):
