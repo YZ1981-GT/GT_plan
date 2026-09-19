@@ -1827,3 +1827,40 @@ reject → 捕获后静默返回、零请求，`el-message` 显示 `canceled`。
 - **🔴🔴 删除类修复必须「双重定位」，只按 label 全局匹配会拿正确数据当垃圾清**：修「给 K4 塞了一行账龄」时按 `label == '1至2年'` 全库匹配 → dry-run 报**命中 13 处**，而 `1至2年` 是真实账龄档（应收账款按账龄披露 / 预付款项 / 应付账款 / 十二、母公司各表都合法拥有），只有 §八、48「其他流动负债」那一处是变异塞的。**幸好先跑了 dry-run。** 判据一律「章节号 + 表名 + label」三段定位。
 - **🔴 变异脚本的 stdout 才是本次判定的权威，报告 JSON 可能是上一次的残留**：本轮 `_k_cycle_mutation_report.json` 停在被污染那次（`90/1/13/6`, `restored_clean: false`），而干净重跑的 stdout 是 `110/110 RED`。**看报告前先核 mtime**；污染态报告要删掉，留着会误导下一轮。
 - **🔴 `cmd /c "python x.py > f 2>&1"` 的输出在进程结束前不落盘**（python 非 tty 下块缓冲）→ 想实时看进度加 `python -u`；`Get-Content` 返回 0 行不代表卡住，查进程与文件 mtime。
+
+## TB 回写铁律：审定数落试算表只能走显式发布门
+
+来源 spec：tb-writeback-explicit-publish-gate，2026-09-14 全 21 任务完成，D 到 N 共 11 个循环全部改造完毕。
+
+### 唯一合法路径
+
+审定表把审定数写入 trial_balance.audited_amount，只能走
+POST /api/workpapers/底稿ID/audit-determination/publish-to-tb
+
+请求体两条路径二选一：
+- writeback_rows 预算行：各行含 account_code、audited_amount、amount_kind；amount_kind 取 balance 表示余额类，取 occurrence 表示损益发生额。
+- html_data.audit_rows 三分量：端点按未审数加 AJE 加 RJE 重算，即 D4-1 原路径。
+
+sheet_name 须含审定表子码，形如 审定表D2-1，即 D 到 N 字母加数字加短横线加 1；解不出则端点返 400。两条路径最终都由端点发出带 publish_confirmed 为真的 WORKPAPER_SAVED 事件，handler 名为 _on_d_audit_determination_saved，它校验发布者权限并用 tb_publish_ack 做幂等后落库。
+
+### 四条硬约束
+
+1. 必经二次确认：发布前必须 ElMessageBox.confirm 或 confirmDangerous 中文二次确认，明示将写 trial_balance 并触发报表与错报评价下游重算。用户取消须完全无副作用：不发请求、不 emit、不写 TB。
+2. 禁自动发布：watch、watchEffect、onMounted、setTimeout、setInterval 的回调体内绝不可发起发布。数据变化与普通保存只 emit substantive:adjudicated 通知附注刷新，绝不写 TB。
+3. 旧端点已删：trial_balance.py 的 PUT /writeback 端点与 TBWritebackBody 已在本 spec 收口时删除；G6 变体端点 POST /api/projects/项目ID/trial_balance 亦已清零。新代码不得再引用这两条路径。
+4. 科目口径按实证不按猜：amount_kind 取 balance 还是 occurrence，须查该科目在 trial_balance 的实际取数口径，即取期末余额还是取贷方发生减借方发生。不按审计循环名臆断 —— H7 生产性生物资产科目 1621 曾被按损益循环猜成 occurrence，实证是余额类 balance。
+
+### 两道 CI 守卫
+
+- backend/scripts/check/check_tb_writeback_no_direct_call.py 断言前端无旧端点与变体端点的活调用。精度做法：先逐字符剥掉行注释、块注释、vue 注释，再匹配 put 或 post 的调用点，因此收口注释与测试断言字符串都不会误报。
+- backend/scripts/check/check_tb_publish_confirm_gate.py 断言 publish-to-tb 必经确认门：同文件有 confirm 为直接门，实测 46 个；同循环存在含 confirm 的 Adjudication 文件为间接门，实测 29 个，对应 FormData 层只负责 post 而 confirm 在 Adjudication 层的现实架构。间接门只认文件名含 Adjudication 的 confirm —— 实证若放宽到同循环任意 confirm，useK1FormData 会误配到 useK1AiGenerate 与 useK1VoucherOcr 的 AI 和 OCR 确认，那不是发布门。该守卫同时禁止上述五种回调体内发布。
+
+两守卫均接入 governance-checks.yml 的 tb-writeback-no-direct-call job，各带自测，合计 43 个用例。
+
+### 新增审定表组件的自检清单
+
+1. 先 grep render schema 实证审定表 sheet 名能解出子码，不要臆断命名。
+2. 科目码由前端按当前项目动态解析后透传，端点不硬编码；本项目无该科目则跳过该行，宁缺勿造，防跨循环污染。H3 投资性房地产的累计折旧缺失即走此路径。
+3. 多科目在单次 writeback_rows 原子发布，不拆成多次请求。
+4. 必须配 gate 单测：确认后命中 publish-to-tb、取消无副作用、只读无请求、不调旧端点、发布后仍 emit substantive:adjudicated。
+5. getDiagnostics 与 ESLint 全绿不足以证明运行时正确，须组件级 mount 或真实点击验证。本 spec 的 G7 return 孤儿 export 导致模块加载即 ReferenceError、G5 只读判定对 Ref 恒真导致发布门永久失效，两个致命 bug 纯静态检查全绿，只有 vue-test-utils mount 真实点击才暴露。
