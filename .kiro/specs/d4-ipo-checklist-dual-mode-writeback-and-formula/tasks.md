@@ -32,8 +32,18 @@ D4-25 **13** 列 / D4-26 **19** 列（14 主 + 5 二级）/ D4-27 **18** 列 / D
   45 passed（`ipoFormulaEngine` / `ipoFormulaPreset` / `ipoSyncBridge` / `ipoTwoLevelHeader` 等）+
   变异脚本 `backend/scripts/verify/verify_ipo_checklist_anchors.py`。
 
-**真实剩余缺口**：① CI job 未加（`governance-checks.yml` 无 IPO job，Task 17）；
-② Playwright 实测未跑（Task 19，环境依赖）；③ 入库核对（Task 21）。
+**真实剩余缺口**（2026-09-19 复盘更新）：① CI job ✅ 已加（Task 17）；② Playwright 🟡 **部分已测**——
+定位/切页签竞态/双切换器已真实实测通过，数据 roundtrip / D4-27 / 冲突 / 只读 7 项待补（Task 19 / B6）；
+③ 入库 ✅ 已做（Task 21）。
+
+**本轮复盘落地的改进（2026-09-19）**：
+- 🐛 **派生列手填锁清空不解锁**（Property 15 后半句「清空手填即解锁回落预设重算」从未落地）：
+  `useIpoChecklistTab.updateCell` 原只 `manualLocks.add` 从不 `delete`，用户把派生列（占比/差异/总计）手填后
+  再清空，锁永久留着 → 该列即使依赖列变化也不再自动重算。修复：清空（空值/空白串）时 `delete` 解锁回落重算；
+  `removeRow` 清理该行遗留手填锁防僵尸键。新增守卫 `ipoChecklistTabManualLock.spec.ts`（3 tests，含反向验证：
+  还原只 add 不 delete → 2 tests 红）。
+- 🐛 **切页签竞态三连锁**（上一提交 `85c3365db`）：canceled 不当失败遮罩 / dedicated sheet 不走 legacy
+  dualMode 双切换器 / 未捕获 CanceledError，及补齐 router 已调但缺失的 `terminate_without_callback`。
 
 ## Task Dependency Graph
 
@@ -222,13 +232,22 @@ D4-25 **13** 列 / D4-26 **19** 列（14 主 + 5 二级）/ D4-27 **18** 列 / D
   - ✅ **证据**：`npx vitest run src/components/workpaper/d4/ipo/__tests__/` = 6 passed / 45 tests。
   - _Requirements: 9.8_
 
-- [ ]* 19. Playwright 实测（🔴 未跑，环境依赖：需 start-dev.bat 后端 9980 + 前端 3030 + OnlyOffice 服务；同 B6 真 OO 往返卡点）
-  - 启动 `start-dev.bat`（后端 9980 + 前端 3030），逐张表走通：D4-25 新增行→填金额→切在线编辑→OO 有值→改
-    →切回一致；D4-26 两级表头浏览器渲染父组跨 5 列→勾选→切 OO 勾选态在 O~S 正确；D4-27 勾 3 个身份列→总计 3
-    →手填总计锁定；D4-28 占比自动算/分母 0 留空；导入导出→表格视图立即显示导入行；fail-visible→断开 OO 显失败原因；
-    冲突→确认框不静默覆盖；只读→任一方向不写入。
+- [~] 19. Playwright 实测（🟡 **部分已测**：定位 + 切页签竞态 + 双切换器已真实实测通过；数据 roundtrip / D4-27 / 冲突 / 只读待补）
+  - **✅ 已实测通过（2026-09-19，start-dev.bat 后端 9980 + 前端 3030 + `audit-onlyoffice` 容器 8080，
+    项目 `0ec33ac9…` / D4 wp `b3ab3c46…`）**：
+    - D4-25/26/28 切「在线编辑」OnlyOffice **打开即定位到各自 sheet**（截图实证名框/A1/表头：D4-25「经销商检查」、
+      D4-26「境外销售收入检查」、D4-28「客户信息核查清单」）；后端亦实证 OO 容器下载到的字节 `activeTab` 精确指向
+      目标 sheet（D4-26=33），负向对照 D4-25/26 activeTab 不同 → 定位按本次目标算而非写死常量。
+    - D4-26/28 单一切换器（`segmentedCount=1`），**无 legacy「结构化视图/两侧数据未互通」双切换器叠加**。
+    - 切页签竞态（D4-26 在线编辑加载中切 D4-28 再点在线编辑）**无「同步失败: canceled」遮罩、无未捕获
+      CanceledError**；竞态被 abort 的在飞请求干净退回 html_idle，再点一次 materialize 200 正常进 OO。
+    - 竞态下 materialize 500 经查为后端**正确的幂等守卫**（`pending_mutation_payload_mismatch`），非缺陷。
+  - **🔴 待补（本轮未实测）**：① 完整数据 roundtrip（OO 改单元格→保存→切回表格视图值一致 / 表格改→切 OO 有值）；
+    ② D4-27 勾身份列→总计→手填锁定→清空解锁；③ 占比分母 0 留空的浏览器实测；④ 导入导出→表格视图立即显示导入行；
+    ⑤ fail-visible（断开 OO 显失败原因）；⑥ 冲突确认框不静默覆盖；⑦ 只读禁写。
   - 🔴 判「能力接没接」落到唯一消费方 + 有渲染宿主，不只 grep 符号名。
-  - **现状**：无 e2e 文件，未跑。待环境实测。
+  - **现状**：无固化 e2e 脚本文件；定位/竞态/双切换器由本会话 Playwright MCP 手动走查 + 截图证据实测通过，
+    数据 roundtrip 等 7 项待补实测。
   - _Requirements: 2.1, 2.5, 3.5, 4.2, 6.6, 8.5_
 
 - [x] 20. 三件套校验与结构核验
@@ -289,9 +308,12 @@ D4-25 **13** 列 / D4-26 **19** 列（14 主 + 5 二级）/ D4-27 **18** 列 / D
     不存在「定性风险 amount=0 入汇总 / diff abs 化 / 抽凭金额当错报」的路径——本 spec 不碰 A13/TB。
   - Validates: Requirements 3.1, 3.2, 3.3, 3.4
 
-- [ ] B6. 逐张 HTML→OO→HTML / 公式重开 / 导出 / 项目隔离验收（🔴 依赖 Task 19 Playwright）
-  - 🔴 逐张四表的 HTML→OO→HTML roundtrip、公式编辑重开、导出、跨项目隔离**实测未跑**（前端 3030 未起）。
-    代码层已就位（Task 10-14 全绿守卫），但 governance C4 要求真实 roundtrip 实测，未测前保持 blocked。
+- [~] B6. 逐张 HTML→OO→HTML / 公式重开 / 导出 / 项目隔离验收（� 定位+竞态已实测，roundtrip 数据往返待补）
+  - **✅ 已实测（2026-09-19，真实前端 3030 + `audit-onlyoffice` 容器）**：D4-25/26/28 切「在线编辑」OO 打开即
+    定位到正确 sheet（截图 + OO 容器字节 activeTab 双重实证）；切页签竞态不再产生假失败遮罩/双切换器/未捕获错误。
+  - **🔴 待补**：逐张四表**完整 HTML→OO→HTML 数据 roundtrip**（改值→保存→回读一致）、公式编辑重开、导出、
+    跨项目隔离——本轮聚焦定位与竞态修复，未跑数据往返闭环。代码层已就位（Task 10-14 全绿守卫），governance C4
+    要求的真实 roundtrip 数据一致性未测前该项保持部分未验证。
   - Validates: Requirements 2.10, 4.6, 5.8
 
 ### Governance Properties
@@ -318,7 +340,9 @@ D4-25 **13** 列 / D4-26 **19** 列（14 主 + 5 二级）/ D4-27 **18** 列 / D
 **Validates: Requirements 1.1, 2.10, 5.1, 5.8**
 
 源模板身份来自实际 finder/index（C0 已核定）；四表分别完成 HTML→OO→HTML、重新打开公式编辑、导出和跨项目
-隔离验收——🔴 代码层就位、守卫全绿，但真实 roundtrip 实测（Task 19 / B6）未跑，未测前该 Property 保持部分未验证。
+隔离验收——� **定位 + 切页签竞态已真实实测**（D4-25/26/28 OO 打开即定位到正确 sheet，截图 + OO 容器字节
+activeTab 双重实证；竞态无假失败/双切换器）；但**完整数据 roundtrip**（改值→保存→回读一致）、公式重开、导出、
+跨项目隔离实测（Task 19 / B6 待补 7 项）未跑，未测前该 Property 保持部分未验证。
 
 ## 收口复盘小节（2026-09-19）
 
@@ -328,10 +352,11 @@ D4-25 **13** 列 / D4-26 **19** 列（14 主 + 5 二级）/ D4-27 **18** 列 / D
 **已补齐**：✅ CI job（Task 17）——`governance-checks.yml` 新增 `d4-ipo-checklist` job（8 steps），
 本地实测三 step 全绿（后端 13 passed / 变异脚本 exit 0 / 前端 45 passed）。
 
-**真实遗留（不假绿）**：
-1. 🔴 **Playwright 未测**（Task 19 / B6）——四表 HTML↔OO roundtrip、冲突框、fail-visible、只读禁写真实实测未跑
-   （需 `start-dev.bat` 起 9980+3030 + 真实项目数据，环境依赖）。
-2. 🔴 **入库待做**（Task 21）——本 spec 产物需 `git status` 逐项归因入库，防工作树蒸发。
+**真实遗留（不假绿，2026-09-19 复盘更新）**：
+1. � **Playwright 部分已测**（Task 19 / B6）——✅ 定位 + 切页签竞态 + 双切换器已真实实测通过（截图 + OO 容器
+   字节 activeTab 双重实证）；🔴 待补 7 项：完整数据 roundtrip（改值→保存→回读一致）、D4-27 总计手填/清空、
+   占比分母 0 浏览器实测、导入导出→表格视图立即显示、fail-visible、冲突框、只读禁写。
+2. ✅ **已入库**（Task 21）——本 spec 产物已归因入库（PR #7）；本轮派生列解锁修复 + 竞态修复待随本次复盘入库。
 3. **可编辑公式未做**（B3 遗留）——当前预设为代码常量，无用户可编辑 F-SHELL v2 公式入口（本 spec 范围外）。
 
 **owner 说明**：C0 owner 矩阵登记 D4-25~28 owner 为 `d4-ipo-fraud-writeback-formula`（该 spec 目录当前不在

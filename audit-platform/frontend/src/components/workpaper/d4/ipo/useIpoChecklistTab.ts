@@ -171,6 +171,11 @@ export function useIpoChecklistTab(opts: UseIpoChecklistTabOptions) {
   function removeRow(rowId: string): void {
     if (opts.isReadonly.value) return
     rows.value = rows.value.filter((r) => r.rowId !== rowId)
+    // 删除行时清掉它遗留的手填锁（design「派生列手填锁定」：删除该行即解锁），
+    // 防 manualLocks 随删行累积成僵尸键。
+    for (const k of [...manualLocks.value]) {
+      if (k.startsWith(`${rowId}:`)) manualLocks.value.delete(k)
+    }
     // 重排 seq
     rows.value.forEach((r, i) => (r.seq = i + 1))
     recalcDerivedColumns(opts.sheetCode, rows.value, manualLocks.value)
@@ -182,8 +187,15 @@ export function useIpoChecklistTab(opts: UseIpoChecklistTabOptions) {
     const row = rows.value.find((r) => r.rowId === rowId)
     if (!row) return
     const col = spec.columns.find((c) => c.key === key)
-    // 派生列手填 → 锁定为手填值，不再重算（Property 15/7）
-    if (col?.derived) manualLocks.value.add(`${rowId}:${key}`)
+    // 派生列：手填 → 锁定为手填值不再重算（Property 15/7）；清空手填 → 解锁回落预设重算
+    // （Property 15 后半句「清空手填即解锁回落预设重算」/ design「派生列手填锁定」小节）。
+    // 🔴 只 add 不 delete 会让用户清空后该列永久停算，即使依赖列变化也不再更新。
+    if (col?.derived) {
+      const lockKey = `${rowId}:${key}`
+      const isBlank = value == null || value === '' || (typeof value === 'string' && value.trim() === '')
+      if (isBlank) manualLocks.value.delete(lockKey)
+      else manualLocks.value.add(lockKey)
+    }
     row[key] = value as never
     recalcDerivedColumns(opts.sheetCode, rows.value, manualLocks.value)
     persist()
