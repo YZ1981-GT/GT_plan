@@ -33,6 +33,7 @@ const displayPrefs = inject(DisplayPrefs_Key, null) ?? useDisplayPrefsStore()
 const {
   columns, rows, auditNote, auditConclusion,
   addRow, removeRow, updateCell, updateNote, updateConclusion, flushPendingSave, reloadHost,
+  refreshInterSheet, fetching, fetchError, hasInterSheet,
 } = useIpoChecklistTab({
   sheetCode: 'D4-25',
   wpId: toRef(props, 'wpId') as Ref<string>,
@@ -152,6 +153,15 @@ async function genConclusion() {
 const { exportTemplate, exportData, importData, importing } = useD4ImportExport({
   wpId: computed(() => props.wpId), projectId: computed(() => props.projectId),
 })
+/** 「刷新取数」：按客户名称从账面重取本期销售金额/期末应收账款余额（覆盖当前值）。 */
+async function handleRefreshInterSheet() {
+  if (props.isReadonly) return
+  const { filled, failed } = await refreshInterSheet({ overwrite: true })
+  if (failed > 0) ElMessage.warning(`取数完成：回填 ${filled} 项，失败 ${failed} 项（失败项保留原值）`)
+  else if (filled > 0) ElMessage.success(`已从账面回填 ${filled} 项`)
+  else ElMessage.info('账面无匹配数据（已保持空值，未写入 0）')
+}
+
 function handleExportTemplate() { exportTemplate('D4-25') }
 function handleExportData() { exportData('D4-25') }
 async function handleImportFile(f: any) {
@@ -167,6 +177,11 @@ async function handleImportFile(f: any) {
   <div class="toolbar">
     <div class="toolbar-left"><el-segmented v-model="editorMode" :options="modeOptions" size="small" /></div>
     <div class="toolbar-right">
+      <el-button
+        v-if="hasInterSheet" size="small" :loading="fetching" :disabled="isReadonly"
+        title="按客户名称从账面（辅助余额表）重取金额列；账面无匹配保持空值，不写 0"
+        @click="handleRefreshInterSheet"
+      >🔄 刷新取数</el-button>
       <el-dropdown trigger="click" size="small">
         <el-button size="small">导入导出 ▾</el-button>
         <template #dropdown><el-dropdown-menu>
@@ -182,6 +197,8 @@ async function handleImportFile(f: any) {
 
   <el-alert v-if="syncFeedbackErr" type="error" :closable="false" show-icon class="sync-alert" :title="'同步失败：' + syncFeedbackErr" />
   <el-alert v-else-if="syncFeedbackOk" type="success" :closable="false" show-icon class="sync-alert" :title="syncFeedbackOk" />
+  <!-- 取数失败 fail-visible：不吞成静默，也绝不把失败写成 0 -->
+  <el-alert v-if="fetchError" type="warning" :closable="false" show-icon class="sync-alert" :title="fetchError" />
 
   <template v-if="editorMode !== 'onlyoffice'">
     <div class="guide-strip"><span class="guide-strip-label">编制流程：</span>

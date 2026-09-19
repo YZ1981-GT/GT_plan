@@ -91,6 +91,98 @@ describe('Property 13：inter_sheet 的 resolver 存在于后端 @auto_resolver�
   })
 })
 
+// ═══════════════════════════════════════════════════════════════════════════
+// Property 13b：inter_sheet 的 resolverField 必须真实存在于该 resolver 的返回体
+//
+// 🔴 补这条的原因（复盘实证）：Property 13 只校验「resolver **名字**在后端注册表里」，
+//    名字对得上就绿 —— 于是「声明了 resolver 却从没人调用它取数」和「调用了但取错
+//    字段名」两类缺陷全部漏网。真实发生过的就是前者：7 条 inter_sheet 声明齐全、
+//    Property 13 全绿，但前端运行时零调用，金额列永远是 null。
+//    字段名尤其容易错：后端返 **snake_case**（`sales_amount`），前端列 key 是
+//    **camelCase**（`salesAmount`），靠推导必错，必须逐条声明 + 跨语言校验。
+// ═══════════════════════════════════════════════════════════════════════════
+
+/** 抽取某个 `@auto_resolver("name")` 装饰的函数体（到下一个顶层 @auto_resolver 或文件尾）。 */
+function resolverBodyOf(resolverName: string): string {
+  if (!existsSync(RESOLVER_DIR)) return ''
+  for (const f of readdirSync(RESOLVER_DIR)) {
+    if (!f.endsWith('.py')) continue
+    const src = readFileSync(resolve(RESOLVER_DIR, f), 'utf-8')
+    const marker = new RegExp(`@auto_resolver\\(\\s*['"]${resolverName}['"]\\s*\\)`)
+    const hit = marker.exec(src)
+    if (!hit) continue
+    const rest = src.slice(hit.index + hit[0].length)
+    const next = /@auto_resolver\(/.exec(rest)
+    return next ? rest.slice(0, next.index) : rest
+  }
+  return ''
+}
+
+describe('Property 13b：inter_sheet 的 resolverField 在后端返回体里真实存在（跨语言字段契约）', () => {
+  it('每条 inter_sheet 都声明了 resolverField（缺了前端无从知道取返回体哪个字段）', () => {
+    for (const p of PRESETS()) {
+      if (p.category !== 'inter_sheet') continue
+      expect(
+        p.resolverField,
+        `${p.sheetCode}.${p.columnKey} inter_sheet 缺 resolverField —— 取数无法回填`,
+      ).toBeTruthy()
+    }
+  })
+
+  it('resolverField 字面量出现在对应 resolver 的返回体中（snake_case 拼错必红）', () => {
+    const interPresets = PRESETS().filter((p) => p.category === 'inter_sheet')
+    expect(interPresets.length, 'inter_sheet 预设不该为空').toBeGreaterThan(0)
+    for (const p of interPresets) {
+      const body = resolverBodyOf(p.resolver)
+      expect(body, `未定位到 resolver ${p.resolver} 的函数体`).not.toBe('')
+      expect(
+        new RegExp(`['"]${p.resolverField}['"]\\s*:`).test(body),
+        `resolver ${p.resolver} 的返回体里没有键 "${p.resolverField}"`
+          + `（${p.sheetCode}.${p.columnKey} 会永远取不到值）`,
+      ).toBe(true)
+    }
+  })
+
+  it('反向自检：不存在的字段名必须判否（否则本判据是假绿）', () => {
+    const body = resolverBodyOf('d4_25_dealer_sales')
+    expect(body).not.toBe('')
+    expect(/['"]sales_amount['"]\s*:/.test(body)).toBe(true)
+    expect(/['"]__definitely_not_a_field__['"]\s*:/.test(body)).toBe(false)
+  })
+})
+
+describe('Property 13c：取数计划按 resolver 去重分组，且覆盖全部 inter_sheet 列', () => {
+  it('interSheetFetchPlans 的 targets 并集 == 该 sheet 的 inter_sheet columnKey 集合', () => {
+    for (const code of SHEET_CODES) {
+      const declared = new Set(
+        PRESETS().filter((p) => p.sheetCode === code && p.category === 'inter_sheet').map((p) => p.columnKey),
+      )
+      const planned = new Set((schema as any).interSheetColumnKeys(code) as string[])
+      expect(planned, `${code} 取数计划与声明不一致`).toEqual(declared)
+    }
+  })
+
+  it('同一 resolver 只出现一个计划条目（避免同查询重复打后端）', () => {
+    for (const code of SHEET_CODES) {
+      const plans = (schema as any).interSheetFetchPlans(code) as Array<{ resolver: string }>
+      const names = plans.map((p) => p.resolver)
+      expect(new Set(names).size, `${code} 的取数计划里有重复 resolver`).toBe(names.length)
+    }
+  })
+
+  it('D4-28 的三列由同一个 resolver 一次取回（N:1 的真实形态）', () => {
+    const plans = (schema as any).interSheetFetchPlans('D4-28') as Array<{
+      resolver: string
+      targets: Array<{ columnKey: string }>
+    }>
+    const plan = plans.find((p) => p.resolver === 'd4_28_customer_balances')
+    expect(plan).toBeTruthy()
+    expect(plan!.targets.map((t) => t.columnKey).sort()).toEqual(
+      ['arBalance', 'contractLiabBalance', 'salesAmount'],
+    )
+  })
+})
+
 describe('Property 14：intra_sheet 的 dependsOn 全为该 sheet 列 key', () => {
   it('无越界依赖', () => {
     for (const p of PRESETS()) {

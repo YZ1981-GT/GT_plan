@@ -206,6 +206,20 @@ def d4_25_dealer_sales(db, project_id, year, customer_name):
 
 统一约定：
 - resolver 入参含 `customer_name`（或 D4-27 的 `person_name`），返回 `{ sales_amount, ar_balance, ... }`。
+
+🔴 **取数链路必须三段齐全（2026-09-19 复盘补：原设计只写了 resolver 这一段，导致实施后整条链路空转）**：
+
+| 段 | 落点 | 缺了会怎样 |
+|---|---|---|
+| ① 声明映射 | `IpoFormulaPreset.resolverField`（`sales_amount` → `salesAmount`） | 后端 snake_case ↔ 前端 camelCase 无从对应，取回来也填不进去 |
+| ② 参数通道 | `GET /auto-data/{source}` 透传非保留 query 参数为 resolver `**kwargs` | 行级 `customer_name` 进不去，resolver 恒返 `{"summary":"未提供客户名称", ...: None}` |
+| ③ 调用与回填 | `useIpoChecklistTab.refreshInterSheet()`（`addRow` 后自动 + 工具栏「刷新取数」） | resolver 注册了也没人调 —— AC 3.4「不填也有值」永不发生 |
+
+回填语义（三条硬约束）：
+- resolver 返回 `null` 的字段**保持空、绝不写 0**（0 会被误读成「已核对为零」）；
+- 自动取数（新增行后）`overwrite=false` 只填空列，不抹用户已录入值；工具栏「刷新取数」`overwrite=true` 才覆盖；
+- 同 `(resolver, 名称)` 只发一次请求（多行同名 / 一 resolver 供多列都不重复打，也避开 `http.ts`
+  去重层对同 URL 在飞请求的 abort）；失败不抛不清值，`fetchError` 显式可见。
 - **取数走四表统一入口**：`get_active_filter` + `app/services/four_table/` 的
   `ReportLineAccountSpec` / `select_leaves` / `aggregate_leaves`，**禁止裸写 `is_deleted == False`**。
 - 匹配不到时返回 `None`（前端显示空），**禁止返回 0** —— 0 会被误解为「已核对为零」。

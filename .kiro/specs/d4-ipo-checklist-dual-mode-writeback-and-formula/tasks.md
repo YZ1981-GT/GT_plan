@@ -37,7 +37,12 @@ D4-25 **13** 列 / D4-26 **19** 列（14 主 + 5 二级）/ D4-27 **18** 列 / D
 ③ 入库 ✅ 已做（Task 21）。
 
 **本轮复盘落地的改进（2026-09-19）**：
-- 🐛 **派生列手填锁清空不解锁**（Property 15 后半句「清空手填即解锁回落预设重算」从未落地）：
+- �🔴 **表间提取（inter_sheet）根本没接通 —— 本 spec 最贵的假绿**（详见 Task 7）：resolver 注册齐全、
+  前端声明齐全、Property 13 全绿，但中间零运行时代码 ⇒ AC 3.4「不填也有值」从未发生，金额列永远空白。
+  已补齐三处（schema `resolverField` 声明映射 + 端点行级参数透传 + composable 取数回填）并加双向守卫，
+  真实数据实测取到 `sales_amount=76613350.78`。**教训：守卫只校验「名字存在」时，「声明了但从不执行」
+  必然漏网 —— 跨语言契约必须验到「字段真实存在」+「调用真实发生」两层。**
+- �🐛 **派生列手填锁清空不解锁**（Property 15 后半句「清空手填即解锁回落预设重算」从未落地）：
   `useIpoChecklistTab.updateCell` 原只 `manualLocks.add` 从不 `delete`，用户把派生列（占比/差异/总计）手填后
   再清空，锁永久留着 → 该列即使依赖列变化也不再自动重算。修复：清空（空值/空白串）时 `delete` 解锁回落重算；
   `removeRow` 清理该行遗留手填锁防僵尸键。新增守卫 `ipoChecklistTabManualLock.spec.ts`（3 tests，含反向验证：
@@ -127,7 +132,42 @@ D4-25 **13** 列 / D4-26 **19** 列（14 主 + 5 二级）/ D4-27 **18** 列 / D
   - ✅ **证据**：`rowsToSheet`/`sheetToRows` 已实现（`truthyCheckbox`/`parseNumeric` 分支齐全）；`ipoSyncBridge.spec.ts` 守卫容差 0.005。
   - _Requirements: 2.3, 2.4, 6.7, 7.7, 8.7_
 
-- [x] 7. 后端表间提取 resolver（4 个）
+- [x] 7. 后端表间提取 resolver（4 个）+ **前端取数接线（2026-09-19 复盘补齐）**
+  - 🔴 **复盘实证：本任务原先只做了一半，且守卫掩盖了另一半。** resolver 真实注册、实现正确，
+    前端 `IPO_FORMULA_PRESETS` 也声明了 resolver 名，但**两者之间没有任何运行时代码**：
+    `useIpoChecklistTab` 全文零网络调用、`newRow` 把金额列硬置 `null`、
+    `ipoChecklistFormulaEngine` 两处硬过滤 `category==='intra_sheet'` 从不读 `resolver` 字段
+    ⇒ AC 3.4「表间提取首次进入即预填」**从未发生**，金额列永远空白。
+    Property 13 只校验「resolver 名字在后端注册表里」，名字对得上就绿 —— 这是本 spec 最贵的一处假绿。
+    另有两条硬阻塞：①通用端点 `GET /auto-data/{source}` 不传行级参数 ⇒ 这 4 个 resolver 经它
+    恒返 `{"summary":"未提供客户名称", ...: None}`；②resolver 返 **snake_case**（`sales_amount`）
+    而列 key 是 **camelCase**（`salesAmount`），全仓无映射代码。
+  - ✅ **已补齐（三处改动 + 双向守卫）**：
+    - `ipoChecklistSchema.ts`：`IpoFormulaPreset` 新增 `resolverField`（7 条 inter_sheet 全补），
+      新增 `interSheetFetchPlans(sheetCode)` 按 resolver **去重分组**（D4-28 三列共用
+      `d4_28_customer_balances`，一次请求取回三值而非打 3 遍）+ `interSheetColumnKeys`。
+    - `backend/app/routers/auto_data.py`：`_row_level_kwargs(request)` 把非保留 query 参数
+      （排除 `project_id`/`source`/`year`）透传为 resolver `**kwargs`。调度器早就支持 kwargs，
+      缺的只是端点这一段通道；对既有调用方是**纯加法**（现存调用方均不传额外参数）。
+    - `useIpoChecklistTab.ts`：`refreshInterSheet({overwrite,rowIds})` 按计划调
+      `/auto-data/{resolver}?year=&customer_name=`，按 `resolverField → columnKey` 回填；
+      `(resolver,名称)` 去重缓存（多行同名只打一次，同时避开 `http.ts` 去重层对同 URL 的 abort）；
+      **resolver 返 null 的字段保持空、绝不写 0**；失败不抛不清值、记 `fetchError`；
+      回填后重算 intra_sheet 派生列 + `persist()`。`addRow` 后自动填空（AC 3.4）。
+    - 四组件：工具栏「🔄 刷新取数」（`overwrite:true`）+ `fetchError` 的 warning `el-alert`（fail-visible）。
+  - ✅ **真实实测（非只跑单测）**：`GET /auto-data/d4_25_dealer_sales?year=2025&customer_name=安徽医科大学第一附属医院(高新院区)`
+    → `sales_amount=76613350.78` / `ar_balance=33204978.3`；顺带实证 `get_active_filter` 正确隔离数据集
+    （同名两个 dataset 各 76613350.78 且 `is_deleted` 均 false，裸写 `is_deleted==False` 会翻倍 —— 印证该铁律）。
+    浏览器实测 D4-28 点「刷新取数」：**2 行 → 2 个请求**（非 6 个）、销售/应收回填真实值、
+    合同负债 resolver 返 null 故保持空且占比显示 `—`（未写 0）、占比列自动重算为 100%。
+  - ✅ **守卫（含反向验证）**：前端 `ipoFormulaPreset.spec.ts` 新增 Property 13b（`resolverField`
+    必须真实出现在对应 resolver 返回体字面量里，抓 snake_case 拼错）+ 13c（取数计划去重/覆盖/N:1）；
+    新增 `ipoInterSheetFetch.spec.ts` 12 条（真发请求 / 映射 / null 不写 0 / overwrite 语义 / 同名去重 /
+    失败 fail-visible / `_error` 降级 / 缺年度不猜「当前年-1」/ 派生列联动 / 只读禁写）；
+    新增后端 `test_auto_data_row_level_params.py` 10 条（保留名剔除 / kwargs 真传进调度器 /
+    未注册 `_error` 形态 / 四 resolver 返回键契约 / 反向自检）。
+    反向验证：把一条 `resolverField` 改成 camelCase → 前端 5 红；去掉 kwargs 透传 → 后端 1 红。
+  - 原有内容（resolver 实现本身）：
   - `backend/app/services/auto_data_resolvers/_d4_revenue.py` **追加**（文件已有 `d4_tb_unadjusted` 等，追加非新建）：
     `d4_25_dealer_sales` / `d4_26_overseas_sales` / `d4_27_related_party_sales` / `d4_28_customer_balances`。
   - 🔴 取数走四表统一入口（`get_active_filter` + `app/services/four_table/` 的 `ReportLineAccountSpec` /
@@ -330,6 +370,11 @@ D4-25 **13** 列 / D4-26 **19** 列（14 主 + 5 二级）/ D4-27 **18** 列 / D
 表间提取经后端 `@auto_resolver` 权威执行；表内派生值是普通值预览（c2 C.3 正交域）不纳入 F-SHELL v2。
 若未来需可编辑公式，须走 F-SHELL v2（`expression`/`refs`/`params`）统一解析、权限、CAS、审计路径。
 
+🔴 **2026-09-19 补**：本 Property 原先只验证了「后端权威执行」的**注册面**（resolver 名存在），
+未验证**执行面**（真的被调用、真的回填）—— 结果 inter_sheet 整条链路空转而判据全绿。现补齐：
+`resolverField` 跨语言字段契约（Property 13b）+ 取数调用与映射的行为判据（`ipoInterSheetFetch.spec.ts`）
++ 端点 kwargs 透传判据（`test_auto_data_row_level_params.py`），三者缺一即红。
+
 ### Property 41: A13 金额方向需人工确认
 **Validates: Requirements 3.1, 3.2, 3.3, 3.4**
 
@@ -348,6 +393,13 @@ activeTab 双重实证；竞态无假失败/双切换器）；但**完整数据 
 
 **已落地（有测试/代码证据）**：Task 1-16、18、20、22（三共享模块 + 四组件平台桥接线 + 4 后端 resolver +
 后端 13 passed + 前端 45 passed + 变异脚本）。9 需求 / 38 Property 主体有对应实现与守卫。
+
+🔴 **2026-09-19 复盘修正上一行的口径**：Task 7「表间提取」当时标 `[x]` 的证据是「4 个 `@auto_resolver`
+均注册」—— 那只证明了**后端半条**。前端取数接线（真调用 + 字段映射 + 回填）完全缺失，AC 3.4 空转。
+现已补齐并配双向守卫 + 真实数据实测（详见 Task 7）。前端 IPO 测试 45 → **66 passed（8 文件）**，
+新增后端 `test_auto_data_row_level_params.py` 10 passed。
+**复盘方法论教训**：「某能力接没接」的判据必须落到**唯一消费方真的调用了它**，
+只断言「注册表里有这个名字」= 允许「声明齐全、运行时空转」这类最难发现的假绿。
 
 **已补齐**：✅ CI job（Task 17）——`governance-checks.yml` 新增 `d4-ipo-checklist` job（8 steps），
 本地实测三 step 全绿（后端 13 passed / 变异脚本 exit 0 / 前端 45 passed）。

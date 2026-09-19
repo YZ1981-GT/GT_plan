@@ -16,7 +16,13 @@
  */
 import { ref, computed, watch, onBeforeUnmount, inject, type Ref } from 'vue'
 import { ElMessageBox } from 'element-plus'
-import { SHEET_SPECS, type ChecklistRow, type ChecklistSheetSpec } from './ipoChecklistSchema'
+import { api } from '@/services/apiProxy'
+import {
+  SHEET_SPECS,
+  interSheetFetchPlans,
+  type ChecklistRow,
+  type ChecklistSheetSpec,
+} from './ipoChecklistSchema'
 import { recalcDerivedColumns } from './ipoChecklistFormulaEngine'
 
 const DEBOUNCE_MS = 2000
@@ -159,9 +165,13 @@ export function useIpoChecklistTab(opts: UseIpoChecklistTabOptions) {
         inputErrorMessage: '不能为空',
       })
       if (value?.trim()) {
-        rows.value.push(newRow(value.trim()))
+        const created = newRow(value.trim())
+        rows.value.push(created)
         recalcDerivedColumns(opts.sheetCode, rows.value, manualLocks.value)
         persist()
+        // AC 3.4「表间提取首次进入即预填」：新增行落定后按名称自动取数（只填空列）。
+        // 不 await —— 行已可见可编辑，取数是后续补值；失败只记 fetchError 不回滚行。
+        void refreshInterSheet({ rowIds: [String(created.rowId)] })
       }
     } catch {
       /* 用户取消：不创建行（Property 34） */
@@ -221,6 +231,116 @@ export function useIpoChecklistTab(opts: UseIpoChecklistTabOptions) {
 
   const columns = computed(() => spec.columns)
 
+  // ═══════════════════════════════════════════════════════════════════════
+  // 表间提取（inter_sheet）：按 IPO_FORMULA_PRESETS 的 resolver 声明真实取数回填
+  //
+  // 🔴 这一段补的是 AC 3.4「表间提取首次进入即预填」的落地：此前 `IPO_FORMULA_PRESETS`
+  //    只**声明**了 resolver 名（且守卫仅校验名字存在于后端注册表），运行时从无任何调用
+  //    ⇒ 金额列永远是 `newRow` 里硬置的 null，「不填也有值」从未发生。
+  // ═══════════════════════════════════════════════════════════════════════
+
+  /** 取数进行中（供工具栏按钮 loading）。 */
+  const fetching = ref(false)
+  /** 最近一次取数的失败原因（空串 = 无失败）。fail-visible：不吞成静默。 */
+  const fetchError = ref('')
+
+  const plans = interSheetFetchPlans(opts.sheetCode)
+  /** 审计年度由宿主 provide（禁在此硬编码「当前年-1」）。 */
+  const auditYear = inject<Ref<number> | number | null>('d4AuditYear', null)
+
+  function resolvedYear(): number | null {
+    const y = auditYear && typeof auditYear === 'object' ? (auditYear as Ref<number>).value : auditYear
+    const n = Number(y)
+    return Number.isFinite(n) && n > 0 ? n : null
+  }
+
+  function isBlankValue(v: unknown): boolean {
+    return v == null || v === '' || (typeof v === 'string' && v.trim() === '')
+  }
+
+  /**
+   * 按声明的 resolver 取数并回填 inter_sheet 列。
+   *
+   * @param overwrite `false`（默认，新增行后自动调用）= 只填空列，不动用户已录入的值；
+   *                  `true`（工具栏「刷新取数」）= 以账面值覆盖。
+   * @param rowIds 限定行（缺省 = 全部行）。
+   *
+   * 约定：
+   * - resolver 返回 `null` 的字段**保持空**，绝不写 0（0 会被误读成「已核对为零」）；
+   * - 同 `(resolver, 名称)` 只发一次请求（多行同名 / 一 resolver 供多列都不重复打）；
+   * - 失败不抛、不清空已有值，只记 `fetchError` 由组件显式展示。
+   */
+  async function refreshInterSheet(
+    { overwrite = false, rowIds }: { overwrite?: boolean; rowIds?: readonly string[] } = {},
+  ): Promise<{ filled: number; failed: number }> {
+    fetchError.value = ''
+    if (opts.isReadonly.value || plans.length === 0) return { filled: 0, failed: 0 }
+    const year = resolvedYear()
+    if (year == null) {
+      fetchError.value = '缺少审计年度，无法取数'
+      return { filled: 0, failed: 0 }
+    }
+    const targetRows = rowIds
+      ? rows.value.filter((r) => rowIds.includes(String(r.rowId)))
+      : rows.value
+    if (targetRows.length === 0) return { filled: 0, failed: 0 }
+
+    fetching.value = true
+    let filled = 0
+    let failed = 0
+    // 同 (resolver, 名称) 的返回体复用：避免多行同名重复打后端，也避开 http.ts
+    // 去重层对同 URL 在飞请求的 abort。
+    const cache = new Map<string, Record<string, unknown> | null>()
+    try {
+      for (const plan of plans) {
+        for (const row of targetRows) {
+          const name = String(row[plan.nameColumnKey] ?? '').trim()
+          if (!name) continue // 没名称无从匹配（resolver 也会短路），不发请求
+          const cacheKey = `${plan.resolver}::${name}`
+          let payload = cache.get(cacheKey)
+          if (payload === undefined) {
+            try {
+              payload = (await api.get(
+                `/api/projects/${opts.projectId.value}/auto-data/${plan.resolver}`,
+                { params: { year, customer_name: name }, _silent: true } as never,
+              )) as Record<string, unknown>
+              // resolver 内部异常时平台返 `_error: true`（非抛异常）——按失败计，不回填。
+              if (payload && (payload as { _error?: boolean })._error) {
+                failed += 1
+                payload = null
+              }
+            } catch {
+              failed += 1
+              payload = null
+            }
+            cache.set(cacheKey, payload ?? null)
+          }
+          if (!payload) continue
+          for (const t of plan.targets) {
+            const raw = payload[t.resolverField]
+            if (raw == null) continue // 账面无匹配 → 保持空，绝不写 0
+            if (!overwrite && !isBlankValue(row[t.columnKey])) continue // 不覆盖已录入
+            const n = Number(raw)
+            if (!Number.isFinite(n)) continue
+            row[t.columnKey] = Number(n.toFixed(t.precision))
+            filled += 1
+          }
+        }
+      }
+    } finally {
+      fetching.value = false
+    }
+    if (failed > 0 && filled === 0) {
+      fetchError.value = `取数失败 ${failed} 项（已保留原值，未写入 0）`
+    }
+    if (filled > 0) {
+      // 表间提取值变了 → 依赖它的表内派生列（占比/差异）跟着重算，再落盘。
+      recalcDerivedColumns(opts.sheetCode, rows.value, manualLocks.value)
+      persist()
+    }
+    return { filled, failed }
+  }
+
   /** 导入成功 / OO 回写后重载宿主 allResponses（AC 4.2：表格视图立即显示导入的行）。 */
   async function reloadHost(): Promise<void> {
     if (reloadWorkpaperData) await reloadWorkpaperData()
@@ -240,5 +360,11 @@ export function useIpoChecklistTab(opts: UseIpoChecklistTabOptions) {
     persist,
     flushPendingSave,
     reloadHost,
+    // 表间提取（inter_sheet）
+    refreshInterSheet,
+    fetching,
+    fetchError,
+    /** 该表是否有表间提取列（无则组件不渲染「刷新取数」按钮）。 */
+    hasInterSheet: computed(() => plans.length > 0),
   }
 }

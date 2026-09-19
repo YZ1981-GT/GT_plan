@@ -294,6 +294,17 @@ export interface IpoFormulaPreset {
   columnKey: string
   category: 'inter_sheet' | 'intra_sheet'
   resolver?: string
+  /**
+   * `category='inter_sheet'` 时必填：resolver 返回 dict 里承载本列值的**字段名**。
+   *
+   * 🔴 为什么必须显式声明、不能靠 columnKey 推导：后端 resolver 返回 **snake_case**
+   * （`sales_amount` / `ar_balance` / `contract_liab_balance` / `annual_sales`），
+   * 前端列 key 是 **camelCase**（`salesAmount` / `arBalance` / …），两侧命名风格不同；
+   * 且**一个 resolver 供多列**（`d4_28_customer_balances` 一次返销售/应收/合同负债三值），
+   * 列与字段是 N:1 关系，只有逐条声明才能确定「这一列取返回体的哪个字段」。
+   * 该映射是跨语言契约，由守卫断言字段名真实出现在对应 resolver 的返回体里。
+   */
+  resolverField?: string
   expression?: string
   dependsOn: readonly string[]
   precision: number
@@ -305,12 +316,12 @@ export const IPO_FORMULA_PRESETS: readonly IpoFormulaPreset[] = [
   // D4-25 经销商检查
   {
     sheetCode: 'D4-25', rowKey: '*', columnKey: 'salesAmount', category: 'inter_sheet',
-    resolver: 'd4_25_dealer_sales', dependsOn: ['customerName'], precision: 2,
+    resolver: 'd4_25_dealer_sales', resolverField: 'sales_amount', dependsOn: ['customerName'], precision: 2,
     sourceRef: '经销商检查D4-25!E11', reason: '按客户名称从 D4-2 收入明细取本期销售金额',
   },
   {
     sheetCode: 'D4-25', rowKey: '*', columnKey: 'arBalance', category: 'inter_sheet',
-    resolver: 'd4_25_dealer_sales', dependsOn: ['customerName'], precision: 2,
+    resolver: 'd4_25_dealer_sales', resolverField: 'ar_balance', dependsOn: ['customerName'], precision: 2,
     sourceRef: '经销商检查D4-25!G11', reason: '按客户名称从 D2-2 客户账龄取期末应收账款余额',
   },
   {
@@ -321,7 +332,7 @@ export const IPO_FORMULA_PRESETS: readonly IpoFormulaPreset[] = [
   // D4-26 境外销售收入检查
   {
     sheetCode: 'D4-26', rowKey: '*', columnKey: 'salesAmount', category: 'inter_sheet',
-    resolver: 'd4_26_overseas_sales', dependsOn: ['customerName'], precision: 2,
+    resolver: 'd4_26_overseas_sales', resolverField: 'sales_amount', dependsOn: ['customerName'], precision: 2,
     sourceRef: '境外销售收入检查D4-26!E11', reason: '按客户名称从境外销售明细取本期销售金额',
   },
   {
@@ -337,7 +348,7 @@ export const IPO_FORMULA_PRESETS: readonly IpoFormulaPreset[] = [
   // D4-27 识别未披露的关联方
   {
     sheetCode: 'D4-27', rowKey: '*', columnKey: 'annualSales', category: 'inter_sheet',
-    resolver: 'd4_27_related_party_sales', dependsOn: ['name'], precision: 2,
+    resolver: 'd4_27_related_party_sales', resolverField: 'annual_sales', dependsOn: ['name'], precision: 2,
     sourceRef: '识别未披露的关联方D4-27!P14', reason: '按姓名从客户维度销售明细取年度销售额',
   },
   {
@@ -354,17 +365,17 @@ export const IPO_FORMULA_PRESETS: readonly IpoFormulaPreset[] = [
   // D4-28 客户信息核查清单
   {
     sheetCode: 'D4-28', rowKey: '*', columnKey: 'salesAmount', category: 'inter_sheet',
-    resolver: 'd4_28_customer_balances', dependsOn: ['customerName'], precision: 2,
+    resolver: 'd4_28_customer_balances', resolverField: 'sales_amount', dependsOn: ['customerName'], precision: 2,
     sourceRef: '客户信息核查清单D4-28!D12', reason: '按客户名称从 D4-2 收入明细取销售金额',
   },
   {
     sheetCode: 'D4-28', rowKey: '*', columnKey: 'arBalance', category: 'inter_sheet',
-    resolver: 'd4_28_customer_balances', dependsOn: ['customerName'], precision: 2,
+    resolver: 'd4_28_customer_balances', resolverField: 'ar_balance', dependsOn: ['customerName'], precision: 2,
     sourceRef: '客户信息核查清单D4-28!F12', reason: '按客户名称从 D2-2 客户账龄取应收账款期末余额',
   },
   {
     sheetCode: 'D4-28', rowKey: '*', columnKey: 'contractLiabBalance', category: 'inter_sheet',
-    resolver: 'd4_28_customer_balances', dependsOn: ['customerName'], precision: 2,
+    resolver: 'd4_28_customer_balances', resolverField: 'contract_liab_balance', dependsOn: ['customerName'], precision: 2,
     sourceRef: '客户信息核查清单D4-28!H12', reason: '按客户名称从合同负债明细取合同负债期末余额',
   },
   {
@@ -383,3 +394,54 @@ export const IPO_FORMULA_PRESETS: readonly IpoFormulaPreset[] = [
     sourceRef: '客户信息核查清单D4-28!I12', reason: '合同负债占比 = 本行合同负债期末余额 / 全部行合计',
   },
 ]
+
+// ═══════════════════════════════════════════════════════════════════════════
+// 表间提取（inter_sheet）取数计划 —— 「哪个 resolver、带什么行级参数、回填哪些列」
+// 的唯一推导点。放在真源模块而不是 composable：组件/composable 只执行计划，不拼装。
+// ═══════════════════════════════════════════════════════════════════════════
+
+/** 一个 resolver 一次调用能回填的全部列（N:1 —— 如 D4-28 一次返销售/应收/合同负债三值）。 */
+export interface InterSheetFetchPlan {
+  /** 后端 `@auto_resolver` 注册名。 */
+  resolver: string
+  /** 行级参数取值所在的列 key（如 `customerName` / `name`）。 */
+  nameColumnKey: string
+  /** 该 resolver 负责的列：`columnKey` ← 返回体的 `resolverField`。 */
+  targets: ReadonlyArray<{ columnKey: string; resolverField: string; precision: number }>
+}
+
+/**
+ * 该 sheet 的 inter_sheet 取数计划（按 resolver 去重分组）。
+ *
+ * 🔴 按 resolver 分组而不是逐列各发一次请求：`d4_28_customer_balances` 一次返回三个值，
+ * 逐列发请求会把同一份查询跑 3 遍（3× DB 往返）。
+ *
+ * 缺 `resolver` / `resolverField` 的条目被跳过（守卫会在 CI 里把这种漏填打红，
+ * 运行时选择静默跳过而不是抛错 —— 取数是便利，不该让整张表打不开）。
+ */
+export function interSheetFetchPlans(sheetCode: string): InterSheetFetchPlan[] {
+  const byResolver = new Map<string, InterSheetFetchPlan>()
+  for (const p of IPO_FORMULA_PRESETS) {
+    if (p.sheetCode !== sheetCode || p.category !== 'inter_sheet') continue
+    if (!p.resolver || !p.resolverField) continue
+    const nameColumnKey = p.dependsOn[0]
+    if (!nameColumnKey) continue
+    const plan = byResolver.get(p.resolver) ?? {
+      resolver: p.resolver,
+      nameColumnKey,
+      targets: [] as Array<{ columnKey: string; resolverField: string; precision: number }>,
+    }
+    ;(plan.targets as Array<{ columnKey: string; resolverField: string; precision: number }>).push({
+      columnKey: p.columnKey,
+      resolverField: p.resolverField,
+      precision: p.precision,
+    })
+    byResolver.set(p.resolver, plan)
+  }
+  return [...byResolver.values()]
+}
+
+/** 该 sheet 全部由表间提取负责回填的列 key（供 UI 标注「自动取数列」）。 */
+export function interSheetColumnKeys(sheetCode: string): readonly string[] {
+  return interSheetFetchPlans(sheetCode).flatMap((p) => p.targets.map((t) => t.columnKey))
+}
