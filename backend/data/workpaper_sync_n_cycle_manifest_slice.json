@@ -87,9 +87,9 @@
    "html_counterpart_verdict": "exists",
    "html_counterpart_source_refs": [
     "audit-platform/frontend/src/components/workpaper/composables/useN1FormData.ts#L61",
-    "audit-platform/frontend/src/components/workpaper/composables/useN1FormData.ts#L204",
-    "audit-platform/frontend/src/components/workpaper/composables/useN1FormData.ts#L208",
-    "audit-platform/frontend/src/components/workpaper/composables/useN1FormData.ts#L290",
+    "audit-platform/frontend/src/components/workpaper/composables/useN1FormData.ts#L206",
+    "audit-platform/frontend/src/components/workpaper/composables/useN1FormData.ts#L210",
+    "audit-platform/frontend/src/components/workpaper/composables/useN1FormData.ts#L292",
     "backend/app/routers/checklist_responses.py#L84",
     "backend/app/routers/checklist_responses.py#L132"
    ],
@@ -103,11 +103,11 @@
     "owner_module": "audit-platform/frontend/src/components/workpaper/composables/useN1FormData.ts",
     "owner_constant": "ITEM_PREFIX",
     "owner_constant_source_ref": "audit-platform/frontend/src/components/workpaper/composables/useN1FormData.ts#L61",
-    "read_source_ref": "audit-platform/frontend/src/components/workpaper/composables/useN1FormData.ts#L204",
-    "namespace_filter_source_ref": "audit-platform/frontend/src/components/workpaper/composables/useN1FormData.ts#L208",
-    "write_source_ref": "audit-platform/frontend/src/components/workpaper/composables/useN1FormData.ts#L290",
+    "read_source_ref": "audit-platform/frontend/src/components/workpaper/composables/useN1FormData.ts#L206",
+    "namespace_filter_source_ref": "audit-platform/frontend/src/components/workpaper/composables/useN1FormData.ts#L210",
+    "write_source_ref": "audit-platform/frontend/src/components/workpaper/composables/useN1FormData.ts#L292",
     "second_write_channel": "trial_balance 回写（审定数 → 四表）",
-    "second_write_channel_source_ref": "audit-platform/frontend/src/components/workpaper/composables/useN1FormData.ts#L459",
+    "second_write_channel_source_ref": "audit-platform/frontend/src/components/workpaper/composables/useN1FormData.ts#L452",
     "how_resolved": "N1 的业务内容由 per-entry 持久化 composable `useN1FormData.ts` 承载：`const ITEM_PREFIX = 'N1-'`（#L61）划出命名空间、load 侧按 `item_id.startsWith(ITEM_PREFIX)` 过滤（#L208）、`api.get('/api/workpapers/${wpId}/checklist-responses')` 读（#L204）、`api.put(...)` 写（#L290）；后端 `checklist_responses.py` 的 `@router.get(\"\")`（#L84）与 `@router.put(\"\")`（#L132）真实存在。故业务内容**确实存在于 HTML 侧持久化通道**，verdict = exists，AC 12.8 禁止 single_onlyoffice。🔴 与 K/J 循环不同，这里**不经** `useChecklistPersistence` 共享适配器（N 域现算命中 0）；与 M 循环同为 per-entry FormData 模块，但 N 多一条 `trial-balance/writeback` 写路径（#L459），required scenario set 必须把它建模进去。"
    },
    "migration_state": "legacy_fake_bidirectional",
@@ -306,9 +306,9 @@
    "html_counterpart_verdict": "exists",
    "html_counterpart_source_refs": [
     "audit-platform/frontend/src/components/workpaper/composables/useN2FormData.ts#L43",
-    "audit-platform/frontend/src/components/workpaper/composables/useN2FormData.ts#L85",
-    "audit-platform/frontend/src/components/workpaper/composables/useN2FormData.ts#L89",
-    "audit-platform/frontend/src/components/workpaper/composables/useN2FormData.ts#L120",
+    "audit-platform/frontend/src/components/workpaper/composables/useN2FormData.ts#L87",
+    "audit-platform/frontend/src/components/workpaper/composables/useN2FormData.ts#L91",
+    "audit-platform/frontend/src/components/workpaper/composables/useN2FormData.ts#L122",
     "backend/app/routers/checklist_responses.py#L84",
     "backend/app/routers/checklist_responses.py#L132"
    ],
@@ -322,11 +322,11 @@
     "owner_module": "audit-platform/frontend/src/components/workpaper/composables/useN2FormData.ts",
     "owner_constant": "ITEM_PREFIX",
     "owner_constant_source_ref": "audit-platform/frontend/src/components/workpaper/composables/useN2FormData.ts#L43",
-    "read_source_ref": "audit-platform/frontend/src/components/workpaper/composables/useN2FormData.ts#L85",
-    "namespace_filter_source_ref": "audit-platform/frontend/src/components/workpaper/composables/useN2FormData.ts#L89",
-    "write_source_ref": "audit-platform/frontend/src/components/workpaper/composables/useN2FormData.ts#L120",
+    "read_source_ref": "audit-platform/frontend/src/components/workpaper/composables/useN2FormData.ts#L87",
+    "namespace_filter_source_ref": "audit-platform/frontend/src/components/workpaper/composables/useN2FormData.ts#L91",
+    "write_source_ref": "audit-platform/frontend/src/components/workpaper/composables/useN2FormData.ts#L122",
     "second_write_channel": "trial_balance 回写（审定数 → 四表）",
-    "second_write_channel_source_ref": "audit-platform/frontend/src/components/workpaper/composables/useN2FormData.ts#L292",
+    "second_write_channel_source_ref": "audit-platform/frontend/src/components/workpaper/composables/useN2FormData.ts#L284",
     "how_resolved": "N2 的业务内容由 per-entry 持久化 composable `useN2FormData.ts` 承载：`const ITEM_PREFIX = 'N2-'`（#L43）划出命名空间、load 侧按 `item_id.startsWith(ITEM_PREFIX)` 过滤（#L89）、`api.get('/api/workpapers/${wpId}/checklist-responses')` 读（#L85）、`api.put(...)` 写（#L120）；后端 `checklist_responses.py` 的 `@router.get(\"\")`（#L84）与 `@router.put(\"\")`（#L132）真实存在。故业务内容**确实存在于 HTML 侧持久化通道**，verdict = exists，AC 12.8 禁止 single_onlyoffice。🔴 与 K/J 循环不同，这里**不经** `useChecklistPersistence` 共享适配器（N 域现算命中 0）；与 M 循环同为 per-entry FormData 模块，但 N 多一条 `trial-balance/writeback` 写路径（#L292），required scenario set 必须把它建模进去。"
    },
    "migration_state": "legacy_fake_bidirectional",
@@ -584,9 +584,9 @@
    "html_counterpart_verdict": "exists",
    "html_counterpart_source_refs": [
     "audit-platform/frontend/src/components/workpaper/composables/useN3FormData.ts#L43",
-    "audit-platform/frontend/src/components/workpaper/composables/useN3FormData.ts#L100",
-    "audit-platform/frontend/src/components/workpaper/composables/useN3FormData.ts#L104",
-    "audit-platform/frontend/src/components/workpaper/composables/useN3FormData.ts#L135",
+    "audit-platform/frontend/src/components/workpaper/composables/useN3FormData.ts#L102",
+    "audit-platform/frontend/src/components/workpaper/composables/useN3FormData.ts#L106",
+    "audit-platform/frontend/src/components/workpaper/composables/useN3FormData.ts#L137",
     "backend/app/routers/checklist_responses.py#L84",
     "backend/app/routers/checklist_responses.py#L132"
    ],
@@ -600,11 +600,11 @@
     "owner_module": "audit-platform/frontend/src/components/workpaper/composables/useN3FormData.ts",
     "owner_constant": "ITEM_PREFIX",
     "owner_constant_source_ref": "audit-platform/frontend/src/components/workpaper/composables/useN3FormData.ts#L43",
-    "read_source_ref": "audit-platform/frontend/src/components/workpaper/composables/useN3FormData.ts#L100",
-    "namespace_filter_source_ref": "audit-platform/frontend/src/components/workpaper/composables/useN3FormData.ts#L104",
-    "write_source_ref": "audit-platform/frontend/src/components/workpaper/composables/useN3FormData.ts#L135",
+    "read_source_ref": "audit-platform/frontend/src/components/workpaper/composables/useN3FormData.ts#L102",
+    "namespace_filter_source_ref": "audit-platform/frontend/src/components/workpaper/composables/useN3FormData.ts#L106",
+    "write_source_ref": "audit-platform/frontend/src/components/workpaper/composables/useN3FormData.ts#L137",
     "second_write_channel": "trial_balance 回写（审定数 → 四表）",
-    "second_write_channel_source_ref": "audit-platform/frontend/src/components/workpaper/composables/useN3FormData.ts#L307",
+    "second_write_channel_source_ref": "audit-platform/frontend/src/components/workpaper/composables/useN3FormData.ts#L299",
     "how_resolved": "N3 的业务内容由 per-entry 持久化 composable `useN3FormData.ts` 承载：`const ITEM_PREFIX = 'N3-'`（#L43）划出命名空间、load 侧按 `item_id.startsWith(ITEM_PREFIX)` 过滤（#L104）、`api.get('/api/workpapers/${wpId}/checklist-responses')` 读（#L100）、`api.put(...)` 写（#L135）；后端 `checklist_responses.py` 的 `@router.get(\"\")`（#L84）与 `@router.put(\"\")`（#L132）真实存在。故业务内容**确实存在于 HTML 侧持久化通道**，verdict = exists，AC 12.8 禁止 single_onlyoffice。🔴 与 K/J 循环不同，这里**不经** `useChecklistPersistence` 共享适配器（N 域现算命中 0）；与 M 循环同为 per-entry FormData 模块，但 N 多一条 `trial-balance/writeback` 写路径（#L307），required scenario set 必须把它建模进去。"
    },
    "migration_state": "legacy_fake_bidirectional",
@@ -776,9 +776,9 @@
    "html_counterpart_verdict": "exists",
    "html_counterpart_source_refs": [
     "audit-platform/frontend/src/components/workpaper/composables/useN4FormData.ts#L63",
-    "audit-platform/frontend/src/components/workpaper/composables/useN4FormData.ts#L260",
-    "audit-platform/frontend/src/components/workpaper/composables/useN4FormData.ts#L263",
-    "audit-platform/frontend/src/components/workpaper/composables/useN4FormData.ts#L125",
+    "audit-platform/frontend/src/components/workpaper/composables/useN4FormData.ts#L262",
+    "audit-platform/frontend/src/components/workpaper/composables/useN4FormData.ts#L265",
+    "audit-platform/frontend/src/components/workpaper/composables/useN4FormData.ts#L127",
     "backend/app/routers/checklist_responses.py#L84",
     "backend/app/routers/checklist_responses.py#L132"
    ],
@@ -792,11 +792,11 @@
     "owner_module": "audit-platform/frontend/src/components/workpaper/composables/useN4FormData.ts",
     "owner_constant": "ITEM_PREFIX",
     "owner_constant_source_ref": "audit-platform/frontend/src/components/workpaper/composables/useN4FormData.ts#L63",
-    "read_source_ref": "audit-platform/frontend/src/components/workpaper/composables/useN4FormData.ts#L260",
-    "namespace_filter_source_ref": "audit-platform/frontend/src/components/workpaper/composables/useN4FormData.ts#L263",
-    "write_source_ref": "audit-platform/frontend/src/components/workpaper/composables/useN4FormData.ts#L125",
+    "read_source_ref": "audit-platform/frontend/src/components/workpaper/composables/useN4FormData.ts#L262",
+    "namespace_filter_source_ref": "audit-platform/frontend/src/components/workpaper/composables/useN4FormData.ts#L265",
+    "write_source_ref": "audit-platform/frontend/src/components/workpaper/composables/useN4FormData.ts#L127",
     "second_write_channel": "trial_balance 回写（审定数 → 四表）",
-    "second_write_channel_source_ref": "audit-platform/frontend/src/components/workpaper/composables/useN4FormData.ts#L375",
+    "second_write_channel_source_ref": "audit-platform/frontend/src/components/workpaper/composables/useN4FormData.ts#L366",
     "how_resolved": "N4 的业务内容由 per-entry 持久化 composable `useN4FormData.ts` 承载：`const ITEM_PREFIX = 'N4-'`（#L63）划出命名空间、load 侧按 `item_id.startsWith(ITEM_PREFIX)` 过滤（#L263）、`api.get('/api/workpapers/${wpId}/checklist-responses')` 读（#L260）、`api.put(...)` 写（#L125）；后端 `checklist_responses.py` 的 `@router.get(\"\")`（#L84）与 `@router.put(\"\")`（#L132）真实存在。故业务内容**确实存在于 HTML 侧持久化通道**，verdict = exists，AC 12.8 禁止 single_onlyoffice。🔴 与 K/J 循环不同，这里**不经** `useChecklistPersistence` 共享适配器（N 域现算命中 0）；与 M 循环同为 per-entry FormData 模块，但 N 多一条 `trial-balance/writeback` 写路径（#L375），required scenario set 必须把它建模进去。"
    },
    "migration_state": "legacy_fake_bidirectional",
@@ -990,9 +990,9 @@
    "html_counterpart_verdict": "exists",
    "html_counterpart_source_refs": [
     "audit-platform/frontend/src/components/workpaper/composables/useN5FormData.ts#L60",
-    "audit-platform/frontend/src/components/workpaper/composables/useN5FormData.ts#L105",
-    "audit-platform/frontend/src/components/workpaper/composables/useN5FormData.ts#L109",
-    "audit-platform/frontend/src/components/workpaper/composables/useN5FormData.ts#L180",
+    "audit-platform/frontend/src/components/workpaper/composables/useN5FormData.ts#L107",
+    "audit-platform/frontend/src/components/workpaper/composables/useN5FormData.ts#L111",
+    "audit-platform/frontend/src/components/workpaper/composables/useN5FormData.ts#L182",
     "backend/app/routers/checklist_responses.py#L84",
     "backend/app/routers/checklist_responses.py#L132"
    ],
@@ -1006,11 +1006,11 @@
     "owner_module": "audit-platform/frontend/src/components/workpaper/composables/useN5FormData.ts",
     "owner_constant": "ITEM_PREFIX",
     "owner_constant_source_ref": "audit-platform/frontend/src/components/workpaper/composables/useN5FormData.ts#L60",
-    "read_source_ref": "audit-platform/frontend/src/components/workpaper/composables/useN5FormData.ts#L105",
-    "namespace_filter_source_ref": "audit-platform/frontend/src/components/workpaper/composables/useN5FormData.ts#L109",
-    "write_source_ref": "audit-platform/frontend/src/components/workpaper/composables/useN5FormData.ts#L180",
+    "read_source_ref": "audit-platform/frontend/src/components/workpaper/composables/useN5FormData.ts#L107",
+    "namespace_filter_source_ref": "audit-platform/frontend/src/components/workpaper/composables/useN5FormData.ts#L111",
+    "write_source_ref": "audit-platform/frontend/src/components/workpaper/composables/useN5FormData.ts#L182",
     "second_write_channel": "trial_balance 回写（审定数 → 四表）",
-    "second_write_channel_source_ref": "audit-platform/frontend/src/components/workpaper/composables/useN5FormData.ts#L335",
+    "second_write_channel_source_ref": "audit-platform/frontend/src/components/workpaper/composables/useN5FormData.ts#L328",
     "how_resolved": "N5 的业务内容由 per-entry 持久化 composable `useN5FormData.ts` 承载：`const ITEM_PREFIX = 'N5-'`（#L60）划出命名空间、load 侧按 `item_id.startsWith(ITEM_PREFIX)` 过滤（#L109）、`api.get('/api/workpapers/${wpId}/checklist-responses')` 读（#L105）、`api.put(...)` 写（#L180）；后端 `checklist_responses.py` 的 `@router.get(\"\")`（#L84）与 `@router.put(\"\")`（#L132）真实存在。故业务内容**确实存在于 HTML 侧持久化通道**，verdict = exists，AC 12.8 禁止 single_onlyoffice。🔴 与 K/J 循环不同，这里**不经** `useChecklistPersistence` 共享适配器（N 域现算命中 0）；与 M 循环同为 per-entry FormData 模块，但 N 多一条 `trial-balance/writeback` 写路径（#L335），required scenario set 必须把它建模进去。"
    },
    "migration_state": "legacy_fake_bidirectional",
@@ -1594,7 +1594,7 @@
   "orphan_non_dual_mode_modules": [
    {
     "file": "audit-platform/frontend/src/components/workpaper/composables/useN4AdjudicationV2.ts",
-    "lines": 288,
+    "lines": 294,
     "kind": "v1_v2_twin",
     "live_twin": "audit-platform/frontend/src/components/workpaper/composables/useN4Adjudication.ts",
     "fabricated_key": "N4-1-rows-v2",
@@ -1673,9 +1673,9 @@
    "live_dual_mode_modules": 2,
    "live_dual_mode_lines_total": 274,
    "orphan_non_dual_mode_modules": 5,
-   "orphan_non_dual_mode_lines_total": 773,
+   "orphan_non_dual_mode_lines_total": 779,
    "orphan_modules_total": 8,
-   "orphan_lines_total": 1325,
+   "orphan_lines_total": 1331,
    "orphan_v1_v2_twins": 2,
    "orphan_modules_with_fabricated_key_shape": 1,
    "orphan_modules_calling_legacy_health_endpoint": 3,
@@ -1740,8 +1740,8 @@
    "summary_constant_source_ref": "audit-platform/frontend/src/components/workpaper/sync/workpaperEntrySyncNotice.ts#L58",
    "reason_constant_source_ref": "audit-platform/frontend/src/components/workpaper/sync/workpaperEntrySyncNotice.ts#L67",
    "registered_entry_ids_source_ref": "audit-platform/frontend/src/components/workpaper/sync/workpaperEntrySyncNotice.ts#L52",
-   "registered_entry_ids_is_empty": true,
-   "production_consumers": 41,
+   "registered_entry_ids_is_empty": false,
+   "production_consumers": 42,
    "n_cycle_consumers": 0
   },
   "counters": {
@@ -1860,7 +1860,7 @@
     "derivation": "`${ITEM_PREFIX}${sheet}-${field}`（#L315 / #L336），sheet/field 由调用点给出",
     "identity_field": "item_id",
     "persisted_via": "api.put(/checklist-responses)",
-    "persist_site": "audit-platform/frontend/src/components/workpaper/composables/useN1FormData.ts#L290",
+    "persist_site": "audit-platform/frontend/src/components/workpaper/composables/useN1FormData.ts#L292",
     "status": "resolved"
    },
    {
@@ -1870,7 +1870,7 @@
     "owner_module": "audit-platform/frontend/src/components/workpaper/composables/useN1Adjudication.ts",
     "owner_constant": "ITEM_PREFIX",
     "owner_constant_value": "N1-1-adj",
-    "owner_constant_source": "audit-platform/frontend/src/components/workpaper/composables/useN1Adjudication.ts#L117",
+    "owner_constant_source": "audit-platform/frontend/src/components/workpaper/composables/useN1Adjudication.ts#L118",
     "declaration_kind": "module_constant_plus_index_derivation",
     "derivation": "`${ITEM_PREFIX}-${index}`，index 是 `N1_ADJUDICATION_CATEGORIES`（#L107，7 项）的**数组下标**",
     "keys": [
@@ -1887,15 +1887,15 @@
      "N1-1-adj-5",
      "N1-1-adj-6"
     ],
-    "key_expansion_source": "audit-platform/frontend/src/components/workpaper/composables/useN1Adjudication.ts#L107",
+    "key_expansion_source": "audit-platform/frontend/src/components/workpaper/composables/useN1Adjudication.ts#L108",
     "key_order_matters": true,
-    "key_order_source": "audit-platform/frontend/src/components/workpaper/composables/useN1Adjudication.ts#L107 的常量数组顺序",
+    "key_order_source": "audit-platform/frontend/src/components/workpaper/composables/useN1Adjudication.ts#L108 的常量数组顺序",
     "identity_field": null,
     "identity_field_note": "行对象没有身份字段，身份就是下标 —— 见 dynamic_row_identity 的 family B",
     "identity_defect": "positional_persistence_key",
     "identity_defect_detail": "🔴 读（#L130 / #L163）与写（#L429）三处都用 `${ITEM_PREFIX}-${index}`。现状下 7 类是源模板 A7~A13 的固定骨架，所以下标**暂时**稳定；但一旦源模板增删一类、或前端插入自定义行，全部历史数据整体左移/右移，且没有任何守卫会红。AC 6.5 明文要求「动态行 SHALL 使用模板行 key 或 row_uuid；不得使用数组下标作为持久化身份」——这里唯一可用的稳定键（`category` 字符串）就在同一行的 `cat` 变量里，却没有被用上。",
     "persisted_via": "父 entry 的 useN1FormData.debouncedSave",
-    "persist_site": "audit-platform/frontend/src/components/workpaper/composables/useN1Adjudication.ts#L429",
+    "persist_site": "audit-platform/frontend/src/components/workpaper/composables/useN1Adjudication.ts#L420",
     "extra_keys_in_same_tab": [
      "N1-1-total-audited",
      "N1-1-total-begin"
@@ -2130,13 +2130,13 @@
     "table_key": "n1_adjudication_rows",
     "entry_id": "xlsx/gt-n1-deferred-tax-assets",
     "persistence_key": "N1-1-adj-{index}",
-    "row_count_source": "audit-platform/frontend/src/components/workpaper/composables/useN1Adjudication.ts#L107（7 类固定骨架）",
+    "row_count_source": "audit-platform/frontend/src/components/workpaper/composables/useN1Adjudication.ts#L108（7 类固定骨架）",
     "row_identity": {
      "kind": "fixed_skeleton_in_memory_positional_index_in_store",
      "identity_field": null,
-     "source_ref": "audit-platform/frontend/src/components/workpaper/composables/useN1Adjudication.ts#L129",
-     "persistence_source_ref": "audit-platform/frontend/src/components/workpaper/composables/useN1Adjudication.ts#L429",
-     "index_binding_source_ref": "audit-platform/frontend/src/components/workpaper/composables/useN1Adjudication.ts#L130",
+     "source_ref": "audit-platform/frontend/src/components/workpaper/composables/useN1Adjudication.ts#L108",
+     "persistence_source_ref": "audit-platform/frontend/src/components/workpaper/composables/useN1Adjudication.ts#L420",
+     "index_binding_source_ref": "audit-platform/frontend/src/components/workpaper/composables/useN1Adjudication.ts#L131",
      "stable_alternative_available": "category（同一行的 `cat` 变量）",
      "violates_forbidden_identity_kind": "positional_persistence_key",
      "why_kind_is_compound": "🔴 `kind` 不直接写 `positional_persistence_key` 是因为范式校验器（`validate_slice_against_schema`）把 `forbidden_identity_kinds` 的**字面值**当成非法声明拒收 —— 直接写会让整份 slice 过不了校验，于是作者的现实选择只剩「改成一个含糊的干净词」（= 藏起缺陷）。M 那轮用的是同一条出路（`generated_opaque_in_memory_positional_in_store`）。本 slice 把两层如实分开写在 kind 里，**并**用 `violates_forbidden_identity_kind` 显式点名它违反的那个禁用值，本轮守卫对该字段有独立判据（缺了即红）—— 这样既过校验器，又不丢诚实度。"
@@ -2206,7 +2206,7 @@
     "row_identity": {
      "kind": "array_position_no_identity_field",
      "identity_field": null,
-     "source_ref": "audit-platform/frontend/src/components/workpaper/composables/useN5TaxAdjustment.ts#L107",
+     "source_ref": "audit-platform/frontend/src/components/workpaper/composables/useN5TaxAdjustment.ts#L108",
      "persistence_source_ref": "audit-platform/frontend/src/components/workpaper/composables/useN5TaxAdjustment.ts#L238",
      "index_binding_source_ref": "audit-platform/frontend/src/components/workpaper/composables/useN5TaxAdjustment.ts#L190",
      "removal_source_ref": "audit-platform/frontend/src/components/workpaper/composables/useN5TaxAdjustment.ts#L220",
@@ -2231,17 +2231,17 @@
    ],
    "persistence_key_family": [
     {
-     "site": "audit-platform/frontend/src/components/workpaper/composables/useN1Adjudication.ts#L130",
+     "site": "audit-platform/frontend/src/components/workpaper/composables/useN1Adjudication.ts#L131",
      "item_id_template": "${ITEM_PREFIX}-${i}",
      "direction": "read"
     },
     {
-     "site": "audit-platform/frontend/src/components/workpaper/composables/useN1Adjudication.ts#L163",
+     "site": "audit-platform/frontend/src/components/workpaper/composables/useN1Adjudication.ts#L162",
      "item_id_template": "${ITEM_PREFIX}-${i}",
      "direction": "read"
     },
     {
-     "site": "audit-platform/frontend/src/components/workpaper/composables/useN1Adjudication.ts#L429",
+     "site": "audit-platform/frontend/src/components/workpaper/composables/useN1Adjudication.ts#L420",
      "item_id_template": "${ITEM_PREFIX}-${index}",
      "direction": "write"
     }
@@ -2282,7 +2282,7 @@
      "prefix": "row"
     },
     {
-     "site": "audit-platform/frontend/src/components/workpaper/composables/useN4Adjudication.ts#L286",
+     "site": "audit-platform/frontend/src/components/workpaper/composables/useN4Adjudication.ts#L287",
      "prefix": "row"
     },
     {
@@ -2533,7 +2533,7 @@
    "status": "open",
    "must_fix_before": "为这三张表补 contract 的 row identity 声明（模板行 key 或 row_uuid）",
    "source_refs": [
-    "audit-platform/frontend/src/components/workpaper/composables/useN1Adjudication.ts#L429",
+    "audit-platform/frontend/src/components/workpaper/composables/useN1Adjudication.ts#L420",
     "audit-platform/frontend/src/components/workpaper/composables/useN2OtherTaxCalc.ts#L348",
     "audit-platform/frontend/src/components/workpaper/composables/useN5TaxAdjustment.ts#L190",
     "audit-platform/frontend/src/components/workpaper/composables/useN5TaxAdjustment.ts#L220"
@@ -2721,9 +2721,9 @@
   "live_dual_mode_modules": 2,
   "live_dual_mode_lines_total": 274,
   "orphan_non_dual_mode_modules": 5,
-  "orphan_non_dual_mode_lines_total": 773,
+  "orphan_non_dual_mode_lines_total": 779,
   "orphan_modules_total": 8,
-  "orphan_lines_total": 1325,
+  "orphan_lines_total": 1331,
   "orphan_v1_v2_twins": 2,
   "orphan_modules_with_fabricated_key_shape": 1,
   "orphan_modules_calling_legacy_health_endpoint": 3,

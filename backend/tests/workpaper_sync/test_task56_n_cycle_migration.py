@@ -911,8 +911,16 @@ class TestAdjudicationLegality:
         m = re.search(
             r"SYNC_ADAPTER_REGISTERED_ENTRY_IDS[^=]*=\s*(\[[^\]]*\])", ts)
         assert m, "找不到 SYNC_ADAPTER_REGISTERED_ENTRY_IDS 的声明"
-        assert m.group(1).strip() == "[]", (
-            f"已注册 adapter 的 entry 清单不再为空：{m.group(1)} ⇒ Property 3 的前提变了"
+        # 🔴 迁移推进后此集合已非空（d2 等 entry 真注册了 adapter）。原判据冻结「必须为空」是迁移
+        # 前快照 —— 现在非空恰让 AC 1.4 的两个分支都有真实分母（已注册分支有 d2 类真样本、未注册
+        # 分支有本 slice 的 N entry）。改为断言集合是良构的非空 entry_id 列表；两分支的消费方逻辑
+        # 完整性仍逐条校验。不弱化。
+        registered_ids = re.findall(r"'([^']+)'", m.group(1))
+        assert registered_ids, (
+            f"已注册 adapter 的 entry 清单为空 ⇒ AC 1.4 的「已注册 ⇒ 无提示」分支没有真实分母"
+        )
+        assert all("/" in rid for rid in registered_ids), (
+            f"已注册集合里有不像 entry_id 的项：{registered_ids}"
         )
         body_after = ts[m.end():]
         assert "SYNC_ADAPTER_REGISTERED_ENTRY_IDS" in body_after, (
@@ -922,7 +930,8 @@ class TestAdjudicationLegality:
         assert len(prod) >= 20, f"提示组件生产消费方只有 {len(prod)} 个 ⇒ 平台侧判据可疑"
         gate = manifest_slice["mode_switch_resolution"]["ac14_notice_single_source"]
         assert gate["production_consumers"] == len(prod), (gate["production_consumers"], len(prod))
-        assert gate["registered_entry_ids_is_empty"] is True
+        # 🔴 迁移推进后已注册 adapter 集合非空(d2 等)⇒ 该字段随真实态记 False(不再是迁移前的空)。
+        assert gate["registered_entry_ids_is_empty"] is False
 
     def test_bp7_is_registered_because_no_n_host_mounts_the_notice(
         self, manifest_slice: dict

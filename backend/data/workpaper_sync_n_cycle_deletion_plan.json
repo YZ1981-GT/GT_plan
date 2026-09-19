@@ -305,9 +305,9 @@
    "adjudication_reason": "N1 实测**有** HTML 对端（checklist_responses + `N1-{sheet}-{field}` item_id 命名空间 + per-entry 持久化 composable `useN1FormData.ts`，GET/PUT 路由在后端真实存在）⇒ AC 12.8 禁止 single_onlyoffice；OO 侧打开的是真实业务工作簿 `N1 递延所得税资产.xlsx`（10 张 sheet、593 个公式格，非空白模板）⇒ AC 12.9 的 single_html 不适用；宿主经 `audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts` 的模块边可达 ⇒ 非 unreachable；AC 12.1 的六件前置（authority model / per-entry contract / non-null bundle / instrumentation candidate / published representation / 逐 scenario evidence）一件未交付 ⇒ SR-6 禁止 bidirectional。四个终态同时被排除 ⇒ 待裁决态。",
    "html_counterpart_source_refs": [
     "audit-platform/frontend/src/components/workpaper/composables/useN1FormData.ts#L61",
-    "audit-platform/frontend/src/components/workpaper/composables/useN1FormData.ts#L204",
-    "audit-platform/frontend/src/components/workpaper/composables/useN1FormData.ts#L208",
-    "audit-platform/frontend/src/components/workpaper/composables/useN1FormData.ts#L290",
+    "audit-platform/frontend/src/components/workpaper/composables/useN1FormData.ts#L206",
+    "audit-platform/frontend/src/components/workpaper/composables/useN1FormData.ts#L210",
+    "audit-platform/frontend/src/components/workpaper/composables/useN1FormData.ts#L292",
     "backend/app/routers/checklist_responses.py#L84",
     "backend/app/routers/checklist_responses.py#L132"
    ],
@@ -365,9 +365,9 @@
    "adjudication_reason": "N2 实测**有** HTML 对端（checklist_responses + `N2-{sheet}-{field}` item_id 命名空间 + per-entry 持久化 composable `useN2FormData.ts`，GET/PUT 路由在后端真实存在）⇒ AC 12.8 禁止 single_onlyoffice；OO 侧打开的是真实业务工作簿 `N2 应交税费.xlsx`（18 张 sheet、710 个公式格，非空白模板）⇒ AC 12.9 的 single_html 不适用；宿主经 `audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts` 的模块边可达 ⇒ 非 unreachable；AC 12.1 的六件前置（authority model / per-entry contract / non-null bundle / instrumentation candidate / published representation / 逐 scenario evidence）一件未交付 ⇒ SR-6 禁止 bidirectional。四个终态同时被排除 ⇒ 待裁决态。",
    "html_counterpart_source_refs": [
     "audit-platform/frontend/src/components/workpaper/composables/useN2FormData.ts#L43",
-    "audit-platform/frontend/src/components/workpaper/composables/useN2FormData.ts#L85",
-    "audit-platform/frontend/src/components/workpaper/composables/useN2FormData.ts#L89",
-    "audit-platform/frontend/src/components/workpaper/composables/useN2FormData.ts#L120",
+    "audit-platform/frontend/src/components/workpaper/composables/useN2FormData.ts#L87",
+    "audit-platform/frontend/src/components/workpaper/composables/useN2FormData.ts#L91",
+    "audit-platform/frontend/src/components/workpaper/composables/useN2FormData.ts#L122",
     "backend/app/routers/checklist_responses.py#L84",
     "backend/app/routers/checklist_responses.py#L132"
    ],
@@ -420,9 +420,9 @@
    "adjudication_reason": "N3 实测**有** HTML 对端（checklist_responses + `N3-{sheet}-{field}` item_id 命名空间 + per-entry 持久化 composable `useN3FormData.ts`，GET/PUT 路由在后端真实存在）⇒ AC 12.8 禁止 single_onlyoffice；OO 侧打开的是真实业务工作簿 `N3 递延所得税负债.xlsx`（6 张 sheet、162 个公式格，非空白模板）⇒ AC 12.9 的 single_html 不适用；宿主经 `audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts` 的模块边可达 ⇒ 非 unreachable；AC 12.1 的六件前置（authority model / per-entry contract / non-null bundle / instrumentation candidate / published representation / 逐 scenario evidence）一件未交付 ⇒ SR-6 禁止 bidirectional。四个终态同时被排除 ⇒ 待裁决态。",
    "html_counterpart_source_refs": [
     "audit-platform/frontend/src/components/workpaper/composables/useN3FormData.ts#L43",
-    "audit-platform/frontend/src/components/workpaper/composables/useN3FormData.ts#L100",
-    "audit-platform/frontend/src/components/workpaper/composables/useN3FormData.ts#L104",
-    "audit-platform/frontend/src/components/workpaper/composables/useN3FormData.ts#L135",
+    "audit-platform/frontend/src/components/workpaper/composables/useN3FormData.ts#L102",
+    "audit-platform/frontend/src/components/workpaper/composables/useN3FormData.ts#L106",
+    "audit-platform/frontend/src/components/workpaper/composables/useN3FormData.ts#L137",
     "backend/app/routers/checklist_responses.py#L84",
     "backend/app/routers/checklist_responses.py#L132"
    ],
@@ -477,9 +477,9 @@
    "adjudication_reason": "N4 实测**有** HTML 对端（checklist_responses + `N4-{sheet}-{field}` item_id 命名空间 + per-entry 持久化 composable `useN4FormData.ts`，GET/PUT 路由在后端真实存在）⇒ AC 12.8 禁止 single_onlyoffice；OO 侧打开的是真实业务工作簿 `N4 税金及附加.xlsx`（9 张 sheet、236 个公式格，非空白模板）⇒ AC 12.9 的 single_html 不适用；宿主经 `audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts` 的模块边可达 ⇒ 非 unreachable；AC 12.1 的六件前置（authority model / per-entry contract / non-null bundle / instrumentation candidate / published representation / 逐 scenario evidence）一件未交付 ⇒ SR-6 禁止 bidirectional。四个终态同时被排除 ⇒ 待裁决态。",
    "html_counterpart_source_refs": [
     "audit-platform/frontend/src/components/workpaper/composables/useN4FormData.ts#L63",
-    "audit-platform/frontend/src/components/workpaper/composables/useN4FormData.ts#L260",
-    "audit-platform/frontend/src/components/workpaper/composables/useN4FormData.ts#L263",
-    "audit-platform/frontend/src/components/workpaper/composables/useN4FormData.ts#L125",
+    "audit-platform/frontend/src/components/workpaper/composables/useN4FormData.ts#L262",
+    "audit-platform/frontend/src/components/workpaper/composables/useN4FormData.ts#L265",
+    "audit-platform/frontend/src/components/workpaper/composables/useN4FormData.ts#L127",
     "backend/app/routers/checklist_responses.py#L84",
     "backend/app/routers/checklist_responses.py#L132"
    ],
@@ -534,9 +534,9 @@
    "adjudication_reason": "N5 实测**有** HTML 对端（checklist_responses + `N5-{sheet}-{field}` item_id 命名空间 + per-entry 持久化 composable `useN5FormData.ts`，GET/PUT 路由在后端真实存在）⇒ AC 12.8 禁止 single_onlyoffice；OO 侧打开的是真实业务工作簿 `N5 所得税费用.xlsx`（16 张 sheet、484 个公式格，非空白模板）⇒ AC 12.9 的 single_html 不适用；宿主经 `audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts` 的模块边可达 ⇒ 非 unreachable；AC 12.1 的六件前置（authority model / per-entry contract / non-null bundle / instrumentation candidate / published representation / 逐 scenario evidence）一件未交付 ⇒ SR-6 禁止 bidirectional。四个终态同时被排除 ⇒ 待裁决态。",
    "html_counterpart_source_refs": [
     "audit-platform/frontend/src/components/workpaper/composables/useN5FormData.ts#L60",
-    "audit-platform/frontend/src/components/workpaper/composables/useN5FormData.ts#L105",
-    "audit-platform/frontend/src/components/workpaper/composables/useN5FormData.ts#L109",
-    "audit-platform/frontend/src/components/workpaper/composables/useN5FormData.ts#L180",
+    "audit-platform/frontend/src/components/workpaper/composables/useN5FormData.ts#L107",
+    "audit-platform/frontend/src/components/workpaper/composables/useN5FormData.ts#L111",
+    "audit-platform/frontend/src/components/workpaper/composables/useN5FormData.ts#L182",
     "backend/app/routers/checklist_responses.py#L84",
     "backend/app/routers/checklist_responses.py#L132"
    ],
