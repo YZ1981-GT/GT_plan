@@ -21,7 +21,7 @@
 
 | # | wp_code | 名称 | owner spec | 后端契约 | 前端组件 | 前端接桥? | 综合 |
 |---|---------|------|-----------|---------|---------|----------|------|
-| 1 | D4-1 | 营业收入审定表 | d4-1-adjudication (0/13) | ❌ 无 d41-managed | GtD4OperatingRevenue(专属) | legacy | 🔵 从零 |
+| 1 | D4-1 | 营业收入审定表 | d4-1-adjudication (0/13) | ❌ 无 d41-managed | GtD4OperatingRevenue(专属) | legacy | 🔵 从零(static-cell模式) |
 | 2 | D4-2 | 主营业务收入明细 | d4-revenue-matrix (11/13) | ✅ d42-managed | 宿主走桥 | ✅ | ✅ |
 | 3 | D4-3 | 其他业务收入明细 | d-cycle-expansion (8/8) | ✅ d43-managed | 宿主走桥 | ✅ | ✅ |
 | 4 | D4-4 | 调整分录汇总 | gap-closure (0/5) | ❌ | — | — | ⬜ 已裁 single_html(无行身份列) |
@@ -79,3 +79,29 @@
 - **"契约里有 sheet" ≠ "双向已落地"**：D4-21/22/23/24 后端契约齐全（d4-21-24 spec 标 11/12），但前端在线编辑仍是 legacy `GtOnlyOfficeSheet`，OO→HTML 统一路径未消费。必须三维全绿。
 - **前后端可能反向不一致**：D4-30/31/32 前端已接桥（sheetKey d4-30/31/32-managed），但后端 `_INCLUDE_IPO_INTERVIEW_SHEETS=False` 契约里根本没这些 sheet — 前端调 materialize 会因 sheet 未在契约而失败。
 - **半成品接入会打挂整个 entry**：D4-15/16 曾因契约声明但 representation 未 rematerialize，导致整个 `gt-d4-operating-revenue` entry（连累 D4-2/3/25~28）store-projection 全线 500。改契约后必须跑 provision + rematerialize 发布链。
+
+## D4-1 几何核定（2026-09-19 openpyxl 直读权威模板 `D/D4 收入底稿.xlsx` sheet `营业收入审定表D4-1`）
+
+**结构**（dims A1:I80）：
+- 表头：行 5「项目/本期数/上期数」+ 行 6「未审数/账项调整/重分类调整/审定数」（两级，本期 B-E / 上期 F-I）
+- 主营业务收入段：数据行 **8-11**（4 行预留骨架）+ 行 12 小计
+- 其他业务收入段：数据行 **14-17**（4 行预留骨架）+ 行 18 小计
+- 行 19 合计、行 20 试算平衡表数、行 21 差异数、行 22+ 审计说明/结论
+- 列：A=项目名 · B/C/D=本期未审/账项调整/重分类(输入) · **E=本期审定(公式 `=SUM(B:D)`)** · F/G/H=上期三输入 · **I=上期审定(公式)**
+- 小计/合计/差异行（12/18/19/21）全是 Excel 内部公式（`=SUM`/`=B12+C12+D12`/`=E19-E20`）
+
+**关键裁决：D4-1 走 static-cell 模式，非行 UUID 模式**
+- ❌ **无 UUID/GTROW 行身份列**（`tables:[]`），数据区是**固定位置 4+4 行骨架**（非动态增删行）——与 D4-2 的动态行 UUID 模型根本不同，**不能套用 D4-2/D4-15 的行 UUID provider**。
+- ✅ **可双向**，但受管字段须用**绝对单元格坐标**（static cell），参照 **D4-5 policy check 的 static_row 模式**（契约里 D4-5「经营模式 B11-B16」即固定单元格）。
+- 受管输入格 = 24 个：B/C/D/F/G/H 列 × 8 数据行（8/9/10/11/14/15/16/17）。
+- formula_mask = E/I 列 8 格 + 小计/合计/差异行（12/18/19/21 的 B-I）——Excel 公式保留、普通值投影不覆盖。
+- **不是 D4-4 那种 single_html**：D4-4 是"动态插入带 + hub store 被 A13 占用 + 借贷平衡仅 HTML 强制"四条独立理由裁 single_html；D4-1 是固定骨架 static cell，可双向。
+
+**D4-1 双向落地实现步骤（下一轮开工，照 D4-5 static 模式 + 发布链）**：
+1. 后端 provider：`phase5_d4_adjudication_sheet.py`（或并入 revenue_detail），定义 `d41-managed` sheet：24 受管 static cell 字段 + formula_mask + store 键 `D4-1-rows`/per-field。
+2. 契约：`instrumentation_specs()`/`build_contract_payload()` 加 d41-managed；`generate_phase5_d4_contract.py --apply`。
+3. 发布链：`fix_task76_provision --apply` + `d43_rematerialize --apply`（注入 D4-1 Table/锚点）。
+4. 前端：D4-1 专属组件（D4TabAdjudication / GtD4OperatingRevenue 的 D4-1 分支）接 `useWorkpaperSyncBridge`（sheetKey=d41-managed）；宿主 `isD4DedicatedSyncSheet` 加 'D4-1'。
+5. **TB 发布分离不动**（owner spec Req 2.4 + governance P0-3d 已把发布门接在 useD4Adjudication.publishAdjudicated 走 publish-to-tb；双向切换不得触发 TB 发布）。
+6. e2e：`d4-bidirectional-acceptance.spec.ts` 加 D4-1。
+7. 🔴 风险：D4-1 是审定枢纽（下游 K9/D4-10/D4-21 取审定数 + TB 发布），provider 半成品会打挂整个 gt-d4-operating-revenue entry（如 D4-15/16 曾发生）——必须发布链跑全 + e2e 绿再收。
