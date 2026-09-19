@@ -758,9 +758,9 @@
    "adjudication_reason": "M1 实测**有** HTML 对端（checklist_responses + `M1-{sheet}-{field}` item_id 命名空间 + per-cycle 持久化 composable `useM1FormData.ts`，GET/PUT 路由在后端真实存在）⇒ AC 12.8 禁止 single_onlyoffice；OO 侧打开的是真实业务工作簿 `M1 应付股利（利润）.xlsx`（11 张 sheet、338 个公式格，非空白模板）⇒ AC 12.9 的 single_html 不适用；宿主经 `audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts` 的模块边可达 ⇒ 非 unreachable；AC 12.1 的六件前置（authority model / per-entry contract / non-null bundle / instrumentation candidate / published representation / 逐 scenario evidence）一件未交付 ⇒ SR-6 禁止 bidirectional。四个终态同时被排除 ⇒ 待裁决态。",
    "html_counterpart_source_refs": [
     "audit-platform/frontend/src/components/workpaper/composables/useM1FormData.ts#L42",
-    "audit-platform/frontend/src/components/workpaper/composables/useM1FormData.ts#L88",
-    "audit-platform/frontend/src/components/workpaper/composables/useM1FormData.ts#L84",
-    "audit-platform/frontend/src/components/workpaper/composables/useM1FormData.ts#L119",
+    "audit-platform/frontend/src/components/workpaper/composables/useM1FormData.ts#L90",
+    "audit-platform/frontend/src/components/workpaper/composables/useM1FormData.ts#L86",
+    "audit-platform/frontend/src/components/workpaper/composables/useM1FormData.ts#L121",
     "backend/app/routers/checklist_responses.py#L84",
     "backend/app/routers/checklist_responses.py#L132"
    ],
@@ -820,9 +820,9 @@
    "adjudication_reason": "M2 实测**有** HTML 对端（checklist_responses + `M2-{sheet}-{field}` item_id 命名空间 + per-cycle 持久化 composable `useM2FormData.ts`，GET/PUT 路由在后端真实存在）⇒ AC 12.8 禁止 single_onlyoffice；OO 侧打开的是真实业务工作簿 `M2 实收资本（股本）.xlsx`（11 张 sheet、574 个公式格，非空白模板）⇒ AC 12.9 的 single_html 不适用；宿主经 `audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts` 的模块边可达 ⇒ 非 unreachable；AC 12.1 的六件前置（authority model / per-entry contract / non-null bundle / instrumentation candidate / published representation / 逐 scenario evidence）一件未交付 ⇒ SR-6 禁止 bidirectional。四个终态同时被排除 ⇒ 待裁决态。",
    "html_counterpart_source_refs": [
     "audit-platform/frontend/src/components/workpaper/composables/useM2FormData.ts#L42",
-    "audit-platform/frontend/src/components/workpaper/composables/useM2FormData.ts#L88",
-    "audit-platform/frontend/src/components/workpaper/composables/useM2FormData.ts#L84",
-    "audit-platform/frontend/src/components/workpaper/composables/useM2FormData.ts#L119",
+    "audit-platform/frontend/src/components/workpaper/composables/useM2FormData.ts#L90",
+    "audit-platform/frontend/src/components/workpaper/composables/useM2FormData.ts#L86",
+    "audit-platform/frontend/src/components/workpaper/composables/useM2FormData.ts#L121",
     "backend/app/routers/checklist_responses.py#L84",
     "backend/app/routers/checklist_responses.py#L132"
    ],
@@ -887,9 +887,9 @@
    "adjudication_reason": "M3 实测**有** HTML 对端（checklist_responses + `M3-{sheet}-{field}` item_id 命名空间 + per-cycle 持久化 composable `useM3FormData.ts`，GET/PUT 路由在后端真实存在）⇒ AC 12.8 禁止 single_onlyoffice；OO 侧打开的是真实业务工作簿 `M3 库存股.xlsx`（10 张 sheet、255 个公式格，非空白模板）⇒ AC 12.9 的 single_html 不适用；宿主经 `audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts` 的模块边可达 ⇒ 非 unreachable；AC 12.1 的六件前置（authority model / per-entry contract / non-null bundle / instrumentation candidate / published representation / 逐 scenario evidence）一件未交付 ⇒ SR-6 禁止 bidirectional。四个终态同时被排除 ⇒ 待裁决态。",
    "html_counterpart_source_refs": [
     "audit-platform/frontend/src/components/workpaper/composables/useM3FormData.ts#L42",
-    "audit-platform/frontend/src/components/workpaper/composables/useM3FormData.ts#L88",
-    "audit-platform/frontend/src/components/workpaper/composables/useM3FormData.ts#L84",
-    "audit-platform/frontend/src/components/workpaper/composables/useM3FormData.ts#L119",
+    "audit-platform/frontend/src/components/workpaper/composables/useM3FormData.ts#L90",
+    "audit-platform/frontend/src/components/workpaper/composables/useM3FormData.ts#L86",
+    "audit-platform/frontend/src/components/workpaper/composables/useM3FormData.ts#L121",
     "backend/app/routers/checklist_responses.py#L84",
     "backend/app/routers/checklist_responses.py#L132"
    ],
@@ -950,9 +950,9 @@
    "adjudication_reason": "M4 实测**有** HTML 对端（checklist_responses + `M4-{sheet}-{field}` item_id 命名空间 + per-cycle 持久化 composable `useM4FormData.ts`，GET/PUT 路由在后端真实存在）⇒ AC 12.8 禁止 single_onlyoffice；OO 侧打开的是真实业务工作簿 `M4 资本公积.xlsx`（9 张 sheet、193 个公式格，非空白模板）⇒ AC 12.9 的 single_html 不适用；宿主经 `audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts` 的模块边可达 ⇒ 非 unreachable；AC 12.1 的六件前置（authority model / per-entry contract / non-null bundle / instrumentation candidate / published representation / 逐 scenario evidence）一件未交付 ⇒ SR-6 禁止 bidirectional。四个终态同时被排除 ⇒ 待裁决态。",
    "html_counterpart_source_refs": [
     "audit-platform/frontend/src/components/workpaper/composables/useM4FormData.ts#L43",
-    "audit-platform/frontend/src/components/workpaper/composables/useM4FormData.ts#L89",
-    "audit-platform/frontend/src/components/workpaper/composables/useM4FormData.ts#L85",
-    "audit-platform/frontend/src/components/workpaper/composables/useM4FormData.ts#L120",
+    "audit-platform/frontend/src/components/workpaper/composables/useM4FormData.ts#L91",
+    "audit-platform/frontend/src/components/workpaper/composables/useM4FormData.ts#L87",
+    "audit-platform/frontend/src/components/workpaper/composables/useM4FormData.ts#L122",
     "backend/app/routers/checklist_responses.py#L84",
     "backend/app/routers/checklist_responses.py#L132"
    ],
@@ -1013,9 +1013,9 @@
    "adjudication_reason": "M5 实测**有** HTML 对端（checklist_responses + `M5-{sheet}-{field}` item_id 命名空间 + per-cycle 持久化 composable `useM5FormData.ts`，GET/PUT 路由在后端真实存在）⇒ AC 12.8 禁止 single_onlyoffice；OO 侧打开的是真实业务工作簿 `M5 盈余公积.xlsx`（10 张 sheet、193 个公式格，非空白模板）⇒ AC 12.9 的 single_html 不适用；宿主经 `audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts` 的模块边可达 ⇒ 非 unreachable；AC 12.1 的六件前置（authority model / per-entry contract / non-null bundle / instrumentation candidate / published representation / 逐 scenario evidence）一件未交付 ⇒ SR-6 禁止 bidirectional。四个终态同时被排除 ⇒ 待裁决态。",
    "html_counterpart_source_refs": [
     "audit-platform/frontend/src/components/workpaper/composables/useM5FormData.ts#L42",
-    "audit-platform/frontend/src/components/workpaper/composables/useM5FormData.ts#L88",
-    "audit-platform/frontend/src/components/workpaper/composables/useM5FormData.ts#L84",
-    "audit-platform/frontend/src/components/workpaper/composables/useM5FormData.ts#L119",
+    "audit-platform/frontend/src/components/workpaper/composables/useM5FormData.ts#L90",
+    "audit-platform/frontend/src/components/workpaper/composables/useM5FormData.ts#L86",
+    "audit-platform/frontend/src/components/workpaper/composables/useM5FormData.ts#L121",
     "backend/app/routers/checklist_responses.py#L84",
     "backend/app/routers/checklist_responses.py#L132"
    ],
@@ -1074,9 +1074,9 @@
    "adjudication_reason": "M6 实测**有** HTML 对端（checklist_responses + `M6-{sheet}-{field}` item_id 命名空间 + per-cycle 持久化 composable `useM6FormData.ts`，GET/PUT 路由在后端真实存在）⇒ AC 12.8 禁止 single_onlyoffice；OO 侧打开的是真实业务工作簿 `M6 未分配利润.xlsx`（10 张 sheet、175 个公式格，非空白模板）⇒ AC 12.9 的 single_html 不适用；宿主经 `audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts` 的模块边可达 ⇒ 非 unreachable；AC 12.1 的六件前置（authority model / per-entry contract / non-null bundle / instrumentation candidate / published representation / 逐 scenario evidence）一件未交付 ⇒ SR-6 禁止 bidirectional。四个终态同时被排除 ⇒ 待裁决态。",
    "html_counterpart_source_refs": [
     "audit-platform/frontend/src/components/workpaper/composables/useM6FormData.ts#L47",
-    "audit-platform/frontend/src/components/workpaper/composables/useM6FormData.ts#L93",
-    "audit-platform/frontend/src/components/workpaper/composables/useM6FormData.ts#L89",
-    "audit-platform/frontend/src/components/workpaper/composables/useM6FormData.ts#L124",
+    "audit-platform/frontend/src/components/workpaper/composables/useM6FormData.ts#L95",
+    "audit-platform/frontend/src/components/workpaper/composables/useM6FormData.ts#L91",
+    "audit-platform/frontend/src/components/workpaper/composables/useM6FormData.ts#L126",
     "backend/app/routers/checklist_responses.py#L84",
     "backend/app/routers/checklist_responses.py#L132"
    ],
@@ -1135,9 +1135,9 @@
    "adjudication_reason": "M7 实测**有** HTML 对端（checklist_responses + `M7-{sheet}-{field}` item_id 命名空间 + per-cycle 持久化 composable `useM7FormData.ts`，GET/PUT 路由在后端真实存在）⇒ AC 12.8 禁止 single_onlyoffice；OO 侧打开的是真实业务工作簿 `M7 专项储备.xlsx`（10 张 sheet、233 个公式格，非空白模板）⇒ AC 12.9 的 single_html 不适用；宿主经 `audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts` 的模块边可达 ⇒ 非 unreachable；AC 12.1 的六件前置（authority model / per-entry contract / non-null bundle / instrumentation candidate / published representation / 逐 scenario evidence）一件未交付 ⇒ SR-6 禁止 bidirectional。四个终态同时被排除 ⇒ 待裁决态。",
    "html_counterpart_source_refs": [
     "audit-platform/frontend/src/components/workpaper/composables/useM7FormData.ts#L45",
-    "audit-platform/frontend/src/components/workpaper/composables/useM7FormData.ts#L91",
-    "audit-platform/frontend/src/components/workpaper/composables/useM7FormData.ts#L87",
-    "audit-platform/frontend/src/components/workpaper/composables/useM7FormData.ts#L124",
+    "audit-platform/frontend/src/components/workpaper/composables/useM7FormData.ts#L93",
+    "audit-platform/frontend/src/components/workpaper/composables/useM7FormData.ts#L89",
+    "audit-platform/frontend/src/components/workpaper/composables/useM7FormData.ts#L126",
     "backend/app/routers/checklist_responses.py#L84",
     "backend/app/routers/checklist_responses.py#L132"
    ],
@@ -1197,9 +1197,9 @@
    "adjudication_reason": "M8 实测**有** HTML 对端（checklist_responses + `M8-{sheet}-{field}` item_id 命名空间 + per-cycle 持久化 composable `useM8FormData.ts`，GET/PUT 路由在后端真实存在）⇒ AC 12.8 禁止 single_onlyoffice；OO 侧打开的是真实业务工作簿 `M8 一般风险准备.xlsx`（11 张 sheet、227 个公式格，非空白模板）⇒ AC 12.9 的 single_html 不适用；宿主经 `audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts` 的模块边可达 ⇒ 非 unreachable；AC 12.1 的六件前置（authority model / per-entry contract / non-null bundle / instrumentation candidate / published representation / 逐 scenario evidence）一件未交付 ⇒ SR-6 禁止 bidirectional。四个终态同时被排除 ⇒ 待裁决态。",
    "html_counterpart_source_refs": [
     "audit-platform/frontend/src/components/workpaper/composables/useM8FormData.ts#L48",
-    "audit-platform/frontend/src/components/workpaper/composables/useM8FormData.ts#L94",
-    "audit-platform/frontend/src/components/workpaper/composables/useM8FormData.ts#L90",
-    "audit-platform/frontend/src/components/workpaper/composables/useM8FormData.ts#L127",
+    "audit-platform/frontend/src/components/workpaper/composables/useM8FormData.ts#L96",
+    "audit-platform/frontend/src/components/workpaper/composables/useM8FormData.ts#L92",
+    "audit-platform/frontend/src/components/workpaper/composables/useM8FormData.ts#L129",
     "backend/app/routers/checklist_responses.py#L84",
     "backend/app/routers/checklist_responses.py#L132"
    ],
@@ -1262,9 +1262,9 @@
    "adjudication_reason": "M9 实测**有** HTML 对端（checklist_responses + `M9-{sheet}-{field}` item_id 命名空间 + per-cycle 持久化 composable `useM9FormData.ts`，GET/PUT 路由在后端真实存在）⇒ AC 12.8 禁止 single_onlyoffice；OO 侧打开的是真实业务工作簿 `M9 其他综合收益.xlsx`（9 张 sheet、470 个公式格，非空白模板）⇒ AC 12.9 的 single_html 不适用；宿主经 `audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts` 的模块边可达 ⇒ 非 unreachable；AC 12.1 的六件前置（authority model / per-entry contract / non-null bundle / instrumentation candidate / published representation / 逐 scenario evidence）一件未交付 ⇒ SR-6 禁止 bidirectional。四个终态同时被排除 ⇒ 待裁决态。",
    "html_counterpart_source_refs": [
     "audit-platform/frontend/src/components/workpaper/composables/useM9FormData.ts#L46",
-    "audit-platform/frontend/src/components/workpaper/composables/useM9FormData.ts#L92",
-    "audit-platform/frontend/src/components/workpaper/composables/useM9FormData.ts#L88",
-    "audit-platform/frontend/src/components/workpaper/composables/useM9FormData.ts#L125",
+    "audit-platform/frontend/src/components/workpaper/composables/useM9FormData.ts#L94",
+    "audit-platform/frontend/src/components/workpaper/composables/useM9FormData.ts#L90",
+    "audit-platform/frontend/src/components/workpaper/composables/useM9FormData.ts#L127",
     "backend/app/routers/checklist_responses.py#L84",
     "backend/app/routers/checklist_responses.py#L132"
    ],
@@ -1323,9 +1323,9 @@
    "adjudication_reason": "M10 实测**有** HTML 对端（checklist_responses + `M10-{sheet}-{field}` item_id 命名空间 + per-cycle 持久化 composable `useM10FormData.ts`，GET/PUT 路由在后端真实存在）⇒ AC 12.8 禁止 single_onlyoffice；OO 侧打开的是真实业务工作簿 `M10 其他权益工具.xlsx`（11 张 sheet、279 个公式格，非空白模板）⇒ AC 12.9 的 single_html 不适用；宿主经 `audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts` 的模块边可达 ⇒ 非 unreachable；AC 12.1 的六件前置（authority model / per-entry contract / non-null bundle / instrumentation candidate / published representation / 逐 scenario evidence）一件未交付 ⇒ SR-6 禁止 bidirectional。四个终态同时被排除 ⇒ 待裁决态。",
    "html_counterpart_source_refs": [
     "audit-platform/frontend/src/components/workpaper/composables/useM10FormData.ts#L42",
-    "audit-platform/frontend/src/components/workpaper/composables/useM10FormData.ts#L88",
-    "audit-platform/frontend/src/components/workpaper/composables/useM10FormData.ts#L84",
-    "audit-platform/frontend/src/components/workpaper/composables/useM10FormData.ts#L119",
+    "audit-platform/frontend/src/components/workpaper/composables/useM10FormData.ts#L90",
+    "audit-platform/frontend/src/components/workpaper/composables/useM10FormData.ts#L86",
+    "audit-platform/frontend/src/components/workpaper/composables/useM10FormData.ts#L121",
     "backend/app/routers/checklist_responses.py#L84",
     "backend/app/routers/checklist_responses.py#L132"
    ],
