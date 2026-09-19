@@ -155,3 +155,80 @@ describe('D4 检查表导入导出/回写 连接性（字面量正确）', () =>
     expect(src).toMatch(/useD4InspectionWriteback\([\s\S]*?wpCode:\s*'D4-14'/)
   })
 })
+
+// ─── T4：发现 → 人工认定链守卫（发现≠自动错报，Requirement 3.1/3.2/3.4）────────
+//
+// 锁定：A13 推送只能人工触发（按钮 @click），禁止在 watch/watchEffect/onMounted/
+// setTimeout/setInterval/debounce 回调体内自动发布 —— 否则「数据一变就悄悄推错报」，
+// 绕过人工对方向/金额/证据的认定（对齐 check_tb_publish_confirm_gate 的门控纪律）。
+
+function stripComments(src: string): string {
+  return src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/.*$/gm, '$1')
+}
+
+const T4_COMPONENTS = [
+  { file: 'D4TabErpCheck.vue', sheet: 'D4-13' },
+  { file: 'D4TabOccurrence.vue', sheet: 'D4-14' },
+  { file: 'D4TabCompleteness.vue', sheet: 'D4-15' },
+  { file: 'D4TabExport.vue', sheet: 'D4-16' },
+]
+
+describe('T4 发现→人工认定链：A13 推送必须人工触发（不得自动发布）', () => {
+  for (const c of T4_COMPONENTS) {
+    it(`${c.file}: pushToA13 只在按钮处理函数里调用，模板用 @click 触发`, () => {
+      const raw = readComp(c.file)
+      const src = stripComments(raw)
+
+      // 1) 模板必须有 @click 绑定的推送处理器（人工触发）
+      expect(src).toMatch(/@click="handlePushToA13"/)
+
+      // 2) 推送调用点不得出现在自动回调体内 —— 既禁 composable 直调 pushToA13(，
+      //    也禁按钮 wrapper handlePushToA13( 被塞进自动回调（绕过人工触发的两条路都要堵）。
+      //    做法：扫描所有 watch/watchEffect/onMounted/setTimeout/setInterval/debounce
+      //    的调用起点，取其后一段函数体，断言体内不含任一推送调用。
+      const autoTriggers = /\b(watch|watchEffect|onMounted|setTimeout|setInterval|debounceSave|debounceTimer)\b/g
+      let m: RegExpExecArray | null
+      while ((m = autoTriggers.exec(src)) !== null) {
+        // 取该触发点后 600 字符窗口（覆盖典型回调体），断言不含任一推送调用
+        const window = src.slice(m.index, m.index + 600)
+        expect(
+          /\bpushToA13\s*\(/.test(window),
+          `${c.file}: pushToA13 疑似出现在 ${m[1]} 自动回调体内（应仅人工触发）`,
+        ).toBe(false)
+        expect(
+          /\bhandlePushToA13\s*\(/.test(window),
+          `${c.file}: handlePushToA13 疑似出现在 ${m[1]} 自动回调体内（应仅 @click 人工触发）`,
+        ).toBe(false)
+      }
+    })
+  }
+})
+
+describe('T4 发现→人工认定链：金额/方向由人工认定，reason/否 非空不构成错报', () => {
+  it('D4-13: 差异金额人工输入（ElMessageBox.prompt），金额 0 不推送', () => {
+    const src = stripComments(readComp('D4TabErpCheck.vue'))
+    // 人工输入金额（prompt），不自动等同任何账面值
+    expect(src).toMatch(/ElMessageBox\.prompt/)
+    // 金额 0 短路（宁缺勿造）
+    expect(src).toMatch(/if\s*\(\s*!amount\s*\)/)
+  })
+
+  it('D4-16: 只按 portsDiff/taxDiff !== 0 过滤，portsReason/taxReason 只作描述不构成异常', () => {
+    const src = stripComments(readComp('D4TabExport.vue'))
+    // 过滤条件是差异非零（不是 reason 非空）
+    expect(src).toMatch(/\.filter\(\s*r\s*=>\s*r\.portsDiff\s*!==\s*0\s*\|\|\s*r\.taxDiff\s*!==\s*0\s*\)/)
+    // reason 只被拼进 description（作证据描述），不作为推送触发条件
+    expect(src).not.toMatch(/\.filter\([^)]*portsReason[^)]*\)/)
+    expect(src).not.toMatch(/\.filter\([^)]*taxReason[^)]*\)/)
+  })
+
+  it('D4-15: 只推 isConsistent === false（判定不一致），不把凭证全额自动当错报', () => {
+    const src = stripComments(readComp('D4TabCompleteness.vue'))
+    expect(src).toMatch(/\.filter\(\s*i\s*=>\s*i\.isConsistent\s*===\s*false\s*\)/)
+  })
+
+  it('D4-14: 只推 conclusion==="存在重大异常" 或 isAnomalous（人工结论/标记）', () => {
+    const src = stripComments(readComp('D4TabOccurrence.vue'))
+    expect(src).toMatch(/conclusion\s*===\s*'存在重大异常'\s*\|\|\s*t\.isAnomalous/)
+  })
+})

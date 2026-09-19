@@ -552,7 +552,11 @@ backend/scripts/diagnose/diagnose_guidance_source_ref_localization.py  860
 #   parser/exporter 集中模块（历史大文件，本就远超上限）。spec d4-ipo-fraud-writeback-formula-io
 #   为 D4-29/30/31/32 补齐专用 parser/exporter/item_id 映射/reshape（+~1000 行，与既有
 #   _parse_d4_XX 同构、内聚在同一 IO 模块）。拆分需与并发 D4 会话协调，属独立瘦身 spec。
-backend/app/routers/wp_render_strategies/_d4_import_export.py  3399
+#   2026-09-19 基线 3399→3655（+256）：spec d4-cutoff-return-writeback-formula-io 为 D4-17/18/19/20
+#   补齐专用 parser（_parse_d4_17/18/19_row + _parse_d4_20_return_row/_20_provision_row）+ import
+#   分发分支 + export 行构造分支 + D4-20 子表键错位修复（item_id 映射，DEC-2）；同批删裸 D4-20
+#   死配置 header（DEC-1）。与既有 _parse_d4_XX 同构、内聚同一 IO 模块，拆分方向不变（独立瘦身 spec）。
+backend/app/routers/wp_render_strategies/_d4_import_export.py  3655
 
 # spec: d4-dual-mode-formula-governance（P0 阻塞修复，2026-09-14 入库）
 #   三个文件均为**改动前即大文件**，本次为 P0 必要修改净增，非从零造超限：

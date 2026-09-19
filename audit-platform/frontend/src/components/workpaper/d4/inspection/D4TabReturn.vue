@@ -15,9 +15,10 @@ import WpAmountInput from '../../shared/WpAmountInput.vue'
  * 双模式：表格视图 / 在线编辑
  * OCR识别、AI辅助审计意见、统计仪表板
  */
-import { ref, computed, inject, watch, onBeforeUnmount } from 'vue'
+import { ref, computed, inject, watch, onBeforeUnmount, toRef } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useD4ImportExport } from '../../composables/useD4ImportExport'
+import { useD4InspectionWriteback } from '../../composables/useD4InspectionWriteback'
 import GtOnlyOfficeSheet from '../../GtOnlyOfficeSheet.vue'
 import GtIndexChip from '../../GtIndexChip.vue'
 import http from '@/utils/http'
@@ -219,6 +220,26 @@ const returnRateDisplay = computed(() => {
   return total.currentRate > 0 ? (total.currentRate * 100).toFixed(2) + '%' : '—'
 })
 
+// ─── 双向回写：异常退货 → A13 错报 + D4-1 审计说明（只推人工标记「是否异常=是」的行）──
+const { pushToA13 } = useD4InspectionWriteback({
+  wpCode: 'D4-20',
+  allResponses: toRef(props, 'allResponses'),
+  isReadonly: toRef(props, 'isReadonly'),
+})
+const abnormalReturns = computed(() =>
+  [...currentReturnRows.value, ...postReturnRows.value].filter(r => r.isAbnormal === '是'),
+)
+function handlePushToA13() {
+  if (props.isReadonly) return
+  const items = abnormalReturns.value.map(r => ({
+    voucherNo: r.voucherNo || '',
+    amount: r.returnAmount || 0,
+    description: `销售退货异常：${r.customerName || ''} ${r.productName || ''}${r.returnReason ? `（${r.returnReason}）` : ''}`,
+    indexRef: r.indexRef || 'D4-20',
+  }))
+  pushToA13(items, '6001', '营业收入')
+}
+
 // ─── Persistence ─────────────────────────────────────────────────────
 function persistAll() {
   props.allResponses.set('D4-20-policy', { item_id: 'D4-20-policy', conclusion: null, remark: policy.value })
@@ -338,6 +359,9 @@ function fmtRate(v: number): string { if (!v) return '—'; return (v * 100).toF
         </el-dropdown>
         <GtIndexChip value="wp:D4-1" :context-project-id="projectId" />
         <GtIndexChip value="wp:D4-12" :context-project-id="projectId" />
+        <el-tooltip content="将标记「是否异常=是」的退货推送至 A13 未更正错报汇总（金额与方向由人工认定），并同步至 D4-1 审计说明" placement="top">
+          <el-button size="small" type="warning" plain :disabled="isReadonly || abnormalReturns.length === 0" @click="handlePushToA13">推送异常至 A13{{ abnormalReturns.length ? `（${abnormalReturns.length}）` : '' }}</el-button>
+        </el-tooltip>
         <el-button v-if="openReviewDialog" size="small" @click="openReviewDialog('D4-20-return')">💬 复核</el-button>
       </div>
     </div>

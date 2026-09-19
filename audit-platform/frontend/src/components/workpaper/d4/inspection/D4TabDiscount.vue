@@ -7,9 +7,10 @@ import WpAmountInput from '../../shared/WpAmountInput.vue'
  * 双模式：表格视图 / 在线编辑
  * 自动计算折扣比例、OCR识别、AI辅助审计意见
  */
-import { ref, computed, inject, watch, onBeforeUnmount } from 'vue'
+import { ref, computed, inject, watch, onBeforeUnmount, toRef } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useD4ImportExport } from '../../composables/useD4ImportExport'
+import { useD4InspectionWriteback } from '../../composables/useD4InspectionWriteback'
 import GtOnlyOfficeSheet from '../../GtOnlyOfficeSheet.vue'
 import GtIndexChip from '../../GtIndexChip.vue'
 import http from '@/utils/http'
@@ -134,6 +135,28 @@ const totalCount = computed(() => rows.value.length)
 const totalDiscount = computed(() => rows.value.reduce((s, r) => s + (r.discountAmount || 0), 0))
 const avgRate = computed(() => { const valid = rows.value.filter(r => r.discountRate > 0); return valid.length ? valid.reduce((s, r) => s + r.discountRate, 0) / valid.length : 0 })
 
+// ─── 双向回写：折扣/折让异常 → A13 错报 + D4-1 审计说明 ──────────────────────
+// 折扣本身是正常业务，是否构成错报由审计师判断：人工输入错报金额+描述（不把折扣额自动等同错报）。
+const { pushToA13 } = useD4InspectionWriteback({
+  wpCode: 'D4-19',
+  allResponses: toRef(props, 'allResponses'),
+  isReadonly: toRef(props, 'isReadonly'),
+})
+async function handlePushToA13() {
+  if (props.isReadonly) return
+  let amountStr: string
+  try {
+    const r = await ElMessageBox.prompt('请输入经审计认定的折扣/折让错报金额（元），方向与金额由人工判断：', '推送折扣错报至 A13', {
+      confirmButtonText: '推送', cancelButtonText: '取消', inputPattern: /^-?\d+(\.\d+)?$/, inputErrorMessage: '请输入数字金额',
+    })
+    amountStr = r.value
+  } catch { return }
+  const amount = parseFloat(amountStr)
+  if (!amount) { ElMessage.info('金额为 0，无需推送'); return }
+  const desc = (auditConclusion.value || auditNote.value || '').trim() || '销售折扣与折让记录存在错报'
+  pushToA13([{ amount, description: `销售折扣与折让：${desc}`, indexRef: 'D4-19' }], '6001', '营业收入')
+}
+
 // ─── Persistence ─────────────────────────────────────────────────────
 function persistAll() {
   props.allResponses.set('D4-19-rows', { item_id: 'D4-19-rows', conclusion: null, remark: JSON.stringify(rows.value) })
@@ -212,6 +235,9 @@ function fmtRate(v: number): string { return (v * 100).toFixed(2) + '%' }
         </el-dropdown>
         <GtIndexChip value="wp:D4-1" :context-project-id="projectId" />
         <GtIndexChip value="wp:D4-12" :context-project-id="projectId" />
+        <el-tooltip content="填写经认定的错报金额后推送至 A13 未更正错报汇总，并同步至 D4-1 审计说明" placement="top">
+          <el-button size="small" type="warning" plain :disabled="isReadonly" @click="handlePushToA13">推送错报至 A13</el-button>
+        </el-tooltip>
         <el-button v-if="openReviewDialog" size="small" @click="openReviewDialog('D4-19-discount')">💬 复核</el-button>
       </div>
     </div>

@@ -7,9 +7,11 @@ import WpAmountInput from '../../shared/WpAmountInput.vue'
  * 双模式：表格视图 / 在线编辑
  * 自动跨期判断、统计仪表板、AI辅助审计意见
  */
-import { ref, computed, inject, watch, onBeforeUnmount, defineAsyncComponent, type Ref } from 'vue'
+import { ref, computed, inject, watch, onBeforeUnmount, defineAsyncComponent, toRef, type Ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useD4ImportExport } from '../../composables/useD4ImportExport'
+import { isCrossPeriodBackward } from '../../composables/useD4FormulaEngine'
+import { useD4InspectionWriteback } from '../../composables/useD4InspectionWriteback'
 import GtOnlyOfficeSheet from '../../GtOnlyOfficeSheet.vue'
 import GtIndexChip from '../../GtIndexChip.vue'
 import http from '@/utils/http'
@@ -66,8 +68,9 @@ const ocrResult = ref<Record<string, any>>({})
 // ─── Auto cutoff check ───────────────────────────────────────────────
 function checkCutoff(row: CutoffBackwardRow): boolean | null {
   if (!row.deliveryDate || !row.voucherDate) return null
-  // D4-18: delivery in period, voucher after period → cutoff issue (×)
-  return !(row.deliveryDate <= cutoffDate.value && row.voucherDate > cutoffDate.value)
+  // D4-18 单据到账方向：单据在期内、凭证在期后 → 跨期问题(×)。走公式引擎单一真源。
+  // isCutoff=true 表示「无跨期问题(√)」= NOT isCrossPeriodBackward(单据, 凭证, 截止日)。
+  return !isCrossPeriodBackward(row.deliveryDate, row.voucherDate, cutoffDate.value)
 }
 
 function recalcAll() {
@@ -187,6 +190,25 @@ const totalRows = computed(() => rows.value.length)
 const cutoffIssues = computed(() => rows.value.filter(r => r.isCutoff === false).length)
 const totalAmount = computed(() => rows.value.reduce((s, r) => s + (r.deliveryAmount || 0), 0))
 
+// ─── 双向回写：跨期问题 → A13 错报 + D4-1 审计说明（人工触发，金额由审计师认定）──
+const { pushToA13 } = useD4InspectionWriteback({
+  wpCode: 'D4-18',
+  allResponses: toRef(props, 'allResponses'),
+  isReadonly: toRef(props, 'isReadonly'),
+})
+function handlePushToA13() {
+  if (props.isReadonly) return
+  const items = rows.value
+    .filter(r => r.isCutoff === false)
+    .map(r => ({
+      voucherNo: r.voucherNo || r.deliveryNo || '',
+      amount: r.deliveryAmount || 0,
+      description: `单据到账截止跨期：发货单${r.deliveryDate || ''}／凭证${r.voucherDate || ''}${r.remark ? `（${r.remark}）` : ''}`,
+      indexRef: 'D4-18',
+    }))
+  pushToA13(items, '6001', '营业收入')
+}
+
 // ─── Persistence ─────────────────────────────────────────────────────
 function persistAll() {
   props.allResponses.set('D4-18-rows', { item_id: 'D4-18-rows', conclusion: null, remark: JSON.stringify(rows.value) })
@@ -264,6 +286,9 @@ function rowClassName({ row }: { row: any }) { return row.isCutoff === false ? '
         </el-dropdown>
         <GtIndexChip value="wp:D4-1" :context-project-id="projectId" />
         <GtIndexChip value="wp:D4-14" :context-project-id="projectId" />
+        <el-tooltip content="将跨期问题推送至 A13 未更正错报汇总（金额与方向由人工认定），并同步至 D4-1 审计说明" placement="top">
+          <el-button size="small" type="warning" plain :disabled="isReadonly || cutoffIssues === 0" @click="handlePushToA13">推送跨期至 A13{{ cutoffIssues ? `（${cutoffIssues}）` : '' }}</el-button>
+        </el-tooltip>
         <el-button v-if="openReviewDialog" size="small" @click="openReviewDialog('D4-18-cutoff')">💬 复核</el-button>
       </div>
     </div>

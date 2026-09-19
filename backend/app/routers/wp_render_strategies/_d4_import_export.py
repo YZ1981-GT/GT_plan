@@ -54,7 +54,8 @@ _ROW_LIMIT = 500
 
 _SUPPORTED_SHEETS: set[str] = {
     "D4-1", "D4-2", "D4-3", "D4-4", "D4-6", "D4-7", "D4-8", "D4-9", "D4-10", "D4-11", "D4-12",
-    "D4-13", "D4-14", "D4-15", "D4-16", "D4-17", "D4-18", "D4-19", "D4-20",
+    "D4-13", "D4-14", "D4-15", "D4-16", "D4-17", "D4-18", "D4-19",
+    # D4-20 主 sheet 是死配置（前端只用 provision/current/post 三子表，从不导入导出裸 D4-20）→ 删（DEC-1）
     "D4-20-provision", "D4-20-current", "D4-20-post",
     "D4-21", "D4-22", "D4-23", "D4-24", "D4-25", "D4-26", "D4-27",
     "D4-28", "D4-29", "D4-30", "D4-31", "D4-32",
@@ -153,11 +154,7 @@ _SHEET_HEADERS: dict[str, list[str]] = {
         "凭证日期", "凭证编号", "会计科目", "明细科目", "借方金额", "贷方金额",
         "审批日期", "审批人", "备注",
     ],
-    "D4-20": [
-        "序号", "客户名称", "产品名称", "退货日期", "退货数量", "退货金额", "退货原因",
-        "凭证日期", "凭证编号", "业务内容", "科目名称", "二级明细", "借方金额", "贷方金额",
-        "是否涉及诉讼", "是否异常", "索引号",
-    ],
+    # D4-20 主 sheet header 删除（死配置，DEC-1）：前端只用 provision/current/post 三子表
     "D4-20-provision": [
         "序号", "产品名称", "计提基数", "计提比例", "应计提金额", "账面已计提金额", "差异金额", "差异原因",
     ],
@@ -600,6 +597,13 @@ async def d4_export_data(
         item_id = "D4-31-interview"
     elif sheet == "D4-32":
         item_id = "D4-32-groups"
+    # D4-20 子表键错位修复（DEC-2，导出侧与导入侧对称）
+    elif sheet == "D4-20-current":
+        item_id = "D4-20-current-returns"
+    elif sheet == "D4-20-post":
+        item_id = "D4-20-post-returns"
+    elif sheet == "D4-20-provision":
+        item_id = "D4-20-provision"
     result = await db.execute(
         sa.text(
             "SELECT remark FROM checklist_responses "
@@ -881,6 +885,73 @@ async def d4_export_data(
                 data_row.get("consistencyScore", 0),
                 data_row.get("conclusion", ""),
                 "",  # 备注
+            ]
+        elif sheet == "D4-17":
+            # D4-17 截止（账到单据）：凭证→发货单；是否跨期派生列导出留空（前端 checkCutoff 重算）
+            row_values = [
+                "",  # 序号
+                data_row.get("voucherDate", ""), data_row.get("voucherNo", ""), data_row.get("voucherProduct", ""),
+                data_row.get("voucherQty", ""), _safe_float(data_row.get("voucherAmount")),
+                data_row.get("deliveryDate", ""), data_row.get("deliveryNo", ""), data_row.get("deliveryProduct", ""),
+                data_row.get("deliveryQty", ""), _safe_float(data_row.get("deliveryAmount")),
+                "",  # 是否跨期（派生，前端 checkCutoff 重算，导出留空）
+                data_row.get("remark", ""),
+            ]
+        elif sheet == "D4-18":
+            # D4-18 截止（单据到账）：发货单→凭证
+            row_values = [
+                "",
+                data_row.get("deliveryDate", ""), data_row.get("deliveryNo", ""), data_row.get("deliveryProduct", ""),
+                data_row.get("deliveryQty", ""), _safe_float(data_row.get("deliveryAmount")),
+                data_row.get("voucherDate", ""), data_row.get("voucherNo", ""), data_row.get("voucherProduct", ""),
+                data_row.get("voucherQty", ""), _safe_float(data_row.get("voucherAmount")),
+                "",  # 是否跨期（派生）
+                data_row.get("remark", ""),
+            ]
+        elif sheet == "D4-19":
+            # D4-19 销售折扣与折让：折扣比例派生列导出留空（前端重算）
+            row_values = [
+                "",  # 序号
+                data_row.get("customerName", ""),
+                data_row.get("discountType", ""),
+                _safe_float(data_row.get("revenueAmount")),
+                _safe_float(data_row.get("discountAmount")),
+                "",  # 折扣比例（派生，前端 calcRate 重算）
+                data_row.get("reason", ""),
+                data_row.get("voucherDate", ""),
+                data_row.get("voucherNo", ""),
+                data_row.get("accountSubject", ""),
+                data_row.get("detailSubject", ""),
+                _safe_float(data_row.get("debitAmount")),
+                _safe_float(data_row.get("creditAmount")),
+                data_row.get("approvalDate", ""),
+                data_row.get("approver", ""),
+                data_row.get("remark", ""),
+            ]
+        elif sheet in ("D4-20-current", "D4-20-post"):
+            # D4-20 退货明细（current/post 同构 ReturnCheckRow）
+            row_values = [
+                "",  # 序号
+                data_row.get("voucherDate", ""), data_row.get("voucherNo", ""),
+                data_row.get("bizContent", ""), data_row.get("subjectName", ""), data_row.get("detailSubject", ""),
+                _safe_float(data_row.get("debitAmount")), _safe_float(data_row.get("creditAmount")),
+                data_row.get("customerName", ""), data_row.get("productName", ""),
+                data_row.get("returnQty", ""), _safe_float(data_row.get("returnAmount")),
+                data_row.get("returnReason", ""),
+                data_row.get("hasLitigation", ""), data_row.get("isAbnormal", ""),
+                data_row.get("indexRef", ""),
+            ]
+        elif sheet == "D4-20-provision":
+            # D4-20 退货计提：应计提/差异派生列导出留空（前端 calcProvision 重算）
+            row_values = [
+                "",  # 序号
+                data_row.get("productName", ""),
+                _safe_float(data_row.get("base")),
+                _safe_float(data_row.get("rate")),
+                "",  # 应计提金额（派生）
+                _safe_float(data_row.get("alreadyProvided")),
+                "",  # 差异金额（派生）
+                data_row.get("diffReason", ""),
             ]
         elif sheet == "D4-21":
             # D4-21 关联方销售/价格：camelCase store 键 → 中文列头顺序。
@@ -1205,6 +1276,16 @@ async def d4_import_data(
             row_dict = _parse_d4_15_row(row, actual_headers)
         elif sheet == "D4-16":
             row_dict = _parse_d4_16_row(row, actual_headers)
+        elif sheet == "D4-17":
+            row_dict = _parse_d4_17_row(row, actual_headers)
+        elif sheet == "D4-18":
+            row_dict = _parse_d4_18_row(row, actual_headers)
+        elif sheet == "D4-19":
+            row_dict = _parse_d4_19_row(row, actual_headers)
+        elif sheet in ("D4-20-current", "D4-20-post"):
+            row_dict = _parse_d4_20_return_row(row, actual_headers)
+        elif sheet == "D4-20-provision":
+            row_dict = _parse_d4_20_provision_row(row, actual_headers)
         elif sheet == "D4-21":
             row_dict = _parse_d4_21_row(row, actual_headers)
         elif sheet == "D4-24":
@@ -1323,6 +1404,15 @@ async def d4_import_data(
         item_id = "D4-30-customers"
     elif sheet == "D4-32":
         item_id = "D4-32-groups"
+    # 🔴 D4-20 子表键错位修复（DEC-2：改后端映射对齐前端键，不改前端键）：
+    #   前端 store 用 D4-20-current-returns / D4-20-post-returns（6 处引用），
+    #   sheet 码 D4-20-current / D4-20-post 默认会落 {sheet}-rows 前端读不到。
+    elif sheet == "D4-20-current":
+        item_id = "D4-20-current-returns"
+    elif sheet == "D4-20-post":
+        item_id = "D4-20-post-returns"
+    elif sheet == "D4-20-provision":
+        item_id = "D4-20-provision"  # 前端键即 D4-20-provision（非 {sheet}-rows）
 
     async def _load_existing(iid: str) -> dict:
         """读取既有 item_id 的 remark（dict），用于多子区合并写回；损坏/缺失返回空 dict。"""
@@ -1933,6 +2023,172 @@ def _parse_d4_16_row(row: tuple, actual_headers: list[str]) -> dict:
         "taxDiff": book - tax,              # 重算
         "taxReason": _safe_str(_col_val("申报差异原因")),
         "taxIndex": _safe_str(_col_val("索引")),
+    }
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# D4-17/18/19/20 截止/折扣/退货专用 parser（spec d4-cutoff-return-writeback-formula-io）
+#
+# 派生列单源：D4-17/18 `isCutoff`、D4-19 `discountRate`、D4-20 provision `shouldProvide/diff`
+# 均由前端公式重算（导入不采信文件派生值，parser 留 None / 重算 / 0），对齐 D4-15/16 口径。
+# ═══════════════════════════════════════════════════════════════════════════════
+
+def _parse_d4_17_row(row: tuple, actual_headers: list[str]) -> dict:
+    """D4-17 截止（账到单据）：凭证 → 发货单方向。isCutoff 留 None 由前端 checkCutoff 重算。"""
+    from uuid import uuid4
+
+    values = list(row) + [None] * (len(actual_headers) - len(row))
+
+    def _col_val(col_name: str) -> Any:
+        try:
+            idx = actual_headers.index(col_name)
+            return values[idx] if idx < len(values) else None
+        except ValueError:
+            return None
+
+    return {
+        "id": f"r-{uuid4().hex[:10]}",
+        "voucherDate": _safe_str(_col_val("凭证日期")),
+        "voucherNo": _safe_str(_col_val("凭证编号")),
+        "voucherProduct": _safe_str(_col_val("凭证品名")),
+        "voucherQty": _safe_str(_col_val("凭证数量")),
+        "voucherAmount": _safe_float(_col_val("凭证金额")),
+        "deliveryDate": _safe_str(_col_val("发货单日期")),
+        "deliveryNo": _safe_str(_col_val("发货单编号")),
+        "deliveryProduct": _safe_str(_col_val("发货单品名")),
+        "deliveryQty": _safe_str(_col_val("发货单数量")),
+        "deliveryAmount": _safe_float(_col_val("发货单金额")),
+        "isCutoff": None,  # 前端 checkCutoff 重算（不双写派生跨期判定）
+        "remark": _safe_str(_col_val("备注")),
+    }
+
+
+def _parse_d4_18_row(row: tuple, actual_headers: list[str]) -> dict:
+    """D4-18 截止（单据到账）：发货单 → 凭证方向。isCutoff 留 None 由前端 checkCutoff 重算。"""
+    from uuid import uuid4
+
+    values = list(row) + [None] * (len(actual_headers) - len(row))
+
+    def _col_val(col_name: str) -> Any:
+        try:
+            idx = actual_headers.index(col_name)
+            return values[idx] if idx < len(values) else None
+        except ValueError:
+            return None
+
+    return {
+        "id": f"r-{uuid4().hex[:10]}",
+        "deliveryDate": _safe_str(_col_val("发货单日期")),
+        "deliveryNo": _safe_str(_col_val("发货单编号")),
+        "deliveryProduct": _safe_str(_col_val("发货单品名")),
+        "deliveryQty": _safe_str(_col_val("发货单数量")),
+        "deliveryAmount": _safe_float(_col_val("发货单金额")),
+        "voucherDate": _safe_str(_col_val("凭证日期")),
+        "voucherNo": _safe_str(_col_val("凭证编号")),
+        "voucherProduct": _safe_str(_col_val("凭证品名")),
+        "voucherQty": _safe_str(_col_val("凭证数量")),
+        "voucherAmount": _safe_float(_col_val("凭证金额")),
+        "isCutoff": None,
+        "remark": _safe_str(_col_val("备注")),
+    }
+
+
+def _parse_d4_19_row(row: tuple, actual_headers: list[str]) -> dict:
+    """D4-19 销售折扣与折让：discountRate 由前端重算（折扣额/收入额，防手改文件造假）。"""
+    from uuid import uuid4
+
+    values = list(row) + [None] * (len(actual_headers) - len(row))
+
+    def _col_val(col_name: str) -> Any:
+        try:
+            idx = actual_headers.index(col_name)
+            return values[idx] if idx < len(values) else None
+        except ValueError:
+            return None
+
+    revenue = _safe_float(_col_val("收入金额"))
+    discount = _safe_float(_col_val("折扣金额"))
+    return {
+        "id": f"r-{uuid4().hex[:10]}",
+        "customerName": _safe_str(_col_val("客户名称")),
+        "discountType": _safe_str(_col_val("折扣类型")),
+        "revenueAmount": revenue,
+        "discountAmount": discount,
+        # 派生列单源：折扣比例后端重算，不读文件「折扣比例」列
+        "discountRate": (discount / revenue) if revenue > 0 and discount > 0 else 0,
+        "reason": _safe_str(_col_val("原因")),
+        "voucherDate": _safe_str(_col_val("凭证日期")),
+        "voucherNo": _safe_str(_col_val("凭证编号")),
+        "accountSubject": _safe_str(_col_val("会计科目")),
+        "detailSubject": _safe_str(_col_val("明细科目")),
+        "debitAmount": _safe_float(_col_val("借方金额")),
+        "creditAmount": _safe_float(_col_val("贷方金额")),
+        "approvalDate": _safe_str(_col_val("审批日期")),
+        "approver": _safe_str(_col_val("审批人")),
+        "remark": _safe_str(_col_val("备注")),
+    }
+
+
+def _parse_d4_20_return_row(row: tuple, actual_headers: list[str]) -> dict:
+    """D4-20 退货明细（current/post 共用）：ReturnCheckRow 结构。无派生列。"""
+    from uuid import uuid4
+
+    values = list(row) + [None] * (len(actual_headers) - len(row))
+
+    def _col_val(col_name: str) -> Any:
+        try:
+            idx = actual_headers.index(col_name)
+            return values[idx] if idx < len(values) else None
+        except ValueError:
+            return None
+
+    return {
+        "id": f"r-{uuid4().hex[:10]}",
+        "voucherDate": _safe_str(_col_val("凭证日期")),
+        "voucherNo": _safe_str(_col_val("凭证编号")),
+        "bizContent": _safe_str(_col_val("业务内容")),
+        "subjectName": _safe_str(_col_val("科目名称")),
+        "detailSubject": _safe_str(_col_val("二级明细")),
+        "debitAmount": _safe_float(_col_val("借方金额")),
+        "creditAmount": _safe_float(_col_val("贷方金额")),
+        "customerName": _safe_str(_col_val("客户名称")),
+        "productName": _safe_str(_col_val("产品名称")),
+        "returnQty": _safe_str(_col_val("退货数量")),
+        "returnAmount": _safe_float(_col_val("退货金额")),
+        "returnReason": _safe_str(_col_val("退货原因")),
+        "hasLitigation": _safe_str(_col_val("是否涉及诉讼")),
+        "isAbnormal": _safe_str(_col_val("是否异常")),
+        "indexRef": _safe_str(_col_val("索引号")),
+    }
+
+
+def _parse_d4_20_provision_row(row: tuple, actual_headers: list[str]) -> dict:
+    """D4-20 退货计提：shouldProvide/diff 后端重算（计提基数×比例；应计提−已计提）。"""
+    from uuid import uuid4
+
+    values = list(row) + [None] * (len(actual_headers) - len(row))
+
+    def _col_val(col_name: str) -> Any:
+        try:
+            idx = actual_headers.index(col_name)
+            return values[idx] if idx < len(values) else None
+        except ValueError:
+            return None
+
+    base = _safe_float(_col_val("计提基数"))
+    rate = _safe_float(_col_val("计提比例"))
+    already = _safe_float(_col_val("账面已计提金额"))
+    should = base * rate
+    return {
+        "id": f"r-{uuid4().hex[:10]}",
+        "productName": _safe_str(_col_val("产品名称")),
+        "base": base,
+        "rate": rate,
+        # 派生列单源：应计提=基数×比例、差异=应计提−已计提，不读文件派生列
+        "shouldProvide": should,
+        "alreadyProvided": already,
+        "diff": should - already,
+        "diffReason": _safe_str(_col_val("差异原因")),
     }
 
 

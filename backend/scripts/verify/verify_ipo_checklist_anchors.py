@@ -25,6 +25,13 @@ import sys
 from dataclasses import dataclass
 from pathlib import Path
 
+# Windows 控制台默认 GBK，脚本输出含中文/记号 → 强制 stdout/stderr 走 UTF-8（防打印崩溃）。
+try:  # pragma: no cover - 仅运行时保护
+    sys.stdout.reconfigure(encoding="utf-8")  # type: ignore[attr-defined]
+    sys.stderr.reconfigure(encoding="utf-8")  # type: ignore[attr-defined]
+except Exception:
+    pass
+
 _REPO = Path(__file__).resolve().parents[3]
 _BACKEND = _REPO / "backend"
 _FRONTEND = _REPO / "audit-platform" / "frontend"
@@ -164,7 +171,7 @@ def run_all() -> int:
     print(f"\n{'='*60}\n变异检验结果（{len(ANCHORS)} 锚点）：")
     red = 0
     for aid, v in results.items():
-        mark = "✓" if v == "RED" else "✗"
+        mark = "[OK]" if v == "RED" else "[X]"
         if v == "RED":
             red += 1
         print(f"  {mark} {aid}: {v}")
