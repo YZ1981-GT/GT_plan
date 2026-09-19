@@ -134,6 +134,18 @@ export function useWpDetailGuard(
       state.value = 'error'
       errorMessage.value = `加载底稿失败（HTTP ${res.status}）`
     } catch (e: any) {
+      // 🔴 请求去重层（utils/http.ts）在同 URL 在飞时用 AbortController.abort() 取消旧请求，
+      // 产生 axios CanceledError（code=ERR_CANCELED / name=CanceledError / message='canceled'）。
+      // 快速切底稿/重进编辑器时，本 guard 的详情请求会被下一次 refresh 的同 URL 请求 abort。
+      // 这不是加载失败——有新请求在路上，误置 error 会弹出「加载底稿失败/canceled」假失败全页屏。
+      // 与全仓十余处保存路径同款短路：canceled 保持当前 loading 态，交由后续请求收敛。
+      if (
+        e?.code === 'ERR_CANCELED' ||
+        e?.name === 'CanceledError' ||
+        e?.message === 'canceled'
+      ) {
+        return
+      }
       state.value = 'error'
       errorMessage.value = e?.message || '加载底稿时发生网络错误'
     }
