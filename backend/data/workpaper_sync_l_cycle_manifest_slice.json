@@ -80,8 +80,8 @@
    ],
    "html_counterpart_verdict": "exists",
    "html_counterpart_source_refs": [
-    "audit-platform/frontend/src/composables/useL1FormData.ts#L179",
-    "audit-platform/frontend/src/composables/useL1FormData.ts#L337",
+    "audit-platform/frontend/src/composables/useL1FormData.ts#L184",
+    "audit-platform/frontend/src/composables/useL1FormData.ts#L342",
     "backend/app/routers/checklist_responses.py#L84",
     "backend/app/routers/checklist_responses.py#L132"
    ],
@@ -91,7 +91,7 @@
      "L1-{sheet}-{field}"
     ],
     "row_identity_key": "item_id",
-    "how_resolved": "L1 的业务内容由 per-cycle 持久化 composable `useL1FormData.ts` 承载：它用 `api.get('/api/workpapers/${wpId}/checklist-responses')` 读（audit-platform/frontend/src/composables/useL1FormData.ts#L179）、`api.put(...)` 写（audit-platform/frontend/src/composables/useL1FormData.ts#L337），item_id 命名空间是 `L1-{sheet}-{field}`；后端 `checklist_responses.py` 的 GET（#L84）与 PUT（#L132）路由真实存在。故业务内容**确实存在于 HTML 侧持久化通道**，verdict = exists。🔴 与 K 循环不同的是这里**不经** `useChecklistPersistence` 共享适配器（L 域现算引用数 0，见 LD-3），端点相同但适配层是每循环一份。"
+    "how_resolved": "L1 的业务内容由 per-cycle 持久化 composable `useL1FormData.ts` 承载：它用 `api.get('/api/workpapers/${wpId}/checklist-responses')` 读（audit-platform/frontend/src/composables/useL1FormData.ts#L184）、`api.put(...)` 写（audit-platform/frontend/src/composables/useL1FormData.ts#L342），item_id 命名空间是 `L1-{sheet}-{field}`；后端 `checklist_responses.py` 的 GET（#L84）与 PUT（#L132）路由真实存在。故业务内容**确实存在于 HTML 侧持久化通道**，verdict = exists。🔴 与 K 循环不同的是这里**不经** `useChecklistPersistence` 共享适配器（L 域现算引用数 0，见 LD-3），端点相同但适配层是每循环一份。"
    },
    "migration_state": "legacy_fake_bidirectional",
    "adapter_id": null,
@@ -202,8 +202,8 @@
    ],
    "html_counterpart_verdict": "exists",
    "html_counterpart_source_refs": [
-    "audit-platform/frontend/src/components/workpaper/composables/useL2FormData.ts#L78",
-    "audit-platform/frontend/src/components/workpaper/composables/useL2FormData.ts#L113",
+    "audit-platform/frontend/src/components/workpaper/composables/useL2FormData.ts#L81",
+    "audit-platform/frontend/src/components/workpaper/composables/useL2FormData.ts#L116",
     "backend/app/routers/checklist_responses.py#L84",
     "backend/app/routers/checklist_responses.py#L132"
    ],
@@ -213,7 +213,7 @@
      "L2-{sheet}-{field}"
     ],
     "row_identity_key": "item_id",
-    "how_resolved": "L2 的业务内容由 per-cycle 持久化 composable `useL2FormData.ts` 承载：它用 `api.get('/api/workpapers/${wpId}/checklist-responses')` 读（audit-platform/frontend/src/components/workpaper/composables/useL2FormData.ts#L78）、`api.put(...)` 写（audit-platform/frontend/src/components/workpaper/composables/useL2FormData.ts#L113），item_id 命名空间是 `L2-{sheet}-{field}`；后端 `checklist_responses.py` 的 GET（#L84）与 PUT（#L132）路由真实存在。故业务内容**确实存在于 HTML 侧持久化通道**，verdict = exists。🔴 与 K 循环不同的是这里**不经** `useChecklistPersistence` 共享适配器（L 域现算引用数 0，见 LD-3），端点相同但适配层是每循环一份。"
+    "how_resolved": "L2 的业务内容由 per-cycle 持久化 composable `useL2FormData.ts` 承载：它用 `api.get('/api/workpapers/${wpId}/checklist-responses')` 读（audit-platform/frontend/src/components/workpaper/composables/useL2FormData.ts#L81）、`api.put(...)` 写（audit-platform/frontend/src/components/workpaper/composables/useL2FormData.ts#L116），item_id 命名空间是 `L2-{sheet}-{field}`；后端 `checklist_responses.py` 的 GET（#L84）与 PUT（#L132）路由真实存在。故业务内容**确实存在于 HTML 侧持久化通道**，verdict = exists。🔴 与 K 循环不同的是这里**不经** `useChecklistPersistence` 共享适配器（L 域现算引用数 0，见 LD-3），端点相同但适配层是每循环一份。"
    },
    "migration_state": "legacy_fake_bidirectional",
    "adapter_id": null,
@@ -324,8 +324,8 @@
    ],
    "html_counterpart_verdict": "exists",
    "html_counterpart_source_refs": [
-    "audit-platform/frontend/src/components/workpaper/composables/useL3FormData.ts#L83",
-    "audit-platform/frontend/src/components/workpaper/composables/useL3FormData.ts#L118",
+    "audit-platform/frontend/src/components/workpaper/composables/useL3FormData.ts#L86",
+    "audit-platform/frontend/src/components/workpaper/composables/useL3FormData.ts#L121",
     "backend/app/routers/checklist_responses.py#L84",
     "backend/app/routers/checklist_responses.py#L132"
    ],
@@ -335,7 +335,7 @@
      "L3-{sheet}-{field}"
     ],
     "row_identity_key": "item_id",
-    "how_resolved": "L3 的业务内容由 per-cycle 持久化 composable `useL3FormData.ts` 承载：它用 `api.get('/api/workpapers/${wpId}/checklist-responses')` 读（audit-platform/frontend/src/components/workpaper/composables/useL3FormData.ts#L83）、`api.put(...)` 写（audit-platform/frontend/src/components/workpaper/composables/useL3FormData.ts#L118），item_id 命名空间是 `L3-{sheet}-{field}`；后端 `checklist_responses.py` 的 GET（#L84）与 PUT（#L132）路由真实存在。故业务内容**确实存在于 HTML 侧持久化通道**，verdict = exists。🔴 与 K 循环不同的是这里**不经** `useChecklistPersistence` 共享适配器（L 域现算引用数 0，见 LD-3），端点相同但适配层是每循环一份。"
+    "how_resolved": "L3 的业务内容由 per-cycle 持久化 composable `useL3FormData.ts` 承载：它用 `api.get('/api/workpapers/${wpId}/checklist-responses')` 读（audit-platform/frontend/src/components/workpaper/composables/useL3FormData.ts#L86）、`api.put(...)` 写（audit-platform/frontend/src/components/workpaper/composables/useL3FormData.ts#L121），item_id 命名空间是 `L3-{sheet}-{field}`；后端 `checklist_responses.py` 的 GET（#L84）与 PUT（#L132）路由真实存在。故业务内容**确实存在于 HTML 侧持久化通道**，verdict = exists。🔴 与 K 循环不同的是这里**不经** `useChecklistPersistence` 共享适配器（L 域现算引用数 0，见 LD-3），端点相同但适配层是每循环一份。"
    },
    "migration_state": "legacy_fake_bidirectional",
    "adapter_id": null,
@@ -438,8 +438,8 @@
    ],
    "html_counterpart_verdict": "exists",
    "html_counterpart_source_refs": [
-    "audit-platform/frontend/src/components/workpaper/composables/useL4FormData.ts#L85",
-    "audit-platform/frontend/src/components/workpaper/composables/useL4FormData.ts#L120",
+    "audit-platform/frontend/src/components/workpaper/composables/useL4FormData.ts#L87",
+    "audit-platform/frontend/src/components/workpaper/composables/useL4FormData.ts#L122",
     "backend/app/routers/checklist_responses.py#L84",
     "backend/app/routers/checklist_responses.py#L132"
    ],
@@ -449,7 +449,7 @@
      "L4-{sheet}-{field}"
     ],
     "row_identity_key": "item_id",
-    "how_resolved": "L4 的业务内容由 per-cycle 持久化 composable `useL4FormData.ts` 承载：它用 `api.get('/api/workpapers/${wpId}/checklist-responses')` 读（audit-platform/frontend/src/components/workpaper/composables/useL4FormData.ts#L85）、`api.put(...)` 写（audit-platform/frontend/src/components/workpaper/composables/useL4FormData.ts#L120），item_id 命名空间是 `L4-{sheet}-{field}`；后端 `checklist_responses.py` 的 GET（#L84）与 PUT（#L132）路由真实存在。故业务内容**确实存在于 HTML 侧持久化通道**，verdict = exists。🔴 与 K 循环不同的是这里**不经** `useChecklistPersistence` 共享适配器（L 域现算引用数 0，见 LD-3），端点相同但适配层是每循环一份。"
+    "how_resolved": "L4 的业务内容由 per-cycle 持久化 composable `useL4FormData.ts` 承载：它用 `api.get('/api/workpapers/${wpId}/checklist-responses')` 读（audit-platform/frontend/src/components/workpaper/composables/useL4FormData.ts#L87）、`api.put(...)` 写（audit-platform/frontend/src/components/workpaper/composables/useL4FormData.ts#L122），item_id 命名空间是 `L4-{sheet}-{field}`；后端 `checklist_responses.py` 的 GET（#L84）与 PUT（#L132）路由真实存在。故业务内容**确实存在于 HTML 侧持久化通道**，verdict = exists。🔴 与 K 循环不同的是这里**不经** `useChecklistPersistence` 共享适配器（L 域现算引用数 0，见 LD-3），端点相同但适配层是每循环一份。"
    },
    "migration_state": "legacy_fake_bidirectional",
    "adapter_id": null,
@@ -562,8 +562,8 @@
    ],
    "html_counterpart_verdict": "exists",
    "html_counterpart_source_refs": [
-    "audit-platform/frontend/src/components/workpaper/composables/useL5FormData.ts#L94",
-    "audit-platform/frontend/src/components/workpaper/composables/useL5FormData.ts#L129",
+    "audit-platform/frontend/src/components/workpaper/composables/useL5FormData.ts#L96",
+    "audit-platform/frontend/src/components/workpaper/composables/useL5FormData.ts#L131",
     "backend/app/routers/checklist_responses.py#L84",
     "backend/app/routers/checklist_responses.py#L132"
    ],
@@ -573,7 +573,7 @@
      "L5-{sheet}-{field}"
     ],
     "row_identity_key": "item_id",
-    "how_resolved": "L5 的业务内容由 per-cycle 持久化 composable `useL5FormData.ts` 承载：它用 `api.get('/api/workpapers/${wpId}/checklist-responses')` 读（audit-platform/frontend/src/components/workpaper/composables/useL5FormData.ts#L94）、`api.put(...)` 写（audit-platform/frontend/src/components/workpaper/composables/useL5FormData.ts#L129），item_id 命名空间是 `L5-{sheet}-{field}`；后端 `checklist_responses.py` 的 GET（#L84）与 PUT（#L132）路由真实存在。故业务内容**确实存在于 HTML 侧持久化通道**，verdict = exists。🔴 与 K 循环不同的是这里**不经** `useChecklistPersistence` 共享适配器（L 域现算引用数 0，见 LD-3），端点相同但适配层是每循环一份。"
+    "how_resolved": "L5 的业务内容由 per-cycle 持久化 composable `useL5FormData.ts` 承载：它用 `api.get('/api/workpapers/${wpId}/checklist-responses')` 读（audit-platform/frontend/src/components/workpaper/composables/useL5FormData.ts#L96）、`api.put(...)` 写（audit-platform/frontend/src/components/workpaper/composables/useL5FormData.ts#L131），item_id 命名空间是 `L5-{sheet}-{field}`；后端 `checklist_responses.py` 的 GET（#L84）与 PUT（#L132）路由真实存在。故业务内容**确实存在于 HTML 侧持久化通道**，verdict = exists。🔴 与 K 循环不同的是这里**不经** `useChecklistPersistence` 共享适配器（L 域现算引用数 0，见 LD-3），端点相同但适配层是每循环一份。"
    },
    "migration_state": "legacy_fake_bidirectional",
    "adapter_id": null,
@@ -609,7 +609,7 @@
    },
    "dual_mode_carrier": {
     "kind": "child_tab_dedicated_composable",
-    "site": "audit-platform/frontend/src/components/workpaper/l5/core/L5TabAdjudication.vue#L230",
+    "site": "audit-platform/frontend/src/components/workpaper/l5/core/L5TabAdjudication.vue#L239",
     "module": "audit-platform/frontend/src/components/workpaper/composables/useL5DualMode.ts",
     "orphan_twin": null,
     "localStorage_prefix": "l5-dual-mode",
@@ -680,8 +680,8 @@
    ],
    "html_counterpart_verdict": "exists",
    "html_counterpart_source_refs": [
-    "audit-platform/frontend/src/components/workpaper/composables/useL6FormData.ts#L88",
-    "audit-platform/frontend/src/components/workpaper/composables/useL6FormData.ts#L125",
+    "audit-platform/frontend/src/components/workpaper/composables/useL6FormData.ts#L90",
+    "audit-platform/frontend/src/components/workpaper/composables/useL6FormData.ts#L127",
     "backend/app/routers/checklist_responses.py#L84",
     "backend/app/routers/checklist_responses.py#L132"
    ],
@@ -691,7 +691,7 @@
      "L6-{sheet}-{field}"
     ],
     "row_identity_key": "item_id",
-    "how_resolved": "L6 的业务内容由 per-cycle 持久化 composable `useL6FormData.ts` 承载：它用 `api.get('/api/workpapers/${wpId}/checklist-responses')` 读（audit-platform/frontend/src/components/workpaper/composables/useL6FormData.ts#L88）、`api.put(...)` 写（audit-platform/frontend/src/components/workpaper/composables/useL6FormData.ts#L125），item_id 命名空间是 `L6-{sheet}-{field}`；后端 `checklist_responses.py` 的 GET（#L84）与 PUT（#L132）路由真实存在。故业务内容**确实存在于 HTML 侧持久化通道**，verdict = exists。🔴 与 K 循环不同的是这里**不经** `useChecklistPersistence` 共享适配器（L 域现算引用数 0，见 LD-3），端点相同但适配层是每循环一份。"
+    "how_resolved": "L6 的业务内容由 per-cycle 持久化 composable `useL6FormData.ts` 承载：它用 `api.get('/api/workpapers/${wpId}/checklist-responses')` 读（audit-platform/frontend/src/components/workpaper/composables/useL6FormData.ts#L90）、`api.put(...)` 写（audit-platform/frontend/src/components/workpaper/composables/useL6FormData.ts#L127），item_id 命名空间是 `L6-{sheet}-{field}`；后端 `checklist_responses.py` 的 GET（#L84）与 PUT（#L132）路由真实存在。故业务内容**确实存在于 HTML 侧持久化通道**，verdict = exists。🔴 与 K 循环不同的是这里**不经** `useChecklistPersistence` 共享适配器（L 域现算引用数 0，见 LD-3），端点相同但适配层是每循环一份。"
    },
    "migration_state": "legacy_fake_bidirectional",
    "adapter_id": null,
@@ -727,7 +727,7 @@
    },
    "dual_mode_carrier": {
     "kind": "child_tab_dedicated_composable",
-    "site": "audit-platform/frontend/src/components/workpaper/l6/core/L6TabAdjudication.vue#L375",
+    "site": "audit-platform/frontend/src/components/workpaper/l6/core/L6TabAdjudication.vue#L384",
     "module": "audit-platform/frontend/src/components/workpaper/composables/useL6DualMode.ts",
     "orphan_twin": null,
     "localStorage_prefix": "l6-dual-mode",
@@ -798,8 +798,8 @@
    ],
    "html_counterpart_verdict": "exists",
    "html_counterpart_source_refs": [
-    "audit-platform/frontend/src/components/workpaper/composables/useL7FormData.ts#L87",
-    "audit-platform/frontend/src/components/workpaper/composables/useL7FormData.ts#L122",
+    "audit-platform/frontend/src/components/workpaper/composables/useL7FormData.ts#L89",
+    "audit-platform/frontend/src/components/workpaper/composables/useL7FormData.ts#L124",
     "backend/app/routers/checklist_responses.py#L84",
     "backend/app/routers/checklist_responses.py#L132"
    ],
@@ -809,7 +809,7 @@
      "L7-{sheet}-{field}"
     ],
     "row_identity_key": "item_id",
-    "how_resolved": "L7 的业务内容由 per-cycle 持久化 composable `useL7FormData.ts` 承载：它用 `api.get('/api/workpapers/${wpId}/checklist-responses')` 读（audit-platform/frontend/src/components/workpaper/composables/useL7FormData.ts#L87）、`api.put(...)` 写（audit-platform/frontend/src/components/workpaper/composables/useL7FormData.ts#L122），item_id 命名空间是 `L7-{sheet}-{field}`；后端 `checklist_responses.py` 的 GET（#L84）与 PUT（#L132）路由真实存在。故业务内容**确实存在于 HTML 侧持久化通道**，verdict = exists。🔴 与 K 循环不同的是这里**不经** `useChecklistPersistence` 共享适配器（L 域现算引用数 0，见 LD-3），端点相同但适配层是每循环一份。"
+    "how_resolved": "L7 的业务内容由 per-cycle 持久化 composable `useL7FormData.ts` 承载：它用 `api.get('/api/workpapers/${wpId}/checklist-responses')` 读（audit-platform/frontend/src/components/workpaper/composables/useL7FormData.ts#L89）、`api.put(...)` 写（audit-platform/frontend/src/components/workpaper/composables/useL7FormData.ts#L124），item_id 命名空间是 `L7-{sheet}-{field}`；后端 `checklist_responses.py` 的 GET（#L84）与 PUT（#L132）路由真实存在。故业务内容**确实存在于 HTML 侧持久化通道**，verdict = exists。🔴 与 K 循环不同的是这里**不经** `useChecklistPersistence` 共享适配器（L 域现算引用数 0，见 LD-3），端点相同但适配层是每循环一份。"
    },
    "migration_state": "legacy_fake_bidirectional",
    "adapter_id": null,
@@ -845,7 +845,7 @@
    },
    "dual_mode_carrier": {
     "kind": "child_tab_dedicated_composable",
-    "site": "audit-platform/frontend/src/components/workpaper/l7/core/L7TabAdjudication.vue#L377",
+    "site": "audit-platform/frontend/src/components/workpaper/l7/core/L7TabAdjudication.vue#L386",
     "module": "audit-platform/frontend/src/components/workpaper/composables/useL7DualMode.ts",
     "orphan_twin": null,
     "localStorage_prefix": "l7-dual-mode",
@@ -914,8 +914,8 @@
    ],
    "html_counterpart_verdict": "exists",
    "html_counterpart_source_refs": [
-    "audit-platform/frontend/src/components/workpaper/composables/useL8FormData.ts#L106",
-    "audit-platform/frontend/src/components/workpaper/composables/useL8FormData.ts#L181",
+    "audit-platform/frontend/src/components/workpaper/composables/useL8FormData.ts#L108",
+    "audit-platform/frontend/src/components/workpaper/composables/useL8FormData.ts#L183",
     "backend/app/routers/checklist_responses.py#L84",
     "backend/app/routers/checklist_responses.py#L132"
    ],
@@ -925,7 +925,7 @@
      "L8-{sheet}-{field}"
     ],
     "row_identity_key": "item_id",
-    "how_resolved": "L8 的业务内容由 per-cycle 持久化 composable `useL8FormData.ts` 承载：它用 `api.get('/api/workpapers/${wpId}/checklist-responses')` 读（audit-platform/frontend/src/components/workpaper/composables/useL8FormData.ts#L106）、`api.put(...)` 写（audit-platform/frontend/src/components/workpaper/composables/useL8FormData.ts#L181），item_id 命名空间是 `L8-{sheet}-{field}`；后端 `checklist_responses.py` 的 GET（#L84）与 PUT（#L132）路由真实存在。故业务内容**确实存在于 HTML 侧持久化通道**，verdict = exists。🔴 与 K 循环不同的是这里**不经** `useChecklistPersistence` 共享适配器（L 域现算引用数 0，见 LD-3），端点相同但适配层是每循环一份。"
+    "how_resolved": "L8 的业务内容由 per-cycle 持久化 composable `useL8FormData.ts` 承载：它用 `api.get('/api/workpapers/${wpId}/checklist-responses')` 读（audit-platform/frontend/src/components/workpaper/composables/useL8FormData.ts#L108）、`api.put(...)` 写（audit-platform/frontend/src/components/workpaper/composables/useL8FormData.ts#L183），item_id 命名空间是 `L8-{sheet}-{field}`；后端 `checklist_responses.py` 的 GET（#L84）与 PUT（#L132）路由真实存在。故业务内容**确实存在于 HTML 侧持久化通道**，verdict = exists。🔴 与 K 循环不同的是这里**不经** `useChecklistPersistence` 共享适配器（L 域现算引用数 0，见 LD-3），端点相同但适配层是每循环一份。"
    },
    "migration_state": "legacy_fake_bidirectional",
    "adapter_id": null,
@@ -1282,9 +1282,9 @@
     "audit-platform/frontend/src/components/workpaper/l6/core/L6TabAdjudication.vue#L13",
     "audit-platform/frontend/src/components/workpaper/l7/core/L7TabAdjudication.vue#L13",
     "audit-platform/frontend/src/components/workpaper/l8/core/L8TabAdjudication.vue#L14",
-    "audit-platform/frontend/src/components/workpaper/l5/core/L5TabAdjudication.vue#L230",
-    "audit-platform/frontend/src/components/workpaper/l6/core/L6TabAdjudication.vue#L375",
-    "audit-platform/frontend/src/components/workpaper/l7/core/L7TabAdjudication.vue#L377",
+    "audit-platform/frontend/src/components/workpaper/l5/core/L5TabAdjudication.vue#L239",
+    "audit-platform/frontend/src/components/workpaper/l6/core/L6TabAdjudication.vue#L384",
+    "audit-platform/frontend/src/components/workpaper/l7/core/L7TabAdjudication.vue#L386",
     "audit-platform/frontend/src/components/workpaper/l8/core/L8TabAdjudication.vue#L317",
     "audit-platform/frontend/src/components/workpaper/composables/useL5DualMode.ts",
     "audit-platform/frontend/src/components/workpaper/composables/useL6DualMode.ts",
@@ -1403,7 +1403,7 @@
    "blocks": [
     "step 6 publish_per_entry_contract"
    ],
-   "what": "**1 处把动态行身份取成位置**（family_a 纯序号）：audit-platform/frontend/src/components/workpaper/l1/core/L1TabAdjudication.vue#L306 的 `rowKey: String(idx)`。这个 `rowKey` 一旦进 per-entry contract 的 stable_field_key，插行/删行/排序后同一 key 会指到不同业务行，OO↔HTML 双向合并会把值搬到错误的行上。🔴 L 循环的位置化规模远小于 K（45 处）—— 计数**必须现算**，照抄 K 的 45 或 J 的「六个 0」都会假红。",
+   "what": "**1 处把动态行身份取成位置**（family_a 纯序号）：audit-platform/frontend/src/components/workpaper/l1/core/L1TabAdjudication.vue#L321 的 `rowKey: String(idx)`。这个 `rowKey` 一旦进 per-entry contract 的 stable_field_key，插行/删行/排序后同一 key 会指到不同业务行，OO↔HTML 双向合并会把值搬到错误的行上。🔴 L 循环的位置化规模远小于 K（45 处）—— 计数**必须现算**，照抄 K 的 45 或 J 的「六个 0」都会假红。",
    "observable_consequences": [
     "L1 审定表的「带入调整」弹窗行选项以 `String(idx)` 作 rowKey；分类行集合变化（新增/删除科目分类）后同一 rowKey 指向不同分类。",
     "另有 9 处 `seq: idx + 1` 是**展示序号**（family_d），键名是 `seq` 不是身份键，不计入缺陷 —— 守卫必须两侧都验，否则把展示序号也算成缺陷等于把判据调松/调紧都无归因。"
@@ -1411,7 +1411,7 @@
    "status": "registered_not_fixed",
    "must_fix_before": "step 6 publish_per_entry_contract（契约里不得出现该位置化 key 作为 stable_field_key）",
    "source_refs": [
-    "audit-platform/frontend/src/components/workpaper/l1/core/L1TabAdjudication.vue#L306"
+    "audit-platform/frontend/src/components/workpaper/l1/core/L1TabAdjudication.vue#L321"
    ]
   }
  ],
@@ -1616,7 +1616,7 @@
     "file": "audit-platform/frontend/src/components/workpaper/composables/useL5DualMode.ts",
     "lines": 189,
     "production_consumers": [
-     "audit-platform/frontend/src/components/workpaper/l5/core/L5TabAdjudication.vue#L217"
+     "audit-platform/frontend/src/components/workpaper/l5/core/L5TabAdjudication.vue#L226"
     ],
     "test_only_consumers": [],
     "mode_enum": "'structured' | 'onlyoffice'",
@@ -1641,7 +1641,7 @@
     "file": "audit-platform/frontend/src/components/workpaper/composables/useL6DualMode.ts",
     "lines": 189,
     "production_consumers": [
-     "audit-platform/frontend/src/components/workpaper/l6/core/L6TabAdjudication.vue#L339"
+     "audit-platform/frontend/src/components/workpaper/l6/core/L6TabAdjudication.vue#L348"
     ],
     "test_only_consumers": [],
     "mode_enum": "'structured' | 'onlyoffice'",
@@ -1666,7 +1666,7 @@
     "file": "audit-platform/frontend/src/components/workpaper/composables/useL7DualMode.ts",
     "lines": 189,
     "production_consumers": [
-     "audit-platform/frontend/src/components/workpaper/l7/core/L7TabAdjudication.vue#L323"
+     "audit-platform/frontend/src/components/workpaper/l7/core/L7TabAdjudication.vue#L332"
     ],
     "test_only_consumers": [],
     "mode_enum": "'structured' | 'onlyoffice'",
@@ -1791,7 +1791,7 @@
     "entry_id": "xlsx/gt-l5-long-term-payables",
     "child_tab": "audit-platform/frontend/src/components/workpaper/l5/core/L5TabAdjudication.vue",
     "segmented_site": "audit-platform/frontend/src/components/workpaper/l5/core/L5TabAdjudication.vue#L16",
-    "carrier_site": "audit-platform/frontend/src/components/workpaper/l5/core/L5TabAdjudication.vue#L230",
+    "carrier_site": "audit-platform/frontend/src/components/workpaper/l5/core/L5TabAdjudication.vue#L239",
     "carrier_module": "audit-platform/frontend/src/components/workpaper/composables/useL5DualMode.ts",
     "dual_mode_members_consumed_in_template": [
      "mode",
@@ -1809,7 +1809,7 @@
     "entry_id": "xlsx/gt-l6-special-payables",
     "child_tab": "audit-platform/frontend/src/components/workpaper/l6/core/L6TabAdjudication.vue",
     "segmented_site": "audit-platform/frontend/src/components/workpaper/l6/core/L6TabAdjudication.vue#L13",
-    "carrier_site": "audit-platform/frontend/src/components/workpaper/l6/core/L6TabAdjudication.vue#L375",
+    "carrier_site": "audit-platform/frontend/src/components/workpaper/l6/core/L6TabAdjudication.vue#L384",
     "carrier_module": "audit-platform/frontend/src/components/workpaper/composables/useL6DualMode.ts",
     "dual_mode_members_consumed_in_template": [
      "mode",
@@ -1827,7 +1827,7 @@
     "entry_id": "xlsx/gt-l7-other-noncurrent-liabilities",
     "child_tab": "audit-platform/frontend/src/components/workpaper/l7/core/L7TabAdjudication.vue",
     "segmented_site": "audit-platform/frontend/src/components/workpaper/l7/core/L7TabAdjudication.vue#L13",
-    "carrier_site": "audit-platform/frontend/src/components/workpaper/l7/core/L7TabAdjudication.vue#L377",
+    "carrier_site": "audit-platform/frontend/src/components/workpaper/l7/core/L7TabAdjudication.vue#L386",
     "carrier_module": "audit-platform/frontend/src/components/workpaper/composables/useL7DualMode.ts",
     "dual_mode_members_consumed_in_template": [
      "mode",
@@ -2545,11 +2545,11 @@
     "is_defect": true,
     "count": 1,
     "hits": [
-     "audit-platform/frontend/src/components/workpaper/l1/core/L1TabAdjudication.vue#L306"
+     "audit-platform/frontend/src/components/workpaper/l1/core/L1TabAdjudication.vue#L321"
     ],
     "samples": [
      {
-      "ref": "audit-platform/frontend/src/components/workpaper/l1/core/L1TabAdjudication.vue#L306",
+      "ref": "audit-platform/frontend/src/components/workpaper/l1/core/L1TabAdjudication.vue#L321",
       "key": "rowKey",
       "value": "String(idx)"
      }
@@ -2603,7 +2603,7 @@
      "seed_placeholder_literal": [],
      "positional_row_id_template": []
     },
-    "non_vacuity_proof": "同一扫描器在同一分母（212 个文件）上对位置化身份现算出 1 处非零命中（audit-platform/frontend/src/components/workpaper/l1/core/L1TabAdjudication.vue#L306）⇒ 分母非空、扫描器会命中；六个模式的 0 是真 0。"
+    "non_vacuity_proof": "同一扫描器在同一分母（212 个文件）上对位置化身份现算出 1 处非零命中（audit-platform/frontend/src/components/workpaper/l1/core/L1TabAdjudication.vue#L321）⇒ 分母非空、扫描器会命中；六个模式的 0 是真 0。"
    },
    "containers_partition": "两个容器的并集必须覆盖全部 1 处命中、交集为空：`tables[]` 收 kind 非禁止值的 3 张表（它们的身份键不在命中集里），`family_a` 收全部 1 处缺陷。守卫两侧都验。"
   }

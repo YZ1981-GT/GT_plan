@@ -1585,7 +1585,7 @@
         "orphan_modules": [
           {
             "module": "audit-platform/frontend/src/components/workpaper/composables/useI4FormData.ts",
-            "lines": 393,
+            "lines": 377,
             "entry_id": "xlsx/gt-i4-long-term-prepaid",
             "production_consumers": [],
             "test_only_consumers": [],
@@ -1598,7 +1598,7 @@
           },
           {
             "module": "audit-platform/frontend/src/components/workpaper/composables/useI6FormData.ts",
-            "lines": 447,
+            "lines": 418,
             "entry_id": "xlsx/gt-i6-research-development-expense",
             "production_consumers": [],
             "test_only_consumers": [],

@@ -63,7 +63,7 @@
     "wp_code": "L5",
     "entry_id": "xlsx/gt-l5-long-term-payables",
     "template_block": "audit-platform/frontend/src/components/workpaper/l5/core/L5TabAdjudication.vue#L16",
-    "script_block": "audit-platform/frontend/src/components/workpaper/l5/core/L5TabAdjudication.vue#L230",
+    "script_block": "audit-platform/frontend/src/components/workpaper/l5/core/L5TabAdjudication.vue#L239",
     "carrier_module_to_delete_with_it": "audit-platform/frontend/src/components/workpaper/composables/useL5DualMode.ts",
     "localStorage_key_to_drop": "l5-dual-mode",
     "mode_gated_v_if_count": 0,
@@ -76,7 +76,7 @@
     "wp_code": "L6",
     "entry_id": "xlsx/gt-l6-special-payables",
     "template_block": "audit-platform/frontend/src/components/workpaper/l6/core/L6TabAdjudication.vue#L13",
-    "script_block": "audit-platform/frontend/src/components/workpaper/l6/core/L6TabAdjudication.vue#L375",
+    "script_block": "audit-platform/frontend/src/components/workpaper/l6/core/L6TabAdjudication.vue#L384",
     "carrier_module_to_delete_with_it": "audit-platform/frontend/src/components/workpaper/composables/useL6DualMode.ts",
     "localStorage_key_to_drop": "l6-dual-mode",
     "mode_gated_v_if_count": 0,
@@ -89,7 +89,7 @@
     "wp_code": "L7",
     "entry_id": "xlsx/gt-l7-other-noncurrent-liabilities",
     "template_block": "audit-platform/frontend/src/components/workpaper/l7/core/L7TabAdjudication.vue#L13",
-    "script_block": "audit-platform/frontend/src/components/workpaper/l7/core/L7TabAdjudication.vue#L377",
+    "script_block": "audit-platform/frontend/src/components/workpaper/l7/core/L7TabAdjudication.vue#L386",
     "carrier_module_to_delete_with_it": "audit-platform/frontend/src/components/workpaper/composables/useL7DualMode.ts",
     "localStorage_key_to_drop": "l7-dual-mode",
     "mode_gated_v_if_count": 0,
@@ -367,8 +367,8 @@
    "html_counterpart_verdict": "exists",
    "adjudication_reason": "L1 实测**有** HTML 对端（checklist_responses + `L1-{sheet}-{field}` item_id 命名空间 + per-cycle 持久化 composable `useL1FormData.ts`，GET/PUT 路由在后端真实存在）⇒ AC 12.8 禁止 single_onlyoffice；OO 侧打开的是真实业务工作簿 `L1 短期借款.xlsx`（13 张 sheet，非空白模板）⇒ AC 12.9 的 single_html 不适用；宿主经 htmlRendererRegistry 的模块边可达 ⇒ 非 unreachable；AC 12.1 的六件前置（authority model / per-entry contract / non-null bundle / instrumentation candidate / published representation / 逐 scenario evidence）一件未交付 ⇒ SR-6 禁止 bidirectional。四个终态同时被排除 ⇒ 待裁决态。",
    "html_counterpart_source_refs": [
-    "audit-platform/frontend/src/composables/useL1FormData.ts#L179",
-    "audit-platform/frontend/src/composables/useL1FormData.ts#L337",
+    "audit-platform/frontend/src/composables/useL1FormData.ts#L184",
+    "audit-platform/frontend/src/composables/useL1FormData.ts#L342",
     "backend/app/routers/checklist_responses.py#L84",
     "backend/app/routers/checklist_responses.py#L132"
    ],
@@ -411,8 +411,8 @@
    "html_counterpart_verdict": "exists",
    "adjudication_reason": "L2 实测**有** HTML 对端（checklist_responses + `L2-{sheet}-{field}` item_id 命名空间 + per-cycle 持久化 composable `useL2FormData.ts`，GET/PUT 路由在后端真实存在）⇒ AC 12.8 禁止 single_onlyoffice；OO 侧打开的是真实业务工作簿 `L2 应付利息.xlsx`（8 张 sheet，非空白模板）⇒ AC 12.9 的 single_html 不适用；宿主经 htmlRendererRegistry 的模块边可达 ⇒ 非 unreachable；AC 12.1 的六件前置（authority model / per-entry contract / non-null bundle / instrumentation candidate / published representation / 逐 scenario evidence）一件未交付 ⇒ SR-6 禁止 bidirectional。四个终态同时被排除 ⇒ 待裁决态。",
    "html_counterpart_source_refs": [
-    "audit-platform/frontend/src/components/workpaper/composables/useL2FormData.ts#L78",
-    "audit-platform/frontend/src/components/workpaper/composables/useL2FormData.ts#L113",
+    "audit-platform/frontend/src/components/workpaper/composables/useL2FormData.ts#L81",
+    "audit-platform/frontend/src/components/workpaper/composables/useL2FormData.ts#L116",
     "backend/app/routers/checklist_responses.py#L84",
     "backend/app/routers/checklist_responses.py#L132"
    ],
@@ -454,8 +454,8 @@
    "html_counterpart_verdict": "exists",
    "adjudication_reason": "L3 实测**有** HTML 对端（checklist_responses + `L3-{sheet}-{field}` item_id 命名空间 + per-cycle 持久化 composable `useL3FormData.ts`，GET/PUT 路由在后端真实存在）⇒ AC 12.8 禁止 single_onlyoffice；OO 侧打开的是真实业务工作簿 `L3 长期借款.xlsx`（14 张 sheet，非空白模板）⇒ AC 12.9 的 single_html 不适用；宿主经 htmlRendererRegistry 的模块边可达 ⇒ 非 unreachable；AC 12.1 的六件前置（authority model / per-entry contract / non-null bundle / instrumentation candidate / published representation / 逐 scenario evidence）一件未交付 ⇒ SR-6 禁止 bidirectional。四个终态同时被排除 ⇒ 待裁决态。",
    "html_counterpart_source_refs": [
-    "audit-platform/frontend/src/components/workpaper/composables/useL3FormData.ts#L83",
-    "audit-platform/frontend/src/components/workpaper/composables/useL3FormData.ts#L118",
+    "audit-platform/frontend/src/components/workpaper/composables/useL3FormData.ts#L86",
+    "audit-platform/frontend/src/components/workpaper/composables/useL3FormData.ts#L121",
     "backend/app/routers/checklist_responses.py#L84",
     "backend/app/routers/checklist_responses.py#L132"
    ],
@@ -496,8 +496,8 @@
    "html_counterpart_verdict": "exists",
    "adjudication_reason": "L4 实测**有** HTML 对端（checklist_responses + `L4-{sheet}-{field}` item_id 命名空间 + per-cycle 持久化 composable `useL4FormData.ts`，GET/PUT 路由在后端真实存在）⇒ AC 12.8 禁止 single_onlyoffice；OO 侧打开的是真实业务工作簿 `L4 应付债券.xlsx`（16 张 sheet，非空白模板）⇒ AC 12.9 的 single_html 不适用；宿主经 htmlRendererRegistry 的模块边可达 ⇒ 非 unreachable；AC 12.1 的六件前置（authority model / per-entry contract / non-null bundle / instrumentation candidate / published representation / 逐 scenario evidence）一件未交付 ⇒ SR-6 禁止 bidirectional。四个终态同时被排除 ⇒ 待裁决态。",
    "html_counterpart_source_refs": [
-    "audit-platform/frontend/src/components/workpaper/composables/useL4FormData.ts#L85",
-    "audit-platform/frontend/src/components/workpaper/composables/useL4FormData.ts#L120",
+    "audit-platform/frontend/src/components/workpaper/composables/useL4FormData.ts#L87",
+    "audit-platform/frontend/src/components/workpaper/composables/useL4FormData.ts#L122",
     "backend/app/routers/checklist_responses.py#L84",
     "backend/app/routers/checklist_responses.py#L132"
    ],
@@ -538,8 +538,8 @@
    "html_counterpart_verdict": "exists",
    "adjudication_reason": "L5 实测**有** HTML 对端（checklist_responses + `L5-{sheet}-{field}` item_id 命名空间 + per-cycle 持久化 composable `useL5FormData.ts`，GET/PUT 路由在后端真实存在）⇒ AC 12.8 禁止 single_onlyoffice；OO 侧打开的是真实业务工作簿 `L5 长期应付款.xlsx`（12 张 sheet，非空白模板）⇒ AC 12.9 的 single_html 不适用；宿主经 htmlRendererRegistry 的模块边可达 ⇒ 非 unreachable；AC 12.1 的六件前置（authority model / per-entry contract / non-null bundle / instrumentation candidate / published representation / 逐 scenario evidence）一件未交付 ⇒ SR-6 禁止 bidirectional。四个终态同时被排除 ⇒ 待裁决态。",
    "html_counterpart_source_refs": [
-    "audit-platform/frontend/src/components/workpaper/composables/useL5FormData.ts#L94",
-    "audit-platform/frontend/src/components/workpaper/composables/useL5FormData.ts#L129",
+    "audit-platform/frontend/src/components/workpaper/composables/useL5FormData.ts#L96",
+    "audit-platform/frontend/src/components/workpaper/composables/useL5FormData.ts#L131",
     "backend/app/routers/checklist_responses.py#L84",
     "backend/app/routers/checklist_responses.py#L132"
    ],
@@ -582,8 +582,8 @@
    "html_counterpart_verdict": "exists",
    "adjudication_reason": "L6 实测**有** HTML 对端（checklist_responses + `L6-{sheet}-{field}` item_id 命名空间 + per-cycle 持久化 composable `useL6FormData.ts`，GET/PUT 路由在后端真实存在）⇒ AC 12.8 禁止 single_onlyoffice；OO 侧打开的是真实业务工作簿 `L6 专项应付款.xlsx`（9 张 sheet，非空白模板）⇒ AC 12.9 的 single_html 不适用；宿主经 htmlRendererRegistry 的模块边可达 ⇒ 非 unreachable；AC 12.1 的六件前置（authority model / per-entry contract / non-null bundle / instrumentation candidate / published representation / 逐 scenario evidence）一件未交付 ⇒ SR-6 禁止 bidirectional。四个终态同时被排除 ⇒ 待裁决态。",
    "html_counterpart_source_refs": [
-    "audit-platform/frontend/src/components/workpaper/composables/useL6FormData.ts#L88",
-    "audit-platform/frontend/src/components/workpaper/composables/useL6FormData.ts#L125",
+    "audit-platform/frontend/src/components/workpaper/composables/useL6FormData.ts#L90",
+    "audit-platform/frontend/src/components/workpaper/composables/useL6FormData.ts#L127",
     "backend/app/routers/checklist_responses.py#L84",
     "backend/app/routers/checklist_responses.py#L132"
    ],
@@ -626,8 +626,8 @@
    "html_counterpart_verdict": "exists",
    "adjudication_reason": "L7 实测**有** HTML 对端（checklist_responses + `L7-{sheet}-{field}` item_id 命名空间 + per-cycle 持久化 composable `useL7FormData.ts`，GET/PUT 路由在后端真实存在）⇒ AC 12.8 禁止 single_onlyoffice；OO 侧打开的是真实业务工作簿 `L7 其他非流动负债.xlsx`（8 张 sheet，非空白模板）⇒ AC 12.9 的 single_html 不适用；宿主经 htmlRendererRegistry 的模块边可达 ⇒ 非 unreachable；AC 12.1 的六件前置（authority model / per-entry contract / non-null bundle / instrumentation candidate / published representation / 逐 scenario evidence）一件未交付 ⇒ SR-6 禁止 bidirectional。四个终态同时被排除 ⇒ 待裁决态。",
    "html_counterpart_source_refs": [
-    "audit-platform/frontend/src/components/workpaper/composables/useL7FormData.ts#L87",
-    "audit-platform/frontend/src/components/workpaper/composables/useL7FormData.ts#L122",
+    "audit-platform/frontend/src/components/workpaper/composables/useL7FormData.ts#L89",
+    "audit-platform/frontend/src/components/workpaper/composables/useL7FormData.ts#L124",
     "backend/app/routers/checklist_responses.py#L84",
     "backend/app/routers/checklist_responses.py#L132"
    ],
@@ -670,8 +670,8 @@
    "html_counterpart_verdict": "exists",
    "adjudication_reason": "L8 实测**有** HTML 对端（checklist_responses + `L8-{sheet}-{field}` item_id 命名空间 + per-cycle 持久化 composable `useL8FormData.ts`，GET/PUT 路由在后端真实存在）⇒ AC 12.8 禁止 single_onlyoffice；OO 侧打开的是真实业务工作簿 `L8 财务费用.xlsx`（10 张 sheet，非空白模板）⇒ AC 12.9 的 single_html 不适用；宿主经 htmlRendererRegistry 的模块边可达 ⇒ 非 unreachable；AC 12.1 的六件前置（authority model / per-entry contract / non-null bundle / instrumentation candidate / published representation / 逐 scenario evidence）一件未交付 ⇒ SR-6 禁止 bidirectional。四个终态同时被排除 ⇒ 待裁决态。",
    "html_counterpart_source_refs": [
-    "audit-platform/frontend/src/components/workpaper/composables/useL8FormData.ts#L106",
-    "audit-platform/frontend/src/components/workpaper/composables/useL8FormData.ts#L181",
+    "audit-platform/frontend/src/components/workpaper/composables/useL8FormData.ts#L108",
+    "audit-platform/frontend/src/components/workpaper/composables/useL8FormData.ts#L183",
     "backend/app/routers/checklist_responses.py#L84",
     "backend/app/routers/checklist_responses.py#L132"
    ],
