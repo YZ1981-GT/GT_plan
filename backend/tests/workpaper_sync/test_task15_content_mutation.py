@@ -70,6 +70,13 @@ from app.services.workpaper_sync.adapters.base import (  # noqa: E402
     UnmanagedRegionReport,
 )
 from app.services.workpaper_sync.artifacts import CanonicalArtifactRepository  # noqa: E402
+from tests.workpaper_sync.g1_structure_fixture import (  # noqa: E402
+    make_structured_excel_adapter,
+    workbook_fixture,
+)
+
+#: `workbook_fixture()` 的受管结构锚点（算 structure_hash 的反读参数，plan 与字节须同源）。
+_, FIXTURE_ANCHORS = workbook_fixture()
 from app.services.workpaper_sync.conflicts import UnresolvedConflictError  # noqa: E402
 from app.services.workpaper_sync.definitions import (  # noqa: E402
     PublishStage,
@@ -510,6 +517,16 @@ def _plain(value: Any) -> Any:
     if isinstance(value, Decimal):
         return format(value, "f")
     return value
+
+
+#: 写盘带真实受管结构的替身，以工厂派生（逻辑归位 fixture 模块，详见其 docstring）。
+_StructuredFakeExcelAdapter = make_structured_excel_adapter(
+    _FakeExcelAdapter,
+    plain_fn=_plain,
+    d_fn=_d,
+    materialize_result_cls=MaterializeResult,
+    anchors=FIXTURE_ANCHORS,
+)
 
 
 _CONTENT_TYPES: Final[bytes] = (
@@ -1314,8 +1331,12 @@ class TestStageAndVerifyWithRealFiles:
     def _plan(self, xc: C.SyncContract, tmp: Path) -> CM.ContentCommitPlan:
         substrate = tmp / "substrate.xlsx"
         substrate.write_bytes(b"substrate-bytes")
+        # `_projection_structure_hash` 用 anchors 反读受管结构（缺失即抛）；与替身写盘字节同源。
         return plan(
-            bundle=bundle_snapshot(xc), contract=xc, substrate_path=substrate
+            bundle=bundle_snapshot(xc),
+            contract=xc,
+            substrate_path=substrate,
+            structure_anchors=dict(FIXTURE_ANCHORS),
         )
 
     def _svc(self, tmp: Path) -> CM.ContentMutationService:
@@ -1333,7 +1354,7 @@ class TestStageAndVerifyWithRealFiles:
         self, xc: C.SyncContract, tmp_path: Path
     ) -> None:
         p = self._plan(xc, tmp_path)
-        adapter = _FakeExcelAdapter()
+        adapter = _StructuredFakeExcelAdapter()
         projection = proj(xc, {PERIOD: "2025 年度", TOTAL: Decimal("100.00")})
         staged = await self._svc(tmp_path)._stage_and_verify(  # noqa: SLF001
             plan=p,
@@ -1362,7 +1383,7 @@ class TestStageAndVerifyWithRealFiles:
         238 项漂移涨到 632 项。
         """
         p = self._plan(xc, tmp_path)
-        adapter = _FakeExcelAdapter()
+        adapter = _StructuredFakeExcelAdapter()
         projection = proj(xc, {PERIOD: "2025 年度", TOTAL: Decimal("100.00")})
         await self._svc(tmp_path)._stage_and_verify(  # noqa: SLF001
             plan=p,

@@ -159,6 +159,29 @@ def _now() -> datetime:
     return datetime.now(timezone.utc)
 
 
+#: V065 给 outbox enum 加过 'processing'，Python 侧 ``OutboxStatus`` 只有三个成员。
+#: 守卫不能跑在比生产更窄的类型上（与 `test_task15_content_mutation_pg.py` 同一处置）。
+_EXTRA_ENUM_LABELS = {"import_event_outbox_status": ("processing",)}
+
+
+def _enum_ddl(tables: list[Any], sa: Any) -> list[str]:
+    """按 ORM 列类型现算 enum DDL（不手抄标签，防第二真源）。"""
+    seen: dict[str, tuple[str, ...]] = {}
+    for table in tables:
+        for column in table.columns:
+            if isinstance(column.type, sa.Enum) and column.type.name:
+                labels = tuple(column.type.enums) + _EXTRA_ENUM_LABELS.get(
+                    column.type.name, ()
+                )
+                seen.setdefault(column.type.name, labels)
+    return [
+        "CREATE TYPE {name} AS ENUM ({labels})".format(
+            name=name, labels=", ".join(f"'{label}'" for label in labels)
+        )
+        for name, labels in sorted(seen.items())
+    ]
+
+
 async def _primary_key_columns(session: Any, table: str) -> tuple[str, ...]:
     """现查该表的主键列（按 `ordinal_position`）。
 
@@ -316,6 +339,23 @@ async def _collect() -> dict[str, Any]:  # noqa: C901, PLR0912, PLR0915 - 一次
                     )
         if snap["apply_errors"]:
             raise _HarnessError(f"迁移应用失败: {snap['apply_errors'][:3]}")
+
+        # outbox 两张表从 **ORM metadata** 建（列不手抄，防第二真源）——
+        # `ContentMutationService.commit` 的第五步（`CONTENT_COMMIT_STEPS` 末项 `outbox`）
+        # 会在同事务里入队 `import_event_outbox` 事件；V151~V153 不建这两张表，故在此补齐。
+        # 不补：materialize 已跑通的 H1/D2 会在发布事务**最后一步**撞
+        # `UndefinedTableError`，被误读成「materialize 仍阻塞」。
+        from app.models.dataset_models import ImportEventConsumption, ImportEventOutbox
+
+        outbox_tables = [ImportEventOutbox.__table__, ImportEventConsumption.__table__]
+        async with engine.begin() as conn:
+            for stmt in _enum_ddl(outbox_tables, sa):
+                await conn.exec_driver_sql(stmt)
+            await conn.run_sync(
+                lambda sync_conn: ImportEventOutbox.metadata.create_all(
+                    sync_conn, tables=outbox_tables, checkfirst=True
+                )
+            )
 
         project, wp, actor = uuid.uuid4(), uuid.uuid4(), uuid.uuid4()
         async with engine.begin() as conn:
@@ -2162,64 +2202,58 @@ class TestFirstPublicationFeasibleDomain:
     | | 真库（主 schema） | 本夹具（干净临时 schema）|
     |---|---|---|
     G7 | **已发布首版**（2026-09-04，`generation=1`，`projection_contract`，`is_current`）| store 为空 ⇒ 夹具喂空载荷 ⇒ 载荷形态不符 |
-    H1 / D2 | `--apply` 真跑过，落 `blocked_*`，库 0 新增行 | 同一错形 |
-    B60 | `blocked_ooxml_gate` | 同 |
+    H1 / D2 | 可发布目标 | **发出首版**（各落 1 行 representation）|
+    B60 | `blocked_ooxml_gate` | 同（stage 安全门）|
 
     **Checkpoint Task 8 的判据在真库上成立** —— 本节问的是另一个问题：
     「在一个从零建起的 schema 上，这四个 entry 各自能走到哪一步」。
-    两者都要看：真库证明路通了，干净 schema 证明路上还有哪几处坎。
+    两者都要看：真库证明路通了，干净 schema 证明路上还剩哪几处坎。
 
-    ⇒ 本节的 `test_no_entry_published_a_first_generation` 说的是**本夹具**里零个
-    entry 走完发布链，**不是**「首版从未落成」。把两者混为一谈会得出与真库相反的结论。
+    ⇒ 本节的 `test_exactly_the_materialize_ready_entries_published` 说的是**本夹具**里
+    恰 H1 与 D2 走完发布链。
 
-    ═══ 为什么这一节存在 ═════════════════════════════════════════════════════
+    ═══ 可行域从「零个」扩大到「恰 H1/D2」的经过 ═══════════════════════════════
 
     Requirement 12.5 声明「`xlsx/gt-h1-fixed-assets` 与
-    `xlsx/gt-d2-accounts-receivable` 为**可发布目标**」。2026-09-05 在干净临时
-    schema 上逐个实测，**四个 entry 都没走完发布链**：
+    `xlsx/gt-d2-accounts-receivable` 为**可发布目标**」。
 
-    | entry | 停在 | error_code |
+    **2026-09-05 首测（旧结论，已翻篇）**：四个 entry 在干净 schema 上都没走完
+    发布链，H1/D2 停在 materialize，error_code `excel_materialize_editable_write_failed`，
+    诊断点名模板末行的 `'……'` 占位符落在受管数字列（H1 A27 / D2 A25）。当时本节
+    固化的就是那个错形，并写明「修通了 ⇒ 更新本节与 Task 8 的 Checkpoint」。
+
+    **翻篇（本次实测）**：commit `93892b99f`（「多 sheet materialize 的
+    defined-name/per-sheet 位移归一化 + sibling footer 扩张」）修掉了那处
+    materialize。H1/D2 从此能把 HTML projection materialize 成 canonical OOXML 并
+    走完 `ContentMutationService.commit` 的五步
+    （`revision → content_version → representation → entry_pointer → outbox`），
+    各落 1 行 representation：
+
+    | entry | 停在 | 结果 |
     |---|---|---|
     B60 | stage | `ooxml_security_rejected`（gate=`external_relationships`）|
-    **H1** | **publish** | `excel_materialize_editable_write_failed` |
-    **D2** | **publish** | `excel_materialize_editable_write_failed` |
+    **H1** | **—（发布成功）** | `representation_rows == 1` |
+    **D2** | **—（发布成功）** | `representation_rows == 1` |
     G7 | publish | `sync_pilot_store_payload_invalid`（**夹具构造所致**，见该条 docstring）|
 
-    H1 与 D2 的阻塞与真库上 `--apply` 实测的 `blocked_template_contract_drift` /
-    `blocked_row_insertion_required` 同源，**不是**本夹具引入的。
+    ═══ 一处必须一起改的夹具缺口 ═════════════════════════════════════════════
 
-    H1 与 D2 撞的是**同一个错形**，根因已定位到单元格级：
-
-    * H1 契约声明受管数据行 13..27，模板里 13..26 是序号 `1..14`，**行 27 是 `'……'`**；
-    * D2 契约声明 13..25，模板里 13..24 是 `1..12`，**行 25 是 `'……'`**。
-
-    `'……'` 是模板「此处可续行」的视觉约定，而契约把该行也算作受管数据行且
-    `seq` 的 `value_type` 是 `integer`。空 store ⇒ overlay 保留基线 ⇒ materialize
-    把 `'……'` 写回 integer 字段 ⇒ 规范化拒绝（那正是 `excel_materialize` 该做的：
-    「不得写一个自己都读不懂的值」）。
-
-    这与 tasks.md 记的 H1 → `blocked_template_contract_drift` 是**同一件事**。
-
-    ═══ 为什么不在本 spec 里改 ═══════════════════════════════════════════════
-
-    三种改法都跨出本 spec 的范围，需要契约/模板裁决：
-
-    1. 把受管区收到 13..26（H1）/ 13..24（D2）—— 动的是**已冻结的契约**，
-       Task 40~43 的判据全部挂在上面；
-    2. 放宽 `seq` 的 `value_type` —— 那是 Requirement 7 明文禁止的「放宽判据」；
-    3. 让 extract 侧把 `'……'` 识别为「非数据行标记」—— 改的是行身份语义，
-       影响 Task 37/38 的等值判据。
+    发布事务第五步写 `import_event_outbox`；本夹具的 `MIGRATIONS`（V151~V153）
+    不建这张表。materialize 修通后，H1/D2 会在发布**最后一步**撞
+    `UndefinedTableError`、`error_code` 落空串，被误读成「materialize 仍阻塞」。
+    因此 `_collect` 现从 ORM metadata 补建 `import_event_outbox` /
+    `import_event_consumptions`（与 `test_task15/18/77` 同款处置），才看得到真实
+    可行域。
 
     ═══ 本节的判据形态 ═══════════════════════════════════════════════════════
 
-    判据**固化实测事实**而不是期望：每个 entry 停在哪一步、error_code 是什么、
-    失败是否无残留。于是
+    判据**固化实测事实**而不是期望：每个 entry 停在哪一步、发没发出首版、
+    落库几行。于是
 
-    * 谁把 H1 修通了 ⇒ `test_h1_is_still_blocked_at_materialize` 打红，
-      提示「可行域变了，更新本节与 Task 8 的 Checkpoint」；
-    * 谁让它以**别的**方式失败 ⇒ 同一条打红，因为 error_code 不再是那一个。
-
-    这样「首版尚未在真库落成」不会被伪装成已完成，Task 8 会照实红。
+    * 谁让 H1/D2 又发不出去 ⇒ `test_h1_and_d2_now_publish_a_first_generation`
+      打红：那是 materialize/commit 链**回归**，先定位根因，不得回退判据；
+    * 谁让别的 entry 也发成功了 ⇒ `test_exactly_the_materialize_ready_entries_published`
+      打红：可行域又扩大，更新本节 + tasks.md Task 8 + design.md §Open Gates。
     """
 
     def _entry(self, snap: dict[str, Any], entry_id: str) -> dict[str, Any]:
@@ -2253,43 +2287,67 @@ class TestFirstPublicationFeasibleDomain:
         )
 
     @pytest.mark.parametrize(
-        ("entry_id", "cell"),
+        "entry_id",
         [
-            ("xlsx/gt-h1-fixed-assets", "A27"),
-            ("xlsx/gt-d2-accounts-receivable", "A25"),
+            "xlsx/gt-h1-fixed-assets",
+            "xlsx/gt-d2-accounts-receivable",
         ],
     )
-    def test_h1_and_d2_are_blocked_at_materialize_by_the_same_shape(
-        self, snap: dict[str, Any], entry_id: str, cell: str
+    def test_h1_and_d2_now_publish_a_first_generation(
+        self, snap: dict[str, Any], entry_id: str
     ) -> None:
-        """🔴 H1 与 D2 停在 materialize，且是**同一个**错形（模板末行的 `'……'`）。
+        """✅ H1 与 D2 在干净 schema 上**发出了首版**（可行域已扩大）。
 
-        判据同时锁三件事：停的位置、error_code、诊断里点名的单元格。
-        三者齐备才说明「这是模板/契约漂移」而不是某个 entry 的偶发。
+        ═══ 判据是怎么从「停在 materialize」变成「发布成功」的 ═══════════════
 
-        本条打红的两种情形都需要人来看：
-        * 修通了 ⇒ 更新本节与 Task 8 的 Checkpoint（可行域变了）；
-        * 换了别的失败方式 ⇒ 根因变了，先定性再改判据。
+        2026-09-05 建这条时，H1/D2 停在 materialize，error_code 为
+        `excel_materialize_editable_write_failed`，诊断点名模板末行 `'……'`
+        占位符落在受管数字列（H1 A27 / D2 A25）。当时判据固化的是那个错形，并
+        写明「修通了 ⇒ 更新本节与 Task 8 的 Checkpoint」。
+
+        commit `93892b99f`（「多 sheet materialize 的 defined-name/per-sheet
+        位移归一化 + sibling footer 扩张」）修掉了那处 materialize，H1/D2 从此
+        能把 HTML 侧 projection materialize 成 canonical OOXML 并走完
+        `ContentMutationService.commit` 的五步
+        （`revision → content_version → representation → entry_pointer → outbox`）。
+
+        实测（`_probe_all_entries`，干净临时 schema）：两者都 `stopped_at is None`、
+        `representation_rows == 1`。—— 这就是「可行域扩大」的直接证据。
+
+        ═══ 为什么这条现在必须断言成功 ═══════════════════════════════════════
+
+        `_probe_all_entries` 的发布事务第五步写 `import_event_outbox`；本夹具的
+        `MIGRATIONS`（V151~V153）不建这张表，故本节采集阶段现从 ORM metadata
+        补建（见 `_collect` 里的 outbox 建表块）。补建之前，materialize 已跑通的
+        H1/D2 会在发布**最后一步**撞 `UndefinedTableError`、`error_code` 落空串，
+        被误读成「materialize 仍阻塞」。补建后才看得到真实的发布可行域。
+
+        谁让 H1/D2 又发不出去了（`stopped_at != None`）⇒ 本条打红：那是**回归**，
+        必须定位根因（materialize / commit 链哪一步坏了），不得回退判据。
         """
         record = self._entry(snap, entry_id)
-        assert record["stopped_at"] == "publish", (
-            f"{entry_id} 停在 {record['stopped_at']!r} 而不是 publish —— "
-            f"可行域变了。实测: {record.get('error', '')[:200]}"
-        )
-        assert record["error_code"] == "excel_materialize_editable_write_failed", (
-            f"{entry_id} 的 error_code 实测为 {record['error_code']!r} —— "
-            "根因变了，先定性再改判据"
-        )
-        assert cell in str(record.get("error", "")), (
-            f"{entry_id} 的诊断里没点名单元格 {cell} —— 实测诊断: "
+        assert record["stopped_at"] is None, (
+            f"{entry_id} 停在 {record['stopped_at']!r} 而不是发布成功 —— "
+            f"可行域回退了（曾在 commit 93892b99f 后发出首版）。"
+            f"实测 error_code={record.get('error_code')!r} 诊断: "
             f"{record.get('error', '')[:240]}"
         )
-        assert "……" in str(record.get("error", "")), (
-            f"{entry_id} 的诊断里没有那个占位符 —— 根因可能换了"
+        assert record["error_code"] == "", (
+            f"{entry_id} 发布成功却带着 error_code {record['error_code']!r} —— "
+            "快照自相矛盾"
         )
-        assert "reached" in record and "resolve_plan" in record["reached"], (
-            f"{entry_id} 没走到 resolve_plan —— 那说明阻塞比 materialize 更早，"
-            f"本条判据的定性失效。实测到达: {record.get('reached')}"
+        assert record.get("representation_rows") == 1, (
+            f"{entry_id} 走完发布链却没落下恰 1 行 representation："
+            f"{record.get('representation_rows')} —— 首版必须落一行 canonical 表示"
+        )
+        assert "reached" in record and record["reached"] == [
+            "provision",
+            "stage",
+            "resolve_plan",
+            "publish",
+        ], (
+            f"{entry_id} 的到达轨迹实测为 {record.get('reached')} —— "
+            "首版发布必须依次走完 provision/stage/resolve_plan/publish 四步"
         )
 
     def test_g7_fails_here_only_because_this_fixture_feeds_an_empty_store(
@@ -2329,16 +2387,24 @@ class TestFirstPublicationFeasibleDomain:
             "需要重新定性"
         )
 
-    def test_no_entry_published_a_first_generation(self, snap: dict[str, Any]) -> None:
-        """🔴 照实固化「**在本夹具的干净 schema 里**零个 entry 走完发布链」。
+    def test_exactly_the_materialize_ready_entries_published(
+        self, snap: dict[str, Any]
+    ) -> None:
+        """✅ 照实固化「在本夹具的干净 schema 里**恰 H1 与 D2** 走完发布链」。
 
-        ⚠️ 这**不是**「首版从未落成」。真库上 G7 已发布（Checkpoint Task 8 成立）。
-        本条只说：从零建起的 schema 上，四个 entry 各自都还差一步。
+        ═══ 从「零个发布」翻到「恰两个发布」的经过 ═══════════════════════════
 
-        谁让任一 entry 在干净 schema 上发成功了，本条打红，提示去更新本节、
-        tasks.md Task 8 的现场记录与 design.md §Open Gates。
+        2026-09-05 建这条时，四个 entry 在干净 schema 上各差一步、零个发出首版，
+        本条判据是 `not published`（零个走完发布链），并写明「谁发成功了 ⇒ 更新
+        本节、tasks.md Task 8、design.md §Open Gates」。
 
-        判据取自**落库行**（Property 33 的做法），不取「有没有抛异常」。
+        commit `93892b99f` 修掉 materialize 后，H1/D2 走完发布链、各落 1 行
+        representation（见 `test_h1_and_d2_now_publish_a_first_generation`）。可行域
+        从「零个」扩大到「恰这两个 materialize-ready 目标」。B60 仍被 OOXML 安全门
+        挡在 stage、G7 仍因**本夹具喂空载荷**停在 publish（都由各自那条锁）。
+
+        判据取自**落库行**（Property 33 的做法），不取「有没有抛异常」：`stopped_at
+        is None` 才算走完，且必须恰落 1 行 representation。
         """
         domain = snap["phases"]["feasible_domain"]
         published = {
@@ -2346,24 +2412,58 @@ class TestFirstPublicationFeasibleDomain:
             for entry_id, record in domain.items()
             if record.get("stopped_at") is None
         }
-        assert not published, (
-            f"有 entry 发出了首版: {published} —— 这是**好事**，但可行域变了：\n"
-            "  ① 更新本节的判据；\n"
-            "  ② 更新 tasks.md Task 8 的 Checkpoint；\n"
-            "  ③ 更新 design.md §Open Gates 第 3 项。"
+        assert set(published) == {
+            "xlsx/gt-h1-fixed-assets",
+            "xlsx/gt-d2-accounts-receivable",
+        }, (
+            f"发出首版的 entry 集实测为 {sorted(published)} —— 期望恰 H1 与 D2。\n"
+            "  · 多了别的 entry ⇒ 可行域又扩大了，更新本节 + tasks.md Task 8 +"
+            " design.md §Open Gates；\n"
+            "  · 少了 H1/D2 ⇒ 那是回归，先定位 materialize/commit 链的根因。"
+        )
+        assert all(rows == 1 for rows in published.values()), (
+            f"发出首版的 entry 落库行数实测 {published} —— 首版每个恰 1 行"
         )
 
-    def test_the_failed_attempts_left_no_residue(self, snap: dict[str, Any]) -> None:
-        """全部失败尝试之后，四张表仍是空的 —— 失败没有留下半成品。
+    def test_the_main_flow_left_exactly_one_first_generation(
+        self, snap: dict[str, Any]
+    ) -> None:
+        """✅ 主流程（`_FIRST_TARGET` = H1）跑完后，四张表里**恰多出一份首版**。
 
-        这是 Property 13 在**真实阻塞**上的应用：四个 entry 各失败一次，
-        四张表逐行不变。
+        ═══ 从「零残留」翻到「恰一份首版」的经过 ═══════════════════════════════
+
+        2026-09-05 建这条时，H1 主流程停在 materialize（`empty → after_rerun`
+        逐行不变），本条判据是「失败尝试没留半成品」。commit `93892b99f` 修掉
+        materialize 后，H1 主流程**发出了首版并落库**（见
+        `test_it_committed_exactly_one_representation_generation`）、随后的重跑被
+        `first_publication_already_done` 幂等拒（见
+        `test_rerun_leaves_the_four_tables_row_for_row_unchanged`）。
+
+        于是 `empty → after_rerun` 不再是「零残留」，而是「恰一份首版」：
+        `content_version` / `content_representation` / `sync_entry_state` 各 0→1，
+        `content_application` 仍为 0（首版发布不写 application）。判据从「无变化」
+        改成「恰这份增量」——这既固化了「首版真的落成」，也固化了「重跑没造出第二份」
+        （Property 13 的另一半：成功之后同样不许有半成品/重复）。
+
+        谁让主流程 H1 又发不出去（回到零增量）⇒ 本条打红：那是 materialize/commit
+        链回归，先定位根因。
         """
         empty = snap["snapshots"]["empty"]
         after = snap["snapshots"]["after_rerun"]
-        diffs = _diff_snapshots(empty, after)
-        assert diffs == [], (
-            "四个 entry 全部失败之后四张表有残留:\n  " + "\n  ".join(diffs)
+        expected_delta = {
+            "working_paper_content_version": 1,
+            "working_paper_content_representation": 1,
+            "working_paper_content_application": 0,
+            "working_paper_sync_entry_state": 1,
+        }
+        actual_delta = {
+            table: after[table]["rows"] - empty[table]["rows"]
+            for table in _SNAPSHOT_TABLES
+        }
+        assert actual_delta == expected_delta, (
+            f"主流程跑完的行数增量实测 {actual_delta}，期望恰一份首版 "
+            f"{expected_delta} —— 少了说明 H1 又发不出去（回归），"
+            "多了说明重跑造出了第二份或残留了半成品"
         )
 
 

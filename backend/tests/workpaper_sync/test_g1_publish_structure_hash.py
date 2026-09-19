@@ -11,8 +11,8 @@ from app.services.workpaper_sync import content_mutation as cm
 from app.services.workpaper_sync import publish_time_structure_hash as hashes
 from app.services.workpaper_sync import contracts
 from app.services.workpaper_sync.published_identity_observer import PublishedIdentityObserver
-from backend.tests.workpaper_sync.g1_structure_fixture import workbook_fixture
-from backend.tests.workpaper_sync.test_task15_content_mutation import xlsx_payload
+from tests.workpaper_sync.g1_structure_fixture import workbook_fixture
+from tests.workpaper_sync.test_task15_content_mutation import xlsx_payload
 
 ROOT = Path(__file__).resolve().parents[3]
 
@@ -64,7 +64,9 @@ async def test_frozen_payload_reader_and_missing_anchors(monkeypatch):
     monkeypatch.setattr(PublishedIdentityObserver, "_load_child_row", read_child)
     monkeypatch.setattr(PublishedIdentityObserver, "_read_definition_payload", read_payload)
     kwargs = dict(session=object(), resolution=object(), bundle=bundle, document_type="xlsx")
-    assert await hashes.load_frozen_structure_anchors(**kwargs) == anchors
+    # load_frozen_structure_anchors 返回**全部**受管 sheet 锚点的 tuple（多 sheet entry 时
+    # structure_hash 必须覆盖 sibling）；单 sheet payload 即 1 元 tuple。
+    assert await hashes.load_frozen_structure_anchors(**kwargs) == (anchors,)
     assert read_child.call_args.kwargs["bundle"] is bundle
     read_payload.return_value = {}
     with pytest.raises(hashes.FrozenChildUnusableError):
@@ -138,7 +140,7 @@ def test_fail_open_mutation_is_killed(tmp_path):
 
 @pytest.mark.asyncio
 async def test_finalize_final_bytes_and_inline_formula_mutation(monkeypatch, tmp_path):
-    from backend.tests.workpaper_sync import test_task36_excel_entry_gate as fixtures
+    from tests.workpaper_sync import test_task36_excel_entry_gate as fixtures
     import app.services.workpaper_sync.excel_entry_gate as gate_module
     monkeypatch.setattr(gate_module, "load_contract", lambda _: contracts.parse_contract(fixtures.xlsx_payload()))
     from app.services.workpaper_sync.excel_entry_gate import ExcelEntryFinalizeGate

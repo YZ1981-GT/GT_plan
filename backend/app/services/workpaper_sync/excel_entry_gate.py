@@ -1261,19 +1261,63 @@ class ExcelEntryFinalizeGate:
             observed_dynamic_columns=observed_dynamic_columns,
         )
 
+        # 🔴 BP-30 evidence 门第二段：读**将要发布的最终字节**并把它锚回同一条证据链。
+        # `evidence.instrumented_sha256` 与 `staged_candidate.sha256` 只是 metadata 之间
+        # 的自洽，若磁盘上的候选字节被换掉（metadata 仍一致），必须在 structure_hash
+        # 计算与 coordinator 调用之前 fail closed（否则 tampered 字节会一路走到发布）。
+        candidate_bytes = Path(staged_candidate.path).read_bytes()
+        candidate_bytes_sha256 = hashlib.sha256(candidate_bytes).hexdigest()
+        if candidate_bytes_sha256 != staged_candidate.sha256:
+            raise CandidateEvidenceError(
+                f"entry {entry_id}: staged candidate 磁盘字节的 digest "
+                f"{candidate_bytes_sha256} 与登记的 {staged_candidate.sha256} 不一致 —— "
+                "将要发布的字节已被篡改，证据链不再指向同一份内容"
+            )
+
+        # 🔴 BP-30 统一 structure_hash（主控 §3.4）：发布/请求两个时刻必须用**同一条**
+        # 公式、从**最终字节**算 structure_hash（不是从调用方传入的 observed metadata 算）。
+        # 三个 host（oo_to_html / conflict_resolution / content_mutation）已收敛到
+        # `compute_structure_hash_from_artifact(data=最终字节, contract=..., anchors=冻结锚点)`，
+        # 本 finalize 门是第四个 host。锚点从 frozen bundle 的 instrumentation child 反读
+        # （docx/opaque authority 时返回 None，`compute_...` 内部按 contract 观测器兜底）。
+        from app.services.workpaper_sync.publish_time_structure_hash import (
+            compute_structure_hash_from_artifact,
+            load_frozen_structure_anchors,
+        )
+
+        anchors = await load_frozen_structure_anchors(
+            session=self._loader._session,
+            resolution=self._resolution,
+            bundle=definitions.bundle,
+            document_type=definitions.adapter_build.document_type,
+        )
+        # docx / custom-authoritative-ooxml：没有受管 projection，`load_frozen_structure_anchors`
+        # 返回 None（与 content_mutation 对 docx 的处理同源）。这些 authority 下 xlsx/docx
+        # 本体自己就是权威、不做投影，structure_hash 退回按契约声明结构算（旧行为）。
+        # projection_contract xlsx 是 load-bearing 分支：anchors 非 None，必须从最终字节反读。
+        structure_hash = (
+            compute_structure_hash_from_artifact(
+                data=candidate_bytes,
+                contract=definitions.contract,
+                anchors=anchors,
+            )
+            if anchors is not None
+            else canonical_digest(
+                {
+                    "schema_version": "excel-entry-structure:v1",
+                    "contract_sha256": definitions.contract.canonical_sha256,
+                    "structure": [list(item) for item in sorted(observed_structure)],
+                }
+            )
+        )
+
         outcome = await self._coordinator.finalize_definition_upgrade(
             project_id=project_id,
             candidate_id=candidate_id,
             staged_candidate=staged_candidate,
             adapter_id=definitions.adapter_build.adapter_id,
             adapter_build_digest=definitions.adapter_build.adapter_build_digest,
-            structure_hash=canonical_digest(
-                {
-                    "schema_version": "excel-entry-structure:v1",
-                    "contract_sha256": definitions.contract.canonical_sha256,
-                    "structure": [list(item) for item in sorted(observed_structure)],
-                }
-            ),
+            structure_hash=structure_hash,
             identity_inventory_sha256=canonical_digest(
                 evidence.identity_inventory.inventory_digest_input
             ),

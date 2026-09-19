@@ -1470,12 +1470,25 @@ class TestFinalizeGate:
 
     @pytest.mark.asyncio
     async def test_happy_path_delegates_to_the_task25_only_exit(
-        self, contract: C.SyncContract
+        self, contract: C.SyncContract, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        sha = _d("instrumented-bytes")
+        # BP-30：finalize 从 candidate **最终字节** 反读受管结构算 structure_hash，
+        # 因此候选必须落成真 xlsx 且 sha 与其字节一致，冻结锚点由 load_frozen_structure_anchors
+        # 提供（这里 monkeypatch 成固定锚点，避免拉起真库读 instrumentation child）。
+        from tests.workpaper_sync.g1_structure_fixture import workbook_fixture
+        from unittest.mock import AsyncMock
+        from app.services.workpaper_sync import publish_time_structure_hash as _hashes
+
+        data, anchors = workbook_fixture()
+        sha = hashlib.sha256(data).hexdigest()
+        monkeypatch.setattr(_hashes, "load_frozen_structure_anchors", AsyncMock(return_value=anchors))
         report = evidence_bytes(instrumented_sha=sha)
         gate, coord, res = build_gate(contract.canonical_sha256, report=report)
-        outcome = await gate.finalize_candidate(**gate_kwargs(report, sha=sha))
+        candidate = staged_candidate(sha, tmp=tmp_path)
+        candidate.path.write_bytes(data)
+        outcome = await gate.finalize_candidate(
+            **gate_kwargs(report, sha=sha, staged_candidate=candidate)
+        )
         assert len(coord.calls) == 1
         assert res.candidate_calls == [CANDIDATE_ID]
         assert outcome.revision_unchanged
@@ -1593,9 +1606,15 @@ class TestFinalizeGate:
 
     @pytest.mark.asyncio
     async def test_result_bundle_must_equal_the_frozen_one(
-        self, contract: C.SyncContract
+        self, contract: C.SyncContract, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        sha = _d("instrumented-bytes")
+        from tests.workpaper_sync.g1_structure_fixture import workbook_fixture
+        from unittest.mock import AsyncMock
+        from app.services.workpaper_sync import publish_time_structure_hash as _hashes
+
+        data, anchors = workbook_fixture()
+        sha = hashlib.sha256(data).hexdigest()
+        monkeypatch.setattr(_hashes, "load_frozen_structure_anchors", AsyncMock(return_value=anchors))
         report = evidence_bytes(instrumented_sha=sha)
         gate, coord, _ = build_gate(
             contract.canonical_sha256,
@@ -1604,26 +1623,38 @@ class TestFinalizeGate:
                 outcome=finalize_outcome(bundle_id=uuid.uuid4())
             ),
         )
+        candidate = staged_candidate(sha, tmp=tmp_path)
+        candidate.path.write_bytes(data)
         with pytest.raises(G.FrozenBundleDigestMismatchError):
-            await gate.finalize_candidate(**gate_kwargs(report, sha=sha))
+            await gate.finalize_candidate(
+                **gate_kwargs(report, sha=sha, staged_candidate=candidate)
+            )
         assert len(coord.calls) == 1
 
     @pytest.mark.asyncio
     async def test_equivalence_report_is_read_from_the_candidate_directory(
-        self, contract: C.SyncContract, tmp_path: Path
+        self, contract: C.SyncContract, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         """不传 `equivalence_report_bytes` 时走真实文件读取（路径由 StagedCandidate 携带）。"""
-        sha = _d("instrumented-bytes")
+        from tests.workpaper_sync.g1_structure_fixture import workbook_fixture
+        from unittest.mock import AsyncMock
+        from app.services.workpaper_sync import publish_time_structure_hash as _hashes
+
+        data, anchors = workbook_fixture()
+        sha = hashlib.sha256(data).hexdigest()
+        monkeypatch.setattr(_hashes, "load_frozen_structure_anchors", AsyncMock(return_value=anchors))
         report = evidence_bytes(instrumented_sha=sha)
         cdir = tmp_path / "cand"
         cdir.mkdir()
         (cdir / "equivalence-abc.json").write_bytes(report)
+        candidate = staged_candidate(sha, tmp=cdir)
+        candidate.path.write_bytes(data)
         gate, coord, _ = build_gate(contract.canonical_sha256, report=report)
         outcome = await gate.finalize_candidate(
             **gate_kwargs(
                 report,
                 sha=sha,
-                staged_candidate=staged_candidate(sha, tmp=cdir),
+                staged_candidate=candidate,
                 equivalence_report_bytes=None,
             )
         )

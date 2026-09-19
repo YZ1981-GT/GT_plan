@@ -1409,6 +1409,10 @@ class ConflictResolutionService:
                 actor_id=actor_id,
                 rolled_back_at=_now(),
             )
+        from app.services.workpaper_sync.publish_time_structure_hash import (
+            load_frozen_structure_anchors,
+        )
+
         plan = ContentCommitPlan(
             project_id=declared_project_id,
             wp_id=declared_wp_id,
@@ -1426,6 +1430,15 @@ class ConflictResolutionService:
             actor_id=actor_id,
             parent_version_id=await self._current_version_id(declared_wp_id),
             contract=contract,
+            # rollback 也是 xlsx projection commit：必须喂冻结受管结构锚点，否则
+            # `_projection_structure_hash` 因缺 structure_anchors fail-closed（与 HTML→OO /
+            # OO→HTML 两个 host 同一发布时刻公式，BP-30）。docx/opaque 时返回 None 由该函数兜。
+            structure_anchors=await load_frozen_structure_anchors(
+                session=self._session,
+                resolution=self._resolution,
+                bundle=resolved.bundle,
+                document_type=resolved.document_type,
+            ),
             reason="rollback",
         )
         receipt = await self._content.commit(

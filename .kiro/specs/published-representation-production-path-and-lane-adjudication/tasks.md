@@ -174,6 +174,35 @@ bundle / artifact 计数**逐项不变**（`2/2/2` · 6 · 18）。
 `xlsx/b60/gt-b60-bundle` | `blocked_ooxml_gate` | 3/10 | `gate=external_relationships`，安全策略裁决（本 spec 不放宽） |
 `xlsx/gt-g7-long-term-equity-main` | 首轮 `blocked_missing_approved_bundle` 2/10 → **现 `ready_to_publish` 10/10，已发布** | — | **已解开**，见下「G7 解锁链」 |
 
+### ✅ 附记（2026-09-19 · 可行域扩大：H1/D2 首版已发出）
+
+> 上表是 **2026-09-04 的 append-only 现场记录**，不回填修改。本附记记录其后可行域的变化。
+
+`excel-structural-row-insertion-and-shift-aware-verification`（M2 插行泳道）落地后，
+commit `93892b99f`（「多 sheet materialize 的 defined-name/per-sheet 位移归一化 + sibling
+footer 扩张」）修掉了上表 H1/D2 的两处首版阻塞。F8 真实 PG 逐 entry 探针
+（`test_projection_first_publication_pg.py::TestFirstPublicationFeasibleDomain`）现实测：
+
+| entry | 旧结算（2026-09-04）| 现结算（2026-09-19，干净临时 schema）|
+|---|---|---|
+`xlsx/gt-h1-fixed-assets` | `blocked_template_contract_drift`（A27 `……`）| **发出首版**，`representation_rows == 1` |
+`xlsx/gt-d2-accounts-receivable` | `blocked_row_insertion_required`（729 行身份无物理行）| **发出首版**，`representation_rows == 1` |
+`xlsx/b60/gt-b60-bundle` | `blocked_ooxml_gate` | 同（stage 安全门，未变）|
+`xlsx/gt-g7-long-term-equity-main` | 已发布 / 夹具喂空载荷停 publish | 同（未变）|
+
+可行域从「干净 schema 上零个 entry 走完发布链」扩大到「**恰 H1 与 D2** 走完发布链」。
+判据随之翻新（`test_h1_and_d2_now_publish_a_first_generation` +
+`test_exactly_the_materialize_ready_entries_published` +
+`test_the_main_flow_left_exactly_one_first_generation`）：谁让 H1/D2 又发不出去即打红（回归），
+谁让别的 entry 也发成功即打红（域又扩大）。**Open Gate 4 / BP-21 的验收判据随之达成**
+（H1 A27 / D2 A25 的 `……` 占位行已被 `resolve_managed_region` 剔出受管区）。
+
+**一处夹具缺口一并补齐**：发布事务第五步写 `import_event_outbox`，而 F8 的 `MIGRATIONS`
+（V151~V153）不建这张表 —— materialize 修通后 H1/D2 会在发布**最后一步**撞
+`UndefinedTableError`、`error_code` 落空串，被误读成「materialize 仍阻塞」。F8 现从
+ORM metadata 补建 `import_event_outbox` / `import_event_consumptions`（与
+`test_task15/18/77` 同款处置），才看得到真实可行域。F8 计数仍为 **51 passed**。
+
 ### G7 解锁链：2/10 → 10/10，四处缺陷全在本 spec 交付面内
 
 每一处都是「前三个 entry 恰好不触发，于是判据在空集上恒真」的形态：
