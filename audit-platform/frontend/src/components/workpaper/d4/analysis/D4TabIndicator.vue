@@ -12,7 +12,10 @@
 import { ref, computed, inject, toRef, watch, onBeforeUnmount, type Ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import http from '@/utils/http'
-import GtOnlyOfficeSheet from '../../GtOnlyOfficeSheet.vue'
+import { useWorkpaperSyncBridge, WP_BRIDGE_IN_FLIGHT_STATES } from '../../sync/useWorkpaperSyncBridge'
+import { readStoreProjection } from '../../sync/workpaperSyncApi'
+import { capabilityForEntry } from '../../sync/workpaperSyncCapability'
+import WorkpaperSyncEditorHost from '../../sync/WorkpaperSyncEditorHost.vue'
 import { useD4ImportExport } from '../../composables/useD4ImportExport'
 
 const props = defineProps<{
@@ -24,13 +27,13 @@ const props = defineProps<{
 
 const openReviewDialog = inject<((sectionId: string) => void) | null>('openReviewDialog', null)
 
-// 双模式（结构化视图 / 在线编辑）
-const editorMode = ref<'structured' | 'onlyoffice'>('structured')
+// ─── 双模式 sync bridge（批次B 从零第一张：D4-6 从 legacy GtOnlyOfficeSheet 迁 ────
+//     useWorkpaperSyncBridge + WorkpaperSyncEditorHost；sheet_key=d46-managed，
+//     同 entry gt-d4-operating-revenue（后端 phase5_d4_indicator_sheet provider）。
+//     参照 D4-15/D4-21 接桥范式。宿主 GtD4OperatingRevenue 须登记 'D4-6'。
+const D4_6_ENTRY = 'xlsx/gt-d4-operating-revenue'
+const D4_6_SHEET_KEY = 'd46-managed'
 const ooHealthy = ref(false)
-const modeOptions = computed(() => [
-  { label: '结构化视图', value: 'structured' },
-  { label: '在线编辑', value: 'onlyoffice', disabled: !ooHealthy.value },
-])
 async function checkOoHealth() {
   try {
     const res = await http.get(`/api/workpapers/onlyoffice/health`, { _silent: true } as any)
@@ -38,6 +41,63 @@ async function checkOoHealth() {
   } catch { ooHealthy.value = false }
 }
 checkOoHealth()
+const syncSwitching = ref(false)
+const syncHostRef = ref<{ forceSave: () => Promise<{ operationId: string }> } | null>(null)
+// flushPendingSave/reload：flushSave / loadIndicators+loadNoteConclusion 是函数声明（提升），
+// 此处引用安全。flushHtml 内先 flush 再 readStoreProjection（防投影旧值，主控 §4.1）。
+function flushPendingSave() { if (debounceTimer) { clearTimeout(debounceTimer); debounceTimer = null } flushSave() }
+function reloadD46() { loadIndicators(); loadNoteConclusion(); loadAuditProcess() }
+const syncBridge = useWorkpaperSyncBridge({
+  entryId: ref(D4_6_ENTRY),
+  wpId: toRef(props, 'wpId'),
+  projectId: toRef(props, 'projectId'),
+  sheetKey: ref(D4_6_SHEET_KEY),
+  capability: capabilityForEntry(D4_6_ENTRY),
+  flushHtml: async () => {
+    flushPendingSave()
+    const snap = await readStoreProjection({ projectId: props.projectId, wpId: props.wpId, entryId: D4_6_ENTRY })
+    return { expectedRevision: snap.expectedRevision, projection: snap.projection, sheetKey: D4_6_SHEET_KEY }
+  },
+  reloadHtml: async () => { reloadD46() },
+})
+const syncOoDescriptor = computed(() => syncBridge.descriptor.value)
+const syncBusy = computed(
+  () => syncSwitching.value
+    || (WP_BRIDGE_IN_FLIGHT_STATES as readonly string[]).includes(String(syncBridge.state.value)),
+)
+const editorMode = computed<'structured' | 'onlyoffice'>({
+  get: () => (syncBridge.mode.value === 'oo' ? 'onlyoffice' : 'structured'),
+  set: (v) => { void switchMode(v) },
+})
+const modeOptions = computed(() => [
+  { label: '结构化视图', value: 'structured' },
+  { label: '在线编辑', value: 'onlyoffice', disabled: props.isReadonly || !ooHealthy.value || syncBusy.value },
+])
+async function switchMode(target: 'structured' | 'onlyoffice'): Promise<void> {
+  const cur = syncBridge.mode.value === 'oo' ? 'onlyoffice' : 'structured'
+  if (target === cur) return
+  if (target === 'onlyoffice') {
+    if (props.isReadonly || !ooHealthy.value) return
+    syncSwitching.value = true
+    try { await syncBridge.switchToOnlyOffice() } finally { syncSwitching.value = false }
+    return
+  }
+  syncSwitching.value = true
+  try { await syncBridge.switchToHtml() } finally { syncSwitching.value = false }
+}
+const syncStateTag = computed(() => {
+  const st = String(syncBridge.state.value)
+  if (syncBusy.value) return { text: '同步中…', type: 'info' as const }
+  if (syncBridge.dirty?.value) {
+    return syncBridge.mode.value === 'oo'
+      ? { text: 'excel 侧有未同步改动', type: 'warning' as const }
+      : { text: 'html 侧有未同步改动', type: 'warning' as const }
+  }
+  if (st.includes('error') || String(syncBridge.lastError?.value || '')) {
+    return { text: '同步失败，请重试', type: 'danger' as const }
+  }
+  return { text: '已同步', type: 'success' as const }
+})
 
 // ─── 审计目标（固定文本） ─────────────────────────────────────────────
 const auditObjectives = [
@@ -290,6 +350,7 @@ onBeforeUnmount(() => { if (debounceTimer) { clearTimeout(debounceTimer); flushS
     <!-- 双模式切换 -->
     <div class="mode-bar">
       <el-segmented v-model="editorMode" :options="modeOptions" size="small" />
+      <el-tag :type="syncStateTag.type" size="small" effect="light" style="margin-left:8px">{{ syncStateTag.text }}</el-tag>
     </div>
 
     <!-- 结构化视图 -->
@@ -448,15 +509,11 @@ onBeforeUnmount(() => { if (debounceTimer) { clearTimeout(debounceTimer); flushS
   
     </template>
 
-    <!-- OnlyOffice 在线编辑 -->
+    <!-- 在线编辑：平台 sync bridge（批次B 迁移，非裸 GtOnlyOfficeSheet） -->
     <template v-else>
       <div style="min-height: 600px; height: calc(100vh - 280px);">
-        <GtOnlyOfficeSheet
-          :wp-id="props.wpId"
-          :project-id="props.projectId"
-          sheet-name="重要指标分析D4-6"
-          :readonly="isReadonly"
-        />
+        <WorkpaperSyncEditorHost v-if="syncOoDescriptor" ref="syncHostRef" :descriptor="syncOoDescriptor" :bridge="syncBridge" />
+        <div v-else class="oo-loading">正在打开 D4-6 同步编辑器…</div>
       </div>
     </template>
   </div>

@@ -182,6 +182,25 @@ from app.services.workpaper_sync.phase5_d4_29_customer_detail import (
     sheet_payload,
     assert_mapping_digest as assert_mapping_digest_d429,
 )
+from app.services.workpaper_sync.phase5_d4_customer_structure import (
+    EXPECTED_MAPPING_DIGEST_D49,
+    MANAGED_SHEET_D49,
+    ROWS_TABLE_KEY_CURRENT as ROWS_TABLE_KEY_D49_CURRENT,
+    ROWS_TABLE_KEY_PRIOR as ROWS_TABLE_KEY_D49_PRIOR,
+    ROW_IDENTITY_STORE_KEY_D49,
+    SHEET_KEY_D49,
+    STORE_ITEM_ID_D49,
+    TABLE_NAME_CURRENT as TABLE_NAME_D49_CURRENT,
+    TABLE_NAME_PRIOR as TABLE_NAME_D49_PRIOR,
+    TEMPLATE_ID_CURRENT as TEMPLATE_ID_D49_CURRENT,
+    TEMPLATE_ID_PRIOR as TEMPLATE_ID_D49_PRIOR,
+    assert_mapping_digest_d49,
+    build_d49_store_projection,
+    instrumentation_spec_d49,
+    merge_projection_into_d49_store,
+    merge_projection_into_d49_store_state,
+    sheet_payload_d49,
+)
 
 from app.services.workpaper_sync.phase5_d4_ipo_interview_sheets import (
     codes as INTERVIEW_SHEET_CODES,
@@ -190,6 +209,13 @@ from app.services.workpaper_sync.phase5_d4_ipo_interview_sheets import (
     store_item_id as interview_store_item_id,
     build_store_projection as build_interview_store_projection,
     merge_projection_into_store as merge_interview_projection_into_store,
+)
+from app.services.workpaper_sync.phase5_d4_indicator_sheet import (  # noqa: E402
+    STORE_ITEM_ID_D46,
+    sheet_payload_d46,
+    instrumentation_spec_d46,
+    build_store_projection_d46,
+    merge_projection_into_d46_rows,
 )
 from app.services.workpaper_sync.phase5_d4_ipo_checklist_sheets import (  # noqa: E402
     CHECKLIST_SHEET_CODES,
@@ -257,6 +283,10 @@ TEMPLATE_SHA256: Final[str] = (
 #: 与行 table 数对齐、_align_specs_to_sibling_tables 成功（sibling 内核已由 D4-1 dual-region
 #: GENERALIZE，单 sheet 单 table 是其子集）。已跑发布链 + rematerialize gen52 无 drift。
 _INCLUDE_IPO_INTERVIEW_SHEETS: Final[bool] = True
+#: D4-6 重要指标分析表接入（批次B 从零第一张，2026-09-20）。固定 12 行静态指标、
+#: 行身份=key、受管列 B/C/E/F/H、formula_mask D/G（差异率内部公式）、注入 UUID 列 I。
+#: provider=phase5_d4_indicator_sheet，单 sheet 单 table（interview 范式子集）。
+_INCLUDE_D46_INDICATOR_SHEET: Final[bool] = True
 #: 🔴 D4-1 同 sheet 双区 instrumentation 接线开关（Task 5）。
 #: 契约 sheet（sheet_payload_d41）+ store projection + merge 恒接（判据先行 Task 2 判据）；
 #: 但 instrumentation_specs 两 spec（主营/其他）暂**不接**，唯一阻塞 = 运行态 sibling binding
@@ -302,6 +332,7 @@ STORE_ITEM_IDS: Final[tuple[str, ...]] = (
     STORE_ITEM_ID_D423,
     STORE_ITEM_ID_D424,
     STORE_ITEM_ID_D41,
+    STORE_ITEM_ID_D49,
     *((STORE_ITEM_ID_D429,) if _INCLUDE_D429_TRANSPOSED else ()),
     *STORE_ITEM_ID_BY_CODE.values(),
 )
@@ -589,6 +620,15 @@ def instrumentation_specs() -> tuple:
             for code in INTERVIEW_SHEET_CODES()
             if _INCLUDE_IPO_INTERVIEW_SHEETS
         ),
+        *(
+            (
+                instrumentation_spec_d46(
+                    entry_id=ENTRY_ID, template_relative_path=TEMPLATE_RELATIVE_PATH
+                ),
+            )
+            if _INCLUDE_D46_INDICATOR_SHEET
+            else ()
+        ),
         # D4-1 营业收入审定表：同 sheet 双区（主营 R8 起 / 其他 R14 起）两 spec，同
         # managed_sheet 不同行段/UUID 列（W/X）。默认不接（见
         # _INCLUDE_D41_ADJUDICATION_INSTRUMENTATION 注释：runtime sibling binding 对齐仍
@@ -599,6 +639,12 @@ def instrumentation_specs() -> tuple:
             )
             if _INCLUDE_D41_ADJUDICATION_INSTRUMENTATION
             else ()
+        ),
+        # D4-9 重要客户结构分析：同 sheet 双区（本期 R13-22 / 上期 R27-36）两 spec，同
+        # managed_sheet 不同行段/UUID 列（W/X）。同 sheet 双区注入内核已由 Task 1 落地，
+        # binding 对齐走共享 _align_specs_to_sibling_tables（与 D4-1 同路径）。
+        *instrumentation_spec_d49(
+            entry_id=ENTRY_ID, template_relative_path=TEMPLATE_RELATIVE_PATH
         ),
     )
 
@@ -738,6 +784,7 @@ def build_contract_payload() -> dict[str, Any]:
     assert_mapping_digest_d45()
     assert_mapping_digest_d435()
     assert_mapping_digest_d41()
+    assert_mapping_digest_d49()
     assert_all_checklist_mapping_digests()
     assert_all_inspection_mapping_digests()
     if _INCLUDE_D429_TRANSPOSED:
@@ -811,6 +858,8 @@ def build_contract_payload() -> dict[str, Any]:
             # D4-1 营业收入审定表：同 sheet 双区（2 张 row table，main/other），
             # provider 返回完整 sheet dict（含 sheet 级 formula_mask + tb_check）。
             sheet_payload_d41(),
+            # D4-9 重要客户结构分析：同 sheet 三 table（本期/上期动态行 + totals 静态标量）。
+            sheet_payload_d49(),
             *(
                 (
                     {
@@ -830,6 +879,7 @@ def build_contract_payload() -> dict[str, Any]:
                 for code in INTERVIEW_SHEET_CODES()
                 if _INCLUDE_IPO_INTERVIEW_SHEETS
             ),
+            *([sheet_payload_d46()] if _INCLUDE_D46_INDICATOR_SHEET else []),
         ],
         "review": {
             "entry_id": ENTRY_ID,
@@ -931,6 +981,30 @@ def build_contract_payload() -> dict[str, Any]:
                             "同 store D4-1-rows，两区 rowId 各自唯一不串区（同 D4-9 W/X 思路）。"
                         ),
                     },
+                    # D4-9 重要客户结构分析：单个 store D4-9-data（{current,prior}+totals 嵌套），
+                    # 同 sheet 三 table（本期/上期动态行 UUID 列 W/X + totals 静态标量）。
+                    {
+                        "item_id": STORE_ITEM_ID_D49,
+                        "sheet_key": SHEET_KEY_D49,
+                        "table_key": ROWS_TABLE_KEY_D49_CURRENT,
+                        "row_identity_key": ROW_IDENTITY_STORE_KEY_D49,
+                        "note": (
+                            "D4-9 本期段动态行（customer_current_rows，R13-22，UUID 列 W）；单个 store "
+                            "D4-9-data 嵌套 {current,prior} 按 table_key 分流三区，B name/C amount/"
+                            "D amountRatio(公式)/E quantity/F quantityRatio(公式)/G priorRank；D/F 占比 "
+                            "+ 合计入 formula_mask 不回写；4 总额 C24/E24/C38/E38 为 totals 静态标量。"
+                        ),
+                    },
+                    {
+                        "item_id": STORE_ITEM_ID_D49,
+                        "sheet_key": SHEET_KEY_D49,
+                        "table_key": ROWS_TABLE_KEY_D49_PRIOR,
+                        "row_identity_key": ROW_IDENTITY_STORE_KEY_D49,
+                        "note": (
+                            "D4-9 上期段动态行（customer_prior_rows，R27-36，UUID 列 X≠本期）；"
+                            "同 store D4-9-data，两区 rowId 各自唯一不串区。"
+                        ),
+                    },
                     *(
                         (
                             {
@@ -972,6 +1046,7 @@ def build_contract_payload() -> dict[str, Any]:
             "mapping_digest_d45": EXPECTED_MAPPING_DIGEST_D45,
             "mapping_digest_d435": EXPECTED_MAPPING_DIGEST_D435,
             "mapping_digest_d41": EXPECTED_MAPPING_DIGEST_D41,
+            "mapping_digest_d49": EXPECTED_MAPPING_DIGEST_D49,
             "mapping_digest_ipo_checklist": assert_all_checklist_mapping_digests(),
             "mapping_digest_inspection": assert_all_inspection_mapping_digests(),
             **(
@@ -988,6 +1063,8 @@ def build_contract_payload() -> dict[str, Any]:
                 TEMPLATE_ID_D423,
                 TEMPLATE_ID_D424,
                 TEMPLATE_ID_D435,
+                TEMPLATE_ID_D49_CURRENT,
+                TEMPLATE_ID_D49_PRIOR,
                 *(
                     (sheet_payload()["template_id"],)
                     if _INCLUDE_D429_TRANSPOSED
@@ -1005,6 +1082,8 @@ def build_contract_payload() -> dict[str, Any]:
                 TABLE_NAME_D423,
                 TABLE_NAME_D424,
                 TABLE_NAME_D435,
+                TABLE_NAME_D49_CURRENT,
+                TABLE_NAME_D49_PRIOR,
                 *(
                     (sheet_payload()["tables"][0]["table_key"],)
                     if _INCLUDE_D429_TRANSPOSED
@@ -1327,6 +1406,10 @@ def build_combined_store_projection(
     d41 = build_store_projection_d41(
         payloads.get(STORE_ITEM_ID_D41, EMPTY_STORE_PAYLOAD), contract=contract, limits=limits
     )
+    # D4-9 重要客户结构分析：单个 store D4-9-data（{current,prior}+totals）三 table 合并投影。
+    d49 = build_d49_store_projection(
+        payloads.get(STORE_ITEM_ID_D49, "{}"), contract=contract, limits=limits
+    )
     interview_projs = [
         build_interview_store_projection(
             code,
@@ -1337,6 +1420,11 @@ def build_combined_store_projection(
         for code in INTERVIEW_SHEET_CODES()
         if _INCLUDE_IPO_INTERVIEW_SHEETS
     ]
+    d46_projs = (
+        [build_store_projection_d46(payloads.get(STORE_ITEM_ID_D46, []), contract=contract, limits=limits)]
+        if _INCLUDE_D46_INDICATOR_SHEET
+        else []
+    )
     # D4-25/26/27/28 IPO 检查表追加受管 sheet（空载荷时安全返回空投影）。
     inspection_projs = [
         build_inspection_store_projection(
@@ -1360,7 +1448,7 @@ def build_combined_store_projection(
     values.update(right.values)
     values.update(groups.values)
     values.update(fixed.values)
-    for proj in (d421, d422, d423, d424, d435, d41, *ipo_checklist_projs, *inspection_projs, *interview_projs):
+    for proj in (d421, d422, d423, d424, d435, d41, d49, *ipo_checklist_projs, *inspection_projs, *interview_projs, *d46_projs):
         values.update(proj.values)
     if d429 is not None:
         values.update(d429.values)
@@ -1374,10 +1462,12 @@ def build_combined_store_projection(
         **dict(d424.row_keys),
         **dict(d435.row_keys),
         **dict(d41.row_keys),
+        **dict(d49.row_keys),
         **(dict(d429.row_keys) if d429 is not None else {}),
         **{k: v for p in interview_projs for k, v in dict(p.row_keys).items()},
         **{k: v for p in ipo_checklist_projs for k, v in dict(p.row_keys).items()},
         **{k: v for p in inspection_projs for k, v in dict(p.row_keys).items()},
+        **{k: v for p in d46_projs for k, v in dict(p.row_keys).items()},
     }
     return Projection(
         contract_id=contract.contract_id,
@@ -1411,6 +1501,16 @@ def merge_projection_into_all_d4_stores(
         for code in INTERVIEW_SHEET_CODES()
         if _INCLUDE_IPO_INTERVIEW_SHEETS
     }
+    d46_results = (
+        {
+            STORE_ITEM_ID_D46: merge_projection_into_d46_rows(
+                projection=projection,
+                base_payload=base_by_item.get(STORE_ITEM_ID_D46, []),
+            )
+        }
+        if _INCLUDE_D46_INDICATOR_SHEET
+        else {}
+    )
     return {
         STORE_ITEM_ID: merge_projection_into_store_rows(
             projection=projection, base_rows=d42_base
@@ -1438,6 +1538,8 @@ def merge_projection_into_all_d4_stores(
         STORE_ITEM_ID_D41: merge_projection_into_d41_rows(
             projection=projection, base_rows=d41_base
         ),
+        # D4-9 是嵌套 dict store（非行数组），不走本 rows 汇总；由 oo_to_html 专用 dict 块
+        # 经 merge_d49_from_projection 单独处理（同 D4-35 STORE_ITEM_ID_D435_DICT 模式）。
         **(
             {
                 STORE_ITEM_ID_D429: merge_d429_projection_into_store(
@@ -1450,6 +1552,7 @@ def merge_projection_into_all_d4_stores(
         ),
 
         **interview_results,
+        **d46_results,
         **{
             STORE_ITEM_ID_BY_CODE[code]: merge_ipo_checklist_projection_into_rows(
                 code,
@@ -1482,6 +1585,24 @@ def merge_d45_fixed_from_projection(
 
 #: D4-35 store item（dict 形态 {rows, sampling, periodAmount}，非行数组，不进 STORE_ITEM_IDS）。
 STORE_ITEM_ID_D435_DICT: Final[str] = STORE_ITEM_ID_D435
+
+#: D4-9 store item（dict 形态 {current,prior}+totals，嵌套非行数组）。**在** STORE_ITEM_IDS 里
+#: （combined projection / 单 item flush 需要），但 oo_to_html 镜像走专用 dict 块（不进 rows 循环）。
+STORE_ITEM_ID_D49_DICT: Final[str] = STORE_ITEM_ID_D49
+
+
+def merge_d49_from_projection(
+    *,
+    projection: Any,
+    base_state: Mapping[str, Any] | None,
+) -> tuple[dict[str, Any], int, int]:
+    """D4-9 dict store ← projection：三 table 分流回 {current,prior}+totals 嵌套结构。
+
+    返回 (merged_dict, applied, visited)。委托 sibling provider 的 merge。
+    """
+    return merge_projection_into_d49_store_state(
+        projection=projection, base_state=base_state
+    )
 
 
 def merge_d435_from_projection(
