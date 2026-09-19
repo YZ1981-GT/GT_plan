@@ -44,3 +44,13 @@
   - _Requirements: 2.1, 2.2, 2.3_
 - [ ] BB3 [blocked] 真栈验收（Task 7）：Playwright 真实 HTML/Excel 往返、durable ack 失败恢复、A13/D4-1 独立重试。需 `start-dev.bat`（后端 9980 + 前端 3030 + OnlyOffice 服务）。
   - _Requirements: 2.2, 4.1_
+
+## 真栈 Playwright 验证（2026-09-19，append-only）
+
+> 环境重启后真栈实测（后端 9980 healthy + 前端 3030 + OnlyOffice healthy + 真 PG），真实项目「重庆和平药房2024」D4 底稿。全程 0 console error。测试数据已清理（真实项目零残留）。证据：`evidence/playwright-realstack-verify.md`。
+
+- [x] RS1. D4-16 派生列重算真栈：录入 账面100000/口岸98000/申报95000 → 口岸差异自动算 2,000.00、免抵退税差异 5,000.00（精确读 DOM），diff-warn 单元格同步；「推送差异至 A13」按钮 hasDiff 门控 disabled→enabled。**公式引擎单源重算浏览器实证生效**。
+- [x] RS2. D4-16 A13 全链路真栈（前端→事件桥→后端 POST→DB）：点推送 → ElMessage `已推送 1 项`（前端）+ `已记入未更正错报汇总 1 笔`（事件桥 ok>0）；DB `unadjusted_misstatements` 实证 source_wp_code=D4-16 / amount=7000(=\|2000\|+\|5000\|) / account=6001 营业收入 / type=factual。
+- [x] RS3. D4-17 跨期公式收敛真栈：凭证2025-12-20(期内)+发货2026-01-05(期后,cutoff 2025-12-31) → 跨期列渲染 `×` = `!isCrossPeriodForward(...)`；「推送跨期至 A13」cutoffIssues 0→1 enabled。**内联 checkCutoff 收敛为引擎函数浏览器实证生效**。
+- 🔴 RS4. 真栈印证 B3 缺口（非臆想）：D4-16 两次点击（间隔 48s > 去重窗 5000ms）→ DB 产生 2 条重复错报。`useA13MisstatementBridge.recentHashes` 内存 Map 去重窗口 5s、跨窗口/刷新失效。**durable ack 缺口真实存在**，属平台级基础设施（B3 blocked），影响全平台 ~35 个推送点。
+- 附：在线编辑模式对 D4-16 能打开 OnlyOffice 渲染源模板结构，界面标「两侧数据未互通/各自独立保存互不同步」——印证 D4-13~20 走 legacy 假双向，真同步桥（BB1/BB2）未做，与 spec 登记一致。
