@@ -7,7 +7,7 @@
     "excel_table",
     "hidden_uuid_column"
   ],
-  "instrumentation_definition_sha256": "e6ac63934d7d80a1585ca5b825fcfb942688c100c97e07f55d430a7c39391772",
+  "instrumentation_definition_sha256": "6035cd7d48328a16ac80086d25ec57ee05fb67eaa458dc5d2ae62d742fdf6e1f",
   "review": {
     "authority_root": "backend/wp_templates",
     "entry_id": "xlsx/gt-d4-operating-revenue",
@@ -108,6 +108,20 @@
           "row_identity_key": "rowId",
           "sheet_key": "d4-28-managed",
           "table_key": "customer_checklist_rows"
+        },
+        {
+          "item_id": "D4-15-items",
+          "note": "D4-15 检查表动态行 store；D4-15 三维嵌套 json_path(delivery/invoice/voucher)、D4-16 差异派生入 mask。",
+          "row_identity_key": "id",
+          "sheet_key": "d4-15-managed",
+          "table_key": "completeness_check_rows"
+        },
+        {
+          "item_id": "D4-16-rows",
+          "note": "D4-16 检查表动态行 store；D4-15 三维嵌套 json_path(delivery/invoice/voucher)、D4-16 差异派生入 mask。",
+          "row_identity_key": "id",
+          "sheet_key": "d4-16-managed",
+          "table_key": "export_customs_check_rows"
         }
       ],
       "table": "checklist_responses"
@@ -125,7 +139,9 @@
       "dealer_check_rows",
       "overseas_sales_rows",
       "undisclosed_rp_rows",
-      "customer_checklist_rows"
+      "customer_checklist_rows",
+      "completeness_check_rows",
+      "export_customs_check_rows"
     ],
     "instrumentation_template_ids": [
       "D42",
@@ -140,13 +156,19 @@
       "D425",
       "D426",
       "D427",
-      "D428"
+      "D428",
+      "D415",
+      "D416"
     ],
     "mapping_digest": "6d2f340d45ba0a24c95424c1e698be3df105252c160d174a2e4c748ec1554cc8",
     "mapping_digest_d429": "e3193dd9b581ac32041d25d7def13df44955108cce34c0341b05ec30eda17856",
     "mapping_digest_d43": "b3186632300c84d14c4c9c3c947cbff0cdcaaf807ce2e5f9848d42195513637f",
     "mapping_digest_d435": "67082d36b06053d607e6697967b8f5ce5f91cfaeae4892a543994a1544bb9b00",
     "mapping_digest_d45": "5e261da248cb0df23ba45f562099c1fdfdb450130df96022fb41ec4275f12eee",
+    "mapping_digest_inspection": {
+      "D4-15": "418b36299710ecd74b6268412aec0fe576156d378286137d19746dd3ee3d715b",
+      "D4-16": "ca12093d0ca7065dbd2647f1f7732f6f54e8fd7efda903e246847aa8961aa51c"
+    },
     "mapping_digest_ipo_checklist": {
       "D4-25": "ba47b19e9fa30e8c5060289366ccab31e3d782435bdd86715843add51c30fdc5",
       "D4-26": "2e8b792957f42df0f9a6209779916f5446259f08344cb97e10a44e3b4be7055a",
@@ -3238,6 +3260,399 @@
         }
       ],
       "template_id": "D428"
+    },
+    {
+      "excel_name": "营业收入完整性检查表D4-15",
+      "locator": {
+        "anchor": "excel_table_sheet_association"
+      },
+      "sheet_key": "d4-15-managed",
+      "tables": [
+        {
+          "anchor": "A11",
+          "delete_policy": "tombstone",
+          "fields": [
+            {
+              "cell": {
+                "column": "B",
+                "row_from": "row_identity"
+              },
+              "column_key": "delivery_date",
+              "header_source_ref": "源xlsx!营业收入完整性检查表D4-15!B12",
+              "header_text": "发货单日期",
+              "json_pointer": "/rows/{row_uuid}/delivery/date",
+              "mode": "editable",
+              "source_ref": "源xlsx!营业收入完整性检查表D4-15!B13",
+              "stable_field_key": "completeness_check_rows/{row_uuid}/delivery_date",
+              "store_item_id": "D4-15-items",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "C",
+                "row_from": "row_identity"
+              },
+              "column_key": "delivery_number",
+              "header_source_ref": "源xlsx!营业收入完整性检查表D4-15!C12",
+              "header_text": "发货单编号",
+              "json_pointer": "/rows/{row_uuid}/delivery/number",
+              "mode": "editable",
+              "source_ref": "源xlsx!营业收入完整性检查表D4-15!C13",
+              "stable_field_key": "completeness_check_rows/{row_uuid}/delivery_number",
+              "store_item_id": "D4-15-items",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "D",
+                "row_from": "row_identity"
+              },
+              "column_key": "delivery_product",
+              "header_source_ref": "源xlsx!营业收入完整性检查表D4-15!D12",
+              "header_text": "发货单品名",
+              "json_pointer": "/rows/{row_uuid}/delivery/productName",
+              "mode": "editable",
+              "source_ref": "源xlsx!营业收入完整性检查表D4-15!D13",
+              "stable_field_key": "completeness_check_rows/{row_uuid}/delivery_product",
+              "store_item_id": "D4-15-items",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "E",
+                "row_from": "row_identity"
+              },
+              "column_key": "delivery_quantity",
+              "header_source_ref": "源xlsx!营业收入完整性检查表D4-15!E12",
+              "header_text": "发货单数量",
+              "json_pointer": "/rows/{row_uuid}/delivery/quantity",
+              "mode": "editable",
+              "source_ref": "源xlsx!营业收入完整性检查表D4-15!E13",
+              "stable_field_key": "completeness_check_rows/{row_uuid}/delivery_quantity",
+              "store_item_id": "D4-15-items",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "F",
+                "row_from": "row_identity"
+              },
+              "column_key": "delivery_amount",
+              "header_source_ref": "源xlsx!营业收入完整性检查表D4-15!F12",
+              "header_text": "发货单金额",
+              "json_pointer": "/rows/{row_uuid}/delivery/amount",
+              "mode": "editable",
+              "source_ref": "源xlsx!营业收入完整性检查表D4-15!F13",
+              "stable_field_key": "completeness_check_rows/{row_uuid}/delivery_amount",
+              "store_item_id": "D4-15-items",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "G",
+                "row_from": "row_identity"
+              },
+              "column_key": "invoice_date",
+              "header_source_ref": "源xlsx!营业收入完整性检查表D4-15!G12",
+              "header_text": "发票日期",
+              "json_pointer": "/rows/{row_uuid}/invoice/date",
+              "mode": "editable",
+              "source_ref": "源xlsx!营业收入完整性检查表D4-15!G13",
+              "stable_field_key": "completeness_check_rows/{row_uuid}/invoice_date",
+              "store_item_id": "D4-15-items",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "H",
+                "row_from": "row_identity"
+              },
+              "column_key": "invoice_number",
+              "header_source_ref": "源xlsx!营业收入完整性检查表D4-15!H12",
+              "header_text": "发票编号",
+              "json_pointer": "/rows/{row_uuid}/invoice/number",
+              "mode": "editable",
+              "source_ref": "源xlsx!营业收入完整性检查表D4-15!H13",
+              "stable_field_key": "completeness_check_rows/{row_uuid}/invoice_number",
+              "store_item_id": "D4-15-items",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "I",
+                "row_from": "row_identity"
+              },
+              "column_key": "invoice_product",
+              "header_source_ref": "源xlsx!营业收入完整性检查表D4-15!I12",
+              "header_text": "发票品名",
+              "json_pointer": "/rows/{row_uuid}/invoice/productName",
+              "mode": "editable",
+              "source_ref": "源xlsx!营业收入完整性检查表D4-15!I13",
+              "stable_field_key": "completeness_check_rows/{row_uuid}/invoice_product",
+              "store_item_id": "D4-15-items",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "J",
+                "row_from": "row_identity"
+              },
+              "column_key": "invoice_quantity",
+              "header_source_ref": "源xlsx!营业收入完整性检查表D4-15!J12",
+              "header_text": "发票数量",
+              "json_pointer": "/rows/{row_uuid}/invoice/quantity",
+              "mode": "editable",
+              "source_ref": "源xlsx!营业收入完整性检查表D4-15!J13",
+              "stable_field_key": "completeness_check_rows/{row_uuid}/invoice_quantity",
+              "store_item_id": "D4-15-items",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "K",
+                "row_from": "row_identity"
+              },
+              "column_key": "invoice_amount",
+              "header_source_ref": "源xlsx!营业收入完整性检查表D4-15!K12",
+              "header_text": "发票金额",
+              "json_pointer": "/rows/{row_uuid}/invoice/amount",
+              "mode": "editable",
+              "source_ref": "源xlsx!营业收入完整性检查表D4-15!K13",
+              "stable_field_key": "completeness_check_rows/{row_uuid}/invoice_amount",
+              "store_item_id": "D4-15-items",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "L",
+                "row_from": "row_identity"
+              },
+              "column_key": "voucher_date",
+              "header_source_ref": "源xlsx!营业收入完整性检查表D4-15!L12",
+              "header_text": "记账凭证日期",
+              "json_pointer": "/rows/{row_uuid}/voucher/date",
+              "mode": "editable",
+              "source_ref": "源xlsx!营业收入完整性检查表D4-15!L13",
+              "stable_field_key": "completeness_check_rows/{row_uuid}/voucher_date",
+              "store_item_id": "D4-15-items",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "M",
+                "row_from": "row_identity"
+              },
+              "column_key": "voucher_number",
+              "header_source_ref": "源xlsx!营业收入完整性检查表D4-15!M12",
+              "header_text": "记账凭证编号",
+              "json_pointer": "/rows/{row_uuid}/voucher/number",
+              "mode": "editable",
+              "source_ref": "源xlsx!营业收入完整性检查表D4-15!M13",
+              "stable_field_key": "completeness_check_rows/{row_uuid}/voucher_number",
+              "store_item_id": "D4-15-items",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "N",
+                "row_from": "row_identity"
+              },
+              "column_key": "voucher_product",
+              "header_source_ref": "源xlsx!营业收入完整性检查表D4-15!N12",
+              "header_text": "记账凭证品名",
+              "json_pointer": "/rows/{row_uuid}/voucher/productName",
+              "mode": "editable",
+              "source_ref": "源xlsx!营业收入完整性检查表D4-15!N13",
+              "stable_field_key": "completeness_check_rows/{row_uuid}/voucher_product",
+              "store_item_id": "D4-15-items",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "O",
+                "row_from": "row_identity"
+              },
+              "column_key": "voucher_quantity",
+              "header_source_ref": "源xlsx!营业收入完整性检查表D4-15!O12",
+              "header_text": "记账凭证数量",
+              "json_pointer": "/rows/{row_uuid}/voucher/quantity",
+              "mode": "editable",
+              "source_ref": "源xlsx!营业收入完整性检查表D4-15!O13",
+              "stable_field_key": "completeness_check_rows/{row_uuid}/voucher_quantity",
+              "store_item_id": "D4-15-items",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "P",
+                "row_from": "row_identity"
+              },
+              "column_key": "voucher_amount",
+              "header_source_ref": "源xlsx!营业收入完整性检查表D4-15!P12",
+              "header_text": "记账凭证金额",
+              "json_pointer": "/rows/{row_uuid}/voucher/amount",
+              "mode": "editable",
+              "source_ref": "源xlsx!营业收入完整性检查表D4-15!P13",
+              "stable_field_key": "completeness_check_rows/{row_uuid}/voucher_amount",
+              "store_item_id": "D4-15-items",
+              "value_type": "amount"
+            }
+          ],
+          "footer_anchor": {
+            "carries_total_formula": false,
+            "marker": "三、审计说明：",
+            "note": "D4-15 动态行；A26「三、审计说明：」是受管区下边界（插行须下移）。UUID 用 R（数据止 Q）。",
+            "search_column": "A"
+          },
+          "formula_mask": [
+            "Q13:Q25"
+          ],
+          "header_rows": 2,
+          "row_identity": {
+            "json_pointer": "/rows/*/id",
+            "kind": "field"
+          },
+          "table_key": "completeness_check_rows"
+        }
+      ],
+      "template_id": "D415"
+    },
+    {
+      "excel_name": "出口收入电子口岸系统核对D4-16",
+      "locator": {
+        "anchor": "excel_table_sheet_association"
+      },
+      "sheet_key": "d4-16-managed",
+      "tables": [
+        {
+          "anchor": "A11",
+          "delete_policy": "tombstone",
+          "fields": [
+            {
+              "cell": {
+                "column": "A",
+                "row_from": "row_identity"
+              },
+              "column_key": "book_amount",
+              "header_source_ref": "源xlsx!出口收入电子口岸系统核对D4-16!A12",
+              "header_text": "账面出口收入金额",
+              "json_pointer": "/rows/{row_uuid}/bookAmount",
+              "mode": "editable",
+              "source_ref": "源xlsx!出口收入电子口岸系统核对D4-16!A13",
+              "stable_field_key": "export_customs_check_rows/{row_uuid}/book_amount",
+              "store_item_id": "D4-16-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "B",
+                "row_from": "row_identity"
+              },
+              "column_key": "ports_period",
+              "header_source_ref": "源xlsx!出口收入电子口岸系统核对D4-16!B12",
+              "header_text": "口岸期间",
+              "json_pointer": "/rows/{row_uuid}/portsPeriod",
+              "mode": "editable",
+              "source_ref": "源xlsx!出口收入电子口岸系统核对D4-16!B13",
+              "stable_field_key": "export_customs_check_rows/{row_uuid}/ports_period",
+              "store_item_id": "D4-16-rows",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "C",
+                "row_from": "row_identity"
+              },
+              "column_key": "ports_amount",
+              "header_source_ref": "源xlsx!出口收入电子口岸系统核对D4-16!C12",
+              "header_text": "口岸结关金额",
+              "json_pointer": "/rows/{row_uuid}/portsAmount",
+              "mode": "editable",
+              "source_ref": "源xlsx!出口收入电子口岸系统核对D4-16!C13",
+              "stable_field_key": "export_customs_check_rows/{row_uuid}/ports_amount",
+              "store_item_id": "D4-16-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "E",
+                "row_from": "row_identity"
+              },
+              "column_key": "ports_reason",
+              "header_source_ref": "源xlsx!出口收入电子口岸系统核对D4-16!E12",
+              "header_text": "口岸差异原因",
+              "json_pointer": "/rows/{row_uuid}/portsReason",
+              "mode": "editable",
+              "source_ref": "源xlsx!出口收入电子口岸系统核对D4-16!E13",
+              "stable_field_key": "export_customs_check_rows/{row_uuid}/ports_reason",
+              "store_item_id": "D4-16-rows",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "H",
+                "row_from": "row_identity"
+              },
+              "column_key": "tax_report_amount",
+              "header_source_ref": "源xlsx!出口收入电子口岸系统核对D4-16!H12",
+              "header_text": "申报外营收入",
+              "json_pointer": "/rows/{row_uuid}/taxReportAmount",
+              "mode": "editable",
+              "source_ref": "源xlsx!出口收入电子口岸系统核对D4-16!H13",
+              "stable_field_key": "export_customs_check_rows/{row_uuid}/tax_report_amount",
+              "store_item_id": "D4-16-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "J",
+                "row_from": "row_identity"
+              },
+              "column_key": "tax_reason",
+              "header_source_ref": "源xlsx!出口收入电子口岸系统核对D4-16!J12",
+              "header_text": "申报差异原因",
+              "json_pointer": "/rows/{row_uuid}/taxReason",
+              "mode": "editable",
+              "source_ref": "源xlsx!出口收入电子口岸系统核对D4-16!J13",
+              "stable_field_key": "export_customs_check_rows/{row_uuid}/tax_reason",
+              "store_item_id": "D4-16-rows",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "K",
+                "row_from": "row_identity"
+              },
+              "column_key": "tax_index",
+              "header_source_ref": "源xlsx!出口收入电子口岸系统核对D4-16!K12",
+              "header_text": "索引",
+              "json_pointer": "/rows/{row_uuid}/taxIndex",
+              "mode": "editable",
+              "source_ref": "源xlsx!出口收入电子口岸系统核对D4-16!K13",
+              "stable_field_key": "export_customs_check_rows/{row_uuid}/tax_index",
+              "store_item_id": "D4-16-rows",
+              "value_type": "text"
+            }
+          ],
+          "footer_anchor": {
+            "carries_total_formula": false,
+            "marker": "三、审计说明：",
+            "note": "D4-16 动态行；A16「三、审计说明：」是受管区下边界（插行须下移）。UUID 用 L（数据止 K）。",
+            "search_column": "A"
+          },
+          "formula_mask": [
+            "D13:D15",
+            "I13:I15"
+          ],
+          "header_rows": 2,
+          "row_identity": {
+            "json_pointer": "/rows/*/id",
+            "kind": "field"
+          },
+          "table_key": "export_customs_check_rows"
+        }
+      ],
+      "template_id": "D416"
     }
   ],
   "template": {

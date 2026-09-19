@@ -391,8 +391,10 @@ const isD4DetailSheet = computed(() => currentSheet.value != null && currentShee
 //    （整册、不定位到目标 sheet、且「两侧数据未互通」），而真正的双向同步桥被埋在下面。
 //    D4-25/26/27/28（IPO 检查表，d4-ipo-checklist-dual-mode-writeback-and-formula）此前
 //    漏登记，实测出现双切换器 + 误入 legacy 路径。
+//    D4-15/16（检查表，d4-inspection-writeback-formula-io B2）同理接子组件 sync bridge，
+//    必须一并登记 —— 否则宿主对它们仍渲染 legacy 通知（「两侧数据未互通」）+ legacy dualMode。
 const isD4DedicatedSyncSheet = computed(() =>
-  ['D4-5', 'D4-25', 'D4-26', 'D4-27', 'D4-28', 'D4-29', 'D4-30', 'D4-31', 'D4-32'].includes(
+  ['D4-5', 'D4-15', 'D4-16', 'D4-25', 'D4-26', 'D4-27', 'D4-28', 'D4-29', 'D4-30', 'D4-31', 'D4-32'].includes(
     currentSheet.value || '',
   ),
 )

@@ -172,6 +172,12 @@ export function useD4CompletenessCheck(options: UseD4CompletenessCheckOptions) {
     window.dispatchEvent(new CustomEvent('d4:save-items', { detail: { items: savedItems } }))
   }
 
+  // 立即 flush 防抖中的落库（双向回写 flushHtml 用：先落库再 readStoreProjection）
+  function flushPendingSave() {
+    if (debounceTimer) { clearTimeout(debounceTimer); debounceTimer = null }
+    flushSave()
+  }
+
   function updateAuditNote(val: string) {
     if (isReadonly.value) return
     auditNote.value = val
@@ -192,7 +198,7 @@ export function useD4CompletenessCheck(options: UseD4CompletenessCheckOptions) {
   return {
     items, auditNote, auditConclusion,
     itemCount, totalAmount, consistentCount, inconsistentCount,
-    addItem, removeItem, updateField, updateAuditNote, updateAuditConclusion, loadItems,
+    addItem, removeItem, updateField, updateAuditNote, updateAuditConclusion, loadItems, flushPendingSave,
   }
 }
 

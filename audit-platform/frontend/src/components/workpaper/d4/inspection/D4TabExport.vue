@@ -17,7 +17,10 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { useD4ImportExport } from '../../composables/useD4ImportExport'
 import { useD4InspectionWriteback } from '../../composables/useD4InspectionWriteback'
 import { calcChangeAmount } from '../../composables/useD4FormulaEngine'
-import GtOnlyOfficeSheet from '../../GtOnlyOfficeSheet.vue'
+import { useWorkpaperSyncBridge, WP_BRIDGE_IN_FLIGHT_STATES } from '../../sync/useWorkpaperSyncBridge'
+import { readStoreProjection } from '../../sync/workpaperSyncApi'
+import { capabilityForEntry } from '../../sync/workpaperSyncCapability'
+import WorkpaperSyncEditorHost from '../../sync/WorkpaperSyncEditorHost.vue'
 import GtIndexChip from '../../GtIndexChip.vue'
 import http from '@/utils/http'
 import { Plus } from '@element-plus/icons-vue'
@@ -159,14 +162,84 @@ function flushSave() {
   const items = keys.map(k => props.allResponses.get(k)).filter(Boolean)
   window.dispatchEvent(new CustomEvent('d4:save-items', { detail: { items } }))
 }
+// 立即 flush 防抖中的落库（双向回写 flushHtml 用：先把 html 改动落库再 readStoreProjection）
+function flushPendingSave() {
+  if (debounceTimer) { clearTimeout(debounceTimer); debounceTimer = null }
+  flushSave()
+}
 function updateAuditNote(val: string) { if (props.isReadonly) return; auditNote.value = val; persistAll() }
 function updateAuditConclusion(val: string) { if (props.isReadonly) return; auditConclusion.value = val; persistAll() }
 
 onBeforeUnmount(() => { if (debounceTimer) { clearTimeout(debounceTimer); flushSave() } })
 
-// ─── Mode / AI / Import-Export ───────────────────────────────────────
-const editorMode = ref<string>('表格视图')
-const modeOptions = ['表格视图', '在线编辑']
+// ─── 双模式 sync bridge（B2：D4-16 迁 useWorkpaperSyncBridge + WorkpaperSyncEditorHost）──
+// sheet_key=d4-16-managed，同 entry gt-d4-operating-revenue（后端 phase5_d4_inspection_sheets provider）。
+const D4_16_ENTRY = 'xlsx/gt-d4-operating-revenue'
+const D4_16_SHEET_KEY = 'd4-16-managed'
+const ooHealthy = ref(false)
+async function checkOoHealth() {
+  try {
+    const res = await http.get('/api/workpapers/onlyoffice/health', { _silent: true } as any)
+    ooHealthy.value = res.data?.data?.healthy ?? res.data?.healthy ?? false
+  } catch { ooHealthy.value = false }
+}
+checkOoHealth()
+const syncSwitching = ref(false)
+const syncHostRef = ref<{ forceSave: () => Promise<{ operationId: string }> } | null>(null)
+const syncBridge = useWorkpaperSyncBridge({
+  entryId: ref(D4_16_ENTRY),
+  wpId: toRef(props, 'wpId'),
+  projectId: toRef(props, 'projectId'),
+  sheetKey: ref(D4_16_SHEET_KEY),
+  capability: capabilityForEntry(D4_16_ENTRY),
+  flushHtml: async () => {
+    flushPendingSave()
+    const snap = await readStoreProjection({ projectId: props.projectId, wpId: props.wpId, entryId: D4_16_ENTRY })
+    return { expectedRevision: snap.expectedRevision, projection: snap.projection, sheetKey: D4_16_SHEET_KEY }
+  },
+  reloadHtml: async () => { window.dispatchEvent(new CustomEvent('d4:reload-responses')) },
+})
+const syncOoDescriptor = computed(() => syncBridge.descriptor.value)
+const syncBusy = computed(
+  () => syncSwitching.value
+    || (WP_BRIDGE_IN_FLIGHT_STATES as readonly string[]).includes(String(syncBridge.state.value)),
+)
+const editorMode = computed<string>({
+  get: () => (syncBridge.mode.value === 'oo' ? '在线编辑' : '表格视图'),
+  set: (v: string) => { void switchMode(v === '在线编辑' ? 'onlyoffice' : 'structured') },
+})
+const modeOptions = computed(() => [
+  { label: '表格视图', value: '表格视图' },
+  { label: '在线编辑', value: '在线编辑', disabled: props.isReadonly || !ooHealthy.value || syncBusy.value },
+])
+async function switchMode(target: 'structured' | 'onlyoffice'): Promise<void> {
+  const cur = syncBridge.mode.value === 'oo' ? 'onlyoffice' : 'structured'
+  if (target === cur) return
+  if (target === 'onlyoffice') {
+    if (props.isReadonly || !ooHealthy.value) return
+    syncSwitching.value = true
+    try { await syncBridge.switchToOnlyOffice() } finally { syncSwitching.value = false }
+    return
+  }
+  syncSwitching.value = true
+  try { await syncBridge.switchToHtml() } finally { syncSwitching.value = false }
+}
+// 同步态三态中文标签（禁裸英文）
+const syncStateTag = computed(() => {
+  const st = String(syncBridge.state.value)
+  if (syncBusy.value) return { text: '同步中…', type: 'info' as const }
+  if (syncBridge.dirty?.value) {
+    return syncBridge.mode.value === 'oo'
+      ? { text: 'excel 侧有未同步改动', type: 'warning' as const }
+      : { text: 'html 侧有未同步改动', type: 'warning' as const }
+  }
+  if (st.includes('error') || String(syncBridge.lastError?.value || '')) {
+    return { text: '同步失败，请重试', type: 'danger' as const }
+  }
+  return { text: '已同步', type: 'success' as const }
+})
+
+// ─── AI / Import-Export ───────────────────────────────────────────────
 const aiAvailable = ref(false)
 async function checkAiHealth() {
   try { const res = await http.get('/api/ai/health', { _silent: true } as any); aiAvailable.value = (res.data?.data?.status ?? res.data?.status) === 'healthy' }
@@ -219,7 +292,10 @@ function fmtAmount(v: number): string {
   <div class="d4-export">
     <!-- 工具条 -->
     <div class="toolbar">
-      <el-segmented v-model="editorMode" :options="modeOptions" size="small" />
+      <div class="toolbar-left">
+        <el-segmented v-model="editorMode" :options="modeOptions" size="small" />
+        <el-tag :type="syncStateTag.type" size="small" effect="light" style="margin-left:8px">{{ syncStateTag.text }}</el-tag>
+      </div>
       <div class="toolbar-right">
         <el-dropdown trigger="click" size="small">
           <el-button size="small">导入导出 ▾</el-button>
@@ -403,9 +479,12 @@ function fmtAmount(v: number): string {
       </details>
     </template>
 
-    <!-- OnlyOffice -->
+    <!-- 在线编辑：平台 sync bridge（B2 迁移，非裸 GtOnlyOfficeSheet）-->
     <template v-if="editorMode === '在线编辑'">
-      <div class="oo-container"><GtOnlyOfficeSheet :wp-id="wpId" :project-id="projectId" sheet-name="出口收入电子口岸系统核对D4-16" :readonly="isReadonly" /></div>
+      <div class="oo-container">
+        <WorkpaperSyncEditorHost v-if="syncOoDescriptor" ref="syncHostRef" :descriptor="syncOoDescriptor" :bridge="syncBridge" />
+        <div v-else class="oo-loading">正在打开 D4-16 同步编辑器…</div>
+      </div>
     </template>
   </div>
 </template>
@@ -413,7 +492,9 @@ function fmtAmount(v: number): string {
 <style scoped>
 .d4-export { padding: 16px 20px; font-size: var(--wp-font-size, 13px); }
 .toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 8px; }
+.toolbar-left { display: flex; align-items: center; }
 .toolbar-right { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.oo-container { min-height: 600px; height: calc(100vh - 280px); border-radius: 8px; overflow: hidden; }
 .stats-dashboard { display: flex; gap: 12px; margin-bottom: 20px; padding: 14px 18px; background: linear-gradient(135deg, #f8f9fe 0%, #f0f4ff 100%); border-radius: 10px; border: 1px solid #e4e7ed; }
 .stat-card { padding: 10px 16px; min-width: 140px; border-radius: 8px; background: #fff; border: 1px solid #ebeef5; box-shadow: 0 1px 3px rgba(0,0,0,0.04); }
 .stat-card.stat-primary { border-left: 3px solid #409eff; }

@@ -52,11 +52,12 @@
   - 证据：见收口段（本次会话末）。B1-B3 保持 `[blocked]`，边界已在 Governance Addendum 写清。
   - _Requirements: 5.1_
 
-- [ ] B1 [blocked] 为 D4-14/15/16 在后端 `workpaper_sync` 建 managed sheet 契约（instrumentation Excel 受管区 + contract sheet_key/table_key/row_identity_key + definition bundle + published representation），D4-13 纯文本表走文本型适配或显式登记 N/A。
-  - 阻塞原因：属 `workpaper_sync` 独立工程；后端契约当前零注册这四表；须先有 owner 与真实 OO 9.x 往返验收环境。
+- [x] B1 已解除阻塞并做实（2026-09-19，参照已完成姊妹 spec `d4-ipo-checklist-dual-mode-writeback-and-formula` D4-25~28 provider 蓝本）：为 **D4-15/16** 在后端 `workpaper_sync` 建 managed sheet provider；**D4-14 明确不做**（32 列七维嵌套 + 计算型 footer 超 IPO「一行 marker footer + 直列映射」范式，风险不可控，单列待评估）；**D4-13 登记 N/A**（纯叙述文本表无行集，不适配受管行表模型）。
+  - 交付：新建 `backend/app/services/workpaper_sync/phase5_d4_inspection_sheets.py`（照 IPO 数据驱动 `_SHEETS` dict 范式：D4-15 三维嵌套 15 字段 `json_path`(delivery/invoice/voucher 三级)+Q 一致性 formula_mask / D4-16 7 字段 + D,I 差异 formula_mask，`mapping_digest` 冻结 D4-15=`418b3629…` / D4-16=`ca120930…`；别名导入 `INSPECTION_*` 避免与 IPO 符号冲突）。装配 `phase5_d4_revenue_detail.py` 6 点（import/instrumentation_specs/digest 断言/sheet_payload/store item 映射/build+merge 投影）。重生成契约 `d4.revenue_detail.json`（canonical_digest `3f2751d0…`，`--check` OK）：instrumentation_specs 12→14、contract sheets 13→15。
+  - 证据：`backend/tests/workpaper_sync/test_d4_inspection_store_roundtrip.py`（18 passed，含三维嵌套专项）；`--check` 契约守卫绿；回归 IPO+inspection roundtrip 58 passed。
   - _Requirements: 2.3_
-- [ ] B2 [blocked] 前端把 D4-14/15/16 从裸 `GtOnlyOfficeSheet` 迁到平台 `useWorkpaperSyncBridge` + `WorkpaperSyncEditorHost` + `capabilityForEntry(父级 entry)` 现算 + `flushHtml`(先 flushPendingSave 再 readStoreProjection)，对齐 D4-35 蓝本；删除 `ContentMutationService` 这一不存在的设施引用。
-  - 阻塞原因：依赖 B1 的后端契约；`ContentMutationService` 不存在需先由治理 spec 澄清真实设施名。
+- [x] B2 已解除阻塞并做实（2026-09-19）：前端把 **D4-15（`D4TabCompleteness.vue`）/ D4-16（`D4TabExport.vue`）** 迁到平台 `useWorkpaperSyncBridge` + `WorkpaperSyncEditorHost` + `capabilityForEntry('xlsx/gt-d4-operating-revenue')` 现算 + `flushHtml`（先 `flushPendingSave` 再 `readStoreProjection`，防投影旧值）；`sheetKey` 锁 `d4-15-managed`/`d4-16-managed`；`useD4CompletenessCheck.ts` 补 `flushPendingSave`。`ContentMutationService` 全库零引用（spec 草案臆想名，已由 IPO 治理澄清真实设施 = `useWorkpaperSyncBridge` 生态），本组件不引用。**并修复宿主漏登记 bug**：`GtD4OperatingRevenue.vue::isD4DedicatedSyncSheet` 未含 D4-15/16 → 宿主仍渲染 legacy「两侧数据未互通」通知 + legacy dualMode（与子组件自管切换器叠加，IPO D4-25~28 曾踩同坑）；补登记后消除。
+  - 证据：前端守卫 `d4InspectionSyncHostWiring.spec.ts`（19 passed，含宿主 dedicated 登记 +3 断言）；`get_diagnostics` 全 clean。**真栈 Playwright 验收**（wp `b3ab3c46` 重药控股安徽 2025）：D4-15/16 均 noticeCount=0 / segCount=1 / syncTag=已同步；切「在线编辑」后 `WorkpaperSyncEditorHost`+OO iframe 渲染成功、0 console errors。早前「切在线编辑 3 errors」根因证伪 = 瞬时后端负载（store-projection 慢+间歇 500，并发 vitest+OO 冷启+ledger 轮询超时），直接探针连调 4 次均 200/0.07-0.14s，非 descriptor/materialize 边界。截图 `evidence/d4-16-live-clean.png`。
   - _Requirements: 2.1, 2.2, 2.3_
 - [x] B3 durable 幂等已做实（2026-09-19）：A13 推送去重从前端 5s 内存 Map 升级为**服务端 DB durable 幂等**。
   - 交付：V164 迁移（`unadjusted_misstatements.source_identity` + 部分唯一索引，真实 PG schema_version=164）+ 模型/schema/service（pre-check + savepoint 并发硬化）+ 前端 `useA13MisstatementBridge` POST 携 `source_identity`（=draftHash 同字段，跨会话/刷新永久去重）。

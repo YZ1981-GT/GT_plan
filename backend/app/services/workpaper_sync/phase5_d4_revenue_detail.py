@@ -183,6 +183,16 @@ from app.services.workpaper_sync.phase5_d4_ipo_checklist_sheets import (  # noqa
     merge_projection_into_rows as merge_ipo_checklist_projection_into_rows,
     sheet_payload as ipo_checklist_sheet_payload,
 )
+from app.services.workpaper_sync.phase5_d4_inspection_sheets import (  # noqa: E402
+    INSPECTION_SHEET_CODES,
+    SHEET_KEY_BY_CODE as INSPECTION_SHEET_KEY_BY_CODE,
+    STORE_ITEM_ID_BY_CODE as INSPECTION_STORE_ITEM_ID_BY_CODE,
+    assert_all_inspection_mapping_digests,
+    build_store_projection as build_inspection_store_projection,
+    instrumentation_spec as instrumentation_spec_inspection,
+    merge_projection_into_rows as merge_inspection_projection_into_rows,
+    sheet_payload as inspection_sheet_payload,
+)
 from app.services.workpaper_sync.json_path import (
     JsonPathMissingSegmentError,
     resolve_json_path,
@@ -528,6 +538,13 @@ def instrumentation_specs() -> tuple:
             )
             for code in CHECKLIST_SHEET_CODES
         ),
+        # D4-15/16 检查表追加受管 sheet（同 entry / 同 template blob；B1 spec d4-inspection）。
+        *(
+            instrumentation_spec_inspection(
+                code, entry_id=ENTRY_ID, template_relative_path=TEMPLATE_RELATIVE_PATH
+            )
+            for code in INSPECTION_SHEET_CODES
+        ),
         # D4-30/31/32：D4-31 singleton 多字段挤同一物理行，materialize roundtrip 红；
         # 暂不进 instrumentation，待几何重裁后再开（否则挡 D4-5 rematerialize）。
         *(
@@ -675,6 +692,7 @@ def build_contract_payload() -> dict[str, Any]:
     assert_mapping_digest_d45()
     assert_mapping_digest_d435()
     assert_all_checklist_mapping_digests()
+    assert_all_inspection_mapping_digests()
     if _INCLUDE_D429_TRANSPOSED:
         assert_mapping_digest_d429()
     template_payload = template_definition_payload()
@@ -756,6 +774,7 @@ def build_contract_payload() -> dict[str, Any]:
                 else ()
             ),
             *(ipo_checklist_sheet_payload(code) for code in CHECKLIST_SHEET_CODES),
+            *(inspection_sheet_payload(code) for code in INSPECTION_SHEET_CODES),
             *(
                 interview_sheet_payload(code)
                 for code in INTERVIEW_SHEET_CODES()
@@ -862,6 +881,16 @@ def build_contract_payload() -> dict[str, Any]:
                         }
                         for code in CHECKLIST_SHEET_CODES
                     ),
+                    *(
+                        {
+                            "item_id": INSPECTION_STORE_ITEM_ID_BY_CODE[code],
+                            "sheet_key": INSPECTION_SHEET_KEY_BY_CODE[code],
+                            "table_key": inspection_sheet_payload(code)["tables"][0]["table_key"],
+                            "row_identity_key": "id",
+                            "note": f"{code} 检查表动态行 store；D4-15 三维嵌套 json_path(delivery/invoice/voucher)、D4-16 差异派生入 mask。",
+                        }
+                        for code in INSPECTION_SHEET_CODES
+                    ),
                 ],
             },
             "reviewed_basis": _REVIEWED_BASIS,
@@ -870,6 +899,7 @@ def build_contract_payload() -> dict[str, Any]:
             "mapping_digest_d45": EXPECTED_MAPPING_DIGEST_D45,
             "mapping_digest_d435": EXPECTED_MAPPING_DIGEST_D435,
             "mapping_digest_ipo_checklist": assert_all_checklist_mapping_digests(),
+            "mapping_digest_inspection": assert_all_inspection_mapping_digests(),
             **(
                 {"mapping_digest_d429": assert_mapping_digest_d429()}
                 if _INCLUDE_D429_TRANSPOSED
@@ -890,6 +920,7 @@ def build_contract_payload() -> dict[str, Any]:
                     else ()
                 ),
                 *[ipo_checklist_sheet_payload(c)["template_id"] for c in CHECKLIST_SHEET_CODES],
+                *[inspection_sheet_payload(c)["template_id"] for c in INSPECTION_SHEET_CODES],
             ],
             "instrumentation_tables": [
                 TABLE_NAME,
@@ -906,6 +937,7 @@ def build_contract_payload() -> dict[str, Any]:
                     else ()
                 ),
                 *[ipo_checklist_sheet_payload(c)["tables"][0]["table_key"] for c in CHECKLIST_SHEET_CODES],
+                *[inspection_sheet_payload(c)["tables"][0]["table_key"] for c in INSPECTION_SHEET_CODES],
             ],
         },
     }
@@ -1228,6 +1260,15 @@ def build_combined_store_projection(
         if _INCLUDE_IPO_INTERVIEW_SHEETS
     ]
     # D4-25/26/27/28 IPO 检查表追加受管 sheet（空载荷时安全返回空投影）。
+    inspection_projs = [
+        build_inspection_store_projection(
+            code,
+            payloads.get(INSPECTION_STORE_ITEM_ID_BY_CODE[code], EMPTY_STORE_PAYLOAD),
+            contract=contract,
+            limits=limits,
+        )
+        for code in INSPECTION_SHEET_CODES
+    ]
     ipo_checklist_projs = [
         build_ipo_checklist_store_projection(
             code,
@@ -1241,7 +1282,7 @@ def build_combined_store_projection(
     values.update(right.values)
     values.update(groups.values)
     values.update(fixed.values)
-    for proj in (d421, d422, d423, d424, d435, *ipo_checklist_projs, *interview_projs):
+    for proj in (d421, d422, d423, d424, d435, *ipo_checklist_projs, *inspection_projs, *interview_projs):
         values.update(proj.values)
     if d429 is not None:
         values.update(d429.values)
@@ -1256,6 +1297,7 @@ def build_combined_store_projection(
         **(dict(d429.row_keys) if d429 is not None else {}),
         **{k: v for p in interview_projs for k, v in dict(p.row_keys).items()},
         **{k: v for p in ipo_checklist_projs for k, v in dict(p.row_keys).items()},
+        **{k: v for p in inspection_projs for k, v in dict(p.row_keys).items()},
     }
     return Projection(
         contract_id=contract.contract_id,
@@ -1329,6 +1371,14 @@ def merge_projection_into_all_d4_stores(
                 base_rows=list(base_by_item.get(STORE_ITEM_ID_BY_CODE[code]) or ()),
             )
             for code in CHECKLIST_SHEET_CODES
+        },
+        **{
+            INSPECTION_STORE_ITEM_ID_BY_CODE[code]: merge_inspection_projection_into_rows(
+                code,
+                projection=projection,
+                base_rows=list(base_by_item.get(INSPECTION_STORE_ITEM_ID_BY_CODE[code]) or ()),
+            )
+            for code in INSPECTION_SHEET_CODES
         },
     }
 

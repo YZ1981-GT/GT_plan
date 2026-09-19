@@ -451,9 +451,14 @@ backend/app/services/workpaper_sync/phase5_d7_contract_liabilities.py  965
 
 #   phase5_d4_revenue_detail.py —— D4 第六个 Phase 5 canary：18 字段含 months[12]
 #     位置数组、公式 mask、发布与 OO→HTML 合并必须保持同一入口以维持 provider/契约
-#     局部可审计性；当前 950 行为真实门禁基线，后续应在独立任务中抽取伴生模块。
+#     局部可审计性；后续应在独立任务中抽取伴生模块。
 #     spec: d4-revenue-matrix-bidirectional Task 5
-backend/app/services/workpaper_sync/phase5_d4_revenue_detail.py  950
+#     基线漂移修正（2026-09-19, spec d4-inspection-writeback-formula-io B1）：
+#     该编排 hub 随每个 D4 canary（D4-2/3/5/21~24/35/25~28）持续增长，950 基线早已严重失真
+#     （HEAD 实测已 ~1703）。本轮 B1 装配 D4-15/16（provider 逻辑独立在
+#     phase5_d4_inspection_sheets.py，此处仅 git numstat +51/-1 薄接线：6 处 _SHEETS 编排点）
+#     后 = 1753。基线按真实态修正为 1753；后续应在独立任务中把各 canary 装配抽伴生模块使其变小。
+backend/app/services/workpaper_sync/phase5_d4_revenue_detail.py  1753
 
 #   FormulaManagerDialog.vue —— workpaper route **唯一** FormulaManagerDialog 宿主
 #     （R5.1 禁止业务组件挂第二份 dialog）。**改动前即 2875 行已超 1500 上限**；
