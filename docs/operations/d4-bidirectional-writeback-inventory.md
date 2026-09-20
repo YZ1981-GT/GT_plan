@@ -55,7 +55,7 @@
 | 8 | D4-8 | 重要产品毛利分析 | gap-closure (0/5) | ❌ | — | — | 🔵 gap待做 |
 | 9 | D4-9 | 重要客户结构分析 | d4-9-customer | ✅ d49-managed(三区,共享entry) | D4TabCustomerStructure | ✅ | ✅ (2026-09-20发布gen55,真OO待验) |
 | 10 | D4-10 | 重要客户销售价格 | d4-price-analysis (9/10) | ❌ | D4TabCustomerPrice | legacy | 🔵 从零(price spec 已做上游取数联动,未做双向) |
-| 11 | D4-11 | 产品销售价格分析 | d4-price-analysis (9/10) | ❌ | D4TabProductPrice | legacy | 🔵 从零(同上) |
+| 11 | D4-11 | 产品销售价格分析 | d4-price-analysis (9/10) | ✅ d411-managed(批次B) | D4TabProductPrice | ✅ | ✅ (2026-09-20发布gen62,补rowId,真OO待验) |
 | 12 | D4-12 | 合同检查 | gap-closure (0/5) | ❌ | — | — | 🔵 gap待做 |
 | 13 | D4-13 | ERP账面核对 | d4-inspection (9/16) | ❌ | — | — | ⬜ evidence裁 N/A(纯叙述文本表) |
 | 14 | D4-14 | 发生检查 | d4-inspection (9/16) | ❌ | D4TabOccurrence | legacy | 🔵 从零(32列七维嵌套,风险高) |
@@ -86,13 +86,14 @@
 
 > 🔴 **重要口径**：下方「✅」是**三维代码全绿（REQUEST_PATH 级）**——后端契约 + 前端接桥 + 宿主登记齐全。但**没有一张到主控 §6.4 的 `ONLYOFFICE_VERIFIED`**（需真实 OO 往返产生 `working_paper_content_application` state=applied + operation 终态 + OO 侧 content version，见 §9.5）。真 OO 验证是 env 门（start-dev.bat 全栈 + OO 容器），列为批次C。
 
-- ✅ 三维代码全绿(REQUEST_PATH)：**24 张** — D4-1/2/3/5/6/9/15/16/17/**18**/**19**/21/22/23/24/25/26/27/28/29/30/31/32/35
-  - 批次A(21~24) + 批次A-5(30~32) + 批次B(D4-6/9/17/18/19) 为 2026-09-20 落地；余此前已接桥
-- 🔵 owner spec 待做/从零(后端无契约 + 前端仍 legacy)：**10 张** — D4-7/8/10/11/12/14/20/33/34/36
+- ✅ 三维代码全绿(REQUEST_PATH)：**25 张** — D4-1/2/3/5/6/9/**11**/15/16/17/18/19/21/22/23/24/25/26/27/28/29/30/31/32/35
+  - 批次A(21~24) + 批次A-5(30~32) + 批次B(D4-6/9/11/17/18/19) 为 2026-09-20 落地；余此前已接桥
+- 🔵 owner spec 待做/从零(后端无契约 + 前端仍 legacy)：**9 张** — D4-7/8/10/12/14/20/33/34/36
 - ⬜ 裁决 single_html/N/A：**2 张** — D4-4/D4-13
 
-> 校验：24 + 10 + 2 = 36 ✓（🟡 半接入类已清零）
-> 契约集合现 **24 张**（+d46/d49/d417/d418/d419-managed）；entry `xlsx/gt-d4-operating-revenue` 当前 representation **gen59**（bundle 318a4047）。
+> 校验：25 + 9 + 2 = 36 ✓（🟡 半接入类已清零）
+> 契约集合现 **25 张**（+d411-managed）；entry `xlsx/gt-d4-operating-revenue` 当前 representation **gen62**（bundle 2eb51921）。
+> 剩余 9 张全属更硬一档：D4-10（总额行结构比 `$D$34`）· D4-12/D4-20（多子表）· D4-14（32列七维嵌套）· D4-7/8/33/34/36（矩阵型/双区，2-3x）。需前端 rowId 回填 or 总额行 or 多区 or 矩阵处理，逐张比已完成的复杂。
 > 注：D4-6/7 前端虽已在宿主 `D4_SHEET_KEY_BY_CODE` 预留 `d46/d47-managed` 键，但契约 sheet_key 集合中**无**对应项且组件未接桥，故仍归 🔵 从零。D4-9/10/11/14/33/34/36 经 grep 实证前端组件均未 import `useWorkpaperSyncBridge`（仍 legacy），契约集合中也无对应项。
 
 ## 逐张推进优先级（建议，2026-09-20 修订）
