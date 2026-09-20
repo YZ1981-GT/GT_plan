@@ -1,0 +1,89 @@
+{
+  "captured_at": "2026-09-21 (session 3)",
+  "task": "Task 11 — D4-29 real HTML->OO->callback->HTML roundtrip (apply save-timing fix)",
+  "goal": "Apply the precisely-diagnosed D4-29 harness save-timing fix (write 客户信息检查表D4-29!C11 without a pre-emptive asc_Save(), let host forcesave trigger the save -> cs_error=0 -> genuine oo_to_html operation applied -> read back marker into D4-29-customers store region).",
+
+  "premise_recheck_result": {
+    "perf_blocker_resolved": true,
+    "evidence": "Owner spec workpaper-sync-materialize-large-table-performance is fully complete (all 8 tasks [x]). Its Task 8 evidence records real-DB D2 POST /materialize returning a valid descriptor in 10.4s for 28491 fields / 729 rows (soft limit 120s). The historical 128-129s / 262-320s figures were pre-optimization or 3-worker CPU-starvation runs, NOT the current single-request cost.",
+    "conclusion": "The task premise that the materialize performance blocker is resolved is CONFIRMED. This session did NOT hit a materialize timeout."
+  },
+
+  "published_representation_state": {
+    "wp_id": "b3ab3c46-828f-4f48-950e-aee9bbdc923f",
+    "entry_id": "xlsx/gt-d4-operating-revenue",
+    "current_representation_id": "d1b92340-fad1-4427-894a-70f37f6d1a2b",
+    "representation_generation": 69,
+    "definition_bundle_id": "4763e2d9-5ded-460f-8da6-ee43d182e860",
+    "entry_state_updated_at": "2026-09-20T03:14:57Z",
+    "d4_29_present_in_published_rep": true,
+    "d4_36_present_in_published_rep": false,
+    "note": "gen69 published bundle is internally consistent: D4-29 transposed sheet present, D4-36 absent. It is NOT the source of the drift."
+  },
+
+  "live_blocker_reproduced": {
+    "step": "store-projection (read-only) — BEFORE materialize / OO edit / forcesave, so the save-timing fix could NOT be exercised",
+    "endpoint": "GET /api/projects/0ec33ac9.../workpapers/b3ab3c46.../sync/entries/xlsx/gt-d4-operating-revenue/store-projection",
+    "http_status": 422,
+    "error_code": "sync_contract_structure_drift",
+    "drift_first_inconsistent_location": "sheet='d436-managed' table='d4_36_backward' field='d4_36_backward/{row_uuid}/doc_amount' locator='J:row_identity'",
+    "reproduced_runs": [
+      { "run": 1, "status": 422, "seconds": 56.588 },
+      { "run": 2, "status": 422, "seconds": 55.741 }
+    ],
+    "stable": "Identical 422 + identical drift field on both runs -> stable external blocker, not transient. STOPPED after 2nd identical failure per no-loop rule."
+  },
+
+  "root_cause": {
+    "summary": "The D4-36 owner's UNCOMMITTED working-tree changes advanced the disk source contract past the published gen69 representation, so `assert_no_structure_drift` (invoked inside `_registration` on every store-projection/materialize) fails closed with a fail-visible 422 (this is the Task 7 registration fix working as designed).",
+    "git_working_tree_evidence": {
+      "modified": [
+        "backend/app/services/workpaper_sync/phase5_d4_revenue_detail.py (36 insertions: adds _INCLUDE_D436_CUTOFF_SHEET=True + all D4-36 wiring; D4-29 flag _INCLUDE_D429_TRANSPOSED unchanged/context-only -> D4-29 NOT flipped)",
+        "backend/data/workpaper_sync_contracts/d4.revenue_detail.json (now declares sheet_key d436-managed / table d4_36_backward with 11 fields incl doc_amount)"
+      ],
+      "untracked": [
+        "backend/app/services/workpaper_sync/phase5_d4_other_cutoff_sheet.py (NEW D4-36 provider)"
+      ],
+      "committed_head_contract": "e4a6496ba (gen64, 27 sheets) does NOT contain D4-36 — the drift is purely from uncommitted D4-36 owner work."
+    },
+    "ownership": "sheet d436-managed / table d4_36_backward is D4-36 (其他业务收入截止性测试) owner scope (Task 8 note already flagged this exact drift). It is NOT D4-29/30/31/32. This task made zero source edits (only a temp read-only timing probe, added then deleted)."
+  },
+
+  "why_not_self_remediated": {
+    "cannot_edit_d4_36_files": "Constraint forbids editing other owner files; reverting/removing d4.revenue_detail.json's D4-36 rows, phase5_d4_revenue_detail.py's D4-36 diff, or deleting phase5_d4_other_cutoff_sheet.py is D4-36 owner scope.",
+    "cannot_stash_owner_uncommitted_work": "git stash of another owner's uncommitted in-progress work is destructive to their session and out of this task's scope.",
+    "cannot_reconcile_representation": "The legal remediation the error demands (publish new definitions template->instrumentation->contract->bundle->representation to include D4-36) is the D4-36 owner's publish/reconcile action; performing it risks exposing unfinished D4-36 modeling and could break D4-30/31/32.",
+    "did_not_touch_soft_limit_or_perf_config": true,
+    "did_not_use_simulated_callback": true
+  },
+
+  "platform_predicates_4_6_already_met_historically": {
+    "note": "Prior session already achieved real (non-simulated) predicates 4-6 at platform level on the D4-29-bearing gen66 bundle d7962c48: oo_to_html operation 76844e8d state=applied, application a02bd8db state=applied at result_revision 90, content_version 9be9a448 source=onlyoffice. DB re-confirmed this session (operation + application + content_version rows persist). The revision chain 88(html)->89(html_to_oo 28420119 applied)->90(oo_to_html 76844e8d applied, source=onlyoffice) is intact.",
+    "remaining_gap": "That applied round-trip's OO write landed on a D4-2 cell, not a D4-29 transposed field cell. The D4-29-specific single-cell L2 readback (OO writes 客户信息检查表D4-29!C11 -> forcesave cs_error=0 -> oo_to_html op applied -> creditcode mirrors into customer_detail_transposed) is the only unmet judgement, and it could not be exercised this session because store-projection is 422 upstream."
+  },
+
+  "not_done": [
+    "store-projection 200 on a bundle containing D4-29 (blocked: 422 D4-36 drift)",
+    "materialize (never reached; but perf blocker itself is resolved)",
+    "OO write C11 with corrected save-timing (never reached)",
+    "forcesave cs_error=0 (never reached)",
+    "oo_to_html operation applied on gen-with-D4-29 for the D4-29 cell (never reached)",
+    "store creditcode mirrors marker (never reached)"
+  ],
+
+  "verdict": "Task 11 stays [-]. The precisely-diagnosed save-timing fix is correct and in-scope but could NOT be exercised: the round-trip is blocked one step earlier at store-projection (422 sync_contract_structure_drift) caused by the D4-36 owner's UNCOMMITTED working-tree changes (new provider + disk-contract d4_36_backward rows) drifting against the published gen69 representation. This is D4-36 owner scope, external to this task. The materialize performance blocker cited in the task premise is genuinely resolved and was NOT hit this session. Not marked green; not faked.",
+
+  "unblock_conditions": [
+    "D4-36 owner resolves the source-contract drift: either commit+reconcile (publish new definitions template->instrumentation->contract->bundle->representation so the published representation includes D4-36 and store-projection returns 200), or revert the uncommitted D4-36 changes so the disk contract matches published gen69;",
+    "then re-run the save-timing-fixed D4-29 L2 probe on a store-projection-200 bundle containing D4-29: write 客户信息检查表D4-29!C11 WITHOUT a pre-emptive asc_Save() -> host forcesave -> cs_error=0 -> oo_to_html operation applied -> application applied + result_revision -> read back customer_detail_transposed/cust-mu0j7ovb-1v1v/creditcode == marker."
+  ],
+
+  "constraints_honored": {
+    "did_not_edit_soft_limit_or_perf_config": true,
+    "did_not_use_simulated_callback": true,
+    "did_not_edit_other_owner_files_D4_20_D4_10_D4_36": true,
+    "did_not_break_D4_29_30_31_32": true,
+    "verified_D4_29_still_enabled_not_flipped_by_tmp_d45_fix": true,
+    "only_added_then_deleted_temp_probe_and_readonly_db_http_measurements": true
+  }
+}

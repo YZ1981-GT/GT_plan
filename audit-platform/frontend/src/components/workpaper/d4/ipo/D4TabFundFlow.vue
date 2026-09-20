@@ -26,6 +26,8 @@ const openReviewDialog = inject<((sectionId: string) => void) | null>('openRevie
 const reloadWorkpaperData = inject<(() => Promise<void>) | null>('reloadWorkpaperData', null)
 
 const d4Save = useD4InterviewSave(() => ['D4-32-groups','D4-32-note','D4-32-conclusion'].map(k => props.allResponses.get(k)).filter(Boolean))
+// R5.3：桥接/保存失败必须可见，且旧数据不得被清空（本地 store 修改已保留，仅提示可恢复）
+const saveError = d4Save.saveError
 const D4_SYNC_ENTRY_ID = 'xlsx/gt-d4-operating-revenue'
 const d4SyncBridge = useWorkpaperSyncBridge({
   entryId: ref(D4_SYNC_ENTRY_ID), wpId: computed(() => props.wpId), projectId: computed(() => props.projectId), sheetKey: ref('d4-32-managed'), capability: capabilityForEntry(D4_SYNC_ENTRY_ID),
@@ -68,7 +70,13 @@ function loadData() {
         for (const group of p) {
           if (!group || typeof group !== 'object' || !Array.isArray(group.rows)) continue
           if (known.has(group.key)) known.get(group.key)!.rows = group.rows
-          else unknown.push({ key: String(group.key || '__unknown__'), label: String(group.label || group.groupLabel || group.key || '待映射分组'), rows: group.rows })
+          else {
+            // 未知组原始来源 label 由后端 reshape 保存在每行 groupLabel 上（组层无 label）；
+            // 优先取组层 label/groupLabel，退而取行级 groupLabel，最后才回落展示占位，
+            // 不得退化成 key 字面量 "__unknown__"（R5.2 未知组保真）。
+            const rowLabel = Array.isArray(group.rows) ? group.rows.find((r: any) => r && r.groupLabel)?.groupLabel : ''
+            unknown.push({ key: String(group.key || '__unknown__'), label: String(group.label || group.groupLabel || rowLabel || '待映射分组'), rows: group.rows })
+          }
         }
         groups.value = [...GROUPS.map(g => known.get(g.key)!), ...unknown]
         return
@@ -149,6 +157,11 @@ const riskFindings = computed<D4IpoFinding[]>(() => {
 <template>
 <div class="d4-fund-flow">
   <div class="toolbar"><div class="toolbar-left"><el-segmented v-model="editorMode" :options="modeOptions" size="small" /></div><div class="toolbar-right"><el-dropdown trigger="click" size="small"><el-button size="small">导入导出 ▾</el-button><template #dropdown><el-dropdown-menu><el-dropdown-item @click="exportTemplate('D4-32')">导出模板</el-dropdown-item><el-dropdown-item @click="exportData('D4-32')">导出数据</el-dropdown-item><el-dropdown-item><el-upload :show-file-list="false" accept=".xlsx" :auto-upload="false" :disabled="isReadonly||importing" @change="handleImportFile"><span>导入数据</span></el-upload></el-dropdown-item></el-dropdown-menu></template></el-dropdown><D4IpoFindingWriteback wp-code="D4-32" :all-responses="allResponses" :is-readonly="isReadonly" :findings="riskFindings" /><GtIndexChip value="wp:E1-31" :context-project-id="projectId" /><el-button v-if="openReviewDialog" size="small" @click="openReviewDialog('D4-32-fund')">💬 复核</el-button></div></div>
+
+  <!-- R5.3：保存/桥接失败可见提示，旧数据已保留在本地未清空 -->
+  <el-alert v-if="saveError" type="error" :closable="false" show-icon class="d4-save-error" title="保存失败，修改已保留在本地未覆盖">
+    <template #default>{{ saveError }}</template>
+  </el-alert>
 
   <!-- 仪表板 -->
   <div class="stats-dashboard">

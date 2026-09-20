@@ -1,0 +1,62 @@
+{
+  "captured_at": "2026-09-21",
+  "task": "Task 11 — D4-29 real HTML->OO->callback->HTML roundtrip",
+  "goal": "Apply save-timing fix (OO writes 客户信息检查表D4-29!C11 without pre-emptive asc_Save; host forcesave triggers real save -> cs_error=0 -> genuine oo_to_html operation applied -> read back marker into D4-29-customers store region).",
+  "fix_applied": {
+    "file": "audit-platform/frontend/e2e/_tmp_d4_29_l2_roundtrip.spec.ts (temp probe, deleted after run)",
+    "change": "OO cell-edit evaluate DOES NOT call api.asc_Save(); it only asc_insertInCell/asc_enterText + asc_closeCellEditor(true) to commit the value into the cell and leaves the document dirty, so the host forcesave button ([data-testid=wp-sync-host-forcesave]) triggers the real save and OO registers a real change (targets cs_error=0 instead of prior cs_error=4 no_changes).",
+    "target_sheet": "客户信息检查表D4-29",
+    "oo_target_cell": "C11 (row 11 = creditCode, column C = customer1) per phase5_d4_29_customer_detail.FIELD_ROWS",
+    "store_readback_field": "customer_detail_transposed/cust-mu0j7ovb-1v1v/creditcode"
+  },
+  "preflight_verified": {
+    "backend_9980_health": 200,
+    "frontend_3030": 200,
+    "onlyoffice_8080": 200,
+    "store_projection_at_start": "HTTP 200 (both 9980 and 3030), expected_revision=92, D4-29 present (customer_detail_transposed / cust-mu0j7ovb-1v1v; customer1 has name '回写闭环客户PROBE-1789361019', creditcode='' legal non-empty state)",
+    "d4_29_in_bundle": true
+  },
+  "blocker_reproduced": {
+    "step": "materialize (whole 47-sheet entry) — BEFORE the OO cell edit / forcesave could run, so the save-timing fix was never exercised",
+    "error_code": "materialize_soft_timeout",
+    "http_status_observed_in_browser": 500,
+    "guard_http_status": 422,
+    "soft_limit_seconds": 120,
+    "measurements": [
+      { "run": 2, "materialize_cpu_seconds": 129.279 },
+      { "run": 3, "materialize_cpu_seconds": 128.506 }
+    ],
+    "run_1_note": "aborted earlier on a transient store-projection 500 precondition (backend recovered to 200); a store-projection warm-up gate was added to the probe after run 1.",
+    "reproducible": "materialize CPU lands at 128.5-129.3s > 120s on EVERY single-worker run of this entry -> consistent boundary blocker, not a transient. STOPPED after the 2nd materialize soft-timeout per no-loop rule.",
+    "cpu_cost_is_unavoidable_per_call": "MaterializeSoftTimeoutError is raised inside _stage_and_verify's CPU segment (content_mutation.py ~L1600), which runs BEFORE the business-identity-reuse / idempotency replay path (materialize_coordinator._find_business_identity_reuse). So pre-warming / repeat calls cannot skip the CPU segment; every materialize pays the full ~128-129s."
+  },
+  "premise_contradiction": "The task premise stated materialize was resolved to 0.28-0.33s for D4-29/D4-30. My two reproducible single-request measurements show the real cold whole-entry materialize CPU is 128.5-129.3s (over the 120s soft limit). The 0.28s figure was likely a warm/cached or differently-scoped measurement; materialize is whole-workbook (sheet_key only selects the launch target sheet, not the materialize scope).",
+  "second_external_blocker_appeared_mid_session": {
+    "error_code": "sync_contract_structure_drift",
+    "http_status": 422,
+    "endpoint": "store-projection (flipped from 200 to 422 during the session)",
+    "drift_location": "sheet='d436-managed' table='d4_36_backward' field='d4_36_backward/{row_uuid}/doc_amount' locator='J:row_identity'",
+    "root_cause": "concurrent untracked owner work: backend/app/services/workpaper_sync/phase5_d4_other_cutoff_sheet.py (D4-36) + modified backend/data/workpaper_sync_contracts/d4.revenue_detail.json now declare d4_36_backward structure not present in the published representation. This is D4-36 (other-cutoff) owner scope, NOT D4-29/30/31/32, and NOT introduced by this session (git status confirms zero source edits by this task — only a temp probe added+deleted and read-only DB/HTTP measurements).",
+    "note": "This drift is the Task 7 _registration fix working as designed (fail-visible 422 with Chinese root cause instead of opaque 500)."
+  },
+  "not_done": [
+    "OO write C11 with corrected save-timing (blocked: materialize never completes)",
+    "forcesave cs_error=0 (never reached)",
+    "oo_to_html operation applied on gen-with-D4-29 (never reached)",
+    "application applied + result_revision (never reached)",
+    "store creditcode mirrors marker (never reached)"
+  ],
+  "constraints_honored": {
+    "did_not_edit_soft_limit_or_perf_config": true,
+    "did_not_use_simulated_callback": true,
+    "did_not_edit_other_owner_files_D4_20_D4_10_D4_36": true,
+    "did_not_break_D4_30_31_32": true,
+    "only_added_then_deleted_temp_probe_and_readonly_measurements": true
+  },
+  "verdict": "Task 11 stays [-]. The precisely-diagnosed save-timing fix is correct and in-scope but CANNOT be exercised because the round-trip is blocked one step earlier at materialize by a reproducible materialize_soft_timeout (128.5-129.3s CPU > 120s), plus a concurrent D4-36 source-contract structure drift (422) that appeared mid-session. Both blockers are external (owner spec workpaper-sync-materialize-large-table-performance for the timeout; D4-36 owner for the drift) and out of this task's scope. Not marked green.",
+  "unblock_conditions": [
+    "materialize CPU for entry xlsx/gt-d4-operating-revenue brought under the 120s soft limit (owner: spec workpaper-sync-materialize-large-table-performance), OR a legal evidence-capture channel that materializes under the limit;",
+    "D4-36 source-contract drift resolved by the D4-36 owner (publish new definitions template->instrumentation->contract->bundle->representation) so store-projection returns 200 again;",
+    "then re-run the save-timing-fixed D4-29 L2 probe: OO writes C11 without pre-emptive asc_Save -> host forcesave -> cs_error=0 -> oo_to_html operation applied -> application applied -> read back customer_detail_transposed/cust-mu0j7ovb-1v1v/creditcode == marker."
+  ]
+}

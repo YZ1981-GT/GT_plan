@@ -1,0 +1,60 @@
+{
+  "pbtResults": {},
+  "executionHistory": {
+    "9. D4-32 unknown 组保真与人工映射：保留 label/id/金额三态/账号中文，非法 JSON 和保存失败保留旧数据并显示错误。": [
+      {
+        "executionId": "df56f6b5-fbed-463d-b722-5f1c22556356",
+        "chatSessionId": "sess_faecb7fd-805c-4cae-9657-fcbd22016698",
+        "timestamp": 1789862662075
+      },
+      {
+        "executionId": "6861231b-8170-41f7-a0cf-52aa83d4f339",
+        "chatSessionId": "sess_faecb7fd-805c-4cae-9657-fcbd22016698",
+        "timestamp": 1789868871561
+      },
+      {
+        "executionId": "6861231b-8170-41f7-a0cf-52aa83d4f339",
+        "chatSessionId": "sess_faecb7fd-805c-4cae-9657-fcbd22016698",
+        "timestamp": 1789869451040
+      }
+    ],
+    "10. 冻结稳定转置 sheet 锚、编译注入、发布/请求共享物理观测及完整性门禁；空客户、缺失/重复/公式身份防御测试。": [
+      {
+        "executionId": "df56f6b5-fbed-463d-b722-5f1c22556356",
+        "chatSessionId": "sess_faecb7fd-805c-4cae-9657-fcbd22016698",
+        "timestamp": 1789862662126
+      },
+      {
+        "executionId": "6861231b-8170-41f7-a0cf-52aa83d4f339",
+        "chatSessionId": "sess_faecb7fd-805c-4cae-9657-fcbd22016698",
+        "timestamp": 1789869457547
+      }
+    ],
+    "11. 合法升级 representation 后完成真实 HTML -> OO -> callback -> HTML 往返，记录 revision 和 operation；不得用模拟 callback 验收。": [
+      {
+        "executionId": "df56f6b5-fbed-463d-b722-5f1c22556356",
+        "chatSessionId": "sess_faecb7fd-805c-4cae-9657-fcbd22016698",
+        "timestamp": 1789862662158
+      },
+      {
+        "executionId": "6861231b-8170-41f7-a0cf-52aa83d4f339",
+        "chatSessionId": "sess_faecb7fd-805c-4cae-9657-fcbd22016698",
+        "timestamp": 1789869929021
+      }
+    ],
+    "7. 真栈验收与收口：Playwright 实测 HTML/Excel 双向往返、三方合并、ack 成功/失败恢复、D4-1 独立重试；完成 spec 结构与产物检查。": [
+      {
+        "executionId": "df56f6b5-fbed-463d-b722-5f1c22556356",
+        "chatSessionId": "sess_faecb7fd-805c-4cae-9657-fcbd22016698",
+        "timestamp": 1789862668889
+      }
+    ],
+    "8. D4-30/31/32 接入统一同步桥与受管 provider；未注册能力保持阻塞态，不修改 D4-29。": [
+      {
+        "executionId": "6861231b-8170-41f7-a0cf-52aa83d4f339",
+        "chatSessionId": "sess_faecb7fd-805c-4cae-9657-fcbd22016698",
+        "timestamp": 1789866991112
+      }
+    ]
+  }
+}

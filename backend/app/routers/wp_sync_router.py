@@ -656,8 +656,13 @@ async def _registration(svc: _SyncServices, scope: GuardedScope):
     """
     from app.services.workpaper_sync.adapters.registry import RegistryError
 
-    await _attach_pilot_adapters(svc)
+    # manifest 注册本身会跑全部 RG 判据（含契约漂移 assert_no_structure_drift）。若 source
+    # contract 与已发布 representation 的结构不一致（如新增 sheet 未 rematerialize），
+    # 会抛 `ContractDriftError`（`SyncDomainError` 子类）。它必须和 `assert_bidirectional_ready`
+    # 一样翻成 fail-visible 422，否则一路冒泡成 opaque 500（把整个 entry 的
+    # store-projection/materialize 打成「服务器内部错误」而看不到中文根因）。
     try:
+        await _attach_pilot_adapters(svc)
         return svc.registry.assert_bidirectional_ready(scope.entry_id)
     except (RegistryError, SyncDomainError) as exc:
         raise HTTPException(

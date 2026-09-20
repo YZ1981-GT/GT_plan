@@ -265,6 +265,156 @@ def test_d4_32_unknown_group_not_auto_other(unknown_label: str) -> None:
     assert unknown and len(unknown[0]["rows"]) == 1  # 独立保留待人工映射
 
 
+# ─── D4-32 未知组保真：label/id/金额三态/账号中文 export→import 往返（Task 9） ──
+
+
+def _d4_32_flatten_export(parsed: list[dict]) -> list[dict]:
+    """复刻端点 elif sheet == "D4-32" 扁平化分支（含未知组保真修复）。
+
+    真源逻辑在 _d4_import_export.d4_export_data 内联，这里最小复刻用于往返验证：
+    未知组别行的导出组别列必须用每行保留的原始来源 label（中文），
+    不能退化成字面量 "__unknown__"。
+    """
+    flat: list[dict] = []
+    for g in parsed:
+        if not isinstance(g, dict):
+            continue
+        gkey = g.get("key", "")
+        glabel = mod._D4_32_GROUP_KEY_TO_LABEL.get(gkey, gkey)
+        for seq, r in enumerate(g.get("rows", []), start=1):
+            rr = dict(r)
+            if gkey == "__unknown__":
+                rr["_groupLabel"] = rr.get("groupLabel") or glabel
+            else:
+                rr["_groupLabel"] = glabel
+            rr["_seq"] = seq
+            flat.append(rr)
+    return flat
+
+
+# 中文/含账号字符串生成器（含 CJK + 数字 + 常见符号）
+_cn_account_st = st.text(
+    min_size=1, max_size=16,
+    alphabet=st.characters(min_codepoint=0x4E00, max_codepoint=0x9FFF),
+) | st.from_regex(r"[0-9\u4e00-\u9fff\-]{1,18}", fullmatch=True)
+
+# 金额三态：0（显式零）/ 空串（空-未知）/ 正数（真实审计金额=2 位小数货币，
+# 用 分→元 生成以避免 xlsx 浮点序列化的位级抖动干扰三态语义断言）
+_amount_tristate_st = st.sampled_from([0.0, ""]) | st.integers(
+    min_value=1, max_value=999_999_999
+).map(lambda cents: cents / 100.0)
+
+
+@settings(max_examples=5)
+@given(
+    unknown_label=st.text(
+        min_size=1, max_size=8,
+        alphabet=st.characters(min_codepoint=0x4E00, max_codepoint=0x9FFF),
+    ),
+    name=st.text(min_size=1, max_size=10, alphabet=st.characters(categories=("L", "N"))),
+    amount=_amount_tristate_st,
+    account=_cn_account_st,
+    bank=st.sampled_from(["中国工商银行", "招商银行", "中国农业银行", ""]),
+)
+def test_d4_32_unknown_group_fidelity_round_trip(
+    unknown_label: str, name: str, amount, account: str, bank: str,
+) -> None:
+    """**Validates: Requirements 5.2**
+
+    D4-32 未知组保真 export→import 往返：
+    - 原始组别 label（中文）保留（不退化成 "__unknown__" 字面量）
+    - 稳定 row id 存在且格式正确（ff- 前缀）
+    - 金额三态（0 / 空-未知 / 正数）逐态保留，不静默变 0
+    - 账号中文/数字文本原样保留
+    人工选择已知组前，未知行独立落 __unknown__，不被猜测归并。
+    """
+    from hypothesis import assume
+
+    # 该 label 必须确实是未知组别（不在六组映射里），且经 _safe_str 后仍非空
+    assume(mod._safe_str(unknown_label) not in mod._D4_32_GROUP_LABEL_TO_KEY)
+    assume(mod._safe_str(unknown_label) != "")
+    assume(mod._safe_str(name) != "")
+
+    # HTML store 结构：__unknown__ 组，行上保留原始来源 label
+    store = [
+        {"key": k, "rows": []} for k in mod._D4_32_GROUP_ORDER
+    ] + [
+        {
+            "key": "__unknown__",
+            "rows": [
+                {
+                    "id": "ff-seed000001",
+                    "name": name,
+                    "amount": amount,
+                    "ratio": "",
+                    "bank": bank,
+                    "account": account,
+                    "method": "银行流水",
+                    "hasAnomaly": "否",
+                    "indexRef": "",
+                    "groupLabel": unknown_label,  # 原始来源组别（中文）
+                }
+            ],
+        }
+    ]
+
+    # 导出扁平化（含保真修复）→ 写 xlsx
+    flat = _d4_32_flatten_export(store)
+    headers = _headers("D4-32")
+    wb = openpyxl.Workbook(); ws = wb.active; ws.append(headers)
+    for dr in flat:
+        _amt = dr.get("amount", "")
+        ws.append([
+            dr.get("_groupLabel", ""),
+            dr.get("_seq", "") or "",
+            dr.get("name", ""),
+            mod._safe_float(_amt) if _amt not in (None, "") else "",
+            dr.get("ratio", ""),
+            dr.get("bank", ""),
+            dr.get("account", ""),
+            dr.get("method", ""),
+            dr.get("hasAnomaly", ""),
+            dr.get("indexRef", ""),
+        ])
+    buf = io.BytesIO(); wb.save(buf); buf.seek(0)
+
+    # 读回 → parse → reshape
+    wb2 = openpyxl.load_workbook(buf, data_only=True); ws2 = wb2.active
+    actual_headers = [str(c.value).strip() if c.value else "" for c in next(ws2.iter_rows(min_row=1, max_row=1))]
+    parsed = [mod._parse_d4_32_row(r, actual_headers) for r in ws2.iter_rows(min_row=2, values_only=True)]
+    parsed = [d for d in parsed if d]
+    reshaped = mod._reshape_d4_32_rows(parsed)
+
+    # 未知组独立保留，未被归入六组任一
+    for gkey in mod._D4_32_GROUP_ORDER:
+        g = next(x for x in reshaped if x["key"] == gkey)
+        assert g["rows"] == [], f"未知组别不应被猜测归入 {gkey}"
+    unknown = [g for g in reshaped if g["key"] == "__unknown__"]
+    assert unknown and len(unknown[0]["rows"]) == 1
+    got = unknown[0]["rows"][0]
+
+    # ① 原始 label（中文）保真，未退化成字面量 "__unknown__"
+    assert got["groupLabel"] == mod._safe_str(unknown_label)
+    assert got["groupLabel"] != "__unknown__"
+
+    # ② 稳定 row id 存在且格式正确（xlsx 无 id 列，parse 侧生成 ff- 前缀稳定 id）
+    assert isinstance(got.get("id"), str) and got["id"].startswith("ff-")
+
+    # ③ 金额三态逐态保留（空↛0、0↛空、正数不被静默清零）
+    if amount == "":
+        assert got["amount"] == "", "空-未知金额不得静默变 0"
+    elif amount == 0.0:
+        assert got["amount"] == 0.0  # 显式 0 保留，非退化成空
+    else:
+        assert got["amount"] != "" and got["amount"] != 0.0, "正数金额不得被静默清零/清空"
+        assert abs(float(got["amount"]) - mod._safe_float(amount)) < 0.005  # 2 位货币精度内一致
+
+    # ④ 账号中文/数字文本原样保留
+    assert got["account"] == mod._safe_str(account)
+    assert got["name"] == mod._safe_str(name)
+    assert got["bank"] == mod._safe_str(bank)
+
+
 # ═══════════════════════════════════════════════════════════════════════════════
 # 结构守卫（非往返）：item_id 双侧一致 + 组别真源锁死 + header↔key 覆盖
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -371,3 +521,23 @@ def test_all_checklist_inserts_include_project_id() -> None:
     assert inserts, "未找到 INSERT checklist_responses"
     for cols in inserts:
         assert "project_id" in cols, f"INSERT 缺 project_id 列: {cols.strip()}"
+
+
+def test_d4_32_export_preserves_unknown_group_source_label() -> None:
+    """**Validates: Requirements 5.2**
+
+    源级守卫：D4-32 导出扁平化分支对 __unknown__ 组必须用每行保留的原始来源
+    label（groupLabel），而非 key→label 查表退化成字面量 "__unknown__"。
+    还原该修复即 RED（防往返丢原始中文组别名回归）。
+    """
+    src = _read("backend/app/routers/wp_render_strategies/_d4_import_export.py")
+    # 定位 D4-32 export 扁平化分支
+    branch_idx = src.find('elif sheet == "D4-32" and isinstance(parsed, list):')
+    assert branch_idx != -1, "未找到 D4-32 导出扁平化分支"
+    branch = src[branch_idx:branch_idx + 900]
+    # 必须对 __unknown__ 组取每行保留的 groupLabel（保真），不能无条件用查表 label
+    assert '__unknown__' in branch, "D4-32 导出分支缺未知组保真处理"
+    assert '.get("groupLabel")' in branch, (
+        "D4-32 未知组导出必须优先用每行保留的原始来源 label(groupLabel)，"
+        "否则往返丢原始中文组别名"
+    )
