@@ -2031,11 +2031,23 @@ def normalise_propagated_part(
 
     out = text
     reverted = 0
+
+    # 🔴 候选形态**必须与 apply 侧对称**（excel_materialize._apply_workbook_propagation）：
+    #    definedName / 公式里的 sheet 名单引号在 workbook.xml 序列化为 `&apos;`，而
+    #    `ref_after`/`ref_before` 由 `_unescape` 还原成裸 `'`、`_escape` 又不转单引号。
+    #    apply 侧已补 `'`→`&apos;` 候选把改动落进 `&apos;` 形态的产物；verify 侧若不补
+    #    同一候选，就逆归一化不回来 → workbook_and_styles 被误判为「未管理区域漂移」
+    #    （adapter_unmanaged_region_drift，D4-26 Print_Area/FOOTER_ANCHOR 真栈）。
+    def _apos(s: str) -> str:
+        return s.replace("'", "&apos;")
+
     # 长的先替换：短的 ref_after 可能是长的子串（`!A2` ⊂ `!A25`），先替短的会切坏长的
     for after, before in sorted(pairs, key=lambda kv: len(kv[0]), reverse=True):
-        # 两种文本形态各试一次：产物里可能是转义后的，也可能保留了原始实体写法
+        # 各文本形态各试一次：产物里可能是转义后的、保留原始实体写法、或单引号 &apos; 形态
         for candidate_after, candidate_before in (
+            (_apos(_escape(after)), _apos(_escape(before))),
             (_escape(after), _escape(before)),
+            (_apos(after), _apos(before)),
             (after, before),
         ):
             hits = out.count(candidate_after)

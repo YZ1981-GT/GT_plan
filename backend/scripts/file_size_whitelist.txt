@@ -418,6 +418,14 @@ backend/tests/workpaper_sync/test_excel_row_shift.py  951
 #     spec: workpaper-html-onlyoffice-bidirectional-writeback-closure G2-2/G2-3
 backend/tests/workpaper_sync/test_workbook_row_change_delete.py  888
 
+#   excel_workbook_row_change.py —— workbook 行结构变更 + definedName/公式传播的 apply/verify
+#     内核（G2 系列）。历史大文件（首次被 hook 触碰时登记，此前一直未入 whitelist）。
+#     2026-09-21：修 verify 侧 &apos; 逆归一化与 apply 侧对称（净 +12），baseline 2328 = 当前真实
+#     行数。该文件把「行变更计划 + apply 补丁 + verify 逆归一化对称判据」内聚在一处，拆分会让
+#     apply↔verify 的候选形态对称性失联（本次 bug 正是两侧候选不对称）。后续应抽 apply/verify
+#     伴生模块使其变小；技术债登记，不留膨胀空间。
+backend/app/services/workpaper_sync/excel_workbook_row_change.py  2328
+
 # ═══════════════════════════════════════════════════════════════════════════
 # spec: platform-architecture-convergence（2026-09-08 归档入库）
 #

@@ -442,3 +442,67 @@ class TestProperty23WiredIntoRealVerifier:
             f"只有 {differing} 张引用侧 sheet 的原始字节不同 ⇒ "
             "要么传播没生效，要么归一化判据本来就不需要"
         )
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# 🔴 回归：definedName 单引号 &apos; 序列化的逆归一化对称（与 apply 侧对称）
+# ═══════════════════════════════════════════════════════════════════════════
+#
+# apply 侧（excel_materialize._apply_workbook_propagation）把 `&apos;` 形态的引用改到；
+# verify 侧（normalise_propagated_part）必须能把它逆归一化回去，否则 workbook.xml 被误判
+# 为「未管理区域漂移」（adapter_unmanaged_region_drift，D4-26 真栈）。两侧候选必须对称。
+
+
+def _apos_plan() -> N1.WorkbookRowChangePlan:
+    return N1.WorkbookRowChangePlan(
+        kind=N1.RowChangeKind.INSERT,
+        managed_sheet_name="境外销售收入检查D4-26",
+        managed_sheet_part="xl/worksheets/sheet1.xml",
+        at=23,
+        count=1,
+        style_from=22,
+        region_first_row=13,
+        region_last_row=22,
+        propagations=(
+            N1.PropagationEntry(
+                carrier="defined_name",
+                part="xl/workbook.xml",
+                locator="Print_Area#0",
+                ref_before="'境外销售收入检查D4-26'!$A$1:$S$33",
+                ref_after="'境外销售收入检查D4-26'!$A$1:$S$34",
+                row_before=33,
+                row_after=34,
+            ),
+        ),
+    )
+
+
+class TestApostropheSerializationSymmetry:
+    """workbook.xml 的 `&apos;` 形态在 verify 侧必须能逆归一化（对称于 apply 侧）。"""
+
+    def test_normalise_reverts_apos_escaped_after(self) -> None:
+        """产物里 after 是 `&apos;` 形态 ⇒ 逆归一化回 before，且 reverted 记 1。"""
+        plan = _apos_plan()
+        # apply 产物：after 落成 &apos; 形态、行号已是 34
+        after_text = (
+            '<definedName name="_xlnm.Print_Area" localSheetId="33">'
+            "&apos;境外销售收入检查D4-26&apos;!$A$1:$S$34</definedName>"
+        )
+        out, reverted = N1.normalise_propagated_part(after_text, plan, part="xl/workbook.xml")
+        assert reverted == 1, f"应逆替换 1 处，实得 {reverted}"
+        # 逆归一化后应回到 before 行号 33（&apos; 形态保留）
+        assert "&apos;境外销售收入检查D4-26&apos;!$A$1:$S$33" in out, out
+        assert "$S$34" not in out, "after 行号 34 应已被逆替换回 33"
+
+    def test_declared_exactly_passes_on_apos_roundtrip(self) -> None:
+        """assert_propagation_declared_exactly：before/after 均 &apos; 形态时不误报漂移。"""
+        plan = _apos_plan()
+        before_text = (
+            '<definedName name="_xlnm.Print_Area" localSheetId="33">'
+            "&apos;境外销售收入检查D4-26&apos;!$A$1:$S$33</definedName>"
+        )
+        after_text = before_text.replace("$S$33", "$S$34")
+        # 不得抛 PropagationDriftError（修复前：逆归一化 reverted=0 → 判未声明漂移）
+        N1.assert_propagation_declared_exactly(
+            before_text, after_text, plan, part="xl/workbook.xml"
+        )

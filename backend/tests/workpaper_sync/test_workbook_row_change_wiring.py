@@ -266,6 +266,54 @@ class TestApplyFollowsTheDeclaration:
         text = out["xl/worksheets/sheet2.xml"].decode("utf-8")
         assert "'受管表'!A21+1" in text, text
 
+    def test_apply_rewrites_definedname_with_apos_escaped_quotes(self) -> None:
+        """🔴 回归：workbook.xml 的 definedName 里 sheet 名单引号序列化为 `&apos;`。
+
+        计划期 `ref_before` 由 `_unescape`(html.unescape) 还原成**裸单引号** `'`，
+        `_escape` 只转义 `& < >`（不转单引号）。若 apply 候选只试裸 `'`，在 `&apos;`
+        序列化的 workbook.xml 里 `count()` 恒为 0 → 误报 PropagationDriftError
+        （D4-26 Print_Area 33→34 / FOOTER_ANCHOR 30→31 真栈）。本测试锁死：apply 必须
+        能把 `&apos;` 形态的引用改到。
+        """
+        change = N1.WorkbookRowChangePlan(
+            kind=N1.RowChangeKind.INSERT,
+            managed_sheet_name="境外销售收入检查D4-26",
+            managed_sheet_part="xl/worksheets/sheet1.xml",
+            at=23,
+            count=1,
+            style_from=22,
+            region_first_row=13,
+            region_last_row=22,
+            propagations=(
+                N1.PropagationEntry(
+                    carrier="defined_name",
+                    part="xl/workbook.xml",
+                    locator="Print_Area#0",
+                    # ref_before/after 是**裸单引号**（计划期 unescape 后的口径）
+                    ref_before="'境外销售收入检查D4-26'!$A$1:$S$33",
+                    ref_after="'境外销售收入检查D4-26'!$A$1:$S$34",
+                    row_before=33,
+                    row_after=34,
+                ),
+            ),
+        )
+        plan = _bare_plan(workbook_row_change=change)
+        # workbook.xml 里单引号是 `&apos;` 序列化（真实 OOXML 形态）
+        wb_xml = (
+            '<definedName name="_xlnm.Print_Area" localSheetId="33">'
+            "&apos;境外销售收入检查D4-26&apos;!$A$1:$S$33</definedName>"
+        )
+        out = M._apply_workbook_propagation(
+            {
+                "xl/worksheets/sheet1.xml": b"<x/>",
+                "xl/workbook.xml": wb_xml.encode("utf-8"),
+            },
+            plan=plan,
+        )
+        text = out["xl/workbook.xml"].decode("utf-8")
+        assert "&apos;境外销售收入检查D4-26&apos;!$A$1:$S$34" in text, text
+        assert "$S$33" not in text, "旧行号 33 应已被改写为 34"
+
 
 class TestPropagationOrderInApply:
     """🔴 传播必须排在**写格之前**、位移之后。"""
@@ -290,16 +338,19 @@ class TestPropagationOrderInApply:
         return [name for _lineno, name in sorted(calls)]
 
     def test_propagation_precedes_cell_patch(self) -> None:
-        """AST：`_apply_workbook_propagation` 的调用在 `_patch_sheet_xml` 之前。
+        """AST：`_apply_workbook_propagation` 的调用在写格 `patch_sheet_xml_indexed` 之前。
 
         若排在写格之后，写格产生的新字节会进入传播的输入 ⇒ 声明与实测的对账口径
         就不再是「计划期冻结的那份」。
+        🔴 生产写格路径是 `patch_sheet_xml_indexed`（apply_plan_zip_with_report 行尾实际调用）；
+        `_patch_sheet_xml` 仅为逐字节等价的对照实现/变异靶心，不在真实调用链里 —— 断言必须
+        钉真实调用的 `patch_sheet_xml_indexed`，否则 AST order 里永不出现该名 ⇒ 假守卫恒红。
         """
         order = self._call_order(M.apply_plan_zip_with_report)
         assert "_apply_workbook_propagation" in order, order
-        assert "_patch_sheet_xml" in order, order
+        assert "patch_sheet_xml_indexed" in order, order
         assert order.index("_apply_workbook_propagation") < order.index(
-            "_patch_sheet_xml"
+            "patch_sheet_xml_indexed"
         ), f"传播排在写格之后 —— 写格的新字节会进入传播输入，对账口径失真：{order}"
 
     def test_propagation_follows_row_shift(self) -> None:
