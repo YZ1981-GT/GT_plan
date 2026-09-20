@@ -591,3 +591,263 @@ class TestStaticAnchorRetained:
             _assert_static_anchor_retained(
                 expected=expected, observed=observed, binding=binding, entry_id="e1"
             )
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Task 5 · materialize 静态链 + 闭合往返（Property 1）
+# ═══════════════════════════════════════════════════════════════════════════
+
+from app.services.workpaper_sync import excel_materialize as M
+from app.services.workpaper_sync.adapters.base import (
+    FieldValue,
+    Projection,
+    SubstrateRole,
+)
+from app.services.workpaper_sync.excel_entry_gate import (
+    AdapterBuild,
+    FrozenEntryDefinitions,
+)
+from app.services.workpaper_sync.models import ArtifactKind, ArtifactState
+
+
+def _read_entries(data: bytes) -> dict:
+    with zipfile.ZipFile(io.BytesIO(data)) as zf:
+        return {name: zf.read(name) for name in zf.namelist()}
+
+
+def _make_full_static_substrate(values: dict[str, float]) -> bytes:
+    """造完整静态 substrate：受管静态 sheet + definedName + 隐藏 _GT_SYNC sheet。
+
+    受管区 E12:F12（rev/cost 两输入），G12 = 一个公式 cell（=E12-F12，formula_mask）。
+    """
+    from app.services.excel_structure_fingerprint import GT_SYNC_SHEET_NAME
+
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = STATIC_SHEET
+    ws["E12"] = values.get("E12", 0)
+    ws["F12"] = values.get("F12", 0)
+    ws["G12"] = "=E12-F12"  # 区内公式（formula_mask 保护）
+    meta = wb.create_sheet(GT_SYNC_SHEET_NAME)
+    meta["A1"] = "GT_SYNC_SCHEMA_VERSION"
+    meta["B1"] = "1"
+    meta.sheet_state = "hidden"
+    wb.defined_names[STATIC_DEFINED_NAME] = DefinedName(
+        STATIC_DEFINED_NAME, attr_text=f"'{STATIC_SHEET}'!$E$12:$G$12"
+    )
+    buf = io.BytesIO()
+    wb.save(buf)
+    return buf.getvalue()
+
+
+def _static_contract_with_formula() -> object:
+    import hashlib
+
+    def _d(s: str) -> str:
+        return hashlib.sha256(s.encode()).hexdigest()
+
+    payload = {
+        "schema_version": "contract-definition:v1",
+        "contract_id": STATIC_CONTRACT_ID,
+        "semantic_version": "1.0.0",
+        "review_status": "reviewed",
+        "document_type": "xlsx",
+        "template_definition_sha256": _d("d433f-template-definition"),
+        "instrumentation_definition_sha256": _d("d433f-instrumentation-definition"),
+        "template": {
+            "relative_path": "D/d433f.xlsx",
+            "template_sha256": _d("d433f-template"),
+            "normalized_structure_hash": _d("d433f-normalized-structure"),
+        },
+        "identity_carriers": ["defined_name"],
+        "sheets": [
+            {
+                "sheet_key": "d433-managed",
+                "excel_name": STATIC_SHEET,
+                "locator": {"anchor": "defined_name_ref"},
+                "tables": [
+                    {
+                        "table_key": STATIC_TABLE_KEY,
+                        "anchor": "E12",
+                        "header_rows": 1,
+                        "formula_mask": ["G12:G12"],
+                        "fields": [
+                            {
+                                "stable_field_key": f"{STATIC_TABLE_KEY}/rev_m1",
+                                "json_pointer": "/months/0/revenue",
+                                "column_key": "rev_m1",
+                                "cell": {"column": "E", "row_from": 12},
+                                "mode": "editable",
+                                "value_type": "amount",
+                                "source_ref": "wp:D4-33!E12",
+                            },
+                            {
+                                "stable_field_key": f"{STATIC_TABLE_KEY}/cost_m1",
+                                "json_pointer": "/months/0/cost",
+                                "column_key": "cost_m1",
+                                "cell": {"column": "F", "row_from": 12},
+                                "mode": "editable",
+                                "value_type": "amount",
+                                "source_ref": "wp:D4-33!F12",
+                            },
+                            {
+                                "stable_field_key": f"{STATIC_TABLE_KEY}/margin_m1",
+                                "json_pointer": "/months/0/margin",
+                                "column_key": "margin_m1",
+                                "cell": {"column": "G", "row_from": 12},
+                                "mode": "formula",
+                                "value_type": "amount",
+                                "source_ref": "wp:D4-33!G12",
+                            },
+                        ],
+                    }
+                ],
+            }
+        ],
+    }
+    return parse_contract(payload, adapter_id=STATIC_CONTRACT_ID)
+
+
+def _static_definitions(contract: object) -> FrozenEntryDefinitions:
+    import hashlib
+    import uuid as _uuid
+
+    from app.services.workpaper_sync.models import (
+        AuthorityModel,
+        BundleSlot,
+        BundleSlotSpec,
+        DefinitionState,
+    )
+    from app.services.workpaper_sync.resolution import DefinitionBundleSnapshot
+
+    def _d(s: str) -> str:
+        return hashlib.sha256(s.encode()).hexdigest()
+
+    def slot(kind, digest):
+        return BundleSlotSpec(kind, "definition", f"definition:{_uuid.uuid4()}", digest)
+
+    bundle = DefinitionBundleSnapshot(
+        bundle_id=_uuid.uuid4(),
+        bundle_sha256=_d("d433-bundle"),
+        schema_version="definition-bundle:v1",
+        state=DefinitionState.approved,
+        authority_model=AuthorityModel.projection_contract,
+        authority_model_definition_id=_uuid.uuid4(),
+        authority_model_definition_sha256=_d("d433-authority"),
+        slots={
+            BundleSlot.template: slot(BundleSlot.template, contract.template_definition_sha256),
+            BundleSlot.instrumentation: slot(
+                BundleSlot.instrumentation, contract.instrumentation_definition_sha256
+            ),
+            BundleSlot.contract: slot(BundleSlot.contract, contract.canonical_sha256),
+        },
+    )
+    return FrozenEntryDefinitions(
+        entry_id="xlsx/gt-d4-33-static-test",
+        bundle=bundle,
+        contract=contract,
+        adapter_build=AdapterBuild(
+            adapter_id=STATIC_CONTRACT_ID,
+            adapter_build_digest=_d("d433-adapter-build"),
+            document_type="xlsx",
+            contract_version="1.0.0",
+        ),
+        identity_inventory=parse_identity_inventory(
+            _static_inventory_raw([STATIC_DEFINED_NAME])
+        ),
+        business_sheets=(),
+        dynamic_column_keys={},
+        structure_inventory_size=0,
+    )
+
+
+def _static_binding() -> ExcelIdentityBinding:
+    return ExcelIdentityBinding(
+        table_key=STATIC_TABLE_KEY, defined_name=STATIC_DEFINED_NAME
+    )
+
+
+def _projection_for(contract: object, *, rev: float, cost: float) -> Projection:
+    def fv(key: str, value, vtype, mode):
+        spec = contract.field_by_stable_key(key)
+        return FieldValue(key, value, spec.value_type, spec.mode)
+
+    values = {
+        f"{STATIC_TABLE_KEY}/rev_m1": fv(
+            f"{STATIC_TABLE_KEY}/rev_m1", rev, "amount", "editable"
+        ),
+        f"{STATIC_TABLE_KEY}/cost_m1": fv(
+            f"{STATIC_TABLE_KEY}/cost_m1", cost, "amount", "editable"
+        ),
+        # formula 字段的缓存值（派生），plan 应保留其 <f> 不当普通值写
+        f"{STATIC_TABLE_KEY}/margin_m1": fv(
+            f"{STATIC_TABLE_KEY}/margin_m1", rev - cost, "amount", "formula"
+        ),
+    }
+    return Projection(
+        contract_id=contract.contract_id,
+        semantic_version=contract.semantic_version,
+        document_type=contract.document_type,
+        values=values,
+        row_keys={},
+    )
+
+
+class TestStaticRoundtrip:
+    """Property 1：静态区 materialize→extract 往返受管值逐字段相等；公式归 formula_inventory。"""
+
+    def test_write_then_read_equal(self, tmp_path) -> None:
+        from app.services.workpaper_sync.excel_extract import extract_projection
+
+        contract = _static_contract_with_formula()
+        definitions = _static_definitions(contract)
+        binding = _static_binding()
+        substrate = _make_full_static_substrate({"E12": 111.0, "F12": 22.0})
+
+        # 1) plan 写新值 rev=888 cost=100
+        region_path = tmp_path / "base.xlsx"
+        region_path.write_bytes(substrate)
+        with zipfile.ZipFile(io.BytesIO(substrate)) as zf:
+            region = M.resolve_managed_region(zf, contract=contract, binding=binding)
+        plan = M.plan_managed_writes(
+            projection=_projection_for(contract, rev=888.0, cost=100.0),
+            contract=contract,
+            binding=binding,
+            region=region,
+            scan=None,
+            substrate_entries=_read_entries(substrate),
+            substrate_formulas={},
+            runtime_binding={},
+        )
+        assert plan.row_shift is None
+        assert plan.footer_marker_row is None
+        # G12 是 formula → 应进 preserved_formulas
+        assert f"{STATIC_TABLE_KEY}/margin_m1" in plan.preserved_formulas
+        # G12 的写入是 cached_value_only（保留 <f>），E12/F12 是普通值写
+        kind_by_coord = {w.coord: w.kind for w in plan.writes}
+        assert kind_by_coord["G12"] is M.CellWriteKind.cached_value_only
+        assert kind_by_coord["E12"] is M.CellWriteKind.number_literal
+        assert kind_by_coord["F12"] is M.CellWriteKind.number_literal
+        # 静态区无 identity 写入（无 UUID 列）
+        assert plan.identity_writes == ()
+
+        # 2) apply → staged
+        staged = M.apply_plan_zip(substrate, plan)
+        staged_path = tmp_path / "staged.xlsx"
+        staged_path.write_bytes(staged)
+
+        # 3) extract 反读
+        outcome = extract_projection(
+            artifact=staged_path,
+            definitions=definitions,
+            binding=binding,
+            substrate_role=SubstrateRole.published_representation,
+            artifact_kind=ArtifactKind.canonical,
+            artifact_state=ArtifactState.published,
+        )
+        rev_back = outcome.projection.get(f"{STATIC_TABLE_KEY}/rev_m1")
+        cost_back = outcome.projection.get(f"{STATIC_TABLE_KEY}/cost_m1")
+        assert float(rev_back.value) == 888.0
+        assert float(cost_back.value) == 100.0
+        # 公式 cell 归 formula_inventory，不当受管值
+        assert f"{STATIC_TABLE_KEY}/margin_m1" in outcome.formula_inventory

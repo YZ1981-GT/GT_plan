@@ -194,7 +194,7 @@ backend/app/services/workpaper_sync/evidence.py  1252
 backend/app/services/workpaper_sync/excel_entry_gate.py  1317
 backend/app/services/workpaper_sync/excel_extract.py  3900
 backend/app/services/workpaper_sync/excel_instrumentation.py  2105
-backend/app/services/workpaper_sync/excel_materialize.py  2980
+backend/app/services/workpaper_sync/excel_materialize.py  3120
 backend/app/services/workpaper_sync/materialize_coordinator.py  2936
 backend/app/services/workpaper_sync/merge.py  1612
 backend/app/services/workpaper_sync/models.py  1486
@@ -303,6 +303,7 @@ backend/tests/workpaper_sync/test_task29_timeline_evidence_pg.py  1565
 backend/tests/workpaper_sync/test_task30_closure_gate_pg.py  2146
 backend/tests/workpaper_sync/test_task35_content_event_refresh.py  824
 backend/tests/workpaper_sync/test_task36_excel_entry_gate.py  1810
+backend/tests/workpaper_sync/test_static_region_writeback.py  1400
 backend/tests/workpaper_sync/test_task37_excel_extract.py  2628
 backend/tests/workpaper_sync/test_task38_excel_materialize.py  3237
 backend/tests/workpaper_sync/test_task39_pilot_harness.py  1951

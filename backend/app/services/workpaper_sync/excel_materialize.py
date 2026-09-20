@@ -159,6 +159,7 @@ from app.services.workpaper_sync.excel_extract import (
     RuntimeIdentityInventory,
     assert_engine_entry_definitions,
     extract_projection,
+    is_static_region,
     managed_tables_of,
     read_runtime_binding_pairs,
     read_runtime_identity_inventory,
@@ -1614,13 +1615,16 @@ def plan_managed_writes(
     contract: SyncContract,
     binding: ExcelIdentityBinding,
     region: ManagedRegion,
-    scan: RowIdentityScan,
+    scan: RowIdentityScan | None,
     substrate_entries: Mapping[str, bytes],
     substrate_formulas: Mapping[str, str],
     runtime_binding: Mapping[str, str],
     intended_formulas: Mapping[str, str] | None = None,
 ) -> MaterializePlan:
     """算出「往哪些格写什么」。纯函数：不碰磁盘、不改 `substrate_entries`。
+
+    静态受管区（:attr:`BindingKind.static_region`）走 :func:`_plan_static_writes` ——
+    按绝对坐标直写，无 row_shift / footer 两门 / minted UUID / workbook 传播（`scan=None`）。
 
     执行顺序即判据（不可交换）：
 
@@ -1637,6 +1641,16 @@ def plan_managed_writes(
     base representation）。缺省为 `substrate_formulas`，即 HTML→OO 方向「substrate 自己就是
     权威」。给了它之后，substrate 上被改写过的公式会被还原 —— 见 :attr:`CellWrite.formula_text`。
     """
+    if is_static_region(binding):
+        return _plan_static_writes(
+            projection=projection,
+            contract=contract,
+            binding=binding,
+            region=region,
+            substrate_entries=substrate_entries,
+            substrate_formulas=substrate_formulas,
+            intended_formulas=intended_formulas,
+        )
     dynamic_columns = assert_dynamic_column_binding_usable(
         contract=contract, binding=binding
     )
@@ -1906,6 +1920,101 @@ def plan_managed_writes(
         workbook_row_change=workbook_row_change,
         managed_sheet_key=_sheet_key_for_table(contract, binding.table_key),
         managed_table_name=binding.table_name,
+    )
+
+
+def _plan_static_writes(
+    *,
+    projection: Projection,
+    contract: SyncContract,
+    binding: ExcelIdentityBinding,
+    region: ManagedRegion,
+    substrate_entries: Mapping[str, bytes],
+    substrate_formulas: Mapping[str, str],
+    intended_formulas: Mapping[str, str] | None = None,
+) -> MaterializePlan:
+    """静态受管区的写入计划（Requirement 4.1/4.2）：按绝对坐标直写。
+
+    与动态 :func:`plan_managed_writes` 的差别（全部因「无动态行维度」而来）：
+    * 无 dynamic_columns 绑定、无 row_shift、无 footer 两门、无 minted UUID、无 workbook 传播；
+    * 受管 cell = 静态表 fields 的 `static_row` 绝对坐标；
+    * 区内公式 cell（合计 / 毛利率）走 formula_mask 保护（与动态区受保护格同一 `_emit` 逻辑）；
+    * definedName 不在 writes 里 → 写操作只碰受管值坐标 → definedName 原样保留（Requirement 4.4）。
+    """
+    _, static_tables = managed_tables_of(contract, binding=binding)
+    xml = substrate_entries[region.sheet_part].decode("utf-8")
+    cell_index = build_sheet_cell_index(xml)
+    intended_map: Mapping[str, str] = (
+        substrate_formulas if intended_formulas is None else intended_formulas
+    )
+    writes: list[CellWrite] = []
+    preserved: dict[str, str] = {}
+
+    for static_table in static_tables:
+        for spec in static_table.fields:
+            if spec.cell is None or spec.cell.static_row is None:
+                continue
+            column = _resolve_column(spec, table=static_table, region=region, binding=binding)
+            coord = f"{column}{spec.cell.static_row}"
+            key = spec.stable_field_key  # 静态字段无 {row_uuid} 实例化
+            field = projection.get(key)
+            if field is None:
+                continue
+            view = cell_index.view(coord)
+            restore = ""
+            if spec.mode is FieldMode.formula:
+                if view is None or not view.has_formula:
+                    raise ProtectedRegionWriteError(
+                        f"契约把 {key!r} 声明为 formula，但 substrate 的 {coord} 没有公式 —— "
+                        "契约/模板漂移，不得凭空写公式或当字面量覆盖（AC 6.6）"
+                    )
+                observed = substrate_formulas.get(key, view.formula_text or "")
+                intended = intended_map.get(key, observed)
+                preserved[key] = intended
+                if intended and _formula_body(intended) != _formula_body(observed):
+                    if not (view.formula_text or ""):
+                        raise ProtectedRegionWriteError(
+                            f"受保护格 {coord}（{key}）的公式与 base representation 不符"
+                            f"（应为 {intended!r}，实测 {observed!r}）且是共享公式组成员 —— "
+                            "必须人工裁决而不是悄悄写回一格（AC 6.6）"
+                        )
+                    restore = _formula_body(intended)
+            elif spec.mode is FieldMode.auto_source:
+                if view is not None and view.has_formula:
+                    raise ProtectedRegionWriteError(
+                        f"契约把 {key!r} 声明为 auto_source，但 substrate 的 {coord} 是公式 "
+                        f"{view.formula_text!r} —— 写字面量会毁掉模板公式（AC 6.6 / 3.5）"
+                    )
+            elif view is not None and view.shared_ref and ":" in (view.shared_ref or ""):
+                raise SharedFormulaMasterWriteError(
+                    f"契约把 {key!r} 声明为 {spec.mode.value}，但 {coord} 是共享公式主格 "
+                    f"(ref={view.shared_ref})—— 覆盖主格会让整组成员失效"
+                )
+            writes.append(
+                CellWrite(
+                    coord=coord,
+                    kind=_write_kind_for(spec),
+                    value=_normalised_write_value(field, spec, coord),
+                    stable_field_key=key,
+                    row_key="",
+                    mode=spec.mode,
+                    formula_text=restore,
+                )
+            )
+
+    return MaterializePlan(
+        sheet_part=region.sheet_part,
+        sheet_name=region.sheet_name,
+        writes=tuple(writes),
+        preserved_formulas=dict(sorted(preserved.items())),
+        dynamic_column_columns={},
+        footer_marker_row=None,
+        row_shift=None,
+        total_formula_rows=(),
+        table_part="",
+        workbook_row_change=None,
+        managed_sheet_key=_sheet_key_for_table(contract, binding.table_key),
+        managed_table_name=None,
     )
 
 
