@@ -7,7 +7,7 @@
     "excel_table",
     "hidden_uuid_column"
   ],
-  "instrumentation_definition_sha256": "25aebd5fb649a40d70722ef180b8b2883a723732a6327e7075ec38ec6eddac9a",
+  "instrumentation_definition_sha256": "59f33aaaf17e2aa6e1a5d0c2ccfabfdb71e0400e86bafccd8e6ddc8cd1241fe5",
   "review": {
     "authority_root": "backend/wp_templates",
     "entry_id": "xlsx/gt-d4-operating-revenue",
@@ -5635,6 +5635,196 @@
         }
       ],
       "template_id": "D417"
+    },
+    {
+      "excel_name": "营业收入截止测试（单据到账）D4-18",
+      "locator": {
+        "anchor": "excel_table_sheet_association"
+      },
+      "sheet_key": "d418-managed",
+      "tables": [
+        {
+          "anchor": "A12",
+          "delete_policy": "tombstone",
+          "fields": [
+            {
+              "cell": {
+                "column": "A",
+                "row_from": "row_identity"
+              },
+              "column_key": "delivery_date",
+              "header_source_ref": "源xlsx!营业收入截止测试（单据到账）D4-18!A12",
+              "header_text": "发货单日期",
+              "json_pointer": "/rows/{row_uuid}/deliveryDate",
+              "mode": "editable",
+              "source_ref": "源xlsx!营业收入截止测试（单据到账）D4-18!A13",
+              "stable_field_key": "d4_18_rows/{row_uuid}/delivery_date",
+              "store_item_id": "D4-18-rows",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "B",
+                "row_from": "row_identity"
+              },
+              "column_key": "delivery_no",
+              "header_source_ref": "源xlsx!营业收入截止测试（单据到账）D4-18!B12",
+              "header_text": "发货单编号",
+              "json_pointer": "/rows/{row_uuid}/deliveryNo",
+              "mode": "editable",
+              "source_ref": "源xlsx!营业收入截止测试（单据到账）D4-18!B13",
+              "stable_field_key": "d4_18_rows/{row_uuid}/delivery_no",
+              "store_item_id": "D4-18-rows",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "C",
+                "row_from": "row_identity"
+              },
+              "column_key": "delivery_product",
+              "header_source_ref": "源xlsx!营业收入截止测试（单据到账）D4-18!C12",
+              "header_text": "发货单品名",
+              "json_pointer": "/rows/{row_uuid}/deliveryProduct",
+              "mode": "editable",
+              "source_ref": "源xlsx!营业收入截止测试（单据到账）D4-18!C13",
+              "stable_field_key": "d4_18_rows/{row_uuid}/delivery_product",
+              "store_item_id": "D4-18-rows",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "D",
+                "row_from": "row_identity"
+              },
+              "column_key": "delivery_qty",
+              "header_source_ref": "源xlsx!营业收入截止测试（单据到账）D4-18!D12",
+              "header_text": "发货单数量",
+              "json_pointer": "/rows/{row_uuid}/deliveryQty",
+              "mode": "editable",
+              "source_ref": "源xlsx!营业收入截止测试（单据到账）D4-18!D13",
+              "stable_field_key": "d4_18_rows/{row_uuid}/delivery_qty",
+              "store_item_id": "D4-18-rows",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "E",
+                "row_from": "row_identity"
+              },
+              "column_key": "delivery_amount",
+              "header_source_ref": "源xlsx!营业收入截止测试（单据到账）D4-18!E12",
+              "header_text": "发货单金额",
+              "json_pointer": "/rows/{row_uuid}/deliveryAmount",
+              "mode": "editable",
+              "source_ref": "源xlsx!营业收入截止测试（单据到账）D4-18!E13",
+              "stable_field_key": "d4_18_rows/{row_uuid}/delivery_amount",
+              "store_item_id": "D4-18-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "F",
+                "row_from": "row_identity"
+              },
+              "column_key": "voucher_date",
+              "header_source_ref": "源xlsx!营业收入截止测试（单据到账）D4-18!F12",
+              "header_text": "记账凭证日期",
+              "json_pointer": "/rows/{row_uuid}/voucherDate",
+              "mode": "editable",
+              "source_ref": "源xlsx!营业收入截止测试（单据到账）D4-18!F13",
+              "stable_field_key": "d4_18_rows/{row_uuid}/voucher_date",
+              "store_item_id": "D4-18-rows",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "G",
+                "row_from": "row_identity"
+              },
+              "column_key": "voucher_no",
+              "header_source_ref": "源xlsx!营业收入截止测试（单据到账）D4-18!G12",
+              "header_text": "记账凭证编号",
+              "json_pointer": "/rows/{row_uuid}/voucherNo",
+              "mode": "editable",
+              "source_ref": "源xlsx!营业收入截止测试（单据到账）D4-18!G13",
+              "stable_field_key": "d4_18_rows/{row_uuid}/voucher_no",
+              "store_item_id": "D4-18-rows",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "H",
+                "row_from": "row_identity"
+              },
+              "column_key": "voucher_product",
+              "header_source_ref": "源xlsx!营业收入截止测试（单据到账）D4-18!H12",
+              "header_text": "记账凭证品名",
+              "json_pointer": "/rows/{row_uuid}/voucherProduct",
+              "mode": "editable",
+              "source_ref": "源xlsx!营业收入截止测试（单据到账）D4-18!H13",
+              "stable_field_key": "d4_18_rows/{row_uuid}/voucher_product",
+              "store_item_id": "D4-18-rows",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "I",
+                "row_from": "row_identity"
+              },
+              "column_key": "voucher_qty",
+              "header_source_ref": "源xlsx!营业收入截止测试（单据到账）D4-18!I12",
+              "header_text": "记账凭证数量",
+              "json_pointer": "/rows/{row_uuid}/voucherQty",
+              "mode": "editable",
+              "source_ref": "源xlsx!营业收入截止测试（单据到账）D4-18!I13",
+              "stable_field_key": "d4_18_rows/{row_uuid}/voucher_qty",
+              "store_item_id": "D4-18-rows",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "J",
+                "row_from": "row_identity"
+              },
+              "column_key": "voucher_amount",
+              "header_source_ref": "源xlsx!营业收入截止测试（单据到账）D4-18!J12",
+              "header_text": "记账凭证金额",
+              "json_pointer": "/rows/{row_uuid}/voucherAmount",
+              "mode": "editable",
+              "source_ref": "源xlsx!营业收入截止测试（单据到账）D4-18!J13",
+              "stable_field_key": "d4_18_rows/{row_uuid}/voucher_amount",
+              "store_item_id": "D4-18-rows",
+              "value_type": "amount"
+            }
+          ],
+          "footer_anchor": {
+            "carries_total_formula": false,
+            "marker": "三、审计说明",
+            "search_column": "A"
+          },
+          "formula_mask": [
+            "K13",
+            "K14",
+            "K15",
+            "K16",
+            "K17",
+            "K18",
+            "K19",
+            "K20",
+            "K21",
+            "K22",
+            "K23"
+          ],
+          "header_rows": 1,
+          "row_identity": {
+            "json_pointer": "/rows/*/id",
+            "kind": "field"
+          },
+          "table_key": "d4_18_rows"
+        }
+      ],
+      "template_id": "D418"
     }
   ],
   "template": {
