@@ -19,7 +19,10 @@ import WpAmountInput from '../../shared/WpAmountInput.vue'
 import { ref, computed, inject, toRef, watch, onBeforeUnmount, type Ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import http from '@/utils/http'
-import GtOnlyOfficeSheet from '../../GtOnlyOfficeSheet.vue'
+import { useWorkpaperSyncBridge, WP_BRIDGE_IN_FLIGHT_STATES } from '../../sync/useWorkpaperSyncBridge'
+import { readStoreProjection } from '../../sync/workpaperSyncApi'
+import { capabilityForEntry } from '../../sync/workpaperSyncCapability'
+import WorkpaperSyncEditorHost from '../../sync/WorkpaperSyncEditorHost.vue'
 import { useD4ImportExport } from '../../composables/useD4ImportExport'
 import GtIndexChip from '../../GtIndexChip.vue'
 import type useD4CrossSheet from '../../composables/useD4CrossSheet'
@@ -48,12 +51,11 @@ const crossSheet = inject<D4CrossSheet | null>('d4CrossSheet', null)
 const ABNORMAL_THRESHOLD = 0.2
 
 // 双模式（结构化视图 / 在线编辑）
-const editorMode = ref<'structured' | 'onlyoffice'>('structured')
+// ─── 双模式 sync bridge（批次B 第六张：D4-10 迁 useWorkpaperSyncBridge，sheet_key=d410-managed）──
+//     flushSave/loadData 等为函数声明（提升），flushPendingSave 仅运行时调用（debounceTimer 已初始化）。
+const D4_10_ENTRY = 'xlsx/gt-d4-operating-revenue'
+const D4_10_SHEET_KEY = 'd410-managed'
 const ooHealthy = ref(false)
-const modeOptions = computed(() => [
-  { label: '结构化视图', value: 'structured' },
-  { label: '在线编辑', value: 'onlyoffice', disabled: !ooHealthy.value },
-])
 async function checkOoHealth() {
   try {
     const res = await http.get(`/api/workpapers/onlyoffice/health`, { _silent: true } as any)
@@ -61,6 +63,61 @@ async function checkOoHealth() {
   } catch { ooHealthy.value = false }
 }
 checkOoHealth()
+const syncSwitching = ref(false)
+const syncHostRef = ref<{ forceSave: () => Promise<{ operationId: string }> } | null>(null)
+function flushPendingSave() { if (debounceTimer) { clearTimeout(debounceTimer); debounceTimer = null } flushSave() }
+function reloadD410() { loadData(); loadNoteConclusion(); loadAuditProcess() }
+const syncBridge = useWorkpaperSyncBridge({
+  entryId: ref(D4_10_ENTRY),
+  wpId: toRef(props, 'wpId'),
+  projectId: toRef(props, 'projectId'),
+  sheetKey: ref(D4_10_SHEET_KEY),
+  capability: capabilityForEntry(D4_10_ENTRY),
+  flushHtml: async () => {
+    flushPendingSave()
+    const snap = await readStoreProjection({ projectId: props.projectId, wpId: props.wpId, entryId: D4_10_ENTRY })
+    return { expectedRevision: snap.expectedRevision, projection: snap.projection, sheetKey: D4_10_SHEET_KEY }
+  },
+  reloadHtml: async () => { reloadD410() },
+})
+const syncOoDescriptor = computed(() => syncBridge.descriptor.value)
+const syncBusy = computed(
+  () => syncSwitching.value
+    || (WP_BRIDGE_IN_FLIGHT_STATES as readonly string[]).includes(String(syncBridge.state.value)),
+)
+const editorMode = computed<'structured' | 'onlyoffice'>({
+  get: () => (syncBridge.mode.value === 'oo' ? 'onlyoffice' : 'structured'),
+  set: (v) => { void switchMode(v) },
+})
+const modeOptions = computed(() => [
+  { label: '结构化视图', value: 'structured' },
+  { label: '在线编辑', value: 'onlyoffice', disabled: props.isReadonly || !ooHealthy.value || syncBusy.value },
+])
+async function switchMode(target: 'structured' | 'onlyoffice'): Promise<void> {
+  const cur = syncBridge.mode.value === 'oo' ? 'onlyoffice' : 'structured'
+  if (target === cur) return
+  if (target === 'onlyoffice') {
+    if (props.isReadonly || !ooHealthy.value) return
+    syncSwitching.value = true
+    try { await syncBridge.switchToOnlyOffice() } finally { syncSwitching.value = false }
+    return
+  }
+  syncSwitching.value = true
+  try { await syncBridge.switchToHtml() } finally { syncSwitching.value = false }
+}
+const syncStateTag = computed(() => {
+  const st = String(syncBridge.state.value)
+  if (syncBusy.value) return { text: '同步中…', type: 'info' as const }
+  if (syncBridge.dirty?.value) {
+    return syncBridge.mode.value === 'oo'
+      ? { text: 'excel 侧有未同步改动', type: 'warning' as const }
+      : { text: 'html 侧有未同步改动', type: 'warning' as const }
+  }
+  if (st.includes('error') || String(syncBridge.lastError?.value || '')) {
+    return { text: '同步失败，请重试', type: 'danger' as const }
+  }
+  return { text: '已同步', type: 'success' as const }
+})
 
 const auditObjective = '利润表中记录的营业收入已发生，且与被审计单位有关，已记录于恰当的账户。'
 
@@ -72,6 +129,7 @@ function updateAuditProcess(val: string) { if (props.isReadonly) return; auditPr
 
 // ─── 数据 ────────────────────────────────────────────────────────────
 interface PriceRow {
+  rowId: string       // 稳定行身份（双向回写用，禁下标作身份）
   seq: number | null  // 序号（同客户多产品时仅首行有）
   customer: string
   product: string
@@ -92,6 +150,18 @@ const totalAmountManualOverride = ref(false)
 /** 公式真源声明（preset；用户手工覆盖后仍保留以便恢复） */
 const TOTAL_AMOUNT_FORMULA_REF = D4_10_TOTAL_AMOUNT_PRESET
 
+/** 生成稳定行身份（优先 crypto.randomUUID，回退时间+随机）。 */
+function genRowId(): string {
+  try { if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID() } catch { /* */ }
+  return `r-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`
+}
+/** 历史无 rowId 行一次性补齐（不丢手工值，双向回写身份前提，同 D4-9 backfill）。 */
+function backfillRowIds(list: PriceRow[]): boolean {
+  let changed = false
+  for (const r of list) { if (!r.rowId) { r.rowId = genRowId(); changed = true } }
+  return changed
+}
+
 function loadData() {
   const resp = props.allResponses.get('D4-10-data')
   if (resp?.remark) {
@@ -102,6 +172,7 @@ function loadData() {
       totalQuantity.value = d.totalQuantity || 0
       totalAmountManualOverride.value = Boolean(d.totalAmountManualOverride)
       // totalAmountFormulaRef 持久化供导入导出；运行时预设常量即 SoT，二次编辑走 manualOverride
+      if (backfillRowIds(rows.value) && !props.isReadonly) persistData()
       return
     } catch {}
   }
@@ -197,7 +268,7 @@ watch(abnormalCustomers, (items) => {
 
 function addRow() {
   if (props.isReadonly) return
-  rows.value.push({ seq: null, customer: '', product: '', amount: 0, quantity: 0, unitPrice: 0, avgPrice: 0, avgReason: '', marketPrice: 0, marketReason: '' })
+  rows.value.push({ rowId: genRowId(), seq: null, customer: '', product: '', amount: 0, quantity: 0, unitPrice: 0, avgPrice: 0, avgReason: '', marketPrice: 0, marketReason: '' })
   persistData()
 }
 function removeRow(idx: number) { if (props.isReadonly) return; rows.value.splice(idx, 1); persistData() }
@@ -285,7 +356,7 @@ async function importFromUpstream() {
     const { added, updated } = mergeCustomers(
       rows.value,
       upstream,
-      (name, amount) => ({ seq: null, customer: name, product: '', amount, quantity: 0, unitPrice: 0, avgPrice: 0, avgReason: '', marketPrice: 0, marketReason: '' }),
+      (name, amount) => ({ rowId: genRowId(), seq: null, customer: name, product: '', amount, quantity: 0, unitPrice: 0, avgPrice: 0, avgReason: '', marketPrice: 0, marketReason: '' }),
     )
     // 本期销售总额自动带出（公式真源 WP('D4-2','本期未审合计')；仅在未手工覆盖时填）
     const upstreamTotal = crossSheet.mainRevenueTotal.value.current
@@ -316,6 +387,7 @@ onBeforeUnmount(() => { if (debounceTimer) { clearTimeout(debounceTimer); flushS
     <!-- 双模式切换 -->
     <div class="mode-bar">
       <el-segmented v-model="editorMode" :options="modeOptions" size="small" />
+      <el-tag :type="syncStateTag.type" size="small" effect="light">{{ syncStateTag.text }}</el-tag>
     </div>
 
     <!-- 结构化视图 -->
@@ -501,15 +573,11 @@ onBeforeUnmount(() => { if (debounceTimer) { clearTimeout(debounceTimer); flushS
   
     </template>
 
-    <!-- OnlyOffice 在线编辑 -->
+    <!-- 在线编辑：平台 sync bridge（批次B 迁移，非裸 GtOnlyOfficeSheet） -->
     <template v-else>
       <div style="min-height: 600px; height: calc(100vh - 280px);">
-        <GtOnlyOfficeSheet
-          :wp-id="props.wpId"
-          :project-id="props.projectId"
-          sheet-name="重要客户销售价格分析D4-10"
-          :readonly="isReadonly"
-        />
+        <WorkpaperSyncEditorHost v-if="syncOoDescriptor" ref="syncHostRef" :descriptor="syncOoDescriptor" :bridge="syncBridge" />
+        <div v-else class="oo-loading">正在打开 D4-10 同步编辑器…</div>
       </div>
     </template>
   </div>

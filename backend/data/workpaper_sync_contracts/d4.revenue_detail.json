@@ -7,7 +7,7 @@
     "excel_table",
     "hidden_uuid_column"
   ],
-  "instrumentation_definition_sha256": "eda3580fd536ac6c1a0654859f0af8e12913a72f182f25f05296e63804114f8d",
+  "instrumentation_definition_sha256": "db4a51b512cfdf73b4eb72c10d9294c090800473fe16d7056db57773d115c476",
   "review": {
     "authority_root": "backend/wp_templates",
     "entry_id": "xlsx/gt-d4-operating-revenue",
@@ -6289,6 +6289,254 @@
         }
       ],
       "template_id": "D411"
+    },
+    {
+      "excel_name": "重要客户销售价格分析D4-10",
+      "locator": {
+        "anchor": "excel_table_sheet_association"
+      },
+      "sheet_key": "d410-managed",
+      "tables": [
+        {
+          "anchor": "A12",
+          "delete_policy": "tombstone",
+          "fields": [
+            {
+              "cell": {
+                "column": "B",
+                "row_from": "row_identity"
+              },
+              "column_key": "customer",
+              "header_source_ref": "源xlsx!重要客户销售价格分析D4-10!B12",
+              "header_text": "客户名称",
+              "json_pointer": "/rows/{row_uuid}/customer",
+              "mode": "editable",
+              "source_ref": "源xlsx!重要客户销售价格分析D4-10!B13",
+              "stable_field_key": "d4_10_rows/{row_uuid}/customer",
+              "store_item_id": "D4-10-data",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "C",
+                "row_from": "row_identity"
+              },
+              "column_key": "product",
+              "header_source_ref": "源xlsx!重要客户销售价格分析D4-10!C12",
+              "header_text": "产品种类",
+              "json_pointer": "/rows/{row_uuid}/product",
+              "mode": "editable",
+              "source_ref": "源xlsx!重要客户销售价格分析D4-10!C13",
+              "stable_field_key": "d4_10_rows/{row_uuid}/product",
+              "store_item_id": "D4-10-data",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "D",
+                "row_from": "row_identity"
+              },
+              "column_key": "amount",
+              "header_source_ref": "源xlsx!重要客户销售价格分析D4-10!D12",
+              "header_text": "销售金额",
+              "json_pointer": "/rows/{row_uuid}/amount",
+              "mode": "editable",
+              "source_ref": "源xlsx!重要客户销售价格分析D4-10!D13",
+              "stable_field_key": "d4_10_rows/{row_uuid}/amount",
+              "store_item_id": "D4-10-data",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "F",
+                "row_from": "row_identity"
+              },
+              "column_key": "quantity",
+              "header_source_ref": "源xlsx!重要客户销售价格分析D4-10!F12",
+              "header_text": "销售数量",
+              "json_pointer": "/rows/{row_uuid}/quantity",
+              "mode": "editable",
+              "source_ref": "源xlsx!重要客户销售价格分析D4-10!F13",
+              "stable_field_key": "d4_10_rows/{row_uuid}/quantity",
+              "store_item_id": "D4-10-data",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "H",
+                "row_from": "row_identity"
+              },
+              "column_key": "unit_price",
+              "header_source_ref": "源xlsx!重要客户销售价格分析D4-10!H12",
+              "header_text": "销售单价",
+              "json_pointer": "/rows/{row_uuid}/unitPrice",
+              "mode": "editable",
+              "source_ref": "源xlsx!重要客户销售价格分析D4-10!H13",
+              "stable_field_key": "d4_10_rows/{row_uuid}/unit_price",
+              "store_item_id": "D4-10-data",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "I",
+                "row_from": "row_identity"
+              },
+              "column_key": "avg_price",
+              "header_source_ref": "源xlsx!重要客户销售价格分析D4-10!I12",
+              "header_text": "年度均价",
+              "json_pointer": "/rows/{row_uuid}/avgPrice",
+              "mode": "editable",
+              "source_ref": "源xlsx!重要客户销售价格分析D4-10!I13",
+              "stable_field_key": "d4_10_rows/{row_uuid}/avg_price",
+              "store_item_id": "D4-10-data",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "K",
+                "row_from": "row_identity"
+              },
+              "column_key": "avg_reason",
+              "header_source_ref": "源xlsx!重要客户销售价格分析D4-10!K12",
+              "header_text": "与均价差异原因",
+              "json_pointer": "/rows/{row_uuid}/avgReason",
+              "mode": "editable",
+              "source_ref": "源xlsx!重要客户销售价格分析D4-10!K13",
+              "stable_field_key": "d4_10_rows/{row_uuid}/avg_reason",
+              "store_item_id": "D4-10-data",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "L",
+                "row_from": "row_identity"
+              },
+              "column_key": "market_price",
+              "header_source_ref": "源xlsx!重要客户销售价格分析D4-10!L12",
+              "header_text": "市场价格",
+              "json_pointer": "/rows/{row_uuid}/marketPrice",
+              "mode": "editable",
+              "source_ref": "源xlsx!重要客户销售价格分析D4-10!L13",
+              "stable_field_key": "d4_10_rows/{row_uuid}/market_price",
+              "store_item_id": "D4-10-data",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "N",
+                "row_from": "row_identity"
+              },
+              "column_key": "market_reason",
+              "header_source_ref": "源xlsx!重要客户销售价格分析D4-10!N12",
+              "header_text": "与市场差异原因",
+              "json_pointer": "/rows/{row_uuid}/marketReason",
+              "mode": "editable",
+              "source_ref": "源xlsx!重要客户销售价格分析D4-10!N13",
+              "stable_field_key": "d4_10_rows/{row_uuid}/market_reason",
+              "store_item_id": "D4-10-data",
+              "value_type": "text"
+            }
+          ],
+          "footer_anchor": {
+            "carries_total_formula": false,
+            "marker": "本期销售总额",
+            "search_column": "A"
+          },
+          "formula_mask": [
+            "E13",
+            "G13",
+            "J13",
+            "M13",
+            "E14",
+            "G14",
+            "J14",
+            "M14",
+            "E15",
+            "G15",
+            "J15",
+            "M15",
+            "E16",
+            "G16",
+            "J16",
+            "M16",
+            "E17",
+            "G17",
+            "J17",
+            "M17",
+            "E18",
+            "G18",
+            "J18",
+            "M18",
+            "E19",
+            "G19",
+            "J19",
+            "M19",
+            "E20",
+            "G20",
+            "J20",
+            "M20",
+            "E21",
+            "G21",
+            "J21",
+            "M21",
+            "E22",
+            "G22",
+            "J22",
+            "M22",
+            "E23",
+            "G23",
+            "J23",
+            "M23",
+            "E24",
+            "G24",
+            "J24",
+            "M24",
+            "E25",
+            "G25",
+            "J25",
+            "M25",
+            "E26",
+            "G26",
+            "J26",
+            "M26",
+            "E27",
+            "G27",
+            "J27",
+            "M27",
+            "E28",
+            "G28",
+            "J28",
+            "M28",
+            "E29",
+            "G29",
+            "J29",
+            "M29",
+            "E30",
+            "G30",
+            "J30",
+            "M30",
+            "E31",
+            "G31",
+            "J31",
+            "M31",
+            "E32",
+            "G32",
+            "J32",
+            "M32",
+            "E33",
+            "G33",
+            "J33",
+            "M33"
+          ],
+          "header_rows": 1,
+          "row_identity": {
+            "json_pointer": "/rows/*/rowId",
+            "kind": "field"
+          },
+          "table_key": "d4_10_rows"
+        }
+      ],
+      "template_id": "D410"
     }
   ],
   "template": {
