@@ -567,6 +567,8 @@ def identity_inventory(
     uuid_sheet_name: str | None = None,
     metadata_sheet: str = GT_SYNC_SHEET_NAME,
     defined_name_prefix: str = "GT_",
+    fingerprint: "WorkbookFingerprint | None" = None,
+    sync_pairs: dict[str, str] | None = None,
 ) -> dict[str, Any]:
     """三类 identity 载体的实测清册。
 
@@ -581,8 +583,30 @@ def identity_inventory(
       3. `uuid_column_header` 只在 Table `headerRowCount>0` 时可用（表头写在单元格里）。
     列内值**全列扫描**而不是按固定行范围取：插删行后 UUID 会整体位移，固定范围会把
     「位移」误判成「丢失」。
+
+    ═══ 已算结果复用（spec workpaper-sync-materialize-large-table-performance Wave 5）═══
+
+    `fingerprint` / `sync_pairs` 是**可选**的「同一份 `data` 已算结果」入口，供
+    :func:`published_identity_observer.collect_workbook_structure` 这类**对同一份不变字节遍历
+    M 个 anchor** 的调用方把全簿解析摊成一次（M=34 时实测 fingerprint 35 次 / 19.8s、
+    sync pairs 34 次 / 13.6s，一次 collect 共 34.2s）。
+
+    * 不传 → 保持原行为自算（既有单独调用点逐字节零回归）；
+    * 传入 → 复用，且**校验 `fingerprint.byte_sha256 == sha256(data)`**，不符即抛
+      :class:`FingerprintError`（Property 12：共享结果必须是该字节的纯投影，不得按陈旧
+      fingerprint 静默产出 inventory）。
     """
-    fp = structure_fingerprint(data)
+    if fingerprint is None:
+        fp = structure_fingerprint(data)
+    else:
+        actual = hashlib.sha256(data).hexdigest()
+        if fingerprint.byte_sha256 != actual:
+            raise FingerprintError(
+                "传入的 fingerprint 与 data 不是同一份字节："
+                f"fingerprint.byte_sha256={fingerprint.byte_sha256} 实测={actual} —— "
+                "共享的已算结果必须是该字节的纯投影，拒绝按陈旧 fingerprint 产出 inventory"
+            )
+        fp = fingerprint
     inv: dict[str, Any] = {
         "byte_sha256": fp.byte_sha256,
         "sheet_names": fp.sheet_names,
@@ -591,7 +615,12 @@ def identity_inventory(
 
     # --- 载体 1：hidden metadata sheet ---
     meta_sheet = next((s for s in fp.sheets if s["name"] == metadata_sheet), None)
-    pairs = _read_gt_sync_pairs(data, metadata_sheet) if meta_sheet else {}
+    if not meta_sheet:
+        pairs: dict[str, str] = {}
+    elif sync_pairs is not None:
+        pairs = sync_pairs
+    else:
+        pairs = _read_gt_sync_pairs(data, metadata_sheet)
     inv["hidden_sheet"] = {
         "present": meta_sheet is not None,
         "sheet_name": metadata_sheet,

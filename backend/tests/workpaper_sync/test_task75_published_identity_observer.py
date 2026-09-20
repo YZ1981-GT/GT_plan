@@ -2239,3 +2239,232 @@ def test_the_empty_provider_branch_is_wired_to_the_reason_helper() -> None:
     assert not literal_only, (
         "该分攬把 reason 赋值成一个不含调用的字面量 -- 其用户看不到真正原因"
     )
+
+
+# ════════════════════════════════════════════════════════════════════════════
+# Wave 5：多 sheet / 多 binding 的观测解析复用
+# （spec workpaper-sync-materialize-large-table-performance 追加批次，2026-09-20）
+#
+# 背景：`collect_workbook_structure` 对同一份**不变字节**遍历 M 个 anchor 时，此前每个
+# anchor 都在 `identity_inventory` 内重算一次 `structure_fingerprint` + 一次
+# `_read_gt_sync_pairs`。D4 entry M=34 时实测 fingerprint 35 次 / 19.8s、sync pairs
+# 34 次 / 13.6s，一次 collect 共 34.2s；materialize 前后各调一次 ⇒ ~68s，直接把该 entry
+# 顶出 120s 生产软上限（MaterializeSoftTimeoutError）。
+#
+# 本组守卫钉的是「算几次」而**不是**「算什么」：
+#   · P11 次数：解析次数与 anchor 数 M 无关（O(1) 而非 O(M)）
+#   · P11 等价：共享路径与逐 anchor 重算路径产出**逐字段相同**
+#   · P12 纯投影：传入与 data 不同字节的 fingerprint 必须 fail visible
+# ════════════════════════════════════════════════════════════════════════════
+
+
+def _count_calls(monkeypatch: Any, *targets: tuple[Any, str]) -> dict[str, int]:
+    """给 (module, attr) 挂计数 wrapper，返回实时累加的计数字典。"""
+    counts: dict[str, int] = {}
+    for mod, name in targets:
+        counts.setdefault(name, 0)
+        orig = getattr(mod, name)
+
+        def make(orig=orig, name=name):
+            def timed(*a: Any, **kw: Any) -> Any:
+                counts[name] += 1
+                return orig(*a, **kw)
+
+            return timed
+
+        monkeypatch.setattr(mod, name, make())
+    return counts
+
+
+@pytest.fixture(scope="module")
+def d4_observe_inputs() -> dict[str, Any]:
+    """真实 D4 多 binding 观测输入：contract / anchors / instrumented substrate 字节。
+
+    全部**离线现造**（provider spec + stage_instrumented_substrate），不连库。
+    module scope：substrate 注入约 1.6s，多条守卫复用一份。
+    """
+    import app.services.workpaper_sync.phase5_d4_revenue_detail as D4
+    from app.services.workpaper_sync import projection_first_publication as F
+    from app.services.workpaper_sync import publish_time_structure_hash as PH
+    from app.services.workpaper_sync.contracts import parse_contract
+
+    contract = parse_contract(D4.build_contract_payload())
+    specs = tuple(D4.instrumentation_specs())
+    fn = getattr(PH, "anchors_from_instrumentation_specs", None)
+    anchors = tuple(fn(specs)) if fn else tuple(PH.anchors_from_instrumentation_spec(s) for s in specs)
+
+    with tempfile.TemporaryDirectory(prefix="wave5-observe-") as tmp:
+        staged = F.stage_instrumented_substrate(
+            entry_id="xlsx/gt-d4-operating-revenue",
+            staging_dir=Path(tmp),
+            contract=contract,
+        )
+        data = Path(str(getattr(staged, "staged_path", staged))).read_bytes()
+    return {"contract": contract, "anchors": list(anchors), "data": data}
+
+
+class TestWave5ObserveParseReuse:
+    """**Validates: Requirements 6.1, 6.2, 6.3, 6.4, 6.5 / Property 11, 12, 13**"""
+
+    def test_identity_inventory_reuses_passed_fingerprint(
+        self, monkeypatch: Any, d4_observe_inputs: dict[str, Any]
+    ) -> None:
+        """P11（次数）：传入已算 fingerprint 时，`identity_inventory` 不得再自行重算。"""
+        from app.services import excel_structure_fingerprint as FP
+
+        data = d4_observe_inputs["data"]
+        anchor = d4_observe_inputs["anchors"][0]
+        fp = FP.structure_fingerprint(data)
+        pairs = FP._read_gt_sync_pairs(data)
+
+        counts = _count_calls(
+            monkeypatch, (FP, "structure_fingerprint"), (FP, "_read_gt_sync_pairs")
+        )
+        FP.identity_inventory(
+            data,
+            expected_table=anchor["table_name"],
+            uuid_column_letter=anchor["uuid_column_letter"],
+            metadata_sheet=anchor["metadata_sheet"],
+            fingerprint=fp,
+            sync_pairs=pairs,
+        )
+        assert counts["structure_fingerprint"] == 0, (
+            f"传入 fingerprint 后仍重算了 {counts['structure_fingerprint']} 次 —— 复用未生效"
+        )
+        assert counts["_read_gt_sync_pairs"] == 0, (
+            f"传入 sync_pairs 后仍重读了 {counts['_read_gt_sync_pairs']} 次 —— 复用未生效"
+        )
+
+    def test_identity_inventory_without_kwargs_keeps_self_computing(
+        self, monkeypatch: Any, d4_observe_inputs: dict[str, Any]
+    ) -> None:
+        """向后兼容：不传 kwarg 时保持原行为自算（既有单独调用点零回归）。"""
+        from app.services import excel_structure_fingerprint as FP
+
+        data = d4_observe_inputs["data"]
+        anchor = d4_observe_inputs["anchors"][0]
+        counts = _count_calls(monkeypatch, (FP, "structure_fingerprint"))
+        FP.identity_inventory(
+            data,
+            expected_table=anchor["table_name"],
+            uuid_column_letter=anchor["uuid_column_letter"],
+            metadata_sheet=anchor["metadata_sheet"],
+        )
+        assert counts["structure_fingerprint"] == 1, "不传 fingerprint 时应自算恰 1 次"
+
+    def test_identity_inventory_rejects_mismatched_fingerprint(
+        self, d4_observe_inputs: dict[str, Any]
+    ) -> None:
+        """P12（纯投影）：传入与 data 不同字节的 fingerprint 必须 fail visible。"""
+        from app.services import excel_structure_fingerprint as FP
+
+        data = d4_observe_inputs["data"]
+        anchor = d4_observe_inputs["anchors"][0]
+        # 用**另一份字节**算 fingerprint（尾部追加一个 zip 注释外的字节即改变 sha256）
+        other = FP.structure_fingerprint(data + b"\x00")
+        with pytest.raises(FP.FingerprintError) as exc:
+            FP.identity_inventory(
+                data,
+                expected_table=anchor["table_name"],
+                uuid_column_letter=anchor["uuid_column_letter"],
+                metadata_sheet=anchor["metadata_sheet"],
+                fingerprint=other,
+            )
+        assert "byte_sha256" in str(exc.value), "拒绝原因须点名 byte_sha256 不符"
+
+    def test_collect_parse_count_is_independent_of_anchor_count(
+        self, monkeypatch: Any, d4_observe_inputs: dict[str, Any]
+    ) -> None:
+        """P11/P13：一次 collect 的解析次数与 anchor 数 M 无关（常数级，远小于 M）。"""
+        from app.services import excel_structure_fingerprint as FP
+
+        data, anchors = d4_observe_inputs["data"], d4_observe_inputs["anchors"]
+        m = len(anchors)
+        assert m >= 10, f"分母太小（M={m}）判据会退化为重言式"
+
+        counts = _count_calls(
+            monkeypatch,
+            (FP, "structure_fingerprint"),
+            (FP, "_read_gt_sync_pairs"),
+            (OBS, "structure_fingerprint"),
+            (OBS, "_read_gt_sync_pairs"),
+        )
+        OBS.collect_workbook_structure(
+            data=data, sheet_anchors=anchors, contract=d4_observe_inputs["contract"]
+        )
+        budget = 6
+        assert counts["structure_fingerprint"] <= budget, (
+            f"structure_fingerprint 调用 {counts['structure_fingerprint']} 次 > 常数预算 {budget}"
+            f"（M={m}）—— 解析次数随 anchor 数增长，共享失效"
+        )
+        assert counts["_read_gt_sync_pairs"] <= budget, (
+            f"_read_gt_sync_pairs 调用 {counts['_read_gt_sync_pairs']} 次 > 常数预算 {budget}（M={m}）"
+        )
+
+    def test_collect_result_equals_per_anchor_recompute(
+        self, monkeypatch: Any, d4_observe_inputs: dict[str, Any]
+    ) -> None:
+        """P11（等价）：共享路径产出 == 逐 anchor 重算路径产出（只改「算几次」不改「算什么」）。
+
+        「逐 anchor 重算」用剥掉复用 kwarg 的 wrapper 模拟优化前行为 —— 这同时是**变异反证**的
+        受控对照：若共享改变了产出，本条即打红。
+        """
+        from app.services import excel_structure_fingerprint as FP
+
+        data, anchors = d4_observe_inputs["data"], d4_observe_inputs["anchors"]
+        contract = d4_observe_inputs["contract"]
+
+        shared = OBS.collect_workbook_structure(
+            data=data, sheet_anchors=anchors, contract=contract
+        )
+
+        real_inventory = OBS.identity_inventory
+
+        def _strip_reuse(data_arg: Any, **kwargs: Any) -> Any:
+            kwargs.pop("fingerprint", None)
+            kwargs.pop("sync_pairs", None)
+            return real_inventory(data_arg, **kwargs)
+
+        monkeypatch.setattr(OBS, "identity_inventory", _strip_reuse)
+        recomputed = OBS.collect_workbook_structure(
+            data=data, sheet_anchors=anchors, contract=contract
+        )
+
+        fp_s, phys_s, inv_s, struct_s = shared
+        fp_r, phys_r, inv_r, struct_r = recomputed
+        assert fp_s.byte_sha256 == fp_r.byte_sha256
+        assert phys_s == phys_r, "physical_sheet_by_key 在共享/重算两路径下不一致"
+        assert struct_s == struct_r, "observed_structure 在共享/重算两路径下不一致"
+        assert (inv_s is None) == (inv_r is None)
+        if inv_s is not None and inv_r is not None:
+            assert inv_s.inventory_digest_input == inv_r.inventory_digest_input, (
+                "primary identity inventory 的 digest 输入在两路径下不一致"
+            )
+
+    def test_structure_hash_unchanged_by_sharing(
+        self, monkeypatch: Any, d4_observe_inputs: dict[str, Any]
+    ) -> None:
+        """P11 最强判据：对外可观察的 structure_hash 在共享前后**逐字符相同**。"""
+        from app.services.workpaper_sync import publish_time_structure_hash as PH
+
+        data, anchors = d4_observe_inputs["data"], d4_observe_inputs["anchors"]
+        contract = d4_observe_inputs["contract"]
+
+        shared_digest = PH.compute_structure_hash_from_artifact(
+            data=data, contract=contract, anchors=list(anchors)
+        )
+
+        real_inventory = OBS.identity_inventory
+
+        def _strip_reuse(data_arg: Any, **kwargs: Any) -> Any:
+            kwargs.pop("fingerprint", None)
+            kwargs.pop("sync_pairs", None)
+            return real_inventory(data_arg, **kwargs)
+
+        monkeypatch.setattr(OBS, "identity_inventory", _strip_reuse)
+        recomputed_digest = PH.compute_structure_hash_from_artifact(
+            data=data, contract=contract, anchors=list(anchors)
+        )
+        assert shared_digest == recomputed_digest, (
+            "共享已算 fingerprint 改变了 structure_hash —— 这不是提速而是改了判据口径"
+        )

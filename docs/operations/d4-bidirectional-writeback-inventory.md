@@ -104,9 +104,34 @@
 > （引擎不支持静态 sheet ×2 / 转置需模板+引擎泛化 / 七维映射裁决 / 性能天花板 + rowId），**非机械 provider 可覆盖**，
 > 均已 docs 裁定并给出解阻条件，宜各立专项 spec 或先解性能瓶颈，而非本轮硬推（避免假绿 / 静默错配 / 生产不可发布）。
 >
-> 🔴 **横切阻塞（优先级最高）**：D4 entry 整册 materialize 已达 138s，超 120s 生产软上限。**再落任何一张都会使整个
-> `xlsx/gt-d4-operating-revenue` entry 生产不可发布**。「D4 entry 拆分 / 增量 materialize」应立即立项，是解锁 D4-7 及
-> 后续所有张的前置条件。
+> ✅ **横切阻塞已解除（2026-09-20）**：D4 entry 整册 materialize 曾达 **138.7s** 超 120s 生产软上限
+> （`MaterializeSoftTimeoutError`，entry 生产不可发布）。
+>
+> **已证否「拆分 entry」**：cProfile（同步化 `to_thread` 后抓全 CPU 段）定位真因**不是 sheet 多**，而是
+> **同一份不变字节被 `openpyxl.load_workbook` 解析 389 次 / 287.3s（占 82%）**；zip 解压重压合计仅 ~1s。
+> 最大头 189.5s 在 `published_identity_observer.collect_workbook_structure`：它对**每个 anchor**（=每 binding）
+> 都在 `identity_inventory` 内重算一次 `structure_fingerprint` + 一次 `_read_gt_sync_pairs`（1+34+34 次）。
+> 而 structure_hash 是**整簿**指纹 —— 拆成 N 个 entry 后每个 entry 仍要对同一 workbook 各算一遍全簿结构
+> ⇒ load 次数**翻倍**，且各 entry 会把对方 sheet 判 unmanaged drift。**拆分既不解根因又引入跨 entry 一致性问题，故拒。**
+>
+> **实际修复**（在既有 spec `workpaper-sync-materialize-large-table-performance` 上 append **Wave 5**，
+> 兑现其 Property 3「解析次数 ≤2」的历史欠账 —— 该 spec Task 4 曾自记「≤2 仍为后续加固项」，且 Task 8 只在
+> **D2 单 binding** 上验收）：给 `identity_inventory` 加**可选** `fingerprint=`/`sync_pairs=` 复用入口
+> （不传即原行为、传入则校验 `byte_sha256` 不符即 fail visible），由 `collect_workbook_structure` 算一次后透传。
+>
+> | 指标 | 修复前 | 修复后 |
+> |---|---|---|
+> | 真库 CPU 段（soft_limit 120 未提高） | **138.7s（抛 SoftTimeout）** | **69.33s（不抛）** |
+> | 一次 `collect_workbook_structure` | 34.211s | **1.714s**（-95%, 20x） |
+> | `structure_fingerprint` / collect | 35 calls | **1 call** |
+> | `_read_gt_sync_pairs` / collect | 34 calls | **1 call** |
+> | `structure_hash` | — | **逐字符不变**（只改「算几次」不改「算什么」） |
+>
+> 守卫 `TestWave5ObserveParseReuse`(6) + 辐射面 246 passed + **变异反证已实做**（改回逐 anchor 重算 ⇒ 次数守卫
+> 打红、等价守卫仍绿）。evidence：`.kiro/specs/workpaper-sync-materialize-large-table-performance/evidence/multi-sheet-*.json`。
+>
+> ⇒ **D4-7 的解阻条件①（性能）已满足**，仅剩②前端 products 补 rowId。后续若再加 sheet 逼近上限，
+> 按 design §11.4 依次做 P1（`adapter.extract` 多 binding 解析共享，84.5s profiled）/ P2（materialize 34 趟链式合并）。
 > 注：D4-6/7 前端虽已在宿主 `D4_SHEET_KEY_BY_CODE` 预留 `d46/d47-managed` 键，但契约 sheet_key 集合中**无**对应项且组件未接桥，故仍归 🔵 从零。D4-9/10/11/14/33/34/36 经 grep 实证前端组件均未 import `useWorkpaperSyncBridge`（仍 legacy），契约集合中也无对应项。
 
 ## 剩余 8 张几何侦查与实现方案（2026-09-20 冻结，供续作，避免蒸发）
@@ -166,10 +191,13 @@
   formula 列 C单价/E结构比/F单位成本/H毛利/I毛利率 + 上期 K/M/N/P/Q + 变动 R/S/T/U/V（15 个 → formula_mask）。
   store `D4-7-products` = `[{name,curQty,curRevenue,curCost,priorQty,priorRevenue,priorCost,remark}]`。
 - ✅ **技术可落地**：§二 动态产品区当 Excel-Table 载体，§一 静态区寄生（同 D4-9 current/prior + totals）。
-- 🔴 **暂缓两阻**：①**性能天花板**——整册 materialize 已 138s > 120s 生产软上限（D4-36 后实测），再加 D4-7
-  两 table 必超，entry 生产不可发布，须先做「D4 entry 拆分 / 增量 materialize」；②前端 products **无 rowId**
-  （array index 当身份，`removeProduct(idx)`），须先补 rowId + backfill（同 D4-10/11 做法）方合行身份铁律。
-  解阻后即可按 D4-9 双区范式落地。
+- ~~🔴 暂缓两阻~~ → **仅剩一阻（2026-09-20 更新）**：
+  - ✅ ①**性能天花板已解除**：真因是同字节被 `load_workbook` 解析 389 次（非 sheet 多），已在 spec
+    `workpaper-sync-materialize-large-table-performance` **Wave 5** 修复（observe 解析复用），真库 CPU 段
+    **138.7s → 69.33s**，soft_limit 120 下不再抛 SoftTimeout（详见本文件顶部「横切阻塞已解除」段）。
+  - 🔴 ②前端 products **无 rowId**（array index 当身份，`removeProduct(idx)`），须先补 rowId + backfill
+    （同 D4-10/11 做法）方合行身份铁律。**这是 D4-7 落地的唯一剩余前置。**
+  - 解阻后即可按 D4-9 双区范式落地（§二 动态产品区当 Excel-Table 载体，§一 静态月度区寄生）。
 ### D4-8 产品毛利率（**2026-09-20 侦查完成，裁定 HTML-only：静态块矩阵无动态行载体，同 D4-33**）
 - 几何（A1:X40）：**固定产品块**（产品A R12-31 / 产品B R32+…），每块 header R13-15（3 行）+ **固定 12 月行**
   R16-27 + 合计 R28 + 同行业A/B/行业平均 R29-31。月行 R16-27 全 F:10（10 公式/行，单价/金额/毛利/毛利率派生）。

@@ -1,0 +1,30 @@
+{
+  "entry_id": "xlsx/gt-d4-operating-revenue",
+  "anchors_m": 35,
+  "substrate_bytes": 234280,
+  "structure_hash": "07421e008af81a9a214199526f9067f75080b212d5975ae176f9befa28a068af",
+  "error": null,
+  "collect_seconds": 1.714,
+  "counts": {
+    "structure_fingerprint": {
+      "calls": 1,
+      "seconds": 0.481
+    },
+    "_read_gt_sync_pairs": {
+      "calls": 1,
+      "seconds": 0.405
+    },
+    "identity_inventory": {
+      "calls": 34,
+      "seconds": 0.008
+    }
+  },
+  "criterion": {
+    "name": "解析次数不随 binding 数增长",
+    "structure_fingerprint_calls": 1,
+    "read_gt_sync_pairs_calls": 1,
+    "const_budget": 6,
+    "verdict": "PASS",
+    "explain": "fingerprint 调用 1 次 <= 常数预算 6，与 M(35) 无关"
+  }
+}

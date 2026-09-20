@@ -146,3 +146,116 @@
 *For any* 引入的坐标索引或 substrate 解析缓存，它 SHALL 由同一份字节单次解析派生、不与 openpyxl/zip 解析并存为可漂移的第二真源；键与真实解析不一致时 SHALL fail visible。*For any* 每条正确性/复杂度守卫，把优化改回 O(N²) 形态或破坏对应等值判据时该守卫 SHALL 打红。
 
 **Validates: Requirements 5.1, 5.2, 5.3**
+
+---
+
+## 追加批次：多 sheet / 多 binding 维度（Wave 5，2026-09-20）
+
+### 追加背景（实测事实，非估算）
+
+原 Wave 0-4 的验收锚点是 **D2 单 sheet 大表**（28431 字段 / 729 行，真库 HTTP 10.4s）。该口径下 Property 3
+「单次 materialize 解析次数 ≤2」**未真正兑现** —— Task 4 自己登记为「解析计数探针 ≤2 仍为后续加固项」。
+
+D4 entry（`xlsx/gt-d4-operating-revenue`）增长到 **29 受管 sheet / 35 dynamic table / 34 binding** 后，这笔欠账
+爆发为生产阻塞：
+
+- 真库实测 materialize CPU 段 **138.7s**，超 `materialize_soft_limit_seconds=120` 生产软上限 ⇒
+  `MaterializeSoftTimeoutError`，该 entry **生产不可发布**。
+- cProfile（把 `asyncio.to_thread` 同步化后抓全 CPU 段）定位：**`openpyxl.load_workbook` 被调用 389 次，
+  累计 287.3s（占 82%）**。zip 解压/重压合计仅 ~1s（原 spec Wave 1/2 的 O(N²) 与 zip 路径已生效，不是瓶颈）。
+- 热点分解（cumtime）：
+  | 位置 | calls | cumtime |
+  |---|---|---|
+  | `content_mutation._projection_structure_hash` | 2 | **189.5s** |
+  | └ `published_identity_observer.collect_workbook_structure` | 2 | 189.5s |
+  | 　├ `excel_structure_fingerprint.identity_inventory` | 69 | 183.6s |
+  | 　├ `excel_structure_fingerprint.structure_fingerprint` | 106 | 160.5s |
+  | 　└ `excel_structure_fingerprint._read_gt_sync_pairs` | 69 | 73.9s |
+  | `excel_extract.extract_projection` → `_read_cell_view` | 102 / 204 | 84.5s |
+  | `excel_materialize.materialize_projection` | 34 | 79.9s |
+- 根因（`published_identity_observer.py:1357` + `excel_structure_fingerprint.py:539/560`）：
+  `collect_workbook_structure(data, sheet_anchors, contract)` 先算一次 `structure_fingerprint(data)`，再对
+  **每个 anchor**（= 每 binding，34 个）调 `identity_inventory(data, ...)`，而 `identity_inventory` 的**第一行
+  又重算 `structure_fingerprint(data)`**、并另调一次 `_read_gt_sync_pairs(data)`（各含一次 `load_workbook`）。
+  ⇒ 1 + 34 + 34 = 69/106/69 次，与实测吻合。**`data` 在整个调用内字节完全不变**，属纯粹「已算结果未向下游
+  共享」，与原 spec §4.1 同一类问题，只是发生在原 spec **改动清单之外**的两个文件
+  （`excel_structure_fingerprint.py` / `published_identity_observer.py`）。
+
+### 追加批次的边界（明确不做）
+
+- **不拆 entry**：实测证否。structure_hash 是**整簿**指纹，拆成 N 个 entry 后每个 entry 仍要对同一 workbook
+  各算一遍全簿结构 ⇒ `load_workbook` 次数**翻倍**；且各 entry 的 `verify_unmanaged_regions` 会把其他 entry
+  的 sheet 判为 unmanaged drift。拆 entry 既不解根因又引入跨 entry 一致性问题，故拒。
+- **不改任何判据口径**：与原 spec 同纪律 —— roundtrip 等值 / 未管理区域 / structure_hash 同构 / identity
+  inventory 实测 / 单事务 revision+1 全部不变。只改「同一份不变字节算几次」。
+- **不改模板、不改契约、不改前端**。
+
+---
+
+### Requirement 6：同一份不变字节在一次观测内只解析一次
+
+**User Story:** 作为平台，当一次 materialize 对同一份 artifact 字节做全簿结构观测时，我要求它只解析一次并
+向所有 anchor 共享，而不是每个 anchor 各重解析一遍整簿。
+
+#### Acceptance Criteria
+
+1. WHEN `collect_workbook_structure` 对一份 `data` 遍历 M 个 sheet anchor THEN 系统 SHALL 对该 `data` 只算
+   **一次** `structure_fingerprint`，并把它共享给全部 M 次 anchor 观测，使 `structure_fingerprint` 的调用
+   次数与 M **无关**（O(1) 而非 O(M)）。
+2. WHEN `identity_inventory` 在已有同一份 `data` 的 fingerprint 可用时被调用 THEN 它 SHALL 复用传入的
+   fingerprint，不得自行重算；WHERE 未传入 THE 它 SHALL 保持现有自算行为（向后兼容，单独调用点不回归）。
+3. WHEN `collect_workbook_structure` 需要隐藏 metadata sheet 的 `_GT_SYNC` 键值 THEN 该 workbook 的
+   `_read_gt_sync_pairs` SHALL 在一次观测内只读一次并共享，调用次数与 M 无关。
+4. WHEN 一次 materialize CPU 段完成 THEN 对**同一份字节**的 `openpyxl.load_workbook` 次数 SHALL 与 binding
+   数 M **无关**；该次数 SHALL 由可复算探针实测给出上界判定。
+5. WHERE 共享的 fingerprint / sync pairs 被传递 THE 它 SHALL 是该 `data` 单次解析的**纯投影**，与 Requirement 5.1
+   同纪律：不得成为与真实解析并存可漂移的第二真源；传入 fingerprint 的 `byte_sha256` 与 `data` 不符时
+   SHALL fail visible。
+
+### Requirement 7：D4 多 sheet entry 回到软上限内且可复算
+
+**User Story:** 作为现场经理，我要求 D4 这个 29 sheet 的 entry 能在生产软上限内发布，且「变快了」是可复算的
+实测事实。
+
+#### Acceptance Criteria
+
+1. WHEN 优化落地后对真库 D4 entry（29 sheet / 34 binding）跑一次 rematerialize THEN materialize CPU 段
+   SHALL 在 `materialize_soft_limit_seconds`（当前 120s）**内**完成，不再抛 `MaterializeSoftTimeoutError`。
+2. WHEN 需要证明改善 THEN 系统 SHALL 提供可复跑的剖析脚本，对同一 entry 实测 CPU 段耗时与
+   `load_workbook` 调用次数，并输出优化前/后对照；数字现场实测不手抄。
+3. WHEN 剖析脚本运行 THEN 它 SHALL 自动判定「`load_workbook` 次数不随 binding 数增长」，给通过/失败。
+4. WHERE 优化后耗时记录在案 THE 该数字 SHALL 由脚本实测得出；改了实现未重跑导致过期时判据 SHALL 打红。
+
+---
+
+### Property 11: 全簿结构观测的解析次数与 anchor 数无关
+
+*For any* 一次 `collect_workbook_structure(data, sheet_anchors, contract)` 调用，对 `data` 的
+`structure_fingerprint` 解析次数与 `_read_gt_sync_pairs` 读取次数 SHALL 各为 **O(1)**（与
+`len(sheet_anchors)` 无关）；共享 fingerprint 后产出的 `(fingerprint, physical, primary_inventory, structure)`
+SHALL 与逐 anchor 各自重算时**逐字段相同**。把共享改回逐 anchor 重算时，次数判据 SHALL 打红而等价判据仍绿
+（证明只改了「算几次」而非「算什么」）。
+
+**Validates: Requirements 6.1, 6.2, 6.3**
+
+### Property 12: 共享观测结果是单一真源的纯投影
+
+*For any* 传入 `identity_inventory` 的已算 fingerprint，它 SHALL 由同一份 `data` 单次解析派生；当其
+`byte_sha256` 与 `data` 实测不一致时 SHALL fail visible，不得按陈旧 fingerprint 静默产出 inventory。
+
+**Validates: Requirements 6.5**
+
+### Property 13: 同一字节的工作簿加载次数与 binding 数无关
+
+*For any* 一次 materialize CPU 段，对**同一份字节**的 `openpyxl.load_workbook` 次数 SHALL 不随 binding 数
+M 增长；该不变式 SHALL 由实测探针给出并自判。插入一处 per-anchor 的重复 `load_workbook` 时该判据 SHALL 打红。
+
+**Validates: Requirements 6.4**
+
+### Property 14: D4 多 sheet entry 软上限内发布且基线自证
+
+*For any* 真库 D4 entry 的一次 rematerialize，materialize CPU 段耗时 SHALL 低于
+`materialize_soft_limit_seconds`；*for any* 记录的耗时/次数数字，SHALL 由可复跑脚本现场实测得出并自判
+「`load_workbook` 次数不随 binding 数增长」，过期数字 SHALL 被判据打红。
+
+**Validates: Requirements 7.1, 7.2, 7.3, 7.4**

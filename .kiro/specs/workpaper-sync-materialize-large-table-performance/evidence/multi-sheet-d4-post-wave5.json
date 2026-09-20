@@ -1,0 +1,32 @@
+{
+  "spec": "workpaper-sync-materialize-large-table-performance / Wave 5 Task 12",
+  "entry_id": "xlsx/gt-d4-operating-revenue",
+  "soft_limit_seconds": 120,
+  "soft_limit_raised": false,
+  "status": "rematerialized",
+  "new_generation": 75,
+  "new_revision": 99,
+  "soft_timeout_raised": false,
+  "wall_seconds_total": 69.33,
+  "counts": {
+    "structure_fingerprint": {
+      "calls": 38,
+      "seconds": 20.23
+    },
+    "collect_workbook_structure": {
+      "calls": 2,
+      "seconds": 3.754
+    },
+    "_read_gt_sync_pairs": {
+      "calls": 3,
+      "seconds": 1.239
+    }
+  },
+  "before_wave5": {
+    "materialize_cpu_seconds": 138.7,
+    "verdict": "MaterializeSoftTimeoutError (138.7s > 120s)",
+    "collect_workbook_structure_seconds_each": 34.211,
+    "structure_fingerprint_calls_per_collect": 35,
+    "read_gt_sync_pairs_calls_per_collect": 34
+  }
+}

@@ -206,7 +206,11 @@ backend/app/services/workpaper_sync/pilot_h1_grouped_dynamic.py  1868
 backend/app/services/workpaper_sync/pilot_harness.py  1887
 backend/app/services/workpaper_sync/pilot_simple_checklist.py  980
 backend/app/services/workpaper_sync/projection_provisioning.py  1249
-backend/app/services/workpaper_sync/published_identity_observer.py  1341
+#   published_identity_observer.py —— 基线 1341 早已 stale（本次改动前 HEAD 实测 1412，
+#     非本次造成）。2026-09-20 spec workpaper-sync-materialize-large-table-performance Wave 5
+#     +14 行（collect_workbook_structure 的 fingerprint/sync_pairs 共享：1 次预读 + 透传 + 根因注释），
+#     用于消除「每 anchor 重算全簿指纹」致 D4 entry materialize 138.7s 超 120s 生产软上限。→ 1426。
+backend/app/services/workpaper_sync/published_identity_observer.py  1426
 backend/app/services/workpaper_sync/repository.py  3124
 backend/app/services/workpaper_sync/request_application.py  1181
 backend/app/services/workpaper_sync/rooms.py  2017
@@ -333,7 +337,11 @@ backend/tests/workpaper_sync/test_task66_legacy_deletion_plan.py  1332
 backend/tests/workpaper_sync/test_task67_structural_pre_reconcile.py  1815
 backend/tests/workpaper_sync/test_task68_backend_chain_regression.py  1581
 backend/tests/workpaper_sync/test_task73_entry_profile_manifest.py  1203
-backend/tests/workpaper_sync/test_task75_published_identity_observer.py  2046
+#   test_task75_published_identity_observer.py —— 基线 2046 早已 stale（本次改动前 HEAD 实测 2241）。
+#     2026-09-20 Wave 5 +229 行 = TestWave5ObserveParseReuse 的 6 条守卫（解析次数与 anchor 数无关 /
+#     向后兼容 / byte_sha256 纯投影 fail visible / 共享vs重算产出等价 / structure_hash 逐字符不变）
+#     + module fixture。新增判据必然增行，属健康增长。→ 2470。
+backend/tests/workpaper_sync/test_task75_published_identity_observer.py  2470
 backend/tests/workpaper_sync/test_task76_projection_definition_provisioner.py  1020
 backend/tests/workpaper_sync/test_task76_projection_definition_provisioner_pg.py  1383
 backend/tests/workpaper_sync/test_task77_word_entry_gate.py  2134

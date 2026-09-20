@@ -21,7 +21,7 @@
       {
         "role": "fingerprint_module",
         "path": "backend/app/services/excel_structure_fingerprint.py",
-        "sha256": "6f508e9ae159ddb7f77deed39e3cb2d5065fdc9d174900d47a86cc319573c347"
+        "sha256": "3a011533c9dff76b667d205cc75bf1a7b87c06625e5c8bf84e3c0e9acc926e27"
       }
     ],
     "onlyoffice_build": "9.4.0-129",

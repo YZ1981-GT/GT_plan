@@ -74,8 +74,10 @@ from app.models.workpaper_sync_models import (
     WorkpaperSyncEntryState,
 )
 from app.services.excel_structure_fingerprint import (
+    GT_SYNC_SHEET_NAME,
     FingerprintError,
     WorkbookFingerprint,
+    _read_gt_sync_pairs,
     identity_inventory,
     structure_fingerprint,
 )
@@ -1363,6 +1365,12 @@ def collect_workbook_structure(*, data, contract, sheet_anchors, context=None):
             raise ArtifactUnreadableError("Workbook fingerprint is incomplete",
                 stage=ObservationStage.observe_workbook,
                 context={**ctx, "fingerprint_errors": list(fingerprint.errors)})
+        # 🔴 `data` 在本调用内字节不变 ⇒ 全簿解析只做一次并向每个 anchor 共享，否则 M 个 anchor
+        #    各自在 identity_inventory 内重算 fingerprint + sync pairs（M=34 实测一次 collect 34.2s，
+        #    materialize 前后各一次 ⇒ 顶出 120s 生产软上限）。只改「算几次」不改「算什么」：
+        #    identity_inventory 校验 byte_sha256，不符即 fail visible。详见 spec
+        #    workpaper-sync-materialize-large-table-performance design §11 / Property 11。
+        shared_sync_pairs = _read_gt_sync_pairs(data)
         physical, rows, transposed = {}, {}, {}
         primary_inventory = None
         for anchor in sheet_anchors:
@@ -1391,7 +1399,13 @@ def collect_workbook_structure(*, data, contract, sheet_anchors, context=None):
                 transposed[key] = fields
                 continue
             raw = identity_inventory(data, expected_table=anchor["table_name"],
-                uuid_column_letter=anchor["uuid_column_letter"], metadata_sheet=anchor["metadata_sheet"])
+                uuid_column_letter=anchor["uuid_column_letter"], metadata_sheet=anchor["metadata_sheet"],
+                fingerprint=fingerprint,
+                sync_pairs=(
+                    shared_sync_pairs
+                    if anchor["metadata_sheet"] == GT_SYNC_SHEET_NAME
+                    else None
+                ))
             table = raw.get("excel_table") or {}
             if not table.get("present") or not table.get("table_sheet"):
                 raise ValueError(f"Missing frozen Excel Table {anchor['table_name']!r}")

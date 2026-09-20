@@ -146,3 +146,123 @@
   - 主控 DEC-10 已更新为「性能前置已解除」；G4-0d / 宿主迁移可推进（仍受 DEC-06/08）。
   - 验证 Property 9。
   - _Requirements: 4.2, 4.3_
+
+---
+
+## 追加批次：Wave 5 — 多 sheet / 多 binding 观测解析复用（2026-09-20）
+
+**追加缘由**：Wave 0-4 的验收锚点是 D2 **单 binding** 大表，Property 3「解析次数 ≤2」当时登记为
+「后续加固项」（见 Task 4 落地备注）。D4 entry 长到 **34 binding** 后该欠账爆发：真库 materialize CPU 段
+**138.7s** 超软上限 120s ⇒ entry 生产不可发布。cProfile 定位 `load_workbook` **389 次 / 287.3s（占 82%）**，
+最大头 189.5s 在 `collect_workbook_structure` 对每个 anchor 重算 `structure_fingerprint` + `_read_gt_sync_pairs`
+（详见 requirements 追加批次 / design §11）。
+
+**已证否的方案**：拆分 entry。structure_hash 是整簿指纹，拆 N 个 entry 后各自仍要全簿观测 ⇒ load 次数翻倍，
+且各 entry 互相把对方 sheet 判 unmanaged drift。**不拆**。
+
+实施纪律（沿用本 spec 既有 4 条）+ 追加 2 条：
+
+5. **只加可选参数、不改既有语义分支**：`identity_inventory` 不传新 kwarg 时行为逐字节等价，保证既有单独
+   调用点零回归。
+6. **改动面与并发 D4 sheet spec 零重叠**：本 Wave 只碰 `excel_structure_fingerprint.py` 与
+   `published_identity_observer.py`；不碰 `excel_materialize/excel_extract/content_mutation/adapters/excel`。
+
+### Task Dependency Graph（追加）
+
+```json
+{
+  "waves": [
+    {
+      "wave": 5,
+      "name": "多 binding 观测解析复用",
+      "tasks": ["9", "10", "11", "12"],
+      "depends_on": [4],
+      "rationale": "先落可复算的多 sheet 基线(9)，再做 fingerprint/sync_pairs 显式共享(10)，加计数与纯投影守卫(11)，最后真库 D4 验收回到软上限内(12)。顺序即判据：没有 9 的基线，10 的'变快'无对照锚。"
+    }
+  ],
+  "dependencies": { "9": [], "10": ["9"], "11": ["10"], "12": ["11"] },
+  "gates": { "multi_sheet_baseline": ["9"], "observe_reuse": ["10"], "reuse_guards": ["11"], "multi_sheet_acceptance": ["12"] }
+}
+```
+
+### Wave 5
+
+- [x] 9. 多 sheet 剖析脚本 + 记录优化前基线
+  - 新增 `backend/scripts/diagnose/profile_materialize_multi_sheet.py`：对真库 D4 entry 跑一次 materialize
+    CPU 段，用 monkeypatch 计数 `openpyxl.load_workbook` / `structure_fingerprint` /
+    `_read_gt_sync_pairs` / `identity_inventory` / `extract_projection` / `materialize_projection` 的
+    **调用次数与累计耗时**，输出 `(binding 数, 各函数 calls/秒, CPU 段总秒)`。
+  - 脚本**自动判定**「`load_workbook` 次数不随 binding 数增长」（以 `structure_fingerprint` 次数 ≤ 常数为
+    代理判据），给通过/失败；数字现场实测不手抄。
+  - 先跑记录**优化前基线**（预期判据 FAIL：fingerprint 106 次、CPU 段 ~138s），落 evidence 作对照锚。
+  - 脚本须能在**不改生产代码**前提下计数（进程内 patch），且跑完**还原** `materialize_soft_limit_seconds`。
+  - 验证 Property 14（基线侧）。
+  - _Requirements: 7.2, 7.3, 7.4_
+  - 落地：`backend/scripts/diagnose/profile_materialize_multi_sheet.py`（离线现造 anchors + substrate，
+    不连库不 gen++，可任意复跑）。基线 evidence `evidence/multi-sheet-baseline-pre-wave5.json`：
+    M=35、一次 collect **34.211s**、`structure_fingerprint` **35 calls/19.763s**、
+    `_read_gt_sync_pairs` **34 calls/13.553s**、`identity_inventory` 34 calls/32.891s，判据 **FAIL**。
+
+- [x] 10. `identity_inventory` 接受已算 fingerprint / sync_pairs；`collect_workbook_structure` 透传
+  - `excel_structure_fingerprint.identity_inventory(...)` 新增**可选** kwarg `fingerprint=None` /
+    `sync_pairs=None`：给定则复用，未给定则保持现状自算（向后兼容）。给定 `fingerprint` 时须校验
+    `fingerprint.byte_sha256 == sha256(data)`，不符 fail visible。
+  - `published_identity_observer.collect_workbook_structure`：入口已算的 `fingerprint` + 新增一次
+    `sync_pairs = _read_gt_sync_pairs(data)` 透传给循环内每次 `identity_inventory`。
+  - 产出等价：`(fingerprint, physical, primary_inventory, structure)` 与共享前**逐字段相同**。
+  - 验证 Property 11、Property 12。
+  - _Requirements: 6.1, 6.2, 6.3, 6.5_
+  - 落地：`excel_structure_fingerprint.identity_inventory` 加**可选** `fingerprint=` / `sync_pairs=`
+    （不传即原行为；传入则复用并校验 `byte_sha256`，不符抛 `FingerprintError`）；
+    `published_identity_observer.collect_workbook_structure` 入口预读一次 `_read_gt_sync_pairs` 并把它与
+    已算 `fingerprint` 透传给循环内每次 `identity_inventory`（`metadata_sheet` 非默认者仍自算，保守）。
+  - 效果 evidence `evidence/multi-sheet-post-wave5.json`：一次 collect **34.211s → 1.714s（-95%, 20x）**、
+    `structure_fingerprint` 35 → **1**、`_read_gt_sync_pairs` 34 → **1**、`identity_inventory` 自身
+    32.891s → **0.008s**，判据 **PASS**；**structure_hash 逐字符不变**（`07421e008af8…`）。
+  - 🔴 触发 Tier-A 保鲜门：改 `excel_structure_fingerprint.py` 使 `onlyoffice_excel_instrumentation_gate.json`
+    的 `tier_a_runtime.files[fingerprint_module].sha256` stale（`ProbeEvidenceStaleError`）。按机制意图
+    **重新实证**而非绕过：刷新该 digest 后跑 carrier-contract / observer / instrumentation / structure-hash
+    四组守卫 **246 passed**，证明采集行为未变、探针裁决仍成立。
+
+- [x] 11. 计数守卫 + 纯投影守卫 + 变异反证
+  - 守卫 A（P11 次数）：构造 M 个 anchor 的 `collect_workbook_structure` 调用，patch 计数
+    `structure_fingerprint` / `_read_gt_sync_pairs`，断言次数 **与 M 无关**（各 ≤ 常数）。
+  - 守卫 B（P11 等价）：同一输入，共享路径与「强制逐 anchor 重算」路径产出**逐字段相同**。
+  - 守卫 C（P12 纯投影）：传入一个 `byte_sha256` 与 `data` 不符的 fingerprint → 断言 fail visible。
+  - 守卫 D（P13）：CPU 段 `load_workbook` 计数不随 binding 数增长。
+  - **变异反证**：把 Task 10 的透传改回逐 anchor 重算 ⇒ 守卫 A/D 打红、守卫 B 仍绿（证明只改「算几次」
+    未改「算什么」）。
+  - 守卫归属：挂 `backend/tests/` 既有 fingerprint / observer 归属边界内，不另起平行测试树。
+  - 验证 Property 11、12、13。
+  - _Requirements: 6.1, 6.2, 6.3, 6.4, 6.5_
+  - 落地：`TestWave5ObserveParseReuse`（6 tests）in `tests/workpaper_sync/test_task75_published_identity_observer.py`
+    —— ①传入 fingerprint/sync_pairs 后重算次数为 0；②不传时仍自算恰 1 次（向后兼容）；
+    ③传入异字节 fingerprint 抛 `FingerprintError` 且点名 `byte_sha256`；④一次 collect 的解析次数
+    ≤ 常数预算 6（M=35，含 `assert m >= 10` 防分母退化）；⑤共享 vs 逐 anchor 重算产出逐字段相同；
+    ⑥structure_hash 两路径逐字符相同。**6 passed**。
+  - **变异反证已实做**：把透传改回 `fingerprint=None, sync_pairs=None` ⇒ 次数守卫④打红
+    （"structure_fingerprint 调用 35 次 > 常数预算 6（M=35）—— 解析次数随 anchor 数增长，共享失效"），
+    而等价守卫⑤⑥**仍绿**（1 failed / 5 passed）⇒ 精确证明守卫有效且「只改算几次、不改算什么」。已还原。
+
+- [x] 12. 真库 D4 验收：CPU 段回到软上限内 + evidence + 辐射面回归
+  - 用 Task 9 脚本对真库 D4 entry 复跑，记录**优化后**实测：`structure_fingerprint` 次数、
+    `load_workbook` 次数、CPU 段总秒；判据「不随 binding 数增长」须 PASS。
+  - 跑一次真实 rematerialize，断言 **不再抛 `MaterializeSoftTimeoutError`**（CPU 段 < 120s），产
+    `evidence/multi-sheet-d4-post-wave5.json`（含优化前/后对照）。
+  - 辐射面回归：按引用关系反查 `excel_structure_fingerprint` / `published_identity_observer` 的调用方
+    （structure_hash / identity observer / entry gate 相关既有守卫），跑其离线集全绿；不跑全量。
+  - 更新 `docs/operations/d4-bidirectional-writeback-inventory.md` 的「横切阻塞」段：性能阻塞解除后，
+    D4-7 的解阻条件①随之满足（仍受②前端 rowId）。
+  - 验证 Property 14。
+  - _Requirements: 7.1, 7.2, 7.4_
+  - 落地 evidence `evidence/multi-sheet-d4-post-wave5.json`（**soft_limit 保持 120 生产口径、未提高**）：
+    真库 D4 rematerialize `status=rematerialized`（gen 75 / rev 99），墙钟 **69.33s**，
+    **不再抛 `MaterializeSoftTimeoutError`**（优化前 138.7s 必抛）⇒ Requirement 7.1 达成、
+    **该 entry 生产可发布**。`collect_workbook_structure` 2 calls 合计 **3.754s**（优化前 2×34.2=68.4s）、
+    `_read_gt_sync_pairs` 69 → **3 calls**。
+  - 辐射面回归：carrier-contract / observer / instrumentation / structure-hash 四组 **246 passed**；
+    Wave 5 专组 **6 passed**。
+  - 🔵 **残留（design §11.4，本批次刻意不做）**：`structure_fingerprint` 仍有 **38 calls / 20.2s**
+    来自 collect 之外的调用点（`identity_inventory` 其他不传 kwarg 的调用方等），以及 P1
+    `adapter.extract` 多 binding 解析共享、P2 materialize 34 趟链式合并。**已不阻塞生产**
+    （69.33s < 120s），按需再开；若后续再加 sheet 逼近上限，优先做 P1/P2。
