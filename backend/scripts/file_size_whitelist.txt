@@ -192,7 +192,7 @@ backend/app/services/workpaper_sync/endpoint_guard.py  1119
 backend/app/services/workpaper_sync/entry_source_facts.py  1096
 backend/app/services/workpaper_sync/evidence.py  1252
 backend/app/services/workpaper_sync/excel_entry_gate.py  1317
-backend/app/services/workpaper_sync/excel_extract.py  3399
+backend/app/services/workpaper_sync/excel_extract.py  3680
 backend/app/services/workpaper_sync/excel_instrumentation.py  2105
 backend/app/services/workpaper_sync/excel_materialize.py  2980
 backend/app/services/workpaper_sync/materialize_coordinator.py  2936
@@ -660,3 +660,9 @@ backend/app/models/audit_platform_models.py  1406
 #   四处均为深耦合双向内核（受主控 §5.3 共享锁约束），拆分需与逐字节锁/AST 变异守卫一起改，
 #   属独立瘦身任务；baseline 取当前真实行数，门禁继续拦膨胀 >5%。
 # ═══════════════════════════════════════════════════════════════════════════
+
+# ── spec workpaper-sync-static-cell-sheet-writeback（2026-09-20）──
+#   excel_extract.py 3399→3680：新增 definedName 锚定静态受管区路径（BindingKind /
+#     is_static_region + _resolve_static_region + _split_defined_name_ref + managed_tables_of
+#     静态分支），修 D4-33/D4-8 引擎限制。基线含 Task4 extract 静态分支余量；静态路径与动态
+#     路径正交（新增旁路，动态 214 passed 零回归）。

@@ -912,8 +912,18 @@ def _contract_table(contract: SyncContract, table_key: str) -> TableSpec | None:
 
 def managed_tables_of(
     contract: SyncContract, *, binding: ExcelIdentityBinding
-) -> tuple[TableSpec, tuple[TableSpec, ...]]:
+) -> tuple[TableSpec | None, tuple[TableSpec, ...]]:
     """`(动态表, 静态表清册)` —— 都必须落在 `binding.table_key` 所在的那张 sheet 上。
+
+    ═══ 静态受管区（:attr:`BindingKind.static_region`）═══
+
+    纯静态 sheet（D4-33/D4-8）无任何动态行表 —— 本函数对静态 binding 返回
+    ``(None, statics)``：动态表位置为 ``None``（静态区无 Excel Table 载体），``statics`` 为
+    本 sheet 全部 `has_dynamic_rows == False` 的表。**不执行**动态路径的
+    ``if not dynamic.has_dynamic_rows: raise`` —— 那条判据只对动态 binding 成立。
+    调用方（`_managed_coordinates` / `_needed_columns_and_rows` / `extract_projection` /
+    `plan_managed_writes`）在拿返回值前必须先 :func:`is_static_region` 分派，静态分支不访问
+    ``dynamic``（为 ``None``）。
 
     一份审定表契约通常是「一张动态行表 + 若干静态格块（TB 数据 / 差异 / 合计）」。动态表
     由 Excel Table 锚点定界，静态块靠**同一张 sheet** 上的固定行列定位（它们没有行身份，
@@ -967,6 +977,21 @@ def managed_tables_of(
             f"契约 {contract.contract_id} 没有 table_key={binding.table_key!r} —— "
             "identity 绑定与契约表必须一一对应"
         )
+    if is_static_region(binding):
+        # ── 静态路径：本 sheet 全部静态表都是受管静态块，无动态表 ──
+        target = next(t for t in sheet.tables if t.table_key == binding.table_key)
+        if target.has_dynamic_rows:
+            raise ManagedRegionResolutionError(
+                f"static binding.table_key={binding.table_key!r} 指向了动态表（有 "
+                "row_identity）—— kind 与契约不符（静态 binding 只能锚定纯静态表）"
+            )
+        statics = tuple(t for t in sheet.tables if not t.has_dynamic_rows)
+        if not statics:
+            raise ManagedRegionResolutionError(
+                f"static binding.table_key={binding.table_key!r} 所在 sheet 无静态表 —— "
+                "kind 与契约不符"
+            )
+        return None, statics
     dynamic = next(t for t in sheet.tables if t.table_key == binding.table_key)
     if not dynamic.has_dynamic_rows:
         raise ManagedRegionResolutionError(

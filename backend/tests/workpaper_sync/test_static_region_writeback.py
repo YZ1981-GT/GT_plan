@@ -303,3 +303,143 @@ class TestResolveStaticRegion:
         # sheet-local scope 不是 workbook-scope → 反读不到 → carrier missing
         with pytest.raises(IdentityCarrierMissingError):
             self._region(_make_static_workbook(workbook_scope=False))
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Task 3 · managed_tables_of 静态路径（Requirement 3.1 / 1.5 / Property 5）
+# ═══════════════════════════════════════════════════════════════════════════
+
+from app.services.workpaper_sync.excel_extract import managed_tables_of
+
+
+def _contract_with(sheet_tables: list) -> object:
+    import hashlib
+
+    def _d(s: str) -> str:
+        return hashlib.sha256(s.encode()).hexdigest()
+
+    payload = {
+        "schema_version": "contract-definition:v1",
+        "contract_id": STATIC_CONTRACT_ID,
+        "semantic_version": "1.0.0",
+        "review_status": "reviewed",
+        "document_type": "xlsx",
+        "template_definition_sha256": _d("mt-template-definition"),
+        "instrumentation_definition_sha256": _d("mt-instrumentation-definition"),
+        "template": {
+            "relative_path": "D/mixed.xlsx",
+            "template_sha256": _d("mt-template"),
+            "normalized_structure_hash": _d("mt-normalized-structure"),
+        },
+        "identity_carriers": ["defined_name", "excel_table", "hidden_uuid_column"],
+        "sheets": [
+            {
+                "sheet_key": "mixed-managed",
+                "excel_name": STATIC_SHEET,
+                "locator": {"anchor": "defined_name_ref"},
+                "tables": sheet_tables,
+            }
+        ],
+    }
+    return parse_contract(payload, adapter_id=STATIC_CONTRACT_ID)
+
+
+def _static_table_spec(table_key: str = STATIC_TABLE_KEY) -> dict:
+    return {
+        "table_key": table_key,
+        "anchor": "E12",
+        "header_rows": 1,
+        "fields": [
+            {
+                "stable_field_key": f"{table_key}/rev_m1",
+                "json_pointer": "/months/0/revenue",
+                "column_key": "rev_m1",
+                "cell": {"column": "E", "row_from": 12},
+                "mode": "editable",
+                "value_type": "amount",
+                "source_ref": "wp:D4-33!E12",
+            }
+        ],
+    }
+
+
+def _dynamic_table_spec(table_key: str = "dyn_rows") -> dict:
+    return {
+        "table_key": table_key,
+        "anchor": "A20",
+        "header_rows": 1,
+        "row_identity": {"kind": "field", "json_pointer": "/rows/*/rowUuid"},
+        "delete_policy": "tombstone",
+        "fields": [
+            {
+                "stable_field_key": f"{table_key}/name",
+                "json_pointer": "/rows/{row_uuid}/name",
+                "column_key": "name",
+                "cell": {"column": "A", "row_from": "row_identity"},
+                "mode": "editable",
+                "value_type": "text",
+                "source_ref": "wp:D4-33!A20",
+            }
+        ],
+    }
+
+
+class TestManagedTablesStaticPath:
+    def test_static_binding_returns_none_dynamic(self) -> None:
+        contract = _contract_with([_static_table_spec()])
+        binding = ExcelIdentityBinding(
+            table_key=STATIC_TABLE_KEY, defined_name=STATIC_DEFINED_NAME
+        )
+        dynamic, statics = managed_tables_of(contract, binding=binding)
+        assert dynamic is None  # 静态区无动态表
+        assert len(statics) == 1
+        assert statics[0].table_key == STATIC_TABLE_KEY
+
+    def test_static_binding_pointing_at_dynamic_table_fail_closed(self) -> None:
+        # 契约里 STATIC_TABLE_KEY 其实是动态表 → static binding 指向它 → 混填 fail-closed
+        dyn = _dynamic_table_spec(table_key=STATIC_TABLE_KEY)
+        contract = _contract_with([dyn])
+        binding = ExcelIdentityBinding(
+            table_key=STATIC_TABLE_KEY, defined_name=STATIC_DEFINED_NAME
+        )
+        with pytest.raises(ManagedRegionResolutionError, match="指向了动态表"):
+            managed_tables_of(contract, binding=binding)
+
+    def test_static_binding_sheet_without_static_table_fail_closed(self) -> None:
+        # sheet 只有动态表、无静态表；binding.table_key 指向动态表 → 先撞「指向动态表」
+        # 用一个不存在的 table_key 会先撞 sheet 定位（None）→ 契约不匹配
+        dyn = _dynamic_table_spec(table_key="only_dyn")
+        contract = _contract_with([dyn])
+        binding = ExcelIdentityBinding(
+            table_key="only_dyn", defined_name=STATIC_DEFINED_NAME
+        )
+        with pytest.raises(ManagedRegionResolutionError, match="指向了动态表"):
+            managed_tables_of(contract, binding=binding)
+
+
+class TestManagedTablesDynamicUnchanged:
+    """动态 binding 的 has_dynamic_rows raise 逐条保留（Requirement 1.5 / Property 5 Task3 锚点）。
+
+    Property 5 的核心：若把「按 uuid 空隐式分派」变异注入 kind，一个动态 binding（uuid 非空）
+    仍判 dynamic（对），但把「静态 binding 误当动态」的边界——本测试钉住动态 binding 走
+    managed_tables_of 时**必经** has_dynamic_rows raise（静态路径绕过它），二者行为可区分。
+    """
+
+    def test_dynamic_binding_returns_dynamic_and_statics(self) -> None:
+        contract = _contract_with([_dynamic_table_spec(), _static_table_spec("footer_static")])
+        binding = ExcelIdentityBinding(
+            table_key="dyn_rows", table_name="GT_DYN", uuid_column="Z"
+        )
+        dynamic, statics = managed_tables_of(contract, binding=binding)
+        assert dynamic is not None
+        assert dynamic.table_key == "dyn_rows"
+        assert {t.table_key for t in statics} == {"footer_static"}
+
+    def test_dynamic_binding_pointing_at_static_table_fail_closed(self) -> None:
+        # 动态 binding（uuid 非空）指向静态表 → 动态路径的 has_dynamic_rows raise 触发
+        contract = _contract_with([_static_table_spec("s_only")])
+        binding = ExcelIdentityBinding(
+            table_key="s_only", table_name="GT_S", uuid_column="Z"
+        )
+        with pytest.raises(ManagedRegionResolutionError, match="没有 row_identity"):
+            managed_tables_of(contract, binding=binding)
