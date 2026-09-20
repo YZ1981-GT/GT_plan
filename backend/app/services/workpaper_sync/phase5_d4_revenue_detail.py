@@ -282,6 +282,18 @@ from app.services.workpaper_sync.phase5_d4_other_cutoff_sheet import (  # noqa: 
     merge_d436_from_projection,
     mapping_digest_d436,
 )
+from app.services.workpaper_sync.phase5_d4_margin_monthly_sheet import (  # noqa: E402
+    STORE_ITEM_ID_D47_PRODUCTS,
+    STORE_ITEM_ID_D47_MONTHLY,
+    TABLE_KEY_PRODUCTS,
+    TABLE_KEY_MONTHLY,
+    sheet_payload_d47,
+    instrumentation_specs_d47,
+    build_store_projection_d47,
+    merge_projection_into_d47_stores,
+    store_item_ids_d47,
+    mapping_digest_d47,
+)
 from app.services.workpaper_sync.phase5_d4_ipo_checklist_sheets import (  # noqa: E402
     CHECKLIST_SHEET_CODES,
     SHEET_KEY_BY_CODE,
@@ -404,6 +416,13 @@ _INCLUDE_D434_CONTRACT_SHEET: Final[bool] = True
 #: formula_mask）。单 dict store D4-36-data（{forward,backward,...params}）→ oo_to_html 专用 dict 块
 #: （merge_d436_from_projection 3-tuple）。2 instrumentation spec。provider=phase5_d4_other_cutoff_sheet。
 _INCLUDE_D436_CUTOFF_SHEET: Final[bool] = True
+#: D4-7 毛利率分析表接入（批次B，同 sheet 1 dynamic + 1 static，2026-09-20，性能瓶颈解除后落地）。
+#: §二产品动态区（输入 8 列、派生 15 列 formula_mask、行身份 rowId、UUID 列 X、footer=合计 R26）当 Excel-Table
+#: 载体；§一月度静态区（R12 收入 B-M+O / R13 成本 B-M+O = 26 cell）寄生（无 row_identity，随本 sheet binding
+#: 纳入受管坐标，同 D4-9 totals）。两 store item（D4-7-products 行数组 + D4-7-monthly 标量对象）→ oo_to_html
+#: 专用 dict 块同时处理两 item，**不进** rows 4-tuple 循环。1 instrumentation spec（仅 dynamic 区）。
+#: provider=phase5_d4_margin_monthly_sheet。
+_INCLUDE_D47_MARGIN_SHEET: Final[bool] = True
 #: 🔴 D4-1 同 sheet 双区 instrumentation 接线开关（Task 5）。
 #: 契约 sheet（sheet_payload_d41）+ store projection + merge 恒接（判据先行 Task 2 判据）；
 #: 但 instrumentation_specs 两 spec（主营/其他）暂**不接**，唯一阻塞 = 运行态 sibling binding
@@ -454,6 +473,7 @@ STORE_ITEM_IDS: Final[tuple[str, ...]] = (
     *((STORE_ITEM_ID_D433,) if _INCLUDE_D433_MARGIN_SHEET else ()),
     *((STORE_ITEM_ID_D434,) if _INCLUDE_D434_CONTRACT_SHEET else ()),
     *((STORE_ITEM_ID_D436,) if _INCLUDE_D436_CUTOFF_SHEET else ()),
+    *((STORE_ITEM_ID_D47_PRODUCTS, STORE_ITEM_ID_D47_MONTHLY) if _INCLUDE_D47_MARGIN_SHEET else ()),
     *STORE_ITEM_ID_BY_CODE.values(),
 )
 EMPTY_STORE_PAYLOAD: Final[str] = "[]"
@@ -815,6 +835,13 @@ def instrumentation_specs() -> tuple:
             if _INCLUDE_D436_CUTOFF_SHEET
             else ()
         ),
+        *(
+            instrumentation_specs_d47(
+                entry_id=ENTRY_ID, template_relative_path=TEMPLATE_RELATIVE_PATH
+            )
+            if _INCLUDE_D47_MARGIN_SHEET
+            else ()
+        ),
         # D4-1 营业收入审定表：同 sheet 双区（主营 R8 起 / 其他 R14 起）两 spec，同
         # managed_sheet 不同行段/UUID 列（W/X）。默认不接（见
         # _INCLUDE_D41_ADJUDICATION_INSTRUMENTATION 注释：runtime sibling binding 对齐仍
@@ -1075,6 +1102,7 @@ def build_contract_payload() -> dict[str, Any]:
             *([sheet_payload_d433()] if _INCLUDE_D433_MARGIN_SHEET else []),
             *([sheet_payload_d434()] if _INCLUDE_D434_CONTRACT_SHEET else []),
             *([sheet_payload_d436()] if _INCLUDE_D436_CUTOFF_SHEET else []),
+            *([sheet_payload_d47()] if _INCLUDE_D47_MARGIN_SHEET else []),
         ],
         "review": {
             "entry_id": ENTRY_ID,
@@ -1667,6 +1695,14 @@ def build_combined_store_projection(
         if _INCLUDE_D436_CUTOFF_SHEET
         else []
     )
+    d47_projs = (
+        [build_store_projection_d47(
+            {sid: payloads.get(sid, {} if sid == STORE_ITEM_ID_D47_MONTHLY else []) for sid in store_item_ids_d47()},
+            contract=contract, limits=limits,
+        )]
+        if _INCLUDE_D47_MARGIN_SHEET
+        else []
+    )
     # D4-25/26/27/28 IPO 检查表追加受管 sheet（空载荷时安全返回空投影）。
     inspection_projs = [
         build_inspection_store_projection(
@@ -1690,7 +1726,7 @@ def build_combined_store_projection(
     values.update(right.values)
     values.update(groups.values)
     values.update(fixed.values)
-    for proj in (d421, d422, d423, d424, d435, d41, d49, *ipo_checklist_projs, *inspection_projs, *interview_projs, *d46_projs, *d417_projs, *d418_projs, *d419_projs, *d411_projs, *d410_projs, *d420_projs, *d433_projs, *d434_projs, *d436_projs):
+    for proj in (d421, d422, d423, d424, d435, d41, d49, *ipo_checklist_projs, *inspection_projs, *interview_projs, *d46_projs, *d417_projs, *d418_projs, *d419_projs, *d411_projs, *d410_projs, *d420_projs, *d433_projs, *d434_projs, *d436_projs, *d47_projs):
         values.update(proj.values)
     if d429 is not None:
         values.update(d429.values)
@@ -1719,6 +1755,7 @@ def build_combined_store_projection(
         **{k: v for p in d433_projs for k, v in dict(p.row_keys).items()},
         **{k: v for p in d434_projs for k, v in dict(p.row_keys).items()},
         **{k: v for p in d436_projs for k, v in dict(p.row_keys).items()},
+        **{k: v for p in d47_projs for k, v in dict(p.row_keys).items()},
     }
     return Projection(
         contract_id=contract.contract_id,
@@ -1925,6 +1962,32 @@ if _INCLUDE_D434_CONTRACT_SHEET:
 #: 不进 rows 4-tuple 循环。仅 flag 开时导出（block hasattr 判定）。
 if _INCLUDE_D436_CUTOFF_SHEET:
     STORE_ITEM_ID_D436_DICT: Final[str] = STORE_ITEM_ID_D436
+
+#: D4-7 两 store item（products 行数组 + monthly 标量对象）。oo_to_html 走专用块（同时处理两 item），
+#: **不进** merge_projection_into_all_d4_stores 的 rows 4-tuple 循环。仅 flag 开时导出（block hasattr 判定）。
+if _INCLUDE_D47_MARGIN_SHEET:
+    STORE_ITEM_IDS_D47_DEDICATED: Final[tuple[str, ...]] = (
+        STORE_ITEM_ID_D47_PRODUCTS,
+        STORE_ITEM_ID_D47_MONTHLY,
+    )
+
+    def merge_d47_from_projection(*, projection, base_by_item):
+        """D4-7 两区 ← projection。返回 {store_item_id: (新载荷, applied)}。
+
+        委托 provider 的两区 merge；`applied` = 本 item 被投影覆盖的键数（>0 才需写回，
+        避免无投影时把已有 store 覆空）。oo_to_html 专用块据此逐 item 写回 checklist_responses。
+        """
+        merged = merge_projection_into_d47_stores(projection=projection, base_by_item=base_by_item)
+        prod_applied = sum(
+            1 for sk in projection.stable_keys() if str(sk).startswith(TABLE_KEY_PRODUCTS + "/")
+        )
+        monthly_applied = sum(
+            1 for sk in projection.stable_keys() if str(sk).startswith(TABLE_KEY_MONTHLY + "/")
+        )
+        return {
+            STORE_ITEM_ID_D47_PRODUCTS: (merged[STORE_ITEM_ID_D47_PRODUCTS], prod_applied),
+            STORE_ITEM_ID_D47_MONTHLY: (merged[STORE_ITEM_ID_D47_MONTHLY], monthly_applied),
+        }
 
 
 def merge_d49_from_projection(

@@ -51,8 +51,8 @@
 | 4 | D4-4 | 调整分录汇总 | gap-closure (0/5) | ❌ | — | — | ⬜ 已裁 single_html(无行身份列) |
 | 5 | D4-5 | 会计政策检查 | d-cycle-expansion | ✅ d45-managed | D4TabPolicyCheck | ✅ | ✅ |
 | 6 | D4-6 | 重要指标分析 | d-cycle-expansion | ✅ d46-managed(批次B从零) | D4TabIndicator | ✅ | ✅ (批次B 2026-09-20落地,真OO待验) |
-| 7 | D4-7 | 毛利率分析 | d-cycle-expansion | ❌ (前端有 d47-managed 键但契约未声明) | D4TabMarginMonthly | legacy | 🔵 从零 |
-| 8 | D4-8 | 重要产品毛利分析 | gap-closure (0/5) | ❌ | — | — | 🔵 gap待做 |
+| 7 | D4-7 | 毛利率分析 | d-cycle-expansion | ✅ d47-managed | D4TabMarginMonthly | ✅ | ✅ (动态产品区+静态月度区,gen76) |
+| 8 | D4-8 | 重要产品毛利分析 | gap-closure (0/5) | ❌ 静态块矩阵无动态行载体 | D4TabProductMargin | legacy | ⛔ 引擎限制(HTML-only,同D4-33) |
 | 9 | D4-9 | 重要客户结构分析 | d4-9-customer | ✅ d49-managed(三区,共享entry) | D4TabCustomerStructure | ✅ | ✅ (2026-09-20发布gen55,真OO待验) |
 | 10 | D4-10 | 重要客户销售价格 | d4-price-analysis (9/10) | ✅ d410-managed(批次B,dict+总额行) | D4TabCustomerPrice | ✅ | ✅ (2026-09-20发布gen63,补rowId,真OO待验) |
 | 11 | D4-11 | 产品销售价格分析 | d4-price-analysis (9/10) | ✅ d411-managed(批次B) | D4TabProductPrice | ✅ | ✅ (2026-09-20发布gen62,补rowId,真OO待验) |
@@ -94,11 +94,14 @@
 > 校验：27 + 7 + 2 = 36 ✓（🟡 半接入类已清零）
 > 契约集合现 **27 张**（+d420-managed，含 4 table：summary/provision/current/post returns）；entry `xlsx/gt-d4-operating-revenue` 当前 representation **gen64**（bundle d91cf0f2）。
 > 剩余 7 张进展（2026-09-20 逐张侦查+落地，全部有结论无悬空）：
-> ✅ **D4-34 / D4-36 已落地**（双区 dynamic dict store，gen68 / gen70，三维代码全绿）
+> ✅ **D4-34 / D4-36 / D4-7 已落地**（D4-34/36 双区 dynamic dict store gen68/gen70；D4-7 动态产品区+静态月度区 gen76，三维代码全绿）
 > ⛔ **D4-33 / D4-8 HTML-only**（引擎不支持纯静态 / 静态块矩阵，无 dynamic-row 载体）
 > ⏸ **D4-12 转置**（需模板改造 + 泛化 D4-29 引擎，待专项 spec `d4-12-transposed-writeback`）
 > ⏸ **D4-14 七维嵌套**（模板列↔前端维度不对齐，需列映射裁决，待专项 spec `d4-14-walkthrough-writeback`）
-> ⏸ **D4-7 双区**（技术可落地=D4-9 范式，但受①性能天花板 materialize 138s>120s ②前端 products 需补 rowId 两阻，暂缓）
+>
+> **D4-7 的两阻已在 2026-09-20 解除并落地**：①性能天花板经 spec workpaper-sync-materialize-large-table-performance
+> Wave 5 修复（观测解析复用，138.7s→69.33s）②前端 products 补 rowId + backfill 完成。加 D4-7 后 entry 仍在
+> 120s 软上限内。
 >
 > **结论**：可直接复用成熟 dynamic-row 范式且无阻的（D4-34/36）已 100% 清零；剩余 5 张各有独立硬约束
 > （引擎不支持静态 sheet ×2 / 转置需模板+引擎泛化 / 七维映射裁决 / 性能天花板 + rowId），**非机械 provider 可覆盖**，
@@ -182,7 +185,23 @@
   同时校准前端模型或模板）。
 - 建议单立 spec `d4-14-walkthrough-writeback`，含「32 列↔7 维字段逐列映射裁决表（人工确认权威源）+ provider +
   守卫」；映射表须经审计业务复核（哪些列受管、客户名称落哪、审批人归属）后方可实现。
-### D4-7 毛利率分析（**2026-09-20 侦查完成：技术可落地（D4-9 双区范式），但受性能天花板 + 需前端 rowId，暂缓**）
+### D4-7 毛利率分析 —— ✅ **2026-09-20 落地完成（gen76）**（性能瓶颈解除 + 前端补 rowId 后）
+- 几何（A1:W32）：**§二产品动态区 + §一月度静态区**（D4-9「动态区载体 + 静态区寄生」架构）。
+  §二 header R18-19 / 数据 R20-25 / 合计 R26：输入 8 列（A名/B数量/D收入/G成本/J上期数量/L上期收入/O上期成本/W备注），
+  派生 15 列（C/E/F/H/I + K/M/N/P/Q + R/S/T/U/V）→ formula_mask；行身份 rowId、UUID 列 X、footer marker `合计`。
+  §一 R11-15：唯一输入 = R12 收入 B-M + O12 + R13 成本 B-M + O13 = **26 static cell**（毛利/毛利率/合计/变动全公式）。
+- 前端 `D4TabMarginMonthly.vue` + store `D4-7-products`（行数组，本轮**补 rowId + backfill**）+ `D4-7-monthly`
+  （标量对象 `{revenue[12],cost[12],priorRevenue,priorCost}`）；provider `phase5_d4_margin_monthly_sheet.py`（406 行）。
+- 两 store item → oo_to_html **专用块**同时处理（不进 rows 4-tuple 循环，按 (payload, applied) 逐 item 写回）；
+  1 instrumentation spec（仅 dynamic 区，static 区随其 binding 纳入受管坐标，同 D4-9 totals）。alignment 双射 35=35。
+- 发布链：generate(30 sheets, digest 6507ff4c)→provision(bundle 53→54, 623a850a)→rematerialize(gen 74→76,
+  revision 100)，soft_limit 120 下**无 SoftTimeout**（Wave 5 性能优化后加此张仍在上限内）。
+- 前端 `useWorkpaperSyncBridge`（d47-managed）+ WorkpaperSyncEditorHost + 宿主登记 D4-7 dedicated；
+  守卫 test_d4_7_margin_contract.py(7) + d4MarginMonthlySyncHostWiring.spec.ts(9)。
+- **意义**：验证「同 sheet 动态区 + 静态区寄生」范式（D4-9 架构）在 revenue entry 复用成功；两阻（性能 + rowId）均解除。
+
+<!-- 原侦查记录（暂缓两阻已解除）：D4-9 双区范式 -->
+### D4-7 毛利率分析（原侦查记录，2026-09-20，已落地）
 - 几何（A1:W32）：**§一 月度静态区 + §二 产品动态区**（正好 D4-9「动态区载体 + 静态区寄生」架构）。
   §一 月度毛利（R11-15）：唯一输入 = R12 主营收入 B-M(12月) + R13 主营成本 B-M(12月) + O12/O13 上期 =
   **~26 静态 cell**；合计 N/变动 P、毛利 R14、毛利率 R15 全 Excel 公式。store `D4-7-monthly` =

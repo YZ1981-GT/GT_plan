@@ -198,7 +198,7 @@ backend/app/services/workpaper_sync/excel_materialize.py  2980
 backend/app/services/workpaper_sync/materialize_coordinator.py  2936
 backend/app/services/workpaper_sync/merge.py  1612
 backend/app/services/workpaper_sync/models.py  1486
-backend/app/services/workpaper_sync/oo_to_html.py  3780
+backend/app/services/workpaper_sync/oo_to_html.py  3860
 backend/app/services/workpaper_sync/opaque_entry_gate.py  1319
 backend/app/services/workpaper_sync/pilot_d2_large_json.py  1513
 backend/app/services/workpaper_sync/pilot_g7_two_level_dynamic.py  2450
@@ -487,8 +487,10 @@ backend/app/services/workpaper_sync/phase5_d7_contract_liabilities.py  965
 #     STORE_ITEMS + 2 instrumentation spec + sheet payload + projection + dict-block 门面/别名）后 = 2262。
 #     2026-09-20 D4-36 其他业务收入截止性测试接线（双区 dynamic dict store，同结构 4 处薄接线 +
 #     2 instrumentation spec + dict-block 门面/别名）后 = 2297。
+#     2026-09-20 D4-7 毛利率分析接线（同 sheet 1 dynamic + 1 static，import + flag + STORE_ITEMS×2 +
+#     1 instrumentation spec + sheet payload + projection + 两 item dedicated 门面/别名）后 = 2360。
 #     🔴 技术债确认：该 hub 随每个 canary 线性增长，抽伴生装配模块（provider_registry）应单立任务。
-backend/app/services/workpaper_sync/phase5_d4_revenue_detail.py  2297
+backend/app/services/workpaper_sync/phase5_d4_revenue_detail.py  2360
 
 #   phase5_d4_customer_structure.py —— D4-9 重要客户结构分析双向回写 provider
 #     (spec d4-9-customer-structure-bidirectional-writeback)。单 sheet 三 table

@@ -2739,6 +2739,8 @@ class OoToHtmlCoordinator:
             str(getattr(bridge, name, "") or "")
             for name in ("STORE_ITEM_ID_D49_DICT", "STORE_ITEM_ID_D433_DICT", "STORE_ITEM_ID_D434_DICT", "STORE_ITEM_ID_D436_DICT")
         }
+        # D4-7 两 item（products / monthly）也走专用块，从 rows 循环 base 构造中排除
+        _dict_store_items |= {str(s) for s in getattr(bridge, "STORE_ITEM_IDS_D47_DEDICATED", ()) or ()}
         _dict_store_items.discard("")
         base_by_item: dict[str, list] = {}
         for item_id in bridge.STORE_ITEM_IDS:
@@ -3118,6 +3120,60 @@ class OoToHtmlCoordinator:
                             "val": payload,
                         },
                     )
+                await self._session.commit()
+
+        # D4-7 两 store item（D4-7-products 行数组 + D4-7-monthly 标量对象）：同 sheet 1 dynamic + 1 static，
+        # 由专用块同时处理两 item（不进 rows 4-tuple 循环）。§一月度静态 cell 随 §二产品 binding 一起被
+        # 纳入受管坐标，两 item 的投影都在 merged_projection 里，按 (payload, applied) 逐 item 写回。
+        if hasattr(bridge, "merge_d47_from_projection") and hasattr(
+            bridge, "STORE_ITEM_IDS_D47_DEDICATED"
+        ):
+            d47_base: dict = {}
+            for item_id in bridge.STORE_ITEM_IDS_D47_DEDICATED:
+                raw = (
+                    await self._session.execute(
+                        sa.text(
+                            "SELECT remark FROM checklist_responses "
+                            "WHERE wp_id = :wp AND item_id = :item"
+                        ),
+                        {"wp": str(state.frozen.wp_id), "item": item_id},
+                    )
+                ).scalar_one_or_none()
+                d47_base[item_id] = raw if isinstance(raw, str) and raw.strip() else None
+            d47_updates = bridge.merge_d47_from_projection(
+                projection=merged_projection, base_by_item=d47_base
+            )
+            d47_wrote = False
+            for item_id, (merged_payload, applied) in d47_updates.items():
+                # 无投影覆盖且已有基线 → 不写（避免把已有 store 覆空）
+                if applied <= 0 and d47_base.get(item_id) is not None:
+                    continue
+                payload = json.dumps(merged_payload, ensure_ascii=False)
+                updated = (
+                    await self._session.execute(
+                        sa.text(
+                            "UPDATE checklist_responses SET remark = :val, updated_at = now() "
+                            "WHERE wp_id = :wp AND item_id = :item"
+                        ),
+                        {"val": payload, "wp": str(state.frozen.wp_id), "item": item_id},
+                    )
+                ).rowcount
+                if not updated:
+                    await self._session.execute(
+                        sa.text(
+                            "INSERT INTO checklist_responses "
+                            "(id, project_id, wp_id, item_id, remark, created_at, updated_at) "
+                            "VALUES (gen_random_uuid(), :pid, :wp, :item, :val, now(), now())"
+                        ),
+                        {
+                            "pid": str(state.frozen.project_id),
+                            "wp": str(state.frozen.wp_id),
+                            "item": item_id,
+                            "val": payload,
+                        },
+                    )
+                d47_wrote = True
+            if d47_wrote:
                 await self._session.commit()
 
     async def _mirror_d2_store_if_needed(
