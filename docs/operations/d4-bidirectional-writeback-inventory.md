@@ -56,9 +56,9 @@
 | 9 | D4-9 | 重要客户结构分析 | d4-9-customer | ✅ d49-managed(三区,共享entry) | D4TabCustomerStructure | ✅ | ✅ (2026-09-20发布gen55,真OO待验) |
 | 10 | D4-10 | 重要客户销售价格 | d4-price-analysis (9/10) | ✅ d410-managed(批次B,dict+总额行) | D4TabCustomerPrice | ✅ | ✅ (2026-09-20发布gen63,补rowId,真OO待验) |
 | 11 | D4-11 | 产品销售价格分析 | d4-price-analysis (9/10) | ✅ d411-managed(批次B) | D4TabProductPrice | ✅ | ✅ (2026-09-20发布gen62,补rowId,真OO待验) |
-| 12 | D4-12 | 合同检查 | gap-closure (0/5) | ❌ | — | — | 🔵 gap待做 |
+| 12 | D4-12 | 合同检查 | gap-closure (0/5) | ❌ 转置需模板改造+引擎泛化 | D4TabContract | legacy | ⏸ 转置(大工程,待专项spec) |
 | 13 | D4-13 | ERP账面核对 | d4-inspection (9/16) | ❌ | — | — | ⬜ evidence裁 N/A(纯叙述文本表) |
-| 14 | D4-14 | 发生检查 | d4-inspection (9/16) | ❌ | D4TabOccurrence | legacy | 🔵 从零(32列七维嵌套,风险高) |
+| 14 | D4-14 | 发生检查 | d4-inspection (9/16) | ❌ 模板列↔前端维度不对齐 | D4TabOccurrence | legacy | ⏸ 七维嵌套(需列映射裁决,待专项spec) |
 | 15 | D4-15 | 完整性检查 | d4-inspection (9/16, B1/B2做实) | ✅ d4-15-managed | D4TabCompleteness | ✅ | ✅ |
 | 16 | D4-16 | 出口口岸核对 | d4-inspection (9/16, B1/B2做实) | ✅ d4-16-managed | D4TabExport | ✅ | ✅ |
 | 17 | D4-17 | 截止测试(账到单据) | d4-cutoff-return (3/13) | ✅ d417-managed(批次B) | D4TabCutoffForward | ✅ | ✅ (2026-09-20发布gen55,真OO待验) |
@@ -93,7 +93,12 @@
 
 > 校验：27 + 7 + 2 = 36 ✓（🟡 半接入类已清零）
 > 契约集合现 **27 张**（+d420-managed，含 4 table：summary/provision/current/post returns）；entry `xlsx/gt-d4-operating-revenue` 当前 representation **gen64**（bundle d91cf0f2）。
-> 剩余 7 张全属更硬一档：D4-12（多子表待侦查）· D4-14（32列七维嵌套）· D4-7/8/33/34/36（矩阵型/双区，`months[12]` 位置数组 + 密集内部公式，2-3x）。逐张比已完成的复杂。
+> 剩余 7 张进展（2026-09-20 逐张侦查+落地）：✅ **D4-34/D4-36 已落地**（双区 dynamic dict store，gen68/gen70）·
+> ⛔ **D4-33 HTML-only**（引擎不支持纯静态 cell sheet）· ⏸ **D4-12 转置**（需模板改造 + 泛化 D4-29 引擎，待专项 spec）·
+> ⏸ **D4-14 七维嵌套**（模板列↔前端维度不对齐，需列映射裁决，待专项 spec）· 🔵 **D4-7/D4-8**（毛利率矩阵，含静态月度
+> 矩阵 + 动态产品行，待细判能否借动态区载体带静态 cell 或裁 HTML-only）。
+> **结论**：可直接复用成熟 dynamic-row 范式的（D4-34/36）已清零；剩余 4 张各有独立难点（引擎限制/模板改造/映射裁决/
+> 混合矩阵），非机械 provider 可覆盖，宜各立专项 spec 而非本轮硬推（避免假绿/静默错配）。
 > 注：D4-6/7 前端虽已在宿主 `D4_SHEET_KEY_BY_CODE` 预留 `d46/d47-managed` 键，但契约 sheet_key 集合中**无**对应项且组件未接桥，故仍归 🔵 从零。D4-9/10/11/14/33/34/36 经 grep 实证前端组件均未 import `useWorkpaperSyncBridge`（仍 legacy），契约集合中也无对应项。
 
 ## 剩余 8 张几何侦查与实现方案（2026-09-20 冻结，供续作，避免蒸发）
@@ -110,8 +115,40 @@
 - 🔴 难点：4 region 同 sheet（1 static + 3 dynamic），需 4 template_id + sibling binding 对齐（D4-9 证过 3 region）；returns 表占满 A-O 故 uuid 列用 P。前端键 `-current-returns`/`-post-returns` 与后端 sheet 键需对齐（inventory 早标的 D4-20 键错位 bug 一并修）。
 - 文本区（policy/assessment/note/conclusion）保持 HTML-only（同 D4-5 footer 下 static 不入契约）。
 
-### D4-12 合同检查（多子表，待侦查列布局）
-### D4-14 发生检查（32 列七维嵌套，风险最高，可能需拆多 sheet 或裁 limited）
+### D4-12 合同检查（**2026-09-20 侦查完成，裁定：转置大工程，待专项 spec**）
+- 几何（A1:K57）：**转置动态表**（同 D4-29 范式）。header R10：A10=`索引号`，B10-K10=`D4-12-1`..`D4-12-10`
+  （最多 10 份合同列）；字段行 R11-31（21 字段：合同编号/交易对方/签订日期/服务内容/合同金额/交货时间/
+  交货方式/结算方式/结算时间/质量保证/销售退回/违约/特殊约定/签字/盖章/时段时点/验收/确认时间/控制权单据/
+  特定交易/结论）。每**列**=一份合同（entity），每**行**=一个字段（transposed vs 普通行表）。
+- 前端 `D4TabContract.vue` + composable `useD4ContractInspection.ts`，store `D4-12-contracts-v2` =
+  `ContractInspectionItem[]`（id + indexNo + 21 字段）；审计说明/结论 R32/R36 HTML-only。
+- 🔴 **裁定：转置双向回写是大工程，本轮不做，待专项 spec**。根因（context-gather + 读 D4-29 provider 实证）：
+  ①引擎的转置机制**完全绑死 D4-29**——`adapters/excel.py` 全程 `from phase5_d4_29_customer_detail import
+  is_enabled/materialize_file/extract_file` + `is_enabled(contract)` 特判，非泛化；D4-29 provider 硬编码
+  `MANAGED_SHEET/MANAGED_REF=$C$10:$M$41/IDENTITY_CARRIER_ROW=9/DEFINED_NAME=GT_MANAGED_REGION_D429`。
+  ②转置要求**模板预置 workbook-scope definedName + 隐藏身份载体行**（D4-29 row 9 存 `GT-CUSTOMER-{id}`），
+  D4-12 模板**两者皆无**（census 确认无 definedName、row 9 空）→ 须改造共享 xlsx 模板。
+  ③落地 D4-12 转置 = (a) 泛化 D4-29 转置引擎（重构一个已稳定+有守卫的模块，高回归风险）+ (b) 模板加
+  definedName+carrier 行 + (c) 新 provider。跨度远超行表张，且与「materialize 已 138s 逼近软上限」叠加。
+- **对比**：D4-34/36（双区行表）复用成熟 dynamic-row 范式零模板改动即落地；D4-12 转置无此便利。
+  建议单立 spec `d4-12-transposed-writeback`，含「泛化转置引擎（extract D4-29 通用化）+ 模板 instrument
+  + provider + 守卫」四阶段，与 D4-29 同引擎共线维护。
+### D4-14 发生检查（**2026-09-20 侦查完成，裁定：模板↔前端维度不对齐，需列映射裁决，待专项 spec**）
+- 几何（A1:AK52，37 列）：**单宽动态行表**（引擎可支持，非转置）。2 行表头 R13（组：记账凭证 B/销售合同 H/
+  出库单 J/仓库保管员 N/发货审批人 O/运输单 P/签收单 U/发票 AB/结论 AG/说明 AI/索引 AJ/是否异常 AK）+
+  R14（子列：客户名称/日期/编号/品名/数量/金额…）；数据 R15-36（22 行），footer `合计` R37（G37/X37/AF37
+  为合计公式，无 per-row 公式）。UUID 列可放 AL。
+- 前端 `D4TabOccurrence.vue` + composable `useD4WalkthroughTest.ts`，store = `TransactionItem[]`（**7 维嵌套**：
+  voucher/contract/delivery/shipping/receipt/invoice/other，每维 sub-object；+ consistencyScore/details 前端派生）。
+- 🔴 **裁定：需列映射裁决，本轮不做，待专项 spec**。根因（读 useD4WalkthroughTest.ts 实证）：**模板列布局与
+  前端 7 维模型独立演进、不 1:1 对齐**——①模板 B=客户名称，但 `VoucherDimension` **无 customerName 字段**
+  （只有 month/date/number/productName/quantity/amount/accountingDate）；②模板 O=发货审批人 vs 前端
+  `contract.approver`/`delivery.warehouseKeeper` 归属歧义；③模板记账凭证 5 子列 vs voucher 维 7 字段数不等。
+  盲目建映射会**静默错配数据**（违主控 correctness 铁律）。技术上引擎可支持（单宽行表 + 嵌套 json_pointer
+  `/rows/{id}/{dim}/{field}`，同 D4-20 resolve_json_path），但**前提是先裁决每列↔字段的权威映射**（可能需
+  同时校准前端模型或模板）。
+- 建议单立 spec `d4-14-walkthrough-writeback`，含「32 列↔7 维字段逐列映射裁决表（人工确认权威源）+ provider +
+  守卫」；映射表须经审计业务复核（哪些列受管、客户名称落哪、审批人归属）后方可实现。
 ### D4-7 毛利率分析（双区：月度 obj `revenue[12]/cost[12]` 位置数组 + products 动态区）
 ### D4-8 产品毛利率（product×12月矩阵 + 密集内部公式 H=D-G/毛利率/变动分析 R-W）
 ### D4-33 其他业务毛利率（**2026-09-20 侦查+落地尝试完成，裁定 HTML-only：引擎不支持纯静态 cell sheet**）
