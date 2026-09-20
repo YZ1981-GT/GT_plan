@@ -207,6 +207,8 @@ __all__ = [
     # 受管区域
     "ManagedRegion",
     "ExcelIdentityBinding",
+    "BindingKind",
+    "is_static_region",
     "resolve_managed_region",
     "managed_tables_of",
     # 预算与分块
@@ -575,6 +577,27 @@ def _scan_row_identities(
 # ═══════════════════════════════════════════════════════════════════════════
 
 
+class BindingKind(Enum):
+    """受管区绑定的锚点类型 —— 显式分派判据（DEC-6 / Property 5）。
+
+    * :attr:`excel_table` —— 既有默认：Excel Table displayName 锚点 + 隐藏 UUID 列，
+      承载动态行区域（D4-1/2/9/34/36…）。
+    * :attr:`static_region` —— 本 spec 新增：workbook-scope definedName 锚点，承载
+      「只有绝对坐标 static cell、无动态行/无 UUID 列」的纯静态受管区（D4-33/D4-8）。
+
+    🔴 D4-29 转置表**不**在本 enum 里 —— 它不构造 :class:`ExcelIdentityBinding`，而是走
+    observer 的 anchor payload 直接标 ``transposed``（另一套机制，语义是「列=entity
+    行=字段」）。本 enum 只区分「经 ExcelIdentityBinding 落盘」的两种受管区。
+
+    分派**必须**据 :meth:`ExcelIdentityBinding.kind`（= `defined_name` 字段是否存在），
+    **禁止**据「`uuid_column` 是否为空」隐式判断：合法动态 binding 永远有 uuid_column，
+    但「按 uuid_column 缺失分派」在未来动态 binding 出现边界态时会误判（Property 5 变异守卫）。
+    """
+
+    excel_table = "excel_table"
+    static_region = "static_region"
+
+
 @dataclass(frozen=True)
 class ExcelIdentityBinding:
     """representation 固定下来的 Excel identity 绑定。
@@ -583,14 +606,29 @@ class ExcelIdentityBinding:
     definition 里），不是语义契约的一部分，所以不放进 `SyncContract`。调用方从
     application/representation 冻结的 bundle 取出后原样传进来 —— 本模块不去 registry
     现查，也不接受「留空就按当前 alias 取」。
+
+    ═══ 两种形态（:attr:`kind` 分派）═══
+
+    * **动态**（:attr:`BindingKind.excel_table`）：`table_name`（Excel Table displayName）
+      + `uuid_column`（隐藏 row UUID 列）必填；`defined_name` 必空。
+    * **静态**（:attr:`BindingKind.static_region`）：`defined_name`（workbook-scope
+      definedName）必填；`table_name` / `uuid_column` 必空（纯静态区无 Excel Table、无
+      UUID 列）。
+
+    kind 由 `defined_name` 字段是否存在决定（见 :class:`BindingKind` 的分派铁律）。
+    `table_name` / `uuid_column` 的默认值改为 `""` 以允许静态构造省略；动态路径的非空
+    强校验从「参数必填」下沉到 :meth:`__post_init__` 的动态分支断言，**校验强度不变**。
     """
 
-    #: Excel Table displayName（唯一通过探针的区域边界锚点）。
-    table_name: str
-    #: 隐藏 row UUID 列列标。
-    uuid_column: str
-    #: 受管表在契约里的 `table_key`。绑定与契约表一一对应。
+    #: 受管表在契约里的 `table_key`。绑定与契约表一一对应。两种形态都必填。
     table_key: str
+    #: Excel Table displayName（动态区唯一通过探针的区域边界锚点）。静态区必空。
+    table_name: str = ""
+    #: 隐藏 row UUID 列列标。静态区必空。
+    uuid_column: str = ""
+    #: workbook-scope definedName（静态受管区的区域边界锚点，如 GT_MANAGED_REGION_D433）。
+    #: 动态区必空。它的存在与否即 :meth:`kind` 分派判据。
+    defined_name: str = ""
     metadata_sheet: str = GT_SYNC_SHEET_NAME
     defined_name_prefix: str = "GT_"
     #: 该 entry 已 tombstone 的 row identity 清册（Requirement 6.15：不得复用）。
@@ -601,7 +639,35 @@ class ExcelIdentityBinding:
         default_factory=dict
     )
 
+    @property
+    def kind(self) -> BindingKind:
+        """静态（有 defined_name）/ 动态（无）—— 下游分派唯一判据。"""
+        return (
+            BindingKind.static_region
+            if str(self.defined_name or "").strip()
+            else BindingKind.excel_table
+        )
+
     def __post_init__(self) -> None:
+        if str(self.defined_name or "").strip():
+            # ── 静态分支：defined_name 必填，table_name/uuid_column 必空（防 kind 混填）──
+            if str(self.table_name or "").strip() or str(self.uuid_column or "").strip():
+                raise ManagedRegionResolutionError(
+                    "static ExcelIdentityBinding 不得同时声明 table_name/uuid_column"
+                    " —— kind 混填（静态区无 Excel Table、无 UUID 列）"
+                )
+            for name, value in (
+                ("defined_name", self.defined_name),
+                ("table_key", self.table_key),
+                ("metadata_sheet", self.metadata_sheet),
+            ):
+                if not str(value or "").strip():
+                    raise ManagedRegionResolutionError(
+                        f"static ExcelIdentityBinding.{name} 不得为空"
+                        " —— frozen identity 必须显式"
+                    )
+            return
+        # ── 动态分支（原样，零改：table_name/uuid_column 强校验保留）──
         for name, value in (
             ("table_name", self.table_name),
             ("uuid_column", self.uuid_column),
@@ -618,6 +684,11 @@ class ExcelIdentityBinding:
             raise ManagedRegionResolutionError(
                 f"ExcelIdentityBinding.uuid_column 形态非法: {self.uuid_column!r}"
             ) from exc
+
+
+def is_static_region(binding: ExcelIdentityBinding) -> bool:
+    """binding 是否为静态受管区（DEC-6 显式判据）。"""
+    return binding.kind is BindingKind.static_region
 
 
 @dataclass(frozen=True)
