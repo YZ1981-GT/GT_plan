@@ -1798,3 +1798,80 @@ class TestServiceErrorMapping:
         http = SR._sync_http(_Novel("x"))
         assert http.status_code == 422
         assert http.detail["error_code"] == "task28_probe_only_novel_code"
+
+    def test_registration_maps_manifest_drift_to_fail_visible_422(self) -> None:
+        """`_registration` 里 `_attach_pilot_adapters(svc)`（=manifest 注册，会跑
+        `assert_no_structure_drift`）必须包在把 `SyncDomainError` 翻成 422 的 try 里。
+
+        🔴 复现根因（d4-ipo-fraud Task 7 真栈验收）：source contract 声明了新 sheet
+        （如 D4-17 `d417-managed`）但已发布 representation 尚未 rematerialize 时，
+        `register_from_manifest` 会抛 `ContractDriftError`（`SyncDomainError` 子类）。
+        它此前在 `_attach_pilot_adapters(svc)` 处**未被包进** try，一路冒泡成 opaque 500
+        —— 整个 `gt-d4-operating-revenue` entry 的 store-projection/materialize 全线
+        「服务器内部错误」，看不到中文根因。修复=把该调用移进 try，与
+        `assert_bidirectional_ready` 共用同一 `SyncDomainError → HTTPException(422)` 分支。
+
+        判据走 AST（不是字符串出现即算）：在 `_registration` 函数体内找到那个 handler 捕获
+        `SyncDomainError` 且 body 里 `raise HTTPException(status_code=422)` 的 try，
+        并断言 `_attach_pilot_adapters(...)` 的 await 调用发生在该 try 的 body 内。
+        """
+        src = inspect.getsource(SR._registration)
+        # dedent 到模块级，才能被 ast 解析
+        import textwrap
+
+        tree = ast.parse(textwrap.dedent(src))
+        func = next(
+            n for n in ast.walk(tree)
+            if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef))
+            and n.name == "_registration"
+        )
+
+        def _handler_maps_to_422(handler: ast.ExceptHandler) -> bool:
+            # 捕获类型里含 SyncDomainError
+            names: list[str] = []
+            t = handler.type
+            if isinstance(t, ast.Tuple):
+                names = [e.id for e in t.elts if isinstance(e, ast.Name)]
+            elif isinstance(t, ast.Name):
+                names = [t.id]
+            if "SyncDomainError" not in names:
+                return False
+            # body 里 raise HTTPException(status_code=422)
+            for node in ast.walk(handler):
+                if (
+                    isinstance(node, ast.Raise)
+                    and isinstance(node.exc, ast.Call)
+                    and isinstance(node.exc.func, ast.Name)
+                    and node.exc.func.id == "HTTPException"
+                ):
+                    for kw in node.exc.keywords:
+                        if kw.arg == "status_code" and isinstance(kw.value, ast.Constant) and kw.value.value == 422:
+                            return True
+            return False
+
+        def _body_awaits_attach(body: list[ast.stmt]) -> bool:
+            for stmt in body:
+                for node in ast.walk(stmt):
+                    if (
+                        isinstance(node, ast.Call)
+                        and isinstance(node.func, ast.Name)
+                        and node.func.id == "_attach_pilot_adapters"
+                    ):
+                        return True
+            return False
+
+        guarded = False
+        for node in ast.walk(func):
+            if not isinstance(node, ast.Try):
+                continue
+            if not any(_handler_maps_to_422(h) for h in node.handlers):
+                continue
+            if _body_awaits_attach(node.body):
+                guarded = True
+                break
+
+        assert guarded, (
+            "_registration 必须把 `_attach_pilot_adapters(svc)`（manifest 注册，含契约漂移校验）"
+            "包进捕获 SyncDomainError→HTTPException(422) 的 try —— 否则 ContractDriftError "
+            "会冒泡成 opaque 500，把整个 entry 的 store-projection 打成「服务器内部错误」"
+        )
