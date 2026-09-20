@@ -298,13 +298,10 @@ _INCLUDE_D46_INDICATOR_SHEET: Final[bool] = True
 #: table，行身份=id、受管列 A-J、formula_mask K（是否跨期派生）、注入 UUID 列 L。
 #: provider=phase5_d4_cutoff_forward_sheet。provider + 契约 + 投影/合并 + 前端接桥 + 守卫
 #: (test_d4_17_cutoff_contract 6 passed / d4CutoffForwardSyncHostWiring 7 passed) 已完成并单测验证。
-#: 🔴 暂关（False）：本 sheet 共享 entry gt-d4-operating-revenue，而该 entry 的 desired bundle
-#: 现含 D4-9（phase5_d4_customer_structure，已入 HEAD），其 build_d49_store_projection 对真实
-#: 项目 D4-9-data（list 形态）抛 StorePayloadError（期望 {current,prior} dict）——live
-#: rematerialize 因此失败、整个 entry 卡在 gen54 无法发布。D4-9 是并发 owner 的文件（主控 §10.3
-#: 共享锁），不擅改。唯一解除条件：D4-9 owner 修 _parse_store_payload 兼容 list 形态并 live
-#: rematerialize 通过后，翻此开关为 True 并跑发布链（provision + rematerialize）+ e2e。
-_INCLUDE_D417_CUTOFF_SHEET: Final[bool] = False
+#: 2026-09-20：曾因共享 entry 的 D4-9 provider 对真实 list 形态 D4-9-data 抛 StorePayloadError
+#: 卡死全 entry rematerialize 而暂关；D4-9 `_parse_store_payload` 已加 legacy list 容差（视为
+#: 空载荷、不打挂全 entry）解除阻塞，故重开为 True 并跑发布链。
+_INCLUDE_D417_CUTOFF_SHEET: Final[bool] = True
 #: 🔴 D4-1 同 sheet 双区 instrumentation 接线开关（Task 5）。
 #: 契约 sheet（sheet_payload_d41）+ store projection + merge 恒接（判据先行 Task 2 判据）；
 #: 但 instrumentation_specs 两 spec（主营/其他）暂**不接**，唯一阻塞 = 运行态 sibling binding
