@@ -93,12 +93,20 @@
 
 > 校验：27 + 7 + 2 = 36 ✓（🟡 半接入类已清零）
 > 契约集合现 **27 张**（+d420-managed，含 4 table：summary/provision/current/post returns）；entry `xlsx/gt-d4-operating-revenue` 当前 representation **gen64**（bundle d91cf0f2）。
-> 剩余 7 张进展（2026-09-20 逐张侦查+落地）：✅ **D4-34/D4-36 已落地**（双区 dynamic dict store，gen68/gen70）·
-> ⛔ **D4-33 HTML-only**（引擎不支持纯静态 cell sheet）· ⏸ **D4-12 转置**（需模板改造 + 泛化 D4-29 引擎，待专项 spec）·
-> ⏸ **D4-14 七维嵌套**（模板列↔前端维度不对齐，需列映射裁决，待专项 spec）· 🔵 **D4-7/D4-8**（毛利率矩阵，含静态月度
-> 矩阵 + 动态产品行，待细判能否借动态区载体带静态 cell 或裁 HTML-only）。
-> **结论**：可直接复用成熟 dynamic-row 范式的（D4-34/36）已清零；剩余 4 张各有独立难点（引擎限制/模板改造/映射裁决/
-> 混合矩阵），非机械 provider 可覆盖，宜各立专项 spec 而非本轮硬推（避免假绿/静默错配）。
+> 剩余 7 张进展（2026-09-20 逐张侦查+落地，全部有结论无悬空）：
+> ✅ **D4-34 / D4-36 已落地**（双区 dynamic dict store，gen68 / gen70，三维代码全绿）
+> ⛔ **D4-33 / D4-8 HTML-only**（引擎不支持纯静态 / 静态块矩阵，无 dynamic-row 载体）
+> ⏸ **D4-12 转置**（需模板改造 + 泛化 D4-29 引擎，待专项 spec `d4-12-transposed-writeback`）
+> ⏸ **D4-14 七维嵌套**（模板列↔前端维度不对齐，需列映射裁决，待专项 spec `d4-14-walkthrough-writeback`）
+> ⏸ **D4-7 双区**（技术可落地=D4-9 范式，但受①性能天花板 materialize 138s>120s ②前端 products 需补 rowId 两阻，暂缓）
+>
+> **结论**：可直接复用成熟 dynamic-row 范式且无阻的（D4-34/36）已 100% 清零；剩余 5 张各有独立硬约束
+> （引擎不支持静态 sheet ×2 / 转置需模板+引擎泛化 / 七维映射裁决 / 性能天花板 + rowId），**非机械 provider 可覆盖**，
+> 均已 docs 裁定并给出解阻条件，宜各立专项 spec 或先解性能瓶颈，而非本轮硬推（避免假绿 / 静默错配 / 生产不可发布）。
+>
+> 🔴 **横切阻塞（优先级最高）**：D4 entry 整册 materialize 已达 138s，超 120s 生产软上限。**再落任何一张都会使整个
+> `xlsx/gt-d4-operating-revenue` entry 生产不可发布**。「D4 entry 拆分 / 增量 materialize」应立即立项，是解锁 D4-7 及
+> 后续所有张的前置条件。
 > 注：D4-6/7 前端虽已在宿主 `D4_SHEET_KEY_BY_CODE` 预留 `d46/d47-managed` 键，但契约 sheet_key 集合中**无**对应项且组件未接桥，故仍归 🔵 从零。D4-9/10/11/14/33/34/36 经 grep 实证前端组件均未 import `useWorkpaperSyncBridge`（仍 legacy），契约集合中也无对应项。
 
 ## 剩余 8 张几何侦查与实现方案（2026-09-20 冻结，供续作，避免蒸发）
@@ -149,8 +157,27 @@
   同时校准前端模型或模板）。
 - 建议单立 spec `d4-14-walkthrough-writeback`，含「32 列↔7 维字段逐列映射裁决表（人工确认权威源）+ provider +
   守卫」；映射表须经审计业务复核（哪些列受管、客户名称落哪、审批人归属）后方可实现。
-### D4-7 毛利率分析（双区：月度 obj `revenue[12]/cost[12]` 位置数组 + products 动态区）
-### D4-8 产品毛利率（product×12月矩阵 + 密集内部公式 H=D-G/毛利率/变动分析 R-W）
+### D4-7 毛利率分析（**2026-09-20 侦查完成：技术可落地（D4-9 双区范式），但受性能天花板 + 需前端 rowId，暂缓**）
+- 几何（A1:W32）：**§一 月度静态区 + §二 产品动态区**（正好 D4-9「动态区载体 + 静态区寄生」架构）。
+  §一 月度毛利（R11-15）：唯一输入 = R12 主营收入 B-M(12月) + R13 主营成本 B-M(12月) + O12/O13 上期 =
+  **~26 静态 cell**；合计 N/变动 P、毛利 R14、毛利率 R15 全 Excel 公式。store `D4-7-monthly` =
+  `{revenue[12],cost[12],priorRevenue,priorCost}`。§二 产品（R18-26）：**动态行**（前端 addProduct/removeProduct），
+  数据 R20-25（6 模板行可克隆），**输入列 A名/B数量/D收入/G成本/J上期数量/L上期收入/O上期成本/W备注（8 个）**，
+  formula 列 C单价/E结构比/F单位成本/H毛利/I毛利率 + 上期 K/M/N/P/Q + 变动 R/S/T/U/V（15 个 → formula_mask）。
+  store `D4-7-products` = `[{name,curQty,curRevenue,curCost,priorQty,priorRevenue,priorCost,remark}]`。
+- ✅ **技术可落地**：§二 动态产品区当 Excel-Table 载体，§一 静态区寄生（同 D4-9 current/prior + totals）。
+- 🔴 **暂缓两阻**：①**性能天花板**——整册 materialize 已 138s > 120s 生产软上限（D4-36 后实测），再加 D4-7
+  两 table 必超，entry 生产不可发布，须先做「D4 entry 拆分 / 增量 materialize」；②前端 products **无 rowId**
+  （array index 当身份，`removeProduct(idx)`），须先补 rowId + backfill（同 D4-10/11 做法）方合行身份铁律。
+  解阻后即可按 D4-9 双区范式落地。
+### D4-8 产品毛利率（**2026-09-20 侦查完成，裁定 HTML-only：静态块矩阵无动态行载体，同 D4-33**）
+- 几何（A1:X40）：**固定产品块**（产品A R12-31 / 产品B R32+…），每块 header R13-15（3 行）+ **固定 12 月行**
+  R16-27 + 合计 R28 + 同行业A/B/行业平均 R29-31。月行 R16-27 全 F:10（10 公式/行，单价/金额/毛利/毛利率派生）。
+- 前端 `D4TabProductMargin.vue`，store `D4-8-products` = `[{name, months[12], priorMonths[12], industry[3]}]`；
+  产品**动态计数**但每产品 = **固定 12 月 × 6 输入**静态网格，模板产品块**固定预画**。
+- 🔴 **裁定：HTML-only**（同 D4-33）。根因：**无真实动态行区**——「products 动态」是块计数动态（映射固定模板块），
+  块内 12 月是固定静态行 + 大量公式，无任何 dynamic-row table 可当 Excel-Table 载体。引擎不支持纯静态/静态块
+  sheet 双向回写（见 D4-33 裁定）。落地须走「多块转置 / 模板预画 N 块 + 泛化引擎」，属大工程；本轮 HTML-only。
 ### D4-33 其他业务毛利率（**2026-09-20 侦查+落地尝试完成，裁定 HTML-only：引擎不支持纯静态 cell sheet**）
 - 模板 `其他业务毛利率分析表D4-33`（A1:M31）：**固定 12 月行**（R12-23）× **固定 3 业务类型列组**
   （出租固定资产 E-G / 出租无形资产 H-J / 销售材料 K-M，每组 收入/成本/毛利率）。合计 B/C/D、
