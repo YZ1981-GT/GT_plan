@@ -77,8 +77,8 @@
 | 30 | D4-30 | 客户访谈记录汇总 | ipo-fraud (6/11) | ✅ d4-30-managed(批次A-5开门) | D4TabInterviewSummary | ✅ | ✅ (批次A-5 2026-09-20,真OO待验) |
 | 31 | D4-31 | 客户访谈记录 | ipo-fraud (6/11) | ✅ d4-31-managed(singleton) | D4TabInterviewDetail | ✅ | ✅ (批次A-5,真OO待验+singleton边界) |
 | 32 | D4-32 | 资金流水检查 | ipo-fraud (6/11) | ✅ d4-32-managed | D4TabFundFlow | ✅ | ✅ (批次A-5,真OO待验) |
-| 33 | D4-33 | 其他业务毛利率分析 | d4-33-36 (0/42) | ❌ 契约无 d433 | D4TabOtherMargin | **legacy** | 🔵 从零 |
-| 34 | D4-34 | 其他业务收入合同测算 | d4-33-36 | ❌ | D4TabOtherContract | **legacy** | 🔵 从零 |
+| 33 | D4-33 | 其他业务毛利率分析 | d4-33-36 (0/42) | ❌ 引擎不支持纯静态 | D4TabOtherMargin | **HTML-only** | ⛔ 引擎限制(裁定) |
+| 34 | D4-34 | 其他业务收入合同测算 | d4-33-36 | ✅ d434-managed | D4TabOtherContract | ✅ | ✅ (双区dynamic,gen68) |
 | 35 | D4-35 | 其他业务收入检查 | d4-33-36 | ✅ d435-managed | D4TabOtherCheck | ✅ | ✅ |
 | 36 | D4-36 | 其他业务收入截止测试 | d4-33-36 | ❌ | D4TabOtherCutoff | **legacy** | 🔵 从零 |
 
@@ -138,7 +138,18 @@
 - 🔴 **同类矩阵张的引擎结论外推**：D4-7（月度双区）、D4-8（product×12月）若同样**无动态行维度**
   （纯固定行×固定列 static matrix），则同受此引擎约束 → HTML-only；若有真实动态行（如 product 可增删行）
   则可按动态表落地。逐张须先侦查「是否存在真实动态行维度」再定，不可一律套 static-cell provider。
-### D4-34 其他业务合同测算（双区 rentals + consults）
+### D4-34 其他业务合同测算（双区 rentals + consults）—— ✅ **2026-09-20 落地完成（gen68）**
+- 几何（A1:K29）：2 dynamic 区。房屋租赁 header R12/数据 R13-17/UUID 列 L/footer marker `2.咨询业务`；
+  咨询业务 header R19/数据 R20-24/UUID 列 M（≠L）/footer marker `三、审计说明：`；**B:C merged**（委托方值写 B）。
+  各区 J 差异=H-I（formula_mask，不回写）。序号 A 列模板自增不入契约。
+- store `D4-34-data` = `{rentals[], consults[]}` dict（行身份 id：rt-/cs-）→ dict-store 模式（同 D4-9）：
+  oo_to_html 专用 dict 块 `merge_d434_from_projection` 3-tuple，不进 rows 4-tuple 循环。
+- provider `phase5_d4_other_contract_sheet.py`（299 行）；2 instrumentation spec（每区一个，alignment 双射校验通过 32=32）。
+- 发布链跑全：generate(28 sheets, digest c0a8f1c9)→provision(bundle 49→50, 45a4b748)→rematerialize(gen 67→68,
+  revision 92, 无 RoundtripEquivalenceError/FooterAnchorDrift)。三维代码全绿（REQUEST_PATH 级，真 OO 待 env）。
+- 前端 `D4TabOtherContract.vue` 接 useWorkpaperSyncBridge（sheetKey d434-managed）+ WorkpaperSyncEditorHost
+  （替 legacy GtOnlyOfficeSheet）+ 宿主登记 D4-34 dedicated；守卫 test_d4_34_contract.py(6) + d4OtherContractSyncHostWiring.spec.ts(8)。
+- **意义**：验证「有真实动态行维度 → 引擎可落地」，与 D4-33（纯静态被阻）形成对照，确证分类判据正确。
 ### D4-36 其他业务截止（三区 forward + backward + params）
 
 > 矩阵型（D4-7/8/33）关键未验证形态 = `months[12]` **位置数组**（B-M 列按下标映射）。首张矩阵落地需先验证「数组下标 json_pointer」往返（DEC-D4-1：12 个月做 12 条独立 field，不做 1 条 array field）。

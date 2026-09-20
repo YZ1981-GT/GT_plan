@@ -266,6 +266,14 @@ from app.services.workpaper_sync.phase5_d4_other_margin_sheet import (  # noqa: 
     merge_d433_from_projection,
     mapping_digest_d433,
 )
+from app.services.workpaper_sync.phase5_d4_other_contract_sheet import (  # noqa: E402
+    STORE_ITEM_ID_D434,
+    sheet_payload_d434,
+    instrumentation_specs_d434,
+    build_store_projection_d434,
+    merge_d434_from_projection,
+    mapping_digest_d434,
+)
 from app.services.workpaper_sync.phase5_d4_ipo_checklist_sheets import (  # noqa: E402
     CHECKLIST_SHEET_CODES,
     SHEET_KEY_BY_CODE,
@@ -376,6 +384,12 @@ _INCLUDE_D420_RETURN_SHEET: Final[bool] = True
 #: 静态块 precedent，不进 Excel 契约）。provider phase5_d4_other_margin_sheet 保留（已过隔离
 #: probe：契约 parse + 72cell projection/merge 往返全绿），待引擎解锁后一键翻 True 接入。
 _INCLUDE_D433_MARGIN_SHEET: Final[bool] = False
+#: D4-34 其他业务收入合同测算表接入（批次B 第九张，同 sheet 双动态区 · dict store，2026-09-20）。
+#: 2 dynamic 区（房屋租赁 R13-17 / 咨询业务 R20-24），各自 UUID 列 L/M、footer marker=下方 section
+#: 标题、J 差异 formula_mask；单 dict store D4-34-data（{rentals[],consults[]}）→ oo_to_html 走专用
+#: dict 块（merge_d434_from_projection 3-tuple，同 D4-9/D4-35）。2 instrumentation spec（每区一个）。
+#: provider=phase5_d4_other_contract_sheet。参照 D4-9 双区 dict + D4-20 同 sheet 多 spec。
+_INCLUDE_D434_CONTRACT_SHEET: Final[bool] = True
 #: 🔴 D4-1 同 sheet 双区 instrumentation 接线开关（Task 5）。
 #: 契约 sheet（sheet_payload_d41）+ store projection + merge 恒接（判据先行 Task 2 判据）；
 #: 但 instrumentation_specs 两 spec（主营/其他）暂**不接**，唯一阻塞 = 运行态 sibling binding
@@ -424,6 +438,7 @@ STORE_ITEM_IDS: Final[tuple[str, ...]] = (
     STORE_ITEM_ID_D49,
     *((STORE_ITEM_ID_D429,) if _INCLUDE_D429_TRANSPOSED else ()),
     *((STORE_ITEM_ID_D433,) if _INCLUDE_D433_MARGIN_SHEET else ()),
+    *((STORE_ITEM_ID_D434,) if _INCLUDE_D434_CONTRACT_SHEET else ()),
     *STORE_ITEM_ID_BY_CODE.values(),
 )
 EMPTY_STORE_PAYLOAD: Final[str] = "[]"
@@ -771,6 +786,13 @@ def instrumentation_specs() -> tuple:
             if _INCLUDE_D420_RETURN_SHEET
             else ()
         ),
+        *(
+            instrumentation_specs_d434(
+                entry_id=ENTRY_ID, template_relative_path=TEMPLATE_RELATIVE_PATH
+            )
+            if _INCLUDE_D434_CONTRACT_SHEET
+            else ()
+        ),
         # D4-1 营业收入审定表：同 sheet 双区（主营 R8 起 / 其他 R14 起）两 spec，同
         # managed_sheet 不同行段/UUID 列（W/X）。默认不接（见
         # _INCLUDE_D41_ADJUDICATION_INSTRUMENTATION 注释：runtime sibling binding 对齐仍
@@ -1029,6 +1051,7 @@ def build_contract_payload() -> dict[str, Any]:
             *([sheet_payload_d410()] if _INCLUDE_D410_PRICE_SHEET else []),
             *([sheet_payload_d420()] if _INCLUDE_D420_RETURN_SHEET else []),
             *([sheet_payload_d433()] if _INCLUDE_D433_MARGIN_SHEET else []),
+            *([sheet_payload_d434()] if _INCLUDE_D434_CONTRACT_SHEET else []),
         ],
         "review": {
             "entry_id": ENTRY_ID,
@@ -1611,6 +1634,11 @@ def build_combined_store_projection(
         if _INCLUDE_D433_MARGIN_SHEET
         else []
     )
+    d434_projs = (
+        [build_store_projection_d434(payloads.get(STORE_ITEM_ID_D434, {}), contract=contract, limits=limits)]
+        if _INCLUDE_D434_CONTRACT_SHEET
+        else []
+    )
     # D4-25/26/27/28 IPO 检查表追加受管 sheet（空载荷时安全返回空投影）。
     inspection_projs = [
         build_inspection_store_projection(
@@ -1634,7 +1662,7 @@ def build_combined_store_projection(
     values.update(right.values)
     values.update(groups.values)
     values.update(fixed.values)
-    for proj in (d421, d422, d423, d424, d435, d41, d49, *ipo_checklist_projs, *inspection_projs, *interview_projs, *d46_projs, *d417_projs, *d418_projs, *d419_projs, *d411_projs, *d410_projs, *d420_projs, *d433_projs):
+    for proj in (d421, d422, d423, d424, d435, d41, d49, *ipo_checklist_projs, *inspection_projs, *interview_projs, *d46_projs, *d417_projs, *d418_projs, *d419_projs, *d411_projs, *d410_projs, *d420_projs, *d433_projs, *d434_projs):
         values.update(proj.values)
     if d429 is not None:
         values.update(d429.values)
@@ -1661,6 +1689,7 @@ def build_combined_store_projection(
         **{k: v for p in d410_projs for k, v in dict(p.row_keys).items()},
         **{k: v for p in d420_projs for k, v in dict(p.row_keys).items()},
         **{k: v for p in d433_projs for k, v in dict(p.row_keys).items()},
+        **{k: v for p in d434_projs for k, v in dict(p.row_keys).items()},
     }
     return Projection(
         contract_id=contract.contract_id,
@@ -1855,6 +1884,12 @@ STORE_ITEM_ID_D49_DICT: Final[str] = STORE_ITEM_ID_D49
 #: 避免对未进契约的 D4-33 空投影误写空 store。
 if _INCLUDE_D433_MARGIN_SHEET:
     STORE_ITEM_ID_D433_DICT: Final[str] = STORE_ITEM_ID_D433
+
+#: D4-34 store item（dict 形态 {rentals[],consults[]}，双区非行数组）。同 D4-9：**在** STORE_ITEM_IDS
+#: 里（combined projection），但 oo_to_html 镜像走专用 dict 块（3-tuple 门面 merge_d434_from_projection），
+#: **不进** merge_projection_into_all_d4_stores 的 rows 4-tuple 循环。仅 flag 开时导出（block hasattr 判定）。
+if _INCLUDE_D434_CONTRACT_SHEET:
+    STORE_ITEM_ID_D434_DICT: Final[str] = STORE_ITEM_ID_D434
 
 
 def merge_d49_from_projection(
