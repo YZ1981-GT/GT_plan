@@ -7,7 +7,7 @@
     "excel_table",
     "hidden_uuid_column"
   ],
-  "instrumentation_definition_sha256": "db4a51b512cfdf73b4eb72c10d9294c090800473fe16d7056db57773d115c476",
+  "instrumentation_definition_sha256": "6afbc2fd21c573b7b990c2c97ce9d0bd767e385e3c2dd1f388a7db088c94f2c0",
   "review": {
     "authority_root": "backend/wp_templates",
     "entry_id": "xlsx/gt-d4-operating-revenue",
@@ -6537,6 +6537,748 @@
         }
       ],
       "template_id": "D410"
+    },
+    {
+      "excel_name": "销售退货检查表 D4-20",
+      "locator": {
+        "anchor": "excel_table_sheet_association"
+      },
+      "sheet_key": "d420-managed",
+      "tables": [
+        {
+          "anchor": "A13",
+          "fields": [
+            {
+              "cell": {
+                "column": "B",
+                "row_from": 15
+              },
+              "column_key": "current_return_0",
+              "header_source_ref": "源xlsx!销售退货检查表 D4-20!B14",
+              "header_text": "本期退货金额",
+              "json_pointer": "/0/currentReturn",
+              "mode": "editable",
+              "source_ref": "源xlsx!销售退货检查表 D4-20!B15",
+              "stable_field_key": "d4_20_summary/row0/current_return",
+              "store_item_id": "D4-20-summary",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "C",
+                "row_from": 15
+              },
+              "column_key": "current_revenue_0",
+              "header_source_ref": "源xlsx!销售退货检查表 D4-20!C14",
+              "header_text": "本期收入金额",
+              "json_pointer": "/0/currentRevenue",
+              "mode": "editable",
+              "source_ref": "源xlsx!销售退货检查表 D4-20!C15",
+              "stable_field_key": "d4_20_summary/row0/current_revenue",
+              "store_item_id": "D4-20-summary",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "E",
+                "row_from": 15
+              },
+              "column_key": "prior_return_0",
+              "header_source_ref": "源xlsx!销售退货检查表 D4-20!E14",
+              "header_text": "上期退货金额",
+              "json_pointer": "/0/priorReturn",
+              "mode": "editable",
+              "source_ref": "源xlsx!销售退货检查表 D4-20!E15",
+              "stable_field_key": "d4_20_summary/row0/prior_return",
+              "store_item_id": "D4-20-summary",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "F",
+                "row_from": 15
+              },
+              "column_key": "prior_revenue_0",
+              "header_source_ref": "源xlsx!销售退货检查表 D4-20!F14",
+              "header_text": "上期收入金额",
+              "json_pointer": "/0/priorRevenue",
+              "mode": "editable",
+              "source_ref": "源xlsx!销售退货检查表 D4-20!F15",
+              "stable_field_key": "d4_20_summary/row0/prior_revenue",
+              "store_item_id": "D4-20-summary",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "B",
+                "row_from": 16
+              },
+              "column_key": "current_return_1",
+              "header_source_ref": "源xlsx!销售退货检查表 D4-20!B14",
+              "header_text": "本期退货金额",
+              "json_pointer": "/1/currentReturn",
+              "mode": "editable",
+              "source_ref": "源xlsx!销售退货检查表 D4-20!B16",
+              "stable_field_key": "d4_20_summary/row1/current_return",
+              "store_item_id": "D4-20-summary",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "C",
+                "row_from": 16
+              },
+              "column_key": "current_revenue_1",
+              "header_source_ref": "源xlsx!销售退货检查表 D4-20!C14",
+              "header_text": "本期收入金额",
+              "json_pointer": "/1/currentRevenue",
+              "mode": "editable",
+              "source_ref": "源xlsx!销售退货检查表 D4-20!C16",
+              "stable_field_key": "d4_20_summary/row1/current_revenue",
+              "store_item_id": "D4-20-summary",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "E",
+                "row_from": 16
+              },
+              "column_key": "prior_return_1",
+              "header_source_ref": "源xlsx!销售退货检查表 D4-20!E14",
+              "header_text": "上期退货金额",
+              "json_pointer": "/1/priorReturn",
+              "mode": "editable",
+              "source_ref": "源xlsx!销售退货检查表 D4-20!E16",
+              "stable_field_key": "d4_20_summary/row1/prior_return",
+              "store_item_id": "D4-20-summary",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "F",
+                "row_from": 16
+              },
+              "column_key": "prior_revenue_1",
+              "header_source_ref": "源xlsx!销售退货检查表 D4-20!F14",
+              "header_text": "上期收入金额",
+              "json_pointer": "/1/priorRevenue",
+              "mode": "editable",
+              "source_ref": "源xlsx!销售退货检查表 D4-20!F16",
+              "stable_field_key": "d4_20_summary/row1/prior_revenue",
+              "store_item_id": "D4-20-summary",
+              "value_type": "amount"
+            }
+          ],
+          "formula_mask": [
+            "D15",
+            "G15",
+            "D16",
+            "G16",
+            "B17",
+            "C17",
+            "D17",
+            "E17",
+            "F17",
+            "G17"
+          ],
+          "header_rows": 2,
+          "table_key": "d4_20_summary"
+        },
+        {
+          "anchor": "A24",
+          "delete_policy": "tombstone",
+          "fields": [
+            {
+              "cell": {
+                "column": "A",
+                "row_from": "row_identity"
+              },
+              "column_key": "product_name",
+              "header_source_ref": "源xlsx!销售退货检查表 D4-20!A24",
+              "header_text": "产品名称",
+              "json_pointer": "/rows/{row_uuid}/productName",
+              "mode": "editable",
+              "source_ref": "源xlsx!销售退货检查表 D4-20!A25",
+              "stable_field_key": "d4_20_provision/{row_uuid}/product_name",
+              "store_item_id": "D4-20-provision",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "B",
+                "row_from": "row_identity"
+              },
+              "column_key": "base",
+              "header_source_ref": "源xlsx!销售退货检查表 D4-20!B24",
+              "header_text": "计提基数",
+              "json_pointer": "/rows/{row_uuid}/base",
+              "mode": "editable",
+              "source_ref": "源xlsx!销售退货检查表 D4-20!B25",
+              "stable_field_key": "d4_20_provision/{row_uuid}/base",
+              "store_item_id": "D4-20-provision",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "C",
+                "row_from": "row_identity"
+              },
+              "column_key": "rate",
+              "header_source_ref": "源xlsx!销售退货检查表 D4-20!C24",
+              "header_text": "计提比例",
+              "json_pointer": "/rows/{row_uuid}/rate",
+              "mode": "editable",
+              "source_ref": "源xlsx!销售退货检查表 D4-20!C25",
+              "stable_field_key": "d4_20_provision/{row_uuid}/rate",
+              "store_item_id": "D4-20-provision",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "E",
+                "row_from": "row_identity"
+              },
+              "column_key": "already_provided",
+              "header_source_ref": "源xlsx!销售退货检查表 D4-20!E24",
+              "header_text": "账面已计提金额",
+              "json_pointer": "/rows/{row_uuid}/alreadyProvided",
+              "mode": "editable",
+              "source_ref": "源xlsx!销售退货检查表 D4-20!E25",
+              "stable_field_key": "d4_20_provision/{row_uuid}/already_provided",
+              "store_item_id": "D4-20-provision",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "G",
+                "row_from": "row_identity"
+              },
+              "column_key": "diff_reason",
+              "header_source_ref": "源xlsx!销售退货检查表 D4-20!G24",
+              "header_text": "差异原因",
+              "json_pointer": "/rows/{row_uuid}/diffReason",
+              "mode": "editable",
+              "source_ref": "源xlsx!销售退货检查表 D4-20!G25",
+              "stable_field_key": "d4_20_provision/{row_uuid}/diff_reason",
+              "store_item_id": "D4-20-provision",
+              "value_type": "text"
+            }
+          ],
+          "footer_anchor": {
+            "carries_total_formula": false,
+            "marker": "5.检查本期产品退货情况",
+            "search_column": "A"
+          },
+          "formula_mask": [
+            "D25",
+            "F25",
+            "D26",
+            "F26",
+            "D27",
+            "F27",
+            "D28",
+            "F28",
+            "D29",
+            "F29"
+          ],
+          "header_rows": 1,
+          "row_identity": {
+            "json_pointer": "/rows/*/id",
+            "kind": "field"
+          },
+          "table_key": "d4_20_provision",
+          "uuid_col": "H"
+        },
+        {
+          "anchor": "A33",
+          "delete_policy": "tombstone",
+          "fields": [
+            {
+              "cell": {
+                "column": "A",
+                "row_from": "row_identity"
+              },
+              "column_key": "voucher_date",
+              "header_source_ref": "源xlsx!销售退货检查表 D4-20!A33",
+              "header_text": "记账凭证日期",
+              "json_pointer": "/rows/{row_uuid}/voucherDate",
+              "mode": "editable",
+              "source_ref": "源xlsx!销售退货检查表 D4-20!A34",
+              "stable_field_key": "d4_20_current_returns/{row_uuid}/voucher_date",
+              "store_item_id": "D4-20-current-returns",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "B",
+                "row_from": "row_identity"
+              },
+              "column_key": "voucher_no",
+              "header_source_ref": "源xlsx!销售退货检查表 D4-20!B33",
+              "header_text": "记账凭证编号",
+              "json_pointer": "/rows/{row_uuid}/voucherNo",
+              "mode": "editable",
+              "source_ref": "源xlsx!销售退货检查表 D4-20!B34",
+              "stable_field_key": "d4_20_current_returns/{row_uuid}/voucher_no",
+              "store_item_id": "D4-20-current-returns",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "C",
+                "row_from": "row_identity"
+              },
+              "column_key": "biz_content",
+              "header_source_ref": "源xlsx!销售退货检查表 D4-20!C33",
+              "header_text": "业务内容",
+              "json_pointer": "/rows/{row_uuid}/bizContent",
+              "mode": "editable",
+              "source_ref": "源xlsx!销售退货检查表 D4-20!C34",
+              "stable_field_key": "d4_20_current_returns/{row_uuid}/biz_content",
+              "store_item_id": "D4-20-current-returns",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "D",
+                "row_from": "row_identity"
+              },
+              "column_key": "subject_name",
+              "header_source_ref": "源xlsx!销售退货检查表 D4-20!D33",
+              "header_text": "科目名称",
+              "json_pointer": "/rows/{row_uuid}/subjectName",
+              "mode": "editable",
+              "source_ref": "源xlsx!销售退货检查表 D4-20!D34",
+              "stable_field_key": "d4_20_current_returns/{row_uuid}/subject_name",
+              "store_item_id": "D4-20-current-returns",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "E",
+                "row_from": "row_identity"
+              },
+              "column_key": "detail_subject",
+              "header_source_ref": "源xlsx!销售退货检查表 D4-20!E33",
+              "header_text": "二级明细",
+              "json_pointer": "/rows/{row_uuid}/detailSubject",
+              "mode": "editable",
+              "source_ref": "源xlsx!销售退货检查表 D4-20!E34",
+              "stable_field_key": "d4_20_current_returns/{row_uuid}/detail_subject",
+              "store_item_id": "D4-20-current-returns",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "F",
+                "row_from": "row_identity"
+              },
+              "column_key": "debit_amount",
+              "header_source_ref": "源xlsx!销售退货检查表 D4-20!F33",
+              "header_text": "借方金额",
+              "json_pointer": "/rows/{row_uuid}/debitAmount",
+              "mode": "editable",
+              "source_ref": "源xlsx!销售退货检查表 D4-20!F34",
+              "stable_field_key": "d4_20_current_returns/{row_uuid}/debit_amount",
+              "store_item_id": "D4-20-current-returns",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "G",
+                "row_from": "row_identity"
+              },
+              "column_key": "credit_amount",
+              "header_source_ref": "源xlsx!销售退货检查表 D4-20!G33",
+              "header_text": "贷方金额",
+              "json_pointer": "/rows/{row_uuid}/creditAmount",
+              "mode": "editable",
+              "source_ref": "源xlsx!销售退货检查表 D4-20!G34",
+              "stable_field_key": "d4_20_current_returns/{row_uuid}/credit_amount",
+              "store_item_id": "D4-20-current-returns",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "H",
+                "row_from": "row_identity"
+              },
+              "column_key": "customer_name",
+              "header_source_ref": "源xlsx!销售退货检查表 D4-20!H33",
+              "header_text": "客户名称",
+              "json_pointer": "/rows/{row_uuid}/customerName",
+              "mode": "editable",
+              "source_ref": "源xlsx!销售退货检查表 D4-20!H34",
+              "stable_field_key": "d4_20_current_returns/{row_uuid}/customer_name",
+              "store_item_id": "D4-20-current-returns",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "I",
+                "row_from": "row_identity"
+              },
+              "column_key": "product_name",
+              "header_source_ref": "源xlsx!销售退货检查表 D4-20!I33",
+              "header_text": "产品名称",
+              "json_pointer": "/rows/{row_uuid}/productName",
+              "mode": "editable",
+              "source_ref": "源xlsx!销售退货检查表 D4-20!I34",
+              "stable_field_key": "d4_20_current_returns/{row_uuid}/product_name",
+              "store_item_id": "D4-20-current-returns",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "J",
+                "row_from": "row_identity"
+              },
+              "column_key": "return_qty",
+              "header_source_ref": "源xlsx!销售退货检查表 D4-20!J33",
+              "header_text": "退货数量",
+              "json_pointer": "/rows/{row_uuid}/returnQty",
+              "mode": "editable",
+              "source_ref": "源xlsx!销售退货检查表 D4-20!J34",
+              "stable_field_key": "d4_20_current_returns/{row_uuid}/return_qty",
+              "store_item_id": "D4-20-current-returns",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "K",
+                "row_from": "row_identity"
+              },
+              "column_key": "return_amount",
+              "header_source_ref": "源xlsx!销售退货检查表 D4-20!K33",
+              "header_text": "退货金额",
+              "json_pointer": "/rows/{row_uuid}/returnAmount",
+              "mode": "editable",
+              "source_ref": "源xlsx!销售退货检查表 D4-20!K34",
+              "stable_field_key": "d4_20_current_returns/{row_uuid}/return_amount",
+              "store_item_id": "D4-20-current-returns",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "L",
+                "row_from": "row_identity"
+              },
+              "column_key": "return_reason",
+              "header_source_ref": "源xlsx!销售退货检查表 D4-20!L33",
+              "header_text": "退货原因",
+              "json_pointer": "/rows/{row_uuid}/returnReason",
+              "mode": "editable",
+              "source_ref": "源xlsx!销售退货检查表 D4-20!L34",
+              "stable_field_key": "d4_20_current_returns/{row_uuid}/return_reason",
+              "store_item_id": "D4-20-current-returns",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "M",
+                "row_from": "row_identity"
+              },
+              "column_key": "has_litigation",
+              "header_source_ref": "源xlsx!销售退货检查表 D4-20!M33",
+              "header_text": "是否涉及诉讼",
+              "json_pointer": "/rows/{row_uuid}/hasLitigation",
+              "mode": "editable",
+              "source_ref": "源xlsx!销售退货检查表 D4-20!M34",
+              "stable_field_key": "d4_20_current_returns/{row_uuid}/has_litigation",
+              "store_item_id": "D4-20-current-returns",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "N",
+                "row_from": "row_identity"
+              },
+              "column_key": "is_abnormal",
+              "header_source_ref": "源xlsx!销售退货检查表 D4-20!N33",
+              "header_text": "是否异常",
+              "json_pointer": "/rows/{row_uuid}/isAbnormal",
+              "mode": "editable",
+              "source_ref": "源xlsx!销售退货检查表 D4-20!N34",
+              "stable_field_key": "d4_20_current_returns/{row_uuid}/is_abnormal",
+              "store_item_id": "D4-20-current-returns",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "O",
+                "row_from": "row_identity"
+              },
+              "column_key": "index_ref",
+              "header_source_ref": "源xlsx!销售退货检查表 D4-20!O33",
+              "header_text": "索引号",
+              "json_pointer": "/rows/{row_uuid}/indexRef",
+              "mode": "editable",
+              "source_ref": "源xlsx!销售退货检查表 D4-20!O34",
+              "stable_field_key": "d4_20_current_returns/{row_uuid}/index_ref",
+              "store_item_id": "D4-20-current-returns",
+              "value_type": "text"
+            }
+          ],
+          "footer_anchor": {
+            "carries_total_formula": false,
+            "marker": "6.检查期后产品退货情况",
+            "search_column": "A"
+          },
+          "formula_mask": [],
+          "header_rows": 1,
+          "row_identity": {
+            "json_pointer": "/rows/*/id",
+            "kind": "field"
+          },
+          "table_key": "d4_20_current_returns",
+          "uuid_col": "P"
+        },
+        {
+          "anchor": "A39",
+          "delete_policy": "tombstone",
+          "fields": [
+            {
+              "cell": {
+                "column": "A",
+                "row_from": "row_identity"
+              },
+              "column_key": "voucher_date",
+              "header_source_ref": "源xlsx!销售退货检查表 D4-20!A39",
+              "header_text": "记账凭证日期",
+              "json_pointer": "/rows/{row_uuid}/voucherDate",
+              "mode": "editable",
+              "source_ref": "源xlsx!销售退货检查表 D4-20!A40",
+              "stable_field_key": "d4_20_post_returns/{row_uuid}/voucher_date",
+              "store_item_id": "D4-20-post-returns",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "B",
+                "row_from": "row_identity"
+              },
+              "column_key": "voucher_no",
+              "header_source_ref": "源xlsx!销售退货检查表 D4-20!B39",
+              "header_text": "记账凭证编号",
+              "json_pointer": "/rows/{row_uuid}/voucherNo",
+              "mode": "editable",
+              "source_ref": "源xlsx!销售退货检查表 D4-20!B40",
+              "stable_field_key": "d4_20_post_returns/{row_uuid}/voucher_no",
+              "store_item_id": "D4-20-post-returns",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "C",
+                "row_from": "row_identity"
+              },
+              "column_key": "biz_content",
+              "header_source_ref": "源xlsx!销售退货检查表 D4-20!C39",
+              "header_text": "业务内容",
+              "json_pointer": "/rows/{row_uuid}/bizContent",
+              "mode": "editable",
+              "source_ref": "源xlsx!销售退货检查表 D4-20!C40",
+              "stable_field_key": "d4_20_post_returns/{row_uuid}/biz_content",
+              "store_item_id": "D4-20-post-returns",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "D",
+                "row_from": "row_identity"
+              },
+              "column_key": "subject_name",
+              "header_source_ref": "源xlsx!销售退货检查表 D4-20!D39",
+              "header_text": "科目名称",
+              "json_pointer": "/rows/{row_uuid}/subjectName",
+              "mode": "editable",
+              "source_ref": "源xlsx!销售退货检查表 D4-20!D40",
+              "stable_field_key": "d4_20_post_returns/{row_uuid}/subject_name",
+              "store_item_id": "D4-20-post-returns",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "E",
+                "row_from": "row_identity"
+              },
+              "column_key": "detail_subject",
+              "header_source_ref": "源xlsx!销售退货检查表 D4-20!E39",
+              "header_text": "二级明细",
+              "json_pointer": "/rows/{row_uuid}/detailSubject",
+              "mode": "editable",
+              "source_ref": "源xlsx!销售退货检查表 D4-20!E40",
+              "stable_field_key": "d4_20_post_returns/{row_uuid}/detail_subject",
+              "store_item_id": "D4-20-post-returns",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "F",
+                "row_from": "row_identity"
+              },
+              "column_key": "debit_amount",
+              "header_source_ref": "源xlsx!销售退货检查表 D4-20!F39",
+              "header_text": "借方金额",
+              "json_pointer": "/rows/{row_uuid}/debitAmount",
+              "mode": "editable",
+              "source_ref": "源xlsx!销售退货检查表 D4-20!F40",
+              "stable_field_key": "d4_20_post_returns/{row_uuid}/debit_amount",
+              "store_item_id": "D4-20-post-returns",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "G",
+                "row_from": "row_identity"
+              },
+              "column_key": "credit_amount",
+              "header_source_ref": "源xlsx!销售退货检查表 D4-20!G39",
+              "header_text": "贷方金额",
+              "json_pointer": "/rows/{row_uuid}/creditAmount",
+              "mode": "editable",
+              "source_ref": "源xlsx!销售退货检查表 D4-20!G40",
+              "stable_field_key": "d4_20_post_returns/{row_uuid}/credit_amount",
+              "store_item_id": "D4-20-post-returns",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "H",
+                "row_from": "row_identity"
+              },
+              "column_key": "customer_name",
+              "header_source_ref": "源xlsx!销售退货检查表 D4-20!H39",
+              "header_text": "客户名称",
+              "json_pointer": "/rows/{row_uuid}/customerName",
+              "mode": "editable",
+              "source_ref": "源xlsx!销售退货检查表 D4-20!H40",
+              "stable_field_key": "d4_20_post_returns/{row_uuid}/customer_name",
+              "store_item_id": "D4-20-post-returns",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "I",
+                "row_from": "row_identity"
+              },
+              "column_key": "product_name",
+              "header_source_ref": "源xlsx!销售退货检查表 D4-20!I39",
+              "header_text": "产品名称",
+              "json_pointer": "/rows/{row_uuid}/productName",
+              "mode": "editable",
+              "source_ref": "源xlsx!销售退货检查表 D4-20!I40",
+              "stable_field_key": "d4_20_post_returns/{row_uuid}/product_name",
+              "store_item_id": "D4-20-post-returns",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "J",
+                "row_from": "row_identity"
+              },
+              "column_key": "return_qty",
+              "header_source_ref": "源xlsx!销售退货检查表 D4-20!J39",
+              "header_text": "退货数量",
+              "json_pointer": "/rows/{row_uuid}/returnQty",
+              "mode": "editable",
+              "source_ref": "源xlsx!销售退货检查表 D4-20!J40",
+              "stable_field_key": "d4_20_post_returns/{row_uuid}/return_qty",
+              "store_item_id": "D4-20-post-returns",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "K",
+                "row_from": "row_identity"
+              },
+              "column_key": "return_amount",
+              "header_source_ref": "源xlsx!销售退货检查表 D4-20!K39",
+              "header_text": "退货金额",
+              "json_pointer": "/rows/{row_uuid}/returnAmount",
+              "mode": "editable",
+              "source_ref": "源xlsx!销售退货检查表 D4-20!K40",
+              "stable_field_key": "d4_20_post_returns/{row_uuid}/return_amount",
+              "store_item_id": "D4-20-post-returns",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "L",
+                "row_from": "row_identity"
+              },
+              "column_key": "return_reason",
+              "header_source_ref": "源xlsx!销售退货检查表 D4-20!L39",
+              "header_text": "退货原因",
+              "json_pointer": "/rows/{row_uuid}/returnReason",
+              "mode": "editable",
+              "source_ref": "源xlsx!销售退货检查表 D4-20!L40",
+              "stable_field_key": "d4_20_post_returns/{row_uuid}/return_reason",
+              "store_item_id": "D4-20-post-returns",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "M",
+                "row_from": "row_identity"
+              },
+              "column_key": "has_litigation",
+              "header_source_ref": "源xlsx!销售退货检查表 D4-20!M39",
+              "header_text": "是否涉及诉讼",
+              "json_pointer": "/rows/{row_uuid}/hasLitigation",
+              "mode": "editable",
+              "source_ref": "源xlsx!销售退货检查表 D4-20!M40",
+              "stable_field_key": "d4_20_post_returns/{row_uuid}/has_litigation",
+              "store_item_id": "D4-20-post-returns",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "N",
+                "row_from": "row_identity"
+              },
+              "column_key": "is_abnormal",
+              "header_source_ref": "源xlsx!销售退货检查表 D4-20!N39",
+              "header_text": "是否异常",
+              "json_pointer": "/rows/{row_uuid}/isAbnormal",
+              "mode": "editable",
+              "source_ref": "源xlsx!销售退货检查表 D4-20!N40",
+              "stable_field_key": "d4_20_post_returns/{row_uuid}/is_abnormal",
+              "store_item_id": "D4-20-post-returns",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "O",
+                "row_from": "row_identity"
+              },
+              "column_key": "index_ref",
+              "header_source_ref": "源xlsx!销售退货检查表 D4-20!O39",
+              "header_text": "索引号",
+              "json_pointer": "/rows/{row_uuid}/indexRef",
+              "mode": "editable",
+              "source_ref": "源xlsx!销售退货检查表 D4-20!O40",
+              "stable_field_key": "d4_20_post_returns/{row_uuid}/index_ref",
+              "store_item_id": "D4-20-post-returns",
+              "value_type": "text"
+            }
+          ],
+          "footer_anchor": {
+            "carries_total_formula": false,
+            "marker": "检查内容说明：",
+            "search_column": "A"
+          },
+          "formula_mask": [],
+          "header_rows": 1,
+          "row_identity": {
+            "json_pointer": "/rows/*/id",
+            "kind": "field"
+          },
+          "table_key": "d4_20_post_returns",
+          "uuid_col": "Q"
+        }
+      ],
+      "template_id": "D420"
     }
   ],
   "template": {
