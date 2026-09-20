@@ -1,0 +1,612 @@
+{
+  "template": "backend/wp_templates/D/D4-13至D4-20主营业务收入-检查（Leap应对措施-检查）.xlsx",
+  "sheet": "营业收入发生检查表D4-14",
+  "dims": "A1:AK52",
+  "max_row": 52,
+  "max_col": 37,
+  "max_col_letter": "AK",
+  "header_r13_r14": [
+    {
+      "col": "A",
+      "col_idx": 1,
+      "r13_group": "序号",
+      "r14_field": null
+    },
+    {
+      "col": "B",
+      "col_idx": 2,
+      "r13_group": "记账凭证",
+      "r14_field": "客户名称"
+    },
+    {
+      "col": "C",
+      "col_idx": 3,
+      "r13_group": null,
+      "r14_field": "日期"
+    },
+    {
+      "col": "D",
+      "col_idx": 4,
+      "r13_group": null,
+      "r14_field": "编号"
+    },
+    {
+      "col": "E",
+      "col_idx": 5,
+      "r13_group": null,
+      "r14_field": "品名"
+    },
+    {
+      "col": "F",
+      "col_idx": 6,
+      "r13_group": null,
+      "r14_field": "数量"
+    },
+    {
+      "col": "G",
+      "col_idx": 7,
+      "r13_group": null,
+      "r14_field": "金额"
+    },
+    {
+      "col": "H",
+      "col_idx": 8,
+      "r13_group": "销售合同/销售订单",
+      "r14_field": "日期"
+    },
+    {
+      "col": "I",
+      "col_idx": 9,
+      "r13_group": null,
+      "r14_field": "合同号/订单号"
+    },
+    {
+      "col": "J",
+      "col_idx": 10,
+      "r13_group": "出库单",
+      "r14_field": "日期"
+    },
+    {
+      "col": "K",
+      "col_idx": 11,
+      "r13_group": null,
+      "r14_field": "编号"
+    },
+    {
+      "col": "L",
+      "col_idx": 12,
+      "r13_group": null,
+      "r14_field": "品名"
+    },
+    {
+      "col": "M",
+      "col_idx": 13,
+      "r13_group": null,
+      "r14_field": "数量"
+    },
+    {
+      "col": "N",
+      "col_idx": 14,
+      "r13_group": "仓库保管员",
+      "r14_field": null
+    },
+    {
+      "col": "O",
+      "col_idx": 15,
+      "r13_group": "发货审批人",
+      "r14_field": null
+    },
+    {
+      "col": "P",
+      "col_idx": 16,
+      "r13_group": "运输单",
+      "r14_field": "日期"
+    },
+    {
+      "col": "Q",
+      "col_idx": 17,
+      "r13_group": null,
+      "r14_field": "编号"
+    },
+    {
+      "col": "R",
+      "col_idx": 18,
+      "r13_group": null,
+      "r14_field": "运输数量"
+    },
+    {
+      "col": "S",
+      "col_idx": 19,
+      "r13_group": null,
+      "r14_field": "运输公司"
+    },
+    {
+      "col": "T",
+      "col_idx": 20,
+      "r13_group": null,
+      "r14_field": "运输地址"
+    },
+    {
+      "col": "U",
+      "col_idx": 21,
+      "r13_group": "签收单",
+      "r14_field": "日期"
+    },
+    {
+      "col": "V",
+      "col_idx": 22,
+      "r13_group": null,
+      "r14_field": "品名"
+    },
+    {
+      "col": "W",
+      "col_idx": 23,
+      "r13_group": null,
+      "r14_field": "数量"
+    },
+    {
+      "col": "X",
+      "col_idx": 24,
+      "r13_group": null,
+      "r14_field": "金额"
+    },
+    {
+      "col": "Y",
+      "col_idx": 25,
+      "r13_group": null,
+      "r14_field": "签收人"
+    },
+    {
+      "col": "Z",
+      "col_idx": 26,
+      "r13_group": null,
+      "r14_field": "盖章类型"
+    },
+    {
+      "col": "AA",
+      "col_idx": 27,
+      "r13_group": null,
+      "r14_field": "盖章单位"
+    },
+    {
+      "col": "AB",
+      "col_idx": 28,
+      "r13_group": "发票",
+      "r14_field": "日期"
+    },
+    {
+      "col": "AC",
+      "col_idx": 29,
+      "r13_group": null,
+      "r14_field": "编号"
+    },
+    {
+      "col": "AD",
+      "col_idx": 30,
+      "r13_group": null,
+      "r14_field": "品名"
+    },
+    {
+      "col": "AE",
+      "col_idx": 31,
+      "r13_group": null,
+      "r14_field": "数量"
+    },
+    {
+      "col": "AF",
+      "col_idx": 32,
+      "r13_group": null,
+      "r14_field": "金额"
+    },
+    {
+      "col": "AG",
+      "col_idx": 33,
+      "r13_group": "……",
+      "r14_field": "……"
+    },
+    {
+      "col": "AH",
+      "col_idx": 34,
+      "r13_group": null,
+      "r14_field": "……"
+    },
+    {
+      "col": "AI",
+      "col_idx": 35,
+      "r13_group": "其他支持性文件或说明",
+      "r14_field": null
+    },
+    {
+      "col": "AJ",
+      "col_idx": 36,
+      "r13_group": "索引号",
+      "r14_field": null
+    },
+    {
+      "col": "AK",
+      "col_idx": 37,
+      "r13_group": "是否异常",
+      "r14_field": null
+    }
+  ],
+  "col_a_scan_1_55": [
+    {
+      "row": 1,
+      "col_a": "致同会计师事务所"
+    },
+    {
+      "row": 2,
+      "col_a": "营业收入发生检查表"
+    },
+    {
+      "row": 3,
+      "col_a": "=底稿目录!A2"
+    },
+    {
+      "row": 4,
+      "col_a": "=底稿目录!A3"
+    },
+    {
+      "row": 5,
+      "col_a": "一、审计目标："
+    },
+    {
+      "row": 6,
+      "col_a": "1.利润表中记录的营业收入已发生，且与被审计单位有关；2.与营业收入有关的金额及其他数据已恰当记录，相关披露已得到恰当计量和描述；3.与营业收入有关的交易和事项已记录于正确的会计期间。"
+    },
+    {
+      "row": 7,
+      "col_a": "二、样本选取标准与规模："
+    },
+    {
+      "row": 8,
+      "col_a": "测试总体："
+    },
+    {
+      "row": 9,
+      "col_a": "抽样总体："
+    },
+    {
+      "row": 10,
+      "col_a": "抽样方法："
+    },
+    {
+      "row": 11,
+      "col_a": "三、测试："
+    },
+    {
+      "row": 12,
+      "col_a": null
+    },
+    {
+      "row": 13,
+      "col_a": "序号"
+    },
+    {
+      "row": 14,
+      "col_a": null
+    },
+    {
+      "row": 15,
+      "col_a": null
+    },
+    {
+      "row": 16,
+      "col_a": null
+    },
+    {
+      "row": 17,
+      "col_a": null
+    },
+    {
+      "row": 18,
+      "col_a": null
+    },
+    {
+      "row": 19,
+      "col_a": null
+    },
+    {
+      "row": 20,
+      "col_a": null
+    },
+    {
+      "row": 21,
+      "col_a": null
+    },
+    {
+      "row": 22,
+      "col_a": null
+    },
+    {
+      "row": 23,
+      "col_a": null
+    },
+    {
+      "row": 24,
+      "col_a": null
+    },
+    {
+      "row": 25,
+      "col_a": null
+    },
+    {
+      "row": 26,
+      "col_a": null
+    },
+    {
+      "row": 27,
+      "col_a": null
+    },
+    {
+      "row": 28,
+      "col_a": null
+    },
+    {
+      "row": 29,
+      "col_a": null
+    },
+    {
+      "row": 30,
+      "col_a": null
+    },
+    {
+      "row": 31,
+      "col_a": null
+    },
+    {
+      "row": 32,
+      "col_a": null
+    },
+    {
+      "row": 33,
+      "col_a": null
+    },
+    {
+      "row": 34,
+      "col_a": null
+    },
+    {
+      "row": 35,
+      "col_a": null
+    },
+    {
+      "row": 36,
+      "col_a": null
+    },
+    {
+      "row": 37,
+      "col_a": "合计"
+    },
+    {
+      "row": 38,
+      "col_a": "本期发生额"
+    },
+    {
+      "row": 39,
+      "col_a": "检查比例"
+    },
+    {
+      "row": 40,
+      "col_a": "四、审计说明："
+    },
+    {
+      "row": 41,
+      "col_a": "1.如果检查比例较低应扩大检查样本量或说明原因"
+    },
+    {
+      "row": 42,
+      "col_a": null
+    },
+    {
+      "row": 43,
+      "col_a": null
+    },
+    {
+      "row": 44,
+      "col_a": "五、审计结论："
+    },
+    {
+      "row": 45,
+      "col_a": null
+    },
+    {
+      "row": 46,
+      "col_a": null
+    },
+    {
+      "row": 47,
+      "col_a": null
+    },
+    {
+      "row": 48,
+      "col_a": "提示1：项目组应根据被审计单位业务特点确定应检查的收入确认依据以及检查要点，例如出口收入确认依据一般还包括报关单、提单等，工程施工收入确认依据一般包括进度审核单、竣工验收报告等。必要时，还应记录不同证据时间逻辑一致性检查。"
+    },
+    {
+      "row": 49,
+      "col_a": "提示2：根据《中国注册会计师审计准则问题解答第18号——识别和应对第三方配合实施财务舞弊》，项目组在检查收入发生时关注第三方配合虚假销售交易涉及的存货实物、交易单证票据和资金流转；例如，在虚假收入交易中的资金流转过程可能如下："
+    },
+    {
+      "row": 50,
+      "col_a": "（1）被审计单位通过虚假交易或虚增交易金额套取自有资金，或者为关联方违规提供担保、由该关联方取得金融机构借款，或者由关联方提供资金（参见《中国注册会计师审计准则问题解答第4号——收入确认》）。"
+    },
+    {
+      "row": 51,
+      "col_a": "（2）虚假交易对手或关联方将资金支付给被审计单位“客户”；为增加隐蔽性，也可能先将资金支付给“过桥”方，再由“过桥”方支付给“客户”。"
+    },
+    {
+      "row": 52,
+      "col_a": "（3）“客户”向被审计单位支付货款，形成虚假销售交易的资金闭环。"
+    }
+  ],
+  "total_marker_cells": [
+    {
+      "row": 37,
+      "col": "A"
+    }
+  ],
+  "formula_cells": [
+    {
+      "cell": "A3",
+      "formula": "=底稿目录!A2"
+    },
+    {
+      "cell": "H3",
+      "formula": "=底稿目录!A4"
+    },
+    {
+      "cell": "M3",
+      "formula": "=底稿目录!A5"
+    },
+    {
+      "cell": "T3",
+      "formula": "=底稿目录!F4"
+    },
+    {
+      "cell": "U3",
+      "formula": "=底稿目录!A2"
+    },
+    {
+      "cell": "Y3",
+      "formula": "=底稿目录!A4"
+    },
+    {
+      "cell": "AC3",
+      "formula": "=底稿目录!A5"
+    },
+    {
+      "cell": "AK3",
+      "formula": "=底稿目录!F4"
+    },
+    {
+      "cell": "A4",
+      "formula": "=底稿目录!A3"
+    },
+    {
+      "cell": "H4",
+      "formula": "=底稿目录!A6"
+    },
+    {
+      "cell": "M4",
+      "formula": "=底稿目录!A7"
+    },
+    {
+      "cell": "U4",
+      "formula": "=底稿目录!A3"
+    },
+    {
+      "cell": "Y4",
+      "formula": "=底稿目录!A6"
+    },
+    {
+      "cell": "AC4",
+      "formula": "=底稿目录!A7"
+    },
+    {
+      "cell": "G37",
+      "formula": "=SUM(G15:G36)"
+    },
+    {
+      "cell": "X37",
+      "formula": "=SUM(X15:X36)"
+    },
+    {
+      "cell": "AF37",
+      "formula": "=SUM(AF15:AF36)"
+    },
+    {
+      "cell": "G39",
+      "formula": "=G37/G38"
+    }
+  ],
+  "data_rows_15_36": [
+    {
+      "row": 15,
+      "non_empty": {}
+    },
+    {
+      "row": 16,
+      "non_empty": {}
+    },
+    {
+      "row": 17,
+      "non_empty": {}
+    },
+    {
+      "row": 18,
+      "non_empty": {}
+    },
+    {
+      "row": 19,
+      "non_empty": {}
+    },
+    {
+      "row": 20,
+      "non_empty": {}
+    },
+    {
+      "row": 21,
+      "non_empty": {}
+    },
+    {
+      "row": 22,
+      "non_empty": {}
+    },
+    {
+      "row": 23,
+      "non_empty": {}
+    },
+    {
+      "row": 24,
+      "non_empty": {}
+    },
+    {
+      "row": 25,
+      "non_empty": {}
+    },
+    {
+      "row": 26,
+      "non_empty": {}
+    },
+    {
+      "row": 27,
+      "non_empty": {}
+    },
+    {
+      "row": 28,
+      "non_empty": {}
+    },
+    {
+      "row": 29,
+      "non_empty": {}
+    },
+    {
+      "row": 30,
+      "non_empty": {}
+    },
+    {
+      "row": 31,
+      "non_empty": {}
+    },
+    {
+      "row": 32,
+      "non_empty": {}
+    },
+    {
+      "row": 33,
+      "non_empty": {}
+    },
+    {
+      "row": 34,
+      "non_empty": {}
+    },
+    {
+      "row": 35,
+      "non_empty": {}
+    },
+    {
+      "row": 36,
+      "non_empty": {}
+    }
+  ]
+}

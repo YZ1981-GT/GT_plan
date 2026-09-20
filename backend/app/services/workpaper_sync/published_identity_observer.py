@@ -1423,26 +1423,42 @@ def collect_workbook_structure(*, data, contract, sheet_anchors, context=None):
                         defined_name=anchor["defined_name"],
                     )
                     continue
-                from app.services.workpaper_sync import phase5_d4_29_customer_detail as d429
-                if key != d429.SHEET_KEY or anchor["defined_name"] != d429.DEFINED_NAME:
+                # 转置 anchor 泛化（spec d4-12-transposed-writeback）：按 sheet_key 从注册表
+                # 取命中的 TransposedSheetSpec（D4-29 / D4-12 …），几何全部读 spec，不硬编码。
+                from app.services.workpaper_sync.phase5_transposed_sheet import (
+                    resolve_managed_sheet as _transposed_resolve,
+                    extract_transposed_workbook as _transposed_extract,
+                )
+                from app.services.workpaper_sync.transposed_registry import spec_by_sheet_key
+                from openpyxl.utils import column_index_from_string as _col_idx
+
+                spec = spec_by_sheet_key(key)
+                if spec is None or anchor["defined_name"] != spec.defined_name:
                     raise ValueError("Unsupported transposed anchor")
-                _, ws = d429.resolve_managed_sheet(data, defined_name=anchor["defined_name"])
-                d429.extract_transposed_workbook(data)
+                # focused 契约（部分发布 / 测试）可能只声明部分转置 sheet：anchor 声明了但
+                # 本契约未含该 sheet declaration 时跳过（不在本次观测范围）。生产完整契约必
+                # 含所有 declaration，故 None 只在 focused 场景出现——不得 next() 无默认崩。
+                declaration = next(
+                    (s for s in contract.canonical_payload["sheets"] if s["sheet_key"] == key), None
+                )
+                if declaration is None:
+                    continue
+                _, ws = _transposed_resolve(data, spec=spec)
+                _transposed_extract(data, spec=spec)
                 physical[key] = ws.title
-                declaration = next(s for s in contract.canonical_payload["sheets"] if s["sheet_key"] == key)
+                first_col_letter = spec.first_entity_column
+                first_col_idx = _col_idx(first_col_letter)
                 fields = {}
                 for table in declaration["tables"]:
                     for field in table["fields"]:
                         row = field.get("transposed_row")
-                        if not isinstance(row, int) or not d429.HEADER_ROW <= row <= d429.LAST_FIELD_ROW:
+                        if not isinstance(row, int) or not spec.header_row <= row <= spec.last_field_row:
                             raise ValueError("Invalid transposed field row")
-                        # The definedName supplies the complete C:M geometry. Only the
-                        # anchor field cell must survive in the XML; trailing customer
-                        # columns may legitimately be absent when the current store has
-                        # fewer customers than the template width.
-                        if (row, 3) not in ws._cells:
+                        # definedName 提供完整实体列几何。仅 anchor 字段格（首实体列）须存活于
+                        # XML；当前 store 实体数少于模板宽度时尾随实体列可合法缺失。
+                        if (row, first_col_idx) not in ws._cells:
                             continue
-                        fields[field["stable_field_key"]] = ("C", row)
+                        fields[field["stable_field_key"]] = (first_col_letter, row)
                 transposed[key] = fields
                 continue
             # kind 分派收口（Requirement 5.1）：动态 Excel-Table anchor 由

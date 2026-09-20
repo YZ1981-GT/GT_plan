@@ -1,7 +1,7 @@
 # D4-1..36 双向回写逐张现状清册
 
 > **基线日期**：2026-09-19（表格/统计基线）
-> **最近更新**：2026-09-20（D4-1 同 sheet 双区双向落地 + 契约集合 15→16，见「增量更新」段）
+> **最近更新**：2026-09-21（现状核对：D4-1 owner spec 12/12 更正过时的 10/12；gap-closure spec Task 1 的 D4-8 HTML-only 裁定 + 138s materialize 阻塞两处过时表述已作废）
 > **目的**：为"逐张落地 D4 双向回写 + Playwright 验证"提供准确的起点清册。
 > **判据三维**（缺一不可，对齐主控文档 §6.4 `HOST-CONSUMES-UNIFIED-PATH`）：
 > 1. **owner spec** 进度（`.kiro/specs/*`）
@@ -100,7 +100,7 @@
 
 > 基线段（上方）保持 2026-09-19 快照不改；本段记录此后的真实推进，供逐张清册与统计段引用。
 
-- **D4-1 营业收入审定表：三维全绿（真双向）已落地**（commit `663c3f019`「feat(d4-1)：营业收入审定表同 sheet 双区双向回写 + 4 处共享内核缺口修复」）。owner spec `d4-1-adjudication-bidirectional-writeback-and-formula-io` = **10/12**（Task 1~10 全 `[x]`，仅 Task 11 e2e / Task 12 收口标 `[~]`，卡 start-dev.bat + 真实 OO 环境）。
+- **D4-1 营业收入审定表：三维全绿（真双向）已落地**（commit `663c3f019`「feat(d4-1)：营业收入审定表同 sheet 双区双向回写 + 4 处共享内核缺口修复」）。owner spec `d4-1-adjudication-bidirectional-writeback-and-formula-io` = **12/12**（🔴 更正：此前记 10/12，实际 tasks.md Task 1~12 全 `[x]`；Task 11 e2e L1 GREEN + L2 REQUEST_PATH 级证据已落，双区真 OO canvas 往返仍 env 门 `UNVERIFIABLE`；Task 12 收口已完成）。
 - **裁决从 static-cell 改判为「同 sheet 双区动态行 UUID」**（重要更正，见文末几何核定段）：provider `phase5_d4_adjudication_sheet.py` 实现两张 row table —— 主营 `adjudication_main_rows`（R8 起 / UUID 列 W / TID `D41MAIN`）+ 其他 `adjudication_other_rows`（R14 起 / UUID 列 X / TID `D41OTHER`），共享 sheet_key `d41-managed`。清册 2026-09-19 版「D4-1 走 static-cell 模式，非行 UUID 模式」的裁决**已作废**。
 - **契约 sheet 集合 15 → 16**：`d4.revenue_detail.json` 现声明 16 张（新增 `d41-managed`）。实测集合 = d42/d43/d45/d421/d422/d423/d424/d435/**d41**/d4-29/d4-25/d4-26/d4-27/d4-28/d4-15/d4-16。
 - **发布链已跑全、DB 判据 GREEN**：live-PG `d43_rematerialize_dual_sheet.py --apply` 成功（generation 50→51、revision 75），entry 当前 representation `definition_bundle_sha256` = `af32bfbde3f1cff8…`（= 含 D4-1 的 desired bundle，此前卡在 665eed8a…gen50）；store-projection 含 D4-1 且不打挂 D4-2/3/25~28。
@@ -118,7 +118,7 @@
 
 | # | wp_code | 名称 | owner spec | 后端契约 | 前端组件 | 前端接桥? | 综合 |
 |---|---------|------|-----------|---------|---------|----------|------|
-| 1 | D4-1 | 营业收入审定表 | d4-1-adjudication (10/12) | ✅ d41-managed(同sheet双区) | D4TabAdjudication | ✅ | ✅ (2026-09-20落地,e2e证据待补) |
+| 1 | D4-1 | 营业收入审定表 | d4-1-adjudication (12/12) | ✅ d41-managed(同sheet双区) | D4TabAdjudication | ✅ | ✅ (2026-09-20落地,e2e/L2 REQUEST_PATH级证据已在,真OO canvas待env) |
 | 2 | D4-2 | 主营业务收入明细 | d4-revenue-matrix (11/13) | ✅ d42-managed | 宿主走桥 | ✅ | ✅ |
 | 3 | D4-3 | 其他业务收入明细 | d-cycle-expansion (9/9) | ✅ d43-managed | D4TabOtherRevenue(宿主走桥) | ✅ | ✅ |
 | 4 | D4-4 | 调整分录汇总 | gap-closure (0/5) | ❌ | — | — | ⬜ 已裁 single_html(无行身份列) |
@@ -129,9 +129,9 @@
 | 9 | D4-9 | 重要客户结构分析 | d4-9-customer | ✅ d49-managed(三区,共享entry) | D4TabCustomerStructure | ✅ | ✅ (2026-09-20发布gen55,真OO待验) |
 | 10 | D4-10 | 重要客户销售价格 | d4-price-analysis (9/10) | ✅ d410-managed(批次B,dict+总额行) | D4TabCustomerPrice | ✅ | ✅ (2026-09-20发布gen63,补rowId,真OO待验) |
 | 11 | D4-11 | 产品销售价格分析 | d4-price-analysis (9/10) | ✅ d411-managed(批次B) | D4TabProductPrice | ✅ | ✅ (2026-09-20发布gen62,补rowId,真OO待验) |
-| 12 | D4-12 | 合同检查 | gap-closure (0/5) | ❌ 转置需模板改造+引擎泛化 | D4TabContract | legacy | ⏸ 转置(大工程,待专项spec) |
+| 12 | D4-12 | 合同检查 | d4-12-transposed-writeback (15/15) | ✅ d4-12-managed(转置,泛化引擎+注入definedName/载体行) | D4TabContract | ✅ | ✅ (2026-09-20落地:泛化D4-29转置引擎为TransposedSheetSpec+注册表零回归→provider→注入→契约34张→发布gen83→接桥+宿主登记,真OO canvas待env) |
 | 13 | D4-13 | ERP账面核对 | d4-inspection (9/16) | ❌ | — | — | ⬜ evidence裁 N/A(纯叙述文本表) |
-| 14 | D4-14 | 发生检查 | d4-inspection (9/16) | ❌ 模板列↔前端维度不对齐 | D4TabOccurrence | legacy | ⏸ 七维嵌套(需列映射裁决,待专项spec) |
+| 14 | D4-14 | 发生检查 | d4-14-walkthrough-writeback (12/12) | ✅ d414-managed(单宽动态行,7维嵌套34字段) | D4TabOccurrence | ✅ | ✅ (2026-09-21路线A全受管落地:裁决签署→前端补16字段→provider→契约34张→发布gen83→接桥,真OO canvas待env) |
 | 15 | D4-15 | 完整性检查 | d4-inspection (9/16, B1/B2做实) | ✅ d4-15-managed | D4TabCompleteness | ✅ | ✅ |
 | 16 | D4-16 | 出口口岸核对 | d4-inspection (9/16, B1/B2做实) | ✅ d4-16-managed | D4TabExport | ✅ | ✅ |
 | 17 | D4-17 | 截止测试(账到单据) | d4-cutoff-return (3/13) | ✅ d417-managed(批次B) | D4TabCutoffForward | ✅ | ✅ (2026-09-20发布gen55,真OO待验) |
@@ -155,19 +155,19 @@
 | 35 | D4-35 | 其他业务收入检查 | d4-33-36 | ✅ d435-managed | D4TabOtherCheck | ✅ | ✅ |
 | 36 | D4-36 | 其他业务收入截止测试 | d4-33-36 | ✅ d436-managed | D4TabOtherCutoff | ✅ | ✅ (双区dynamic,gen70) |
 
-## 统计（2026-09-20 静态 cell 落地 + D4-8 修复后，磁盘契约 `d4.revenue_detail.json` **实测 32 张 sheet_key**：d41/d42/d43/d45/d46/d47/d49/d410/d411/d417/d418/d419/d420/d421/d422/d423/d424/d433/d434/d435/d436/d48/d4-15/d4-16/d4-25/d4-26/d4-27/d4-28/d4-29/d4-30/d4-31/d4-32）
+## 统计（2026-09-20 D4-12 转置落地后，磁盘契约 `d4.revenue_detail.json` **实测 34 张 sheet_key**：d41/d42/d43/d45/d46/d47/d49/d410/d411/**d4-12**/**d414**/d417/d418/d419/d420/d421/d422/d423/d424/d433/d434/d435/d436/d48/d4-15/d4-16/d4-25/d4-26/d4-27/d4-28/d4-29/d4-30/d4-31/d4-32）
 
 > 🔴 **重要口径**：下方「✅」是**三维代码全绿（REQUEST_PATH 级）**——后端契约 + 前端接桥 + 宿主登记齐全。但**没有一张到主控 §6.4 的 `ONLYOFFICE_VERIFIED`**（需真实 OO 往返产生 `working_paper_content_application` state=applied + operation 终态 + OO 侧 content version，见 §9.5）。真 OO 验证是 env 门（start-dev.bat 全栈 + OO 容器），列为批次C。
 > 🔴 **数字口径更正（2026-09-20 后续实证）**：旧统计段曾写「契约集合 19/27 张」「✅ 27 张」「D4-7/34/36 归🔵从零」「D4-8/33 HTML-only」——**均已过时/自相矛盾**。以本段为准（契约磁盘实测 32 张；D4-33/34/36/7 已落地为 ✅；D4-8 因非法 key 修复+落盘转 🟡 半接入）。
 
-- ✅ 三维代码全绿(REQUEST_PATH)：**32 张** — D4-1/2/3/5/6/7/8/9/10/11/15/16/17/18/19/20/21/22/23/24/25/26/27/28/29/30/31/32/33/34/35/36
-  - 前端宿主 `isD4DedicatedSyncSheet` 登记 30 张（D4-1/5/6/7/8/9/10/11/15~36 除 D4-4/12/13/14）；D4-2/3 走宿主统一桥
-- 🟡 半接入(后端契约已落但前端未接桥 / representation 未 rematerialize)：**0 张** — D4-8 已于 2026-09-21 补齐前端接桥（`D4TabProductMargin` 改 `useWorkpaperSyncBridge` + 宿主登记 'D4-8' + 守卫 `d4ProductMarginSyncHostWiring.spec.ts`），转 ✅ 三维代码全绿
-- ⏸ 待专项 spec(硬约束,非机械 provider)：**2 张** — D4-12(转置,`d4-12-transposed-writeback`) / D4-14(七维列映射裁决,`d4-14-walkthrough-writeback`)
+- ✅ 三维代码全绿(REQUEST_PATH)：**34 张** — D4-1/2/3/5/6/7/8/9/10/11/**12**/**14**/15/16/17/18/19/20/21/22/23/24/25/26/27/28/29/30/31/32/33/34/35/36
+  - 前端宿主 `isD4DedicatedSyncSheet` 登记 32 张（D4-1/5/6/7/8/9/10/11/**12**/**14**/15~36 除 D4-4/13）；D4-2/3 走宿主统一桥
+- 🟡 半接入(后端契约已落但前端未接桥 / representation 未 rematerialize)：**0 张**
+- ⏸ 待专项 spec(硬约束,非机械 provider)：**0 张** — D4-12 已于 2026-09-20 经 `d4-12-transposed-writeback`（15/15）落地：泛化绑死 D4-29 的转置引擎为参数化 `TransposedSheetSpec` + 注册表分派（D4-29 逐字节/mapping_digest 零回归）→ D4-12 provider（首列 B、21 字段 R11-R31、GT-CONTRACT- 载体）→ instrument 注入 definedName+隐藏载体行→契约 34 张→发布 gen83→前端接桥+宿主登记，转 ✅ 三维代码全绿。D4-14 已于 2026-09-21 经路线A全受管落地转 ✅
 - ⬜ 裁决 single_html/N/A：**2 张** — D4-4(无行身份列) / D4-13(纯叙述文本表)
 
-> 校验：32 + 0 + 2 + 2 = 36 ✓
-> 契约集合现 **32 张**（+d48-managed，含静态块矩阵 180 static cell）；entry `xlsx/gt-d4-operating-revenue`
+> 校验：34 + 0 + 0 + 2 = 36 ✓
+> 契约集合现 **34 张**（+d4-12-managed，转置 21 字段 R11-R31 首列 B；此前 33 张含 d414-managed）；entry `xlsx/gt-d4-operating-revenue`
 > 磁盘契约 `assert_contract_file_matches_source` = OK（此前因 D4-8 非法 key 一直 DRIFT 红态，已修复消除）。
 > ✅ **D4-8 的 representation 已发布**（commit `98ab0eaef`）：rematerialize **gen 81→82 / revision 106**，
 > bundle `5bca042d` 已含 `d48-managed`（180 字段），`--check`=`already_on_desired_bundle`，无 SoftTimeout
@@ -178,7 +178,7 @@
 > ✅ **D4-34 / D4-36 / D4-7 / D4-33 / D4-8 已落地**（D4-34/36 双区 dynamic dict store gen68/gen70；
 > D4-7 动态产品区+静态月度区 gen76；D4-33 静态 cell 引擎路径三维全绿；D4-8 静态块矩阵契约落盘 + 前端接桥
 > 三维代码全绿，rematerialize + 真 OO canvas 为 env 门 `UNVERIFIABLE`）
-> ⏸ **D4-12 转置**（需模板改造 + 泛化 D4-29 引擎，待专项 spec `d4-12-transposed-writeback`）
+> ✅ **D4-12 转置已落地**（2026-09-20，`d4-12-transposed-writeback` 15/15）：泛化 D4-29 引擎为 `TransposedSheetSpec`+注册表（零回归）→ instrument 注入 definedName+载体行 → 发布 gen83 → 接桥
 > ⏸ **D4-14 七维嵌套**（模板列↔前端维度不对齐，需列映射裁决，待专项 spec `d4-14-walkthrough-writeback`）
 >
 > **D4-7 的两阻已在 2026-09-20 解除并落地**：①性能天花板经 spec workpaper-sync-materialize-large-table-performance
@@ -386,10 +386,14 @@
 
 > 🔴 **本段（2026-09-20 版）整段作废**：其「修半接入 7 张 / 做从零 15 张」与统计段「32 张三维代码全绿 / 0 张半接入」直接矛盾——那批张已在批次 A/B/A-5 全部接入。以下为 2026-09-21 现状优先级：
 
-1. **真 OO canvas 往返验证（唯一 env 门，批次C）**：32 张三维代码全绿但**无一张到 `ONLYOFFICE_VERIFIED`**（需 start-dev.bat 全栈 + OO 容器，OO canvas 非 DOM，Playwright 无法可靠编辑单元格）。逐张产 `evidence/.../D4-*.json` 的 `doc_editor_called:true` + `working_paper_content_application` state=applied。此前的 REQUEST_PATH 级证据（含 D4-1）已在。
+1. **真 OO canvas 往返验证（唯一 env 门，批次C）**：34 张三维代码全绿但**无一张到 `ONLYOFFICE_VERIFIED`**（需 start-dev.bat 全栈 + OO 容器，OO canvas 非 DOM，Playwright 无法可靠编辑单元格）。逐张产 `evidence/.../D4-*.json` 的 `doc_editor_called:true` + `working_paper_content_application` state=applied。此前的 REQUEST_PATH 级证据（含 D4-1）已在。
 2. **D4-8 rematerialize 已完成**（commit 98ab0eaef，gen81→82，真栈 store-projection 200 含 180 cell）——原「representation 未含」记录过时；仅剩真 OO canvas 往返 env 门。
-3. **两张待专项 spec**（各有独立硬约束，非机械 provider）：D4-12 转置（`d4-12-transposed-writeback`，需泛化 D4-29 引擎 + 模板改造）/ D4-14 七维列映射（`d4-14-walkthrough-writeback`，需源模板物理列↔前端 7 维裁决）。**两 spec 目前尚未创建**，本文档引用它们时按「建议立项」而非「已立待做」。
-4. **D4-4/D4-13** 保持裁决（single_html / N/A），不做单元格双向。
+3. **D4-14 已落地**（2026-09-21，路线A全受管）：源模板物理列↔前端 7 维裁决经审计业务复核**签署确认路线A**（`evidence/d414-column-mapping-adjudication.md`），前端补 16 字段（voucher.customerName/contract.date/delivery.number·quantity·shippingApprover/shipping.number·quantity·company·address/receipt.quantity·signer·sealType·sealEntity/invoice.productName·quantity/other.anomalyNote），provider `phase5_d4_14_occurrence`（单宽动态行 + 7 维嵌套 json_pointer + 34 受管字段 + formula_mask G37/X37/AF37/G39 + UUID列AL），契约 34 张（含 d4-12 + d414），发布 gen82→83（contract 0e2023fa **同时含 d4-12 + d414**），前端接桥 + 宿主登记 'D4-14'，守卫 `test_d4_14_occurrence_contract`(7)/`test_d4_14_walkthrough_roundtrip`(3,真instrument往返)/`test_d4_14_mirror_consume`(4)/`mutate_d4_14_guards`(5锚点全RED)/`d4OccurrenceSyncHostWiring.spec.ts`(10) 全绿；真 OO canvas 往返 env 门（批次C，同全组标准）。
+4. **D4-12 转置已落地**（2026-09-20，`d4-12-transposed-writeback` 15/15，三维代码全绿，真 OO canvas env 门）。
+   - ✅ **落地记录（2026-09-20）**：核心 = 把绑死 D4-29 的转置引擎**泛化**为参数化 `TransposedSheetSpec`（geometry/identity/store 形态全字段）+ `transposed_registry.resolve_transposed_specs` 注册表分派，`adapters/excel.py` 4 处旁路（materialize 单/多 binding + extract + verify）从「if is_enabled 单例」改「for spec 遍历」，`published_identity_observer` 转置 anchor 识别一并泛化（原硬编码 D4-29 SHEET_KEY/DEFINED_NAME/首列 C）。**D4-29 零回归实证**：materialize sha256 count=0/2/12/14 逐字节 == 泛化前、extract 逐字段 ==、mapping_digest `e3193dd9…` 逐字符不变（`evidence/d429-zero-regression.json` + 变异守卫 `test_d429_unaffected_when_registry_only_d429`）。D4-12 provider `phase5_d4_12_contract`（首列 **B**≠D4-29 的 C、21 字段 R11-R31、扁平 store `D4-12-contracts-v2`、`GT-CONTRACT-` 载体、`contractAmount` value_type=amount、mapping_digest `2d3a1c5f…` 冻结）。instrument 注入走既有 `excel_instrumentation` transposed_sheets 分支（实测 D4-29 的 definedName+载体行也是 instrument 注入而非模板预置，故 D4-12 零新注入代码）。发布链 gen82→83（contract `0e2023fa`，34 张含 d4-12-managed），无 Roundtrip/FooterAnchor/SoftTimeout。前端 `D4TabContract.vue` 接 `useWorkpaperSyncBridge`+`WorkpaperSyncEditorHost`（替 legacy `GtOnlyOfficeSheet`）+ 三态中文 tag，宿主 `isD4DedicatedSyncSheet` 含 'D4-12'。守卫 `test_transposed_registry`(10)/`test_d4_12_contract`(6)/`test_d4_12_transposed_roundtrip`(11,真 instrument 往返)/`test_d4_12_mirror_consume`(5,第四维)/`mutate_d4_12_transposed_guards`(4 锚点全 RED + 每条 D4-29 回归绿)/`d4ContractSyncHostWiring.spec.ts`(10) 全绿；D4 辐射面 340 passed 零回归。真 OO canvas 往返 env 门（批次C，同全组标准）。
+   - 🔴 **发布链途中修复一处 pre-existing bug（与 D4-12 无关）**：`d43_rematerialize_dual_sheet._read_store_map` 对缺失 store item 统一塞 `EMPTY_STORE_PAYLOAD("[]")`，但 dict-store（D4-31 singleton `{}` / D4-9 / D4-35）拿 `"[]"` 被 `build_store_projection` 判「必须是单对象/字典」抛 `ValueError` 打挂整册 rematerialize。修复 = 缺失时**不塞该 key**（fixed_ids 除外），让 `build_combined_store_projection` 的 `payloads.get(item, <per-item 默认>)` 用 provider 单源默认；回归守卫 `test_dict_store_missing_key_uses_provider_default_not_empty_list`。
+   - ✅ **D4-14 已完成（2026-09-21，见上方第 3 条）**：源模板物理列冻结（`营业收入发生检查表D4-14` A1:AK52，37 物理列，R13-14 两级表头，数据区 R15-36，footer 单行 `合计` R37），footer/引擎非障碍。裁决门经审计业务复核**签署确认路线A（全受管）**，14+2 无对应字段列全补前端字段，Phase 0-5 全落地。（此前"12 任务全未开始 / 待签署"记录已过时作废。）
+5. **D4-4/D4-13** 保持裁决（single_html / N/A），不做单元格双向。
 
 ## 关键教训（写入本清册以防再犯）
 
@@ -415,7 +419,7 @@
 - 列：A=项目名 · B/C/D=本期未审/账项调整/重分类(受管输入) · **E=本期审定(公式 `=SUM(B:D)`)** · F/G/H=上期三输入 · **I=上期审定(公式)**
 - 受管字段 = 每区 label + 6 金额（B/C/D/F/G/H）；formula_mask = E/I 数据行 + 小计/合计/差异行（12/18/19/21）的 B-I。
 
-**已落地（commit `663c3f019`，owner spec 10/12）**：
+**已落地（commit `663c3f019`，owner spec 12/12）**：
 - provider `phase5_d4_adjudication_sheet.py`：两 row table + `MANAGED_FIELD_SPECS`(7 字段) + `_formula_mask_cells` + `sheet_payload_d41`(2 table) + `instrumentation_spec_d41`(2 spec 共享 sheet_key) + `build_store_projection_d41`(按 sectionKey 分流) + `merge_projection_into_d41_rows`；`EXPECTED_MAPPING_DIGEST_D41` 冻结。
 - 6 点集成进 `phase5_d4_revenue_detail`（只加不动 D4-2/3/5/15/16/25~28）。
 - **4 处共享内核缺口全修**（见上「增量更新」段①~④）——这是 D4-1 的真实工作量核心，也顺带解除了 D4-9 Task 1 阻塞。
@@ -423,7 +427,7 @@
 - 前端 `D4TabAdjudication.vue` 接桥 + 宿主 `isD4DedicatedSyncSheet` 含 'D4-1'；`publishAdjudicated` 发布门不动（TB 发布分离，双向切换不触发 TB 发布）。
 - 守卫全绿：后端 `test_d4_1_adjudication_contract.py`(10/10)/`test_d4_1_dual_region_managed_tables.py`(7)/`test_d4_1_sibling_binding_alignment.py`/`test_d4_1_footer_anchor_per_region.py`(10) + 变异 `mutate_d4_1_adjudication_guards.py`；前端 `d4AdjudicationSyncHostWiring.spec.ts`。
 
-**仍待办**：
-- Task 11 e2e（`d4-bidirectional-acceptance.spec.ts` 加 D4-1 + 证据 `evidence/.../D4-1.json`）标 `[~]`，卡 start-dev.bat + 真实 OO 环境（`UNVERIFIABLE`）。
-- Task 12 收口同 `[~]`。
-- 🔴 风险已缓解但仍需真栈确认：D4-1 是审定枢纽（下游 K9/D4-10/D4-21 取审定数 + TB 发布）；离线/DB 判据已绿，e2e 真栈往返（OO 改主营/其他行→切回 HTML 值一致、两区不串）是最后一道未验证门。
+**仍待办**（🔴 更正：tasks.md 中 Task 11/12 现均已 `[x]`，非 `[~]`）：
+- Task 11 e2e（`d4-bidirectional-acceptance.spec.ts` 加 D4-1 + 证据 `evidence/.../D4-1.json` + `D4-1-L2.json`）：L1 GREEN（进在线编辑走统一路径、callback 四项齐、0 旁路、OO 挂载），L2 双区 roundtrip 因目标 wp 无 D4-1 受管双区行而**如实 SKIP/blocked**（真实库唯一有 D4-1-rows 的 wp 无 published representation），不伪造 cs_error=0。完整往返待 seed「同时有 published representation + D4-1-rows(main+other)」的 wp（`D4_ACCEPT_L2_WP_ID` 指向）后即绿——归真 OO canvas env 门批次C。
+- Task 12 收口已完成（三件套校验 + git 入库）。
+- 🔴 风险已缓解但仍需真栈确认：D4-1 是审定枢纽（下游 K9/D4-10/D4-21 取审定数 + TB 发布）；离线/DB 判据已绿，e2e 真栈双区往返（OO 改主营/其他行→切回 HTML 值一致、两区不串）是最后一道未验证门（env 门）。

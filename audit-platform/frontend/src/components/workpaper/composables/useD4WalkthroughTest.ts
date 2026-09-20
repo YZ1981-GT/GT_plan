@@ -15,6 +15,7 @@ import { parseNum } from './useD4FormulaEngine'
 
 export interface VoucherDimension {
   month: string
+  customerName: string  // D4-14 物理列 B（路线A受管补字段）
   date: string
   number: string
   productName: string
@@ -27,6 +28,7 @@ export interface VoucherDimension {
 }
 
 export interface ContractDimension {
+  date: string  // D4-14 物理列 H 合同日期（路线A受管补字段）
   number: string
   productName: string
   amount: number
@@ -40,9 +42,12 @@ export interface ContractDimension {
 
 export interface DeliveryDimension {
   date: string
+  number: string  // D4-14 物理列 K 出库编号（路线A受管补字段）
   productName: string
+  quantity: string  // D4-14 物理列 M 出库数量（路线A受管补字段）
   amount: number
   warehouseKeeper: string
+  shippingApprover: string  // D4-14 物理列 O 发货审批人（路线A受管补字段）
   attachmentId?: string
   attachmentName?: string
   ocrStatus?: 'none' | 'processing' | 'done' | 'failed'
@@ -50,8 +55,12 @@ export interface DeliveryDimension {
 
 export interface ShippingDimension {
   date: string
+  number: string  // D4-14 物理列 Q 运输编号（路线A受管补字段）
   productName: string
+  quantity: string  // D4-14 物理列 R 运输数量（路线A受管补字段）
   amount: number
+  company: string  // D4-14 物理列 S 运输公司（路线A受管补字段）
+  address: string  // D4-14 物理列 T 运输地址（路线A受管补字段）
   attachmentId?: string
   attachmentName?: string
   ocrStatus?: 'none' | 'processing' | 'done' | 'failed'
@@ -60,7 +69,11 @@ export interface ShippingDimension {
 export interface ReceiptDimension {
   date: string
   productName: string
+  quantity: string  // D4-14 物理列 W 签收数量（路线A受管补字段）
   amount: number
+  signer: string  // D4-14 物理列 Y 签收人（路线A受管补字段）
+  sealType: string  // D4-14 物理列 Z 盖章类型（路线A受管补字段）
+  sealEntity: string  // D4-14 物理列 AA 盖章单位（路线A受管补字段）
   attachmentId?: string
   attachmentName?: string
   ocrStatus?: 'none' | 'processing' | 'done' | 'failed'
@@ -69,6 +82,8 @@ export interface ReceiptDimension {
 export interface InvoiceDimension {
   date: string
   number: string
+  productName: string  // D4-14 物理列 AD 发票品名（路线A受管补字段）
+  quantity: string  // D4-14 物理列 AE 发票数量（路线A受管补字段）
   amount: number
   attachmentId?: string
   attachmentName?: string
@@ -78,6 +93,7 @@ export interface InvoiceDimension {
 export interface OtherDimension {
   description: string
   indexNo: string
+  anomalyNote: string  // D4-14 物理列 AK 是否异常（路线A受管补字段，人工录入；可选，不参与完整性判定）
   attachmentId?: string
   attachmentName?: string
   ocrStatus?: 'none' | 'processing' | 'done' | 'failed'
@@ -139,6 +155,7 @@ export const DIMENSION_GROUPS = [
     label: '记账凭证',
     fields: [
       { key: 'month', label: '月份', type: 'text' },
+      { key: 'customerName', label: '客户名称', type: 'text' },
       { key: 'date', label: '日期', type: 'date' },
       { key: 'number', label: '编号', type: 'text' },
       { key: 'productName', label: '品名', type: 'text' },
@@ -151,6 +168,7 @@ export const DIMENSION_GROUPS = [
     key: 'contract',
     label: '销售合同',
     fields: [
+      { key: 'date', label: '日期', type: 'date' },
       { key: 'number', label: '编号', type: 'text' },
       { key: 'productName', label: '品名', type: 'text' },
       { key: 'amount', label: '金额', type: 'number' },
@@ -163,9 +181,12 @@ export const DIMENSION_GROUPS = [
     label: '出库单',
     fields: [
       { key: 'date', label: '日期', type: 'date' },
+      { key: 'number', label: '编号', type: 'text' },
       { key: 'productName', label: '品名', type: 'text' },
+      { key: 'quantity', label: '数量', type: 'text' },
       { key: 'amount', label: '金额', type: 'number' },
       { key: 'warehouseKeeper', label: '仓库保管员', type: 'text' },
+      { key: 'shippingApprover', label: '发货审批人', type: 'text' },
     ],
   },
 
@@ -174,8 +195,12 @@ export const DIMENSION_GROUPS = [
     label: '运输单',
     fields: [
       { key: 'date', label: '日期', type: 'date' },
+      { key: 'number', label: '编号', type: 'text' },
       { key: 'productName', label: '品名', type: 'text' },
+      { key: 'quantity', label: '运输数量', type: 'text' },
       { key: 'amount', label: '金额', type: 'number' },
+      { key: 'company', label: '运输公司', type: 'text' },
+      { key: 'address', label: '运输地址', type: 'text' },
     ],
   },
   {
@@ -184,7 +209,11 @@ export const DIMENSION_GROUPS = [
     fields: [
       { key: 'date', label: '日期', type: 'date' },
       { key: 'productName', label: '品名', type: 'text' },
+      { key: 'quantity', label: '数量', type: 'text' },
       { key: 'amount', label: '金额', type: 'number' },
+      { key: 'signer', label: '签收人', type: 'text' },
+      { key: 'sealType', label: '盖章类型', type: 'text' },
+      { key: 'sealEntity', label: '盖章单位', type: 'text' },
     ],
   },
   {
@@ -193,6 +222,8 @@ export const DIMENSION_GROUPS = [
     fields: [
       { key: 'date', label: '日期', type: 'date' },
       { key: 'number', label: '编号', type: 'text' },
+      { key: 'productName', label: '品名', type: 'text' },
+      { key: 'quantity', label: '数量', type: 'text' },
       { key: 'amount', label: '金额', type: 'number' },
     ],
   },
@@ -202,6 +233,7 @@ export const DIMENSION_GROUPS = [
     fields: [
       { key: 'description', label: '文件描述', type: 'textarea' },
       { key: 'indexNo', label: '索引号', type: 'text' },
+      { key: 'anomalyNote', label: '是否异常', type: 'text', optional: true },
     ],
   },
 ] as const
@@ -221,13 +253,14 @@ const AMOUNT_DIMENSIONS: { key: keyof TransactionItem; label: string }[] = [
   { key: 'invoice', label: '发票' },
 ]
 
-/** 维度 key 与品名字段的映射 */
+/** 维度 key 与品名字段的映射（路线A补 invoice.productName 后纳入比对） */
 const PRODUCT_NAME_DIMENSIONS: { key: keyof TransactionItem; label: string }[] = [
   { key: 'voucher', label: '记账凭证' },
   { key: 'contract', label: '销售合同' },
   { key: 'delivery', label: '出库单' },
   { key: 'shipping', label: '运输单' },
   { key: 'receipt', label: '签收单' },
+  { key: 'invoice', label: '发票' },
 ]
 
 /** 维度 key 与日期字段的映射 */
@@ -395,6 +428,8 @@ export function isDimensionComplete(dimension: any, dimensionKey: string): boole
   if (!group) return false
 
   for (const field of group.fields) {
+    // 可选字段（如 other.anomalyNote 人工录入的异常标记）不参与完整性判定
+    if ((field as { optional?: boolean }).optional) continue
     const val = dimension[field.key]
     if (field.type === 'number') {
       if (!val || val === 0) return false
@@ -448,6 +483,7 @@ export function mapLedgerToTransaction(entry: {
     label: entry.summary || '',
     voucher: {
       month: '',
+      customerName: '',
       date: entry.date || '',
       number: entry.voucherNo || '',
       productName: '',
@@ -455,12 +491,12 @@ export function mapLedgerToTransaction(entry: {
       amount: parseNum(entry.amount),
       accountingDate: '',
     },
-    contract: { number: '', productName: '', amount: 0, approver: '', confirmor: '' },
-    delivery: { date: '', productName: '', amount: 0, warehouseKeeper: '' },
-    shipping: { date: '', productName: '', amount: 0 },
-    receipt: { date: '', productName: '', amount: 0 },
-    invoice: { date: '', number: '', amount: 0 },
-    other: { description: '', indexNo: '' },
+    contract: { date: '', number: '', productName: '', amount: 0, approver: '', confirmor: '' },
+    delivery: { date: '', number: '', productName: '', quantity: '', amount: 0, warehouseKeeper: '', shippingApprover: '' },
+    shipping: { date: '', number: '', productName: '', quantity: '', amount: 0, company: '', address: '' },
+    receipt: { date: '', productName: '', quantity: '', amount: 0, signer: '', sealType: '', sealEntity: '' },
+    invoice: { date: '', number: '', productName: '', quantity: '', amount: 0 },
+    other: { description: '', indexNo: '', anomalyNote: '' },
     consistencyScore: 0,
     consistencyDetails: null,
     conclusion: '',
@@ -635,13 +671,13 @@ export function useD4WalkthroughTest(options: UseD4WalkthroughTestOptions) {
       id: `t-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`,
       indexNo: '',
       label,
-      voucher: { month: '', date: '', number: '', productName: '', quantity: '', amount: 0, accountingDate: '' },
-      contract: { number: '', productName: '', amount: 0, approver: '', confirmor: '' },
-      delivery: { date: '', productName: '', amount: 0, warehouseKeeper: '' },
-      shipping: { date: '', productName: '', amount: 0 },
-      receipt: { date: '', productName: '', amount: 0 },
-      invoice: { date: '', number: '', amount: 0 },
-      other: { description: '', indexNo: '' },
+      voucher: { month: '', customerName: '', date: '', number: '', productName: '', quantity: '', amount: 0, accountingDate: '' },
+      contract: { date: '', number: '', productName: '', amount: 0, approver: '', confirmor: '' },
+      delivery: { date: '', number: '', productName: '', quantity: '', amount: 0, warehouseKeeper: '', shippingApprover: '' },
+      shipping: { date: '', number: '', productName: '', quantity: '', amount: 0, company: '', address: '' },
+      receipt: { date: '', productName: '', quantity: '', amount: 0, signer: '', sealType: '', sealEntity: '' },
+      invoice: { date: '', number: '', productName: '', quantity: '', amount: 0 },
+      other: { description: '', indexNo: '', anomalyNote: '' },
       consistencyScore: 0,
       consistencyDetails: null,
       conclusion: '',
@@ -788,6 +824,7 @@ export function useD4WalkthroughTest(options: UseD4WalkthroughTestOptions) {
     updateSamplingParams,
     reindexItems,
     loadTransactions,
+    flushSave,  // D4-14 双向回写：sync bridge flushHtml 需先 flush 待存的 debounce 保存再读 store-projection
   }
 }
 

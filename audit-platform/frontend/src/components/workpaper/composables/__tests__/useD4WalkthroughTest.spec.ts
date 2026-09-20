@@ -45,25 +45,25 @@ const dateStr = fc.integer({ min: 2020, max: 2030 }).chain(year =>
 )
 
 function makeVoucher(o: Partial<VoucherDimension> = {}): VoucherDimension {
-  return { month: '', date: '', number: '', productName: '', quantity: '', amount: 0, accountingDate: '', ...o }
+  return { month: '', customerName: '', date: '', number: '', productName: '', quantity: '', amount: 0, accountingDate: '', ...o }
 }
 function makeContract(o: Partial<ContractDimension> = {}): ContractDimension {
-  return { number: '', productName: '', amount: 0, approver: '', confirmor: '', ...o }
+  return { date: '', number: '', productName: '', amount: 0, approver: '', confirmor: '', ...o }
 }
 function makeDelivery(o: Partial<DeliveryDimension> = {}): DeliveryDimension {
-  return { date: '', productName: '', amount: 0, warehouseKeeper: '', ...o }
+  return { date: '', number: '', productName: '', quantity: '', amount: 0, warehouseKeeper: '', shippingApprover: '', ...o }
 }
 function makeShipping(o: Partial<ShippingDimension> = {}): ShippingDimension {
-  return { date: '', productName: '', amount: 0, ...o }
+  return { date: '', number: '', productName: '', quantity: '', amount: 0, company: '', address: '', ...o }
 }
 function makeReceipt(o: Partial<ReceiptDimension> = {}): ReceiptDimension {
-  return { date: '', productName: '', amount: 0, ...o }
+  return { date: '', productName: '', quantity: '', amount: 0, signer: '', sealType: '', sealEntity: '', ...o }
 }
 function makeInvoice(o: Partial<InvoiceDimension> = {}): InvoiceDimension {
-  return { date: '', number: '', amount: 0, ...o }
+  return { date: '', number: '', productName: '', quantity: '', amount: 0, ...o }
 }
 function makeOther(o: Partial<OtherDimension> = {}): OtherDimension {
-  return { description: '', indexNo: '', ...o }
+  return { description: '', indexNo: '', anomalyNote: '', ...o }
 }
 function makeItem(o: Partial<TransactionItem> = {}): TransactionItem {
   return {
@@ -284,7 +284,7 @@ describe('useD4WalkthroughTest - PBT', () => {
     it('voucher all fields filled → true', () => {
       fc.assert(fc.property(positiveAmount, nonEmptyStr, nonEmptyStr, nonEmptyStr, nonEmptyStr, nonEmptyStr, nonEmptyStr,
         (amt, month, date, num, name, qty, accDate) => {
-          const dim = { month, date, number: num, productName: name, quantity: qty, amount: amt, accountingDate: accDate }
+          const dim = { month, customerName: '客户A', date, number: num, productName: name, quantity: qty, amount: amt, accountingDate: accDate }
           expect(isDimensionComplete(dim, 'voucher')).toBe(true)
         }), { numRuns: 100 })
     })
@@ -298,13 +298,14 @@ describe('useD4WalkthroughTest - PBT', () => {
 
     it('delivery all fields filled → true', () => {
       fc.assert(fc.property(positiveAmount, nonEmptyStr, nonEmptyStr, nonEmptyStr, (amt, date, name, keeper) => {
-        expect(isDimensionComplete({ date, productName: name, amount: amt, warehouseKeeper: keeper }, 'delivery')).toBe(true)
+        expect(isDimensionComplete({ date, number: 'CK001', productName: name, quantity: '10', amount: amt, warehouseKeeper: keeper, shippingApprover: '审批人' }, 'delivery')).toBe(true)
       }), { numRuns: 100 })
     })
 
-    it('other all fields filled → true', () => {
+    it('other required fields filled → true (anomalyNote optional 不参与判定)', () => {
       fc.assert(fc.property(nonEmptyStr, nonEmptyStr, (desc, idx) => {
-        expect(isDimensionComplete({ description: desc, indexNo: idx }, 'other')).toBe(true)
+        // anomalyNote 为空仍应完整（optional 字段）
+        expect(isDimensionComplete({ description: desc, indexNo: idx, anomalyNote: '' }, 'other')).toBe(true)
       }), { numRuns: 100 })
     })
 
@@ -321,13 +322,13 @@ describe('useD4WalkthroughTest - PBT', () => {
         id: fc.string({ minLength: 1, maxLength: 20 }),
         indexNo: fc.string({ maxLength: 10 }),
         label: fc.string({ maxLength: 30 }),
-        voucher: fc.record({ month: fc.string({ maxLength: 5 }), date: fc.string({ maxLength: 10 }), number: fc.string({ maxLength: 10 }), productName: fc.string({ maxLength: 20 }), quantity: fc.string({ maxLength: 5 }), amount: fc.double({ min: 0, max: 1e8, noNaN: true, noDefaultInfinity: true }), accountingDate: fc.string({ maxLength: 10 }) }),
-        contract: fc.record({ number: fc.string({ maxLength: 10 }), productName: fc.string({ maxLength: 20 }), amount: fc.double({ min: 0, max: 1e8, noNaN: true, noDefaultInfinity: true }), approver: fc.string({ maxLength: 10 }), confirmor: fc.string({ maxLength: 10 }) }),
-        delivery: fc.record({ date: fc.string({ maxLength: 10 }), productName: fc.string({ maxLength: 20 }), amount: fc.double({ min: 0, max: 1e8, noNaN: true, noDefaultInfinity: true }), warehouseKeeper: fc.string({ maxLength: 10 }) }),
-        shipping: fc.record({ date: fc.string({ maxLength: 10 }), productName: fc.string({ maxLength: 20 }), amount: fc.double({ min: 0, max: 1e8, noNaN: true, noDefaultInfinity: true }) }),
-        receipt: fc.record({ date: fc.string({ maxLength: 10 }), productName: fc.string({ maxLength: 20 }), amount: fc.double({ min: 0, max: 1e8, noNaN: true, noDefaultInfinity: true }) }),
-        invoice: fc.record({ date: fc.string({ maxLength: 10 }), number: fc.string({ maxLength: 10 }), amount: fc.double({ min: 0, max: 1e8, noNaN: true, noDefaultInfinity: true }) }),
-        other: fc.record({ description: fc.string({ maxLength: 30 }), indexNo: fc.string({ maxLength: 10 }) }),
+        voucher: fc.record({ month: fc.string({ maxLength: 5 }), customerName: fc.string({ maxLength: 20 }), date: fc.string({ maxLength: 10 }), number: fc.string({ maxLength: 10 }), productName: fc.string({ maxLength: 20 }), quantity: fc.string({ maxLength: 5 }), amount: fc.double({ min: 0, max: 1e8, noNaN: true, noDefaultInfinity: true }), accountingDate: fc.string({ maxLength: 10 }) }),
+        contract: fc.record({ date: fc.string({ maxLength: 10 }), number: fc.string({ maxLength: 10 }), productName: fc.string({ maxLength: 20 }), amount: fc.double({ min: 0, max: 1e8, noNaN: true, noDefaultInfinity: true }), approver: fc.string({ maxLength: 10 }), confirmor: fc.string({ maxLength: 10 }) }),
+        delivery: fc.record({ date: fc.string({ maxLength: 10 }), number: fc.string({ maxLength: 10 }), productName: fc.string({ maxLength: 20 }), quantity: fc.string({ maxLength: 5 }), amount: fc.double({ min: 0, max: 1e8, noNaN: true, noDefaultInfinity: true }), warehouseKeeper: fc.string({ maxLength: 10 }), shippingApprover: fc.string({ maxLength: 10 }) }),
+        shipping: fc.record({ date: fc.string({ maxLength: 10 }), number: fc.string({ maxLength: 10 }), productName: fc.string({ maxLength: 20 }), quantity: fc.string({ maxLength: 5 }), amount: fc.double({ min: 0, max: 1e8, noNaN: true, noDefaultInfinity: true }), company: fc.string({ maxLength: 20 }), address: fc.string({ maxLength: 30 }) }),
+        receipt: fc.record({ date: fc.string({ maxLength: 10 }), productName: fc.string({ maxLength: 20 }), quantity: fc.string({ maxLength: 5 }), amount: fc.double({ min: 0, max: 1e8, noNaN: true, noDefaultInfinity: true }), signer: fc.string({ maxLength: 10 }), sealType: fc.string({ maxLength: 10 }), sealEntity: fc.string({ maxLength: 20 }) }),
+        invoice: fc.record({ date: fc.string({ maxLength: 10 }), number: fc.string({ maxLength: 10 }), productName: fc.string({ maxLength: 20 }), quantity: fc.string({ maxLength: 5 }), amount: fc.double({ min: 0, max: 1e8, noNaN: true, noDefaultInfinity: true }) }),
+        other: fc.record({ description: fc.string({ maxLength: 30 }), indexNo: fc.string({ maxLength: 10 }), anomalyNote: fc.string({ maxLength: 10 }) }),
         consistencyScore: fc.integer({ min: 0, max: 100 }),
         consistencyDetails: fc.constant(null),
         conclusion: fc.constantFrom('无异常', '存在差异已解释', '存在重大异常', '' as const),
@@ -394,10 +395,11 @@ describe('useD4WalkthroughTest - PBT', () => {
         fc.constantFrom('voucher', 'contract', 'delivery', 'shipping', 'receipt', 'invoice', 'other'),
         (dimKey) => {
           const allFields: Record<string, any> = {
-            month: '6', date: '2025-06-01', number: 'V001', productName: '产品A',
+            month: '6', customerName: '甲公司', date: '2025-06-01', number: 'V001', productName: '产品A',
             quantity: '10', amount: 5000, accountingDate: '2025-06-02',
-            approver: '张三', confirmor: '李四', warehouseKeeper: '王五',
-            description: '其他文件', indexNo: 'IX-01',
+            approver: '张三', confirmor: '李四', warehouseKeeper: '王五', shippingApprover: '赵六',
+            company: '顺丰', address: '北京', signer: '钱七', sealType: '公章', sealEntity: '乙公司',
+            description: '其他文件', indexNo: 'IX-01', anomalyNote: '无异常',
           }
           const group = DIMENSION_GROUPS.find(g => g.key === dimKey)!
           const validKeys = new Set(group.fields.map(f => f.key))
@@ -617,13 +619,13 @@ describe('useD4WalkthroughTest - Unit Tests', () => {
 
   describe('isDimensionComplete additional cases', () => {
     it('shipping with all fields → true', () => {
-      expect(isDimensionComplete({ date: '2025-01-01', productName: 'A', amount: 100 }, 'shipping')).toBe(true)
+      expect(isDimensionComplete({ date: '2025-01-01', number: 'YS001', productName: 'A', quantity: '5', amount: 100, company: '顺丰', address: '北京' }, 'shipping')).toBe(true)
     })
     it('invoice with amount=0 → false', () => {
-      expect(isDimensionComplete({ date: '2025-01-01', number: 'INV001', amount: 0 }, 'invoice')).toBe(false)
+      expect(isDimensionComplete({ date: '2025-01-01', number: 'INV001', productName: 'A', quantity: '5', amount: 0 }, 'invoice')).toBe(false)
     })
     it('contract missing approver → false', () => {
-      expect(isDimensionComplete({ number: 'C01', productName: 'B', amount: 100, approver: '', confirmor: '张三' }, 'contract')).toBe(false)
+      expect(isDimensionComplete({ date: '2025-01-01', number: 'C01', productName: 'B', amount: 100, approver: '', confirmor: '张三' }, 'contract')).toBe(false)
     })
   })
 })

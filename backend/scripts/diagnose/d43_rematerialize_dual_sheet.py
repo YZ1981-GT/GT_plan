@@ -102,7 +102,14 @@ async def _read_store_map(
             )
         ).scalar_one_or_none()
         if raw is None or not str(raw).strip():
-            out[item_id] = "" if item_id in fixed_ids else D4.EMPTY_STORE_PAYLOAD
+            # 🔴 缺失 store 不能统一塞 EMPTY_STORE_PAYLOAD("[]")：dict-store item（D4-31
+            # singleton 问卷 {} / D4-9 / D4-35 等）拿到 "[]" 会被 build_store_projection 判
+            # 「必须是单对象/字典」而抛 ValueError，打挂整册 rematerialize（与 D4-12 无关的
+            # 既有 bug）。正解 = 缺失时**不塞该 key**，让 build_combined_store_projection 的
+            # `payloads.get(item, <per-item 默认>)` 用 provider 自己声明的正确空默认（单源）。
+            # fixed_ids（D4-5 固定块）仍需显式空串占位。
+            if item_id in fixed_ids:
+                out[item_id] = ""
         else:
             out[item_id] = str(raw)
     return out

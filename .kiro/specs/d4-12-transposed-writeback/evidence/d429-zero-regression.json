@@ -1,0 +1,23 @@
+{
+  "captured": "2026-09-20",
+  "task": "Task 5 D4-29 零回归前置门",
+  "method": "从 git HEAD 抓泛化前 phase5_d4_29_customer_detail.py exec 成独立模块, 与泛化后版本各跑 materialize/extract 对比 sha256 + 逐字段 + mapping_digest。一次性脚本 _probe_d429_zero_regression.py(用完即删)。",
+  "materialize_sha256_byte_identical": {
+    "count_0": {"old": "5e1a8b1365a1", "new": "5e1a8b1365a1", "match": true},
+    "count_2": {"old": "2e72aded38e1", "new": "2e72aded38e1", "match": true},
+    "count_12": {"old": "64fc4397ea2e", "new": "64fc4397ea2e", "match": true},
+    "count_14": {"old": "e9cf1a8cc70c", "new": "e9cf1a8cc70c", "match": true}
+  },
+  "extract_fields_identical": "所有 count 泛化前后 extract 逐字段 == 原 payload",
+  "mapping_digest": {
+    "value": "e3193dd9b581ac32041d25d7def13df44955108cce34c0341b05ec30eda17856",
+    "expected": "e3193dd9b581ac32041d25d7def13df44955108cce34c0341b05ec30eda17856",
+    "match": true
+  },
+  "test_suite": {
+    "test_d4_29_customer_detail_sync.py": "26 passed",
+    "test_transposed_registry.py": "8 passed",
+    "d4_9_contract + mirror_shape + launch_locate": "34 passed"
+  },
+  "conclusion": "ZERO REGRESSION VERIFIED — 泛化(抽 TransposedSheetSpec + 注册表分派 + adapter 4处旁路遍历 + observer 转置anchor泛化)对 D4-29 materialize 逐字节 / extract 逐字段 / mapping_digest 全部零回归。可进 Task 6 接 D4-12。"
+}

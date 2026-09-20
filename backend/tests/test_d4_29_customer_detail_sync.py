@@ -135,7 +135,9 @@ def test_production_adapter_dispatch(template, contract, tmp_path, monkeypatch):
         def _baseline_pair(self): return None, None
         def _substrate_shape_of(self, artifact):
             return self.substrate_role, self.substrate_kind, self.substrate_state
-        def _merge_projections(self, parts): return parts[-1]
+        # 复用生产合并逻辑：extract 现遍历 resolve_transposed_specs 产多段（D4-29 + D4-12），
+        # 不能再返 parts[-1]（会丢 D4-29 段）。合并 values + row_keys。
+        _merge_projections = excel.ExcelSyncAdapter._merge_projections
     source, output = tmp_path / 'source.xlsx', tmp_path / 'output.xlsx'
     source.write_bytes(template)
     host = Host()

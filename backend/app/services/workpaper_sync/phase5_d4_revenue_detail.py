@@ -182,6 +182,15 @@ from app.services.workpaper_sync.phase5_d4_29_customer_detail import (
     sheet_payload,
     assert_mapping_digest as assert_mapping_digest_d429,
 )
+from app.services.workpaper_sync.phase5_d4_12_contract import (
+    MANAGED_SHEET as MANAGED_SHEET_D412,
+    SHEET_KEY as SHEET_KEY_D412,
+    STORE_ITEM_ID as STORE_ITEM_ID_D412,
+    build_store_projection as build_d412_store_projection,
+    merge_projection_into_store as merge_d412_projection_into_store,
+    sheet_payload as sheet_payload_d412,
+    assert_mapping_digest as assert_mapping_digest_d412,
+)
 from app.services.workpaper_sync.phase5_d4_customer_structure import (
     EXPECTED_MAPPING_DIGEST_D49,
     MANAGED_SHEET_D49,
@@ -303,6 +312,14 @@ from app.services.workpaper_sync.phase5_d4_margin_monthly_sheet import (  # noqa
     merge_projection_into_d47_stores,
     store_item_ids_d47,
     mapping_digest_d47,
+)
+from app.services.workpaper_sync.phase5_d4_14_occurrence import (  # noqa: E402
+    STORE_ITEM_ID_D414,
+    sheet_payload_d414,
+    instrumentation_specs_d414,
+    build_d414_store_projection,
+    merge_projection_into_d414,
+    mapping_digest_d414,
 )
 from app.services.workpaper_sync.phase5_d4_ipo_checklist_sheets import (  # noqa: E402
     CHECKLIST_SHEET_CODES,
@@ -432,6 +449,12 @@ _INCLUDE_D436_CUTOFF_SHEET: Final[bool] = True
 #: 专用 dict 块同时处理两 item，**不进** rows 4-tuple 循环。1 instrumentation spec（仅 dynamic 区）。
 #: provider=phase5_d4_margin_monthly_sheet。
 _INCLUDE_D47_MARGIN_SHEET: Final[bool] = True
+#: D4-14 营业收入发生检查表（穿行测试）接入（spec d4-14-walkthrough-writeback，裁决=路线A全受管）。
+#: 单宽动态行表（每行一笔交易，7 证据维嵌套 json_pointer，34 受管字段 B-AK 除占位/序号）；行身份=前端 id、
+#: UUID 列 AL、两级表头 R13-14、数据 R15-36、footer marker=合计 R37；formula_mask=G37/X37/AF37(SUM)+G39。
+#: store D4-14-transactions 是裸数组 TransactionItem[]（同 D4-46/417 单区行 store，merge 返 4-tuple 进
+#: rows results，不需专用 dict 块）。1 instrumentation spec。provider=phase5_d4_14_occurrence。
+_INCLUDE_D414_OCCURRENCE_SHEET: Final[bool] = True
 #: 🔴 D4-1 同 sheet 双区 instrumentation 接线开关（Task 5）。**现为 True，已落地**。
 #: 契约 sheet（sheet_payload_d41）+ store projection + merge 恒接；两 spec（主营/其他）也已
 #: 进 instrumentation_specs。曾经的唯一阻塞（sibling binding 对齐仍是「1 spec ↔ 1 sheet」的
@@ -443,6 +466,10 @@ _INCLUDE_D47_MARGIN_SHEET: Final[bool] = True
 _INCLUDE_D41_ADJUDICATION_INSTRUMENTATION: Final[bool] = True
 #: D4-29 uses an independently compiled, workbook-scope transposed anchor.
 _INCLUDE_D429_TRANSPOSED: Final[bool] = True
+#: D4-12 合同检查表转置双向回写（spec d4-12-transposed-writeback）。与 D4-29 同范式转置表
+#: （一列=一份合同，一行=一个字段），走泛化通用引擎 + 注册表分派。模板无预置 definedName +
+#: 载体行，由 instrumentation transposed_sheets 分支注入（同 D4-29，实测源模板也靠注入）。
+_INCLUDE_D412_TRANSPOSED: Final[bool] = True
 MANAGED_SHEET: Final[str] = "主营业务收入明细表D4-2"
 TEMPLATE_ID: Final[str] = "D42"
 SHEET_KEY: Final[str] = f"{TEMPLATE_ID.lower()}-managed"
@@ -475,11 +502,13 @@ STORE_ITEM_IDS: Final[tuple[str, ...]] = (
     STORE_ITEM_ID_D41,
     STORE_ITEM_ID_D49,
     *((STORE_ITEM_ID_D429,) if _INCLUDE_D429_TRANSPOSED else ()),
+    *((STORE_ITEM_ID_D412,) if _INCLUDE_D412_TRANSPOSED else ()),
     *((STORE_ITEM_ID_D433,) if _INCLUDE_D433_MARGIN_SHEET else ()),
     *((STORE_ITEM_ID_D48,) if _INCLUDE_D48_PRODUCT_MARGIN_SHEET else ()),
     *((STORE_ITEM_ID_D434,) if _INCLUDE_D434_CONTRACT_SHEET else ()),
     *((STORE_ITEM_ID_D436,) if _INCLUDE_D436_CUTOFF_SHEET else ()),
     *((STORE_ITEM_ID_D47_PRODUCTS, STORE_ITEM_ID_D47_MONTHLY) if _INCLUDE_D47_MARGIN_SHEET else ()),
+    *((STORE_ITEM_ID_D414,) if _INCLUDE_D414_OCCURRENCE_SHEET else ()),
     # 🔴 批次 A-5 / 批次 B 接入的 item 此前**漏登记** STORE_ITEM_IDS，导致 oo_to_html 的
     # mirror 按 STORE_ITEM_IDS 构造 base 时读不到它们（基线恒空 → merge 覆写丢 HTML-only
     # 字段/行）。逐张按各自 _INCLUDE_* 补齐（与上方同门控），使 mirror 能读到真实 base。
@@ -727,7 +756,10 @@ def instrumentation_spec() -> ExcelInstrumentationSpec:
         managed_last_col=MANAGED_LAST_COL,
         uuid_col=UUID_COL,
         table_name=TABLE_NAME,
-        transposed_sheets=(sheet_payload(),) if _INCLUDE_D429_TRANSPOSED else (),
+        transposed_sheets=(
+            *((sheet_payload(),) if _INCLUDE_D429_TRANSPOSED else ()),
+            *((sheet_payload_d412(),) if _INCLUDE_D412_TRANSPOSED else ()),
+        ),
         # D4-33/D4-8 静态受管区寄生（spec workpaper-sync-static-cell-sheet-writeback）：只在动态
         # primary spec 上挂 static_sheets，instrumentation 注入 workbook-scope definedName。
         static_sheets=(
@@ -870,6 +902,13 @@ def instrumentation_specs() -> tuple:
             if _INCLUDE_D47_MARGIN_SHEET
             else ()
         ),
+        *(
+            instrumentation_specs_d414(
+                entry_id=ENTRY_ID, template_relative_path=TEMPLATE_RELATIVE_PATH
+            )
+            if _INCLUDE_D414_OCCURRENCE_SHEET
+            else ()
+        ),
         # D4-1 营业收入审定表：同 sheet 双区（主营 R8 起 / 其他 R14 起）两 spec，同
         # managed_sheet 不同行段/UUID 列（W/X）。默认不接（见
         # _INCLUDE_D41_ADJUDICATION_INSTRUMENTATION 注释：runtime sibling binding 对齐仍
@@ -907,9 +946,10 @@ def instrumentation_definition_payload() -> dict[str, Any]:
         template_sha256=TEMPLATE_SHA256,
         gate=excel_carrier_gate(),
     )
-    payload["transposed_sheets"] = (
-        [sheet_payload()] if _INCLUDE_D429_TRANSPOSED else []
-    )
+    payload["transposed_sheets"] = [
+        *([sheet_payload()] if _INCLUDE_D429_TRANSPOSED else []),
+        *([sheet_payload_d412()] if _INCLUDE_D412_TRANSPOSED else []),
+    ]
     return payload
 
 
@@ -1030,6 +1070,8 @@ def build_contract_payload() -> dict[str, Any]:
     assert_all_inspection_mapping_digests()
     if _INCLUDE_D429_TRANSPOSED:
         assert_mapping_digest_d429()
+    if _INCLUDE_D412_TRANSPOSED:
+        assert_mapping_digest_d412()
     template_payload = template_definition_payload()
     return {
         "schema_version": CONTRACT_SCHEMA_VERSION,
@@ -1113,6 +1155,18 @@ def build_contract_payload() -> dict[str, Any]:
                 if _INCLUDE_D429_TRANSPOSED
                 else ()
             ),
+            *(
+                (
+                    {
+                        "sheet_key": SHEET_KEY_D412,
+                        "excel_name": MANAGED_SHEET_D412,
+                        "locator": sheet_payload_d412()["locator"],
+                        "tables": sheet_payload_d412()["tables"],
+                    },
+                )
+                if _INCLUDE_D412_TRANSPOSED
+                else ()
+            ),
             *(ipo_checklist_sheet_payload(code) for code in CHECKLIST_SHEET_CODES),
             *(inspection_sheet_payload(code) for code in INSPECTION_SHEET_CODES),
             *(
@@ -1132,6 +1186,7 @@ def build_contract_payload() -> dict[str, Any]:
             *([sheet_payload_d434()] if _INCLUDE_D434_CONTRACT_SHEET else []),
             *([sheet_payload_d436()] if _INCLUDE_D436_CUTOFF_SHEET else []),
             *([sheet_payload_d47()] if _INCLUDE_D47_MARGIN_SHEET else []),
+            *([sheet_payload_d414()] if _INCLUDE_D414_OCCURRENCE_SHEET else []),
         ],
         "review": {
             "entry_id": ENTRY_ID,
@@ -1271,6 +1326,19 @@ def build_contract_payload() -> dict[str, Any]:
                         else ()
                     ),
                     *(
+                        (
+                            {
+                                "item_id": STORE_ITEM_ID_D412,
+                                "sheet_key": SHEET_KEY_D412,
+                                "table_key": sheet_payload_d412()["tables"][0]["table_key"],
+                                "row_identity_key": "id",
+                                "note": "合同按 id 同步，Excel 转置合同列由通用转置引擎读写（首列 B、21 字段 R11-R31）。",
+                            },
+                        )
+                        if _INCLUDE_D412_TRANSPOSED
+                        else ()
+                    ),
+                    *(
                         {
                             "item_id": STORE_ITEM_ID_BY_CODE[code],
                             "sheet_key": SHEET_KEY_BY_CODE[code],
@@ -1306,6 +1374,11 @@ def build_contract_payload() -> dict[str, Any]:
                 if _INCLUDE_D429_TRANSPOSED
                 else {}
             ),
+            **(
+                {"mapping_digest_d412": assert_mapping_digest_d412()}
+                if _INCLUDE_D412_TRANSPOSED
+                else {}
+            ),
             "instrumentation_template_ids": [
                 TEMPLATE_ID,
                 TEMPLATE_ID_D43,
@@ -1320,6 +1393,11 @@ def build_contract_payload() -> dict[str, Any]:
                 *(
                     (sheet_payload()["template_id"],)
                     if _INCLUDE_D429_TRANSPOSED
+                    else ()
+                ),
+                *(
+                    (sheet_payload_d412()["template_id"],)
+                    if _INCLUDE_D412_TRANSPOSED
                     else ()
                 ),
                 *[ipo_checklist_sheet_payload(c)["template_id"] for c in CHECKLIST_SHEET_CODES],
@@ -1339,6 +1417,11 @@ def build_contract_payload() -> dict[str, Any]:
                 *(
                     (sheet_payload()["tables"][0]["table_key"],)
                     if _INCLUDE_D429_TRANSPOSED
+                    else ()
+                ),
+                *(
+                    (sheet_payload_d412()["tables"][0]["table_key"],)
+                    if _INCLUDE_D412_TRANSPOSED
                     else ()
                 ),
                 *[ipo_checklist_sheet_payload(c)["tables"][0]["table_key"] for c in CHECKLIST_SHEET_CODES],
@@ -1637,6 +1720,13 @@ def build_combined_store_projection(
         if _INCLUDE_D429_TRANSPOSED
         else None
     )
+    d412 = (
+        build_d412_store_projection(
+            payloads.get(STORE_ITEM_ID_D412, []), contract=contract, limits=limits
+        )
+        if _INCLUDE_D412_TRANSPOSED
+        else None
+    )
 
     d421 = build_d421_store_projection(
         payloads.get(STORE_ITEM_ID_D421, EMPTY_STORE_PAYLOAD), contract=contract, limits=limits
@@ -1739,6 +1829,13 @@ def build_combined_store_projection(
         if _INCLUDE_D47_MARGIN_SHEET
         else []
     )
+    d414_projs = (
+        [build_d414_store_projection(
+            payloads.get(STORE_ITEM_ID_D414, []), contract=contract, limits=limits,
+        )]
+        if _INCLUDE_D414_OCCURRENCE_SHEET
+        else []
+    )
     # D4-25/26/27/28 IPO 检查表追加受管 sheet（空载荷时安全返回空投影）。
     inspection_projs = [
         build_inspection_store_projection(
@@ -1762,10 +1859,12 @@ def build_combined_store_projection(
     values.update(right.values)
     values.update(groups.values)
     values.update(fixed.values)
-    for proj in (d421, d422, d423, d424, d435, d41, d49, *ipo_checklist_projs, *inspection_projs, *interview_projs, *d46_projs, *d417_projs, *d418_projs, *d419_projs, *d411_projs, *d410_projs, *d420_projs, *d433_projs, *d48_projs, *d434_projs, *d436_projs, *d47_projs):
+    for proj in (d421, d422, d423, d424, d435, d41, d49, *ipo_checklist_projs, *inspection_projs, *interview_projs, *d46_projs, *d417_projs, *d418_projs, *d419_projs, *d411_projs, *d410_projs, *d420_projs, *d433_projs, *d48_projs, *d434_projs, *d436_projs, *d47_projs, *d414_projs):
         values.update(proj.values)
     if d429 is not None:
         values.update(d429.values)
+    if d412 is not None:
+        values.update(d412.values)
     row_keys = {
         **dict(left.row_keys),
         **dict(right.row_keys),
@@ -1778,6 +1877,7 @@ def build_combined_store_projection(
         **dict(d41.row_keys),
         **dict(d49.row_keys),
         **(dict(d429.row_keys) if d429 is not None else {}),
+        **(dict(d412.row_keys) if d412 is not None else {}),
         **{k: v for p in interview_projs for k, v in dict(p.row_keys).items()},
         **{k: v for p in ipo_checklist_projs for k, v in dict(p.row_keys).items()},
         **{k: v for p in inspection_projs for k, v in dict(p.row_keys).items()},
@@ -1793,6 +1893,7 @@ def build_combined_store_projection(
         **{k: v for p in d434_projs for k, v in dict(p.row_keys).items()},
         **{k: v for p in d436_projs for k, v in dict(p.row_keys).items()},
         **{k: v for p in d47_projs for k, v in dict(p.row_keys).items()},
+        **{k: v for p in d414_projs for k, v in dict(p.row_keys).items()},
     }
     return Projection(
         contract_id=contract.contract_id,
@@ -1903,6 +2004,16 @@ def merge_projection_into_all_d4_stores(
         if _INCLUDE_D420_RETURN_SHEET
         else {}
     )
+    d414_results = (
+        {
+            STORE_ITEM_ID_D414: merge_projection_into_d414(
+                projection=projection,
+                base_payload=base_by_item.get(STORE_ITEM_ID_D414, []),
+            )
+        }
+        if _INCLUDE_D414_OCCURRENCE_SHEET
+        else {}
+    )
     _raw_updates: dict[str, Any] = {
         STORE_ITEM_ID: merge_projection_into_store_rows(
             projection=projection, base_rows=d42_base
@@ -1942,6 +2053,16 @@ def merge_projection_into_all_d4_stores(
             if _INCLUDE_D429_TRANSPOSED
             else {}
         ),
+        **(
+            {
+                STORE_ITEM_ID_D412: merge_d412_projection_into_store(
+                    projection=projection,
+                    base_payload=base_by_item.get(STORE_ITEM_ID_D412),
+                )
+            }
+            if _INCLUDE_D412_TRANSPOSED
+            else {}
+        ),
 
         **interview_results,
         **d46_results,
@@ -1951,6 +2072,7 @@ def merge_projection_into_all_d4_stores(
         **d411_results,
         **d410_results,
         **d420_results,
+        **d414_results,
         **{
             STORE_ITEM_ID_BY_CODE[code]: merge_ipo_checklist_projection_into_rows(
                 code,

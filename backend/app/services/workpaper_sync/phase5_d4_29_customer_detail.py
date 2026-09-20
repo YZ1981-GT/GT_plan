@@ -1,17 +1,28 @@
-"""D4-29: logical customer rows rendered as identity-bearing Excel columns."""
+"""D4-29: logical customer rows rendered as identity-bearing Excel columns.
+
+此模块现为**薄壳**（spec d4-12-transposed-writeback / Task 3）：几何/身份常量收敛到
+``SPEC_D429`` 实例，算法委托通用引擎 :mod:`phase5_transposed_sheet`。既有导出名
+（``is_enabled`` / ``materialize_file`` / ``extract_file`` / ``materialize_transposed_workbook``
+/ ``extract_transposed_workbook`` / ``assert_mapping_digest`` / ``sheet_payload`` /
+``build_store_projection`` / ``merge_projection_into_store`` / ``stable_key_for`` /
+``FIELD_ROWS`` / ``FIELD_KEYS`` 等）全部保留，使 adapter / 观测器 / 守卫 import 零改动。
+
+零回归纪律：``sheet_payload()`` / materialize 字节 / extract 字段 / ``EXPECTED_MAPPING_DIGEST``
+必须与泛化前逐字/逐字节相同（Task 5 前置门 + test_d4_29_customer_detail_sync.py 钉死）。
+"""
 from __future__ import annotations
 
-import copy
-import io
-import json
-from typing import Mapping, Sequence
-
-from openpyxl import load_workbook
-from openpyxl.utils import get_column_letter, column_index_from_string
-from openpyxl.styles import Protection
-
-from app.services.workpaper_sync.adapters.base import FieldValue, Projection
 from app.services.workpaper_sync.definitions import canonical_digest
+from app.services.workpaper_sync.phase5_transposed_sheet import (
+    TransposedSheetSpec,
+    build_store_projection as _build_store_projection,
+    extract_transposed_workbook as _extract_transposed_workbook,
+    materialize_transposed_workbook as _materialize_transposed_workbook,
+    merge_projection_into_store as _merge_projection_into_store,
+    resolve_managed_sheet as _resolve_managed_sheet,
+    sheet_payload as _sheet_payload,
+    stable_key_for as _stable_key_for,
+)
 
 MANAGED_SHEET = "客户信息检查表D4-29"
 SHEET_KEY = "d4-29-managed"
@@ -31,33 +42,6 @@ IDENTITY_CARRIER_PREFIX = "GT-CUSTOMER-"
 DEFINED_NAME = "GT_MANAGED_REGION_D429"
 MANAGED_REF = "$C$10:$M$41"
 
-
-def resolve_managed_sheet(workbook_bytes, *, defined_name=DEFINED_NAME):
-    """Validate the raw name list before openpyxl can collapse duplicates."""
-    import zipfile
-    from xml.etree import ElementTree as ET
-    with zipfile.ZipFile(io.BytesIO(workbook_bytes)) as archive:
-        root = ET.fromstring(archive.read("xl/workbook.xml"))
-    names = [n for n in root.findall("{*}definedNames/{*}definedName")
-             if n.get("name", "").lower() == defined_name.lower()]
-    if len(names) != 1 or "localSheetId" in names[0].attrib:
-        raise ValueError("D4-29 requires one workbook-scope definedName")
-    from openpyxl.workbook.defined_name import DefinedName
-    name = DefinedName(defined_name, attr_text=names[0].text)
-    if name.type != "RANGE":
-        raise ValueError("D4-29 invalid managed region anchor")
-    destinations = list(name.destinations)
-    if len(destinations) != 1 or destinations[0][1] != MANAGED_REF:
-        raise ValueError("D4-29 managed region geometry drift")
-    wb = load_workbook(io.BytesIO(workbook_bytes), data_only=False)
-    title = destinations[0][0].replace("''", "'")
-    if title not in wb.sheetnames:
-        raise ValueError("D4-29 managed region sheet missing")
-    ws = wb[title]
-    if ws.max_row < LAST_FIELD_ROW or ws.max_column < 13:
-        raise ValueError("D4-29 managed region extent missing")
-    return wb, ws
-
 # Rows 27 and 32..33 are source-template continuation slots, not new fields.
 FIELD_ROWS = {
     "creditCode": 11, "regAddress": 12, "officeAddress": 13, "website": 14,
@@ -71,124 +55,54 @@ FIELD_ROWS = {
 }
 FIELD_KEYS = tuple(FIELD_ROWS)
 
+#: D4-29 的转置表规格（几何/身份/store 形态的单一真源）。
+SPEC_D429 = TransposedSheetSpec(
+    managed_sheet=MANAGED_SHEET,
+    sheet_key=SHEET_KEY,
+    table_key=TABLE_KEY,
+    template_id=TEMPLATE_ID,
+    store_item_id=STORE_ITEM_ID,
+    identity_key=IDENTITY_KEY,
+    header_row=HEADER_ROW,
+    field_rows=FIELD_ROWS,
+    footer_rows=FOOTER_ROWS,
+    static_prompt_first_row=STATIC_PROMPT_FIRST_ROW,
+    first_entity_column=FIRST_CUSTOMER_COLUMN,
+    initial_entity_column=INITIAL_CUSTOMER_COLUMN,
+    identity_carrier_row=IDENTITY_CARRIER_ROW,
+    identity_carrier_prefix=IDENTITY_CARRIER_PREFIX,
+    defined_name=DEFINED_NAME,
+    managed_ref=MANAGED_REF,
+    header_field_key="name",
+    nested_fields_key="fields",
+    pointer_root="customers",
+    error_label="D4-29",
+    entity_noun="customer",
+    entity_noun_plural="customers",
+)
 
-def _payload(payload):
-    if payload is None:
-        return []
-    if isinstance(payload, (str, bytes, bytearray)):
-        payload = json.loads(payload or "[]")
-    if isinstance(payload, Mapping):
-        payload = payload.get("customers", [])
-    if not isinstance(payload, Sequence) or isinstance(payload, (str, bytes, bytearray)):
-        raise ValueError("D4-29 customers must be a JSON array")
-    out, seen = [], set()
-    for raw in payload:
-        if not isinstance(raw, Mapping):
-            raise ValueError("D4-29 customer must be an object")
-        ident = str(raw.get("id", "")).strip()
-        if not ident or ident in seen or any(c in ident for c in "/~{}"):
-            raise ValueError("D4-29 customer.id must be unique and safe")
-        fields = raw.get("fields", {})
-        if not isinstance(fields, Mapping):
-            raise ValueError("D4-29 customer.fields must be an object")
-        out.append({"id": ident, "name": str(raw.get("name", "") or ""), "fields": dict(fields)})
-        seen.add(ident)
-    return out
+
+# ── 既有导出名（委托通用引擎 + SPEC_D429），签名保持不变 ──────────────
+
+
+def resolve_managed_sheet(workbook_bytes, *, defined_name=DEFINED_NAME):
+    return _resolve_managed_sheet(workbook_bytes, spec=SPEC_D429)
 
 
 def stable_key_for(customer_id, field_key):
-    return f"{TABLE_KEY}/{customer_id}/{field_key.lower()}"
+    return _stable_key_for(customer_id, field_key, spec=SPEC_D429)
 
 
 def build_store_projection(payload, *, contract, limits=None):
-    from app.services.workpaper_sync.excel_extract import StreamingProjectionBudget
-    from app.services.workpaper_sync.limits import load_limits
-    budget = StreamingProjectionBudget(limits or load_limits())
-    values = {}
-    customers = _payload(payload)
-    for customer in customers:
-        budget.add_row(TABLE_KEY)
-        for key, value in (("name", customer["name"]), *((k, customer["fields"].get(k, "")) for k in FIELD_KEYS)):
-            spec = contract.field_by_stable_key(stable_key_for("{row_uuid}", key))
-            stable = stable_key_for(customer["id"], key)
-            budget.add_field()
-            values[stable] = FieldValue(stable, value, spec.value_type, spec.mode, row_key=customer["id"])
-    return Projection(contract_id=contract.contract_id, semantic_version=contract.semantic_version,
-                      document_type=contract.document_type, values=values,
-                      row_keys={TABLE_KEY: tuple(c["id"] for c in customers)})
+    return _build_store_projection(payload, contract=contract, spec=SPEC_D429, limits=limits)
 
 
 def merge_projection_into_store(*, projection, base_payload):
-    rows = _payload(base_payload)
-    by = {r["id"]: r for r in rows}
-    original = set(by)
-    order = list(by)
-    applied = visited = 0
-    keys = {k.lower(): k for k in ("name", *FIELD_KEYS)}
-    for stable in projection.stable_keys():
-        if not str(stable).startswith(TABLE_KEY + "/"):
-            continue
-        _, ident, key = str(stable).split("/", 2)
-        field = projection.get(stable)
-        if field is None or field.is_protected or key not in keys:
-            continue
-        key = keys[key]
-        if ident not in by:
-            by[ident] = {"id": ident, "name": "", "fields": {}}
-            order.append(ident)
-            applied += 1
-        target = by[ident] if key == "name" else by[ident]["fields"]
-        value = "" if field.value is None else field.value
-        visited += 1
-        if target.get(key, "") != value:
-            target[key] = value
-            applied += 1
-    ids = list(projection.row_keys[TABLE_KEY]) if TABLE_KEY in projection.row_keys else order
-    if len(ids) != len(set(ids)) or any(i not in by for i in ids):
-        missing = [i for i in ids if i not in by]
-        raise ValueError(
-            f"D4-29 invalid projection customer identities: missing={missing[:10]} "
-            f"row_keys={len(ids)} base={len(by)}"
-        )
-    removed = original - set(ids)
-    applied += len(removed) + int(ids != order and not removed)
-    return [by[i] for i in ids], applied, visited, removed
-
-
-def _src(cell):
-    return f"源xlsx!{MANAGED_SHEET}!{cell}"
-
-
-def _parse_field_pointer(key: str, *, row_uuid: str) -> str:
-    return f"/customers/{row_uuid}/{'name' if key == 'name' else 'fields/' + key}"
+    return _merge_projection_into_store(projection=projection, base_payload=base_payload, spec=SPEC_D429)
 
 
 def sheet_payload():
-    fields = []
-    for key in ("name", *FIELD_KEYS):
-        row = HEADER_ROW if key == "name" else FIELD_ROWS[key]
-        fields.append({
-            "stable_field_key": stable_key_for("{row_uuid}", key),
-            "json_pointer": _parse_field_pointer(key, row_uuid="{row_uuid}"),
-            "source_ref": _src(f"C{row}:M{row}"),
-            "header_source_ref": _src(f"A{row}:B{row}"),
-            "cell": {"column": "C", "row_from": "row_identity"},
-            "transposed_row": row, "mode": "editable", "value_type": "text",
-            "instances": "many",
-        })
-    return {"sheet_key": SHEET_KEY, "template_id": TEMPLATE_ID, "excel_name": MANAGED_SHEET,
-            "locator": {"anchor": "defined_name_ref", "defined_name": DEFINED_NAME},
-            "region_boundary_locator": {"anchor": "defined_name_ref", "defined_name": DEFINED_NAME,
-                                        "range": MANAGED_REF},
-            "tables": [{
-                "table_key": TABLE_KEY, "anchor": "C10", "header_rows": 1,
-                "layout": "customer_columns", "row_identity": {"kind": "field", "json_pointer": "/customers/*/id"},
-                "delete_policy": "tombstone",
-                "transposed_columns": {"source_ref": _src("C10:M10"), "identity_row": IDENTITY_CARRIER_ROW,
-                                       "identity_prefix": IDENTITY_CARRIER_PREFIX, "identity": "id"},
-                "protected_regions": {"label_columns": "A:B", "footer_rows": list(FOOTER_ROWS),
-                                      "static_prompt": f"A{STATIC_PROMPT_FIRST_ROW}:XFD1048576"},
-                "fields": fields}]}
+    return _sheet_payload(spec=SPEC_D429)
 
 
 def mapping_digest_payload():
@@ -209,114 +123,12 @@ def assert_mapping_digest():
     return got
 
 
-def _copy_column(ws, src, dst):
-    source, target = get_column_letter(src), get_column_letter(dst)
-    dimension = copy.copy(ws.column_dimensions[source])
-    dimension.index = target
-    dimension.min = dimension.max = dst
-    ws.column_dimensions[target] = dimension
-    for row in range(1, ws.max_row + 1):
-        a, b = ws.cell(row, src), ws.cell(row, dst)
-        b._style = copy.copy(a._style)
-        if row < FOOTER_ROWS[0]:
-            b.value = a.value
-            if a.comment:
-                b.comment = copy.copy(a.comment)
-            if a.hyperlink:
-                b.hyperlink = copy.copy(a.hyperlink)
-    for merged in list(ws.merged_cells.ranges):
-        if merged.min_col == merged.max_col == src and merged.max_row < FOOTER_ROWS[0]:
-            ws.merge_cells(start_row=merged.min_row, end_row=merged.max_row, start_column=dst, end_column=dst)
-
-
 def materialize_transposed_workbook(workbook_bytes: bytes, payload, *, sheet_name=MANAGED_SHEET) -> bytes:
-    wb, ws = resolve_managed_sheet(workbook_bytes)
-    sheet_name = ws.title
-    customers = _payload(payload)
-    start = column_index_from_string(FIRST_CUSTOMER_COLUMN)
-    last = column_index_from_string(INITIAL_CUSTOMER_COLUMN)
-    if start + len(customers) - 1 > 16384:
-        raise ValueError("D4-29 exceeds Excel column limit")
-    for i in range(len(customers)):
-        col = start + i
-        if col > last:
-            _copy_column(ws, last, col)
-    for col in range(start, ws.max_column + 1):
-        for row in (IDENTITY_CARRIER_ROW, HEADER_ROW, *FIELD_ROWS.values()):
-            ws.cell(row, col).value = None
-    ws.row_dimensions[IDENTITY_CARRIER_ROW].hidden = True
-    for i, customer in enumerate(customers):
-        col = start + i
-        ws.cell(IDENTITY_CARRIER_ROW, col).value = IDENTITY_CARRIER_PREFIX + customer["id"]
-        ws.cell(IDENTITY_CARRIER_ROW, col).protection = Protection(locked=True)
-        for key in ("name", *FIELD_KEYS):
-            row = HEADER_ROW if key == "name" else FIELD_ROWS[key]
-            cell = ws.cell(row, col)
-            cell.value = customer["name"] if key == "name" else customer["fields"].get(key, "")
-            cell.data_type = "s" if isinstance(cell.value, str) else cell.data_type
-            cell.protection = Protection(locked=False)
-    ws.protection.sheet = True
-    out = io.BytesIO()
-    wb.save(out)
-    # Keep unrelated sheets, caches, relationships and unsupported OOXML untouched.
-    import zipfile
-    from xml.etree import ElementTree as ET
-    with zipfile.ZipFile(io.BytesIO(workbook_bytes)) as original, zipfile.ZipFile(io.BytesIO(out.getvalue())) as edited:
-        ns = {"m": "http://schemas.openxmlformats.org/spreadsheetml/2006/main"}
-        rel_ns = "{http://schemas.openxmlformats.org/officeDocument/2006/relationships}id"
-        sheets = ET.fromstring(original.read("xl/workbook.xml"))
-        rid = next(s.attrib[rel_ns] for s in sheets.findall("m:sheets/m:sheet", ns) if s.attrib["name"] == sheet_name)
-        rels = ET.fromstring(original.read("xl/_rels/workbook.xml.rels"))
-        target = next(r.attrib["Target"] for r in rels if r.attrib["Id"] == rid)
-        part = target.lstrip("/") if target.startswith("/") else "xl/" + target
-        edited_sheets = ET.fromstring(edited.read("xl/workbook.xml"))
-        edited_rid = next(s.attrib[rel_ns] for s in edited_sheets.findall("m:sheets/m:sheet", ns) if s.attrib["name"] == sheet_name)
-        edited_rels = ET.fromstring(edited.read("xl/_rels/workbook.xml.rels"))
-        edited_target = next(r.attrib["Target"] for r in edited_rels if r.attrib["Id"] == edited_rid)
-        edited_part = edited_target.lstrip("/") if edited_target.startswith("/") else "xl/" + edited_target
-        result = io.BytesIO()
-        with zipfile.ZipFile(result, "w", zipfile.ZIP_DEFLATED) as archive:
-            for info in original.infolist():
-                data = edited.read(edited_part) if info.filename == part else (
-                    edited.read("xl/styles.xml") if info.filename == "xl/styles.xml" else original.read(info.filename))
-                archive.writestr(info, data)
-        return result.getvalue()
+    return _materialize_transposed_workbook(workbook_bytes, payload, spec=SPEC_D429)
 
 
 def extract_transposed_workbook(workbook_bytes: bytes, *, sheet_name=MANAGED_SHEET):
-    _, ws = resolve_managed_sheet(workbook_bytes)
-    if not ws.row_dimensions[IDENTITY_CARRIER_ROW].hidden:
-        raise ValueError("D4-29 customer identity row must be hidden")
-    result = []
-    for col in range(column_index_from_string(FIRST_CUSTOMER_COLUMN), ws.max_column + 1):
-        carrier = ws.cell(IDENTITY_CARRIER_ROW, col)
-        raw = carrier.value
-        if raw is None or raw == "":
-            values = [ws.cell(row, col).value for row in (HEADER_ROW, *FIELD_ROWS.values())]
-            # The source template contains non-business placeholder headers in the
-            # empty customer slots. They are baseline scaffolding, not customers.
-            business_values = [value for row, value in zip((HEADER_ROW, *FIELD_ROWS.values()), values)
-                               if row != HEADER_ROW]
-            header_value = values[0]
-            import re
-            placeholder_header = (
-                header_value in (None, "", "……")
-                or bool(re.fullmatch(r"客户\d+XXX", str(header_value)))
-            )
-            if any(value not in (None, "") for value in business_values) or not placeholder_header:
-                raise ValueError("D4-29 missing customer identity carrier for populated column")
-            continue
-        if (carrier.data_type == "f" or not isinstance(raw, str)
-                or not raw.startswith(IDENTITY_CARRIER_PREFIX)):
-            raise ValueError("D4-29 invalid customer identity carrier")
-        def value(row):
-            cell = ws.cell(row, col)
-            if cell.data_type == "f":
-                raise ValueError("D4-29 text field cannot contain a formula")
-            return "" if cell.value is None else cell.value
-        result.append({"id": raw[len(IDENTITY_CARRIER_PREFIX):], "name": value(HEADER_ROW),
-                       "fields": {key: value(row) for key, row in FIELD_ROWS.items()}})
-    return _payload(result)
+    return _extract_transposed_workbook(workbook_bytes, spec=SPEC_D429)
 
 
 def row_oriented_sheets(contract):
@@ -327,11 +139,12 @@ def row_oriented_sheets(contract):
 
 
 def is_enabled(contract):
-    return contract.contract_id == "d4.revenue_detail" and any(s.sheet_key == SHEET_KEY for s in contract.sheets)
+    from app.services.workpaper_sync.transposed_registry import resolve_transposed_specs
+    return bool(resolve_transposed_specs(contract))
 
 
 def materialize_file(output, projection, contract):
-    if not is_enabled(contract) or TABLE_KEY not in projection.row_keys:
+    if TABLE_KEY not in projection.row_keys:
         return
     current_payload = extract_transposed_workbook(output.read_bytes())
     customers, _, _, _ = merge_projection_into_store(

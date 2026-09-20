@@ -387,6 +387,15 @@ export function useD4ContractInspection(options: UseD4ContractInspectionOptions)
     window.dispatchEvent(new CustomEvent('d4:save-items', { detail: { items } }))
   }
 
+  /**
+   * 立即冲刷待保存内容（清 debounce timer + 同步派发）。
+   * 供同步桥 flushHtml 在 readStoreProjection 前调用, 防投影旧值(切 OO 前先落库)。
+   */
+  async function flushPendingSave(): Promise<void> {
+    if (debounceTimer) { clearTimeout(debounceTimer); debounceTimer = null }
+    flushSave()
+  }
+
   onBeforeUnmount(() => {
     if (debounceTimer) { clearTimeout(debounceTimer); flushSave() }
   })
@@ -407,5 +416,6 @@ export function useD4ContractInspection(options: UseD4ContractInspectionOptions)
     setAttachment,
     updateAuditNote,
     updateAuditConclusion,
+    flushPendingSave,
   }
 }

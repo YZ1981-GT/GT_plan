@@ -7,7 +7,7 @@
     "excel_table",
     "hidden_uuid_column"
   ],
-  "instrumentation_definition_sha256": "6d1c630575d5e9c7220c1aad5fcd6c9f463ac7fef5d02f0652b04e6cce257e50",
+  "instrumentation_definition_sha256": "cfc9755737a3a9f222d5e71b104d31a104ac9208dcdac6d4c4f11eec243ad97a",
   "review": {
     "authority_root": "backend/wp_templates",
     "entry_id": "xlsx/gt-d4-operating-revenue",
@@ -110,6 +110,13 @@
           "table_key": "customer_detail_transposed"
         },
         {
+          "item_id": "D4-12-contracts-v2",
+          "note": "合同按 id 同步，Excel 转置合同列由通用转置引擎读写（首列 B、21 字段 R11-R31）。",
+          "row_identity_key": "id",
+          "sheet_key": "d4-12-managed",
+          "table_key": "contract_inspection_transposed"
+        },
+        {
           "item_id": "D4-25-rows",
           "note": "D4-25 IPO 检查表动态行 store；json_path 与前端 ipoChecklistSchema 列 key 逐列对齐。",
           "row_identity_key": "rowId",
@@ -166,6 +173,7 @@
       "GT_D49C_ROWS",
       "GT_D49P_ROWS",
       "customer_detail_transposed",
+      "contract_inspection_transposed",
       "dealer_check_rows",
       "overseas_sales_rows",
       "undisclosed_rp_rows",
@@ -185,6 +193,7 @@
       "D49C",
       "D49P",
       "D429",
+      "D412",
       "D425",
       "D426",
       "D427",
@@ -194,6 +203,7 @@
     ],
     "mapping_digest": "6d2f340d45ba0a24c95424c1e698be3df105252c160d174a2e4c748ec1554cc8",
     "mapping_digest_d41": "94e813e067d7160e3e1f51b83922025d7f0fd293cffe7ddd6ac490e7477b2bff",
+    "mapping_digest_d412": "2d3a1c5f77f198283603ac42b4eb54f5d67ef2f4dfa7aa57a2673a023c689e9a",
     "mapping_digest_d429": "e3193dd9b581ac32041d25d7def13df44955108cce34c0341b05ec30eda17856",
     "mapping_digest_d43": "b3186632300c84d14c4c9c3c947cbff0cdcaaf807ce2e5f9848d42195513637f",
     "mapping_digest_d435": "67082d36b06053d607e6697967b8f5ce5f91cfaeae4892a543994a1544bb9b00",
@@ -2874,6 +2884,337 @@
             "identity_prefix": "GT-CUSTOMER-",
             "identity_row": 9,
             "source_ref": "源xlsx!客户信息检查表D4-29!C10:M10"
+          }
+        }
+      ]
+    },
+    {
+      "excel_name": "合同检查表D4-12",
+      "locator": {
+        "anchor": "defined_name_ref",
+        "defined_name": "GT_MANAGED_REGION_D412"
+      },
+      "sheet_key": "d4-12-managed",
+      "tables": [
+        {
+          "anchor": "B10",
+          "delete_policy": "tombstone",
+          "fields": [
+            {
+              "cell": {
+                "column": "B",
+                "row_from": "row_identity"
+              },
+              "header_source_ref": "源xlsx!合同检查表D4-12!A11",
+              "instances": "many",
+              "json_pointer": "/contracts/{row_uuid}/contractNo",
+              "mode": "editable",
+              "source_ref": "源xlsx!合同检查表D4-12!B11:K11",
+              "stable_field_key": "contract_inspection_transposed/{row_uuid}/contractno",
+              "transposed_row": 11,
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "B",
+                "row_from": "row_identity"
+              },
+              "header_source_ref": "源xlsx!合同检查表D4-12!A12",
+              "instances": "many",
+              "json_pointer": "/contracts/{row_uuid}/counterparty",
+              "mode": "editable",
+              "source_ref": "源xlsx!合同检查表D4-12!B12:K12",
+              "stable_field_key": "contract_inspection_transposed/{row_uuid}/counterparty",
+              "transposed_row": 12,
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "B",
+                "row_from": "row_identity"
+              },
+              "header_source_ref": "源xlsx!合同检查表D4-12!A13",
+              "instances": "many",
+              "json_pointer": "/contracts/{row_uuid}/signDate",
+              "mode": "editable",
+              "source_ref": "源xlsx!合同检查表D4-12!B13:K13",
+              "stable_field_key": "contract_inspection_transposed/{row_uuid}/signdate",
+              "transposed_row": 13,
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "B",
+                "row_from": "row_identity"
+              },
+              "header_source_ref": "源xlsx!合同检查表D4-12!A14",
+              "instances": "many",
+              "json_pointer": "/contracts/{row_uuid}/serviceContent",
+              "mode": "editable",
+              "source_ref": "源xlsx!合同检查表D4-12!B14:K14",
+              "stable_field_key": "contract_inspection_transposed/{row_uuid}/servicecontent",
+              "transposed_row": 14,
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "B",
+                "row_from": "row_identity"
+              },
+              "header_source_ref": "源xlsx!合同检查表D4-12!A15",
+              "instances": "many",
+              "json_pointer": "/contracts/{row_uuid}/contractAmount",
+              "mode": "editable",
+              "source_ref": "源xlsx!合同检查表D4-12!B15:K15",
+              "stable_field_key": "contract_inspection_transposed/{row_uuid}/contractamount",
+              "transposed_row": 15,
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "B",
+                "row_from": "row_identity"
+              },
+              "header_source_ref": "源xlsx!合同检查表D4-12!A16",
+              "instances": "many",
+              "json_pointer": "/contracts/{row_uuid}/deliveryTime",
+              "mode": "editable",
+              "source_ref": "源xlsx!合同检查表D4-12!B16:K16",
+              "stable_field_key": "contract_inspection_transposed/{row_uuid}/deliverytime",
+              "transposed_row": 16,
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "B",
+                "row_from": "row_identity"
+              },
+              "header_source_ref": "源xlsx!合同检查表D4-12!A17",
+              "instances": "many",
+              "json_pointer": "/contracts/{row_uuid}/deliveryMethod",
+              "mode": "editable",
+              "source_ref": "源xlsx!合同检查表D4-12!B17:K17",
+              "stable_field_key": "contract_inspection_transposed/{row_uuid}/deliverymethod",
+              "transposed_row": 17,
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "B",
+                "row_from": "row_identity"
+              },
+              "header_source_ref": "源xlsx!合同检查表D4-12!A18",
+              "instances": "many",
+              "json_pointer": "/contracts/{row_uuid}/settlementMethod",
+              "mode": "editable",
+              "source_ref": "源xlsx!合同检查表D4-12!B18:K18",
+              "stable_field_key": "contract_inspection_transposed/{row_uuid}/settlementmethod",
+              "transposed_row": 18,
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "B",
+                "row_from": "row_identity"
+              },
+              "header_source_ref": "源xlsx!合同检查表D4-12!A19",
+              "instances": "many",
+              "json_pointer": "/contracts/{row_uuid}/settlementTime",
+              "mode": "editable",
+              "source_ref": "源xlsx!合同检查表D4-12!B19:K19",
+              "stable_field_key": "contract_inspection_transposed/{row_uuid}/settlementtime",
+              "transposed_row": 19,
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "B",
+                "row_from": "row_identity"
+              },
+              "header_source_ref": "源xlsx!合同检查表D4-12!A20",
+              "instances": "many",
+              "json_pointer": "/contracts/{row_uuid}/warrantyClause",
+              "mode": "editable",
+              "source_ref": "源xlsx!合同检查表D4-12!B20:K20",
+              "stable_field_key": "contract_inspection_transposed/{row_uuid}/warrantyclause",
+              "transposed_row": 20,
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "B",
+                "row_from": "row_identity"
+              },
+              "header_source_ref": "源xlsx!合同检查表D4-12!A21",
+              "instances": "many",
+              "json_pointer": "/contracts/{row_uuid}/returnClause",
+              "mode": "editable",
+              "source_ref": "源xlsx!合同检查表D4-12!B21:K21",
+              "stable_field_key": "contract_inspection_transposed/{row_uuid}/returnclause",
+              "transposed_row": 21,
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "B",
+                "row_from": "row_identity"
+              },
+              "header_source_ref": "源xlsx!合同检查表D4-12!A22",
+              "instances": "many",
+              "json_pointer": "/contracts/{row_uuid}/breachClause",
+              "mode": "editable",
+              "source_ref": "源xlsx!合同检查表D4-12!B22:K22",
+              "stable_field_key": "contract_inspection_transposed/{row_uuid}/breachclause",
+              "transposed_row": 22,
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "B",
+                "row_from": "row_identity"
+              },
+              "header_source_ref": "源xlsx!合同检查表D4-12!A23",
+              "instances": "many",
+              "json_pointer": "/contracts/{row_uuid}/specialTerms",
+              "mode": "editable",
+              "source_ref": "源xlsx!合同检查表D4-12!B23:K23",
+              "stable_field_key": "contract_inspection_transposed/{row_uuid}/specialterms",
+              "transposed_row": 23,
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "B",
+                "row_from": "row_identity"
+              },
+              "header_source_ref": "源xlsx!合同检查表D4-12!A24",
+              "instances": "many",
+              "json_pointer": "/contracts/{row_uuid}/isSigned",
+              "mode": "editable",
+              "source_ref": "源xlsx!合同检查表D4-12!B24:K24",
+              "stable_field_key": "contract_inspection_transposed/{row_uuid}/issigned",
+              "transposed_row": 24,
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "B",
+                "row_from": "row_identity"
+              },
+              "header_source_ref": "源xlsx!合同检查表D4-12!A25",
+              "instances": "many",
+              "json_pointer": "/contracts/{row_uuid}/isSealed",
+              "mode": "editable",
+              "source_ref": "源xlsx!合同检查表D4-12!B25:K25",
+              "stable_field_key": "contract_inspection_transposed/{row_uuid}/issealed",
+              "transposed_row": 25,
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "B",
+                "row_from": "row_identity"
+              },
+              "header_source_ref": "源xlsx!合同检查表D4-12!A26",
+              "instances": "many",
+              "json_pointer": "/contracts/{row_uuid}/recognitionMethod",
+              "mode": "editable",
+              "source_ref": "源xlsx!合同检查表D4-12!B26:K26",
+              "stable_field_key": "contract_inspection_transposed/{row_uuid}/recognitionmethod",
+              "transposed_row": 26,
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "B",
+                "row_from": "row_identity"
+              },
+              "header_source_ref": "源xlsx!合同检查表D4-12!A27",
+              "instances": "many",
+              "json_pointer": "/contracts/{row_uuid}/acceptanceClause",
+              "mode": "editable",
+              "source_ref": "源xlsx!合同检查表D4-12!B27:K27",
+              "stable_field_key": "contract_inspection_transposed/{row_uuid}/acceptanceclause",
+              "transposed_row": 27,
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "B",
+                "row_from": "row_identity"
+              },
+              "header_source_ref": "源xlsx!合同检查表D4-12!A28",
+              "instances": "many",
+              "json_pointer": "/contracts/{row_uuid}/recognitionTime",
+              "mode": "editable",
+              "source_ref": "源xlsx!合同检查表D4-12!B28:K28",
+              "stable_field_key": "contract_inspection_transposed/{row_uuid}/recognitiontime",
+              "transposed_row": 28,
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "B",
+                "row_from": "row_identity"
+              },
+              "header_source_ref": "源xlsx!合同检查表D4-12!A29",
+              "instances": "many",
+              "json_pointer": "/contracts/{row_uuid}/controlTransferDoc",
+              "mode": "editable",
+              "source_ref": "源xlsx!合同检查表D4-12!B29:K29",
+              "stable_field_key": "contract_inspection_transposed/{row_uuid}/controltransferdoc",
+              "transposed_row": 29,
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "B",
+                "row_from": "row_identity"
+              },
+              "header_source_ref": "源xlsx!合同检查表D4-12!A30",
+              "instances": "many",
+              "json_pointer": "/contracts/{row_uuid}/specialTransaction",
+              "mode": "editable",
+              "source_ref": "源xlsx!合同检查表D4-12!B30:K30",
+              "stable_field_key": "contract_inspection_transposed/{row_uuid}/specialtransaction",
+              "transposed_row": 30,
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "B",
+                "row_from": "row_identity"
+              },
+              "header_source_ref": "源xlsx!合同检查表D4-12!A31",
+              "instances": "many",
+              "json_pointer": "/contracts/{row_uuid}/conclusion",
+              "mode": "editable",
+              "source_ref": "源xlsx!合同检查表D4-12!B31:K31",
+              "stable_field_key": "contract_inspection_transposed/{row_uuid}/conclusion",
+              "transposed_row": 31,
+              "value_type": "text"
+            }
+          ],
+          "header_rows": 1,
+          "layout": "customer_columns",
+          "protected_regions": {
+            "footer_rows": [
+              32,
+              36
+            ],
+            "label_columns": "A",
+            "static_prompt": "A38:XFD1048576"
+          },
+          "row_identity": {
+            "json_pointer": "/contracts/*/id",
+            "kind": "field"
+          },
+          "table_key": "contract_inspection_transposed",
+          "transposed_columns": {
+            "identity": "id",
+            "identity_prefix": "GT-CONTRACT-",
+            "identity_row": 9,
+            "source_ref": "源xlsx!合同检查表D4-12!B10:K10"
           }
         }
       ]
@@ -12789,6 +13130,550 @@
         }
       ],
       "template_id": "D47"
+    },
+    {
+      "excel_name": "营业收入发生检查表D4-14",
+      "locator": {
+        "anchor": "excel_table_sheet_association"
+      },
+      "sheet_key": "d414-managed",
+      "tables": [
+        {
+          "anchor": "A13",
+          "delete_policy": "tombstone",
+          "fields": [
+            {
+              "cell": {
+                "column": "B",
+                "row_from": "row_identity"
+              },
+              "column_key": "voucher_customer_name",
+              "header_source_ref": "源xlsx!营业收入发生检查表D4-14!B14",
+              "header_text": "客户名称",
+              "json_pointer": "/{row_uuid}/voucher/customerName",
+              "mode": "editable",
+              "source_ref": "源xlsx!营业收入发生检查表D4-14!B15",
+              "stable_field_key": "walkthrough_transactions/{row_uuid}/voucher_customer_name",
+              "store_item_id": "D4-14-transactions",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "C",
+                "row_from": "row_identity"
+              },
+              "column_key": "voucher_date",
+              "header_source_ref": "源xlsx!营业收入发生检查表D4-14!C14",
+              "header_text": "凭证日期",
+              "json_pointer": "/{row_uuid}/voucher/date",
+              "mode": "editable",
+              "source_ref": "源xlsx!营业收入发生检查表D4-14!C15",
+              "stable_field_key": "walkthrough_transactions/{row_uuid}/voucher_date",
+              "store_item_id": "D4-14-transactions",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "D",
+                "row_from": "row_identity"
+              },
+              "column_key": "voucher_number",
+              "header_source_ref": "源xlsx!营业收入发生检查表D4-14!D14",
+              "header_text": "凭证编号",
+              "json_pointer": "/{row_uuid}/voucher/number",
+              "mode": "editable",
+              "source_ref": "源xlsx!营业收入发生检查表D4-14!D15",
+              "stable_field_key": "walkthrough_transactions/{row_uuid}/voucher_number",
+              "store_item_id": "D4-14-transactions",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "E",
+                "row_from": "row_identity"
+              },
+              "column_key": "voucher_product_name",
+              "header_source_ref": "源xlsx!营业收入发生检查表D4-14!E14",
+              "header_text": "凭证品名",
+              "json_pointer": "/{row_uuid}/voucher/productName",
+              "mode": "editable",
+              "source_ref": "源xlsx!营业收入发生检查表D4-14!E15",
+              "stable_field_key": "walkthrough_transactions/{row_uuid}/voucher_product_name",
+              "store_item_id": "D4-14-transactions",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "F",
+                "row_from": "row_identity"
+              },
+              "column_key": "voucher_quantity",
+              "header_source_ref": "源xlsx!营业收入发生检查表D4-14!F14",
+              "header_text": "凭证数量",
+              "json_pointer": "/{row_uuid}/voucher/quantity",
+              "mode": "editable",
+              "source_ref": "源xlsx!营业收入发生检查表D4-14!F15",
+              "stable_field_key": "walkthrough_transactions/{row_uuid}/voucher_quantity",
+              "store_item_id": "D4-14-transactions",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "G",
+                "row_from": "row_identity"
+              },
+              "column_key": "voucher_amount",
+              "header_source_ref": "源xlsx!营业收入发生检查表D4-14!G14",
+              "header_text": "凭证金额",
+              "json_pointer": "/{row_uuid}/voucher/amount",
+              "mode": "editable",
+              "source_ref": "源xlsx!营业收入发生检查表D4-14!G15",
+              "stable_field_key": "walkthrough_transactions/{row_uuid}/voucher_amount",
+              "store_item_id": "D4-14-transactions",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "H",
+                "row_from": "row_identity"
+              },
+              "column_key": "contract_date",
+              "header_source_ref": "源xlsx!营业收入发生检查表D4-14!H14",
+              "header_text": "合同日期",
+              "json_pointer": "/{row_uuid}/contract/date",
+              "mode": "editable",
+              "source_ref": "源xlsx!营业收入发生检查表D4-14!H15",
+              "stable_field_key": "walkthrough_transactions/{row_uuid}/contract_date",
+              "store_item_id": "D4-14-transactions",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "I",
+                "row_from": "row_identity"
+              },
+              "column_key": "contract_number",
+              "header_source_ref": "源xlsx!营业收入发生检查表D4-14!I14",
+              "header_text": "合同号/订单号",
+              "json_pointer": "/{row_uuid}/contract/number",
+              "mode": "editable",
+              "source_ref": "源xlsx!营业收入发生检查表D4-14!I15",
+              "stable_field_key": "walkthrough_transactions/{row_uuid}/contract_number",
+              "store_item_id": "D4-14-transactions",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "J",
+                "row_from": "row_identity"
+              },
+              "column_key": "delivery_date",
+              "header_source_ref": "源xlsx!营业收入发生检查表D4-14!J14",
+              "header_text": "出库日期",
+              "json_pointer": "/{row_uuid}/delivery/date",
+              "mode": "editable",
+              "source_ref": "源xlsx!营业收入发生检查表D4-14!J15",
+              "stable_field_key": "walkthrough_transactions/{row_uuid}/delivery_date",
+              "store_item_id": "D4-14-transactions",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "K",
+                "row_from": "row_identity"
+              },
+              "column_key": "delivery_number",
+              "header_source_ref": "源xlsx!营业收入发生检查表D4-14!K14",
+              "header_text": "出库编号",
+              "json_pointer": "/{row_uuid}/delivery/number",
+              "mode": "editable",
+              "source_ref": "源xlsx!营业收入发生检查表D4-14!K15",
+              "stable_field_key": "walkthrough_transactions/{row_uuid}/delivery_number",
+              "store_item_id": "D4-14-transactions",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "L",
+                "row_from": "row_identity"
+              },
+              "column_key": "delivery_product_name",
+              "header_source_ref": "源xlsx!营业收入发生检查表D4-14!L14",
+              "header_text": "出库品名",
+              "json_pointer": "/{row_uuid}/delivery/productName",
+              "mode": "editable",
+              "source_ref": "源xlsx!营业收入发生检查表D4-14!L15",
+              "stable_field_key": "walkthrough_transactions/{row_uuid}/delivery_product_name",
+              "store_item_id": "D4-14-transactions",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "M",
+                "row_from": "row_identity"
+              },
+              "column_key": "delivery_quantity",
+              "header_source_ref": "源xlsx!营业收入发生检查表D4-14!M14",
+              "header_text": "出库数量",
+              "json_pointer": "/{row_uuid}/delivery/quantity",
+              "mode": "editable",
+              "source_ref": "源xlsx!营业收入发生检查表D4-14!M15",
+              "stable_field_key": "walkthrough_transactions/{row_uuid}/delivery_quantity",
+              "store_item_id": "D4-14-transactions",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "N",
+                "row_from": "row_identity"
+              },
+              "column_key": "delivery_warehouse_keeper",
+              "header_source_ref": "源xlsx!营业收入发生检查表D4-14!N14",
+              "header_text": "仓库保管员",
+              "json_pointer": "/{row_uuid}/delivery/warehouseKeeper",
+              "mode": "editable",
+              "source_ref": "源xlsx!营业收入发生检查表D4-14!N15",
+              "stable_field_key": "walkthrough_transactions/{row_uuid}/delivery_warehouse_keeper",
+              "store_item_id": "D4-14-transactions",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "O",
+                "row_from": "row_identity"
+              },
+              "column_key": "delivery_shipping_approver",
+              "header_source_ref": "源xlsx!营业收入发生检查表D4-14!O14",
+              "header_text": "发货审批人",
+              "json_pointer": "/{row_uuid}/delivery/shippingApprover",
+              "mode": "editable",
+              "source_ref": "源xlsx!营业收入发生检查表D4-14!O15",
+              "stable_field_key": "walkthrough_transactions/{row_uuid}/delivery_shipping_approver",
+              "store_item_id": "D4-14-transactions",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "P",
+                "row_from": "row_identity"
+              },
+              "column_key": "shipping_date",
+              "header_source_ref": "源xlsx!营业收入发生检查表D4-14!P14",
+              "header_text": "运输日期",
+              "json_pointer": "/{row_uuid}/shipping/date",
+              "mode": "editable",
+              "source_ref": "源xlsx!营业收入发生检查表D4-14!P15",
+              "stable_field_key": "walkthrough_transactions/{row_uuid}/shipping_date",
+              "store_item_id": "D4-14-transactions",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "Q",
+                "row_from": "row_identity"
+              },
+              "column_key": "shipping_number",
+              "header_source_ref": "源xlsx!营业收入发生检查表D4-14!Q14",
+              "header_text": "运输编号",
+              "json_pointer": "/{row_uuid}/shipping/number",
+              "mode": "editable",
+              "source_ref": "源xlsx!营业收入发生检查表D4-14!Q15",
+              "stable_field_key": "walkthrough_transactions/{row_uuid}/shipping_number",
+              "store_item_id": "D4-14-transactions",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "R",
+                "row_from": "row_identity"
+              },
+              "column_key": "shipping_quantity",
+              "header_source_ref": "源xlsx!营业收入发生检查表D4-14!R14",
+              "header_text": "运输数量",
+              "json_pointer": "/{row_uuid}/shipping/quantity",
+              "mode": "editable",
+              "source_ref": "源xlsx!营业收入发生检查表D4-14!R15",
+              "stable_field_key": "walkthrough_transactions/{row_uuid}/shipping_quantity",
+              "store_item_id": "D4-14-transactions",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "S",
+                "row_from": "row_identity"
+              },
+              "column_key": "shipping_company",
+              "header_source_ref": "源xlsx!营业收入发生检查表D4-14!S14",
+              "header_text": "运输公司",
+              "json_pointer": "/{row_uuid}/shipping/company",
+              "mode": "editable",
+              "source_ref": "源xlsx!营业收入发生检查表D4-14!S15",
+              "stable_field_key": "walkthrough_transactions/{row_uuid}/shipping_company",
+              "store_item_id": "D4-14-transactions",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "T",
+                "row_from": "row_identity"
+              },
+              "column_key": "shipping_address",
+              "header_source_ref": "源xlsx!营业收入发生检查表D4-14!T14",
+              "header_text": "运输地址",
+              "json_pointer": "/{row_uuid}/shipping/address",
+              "mode": "editable",
+              "source_ref": "源xlsx!营业收入发生检查表D4-14!T15",
+              "stable_field_key": "walkthrough_transactions/{row_uuid}/shipping_address",
+              "store_item_id": "D4-14-transactions",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "U",
+                "row_from": "row_identity"
+              },
+              "column_key": "receipt_date",
+              "header_source_ref": "源xlsx!营业收入发生检查表D4-14!U14",
+              "header_text": "签收日期",
+              "json_pointer": "/{row_uuid}/receipt/date",
+              "mode": "editable",
+              "source_ref": "源xlsx!营业收入发生检查表D4-14!U15",
+              "stable_field_key": "walkthrough_transactions/{row_uuid}/receipt_date",
+              "store_item_id": "D4-14-transactions",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "V",
+                "row_from": "row_identity"
+              },
+              "column_key": "receipt_product_name",
+              "header_source_ref": "源xlsx!营业收入发生检查表D4-14!V14",
+              "header_text": "签收品名",
+              "json_pointer": "/{row_uuid}/receipt/productName",
+              "mode": "editable",
+              "source_ref": "源xlsx!营业收入发生检查表D4-14!V15",
+              "stable_field_key": "walkthrough_transactions/{row_uuid}/receipt_product_name",
+              "store_item_id": "D4-14-transactions",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "W",
+                "row_from": "row_identity"
+              },
+              "column_key": "receipt_quantity",
+              "header_source_ref": "源xlsx!营业收入发生检查表D4-14!W14",
+              "header_text": "签收数量",
+              "json_pointer": "/{row_uuid}/receipt/quantity",
+              "mode": "editable",
+              "source_ref": "源xlsx!营业收入发生检查表D4-14!W15",
+              "stable_field_key": "walkthrough_transactions/{row_uuid}/receipt_quantity",
+              "store_item_id": "D4-14-transactions",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "X",
+                "row_from": "row_identity"
+              },
+              "column_key": "receipt_amount",
+              "header_source_ref": "源xlsx!营业收入发生检查表D4-14!X14",
+              "header_text": "签收金额",
+              "json_pointer": "/{row_uuid}/receipt/amount",
+              "mode": "editable",
+              "source_ref": "源xlsx!营业收入发生检查表D4-14!X15",
+              "stable_field_key": "walkthrough_transactions/{row_uuid}/receipt_amount",
+              "store_item_id": "D4-14-transactions",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "Y",
+                "row_from": "row_identity"
+              },
+              "column_key": "receipt_signer",
+              "header_source_ref": "源xlsx!营业收入发生检查表D4-14!Y14",
+              "header_text": "签收人",
+              "json_pointer": "/{row_uuid}/receipt/signer",
+              "mode": "editable",
+              "source_ref": "源xlsx!营业收入发生检查表D4-14!Y15",
+              "stable_field_key": "walkthrough_transactions/{row_uuid}/receipt_signer",
+              "store_item_id": "D4-14-transactions",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "Z",
+                "row_from": "row_identity"
+              },
+              "column_key": "receipt_seal_type",
+              "header_source_ref": "源xlsx!营业收入发生检查表D4-14!Z14",
+              "header_text": "盖章类型",
+              "json_pointer": "/{row_uuid}/receipt/sealType",
+              "mode": "editable",
+              "source_ref": "源xlsx!营业收入发生检查表D4-14!Z15",
+              "stable_field_key": "walkthrough_transactions/{row_uuid}/receipt_seal_type",
+              "store_item_id": "D4-14-transactions",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "AA",
+                "row_from": "row_identity"
+              },
+              "column_key": "receipt_seal_entity",
+              "header_source_ref": "源xlsx!营业收入发生检查表D4-14!AA14",
+              "header_text": "盖章单位",
+              "json_pointer": "/{row_uuid}/receipt/sealEntity",
+              "mode": "editable",
+              "source_ref": "源xlsx!营业收入发生检查表D4-14!AA15",
+              "stable_field_key": "walkthrough_transactions/{row_uuid}/receipt_seal_entity",
+              "store_item_id": "D4-14-transactions",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "AB",
+                "row_from": "row_identity"
+              },
+              "column_key": "invoice_date",
+              "header_source_ref": "源xlsx!营业收入发生检查表D4-14!AB14",
+              "header_text": "发票日期",
+              "json_pointer": "/{row_uuid}/invoice/date",
+              "mode": "editable",
+              "source_ref": "源xlsx!营业收入发生检查表D4-14!AB15",
+              "stable_field_key": "walkthrough_transactions/{row_uuid}/invoice_date",
+              "store_item_id": "D4-14-transactions",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "AC",
+                "row_from": "row_identity"
+              },
+              "column_key": "invoice_number",
+              "header_source_ref": "源xlsx!营业收入发生检查表D4-14!AC14",
+              "header_text": "发票编号",
+              "json_pointer": "/{row_uuid}/invoice/number",
+              "mode": "editable",
+              "source_ref": "源xlsx!营业收入发生检查表D4-14!AC15",
+              "stable_field_key": "walkthrough_transactions/{row_uuid}/invoice_number",
+              "store_item_id": "D4-14-transactions",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "AD",
+                "row_from": "row_identity"
+              },
+              "column_key": "invoice_product_name",
+              "header_source_ref": "源xlsx!营业收入发生检查表D4-14!AD14",
+              "header_text": "发票品名",
+              "json_pointer": "/{row_uuid}/invoice/productName",
+              "mode": "editable",
+              "source_ref": "源xlsx!营业收入发生检查表D4-14!AD15",
+              "stable_field_key": "walkthrough_transactions/{row_uuid}/invoice_product_name",
+              "store_item_id": "D4-14-transactions",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "AE",
+                "row_from": "row_identity"
+              },
+              "column_key": "invoice_quantity",
+              "header_source_ref": "源xlsx!营业收入发生检查表D4-14!AE14",
+              "header_text": "发票数量",
+              "json_pointer": "/{row_uuid}/invoice/quantity",
+              "mode": "editable",
+              "source_ref": "源xlsx!营业收入发生检查表D4-14!AE15",
+              "stable_field_key": "walkthrough_transactions/{row_uuid}/invoice_quantity",
+              "store_item_id": "D4-14-transactions",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "AF",
+                "row_from": "row_identity"
+              },
+              "column_key": "invoice_amount",
+              "header_source_ref": "源xlsx!营业收入发生检查表D4-14!AF14",
+              "header_text": "发票金额",
+              "json_pointer": "/{row_uuid}/invoice/amount",
+              "mode": "editable",
+              "source_ref": "源xlsx!营业收入发生检查表D4-14!AF15",
+              "stable_field_key": "walkthrough_transactions/{row_uuid}/invoice_amount",
+              "store_item_id": "D4-14-transactions",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "AI",
+                "row_from": "row_identity"
+              },
+              "column_key": "other_description",
+              "header_source_ref": "源xlsx!营业收入发生检查表D4-14!AI14",
+              "header_text": "其他支持性文件或说明",
+              "json_pointer": "/{row_uuid}/other/description",
+              "mode": "editable",
+              "source_ref": "源xlsx!营业收入发生检查表D4-14!AI15",
+              "stable_field_key": "walkthrough_transactions/{row_uuid}/other_description",
+              "store_item_id": "D4-14-transactions",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "AJ",
+                "row_from": "row_identity"
+              },
+              "column_key": "other_index_no",
+              "header_source_ref": "源xlsx!营业收入发生检查表D4-14!AJ14",
+              "header_text": "索引号",
+              "json_pointer": "/{row_uuid}/other/indexNo",
+              "mode": "editable",
+              "source_ref": "源xlsx!营业收入发生检查表D4-14!AJ15",
+              "stable_field_key": "walkthrough_transactions/{row_uuid}/other_index_no",
+              "store_item_id": "D4-14-transactions",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "AK",
+                "row_from": "row_identity"
+              },
+              "column_key": "other_anomaly_note",
+              "header_source_ref": "源xlsx!营业收入发生检查表D4-14!AK14",
+              "header_text": "是否异常",
+              "json_pointer": "/{row_uuid}/other/anomalyNote",
+              "mode": "editable",
+              "source_ref": "源xlsx!营业收入发生检查表D4-14!AK15",
+              "stable_field_key": "walkthrough_transactions/{row_uuid}/other_anomaly_note",
+              "store_item_id": "D4-14-transactions",
+              "value_type": "text"
+            }
+          ],
+          "footer_anchor": {
+            "carries_total_formula": true,
+            "marker": "合计",
+            "note": "footer 行 A37「合计」（G37/X37/AF37 SUM 金额公式）；A38「本期发生额」、A39「检查比例」（G39=G37/G38 公式）为衍生统计，不进受管区（15..36）。sampling / auditNote / auditConclusion 走 HTML 独立 store，不进 Excel Table。",
+            "search_column": "A"
+          },
+          "formula_mask": [
+            "G37",
+            "X37",
+            "AF37",
+            "G39"
+          ],
+          "header_rows": 2,
+          "row_identity": {
+            "json_pointer": "/*/id",
+            "kind": "field"
+          },
+          "table_key": "walkthrough_transactions"
+        }
+      ],
+      "template_id": "D414"
     }
   ],
   "template": {

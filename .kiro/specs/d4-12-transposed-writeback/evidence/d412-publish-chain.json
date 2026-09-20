@@ -1,0 +1,49 @@
+{
+  "captured": "2026-09-20",
+  "task": "Task 9 发布链 (provision + rematerialize, live PG audit-postgres pg16)",
+  "chain": {
+    "1_generate_apply": {
+      "canonical_digest": "0e2023fa11645c744b5ed1940abc97cc3ecfda24744946e70e609de1b5a0ef32",
+      "recheck": "OK",
+      "disk_sheets": 34,
+      "d4-12-managed_present": true
+    },
+    "2_provision_apply": {
+      "created_total": 3,
+      "created": ["bundle", "contract", "instrumentation"],
+      "reused": ["authority_model", "template"],
+      "contract_digest": "0e2023fa11645c744b5ed1940abc97cc3ecfda24744946e70e609de1b5a0ef32",
+      "supply_rows": {"artifact": "121→123", "bundle": "56→57"},
+      "errors": []
+    },
+    "3_rematerialize_apply": {
+      "generation": "82→83",
+      "current_bundle_sha256": "2a8db8076b143ba9173cdc3ce826b5fc13f2d3e0c459dcb26ad706b8c1fb4b4b",
+      "desired_bundle_sha256": "2a8db8076b143ba9173cdc3ce826b5fc13f2d3e0c459dcb26ad706b8c1fb4b4b",
+      "recheck_status": "already_on_desired_bundle",
+      "no_roundtrip_equivalence_error": true,
+      "no_footer_anchor_drift": true,
+      "no_soft_timeout": true,
+      "note": "首次 --apply 已提交(rev 106→107, gen→83, bundle 切到含 D4-12 的 desired); 第二次 --apply 报 RevisionConflict(expected=106 current=107) 是因状态已最新, --check 确认 already_on_desired_bundle。DB 查证 gen 83 representation.definition_bundle_sha256=2a8db8076(含 d4-12-managed), gen 81/82 是旧 bundle 5bca042d(D4-8)。"
+    },
+    "4_materialize_timing": {
+      "method": "复盘 #2 补量化: --apply --force 强制重 publish(gen83→84 revision108) 计时整个进程。",
+      "total_process_seconds": 88.91,
+      "note": "总进程 88.91s 含 Python 启动 + DB 连接 + import 开销(约 3-5s) + 整册 34 sheet materialize + 发布链。materialize 段本身(MaterializeSoftTimeoutError 判据针对的 CPU 段)未抛 SoftTimeout ⇒ < 120s soft_limit, 加 D4-12 后仍有余量(与 memory Wave 5 后基线 D4-14 加入约 82s 一致)。soft_limit 未提高。",
+      "soft_limit": 120,
+      "margin": "有余量(materialize 段 < 120s, 未抛 SoftTimeout)"
+    }
+  },
+  "pre_existing_bug_fixed_en_route": {
+    "file": "backend/scripts/diagnose/d43_rematerialize_dual_sheet.py",
+    "symbol": "_read_store_map",
+    "bug": "缺失 store item 统一塞 EMPTY_STORE_PAYLOAD('[]'), 但 dict-store item(D4-31 singleton问卷{}/D4-9/D4-35) 拿到 '[]' 被 build_store_projection 判『必须是单对象/字典』抛 ValueError('D4-31 必须是单对象问卷'), 打挂整册 rematerialize。与 D4-12 无关的 pre-existing bug(rematerialize 读 store 默认值与 provider build_combined_store_projection 的 per-item 默认约定不一致)。",
+    "fix": "缺失时不塞该 key(fixed_ids 除外), 让 build_combined_store_projection 的 payloads.get(item, <per-item默认>) 用 provider 自己声明的正确空默认(单源)。",
+    "触类旁通": "一次修复覆盖所有 dict-store item(D4-31/D4-9/D4-35), 非只 D4-31 换默认。"
+  },
+  "env_gate": {
+    "store_projection_200_field_count": "UNVERIFIABLE — 需 start-dev.bat 全栈起后端才能 GET store-projection 端点; 往返正确性由 Task6 test_d4_12_transposed_roundtrip.py 11 passed + 本发布链真 PG gen83 无 RoundtripEquivalenceError 保证。",
+    "real_oo_canvas_roundtrip": "UNVERIFIABLE — OO canvas 非 DOM, Playwright 无法可靠编辑单元格(同 D4 全组批次C 标准)。"
+  },
+  "conclusion": "发布链核心判据达成: contract/provision 入库 + rematerialize gen82→83 current==desired(含d4-12-managed) 无 Roundtrip/FooterAnchor/SoftTimeout; 复盘 #2 补 --force 计时至 gen84(bundle sha256 不变, 仅 representation 版本累积), 整册 materialize 总进程 88.91s、materialize 段 < 120s soft_limit 有余量。真 OO canvas + 全栈 store-projection 端点为 env 门标 UNVERIFIABLE 不假绿。"
+}

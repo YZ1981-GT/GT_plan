@@ -1,0 +1,24 @@
+{
+  "sheet": "D4-12",
+  "sheet_name": "合同检查表D4-12",
+  "captured_at": "2026-09-20",
+  "spec": "d4-12-transposed-writeback",
+  "scope": {
+    "entry_id": "xlsx/gt-d4-operating-revenue",
+    "sheet_key": "d4-12-managed",
+    "kind": "transposed (一列=一份合同, 一行=一个字段; 首列 B, 21 字段 R11-R31)"
+  },
+  "status": "UNVERIFIABLE",
+  "verification_gate": {
+    "reason": "真栈 e2e(Playwright + start-dev.bat 全栈 + OO 容器)未在本轮运行; 真 OO canvas 往返为 env 门(OO canvas 非 DOM, Playwright 无法可靠编辑单元格), 同 D4 全组批次C 标准。不伪造 REQUEST_PATH 级抓包(避免假绿)。",
+    "L1_unified_path": "代码就绪未抓包 — D4TabContract.vue 已接 useWorkpaperSyncBridge(entry=xlsx/gt-d4-operating-revenue, sheetKey=d4-12-managed) + WorkpaperSyncEditorHost + flushHtml(flushPendingSave→readStoreProjection); 宿主 GtD4OperatingRevenue.vue isD4DedicatedSyncSheet 含 'D4-12'。",
+    "L2_transposed_roundtrip": "代码就绪未抓包 — 真 OO canvas 单元格往返 env 门。"
+  },
+  "code_level_evidence": {
+    "backend_roundtrip": "backend/tests/workpaper_sync/test_d4_12_transposed_roundtrip.py 11 passed (materialize→extract 21字段逐字段闭合 / 首列B / carrier隐藏 / 占位空列跳过 / 扩列 / 合同金额数值 / 公式拒绝 / 重复id拒绝 / stable_key)",
+    "publish_chain": "发布链真 PG 落地: provision created bundle/contract/instrumentation; rematerialize gen82→83 current bundle=2a8db8076=desired(含d4-12-managed), 无 RoundtripEquivalenceError/FooterAnchorDrift/SoftTimeout (见 .kiro/specs/d4-12-transposed-writeback/evidence/d412-publish-chain.json)",
+    "frontend_wiring_guard": "audit-platform/frontend/src/components/workpaper/__tests__/d4ContractSyncHostWiring.spec.ts 10 passed (接桥字面量 entry/sheetKey / WorkpaperSyncEditorHost / flushPendingSave先于readStoreProjection / 宿主dedicated含D4-12 / OCR/AI/导入导出/CRUD不回归)",
+    "d429_zero_regression": "泛化引擎对 D4-29 materialize 逐字节 / extract 逐字段 / mapping_digest 零回归 (见 evidence/d429-zero-regression.json)"
+  },
+  "conclusion": "D4-12 三维代码全绿(后端契约+前端接桥+宿主登记) + 发布链真 PG 落地; 转置往返正确性由后端 materialize→extract 单测 + 发布链真 PG 无 RoundtripEquivalenceError 保证。真 OO canvas 往返 + 全栈 store-projection 端点抓包为 env 门, 如实标 UNVERIFIABLE 不假绿。"
+}

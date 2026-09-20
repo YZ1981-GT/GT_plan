@@ -321,14 +321,18 @@ class ExcelSyncAdapter:
                     capability=self.capability,
                     limits=self._limits,
                 ).result
-                from app.services.workpaper_sync.phase5_d4_29_customer_detail import materialize_file, is_enabled
-                if is_enabled(contract):
-                    # D4-29 转置写盘后只刷新 artifact 字节摘要；structure_hash 由
+                from app.services.workpaper_sync.phase5_transposed_sheet import materialize_file as _transposed_materialize_file
+                from app.services.workpaper_sync.transposed_registry import resolve_transposed_specs
+                specs = resolve_transposed_specs(contract)
+                if specs:
+                    # 转置写盘后只刷新 artifact 字节摘要；structure_hash 由
                     # ContentMutationService._projection_structure_hash（与观测器同构）覆盖，
                     # 不得用 normalized_structure_hash（整簿指纹）覆盖 —— 那会立刻漂移。
+                    # 多张转置 sheet（D4-29/D4-12…）逐 spec 覆盖各自的列。
                     import dataclasses
                     import hashlib
-                    materialize_file(output, projection, contract)
+                    for spec in specs:
+                        _transposed_materialize_file(output, projection, spec=spec)
                     result = dataclasses.replace(
                         result,
                         artifact_sha256=hashlib.sha256(output.read_bytes()).hexdigest(),
@@ -408,12 +412,16 @@ class ExcelSyncAdapter:
                     path.unlink(missing_ok=True)
             assert last_result is not None
             assert primary_result is not None
-            from app.services.workpaper_sync.phase5_d4_29_customer_detail import materialize_file, is_enabled
-            if is_enabled(contract):
-                # D4-29 转置写盘后只刷新 artifact 字节摘要；structure_hash 由
+            from app.services.workpaper_sync.phase5_transposed_sheet import materialize_file as _transposed_materialize_file
+            from app.services.workpaper_sync.transposed_registry import resolve_transposed_specs
+            specs = resolve_transposed_specs(contract)
+            if specs:
+                # 转置写盘后只刷新 artifact 字节摘要；structure_hash 由
                 # ContentMutationService._projection_structure_hash（与观测器同构）覆盖。
+                # 多张转置 sheet 逐 spec 覆盖各自的列。
                 import hashlib
-                materialize_file(output, projection, contract)
+                for spec in specs:
+                    _transposed_materialize_file(output, projection, spec=spec)
                 last_result = dataclasses.replace(
                     last_result,
                     artifact_sha256=hashlib.sha256(output.read_bytes()).hexdigest(),
@@ -477,9 +485,10 @@ class ExcelSyncAdapter:
                     retain_identity_inventory=binding.table_key == self.binding.table_key,
                 ).projection
             )
-        from app.services.workpaper_sync.phase5_d4_29_customer_detail import is_enabled, extract_file
-        if is_enabled(contract):
-            parts.append(extract_file(artifact, contract))
+        from app.services.workpaper_sync.phase5_transposed_sheet import extract_file as _transposed_extract_file
+        from app.services.workpaper_sync.transposed_registry import resolve_transposed_specs
+        for spec in resolve_transposed_specs(contract):
+            parts.append(_transposed_extract_file(artifact, contract, spec=spec))
         return self._merge_projections(parts)
 
     def _substrate_shape_of(
@@ -559,17 +568,27 @@ class ExcelSyncAdapter:
         g7_before_sanitized: Path | None = None
         d429_before: Path | None = None
         try:
-            from app.services.workpaper_sync.phase5_d4_29_customer_detail import (
-                is_enabled, materialize_transposed_workbook, extract_transposed_workbook,
+            from app.services.workpaper_sync.phase5_transposed_sheet import (
+                materialize_transposed_workbook as _transposed_materialize,
+                extract_transposed_workbook as _transposed_extract,
             )
-            if is_enabled(contract):
+            from app.services.workpaper_sync.transposed_registry import resolve_transposed_specs
+            specs = resolve_transposed_specs(contract)
+            if specs:
+                # 把 after 侧每张转置 sheet 的受管列重投影回 before 副本，使 verify 不把
+                # 合法的转置列变化判成 unmanaged drift。多张转置 sheet 链式叠加（逐 spec 各
+                # 重投影一遍，前一遍产物喂下一遍）。
                 import tempfile
-                handle = tempfile.NamedTemporaryFile(suffix=".d429-before.xlsx", delete=False)
+                handle = tempfile.NamedTemporaryFile(suffix=".transposed-before.xlsx", delete=False)
                 handle.close()
                 d429_before = Path(handle.name)
-                d429_before.write_bytes(materialize_transposed_workbook(
-                    before.read_bytes(), extract_transposed_workbook(after.read_bytes())
-                ))
+                projected = before.read_bytes()
+                after_bytes = after.read_bytes()
+                for spec in specs:
+                    projected = _transposed_materialize(
+                        projected, _transposed_extract(after_bytes, spec=spec), spec=spec
+                    )
+                d429_before.write_bytes(projected)
                 before_for_compare = d429_before
             if self.adapter_id == "g7.soe_subsidiary_disclosure":
                 import shutil

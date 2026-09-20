@@ -1,0 +1,77 @@
+{
+  "captured": "2026-09-20",
+  "source_template": "backend/wp_templates/D/D4-12 营业收入-合同检查（Leap-常规程序）.xlsx",
+  "method": "openpyxl load_workbook(data_only=False) 直读 + raw xl/workbook.xml definedNames",
+  "sheet": {
+    "name": "合同检查表D4-12",
+    "dims": "A1:K57",
+    "max_row": 57,
+    "max_col": 11
+  },
+  "transposed_geometry": {
+    "header_row": 10,
+    "header_row_semantics": "A10=索引号(标签列), B10..K10=D4-12-1..D4-12-10(模板预画10合同列,indexNo非受管业务字段)",
+    "first_entity_column": "B",
+    "initial_entity_column": "K",
+    "entity_column_count": 10,
+    "field_first_row": 11,
+    "field_last_row": 31,
+    "field_count": 21,
+    "label_column": "A"
+  },
+  "footer": {
+    "audit_note_row": 32,
+    "audit_conclusion_row": 36,
+    "static_prompt_first_row": 38,
+    "note": "R32审计说明/R36审计结论/R38+提示 全部 HTML-only, 不进转置受管区"
+  },
+  "identity_carrier_row_census": {
+    "decision": 9,
+    "rationale": "R8=`1.……`(审计过程文本,占用); R9 实测为空(无内容,未hidden); header在R10。取 header_row 上方一行 R9 作 carrier, 不覆盖任何已有内容, 与 D4-29 一致(D4-29 carrier=R9)。instrumentation 注入时写 hidden + GT-CONTRACT-{id} + locked, 无需 insert 行/下移几何。",
+    "R8_value": "1.……",
+    "R9_value": null,
+    "R9_hidden_before_inject": false
+  },
+  "defined_name_census": {
+    "GT_MANAGED_REGION_D412_present": false,
+    "existing_names_note": "只有 sheet-scoped _xlnm.Print_Area='合同检查表D4-12'!$A$1:$K$37 + 一堆 #REF! 垃圾名(AFV/CCD/CDE/XREF_*等)。无任何 GT_ 前缀 RANGE definedName。须 instrument 注入 workbook-scope GT_MANAGED_REGION_D412=$B$10:$K$31。",
+    "managed_ref_to_inject": "$B$10:$K$31"
+  },
+  "field_rows_alignment": {
+    "note": "R11..R31 模板标签 ↔ 前端 ContractInspectionItem key 逐项对齐(21条连续)。前端 store D4-12-contracts-v2 是扁平结构(id + 21平铺字段 + indexNo/label/attachment* 等HTML-only元字段), 无 D4-29 的 fields 嵌套。",
+    "store_shape": "flat (无 fields 嵌套, 区别于 D4-29 的 {id,name,fields:{}})",
+    "header_field_key": null,
+    "nested_fields_key": null,
+    "mapping": [
+      {"row": 11, "template_label": "合同编号", "frontend_key": "contractNo", "value_type": "text"},
+      {"row": 12, "template_label": "交易对方名称", "frontend_key": "counterparty", "value_type": "text"},
+      {"row": 13, "template_label": "合同签订日期", "frontend_key": "signDate", "value_type": "text"},
+      {"row": 14, "template_label": "服务内容/提供产品名称", "frontend_key": "serviceContent", "value_type": "text"},
+      {"row": 15, "template_label": "合同金额", "frontend_key": "contractAmount", "value_type": "number"},
+      {"row": 16, "template_label": "交货时间/服务期间", "frontend_key": "deliveryTime", "value_type": "text"},
+      {"row": 17, "template_label": "交货方式/提供服务方式", "frontend_key": "deliveryMethod", "value_type": "text"},
+      {"row": 18, "template_label": "结算方式", "frontend_key": "settlementMethod", "value_type": "text"},
+      {"row": 19, "template_label": "结算时间", "frontend_key": "settlementTime", "value_type": "text"},
+      {"row": 20, "template_label": "质量保证条款", "frontend_key": "warrantyClause", "value_type": "text"},
+      {"row": 21, "template_label": "销售退回条款", "frontend_key": "returnClause", "value_type": "text"},
+      {"row": 22, "template_label": "违约条款", "frontend_key": "breachClause", "value_type": "text"},
+      {"row": 23, "template_label": "特殊约定", "frontend_key": "specialTerms", "value_type": "text"},
+      {"row": 24, "template_label": "订立双方是否签字", "frontend_key": "isSigned", "value_type": "text"},
+      {"row": 25, "template_label": "订立双方是否盖章", "frontend_key": "isSealed", "value_type": "text"},
+      {"row": 26, "template_label": "时段法/时点法", "frontend_key": "recognitionMethod", "value_type": "text"},
+      {"row": 27, "template_label": "验收条款", "frontend_key": "acceptanceClause", "value_type": "text"},
+      {"row": 28, "template_label": "收入确认时间", "frontend_key": "recognitionTime", "value_type": "text"},
+      {"row": 29, "template_label": "表明控制权转移的单据名称", "frontend_key": "controlTransferDoc", "value_type": "text"},
+      {"row": 30, "template_label": "是否涉及特定交易及相关说明", "frontend_key": "specialTransaction", "value_type": "text"},
+      {"row": 31, "template_label": "结论", "frontend_key": "conclusion", "value_type": "text"}
+    ]
+  },
+  "generalization_deltas_vs_d429": {
+    "first_entity_column": "D4-29=C, D4-12=B (A为标签列, 无独立label子列)",
+    "initial_entity_column": "D4-29=M, D4-12=K",
+    "field_count": "D4-29=28(跳27/32/33), D4-12=21(R11-R31连续)",
+    "header_field": "D4-29 header_row存受管字段 name; D4-12 header_row存 indexNo(非受管,模板预画标签) → header_field_key=None",
+    "store_shape": "D4-29 嵌套 {id,name,fields:{}}; D4-12 扁平 {id,...21字段} → nested_fields_key=None",
+    "template_prereq": "D4-29 模板预置 definedName+隐藏R9; D4-12 两者皆无, 须 instrument 注入"
+  }
+}

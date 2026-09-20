@@ -119,13 +119,13 @@ _SHEET_HEADERS: dict[str, list[str]] = {
     ],
     "D4-14": [
         "序号", "事项名称",
-        "凭证月份", "凭证日期", "凭证编号", "凭证品名", "凭证数量", "凭证金额", "记账日期",
-        "合同编号", "合同品名", "合同金额", "签发审批", "签收确认",
-        "出库日期", "出库品名", "出库金额", "仓库保管员",
-        "运输日期", "运输品名", "运输金额",
-        "签收日期", "签收品名", "签收金额",
-        "发票日期", "发票编号", "发票金额",
-        "其他文件描述", "其他索引号",
+        "凭证月份", "凭证客户名称", "凭证日期", "凭证编号", "凭证品名", "凭证数量", "凭证金额", "记账日期",
+        "合同日期", "合同编号", "合同品名", "合同金额", "签发审批", "签收确认",
+        "出库日期", "出库编号", "出库品名", "出库数量", "出库金额", "仓库保管员", "发货审批人",
+        "运输日期", "运输编号", "运输品名", "运输数量", "运输金额", "运输公司", "运输地址",
+        "签收日期", "签收品名", "签收数量", "签收金额", "签收人", "盖章类型", "盖章单位",
+        "发票日期", "发票编号", "发票品名", "发票数量", "发票金额",
+        "其他文件描述", "其他索引号", "是否异常",
         "一致性分数", "检查结论", "备注",
     ],
     "D4-15": [
@@ -872,7 +872,7 @@ async def d4_export_data(
                 data_row.get("taxIndex", ""),
             ]
         elif sheet == "D4-14":
-            # D4-14 穿行测试：TransactionItem → 32列平铺
+            # D4-14 穿行测试：TransactionItem → 48列平铺（路线A全受管，与 _SHEET_HEADERS["D4-14"] 严格同序）
             v = data_row.get("voucher", {})
             c = data_row.get("contract", {})
             d = data_row.get("delivery", {})
@@ -883,15 +883,18 @@ async def d4_export_data(
             row_values = [
                 data_row.get("indexNo", ""),
                 data_row.get("label", ""),
-                v.get("month", ""), v.get("date", ""), v.get("number", ""),
+                v.get("month", ""), v.get("customerName", ""), v.get("date", ""), v.get("number", ""),
                 v.get("productName", ""), v.get("quantity", ""), _safe_float(v.get("amount")), v.get("accountingDate", ""),
-                c.get("number", ""), c.get("productName", ""), _safe_float(c.get("amount")),
+                c.get("date", ""), c.get("number", ""), c.get("productName", ""), _safe_float(c.get("amount")),
                 c.get("approver", ""), c.get("confirmor", ""),
-                d.get("date", ""), d.get("productName", ""), _safe_float(d.get("amount")), d.get("warehouseKeeper", ""),
-                s.get("date", ""), s.get("productName", ""), _safe_float(s.get("amount")),
-                r.get("date", ""), r.get("productName", ""), _safe_float(r.get("amount")),
-                inv.get("date", ""), inv.get("number", ""), _safe_float(inv.get("amount")),
-                o.get("description", ""), o.get("indexNo", ""),
+                d.get("date", ""), d.get("number", ""), d.get("productName", ""), d.get("quantity", ""),
+                _safe_float(d.get("amount")), d.get("warehouseKeeper", ""), d.get("shippingApprover", ""),
+                s.get("date", ""), s.get("number", ""), s.get("productName", ""), s.get("quantity", ""),
+                _safe_float(s.get("amount")), s.get("company", ""), s.get("address", ""),
+                r.get("date", ""), r.get("productName", ""), r.get("quantity", ""), _safe_float(r.get("amount")),
+                r.get("signer", ""), r.get("sealType", ""), r.get("sealEntity", ""),
+                inv.get("date", ""), inv.get("number", ""), inv.get("productName", ""), inv.get("quantity", ""), _safe_float(inv.get("amount")),
+                o.get("description", ""), o.get("indexNo", ""), o.get("anomalyNote", ""),
                 data_row.get("consistencyScore", 0),
                 data_row.get("conclusion", ""),
                 "",  # 备注
@@ -1877,6 +1880,7 @@ def _parse_d4_14_row(row: tuple, actual_headers: list[str]) -> dict:
         "label": _safe_str(_col_val("事项名称")),
         "voucher": {
             "month": _safe_str(_col_val("凭证月份")),
+            "customerName": _safe_str(_col_val("凭证客户名称")),
             "date": _safe_str(_col_val("凭证日期")),
             "number": _safe_str(_col_val("凭证编号")),
             "productName": _safe_str(_col_val("凭证品名")),
@@ -1885,6 +1889,7 @@ def _parse_d4_14_row(row: tuple, actual_headers: list[str]) -> dict:
             "accountingDate": _safe_str(_col_val("记账日期")),
         },
         "contract": {
+            "date": _safe_str(_col_val("合同日期")),
             "number": _safe_str(_col_val("合同编号")),
             "productName": _safe_str(_col_val("合同品名")),
             "amount": _safe_float(_col_val("合同金额")),
@@ -1893,28 +1898,42 @@ def _parse_d4_14_row(row: tuple, actual_headers: list[str]) -> dict:
         },
         "delivery": {
             "date": _safe_str(_col_val("出库日期")),
+            "number": _safe_str(_col_val("出库编号")),
             "productName": _safe_str(_col_val("出库品名")),
+            "quantity": _safe_str(_col_val("出库数量")),
             "amount": _safe_float(_col_val("出库金额")),
             "warehouseKeeper": _safe_str(_col_val("仓库保管员")),
+            "shippingApprover": _safe_str(_col_val("发货审批人")),
         },
         "shipping": {
             "date": _safe_str(_col_val("运输日期")),
+            "number": _safe_str(_col_val("运输编号")),
             "productName": _safe_str(_col_val("运输品名")),
+            "quantity": _safe_str(_col_val("运输数量")),
             "amount": _safe_float(_col_val("运输金额")),
+            "company": _safe_str(_col_val("运输公司")),
+            "address": _safe_str(_col_val("运输地址")),
         },
         "receipt": {
             "date": _safe_str(_col_val("签收日期")),
             "productName": _safe_str(_col_val("签收品名")),
+            "quantity": _safe_str(_col_val("签收数量")),
             "amount": _safe_float(_col_val("签收金额")),
+            "signer": _safe_str(_col_val("签收人")),
+            "sealType": _safe_str(_col_val("盖章类型")),
+            "sealEntity": _safe_str(_col_val("盖章单位")),
         },
         "invoice": {
             "date": _safe_str(_col_val("发票日期")),
             "number": _safe_str(_col_val("发票编号")),
+            "productName": _safe_str(_col_val("发票品名")),
+            "quantity": _safe_str(_col_val("发票数量")),
             "amount": _safe_float(_col_val("发票金额")),
         },
         "other": {
             "description": _safe_str(_col_val("其他文件描述")),
             "indexNo": _safe_str(_col_val("其他索引号")),
+            "anomalyNote": _safe_str(_col_val("是否异常")),
         },
         "consistencyScore": 0,
         "consistencyDetails": None,

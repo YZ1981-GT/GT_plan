@@ -16,8 +16,11 @@ import {
   type OcrExtractedFields,
 } from '../../composables/useD4ContractInspection'
 import { useD4ImportExport } from '../../composables/useD4ImportExport'
+import { useWorkpaperSyncBridge } from '../../sync/useWorkpaperSyncBridge'
+import { readStoreProjection } from '../../sync/workpaperSyncApi'
+import { capabilityForEntry } from '../../sync/workpaperSyncCapability'
+import WorkpaperSyncEditorHost from '../../sync/WorkpaperSyncEditorHost.vue'
 import D4ContractCard from './D4ContractCard.vue'
-import GtOnlyOfficeSheet from '../../GtOnlyOfficeSheet.vue'
 import GtIndexChip from '../../GtIndexChip.vue'
 import http from '@/utils/http'
 
@@ -31,22 +34,24 @@ const props = defineProps<{
 }>()
 
 const openReviewDialog = inject<((sectionId: string) => void) | null>('openReviewDialog', null)
+// 导入 xlsx / OO 回写后重载 allResponses（主入口 provide），否则界面停留旧值
+const reloadWorkpaperData = inject<(() => Promise<void>) | null>('reloadWorkpaperData', null)
+let reloadInFlight: Promise<void> | null = null
+async function reloadD412Data(): Promise<void> {
+  if (!reloadWorkpaperData) throw new Error('D4-12 未提供回读宿主')
+  if (!reloadInFlight) {
+    reloadInFlight = reloadWorkpaperData().finally(() => { reloadInFlight = null })
+  }
+  await reloadInFlight
+}
 
 // ─── 三模式 ──────────────────────────────────────────────────────────
 const editorMode = ref<'structured' | 'matrix' | 'onlyoffice'>('structured')
-const ooHealthy = ref(false)
 const modeOptions = computed(() => [
   { label: '卡片视图', value: 'structured' },
   { label: '矩阵视图', value: 'matrix' },
-  { label: '在线编辑', value: 'onlyoffice', disabled: !ooHealthy.value },
+  { label: '在线编辑', value: 'onlyoffice' },
 ])
-async function checkOoHealth() {
-  try {
-    const res = await http.get('/api/workpapers/onlyoffice/health', { _silent: true } as any)
-    ooHealthy.value = res.data?.data?.healthy ?? res.data?.healthy ?? false
-  } catch { ooHealthy.value = false }
-}
-checkOoHealth()
 
 // ─── AI 健康检查 ─────────────────────────────────────────────────────
 const aiAvailable = ref(false)
@@ -76,11 +81,50 @@ const {
   setAttachment,
   updateAuditNote,
   updateAuditConclusion,
+  flushPendingSave,
 } = useD4ContractInspection({
   wpId: toRef(props, 'wpId') as Ref<string>,
   projectId: toRef(props, 'projectId') as Ref<string>,
   allResponses: toRef(props, 'allResponses') as Ref<Map<string, any>>,
   isReadonly: toRef(props, 'isReadonly') as Ref<boolean>,
+})
+
+// ─── D4-12 专用同步桥（转置表：后端 provider 按合同 id 动态生成列并合并回写）──
+const D412_ENTRY = 'xlsx/gt-d4-operating-revenue'
+const D412_SHEET_KEY = 'd4-12-managed'
+const d412Bridge = useWorkpaperSyncBridge({
+  entryId: ref(D412_ENTRY), wpId: toRef(props, 'wpId'), projectId: toRef(props, 'projectId'),
+  sheetKey: ref(D412_SHEET_KEY), capability: capabilityForEntry(D412_ENTRY),
+  flushHtml: async () => {
+    await flushPendingSave()
+    const snap = await readStoreProjection({ projectId: props.projectId, wpId: props.wpId, entryId: D412_ENTRY })
+    return { expectedRevision: snap.expectedRevision, projection: snap.projection, sheetKey: D412_SHEET_KEY }
+  },
+  reloadHtml: async () => { await reloadD412Data() },
+})
+const d412SyncBusy = computed(() => ['oo_loading', 'forcesave_pending', 'refresh_required'].includes(String(d412Bridge.state.value)))
+const d412Switching = ref(false)
+const d412LastError = ref<string | null>(null)
+async function switchD412Mode(v: 'structured' | 'matrix' | 'onlyoffice') {
+  d412Switching.value = true; d412LastError.value = null
+  try {
+    if (v === 'onlyoffice') await d412Bridge.switchToOnlyOffice()
+    else if (d412Bridge.mode.value === 'oo') await d412Bridge.switchToHtml()
+    editorMode.value = v
+  } catch (error: any) { d412LastError.value = error?.message || '模式切换失败'; ElMessage.error(d412LastError.value) }
+  finally { d412Switching.value = false }
+}
+// segmented 绑定：OO 模式由 bridge.mode 权威判定, 其余用本地 editorMode
+const activeMode = computed<'structured' | 'matrix' | 'onlyoffice'>({
+  get: () => d412Bridge.mode.value === 'oo' ? 'onlyoffice' : editorMode.value,
+  set: (v) => { void switchD412Mode(v) },
+})
+// fail-visible 同步态三态中文 tag（同步中/同步失败/已同步）
+const d412SyncStateTag = computed(() => {
+  if (d412LastError.value || d412Bridge.lastError.value) return { text: '同步失败', type: 'danger' as const }
+  if (d412SyncBusy.value || d412Switching.value) return { text: '同步中', type: 'warning' as const }
+  if (d412Bridge.mode.value === 'oo') return { text: '已同步', type: 'success' as const }
+  return null
 })
 
 // ─── 导入导出 ────────────────────────────────────────────────────────
@@ -230,7 +274,10 @@ function fmtAmount(v: number): string {
   <div class="d4-contract">
     <!-- 顶部工具条 -->
     <div class="mode-bar">
-      <el-segmented v-model="editorMode" :options="modeOptions" size="small" />
+      <div class="mode-bar-left">
+        <el-segmented v-model="activeMode" :options="modeOptions" size="small" :disabled="d412SyncBusy || d412Switching" />
+        <el-tag v-if="d412SyncStateTag" :type="d412SyncStateTag.type" size="small" effect="light">{{ d412SyncStateTag.text }}</el-tag>
+      </div>
       <div class="mode-bar-right">
         <el-dropdown size="small" trigger="click" :disabled="isReadonly">
           <el-button size="small">导入导出 ▾</el-button>
@@ -253,8 +300,11 @@ function fmtAmount(v: number): string {
       </div>
     </div>
 
+    <!-- 同步错误提示 -->
+    <div v-if="d412LastError || d412Bridge.lastError.value" class="sync-error" role="alert">{{ d412LastError || d412Bridge.lastError.value }}</div>
+
     <!-- 结构化视图 -->
-    <template v-if="editorMode === 'structured'">
+    <template v-if="activeMode === 'structured'">
       <!-- 概览横幅 -->
       <div class="overview-panel">
         <el-progress
@@ -352,7 +402,7 @@ function fmtAmount(v: number): string {
     </template>
 
     <!-- 矩阵视图 -->
-    <template v-else-if="editorMode === 'matrix'">
+    <template v-else-if="activeMode === 'matrix'">
       <!-- 概览横幅 -->
       <div class="overview-panel">
         <el-progress
@@ -420,15 +470,15 @@ function fmtAmount(v: number): string {
       </el-card>
     </template>
 
-    <!-- OnlyOffice 模式 -->
-    <template v-else-if="editorMode === 'onlyoffice'">
-      <div style="min-height: 600px; height: calc(100vh - 280px);">
-        <GtOnlyOfficeSheet
-          :wp-id="props.wpId"
-          :project-id="props.projectId"
-          sheet-name="合同检查表D4-12"
-          :readonly="isReadonly"
+    <!-- 在线编辑（统一同步桥 OO↔HTML 双向回写，替代 legacy GtOnlyOfficeSheet）-->
+    <template v-else-if="activeMode === 'onlyoffice'">
+      <div class="oo-container">
+        <WorkpaperSyncEditorHost
+          v-if="d412Bridge.descriptor.value"
+          :descriptor="d412Bridge.descriptor.value"
+          :bridge="d412Bridge"
         />
+        <div v-else class="oo-loading">正在打开 D4-12 同步编辑器…</div>
       </div>
     </template>
   </div>
@@ -445,6 +495,7 @@ function fmtAmount(v: number): string {
   flex-wrap: wrap;
   gap: 8px;
 }
+.mode-bar-left { display: flex; gap: 8px; align-items: center; }
 .mode-bar-right { display: flex; gap: 6px; align-items: center; }
 .chip-label { font-size: 12px; color: #909399; }
 
@@ -547,4 +598,17 @@ function fmtAmount(v: number): string {
   color: #606266;
   margin-bottom: 6px;
 }
+
+.sync-error {
+  margin-bottom: 12px;
+  padding: 8px 12px;
+  background: #fef0f0;
+  border: 1px solid #fde2e2;
+  border-left: 3px solid #f56c6c;
+  border-radius: 6px;
+  color: #f56c6c;
+  font-size: var(--wp-font-size, 13px);
+}
+.oo-container { min-height: 600px; height: calc(100vh - 280px); border-radius: 8px; overflow: hidden; }
+.oo-loading { padding: 40px; text-align: center; color: #909399; }
 </style>
