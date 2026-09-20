@@ -262,6 +262,8 @@ from app.services.workpaper_sync.phase5_d4_return_sheet import (  # noqa: E402
 from app.services.workpaper_sync.phase5_d4_other_margin_sheet import (  # noqa: E402
     STORE_ITEM_ID_D433,
     sheet_payload_d433,
+    static_sheet_payload_d433,
+    static_binding_d433,
     build_store_projection_d433,
     merge_d433_from_projection,
     mapping_digest_d433,
@@ -390,20 +392,15 @@ _INCLUDE_D410_PRICE_SHEET: Final[bool] = True
 #: provision/current-returns/post-returns(3 dynamic)。3 个 instrumentation spec（每 dynamic 区一个）。
 #: provider=phase5_d4_return_sheet。参照 D4-9 三区 + D4-1 多 spec 同 sheet。
 _INCLUDE_D420_RETURN_SHEET: Final[bool] = True
-#: 🔴 D4-33 其他业务毛利率分析表：**引擎不支持纯静态 cell sheet 双向回写**（2026-09-20 侦查裁定）。
-#: 几何：固定 12 月行 × 固定 3 业务类型列组（E-G/H-J/K-M）× 收入/成本 = 72 static cell，
-#: **无任何动态行维度**（12 月是固定枚举、业务类型是动态列但模板只 3 固定列组）。
-#: 引擎硬约束（context-gather 实证）：受管 cell 只能经 ExcelIdentityBinding 落盘，而 binding
-#: **必须**锚定一张 `row_identity` 动态表的 Excel Table `<tableParts>` 载体（materialize
-#: 的 `managed_tables_of` 对 `not dynamic.has_dynamic_rows` 直接 raise；extract 的
-#: `resolve_managed_region` 靠 Excel Table displayName 定位受管区）。D4-9 的 customer_totals
-#: 静态标量能落盘，仅因它**寄生**在同 sheet 的两张动态表（current/prior）的 tableParts 上；
-#: D4-33 整张只有静态表、无任何动态表 → 无载体 → materialize 写不进、反读 RoundtripEquivalenceError。
-#: 解除条件：要么给 D4-33 造一张真实动态行表当载体（本表无动态行语义，属伪造，拒），
-#: 要么等引擎支持「纯静态 sheet 直写绝对坐标」的载体（DEC 待定）。故 **HTML-only**（同 D4-45
-#: 静态块 precedent，不进 Excel 契约）。provider phase5_d4_other_margin_sheet 保留（已过隔离
-#: probe：契约 parse + 72cell projection/merge 往返全绿），待引擎解锁后一键翻 True 接入。
-_INCLUDE_D433_MARGIN_SHEET: Final[bool] = False
+#: ✅ D4-33 其他业务毛利率分析表：**引擎静态 cell sheet 双向回写路径已落地**（spec
+#: workpaper-sync-static-cell-sheet-writeback，2026-09-20）。几何：固定 12 月行 × 固定 3
+#: 业务类型列组（E-G/H-J/K-M）× 收入/成本 = 72 static cell，无动态行维度。
+#: 引擎新增 definedName 锚定静态受管区路径（BindingKind.static_region）：binding 用静态形态
+#: （defined_name=GT_MANAGED_REGION_D433，无 table_name/uuid_column），锚点是 workbook-scope
+#: definedName（instrumentation 注入，模板无既有 definedName），extract/materialize 跳过
+#: identity scan / row_shift / footer / minted UUID，按绝对坐标直写/反读。区内公式（合计/毛利率/
+#: 上年/变动）走 formula_mask 保护。前 3 业务类型 slot 位置映射 3 列组，第 4+ 个 HTML-only。
+_INCLUDE_D433_MARGIN_SHEET: Final[bool] = True
 #: D4-34 其他业务收入合同测算表接入（批次B 第九张，同 sheet 双动态区 · dict store，2026-09-20）。
 #: 2 dynamic 区（房屋租赁 R13-17 / 咨询业务 R20-24），各自 UUID 列 L/M、footer marker=下方 section
 #: 标题、J 差异 formula_mask；单 dict store D4-34-data（{rentals[],consults[]}）→ oo_to_html 走专用
@@ -706,6 +703,11 @@ def instrumentation_spec() -> ExcelInstrumentationSpec:
         uuid_col=UUID_COL,
         table_name=TABLE_NAME,
         transposed_sheets=(sheet_payload(),) if _INCLUDE_D429_TRANSPOSED else (),
+        # D4-33 静态受管区寄生（spec workpaper-sync-static-cell-sheet-writeback）：只在动态
+        # primary spec 上挂 static_sheets，instrumentation 注入 workbook-scope definedName。
+        static_sheets=(
+            (static_sheet_payload_d433(),) if _INCLUDE_D433_MARGIN_SHEET else ()
+        ),
     )
 
 
@@ -2320,6 +2322,15 @@ def _attach_sibling_bindings(
             },
         )
         siblings.append(binding)
+    # 静态受管区 binding（引擎静态路径；无动态行，不经 _align_specs_to_sibling_tables）。
+    # 复用 publish 侧同一通用生成器，两路径 binding 不漂移。
+    from app.services.workpaper_sync.projection_first_publication import (
+        _static_region_bindings,
+    )
+
+    siblings.extend(
+        _static_region_bindings(provider=_provider, metadata_sheet=GT_SYNC_SHEET_NAME)
+    )
     return tuple(siblings)
 
 

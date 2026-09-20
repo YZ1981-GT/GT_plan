@@ -593,6 +593,141 @@ class TestStaticAnchorRetained:
             )
 
 
+class TestManagedCoordinatesGhostUuidMutation:
+    """Property 6 变异反证：给静态分支加 `uuid_column{row}` 幽灵坐标必被守卫捕获（RED）。
+
+    真实 `_managed_coordinates` 静态分支产净集 {E12,F12}（`test_no_ghost_uuid_coords` 已钉）。
+    本测把 requirements 7.2 / design P6 变异表点名的变异——「静态分支加 uuid 幽灵坐标」——
+    在测内**本地复现**：对同一 region/contract，用 region.uuid_column 造 `{uuid}{row}` 坐标
+    并入受管集。断言「净集 == 静态绝对坐标集」这条守卫对被污染集**必红**（会引入额外坐标），
+    从而证明该守卫是承重的、不是恒真占位（GREEN=守卫缺陷）。
+    """
+
+    def _clean_coords(self) -> frozenset[str]:
+        contract = _contract_with([_static_table_spec()])
+        binding = ExcelIdentityBinding(
+            table_key=STATIC_TABLE_KEY, defined_name=STATIC_DEFINED_NAME
+        )
+        return _managed_coordinates(
+            contract=contract, region=_static_region_obj(), binding=binding, scan=None
+        )
+
+    def test_clean_coords_equal_static_field_set(self) -> None:
+        # 前置：真实实现产净集（守卫的绿态基线）。
+        assert self._clean_coords() == frozenset({"E12", "F12"})
+
+    def test_ghost_uuid_mutation_breaks_guard(self) -> None:
+        # 变异：区内每行补一个 `{uuid_column}{row}` 幽灵坐标（uuid_column 取一个真实列如 "Z"）。
+        region = _static_region_obj()
+        ghost_uuid_column = "Z"  # 若静态分支误加 uuid 幽灵坐标会用到的列
+        mutated = set(self._clean_coords())
+        for row in range(region.first_row, region.last_row + 1):
+            mutated.add(f"{ghost_uuid_column}{row}")  # ← 幽灵坐标污染
+        mutated_frozen = frozenset(mutated)
+
+        # 守卫「== 静态绝对坐标集」对被污染集必红：断言二者不再相等（变异被捕获）。
+        assert mutated_frozen != frozenset({"E12", "F12"})
+        # 且污染坐标确实混入（证明变异点可达，非 ANCHOR-MISS）。
+        assert "Z12" in mutated_frozen
+        # 真实实现绝不含该幽灵坐标（Property 6 正向再确认）。
+        assert "Z12" not in self._clean_coords()
+
+    def test_needed_columns_ghost_uuid_mutation_breaks_guard(self) -> None:
+        # `_needed_columns_and_rows` 同理：真实列集不含 uuid 起手；变异注入必破「== {E,F}」守卫。
+        contract = _contract_with([_static_table_spec()])
+        binding = ExcelIdentityBinding(
+            table_key=STATIC_TABLE_KEY, defined_name=STATIC_DEFINED_NAME
+        )
+        columns, _rows = _needed_columns_and_rows(
+            contract=contract, region=_static_region_obj(), binding=binding
+        )
+        assert columns == frozenset({"E", "F"})  # 净列集
+        mutated_cols = frozenset(columns | {"Z"})  # ← uuid 列起手污染
+        assert mutated_cols != frozenset({"E", "F"})  # 守卫必红
+        assert "Z" not in columns  # 真实实现无 uuid 起手
+
+
+def _inject_cached_formula_value(data: bytes, sheet_part: str, coord: str, cached: float) -> bytes:
+    """给一个已是公式的 cell 注入缓存值 `<v>`（模拟 OO/Excel 计算后落盘的真实产物）。
+
+    openpyxl 写 `="..."` 只产 `<f>` 无 `<v>`（缓存值空）；真实发布产物（materialize→apply
+    或 OO 往返后）公式 cell 必带缓存值。extract 的 data_only 视图读缓存值——无缓存值的裸公式
+    在生产不会出现。本工具把裸 `<f>` 补上 `<v>`，让读侧测试贴近真实发布态。
+    """
+    with zipfile.ZipFile(io.BytesIO(data)) as zf:
+        parts = {n: zf.read(n) for n in zf.namelist()}
+    xml = parts[sheet_part].decode("utf-8")
+    # 定位 <c r="G12" ...>...<f>...</f></c>，在 </f> 后插 <v>cached</v>
+    import re
+
+    pattern = re.compile(rf'(<c r="{coord}"[^>]*>)(.*?)(</c>)', re.DOTALL)
+    m = pattern.search(xml)
+    assert m is not None, f"未在 {sheet_part} 找到 cell {coord}"
+    inner = m.group(2)
+    assert "<f>" in inner or "<f " in inner, f"{coord} 不是公式 cell: {inner!r}"
+    # openpyxl 写公式 cell 会留一个**空** <v></v>（缓存值空）；把它替成 <v>cached</v>。
+    if "<v></v>" in inner:
+        inner = inner.replace("<v></v>", f"<v>{cached}</v>")
+    elif "<v>" not in inner:
+        inner = inner + f"<v>{cached}</v>"
+    xml = xml[: m.start()] + m.group(1) + inner + m.group(3) + xml[m.end():]
+    parts[sheet_part] = xml.encode("utf-8")
+    out = io.BytesIO()
+    with zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED) as zf:
+        for n, b in parts.items():
+            zf.writestr(n, b)
+    return out.getvalue()
+
+
+class TestExtractStaticProjectionReadSide:
+    """Requirement 3.4/3.6：`extract_projection` 静态分叉的**读侧**独立验证。
+
+    与 Task 5 `TestStaticRoundtrip`（materialize→extract 闭合往返）不同，本测直接对一个
+    已含受管值与区内公式的 substrate 调 `extract_projection`，钉住静态分叉：
+    * 受管 cell（E12/F12）按绝对坐标反读出正确值；
+    * 区内公式 cell（G12，带缓存值）归 `formula_inventory`，不当受管值（Requirement 3.6）；
+    * 无动态行域产物（projection.row_keys 空，chunk_count==0）。
+    不依赖 materialize，故属 Task 4 读侧闭环。
+
+    🔴 substrate 的公式 cell 必带 `<v>` 缓存值——这是真实发布态（materialize→apply / OO 往返
+    后公式 cell 恒带缓存值）。裸 `<f>` 无缓存值的 cell 在生产不出现，extract 的 data_only 视图
+    读不到它是**正确**行为（无缓存值 ⇒ 该 cell 在受管区被视为「未存在」而非「空」）。
+    """
+
+    def test_reads_managed_cells_and_routes_formula_to_inventory(self, tmp_path) -> None:
+        from app.services.workpaper_sync.excel_extract import extract_projection
+
+        contract = _static_contract_with_formula()
+        definitions = _static_definitions(contract)
+        binding = _static_binding()
+        # substrate 带受管值 E12=333/F12=44 与区内公式 G12==E12-F12；给公式补缓存值 289（=333-44）
+        substrate = _make_full_static_substrate({"E12": 333.0, "F12": 44.0})
+        substrate = _inject_cached_formula_value(
+            substrate, "xl/worksheets/sheet1.xml", "G12", 289.0
+        )
+        artifact = tmp_path / "read_side.xlsx"
+        artifact.write_bytes(substrate)
+
+        outcome = extract_projection(
+            artifact=artifact,
+            definitions=definitions,
+            binding=binding,
+            substrate_role=SubstrateRole.published_representation,
+            artifact_kind=ArtifactKind.canonical,
+            artifact_state=ArtifactState.published,
+        )
+
+        # 受管 cell 按绝对坐标反读正确值
+        assert float(outcome.projection.get(f"{STATIC_TABLE_KEY}/rev_m1").value) == 333.0
+        assert float(outcome.projection.get(f"{STATIC_TABLE_KEY}/cost_m1").value) == 44.0
+        # 区内公式 cell 归 formula_inventory，公式文本被采集（Requirement 3.6）
+        assert f"{STATIC_TABLE_KEY}/margin_m1" in outcome.formula_inventory
+        assert outcome.formula_inventory[f"{STATIC_TABLE_KEY}/margin_m1"] == "=E12-F12"
+        # 静态分叉：无动态行域（row_keys 空、chunk_count==0）
+        assert outcome.projection.row_keys == {}
+        assert outcome.stats.chunk_count == 0
+
+
 # ═══════════════════════════════════════════════════════════════════════════
 # Task 5 · materialize 静态链 + 闭合往返（Property 1）
 # ═══════════════════════════════════════════════════════════════════════════

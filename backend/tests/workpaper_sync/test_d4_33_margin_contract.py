@@ -1,17 +1,16 @@
 # -*- coding: utf-8 -*-
 """D4-33 其他业务毛利率分析表守卫。
 
-裁定（2026-09-20）：引擎**不支持纯静态 cell sheet 双向回写** —— 受管 cell 只能经
-ExcelIdentityBinding 落盘，而 binding 必须锚定一张 row_identity 动态表的 Excel Table
-`<tableParts>` 载体（materialize.managed_tables_of 对无动态行的 sheet 直接 raise）。
-D4-33 整张只有 12 月 × 3 业务类型的 static cell、**无任何动态行维度**，故当前 **HTML-only**
-（`_INCLUDE_D433_MARGIN_SHEET=False`，同 D4-45 静态块 precedent）。
+✅ 落地（spec workpaper-sync-static-cell-sheet-writeback，2026-09-20）：引擎新增
+definedName 锚定**静态受管区**路径（`BindingKind.static_region`），D4-33 从 HTML-only
+转为真双向。静态 binding 用 `defined_name=GT_MANAGED_REGION_D433`（无 table_name/uuid_column），
+锚点是 workbook-scope definedName（instrumentation 注入）；extract/materialize 跳过
+identity scan / row_shift / footer / minted UUID，按绝对坐标直写/反读。
 
-本守卫钉住两件事：
-  1) provider 自洽：契约 parse + 72 cell projection/merge 往返（slot 位置映射）全绿 ——
-     引擎解锁后可一键翻 flag=True 接入，provider 不需重写；
-  2) 当前 live 契约**不含** D4-33（flag=False 的诚实状态），且 STORE_ITEM_ID_D433_DICT
-     未导出（oo_to_html 专用块 inert，不会对未进契约的 D4-33 空投影误写）。
+本守卫钉住：
+  1) provider 自洽：契约 parse + 72 cell projection/merge 往返（slot 位置映射）全绿；
+  2) live 契约**含** D4-33（`_INCLUDE_D433_MARGIN_SHEET=True`），sheet locator 为静态
+     definedName_ref + region_kind=static，且 STORE_ITEM_ID_D433_DICT 已导出。
 """
 from __future__ import annotations
 
@@ -28,16 +27,17 @@ from app.services.workpaper_sync.contracts import parse_contract
 
 
 def _isolated_contract():
-    """把 D4-33 单 sheet 塞进全量契约的一个拷贝里 parse（不改 live flag）。"""
-    payload = D4.build_contract_payload()
-    payload = dict(payload)
-    payload["sheets"] = list(payload["sheets"]) + [M.sheet_payload_d433()]
-    return parse_contract(payload)
+    """live 契约（flag=True 后 build_contract_payload 已含 D4-33）。"""
+    return parse_contract(D4.build_contract_payload())
 
 
 def test_sheet_payload_shape():
     sp = M.sheet_payload_d433()
     assert sp["sheet_key"] == "d433-managed"
+    # 静态 locator：definedName_ref + region_kind=static（引擎静态路径，非 Excel Table）
+    assert sp["locator"]["anchor"] == "defined_name_ref"
+    assert sp["locator"]["defined_name"] == "GT_MANAGED_REGION_D433"
+    assert sp["region_boundary_locator"]["region_kind"] == "static"
     table = sp["tables"][0]
     assert table["table_key"] == "d4_33_matrix"
     # 前 3 业务类型 × 12 月 × 收入/成本 = 72 static cell
@@ -102,17 +102,31 @@ def test_merge_3tuple_signature_for_dict_block():
     assert isinstance(applied, int) and isinstance(visited, int)
 
 
-# ── live 契约诚实状态（flag=False，引擎不支持纯静态 sheet） ─────────────────
+# ── live 契约落地状态（flag=True，引擎静态 cell 路径已支持） ─────────────────
 
 
-def test_flag_off_and_absent_from_live_contract():
-    # 裁定：引擎不支持纯静态 cell sheet → 当前 HTML-only
-    assert D4._INCLUDE_D433_MARGIN_SHEET is False
+def test_flag_on_and_present_in_live_contract():
+    # 落地：引擎静态 cell 路径支持 → D4-33 真双向
+    assert D4._INCLUDE_D433_MARGIN_SHEET is True
     contract = parse_contract(D4.build_contract_payload())
     sheet_keys = {s.sheet_key for s in contract.sheets}
-    assert "d433-managed" not in sheet_keys
-    # STORE_ITEM_ID_D433_DICT 未导出 → oo_to_html 专用块 inert
-    assert not hasattr(D4, "STORE_ITEM_ID_D433_DICT")
-    # 但 store item id 常量本身仍在（前端/store 用），只是不进 STORE_ITEMS
+    assert "d433-managed" in sheet_keys
+    # D4-33 静态表无动态行（has_dynamic_rows False）——引擎走静态路径的判据
+    d433_sheet = next(s for s in contract.sheets if s.sheet_key == "d433-managed")
+    assert all(not t.has_dynamic_rows for t in d433_sheet.tables)
+    # STORE_ITEM_ID_D433_DICT 已导出 → oo_to_html 专用 dict 块生效
+    assert hasattr(D4, "STORE_ITEM_ID_D433_DICT")
+    assert D4.STORE_ITEM_ID_D433_DICT == "D4-33-data"
+    # store item id 进 STORE_ITEM_IDS（combined projection）
     assert M.STORE_ITEM_ID_D433 == "D4-33-data"
-    assert M.STORE_ITEM_ID_D433 not in D4.STORE_ITEM_IDS
+    assert M.STORE_ITEM_ID_D433 in D4.STORE_ITEM_IDS
+
+
+def test_static_binding_is_static_kind():
+    from app.services.workpaper_sync.excel_extract import is_static_region
+
+    binding = M.static_binding_d433()
+    assert is_static_region(binding) is True
+    assert binding.defined_name == "GT_MANAGED_REGION_D433"
+    assert binding.table_name == ""
+    assert binding.uuid_column == ""

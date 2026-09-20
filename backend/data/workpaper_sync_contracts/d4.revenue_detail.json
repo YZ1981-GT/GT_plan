@@ -7,7 +7,7 @@
     "excel_table",
     "hidden_uuid_column"
   ],
-  "instrumentation_definition_sha256": "6afbc2fd21c573b7b990c2c97ce9d0bd767e385e3c2dd1f388a7db088c94f2c0",
+  "instrumentation_definition_sha256": "7b6aa88f82f2f2de454254b2430db3a07122aced37bd41b83240fdd22ec931be",
   "review": {
     "authority_root": "backend/wp_templates",
     "entry_id": "xlsx/gt-d4-operating-revenue",
@@ -7279,6 +7279,2618 @@
         }
       ],
       "template_id": "D420"
+    },
+    {
+      "excel_name": "其他业务毛利率分析表D4-33",
+      "locator": {
+        "anchor": "defined_name_ref",
+        "defined_name": "GT_MANAGED_REGION_D433"
+      },
+      "region_boundary_locator": {
+        "anchor": "defined_name_ref",
+        "defined_name": "GT_MANAGED_REGION_D433",
+        "range": "$E$12:$M$23",
+        "region_kind": "static"
+      },
+      "sheet_key": "d433-managed",
+      "tables": [
+        {
+          "anchor": "A11",
+          "fields": [
+            {
+              "cell": {
+                "column": "E",
+                "row_from": 12
+              },
+              "column_key": "s0_m0_revenue",
+              "header_source_ref": "源xlsx!其他业务毛利率分析表D4-33!E11",
+              "header_text": "业务1 1月收入",
+              "json_pointer": "/slot0/month0/revenue",
+              "mode": "editable",
+              "source_ref": "源xlsx!其他业务毛利率分析表D4-33!E12",
+              "stable_field_key": "d4_33_matrix/slot0_m0/revenue",
+              "store_item_id": "D4-33-data",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "F",
+                "row_from": 12
+              },
+              "column_key": "s0_m0_cost",
+              "header_source_ref": "源xlsx!其他业务毛利率分析表D4-33!F11",
+              "header_text": "业务1 1月成本",
+              "json_pointer": "/slot0/month0/cost",
+              "mode": "editable",
+              "source_ref": "源xlsx!其他业务毛利率分析表D4-33!F12",
+              "stable_field_key": "d4_33_matrix/slot0_m0/cost",
+              "store_item_id": "D4-33-data",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "E",
+                "row_from": 13
+              },
+              "column_key": "s0_m1_revenue",
+              "header_source_ref": "源xlsx!其他业务毛利率分析表D4-33!E11",
+              "header_text": "业务1 2月收入",
+              "json_pointer": "/slot0/month1/revenue",
+              "mode": "editable",
+              "source_ref": "源xlsx!其他业务毛利率分析表D4-33!E13",
+              "stable_field_key": "d4_33_matrix/slot0_m1/revenue",
+              "store_item_id": "D4-33-data",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "F",
+                "row_from": 13
+              },
+              "column_key": "s0_m1_cost",
+              "header_source_ref": "源xlsx!其他业务毛利率分析表D4-33!F11",
+              "header_text": "业务1 2月成本",
+              "json_pointer": "/slot0/month1/cost",
+              "mode": "editable",
+              "source_ref": "源xlsx!其他业务毛利率分析表D4-33!F13",
+              "stable_field_key": "d4_33_matrix/slot0_m1/cost",
+              "store_item_id": "D4-33-data",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "E",
+                "row_from": 14
+              },
+              "column_key": "s0_m2_revenue",
+              "header_source_ref": "源xlsx!其他业务毛利率分析表D4-33!E11",
+              "header_text": "业务1 3月收入",
+              "json_pointer": "/slot0/month2/revenue",
+              "mode": "editable",
+              "source_ref": "源xlsx!其他业务毛利率分析表D4-33!E14",
+              "stable_field_key": "d4_33_matrix/slot0_m2/revenue",
+              "store_item_id": "D4-33-data",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "F",
+                "row_from": 14
+              },
+              "column_key": "s0_m2_cost",
+              "header_source_ref": "源xlsx!其他业务毛利率分析表D4-33!F11",
+              "header_text": "业务1 3月成本",
+              "json_pointer": "/slot0/month2/cost",
+              "mode": "editable",
+              "source_ref": "源xlsx!其他业务毛利率分析表D4-33!F14",
+              "stable_field_key": "d4_33_matrix/slot0_m2/cost",
+              "store_item_id": "D4-33-data",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "E",
+                "row_from": 15
+              },
+              "column_key": "s0_m3_revenue",
+              "header_source_ref": "源xlsx!其他业务毛利率分析表D4-33!E11",
+              "header_text": "业务1 4月收入",
+              "json_pointer": "/slot0/month3/revenue",
+              "mode": "editable",
+              "source_ref": "源xlsx!其他业务毛利率分析表D4-33!E15",
+              "stable_field_key": "d4_33_matrix/slot0_m3/revenue",
+              "store_item_id": "D4-33-data",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "F",
+                "row_from": 15
+              },
+              "column_key": "s0_m3_cost",
+              "header_source_ref": "源xlsx!其他业务毛利率分析表D4-33!F11",
+              "header_text": "业务1 4月成本",
+              "json_pointer": "/slot0/month3/cost",
+              "mode": "editable",
+              "source_ref": "源xlsx!其他业务毛利率分析表D4-33!F15",
+              "stable_field_key": "d4_33_matrix/slot0_m3/cost",
+              "store_item_id": "D4-33-data",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "E",
+                "row_from": 16
+              },
+              "column_key": "s0_m4_revenue",
+              "header_source_ref": "源xlsx!其他业务毛利率分析表D4-33!E11",
+              "header_text": "业务1 5月收入",
+              "json_pointer": "/slot0/month4/revenue",
+              "mode": "editable",
+              "source_ref": "源xlsx!其他业务毛利率分析表D4-33!E16",
+              "stable_field_key": "d4_33_matrix/slot0_m4/revenue",
+              "store_item_id": "D4-33-data",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "F",
+                "row_from": 16
+              },
+              "column_key": "s0_m4_cost",
+              "header_source_ref": "源xlsx!其他业务毛利率分析表D4-33!F11",
+              "header_text": "业务1 5月成本",
+              "json_pointer": "/slot0/month4/cost",
+              "mode": "editable",
+              "source_ref": "源xlsx!其他业务毛利率分析表D4-33!F16",
+              "stable_field_key": "d4_33_matrix/slot0_m4/cost",
+              "store_item_id": "D4-33-data",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "E",
+                "row_from": 17
+              },
+              "column_key": "s0_m5_revenue",
+              "header_source_ref": "源xlsx!其他业务毛利率分析表D4-33!E11",
+              "header_text": "业务1 6月收入",
+              "json_pointer": "/slot0/month5/revenue",
+              "mode": "editable",
+              "source_ref": "源xlsx!其他业务毛利率分析表D4-33!E17",
+              "stable_field_key": "d4_33_matrix/slot0_m5/revenue",
+              "store_item_id": "D4-33-data",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "F",
+                "row_from": 17
+              },
+              "column_key": "s0_m5_cost",
+              "header_source_ref": "源xlsx!其他业务毛利率分析表D4-33!F11",
+              "header_text": "业务1 6月成本",
+              "json_pointer": "/slot0/month5/cost",
+              "mode": "editable",
+              "source_ref": "源xlsx!其他业务毛利率分析表D4-33!F17",
+              "stable_field_key": "d4_33_matrix/slot0_m5/cost",
+              "store_item_id": "D4-33-data",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "E",
+                "row_from": 18
+              },
+              "column_key": "s0_m6_revenue",
+              "header_source_ref": "源xlsx!其他业务毛利率分析表D4-33!E11",
+              "header_text": "业务1 7月收入",
+              "json_pointer": "/slot0/month6/revenue",
+              "mode": "editable",
+              "source_ref": "源xlsx!其他业务毛利率分析表D4-33!E18",
+              "stable_field_key": "d4_33_matrix/slot0_m6/revenue",
+              "store_item_id": "D4-33-data",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "F",
+                "row_from": 18
+              },
+              "column_key": "s0_m6_cost",
+              "header_source_ref": "源xlsx!其他业务毛利率分析表D4-33!F11",
+              "header_text": "业务1 7月成本",
+              "json_pointer": "/slot0/month6/cost",
+              "mode": "editable",
+              "source_ref": "源xlsx!其他业务毛利率分析表D4-33!F18",
+              "stable_field_key": "d4_33_matrix/slot0_m6/cost",
+              "store_item_id": "D4-33-data",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "E",
+                "row_from": 19
+              },
+              "column_key": "s0_m7_revenue",
+              "header_source_ref": "源xlsx!其他业务毛利率分析表D4-33!E11",
+              "header_text": "业务1 8月收入",
+              "json_pointer": "/slot0/month7/revenue",
+              "mode": "editable",
+              "source_ref": "源xlsx!其他业务毛利率分析表D4-33!E19",
+              "stable_field_key": "d4_33_matrix/slot0_m7/revenue",
+              "store_item_id": "D4-33-data",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "F",
+                "row_from": 19
+              },
+              "column_key": "s0_m7_cost",
+              "header_source_ref": "源xlsx!其他业务毛利率分析表D4-33!F11",
+              "header_text": "业务1 8月成本",
+              "json_pointer": "/slot0/month7/cost",
+              "mode": "editable",
+              "source_ref": "源xlsx!其他业务毛利率分析表D4-33!F19",
+              "stable_field_key": "d4_33_matrix/slot0_m7/cost",
+              "store_item_id": "D4-33-data",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "E",
+                "row_from": 20
+              },
+              "column_key": "s0_m8_revenue",
+              "header_source_ref": "源xlsx!其他业务毛利率分析表D4-33!E11",
+              "header_text": "业务1 9月收入",
+              "json_pointer": "/slot0/month8/revenue",
+              "mode": "editable",
+              "source_ref": "源xlsx!其他业务毛利率分析表D4-33!E20",
+              "stable_field_key": "d4_33_matrix/slot0_m8/revenue",
+              "store_item_id": "D4-33-data",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "F",
+                "row_from": 20
+              },
+              "column_key": "s0_m8_cost",
+              "header_source_ref": "源xlsx!其他业务毛利率分析表D4-33!F11",
+              "header_text": "业务1 9月成本",
+              "json_pointer": "/slot0/month8/cost",
+              "mode": "editable",
+              "source_ref": "源xlsx!其他业务毛利率分析表D4-33!F20",
+              "stable_field_key": "d4_33_matrix/slot0_m8/cost",
+              "store_item_id": "D4-33-data",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "E",
+                "row_from": 21
+              },
+              "column_key": "s0_m9_revenue",
+              "header_source_ref": "源xlsx!其他业务毛利率分析表D4-33!E11",
+              "header_text": "业务1 10月收入",
+              "json_pointer": "/slot0/month9/revenue",
+              "mode": "editable",
+              "source_ref": "源xlsx!其他业务毛利率分析表D4-33!E21",
+              "stable_field_key": "d4_33_matrix/slot0_m9/revenue",
+              "store_item_id": "D4-33-data",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "F",
+                "row_from": 21
+              },
+              "column_key": "s0_m9_cost",
+              "header_source_ref": "源xlsx!其他业务毛利率分析表D4-33!F11",
+              "header_text": "业务1 10月成本",
+              "json_pointer": "/slot0/month9/cost",
+              "mode": "editable",
+              "source_ref": "源xlsx!其他业务毛利率分析表D4-33!F21",
+              "stable_field_key": "d4_33_matrix/slot0_m9/cost",
+              "store_item_id": "D4-33-data",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "E",
+                "row_from": 22
+              },
+              "column_key": "s0_m10_revenue",
+              "header_source_ref": "源xlsx!其他业务毛利率分析表D4-33!E11",
+              "header_text": "业务1 11月收入",
+              "json_pointer": "/slot0/month10/revenue",
+              "mode": "editable",
+              "source_ref": "源xlsx!其他业务毛利率分析表D4-33!E22",
+              "stable_field_key": "d4_33_matrix/slot0_m10/revenue",
+              "store_item_id": "D4-33-data",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "F",
+                "row_from": 22
+              },
+              "column_key": "s0_m10_cost",
+              "header_source_ref": "源xlsx!其他业务毛利率分析表D4-33!F11",
+              "header_text": "业务1 11月成本",
+              "json_pointer": "/slot0/month10/cost",
+              "mode": "editable",
+              "source_ref": "源xlsx!其他业务毛利率分析表D4-33!F22",
+              "stable_field_key": "d4_33_matrix/slot0_m10/cost",
+              "store_item_id": "D4-33-data",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "E",
+                "row_from": 23
+              },
+              "column_key": "s0_m11_revenue",
+              "header_source_ref": "源xlsx!其他业务毛利率分析表D4-33!E11",
+              "header_text": "业务1 12月收入",
+              "json_pointer": "/slot0/month11/revenue",
+              "mode": "editable",
+              "source_ref": "源xlsx!其他业务毛利率分析表D4-33!E23",
+              "stable_field_key": "d4_33_matrix/slot0_m11/revenue",
+              "store_item_id": "D4-33-data",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "F",
+                "row_from": 23
+              },
+              "column_key": "s0_m11_cost",
+              "header_source_ref": "源xlsx!其他业务毛利率分析表D4-33!F11",
+              "header_text": "业务1 12月成本",
+              "json_pointer": "/slot0/month11/cost",
+              "mode": "editable",
+              "source_ref": "源xlsx!其他业务毛利率分析表D4-33!F23",
+              "stable_field_key": "d4_33_matrix/slot0_m11/cost",
+              "store_item_id": "D4-33-data",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "H",
+                "row_from": 12
+              },
+              "column_key": "s1_m0_revenue",
+              "header_source_ref": "源xlsx!其他业务毛利率分析表D4-33!H11",
+              "header_text": "业务2 1月收入",
+              "json_pointer": "/slot1/month0/revenue",
+              "mode": "editable",
+              "source_ref": "源xlsx!其他业务毛利率分析表D4-33!H12",
+              "stable_field_key": "d4_33_matrix/slot1_m0/revenue",
+              "store_item_id": "D4-33-data",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "I",
+                "row_from": 12
+              },
+              "column_key": "s1_m0_cost",
+              "header_source_ref": "源xlsx!其他业务毛利率分析表D4-33!I11",
+              "header_text": "业务2 1月成本",
+              "json_pointer": "/slot1/month0/cost",
+              "mode": "editable",
+              "source_ref": "源xlsx!其他业务毛利率分析表D4-33!I12",
+              "stable_field_key": "d4_33_matrix/slot1_m0/cost",
+              "store_item_id": "D4-33-data",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "H",
+                "row_from": 13
+              },
+              "column_key": "s1_m1_revenue",
+              "header_source_ref": "源xlsx!其他业务毛利率分析表D4-33!H11",
+              "header_text": "业务2 2月收入",
+              "json_pointer": "/slot1/month1/revenue",
+              "mode": "editable",
+              "source_ref": "源xlsx!其他业务毛利率分析表D4-33!H13",
+              "stable_field_key": "d4_33_matrix/slot1_m1/revenue",
+              "store_item_id": "D4-33-data",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "I",
+                "row_from": 13
+              },
+              "column_key": "s1_m1_cost",
+              "header_source_ref": "源xlsx!其他业务毛利率分析表D4-33!I11",
+              "header_text": "业务2 2月成本",
+              "json_pointer": "/slot1/month1/cost",
+              "mode": "editable",
+              "source_ref": "源xlsx!其他业务毛利率分析表D4-33!I13",
+              "stable_field_key": "d4_33_matrix/slot1_m1/cost",
+              "store_item_id": "D4-33-data",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "H",
+                "row_from": 14
+              },
+              "column_key": "s1_m2_revenue",
+              "header_source_ref": "源xlsx!其他业务毛利率分析表D4-33!H11",
+              "header_text": "业务2 3月收入",
+              "json_pointer": "/slot1/month2/revenue",
+              "mode": "editable",
+              "source_ref": "源xlsx!其他业务毛利率分析表D4-33!H14",
+              "stable_field_key": "d4_33_matrix/slot1_m2/revenue",
+              "store_item_id": "D4-33-data",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "I",
+                "row_from": 14
+              },
+              "column_key": "s1_m2_cost",
+              "header_source_ref": "源xlsx!其他业务毛利率分析表D4-33!I11",
+              "header_text": "业务2 3月成本",
+              "json_pointer": "/slot1/month2/cost",
+              "mode": "editable",
+              "source_ref": "源xlsx!其他业务毛利率分析表D4-33!I14",
+              "stable_field_key": "d4_33_matrix/slot1_m2/cost",
+              "store_item_id": "D4-33-data",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "H",
+                "row_from": 15
+              },
+              "column_key": "s1_m3_revenue",
+              "header_source_ref": "源xlsx!其他业务毛利率分析表D4-33!H11",
+              "header_text": "业务2 4月收入",
+              "json_pointer": "/slot1/month3/revenue",
+              "mode": "editable",
+              "source_ref": "源xlsx!其他业务毛利率分析表D4-33!H15",
+              "stable_field_key": "d4_33_matrix/slot1_m3/revenue",
+              "store_item_id": "D4-33-data",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "I",
+                "row_from": 15
+              },
+              "column_key": "s1_m3_cost",
+              "header_source_ref": "源xlsx!其他业务毛利率分析表D4-33!I11",
+              "header_text": "业务2 4月成本",
+              "json_pointer": "/slot1/month3/cost",
+              "mode": "editable",
+              "source_ref": "源xlsx!其他业务毛利率分析表D4-33!I15",
+              "stable_field_key": "d4_33_matrix/slot1_m3/cost",
+              "store_item_id": "D4-33-data",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "H",
+                "row_from": 16
+              },
+              "column_key": "s1_m4_revenue",
+              "header_source_ref": "源xlsx!其他业务毛利率分析表D4-33!H11",
+              "header_text": "业务2 5月收入",
+              "json_pointer": "/slot1/month4/revenue",
+              "mode": "editable",
+              "source_ref": "源xlsx!其他业务毛利率分析表D4-33!H16",
+              "stable_field_key": "d4_33_matrix/slot1_m4/revenue",
+              "store_item_id": "D4-33-data",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "I",
+                "row_from": 16
+              },
+              "column_key": "s1_m4_cost",
+              "header_source_ref": "源xlsx!其他业务毛利率分析表D4-33!I11",
+              "header_text": "业务2 5月成本",
+              "json_pointer": "/slot1/month4/cost",
+              "mode": "editable",
+              "source_ref": "源xlsx!其他业务毛利率分析表D4-33!I16",
+              "stable_field_key": "d4_33_matrix/slot1_m4/cost",
+              "store_item_id": "D4-33-data",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "H",
+                "row_from": 17
+              },
+              "column_key": "s1_m5_revenue",
+              "header_source_ref": "源xlsx!其他业务毛利率分析表D4-33!H11",
+              "header_text": "业务2 6月收入",
+              "json_pointer": "/slot1/month5/revenue",
+              "mode": "editable",
+              "source_ref": "源xlsx!其他业务毛利率分析表D4-33!H17",
+              "stable_field_key": "d4_33_matrix/slot1_m5/revenue",
+              "store_item_id": "D4-33-data",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "I",
+                "row_from": 17
+              },
+              "column_key": "s1_m5_cost",
+              "header_source_ref": "源xlsx!其他业务毛利率分析表D4-33!I11",
+              "header_text": "业务2 6月成本",
+              "json_pointer": "/slot1/month5/cost",
+              "mode": "editable",
+              "source_ref": "源xlsx!其他业务毛利率分析表D4-33!I17",
+              "stable_field_key": "d4_33_matrix/slot1_m5/cost",
+              "store_item_id": "D4-33-data",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "H",
+                "row_from": 18
+              },
+              "column_key": "s1_m6_revenue",
+              "header_source_ref": "源xlsx!其他业务毛利率分析表D4-33!H11",
+              "header_text": "业务2 7月收入",
+              "json_pointer": "/slot1/month6/revenue",
+              "mode": "editable",
+              "source_ref": "源xlsx!其他业务毛利率分析表D4-33!H18",
+              "stable_field_key": "d4_33_matrix/slot1_m6/revenue",
+              "store_item_id": "D4-33-data",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "I",
+                "row_from": 18
+              },
+              "column_key": "s1_m6_cost",
+              "header_source_ref": "源xlsx!其他业务毛利率分析表D4-33!I11",
+              "header_text": "业务2 7月成本",
+              "json_pointer": "/slot1/month6/cost",
+              "mode": "editable",
+              "source_ref": "源xlsx!其他业务毛利率分析表D4-33!I18",
+              "stable_field_key": "d4_33_matrix/slot1_m6/cost",
+              "store_item_id": "D4-33-data",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "H",
+                "row_from": 19
+              },
+              "column_key": "s1_m7_revenue",
+              "header_source_ref": "源xlsx!其他业务毛利率分析表D4-33!H11",
+              "header_text": "业务2 8月收入",
+              "json_pointer": "/slot1/month7/revenue",
+              "mode": "editable",
+              "source_ref": "源xlsx!其他业务毛利率分析表D4-33!H19",
+              "stable_field_key": "d4_33_matrix/slot1_m7/revenue",
+              "store_item_id": "D4-33-data",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "I",
+                "row_from": 19
+              },
+              "column_key": "s1_m7_cost",
+              "header_source_ref": "源xlsx!其他业务毛利率分析表D4-33!I11",
+              "header_text": "业务2 8月成本",
+              "json_pointer": "/slot1/month7/cost",
+              "mode": "editable",
+              "source_ref": "源xlsx!其他业务毛利率分析表D4-33!I19",
+              "stable_field_key": "d4_33_matrix/slot1_m7/cost",
+              "store_item_id": "D4-33-data",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "H",
+                "row_from": 20
+              },
+              "column_key": "s1_m8_revenue",
+              "header_source_ref": "源xlsx!其他业务毛利率分析表D4-33!H11",
+              "header_text": "业务2 9月收入",
+              "json_pointer": "/slot1/month8/revenue",
+              "mode": "editable",
+              "source_ref": "源xlsx!其他业务毛利率分析表D4-33!H20",
+              "stable_field_key": "d4_33_matrix/slot1_m8/revenue",
+              "store_item_id": "D4-33-data",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "I",
+                "row_from": 20
+              },
+              "column_key": "s1_m8_cost",
+              "header_source_ref": "源xlsx!其他业务毛利率分析表D4-33!I11",
+              "header_text": "业务2 9月成本",
+              "json_pointer": "/slot1/month8/cost",
+              "mode": "editable",
+              "source_ref": "源xlsx!其他业务毛利率分析表D4-33!I20",
+              "stable_field_key": "d4_33_matrix/slot1_m8/cost",
+              "store_item_id": "D4-33-data",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "H",
+                "row_from": 21
+              },
+              "column_key": "s1_m9_revenue",
+              "header_source_ref": "源xlsx!其他业务毛利率分析表D4-33!H11",
+              "header_text": "业务2 10月收入",
+              "json_pointer": "/slot1/month9/revenue",
+              "mode": "editable",
+              "source_ref": "源xlsx!其他业务毛利率分析表D4-33!H21",
+              "stable_field_key": "d4_33_matrix/slot1_m9/revenue",
+              "store_item_id": "D4-33-data",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "I",
+                "row_from": 21
+              },
+              "column_key": "s1_m9_cost",
+              "header_source_ref": "源xlsx!其他业务毛利率分析表D4-33!I11",
+              "header_text": "业务2 10月成本",
+              "json_pointer": "/slot1/month9/cost",
+              "mode": "editable",
+              "source_ref": "源xlsx!其他业务毛利率分析表D4-33!I21",
+              "stable_field_key": "d4_33_matrix/slot1_m9/cost",
+              "store_item_id": "D4-33-data",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "H",
+                "row_from": 22
+              },
+              "column_key": "s1_m10_revenue",
+              "header_source_ref": "源xlsx!其他业务毛利率分析表D4-33!H11",
+              "header_text": "业务2 11月收入",
+              "json_pointer": "/slot1/month10/revenue",
+              "mode": "editable",
+              "source_ref": "源xlsx!其他业务毛利率分析表D4-33!H22",
+              "stable_field_key": "d4_33_matrix/slot1_m10/revenue",
+              "store_item_id": "D4-33-data",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "I",
+                "row_from": 22
+              },
+              "column_key": "s1_m10_cost",
+              "header_source_ref": "源xlsx!其他业务毛利率分析表D4-33!I11",
+              "header_text": "业务2 11月成本",
+              "json_pointer": "/slot1/month10/cost",
+              "mode": "editable",
+              "source_ref": "源xlsx!其他业务毛利率分析表D4-33!I22",
+              "stable_field_key": "d4_33_matrix/slot1_m10/cost",
+              "store_item_id": "D4-33-data",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "H",
+                "row_from": 23
+              },
+              "column_key": "s1_m11_revenue",
+              "header_source_ref": "源xlsx!其他业务毛利率分析表D4-33!H11",
+              "header_text": "业务2 12月收入",
+              "json_pointer": "/slot1/month11/revenue",
+              "mode": "editable",
+              "source_ref": "源xlsx!其他业务毛利率分析表D4-33!H23",
+              "stable_field_key": "d4_33_matrix/slot1_m11/revenue",
+              "store_item_id": "D4-33-data",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "I",
+                "row_from": 23
+              },
+              "column_key": "s1_m11_cost",
+              "header_source_ref": "源xlsx!其他业务毛利率分析表D4-33!I11",
+              "header_text": "业务2 12月成本",
+              "json_pointer": "/slot1/month11/cost",
+              "mode": "editable",
+              "source_ref": "源xlsx!其他业务毛利率分析表D4-33!I23",
+              "stable_field_key": "d4_33_matrix/slot1_m11/cost",
+              "store_item_id": "D4-33-data",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "K",
+                "row_from": 12
+              },
+              "column_key": "s2_m0_revenue",
+              "header_source_ref": "源xlsx!其他业务毛利率分析表D4-33!K11",
+              "header_text": "业务3 1月收入",
+              "json_pointer": "/slot2/month0/revenue",
+              "mode": "editable",
+              "source_ref": "源xlsx!其他业务毛利率分析表D4-33!K12",
+              "stable_field_key": "d4_33_matrix/slot2_m0/revenue",
+              "store_item_id": "D4-33-data",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "L",
+                "row_from": 12
+              },
+              "column_key": "s2_m0_cost",
+              "header_source_ref": "源xlsx!其他业务毛利率分析表D4-33!L11",
+              "header_text": "业务3 1月成本",
+              "json_pointer": "/slot2/month0/cost",
+              "mode": "editable",
+              "source_ref": "源xlsx!其他业务毛利率分析表D4-33!L12",
+              "stable_field_key": "d4_33_matrix/slot2_m0/cost",
+              "store_item_id": "D4-33-data",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "K",
+                "row_from": 13
+              },
+              "column_key": "s2_m1_revenue",
+              "header_source_ref": "源xlsx!其他业务毛利率分析表D4-33!K11",
+              "header_text": "业务3 2月收入",
+              "json_pointer": "/slot2/month1/revenue",
+              "mode": "editable",
+              "source_ref": "源xlsx!其他业务毛利率分析表D4-33!K13",
+              "stable_field_key": "d4_33_matrix/slot2_m1/revenue",
+              "store_item_id": "D4-33-data",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "L",
+                "row_from": 13
+              },
+              "column_key": "s2_m1_cost",
+              "header_source_ref": "源xlsx!其他业务毛利率分析表D4-33!L11",
+              "header_text": "业务3 2月成本",
+              "json_pointer": "/slot2/month1/cost",
+              "mode": "editable",
+              "source_ref": "源xlsx!其他业务毛利率分析表D4-33!L13",
+              "stable_field_key": "d4_33_matrix/slot2_m1/cost",
+              "store_item_id": "D4-33-data",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "K",
+                "row_from": 14
+              },
+              "column_key": "s2_m2_revenue",
+              "header_source_ref": "源xlsx!其他业务毛利率分析表D4-33!K11",
+              "header_text": "业务3 3月收入",
+              "json_pointer": "/slot2/month2/revenue",
+              "mode": "editable",
+              "source_ref": "源xlsx!其他业务毛利率分析表D4-33!K14",
+              "stable_field_key": "d4_33_matrix/slot2_m2/revenue",
+              "store_item_id": "D4-33-data",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "L",
+                "row_from": 14
+              },
+              "column_key": "s2_m2_cost",
+              "header_source_ref": "源xlsx!其他业务毛利率分析表D4-33!L11",
+              "header_text": "业务3 3月成本",
+              "json_pointer": "/slot2/month2/cost",
+              "mode": "editable",
+              "source_ref": "源xlsx!其他业务毛利率分析表D4-33!L14",
+              "stable_field_key": "d4_33_matrix/slot2_m2/cost",
+              "store_item_id": "D4-33-data",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "K",
+                "row_from": 15
+              },
+              "column_key": "s2_m3_revenue",
+              "header_source_ref": "源xlsx!其他业务毛利率分析表D4-33!K11",
+              "header_text": "业务3 4月收入",
+              "json_pointer": "/slot2/month3/revenue",
+              "mode": "editable",
+              "source_ref": "源xlsx!其他业务毛利率分析表D4-33!K15",
+              "stable_field_key": "d4_33_matrix/slot2_m3/revenue",
+              "store_item_id": "D4-33-data",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "L",
+                "row_from": 15
+              },
+              "column_key": "s2_m3_cost",
+              "header_source_ref": "源xlsx!其他业务毛利率分析表D4-33!L11",
+              "header_text": "业务3 4月成本",
+              "json_pointer": "/slot2/month3/cost",
+              "mode": "editable",
+              "source_ref": "源xlsx!其他业务毛利率分析表D4-33!L15",
+              "stable_field_key": "d4_33_matrix/slot2_m3/cost",
+              "store_item_id": "D4-33-data",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "K",
+                "row_from": 16
+              },
+              "column_key": "s2_m4_revenue",
+              "header_source_ref": "源xlsx!其他业务毛利率分析表D4-33!K11",
+              "header_text": "业务3 5月收入",
+              "json_pointer": "/slot2/month4/revenue",
+              "mode": "editable",
+              "source_ref": "源xlsx!其他业务毛利率分析表D4-33!K16",
+              "stable_field_key": "d4_33_matrix/slot2_m4/revenue",
+              "store_item_id": "D4-33-data",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "L",
+                "row_from": 16
+              },
+              "column_key": "s2_m4_cost",
+              "header_source_ref": "源xlsx!其他业务毛利率分析表D4-33!L11",
+              "header_text": "业务3 5月成本",
+              "json_pointer": "/slot2/month4/cost",
+              "mode": "editable",
+              "source_ref": "源xlsx!其他业务毛利率分析表D4-33!L16",
+              "stable_field_key": "d4_33_matrix/slot2_m4/cost",
+              "store_item_id": "D4-33-data",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "K",
+                "row_from": 17
+              },
+              "column_key": "s2_m5_revenue",
+              "header_source_ref": "源xlsx!其他业务毛利率分析表D4-33!K11",
+              "header_text": "业务3 6月收入",
+              "json_pointer": "/slot2/month5/revenue",
+              "mode": "editable",
+              "source_ref": "源xlsx!其他业务毛利率分析表D4-33!K17",
+              "stable_field_key": "d4_33_matrix/slot2_m5/revenue",
+              "store_item_id": "D4-33-data",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "L",
+                "row_from": 17
+              },
+              "column_key": "s2_m5_cost",
+              "header_source_ref": "源xlsx!其他业务毛利率分析表D4-33!L11",
+              "header_text": "业务3 6月成本",
+              "json_pointer": "/slot2/month5/cost",
+              "mode": "editable",
+              "source_ref": "源xlsx!其他业务毛利率分析表D4-33!L17",
+              "stable_field_key": "d4_33_matrix/slot2_m5/cost",
+              "store_item_id": "D4-33-data",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "K",
+                "row_from": 18
+              },
+              "column_key": "s2_m6_revenue",
+              "header_source_ref": "源xlsx!其他业务毛利率分析表D4-33!K11",
+              "header_text": "业务3 7月收入",
+              "json_pointer": "/slot2/month6/revenue",
+              "mode": "editable",
+              "source_ref": "源xlsx!其他业务毛利率分析表D4-33!K18",
+              "stable_field_key": "d4_33_matrix/slot2_m6/revenue",
+              "store_item_id": "D4-33-data",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "L",
+                "row_from": 18
+              },
+              "column_key": "s2_m6_cost",
+              "header_source_ref": "源xlsx!其他业务毛利率分析表D4-33!L11",
+              "header_text": "业务3 7月成本",
+              "json_pointer": "/slot2/month6/cost",
+              "mode": "editable",
+              "source_ref": "源xlsx!其他业务毛利率分析表D4-33!L18",
+              "stable_field_key": "d4_33_matrix/slot2_m6/cost",
+              "store_item_id": "D4-33-data",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "K",
+                "row_from": 19
+              },
+              "column_key": "s2_m7_revenue",
+              "header_source_ref": "源xlsx!其他业务毛利率分析表D4-33!K11",
+              "header_text": "业务3 8月收入",
+              "json_pointer": "/slot2/month7/revenue",
+              "mode": "editable",
+              "source_ref": "源xlsx!其他业务毛利率分析表D4-33!K19",
+              "stable_field_key": "d4_33_matrix/slot2_m7/revenue",
+              "store_item_id": "D4-33-data",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "L",
+                "row_from": 19
+              },
+              "column_key": "s2_m7_cost",
+              "header_source_ref": "源xlsx!其他业务毛利率分析表D4-33!L11",
+              "header_text": "业务3 8月成本",
+              "json_pointer": "/slot2/month7/cost",
+              "mode": "editable",
+              "source_ref": "源xlsx!其他业务毛利率分析表D4-33!L19",
+              "stable_field_key": "d4_33_matrix/slot2_m7/cost",
+              "store_item_id": "D4-33-data",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "K",
+                "row_from": 20
+              },
+              "column_key": "s2_m8_revenue",
+              "header_source_ref": "源xlsx!其他业务毛利率分析表D4-33!K11",
+              "header_text": "业务3 9月收入",
+              "json_pointer": "/slot2/month8/revenue",
+              "mode": "editable",
+              "source_ref": "源xlsx!其他业务毛利率分析表D4-33!K20",
+              "stable_field_key": "d4_33_matrix/slot2_m8/revenue",
+              "store_item_id": "D4-33-data",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "L",
+                "row_from": 20
+              },
+              "column_key": "s2_m8_cost",
+              "header_source_ref": "源xlsx!其他业务毛利率分析表D4-33!L11",
+              "header_text": "业务3 9月成本",
+              "json_pointer": "/slot2/month8/cost",
+              "mode": "editable",
+              "source_ref": "源xlsx!其他业务毛利率分析表D4-33!L20",
+              "stable_field_key": "d4_33_matrix/slot2_m8/cost",
+              "store_item_id": "D4-33-data",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "K",
+                "row_from": 21
+              },
+              "column_key": "s2_m9_revenue",
+              "header_source_ref": "源xlsx!其他业务毛利率分析表D4-33!K11",
+              "header_text": "业务3 10月收入",
+              "json_pointer": "/slot2/month9/revenue",
+              "mode": "editable",
+              "source_ref": "源xlsx!其他业务毛利率分析表D4-33!K21",
+              "stable_field_key": "d4_33_matrix/slot2_m9/revenue",
+              "store_item_id": "D4-33-data",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "L",
+                "row_from": 21
+              },
+              "column_key": "s2_m9_cost",
+              "header_source_ref": "源xlsx!其他业务毛利率分析表D4-33!L11",
+              "header_text": "业务3 10月成本",
+              "json_pointer": "/slot2/month9/cost",
+              "mode": "editable",
+              "source_ref": "源xlsx!其他业务毛利率分析表D4-33!L21",
+              "stable_field_key": "d4_33_matrix/slot2_m9/cost",
+              "store_item_id": "D4-33-data",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "K",
+                "row_from": 22
+              },
+              "column_key": "s2_m10_revenue",
+              "header_source_ref": "源xlsx!其他业务毛利率分析表D4-33!K11",
+              "header_text": "业务3 11月收入",
+              "json_pointer": "/slot2/month10/revenue",
+              "mode": "editable",
+              "source_ref": "源xlsx!其他业务毛利率分析表D4-33!K22",
+              "stable_field_key": "d4_33_matrix/slot2_m10/revenue",
+              "store_item_id": "D4-33-data",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "L",
+                "row_from": 22
+              },
+              "column_key": "s2_m10_cost",
+              "header_source_ref": "源xlsx!其他业务毛利率分析表D4-33!L11",
+              "header_text": "业务3 11月成本",
+              "json_pointer": "/slot2/month10/cost",
+              "mode": "editable",
+              "source_ref": "源xlsx!其他业务毛利率分析表D4-33!L22",
+              "stable_field_key": "d4_33_matrix/slot2_m10/cost",
+              "store_item_id": "D4-33-data",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "K",
+                "row_from": 23
+              },
+              "column_key": "s2_m11_revenue",
+              "header_source_ref": "源xlsx!其他业务毛利率分析表D4-33!K11",
+              "header_text": "业务3 12月收入",
+              "json_pointer": "/slot2/month11/revenue",
+              "mode": "editable",
+              "source_ref": "源xlsx!其他业务毛利率分析表D4-33!K23",
+              "stable_field_key": "d4_33_matrix/slot2_m11/revenue",
+              "store_item_id": "D4-33-data",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "L",
+                "row_from": 23
+              },
+              "column_key": "s2_m11_cost",
+              "header_source_ref": "源xlsx!其他业务毛利率分析表D4-33!L11",
+              "header_text": "业务3 12月成本",
+              "json_pointer": "/slot2/month11/cost",
+              "mode": "editable",
+              "source_ref": "源xlsx!其他业务毛利率分析表D4-33!L23",
+              "stable_field_key": "d4_33_matrix/slot2_m11/cost",
+              "store_item_id": "D4-33-data",
+              "value_type": "amount"
+            }
+          ],
+          "formula_mask": [
+            "B12",
+            "C12",
+            "D12",
+            "G12",
+            "J12",
+            "M12",
+            "B13",
+            "C13",
+            "D13",
+            "G13",
+            "J13",
+            "M13",
+            "B14",
+            "C14",
+            "D14",
+            "G14",
+            "J14",
+            "M14",
+            "B15",
+            "C15",
+            "D15",
+            "G15",
+            "J15",
+            "M15",
+            "B16",
+            "C16",
+            "D16",
+            "G16",
+            "J16",
+            "M16",
+            "B17",
+            "C17",
+            "D17",
+            "G17",
+            "J17",
+            "M17",
+            "B18",
+            "C18",
+            "D18",
+            "G18",
+            "J18",
+            "M18",
+            "B19",
+            "C19",
+            "D19",
+            "G19",
+            "J19",
+            "M19",
+            "B20",
+            "C20",
+            "D20",
+            "G20",
+            "J20",
+            "M20",
+            "B21",
+            "C21",
+            "D21",
+            "G21",
+            "J21",
+            "M21",
+            "B22",
+            "C22",
+            "D22",
+            "G22",
+            "J22",
+            "M22",
+            "B23",
+            "C23",
+            "D23",
+            "G23",
+            "J23",
+            "M23",
+            "B24",
+            "C24",
+            "D24",
+            "E24",
+            "F24",
+            "G24",
+            "H24",
+            "I24",
+            "J24",
+            "K24",
+            "L24",
+            "M24",
+            "B25",
+            "C25",
+            "D25",
+            "E25",
+            "F25",
+            "G25",
+            "H25",
+            "I25",
+            "J25",
+            "K25",
+            "L25",
+            "M25",
+            "B26",
+            "C26",
+            "D26",
+            "E26",
+            "F26",
+            "G26",
+            "H26",
+            "I26",
+            "J26",
+            "K26",
+            "L26",
+            "M26",
+            "B27",
+            "C27",
+            "D27",
+            "E27",
+            "F27",
+            "G27",
+            "H27",
+            "I27",
+            "J27",
+            "K27",
+            "L27",
+            "M27"
+          ],
+          "header_rows": 2,
+          "table_key": "d4_33_matrix"
+        }
+      ],
+      "template_id": "D433"
+    },
+    {
+      "excel_name": "其他业务收入合同测算表D4-34",
+      "locator": {
+        "anchor": "excel_table_sheet_association"
+      },
+      "sheet_key": "d434-managed",
+      "tables": [
+        {
+          "anchor": "A12",
+          "delete_policy": "tombstone",
+          "fields": [
+            {
+              "cell": {
+                "column": "B",
+                "row_from": "row_identity"
+              },
+              "column_key": "tenant",
+              "header_source_ref": "源xlsx!其他业务收入合同测算表D4-34!B12",
+              "header_text": "承租方",
+              "json_pointer": "/rentals/{row_uuid}/tenant",
+              "mode": "editable",
+              "source_ref": "源xlsx!其他业务收入合同测算表D4-34!B13",
+              "stable_field_key": "d4_34_rentals/{row_uuid}/tenant",
+              "store_item_id": "D4-34-data",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "C",
+                "row_from": "row_identity"
+              },
+              "column_key": "period",
+              "header_source_ref": "源xlsx!其他业务收入合同测算表D4-34!C12",
+              "header_text": "租赁期间",
+              "json_pointer": "/rentals/{row_uuid}/period",
+              "mode": "editable",
+              "source_ref": "源xlsx!其他业务收入合同测算表D4-34!C13",
+              "stable_field_key": "d4_34_rentals/{row_uuid}/period",
+              "store_item_id": "D4-34-data",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "D",
+                "row_from": "row_identity"
+              },
+              "column_key": "area",
+              "header_source_ref": "源xlsx!其他业务收入合同测算表D4-34!D12",
+              "header_text": "租赁面积",
+              "json_pointer": "/rentals/{row_uuid}/area",
+              "mode": "editable",
+              "source_ref": "源xlsx!其他业务收入合同测算表D4-34!D13",
+              "stable_field_key": "d4_34_rentals/{row_uuid}/area",
+              "store_item_id": "D4-34-data",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "E",
+                "row_from": "row_identity"
+              },
+              "column_key": "unit_price",
+              "header_source_ref": "源xlsx!其他业务收入合同测算表D4-34!E12",
+              "header_text": "合同单价",
+              "json_pointer": "/rentals/{row_uuid}/unitPrice",
+              "mode": "editable",
+              "source_ref": "源xlsx!其他业务收入合同测算表D4-34!E13",
+              "stable_field_key": "d4_34_rentals/{row_uuid}/unit_price",
+              "store_item_id": "D4-34-data",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "F",
+                "row_from": "row_identity"
+              },
+              "column_key": "contract_ref",
+              "header_source_ref": "源xlsx!其他业务收入合同测算表D4-34!F12",
+              "header_text": "合同索引",
+              "json_pointer": "/rentals/{row_uuid}/contractRef",
+              "mode": "editable",
+              "source_ref": "源xlsx!其他业务收入合同测算表D4-34!F13",
+              "stable_field_key": "d4_34_rentals/{row_uuid}/contract_ref",
+              "store_item_id": "D4-34-data",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "G",
+                "row_from": "row_identity"
+              },
+              "column_key": "actual_months",
+              "header_source_ref": "源xlsx!其他业务收入合同测算表D4-34!G12",
+              "header_text": "本期实际租赁月数",
+              "json_pointer": "/rentals/{row_uuid}/actualMonths",
+              "mode": "editable",
+              "source_ref": "源xlsx!其他业务收入合同测算表D4-34!G13",
+              "stable_field_key": "d4_34_rentals/{row_uuid}/actual_months",
+              "store_item_id": "D4-34-data",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "H",
+                "row_from": "row_identity"
+              },
+              "column_key": "expected_revenue",
+              "header_source_ref": "源xlsx!其他业务收入合同测算表D4-34!H12",
+              "header_text": "本期应计收入",
+              "json_pointer": "/rentals/{row_uuid}/expectedRevenue",
+              "mode": "editable",
+              "source_ref": "源xlsx!其他业务收入合同测算表D4-34!H13",
+              "stable_field_key": "d4_34_rentals/{row_uuid}/expected_revenue",
+              "store_item_id": "D4-34-data",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "I",
+                "row_from": "row_identity"
+              },
+              "column_key": "actual_revenue",
+              "header_source_ref": "源xlsx!其他业务收入合同测算表D4-34!I12",
+              "header_text": "本期实计收入",
+              "json_pointer": "/rentals/{row_uuid}/actualRevenue",
+              "mode": "editable",
+              "source_ref": "源xlsx!其他业务收入合同测算表D4-34!I13",
+              "stable_field_key": "d4_34_rentals/{row_uuid}/actual_revenue",
+              "store_item_id": "D4-34-data",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "K",
+                "row_from": "row_identity"
+              },
+              "column_key": "index_ref",
+              "header_source_ref": "源xlsx!其他业务收入合同测算表D4-34!K12",
+              "header_text": "索引号",
+              "json_pointer": "/rentals/{row_uuid}/indexRef",
+              "mode": "editable",
+              "source_ref": "源xlsx!其他业务收入合同测算表D4-34!K13",
+              "stable_field_key": "d4_34_rentals/{row_uuid}/index_ref",
+              "store_item_id": "D4-34-data",
+              "value_type": "text"
+            }
+          ],
+          "footer_anchor": {
+            "carries_total_formula": false,
+            "marker": "2.咨询业务",
+            "search_column": "A"
+          },
+          "formula_mask": [
+            "J13",
+            "J14",
+            "J15",
+            "J16",
+            "J17"
+          ],
+          "header_rows": 1,
+          "row_identity": {
+            "json_pointer": "/rentals/*/id",
+            "kind": "field"
+          },
+          "table_key": "d4_34_rentals",
+          "uuid_col": "L"
+        },
+        {
+          "anchor": "A19",
+          "delete_policy": "tombstone",
+          "fields": [
+            {
+              "cell": {
+                "column": "B",
+                "row_from": "row_identity"
+              },
+              "column_key": "client",
+              "header_source_ref": "源xlsx!其他业务收入合同测算表D4-34!B19",
+              "header_text": "委托方",
+              "json_pointer": "/consults/{row_uuid}/client",
+              "mode": "editable",
+              "source_ref": "源xlsx!其他业务收入合同测算表D4-34!B20",
+              "stable_field_key": "d4_34_consults/{row_uuid}/client",
+              "store_item_id": "D4-34-data",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "D",
+                "row_from": "row_identity"
+              },
+              "column_key": "project",
+              "header_source_ref": "源xlsx!其他业务收入合同测算表D4-34!D19",
+              "header_text": "咨询项目",
+              "json_pointer": "/consults/{row_uuid}/project",
+              "mode": "editable",
+              "source_ref": "源xlsx!其他业务收入合同测算表D4-34!D20",
+              "stable_field_key": "d4_34_consults/{row_uuid}/project",
+              "store_item_id": "D4-34-data",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "E",
+                "row_from": "row_identity"
+              },
+              "column_key": "duration",
+              "header_source_ref": "源xlsx!其他业务收入合同测算表D4-34!E19",
+              "header_text": "委托期限",
+              "json_pointer": "/consults/{row_uuid}/duration",
+              "mode": "editable",
+              "source_ref": "源xlsx!其他业务收入合同测算表D4-34!E20",
+              "stable_field_key": "d4_34_consults/{row_uuid}/duration",
+              "store_item_id": "D4-34-data",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "F",
+                "row_from": "row_identity"
+              },
+              "column_key": "contract_amount",
+              "header_source_ref": "源xlsx!其他业务收入合同测算表D4-34!F19",
+              "header_text": "合同金额",
+              "json_pointer": "/consults/{row_uuid}/contractAmount",
+              "mode": "editable",
+              "source_ref": "源xlsx!其他业务收入合同测算表D4-34!F20",
+              "stable_field_key": "d4_34_consults/{row_uuid}/contract_amount",
+              "store_item_id": "D4-34-data",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "G",
+                "row_from": "row_identity"
+              },
+              "column_key": "contract_ref",
+              "header_source_ref": "源xlsx!其他业务收入合同测算表D4-34!G19",
+              "header_text": "合同索引",
+              "json_pointer": "/consults/{row_uuid}/contractRef",
+              "mode": "editable",
+              "source_ref": "源xlsx!其他业务收入合同测算表D4-34!G20",
+              "stable_field_key": "d4_34_consults/{row_uuid}/contract_ref",
+              "store_item_id": "D4-34-data",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "H",
+                "row_from": "row_identity"
+              },
+              "column_key": "expected_revenue",
+              "header_source_ref": "源xlsx!其他业务收入合同测算表D4-34!H19",
+              "header_text": "本期应计收入",
+              "json_pointer": "/consults/{row_uuid}/expectedRevenue",
+              "mode": "editable",
+              "source_ref": "源xlsx!其他业务收入合同测算表D4-34!H20",
+              "stable_field_key": "d4_34_consults/{row_uuid}/expected_revenue",
+              "store_item_id": "D4-34-data",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "I",
+                "row_from": "row_identity"
+              },
+              "column_key": "actual_revenue",
+              "header_source_ref": "源xlsx!其他业务收入合同测算表D4-34!I19",
+              "header_text": "本期实计收入",
+              "json_pointer": "/consults/{row_uuid}/actualRevenue",
+              "mode": "editable",
+              "source_ref": "源xlsx!其他业务收入合同测算表D4-34!I20",
+              "stable_field_key": "d4_34_consults/{row_uuid}/actual_revenue",
+              "store_item_id": "D4-34-data",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "K",
+                "row_from": "row_identity"
+              },
+              "column_key": "index_ref",
+              "header_source_ref": "源xlsx!其他业务收入合同测算表D4-34!K19",
+              "header_text": "索引号",
+              "json_pointer": "/consults/{row_uuid}/indexRef",
+              "mode": "editable",
+              "source_ref": "源xlsx!其他业务收入合同测算表D4-34!K20",
+              "stable_field_key": "d4_34_consults/{row_uuid}/index_ref",
+              "store_item_id": "D4-34-data",
+              "value_type": "text"
+            }
+          ],
+          "footer_anchor": {
+            "carries_total_formula": false,
+            "marker": "三、审计说明：",
+            "search_column": "A"
+          },
+          "formula_mask": [
+            "J20",
+            "J21",
+            "J22",
+            "J23",
+            "J24"
+          ],
+          "header_rows": 1,
+          "row_identity": {
+            "json_pointer": "/consults/*/id",
+            "kind": "field"
+          },
+          "table_key": "d4_34_consults",
+          "uuid_col": "M"
+        }
+      ],
+      "template_id": "D434"
+    },
+    {
+      "excel_name": "其他业务收入截止性测试D4-36",
+      "locator": {
+        "anchor": "excel_table_sheet_association"
+      },
+      "sheet_key": "d436-managed",
+      "tables": [
+        {
+          "anchor": "A15",
+          "delete_policy": "tombstone",
+          "fields": [
+            {
+              "cell": {
+                "column": "A",
+                "row_from": "row_identity"
+              },
+              "column_key": "voucher_date",
+              "header_source_ref": "源xlsx!其他业务收入截止性测试D4-36!A15",
+              "header_text": "记账凭证日期",
+              "json_pointer": "/forward/{row_uuid}/voucherDate",
+              "mode": "editable",
+              "source_ref": "源xlsx!其他业务收入截止性测试D4-36!A16",
+              "stable_field_key": "d4_36_forward/{row_uuid}/voucher_date",
+              "store_item_id": "D4-36-data",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "B",
+                "row_from": "row_identity"
+              },
+              "column_key": "voucher_no",
+              "header_source_ref": "源xlsx!其他业务收入截止性测试D4-36!B15",
+              "header_text": "记账凭证编号",
+              "json_pointer": "/forward/{row_uuid}/voucherNo",
+              "mode": "editable",
+              "source_ref": "源xlsx!其他业务收入截止性测试D4-36!B16",
+              "stable_field_key": "d4_36_forward/{row_uuid}/voucher_no",
+              "store_item_id": "D4-36-data",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "C",
+                "row_from": "row_identity"
+              },
+              "column_key": "voucher_product",
+              "header_source_ref": "源xlsx!其他业务收入截止性测试D4-36!C15",
+              "header_text": "记账凭证品名",
+              "json_pointer": "/forward/{row_uuid}/voucherProduct",
+              "mode": "editable",
+              "source_ref": "源xlsx!其他业务收入截止性测试D4-36!C16",
+              "stable_field_key": "d4_36_forward/{row_uuid}/voucher_product",
+              "store_item_id": "D4-36-data",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "D",
+                "row_from": "row_identity"
+              },
+              "column_key": "voucher_qty",
+              "header_source_ref": "源xlsx!其他业务收入截止性测试D4-36!D15",
+              "header_text": "记账凭证数量",
+              "json_pointer": "/forward/{row_uuid}/voucherQty",
+              "mode": "editable",
+              "source_ref": "源xlsx!其他业务收入截止性测试D4-36!D16",
+              "stable_field_key": "d4_36_forward/{row_uuid}/voucher_qty",
+              "store_item_id": "D4-36-data",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "E",
+                "row_from": "row_identity"
+              },
+              "column_key": "voucher_amount",
+              "header_source_ref": "源xlsx!其他业务收入截止性测试D4-36!E15",
+              "header_text": "记账凭证金额",
+              "json_pointer": "/forward/{row_uuid}/voucherAmount",
+              "mode": "editable",
+              "source_ref": "源xlsx!其他业务收入截止性测试D4-36!E16",
+              "stable_field_key": "d4_36_forward/{row_uuid}/voucher_amount",
+              "store_item_id": "D4-36-data",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "F",
+                "row_from": "row_identity"
+              },
+              "column_key": "doc_date",
+              "header_source_ref": "源xlsx!其他业务收入截止性测试D4-36!F15",
+              "header_text": "单据日期",
+              "json_pointer": "/forward/{row_uuid}/docDate",
+              "mode": "editable",
+              "source_ref": "源xlsx!其他业务收入截止性测试D4-36!F16",
+              "stable_field_key": "d4_36_forward/{row_uuid}/doc_date",
+              "store_item_id": "D4-36-data",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "G",
+                "row_from": "row_identity"
+              },
+              "column_key": "doc_no",
+              "header_source_ref": "源xlsx!其他业务收入截止性测试D4-36!G15",
+              "header_text": "单据编号",
+              "json_pointer": "/forward/{row_uuid}/docNo",
+              "mode": "editable",
+              "source_ref": "源xlsx!其他业务收入截止性测试D4-36!G16",
+              "stable_field_key": "d4_36_forward/{row_uuid}/doc_no",
+              "store_item_id": "D4-36-data",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "H",
+                "row_from": "row_identity"
+              },
+              "column_key": "doc_product",
+              "header_source_ref": "源xlsx!其他业务收入截止性测试D4-36!H15",
+              "header_text": "单据品名",
+              "json_pointer": "/forward/{row_uuid}/docProduct",
+              "mode": "editable",
+              "source_ref": "源xlsx!其他业务收入截止性测试D4-36!H16",
+              "stable_field_key": "d4_36_forward/{row_uuid}/doc_product",
+              "store_item_id": "D4-36-data",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "I",
+                "row_from": "row_identity"
+              },
+              "column_key": "doc_qty",
+              "header_source_ref": "源xlsx!其他业务收入截止性测试D4-36!I15",
+              "header_text": "单据数量",
+              "json_pointer": "/forward/{row_uuid}/docQty",
+              "mode": "editable",
+              "source_ref": "源xlsx!其他业务收入截止性测试D4-36!I16",
+              "stable_field_key": "d4_36_forward/{row_uuid}/doc_qty",
+              "store_item_id": "D4-36-data",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "J",
+                "row_from": "row_identity"
+              },
+              "column_key": "doc_amount",
+              "header_source_ref": "源xlsx!其他业务收入截止性测试D4-36!J15",
+              "header_text": "单据金额",
+              "json_pointer": "/forward/{row_uuid}/docAmount",
+              "mode": "editable",
+              "source_ref": "源xlsx!其他业务收入截止性测试D4-36!J16",
+              "stable_field_key": "d4_36_forward/{row_uuid}/doc_amount",
+              "store_item_id": "D4-36-data",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "K",
+                "row_from": "row_identity"
+              },
+              "column_key": "is_crossing",
+              "header_source_ref": "源xlsx!其他业务收入截止性测试D4-36!K15",
+              "header_text": "是否跨期",
+              "json_pointer": "/forward/{row_uuid}/isCrossing",
+              "mode": "editable",
+              "source_ref": "源xlsx!其他业务收入截止性测试D4-36!K16",
+              "stable_field_key": "d4_36_forward/{row_uuid}/is_crossing",
+              "store_item_id": "D4-36-data",
+              "value_type": "text"
+            }
+          ],
+          "footer_anchor": {
+            "carries_total_formula": false,
+            "marker": "截止日期：202X年12月31日",
+            "search_column": "A"
+          },
+          "formula_mask": [],
+          "header_rows": 1,
+          "row_identity": {
+            "json_pointer": "/forward/*/id",
+            "kind": "field"
+          },
+          "table_key": "d4_36_forward",
+          "uuid_col": "L"
+        },
+        {
+          "anchor": "A35",
+          "delete_policy": "tombstone",
+          "fields": [
+            {
+              "cell": {
+                "column": "A",
+                "row_from": "row_identity"
+              },
+              "column_key": "voucher_date",
+              "header_source_ref": "源xlsx!其他业务收入截止性测试D4-36!A35",
+              "header_text": "记账凭证日期",
+              "json_pointer": "/backward/{row_uuid}/voucherDate",
+              "mode": "editable",
+              "source_ref": "源xlsx!其他业务收入截止性测试D4-36!A36",
+              "stable_field_key": "d4_36_backward/{row_uuid}/voucher_date",
+              "store_item_id": "D4-36-data",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "B",
+                "row_from": "row_identity"
+              },
+              "column_key": "voucher_no",
+              "header_source_ref": "源xlsx!其他业务收入截止性测试D4-36!B35",
+              "header_text": "记账凭证编号",
+              "json_pointer": "/backward/{row_uuid}/voucherNo",
+              "mode": "editable",
+              "source_ref": "源xlsx!其他业务收入截止性测试D4-36!B36",
+              "stable_field_key": "d4_36_backward/{row_uuid}/voucher_no",
+              "store_item_id": "D4-36-data",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "C",
+                "row_from": "row_identity"
+              },
+              "column_key": "voucher_product",
+              "header_source_ref": "源xlsx!其他业务收入截止性测试D4-36!C35",
+              "header_text": "记账凭证品名",
+              "json_pointer": "/backward/{row_uuid}/voucherProduct",
+              "mode": "editable",
+              "source_ref": "源xlsx!其他业务收入截止性测试D4-36!C36",
+              "stable_field_key": "d4_36_backward/{row_uuid}/voucher_product",
+              "store_item_id": "D4-36-data",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "D",
+                "row_from": "row_identity"
+              },
+              "column_key": "voucher_qty",
+              "header_source_ref": "源xlsx!其他业务收入截止性测试D4-36!D35",
+              "header_text": "记账凭证数量",
+              "json_pointer": "/backward/{row_uuid}/voucherQty",
+              "mode": "editable",
+              "source_ref": "源xlsx!其他业务收入截止性测试D4-36!D36",
+              "stable_field_key": "d4_36_backward/{row_uuid}/voucher_qty",
+              "store_item_id": "D4-36-data",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "E",
+                "row_from": "row_identity"
+              },
+              "column_key": "voucher_amount",
+              "header_source_ref": "源xlsx!其他业务收入截止性测试D4-36!E35",
+              "header_text": "记账凭证金额",
+              "json_pointer": "/backward/{row_uuid}/voucherAmount",
+              "mode": "editable",
+              "source_ref": "源xlsx!其他业务收入截止性测试D4-36!E36",
+              "stable_field_key": "d4_36_backward/{row_uuid}/voucher_amount",
+              "store_item_id": "D4-36-data",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "F",
+                "row_from": "row_identity"
+              },
+              "column_key": "doc_date",
+              "header_source_ref": "源xlsx!其他业务收入截止性测试D4-36!F35",
+              "header_text": "单据日期",
+              "json_pointer": "/backward/{row_uuid}/docDate",
+              "mode": "editable",
+              "source_ref": "源xlsx!其他业务收入截止性测试D4-36!F36",
+              "stable_field_key": "d4_36_backward/{row_uuid}/doc_date",
+              "store_item_id": "D4-36-data",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "G",
+                "row_from": "row_identity"
+              },
+              "column_key": "doc_no",
+              "header_source_ref": "源xlsx!其他业务收入截止性测试D4-36!G35",
+              "header_text": "单据编号",
+              "json_pointer": "/backward/{row_uuid}/docNo",
+              "mode": "editable",
+              "source_ref": "源xlsx!其他业务收入截止性测试D4-36!G36",
+              "stable_field_key": "d4_36_backward/{row_uuid}/doc_no",
+              "store_item_id": "D4-36-data",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "H",
+                "row_from": "row_identity"
+              },
+              "column_key": "doc_product",
+              "header_source_ref": "源xlsx!其他业务收入截止性测试D4-36!H35",
+              "header_text": "单据品名",
+              "json_pointer": "/backward/{row_uuid}/docProduct",
+              "mode": "editable",
+              "source_ref": "源xlsx!其他业务收入截止性测试D4-36!H36",
+              "stable_field_key": "d4_36_backward/{row_uuid}/doc_product",
+              "store_item_id": "D4-36-data",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "I",
+                "row_from": "row_identity"
+              },
+              "column_key": "doc_qty",
+              "header_source_ref": "源xlsx!其他业务收入截止性测试D4-36!I35",
+              "header_text": "单据数量",
+              "json_pointer": "/backward/{row_uuid}/docQty",
+              "mode": "editable",
+              "source_ref": "源xlsx!其他业务收入截止性测试D4-36!I36",
+              "stable_field_key": "d4_36_backward/{row_uuid}/doc_qty",
+              "store_item_id": "D4-36-data",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "J",
+                "row_from": "row_identity"
+              },
+              "column_key": "doc_amount",
+              "header_source_ref": "源xlsx!其他业务收入截止性测试D4-36!J35",
+              "header_text": "单据金额",
+              "json_pointer": "/backward/{row_uuid}/docAmount",
+              "mode": "editable",
+              "source_ref": "源xlsx!其他业务收入截止性测试D4-36!J36",
+              "stable_field_key": "d4_36_backward/{row_uuid}/doc_amount",
+              "store_item_id": "D4-36-data",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "K",
+                "row_from": "row_identity"
+              },
+              "column_key": "is_crossing",
+              "header_source_ref": "源xlsx!其他业务收入截止性测试D4-36!K35",
+              "header_text": "是否跨期",
+              "json_pointer": "/backward/{row_uuid}/isCrossing",
+              "mode": "editable",
+              "source_ref": "源xlsx!其他业务收入截止性测试D4-36!K36",
+              "stable_field_key": "d4_36_backward/{row_uuid}/is_crossing",
+              "store_item_id": "D4-36-data",
+              "value_type": "text"
+            }
+          ],
+          "footer_anchor": {
+            "carries_total_formula": false,
+            "marker": "截止日期：202X年12月31日",
+            "search_column": "A"
+          },
+          "formula_mask": [],
+          "header_rows": 1,
+          "row_identity": {
+            "json_pointer": "/backward/*/id",
+            "kind": "field"
+          },
+          "table_key": "d4_36_backward",
+          "uuid_col": "M"
+        }
+      ],
+      "template_id": "D436"
+    },
+    {
+      "excel_name": "毛利率分析表D4-7",
+      "locator": {
+        "anchor": "excel_table_sheet_association"
+      },
+      "sheet_key": "d47-managed",
+      "tables": [
+        {
+          "anchor": "A19",
+          "delete_policy": "tombstone",
+          "fields": [
+            {
+              "cell": {
+                "column": "A",
+                "row_from": "row_identity"
+              },
+              "column_key": "name",
+              "header_source_ref": "源xlsx!毛利率分析表D4-7!A19",
+              "header_text": "产品名称",
+              "json_pointer": "/{row_uuid}/name",
+              "mode": "editable",
+              "source_ref": "源xlsx!毛利率分析表D4-7!A20",
+              "stable_field_key": "d4_7_products/{row_uuid}/name",
+              "store_item_id": "D4-7-products",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "B",
+                "row_from": "row_identity"
+              },
+              "column_key": "cur_qty",
+              "header_source_ref": "源xlsx!毛利率分析表D4-7!B19",
+              "header_text": "本期数量",
+              "json_pointer": "/{row_uuid}/curQty",
+              "mode": "editable",
+              "source_ref": "源xlsx!毛利率分析表D4-7!B20",
+              "stable_field_key": "d4_7_products/{row_uuid}/cur_qty",
+              "store_item_id": "D4-7-products",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "D",
+                "row_from": "row_identity"
+              },
+              "column_key": "cur_revenue",
+              "header_source_ref": "源xlsx!毛利率分析表D4-7!D19",
+              "header_text": "本期主营业务收入",
+              "json_pointer": "/{row_uuid}/curRevenue",
+              "mode": "editable",
+              "source_ref": "源xlsx!毛利率分析表D4-7!D20",
+              "stable_field_key": "d4_7_products/{row_uuid}/cur_revenue",
+              "store_item_id": "D4-7-products",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "G",
+                "row_from": "row_identity"
+              },
+              "column_key": "cur_cost",
+              "header_source_ref": "源xlsx!毛利率分析表D4-7!G19",
+              "header_text": "本期主营业务成本",
+              "json_pointer": "/{row_uuid}/curCost",
+              "mode": "editable",
+              "source_ref": "源xlsx!毛利率分析表D4-7!G20",
+              "stable_field_key": "d4_7_products/{row_uuid}/cur_cost",
+              "store_item_id": "D4-7-products",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "J",
+                "row_from": "row_identity"
+              },
+              "column_key": "prior_qty",
+              "header_source_ref": "源xlsx!毛利率分析表D4-7!J19",
+              "header_text": "上期数量",
+              "json_pointer": "/{row_uuid}/priorQty",
+              "mode": "editable",
+              "source_ref": "源xlsx!毛利率分析表D4-7!J20",
+              "stable_field_key": "d4_7_products/{row_uuid}/prior_qty",
+              "store_item_id": "D4-7-products",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "L",
+                "row_from": "row_identity"
+              },
+              "column_key": "prior_revenue",
+              "header_source_ref": "源xlsx!毛利率分析表D4-7!L19",
+              "header_text": "上期主营业务收入",
+              "json_pointer": "/{row_uuid}/priorRevenue",
+              "mode": "editable",
+              "source_ref": "源xlsx!毛利率分析表D4-7!L20",
+              "stable_field_key": "d4_7_products/{row_uuid}/prior_revenue",
+              "store_item_id": "D4-7-products",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "O",
+                "row_from": "row_identity"
+              },
+              "column_key": "prior_cost",
+              "header_source_ref": "源xlsx!毛利率分析表D4-7!O19",
+              "header_text": "上期主营业务成本",
+              "json_pointer": "/{row_uuid}/priorCost",
+              "mode": "editable",
+              "source_ref": "源xlsx!毛利率分析表D4-7!O20",
+              "stable_field_key": "d4_7_products/{row_uuid}/prior_cost",
+              "store_item_id": "D4-7-products",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "W",
+                "row_from": "row_identity"
+              },
+              "column_key": "remark",
+              "header_source_ref": "源xlsx!毛利率分析表D4-7!W19",
+              "header_text": "备注",
+              "json_pointer": "/{row_uuid}/remark",
+              "mode": "editable",
+              "source_ref": "源xlsx!毛利率分析表D4-7!W20",
+              "stable_field_key": "d4_7_products/{row_uuid}/remark",
+              "store_item_id": "D4-7-products",
+              "value_type": "text"
+            }
+          ],
+          "footer_anchor": {
+            "carries_total_formula": true,
+            "marker": "合计",
+            "search_column": "A"
+          },
+          "formula_mask": [
+            "C20",
+            "E20",
+            "F20",
+            "H20",
+            "I20",
+            "K20",
+            "M20",
+            "N20",
+            "P20",
+            "Q20",
+            "R20",
+            "S20",
+            "T20",
+            "U20",
+            "V20",
+            "C21",
+            "E21",
+            "F21",
+            "H21",
+            "I21",
+            "K21",
+            "M21",
+            "N21",
+            "P21",
+            "Q21",
+            "R21",
+            "S21",
+            "T21",
+            "U21",
+            "V21",
+            "C22",
+            "E22",
+            "F22",
+            "H22",
+            "I22",
+            "K22",
+            "M22",
+            "N22",
+            "P22",
+            "Q22",
+            "R22",
+            "S22",
+            "T22",
+            "U22",
+            "V22",
+            "C23",
+            "E23",
+            "F23",
+            "H23",
+            "I23",
+            "K23",
+            "M23",
+            "N23",
+            "P23",
+            "Q23",
+            "R23",
+            "S23",
+            "T23",
+            "U23",
+            "V23",
+            "C24",
+            "E24",
+            "F24",
+            "H24",
+            "I24",
+            "K24",
+            "M24",
+            "N24",
+            "P24",
+            "Q24",
+            "R24",
+            "S24",
+            "T24",
+            "U24",
+            "V24",
+            "C25",
+            "E25",
+            "F25",
+            "H25",
+            "I25",
+            "K25",
+            "M25",
+            "N25",
+            "P25",
+            "Q25",
+            "R25",
+            "S25",
+            "T25",
+            "U25",
+            "V25",
+            "C26",
+            "E26",
+            "F26",
+            "H26",
+            "I26",
+            "K26",
+            "M26",
+            "N26",
+            "P26",
+            "Q26",
+            "R26",
+            "S26",
+            "T26",
+            "U26",
+            "V26",
+            "B26",
+            "D26",
+            "G26",
+            "J26",
+            "L26",
+            "O26"
+          ],
+          "header_rows": 1,
+          "row_identity": {
+            "json_pointer": "/*/rowId",
+            "kind": "field"
+          },
+          "table_key": "d4_7_products",
+          "uuid_col": "X"
+        },
+        {
+          "anchor": "A11",
+          "fields": [
+            {
+              "cell": {
+                "column": "B",
+                "row_from": 12
+              },
+              "column_key": "revenue_0",
+              "header_source_ref": "源xlsx!毛利率分析表D4-7!B11",
+              "header_text": "月度",
+              "json_pointer": "/revenue/0",
+              "mode": "editable",
+              "source_ref": "源xlsx!毛利率分析表D4-7!B12",
+              "stable_field_key": "d4_7_monthly/revenue_0",
+              "store_item_id": "D4-7-monthly",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "B",
+                "row_from": 13
+              },
+              "column_key": "cost_0",
+              "header_source_ref": "源xlsx!毛利率分析表D4-7!B11",
+              "header_text": "月度",
+              "json_pointer": "/cost/0",
+              "mode": "editable",
+              "source_ref": "源xlsx!毛利率分析表D4-7!B13",
+              "stable_field_key": "d4_7_monthly/cost_0",
+              "store_item_id": "D4-7-monthly",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "C",
+                "row_from": 12
+              },
+              "column_key": "revenue_1",
+              "header_source_ref": "源xlsx!毛利率分析表D4-7!C11",
+              "header_text": "月度",
+              "json_pointer": "/revenue/1",
+              "mode": "editable",
+              "source_ref": "源xlsx!毛利率分析表D4-7!C12",
+              "stable_field_key": "d4_7_monthly/revenue_1",
+              "store_item_id": "D4-7-monthly",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "C",
+                "row_from": 13
+              },
+              "column_key": "cost_1",
+              "header_source_ref": "源xlsx!毛利率分析表D4-7!C11",
+              "header_text": "月度",
+              "json_pointer": "/cost/1",
+              "mode": "editable",
+              "source_ref": "源xlsx!毛利率分析表D4-7!C13",
+              "stable_field_key": "d4_7_monthly/cost_1",
+              "store_item_id": "D4-7-monthly",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "D",
+                "row_from": 12
+              },
+              "column_key": "revenue_2",
+              "header_source_ref": "源xlsx!毛利率分析表D4-7!D11",
+              "header_text": "月度",
+              "json_pointer": "/revenue/2",
+              "mode": "editable",
+              "source_ref": "源xlsx!毛利率分析表D4-7!D12",
+              "stable_field_key": "d4_7_monthly/revenue_2",
+              "store_item_id": "D4-7-monthly",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "D",
+                "row_from": 13
+              },
+              "column_key": "cost_2",
+              "header_source_ref": "源xlsx!毛利率分析表D4-7!D11",
+              "header_text": "月度",
+              "json_pointer": "/cost/2",
+              "mode": "editable",
+              "source_ref": "源xlsx!毛利率分析表D4-7!D13",
+              "stable_field_key": "d4_7_monthly/cost_2",
+              "store_item_id": "D4-7-monthly",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "E",
+                "row_from": 12
+              },
+              "column_key": "revenue_3",
+              "header_source_ref": "源xlsx!毛利率分析表D4-7!E11",
+              "header_text": "月度",
+              "json_pointer": "/revenue/3",
+              "mode": "editable",
+              "source_ref": "源xlsx!毛利率分析表D4-7!E12",
+              "stable_field_key": "d4_7_monthly/revenue_3",
+              "store_item_id": "D4-7-monthly",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "E",
+                "row_from": 13
+              },
+              "column_key": "cost_3",
+              "header_source_ref": "源xlsx!毛利率分析表D4-7!E11",
+              "header_text": "月度",
+              "json_pointer": "/cost/3",
+              "mode": "editable",
+              "source_ref": "源xlsx!毛利率分析表D4-7!E13",
+              "stable_field_key": "d4_7_monthly/cost_3",
+              "store_item_id": "D4-7-monthly",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "F",
+                "row_from": 12
+              },
+              "column_key": "revenue_4",
+              "header_source_ref": "源xlsx!毛利率分析表D4-7!F11",
+              "header_text": "月度",
+              "json_pointer": "/revenue/4",
+              "mode": "editable",
+              "source_ref": "源xlsx!毛利率分析表D4-7!F12",
+              "stable_field_key": "d4_7_monthly/revenue_4",
+              "store_item_id": "D4-7-monthly",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "F",
+                "row_from": 13
+              },
+              "column_key": "cost_4",
+              "header_source_ref": "源xlsx!毛利率分析表D4-7!F11",
+              "header_text": "月度",
+              "json_pointer": "/cost/4",
+              "mode": "editable",
+              "source_ref": "源xlsx!毛利率分析表D4-7!F13",
+              "stable_field_key": "d4_7_monthly/cost_4",
+              "store_item_id": "D4-7-monthly",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "G",
+                "row_from": 12
+              },
+              "column_key": "revenue_5",
+              "header_source_ref": "源xlsx!毛利率分析表D4-7!G11",
+              "header_text": "月度",
+              "json_pointer": "/revenue/5",
+              "mode": "editable",
+              "source_ref": "源xlsx!毛利率分析表D4-7!G12",
+              "stable_field_key": "d4_7_monthly/revenue_5",
+              "store_item_id": "D4-7-monthly",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "G",
+                "row_from": 13
+              },
+              "column_key": "cost_5",
+              "header_source_ref": "源xlsx!毛利率分析表D4-7!G11",
+              "header_text": "月度",
+              "json_pointer": "/cost/5",
+              "mode": "editable",
+              "source_ref": "源xlsx!毛利率分析表D4-7!G13",
+              "stable_field_key": "d4_7_monthly/cost_5",
+              "store_item_id": "D4-7-monthly",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "H",
+                "row_from": 12
+              },
+              "column_key": "revenue_6",
+              "header_source_ref": "源xlsx!毛利率分析表D4-7!H11",
+              "header_text": "月度",
+              "json_pointer": "/revenue/6",
+              "mode": "editable",
+              "source_ref": "源xlsx!毛利率分析表D4-7!H12",
+              "stable_field_key": "d4_7_monthly/revenue_6",
+              "store_item_id": "D4-7-monthly",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "H",
+                "row_from": 13
+              },
+              "column_key": "cost_6",
+              "header_source_ref": "源xlsx!毛利率分析表D4-7!H11",
+              "header_text": "月度",
+              "json_pointer": "/cost/6",
+              "mode": "editable",
+              "source_ref": "源xlsx!毛利率分析表D4-7!H13",
+              "stable_field_key": "d4_7_monthly/cost_6",
+              "store_item_id": "D4-7-monthly",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "I",
+                "row_from": 12
+              },
+              "column_key": "revenue_7",
+              "header_source_ref": "源xlsx!毛利率分析表D4-7!I11",
+              "header_text": "月度",
+              "json_pointer": "/revenue/7",
+              "mode": "editable",
+              "source_ref": "源xlsx!毛利率分析表D4-7!I12",
+              "stable_field_key": "d4_7_monthly/revenue_7",
+              "store_item_id": "D4-7-monthly",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "I",
+                "row_from": 13
+              },
+              "column_key": "cost_7",
+              "header_source_ref": "源xlsx!毛利率分析表D4-7!I11",
+              "header_text": "月度",
+              "json_pointer": "/cost/7",
+              "mode": "editable",
+              "source_ref": "源xlsx!毛利率分析表D4-7!I13",
+              "stable_field_key": "d4_7_monthly/cost_7",
+              "store_item_id": "D4-7-monthly",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "J",
+                "row_from": 12
+              },
+              "column_key": "revenue_8",
+              "header_source_ref": "源xlsx!毛利率分析表D4-7!J11",
+              "header_text": "月度",
+              "json_pointer": "/revenue/8",
+              "mode": "editable",
+              "source_ref": "源xlsx!毛利率分析表D4-7!J12",
+              "stable_field_key": "d4_7_monthly/revenue_8",
+              "store_item_id": "D4-7-monthly",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "J",
+                "row_from": 13
+              },
+              "column_key": "cost_8",
+              "header_source_ref": "源xlsx!毛利率分析表D4-7!J11",
+              "header_text": "月度",
+              "json_pointer": "/cost/8",
+              "mode": "editable",
+              "source_ref": "源xlsx!毛利率分析表D4-7!J13",
+              "stable_field_key": "d4_7_monthly/cost_8",
+              "store_item_id": "D4-7-monthly",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "K",
+                "row_from": 12
+              },
+              "column_key": "revenue_9",
+              "header_source_ref": "源xlsx!毛利率分析表D4-7!K11",
+              "header_text": "月度",
+              "json_pointer": "/revenue/9",
+              "mode": "editable",
+              "source_ref": "源xlsx!毛利率分析表D4-7!K12",
+              "stable_field_key": "d4_7_monthly/revenue_9",
+              "store_item_id": "D4-7-monthly",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "K",
+                "row_from": 13
+              },
+              "column_key": "cost_9",
+              "header_source_ref": "源xlsx!毛利率分析表D4-7!K11",
+              "header_text": "月度",
+              "json_pointer": "/cost/9",
+              "mode": "editable",
+              "source_ref": "源xlsx!毛利率分析表D4-7!K13",
+              "stable_field_key": "d4_7_monthly/cost_9",
+              "store_item_id": "D4-7-monthly",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "L",
+                "row_from": 12
+              },
+              "column_key": "revenue_10",
+              "header_source_ref": "源xlsx!毛利率分析表D4-7!L11",
+              "header_text": "月度",
+              "json_pointer": "/revenue/10",
+              "mode": "editable",
+              "source_ref": "源xlsx!毛利率分析表D4-7!L12",
+              "stable_field_key": "d4_7_monthly/revenue_10",
+              "store_item_id": "D4-7-monthly",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "L",
+                "row_from": 13
+              },
+              "column_key": "cost_10",
+              "header_source_ref": "源xlsx!毛利率分析表D4-7!L11",
+              "header_text": "月度",
+              "json_pointer": "/cost/10",
+              "mode": "editable",
+              "source_ref": "源xlsx!毛利率分析表D4-7!L13",
+              "stable_field_key": "d4_7_monthly/cost_10",
+              "store_item_id": "D4-7-monthly",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "M",
+                "row_from": 12
+              },
+              "column_key": "revenue_11",
+              "header_source_ref": "源xlsx!毛利率分析表D4-7!M11",
+              "header_text": "月度",
+              "json_pointer": "/revenue/11",
+              "mode": "editable",
+              "source_ref": "源xlsx!毛利率分析表D4-7!M12",
+              "stable_field_key": "d4_7_monthly/revenue_11",
+              "store_item_id": "D4-7-monthly",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "M",
+                "row_from": 13
+              },
+              "column_key": "cost_11",
+              "header_source_ref": "源xlsx!毛利率分析表D4-7!M11",
+              "header_text": "月度",
+              "json_pointer": "/cost/11",
+              "mode": "editable",
+              "source_ref": "源xlsx!毛利率分析表D4-7!M13",
+              "stable_field_key": "d4_7_monthly/cost_11",
+              "store_item_id": "D4-7-monthly",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "O",
+                "row_from": 12
+              },
+              "column_key": "prior_revenue",
+              "header_source_ref": "源xlsx!毛利率分析表D4-7!O11",
+              "header_text": "月度",
+              "json_pointer": "/priorRevenue",
+              "mode": "editable",
+              "source_ref": "源xlsx!毛利率分析表D4-7!O12",
+              "stable_field_key": "d4_7_monthly/prior_revenue",
+              "store_item_id": "D4-7-monthly",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "O",
+                "row_from": 13
+              },
+              "column_key": "prior_cost",
+              "header_source_ref": "源xlsx!毛利率分析表D4-7!O11",
+              "header_text": "月度",
+              "json_pointer": "/priorCost",
+              "mode": "editable",
+              "source_ref": "源xlsx!毛利率分析表D4-7!O13",
+              "stable_field_key": "d4_7_monthly/prior_cost",
+              "store_item_id": "D4-7-monthly",
+              "value_type": "amount"
+            }
+          ],
+          "formula_mask": [
+            "N12",
+            "P12",
+            "N13",
+            "P13",
+            "B14",
+            "C14",
+            "D14",
+            "E14",
+            "F14",
+            "G14",
+            "H14",
+            "I14",
+            "J14",
+            "K14",
+            "L14",
+            "M14",
+            "N14",
+            "O14",
+            "P14",
+            "B15",
+            "C15",
+            "D15",
+            "E15",
+            "F15",
+            "G15",
+            "H15",
+            "I15",
+            "J15",
+            "K15",
+            "L15",
+            "M15",
+            "N15",
+            "O15"
+          ],
+          "header_rows": 1,
+          "table_key": "d4_7_monthly"
+        }
+      ],
+      "template_id": "D47"
     }
   ],
   "template": {

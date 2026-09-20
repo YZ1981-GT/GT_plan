@@ -1284,7 +1284,45 @@ def _sibling_identity_bindings(
             },
         )
         siblings.append(binding)
+    siblings.extend(
+        _static_region_bindings(provider=provider, metadata_sheet=GT_SYNC_SHEET_NAME)
+    )
     return tuple(siblings)
+
+
+def _static_region_bindings(*, provider: Any, metadata_sheet: str) -> list[Any]:
+    """从 provider 各 instrumentation spec 的 ``static_sheets`` 生成静态受管区 binding。
+
+    静态受管区（spec workpaper-sync-static-cell-sheet-writeback）无动态行，不经
+    :func:`_align_specs_to_sibling_tables`（那只对齐 row table）。每个 static_sheets 元素
+    的 ``region_boundary_locator.defined_name`` 是 workbook-scope definedName 锚点，
+    ``tables[0].table_key`` 是契约静态表 key。binding 用静态形态（``defined_name=``，无
+    ``table_name``/``uuid_column``）。
+    """
+    from app.services.workpaper_sync.excel_extract import ExcelIdentityBinding
+
+    specs_fn = getattr(provider, "instrumentation_specs", None)
+    if not callable(specs_fn):
+        return []
+    out: list[Any] = []
+    for spec in specs_fn():
+        for sheet in getattr(spec, "static_sheets", ()) or ():
+            boundary = sheet.get("region_boundary_locator") or {}
+            defined_name = str(boundary.get("defined_name") or "").strip()
+            tables = sheet.get("tables") or []
+            table_key = (
+                str(tables[0].get("table_key") or "").strip() if tables else ""
+            )
+            if not defined_name or not table_key:
+                continue
+            out.append(
+                ExcelIdentityBinding(
+                    table_key=table_key,
+                    defined_name=defined_name,
+                    metadata_sheet=metadata_sheet,
+                )
+            )
+    return out
 
 
 def _identity_binding(

@@ -35,6 +35,12 @@ FIRST_MONTH_ROW_D433: Final[int] = 12   # 1 月
 LAST_MONTH_ROW_D433: Final[int] = 23    # 12 月
 MONTH_COUNT: Final[int] = 12
 
+#: 静态受管区 workbook-scope definedName 锚点（spec workpaper-sync-static-cell-sheet-writeback）。
+#: 引擎的静态 cell 路径经它定界受管矩形；instrumentation 注入（模板无既有 definedName）。
+#: 受管区几何覆盖 3 业务类型列组 E-M × 12 月行 R12-23（含公式列，受管 cell 由 fields 精确声明）。
+DEFINED_NAME_D433: Final[str] = "GT_MANAGED_REGION_D433"
+MANAGED_REF_D433: Final[str] = f"$E${FIRST_MONTH_ROW_D433}:$M${LAST_MONTH_ROW_D433}"
+
 #: 3 个业务类型列组（slot 位置 → 收入列 / 成本列）。毛利率列 G/J/M 为公式，不受管。
 #: slot0 出租固定资产 E/F · slot1 出租无形资产 H/I · slot2 销售材料 K/L。
 BIZ_SLOTS: Final[tuple[tuple[str, str], ...]] = (("E", "F"), ("H", "I"), ("K", "L"))
@@ -96,11 +102,22 @@ def sheet_payload_d433() -> dict[str, Any]:
                     }
                 )
     # static-cell 表：无 row_identity / delete_policy / footer_anchor（参 D4-5 fixed_table）。
+    # 🔴 locator 用 definedName_ref + region_kind=static（引擎静态受管区路径），非 Excel Table。
+    #    静态区无 UUID 列、无 tableParts，锚点是 workbook-scope definedName（instrumentation 注入）。
     return {
         "sheet_key": SHEET_KEY_D433,
         "excel_name": MANAGED_SHEET_D433,
         "template_id": TEMPLATE_ID_D433,
-        "locator": {"anchor": "excel_table_sheet_association"},
+        "locator": {
+            "anchor": "defined_name_ref",
+            "defined_name": DEFINED_NAME_D433,
+        },
+        "region_boundary_locator": {
+            "anchor": "defined_name_ref",
+            "defined_name": DEFINED_NAME_D433,
+            "range": MANAGED_REF_D433,
+            "region_kind": "static",
+        },
         "tables": [
             {
                 "table_key": TABLE_KEY_D433,
@@ -111,6 +128,41 @@ def sheet_payload_d433() -> dict[str, Any]:
             }
         ],
     }
+
+
+def static_sheet_payload_d433() -> dict[str, Any]:
+    """instrumentation `static_sheets` 元素（寄生在动态 primary spec 上，同 transposed_sheets）。
+
+    只声明 workbook-scope definedName 锚点几何；注入时只写 definedName，不注 Excel Table /
+    UUID 列 / 隐藏行（引擎静态路径）。
+    """
+    return {
+        "sheet_key": SHEET_KEY_D433,
+        "excel_name": MANAGED_SHEET_D433,
+        "template_id": TEMPLATE_ID_D433,
+        "region_boundary_locator": {
+            "anchor": "defined_name_ref",
+            "defined_name": DEFINED_NAME_D433,
+            "range": MANAGED_REF_D433,
+            "region_kind": "static",
+        },
+        "tables": [{"table_key": TABLE_KEY_D433}],
+    }
+
+
+def static_binding_d433():
+    """D4-33 静态受管区的 ExcelIdentityBinding（静态形态：defined_name，无 table_name/uuid）。
+
+    加进 adapter 的 sibling_bindings，使 extract/materialize 走引擎静态路径。
+    """
+    from app.services.excel_structure_fingerprint import GT_SYNC_SHEET_NAME
+    from app.services.workpaper_sync.excel_extract import ExcelIdentityBinding
+
+    return ExcelIdentityBinding(
+        table_key=TABLE_KEY_D433,
+        defined_name=DEFINED_NAME_D433,
+        metadata_sheet=GT_SYNC_SHEET_NAME,
+    )
 
 
 def _decode(payload: Any) -> Any:
