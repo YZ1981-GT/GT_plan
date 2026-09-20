@@ -2731,8 +2731,19 @@ class OoToHtmlCoordinator:
         """D4-2-rows + D4-3-rows：按 table 前缀分别 merge 后写回各自 checklist item。"""
         import json
 
+        # dict store（D4-9 {current,prior}+totals / D4-33 {bizTypes,months,priorYear} /
+        # D4-34 {rentals,consults}）不走本 rows 循环，由下方各自专用 dict 块单独处理
+        # （同 D4-35 STORE_ITEM_ID_D435_DICT）。它们在 STORE_ITEM_IDS 里（combined projection 需要），
+        # 但 merge_projection_into_all_d4_stores 不产出它们，故这里从 base_by_item 构造中跳过。
+        _dict_store_items = {
+            str(getattr(bridge, name, "") or "")
+            for name in ("STORE_ITEM_ID_D49_DICT", "STORE_ITEM_ID_D433_DICT", "STORE_ITEM_ID_D434_DICT", "STORE_ITEM_ID_D436_DICT")
+        }
+        _dict_store_items.discard("")
         base_by_item: dict[str, list] = {}
         for item_id in bridge.STORE_ITEM_IDS:
+            if item_id in _dict_store_items:
+                continue
             raw = (
                 await self._session.execute(
                     sa.text(
@@ -2897,6 +2908,59 @@ class OoToHtmlCoordinator:
                     )
                 await self._session.commit()
 
+        # D4-9 dict store（{current,prior}+totals）：三 table 分流回嵌套 dict，
+        # formula_mask（D/F 占比 + 合计）不回写；保留未受管的顶层键。
+        if hasattr(bridge, "merge_d49_from_projection") and hasattr(
+            bridge, "STORE_ITEM_ID_D49_DICT"
+        ):
+            item_id = bridge.STORE_ITEM_ID_D49_DICT
+            raw = (
+                await self._session.execute(
+                    sa.text(
+                        "SELECT remark FROM checklist_responses "
+                        "WHERE wp_id = :wp AND item_id = :item"
+                    ),
+                    {"wp": str(state.frozen.wp_id), "item": item_id},
+                )
+            ).scalar_one_or_none()
+            base_state_d49: dict | None = None
+            if raw:
+                try:
+                    parsed = json.loads(raw)
+                    if isinstance(parsed, dict):
+                        base_state_d49 = parsed
+                except (TypeError, ValueError):
+                    base_state_d49 = None
+            merged_dict, applied, _visited = bridge.merge_d49_from_projection(
+                projection=merged_projection, base_state=base_state_d49
+            )
+            if not (applied <= 0 and base_state_d49 is not None):
+                payload = json.dumps(merged_dict, ensure_ascii=False)
+                updated = (
+                    await self._session.execute(
+                        sa.text(
+                            "UPDATE checklist_responses SET remark = :val, updated_at = now() "
+                            "WHERE wp_id = :wp AND item_id = :item"
+                        ),
+                        {"val": payload, "wp": str(state.frozen.wp_id), "item": item_id},
+                    )
+                ).rowcount
+                if not updated:
+                    await self._session.execute(
+                        sa.text(
+                            "INSERT INTO checklist_responses "
+                            "(id, project_id, wp_id, item_id, remark, created_at, updated_at) "
+                            "VALUES (gen_random_uuid(), :pid, :wp, :item, :val, now(), now())"
+                        ),
+                        {
+                            "pid": str(state.frozen.project_id),
+                            "wp": str(state.frozen.wp_id),
+                            "item": item_id,
+                            "val": payload,
+                        },
+                    )
+                await self._session.commit()
+
         # D4-33 dict store（{bizTypes,months,priorYear}）：前 3 业务类型 × 12 月 × 收入/成本
         # 按 slot 位置回写；毛利率/合计/上年/变动 formula_mask 不回写；保留 priorYear 与第 4+ 业务类型。
         if hasattr(bridge, "merge_d433_from_projection") and hasattr(
@@ -3003,6 +3067,58 @@ class OoToHtmlCoordinator:
                     )
                 await self._session.commit()
 
+        # D4-36 dict store（{forward,backward,...params}）：双区动态行按 table_key 分流回两数组；
+        # 参数标量（cutoffDate/days*/amountThreshold）不受管保留；K 跨期为手工标记随行回写。
+        if hasattr(bridge, "merge_d436_from_projection") and hasattr(
+            bridge, "STORE_ITEM_ID_D436_DICT"
+        ):
+            item_id = bridge.STORE_ITEM_ID_D436_DICT
+            raw = (
+                await self._session.execute(
+                    sa.text(
+                        "SELECT remark FROM checklist_responses "
+                        "WHERE wp_id = :wp AND item_id = :item"
+                    ),
+                    {"wp": str(state.frozen.wp_id), "item": item_id},
+                )
+            ).scalar_one_or_none()
+            base_state_d436: dict | None = None
+            if raw:
+                try:
+                    parsed = json.loads(raw)
+                    if isinstance(parsed, dict):
+                        base_state_d436 = parsed
+                except (TypeError, ValueError):
+                    base_state_d436 = None
+            merged_dict, applied, _visited = bridge.merge_d436_from_projection(
+                projection=merged_projection, base_state=base_state_d436
+            )
+            if not (applied <= 0 and base_state_d436 is not None):
+                payload = json.dumps(merged_dict, ensure_ascii=False)
+                updated = (
+                    await self._session.execute(
+                        sa.text(
+                            "UPDATE checklist_responses SET remark = :val, updated_at = now() "
+                            "WHERE wp_id = :wp AND item_id = :item"
+                        ),
+                        {"val": payload, "wp": str(state.frozen.wp_id), "item": item_id},
+                    )
+                ).rowcount
+                if not updated:
+                    await self._session.execute(
+                        sa.text(
+                            "INSERT INTO checklist_responses "
+                            "(id, project_id, wp_id, item_id, remark, created_at, updated_at) "
+                            "VALUES (gen_random_uuid(), :pid, :wp, :item, :val, now(), now())"
+                        ),
+                        {
+                            "pid": str(state.frozen.project_id),
+                            "wp": str(state.frozen.wp_id),
+                            "item": item_id,
+                            "val": payload,
+                        },
+                    )
+                await self._session.commit()
 
     async def _mirror_d2_store_if_needed(
         self, state: _ApplyState, *, merged_projection: Any

@@ -80,7 +80,7 @@
 | 33 | D4-33 | 其他业务毛利率分析 | d4-33-36 (0/42) | ❌ 引擎不支持纯静态 | D4TabOtherMargin | **HTML-only** | ⛔ 引擎限制(裁定) |
 | 34 | D4-34 | 其他业务收入合同测算 | d4-33-36 | ✅ d434-managed | D4TabOtherContract | ✅ | ✅ (双区dynamic,gen68) |
 | 35 | D4-35 | 其他业务收入检查 | d4-33-36 | ✅ d435-managed | D4TabOtherCheck | ✅ | ✅ |
-| 36 | D4-36 | 其他业务收入截止测试 | d4-33-36 | ❌ | D4TabOtherCutoff | **legacy** | 🔵 从零 |
+| 36 | D4-36 | 其他业务收入截止测试 | d4-33-36 | ✅ d436-managed | D4TabOtherCutoff | ✅ | ✅ (双区dynamic,gen70) |
 
 ## 统计（2026-09-20 批次A/A-5 后，契约 sheet_key 集合 **19 张**：d41/d42/d43/d45/d421/d422/d423/d424/d435/d4-29/d4-25/d4-26/d4-27/d4-28/d4-15/d4-16/**d4-30/d4-31/d4-32**）
 
@@ -150,7 +150,22 @@
 - 前端 `D4TabOtherContract.vue` 接 useWorkpaperSyncBridge（sheetKey d434-managed）+ WorkpaperSyncEditorHost
   （替 legacy GtOnlyOfficeSheet）+ 宿主登记 D4-34 dedicated；守卫 test_d4_34_contract.py(6) + d4OtherContractSyncHostWiring.spec.ts(8)。
 - **意义**：验证「有真实动态行维度 → 引擎可落地」，与 D4-33（纯静态被阻）形成对照，确证分类判据正确。
-### D4-36 其他业务截止（三区 forward + backward + params）
+### D4-36 其他业务截止（双区 forward + backward + params）—— ✅ **2026-09-20 落地完成（gen70）**
+- 几何（A1:M59）：2 dynamic 区。账到单据 forward header R14-15/数据 R16-23/UUID 列 L/footer marker
+  `截止日期：202X年12月31日`（R24，全文精确匹配）；单据到账 backward header R34-35/数据 R36-43/UUID 列 M/
+  footer marker 同文本（R44，靠各区 first_row 消歧）。11 字段（voucher* A-E / doc* F-J / isCrossing K）。
+  K 跨期为手工 √/× 标记（前端 autoJudge 派生，模板无 Excel 公式）→ editable 可回写，formula_mask 为空。
+- store `D4-36-data` = `{forward[], backward[], cutoffDate, daysBefore, daysAfter, amountThreshold}` dict
+  （行身份 id：ct-）→ dict-store 模式；参数标量 + 截止日期文本行 R24/R44 HTML-only（merge 保留顶层键）。
+- provider `phase5_d4_other_cutoff_sheet.py`（293 行）；2 instrumentation spec（alignment 双射 34=34）。
+- 发布链：generate(29 sheets, digest 843e9880)→provision(bundle 52→53, 550e77ed)→rematerialize(gen 68→70,
+  revision 94)。**⚠️ 遇 2 个门槛并解决**：①footer marker 首用 section 标题致 FooterAnchorDrift（marker 在
+  R33 但 footer_row=24）→ 改用数据正下方 `截止日期` 全文 + 精确等值匹配；②materialize CPU 138s 超软上限 120s
+  （29 sheets 整册重materialize 变慢）→ 临时提 materialize_soft_limit_seconds 到 300 跑完再还原（配置未入库）。
+- 前端 `D4TabOtherCutoff.vue` 接 useWorkpaperSyncBridge（d436-managed）+ WorkpaperSyncEditorHost + 宿主登记；
+  守卫 test_d4_36_contract.py(6) + d4OtherCutoffSyncHostWiring.spec.ts(8)。
+- 🔴 **性能观察**：整册 materialize 已达 138s，随 sheet 数线性增长逼近软上限——D4 entry 拆分/增量 materialize
+  应尽快立项（预计再加 2-3 张即超 120s 生产门）。
 
 > 矩阵型（D4-7/8/33）关键未验证形态 = `months[12]` **位置数组**（B-M 列按下标映射）。首张矩阵落地需先验证「数组下标 json_pointer」往返（DEC-D4-1：12 个月做 12 条独立 field，不做 1 条 array field）。
 
