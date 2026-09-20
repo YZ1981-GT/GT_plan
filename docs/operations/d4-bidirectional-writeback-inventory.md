@@ -16,11 +16,12 @@
 - **`useWpDetailGuard` CanceledError 假失败屏已修**（commit `79cf1b52e`）：切底稿竞态不再弹"加载底稿失败/canceled"全页屏。
 - D4-2 DB 侧铁证：12 个 applied oo_to_html application + 12 个 source=onlyoffice content_version（双向真实往返）。
 
-## 🔴 阻塞（2026-09-20 实测，影响整个 gt-d4-operating-revenue entry 发布）
+## ✅ 阻塞已解除（2026-09-20，D4-9 legacy 容差 + 入库 + 发布 gen55）
 
-- **D4-9 provider 对真实数据抛 StorePayloadError，卡死整个 entry 的 live rematerialize**。`phase5_d4_customer_structure.build_d49_store_projection` 的 `_parse_store_payload` 期望 `D4-9-data` 为 `{current, prior}` dict，但真实项目（首汽租车等）该 store 是 **list** 形态 → rematerialize 全 entry 事务回滚，卡在 gen54。D4-9 已入 HEAD 契约（21 sheets）但**从未 live 发布过**（gen54 = D4-6 的 20-sheet bundle，不含 D4-9）。
-- **连带影响**：批次B 的 D4-17 provider 已完成 + 单测通过，但因共享同一 entry、desired bundle 含 D4-9，**无法 live 发布**（flag `_INCLUDE_D417_CUTOFF_SHEET` 暂关）。任何后续该 entry 的从零 sheet 发布都被 D4-9 挡住。
-- **解除条件**：D4-9 owner 修 `_parse_store_payload` 兼容 list 形态（或前端 D4-9-data 统一为 dict）+ live rematerialize 通过。修复前该 entry 的发布管线冻结在 gen54。属主控 §10.3 并发 owner 文件，不擅改。
+- ~~D4-9 provider 对真实 list 形态 D4-9-data 抛 StorePayloadError 卡死全 entry rematerialize~~ **已修**：`phase5_d4_customer_structure._parse_store_payload` 加 legacy list 容差（bare list 视为空载荷、不打挂全 entry）+ `build_d49_totals_projection` amount None→0 归一（防 RoundtripEquivalenceError）。
+- **同时修复一个 HEAD 断裂**：并发 session 把 `phase5_d4_revenue_detail` 的 D4-9 import 提交进 HEAD，却**漏提交** `phase5_d4_customer_structure.py` 本体（git 未跟踪）——HEAD clean checkout 会 ImportError。本轮补入库 provider + 4 测试 + mutate guard，HEAD 恢复自洽。
+- **D4-9 确认合并到共享 entry**（用户裁决，不做独立 entry）：前端 `D4TabCustomerStructure` 早已接 `xlsx/gt-d4-operating-revenue` / `d49-managed`（非独立 entry，代码已对，仅注释残留旧描述）；后端并入 `phase5_d4_revenue_detail` 的 sheets/instrumentation/projection/merge。独立 entry 契约 `d4.customer_structure.json` 从未生成，已废弃。
+- **D4-9 + D4-17 均已 live 发布**：`d43_rematerialize --apply` gen54→**55**（bundle `c9050de8…`，22 sheets），无 drift；40+29 focused 测试无回归。
 
 ## 增量更新（2026-09-20，D4-1 落地）
 
@@ -52,7 +53,7 @@
 | 6 | D4-6 | 重要指标分析 | d-cycle-expansion | ✅ d46-managed(批次B从零) | D4TabIndicator | ✅ | ✅ (批次B 2026-09-20落地,真OO待验) |
 | 7 | D4-7 | 毛利率分析 | d-cycle-expansion | ❌ (前端有 d47-managed 键但契约未声明) | D4TabMarginMonthly | legacy | 🔵 从零 |
 | 8 | D4-8 | 重要产品毛利分析 | gap-closure (0/5) | ❌ | — | — | 🔵 gap待做 |
-| 9 | D4-9 | 重要客户结构分析 | d4-9-customer (1/15) | ❌ 无 d49 契约 | D4TabCustomerStructure | legacy | 🔵 从零(Task1双区instrumentation已由D4-1借道落地,余待做) |
+| 9 | D4-9 | 重要客户结构分析 | d4-9-customer | ✅ d49-managed(三区,共享entry) | D4TabCustomerStructure | ✅ | ✅ (2026-09-20发布gen55,真OO待验) |
 | 10 | D4-10 | 重要客户销售价格 | d4-price-analysis (9/10) | ❌ | D4TabCustomerPrice | legacy | 🔵 从零(price spec 已做上游取数联动,未做双向) |
 | 11 | D4-11 | 产品销售价格分析 | d4-price-analysis (9/10) | ❌ | D4TabProductPrice | legacy | 🔵 从零(同上) |
 | 12 | D4-12 | 合同检查 | gap-closure (0/5) | ❌ | — | — | 🔵 gap待做 |
@@ -60,7 +61,7 @@
 | 14 | D4-14 | 发生检查 | d4-inspection (9/16) | ❌ | D4TabOccurrence | legacy | 🔵 从零(32列七维嵌套,风险高) |
 | 15 | D4-15 | 完整性检查 | d4-inspection (9/16, B1/B2做实) | ✅ d4-15-managed | D4TabCompleteness | ✅ | ✅ |
 | 16 | D4-16 | 出口口岸核对 | d4-inspection (9/16, B1/B2做实) | ✅ d4-16-managed | D4TabExport | ✅ | ✅ |
-| 17 | D4-17 | 截止测试(账到单据) | d4-cutoff-return (3/13) | 🟡 provider就绪(flag暂关) | D4TabCutoffForward | ✅ | 🟡 代码+单测就绪,契约门被D4-9阻塞 |
+| 17 | D4-17 | 截止测试(账到单据) | d4-cutoff-return (3/13) | ✅ d417-managed(批次B) | D4TabCutoffForward | ✅ | ✅ (2026-09-20发布gen55,真OO待验) |
 | 18 | D4-18 | 截止测试(单据到账) | d4-cutoff-return (3/13) | ❌ | D4TabCutoffBackward | legacy | 🔵 从零(BB1-3 blocked) |
 | 19 | D4-19 | 销售折扣与折让 | d4-cutoff-return (3/13) | ❌ | D4TabDiscount | legacy | 🔵 从零(BB1-3 blocked) |
 | 20 | D4-20 | 销售退货检查 | d4-cutoff-return (3/13) | ❌ | D4TabReturn | legacy | 🔵 从零(BB1-3 blocked) |
@@ -85,13 +86,13 @@
 
 > 🔴 **重要口径**：下方「✅」是**三维代码全绿（REQUEST_PATH 级）**——后端契约 + 前端接桥 + 宿主登记齐全。但**没有一张到主控 §6.4 的 `ONLYOFFICE_VERIFIED`**（需真实 OO 往返产生 `working_paper_content_application` state=applied + operation 终态 + OO 侧 content version，见 §9.5）。真 OO 验证是 env 门（start-dev.bat 全栈 + OO 容器），列为批次C。
 
-- ✅ 三维代码全绿(REQUEST_PATH)：**20 张** — D4-1/2/3/5/**6**/15/16/21/22/23/24/25/26/27/28/29/30/31/32/35
-  - D4-21/22/23/24（批次A）+ D4-30/31/32（批次A-5）+ **D4-6（批次B 从零第一张，provider phase5_d4_indicator_sheet，gen54）** 为 2026-09-20 新接桥/开门/落地；余 12 张此前已接桥
-- 🔵 owner spec 待做/从零(后端无契约 + 前端仍 legacy)：**14 张** — D4-7/8/9/10/11/12/14/17/18/19/20/33/34/36
+- ✅ 三维代码全绿(REQUEST_PATH)：**22 张** — D4-1/2/3/5/6/**9**/15/16/**17**/21/22/23/24/25/26/27/28/29/30/31/32/35
+  - 批次A(21~24) + 批次A-5(30~32) + 批次B(D4-6 gen54 / **D4-9 gen55** / **D4-17 gen55**) 为 2026-09-20 落地；余此前已接桥
+- 🔵 owner spec 待做/从零(后端无契约 + 前端仍 legacy)：**12 张** — D4-7/8/10/11/12/14/18/19/20/33/34/36
 - ⬜ 裁决 single_html/N/A：**2 张** — D4-4/D4-13
 
-> 校验：20 + 14 + 2 = 36 ✓（🟡 半接入类已清零）
-> 契约集合现 **20 张**（+d46-managed）；entry `xlsx/gt-d4-operating-revenue` 当前 representation gen54。
+> 校验：22 + 12 + 2 = 36 ✓（🟡 半接入类已清零）
+> 契约集合现 **22 张**（+d46/d49/d417-managed）；entry `xlsx/gt-d4-operating-revenue` 当前 representation **gen55**（bundle c9050de8）。
 > 注：D4-6/7 前端虽已在宿主 `D4_SHEET_KEY_BY_CODE` 预留 `d46/d47-managed` 键，但契约 sheet_key 集合中**无**对应项且组件未接桥，故仍归 🔵 从零。D4-9/10/11/14/33/34/36 经 grep 实证前端组件均未 import `useWorkpaperSyncBridge`（仍 legacy），契约集合中也无对应项。
 
 ## 逐张推进优先级（建议，2026-09-20 修订）
