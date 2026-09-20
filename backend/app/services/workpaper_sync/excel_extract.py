@@ -1407,6 +1407,19 @@ def _managed_coordinates(
     刻意按**单元格**而不是按行排除：按行排除时，同一行里一个未管理格被改动就看不见了。
     """
     coords: set[str] = set()
+    if is_static_region(binding):
+        # ── 静态区：受管坐标 = 静态表 fields 的绝对坐标集，**不含** uuid_column 幽灵坐标 ──
+        _, statics = managed_tables_of(contract, binding=binding)
+        for table in statics:
+            for spec in table.fields:
+                cell = spec.cell
+                if cell is None or cell.static_row is None:
+                    continue
+                column = _resolve_field_column(
+                    spec, table=table, region=region, binding=binding
+                )
+                coords.add(f"{column}{cell.static_row}")
+        return frozenset(coords)
     dynamic, statics = managed_tables_of(contract, binding=binding)
     rows = sorted(scan.row_identity_by_row) if scan is not None else list(region.row_span)
     for table in (dynamic, *statics):
@@ -2422,6 +2435,21 @@ def _needed_columns_and_rows(
     region: ManagedRegion,
     binding: ExcelIdentityBinding,
 ) -> tuple[frozenset[str], range]:
+    if is_static_region(binding):
+        # ── 静态区：columns 起手集合**不含** uuid_column（静态无 UUID 列）──
+        _, statics = managed_tables_of(contract, binding=binding)
+        columns_static: set[str] = set()
+        first = region.first_row
+        last = region.last_row
+        for table in statics:
+            for spec in table.fields:
+                columns_static.add(
+                    _resolve_field_column(spec, table=table, region=region, binding=binding)
+                )
+                if spec.cell is not None and spec.cell.static_row is not None:
+                    first = min(first, spec.cell.static_row)
+                    last = max(last, spec.cell.static_row)
+        return frozenset(columns_static), range(first, last + 1)
     dynamic, statics = managed_tables_of(contract, binding=binding)
     columns = {region.uuid_column}
     first = region.first_row
@@ -2491,6 +2519,23 @@ def extract_projection(
         raise IdentityCarrierMissingError(
             f"entry {entry_id}: workbook 结构采集失败，无法定位受管区域: {exc}"
         ) from exc
+
+    if is_static_region(binding):
+        return _extract_static_projection(
+            artifact=artifact,
+            definitions=definitions,
+            binding=binding,
+            region=region,
+            columns=columns,
+            rows=rows,
+            baseline=baseline,
+            baseline_formulas=baseline_formulas,
+            limits=lim,
+            ooxml=ooxml,
+            sidecar_path=sidecar_path,
+            retain_identity_inventory=retain_identity_inventory,
+            entry_id=entry_id,
+        )
 
     cells = _read_cell_view(
         artifact,
@@ -2655,6 +2700,177 @@ def extract_projection(
         ),
         region=region,
         scan=scan,
+        formula_inventory=dict(sorted(formula_inventory.items())),
+        sidecar_path=sidecar_path,
+    )
+
+
+def _assert_static_anchor_retained(
+    *,
+    expected: EntryIdentityInventory,
+    observed: RuntimeIdentityInventory,
+    binding: ExcelIdentityBinding,
+    entry_id: str,
+) -> None:
+    """静态受管区的保留门（Property 4）：只断言 definedName 锚点在往返后仍在。
+
+    静态区无 row UUID 载体，故**不比** row identity 清册（那是动态区判据）；但它的
+    workbook-scope definedName 是唯一区域锚点，等价于动态区的 Excel Table —— 缺它必须
+    fail-closed。同时 `_GT_SYNC` 隐藏 metadata sheet（runtime binding 载体）也必须保留。
+    """
+    where = f"entry {entry_id}"
+    if binding.defined_name not in set(observed.defined_names):
+        raise IdentityRetentionError(
+            f"{where}: 静态受管区 definedName {binding.defined_name!r} 在 OO 往返后丢失 —— "
+            "区域锚点没了，阻断 engine gate（Property 4 / 66）"
+        )
+    if binding.defined_name not in set(expected.defined_names):
+        raise IdentityRetentionError(
+            f"{where}: 冻结 inventory 未记录静态受管区 definedName "
+            f"{binding.defined_name!r} —— representation 身份不完整"
+        )
+    if expected.hidden_sheet_present and not observed.hidden_sheet_present:
+        raise IdentityRetentionError(
+            f"{where}: 隐藏 metadata sheet 在 OO 往返后消失"
+        )
+
+
+def _extract_static_projection(
+    *,
+    artifact: Path,
+    definitions: FrozenEntryDefinitions,
+    binding: ExcelIdentityBinding,
+    region: ManagedRegion,
+    columns: frozenset[str],
+    rows: range,
+    baseline: Projection | None,
+    baseline_formulas: Mapping[str, str] | None,
+    limits: SyncLimits,
+    ooxml: Any,
+    sidecar_path: Path | None,
+    retain_identity_inventory: bool,
+    entry_id: str,
+) -> ExcelExtractOutcome:
+    """静态受管区反读（Requirement 3.4/3.5）：按绝对坐标收字段，跳 identity scan / uuid。
+
+    与 :func:`extract_projection` 动态路径的差别（全部因「无动态行维度」而来）：
+    * 不采 `raw_uuid_by_row`、不调 `_scan_row_identities`（`scan=None`）；
+    * 不走 7.2 行域 chunk 循环；只走 7.1 静态块按 `static_row` 收字段；
+    * identity 保留门用 :func:`_assert_static_anchor_retained`（只断 definedName 锚点，不比 row 清册）；
+    * `unmanaged_region_digest(scan=None, row_shift=None)` —— 静态区无插行位移。
+    """
+    contract = definitions.contract
+    _, static_tables = managed_tables_of(contract, binding=binding)
+
+    cells = _read_cell_view(
+        artifact,
+        sheet_name=region.sheet_name,
+        columns=columns,
+        rows=rows,
+        data_only=True,
+    )
+    formula_cells = {
+        coord: str(value)
+        for coord, value in _read_cell_view(
+            artifact,
+            sheet_name=region.sheet_name,
+            columns=columns,
+            rows=rows,
+            data_only=False,
+        ).items()
+        if isinstance(value, str) and value.startswith("=")
+    }
+
+    with zipfile.ZipFile(artifact) as zf:
+        inventory = read_runtime_identity_inventory(
+            zf,
+            region=region,
+            binding=binding,
+            raw_uuid_by_row={},  # 静态区无 row UUID
+            limits=limits,
+        )
+    if retain_identity_inventory:
+        _assert_static_anchor_retained(
+            expected=definitions.identity_inventory,
+            observed=inventory,
+            binding=binding,
+            entry_id=entry_id,
+        )
+
+    budget = StreamingProjectionBudget(limits)
+    values: dict[str, FieldValue] = {}
+    formula_inventory: dict[str, str] = {}
+    anomalies: list[StructuralAnomaly] = []
+    findings: list[ProtectedCellFinding] = []
+    sidecar_writer = (
+        _SidecarWriter(sidecar_path, contract=contract, region=region)
+        if sidecar_path is not None
+        else None
+    )
+    try:
+        for static_table in static_tables:
+            _collect_fields(
+                specs=[spec for spec in static_table.fields if spec.cell is not None],
+                row_identity="",
+                excel_rows=(),
+                cells=cells,
+                formula_cells=formula_cells,
+                table=static_table,
+                region=region,
+                binding=binding,
+                values=values,
+                formula_inventory=formula_inventory,
+                anomalies=anomalies,
+                findings=findings,
+                baseline=baseline,
+                baseline_formulas=baseline_formulas,
+                budget=budget,
+                sidecar=sidecar_writer,
+            )
+    except BaseException:
+        if sidecar_writer is not None:
+            sidecar_writer.close()
+            sidecar_writer = None
+            sidecar_path.unlink(missing_ok=True)  # type: ignore[union-attr]
+        raise
+    finally:
+        if sidecar_writer is not None:
+            sidecar_writer.close()
+
+    projection = Projection(
+        contract_id=contract.contract_id,
+        semantic_version=contract.semantic_version,
+        document_type=contract.document_type,
+        values=values,
+        row_keys={},  # 静态区无行域表
+    )
+    projection.assert_matches_contract(contract)
+
+    unmanaged = unmanaged_region_digest(
+        artifact,
+        contract=contract,
+        region=region,
+        binding=binding,
+        scan=None,
+        limits=limits,
+    )
+    return ExcelExtractOutcome(
+        projection=projection,
+        anomalies=tuple(anomalies),
+        protected_findings=tuple(findings),
+        identity_inventory=inventory,
+        unmanaged=unmanaged,
+        stats=ExtractStats(
+            field_count=budget.field_count,
+            table_row_counts=budget.table_row_counts,
+            chunk_count=0,
+            rows_per_chunk=rows_per_chunk(limits),
+            archive_bytes=ooxml.archive_bytes,
+            expanded_bytes=ooxml.expanded_bytes,
+            carrier_tier=ExtractCarrierTier.instrumented_identity,
+        ),
+        region=region,
+        scan=None,
         formula_inventory=dict(sorted(formula_inventory.items())),
         sidecar_path=sidecar_path,
     )

@@ -192,7 +192,7 @@ backend/app/services/workpaper_sync/endpoint_guard.py  1119
 backend/app/services/workpaper_sync/entry_source_facts.py  1096
 backend/app/services/workpaper_sync/evidence.py  1252
 backend/app/services/workpaper_sync/excel_entry_gate.py  1317
-backend/app/services/workpaper_sync/excel_extract.py  3680
+backend/app/services/workpaper_sync/excel_extract.py  3900
 backend/app/services/workpaper_sync/excel_instrumentation.py  2105
 backend/app/services/workpaper_sync/excel_materialize.py  2980
 backend/app/services/workpaper_sync/materialize_coordinator.py  2936

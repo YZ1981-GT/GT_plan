@@ -358,7 +358,16 @@ def _static_table_spec(table_key: str = STATIC_TABLE_KEY) -> dict:
                 "mode": "editable",
                 "value_type": "amount",
                 "source_ref": "wp:D4-33!E12",
-            }
+            },
+            {
+                "stable_field_key": f"{table_key}/cost_m1",
+                "json_pointer": "/months/0/cost",
+                "column_key": "cost_m1",
+                "cell": {"column": "F", "row_from": 12},
+                "mode": "editable",
+                "value_type": "amount",
+                "source_ref": "wp:D4-33!F12",
+            },
         ],
     }
 
@@ -443,3 +452,142 @@ class TestManagedTablesDynamicUnchanged:
         )
         with pytest.raises(ManagedRegionResolutionError, match="没有 row_identity"):
             managed_tables_of(contract, binding=binding)
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Task 4 · extract 静态链部件（Requirement 3.2/3.3 / Property 6）
+# 注：完整 extract→materialize 往返（Property 1）在 Task 5 闭合（需 materialize + 注入
+# definedName 的真实 substrate）。本段测 extract 侧可独立验证的部件：坐标集/列集/保留门。
+# ═══════════════════════════════════════════════════════════════════════════
+
+from app.services.workpaper_sync.excel_extract import (
+    ManagedRegion,
+    _assert_static_anchor_retained,
+    _managed_coordinates,
+    _needed_columns_and_rows,
+)
+from app.services.workpaper_sync.excel_entry_gate import parse_identity_inventory
+
+
+def _static_region_obj() -> ManagedRegion:
+    return ManagedRegion(
+        table_key=STATIC_TABLE_KEY,
+        table_name="",
+        sheet_name=STATIC_SHEET,
+        sheet_part="xl/worksheets/sheet1.xml",
+        table_ref="E12:F12",
+        first_row=12,
+        last_row=12,
+        first_column="E",
+        last_column="F",
+        uuid_column="",
+    )
+
+
+class TestManagedCoordinatesStatic:
+    def test_no_ghost_uuid_coords(self) -> None:
+        # Property 6：静态区受管坐标 = 静态 fields 绝对坐标集，不含任何 uuid_column{row}
+        contract = _contract_with([_static_table_spec()])
+        binding = ExcelIdentityBinding(
+            table_key=STATIC_TABLE_KEY, defined_name=STATIC_DEFINED_NAME
+        )
+        coords = _managed_coordinates(
+            contract=contract, region=_static_region_obj(), binding=binding, scan=None
+        )
+        assert coords == frozenset({"E12", "F12"})
+        # 无空列坐标（uuid_column="" 会产生 "12" 之类幽灵坐标）
+        assert not any(c.lstrip("ABCDEFGHIJKLMNOPQRSTUVWXYZ") == c for c in coords)
+
+
+class TestNeededColumnsStatic:
+    def test_columns_exclude_uuid(self) -> None:
+        contract = _contract_with([_static_table_spec()])
+        binding = ExcelIdentityBinding(
+            table_key=STATIC_TABLE_KEY, defined_name=STATIC_DEFINED_NAME
+        )
+        columns, rows = _needed_columns_and_rows(
+            contract=contract, region=_static_region_obj(), binding=binding
+        )
+        assert columns == frozenset({"E", "F"})  # 不含 uuid_column ""
+        assert "" not in columns
+        assert 12 in rows
+
+
+def _static_inventory_raw(defined_names: list[str]) -> dict:
+    return {
+        "hidden_sheet": {
+            "present": True,
+            "is_hidden": True,
+            "excluded_from_business_enumeration": True,
+        },
+        "defined_name": {"names": {n: f"'{STATIC_SHEET}'!$E$12:$M$23" for n in defined_names}},
+        "excel_table": {"present": False, "table_ref": ""},
+        "hidden_uuid_column": {
+            "resolved_sheet_by": None,
+            "uuid_column_hidden": False,
+            "row_uuids": {},
+            "duplicate_row_uuids": [],
+            "empty_row_uuids": [],
+        },
+    }
+
+
+def _runtime_static_inventory(defined_names: tuple[str, ...], *, hidden_present: bool = True):
+    from app.services.workpaper_sync.excel_extract import RuntimeIdentityInventory
+    from app.services.workpaper_sync.excel_extract import TABLE_SHEET_ANCHOR  # noqa: F401
+
+    return RuntimeIdentityInventory(
+        hidden_sheet_present=hidden_present,
+        hidden_sheet_is_hidden=True,
+        excluded_from_business_enumeration=True,
+        defined_names=defined_names,
+        table_present=True,
+        table_ref="E12:F12",
+        table_sheet=STATIC_SHEET,
+        resolved_sheet_by=None,
+        uuid_column="",
+        uuid_column_hidden=False,
+        row_uuids={},
+        duplicate_row_uuids=(),
+        empty_row_uuids=(),
+        business_sheets=(STATIC_SHEET,),
+    )
+
+
+class TestStaticAnchorRetained:
+    def test_anchor_present_passes(self) -> None:
+        expected = parse_identity_inventory(_static_inventory_raw([STATIC_DEFINED_NAME]))
+        observed = _runtime_static_inventory((STATIC_DEFINED_NAME,))
+        binding = ExcelIdentityBinding(
+            table_key=STATIC_TABLE_KEY, defined_name=STATIC_DEFINED_NAME
+        )
+        # 不抛即通过
+        _assert_static_anchor_retained(
+            expected=expected, observed=observed, binding=binding, entry_id="e1"
+        )
+
+    def test_anchor_lost_in_observed_fail_closed(self) -> None:
+        from app.services.workpaper_sync.excel_extract import IdentityRetentionError
+
+        expected = parse_identity_inventory(_static_inventory_raw([STATIC_DEFINED_NAME]))
+        observed = _runtime_static_inventory(())  # OO 往返后 definedName 丢了
+        binding = ExcelIdentityBinding(
+            table_key=STATIC_TABLE_KEY, defined_name=STATIC_DEFINED_NAME
+        )
+        with pytest.raises(IdentityRetentionError, match="在 OO 往返后丢失"):
+            _assert_static_anchor_retained(
+                expected=expected, observed=observed, binding=binding, entry_id="e1"
+            )
+
+    def test_hidden_sheet_lost_fail_closed(self) -> None:
+        from app.services.workpaper_sync.excel_extract import IdentityRetentionError
+
+        expected = parse_identity_inventory(_static_inventory_raw([STATIC_DEFINED_NAME]))
+        observed = _runtime_static_inventory((STATIC_DEFINED_NAME,), hidden_present=False)
+        binding = ExcelIdentityBinding(
+            table_key=STATIC_TABLE_KEY, defined_name=STATIC_DEFINED_NAME
+        )
+        with pytest.raises(IdentityRetentionError, match="隐藏 metadata sheet"):
+            _assert_static_anchor_retained(
+                expected=expected, observed=observed, binding=binding, entry_id="e1"
+            )
