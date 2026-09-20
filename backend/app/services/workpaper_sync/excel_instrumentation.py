@@ -641,6 +641,11 @@ class ExcelInstrumentationSpec:
     #: ``observe_structure_inventory`` 按契约 key 查物理 sheet 会整表跳过。
     sheet_key: str | None = None
     transposed_sheets: tuple[dict[str, Any], ...] = ()
+    #: 静态受管区寄生声明（spec workpaper-sync-static-cell-sheet-writeback）。
+    #: 与 ``transposed_sheets`` 同构地挂在动态 primary spec 上：每项声明一张纯静态 sheet
+    #: 的 workbook-scope definedName 锚点（region_kind=static）。注入**只**写 definedName，
+    #: **不**注 Excel Table / 隐藏 UUID 列 / 隐藏 identity_row（那些是动态/转置专有）。
+    static_sheets: tuple[dict[str, Any], ...] = ()
 
     def __post_init__(self) -> None:
         if not self.entry_id.strip():
@@ -876,6 +881,17 @@ def build_instrumentation_payload_for_sheets(
             payload["defined_names"][boundary["defined_name"]] = (
                 "{managed_sheet}!" + boundary["range"]
             )
+    # 静态受管区（spec workpaper-sync-static-cell-sheet-writeback）：与 transposed 同构地
+    # 放进 managed_sheets 的兄弟集合 static_sheets，供 _frozen_sheet_anchors 读出带
+    # region_kind=static 的 defined_name_ref 锚点；同样把 definedName 登记进 defined_names。
+    static_sheets = [sheet for spec in specs for sheet in spec.static_sheets]
+    if static_sheets:
+        payload["static_sheets"] = static_sheets
+        for sheet in static_sheets:
+            boundary = sheet["region_boundary_locator"]
+            payload["defined_names"][boundary["defined_name"]] = (
+                "{managed_sheet}!" + boundary["range"]
+            )
     validate_instrumentation_payload(payload)
     _assert_no_forbidden_anchor_declared(payload, gate=gate)
     return payload
@@ -980,6 +996,22 @@ def _insert_before(text: str, needle: str, addition: str, *, what: str) -> str:
     if idx < 0:
         raise InstrumentationError(f"注入 {what} 失败：找不到锚点 {needle!r}")
     return text[:idx] + addition + text[idx:]
+
+
+def _insert_after_sheets_defined_names(workbook_xml: str, node: str) -> str:
+    """workbook 无既有 `<definedNames>` 块时，在 `</sheets>` 后插入一个完整块。
+
+    OOXML 的 CT_Workbook schema 要求 `definedNames` 紧跟 `sheets` 之后，故锚点选 `</sheets>`。
+    静态受管区模板（D4-33 census 确认无 definedName）走此支；有块时走 `_insert_before`。
+    """
+    idx = workbook_xml.find("</sheets>")
+    if idx < 0:
+        raise InstrumentationError(
+            "注入 static region definedName 失败：workbook.xml 无 </sheets> 锚点"
+        )
+    insert_at = idx + len("</sheets>")
+    block = f"<definedNames>{node}</definedNames>"
+    return workbook_xml[:insert_at] + block + workbook_xml[insert_at:]
 
 
 def _gt_sync_sheet_xml(pairs: Sequence[tuple[str, str]]) -> bytes:
@@ -1460,6 +1492,35 @@ def instrument_workbook_bytes_multi(
                 data_node.insert(index, row)
             row.set("hidden", "1")
             entries[part] = ET.tostring(sheet_root, encoding="utf-8", xml_declaration=True)
+
+    # ── 静态受管区注入（spec workpaper-sync-static-cell-sheet-writeback）──────────
+    #
+    # 只写 workbook-scope definedName（区域锚点），**不注** Excel Table / 隐藏 UUID 列 /
+    # 隐藏 identity_row（那些是动态/转置专有）。D4-33 模板 census 确认无既有 definedName，
+    # 故若 workbook 尚无 `<definedNames>` 块必须先建（transposed 假设已有，静态不能假设）。
+    for spec in specs:
+        for sheet in spec.static_sheets:
+            from xml.etree import ElementTree as ET
+
+            boundary = sheet["region_boundary_locator"]
+            name = boundary["defined_name"]
+            root = ET.fromstring(workbook_xml)
+            if any(
+                n.get("name", "").lower() == name.lower()
+                for n in root.findall("{*}definedNames/{*}definedName")
+            ):
+                raise InstrumentationError(f"Duplicate static definedName: {name}")
+            ref = _quote_sheet_name(sheet["excel_name"]) + "!" + boundary["range"]
+            node = f'<definedName name="{name}">{_xml_escape(ref)}</definedName>'
+            if "</definedNames>" in workbook_xml:
+                workbook_xml = _insert_before(
+                    workbook_xml, "</definedNames>", node, what="static region anchor"
+                )
+            else:
+                # 无既有 definedNames 块：在 </sheets> 后插入完整块（workbook.xml schema 顺序：
+                # sheets → definedNames）。
+                workbook_xml = _insert_after_sheets_defined_names(workbook_xml, node)
+            all_refs[name] = ref
 
     entries["xl/workbook.xml"] = workbook_xml.encode("utf-8")
     entries["[Content_Types].xml"] = content_types.encode("utf-8")

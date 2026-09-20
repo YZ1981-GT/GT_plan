@@ -109,6 +109,7 @@ def anchors_from_instrumentation_specs(specs: Sequence[Any]) -> tuple[dict[str, 
     anchors = [anchors_from_instrumentation_spec(spec) for spec in specs]
     for spec in specs:
         anchors.extend(_frozen_sheet_anchors({"transposed_sheets": getattr(spec, "transposed_sheets", ())}))
+        anchors.extend(_frozen_sheet_anchors({"static_sheets": getattr(spec, "static_sheets", ())}))
     return tuple(anchors)
 
 

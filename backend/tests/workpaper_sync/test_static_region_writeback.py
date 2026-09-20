@@ -947,3 +947,124 @@ class TestCollectWorkbookStructureStatic:
         # 结构清册含静态 fields 的绝对坐标（E12/F12/G12 由 _cell_coordinates_for 静态路径产）
         locators = {loc for (_sk, _tk, _fk, loc) in structure}
         assert any(":12" in loc for loc in locators)
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Task 7 · instrumentation 注入静态 definedName（Requirement 5.4/5.5）
+# ═══════════════════════════════════════════════════════════════════════════
+
+import pathlib
+
+from app.services.workpaper_sync import excel_instrumentation as EI
+
+_WP_TEMPLATES = pathlib.Path(__file__).resolve().parents[2] / "wp_templates"
+_K11_TEMPLATE = _WP_TEMPLATES / "K" / "K11 资产减值损失.xlsx"
+
+
+def _spec_with_static(static_sheet_name: str, defined_name: str, region_range: str):
+    """动态 primary spec（K11）+ 一个静态受管区寄生声明。"""
+    return EI.ExcelInstrumentationSpec(
+        entry_id="k11.adjudication",
+        template_id="K11",
+        template_relative_path="K/K11 资产减值损失.xlsx",
+        managed_sheet="审定表K11-1",
+        first_data_row=7,
+        last_data_row=25,
+        footer_row=26,
+        managed_last_col="L",
+        uuid_col="N",
+        table_name="GT_K11_1_ROWS",
+        static_sheets=(
+            {
+                "sheet_key": "d433-managed",
+                "excel_name": static_sheet_name,
+                "region_boundary_locator": {
+                    "anchor": "defined_name_ref",
+                    "defined_name": defined_name,
+                    "range": region_range,
+                    "region_kind": "static",
+                },
+                "tables": [{"table_key": "d433-static"}],
+            },
+        ),
+    )
+
+
+def _first_other_sheet_name(data: bytes) -> str:
+    import re as _re
+
+    wb = _read_entries(data)["xl/workbook.xml"].decode("utf-8")
+    names = _re.findall(r'<sheet [^>]*name="([^"]+)"', wb)
+    for n in names:
+        if n != "审定表K11-1":
+            return n
+    raise AssertionError("K11 模板只有一张 sheet？")
+
+
+class TestStaticInstrumentation:
+    @pytest.fixture(scope="class")
+    def source(self) -> bytes:
+        if not _K11_TEMPLATE.exists():
+            pytest.skip(f"模板缺失: {_K11_TEMPLATE}")
+        return _K11_TEMPLATE.read_bytes()
+
+    def test_injects_workbook_scope_defined_name_no_table_no_uuid(self, source: bytes) -> None:
+        static_sheet = _first_other_sheet_name(source)
+        spec = _spec_with_static(static_sheet, "GT_MANAGED_REGION_D433T", "$E$12:$G$13")
+        gate = EI.ExcelIdentityCarrierGate.load()
+        result = EI.instrument_workbook_bytes_multi(source, [spec], gate=gate)
+        entries = _read_entries(result.instrumented_bytes)
+        wb = entries["xl/workbook.xml"].decode("utf-8")
+        # (a) 注入了 workbook-scope definedName（无 localSheetId）
+        assert "GT_MANAGED_REGION_D433T" in wb
+        import re as _re
+
+        m = _re.search(
+            r'<definedName name="GT_MANAGED_REGION_D433T"([^>]*)>([^<]+)</definedName>', wb
+        )
+        assert m is not None
+        assert "localSheetId" not in m.group(1)  # workbook-scope
+        assert "$E$12:$G$13" in m.group(2)
+        # definedName_refs 里也有它
+        assert "GT_MANAGED_REGION_D433T" in result.defined_name_refs
+
+    def test_static_defined_name_resolvable_by_extract(self, source: bytes) -> None:
+        # 注入后用 extract 的 _resolve_static_region 能反解出 region（端到端锚点闭合）
+        static_sheet = _first_other_sheet_name(source)
+        spec = _spec_with_static(static_sheet, "GT_MANAGED_REGION_D433T", "$E$12:$G$13")
+        gate = EI.ExcelIdentityCarrierGate.load()
+        result = EI.instrument_workbook_bytes_multi(source, [spec], gate=gate)
+        from app.services.workpaper_sync.excel_extract import (
+            _resolve_static_region,
+        )
+
+        binding = ExcelIdentityBinding(
+            table_key="d433-static", defined_name="GT_MANAGED_REGION_D433T"
+        )
+        with zipfile.ZipFile(io.BytesIO(result.instrumented_bytes)) as zf:
+            region = _resolve_static_region(
+                zf, contract=_static_contract_with_formula(), binding=binding
+            )
+        assert region.sheet_name == static_sheet
+        assert region.first_column == "E"
+        assert region.last_column == "G"
+        assert region.first_row == 12
+        assert region.uuid_column == ""
+
+    def test_frozen_anchors_from_payload_yield_static_kind(self, source: bytes) -> None:
+        spec = _spec_with_static(
+            _first_other_sheet_name(source), "GT_MANAGED_REGION_D433T", "$E$12:$G$13"
+        )
+        import hashlib as _h
+
+        payload = EI.build_instrumentation_payload_for_sheets(
+            specs=[spec],
+            template_definition_sha256=_h.sha256(b"td").hexdigest(),
+            template_sha256=_h.sha256(b"ts").hexdigest(),
+            gate=EI.ExcelIdentityCarrierGate.load(),
+        )
+        assert "static_sheets" in payload
+        anchors = _frozen_sheet_anchors(payload)
+        static_anchors = [a for a in anchors if a.get("region_kind") == "static"]
+        assert len(static_anchors) == 1
+        assert static_anchors[0]["defined_name"] == "GT_MANAGED_REGION_D433T"

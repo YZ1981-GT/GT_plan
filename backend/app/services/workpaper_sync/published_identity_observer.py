@@ -1252,7 +1252,7 @@ def _frozen_sheet_anchors(instrumentation: Mapping[str, Any]) -> list[dict[str, 
     字段会被 observer 误判为结构漂移。
     """
     sections = []
-    for key in ("managed_sheets", "transposed_sheets"):
+    for key in ("managed_sheets", "transposed_sheets", "static_sheets"):
         sheets = instrumentation.get(key)
         if isinstance(sheets, (list, tuple)):
             sections.extend(sheets)
