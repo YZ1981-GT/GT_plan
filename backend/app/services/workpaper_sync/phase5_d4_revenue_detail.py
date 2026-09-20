@@ -268,6 +268,14 @@ from app.services.workpaper_sync.phase5_d4_other_margin_sheet import (  # noqa: 
     merge_d433_from_projection,
     mapping_digest_d433,
 )
+from app.services.workpaper_sync.phase5_d4_product_margin_sheet import (  # noqa: E402
+    STORE_ITEM_ID_D48,
+    sheet_payload_d48,
+    static_sheet_payload_d48,
+    build_store_projection_d48,
+    merge_d48_from_projection,
+    mapping_digest_d48,
+)
 from app.services.workpaper_sync.phase5_d4_other_contract_sheet import (  # noqa: E402
     STORE_ITEM_ID_D434,
     sheet_payload_d434,
@@ -401,6 +409,10 @@ _INCLUDE_D420_RETURN_SHEET: Final[bool] = True
 #: identity scan / row_shift / footer / minted UUID，按绝对坐标直写/反读。区内公式（合计/毛利率/
 #: 上年/变动）走 formula_mask 保护。前 3 业务类型 slot 位置映射 3 列组，第 4+ 个 HTML-only。
 _INCLUDE_D433_MARGIN_SHEET: Final[bool] = True
+#: ✅ D4-8 重要产品毛利分析表：静态块矩阵（census 裁定，同 D4-33 分类）。引擎静态 cell 路径已解锁。
+#: 产品A(slot0) 12 月 × 12 输入列 + 同行业 3 行 × 12 = 180 static cell；公式列走 formula_mask。
+#: 前端 products 动态计数但模板固定块，只受管第 1 个产品（slot0→产品A块），第 2+ HTML-only。
+_INCLUDE_D48_PRODUCT_MARGIN_SHEET: Final[bool] = True
 #: D4-34 其他业务收入合同测算表接入（批次B 第九张，同 sheet 双动态区 · dict store，2026-09-20）。
 #: 2 dynamic 区（房屋租赁 R13-17 / 咨询业务 R20-24），各自 UUID 列 L/M、footer marker=下方 section
 #: 标题、J 差异 formula_mask；单 dict store D4-34-data（{rentals[],consults[]}）→ oo_to_html 走专用
@@ -468,6 +480,7 @@ STORE_ITEM_IDS: Final[tuple[str, ...]] = (
     STORE_ITEM_ID_D49,
     *((STORE_ITEM_ID_D429,) if _INCLUDE_D429_TRANSPOSED else ()),
     *((STORE_ITEM_ID_D433,) if _INCLUDE_D433_MARGIN_SHEET else ()),
+    *((STORE_ITEM_ID_D48,) if _INCLUDE_D48_PRODUCT_MARGIN_SHEET else ()),
     *((STORE_ITEM_ID_D434,) if _INCLUDE_D434_CONTRACT_SHEET else ()),
     *((STORE_ITEM_ID_D436,) if _INCLUDE_D436_CUTOFF_SHEET else ()),
     *((STORE_ITEM_ID_D47_PRODUCTS, STORE_ITEM_ID_D47_MONTHLY) if _INCLUDE_D47_MARGIN_SHEET else ()),
@@ -703,10 +716,11 @@ def instrumentation_spec() -> ExcelInstrumentationSpec:
         uuid_col=UUID_COL,
         table_name=TABLE_NAME,
         transposed_sheets=(sheet_payload(),) if _INCLUDE_D429_TRANSPOSED else (),
-        # D4-33 静态受管区寄生（spec workpaper-sync-static-cell-sheet-writeback）：只在动态
+        # D4-33/D4-8 静态受管区寄生（spec workpaper-sync-static-cell-sheet-writeback）：只在动态
         # primary spec 上挂 static_sheets，instrumentation 注入 workbook-scope definedName。
         static_sheets=(
-            (static_sheet_payload_d433(),) if _INCLUDE_D433_MARGIN_SHEET else ()
+            *((static_sheet_payload_d433(),) if _INCLUDE_D433_MARGIN_SHEET else ()),
+            *((static_sheet_payload_d48(),) if _INCLUDE_D48_PRODUCT_MARGIN_SHEET else ()),
         ),
     )
 
@@ -1102,6 +1116,7 @@ def build_contract_payload() -> dict[str, Any]:
             *([sheet_payload_d410()] if _INCLUDE_D410_PRICE_SHEET else []),
             *([sheet_payload_d420()] if _INCLUDE_D420_RETURN_SHEET else []),
             *([sheet_payload_d433()] if _INCLUDE_D433_MARGIN_SHEET else []),
+            *([sheet_payload_d48()] if _INCLUDE_D48_PRODUCT_MARGIN_SHEET else []),
             *([sheet_payload_d434()] if _INCLUDE_D434_CONTRACT_SHEET else []),
             *([sheet_payload_d436()] if _INCLUDE_D436_CUTOFF_SHEET else []),
             *([sheet_payload_d47()] if _INCLUDE_D47_MARGIN_SHEET else []),

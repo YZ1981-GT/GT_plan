@@ -7,7 +7,7 @@
     "excel_table",
     "hidden_uuid_column"
   ],
-  "instrumentation_definition_sha256": "7b6aa88f82f2f2de454254b2430db3a07122aced37bd41b83240fdd22ec931be",
+  "instrumentation_definition_sha256": "6d1c630575d5e9c7220c1aad5fcd6c9f463ac7fef5d02f0652b04e6cce257e50",
   "review": {
     "authority_root": "backend/wp_templates",
     "entry_id": "xlsx/gt-d4-operating-revenue",
@@ -8505,6 +8505,2904 @@
         }
       ],
       "template_id": "D433"
+    },
+    {
+      "excel_name": "重要产品毛利分析D4-8",
+      "locator": {
+        "anchor": "defined_name_ref",
+        "defined_name": "GT_MANAGED_REGION_D48"
+      },
+      "region_boundary_locator": {
+        "anchor": "defined_name_ref",
+        "defined_name": "GT_MANAGED_REGION_D48",
+        "range": "$B$16:$W$31",
+        "region_kind": "static"
+      },
+      "sheet_key": "d48-managed",
+      "tables": [
+        {
+          "anchor": "A13",
+          "fields": [
+            {
+              "cell": {
+                "column": "B",
+                "row_from": 16
+              },
+              "column_key": "m0_cur_rev_qty",
+              "header_source_ref": "源xlsx!重要产品毛利分析D4-8!B13",
+              "header_text": "1月本期revQty",
+              "json_pointer": "/months/0/cur/revQty",
+              "mode": "editable",
+              "source_ref": "源xlsx!重要产品毛利分析D4-8!B16",
+              "stable_field_key": "d4_8_matrix/m0_cur/rev_qty",
+              "store_item_id": "D4-8-products",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "J",
+                "row_from": 16
+              },
+              "column_key": "m0_prior_rev_qty",
+              "header_source_ref": "源xlsx!重要产品毛利分析D4-8!J13",
+              "header_text": "1月上期revQty",
+              "json_pointer": "/months/0/prior/revQty",
+              "mode": "editable",
+              "source_ref": "源xlsx!重要产品毛利分析D4-8!J16",
+              "stable_field_key": "d4_8_matrix/m0_prior/rev_qty",
+              "store_item_id": "D4-8-products",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "C",
+                "row_from": 16
+              },
+              "column_key": "m0_cur_rev_price",
+              "header_source_ref": "源xlsx!重要产品毛利分析D4-8!C13",
+              "header_text": "1月本期revPrice",
+              "json_pointer": "/months/0/cur/revPrice",
+              "mode": "editable",
+              "source_ref": "源xlsx!重要产品毛利分析D4-8!C16",
+              "stable_field_key": "d4_8_matrix/m0_cur/rev_price",
+              "store_item_id": "D4-8-products",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "K",
+                "row_from": 16
+              },
+              "column_key": "m0_prior_rev_price",
+              "header_source_ref": "源xlsx!重要产品毛利分析D4-8!K13",
+              "header_text": "1月上期revPrice",
+              "json_pointer": "/months/0/prior/revPrice",
+              "mode": "editable",
+              "source_ref": "源xlsx!重要产品毛利分析D4-8!K16",
+              "stable_field_key": "d4_8_matrix/m0_prior/rev_price",
+              "store_item_id": "D4-8-products",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "D",
+                "row_from": 16
+              },
+              "column_key": "m0_cur_rev_amt",
+              "header_source_ref": "源xlsx!重要产品毛利分析D4-8!D13",
+              "header_text": "1月本期revAmt",
+              "json_pointer": "/months/0/cur/revAmt",
+              "mode": "editable",
+              "source_ref": "源xlsx!重要产品毛利分析D4-8!D16",
+              "stable_field_key": "d4_8_matrix/m0_cur/rev_amt",
+              "store_item_id": "D4-8-products",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "L",
+                "row_from": 16
+              },
+              "column_key": "m0_prior_rev_amt",
+              "header_source_ref": "源xlsx!重要产品毛利分析D4-8!L13",
+              "header_text": "1月上期revAmt",
+              "json_pointer": "/months/0/prior/revAmt",
+              "mode": "editable",
+              "source_ref": "源xlsx!重要产品毛利分析D4-8!L16",
+              "stable_field_key": "d4_8_matrix/m0_prior/rev_amt",
+              "store_item_id": "D4-8-products",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "E",
+                "row_from": 16
+              },
+              "column_key": "m0_cur_cost_qty",
+              "header_source_ref": "源xlsx!重要产品毛利分析D4-8!E13",
+              "header_text": "1月本期costQty",
+              "json_pointer": "/months/0/cur/costQty",
+              "mode": "editable",
+              "source_ref": "源xlsx!重要产品毛利分析D4-8!E16",
+              "stable_field_key": "d4_8_matrix/m0_cur/cost_qty",
+              "store_item_id": "D4-8-products",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "M",
+                "row_from": 16
+              },
+              "column_key": "m0_prior_cost_qty",
+              "header_source_ref": "源xlsx!重要产品毛利分析D4-8!M13",
+              "header_text": "1月上期costQty",
+              "json_pointer": "/months/0/prior/costQty",
+              "mode": "editable",
+              "source_ref": "源xlsx!重要产品毛利分析D4-8!M16",
+              "stable_field_key": "d4_8_matrix/m0_prior/cost_qty",
+              "store_item_id": "D4-8-products",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "F",
+                "row_from": 16
+              },
+              "column_key": "m0_cur_cost_price",
+              "header_source_ref": "源xlsx!重要产品毛利分析D4-8!F13",
+              "header_text": "1月本期costPrice",
+              "json_pointer": "/months/0/cur/costPrice",
+              "mode": "editable",
+              "source_ref": "源xlsx!重要产品毛利分析D4-8!F16",
+              "stable_field_key": "d4_8_matrix/m0_cur/cost_price",
+              "store_item_id": "D4-8-products",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "N",
+                "row_from": 16
+              },
+              "column_key": "m0_prior_cost_price",
+              "header_source_ref": "源xlsx!重要产品毛利分析D4-8!N13",
+              "header_text": "1月上期costPrice",
+              "json_pointer": "/months/0/prior/costPrice",
+              "mode": "editable",
+              "source_ref": "源xlsx!重要产品毛利分析D4-8!N16",
+              "stable_field_key": "d4_8_matrix/m0_prior/cost_price",
+              "store_item_id": "D4-8-products",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "G",
+                "row_from": 16
+              },
+              "column_key": "m0_cur_cost_amt",
+              "header_source_ref": "源xlsx!重要产品毛利分析D4-8!G13",
+              "header_text": "1月本期costAmt",
+              "json_pointer": "/months/0/cur/costAmt",
+              "mode": "editable",
+              "source_ref": "源xlsx!重要产品毛利分析D4-8!G16",
+              "stable_field_key": "d4_8_matrix/m0_cur/cost_amt",
+              "store_item_id": "D4-8-products",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "O",
+                "row_from": 16
+              },
+              "column_key": "m0_prior_cost_amt",
+              "header_source_ref": "源xlsx!重要产品毛利分析D4-8!O13",
+              "header_text": "1月上期costAmt",
+              "json_pointer": "/months/0/prior/costAmt",
+              "mode": "editable",
+              "source_ref": "源xlsx!重要产品毛利分析D4-8!O16",
+              "stable_field_key": "d4_8_matrix/m0_prior/cost_amt",
+              "store_item_id": "D4-8-products",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "B",
+                "row_from": 17
+              },
+              "column_key": "m1_cur_rev_qty",
+              "header_source_ref": "源xlsx!重要产品毛利分析D4-8!B13",
+              "header_text": "2月本期revQty",
+              "json_pointer": "/months/1/cur/revQty",
+              "mode": "editable",
+              "source_ref": "源xlsx!重要产品毛利分析D4-8!B17",
+              "stable_field_key": "d4_8_matrix/m1_cur/rev_qty",
+              "store_item_id": "D4-8-products",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "J",
+                "row_from": 17
+              },
+              "column_key": "m1_prior_rev_qty",
+              "header_source_ref": "源xlsx!重要产品毛利分析D4-8!J13",
+              "header_text": "2月上期revQty",
+              "json_pointer": "/months/1/prior/revQty",
+              "mode": "editable",
+              "source_ref": "源xlsx!重要产品毛利分析D4-8!J17",
+              "stable_field_key": "d4_8_matrix/m1_prior/rev_qty",
+              "store_item_id": "D4-8-products",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "C",
+                "row_from": 17
+              },
+              "column_key": "m1_cur_rev_price",
+              "header_source_ref": "源xlsx!重要产品毛利分析D4-8!C13",
+              "header_text": "2月本期revPrice",
+              "json_pointer": "/months/1/cur/revPrice",
+              "mode": "editable",
+              "source_ref": "源xlsx!重要产品毛利分析D4-8!C17",
+              "stable_field_key": "d4_8_matrix/m1_cur/rev_price",
+              "store_item_id": "D4-8-products",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "K",
+                "row_from": 17
+              },
+              "column_key": "m1_prior_rev_price",
+              "header_source_ref": "源xlsx!重要产品毛利分析D4-8!K13",
+              "header_text": "2月上期revPrice",
+              "json_pointer": "/months/1/prior/revPrice",
+              "mode": "editable",
+              "source_ref": "源xlsx!重要产品毛利分析D4-8!K17",
+              "stable_field_key": "d4_8_matrix/m1_prior/rev_price",
+              "store_item_id": "D4-8-products",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "D",
+                "row_from": 17
+              },
+              "column_key": "m1_cur_rev_amt",
+              "header_source_ref": "源xlsx!重要产品毛利分析D4-8!D13",
+              "header_text": "2月本期revAmt",
+              "json_pointer": "/months/1/cur/revAmt",
+              "mode": "editable",
+              "source_ref": "源xlsx!重要产品毛利分析D4-8!D17",
+              "stable_field_key": "d4_8_matrix/m1_cur/rev_amt",
+              "store_item_id": "D4-8-products",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "L",
+                "row_from": 17
+              },
+              "column_key": "m1_prior_rev_amt",
+              "header_source_ref": "源xlsx!重要产品毛利分析D4-8!L13",
+              "header_text": "2月上期revAmt",
+              "json_pointer": "/months/1/prior/revAmt",
+              "mode": "editable",
+              "source_ref": "源xlsx!重要产品毛利分析D4-8!L17",
+              "stable_field_key": "d4_8_matrix/m1_prior/rev_amt",
+              "store_item_id": "D4-8-products",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "E",
+                "row_from": 17
+              },
+              "column_key": "m1_cur_cost_qty",
+              "header_source_ref": "源xlsx!重要产品毛利分析D4-8!E13",
+              "header_text": "2月本期costQty",
+              "json_pointer": "/months/1/cur/costQty",
+              "mode": "editable",
+              "source_ref": "源xlsx!重要产品毛利分析D4-8!E17",
+              "stable_field_key": "d4_8_matrix/m1_cur/cost_qty",
+              "store_item_id": "D4-8-products",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "M",
+                "row_from": 17
+              },
+              "column_key": "m1_prior_cost_qty",
+              "header_source_ref": "源xlsx!重要产品毛利分析D4-8!M13",
+              "header_text": "2月上期costQty",
+              "json_pointer": "/months/1/prior/costQty",
+              "mode": "editable",
+              "source_ref": "源xlsx!重要产品毛利分析D4-8!M17",
+              "stable_field_key": "d4_8_matrix/m1_prior/cost_qty",
+              "store_item_id": "D4-8-products",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "F",
+                "row_from": 17
+              },
+              "column_key": "m1_cur_cost_price",
+              "header_source_ref": "源xlsx!重要产品毛利分析D4-8!F13",
+              "header_text": "2月本期costPrice",
+              "json_pointer": "/months/1/cur/costPrice",
+              "mode": "editable",
+              "source_ref": "源xlsx!重要产品毛利分析D4-8!F17",
+              "stable_field_key": "d4_8_matrix/m1_cur/cost_price",
+              "store_item_id": "D4-8-products",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "N",
+                "row_from": 17
+              },
+              "column_key": "m1_prior_cost_price",
+              "header_source_ref": "源xlsx!重要产品毛利分析D4-8!N13",
+              "header_text": "2月上期costPrice",
+              "json_pointer": "/months/1/prior/costPrice",
+              "mode": "editable",
+              "source_ref": "源xlsx!重要产品毛利分析D4-8!N17",
+              "stable_field_key": "d4_8_matrix/m1_prior/cost_price",
+              "store_item_id": "D4-8-products",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "G",
+                "row_from": 17
+              },
+              "column_key": "m1_cur_cost_amt",
+              "header_source_ref": "源xlsx!重要产品毛利分析D4-8!G13",
+              "header_text": "2月本期costAmt",
+              "json_pointer": "/months/1/cur/costAmt",
+              "mode": "editable",
+              "source_ref": "源xlsx!重要产品毛利分析D4-8!G17",
+              "stable_field_key": "d4_8_matrix/m1_cur/cost_amt",
+              "store_item_id": "D4-8-products",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "O",
+                "row_from": 17
+              },
+              "column_key": "m1_prior_cost_amt",
+              "header_source_ref": "源xlsx!重要产品毛利分析D4-8!O13",
+              "header_text": "2月上期costAmt",
+              "json_pointer": "/months/1/prior/costAmt",
+              "mode": "editable",
+              "source_ref": "源xlsx!重要产品毛利分析D4-8!O17",
+              "stable_field_key": "d4_8_matrix/m1_prior/cost_amt",
+              "store_item_id": "D4-8-products",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "B",
+                "row_from": 18
+              },
+              "column_key": "m2_cur_rev_qty",
+              "header_source_ref": "源xlsx!重要产品毛利分析D4-8!B13",
+              "header_text": "3月本期revQty",
+              "json_pointer": "/months/2/cur/revQty",
+              "mode": "editable",
+              "source_ref": "源xlsx!重要产品毛利分析D4-8!B18",
+              "stable_field_key": "d4_8_matrix/m2_cur/rev_qty",
+              "store_item_id": "D4-8-products",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "J",
+                "row_from": 18
+              },
+              "column_key": "m2_prior_rev_qty",
+              "header_source_ref": "源xlsx!重要产品毛利分析D4-8!J13",
+              "header_text": "3月上期revQty",
+              "json_pointer": "/months/2/prior/revQty",
+              "mode": "editable",
+              "source_ref": "源xlsx!重要产品毛利分析D4-8!J18",
+              "stable_field_key": "d4_8_matrix/m2_prior/rev_qty",
+              "store_item_id": "D4-8-products",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "C",
+                "row_from": 18
+              },
+              "column_key": "m2_cur_rev_price",
+              "header_source_ref": "源xlsx!重要产品毛利分析D4-8!C13",
+              "header_text": "3月本期revPrice",
+              "json_pointer": "/months/2/cur/revPrice",
+              "mode": "editable",
+              "source_ref": "源xlsx!重要产品毛利分析D4-8!C18",
+              "stable_field_key": "d4_8_matrix/m2_cur/rev_price",
+              "store_item_id": "D4-8-products",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "K",
+                "row_from": 18
+              },
+              "column_key": "m2_prior_rev_price",
+              "header_source_ref": "源xlsx!重要产品毛利分析D4-8!K13",
+              "header_text": "3月上期revPrice",
+              "json_pointer": "/months/2/prior/revPrice",
+              "mode": "editable",
+              "source_ref": "源xlsx!重要产品毛利分析D4-8!K18",
+              "stable_field_key": "d4_8_matrix/m2_prior/rev_price",
+              "store_item_id": "D4-8-products",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "D",
+                "row_from": 18
+              },
+              "column_key": "m2_cur_rev_amt",
+              "header_source_ref": "源xlsx!重要产品毛利分析D4-8!D13",
+              "header_text": "3月本期revAmt",
+              "json_pointer": "/months/2/cur/revAmt",
+              "mode": "editable",
+              "source_ref": "源xlsx!重要产品毛利分析D4-8!D18",
+              "stable_field_key": "d4_8_matrix/m2_cur/rev_amt",
+              "store_item_id": "D4-8-products",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "L",
+                "row_from": 18
+              },
+              "column_key": "m2_prior_rev_amt",
+              "header_source_ref": "源xlsx!重要产品毛利分析D4-8!L13",
+              "header_text": "3月上期revAmt",
+              "json_pointer": "/months/2/prior/revAmt",
+              "mode": "editable",
+              "source_ref": "源xlsx!重要产品毛利分析D4-8!L18",
+              "stable_field_key": "d4_8_matrix/m2_prior/rev_amt",
+              "store_item_id": "D4-8-products",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "E",
+                "row_from": 18
+              },
+              "column_key": "m2_cur_cost_qty",
+              "header_source_ref": "源xlsx!重要产品毛利分析D4-8!E13",
+              "header_text": "3月本期costQty",
+              "json_pointer": "/months/2/cur/costQty",
+              "mode": "editable",
+              "source_ref": "源xlsx!重要产品毛利分析D4-8!E18",
+              "stable_field_key": "d4_8_matrix/m2_cur/cost_qty",
+              "store_item_id": "D4-8-products",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "M",
+                "row_from": 18
+              },
+              "column_key": "m2_prior_cost_qty",
+              "header_source_ref": "源xlsx!重要产品毛利分析D4-8!M13",
+              "header_text": "3月上期costQty",
+              "json_pointer": "/months/2/prior/costQty",
+              "mode": "editable",
+              "source_ref": "源xlsx!重要产品毛利分析D4-8!M18",
+              "stable_field_key": "d4_8_matrix/m2_prior/cost_qty",
+              "store_item_id": "D4-8-products",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "F",
+                "row_from": 18
+              },
+              "column_key": "m2_cur_cost_price",
+              "header_source_ref": "源xlsx!重要产品毛利分析D4-8!F13",
+              "header_text": "3月本期costPrice",
+              "json_pointer": "/months/2/cur/costPrice",
+              "mode": "editable",
+              "source_ref": "源xlsx!重要产品毛利分析D4-8!F18",
+              "stable_field_key": "d4_8_matrix/m2_cur/cost_price",
+              "store_item_id": "D4-8-products",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "N",
+                "row_from": 18
+              },
+              "column_key": "m2_prior_cost_price",
+              "header_source_ref": "源xlsx!重要产品毛利分析D4-8!N13",
+              "header_text": "3月上期costPrice",
+              "json_pointer": "/months/2/prior/costPrice",
+              "mode": "editable",
+              "source_ref": "源xlsx!重要产品毛利分析D4-8!N18",
+              "stable_field_key": "d4_8_matrix/m2_prior/cost_price",
+              "store_item_id": "D4-8-products",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "G",
+                "row_from": 18
+              },
+              "column_key": "m2_cur_cost_amt",
+              "header_source_ref": "源xlsx!重要产品毛利分析D4-8!G13",
+              "header_text": "3月本期costAmt",
+              "json_pointer": "/months/2/cur/costAmt",
+              "mode": "editable",
+              "source_ref": "源xlsx!重要产品毛利分析D4-8!G18",
+              "stable_field_key": "d4_8_matrix/m2_cur/cost_amt",
+              "store_item_id": "D4-8-products",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "O",
+                "row_from": 18
+              },
+              "column_key": "m2_prior_cost_amt",
+              "header_source_ref": "源xlsx!重要产品毛利分析D4-8!O13",
+              "header_text": "3月上期costAmt",
+              "json_pointer": "/months/2/prior/costAmt",
+              "mode": "editable",
+              "source_ref": "源xlsx!重要产品毛利分析D4-8!O18",
+              "stable_field_key": "d4_8_matrix/m2_prior/cost_amt",
+              "store_item_id": "D4-8-products",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "B",
+                "row_from": 19
+              },
+              "column_key": "m3_cur_rev_qty",
+              "header_source_ref": "源xlsx!重要产品毛利分析D4-8!B13",
+              "header_text": "4月本期revQty",
+              "json_pointer": "/months/3/cur/revQty",
+              "mode": "editable",
+              "source_ref": "源xlsx!重要产品毛利分析D4-8!B19",
+              "stable_field_key": "d4_8_matrix/m3_cur/rev_qty",
+              "store_item_id": "D4-8-products",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "J",
+                "row_from": 19
+              },
+              "column_key": "m3_prior_rev_qty",
+              "header_source_ref": "源xlsx!重要产品毛利分析D4-8!J13",
+              "header_text": "4月上期revQty",
+              "json_pointer": "/months/3/prior/revQty",
+              "mode": "editable",
+              "source_ref": "源xlsx!重要产品毛利分析D4-8!J19",
+              "stable_field_key": "d4_8_matrix/m3_prior/rev_qty",
+              "store_item_id": "D4-8-products",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "C",
+                "row_from": 19
+              },
+              "column_key": "m3_cur_rev_price",
+              "header_source_ref": "源xlsx!重要产品毛利分析D4-8!C13",
+              "header_text": "4月本期revPrice",
+              "json_pointer": "/months/3/cur/revPrice",
+              "mode": "editable",
+              "source_ref": "源xlsx!重要产品毛利分析D4-8!C19",
+              "stable_field_key": "d4_8_matrix/m3_cur/rev_price",
+              "store_item_id": "D4-8-products",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "K",
+                "row_from": 19
+              },
+              "column_key": "m3_prior_rev_price",
+              "header_source_ref": "源xlsx!重要产品毛利分析D4-8!K13",
+              "header_text": "4月上期revPrice",
+              "json_pointer": "/months/3/prior/revPrice",
+              "mode": "editable",
+              "source_ref": "源xlsx!重要产品毛利分析D4-8!K19",
+              "stable_field_key": "d4_8_matrix/m3_prior/rev_price",
+              "store_item_id": "D4-8-products",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "D",
+                "row_from": 19
+              },
+              "column_key": "m3_cur_rev_amt",
+              "header_source_ref": "源xlsx!重要产品毛利分析D4-8!D13",
+              "header_text": "4月本期revAmt",
+              "json_pointer": "/months/3/cur/revAmt",
+              "mode": "editable",
+              "source_ref": "源xlsx!重要产品毛利分析D4-8!D19",
+              "stable_field_key": "d4_8_matrix/m3_cur/rev_amt",
+              "store_item_id": "D4-8-products",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "L",
+                "row_from": 19
+              },
+              "column_key": "m3_prior_rev_amt",
+              "header_source_ref": "源xlsx!重要产品毛利分析D4-8!L13",
+              "header_text": "4月上期revAmt",
+              "json_pointer": "/months/3/prior/revAmt",
+              "mode": "editable",
+              "source_ref": "源xlsx!重要产品毛利分析D4-8!L19",
+              "stable_field_key": "d4_8_matrix/m3_prior/rev_amt",
+              "store_item_id": "D4-8-products",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "E",
+                "row_from": 19
+              },
+              "column_key": "m3_cur_cost_qty",
+              "header_source_ref": "源xlsx!重要产品毛利分析D4-8!E13",
+              "header_text": "4月本期costQty",
+              "json_pointer": "/months/3/cur/costQty",
+              "mode": "editable",
+              "source_ref": "源xlsx!重要产品毛利分析D4-8!E19",
+              "stable_field_key": "d4_8_matrix/m3_cur/cost_qty",
+              "store_item_id": "D4-8-products",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "M",
+                "row_from": 19
+              },
+              "column_key": "m3_prior_cost_qty",
+              "header_source_ref": "源xlsx!重要产品毛利分析D4-8!M13",
+              "header_text": "4月上期costQty",
+              "json_pointer": "/months/3/prior/costQty",
+              "mode": "editable",
+              "source_ref": "源xlsx!重要产品毛利分析D4-8!M19",
+              "stable_field_key": "d4_8_matrix/m3_prior/cost_qty",
+              "store_item_id": "D4-8-products",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "F",
+                "row_from": 19
+              },
+              "column_key": "m3_cur_cost_price",
+              "header_source_ref": "源xlsx!重要产品毛利分析D4-8!F13",
+              "header_text": "4月本期costPrice",
+              "json_pointer": "/months/3/cur/costPrice",
+              "mode": "editable",
+              "source_ref": "源xlsx!重要产品毛利分析D4-8!F19",
+              "stable_field_key": "d4_8_matrix/m3_cur/cost_price",
+              "store_item_id": "D4-8-products",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "N",
+                "row_from": 19
+              },
+              "column_key": "m3_prior_cost_price",
+              "header_source_ref": "源xlsx!重要产品毛利分析D4-8!N13",
+              "header_text": "4月上期costPrice",
+              "json_pointer": "/months/3/prior/costPrice",
+              "mode": "editable",
+              "source_ref": "源xlsx!重要产品毛利分析D4-8!N19",
+              "stable_field_key": "d4_8_matrix/m3_prior/cost_price",
+              "store_item_id": "D4-8-products",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "G",
+                "row_from": 19
+              },
+              "column_key": "m3_cur_cost_amt",
+              "header_source_ref": "源xlsx!重要产品毛利分析D4-8!G13",
+              "header_text": "4月本期costAmt",
+              "json_pointer": "/months/3/cur/costAmt",
+              "mode": "editable",
+              "source_ref": "源xlsx!重要产品毛利分析D4-8!G19",
+              "stable_field_key": "d4_8_matrix/m3_cur/cost_amt",
+              "store_item_id": "D4-8-products",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "O",
+                "row_from": 19
+              },
+              "column_key": "m3_prior_cost_amt",
+              "header_source_ref": "源xlsx!重要产品毛利分析D4-8!O13",
+              "header_text": "4月上期costAmt",
+              "json_pointer": "/months/3/prior/costAmt",
+              "mode": "editable",
+              "source_ref": "源xlsx!重要产品毛利分析D4-8!O19",
+              "stable_field_key": "d4_8_matrix/m3_prior/cost_amt",
+              "store_item_id": "D4-8-products",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "B",
+                "row_from": 20
+              },
+              "column_key": "m4_cur_rev_qty",
+              "header_source_ref": "源xlsx!重要产品毛利分析D4-8!B13",
+              "header_text": "5月本期revQty",
+              "json_pointer": "/months/4/cur/revQty",
+              "mode": "editable",
+              "source_ref": "源xlsx!重要产品毛利分析D4-8!B20",
+              "stable_field_key": "d4_8_matrix/m4_cur/rev_qty",
+              "store_item_id": "D4-8-products",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "J",
+                "row_from": 20
+              },
+              "column_key": "m4_prior_rev_qty",
+              "header_source_ref": "源xlsx!重要产品毛利分析D4-8!J13",
+              "header_text": "5月上期revQty",
+              "json_pointer": "/months/4/prior/revQty",
+              "mode": "editable",
+              "source_ref": "源xlsx!重要产品毛利分析D4-8!J20",
+              "stable_field_key": "d4_8_matrix/m4_prior/rev_qty",
+              "store_item_id": "D4-8-products",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "C",
+                "row_from": 20
+              },
+              "column_key": "m4_cur_rev_price",
+              "header_source_ref": "源xlsx!重要产品毛利分析D4-8!C13",
+              "header_text": "5月本期revPrice",
+              "json_pointer": "/months/4/cur/revPrice",
+              "mode": "editable",
+              "source_ref": "源xlsx!重要产品毛利分析D4-8!C20",
+              "stable_field_key": "d4_8_matrix/m4_cur/rev_price",
+              "store_item_id": "D4-8-products",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "K",
+                "row_from": 20
+              },
+              "column_key": "m4_prior_rev_price",
+              "header_source_ref": "源xlsx!重要产品毛利分析D4-8!K13",
+              "header_text": "5月上期revPrice",
+              "json_pointer": "/months/4/prior/revPrice",
+              "mode": "editable",
+              "source_ref": "源xlsx!重要产品毛利分析D4-8!K20",
+              "stable_field_key": "d4_8_matrix/m4_prior/rev_price",
+              "store_item_id": "D4-8-products",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "D",
+                "row_from": 20
+              },
+              "column_key": "m4_cur_rev_amt",
+              "header_source_ref": "源xlsx!重要产品毛利分析D4-8!D13",
+              "header_text": "5月本期revAmt",
+              "json_pointer": "/months/4/cur/revAmt",
+              "mode": "editable",
+              "source_ref": "源xlsx!重要产品毛利分析D4-8!D20",
+              "stable_field_key": "d4_8_matrix/m4_cur/rev_amt",
+              "store_item_id": "D4-8-products",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "L",
+                "row_from": 20
+              },
+              "column_key": "m4_prior_rev_amt",
+              "header_source_ref": "源xlsx!重要产品毛利分析D4-8!L13",
+              "header_text": "5月上期revAmt",
+              "json_pointer": "/months/4/prior/revAmt",
+              "mode": "editable",
+              "source_ref": "源xlsx!重要产品毛利分析D4-8!L20",
+              "stable_field_key": "d4_8_matrix/m4_prior/rev_amt",
+              "store_item_id": "D4-8-products",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "E",
+                "row_from": 20
+              },
+              "column_key": "m4_cur_cost_qty",
+              "header_source_ref": "源xlsx!重要产品毛利分析D4-8!E13",
+              "header_text": "5月本期costQty",
+              "json_pointer": "/months/4/cur/costQty",
+              "mode": "editable",
+              "source_ref": "源xlsx!重要产品毛利分析D4-8!E20",
+              "stable_field_key": "d4_8_matrix/m4_cur/cost_qty",
+              "store_item_id": "D4-8-products",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "M",
+                "row_from": 20
+              },
+              "column_key": "m4_prior_cost_qty",
+              "header_source_ref": "源xlsx!重要产品毛利分析D4-8!M13",
+              "header_text": "5月上期costQty",
+              "json_pointer": "/months/4/prior/costQty",
+              "mode": "editable",
+              "source_ref": "源xlsx!重要产品毛利分析D4-8!M20",
+              "stable_field_key": "d4_8_matrix/m4_prior/cost_qty",
+              "store_item_id": "D4-8-products",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "F",
+                "row_from": 20
+              },
+              "column_key": "m4_cur_cost_price",
+              "header_source_ref": "源xlsx!重要产品毛利分析D4-8!F13",
+              "header_text": "5月本期costPrice",
+              "json_pointer": "/months/4/cur/costPrice",
+              "mode": "editable",
+              "source_ref": "源xlsx!重要产品毛利分析D4-8!F20",
+              "stable_field_key": "d4_8_matrix/m4_cur/cost_price",
+              "store_item_id": "D4-8-products",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "N",
+                "row_from": 20
+              },
+              "column_key": "m4_prior_cost_price",
+              "header_source_ref": "源xlsx!重要产品毛利分析D4-8!N13",
+              "header_text": "5月上期costPrice",
+              "json_pointer": "/months/4/prior/costPrice",
+              "mode": "editable",
+              "source_ref": "源xlsx!重要产品毛利分析D4-8!N20",
+              "stable_field_key": "d4_8_matrix/m4_prior/cost_price",
+              "store_item_id": "D4-8-products",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "G",
+                "row_from": 20
+              },
+              "column_key": "m4_cur_cost_amt",
+              "header_source_ref": "源xlsx!重要产品毛利分析D4-8!G13",
+              "header_text": "5月本期costAmt",
+              "json_pointer": "/months/4/cur/costAmt",
+              "mode": "editable",
+              "source_ref": "源xlsx!重要产品毛利分析D4-8!G20",
+              "stable_field_key": "d4_8_matrix/m4_cur/cost_amt",
+              "store_item_id": "D4-8-products",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "O",
+                "row_from": 20
+              },
+              "column_key": "m4_prior_cost_amt",
+              "header_source_ref": "源xlsx!重要产品毛利分析D4-8!O13",
+              "header_text": "5月上期costAmt",
+              "json_pointer": "/months/4/prior/costAmt",
+              "mode": "editable",
+              "source_ref": "源xlsx!重要产品毛利分析D4-8!O20",
+              "stable_field_key": "d4_8_matrix/m4_prior/cost_amt",
+              "store_item_id": "D4-8-products",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "B",
+                "row_from": 21
+              },
+              "column_key": "m5_cur_rev_qty",
+              "header_source_ref": "源xlsx!重要产品毛利分析D4-8!B13",
+              "header_text": "6月本期revQty",
+              "json_pointer": "/months/5/cur/revQty",
+              "mode": "editable",
+              "source_ref": "源xlsx!重要产品毛利分析D4-8!B21",
+              "stable_field_key": "d4_8_matrix/m5_cur/rev_qty",
+              "store_item_id": "D4-8-products",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "J",
+                "row_from": 21
+              },
+              "column_key": "m5_prior_rev_qty",
+              "header_source_ref": "源xlsx!重要产品毛利分析D4-8!J13",
+              "header_text": "6月上期revQty",
+              "json_pointer": "/months/5/prior/revQty",
+              "mode": "editable",
+              "source_ref": "源xlsx!重要产品毛利分析D4-8!J21",
+              "stable_field_key": "d4_8_matrix/m5_prior/rev_qty",
+              "store_item_id": "D4-8-products",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "C",
+                "row_from": 21
+              },
+              "column_key": "m5_cur_rev_price",
+              "header_source_ref": "源xlsx!重要产品毛利分析D4-8!C13",
+              "header_text": "6月本期revPrice",
+              "json_pointer": "/months/5/cur/revPrice",
+              "mode": "editable",
+              "source_ref": "源xlsx!重要产品毛利分析D4-8!C21",
+              "stable_field_key": "d4_8_matrix/m5_cur/rev_price",
+              "store_item_id": "D4-8-products",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "K",
+                "row_from": 21
+              },
+              "column_key": "m5_prior_rev_price",
+              "header_source_ref": "源xlsx!重要产品毛利分析D4-8!K13",
+              "header_text": "6月上期revPrice",
+              "json_pointer": "/months/5/prior/revPrice",
+              "mode": "editable",
+              "source_ref": "源xlsx!重要产品毛利分析D4-8!K21",
+              "stable_field_key": "d4_8_matrix/m5_prior/rev_price",
+              "store_item_id": "D4-8-products",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "D",
+                "row_from": 21
+              },
+              "column_key": "m5_cur_rev_amt",
+              "header_source_ref": "源xlsx!重要产品毛利分析D4-8!D13",
+              "header_text": "6月本期revAmt",
+              "json_pointer": "/months/5/cur/revAmt",
+              "mode": "editable",
+              "source_ref": "源xlsx!重要产品毛利分析D4-8!D21",
+              "stable_field_key": "d4_8_matrix/m5_cur/rev_amt",
+              "store_item_id": "D4-8-products",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "L",
+                "row_from": 21
+              },
+              "column_key": "m5_prior_rev_amt",
+              "header_source_ref": "源xlsx!重要产品毛利分析D4-8!L13",
+              "header_text": "6月上期revAmt",
+              "json_pointer": "/months/5/prior/revAmt",
+              "mode": "editable",
+              "source_ref": "源xlsx!重要产品毛利分析D4-8!L21",
+              "stable_field_key": "d4_8_matrix/m5_prior/rev_amt",
+              "store_item_id": "D4-8-products",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "E",
+                "row_from": 21
+              },
+              "column_key": "m5_cur_cost_qty",
+              "header_source_ref": "源xlsx!重要产品毛利分析D4-8!E13",
+              "header_text": "6月本期costQty",
+              "json_pointer": "/months/5/cur/costQty",
+              "mode": "editable",
+              "source_ref": "源xlsx!重要产品毛利分析D4-8!E21",
+              "stable_field_key": "d4_8_matrix/m5_cur/cost_qty",
+              "store_item_id": "D4-8-products",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "M",
+                "row_from": 21
+              },
+              "column_key": "m5_prior_cost_qty",
+              "header_source_ref": "源xlsx!重要产品毛利分析D4-8!M13",
+              "header_text": "6月上期costQty",
+              "json_pointer": "/months/5/prior/costQty",
+              "mode": "editable",
+              "source_ref": "源xlsx!重要产品毛利分析D4-8!M21",
+              "stable_field_key": "d4_8_matrix/m5_prior/cost_qty",
+              "store_item_id": "D4-8-products",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "F",
+                "row_from": 21
+              },
+              "column_key": "m5_cur_cost_price",
+              "header_source_ref": "源xlsx!重要产品毛利分析D4-8!F13",
+              "header_text": "6月本期costPrice",
+              "json_pointer": "/months/5/cur/costPrice",
+              "mode": "editable",
+              "source_ref": "源xlsx!重要产品毛利分析D4-8!F21",
+              "stable_field_key": "d4_8_matrix/m5_cur/cost_price",
+              "store_item_id": "D4-8-products",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "N",
+                "row_from": 21
+              },
+              "column_key": "m5_prior_cost_price",
+              "header_source_ref": "源xlsx!重要产品毛利分析D4-8!N13",
+              "header_text": "6月上期costPrice",
+              "json_pointer": "/months/5/prior/costPrice",
+              "mode": "editable",
+              "source_ref": "源xlsx!重要产品毛利分析D4-8!N21",
+              "stable_field_key": "d4_8_matrix/m5_prior/cost_price",
+              "store_item_id": "D4-8-products",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "G",
+                "row_from": 21
+              },
+              "column_key": "m5_cur_cost_amt",
+              "header_source_ref": "源xlsx!重要产品毛利分析D4-8!G13",
+              "header_text": "6月本期costAmt",
+              "json_pointer": "/months/5/cur/costAmt",
+              "mode": "editable",
+              "source_ref": "源xlsx!重要产品毛利分析D4-8!G21",
+              "stable_field_key": "d4_8_matrix/m5_cur/cost_amt",
+              "store_item_id": "D4-8-products",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "O",
+                "row_from": 21
+              },
+              "column_key": "m5_prior_cost_amt",
+              "header_source_ref": "源xlsx!重要产品毛利分析D4-8!O13",
+              "header_text": "6月上期costAmt",
+              "json_pointer": "/months/5/prior/costAmt",
+              "mode": "editable",
+              "source_ref": "源xlsx!重要产品毛利分析D4-8!O21",
+              "stable_field_key": "d4_8_matrix/m5_prior/cost_amt",
+              "store_item_id": "D4-8-products",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "B",
+                "row_from": 22
+              },
+              "column_key": "m6_cur_rev_qty",
+              "header_source_ref": "源xlsx!重要产品毛利分析D4-8!B13",
+              "header_text": "7月本期revQty",
+              "json_pointer": "/months/6/cur/revQty",
+              "mode": "editable",
+              "source_ref": "源xlsx!重要产品毛利分析D4-8!B22",
+              "stable_field_key": "d4_8_matrix/m6_cur/rev_qty",
+              "store_item_id": "D4-8-products",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "J",
+                "row_from": 22
+              },
+              "column_key": "m6_prior_rev_qty",
+              "header_source_ref": "源xlsx!重要产品毛利分析D4-8!J13",
+              "header_text": "7月上期revQty",
+              "json_pointer": "/months/6/prior/revQty",
+              "mode": "editable",
+              "source_ref": "源xlsx!重要产品毛利分析D4-8!J22",
+              "stable_field_key": "d4_8_matrix/m6_prior/rev_qty",
+              "store_item_id": "D4-8-products",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "C",
+                "row_from": 22
+              },
+              "column_key": "m6_cur_rev_price",
+              "header_source_ref": "源xlsx!重要产品毛利分析D4-8!C13",
+              "header_text": "7月本期revPrice",
+              "json_pointer": "/months/6/cur/revPrice",
+              "mode": "editable",
+              "source_ref": "源xlsx!重要产品毛利分析D4-8!C22",
+              "stable_field_key": "d4_8_matrix/m6_cur/rev_price",
+              "store_item_id": "D4-8-products",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "K",
+                "row_from": 22
+              },
+              "column_key": "m6_prior_rev_price",
+              "header_source_ref": "源xlsx!重要产品毛利分析D4-8!K13",
+              "header_text": "7月上期revPrice",
+              "json_pointer": "/months/6/prior/revPrice",
+              "mode": "editable",
+              "source_ref": "源xlsx!重要产品毛利分析D4-8!K22",
+              "stable_field_key": "d4_8_matrix/m6_prior/rev_price",
+              "store_item_id": "D4-8-products",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "D",
+                "row_from": 22
+              },
+              "column_key": "m6_cur_rev_amt",
+              "header_source_ref": "源xlsx!重要产品毛利分析D4-8!D13",
+              "header_text": "7月本期revAmt",
+              "json_pointer": "/months/6/cur/revAmt",
+              "mode": "editable",
+              "source_ref": "源xlsx!重要产品毛利分析D4-8!D22",
+              "stable_field_key": "d4_8_matrix/m6_cur/rev_amt",
+              "store_item_id": "D4-8-products",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "L",
+                "row_from": 22
+              },
+              "column_key": "m6_prior_rev_amt",
+              "header_source_ref": "源xlsx!重要产品毛利分析D4-8!L13",
+              "header_text": "7月上期revAmt",
+              "json_pointer": "/months/6/prior/revAmt",
+              "mode": "editable",
+              "source_ref": "源xlsx!重要产品毛利分析D4-8!L22",
+              "stable_field_key": "d4_8_matrix/m6_prior/rev_amt",
+              "store_item_id": "D4-8-products",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "E",
+                "row_from": 22
+              },
+              "column_key": "m6_cur_cost_qty",
+              "header_source_ref": "源xlsx!重要产品毛利分析D4-8!E13",
+              "header_text": "7月本期costQty",
+              "json_pointer": "/months/6/cur/costQty",
+              "mode": "editable",
+              "source_ref": "源xlsx!重要产品毛利分析D4-8!E22",
+              "stable_field_key": "d4_8_matrix/m6_cur/cost_qty",
+              "store_item_id": "D4-8-products",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "M",
+                "row_from": 22
+              },
+              "column_key": "m6_prior_cost_qty",
+              "header_source_ref": "源xlsx!重要产品毛利分析D4-8!M13",
+              "header_text": "7月上期costQty",
+              "json_pointer": "/months/6/prior/costQty",
+              "mode": "editable",
+              "source_ref": "源xlsx!重要产品毛利分析D4-8!M22",
+              "stable_field_key": "d4_8_matrix/m6_prior/cost_qty",
+              "store_item_id": "D4-8-products",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "F",
+                "row_from": 22
+              },
+              "column_key": "m6_cur_cost_price",
+              "header_source_ref": "源xlsx!重要产品毛利分析D4-8!F13",
+              "header_text": "7月本期costPrice",
+              "json_pointer": "/months/6/cur/costPrice",
+              "mode": "editable",
+              "source_ref": "源xlsx!重要产品毛利分析D4-8!F22",
+              "stable_field_key": "d4_8_matrix/m6_cur/cost_price",
+              "store_item_id": "D4-8-products",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "N",
+                "row_from": 22
+              },
+              "column_key": "m6_prior_cost_price",
+              "header_source_ref": "源xlsx!重要产品毛利分析D4-8!N13",
+              "header_text": "7月上期costPrice",
+              "json_pointer": "/months/6/prior/costPrice",
+              "mode": "editable",
+              "source_ref": "源xlsx!重要产品毛利分析D4-8!N22",
+              "stable_field_key": "d4_8_matrix/m6_prior/cost_price",
+              "store_item_id": "D4-8-products",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "G",
+                "row_from": 22
+              },
+              "column_key": "m6_cur_cost_amt",
+              "header_source_ref": "源xlsx!重要产品毛利分析D4-8!G13",
+              "header_text": "7月本期costAmt",
+              "json_pointer": "/months/6/cur/costAmt",
+              "mode": "editable",
+              "source_ref": "源xlsx!重要产品毛利分析D4-8!G22",
+              "stable_field_key": "d4_8_matrix/m6_cur/cost_amt",
+              "store_item_id": "D4-8-products",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "O",
+                "row_from": 22
+              },
+              "column_key": "m6_prior_cost_amt",
+              "header_source_ref": "源xlsx!重要产品毛利分析D4-8!O13",
+              "header_text": "7月上期costAmt",
+              "json_pointer": "/months/6/prior/costAmt",
+              "mode": "editable",
+              "source_ref": "源xlsx!重要产品毛利分析D4-8!O22",
+              "stable_field_key": "d4_8_matrix/m6_prior/cost_amt",
+              "store_item_id": "D4-8-products",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "B",
+                "row_from": 23
+              },
+              "column_key": "m7_cur_rev_qty",
+              "header_source_ref": "源xlsx!重要产品毛利分析D4-8!B13",
+              "header_text": "8月本期revQty",
+              "json_pointer": "/months/7/cur/revQty",
+              "mode": "editable",
+              "source_ref": "源xlsx!重要产品毛利分析D4-8!B23",
+              "stable_field_key": "d4_8_matrix/m7_cur/rev_qty",
+              "store_item_id": "D4-8-products",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "J",
+                "row_from": 23
+              },
+              "column_key": "m7_prior_rev_qty",
+              "header_source_ref": "源xlsx!重要产品毛利分析D4-8!J13",
+              "header_text": "8月上期revQty",
+              "json_pointer": "/months/7/prior/revQty",
+              "mode": "editable",
+              "source_ref": "源xlsx!重要产品毛利分析D4-8!J23",
+              "stable_field_key": "d4_8_matrix/m7_prior/rev_qty",
+              "store_item_id": "D4-8-products",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "C",
+                "row_from": 23
+              },
+              "column_key": "m7_cur_rev_price",
+              "header_source_ref": "源xlsx!重要产品毛利分析D4-8!C13",
+              "header_text": "8月本期revPrice",
+              "json_pointer": "/months/7/cur/revPrice",
+              "mode": "editable",
+              "source_ref": "源xlsx!重要产品毛利分析D4-8!C23",
+              "stable_field_key": "d4_8_matrix/m7_cur/rev_price",
+              "store_item_id": "D4-8-products",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "K",
+                "row_from": 23
+              },
+              "column_key": "m7_prior_rev_price",
+              "header_source_ref": "源xlsx!重要产品毛利分析D4-8!K13",
+              "header_text": "8月上期revPrice",
+              "json_pointer": "/months/7/prior/revPrice",
+              "mode": "editable",
+              "source_ref": "源xlsx!重要产品毛利分析D4-8!K23",
+              "stable_field_key": "d4_8_matrix/m7_prior/rev_price",
+              "store_item_id": "D4-8-products",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "D",
+                "row_from": 23
+              },
+              "column_key": "m7_cur_rev_amt",
+              "header_source_ref": "源xlsx!重要产品毛利分析D4-8!D13",
+              "header_text": "8月本期revAmt",
+              "json_pointer": "/months/7/cur/revAmt",
+              "mode": "editable",
+              "source_ref": "源xlsx!重要产品毛利分析D4-8!D23",
+              "stable_field_key": "d4_8_matrix/m7_cur/rev_amt",
+              "store_item_id": "D4-8-products",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "L",
+                "row_from": 23
+              },
+              "column_key": "m7_prior_rev_amt",
+              "header_source_ref": "源xlsx!重要产品毛利分析D4-8!L13",
+              "header_text": "8月上期revAmt",
+              "json_pointer": "/months/7/prior/revAmt",
+              "mode": "editable",
+              "source_ref": "源xlsx!重要产品毛利分析D4-8!L23",
+              "stable_field_key": "d4_8_matrix/m7_prior/rev_amt",
+              "store_item_id": "D4-8-products",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "E",
+                "row_from": 23
+              },
+              "column_key": "m7_cur_cost_qty",
+              "header_source_ref": "源xlsx!重要产品毛利分析D4-8!E13",
+              "header_text": "8月本期costQty",
+              "json_pointer": "/months/7/cur/costQty",
+              "mode": "editable",
+              "source_ref": "源xlsx!重要产品毛利分析D4-8!E23",
+              "stable_field_key": "d4_8_matrix/m7_cur/cost_qty",
+              "store_item_id": "D4-8-products",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "M",
+                "row_from": 23
+              },
+              "column_key": "m7_prior_cost_qty",
+              "header_source_ref": "源xlsx!重要产品毛利分析D4-8!M13",
+              "header_text": "8月上期costQty",
+              "json_pointer": "/months/7/prior/costQty",
+              "mode": "editable",
+              "source_ref": "源xlsx!重要产品毛利分析D4-8!M23",
+              "stable_field_key": "d4_8_matrix/m7_prior/cost_qty",
+              "store_item_id": "D4-8-products",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "F",
+                "row_from": 23
+              },
+              "column_key": "m7_cur_cost_price",
+              "header_source_ref": "源xlsx!重要产品毛利分析D4-8!F13",
+              "header_text": "8月本期costPrice",
+              "json_pointer": "/months/7/cur/costPrice",
+              "mode": "editable",
+              "source_ref": "源xlsx!重要产品毛利分析D4-8!F23",
+              "stable_field_key": "d4_8_matrix/m7_cur/cost_price",
+              "store_item_id": "D4-8-products",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "N",
+                "row_from": 23
+              },
+              "column_key": "m7_prior_cost_price",
+              "header_source_ref": "源xlsx!重要产品毛利分析D4-8!N13",
+              "header_text": "8月上期costPrice",
+              "json_pointer": "/months/7/prior/costPrice",
+              "mode": "editable",
+              "source_ref": "源xlsx!重要产品毛利分析D4-8!N23",
+              "stable_field_key": "d4_8_matrix/m7_prior/cost_price",
+              "store_item_id": "D4-8-products",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "G",
+                "row_from": 23
+              },
+              "column_key": "m7_cur_cost_amt",
+              "header_source_ref": "源xlsx!重要产品毛利分析D4-8!G13",
+              "header_text": "8月本期costAmt",
+              "json_pointer": "/months/7/cur/costAmt",
+              "mode": "editable",
+              "source_ref": "源xlsx!重要产品毛利分析D4-8!G23",
+              "stable_field_key": "d4_8_matrix/m7_cur/cost_amt",
+              "store_item_id": "D4-8-products",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "O",
+                "row_from": 23
+              },
+              "column_key": "m7_prior_cost_amt",
+              "header_source_ref": "源xlsx!重要产品毛利分析D4-8!O13",
+              "header_text": "8月上期costAmt",
+              "json_pointer": "/months/7/prior/costAmt",
+              "mode": "editable",
+              "source_ref": "源xlsx!重要产品毛利分析D4-8!O23",
+              "stable_field_key": "d4_8_matrix/m7_prior/cost_amt",
+              "store_item_id": "D4-8-products",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "B",
+                "row_from": 24
+              },
+              "column_key": "m8_cur_rev_qty",
+              "header_source_ref": "源xlsx!重要产品毛利分析D4-8!B13",
+              "header_text": "9月本期revQty",
+              "json_pointer": "/months/8/cur/revQty",
+              "mode": "editable",
+              "source_ref": "源xlsx!重要产品毛利分析D4-8!B24",
+              "stable_field_key": "d4_8_matrix/m8_cur/rev_qty",
+              "store_item_id": "D4-8-products",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "J",
+                "row_from": 24
+              },
+              "column_key": "m8_prior_rev_qty",
+              "header_source_ref": "源xlsx!重要产品毛利分析D4-8!J13",
+              "header_text": "9月上期revQty",
+              "json_pointer": "/months/8/prior/revQty",
+              "mode": "editable",
+              "source_ref": "源xlsx!重要产品毛利分析D4-8!J24",
+              "stable_field_key": "d4_8_matrix/m8_prior/rev_qty",
+              "store_item_id": "D4-8-products",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "C",
+                "row_from": 24
+              },
+              "column_key": "m8_cur_rev_price",
+              "header_source_ref": "源xlsx!重要产品毛利分析D4-8!C13",
+              "header_text": "9月本期revPrice",
+              "json_pointer": "/months/8/cur/revPrice",
+              "mode": "editable",
+              "source_ref": "源xlsx!重要产品毛利分析D4-8!C24",
+              "stable_field_key": "d4_8_matrix/m8_cur/rev_price",
+              "store_item_id": "D4-8-products",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "K",
+                "row_from": 24
+              },
+              "column_key": "m8_prior_rev_price",
+              "header_source_ref": "源xlsx!重要产品毛利分析D4-8!K13",
+              "header_text": "9月上期revPrice",
+              "json_pointer": "/months/8/prior/revPrice",
+              "mode": "editable",
+              "source_ref": "源xlsx!重要产品毛利分析D4-8!K24",
+              "stable_field_key": "d4_8_matrix/m8_prior/rev_price",
+              "store_item_id": "D4-8-products",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "D",
+                "row_from": 24
+              },
+              "column_key": "m8_cur_rev_amt",
+              "header_source_ref": "源xlsx!重要产品毛利分析D4-8!D13",
+              "header_text": "9月本期revAmt",
+              "json_pointer": "/months/8/cur/revAmt",
+              "mode": "editable",
+              "source_ref": "源xlsx!重要产品毛利分析D4-8!D24",
+              "stable_field_key": "d4_8_matrix/m8_cur/rev_amt",
+              "store_item_id": "D4-8-products",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "L",
+                "row_from": 24
+              },
+              "column_key": "m8_prior_rev_amt",
+              "header_source_ref": "源xlsx!重要产品毛利分析D4-8!L13",
+              "header_text": "9月上期revAmt",
+              "json_pointer": "/months/8/prior/revAmt",
+              "mode": "editable",
+              "source_ref": "源xlsx!重要产品毛利分析D4-8!L24",
+              "stable_field_key": "d4_8_matrix/m8_prior/rev_amt",
+              "store_item_id": "D4-8-products",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "E",
+                "row_from": 24
+              },
+              "column_key": "m8_cur_cost_qty",
+              "header_source_ref": "源xlsx!重要产品毛利分析D4-8!E13",
+              "header_text": "9月本期costQty",
+              "json_pointer": "/months/8/cur/costQty",
+              "mode": "editable",
+              "source_ref": "源xlsx!重要产品毛利分析D4-8!E24",
+              "stable_field_key": "d4_8_matrix/m8_cur/cost_qty",
+              "store_item_id": "D4-8-products",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "M",
+                "row_from": 24
+              },
+              "column_key": "m8_prior_cost_qty",
+              "header_source_ref": "源xlsx!重要产品毛利分析D4-8!M13",
+              "header_text": "9月上期costQty",
+              "json_pointer": "/months/8/prior/costQty",
+              "mode": "editable",
+              "source_ref": "源xlsx!重要产品毛利分析D4-8!M24",
+              "stable_field_key": "d4_8_matrix/m8_prior/cost_qty",
+              "store_item_id": "D4-8-products",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "F",
+                "row_from": 24
+              },
+              "column_key": "m8_cur_cost_price",
+              "header_source_ref": "源xlsx!重要产品毛利分析D4-8!F13",
+              "header_text": "9月本期costPrice",
+              "json_pointer": "/months/8/cur/costPrice",
+              "mode": "editable",
+              "source_ref": "源xlsx!重要产品毛利分析D4-8!F24",
+              "stable_field_key": "d4_8_matrix/m8_cur/cost_price",
+              "store_item_id": "D4-8-products",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "N",
+                "row_from": 24
+              },
+              "column_key": "m8_prior_cost_price",
+              "header_source_ref": "源xlsx!重要产品毛利分析D4-8!N13",
+              "header_text": "9月上期costPrice",
+              "json_pointer": "/months/8/prior/costPrice",
+              "mode": "editable",
+              "source_ref": "源xlsx!重要产品毛利分析D4-8!N24",
+              "stable_field_key": "d4_8_matrix/m8_prior/cost_price",
+              "store_item_id": "D4-8-products",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "G",
+                "row_from": 24
+              },
+              "column_key": "m8_cur_cost_amt",
+              "header_source_ref": "源xlsx!重要产品毛利分析D4-8!G13",
+              "header_text": "9月本期costAmt",
+              "json_pointer": "/months/8/cur/costAmt",
+              "mode": "editable",
+              "source_ref": "源xlsx!重要产品毛利分析D4-8!G24",
+              "stable_field_key": "d4_8_matrix/m8_cur/cost_amt",
+              "store_item_id": "D4-8-products",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "O",
+                "row_from": 24
+              },
+              "column_key": "m8_prior_cost_amt",
+              "header_source_ref": "源xlsx!重要产品毛利分析D4-8!O13",
+              "header_text": "9月上期costAmt",
+              "json_pointer": "/months/8/prior/costAmt",
+              "mode": "editable",
+              "source_ref": "源xlsx!重要产品毛利分析D4-8!O24",
+              "stable_field_key": "d4_8_matrix/m8_prior/cost_amt",
+              "store_item_id": "D4-8-products",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "B",
+                "row_from": 25
+              },
+              "column_key": "m9_cur_rev_qty",
+              "header_source_ref": "源xlsx!重要产品毛利分析D4-8!B13",
+              "header_text": "10月本期revQty",
+              "json_pointer": "/months/9/cur/revQty",
+              "mode": "editable",
+              "source_ref": "源xlsx!重要产品毛利分析D4-8!B25",
+              "stable_field_key": "d4_8_matrix/m9_cur/rev_qty",
+              "store_item_id": "D4-8-products",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "J",
+                "row_from": 25
+              },
+              "column_key": "m9_prior_rev_qty",
+              "header_source_ref": "源xlsx!重要产品毛利分析D4-8!J13",
+              "header_text": "10月上期revQty",
+              "json_pointer": "/months/9/prior/revQty",
+              "mode": "editable",
+              "source_ref": "源xlsx!重要产品毛利分析D4-8!J25",
+              "stable_field_key": "d4_8_matrix/m9_prior/rev_qty",
+              "store_item_id": "D4-8-products",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "C",
+                "row_from": 25
+              },
+              "column_key": "m9_cur_rev_price",
+              "header_source_ref": "源xlsx!重要产品毛利分析D4-8!C13",
+              "header_text": "10月本期revPrice",
+              "json_pointer": "/months/9/cur/revPrice",
+              "mode": "editable",
+              "source_ref": "源xlsx!重要产品毛利分析D4-8!C25",
+              "stable_field_key": "d4_8_matrix/m9_cur/rev_price",
+              "store_item_id": "D4-8-products",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "K",
+                "row_from": 25
+              },
+              "column_key": "m9_prior_rev_price",
+              "header_source_ref": "源xlsx!重要产品毛利分析D4-8!K13",
+              "header_text": "10月上期revPrice",
+              "json_pointer": "/months/9/prior/revPrice",
+              "mode": "editable",
+              "source_ref": "源xlsx!重要产品毛利分析D4-8!K25",
+              "stable_field_key": "d4_8_matrix/m9_prior/rev_price",
+              "store_item_id": "D4-8-products",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "D",
+                "row_from": 25
+              },
+              "column_key": "m9_cur_rev_amt",
+              "header_source_ref": "源xlsx!重要产品毛利分析D4-8!D13",
+              "header_text": "10月本期revAmt",
+              "json_pointer": "/months/9/cur/revAmt",
+              "mode": "editable",
+              "source_ref": "源xlsx!重要产品毛利分析D4-8!D25",
+              "stable_field_key": "d4_8_matrix/m9_cur/rev_amt",
+              "store_item_id": "D4-8-products",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "L",
+                "row_from": 25
+              },
+              "column_key": "m9_prior_rev_amt",
+              "header_source_ref": "源xlsx!重要产品毛利分析D4-8!L13",
+              "header_text": "10月上期revAmt",
+              "json_pointer": "/months/9/prior/revAmt",
+              "mode": "editable",
+              "source_ref": "源xlsx!重要产品毛利分析D4-8!L25",
+              "stable_field_key": "d4_8_matrix/m9_prior/rev_amt",
+              "store_item_id": "D4-8-products",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "E",
+                "row_from": 25
+              },
+              "column_key": "m9_cur_cost_qty",
+              "header_source_ref": "源xlsx!重要产品毛利分析D4-8!E13",
+              "header_text": "10月本期costQty",
+              "json_pointer": "/months/9/cur/costQty",
+              "mode": "editable",
+              "source_ref": "源xlsx!重要产品毛利分析D4-8!E25",
+              "stable_field_key": "d4_8_matrix/m9_cur/cost_qty",
+              "store_item_id": "D4-8-products",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "M",
+                "row_from": 25
+              },
+              "column_key": "m9_prior_cost_qty",
+              "header_source_ref": "源xlsx!重要产品毛利分析D4-8!M13",
+              "header_text": "10月上期costQty",
+              "json_pointer": "/months/9/prior/costQty",
+              "mode": "editable",
+              "source_ref": "源xlsx!重要产品毛利分析D4-8!M25",
+              "stable_field_key": "d4_8_matrix/m9_prior/cost_qty",
+              "store_item_id": "D4-8-products",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "F",
+                "row_from": 25
+              },
+              "column_key": "m9_cur_cost_price",
+              "header_source_ref": "源xlsx!重要产品毛利分析D4-8!F13",
+              "header_text": "10月本期costPrice",
+              "json_pointer": "/months/9/cur/costPrice",
+              "mode": "editable",
+              "source_ref": "源xlsx!重要产品毛利分析D4-8!F25",
+              "stable_field_key": "d4_8_matrix/m9_cur/cost_price",
+              "store_item_id": "D4-8-products",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "N",
+                "row_from": 25
+              },
+              "column_key": "m9_prior_cost_price",
+              "header_source_ref": "源xlsx!重要产品毛利分析D4-8!N13",
+              "header_text": "10月上期costPrice",
+              "json_pointer": "/months/9/prior/costPrice",
+              "mode": "editable",
+              "source_ref": "源xlsx!重要产品毛利分析D4-8!N25",
+              "stable_field_key": "d4_8_matrix/m9_prior/cost_price",
+              "store_item_id": "D4-8-products",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "G",
+                "row_from": 25
+              },
+              "column_key": "m9_cur_cost_amt",
+              "header_source_ref": "源xlsx!重要产品毛利分析D4-8!G13",
+              "header_text": "10月本期costAmt",
+              "json_pointer": "/months/9/cur/costAmt",
+              "mode": "editable",
+              "source_ref": "源xlsx!重要产品毛利分析D4-8!G25",
+              "stable_field_key": "d4_8_matrix/m9_cur/cost_amt",
+              "store_item_id": "D4-8-products",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "O",
+                "row_from": 25
+              },
+              "column_key": "m9_prior_cost_amt",
+              "header_source_ref": "源xlsx!重要产品毛利分析D4-8!O13",
+              "header_text": "10月上期costAmt",
+              "json_pointer": "/months/9/prior/costAmt",
+              "mode": "editable",
+              "source_ref": "源xlsx!重要产品毛利分析D4-8!O25",
+              "stable_field_key": "d4_8_matrix/m9_prior/cost_amt",
+              "store_item_id": "D4-8-products",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "B",
+                "row_from": 26
+              },
+              "column_key": "m10_cur_rev_qty",
+              "header_source_ref": "源xlsx!重要产品毛利分析D4-8!B13",
+              "header_text": "11月本期revQty",
+              "json_pointer": "/months/10/cur/revQty",
+              "mode": "editable",
+              "source_ref": "源xlsx!重要产品毛利分析D4-8!B26",
+              "stable_field_key": "d4_8_matrix/m10_cur/rev_qty",
+              "store_item_id": "D4-8-products",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "J",
+                "row_from": 26
+              },
+              "column_key": "m10_prior_rev_qty",
+              "header_source_ref": "源xlsx!重要产品毛利分析D4-8!J13",
+              "header_text": "11月上期revQty",
+              "json_pointer": "/months/10/prior/revQty",
+              "mode": "editable",
+              "source_ref": "源xlsx!重要产品毛利分析D4-8!J26",
+              "stable_field_key": "d4_8_matrix/m10_prior/rev_qty",
+              "store_item_id": "D4-8-products",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "C",
+                "row_from": 26
+              },
+              "column_key": "m10_cur_rev_price",
+              "header_source_ref": "源xlsx!重要产品毛利分析D4-8!C13",
+              "header_text": "11月本期revPrice",
+              "json_pointer": "/months/10/cur/revPrice",
+              "mode": "editable",
+              "source_ref": "源xlsx!重要产品毛利分析D4-8!C26",
+              "stable_field_key": "d4_8_matrix/m10_cur/rev_price",
+              "store_item_id": "D4-8-products",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "K",
+                "row_from": 26
+              },
+              "column_key": "m10_prior_rev_price",
+              "header_source_ref": "源xlsx!重要产品毛利分析D4-8!K13",
+              "header_text": "11月上期revPrice",
+              "json_pointer": "/months/10/prior/revPrice",
+              "mode": "editable",
+              "source_ref": "源xlsx!重要产品毛利分析D4-8!K26",
+              "stable_field_key": "d4_8_matrix/m10_prior/rev_price",
+              "store_item_id": "D4-8-products",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "D",
+                "row_from": 26
+              },
+              "column_key": "m10_cur_rev_amt",
+              "header_source_ref": "源xlsx!重要产品毛利分析D4-8!D13",
+              "header_text": "11月本期revAmt",
+              "json_pointer": "/months/10/cur/revAmt",
+              "mode": "editable",
+              "source_ref": "源xlsx!重要产品毛利分析D4-8!D26",
+              "stable_field_key": "d4_8_matrix/m10_cur/rev_amt",
+              "store_item_id": "D4-8-products",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "L",
+                "row_from": 26
+              },
+              "column_key": "m10_prior_rev_amt",
+              "header_source_ref": "源xlsx!重要产品毛利分析D4-8!L13",
+              "header_text": "11月上期revAmt",
+              "json_pointer": "/months/10/prior/revAmt",
+              "mode": "editable",
+              "source_ref": "源xlsx!重要产品毛利分析D4-8!L26",
+              "stable_field_key": "d4_8_matrix/m10_prior/rev_amt",
+              "store_item_id": "D4-8-products",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "E",
+                "row_from": 26
+              },
+              "column_key": "m10_cur_cost_qty",
+              "header_source_ref": "源xlsx!重要产品毛利分析D4-8!E13",
+              "header_text": "11月本期costQty",
+              "json_pointer": "/months/10/cur/costQty",
+              "mode": "editable",
+              "source_ref": "源xlsx!重要产品毛利分析D4-8!E26",
+              "stable_field_key": "d4_8_matrix/m10_cur/cost_qty",
+              "store_item_id": "D4-8-products",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "M",
+                "row_from": 26
+              },
+              "column_key": "m10_prior_cost_qty",
+              "header_source_ref": "源xlsx!重要产品毛利分析D4-8!M13",
+              "header_text": "11月上期costQty",
+              "json_pointer": "/months/10/prior/costQty",
+              "mode": "editable",
+              "source_ref": "源xlsx!重要产品毛利分析D4-8!M26",
+              "stable_field_key": "d4_8_matrix/m10_prior/cost_qty",
+              "store_item_id": "D4-8-products",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "F",
+                "row_from": 26
+              },
+              "column_key": "m10_cur_cost_price",
+              "header_source_ref": "源xlsx!重要产品毛利分析D4-8!F13",
+              "header_text": "11月本期costPrice",
+              "json_pointer": "/months/10/cur/costPrice",
+              "mode": "editable",
+              "source_ref": "源xlsx!重要产品毛利分析D4-8!F26",
+              "stable_field_key": "d4_8_matrix/m10_cur/cost_price",
+              "store_item_id": "D4-8-products",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "N",
+                "row_from": 26
+              },
+              "column_key": "m10_prior_cost_price",
+              "header_source_ref": "源xlsx!重要产品毛利分析D4-8!N13",
+              "header_text": "11月上期costPrice",
+              "json_pointer": "/months/10/prior/costPrice",
+              "mode": "editable",
+              "source_ref": "源xlsx!重要产品毛利分析D4-8!N26",
+              "stable_field_key": "d4_8_matrix/m10_prior/cost_price",
+              "store_item_id": "D4-8-products",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "G",
+                "row_from": 26
+              },
+              "column_key": "m10_cur_cost_amt",
+              "header_source_ref": "源xlsx!重要产品毛利分析D4-8!G13",
+              "header_text": "11月本期costAmt",
+              "json_pointer": "/months/10/cur/costAmt",
+              "mode": "editable",
+              "source_ref": "源xlsx!重要产品毛利分析D4-8!G26",
+              "stable_field_key": "d4_8_matrix/m10_cur/cost_amt",
+              "store_item_id": "D4-8-products",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "O",
+                "row_from": 26
+              },
+              "column_key": "m10_prior_cost_amt",
+              "header_source_ref": "源xlsx!重要产品毛利分析D4-8!O13",
+              "header_text": "11月上期costAmt",
+              "json_pointer": "/months/10/prior/costAmt",
+              "mode": "editable",
+              "source_ref": "源xlsx!重要产品毛利分析D4-8!O26",
+              "stable_field_key": "d4_8_matrix/m10_prior/cost_amt",
+              "store_item_id": "D4-8-products",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "B",
+                "row_from": 27
+              },
+              "column_key": "m11_cur_rev_qty",
+              "header_source_ref": "源xlsx!重要产品毛利分析D4-8!B13",
+              "header_text": "12月本期revQty",
+              "json_pointer": "/months/11/cur/revQty",
+              "mode": "editable",
+              "source_ref": "源xlsx!重要产品毛利分析D4-8!B27",
+              "stable_field_key": "d4_8_matrix/m11_cur/rev_qty",
+              "store_item_id": "D4-8-products",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "J",
+                "row_from": 27
+              },
+              "column_key": "m11_prior_rev_qty",
+              "header_source_ref": "源xlsx!重要产品毛利分析D4-8!J13",
+              "header_text": "12月上期revQty",
+              "json_pointer": "/months/11/prior/revQty",
+              "mode": "editable",
+              "source_ref": "源xlsx!重要产品毛利分析D4-8!J27",
+              "stable_field_key": "d4_8_matrix/m11_prior/rev_qty",
+              "store_item_id": "D4-8-products",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "C",
+                "row_from": 27
+              },
+              "column_key": "m11_cur_rev_price",
+              "header_source_ref": "源xlsx!重要产品毛利分析D4-8!C13",
+              "header_text": "12月本期revPrice",
+              "json_pointer": "/months/11/cur/revPrice",
+              "mode": "editable",
+              "source_ref": "源xlsx!重要产品毛利分析D4-8!C27",
+              "stable_field_key": "d4_8_matrix/m11_cur/rev_price",
+              "store_item_id": "D4-8-products",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "K",
+                "row_from": 27
+              },
+              "column_key": "m11_prior_rev_price",
+              "header_source_ref": "源xlsx!重要产品毛利分析D4-8!K13",
+              "header_text": "12月上期revPrice",
+              "json_pointer": "/months/11/prior/revPrice",
+              "mode": "editable",
+              "source_ref": "源xlsx!重要产品毛利分析D4-8!K27",
+              "stable_field_key": "d4_8_matrix/m11_prior/rev_price",
+              "store_item_id": "D4-8-products",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "D",
+                "row_from": 27
+              },
+              "column_key": "m11_cur_rev_amt",
+              "header_source_ref": "源xlsx!重要产品毛利分析D4-8!D13",
+              "header_text": "12月本期revAmt",
+              "json_pointer": "/months/11/cur/revAmt",
+              "mode": "editable",
+              "source_ref": "源xlsx!重要产品毛利分析D4-8!D27",
+              "stable_field_key": "d4_8_matrix/m11_cur/rev_amt",
+              "store_item_id": "D4-8-products",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "L",
+                "row_from": 27
+              },
+              "column_key": "m11_prior_rev_amt",
+              "header_source_ref": "源xlsx!重要产品毛利分析D4-8!L13",
+              "header_text": "12月上期revAmt",
+              "json_pointer": "/months/11/prior/revAmt",
+              "mode": "editable",
+              "source_ref": "源xlsx!重要产品毛利分析D4-8!L27",
+              "stable_field_key": "d4_8_matrix/m11_prior/rev_amt",
+              "store_item_id": "D4-8-products",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "E",
+                "row_from": 27
+              },
+              "column_key": "m11_cur_cost_qty",
+              "header_source_ref": "源xlsx!重要产品毛利分析D4-8!E13",
+              "header_text": "12月本期costQty",
+              "json_pointer": "/months/11/cur/costQty",
+              "mode": "editable",
+              "source_ref": "源xlsx!重要产品毛利分析D4-8!E27",
+              "stable_field_key": "d4_8_matrix/m11_cur/cost_qty",
+              "store_item_id": "D4-8-products",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "M",
+                "row_from": 27
+              },
+              "column_key": "m11_prior_cost_qty",
+              "header_source_ref": "源xlsx!重要产品毛利分析D4-8!M13",
+              "header_text": "12月上期costQty",
+              "json_pointer": "/months/11/prior/costQty",
+              "mode": "editable",
+              "source_ref": "源xlsx!重要产品毛利分析D4-8!M27",
+              "stable_field_key": "d4_8_matrix/m11_prior/cost_qty",
+              "store_item_id": "D4-8-products",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "F",
+                "row_from": 27
+              },
+              "column_key": "m11_cur_cost_price",
+              "header_source_ref": "源xlsx!重要产品毛利分析D4-8!F13",
+              "header_text": "12月本期costPrice",
+              "json_pointer": "/months/11/cur/costPrice",
+              "mode": "editable",
+              "source_ref": "源xlsx!重要产品毛利分析D4-8!F27",
+              "stable_field_key": "d4_8_matrix/m11_cur/cost_price",
+              "store_item_id": "D4-8-products",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "N",
+                "row_from": 27
+              },
+              "column_key": "m11_prior_cost_price",
+              "header_source_ref": "源xlsx!重要产品毛利分析D4-8!N13",
+              "header_text": "12月上期costPrice",
+              "json_pointer": "/months/11/prior/costPrice",
+              "mode": "editable",
+              "source_ref": "源xlsx!重要产品毛利分析D4-8!N27",
+              "stable_field_key": "d4_8_matrix/m11_prior/cost_price",
+              "store_item_id": "D4-8-products",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "G",
+                "row_from": 27
+              },
+              "column_key": "m11_cur_cost_amt",
+              "header_source_ref": "源xlsx!重要产品毛利分析D4-8!G13",
+              "header_text": "12月本期costAmt",
+              "json_pointer": "/months/11/cur/costAmt",
+              "mode": "editable",
+              "source_ref": "源xlsx!重要产品毛利分析D4-8!G27",
+              "stable_field_key": "d4_8_matrix/m11_cur/cost_amt",
+              "store_item_id": "D4-8-products",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "O",
+                "row_from": 27
+              },
+              "column_key": "m11_prior_cost_amt",
+              "header_source_ref": "源xlsx!重要产品毛利分析D4-8!O13",
+              "header_text": "12月上期costAmt",
+              "json_pointer": "/months/11/prior/costAmt",
+              "mode": "editable",
+              "source_ref": "源xlsx!重要产品毛利分析D4-8!O27",
+              "stable_field_key": "d4_8_matrix/m11_prior/cost_amt",
+              "store_item_id": "D4-8-products",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "B",
+                "row_from": 29
+              },
+              "column_key": "ind0_cur_rev_qty",
+              "header_source_ref": "源xlsx!重要产品毛利分析D4-8!B13",
+              "header_text": "同行业0本期revQty",
+              "json_pointer": "/industry/0/cur/revQty",
+              "mode": "editable",
+              "source_ref": "源xlsx!重要产品毛利分析D4-8!B29",
+              "stable_field_key": "d4_8_matrix/ind0_cur/rev_qty",
+              "store_item_id": "D4-8-products",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "J",
+                "row_from": 29
+              },
+              "column_key": "ind0_prior_rev_qty",
+              "header_source_ref": "源xlsx!重要产品毛利分析D4-8!J13",
+              "header_text": "同行业0上期revQty",
+              "json_pointer": "/industry/0/prior/revQty",
+              "mode": "editable",
+              "source_ref": "源xlsx!重要产品毛利分析D4-8!J29",
+              "stable_field_key": "d4_8_matrix/ind0_prior/rev_qty",
+              "store_item_id": "D4-8-products",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "C",
+                "row_from": 29
+              },
+              "column_key": "ind0_cur_rev_price",
+              "header_source_ref": "源xlsx!重要产品毛利分析D4-8!C13",
+              "header_text": "同行业0本期revPrice",
+              "json_pointer": "/industry/0/cur/revPrice",
+              "mode": "editable",
+              "source_ref": "源xlsx!重要产品毛利分析D4-8!C29",
+              "stable_field_key": "d4_8_matrix/ind0_cur/rev_price",
+              "store_item_id": "D4-8-products",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "K",
+                "row_from": 29
+              },
+              "column_key": "ind0_prior_rev_price",
+              "header_source_ref": "源xlsx!重要产品毛利分析D4-8!K13",
+              "header_text": "同行业0上期revPrice",
+              "json_pointer": "/industry/0/prior/revPrice",
+              "mode": "editable",
+              "source_ref": "源xlsx!重要产品毛利分析D4-8!K29",
+              "stable_field_key": "d4_8_matrix/ind0_prior/rev_price",
+              "store_item_id": "D4-8-products",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "D",
+                "row_from": 29
+              },
+              "column_key": "ind0_cur_rev_amt",
+              "header_source_ref": "源xlsx!重要产品毛利分析D4-8!D13",
+              "header_text": "同行业0本期revAmt",
+              "json_pointer": "/industry/0/cur/revAmt",
+              "mode": "editable",
+              "source_ref": "源xlsx!重要产品毛利分析D4-8!D29",
+              "stable_field_key": "d4_8_matrix/ind0_cur/rev_amt",
+              "store_item_id": "D4-8-products",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "L",
+                "row_from": 29
+              },
+              "column_key": "ind0_prior_rev_amt",
+              "header_source_ref": "源xlsx!重要产品毛利分析D4-8!L13",
+              "header_text": "同行业0上期revAmt",
+              "json_pointer": "/industry/0/prior/revAmt",
+              "mode": "editable",
+              "source_ref": "源xlsx!重要产品毛利分析D4-8!L29",
+              "stable_field_key": "d4_8_matrix/ind0_prior/rev_amt",
+              "store_item_id": "D4-8-products",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "E",
+                "row_from": 29
+              },
+              "column_key": "ind0_cur_cost_qty",
+              "header_source_ref": "源xlsx!重要产品毛利分析D4-8!E13",
+              "header_text": "同行业0本期costQty",
+              "json_pointer": "/industry/0/cur/costQty",
+              "mode": "editable",
+              "source_ref": "源xlsx!重要产品毛利分析D4-8!E29",
+              "stable_field_key": "d4_8_matrix/ind0_cur/cost_qty",
+              "store_item_id": "D4-8-products",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "M",
+                "row_from": 29
+              },
+              "column_key": "ind0_prior_cost_qty",
+              "header_source_ref": "源xlsx!重要产品毛利分析D4-8!M13",
+              "header_text": "同行业0上期costQty",
+              "json_pointer": "/industry/0/prior/costQty",
+              "mode": "editable",
+              "source_ref": "源xlsx!重要产品毛利分析D4-8!M29",
+              "stable_field_key": "d4_8_matrix/ind0_prior/cost_qty",
+              "store_item_id": "D4-8-products",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "F",
+                "row_from": 29
+              },
+              "column_key": "ind0_cur_cost_price",
+              "header_source_ref": "源xlsx!重要产品毛利分析D4-8!F13",
+              "header_text": "同行业0本期costPrice",
+              "json_pointer": "/industry/0/cur/costPrice",
+              "mode": "editable",
+              "source_ref": "源xlsx!重要产品毛利分析D4-8!F29",
+              "stable_field_key": "d4_8_matrix/ind0_cur/cost_price",
+              "store_item_id": "D4-8-products",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "N",
+                "row_from": 29
+              },
+              "column_key": "ind0_prior_cost_price",
+              "header_source_ref": "源xlsx!重要产品毛利分析D4-8!N13",
+              "header_text": "同行业0上期costPrice",
+              "json_pointer": "/industry/0/prior/costPrice",
+              "mode": "editable",
+              "source_ref": "源xlsx!重要产品毛利分析D4-8!N29",
+              "stable_field_key": "d4_8_matrix/ind0_prior/cost_price",
+              "store_item_id": "D4-8-products",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "G",
+                "row_from": 29
+              },
+              "column_key": "ind0_cur_cost_amt",
+              "header_source_ref": "源xlsx!重要产品毛利分析D4-8!G13",
+              "header_text": "同行业0本期costAmt",
+              "json_pointer": "/industry/0/cur/costAmt",
+              "mode": "editable",
+              "source_ref": "源xlsx!重要产品毛利分析D4-8!G29",
+              "stable_field_key": "d4_8_matrix/ind0_cur/cost_amt",
+              "store_item_id": "D4-8-products",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "O",
+                "row_from": 29
+              },
+              "column_key": "ind0_prior_cost_amt",
+              "header_source_ref": "源xlsx!重要产品毛利分析D4-8!O13",
+              "header_text": "同行业0上期costAmt",
+              "json_pointer": "/industry/0/prior/costAmt",
+              "mode": "editable",
+              "source_ref": "源xlsx!重要产品毛利分析D4-8!O29",
+              "stable_field_key": "d4_8_matrix/ind0_prior/cost_amt",
+              "store_item_id": "D4-8-products",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "B",
+                "row_from": 30
+              },
+              "column_key": "ind1_cur_rev_qty",
+              "header_source_ref": "源xlsx!重要产品毛利分析D4-8!B13",
+              "header_text": "同行业1本期revQty",
+              "json_pointer": "/industry/1/cur/revQty",
+              "mode": "editable",
+              "source_ref": "源xlsx!重要产品毛利分析D4-8!B30",
+              "stable_field_key": "d4_8_matrix/ind1_cur/rev_qty",
+              "store_item_id": "D4-8-products",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "J",
+                "row_from": 30
+              },
+              "column_key": "ind1_prior_rev_qty",
+              "header_source_ref": "源xlsx!重要产品毛利分析D4-8!J13",
+              "header_text": "同行业1上期revQty",
+              "json_pointer": "/industry/1/prior/revQty",
+              "mode": "editable",
+              "source_ref": "源xlsx!重要产品毛利分析D4-8!J30",
+              "stable_field_key": "d4_8_matrix/ind1_prior/rev_qty",
+              "store_item_id": "D4-8-products",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "C",
+                "row_from": 30
+              },
+              "column_key": "ind1_cur_rev_price",
+              "header_source_ref": "源xlsx!重要产品毛利分析D4-8!C13",
+              "header_text": "同行业1本期revPrice",
+              "json_pointer": "/industry/1/cur/revPrice",
+              "mode": "editable",
+              "source_ref": "源xlsx!重要产品毛利分析D4-8!C30",
+              "stable_field_key": "d4_8_matrix/ind1_cur/rev_price",
+              "store_item_id": "D4-8-products",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "K",
+                "row_from": 30
+              },
+              "column_key": "ind1_prior_rev_price",
+              "header_source_ref": "源xlsx!重要产品毛利分析D4-8!K13",
+              "header_text": "同行业1上期revPrice",
+              "json_pointer": "/industry/1/prior/revPrice",
+              "mode": "editable",
+              "source_ref": "源xlsx!重要产品毛利分析D4-8!K30",
+              "stable_field_key": "d4_8_matrix/ind1_prior/rev_price",
+              "store_item_id": "D4-8-products",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "D",
+                "row_from": 30
+              },
+              "column_key": "ind1_cur_rev_amt",
+              "header_source_ref": "源xlsx!重要产品毛利分析D4-8!D13",
+              "header_text": "同行业1本期revAmt",
+              "json_pointer": "/industry/1/cur/revAmt",
+              "mode": "editable",
+              "source_ref": "源xlsx!重要产品毛利分析D4-8!D30",
+              "stable_field_key": "d4_8_matrix/ind1_cur/rev_amt",
+              "store_item_id": "D4-8-products",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "L",
+                "row_from": 30
+              },
+              "column_key": "ind1_prior_rev_amt",
+              "header_source_ref": "源xlsx!重要产品毛利分析D4-8!L13",
+              "header_text": "同行业1上期revAmt",
+              "json_pointer": "/industry/1/prior/revAmt",
+              "mode": "editable",
+              "source_ref": "源xlsx!重要产品毛利分析D4-8!L30",
+              "stable_field_key": "d4_8_matrix/ind1_prior/rev_amt",
+              "store_item_id": "D4-8-products",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "E",
+                "row_from": 30
+              },
+              "column_key": "ind1_cur_cost_qty",
+              "header_source_ref": "源xlsx!重要产品毛利分析D4-8!E13",
+              "header_text": "同行业1本期costQty",
+              "json_pointer": "/industry/1/cur/costQty",
+              "mode": "editable",
+              "source_ref": "源xlsx!重要产品毛利分析D4-8!E30",
+              "stable_field_key": "d4_8_matrix/ind1_cur/cost_qty",
+              "store_item_id": "D4-8-products",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "M",
+                "row_from": 30
+              },
+              "column_key": "ind1_prior_cost_qty",
+              "header_source_ref": "源xlsx!重要产品毛利分析D4-8!M13",
+              "header_text": "同行业1上期costQty",
+              "json_pointer": "/industry/1/prior/costQty",
+              "mode": "editable",
+              "source_ref": "源xlsx!重要产品毛利分析D4-8!M30",
+              "stable_field_key": "d4_8_matrix/ind1_prior/cost_qty",
+              "store_item_id": "D4-8-products",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "F",
+                "row_from": 30
+              },
+              "column_key": "ind1_cur_cost_price",
+              "header_source_ref": "源xlsx!重要产品毛利分析D4-8!F13",
+              "header_text": "同行业1本期costPrice",
+              "json_pointer": "/industry/1/cur/costPrice",
+              "mode": "editable",
+              "source_ref": "源xlsx!重要产品毛利分析D4-8!F30",
+              "stable_field_key": "d4_8_matrix/ind1_cur/cost_price",
+              "store_item_id": "D4-8-products",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "N",
+                "row_from": 30
+              },
+              "column_key": "ind1_prior_cost_price",
+              "header_source_ref": "源xlsx!重要产品毛利分析D4-8!N13",
+              "header_text": "同行业1上期costPrice",
+              "json_pointer": "/industry/1/prior/costPrice",
+              "mode": "editable",
+              "source_ref": "源xlsx!重要产品毛利分析D4-8!N30",
+              "stable_field_key": "d4_8_matrix/ind1_prior/cost_price",
+              "store_item_id": "D4-8-products",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "G",
+                "row_from": 30
+              },
+              "column_key": "ind1_cur_cost_amt",
+              "header_source_ref": "源xlsx!重要产品毛利分析D4-8!G13",
+              "header_text": "同行业1本期costAmt",
+              "json_pointer": "/industry/1/cur/costAmt",
+              "mode": "editable",
+              "source_ref": "源xlsx!重要产品毛利分析D4-8!G30",
+              "stable_field_key": "d4_8_matrix/ind1_cur/cost_amt",
+              "store_item_id": "D4-8-products",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "O",
+                "row_from": 30
+              },
+              "column_key": "ind1_prior_cost_amt",
+              "header_source_ref": "源xlsx!重要产品毛利分析D4-8!O13",
+              "header_text": "同行业1上期costAmt",
+              "json_pointer": "/industry/1/prior/costAmt",
+              "mode": "editable",
+              "source_ref": "源xlsx!重要产品毛利分析D4-8!O30",
+              "stable_field_key": "d4_8_matrix/ind1_prior/cost_amt",
+              "store_item_id": "D4-8-products",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "B",
+                "row_from": 31
+              },
+              "column_key": "ind2_cur_rev_qty",
+              "header_source_ref": "源xlsx!重要产品毛利分析D4-8!B13",
+              "header_text": "同行业2本期revQty",
+              "json_pointer": "/industry/2/cur/revQty",
+              "mode": "editable",
+              "source_ref": "源xlsx!重要产品毛利分析D4-8!B31",
+              "stable_field_key": "d4_8_matrix/ind2_cur/rev_qty",
+              "store_item_id": "D4-8-products",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "J",
+                "row_from": 31
+              },
+              "column_key": "ind2_prior_rev_qty",
+              "header_source_ref": "源xlsx!重要产品毛利分析D4-8!J13",
+              "header_text": "同行业2上期revQty",
+              "json_pointer": "/industry/2/prior/revQty",
+              "mode": "editable",
+              "source_ref": "源xlsx!重要产品毛利分析D4-8!J31",
+              "stable_field_key": "d4_8_matrix/ind2_prior/rev_qty",
+              "store_item_id": "D4-8-products",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "C",
+                "row_from": 31
+              },
+              "column_key": "ind2_cur_rev_price",
+              "header_source_ref": "源xlsx!重要产品毛利分析D4-8!C13",
+              "header_text": "同行业2本期revPrice",
+              "json_pointer": "/industry/2/cur/revPrice",
+              "mode": "editable",
+              "source_ref": "源xlsx!重要产品毛利分析D4-8!C31",
+              "stable_field_key": "d4_8_matrix/ind2_cur/rev_price",
+              "store_item_id": "D4-8-products",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "K",
+                "row_from": 31
+              },
+              "column_key": "ind2_prior_rev_price",
+              "header_source_ref": "源xlsx!重要产品毛利分析D4-8!K13",
+              "header_text": "同行业2上期revPrice",
+              "json_pointer": "/industry/2/prior/revPrice",
+              "mode": "editable",
+              "source_ref": "源xlsx!重要产品毛利分析D4-8!K31",
+              "stable_field_key": "d4_8_matrix/ind2_prior/rev_price",
+              "store_item_id": "D4-8-products",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "D",
+                "row_from": 31
+              },
+              "column_key": "ind2_cur_rev_amt",
+              "header_source_ref": "源xlsx!重要产品毛利分析D4-8!D13",
+              "header_text": "同行业2本期revAmt",
+              "json_pointer": "/industry/2/cur/revAmt",
+              "mode": "editable",
+              "source_ref": "源xlsx!重要产品毛利分析D4-8!D31",
+              "stable_field_key": "d4_8_matrix/ind2_cur/rev_amt",
+              "store_item_id": "D4-8-products",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "L",
+                "row_from": 31
+              },
+              "column_key": "ind2_prior_rev_amt",
+              "header_source_ref": "源xlsx!重要产品毛利分析D4-8!L13",
+              "header_text": "同行业2上期revAmt",
+              "json_pointer": "/industry/2/prior/revAmt",
+              "mode": "editable",
+              "source_ref": "源xlsx!重要产品毛利分析D4-8!L31",
+              "stable_field_key": "d4_8_matrix/ind2_prior/rev_amt",
+              "store_item_id": "D4-8-products",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "E",
+                "row_from": 31
+              },
+              "column_key": "ind2_cur_cost_qty",
+              "header_source_ref": "源xlsx!重要产品毛利分析D4-8!E13",
+              "header_text": "同行业2本期costQty",
+              "json_pointer": "/industry/2/cur/costQty",
+              "mode": "editable",
+              "source_ref": "源xlsx!重要产品毛利分析D4-8!E31",
+              "stable_field_key": "d4_8_matrix/ind2_cur/cost_qty",
+              "store_item_id": "D4-8-products",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "M",
+                "row_from": 31
+              },
+              "column_key": "ind2_prior_cost_qty",
+              "header_source_ref": "源xlsx!重要产品毛利分析D4-8!M13",
+              "header_text": "同行业2上期costQty",
+              "json_pointer": "/industry/2/prior/costQty",
+              "mode": "editable",
+              "source_ref": "源xlsx!重要产品毛利分析D4-8!M31",
+              "stable_field_key": "d4_8_matrix/ind2_prior/cost_qty",
+              "store_item_id": "D4-8-products",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "F",
+                "row_from": 31
+              },
+              "column_key": "ind2_cur_cost_price",
+              "header_source_ref": "源xlsx!重要产品毛利分析D4-8!F13",
+              "header_text": "同行业2本期costPrice",
+              "json_pointer": "/industry/2/cur/costPrice",
+              "mode": "editable",
+              "source_ref": "源xlsx!重要产品毛利分析D4-8!F31",
+              "stable_field_key": "d4_8_matrix/ind2_cur/cost_price",
+              "store_item_id": "D4-8-products",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "N",
+                "row_from": 31
+              },
+              "column_key": "ind2_prior_cost_price",
+              "header_source_ref": "源xlsx!重要产品毛利分析D4-8!N13",
+              "header_text": "同行业2上期costPrice",
+              "json_pointer": "/industry/2/prior/costPrice",
+              "mode": "editable",
+              "source_ref": "源xlsx!重要产品毛利分析D4-8!N31",
+              "stable_field_key": "d4_8_matrix/ind2_prior/cost_price",
+              "store_item_id": "D4-8-products",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "G",
+                "row_from": 31
+              },
+              "column_key": "ind2_cur_cost_amt",
+              "header_source_ref": "源xlsx!重要产品毛利分析D4-8!G13",
+              "header_text": "同行业2本期costAmt",
+              "json_pointer": "/industry/2/cur/costAmt",
+              "mode": "editable",
+              "source_ref": "源xlsx!重要产品毛利分析D4-8!G31",
+              "stable_field_key": "d4_8_matrix/ind2_cur/cost_amt",
+              "store_item_id": "D4-8-products",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "O",
+                "row_from": 31
+              },
+              "column_key": "ind2_prior_cost_amt",
+              "header_source_ref": "源xlsx!重要产品毛利分析D4-8!O13",
+              "header_text": "同行业2上期costAmt",
+              "json_pointer": "/industry/2/prior/costAmt",
+              "mode": "editable",
+              "source_ref": "源xlsx!重要产品毛利分析D4-8!O31",
+              "stable_field_key": "d4_8_matrix/ind2_prior/cost_amt",
+              "store_item_id": "D4-8-products",
+              "value_type": "amount"
+            }
+          ],
+          "formula_mask": [
+            "H16",
+            "I16",
+            "P16",
+            "Q16",
+            "R16",
+            "S16",
+            "T16",
+            "U16",
+            "V16",
+            "W16",
+            "H17",
+            "I17",
+            "P17",
+            "Q17",
+            "R17",
+            "S17",
+            "T17",
+            "U17",
+            "V17",
+            "W17",
+            "H18",
+            "I18",
+            "P18",
+            "Q18",
+            "R18",
+            "S18",
+            "T18",
+            "U18",
+            "V18",
+            "W18",
+            "H19",
+            "I19",
+            "P19",
+            "Q19",
+            "R19",
+            "S19",
+            "T19",
+            "U19",
+            "V19",
+            "W19",
+            "H20",
+            "I20",
+            "P20",
+            "Q20",
+            "R20",
+            "S20",
+            "T20",
+            "U20",
+            "V20",
+            "W20",
+            "H21",
+            "I21",
+            "P21",
+            "Q21",
+            "R21",
+            "S21",
+            "T21",
+            "U21",
+            "V21",
+            "W21",
+            "H22",
+            "I22",
+            "P22",
+            "Q22",
+            "R22",
+            "S22",
+            "T22",
+            "U22",
+            "V22",
+            "W22",
+            "H23",
+            "I23",
+            "P23",
+            "Q23",
+            "R23",
+            "S23",
+            "T23",
+            "U23",
+            "V23",
+            "W23",
+            "H24",
+            "I24",
+            "P24",
+            "Q24",
+            "R24",
+            "S24",
+            "T24",
+            "U24",
+            "V24",
+            "W24",
+            "H25",
+            "I25",
+            "P25",
+            "Q25",
+            "R25",
+            "S25",
+            "T25",
+            "U25",
+            "V25",
+            "W25",
+            "H26",
+            "I26",
+            "P26",
+            "Q26",
+            "R26",
+            "S26",
+            "T26",
+            "U26",
+            "V26",
+            "W26",
+            "H27",
+            "I27",
+            "P27",
+            "Q27",
+            "R27",
+            "S27",
+            "T27",
+            "U27",
+            "V27",
+            "W27",
+            "H29",
+            "I29",
+            "P29",
+            "Q29",
+            "R29",
+            "S29",
+            "T29",
+            "U29",
+            "V29",
+            "W29",
+            "H30",
+            "I30",
+            "P30",
+            "Q30",
+            "R30",
+            "S30",
+            "T30",
+            "U30",
+            "V30",
+            "W30",
+            "H31",
+            "I31",
+            "P31",
+            "Q31",
+            "R31",
+            "S31",
+            "T31",
+            "U31",
+            "V31",
+            "W31",
+            "B28",
+            "C28",
+            "D28",
+            "E28",
+            "F28",
+            "G28",
+            "H28",
+            "I28",
+            "J28",
+            "K28",
+            "L28",
+            "M28",
+            "N28",
+            "O28",
+            "P28",
+            "Q28",
+            "R28",
+            "S28",
+            "T28",
+            "U28",
+            "V28",
+            "W28"
+          ],
+          "header_rows": 3,
+          "table_key": "d4_8_matrix"
+        }
+      ],
+      "template_id": "D48"
     },
     {
       "excel_name": "其他业务收入合同测算表D4-34",

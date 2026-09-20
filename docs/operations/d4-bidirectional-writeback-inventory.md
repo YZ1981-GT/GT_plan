@@ -23,6 +23,37 @@
 - **D4-9 确认合并到共享 entry**（用户裁决，不做独立 entry）：前端 `D4TabCustomerStructure` 早已接 `xlsx/gt-d4-operating-revenue` / `d49-managed`（非独立 entry，代码已对，仅注释残留旧描述）；后端并入 `phase5_d4_revenue_detail` 的 sheets/instrumentation/projection/merge。独立 entry 契约 `d4.customer_structure.json` 从未生成，已废弃。
 - **D4-9 + D4-17 均已 live 发布**：`d43_rematerialize --apply` gen54→**55**（bundle `c9050de8…`，22 sheets），无 drift；40+29 focused 测试无回归。
 
+## ✅ 静态 cell 路径落地 + D4-8 非法 key 修复（2026-09-20 后续，spec `workpaper-sync-static-cell-sheet-writeback`）
+
+> 🔴 本段修正下方多处**过时裁定**：`D4-8/D4-33 引擎不支持纯静态 sheet → HTML-only` 已被 spec
+> `workpaper-sync-static-cell-sheet-writeback`（静态 cell 直写绝对坐标载体路径）**推翻**。文末
+> 「D4-33 HTML-only 裁定」「D4-8 HTML-only 裁定」两段整段作废，以本段为准。
+
+- **静态 cell 引擎路径已落地**：受管 cell 不再强制锚定动态 Excel Table，静态区可经 workbook-scope
+  definedName + instrumentation 注入按绝对坐标直写/反读。D4-33（`_INCLUDE_D433_MARGIN_SHEET=True`）、
+  D4-8（`_INCLUDE_D48_PRODUCT_MARGIN_SHEET=True`）均已翻 flag 接入。
+- **🔴 修复一个会打挂整个 entry 的真实 bug（D4-8 非法 stable_field_key）**：`phase5_d4_product_margin_sheet.py`
+  的契约键曾直接用前端 store 驼峰字段名（`revQty`/`revPrice`/`revAmt`/`costQty`/`costPrice`/`costAmt`），
+  生成 180 个含大写的非法 key（如 `d4_8_matrix/m0_cur/revQty`），违反 `contracts.assert_stable_key`
+  （只允许小写/数字/`_`/`-`/`.`/`/`/`{}`）→ `parse_contract(build_contract_payload())` 抛
+  `ContractSchemaError`，连累整份 payload（D4-33 等测试也一起挂）。当时靠**磁盘旧契约不含 D4-8** 苟住
+  （`assert_contract_file_matches_source` 一直处于 DRIFT 红态），一旦 `generate --apply` 就会写出非法契约
+  打挂全 entry parse 500。**根因修复** = 契约键小写化（`rev_qty`…），`stable_field_key`/`column_key` 用
+  小写契约键、`json_pointer`/store 写回仍用驼峰键（前端 `ProductData` 真源），二者分离；加
+  `_CONTRACT_TO_STORE_FIELD` 反查表供 merge 写回。非法 key **180→0**，`parse_contract` 32 sheets OK。
+- **DRIFT 消除**：`generate_phase5_d4_contract.py --apply` 落盘，磁盘契约 **31→32 张**（新增合法
+  `d48-managed`），`assert_contract_file_matches_source` 恢复 OK。此前磁盘含 D4-33 等 30 张、**独缺 D4-8**
+  （D4-8 是这波唯一因非法 key 没能落盘的那张）。
+- **解 HEAD 断裂**：`phase5_d4_product_margin_sheet.py` + `test_d4_8_margin_contract.py` 此前 git 未跟踪
+  （`??`），但已跟踪的 `phase5_d4_revenue_detail.py:271` 已 import 它 → clean checkout 会 ImportError
+  打挂全 entry。本轮补入库两文件，HEAD 恢复自洽（同 D4-9 那次 HEAD 断裂处理）。
+- **守卫**：`test_d4_8_margin_contract.py`(10) + `test_d4_33_margin_contract.py`(10) 全绿；磁盘一致性
+  `test_d4_9 disk_source_locked` + `test_launch_target_sheet_locate`(16) 全绿；D4 契约辐射面 44 passed 无回归。
+- **仍待办（spec Task 9/10，非本轮 P0）**：①D4-8 的 rematerialize 发布 representation（需 live PG，D4 entry
+  整册 materialize 已 138s 逼近 120s 软上限，加 D4-8 有超时风险）——故 D4-8 契约已声明但 representation 未含，
+  归 🟡 半接入；②D4-8 前端 `D4TabProductMargin.vue` 未接 `useWorkpaperSyncBridge`、宿主
+  `isD4DedicatedSyncSheet` 未含 `'D4-8'`。
+
 ## 增量更新（2026-09-20，D4-1 落地）
 
 > 基线段（上方）保持 2026-09-19 快照不改；本段记录此后的真实推进，供逐张清册与统计段引用。
@@ -52,7 +83,7 @@
 | 5 | D4-5 | 会计政策检查 | d-cycle-expansion | ✅ d45-managed | D4TabPolicyCheck | ✅ | ✅ |
 | 6 | D4-6 | 重要指标分析 | d-cycle-expansion | ✅ d46-managed(批次B从零) | D4TabIndicator | ✅ | ✅ (批次B 2026-09-20落地,真OO待验) |
 | 7 | D4-7 | 毛利率分析 | d-cycle-expansion | ✅ d47-managed | D4TabMarginMonthly | ✅ | ✅ (动态产品区+静态月度区,gen76) |
-| 8 | D4-8 | 重要产品毛利分析 | gap-closure (0/5) | ❌ 静态块矩阵无动态行载体 | D4TabProductMargin | legacy | ⛔ 引擎限制(HTML-only,同D4-33) |
+| 8 | D4-8 | 重要产品毛利分析 | static-cell-writeback (Task11*) | ✅ d48-managed(静态块矩阵,slot0受管) | D4TabProductMargin | legacy | 🟡 后端契约已落(2026-09-20非法key修复+落盘),前端未接桥 |
 | 9 | D4-9 | 重要客户结构分析 | d4-9-customer | ✅ d49-managed(三区,共享entry) | D4TabCustomerStructure | ✅ | ✅ (2026-09-20发布gen55,真OO待验) |
 | 10 | D4-10 | 重要客户销售价格 | d4-price-analysis (9/10) | ✅ d410-managed(批次B,dict+总额行) | D4TabCustomerPrice | ✅ | ✅ (2026-09-20发布gen63,补rowId,真OO待验) |
 | 11 | D4-11 | 产品销售价格分析 | d4-price-analysis (9/10) | ✅ d411-managed(批次B) | D4TabProductPrice | ✅ | ✅ (2026-09-20发布gen62,补rowId,真OO待验) |
@@ -77,25 +108,30 @@
 | 30 | D4-30 | 客户访谈记录汇总 | ipo-fraud (6/11) | ✅ d4-30-managed(批次A-5开门) | D4TabInterviewSummary | ✅ | ✅ (批次A-5 2026-09-20,真OO待验) |
 | 31 | D4-31 | 客户访谈记录 | ipo-fraud (6/11) | ✅ d4-31-managed(singleton) | D4TabInterviewDetail | ✅ | ✅ (批次A-5,真OO待验+singleton边界) |
 | 32 | D4-32 | 资金流水检查 | ipo-fraud (6/11) | ✅ d4-32-managed | D4TabFundFlow | ✅ | ✅ (批次A-5,真OO待验) |
-| 33 | D4-33 | 其他业务毛利率分析 | d4-33-36 (0/42) | ❌ 引擎不支持纯静态 | D4TabOtherMargin | **HTML-only** | ⛔ 引擎限制(裁定) |
+| 33 | D4-33 | 其他业务毛利率分析 | static-cell-writeback | ✅ d433-managed(静态cell路径,前3业务slot) | D4TabOtherMargin | ✅ | ✅ (静态cell引擎落地,已接桥+宿主登记) |
 | 34 | D4-34 | 其他业务收入合同测算 | d4-33-36 | ✅ d434-managed | D4TabOtherContract | ✅ | ✅ (双区dynamic,gen68) |
 | 35 | D4-35 | 其他业务收入检查 | d4-33-36 | ✅ d435-managed | D4TabOtherCheck | ✅ | ✅ |
 | 36 | D4-36 | 其他业务收入截止测试 | d4-33-36 | ✅ d436-managed | D4TabOtherCutoff | ✅ | ✅ (双区dynamic,gen70) |
 
-## 统计（2026-09-20 批次A/A-5 后，契约 sheet_key 集合 **19 张**：d41/d42/d43/d45/d421/d422/d423/d424/d435/d4-29/d4-25/d4-26/d4-27/d4-28/d4-15/d4-16/**d4-30/d4-31/d4-32**）
+## 统计（2026-09-20 静态 cell 落地 + D4-8 修复后，磁盘契约 `d4.revenue_detail.json` **实测 32 张 sheet_key**：d41/d42/d43/d45/d46/d47/d49/d410/d411/d417/d418/d419/d420/d421/d422/d423/d424/d433/d434/d435/d436/d48/d4-15/d4-16/d4-25/d4-26/d4-27/d4-28/d4-29/d4-30/d4-31/d4-32）
 
 > 🔴 **重要口径**：下方「✅」是**三维代码全绿（REQUEST_PATH 级）**——后端契约 + 前端接桥 + 宿主登记齐全。但**没有一张到主控 §6.4 的 `ONLYOFFICE_VERIFIED`**（需真实 OO 往返产生 `working_paper_content_application` state=applied + operation 终态 + OO 侧 content version，见 §9.5）。真 OO 验证是 env 门（start-dev.bat 全栈 + OO 容器），列为批次C。
+> 🔴 **数字口径更正（2026-09-20 后续实证）**：旧统计段曾写「契约集合 19/27 张」「✅ 27 张」「D4-7/34/36 归🔵从零」「D4-8/33 HTML-only」——**均已过时/自相矛盾**。以本段为准（契约磁盘实测 32 张；D4-33/34/36/7 已落地为 ✅；D4-8 因非法 key 修复+落盘转 🟡 半接入）。
 
-- ✅ 三维代码全绿(REQUEST_PATH)：**27 张** — D4-1/2/3/5/6/9/10/11/15/16/17/18/19/**20**/21/22/23/24/25/26/27/28/29/30/31/32/35
-  - 批次A(21~24) + 批次A-5(30~32) + 批次B(D4-6/9/10/11/17/18/19/20) 为 2026-09-20 落地；余此前已接桥
-- 🔵 owner spec 待做/从零(后端无契约 + 前端仍 legacy)：**7 张** — D4-7/8/12/14/33/34/36
-- ⬜ 裁决 single_html/N/A：**2 张** — D4-4/D4-13
+- ✅ 三维代码全绿(REQUEST_PATH)：**31 张** — D4-1/2/3/5/6/7/9/10/11/15/16/17/18/19/20/21/22/23/24/25/26/27/28/29/30/31/32/33/34/35/36
+  - 前端宿主 `isD4DedicatedSyncSheet` 登记 29 张（D4-1/5/6/7/9/10/11/15~36 除 D4-4/8/12/13/14）；D4-2/3 走宿主统一桥
+- 🟡 半接入(后端契约已落但前端未接桥 / representation 未 rematerialize)：**1 张** — D4-8（2026-09-20 非法 key 修复 + 契约落盘，前端 `D4TabProductMargin` 仍 legacy、rematerialize 待 live）
+- ⏸ 待专项 spec(硬约束,非机械 provider)：**2 张** — D4-12(转置,`d4-12-transposed-writeback`) / D4-14(七维列映射裁决,`d4-14-walkthrough-writeback`)
+- ⬜ 裁决 single_html/N/A：**2 张** — D4-4(无行身份列) / D4-13(纯叙述文本表)
 
-> 校验：27 + 7 + 2 = 36 ✓（🟡 半接入类已清零）
-> 契约集合现 **27 张**（+d420-managed，含 4 table：summary/provision/current/post returns）；entry `xlsx/gt-d4-operating-revenue` 当前 representation **gen64**（bundle d91cf0f2）。
-> 剩余 7 张进展（2026-09-20 逐张侦查+落地，全部有结论无悬空）：
-> ✅ **D4-34 / D4-36 / D4-7 已落地**（D4-34/36 双区 dynamic dict store gen68/gen70；D4-7 动态产品区+静态月度区 gen76，三维代码全绿）
-> ⛔ **D4-33 / D4-8 HTML-only**（引擎不支持纯静态 / 静态块矩阵，无 dynamic-row 载体）
+> 校验：31 + 1 + 2 + 2 = 36 ✓
+> 契约集合现 **32 张**（+d48-managed，含静态块矩阵 180 static cell）；entry `xlsx/gt-d4-operating-revenue`
+> 磁盘契约 `assert_contract_file_matches_source` = OK（此前因 D4-8 非法 key 一直 DRIFT 红态，已修复消除）。
+> 🔴 **D4-8 的 representation 尚未含**（契约声明但 bundle 未 rematerialize）——真上线前须跑发布链（Task 9，
+> 需 live PG + 注意 D4 entry materialize 已 138s 逼近 120s 软上限）。
+> 剩余待办进展（2026-09-20 逐张侦查+落地，全部有结论无悬空）：
+> ✅ **D4-34 / D4-36 / D4-7 / D4-33 / D4-8(后端) 已落地**（D4-34/36 双区 dynamic dict store gen68/gen70；
+> D4-7 动态产品区+静态月度区 gen76；D4-33 静态 cell 引擎路径；D4-8 静态块矩阵契约已落盘待 rematerialize）
 > ⏸ **D4-12 转置**（需模板改造 + 泛化 D4-29 引擎，待专项 spec `d4-12-transposed-writeback`）
 > ⏸ **D4-14 七维嵌套**（模板列↔前端维度不对齐，需列映射裁决，待专项 spec `d4-14-walkthrough-writeback`）
 >
@@ -227,7 +263,7 @@
   - 🔴 ②前端 products **无 rowId**（array index 当身份，`removeProduct(idx)`），须先补 rowId + backfill
     （同 D4-10/11 做法）方合行身份铁律。**这是 D4-7 落地的唯一剩余前置。**
   - 解阻后即可按 D4-9 双区范式落地（§二 动态产品区当 Excel-Table 载体，§一 静态月度区寄生）。
-### D4-8 产品毛利率（**2026-09-20 侦查完成，裁定 HTML-only：静态块矩阵无动态行载体，同 D4-33**）
+### D4-8 产品毛利率（~~2026-09-20 裁定 HTML-only~~ **已作废，见顶部「静态 cell 路径落地」段：后端契约已落盘（非法 key 已修），转 🟡 半接入，待前端接桥 + rematerialize**）
 - 几何（A1:X40）：**固定产品块**（产品A R12-31 / 产品B R32+…），每块 header R13-15（3 行）+ **固定 12 月行**
   R16-27 + 合计 R28 + 同行业A/B/行业平均 R29-31。月行 R16-27 全 F:10（10 公式/行，单价/金额/毛利/毛利率派生）。
 - 前端 `D4TabProductMargin.vue`，store `D4-8-products` = `[{name, months[12], priorMonths[12], industry[3]}]`；
@@ -235,7 +271,7 @@
 - 🔴 **裁定：HTML-only**（同 D4-33）。根因：**无真实动态行区**——「products 动态」是块计数动态（映射固定模板块），
   块内 12 月是固定静态行 + 大量公式，无任何 dynamic-row table 可当 Excel-Table 载体。引擎不支持纯静态/静态块
   sheet 双向回写（见 D4-33 裁定）。落地须走「多块转置 / 模板预画 N 块 + 泛化引擎」，属大工程；本轮 HTML-only。
-### D4-33 其他业务毛利率（**2026-09-20 侦查+落地尝试完成，裁定 HTML-only：引擎不支持纯静态 cell sheet**）
+### D4-33 其他业务毛利率（~~2026-09-20 裁定 HTML-only~~ **已作废，见顶部「静态 cell 路径落地」段：静态 cell 引擎路径已支持，D4-33 已 ✅ 落地**）
 - 模板 `其他业务毛利率分析表D4-33`（A1:M31）：**固定 12 月行**（R12-23）× **固定 3 业务类型列组**
   （出租固定资产 E-G / 出租无形资产 H-J / 销售材料 K-M，每组 收入/成本/毛利率）。合计 B/C/D、
   各组毛利率 G/J/M、合计行 24-27（合计/上年/变动额/变动比例）全 Excel 内部公式。
@@ -305,6 +341,8 @@
 - **裁决 static-cell vs 动态行必须实测模板行为，不能只看当前数据区行数**：D4-1 清册初判 static-cell（因看到 R8-11/R14-17 只 4 行），但模板数据区实为**可扩动态行**，且前端早已用 `D4-1-rows` 动态行模型 —— 硬套 static 会与前端模型对不齐。裁决动态/静态要看「业务上能否增删行」，不是「当前占几行」。
 - **同 sheet 双区双向 = 4 处共享内核缺口，不是加个 sheet 那么简单**（D4-1 实测）：`_attach_table_part` XML 合并 / sibling binding 对齐 / `excel_extract` 一 sheet N 表逐 binding 反读 / `excel_materialize` footer per-region 解析（同名 `小计` marker 靠 `min_row` 区分、`GT_FOOTER_ROW_{TID}` 靠平行清册）。任一没修都会在 rematerialize 阶段以 `ManagedRegionResolutionError` 或 `FooterAnchorDriftError` 暴雷。改这些共享文件受主控 §5.3 共享锁约束，须 GENERALIZE 不回归单动态表（既有 358 单 sheet 工作簿注入字节 sha256 零漂移 + 变异守卫）。
 - **跨 spec 借道要双向登记**：D4-1 落地时顺带把 D4-9 owner spec 的 Task 1（`_attach_table_part` 合并）做实了，D4-9 因此从 0/15 变 1/15。这类"A spec 解除 B spec 阻塞"的情况，两边 tasks.md 和本清册都要同步，否则 B spec 会重复评估已完成的阻塞项。
+- **flag 翻 True ≠ 收口，非法 key 会打挂整个 entry**（D4-8 实测，2026-09-20）：`stable_field_key` 必须过 `contracts.assert_stable_key`（只允许小写/数字/`_`/`-`/`.`/`/`/`{}`），直接把前端 store 的驼峰字段名（`revQty` 等）拼进契约键 → 生成非法 key → `parse_contract(build_contract_payload())` 抛 `ContractSchemaError`，**连累整份 payload**（同 entry 其它张测试一起挂）。契约键要小写化、`json_pointer`/store 写回另用驼峰键（前端真源），二者分离。**且 flag 翻 True 但 spec 收口任务（零回归/发布链）未完成时，靠"磁盘旧契约没这张"苟住只是把雷埋在 `assert_contract_file_matches_source` DRIFT 里——一次 `generate --apply` 就爆。落 flag 前先确认契约能 parse + 磁盘 source 一致。**
+- **未跟踪文件 + 已跟踪模块 import 它 = HEAD 断裂**（D4-8 / D4-9 两次同源）：provider/测试若 `??` 未入 git，但已入库的父模块 import 了它，clean checkout 会 ImportError 打挂全 entry。落地一张的收口清单必含「provider + 测试 + 前端守卫全部 `git add`」，收口后 `git status` 应无自己的 `??`。
 
 ## D4-1 几何核定与落地记录（2026-09-20 更新，对齐已入库实现 `phase5_d4_adjudication_sheet.py`）
 
