@@ -10,15 +10,23 @@ import { ref, computed, inject, watch, onBeforeUnmount, toRef } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useD4ImportExport } from '../../composables/useD4ImportExport'
 import { parseNum, calcGrossMarginRate, calcSubtotal, calcChangeRate } from '../../composables/useD4FormulaEngine'
-import GtOnlyOfficeSheet from '../../GtOnlyOfficeSheet.vue'
 import GtIndexChip from '../../GtIndexChip.vue'
 import http from '@/utils/http'
 import { Plus } from '@element-plus/icons-vue'
 import { useD4InspectionWriteback } from '../../composables/useD4InspectionWriteback'
 import { d4_33Candidates, D4_OTHER_ACCOUNT_CODE, D4_OTHER_ACCOUNT_NAME } from '../../composables/d4OtherGroupPushPredicates'
 import { eventBus } from '@/utils/eventBus'
+// D4-33 双向回写：子组件自管 sync bridge（dedicated sync sheet，sheetKey=d433-managed，
+// 同 entry gt-d4-operating-revenue；后端 phase5_d4_other_margin_sheet 作为**静态受管区** sibling
+// sheet 并入 phase5_d4_revenue_detail，adapter d4.revenue_detail）——引擎静态 cell 路径
+// （spec workpaper-sync-static-cell-sheet-writeback，非 legacy 裸 GtOnlyOfficeSheet）。
+import { useWorkpaperSyncBridge, WP_BRIDGE_IN_FLIGHT_STATES } from '../../sync/useWorkpaperSyncBridge'
+import WorkpaperSyncEditorHost from '../../sync/WorkpaperSyncEditorHost.vue'
+import { readStoreProjection } from '../../sync/workpaperSyncApi'
+import { capabilityForEntry } from '../../sync/workpaperSyncCapability'
 
 const props = defineProps<{ wpId: string; projectId: string; allResponses: Map<string, any>; isReadonly: boolean }>()
+const reloadWorkpaperData = inject<(() => Promise<void>) | null>('reloadWorkpaperData', null)
 
 // ─── 公式管理（打开平台全局公式管理中心，定位到本底稿 D4-33）───────────────────
 // 由顶层挂载的全局 FormulaManagerDialog 响应 `open-formula-manager`（同 E1 范式）。
@@ -116,9 +124,72 @@ function persistAll() {
 }
 function updateAuditNote(v: string) { if (props.isReadonly) return; auditNote.value = v; persistAll() }
 function updateAuditConclusion(v: string) { if (props.isReadonly) return; auditConclusion.value = v; persistAll() }
+// 立即 flush（清 debounce + 同步 dispatch），供 sync bridge 切到在线编辑前把 html 侧落库。
+function flushPendingSave() {
+  if (debounceTimer) { clearTimeout(debounceTimer); debounceTimer = null }
+  const keys = ['D4-33-data', 'D4-33-note', 'D4-33-conclusion']
+  window.dispatchEvent(new CustomEvent('d4:save-items', { detail: { items: keys.map(k => props.allResponses.get(k)).filter(Boolean) } }))
+}
 onBeforeUnmount(() => { if (debounceTimer) { clearTimeout(debounceTimer); const keys = ['D4-33-data','D4-33-note','D4-33-conclusion']; window.dispatchEvent(new CustomEvent('d4:save-items', { detail: { items: keys.map(k => props.allResponses.get(k)).filter(Boolean) } })) } })
 
-const editorMode = ref<string>('表格视图'); const modeOptions = ['表格视图', '在线编辑']
+// ─── 双模式 sync bridge（D4-33 其他业务毛利率，dedicated 静态受管区 sync sheet）──────────
+const D4_33_ENTRY = 'xlsx/gt-d4-operating-revenue'
+const D4_33_SHEET_KEY = 'd433-managed'
+const modeOptions = ['表格视图', '在线编辑']
+const ooHealthy = ref(false)
+async function checkOoHealth() {
+  try { const r = await http.get('/api/onlyoffice/health', { _silent: true } as any); ooHealthy.value = (r.data?.data?.status ?? r.data?.status) === 'healthy' } catch { ooHealthy.value = false }
+}
+checkOoHealth()
+const syncSwitching = ref(false)
+const syncBridge = useWorkpaperSyncBridge({
+  entryId: ref(D4_33_ENTRY),
+  wpId: toRef(props, 'wpId'),
+  projectId: toRef(props, 'projectId'),
+  sheetKey: ref(D4_33_SHEET_KEY),
+  capability: capabilityForEntry(D4_33_ENTRY),
+  flushHtml: async () => {
+    flushPendingSave()
+    const snap = await readStoreProjection({ projectId: props.projectId, wpId: props.wpId, entryId: D4_33_ENTRY })
+    return { expectedRevision: snap.expectedRevision, projection: snap.projection, sheetKey: D4_33_SHEET_KEY }
+  },
+  reloadHtml: async () => { if (reloadWorkpaperData) await reloadWorkpaperData() },
+})
+const syncOoDescriptor = computed(() => syncBridge.descriptor.value)
+const syncBusy = computed(
+  () => syncSwitching.value
+    || (WP_BRIDGE_IN_FLIGHT_STATES as readonly string[]).includes(String(syncBridge.state.value)),
+)
+const editorMode = computed<string>({
+  get: () => (syncBridge.mode.value === 'oo' ? '在线编辑' : '表格视图'),
+  set: (v: string) => { void switchMode(v === '在线编辑' ? 'onlyoffice' : 'structured') },
+})
+async function switchMode(target: 'structured' | 'onlyoffice'): Promise<void> {
+  const cur = syncBridge.mode.value === 'oo' ? 'onlyoffice' : 'structured'
+  if (target === cur) return
+  if (target === 'onlyoffice') {
+    if (props.isReadonly || !ooHealthy.value) return
+    syncSwitching.value = true
+    try { await syncBridge.switchToOnlyOffice() } finally { syncSwitching.value = false }
+    return
+  }
+  syncSwitching.value = true
+  try { await syncBridge.switchToHtml() } finally { syncSwitching.value = false }
+}
+// fail-visible：同步失败以中文 tag 显式呈现，不静默吞。
+const syncStateTag = computed(() => {
+  const st = String(syncBridge.state.value)
+  if (syncBusy.value) return { text: '同步中…', type: 'info' as const }
+  if (syncBridge.dirty?.value) {
+    return syncBridge.mode.value === 'oo'
+      ? { text: 'excel 侧有未同步改动', type: 'warning' as const }
+      : { text: 'html 侧有未同步改动', type: 'warning' as const }
+  }
+  if (st.includes('error') || String(syncBridge.lastError?.value || '')) {
+    return { text: '同步失败，请重试', type: 'danger' as const }
+  }
+  return { text: syncBridge.mode.value === 'oo' ? 'Excel 在线编辑' : '表格视图', type: 'success' as const }
+})
 const aiAvailable = ref(false)
 async function checkAiHealth() { try { const r = await http.get('/api/ai/health', { _silent: true } as any); aiAvailable.value = (r.data?.data?.status ?? r.data?.status) === 'healthy' || (r.data?.data?.status ?? r.data?.status) === 'degraded' } catch { aiAvailable.value = false } }
 checkAiHealth()
@@ -169,7 +240,7 @@ async function pushMarginAnomaliesToA13() {
 
 <template>
 <div class="d4-other-margin">
-  <div class="toolbar"><div class="toolbar-left"><el-segmented v-model="editorMode" :options="modeOptions" size="small" /></div><div class="toolbar-right"><el-button size="small" type="warning" plain :disabled="isReadonly||pushableCount===0" @click="pushMarginAnomaliesToA13" title="把毛利率异常推送到 A13（定性项，金额由人工逐条认定）">推送异常至 A13{{ pushableCount ? `（${pushableCount}）` : '' }}</el-button><el-button size="small" @click="openFormulaManager" title="打开平台公式管理中心（唯一一套公式，支持跨底稿取数联动与表内校对）">ƒx 公式管理</el-button><el-dropdown trigger="click" size="small"><el-button size="small">导入导出 ▾</el-button><template #dropdown><el-dropdown-menu><el-dropdown-item @click="exportTemplate('D4-33')">导出模板</el-dropdown-item><el-dropdown-item @click="exportData('D4-33')">导出数据</el-dropdown-item><el-dropdown-item><el-upload :show-file-list="false" accept=".xlsx" :auto-upload="false" :disabled="isReadonly||importing" @change="(f:any)=>importData('D4-33',f.raw||f)"><span>导入数据</span></el-upload></el-dropdown-item></el-dropdown-menu></template></el-dropdown><GtIndexChip value="wp:D4-3" :context-project-id="projectId" /><el-button v-if="openReviewDialog" size="small" @click="openReviewDialog('D4-33-margin')">💬 复核</el-button></div></div>
+  <div class="toolbar"><div class="toolbar-left"><el-segmented v-model="editorMode" :options="modeOptions" size="small" /></div><div class="toolbar-right"><el-button size="small" type="warning" plain :disabled="isReadonly||pushableCount===0" @click="pushMarginAnomaliesToA13" title="把毛利率异常推送到 A13（定性项，金额由人工逐条认定）">推送异常至 A13{{ pushableCount ? `（${pushableCount}）` : '' }}</el-button><el-button size="small" @click="openFormulaManager" title="打开平台公式管理中心（唯一一套公式，支持跨底稿取数联动与表内校对）">ƒx 公式管理</el-button><el-dropdown trigger="click" size="small"><el-button size="small">导入导出 ▾</el-button><template #dropdown><el-dropdown-menu><el-dropdown-item @click="exportTemplate('D4-33')">导出模板</el-dropdown-item><el-dropdown-item @click="exportData('D4-33')">导出数据</el-dropdown-item><el-dropdown-item><el-upload :show-file-list="false" accept=".xlsx" :auto-upload="false" :disabled="isReadonly||importing" @change="(f:any)=>importData('D4-33',f.raw||f)"><span>导入数据</span></el-upload></el-dropdown-item></el-dropdown-menu></template></el-dropdown><GtIndexChip value="wp:D4-3" :context-project-id="projectId" /><el-tag :type="syncStateTag.type" size="small" class="sync-state-tag">{{ syncStateTag.text }}</el-tag><el-button v-if="openReviewDialog" size="small" @click="openReviewDialog('D4-33-margin')">💬 复核</el-button></div></div>
 
   <template v-if="editorMode !== '在线编辑'">
     <!-- 业务类型管理 -->
@@ -252,7 +323,8 @@ async function pushMarginAnomaliesToA13() {
     <!-- 审计意见区 -->
     <el-card class="audit-opinion-card" shadow="never"><template #header><div class="opinion-header"><span class="opinion-title">审计意见区</span><div class="opinion-actions"><el-tooltip :content="aiTip" placement="top"><el-button size="small" type="primary" plain :loading="aiNoteLoading" :disabled="isReadonly||!aiAvailable" @click="genNote">🤖 AI辅助说明</el-button></el-tooltip><el-tooltip :content="aiTip" placement="top"><el-button size="small" type="primary" plain :loading="aiConclusionLoading" :disabled="isReadonly||!aiAvailable" @click="genConclusion">🤖 AI辅助结论</el-button></el-tooltip></div></div></template><div class="opinion-body"><div class="opinion-field"><label>三、审计说明</label><el-input type="textarea" :autosize="{minRows:3,maxRows:12}" :model-value="auditNote" :disabled="isReadonly" placeholder="分析各业务类型毛利率变动的合理性" @input="(v:string)=>updateAuditNote(v)" /></div><div class="opinion-field"><label>四、审计结论</label><el-input type="textarea" :autosize="{minRows:2,maxRows:8}" :model-value="auditConclusion" :disabled="isReadonly" placeholder="综合判断其他业务收入毛利率是否合理" @input="(v:string)=>updateAuditConclusion(v)" /></div></div></el-card>
   </template>
-  <template v-if="editorMode==='在线编辑'"><div class="oo-container"><GtOnlyOfficeSheet :wp-id="wpId" :project-id="projectId" sheet-name="其他业务毛利率分析表D4-33" :readonly="isReadonly" /></div></template>
+  <!-- 在线编辑：平台 sync bridge（dedicated 静态受管区 sync sheet，非裸 GtOnlyOfficeSheet） -->
+  <template v-if="editorMode==='在线编辑'"><div class="oo-container"><WorkpaperSyncEditorHost v-if="syncOoDescriptor" :descriptor="syncOoDescriptor" :bridge="syncBridge" /><div v-else class="oo-loading">正在打开 D4-33 同步编辑器…</div></div></template>
 </div>
 </template>
 
