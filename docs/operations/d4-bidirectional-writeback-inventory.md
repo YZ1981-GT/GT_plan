@@ -114,7 +114,30 @@
 ### D4-14 发生检查（32 列七维嵌套，风险最高，可能需拆多 sheet 或裁 limited）
 ### D4-7 毛利率分析（双区：月度 obj `revenue[12]/cost[12]` 位置数组 + products 动态区）
 ### D4-8 产品毛利率（product×12月矩阵 + 密集内部公式 H=D-G/毛利率/变动分析 R-W）
-### D4-33 其他业务毛利率（bizTypes×months 矩阵，同 D4-8 量级）
+### D4-33 其他业务毛利率（**2026-09-20 侦查+落地尝试完成，裁定 HTML-only：引擎不支持纯静态 cell sheet**）
+- 模板 `其他业务毛利率分析表D4-33`（A1:M31）：**固定 12 月行**（R12-23）× **固定 3 业务类型列组**
+  （出租固定资产 E-G / 出租无形资产 H-J / 销售材料 K-M，每组 收入/成本/毛利率）。合计 B/C/D、
+  各组毛利率 G/J/M、合计行 24-27（合计/上年/变动额/变动比例）全 Excel 内部公式。
+  受管输入 = 12 月 × 3 组 × 2（收入/成本）= **72 个 static cell**（E/F/H/I/K/L 列 × R12-23）。
+- 前端 `D4-33-data` = `{bizTypes[], months{bizId:MonthEntry[12]}, priorYear}`，业务类型动态
+  （addBizType/removeBizType，默认 3 个 biz-rent-fixed/intangible/sell-material），模板只有 3 固定列组。
+- ✅ **provider 已写并过隔离 probe**（`phase5_d4_other_margin_sheet.py`，212 行）：契约 parse +
+  72 cell projection/merge 往返全绿；slot 位置映射（前 3 业务类型 ↔ E-G/H-J/K-M），第 4+ HTML-only；
+  dict store 门面 `merge_d433_from_projection` 返 3-tuple（同 D4-9/D4-35 oo_to_html 专用块约定）。
+- 🔴 **落地被引擎硬约束挡下（context-gather 实证 + rematerialize 实测 RoundtripEquivalenceError）**：
+  受管 cell 只能经 `ExcelIdentityBinding` 落盘，binding **必须**锚定一张 `row_identity` **动态表**的
+  Excel Table `<tableParts>` 载体（materialize `managed_tables_of` 对 `not dynamic.has_dynamic_rows`
+  直接 raise；extract `resolve_managed_region` 靠 Excel Table displayName 定位受管区）。D4-9 的
+  `customer_totals` 静态标量能落盘仅因它**寄生**在同 sheet 两张动态表（current/prior）的 tableParts 上。
+  **D4-33 整张只有静态表、无任何动态行维度**（12 月是固定枚举、业务类型是动态列但模板仅 3 固定列组）
+  → 无载体 → materialize 写不进、反读缺全部 72 字段。
+- **裁定：HTML-only**（`_INCLUDE_D433_MARGIN_SHEET=False`，同 D4-45 静态块 precedent，不进 Excel 契约）。
+  wiring 已接但全 flag 门控 inert；守卫 `test_d4_33_margin_contract.py`（4 测试）钉住 provider 自洽 +
+  live 契约不含 D4-33 的诚实状态。**解除条件**：引擎支持「纯静态 sheet 直写绝对坐标载体」，或给
+  D4-33 造真实动态行表当载体（本表无动态行语义，属伪造，拒）。届时一键翻 flag=True 接入。
+- 🔴 **同类矩阵张的引擎结论外推**：D4-7（月度双区）、D4-8（product×12月）若同样**无动态行维度**
+  （纯固定行×固定列 static matrix），则同受此引擎约束 → HTML-only；若有真实动态行（如 product 可增删行）
+  则可按动态表落地。逐张须先侦查「是否存在真实动态行维度」再定，不可一律套 static-cell provider。
 ### D4-34 其他业务合同测算（双区 rentals + consults）
 ### D4-36 其他业务截止（三区 forward + backward + params）
 
