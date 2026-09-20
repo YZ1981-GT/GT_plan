@@ -325,3 +325,209 @@ def test_d4_17_18_19_dispatch_dedicated_parsers() -> None:
     assert re.search(r'elif sheet == "D4-18":\s*\n\s*row_dict = _parse_d4_18_row', src)
     assert re.search(r'elif sheet == "D4-19":\s*\n\s*row_dict = _parse_d4_19_row', src)
     assert re.search(r'elif sheet in \("D4-20-current", "D4-20-post"\):\s*\n\s*row_dict = _parse_d4_20_return_row', src)
+
+
+# ─── D4-19 派生列零/负边界：discountRate 单源重算不除零、不信文件（补 else 分支）─────
+
+@settings(max_examples=5)
+@given(
+    revenue=st.floats(min_value=-1e6, max_value=1e6, allow_nan=False).map(lambda x: round(x, 2)),
+    discount=st.floats(min_value=-1e6, max_value=1e6, allow_nan=False).map(lambda x: round(x, 2)),
+    poison_rate=st.floats(min_value=-99, max_value=99, allow_nan=False).map(lambda x: round(x, 4)),
+)
+def test_d4_19_discount_rate_zero_edge_single_source(
+    revenue: float, discount: float, poison_rate: float
+) -> None:
+    """**Validates: Requirements 1.3, 1.5**
+
+    D4-19 折扣比例单源重算的零/负边界：收入或折扣 ≤0 时 discountRate=0（不除零、不信文件污染的
+    比例列）；两者 >0 时才 = 折扣/收入。PBT `test_d4_19_round_trip_rate_recompute` 只覆盖正数区间，
+    此处专攻 else 分支（防「负收入/零折扣」时误信文件或抛除零）。
+    """
+    headers = _headers("D4-19")
+    row_values = [
+        "", "客户甲", "现金折扣", revenue, discount,
+        poison_rate,  # 折扣比例（污染 → 忽略/重算）
+        "原因", "2025-01-01", "PZ-1", "6001", "主营", 0.0, 0.0, "2025-01-02", "张三", "备注",
+    ]
+    parsed = _roundtrip(headers, [row_values], mod._parse_d4_19_row)
+    assert len(parsed) == 1
+    got = parsed[0]
+    if revenue > 0 and discount > 0:
+        assert got["discountRate"] == discount / revenue
+    else:
+        # 收入≤0 或 折扣≤0：单源重算给 0，绝不采信文件污染值 poison_rate
+        assert got["discountRate"] == 0
+    assert got["discountRate"] != poison_rate or poison_rate == 0
+
+
+# ─── 导出侧投影守卫：D4-17/18/19/20 派生列导出留空（往返永不回注被信任的派生值）───────
+
+def test_export_leaves_derived_columns_blank() -> None:
+    """**Validates: Requirements 1.2, 1.3, 1.5, 2.3**
+
+    export 行构造对 D4-17/18(是否跨期)、D4-19(折扣比例)、D4-20-provision(应计提/差异) 派生列
+    一律写空串 ""（前端公式重算），不得 `data_row.get("isCutoff"/"discountRate"/"shouldProvide"/"diff")`。
+    这是「派生值单源」在导出投影侧的对称守卫：即便文件被回导，import parser 也已忽略/重算，
+    但导出侧亦不得先泄漏被信任的派生值到文件。
+    """
+    import re
+    src = _read("backend/app/routers/wp_render_strategies/_d4_import_export.py")
+    # 导出分支绝不读这些派生键（否则往返会把「文件里的派生值」当真源来回搬运）。
+    # isCutoff/discountRate/shouldProvide 是 D4-17/18/19/20 专属派生键，全文件唯一归属这四表，
+    # 可直接全文件断言（"diff" 是 D4-23 发票差异合法列名，故按分支体局部断言，见下）。
+    assert 'data_row.get("isCutoff")' not in src
+    assert 'data_row.get("discountRate")' not in src
+    assert 'data_row.get("shouldProvide")' not in src
+    # D4-20-provision 导出分支体内：应计提/差异派生列必须写空串，不得从 store 读派生值。
+    m_prov = re.search(
+        r'elif sheet == "D4-20-provision":(.+?)(?:elif sheet ==|\n        else:)', src, re.S
+    )
+    assert m_prov, "D4-20-provision export branch not found"
+    prov_body = m_prov.group(1)
+    assert 'data_row.get("diff")' not in prov_body
+    assert 'data_row.get("shouldProvide")' not in prov_body
+
+
+def test_d4_17_18_export_preserves_business_direction() -> None:
+    """**Validates: Requirements 1.2**
+
+    D4-17(账→单据 forward)/D4-18(单据→账 backward) 的导出列顺序保持业务方向：
+    D4-17 先凭证列后发货单列；D4-18 先发货单列后凭证列。锁死方向不被对调。
+    """
+    import re
+    src = _read("backend/app/routers/wp_render_strategies/_d4_import_export.py")
+    # D4-17 分支：voucherDate 出现在 deliveryDate 之前
+    m17 = re.search(r'elif sheet == "D4-17":(.+?)elif sheet == "D4-18":', src, re.S)
+    assert m17, "D4-17 export branch not found"
+    body17 = m17.group(1)
+    assert body17.index('voucherDate') < body17.index('deliveryDate')
+    # D4-18 分支：deliveryDate 出现在 voucherDate 之前
+    m18 = re.search(r'elif sheet == "D4-18":(.+?)elif sheet == "D4-19":', src, re.S)
+    assert m18, "D4-18 export branch not found"
+    body18 = m18.group(1)
+    assert body18.index('deliveryDate') < body18.index('voucherDate')
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Task 6 · 四态变异（four-state mutation）+ 截止非跨期语义守卫
+#
+# Design Property 4（Validates 4.1）：变异检验命中预期守卫——把代码翻成反模式后，守卫必须
+# 失败。下列测试不改生产代码，而是就地重演「反模式」输入/逻辑，断言守卫不变量被破坏（证明守卫
+# 敏感、非空转）。每个 facet 一条 mutation，触类旁通覆盖 D4-17/18/19/20 四表。
+# ═══════════════════════════════════════════════════════════════════════════════
+
+
+# ─── Mutation 1 · 派生值单源（未知边界）：若 parser「信任文件派生列」则往返守卫失败 ──────
+
+@settings(max_examples=5)
+@given(
+    revenue=st.floats(min_value=1, max_value=1e6, allow_nan=False).map(lambda x: round(x, 2)),
+    discount=st.floats(min_value=1, max_value=1e6, allow_nan=False).map(lambda x: round(x, 2)),
+    poison_rate=st.floats(min_value=-99, max_value=99, allow_nan=False).map(lambda x: round(x, 4)),
+)
+def test_mutation_d4_19_trust_file_rate_would_break_guard(
+    revenue: float, discount: float, poison_rate: float
+) -> None:
+    """**Validates: Requirements 1.5, 4.1（mutation）**
+
+    四态变异：把「派生列单源重算」翻成反模式「信任文件折扣比例列」。
+    真 parser 重算 discountRate=折扣/收入；mutant 读文件污染值 poison_rate。
+    断言 mutant 与真值在 poison_rate ≠ 真值时必不同——即单源守卫确实拦得住「信任文件」回归。
+    """
+    headers = _headers("D4-19")
+    row_values = [
+        "", "客户甲", "现金折扣", revenue, discount, poison_rate,
+        "原因", "2025-01-01", "PZ-1", "6001", "主营", 0.0, 0.0, "2025-01-02", "张三", "备注",
+    ]
+    parsed = _roundtrip(headers, [row_values], mod._parse_d4_19_row)
+    assert len(parsed) == 1
+    real_rate = parsed[0]["discountRate"]
+    true_rate = discount / revenue  # 单源应得值
+    assert real_rate == true_rate
+
+    # mutant：反模式「信任文件」= 直接取污染列值
+    mutant_rate = poison_rate
+    if abs(poison_rate - true_rate) > 1e-9:
+        # 守卫命中：真值 ≠ mutant，说明「== 文件值」的断言会失败 → 守卫拦得住该回归
+        assert real_rate != mutant_rate
+
+
+@settings(max_examples=5)
+@given(
+    base=_amt,
+    rate=st.floats(min_value=0, max_value=1, allow_nan=False).map(lambda x: round(x, 4)),
+    already=_amt,
+    poison_should=st.floats(min_value=1, max_value=1e6, allow_nan=False).map(lambda x: round(x, 2)),
+)
+def test_mutation_d4_20_provision_trust_file_derived_would_break(
+    base: float, rate: float, already: float, poison_should: float
+) -> None:
+    """**Validates: Requirements 1.5, 4.1（mutation）**
+
+    四态变异 D4-20 计提：反模式「信任文件应计提列」。真 parser 重算 base×rate；
+    mutant 取文件 poison_should。poison ≠ 真值时守卫命中（触类旁通同 D4-19 单源反模式）。
+    """
+    headers = _headers("D4-20-provision")
+    row_values = ["", "货品甲", base, rate, poison_should, already, 0.0, "原因"]
+    parsed = _roundtrip(headers, [row_values], mod._parse_d4_20_provision_row)
+    assert len(parsed) == 1
+    real_should = parsed[0]["shouldProvide"]
+    true_should = base * rate
+    assert real_should == true_should
+    if abs(poison_should - true_should) > 1e-9:
+        assert real_should != poison_should  # 守卫拦得住「信任文件派生列」
+
+
+# ─── Mutation 2 · 专用 IO：若 D4-19 走 generic 兜底则字段结构守卫失败 ───────────────
+
+def test_mutation_generic_fallback_would_lose_dedicated_fields() -> None:
+    """**Validates: Requirements 1.2, 4.1（mutation）**
+
+    四态变异：把 D4-19 分发从专用 parser 翻成 generic 兜底。
+    专用 parser 产出 discountRate/revenueAmount/discountAmount 等英文语义键；generic 兜底
+    只按列头产原样字典、没有派生键与英文 key 映射。断言两者产物结构不同——即「专用 IO」守卫
+    （dispatch 专用 parser）确实拦得住 generic 回归。
+    """
+    headers = _headers("D4-19")
+    row = ("", "客户甲", "现金折扣", 1000.0, 200.0, 0.0, "原因", "2025-01-01",
+           "PZ-1", "6001", "主营", 0.0, 0.0, "2025-01-02", "张三", "备注")
+    dedicated = mod._parse_d4_19_row(row, headers)
+    # 专用 parser 的英文语义键 + 单源派生键
+    assert "discountRate" in dedicated
+    assert dedicated["revenueAmount"] == 1000.0
+    assert dedicated["discountRate"] == 200.0 / 1000.0
+
+    # mutant：generic 兜底（按中文列头原样 → 无英文语义键、无单源重算）
+    mutant = {h: v for h, v in zip(headers, row) if h}
+    assert "discountRate" not in mutant  # generic 不产派生键
+    assert "revenueAmount" not in mutant  # generic 不做英文 key 映射
+    # 守卫命中：dedicated 与 mutant 结构不同，证明「dispatch 专用 parser」非可有可无
+    assert set(dedicated.keys()) != set(mutant.keys())
+
+
+# ─── Mutation 3 · item_id 双侧一致：若后端映射错 store 键则对齐守卫失败 ──────────────
+
+def test_mutation_wrong_item_id_would_break_alignment_guard() -> None:
+    """**Validates: Requirements 1.3, 2.3, 4.1（mutation）**
+
+    四态变异：把 D4-20 子表 item_id 从对齐前端键（D4-20-current-returns）翻成裸 sheet 码
+    （D4-20-current）。前端 store 只认 D4-20-current-returns/post-returns/provision。
+    断言 mutant 键 ∉ 前端组件引用集——即 item_id 双侧一致守卫拦得住键错位回归。
+    """
+    fe = _read("audit-platform/frontend/src/components/workpaper/d4/inspection/D4TabReturn.vue")
+    correct_keys = {"D4-20-current-returns", "D4-20-post-returns", "D4-20-provision"}
+    for k in correct_keys:
+        assert f"'{k}'" in fe  # 真键前端确实引用
+
+    # mutant：错位成裸 sheet 码作为 store 键（曾经的 DEC-2 bug）。前端 store 引用的是带
+    # -returns 后缀的键，裸 sheet 码作为「store 键字面量」从不出现（用引号包裹精确匹配 key 位置）。
+    mutant_keys = {"D4-20-current", "D4-20-post"}
+    for mk in mutant_keys:
+        # 守卫命中：裸 sheet 码作为 store 键字面量 'D4-20-current'（后接引号闭合，非 -returns 前缀）
+        # 在前端从不作为 item_id 键引用 → 若后端映射错成裸码，导入落孤儿键、导出读不到 → 往返丢数据。
+        assert f"item_id: '{mk}'" not in fe
+        assert f"'{mk}',\n" not in fe  # 裸码作为独立 key 字面量不存在
+    # 反向确认：正确的带后缀键确实被前端引用（守卫非空转）
+    assert "'D4-20-current-returns'" in fe
+    assert "'D4-20-post-returns'" in fe

@@ -18,6 +18,7 @@ import {
   isChangeRateExceeding,
   calcAnomalyRate,
   calcCoverageRate,
+  calcDiscountRate,
   isCrossPeriod,
   isCrossPeriodForward,
   isCrossPeriodBackward,
@@ -258,6 +259,33 @@ describe('useD4FormulaEngine', () => {
     })
   })
 
+  // ─── calcDiscountRate（D4-19 折扣比例，单一真源）────────────────────────────
+
+  describe('calcDiscountRate', () => {
+    it('计算 折扣额/收入额', () => {
+      expect(calcDiscountRate(20, 100)).toBe(0.2)
+    })
+    it('收入额<=0 返回 0（不造分母为零/负比例）', () => {
+      expect(calcDiscountRate(20, 0)).toBe(0)
+      expect(calcDiscountRate(20, -100)).toBe(0)
+    })
+    it('折扣额<=0 返回 0（无折扣）', () => {
+      expect(calcDiscountRate(0, 100)).toBe(0)
+      expect(calcDiscountRate(-5, 100)).toBe(0)
+    })
+    it('与后端 _parse_d4_19_row 同定义：(discount/revenue) if revenue>0 && discount>0 else 0', () => {
+      // 逐字段对齐后端语义
+      const cases: Array<[number, number, number]> = [
+        [30, 200, 0.15],
+        [0, 200, 0],
+        [30, 0, 0],
+      ]
+      for (const [d, r, expected] of cases) {
+        expect(calcDiscountRate(d, r)).toBe(expected)
+      }
+    })
+  })
+
   // ─── isCrossPeriod ────────────────────────────────────────────────────────
 
   describe('isCrossPeriod', () => {
@@ -408,6 +436,94 @@ describe('useD4FormulaEngine', () => {
       const v = '2024-12-30', d = '2025-01-03', c = '2024-12-31'
       expect(isCrossPeriodForward(v, d, c)).toBe(true)
       expect(isCrossPeriodBackward(d, v, c)).toBe(false)
+    })
+  })
+
+  // ─── Req 2.3 截止非跨期语义：只对跨期条件互斥；非跨期允许同为假；缺失/非法→N/A(false)，
+  //     不得输出恒相反。这是「截止≠通用跨期(mutual-exclusion)」的核心守卫。─────────────────
+  describe('Req 2.3 截止非跨期语义（非跨期不被强制取反）', () => {
+    const c = '2024-12-31'
+
+    it('两侧均在期内 → forward 与 backward 同为 false（非跨期允许同为假，非互斥取反）', () => {
+      // 凭证 2024-12-20 期内、单据 2024-12-28 期内：都不跨期
+      const v = '2024-12-20', d = '2024-12-28'
+      expect(isCrossPeriodForward(v, d, c)).toBe(false)
+      expect(isCrossPeriodBackward(d, v, c)).toBe(false)
+      // 关键：两者不是 !另一个 —— 都为 false，不被强制取反
+    })
+
+    it('两侧均在期后 → forward 与 backward 同为 false（非跨期同为假）', () => {
+      const v = '2025-01-05', d = '2025-01-10'
+      expect(isCrossPeriodForward(v, d, c)).toBe(false)
+      expect(isCrossPeriodBackward(d, v, c)).toBe(false)
+    })
+
+    it('日期缺失（空串）→ false（N/A），不强制取反为 true', () => {
+      expect(isCrossPeriodForward('', '2025-01-03', c)).toBe(false)
+      expect(isCrossPeriodBackward('', '2025-01-03', c)).toBe(false)
+      expect(isCrossPeriodForward('2024-12-30', '', c)).toBe(false)
+      expect(isCrossPeriodBackward('2024-12-30', '', c)).toBe(false)
+    })
+
+    it('日期非法（乱字符）→ false（N/A），不强制取反为 true', () => {
+      expect(isCrossPeriodForward('invalid', '2025-01-03', c)).toBe(false)
+      expect(isCrossPeriodBackward('2024-12-29', 'not-a-date', c)).toBe(false)
+    })
+
+    it('截止日缺失/非法 → false（N/A），不猜方向', () => {
+      expect(isCrossPeriodForward('2024-12-30', '2025-01-03', '')).toBe(false)
+      expect(isCrossPeriodBackward('2024-12-29', '2025-01-05', 'invalid')).toBe(false)
+    })
+  })
+
+  // ─── Task 6 四态变异：把「非跨期语义」翻成反模式「通用互斥取反」(backward = !forward)，
+  //     断言在「非跨期」与「非法日期」样本上 mutant 与真实实现产生不同结果——即守卫拦得住
+  //     「截止被当成通用跨期(mutual-exclusion)」的回归（Design Property 4 / Req 4.1）。─────
+  describe('Task 6 mutation · 截止非跨期语义守卫命中', () => {
+    const c = '2024-12-31'
+    // mutant：反模式实现——backward 恒为 forward 的取反（通用互斥，正是 spec 要拦的）
+    const mutantBackward = (docDate: string, voucherDate: string, cutoff: string) =>
+      !isCrossPeriodForward(voucherDate, docDate, cutoff)
+
+    it('非跨期样本：真实 backward=false，但 mutant(取反)=true → 守卫命中差异', () => {
+      // 两侧期内：真实 forward=false backward=false；mutant backward=!false=true（错）
+      const v = '2024-12-20', d = '2024-12-28'
+      expect(isCrossPeriodBackward(d, v, c)).toBe(false)
+      expect(mutantBackward(d, v, c)).toBe(true)
+      expect(isCrossPeriodBackward(d, v, c)).not.toBe(mutantBackward(d, v, c))
+    })
+
+    it('非法日期样本：真实 backward=false，mutant(取反)=true → 守卫命中差异', () => {
+      const v = 'invalid', d = '2025-01-03'
+      // 真实：forward 因非法日期=false → backward 也应=false（N/A）
+      expect(isCrossPeriodForward(v, d, c)).toBe(false)
+      expect(isCrossPeriodBackward(d, v, c)).toBe(false)
+      // mutant：backward=!forward=!false=true（把 N/A 强制成跨期，错）
+      expect(mutantBackward(d, v, c)).toBe(true)
+      expect(isCrossPeriodBackward(d, v, c)).not.toBe(mutantBackward(d, v, c))
+    })
+  })
+
+  // ─── Task 6 四态变异：discountRate 单源——把「收入/折扣≤0 → 0」翻成反模式「无条件相除」，
+  //     断言零/负边界上 mutant 与真实实现不同（NaN/负比例/除零）——守卫拦得住除零回归。──────
+  describe('Task 6 mutation · discountRate 单源零边界守卫命中', () => {
+    // mutant：反模式无条件相除（不 guard 分母/负值）
+    const mutantRate = (discount: number, revenue: number) => discount / revenue
+
+    it('收入=0：真实=0（有限值），mutant=Infinity/NaN → 守卫命中差异', () => {
+      expect(calcDiscountRate(20, 0)).toBe(0)
+      expect(Number.isFinite(mutantRate(20, 0))).toBe(false) // 20/0 = Infinity
+    })
+
+    it('折扣=0 收入>0：真实=0，mutant=0（同）但收入=0 折扣=0 mutant=NaN → 差异', () => {
+      expect(calcDiscountRate(0, 100)).toBe(0)
+      expect(Number.isNaN(mutantRate(0, 0))).toBe(true) // 0/0 = NaN，真实=0
+      expect(calcDiscountRate(0, 0)).toBe(0)
+    })
+
+    it('负收入：真实=0，mutant=负比例 → 守卫命中差异', () => {
+      expect(calcDiscountRate(20, -100)).toBe(0)
+      expect(mutantRate(20, -100)).toBeLessThan(0)
     })
   })
 

@@ -11,6 +11,7 @@ import { ref, computed, inject, watch, onBeforeUnmount, toRef } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useD4ImportExport } from '../../composables/useD4ImportExport'
 import { useD4InspectionWriteback } from '../../composables/useD4InspectionWriteback'
+import { calcDiscountRate } from '../../composables/useD4FormulaEngine'
 import { useWorkpaperSyncBridge, WP_BRIDGE_IN_FLIGHT_STATES } from '../../sync/useWorkpaperSyncBridge'
 import { readStoreProjection } from '../../sync/workpaperSyncApi'
 import { capabilityForEntry } from '../../sync/workpaperSyncCapability'
@@ -61,9 +62,9 @@ const ocrDimension = ref<string>('basic')
 const ocrDialogVisible = ref(false)
 const ocrResult = ref<Record<string, any>>({})
 
-// ─── Auto-calc discount rate ─────────────────────────────────────────
+// ─── Auto-calc discount rate（走公式引擎单一真源，不内联重算）─────────────
 function calcRate(row: DiscountRow) {
-  row.discountRate = (row.revenueAmount > 0 && row.discountAmount > 0) ? row.discountAmount / row.revenueAmount : 0
+  row.discountRate = calcDiscountRate(row.discountAmount, row.revenueAmount)
 }
 
 // ─── Load ────────────────────────────────────────────────────────────

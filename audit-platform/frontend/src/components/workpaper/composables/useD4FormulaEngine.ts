@@ -165,6 +165,20 @@ export function calcCoverageRate(checkedAmount: number, revenueTotal: number): n
   return (checkedAmount / revenueTotal) * 100
 }
 
+// ─── 折扣折让公式 ────────────────────────────────────────────────────────────
+
+/**
+ * 折扣比例 = 折扣额 / 收入额
+ *
+ * D4-19 销售折扣与折让派生列单源。收入额≤0 或 折扣额≤0 时返回 0
+ * （无意义/无折扣，不造分母为零或负比例）。前端 calcRate、后端 parser
+ * `_parse_d4_19_row` 同一定义（后端权威执行、前端同定义），不得各自内联重算。
+ */
+export function calcDiscountRate(discountAmount: number, revenueAmount: number): number {
+  if (revenueAmount <= 0 || discountAmount <= 0) return 0
+  return discountAmount / revenueAmount
+}
+
 // ─── 截止测试公式 ────────────────────────────────────────────────────────────
 
 /**
