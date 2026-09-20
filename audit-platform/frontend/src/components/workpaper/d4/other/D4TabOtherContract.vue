@@ -16,6 +16,7 @@ import http from '@/utils/http'
 import { Plus } from '@element-plus/icons-vue'
 import { useD4InspectionWriteback } from '../../composables/useD4InspectionWriteback'
 import { d4_34Candidates, D4_OTHER_ACCOUNT_CODE, D4_OTHER_ACCOUNT_NAME } from '../../composables/d4OtherGroupPushPredicates'
+import { eventBus } from '@/utils/eventBus'
 // D4-34 双向回写：子组件自管 sync bridge（dedicated sync sheet，sheetKey=d434-managed，
 // 同 entry gt-d4-operating-revenue；后端 phase5_d4_other_contract_sheet 作为 sibling sheet
 // 并入 phase5_d4_revenue_detail，adapter d4.revenue_detail）——与 D4-9 同架构（双区 dict store）。
@@ -167,6 +168,13 @@ function pushDiffsToA13() {
   pushToA13(items, D4_OTHER_ACCOUNT_CODE, D4_OTHER_ACCOUNT_NAME)
 }
 
+// ─── 公式管理（打开平台全局公式管理中心，定位到本底稿 D4-34；同 E1 范式）───────────
+// 平台唯一一套公式：wp_formula 表权威存储，后端权威执行 + CAS + 审计；
+// 支持跨底稿 TB()/WP()/ROW() 取数联动与表内 SUM_ROW()/IF() 运算校对。
+function openFormulaManager() {
+  eventBus.emit('open-formula-manager', { nodeKey: 'wp_d4_34' })
+}
+
 // ─── OCR附件上传 ─────────────────────────────────────────────────────
 async function handleOcrUpload(type: 'rental' | 'consult', rowId: string, file: File) {
   if (!file) return
@@ -203,7 +211,7 @@ async function handleOcrUpload(type: 'rental' | 'consult', rowId: string, file: 
 
 <template>
 <div class="d4-other-contract">
-  <div class="toolbar"><div class="toolbar-left"><el-segmented v-model="editorMode" :options="modeOptions" size="small" /></div><div class="toolbar-right"><el-button size="small" type="warning" plain :disabled="isReadonly||pushableCount===0" @click="pushDiffsToA13" title="把合同测算差异推送到 A13 未更正错报汇总（差异保留符号，人工认定）">推送差异至 A13{{ pushableCount ? `（${pushableCount}）` : '' }}</el-button><el-dropdown trigger="click" size="small"><el-button size="small">导入导出 ▾</el-button><template #dropdown><el-dropdown-menu>
+  <div class="toolbar"><div class="toolbar-left"><el-segmented v-model="editorMode" :options="modeOptions" size="small" /></div><div class="toolbar-right"><el-button size="small" type="warning" plain :disabled="isReadonly||pushableCount===0" @click="pushDiffsToA13" title="把合同测算差异推送到 A13 未更正错报汇总（差异保留符号，人工认定）">推送差异至 A13{{ pushableCount ? `（${pushableCount}）` : '' }}</el-button><el-button size="small" @click="openFormulaManager" title="打开平台公式管理中心（唯一一套公式，支持跨底稿取数联动与表内校对）">ƒx 公式管理</el-button><el-dropdown trigger="click" size="small"><el-button size="small">导入导出 ▾</el-button><template #dropdown><el-dropdown-menu>
     <el-dropdown-item disabled class="dropdown-group-label">— 房屋租赁业务 —</el-dropdown-item>
     <el-dropdown-item @click="exportTemplate('D4-34-rental')">导出模板</el-dropdown-item>
     <el-dropdown-item @click="exportData('D4-34-rental')">导出数据</el-dropdown-item>

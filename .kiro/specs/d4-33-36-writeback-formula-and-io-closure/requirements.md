@@ -41,7 +41,7 @@ D4 循环的**其他业务收入组**四张底稿 —— **D4-33（其他业务�
 - **科目口径**：四表统一 `accountCode: '6051'`（其他业务收入），`accountName: '其他业务收入'`——**注意不是主营的 `6001`**，与 D4-33~36 属 6051 科目一致（这是与姊妹 spec 的唯一科目差异，守卫必须断言，防照抄 D4-13~20 时把 `6001` 抄过来）。
 - **公式真源**：`useD4FormulaEngine` 的纯函数是**默认公式**（真源）；用户二次编辑覆盖按 `(wp_id, sheet_code, formula_key)` 三元组存 `checklist_responses` 的 `remark`（item_id = `{sheet}-formula-override`），**不新增数据库表**。
 - **派生值不参与往返**：导入导出只搬运录入字段，派生值（毛利率/合计/差异/异常率/跨期判定/跨期天数/调整建议汇总）由公式引擎+覆盖层重算。
-- **口径冲突先裁决**：D4-33 现有内联毛利率是**小数比率**、引擎 `calcGrossMarginRate` 返回**百分比**，两者差 100 倍。本 spec 裁决见 DEC-2（统一到引擎的百分比口径，前端展示处补 `%` 后缀），**不在组件里做局部 `*100` 打补丁**。
+- **口径统一（2026-09-20 事实更正）**：🔴 原表述「引擎 `calcGrossMarginRate` 返回百分比」**有误**——引擎实际返回**小数比率**（`(rev-cost)/rev`，`useD4FormulaEngine.ts` L103）。本 spec 裁决见 DEC-2：统一以引擎为**单一真源**（返小数），前端展示处 `× 100` 补 `%` 后缀是**正确格式化**（非制造第四套口径）。核心目标不变：全库不得存在返回口径不一致的第二套毛利率计算路径。
 
 ## Requirements
 
@@ -72,7 +72,7 @@ D4 循环的**其他业务收入组**四张底稿 —— **D4-33（其他业务�
 3. WHEN html → excel 反向 THEN 必须提供「同步到在线编辑」入口（工具条按钮，与「导入导出 ▾」并列），把当前结构化数据推送给 OO 侧；**该入口只允许人工触发，禁止在 html 保存时自动静默反写 excel**（防双写冲突）
 4. WHEN 双向同步后存在差异（两侧数据不一致）THEN 只读校对应给出差异提示（哪些行/字段不一致），**禁止自动覆盖任一侧**；审计师决定保留哪侧
 5. WHEN 同步状态显示 THEN 四张表工具条必须显示当前同步态（「已同步」/「excel 侧有未同步改动」/「html 侧有未同步改动」三态，中文彩色 tag，禁裸英文），只读态下按钮禁用
-6. WHEN 双向回写实现 THEN 必须在**共享层**实现（新增 `useD4OtherGroupDualWriteback.ts` 或同类共享 composable，四张表共同调用），**禁止**在任一组件内联重写 OO 保存钩子或同步协议；四张表只传 sheet_code + 结构 adapter（四张表结构差异大：D4-33 是 `{bizTypes}`、D4-34 是 `{rentals,consults}`、D4-35 是 `{rows,sampling,periodAmount}`、D4-36 是 `{forward,backward}`，adapter 必须显式声明，不得用通用 JSON 猜测）
+6. WHEN 双向回写实现 THEN 必须在**共享层**实现，**禁止**在任一组件内联重写 OO 保存钩子或同步协议。🔴 **2026-09-20 治理对齐更正**：原文「新增 `useD4OtherGroupDualWriteback.ts` 自建同步 composable」已被共同契约 `d4-dual-mode-formula-governance`（B2/C1）**禁止自建 bridge**；实际改为**复用平台 `useWorkpaperSyncBridge` + `WorkpaperSyncEditorHost`**（D4-34/35/36 已接，D4-33 待接），这才是共享层正道。四表按结构差异（D4-33 `{bizTypes}`、D4-34 `{rentals,consults}`、D4-35 `{rows,sampling,periodAmount}`、D4-36 `{forward,backward}`）经各自 sync entry/sibling sheet 显式声明，不用通用 JSON 猜测。
 7. WHEN 双向回写落库路径 THEN 必须复用组件既有 `persistAll`/`flushSave` → `d4:save-items` → 宿主 `GtD4OperatingRevenue` PUT `checklist-responses` 通道，不得新造保存端点或旁路写 `allResponses`
 8. WHEN 「在线编辑」模式未挂载或 OO 服务不可用 THEN html 侧功能必须完全不受影响（不得因 OO 探针失败而阻断 html 编辑/保存），差异提示退化为「在线编辑不可用」
 9. WHEN 多子区表（D4-34 两区 / D4-36 两区）双向回写 THEN 同步必须**逐区独立**（导入/同步 `-rental` 不得冲掉 `consults`，同步 `forward` 不得冲掉 `backward`），与 Requirement 1 AC2/AC4 的合并写回语义一致
@@ -208,7 +208,7 @@ excel → html 同步失败时，必须可见报错且同步态不得标记为�
 ## Decisions
 
 - **DEC-1（已裁决）｜item_id 错位方向**：改**后端映射**，不改前端键。前端 `D4-33-data`/`D4-34-data`/`D4-35-data`/`D4-36-data` 已被各组件内 watch/persistAll/onBeforeUnmount 多处引用；后端四个 `f"{sheet}-rows"` 兜底键当前零消费者。与姊妹 spec 的 DEC-2 同方向。
-- **DEC-2（已裁决）｜毛利率口径冲突**：统一到引擎 `calcGrossMarginRate` 的**百分比口径**，前端展示补 `%` 后缀；**禁止**在组件里做局部 `*100` 打补丁（那会制造第四套口径）。理由：引擎是单一真源，且姊妹 spec 与平台其他毛利率显示（D4-7/D4-8/D4-33 后端 export 的「合计-毛利率」列）均按百分比。
+- **DEC-2（已裁决，2026-09-20 事实更正）｜毛利率口径**：统一以引擎 `calcGrossMarginRate` 为**单一真源**。🔴 更正：引擎实际返回**小数比率**（`(rev-cost)/rev`），**非**原文所述「百分比」；前端展示处 `× 100` 补 `%` 后缀是**正确的百分比格式化**，不是「第四套口径打补丁」。裁决实质不变（引擎单一真源、全库无第二套毛利率路径）。Property 5 由后端 `test_d4_33_margin_is_percentage`（断言导出「合计-毛利率」列为百分比数值）+ 变异 `d33_margin_ratio`（改回不 ×100 必红）双锁。理由：引擎是单一真源，平台其他毛利率显示（D4-7/D4-8）与后端 export「合计-毛利率」列均按百分比呈现（展示层 ×100）。
 - **DEC-3（已裁决）｜主 sheet 死配置**：`D4-34`（12 列）与 `D4-36`（12 列）**删除**而非报错短路。前端只用 `-rental`/`-consult` 与 `-forward`/`-backward` 子键，主键从未有消费方；保留即 Property 12 的死配置。与姊妹 spec 的 DEC-1 同方向。
 - **DEC-4（已裁决）｜死代码处置**：`useD4OtherGroup.ts` **直接删除**，不留 DEPRECATED 注释（平台铁律：死代码立即删除，否则每次复盘重复提议）。该文件类型定义与真实组件类型全不符（如声明 `OtherCheckRow.isAnomalous: boolean` 而真实是 string），留着只会误导。
 - **DEC-5（已裁决）｜科目码**：四表统一 `6051`/`其他业务收入`。这是本 spec 与两个姊妹 spec（`6001`/`营业收入`）的唯一科目差异，**必须**有守卫断言防照抄错误（Property 8）。

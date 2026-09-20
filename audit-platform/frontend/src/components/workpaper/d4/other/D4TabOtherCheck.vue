@@ -20,6 +20,7 @@ import { capabilityForEntry } from '../../sync/workpaperSyncCapability'
 import WorkpaperSyncEditorHost from '../../sync/WorkpaperSyncEditorHost.vue'
 import { useD4InspectionWriteback } from '../../composables/useD4InspectionWriteback'
 import { d4_35Candidates, D4_OTHER_ACCOUNT_CODE, D4_OTHER_ACCOUNT_NAME } from '../../composables/d4OtherGroupPushPredicates'
+import { eventBus } from '@/utils/eventBus'
 
 const props = defineProps<{ wpId: string; projectId: string; allResponses: Map<string, any>; isReadonly: boolean }>()
 const openReviewDialog = inject<((sectionId: string) => void) | null>('openReviewDialog', null)
@@ -201,11 +202,18 @@ function pushAnomaliesToA13() {
   }))
   pushToA13(items, D4_OTHER_ACCOUNT_CODE, D4_OTHER_ACCOUNT_NAME)
 }
+
+// ─── 公式管理（打开平台全局公式管理中心，定位到本底稿 D4-35；同 E1 范式）───────────
+// 平台唯一一套公式：wp_formula 表权威存储，后端权威执行 + CAS + 审计；
+// 支持跨底稿 TB()/WP()/ROW() 取数联动与表内 SUM_ROW()/IF() 运算校对。
+function openFormulaManager() {
+  eventBus.emit('open-formula-manager', { nodeKey: 'wp_d4_35' })
+}
 </script>
 
 <template>
 <div class="d4-other-check">
-  <div class="toolbar"><div class="toolbar-left"><el-segmented v-model="editorMode" :options="modeOptions" size="small" /><el-tag :type="syncStateTag.type" size="small" effect="light" style="margin-left:8px">{{ syncStateTag.text }}</el-tag></div><div class="toolbar-right"><el-button size="small" type="warning" plain :disabled="isReadonly||pushableCount===0" @click="pushAnomaliesToA13" title="把抽凭异常推送到 A13 未更正错报汇总（金额与方向由人工认定）">推送异常至 A13{{ pushableCount ? `（${pushableCount}）` : '' }}</el-button><el-button size="small" :disabled="isReadonly||d435SyncBusy||editorMode==='在线编辑'" @click="switchD435Mode('onlyoffice')" title="把当前 html 数据推送到在线编辑（人工触发）">同步到在线编辑</el-button><el-dropdown trigger="click" size="small"><el-button size="small">导入导出 ▾</el-button><template #dropdown><el-dropdown-menu><el-dropdown-item @click="exportTemplate('D4-35')">导出模板</el-dropdown-item><el-dropdown-item @click="exportData('D4-35')">导出数据</el-dropdown-item><el-dropdown-item><el-upload :show-file-list="false" accept=".xlsx" :auto-upload="false" :disabled="isReadonly||importing" @change="(f:any)=>importData('D4-35',f.raw||f)"><span>导入数据</span></el-upload></el-dropdown-item></el-dropdown-menu></template></el-dropdown><GtIndexChip value="wp:D4-34" :context-project-id="projectId" /><el-button v-if="openReviewDialog" size="small" @click="openReviewDialog('D4-35-check')">💬 复核</el-button></div></div>
+  <div class="toolbar"><div class="toolbar-left"><el-segmented v-model="editorMode" :options="modeOptions" size="small" /><el-tag :type="syncStateTag.type" size="small" effect="light" style="margin-left:8px">{{ syncStateTag.text }}</el-tag></div><div class="toolbar-right"><el-button size="small" type="warning" plain :disabled="isReadonly||pushableCount===0" @click="pushAnomaliesToA13" title="把抽凭异常推送到 A13 未更正错报汇总（金额与方向由人工认定）">推送异常至 A13{{ pushableCount ? `（${pushableCount}）` : '' }}</el-button><el-button size="small" :disabled="isReadonly||d435SyncBusy||editorMode==='在线编辑'" @click="switchD435Mode('onlyoffice')" title="把当前 html 数据推送到在线编辑（人工触发）">同步到在线编辑</el-button><el-button size="small" @click="openFormulaManager" title="打开平台公式管理中心（唯一一套公式，支持跨底稿取数联动与表内校对）">ƒx 公式管理</el-button><el-dropdown trigger="click" size="small"><el-button size="small">导入导出 ▾</el-button><template #dropdown><el-dropdown-menu><el-dropdown-item @click="exportTemplate('D4-35')">导出模板</el-dropdown-item><el-dropdown-item @click="exportData('D4-35')">导出数据</el-dropdown-item><el-dropdown-item><el-upload :show-file-list="false" accept=".xlsx" :auto-upload="false" :disabled="isReadonly||importing" @change="(f:any)=>importData('D4-35',f.raw||f)"><span>导入数据</span></el-upload></el-dropdown-item></el-dropdown-menu></template></el-dropdown><GtIndexChip value="wp:D4-34" :context-project-id="projectId" /><el-button v-if="openReviewDialog" size="small" @click="openReviewDialog('D4-35-check')">💬 复核</el-button></div></div>
 
   <template v-if="editorMode !== '在线编辑'">
     <!-- 审计目标 -->

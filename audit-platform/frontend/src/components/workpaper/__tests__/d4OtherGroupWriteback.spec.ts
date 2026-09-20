@@ -144,3 +144,48 @@ describe('D4-33~36 组件连接性（字面量正确）', () => {
     expect(src).not.toContain('GtOnlyOfficeSheet')
   })
 })
+
+// ─── 公式管理入口守卫：接入平台唯一公式体系（FormulaManagerDialog / wp_formula） ─────
+// 四组件通过 open-formula-manager 事件打开平台全局公式管理中心（同 E1 范式），
+// 定位到本底稿 nodeKey（wp_d4_33/34/35/36）。平台侧后端权威执行 + CAS + 审计 +
+// 跨底稿 TB()/WP()/ROW() 取数联动，为"唯一一套公式"的落地入口。
+describe('D4-33~36 公式管理入口（接入平台唯一公式体系）', () => {
+  const cases = [
+    { file: 'D4TabOtherMargin.vue', node: 'wp_d4_33' },
+    { file: 'D4TabOtherContract.vue', node: 'wp_d4_34' },
+    { file: 'D4TabOtherCheck.vue', node: 'wp_d4_35' },
+    { file: 'D4TabOtherCutoff.vue', node: 'wp_d4_36' },
+  ]
+  for (const c of cases) {
+    it(`${c.file}: import eventBus 且 openFormulaManager emit open-formula-manager`, () => {
+      const src = readOther(c.file)
+      expect(src).toContain("from '@/utils/eventBus'")
+      // 判行为：openFormulaManager 函数体 emit 平台事件（非仅字符串出现）
+      const fnIdx = src.indexOf('function openFormulaManager')
+      expect(fnIdx, `${c.file} 缺 openFormulaManager 函数`).toBeGreaterThan(0)
+      const fnBody = src.slice(fnIdx, fnIdx + 260)
+      expect(fnBody).toContain("eventBus.emit('open-formula-manager'")
+    })
+    it(`${c.file}: nodeKey 字面量 = ${c.node}（定位本底稿，防串表）`, () => {
+      const src = readOther(c.file)
+      const fnIdx = src.indexOf('function openFormulaManager')
+      const fnBody = src.slice(fnIdx, fnIdx + 260)
+      expect(fnBody).toContain(`nodeKey: '${c.node}'`)
+    })
+    it(`${c.file}: 工具条有「ƒx 公式管理」按钮且 @click=openFormulaManager`, () => {
+      const src = readOther(c.file)
+      expect(src).toContain('ƒx 公式管理')
+      expect(src).toContain('@click="openFormulaManager"')
+    })
+  }
+
+  it('四组件 nodeKey 互不串表（每表唯一 wp_d4_3X）', () => {
+    const nodes = cases.map(c => {
+      const src = readOther(c.file)
+      const m = src.match(/nodeKey:\s*'(wp_d4_3\d)'/)
+      return m?.[1]
+    })
+    expect(new Set(nodes).size).toBe(4) // 四个各自唯一
+    expect(nodes).toEqual(['wp_d4_33', 'wp_d4_34', 'wp_d4_35', 'wp_d4_36'])
+  })
+})

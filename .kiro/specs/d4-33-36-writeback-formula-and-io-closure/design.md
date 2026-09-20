@@ -30,23 +30,25 @@
 └─ export 分发 elif 链：对应 6 个行构造函数（D4-33 既有分支保留，补对称 import）
 
 前端（audit-platform/frontend/src/components/workpaper/）
-├─ composables/useD4FormulaEngine.ts        ← 接线为主 + 可能新增方向化跨期判定
-├─ composables/d4OtherGroupFormulaOverrides.ts   ← 【新增】公式覆盖层（单一读取入口）
-├─ composables/d4OtherGroupPushPredicates.ts     ← 【新增】可推送判据单一真源
-├─ composables/useD4OtherGroupDualWriteback.ts   ← 【新增】双模式同步 + A13 推送共享件
-├─ composables/useD4InspectionWriteback.ts       ← 复用（已存在），必要时仅扩可选参数
-├─ d4/other/D4TabOtherMargin.vue               ← D4-33 接线
-├─ d4/other/D4TabOtherContract.vue             ← D4-34 接线（两区 adapter）
-├─ d4/other/D4TabOtherCheck.vue                ← D4-35 接线（含 sampling 保护）
-├─ d4/other/D4TabOtherCutoff.vue               ← D4-36 接线（两区 adapter，方向化判定）
-└─ composables/useD4OtherGroup.ts              ← 【删除】死代码
+├─ composables/useD4FormulaEngine.ts        ← ✅ 接线为主 + 已新增方向化跨期判定 isCrossPeriodForward/Backward
+├─ composables/d4OtherGroupFormulaOverrides.ts   ← 🔴【作废·未建】自建公式覆盖层被治理契约 B3/B4 禁止（checklist remark 冒充公式）；公式二次编辑改走平台 F-SHELL v2 mutation（待接入 D4）
+├─ composables/d4OtherGroupPushPredicates.ts     ← ✅【已建】可推送判据单一真源
+├─ composables/useD4OtherGroupDualWriteback.ts   ← 🔴【作废·未建】自建双模式同步 composable 被治理契约 B2/C1 禁止；实际改用平台 useWorkpaperSyncBridge + WorkpaperSyncEditorHost（D4-34/35/36 已接，D4-33 待接）
+├─ sync/useWorkpaperSyncBridge.ts + WorkpaperSyncEditorHost.vue ← ✅【复用平台件】双模式回写正道（替代上面的自建件）
+├─ composables/useD4InspectionWriteback.ts       ← ✅ 复用（已存在），A13 推送 pushToA13
+├─ d4/other/D4TabOtherMargin.vue               ← ✅ D4-33 公式/A13 接线（双模式待接，样式/公式面板 partial）
+├─ d4/other/D4TabOtherContract.vue             ← ✅ D4-34 接线（两区 adapter + 双模式）
+├─ d4/other/D4TabOtherCheck.vue                ← ✅ D4-35 接线（含 sampling 保护 + 双模式 + 同步态 tag）
+├─ d4/other/D4TabOtherCutoff.vue               ← ✅ D4-36 接线（两区 adapter，方向化判定 + 双模式）
+└─ composables/useD4OtherGroup.ts              ← ✅【已删除】死代码
 
 守卫（后端 backend/tests/，前端 audit-platform/frontend/src/**/__tests__/）
-├─ test_d4_33_36_import_export_roundtrip.py    ← 后端 6 个 parser 逐字段结构断言
-├─ test_d4_33_36_item_id_and_dead_config.py    ← item_id 字面量 + 死配置删除断言
-├─ d4OtherGroupWriteback.spec.ts               ← A13 推送 payload 字面量 + 空项不 emit
-├─ d4OtherGroupFormulaOverride.spec.ts         ← 三处同口径 + 百分比口径 + 失败不静默
-└─ mutate_d4_33_36_guards.py                   ← 变异检验 harness（12+ 锚点）
+├─ test_d4_33_36_import_export_roundtrip.py    ← ✅ 后端 6 个 parser 逐字段结构断言（14 passed）
+├─ test_d4_33_36_item_id_and_dead_config.py    ← ✅ item_id 字面量 + 死配置删除断言（6 passed）
+├─ __tests__/d4OtherGroupWriteback.spec.ts     ← ✅ A13 推送 payload 字面量(6051) + 空项不 emit + 只读禁用（12 passed）
+├─ composables/__tests__/d4OtherGroupPushPredicates.spec.ts ← ✅ 判据单一真源专测（11 passed，替代原 FormulaOverride.spec）
+├─ d4OtherGroupFormulaOverride.spec.ts         ← 🔴【作废·未建】覆盖层三处同口径专测随覆盖层（2.1/2.2）作废；百分比口径改由后端 test_d4_33_margin_is_percentage + 变异 d33_margin_ratio 锁死
+└─ scripts/diagnose/mutate_d4_33_36_guards.py  ← ✅ 变异检验 harness（实际 7 锚点全 RED，覆盖后端可变异面；前端锚点在 vitest 侧）
 ```
 
 ### 数据流
@@ -78,25 +80,36 @@ html 侧（人工点「同步到在线编辑」）
   → compareBothSides(sheet) → 差异列表（行/字段级）→ 仅提示，绝不自动覆盖任一侧
 ```
 
-**公式覆盖层**
+**公式（默认口径 + 二次编辑）**
 
+> 🔴 **2026-09-20 治理对齐更正**：原设计的「前端 `getFormulaParam` 读 checklist remark 覆盖层 + 后端 `d4OtherGroupFormulaDefaults.json` 双默认 + export 读 `{sheet}-formula-override` item_id」整套自建覆盖层方案，已被共同契约 `d4-dual-mode-formula-governance`（C2 §C.5/§I、Gating B3/B4）**明令禁止**（禁止 checklist remark 冒充公式、禁止前后端各存一份默认值）。**实际实现正确地未建这套自建层**（grep `getFormulaParam`/`formula-override`/`d4OtherGroupFormulaDefaults` 全零命中）。
+
+现状（已落地）：
 ```
-统一公式参数入口：effective definition 由 F-SHELL v2 mutation 管理，后端权威执行并投影 HTML/OO；不读取 `field_overrides` 或 checklist remark 作为公式覆盖。
-
-消费方（三处，必须同一个入口）：
-  ① 表格渲染值   ← 组件 computed 调 getFormulaParam
-  ② A13 推送判据 ← pushPredicates 调 getFormulaParam
-  ③ 导出行构造   ← 后端 export 读同一 item_id（后端也读覆盖层，见下）
+默认公式口径 = useD4FormulaEngine 纯函数（前端单侧真源，展示层派生）：
+  ① 表格渲染值   ← 组件 computed 调引擎纯函数（calcGrossMarginRate ×100 等）
+  ② A13 推送判据 ← d4OtherGroupPushPredicates 调引擎纯函数（阈值以函数可选参数默认承载）
+  ③ 导出行构造   ← 后端 export 重算派生列（不读文件值，防手改文件伪造结论）
 ```
 
-> 🔴 **一个必须显式设计的点**：导出行构造在**后端**执行，而覆盖层默认值在**前端引擎**里。为保证「三处同口径」（Property 4），后端导出必须**从 DB 读同一个 `{sheet}-formula-override` item_id** 取覆盖值，默认值表必须在**后端也有一份且与前端常量字面量一致**（由契约测试锁死双向一致，防止只改一侧）。这是本 spec 唯一需要跨端同步的常量清单，集中在 `d4OtherGroupFormulaDefaults.json`（`backend/data/`，前端运行时通过既有静态数据端点读取或直接 import 同源文件）。
+二次编辑（待落地，走治理正道）：
+```
+用户二次编辑公式 = 平台 FormulaManagerDialog + wp_formula（后端权威执行 + CAS + 审计）【2026-09-20 已接入，层次A】：
+  · 四组件 openFormulaManager() emit 'open-formula-manager' + nodeKey wp_d4_3X（同 E1 范式）
+  · 打开全局公式管理中心 → TB()/WP()/ROW()/SUM_ROW()/IF() 定义本底稿公式 → 落 wp_formula 表
+  · effective definition 含 expression/refs/params；preset/custom 分离、删除/恢复默认、未知函数 blocked
+  · 跨底稿取数联动 + 表内运算校对 = 平台既有能力；classify_scope 对 D4 wp_code 确定性分类，零后端改动
+  · 层次B（既有派生列本身迁到后端权威执行、废弃前端纯函数）= 独立后续工程，全平台未做，非本次范围
+```
+
+> **「三处同口径」（Property 4）的现状保证**：默认口径来自引擎单一真源（前端纯函数），后端 export 重算而非读文件，A13 判据与表格渲染共用同一引擎函数 ⇒ 三处同口径由「单一引擎真源」而非「跨端覆盖层同步」保证。这消除了原设计「前后端双默认漂移」的风险来源（也是治理禁止双默认的原因）。用户级公式二次编辑已于 2026-09-20 接入平台 `FormulaManagerDialog`/`wp_formula`（层次A，同 E1），落 wp_formula 表由后端权威执行 + CAS + 审计承载；组件既有派生列迁到后端权威执行（层次B）为独立后续工程。
 
 ## Key Decisions
 
 | # | 决策 | 理由 |
 |---|---|---|
 | DEC-1 | item_id 错位改后端映射，不改前端键 | 前端键已被 watch/persistAll/onBeforeUnmount 多处引用；后端 `-rows` 键零消费者。与姊妹 spec 同方向 |
-| DEC-2 | 毛利率统一到引擎**百分比**口径 | 引擎是单一真源；`*100` 局部补丁会造第四套口径（Property 5） |
+| DEC-2 | 毛利率统一到引擎口径（引擎为单一真源） | 🔴 **2026-09-20 事实更正**：引擎 `calcGrossMarginRate` 实际返回**小数比率**（`(rev-cost)/rev`，`useD4FormulaEngine.ts` L103），**非**原 DEC-2 所述「百分比」。组件展示处 `* 100` 是**正确的百分比格式化**，不是「第四套口径打补丁」。裁决实质不变（引擎单一真源、全库无第二套毛利率路径），仅口径描述纠正为「引擎返小数、展示层 ×100」。Property 5 由后端 `test_d4_33_margin_is_percentage` + 变异 `d33_margin_ratio` RED 锁死。 |
 | DEC-3 | 主 sheet 死配置 `D4-34`/`D4-36` 删除（非报错短路） | 前端从未有主键入口，保留即 Property 12 死配置 |
 | DEC-4 | `useD4OtherGroup.ts` 直接删除 | 平台铁律「死代码立即删除」；其类型与真实组件全不符（`isAnomalous: boolean` vs 实际 string），留着只会误导 |
 | DEC-5 | 科目码统一 `6051`/`其他业务收入` | 本 spec 与姊妹 spec（`6001`）的唯一科目差异，必须守卫锁死防照抄错 |
