@@ -736,7 +736,12 @@ def resolve_managed_region(
     * >1 个 → :class:`ManagedRegionResolutionError`（同一 displayName 落在多张 sheet 上，
       连「哪一份是受管区域」都无法确定；上游 `identity_inventory` 用 `next(...)` 取第一个
       是 fail-open，本模块不复制那个行为）。
+
+    静态受管区（:attr:`BindingKind.static_region`）走 :func:`_resolve_static_region`
+    —— 锚点是 workbook-scope definedName，不经 Excel Table。
     """
+    if is_static_region(binding):
+        return _resolve_static_region(zf, contract=contract, binding=binding)
     sheets, _ = _sheet_part_map(zf)
     tables = parse_tables(zf, sheets)
     matched = [
@@ -805,6 +810,96 @@ def resolve_managed_region(
             "identity 列必须被 Table 覆盖，否则插删行时会与数据行错位"
         )
     return region
+
+
+def _split_defined_name_ref(ref: str) -> tuple[str, str]:
+    """把 definedName ref `'工作表'!$C$10:$M$41` 拆成 `(sheet_name, "C10:M41")`。
+
+    definedName 的 ref 带 sheet 前缀（可能加单引号）与 `$` 绝对符，而
+    :func:`parse_a1_range` 只吃纯 `C10:M41`。这里做**唯一**一次剥离，不在别处重写。
+    """
+    raw = str(ref or "").strip()
+    if "!" not in raw:
+        raise ManagedRegionResolutionError(
+            f"静态受管区 definedName ref 缺 sheet 前缀: {ref!r}"
+        )
+    sheet_part_raw, a1 = raw.rsplit("!", 1)
+    sheet_name = sheet_part_raw.strip()
+    if sheet_name.startswith("'") and sheet_name.endswith("'"):
+        sheet_name = sheet_name[1:-1].replace("''", "'")
+    a1_clean = a1.replace("$", "")
+    return sheet_name, a1_clean
+
+
+def _resolve_static_region(
+    zf: zipfile.ZipFile, *, contract: SyncContract, binding: ExcelIdentityBinding
+) -> ManagedRegion:
+    """由 **workbook-scope definedName** 求静态受管区（Requirement 2）。
+
+    锚点是磁盘上可校验的 definedName（OO 改 sheet 名不动它），不经 Excel Table、无 UUID 列。
+    命中 0 / >1 / 落隐藏 metadata sheet 都 fail-closed，与 Excel Table 分支同构。
+    """
+    sheets, defined_names = _sheet_part_map(zf)
+    # workbook-scope（scope is None）+ 名字匹配（大小写不敏感，同 D4-29 纪律）
+    matched = [
+        d
+        for d in defined_names
+        if str(d.get("name") or "").lower() == binding.defined_name.lower()
+        and d.get("scope") is None
+    ]
+    if not matched:
+        raise IdentityCarrierMissingError(
+            f"静态受管区 definedName {binding.defined_name!r} 反读不到（实测 workbook-scope "
+            f"names: {[d.get('name') for d in defined_names if d.get('scope') is None]}）—— "
+            "它是纯静态 sheet 唯一可用的区域边界锚点，缺它即无锚点可用，必须 fail closed"
+        )
+    if len(matched) > 1:
+        raise ManagedRegionResolutionError(
+            f"静态受管区 definedName {binding.defined_name!r} 命中 {len(matched)} 个 —— "
+            "受管区不唯一，禁止取第一个继续"
+        )
+    ref = str(matched[0].get("ref") or "")
+    if not ref:
+        raise ManagedRegionResolutionError(
+            f"静态受管区 definedName {binding.defined_name!r} 没有 ref —— 受管区间无法确定"
+        )
+    sheet_name, a1 = _split_defined_name_ref(ref)
+    first_col, first_row, last_col, last_row = parse_a1_range(
+        a1, location=f"definedName[{binding.defined_name}].ref"
+    )
+    sheet = next((s for s in sheets if s["name"] == sheet_name), None)
+    if sheet is None:
+        raise ManagedRegionResolutionError(
+            f"静态受管区 definedName 指向的 sheet {sheet_name!r} 不在 workbook 清册里"
+        )
+    if is_platform_metadata_sheet(sheet_name):
+        raise ManagedRegionResolutionError(
+            f"受管静态区落在平台隐藏 metadata sheet {sheet_name!r} 上 —— "
+            "隐藏元数据表永不得作为受管业务 sheet"
+        )
+    sheet_part = normalise_part(sheet["rel_target"])
+    if sheet_part not in zf.namelist():
+        raise ManagedRegionResolutionError(
+            f"受管静态区 sheet part {sheet_part!r} 不在 zip 里"
+        )
+    if _contract_table(contract, binding.table_key) is None:
+        raise ManagedRegionResolutionError(
+            f"契约 {contract.contract_id} 没有 table_key={binding.table_key!r} —— "
+            "identity 绑定与契约表必须一一对应"
+        )
+    # 🔴 静态区 uuid_column="" —— 下游按 kind 分派不访问它；不执行 contains_column(uuid) 校验。
+    return ManagedRegion(
+        table_key=binding.table_key,
+        table_name="",
+        sheet_name=sheet_name,
+        sheet_part=sheet_part,
+        table_ref=a1,
+        first_row=first_row,
+        last_row=last_row,
+        first_column=first_col,
+        last_column=last_col,
+        uuid_column="",
+    )
 
 
 def _contract_table(contract: SyncContract, table_key: str) -> TableSpec | None:

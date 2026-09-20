@@ -136,7 +136,9 @@ def _resolve_static_region(zf, *, contract, binding) -> ManagedRegion:
 
 `ManagedRegion.uuid_column` 现为必填 str。静态区传 `""`；下游对静态 region 不访问 `uuid_column`（由 kind 分派保证）。`resolve_managed_sheet` 目前签名 `(workbook_bytes, *, defined_name)`——它接受 bytes，本处从 zf 取回字节复用（避免重解 zip 的第二真源）。`_defined_name_ref` 是新增小工具：从 workbook.xml 取该 definedName 的 `attr_text`（ref），复用 D4-29 `resolve_managed_sheet` 内部已解析的 `DefinedName.value`，不重写 XML 解析。
 
-> 🔴 实现前置核查：`resolve_managed_sheet` 当前返回 `(name, ws)` 还是别的元组，须 read 确认后对齐；`_defined_name_ref` 若 `resolve_managed_sheet` 已能返回 ref 则直接取，不新造。
+> 🔴 **实现期修正（2026-09-20，Task 2 落地实测）**：
+> 1. **不复用 D4-29 的 `resolve_managed_sheet`**——它深度绑死 D4-29 几何（硬编码校验 `destinations[0][1] != MANAGED_REF`=`$C$10:$M$41`、`ws.max_row < LAST_FIELD_ROW`）。静态区改为直接用 `_parse_workbook_xml`（fingerprint 模块）返回的 `defined_names` 条目 `{name, scope, ref, hidden}`：`scope is None` 即 workbook-scope。新增 `_split_defined_name_ref` 剥 `'Sheet'!$C$10:$M$41` 的 sheet 前缀与 `$`，复用 `parse_a1_range` 求几何。
+> 2. **locator anchor 复用 `defined_name_ref`（不自造 `static_region_ref` carrier 锚点）**：carrier gate 真值表（`onlyoffice_excel_identity_carrier_contract.json`）是**真实 OO 探针裁决**，`defined_name_ref` 已 `probe_verdict: passed`（workbook-scope definedName 经 OO 往返保留、ref 随 sheet 改名自动改写），而 `static_region_ref` 从未被 OO 探针取证→SHALL NOT 入 gate。故契约 sheet 的 `locator.anchor = "defined_name_ref"`（合规复用）；**「静态 vs 转置」的语义分派放在 binding.kind（defined_name 字段）+ observer payload 的 region_kind 标记层**，不在 carrier 锚点名层。这修正了 requirements 里「新增 static_region_ref anchor kind」的表述——kind 是**引擎内部分派标记**，不是 carrier gate 锚点。
 
 #### C1.3 `managed_tables_of` 静态路径（Requirement 3.1）
 
