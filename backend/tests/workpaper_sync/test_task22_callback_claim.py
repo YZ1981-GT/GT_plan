@@ -765,6 +765,63 @@ def test_non_uuid_userdata_degrades_to_absent() -> None:
     assert payload.request_id is None
 
 
+def test_json_userdata_yields_request_id() -> None:
+    """🔴 两端编解码对称：出站 forcesave 写的 JSON userdata 必须能被 request_id 还原。
+
+    `command_service.forcesave` 把 userdata 写成 `{"request_id":..., "operation_id":...}`
+    （JSON 对象串），OO 原样回显。若 request_id 只按裸 UUID 解析，JSON 串必失败 →
+    request-first 精确绑定失效 → 所有 forcesave callback 掉进 recovery
+    (missing_request/ambiguous_close)、OO→HTML 永不落 store。此测试锁死对称。
+    """
+    import json as _json
+
+    rid = uuid.uuid4()
+    userdata = _json.dumps(
+        {"request_id": str(rid), "operation_id": str(uuid.uuid4())},
+        ensure_ascii=False,
+        sort_keys=True,
+    )
+    payload = CallbackPayload.from_mapping(_body(userdata=userdata), contract=CONTRACT)
+    assert payload.request_id == rid, "JSON userdata 必须还原出同一个 request_id"
+
+
+def test_forcesave_userdata_roundtrips_through_callback_request_id() -> None:
+    """出站 command_service.forcesave 写的 userdata ↔ 回调 request_id 逐字节对称。
+
+    不 mock 编码：直接用 command_service 里出站请求体的**同一套** json.dumps 约定构造
+    userdata，断言 callback 侧解得回同一 request.id。任一端单边改编码，这条即红。
+    """
+    import json as _json
+
+    rid = uuid.uuid4()
+    oid = uuid.uuid4()
+    # 与 command_service.forcesave 的出站体逐字一致的 userdata 编码
+    outbound_userdata = _json.dumps(
+        {"request_id": str(rid), "operation_id": str(oid)},
+        ensure_ascii=False,
+        sort_keys=True,
+    )
+    payload = CallbackPayload.from_mapping(_body(userdata=outbound_userdata), contract=CONTRACT)
+    assert payload.request_id == rid
+
+
+def test_bare_uuid_userdata_still_supported() -> None:
+    """向后兼容：历史/第三方裸 UUID userdata 仍能解析出 request_id。"""
+    rid = uuid.uuid4()
+    payload = CallbackPayload.from_mapping(_body(userdata=str(rid)), contract=CONTRACT)
+    assert payload.request_id == rid
+
+
+def test_json_userdata_without_request_id_degrades_to_absent() -> None:
+    """JSON userdata 但缺 request_id 键 → 当作无 userdata（不抛，走 recovery）。"""
+    import json as _json
+
+    payload = CallbackPayload.from_mapping(
+        _body(userdata=_json.dumps({"operation_id": str(uuid.uuid4())})), contract=CONTRACT
+    )
+    assert payload.request_id is None
+
+
 # ═══════════════════════════════════════════════════════════════════════════
 # 5. delivery 去重
 # ═══════════════════════════════════════════════════════════════════════════

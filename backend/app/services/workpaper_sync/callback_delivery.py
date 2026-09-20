@@ -350,9 +350,32 @@ class CallbackPayload:
         不抛：Task 4 实测 OO 原样回显任意 `userdata`，第三方/旧版本可能塞非 UUID 文本。
         把它当致命错误会让 durable 内容无法进入 recovery；正确处置是"当作无 userdata"，
         由归组规则决定去 recovery 还是 close-capture。
+
+        🔴 出站 `command_service.forcesave` 把 userdata 写成 **JSON 对象串**
+        `{"request_id": "...", "operation_id": "..."}`（为把 operation_id 一并带回），
+        OO 原样回显。若这里只按裸 UUID 解析，JSON 串必然解析失败 → request-first 精确
+        绑定失效 → 所有 forcesave callback 掉进 recovery(missing_request/ambiguous_close)，
+        OO→HTML 永不落 store。两端编解码必须对称：**先按 JSON 取 `request_id`，失败再
+        回退裸 UUID**（兼容历史裸 UUID 投递与第三方 userdata）。
         """
         if self.userdata is None:
             return None
+        # 先按 JSON 对象解包（出站约定的格式）
+        try:
+            parsed = json.loads(self.userdata)
+        except (ValueError, TypeError):
+            parsed = None
+        if isinstance(parsed, dict):
+            raw = parsed.get("request_id")
+            if raw is None:
+                logger.warning("callback userdata JSON 里没有 request_id，按无 userdata 处理: %r", self.userdata)
+                return None
+            try:
+                return uuid.UUID(str(raw))
+            except (ValueError, AttributeError, TypeError):
+                logger.warning("callback userdata.request_id 不是 UUID，按无 userdata 处理: %r", raw)
+                return None
+        # 回退：整串当裸 UUID（历史格式 / 第三方）
         try:
             return uuid.UUID(self.userdata)
         except (ValueError, AttributeError, TypeError):

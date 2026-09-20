@@ -285,7 +285,7 @@ backend/tests/workpaper_sync/test_task19_writer_migration.py  1751
 backend/tests/workpaper_sync/test_task20_writer_gate.py  1569
 backend/tests/workpaper_sync/test_task21_room_service.py  1335
 backend/tests/workpaper_sync/test_task21_room_service_pg.py  2663
-backend/tests/workpaper_sync/test_task22_callback_claim.py  1326
+backend/tests/workpaper_sync/test_task22_callback_claim.py  1457
 backend/tests/workpaper_sync/test_task22_callback_claim_pg.py  2089
 backend/tests/workpaper_sync/test_task23_request_application_pg.py  2774
 backend/tests/workpaper_sync/test_task24_close_intent.py  1305
