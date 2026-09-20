@@ -30,7 +30,9 @@
       "contract sheets（sheet_payload_d48）",
       "combined projection（d48_projs，默认值 [] 而非 {}）",
       "values.update 循环 + row_keys",
-      "STORE_ITEM_ID_D48_DICT 导出（oo_to_html 专用块，不进 rows 4-tuple 循环）"
+      "STORE_ITEM_ID_D48_DICT 导出（oo_to_html 专用块，不进 rows 4-tuple 循环）",
+      "前端接桥：D4TabProductMargin.vue 接 useWorkpaperSyncBridge + WorkpaperSyncEditorHost（sheetKey=d48-managed），已去 legacy GtOnlyOfficeSheet",
+      "宿主登记：GtD4OperatingRevenue.vue isD4DedicatedSyncSheet 含 'D4-8'"
     ]
   },
   "publish_chain": {
@@ -67,9 +69,9 @@
   },
   "not_covered": [
     {
-      "aspect": "frontend_bridge_wiring",
-      "verdict": "NOT_DONE",
-      "reason": "D4TabProductMargin.vue 仍是 legacy（未接 useWorkpaperSyncBridge/WorkpaperSyncEditorHost），宿主 isD4DedicatedSyncSheet 未含 'D4-8'。后端契约/projection/发布链已全绿（真双向的后端侧就绪），前端接桥为独立后续步骤。"
+      "aspect": "oo_verified_end_to_end",
+      "verdict": "PENDING_ENV",
+      "reason": "未达主控 §6.4 ONLYOFFICE_VERIFIED（需真实 OO 往返产生 working_paper_content_application state=applied + operation 终态 + OO 侧 content version）。同 D4 全组 32 张一致标准，列批次C env 门。"
     },
     {
       "aspect": "oo_canvas_cell_edit_roundtrip",
