@@ -432,18 +432,14 @@ _INCLUDE_D436_CUTOFF_SHEET: Final[bool] = True
 #: 专用 dict 块同时处理两 item，**不进** rows 4-tuple 循环。1 instrumentation spec（仅 dynamic 区）。
 #: provider=phase5_d4_margin_monthly_sheet。
 _INCLUDE_D47_MARGIN_SHEET: Final[bool] = True
-#: 🔴 D4-1 同 sheet 双区 instrumentation 接线开关（Task 5）。
-#: 契约 sheet（sheet_payload_d41）+ store projection + merge 恒接（判据先行 Task 2 判据）；
-#: 但 instrumentation_specs 两 spec（主营/其他）暂**不接**，唯一阻塞 = 运行态 sibling binding
-#: 对齐仍是「1 spec ↔ 1 sheet」的位置 zip（`_attach_sibling_bindings` /
-#: `_sibling_identity_bindings`：`len(sheets) != len(specs)` 且 `zip(specs, sheets)`），
-#: 无法把 D4-1 的 2 个 spec 归到同一张 sheet。同 sheet 双区 **XML 注入内核**
-#: (`_attach_table_part` 合并 `<tableParts>`) 已由 D4-9 Task 1 落地（gate GREEN），但
-#: **binding 对齐**这一段属另一段共享内核工作（主控 §5.3 共享锁，D4-9 owner）。为遵守
-#: 「不改动影响 D4-2/3/5/15/16/25~28 任何字节」，本开关默认 False：两 spec 不进
-#: instrumentation_specs（否则 specs 数比 row_oriented_sheets 多 1，publish 侧
-#: `_sibling_identity_bindings` 抛 ProviderCapabilityError 打挂整个 gt-d4-operating-revenue
-#: entry）。唯一解除条件：dual-region binding 对齐（按 managed_sheet 归组 spec）落地 + 守卫。
+#: 🔴 D4-1 同 sheet 双区 instrumentation 接线开关（Task 5）。**现为 True，已落地**。
+#: 契约 sheet（sheet_payload_d41）+ store projection + merge 恒接；两 spec（主营/其他）也已
+#: 进 instrumentation_specs。曾经的唯一阻塞（sibling binding 对齐仍是「1 spec ↔ 1 sheet」的
+#: 位置 zip，无法把 D4-1 的 2 个 spec 归到同一张 sheet）已由 D4-1 落地时补齐的 4 处共享内核
+#: 缺口解除（`_attach_table_part` XML 合并 / `_attach_sibling_bindings` 按 managed_sheet 归组 /
+#: `excel_extract` 一 sheet N 表逐 binding 反读 / `excel_materialize` footer per-region 解析），
+#: 见 commit 663c3f019 + 清册「增量更新（2026-09-20，D4-1 落地）」段。发布链已跑全、DB 判据
+#: GREEN（不回归 D4-2/3/5/15/16/25~28）。
 _INCLUDE_D41_ADJUDICATION_INSTRUMENTATION: Final[bool] = True
 #: D4-29 uses an independently compiled, workbook-scope transposed anchor.
 _INCLUDE_D429_TRANSPOSED: Final[bool] = True
@@ -484,6 +480,22 @@ STORE_ITEM_IDS: Final[tuple[str, ...]] = (
     *((STORE_ITEM_ID_D434,) if _INCLUDE_D434_CONTRACT_SHEET else ()),
     *((STORE_ITEM_ID_D436,) if _INCLUDE_D436_CUTOFF_SHEET else ()),
     *((STORE_ITEM_ID_D47_PRODUCTS, STORE_ITEM_ID_D47_MONTHLY) if _INCLUDE_D47_MARGIN_SHEET else ()),
+    # 🔴 批次 A-5 / 批次 B 接入的 item 此前**漏登记** STORE_ITEM_IDS，导致 oo_to_html 的
+    # mirror 按 STORE_ITEM_IDS 构造 base 时读不到它们（基线恒空 → merge 覆写丢 HTML-only
+    # 字段/行）。逐张按各自 _INCLUDE_* 补齐（与上方同门控），使 mirror 能读到真实 base。
+    *((STORE_ITEM_ID_D46,) if _INCLUDE_D46_INDICATOR_SHEET else ()),
+    *((STORE_ITEM_ID_D417,) if _INCLUDE_D417_CUTOFF_SHEET else ()),
+    *((STORE_ITEM_ID_D418,) if _INCLUDE_D418_CUTOFF_SHEET else ()),
+    *((STORE_ITEM_ID_D419,) if _INCLUDE_D419_DISCOUNT_SHEET else ()),
+    *((STORE_ITEM_ID_D411,) if _INCLUDE_D411_PRICE_SHEET else ()),
+    *((STORE_ITEM_ID_D410,) if _INCLUDE_D410_PRICE_SHEET else ()),
+    *(store_item_ids_d420() if _INCLUDE_D420_RETURN_SHEET else ()),
+    *(
+        tuple(interview_store_item_id(code) for code in INTERVIEW_SHEET_CODES())
+        if _INCLUDE_IPO_INTERVIEW_SHEETS
+        else ()
+    ),
+    *INSPECTION_STORE_ITEM_ID_BY_CODE.values(),
     *STORE_ITEM_ID_BY_CODE.values(),
 )
 EMPTY_STORE_PAYLOAD: Final[str] = "[]"
@@ -767,8 +779,8 @@ def instrumentation_specs() -> tuple:
             )
             for code in INSPECTION_SHEET_CODES
         ),
-        # D4-30/31/32：D4-31 singleton 多字段挤同一物理行，materialize roundtrip 红；
-        # 暂不进 instrumentation，待几何重裁后再开（否则挡 D4-5 rematerialize）。
+        # D4-30/31/32（IPO 访谈，批次 A-5 已落地，_INCLUDE_IPO_INTERVIEW_SHEETS=True）：
+        # D4-31 singleton 几何已裁并接入，随发布链 gen52 rematerialize 无 drift。
         *(
             instrumentation_spec_interview(
                 code, entry_id=ENTRY_ID, template_relative_path=TEMPLATE_RELATIVE_PATH
@@ -1795,8 +1807,17 @@ def merge_projection_into_all_d4_stores(
     *,
     projection: Any,
     base_by_item: Mapping[str, list[Mapping[str, Any]]],
-) -> dict[str, tuple[list[dict[str, Any]], int, int, set[str]]]:
-    """对 D4-2 / D4-3 / D4-5-policy-groups 分别 merge（fixed items 另见 merge_d45_fixed）。"""
+) -> dict[str, tuple[Any, int, int, set[str]]]:
+    """对各 D4 sheet 分别 merge（fixed items 另见 merge_d45_fixed）。
+
+    🔴 **返回形态契约（单源收口）**：本函数**保证**每个 value 是 4-tuple
+    ``(payload, applied, visited, touched)`` —— oo_to_html 的 mirror 循环按此硬解包
+    （生产回写路径，无 try/except）。历史上一批 provider 的 merge 只返回裸 payload
+    （list / dict），在 mirror 处以 ``ValueError`` 打挂整个 D4 entry 的 OO→HTML 回写；
+    本函数最后统一经 :func:`_normalize_merge_updates` 归一，把裸 payload 包成 4-tuple
+    并按 projection 命中数补出 ``applied``（供 mirror 判「无投影不覆空」）。``payload``
+    对 rows-store 是 list、对 dict-store（D4-10/30/31）是 dict —— mirror 直接 json.dumps
+    整个 payload 写 remark，故 dict 亦正确。"""
     d42_base = list(base_by_item.get(STORE_ITEM_ID) or ())
     d43_base = list(base_by_item.get(STORE_ITEM_ID_D43) or ())
     d45_base = list(base_by_item.get(STORE_ITEM_ID_D45_GROUPS) or ())
@@ -1882,7 +1903,7 @@ def merge_projection_into_all_d4_stores(
         if _INCLUDE_D420_RETURN_SHEET
         else {}
     )
-    return {
+    _raw_updates: dict[str, Any] = {
         STORE_ITEM_ID: merge_projection_into_store_rows(
             projection=projection, base_rows=d42_base
         ),
@@ -1947,6 +1968,78 @@ def merge_projection_into_all_d4_stores(
             for code in INSPECTION_SHEET_CODES
         },
     }
+    return _normalize_merge_updates(_raw_updates, projection=projection)
+
+
+#: 裸 payload provider 的 ``store_item_id → (table_key,...)`` 精确映射（领域稳定常量）。
+#: 这些 item 的 merge 返回裸 list/dict（非 4-tuple），归一时按其名下 table_key 在
+#: projection 里的命中数补 ``applied``。dict-store（D4-9/33/34/36/8/7）走专用块不经此路径。
+#: table_key 取自各 provider 契约 sheet.tables[].table_key（见 build_contract_payload）。
+_RAW_PAYLOAD_ITEM_TABLE_KEYS: Final[dict[str, tuple[str, ...]]] = {
+    STORE_ITEM_ID_D46: ("d4_6_indicators",),
+    STORE_ITEM_ID_D417: ("d4_17_rows",),
+    STORE_ITEM_ID_D418: ("d4_18_rows",),
+    STORE_ITEM_ID_D419: ("d4_19_rows",),
+    STORE_ITEM_ID_D411: ("d4_11_rows",),
+    STORE_ITEM_ID_D410: ("d4_10_rows",),
+    "D4-20-summary": ("d4_20_summary",),
+    "D4-20-provision": ("d4_20_provision",),
+    "D4-20-current-returns": ("d4_20_current_returns",),
+    "D4-20-post-returns": ("d4_20_post_returns",),
+    "D4-30-customers": ("d4_30_customers",),
+    "D4-31-interview": ("d4_31_interview",),
+    "D4-32-groups": ("d4_32_groups",),
+}
+
+
+def _normalize_merge_updates(
+    raw: Mapping[str, Any], *, projection: Any
+) -> dict[str, tuple[Any, int, int, set[str]]]:
+    """把 ``merge_projection_into_all_d4_stores`` 的混合返回归一为统一 4-tuple。
+
+    - 已是 ``(payload, applied, visited, touched)`` 的（D4-2/3/5/21~24/1/25~28/15/16 等
+      rows provider）原样透传。
+    - 裸 payload（list / dict，来自 D4-6/10/11/17/18/19/20×4/30/31/32 provider）包成
+      4-tuple：``applied``/``visited`` = projection 中命中「该 payload 所属 table_key」
+      的非 protected 键数；``touched`` = 命中键的 row_key 集合。
+
+    ``applied`` 的意义：mirror 用 ``applied <= 0 and base 非空 → 跳过写库`` 防止无投影时
+    把已有 store 覆空。裸 payload provider 已在内部完成 merge，这里只需补一个「本次投影
+    是否真的碰过这个 item」的计数即可让 mirror 的护栏成立。
+    """
+    # payload 首段 table_key → 该 item 命中键数/命中行。用 projection 键前缀统计，
+    # provider-agnostic（不依赖各 provider 内部 TABLE_KEY 常量，避免漂移）。
+    prefix_hits: dict[str, tuple[int, set[str]]] = {}
+    for sk in projection.stable_keys():
+        fv = projection.get(sk)
+        if fv is None or getattr(fv, "is_protected", False):
+            continue
+        table_key = str(sk).split("/", 1)[0]
+        count, rows = prefix_hits.get(table_key, (0, set()))
+        count += 1
+        rk = getattr(fv, "row_key", None)
+        if rk:
+            rows.add(str(rk))
+        prefix_hits[table_key] = (count, rows)
+
+    # item → table_key 精确映射（本 entry 内裸 payload item 全是「一 item 一/多 table_key」，
+    # 用契约稳定的领域常量表，避免依赖 payload 结构）。
+    item_table_keys = _RAW_PAYLOAD_ITEM_TABLE_KEYS
+
+    normalized: dict[str, tuple[Any, int, int, set[str]]] = {}
+    for item_id, value in raw.items():
+        if isinstance(value, tuple) and len(value) == 4:
+            normalized[item_id] = value
+            continue
+        # 裸 payload（list / dict）→ 补 applied/visited/touched
+        applied = 0
+        touched: set[str] = set()
+        for tk in item_table_keys.get(item_id, ()):  # type: ignore[call-overload]
+            cnt, rows = prefix_hits.get(tk, (0, set()))
+            applied += cnt
+            touched |= rows
+        normalized[item_id] = (value, applied, applied, touched)
+    return normalized
 
 
 def merge_d45_fixed_from_projection(

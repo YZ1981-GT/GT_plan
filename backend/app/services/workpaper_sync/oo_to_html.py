@@ -2737,12 +2737,20 @@ class OoToHtmlCoordinator:
         # 但 merge_projection_into_all_d4_stores 不产出它们，故这里从 base_by_item 构造中跳过。
         _dict_store_items = {
             str(getattr(bridge, name, "") or "")
-            for name in ("STORE_ITEM_ID_D49_DICT", "STORE_ITEM_ID_D433_DICT", "STORE_ITEM_ID_D434_DICT", "STORE_ITEM_ID_D436_DICT")
+            for name in (
+                "STORE_ITEM_ID_D49_DICT",
+                "STORE_ITEM_ID_D433_DICT",
+                "STORE_ITEM_ID_D434_DICT",
+                "STORE_ITEM_ID_D436_DICT",
+                # D4-8（list 形态 ProductData[]）走专用块（3-tuple 门面 merge_d48_from_projection），
+                # merge_projection_into_all_d4_stores 不产出它，故从 rows 循环 base 构造排除。
+                "STORE_ITEM_ID_D48_DICT",
+            )
         }
         # D4-7 两 item（products / monthly）也走专用块，从 rows 循环 base 构造中排除
         _dict_store_items |= {str(s) for s in getattr(bridge, "STORE_ITEM_IDS_D47_DEDICATED", ()) or ()}
         _dict_store_items.discard("")
-        base_by_item: dict[str, list] = {}
+        base_by_item: dict[str, Any] = {}
         for item_id in bridge.STORE_ITEM_IDS:
             if item_id in _dict_store_items:
                 continue
@@ -2755,15 +2763,18 @@ class OoToHtmlCoordinator:
                     {"wp": str(state.frozen.wp_id), "item": item_id},
                 )
             ).scalar_one_or_none()
-            rows: list = []
+            # 🔴 base 可能是 list（rows-store）或 dict（D4-10 {rows,...} / D4-30
+            # {customers,customDimensions} / D4-31 singleton）——两者都要透传给
+            # merge，否则 dict-store 的表级标量（totalAmount 等）会因基线被降为 [] 而丢失。
+            base_payload: Any = []
             if raw:
                 try:
                     parsed = json.loads(raw)
-                    if isinstance(parsed, list):
-                        rows = parsed
+                    if isinstance(parsed, (list, dict)):
+                        base_payload = parsed
                 except (TypeError, ValueError):
-                    rows = []
-            base_by_item[item_id] = rows
+                    base_payload = []
+            base_by_item[item_id] = base_payload
 
         updates = bridge.merge_projection_into_all_d4_stores(
             projection=merged_projection, base_by_item=base_by_item
@@ -2938,6 +2949,60 @@ class OoToHtmlCoordinator:
             )
             if not (applied <= 0 and base_state_d49 is not None):
                 payload = json.dumps(merged_dict, ensure_ascii=False)
+                updated = (
+                    await self._session.execute(
+                        sa.text(
+                            "UPDATE checklist_responses SET remark = :val, updated_at = now() "
+                            "WHERE wp_id = :wp AND item_id = :item"
+                        ),
+                        {"val": payload, "wp": str(state.frozen.wp_id), "item": item_id},
+                    )
+                ).rowcount
+                if not updated:
+                    await self._session.execute(
+                        sa.text(
+                            "INSERT INTO checklist_responses "
+                            "(id, project_id, wp_id, item_id, remark, created_at, updated_at) "
+                            "VALUES (gen_random_uuid(), :pid, :wp, :item, :val, now(), now())"
+                        ),
+                        {
+                            "pid": str(state.frozen.project_id),
+                            "wp": str(state.frozen.wp_id),
+                            "item": item_id,
+                            "val": payload,
+                        },
+                    )
+                await self._session.commit()
+
+        # D4-8 list store（ProductData[]，静态块矩阵）：只回写第 1 个产品（slot0）的 180 static
+        # cell（月度/上期/同行业），保留第 2+ 产品；公式列走 formula_mask 不回写。base 是 list
+        # （非 dict），parse 保留 list 形态。
+        if hasattr(bridge, "merge_d48_from_projection") and hasattr(
+            bridge, "STORE_ITEM_ID_D48_DICT"
+        ):
+            item_id = bridge.STORE_ITEM_ID_D48_DICT
+            raw = (
+                await self._session.execute(
+                    sa.text(
+                        "SELECT remark FROM checklist_responses "
+                        "WHERE wp_id = :wp AND item_id = :item"
+                    ),
+                    {"wp": str(state.frozen.wp_id), "item": item_id},
+                )
+            ).scalar_one_or_none()
+            base_state_d48: list | None = None
+            if raw:
+                try:
+                    parsed = json.loads(raw)
+                    if isinstance(parsed, list):
+                        base_state_d48 = parsed
+                except (TypeError, ValueError):
+                    base_state_d48 = None
+            merged_list, applied, _visited = bridge.merge_d48_from_projection(
+                projection=merged_projection, base_state=base_state_d48
+            )
+            if not (applied <= 0 and base_state_d48):
+                payload = json.dumps(merged_list, ensure_ascii=False)
                 updated = (
                     await self._session.execute(
                         sa.text(

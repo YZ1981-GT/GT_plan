@@ -374,6 +374,11 @@ const ooSheetName = computed(() =>
 )
 
 // ─── G5-1 D4-2/D4-3 canary：useWorkpaperSyncBridge + store-projection flush ────────
+// 🔴 本 map 驱动**宿主自身**的 syncBridge（isD4DetailSheet 分支）。仅 D4-2/D4-3 真正走这条
+//    宿主桥。D4-6/7/30/31/32 虽在此列，但它们同时在下方 isD4DedicatedSyncSheet 里 ——
+//    dedicated 分支使 renderMode 恒 'html'、宿主工具栏与宿主桥都不渲染，故这几条是**死配置**
+//    （由各自子组件自管桥消费 sheetKey），保留仅因删除需连带核对 syncSheetKey 兜底默认值，
+//    无可见 bug。新增自管 sheet 时**不应**再往本 map 加键，直接进 isD4DedicatedSyncSheet 即可。
 const D4_SYNC_ENTRY_ID = 'xlsx/gt-d4-operating-revenue'
 const D4_SHEET_KEY_BY_CODE: Record<string, string> = {
   'D4-2': 'd42-managed',
@@ -401,7 +406,9 @@ const isD4DetailSheet = computed(() => currentSheet.value != null && currentShee
 //    但前端此前仍是 legacy GtOnlyOfficeSheet（inventory 记的「半接入」）。批次A 迁到子组件自管
 //    sync bridge，必须一并登记为 dedicated。
 //    D4-9（重要客户结构分析，d4-9-customer-structure-bidirectional-writeback）改造为子组件
-//    自管 sync bridge（独立 entry xlsx/gt-d4-customer-structure，sheetKey=d49-managed），
+//    自管 sync bridge（**共享** entry xlsx/gt-d4-operating-revenue，sheetKey=d49-managed，
+//    与 D4-1 同架构、不建独立 entry；早期设计曾拟独立 entry xlsx/gt-d4-customer-structure，
+//    实现阶段并入共享 entry，见 D4TabCustomerStructure.vue 的 D4_9_ENTRY），
 //    必须登记为 dedicated —— 否则宿主对它叠加 legacy 双切换器 + 走整册 GtOnlyOfficeSheet。
 const isD4DedicatedSyncSheet = computed(() =>
   ['D4-1', 'D4-5', 'D4-6', 'D4-7', 'D4-8', 'D4-9', 'D4-10', 'D4-11', 'D4-15', 'D4-16', 'D4-17', 'D4-18', 'D4-19', 'D4-20', 'D4-21', 'D4-22', 'D4-23', 'D4-24', 'D4-25', 'D4-26', 'D4-27', 'D4-28', 'D4-29', 'D4-30', 'D4-31', 'D4-32', 'D4-33', 'D4-34', 'D4-35', 'D4-36'].includes(

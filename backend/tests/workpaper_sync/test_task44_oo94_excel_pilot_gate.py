@@ -361,6 +361,10 @@ class TestFinalizeStateIsReadFromProduction:
 
     def test_admitted_requires_all_four_signals(self) -> None:
         """准入是**合取**：任一缺失即不准入。逐项掰掉一个，`admitted` 必须变 False。"""
+        # 🔴 admitted 的现行四合取（2026-09-06 起）：capability_enabled ∧
+        # adapter_registered_on_request_path is True ∧ observer==available ∧
+        # refuses_without_representation（= attach_without_representation 为空）。
+        # 准入态必须让四项全真：请求路径信号非空 + adapter_id_probe 命中 + 无 repr 时拒绝。
         ready = G.FinalizeSignals(
             capability_enabled=True,
             capability_reject="",
@@ -368,15 +372,18 @@ class TestFinalizeStateIsReadFromProduction:
             registered_adapter_ids=("x",),
             published_identity_observer="available",
             observer_detail="",
-            attach_without_representation=("x",),
+            attach_without_representation=(),
             attach_with_representation_without_bundle=("x",),
+            request_path_registered_adapter_ids=("x",),
+            adapter_id_probe="x",
         )
         assert ready.admitted is True
+        # 四合取里任一被破坏都必须使 admitted 变 False（方向：非空 attach = 伪注册被禁）。
         for field_name, broken in (
             ("capability_enabled", False),
-            ("adapter_registered", False),
+            ("request_path_registered_adapter_ids", None),
             ("published_identity_observer", "unavailable"),
-            ("attach_without_representation", ()),
+            ("attach_without_representation", ("x",)),
         ):
             assert replace(ready, **{field_name: broken}).admitted is False, field_name
 
@@ -560,7 +567,21 @@ class TestOrderingIsNotCommutable:
 
 
 def _ready_signals() -> Any:
-    """「已 finalize」的替身信号（只在守卫里用，生产路径不存在这条路）。"""
+    """「已 finalize + 已准入」的替身信号（只在守卫里用，生产路径不存在这条路）。
+
+    🔴 必须与 `FinalizeSignals.admitted` 的现行四合取定义对齐（2026-09-06 起）：
+    admitted = capability_enabled ∧ adapter_registered_on_request_path is True
+               ∧ observer==available ∧ refuses_without_representation。
+    因此替身要「准入」必须：
+      * `request_path_registered_adapter_ids=("stand-in",)` + `adapter_id_probe="stand-in"`
+        ⇒ `adapter_registered_on_request_path` 为 True（不是恒空 registry 快照那条）。
+      * `attach_without_representation=()`（空元组）⇒ `refuses_without_representation` 为 True
+        —— 无 published representation 时**拒绝**才是正确不变量；给非空元组等于要求
+        「没有 representation 也伪注册」，是 RG-18 / AC 1.4 禁止的伪双向，会使替身永不准入。
+    历史此处曾给 `attach_without_representation=("stand-in",)` 且缺请求路径信号，导致
+    `admitted=False` ⇒ 准入门判 `pilot_not_admitted`，`test_a_broken_record_reaches_failed`
+    这类「先准入再看破坏样例是否 failed」的守卫全体假红。
+    """
     return G.FinalizeSignals(
         capability_enabled=True,
         capability_reject="",
@@ -568,8 +589,10 @@ def _ready_signals() -> Any:
         registered_adapter_ids=("stand-in",),
         published_identity_observer="available",
         observer_detail="substituted",
-        attach_without_representation=("stand-in",),
+        attach_without_representation=(),
         attach_with_representation_without_bundle=("stand-in",),
+        request_path_registered_adapter_ids=("stand-in",),
+        adapter_id_probe="stand-in",
     )
 
 

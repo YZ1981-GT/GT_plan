@@ -9,6 +9,8 @@
 > 3. **前端宿主**：组件在线编辑走 `useWorkpaperSyncBridge`（统一桥＝真双向）还是 legacy `GtOnlyOfficeSheet`（未接桥＝假双向/单向）
 >
 > **只有三维全绿才算"双向已落地"**；后端有契约但前端仍 legacy = "半接入"（后端可 materialize，但宿主没消费统一路径，OO→HTML 不成立）。
+>
+> 🔴 **判据补第四维（2026-09-21 实证追加，见文末「OO→HTML 消费侧接线缺口」段）**：三维全绿仍**不足以**保证真双向——D4-8 曾三维全绿却 oo→html 完全不回写。第四维 = **OO→HTML 消费侧接线**：`merge_projection_into_all_d4_stores` 返回形态是 4-tuple（否则 mirror 硬解包崩）+ 契约 sheet 的 store item ∈ `STORE_ITEM_IDS`（否则 mirror base 恒空）+ dict-store 有专用块消费（否则静默不回写）。此维由 `backend/tests/workpaper_sync/test_d4_mirror_shape_invariants.py` 机器化钉死。
 
 ## 平台底座状态（2026-09-19 实测）
 
@@ -82,6 +84,18 @@
   的测试数字必须用不带 `rtk` 的原始 pytest 输出核实**；`rtk` 仅用于日常省 token，不作为计数真源。
   （本条订正了上批次据 rtk 数字误推的 D4-33 守卫数 4 → 实为 5。）
 
+## ✅ OO→HTML 消费侧接线缺口全修（2026-09-21，P0/P1/P2 + 第四维判据落地）
+
+> 三维（owner spec + 后端契约 + 前端接桥）全绿的 32 张，逐张侦查 OO→HTML **消费侧**（`oo_to_html._mirror_d4_dual_stores`）后发现三处此前未被任何判据覆盖的缺口。实跑复现 + 修复 + 守卫钉死，全部由红转绿、D4 辐射面 301 passed 零回归。
+
+- **🔴 P0（会打挂整个 D4 entry 回写）：`oo_to_html:2772` 硬解包 4-tuple 崩**。`for item_id, (merged_rows, applied, _v, _t) in updates.items()` 按 4-tuple 解包，但 `merge_projection_into_all_d4_stores` 的 **13 个 item**（D4-6/10/11/17/18/19/20×4/30/31/32）返回**裸 list/dict**（非 4-tuple）→ 实跑复现 `ValueError: not enough values to unpack (expected 4, got 2)`。因 `commit()` 在循环之后，前批已写入的 D4-2/3/5/21~24/1/29 一并丢失；调用点无 try/except，异常冒泡形成「xlsx 版本已进、HTML store 未更新、apply 报错」半应用态。破坏时点 = 批次 A-5/批次 B（2026-09-20 接入这批），此后清册顶部「D4-2 DB 侧 12 个 applied」铁证已不代表现状。**根因修复** = 在 `merge_projection_into_all_d4_stores` 末尾经 `_normalize_merge_updates` **统一归一为 4-tuple**（裸 payload → `(payload, applied, visited, touched)`，`applied` 按 `_RAW_PAYLOAD_ITEM_TABLE_KEYS` + projection 前缀命中统计，dict-store payload 原样保留供 mirror json.dumps）。这是单源收口——形态契约钉在生产者侧，消费者 `oo_to_html:2772` 不改。
+- **🔴 P1（D4-8 静态 180 cell 静默永不回写）：oo_to_html 无 D4-8 专用块**。`STORE_ITEM_ID_D48_DICT` / `merge_d48_from_projection` 在 oo_to_html 里**0 引用**（对比 D4-9/33 各 3 次），`merge_d48_from_projection` 全仓唯一调用方是自己的测试。D4-8 的 html→oo 正常，oo→html 永不回写。**修复** = `_dict_store_items` 加 `STORE_ITEM_ID_D48_DICT`（排除 rows 循环）+ 新增 D4-8 专用块（base 是 **list** 形态 ProductData[]，parse 保留 list）。此前 spec 记的「补齐 4 处后端接线（原 5/7）」实为 5/8——少的第 8 处在消费侧。
+- **🔴 P2（15 个 item merge 基线恒空 → 覆写丢字段/行）：`STORE_ITEM_IDS` 漏 15 个 item**。mirror 只按 `bridge.STORE_ITEM_IDS`（原 20 个）读 base，但 merge 产出 28 个；差集 15 个（D4-6/10/11/15/16/17/18/19/20×4/30/31/32）base 恒 `{}`。对 D4-15/16 尤危（其 merge 是 create-if-missing，空基线 + applied>0 会把 store 覆写成「仅契约受管字段」抹掉 HTML-only）。**修复** = `STORE_ITEM_IDS` 按各自 `_INCLUDE_*` 门控补齐 15 个（20→35）；且 mirror 构造 base 的过滤从 `isinstance(parsed, list)` 放宽为 `(list, dict)`——保 D4-10/30/31 dict-store 的表级标量（实测 D4-10 `totalAmount` 保留、applied>0、payload 类型正确）。
+- **守卫（第四维机器化判据）**：`test_d4_mirror_shape_invariants.py`（5 tests / 3 类不变量）——①每 value 是 4-tuple + 复刻 mirror 硬解包不抛；②契约 store item ∈ `STORE_ITEM_IDS`∪专用块集合 + D4-8 有专用块；③updates ⊆ `STORE_ITEM_IDS`。**变异反证**：monkeypatch 掉 `_normalize_merge_updates` → 13 非 4-tuple + ValueError 复现，还原后全绿。
+- **零回归**：`pytest -k "d4 and not task44"` = **301 passed**。
+- **顺带修一条假红**：`test_task44_oo94_excel_pilot_gate.py` 的 `_ready_signals()` 替身过时（`attach_without_representation` 给了非空元组、缺 request_path 信号）→ `admitted=False` 使 `test_a_broken_record_reaches_failed[...]` 假红；已按 gate 现行四合取（`refuses_without_representation` 要求空元组 + `adapter_registered_on_request_path` 需 request_path 信号）修正，连同同源 `test_admitted_requires_all_four_signals`（其 broken 列表极性也反了）一并转绿。该文件 `TestFinalizeStateIsReadFromProduction` 另有 7 条 **pre-existing** 红（依赖 live PG / 生产注册路径，`session.calls>=1` 等，owner=spec `workpaper-html-onlyoffice-bidirectional-writeback-closure`），非本轮引入，未扩范围硬修（stash 基线 8 红 → 修后 7 红，只减不增）。
+- **代码注释同步**：`_INCLUDE_D41_ADJUDICATION_INSTRUMENTATION` 注释（原写「默认 False 两 spec 不进 instrumentation」）/ D4-30/31/32 interview 注释（原写「暂不进 instrumentation 待几何重裁」）/ `GtD4OperatingRevenue.vue` D4-9 entry 注释（原写「独立 entry」）均已按现状（全 True 已落地 / 共享 entry）更正；`D4_SHEET_KEY_BY_CODE` 加「D4-6/7/30/31/32 是死配置，新自管 sheet 直接进 isD4DedicatedSyncSheet」说明。
+
 ## 增量更新（2026-09-20，D4-1 落地）
 
 > 基线段（上方）保持 2026-09-19 快照不改；本段记录此后的真实推进，供逐张清册与统计段引用。
@@ -96,7 +110,7 @@
   3. `excel_extract.managed_tables_of` extract 侧解析（一 sheet N 张动态表各自 binding、逐表反读合并；原硬抛 `ManagedRegionResolutionError` → 跳过兄弟表）。
   4. `excel_materialize` footer per-region 解析（按 REGION/table_name 经平行清册取 `GT_FOOTER_ROW_{TID}` + `_find_marker_row` 加 `min_row` 区分同名 `小计` marker；原 sheet_key→单 TID 假设在一 sheet N region 时回退裸键误判 → `FooterAnchorDriftError`）。
 - **前端接桥 + 宿主登记已入库**：`D4TabAdjudication.vue` 接 `useWorkpaperSyncBridge`（entryId=`xlsx/gt-d4-operating-revenue`、sheetKey=`d41-managed`）+ `WorkpaperSyncEditorHost`；宿主 `GtD4OperatingRevenue.vue` 的 `isD4DedicatedSyncSheet` 已含 `'D4-1'`。前端守卫 `d4AdjudicationSyncHostWiring.spec.ts` + 后端守卫/变异 `test_d4_1_adjudication_*` / `mutate_d4_1_adjudication_guards.py` 全绿。
-- **仍缺**：D4-1 的 e2e 证据 JSON（`docs/operations/evidence/d4-bidirectional-acceptance/D4-1.json`）尚未产出（Task 11 `[~]`，待真实 OO 环境）。目前证据目录仅 11 张（D4-2/3/5/15/16/25/26/27/28/29/35）。
+- **证据现状更正（2026-09-21 实测）**：`docs/operations/evidence/d4-bidirectional-acceptance/` 现 **15 个 JSON**（D4-1/2/3/5/15/16/25/26/27/28/29/33/35/8 + D4-1-L2）。`D4-1.json` 已在（captured 2026-09-19T23:11，`doc_editor_called:false` = REQUEST_PATH 级，真 OO canvas 往返仍 env 门）——此前「D4-1 缺 e2e 证据 / 证据目录仅 11 张」记录已过时。
 
 ## 逐张清册（分母 = 36）
 
@@ -370,15 +384,18 @@
 
 ## 逐张推进优先级（建议，2026-09-20 修订）
 
-1. **补齐 e2e 证据**：已做实 12 张（✅）中 D4-1 缺 e2e 证据 JSON（Task 11 `[~]`）；其余 11 张已有证据。待 start-dev.bat + 真实 OO 环境跑 `d4-bidirectional-acceptance.spec.ts` 全量确认真双向可用。
-2. **修半接入的 7 张**（🟡）：前端从 legacy `GtOnlyOfficeSheet` 改为 `useWorkpaperSyncBridge`（D4-21/22/23/24）；D4-30/31/32 需后端开 `_INCLUDE_IPO_INTERVIEW_SHEETS` 并解决 D4-31 几何 — 每张改完 Playwright 验证。
-3. **做从零的 15 张**（🔵）：按 owner spec 实现 provider + 契约 + 前端接桥 + Playwright — 工作量最大。**D4-9 优先**（Task 1 双区 instrumentation 已由 D4-1 借道落地，内核已就绪；且 D4-9 是 D4-1 双区模型的原始蓝本 owner）。
-4. **D4-4/D4-13** 保持裁决，不做单元格双向。
+> 🔴 **本段（2026-09-20 版）整段作废**：其「修半接入 7 张 / 做从零 15 张」与统计段「32 张三维代码全绿 / 0 张半接入」直接矛盾——那批张已在批次 A/B/A-5 全部接入。以下为 2026-09-21 现状优先级：
+
+1. **真 OO canvas 往返验证（唯一 env 门，批次C）**：32 张三维代码全绿但**无一张到 `ONLYOFFICE_VERIFIED`**（需 start-dev.bat 全栈 + OO 容器，OO canvas 非 DOM，Playwright 无法可靠编辑单元格）。逐张产 `evidence/.../D4-*.json` 的 `doc_editor_called:true` + `working_paper_content_application` state=applied。此前的 REQUEST_PATH 级证据（含 D4-1）已在。
+2. **D4-8 rematerialize 已完成**（commit 98ab0eaef，gen81→82，真栈 store-projection 200 含 180 cell）——原「representation 未含」记录过时；仅剩真 OO canvas 往返 env 门。
+3. **两张待专项 spec**（各有独立硬约束，非机械 provider）：D4-12 转置（`d4-12-transposed-writeback`，需泛化 D4-29 引擎 + 模板改造）/ D4-14 七维列映射（`d4-14-walkthrough-writeback`，需源模板物理列↔前端 7 维裁决）。**两 spec 目前尚未创建**，本文档引用它们时按「建议立项」而非「已立待做」。
+4. **D4-4/D4-13** 保持裁决（single_html / N/A），不做单元格双向。
 
 ## 关键教训（写入本清册以防再犯）
 
-- **"契约里有 sheet" ≠ "双向已落地"**：D4-21/22/23/24 后端契约齐全（d4-21-24 spec 标 11/12），但前端在线编辑仍是 legacy `GtOnlyOfficeSheet`，OO→HTML 统一路径未消费。必须三维全绿。
-- **前后端可能反向不一致**：D4-30/31/32 前端已接桥（sheetKey d4-30/31/32-managed），但后端 `_INCLUDE_IPO_INTERVIEW_SHEETS=False` 契约里根本没这些 sheet — 前端调 materialize 会因 sheet 未在契约而失败。
+- **"契约里有 sheet" ≠ "双向已落地"**（历史教训，D4-21/22/23/24 **已于批次A 解决**）：曾后端契约齐全但前端在线编辑仍 legacy `GtOnlyOfficeSheet`，OO→HTML 统一路径未消费。必须三维全绿。现四张均已接 `useWorkpaperSyncBridge` + 宿主登记 dedicated。
+- **前后端可能反向不一致**（历史教训，D4-30/31/32 **已于批次A-5 解决**）：曾前端已接桥但后端 `_INCLUDE_IPO_INTERVIEW_SHEETS=False` 契约无这些 sheet，前端调 materialize 因 sheet 不在契约而失败。现 flag=True、契约含三张、gen52 rematerialize 无 drift。
+- **🔴 三维全绿 ≠ 真双向：OO→HTML 消费侧是第四维**（2026-09-21 新教训）：D4-8 三维全绿却 oo→html 完全不回写（无专用块）；13 个 item 因 merge 返回裸 payload 在 mirror 硬解包处崩、连累整个 entry；15 个 item 因漏登记 `STORE_ITEM_IDS` 而 merge 基线恒空。前三维（spec/契约/前端接桥）**都不覆盖消费侧**，必须补机器化守卫（`test_d4_mirror_shape_invariants.py`）：返回形态 4-tuple + 契约 store item ∈ STORE_ITEM_IDS∪专用块 + dict-store 有专用块。这是历史 4 次同源缺漏（D4-8×2 / D4-9 / D4-15/16）的统一判据面。
 - **半成品接入会打挂整个 entry**：D4-15/16 曾因契约声明但 representation 未 rematerialize，导致整个 `gt-d4-operating-revenue` entry（连累 D4-2/3/25~28）store-projection 全线 500。改契约后必须跑 provision + rematerialize 发布链。
 - **裁决 static-cell vs 动态行必须实测模板行为，不能只看当前数据区行数**：D4-1 清册初判 static-cell（因看到 R8-11/R14-17 只 4 行），但模板数据区实为**可扩动态行**，且前端早已用 `D4-1-rows` 动态行模型 —— 硬套 static 会与前端模型对不齐。裁决动态/静态要看「业务上能否增删行」，不是「当前占几行」。
 - **同 sheet 双区双向 = 4 处共享内核缺口，不是加个 sheet 那么简单**（D4-1 实测）：`_attach_table_part` XML 合并 / sibling binding 对齐 / `excel_extract` 一 sheet N 表逐 binding 反读 / `excel_materialize` footer per-region 解析（同名 `小计` marker 靠 `min_row` 区分、`GT_FOOTER_ROW_{TID}` 靠平行清册）。任一没修都会在 rematerialize 阶段以 `ManagedRegionResolutionError` 或 `FooterAnchorDriftError` 暴雷。改这些共享文件受主控 §5.3 共享锁约束，须 GENERALIZE 不回归单动态表（既有 358 单 sheet 工作簿注入字节 sha256 零漂移 + 变异守卫）。
