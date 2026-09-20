@@ -1702,6 +1702,13 @@ def build_combined_store_projection(
         if _INCLUDE_D433_MARGIN_SHEET
         else []
     )
+    # 🔴 D4-8 store 默认是 **list**（ProductData[]），不是 dict —— 传 {} 会被 _decode 当非 list
+    #    走 _product0 返回 None ⇒ 180 个 cell 全投 0（静默清零），故默认值必须是 []。
+    d48_projs = (
+        [build_store_projection_d48(payloads.get(STORE_ITEM_ID_D48, []), contract=contract, limits=limits)]
+        if _INCLUDE_D48_PRODUCT_MARGIN_SHEET
+        else []
+    )
     d434_projs = (
         [build_store_projection_d434(payloads.get(STORE_ITEM_ID_D434, {}), contract=contract, limits=limits)]
         if _INCLUDE_D434_CONTRACT_SHEET
@@ -1743,7 +1750,7 @@ def build_combined_store_projection(
     values.update(right.values)
     values.update(groups.values)
     values.update(fixed.values)
-    for proj in (d421, d422, d423, d424, d435, d41, d49, *ipo_checklist_projs, *inspection_projs, *interview_projs, *d46_projs, *d417_projs, *d418_projs, *d419_projs, *d411_projs, *d410_projs, *d420_projs, *d433_projs, *d434_projs, *d436_projs, *d47_projs):
+    for proj in (d421, d422, d423, d424, d435, d41, d49, *ipo_checklist_projs, *inspection_projs, *interview_projs, *d46_projs, *d417_projs, *d418_projs, *d419_projs, *d411_projs, *d410_projs, *d420_projs, *d433_projs, *d48_projs, *d434_projs, *d436_projs, *d47_projs):
         values.update(proj.values)
     if d429 is not None:
         values.update(d429.values)
@@ -1770,6 +1777,7 @@ def build_combined_store_projection(
         **{k: v for p in d410_projs for k, v in dict(p.row_keys).items()},
         **{k: v for p in d420_projs for k, v in dict(p.row_keys).items()},
         **{k: v for p in d433_projs for k, v in dict(p.row_keys).items()},
+        **{k: v for p in d48_projs for k, v in dict(p.row_keys).items()},
         **{k: v for p in d434_projs for k, v in dict(p.row_keys).items()},
         **{k: v for p in d436_projs for k, v in dict(p.row_keys).items()},
         **{k: v for p in d47_projs for k, v in dict(p.row_keys).items()},
@@ -1967,6 +1975,14 @@ STORE_ITEM_ID_D49_DICT: Final[str] = STORE_ITEM_ID_D49
 #: 避免对未进契约的 D4-33 空投影误写空 store。
 if _INCLUDE_D433_MARGIN_SHEET:
     STORE_ITEM_ID_D433_DICT: Final[str] = STORE_ITEM_ID_D433
+
+#: D4-8 store item（**list** 形态 ProductData[]，非 rows 行数组语义：产品块 slot 映射）。同 D4-33：
+#: **在** STORE_ITEM_IDS 里（combined projection），但 oo_to_html 镜像走专用块（3-tuple 门面
+#: merge_d48_from_projection），**不进** merge_projection_into_all_d4_stores 的 rows 4-tuple 循环
+#: —— 那个循环按 `(merged_rows, applied, _v, _t)` 解包，对本 store 的 bare list 会 crash。
+#: 仅 flag 开时导出（oo_to_html 用 hasattr 判定是否跑 D4-8 块）。
+if _INCLUDE_D48_PRODUCT_MARGIN_SHEET:
+    STORE_ITEM_ID_D48_DICT: Final[str] = STORE_ITEM_ID_D48
 
 #: D4-34 store item（dict 形态 {rentals[],consults[]}，双区非行数组）。同 D4-9：**在** STORE_ITEM_IDS
 #: 里（combined projection），但 oo_to_html 镜像走专用 dict 块（3-tuple 门面 merge_d434_from_projection），

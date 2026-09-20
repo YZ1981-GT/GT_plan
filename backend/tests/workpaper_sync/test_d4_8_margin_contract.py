@@ -114,3 +114,33 @@ def test_static_binding_is_static_kind():
     assert binding.defined_name == "GT_MANAGED_REGION_D48"
     assert binding.table_name == ""
     assert binding.uuid_column == ""
+
+
+def test_merge_writes_frontend_camelcase_keys_from_empty_base():
+    """🔴 防假绿：projection 的 stable_key 经契约规范化成 snake_case（cost_amt），而前端 store
+    是 camelCase（costAmt）。merge 必须把值真实写进**前端 camelCase 键**——否则会写出一套
+    snake_case 键，前端读 costAmt 读到空（静默数据丢失，且 base 非空时旧值原样带过会伪装成"往返正确"）。
+
+    判据刻意用**空 base**：base 非空时 merge 空转也能"看起来对"（值是 base 原样带过来的）。
+    """
+    contract = _isolated_contract()
+    src = [_sample_product()]
+    proj = M.build_store_projection_d48(json.dumps(src, ensure_ascii=False), contract=contract)
+    # projection 侧确实是 snake_case（形态锚点，规范化规则变了这条会先红）
+    assert any(k.endswith("/cost_amt") for k in proj.values), sorted(proj.values)[:5]
+
+    empty = [{"name": "A", "months": [], "priorMonths": [], "industry": []}]
+    merged, applied, visited = M.merge_d48_from_projection(
+        projection=proj, base_state=json.dumps(empty, ensure_ascii=False)
+    )
+    assert visited == 180
+    assert applied == 144 + 18  # 月度全量 + industry cur（prior 前端无字段不回写）
+    m0 = merged[0]["months"][0]
+    # 前端 camelCase 键必须存在且有值；不得出现 snake_case 键
+    for camel in ("revQty", "revPrice", "revAmt", "costQty", "costPrice", "costAmt"):
+        assert camel in m0, f"merge 未写前端键 {camel}：实得 {sorted(m0)}"
+    for snake in ("rev_qty", "cost_amt"):
+        assert snake not in m0, f"merge 写出了 snake_case 键 {snake} —— 前端读不到（静默丢失）"
+    assert m0["costAmt"] == src[0]["months"][0]["costAmt"]
+    assert merged[0]["priorMonths"][0]["revQty"] == src[0]["priorMonths"][0]["revQty"]
+    assert merged[0]["industry"][0]["revPrice"] == src[0]["industry"][0]["revPrice"]
