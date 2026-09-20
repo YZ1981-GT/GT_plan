@@ -1,0 +1,52 @@
+{
+  "baseline": "GREEN",
+  "guards": [
+    "guard_contract_parses_with_three_tables",
+    "guard_regions_disjoint",
+    "guard_missing_row_id_fail_closed",
+    "guard_user_formula_cell_in_protected_set"
+  ],
+  "verdicts": [
+    {
+      "id": "M1_drop_ratio_formula_mask",
+      "actual": "RED",
+      "desc": "删 D 列占比 formula_mask（CS-13）",
+      "caught_by": "guard_contract_parses_with_three_tables: ValueError: D4-9 mapping_digest 漂移：现算=736209ef3c6b339ba7a1fd5b3c2b0d49f435fbdc04561abac954bfbafb54ecf1 冻结=3a803643bc64a945c1867d4a0a5324f5347ec4a78723bded8bb3a6740f0b04d1 —— 与 openpyxl 实测几何不一致"
+    },
+    {
+      "id": "M2_totals_row_scoped",
+      "actual": "RED",
+      "desc": "totals 静态标量改行域 pointer",
+      "caught_by": "guard_contract_parses_with_three_tables: ContractSchemaError: contract[d4.revenue_detail].sheets[d49-managed].tables[customer_totals].fields[customer_totals/current_total_amount]: 非行域字段的 JSON Pointer 不得含 {row_uuid}: '/current/{row_uuid}/current_total_amount'"
+    },
+    {
+      "id": "M3_merge_two_tables",
+      "actual": "RED",
+      "desc": "上期用本期 table_key（合并两区）",
+      "caught_by": "guard_regions_disjoint: 本期 row_keys 异常: ['p1']"
+    },
+    {
+      "id": "M4_drop_row_identity",
+      "actual": "RED",
+      "desc": "行身份下标兜底（丢 rowId）",
+      "caught_by": "guard_missing_row_id_fail_closed: 缺 rowId 未 fail-closed —— 行身份退回数组下标兜底"
+    },
+    {
+      "id": "M5_user_formula_unprotected",
+      "actual": "RED",
+      "desc": "用户公式 cell 不进保护集合",
+      "caught_by": "guard_user_formula_cell_in_protected_set: 用户公式 cell C24 未并入运行时保护集合"
+    }
+  ],
+  "non_red_count": 0,
+  "baseline_after_restore": "GREEN",
+  "four_state_matrix": {
+    "baseline": "GREEN",
+    "M1_drop_ratio_formula_mask": "RED",
+    "M2_totals_row_scoped": "RED",
+    "M3_merge_two_tables": "RED",
+    "M4_drop_row_identity": "RED",
+    "M5_user_formula_unprotected": "RED"
+  },
+  "pass": true
+}

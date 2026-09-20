@@ -100,7 +100,15 @@ sheet: `重要客户结构分析D4-9`，locator anchor 走 probe gate allowlist�
 
 ## 5. registry / manifest
 
-- **新建独立 entry**（不复用 gt-d4-operating-revenue）。理由：entry 是「可双向的逻辑单元 + 一份 contract + 一个 adapter」，D4-9 contract 与 D4-2/3 完全不同；宿主组件相同不构成复用 entry 的理由（descriptor facts 观测宿主挂载点，D4-9 sheet 可独立观测）。
+> **🔴 架构裁决更新（路 B，2026-09-20 定稿，作废本节原"独立 entry"方案）**：平台 manifest
+> 由前端 mount 发现器 + reviewed overlay 生成，overlay 规则把 `d4/**` 下所有 mount 归父 entry
+> `gt-d4-operating-revenue`（"D4 tab hosts must not be counted as independent adapters"）。
+> D4-1（结构同样迥异的同 sheet 双区审定表）先例已复用父 entry 而非独立 entry。故 D4-9 最终
+> **作为 sibling sheet 并入 `gt-d4-operating-revenue`**（sheetKey=`d49-managed`，共享 adapter
+> `d4.revenue_detail`，provider `phase5_d4_customer_structure` 由 `phase5_d4_revenue_detail`
+> 编排），**不建独立 entry / 不建 manifest entry / 不改 overlay**。下方原"独立 entry"设计仅存档。
+
+- ~~**新建独立 entry**（不复用 gt-d4-operating-revenue）~~（已作废，见上）。原理由：entry 是「可双向的逻辑单元 + 一份 contract + 一个 adapter」，D4-9 contract 与 D4-2/3 完全不同；宿主组件相同不构成复用 entry 的理由（descriptor facts 观测宿主挂载点，D4-9 sheet 可独立观测）。→ 被平台 overlay 约束 + D4-1 先例否决。
 - manifest entry：document_type xlsx，independent_entry true，scenario_profile 复用 `xlsx.editable.shared.single.room_service_wired.v1`，wp_match wp_code_patterns（宿主幻影码），adapter_id `d4.customer_structure`，capability 由 reviewed overlay 裁决为 bidirectional，browser_case/contract_test 指向本 spec 证据。
 - `attach_adapters` 在 `build_production_registry` 请求期被调用；capability!=bidirectional 或 adapter_id 不符时 fail closed。
 

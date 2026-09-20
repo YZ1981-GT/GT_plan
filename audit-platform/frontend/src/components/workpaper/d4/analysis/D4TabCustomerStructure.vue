@@ -18,9 +18,17 @@ import WpAmountInput from '../../shared/WpAmountInput.vue'
 import { ref, computed, inject, toRef, watch, onBeforeUnmount, type Ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import http from '@/utils/http'
-import GtOnlyOfficeSheet from '../../GtOnlyOfficeSheet.vue'
 import { useD4ImportExport } from '../../composables/useD4ImportExport'
 import GtIndexChip from '../../GtIndexChip.vue'
+// D4-9 双向回写：子组件自管 sync bridge + WorkpaperSyncEditorHost（dedicated sync sheet）。
+// sheet_key=d49-managed，同 entry gt-d4-operating-revenue（后端 phase5_d4_customer_structure
+// 作为 sibling sheet 并入 phase5_d4_revenue_detail，adapter d4.revenue_detail）——与 D4-1 同架构。
+// 移除 legacy GtOnlyOfficeSheet 单向入口（Requirement 7.1 / 7.5）。
+import { useWorkpaperSyncBridge, WP_BRIDGE_IN_FLIGHT_STATES } from '../../sync/useWorkpaperSyncBridge'
+import { readStoreProjection } from '../../sync/workpaperSyncApi'
+import { capabilityForEntry } from '../../sync/workpaperSyncCapability'
+import WorkpaperSyncEditorHost from '../../sync/WorkpaperSyncEditorHost.vue'
+import GtEntrySyncCapabilityNotice from '../../sync/GtEntrySyncCapabilityNotice.vue'
 
 const props = defineProps<{
   wpId: string
@@ -30,21 +38,77 @@ const props = defineProps<{
 }>()
 
 const openReviewDialog = inject<((sectionId: string) => void) | null>('openReviewDialog', null)
+const reloadWorkpaperData = inject<(() => Promise<void> | void) | null>('reloadWorkpaperData', null)
 
-// 双模式（结构化视图 / 在线编辑）
-const editorMode = ref<'structured' | 'onlyoffice'>('structured')
+// ─── 双模式 sync bridge（D4-9 重要客户结构分析）──────────────────────────────
+// D4-9 作为 gt-d4-operating-revenue 的 sibling sheet（sheetKey=d49-managed，后端
+// phase5_d4_customer_structure 并入 phase5_d4_revenue_detail，adapter d4.revenue_detail），
+// 与 D4-1 同架构 —— 不建独立 entry。flushHtml 先 flush 待存改动再 readStoreProjection
+// （防投影旧值）；capability 现算；fail-visible，能力未裁决 / OO 不健康时 fail-closed（Req 7.4）。
+const D4_9_ENTRY = 'xlsx/gt-d4-operating-revenue'
+const D4_9_SHEET_KEY = 'd49-managed'
 const ooHealthy = ref(false)
-const modeOptions = computed(() => [
-  { label: '结构化视图', value: 'structured' },
-  { label: '在线编辑', value: 'onlyoffice', disabled: !ooHealthy.value },
-])
 async function checkOoHealth() {
   try {
-    const res = await http.get(`/api/workpapers/onlyoffice/health`, { _silent: true } as any)
+    const res = await http.get('/api/workpapers/onlyoffice/health', { _silent: true } as any)
     ooHealthy.value = res.data?.data?.healthy ?? res.data?.healthy ?? false
   } catch { ooHealthy.value = false }
 }
 checkOoHealth()
+const syncSwitching = ref(false)
+const syncBridge = useWorkpaperSyncBridge({
+  entryId: ref(D4_9_ENTRY),
+  wpId: toRef(props, 'wpId'),
+  projectId: toRef(props, 'projectId'),
+  sheetKey: ref(D4_9_SHEET_KEY),
+  capability: capabilityForEntry(D4_9_ENTRY),
+  flushHtml: async () => {
+    flushSave()
+    const snap = await readStoreProjection({ projectId: props.projectId, wpId: props.wpId, entryId: D4_9_ENTRY })
+    return { expectedRevision: snap.expectedRevision, projection: snap.projection, sheetKey: D4_9_SHEET_KEY }
+  },
+  reloadHtml: async () => { if (reloadWorkpaperData) await reloadWorkpaperData() },
+})
+const syncOoDescriptor = computed(() => syncBridge.descriptor.value)
+const syncBusy = computed(
+  () => syncSwitching.value
+    || (WP_BRIDGE_IN_FLIGHT_STATES as readonly string[]).includes(String(syncBridge.state.value)),
+)
+// editorMode 由 sync bridge 的 mode 表达（不再是本地 legacy ref）。
+const editorMode = computed<string>({
+  get: () => (syncBridge.mode.value === 'oo' ? '在线编辑' : '结构化视图'),
+  set: (v: string) => { void switchMode(v === '在线编辑' ? 'onlyoffice' : 'structured') },
+})
+const modeOptions = computed(() => [
+  { label: '结构化视图', value: '结构化视图' },
+  { label: '在线编辑', value: '在线编辑', disabled: props.isReadonly || !ooHealthy.value || syncBusy.value },
+])
+async function switchMode(target: 'structured' | 'onlyoffice'): Promise<void> {
+  const cur = syncBridge.mode.value === 'oo' ? 'onlyoffice' : 'structured'
+  if (target === cur) return
+  if (target === 'onlyoffice') {
+    if (props.isReadonly || !ooHealthy.value) return
+    syncSwitching.value = true
+    try { await syncBridge.switchToOnlyOffice() } finally { syncSwitching.value = false }
+    return
+  }
+  syncSwitching.value = true
+  try { await syncBridge.switchToHtml() } finally { syncSwitching.value = false }
+}
+// fail-visible：同步失败以中文 tag 显式呈现，不静默吞。
+const syncStateTag = computed(() => {
+  const st = String(syncBridge.state.value)
+  if (syncBusy.value) return { text: '同步中…', type: 'info' as const }
+  if (syncBridge.dirty?.value) {
+    return syncBridge.mode.value === 'oo'
+      ? { text: 'excel 侧有未同步改动', type: 'warning' as const }
+      : { text: 'html 侧有未同步改动', type: 'warning' as const }
+  }
+  if (st.includes('error') || String(syncBridge.lastError?.value || '')) {
+    return { text: '同步失败，请重试', type: 'danger' as const }
+  }
+  return { text: '已同步', type: 'success' as const }
+})
 
 const auditObjective = '利润表中记录的营业收入已发生，且与被审计单位有关。'
 
@@ -55,7 +119,10 @@ watch(() => props.allResponses.get('D4-9-audit-process')?.remark, () => loadAudi
 function updateAuditProcess(val: string) { if (props.isReadonly) return; auditProcess.value = val; persist('D4-9-audit-process', val) }
 
 // ─── 客户数据 ─────────────────────────────────────────────────────────
+// 行身份 = rowId（稳定 UUID，禁下标）。后端投影 iter_store_rows 复用
+// store_row_identity fail-closed：缺/重复 rowId 抛 StorePayloadError（design §2.3）。
 interface CustomerRow {
+  rowId: string
   name: string
   amount: number
   quantity: number
@@ -70,8 +137,34 @@ interface PeriodData {
 const currentPeriod = ref<PeriodData>({ rows: [], totalAmount: 0, totalQuantity: 0 })
 const priorPeriod = ref<PeriodData>({ rows: [], totalAmount: 0, totalQuantity: 0 })
 
+/** 生成稳定行身份。优先 crypto.randomUUID，回退到时间+随机串（老浏览器/测试环境）。 */
+function createRowId(): string {
+  const c = (globalThis as any).crypto as { randomUUID?: () => string } | undefined
+  if (c && typeof c.randomUUID === 'function') return c.randomUUID()
+  return `d49-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`
+}
+
+function makeRow(): CustomerRow {
+  return { rowId: createRowId(), name: '', amount: 0, quantity: 0, priorRank: '' }
+}
+
 function defaultRows(): CustomerRow[] {
-  return Array.from({ length: 10 }, () => ({ name: '', amount: 0, quantity: 0, priorRank: '' }))
+  return Array.from({ length: 10 }, () => makeRow())
+}
+
+/**
+ * 对历史行（无 rowId）补齐稳定身份，不改动既有手工值。
+ * @returns 是否发生了补齐（用于判定是否需要一次性持久化）
+ */
+function backfillRowIds(rows: CustomerRow[]): boolean {
+  let changed = false
+  for (const r of rows) {
+    if (!r.rowId || typeof r.rowId !== 'string' || !r.rowId.trim()) {
+      r.rowId = createRowId()
+      changed = true
+    }
+  }
+  return changed
 }
 
 function loadData() {
@@ -79,8 +172,16 @@ function loadData() {
   if (resp?.remark) {
     try {
       const d = JSON.parse(resp.remark)
-      currentPeriod.value = { rows: d.current?.rows || defaultRows(), totalAmount: d.current?.totalAmount || 0, totalQuantity: d.current?.totalQuantity || 0 }
-      priorPeriod.value = { rows: d.prior?.rows || defaultRows(), totalAmount: d.prior?.totalAmount || 0, totalQuantity: d.prior?.totalQuantity || 0 }
+      const currentRows: CustomerRow[] = Array.isArray(d.current?.rows) ? d.current.rows : defaultRows()
+      const priorRows: CustomerRow[] = Array.isArray(d.prior?.rows) ? d.prior.rows : defaultRows()
+      currentPeriod.value = { rows: currentRows, totalAmount: d.current?.totalAmount || 0, totalQuantity: d.current?.totalQuantity || 0 }
+      priorPeriod.value = { rows: priorRows, totalAmount: d.prior?.totalAmount || 0, totalQuantity: d.prior?.totalQuantity || 0 }
+      // 历史 store 无 rowId → 一次性补齐并持久化（Requirement 3.2），不丢既有手工值。
+      // current/prior 各区独立生成，rowId 在两区内各自唯一（Requirement 3.4）。
+      const changed = backfillRowIds(currentPeriod.value.rows)
+      const changedPrior = backfillRowIds(priorPeriod.value.rows)
+      // 只读态仅在内存补齐（供投影用），不回写；可写态一次性持久化。
+      if ((changed || changedPrior) && !props.isReadonly) persistData()
       return
     } catch {}
   }
@@ -134,7 +235,7 @@ const concentrationWarning = computed(() => {
 function addRow(period: 'current' | 'prior') {
   if (props.isReadonly) return
   const target = period === 'current' ? currentPeriod.value : priorPeriod.value
-  target.rows.push({ name: '', amount: 0, quantity: 0, priorRank: '' })
+  target.rows.push(makeRow())
   persistData()
 }
 function removeRow(period: 'current' | 'prior', idx: number) {
@@ -217,13 +318,17 @@ onBeforeUnmount(() => { if (debounceTimer) { clearTimeout(debounceTimer); flushS
 <template>
   <div class="d4-customer-structure">
 
-    <!-- 双模式切换 -->
+    <!-- 双模式切换（结构化视图 ↔ 在线编辑，走统一双向 sync bridge） -->
     <div class="mode-bar">
       <el-segmented v-model="editorMode" :options="modeOptions" size="small" />
+      <div class="mode-bar-status">
+        <el-tag :type="syncStateTag.type" size="small">{{ syncStateTag.text }}</el-tag>
+        <GtEntrySyncCapabilityNotice entry-id="xlsx/gt-d4-operating-revenue" />
+      </div>
     </div>
 
     <!-- 结构化视图 -->
-    <template v-if="editorMode === 'structured'">    <!-- 一、审计目标 -->
+    <template v-if="editorMode === '结构化视图'">    <!-- 一、审计目标 -->
     <section class="sec">
       <h4 class="sec-title">一、审计目标</h4>
       <div class="objective-list"><p class="objective-item">{{ auditObjective }}</p></div>
@@ -376,15 +481,11 @@ onBeforeUnmount(() => { if (debounceTimer) { clearTimeout(debounceTimer); flushS
   
     </template>
 
-    <!-- OnlyOffice 在线编辑 -->
+    <!-- 在线编辑：统一双向 sync host（替代 legacy GtOnlyOfficeSheet 单向入口） -->
     <template v-else>
-      <div style="min-height: 600px; height: calc(100vh - 280px);">
-        <GtOnlyOfficeSheet
-          :wp-id="props.wpId"
-          :project-id="props.projectId"
-          sheet-name="重要客户结构分析D4-9"
-          :readonly="isReadonly"
-        />
+      <div class="oo-container">
+        <WorkpaperSyncEditorHost v-if="syncOoDescriptor" :descriptor="syncOoDescriptor" :bridge="syncBridge" />
+        <div v-else class="oo-loading">正在打开 D4-9 同步编辑器…</div>
       </div>
     </template>
   </div>
@@ -414,4 +515,7 @@ onBeforeUnmount(() => { if (debounceTimer) { clearTimeout(debounceTimer); flushS
 .guidance-content p { margin: 0 0 4px; }
 
 .mode-bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+.mode-bar-status { display: flex; align-items: center; gap: 8px; }
+.oo-container { min-height: 600px; height: calc(100vh - 280px); }
+.oo-loading { padding: 40px; text-align: center; color: #909399; font-size: var(--wp-font-size, 13px); }
 </style>

@@ -95,8 +95,11 @@ _SHEET_HEADERS: dict[str, list[str]] = {
         "上期销量", "上期平均单价", "上期收入金额",
         "上期成本销量", "上期平均单位成本", "上期成本金额",
     ],
+    # D4-9 重要客户结构：本期/上期两区各 Top10 + 4 总额。导出含期间标识 + 占比列（计算值，
+    # 不可回导覆盖公式）。导入按「期间」列判本期/上期，按「客户名称=本期销售总额/上期销售总额」
+    # 识别总额行（spec d4-9-customer-structure-bidirectional-writeback Req 6）。
     "D4-9": [
-        "客户名称", "销售金额", "销售数量", "上期排名",
+        "期间", "序号", "客户名称", "销售金额", "销售金额占比", "销售数量", "销售数量占比", "上期排名",
     ],
     "D4-10": [
         "客户名称", "产品种类", "销售金额", "销售数量",
@@ -652,13 +655,20 @@ async def d4_export_data(
                     _glabel = _D4_32_GROUP_KEY_TO_LABEL.get(_gkey, _gkey)
                     for _seq, _r in enumerate(_g.get("rows", []), start=1):
                         _rr = dict(_r)
-                        _rr["_groupLabel"] = _glabel
+                        # 未知组别（__unknown__）保真：优先用每行保留的原始来源 label（中文），
+                        # 不能用 key→label 查表退化成字面量 "__unknown__"，否则往返丢原始组别名。
+                        if _gkey == "__unknown__":
+                            _rr["_groupLabel"] = _rr.get("groupLabel") or _glabel
+                        else:
+                            _rr["_groupLabel"] = _glabel
                         _rr["_seq"] = _seq
                         _flat.append(_rr)
                 rows_data = _flat
-            # D4-9 stores {current:{rows…}, prior:{…}} → 导出本期行
+            # D4-9 stores {current:{rows,totalAmount,totalQuantity}, prior:{…}} →
+            # 导出本期区（数据行 + 总额行）+ 上期区（数据行 + 总额行），每行带 _period/_seq，
+            # 总额行 _isTotal=True。占比列由 row-builder 计算导出（不可回导覆盖公式）。
             elif sheet == "D4-9" and isinstance(parsed, dict):
-                rows_data = (parsed.get("current") or {}).get("rows", []) or []
+                rows_data = _build_d4_9_export_rows(parsed)
             # D4-10 stores {rows, totalAmount, formula…}
             elif sheet == "D4-10" and isinstance(parsed, dict):
                 rows_data = parsed.get("rows", []) or []
@@ -1027,12 +1037,38 @@ async def d4_export_data(
             # D4-33 嵌套结构，由循环后专属分支展开（此处不应有行）
             continue
         elif sheet == "D4-9":
-            row_values = [
-                data_row.get("name", ""),
-                _safe_float(data_row.get("amount")),
-                _safe_float(data_row.get("quantity")),
-                data_row.get("priorRank", ""),
-            ]
+            # 期间/序号/客户名称/销售金额/销售金额占比/销售数量/销售数量占比/上期排名。
+            # 占比 = 计算值（金额/总额），导出供人读，不可回导（parser 忽略占比列）。
+            _period = data_row.get("_period", "本期")
+            _amt = _safe_float(data_row.get("amount"))
+            _qty = _safe_float(data_row.get("quantity"))
+            _ta = _safe_float(data_row.get("_totalAmount"))
+            _tq = _safe_float(data_row.get("_totalQuantity"))
+            _amt_ratio = (_amt / _ta) if _ta else 0.0
+            _qty_ratio = (_qty / _tq) if _tq else 0.0
+            if data_row.get("_isTotal"):
+                # 总额行：客户名称列写「本期销售总额」/「上期销售总额」，金额/数量为总额。
+                row_values = [
+                    _period,
+                    "",
+                    "本期销售总额" if _period == "本期" else "上期销售总额",
+                    _ta,
+                    "",
+                    _tq,
+                    "",
+                    "",
+                ]
+            else:
+                row_values = [
+                    _period,
+                    data_row.get("_seq", ""),
+                    data_row.get("name", ""),
+                    _amt,
+                    _amt_ratio,
+                    _qty,
+                    _qty_ratio,
+                    data_row.get("priorRank", ""),
+                ]
         elif sheet == "D4-10":
             row_values = [
                 data_row.get("customer", ""),
@@ -1490,18 +1526,41 @@ async def d4_import_data(
         merged = merge_d4_10_import_rows(existing_data, rows_data, _d4_10_xlsx_meta)
         remark_json = json.dumps(merged, ensure_ascii=False)
     elif sheet == "D4-9":
-        # D4-9 store = {current:{rows,total…}, prior:{…}}；xlsx 只投影 current 行，
-        # 导入替换 current.rows，保留总额与 prior 整段（避免冲掉对侧期间）。
+        # D4-9 store = {current:{rows,totalAmount,totalQuantity}, prior:{…}}。
+        # rows_data 含本期/上期两区数据行 + 总额行（_isTotal），按 _period 分流回两区；
+        # 每区导入替换其 rows（补 rowId）+ 用总额行回填 totalAmount/totalQuantity；
+        # 缺某区数据时保留既有值（避免冲掉对侧期间）。占比列已在 parser 忽略（Req 6.4）。
         existing_data = await _load_existing(item_id)
         current = dict(existing_data.get("current") or {})
         prior = dict(existing_data.get("prior") or {})
-        current["rows"] = rows_data
-        current.setdefault("totalAmount", current.get("totalAmount", 0) or 0)
-        current.setdefault("totalQuantity", current.get("totalQuantity", 0) or 0)
-        remark_json = json.dumps(
-            {"current": current, "prior": prior or {"rows": [], "totalAmount": 0, "totalQuantity": 0}},
-            ensure_ascii=False,
-        )
+
+        def _region_from_import(period: str, base: dict) -> dict:
+            out = dict(base)
+            data_rows = [
+                {k: v for k, v in r.items() if not k.startswith("_")}
+                for r in rows_data
+                if isinstance(r, dict) and not r.get("_isTotal") and r.get("_period") == period
+            ]
+            total_rows = [
+                r for r in rows_data
+                if isinstance(r, dict) and r.get("_isTotal") and r.get("_period") == period
+            ]
+            # 有导入数据行才替换该区 rows（否则保留既有，不冲掉对侧/空导入）。
+            if data_rows:
+                out["rows"] = data_rows
+            else:
+                out.setdefault("rows", base.get("rows", []) or [])
+            if total_rows:
+                out["totalAmount"] = _safe_float(total_rows[-1].get("amount"))
+                out["totalQuantity"] = _safe_float(total_rows[-1].get("quantity"))
+            else:
+                out.setdefault("totalAmount", base.get("totalAmount", 0) or 0)
+                out.setdefault("totalQuantity", base.get("totalQuantity", 0) or 0)
+            return out
+
+        current = _region_from_import("本期", current)
+        prior = _region_from_import("上期", prior)
+        remark_json = json.dumps({"current": current, "prior": prior}, ensure_ascii=False)
     else:
         # D4-11 等：store 即为行数组
         remark_json = json.dumps(rows_data, ensure_ascii=False)
@@ -2205,8 +2264,52 @@ def _parse_generic_row(row: tuple, actual_headers: list[str]) -> dict:
     return result
 
 
+def _build_d4_9_export_rows(parsed: dict) -> list[dict]:
+    """把 D4-9 store {current,prior} 展平成导出行：每区数据行 + 一条总额行。
+
+    每行携带 _period（本期/上期）、_seq（序号）、_totalAmount/_totalQuantity（供占比计算）；
+    总额行 _isTotal=True。spec d4-9 Req 6.1：导出含本期/上期两区 + 总额。
+    """
+    out: list[dict] = []
+    for period_label, region_key in (("本期", "current"), ("上期", "prior")):
+        region = parsed.get(region_key) or {}
+        if not isinstance(region, dict):
+            region = {}
+        ta = _safe_float(region.get("totalAmount"))
+        tq = _safe_float(region.get("totalQuantity"))
+        rows = region.get("rows") or []
+        if not isinstance(rows, list):
+            rows = []
+        for seq, r in enumerate(rows, start=1):
+            if not isinstance(r, dict):
+                continue
+            item = dict(r)
+            item["_period"] = period_label
+            item["_seq"] = seq
+            item["_totalAmount"] = ta
+            item["_totalQuantity"] = tq
+            out.append(item)
+        # 每区末尾追加总额行。
+        out.append({
+            "_period": period_label,
+            "_isTotal": True,
+            "_totalAmount": ta,
+            "_totalQuantity": tq,
+        })
+    return out
+
+
 def _parse_d4_9_row(row: tuple, actual_headers: list[str]) -> dict:
-    """D4-9 重要客户结构：中文列 → {name, amount, quantity, priorRank}。"""
+    """D4-9 重要客户结构专用 parser（spec d4-9 Req 6.2/6.3/6.4）。
+
+    - 判本期/上期归属（「期间」列，缺列或空默认本期）。
+    - 识别总额行（客户名称含「销售总额」）→ 返回 {_isTotal, _period, amount, quantity}。
+    - 普通行补 rowId（与 Requirement 3 同规则），返回
+      {rowId, name, amount, quantity, priorRank, _period}。
+    - 占比列（销售金额占比/销售数量占比）**不解析**（公式列，不可回导覆盖，Req 6.4）。
+    """
+    from uuid import uuid4
+
     values = list(row) + [None] * (len(actual_headers) - len(row))
 
     def _col_val(col_name: str) -> Any:
@@ -2216,11 +2319,28 @@ def _parse_d4_9_row(row: tuple, actual_headers: list[str]) -> dict:
         except ValueError:
             return None
 
+    period_raw = _safe_str(_col_val("期间"))
+    period = "上期" if "上期" in period_raw else "本期"
+    name = _safe_str(_col_val("客户名称"))
+    amount = _safe_float(_col_val("销售金额"))
+    quantity = _safe_float(_col_val("销售数量"))
+
+    # 总额行：客户名称列写「本期销售总额/上期销售总额」，金额/数量为总额标量。
+    if "销售总额" in name:
+        return {
+            "_isTotal": True,
+            "_period": period,
+            "amount": amount,
+            "quantity": quantity,
+        }
+
     return {
-        "name": _safe_str(_col_val("客户名称")),
-        "amount": _safe_float(_col_val("销售金额")),
-        "quantity": _safe_float(_col_val("销售数量")),
+        "rowId": str(uuid4()),
+        "name": name,
+        "amount": amount,
+        "quantity": quantity,
         "priorRank": _safe_str(_col_val("上期排名")),
+        "_period": period,
     }
 
 

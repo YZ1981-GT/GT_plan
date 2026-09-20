@@ -1249,6 +1249,9 @@ DELIVERED_PER_ENTRY_CONTRACTS: Final[tuple[Mapping[str, Any], ...]] = (
             "d42-managed / d43-managed / d45-managed（D4-5 政策检查：分组紧凑表 + 经营模式 B11–B16；"
             "宿主 D4TabPolicyCheck 独立，不进 isD4DetailSheet）。HTML store 含 D4-2-rows / D4-3-rows / "
             "D4-5-policy-groups + D4-5-biz-*。wp_code 裁决=['D4']（真载荷落点）。"
+            "D4-9 重要客户结构分析作为 sibling sheet（d49-managed，同 entry / 同 adapter）"
+            "并入本 entry —— 与 D4-1/2/3/5/15/16/21~29/35 同架构（overlay 规则：D4 子表 mount "
+            "归父 entry，不独立计数）。"
         ),
     },
 )
