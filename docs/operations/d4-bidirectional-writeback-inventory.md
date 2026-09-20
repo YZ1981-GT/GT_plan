@@ -176,15 +176,25 @@
   为合计公式，无 per-row 公式）。UUID 列可放 AL。
 - 前端 `D4TabOccurrence.vue` + composable `useD4WalkthroughTest.ts`，store = `TransactionItem[]`（**7 维嵌套**：
   voucher/contract/delivery/shipping/receipt/invoice/other，每维 sub-object；+ consistencyScore/details 前端派生）。
-- 🔴 **裁定：需列映射裁决，本轮不做，待专项 spec**。根因（读 useD4WalkthroughTest.ts 实证）：**模板列布局与
-  前端 7 维模型独立演进、不 1:1 对齐**——①模板 B=客户名称，但 `VoucherDimension` **无 customerName 字段**
-  （只有 month/date/number/productName/quantity/amount/accountingDate）；②模板 O=发货审批人 vs 前端
-  `contract.approver`/`delivery.warehouseKeeper` 归属歧义；③模板记账凭证 5 子列 vs voucher 维 7 字段数不等。
-  盲目建映射会**静默错配数据**（违主控 correctness 铁律）。技术上引擎可支持（单宽行表 + 嵌套 json_pointer
-  `/rows/{id}/{dim}/{field}`，同 D4-20 resolve_json_path），但**前提是先裁决每列↔字段的权威映射**（可能需
-  同时校准前端模型或模板）。
-- 建议单立 spec `d4-14-walkthrough-writeback`，含「32 列↔7 维字段逐列映射裁决表（人工确认权威源）+ provider +
-  守卫」；映射表须经审计业务复核（哪些列受管、客户名称落哪、审批人归属）后方可实现。
+- 🔴 **裁定：需列映射裁决，本轮不做，待专项 spec**（2026-09-20 深核实，判词加固，非推翻）。
+- **深核实（三层证据，避免被现有资产误导）**：
+  1. footer **不是障碍**——数据区 R15-36、footer marker = **单行 `合计` R37**（G37/X37/AF37=SUM 归 formula_mask），
+     `本期发生额` R38 / `检查比例` R39 是 footer 下方审计说明辅助行（HTML-only）。与 D4-7 §一 / D4-20 footer 同构，
+     `d4-inspection` evidence 当初记的「计算型 footer 超范式」经实测**不成立**（marker 就是单行 `合计`）。
+  2. footer 排除后引擎**范式可支持**（单宽动态行表 + 嵌套 json_pointer，同本轮 D4-7 已验证）。
+  3. 🔴 **真障碍 = 前端 7 维模型 与 源模板物理列 是两套不同列集**（这才是「不对齐」的准确含义）：
+     后端 `_d4_import_export._SHEET_HEADERS["D4-14"]` 那 32 列是**按前端 7 维字段平铺的语义投影头**
+     （凭证 7 + 合同 5 + 出库 4 + 运输 3 + 签收 3 + 发票 3 + 其他 2 + 派生 3），**不是源模板 R13-14 物理列**。
+     源模板物理列**多出**前端 7 维没有的字段：B 客户名称 / H 合同日期 / K 出库编号 / M 出库数量 /
+     Q 运输编号 / R 运输数量 / S 运输公司 / T 运输地址 / Y 签收人 / Z 盖章类型 / AA 盖章单位 等。
+     import/export 走「前端 7 维 ↔ 32 列语义投影」（自洽已实现），但 **sync 双向回写要求「前端 store ↔ 源模板
+     物理 cell」**，那些物理列在前端 7 维**无对应字段**，无处安放。
+- **⚠️ 反误导记录**：不要因「后端 import/export 已有 D4-14 32 列头 + _parse_d4_14_row」就以为 sync 可直接复用——
+  那是**语义投影头**，非物理列头；直接拿它当 sync 列映射会把源模板物理列（客户名称/合同日期/出库编号/运输公司/
+  签收人/盖章…）静默丢弃（违 correctness 铁律）。
+- 建议单立 spec `d4-14-walkthrough-writeback`，第一阶段就是「**源模板 R13-14 物理列 ↔ 前端 7 维字段**逐列裁决表」：
+  每个物理列标 {受管映射到某维字段 / 前端补字段 / 留 HTML-only}，经审计业务复核（尤其前端无字段的 11+ 物理列
+  如何处置）后方可建 provider。范式已通（footer 单行 + 嵌套 json_pointer），阻塞纯在**映射权威源确认**。
 ### D4-7 毛利率分析 —— ✅ **2026-09-20 落地完成（gen76）**（性能瓶颈解除 + 前端补 rowId 后）
 - 几何（A1:W32）：**§二产品动态区 + §一月度静态区**（D4-9「动态区载体 + 静态区寄生」架构）。
   §二 header R18-19 / 数据 R20-25 / 合计 R26：输入 8 列（A名/B数量/D收入/G成本/J上期数量/L上期收入/O上期成本/W备注），
