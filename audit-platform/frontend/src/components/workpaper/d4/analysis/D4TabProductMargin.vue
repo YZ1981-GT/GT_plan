@@ -23,6 +23,16 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import http from '@/utils/http'
 import { useD4ImportExport } from '../../composables/useD4ImportExport'
 import GtIndexChip from '../../GtIndexChip.vue'
+// D4-8 双向回写：子组件自管 sync bridge（dedicated 静态受管区 sync sheet，sheetKey=d48-managed，
+// 同 entry gt-d4-operating-revenue；后端 phase5_d4_product_margin_sheet 作为**静态受管区** sibling
+// sheet 并入 phase5_d4_revenue_detail，adapter d4.revenue_detail）——引擎静态 cell 路径
+// （spec workpaper-sync-static-cell-sheet-writeback，非 legacy 裸 GtOnlyOfficeSheet）。
+// census 裁定：D4-8 = 静态块矩阵（模板预画产品块 + 块内 12 月固定行 + 同行业 3 行），
+// 受管第 1 个产品（slot0→产品A 块）= 180 static cell；第 2+ 产品无模板块 → HTML-only。
+import { useWorkpaperSyncBridge, WP_BRIDGE_IN_FLIGHT_STATES } from '../../sync/useWorkpaperSyncBridge'
+import WorkpaperSyncEditorHost from '../../sync/WorkpaperSyncEditorHost.vue'
+import { readStoreProjection } from '../../sync/workpaperSyncApi'
+import { capabilityForEntry } from '../../sync/workpaperSyncCapability'
 
 const props = defineProps<{
   wpId: string
@@ -378,13 +388,85 @@ function flushSave() {
   const items = keys.map(k => props.allResponses.get(k)).filter(Boolean)
   window.dispatchEvent(new CustomEvent('d4:save-items', { detail: { items } }))
 }
+// 立即 flush（清 debounce + 同步 dispatch），供 sync bridge 切到在线编辑前把 html 侧落库。
+function flushPendingSave() {
+  if (debounceTimer) { clearTimeout(debounceTimer); debounceTimer = null }
+  flushSave()
+}
 onBeforeUnmount(() => { if (debounceTimer) { clearTimeout(debounceTimer); flushSave() } })
+
+// ─── 双模式 sync bridge（D4-8 重要产品毛利，dedicated 静态受管区 sync sheet）──────────────
+const reloadWorkpaperData = inject<(() => Promise<void>) | null>('reloadWorkpaperData', null)
+const D4_8_ENTRY = 'xlsx/gt-d4-operating-revenue'
+const D4_8_SHEET_KEY = 'd48-managed'
+const modeOptions = ['表格视图', '在线编辑']
+const ooHealthy = ref(false)
+async function checkOoHealth() {
+  try { const r = await http.get('/api/onlyoffice/health', { _silent: true } as any); ooHealthy.value = (r.data?.data?.status ?? r.data?.status) === 'healthy' } catch { ooHealthy.value = false }
+}
+checkOoHealth()
+const syncSwitching = ref(false)
+const syncBridge = useWorkpaperSyncBridge({
+  entryId: ref(D4_8_ENTRY),
+  wpId: toRef(props, 'wpId'),
+  projectId: toRef(props, 'projectId'),
+  sheetKey: ref(D4_8_SHEET_KEY),
+  capability: capabilityForEntry(D4_8_ENTRY),
+  flushHtml: async () => {
+    flushPendingSave()
+    const snap = await readStoreProjection({ projectId: props.projectId, wpId: props.wpId, entryId: D4_8_ENTRY })
+    return { expectedRevision: snap.expectedRevision, projection: snap.projection, sheetKey: D4_8_SHEET_KEY }
+  },
+  reloadHtml: async () => { if (reloadWorkpaperData) await reloadWorkpaperData() },
+})
+const syncOoDescriptor = computed(() => syncBridge.descriptor.value)
+const syncBusy = computed(
+  () => syncSwitching.value
+    || (WP_BRIDGE_IN_FLIGHT_STATES as readonly string[]).includes(String(syncBridge.state.value)),
+)
+const editorMode = computed<string>({
+  get: () => (syncBridge.mode.value === 'oo' ? '在线编辑' : '表格视图'),
+  set: (v: string) => { void switchMode(v === '在线编辑' ? 'onlyoffice' : 'structured') },
+})
+async function switchMode(target: 'structured' | 'onlyoffice'): Promise<void> {
+  const cur = syncBridge.mode.value === 'oo' ? 'onlyoffice' : 'structured'
+  if (target === cur) return
+  if (target === 'onlyoffice') {
+    if (props.isReadonly || !ooHealthy.value) return
+    syncSwitching.value = true
+    try { await syncBridge.switchToOnlyOffice() } finally { syncSwitching.value = false }
+    return
+  }
+  syncSwitching.value = true
+  try { await syncBridge.switchToHtml() } finally { syncSwitching.value = false }
+}
+// fail-visible：同步失败以中文 tag 显式呈现，不静默吞。
+const syncStateTag = computed(() => {
+  const st = String(syncBridge.state.value)
+  if (syncBusy.value) return { text: '同步中…', type: 'info' as const }
+  if (syncBridge.dirty?.value) {
+    return syncBridge.mode.value === 'oo'
+      ? { text: 'excel 侧有未同步改动', type: 'warning' as const }
+      : { text: 'html 侧有未同步改动', type: 'warning' as const }
+  }
+  if (st.includes('error') || String(syncBridge.lastError?.value || '')) {
+    return { text: '同步失败，请重试', type: 'danger' as const }
+  }
+  return { text: syncBridge.mode.value === 'oo' ? 'Excel 在线编辑' : '表格视图', type: 'success' as const }
+})
 </script>
 
 
 
 <template>
   <div class="d4-product-margin">
+    <!-- 双模式工具栏（表格视图 / 在线编辑），dedicated 静态受管区 sync bridge -->
+    <div class="sync-toolbar">
+      <el-segmented v-model="editorMode" :options="modeOptions" size="small" />
+      <el-tag :type="syncStateTag.type" size="small" class="sync-state-tag">{{ syncStateTag.text }}</el-tag>
+    </div>
+
+    <template v-if="editorMode !== '在线编辑'">
     <!-- 一、审计目标 -->
     <section class="sec">
       <h4 class="sec-title">一、审计目标</h4>
@@ -728,6 +810,15 @@ onBeforeUnmount(() => { if (debounceTimer) { clearTimeout(debounceTimer); flushS
         <p>4. 关注各月毛利率波动的合理性，如存在显著异常需进一步分析原因并记录于审计说明中。</p>
       </div>
     </details>
+    </template>
+
+    <!-- 在线编辑：平台 sync bridge（dedicated 静态受管区 sync sheet，非裸 GtOnlyOfficeSheet） -->
+    <template v-if="editorMode === '在线编辑'">
+      <div class="oo-container">
+        <WorkpaperSyncEditorHost v-if="syncOoDescriptor" :descriptor="syncOoDescriptor" :bridge="syncBridge" />
+        <div v-else class="oo-loading">正在打开 D4-8 同步编辑器…</div>
+      </div>
+    </template>
   </div>
 </template>
 
@@ -735,6 +826,10 @@ onBeforeUnmount(() => { if (debounceTimer) { clearTimeout(debounceTimer); flushS
 
 <style scoped>
 .d4-product-margin { padding: 16px; }
+.sync-toolbar { display: flex; align-items: center; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; }
+.sync-state-tag { margin-left: auto; }
+.oo-container { min-height: 600px; height: calc(100vh - 280px); border-radius: 8px; overflow: hidden; }
+.oo-loading { display: flex; align-items: center; justify-content: center; height: 100%; color: #909399; font-size: 13px; }
 .sec { margin-bottom: 20px; }
 .sec-title { font-size: 14px; font-weight: 600; color: #303133; margin: 0 0 8px; }
 .sec-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }

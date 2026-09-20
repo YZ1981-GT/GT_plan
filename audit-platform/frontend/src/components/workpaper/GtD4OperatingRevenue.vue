@@ -404,7 +404,7 @@ const isD4DetailSheet = computed(() => currentSheet.value != null && currentShee
 //    自管 sync bridge（独立 entry xlsx/gt-d4-customer-structure，sheetKey=d49-managed），
 //    必须登记为 dedicated —— 否则宿主对它叠加 legacy 双切换器 + 走整册 GtOnlyOfficeSheet。
 const isD4DedicatedSyncSheet = computed(() =>
-  ['D4-1', 'D4-5', 'D4-6', 'D4-7', 'D4-9', 'D4-10', 'D4-11', 'D4-15', 'D4-16', 'D4-17', 'D4-18', 'D4-19', 'D4-20', 'D4-21', 'D4-22', 'D4-23', 'D4-24', 'D4-25', 'D4-26', 'D4-27', 'D4-28', 'D4-29', 'D4-30', 'D4-31', 'D4-32', 'D4-33', 'D4-34', 'D4-35', 'D4-36'].includes(
+  ['D4-1', 'D4-5', 'D4-6', 'D4-7', 'D4-8', 'D4-9', 'D4-10', 'D4-11', 'D4-15', 'D4-16', 'D4-17', 'D4-18', 'D4-19', 'D4-20', 'D4-21', 'D4-22', 'D4-23', 'D4-24', 'D4-25', 'D4-26', 'D4-27', 'D4-28', 'D4-29', 'D4-30', 'D4-31', 'D4-32', 'D4-33', 'D4-34', 'D4-35', 'D4-36'].includes(
     currentSheet.value || '',
   ),
 )

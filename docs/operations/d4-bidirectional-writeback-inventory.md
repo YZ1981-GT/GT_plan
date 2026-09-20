@@ -53,6 +53,12 @@
   整册 materialize 已 138s 逼近 120s 软上限，加 D4-8 有超时风险）——故 D4-8 契约已声明但 representation 未含，
   归 🟡 半接入；②D4-8 前端 `D4TabProductMargin.vue` 未接 `useWorkpaperSyncBridge`、宿主
   `isD4DedicatedSyncSheet` 未含 `'D4-8'`。
+- **进展更正（2026-09-21，Task 11②/Task 12 收口）**：②**已完成**——D4-8 前端 `D4TabProductMargin.vue` 已接
+  `useWorkpaperSyncBridge` + `WorkpaperSyncEditorHost`、宿主 `isD4DedicatedSyncSheet` 已含 `'D4-8'`，守卫
+  `d4ProductMarginSyncHostWiring.spec.ts`(9) 全绿 → D4-8 转 **✅ 三维代码全绿**（见下方逐张清册 + D4-8 段）。
+  ①rematerialize 发布 representation 仍 `UNVERIFIABLE`（env 门：需 live PG，D4 entry 整册 materialize 已 ~138s
+  逼近 120s 软上限）——同 D4-33/D4-35 真 OO env 门标准，不假绿；引擎静态路径往返正确性由 D4-33 同
+  `BindingKind.static_region` 单测 + 发布链真 PG 无 `RoundtripEquivalenceError` 保证。
 
 ## 增量更新（2026-09-20，D4-1 落地）
 
@@ -83,7 +89,7 @@
 | 5 | D4-5 | 会计政策检查 | d-cycle-expansion | ✅ d45-managed | D4TabPolicyCheck | ✅ | ✅ |
 | 6 | D4-6 | 重要指标分析 | d-cycle-expansion | ✅ d46-managed(批次B从零) | D4TabIndicator | ✅ | ✅ (批次B 2026-09-20落地,真OO待验) |
 | 7 | D4-7 | 毛利率分析 | d-cycle-expansion | ✅ d47-managed | D4TabMarginMonthly | ✅ | ✅ (动态产品区+静态月度区,gen76) |
-| 8 | D4-8 | 重要产品毛利分析 | static-cell-writeback (Task11*) | ✅ d48-managed(静态块矩阵,slot0受管) | D4TabProductMargin | legacy | 🟡 后端契约已落(2026-09-20非法key修复+落盘),前端未接桥 |
+| 8 | D4-8 | 重要产品毛利分析 | static-cell-writeback (Task11*) | ✅ d48-managed(静态块矩阵,slot0受管180cell) | D4TabProductMargin | ✅ | ✅ (2026-09-21静态cell引擎+前端接桥+宿主登记全绿;rematerialize+真OO待env) |
 | 9 | D4-9 | 重要客户结构分析 | d4-9-customer | ✅ d49-managed(三区,共享entry) | D4TabCustomerStructure | ✅ | ✅ (2026-09-20发布gen55,真OO待验) |
 | 10 | D4-10 | 重要客户销售价格 | d4-price-analysis (9/10) | ✅ d410-managed(批次B,dict+总额行) | D4TabCustomerPrice | ✅ | ✅ (2026-09-20发布gen63,补rowId,真OO待验) |
 | 11 | D4-11 | 产品销售价格分析 | d4-price-analysis (9/10) | ✅ d411-managed(批次B) | D4TabProductPrice | ✅ | ✅ (2026-09-20发布gen62,补rowId,真OO待验) |
@@ -118,20 +124,22 @@
 > 🔴 **重要口径**：下方「✅」是**三维代码全绿（REQUEST_PATH 级）**——后端契约 + 前端接桥 + 宿主登记齐全。但**没有一张到主控 §6.4 的 `ONLYOFFICE_VERIFIED`**（需真实 OO 往返产生 `working_paper_content_application` state=applied + operation 终态 + OO 侧 content version，见 §9.5）。真 OO 验证是 env 门（start-dev.bat 全栈 + OO 容器），列为批次C。
 > 🔴 **数字口径更正（2026-09-20 后续实证）**：旧统计段曾写「契约集合 19/27 张」「✅ 27 张」「D4-7/34/36 归🔵从零」「D4-8/33 HTML-only」——**均已过时/自相矛盾**。以本段为准（契约磁盘实测 32 张；D4-33/34/36/7 已落地为 ✅；D4-8 因非法 key 修复+落盘转 🟡 半接入）。
 
-- ✅ 三维代码全绿(REQUEST_PATH)：**31 张** — D4-1/2/3/5/6/7/9/10/11/15/16/17/18/19/20/21/22/23/24/25/26/27/28/29/30/31/32/33/34/35/36
-  - 前端宿主 `isD4DedicatedSyncSheet` 登记 29 张（D4-1/5/6/7/9/10/11/15~36 除 D4-4/8/12/13/14）；D4-2/3 走宿主统一桥
-- 🟡 半接入(后端契约已落但前端未接桥 / representation 未 rematerialize)：**1 张** — D4-8（2026-09-20 非法 key 修复 + 契约落盘，前端 `D4TabProductMargin` 仍 legacy、rematerialize 待 live）
+- ✅ 三维代码全绿(REQUEST_PATH)：**32 张** — D4-1/2/3/5/6/7/8/9/10/11/15/16/17/18/19/20/21/22/23/24/25/26/27/28/29/30/31/32/33/34/35/36
+  - 前端宿主 `isD4DedicatedSyncSheet` 登记 30 张（D4-1/5/6/7/8/9/10/11/15~36 除 D4-4/12/13/14）；D4-2/3 走宿主统一桥
+- 🟡 半接入(后端契约已落但前端未接桥 / representation 未 rematerialize)：**0 张** — D4-8 已于 2026-09-21 补齐前端接桥（`D4TabProductMargin` 改 `useWorkpaperSyncBridge` + 宿主登记 'D4-8' + 守卫 `d4ProductMarginSyncHostWiring.spec.ts`），转 ✅ 三维代码全绿
 - ⏸ 待专项 spec(硬约束,非机械 provider)：**2 张** — D4-12(转置,`d4-12-transposed-writeback`) / D4-14(七维列映射裁决,`d4-14-walkthrough-writeback`)
 - ⬜ 裁决 single_html/N/A：**2 张** — D4-4(无行身份列) / D4-13(纯叙述文本表)
 
-> 校验：31 + 1 + 2 + 2 = 36 ✓
+> 校验：32 + 0 + 2 + 2 = 36 ✓
 > 契约集合现 **32 张**（+d48-managed，含静态块矩阵 180 static cell）；entry `xlsx/gt-d4-operating-revenue`
 > 磁盘契约 `assert_contract_file_matches_source` = OK（此前因 D4-8 非法 key 一直 DRIFT 红态，已修复消除）。
-> 🔴 **D4-8 的 representation 尚未含**（契约声明但 bundle 未 rematerialize）——真上线前须跑发布链（Task 9，
-> 需 live PG + 注意 D4 entry materialize 已 138s 逼近 120s 软上限）。
+> 🔴 **D4-8 的 representation 尚未 rematerialize**（契约声明已落盘、前端已接桥，但 bundle 未含）——真上线前须跑发布链（Task 9，
+> 需 live PG + 注意 D4 entry materialize 已 ~138s 逼近 120s 软上限）；rematerialize + 真 OO canvas 往返为 env 门 `UNVERIFIABLE`（同 D4-33/D4-35 标准）。
+> 引擎静态路径往返正确性由 D4-33 同 `BindingKind.static_region` 单测（TestStaticRoundtrip）+ 发布链真 PG 无 `RoundtripEquivalenceError` 保证（D4-8 复用同一引擎路径）。
 > 剩余待办进展（2026-09-20 逐张侦查+落地，全部有结论无悬空）：
-> ✅ **D4-34 / D4-36 / D4-7 / D4-33 / D4-8(后端) 已落地**（D4-34/36 双区 dynamic dict store gen68/gen70；
-> D4-7 动态产品区+静态月度区 gen76；D4-33 静态 cell 引擎路径；D4-8 静态块矩阵契约已落盘待 rematerialize）
+> ✅ **D4-34 / D4-36 / D4-7 / D4-33 / D4-8 已落地**（D4-34/36 双区 dynamic dict store gen68/gen70；
+> D4-7 动态产品区+静态月度区 gen76；D4-33 静态 cell 引擎路径三维全绿；D4-8 静态块矩阵契约落盘 + 前端接桥
+> 三维代码全绿，rematerialize + 真 OO canvas 为 env 门 `UNVERIFIABLE`）
 > ⏸ **D4-12 转置**（需模板改造 + 泛化 D4-29 引擎，待专项 spec `d4-12-transposed-writeback`）
 > ⏸ **D4-14 七维嵌套**（模板列↔前端维度不对齐，需列映射裁决，待专项 spec `d4-14-walkthrough-writeback`）
 >
@@ -263,14 +271,23 @@
   - 🔴 ②前端 products **无 rowId**（array index 当身份，`removeProduct(idx)`），须先补 rowId + backfill
     （同 D4-10/11 做法）方合行身份铁律。**这是 D4-7 落地的唯一剩余前置。**
   - 解阻后即可按 D4-9 双区范式落地（§二 动态产品区当 Excel-Table 载体，§一 静态月度区寄生）。
-### D4-8 产品毛利率（~~2026-09-20 裁定 HTML-only~~ **已作废，见顶部「静态 cell 路径落地」段：后端契约已落盘（非法 key 已修），转 🟡 半接入，待前端接桥 + rematerialize**）
+### D4-8 产品毛利率（~~2026-09-20 裁定 HTML-only~~ **已由 spec `workpaper-sync-static-cell-sheet-writeback` 解除，转 ✅ 三维代码全绿**）
 - 几何（A1:X40）：**固定产品块**（产品A R12-31 / 产品B R32+…），每块 header R13-15（3 行）+ **固定 12 月行**
   R16-27 + 合计 R28 + 同行业A/B/行业平均 R29-31。月行 R16-27 全 F:10（10 公式/行，单价/金额/毛利/毛利率派生）。
 - 前端 `D4TabProductMargin.vue`，store `D4-8-products` = `[{name, months[12], priorMonths[12], industry[3]}]`；
   产品**动态计数**但每产品 = **固定 12 月 × 6 输入**静态网格，模板产品块**固定预画**。
-- 🔴 **裁定：HTML-only**（同 D4-33）。根因：**无真实动态行区**——「products 动态」是块计数动态（映射固定模板块），
-  块内 12 月是固定静态行 + 大量公式，无任何 dynamic-row table 可当 Excel-Table 载体。引擎不支持纯静态/静态块
-  sheet 双向回写（见 D4-33 裁定）。落地须走「多块转置 / 模板预画 N 块 + 泛化引擎」，属大工程；本轮 HTML-only。
+- ✅ **裁定已由 spec `workpaper-sync-static-cell-sheet-writeback` 解除**（原「HTML-only」作废）。原根因「无真实动态行区
+  → 无 Excel-Table 载体」经该 spec 补的 **definedName 锚定静态受管区**（`BindingKind.static_region`）路径消除：受管
+  cell 不再强制锚定动态 Excel Table，静态块经 workbook-scope definedName（`GT_MANAGED_REGION_D48` / ref `$B$16:$W$31`）
+  按绝对坐标直写/反读。census 实测裁定 = **块计数动态（块内 12 月固定静态行、模板预画单块）**，受管 slot0（产品A 块）
+  180 static cell（见 `evidence/d4-bidirectional-acceptance/D4-8.json`）。已落：provider `phase5_d4_product_margin_sheet.py`
+  + `_INCLUDE_D48_PRODUCT_MARGIN_SHEET=True` + 契约 `d48-managed` 落盘（`assert_contract_file_matches_source` OK）
+  + 前端 `D4TabProductMargin.vue` 接 `useWorkpaperSyncBridge` + 宿主登记 'D4-8' + 守卫 `test_d4_8_margin_contract.py`(5)
+  / `d4ProductMarginSyncHostWiring.spec.ts`(9)。**仍 `UNVERIFIABLE`（env 门，不假绿）**：rematerialize 发布
+  representation（需 live PG，D4 entry materialize 已 ~138s 逼近 120s 软上限）+ 真 OO canvas 单元格往返（同 D4-33/D4-35
+  标准）；引擎静态路径往返正确性由 D4-33 同 `BindingKind.static_region` 单测（TestStaticRoundtrip）+ 发布链真 PG 无
+  `RoundtripEquivalenceError` 保证（D4-8 复用同一引擎路径）。落地须走「多块转置 / 模板预画 N 块」的旧结论亦作废——
+  静态块矩阵单块 slot0 直写已足够覆盖模板唯一物理块。
 ### D4-33 其他业务毛利率（~~2026-09-20 裁定 HTML-only~~ **已作废，见顶部「静态 cell 路径落地」段：静态 cell 引擎路径已支持，D4-33 已 ✅ 落地**）
 - 模板 `其他业务毛利率分析表D4-33`（A1:M31）：**固定 12 月行**（R12-23）× **固定 3 业务类型列组**
   （出租固定资产 E-G / 出租无形资产 H-J / 销售材料 K-M，每组 收入/成本/毛利率）。合计 B/C/D、
@@ -281,20 +298,20 @@
 - ✅ **provider 已写并过隔离 probe**（`phase5_d4_other_margin_sheet.py`，212 行）：契约 parse +
   72 cell projection/merge 往返全绿；slot 位置映射（前 3 业务类型 ↔ E-G/H-J/K-M），第 4+ HTML-only；
   dict store 门面 `merge_d433_from_projection` 返 3-tuple（同 D4-9/D4-35 oo_to_html 专用块约定）。
-- 🔴 **落地被引擎硬约束挡下（context-gather 实证 + rematerialize 实测 RoundtripEquivalenceError）**：
-  受管 cell 只能经 `ExcelIdentityBinding` 落盘，binding **必须**锚定一张 `row_identity` **动态表**的
-  Excel Table `<tableParts>` 载体（materialize `managed_tables_of` 对 `not dynamic.has_dynamic_rows`
-  直接 raise；extract `resolve_managed_region` 靠 Excel Table displayName 定位受管区）。D4-9 的
-  `customer_totals` 静态标量能落盘仅因它**寄生**在同 sheet 两张动态表（current/prior）的 tableParts 上。
-  **D4-33 整张只有静态表、无任何动态行维度**（12 月是固定枚举、业务类型是动态列但模板仅 3 固定列组）
-  → 无载体 → materialize 写不进、反读缺全部 72 字段。
-- **裁定：HTML-only**（`_INCLUDE_D433_MARGIN_SHEET=False`，同 D4-45 静态块 precedent，不进 Excel 契约）。
-  wiring 已接但全 flag 门控 inert；守卫 `test_d4_33_margin_contract.py`（4 测试）钉住 provider 自洽 +
-  live 契约不含 D4-33 的诚实状态。**解除条件**：引擎支持「纯静态 sheet 直写绝对坐标载体」，或给
-  D4-33 造真实动态行表当载体（本表无动态行语义，属伪造，拒）。届时一键翻 flag=True 接入。
-- 🔴 **同类矩阵张的引擎结论外推**：D4-7（月度双区）、D4-8（product×12月）若同样**无动态行维度**
-  （纯固定行×固定列 static matrix），则同受此引擎约束 → HTML-only；若有真实动态行（如 product 可增删行）
-  则可按动态表落地。逐张须先侦查「是否存在真实动态行维度」再定，不可一律套 static-cell provider。
+- ✅ **原引擎硬约束已由 spec `workpaper-sync-static-cell-sheet-writeback` 解除**（下方「HTML-only 裁定」作废）：
+  原约束「受管 cell 只能经锚定动态 Excel Table `<tableParts>` 的 `ExcelIdentityBinding` 落盘」经该 spec 新增的
+  **definedName 锚定静态受管区**（`BindingKind.static_region`，与动态 Excel-Table 路径正交的新增旁路）消除。D4-33 的
+  72 static cell 现经 workbook-scope definedName `GT_MANAGED_REGION_D433`（instrumentation 注入，源模板无）按绝对坐标
+  直写/反读，不再需要动态行载体。动态路径（D4-2/9/34/36 等）逐字节零回归、D4-29 transposed 零回归由该 spec 守卫钉死。
+- ✅ **裁定：三维代码全绿（原「HTML-only」作废）**（`_INCLUDE_D433_MARGIN_SHEET=True`，契约含 `d433-managed`）。
+  provider `phase5_d4_other_margin_sheet.py` + 静态 binding（definedName + 72 cell）+ 前端 `D4TabOtherMargin.vue`
+  接 `useWorkpaperSyncBridge` + 宿主登记 'D4-33'；守卫 `test_d4_33_margin_contract.py` 现钉 live 契约**含** D4-33 + 静态往返。
+  **仍 `UNVERIFIABLE`（env 门，不假绿）**：真 OO canvas 单元格往返 evidence（`evidence/d4-bidirectional-acceptance/D4-33.json`
+  待 start-dev.bat + 真 OO 环境），同 §统计段「无一张到 ONLYOFFICE_VERIFIED」标准；引擎静态路径往返由后端单测
+  TestStaticRoundtrip（72 cell materialize→extract 逐字段等）+ 发布链真 PG 无 `RoundtripEquivalenceError` 保证。
+- ✅ **同类矩阵张外推已兑现**：原「D4-7/D4-8 若无真实动态行维度则同 HTML-only」的外推——D4-7 走「动态产品区 + 静态月度区
+  寄生」（有动态载体，gen76 落地），D4-8 走本 spec **静态块矩阵**路径（`BindingKind.static_region`，slot0 180 cell，同 D4-33），
+  两张均已落地为 ✅ 三维代码全绿。引擎「纯静态 sheet 直写绝对坐标载体」能力已通用，不再是 HTML-only 硬约束。
 ### D4-34 其他业务合同测算（双区 rentals + consults）—— ✅ **2026-09-20 落地完成（gen68）**
 - 几何（A1:K29）：2 dynamic 区。房屋租赁 header R12/数据 R13-17/UUID 列 L/footer marker `2.咨询业务`；
   咨询业务 header R19/数据 R20-24/UUID 列 M（≠L）/footer marker `三、审计说明：`；**B:C merged**（委托方值写 B）。

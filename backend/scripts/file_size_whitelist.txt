@@ -303,7 +303,6 @@ backend/tests/workpaper_sync/test_task29_timeline_evidence_pg.py  1565
 backend/tests/workpaper_sync/test_task30_closure_gate_pg.py  2146
 backend/tests/workpaper_sync/test_task35_content_event_refresh.py  824
 backend/tests/workpaper_sync/test_task36_excel_entry_gate.py  1810
-backend/tests/workpaper_sync/test_static_region_writeback.py  1400
 backend/tests/workpaper_sync/test_task37_excel_extract.py  2628
 backend/tests/workpaper_sync/test_task38_excel_materialize.py  3237
 backend/tests/workpaper_sync/test_task39_pilot_harness.py  1951
@@ -667,3 +666,12 @@ backend/app/models/audit_platform_models.py  1406
 #     is_static_region + _resolve_static_region + _split_defined_name_ref + managed_tables_of
 #     静态分支），修 D4-33/D4-8 引擎限制。基线含 Task4 extract 静态分支余量；静态路径与动态
 #     路径正交（新增旁路，动态 214 passed 零回归）。
+#   test_static_region_writeback.py 1520→1871：本 spec 静态受管区引擎路径的守卫宿主。
+#     基线 1520 定于 extract/materialize 静态分支落地时；后续 Task 5/8/9/11 陆续补入
+#     Property 1 往返等价（D4-33 72 cell materialize→extract 逐字段）、kind 显式分派、
+#     六锚点变异四态判定、D4-8 静态块矩阵（slot0 180 cell）同路径复用等守卫，均为
+#     新增判据（数据非逻辑，增行属健康增长，同 test_task75 Wave5 登记先例）。1871 =
+#     Task 12 收口实测真实行数，门禁继续拦膨胀 >5%。拆分方向：按 Property 分组拆
+#     roundtrip / kind-dispatch / fail-closed 三文件，属独立任务（与守卫补录同批会
+#     把「清单 ↔ 变异覆盖率」分母核对打散）。spec: workpaper-sync-static-cell-sheet-writeback Task 12
+backend/tests/workpaper_sync/test_static_region_writeback.py  1871
