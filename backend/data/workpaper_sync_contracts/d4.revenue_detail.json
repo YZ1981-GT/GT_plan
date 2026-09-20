@@ -7,7 +7,7 @@
     "excel_table",
     "hidden_uuid_column"
   ],
-  "instrumentation_definition_sha256": "eb9a85dddda49edcb38c46ef8b324d7c8ffb075bec7022595938b1fecb52ff94",
+  "instrumentation_definition_sha256": "eda3580fd536ac6c1a0654859f0af8e12913a72f182f25f05296e63804114f8d",
   "review": {
     "authority_root": "backend/wp_templates",
     "entry_id": "xlsx/gt-d4-operating-revenue",
@@ -6060,6 +6060,235 @@
         }
       ],
       "template_id": "D419"
+    },
+    {
+      "excel_name": "产品销售价格分析D4-11",
+      "locator": {
+        "anchor": "excel_table_sheet_association"
+      },
+      "sheet_key": "d411-managed",
+      "tables": [
+        {
+          "anchor": "A11",
+          "delete_policy": "tombstone",
+          "fields": [
+            {
+              "cell": {
+                "column": "B",
+                "row_from": "row_identity"
+              },
+              "column_key": "customer",
+              "header_source_ref": "源xlsx!产品销售价格分析D4-11!B11",
+              "header_text": "客户名称",
+              "json_pointer": "/rows/{row_uuid}/customer",
+              "mode": "editable",
+              "source_ref": "源xlsx!产品销售价格分析D4-11!B12",
+              "stable_field_key": "d4_11_rows/{row_uuid}/customer",
+              "store_item_id": "D4-11-data",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "C",
+                "row_from": "row_identity"
+              },
+              "column_key": "product",
+              "header_source_ref": "源xlsx!产品销售价格分析D4-11!C11",
+              "header_text": "品种/规格",
+              "json_pointer": "/rows/{row_uuid}/product",
+              "mode": "editable",
+              "source_ref": "源xlsx!产品销售价格分析D4-11!C12",
+              "stable_field_key": "d4_11_rows/{row_uuid}/product",
+              "store_item_id": "D4-11-data",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "D",
+                "row_from": "row_identity"
+              },
+              "column_key": "unit_price",
+              "header_source_ref": "源xlsx!产品销售价格分析D4-11!D11",
+              "header_text": "销售单价",
+              "json_pointer": "/rows/{row_uuid}/unitPrice",
+              "mode": "editable",
+              "source_ref": "源xlsx!产品销售价格分析D4-11!D12",
+              "stable_field_key": "d4_11_rows/{row_uuid}/unit_price",
+              "store_item_id": "D4-11-data",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "E",
+                "row_from": "row_identity"
+              },
+              "column_key": "quantity",
+              "header_source_ref": "源xlsx!产品销售价格分析D4-11!E11",
+              "header_text": "销售数量",
+              "json_pointer": "/rows/{row_uuid}/quantity",
+              "mode": "editable",
+              "source_ref": "源xlsx!产品销售价格分析D4-11!E12",
+              "stable_field_key": "d4_11_rows/{row_uuid}/quantity",
+              "store_item_id": "D4-11-data",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "F",
+                "row_from": "row_identity"
+              },
+              "column_key": "invoice_date",
+              "header_source_ref": "源xlsx!产品销售价格分析D4-11!F11",
+              "header_text": "开票日期",
+              "json_pointer": "/rows/{row_uuid}/invoiceDate",
+              "mode": "editable",
+              "source_ref": "源xlsx!产品销售价格分析D4-11!F12",
+              "stable_field_key": "d4_11_rows/{row_uuid}/invoice_date",
+              "store_item_id": "D4-11-data",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "G",
+                "row_from": "row_identity"
+              },
+              "column_key": "order_no",
+              "header_source_ref": "源xlsx!产品销售价格分析D4-11!G11",
+              "header_text": "销售订单",
+              "json_pointer": "/rows/{row_uuid}/orderNo",
+              "mode": "editable",
+              "source_ref": "源xlsx!产品销售价格分析D4-11!G12",
+              "stable_field_key": "d4_11_rows/{row_uuid}/order_no",
+              "store_item_id": "D4-11-data",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "H",
+                "row_from": "row_identity"
+              },
+              "column_key": "order_date",
+              "header_source_ref": "源xlsx!产品销售价格分析D4-11!H11",
+              "header_text": "订单日期",
+              "json_pointer": "/rows/{row_uuid}/orderDate",
+              "mode": "editable",
+              "source_ref": "源xlsx!产品销售价格分析D4-11!H12",
+              "stable_field_key": "d4_11_rows/{row_uuid}/order_date",
+              "store_item_id": "D4-11-data",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "I",
+                "row_from": "row_identity"
+              },
+              "column_key": "list_price",
+              "header_source_ref": "源xlsx!产品销售价格分析D4-11!I11",
+              "header_text": "商品销售价格表所列单价",
+              "json_pointer": "/rows/{row_uuid}/listPrice",
+              "mode": "editable",
+              "source_ref": "源xlsx!产品销售价格分析D4-11!I12",
+              "stable_field_key": "d4_11_rows/{row_uuid}/list_price",
+              "store_item_id": "D4-11-data",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "K",
+                "row_from": "row_identity"
+              },
+              "column_key": "market_price",
+              "header_source_ref": "源xlsx!产品销售价格分析D4-11!K11",
+              "header_text": "同期市场价格",
+              "json_pointer": "/rows/{row_uuid}/marketPrice",
+              "mode": "editable",
+              "source_ref": "源xlsx!产品销售价格分析D4-11!K12",
+              "stable_field_key": "d4_11_rows/{row_uuid}/market_price",
+              "store_item_id": "D4-11-data",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "M",
+                "row_from": "row_identity"
+              },
+              "column_key": "reason",
+              "header_source_ref": "源xlsx!产品销售价格分析D4-11!M11",
+              "header_text": "差异原因分析",
+              "json_pointer": "/rows/{row_uuid}/reason",
+              "mode": "editable",
+              "source_ref": "源xlsx!产品销售价格分析D4-11!M12",
+              "stable_field_key": "d4_11_rows/{row_uuid}/reason",
+              "store_item_id": "D4-11-data",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "N",
+                "row_from": "row_identity"
+              },
+              "column_key": "price_source",
+              "header_source_ref": "源xlsx!产品销售价格分析D4-11!N11",
+              "header_text": "同期市场价格来源",
+              "json_pointer": "/rows/{row_uuid}/priceSource",
+              "mode": "editable",
+              "source_ref": "源xlsx!产品销售价格分析D4-11!N12",
+              "stable_field_key": "d4_11_rows/{row_uuid}/price_source",
+              "store_item_id": "D4-11-data",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "O",
+                "row_from": "row_identity"
+              },
+              "column_key": "remark",
+              "header_source_ref": "源xlsx!产品销售价格分析D4-11!O11",
+              "header_text": "备注",
+              "json_pointer": "/rows/{row_uuid}/remark",
+              "mode": "editable",
+              "source_ref": "源xlsx!产品销售价格分析D4-11!O12",
+              "stable_field_key": "d4_11_rows/{row_uuid}/remark",
+              "store_item_id": "D4-11-data",
+              "value_type": "text"
+            }
+          ],
+          "footer_anchor": {
+            "carries_total_formula": false,
+            "marker": "三、审计说明",
+            "search_column": "A"
+          },
+          "formula_mask": [
+            "J12",
+            "L12",
+            "J13",
+            "L13",
+            "J14",
+            "L14",
+            "J15",
+            "L15",
+            "J16",
+            "L16",
+            "J17",
+            "L17",
+            "J18",
+            "L18",
+            "J19",
+            "L19",
+            "J20",
+            "L20",
+            "J21",
+            "L21"
+          ],
+          "header_rows": 1,
+          "row_identity": {
+            "json_pointer": "/rows/*/rowId",
+            "kind": "field"
+          },
+          "table_key": "d4_11_rows"
+        }
+      ],
+      "template_id": "D411"
     }
   ],
   "template": {

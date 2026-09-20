@@ -238,6 +238,13 @@ from app.services.workpaper_sync.phase5_d4_discount_sheet import (  # noqa: E402
     build_store_projection_d419,
     merge_projection_into_d419_rows,
 )
+from app.services.workpaper_sync.phase5_d4_product_price_sheet import (  # noqa: E402
+    STORE_ITEM_ID_D411,
+    sheet_payload_d411,
+    instrumentation_spec_d411,
+    build_store_projection_d411,
+    merge_projection_into_d411_rows,
+)
 from app.services.workpaper_sync.phase5_d4_ipo_checklist_sheets import (  # noqa: E402
     CHECKLIST_SHEET_CODES,
     SHEET_KEY_BY_CODE,
@@ -322,6 +329,10 @@ _INCLUDE_D418_CUTOFF_SHEET: Final[bool] = True
 #: D4-19 销售折扣与折让检查接入（批次B 第四张，2026-09-20）。单 sheet 单动态行，行身份=id、
 #: 受管列 A-D+F-N、formula_mask E（折扣比例派生）、注入 UUID 列 P。provider=phase5_d4_discount_sheet。
 _INCLUDE_D419_DISCOUNT_SHEET: Final[bool] = True
+#: D4-11 产品销售价格分析接入（批次B 第五张，2026-09-20）。单 sheet 单动态行，行身份=rowId
+#: （前端本轮新增+backfill）、受管列 B-I/K/M/N/O、formula_mask J/L（差异率派生）、注入 UUID 列 P。
+#: provider=phase5_d4_product_price_sheet。
+_INCLUDE_D411_PRICE_SHEET: Final[bool] = True
 #: 🔴 D4-1 同 sheet 双区 instrumentation 接线开关（Task 5）。
 #: 契约 sheet（sheet_payload_d41）+ store projection + merge 恒接（判据先行 Task 2 判据）；
 #: 但 instrumentation_specs 两 spec（主营/其他）暂**不接**，唯一阻塞 = 运行态 sibling binding
@@ -691,6 +702,15 @@ def instrumentation_specs() -> tuple:
             if _INCLUDE_D419_DISCOUNT_SHEET
             else ()
         ),
+        *(
+            (
+                instrumentation_spec_d411(
+                    entry_id=ENTRY_ID, template_relative_path=TEMPLATE_RELATIVE_PATH
+                ),
+            )
+            if _INCLUDE_D411_PRICE_SHEET
+            else ()
+        ),
         # D4-1 营业收入审定表：同 sheet 双区（主营 R8 起 / 其他 R14 起）两 spec，同
         # managed_sheet 不同行段/UUID 列（W/X）。默认不接（见
         # _INCLUDE_D41_ADJUDICATION_INSTRUMENTATION 注释：runtime sibling binding 对齐仍
@@ -945,6 +965,7 @@ def build_contract_payload() -> dict[str, Any]:
             *([sheet_payload_d417()] if _INCLUDE_D417_CUTOFF_SHEET else []),
             *([sheet_payload_d418()] if _INCLUDE_D418_CUTOFF_SHEET else []),
             *([sheet_payload_d419()] if _INCLUDE_D419_DISCOUNT_SHEET else []),
+            *([sheet_payload_d411()] if _INCLUDE_D411_PRICE_SHEET else []),
         ],
         "review": {
             "entry_id": ENTRY_ID,
@@ -1505,6 +1526,11 @@ def build_combined_store_projection(
         if _INCLUDE_D419_DISCOUNT_SHEET
         else []
     )
+    d411_projs = (
+        [build_store_projection_d411(payloads.get(STORE_ITEM_ID_D411, []), contract=contract, limits=limits)]
+        if _INCLUDE_D411_PRICE_SHEET
+        else []
+    )
     # D4-25/26/27/28 IPO 检查表追加受管 sheet（空载荷时安全返回空投影）。
     inspection_projs = [
         build_inspection_store_projection(
@@ -1528,7 +1554,7 @@ def build_combined_store_projection(
     values.update(right.values)
     values.update(groups.values)
     values.update(fixed.values)
-    for proj in (d421, d422, d423, d424, d435, d41, d49, *ipo_checklist_projs, *inspection_projs, *interview_projs, *d46_projs, *d417_projs, *d418_projs, *d419_projs):
+    for proj in (d421, d422, d423, d424, d435, d41, d49, *ipo_checklist_projs, *inspection_projs, *interview_projs, *d46_projs, *d417_projs, *d418_projs, *d419_projs, *d411_projs):
         values.update(proj.values)
     if d429 is not None:
         values.update(d429.values)
@@ -1551,6 +1577,7 @@ def build_combined_store_projection(
         **{k: v for p in d417_projs for k, v in dict(p.row_keys).items()},
         **{k: v for p in d418_projs for k, v in dict(p.row_keys).items()},
         **{k: v for p in d419_projs for k, v in dict(p.row_keys).items()},
+        **{k: v for p in d411_projs for k, v in dict(p.row_keys).items()},
     }
     return Projection(
         contract_id=contract.contract_id,
@@ -1624,6 +1651,16 @@ def merge_projection_into_all_d4_stores(
         if _INCLUDE_D419_DISCOUNT_SHEET
         else {}
     )
+    d411_results = (
+        {
+            STORE_ITEM_ID_D411: merge_projection_into_d411_rows(
+                projection=projection,
+                base_payload=base_by_item.get(STORE_ITEM_ID_D411, []),
+            )
+        }
+        if _INCLUDE_D411_PRICE_SHEET
+        else {}
+    )
     return {
         STORE_ITEM_ID: merge_projection_into_store_rows(
             projection=projection, base_rows=d42_base
@@ -1669,6 +1706,7 @@ def merge_projection_into_all_d4_stores(
         **d417_results,
         **d418_results,
         **d419_results,
+        **d411_results,
         **{
             STORE_ITEM_ID_BY_CODE[code]: merge_ipo_checklist_projection_into_rows(
                 code,
