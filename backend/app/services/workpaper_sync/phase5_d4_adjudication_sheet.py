@@ -50,7 +50,12 @@ MANAGED_SHEET_D41: Final[str] = "营业收入审定表D4-1"
 TEMPLATE_ID_D41: Final[str] = "D41"
 SHEET_KEY_D41: Final[str] = "d41-managed"
 STORE_ITEM_ID_D41: Final[str] = "D4-1-rows"
-ROW_IDENTITY_STORE_KEY_D41: Final[str] = "rowKey"
+#: 🔴 行身份键必须与前端 `dynamicAdjudicationRows.serializeRows` 落库的键一致。
+#: 前端持久化 `D4-1-rows` = `[{rowId, label, source, accountCode}]`（`rowId` 是身份，
+#: 内存态 `AdjudicationRow.rowKey` 只是 UI 字段、不落库）。此前误写 `rowKey` →
+#: 任何 D4-1-rows 有真载荷的底稿一进「在线编辑」即 store-projection 500（fail-closed
+#: 抛「缺稳定行身份 rowKey」），把整个 gt-d4-operating-revenue entry 打挂。改回 `rowId`。
+ROW_IDENTITY_STORE_KEY_D41: Final[str] = "rowId"
 
 #: 两级表头（R5 项目/本期/上期；R6 未审/账项/重分类/审定）。
 HEADER_ROWS_D41: Final[tuple[int, int]] = (5, 6)
@@ -448,6 +453,20 @@ _STORE_KEY_TO_COLUMN_KEY: Final[dict[str, str]] = {
 }
 
 
+#: 科目码 → 段（与前端 `d4AccountScope.isMainRevenueCode/isOtherRevenueCode` 同规则：
+#: 6051 前缀 = 其他业务收入段，6001 前缀（及缺省）= 主营段）。前端 `serializeRows`
+#: **不落库 sectionKey**（只落 rowId/label/source/accountCode），故 section 归属必须能从
+#: accountCode 兜底推导，否则真实底稿两区行会全塌进主营（串区，违反 Property 3）。
+def _table_key_for_row(row: Mapping[str, Any]) -> str:
+    section_key = str(row.get(SECTION_KEY_FIELD) or "").strip()
+    if section_key in _SECTION_TO_TABLE:
+        return _SECTION_TO_TABLE[section_key]
+    account_code = str(row.get("accountCode") or "").strip()
+    if account_code.startswith("6051"):
+        return ROWS_TABLE_KEY_OTHER
+    return ROWS_TABLE_KEY_MAIN
+
+
 def _table_key_for_section(section_key: Any) -> str:
     return _SECTION_TO_TABLE.get(str(section_key or "").strip(), ROWS_TABLE_KEY_MAIN)
 
@@ -511,7 +530,7 @@ def build_store_projection_d41(
     row_keys_main: list[str] = []
     row_keys_other: list[str] = []
     for rid, row in _iter_store_rows(payload):
-        table_key = _table_key_for_section(row.get(SECTION_KEY_FIELD))
+        table_key = _table_key_for_row(row)
         if table_key == ROWS_TABLE_KEY_MAIN:
             budget.add_row(ROWS_TABLE_KEY_MAIN)
             row_keys_main.append(rid)

@@ -401,3 +401,52 @@ def test_property_two_region_roundtrip_field_identical(
         rid = src[A.ROW_IDENTITY_STORE_KEY_D41]
         _assert_row_equal(by_id[rid], src)
         assert by_id[rid][A.SECTION_KEY_FIELD] == src[A.SECTION_KEY_FIELD]
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# 6. 真实前端 store 形态回归守卫（Task 11 e2e 真栈暴露的两个生产 bug）
+# **Validates: Requirements 5.1, 5.3, Property 3**
+#
+# 背景：前端 `dynamicAdjudicationRows.serializeRows` 落库的 `D4-1-rows` 只含
+#   `{rowId, label, source, accountCode}` —— **身份键是 `rowId`（不是 `rowKey`），且不落
+#   `sectionKey`**（section 前端按 accountCode 现算）。此前 provider 误用 `rowKey` 作身份键
+#   且只按缺省 sectionKey 分区（缺省全塌主营），导致：
+#     bug1：任何有真载荷的 D4-1 一进「在线编辑」→ store-projection 500（缺稳定行身份）。
+#     bug2：即便能投影，两区行也全进主营（串区，违反 Property 3）。
+#   旧守卫的 `_row()` fixture 恰好显式带了 `rowKey`(=旧常量) + `sectionKey`，把两个 bug 都遮住。
+#   本组用**前端真实落库形态**（accountCode-only、无 sectionKey、身份键字面 `rowId`）复现并锁死。
+# ═══════════════════════════════════════════════════════════════════════════
+
+
+def test_row_identity_store_key_matches_frontend_literal() -> None:
+    """身份键必须是前端 serializeRows 落库的字面 `rowId`（不得回退 `rowKey`）。"""
+    assert A.ROW_IDENTITY_STORE_KEY_D41 == "rowId", (
+        "前端 dynamicAdjudicationRows.serializeRows 落库 `rowId`；provider 身份键必须与之一致，"
+        "否则真实底稿一进在线编辑即 store-projection 500"
+    )
+
+
+def test_real_store_shape_without_section_key_splits_by_account_code(contract: Any) -> None:
+    """前端真实落库形态（无 sectionKey，仅 accountCode）：6001→主营 / 6051→其他，不串区。"""
+    rows = [
+        {"rowId": "seedmain", "label": "主营业务收入(E2E)", "source": "manual", "accountCode": "6001"},
+        {"rowId": "seedother", "label": "其他业务收入(E2E)", "source": "manual", "accountCode": "6051"},
+    ]
+    proj = A.build_store_projection_d41(rows, contract=contract)
+    assert proj.row_keys[A.ROWS_TABLE_KEY_MAIN] == ("seedmain",), (
+        f"6001 应入主营，实得 {proj.row_keys[A.ROWS_TABLE_KEY_MAIN]}"
+    )
+    assert proj.row_keys[A.ROWS_TABLE_KEY_OTHER] == ("seedother",), (
+        f"6051 应入其他，实得 {proj.row_keys[A.ROWS_TABLE_KEY_OTHER]}"
+    )
+
+
+def test_explicit_section_key_still_wins_over_account_code(contract: Any) -> None:
+    """显式 sectionKey 优先于 accountCode 兜底（不破坏既有带 sectionKey 的载荷）。"""
+    rows = [
+        # accountCode 说主营，但显式 sectionKey 说其他 → 以显式 sectionKey 为准。
+        {"rowId": "x1", "label": "冲突行", "accountCode": "6001", "sectionKey": "other-revenue"},
+    ]
+    proj = A.build_store_projection_d41(rows, contract=contract)
+    assert proj.row_keys[A.ROWS_TABLE_KEY_OTHER] == ("x1",)
+    assert proj.row_keys[A.ROWS_TABLE_KEY_MAIN] == ()
