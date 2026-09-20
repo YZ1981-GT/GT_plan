@@ -64,7 +64,7 @@
 | 17 | D4-17 | 截止测试(账到单据) | d4-cutoff-return (3/13) | ✅ d417-managed(批次B) | D4TabCutoffForward | ✅ | ✅ (2026-09-20发布gen55,真OO待验) |
 | 18 | D4-18 | 截止测试(单据到账) | d4-cutoff-return (3/13) | ✅ d418-managed(批次B) | D4TabCutoffBackward | ✅ | ✅ (2026-09-20发布gen57,真OO待验) |
 | 19 | D4-19 | 销售折扣与折让 | d4-cutoff-return (3/13) | ✅ d419-managed(批次B) | D4TabDiscount | ✅ | ✅ (2026-09-20发布gen59,真OO待验) |
-| 20 | D4-20 | 销售退货检查 | d4-cutoff-return (3/13) | ❌ | D4TabReturn | legacy | 🔵 从零(BB1-3 blocked) |
+| 20 | D4-20 | 销售退货检查 | d4-cutoff-return (3/13) | ✅ d420-managed(批次B,4区) | D4TabReturn | ✅ | ✅ (2026-09-20发布gen64,4region,真OO待验) |
 | 21 | D4-21 | 关联方销售/价格 | d4-21-24 (10/11) | ✅ d421-managed | D4TabRelatedPrice | ✅ | ✅ (批次A 2026-09-20接桥,真OO待验) |
 | 22 | D4-22 | IPO重要指标分析 | d4-21-24 (10/11) | ✅ d422-managed | D4TabIpoIndicator | ✅ | ✅ (批次A接桥,真OO待验) |
 | 23 | D4-23 | 收入与开票比较 | d4-21-24 (10/11) | ✅ d423-managed | D4TabInvoiceCompare | ✅ | ✅ (批次A接桥,真OO待验) |
@@ -86,15 +86,39 @@
 
 > 🔴 **重要口径**：下方「✅」是**三维代码全绿（REQUEST_PATH 级）**——后端契约 + 前端接桥 + 宿主登记齐全。但**没有一张到主控 §6.4 的 `ONLYOFFICE_VERIFIED`**（需真实 OO 往返产生 `working_paper_content_application` state=applied + operation 终态 + OO 侧 content version，见 §9.5）。真 OO 验证是 env 门（start-dev.bat 全栈 + OO 容器），列为批次C。
 
-- ✅ 三维代码全绿(REQUEST_PATH)：**26 张** — D4-1/2/3/5/6/9/**10**/11/15/16/17/18/19/21/22/23/24/25/26/27/28/29/30/31/32/35
-  - 批次A(21~24) + 批次A-5(30~32) + 批次B(D4-6/9/10/11/17/18/19) 为 2026-09-20 落地；余此前已接桥
-- 🔵 owner spec 待做/从零(后端无契约 + 前端仍 legacy)：**8 张** — D4-7/8/12/14/20/33/34/36
+- ✅ 三维代码全绿(REQUEST_PATH)：**27 张** — D4-1/2/3/5/6/9/10/11/15/16/17/18/19/**20**/21/22/23/24/25/26/27/28/29/30/31/32/35
+  - 批次A(21~24) + 批次A-5(30~32) + 批次B(D4-6/9/10/11/17/18/19/20) 为 2026-09-20 落地；余此前已接桥
+- 🔵 owner spec 待做/从零(后端无契约 + 前端仍 legacy)：**7 张** — D4-7/8/12/14/33/34/36
 - ⬜ 裁决 single_html/N/A：**2 张** — D4-4/D4-13
 
-> 校验：26 + 8 + 2 = 36 ✓（🟡 半接入类已清零）
-> 契约集合现 **26 张**（+d410-managed）；entry `xlsx/gt-d4-operating-revenue` 当前 representation **gen63**（bundle 95f031a2）。
-> 剩余 8 张全属更硬一档：D4-12/D4-20（多子表）· D4-14（32列七维嵌套）· D4-7/8/33/34/36（矩阵型/双区，2-3x）。逐张比已完成的复杂。
+> 校验：27 + 7 + 2 = 36 ✓（🟡 半接入类已清零）
+> 契约集合现 **27 张**（+d420-managed，含 4 table：summary/provision/current/post returns）；entry `xlsx/gt-d4-operating-revenue` 当前 representation **gen64**（bundle d91cf0f2）。
+> 剩余 7 张全属更硬一档：D4-12（多子表待侦查）· D4-14（32列七维嵌套）· D4-7/8/33/34/36（矩阵型/双区，`months[12]` 位置数组 + 密集内部公式，2-3x）。逐张比已完成的复杂。
 > 注：D4-6/7 前端虽已在宿主 `D4_SHEET_KEY_BY_CODE` 预留 `d46/d47-managed` 键，但契约 sheet_key 集合中**无**对应项且组件未接桥，故仍归 🔵 从零。D4-9/10/11/14/33/34/36 经 grep 实证前端组件均未 import `useWorkpaperSyncBridge`（仍 legacy），契约集合中也无对应项。
+
+## 剩余 8 张几何侦查与实现方案（2026-09-20 冻结，供续作，避免蒸发）
+
+> 这 8 张全属多区/矩阵硬档，不能套单表范式。下方几何已 openpyxl 实测冻结。
+
+### D4-20 销售退货检查表（4 region，最接近 D4-9 可先做）
+- 模板 `销售退货检查表 D4-20`，A1:O61。**4 个受管区**：
+  1. **退货总体情况**（fixed static，行 15-16 数据 + 17 合计）：A 分类(模板文本) / B 本期退货额 / C 本期收入 / [D 比例=B/C formula] / E 上期退货额 / F 上期收入 / [G 比例 formula]。前端 store `D4-20-summary`（固定 3 行数组：贸易商/终端用户/合计）。→ static_row 模式（参 D4-5），受管 B/C/E/F。
+  2. **重新测算**（dynamic，行 25-29+）：A 产品名 / B 计提基数 / C 计提比例 / [D=B*C formula] / E 账面已计提 / [F 差异=formula] / G 差异原因。前端 `D4-20-provision`（有 id）。行身份=id，受管 A/B/C/E/G，formula_mask D/F，header 行 24，uuid 列 H。
+  3. **本期退货**（dynamic，行 34+）：15 列 A-O（日期/编号/业务/科目/明细/借/贷/客户/产品/数量/金额/原因/诉讼/异常/索引）。前端 `D4-20-current-returns`（有 id）。header 行 32-33，uuid 列 **P**（表占满 A-O，无中间空列）。
+  4. **期后退货**（dynamic，行 40+）：同 15 列布局。前端 `D4-20-post-returns`（有 id）。header 行 38-39，uuid 列 P（不同行段，可共用列）。
+- footer marker：`检查内容说明：`(A43) 或 `三、审计说明：`(A49)。
+- 🔴 难点：4 region 同 sheet（1 static + 3 dynamic），需 4 template_id + sibling binding 对齐（D4-9 证过 3 region）；returns 表占满 A-O 故 uuid 列用 P。前端键 `-current-returns`/`-post-returns` 与后端 sheet 键需对齐（inventory 早标的 D4-20 键错位 bug 一并修）。
+- 文本区（policy/assessment/note/conclusion）保持 HTML-only（同 D4-5 footer 下 static 不入契约）。
+
+### D4-12 合同检查（多子表，待侦查列布局）
+### D4-14 发生检查（32 列七维嵌套，风险最高，可能需拆多 sheet 或裁 limited）
+### D4-7 毛利率分析（双区：月度 obj `revenue[12]/cost[12]` 位置数组 + products 动态区）
+### D4-8 产品毛利率（product×12月矩阵 + 密集内部公式 H=D-G/毛利率/变动分析 R-W）
+### D4-33 其他业务毛利率（bizTypes×months 矩阵，同 D4-8 量级）
+### D4-34 其他业务合同测算（双区 rentals + consults）
+### D4-36 其他业务截止（三区 forward + backward + params）
+
+> 矩阵型（D4-7/8/33）关键未验证形态 = `months[12]` **位置数组**（B-M 列按下标映射）。首张矩阵落地需先验证「数组下标 json_pointer」往返（DEC-D4-1：12 个月做 12 条独立 field，不做 1 条 array field）。
 
 ## 逐张推进优先级（建议，2026-09-20 修订）
 
