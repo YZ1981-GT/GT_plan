@@ -1274,8 +1274,13 @@ def _frozen_sheet_anchors(instrumentation: Mapping[str, Any]) -> list[dict[str, 
         if isinstance(boundary, AbcMapping) and boundary.get("anchor") == "defined_name_ref":
             name = str(boundary.get("defined_name") or "").strip()
             if sheet_key and name:
+                # region_kind 区分「静态受管区」与「D4-29 转置表」——两者 carrier 锚点同为
+                # defined_name_ref（已探针 passed），但反读语义不同。缺省（D4-29 payload 无此
+                # 字段）视为 transposed，保 D4-29 零回归；静态 sheet 由 instrumentation 注入
+                # region_kind="static"。
                 out.append({"sheet_key": sheet_key, "defined_name": name,
-                            "anchor": "defined_name_ref"})
+                            "anchor": "defined_name_ref",
+                            "region_kind": str(boundary.get("region_kind") or "").strip()})
             continue
         tables = sheet.get("tables")
         uuid_column = ""
@@ -1356,6 +1361,40 @@ async def observe_published_frozen_definitions(
     )
 
 
+def _collect_static_region_physical(*, data, contract, key, defined_name):
+    """静态受管区（region_kind=static）的 physical sheet 名解析（Task 6）。
+
+    与 D4-29 转置分支的差别：静态区**不调** `extract_transposed_workbook`（那是「列=entity
+    行=字段」的转置反读），也不产 transposed 字段映射——静态 field 的坐标由
+    :func:`observe_structure_inventory` 的 `_cell_coordinates_for` 静态行路径（`static_row`）
+    自然产出。本函数只解析 definedName 求受管 sheet 的物理名（供 physical_sheet_by_key）。
+    """
+    import io
+    import zipfile
+
+    from app.services.excel_structure_fingerprint import _parse_workbook_xml
+    from app.services.workpaper_sync.excel_extract import _split_defined_name_ref
+
+    with zipfile.ZipFile(io.BytesIO(data)) as zf:
+        _sheets, defined_names = _parse_workbook_xml(zf)
+    matched = [
+        d
+        for d in defined_names
+        if str(d.get("name") or "").lower() == str(defined_name).lower()
+        and d.get("scope") is None
+    ]
+    if not matched:
+        raise ValueError(
+            f"静态受管区 definedName {defined_name!r} 反读不到（sheet_key={key}）"
+        )
+    if len(matched) > 1:
+        raise ValueError(
+            f"静态受管区 definedName {defined_name!r} 命中 {len(matched)} 个，受管区不唯一"
+        )
+    sheet_name, _a1 = _split_defined_name_ref(str(matched[0].get("ref") or ""))
+    return sheet_name
+
+
 def collect_workbook_structure(*, data, contract, sheet_anchors, context=None):
     """One physical collection path for publication and request-time observation."""
     ctx = context or {}
@@ -1376,6 +1415,14 @@ def collect_workbook_structure(*, data, contract, sheet_anchors, context=None):
         for anchor in sheet_anchors:
             key = anchor["sheet_key"]
             if anchor.get("anchor") == "defined_name_ref":
+                # region_kind 分派：static → 静态受管区（绝对坐标）；否则 → D4-29 转置表。
+                # 二者 carrier 锚点同为 defined_name_ref（真实 OO 探针 passed），语义不同。
+                if anchor.get("region_kind") == "static":
+                    physical[key] = _collect_static_region_physical(
+                        data=data, contract=contract, key=key,
+                        defined_name=anchor["defined_name"],
+                    )
+                    continue
                 from app.services.workpaper_sync import phase5_d4_29_customer_detail as d429
                 if key != d429.SHEET_KEY or anchor["defined_name"] != d429.DEFINED_NAME:
                     raise ValueError("Unsupported transposed anchor")

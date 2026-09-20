@@ -210,7 +210,7 @@ backend/app/services/workpaper_sync/projection_provisioning.py  1249
 #     非本次造成）。2026-09-20 spec workpaper-sync-materialize-large-table-performance Wave 5
 #     +14 行（collect_workbook_structure 的 fingerprint/sync_pairs 共享：1 次预读 + 透传 + 根因注释），
 #     用于消除「每 anchor 重算全簿指纹」致 D4 entry materialize 138.7s 超 120s 生产软上限。→ 1426。
-backend/app/services/workpaper_sync/published_identity_observer.py  1426
+backend/app/services/workpaper_sync/published_identity_observer.py  1500
 backend/app/services/workpaper_sync/repository.py  3124
 backend/app/services/workpaper_sync/request_application.py  1181
 backend/app/services/workpaper_sync/rooms.py  2017

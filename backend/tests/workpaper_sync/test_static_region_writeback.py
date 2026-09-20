@@ -851,3 +851,99 @@ class TestStaticRoundtrip:
         assert float(cost_back.value) == 100.0
         # 公式 cell 归 formula_inventory，不当受管值
         assert f"{STATIC_TABLE_KEY}/margin_m1" in outcome.formula_inventory
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Task 6 · observer 泛化（Requirement 5.1/5.3 / Property 3/7）
+# ═══════════════════════════════════════════════════════════════════════════
+
+from app.services.workpaper_sync.published_identity_observer import (
+    _collect_static_region_physical,
+    _frozen_sheet_anchors,
+    collect_workbook_structure,
+)
+
+
+class TestFrozenSheetAnchorsStatic:
+    def test_static_payload_yields_region_kind_static(self) -> None:
+        payload = {
+            "managed_sheets": [
+                {
+                    "sheet_key": "d433-managed",
+                    "region_boundary_locator": {
+                        "anchor": "defined_name_ref",
+                        "defined_name": STATIC_DEFINED_NAME,
+                        "region_kind": "static",
+                    },
+                }
+            ]
+        }
+        anchors = _frozen_sheet_anchors(payload)
+        assert len(anchors) == 1
+        assert anchors[0]["anchor"] == "defined_name_ref"
+        assert anchors[0]["region_kind"] == "static"
+        assert anchors[0]["defined_name"] == STATIC_DEFINED_NAME
+
+    def test_transposed_payload_has_empty_region_kind(self) -> None:
+        # D4-29 payload 无 region_kind → 缺省 ""（走 transposed，零回归）
+        payload = {
+            "transposed_sheets": [
+                {
+                    "sheet_key": "d4-29",
+                    "region_boundary_locator": {
+                        "anchor": "defined_name_ref",
+                        "defined_name": "GT_MANAGED_REGION_D429",
+                    },
+                }
+            ]
+        }
+        anchors = _frozen_sheet_anchors(payload)
+        assert len(anchors) == 1
+        assert anchors[0]["region_kind"] == ""
+
+
+class TestCollectStaticRegionPhysical:
+    def test_resolves_sheet_name(self) -> None:
+        data = _make_full_static_substrate({"E12": 1.0, "F12": 2.0})
+        contract = _static_contract_with_formula()
+        physical = _collect_static_region_physical(
+            data=data, contract=contract, key="d433-managed",
+            defined_name=STATIC_DEFINED_NAME,
+        )
+        assert physical == STATIC_SHEET
+
+    def test_missing_defined_name_fail_closed(self) -> None:
+        wb = openpyxl.Workbook()
+        wb.active.title = STATIC_SHEET
+        buf = io.BytesIO()
+        wb.save(buf)
+        with pytest.raises(ValueError, match="反读不到"):
+            _collect_static_region_physical(
+                data=buf.getvalue(), contract=_static_contract_with_formula(),
+                key="d433-managed", defined_name=STATIC_DEFINED_NAME,
+            )
+
+
+class TestCollectWorkbookStructureStatic:
+    def test_static_anchor_goes_through_static_path(self) -> None:
+        # collect_workbook_structure 对 static anchor 走 _collect_static_region_physical，
+        # 不调 extract_transposed_workbook（那是转置语义）。
+        data = _make_full_static_substrate({"E12": 10.0, "F12": 3.0})
+        contract = _static_contract_with_formula()
+        anchors = [
+            {
+                "sheet_key": "d433-managed",
+                "anchor": "defined_name_ref",
+                "defined_name": STATIC_DEFINED_NAME,
+                "region_kind": "static",
+            }
+        ]
+        fingerprint, physical, primary_inventory, structure = collect_workbook_structure(
+            data=data, contract=contract, sheet_anchors=anchors
+        )
+        assert physical["d433-managed"] == STATIC_SHEET
+        # 静态区无 primary_inventory（那是动态 row UUID 路径产的）
+        assert primary_inventory is None
+        # 结构清册含静态 fields 的绝对坐标（E12/F12/G12 由 _cell_coordinates_for 静态路径产）
+        locators = {loc for (_sk, _tk, _fk, loc) in structure}
+        assert any(":12" in loc for loc in locators)
