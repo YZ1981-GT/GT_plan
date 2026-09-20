@@ -1373,16 +1373,16 @@ def _collect_static_region_physical(*, data, contract, key, defined_name):
     import zipfile
 
     from app.services.excel_structure_fingerprint import _parse_workbook_xml
-    from app.services.workpaper_sync.excel_extract import _split_defined_name_ref
+    from app.services.workpaper_sync.excel_extract import (
+        _split_defined_name_ref,
+        match_workbook_scope_defined_names,
+    )
 
     with zipfile.ZipFile(io.BytesIO(data)) as zf:
         _sheets, defined_names = _parse_workbook_xml(zf)
-    matched = [
-        d
-        for d in defined_names
-        if str(d.get("name") or "").lower() == str(defined_name).lower()
-        and d.get("scope") is None
-    ]
+    # 判据（workbook-scope + 大小写不敏感）与 extract 侧共用单源；observer 侧的错误契约
+    # 仍是 ValueError（被 observe 转译为 ObservedIdentityDriftError），保持不变。
+    matched = match_workbook_scope_defined_names(defined_names, defined_name)
     if not matched:
         raise ValueError(
             f"静态受管区 definedName {defined_name!r} 反读不到（sheet_key={key}）"
@@ -1445,6 +1445,15 @@ def collect_workbook_structure(*, data, contract, sheet_anchors, context=None):
                         fields[field["stable_field_key"]] = ("C", row)
                 transposed[key] = fields
                 continue
+            # kind 分派收口（Requirement 5.1）：动态 Excel-Table anchor 由
+            # `_frozen_sheet_anchors` 产出，**不带** `anchor` 键（只带 table_name/
+            # uuid_column_letter/metadata_sheet）。若 anchor 显式声明了一个既非
+            # `defined_name_ref` 又非缺省的 kind，即未知 carrier kind → 显式 fail-closed
+            # 抛 ValueError（observer 统一转译为 ObservedIdentityDriftError），
+            # 绝不 fall-through 到动态路径产生裸 KeyError 或静默误判。
+            anchor_kind = anchor.get("anchor")
+            if anchor_kind is not None and anchor_kind != "defined_name_ref":
+                raise ValueError(f"Unsupported anchor kind: {anchor_kind!r}")
             raw = identity_inventory(data, expected_table=anchor["table_name"],
                 uuid_column_letter=anchor["uuid_column_letter"], metadata_sheet=anchor["metadata_sheet"],
                 fingerprint=fingerprint,

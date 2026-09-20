@@ -232,3 +232,39 @@ D4-33/D4-8 静态区加入 entry `xlsx/gt-d4-operating-revenue` 后，整册 mat
 | Tier-A 保鲜门 | 改 `excel_structure_fingerprint.py` 触发 `ProbeEvidenceStaleError`，须刷 gate.json digest + 重跑守卫重新实证 |
 
 > **三件套格式约定**：Property 交叉引用统一 `**Validates: Requirements N.M**`（逗号分隔多条）；`### Property` 序号为纯整数。本 spec 只做引擎静态路径 + D4-33/D4-8 验收，不动动态路径与 D4-29 transposed 语义。
+
+## 实现期修正记录（2026-09-21 复盘补记，不改写上方需求条文）
+
+> 需求条文保持原样作为审计轨迹；以下为实现期实测后与条文产生偏差的四处，供后续维护者对照，避免按条文字面去 grep 不存在的符号。
+
+1. **anchor kind 命名：`static_region_ref` → `defined_name_ref` + `region_kind="static"`**
+   本文档（Requirement 1 标题 / 5.3 / 术语约定 / Glossary）与 tasks.md 用 `static_region_ref` 指代新 anchor kind，
+   但**实现最终未新增该 carrier 名**：carrier gate（`onlyoffice_excel_instrumentation_gate.json`）的真值表里只有
+   `defined_name_ref` 通过了真实 OO 探针，新增一个从未被探针验证的 carrier 名会破坏探针证据链。故实现复用
+   `defined_name_ref` 作 carrier，用 payload 上的 `region_kind`（`"static"` / 缺省=D4-29 transposed）区分语义，
+   静态/动态分派仍由 `binding.kind`（`BindingKind.static_region`）显式裁决（Property 5 / DEC-6 不变）。
+   详见 design.md §C1.2 的「🔴 实现期修正」注。**grep 提示**：搜 `region_kind` 与 `BindingKind.static_region`，
+   而非 `static_region_ref`。
+
+2. **Requirement 2.1 / 5.5「复用 `resolve_managed_sheet` 校验入口，不重写第二份」未能达成**
+   D4-29 的 `resolve_managed_sheet` **硬编码 D4-29 几何**（校验 `destinations[0][1] != MANAGED_REF`=`$C$10:$M$41`、
+   `ws.max_row < LAST_FIELD_ROW`），对任意静态区不可复用。实现改用 fingerprint 模块的 `_parse_workbook_xml`
+   取 `defined_names`（`{name, scope, ref, hidden}`，`scope is None` 即 workbook-scope），并在
+   `_resolve_static_region` 内自行做「唯一 / workbook-scope / 非隐藏 metadata sheet」校验 ⇒ 事实上**存在两份
+   definedName 校验逻辑**（D4-29 一份、静态区一份）。**这是本 spec 留下的可重构点**：宜抽共享纯函数
+   `resolve_workbook_scope_defined_name(zf, name)` 供两路共同消费，避免未来改校验纪律时改一处漏一处。
+
+3. **Requirement 7.5「structure_hash 包含 definedName 锚点（删 definedName 则 hash 变）」机制描述不准确**
+   实测 `StructureFacts.aspect_digests()` 的六个 aspect 为 `visible_sheets` / `business_values` / `formulas` /
+   `styles` / `merges` / `protected_parts`，**不含 `defined_names`** ⇒ 删 definedName 不会让该 hash 变。
+   真实的锚点漂移捕获机制是 **`identity_inventory` 的 `defined_name` 载体**（按 `GT_` 前缀收集 definedName
+   并计数/记 hidden_flags）+ **observer 静态分派 fail-closed**（`_collect_static_region_physical` 反读不到
+   definedName 即抛）——后者比「hash 变」更强（结构采集直接无法完成）。守卫见
+   `test_static_region_writeback.py::TestStructureHashDynamicUnchangedStaticAnchored::test_deleting_defined_name_fails_static_structure_collection`。
+
+4. **Property 2「逐字节相等（sha256 恒等）」在现引擎下不可证伪**
+   `excel_materialize._write_entries` 用 `zipfile.writestr(name, payload)` 不传 `ZipInfo`，zip 条目会写入
+   **当前时间戳** ⇒ 同一输入两次 materialize 的**整文件** sha256 必然不同。故 Property 2 的字节判据实际以
+   **per-zip-member 解压内容 sha256**（剥离 date_time 噪声）落地，守卫见
+   `TestDynamicMaterializeByteZeroRegression`。注：非确定性不影响正确性判定——`RoundtripEquivalenceError`
+   比的是 **projection 字段值**，发布链 `--check` 比的是 **definition_bundle_sha256**，均不依赖产物字节。

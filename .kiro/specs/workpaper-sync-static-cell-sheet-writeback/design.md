@@ -405,3 +405,29 @@ D4-33 走 start-dev.bat + 真实 OO 环境：HTML 改一个月度收入 → 「�
 9. **清册更新 + 收口**（Requirement 6.7 / 7.8）。
 
 > 每步守卫全绿 + 变异反证 + soft_limit 不提，才进下一步。发布链每步验 `--check` 无 drift。全程 stash-isolation 只提交自己文件。
+
+## 已知可改进项（超出本 spec 范围，供后续立项）
+
+### materialize 产物不可复现（zip 条目时间戳）
+
+`excel_materialize._write_entries` 用 `zipfile.writestr(name, payload)` 不传 `ZipInfo`，zip 条目
+`date_time` 取**当前时间** ⇒ 同一输入两次 materialize 的**整文件 sha256 必然不同**，产物不可复现。
+这使 Property 2 的「逐字节 sha256 恒等」判据物理不可达，只能以 per-zip-member 解压内容 sha256 落地
+（守卫 `TestDynamicMaterializeByteZeroRegression`）。
+
+🔴 与平台既定纪律不一致：同仓的 `excel_workbook_row_change._repack` 与
+`excel_sheet_visibility._replace_workbook_part` 都是「其余部件连 `ZipInfo`（`date_time`/
+`compress_type`/`external_attr`）一起原样搬，让除声明部件外一个字节不动」，并有守卫
+`test_repack_preserves_zipinfo_like_visibility_module` 锁死两者不漂移。`_write_entries` 是这条纪律的例外。
+
+**为何不在本 spec 修**：`_read_entries` 返回 `{name: bytes}` 已丢弃源 `ZipInfo`，要保留就得改
+`_read_entries` 签名及其**全部调用点**（materialize/verify/row-shift 多处），属共享内核重构，
+影响所有 entry 的产物字节，超出「静态 cell 受管区」范围，按「改动前先 spec 三件套」铁律应独立立项。
+
+**影响面评估（已实证）**：非确定性**不影响正确性判定** —— `RoundtripEquivalenceError` 比的是
+projection **字段值**、发布链 `--check` 比的是 **definition_bundle_sha256**，均不依赖产物字节；
+且正因产物本就不确定，仓内**不可能**存在硬编码其整文件 sha256 的基线（故修复它不会打破现存守卫）。
+
+**建议方案**：新立 spec，让 `_read_entries` 一并返回 per-part `ZipInfo` 元数据（或改用
+`_repack` 同形的「克隆源 info」写法），使 materialize 产物可复现；收益是解锁真正的字节级零回归判据
+与 artifact 去重，并让 `_write_entries` 回归平台纪律。

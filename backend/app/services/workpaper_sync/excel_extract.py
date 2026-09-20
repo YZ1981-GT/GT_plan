@@ -209,6 +209,7 @@ __all__ = [
     "ExcelIdentityBinding",
     "BindingKind",
     "is_static_region",
+    "match_workbook_scope_defined_names",
     "resolve_managed_region",
     "managed_tables_of",
     # 预算与分块
@@ -831,6 +832,31 @@ def _split_defined_name_ref(ref: str) -> tuple[str, str]:
     return sheet_name, a1_clean
 
 
+def match_workbook_scope_defined_names(
+    defined_names: Iterable[Mapping[str, Any]], name: str
+) -> list[Mapping[str, Any]]:
+    """筛出名字匹配的 **workbook-scope** definedName（判据单源）。
+
+    workbook-scope 判据 = `scope is None`（`_parse_workbook_xml` 对 localSheetId 会填
+    具体 sheet 名）；名字匹配大小写不敏感（同 D4-29 纪律）。
+
+    只做筛选**不抛异常**：0 命中 / >1 命中各自的语义（缺锚点 vs 锚点不唯一）由调用方
+    按自己的错误契约裁决 —— extract 侧抛 :class:`IdentityCarrierMissingError` /
+    :class:`ManagedRegionResolutionError`，observer 侧抛 ``ValueError``（被转译为
+    ``ObservedIdentityDriftError``）。把抛错留给调用方是为了让这次收口**零行为变化**。
+
+    ⚠️ D4-29 的 `phase5_d4_29_customer_detail.resolve_managed_sheet` 走 openpyxl
+    `wb.defined_names` 而不是 `_parse_workbook_xml` 的 dict 清册，形态不同（不是
+    `Mapping`），**不**收口进来。
+    """
+    target = str(name).lower()
+    return [
+        d
+        for d in defined_names
+        if str(d.get("name") or "").lower() == target and d.get("scope") is None
+    ]
+
+
 def _resolve_static_region(
     zf: zipfile.ZipFile, *, contract: SyncContract, binding: ExcelIdentityBinding
 ) -> ManagedRegion:
@@ -840,13 +866,9 @@ def _resolve_static_region(
     命中 0 / >1 / 落隐藏 metadata sheet 都 fail-closed，与 Excel Table 分支同构。
     """
     sheets, defined_names = _sheet_part_map(zf)
-    # workbook-scope（scope is None）+ 名字匹配（大小写不敏感，同 D4-29 纪律）
-    matched = [
-        d
-        for d in defined_names
-        if str(d.get("name") or "").lower() == binding.defined_name.lower()
-        and d.get("scope") is None
-    ]
+    # workbook-scope + 大小写不敏感名字匹配的判据单源在 match_workbook_scope_defined_names，
+    # 这里只按 extract 侧错误契约裁决 0 / >1 命中。
+    matched = match_workbook_scope_defined_names(defined_names, binding.defined_name)
     if not matched:
         raise IdentityCarrierMissingError(
             f"静态受管区 definedName {binding.defined_name!r} 反读不到（实测 workbook-scope "

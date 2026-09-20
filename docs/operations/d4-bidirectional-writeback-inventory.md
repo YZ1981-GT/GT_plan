@@ -47,7 +47,7 @@
 - **解 HEAD 断裂**：`phase5_d4_product_margin_sheet.py` + `test_d4_8_margin_contract.py` 此前 git 未跟踪
   （`??`），但已跟踪的 `phase5_d4_revenue_detail.py:271` 已 import 它 → clean checkout 会 ImportError
   打挂全 entry。本轮补入库两文件，HEAD 恢复自洽（同 D4-9 那次 HEAD 断裂处理）。
-- **守卫**：`test_d4_8_margin_contract.py`(10) + `test_d4_33_margin_contract.py`(10) 全绿；磁盘一致性
+- **守卫**：`test_d4_8_margin_contract.py`(6) + `test_d4_33_margin_contract.py`(5) 全绿；磁盘一致性
   `test_d4_9 disk_source_locked` + `test_launch_target_sheet_locate`(16) 全绿；D4 契约辐射面 44 passed 无回归。
 - **仍待办（spec Task 9/10，非本轮 P0）**：①D4-8 的 rematerialize 发布 representation（需 live PG，D4 entry
   整册 materialize 已 138s 逼近 120s 软上限，加 D4-8 有超时风险）——故 D4-8 契约已声明但 representation 未含，
@@ -59,6 +59,28 @@
   ①rematerialize 发布 representation 仍 `UNVERIFIABLE`（env 门：需 live PG，D4 entry 整册 materialize 已 ~138s
   逼近 120s 软上限）——同 D4-33/D4-35 真 OO env 门标准，不假绿；引擎静态路径往返正确性由 D4-33 同
   `BindingKind.static_region` 单测 + 发布链真 PG 无 `RoundtripEquivalenceError` 保证。
+- 🔴 **进展再更正（2026-09-21 后续，commit `98ab0eaef` + `a2c07934f`；上两条的①与「138s」均已过时）**：
+  ①**已完成，不再是 UNVERIFIABLE**——D4-8 的 representation **已发布**：发布链 `generate --apply`
+  （契约 canonical `8b7b5baf`，32 张含 `d48-managed` 180 字段）→ `provision` → `rematerialize --apply`
+  **gen 81→82 / revision 106**，无 `RoundtripEquivalenceError`/`FooterAnchorDriftError`/`SoftTimeout`；
+  `--check` = `already_on_desired_bundle`（bundle `5bca042d`）；真栈 store-projection 200（field_count=751，
+  含 D4-8 的 180 cell + D4-33 的 72 cell）。**故 Property 8（materialize ≤120s soft_limit 不提高）对
+  D4-33+D4-8 双张均成立**。
+  🔴 **「138s 逼近上限」是 Wave 5 性能修复*前*的过时数字**，不可再作为判断依据：Wave 5 修复后真库 CPU 段
+  **138.7s→69.33s**，加 D4-33 后实测 **82.53s**，加 D4-8 后 rematerialize 成功（未抛 SoftTimeout），
+  当前距 120s 上限仍有余量。**教训**：引用性能数字前必须确认它在哪个优化版本之后测得，否则会用旧数字
+  误判出「有超时风险」而跳过本可跑通的发布链。
+  ②同批发现并修复 **D4-8 后端接线原仅完成 5/7 处**（缺 combined projection `d48_projs` / `values.update`
+  循环 / `row_keys` / `STORE_ITEM_ID_D48_DICT` 导出），其中 `d48_projs` 默认值若用 `{}` 而非 `[]`，
+  `_decode`/`_product0` 对非 list 返 None 会**静默把 180 cell 全投 0**（已加空 base 防假绿守卫钉死）。
+  **教训**：「provider 已写 + flag 已翻 + 契约已落盘」≠ 接线完整，必须逐处核对 combined projection /
+  values.update / row_keys / dict 门面四点，缺任一即静默投 0 或 crash。
+  仅剩真栈 OO canvas 单元格往返为 env 门（同 D4 全组批次C 标准）。
+  🔴 **工具教训（本轮实测）**：`rtk` 压缩代理的 pytest 输出**测试计数可能不准** —— 同一组
+  `test_d4_8_margin_contract.py` + `test_d4_33_margin_contract.py`，经 `rtk` 报 `10 passed`，
+  而原始 `python -m pytest` 报 **11 passed**（`--collect-only` 实证 6 + 5）。故**写进文档/evidence
+  的测试数字必须用不带 `rtk` 的原始 pytest 输出核实**；`rtk` 仅用于日常省 token，不作为计数真源。
+  （本条订正了上批次据 rtk 数字误推的 D4-33 守卫数 4 → 实为 5。）
 
 ## 增量更新（2026-09-20，D4-1 落地）
 
@@ -133,8 +155,10 @@
 > 校验：32 + 0 + 2 + 2 = 36 ✓
 > 契约集合现 **32 张**（+d48-managed，含静态块矩阵 180 static cell）；entry `xlsx/gt-d4-operating-revenue`
 > 磁盘契约 `assert_contract_file_matches_source` = OK（此前因 D4-8 非法 key 一直 DRIFT 红态，已修复消除）。
-> 🔴 **D4-8 的 representation 尚未 rematerialize**（契约声明已落盘、前端已接桥，但 bundle 未含）——真上线前须跑发布链（Task 9，
-> 需 live PG + 注意 D4 entry materialize 已 ~138s 逼近 120s 软上限）；rematerialize + 真 OO canvas 往返为 env 门 `UNVERIFIABLE`（同 D4-33/D4-35 标准）。
+> ✅ **D4-8 的 representation 已发布**（commit `98ab0eaef`）：rematerialize **gen 81→82 / revision 106**，
+> bundle `5bca042d` 已含 `d48-managed`（180 字段），`--check`=`already_on_desired_bundle`，无 SoftTimeout
+> ⇒ Property 8 对 D4-33+D4-8 双张成立。（旧记录「尚未 rematerialize / 138s 逼近上限」已过时作废，
+> 138s 是 Wave 5 性能修复*前*的数字，修复后 69.33s、加 D4-33 后 82.53s。）仅真 OO canvas 往返仍为 env 门。
 > 引擎静态路径往返正确性由 D4-33 同 `BindingKind.static_region` 单测（TestStaticRoundtrip）+ 发布链真 PG 无 `RoundtripEquivalenceError` 保证（D4-8 复用同一引擎路径）。
 > 剩余待办进展（2026-09-20 逐张侦查+落地，全部有结论无悬空）：
 > ✅ **D4-34 / D4-36 / D4-7 / D4-33 / D4-8 已落地**（D4-34/36 双区 dynamic dict store gen68/gen70；
@@ -209,7 +233,7 @@
   ②转置要求**模板预置 workbook-scope definedName + 隐藏身份载体行**（D4-29 row 9 存 `GT-CUSTOMER-{id}`），
   D4-12 模板**两者皆无**（census 确认无 definedName、row 9 空）→ 须改造共享 xlsx 模板。
   ③落地 D4-12 转置 = (a) 泛化 D4-29 转置引擎（重构一个已稳定+有守卫的模块，高回归风险）+ (b) 模板加
-  definedName+carrier 行 + (c) 新 provider。跨度远超行表张，且与「materialize 已 138s 逼近软上限」叠加。
+  definedName+carrier 行 + (c) 新 provider。跨度远超行表张，且与 materialize 性能预算叠加（注：Wave 5 修复后当前约 82s，138s 为修复前旧值，勿再引用）。
 - **对比**：D4-34/36（双区行表）复用成熟 dynamic-row 范式零模板改动即落地；D4-12 转置无此便利。
   建议单立 spec `d4-12-transposed-writeback`，含「泛化转置引擎（extract D4-29 通用化）+ 模板 instrument
   + provider + 守卫」四阶段，与 D4-29 同引擎共线维护。
@@ -282,9 +306,10 @@
   按绝对坐标直写/反读。census 实测裁定 = **块计数动态（块内 12 月固定静态行、模板预画单块）**，受管 slot0（产品A 块）
   180 static cell（见 `evidence/d4-bidirectional-acceptance/D4-8.json`）。已落：provider `phase5_d4_product_margin_sheet.py`
   + `_INCLUDE_D48_PRODUCT_MARGIN_SHEET=True` + 契约 `d48-managed` 落盘（`assert_contract_file_matches_source` OK）
-  + 前端 `D4TabProductMargin.vue` 接 `useWorkpaperSyncBridge` + 宿主登记 'D4-8' + 守卫 `test_d4_8_margin_contract.py`(5)
-  / `d4ProductMarginSyncHostWiring.spec.ts`(9)。**仍 `UNVERIFIABLE`（env 门，不假绿）**：rematerialize 发布
-  representation（需 live PG，D4 entry materialize 已 ~138s 逼近 120s 软上限）+ 真 OO canvas 单元格往返（同 D4-33/D4-35
+  + 前端 `D4TabProductMargin.vue` 接 `useWorkpaperSyncBridge` + 宿主登记 'D4-8' + 守卫 `test_d4_8_margin_contract.py`(6)
+  / `d4ProductMarginSyncHostWiring.spec.ts`(9)。
+  **rematerialize 已完成**（commit `98ab0eaef`：gen 81→82 / rev 106，bundle `5bca042d` 含 d48-managed，无 SoftTimeout）；
+  **仅剩 `UNVERIFIABLE`（env 门，不假绿）**：真 OO canvas 单元格往返（同 D4-33/D4-35
   标准）；引擎静态路径往返正确性由 D4-33 同 `BindingKind.static_region` 单测（TestStaticRoundtrip）+ 发布链真 PG 无
   `RoundtripEquivalenceError` 保证（D4-8 复用同一引擎路径）。落地须走「多块转置 / 模板预画 N 块」的旧结论亦作废——
   静态块矩阵单块 slot0 直写已足够覆盖模板唯一物理块。
