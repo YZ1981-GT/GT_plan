@@ -62,8 +62,8 @@
 | 15 | D4-15 | 完整性检查 | d4-inspection (9/16, B1/B2做实) | ✅ d4-15-managed | D4TabCompleteness | ✅ | ✅ |
 | 16 | D4-16 | 出口口岸核对 | d4-inspection (9/16, B1/B2做实) | ✅ d4-16-managed | D4TabExport | ✅ | ✅ |
 | 17 | D4-17 | 截止测试(账到单据) | d4-cutoff-return (3/13) | ✅ d417-managed(批次B) | D4TabCutoffForward | ✅ | ✅ (2026-09-20发布gen55,真OO待验) |
-| 18 | D4-18 | 截止测试(单据到账) | d4-cutoff-return (3/13) | ❌ | D4TabCutoffBackward | legacy | 🔵 从零(BB1-3 blocked) |
-| 19 | D4-19 | 销售折扣与折让 | d4-cutoff-return (3/13) | ❌ | D4TabDiscount | legacy | 🔵 从零(BB1-3 blocked) |
+| 18 | D4-18 | 截止测试(单据到账) | d4-cutoff-return (3/13) | ✅ d418-managed(批次B) | D4TabCutoffBackward | ✅ | ✅ (2026-09-20发布gen57,真OO待验) |
+| 19 | D4-19 | 销售折扣与折让 | d4-cutoff-return (3/13) | ✅ d419-managed(批次B) | D4TabDiscount | ✅ | ✅ (2026-09-20发布gen59,真OO待验) |
 | 20 | D4-20 | 销售退货检查 | d4-cutoff-return (3/13) | ❌ | D4TabReturn | legacy | 🔵 从零(BB1-3 blocked) |
 | 21 | D4-21 | 关联方销售/价格 | d4-21-24 (10/11) | ✅ d421-managed | D4TabRelatedPrice | ✅ | ✅ (批次A 2026-09-20接桥,真OO待验) |
 | 22 | D4-22 | IPO重要指标分析 | d4-21-24 (10/11) | ✅ d422-managed | D4TabIpoIndicator | ✅ | ✅ (批次A接桥,真OO待验) |
@@ -86,13 +86,13 @@
 
 > 🔴 **重要口径**：下方「✅」是**三维代码全绿（REQUEST_PATH 级）**——后端契约 + 前端接桥 + 宿主登记齐全。但**没有一张到主控 §6.4 的 `ONLYOFFICE_VERIFIED`**（需真实 OO 往返产生 `working_paper_content_application` state=applied + operation 终态 + OO 侧 content version，见 §9.5）。真 OO 验证是 env 门（start-dev.bat 全栈 + OO 容器），列为批次C。
 
-- ✅ 三维代码全绿(REQUEST_PATH)：**22 张** — D4-1/2/3/5/6/**9**/15/16/**17**/21/22/23/24/25/26/27/28/29/30/31/32/35
-  - 批次A(21~24) + 批次A-5(30~32) + 批次B(D4-6 gen54 / **D4-9 gen55** / **D4-17 gen55**) 为 2026-09-20 落地；余此前已接桥
-- 🔵 owner spec 待做/从零(后端无契约 + 前端仍 legacy)：**12 张** — D4-7/8/10/11/12/14/18/19/20/33/34/36
+- ✅ 三维代码全绿(REQUEST_PATH)：**24 张** — D4-1/2/3/5/6/9/15/16/17/**18**/**19**/21/22/23/24/25/26/27/28/29/30/31/32/35
+  - 批次A(21~24) + 批次A-5(30~32) + 批次B(D4-6/9/17/18/19) 为 2026-09-20 落地；余此前已接桥
+- 🔵 owner spec 待做/从零(后端无契约 + 前端仍 legacy)：**10 张** — D4-7/8/10/11/12/14/20/33/34/36
 - ⬜ 裁决 single_html/N/A：**2 张** — D4-4/D4-13
 
-> 校验：22 + 12 + 2 = 36 ✓（🟡 半接入类已清零）
-> 契约集合现 **22 张**（+d46/d49/d417-managed）；entry `xlsx/gt-d4-operating-revenue` 当前 representation **gen55**（bundle c9050de8）。
+> 校验：24 + 10 + 2 = 36 ✓（🟡 半接入类已清零）
+> 契约集合现 **24 张**（+d46/d49/d417/d418/d419-managed）；entry `xlsx/gt-d4-operating-revenue` 当前 representation **gen59**（bundle 318a4047）。
 > 注：D4-6/7 前端虽已在宿主 `D4_SHEET_KEY_BY_CODE` 预留 `d46/d47-managed` 键，但契约 sheet_key 集合中**无**对应项且组件未接桥，故仍归 🔵 从零。D4-9/10/11/14/33/34/36 经 grep 实证前端组件均未 import `useWorkpaperSyncBridge`（仍 legacy），契约集合中也无对应项。
 
 ## 逐张推进优先级（建议，2026-09-20 修订）
