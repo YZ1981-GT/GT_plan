@@ -7,7 +7,7 @@
     "excel_table",
     "hidden_uuid_column"
   ],
-  "instrumentation_definition_sha256": "cfc9755737a3a9f222d5e71b104d31a104ac9208dcdac6d4c4f11eec243ad97a",
+  "instrumentation_definition_sha256": "c2c5583f9b575a4ef12df8558741624b9002a5e8eecfd8d5b764e18a5280fc1f",
   "review": {
     "authority_root": "backend/wp_templates",
     "entry_id": "xlsx/gt-d4-operating-revenue",
@@ -38,6 +38,17 @@
           "row_identity_key": "id",
           "sheet_key": "d45-managed",
           "table_key": "d45_policy_groups"
+        },
+        {
+          "fixed_item_ids": [
+            "D4-13-process",
+            "D4-13-conclusion"
+          ],
+          "item_id": null,
+          "note": "D4-13 ERP 核对：两段自由文本各为独立 item（D4-13-process / D4-13-conclusion）。sheet_key=d413-managed；宿主独立于 isD4DetailSheet。全篇无插删动态行表，两字段均直接锚定死行号（A6/A16）全入 Excel 契约（不同于 D4-5 的 HTML-only 分流——该分流仅因字段位于会插删行表 footer 之下，D4-13 无此结构）。",
+          "row_identity_key": null,
+          "sheet_key": "d413-managed",
+          "table_key": "d413_erp_check_fixed"
         },
         {
           "item_id": "D4-21-rows",
@@ -841,6 +852,60 @@
           "table_key": "d45_policy_fixed"
         }
       ]
+    },
+    {
+      "excel_name": "营业收入账面金额与ERP系统核对记录D4-13",
+      "locator": {
+        "anchor": "defined_name_ref",
+        "defined_name": "GT_MANAGED_REGION_D413"
+      },
+      "region_boundary_locator": {
+        "anchor": "defined_name_ref",
+        "defined_name": "GT_MANAGED_REGION_D413",
+        "range": "$A$6:$A$16",
+        "region_kind": "static"
+      },
+      "sheet_key": "d413-managed",
+      "tables": [
+        {
+          "anchor": "A5",
+          "fields": [
+            {
+              "cell": {
+                "column": "A",
+                "row_from": 6
+              },
+              "column_key": "process",
+              "header_source_ref": "源xlsx!营业收入账面金额与ERP系统核对记录D4-13!A5",
+              "header_text": "process",
+              "json_pointer": "/fixed/process",
+              "mode": "editable",
+              "source_ref": "源xlsx!营业收入账面金额与ERP系统核对记录D4-13!A6",
+              "stable_field_key": "d413_erp_check_fixed/process",
+              "store_item_id": "D4-13-process",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "A",
+                "row_from": 16
+              },
+              "column_key": "conclusion",
+              "header_source_ref": "源xlsx!营业收入账面金额与ERP系统核对记录D4-13!A15",
+              "header_text": "conclusion",
+              "json_pointer": "/fixed/conclusion",
+              "mode": "editable",
+              "source_ref": "源xlsx!营业收入账面金额与ERP系统核对记录D4-13!A16",
+              "stable_field_key": "d413_erp_check_fixed/conclusion",
+              "store_item_id": "D4-13-conclusion",
+              "value_type": "text"
+            }
+          ],
+          "header_rows": 1,
+          "table_key": "d413_erp_check_fixed"
+        }
+      ],
+      "template_id": "D413"
     },
     {
       "excel_name": "关联方销售情况及价格分析D4-21",

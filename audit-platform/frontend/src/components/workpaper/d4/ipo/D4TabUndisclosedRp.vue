@@ -14,14 +14,10 @@ import http from '@/utils/http'
 import { useD4ImportExport } from '../../composables/useD4ImportExport'
 import { DisplayPrefs_Key } from '../../composables/displayPrefsKey'
 import { useDisplayPrefsStore } from '@/stores/displayPrefs'
-import {
-  useWorkpaperSyncBridge,
-  WP_BRIDGE_IN_FLIGHT_STATES,
-} from '../../sync/useWorkpaperSyncBridge'
 import { readStoreProjection } from '../../sync/workpaperSyncApi'
-import { capabilityForEntry } from '../../sync/workpaperSyncCapability'
 import WorkpaperSyncEditorHost from '../../sync/WorkpaperSyncEditorHost.vue'
 import { useIpoChecklistTab } from './useIpoChecklistTab'
+import { useD4SyncMode, D4_SYNC_ENTRY_ID } from '../composables/useD4SyncMode'
 
 const props = defineProps<{ wpId: string; projectId: string; allResponses: Map<string, any>; isReadonly: boolean }>()
 const emit = defineEmits<{ (e: 'imported'): void }>()
@@ -44,53 +40,26 @@ const {
 const matchCount = computed(() => rows.value.filter((r) => r.isDuplicateName === 'Y').length)
 const totalSales = computed(() => rows.value.reduce((s, r) => s + (Number(r.annualSales) || 0), 0))
 
-// ─── D4-27 专用 sync bridge ──────────────────────────────────────────
-const D4_27_ENTRY = 'xlsx/gt-d4-operating-revenue'
+// ─── D4-27 sync bridge（统一走 useD4SyncMode，见其文件头注释） ─────────
+// 🔴 sheetKey 必须走具名常量（非内联字面量）：跨语言契约守卫
+// test_d4_ipo_checklist_cross_lang_contract.py 靠正则抓这个常量声明反查后端 sheet_key
+// 是否漂移，内联字面量会让该守卫失明（AssertionError 已验证复现）。
 const D4_27_SHEET_KEY = 'd4-27-managed'
-const syncSwitching = ref(false)
-const syncHostRef = ref<{ forceSave: () => Promise<{ operationId: string }> } | null>(null)
-const entryId = ref(D4_27_ENTRY)
-const sheetKey = ref(D4_27_SHEET_KEY)
-const syncBridge = useWorkpaperSyncBridge({
-  entryId,
-  wpId: toRef(props, 'wpId'),
-  projectId: toRef(props, 'projectId'),
-  sheetKey,
-  capability: capabilityForEntry(D4_27_ENTRY),
+const { syncBridge, descriptor: syncOoDescriptor, editorMode, modeOptions, syncHostRef } = useD4SyncMode({
+  sheetKey: D4_27_SHEET_KEY,
+  wpId: toRef(props, 'wpId') as Ref<string>,
+  projectId: toRef(props, 'projectId') as Ref<string>,
+  isReadonly: toRef(props, 'isReadonly') as Ref<boolean>,
+  views: ['表格视图'],
   flushHtml: async () => {
     flushPendingSave()
-    const snap = await readStoreProjection({ projectId: props.projectId, wpId: props.wpId, entryId: D4_27_ENTRY })
+    const snap = await readStoreProjection({ projectId: props.projectId, wpId: props.wpId, entryId: D4_SYNC_ENTRY_ID })
     return { expectedRevision: snap.expectedRevision, projection: snap.projection, sheetKey: D4_27_SHEET_KEY }
   },
   reloadHtml: async () => { await reloadHost() },
 })
-const syncOoDescriptor = computed(() => syncBridge.descriptor.value)
-const syncBusy = computed(
-  () => syncSwitching.value || (WP_BRIDGE_IN_FLIGHT_STATES as readonly string[]).includes(String(syncBridge.state.value)),
-)
 const syncFeedbackOk = computed(() => (syncBridge.feedback.value.kind === 'success' ? syncBridge.feedback.value.message : ''))
 const syncFeedbackErr = computed(() => (syncBridge.feedback.value.kind === 'error' ? syncBridge.feedback.value.message : ''))
-
-const editorMode = computed({
-  get: (): 'structured' | 'onlyoffice' => (syncBridge.mode.value === 'oo' ? 'onlyoffice' : 'structured'),
-  set: (v: 'structured' | 'onlyoffice') => { void switchMode(v) },
-})
-const modeOptions = computed(() => [
-  { label: '表格视图', value: 'structured' },
-  { label: '在线编辑', value: 'onlyoffice', disabled: props.isReadonly || syncBusy.value },
-])
-async function switchMode(target: 'structured' | 'onlyoffice'): Promise<void> {
-  if (target === editorMode.value) return
-  syncSwitching.value = true
-  try {
-    if (target === 'onlyoffice') { if (props.isReadonly) return; await syncBridge.switchToOnlyOffice() }
-    else await syncBridge.switchToHtml()
-  } catch {
-    // 失败已由桥写入 feedback（syncFeedbackErr 展示真实原因）；请求被去重层取消
-    // （切页签竞态）时桥已内部退回 html_idle。这里一律吞掉，避免 rethrow 变成
-    // 未捕获 Promise rejection（控制台红字 CanceledError）。
-  } finally { syncSwitching.value = false }
-}
 
 // ─── AI 辅助 ─────────────────────────────────────────────────────────
 const aiAvailable = ref(false)
@@ -193,7 +162,7 @@ function rowClassName({ row }: { row: any }) { return row.isDuplicateName === 'Y
     <div class="stat-card stat-amount"><div class="stat-value">{{ displayPrefs.fmtAmount(totalSales) }}</div><div class="stat-label">涉及销售额</div></div>
   </div>
 
-  <template v-if="editorMode !== 'onlyoffice'">
+  <template v-if="editorMode !== '在线编辑'">
     <details class="methodology-collapse">
       <summary class="methodology-summary">审计目标与识别未披露关联方过程（点击展开）</summary>
       <div class="methodology-body">

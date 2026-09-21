@@ -23,13 +23,12 @@ import D4WalkthroughCard from './D4WalkthroughCard.vue'
 import D4WalkthroughMatrix from './D4WalkthroughMatrix.vue'
 import GtIndexChip from '../../GtIndexChip.vue'
 import http from '@/utils/http'
-// D4-14 双向回写：子组件自管 sync bridge（dedicated sync sheet，sheetKey=d414-managed，同 entry
+// D4-14 双向回写：统一走 useD4SyncMode（dedicated sync sheet，sheetKey=d414-managed，同 entry
 // gt-d4-operating-revenue；后端 phase5_d4_14_occurrence 作为 sibling sheet 并入 phase5_d4_revenue_detail，
 // adapter d4.revenue_detail）——同 D4-7/D4-35 单动态区行 store 架构（store D4-14-transactions 是 TransactionItem[]）。
-import { useWorkpaperSyncBridge, WP_BRIDGE_IN_FLIGHT_STATES } from '../../sync/useWorkpaperSyncBridge'
 import WorkpaperSyncEditorHost from '../../sync/WorkpaperSyncEditorHost.vue'
 import { readStoreProjection } from '../../sync/workpaperSyncApi'
-import { capabilityForEntry } from '../../sync/workpaperSyncCapability'
+import { useD4SyncMode, D4_SYNC_ENTRY_ID } from '../composables/useD4SyncMode'
 import { D4_MAIN_REVENUE_STANDARD } from '../../composables/d4AccountScope'
 import { Plus, Download } from '@element-plus/icons-vue'
 
@@ -103,71 +102,29 @@ function handlePushToA13() {
   pushToA13(misItems, '6001', '营业收入')
 }
 
-// ─── 4.1.1 Mode switching ────────────────────────────────────────────
-const editorMode = ref<string>('卡片视图')
-const modeOptions = ['卡片视图', '矩阵视图', '在线编辑']
-
-// ─── D4-14 sync bridge（dedicated sync sheet，在线编辑走统一同步桥而非 legacy GtOnlyOfficeSheet）──
-const D4_14_ENTRY = 'xlsx/gt-d4-operating-revenue'
-const D4_14_SHEET_KEY = 'd414-managed'
-const syncSwitching = ref(false)
-const syncBridge = useWorkpaperSyncBridge({
-  entryId: ref(D4_14_ENTRY),
+// ─── D4-14 sync bridge（统一走 useD4SyncMode，见其文件头注释） ─────────
+// 🔴 迁移前该文件用 `watch(editorMode, ...)` 单向触发在线编辑，**从未调用 switchToHtml()**：
+//    用户点回「卡片/矩阵视图」只是本地 ref 变了，桥仍停在 oo 模式（模板 v-if 却已经切回非-OO
+//    分支渲染）——数据与桥状态不一致的真 bug。useD4SyncMode 的 switchMode 双向完整处理
+//    （切非-OO 视图时按 state 走 reloadAfterApplied/switchToHtml），迁移顺带修复。
+const { syncBridge, descriptor: syncOoDescriptor, editorMode, modeOptions, syncStateTag, ooHealthy } = useD4SyncMode({
+  sheetKey: 'd414-managed',
   wpId: toRef(props, 'wpId'),
   projectId: toRef(props, 'projectId'),
-  sheetKey: ref(D4_14_SHEET_KEY),
-  capability: capabilityForEntry(D4_14_ENTRY),
+  isReadonly: toRef(props, 'isReadonly'),
+  views: ['卡片视图', '矩阵视图'],
   flushHtml: async () => {
     // 先 flush 待存的 debounce 保存（store 已同步写入 allResponses，但后端保存是 debounce），
     // 再读 store-projection，保证 OO 侧拿到的是最新 D4-14-transactions。
     flushSave()
-    const snap = await readStoreProjection({ projectId: props.projectId, wpId: props.wpId, entryId: D4_14_ENTRY })
-    return { expectedRevision: snap.expectedRevision, projection: snap.projection, sheetKey: D4_14_SHEET_KEY }
+    const snap = await readStoreProjection({ projectId: props.projectId, wpId: props.wpId, entryId: D4_SYNC_ENTRY_ID })
+    return { expectedRevision: snap.expectedRevision, projection: snap.projection, sheetKey: 'd414-managed' }
   },
   reloadHtml: async () => { if (reloadWorkpaperData) await reloadWorkpaperData() },
 })
-const syncOoDescriptor = computed(() => syncBridge.descriptor.value)
-const syncBusy = computed(
-  () => syncSwitching.value
-    || (WP_BRIDGE_IN_FLIGHT_STATES as readonly string[]).includes(String(syncBridge.state.value)),
-)
-// 在线编辑激活时，惰性切到 OO 模式（bridge 内部管理 html↔oo 往返）。
-async function activateOnlineEdit(): Promise<void> {
-  if (props.isReadonly) return
-  if (syncBridge.mode.value === 'oo') return
-  // 🔴 竞态修复：editorMode 可能在 checkOoHealth() 的异步响应到达**之前**就被切成「在线编辑」
-  //    （用户/自动化点得快，或 async 子组件刚挂载）。此前直接读 ooHealthy.value（可能仍是初始
-  //    false）→ 静默 return → switchToOnlyOffice 从不触发 → 卡在「正在打开同步编辑器…」、
-  //    store-projection/materialize 一个都不发（L1 真栈 hits.length=0 的真因）。改为：健康未就绪
-  //    时**当场 await 一次健康检查**再判定，OO 真的不可用才 return（fail-visible 由桥/后端给）。
-  if (!ooHealthy.value) await checkOoHealth()
-  if (!ooHealthy.value) return
-  syncSwitching.value = true
-  try { await syncBridge.switchToOnlyOffice() } finally { syncSwitching.value = false }
-}
-watch(editorMode, (m) => { if (m === '在线编辑') void activateOnlineEdit() })
-const syncStateTag = computed(() => {
-  if (syncBusy.value) return { text: '同步中…', type: 'info' as const }
-  if (syncBridge.dirty?.value) {
-    return syncBridge.mode.value === 'oo'
-      ? { text: 'excel 侧有未同步改动', type: 'warning' as const }
-      : { text: 'html 侧有未同步改动', type: 'warning' as const }
-  }
-  if (String(syncBridge.state.value).includes('error') || String(syncBridge.lastError?.value || '')) {
-    return { text: '同步失败，请重试', type: 'danger' as const }
-  }
-  return { text: syncBridge.mode.value === 'oo' ? 'Excel 在线编辑' : '结构化视图', type: 'success' as const }
-})
 
-// ─── OO + AI health ──────────────────────────────────────────────────
-const ooHealthy = ref(false)
+// ─── AI health ───────────────────────────────────────────────────────
 const aiAvailable = ref(false)
-async function checkOoHealth() {
-  try {
-    const res = await http.get('/api/workpapers/onlyoffice/health', { _silent: true } as any)
-    ooHealthy.value = res.data?.data?.healthy ?? res.data?.healthy ?? false
-  } catch { ooHealthy.value = false }
-}
 async function checkAiHealth() {
   try {
     const res = await http.get('/api/ai/health', { _silent: true } as any)
@@ -175,7 +132,6 @@ async function checkAiHealth() {
     aiAvailable.value = s === 'healthy' || s === 'degraded'
   } catch { aiAvailable.value = false }
 }
-checkOoHealth()
 checkAiHealth()
 
 // ─── 4.1.2 Overview banner ──────────────────────────────────────────

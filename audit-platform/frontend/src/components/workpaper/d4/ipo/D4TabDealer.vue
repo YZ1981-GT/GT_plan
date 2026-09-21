@@ -15,13 +15,9 @@ import http from '@/utils/http'
 import { useD4ImportExport } from '../../composables/useD4ImportExport'
 import { DisplayPrefs_Key } from '../../composables/displayPrefsKey'
 import { useDisplayPrefsStore } from '@/stores/displayPrefs'
-import {
-  useWorkpaperSyncBridge,
-  WP_BRIDGE_IN_FLIGHT_STATES,
-} from '../../sync/useWorkpaperSyncBridge'
 import { readStoreProjection } from '../../sync/workpaperSyncApi'
-import { capabilityForEntry } from '../../sync/workpaperSyncCapability'
 import WorkpaperSyncEditorHost from '../../sync/WorkpaperSyncEditorHost.vue'
+import { useD4SyncMode, D4_SYNC_ENTRY_ID } from '../composables/useD4SyncMode'
 import { useIpoChecklistTab } from './useIpoChecklistTab'
 
 const props = defineProps<{ wpId: string; projectId: string; allResponses: Map<string, any>; isReadonly: boolean }>()
@@ -42,70 +38,37 @@ const {
   isReadonly: toRef(props, 'isReadonly') as Ref<boolean>,
 })
 
-// ─── D4-25 专用 sync bridge（复用父级 D4 workbook 的 bidirectional 入口）──────
-const D4_25_ENTRY = 'xlsx/gt-d4-operating-revenue'
+// ─── D4-25 sync bridge：统一 useD4SyncMode（治本收敛）── 归一到统一中文方案「表格视图」
+// （此前 D4-25 用英文 structured/onlyoffice 值，且无健康门禁——switchMode 靠 try/catch 兜底；
+// useD4SyncMode 内聚等价的 race-safe 健康 await，行为不变，仅去重复实现）。模板判据同步改
+// `editorMode !== '在线编辑'`。
 const D4_25_SHEET_KEY = 'd4-25-managed'
-const syncSwitching = ref(false)
-const syncHostRef = ref<{ forceSave: () => Promise<{ operationId: string }> } | null>(null)
-const entryId = ref(D4_25_ENTRY)
-const sheetKey = ref(D4_25_SHEET_KEY)
-const syncBridge = useWorkpaperSyncBridge({
-  entryId,
+const {
+  syncBridge, descriptor: syncOoDescriptor, editorMode, modeOptions,
+  busy: syncBusy, syncHostRef,
+} = useD4SyncMode({
+  sheetKey: D4_25_SHEET_KEY,
   wpId: toRef(props, 'wpId'),
   projectId: toRef(props, 'projectId'),
-  sheetKey,
-  capability: capabilityForEntry(D4_25_ENTRY),
+  isReadonly: toRef(props, 'isReadonly'),
+  views: ['表格视图'],
   flushHtml: async () => {
     flushPendingSave()
     const snap = await readStoreProjection({
       projectId: props.projectId,
       wpId: props.wpId,
-      entryId: D4_25_ENTRY,
+      entryId: D4_SYNC_ENTRY_ID,
     })
     return { expectedRevision: snap.expectedRevision, projection: snap.projection, sheetKey: D4_25_SHEET_KEY }
   },
   reloadHtml: async () => { await reloadHost() },
 })
-const syncOoDescriptor = computed(() => syncBridge.descriptor.value)
-const syncBusy = computed(
-  () =>
-    syncSwitching.value
-    || (WP_BRIDGE_IN_FLIGHT_STATES as readonly string[]).includes(String(syncBridge.state.value)),
-)
 const syncFeedbackOk = computed(() =>
   syncBridge.feedback.value.kind === 'success' ? syncBridge.feedback.value.message : '',
 )
 const syncFeedbackErr = computed(() =>
   syncBridge.feedback.value.kind === 'error' ? syncBridge.feedback.value.message : '',
 )
-
-const editorMode = computed({
-  get: (): 'structured' | 'onlyoffice' => (syncBridge.mode.value === 'oo' ? 'onlyoffice' : 'structured'),
-  set: (v: 'structured' | 'onlyoffice') => { void switchMode(v) },
-})
-const modeOptions = computed(() => [
-  { label: '表格视图', value: 'structured' },
-  { label: '在线编辑', value: 'onlyoffice', disabled: props.isReadonly || syncBusy.value },
-])
-
-async function switchMode(target: 'structured' | 'onlyoffice'): Promise<void> {
-  if (target === editorMode.value) return
-  syncSwitching.value = true
-  try {
-    if (target === 'onlyoffice') {
-      if (props.isReadonly) return
-      await syncBridge.switchToOnlyOffice()
-    } else {
-      await syncBridge.switchToHtml()
-    }
-  } catch {
-    // 失败已由桥写入 feedback（syncFeedbackErr 展示真实原因）；请求被去重层取消
-    // （切页签竞态）时桥已内部退回 html_idle。这里一律吞掉，避免 rethrow 变成
-    // 未捕获 Promise rejection（控制台红字 CanceledError）。
-  } finally {
-    syncSwitching.value = false
-  }
-}
 
 // ─── AI 辅助 ─────────────────────────────────────────────────────────
 const aiAvailable = ref(false)
@@ -200,7 +163,7 @@ async function handleImportFile(f: any) {
   <!-- 取数失败 fail-visible：不吞成静默，也绝不把失败写成 0 -->
   <el-alert v-if="fetchError" type="warning" :closable="false" show-icon class="sync-alert" :title="fetchError" />
 
-  <template v-if="editorMode !== 'onlyoffice'">
+  <template v-if="editorMode !== '在线编辑'">
     <div class="guide-strip"><span class="guide-strip-label">编制流程：</span>
       <el-tooltip content="关注经销商基本情况是否与销售规模匹配" placement="bottom" :show-after="300"><span class="guide-chip">①客户匹配</span></el-tooltip><span class="guide-arrow">→</span>
       <el-tooltip content="记录经销商情况(关联方/法人类型/费用承担/返利)" placement="bottom" :show-after="300"><span class="guide-chip">②记录信息</span></el-tooltip><span class="guide-arrow">→</span>

@@ -1,5 +1,4 @@
-import { computed, inject, onBeforeUnmount, ref } from 'vue'
-import { WP_BRIDGE_IN_FLIGHT_STATES, type WorkpaperSyncBridge } from '../../sync/useWorkpaperSyncBridge'
+import { inject, onBeforeUnmount, ref } from 'vue'
 
 type SaveItem = { item_id: string; conclusion: string | null; remark: string | null }
 
@@ -30,35 +29,5 @@ export function useD4InterviewSave(getItems: () => SaveItem[]) {
   return { flush, schedule, saveError }
 }
 
-export function useD4InterviewMode(bridge: WorkpaperSyncBridge, readonly: () => boolean, views: string[]) {
-  const htmlView = ref(views[0])
-  const switching = ref(false)
-  const switchError = ref('')
-  const busy = computed(() => switching.value || (WP_BRIDGE_IN_FLIGHT_STATES as readonly string[]).includes(bridge.state.value))
-  async function switchMode(target: string) {
-    if (busy.value) return
-    switchError.value = ''
-    switching.value = true
-    try {
-      if (target === '在线编辑') {
-        if (readonly() || bridge.mode.value === 'oo') return
-        await bridge.switchToOnlyOffice()
-      } else if (views.includes(target)) {
-        htmlView.value = target
-        if (bridge.mode.value === 'oo') {
-          if (bridge.state.value === 'applied') await bridge.reloadAfterApplied()
-          else await bridge.switchToHtml()
-        }
-      }
-    } catch (error) {
-      switchError.value = String((error as Error)?.message || error)
-    } finally { switching.value = false }
-  }
-  const editorMode = computed({
-    get: () => bridge.mode.value === 'oo' ? '在线编辑' : htmlView.value,
-    set: (target: string) => { void switchMode(target) },
-  })
-  const modeOptions = computed(() => [...views, '在线编辑'].map(value => ({ label: value, value, disabled: busy.value || (value === '在线编辑' && readonly()) })))
-  const feedback = computed(() => switchError.value || bridge.feedback.value.message)
-  return { editorMode, modeOptions, busy, feedback }
-}
+// `useD4InterviewMode`（旧的组件级 mode composable，不建桥/不管健康）已随 D4-30/31/32
+// 迁移至 `../composables/useD4SyncMode` 而移除（2026-09-21 治本迁移收尾）。

@@ -7,16 +7,22 @@
  * 架构（路 B）：D4-9 作为 gt-d4-operating-revenue 的 sibling sheet（sheetKey=d49-managed，
  * 后端 phase5_d4_customer_structure 并入 phase5_d4_revenue_detail），与 D4-1 同架构。
  *
- * 判据落到源码结构：
- *  1. D4TabCustomerStructure.vue 用平台 useWorkpaperSyncBridge，接桥字面量
- *     entryId=`xlsx/gt-d4-operating-revenue`、sheetKey=`d49-managed`（均以常量声明）。
- *  2. flushHtml 内 flush 先于 readStoreProjection（防投影旧值 / 顺序守卫）。
- *  3. 宿主 GtD4OperatingRevenue.vue 的 isD4DedicatedSyncSheet 含 'D4-9'。
- *  4. fail-visible：同步失败以中文 danger tag 显式呈现，不静默 markSynced。
- *  5. 挂载 WorkpaperSyncEditorHost，不得再挂裸 GtOnlyOfficeSheet（legacy 单向已移除）。
- *  6. rowId 迁移：CustomerRow 带 rowId、有 backfillRowIds、createRowId（Req 3.1/3.2）。
+ * 2026-09-21 治本改造后更新：D4-9 的接桥不再直接调 `useWorkpaperSyncBridge`，而是通过
+ * 共享 composable `useD4SyncMode`（见 `d4/composables/useD4SyncMode.ts`）——entryId/
+ * capability/健康门禁/switchMode/fail-visible tag 的**实现细节**已内聚到该 composable
+ * 内部（并由 `useD4SyncMode.spec.ts` 单独守卫），组件源码里不再重复这些字面量。
  *
- * 反向自检（变异守卫）：若 'D4-9' 从 dedicated 列表移除、或 entryId/sheetKey 字面量写错、
+ * 判据落到源码结构：
+ *  1. D4TabCustomerStructure.vue 消费 `useD4SyncMode`（禁自建/直连底层桥）。
+ *  2. sheetKey 走具名常量 `d49-managed`（不得内联字面量，防漂移）。
+ *  3. flushHtml 内 flush 先于 readStoreProjection（防投影旧值 / 顺序守卫）。
+ *  4. 宿主 GtD4OperatingRevenue.vue 的 isD4DedicatedSyncSheet 含 'D4-9'。
+ *  5. fail-visible：消费 composable 导出的 syncStateTag（danger 文案实现在
+ *     useD4SyncMode 内聚，不在本组件重复）。
+ *  6. 挂载 WorkpaperSyncEditorHost，不得再挂裸 GtOnlyOfficeSheet（legacy 单向已移除）。
+ *  7. rowId 迁移：CustomerRow 带 rowId、有 backfillRowIds、createRowId（Req 3.1/3.2）。
+ *
+ * 反向自检（变异守卫）：若 'D4-9' 从 dedicated 列表移除、或 sheetKey 变成内联字面量、
  * 或 GtOnlyOfficeSheet 回潮、或 rowId 迁移缺失，则相应断言转红。
  */
 import { describe, it, expect } from 'vitest'
@@ -28,7 +34,6 @@ const _dir = dirname(fileURLToPath(import.meta.url))
 const CS_PATH = resolve(_dir, '..', 'd4', 'analysis', 'D4TabCustomerStructure.vue')
 const HOST_PATH = resolve(_dir, '..', 'GtD4OperatingRevenue.vue')
 
-const D4_9_ENTRY = 'xlsx/gt-d4-operating-revenue'
 const D4_9_SHEET_KEY = 'd49-managed'
 
 function read(path: string): string {
@@ -37,8 +42,9 @@ function read(path: string): string {
 function stripComments(src: string): string {
   return src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/.*$/gm, '$1')
 }
+/** 抽取 useD4SyncMode({...}) 的调用体（括号配平）。 */
 function extractBridgeCallArgs(src: string): string {
-  const marker = 'useWorkpaperSyncBridge('
+  const marker = 'useD4SyncMode('
   const start = src.indexOf(marker)
   if (start < 0) return ''
   let depth = 0
@@ -63,26 +69,16 @@ describe('D4-9 重要客户结构必须消费平台 sync bridge（Req 7.1）', (
     expect(existsSync(CS_PATH)).toBe(true)
   })
 
-  it('调用了平台 useWorkpaperSyncBridge（禁自建同步 composable）', () => {
+  it('调用了共享 composable useD4SyncMode（禁自建同步 composable / 禁直连底层桥）', () => {
     expect(bridgeArgs.length).toBeGreaterThan(0)
+    expect(csSrc).not.toContain('useWorkpaperSyncBridge(')
     expect(csSrc).not.toContain('ContentMutationService')
   })
 
-  it('接桥 entryId 字面量 = xlsx/gt-d4-operating-revenue（sibling，非独立 entry）', () => {
-    expect(csSrc).toContain(`= '${D4_9_ENTRY}'`)
-    expect(bridgeArgs).toMatch(/entryId:\s*ref\(\s*D4_9_ENTRY\s*\)/)
-    // 不得残留路 A 的独立 entry 字面量作为 entryId 常量
-    expect(csSrc).not.toContain("D4_9_ENTRY = 'xlsx/gt-d4-customer-structure'")
-  })
-
-  it('接桥 sheetKey 字面量 = d49-managed', () => {
+  it('sheetKey 走具名常量（不得内联字面量，防漂移）', () => {
     expect(csSrc).toContain(`= '${D4_9_SHEET_KEY}'`)
-    expect(bridgeArgs).toMatch(/sheetKey:\s*ref\(\s*D4_9_SHEET_KEY\s*\)/)
-  })
-
-  it('capability 现算：capabilityForEntry(entry)，禁内联 bidirectional 字面量', () => {
-    expect(csSrc).toMatch(/capabilityForEntry\s*\(/)
-    expect(bridgeArgs).not.toMatch(/capability:\s*['"]bidirectional['"]/)
+    expect(bridgeArgs).toMatch(/sheetKey:\s*D4_9_SHEET_KEY\b/)
+    expect(bridgeArgs).not.toMatch(new RegExp(`sheetKey:\\s*['"]${D4_9_SHEET_KEY}['"]`))
   })
 
   it('flushHtml 内 flush 先于 readStoreProjection（防投影旧值）', () => {
@@ -107,15 +103,15 @@ describe('D4-9 重要客户结构必须消费平台 sync bridge（Req 7.1）', (
 })
 
 // ── fail-visible 守卫（Req 7.4）─────────────────────────────────────────────
-describe('D4-9 同步失败必须 fail-visible（中文 danger tag，不静默）', () => {
-  it('存在同步状态 tag 计算属性', () => {
-    expect(csSrc).toContain('syncStateTag')
+describe('D4-9 同步失败必须 fail-visible（消费共享 composable 的中文 danger tag）', () => {
+  it('消费 composable 导出的 syncStateTag（不自行重复 danger 文案 —— 实现细节交 useD4SyncMode.spec.ts 守）', () => {
+    expect(bridgeArgs.length).toBeGreaterThan(0)
+    expect(csSrc).toMatch(/syncStateTag/)
+    expect(csSrc).toMatch(/syncStateTag\.type/)
+    expect(csSrc).toMatch(/syncStateTag\.text/)
   })
 
-  it('错误态呈现中文 danger tag，不 markSynced 静默', () => {
-    expect(csSrc).toMatch(/lastError/)
-    expect(csSrc).toMatch(/type:\s*'danger'/)
-    expect(csSrc).toContain('同步失败')
+  it('不得绕过共享 composable 自行 markSynced 静默吞错', () => {
     expect(csSrc).not.toContain('markSynced')
   })
 })
@@ -167,7 +163,7 @@ describe('宿主 GtD4OperatingRevenue 必须把 D4-9 登记为 dedicated sync sh
 // ── 反向自检：抽取器/剥注释真在承重（防恒真）────────────────────────────────
 describe('守卫自检（防恒真）', () => {
   it('extractBridgeCallArgs 抓到真实调用体', () => {
-    const stub = "const b = useWorkpaperSyncBridge({ entryId: ref(D4_9_ENTRY), flushHtml: async () => {} })"
+    const stub = "const b = useD4SyncMode({ sheetKey: D4_9_SHEET_KEY, flushHtml: async () => {} })"
     expect(extractBridgeCallArgs(stub)).toContain('flushHtml')
     expect(extractBridgeCallArgs('no bridge here')).toBe('')
   })

@@ -51,7 +51,11 @@ _EVIDENCE = (
 
 #: Task 20 冻结的红基线里这两条的实测值 —— Task 74 的第一半就是把它们清成 0。
 #: 数字不是手抄：`test_adjudicating_clears_exactly_two_criteria` 摘掉裁决后现场重量，两侧必须相等。
-_UNADJUDICATED_BEFORE = {"unadjudicated_writer": 239, "unadjudicated_resolver": 39}
+#: 2026-09-20：239/39 -> 279/43。有界委派闭包（generator `_propagate_content_writers` 从单跳改为
+#: writer 图闭包）补回了 40 个 writer + 4 个 resolver 多跳入口（D2/D4 双向回写迁移把 import 函数
+#: 改成委派 writer 后，调用它们的适配器/端点原本掉出发现面）。摘掉全部 task74 裁决后未裁决基线
+#: 相应上升，两侧仍由 `test_adjudicating_clears_exactly_two_criteria` 现场重量比对，不是手抄。
+_UNADJUDICATED_BEFORE = {"unadjudicated_writer": 279, "unadjudicated_resolver": 43}
 
 #: 本任务新加的两条 lane。加 lane 不是加豁免，两条判据在下面各守一面。
 _NEW_LANES = ("unified_commit_substrate", "read_only_evaluation")

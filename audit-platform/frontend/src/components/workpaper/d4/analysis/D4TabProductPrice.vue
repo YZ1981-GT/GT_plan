@@ -13,10 +13,9 @@
 import { ref, computed, inject, toRef, watch, onBeforeUnmount, type Ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import http from '@/utils/http'
-import { useWorkpaperSyncBridge, WP_BRIDGE_IN_FLIGHT_STATES } from '../../sync/useWorkpaperSyncBridge'
 import { readStoreProjection } from '../../sync/workpaperSyncApi'
-import { capabilityForEntry } from '../../sync/workpaperSyncCapability'
 import WorkpaperSyncEditorHost from '../../sync/WorkpaperSyncEditorHost.vue'
+import { useD4SyncMode, D4_SYNC_ENTRY_ID } from '../composables/useD4SyncMode'
 import { useD4ImportExport } from '../../composables/useD4ImportExport'
 import GtIndexChip from '../../GtIndexChip.vue'
 import type useD4CrossSheet from '../../composables/useD4CrossSheet'
@@ -42,72 +41,27 @@ const ABNORMAL_THRESHOLD = 0.1
 
 // ─── 双模式 sync bridge（批次B 第五张：D4-11 迁 useWorkpaperSyncBridge，sheet_key=d411-managed）──
 //     参照 D4-6/D4-19 接桥范式。flushSave/loadData 等为函数声明（提升），此处引用安全。
-const D4_11_ENTRY = 'xlsx/gt-d4-operating-revenue'
 const D4_11_SHEET_KEY = 'd411-managed'
-const ooHealthy = ref(false)
-async function checkOoHealth() {
-  try {
-    const res = await http.get(`/api/workpapers/onlyoffice/health`, { _silent: true } as any)
-    ooHealthy.value = res.data?.data?.healthy ?? res.data?.healthy ?? false
-  } catch { ooHealthy.value = false }
-}
-checkOoHealth()
-const syncSwitching = ref(false)
-const syncHostRef = ref<{ forceSave: () => Promise<{ operationId: string }> } | null>(null)
 function flushPendingSave() { if (debounceTimer) { clearTimeout(debounceTimer); debounceTimer = null } flushSave() }
 function reloadD411() { loadData(); loadNoteConclusion(); loadAuditProcess() }
-const syncBridge = useWorkpaperSyncBridge({
-  entryId: ref(D4_11_ENTRY),
+const {
+  syncBridge, descriptor: syncOoDescriptor, editorMode, modeOptions,
+  busy: syncBusy, syncStateTag, syncHostRef,
+} = useD4SyncMode({
+  sheetKey: D4_11_SHEET_KEY,
   wpId: toRef(props, 'wpId'),
   projectId: toRef(props, 'projectId'),
-  sheetKey: ref(D4_11_SHEET_KEY),
-  capability: capabilityForEntry(D4_11_ENTRY),
+  isReadonly: toRef(props, 'isReadonly'),
+  // 归一到统一中文方案「结构化视图」（此前 D4-11 用英文 structured/onlyoffice 值）；
+  // 模板判据同步改 `editorMode !== '在线编辑'`。
+  views: ['结构化视图'],
   flushHtml: async () => {
     flushPendingSave()
-    const snap = await readStoreProjection({ projectId: props.projectId, wpId: props.wpId, entryId: D4_11_ENTRY })
+    const snap = await readStoreProjection({ projectId: props.projectId, wpId: props.wpId, entryId: D4_SYNC_ENTRY_ID })
     return { expectedRevision: snap.expectedRevision, projection: snap.projection, sheetKey: D4_11_SHEET_KEY }
   },
   reloadHtml: async () => { reloadD411() },
 })
-const syncOoDescriptor = computed(() => syncBridge.descriptor.value)
-const syncBusy = computed(
-  () => syncSwitching.value
-    || (WP_BRIDGE_IN_FLIGHT_STATES as readonly string[]).includes(String(syncBridge.state.value)),
-)
-const editorMode = computed<'structured' | 'onlyoffice'>({
-  get: () => (syncBridge.mode.value === 'oo' ? 'onlyoffice' : 'structured'),
-  set: (v) => { void switchMode(v) },
-})
-const modeOptions = computed(() => [
-  { label: '结构化视图', value: 'structured' },
-  { label: '在线编辑', value: 'onlyoffice', disabled: props.isReadonly || !ooHealthy.value || syncBusy.value },
-])
-async function switchMode(target: 'structured' | 'onlyoffice'): Promise<void> {
-  const cur = syncBridge.mode.value === 'oo' ? 'onlyoffice' : 'structured'
-  if (target === cur) return
-  if (target === 'onlyoffice') {
-    if (props.isReadonly || !ooHealthy.value) return
-    syncSwitching.value = true
-    try { await syncBridge.switchToOnlyOffice() } finally { syncSwitching.value = false }
-    return
-  }
-  syncSwitching.value = true
-  try { await syncBridge.switchToHtml() } finally { syncSwitching.value = false }
-}
-const syncStateTag = computed(() => {
-  const st = String(syncBridge.state.value)
-  if (syncBusy.value) return { text: '同步中…', type: 'info' as const }
-  if (syncBridge.dirty?.value) {
-    return syncBridge.mode.value === 'oo'
-      ? { text: 'excel 侧有未同步改动', type: 'warning' as const }
-      : { text: 'html 侧有未同步改动', type: 'warning' as const }
-  }
-  if (st.includes('error') || String(syncBridge.lastError?.value || '')) {
-    return { text: '同步失败，请重试', type: 'danger' as const }
-  }
-  return { text: '已同步', type: 'success' as const }
-})
-
 const auditObjective = '利润表中记录的营业收入已发生，且与被审计单位有关。'
 
 // ─── 审计过程 ─────────────────────────────────────────────────────────
@@ -309,7 +263,7 @@ onBeforeUnmount(() => { if (debounceTimer) { clearTimeout(debounceTimer); flushS
     </div>
 
     <!-- 结构化视图 -->
-    <template v-if="editorMode === 'structured'">    <!-- 一、审计目标 -->
+    <template v-if="editorMode !== '在线编辑'">    <!-- 一、审计目标 -->
     <section class="sec">
       <h4 class="sec-title">一、审计目标</h4>
       <div class="objective-list"><p class="objective-item">{{ auditObjective }}</p></div>

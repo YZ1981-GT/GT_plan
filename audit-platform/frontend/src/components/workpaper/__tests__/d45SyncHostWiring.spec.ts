@@ -2,6 +2,11 @@
  * D4-5 宿主接线守卫 —— 独立 sync host，不并入父级 isD4DetailSheet。
  *
  * spec: d-cycle-sheet-bidirectional-expansion · paragraph_block_bidirectional
+ *
+ * 2026-09-21 治本改造后更新：D4-5 的接桥不再直接调 `useWorkpaperSyncBridge`，而是通过
+ * 共享 composable `useD4SyncMode`（entryId/capability/健康门禁/switchMode 已内聚到该
+ * composable 内部，由 `useD4SyncMode.spec.ts` 单独守卫）。D4-5 destructure 时用了组件专属
+ * 前缀命名（`d45SyncBridge`/`d45SyncOoDescriptor`/`d45SyncHostRef`），sheetKey 为内联字面量。
  */
 import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'node:fs'
@@ -21,7 +26,7 @@ function stripComments(src: string): string {
 }
 
 function extractBridgeCallArgs(src: string): string {
-  const marker = 'useWorkpaperSyncBridge('
+  const marker = 'useD4SyncMode('
   const start = src.indexOf(marker)
   if (start < 0) return ''
   let depth = 0
@@ -36,12 +41,13 @@ function extractBridgeCallArgs(src: string): string {
   return ''
 }
 
-describe('D4-5 tab 必须自管 useWorkpaperSyncBridge（独立宿主）', () => {
+describe('D4-5 tab 必须消费共享 composable useD4SyncMode（独立宿主）', () => {
   const hostSrc = stripComments(read(TAB))
   const args = extractBridgeCallArgs(hostSrc)
 
-  it('tab 确实调用了 useWorkpaperSyncBridge', () => {
+  it('tab 确实调用了共享 composable useD4SyncMode（禁直连底层桥）', () => {
     expect(args.length).toBeGreaterThan(0)
+    expect(hostSrc).not.toContain('useWorkpaperSyncBridge(')
   })
 
   it('flushHtml 必须先 flushPendingSave 再 readStoreProjection', () => {
@@ -54,9 +60,8 @@ describe('D4-5 tab 必须自管 useWorkpaperSyncBridge（独立宿主）', () =>
     expect(readAt).toBeGreaterThan(flushAt)
   })
 
-  it('entryId / sheetKey 锁死 D4-5 managed 身份', () => {
-    expect(hostSrc).toContain('xlsx/gt-d4-operating-revenue')
-    expect(hostSrc).toContain('d45-managed')
+  it('sheetKey 锁死 D4-5 managed 身份', () => {
+    expect(args).toMatch(/sheetKey:\s*['"]d45-managed['"]/)
     expect(hostSrc).not.toContain('d45-policy')
   })
 
@@ -66,6 +71,14 @@ describe('D4-5 tab 必须自管 useWorkpaperSyncBridge（独立宿主）', () =>
 
   it('不得再挂裸 GtOnlyOfficeSheet', () => {
     expect(hostSrc).not.toMatch(/<GtOnlyOfficeSheet\b/)
+  })
+})
+
+describe('守卫自检（防恒真）', () => {
+  it('extractBridgeCallArgs 抓到真实调用体', () => {
+    const stub = "const b = useD4SyncMode({ sheetKey: 'd45-managed', flushHtml: async () => {} })"
+    expect(extractBridgeCallArgs(stub)).toContain('flushHtml')
+    expect(extractBridgeCallArgs('no bridge here')).toBe('')
   })
 })
 

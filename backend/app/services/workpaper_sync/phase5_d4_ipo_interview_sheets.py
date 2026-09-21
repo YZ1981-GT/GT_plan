@@ -147,6 +147,7 @@ def _rows(code: str, payload: Any) -> list[tuple[str, Mapping[str, Any]]]:
 
 def build_store_projection(code: str, payload: Any, *, contract: Any, limits: Any | None = None):
     from app.services.workpaper_sync.adapters.base import FieldValue, Projection
+    from app.services.workpaper_sync.contracts import FieldMode, ValueType
     values: dict[str, FieldValue] = {}; row_keys: list[str] = []
     s = _s(code)
     for identity, row in _rows(code, payload):
@@ -176,7 +177,14 @@ def build_store_projection(code: str, payload: Any, *, contract: Any, limits: An
             if code == "D4-31" and field == "q1_relation": value = json.dumps(value if isinstance(value, list) else [], ensure_ascii=False)
             if field == "custom_dimensions" and value is None: value = {}
             sk = stable_key_for(code, field, identity)
-            values[sk] = FieldValue(stable_key=sk, value=value, value_type=value_type, mode=mode, row_key=identity)
+            # 🔴 2026-09-21 修复既有 bug：`value_type`/`mode` 此前是字段元组里的**裸
+            # 字符串**（"text"/"json"/"editable"），FieldValue 从未把它们转换成
+            # ValueType/FieldMode 枚举。多数校验路径用 `==` 比较（str 混入枚举与裸
+            # 字符串相等）掩盖了这个问题，但 `content_mutation._assert_roundtrip_
+            # equivalent`（`is` 恒等分派）与 `_projection_payload`（`.mode.value`
+            # 属性访问）会直接炸——这次 D4-13 rematerialize（全 entry 范围）首次真正
+            # 跑通这两条路径时暴露。修复：统一转换成真枚举实例，其余逻辑不变。
+            values[sk] = FieldValue(stable_key=sk, value=value, value_type=ValueType(value_type), mode=FieldMode(mode), row_key=identity)
     return Projection(contract_id=contract.contract_id, semantic_version=contract.semantic_version, document_type=contract.document_type, values=values, row_keys={s["table_key"]: tuple(row_keys)})
 
 

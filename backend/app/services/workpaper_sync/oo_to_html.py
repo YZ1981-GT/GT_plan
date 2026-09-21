@@ -2868,6 +2868,56 @@ class OoToHtmlCoordinator:
             if fixed_updates:
                 await self._session.commit()
 
+        # D4-13 固定 item（核对过程/核对结论，纯文本 remark）—— 与 D4-5 固定 item 同构。
+        if hasattr(bridge, "merge_d413_fixed_from_projection") and hasattr(
+            bridge, "STORE_ITEM_IDS_D413_FIXED"
+        ):
+            base_fixed_d413: dict[str, str | None] = {}
+            for item_id in bridge.STORE_ITEM_IDS_D413_FIXED:
+                raw = (
+                    await self._session.execute(
+                        sa.text(
+                            "SELECT remark FROM checklist_responses "
+                            "WHERE wp_id = :wp AND item_id = :item"
+                        ),
+                        {"wp": str(state.frozen.wp_id), "item": item_id},
+                    )
+                ).scalar_one_or_none()
+                base_fixed_d413[item_id] = raw if isinstance(raw, str) else None
+            fixed_updates_d413 = bridge.merge_d413_fixed_from_projection(
+                projection=merged_projection, base_by_item=base_fixed_d413
+            )
+            for item_id, text in fixed_updates_d413.items():
+                updated = (
+                    await self._session.execute(
+                        sa.text(
+                            "UPDATE checklist_responses SET remark = :val, updated_at = now() "
+                            "WHERE wp_id = :wp AND item_id = :item"
+                        ),
+                        {
+                            "val": text,
+                            "wp": str(state.frozen.wp_id),
+                            "item": item_id,
+                        },
+                    )
+                ).rowcount
+                if not updated:
+                    await self._session.execute(
+                        sa.text(
+                            "INSERT INTO checklist_responses "
+                            "(id, project_id, wp_id, item_id, remark, created_at, updated_at) "
+                            "VALUES (gen_random_uuid(), :pid, :wp, :item, :val, now(), now())"
+                        ),
+                        {
+                            "pid": str(state.frozen.project_id),
+                            "wp": str(state.frozen.wp_id),
+                            "item": item_id,
+                            "val": text,
+                        },
+                    )
+            if fixed_updates_d413:
+                await self._session.commit()
+
         # D4-35 dict store（{rows, sampling, periodAmount}）：只 merge rows，保留 sampling/periodAmount
         if hasattr(bridge, "merge_d435_from_projection") and hasattr(
             bridge, "STORE_ITEM_ID_D435_DICT"

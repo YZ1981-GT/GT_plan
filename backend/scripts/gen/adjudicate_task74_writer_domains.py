@@ -502,6 +502,121 @@ _EXPLICIT: dict[str, tuple[str, str, str]] = {
         "itself: the destination has to come from the canonical resolver so that the file a "
         "resolver later returns and the file provisioning wrote can never diverge",
     ),
+    # ── 有界委派闭包 (2026-09-20) 补回的多跳 writer/resolver 入口 ─────────────
+    # 单跳传播盲区：D2/D4 双向回写迁移把 d4_import_data/import_data 从 direct writer
+    # 改成委派 writer，调用它们的适配器/端点因此掉出发现面。闭包补回后逐条裁决入 lane。
+    "app.routers.b60_plan::post_b60_plan_update": (
+        "template_provisioning",
+        "The B60 plan-update endpoint; its delegation chain reaches the B60 plan provisioning "
+        "service (`bump_plan_version` / `save_attachment_flags`), which Task 3 already put in the "
+        "provisioning lane, so this entry point belongs with it",
+        "It holds no content of its own and inherits the provisioning lane through its delegates; "
+        "it must not open a second transaction boundary next to the provisioning commit, and its "
+        "chain migrates when the B60 plan service commits through `ContentMutationService`",
+    ),
+    "app.routers.b60_plan::put_b60_attachment_flags": (
+        "template_provisioning",
+        "The B60 attachment-flag endpoint; it delegates to `b60_plan_service.save_attachment_flags`, "
+        "a provisioning-lane writer, so the entry point shares that lane",
+        "Same obligation as its sibling `post_b60_plan_update`: no second boundary here, and the "
+        "chain migrates onto `ContentMutationService` when the plan service does",
+    ),
+    "app.routers.custom_workpaper_cells::update_custom_cells": (
+        "custom",
+        "The custom-cell write endpoint. Task 19 routed its authoritative xlsx body through "
+        "`ContentMutationService` (so it carries no direct version/content fact of its own), but "
+        "it still delegates to `refresh_custom_projection`, which refreshes the custom projection "
+        "into `working_paper.parsed_data`; that delegation is a real content mutation, so it is a "
+        "delegation writer two hops above the projection writer. It was retired under the "
+        "single-hop discovery model, which masked this edge",
+        "The authoritative-body leg is already migrated; the remaining obligation is that the "
+        "projection refresh it triggers rides the same unified commit rather than a second write "
+        "of `parsed_data`, and that no second transaction boundary wraps the pair",
+    ),
+    "app.routers.custom_workpaper_cells::refresh_custom_projection_endpoint": (
+        "custom",
+        "The custom projection-refresh endpoint; it delegates to `refresh_custom_projection` -> "
+        "`write_projection_to_parsed_data`, the same custom-projection writer its sibling "
+        "`update_custom_cells` reaches, so it shares the custom lane",
+        "It inherits the custom lane through its delegate; the projection write must move onto the "
+        "unified commit and it must not open its own boundary around the refresh",
+    ),
+    "app.routers.d2_sync_router::_load_context": (
+        "export_storage_resolver",
+        "A D2 sync helper that resolves the OnlyOffice storage directory through "
+        "`_onlyoffice_storage_dir` to locate the workpaper's cached file, composing a storage path "
+        "rather than reaching the canonical `resolve_wp_file`",
+        "A path resolver applies no content, so no version field may move here. The debt is the "
+        "resolver split: it reaches the file through the OnlyOffice cache directory instead of the "
+        "canonical resolver, which is why it is also counted in `non_canonical_resolver_only`",
+    ),
+    "app.routers.trial_balance::recalc_trial_balance": (
+        "dedicated_router",
+        "The trial-balance recalculation endpoint; it delegates to "
+        "`prefill_engine.resolve_stale_after_recalc`, a dedicated-router-lane convergence writer, "
+        "so this entry point shares that lane",
+        "It holds no content of its own and inherits the lane through its delegate; it must not "
+        "open a second boundary around the batch, and the chain migrates when the prefill stack "
+        "commits through `ContentMutationService`",
+    ),
+    "app.routers.wp_i_amortization::i1_amortization_calc": (
+        "dedicated_router",
+        "The I1 amortization-calculation endpoint; it delegates to the module-local `_execute`, "
+        "which writes the computed schedule into `working_paper.parsed_data`, the same content "
+        "shape as the other dedicated cycle-calculation routers Task 3 adjudicated",
+        "This is a real content application, so it needs the unified boundary: read the current "
+        "`content_revision`, apply, commit once through `ContentMutationService`; today the write "
+        "lands outside that boundary",
+    ),
+    "app.routers.wp_i_amortization::i4_amortization_calc": (
+        "dedicated_router",
+        "The I4 amortization-calculation endpoint; like its I1 sibling it delegates to the "
+        "module-local `_execute` that writes the schedule into `working_paper.parsed_data`",
+        "Same obligation as `i1_amortization_calc`: one unified commit per calculation, replacing "
+        "the current write outside the boundary",
+    ),
+    "app.services.event_handlers._impl::register_event_handlers._on_b515_high_risk": (
+        "orchestrator_side_effect",
+        "An EventBus handler registered inside `register_event_handlers`: on a B51-5 high fraud "
+        "risk verdict it appends the D4 IPO workpapers by calling `_ensure_d4_ipo_loaded`, which "
+        "Task 3 already adjudicated as `template_provisioning` -- the same shape as the sibling "
+        "`_on_b514_high_risk` handler",
+        "It holds no content of its own -- the lane statement is about the trigger, not the "
+        "store. It must never move a version field (it moves none), and its commit has to become "
+        "the provisioning call's commit instead of a second boundary opened by the handler",
+    ),
+    "app.services.guidance_runtime_facts::load_template_source_facts": (
+        "export_storage_resolver",
+        "Resolves the template source file by composing a path under the template tree itself so "
+        "guidance runtime facts can be read back, the same template-lookup role as the "
+        "`wp_template_finder` rows in this lane",
+        "Reading template facts is not a content application, so no version field may move. The "
+        "debt is the resolver split: it builds the path itself instead of going through the "
+        "canonical resolver, which is why it is also counted in `non_canonical_resolver_only`",
+    ),
+    "app.services.wp_batch_prefill::batch_prefill": (
+        "dedicated_router",
+        "The batch prefill service; it delegates to `prefill_engine.batch_prefill_ordered`, a "
+        "dedicated-router-lane writer, so the service shares that lane",
+        "It inherits the lane through its delegate; it must not open a second boundary around the "
+        "batch, and the chain migrates when the ordered prefill commits through "
+        "`ContentMutationService`",
+    ),
+    "app.services.wp_batch_prefill::batch_prefill_project": (
+        "dedicated_router",
+        "The project-level batch prefill entry; it delegates to `batch_prefill` in the same "
+        "module, so it shares the dedicated-router lane",
+        "Same obligation as `batch_prefill`: no second boundary, migrates with the prefill stack",
+    ),
+    "app.services.wp_whole_workbook_document::whole_workbook_template_or_primary": (
+        "export_storage_resolver",
+        "Resolves the whole-workbook template (or the primary sheet's template) by delegating to "
+        "`find_template_file_any`, the template-library lookup lane the `wp_template_finder` rows "
+        "already occupy",
+        "A template resolver applies no content, so no version field may move. It never reaches "
+        "the canonical `resolve_wp_file`, which is why it is also counted in "
+        "`non_canonical_resolver_only`",
+    ),
 }
 
 #: 模式规则。顺序敏感：先精确、后模式；命中即停。

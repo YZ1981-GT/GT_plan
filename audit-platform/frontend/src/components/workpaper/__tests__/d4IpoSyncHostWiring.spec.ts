@@ -3,12 +3,11 @@
  *
  * spec: d4-ipo-checklist-dual-mode-writeback-and-formula · Wave 1 · Task 2
  *
- * 判据落到「源码结构」（宿主必须消费平台既有 useWorkpaperSyncBridge +
- * WorkpaperSyncEditorHost + capabilityForEntry(...) 现算 + readStoreProjection），
- * 禁止自建同步 composable、禁止内联 capability 字面量、禁止再挂裸 GtOnlyOfficeSheet。
- *
- * 🔴 Wave 1 阶段本守卫必须先红：四个 IPO tab 目前仍是「rows JSON 塞 remark + 裸
- *    GtOnlyOfficeSheet」的旧反模式（见 D4TabDealer.vue）。
+ * 2026-09-21 治本改造后更新：四张 IPO 检查表的接桥不再直接调 `useWorkpaperSyncBridge`，
+ * 而是通过共享 composable `useD4SyncMode`（entryId/capability/健康门禁/switchMode/
+ * fail-visible tag 已内聚到该 composable 内部，由 `useD4SyncMode.spec.ts` 单独守卫）。
+ * sheetKey 四张表均走具名常量（`D4_2X_SHEET_KEY`），源码注释明确标注这是跨语言契约守卫要求
+ * （后端 test_d4_ipo_checklist_cross_lang_contract.py 靠正则抓常量声明反查 sheet_key 漂移）。
  */
 import { describe, it, expect } from 'vitest'
 import { readFileSync, existsSync } from 'node:fs'
@@ -22,13 +21,18 @@ const TABS: Record<string, string> = {
   'D4-28': resolve(IPO_DIR, 'D4TabCustomerChecklist.vue'),
 }
 
-// 四张 IPO 检查表共用父级 D4 workbook 的 bidirectional 入口，各自一个 managed sheet key。
-const PARENT_ENTRY = 'xlsx/gt-d4-operating-revenue'
+// 四张 IPO 检查表共用父级 D4 workbook 的统一同步入口，各自一个 managed sheet key + 具名常量。
 const MANAGED_KEY_BY_CODE: Record<string, string> = {
   'D4-25': 'd4-25-managed',
   'D4-26': 'd4-26-managed',
   'D4-27': 'd4-27-managed',
   'D4-28': 'd4-28-managed',
+}
+const NAMED_CONST_BY_CODE: Record<string, string> = {
+  'D4-25': 'D4_25_SHEET_KEY',
+  'D4-26': 'D4_26_SHEET_KEY',
+  'D4-27': 'D4_27_SHEET_KEY',
+  'D4-28': 'D4_28_SHEET_KEY',
 }
 
 function read(path: string): string {
@@ -40,7 +44,7 @@ function stripComments(src: string): string {
 }
 
 function extractBridgeCallArgs(src: string): string {
-  const marker = 'useWorkpaperSyncBridge('
+  const marker = 'useD4SyncMode('
   const start = src.indexOf(marker)
   if (start < 0) return ''
   let depth = 0
@@ -58,13 +62,16 @@ function extractBridgeCallArgs(src: string): string {
 describe.each(Object.entries(TABS))('%s IPO 检查表必须消费平台 sync bridge', (code, path) => {
   const src = existsSync(path) ? stripComments(read(path)) : ''
   const args = extractBridgeCallArgs(src)
+  const sheetKey = MANAGED_KEY_BY_CODE[code]
+  const namedConst = NAMED_CONST_BY_CODE[code]
 
   it('tab 文件存在', () => {
     expect(existsSync(path)).toBe(true)
   })
 
-  it('调用了平台 useWorkpaperSyncBridge（禁止自建同步 composable）', () => {
+  it('调用了共享 composable useD4SyncMode（禁自建同步 composable / 禁直连底层桥）', () => {
     expect(args.length).toBeGreaterThan(0)
+    expect(src).not.toContain('useWorkpaperSyncBridge(')
     // 禁止本 spec 早期草案里的自建桥
     expect(src).not.toContain('useIpoChecklistSyncBridge')
   })
@@ -79,15 +86,10 @@ describe.each(Object.entries(TABS))('%s IPO 检查表必须消费平台 sync bri
     expect(readAt).toBeGreaterThan(flushAt)
   })
 
-  it('capability 现算：capabilityForEntry(父级入口)，禁止内联 bidirectional 字面量', () => {
-    expect(src).toMatch(/capabilityForEntry\s*\(/)
-    expect(src).toContain(PARENT_ENTRY)
-    // 不得像 legacy d2_sync_status.bidirectional 那样硬编码给桥
-    expect(args).not.toMatch(/capability:\s*['"]bidirectional['"]/)
-  })
-
-  it('entryId / sheetKey 锁死本表 managed 身份', () => {
-    expect(src).toContain(MANAGED_KEY_BY_CODE[code])
+  it('sheetKey 走具名常量（不得内联字面量，跨语言契约守卫要求）', () => {
+    expect(src).toContain(`= '${sheetKey}'`)
+    expect(args).toMatch(new RegExp(`sheetKey:\\s*${namedConst}\\b`))
+    expect(args).not.toMatch(new RegExp(`sheetKey:\\s*['"]${sheetKey}['"]`))
   })
 
   it('模板挂载了 WorkpaperSyncEditorHost', () => {
@@ -115,7 +117,7 @@ describe.each(Object.entries(TABS))('%s IPO 检查表必须消费平台 sync bri
 // ── 反向自检：extractBridgeCallArgs / stripComments 真在承重 ──────────────────
 describe('守卫自检（防恒真）', () => {
   it('extractBridgeCallArgs 能抓到真实调用体', () => {
-    const stub = 'const b = useWorkpaperSyncBridge({ entryId: x, flushHtml: async () => {} })'
+    const stub = 'const b = useD4SyncMode({ sheetKey: D4_25_SHEET_KEY, flushHtml: async () => {} })'
     expect(extractBridgeCallArgs(stub)).toContain('flushHtml')
     expect(extractBridgeCallArgs('no bridge here')).toBe('')
   })

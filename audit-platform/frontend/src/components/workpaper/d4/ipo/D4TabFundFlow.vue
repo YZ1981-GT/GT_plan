@@ -8,17 +8,16 @@ import WpAmountInput from '../../shared/WpAmountInput.vue'
  * 异常行红色高亮 + AI辅助 + 双模式OO + 导入导出
  */
 import { ref, computed, inject, watch, onBeforeUnmount } from 'vue'
-import { useD4InterviewSave, useD4InterviewMode } from './useD4InterviewSync'
+import { useD4InterviewSave } from './useD4InterviewSync'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useD4ImportExport } from '../../composables/useD4ImportExport'
 import D4IpoFindingWriteback, { type D4IpoFinding } from './D4IpoFindingWriteback.vue'
 import WorkpaperSyncEditorHost from '../../sync/WorkpaperSyncEditorHost.vue'
-import { useWorkpaperSyncBridge } from '../../sync/useWorkpaperSyncBridge'
 import { readStoreProjection } from '../../sync/workpaperSyncApi'
-import { capabilityForEntry } from '../../sync/workpaperSyncCapability'
 import GtIndexChip from '../../GtIndexChip.vue'
 import http from '@/utils/http'
 import { Plus } from '@element-plus/icons-vue'
+import { useD4SyncMode, D4_SYNC_ENTRY_ID } from '../composables/useD4SyncMode'
 
 const props = defineProps<{ wpId: string; projectId: string; allResponses: Map<string, any>; isReadonly: boolean }>()
 const openReviewDialog = inject<((sectionId: string) => void) | null>('openReviewDialog', null)
@@ -28,13 +27,20 @@ const reloadWorkpaperData = inject<(() => Promise<void>) | null>('reloadWorkpape
 const d4Save = useD4InterviewSave(() => ['D4-32-groups','D4-32-note','D4-32-conclusion'].map(k => props.allResponses.get(k)).filter(Boolean))
 // R5.3：桥接/保存失败必须可见，且旧数据不得被清空（本地 store 修改已保留，仅提示可恢复）
 const saveError = d4Save.saveError
-const D4_SYNC_ENTRY_ID = 'xlsx/gt-d4-operating-revenue'
-const d4SyncBridge = useWorkpaperSyncBridge({
-  entryId: ref(D4_SYNC_ENTRY_ID), wpId: computed(() => props.wpId), projectId: computed(() => props.projectId), sheetKey: ref('d4-32-managed'), capability: capabilityForEntry(D4_SYNC_ENTRY_ID),
-  flushHtml: async () => { await d4Save.flush(); const snap = await readStoreProjection({ projectId: props.projectId, wpId: props.wpId, entryId: D4_SYNC_ENTRY_ID }); return { expectedRevision: snap.expectedRevision, projection: snap.projection, sheetKey: 'd4-32-managed' } },
+// ─── D4-32 sync bridge（统一走 useD4SyncMode，见其文件头注释） ─────────
+const { syncBridge: d4SyncBridge, descriptor: d4SyncDescriptor, editorMode, modeOptions } = useD4SyncMode({
+  sheetKey: 'd4-32-managed',
+  wpId: computed(() => props.wpId),
+  projectId: computed(() => props.projectId),
+  isReadonly: computed(() => props.isReadonly),
+  views: ['表格视图'],
+  flushHtml: async () => {
+    await d4Save.flush()
+    const snap = await readStoreProjection({ projectId: props.projectId, wpId: props.wpId, entryId: D4_SYNC_ENTRY_ID })
+    return { expectedRevision: snap.expectedRevision, projection: snap.projection, sheetKey: 'd4-32-managed' }
+  },
   reloadHtml: async () => { await reloadWorkpaperData?.() },
 })
-const d4SyncDescriptor = computed(() => d4SyncBridge.descriptor.value)
 
 const GROUPS = [
   { key: 'supplier', label: '主要供应商', color: '#f0faf0' },
@@ -121,7 +127,6 @@ function updateAuditNote(v: string) { if (props.isReadonly) return; auditNote.va
 function updateAuditConclusion(v: string) { if (props.isReadonly) return; auditConclusion.value = v; persistAll() }
 onBeforeUnmount(() => { if (debounceTimer) { clearTimeout(debounceTimer); d4Save.flush().catch(() => undefined) } })
 
-const { editorMode, modeOptions, busy: syncBusy, feedback: syncFeedback } = useD4InterviewMode(d4SyncBridge, () => props.isReadonly, ['表格视图'])
 const aiAvailable = ref(false)
 async function checkAiHealth() { try { const r = await http.get('/api/ai/health', { _silent: true } as any); aiAvailable.value = (r.data?.data?.status ?? r.data?.status) === 'healthy' || (r.data?.data?.status ?? r.data?.status) === 'degraded' } catch { aiAvailable.value = false } }
 checkAiHealth()

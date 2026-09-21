@@ -17,10 +17,9 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { useD4ImportExport } from '../../composables/useD4ImportExport'
 import { useD4InspectionWriteback } from '../../composables/useD4InspectionWriteback'
 import { calcChangeAmount } from '../../composables/useD4FormulaEngine'
-import { useWorkpaperSyncBridge, WP_BRIDGE_IN_FLIGHT_STATES } from '../../sync/useWorkpaperSyncBridge'
 import { readStoreProjection } from '../../sync/workpaperSyncApi'
-import { capabilityForEntry } from '../../sync/workpaperSyncCapability'
 import WorkpaperSyncEditorHost from '../../sync/WorkpaperSyncEditorHost.vue'
+import { useD4SyncMode, D4_SYNC_ENTRY_ID } from '../composables/useD4SyncMode'
 import GtIndexChip from '../../GtIndexChip.vue'
 import http from '@/utils/http'
 import { Plus } from '@element-plus/icons-vue'
@@ -174,71 +173,23 @@ onBeforeUnmount(() => { if (debounceTimer) { clearTimeout(debounceTimer); flushS
 
 // ─── 双模式 sync bridge（B2：D4-16 迁 useWorkpaperSyncBridge + WorkpaperSyncEditorHost）──
 // sheet_key=d4-16-managed，同 entry gt-d4-operating-revenue（后端 phase5_d4_inspection_sheets provider）。
-const D4_16_ENTRY = 'xlsx/gt-d4-operating-revenue'
 const D4_16_SHEET_KEY = 'd4-16-managed'
-const ooHealthy = ref(false)
-async function checkOoHealth() {
-  try {
-    const res = await http.get('/api/workpapers/onlyoffice/health', { _silent: true } as any)
-    ooHealthy.value = res.data?.data?.healthy ?? res.data?.healthy ?? false
-  } catch { ooHealthy.value = false }
-}
-checkOoHealth()
-const syncSwitching = ref(false)
-const syncHostRef = ref<{ forceSave: () => Promise<{ operationId: string }> } | null>(null)
-const syncBridge = useWorkpaperSyncBridge({
-  entryId: ref(D4_16_ENTRY),
+const {
+  syncBridge, descriptor: syncOoDescriptor, editorMode, modeOptions,
+  busy: syncBusy, syncStateTag, syncHostRef,
+} = useD4SyncMode({
+  sheetKey: D4_16_SHEET_KEY,
   wpId: toRef(props, 'wpId'),
   projectId: toRef(props, 'projectId'),
-  sheetKey: ref(D4_16_SHEET_KEY),
-  capability: capabilityForEntry(D4_16_ENTRY),
+  isReadonly: toRef(props, 'isReadonly'),
+  views: ['表格视图'],
   flushHtml: async () => {
     flushPendingSave()
-    const snap = await readStoreProjection({ projectId: props.projectId, wpId: props.wpId, entryId: D4_16_ENTRY })
+    const snap = await readStoreProjection({ projectId: props.projectId, wpId: props.wpId, entryId: D4_SYNC_ENTRY_ID })
     return { expectedRevision: snap.expectedRevision, projection: snap.projection, sheetKey: D4_16_SHEET_KEY }
   },
   reloadHtml: async () => { window.dispatchEvent(new CustomEvent('d4:reload-responses')) },
 })
-const syncOoDescriptor = computed(() => syncBridge.descriptor.value)
-const syncBusy = computed(
-  () => syncSwitching.value
-    || (WP_BRIDGE_IN_FLIGHT_STATES as readonly string[]).includes(String(syncBridge.state.value)),
-)
-const editorMode = computed<string>({
-  get: () => (syncBridge.mode.value === 'oo' ? '在线编辑' : '表格视图'),
-  set: (v: string) => { void switchMode(v === '在线编辑' ? 'onlyoffice' : 'structured') },
-})
-const modeOptions = computed(() => [
-  { label: '表格视图', value: '表格视图' },
-  { label: '在线编辑', value: '在线编辑', disabled: props.isReadonly || !ooHealthy.value || syncBusy.value },
-])
-async function switchMode(target: 'structured' | 'onlyoffice'): Promise<void> {
-  const cur = syncBridge.mode.value === 'oo' ? 'onlyoffice' : 'structured'
-  if (target === cur) return
-  if (target === 'onlyoffice') {
-    if (props.isReadonly || !ooHealthy.value) return
-    syncSwitching.value = true
-    try { await syncBridge.switchToOnlyOffice() } finally { syncSwitching.value = false }
-    return
-  }
-  syncSwitching.value = true
-  try { await syncBridge.switchToHtml() } finally { syncSwitching.value = false }
-}
-// 同步态三态中文标签（禁裸英文）
-const syncStateTag = computed(() => {
-  const st = String(syncBridge.state.value)
-  if (syncBusy.value) return { text: '同步中…', type: 'info' as const }
-  if (syncBridge.dirty?.value) {
-    return syncBridge.mode.value === 'oo'
-      ? { text: 'excel 侧有未同步改动', type: 'warning' as const }
-      : { text: 'html 侧有未同步改动', type: 'warning' as const }
-  }
-  if (st.includes('error') || String(syncBridge.lastError?.value || '')) {
-    return { text: '同步失败，请重试', type: 'danger' as const }
-  }
-  return { text: '已同步', type: 'success' as const }
-})
-
 // ─── AI / Import-Export ───────────────────────────────────────────────
 const aiAvailable = ref(false)
 async function checkAiHealth() {

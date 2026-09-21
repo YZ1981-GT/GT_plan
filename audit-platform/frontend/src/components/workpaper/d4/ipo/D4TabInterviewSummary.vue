@@ -7,35 +7,36 @@
  * 底部10条红字访谈核对提示
  */
 import { ref, computed, inject, watch, onBeforeUnmount } from 'vue'
-import { useD4InterviewSave, useD4InterviewMode } from './useD4InterviewSync'
+import { useD4InterviewSave } from './useD4InterviewSync'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useD4ImportExport } from '../../composables/useD4ImportExport'
 import D4IpoFindingWriteback, { type D4IpoFinding } from './D4IpoFindingWriteback.vue'
 import GtIndexChip from '../../GtIndexChip.vue'
 import WorkpaperSyncEditorHost from '../../sync/WorkpaperSyncEditorHost.vue'
-import { useWorkpaperSyncBridge } from '../../sync/useWorkpaperSyncBridge'
 import { readStoreProjection } from '../../sync/workpaperSyncApi'
-import { capabilityForEntry } from '../../sync/workpaperSyncCapability'
 import http from '@/utils/http'
 import { Plus } from '@element-plus/icons-vue'
+import { useD4SyncMode, D4_SYNC_ENTRY_ID } from '../composables/useD4SyncMode'
 
 const props = defineProps<{ wpId: string; projectId: string; allResponses: Map<string, any>; isReadonly: boolean }>()
 const openReviewDialog = inject<((sectionId: string) => void) | null>('openReviewDialog', null)
 // 导入 xlsx 成功后重载 allResponses（主入口 provide），否则界面停留在旧值
 const reloadWorkpaperData = inject<(() => Promise<void>) | null>('reloadWorkpaperData', null)
-const D4_SYNC_ENTRY_ID = 'xlsx/gt-d4-operating-revenue'
 const d4Save = useD4InterviewSave(() => ['D4-30-customers','D4-30-note','D4-30-conclusion'].map(k => props.allResponses.get(k)).filter(Boolean))
-const d4SyncBridge = useWorkpaperSyncBridge({
-  entryId: ref(D4_SYNC_ENTRY_ID), wpId: computed(() => props.wpId), projectId: computed(() => props.projectId),
-  sheetKey: ref('d4-30-managed'), capability: capabilityForEntry(D4_SYNC_ENTRY_ID),
-  flushHtml: async () => { await d4Save.flush(); const snap = await readStoreProjection({ projectId: props.projectId, wpId: props.wpId, entryId: D4_SYNC_ENTRY_ID }); return { expectedRevision: snap.expectedRevision, projection: snap.projection, sheetKey: 'd4-30-managed' } },
+// ─── D4-30 sync bridge（统一走 useD4SyncMode，见其文件头注释） ─────────
+const { syncBridge: d4SyncBridge, descriptor: d4SyncDescriptor, editorMode, modeOptions, syncHostRef } = useD4SyncMode({
+  sheetKey: 'd4-30-managed',
+  wpId: computed(() => props.wpId),
+  projectId: computed(() => props.projectId),
+  isReadonly: computed(() => props.isReadonly),
+  views: ['卡片视图', '矩阵视图'],
+  flushHtml: async () => {
+    await d4Save.flush()
+    const snap = await readStoreProjection({ projectId: props.projectId, wpId: props.wpId, entryId: D4_SYNC_ENTRY_ID })
+    return { expectedRevision: snap.expectedRevision, projection: snap.projection, sheetKey: 'd4-30-managed' }
+  },
   reloadHtml: async () => { await reloadWorkpaperData?.() },
 })
-const syncHostRef = ref<{ forceSave: () => Promise<{ operationId: string }> } | null>(null)
-// 🔴 模板 `v-if="d4SyncDescriptor"` 依赖此计算属性；此前漏声明 → 恒 undefined → OO 编辑器
-//    宿主永不挂载、卡在「正在打开同步编辑器…」（L1 判据4 wp-sync-host 超时的真因）。
-//    与 D4-31 InterviewDetail 同一取法：materialize 产出的 descriptor 由桥暴露。
-const d4SyncDescriptor = computed(() => d4SyncBridge.descriptor.value)
 
 // ─── 访谈维度定义 ─────────────────────────────────────────────────────
 const INTERVIEW_FIELDS = [
@@ -134,7 +135,6 @@ function updateAuditNote(v: string) { if (props.isReadonly) return; auditNote.va
 function updateAuditConclusion(v: string) { if (props.isReadonly) return; auditConclusion.value = v; persistAll() }
 onBeforeUnmount(() => { if (debounceTimer) { clearTimeout(debounceTimer); d4Save.flush().catch(() => undefined) } })
 
-const { editorMode, modeOptions, busy: syncBusy, feedback: syncFeedback } = useD4InterviewMode(d4SyncBridge, () => props.isReadonly, ['卡片视图', '矩阵视图'])
 const activeIdx = ref(0)
 const activeCustomer = computed(() => customers.value[activeIdx.value] || null)
 

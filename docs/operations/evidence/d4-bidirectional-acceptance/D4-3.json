@@ -1,7 +1,7 @@
 {
   "sheet": "D4-3",
   "sheet_name": "其他业务收入明细表D4-3",
-  "captured_at": "2026-09-19T12:39:17.530Z",
+  "captured_at": "2026-09-21T15:23:41.820Z",
   "scope": {
     "project_id": "0ec33ac9-3de5-4e65-b3bf-f9dccd7b2a49",
     "wp_id": "b3ab3c46-828f-4f48-950e-aee9bbdc923f",
@@ -38,6 +38,7 @@
     "sync_host_mounted": true,
     "oo_iframe_count": 1,
     "doc_editor_called": false,
+    "http_errors": [],
     "console_errors": []
   }
 }

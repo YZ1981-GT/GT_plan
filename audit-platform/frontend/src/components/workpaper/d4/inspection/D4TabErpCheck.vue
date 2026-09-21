@@ -13,7 +13,9 @@ import { ref, computed, watch, inject, onBeforeUnmount, toRef } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useD4ImportExport } from '../../composables/useD4ImportExport'
 import { useD4InspectionWriteback } from '../../composables/useD4InspectionWriteback'
-import GtOnlyOfficeSheet from '../../GtOnlyOfficeSheet.vue'
+import { readStoreProjection } from '../../sync/workpaperSyncApi'
+import WorkpaperSyncEditorHost from '../../sync/WorkpaperSyncEditorHost.vue'
+import { useD4SyncMode, D4_SYNC_ENTRY_ID } from '../composables/useD4SyncMode'
 import GtIndexChip from '../../GtIndexChip.vue'
 import http from '@/utils/http'
 
@@ -25,21 +27,6 @@ const props = defineProps<{
 }>()
 
 const openReviewDialog = inject<((sectionId: string) => void) | null>('openReviewDialog', null)
-
-// ─── 双模式 ──────────────────────────────────────────────────────────
-const editorMode = ref<'structured' | 'onlyoffice'>('structured')
-const ooHealthy = ref(false)
-const modeOptions = computed(() => [
-  { label: '结构化视图', value: 'structured' },
-  { label: '在线编辑', value: 'onlyoffice', disabled: !ooHealthy.value },
-])
-async function checkOoHealth() {
-  try {
-    const res = await http.get('/api/workpapers/onlyoffice/health', { _silent: true } as any)
-    ooHealthy.value = res.data?.data?.healthy ?? res.data?.healthy ?? false
-  } catch { ooHealthy.value = false }
-}
-checkOoHealth()
 
 // ─── AI 健康 ─────────────────────────────────────────────────────────
 const aiAvailable = ref(false)
@@ -84,6 +71,28 @@ function flush() {
 function onProcess(v: string) { processText.value = v; save() }
 function onConclusion(v: string) { conclusionText.value = v; save() }
 onBeforeUnmount(() => { if (timer) { clearTimeout(timer); flush() } })
+
+// ─── 双模式 sync bridge（治本改造：D4-13 全篇无插删动态行表，两段文本走 useD4SyncMode
+//     静态受管区，同 D4-33/D4-8。sheet_key=d413-managed，同 entry gt-d4-operating-revenue，
+//     provider=phase5_d4_erp_check_sheet） ─────────────────────────────────
+const D4_13_SHEET_KEY = 'd413-managed'
+const {
+  syncBridge, descriptor: syncOoDescriptor, editorMode, modeOptions,
+  busy: syncBusy, syncStateTag, syncHostRef,
+} = useD4SyncMode({
+  sheetKey: D4_13_SHEET_KEY,
+  wpId: toRef(props, 'wpId'),
+  projectId: toRef(props, 'projectId'),
+  isReadonly: toRef(props, 'isReadonly'),
+  views: ['结构化视图'],
+  flushHtml: async () => {
+    if (timer) { clearTimeout(timer); timer = null }
+    flush()
+    const snap = await readStoreProjection({ projectId: props.projectId, wpId: props.wpId, entryId: D4_SYNC_ENTRY_ID })
+    return { expectedRevision: snap.expectedRevision, projection: snap.projection, sheetKey: D4_13_SHEET_KEY }
+  },
+  reloadHtml: async () => { window.dispatchEvent(new CustomEvent('d4:reload-responses')) },
+})
 
 // ─── AI 核对过程 ─────────────────────────────────────────────────────
 const aiProcessLoading = ref(false)
@@ -209,7 +218,10 @@ async function handlePushToA13() {
   <div class="d4-erp">
     <!-- 工具条 -->
     <div class="toolbar">
-      <el-segmented v-model="editorMode" :options="modeOptions" size="small" />
+      <div class="toolbar-left">
+        <el-segmented v-model="editorMode" :options="modeOptions" size="small" :disabled="syncBusy" />
+        <el-tag :type="syncStateTag.type" size="small" effect="light" style="margin-left:8px">{{ syncStateTag.text }}</el-tag>
+      </div>
       <div class="toolbar-right">
         <el-dropdown trigger="click" size="small">
           <el-button size="small">导入导出 ▾</el-button>
@@ -237,7 +249,7 @@ async function handlePushToA13() {
     </div>
 
     <!-- 结构化视图 -->
-    <template v-if="editorMode === 'structured'">
+    <template v-if="editorMode !== '在线编辑'">
       <!-- 一、核对过程 -->
       <section class="block">
         <div class="block-head">
@@ -275,15 +287,11 @@ async function handlePushToA13() {
       </details>
     </template>
 
-    <!-- 在线编辑 -->
-    <template v-else>
+    <!-- 在线编辑：平台 sync bridge（治本改造，非裸 GtOnlyOfficeSheet）-->
+    <template v-if="editorMode === '在线编辑'">
       <div class="oo-container">
-        <GtOnlyOfficeSheet
-          :wp-id="props.wpId"
-          :project-id="props.projectId"
-          sheet-name="营业收入账面金额与ERP系统核对记录D4-13"
-          :readonly="isReadonly"
-        />
+        <WorkpaperSyncEditorHost v-if="syncOoDescriptor" ref="syncHostRef" :descriptor="syncOoDescriptor" :bridge="syncBridge" />
+        <div v-else class="oo-loading">正在打开 D4-13 同步编辑器…</div>
       </div>
     </template>
   </div>
@@ -296,6 +304,7 @@ async function handlePushToA13() {
   display: flex; justify-content: space-between; align-items: center;
   margin-bottom: 20px; flex-wrap: wrap; gap: 8px;
 }
+.toolbar-left { display: flex; align-items: center; }
 .toolbar-right { display: flex; gap: 6px; align-items: center; }
 .chip-label { font-size: 12px; color: #909399; margin-right: 2px; }
 
@@ -318,5 +327,6 @@ async function handlePushToA13() {
 .guidance summary { cursor: pointer; font-weight: 500; color: #e6a23c; font-size: var(--wp-font-size, 13px); }
 .guidance p { margin: 8px 0 0; font-size: var(--wp-font-size, 13px); color: #606266; line-height: 1.7; }
 
-.oo-container { min-height: 600px; height: calc(100vh - 280px); }
+.oo-container { min-height: 600px; height: calc(100vh - 280px); border-radius: 8px; overflow: hidden; }
+.oo-loading { padding: 40px; text-align: center; color: #909399; }
 </style>

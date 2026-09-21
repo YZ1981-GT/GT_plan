@@ -125,17 +125,19 @@ describe('D4-33~36 组件连接性（字面量正确）', () => {
     expect(src).toMatch(/useD4InspectionWriteback\([\s\S]*?wpCode:\s*'D4-36'/)
   })
 
-  it('D4-35 双向回写走平台 sync bridge（人工触发，非 html 保存自动反写）', () => {
+  it('D4-35 双向回写走平台共享 composable useD4SyncMode（人工触发，非 html 保存自动反写）', () => {
     const src = readOther('D4TabOtherCheck.vue')
-    // 消费平台设施而非自建同步
-    expect(src).toContain('useWorkpaperSyncBridge')
+    // 消费平台共享 composable（entryId/capability/健康门禁/switchMode 已内聚，禁直连底层桥）
+    expect(src).toContain('useD4SyncMode')
+    expect(src).not.toContain('useWorkpaperSyncBridge(')
     expect(src).toContain('WorkpaperSyncEditorHost')
-    // html→excel 为人工按钮触发（switchToOnlyOffice），不存在 html 保存时自动反写 excel 的调用
+    // html→excel 为人工按钮触发（switchMode('在线编辑')），不存在 html 保存时自动反写 excel 的调用
     expect(src).toContain('同步到在线编辑')
-    // persistAll（html 保存）里不得调用 switchToOnlyOffice / forceSave（防自动反写）
+    // persistAll（html 保存）里不得调用 switchMode/switchToOnlyOffice / forceSave（防自动反写）
     const persistIdx = src.indexOf('function persistAll')
     const persistBody = src.slice(persistIdx, persistIdx + 600)
     expect(persistBody).not.toContain('switchToOnlyOffice')
+    expect(persistBody).not.toContain('switchD435Mode')
     expect(persistBody).not.toContain('forceSave')
   })
 

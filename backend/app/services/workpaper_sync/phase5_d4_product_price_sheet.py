@@ -194,6 +194,7 @@ def _rows(payload: Any) -> list[tuple[str, Mapping[str, Any]]]:
 
 def build_store_projection_d411(payload: Any, *, contract: Any, limits: Any | None = None):
     from app.services.workpaper_sync.adapters.base import FieldValue, Projection
+    from app.services.workpaper_sync.contracts import FieldMode, ValueType
 
     values: dict[str, FieldValue] = {}
     row_keys: list[str] = []
@@ -202,8 +203,10 @@ def build_store_projection_d411(payload: Any, *, contract: Any, limits: Any | No
         for field, _col, mode, value_type, path, _label in MANAGED_FIELD_SPECS_D411:
             value = resolve_json_path(row, path) if "/" in path else row.get(path)
             sk = stable_key_for_d411(field, identity)
+            # 🔴 2026-09-21 修复既有 bug（同 phase5_d4_ipo_interview_sheets.py）：value_type/
+            # mode 此前是字段元组里的裸字符串，未经枚举转换。
             values[sk] = FieldValue(
-                stable_key=sk, value=value, value_type=value_type, mode=mode, row_key=identity
+                stable_key=sk, value=value, value_type=ValueType(value_type), mode=FieldMode(mode), row_key=identity
             )
     return Projection(
         contract_id=contract.contract_id,

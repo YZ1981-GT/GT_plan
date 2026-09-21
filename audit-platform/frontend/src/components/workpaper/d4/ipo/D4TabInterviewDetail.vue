@@ -8,29 +8,35 @@
  * AI辅助生成访谈问卷内容 + 双模式OO
  */
 import { ref, computed, inject, watch, onBeforeUnmount } from 'vue'
-import { useD4InterviewSave, useD4InterviewMode } from './useD4InterviewSync'
+import { useD4InterviewSave } from './useD4InterviewSync'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useD4ImportExport } from '../../composables/useD4ImportExport'
 import D4IpoFindingWriteback, { type D4IpoFinding } from './D4IpoFindingWriteback.vue'
 import WorkpaperSyncEditorHost from '../../sync/WorkpaperSyncEditorHost.vue'
-import { useWorkpaperSyncBridge } from '../../sync/useWorkpaperSyncBridge'
 import { readStoreProjection } from '../../sync/workpaperSyncApi'
-import { capabilityForEntry } from '../../sync/workpaperSyncCapability'
 import GtIndexChip from '../../GtIndexChip.vue'
 import http from '@/utils/http'
+import { useD4SyncMode, D4_SYNC_ENTRY_ID } from '../composables/useD4SyncMode'
 
 const props = defineProps<{ wpId: string; projectId: string; allResponses: Map<string, any>; isReadonly: boolean }>()
 const openReviewDialog = inject<((sectionId: string) => void) | null>('openReviewDialog', null)
 // 导入 xlsx 成功后重载 allResponses（主入口 provide），否则界面停留在旧值
 const reloadWorkpaperData = inject<(() => Promise<void>) | null>('reloadWorkpaperData', null)
 const d4Save = useD4InterviewSave(() => ['D4-31-interview'].map(k => props.allResponses.get(k)).filter(Boolean))
-const D4_SYNC_ENTRY_ID = 'xlsx/gt-d4-operating-revenue'
-const d4SyncBridge = useWorkpaperSyncBridge({
-  entryId: ref(D4_SYNC_ENTRY_ID), wpId: computed(() => props.wpId), projectId: computed(() => props.projectId), sheetKey: ref('d4-31-managed'), capability: capabilityForEntry(D4_SYNC_ENTRY_ID),
-  flushHtml: async () => { await d4Save.flush(); const snap = await readStoreProjection({ projectId: props.projectId, wpId: props.wpId, entryId: D4_SYNC_ENTRY_ID }); return { expectedRevision: snap.expectedRevision, projection: snap.projection, sheetKey: 'd4-31-managed' } },
+// ─── D4-31 sync bridge（统一走 useD4SyncMode，见其文件头注释） ─────────
+const { syncBridge: d4SyncBridge, descriptor: d4SyncDescriptor, editorMode, modeOptions } = useD4SyncMode({
+  sheetKey: 'd4-31-managed',
+  wpId: computed(() => props.wpId),
+  projectId: computed(() => props.projectId),
+  isReadonly: computed(() => props.isReadonly),
+  views: ['问卷视图'],
+  flushHtml: async () => {
+    await d4Save.flush()
+    const snap = await readStoreProjection({ projectId: props.projectId, wpId: props.wpId, entryId: D4_SYNC_ENTRY_ID })
+    return { expectedRevision: snap.expectedRevision, projection: snap.projection, sheetKey: 'd4-31-managed' }
+  },
   reloadHtml: async () => { await reloadWorkpaperData?.() },
 })
-const d4SyncDescriptor = computed(() => d4SyncBridge.descriptor.value)
 
 async function handleImportFile(f: any) { const r = await importData('D4-31', f.raw || f); if (r) await reloadWorkpaperData?.() }
 
@@ -112,7 +118,6 @@ const riskFindings = computed<D4IpoFinding[]>(() => {
   return out
 })
 
-const { editorMode, modeOptions, busy: syncBusy, feedback: syncFeedback } = useD4InterviewMode(d4SyncBridge, () => props.isReadonly, ['问卷视图'])
 const activeSection = ref('meta')
 const showExample = ref(false)
 

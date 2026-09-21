@@ -29,10 +29,10 @@ import GtIndexChip from '../../GtIndexChip.vue'
 // （spec workpaper-sync-static-cell-sheet-writeback，非 legacy 裸 GtOnlyOfficeSheet）。
 // census 裁定：D4-8 = 静态块矩阵（模板预画产品块 + 块内 12 月固定行 + 同行业 3 行），
 // 受管第 1 个产品（slot0→产品A 块）= 180 static cell；第 2+ 产品无模板块 → HTML-only。
-import { useWorkpaperSyncBridge, WP_BRIDGE_IN_FLIGHT_STATES } from '../../sync/useWorkpaperSyncBridge'
+// 统一走 useD4SyncMode（见其文件头注释）。
 import WorkpaperSyncEditorHost from '../../sync/WorkpaperSyncEditorHost.vue'
 import { readStoreProjection } from '../../sync/workpaperSyncApi'
-import { capabilityForEntry } from '../../sync/workpaperSyncCapability'
+import { useD4SyncMode, D4_SYNC_ENTRY_ID } from '../composables/useD4SyncMode'
 
 const props = defineProps<{
   wpId: string
@@ -395,64 +395,22 @@ function flushPendingSave() {
 }
 onBeforeUnmount(() => { if (debounceTimer) { clearTimeout(debounceTimer); flushSave() } })
 
-// ─── 双模式 sync bridge（D4-8 重要产品毛利，dedicated 静态受管区 sync sheet）──────────────
+// ─── D4-8 sync bridge（统一走 useD4SyncMode，见其文件头注释） ─────────
+// 🔴 迁移前该文件 switchMode 无竞态修复兜底（历史 bug②残留实例）；useD4SyncMode 内置
+//    await checkOoHealth() 二次判定，迁移顺带修复。
 const reloadWorkpaperData = inject<(() => Promise<void>) | null>('reloadWorkpaperData', null)
-const D4_8_ENTRY = 'xlsx/gt-d4-operating-revenue'
-const D4_8_SHEET_KEY = 'd48-managed'
-const modeOptions = ['表格视图', '在线编辑']
-const ooHealthy = ref(false)
-async function checkOoHealth() {
-  try { const r = await http.get('/api/workpapers/onlyoffice/health', { _silent: true } as any); ooHealthy.value = r.data?.data?.healthy ?? r.data?.healthy ?? false } catch { ooHealthy.value = false }
-}
-checkOoHealth()
-const syncSwitching = ref(false)
-const syncBridge = useWorkpaperSyncBridge({
-  entryId: ref(D4_8_ENTRY),
+const { syncBridge, descriptor: syncOoDescriptor, editorMode, modeOptions, syncStateTag } = useD4SyncMode({
+  sheetKey: 'd48-managed',
   wpId: toRef(props, 'wpId'),
   projectId: toRef(props, 'projectId'),
-  sheetKey: ref(D4_8_SHEET_KEY),
-  capability: capabilityForEntry(D4_8_ENTRY),
+  isReadonly: toRef(props, 'isReadonly'),
+  views: ['表格视图'],
   flushHtml: async () => {
     flushPendingSave()
-    const snap = await readStoreProjection({ projectId: props.projectId, wpId: props.wpId, entryId: D4_8_ENTRY })
-    return { expectedRevision: snap.expectedRevision, projection: snap.projection, sheetKey: D4_8_SHEET_KEY }
+    const snap = await readStoreProjection({ projectId: props.projectId, wpId: props.wpId, entryId: D4_SYNC_ENTRY_ID })
+    return { expectedRevision: snap.expectedRevision, projection: snap.projection, sheetKey: 'd48-managed' }
   },
   reloadHtml: async () => { if (reloadWorkpaperData) await reloadWorkpaperData() },
-})
-const syncOoDescriptor = computed(() => syncBridge.descriptor.value)
-const syncBusy = computed(
-  () => syncSwitching.value
-    || (WP_BRIDGE_IN_FLIGHT_STATES as readonly string[]).includes(String(syncBridge.state.value)),
-)
-const editorMode = computed<string>({
-  get: () => (syncBridge.mode.value === 'oo' ? '在线编辑' : '表格视图'),
-  set: (v: string) => { void switchMode(v === '在线编辑' ? 'onlyoffice' : 'structured') },
-})
-async function switchMode(target: 'structured' | 'onlyoffice'): Promise<void> {
-  const cur = syncBridge.mode.value === 'oo' ? 'onlyoffice' : 'structured'
-  if (target === cur) return
-  if (target === 'onlyoffice') {
-    if (props.isReadonly || !ooHealthy.value) return
-    syncSwitching.value = true
-    try { await syncBridge.switchToOnlyOffice() } finally { syncSwitching.value = false }
-    return
-  }
-  syncSwitching.value = true
-  try { await syncBridge.switchToHtml() } finally { syncSwitching.value = false }
-}
-// fail-visible：同步失败以中文 tag 显式呈现，不静默吞。
-const syncStateTag = computed(() => {
-  const st = String(syncBridge.state.value)
-  if (syncBusy.value) return { text: '同步中…', type: 'info' as const }
-  if (syncBridge.dirty?.value) {
-    return syncBridge.mode.value === 'oo'
-      ? { text: 'excel 侧有未同步改动', type: 'warning' as const }
-      : { text: 'html 侧有未同步改动', type: 'warning' as const }
-  }
-  if (st.includes('error') || String(syncBridge.lastError?.value || '')) {
-    return { text: '同步失败，请重试', type: 'danger' as const }
-  }
-  return { text: syncBridge.mode.value === 'oo' ? 'Excel 在线编辑' : '表格视图', type: 'success' as const }
 })
 </script>
 

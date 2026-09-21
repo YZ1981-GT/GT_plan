@@ -11,10 +11,9 @@ import { ref, computed, inject, toRef } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useD4KeyIndicator, INDICATOR_DEFINITIONS } from '../../composables/useD4KeyIndicator'
 import { useD4ImportExport } from '../../composables/useD4ImportExport'
-import { useWorkpaperSyncBridge, WP_BRIDGE_IN_FLIGHT_STATES } from '../../sync/useWorkpaperSyncBridge'
 import { readStoreProjection } from '../../sync/workpaperSyncApi'
-import { capabilityForEntry } from '../../sync/workpaperSyncCapability'
 import WorkpaperSyncEditorHost from '../../sync/WorkpaperSyncEditorHost.vue'
+import { useD4SyncMode, D4_SYNC_ENTRY_ID } from '../composables/useD4SyncMode'
 import GtIndexChip from '../../GtIndexChip.vue'
 import http from '@/utils/http'
 import { Plus } from '@element-plus/icons-vue'
@@ -62,78 +61,19 @@ const { exportTemplate, exportData, importData, importing } = useD4ImportExport(
   projectId: computed(() => props.projectId),
 })
 
-// ─── 双模式 sync bridge（批次A-2：D4-22 从 legacy GtOnlyOfficeSheet 迁 useWorkpaperSyncBridge）──
-// sheet_key=d422-managed，同 entry gt-d4-operating-revenue。参照 D4-15（D4TabCompleteness）。
-const D4_22_ENTRY = 'xlsx/gt-d4-operating-revenue'
-const D4_22_SHEET_KEY = 'd422-managed'
-const ooHealthy = ref(false)
-async function checkOoHealth() {
-  try {
-    const res = await http.get('/api/workpapers/onlyoffice/health', { _silent: true } as any)
-    ooHealthy.value = res.data?.data?.healthy ?? res.data?.healthy ?? false
-  } catch { ooHealthy.value = false }
-}
-checkOoHealth()
-const syncSwitching = ref(false)
-const syncHostRef = ref<{ forceSave: () => Promise<{ operationId: string }> } | null>(null)
-const syncBridge = useWorkpaperSyncBridge({
-  entryId: ref(D4_22_ENTRY),
+// ─── D4-22 sync bridge（统一走 useD4SyncMode，见其文件头注释） ─────────
+const { syncBridge, descriptor: syncOoDescriptor, editorMode, modeOptions, syncStateTag, syncHostRef } = useD4SyncMode({
+  sheetKey: 'd422-managed',
   wpId: toRef(props, 'wpId'),
   projectId: toRef(props, 'projectId'),
-  sheetKey: ref(D4_22_SHEET_KEY),
-  capability: capabilityForEntry(D4_22_ENTRY),
+  isReadonly: toRef(props, 'isReadonly'),
+  views: ['表格视图'],
   flushHtml: async () => {
     flushPendingSave()
-    const snap = await readStoreProjection({ projectId: props.projectId, wpId: props.wpId, entryId: D4_22_ENTRY })
-    return { expectedRevision: snap.expectedRevision, projection: snap.projection, sheetKey: D4_22_SHEET_KEY }
+    const snap = await readStoreProjection({ projectId: props.projectId, wpId: props.wpId, entryId: D4_SYNC_ENTRY_ID })
+    return { expectedRevision: snap.expectedRevision, projection: snap.projection, sheetKey: 'd422-managed' }
   },
   reloadHtml: async () => { reload() },
-})
-const syncOoDescriptor = computed(() => syncBridge.descriptor.value)
-const syncBusy = computed(
-  () => syncSwitching.value
-    || (WP_BRIDGE_IN_FLIGHT_STATES as readonly string[]).includes(String(syncBridge.state.value)),
-)
-const editorMode = computed<string>({
-  get: () => (syncBridge.mode.value === 'oo' ? '在线编辑' : '表格视图'),
-  set: (v: string) => { void switchMode(v === '在线编辑' ? 'onlyoffice' : 'structured') },
-})
-const modeOptions = computed(() => [
-  { label: '表格视图', value: '表格视图' },
-  // 🔴 不再用 !ooHealthy 禁用切换器：健康检查是 mount 期异步（20ms 端点，但仍可能晚于用户点击），
-  //    此前 disabled 在健康未就绪时把切换器锁死 → 用户/自动化点击被忽略、从不触发 switchMode
-  //    → store-projection/materialize 一个都不发（L1 判据1 hits.length=0）。健康门禁改由 switchMode
-  //    内 `await checkOoHealth()` 把守（OO 真不可用时 fail-visible），切换器保持可点。
-  { label: '在线编辑', value: '在线编辑', disabled: props.isReadonly || syncBusy.value },
-])
-async function switchMode(target: 'structured' | 'onlyoffice'): Promise<void> {
-  const cur = syncBridge.mode.value === 'oo' ? 'onlyoffice' : 'structured'
-  if (target === cur) return
-  if (target === 'onlyoffice') {
-    if (props.isReadonly) return
-    // 🔴 竞态修复：切「在线编辑」可能早于 checkOoHealth() 异步响应；直接读初始 false 的
-    //    ooHealthy 会静默 return → 从不触发 switchToOnlyOffice。健康未就绪则当场 await 再判。
-    if (!ooHealthy.value) await checkOoHealth()
-    if (!ooHealthy.value) return
-    syncSwitching.value = true
-    try { await syncBridge.switchToOnlyOffice() } finally { syncSwitching.value = false }
-    return
-  }
-  syncSwitching.value = true
-  try { await syncBridge.switchToHtml() } finally { syncSwitching.value = false }
-}
-const syncStateTag = computed(() => {
-  const st = String(syncBridge.state.value)
-  if (syncBusy.value) return { text: '同步中…', type: 'info' as const }
-  if (syncBridge.dirty?.value) {
-    return syncBridge.mode.value === 'oo'
-      ? { text: 'excel 侧有未同步改动', type: 'warning' as const }
-      : { text: 'html 侧有未同步改动', type: 'warning' as const }
-  }
-  if (st.includes('error') || String(syncBridge.lastError?.value || '')) {
-    return { text: '同步失败，请重试', type: 'danger' as const }
-  }
-  return { text: '已同步', type: 'success' as const }
 })
 
 const aiAvailable = ref(false)

@@ -38,3 +38,7 @@
 ## D4-13 ERP 核对（纯文本表）— N/A
 
 - 源模板两段文本（一、核对过程 / 二、核对结论），merges 仅抬头，无数据表结构。**不适配受管行表同步模型**，登记 N/A（保留裸 OnlyOffice 文本双模式）。
+
+---
+
+**2026-09-21 更正（append-only，不改上文原始记录）**：上文「D4-13 ERP 核对（纯文本表）— N/A」的裁决已被撤销。原判定基于「行表 provider」范式（json_pointer 需 row identity），未评估静态字段直映射路径。D4-13 现已改用引擎的 static_region 静态受管区路径（同 D4-33/D4-8，无动态行、无 UUID 列，两段文本各锚 A6/A16 死行号）补齐真双向。新裁决与实现见 `d-cycle-sheet-bidirectional-expansion/evidence/T10-d413-erp-check-field-mapping.json` + `backend/app/services/workpaper_sync/phase5_d4_erp_check_sheet.py`。

@@ -1,0 +1,52 @@
+{
+  "measured_at": "2026-09-21",
+  "tool": "openpyxl data_only=False",
+  "template_path": "backend/wp_templates/D/D4 收入底稿.xlsx",
+  "decision": "paragraph_block_bidirectional",
+  "mapping_digest": "0ec95fc554f63c40e034ab315027af6f270a2e439b92c2b9a9ad20266e25c55b",
+  "digest_payload": {
+    "managed_sheet": "营业收入账面金额与ERP系统核对记录D4-13",
+    "template_sha256": "b8fb92d4c22cd5d639e415403a12cb61650639153f136a5330c930b880167b5f",
+    "layout": "paragraph_block_bidirectional",
+    "fixed_fields": [
+      {
+        "store_item": "D4-13-process",
+        "column_key": "process",
+        "cell": "A6",
+        "label_cell": "A5",
+        "label_text": "一、核对过程"
+      },
+      {
+        "store_item": "D4-13-conclusion",
+        "column_key": "conclusion",
+        "cell": "A16",
+        "label_cell": "A15",
+        "label_text": "二、核对结论"
+      }
+    ],
+    "readonly_mask": [
+      { "cell": "A1", "reason": "firm_header" },
+      { "cell": "A2", "reason": "sheet_title" },
+      { "cell": "A3", "reason": "meta_label" },
+      { "cell": "B3", "reason": "meta_label" },
+      { "cell": "C3", "reason": "meta_label" },
+      { "cell": "D3", "reason": "meta_label" },
+      { "cell": "E3", "reason": "index_no_fixed" },
+      { "cell": "A4", "reason": "meta_label" },
+      { "cell": "B4", "reason": "meta_label" },
+      { "cell": "C4", "reason": "meta_label" },
+      { "cell": "D4", "reason": "meta_label" },
+      { "cell": "A5", "reason": "section_header" },
+      { "cell": "A15", "reason": "section_header" },
+      { "cell": "A19", "reason": "tip" }
+    ],
+    "host_path": "D4TabErpCheck_own_dualMode_not_isD4DetailSheet"
+  },
+  "notes": [
+    "全篇 A1:E19，无插删动态行表、无公式（openpyxl 直读 A1:E19 逐格核实为 0 formula cell）——不受 D4-5 那条「footer 下 static_row 与插行 fail-closed 冲突」约束（该约束仅影响紧邻会插删行的动态表下方的 static 字段；D4-13 全篇没有会插删行的动态表）。",
+    "两段文本各占单个 cell（A6 存「核对过程」全文、A16 存「核对结论」全文），与前端 useD4InspectionWriteback/D4TabErpCheck.vue 的 textarea 单字符串字段模型一致；模板正文 A6-A14/A16-A18 原为空白多行区域，取首行 cell 承载全文本，其余行留白不受管。",
+    "此裁决撤销 d4-inspection-writeback-formula-io/evidence/b1-provider-geometry.md 对 D4-13 的原 N/A 裁决 —— 原裁决理由「无数据表结构，不适配受管行表同步模型」成立于「行表 provider」范式（json_pointer 需要 row identity），但本次改用「D4-5 fixed 区」范式（cell 直接锚定死行号，非行表）后不适用；原裁决未评估这条静态字段直映射路径。",
+    "host_path 与 D4-5 同款：D4TabErpCheck 自管 dualMode，不并入宿主 isD4DetailSheet（宿主的 D4_SHEET_KEY_BY_CODE 不含 D4-13）。"
+  ],
+  "supersedes": "d4-inspection-writeback-formula-io/evidence/b1-provider-geometry.md#D4-13"
+}

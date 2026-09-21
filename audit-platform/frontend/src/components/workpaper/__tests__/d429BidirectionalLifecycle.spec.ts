@@ -4,25 +4,46 @@ import { flushPromises, shallowMount } from '@vue/test-utils'
 import D4TabCustomerDetail from '../d4/ipo/D4TabCustomerDetail.vue'
 
 const mocks = vi.hoisted(() => ({ save: vi.fn(), read: vi.fn(), reload: vi.fn(), bridge: null as any }))
-vi.mock('@/utils/http', () => ({ default: { get: vi.fn(async () => ({ data: { status: 'unavailable' } })) } }))
+// 🔴 useD4SyncMode 在 mount 期会经 fetchOnlyOfficeHealthy() 探健康（读 data.healthy），
+//    switchMode('在线编辑') 靠这个健康门禁放行；必须返回 healthy:true 否则 oo 分支永远短路。
+vi.mock('@/utils/http', () => ({ default: { get: vi.fn(async () => ({ data: { healthy: true } })) } }))
 vi.mock('../sync/workpaperSyncApi', () => ({ readStoreProjection: mocks.read }))
 vi.mock('../sync/workpaperSyncCapability', () => ({ capabilityForEntry: () => 'bidirectional' }))
 vi.mock('../composables/useD4ImportExport', () => ({ useD4ImportExport: () => ({ exportTemplate: vi.fn(), exportData: vi.fn(), importData: vi.fn(), importing: ref(false) }) }))
 vi.mock('../d4/ipo/D4IpoFindingWriteback.vue', () => ({ default: defineComponent({ name: 'D4IpoFindingWriteback', render: () => h('span') }) }))
 vi.mock('../GtIndexChip.vue', () => ({ default: defineComponent({ name: 'GtIndexChip', render: () => h('span') }) }))
 vi.mock('../sync/WorkpaperSyncEditorHost.vue', () => ({ default: defineComponent({ name: 'WorkpaperSyncEditorHost', props: ['descriptor', 'bridge'], render: () => h('div') }) }))
+// 🔴 2026-09-21 治本改造后：D4TabCustomerDetail 不再直连 useWorkpaperSyncBridge，而是经
+//    共享 composable useD4SyncMode（../d4/composables/useD4SyncMode.ts）内部调用它。该
+//    composable 还引用了本模块的 WP_BRIDGE_IN_FLIGHT_STATES（busy 判定），mock 必须一并
+//    导出，否则 "No export is defined on mock" 报错（该常量并非本测试断言点，只需给出
+//    与真实模块同构的只读数组，取用真实模块的部分状态即可，勿返回空数组—— busy 语义仍要成立）。
 vi.mock('../sync/useWorkpaperSyncBridge', () => ({
+  WP_BRIDGE_IN_FLIGHT_STATES: ['flushing', 'materializing', 'oo_loading'],
   useWorkpaperSyncBridge: (options: any) => {
     const bridge = {
       state: ref('html_idle'), mode: ref('html'), descriptor: ref<any>(null), lastError: ref(null),
+      dirty: ref(false), feedback: ref({ message: '' }),
       switchToOnlyOffice: vi.fn(async () => {
-        await options.flushHtml()
+        // 真实桥：flushHtml 抛错时先写 lastError（sticky，供 role=alert 展示）再重新
+        // throw（不吞异常），见 useWorkpaperSyncBridge.ts fail()/switchToOnlyOffice。
+        try {
+          await options.flushHtml()
+        } catch (e: any) {
+          bridge.lastError.value = { message: e?.message ?? String(e) }
+          throw e
+        }
         bridge.descriptor.value = { documentKey: 'test-document' }
         bridge.mode.value = 'oo'
         bridge.state.value = 'oo_editing'
       }),
       switchToHtml: vi.fn(async () => {
-        await options.reloadHtml(7)
+        try {
+          await options.reloadHtml(7)
+        } catch (e: any) {
+          bridge.lastError.value = { message: e?.message ?? String(e) }
+          throw e
+        }
         bridge.mode.value = 'html'
         bridge.state.value = 'html_idle'
       }),
@@ -31,9 +52,20 @@ vi.mock('../sync/useWorkpaperSyncBridge', () => ({
     return bridge
   },
 }))
+// 🔴 2026-09-21 治本改造后：useD4SyncMode.modeOptions 是对象数组
+//    `{ label, value, disabled }`（不再是纯字符串数组），el-segmented 真实组件按
+//    option.value 取值、option.disabled 判每项禁用。stub 必须同构，否则 emit 出去的是
+//    整个 option 对象（字符串比较永远 false）、disabled 永远读不到 per-option 值。
 const Segmented = defineComponent({
   props: ['modelValue', 'options', 'disabled'], emits: ['update:modelValue'],
-  setup(props, { emit }) { return () => h('nav', props.options.map((label: string) => h('button', { disabled: props.disabled, onClick: () => emit('update:modelValue', label) }, label))) },
+  setup(props, { emit }) {
+    return () => h('nav', props.options.map((opt: any) => {
+      const value = typeof opt === 'string' ? opt : opt.value
+      const label = typeof opt === 'string' ? opt : opt.label
+      const optDisabled = typeof opt === 'string' ? props.disabled : (opt.disabled || props.disabled)
+      return h('button', { disabled: optDisabled, onClick: () => emit('update:modelValue', value) }, label)
+    }))
+  },
 })
 const Input = defineComponent({ props: ['modelValue'], render() { return h('textarea', { value: this.modelValue }) } })
 const Card = defineComponent({ setup(_, { slots }) { return () => h('section', slots.default?.()) } })

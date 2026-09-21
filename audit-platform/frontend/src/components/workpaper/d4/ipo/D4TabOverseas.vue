@@ -15,15 +15,11 @@ import http from '@/utils/http'
 import { useD4ImportExport } from '../../composables/useD4ImportExport'
 import { DisplayPrefs_Key } from '../../composables/displayPrefsKey'
 import { useDisplayPrefsStore } from '@/stores/displayPrefs'
-import {
-  useWorkpaperSyncBridge,
-  WP_BRIDGE_IN_FLIGHT_STATES,
-} from '../../sync/useWorkpaperSyncBridge'
 import { readStoreProjection } from '../../sync/workpaperSyncApi'
-import { capabilityForEntry } from '../../sync/workpaperSyncCapability'
 import WorkpaperSyncEditorHost from '../../sync/WorkpaperSyncEditorHost.vue'
 import { useIpoChecklistTab } from './useIpoChecklistTab'
 import type { ChecklistColumnSpec } from './ipoChecklistSchema'
+import { useD4SyncMode, D4_SYNC_ENTRY_ID } from '../composables/useD4SyncMode'
 
 const props = defineProps<{ wpId: string; projectId: string; allResponses: Map<string, any>; isReadonly: boolean }>()
 const emit = defineEmits<{ (e: 'imported'): void }>()
@@ -55,53 +51,29 @@ const headerSegments = computed<RenderSegment[]>(() => {
   return segs
 })
 
-// ─── D4-26 专用 sync bridge ──────────────────────────────────────────
-const D4_26_ENTRY = 'xlsx/gt-d4-operating-revenue'
+// ─── D4-26 sync bridge（统一走 useD4SyncMode，见其文件头注释） ─────────
+// 🔴 迁移前该文件完全没有健康检查（modeOptions disabled 只判 isReadonly/syncBusy）；
+//    useD4SyncMode 内置 ooHealthy 门禁，迁移新增该保护（同 D4-25/27/28/29/12 系列裁定，
+//    行为等价改进：OO 服务未就绪时不再无声尝试切换，而是 fail-visible）。
+// 🔴 sheetKey 必须走具名常量（非内联字面量）：跨语言契约守卫
+// test_d4_ipo_checklist_cross_lang_contract.py 靠正则抓这个常量声明反查后端 sheet_key
+// 是否漂移，内联字面量会让该守卫失明（AssertionError 已验证复现）。
 const D4_26_SHEET_KEY = 'd4-26-managed'
-const syncSwitching = ref(false)
-const syncHostRef = ref<{ forceSave: () => Promise<{ operationId: string }> } | null>(null)
-const entryId = ref(D4_26_ENTRY)
-const sheetKey = ref(D4_26_SHEET_KEY)
-const syncBridge = useWorkpaperSyncBridge({
-  entryId,
-  wpId: toRef(props, 'wpId'),
-  projectId: toRef(props, 'projectId'),
-  sheetKey,
-  capability: capabilityForEntry(D4_26_ENTRY),
+const { syncBridge, descriptor: syncOoDescriptor, editorMode, modeOptions, syncHostRef } = useD4SyncMode({
+  sheetKey: D4_26_SHEET_KEY,
+  wpId: toRef(props, 'wpId') as Ref<string>,
+  projectId: toRef(props, 'projectId') as Ref<string>,
+  isReadonly: toRef(props, 'isReadonly') as Ref<boolean>,
+  views: ['表格视图'],
   flushHtml: async () => {
     flushPendingSave()
-    const snap = await readStoreProjection({ projectId: props.projectId, wpId: props.wpId, entryId: D4_26_ENTRY })
+    const snap = await readStoreProjection({ projectId: props.projectId, wpId: props.wpId, entryId: D4_SYNC_ENTRY_ID })
     return { expectedRevision: snap.expectedRevision, projection: snap.projection, sheetKey: D4_26_SHEET_KEY }
   },
   reloadHtml: async () => { await reloadHost() },
 })
-const syncOoDescriptor = computed(() => syncBridge.descriptor.value)
-const syncBusy = computed(
-  () => syncSwitching.value || (WP_BRIDGE_IN_FLIGHT_STATES as readonly string[]).includes(String(syncBridge.state.value)),
-)
 const syncFeedbackOk = computed(() => (syncBridge.feedback.value.kind === 'success' ? syncBridge.feedback.value.message : ''))
 const syncFeedbackErr = computed(() => (syncBridge.feedback.value.kind === 'error' ? syncBridge.feedback.value.message : ''))
-
-const editorMode = computed({
-  get: (): 'structured' | 'onlyoffice' => (syncBridge.mode.value === 'oo' ? 'onlyoffice' : 'structured'),
-  set: (v: 'structured' | 'onlyoffice') => { void switchMode(v) },
-})
-const modeOptions = computed(() => [
-  { label: '表格视图', value: 'structured' },
-  { label: '在线编辑', value: 'onlyoffice', disabled: props.isReadonly || syncBusy.value },
-])
-async function switchMode(target: 'structured' | 'onlyoffice'): Promise<void> {
-  if (target === editorMode.value) return
-  syncSwitching.value = true
-  try {
-    if (target === 'onlyoffice') { if (props.isReadonly) return; await syncBridge.switchToOnlyOffice() }
-    else await syncBridge.switchToHtml()
-  } catch {
-    // 失败已由桥写入 feedback（syncFeedbackErr 展示真实原因）；请求被去重层取消
-    // （切页签竞态）时桥已内部退回 html_idle。这里一律吞掉，避免 rethrow 变成
-    // 未捕获 Promise rejection（控制台红字 CanceledError）。
-  } finally { syncSwitching.value = false }
-}
 
 // ─── AI 辅助 ─────────────────────────────────────────────────────────
 const aiAvailable = ref(false)
@@ -202,7 +174,7 @@ function alignOf(col: ChecklistColumnSpec) {
   <!-- 取数失败 fail-visible：不吞成静默，也绝不把失败写成 0 -->
   <el-alert v-if="fetchError" type="warning" :closable="false" show-icon class="sync-alert" :title="fetchError" />
 
-  <template v-if="editorMode !== 'onlyoffice'">
+  <template v-if="editorMode !== '在线编辑'">
     <div class="methodology-strip">
       <span class="methodology-label">编制说明：</span>
       境外销售须核查客户目的国/产品/业务模式/贸易条款，并勾选已执行的核查程序（实地走访/交易函证/海关函证/核对报关单/电子口岸数据查询）；差异 = 核查确认金额 − 本期金额自动计算。

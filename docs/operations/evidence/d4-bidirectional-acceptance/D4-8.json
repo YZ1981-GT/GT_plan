@@ -1,82 +1,48 @@
 {
   "sheet": "D4-8",
   "sheet_name": "重要产品毛利分析D4-8",
-  "captured_at": "2026-09-20T17:05:00.000Z",
-  "spec": "workpaper-sync-static-cell-sheet-writeback",
-  "region_kind": "static",
-  "census_verdict": {
-    "classification": "static_block_matrix",
-    "evidence": "openpyxl 实读 D/D4 收入底稿.xlsx sheet 重要产品毛利分析D4-8（A1:X40）：无 Excel Table、无 definedName、无 UUID 列、无动态行（月份固定 1-12 枚举，产品块模板预画：产品A R12-31 + 产品B「（略）」占位 R32）。",
-    "managed_geometry": "产品A(slot0)：12 月行 R16-27 × 12 输入列（本期 B/C/D/E/F/G + 上期 J/K/L/M/N/O）= 144 cell；同行业对比 R29-31 × 12 列 = 36 cell；合计 180 static cell。公式列 H/I/P/Q/R/S/T/U/V/W + 合计行 R28 走 formula_mask。",
-    "limitation": "模板只预画 1 个完整产品块；前端 D4-8-products 产品动态计数（逐产品切换视图）→ 只受管第 1 个产品（slot0→产品A块），第 2+ 产品 HTML-only（同 D4-33 第 4+ 业务类型）。同行业 prior 列（J-O）模板存在但前端 IndustryRow 无 prior 字段 → 受管值填 0、merge 不回写。"
-  },
+  "captured_at": "2026-09-21T07:47:50.021Z",
   "scope": {
     "project_id": "0ec33ac9-3de5-4e65-b3bf-f9dccd7b2a49",
     "wp_id": "b3ab3c46-828f-4f48-950e-aee9bbdc923f",
     "entry_id": "xlsx/gt-d4-operating-revenue"
   },
-  "wiring": {
-    "provider": "backend/app/services/workpaper_sync/phase5_d4_product_margin_sheet.py",
-    "defined_name": "GT_MANAGED_REGION_D48",
-    "managed_ref": "$B$16:$W$31",
-    "sheet_key": "d48-managed",
-    "table_key": "d4_8_matrix",
-    "store_item_id": "D4-8-products",
-    "integration_points_completed": [
-      "import（phase5_d4_revenue_detail）",
-      "_INCLUDE_D48_PRODUCT_MARGIN_SHEET=True",
-      "STORE_ITEM_IDS",
-      "primary spec static_sheets（instrumentation 注入 definedName）",
-      "contract sheets（sheet_payload_d48）",
-      "combined projection（d48_projs，默认值 [] 而非 {}）",
-      "values.update 循环 + row_keys",
-      "STORE_ITEM_ID_D48_DICT 导出（oo_to_html 专用块，不进 rows 4-tuple 循环）",
-      "前端接桥：D4TabProductMargin.vue 接 useWorkpaperSyncBridge + WorkpaperSyncEditorHost（sheetKey=d48-managed），已去 legacy GtOnlyOfficeSheet",
-      "宿主登记：GtD4OperatingRevenue.vue isD4DedicatedSyncSheet 含 'D4-8'"
-    ]
-  },
-  "publish_chain": {
-    "generate_contract_canonical": "8b7b5baf4bca6e8b6fb35e7f56a423bbcddd09d31448761d904ed6b02e1b9756",
-    "desired_bundle_sha256": "5bca042d41907b105e59717b32c62a4b2d7686ba2f8ea26bf1c3af31e71ec749",
-    "provision_errors": [],
-    "rematerialize_status": "rematerialized (gen 81->82, revision 106)",
-    "rematerialize_check": "already_on_desired_bundle",
-    "no_roundtrip_or_footer_or_softtimeout_error": true,
-    "store_bytes_contains_D4_8_products": true
-  },
   "predicates": {
     "user_sync_requests": [
       {
         "method": "GET",
-        "path": "/api/projects/{pid}/workpapers/{wid}/sync/entries/xlsx/gt-d4-operating-revenue/store-projection",
-        "status": 200,
-        "note": "真栈反读：expected_revision=106，field_count=751，含 D4-8 的 180 cell（d4_8_matrix/m{0..11}_{cur,prior}/{6 字段} + ind{0..2}_{cur,prior}/{6 字段}）与 D4-33 的 72 cell"
+        "path": "/api/projects/0ec33ac9-3de5-4e65-b3bf-f9dccd7b2a49/workpapers/b3ab3c46-828f-4f48-950e-aee9bbdc923f/sync/entries/xlsx/gt-d4-operating-revenue/store-projection",
+        "status": 200
+      },
+      {
+        "method": "POST",
+        "path": "/api/projects/0ec33ac9-3de5-4e65-b3bf-f9dccd7b2a49/workpapers/b3ab3c46-828f-4f48-950e-aee9bbdc923f/sync/entries/xlsx/gt-d4-operating-revenue/pending-mutations",
+        "status": 200
+      },
+      {
+        "method": "POST",
+        "path": "/api/projects/0ec33ac9-3de5-4e65-b3bf-f9dccd7b2a49/workpapers/b3ab3c46-828f-4f48-950e-aee9bbdc923f/sync/entries/xlsx/gt-d4-operating-revenue/materialize",
+        "status": 200
       }
     ],
     "store_projection_ok": true,
-    "d48_static_cell_count": 180,
-    "d433_static_cell_count_unaffected": 72,
-    "d48_key_sample": [
-      "d4_8_matrix/m0_cur/rev_qty",
-      "d4_8_matrix/m0_prior/rev_qty",
-      "d4_8_matrix/m0_cur/rev_price"
+    "materialize_ok": true,
+    "d2_sync_hits": 0,
+    "callback_url_keys": [
+      "doc_key",
+      "generation",
+      "room_id",
+      "route_credential_id",
+      "route_token"
+    ],
+    "sync_host_mounted": true,
+    "oo_iframe_count": 1,
+    "doc_editor_called": false,
+    "http_errors": [],
+    "console_errors": [
+      "Failed to load resource: the server responded with a status of 500 (Internal Server Error)",
+      "Failed to load resource: the server responded with a status of 500 (Internal Server Error)",
+      "Failed to load resource: the server responded with a status of 500 (Internal Server Error)"
     ]
-  },
-  "guards": {
-    "backend": "backend/tests/workpaper_sync/test_d4_8_margin_contract.py（6 tests：payload 形态/180 cell/projection+merge slot0 往返/3-tuple 门面/flag+live 契约/静态 binding kind/防假绿 camelCase 回写）",
-    "anti_false_green": "test_merge_writes_frontend_camelcase_keys_from_empty_base —— projection stable_key 经契约规范化为 snake_case（cost_amt），前端 store 是 camelCase（costAmt）；用**空 base** 断言 merge 真实写入前端 camelCase 键且不产 snake_case 键（base 非空时 merge 空转也会看起来对，故必须空 base）",
-    "zero_regression": "同 entry D4-33/34/36 + 引擎静态路径 + D4-1 双区 = 79 passed"
-  },
-  "not_covered": [
-    {
-      "aspect": "oo_verified_end_to_end",
-      "verdict": "PENDING_ENV",
-      "reason": "未达主控 §6.4 ONLYOFFICE_VERIFIED（需真实 OO 往返产生 working_paper_content_application state=applied + operation 终态 + OO 侧 content version）。同 D4 全组 32 张一致标准，列批次C env 门。"
-    },
-    {
-      "aspect": "oo_canvas_cell_edit_roundtrip",
-      "verdict": "UNVERIFIABLE",
-      "reason": "OnlyOffice canvas 渲染单元格（非 DOM），Playwright 无法可靠编辑；同 D4-33/D4-35 evidence 标准（env 门批次C）。"
-    }
-  ]
+  }
 }

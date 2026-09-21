@@ -12,10 +12,9 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { useD4PolicyCheck } from '../../composables/useD4PolicyCheck'
 import GtIndexChip from '../../GtIndexChip.vue'
 import http from '@/utils/http'
-import { useWorkpaperSyncBridge, WP_BRIDGE_IN_FLIGHT_STATES } from '../../sync/useWorkpaperSyncBridge'
 import { readStoreProjection } from '../../sync/workpaperSyncApi'
-import { capabilityForEntry } from '../../sync/workpaperSyncCapability'
 import WorkpaperSyncEditorHost from '../../sync/WorkpaperSyncEditorHost.vue'
+import { useD4SyncMode, D4_SYNC_ENTRY_ID } from '../composables/useD4SyncMode'
 
 const props = defineProps<{
   wpId: string
@@ -25,16 +24,6 @@ const props = defineProps<{
 }>()
 
 const openReviewDialog = inject<((sectionId: string) => void) | null>('openReviewDialog', null)
-
-// ─── OO 健康（tab 内 dualMode 用）────────────────────────────────────
-const ooHealthy = ref(false)
-async function checkOoHealth() {
-  try {
-    const res = await http.get('/api/workpapers/onlyoffice/health', { _silent: true } as any)
-    ooHealthy.value = res.data?.data?.healthy ?? res.data?.healthy ?? false
-  } catch { ooHealthy.value = false }
-}
-checkOoHealth()
 
 // ─── AI 健康检查 ─────────────────────────────────────────────────────
 const aiAvailable = ref(false)
@@ -74,30 +63,24 @@ const {
   isReadonly: toRef(props, 'isReadonly') as Ref<boolean>,
 })
 
-// ─── D4-5 专用 sync bridge（不并入父级 isD4DetailSheet）────────────────
-const D45_ENTRY = 'xlsx/gt-d4-operating-revenue'
-const D45_SHEET_KEY = 'd45-managed'
-const d45SyncSwitching = ref(false)
-const d45SyncHostRef = ref<{ forceSave: () => Promise<{ operationId: string }> } | null>(null)
-const d45EntryId = ref(D45_ENTRY)
-const d45SheetKey = ref(D45_SHEET_KEY)
-const d45SyncBridge = useWorkpaperSyncBridge({
-  entryId: d45EntryId,
-  wpId: toRef(props, 'wpId'),
-  projectId: toRef(props, 'projectId'),
-  sheetKey: d45SheetKey,
-  capability: capabilityForEntry(D45_ENTRY),
+// ─── D4-5 sync bridge（统一走 useD4SyncMode，见其文件头注释；不并入父级 isD4DetailSheet）──
+const { syncBridge: d45SyncBridge, descriptor: d45SyncOoDescriptor, editorMode, modeOptions, syncHostRef: d45SyncHostRef } = useD4SyncMode({
+  sheetKey: 'd45-managed',
+  wpId: toRef(props, 'wpId') as Ref<string>,
+  projectId: toRef(props, 'projectId') as Ref<string>,
+  isReadonly: toRef(props, 'isReadonly') as Ref<boolean>,
+  views: ['结构化视图'],
   flushHtml: async () => {
     flushPendingSave()
     const snap = await readStoreProjection({
       projectId: props.projectId,
       wpId: props.wpId,
-      entryId: D45_ENTRY,
+      entryId: D4_SYNC_ENTRY_ID,
     })
     return {
       expectedRevision: snap.expectedRevision,
       projection: snap.projection,
-      sheetKey: D45_SHEET_KEY,
+      sheetKey: 'd45-managed',
     }
   },
   reloadHtml: async () => {
@@ -105,48 +88,6 @@ const d45SyncBridge = useWorkpaperSyncBridge({
     window.dispatchEvent(new CustomEvent('d4:reload-responses'))
   },
 })
-const d45SyncOoDescriptor = computed(() => d45SyncBridge.descriptor.value)
-const d45SyncBusy = computed(
-  () =>
-    d45SyncSwitching.value
-    || (WP_BRIDGE_IN_FLIGHT_STATES as readonly string[]).includes(String(d45SyncBridge.state.value)),
-)
-
-const editorMode = computed({
-  get: (): 'structured' | 'onlyoffice' =>
-    d45SyncBridge.mode.value === 'oo' ? 'onlyoffice' : 'structured',
-  set: (v: 'structured' | 'onlyoffice') => {
-    void switchD45Mode(v)
-  },
-})
-const modeOptions = computed(() => [
-  { label: '结构化视图', value: 'structured' },
-  {
-    label: '在线编辑',
-    value: 'onlyoffice',
-    disabled: props.isReadonly || !ooHealthy.value || d45SyncBusy.value,
-  },
-])
-
-async function switchD45Mode(target: 'structured' | 'onlyoffice'): Promise<void> {
-  if (target === editorMode.value) return
-  if (target === 'onlyoffice') {
-    if (props.isReadonly || !ooHealthy.value) return
-    d45SyncSwitching.value = true
-    try {
-      await d45SyncBridge.switchToOnlyOffice()
-    } finally {
-      d45SyncSwitching.value = false
-    }
-    return
-  }
-  d45SyncSwitching.value = true
-  try {
-    await d45SyncBridge.switchToHtml()
-  } finally {
-    d45SyncSwitching.value = false
-  }
-}
 
 // ─── 各章节完成状态（引导式流程用） ──────────────────────────────────
 const bizModelDone = computed(() => bizModelItems.value.filter(i => i.content.trim()).length)
@@ -264,7 +205,7 @@ const aiTip = computed(() => aiAvailable.value ? 'AI 辅助生成' : 'AI 服务�
     </div>
 
     <!-- 结构化视图 -->
-    <template v-if="editorMode === 'structured'">
+    <template v-if="editorMode !== '在线编辑'">
       <!-- 概览横幅 -->
       <div class="overview-panel">
         <el-progress

@@ -481,9 +481,15 @@ _MIGRATED_TO_UNIFIED_COMMIT = {
     # 提交权威 OOXML 本体（`custom_authoritative_ooxml` / `opaque_single_onlyoffice`
     # authority model + 三个 registry typed null marker 的 approved bundle）。
     #
-    # 🔴 `custom_workpaper_cells::update_custom_cells` **不在这里**：它迁移后
-    # 版本/内容/commit facts 全空，整行离开了 writer 集合，正面判据改由
-    # `retired_writers` 台账承担（与 Task 16/18 对 `after_save` 的处理同形）。
+    # 🔴 `custom_workpaper_cells::update_custom_cells` **回到这里了**（2026-09-20）：
+    # 它迁移后自己的版本/内容/commit facts 确实全空、其权威 xlsx 本体经
+    # `build_content_mutation_service_writer()` 走统一 commit，所以它**有**
+    # `unified_commit_calls`。此前它被单跳传播盲区判成「离开 writer 集合」、正面判据挂在
+    # `retired_writers` 台账；但有界委派闭包（generator `_propagate_content_writers`）证明
+    # 它仍委派 `refresh_custom_projection` -> `write_projection_to_parsed_data` 刷
+    # `working_paper.parsed_data`，是真实内容委派入口 ⇒ 回到 writer 集合。它既在 writer 集合、
+    # 又有 `unified_commit_calls`，故正面判据回到本台账（unified commit writer = 8）。
+    "app.routers.custom_workpaper_cells::update_custom_cells",
     "app.services.wopi_service::WOPIHostService.put_file",
     "app.services.wp_download_service::WpUploadService.upload_file",
     # ── Task 19 增量二: F2 半闭环（authoritative-bytes lane）──────────────────
@@ -1216,8 +1222,13 @@ def test_multi_resolver_stays_in_has_debt_even_when_other_criteria_cleared(
     # After clearing everything, multi_resolver should still be 0 (it was cleared too)
     # But the REAL inventory must show multi_resolver > 0 because it's not yet resolved
     issues_real = gate.evaluate_gate(inventory)
-    assert len(issues_real["multi_resolver"]) == 4, (
-        f"multi_resolver must have exactly 4 rows (all in wp_onlyoffice_router), "
+    # 2026-09-20: 4 -> 3. The excel-template-override-layer wiring routed
+    # `get_whole_excel_grid` through `_whole_workbook_template_or_primary` instead of
+    # calling `find_template_file_any` directly, so that row dropped from two resolver
+    # identities to one and no longer trips `multi_resolver`. Source convergence, not a
+    # relaxed criterion -- the row is still in the denominator as a single-resolver row.
+    assert len(issues_real["multi_resolver"]) == 3, (
+        f"multi_resolver must have exactly 3 rows (all in wp_onlyoffice_router), "
         f"got {len(issues_real['multi_resolver'])}"
     )
     # And they must all be in wp_onlyoffice_router

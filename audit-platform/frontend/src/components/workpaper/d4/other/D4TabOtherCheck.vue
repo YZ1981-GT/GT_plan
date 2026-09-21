@@ -14,11 +14,10 @@ import { parseNum, calcSubtotal, calcAnomalyRate, calcCoverageRate } from '../..
 import GtIndexChip from '../../GtIndexChip.vue'
 import http from '@/utils/http'
 import { Plus } from '@element-plus/icons-vue'
-import { useWorkpaperSyncBridge, WP_BRIDGE_IN_FLIGHT_STATES } from '../../sync/useWorkpaperSyncBridge'
 import { readStoreProjection } from '../../sync/workpaperSyncApi'
-import { capabilityForEntry } from '../../sync/workpaperSyncCapability'
 import WorkpaperSyncEditorHost from '../../sync/WorkpaperSyncEditorHost.vue'
 import { useD4InspectionWriteback } from '../../composables/useD4InspectionWriteback'
+import { useD4SyncMode, D4_SYNC_ENTRY_ID } from '../composables/useD4SyncMode'
 import { d4_35Candidates, D4_OTHER_ACCOUNT_CODE, D4_OTHER_ACCOUNT_NAME } from '../../composables/d4OtherGroupPushPredicates'
 import { eventBus } from '@/utils/eventBus'
 
@@ -104,70 +103,24 @@ async function handleOcrUpload(rowId: string, file: File) {
   } catch { ElMessage.warning('OCR识别失败') }
 }
 
-// ─── D4-35 双向回写 sync bridge（sheet_key=d435-managed，同 entry gt-d4-operating-revenue）─────
-const D435_ENTRY = 'xlsx/gt-d4-operating-revenue'
-const D435_SHEET_KEY = 'd435-managed'
-const ooHealthy = ref(false)
-async function checkOoHealth() {
-  try {
-    const res = await http.get('/api/workpapers/onlyoffice/health', { _silent: true } as any)
-    ooHealthy.value = res.data?.data?.healthy ?? res.data?.healthy ?? false
-  } catch { ooHealthy.value = false }
-}
-checkOoHealth()
-const d435SyncSwitching = ref(false)
-const d435SyncHostRef = ref<{ forceSave: () => Promise<{ operationId: string }> } | null>(null)
-const d435SyncBridge = useWorkpaperSyncBridge({
-  entryId: ref(D435_ENTRY),
+// ─── D4-35 sync bridge（统一走 useD4SyncMode，见其文件头注释） ─────────
+// 🔴 迁移前该文件的 switchD435Mode 无竞态修复兜底（直接读 ooHealthy 静默 return，历史 bug②
+//    残留实例）；useD4SyncMode 内置 await checkOoHealth() 二次判定，迁移顺带修复。
+const {
+  syncBridge: d435SyncBridge, descriptor: d435SyncOoDescriptor, editorMode, modeOptions,
+  busy: d435SyncBusy, syncStateTag, switchMode: switchD435Mode, syncHostRef: d435SyncHostRef,
+} = useD4SyncMode({
+  sheetKey: 'd435-managed',
   wpId: toRef(props, 'wpId'),
   projectId: toRef(props, 'projectId'),
-  sheetKey: ref(D435_SHEET_KEY),
-  capability: capabilityForEntry(D435_ENTRY),
+  isReadonly: toRef(props, 'isReadonly'),
+  views: ['表格视图'],
   flushHtml: async () => {
     flushPendingSave()
-    const snap = await readStoreProjection({ projectId: props.projectId, wpId: props.wpId, entryId: D435_ENTRY })
-    return { expectedRevision: snap.expectedRevision, projection: snap.projection, sheetKey: D435_SHEET_KEY }
+    const snap = await readStoreProjection({ projectId: props.projectId, wpId: props.wpId, entryId: D4_SYNC_ENTRY_ID })
+    return { expectedRevision: snap.expectedRevision, projection: snap.projection, sheetKey: 'd435-managed' }
   },
   reloadHtml: async () => { window.dispatchEvent(new CustomEvent('d4:reload-responses')) },
-})
-const d435SyncOoDescriptor = computed(() => d435SyncBridge.descriptor.value)
-const d435SyncBusy = computed(
-  () => d435SyncSwitching.value
-    || (WP_BRIDGE_IN_FLIGHT_STATES as readonly string[]).includes(String(d435SyncBridge.state.value)),
-)
-const editorMode = computed<string>({
-  get: () => (d435SyncBridge.mode.value === 'oo' ? '在线编辑' : '表格视图'),
-  set: (v: string) => { void switchD435Mode(v === '在线编辑' ? 'onlyoffice' : 'structured') },
-})
-const modeOptions = computed(() => [
-  { label: '表格视图', value: '表格视图' },
-  { label: '在线编辑', value: '在线编辑', disabled: props.isReadonly || !ooHealthy.value || d435SyncBusy.value },
-])
-async function switchD435Mode(target: 'structured' | 'onlyoffice'): Promise<void> {
-  const cur = d435SyncBridge.mode.value === 'oo' ? 'onlyoffice' : 'structured'
-  if (target === cur) return
-  if (target === 'onlyoffice') {
-    if (props.isReadonly || !ooHealthy.value) return
-    d435SyncSwitching.value = true
-    try { await d435SyncBridge.switchToOnlyOffice() } finally { d435SyncSwitching.value = false }
-    return
-  }
-  d435SyncSwitching.value = true
-  try { await d435SyncBridge.switchToHtml() } finally { d435SyncSwitching.value = false }
-}
-// 同步态三态中文标签（禁裸英文）
-const syncStateTag = computed(() => {
-  const st = String(d435SyncBridge.state.value)
-  if (d435SyncBusy.value) return { text: '同步中…', type: 'info' as const }
-  if (d435SyncBridge.dirty?.value) {
-    return d435SyncBridge.mode.value === 'oo'
-      ? { text: 'excel 侧有未同步改动', type: 'warning' as const }
-      : { text: 'html 侧有未同步改动', type: 'warning' as const }
-  }
-  if (st.includes('error') || String(d435SyncBridge.lastError?.value || '')) {
-    return { text: '同步失败，请重试', type: 'danger' as const }
-  }
-  return { text: '已同步', type: 'success' as const }
 })
 
 const aiAvailable = ref(false)
@@ -213,7 +166,7 @@ function openFormulaManager() {
 
 <template>
 <div class="d4-other-check">
-  <div class="toolbar"><div class="toolbar-left"><el-segmented v-model="editorMode" :options="modeOptions" size="small" /><el-tag :type="syncStateTag.type" size="small" effect="light" style="margin-left:8px">{{ syncStateTag.text }}</el-tag></div><div class="toolbar-right"><el-button size="small" type="warning" plain :disabled="isReadonly||pushableCount===0" @click="pushAnomaliesToA13" title="把抽凭异常推送到 A13 未更正错报汇总（金额与方向由人工认定）">推送异常至 A13{{ pushableCount ? `（${pushableCount}）` : '' }}</el-button><el-button size="small" :disabled="isReadonly||d435SyncBusy||editorMode==='在线编辑'" @click="switchD435Mode('onlyoffice')" title="把当前 html 数据推送到在线编辑（人工触发）">同步到在线编辑</el-button><el-button size="small" @click="openFormulaManager" title="打开平台公式管理中心（唯一一套公式，支持跨底稿取数联动与表内校对）">ƒx 公式管理</el-button><el-dropdown trigger="click" size="small"><el-button size="small">导入导出 ▾</el-button><template #dropdown><el-dropdown-menu><el-dropdown-item @click="exportTemplate('D4-35')">导出模板</el-dropdown-item><el-dropdown-item @click="exportData('D4-35')">导出数据</el-dropdown-item><el-dropdown-item><el-upload :show-file-list="false" accept=".xlsx" :auto-upload="false" :disabled="isReadonly||importing" @change="(f:any)=>importData('D4-35',f.raw||f)"><span>导入数据</span></el-upload></el-dropdown-item></el-dropdown-menu></template></el-dropdown><GtIndexChip value="wp:D4-34" :context-project-id="projectId" /><el-button v-if="openReviewDialog" size="small" @click="openReviewDialog('D4-35-check')">💬 复核</el-button></div></div>
+  <div class="toolbar"><div class="toolbar-left"><el-segmented v-model="editorMode" :options="modeOptions" size="small" /><el-tag :type="syncStateTag.type" size="small" effect="light" style="margin-left:8px">{{ syncStateTag.text }}</el-tag></div><div class="toolbar-right"><el-button size="small" type="warning" plain :disabled="isReadonly||pushableCount===0" @click="pushAnomaliesToA13" title="把抽凭异常推送到 A13 未更正错报汇总（金额与方向由人工认定）">推送异常至 A13{{ pushableCount ? `（${pushableCount}）` : '' }}</el-button><el-button size="small" :disabled="isReadonly||d435SyncBusy||editorMode==='在线编辑'" @click="switchD435Mode('在线编辑')" title="把当前 html 数据推送到在线编辑（人工触发）">同步到在线编辑</el-button><el-button size="small" @click="openFormulaManager" title="打开平台公式管理中心（唯一一套公式，支持跨底稿取数联动与表内校对）">ƒx 公式管理</el-button><el-dropdown trigger="click" size="small"><el-button size="small">导入导出 ▾</el-button><template #dropdown><el-dropdown-menu><el-dropdown-item @click="exportTemplate('D4-35')">导出模板</el-dropdown-item><el-dropdown-item @click="exportData('D4-35')">导出数据</el-dropdown-item><el-dropdown-item><el-upload :show-file-list="false" accept=".xlsx" :auto-upload="false" :disabled="isReadonly||importing" @change="(f:any)=>importData('D4-35',f.raw||f)"><span>导入数据</span></el-upload></el-dropdown-item></el-dropdown-menu></template></el-dropdown><GtIndexChip value="wp:D4-34" :context-project-id="projectId" /><el-button v-if="openReviewDialog" size="small" @click="openReviewDialog('D4-35-check')">💬 复核</el-button></div></div>
 
   <template v-if="editorMode !== '在线编辑'">
     <!-- 审计目标 -->

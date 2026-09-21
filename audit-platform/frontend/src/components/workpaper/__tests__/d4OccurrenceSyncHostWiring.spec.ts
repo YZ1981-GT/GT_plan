@@ -4,6 +4,12 @@
  *    在线编辑从 legacy GtOnlyOfficeSheet 升级为平台统一 sync bridge（sheetKey=d414-managed）。
  *
  * spec: d4-14-walkthrough-writeback · Task 11
+ *
+ * 2026-09-21 治本改造后更新：D4-14 的接桥不再直接调 `useWorkpaperSyncBridge`，而是通过
+ * 共享 composable `useD4SyncMode`（entryId/capability/健康门禁/switchMode 已内聚到该
+ * composable 内部，由 `useD4SyncMode.spec.ts` 单独守卫）。D4-14 sheetKey 为内联字面量
+ * （未声明具名常量），且额外解构了 `ooHealthy`（模板 `v-if="!ooHealthy"` 直接消费，
+ * fail-visible 判据据此断言，不要求 danger 文案字面量）。
  */
 import { describe, it, expect } from 'vitest'
 import { readFileSync, existsSync } from 'node:fs'
@@ -13,14 +19,13 @@ import { fileURLToPath } from 'node:url'
 const _dir = dirname(fileURLToPath(import.meta.url))
 const TAB = resolve(_dir, '..', 'd4', 'inspection', 'D4TabOccurrence.vue')
 const HOST = resolve(_dir, '..', 'GtD4OperatingRevenue.vue')
-const PARENT_ENTRY = 'xlsx/gt-d4-operating-revenue'
 
 function read(p: string): string { return readFileSync(p, 'utf-8') }
 function stripComments(src: string): string {
   return src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/.*$/gm, '$1')
 }
 function extractBridgeCallArgs(src: string): string {
-  const marker = 'useWorkpaperSyncBridge('
+  const marker = 'useD4SyncMode('
   const start = src.indexOf(marker)
   if (start < 0) return ''
   let depth = 0
@@ -39,8 +44,9 @@ describe('D4-14 穿行测试必须消费平台 sync bridge（单宽动态行 7 �
 
   it('tab 文件存在', () => { expect(existsSync(TAB)).toBe(true) })
 
-  it('调用了平台 useWorkpaperSyncBridge', () => {
+  it('调用了共享 composable useD4SyncMode（禁自建同步 composable / 禁直连底层桥）', () => {
     expect(args.length).toBeGreaterThan(0)
+    expect(src).not.toContain('useWorkpaperSyncBridge(')
     expect(src).not.toContain('ContentMutationService')
   })
 
@@ -52,13 +58,9 @@ describe('D4-14 穿行测试必须消费平台 sync bridge（单宽动态行 7 �
     expect(r).toBeGreaterThan(f)
   })
 
-  it('capability 现算 + 父 entry，禁内联 bidirectional 字面量', () => {
-    expect(src).toMatch(/capabilityForEntry\s*\(/)
-    expect(src).toContain(PARENT_ENTRY)
-    expect(args).not.toMatch(/capability:\s*['"]bidirectional['"]/)
+  it('sheetKey 锁 d414-managed 身份', () => {
+    expect(args).toMatch(/sheetKey:\s*['"]d414-managed['"]/)
   })
-
-  it('sheetKey 锁 d414-managed', () => { expect(src).toContain('d414-managed') })
 
   it('挂 WorkpaperSyncEditorHost 且不再挂 legacy GtOnlyOfficeSheet', () => {
     expect(src).toContain('<WorkpaperSyncEditorHost')
@@ -66,12 +68,12 @@ describe('D4-14 穿行测试必须消费平台 sync bridge（单宽动态行 7 �
     expect(src).not.toMatch(/import\s+GtOnlyOfficeSheet/)
   })
 
-  it('OO 描述子来自 bridge（syncOoDescriptor），编辑器由 bridge 驱动', () => {
+  it('OO 描述子来自 composable（syncOoDescriptor），编辑器由 bridge 驱动', () => {
     expect(src).toContain('syncOoDescriptor')
     expect(src).toMatch(/:bridge="syncBridge"/)
   })
 
-  it('fail-visible：OO 不可用有可见提示，且同步态三态 tag', () => {
+  it('fail-visible：消费 composable 导出的 ooHealthy/syncStateTag（不自行重复 danger 文案）', () => {
     expect(src).toContain('syncStateTag')
     expect(src).toMatch(/OO\s*不可用|ooHealthy/)
   })
@@ -79,6 +81,20 @@ describe('D4-14 穿行测试必须消费平台 sync bridge（单宽动态行 7 �
   it('行身份用前端稳定 id（TransactionItem.id，禁数组下标当身份）', () => {
     // composable 的 TransactionItem 以 id 为稳定行身份；后端 provider row_identity=/*/id
     expect(src).not.toMatch(/store_item_id/)  // 前端不应硬编码后端 stable key
+  })
+})
+
+describe('守卫自检（防恒真）', () => {
+  it('extractBridgeCallArgs 抓到真实调用体', () => {
+    const stub = "const b = useD4SyncMode({ sheetKey: 'd414-managed', flushHtml: async () => {} })"
+    expect(extractBridgeCallArgs(stub)).toContain('flushHtml')
+    expect(extractBridgeCallArgs('no bridge here')).toBe('')
+  })
+  it('stripComments 剥掉注释里的反例', () => {
+    const stub = 'const x = 1 // <GtOnlyOfficeSheet />\n/* ContentMutationService */'
+    const out = stripComments(stub)
+    expect(out).not.toContain('GtOnlyOfficeSheet')
+    expect(out).not.toContain('ContentMutationService')
   })
 })
 

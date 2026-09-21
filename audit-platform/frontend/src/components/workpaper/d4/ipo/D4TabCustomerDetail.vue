@@ -9,10 +9,9 @@ import { ref, computed, inject, toRef } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useD4CustomerDetail, CUSTOMER_FIELDS, FIELD_GROUPS } from '../../composables/useD4CustomerDetail'
 import { useD4ImportExport } from '../../composables/useD4ImportExport'
-import { useWorkpaperSyncBridge } from '../../sync/useWorkpaperSyncBridge'
 import { readStoreProjection } from '../../sync/workpaperSyncApi'
-import { capabilityForEntry } from '../../sync/workpaperSyncCapability'
 import WorkpaperSyncEditorHost from '../../sync/WorkpaperSyncEditorHost.vue'
+import { useD4SyncMode, D4_SYNC_ENTRY_ID } from '../composables/useD4SyncMode'
 import D4IpoFindingWriteback, { type D4IpoFinding } from './D4IpoFindingWriteback.vue'
 import GtIndexChip from '../../GtIndexChip.vue'
 import http from '@/utils/http'
@@ -47,39 +46,25 @@ const {
 
 const { exportTemplate, exportData, importData, importing } = useD4ImportExport({ wpId: computed(() => props.wpId), projectId: computed(() => props.projectId) })
 
-// ─── Mode ────────────────────────────────────────────────────────────
-const editorMode = ref<string>('卡片视图')
-const modeOptions = ['卡片视图', '矩阵视图', '在线编辑']
 const activeCustomerIdx = ref(0)
 
-// D4-29 专用同步桥：转置表由后端 provider 动态生成列并按客户 id 合并
-const D429_ENTRY = 'xlsx/gt-d4-operating-revenue'
-const D429_SHEET_KEY = 'd4-29-managed'
-const d429Bridge = useWorkpaperSyncBridge({
-  entryId: ref(D429_ENTRY), wpId: toRef(props, 'wpId'), projectId: toRef(props, 'projectId'),
-  sheetKey: ref(D429_SHEET_KEY), capability: capabilityForEntry(D429_ENTRY),
+// ─── D4-29 sync bridge（统一走 useD4SyncMode，见其文件头注释；转置表由后端 provider
+//     动态生成列并按客户 id 合并——该形态与桥接层无关，正常套用） ─────────────────
+const {
+  syncBridge: d429Bridge, descriptor: d429Descriptor, editorMode: d429Mode, modeOptions,
+  busy: d429SyncBusy,
+} = useD4SyncMode({
+  sheetKey: 'd4-29-managed',
+  wpId: toRef(props, 'wpId'),
+  projectId: toRef(props, 'projectId'),
+  isReadonly: toRef(props, 'isReadonly'),
+  views: ['卡片视图', '矩阵视图'],
   flushHtml: async () => {
     await flushPendingSave()
-    const snap = await readStoreProjection({ projectId: props.projectId, wpId: props.wpId, entryId: D429_ENTRY })
-    return { expectedRevision: snap.expectedRevision, projection: snap.projection, sheetKey: D429_SHEET_KEY }
+    const snap = await readStoreProjection({ projectId: props.projectId, wpId: props.wpId, entryId: D4_SYNC_ENTRY_ID })
+    return { expectedRevision: snap.expectedRevision, projection: snap.projection, sheetKey: 'd4-29-managed' }
   },
   reloadHtml: async () => { await reloadD429Data() },
-})
-const d429SyncBusy = computed(() => ['oo_loading', 'forcesave_pending', 'refresh_required'].includes(String(d429Bridge.state.value)))
-const d429Switching = ref(false)
-const d429LastError = ref<string | null>(null)
-async function switchD429Mode(v: string) {
-  d429Switching.value = true; d429LastError.value = null
-  try {
-    if (v === '在线编辑') await d429Bridge.switchToOnlyOffice()
-    else if (d429Bridge.mode.value === 'oo') await d429Bridge.switchToHtml()
-    editorMode.value = v
-  } catch (error: any) { d429LastError.value = error?.message || '模式切换失败'; ElMessage.error(d429LastError.value) }
-  finally { d429Switching.value = false }
-}
-const d429Mode = computed({
-  get: () => d429Bridge.mode.value === 'oo' ? '在线编辑' : editorMode.value,
-  set: (v: string) => { void switchD429Mode(v) },
 })
 
 // ─── AI ──────────────────────────────────────────────────────────────
@@ -124,10 +109,10 @@ const riskFindings = computed<D4IpoFinding[]>(() => {
 <template>
 <div class="d4-customer-detail">
   <!-- 工具条 -->
-  <div class="toolbar"><div class="toolbar-left"><el-segmented v-model="d429Mode" :options="modeOptions" size="small" :disabled="d429SyncBusy || d429Switching" /></div><div class="toolbar-right"><el-dropdown trigger="click" size="small"><el-button size="small">导入导出 ▾</el-button><template #dropdown><el-dropdown-menu><el-dropdown-item @click="handleExportTemplate">导出模板</el-dropdown-item><el-dropdown-item @click="handleExportData">导出数据</el-dropdown-item><el-dropdown-item><el-upload :show-file-list="false" accept=".xlsx" :auto-upload="false" :disabled="isReadonly||importing" @change="handleImportFile"><span>导入数据</span></el-upload></el-dropdown-item></el-dropdown-menu></template></el-dropdown><D4IpoFindingWriteback wp-code="D4-29" :all-responses="allResponses" :is-readonly="isReadonly" :findings="riskFindings" /><GtIndexChip value="wp:D4-28" :context-project-id="projectId" /><el-button v-if="openReviewDialog" size="small" @click="openReviewDialog('D4-29-detail')">💬 复核</el-button></div></div>
+  <div class="toolbar"><div class="toolbar-left"><el-segmented v-model="d429Mode" :options="modeOptions" size="small" :disabled="d429SyncBusy" /></div><div class="toolbar-right"><el-dropdown trigger="click" size="small"><el-button size="small">导入导出 ▾</el-button><template #dropdown><el-dropdown-menu><el-dropdown-item @click="handleExportTemplate">导出模板</el-dropdown-item><el-dropdown-item @click="handleExportData">导出数据</el-dropdown-item><el-dropdown-item><el-upload :show-file-list="false" accept=".xlsx" :auto-upload="false" :disabled="isReadonly||importing" @change="handleImportFile"><span>导入数据</span></el-upload></el-dropdown-item></el-dropdown-menu></template></el-dropdown><D4IpoFindingWriteback wp-code="D4-29" :all-responses="allResponses" :is-readonly="isReadonly" :findings="riskFindings" /><GtIndexChip value="wp:D4-28" :context-project-id="projectId" /><el-button v-if="openReviewDialog" size="small" @click="openReviewDialog('D4-29-detail')">💬 复核</el-button></div></div>
 
   <!-- 仪表板 -->
-  <div v-if="d429LastError || d429Bridge.lastError.value" role="alert">{{ d429LastError || d429Bridge.lastError.value }}</div>
+  <div v-if="d429Bridge.lastError.value" role="alert">{{ d429Bridge.lastError.value.message }}</div>
   <div class="stats-dashboard">
     <div class="stat-card stat-primary"><div class="stat-value">{{ customerCount }}<span class="stat-unit">家</span></div><div class="stat-label">检查客户</div></div>
     <div class="stat-card" :class="relatedCount > 0 ? 'stat-warn' : 'stat-ok'"><div class="stat-value">{{ relatedCount }}<span class="stat-unit">家</span></div><div class="stat-label">关联方</div></div>
@@ -189,7 +174,7 @@ const riskFindings = computed<D4IpoFinding[]>(() => {
 
   <!-- ═══ 在线编辑 ═══ -->
   <template v-else-if="d429Mode === '在线编辑'">
-    <div class="oo-container"><WorkpaperSyncEditorHost v-if="d429Bridge.descriptor.value" ref="d429Descriptor" :descriptor="d429Bridge.descriptor.value" :bridge="d429Bridge" /><div v-else class="oo-loading">正在打开 D4-29 同步编辑器…</div></div>
+    <div class="oo-container"><WorkpaperSyncEditorHost v-if="d429Descriptor" :descriptor="d429Descriptor" :bridge="d429Bridge" /><div v-else class="oo-loading">正在打开 D4-29 同步编辑器…</div></div>
   </template>
 
   <!-- 非OO模式共享区域 -->

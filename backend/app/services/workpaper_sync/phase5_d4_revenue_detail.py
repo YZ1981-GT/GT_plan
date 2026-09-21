@@ -122,6 +122,16 @@ from app.services.workpaper_sync.phase5_d4_policy_check_sheet import (
     merge_projection_into_d45_group_rows,
     sheet_payload_d45,
 )
+from app.services.workpaper_sync.phase5_d4_erp_check_sheet import (
+    EXPECTED_MAPPING_DIGEST_D413,
+    SHEET_KEY_D413,
+    STORE_ITEM_IDS_D413_FIXED,
+    assert_mapping_digest_d413,
+    build_d413_fixed_store_projection,
+    merge_projection_into_d413_fixed_items,
+    sheet_payload_d413,
+    static_sheet_payload_d413,
+)
 from app.services.workpaper_sync.phase5_d4_ipo_related_sheets import (
     EXPECTED_MAPPING_DIGEST_D421,
     EXPECTED_MAPPING_DIGEST_D422,
@@ -387,6 +397,12 @@ TEMPLATE_SHA256: Final[str] = (
 #: 与行 table 数对齐、_align_specs_to_sibling_tables 成功（sibling 内核已由 D4-1 dual-region
 #: GENERALIZE，单 sheet 单 table 是其子集）。已跑发布链 + rematerialize gen52 无 drift。
 _INCLUDE_IPO_INTERVIEW_SHEETS: Final[bool] = True
+#: D4-13 营业收入账面金额与ERP系统核对记录接入（2026-09-21，补裁决）。全篇 A1:E19、
+#: 无插删动态行表、无公式 —— 两段自由文本各走单 cell 静态锚定（A6/A16，同 D4-5 fixed
+#: 区范式），不建行表 provider。此裁决撤销 d4-inspection-writeback-formula-io 的原
+#: N/A 判定（该判定基于「行表 provider」范式评估，未覆盖静态字段直映射路径），
+#: 见 evidence/T10-d413-erp-check-field-mapping.json。provider=phase5_d4_erp_check_sheet。
+_INCLUDE_D413_ERP_CHECK_SHEET: Final[bool] = True
 #: D4-6 重要指标分析表接入（批次B 从零第一张，2026-09-20）。固定 12 行静态指标、
 #: 行身份=key、受管列 B/C/E/F/H、formula_mask D/G（差异率内部公式）、注入 UUID 列 I。
 #: provider=phase5_d4_indicator_sheet，单 sheet 单 table（interview 范式子集）。
@@ -760,11 +776,12 @@ def instrumentation_spec() -> ExcelInstrumentationSpec:
             *((sheet_payload(),) if _INCLUDE_D429_TRANSPOSED else ()),
             *((sheet_payload_d412(),) if _INCLUDE_D412_TRANSPOSED else ()),
         ),
-        # D4-33/D4-8 静态受管区寄生（spec workpaper-sync-static-cell-sheet-writeback）：只在动态
-        # primary spec 上挂 static_sheets，instrumentation 注入 workbook-scope definedName。
+        # D4-33/D4-8/D4-13 静态受管区寄生（spec workpaper-sync-static-cell-sheet-writeback）：
+        # 只在动态 primary spec 上挂 static_sheets，instrumentation 注入 workbook-scope definedName。
         static_sheets=(
             *((static_sheet_payload_d433(),) if _INCLUDE_D433_MARGIN_SHEET else ()),
             *((static_sheet_payload_d48(),) if _INCLUDE_D48_PRODUCT_MARGIN_SHEET else ()),
+            *((static_sheet_payload_d413(),) if _INCLUDE_D413_ERP_CHECK_SHEET else ()),
         ),
     )
 
@@ -1056,6 +1073,13 @@ _HTML_STORE_NOTE_D45: Final[str] = (
     "（footer 下 static_row 与插行 fail-closed 冲突，见 phase5_d4_policy_check_sheet）。"
 )
 
+_HTML_STORE_NOTE_D413: Final[str] = (
+    "D4-13 ERP 核对：两段自由文本各为独立 item（D4-13-process / D4-13-conclusion）。"
+    "sheet_key=d413-managed；宿主独立于 isD4DetailSheet。全篇无插删动态行表，两字段"
+    "均直接锚定死行号（A6/A16）全入 Excel 契约（不同于 D4-5 的 HTML-only 分流——"
+    "该分流仅因字段位于会插删行表 footer 之下，D4-13 无此结构）。"
+)
+
 
 def build_contract_payload() -> dict[str, Any]:
     from app.services.workpaper_sync.excel_extract import TABLE_SHEET_ANCHOR
@@ -1063,6 +1087,7 @@ def build_contract_payload() -> dict[str, Any]:
     assert_mapping_digest()
     assert_mapping_digest_d43()
     assert_mapping_digest_d45()
+    assert_mapping_digest_d413()
     assert_mapping_digest_d435()
     assert_mapping_digest_d41()
     assert_mapping_digest_d49()
@@ -1108,6 +1133,7 @@ def build_contract_payload() -> dict[str, Any]:
                 "tables": [rows_table_payload_d43()],
             },
             sheet_payload_d45(),
+            *([sheet_payload_d413()] if _INCLUDE_D413_ERP_CHECK_SHEET else []),
             {
                 "sheet_key": SHEET_KEY_D421,
                 "excel_name": MANAGED_SHEET_D421,
@@ -1213,6 +1239,14 @@ def build_contract_payload() -> dict[str, Any]:
                         "row_identity_key": "id",
                         "note": _HTML_STORE_NOTE_D45,
                         "fixed_item_ids": list(STORE_ITEM_IDS_D45_FIXED),
+                    },
+                    {
+                        "item_id": None,
+                        "sheet_key": SHEET_KEY_D413,
+                        "table_key": "d413_erp_check_fixed",
+                        "row_identity_key": None,
+                        "note": _HTML_STORE_NOTE_D413,
+                        "fixed_item_ids": list(STORE_ITEM_IDS_D413_FIXED),
                     },
                     {
                         "item_id": STORE_ITEM_ID_D421,
@@ -1713,6 +1747,21 @@ def build_combined_store_projection(
         elif isinstance(raw, str):
             fixed_payloads[item_id] = raw
     fixed = build_d45_fixed_store_projection(fixed_payloads, contract=contract)
+    d413_fixed_payloads: dict[str, str | None] = {}
+    if _INCLUDE_D413_ERP_CHECK_SHEET:
+        for item_id in STORE_ITEM_IDS_D413_FIXED:
+            raw = payloads.get(item_id)
+            if isinstance(raw, (bytes, bytearray)):
+                d413_fixed_payloads[item_id] = raw.decode("utf-8")
+            elif isinstance(raw, str):
+                d413_fixed_payloads[item_id] = raw
+            else:
+                d413_fixed_payloads[item_id] = None
+    d413_fixed = (
+        build_d413_fixed_store_projection(d413_fixed_payloads, contract=contract)
+        if _INCLUDE_D413_ERP_CHECK_SHEET
+        else None
+    )
     d429 = (
         build_d429_store_projection(
             payloads.get(STORE_ITEM_ID_D429, []), contract=contract, limits=limits
@@ -1859,6 +1908,8 @@ def build_combined_store_projection(
     values.update(right.values)
     values.update(groups.values)
     values.update(fixed.values)
+    if d413_fixed is not None:
+        values.update(d413_fixed.values)
     for proj in (d421, d422, d423, d424, d435, d41, d49, *ipo_checklist_projs, *inspection_projs, *interview_projs, *d46_projs, *d417_projs, *d418_projs, *d419_projs, *d411_projs, *d410_projs, *d420_projs, *d433_projs, *d48_projs, *d434_projs, *d436_projs, *d47_projs, *d414_projs):
         values.update(proj.values)
     if d429 is not None:
@@ -2171,6 +2222,21 @@ def merge_d45_fixed_from_projection(
 ) -> dict[str, str]:
     """D4-5 固定 item（remark 纯文本）← projection。"""
     return merge_projection_into_d45_fixed_items(
+        projection=projection, base_by_item=base_by_item
+    )
+
+
+def merge_d413_fixed_from_projection(
+    *,
+    projection: Any,
+    base_by_item: Mapping[str, str | None],
+) -> dict[str, str]:
+    """D4-13 固定 item（核对过程/核对结论，remark 纯文本）← projection。
+
+    与 :func:`merge_d45_fixed_from_projection` 同构；``oo_to_html.py`` 通过
+    ``hasattr(bridge, "merge_d413_fixed_from_projection")`` 鸭子类型检测调用。
+    """
+    return merge_projection_into_d413_fixed_items(
         projection=projection, base_by_item=base_by_item
     )
 

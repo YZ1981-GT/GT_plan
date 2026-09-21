@@ -1,13 +1,17 @@
 /**
- * D4-15/16 检查表宿主接线守卫（B2）—— 参照 d4IpoSyncHostWiring.spec.ts。
+ * D4-13/15/16 检查表宿主接线守卫（B2）—— 参照 d4IpoSyncHostWiring.spec.ts。
  *
- * spec: d4-inspection-writeback-formula-io · B2
+ * spec: d4-inspection-writeback-formula-io · B2 / d-cycle-sheet-bidirectional-expansion T10
  *
- * 判据落到源码结构：宿主必须消费平台 useWorkpaperSyncBridge + WorkpaperSyncEditorHost +
- * capabilityForEntry(父级 entry) 现算 + readStoreProjection；禁裸 GtOnlyOfficeSheet；
- * flushHtml 内 flushPendingSave 先于 readStoreProjection（防投影旧值）；sheetKey 锁本表。
+ * 2026-09-21 治本改造后更新：D4-13/15/16 的接桥不再直接调 `useWorkpaperSyncBridge`，而是通过
+ * 共享 composable `useD4SyncMode`（entryId/capability/健康门禁/switchMode/fail-visible tag
+ * 已内聚到该 composable 内部，由 `useD4SyncMode.spec.ts` 单独守卫）。三表均走具名常量。
  *
- * D4-13(纯文本)/D4-14(七维+计算footer,超范式)不在本组 —— 见 evidence/b1-provider-geometry.md。
+ * D4-13 补裁决（2026-09-21，见 evidence/T10-d413-erp-check-field-mapping.json）：原
+ * b1-provider-geometry.md 判定 D4-13「纯文本，N/A」是基于「行表 provider」范式，未评估
+ * 静态字段直映射路径（同 D4-33/D4-8 的 static_region）；现已补齐真双向。
+ *
+ * D4-14(七维+计算footer,超范式)仍不在本组 —— 见 evidence/b1-provider-geometry.md。
  */
 import { describe, it, expect } from 'vitest'
 import { readFileSync, existsSync } from 'node:fs'
@@ -16,11 +20,13 @@ import { fileURLToPath } from 'node:url'
 
 const _dir = dirname(fileURLToPath(import.meta.url))
 const INSPECT_DIR = resolve(_dir, '..', 'd4', 'inspection')
-const PARENT_ENTRY = 'xlsx/gt-d4-operating-revenue'
 
-const TABS: Record<string, { file: string; sheetKey: string }> = {
-  'D4-15': { file: 'D4TabCompleteness.vue', sheetKey: 'd4-15-managed' },
-  'D4-16': { file: 'D4TabExport.vue', sheetKey: 'd4-16-managed' },
+const TABS: Record<string, { file: string; sheetKey: string; namedConst: string; flushFn: string }> = {
+  // D4-13 沿用组件既有持久化函数名 flush（治本改造前就叫这个，行为语义与 flushPendingSave
+  // 一致：先 clear 防抖 timer 再立即落库），不强行改名凑统一断言。
+  'D4-13': { file: 'D4TabErpCheck.vue', sheetKey: 'd413-managed', namedConst: 'D4_13_SHEET_KEY', flushFn: 'flush' },
+  'D4-15': { file: 'D4TabCompleteness.vue', sheetKey: 'd4-15-managed', namedConst: 'D4_15_SHEET_KEY', flushFn: 'flushPendingSave' },
+  'D4-16': { file: 'D4TabExport.vue', sheetKey: 'd4-16-managed', namedConst: 'D4_16_SHEET_KEY', flushFn: 'flushPendingSave' },
 }
 
 function read(path: string): string {
@@ -30,7 +36,7 @@ function stripComments(src: string): string {
   return src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/.*$/gm, '$1')
 }
 function extractBridgeCallArgs(src: string): string {
-  const marker = 'useWorkpaperSyncBridge('
+  const marker = 'useD4SyncMode('
   const start = src.indexOf(marker)
   if (start < 0) return ''
   let depth = 0
@@ -45,7 +51,7 @@ function extractBridgeCallArgs(src: string): string {
   return ''
 }
 
-describe.each(Object.entries(TABS))('%s 检查表必须消费平台 sync bridge', (code, { file, sheetKey }) => {
+describe.each(Object.entries(TABS))('%s 检查表必须消费平台 sync bridge', (code, { file, sheetKey, namedConst, flushFn }) => {
   const path = resolve(INSPECT_DIR, file)
   const src = existsSync(path) ? stripComments(read(path)) : ''
   const args = extractBridgeCallArgs(src)
@@ -54,29 +60,27 @@ describe.each(Object.entries(TABS))('%s 检查表必须消费平台 sync bridge'
     expect(existsSync(path)).toBe(true)
   })
 
-  it('调用了平台 useWorkpaperSyncBridge（禁自建同步 composable）', () => {
+  it('调用了共享 composable useD4SyncMode（禁自建同步 composable / 禁直连底层桥）', () => {
     expect(args.length).toBeGreaterThan(0)
+    expect(src).not.toContain('useWorkpaperSyncBridge(')
     expect(src).not.toContain('ContentMutationService') // spec 草案臆想名，禁引用
   })
 
-  it('flushHtml 内 flushPendingSave 先于 readStoreProjection（防投影旧值）', () => {
+  it(`flushHtml 内 ${flushFn} 先于 readStoreProjection（防投影旧值）`, () => {
     expect(args).toContain('flushHtml')
-    expect(args).toMatch(/flushPendingSave\s*\(/)
+    const flushPattern = new RegExp(`${flushFn}\\s*\\(`)
+    expect(args).toMatch(flushPattern)
     expect(args).toMatch(/readStoreProjection\s*\(/)
-    const flushAt = args.indexOf('flushPendingSave')
+    const flushAt = args.search(flushPattern)
     const readAt = args.indexOf('readStoreProjection')
     expect(flushAt).toBeGreaterThanOrEqual(0)
     expect(readAt).toBeGreaterThan(flushAt)
   })
 
-  it('capability 现算：capabilityForEntry(父级 entry)，禁内联 bidirectional 字面量', () => {
-    expect(src).toMatch(/capabilityForEntry\s*\(/)
-    expect(src).toContain(PARENT_ENTRY)
-    expect(args).not.toMatch(/capability:\s*['"]bidirectional['"]/)
-  })
-
-  it('sheetKey 锁本表 managed 身份', () => {
-    expect(src).toContain(sheetKey)
+  it('sheetKey 走具名常量（不得内联字面量，防漂移）', () => {
+    expect(src).toContain(`= '${sheetKey}'`)
+    expect(args).toMatch(new RegExp(`sheetKey:\\s*${namedConst}\\b`))
+    expect(args).not.toMatch(new RegExp(`sheetKey:\\s*['"]${sheetKey}['"]`))
   })
 
   it('模板挂载了 WorkpaperSyncEditorHost', () => {
@@ -86,6 +90,10 @@ describe.each(Object.entries(TABS))('%s 检查表必须消费平台 sync bridge'
   it('不得再挂裸 GtOnlyOfficeSheet（旧反模式）', () => {
     expect(src).not.toMatch(/<GtOnlyOfficeSheet\b/)
     expect(src).not.toMatch(/import\s+GtOnlyOfficeSheet/)
+  })
+
+  it('消费 composable 导出的 syncStateTag（不自行重复 danger 文案）', () => {
+    expect(src).toMatch(/syncStateTag/)
   })
 })
 
@@ -112,8 +120,9 @@ describe('宿主 GtD4OperatingRevenue 必须把 D4-15/16 登记为 dedicated syn
     expect(hostSrc).toContain('isD4DedicatedSyncSheet')
   })
 
-  it('dedicated 列表含 D4-15 与 D4-16', () => {
+  it('dedicated 列表含 D4-13 与 D4-15 与 D4-16', () => {
     const list = extractDedicatedList(hostSrc)
+    expect(list).toContain("'D4-13'")
     expect(list).toContain("'D4-15'")
     expect(list).toContain("'D4-16'")
   })
@@ -134,7 +143,7 @@ describe('宿主 GtD4OperatingRevenue 必须把 D4-15/16 登记为 dedicated syn
 // ── 反向自检：抽取器/剥注释真在承重 ──────────────────────────────────────────
 describe('守卫自检（防恒真）', () => {
   it('extractBridgeCallArgs 抓到真实调用体', () => {
-    const stub = 'const b = useWorkpaperSyncBridge({ entryId: x, flushHtml: async () => {} })'
+    const stub = 'const b = useD4SyncMode({ sheetKey: D4_15_SHEET_KEY, flushHtml: async () => {} })'
     expect(extractBridgeCallArgs(stub)).toContain('flushHtml')
     expect(extractBridgeCallArgs('no bridge here')).toBe('')
   })

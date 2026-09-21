@@ -814,20 +814,36 @@ def _writes_content_directly(facts: _FunctionFacts) -> bool:
 def _propagate_content_writers(
     functions: list[dict[str, Any]],
 ) -> dict[str, list[str]]:
-    """Find callers that are one resolvable hop away from a direct content writer.
+    """Find callers that resolvably reach a direct content writer through delegation.
 
     Task 3 needs the *entry points* that write workpaper content -- the F2 sync endpoints
     delegating to ``_save_fields``, the rollback router delegating to
-    ``VersionTrailService.rollback_to_snapshot``. It does not need the full transitive
-    closure: following the call graph to a fixed point pulls in every orchestration layer
-    that eventually touches a workpaper and drowns the inventory (measured: 349 rows
-    instead of the single-hop denominator).
+    ``VersionTrailService.rollback_to_snapshot``, and the bulk/adapter entry points that
+    delegate to a router import/export function which itself only reaches the direct
+    content writer one more hop in (``_d4_import`` -> ``d4_import_data`` ->
+    ``_upsert_checklist_response``). A single-hop pass silently drops that last class: the
+    D2/D4 migration reshaped ``d4_import_data`` into a *delegated* writer rather than a
+    direct one, so the adapter that calls it fell out of the denominator entirely -- an
+    under-count, not a real migration.
 
-    Resolution is deliberately conservative -- a call edge is only followed when the
+    The closure is taken over the **writer graph**, not the full call graph. A function
+    joins the writer set only when it resolvably calls something already in that set,
+    seeded by the direct content writers. Non-writer leaves never enter, so this cannot
+    grow into the whole orchestration surface the way an unbounded call-graph fixpoint
+    does (measured: full transitive closure pulled 349 rows; this bounded closure adds a
+    small, source-verifiable set of genuine multi-hop entry points on top of the direct
+    writers).
+
+    Resolution stays deliberately conservative -- a call edge is only followed when the
     callee is defined in the same module, is an explicitly imported symbol, or is a method
     reached through an explicitly imported class. Bare leaf-name matching across the whole
     tree would manufacture edges (five modules define ``_save_html_data``), which is the
     false-positive class this inventory must not have.
+
+    Returns, for every *delegated* (non-direct) writer, the sorted writer(s) it reaches by
+    one resolvable hop -- direct writers, or other delegated writers already proven to
+    reach a direct writer. The recorded hop stays a real, single, resolvable call edge so
+    the provenance is auditable; membership in the writer set is what closes transitively.
     """
     by_module: dict[str, dict[str, str]] = defaultdict(dict)
     by_qualified: dict[str, str] = {}
@@ -843,7 +859,9 @@ def _propagate_content_writers(
         if _writes_content_directly(item["facts_obj"])
     }
 
-    delegated: dict[str, list[str]] = {}
+    # Resolve every function's outgoing call edges once, using the conservative rules
+    # above. ``edges[writer_id]`` is the set of *discovered* callees it can reach.
+    edges: dict[str, set[str]] = {}
     for item in functions:
         if item["writer_id"] in direct:
             continue
@@ -865,9 +883,31 @@ def _propagate_content_writers(
             origin = imports.get(receiver_root)
             if origin and f"{origin}.{leaf}" in by_qualified:
                 targets.add(by_qualified[f"{origin}.{leaf}"])
-        hits = sorted(targets & direct)
+        targets.discard(item["writer_id"])
+        edges[item["writer_id"]] = targets
+
+    # Fixpoint over the writer graph: a caller is a writer once it can reach any function
+    # already known to be a writer (seeded by ``direct``). Bounded because a function that
+    # reaches no writer never joins, so orchestration that only touches non-writers stays
+    # out.
+    writers = set(direct)
+    changed = True
+    while changed:
+        changed = False
+        for writer_id, targets in edges.items():
+            if writer_id in writers:
+                continue
+            if targets & writers:
+                writers.add(writer_id)
+                changed = True
+
+    delegated: dict[str, list[str]] = {}
+    for writer_id, targets in edges.items():
+        if writer_id not in writers:
+            continue
+        hits = sorted(targets & writers)
         if hits:
-            delegated[item["writer_id"]] = hits
+            delegated[writer_id] = hits
     return delegated
 
 
