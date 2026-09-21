@@ -1,77 +1,44 @@
 {
   "sheet": "D4-33",
   "sheet_name": "其他业务毛利率分析表D4-33",
-  "captured_at": "2026-09-20T16:35:00.000Z",
-  "spec": "workpaper-sync-static-cell-sheet-writeback",
-  "region_kind": "static",
-  "note": "引擎新增 definedName 锚定静态受管区路径（BindingKind.static_region）落地后首次真栈验证。D4-33 无动态行/无 UUID/无 Excel Table，靠 workbook-scope definedName(GT_MANAGED_REGION_D433) 锚定 72 个绝对坐标 static cell。真栈往返经真实 PG representation gen79 + 真 OO room 完成 store-projection(读) → pending-mutations(HTML flush) → materialize(写→OO substrate) 三步链路。",
+  "captured_at": "2026-09-21T05:33:37.473Z",
   "scope": {
     "project_id": "0ec33ac9-3de5-4e65-b3bf-f9dccd7b2a49",
     "wp_id": "b3ab3c46-828f-4f48-950e-aee9bbdc923f",
     "entry_id": "xlsx/gt-d4-operating-revenue"
   },
-  "environment": {
-    "backend_health": 200,
-    "frontend_health": 200,
-    "docker_onlyoffice": "audit-onlyoffice healthy",
-    "docker_postgres": "audit-postgres healthy"
-  },
   "predicates": {
     "user_sync_requests": [
       {
         "method": "GET",
-        "path": "/api/projects/{pid}/workpapers/{wid}/sync/entries/xlsx/gt-d4-operating-revenue/store-projection",
-        "status": 200,
-        "note": "反读 D4-33 静态区：projection.values 含 72 个 d4_33_matrix/slot{0..2}_m{0..11}/{revenue,cost} cell（引擎静态路径反读）"
+        "path": "/api/projects/0ec33ac9-3de5-4e65-b3bf-f9dccd7b2a49/workpapers/b3ab3c46-828f-4f48-950e-aee9bbdc923f/sync/entries/xlsx/gt-d4-operating-revenue/store-projection",
+        "status": 200
       },
       {
         "method": "POST",
-        "path": "/api/projects/{pid}/workpapers/{wid}/sync/entries/xlsx/gt-d4-operating-revenue/pending-mutations",
-        "status": 200,
-        "note": "HTML flush：返回 pending_mutation_token + payload_sha256 + expected_revision（幂等冻结 Idempotency-Key）"
+        "path": "/api/projects/0ec33ac9-3de5-4e65-b3bf-f9dccd7b2a49/workpapers/b3ab3c46-828f-4f48-950e-aee9bbdc923f/sync/entries/xlsx/gt-d4-operating-revenue/pending-mutations",
+        "status": 200
       },
       {
         "method": "POST",
-        "path": "/api/projects/{pid}/workpapers/{wid}/sync/entries/xlsx/gt-d4-operating-revenue/materialize",
-        "status": 200,
-        "note": "HTML→OO substrate 物化：返回 doc_key=wpsync-...-g80 + room_id + representation_id + artifact_sha256 + definition_bundle_sha256，generation 推进 79→80（真 OO room 创建）"
+        "path": "/api/projects/0ec33ac9-3de5-4e65-b3bf-f9dccd7b2a49/workpapers/b3ab3c46-828f-4f48-950e-aee9bbdc923f/sync/entries/xlsx/gt-d4-operating-revenue/materialize",
+        "status": 200
       }
     ],
     "store_projection_ok": true,
-    "d433_static_cell_count": 72,
-    "d433_key_sample": [
-      "d4_33_matrix/slot0_m0/revenue",
-      "d4_33_matrix/slot0_m0/cost",
-      "d4_33_matrix/slot0_m1/revenue"
-    ],
-    "pending_mutations_ok": true,
     "materialize_ok": true,
-    "oo_room_created": true,
-    "oo_doc_key_prefix": "wpsync-",
-    "generation_advanced": "79 -> 80",
-    "idempotency_key_shared_across_pending_and_materialize": true,
-    "fail_closed_guards_hit_then_satisfied": [
-      "materialize_idempotency_key_mismatch (pending + materialize 必须同 Idempotency-Key)",
-      "projection_payload_invalid (materialize 必须带 projection，防清表)",
-      "pending_mutation_token_required (materialize 必须先经 pending-mutations flush)"
-    ]
-  },
-  "publish_chain": {
-    "generate_contract_canonical": "4e06c60e55c673620cbbe35336ea0f56ff7eea40c5eaf51a31142a8cf9a55533",
-    "desired_bundle_sha256": "98c6ce5d57c2567240f2da4420e56f77d0a56ae97c77c69b9db056611af02b58",
-    "rematerialize_status": "rematerialized (gen 78->79)",
-    "rematerialize_check": "already_on_desired_bundle",
-    "no_roundtrip_or_footer_or_softtimeout_error": true
-  },
-  "engine_property_1_roundtrip": {
-    "note": "materialize→apply→extract 往返受管值逐字段等，公式 cell 归 formula_inventory —— 由单测 TestStaticRoundtrip 闭合（rev=888/cost=100 逐字段等）+ 发布链真 PG rematerialize 无 RoundtripEquivalenceError 双重实证",
-    "unit_test": "backend/tests/workpaper_sync/test_static_region_writeback.py::TestStaticRoundtrip::test_write_then_read_equal"
-  },
-  "not_covered": [
-    {
-      "aspect": "oo_canvas_cell_edit_roundtrip",
-      "verdict": "UNVERIFIABLE",
-      "reason": "OnlyOffice 用 canvas 渲染单元格（非 DOM），Playwright/chrome-devtools 无法可靠点击/编辑 canvas 内单元格。此为 D4 全组同一 env 门（批次C，与 D4-35 evidence 的 doc_editor_called=false 同标准）——真 OO 内改单元格后回读 HTML 一致的最后一段需人工在真实 OO 编辑器验证。引擎侧往返正确性已由 materialize→extract 单测 + 发布链真 PG rematerialize 无 Roundtrip 错误双重保证。"
-    }
-  ]
+    "d2_sync_hits": 0,
+    "callback_url_keys": [
+      "doc_key",
+      "generation",
+      "room_id",
+      "route_credential_id",
+      "route_token"
+    ],
+    "sync_host_mounted": true,
+    "oo_iframe_count": 1,
+    "doc_editor_called": false,
+    "http_errors": [],
+    "console_errors": []
+  }
 }

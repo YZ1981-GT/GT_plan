@@ -1,8 +1,8 @@
 # D4-1..36 双向回写逐张现状清册
 
 > **基线日期**：2026-09-19（表格/统计基线）
-> **最近更新**：2026-09-21 第三轮（见文末「2026-09-21 第三轮」段：**D4-2 L2 真栈首次在当前发布态跑通**＋两处 apply 阻塞根因修复：value_type=json 单元格往返 bug（correctness）+ 转置 sheet other_sheet_parts 假 drift（verify 假红，方案 A）；7 张 L1 前端「在线编辑」切换器 gap 独立登记）
-> **上一轮更新**：2026-09-21 第二轮（**工作区 detached HEAD 事故**＋owner spec 进度 6 处过时数字更正＋「当前 bundle 上 applied=0」新实证＋第三维缺闭集守卫）
+> **最近更新**：2026-09-21 第四轮（见文末「2026-09-21 第四轮」段：前端「在线编辑」切换器不可达 7 张全修——6 类真前端 bug（.fields undefined / debounceTimer TDZ / ooHealthy 竞态 / 错误健康端点 / 缺 descriptor computed）+ 1 个 e2e 定位器 bug；全 20 张 dedicated sync L1 serial 20 passed）
+> **上一轮更新**：2026-09-21 第三轮（**D4-2 L2 真栈首次在当前发布态跑通**＋value_type=json 单元格往返 + 转置 sheet other_sheet_parts 假 drift 两处 apply 阻塞根因修复）
 > **目的**：为"逐张落地 D4 双向回写 + Playwright 验证"提供准确的起点清册。
 > **判据三维**（缺一不可，对齐主控文档 §6.4 `HOST-CONSUMES-UNIFIED-PATH`）：
 > 1. **owner spec** 进度（`.kiro/specs/*`）
@@ -636,3 +636,84 @@ pre-existing，已恢复改动。属 apply 半应用态的既有欠账，非本�
 - `backend/data/workpaper_sync_contracts/d4.revenue_detail.json` + 新 bundle/contract artifact（value_type regenerate）
 - 守卫：`test_json_cell_roundtrip.py`（新）/ `test_d4_interview_missing_fields_tolerance.py`（新）/
   `test_d4_12_transposed_roundtrip.py` / `test_d4_ipo_all_four_bidirectional_roundtrip.py`
+
+---
+
+## 2026-09-21 第四轮：前端「在线编辑」切换器不可达 7 张全修，D4 全 20 张 dedicated sync L1 全绿（本轮）
+
+> **本轮结论**：上一轮（第三轮 §④）诚实登记的「前端 D4-14/22/10/30/33/34/36 在线编辑切换器不可达」7 张
+> **全部根治**。逐张 chrome-devtools/playwright 实证 console 错误定位（非猜），挖出并触类旁通修掉 **6 类**
+> 真前端 bug + 1 个 e2e 定位器 bug。全 20 张 dedicated sync 底稿 L1 serial（`--workers=1`）**20 passed**。
+
+### 判据先厘清：为什么之前 7 张卡住
+
+7 张失败**不是** `currentSheet` 路由错（render-config 真实 sheet_name 全部干净以编码结尾，正则派生正确），
+而是**子组件 mount 期崩溃 / 静默不发请求**。逐张 devtools 实证的 console 错误锁定 6 类真因：
+
+### ① D4-30 render crash：`.fields` undefined（`Cannot read properties of undefined (reading 'time')`）
+
+- 卡片视图 `activeCustomer.fields[field.key]` / 矩阵 `cust.fields[row.key]`。后端 store 里一条客户行可能只有
+  `{id,name}`（合法半成品，**与后端 `phase5_d4_ipo_interview_sheets`「缺 fields 段 → None」容差同源**）→
+  `fields` undefined → 组件渲染抛错被 ErrorBoundary 捕获 → 子组件不挂载 → 在线编辑切换器不可达。
+- 修：`D4TabInterviewSummary.vue` `loadData` 加 `normalizeCustomers` 归一 `fields` 为对象（单源）。
+- **触类旁通**：`useD4CustomerDetail.ts`（D4-29）同一 `.fields[]` 模式（`relatedCount`/`completionRate` 也会崩）
+  同型修。守卫 `useD4CustomerDetail.normalize.spec.ts`（2 passed + 变异反证 RED）。
+
+### ② D4-10 TDZ crash：`Cannot access 'debounceTimer' before initialization`
+
+- `D4TabCustomerPrice.vue` 的 `immediate: true` watch 在 setup 期即跑 `persistData → debounceSave`，访问
+  `let debounceTimer`（声明在文件后段，处于 TDZ，`let` 不提升）→ ReferenceError 打挂组件。
+- 修：`debounceTimer` 声明上移到 setup 顶部（任何 immediate watch 之前）。
+- **级联发现**：D4-14/22/33/34/36 在批量 serial 里曾被 D4-10 崩溃**级联连累**（ErrorBoundary 捕获后同会话
+  后续 tab 受影响）——D4-10 修好后它们的渲染自愈，只剩各自的健康竞态（③④）。
+
+### ③ ooHealthy 竞态：切「在线编辑」静默 no-op（L1 判据1 `hits.length=0` 真因）
+
+- `switchMode`/`activateOnlineEdit` 里 `if (props.isReadonly || !ooHealthy.value) return`——`ooHealthy` 初始
+  `false`，`checkOoHealth()` 是 mount 期异步（端点 20ms 但仍可能晚于用户/自动化点击）。点击早于健康响应
+  到达 → 读到初始 false → **静默 return** → `switchToOnlyOffice` 从不触发 → store-projection/materialize
+  一个都不发 → 卡在「正在打开同步编辑器…」。
+- 修（D4-14/10/22/33/34/36）：健康未就绪时**当场 `await checkOoHealth()` 再判**，OO 真不可用才 return
+  （fail-visible 由桥/后端给）。D4-22 另去掉 `modeOptions` 的 `!ooHealthy` disabled（切换器保持可点，
+  健康门禁移进 `switchMode`），否则 disabled 段忽略点击、`switchMode` 根本不触发。
+
+### ④ 错误健康端点：`/api/onlyoffice/health` 404 + 错响应字段
+
+- D4-33/34/36 + D4-7(`D4TabMarginMonthly`)/D4-8(`D4TabProductMargin`) 打 `/api/onlyoffice/health`（**404**，
+  正确是 `/api/workpapers/onlyoffice/health`）且读错字段 `status === 'healthy'`（正确是 `.healthy` bool）→
+  `ooHealthy` 恒 false → 叠加 ③ 直接锁死在线编辑。
+- 修（触类旁通全 5 处）：URL → `/api/workpapers/onlyoffice/health`，判定 → `r.data?.data?.healthy ?? r.data?.healthy`。
+
+### ⑤ D4-30 缺 descriptor 计算属性（L1 判据4 `wp-sync-host` 超时）
+
+- `D4TabInterviewSummary.vue` 模板 `<WorkpaperSyncEditorHost v-if="d4SyncDescriptor" ...>`，但脚本**漏声明**
+  `d4SyncDescriptor` → 恒 undefined → materialize 成功拿到 descriptor 也永不挂载 OO 宿主。
+- 修：补 `const d4SyncDescriptor = computed(() => d4SyncBridge.descriptor.value)`（与已工作的 D4-31 同取法）。
+
+### ⑥ e2e 定位器 bug：`D4-22(?!\d)` 误命中 `D4-22A`
+
+- 验收 spec 的 tab 正则 `sheet.code + '(?!\\d)'`：对 code `D4-22` → `D4-22(?!\d)` **同时命中**「…D4-22」与
+  「…D4-22A（程序表）」，且 D4-22A 页签在 DOM 靠前 → `.first()` 误点到 `D4TabIpoProcedure`（无 dedicated
+  sync 桥、走 legacy OO）→ 点在线编辑不发 `/sync/` → `hits.length=0`。属**测试**bug 非产品。
+- 修：`e2e/d4-bidirectional-acceptance.spec.ts` 正则改 `(?![\dA-Za-z])` 排除字母后缀，精确区分编码与编码+字母变体。
+
+### 真栈验证
+
+- **全 20 张 dedicated sync 底稿 L1 serial（`--workers=1`）：20 passed**（store-projection 200 → materialize 200
+  → callback 4 项齐全 → 无 /d2-sync/* 旁路 → OnlyOffice DocEditor 真实挂载）。
+- 逐张手动 chrome-devtools/playwright MCP 实证：点击「在线编辑」→ store-projection/pending-mutations/materialize
+  三连 200 + OO iframe active（D4-14/22/30 各实证）。
+- 前端 vitest 回归：`useD4WalkthroughTest`(50) + `d4OccurrenceSyncHostWiring`(10) + `d4ContractSyncHostWiring`(10)
+  + 新 `useD4CustomerDetail.normalize`(2) = 72 passed 零回归。
+- ⚠️ 并行跑法（多 worker）仍会因 OnlyOffice 8080 单实例并发 contention 假失败——逐张 L1 **必须 `--workers=1`**。
+
+### 本轮改动文件（11 个，纯前端 + e2e，与后端 sync 修复不同层）
+
+- `D4TabInterviewSummary.vue`（normalizeCustomers + d4SyncDescriptor computed）
+- `useD4CustomerDetail.ts`（normalizeCustomers）+ 守卫 `__tests__/useD4CustomerDetail.normalize.spec.ts`（新）
+- `D4TabCustomerPrice.vue`（debounceTimer 上移 + switchMode 健康 await）
+- `D4TabOccurrence.vue`（activateOnlineEdit 健康 await）
+- `D4TabIpoIndicator.vue`（switchMode 健康 await + 去 !ooHealthy disabled）
+- `D4TabOtherMargin.vue` / `D4TabOtherContract.vue` / `D4TabOtherCutoff.vue`（健康端点修正 + switchMode 健康 await）
+- `D4TabMarginMonthly.vue` / `D4TabProductMargin.vue`（健康端点修正）
+- `e2e/d4-bidirectional-acceptance.spec.ts`（tab 正则 `(?![\dA-Za-z])`）

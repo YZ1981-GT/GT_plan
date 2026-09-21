@@ -51,7 +51,7 @@ const D4_7_ENTRY = 'xlsx/gt-d4-operating-revenue'
 const D4_7_SHEET_KEY = 'd47-managed'
 const ooHealthy = ref(false)
 async function checkOoHealth() {
-  try { const r = await http.get('/api/onlyoffice/health', { _silent: true } as any); ooHealthy.value = (r.data?.data?.status ?? r.data?.status) === 'healthy' } catch { ooHealthy.value = false }
+  try { const r = await http.get('/api/workpapers/onlyoffice/health', { _silent: true } as any); ooHealthy.value = r.data?.data?.healthy ?? r.data?.healthy ?? false } catch { ooHealthy.value = false }
 }
 checkOoHealth()
 const syncSwitching = ref(false)

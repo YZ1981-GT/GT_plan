@@ -32,6 +32,10 @@ const d4SyncBridge = useWorkpaperSyncBridge({
   reloadHtml: async () => { await reloadWorkpaperData?.() },
 })
 const syncHostRef = ref<{ forceSave: () => Promise<{ operationId: string }> } | null>(null)
+// 🔴 模板 `v-if="d4SyncDescriptor"` 依赖此计算属性；此前漏声明 → 恒 undefined → OO 编辑器
+//    宿主永不挂载、卡在「正在打开同步编辑器…」（L1 判据4 wp-sync-host 超时的真因）。
+//    与 D4-31 InterviewDetail 同一取法：materialize 产出的 descriptor 由桥暴露。
+const d4SyncDescriptor = computed(() => d4SyncBridge.descriptor.value)
 
 // ─── 访谈维度定义 ─────────────────────────────────────────────────────
 const INTERVIEW_FIELDS = [
@@ -69,14 +73,31 @@ function loadData() {
       const p = JSON.parse(r.remark)
       if (p && typeof p === 'object' && !Array.isArray(p)) {
         // 新格式: { customers: [...], customDimensions: [...] }
-        customers.value = p.customers || []
+        customers.value = normalizeCustomers(p.customers)
         customDimensions.value = p.customDimensions || []
         return
       }
-      if (Array.isArray(p)) { customers.value = p; customDimensions.value = []; return }
+      if (Array.isArray(p)) { customers.value = normalizeCustomers(p); customDimensions.value = []; return }
     } catch {}
   }
   customers.value = []; customDimensions.value = []
+}
+// 🔴 后端 store 里一条访谈客户行可能只有 {id,name}（尚未填 fields 子对象，合法半成品，
+//    与后端 phase5_d4_ipo_interview_sheets 的「缺 fields 段 → None」容差同源）。模板卡片视图
+//    `activeCustomer.fields[field.key]` / 矩阵视图 `cust.fields[row.key]` 若 fields 为 undefined
+//    会抛 `Cannot read properties of undefined (reading 'time')` 打挂整个组件渲染（ErrorBoundary
+//    捕获后子组件不挂载 → 在线编辑切换器不可达）。载入时统一归一 fields 为对象，单源杜绝。
+function normalizeCustomers(raw: unknown): InterviewCustomer[] {
+  if (!Array.isArray(raw)) return []
+  return raw
+    .filter((c): c is Record<string, unknown> => !!c && typeof c === 'object')
+    .map((c) => ({
+      id: String(c.id ?? ''),
+      name: String(c.name ?? ''),
+      fields: (c.fields && typeof c.fields === 'object' && !Array.isArray(c.fields))
+        ? (c.fields as Record<string, string>)
+        : {},
+    }))
 }
 function loadNote() { auditNote.value = props.allResponses.get('D4-30-note')?.remark || ''; auditConclusion.value = props.allResponses.get('D4-30-conclusion')?.remark || '' }
 watch(() => props.allResponses.get('D4-30-customers')?.remark, loadData, { immediate: true })

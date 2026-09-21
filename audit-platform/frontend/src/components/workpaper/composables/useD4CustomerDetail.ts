@@ -67,6 +67,25 @@ export interface CustomerItem {
   fields: Record<string, string>  // key → value
 }
 
+// 🔴 后端 store 里一条客户行可能只有 {id,name}（尚未填 fields 子对象，合法半成品，与后端
+//    phase5_d4_ipo_interview_sheets 的「缺 fields 段 → None」容差同源）。卡片视图
+//    `activeCustomer.fields[field.key]` / 矩阵视图 `cust.fields[row.key]` / relatedCount /
+//    completionRate 若 fields 为 undefined 会抛 `Cannot read properties of undefined` 打挂整个
+//    组件渲染（ErrorBoundary 捕获后子组件不挂载 → 在线编辑切换器不可达）。载入时统一归一
+//    fields 为对象，单源杜绝（与 D4TabInterviewSummary 同型修复）。
+function normalizeCustomers(raw: unknown): CustomerItem[] {
+  if (!Array.isArray(raw)) return []
+  return raw
+    .filter((c): c is Record<string, unknown> => !!c && typeof c === 'object')
+    .map((c) => ({
+      id: String(c.id ?? ''),
+      name: String(c.name ?? ''),
+      fields: (c.fields && typeof c.fields === 'object' && !Array.isArray(c.fields))
+        ? (c.fields as Record<string, string>)
+        : {},
+    }))
+}
+
 export interface UseD4CustomerDetailOptions {
   wpId: Ref<string>
   projectId: Ref<string>
@@ -91,7 +110,7 @@ export function useD4CustomerDetail(options: UseD4CustomerDetailOptions) {
   function loadData() {
     const r = allResponses.value.get('D4-29-customers')
     if (r?.remark) {
-      try { const p = JSON.parse(r.remark); if (Array.isArray(p)) { customers.value = p; return } } catch {}
+      try { const p = JSON.parse(r.remark); if (Array.isArray(p)) { customers.value = normalizeCustomers(p); return } } catch {}
     }
     customers.value = []
   }

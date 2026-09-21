@@ -402,7 +402,7 @@ const D4_8_SHEET_KEY = 'd48-managed'
 const modeOptions = ['表格视图', '在线编辑']
 const ooHealthy = ref(false)
 async function checkOoHealth() {
-  try { const r = await http.get('/api/onlyoffice/health', { _silent: true } as any); ooHealthy.value = (r.data?.data?.status ?? r.data?.status) === 'healthy' } catch { ooHealthy.value = false }
+  try { const r = await http.get('/api/workpapers/onlyoffice/health', { _silent: true } as any); ooHealthy.value = r.data?.data?.healthy ?? r.data?.healthy ?? false } catch { ooHealthy.value = false }
 }
 checkOoHealth()
 const syncSwitching = ref(false)

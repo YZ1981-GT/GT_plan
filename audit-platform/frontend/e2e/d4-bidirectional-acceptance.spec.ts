@@ -150,7 +150,11 @@ test.describe('D4 双向回写逐张 L1 验收', () => {
       await openD4Detail(page)
 
       // 点该 sheet 页签
-      const tab = page.locator('[role="tab"]').filter({ hasText: new RegExp(sheet.code.replace('-', '\\-') + '(?!\\d)') }).first()
+      // 🔴 负向前瞻必须排除**字母**后缀而非仅数字：sheet 名以编码结尾，`D4-22(?!\d)` 会同时命中
+      //    「…D4-22」与「…D4-22A（程序表）」，且 D4-22A 页签在 DOM 中靠前 → .first() 误点到
+      //    D4TabIpoProcedure（无 dedicated sync 桥、走 legacy OO）→ 点在线编辑不发 /sync/ 请求
+      //    → 判据1 hits.length=0（D4-22 真栈实证误判）。用 (?![\dA-Za-z]) 精确区分编码与编码+字母变体。
+      const tab = page.locator('[role="tab"]').filter({ hasText: new RegExp(sheet.code.replace('-', '\\-') + '(?![\\dA-Za-z])') }).first()
       await expect(tab, `${sheet.code} 页签应可见`).toBeVisible({ timeout: 30_000 })
       await tab.click()
       await page.waitForTimeout(1500)

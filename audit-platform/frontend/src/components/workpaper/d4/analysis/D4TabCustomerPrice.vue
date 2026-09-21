@@ -65,6 +65,9 @@ async function checkOoHealth() {
 checkOoHealth()
 const syncSwitching = ref(false)
 const syncHostRef = ref<{ forceSave: () => Promise<{ operationId: string }> } | null>(null)
+// 🔴 必须在任何 immediate watch 之前声明：setup 期 immediate watch 会经 persistData→debounceSave
+//    访问它，留到文件后段（let 处于 TDZ）会抛 ReferenceError 打挂组件（见下方「持久化」段说明）。
+let debounceTimer: ReturnType<typeof setTimeout> | null = null
 function flushPendingSave() { if (debounceTimer) { clearTimeout(debounceTimer); debounceTimer = null } flushSave() }
 function reloadD410() { loadData(); loadNoteConclusion(); loadAuditProcess() }
 const syncBridge = useWorkpaperSyncBridge({
@@ -97,7 +100,13 @@ async function switchMode(target: 'structured' | 'onlyoffice'): Promise<void> {
   const cur = syncBridge.mode.value === 'oo' ? 'onlyoffice' : 'structured'
   if (target === cur) return
   if (target === 'onlyoffice') {
-    if (props.isReadonly || !ooHealthy.value) return
+    if (props.isReadonly) return
+    // 🔴 竞态修复：切「在线编辑」可能早于 checkOoHealth() 异步响应到达；此前直接读
+    //    ooHealthy.value（可能仍初始 false）→ 静默 return → switchToOnlyOffice 从不触发
+    //    → store-projection/materialize 一个都不发（L1 真栈 hits.length=0 的真因）。
+    //    健康未就绪则当场 await 一次再判定，OO 真不可用才 return（fail-visible 由桥/后端给）。
+    if (!ooHealthy.value) await checkOoHealth()
+    if (!ooHealthy.value) return
     syncSwitching.value = true
     try { await syncBridge.switchToOnlyOffice() } finally { syncSwitching.value = false }
     return
@@ -373,7 +382,10 @@ async function importFromUpstream() {
 }
 
 // ─── 持久化 ──────────────────────────────────────────────────────────
-let debounceTimer: ReturnType<typeof setTimeout> | null = null
+// 🔴 debounceTimer 声明已上移到 setup 顶部（syncHostRef 之后）：`immediate: true` 的 watch
+//    在 setup 期就跑 persistData → debounceSave，若声明留在此处（let 不提升，处于 TDZ）会抛
+//    `Cannot access 'debounceTimer' before initialization` 打挂整个组件（ErrorBoundary 捕获 →
+//    子组件不挂载 → 在线编辑切换器不可达）。
 function persist(itemId: string, value: string) { props.allResponses.set(itemId, { item_id: itemId, conclusion: null, remark: value }); debounceSave() }
 function debounceSave() { if (debounceTimer) clearTimeout(debounceTimer); debounceTimer = setTimeout(() => { debounceTimer = null; flushSave() }, 2000) }
 function flushSave() { const keys = ['D4-10-audit-process', 'D4-10-data', 'D4-10-note', 'D4-10-conclusion']; const items = keys.map(k => props.allResponses.get(k)).filter(Boolean); window.dispatchEvent(new CustomEvent('d4:save-items', { detail: { items } })) }

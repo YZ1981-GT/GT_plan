@@ -100,13 +100,21 @@ const editorMode = computed<string>({
 })
 const modeOptions = computed(() => [
   { label: '表格视图', value: '表格视图' },
-  { label: '在线编辑', value: '在线编辑', disabled: props.isReadonly || !ooHealthy.value || syncBusy.value },
+  // 🔴 不再用 !ooHealthy 禁用切换器：健康检查是 mount 期异步（20ms 端点，但仍可能晚于用户点击），
+  //    此前 disabled 在健康未就绪时把切换器锁死 → 用户/自动化点击被忽略、从不触发 switchMode
+  //    → store-projection/materialize 一个都不发（L1 判据1 hits.length=0）。健康门禁改由 switchMode
+  //    内 `await checkOoHealth()` 把守（OO 真不可用时 fail-visible），切换器保持可点。
+  { label: '在线编辑', value: '在线编辑', disabled: props.isReadonly || syncBusy.value },
 ])
 async function switchMode(target: 'structured' | 'onlyoffice'): Promise<void> {
   const cur = syncBridge.mode.value === 'oo' ? 'onlyoffice' : 'structured'
   if (target === cur) return
   if (target === 'onlyoffice') {
-    if (props.isReadonly || !ooHealthy.value) return
+    if (props.isReadonly) return
+    // 🔴 竞态修复：切「在线编辑」可能早于 checkOoHealth() 异步响应；直接读初始 false 的
+    //    ooHealthy 会静默 return → 从不触发 switchToOnlyOffice。健康未就绪则当场 await 再判。
+    if (!ooHealthy.value) await checkOoHealth()
+    if (!ooHealthy.value) return
     syncSwitching.value = true
     try { await syncBridge.switchToOnlyOffice() } finally { syncSwitching.value = false }
     return

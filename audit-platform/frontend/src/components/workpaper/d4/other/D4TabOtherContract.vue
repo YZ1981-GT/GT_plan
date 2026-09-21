@@ -83,7 +83,7 @@ const D4_34_ENTRY = 'xlsx/gt-d4-operating-revenue'
 const D4_34_SHEET_KEY = 'd434-managed'
 const ooHealthy = ref(false)
 async function checkOoHealth() {
-  try { const r = await http.get('/api/onlyoffice/health', { _silent: true } as any); ooHealthy.value = (r.data?.data?.status ?? r.data?.status) === 'healthy' } catch { ooHealthy.value = false }
+  try { const r = await http.get('/api/workpapers/onlyoffice/health', { _silent: true } as any); ooHealthy.value = r.data?.data?.healthy ?? r.data?.healthy ?? false } catch { ooHealthy.value = false }
 }
 checkOoHealth()
 const syncSwitching = ref(false)
@@ -113,7 +113,11 @@ async function switchMode(target: 'structured' | 'onlyoffice'): Promise<void> {
   const cur = syncBridge.mode.value === 'oo' ? 'onlyoffice' : 'structured'
   if (target === cur) return
   if (target === 'onlyoffice') {
-    if (props.isReadonly || !ooHealthy.value) return
+    if (props.isReadonly) return
+    // 🔴 竞态修复：切「在线编辑」可能早于 checkOoHealth() 异步响应；直接读初始 false 的
+    //    ooHealthy 会静默 return → 从不触发 switchToOnlyOffice。健康未就绪则当场 await 再判。
+    if (!ooHealthy.value) await checkOoHealth()
+    if (!ooHealthy.value) return
     syncSwitching.value = true
     try { await syncBridge.switchToOnlyOffice() } finally { syncSwitching.value = false }
     return

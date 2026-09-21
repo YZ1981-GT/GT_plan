@@ -133,8 +133,15 @@ const syncBusy = computed(
 )
 // 在线编辑激活时，惰性切到 OO 模式（bridge 内部管理 html↔oo 往返）。
 async function activateOnlineEdit(): Promise<void> {
-  if (props.isReadonly || !ooHealthy.value) return
+  if (props.isReadonly) return
   if (syncBridge.mode.value === 'oo') return
+  // 🔴 竞态修复：editorMode 可能在 checkOoHealth() 的异步响应到达**之前**就被切成「在线编辑」
+  //    （用户/自动化点得快，或 async 子组件刚挂载）。此前直接读 ooHealthy.value（可能仍是初始
+  //    false）→ 静默 return → switchToOnlyOffice 从不触发 → 卡在「正在打开同步编辑器…」、
+  //    store-projection/materialize 一个都不发（L1 真栈 hits.length=0 的真因）。改为：健康未就绪
+  //    时**当场 await 一次健康检查**再判定，OO 真的不可用才 return（fail-visible 由桥/后端给）。
+  if (!ooHealthy.value) await checkOoHealth()
+  if (!ooHealthy.value) return
   syncSwitching.value = true
   try { await syncBridge.switchToOnlyOffice() } finally { syncSwitching.value = false }
 }
