@@ -3049,8 +3049,25 @@ def _collect_fields(
         if observed_formula:
             formula_inventory[stable_key] = observed_formula
 
+        # 🔴 json：materialize 侧把 value 自身的 JSON 文本落到单元格（见
+        #    excel_materialize._normalised_write_value 的对称说明）。extract 必须把这串文本
+        #    `json.loads` 解回 Python 对象，projection 才与提交侧持同一形态；否则 raw 字符串
+        #    进 `normalize_value` 会被再包一层 `{"v": "<那串>"}` ⇒ Property 65 假红。
+        #    解析失败（用户在 OO 里把 JSON 手改坏）→ 保留原串，让下方 normalize 校验记
+        #    type_normalization_failure（交人工裁决，绝不静默吞）。
+        field_value: Any = raw
+        if spec.value_type is ValueType.json and isinstance(raw, str):
+            text = raw.strip()
+            if text == "":
+                field_value = None
+            else:
+                try:
+                    field_value = json.loads(text)
+                except (TypeError, ValueError):
+                    field_value = raw
+
         try:
-            normalize_value(raw, spec.value_type)
+            normalize_value(field_value, spec.value_type)
         except ValueNormalizationError as exc:
             anomalies.append(
                 StructuralAnomaly(
@@ -3069,7 +3086,7 @@ def _collect_fields(
 
         values[stable_key] = FieldValue(
             stable_key=stable_key,
-            value=raw,
+            value=field_value,
             value_type=spec.value_type,
             mode=spec.mode,
             row_key=row_identity or None,

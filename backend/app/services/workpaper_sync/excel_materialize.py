@@ -1601,12 +1601,25 @@ def _normalised_write_value(field: FieldValue, spec: FieldSpec, coord: str) -> A
     反读认为不等值」就会变成无法解释的发布失败。
     """
     try:
-        return normalize_value(field.value, spec.value_type)
+        normalized = normalize_value(field.value, spec.value_type)
     except ValueNormalizationError as exc:
         raise EditableCellWriteError(
             f"受管格 {coord}（{spec.stable_field_key}）的值 {field.value!r} 无法按 "
             f"{spec.value_type.value} 规范化: {exc} —— 不得写一个自己都读不懂的值"
         ) from exc
+    # 🔴 json：`normalize_value` 返回的是 canonical **bytes**（`{"v": value}` 包裹，仅作
+    #    比较口径的键）。它绝不能被 `inline_text` 的 `str(write.value)` 直接落盘 —— 那会写成
+    #    Python bytes repr（带 `b'...'` 前缀），extract 读回该字符串后 `normalize_value` 再
+    #    包一层 `{"v": "<那串>"}` ⇒ 与提交侧 `{"v": value}` 永远不等值（Property 65 假红：
+    #    「提交 {} → 反读 'b\'{"v":{}}\''」，D4-30 custom_dimensions / D4-31 q1_relation 真栈实测）。
+    #    落盘的应是 **value 自身**的 JSON 文本（`{}` / `[]` / `{"a":1}`），extract 侧对称
+    #    `json.loads` 解回对象；两侧都持 Python 对象后，`normalize_value` 对称包裹即等值。
+    #    仍用 normalize_value 先校验（拒 NaN/Infinity/非可序列化），只是落盘换成解包后的文本。
+    if spec.value_type is ValueType.json:
+        if field.value is None:
+            return None
+        return json.dumps(field.value, ensure_ascii=False, sort_keys=True)
+    return normalized
 
 
 def plan_managed_writes(
@@ -2918,6 +2931,7 @@ def materialize_projection(
     intended_formulas: Mapping[str, str] | None = None,
     limits: SyncLimits | None = None,
     retain_identity_inventory: bool = True,
+    compute_structure_hash: bool = True,
 ) -> ExcelMaterializeOutcome:
     """把 projection 写进 substrate 的**副本**，产出 staged 文件。
 
@@ -3023,7 +3037,18 @@ def materialize_projection(
             output_path=output,
             document_type=definitions.contract.document_type,
             artifact_sha256=hashlib.sha256(staged_bytes).hexdigest(),
-            structure_hash=normalized_structure_hash(staged_bytes),
+            # 🔴 ROI-2（多 sheet 性能）：非终趟的 structure_hash 在 adapter.materialize 的
+            #    多 binding 循环里**必被丢弃**（只保留 last_result.structure_hash），且最终值
+            #    还会被 ContentMutationService._projection_structure_hash 按观测器同构口径覆盖
+            #    （BP-30）。故非终趟跳过整簿 normalized_structure_hash（每趟 ~1.4s×34≈52s）是
+            #    纯删死算，不改任何被消费的值。终趟/单 binding 仍照算（compute_structure_hash=True）。
+            #    占位用 staged 字节 sha256（已算，合法 64-hex，满足 MaterializeResult 非空校验），
+            #    它永不被消费（下游只读终趟的 structure_hash）。
+            structure_hash=(
+                normalized_structure_hash(staged_bytes)
+                if compute_structure_hash
+                else hashlib.sha256(staged_bytes).hexdigest()
+            ),
             identity_inventory_sha256=staged_inventory.inventory_digest,
             managed_field_count=len(plan.field_writes),
             # 🔴 BP-23：把**写盘前冻结的**三个结构性声明随产物一起带出去，

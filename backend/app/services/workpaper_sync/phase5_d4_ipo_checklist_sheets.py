@@ -121,12 +121,16 @@ TABLE_NAME_D425: Final[str] = f"GT_{TEMPLATE_ID_D425}_ROWS"
 
 #: 13 列（json_path = 前端 ipoChecklistSchema D4-25 列 key）。
 MANAGED_FIELD_SPECS_D425: Final[tuple[tuple[str, str, str, str, str, str], ...]] = (
-    ("seq", "A", "editable", "text", "seq", "序号"),
+    # 🔴 value_type 对齐前端 ipoChecklistSchema「唯一结构真源」：seq=number→amount、
+    #    proportion=percent→ratio。此前误标 text，store 存 int（seq:1/proportion:1）在
+    #    materialize `normalize_value(1,'text')` 抛 EditableCellWriteError，打挂整册 apply。
+    #    amount/ratio 经 _DECIMAL_TYPES 接受 int→Decimal，往返正确。
+    ("seq", "A", "editable", "amount", "seq", "序号"),
     ("customer_name", "B", "editable", "text", "customerName", "客户名称"),
     ("dealer", "C", "editable", "text", "dealer", "经销商"),
     ("sales_qty", "D", "editable", "amount", "salesQty", "本期销售数量"),
     ("sales_amount", "E", "editable", "amount", "salesAmount", "本期销售金额"),
-    ("proportion", "F", "editable", "text", "proportion", "占同类交易比例"),
+    ("proportion", "F", "editable", "ratio", "proportion", "占同类交易比例"),
     ("ar_balance", "G", "editable", "amount", "arBalance", "期末应收账款余额"),
     ("is_related", "H", "editable", "text", "isRelated", "是否关联方"),
     ("entity_type", "I", "editable", "text", "entityType", "个人/企业"),
@@ -169,7 +173,8 @@ MANAGED_FIELD_SPECS_D426: Final[tuple[tuple[str, str, str, str, str, str], ...]]
     ("product_type", "C", "editable", "text", "productType", "产品种类"),
     ("business_mode", "D", "editable", "text", "businessMode", "业务模式"),
     ("sales_amount", "E", "editable", "amount", "salesAmount", "本期销售金额"),
-    ("proportion", "F", "editable", "text", "proportion", "占同类交易比例"),
+    # value_type 对齐前端 percent → ratio（此前误标 text）。
+    ("proportion", "F", "editable", "ratio", "proportion", "占同类交易比例"),
     ("trade_mode", "G", "editable", "text", "tradeMode", "贸易模式"),
     ("trade_terms", "H", "editable", "text", "tradeTerms", "主要贸易条款"),
     ("settlement_mode", "I", "editable", "text", "settlementMode", "出口结算模式"),
@@ -214,7 +219,8 @@ TABLE_NAME_D427: Final[str] = f"GT_{TEMPLATE_ID_D427}_ROWS"
 
 #: 18 列 A–R；总计列 M 源模板内嵌 =SUM(C15:L15) → 入 mask，不入受管契约（17 契约字段）。
 MANAGED_FIELD_SPECS_D427: Final[tuple[tuple[str, str, str, str, str, str], ...]] = (
-    ("seq", "A", "editable", "text", "seq", "序号"),
+    # seq value_type 对齐前端 number → amount（此前误标 text，store int 撞 normalize）。
+    ("seq", "A", "editable", "amount", "seq", "序号"),
     ("name", "B", "editable", "text", "name", "姓名"),
     # 10 个身份属性勾选列：value_type=boolean（源模板示例 C16=1/G16=1 即勾选态）。
     ("is_personal_customer", "C", "editable", "boolean", "isPersonalCustomer", "个人客户"),
@@ -266,15 +272,16 @@ TABLE_NAME_D428: Final[str] = f"GT_{TEMPLATE_ID_D428}_ROWS"
 
 #: 15 列 = 9 主(A–I) + 核查方式 5 子(J–N) + 索引号(O)。占比列 E/G/I 前端表内计算，OO 无内嵌公式。
 MANAGED_FIELD_SPECS_D428: Final[tuple[tuple[str, str, str, str, str, str], ...]] = (
-    ("seq", "A", "editable", "text", "seq", "序号"),
+    # seq number→amount、三个占比 percent→ratio，对齐前端「唯一结构真源」（此前误标 text）。
+    ("seq", "A", "editable", "amount", "seq", "序号"),
     ("customer_name", "B", "editable", "text", "customerName", "客户名称"),
     ("selection_reason", "C", "editable", "text", "selectionReason", "选取原因"),
     ("sales_amount", "D", "editable", "amount", "salesAmount", "销售金额"),
-    ("sales_proportion", "E", "editable", "text", "salesProportion", "占总交易比重"),
+    ("sales_proportion", "E", "editable", "ratio", "salesProportion", "占总交易比重"),
     ("ar_balance", "F", "editable", "amount", "arBalance", "应收账款期末余额"),
-    ("ar_proportion", "G", "editable", "text", "arProportion", "占期末余额比重"),
+    ("ar_proportion", "G", "editable", "ratio", "arProportion", "占期末余额比重"),
     ("contract_liab_balance", "H", "editable", "amount", "contractLiabBalance", "合同负债期末余额"),
-    ("contract_liab_proportion", "I", "editable", "text", "contractLiabProportion", "占期末余额比重"),
+    ("contract_liab_proportion", "I", "editable", "ratio", "contractLiabProportion", "占期末余额比重"),
     # 5 个核查方式勾选列：value_type=boolean（勾选落 <v>1</v>，未勾空格）。
     ("method_business_info", "J", "editable", "boolean", "methodBusinessInfo", "工商资料查询"),
     ("method_internet", "K", "editable", "boolean", "methodInternet", "互联网信息查询"),

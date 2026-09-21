@@ -209,3 +209,88 @@ def test_merge_conflict_semantics_managed_overwritten_metafield_kept(contract):
     assert row["attachmentId"] == "att-old"
     assert row["ocrStatus"] == "done"
     assert applied > 0
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# 空转置表中性化假 drift 回归守卫（本轮修复：adapters/excel.verify_unmanaged_regions）
+#
+# 🔴 根因：verify 侧转置中性化对**空转置表**（D4-12 无行）仍无条件跑
+#    materialize_transposed_workbook，其 openpyxl `wb.save()` 会**重序列化目标 sheet
+#    part**，即便零实体也产出字节不同的 XML。而 materialize 侧对空转置表是 no-op
+#    （materialize_file: `if spec.table_key not in projection.row_keys: return`），故 after
+#    的该 sheet 与 before 逐字节相同。若中性化仍无条件重投影，就把 before 那张 sheet 无谓
+#    openpyxl 重写成字节不同 ⇒ verify 的 other_sheet_parts 把「after==before 的空转置
+#    sheet」判成 drift（真栈 D4-12 无行时 sheet17 假漂移、apply 卡 adapter_unmanaged_region_drift）。
+# 修复：中性化循环 `after_rows = _transposed_extract(after)`，**空则 continue 跳过**
+#    （与 materialize 侧对称），仅当有非空实体才切 before_for_compare。
+# ═══════════════════════════════════════════════════════════════════════
+
+
+def test_empty_transposed_roundtrip_is_NOT_byte_idempotent(template):
+    """记录陷阱本身：空转置表的 materialize(extract()) 往返**不是**逐字节幂等。
+
+    这正是「中性化必须跳过空转置表」的理由 —— 若不跳，中性化会把 before 的该 sheet
+    无谓重写成字节不同，从而在 verify 里制造假 drift。此测试把这个 openpyxl 重序列化
+    事实钉死：一旦哪天引擎改成空表 no-op（字节幂等），本断言会提醒复核「跳过」是否仍必要。
+    """
+    import hashlib
+    import zipfile
+
+    S = "xl/worksheets/"
+
+    def _managed_sheet_part(data: bytes) -> str:
+        # D4-12 受管 sheet 的 part 路径（按 workbook.xml → rels 解析）
+        import re
+        with zipfile.ZipFile(io.BytesIO(data)) as z:
+            wb = z.read("xl/workbook.xml").decode("utf-8", "replace")
+            rels = z.read("xl/_rels/workbook.xml.rels").decode("utf-8", "replace")
+        rid = next(m.group(2) for m in re.finditer(r'<sheet[^>]*name="([^"]+)"[^>]*r:id="([^"]+)"', wb)
+                   if m.group(1) == d12.MANAGED_SHEET)
+        tgt = dict(re.findall(r'Id="([^"]+)"[^>]*Target="([^"]+)"', rels))[rid]
+        return "xl/" + tgt.lstrip("/")
+
+    def _part_sha(data: bytes, part: str) -> str:
+        with zipfile.ZipFile(io.BytesIO(data)) as z:
+            return hashlib.sha256(z.read(part)).hexdigest()
+
+    part = _managed_sheet_part(template)
+    # 空转置表：extract 得 0 实体
+    assert _extract_business(template) == []
+    # 无谓往返（extract 空 → materialize 回）——openpyxl 重序列化使字节改变
+    round_tripped = d12.materialize_transposed_workbook(template, _extract_business(template))
+    assert _part_sha(template, part) != _part_sha(round_tripped, part), (
+        "若此断言失败说明空转置往返已字节幂等——需复核 verify 中性化的「空则跳过」是否仍必要"
+    )
+
+
+def test_verify_neutralization_skips_empty_transposed_spec_source_anchor():
+    """AST 锚点：adapters/excel.verify_unmanaged_regions 的转置中性化循环必须**先取
+    after_rows 再对空跳过**（`if not after_rows: continue`），否则空转置表假 drift 复发。
+
+    这是行为级判据的源码形态守卫（同 repo 既有 AST 守卫风格）：删掉「空则跳过」这行、
+    或改回无条件 `_transposed_materialize` 都会让本测试打红。
+    """
+    import ast
+    import inspect
+    import textwrap
+
+    from app.services.workpaper_sync.adapters import excel as AX
+
+    src = textwrap.dedent(inspect.getsource(AX.ExcelSyncAdapter.verify_unmanaged_regions))
+    tree = ast.parse(src)
+
+    # 找到「for spec in specs」循环体，断言其中有基于 after_rows 空值的 continue
+    found_guard = False
+    for node in ast.walk(tree):
+        if isinstance(node, ast.For):
+            body_src = ast.get_source_segment(src, node) or ""
+            if "_transposed_extract" in body_src or "_transposed_materialize" in body_src:
+                # 循环体里必须出现「空 rows → continue」的短路，且在 materialize 调用之前
+                if "continue" in body_src and (
+                    "not after_rows" in body_src or "if not " in body_src
+                ):
+                    found_guard = True
+    assert found_guard, (
+        "verify_unmanaged_regions 的转置中性化循环缺「空 after_rows 跳过」守卫 —— "
+        "空转置表会被 openpyxl 重序列化制造假 other_sheet_parts drift（D4-12 真栈复现）"
+    )

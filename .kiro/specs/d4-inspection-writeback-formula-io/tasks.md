@@ -65,3 +65,26 @@
   - 覆盖全平台 ~35 个推送点（useA13MisstatementBridge 唯一消费者）。
   - 🔴 **剩余未做（如实登记）**：「失败重试队列 / 持久 outbox」属更重的异步基础设施，本次未做 —— A13 是同步 POST，失败即时返回由前端 try/catch 计 fail；durable 幂等已消除重复错报这一真栈实测印证的主要痛点。
   - _Requirements: 3.3_
+
+## 任务状态归并表（2026-09-21 append-only；上方 1-7 原文与复选框一律不动）
+
+> **为什么要这张表**：本文件同时存在两代任务编号 —— 草案代 `1-7`（`[ ]`）与 Governance Addendum
+> 做实代 `T1-T7 / B1-B3`（全 `[x]`）。机械统计复选框会得出「9/16 未完成」，**与实际状态相反**：
+> 草案 1-7 已被 T1-T7/B1-B3 逐条承接做实或显式裁决，**没有一条是"待开工"**。本表是唯一权威对照。
+> 按「历史档案 append-only」铁律，不回改 1-7 的 `[ ]`，只在此登记映射。
+
+| 草案任务 | 承接者 | 现状 | 证据 |
+|---|---|---|---|
+| 1. 源模板核定与稳定 ID gate | **T1** `[x]` | 已做实 | `evidence/t1-source-template-gate.md`（9 sheet 逐 sheet + 两级表头 merges + item_id/行 id 前缀/三态边界核定 + 2 处非阻断偏差登记） |
+| 2. 共享公式与双模式 gate | **B1/B2** `[x]` + **B3** `[x]` | D4-15/16 已做实；**D4-13 裁 N/A**（纯叙述文本表无行集）；**D4-14 已移交专项 spec `d4-14-walkthrough-writeback` 并于 2026-09-21 落地**（`d414-managed` 34 受管字段 / 契约 34 张 / gen83 / 前端接桥 + 宿主登记 'D4-14'） | `test_d4_inspection_store_roundtrip.py`(18) / `d4InspectionSyncHostWiring.spec.ts`(19) / `evidence/b3-durable-ack.md` |
+| 3. D4-13/15/16 IO | **T3** `[x]` | 已做实 | `test_d4_inspection_io_roundtrip.py`(7) + `test_d4_inspection_io_guards.py`(6) |
+| 4. 发现→人工认定业务链 | **T4** `[x]` | 已做实 | `d4InspectionWriteback.spec.ts`(21，含 T4 段 9 条) |
+| 5. A13 + D4-1 独立持久链 | **T5** `[x]` + **B3** `[x]` | durable **幂等**已做实（V164 `source_identity` + 部分唯一索引，真 PG 实测同 identity 两次 POST → 恰 1 行）；**失败重试队列/持久 outbox 仍未做**，已在 B3 如实登记为遗留 | `evidence/t4-t5-linkage-chain.md` / `test_misstatement_source_identity_dedup.py`(4) |
+| 6. 行为守卫与变异检验 | **T6** `[x]` | 已做实（变异真实揪出并修复 1 处守卫缺陷：T4 守卫只扫 `pushToA13(` 漏 wrapper `handlePushToA13(`） | `evidence/t6-guards-mutation.md`，两个 mutate 脚本锚点全 RED |
+| 7. 真栈验收与收口 | **T7** `[x]` + **B2** `[x]` | 离线/REQUEST_PATH 级已做实（D4-15/16 真栈 Playwright noticeCount=0 / syncTag=已同步 / 0 console error，截图 `evidence/d4-16-live-clean.png`）；**真 OO canvas 单元格往返仍 env 门**（批次C，D4 全组无一张达标） | `evidence/d4-16-live-clean.png` + 清册 §统计段口径 |
+
+**结论：本 spec 无"需要继续做"的本 spec 产物**。两处如实留白，且都不属本 spec 可独立解除：
+1. **A13 失败重试队列 / 持久 outbox**（B3 已登记）—— 平台级异步基础设施，宜单立 spec，不该塞进本 spec。
+2. **真 OO canvas 往返**（批次C）—— D4 全组 34 张共同的最后一道门，见清册 §逐张推进优先级 第 1 条。
+
+**遗留的唯一"账面失真"就是上方 1-7 的 `[ ]`**，本表即为其对照说明；后续统计 D4 spec 完成度时请按 T/B 代计（T1-T7 + B1-B3 = 10/10），不要把 1-7 重复计入分母。

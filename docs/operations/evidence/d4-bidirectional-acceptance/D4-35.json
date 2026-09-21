@@ -1,7 +1,7 @@
 {
   "sheet": "D4-35",
   "sheet_name": "其他业务收入检查表D4-35",
-  "captured_at": "2026-09-19T12:45:05.260Z",
+  "captured_at": "2026-09-21T04:06:20.901Z",
   "scope": {
     "project_id": "0ec33ac9-3de5-4e65-b3bf-f9dccd7b2a49",
     "wp_id": "b3ab3c46-828f-4f48-950e-aee9bbdc923f",
@@ -38,6 +38,11 @@
     "sync_host_mounted": true,
     "oo_iframe_count": 1,
     "doc_editor_called": false,
-    "console_errors": []
+    "http_errors": [],
+    "console_errors": [
+      "Failed to load resource: the server responded with a status of 500 (Internal Server Error)",
+      "Failed to load resource: the server responded with a status of 500 (Internal Server Error)",
+      "Failed to load resource: the server responded with a status of 500 (Internal Server Error)"
+    ]
   }
 }

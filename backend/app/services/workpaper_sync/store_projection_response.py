@@ -182,9 +182,16 @@ async def compute_store_projection_response(
                     {"wp": str(wp_id), "item": item},
                 )
             ).scalar_one_or_none()
-            payloads[item] = (
-                str(row) if row is not None and str(row).strip() else empty
-            )
+            # 🔴 缺失/空 item **不塞** blanket `empty`（"[]"）：dict-store（D4-9 `{}`）与
+            #    singleton（D4-31 `{}`）拿到列表默认 "[]" 会在 provider 内抛非 domain
+            #    ValueError（如「D4-31 必须是单对象问卷」），一路冒泡成 opaque 500，
+            #    连累整个 entry（34 张）store-projection。让 build_combined_store_projection
+            #    的 `payloads.get(item, <per-item 默认>)` 用 provider 单源 per-item 默认
+            #    （list item → []、dict/singleton → {}）。与 d43_rematerialize 的
+            #    `test_dict_store_missing_key_uses_provider_default_not_empty_list` 同源修复，
+            #    此前只修了 rematerialize 侧、漏了本只读 projection 侧。
+            if row is not None and str(row).strip():
+                payloads[item] = str(row)
         # D4-5 固定 item（remark 纯文本）一并喂 combined
         for item in tuple(getattr(provider, "STORE_ITEM_IDS_D45_FIXED", ()) or ()):
             row = (

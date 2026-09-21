@@ -145,8 +145,10 @@ def _sample_row(code: str, row_uuid: str) -> dict[str, Any]:
             continue
         if vt == "boolean":
             row[json_path] = (json_path == checked)  # 第一个 True，其余显式 False
-        elif vt == "amount":
-            row[json_path] = 1234.56
+        elif vt in ("amount", "ratio", "rate", "integer", "number"):
+            # 🔴 数值型（含占比 ratio，此前误标 text 已修正为对齐前端 percent）：给数值。
+            #    ratio 给一个非整小数，验证小数往返；amount 给固定金额。
+            row[json_path] = 0.25 if vt in ("ratio", "rate") else 1234.56
         else:
             row[json_path] = f"v-{json_path}"
     return row
@@ -190,6 +192,7 @@ def test_bidirectional_roundtrip_through_real_ooxml(
     # 逐字段核对两向一致
     cb_paths = {spec[4] for spec in s["fields"] if spec[3] == "boolean"}
     amount_paths = {spec[4] for spec in s["fields"] if spec[3] == "amount"}
+    ratio_paths = {spec[4] for spec in s["fields"] if spec[3] in ("ratio", "rate")}
     checked = _checked_path(code)
     for column_key, _c, _m, vt, json_path, _h in s["fields"]:
         if json_path == "seq":
@@ -204,6 +207,11 @@ def test_bidirectional_roundtrip_through_real_ooxml(
                 )
         elif json_path in amount_paths:
             assert abs(float(out[json_path]) - 1234.56) <= 0.005, f"{code}.{json_path}: 金额往返超容差"
+        elif json_path in ratio_paths:
+            # 占比 ratio：小数往返（0.25）；此前误标 text 会走文本分支，现按数值核对。
+            assert abs(float(out[json_path]) - 0.25) <= 0.0005, (
+                f"{code}.{json_path}: 占比往返超容差（实得 {out.get(json_path)!r}）"
+            )
         else:
             assert out.get(json_path) == f"v-{json_path}", (
                 f"{code}.{json_path}: 文本往返丢值/串列（实得 {out.get(json_path)!r}）"

@@ -1,6 +1,6 @@
 {
   "script": "e2e/g5-1-d4-unified-path.spec.ts",
-  "captured_at": "2026-09-12T15:51:34.100Z",
+  "captured_at": "2026-09-21T03:53:20.950Z",
   "scope": {
     "project_id": "0ec33ac9-3de5-4e65-b3bf-f9dccd7b2a49",
     "wp_id": "b3ab3c46-828f-4f48-950e-aee9bbdc923f",
@@ -27,7 +27,7 @@
     "forcesave_hits": [
       {
         "method": "POST",
-        "path": "/api/projects/0ec33ac9-3de5-4e65-b3bf-f9dccd7b2a49/workpapers/b3ab3c46-828f-4f48-950e-aee9bbdc923f/sync/entries/xlsx/gt-d4-operating-revenue/rooms/59121da3-8c3e-450f-a83d-bf1135466a94/forcesave",
+        "path": "/api/projects/0ec33ac9-3de5-4e65-b3bf-f9dccd7b2a49/workpapers/b3ab3c46-828f-4f48-950e-aee9bbdc923f/sync/entries/xlsx/gt-d4-operating-revenue/rooms/4b90e130-fecd-40f9-a4f9-1b2f9c8221ad/forcesave",
         "status": 202
       }
     ],
@@ -39,7 +39,7 @@
       "route_credential_id",
       "route_token"
     ],
-    "callback_url_redacted": "http://host.docker.internal:9980/api/workpaper-sync/rooms/59121da3-8c3e-450f-a83d-bf1135466a94/onlyoffice-callback?room_id=%3Credacted%3E&generation=%3Credacted%3E&doc_key=%3Credacted%3E&route_credential_id=%3Credacted%3E&route_token=%3Credacted%3E",
+    "callback_url_redacted": "http://host.docker.internal:9980/api/workpaper-sync/rooms/4b90e130-fecd-40f9-a4f9-1b2f9c8221ad/onlyoffice-callback?room_id=%3Credacted%3E&generation=%3Credacted%3E&doc_key=%3Credacted%3E&route_credential_id=%3Credacted%3E&route_token=%3Credacted%3E",
     "host_mounted": true,
     "confirm_descriptor_200": true,
     "forcesave_clicked": true,
@@ -60,7 +60,7 @@
       "cs_outcome",
       "callback_expected"
     ],
-    "materialize_room_id": "59121da3-8c3e-450f-a83d-bf1135466a94",
+    "materialize_room_id": "4b90e130-fecd-40f9-a4f9-1b2f9c8221ad",
     "materialize_has_jwt_token": true,
     "doc_editor_called": false,
     "doc_editor_has_root_token": false,
@@ -70,14 +70,14 @@
     "confirm_forcesave_error": null,
     "html_dom_roundtrip": {
       "attempted": true,
-      "marker": "g5d4228488",
+      "marker": "g5d4620305",
       "switched_to_html": true,
       "marker_visible": true,
       "store_mirrored": true,
       "dom_probe": {
         "by_exact_text": 0,
         "input_prop_hits": 1,
-        "tracked_operation_id": "4170b4fb-e156-42a9-8215-3ed51e2f76af",
+        "tracked_operation_id": "3aa3ac6c-75cb-4c94-a302-2a6312a5f1ef",
         "search_filled": true,
         "row_chip": "共 8 行"
       }
@@ -142,11 +142,11 @@
       "pasted": true,
       "closeRet": true,
       "closed": true,
-      "cellText": "g5d4228488",
+      "cellText": "g5d4620305",
       "modified": true,
       "saveRet": true,
       "saved": true,
-      "cellTextAfterSave": "g5d4228488"
+      "cellTextAfterSave": "g5d4620305"
     },
     "http_errors": []
   },

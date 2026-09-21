@@ -3243,7 +3243,7 @@
               "source_ref": "源xlsx!经销商检查D4-25!A12",
               "stable_field_key": "dealer_check_rows/{row_uuid}/seq",
               "store_item_id": "D4-25-rows",
-              "value_type": "text"
+              "value_type": "amount"
             },
             {
               "cell": {
@@ -3318,7 +3318,7 @@
               "source_ref": "源xlsx!经销商检查D4-25!F12",
               "stable_field_key": "dealer_check_rows/{row_uuid}/proportion",
               "store_item_id": "D4-25-rows",
-              "value_type": "text"
+              "value_type": "ratio"
             },
             {
               "cell": {
@@ -3542,7 +3542,7 @@
               "source_ref": "源xlsx!境外销售收入检查D4-26!F13",
               "stable_field_key": "overseas_sales_rows/{row_uuid}/proportion",
               "store_item_id": "D4-26-rows",
-              "value_type": "text"
+              "value_type": "ratio"
             },
             {
               "cell": {
@@ -3781,7 +3781,7 @@
               "source_ref": "源xlsx!识别未披露的关联方D4-27!A15",
               "stable_field_key": "undisclosed_rp_rows/{row_uuid}/seq",
               "store_item_id": "D4-27-rows",
-              "value_type": "text"
+              "value_type": "amount"
             },
             {
               "cell": {
@@ -4067,7 +4067,7 @@
               "source_ref": "源xlsx!客户信息核查清单D4-28!A14",
               "stable_field_key": "customer_checklist_rows/{row_uuid}/seq",
               "store_item_id": "D4-28-rows",
-              "value_type": "text"
+              "value_type": "amount"
             },
             {
               "cell": {
@@ -4127,7 +4127,7 @@
               "source_ref": "源xlsx!客户信息核查清单D4-28!E14",
               "stable_field_key": "customer_checklist_rows/{row_uuid}/sales_proportion",
               "store_item_id": "D4-28-rows",
-              "value_type": "text"
+              "value_type": "ratio"
             },
             {
               "cell": {
@@ -4157,7 +4157,7 @@
               "source_ref": "源xlsx!客户信息核查清单D4-28!G14",
               "stable_field_key": "customer_checklist_rows/{row_uuid}/ar_proportion",
               "store_item_id": "D4-28-rows",
-              "value_type": "text"
+              "value_type": "ratio"
             },
             {
               "cell": {
@@ -4187,7 +4187,7 @@
               "source_ref": "源xlsx!客户信息核查清单D4-28!I14",
               "stable_field_key": "customer_checklist_rows/{row_uuid}/contract_liab_proportion",
               "store_item_id": "D4-28-rows",
-              "value_type": "text"
+              "value_type": "ratio"
             },
             {
               "cell": {

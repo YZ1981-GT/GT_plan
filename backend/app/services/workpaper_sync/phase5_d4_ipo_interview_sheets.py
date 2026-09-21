@@ -9,7 +9,11 @@ from __future__ import annotations
 import json
 from typing import Any, Final, Mapping
 
-from app.services.workpaper_sync.json_path import resolve_json_path, set_json_path
+from app.services.workpaper_sync.json_path import (
+    JsonPathMissingSegmentError,
+    resolve_json_path,
+    set_json_path,
+)
 
 TEMPLATE_RELATIVE_PATH: Final[str] = "D/D4 收入底稿.xlsx"
 ENTRY_ID: Final[str] = "xlsx/gt-d4-operating-revenue"
@@ -148,7 +152,27 @@ def build_store_projection(code: str, payload: Any, *, contract: Any, limits: An
     for identity, row in _rows(code, payload):
         row_keys.append(identity)
         for field, _col, mode, value_type, path, _label in s["fields"]:
-            value = resolve_json_path(row, path) if "/" in path else row.get(path)
+            # 🔴 嵌套 scalar 字段（D4-30 `fields/时间/原因/方式…` 等访谈内容）缺失段 → None：
+            #    一条访谈客户行可能只填了 id/name、尚未填 `fields` 子对象（合法半成品）。
+            #    resolve_json_path fail-closed 抛 JsonPathMissingSegmentError 会把整个 entry 的
+            #    combined store-projection 打成 422（真栈实测 D4-30 只有 {id,name} 时复现），
+            #    连累 D4-2..36 全部无法进在线编辑。与主 provider `_resolve_store_path` 同一
+            #    「标量缺失段 → None、数组路径 fail closed」口径：这里 fields/* 是嵌套 scalar，
+            #    缺失投空（未填），不软化任何数组路径（interview 无数组字段）。
+            # 🔴 嵌套 scalar 字段（D4-30 `fields/时间/原因/方式…` 等访谈内容）缺失段 → None：
+            #    一条访谈客户行可能只填了 id/name、尚未填 `fields` 子对象（合法半成品）。
+            #    resolve_json_path fail-closed 抛 JsonPathMissingSegmentError 会把整个 entry 的
+            #    combined store-projection 打成 422（真栈实测 D4-30 只有 {id,name} 时复现），
+            #    连累 D4-2..36 全部无法进在线编辑。与主 provider `_resolve_store_path` 同一
+            #    「标量缺失段 → None、数组路径 fail closed」口径：这里 fields/* 是嵌套 scalar，
+            #    缺失投空（未填），不软化任何数组路径（interview 无数组字段）。
+            if "/" in path:
+                try:
+                    value = resolve_json_path(row, path)
+                except JsonPathMissingSegmentError:
+                    value = None
+            else:
+                value = row.get(path)
             if code == "D4-31" and field == "q1_relation": value = json.dumps(value if isinstance(value, list) else [], ensure_ascii=False)
             if field == "custom_dimensions" and value is None: value = {}
             sk = stable_key_for(code, field, identity)

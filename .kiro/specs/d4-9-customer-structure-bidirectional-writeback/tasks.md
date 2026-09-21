@@ -98,6 +98,8 @@
   - 选真实 D4 底稿：HTML 编辑客户行 + 4 总额 → 在线编辑可见 → OO 改一行 + 改一总额 → 切回 HTML 值逐字对齐；merge 幂等；用户公式 cell 不被 OO 覆盖（含 Task 9 运行时保护区强制执行的真栈验证）
   - 证据 JSON 记录 request 路径（命中 USER_SYNC_PREFIX、无 legacy 旁路）、content version、application、operation 终态、artifact digest
   - 🔴 **运行时阻塞**：D4-9 sheet 并入父 entry 后，父 `d4.revenue_detail` 契约 digest 变化（含 d49-managed），需 representation 升级到新 bundle 才能真栈往返；升级需 `ContentMutationService.commit` 或 instrumentation upgrader（provisioner 不伪造）。属部署时步骤，离线不可完成 → 记 `UNVERIFIABLE`
+  - ✅ **上条「运行时阻塞」已过时作废（2026-09-21 真 PG 实证）**：representation 早已升级并远超当初卡点 —— `d43_rematerialize_dual_sheet.py --check` 返 `already_on_desired_bundle`，entry `xlsx/gt-d4-operating-revenue` 当前 **generation 84 / bundle `2a8db807…`**（34 张 sheet，含 `d49-managed`），desired == current 无漂移。故「需先升级 representation」不再是 D4-9 的阻塞。
+  - 🔴 **本任务仍 `[~]`，但剩余阻塞已换成另一条（同 D4 全组批次C 标准，非 D4-9 独有）**：真 OO canvas 单元格往返。**新增实证**：`working_paper_content_application` 表里打在**当前 bundle `2a8db807…` 上的 applied 记录数 = 0**（全 14 条 applied 最新一条 2026-09-20 02:25Z，打在旧 bundle `d91cf0f2…` 上；`working_paper_content_version` 的 `source=onlyoffice` 14 条最新 02:26Z，同样早于当前 bundle 13:58Z）⇒ 当前 34 张 bundle 上的 OO→HTML apply 路径**一次都没被真实走过**，包括 commit `808505a15` 修的三处消费侧缺口（P0 硬解包 / P1 D4-8 静默 / P2 基线恒空）目前只有离线守卫覆盖。这是全组共同的最后一道门，不是把 D4-9 单独标绿的理由。
   - _Requirements: 8.5, 8.6_
 
 ## Notes

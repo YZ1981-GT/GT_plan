@@ -45,9 +45,12 @@
 
 ## Wave 1 — 前端模型对齐（依赖裁决）
 
-- [ ] 3. 前端 7 维模型按裁决对齐
-  - 裁决含「前端补字段」时：扩 `TransactionItem` 对应维度 sub-object + `DIMENSION_GROUPS` + 一致性引擎（若补字段参与比对）；`import/export` 32 列语义投影头同步对齐（防再分叉）；行身份 id 安全校验（不含 `/~{}`、唯一、跨会话稳定）。既有一致性/OCR/D4-12 联动/序时账导入/AI 分析不回归。
-  - 判据：前端模型字段集 == 裁决表「受管+补字段」集；vitest 既有守卫不回归。
+- [x] 3. 前端 7 维模型按裁决对齐 — ✅ 2026-09-21 实测确认已完成（此前漏勾，非未做；下方为逐项实证）
+  - **7 维 sub-object 已按路线A补字段**（实测字段数，含 attachmentId/attachmentName/ocrStatus 三个既有附件字段）：`VoucherDimension` 11（新增 `customerName`←物理列B）/ `ContractDimension` 10（`date`←H）/ `DeliveryDimension` 10（`number`←K、`quantity`←M、`shippingApprover`←O）/ `ShippingDimension` 10（`number`←Q、`quantity`←R、`company`←S、`address`←T）/ `ReceiptDimension` 10（`quantity`、`signer`←Y、`sealType`←Z、`sealEntity`←AA）/ `InvoiceDimension` 8（`productName`←AD、`quantity`←AE）/ `OtherDimension` 6（`anomalyNote`←AK，标 `optional: true` 不参与完整性判定）。`DIMENSION_GROUPS` 同步加对应 `{key,label,type}`，`createEmptyTransaction`/序时账 `fromLedgerEntry` 两处初始化器均已补默认值。
+  - **`import/export` 语义投影头已同步对齐**：`_d4_import_export._SHEET_HEADERS["D4-14"]` 从 32 列扩为 **48 列**（实测），与路线A全受管严格同序，消除「语义投影头 ≠ 物理列」的再分叉风险（这正是 Notes「反误导」段点名的坑）。
+  - **判据实测全绿**：`useD4WalkthroughTest.spec.ts` **50 passed**（新字段进 fast-check PBT：`isDimensionComplete` 逐维全字段 property + `anomalyNote` optional 专测 + 全维 record arbitrary）；`d4OccurrenceSyncHostWiring.spec.ts` **10 passed**；`d4ContractSyncHostWiring.spec.ts` **10 passed**（同批，D4-12 不回归）。三文件合计 **70 passed**（原始 vitest 输出，非 rtk 计数）。
+  - **行身份 id 安全**：由后端侧钉死 —— `row_identity.json_pointer` + UUID 列 AL 注入，守卫 `test_d4_14_walkthrough_roundtrip.py`(3, 真 instrument workbook 往返) + `test_d4_14_occurrence_contract.py`(7)。
+  - **不回归**：`backend/tests/workpaper_sync -k d4` **346 passed / 0 failed**（含 `test_d4_mirror_shape_invariants.py` 第四维、D4-12/D4-14 contract+mirror+roundtrip、D4-29 转置零回归）。
   - _Requirements: 2.1, 2.2, 2.3, 2.4_
 
 ## Wave 2 — provider + 契约

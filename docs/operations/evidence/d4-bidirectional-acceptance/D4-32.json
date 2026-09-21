@@ -1,7 +1,7 @@
 {
-  "sheet": "D4-28",
-  "sheet_name": "客户信息核查清单D4-28",
-  "captured_at": "2026-09-21T04:00:22.052Z",
+  "sheet": "D4-32",
+  "sheet_name": "客户、供应商等资金流水检查D4-32",
+  "captured_at": "2026-09-21T04:05:04.377Z",
   "scope": {
     "project_id": "0ec33ac9-3de5-4e65-b3bf-f9dccd7b2a49",
     "wp_id": "b3ab3c46-828f-4f48-950e-aee9bbdc923f",
@@ -39,6 +39,10 @@
     "oo_iframe_count": 1,
     "doc_editor_called": false,
     "http_errors": [],
-    "console_errors": []
+    "console_errors": [
+      "Failed to load resource: the server responded with a status of 500 (Internal Server Error)",
+      "Failed to load resource: the server responded with a status of 500 (Internal Server Error)",
+      "Failed to load resource: the server responded with a status of 500 (Internal Server Error)"
+    ]
   }
 }

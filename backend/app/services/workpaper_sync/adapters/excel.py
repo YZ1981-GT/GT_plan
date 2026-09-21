@@ -394,6 +394,9 @@ class ExcelSyncAdapter:
                         retain_identity_inventory=(
                             binding.table_key == self.binding.table_key
                         ),
+                        # 🔴 ROI-2：非终趟 structure_hash 必被丢弃（下方只取
+                        #    last_result.structure_hash）⇒ 跳过整簿指纹重算（每趟省 ~1.4s）。
+                        compute_structure_hash=is_last,
                     ).result
                     field_count += int(step.managed_field_count)
                     if step.workbook_row_change is not None:
@@ -584,12 +587,24 @@ class ExcelSyncAdapter:
                 d429_before = Path(handle.name)
                 projected = before.read_bytes()
                 after_bytes = after.read_bytes()
+                any_projected = False
                 for spec in specs:
-                    projected = _transposed_materialize(
-                        projected, _transposed_extract(after_bytes, spec=spec), spec=spec
-                    )
-                d429_before.write_bytes(projected)
-                before_for_compare = d429_before
+                    after_rows = _transposed_extract(after_bytes, spec=spec)
+                    # 🔴 空转置表跳过中性化（否则假 drift）：`materialize_transposed_workbook`
+                    #    经 openpyxl `wb.save()` 重序列化目标 sheet part，即便**零实体**也会
+                    #    产出字节不同的 XML。而 materialize 侧对空转置表是 no-op
+                    #    （`materialize_file`：`if spec.table_key not in projection.row_keys: return`），
+                    #    故 after 该 sheet 与 before 逐字节相同。若这里仍无条件重投影，就把
+                    #    before 那张 sheet 无谓 openpyxl 重写成字节不同 ⇒ verify 的
+                    #    `other_sheet_parts` 把「after==before 的空转置 sheet」判成 drift
+                    #    （D4-12 无行时 sheet17 假漂移的真因）。空则不动 before，保持与 after 对称。
+                    if not after_rows:
+                        continue
+                    projected = _transposed_materialize(projected, after_rows, spec=spec)
+                    any_projected = True
+                if any_projected:
+                    d429_before.write_bytes(projected)
+                    before_for_compare = d429_before
             if self.adapter_id == "g7.soe_subsidiary_disclosure":
                 import shutil
 
@@ -619,6 +634,31 @@ class ExcelSyncAdapter:
             all_managed_parts = frozenset(
                 region.sheet_part for _binding, region in regions_by_binding
             )
+            # 🔴 转置 sheet（D4-29 customer_detail / D4-12 contract_inspection）是**受管
+            #    sheet**，但走 carrier-row 身份机制、**没有 ExcelIdentityBinding**（不在
+            #    instrumentation_specs 的受管表清单里）。若不显式登记，它们的 sheet part 不在
+            #    all_managed_parts ⇒ 落进 `other_sheet_parts` 桶做**原始字节比对**。而转置
+            #    materialize 用 openpyxl `wb.save()` 全量重序列化目标 sheet part，其字节依赖整簿
+            #    内部状态：materialize 侧在 34-binding 链式改写后的 workbook 上跑、verify 中性化
+            #    侧在原始 before 上跑 ⇒ 两侧非受管列字节（dimension/style xf 索引/属性序）不一致
+            #    ⇒ 假 `adapter_unmanaged_region_drift`（D4-29 非空真栈复现；D4-12 空表同类，此前
+            #    靠 `if not after_rows: continue` 空守卫绕过，非空则复发）。
+            #    正解：把转置 sheet part 并入 all_managed_parts，与「有 binding 的 sheet 走各自
+            #    managed_sheet_* aspect、不进 other_sheet_parts」同口径。转置 sheet 的受管内容
+            #    （列）由 `extract_transposed_workbook` 往返 + fail-closed 校验（公式格拒绝 /
+            #    carrier 强校验）守护；保护区（label 列 A/B / footer / static prompt）materialize
+            #    不写、只被 openpyxl 重序列化碰字节，排除原始字节比对不损失篡改检测。
+            if specs:
+                from app.services.workpaper_sync.excel_extract import _sheet_parts
+
+                with zipfile.ZipFile(after) as _zf_after:
+                    after_sheet_parts = _sheet_parts(_zf_after)
+                transposed_parts = frozenset(
+                    part
+                    for spec in specs
+                    if (part := after_sheet_parts.get(spec.managed_sheet)) is not None
+                )
+                all_managed_parts = all_managed_parts | transposed_parts
             last_report: UnmanagedRegionReport | None = None
             for binding, region in regions_by_binding:
                 extra = all_managed_parts - {region.sheet_part}

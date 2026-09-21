@@ -1,7 +1,8 @@
 # D4-1..36 双向回写逐张现状清册
 
 > **基线日期**：2026-09-19（表格/统计基线）
-> **最近更新**：2026-09-21（现状核对：D4-1 owner spec 12/12 更正过时的 10/12；gap-closure spec Task 1 的 D4-8 HTML-only 裁定 + 138s materialize 阻塞两处过时表述已作废）
+> **最近更新**：2026-09-21 第三轮（见文末「2026-09-21 第三轮」段：**D4-2 L2 真栈首次在当前发布态跑通**＋两处 apply 阻塞根因修复：value_type=json 单元格往返 bug（correctness）+ 转置 sheet other_sheet_parts 假 drift（verify 假红，方案 A）；7 张 L1 前端「在线编辑」切换器 gap 独立登记）
+> **上一轮更新**：2026-09-21 第二轮（**工作区 detached HEAD 事故**＋owner spec 进度 6 处过时数字更正＋「当前 bundle 上 applied=0」新实证＋第三维缺闭集守卫）
 > **目的**：为"逐张落地 D4 双向回写 + Playwright 验证"提供准确的起点清册。
 > **判据三维**（缺一不可，对齐主控文档 §6.4 `HOST-CONSUMES-UNIFIED-PATH`）：
 > 1. **owner spec** 进度（`.kiro/specs/*`）
@@ -431,3 +432,207 @@
 - Task 11 e2e（`d4-bidirectional-acceptance.spec.ts` 加 D4-1 + 证据 `evidence/.../D4-1.json` + `D4-1-L2.json`）：L1 GREEN（进在线编辑走统一路径、callback 四项齐、0 旁路、OO 挂载），L2 双区 roundtrip 因目标 wp 无 D4-1 受管双区行而**如实 SKIP/blocked**（真实库唯一有 D4-1-rows 的 wp 无 published representation），不伪造 cs_error=0。完整往返待 seed「同时有 published representation + D4-1-rows(main+other)」的 wp（`D4_ACCEPT_L2_WP_ID` 指向）后即绿——归真 OO canvas env 门批次C。
 - Task 12 收口已完成（三件套校验 + git 入库）。
 - 🔴 风险已缓解但仍需真栈确认：D4-1 是审定枢纽（下游 K9/D4-10/D4-21 取审定数 + TB 发布）；离线/DB 判据已绿，e2e 真栈双区往返（OO 改主营/其他行→切回 HTML 值一致、两区不串）是最后一道未验证门（env 门）。
+
+## 2026-09-21 第二轮现状核对（全部结论经磁盘/git/真 PG 实证，不引用文档自述）
+
+> 本段只记「与上方既有记录不一致」或「上方从未覆盖」的事实。上方各段保持原样（append-only）。
+
+### 🔴 一、工作区 detached HEAD 事故（最高优先级，已修复；这是本轮最大发现）
+
+核查开始时工作区**停在 detached HEAD `c5e456990`**，即分支 `work/2026-09-14-d4-dual-mode-p0-fixes`
+tip（`3e894ed48`「feat(d4-14+d4-12)」）的**父提交**。reflog 实证是 2026-09-20 23:13/23:14/23:15
+三次 `checkout` 来回切换（疑似零回归/变异核查）后**停在了父提交没切回来**。
+
+后果（当时磁盘实测，全部与上方文档记载相反）：
+
+| 判据 | 文档记载 | detached HEAD 实测 |
+|---|---|---|
+| 磁盘契约 sheet 数 | 34 | **32**（无 `d4-12-managed` / `d414-managed`） |
+| provider | `phase5_d4_12_contract.py` / `phase5_d4_14_occurrence.py` / `transposed_registry.py` | **三个文件都不存在**（只剩 `__pycache__` 里的 `.pyc` 残骸） |
+| 前端接桥 | D4TabContract / D4TabOccurrence 已接桥 | **两个都还是 legacy `GtOnlyOfficeSheet`** |
+| 宿主登记 | 32 张 | **30 张**（缺 'D4-12'/'D4-14'） |
+| 守卫 | `d4ContractSyncHostWiring.spec.ts` / `d4OccurrenceSyncHostWiring.spec.ts` | **两个文件都不存在** |
+| spec 三件套 | `d4-12-transposed-writeback` / `d4-14-walkthrough-writeback` | **两个目录都不存在** |
+| definition_store | bundle `2a8db807` / contract `0e2023fa` / instrumentation `cfc97557` | **三个 artifact 文件都不存在** |
+
+而**真 PG 的 `working_paper_sync_entry_state` 当时已是 generation 84 / bundle `2a8db807…`（34 张）**
+—— 即「DB 已发布 34 张，磁盘源码只能产 32 张、且 bundle/contract artifact 文件缺失」的**自相矛盾态**。
+这正是清册「半成品接入会打挂整个 entry」警示的同型故障，只是成因从「漏 rematerialize」换成了
+「检出停在旧提交」。
+
+**处置**：`git checkout work/2026-09-14-d4-dual-mode-p0-fixes` 恢复（零风险：worktree 干净、
+tip 已 push 到 `origin/`、父提交内容是 tip 的子集，无任何丢失可能）。恢复后全部判据与文档记载一致：
+契约 34 张 ✓ / 三个 provider 在 ✓ / 两组件接桥 ✓ / 宿主 32 张 ✓ / 守卫在 ✓ / artifact 在 ✓ /
+`d43_rematerialize --check` = **`already_on_desired_bundle`（gen 84，desired == current，无漂移）** ✓。
+
+**🔴 教训（新增，与既有教训同级）**：
+1. **「切到父提交做零回归/变异核查」必须配对切回，且要有收尾检查**。收尾清单应加一条：
+   `git status` 干净 **且** `git branch --show-current` **非空**（detached 即视为未收尾）。
+   本次若不是逐张核查磁盘，几乎必然把「D4-12/14 前端未接桥、守卫文件不存在」误报成**真实回归**
+   —— 本轮前半程确实一度得出了这个错误结论，靠 `git ls-tree` + reflog 才定位到是检出问题。
+2. **判断「某产物是否存在」必须落到磁盘/git 实证**（`Test-Path` / `git ls-tree` / python `Path.exists()`），
+   不能只靠 IDE 侧的文件读取 —— 本轮 IDE 的 `read_file`/`list_directory` 返回的是**分支 tip 的缓存视图**，
+   与 detached HEAD 的真实磁盘内容**不一致**（读得到 `.kiro/specs/d4-14-walkthrough-writeback/tasks.md`，
+   而 `Test-Path` 判 False）。两套视图打架时**以磁盘为准**。
+
+### 二、owner spec 进度数字更正（上方「逐张清册」表内 6 处过时）
+
+上方表格 owner spec 括号里的进度是历史快照，现按磁盘 tasks.md 复选框实测更正：
+
+| 清册记载 | 实测（2026-09-21） | 说明 |
+|---|---|---|
+| `d4-revenue-matrix (11/13)` | **13/14**（13 `[x]` + 1 `[~]`） | 剩 Task 13 C4 逐表验收（含 Playwright），env 门 |
+| `d4-9-customer (1/15)` | **12/15**（12 `[x]` + 3 `[~]`） | 「1/15」是 D4-1 顺带解阻当时的旧数；剩 13/14/15 全 env 门/总纲 gate |
+| `d4-cutoff-return (3/13)` | **13/13 全绿** | D4-17~20 四张已落地，spec 已收口 |
+| `ipo-fraud (6/11)` | **11/11 全绿** | D4-30/31/32 批次A-5 已收口 |
+| `gap-closure (0/5)` | **1/5 `[x]` + 4/5 `[-]` N/A** | Task 2-5 已显式裁 N/A 作废（D4-4 single_html / D4-8 归 static-cell spec / D4-12 已归专项 spec） |
+| `d4-14-walkthrough-writeback (12/12)` | **12/13 `[x]` + 1 `[~]`** | 🔴 本轮把漏勾的 **Task 3** 补为 `[x]`（前端 7 维模型对齐实为已完成，见下条）；Task 11 的 e2e 子项保持 `[~]` env 门 |
+
+另外 `d4-inspection-writeback-formula-io` 机械计数是「9/16」，**与实际状态相反**：草案代任务 1-7
+已被做实代 T1-T7/B1-B3（全 `[x]`）逐条承接或显式裁决，无一条待开工。已在该 spec tasks.md 末尾
+append「任务状态归并表」作为唯一权威对照，后续统计请按 T/B 代计（**10/10**），勿把 1-7 重复计入分母。
+
+### 三、D4-14 Task 3（前端 7 维模型对齐）实为已完成，本轮补勾
+
+实测证据：7 维 sub-object 已按路线A补齐（voucher 11 / contract 10 / delivery 10 / shipping 10 /
+receipt 10 / invoice 8 / other 6 字段，`customerName`·`shippingApprover`·`anomalyNote` 等 16 个新字段
+全在，`anomalyNote` 标 `optional: true` 不参与完整性判定）；`_SHEET_HEADERS["D4-14"]` 语义投影头
+**32 → 48 列**，与路线A全受管严格同序（消除「语义投影头 ≠ 物理列」再分叉）；
+`useD4WalkthroughTest.spec.ts` **50 passed**（新字段已进 fast-check PBT）+
+`d4OccurrenceSyncHostWiring.spec.ts` **10** + `d4ContractSyncHostWiring.spec.ts` **10** = **70 passed**。
+
+### 🔴 四、新实证：当前 bundle 上的 OO→HTML apply 次数 = 0
+
+真 PG 查询（`working_paper_content_application` / `working_paper_content_version`）：
+
+- entry `xlsx/gt-d4-operating-revenue` 累计 **applied 14 / error 5 / conflict 3 / authorization_stale 2**；
+  `working_paper_content_version` 的 `source=onlyoffice` **14 条**。
+- 但**按 bundle 分组后，`definition_bundle_sha256 = 2a8db807…`（= 当前 gen84 的 34 张 bundle）的
+  application 记录数 = 0**。最后一条 applied 打在旧 bundle `d91cf0f2…` 上，时间 2026-09-20 **02:25Z**；
+  而当前 bundle 的 contract artifact 落库时间是同日 **13:58Z**、gen84 是 **14:54Z**。
+
+**含义（上方任何段落都未覆盖）**：
+1. 清册顶部「D4-2 DB 侧铁证：12 个 applied oo_to_html application」确实是真实往返，但**全部发生在旧
+   bundle 上**，不能代表当前 34 张 bundle 的回写链可用。
+2. commit `808505a15` 修的三处 OO→HTML 消费侧缺口（P0 硬解包崩 / P1 D4-8 静默不回写 / P2 15 item
+   基线恒空）**目前只有离线守卫（`test_d4_mirror_shape_invariants.py` 5 tests）覆盖，真实 apply 路径
+   一次都没走过**。P0 那条原本就是「实跑才复现」的 `ValueError`，纯离线守卫不足以证明修复在真栈成立。
+3. 同理，D4-12（转置）/ D4-14（7 维嵌套）/ D4-8（180 静态 cell）三条**新引擎路径**的 apply 侧
+   `_mirror_d4_dual_stores` 消费，也从未在真栈执行过。
+
+⇒ 所以「34 张三维代码全绿」的口径依然成立，但**批次C 的紧迫性被低估了**：它不只是「补证据 JSON」，
+而是「当前发布态的回写链从未被真实验证过一次」。
+
+### 🔴 五、第三维（前端接桥 + 宿主登记）缺机器化闭集守卫
+
+第四维已由 `test_d4_mirror_shape_invariants.py` 钉死（契约 store item ∈ `STORE_ITEM_IDS` ∪ 专用块集合）。
+但**第三维没有同型的闭集守卫**：实测 `audit-platform/frontend/src/components/workpaper/__tests__/`
+下有 **20 个 `d4*SyncHostWiring.spec.ts`**，每个都各自复制一份 `extractDedicatedList` helper，
+只断言**自己那一张**在 `isD4DedicatedSyncSheet` 里。
+
+后果：这些守卫只能防「已有守卫的那张被删掉」，**防不住新增的那张忘记登记** —— 而这恰恰是历史上
+复发 4 次的同源缺漏（D4-15/16、D4-21~24、D4-25~28、D4-30~32 全是「后端契约已落、宿主漏登记 →
+双切换器叠加 + 误入 legacy 整册 `GtOnlyOfficeSheet`」）。第 35 张 sheet 明天落地时，同一个坑仍然敞开。
+
+**建议补一个闭集守卫**（第三维机器化判据，与第四维同型）：读
+`backend/data/workpaper_sync_contracts/d4.revenue_detail.json` 的 sheet_key 全集 → 对每个 sheet_key
+反查「有 `D4Tab*.vue` 引用该 sheetKey 且 import `useWorkpaperSyncBridge` + `WorkpaperSyncEditorHost`」
++「其 D4 编码 ∈ 宿主 `isD4DedicatedSyncSheet`」，任一缺失即红；宿主自管的 `d42/d43-managed` 与
+裁决 single_html/N/A 的 D4-4/D4-13 走显式白名单（白名单本身也要断言不含契约里的张）。落地后
+20 个重复 helper 可收口成一个共享工具，不必逐张再写。
+
+### 六、附带发现：工作树有一份在途未提交的 writer gate 修复（非 D4 直接产物但由 D4 迁移触发）
+
+恢复分支后 `git status` 显示 4 个文件有未提交改动（不是本轮核查产生的，是此前会话的在途工作，已原样保留）：
+`.kiro/specs/workpaper-html-onlyoffice-bidirectional-writeback-closure/tasks.md` /
+`backend/data/workpaper_writer_domain_overlay.json` / `backend/data/workpaper_writer_inventory.json` /
+`backend/scripts/gen/generate_workpaper_writer_inventory.py`。
+
+内容是一条**由 D4 双向回写迁移触发的 writer gate 崩溃修复**：D2/D4 迁移把 `d4_import_data` 从
+direct content writer 改成**委派** writer，使调用它的 `_d4_import` 从 `_propagate_content_writers` 的
+**单跳**传播里掉出发现面，overlay 仍裁决着它 → 门崩在 `assert_inventory_is_current`
+（`WriterInventoryError: writers ... no longer exist in source`）。修法是把委派传播改成**对 writer 图的
+有界闭包**，补回 33 个真实多跳 writer 入口，分母 327 → 371，红基线 658 → 788 条 blocking facts
+（`unadjudicated_writer` 0 → 36 等是新补回入口尚无 overlay 裁决的真实欠账显形，非放宽判据）。
+
+**提醒**：这份改动**尚未提交、也不在任何 commit 里**（`git log --all -S"_propagate_content_writers"`
+只命中它的引入 commit `42d2f6e6f`，改动本身无归属）。属易丢工作，宜尽快独立入库。
+
+---
+
+## 2026-09-21 第三轮：D4-2 真栈彻底跑通 + 两处 apply 阻塞根因修复（本轮）
+
+> **本轮结论**：D4-2 L2 真栈（真 OO canvas 写 A12 → forcesave → mirror 回 HTML → applied）**首次在当前发布态跑通**。
+> 逐层暴露并根治了两个此前挡在 apply 前的真实 bug（一个 correctness、一个 verify 假红），均配机器化守卫 + 变异反证。
+> 上方「四、当前 bundle 上 apply 次数 = 0」的紧迫性由此**部分解除**：当前发布态回写链已被真实验证过一次（D4-2）。
+
+### ① value_type=json 单元格往返 bug（correctness，Property 65 真红）
+
+- **真因**：D4-30 `custom_dimensions` / D4-31 `q1_relation` 是 `value_type=json` 的受管单元格字段。
+  materialize 侧 `excel_materialize._normalised_write_value` 返回 `merge.normalize_value` 的 canonical
+  **bytes**（`{"v": value}` 包裹，本意只作比较口径的键）；`inline_text` 渲染 `str(write.value)` 把 bytes 写成
+  Python repr（**带 `b'...'` 前缀**）落盘；extract 读回该字符串后 `normalize_value` 再包一层
+  `{"v": "<那串>"}` → 与提交侧 `{"v": value}` **永不等值** → materialize 报
+  `roundtrip_projection_mismatch`（真栈实测「提交 `{}` → 反读 `'b\'{"v":{}}\''`」）。
+  这是 D4-30 把 `custom_dimensions` 变成投影字段后暴露的既有隐患（此前该字段未进投影，从未跑到）。
+- **对称修复**（不弱化 normalize_value 的比较口径）：
+  - `excel_materialize._normalised_write_value`：json 落盘写 **value 自身**的 JSON 文本（`json.dumps`，
+    `{}`/`[]`/`{"a":1}`），仍先过 normalize_value 校验（拒 NaN/Infinity/非可序列化）；
+  - `excel_extract._collect_fields`：json 单元格文本 `json.loads` 解回 Python 对象（解析失败保留原串，
+    交下方 normalize 记 `type_normalization_failure`，绝不静默吞）。两侧都持对象后 normalize 对称等值。
+- **守卫**：`test_json_cell_roundtrip.py`（9 passed，含空 dict 最小复现 + 7 参数化 JSON 值 + 负向断言）；
+  **变异反证**：把 materialize 改回 `return normalized`（bytes）→ 7 RED 精确复现 `b'{"v":{}}'` 形态。
+
+### ② 转置 sheet other_sheet_parts 假 drift（verify 假红，方案 A）
+
+- **真因**：转置 sheet（D4-29 `客户信息检查表` / D4-12 `合同检查表`）走 **carrier-row 身份机制、无
+  `ExcelIdentityBinding`**（不在 `instrumentation_specs` 受管表清单里）。verify 时其 sheet part 不在
+  `all_managed_parts` → 落进 `other_sheet_parts` 桶做**原始字节比对**（`_part_digest` 纯 sha256）。而转置
+  materialize 用 openpyxl `wb.save()` 全量重序列化目标 sheet part，其字节**依赖整簿内部状态**：materialize
+  侧在 34-binding 链式改写后的 workbook 上跑、verify 中性化侧在**原始 before** 上跑 → 两侧非受管列字节
+  （dimension/style xf 索引/属性序）不一致 → 假 `adapter_unmanaged_region_drift`（D4-29 非空真栈复现；
+  D4-12 空表同类，此前靠 `if not after_rows: continue` 空守卫绕过，非空则复发）。
+- **方案 A 修复**（`adapters/excel.py` verify wrapper）：把转置 sheet 的 part（`resolve_transposed_specs`
+  的 `managed_sheet` 经 `_sheet_parts` 解析）**并入 `all_managed_parts`**，从 `other_sheet_parts` 原始
+  字节比对里排除——与「有 binding 的 sheet 走各自 `managed_sheet_*` aspect、不进 other_sheet_parts」同口径。
+  转置 sheet 受管内容（列）由 `extract_transposed_workbook` 往返 + fail-closed 校验（公式格拒绝 / carrier
+  强校验）守护；保护区（label 列 A/B / footer / static prompt）materialize 不写、只被 openpyxl 重序列化碰
+  字节，排除原始字节比对**不损失篡改检测**。
+- **守卫**：`test_d4_12_transposed_roundtrip` + `test_transposed_registry`（33 passed 含既有空表 AST 守卫，无回归）。
+
+### ③ 真栈验证结果
+
+- **D4-2 L2 e2e：`1 passed (5.0m)`** —— store-projection 200 → pending-mutations 200 → **materialize 200**
+  → OO canvas 写 A12（via `Asc.editor`）→ callback 4 项齐全 → mirror 回 HTML → applied。
+- **D4-25/26/27/28/29 L1（serial，含转置 D4-29 + json 相关 IPO 表）：`5 passed (47.7s)`**。
+  ⚠️ 先前 5-worker **并行**版全挂 = OnlyOffice 8080 并发 contention（`ooHealthy`/挂载超时），**非** wiring gap
+  也非本轮后端修复——serial 版全绿即证。逐张 L1 必须 `--workers=1` 跑（OO 单实例扛不住并行编辑会话）。
+- D4 全套后端回归 **348 passed 0 failed**（含 3 个新 json 守卫，零回归）。
+
+### ④ 诚实暴露：7 张 L1 仍未过（前端「在线编辑」切换器 gap，非本轮范畴）
+
+serial 跑其余 15 张，**8 passed / 7 failed**（过：D4-9/21/23/24/11/31/32；未过：**D4-14/22/10/30/33/34/36**）。
+7 张失败**全部卡在前端**「在线编辑」切换器 `element not found`（20s 超时），**根本没走到 materialize**——
+用 chrome-devtools 手动点 D4-30 页签实证：点击后主内容区未渲染 `D4TabInterviewSummary`、`el-segmented` 为空，
+是**前端 UI 页签导航 / host-wiring gap**（与本轮后端 sync 引擎修复无关，属独立待办）。同组件模式的 D4-31
+（InterviewDetail）却过、D4-30（InterviewSummary）不过，说明是**逐张导航/渲染时序**问题而非系统性缺失。
+→ 独立登记为待办：**前端 D4-14/22/10/30/33/34/36 在线编辑切换器不可达**，需前端 host 侧排查（页签点击后
+dedicated sync 组件未挂载）。
+
+### ⑤ pre-existing 失败已核验（非本轮引入）
+
+`test_task26_oo_to_html_pg::TestAppliedHappyPath::test_p29`（applied 场景 `materialize` 调用数 0≠1）——
+`git stash` 掉本轮 3 个后端源文件（excel_materialize/excel_extract/adapters·excel）后**同样失败**，确认
+pre-existing，已恢复改动。属 apply 半应用态的既有欠账，非本轮 json/transposed 修复触及。
+
+### 本轮改动文件（sync 修复，与 writer-gate 在途拆开独立提交）
+
+- `backend/app/services/workpaper_sync/excel_materialize.py`（json 落盘写文本 + 既有 timeout structure_hash）
+- `backend/app/services/workpaper_sync/excel_extract.py`（json 单元格 json.loads 解回对象）
+- `backend/app/services/workpaper_sync/adapters/excel.py`（转置 part 并入 all_managed_parts + 既有 timeout）
+- `backend/app/services/workpaper_sync/phase5_d4_ipo_checklist_sheets.py`（8 处 value_type，上轮第3层-A）
+- `backend/app/services/workpaper_sync/phase5_d4_ipo_interview_sheets.py`（D4-30 缺 fields 段容差，上轮第3层-C）
+- `backend/app/services/workpaper_sync/store_projection_response.py`（P0-A 缺失 item 不预填 empty）
+- `backend/data/workpaper_sync_contracts/d4.revenue_detail.json` + 新 bundle/contract artifact（value_type regenerate）
+- 守卫：`test_json_cell_roundtrip.py`（新）/ `test_d4_interview_missing_fields_tolerance.py`（新）/
+  `test_d4_12_transposed_roundtrip.py` / `test_d4_ipo_all_four_bidirectional_roundtrip.py`
