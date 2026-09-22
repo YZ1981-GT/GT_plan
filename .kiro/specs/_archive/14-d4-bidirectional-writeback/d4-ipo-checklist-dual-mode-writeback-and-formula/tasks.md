@@ -515,3 +515,29 @@ activeTab 双重实证；竞态无假失败/双切换器）；但**完整数据 
 
 **方法论教训**：spec 文档若沿用已删死代码的口径描述运行时行为，会让 review 者对正确的生产代码产生误判 ——
 文档行锚点必须以生产 provider 为单一真源并随其冻结，且「决定边界的字段」（下边界 footer）不能只写「首行」。
+
+---
+
+## 2026-09-22 归档前状态刷新（append-only；上方复选框与原文一律不动）
+
+> 上方 Task 19 与 B6 的 `[~]` 当时写的是「定位 + 切页签竞态 + 双切换器已真实实测通过；
+> **数据 roundtrip / D4-27 / 冲突 / 只读待补**」「不得以 D4-35 代表全组」。本节登记新事实。
+
+**① 四表 L1 逐张验收已全绿（含此前未测的 D4-27）**：
+`docs/operations/evidence/d4-bidirectional-acceptance/D4-25.json` / `D4-26.json` / `D4-27.json` /
+`D4-28.json`（2026-09-22）—— 四份均 store-projection 200 → materialize 200 → callbackUrl 四项齐全
+→ `wp-sync-host` + OO iframe，`d2_sync_hits=0`，`console_errors=[]` / `http_errors=[]`。
+⇒ 上方「D4-27 待补」一条**已兑现**；「不得以 D4-35 代表全组」这条纪律在 L1 层已逐张满足，不再是推断。
+⚠️ 逐张 L1 必须 `--workers=1` 串行跑：多 worker 并行会因 OnlyOffice 8080 单实例并发 contention 假失败
+（2026-09-21 实证：5-worker 并行全挂 / serial 5 passed，**非** wiring gap）。
+
+**② 仍未兑现的是 L2 数据往返**（改值→保存→回读逐字对齐）、公式重开、导出、跨项目隔离。
+D4 全组该项只在 **D4-2** 上真实跑通并落 applied（证据
+`.kiro/specs/_archive/14-d4-bidirectional-writeback/d4-revenue-matrix-bidirectional/evidence/g5-1-d4-unified-path/`：`forcesave_cs_error=0`
++ `operation.state=applied` + `application.state=applied` + `content_version.source=onlyoffice`
++ `store_mirror.marker_in_store=true`）。D4-25~28 未单独跑。
+
+**③ 残留归属**：按 entry 粒度（D4 全部子表同属父 entry `xlsx/gt-d4-operating-revenue`）移交总纲
+`workpaper-html-onlyoffice-bidirectional-writeback-closure` Task 70 的「全 entry required scenario」口径。
+本 spec 自有产物（四表 provider + 契约 + 前端迁平台 bridge + 宿主 dedicated 登记 + 行定位加固 + 守卫）
+已全部就位 ⇒ **可归档**。

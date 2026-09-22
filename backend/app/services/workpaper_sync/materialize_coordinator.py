@@ -2238,23 +2238,29 @@ class MaterializeCoordinator:
         pre.bundle_identity.assert_same_as(room_bundle, where="materialize-room")
         try:
             participant = await self._join_or_reuse_participant(request, room=room)
-        except _ExpiredLeaseRoomSuperseded:
-            # 僵死 lease 已终结并 supersede；同一次 materialize 内开新 room。
-            try:
-                room, room_bundle = await self._rooms.open_or_reuse_room(
-                    request.scope,
-                    representation=representation,
-                    opened_base_version_id=content_version_id,
-                    ttl=self._room_ttl,
-                )
-            except (RepresentationNotPublishedError, BundleAliasDriftError) as exc:
-                raise DescriptorSubstrateStaleError(
-                    f"{STALE_ON_ROOM_OPEN_MARKER}: 开 room 时 representation "
-                    f"{representation.id} 已不可用（{exc}）—— preflight 与 room 打开之间"
-                    "发生了并发推进，请重新 flush"
-                ) from exc
-            pre.bundle_identity.assert_same_as(room_bundle, where="materialize-room-retry")
-            participant = await self._join_or_reuse_participant(request, room=room)
+        except _ExpiredLeaseRoomSuperseded as exc:
+            # 🔴 2026-09-22 修复：僵死**写** lease 触发的 supersede 之后，**不得**在同一次
+            #    materialize 内同代重开。room.generation ≡ representation.generation（open_or_
+            #    reuse_room L926：generation=int(representation.generation)），而
+            #    uq_wpoor_generation 使 superseded 代际永不可重开（rooms.py L942-948 +
+            #    test_superseded_generation_cannot_be_reopened 锁定为设计要求）；materialize
+            #    是读取路径，手里只有冻结的旧 representation，无法旋转 generation（那是
+            #    content_commit 发布路径的职责，见 content_mutation._next_generation_probe 的
+            #    D4/G7 canary max(rep,room)+1）。旧代码拿同代 representation 重开 → 撞刚被自己
+            #    supersede 的同代 room → RoomNotWritableError 500 死循环（真栈稳定复现）。
+            #
+            #    正解：抛 409 DescriptorSubstrateStaleError（error_code=launch_descriptor_
+            #    substrate_stale，前端 classifySyncFailure 已识别为「不可原地重试」），让客户端
+            #    重新 flush → commit。commit 走 content_commit，D4/G7 canary 的
+            #    _next_generation_probe 会发布 max(rep,room)+1 的新 generation representation +
+            #    移动 entry pointer，下一次 materialize 便用全新 generation 的干净 room 开成功。
+            #    此处抛异常会连带回滚本请求内未提交的 revoke+supersede：无害——旧 gen room 保持
+            #    原状留作历史残留，新 gen 的 canary probe 天然跳过它，不复用。
+            raise DescriptorSubstrateStaleError(
+                f"{STALE_ON_ROOM_OPEN_MARKER}: 本代 room 因僵死写会话（过期/被撤销的 edit "
+                f"lease）已作废（{exc}）—— 写会话可能已污染内容，该 generation 必须废弃；"
+                "请重新 flush → 提交以发布新 generation，再进在线编辑"
+            ) from exc
         await self._session.commit()
 
         descriptor = EditorLaunchDescriptor(
@@ -2335,8 +2341,39 @@ class MaterializeCoordinator:
         if live.revoked_at is not None or (
             live.expires_at is not None and live.expires_at <= _now()
         ):
-            # 僵死 lease 仍占 uq_wpoop_active_lease：先终结并 supersede，
-            # 由 _open_room_and_descriptor 同一次 materialize 内开新 room。
+            # 僵死 lease 仍占 uq_wpoop_active_lease，必须先让它离开 active/closing。
+            # 🔴 2026-09-22 治本分流：按「这一代是否**真正接管过内容**」决定反应强度。
+            #
+            # ① 从未接管（room 停在 opening、descriptor 确认从未到达、request/durable
+            #    序列为 0、无 application、fence 仍是初值）⇒ 污染在物理上不可能发生。
+            #    轻量释放 lease（active → expired，partial unique 槽位即刻腾出）+ 续租
+            #    room 使用窗口，**复用同代 room** 重新 join 一个干净 lease。用户当场回到
+            #    在线编辑：不烧 generation、不抛 409。
+            #
+            #    这一支修的是一个真栈稳定复现的死锁：旧代码无条件把僵死 lease 当「写会话
+            #    被撤销」处理 → 作废整代 → 而 materialize 无法旋转 generation（那是
+            #    content_commit 的职责），且「重新 flush」在内容未改时走 business-identity
+            #    复用路径、**同样不触发旋转** ⇒ 永远回到同一间死 room。真栈同一 entry 已
+            #    堆积 6 个从未确认即被遗弃的代际（g69/76/77/78/80/93）。
+            #
+            # ② 接管过（确认到达过 / 有 request 或 durable 内容 / fence 被提升过）⇒
+            #    「OO 的 c=drop 不证明已合入内容被移除」这条前提成立，保持原有重型反应：
+            #    revoke（fence+1 + refresh_required）→ supersede 本代 → 由调用方抛 409
+            #    stale，要求重新 flush→commit 发布新 generation 后再进。
+            released = await self._rooms.release_stale_lease_on_pristine_room(
+                room_id=room.id,
+                participant_id=live.id,
+                ttl=self._room_ttl,
+            )
+            if released:
+                return await self._rooms.join_participant(
+                    request.scope,
+                    room_id=room.id,
+                    user_id=request.user_id,
+                    mode="edit",
+                    permission_epoch=int(request.permission_epoch),
+                    lease_token=(request.lease_token or uuid.uuid4().hex),
+                )
             await self._rooms.revoke_participant(
                 room_id=room.id,
                 participant_id=live.id,

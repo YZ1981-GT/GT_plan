@@ -160,6 +160,7 @@ async def _collect() -> dict[str, Any]:  # noqa: C901 - 单次采集覆盖全部
         "baselines": {},
         "revoke": {},
         "supersede": {},
+        "stale_lease": {},
         "flush_only": {},
     }
     #: 每个采集阶段的异常都记进这里，**不允许**穿透 `_collect()`。
@@ -1203,6 +1204,192 @@ async def _collect() -> dict[str, Any]:  # noqa: C901 - 单次采集覆盖全部
             except Exception as exc:  # noqa: BLE001 - 记录实际类型供断言
                 snap["supersede"]["reopen_after_new_generation_error"] = _err(exc)
             await s.rollback()
+
+        # ═══ ⑨b 僵死 lease × 「从未接管内容」的 room ⇒ 轻量释放 + 同代复用 ═══
+        #
+        # 治本回归守卫（2026-09-22 真栈根因）：`materialize` 旧代码把**所有**僵死
+        # participant lease 都当「写会话被撤销 ⇒ 内容可能已污染 ⇒ 作废整代」处理。该安全
+        # 论证（「OO 的 c=drop 只证明会话被逐出，不证明已合入内容被移除」）预设 **OO 会话
+        # 真实接管过文档**。但另有一类僵死 lease：room 建好后 **descriptor 确认从未到达**
+        # （OO 没加载完 / 用户切走 / L1 验收只测挂载不测确认），lease 随后自然到期 —— 此时
+        # room 停在 opening、client_confirmed_* 全空、request/durable 序列为 0、fence 仍是
+        # 初值，这一代**从未写入过任何字节**。作废它既无必要又会把用户彻底锁死：materialize
+        # 无法旋转 generation（那是 content_commit 的职责），而「重新 flush」在内容未改时走
+        # business-identity 复用路径、同样不触发旋转 ⇒ 永远回到同一间死 room。
+        #
+        # 两个独立 entry 覆盖分流两侧：pristine（从未确认）必须轻量释放；confirmed
+        # （确认过 ⇒ 接管过内容）必须拒绝轻量路径、交回 revoke+supersede 重型路径。
+        for case, pristine_case in (("pristine", True), ("confirmed", False)):
+            lease_entry = f"xlsx/gt-stale-lease-{case}"
+            lease_scope = RoomScope(
+                project_id=project_id, wp_id=wp_id, entry_id=lease_entry
+            )
+            try:
+                async with Session() as s:
+                    repo = WorkpaperSyncRepository(s)
+                    svc = RoomService(repo)
+                    l_art = await repo.register_artifact(
+                        project_id=project_id,
+                        wp_id=wp_id,
+                        kind=ArtifactKind.canonical,
+                        state=ArtifactState.published,
+                        relative_path=(
+                            f"{base_path}/.versions/{wp_id}/representations/"
+                            f"{lease_entry}/g1.xlsx"
+                        ),
+                        sha256=_d(f"canonical-lease-{case}"),
+                        size_bytes=2048,
+                        document_type="xlsx",
+                    )
+                    l_rep = await repo.create_representation(
+                        project_id=project_id,
+                        wp_id=wp_id,
+                        entry_id=lease_entry,
+                        content_version_id=cv_id,
+                        generation=1,
+                        document_type="xlsx",
+                        artifact_id=l_art.id,
+                        artifact_sha256=l_art.sha256,
+                        definition_bundle_id=bundle_id,
+                        authority_model_definition_id=world["authority"].id,
+                        adapter_id=f"excel.lease.{case}.v1",
+                        adapter_build_digest=_d("adapter-build"),
+                        structure_hash=_d(f"structure-lease-{case}"),
+                        identity_inventory_sha256=_d(f"identity-lease-{case}"),
+                        reason="content_commit",
+                    )
+                    await repo.set_entry_pointer(
+                        wp_id=wp_id,
+                        entry_id=lease_entry,
+                        representation_id=l_rep.id,
+                        generation=1,
+                    )
+                    l_room, l_bundle = await svc.open_or_reuse_room(
+                        lease_scope, representation=l_rep, opened_base_version_id=cv_id
+                    )
+                    l_part = await svc.join_participant(
+                        lease_scope,
+                        room_id=l_room.id,
+                        user_id=ids["user_a"],
+                        mode=ParticipantMode.edit,
+                        permission_epoch=5,
+                        lease_token=f"lease-token-stale-{case}",
+                    )
+                    if not pristine_case:
+                        # 确认 descriptor ⇒ room 转 active + client_confirmed_* 落值
+                        # ⇒ 这一代**接管过**内容。
+                        await svc.confirm_descriptor(
+                            lease_scope,
+                            room_id=l_room.id,
+                            participant_id=l_part.id,
+                            representation_id=l_rep.id,
+                            content_version_id=cv_id,
+                            projection_sha256=projection_sha,
+                            idempotency_key=f"stale-lease-confirm-{case}",
+                            expected_bundle=l_bundle,
+                        )
+                    await s.commit()
+                    l_room_id, l_part_id = l_room.id, l_part.id
+
+                # lease 自然到期（真栈里就是 TTL 到点）。时间戳走 SQL 侧 now()，
+                # 与本文件既有做法一致（见 ⑤ 的 expires_at 过期注入）。
+                async with Session() as s:
+                    await s.execute(
+                        sa.text(
+                            "UPDATE working_paper_oo_participant "
+                            "SET expires_at = now() - interval '1 hour' WHERE id = :p"
+                        ),
+                        {"p": l_part_id},
+                    )
+                    # room 使用窗口也一并过期（真栈 gen93 即如此）
+                    await s.execute(
+                        sa.text(
+                            "UPDATE working_paper_oo_room "
+                            "SET expires_at = now() - interval '30 minutes' "
+                            "WHERE id = :r"
+                        ),
+                        {"r": l_room_id},
+                    )
+                    await s.commit()
+
+                async with Session() as s:
+                    repo = WorkpaperSyncRepository(s)
+                    svc = RoomService(repo)
+                    before_row = (
+                        await s.execute(
+                            sa.text(
+                                "SELECT state, write_fence_epoch, "
+                                "client_confirmed_representation_id IS NULL "
+                                "AS never_confirmed "
+                                "FROM working_paper_oo_room WHERE id = :r"
+                            ),
+                            {"r": l_room_id},
+                        )
+                    ).mappings().one()
+                    released = await svc.release_stale_lease_on_pristine_room(
+                        room_id=l_room_id,
+                        participant_id=l_part_id,
+                        ttl=timedelta(hours=8),
+                    )
+                    rejoin_error = None
+                    rejoined_id = None
+                    if released:
+                        try:
+                            rejoined = await svc.join_participant(
+                                lease_scope,
+                                room_id=l_room_id,
+                                user_id=ids["user_a"],
+                                mode=ParticipantMode.edit,
+                                permission_epoch=5,
+                                lease_token=f"lease-token-rejoin-{case}",
+                            )
+                            rejoined_id = str(rejoined.id)
+                        except Exception as exc:  # noqa: BLE001 - 记录实际类型
+                            rejoin_error = _err(exc)
+                        await s.commit()
+                    else:
+                        await s.rollback()
+
+                async with Session() as s:
+                    after_room = (
+                        await s.execute(
+                            sa.text(
+                                "SELECT state, write_fence_epoch, refresh_required_at, "
+                                "expires_at > now() AS window_renewed "
+                                "FROM working_paper_oo_room WHERE id = :r"
+                            ),
+                            {"r": l_room_id},
+                        )
+                    ).mappings().one()
+                    lease_rows = [
+                        str(x)
+                        for x in (
+                            await s.execute(
+                                sa.text(
+                                    "SELECT state FROM working_paper_oo_participant "
+                                    "WHERE room_id = :r ORDER BY created_at"
+                                ),
+                                {"r": l_room_id},
+                            )
+                        ).scalars().all()
+                    ]
+
+                snap["stale_lease"][case] = {
+                    "precondition_state": str(before_row["state"]),
+                    "precondition_never_confirmed": bool(before_row["never_confirmed"]),
+                    "precondition_fence": int(before_row["write_fence_epoch"]),
+                    "released": bool(released),
+                    "rejoin_error": rejoin_error,
+                    "rejoined": rejoined_id is not None,
+                    "room_state_after": str(after_room["state"]),
+                    "fence_after": int(after_room["write_fence_epoch"]),
+                    "refresh_required_after": after_room["refresh_required_at"]
+                    is not None,
+                    "window_renewed": bool(after_room["window_renewed"]),
+                    "lease_states": lease_rows,
+                }
+            except Exception as exc:  # noqa: BLE001
+                _phase_failed(f"stale_lease_{case}", exc)
 
         # ═══ ⑩ flush-only：rollback 后零行（用独立 entry 避免撞唯一约束）════
         probe_entry = "xlsx/gt-probe-flush-only"
@@ -2332,6 +2519,81 @@ def test_historical_generation_is_rejected_by_the_publication_gate(
     err = snap["supersede"]["reopen_after_new_generation_error"]
     assert err is not None, "旧代际必须被拒"
     assert err.startswith("RepresentationNotPublishedError"), err
+
+
+def test_stale_lease_on_a_pristine_room_is_released_and_the_generation_is_reused(
+    snap: dict[str, Any],
+) -> None:
+    """僵死 lease × 从未接管内容的 room ⇒ 轻量释放 + 续租 + 可立即重新 join 同代 room。
+
+    治本回归守卫（2026-09-22 真栈根因）：旧代码把**所有**僵死 lease 都当「写会话被撤销 ⇒
+    内容可能已污染 ⇒ 作废整代」处理，而该安全前提只对「OO 真实接管过文档」成立。对一间
+    停在 `opening`、descriptor 确认从未到达、request/durable 序列为 0、fence 仍是初值的
+    room，污染在物理上不可能发生；作废它反而把用户彻底锁死 —— materialize 无法旋转
+    generation（那是 content_commit 的职责），而「重新 flush」在内容未改时走
+    business-identity 复用路径、同样不触发旋转 ⇒ 永远回到同一间死 room（真栈实测：该
+    entry 已堆积 6 个从未确认即被遗弃的代际 g69/76/77/78/80/93，materialize 稳定 500）。
+
+    判据全落在库里可观测的事实上，且**明确排除重型副作用**：lease 必须是 `expired` 而不是
+    `revoked`（后者带 fence+1 + refresh_required），fence 与 refresh_required_at 必须原封
+    不动 —— 否则这一代仍会被后续 `_assert_room_accepts_new_editor` / 准入门拒掉。
+    """
+    row = snap["stale_lease"]["pristine"]
+
+    # 前置：必须真的是「从未接管内容」的 room（防恒真）
+    assert row["precondition_state"] == "opening", row
+    assert row["precondition_never_confirmed"] is True, row
+    assert row["precondition_fence"] == 1, row
+
+    # 轻量分支必须命中
+    assert row["released"] is True, "pristine room 必须走轻量释放分支"
+
+    # 僵死 lease 落 expired 腾出 uq_wpoop_active_lease，并且**不是** revoked
+    assert "expired" in row["lease_states"], (
+        f"僵死 lease 必须落 expired 以释放 partial unique 槽位，实得 {row['lease_states']}"
+    )
+    assert "revoked" not in row["lease_states"], (
+        f"pristine 分支不得走 revoke_participant 重型路径，实得 {row['lease_states']}"
+    )
+
+    # 槽位确已腾出：同 (room, user) 能再建一个干净 lease
+    assert row["rejoin_error"] is None, (
+        f"释放后必须能重新 join 同代 room，实得 {row['rejoin_error']}"
+    )
+    assert row["rejoined"] is True, row
+    assert "active" in row["lease_states"], row
+
+    # 重型副作用一律不得发生，且使用窗口已续租
+    assert row["room_state_after"] == "opening", "room 不得被推进/作废"
+    assert row["fence_after"] == 1, "pristine 分支不得提升 write fence"
+    assert row["refresh_required_after"] is False, "不得标 refresh-required"
+    assert row["window_renewed"] is True, (
+        "必须续租 room.expires_at —— 否则用户进得去却存不了（forcesave 撞「room 已过期」）"
+    )
+
+
+def test_stale_lease_on_a_room_that_took_custody_refuses_the_lightweight_path(
+    snap: dict[str, Any],
+) -> None:
+    """确认过 descriptor 的 room 接管过内容 ⇒ 必须拒绝轻量路径，交回重型路径。
+
+    反向自检：没有这一条，把 `room_never_took_custody` 写成恒 True 也能让上一条全绿，
+    而那会让「写会话可能已污染内容 ⇒ 必须作废该代际」这条安全语义被彻底绕过。
+    """
+    row = snap["stale_lease"]["confirmed"]
+
+    assert row["precondition_state"] == "active", (
+        f"confirm_descriptor 之后 room 应为 active（= 接管过内容），实得 {row}"
+    )
+    assert row["precondition_never_confirmed"] is False, row
+    assert row["released"] is False, (
+        "接管过内容的 room 不得走轻量释放分支 —— 必须交给 revoke+supersede"
+    )
+    # 返回 False 时不得改动任何状态（调用方还要在同一事务里走重型路径）
+    assert row["lease_states"] == ["active"], (
+        f"拒绝轻量路径时不得改动 lease，实得 {row['lease_states']}"
+    )
+    assert row["fence_after"] == 1, "拒绝时不得自行提升 fence"
 
 
 def test_property_5_room_service_only_flushes(snap: dict[str, Any]) -> None:

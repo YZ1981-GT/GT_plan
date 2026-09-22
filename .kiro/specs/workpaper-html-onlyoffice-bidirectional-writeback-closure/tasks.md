@@ -862,3 +862,52 @@
   （9 个 B 子码）结构上不可执行。
 * **BP-19**：`B2-3` 载体二义（两封沟通函，sha256 与 size 均不同 ⇒ 两份不同文档），
   OPT-SPLIT / OPT-PRIMARY 两方案均未选定。
+
+---
+
+## 2026-09-22 D4 lane 登记与两处口径更正（append-only；上方 Tasks 1–77 原文与复选框一律不动）
+
+> 详细现读数与对照表见 `requirements.md` 末尾「2026-09-22 现状刷新」一节，此处只记与 tasks 判据直接
+> 相关的两处更正，避免读者按上方旧文得出错误结论。
+
+### 更正 ①：Tasks 40–44 的「四类 Excel pilot」是计划口径，不等于现状的 4 个 bidirectional entry
+
+现行 manifest（`backend/data/workpaper_sync_entry_manifest.json`，digest `5c55208f01c0…`）里
+`capability=bidirectional` + `migration_state=adapter_registered` 的 4 条是
+`gt-d2-accounts-receivable` / **`gt-d4-operating-revenue`** / `gt-g7-long-term-equity-main` /
+`gt-h1-fixed-assets`。Task 40 的 checklist pilot entry `xlsx/b60/gt-b60-bundle` **现仍是
+`single_onlyoffice` + `legacy_fake_bidirectional`、`adapter_id=None`**，从未成为 bidirectional entry。
+⇒ 读 Task 44 的 `pilot_not_admitted` / `real_onlyoffice_not_executed` 分型时，别把它当成
+「4 个真双向 entry 都没跑真实 OO」：其中 b60 那条根本不在 bidirectional 集合里，而 **D4 这条不在
+Tasks 40–43 的 pilot 集合里**（D4 的双向能力由 `d4-*` 系列 14 个独立 spec 做实，与本 spec 的 pilot 序列并行）。
+
+### 更正 ②：D4 lane 的真实 OO 场景**已执行**，Tasks 40–44 里「真实 OO 未执行前保持 UNVERIFIABLE」对 D4 不适用
+
+- **逐张 L1（30 张全绿）**：`docs/operations/evidence/d4-bidirectional-acceptance/D4-{1..36}.json`
+  （缺 D4-4）—— store-projection 200 → materialize 200 → callbackUrl 四项齐全 → `wp-sync-host` + OO iframe
+  + `d2_sync_hits=0`；`console_errors`/`http_errors` 全为 0。逐张 L1 必须 `--workers=1` 串行跑。
+- **完整 L2（1 张，D4-2，真 OO canvas → applied）**：
+  `.kiro/specs/_archive/14-d4-bidirectional-writeback/d4-revenue-matrix-bidirectional/evidence/g5-1-d4-unified-path/network-and-callback.json`
+  （`forcesave_cs_error=0` / `forcesave_http_status=202` / `confirm_descriptor_200=true`）+ 同目录
+  `db-check.json`（`operation.state=applied` / `application.state=applied` /
+  `content_version.source=onlyoffice` 且 `operation_id` 交叉一致 / `store_mirror.marker_in_store=true`）。
+- **对 Task 70 的影响**：D4 entry 现有 **1 条**真实 applied operation。按 Req 14.1「不得用一条 applied
+  operation 覆盖全部场景」，它**不能**替 D4 其余 29 张 sheet 与其余 required scenario 签收 ——
+  D4 的 required scenario set 仍需按 Task 70 口径逐项刷新。本节只更正「从未执行」这一事实判断，
+  **不推进任何复选框**。
+- **对 Task 72 Stage A 的影响**：零。Stage A 的五个零（未裁决=0 / 假双向=0 / bidirectional 未验收=0 /
+  unreachable=0 / evidence stale=0）当前仍全部为红（`legacy_fake_bidirectional`=137、
+  `unadjudicated_count`=132、`working_paper_sync_test_run` 0 行）。
+
+### 未完成任务清单（2026-09-22 实扫复选框，供索引核对）
+
+`[-]` **5 个**：Task 61（真实 OO 9.4 F2 Word gate）· Task 71（变异/容量/故障恢复/retention 验收）·
+Task 72（pre-delete eligibility + legacy 删除 + post-delete 重验 + 归档）· Task 74（writer/version
+domain 七条准则归零）· Task 75（published-representation → frozen entry definitions 观测器 +
+按 manifest 真实注册 adapter）。其余 72 个 `[x]`。⇒ **本 spec 不具备归档条件。**
+
+⚠️ 上方 Task 67 段引用的 structural pre-reconcile 报告
+（`backend/data/workpaper_sync_task67_structural_pre_reconcile.json`）生成于 **2026-09-13**，其
+`entries_with_published_representation=0` / `content_representation_rows=1` /
+`capability_counts` 无 `bidirectional` 键等读数**已被 D2/D4/G7/H1 的后续推进作废**；
+Task 72 Stage A 消费该报告前必须重新生成，不得读这份旧的。

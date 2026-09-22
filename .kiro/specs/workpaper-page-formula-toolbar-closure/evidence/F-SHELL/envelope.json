@@ -12,7 +12,7 @@
     "G-RAIL": "1.0",
     "F-SHELL": "1.0"
   },
-  "inventoryDigest": "cb788c0c01b286f7af07e7c7e680eda4db41c89a16fb9fba27dd6a46a7e9301e",
+  "inventoryDigest": "8134c0d843841df847d7347b8eac3821eb690aa0bb9a2aca71103b7307e3158f",
   "sourceDigests": {
     "contractModule": "shell/formula/fShellContract.ts",
     "mutationReport": null

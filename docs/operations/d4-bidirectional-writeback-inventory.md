@@ -717,3 +717,151 @@ pre-existing，已恢复改动。属 apply 半应用态的既有欠账，非本�
 - `D4TabOtherMargin.vue` / `D4TabOtherContract.vue` / `D4TabOtherCutoff.vue`（健康端点修正 + switchMode 健康 await）
 - `D4TabMarginMonthly.vue` / `D4TabProductMargin.vue`（健康端点修正）
 - `e2e/d4-bidirectional-acceptance.spec.ts`（tab 正则 `(?![\dA-Za-z])`）
+---
+
+## 2026-09-22 第五轮：30 张全绿之后的 5 处真根因修复 + 2 处判据/证据保真（本轮）
+
+> **本轮定位**：第四轮把「点不进在线编辑」的前端 gap 清零后，D4 全量 30 张证据（`docs/operations/
+> evidence/d4-bidirectional-acceptance/D4-{1..36}.json`，缺 D4-4 = owner 去重后不独立成表）
+> `console_errors` / `http_errors` **全部为 0**。本轮修的是「全绿之后仍在真栈稳定复现」的深层缺陷：
+> 一个把用户锁死在 500 死循环的 room 生命周期误判、一个恒假成功的删除、一个破坏公式键 identity
+> 的正则、一对拖慢切页面的健康探针。全部**先复现 → 再定位根因 → 修主代码 → 补守卫**。
+
+### ① 僵死 lease 打挂在线编辑：500 死循环（P0，真栈稳定复现）
+
+**现象**：某些 D4 entry 点「在线编辑」永远停在「正在打开同步编辑器…」，`materialize` 稳定 **500
+`room_not_writable`**；重新 flush 无效，反复重试仍回到同一间房。真栈同一 entry 已堆积 **6 个
+从未确认即被遗弃的代际**（g69/76/77/78/80/93）。
+
+**根因（两层，缺一不可）**：
+
+1. `_join_or_reuse_participant` 发现僵死 lease 后**无条件**按「写会话被撤销 ⇒ 内容可能已污染 ⇒
+   作废整代」处理（`revoke_participant` fence+1 + `refresh_required` → `supersede_room`）。该安全
+   论证（「OO 的 `c=drop` 只证明会话被逐出，**不证明**已合入内容被移除」）预设 **OO 会话真实接管过
+   文档**。而另有一类僵死 lease 根本没接管过：用户点了在线编辑、room 建好、**descriptor 确认从未
+   到达**（OO 没加载完 / 用户切走），lease 随后自然到期。
+2. 旧 `except _ExpiredLeaseRoomSuperseded` 分支拿**同一个** representation 去 `open_or_reuse_room`
+   重开。但 `room.generation ≡ representation.generation`，`uq_wpoor_generation` 使 superseded 代际
+   **永不可同代重开** ⇒ 撞 `RoomNotWritableError` → 500。而 materialize 是**读取路径**，手里只有
+   冻结的旧 representation，**无法旋转 generation**（那是 `content_commit` 发布路径的职责）；且
+   「重新 flush」在内容未改时走 business-identity 复用路径、**同样不旋转** ⇒ 永远回到同一间死房。
+
+**修复（治本分流，按「这一代是否真正接管过内容」决定反应强度）**：
+
+- 新增纯判据 `rooms.room_never_took_custody(room)`：room 停在 `opening`、`refresh_required_at` 为空、
+  `client_confirmed_*` 四项全空、`last_applied_version_id` / `latest_durable_application_id` /
+  `close_leader_intent_id` 全空、request/durable/close_barrier 序列为 0、`write_fence_epoch` 仍是初值 1。
+  判据**全部取保守方向**（任何一项显示可能动过内容即 `False`），新增承载托管语义的列必须在此登记。
+- 新增 `RoomService.release_stale_lease_on_pristine_room()`：判据为真 ⇒ participant `active → expired`
+  （`uq_wpoop_active_lease` 是 `WHERE state IN ('active','closing')` 的 partial unique，转出即腾槽位），
+  **并续租** `room.expires_at`（不续租会让用户进得去却存不了——`assert_can_initiate_request` 的
+  room 过期门会拒 forcesave），随后在**同代 room** 上重新 join 一个干净 lease。用户当场回到在线编辑：
+  不烧 generation、不抛 409。`ParticipantState.expired` 与 `PARTICIPANT_EDGES` 里的 `active → expired`
+  早已定义却从未被任何代码使用——这条轻量迁移正是当初设计好、缺了接线的那一环。
+- 判据为假（真接管过）⇒ 保持原重型反应，但 `except` 分支改抛 **409** `DescriptorSubstrateStaleError`
+  （`error_code=launch_descriptor_substrate_stale`，前端 `classifySyncFailure` 已识别为「不可原地重试」），
+  让客户端重新 flush → commit，由 D4/G7 canary 的 `_next_generation_probe`（`max(rep,room)+1`）发布新
+  generation，下一次 materialize 用干净新代 room 开成功。**不再同代重开**。
+
+**守卫**：`test_pristine_room_stale_lease_recovery.py`（新，判据侧纯函数 + 承载列登记反证）、
+`test_task21_room_service_pg.py` §⑨b（真 PG：轻量释放 + 续租 + 立即重新 join 同代）、
+`test_task25_materialize_coordinator_pg.py::test_expired_write_lease_refuses_with_409_stale_not_500_room_not_writable`
+（阶段 8a-bis 采证 + `STALE_ON_ROOM_OPEN_MARKER` 区分「room 打开侧」与「重放侧」两条 stale 判据）。
+
+### ② 公式删除恒假成功（P0，静默数据不一致）
+
+`wp_formula.delete_formula` 调 `wp_formula_service.delete(db, formula_id)` **不传 `project_id`**，而服务层
+第一道 ownership 门是「`project_id` 为 None 即拒绝并 `return False`」（Req 10.6）⇒ 永不执行 `db.delete()`；
+路由又**忽略返回值**、无条件返回 `{"deleted": ...}` ⇒ 前端显示删除成功，刷新后公式仍在（真栈实测：
+DELETE 200 之后 GET /formulas 仍返回该条）。同款缺陷在 `list_by_wp` 路径上已修过，delete 是当时漏掉的
+最后一处。修：补传 `project_id=wp.project_id`，返回 `False` 时抛 404，不得再返回 200「已删除」。
+守卫：`test_wp_formula_endpoint.py` 在 `DELETE 200` 之后**补回读断言**（原来只断言 200 ⇒ 正好漏掉这个缺陷）。
+
+### ③ 公式 stable key 被展示前缀吃掉（P0，公式与单元格失联）
+
+`stable_key._ORDER_PREFIX_RE` 原式 `[一二三四五六七八九十]+[、.．]?\d*[、.．]?`：`\d*` 本意吃掉 "五、1 "
+这类**子序号**，却会贪心吃掉**正文**——PBT `test_property_key_stable_across_sheet_rename` 抽到反例
+`base='0'`（`'0'` vs `'一、0'`）：整串被剥成空串 ⇒ `stable_sheet_key=''` 且 `needs_review=True`，而未加前缀
+的 `'0'` 得到 `'0'` ⇒ 「加展示前缀不得改键」这条 identity 不变量被破坏。修：子序号 `\d+` 只在其后紧跟空白或
+`、.．` 时才并入前缀（区分子序号与正文的判据就是**分隔符**：`"五、1 "` 带尾随空白，`"五、审定表D2-1"` 的
+正文紧跟标点）；同时要求中文序号后**必须**有 `、.．`（原式 `[、.．]?` 会把 `"五1 "` 也当前缀，剥得过宽）。
+
+### ④ OO 健康探针拖慢切页面（P1，一人慢拖累所有人）
+
+- **后端**：`OnlyOfficeCallbackService.health_check` 标了 `async def` 却用同步阻塞的
+  `urllib.request.urlopen`，在方法体内**真阻塞事件循环**最多 `timeout` 秒。调用方
+  `wp_onlyoffice_router.get_onlyoffice_health` 是 D4 每次切底稿都会打的无鉴权探针，一次阻塞连累同进程内
+  **所有**并发请求。改用本文件已有的 `httpx.AsyncClient`（真异步，不引入新依赖）。
+  守卫：`test_onlyoffice_health_check_nonblocking.py`（新）。
+- **前端**：`useD4SyncMode()` 每次被调用（=== 每切一张 D4 底稿，**不论是否点在线编辑**）都无条件
+  `void checkOoHealth()`，30 张共用同一段 mount 逻辑。改为模块级共享 TTL 缓存（15s）+ **in-flight 去重**
+  （多组件同时挂载只发一次真实请求）；`switchMode` 的竞态兜底传 `forceRefresh=true` 绕过缓存——用户已点击，
+  不能信一个可能刚好卡在缓存边界的旧值挡住这次真实点击。测试专用 `__resetOoHealthCacheForTests()` 防跨用例污染。
+
+### ⑤ 判据收窄 + 扩面：room 序号守卫（本轮 ① 暴露出的守卫精度问题）
+
+`test_room_service_does_not_compute_request_sequence` 原判据是「剥注释/字符串后，模块正文里不得出现子串
+`latest_request_sequence`」——① 的新纯判据只是**只读比较** `latest_request_sequence == 0` 就被打红。
+
+该判据有两个毛病：**过宽**（把「只读观测」与「第二处推进」混为一谈；模块 docstring 自己把禁令写成「故意不提供
+`next_request_sequence()`」，`_advance_canonical_fence_locked` 的 docstring 写成「那三行**算术**委派给
+`repo.advance_room_durable_fence()`」——要守的一直是「算」不是「读」；旁证：兄弟字段 `latest_durable_sequence`
+本来就被服务层 L1679 读着建快照，从未有人认为那违反本不变量）；**过窄**（只盯一个字段，`latest_durable_sequence`
+此前**一条守卫都没有**，服务层今天写一行 `room.latest_durable_sequence = n` 不会有任何测试发现）。
+
+改为 AST 判据 `_room_field_usages()`：把用法分成 `write`（赋值目标）/ `arith`（参与算术）/ `dynamic`
+（字段名以字符串形态出现在调用实参或 dict 键，即 `setattr` 绕道）/ `read`（其余取值）四类——**前三类一律禁止**，
+只读仅限逐字段登记的 `_SEQUENCE_READ_ALLOWLIST`（fail-closed：新函数想读必须显式登记并写明理由）。两个字段同判据。
+**变异反证已实跑**：注入 `room.latest_request_sequence = 0`（write）与 `room.latest_durable_sequence + 1`（arith）
+各打红一次，文件已还原。
+
+### ⑥ 证据保真：`sheet_name` 改记观测值
+
+`e2e/d4-bidirectional-acceptance.spec.ts` 的证据字段 `sheet_name` 原取调用方在 `D4_ACCEPT_SHEETS` 里传入的
+`name`。本轮全量重跑用 `name === code` 的简写调用，30 份证据的 `sheet_name` 全退化成「D4-13」这类纯编码，
+丢掉「到底点中哪张表」这个最关键的可复核信息——而页签**定位只用 `code`**，`name` 纯属证据字段，于是**没有
+任何判据能发现它被传坏了**。改为记录**实际点中的页签文本**（`observedTabText`），清单声明值另存
+`sheet_name_expected`。证据只记观测到的事实，不记输入参数。
+⚠️ 本项**代码已改、未实测**：前端 3030 dev server 未运行，e2e 无法重跑，需下次验收运行才体现在证据 JSON 里。
+
+### 真栈/回归验证
+
+- PG 真栈：`test_task21_room_service_pg` + `test_pristine_room_stale_lease_recovery` **81 passed**；
+  `test_task25_materialize_coordinator_pg` **52 passed**。
+- 定向回归（含 ①④ 所有消费侧）：`test_task21_room_service` / `test_task25_materialize_coordinator` /
+  `test_room_launch` / `test_task22_callback_claim` / `test_task28_sync_router` / `test_wp_onlyoffice_router` /
+  `test_deliverable_onlyoffice` 合计 **494 passed**（1 pre-existing 红，见下）。
+- 公式侧：`test_wp_formula_endpoint`(+`test_onlyoffice_health_check_nonblocking`) **6 passed**、
+  `test_wp_formula_stable_key` **17 passed**。前端 `useD4SyncMode.spec.ts` **10 passed**。
+- ⚠️ `tests/workpaper_sync` 全量约 180 文件，整目录跑 30 分钟只到 60%，不适合当回归口径；按改动模块定向跑。
+
+### 诚实暴露：pre-existing 红（本轮逐一验证过「与本批无关」，登记为独立待办）
+
+1. **OnlyOffice `enabled` 契约漂移（安全相关，待拍板）**：生产代码已改成
+   `enabled = bool(settings.ONLYOFFICE_URL)`（commit `a60198b6a`，注释「JWT 为可选鉴权」），且
+   `verify_callback_jwt` 在无 secret 时**直接放行**。但 `test_deliverable_onlyoffice::test_property_54`
+   与 `test_deliverable_center_p1::test_onlyoffice_disabled_without_secret` 仍锚定旧契约（无 secret ⇒
+   `enabled is False` / `verify_callback_jwt is False`）⇒ 两处红。已用 `git show HEAD:` 版本覆盖
+   `onlyoffice_callback_service.py` 复跑确认**与本轮 httpx 改造无关**。
+   含义：若部署时配了 `ONLYOFFICE_URL` 却没配 JWT secret，callback 端点会接受**未鉴权**的内容写入。
+   两条路（收紧生产契约 / 更新测试到新契约）取向不同，**未擅自改，待决策**。
+2. `test_d2_sync_retirement.py` 11 红——前瞻性退役门禁，phase 仍 `pre_delete`，legacy `d2_sync_router.py`
+   与 `wp_html_save.py` 里的 `d2-sync` 字面量未删（门禁是「等退役执行后才转绿」的设计）。
+3. `test_d2_store_value_equivalence.py` 3 红——`d2_bidirectional_bridge` 已无
+   `merge_projection_into_store_rows`（API 漂移，测试未跟上）。
+4. `test_task26_oo_to_html_pg::TestAppliedHappyPath::test_p29`——第三轮 §⑤ 已登记的既有欠账（apply 半应用态）。
+
+### 本轮改动文件
+
+- `backend/app/services/workpaper_sync/rooms.py`（`room_never_took_custody` + `release_stale_lease_on_pristine_room`）
+- `backend/app/services/workpaper_sync/materialize_coordinator.py`（僵死 lease 分流 + 同代重开改抛 409）
+- `backend/app/routers/wp_formula.py`（delete 补 `project_id` + 404 而非假 200）
+- `backend/app/services/formula_management/stable_key.py`（`_ORDER_PREFIX_RE` 收窄）
+- `backend/app/services/onlyoffice_callback_service.py`（health_check 改 httpx 异步）
+- `audit-platform/frontend/src/components/workpaper/d4/composables/useD4SyncMode.ts`（健康 TTL 缓存 + 去重）
+- `audit-platform/frontend/e2e/d4-bidirectional-acceptance.spec.ts`（`sheet_name` 改记观测值）
+- 守卫：`test_pristine_room_stale_lease_recovery.py`（新）/ `test_onlyoffice_health_check_nonblocking.py`（新）/
+  `test_task21_room_service_pg.py` §⑨b / `test_task25_materialize_coordinator_pg.py` 阶段 8a-bis /
+  `test_task21_room_service.py`（AST 判据收窄+扩面）/ `test_wp_formula_endpoint.py`（回读断言）/
+  `useD4SyncMode.spec.ts`（缓存/去重/forceRefresh）
+- 证据刷新：`docs/operations/evidence/d4-bidirectional-acceptance/D4-{1..36}.json`（30 份，全量重跑）

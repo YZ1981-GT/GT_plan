@@ -6,12 +6,12 @@
   "runId": "t15-full-inventory-2026-09-09",
   "overall": "PASS",
   "blockers": [],
-  "inventoryDigest": "cb788c0c01b286f7af07e7c7e680eda4db41c89a16fb9fba27dd6a46a7e9301e",
+  "inventoryDigest": "8134c0d843841df847d7347b8eac3821eb690aa0bb9a2aca71103b7307e3158f",
   "digests": {
     "entries": "375690c9e63f128c293bf6475ded2c1ea0fb2f0a018c87d162c05092acc95272",
-    "duplicates": "bf05369e533b0193a8fffa568af4b6ba60b834b07d6638eb03d0df5e999d2c7c",
+    "duplicates": "eb6554bc7df29acd04010ffc788467b3ef9ba6ce2c432922604ec3d67ed51163",
     "exclusions": "e0a779702afc38c58bf471a7eca1bb52f76ed2b8c18e5f3e6d6d877fd4be9f44",
-    "run": "cb788c0c01b286f7af07e7c7e680eda4db41c89a16fb9fba27dd6a46a7e9301e"
+    "run": "8134c0d843841df847d7347b8eac3821eb690aa0bb9a2aca71103b7307e3158f"
   },
   "entryCount": 216,
   "domainExclusionCount": 6,
@@ -97,7 +97,7 @@
     }
   ],
   "duplicates": {
-    "rawCount": 15,
+    "rawCount": 19,
     "forbiddenCount": 0,
     "byKindForbidden": {},
     "shellOwned": [
@@ -128,6 +128,26 @@
       }
     ],
     "allowedDelegates": [
+      {
+        "kind": "formula-entry",
+        "path": "components/workpaper/d4/other/D4TabOtherCheck.vue",
+        "reason": "emits/references FormulaManager without mounting a second dialog"
+      },
+      {
+        "kind": "formula-entry",
+        "path": "components/workpaper/d4/other/D4TabOtherContract.vue",
+        "reason": "emits/references FormulaManager without mounting a second dialog"
+      },
+      {
+        "kind": "formula-entry",
+        "path": "components/workpaper/d4/other/D4TabOtherCutoff.vue",
+        "reason": "emits/references FormulaManager without mounting a second dialog"
+      },
+      {
+        "kind": "formula-entry",
+        "path": "components/workpaper/d4/other/D4TabOtherMargin.vue",
+        "reason": "emits/references FormulaManager without mounting a second dialog"
+      },
       {
         "kind": "human-review",
         "path": "components/workpaper/GtD1NotesReceivable.vue",
@@ -189,5 +209,5 @@
   "browserImportGuards": {
     "cryptoStaticImports": []
   },
-  "evidenceSha256": "b696f9039f8a7c5bd36d3b51ac1dd3a71dcdb3d2918a954f51515a3a49b786fa"
+  "evidenceSha256": "903c484cb61629f671e7b3754c9464a0530bf5cf820e53b1931d7343c3bdcefe"
 }

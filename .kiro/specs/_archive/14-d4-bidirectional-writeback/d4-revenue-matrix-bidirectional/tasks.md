@@ -111,3 +111,32 @@ Task 1 未冻结字段映射前不得假定字段数量；Task 2 必须通过共
 - [~] 13. C4逐D4-2/3验收：source evidence、stable identity、formula mask、roundtrip、权限、Playwright及变异；公式同步不发布TB/A13，只门控本spec相关产物。
   - **本轮**：D4-2 真栈证据已在 `evidence/g5-1-d4-unified-path/`；D4-3 为兄弟表，正式 C4 矩阵仍随总纲推进。
   - _Requirements: 3.1, 3.2, 6.1_
+
+---
+
+## 2026-09-22 归档前状态刷新（append-only；上方复选框与原文一律不动）
+
+> 上方 Task 13 的 `[~]` 理由原文是「D4-2 真栈证据已在 `evidence/g5-1-d4-unified-path/`；D4-3 为兄弟表，
+> 正式 C4 矩阵仍随总纲推进」。本节把 D4-2/D4-3 的最终状态说清 —— 本 spec 是 **D4 全组唯一拿到
+> 真 OO canvas → applied 完整 L2 证据**的 spec，值得显式记录。
+
+**① D4-2 是 D4 全组唯一的完整 L2 样板（真 OO canvas → forcesave → callback → applied → store 镜像）**：
+`evidence/g5-1-d4-unified-path/network-and-callback.json`（2026-09-21 刷新）——
+`forcesave_cs_error=0`（权威判据，0=有变更；4=no_changes 不算）· `forcesave_http_status=202` ·
+`confirm_descriptor_200=true` · `oo_cell_dirty_attempted=true` · `d2_sync_hits=0` ·
+callbackUrl 五项键（`room_id`/`generation`/`doc_key`/`route_credential_id`/`route_token`）。
+`evidence/g5-1-d4-unified-path/db-check.json` —— `operation.state=applied` ·
+`application.state=applied`（`result_revision=12`, `adapter_id=d4.revenue_detail`）·
+`content_version.source=onlyoffice` 且 `operation_id` 交叉一致 ·
+`store_mirror.marker_in_store=true`（OO 里写的 marker 出现在 HTML store 的 `GTROW-D42-0012.product`，
+`months` 仍是长度 12 的位置数组 ⇒ **DEC-D4-1「12 个月做 12 条独立 field」的往返等值在真栈成立**）。
+
+**② D4-3 状态**：`docs/operations/evidence/d4-bidirectional-acceptance/D4-3.json`（2026-09-22）L1 全绿；
+后端 `d43-managed` 受管链路由 `d-cycle-sheet-bidirectional-expansion` Tasks 1–5 做实
+（`test_d43_production_roundtrip.py` 绿、contract digest `74804f74…`、bundle `0b7bb759…`）。
+D4-3 自身的 L2 canvas 往返未单独跑。
+
+**③ 残留归属**：C4 逐表验收矩阵按 entry 粒度归父 entry `xlsx/gt-d4-operating-revenue`，
+移交总纲 `workpaper-html-onlyoffice-bidirectional-writeback-closure` Task 70 口径。
+
+**④ 归档判定**：本 spec 自有产物全部就位，且是全组唯一有完整 L2 applied 证据的 spec ⇒ **可归档**。

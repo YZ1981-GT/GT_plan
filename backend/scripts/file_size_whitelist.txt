@@ -213,7 +213,7 @@ backend/app/services/workpaper_sync/projection_provisioning.py  1249
 backend/app/services/workpaper_sync/published_identity_observer.py  1500
 backend/app/services/workpaper_sync/repository.py  3124
 backend/app/services/workpaper_sync/request_application.py  1181
-backend/app/services/workpaper_sync/rooms.py  2017
+backend/app/services/workpaper_sync/rooms.py  2119
 backend/app/services/workpaper_sync/timeline.py  911
 backend/app/services/workpaper_sync/word_entry_gate.py  1856
 backend/app/services/workpaper_sync/word_instrumentation.py  1797
@@ -291,14 +291,12 @@ backend/tests/workpaper_sync/test_task18_html_save_unified_revision_pg.py  830
 backend/tests/workpaper_sync/test_task19_writer_migration.py  1751
 backend/tests/workpaper_sync/test_task20_writer_gate.py  1569
 backend/tests/workpaper_sync/test_task21_room_service.py  1335
-backend/tests/workpaper_sync/test_task21_room_service_pg.py  2663
 backend/tests/workpaper_sync/test_task22_callback_claim.py  1457
 backend/tests/workpaper_sync/test_task22_callback_claim_pg.py  2089
 backend/tests/workpaper_sync/test_task23_request_application_pg.py  2774
 backend/tests/workpaper_sync/test_task24_close_intent.py  1305
 backend/tests/workpaper_sync/test_task24_close_intent_pg.py  1890
 backend/tests/workpaper_sync/test_task25_materialize_coordinator.py  1210
-backend/tests/workpaper_sync/test_task25_materialize_coordinator_pg.py  2481
 backend/tests/workpaper_sync/test_task26_oo_to_html.py  2196
 backend/tests/workpaper_sync/test_task26_oo_to_html_pg.py  3493
 backend/tests/workpaper_sync/test_task27_conflict_resolution.py  1039
@@ -698,3 +696,38 @@ backend/app/models/audit_platform_models.py  1406
 #     roundtrip / kind-dispatch / fail-closed 三文件，属独立任务（与守卫补录同批会
 #     把「清单 ↔ 变异覆盖率」分母核对打散）。spec: workpaper-sync-static-cell-sheet-writeback Task 12
 backend/tests/workpaper_sync/test_static_region_writeback.py  1871
+
+#   ── 2026-09-22 D4 双向回写第五轮根因修复（rooms/materialize/wp_formula）的基线调整 ──
+#   已先做能做的结构性拆分，**再**动基线：本轮新增的「room 序号归属」AST 守卫（约 130 行）
+#   已抽成独立文件 `backend/tests/workpaper_sync/test_room_sequence_ownership_guard.py`，
+#   `test_task21_room_service.py` 因此回到基线内（1464 → 1332 < 1335），**不改它的基线**。
+#
+#   rooms.py 2017→2119：新增 `room_never_took_custody` 纯判据 + `RoomService.
+#     release_stale_lease_on_pristine_room()`（僵死 lease × 从未接管内容 room ⇒ 轻量释放
+#     active→expired + 续租 + 同代复用）。治一个真栈稳定复现的死锁：旧代码无条件把僵死 lease
+#     当「写会话被撤销 ⇒ 内容可能污染 ⇒ 作废整代」，而 materialize 无法旋转 generation，
+#     「重新 flush」在内容未改时也不旋转 ⇒ 用户永远回到同一间死 room（同一 entry 已堆积
+#     6 个从未确认即被遗弃的代际）。属**新增能力**不是打磨膨胀；判据刻意取保守方向且逐列
+#     登记，写短了会失去「新增承载内容托管语义的列必须在此登记」这层防线。拆分方向：把
+#     room 生命周期判据族（never_took_custody / upgrade candidate 终态 / request 资格门）
+#     抽 `room_predicates.py` 伴生纯函数模块，属独立打磨任务。
+#   test_task21_room_service_pg.py 2663→2925 / test_task25_materialize_coordinator_pg.py
+#     2481→2682：分别新增「僵死 lease × pristine room ⇒ 释放+续租+可立即重新 join 同代」
+#     与「僵死写 lease ⇒ materialize 409 stale 而非 500 room_not_writable」两个真 PG 场景。
+#     两者都**结构性绑定**在各文件唯一的 module 级一次性 `_collect()` 快照 fixture 上
+#     （世界只搭一次，阶段间共享 room/representation/token 状态），抽到新文件必须重建整套
+#     PG 世界 ⇒ 复制 setup + 跑两遍 PG + 状态漂移风险，比留在原文件更差。拆分方向：先把
+#     `_collect()` 的世界搭建抽成可复用 fixture 模块，再按阶段分文件，属独立打磨任务。
+backend/tests/workpaper_sync/test_task21_room_service_pg.py  2925
+backend/tests/workpaper_sync/test_task25_materialize_coordinator_pg.py  2682
+
+#   wp_formula.py 895（**改动前即已 895 > 800 上限、却从未登记在册** —— 本次首次登记，
+#     baseline 取 HEAD 真实行数 895 而非改动后的 908，让这笔历史欠账按它原本的大小入册）。
+#     本轮 +13 行是修一处**恒假成功**：`delete_formula` 调 `wp_formula_service.delete()`
+#     不传 `project_id`，而服务层第一道 ownership 门是「project_id 为 None 即拒绝并
+#     return False」（Req 10.6）⇒ 永不执行 `db.delete()`；路由又忽略返回值无条件返回
+#     `{"deleted": ...}` ⇒ 前端显示删除成功、刷新后公式仍在（真栈实测 DELETE 200 之后
+#     GET 仍返回该条）。补传 project_id + 返回 False 时抛 404。拆分方向：该 router 是
+#     公式 CRUD + 预设 + 依赖图 + 批量重算的聚合体，宜按「CRUD / preset / graph」拆三个
+#     router 模块，属独立打磨任务。
+backend/app/routers/wp_formula.py  895

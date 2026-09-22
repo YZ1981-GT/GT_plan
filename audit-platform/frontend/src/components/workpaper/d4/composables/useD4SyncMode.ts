@@ -46,13 +46,62 @@ export const D4_ONLINE_EDIT_LABEL = '在线编辑'
  *    正确端点是 `/api/workpapers/onlyoffice/health`，返回 `{ data: { healthy: boolean } }`。
  *    所有 D4 sync 组件必须经本函数取健康，禁止各自再 http.get 一遍。
  */
-export async function fetchOnlyOfficeHealthy(): Promise<boolean> {
+async function requestOnlyOfficeHealthy(): Promise<boolean> {
   try {
     const res = await http.get('/api/workpapers/onlyoffice/health', { _silent: true } as any)
     return (res.data?.data?.healthy ?? res.data?.healthy ?? false) as boolean
   } catch {
     return false
   }
+}
+
+/** 健康检查结果的存活时长——同一时段内多次切换底稿共用一份结果，不逐张重打。 */
+const OO_HEALTH_TTL_MS = 15_000
+
+/** 模块级共享缓存（跨组件实例）：{value, expiresAt} 或 null（未探测过/已过期）。 */
+let ooHealthCache: { value: boolean; expiresAt: number } | null = null
+/** 并发去重：多个组件几乎同时挂载时，只发一次真实请求，其余等这个 promise。 */
+let ooHealthInFlight: Promise<boolean> | null = null
+
+/**
+ * OnlyOffice 健康检查 —— 带模块级共享 TTL 缓存。
+ *
+ * 🔴 2026-09-22 修复：此前每次 `useD4SyncMode()` 被调用（=== 每次切换 D4-N 底稿组件
+ *    挂载，不论是否点了「在线编辑」）都会无条件 `void checkOoHealth()` 打一次这个端点
+ *    （D4-1~36 全量 30 张底稿共用同一段 mount 逻辑）。切一次底稿多打一次探针，且后端
+ *    该端点内部一度是同步阻塞 IO（已修，见 `onlyoffice_callback_service.py`），叠加起来
+ *    是「切页面不丝滑」的真根因之一。改为 15s 内命中缓存直接返回、缓存过期才真正
+ *    发请求，且并发去重（同一时刻多个组件挂载只触发一次网络请求）。
+ *
+ * `forceRefresh`：`switchMode` 里健康未就绪时的竞态兜底仍需要「当场探一次」而不是
+ * 信一个可能刚好卡在缓存边界的旧值——传 `true` 绕过缓存直接发请求（仍写回缓存供后续
+ * 命中，且仍走同一个 in-flight 去重，不会与并发调用打两次请求）。
+ */
+export async function fetchOnlyOfficeHealthy(forceRefresh = false): Promise<boolean> {
+  const now = Date.now()
+  if (!forceRefresh && ooHealthCache && ooHealthCache.expiresAt > now) {
+    return ooHealthCache.value
+  }
+  if (ooHealthInFlight) return ooHealthInFlight
+  ooHealthInFlight = requestOnlyOfficeHealthy()
+    .then(value => {
+      ooHealthCache = { value, expiresAt: Date.now() + OO_HEALTH_TTL_MS }
+      return value
+    })
+    .finally(() => { ooHealthInFlight = null })
+  return ooHealthInFlight
+}
+
+/**
+ * 仅供测试使用：清空模块级健康缓存/in-flight 去重状态。
+ *
+ * 各测试用例各自 mock 独立的 http 响应/延迟 resolve 时机，若不在每个用例开始前清空，
+ * 前一个用例遗留的缓存值或悬挂中的 in-flight promise 会被下一个用例误复用，产生
+ * 跨用例污染。生产代码路径不调用本函数——TTL 到期或强制刷新已足够。
+ */
+export function __resetOoHealthCacheForTests(): void {
+  ooHealthCache = null
+  ooHealthInFlight = null
 }
 
 export interface UseD4SyncModeOptions {
@@ -80,11 +129,14 @@ export function useD4SyncMode(options: UseD4SyncModeOptions) {
   const views = options.views.length ? [...options.views] : ['表格视图']
 
   const ooHealthy = ref(false)
-  async function checkOoHealth(): Promise<boolean> {
-    ooHealthy.value = await fetchOnlyOfficeHealthy()
+  /** `forceRefresh`：仅 `switchMode` 竞态兜底传 true——用户已点击，需要绕过缓存确认
+   *  最新状态；mount 期首探（下方 `void checkOoHealth()`）用默认值走缓存，命中即返回。 */
+  async function checkOoHealth(forceRefresh = false): Promise<boolean> {
+    ooHealthy.value = await fetchOnlyOfficeHealthy(forceRefresh)
     return ooHealthy.value
   }
-  // mount 期先探一次（异步；switchMode 内还会兜底 await，见下）。
+  // mount 期先探一次（异步；switchMode 内还会兜底 await，见下）。命中模块级缓存时
+  // 这一步几乎零成本，不再是「切一次底稿打一次请求」。
   void checkOoHealth()
 
   const syncSwitching = ref(false)
@@ -134,7 +186,9 @@ export function useD4SyncMode(options: UseD4SyncModeOptions) {
       // 🔴 竞态兜底（bug ②）：点击可能早于 mount 期 checkOoHealth() 响应到达，此时
       //    ooHealthy 仍为初始 false。健康未就绪则**当场 await 一次**再判定，OO 真不可用
       //    才 return（fail-visible 由桥/后端给），绝不因「健康还没探到」静默吞掉点击。
-      if (!ooHealthy.value) await checkOoHealth()
+      //    forceRefresh=true：绕过 TTL 缓存直接问最新状态——不能信一个可能刚好过期
+      //    边界的旧值挡住用户这次真实点击。
+      if (!ooHealthy.value) await checkOoHealth(true)
       if (!ooHealthy.value) return
       syncSwitching.value = true
       // 🔴 桥的 switchToOnlyOffice/switchToHtml 失败时会先把错误写进 `syncBridge.lastError`

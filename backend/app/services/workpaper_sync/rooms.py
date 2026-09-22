@@ -752,6 +752,50 @@ _REQUEST_ALLOWED_PARTICIPANT_STATES: Final[frozenset[ParticipantState]] = frozen
     {ParticipantState.active, ParticipantState.closing}
 )
 
+#: 复用「从未接管内容」的 room 时给它续的使用窗口（与 `repository.create_room` 的默认 room
+#: TTL 一致：重新接纳编辑者等于重启这间房的可用窗口，不该给一个更短的特例值）。
+_PRISTINE_ROOM_RENEW_TTL: Final[timedelta] = timedelta(hours=8)
+
+
+def room_never_took_custody(room: WorkpaperOoRoom) -> bool:
+    """该 room（generation）是否**从未接管过内容** —— 纯判据，只读行上的可观测事实。
+
+    `True` 的含义很强：这一代自打开以来，OO 从未确认过 descriptor、没发起过任何 request、
+    没有任何 durable 内容或 application、fence 从未被提升、没进过 close barrier、也没被标
+    refresh-required ⇒ **物理上不可能存在已合入的内容**，故「撤销写会话可能已污染内容」
+    这条安全前提对它不成立。
+
+    判据刻意全部取**保守**方向：任何一项显示「可能动过内容」即返回 `False`，让调用方退回
+    :meth:`RoomService.revoke_participant` + :meth:`RoomService.supersede_room` 的重型路径。
+    新增列若承载内容托管语义，必须在此登记，否则会静默放宽本判据。
+    """
+    if RoomState(room.state) is not RoomState.opening:
+        # 只有停在 opening 才可能「从未确认」；active 及其后继都意味着确认到达过。
+        return False
+    if room.refresh_required_at is not None:
+        return False
+    for frozen in (
+        room.client_confirmed_base_version_id,
+        room.client_confirmed_representation_id,
+        room.client_confirmed_definition_bundle_id,
+        room.client_confirmed_projection_sha256,
+        room.last_applied_version_id,
+        room.latest_durable_application_id,
+        room.close_leader_intent_id,
+    ):
+        if frozen is not None:
+            return False
+    if int(room.latest_request_sequence or 0) > 0:
+        return False
+    if int(room.latest_durable_sequence or 0) > 0:
+        return False
+    if int(room.close_barrier_epoch or 0) > 0:
+        return False
+    # fence 初值为 1；> 1 意味着此前发生过撤销/旋转，不能再当作干净代际。
+    if int(room.write_fence_epoch or 1) > 1:
+        return False
+    return True
+
 #: upgrade candidate 的**终态**。写成「终态取补集」而不是「阻断态白名单」是刻意的：
 #: 将来新增一个 candidate 状态时，补集写法把它当**阻断**处理（fail closed），白名单
 #: 写法则会把它静默当成「不阻断」，于是一个全新的中间态可以带着 staged 产物进 room。
@@ -1802,6 +1846,63 @@ class RoomService:
             decision=policy.decision,
         )
 
+    async def release_stale_lease_on_pristine_room(
+        self,
+        *,
+        room_id: uuid.UUID,
+        participant_id: uuid.UUID,
+        ttl: timedelta | None = None,
+    ) -> bool:
+        """僵死 lease 落在**从未接管内容**的 room 上 ⇒ 轻量释放并续租，复用同代 room。
+
+        返回 ``True`` = 已释放（调用方可在同 room 上重新 join 一个干净 lease）；
+        ``False`` = 该 room **接管过**内容，必须走 :meth:`revoke_participant` +
+        :meth:`supersede_room` 的保守路径（调用方据此分流）。
+
+        🔴 为什么需要这条路径（2026-09-22 真栈根因）：:meth:`revoke_participant` 对 **写**
+        会话的重型反应（fence+1 → refresh_required → 旋转 generation）建立在一条前提上 ——
+        「OO 的 ``c=drop`` 只证明会话被逐出，**不证明**已合入内容被移除」；该前提预设
+        **OO 会话真实接管过文档**。
+
+        但真实存在另一类僵死 lease：用户点了在线编辑、room 建好、**descriptor 确认从未
+        到达**（OO 没加载完 / 用户切走），lease 随后自然到期。此时 room 停在 ``opening``、
+        ``client_confirmed_*`` 全空、request/durable 序列为 0、无 application、fence 仍是初值
+        —— **这一代从未接管任何内容，污染在物理上不可能发生**。对它「作废整代」既无必要，
+        又把用户锁死：materialize 只能反复拒绝，而「重新 flush」在内容未改时走
+        business-identity 复用路径、**同样不触发 generation 旋转**，于是永远回到同一间死
+        room（真栈实测：同一 entry 已堆积 6 个从未确认即被遗弃的代际 g69/76/77/78/80/93）。
+
+        ``ParticipantState.expired`` 与 ``PARTICIPANT_EDGES`` 的 ``active → expired`` 早已定义
+        却从未被任何代码使用 —— 这条轻量迁移正是当初设计好、缺了接线的那一环。
+        ``uq_wpoop_active_lease`` 是 ``WHERE state IN ('active','closing')`` 的 partial unique，
+        把 lease 转出这两态即释放槽位，无需撤销、无需动 fence。同时**续租**
+        ``room.expires_at``（room TTL = 「这间房还能用多久」，重新接纳编辑者就该重启该窗口）；
+        不续租会让用户进得去却存不了 —— :meth:`assert_can_initiate_request` 的
+        ``room 已过期`` 门会拒 forcesave。
+
+        内容安全性：该代际 durable 序列为 0、无 application ⇒ 从未写入过任何字节，
+        OO 侧若存有同 ``doc_key`` 的缓存，其内容与将要再次下发的 substrate 同源。
+        """
+        room = await self._repo.lock_room(room_id)
+        if not room_never_took_custody(room):
+            return False
+        participant = await self._load_participant(participant_id, room_id=room_id)
+        assert_transition("participant", participant.state, ParticipantState.expired)
+        participant.state = ParticipantState.expired.value
+        participant.updated_at = _now()
+        room.expires_at = _now() + (ttl if ttl is not None else _PRISTINE_ROOM_RENEW_TTL)
+        room.updated_at = _now()
+        await self._session.flush()
+        logger.info(
+            "room %s（generation %s）从未接管内容：僵死 lease %s 落 expired 并续租至 %s ⇒ "
+            "同代复用，不旋转 generation",
+            room_id,
+            room.generation,
+            participant_id,
+            room.expires_at.isoformat(),
+        )
+        return True
+
     async def supersede_room(
         self, *, room_id: uuid.UUID, reason: str
     ) -> WorkpaperOoRoom:
@@ -2009,6 +2110,7 @@ __all__ = [
     "RoomBaselines",
     "RequestFreeze",
     "BaselineSettlement",
+    "room_never_took_custody",
     "RevokeOutcome",
     "ContributorRecord",
     "ContributorSnapshot",

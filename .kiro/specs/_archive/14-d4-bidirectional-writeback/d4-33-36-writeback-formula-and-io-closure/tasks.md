@@ -291,3 +291,39 @@ A13 payload 只能来自人工认定金额与方向；定性风险不得 amount=
 **Validates: Requirements 1.1, 2.10, 5.1, 5.8**
 
 模板身份必须来自实际 finder/index；四表各自完成双向回写、重新打开公式编辑、导出及跨项目隔离，否则任务保持 blocked。
+
+---
+
+## 2026-09-22 归档前状态刷新（append-only；上方复选框与原文一律不动）
+
+> 本 spec 有 2 条 `[ ]*`（5.4 / B6）与 5 条 `[~]`。5 条 `[~]` 皆为**治理作废/重定向**（2.1/2.2 被 B3/B4
+> 禁区裁掉且实证未建、5.2 归平台 bridge 契约、B1 判定本 spec 无模板身份改动、B2 部分满足）——
+> 这些不是待开工项。真正的开工项是 5.4 与 B6 两条真栈实测，其阻塞理由「外部依赖 start-dev.bat 环境
+> + 真实 PG」**已不成立**。按 append-only 铁律不动上方文字。
+
+**① B6 的「D4-33 双模式缺」已过时**：D4-33/34/36 此前点不进在线编辑的真因是**打错健康端点** ——
+组件打 `/api/onlyoffice/health`（404，正确是 `/api/workpapers/onlyoffice/health`）且读错字段
+`status === 'healthy'`（正确是 `.healthy` bool）⇒ `ooHealthy` 恒 false ⇒ 叠加 `switchMode` 的健康竞态
+直接锁死在线编辑。已触类旁通修全 5 处（另含 D4-7 `D4TabMarginMonthly` / D4-8 `D4TabProductMargin`），
+见 `docs/operations/d4-bidirectional-writeback-inventory.md` §第四轮 ④。
+现四表健康探测统一走 `useD4SyncMode.fetchOnlyOfficeHealthy()`（2026-09-22 起带 15s 模块级 TTL 缓存
++ in-flight 去重），**禁止各组件再自行 `http.get` 一遍**。
+
+**② 四表 L1 逐张验收已全绿**：`docs/operations/evidence/d4-bidirectional-acceptance/D4-33.json` /
+`D4-34.json` / `D4-35.json` / `D4-36.json`（2026-09-22）—— 四份均 store-projection 200 →
+materialize 200 → callbackUrl 四项齐全 → `wp-sync-host` + OO iframe，`d2_sync_hits=0`，
+`console_errors=[]` / `http_errors=[]`。⇒ B6 的「HTML→OO 进得去、走统一路径、不走 legacy 旁路」
+这一段四表逐张成立，**不再是「以 D4-35 代表全组」**。
+
+**③ 5.4 / B6 仍未兑现的部分（如实登记，不推绿）**：
+- **L2 数据往返**（OO 画布改值 → forcesave → callback → 切回 HTML 逐字对齐）四表均未单独跑。
+  D4 全组该项只在 **D4-2** 上真实跑通并落 applied（证据
+  `.kiro/specs/_archive/14-d4-bidirectional-writeback/d4-revenue-matrix-bidirectional/evidence/g5-1-d4-unified-path/`）。
+- **导出→导入往返 + 差异→A13 推送（科目 6051）+ 跨项目隔离 + 公式重开** 的浏览器实测未跑；
+  代码层已备（四表导入导出专用 parser/exporter 往返测试绿、A13 推送 durable 幂等 V164 已落地）。
+
+**④ 残留归属与归档判定**：L2 数据往返按 entry 粒度（D4 全部子表同属父 entry
+`xlsx/gt-d4-operating-revenue`）移交总纲 `workpaper-html-onlyoffice-bidirectional-writeback-closure`
+Task 70 的「全 entry required scenario」口径；导出/导入与 A13 的浏览器实测属验收深度补充，
+代码层守卫已覆盖同一行为。本 spec 自有产物（D4-33/34/35/36 provider + 契约 + 前端迁平台 bridge
++ 公式单源 + 导入导出）已全部就位 ⇒ **可归档**，两条 `[ ]*` 的残留边界即为本节 ③。

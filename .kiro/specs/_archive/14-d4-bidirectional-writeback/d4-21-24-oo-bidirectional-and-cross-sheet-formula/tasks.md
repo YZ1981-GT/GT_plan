@@ -30,3 +30,39 @@
 
 
 > **并发登记（D4-29 schema 阻塞，2026-09-13）**：`phase5_d4_29_customer_detail.py` 当前 `sheet_payload()` 返回 TableSpec 形态，却被 `phase5_d4_revenue_detail.py` 直接放入 `sheets`，缺少 SheetSpec 的 `sheet_key/excel_name/locator/tables` 包装；字段还缺 `cell`，且 `row_identity` 与 `delete_policy` 未成对声明，stable key 含 camelCase 也不符合 `_STABLE_KEY_RE`。该问题属于本 spec 的 D4-29 并发泳道，待其作者按 IPO 范式修正后再运行 D4 契约生成与 5.3 验证；本会话不修改上述实现文件。
+
+---
+
+## 2026-09-22 归档前状态刷新（append-only；上方复选框与原文一律不动）
+
+> 上方 Task 5.3 的 `[~]` 理由原文是「**仍缺**：真 OO 往返 evidence（主控 §6.4 谓词 4-6 需真实 DB
+> application 记录）+ Playwright 四表实测，待 start-dev.bat 全栈 + 真实 OO」。其中**Playwright 四表实测
+> 已完成**，真 OO 往返 evidence 的口径需按新事实重述。按 append-only 铁律不动上方文字。
+
+**① Playwright 四表实测已完成（2026-09-21 第四轮 + 2026-09-22 重跑）**：D4-21/22/23/24 四表逐张
+L1 全绿，证据 `docs/operations/evidence/d4-bidirectional-acceptance/D4-2{1,2,3,4}.json` ——
+store-projection 200 → materialize 200 → callbackUrl 四项齐全 → `wp-sync-host` + OO iframe，
+`d2_sync_hits=0`，`console_errors=[]` / `http_errors=[]`。
+其中 **D4-22 此前的 `hits.length=0` 是测试 bug 不是产品 bug**：验收 spec 的 tab 正则 `D4-22(?!\d)`
+同时命中「…D4-22」与「…D4-22A（程序表）」，DOM 靠前的 D4-22A 被 `.first()` 误点到走 legacy OO；
+已改 `(?![\dA-Za-z])` 精确区分编码与编码+字母变体（见清册 §第四轮 ⑥）。
+D4-22 另去掉了 `modeOptions` 的 `!ooHealthy` disabled（否则 disabled 段忽略点击、`switchMode` 根本不触发）。
+
+**② 真 OO 往返 evidence（主控 §6.4 谓词 4-6）的真实口径**：该谓词要求真实 DB application 记录。
+D4 全组现有**一份**真实 applied 记录，落在 **D4-2**（同父 entry `xlsx/gt-d4-operating-revenue`、
+同 adapter `d4.revenue_detail`）：`.kiro/specs/_archive/14-d4-bidirectional-writeback/d4-revenue-matrix-bidirectional/evidence/
+g5-1-d4-unified-path/db-check.json` —— `operation.state=applied` / `application.state=applied` /
+`content_version.source=onlyoffice` / `store_mirror.marker_in_store=true`；同目录
+`network-and-callback.json` 记 `forcesave_cs_error=0`（权威判据）。
+D4-21/22/23/24 自身的 per-sheet applied 记录**未单独产生**。
+
+**③ 残留归属**：per-sheet L2 数据往返是 **D4 全组共用的验收深度项**，entry 粒度归父 entry，
+移交总纲 `workpaper-html-onlyoffice-bidirectional-writeback-closure` Task 70 口径统一推进。
+本 spec 自有产物（后端 contract/instrumentation/store projection + OO→HTML 泛型覆盖 + 前端从 legacy
+`GtOnlyOfficeSheet` + 本地 `editorMode` ref 迁到平台 `useWorkpaperSyncBridge` + 宿主 dedicated 登记）
+全部就位且有真栈 L1 证据 ⇒ **可归档**。
+
+**④ 并发登记项已过时**：上方「D4-29 schema 阻塞（`phase5_d4_29_customer_detail.sheet_payload()` 返
+TableSpec 形态缺 SheetSpec 字段）」已解除 —— D4-29 现有独立 L1 绿证据
+（`D4-29.json`，含转置 sheet 路径），且转置往返守卫 `test_d4_12_transposed_roundtrip.py` /
+`test_transposed_registry.py` 全绿（见清册 §第三轮 ②方案 A）。

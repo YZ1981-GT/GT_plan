@@ -130,3 +130,32 @@
   - _Requirements: 2.1, 2.2, 3.1, 8.1_
 - [~] 15. C4逐D4-9验收：source/template evidence、三table identity、formula mask、roundtrip、权限、Playwright和变异；只门控D4-9相关产物。
   - _Requirements: 3.1, 8.1_
+
+---
+
+## 2026-09-22 归档前状态刷新（append-only；上方复选框与原文一律不动）
+
+> 上方 Task 13 已两次登记「运行时阻塞」并两次自我作废/替换（第一条 representation 未升级已于
+> 2026-09-21 实证作废；第二条改成「真 OO canvas 单元格往返，当前 bundle 上 applied 记录数 = 0」）。
+> 本节登记第三次核对结果，并把 Task 14/15 的 `[~]` 一并说清。按 append-only 铁律不动上方文字。
+
+**① Task 13 的 L1 侧已完成**：`docs/operations/evidence/d4-bidirectional-acceptance/D4-9.json`
+（2026-09-22）—— store-projection 200 → materialize 200 → callbackUrl 四项齐全 → `wp-sync-host`
++ OO iframe，`d2_sync_hits=0`，`console_errors=[]` / `http_errors=[]`。
+即「HTML 编辑客户行 → 切在线编辑可见 → 统一路径无 legacy 旁路」这一段已真栈成立。
+
+**② Task 13 剩余的「真 OO canvas 单元格往返 + 当前 bundle 上的 applied 记录」仍未在 D4-9 上产生**，
+但同父 entry（`xlsx/gt-d4-operating-revenue` / adapter `d4.revenue_detail`）已有**一份**真实 applied
+记录，落在 D4-2：`.kiro/specs/_archive/14-d4-bidirectional-writeback/d4-revenue-matrix-bidirectional/evidence/g5-1-d4-unified-path/db-check.json`
+（`operation.state=applied` / `application.state=applied` / `content_version.source=onlyoffice` /
+`store_mirror.marker_in_store=true`）+ `network-and-callback.json` 的 `forcesave_cs_error=0`。
+⇒ 「链路能不能真 applied」已被证伪为**不是缺陷**；D4-9 缺的是**同一条链路在本 sheet 上再跑一遍**。
+
+**③ Task 14/15 的 `[~]`（C0-C4 alignment / C4 逐 D4-9 验收矩阵）**：这两条的判据锚在总纲的 C4 验收矩阵，
+其推进主体是 `d4-dual-mode-formula-governance`（现 16/16 全绿）与总纲
+`workpaper-html-onlyoffice-bidirectional-writeback-closure`（Task 70 口径）。本 spec 侧的 D4-9 产物
+（同 sheet 双区 instrumentation、sibling sheet 双向回写路 B、用户公式保护区、导入导出补齐、前端接桥）
+已全部就位并有守卫；C4 矩阵本身不是本 spec 可独立签发的产物。
+
+**④ 归档判定**：本 spec 无剩余自有产物 ⇒ **可归档**。残留的 per-sheet L2 数据往返按 entry 粒度
+移交总纲 Task 70 的「全 entry required scenario」口径，与 D4 其余 28 张同批推进，不单独挂在本 spec。

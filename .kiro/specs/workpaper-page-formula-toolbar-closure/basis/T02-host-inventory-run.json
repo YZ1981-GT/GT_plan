@@ -3,7 +3,7 @@
   "generatedAt": "2026-09-08T12:00:00.000Z",
   "runId": "dup-run",
   "entryCount": 216,
-  "duplicateCount": 15,
+  "duplicateCount": 19,
   "domainExclusionCount": 6,
   "outletBaseline": {
     "primarySlotName": "page-capabilities-primary",
@@ -14,9 +14,9 @@
   },
   "digests": {
     "entries": "375690c9e63f128c293bf6475ded2c1ea0fb2f0a018c87d162c05092acc95272",
-    "duplicates": "bf05369e533b0193a8fffa568af4b6ba60b834b07d6638eb03d0df5e999d2c7c",
+    "duplicates": "eb6554bc7df29acd04010ffc788467b3ef9ba6ce2c432922604ec3d67ed51163",
     "exclusions": "e0a779702afc38c58bf471a7eca1bb52f76ed2b8c18e5f3e6d6d877fd4be9f44",
-    "run": "aacceba9d4a8dfa0187883821374b1c1738d1b496b9d38ba4158827200e5ad74"
+    "run": "0a555a2e2674a88a7972ef1616db34f36f42b4c490a5001251bd2301fca32ede"
   },
   "sampleDuplicates": [
     {
@@ -33,6 +33,26 @@
       "kind": "ai-review-panel",
       "relativePath": "components/workpaper/review/GtWpAiReviewToolbar.vue",
       "detail": "AI review panel mount"
+    },
+    {
+      "kind": "formula-entry",
+      "relativePath": "components/workpaper/d4/other/D4TabOtherCheck.vue",
+      "detail": "formula manager entry"
+    },
+    {
+      "kind": "formula-entry",
+      "relativePath": "components/workpaper/d4/other/D4TabOtherContract.vue",
+      "detail": "formula manager entry"
+    },
+    {
+      "kind": "formula-entry",
+      "relativePath": "components/workpaper/d4/other/D4TabOtherCutoff.vue",
+      "detail": "formula manager entry"
+    },
+    {
+      "kind": "formula-entry",
+      "relativePath": "components/workpaper/d4/other/D4TabOtherMargin.vue",
+      "detail": "formula manager entry"
     },
     {
       "kind": "formula-entry",

@@ -320,3 +320,72 @@
 14.14. 每个 entry 的 evidence SHALL 由服务端从 `sync_test_run + scenario rows + operation/recovery case/content version/representation + trace bundle` 重算 capability + immutable definition bundle + authoritative model 所要求的 scenario set、外键、hash、bundle typed slots、OO build 与 timeline 一致性；代表 entry、截图、自由文本或一条 operation 不能替代逐 scenario 证据。
 14.15. final gate SHALL 扫描每个 AC 的 Design oracle、实现 task、独立验证 task 与 evidence type；任何悬挂 AC、无验证 Property、无依赖边或单任务自证均不得归档。
 14.16. 真实 OO probe、pilot 和 bulk evidence SHALL 记录 OnlyOffice 精确 build、浏览器版本、authority model definition digest、immutable definition bundle id/digest 及其 template/instrumentation/contract typed child identities、runner/source commit 与运行时间；环境、source commit、runner、bundle 或任一非-null definition child 变化后 SHALL 按 stale policy 失效。structural pre-reconcile MAY 报告 stale 而不把 fresh=0 当作结构检查前提；真正 pre-delete eligibility 只能在全 entry required scenario rerun 与服务端 recomputation 后判定。删除 legacy/不可达桩造成 source commit 变化后，相关 entry 必须生成新的 test run，完整重跑 required scenario set并通过服务端 recomputation；post-delete smoke 不得替代。
+
+---
+
+## 2026-09-22 现状刷新（append-only；正文 Req 1~14 与 §背景 一律不动）
+
+> **为什么追加**：§背景 里那句「当前生成事实为 185 个物理宿主、276 个挂载点、1 个 dispatcher、
+> 186 个 manifest entry；其中 142 个独立入口、43 个父级重复入口、1 个不可达旧桩、136 个尚未完成业务裁决」
+> 是 spec 撰写期（2026-08）的**冻结快照**。它已被后续迁移推进得过期，而本 spec 多处 Task 的判据引用这些
+> 数字，读者容易把旧快照当现状。按「历史档案 append-only」铁律不改原文，在此登记现读数与判读口径。
+
+### ① 现行 manifest 读数（真源 `backend/data/workpaper_sync_entry_manifest.json`，`manifest_digest` `5c55208f01c0…`）
+
+| 项 | §背景 旧快照 | 现读数 | 结论 |
+|---|---|---|---|
+| 物理宿主 `host_count` | 185 | **175** | 已过期 |
+| 挂载点 `mount_count` | 276 | **265** | 已过期 |
+| dispatcher | 1 | 1 | 仍成立 |
+| manifest entry | 186 | **176** | 已过期 |
+| 独立入口 `independent_entry_count` | 142 | **142** | 仍成立 |
+| 父级重复入口 `parent_duplicate_count` | 43 | **33** | 已过期 |
+| 不可达旧桩 | 1 | 1（`xlsx/gt-g6-other-bond-ecl`） | 仍成立 |
+| 尚未完成业务裁决 `unadjudicated_count` | 136 | **132** | 已过期 |
+| — | — | `legacy_fake_bidirectional_count` = **137** | 新增口径 |
+
+`capability_counts`：**`bidirectional` 4** · `single_html` 5 · `single_onlyoffice` 166 · `unreachable` 1。
+`room_model_counts`：`shared` 169 · `exclusive` 6 · `none` 1。`room_service_state`：`room_service_wired`。
+
+⚠️ 报数一律现扫 manifest，**不得引用本表或 §背景**：manifest 随迁移持续变化，本表同样会过期。
+
+### ② 4 个 `bidirectional` entry 与本 spec 列的「四类 Excel pilot」**不是同一组**
+
+- 现行 4 个 `capability=bidirectional` + `migration_state=adapter_registered`：
+  `xlsx/gt-d2-accounts-receivable`(`d2.receivable_detail`) · **`xlsx/gt-d4-operating-revenue`**
+  (`d4.revenue_detail`) · `xlsx/gt-g7-long-term-equity-main`(`g7.soe_subsidiary_disclosure`) ·
+  `xlsx/gt-h1-fixed-assets`(`h1.disposal_check`)，四者 `room_model` 均为 `shared`。
+- Tasks 40–43 列的四类 pilot 是 **简单 checklist / D2 大 JSON / H1 分组动态 / G7 两级动态**。
+  其中 checklist pilot 的 entry `xlsx/b60/gt-b60-bundle` **现仍是 `single_onlyoffice` +
+  `legacy_fake_bidirectional`**（`adapter_id=None`），从未成为 bidirectional entry。
+- ⇒ **D4 替代了 checklist 成为第四个真双向 entry**，但本 spec 三件套里 D4 只有 2 处无关紧要的顺带提及
+  （`tasks.md` L290 红基线、L821 数字刷新），从未作为 lane 登记。读 Tasks 40–44 时须知：
+  「四类 pilot」是**计划口径**，「4 个 bidirectional entry」是**现状口径**，两者交集只有 D2/G7/H1。
+
+### ③ D4 lane 的真实进度（Req 14.5 / 14.9 的 UNVERIFIABLE 口径对 D4 已不再适用）
+
+D4 的 30 张子表**全部挂在唯一父 entry `xlsx/gt-d4-operating-revenue`**（manifest 里 21 条
+`xlsx/d4/...` 子入口一律 `parent_duplicate`，不进主分母）。该 entry 已完成：
+
+- **逐张 L1 真栈验收（30 张全绿）**：`docs/operations/evidence/d4-bidirectional-acceptance/D4-{1..36}.json`
+  （缺 D4-4，owner 去重后不独立成表）—— 每份记 store-projection 200 → materialize 200 →
+  callbackUrl 含 `room_id`/`generation`/`doc_key`/`route_credential_id` → `wp-sync-host` 挂载 + OO iframe，
+  且 `d2_sync_hits=0`（无 legacy 旁路）；36 份的 `console_errors`/`http_errors` **全为 0**。
+  ⚠️ 逐张 L1 必须 `--workers=1` 串行：多 worker 会因 OnlyOffice 8080 单实例并发 contention 假失败。
+- **完整 L2 真 OO canvas 往返（1 张，D4-2）**：
+  `.kiro/specs/_archive/14-d4-bidirectional-writeback/d4-revenue-matrix-bidirectional/evidence/g5-1-d4-unified-path/network-and-callback.json`
+  记 `forcesave_cs_error=0`（权威判据）+ `forcesave_http_status=202` + `confirm_descriptor_200=true`；
+  同目录 `db-check.json` 记 `operation.state=applied` · `application.state=applied`
+  （`adapter_id=d4.revenue_detail`, `result_revision=12`）· `content_version.source=onlyoffice` 且
+  `operation_id` 交叉一致 · `store_mirror.marker_in_store=true`。
+  ⇒ Req 14.2 的「OO 改值→durable callback→HTML 可见」在 D4 上**已有真实 OO 9.4 证据**，
+  不再是「真实 OO 未执行 ⇒ UNVERIFIABLE」。
+- **残留（如实登记）**：其余 29 张的 per-sheet L2 数据往返未逐张跑；Req 14.1「不得用一条 applied
+  operation 覆盖全部场景」⇒ D4-2 的这条 applied **不能**替 29 张签收。该残留归 Task 70 的
+  「全 entry required scenario」口径，是**验收深度**项，不是能力缺口。
+
+### ④ 本节不改变本 spec 的完成定义
+
+§背景 那句「每个独立入口要么完成真双向 adapter，要么被明确裁决为 `single_html`/`single_onlyoffice`，
+界面不得继续展示假双向」**仍然成立且仍未达成**：`legacy_fake_bidirectional` 现为 137。
+本 spec 仍有 5 个任务未完成（Tasks 61 / 71 / 72 / 74 / 75，复选框 `[-]`），**不具备归档条件**。

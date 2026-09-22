@@ -88,3 +88,37 @@
 2. **真 OO canvas 往返**（批次C）—— D4 全组 34 张共同的最后一道门，见清册 §逐张推进优先级 第 1 条。
 
 **遗留的唯一"账面失真"就是上方 1-7 的 `[ ]`**，本表即为其对照说明；后续统计 D4 spec 完成度时请按 T/B 代计（T1-T7 + B1-B3 = 10/10），不要把 1-7 重复计入分母。
+
+---
+
+## 2026-09-22 归档前状态刷新：更正归并表里一条已过时的断言（append-only）
+
+> 上方「任务状态归并表」第 7 行与结论段写的是「**真 OO canvas 往返仍 env 门（批次C，D4 全组无一张达标）**」。
+> 这条**已被证伪**，按「历史档案 append-only」铁律不回改原文，在此登记更正。
+
+**① 「D4 全组无一张达标」不成立 —— D4-2 已达标**：
+`.kiro/specs/_archive/14-d4-bidirectional-writeback/d4-revenue-matrix-bidirectional/evidence/g5-1-d4-unified-path/network-and-callback.json`
+记 `forcesave_cs_error=0`（权威判据）+ `forcesave_http_status=202` + `confirm_descriptor_200=true`；
+同目录 `db-check.json` 记 `operation.state=applied` · `application.state=applied`
+（`adapter_id=d4.revenue_detail`, `result_revision=12`）· `content_version.source=onlyoffice` 且
+`operation_id` 交叉一致 · `store_mirror.marker_in_store=true`（OO 画布里写的 marker 出现在 HTML store）。
+⇒ 真 OO canvas → forcesave → callback → applied → HTML 镜像**整条链在 D4 上已真栈跑通一次**。
+正确表述应为：「**D4 全组 30 张中 1 张（D4-2）已达标，其余 29 张只做到 L1**」。
+
+**② env 门也已解除**：D4 全量 30 张逐张 L1 验收全绿，证据
+`docs/operations/evidence/d4-bidirectional-acceptance/D4-{1..36}.json`（缺 D4-4，owner 去重后不独立成表）
+—— 36 份 JSON 的 `console_errors` / `http_errors` **全为 0**。本 spec 直接相关的 D4-13/14/15/16 四张
+各有独立证据（`D4-13.json` / `D4-14.json` / `D4-15.json` / `D4-16.json`）。
+其中 D4-14 已由专项 spec `d4-14-walkthrough-writeback` 落地（`d414-managed` 34 受管字段，gen83）；
+D4-13 维持本 spec 的 `N/A` 裁定（纯叙述文本表无行集，不适配受管行表模型）。
+
+**③ 结论段两处留白的现状**：
+1. **A13 失败重试队列 / 持久 outbox** —— 仍未做（B3 已如实登记）。durable **幂等**已做实（V164
+   `source_identity` + 部分唯一索引，真 PG 实测同 identity 两次 POST → 恰 1 行）。属平台级异步基础设施，
+   宜单立 spec，**不构成本 spec 未完成产物**。
+2. **真 OO canvas 往返** —— 按本节 ① 更正：链路已证；剩余是「逐张再跑一遍」的验收深度项，
+   按 entry 粒度（D4 全部子表同属父 entry `xlsx/gt-d4-operating-revenue`）移交总纲
+   `workpaper-html-onlyoffice-bidirectional-writeback-closure` Task 70 的「全 entry required scenario」口径。
+
+**④ 归档判定**：T1-T7 + B1-B3 = **10/10**（草案 1-7 的 `[ ]` 是两代编号的账面失真，归并表为唯一权威对照，
+统计时不得把 1-7 重复计入分母）⇒ **可归档**。

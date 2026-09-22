@@ -89,3 +89,29 @@
 - [~] 10. C4逐D4-10/11验收：source/template evidence、stable row identity、联动DAG、公式/冲突、权限和Playwright；风险发现不等于TB/A13发布。
   - **本轮**：单元+接线+导入导出守卫全绿；真栈 Playwright 待 `RUN_FULL_E2E=1` 实跑落 `evidence/g5-1-d4-price-linkage/`。
   - _Requirements: 8.1, 8.3_
+
+---
+
+## 2026-09-22 归档前状态刷新（append-only；上方复选框与原文一律不动）
+
+> 上方 Task 10 的 `[~]` 理由原文是「真栈 Playwright 待 `RUN_FULL_E2E=1` 实跑落
+> `evidence/g5-1-d4-price-linkage/`」。真栈 Playwright **已实跑**，落点与原计划不同，在此登记。
+
+**① 真栈 Playwright 已实跑（落点为统一验收目录，不是原计划的 per-spec 目录）**：
+D4-10（`D4TabCustomerPrice`）与 D4-11 的逐张 L1 验收证据在
+`docs/operations/evidence/d4-bidirectional-acceptance/D4-10.json` / `D4-11.json`（2026-09-22）——
+store-projection 200 → materialize 200 → callbackUrl 四项齐全 → `wp-sync-host` + OO iframe，
+`d2_sync_hits=0`，`console_errors=[]` / `http_errors=[]`。
+D4-10 此前点不进在线编辑的真因已根治：`D4TabCustomerPrice.vue` 的 `immediate: true` watch 在 setup 期
+即跑 `persistData → debounceSave`，访问声明在文件后段的 `let debounceTimer`（TDZ，`let` 不提升）
+⇒ ReferenceError 打挂组件，并**级联连累**同会话后续 tab；`debounceTimer` 声明上移后自愈
+（见 `docs/operations/d4-bidirectional-writeback-inventory.md` §第四轮 ②）。
+
+**② 残留**：C4 验收矩阵要求的「逐 D4-10/11 L2 数据往返（改值→保存→回读逐字对齐）」未单独跑。
+D4 全组该项只在 **D4-2** 上真实跑通并落 applied（证据
+`.kiro/specs/_archive/14-d4-bidirectional-writeback/d4-revenue-matrix-bidirectional/evidence/g5-1-d4-unified-path/`）。按 entry 粒度
+（D4 全部子表同属父 entry `xlsx/gt-d4-operating-revenue`）移交总纲
+`workpaper-html-onlyoffice-bidirectional-writeback-closure` Task 70 口径。
+
+**③ 归档判定**：本 spec 自有产物（价格分析双向回写 + 风险发现联动 DAG + 公式/冲突 + 权限）已就位、
+单元/接线/导入导出守卫全绿、真栈 L1 有证 ⇒ **可归档**。

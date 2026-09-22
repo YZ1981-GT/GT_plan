@@ -110,3 +110,34 @@
 - **裁决可能结论 C（single_html）**：若受管 ROI 过低，裁决为不双向，本 spec 收口为裁决记录，清册标终态，不假装受管。
 - **Windows 命令约定**：`python`（非 python3）；禁 `&&` 用 `;`；禁 `cd` 用 `cwd`；pytest 从仓库根跑；shell 加 `rtk` 前缀（计数以不带 rtk 的原始 pytest 为准）。
 - **收尾纪律**：探针脚本用完即删；spec 目录入库；push 前先 `git fetch`；协作走 PR 不直推 main。
+
+---
+
+## 2026-09-22 归档前状态刷新（append-only；上方复选框与原文一律不动）
+
+> **为什么追加这一节**：上方 Task「e2e 真 OO canvas 往返」当时标 `[~] UNVERIFIABLE（env/交互门）`，
+> 理由是「需驱动 SPA 到 D4-14 tab 在线编辑（route/鉴权 token 交互未定位）」。该 env/交互门**已解除**，
+> 按「不回改历史记录」铁律不动上方文字，在此登记新事实与残留边界。
+
+**① env/交互门已解除（2026-09-21 第四轮）**：D4-14 此前点不进「在线编辑」的真因已定位并修复 ——
+不是 route/token，而是 `ooHealthy` 竞态（`switchMode` 读到 mount 期异步健康探测尚未返回的初始 `false`
+就静默 `return`）叠加 D4-10 `debounceTimer` TDZ 崩溃的级联连累。修复见
+`docs/operations/d4-bidirectional-writeback-inventory.md` §2026-09-21 第四轮 ②③。
+
+**② L1 逐张验收通过**：`docs/operations/evidence/d4-bidirectional-acceptance/D4-14.json`
+（2026-09-22 重跑）—— store-projection 200 → materialize 200 → callbackUrl 四项齐全
+（`room_id`/`generation`/`doc_key`/`route_credential_id`）→ `wp-sync-host` 挂载 + OO iframe，
+`d2_sync_hits=0`（无 legacy 旁路），`console_errors=[]` / `http_errors=[]`。
+后端受管面同期已落地：`d414-managed` 34 受管字段 + 契约 34 张 sheet + 发布至 gen83。
+
+**③ 残留（本 spec 无自有产物，移交总纲）**：**逐张 L2 真 OO canvas 数据往返**
+（在 OO 画布改值 → forcesave → callback → 切回 HTML 逐字对齐）在 D4 全组只在 **D4-2** 上真实跑通并
+落 applied（证据 `.kiro/specs/_archive/14-d4-bidirectional-writeback/d4-revenue-matrix-bidirectional/evidence/g5-1-d4-unified-path/`：
+`forcesave_cs_error=0` + `operation.state=applied` + `application.state=applied` +
+`content_version.source=onlyoffice` + `store_mirror.marker_in_store=true`）。D4-14 的 L2 未单独跑。
+该残留是 **D4 全组共用的验收深度项**、按 entry 粒度归属父 entry `xlsx/gt-d4-operating-revenue`，
+移交总纲 `workpaper-html-onlyoffice-bidirectional-writeback-closure` Task 70 的「全 entry required
+scenario」口径统一推进，**不构成本 spec 的未完成产物**。
+
+**④ 归档判定**：本 spec 自有产物（后端 `d414-managed` provider + 契约 + 前端接桥 + 宿主登记 'D4-14'
++ 守卫 `d4OccurrenceSyncHostWiring.spec.ts`）全部就位且有真栈 L1 证据 ⇒ **可归档**。

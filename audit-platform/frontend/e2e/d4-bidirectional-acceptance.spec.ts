@@ -156,6 +156,12 @@ test.describe('D4 双向回写逐张 L1 验收', () => {
       //    → 判据1 hits.length=0（D4-22 真栈实证误判）。用 (?![\dA-Za-z]) 精确区分编码与编码+字母变体。
       const tab = page.locator('[role="tab"]').filter({ hasText: new RegExp(sheet.code.replace('-', '\\-') + '(?![\\dA-Za-z])') }).first()
       await expect(tab, `${sheet.code} 页签应可见`).toBeVisible({ timeout: 30_000 })
+      // 🔴 证据只记**观测到的事实**：sheet_name 取真实点中的页签文本，而不是调用方在
+      //    `D4_ACCEPT_SHEETS` 里传进来的 name。2026-09-22 全量重跑时以 `name===code`
+      //    的简写调用，导致 30 份证据的 sheet_name 全退化成「D4-13」这类纯编码，
+      //    丢掉了「到底点中哪张表」这个最关键的可复核信息（定位本来就只用 code，
+      //    name 纯粹是证据字段，于是没有任何判据能发现它被传坏了）。
+      const observedTabText = ((await tab.textContent()) ?? '').trim().replace(/\s+/g, ' ')
       await tab.click()
       await page.waitForTimeout(1500)
 
@@ -205,7 +211,9 @@ test.describe('D4 双向回写逐张 L1 验收', () => {
 
       const evidence = {
         sheet: sheet.code,
-        sheet_name: sheet.name,
+        /** 真实点中的页签文本（观测值）。清单里声明的期望名另记 `sheet_name_expected`。 */
+        sheet_name: observedTabText,
+        sheet_name_expected: sheet.name,
         captured_at: new Date().toISOString(),
         scope: { project_id: PROJECT_ID, wp_id: WP_ID, entry_id: ENTRY },
         predicates: {
