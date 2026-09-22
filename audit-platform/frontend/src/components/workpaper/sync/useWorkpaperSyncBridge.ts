@@ -737,6 +737,28 @@ export function useWorkpaperSyncBridge(options: WorkpaperSyncBridgeOptions) {
     })
     apply('operation_observed', { operation: snapshot })
     operation.value = snapshot
+    // 🔴 落 `error` 时必须把**真因**摆出来。快照的 `errorCode` 在 post-durable 路径上
+    // 恒为 null（`apply_durable_incoming` durable 之后刻意不抛，失败只落 application
+    // 事件流），此前界面因此只剩一句「同步失败」——真栈实测：往 amount 列填了文本，
+    // `excel_materialize_editable_write_failed` 全程只在后端日志里，用户无从下手。
+    // 后端已按读侧投影补上 application_error_* 三项（中文措辞单源在后端），这里只是把它
+    // 接到 `lastError`（`feedback` 里优先级最高），不做任何码→文案的二次映射。
+    if (state.value === 'error') {
+      const code = snapshot.applicationErrorCode ?? snapshot.errorCode
+      if (code !== null) {
+        lastError.value = describeBridgeFailure('apply', {
+          response: {
+            status: 422,
+            data: {
+              detail: {
+                error_code: code,
+                message: snapshot.applicationErrorMessage ?? `回写失败：${code}`,
+              },
+            },
+          },
+        })
+      }
+    }
   }
 
   /**

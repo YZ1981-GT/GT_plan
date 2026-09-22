@@ -1,0 +1,46 @@
+feat(workpaper-sync): 回写失败的真因终于能被用户看到，不再只是一句「同步失败」
+
+浏览器实测（D4-2，真库真 OO）复现出的可用性缺陷：在 OnlyOffice 里往「本月金额」这类
+amount 列填了一段文本，点保存后界面只显示「同步失败」，什么都没有。查库才知道真因是
+excel_materialize_editable_write_failed（「editable 受管格定位不到或 projection 值无法
+按契约 value_type 规范化」），而它全程只进了后端日志：
+
+    working_paper_sync_operation.error_code            = NULL
+    application_event[last].error_code                 = excel_materialize_editable_write_failed
+
+根因不是漏记，而是 apply_durable_incoming 在 durable 之后**刻意不抛**（AC 5.7/5.8），
+失败只表现为 result.result，落库落在 application 事件流上；operation 行在这条路径上
+本来就该保持 NULL。所以修法是**读侧投影**，不动任何领域状态、不碰 oo_to_html：
+
+* 后端 `_application_failure_facts()`：从 application 事件流取**最后一条**带 error_code
+  的事件，投影出 application_error_code / _stage / _message 三项；GET 端点原有的
+  app_facts 默认值里同时声明这三个键（pre-correlation shell 阶段整键缺失会让前端读到
+  undefined 而不是 null）。
+* 中文措辞**由后端给**，且取已有单源词表（excel_materialize.FAILURE_KINDS，它本身有
+  「每种 kind 各真触发一次」的可达性守卫）。新增 `failure_wording.py` 只做聚合与查表，
+  不新增措辞；查不到就返回 None 让 UI 显示码本身 —— 可诊断 > 看起来完整。
+  拒绝在前端再抄一份码→文案：抄一份必然漂移，而漂移的表现就是用户看到一段没人维护的旧措辞。
+* 前端 DTO 解析这三项；桥在落 error 时把它接到 lastError（feedback 优先级最高），
+  不做任何二次映射。
+
+活体实证（重启后端后直接打那条真实失败的 operation）：
+
+    error_code                = None
+    application_error_code    = 'excel_materialize_editable_write_failed'
+    application_error_stage   = 'error'
+    application_error_message = 'editable 受管格定位不到或 projection 值无法按契约 value_type 规范化'
+
+守卫 9 条 + 变异反证 5 条全部 KILLED：
+  不投影 / 取首条而非末条 / 不过滤 error_code 非空 / 未登记的码也编措辞 /
+  措辞改成自己抄的第二份副本
+回归：后端定向 122 passed（task28 router + 本文件 + 预热）；
+      前端 sync 套件 3 failed | 19 passed (22)，与基线同（3 条 pre-existing）。
+
+顺带记录本轮浏览器实测拿到的正面证据（这些是原诉求「双向回写要互通」的直接证明）：
+  * 切 OO：3.1~4.9s 到 oo_editing，端点多重集恰为 store-projection / pending-mutations
+    / materialize / confirm-descriptor 四项
+  * 保存：forcesave_requesting → waiting_application → application_bound → 终态，
+    宿主自己轮询 37 次把状态推到底（修复前恒停在「等待 OnlyOffice 回传文件」）
+  * 一次写入金额列后落 conflict：N 列是只读公式合计列，其缓存值随 E 列改动而变，
+    引擎按 Property 24 判 protected 冲突并给 keep_current 建议 —— 设计行为，不是缺陷
+  * 历史上同一 entry 已有 application state=applied / result_revision=118

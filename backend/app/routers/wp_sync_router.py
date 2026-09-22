@@ -92,6 +92,7 @@ from app.services.workpaper_sync.endpoint_payloads import (
     build_resolution_choices,
     build_resolve_fence,
 )
+from app.services.workpaper_sync.failure_wording import describe_sync_failure_code
 from app.services.workpaper_sync.endpoint_guard import (
     GuardedScope,
     ScopeClaimCodec,
@@ -1930,6 +1931,50 @@ def _operation_ref(operation_id: uuid.UUID) -> ScopeRef:
     )
 
 
+async def _application_failure_facts(
+    svc: _SyncServices, *, application_id: uuid.UUID
+) -> dict[str, Any]:
+    """把 application 事件流里的失败真因投影给前端（**只读**，不改任何状态）。
+
+    为什么必须从事件流读：`apply_durable_incoming` 在 durable 之后刻意不抛
+    （AC 5.7/5.8），失败只表现为 `result.result`，落库落在
+    `working_paper_content_application_event.error_code` 上；
+    `working_paper_sync_operation.error_code` 在这条路径上恒为 NULL。
+
+    中文说明取后端**已有的单源词表**（`excel_materialize.FAILURE_KINDS` 等），
+    不在前端再抄一份码→文案的映射：抄一份就必然与后端漂移，而漂移的表现是
+    「用户看到一个没人维护的旧措辞」。查不到登记时**不编**，只回码本身。
+    """
+    from app.models.workpaper_sync_models import WorkpaperContentApplicationEvent
+
+    row = (
+        await svc.session.execute(
+            sa.select(
+                WorkpaperContentApplicationEvent.error_code,
+                WorkpaperContentApplicationEvent.to_state,
+            )
+            .where(
+                WorkpaperContentApplicationEvent.application_id == application_id,
+                WorkpaperContentApplicationEvent.error_code.isnot(None),
+            )
+            .order_by(WorkpaperContentApplicationEvent.sequence_no.desc())
+            .limit(1)
+        )
+    ).first()
+    if row is None:
+        return {
+            "application_error_code": None,
+            "application_error_stage": None,
+            "application_error_message": None,
+        }
+    code = str(row[0])
+    return {
+        "application_error_code": code,
+        "application_error_stage": (None if row[1] is None else str(row[1])),
+        "application_error_message": describe_sync_failure_code(code),
+    }
+
+
 @router.get(USER_SYNC_PREFIX + "/operations/{operation_id}")
 async def get_operation(
     project_id: uuid.UUID,
@@ -1972,6 +2017,18 @@ async def get_operation(
         "authority_model_definition_sha256": None,
         "durable_at": None,
         "finished_at": None,
+        # 🔴 2026-09-22：post-durable 失败的真因**不在** operation 行上。
+        # `apply_durable_incoming` 在 durable 之后刻意不抛（AC 5.7/5.8），失败只落在
+        # application 的事件流里（`working_paper_content_application_event.error_code`），
+        # 而 `working_paper_sync_operation.error_code` 保持 NULL。于是前端拿到的快照
+        # 里 error_code 是 null，界面只能显示裸的「同步失败」。
+        # 真栈实测：往金额列写了一段文本 → `excel_materialize_editable_write_failed`
+        # 全程只进了后端日志，用户完全看不出「这一列要数字」。
+        # 这里按**读侧投影**补上（不改任何领域状态、不动 oo_to_html），
+        # 措辞取后端已有的单源词表，前端只负责显示。
+        "application_error_code": None,
+        "application_error_stage": None,
+        "application_error_message": None,
     }
     if op.application_id is not None:
         from app.models.workpaper_sync_models import WorkpaperContentApplication
@@ -2001,6 +2058,7 @@ async def get_operation(
                 ),
                 "durable_at": row.durable_at.isoformat() if row.durable_at else None,
                 "finished_at": row.finished_at.isoformat() if row.finished_at else None,
+                **await _application_failure_facts(svc, application_id=row.id),
             }
     return {
         "requested_operation_id": str(canonical.requested_operation.id),

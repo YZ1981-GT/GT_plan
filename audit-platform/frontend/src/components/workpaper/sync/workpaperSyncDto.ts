@@ -639,6 +639,17 @@ export interface WorkpaperSyncOperationSnapshot {
   readonly duplicateOfOperationId: string | null
   readonly errorCode: string | null
   readonly errorStage: string | null
+  /**
+   * post-durable 失败的真因（由后端从 application 事件流投影）。
+   *
+   * `errorCode` 在这条路径上恒为 null —— `apply_durable_incoming` 在 durable 之后
+   * 刻意不抛（AC 5.7/5.8），失败只落 application 事件流。这三项补上之后，界面才能
+   * 从「同步失败」变成「金额列填了文本」这类可操作信息。`applicationErrorMessage`
+   * 的中文措辞由后端单源词表给，前端不再抄一份码→文案的映射。
+   */
+  readonly applicationErrorCode: string | null
+  readonly applicationErrorStage: string | null
+  readonly applicationErrorMessage: string | null
   readonly acceptedAt: string | null
   readonly applicationBoundAt: string | null
   readonly operationFinishedAt: string | null
@@ -743,6 +754,23 @@ export function parseOperationSnapshot(payload: unknown): WorkpaperSyncOperation
     duplicateOfOperationId,
     errorCode: typeof errorCode === 'string' && errorCode !== '' ? errorCode : null,
     errorStage: typeof wire.error_stage === 'string' ? wire.error_stage : null,
+    // 🔴 post-durable 失败的真因不在 operation 行上（`apply_durable_incoming` 在 durable
+    // 之后刻意不抛，失败只落 application 事件流），所以 `error_code` 恒为 null，界面只剩
+    // 一句「同步失败」。真栈实测：往 amount 列填文本 →
+    // `excel_materialize_editable_write_failed` 全程只在后端日志里。
+    // 后端按读侧投影补了这三个字段，**中文措辞由后端给**（单源词表在
+    // `excel_materialize.FAILURE_KINDS`），前端只负责显示，不在这里再抄一份码→文案。
+    applicationErrorCode:
+      typeof wire.application_error_code === 'string' && wire.application_error_code !== ''
+        ? wire.application_error_code
+        : null,
+    applicationErrorStage:
+      typeof wire.application_error_stage === 'string' ? wire.application_error_stage : null,
+    applicationErrorMessage:
+      typeof wire.application_error_message === 'string' &&
+      wire.application_error_message !== ''
+        ? wire.application_error_message
+        : null,
     acceptedAt: typeof wire.accepted_at === 'string' ? wire.accepted_at : null,
     applicationBoundAt:
       typeof wire.application_bound_at === 'string' ? wire.application_bound_at : null,
