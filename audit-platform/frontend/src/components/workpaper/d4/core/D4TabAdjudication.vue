@@ -629,7 +629,9 @@ const aiTip = computed(() => aiAvailable.value ? 'AI 辅助生成' : 'AI 服务�
   padding: 12px;
 }
 .sync-mode-bar { display: flex; align-items: center; margin-bottom: 12px; }
-.oo-container { min-height: 600px; }
+/* 🔴 必须带**视口相关的确定高度**：`WorkpaperSyncEditorHost` 根元素是 height:100% + flex 列，
+   只给 min-height 时编辑区仍会被压到接近下限，OnlyOffice 在页面上只剩一条（2026-09-22 实测）。 */
+.oo-container { min-height: 600px; height: calc(100vh - 280px); overflow: hidden; border-radius: 8px; }
 .oo-loading { padding: 40px; text-align: center; color: #909399; font-size: var(--wp-font-size, 13px); }
 .import-export-bar { display: flex; justify-content: flex-end; margin-bottom: 12px; }
 .d4-tab-adjudication :deep(.el-table) {

@@ -176,7 +176,19 @@ backend/app/routers/wp_onlyoffice_router.py  1749
 # `get_room_contents` / `_materialize_request` 一组约 220 行可整体外移，但 test_task28_sync_router
 # 有按函数名钉在本文件上的 AST 判据，搬迁需与那批判据一起改，属独立任务）。
 backend/app/routers/wp_sync_router.py  2764
-backend/app/services/excel_structure_fingerprint.py  918
+#   excel_structure_fingerprint.py —— 基线 918 早已 stale（本次改动前 HEAD 实测 947）。
+#     2026-09-22 给 `structure_fingerprint(data)` 加**按 sha256 内容寻址的 LRU 记忆化**
+#     （+46 行 = 缓存字典/上限/两侧 deepcopy/clear 入口 + 根因注释）。实测依据：冷路径
+#     `attach_pilot_*` / `register_from_manifest` → `observe_published_frozen_definitions`
+#     → `collect_workbook_structure` → 本函数，`openpyxl.load_workbook` 被调 100 次累计 61s，
+#     而涉及的**不同** artifact 只有个位数 —— 同一份字节被反复完整解析。
+#     🔴 记忆化必须留在本文件：本函数是所有调用方共享的那个纯函数，挪到某个调用方外层
+#     会让其余调用方继续重复解析（这正是拒绝「挪到 published_identity_observer 外层」的
+#     理由）。而且 `onlyoffice_excel_instrumentation_gate.json` 用本模块 sha256 钉证据，
+#     搬迁会连带动那条门。baseline 取当前真实行数（993），门禁继续拦膨胀 >5%。
+#     拆分方向：把 `_parse_*` 系列（workbook/tables/sheets 三组解析器，约 300 行）下沉为
+#     `excel_structure_parsers.py`，属独立任务。
+backend/app/services/excel_structure_fingerprint.py  993
 backend/app/services/word_sdt_fingerprint.py  874
 backend/app/services/workpaper_sync/adapters/registry.py  1494
 backend/app/services/workpaper_sync/artifacts.py  1493
@@ -195,7 +207,20 @@ backend/app/services/workpaper_sync/excel_entry_gate.py  1317
 backend/app/services/workpaper_sync/excel_extract.py  3900
 backend/app/services/workpaper_sync/excel_instrumentation.py  2200
 backend/app/services/workpaper_sync/excel_materialize.py  3120
-backend/app/services/workpaper_sync/materialize_coordinator.py  2936
+#   materialize_coordinator.py —— 基线 2936 早已 stale（本次改动前 HEAD 实测 3017）。
+#     2026-09-22 僵死 lease 的治本分流（+134 行）：按「这一代是否**真正接管过内容**」分两支 ——
+#     ① 从未接管（room 停在 opening / descriptor 确认从未到达 / 序列为 0 / 无 application）
+#        ⇒ 轻量释放 lease + 复用同代 room；
+#     ② 已接管过 ⇒ `_rotate_generation_for_stale_room()`：同 content_version + 新 generation
+#        + 复用同一 artifact + `reason="rematerialize"` + `set_entry_pointer`。
+#     修的是真栈稳定复现的死锁：旧代码无条件作废整代，而 materialize 不能旋转 generation
+#     （那是 content_commit 的职责），且「重新 flush」在内容未改时命中业务身份复用、同样
+#     不触发旋转 ⇒ 永远回到同一间死 room（真栈同一 entry 连续 409）。两支的分流判据与
+#     各自的恢复动作必须同文件：判据（五项「从未接管」证据）与动作是一体的，拆开会让
+#     「哪些证据成立才允许复用同代」与「复用时到底做了什么」失联 —— 而那正是这次死锁的形态。
+#     baseline 取当前真实行数（3151），门禁继续拦膨胀 >5%。拆分方向：把 room/participant/
+#     descriptor 那一组（约 600 行）抽为 `materialize_room_stage.py`，属独立任务。
+backend/app/services/workpaper_sync/materialize_coordinator.py  3151
 backend/app/services/workpaper_sync/merge.py  1612
 backend/app/services/workpaper_sync/models.py  1486
 backend/app/services/workpaper_sync/oo_to_html.py  3860
@@ -359,6 +384,23 @@ backend/tests/workpaper_sync_predelete/test_task72_pre_delete_eligibility.py  10
 
 # ── 前端 ────────────────────────────────────────────────────────────
 audit-platform/frontend/src/components/workpaper/sync/__tests__/task69IndependentRegression.spec.ts  2103
+
+#   WorkpaperSyncEditorHost.spec.ts —— **改动前即 1430 行**（未入册，本次首登）。
+#     2026-09-22 +146 行：补回宿主的 operation 推进器判据（假定时器驱动
+#     waiting_application→applied / 落地停轮询 / 超 3 分钟 fail-visible / trackOperation=false
+#     隔离开关 / callback_expected=false 不进等待态）。实测依据：用户点保存后 UI 永久停在
+#     「等待 OnlyOffice 回传文件」，而服务端早已 applied —— 根因是桥与宿主**两边都没接**推进器。
+#     🔴 为什么不拆走那组判据：本文件末尾的「零消费方判决」按**本文件真正驱动过的集合**
+#     与组件声明的 prop/emit 集合取等值（多声明一个死 prop 或漏驱动一个都打红）。
+#     把 tracker 那组搬出去，`trackOperation` 这个 prop 就不再被本文件驱动，那条等值判据
+#     会变成「声明 6 个、驱动 5 个」的假红，而它恰恰是本轮抓出「接线丢失」的判据
+#     （实测：接线丢了之后它连同 3 条 tracker 判据一起红）。判据与它数的东西必须同文件。
+#     baseline 取当前真实行数（1576），门禁继续拦膨胀 >5%。
+#     拆分方向：把 harness 与 DTO 工厂抽为 `__tests__/editorHostHarness.ts`（约 200 行，
+#     `task69IndependentRegression.spec.ts` 也能复用），再按「挂载链 / 错误归一 / 推进器」
+#     分文件，属独立任务 —— 需同时改「零消费方判决」的计数口径。
+#     spec: workpaper-html-onlyoffice-bidirectional-writeback-closure Task 33/34
+audit-platform/frontend/src/components/workpaper/sync/__tests__/WorkpaperSyncEditorHost.spec.ts  1576
 
 #   GtConfirmationSummary.vue / TrialBalance.vue —— **改动前即 1955 / 4491 行已超限**；
 #     本次为悬空引用修复，两个文件行数**一行未增**（原地替换）：前者把

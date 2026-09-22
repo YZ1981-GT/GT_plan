@@ -10,3 +10,11 @@
 # ⇒ hook 在 WSL / Linux / CI 上**完全不执行**（静默失去防护）。
 # Windows 上 git 自带的 MSYS bash 容忍 CRLF，故本机看不出问题 —— 这正是它能长期潜伏的原因。
 .git-hooks/* text eol=lf
+
+# per-entry 同步契约 JSON 强制 LF。
+# 2026-09-22 实测：`backend/tests/workpaper_sync/test_platform_contract_disk_byte_stability.py`
+# 直接校验磁盘原始字节必须是 LF + canonical JSON（因为 canonical digest 走解析后的 JSON，
+# 发现不了行尾回流）。但 core.autocrlf=true 会在 checkout 时把这些 LF blob 转成 CRLF，
+# 于是任何一次 checkout / stash pop 之后该守卫就在 Windows 本机变红（CI 的 Linux 上看不见）。
+# index 里本就是 LF，故此规则不产生行尾 churn，只保证 checkout 后仍是 LF。
+backend/data/workpaper_sync_contracts/*.json text eol=lf

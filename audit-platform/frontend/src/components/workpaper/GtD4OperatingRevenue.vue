@@ -13,13 +13,18 @@
         <GtEntrySyncCapabilityNotice v-if="!isD4DedicatedSyncSheet" entry-id="xlsx/gt-d4-operating-revenue" />
       </div>
 
-      <!-- D4-2 由外层统一桥接；D4-5 与 IPO/舞弊子表由自身组件管理双向模式。 -->
-      <WorkpaperSyncEditorHost
-        v-if="renderMode === 'onlyoffice' && isD4DetailSheet"
-        ref="syncEditorHostRef"
-        :descriptor="syncOoDescriptor"
-        :bridge="syncBridge"
-      />
+      <!-- D4-2 由外层统一桥接；D4-5 与 IPO/舞弊子表由自身组件管理双向模式。
+           🔴 必须包在带**确定高度**的 `.oo-container` 里：宿主 `WorkpaperSyncEditorHost`
+           的 `.wp-sync-editor-host` 是 `height:100%` + flex 列，父级高度为 auto 时它只能
+           退到自己的 `min-height` 兜底，编辑区被压成一条，OnlyOffice 里什么都看不清
+           （用户实测截图）。D4 那 28 个子 tab 全都有这个容器，只有这里漏了。 -->
+      <div v-if="renderMode === 'onlyoffice' && isD4DetailSheet" class="oo-container">
+        <WorkpaperSyncEditorHost
+          ref="syncEditorHostRef"
+          :descriptor="syncOoDescriptor"
+          :bridge="syncBridge"
+        />
+      </div>
 
       <GtOnlyOfficeSheet
         v-else-if="renderMode === 'onlyoffice' && !isD4DedicatedSyncSheet && currentSheet !== 'D4-5'"
@@ -609,5 +614,14 @@ onBeforeUnmount(() => {
   align-items: center;
   gap: 12px;
   margin-bottom: 12px;
+}
+
+/* 与 D4 全部 28 个子 tab 的 `.oo-container` 逐字同款 —— 在线编辑区必须拿到**确定高度**，
+   否则 `WorkpaperSyncEditorHost` 的 `height:100%` 解析成 auto、编辑区被压扁。 */
+.oo-container {
+  min-height: 600px;
+  height: calc(100vh - 280px);
+  overflow: hidden;
+  border-radius: 8px;
 }
 </style>

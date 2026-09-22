@@ -120,6 +120,7 @@ representation generation** 而 `content_revision` **不变**。
 from __future__ import annotations
 
 import ast
+import logging
 import base64
 import hashlib
 import hmac
@@ -974,6 +975,8 @@ _REQUIRED_SLOT_KEYS: Final[tuple[str, ...]] = ("template", "instrumentation", "c
 #: `resolution.py` 断言消息含 ``frozen `representation_id``` 同一手法）。
 STALE_ON_REPLAY_MARKER: Final[str] = "stale-substrate/replay"
 STALE_ON_ROOM_OPEN_MARKER: Final[str] = "stale-substrate/room-open"
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -2239,28 +2242,63 @@ class MaterializeCoordinator:
         try:
             participant = await self._join_or_reuse_participant(request, room=room)
         except _ExpiredLeaseRoomSuperseded as exc:
-            # 🔴 2026-09-22 修复：僵死**写** lease 触发的 supersede 之后，**不得**在同一次
-            #    materialize 内同代重开。room.generation ≡ representation.generation（open_or_
-            #    reuse_room L926：generation=int(representation.generation)），而
-            #    uq_wpoor_generation 使 superseded 代际永不可重开（rooms.py L942-948 +
-            #    test_superseded_generation_cannot_be_reopened 锁定为设计要求）；materialize
-            #    是读取路径，手里只有冻结的旧 representation，无法旋转 generation（那是
-            #    content_commit 发布路径的职责，见 content_mutation._next_generation_probe 的
-            #    D4/G7 canary max(rep,room)+1）。旧代码拿同代 representation 重开 → 撞刚被自己
-            #    supersede 的同代 room → RoomNotWritableError 500 死循环（真栈稳定复现）。
+            # 🔴 2026-09-22（第二版，替代同日上午那版「直接抛 409」）：僵死**写** lease 触发
+            #    supersede 之后，**同代重开在结构上不可能**（`room.generation ≡
+            #    representation.generation`，而 `uq_wpoor_generation` 使 superseded 代际永不
+            #    可重建），所以必须换一代。
             #
-            #    正解：抛 409 DescriptorSubstrateStaleError（error_code=launch_descriptor_
-            #    substrate_stale，前端 classifySyncFailure 已识别为「不可原地重试」），让客户端
-            #    重新 flush → commit。commit 走 content_commit，D4/G7 canary 的
-            #    _next_generation_probe 会发布 max(rep,room)+1 的新 generation representation +
-            #    移动 entry pointer，下一次 materialize 便用全新 generation 的干净 room 开成功。
-            #    此处抛异常会连带回滚本请求内未提交的 revoke+supersede：无害——旧 gen room 保持
-            #    原状留作历史残留，新 gen 的 canary probe 天然跳过它，不复用。
-            raise DescriptorSubstrateStaleError(
-                f"{STALE_ON_ROOM_OPEN_MARKER}: 本代 room 因僵死写会话（过期/被撤销的 edit "
-                f"lease）已作废（{exc}）—— 写会话可能已污染内容，该 generation 必须废弃；"
-                "请重新 flush → 提交以发布新 generation，再进在线编辑"
-            ) from exc
+            #    上午那版的做法是抛 409 让客户端「重新 flush → 提交以发布新 generation」。
+            #    真栈实测证明这条建议**客户端无法执行**：`content_commit` 只在发布**新
+            #    content version** 时才走 `_next_generation_probe`，而「重新 flush」在内容
+            #    一字未改时命中 `_find_business_identity_reuse`（AC 3.6 幂等复用、零 revision）
+            #    ⇒ 不发布、不旋转 ⇒ 下一次 materialize 又撞同一间死 room ⇒ **409 永久死循环，
+            #    用户再也进不去在线编辑**。真栈证据（wp b3ab3c46 / entry gt-d4-operating-revenue）：
+            #    room gen 93 `state=active` / `confirmed=True` / `latest_request_sequence=2`
+            #    但 `latest_durable_sequence=0`，edit lease 过期后每次点「在线编辑」恒 409。
+            #    而 **lease 到期是正常场景**（TTL 4h，用户离开再回来即触发），不是边缘情况。
+            #
+            #    正解：materialize 自己**旋转 representation generation**。
+            #    `create_representation` 支持「同一个 `content_version_id` + 新 `generation`
+            #    + 复用同一 artifact」，于是：
+            #      · 不产生新 content version ⇒ **business revision 不变**，AC 3.6 的
+            #        「业务身份相同不得产生重复 revision」继续成立（`assert_revision_delta`
+            #        照样看到 delta=0）；
+            #      · generation 变了 ⇒ `doc_key` 变了 ⇒ OnlyOffice 按 doc_key 的缓存文档被
+            #        换掉，「被撤销写会话的未落盘编辑可能被后来者静默继承」这条污染路径**照样
+            #        被切断**（这正是当初要 supersede 整代的唯一理由）；
+            #      · 旧代 room 的 `revoke_participant` 已经 fence+1 + refresh_required，
+            #        任何在旧 fence 下冻结的请求仍被拒 —— 安全前提一条没松。
+            #    也不需要重新 materialize 字节：artifact 与 bundle 逐项复用，只换代际。
+            #
+            #    只重试**一次**：第二次仍失败说明不是「僵死 lease」这一类，按 409 如实透出。
+            rotated = await self._rotate_generation_for_stale_room(
+                representation, project_id=request.project_id
+            )
+            if rotated is None:
+                raise DescriptorSubstrateStaleError(
+                    f"{STALE_ON_ROOM_OPEN_MARKER}: 本代 room 因僵死写会话（过期/被撤销的 "
+                    f"edit lease）已作废（{exc}），且无法为同一内容版本旋转出新 generation "
+                    "—— 请重新 flush → 提交后再进在线编辑"
+                ) from exc
+            representation = rotated
+            try:
+                room, room_bundle = await self._rooms.open_or_reuse_room(
+                    request.scope,
+                    representation=representation,
+                    opened_base_version_id=content_version_id,
+                    ttl=self._room_ttl,
+                )
+            except (RepresentationNotPublishedError, BundleAliasDriftError) as retry_exc:
+                raise DescriptorSubstrateStaleError(
+                    f"{STALE_ON_ROOM_OPEN_MARKER}: 旋转到 generation "
+                    f"{representation.generation} 后开 room 仍失败（{retry_exc}）"
+                ) from retry_exc
+            pre.bundle_identity.assert_same_as(
+                room_bundle, where="materialize-room-rotated"
+            )
+            participant = await self._join_or_reuse_participant(request, room=room)
+            representation_id = representation.id
+            representation_generation = int(representation.generation)
         await self._session.commit()
 
         descriptor = EditorLaunchDescriptor(
@@ -2295,6 +2333,102 @@ class MaterializeCoordinator:
         )
         self.descriptors_issued += 1
         return descriptor
+
+    async def _rotate_generation_for_stale_room(
+        self,
+        representation: WorkpaperContentRepresentation,
+        *,
+        project_id: uuid.UUID,
+    ) -> WorkpaperContentRepresentation | None:
+        """为**同一个 content version** 发一代新 representation（只换 generation）。
+
+        用途只有一个：上一代 room 因僵死写会话作废后，给 materialize 一个可开的新代际。
+        见调用点的长注释（为什么不能同代重开、为什么这样仍然安全、为什么 revision 不动）。
+
+        与 `content_commit` 的分工：commit 负责「内容变了 ⇒ 新 content version + 新
+        representation」；本方法负责「内容没变，但代际不可用 ⇒ 同内容换代」。两者都经
+        `repo.create_representation`（同一道 approved-bundle 门禁），不存在第二条发布路径。
+
+        返回 ``None`` = 拿不到可复用的 bundle/authority 身份，交调用方按 409 如实透出
+        （宁可报错，也不猜一个 bundle —— 猜错等于用别的 entry 的 definition 开 room）。
+        """
+        entry_id = str(representation.entry_id)
+        next_generation = int(
+            (
+                await self._session.execute(
+                    sa.select(
+                        sa.func.max(WorkpaperContentRepresentation.generation)
+                    ).where(
+                        WorkpaperContentRepresentation.wp_id == representation.wp_id,
+                        WorkpaperContentRepresentation.entry_id == entry_id,
+                    )
+                )
+            ).scalar_one_or_none()
+            or 0
+        )
+        max_room = int(
+            (
+                await self._session.execute(
+                    sa.select(sa.func.max(WorkpaperOoRoom.generation)).where(
+                        WorkpaperOoRoom.wp_id == representation.wp_id,
+                        WorkpaperOoRoom.entry_id == entry_id,
+                    )
+                )
+            ).scalar_one_or_none()
+            or 0
+        )
+        # 与 `content_mutation._next_generation_probe` 逐字同口径：必须同时越过
+        # representation 与 **room** 的历史最大代际 —— 只看 representation 会撞上历史残留
+        # room 的 `uq_wpoor_generation`。
+        generation = max(next_generation, max_room) + 1
+        if (
+            representation.definition_bundle_id is None
+            or representation.authority_model_definition_id is None
+        ):
+            return None
+        rotated = await self._repo.create_representation(
+            project_id=project_id,
+            wp_id=representation.wp_id,
+            entry_id=entry_id,
+            content_version_id=representation.content_version_id,
+            generation=generation,
+            document_type=str(representation.document_type),
+            # 复用同一 artifact：字节一模一样，只是换代际，不需要重新 materialize。
+            artifact_id=representation.artifact_id,
+            artifact_sha256=str(representation.artifact_sha256),
+            definition_bundle_id=representation.definition_bundle_id,
+            authority_model_definition_id=representation.authority_model_definition_id,
+            adapter_id=str(representation.adapter_id),
+            adapter_build_digest=str(representation.adapter_build_digest),
+            structure_hash=str(representation.structure_hash),
+            identity_inventory_sha256=str(representation.identity_inventory_sha256),
+            # 🔴 `reason` 不是自由文本：`ck_wpcr_reason` 是封闭词表
+            #    （content_commit / definition_upgrade / rollback / rematerialize）。
+            #    本场景内容未变、definition 未变，只是把同一份字节按新代际重新物化出来给
+            #    编辑器打开 ⇒ 语义上恰是 `rematerialize`。首版写了自由文本 `stale_room_rotation`，
+            #    被该 CHECK 挡成 IntegrityError（PG 真栈实测）——封闭词表这次帮了忙。
+            reason="rematerialize",
+            parent_representation_id=representation.id,
+        )
+        # entry pointer 必须跟着走：materialize 的 preflight 与 `open_or_reuse_room` 的
+        # published 门都按 pointer 认「当前代」。`set_entry_pointer` 的契约正是
+        # 「切 pointer **不改 content revision**」—— 与本路径要的语义逐字吻合。
+        await self._repo.set_entry_pointer(
+            wp_id=representation.wp_id,
+            entry_id=entry_id,
+            representation_id=rotated.id,
+            generation=generation,
+        )
+        await self._session.flush()
+        logger.info(
+            "entry %s 的 generation %s 因僵死写会话作废，已为同一 content version %s "
+            "旋转到 generation %s（revision 不变、artifact 复用、doc_key 已换）",
+            entry_id,
+            representation.generation,
+            representation.content_version_id,
+            generation,
+        )
+        return rotated
 
     async def _join_or_reuse_participant(
         self, request: MaterializeRequest, *, room: WorkpaperOoRoom

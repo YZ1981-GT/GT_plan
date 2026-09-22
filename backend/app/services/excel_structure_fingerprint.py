@@ -23,12 +23,14 @@ Task 5（真实 OO 9.4 Excel identity 黑盒 probe）产出，Task 17（instrume
 
 from __future__ import annotations
 
+import copy
 import hashlib
 import io
 import re
 import zipfile
+from collections import OrderedDict
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, Final
 from xml.etree import ElementTree as ET
 
 __all__ = [
@@ -441,12 +443,56 @@ def _style_signature(cell: Any) -> str:
     )
 
 
-def structure_fingerprint(data: bytes) -> WorkbookFingerprint:
-    """采集一份 xlsx 的全部结构事实。
+#: 指纹缓存上限（LRU）。冷路径实测只涉及个位数个不同 artifact。
+_FINGERPRINT_CACHE_MAX: Final[int] = 16
 
-    失败一律抛 `FingerprintError`（禁止返回空结构）。局部可容忍问题记入 `errors`，
-    调用方守卫必须断言 `errors == []`。
+#: sha256(bytes) → 指纹。**内容寻址**：命中即入参逐字节相同，故不存在「何时失效」
+#: 的问题 —— 改一个字节就落到另一个 key 上。
+_FINGERPRINT_CACHE: "OrderedDict[str, WorkbookFingerprint]" = OrderedDict()
+
+
+def structure_fingerprint(data: bytes) -> WorkbookFingerprint:
+    """采集一份 xlsx 的全部结构事实（**按字节摘要记忆化**）。
+
+    🔴 2026-09-22 加缓存的实测依据：冷路径 `attach_pilot_*` /
+    `register_from_manifest` → `observe_published_frozen_definitions` →
+    `collect_workbook_structure` → 本函数，`openpyxl.load_workbook` 被调 100 次累计
+    61s（`apply_stylesheet` 22s），而涉及的**不同** artifact 只有个位数。
+
+    安全性不靠「赌它不会变」：本函数是 `bytes → WorkbookFingerprint` 的纯函数，
+    key 取 `sha256(data)` ⇒ 命中即入参逐字节相同 ⇒ 输出必然相同。只改「算几次」，
+    指纹算法与结构身份一个字节没动（同类增量优化见 spec
+    `workpaper-sync-materialize-large-table-performance` Wave 5）。
+
+    存入与命中**两侧都 deepcopy**：`WorkbookFingerprint` 内部全是 dict/list，
+    把缓存对象交出去时调用方的就地修改会毒化后续全部命中
+    （`test_structure_fingerprint_memoization.py` 分别守这两侧）。
+
+    失败一律抛 `FingerprintError`（禁止返回空结构）；局部可容忍问题记入 `errors`。
     """
+    key = _sha256(data)
+    cached = _FINGERPRINT_CACHE.get(key)
+    if cached is not None:
+        _FINGERPRINT_CACHE.move_to_end(key)
+        return copy.deepcopy(cached)
+    computed = _structure_fingerprint_uncached(data)
+    _FINGERPRINT_CACHE[key] = copy.deepcopy(computed)
+    while len(_FINGERPRINT_CACHE) > _FINGERPRINT_CACHE_MAX:
+        _FINGERPRINT_CACHE.popitem(last=False)
+    return computed
+
+
+def clear_structure_fingerprint_cache() -> None:
+    """清空指纹缓存。
+
+    给测试用（让「解析了几次」这类判据不被上一个用例的缓存干扰）；生产路径不需要调 ——
+    key 是内容摘要，本来就不会过期。
+    """
+    _FINGERPRINT_CACHE.clear()
+
+
+def _structure_fingerprint_uncached(data: bytes) -> WorkbookFingerprint:
+    """真正的采集实现（无缓存）。缓存包装见 :func:`structure_fingerprint`。"""
     if not data[:2] == b"PK":
         raise FingerprintError("不是 zip/xlsx 字节流（缺少 PK 魔数）")
 

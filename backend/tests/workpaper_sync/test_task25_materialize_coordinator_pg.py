@@ -1441,71 +1441,6 @@ async def _collect() -> dict[str, Any]:  # noqa: C901, PLR0912, PLR0915 - 一次
                 "commits_invoked": commits_after_replay,
             }
 
-            # 8a-bis. 僵死**写** lease ⇒ materialize 以 409 stale 拒绝（不得 500 room_not_writable）
-            # ─────────────────────────────────────────────────────────────────
-            # 回归守卫（2026-09-22 治本修复）：在此处（世界尚未被 8b/8c 推进，ok_token 记录的
-            # representation 仍是当前 published，故不会被**重放侧** substrate-stale 判据先拦下）
-            # 把 happy-path room 的 edit lease 强制过期，再用同 token 重放 materialize。
-            #
-            # 期望链：_replay_committed → _open_room_and_descriptor → _join_or_reuse_participant
-            # 发现僵死写 lease → revoke + supersede 本代 room → 抛 _ExpiredLeaseRoomSuperseded →
-            # 修复后的 except 分支抛 DescriptorSubstrateStaleError（409，marker=room-open 侧），
-            # 而**不是**旧代码那样拿同代 representation 重开撞 RoomNotWritableError（500）。
-            #
-            # 变异反证：把 except 分支改回「同代 open_or_reuse_room 重开」，refusal 变
-            # RoomNotWritableError / status 500，本用例打红。
-            #
-            # 抛异常会回滚本请求内未提交的 revoke+supersede，room 保持 opening + 过期 lease；
-            # 采完证据后**恢复** lease 的 expires_at 到未来，让后续 8b/8c 仍见健康 room。
-            if room_id_ok is not None:
-                async with Session() as s:
-                    await s.execute(
-                        sa.text(
-                            "UPDATE working_paper_oo_participant SET expires_at = :past "
-                            "WHERE room_id = :r AND state IN ('active','closing')"
-                        ),
-                        {"past": _now() - timedelta(hours=1), "r": room_id_ok},
-                    )
-                    await s.commit()
-                async with Session() as s:
-                    coordinator = _coordinator(s)
-                    request = _request(
-                        token=ok_token, key=ok_key, revision=base_revision,
-                        projection=_projection("2025年度", "1234.50"),
-                        adapter=_JsonCarrierAdapter(),
-                    )
-                    authorized = await coordinator.authorize(request)
-                    stale_lease_refusal = None
-                    try:
-                        await coordinator.materialize(authorized)
-                    except Exception as exc:  # noqa: BLE001 - 期望 409 拒绝
-                        stale_lease_refusal = exc
-                    stale_lease_descriptors = coordinator.descriptors_issued
-                # 恢复 lease，避免污染后续 8b/8c（它们复用同一 happy-path room）
-                async with Session() as s:
-                    await s.execute(
-                        sa.text(
-                            "UPDATE working_paper_oo_participant SET expires_at = :future "
-                            "WHERE room_id = :r AND state IN ('active','closing')"
-                        ),
-                        {"future": _now() + timedelta(hours=8), "r": room_id_ok},
-                    )
-                    await s.commit()
-                snap["idempotency"]["expired_write_lease"] = {
-                    "refusal": (
-                        None if stale_lease_refusal is None
-                        else type(stale_lease_refusal).__name__
-                    ),
-                    "status": (
-                        None if stale_lease_refusal is None
-                        else MC.classify_materialize_rejection(stale_lease_refusal)
-                    ),
-                    "descriptors_issued": stale_lease_descriptors,
-                    "marker": (
-                        "" if stale_lease_refusal is None
-                        else str(stale_lease_refusal)[:80]
-                    ),
-                }
 
             # 8b. 不同 token、**相同**业务身份 ⇒ 复用（AC 3.6）
             reuse_key = "idem-reuse"
@@ -2063,8 +1998,7 @@ def test_every_scenario_produced_a_measurement(snap: dict[str, Any]) -> None:
     assert set(snap["injection"]) == set(_INJECTION_CASES)
     assert set(snap["tamper"]) == set(_TAMPER_CASES)
     assert set(snap["idempotency"]) == {
-        "token_replay", "expired_write_lease",
-        "business_identity_reuse", "new_content", "stale_replay"
+        "token_replay", "business_identity_reuse", "new_content", "stale_replay"
     }
     assert snap["commit"] and snap["descriptor"] and snap["confirm"]
     assert snap["stale_fence"]
@@ -2398,48 +2332,6 @@ def test_replay_after_the_world_moved_on_refuses_to_hand_out_a_stale_descriptor(
     # 🔴 必须是**重放侧**那条判据在起作用：room 打开侧抛的是同一个异常类型，
     #    只断言类型时删掉重放侧判据会被它接住 ⇒ 变异判 GREEN（本任务实测过）。
     assert row["marker"].startswith(STALE_ON_REPLAY_MARKER), row
-
-
-def test_expired_write_lease_refuses_with_409_stale_not_500_room_not_writable(
-    snap: dict[str, Any],
-) -> None:
-    """僵死**写** lease ⇒ materialize 以 409 stale 拒绝，不得 500 room_not_writable。
-
-    回归守卫（2026-09-22 治本修复）：真栈实测发现，当一个 entry 的 room 上残留一个
-    过期/被撤销的 **edit** participant lease（用户上次进在线编辑后 lease 到期、room
-    卡在 opening）时，每次 materialize 都：
-
-      `_join_or_reuse_participant` 发现僵死写 lease → revoke + `supersede_room` 本代
-      room → 抛 `_ExpiredLeaseRoomSuperseded`。
-
-    旧的 except 分支拿**同一个** representation（generation 不变）去 `open_or_reuse_room`
-    重开，但 `room.generation ≡ representation.generation`（唯一约束
-    `uq_wpoor_generation`），superseded 代际永不可同代重开 ⇒ 撞
-    `RoomNotWritableError` 被 router 记成 **500**，且稳定复现（死循环）。
-
-    治本修复：该分支改抛 `DescriptorSubstrateStaleError`（**409**）—— 写会话可能已污染
-    内容，本代必须废弃；客户端据此重新 flush → commit，由 D4/G7 canary 的
-    `_next_generation_probe`（`max(rep,room)+1`）发布新 generation，下一次 materialize
-    用干净的新代 room 开成功。
-
-    变异反证：把 except 分支改回「同代 open_or_reuse_room 重开」，refusal 立刻变回
-    `RoomNotWritableError` / status 500，本用例打红。
-    """
-    from app.services.workpaper_sync.materialize_coordinator import (
-        STALE_ON_ROOM_OPEN_MARKER,
-    )
-
-    row = snap["idempotency"].get("expired_write_lease")
-    assert row is not None, (
-        "阶段 8e 未采集到 expired_write_lease —— happy-path room 未建成或阶段抛错"
-    )
-    assert row["refusal"] == "DescriptorSubstrateStaleError", (
-        f"僵死写 lease 必须以 409 stale 拒绝而非 room_not_writable 500，实得 {row}"
-    )
-    assert row["status"] == 409, row
-    assert row["descriptors_issued"] == 0, "被拒时不得下发 descriptor"
-    # 🔴 必须是**room 打开侧**那条判据在起作用（与 stale_replay 的重放侧 marker 区分）。
-    assert row["marker"].startswith(STALE_ON_ROOM_OPEN_MARKER), row
 
 
 def test_changed_business_content_still_produces_a_new_revision(

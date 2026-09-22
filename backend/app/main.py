@@ -123,6 +123,13 @@ async def lifespan(app: FastAPI):
     stop_event = asyncio.Event()
     tasks = _start_workers(stop_event)
 
+    # workpaper-sync 冷注册预热（后台，不阻塞 Ready）。与 _warm_render_caches 同类问题：
+    # 成本此前完整落在**首个** sync 请求内（store-projection 实测首请求 32.3s / 次请求
+    # 232ms）。这里是 25~30s 的量级，不能像 render 预热那样 await 在 Ready 之前（health
+    # 等待会超时），故建后台任务；请求路径侧有串行锁，首请求若在预热中途到达会等它建完
+    # 而不是再跑一遍。任务引用存入 tasks，关闭阶段统一 cancel（避免被 GC 静默回收）。
+    tasks.append(asyncio.create_task(_warm_workpaper_sync_registry()))
+
     # 注册 SIGTERM handler（drain 用）
     from app.core.graceful_shutdown import install_sigterm_handler
     install_sigterm_handler()
@@ -259,6 +266,53 @@ async def _warm_render_caches() -> None:
                  len(wp_render_strategies.RENDERER_DISPATCH))
     except Exception as e:  # noqa: BLE001 — 预热失败不阻塞启动，首请求会自行惰性导入
         log.warning("[启动] render 热路径预热失败（忽略，改由首请求惰性导入）: %s", e)
+
+
+async def _warm_workpaper_sync_registry() -> None:
+    """后台预热 workpaper-sync 的 ROI-0 冷注册缓存。
+
+    4 条 pilot attach + `register_from_manifest`（186 条 entry）实测 25~30s，此前完整
+    发生在**首个** sync 请求里 —— 用户点「在线编辑」看到的 32 秒就是它。预热走的是与请求
+    路径同一条代码，因此不会出现「预热建的缓存与请求要的不是一回事」。
+
+    失败只记 WARNING：预热只把成本提前，失败就退回原来的惰性路径（首请求自己建），
+    绝不让预热把后端启动打挂。
+    """
+    import asyncio
+    import logging as _sync_warm_log
+    import time as _sync_warm_time
+
+    log = _sync_warm_log.getLogger("audit_platform")
+    started = _sync_warm_time.perf_counter()
+    try:
+        from app.services.workpaper_sync.startup_prewarm import (
+            prewarm_sync_baseline_projections,
+            prewarm_sync_registration_cache,
+        )
+
+        adapter_ids = await prewarm_sync_registration_cache()
+        registered_at = _sync_warm_time.perf_counter()
+        log.warning(
+            "[启动] workpaper-sync 冷注册预热完成：%d 个 adapter，耗时 %.1fs",
+            len(adapter_ids),
+            registered_at - started,
+        )
+        # 第二段：可切 OO 的 entry 的基线 extract（首请求实测仍要 8.2s，暖后 0.13s）。
+        warmed, skipped = await prewarm_sync_baseline_projections()
+        log.warning(
+            "[启动] workpaper-sync 基线 projection 预热完成：暖 %d 个 / 跳过 %d 个，耗时 %.1fs",
+            warmed,
+            skipped,
+            _sync_warm_time.perf_counter() - registered_at,
+        )
+    except asyncio.CancelledError:  # 关闭阶段取消，不当成失败
+        raise
+    except Exception as exc:  # noqa: BLE001 — 预热失败不阻塞，首请求会自行惰性注册
+        log.warning(
+            "[启动] workpaper-sync 冷注册预热失败（忽略，改由首请求惰性注册，%.1fs）: %s",
+            _sync_warm_time.perf_counter() - started,
+            exc,
+        )
 
 
 async def _run_schema_drift_check() -> None:

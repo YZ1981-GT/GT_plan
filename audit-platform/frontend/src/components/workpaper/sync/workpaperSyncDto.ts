@@ -552,6 +552,29 @@ export interface WorkpaperSyncForcesaveAccepted {
   readonly replayed: boolean
   /** 出站失败时的 error_code；`null` 才代表 Command Service 已受理。 */
   readonly dispatchError: string | null
+  /**
+   * Command Service 的原始返回码（`0`=accepted / `4`=no_changes / …）。
+   *
+   * 🔴 2026-09-22 补解析。后端 `request_forcesave` 一直在 202 里回传
+   * `cs_error / cs_outcome / callback_expected` 三项，并对
+   * `terminal_without_callback`（no_changes / doc_not_online / configuration_error /
+   * implementation_defect）**就地终结** request+shell，源码注释写的就是
+   * 「避免前端无限等 status 6」。但前端此前**根本不解析这三项**，于是后端明确说过
+   * 「不会再有 callback」之后，桥照样进 `waiting_application` 干等 ——
+   * 用户「进 OO 什么都没改直接点保存」必然永久转圈（真栈实测）。
+   *
+   * 出站失败（`dispatchError !== null`）时三项为 `null`：那条路径连 CS 都没调到。
+   */
+  readonly csError: number | null
+  /** CS 结果的语义名（`accepted` / `no_changes` / …），用于给用户讲人话。 */
+  readonly csOutcome: string | null
+  /**
+   * 这次 forcesave **是否还会有 callback**。
+   *
+   * `false` ⇒ 后端已终结 request+shell，**不得**进入 `waiting_application`。
+   * `null` ⇒ 后端未给（旧版本 / 出站失败），按「可能会来」保守处理。
+   */
+  readonly callbackExpected: boolean | null
 }
 
 export function parseForcesaveAccepted(payload: unknown): WorkpaperSyncForcesaveAccepted {
@@ -571,6 +594,9 @@ export function parseForcesaveAccepted(payload: unknown): WorkpaperSyncForcesave
       `forcesave 的 dispatch_error=${JSON.stringify(dispatchError)} 既不是 null 也不是 error_code 字符串`,
     )
   }
+  const csError = wire.cs_error
+  const csOutcome = wire.cs_outcome
+  const callbackExpected = wire.callback_expected
   return {
     forcesaveRequestId: requiredOpaqueId(wire, 'forcesave_request_id', 'forcesave'),
     operationId: requiredOpaqueId(wire, 'operation_id', 'forcesave'),
@@ -579,6 +605,12 @@ export function parseForcesaveAccepted(payload: unknown): WorkpaperSyncForcesave
     pollAfterMs: requiredInt(wire, 'poll_after_ms', 'forcesave'),
     replayed: wire.replayed === true,
     dispatchError: typeof dispatchError === 'string' ? dispatchError : null,
+    // 三项都**宽松**解析：缺字段按 null（旧后端 / 出站失败路径），不 refuse ——
+    // 这三项是「能不能少等一会儿」的优化信号，拿不到时退回原有保守行为即可，
+    // 为它们把整个保存流程打挂是过度反应。
+    csError: typeof csError === 'number' ? csError : null,
+    csOutcome: typeof csOutcome === 'string' ? csOutcome : null,
+    callbackExpected: typeof callbackExpected === 'boolean' ? callbackExpected : null,
   }
 }
 

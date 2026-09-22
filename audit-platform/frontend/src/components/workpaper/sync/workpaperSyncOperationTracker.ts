@@ -57,6 +57,28 @@ export interface WorkpaperSyncTrackerOptions {
   ) => Promise<WorkpaperSyncOperationSnapshot>
   /** 降级后的轮询间隔。 */
   readonly degradedPollIntervalMs?: number
+  /**
+   * **不等降级就轮询**的间隔（毫秒）。给了就从 `start()` 起一直轮询。
+   *
+   * 🔴 2026-09-22 新增。上面第 2 条职责「SSE 健康时不轮询」是为**稳态**订阅写的
+   * （6000 会话下常态 operation GET 会打成流量）。但 forcesave → applied 是一个
+   * **短窗口内必须可靠落地**的问题：只赌 SSE 有两条失效路径 ——
+   * ① 该 flow 的 `workpaper.content.updated` 若没发/没订上，`start()` 之后就再没有
+   *    第二次读，UI 永久停在「等待 OnlyOffice 回传文件」（真栈实测的正是这个症状）；
+   * ② SSE 连着但事件迟到，用户看不到任何进展。
+   * 短窗口 + 有 {@link deadlineMs} 封顶，与「稳态不轮询」并不冲突：稳态订阅不传本项即可。
+   */
+  readonly pollIntervalMs?: number
+  /**
+   * 追踪窗口上限（毫秒）。超时即 `stop()` 并回调 {@link onDeadline}。
+   *
+   * 🔴 2026-09-22 新增。此前**整条链路没有任何超时兜底** —— 桥的
+   * `waiting_application` 出边只有「close 失权」与「HTTP 失败」，一旦没人喂快照就是
+   * 无限等待，而 spec Task 34 明文「不得无限等待」。不给本项 = 沿用旧的无限行为。
+   */
+  readonly deadlineMs?: number
+  /** 到达 {@link deadlineMs} 时的回调（调用方据此 fail-visible）。 */
+  readonly onDeadline?: (elapsedMs: number) => void
 }
 
 /** 去重结果。`accepted=false` 表示这条事实此前已投递过。 */
@@ -135,12 +157,16 @@ export class WorkpaperSyncOperationTracker {
 
   private stopped = false
 
+  /** `start()` 的时刻，用于 {@link WorkpaperSyncTrackerOptions.deadlineMs} 计时。 */
+  private startedAt: number | null = null
+
   constructor(options: WorkpaperSyncTrackerOptions) {
     this.options = options
   }
 
   async start(): Promise<void> {
     this.stopped = false
+    this.startedAt = Date.now()
     const subscribe = this.options.subscribe ?? defaultSubscribe
     this.subscription = subscribe({
       projectId: this.options.scope.projectId,
@@ -151,6 +177,10 @@ export class WorkpaperSyncOperationTracker {
       },
       onDegraded: () => this.enterDegradedPolling(),
     })
+    // 窗口型追踪（forcesave → 落地）不等降级就开始轮询，见 `pollIntervalMs` 的说明。
+    if (this.options.pollIntervalMs !== undefined) {
+      this.startPolling(this.options.pollIntervalMs)
+    }
     // 初次读一次当前状态：SSE 只投递之后的事件。
     await this.refresh()
   }
@@ -168,10 +198,27 @@ export class WorkpaperSyncOperationTracker {
   /** 显式读一次并按去重键投递。 */
   async refresh(): Promise<void> {
     if (this.stopped) return
+    if (this.exceededDeadline()) return
     const poll = this.options.poll ?? getOperation
     this.pollCount += 1
     const snapshot = await poll(this.options.scope, this.options.operationId)
     this.deliver(snapshot)
+  }
+
+  /**
+   * 是否已超出追踪窗口。超出则**就地停掉**并回调一次 `onDeadline`。
+   *
+   * 放在 `refresh()` 入口而不是另起一个 timer：省一个定时器，且保证「超时」这件事
+   * 一定发生在一次真实的读之前 —— 不会出现「已经拿到 applied 却仍报超时」。
+   */
+  private exceededDeadline(): boolean {
+    const limit = this.options.deadlineMs
+    if (limit === undefined || this.startedAt === null) return false
+    const elapsed = Date.now() - this.startedAt
+    if (elapsed < limit) return false
+    this.stop()
+    this.options.onDeadline?.(elapsed)
+    return true
   }
 
   /** SSE 事件 → 先按 `wp_id + revision` 去重，再补读 operation 快照。 */
@@ -204,9 +251,16 @@ export class WorkpaperSyncOperationTracker {
   private enterDegradedPolling(): void {
     if (this.degraded || this.stopped) return
     this.degraded = true
-    const interval = this.options.degradedPollIntervalMs ?? 5000
+    this.startPolling(this.options.degradedPollIntervalMs ?? 5000)
+  }
+
+  /** 起轮询定时器（已有则不重起 —— 降级与窗口型轮询共用同一个 timer）。 */
+  private startPolling(intervalMs: number): void {
+    if (this.timer !== null || this.stopped) return
     this.timer = setInterval(() => {
-      void this.refresh()
-    }, interval)
+      // `refresh()` 里会自查 deadline 并 stop；这里吞掉 rejection，
+      // 否则定时器里的 rejection 变成 unhandled（控制台红、UI 无感）。
+      void this.refresh().catch(() => {})
+    }, Math.max(250, intervalMs))
   }
 }

@@ -254,6 +254,28 @@ export const WP_BRIDGE_IN_FLIGHT_STATES: readonly WorkpaperSyncBridgeState[] = [
   'recovery_claiming',
 ]
 
+/**
+ * 可以（重新）发强制保存命令的状态集合。
+ *
+ * 🔴 `forcesave_frozen` 必须在内，否则「允许重试」只是说法：转换表里
+ * `forcesave_frozen --forcesave_started--> forcesave_requesting` 本来就在（design
+ * §retryOperation「重试只重发命令，不重新冻结 request」），状态提示也写着「请重新发送
+ * 强制保存命令」，但 `canForcesave` 只认 `oo_editing` ⇒ 宿主的保存按钮
+ * `:disabled="!canForcesave"` 永久灰掉、`switchToHtml()` 的首道门也直接 refuse。
+ *
+ * 2026-09-22 真栈实测的死角：用户进 OO 什么都没改就点保存 → Command Service 返
+ * `no_changes` → `callback_expected=false` → `forcesave_frozen`，界面显示「文档没有
+ * 检测到改动……请在编辑器内先点一下单元格外的空白处让改动生效，**再重新保存**」，而那个
+ * 按钮已经灰了；同时 room 开着、结构化视图的切换入口也是禁用的 ⇒ 用户被关在 OO 里无路可走。
+ *
+ * `forcesaveUnlocked` 仍是硬前提（在 `canForcesave` 里与本集合取合），没拿到
+ * confirm-descriptor 成功响应之前一律不放行。
+ */
+export const WP_BRIDGE_FORCESAVE_READY_STATES: readonly WorkpaperSyncBridgeState[] = [
+  'oo_editing',
+  'forcesave_frozen',
+]
+
 // ═══════════════════════════════════════════════════════════════════════════
 // 3. 选项
 // ═══════════════════════════════════════════════════════════════════════════
@@ -364,6 +386,14 @@ export function useWorkpaperSyncBridge(options: WorkpaperSyncBridgeOptions) {
   const applicationEffectiveSequence = ref<number | null>(null)
   const mountCallCount = ref(0)
   const forcesaveCallCount = ref(0)
+  /**
+   * 后端 forcesave 202 给的轮询节奏（`poll_after_ms`，当前 500）。
+   *
+   * 桥自己**不**用它（桥被动、不起定时器），但必须把它**透出去**给宿主的 operation
+   * 推进器用。此前它被 DTO 解析后就地丢弃 —— 后端给了节奏、前端没人接，正是
+   * 「保存后永久转圈」这条缺陷的一部分。
+   */
+  const pollAfterMs = ref<number | null>(null)
 
   function scope(): WorkpaperSyncEntryScope {
     return {
@@ -568,7 +598,9 @@ export function useWorkpaperSyncBridge(options: WorkpaperSyncBridgeOptions) {
   }
 
   const canForcesave = computed(
-    () => state.value === 'oo_editing' && confirmation.value?.forcesaveUnlocked === true,
+    () =>
+      WP_BRIDGE_FORCESAVE_READY_STATES.includes(state.value) &&
+      confirmation.value?.forcesaveUnlocked === true,
   )
 
   // ── 4.3 OO → HTML
@@ -607,6 +639,7 @@ export function useWorkpaperSyncBridge(options: WorkpaperSyncBridgeOptions) {
       return fail('forcesave', error)
     }
     requestedOperationId.value = accepted.operationId
+    pollAfterMs.value = accepted.pollAfterMs
     if (accepted.dispatchError !== null) {
       // request 已冻结、shell 已建，但 Command Service 未受理 ⇒ 保持 OO 并允许重试
       // （AC 4.4）。这一步**不是** error：request 是真的冻结了，文案必须区分。
@@ -621,8 +654,66 @@ export function useWorkpaperSyncBridge(options: WorkpaperSyncBridgeOptions) {
       })
       return
     }
+    // 🔴 2026-09-22：后端明确说「这次不会再有 callback」时**不得**进 `waiting_application`。
+    //
+    // `request_forcesave` 对 CS 的 `terminal_without_callback`（`no_changes` /
+    // `doc_not_online` / `configuration_error` / `implementation_defect`）已经
+    // `terminate_without_callback` 就地终结 request+shell，并在 202 里回传
+    // `callback_expected=false`。此前前端不读这个字段，于是照样 `shell_tracking_started`
+    // → `waiting_application` 干等一个后端已经宣告不会来的 callback。最常见触发路径是
+    // **用户进 OO 什么都没改就点保存**（CS 返 `no_changes`），真栈实测永久转圈。
+    //
+    // 落到 `forcesave_frozen`（`forcesave_dispatch_failed` 的目标态）而不是 `error`：
+    // request 确实冻结成功了、OO 会话仍然健康、用户改点东西再存就能成 —— 这正是
+    // `forcesave_frozen` 的语义（保持 OO、允许重试）。具体原因走 `lastError`，
+    // 它在 `feedback` 里优先级最高，用户看到的是人话而不是笼统的「未被受理」。
+    if (accepted.callbackExpected === false) {
+      apply('forcesave_dispatch_failed')
+      lastError.value = describeBridgeFailure('forcesave_dispatch', {
+        response: {
+          status: 409,
+          data: {
+            detail: {
+              error_code: `forcesave_${accepted.csOutcome ?? 'terminal_without_callback'}`,
+              message: forcesaveTerminalMessage(accepted.csOutcome, accepted.csError),
+            },
+          },
+        },
+      })
+      return
+    }
     apply('forcesave_command_accepted')
     apply('shell_tracking_started', { requestedOperationId: accepted.operationId })
+    // 🔴 到此**刻意**结束：桥是被动的，不自己发定时器/不自己订 SSE。
+    //    推进 `waiting_application` 的责任在宿主（`WorkpaperSyncEditorHost.vue` 用
+    //    `WorkpaperSyncOperationTracker` 喂 `ingestOperationSnapshot`）——它持有组件
+    //    生命周期，能保证定时器随卸载停掉。
+    //
+    //    这条分工不是洁癖：桥若自己轮询，`switchToHtml()` 就会多打一次 operation GET，
+    //    而本 spec 的独立回归（T69-I27「整趟端点多重集恰为三项」等 10 条）正是按
+    //    「桥只在被调用时发请求」建立的判据 —— 桥自轮询会把那批判据全部打红，
+    //    等于用改判据来迁就实现。2026-09-22 первый版把 tracker 放进桥，实测打红 10 条后
+    //    移到宿主，判据零改动。
+    //
+    //    🔴 曾经的缺陷正是「两边都没接」：宿主没接 tracker、桥也不轮询，于是保存后 UI
+    //    永远停在「已发送强制保存，等待 OnlyOffice 回传文件」，而服务端早已 applied
+    //    （真栈证据：`operation.state=applied` / `application.state=applied`，
+    //    而 `host_status` 一直是那句等待文案）。
+  }
+
+  /** `terminal_without_callback` 的人话文案（按 CS 语义分型，不压成一句）。 */
+  function forcesaveTerminalMessage(outcome: string | null, code: number | null): string {
+    const suffix = code === null ? '' : `（Command Service 返回码 ${code}）`
+    switch (outcome) {
+      case 'no_changes':
+        return `文档没有检测到改动，本次无需保存${suffix}。若确实改过，请在编辑器内先点一下单元格外的空白处让改动生效，再重新保存。`
+      case 'doc_not_online':
+        return `编辑会话已不在线，无法保存${suffix}。请退出在线编辑后重新进入，再保存。`
+      case 'configuration_error':
+        return `OnlyOffice 服务配置异常，保存命令无法执行${suffix}。请联系管理员检查 OnlyOffice 配置。`
+      default:
+        return `强制保存已终结且不会有回传${suffix}：${outcome ?? '未知原因'}。`
+    }
   }
 
   /**
@@ -720,6 +811,25 @@ export function useWorkpaperSyncBridge(options: WorkpaperSyncBridgeOptions) {
   }
 
   /** 重新读一次快照。duplicate 时仍按 requested id 发起（服务端先授权后 canonicalize）。 */
+  /**
+   * 只**取**一份 operation 快照，不动任何状态。
+   *
+   * 🔴 2026-09-22 新增，供宿主的 operation 追踪器用。为什么不让追踪器自己打端点：
+   * `WorkpaperSyncOperationTracker` 的 `poll` 默认直接调模块级 `getOperation`，那是
+   * **第二条 api 通道** —— 绕过桥注入的 `api`，于是拦截器/鉴权/测试替身全都不一致
+   * （实测表现为：测试注入的 api stub 明明排好了响应，追踪器却去打真实端点）。
+   * 追踪器改用本函数后，全链路只有一条 api 通道。
+   *
+   * 与 {@link refreshOperation} 的分工：本函数**只读**；要不要把快照喂进状态机由调用方
+   * 显式调 {@link ingestOperationSnapshot} 决定。两件事分开才能让追踪器在 `duplicate`
+   * 这类 terminal 上只更新投影而不推状态。
+   */
+  async function fetchOperationSnapshot(
+    operationId: string,
+  ): Promise<WorkpaperSyncOperationSnapshot> {
+    return api.getOperation(scope(), operationId)
+  }
+
   async function refreshOperation(): Promise<WorkpaperSyncOperationSnapshot> {
     const id = operationIdForCalls()
     let snapshot: WorkpaperSyncOperationSnapshot
@@ -1277,6 +1387,9 @@ export function useWorkpaperSyncBridge(options: WorkpaperSyncBridgeOptions) {
     applicationEffectiveSequence: readonly(applicationEffectiveSequence),
     mountCallCount: readonly(mountCallCount),
     forcesaveCallCount: readonly(forcesaveCallCount),
+    pollAfterMs: readonly(pollAfterMs),
+    /** 当前 entry scope（宿主的 operation 推进器要用它构造 tracker）。 */
+    scope,
     canForcesave,
     canLeave,
     leaveBlockReason,
@@ -1291,6 +1404,7 @@ export function useWorkpaperSyncBridge(options: WorkpaperSyncBridgeOptions) {
     switchToHtml,
     ingestOperationSnapshot,
     observeApplicationFence,
+    fetchOperationSnapshot,
     refreshOperation,
     reloadAfterApplied,
     fetchConflicts,

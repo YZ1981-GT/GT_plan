@@ -81,6 +81,13 @@ export const WP_SYNC_HOST_ERROR_TEXT: Readonly<Record<string, string>> = Object.
     '编辑器异常中断，但服务端未列出可认领的恢复项，请联系项目负责人重新授权',
   editor_host_recovery_before_confirmation:
     '编辑器身份尚未确认，异常中断不进入恢复流程',
+  // 🔴 2026-09-22：修复前这条链路**没有任何超时兜底**，保存后可以无限转圈
+  //    （spec Task 34 明文「不得无限等待」）。宿主的 operation 追踪器超过窗口即报此码。
+  // 文案里点名「重试回写」= 宿主模板里真实存在的那个按钮（`showPlainRetry` 门后），
+  // 不是一句泛泛的「请稍后再试」——超时之后用户必须知道下一步点哪里。
+  editor_host_operation_tracking_timeout:
+    '等待 OnlyOffice 回传结果超时，保存尚未落地。请点「重试回写」重新发送保存命令，'
+    + '或退出在线编辑后重新进入。',
 })
 
 /**

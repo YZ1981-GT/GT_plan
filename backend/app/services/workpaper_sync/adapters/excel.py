@@ -60,6 +60,7 @@ from app.services.workpaper_sync.excel_extract import (
     extract_projection,
     resolve_managed_region,
     verify_unmanaged_regions,
+    workbook_read_scope,
 )
 from app.services.workpaper_sync.excel_materialize import (
     ExcelWriteCapability,
@@ -472,26 +473,33 @@ class ExcelSyncAdapter:
         if role is SubstrateRole.published_representation:
             baseline, baseline_formulas = (None, None)
         parts: list[Projection] = []
-        for binding in self._all_bindings():
-            parts.append(
-                extract_projection(
-                    artifact=artifact,
-                    definitions=self.definitions,
-                    binding=binding,
-                    substrate_role=role,
-                    artifact_kind=kind,
-                    artifact_state=state,
-                    baseline=baseline,
-                    baseline_formulas=baseline_formulas,
-                    limits=self._limits,
-                    # 冻结 inventory 只锁主 sheet；sibling 表列跨度不同，不得拿主表期望比对。
-                    retain_identity_inventory=binding.table_key == self.binding.table_key,
-                ).projection
-            )
-        from app.services.workpaper_sync.phase5_transposed_sheet import extract_file as _transposed_extract_file
-        from app.services.workpaper_sync.transposed_registry import resolve_transposed_specs
-        for spec in resolve_transposed_specs(contract):
-            parts.append(_transposed_extract_file(artifact, contract, spec=spec))
+        # 🔴 多 binding 底稿（D4-营业收入实测 39 个 binding）每个 binding 都要读同一个
+        # artifact 的两个视图（data_only True/False）⇒ 78 次全簿 openpyxl 解析、cProfile
+        # 累计 60.8s，这是 store-projection 首请求十秒量级的主项。作用域内同一
+        # (文件身份, data_only) 只解析一次；退出时 finally 关闭全部句柄（Windows 上
+        # staged/repaired 临时文件随后要 unlink，不能有残留句柄）。
+        # 只改「解析几次」不改「解析出什么」——作用域外行为与优化前逐字节相同。
+        with workbook_read_scope():
+            for binding in self._all_bindings():
+                parts.append(
+                    extract_projection(
+                        artifact=artifact,
+                        definitions=self.definitions,
+                        binding=binding,
+                        substrate_role=role,
+                        artifact_kind=kind,
+                        artifact_state=state,
+                        baseline=baseline,
+                        baseline_formulas=baseline_formulas,
+                        limits=self._limits,
+                        # 冻结 inventory 只锁主 sheet；sibling 表列跨度不同，不得拿主表期望比对。
+                        retain_identity_inventory=binding.table_key == self.binding.table_key,
+                    ).projection
+                )
+            from app.services.workpaper_sync.phase5_transposed_sheet import extract_file as _transposed_extract_file
+            from app.services.workpaper_sync.transposed_registry import resolve_transposed_specs
+            for spec in resolve_transposed_specs(contract):
+                parts.append(_transposed_extract_file(artifact, contract, spec=spec))
         return self._merge_projections(parts)
 
     def _substrate_shape_of(

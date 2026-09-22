@@ -528,7 +528,55 @@ def _entry_scope(scope: GuardedScope) -> RoomScope:
     )
 
 
-async def _attach_pilot_adapters(svc: _SyncServices) -> tuple[str, ...]:
+@dataclass(frozen=True)
+class _RegistrationWarmupContext:
+    """启动预热用的最小上下文。
+
+    注册路径（:func:`_attach_pilot_adapters` / :func:`_registration_state_fingerprint`）
+    只用到 ``session`` 与 ``registry`` 两项 —— 不碰 guard / user / probe。预热发生在没有
+    HTTP 请求的启动阶段，构不出真正的 :class:`_SyncServices`（它要 user_id 与可见性探针），
+    因此这里给一个**同形但最小**的上下文，而不是把 guard 依赖伪造成匿名用户。
+    """
+
+    session: Any
+    registry: WorkpaperSyncAdapterRegistry
+
+
+#: 冷注册串行锁。
+#
+# 冷注册（4 条 pilot attach + register_from_manifest）实测 25~30s。没有这把锁时，
+# 进程刚起来那一批并发请求（前端打开底稿会并发打 store-projection / materialize /
+# timeline 多个 sync 端点）会**各自完整跑一遍**同一份 30s 注册：CPU 抢占让每个都更慢，
+# 且 openpyxl 全簿解析 ×N 份内存。有锁后第一个建、其余等它建完直接命中 ROI-0 缓存。
+#
+# 锁只护「建缓存」这段；缓存命中路径（绝大多数请求）完全不进锁。
+_REGISTRATION_BUILD_LOCK: "asyncio.Lock | None" = None
+
+
+def _registration_build_lock() -> "asyncio.Lock":
+    """惰性建锁：模块导入时还没有 running loop（`asyncio.Lock()` 不再绑 loop，但保持惰性
+    以免测试里跨 loop 复用同一把锁）。"""
+    global _REGISTRATION_BUILD_LOCK
+    if _REGISTRATION_BUILD_LOCK is None:
+        _REGISTRATION_BUILD_LOCK = asyncio.Lock()
+    return _REGISTRATION_BUILD_LOCK
+
+
+def _replay_cached_registrations(
+    svc: "_SyncServices | _RegistrationWarmupContext",
+    cached: "_RegistrationSnapshot",
+) -> tuple[str, ...]:
+    """把缓存的注册原样重放进本请求的新 registry（`register()` 仍跑全部 RG 判据）。"""
+    already = {reg.entry_id for reg in svc.registry.registrations()}
+    for reg in cached.registrations:
+        if reg.entry_id not in already:
+            svc.registry.register(reg)
+    return cached.adapter_ids
+
+
+async def _attach_pilot_adapters(
+    svc: "_SyncServices | _RegistrationWarmupContext",
+) -> tuple[str, ...]:
     """Task 40 起的**生产接线点**：把已 finalize 的 pilot entry 接进 registry。
 
     放在这里（而不是 `build_sync_services`）的唯一原因是它必须读库：bundle 快照只能按
@@ -570,32 +618,35 @@ async def _attach_pilot_adapters(svc: _SyncServices) -> tuple[str, ...]:
     fingerprint = await _registration_state_fingerprint(svc)
     cached = _REGISTRATION_CACHE.get(fingerprint)
     if cached is not None:
-        already = {reg.entry_id for reg in svc.registry.registrations()}
-        for reg in cached.registrations:
-            if reg.entry_id not in already:
-                svc.registry.register(reg)
-        return cached.adapter_ids
+        return _replay_cached_registrations(svc, cached)
 
-    explicit = (
-        await attach_pilot_adapters(svc.registry, session=svc.session)
-        + await attach_d2_pilot_adapters(svc.registry, session=svc.session)
-        + await attach_h1_pilot_adapters(svc.registry, session=svc.session)
-        + await attach_g7_pilot_adapters(svc.registry, session=svc.session)
-    )
-    # Task 75 追加（只加不动）：manifest 驱动的注册 —— 覆盖**全部** 186 条 entry，
-    # 并为每条未注册 entry 给出显式原因（`outcome.reasons`）。四条 pilot attach 保留在
-    # 上面：计划里每个 entry 仍派发到它**自己**的 attach（不共用），本次 pass 会发现它们
-    # 已注册并原样计入。零注册不再是「没人来注册」，而是可读的供给原因。
-    outcome = await svc.registry.register_from_manifest(session=svc.session)
-    adapter_ids = tuple(dict.fromkeys((*explicit, *outcome.registered_adapter_ids)))
-    _REGISTRATION_CACHE.put(
-        fingerprint,
-        _RegistrationSnapshot(
-            registrations=svc.registry.registrations(),
-            adapter_ids=adapter_ids,
-        ),
-    )
-    return adapter_ids
+    # 🔴 冷路径串行化：并发首请求不得各跑一遍 30s 注册（见 _REGISTRATION_BUILD_LOCK）。
+    async with _registration_build_lock():
+        # 拿到锁后**重查**：等锁期间别的请求很可能已经把缓存建好了。
+        cached = _REGISTRATION_CACHE.get(fingerprint)
+        if cached is not None:
+            return _replay_cached_registrations(svc, cached)
+
+        explicit = (
+            await attach_pilot_adapters(svc.registry, session=svc.session)
+            + await attach_d2_pilot_adapters(svc.registry, session=svc.session)
+            + await attach_h1_pilot_adapters(svc.registry, session=svc.session)
+            + await attach_g7_pilot_adapters(svc.registry, session=svc.session)
+        )
+        # Task 75 追加（只加不动）：manifest 驱动的注册 —— 覆盖**全部** 186 条 entry，
+        # 并为每条未注册 entry 给出显式原因（`outcome.reasons`）。四条 pilot attach 保留在
+        # 上面：计划里每个 entry 仍派发到它**自己**的 attach（不共用），本次 pass 会发现它们
+        # 已注册并原样计入。零注册不再是「没人来注册」，而是可读的供给原因。
+        outcome = await svc.registry.register_from_manifest(session=svc.session)
+        adapter_ids = tuple(dict.fromkeys((*explicit, *outcome.registered_adapter_ids)))
+        _REGISTRATION_CACHE.put(
+            fingerprint,
+            _RegistrationSnapshot(
+                registrations=svc.registry.registrations(),
+                adapter_ids=adapter_ids,
+            ),
+        )
+        return adapter_ids
 
 
 @dataclass(frozen=True)

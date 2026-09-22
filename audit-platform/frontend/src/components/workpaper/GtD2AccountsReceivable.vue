@@ -79,12 +79,15 @@
 
       <!-- OnlyOffice 在线编辑（统一路径：descriptor → WorkpaperSyncEditorHost） -->
       <!-- D2-2 canary：只在明细表走 USER_SYNC_PREFIX；其它 sheet 不挂 legacy GtOnlyOfficeSheet -->
-      <WorkpaperSyncEditorHost
-        v-if="renderMode === 'onlyoffice' && isD2DetailSheet"
-        ref="syncEditorHostRef"
-        :descriptor="syncOoDescriptor"
-        :bridge="syncBridge"
-      />
+      <!-- 🔴 必须包在带确定高度的容器里，否则 host 的 height:100% 解析成 auto、
+           编辑区被压扁（见 workpaperSyncEditorHostSizing 守卫）。 -->
+      <div v-if="renderMode === 'onlyoffice' && isD2DetailSheet" class="oo-container">
+        <WorkpaperSyncEditorHost
+          ref="syncEditorHostRef"
+          :descriptor="syncOoDescriptor"
+          :bridge="syncBridge"
+        />
+      </div>
 
       <!-- HTML 结构化视图 -->
       <template v-else>
@@ -613,5 +616,16 @@ onBeforeUnmount(() => {
   align-items: center;
   gap: 12px;
   margin-bottom: 12px;
+}
+
+/* 🔴 在线编辑区必须拿到**视口相关的确定高度**：`WorkpaperSyncEditorHost` 根元素是
+   height:100% + flex 列，父级为 auto 高度时编辑区被压扁，OnlyOffice 在页面上只剩一条
+   （2026-09-22 用户真栈实测，D4-2 同款缺陷；本文件由 workpaperSyncEditorHostSizing
+   守卫一并抓出）。数值与 D4 全部子 tab 的 `.oo-container` 逐字同款。 */
+.oo-container {
+  min-height: 600px;
+  height: calc(100vh - 280px);
+  overflow: hidden;
+  border-radius: 8px;
 }
 </style>

@@ -17,6 +17,7 @@ import { mount } from '@vue/test-utils'
 import ElementPlus from 'element-plus'
 
 import GtEntrySyncCapabilityNotice from '../GtEntrySyncCapabilityNotice.vue'
+import { WORKPAPER_SYNC_MANIFEST } from '../workpaperSyncManifest.generated'
 import {
   ENTRY_SYNC_NOTICE_LABEL,
   ENTRY_SYNC_NOTICE_REASON,
@@ -26,23 +27,37 @@ import {
 } from '../workpaperEntrySyncNotice'
 
 /**
- * D 循环**尚未接通**双向回写的 entry。
+ * D 循环**尚未接通**双向回写的 entry —— 从 manifest **现算**，不再手写清单。
  *
- * 🔴 D2 于 2026-09-06 接通（`useD2SyncBridge` + 后端 `/d2-sync/*`），故从本集合移出。
- * 它的判据改由下面「已接通的 entry 不显示警告」那条承担 —— 那条现在读**生产常量**，
- * 不再自己造一个 `registered` 数组，否则常量改了测试也不会红（假绿第③源）。
+ * 🔴 2026-09-22：原来这是个手写数组，里面钉着 `'xlsx/gt-d4-operating-revenue'`。
+ * 而 D4 早已在 manifest 里 `capability=bidirectional`，于是这条守卫**把缺陷写进了判据**
+ * —— 它断言「D4 必须显示两侧数据未互通」，反过来保护了生产侧那个硬编码登记表漏登记
+ * D4/G7/H1 的 bug。用户在 D4-2 上实测撞到红字后才暴露。
+ *
+ * 教训：**判据里的成员清单只要是手写的，就会在事实变化时变成「保护缺陷的判据」**。
+ * 现在两侧分母都从同一真源（generated manifest）现算：
+ *   未接通（capability ≠ bidirectional）⇒ 必须有通知
+ *   已接通（capability === bidirectional）⇒ 必须没有通知
+ * 两侧都非空由下方 `toBeGreaterThan(0)` 锁死，避免退化成空分母重言式。
  */
-const D_CYCLE_NOT_WIRED_ENTRY_IDS = [
-  'xlsx/gt-d1-notes-receivable',
-  'xlsx/gt-d3-prepaid-accounts',
-  'xlsx/gt-d4-operating-revenue',
-  'xlsx/gt-d5-receivables-financing',
-  'xlsx/gt-d6-contract-assets',
-  'xlsx/gt-d7-contract-liabilities',
+const D_CYCLE_ENTRY_PREFIXES = [
+  'xlsx/gt-d1-',
+  'xlsx/gt-d3-',
+  'xlsx/gt-d4-',
+  'xlsx/gt-d5-',
+  'xlsx/gt-d6-',
+  'xlsx/gt-d7-',
 ] as const
+
+const D_CYCLE_NOT_WIRED_ENTRY_IDS: readonly string[] = WORKPAPER_SYNC_MANIFEST.filter(
+  (e) =>
+    e.capability !== 'bidirectional'
+    && D_CYCLE_ENTRY_PREFIXES.some((p) => e.entryId.startsWith(p)),
+).map((e) => e.entryId)
 
 describe('entrySyncNotice — 未注册 adapter 的入口必须给可操作原因（AC 1.4）', () => {
   it('尚未接通的 D 循环 entry 全部拿到非空通知', () => {
+    expect(D_CYCLE_NOT_WIRED_ENTRY_IDS.length, '未接通侧分母不得为空').toBeGreaterThan(0)
     for (const entryId of D_CYCLE_NOT_WIRED_ENTRY_IDS) {
       const notice = entrySyncNotice(entryId)
       expect(notice, entryId).not.toBeNull()
@@ -68,6 +83,30 @@ describe('entrySyncNotice — 未注册 adapter 的入口必须给可操作原�
       'xlsx/gt-d2-accounts-receivable',
     )
     expect(entrySyncNotice('xlsx/gt-d2-accounts-receivable')).toBeNull()
+  })
+
+  it('登记表与 manifest 的 bidirectional 集合逐项一致（禁止第二个真源）', () => {
+    // 🔴 2026-09-22 新增。修的缺陷是「生产侧手写数组只有 D2，漏了 manifest 里同为
+    //    bidirectional 的 D4/G7/H1，于是三个真双向底稿常显『两侧数据未互通』」。
+    //    这条判据直接锁死「登记表 === manifest 现算」，任何一侧再漂移都打红。
+    //    变异反证：把生产侧改回 `['xlsx/gt-d2-accounts-receivable']` 立刻红。
+    const fromManifest = WORKPAPER_SYNC_MANIFEST.filter(
+      (e) => e.capability === 'bidirectional',
+    ).map((e) => e.entryId)
+    expect(fromManifest.length, 'manifest 里必须有 bidirectional entry').toBeGreaterThan(0)
+    expect([...SYNC_ADAPTER_REGISTERED_ENTRY_IDS].sort()).toEqual([...fromManifest].sort())
+  })
+
+  it('D4/G7/H1 这三个真双向 entry 不得再出「两侧数据未互通」', () => {
+    // 用户真栈实测撞到的正是 D4-2（entry xlsx/gt-d4-operating-revenue）。
+    // 这条按 entry_id 逐个点名，即使上面那条一致性判据被人放宽，这三个也不许回退。
+    for (const entryId of [
+      'xlsx/gt-d4-operating-revenue',
+      'xlsx/gt-g7-long-term-equity-main',
+      'xlsx/gt-h1-fixed-assets',
+    ]) {
+      expect(entrySyncNotice(entryId), entryId).toBeNull()
+    }
   })
 
   it('空 entryId 不产生通知（宿主没传 entry 时不挂无主警告）', () => {
@@ -111,9 +150,18 @@ describe('可操作原因的内容判据', () => {
 })
 
 describe('GtEntrySyncCapabilityNotice — DOM 侧判据', () => {
+  /**
+   * DOM 判据的样本 entry 必须**真的未接通**，从 manifest 现算取第一条。
+   *
+   * 🔴 2026-09-22：原来这里写死 `'xlsx/gt-d4-operating-revenue'`，而 D4 已是
+   * `bidirectional` ⇒ 该判据同样在保护缺陷（断言真双向 entry 要渲染「未互通」标签）。
+   */
+  const sampleNotWiredEntryId = D_CYCLE_NOT_WIRED_ENTRY_IDS[0]
+
   it('挂载后真渲染标签、原因与 entry 绑定', () => {
+    expect(sampleNotWiredEntryId, '需要一个真未接通的样本 entry').toBeTruthy()
     const wrapper = mount(GtEntrySyncCapabilityNotice, {
-      props: { entryId: 'xlsx/gt-d4-operating-revenue' },
+      props: { entryId: sampleNotWiredEntryId },
       global: { plugins: [ElementPlus] },
       attachTo: document.body,
     })
@@ -126,7 +174,7 @@ describe('GtEntrySyncCapabilityNotice — DOM 侧判据', () => {
     // entry 绑定真落到属性上 —— 模板漏掉 :data-entry-sync-notice 即红
     const tagged = wrapper.find('[data-entry-sync-notice]')
     expect(tagged.exists()).toBe(true)
-    expect(tagged.attributes('data-entry-sync-notice')).toBe('xlsx/gt-d4-operating-revenue')
+    expect(tagged.attributes('data-entry-sync-notice')).toBe(sampleNotWiredEntryId)
     // 完整原因挂在 tooltip 触发器上（hover 后展开），触发器本身必须存在
     expect(wrapper.find('.entry-sync-notice__summary').exists()).toBe(true)
 

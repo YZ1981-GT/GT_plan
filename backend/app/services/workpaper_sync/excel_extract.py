@@ -83,6 +83,8 @@ identity 列/载体缺失         Table 覆盖数据行却读不到一个 UUID  
 from __future__ import annotations
 
 import ast
+import contextlib
+import contextvars
 import gzip
 import hashlib
 import json
@@ -226,6 +228,7 @@ __all__ = [
     "ExcelExtractOutcome",
     "assert_engine_entry_definitions",
     "extract_projection",
+    "workbook_read_scope",
     "write_projection_sidecar",
     "read_projection_sidecar",
     # verifier
@@ -2413,12 +2416,9 @@ def _read_cell_view(
 
     只读打开，不写任何字节。
     """
-    import openpyxl
-
     wanted = {column_index_from_string(col) for col in columns}
     out: dict[str, Any] = {}
-    wb = openpyxl.load_workbook(path, read_only=True, data_only=data_only)
-    try:
+    with _acquire_read_only_workbook(path, data_only=data_only) as wb:
         if sheet_name not in wb.sheetnames:
             raise IdentityCarrierMissingError(
                 f"受管 sheet {sheet_name!r} 打不开（workbook 里有 {wb.sheetnames}）—— "
@@ -2446,8 +2446,6 @@ def _read_cell_view(
                 if value is None:
                     continue
                 out[f"{get_column_letter(column_index)}{row_number}"] = value
-    finally:
-        wb.close()
     return out
 
 
@@ -2982,6 +2980,88 @@ def _validate_ooxml_cached(path: Path, *, document_type: str, limits: SyncLimits
         _ooxml_cache.clear()
     _ooxml_cache[key] = report
     return report
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# workbook 解析作用域复用（同一 extract 趟内 openpyxl 只解析一次）
+#
+# 上面两个缓存收掉了「N 个 binding = N 次全量解压 + N 次全量哈希」，但**没有**收
+# ``_read_cell_view`` 里的 ``openpyxl.load_workbook``。D4-营业收入实测：39 个 binding ×
+# 2 个视图（data_only True/False）= **78 次全簿解析**，cProfile 累计 60.8s（其中
+# ``apply_stylesheet`` 22.2s）—— 这是 store-projection 首请求 10s 量级的主项。
+# 同一趟 extract 里这 78 次读的是**同一个文件、同一批字节**。
+#
+# 为什么用「作用域」而不是像上面两个那样挂模块级 dict：
+#   * ``load_workbook`` 返回的对象**持有打开的 zip 句柄**。模块级长存 = Windows 上
+#     该文件删不掉（staged 产物 / repaired 临时文件都要 ``unlink``），会把一个性能优化
+#     变成偶发 PermissionError。
+#   * 作用域退出时 ``finally`` 里逐个 ``close()``，句柄生命周期与调用栈严格对齐；
+#     作用域之外行为与优化前**逐字节相同**（照旧 load 完即 close）。
+#   * ``ContextVar`` 而非全局变量：并发请求各自独立（同一进程里多个 asyncio 任务不串）。
+#
+# 只改「解析几次」，不改「解析出什么」：read_only workbook 在 openpyxl 下可跨多次
+# ``iter_rows``、跨 sheet 重复读，结果恒等（已实证）。
+# ═══════════════════════════════════════════════════════════════════════════
+
+_workbook_scope: contextvars.ContextVar[dict[tuple[Any, ...], Any] | None] = (
+    contextvars.ContextVar("workpaper_sync_workbook_scope", default=None)
+)
+
+
+@contextlib.contextmanager
+def workbook_read_scope() -> Iterator[None]:
+    """在本作用域内，同一 ``(文件身份, data_only)`` 的 read_only workbook 只解析一次。
+
+    退出时**无条件**关闭本作用域打开的全部 workbook（含异常路径），因此不会有句柄
+    泄漏到作用域之外。嵌套进入时沿用外层缓存（不重复打开、也不提前关闭）。
+    """
+    if _workbook_scope.get() is not None:
+        # 嵌套：外层已建作用域，直接复用（关闭责任留给最外层）。
+        yield
+        return
+    cache: dict[tuple[Any, ...], Any] = {}
+    token = _workbook_scope.set(cache)
+    try:
+        yield
+    finally:
+        _workbook_scope.reset(token)
+        for workbook in cache.values():
+            try:
+                workbook.close()
+            except Exception:  # noqa: BLE001 - 关闭失败不得掩盖作用域内的真实异常
+                pass
+
+
+@contextlib.contextmanager
+def _acquire_read_only_workbook(path: Path, *, data_only: bool) -> Iterator[Any]:
+    """拿一个 read_only workbook：作用域内共享，作用域外用完即关。"""
+    import openpyxl
+
+    cache = _workbook_scope.get()
+    if cache is None:
+        workbook = openpyxl.load_workbook(path, read_only=True, data_only=data_only)
+        try:
+            yield workbook
+        finally:
+            workbook.close()
+        return
+
+    key = (_file_cache_key(path), bool(data_only))
+    if key[0] is None:
+        # stat 不到（文件不存在等）⇒ 不进缓存，退化成即用即关，交由 openpyxl 抛原生错误。
+        workbook = openpyxl.load_workbook(path, read_only=True, data_only=data_only)
+        try:
+            yield workbook
+        finally:
+            workbook.close()
+        return
+
+    hit = cache.get(key)
+    if hit is None:
+        hit = openpyxl.load_workbook(path, read_only=True, data_only=data_only)
+        cache[key] = hit
+    # 作用域持有者负责 close，这里**不**关。
+    yield hit
 
 
 def _collect_fields(
