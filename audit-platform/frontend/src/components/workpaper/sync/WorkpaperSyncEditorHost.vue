@@ -25,19 +25,35 @@
 -->
 <template>
   <div
-    class="wp-sync-editor-host"
+    ref="rootEl"
+    :class="['wp-sync-editor-host', { 'wp-sync-editor-host--fullscreen': isFullscreen }]"
     data-testid="wp-sync-host"
     :data-bridge-state="bridge.state.value"
     :data-dirty="bridge.dirty.value ? '1' : '0'"
   >
-    <!-- 状态条：文案唯一真源是桥的 feedback（error 优先，Property 48） -->
-    <div
-      class="wp-sync-editor-host__status"
-      :class="`wp-sync-editor-host__status--${feedback.kind}`"
-      data-testid="wp-sync-host-status"
-      :data-kind="feedback.kind"
-    >
-      {{ feedback.message }}
+    <!-- 状态条：文案唯一真源是桥的 feedback（error 优先，Property 48）。
+         全屏按钮独立于状态条 —— 状态条的 `.text` 是既有判据的断言点（AC 11.5/Property 48
+         等一系列用例逐字比较它），混进按钮标签会让那批判据全部打红。 -->
+    <div class="wp-sync-editor-host__status-row">
+      <div
+        class="wp-sync-editor-host__status"
+        :class="`wp-sync-editor-host__status--${feedback.kind}`"
+        data-testid="wp-sync-host-status"
+        :data-kind="feedback.kind"
+      >
+        {{ feedback.message }}
+      </div>
+      <!-- 全屏切换：与 GtOnlyOfficeSheet 同款交互（原生 Fullscreen API + ESC 退出） -->
+      <button
+        v-if="editorLive"
+        type="button"
+        class="wp-sync-editor-host__fullscreen-btn"
+        data-testid="wp-sync-host-fullscreen"
+        :title="isFullscreen ? '退出全屏' : '全屏编辑'"
+        @click="toggleFullscreen"
+      >
+        {{ isFullscreen ? '退出全屏' : '全屏编辑' }}
+      </button>
     </div>
 
     <!-- 宿主侧失败：载入/挂载/保存早于确认。桥的失败已在状态条里，两处互不覆盖 -->
@@ -184,6 +200,50 @@ const containerId = ref('')
 let editorInstance: WorkpaperSyncDocEditorInstance | null = null
 let mountedKey: string | null = null
 let mountSeq = 0
+
+// ── 全屏切换（与 GtOnlyOfficeSheet 同款：浏览器原生 Fullscreen API + CSS fixed 兜底）
+const rootEl = ref<HTMLElement | null>(null)
+const isFullscreen = ref(false)
+
+function handleFullscreenChange(): void {
+  // 用户按 ESC 退出浏览器全屏时同步状态
+  if (!document.fullscreenElement && isFullscreen.value) {
+    isFullscreen.value = false
+    document.removeEventListener('fullscreenchange', handleFullscreenChange)
+  }
+}
+
+function handleEscFullscreen(e: KeyboardEvent): void {
+  if (e.key === 'Escape' && isFullscreen.value) {
+    if (document.fullscreenElement) {
+      document.exitFullscreen().catch(() => {})
+    }
+    isFullscreen.value = false
+    document.removeEventListener('keydown', handleEscFullscreen)
+    document.removeEventListener('fullscreenchange', handleFullscreenChange)
+  }
+}
+
+function toggleFullscreen(): void {
+  if (!isFullscreen.value) {
+    const el = rootEl.value as (HTMLElement & { webkitRequestFullscreen?: () => Promise<void> | void }) | null
+    if (el?.requestFullscreen) {
+      el.requestFullscreen().catch(() => { /* CSS fallback 仍生效 */ })
+    } else if (el?.webkitRequestFullscreen) {
+      el.webkitRequestFullscreen()
+    }
+    isFullscreen.value = true
+    document.addEventListener('keydown', handleEscFullscreen)
+    document.addEventListener('fullscreenchange', handleFullscreenChange)
+  } else {
+    if (document.fullscreenElement) {
+      document.exitFullscreen().catch(() => {})
+    }
+    isFullscreen.value = false
+    document.removeEventListener('keydown', handleEscFullscreen)
+    document.removeEventListener('fullscreenchange', handleFullscreenChange)
+  }
+}
 
 // ── 桥投影（模板不能自动解包 prop 上的 ref，一律经 computed）
 
@@ -529,6 +589,8 @@ function getSyncState(): {
 onBeforeUnmount(() => {
   mountSeq += 1
   destroyEditor()
+  document.removeEventListener('keydown', handleEscFullscreen)
+  document.removeEventListener('fullscreenchange', handleFullscreenChange)
 })
 
 defineExpose({ forceSave, getSyncState })
@@ -542,11 +604,46 @@ defineExpose({ forceSave, getSyncState })
   width: 100%;
   height: 100%;
   min-height: 480px;
+  position: relative;
+}
+
+/* 全屏模式：CSS fixed 兜底（浏览器原生 Fullscreen API 不可用时仍能铺满视口） */
+.wp-sync-editor-host--fullscreen {
+  position: fixed;
+  inset: 0;
+  z-index: 2000;
+  background: #fff;
+  min-height: 100vh;
+  height: 100vh;
+}
+
+.wp-sync-editor-host__status-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
 }
 
 .wp-sync-editor-host__status {
   font-size: 13px;
   color: #606266;
+}
+
+.wp-sync-editor-host__fullscreen-btn {
+  flex-shrink: 0;
+  padding: 4px 12px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: #606266;
+  background: #fff;
+  border: 1px solid #dcdfe6;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.wp-sync-editor-host__fullscreen-btn:hover {
+  color: #4b2d77;
+  border-color: #d8b8ee;
 }
 
 .wp-sync-editor-host__status--error {

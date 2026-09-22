@@ -1631,6 +1631,20 @@ def merge_projection_into_store_rows(
 
     只消费 ``revenue_detail_rows/*`` 键；D4-3 的 ``other_revenue_detail_rows/*`` 由
     :func:`merge_projection_into_d43_store_rows` / :func:`merge_projection_into_all_d4_stores` 处理。
+
+    🔴 幽灵行防护（2026-09-22 用户实测：D4-2 结构化视图第 12-14 行出现只有 rowId /
+    乱码、没有任何客户数据的空行）：Excel Table 在最后一行边界被 Tab/Enter/拖拽扩展时，
+    公式列（period_total=SUM(B:M)）会自动填到新行并缓存出 0 —— 这类值已由上面的
+    ``is_protected`` 挡掉。但如果那一行**恰好**还有一个杂散的 editable 格非空（复制格式
+    带下来的 0、被顶掉的空字符串、误粘贴的一个字符……），这唯一一个字段就会让该 identity
+    通过 shell 创建关卡，而 product 及其余 17 个字段因为从未在 Excel 里写入过内容、
+    根本不会产出 FieldValue，永久停留在初始空值——用户在结构化视图里看到的正是这样
+    「有 rowId、没数据」的行。
+
+    只对**本次新增**的 identity（不在 base_rows 里）加这道门：已存在的行即使被用户清空
+    全部字段也必须原样保留（清空是合法编辑），但一个「从未存在过」的身份要想真正落进
+    HTML store，其 product（该行的业务名称）必须至少有一个非空字符——没有名字的行
+    对审计底稿而言不是数据，是噪音。
     """
     field_to_path = {spec[0]: spec[4] for spec in MANAGED_FIELD_SPECS}
     prefix = f"{ROWS_TABLE_KEY}/"
@@ -1645,6 +1659,7 @@ def merge_projection_into_store_rows(
         by_id[rid] = copied
         order.append(rid)
 
+    pre_existing_ids = set(by_id)
     applied = 0
     visited = 0
     touched_rows: set[str] = set()
@@ -1674,6 +1689,16 @@ def merge_projection_into_store_rows(
             applied += 1
             touched_rows.add(str(rid))
             _ensure_months_list(target)
+
+    # 幽灵行剔除：只挑本次新增且 product 仍为空的 identity，已存在的行永不受影响。
+    ghost_ids = {
+        rid
+        for rid in order
+        if rid not in pre_existing_ids and not str(by_id[rid].get("product") or "").strip()
+    }
+    if ghost_ids:
+        order = [rid for rid in order if rid not in ghost_ids]
+        touched_rows -= ghost_ids
 
     return [by_id[rid] for rid in order], applied, visited, touched_rows
 

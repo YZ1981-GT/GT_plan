@@ -648,8 +648,15 @@ def merge_projection_into_store_rows(
 
     🔴 field_id（snake column_key）→ store json 路径（含 nested 账龄 agingPrior/within1）
     的映射由 MANAGED_FIELD_SPECS 的第 0/4 列给出，两侧不可能各写一份而脱钩。
+
+    🔴 幽灵行防护（D4-2 同源缺陷，2026-09-22 用户实测）：Excel Table 边界被扩展时，
+    若新行只有一个杂散的 editable 格非空（公式列已由 is_protected 挡掉），这一个
+    字段就会让 identity 通过 shell 创建关卡，而 contract_name（该行的业务名称，
+    契约首列）因从未在 Excel 里写入内容、根本不产出 FieldValue，永久停在空值。
+    只对**本次新增**的 identity 加这道门：已存在的行永不受影响（清空是合法编辑）。
     """
     field_to_path = {spec[0]: spec[4] for spec in MANAGED_FIELD_SPECS}
+    name_json_path = MANAGED_FIELD_SPECS[0][4]
     by_id: dict[str, dict[str, Any]] = {}
     order: list[str] = []
     for row in base_rows:
@@ -659,6 +666,7 @@ def merge_projection_into_store_rows(
         by_id[rid] = dict(row)
         order.append(rid)
 
+    pre_existing_ids = set(by_id)
     applied = 0
     visited = 0
     touched_rows: set[str] = set()
@@ -683,6 +691,16 @@ def merge_projection_into_store_rows(
         if _set_json_path(target, json_path, new_val):
             applied += 1
             touched_rows.add(str(rid))
+
+    ghost_ids = {
+        rid
+        for rid in order
+        if rid not in pre_existing_ids
+        and not str(_resolve_json_path(by_id[rid], name_json_path) or "").strip()
+    }
+    if ghost_ids:
+        order = [rid for rid in order if rid not in ghost_ids]
+        touched_rows -= ghost_ids
 
     return [by_id[rid] for rid in order], applied, visited, touched_rows
 
