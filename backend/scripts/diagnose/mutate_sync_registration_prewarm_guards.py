@@ -80,6 +80,25 @@ MUTATIONS: list[tuple[str, Path, str, str]] = [
         "        warmed, skipped = await prewarm_sync_baseline_projections()",
         "        warmed, skipped = (0, 0)  # MUTATED: 不跑第二段",
     ),
+    # 🔴 本轮真栈漏网的形态：延迟 import 写错模块 => 每次启动抛
+    # `cannot import name 'WorkingPaper'` 被「失败不阻塞启动」吞成 WARNING，
+    # 预热静默从不执行。只有源码/AST 判据时它是绿的。
+    (
+        "延迟 import 写错模块（WorkingPaper 挪回 app.models.core）",
+        PREWARM,
+        "    from app.models.workpaper_models import WorkingPaper",
+        "    from app.models.core import WorkingPaper",
+    ),
+    (
+        "第二段不再按 bidirectional 分流（失败也算暖）",
+        PREWARM,
+        "            except Exception:  # noqa: BLE001 - 非 bidirectional / 未注册：本就不预热\n"
+        "                skipped += 1\n"
+        "                continue",
+        "            except Exception:  # noqa: BLE001\n"
+        "                warmed += 1\n"
+        "                continue",
+    ),
 ]
 
 

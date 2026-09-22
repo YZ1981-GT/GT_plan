@@ -83,7 +83,7 @@ async def prewarm_sync_baseline_projections() -> tuple[int, int]:
     （以及后面的 entry）全丢。
     """
     from app.core.database import async_session
-    from app.models.core import WorkingPaper
+    from app.models.workpaper_models import WorkingPaper
     from app.models.workpaper_sync_models import WorkpaperSyncEntryState
     from app.routers.wp_sync_router import (  # noqa: PLC0415 - 同上
         _RegistrationWarmupContext,

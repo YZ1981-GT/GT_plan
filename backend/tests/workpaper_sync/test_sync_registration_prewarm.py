@@ -27,6 +27,7 @@ import ast
 import asyncio
 import inspect
 import textwrap
+import uuid
 
 import pytest
 
@@ -96,6 +97,10 @@ def _install_fakes(monkeypatch, *, counter: list[str]) -> None:
             return (f"{_label}-adapter",)
 
         monkeypatch.setattr(module, "attach_pilot_adapters", attach)
+
+
+UUID_WP = uuid.UUID("b3ab3c46-828f-4f48-950e-aee9bbdc923f")
+UUID_PROJECT = uuid.UUID("0ec33ac9-3de5-4e65-b3bf-f9dccd7b2a49")
 
 
 def _context(registry=None):
@@ -294,6 +299,111 @@ def test_baseline_projection_prewarm_skips_a_failing_entry_instead_of_aborting(
     assert "raise" not in source.split('"""')[-1], (
         "预热里出现 raise —— 会把失败冒泡成启动告警/任务崩溃"
     )
+
+
+def test_every_deferred_import_inside_the_prewarm_actually_resolves() -> None:
+    """🔴 函数体内的延迟 import 必须**真的**能解析到那个名字。
+
+    本轮真栈实测的漏网：`prewarm_sync_baseline_projections` 里写了
+    ``from app.models.core import WorkingPaper``，而 `WorkingPaper` 住在
+    `app.models.workpaper_models`。后果是第二段预热每次启动都抛
+    ``cannot import name 'WorkingPaper'``、被「失败不阻塞启动」如实吞成一条 WARNING，
+    于是**预热看起来接好了、实际从未跑过**（首请求仍 2.5s 而不是 0.12s）。
+
+    为什么原有判据抓不到：那一组是 AST / 源码文本判据（「有没有调用
+    assert_bidirectional_ready」「有没有 LIMIT」），它们只看**写了什么**，
+    看不出「写的这个名字在那个模块里不存在」。延迟 import 又不会在模块导入期报错。
+    本判据把两段预热函数体里的每条 `from X import a, b` 真的 import 一遍。
+    """
+    import importlib
+
+    for func in (
+        prewarm_mod.prewarm_sync_registration_cache,
+        prewarm_mod.prewarm_sync_baseline_projections,
+    ):
+        tree = ast.parse(textwrap.dedent(inspect.getsource(func)))
+        checked = 0
+        for node in ast.walk(tree):
+            if not isinstance(node, ast.ImportFrom) or node.module is None:
+                continue
+            module = importlib.import_module(node.module)
+            for alias in node.names:
+                assert hasattr(module, alias.name), (
+                    f"{func.__name__} 里 `from {node.module} import {alias.name}` "
+                    f"解析不到 —— 延迟 import 不会在模块导入期报错，这条会被"
+                    "「预热失败不阻塞启动」吞成一条 WARNING，预热从此静默不跑"
+                )
+                checked += 1
+        assert checked > 0, f"{func.__name__} 里没扫到任何延迟 import —— 判据恒真"
+
+
+@pytest.mark.asyncio
+async def test_baseline_projection_prewarm_really_runs_and_splits_warmed_from_skipped(
+    monkeypatch,
+) -> None:
+    """真跑第二段：只有源码级判据时，一个写错的 import 就能让它从未执行过。"""
+    calls: list[str] = []
+    _install_fakes(monkeypatch, counter=calls)
+
+    rows = [
+        (UUID_WP, "xlsx/gt-d4-operating-revenue", UUID_PROJECT),
+        (UUID_WP, "xlsx/gt-d3-prepaid-accounts", UUID_PROJECT),  # 非 bidirectional
+        (UUID_WP, "xlsx/gt-g7-long-term-equity-main", UUID_PROJECT),  # projection 抛错
+    ]
+
+    class _Result:
+        def all(self):
+            return rows
+
+    class _FakeSession:
+        async def execute(self, *_args, **_kwargs):
+            return _Result()
+
+    class _FakeSessionCtx:
+        async def __aenter__(self):
+            return _FakeSession()
+
+        async def __aexit__(self, *exc):
+            return False
+
+    class _RegistryWithGate(_FakeRegistry):
+        def assert_bidirectional_ready(self, entry_id: str):
+            if "d3-prepaid" in entry_id:
+                raise RuntimeError("不是 bidirectional")
+            return object()
+
+    monkeypatch.setattr(
+        "app.core.database.async_session", lambda: _FakeSessionCtx(), raising=True
+    )
+    monkeypatch.setattr(
+        "app.services.workpaper_sync.adapters.registry.build_production_registry",
+        lambda **kw: _RegistryWithGate(),
+        raising=True,
+    )
+
+    projected: list[str] = []
+
+    async def fake_projection(*, entry_id, **_kwargs):
+        projected.append(str(entry_id))
+        if "g7" in str(entry_id):
+            raise RuntimeError("这张表算不出来")
+        return {"values": {}}
+
+    monkeypatch.setattr(
+        "app.services.workpaper_sync.store_projection_response"
+        ".compute_store_projection_response",
+        fake_projection,
+        raising=True,
+    )
+
+    warmed, skipped = await prewarm_mod.prewarm_sync_baseline_projections()
+
+    assert projected == [
+        "xlsx/gt-d4-operating-revenue",
+        "xlsx/gt-g7-long-term-equity-main",
+    ], f"非 bidirectional 的 entry 不该被投影，实际投影了 {projected}"
+    assert warmed == 1, f"成功数应为 1（只有 D4 算成功），实际 {warmed}"
+    assert skipped == 2, f"跳过数应为 2（D3 非双向 + G7 抛错），实际 {skipped}"
 
 
 # ═══ 3. 启动接线 ═══
