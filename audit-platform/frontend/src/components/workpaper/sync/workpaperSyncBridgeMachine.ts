@@ -155,6 +155,32 @@ export const WP_BRIDGE_EVENTS = [
   'close_authorization_lost',
   'close_successor_applied',
   'close_no_successor',
+  /**
+   * 未改动的 clean close 完成（AC 4.10 的 clean close，非仲裁路径）。
+   *
+   * 🔴 2026-09-22 补这条边之前，`oo_editing` 的**唯一**自愿出边是 `forcesave_started`
+   * —— 即「想离开 OO 必须先发一次强制保存」。于是用户一个字都没改就点「结构化视图」时：
+   * 冻结 forcesave → Command Service 返回码 4（无改动）→ 落 `forcesave_frozen` →
+   * 界面一条红字「文档没有检测到改动…」，人还留在 OO 里。那不是错误，是**这条路不存在**。
+   *
+   * 判据没有被放宽：本事件只在 `dirty === false` 时可发（`leaveWithoutSaving()` 的门），
+   * 而 `dirty` 正是 `leaveBlockReason` 判「离开会不会丢东西」用的同一个信号 ——
+   * 平台早就用它挡 beforeunload/路由离开，这里只是让「不会丢东西」这一结论
+   * 也能用在「省掉那次必然返回『无改动』的往返」上。
+   *
+   * 🔴 它是**纯本地**转换，`leaveWithoutSaving()` 一个请求都不发。首版在那里发
+   * `POST …/rooms/{id}/close-intents`，真库实测是误用：服务端的 close-intent 不是「我走了」
+   * 而是 **close barrier 仲裁** —— 把 participant 推成 `closing`、选 leader、并提升一条
+   * `kind=close_capture` 写请求。未改动文档的那条 capture 永远等不到 OO 回调：实测 room
+   * `03bbcad8` 停在 `state=close_barrier` / participant `closing` / capture `state=frozen`，
+   * 该 room 此后再也进不去（下次打开 confirm-descriptor 仍 200，紧接着「同步失败，请重试」）。
+   * 而「不发就留活 lease」这个担心本身站不住：真保存后返回 HTML 的现有成功路径同样不释放
+   * participant（实测 `ee4021f6` / `3fc2be85` / `7c235d1a` 全是 room active + participant
+   * active）。真正缺的是一条「participant 主动离开」的服务端路径（`ParticipantState.left`
+   * 在转换表里合法，但全仓没有任何 service/端点会写它）—— 见 spec
+   * `oo-single-pass-materialize-and-room-leave` Requirement 4。
+   */
+  'clean_close_completed',
   'recovery_case_observed',
   'recovery_claim_started',
   'recovery_claim_failed',
@@ -318,6 +344,8 @@ const DETERMINISTIC_EDGES: Readonly<Record<WorkpaperSyncBridgeState, EdgeMap>> =
     },
     oo_editing: {
       forcesave_started: 'forcesave_requesting',
+      // 未改动时的 clean close：直接回 HTML，不走 forcesave（见事件处的说明）。
+      clean_close_completed: 'html_idle',
       close_authorization_lost: 'close_authorization_stale',
       recovery_case_observed: 'recovery_pending',
       sync_failed: 'error',

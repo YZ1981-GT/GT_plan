@@ -614,8 +614,6 @@ class CloseIntentService:
         participant_id: uuid.UUID,
         idempotency_key: str,
         client_edit_epoch: int,
-        adapter_build_digest: str,
-        contributor_snapshot_digest: str,
         contributor_user_ids: Iterable[uuid.UUID | str] = (),
         expected_write_fence_epoch: int | None = None,
         expected_bundle: FrozenBundleIdentity | None = None,
@@ -685,12 +683,7 @@ class CloseIntentService:
                 actor_id=actor_id,
             )
 
-        reconcile = await self.reconcile(
-            scope,
-            room_id=room_id,
-            adapter_build_digest=adapter_build_digest,
-            contributor_snapshot_digest=contributor_snapshot_digest,
-        )
+        reconcile = await self.reconcile(scope, room_id=room_id)
         return CloseIntentOpened(
             intent_id=intent.id,
             intent_sequence=int(intent.intent_sequence),
@@ -787,8 +780,6 @@ class CloseIntentService:
         scope: RoomScope,
         *,
         room_id: uuid.UUID,
-        adapter_build_digest: str,
-        contributor_snapshot_digest: str,
     ) -> CloseReconcileServiceOutcome:
         """可重入 reconcile（AC 4.10）。快照与仲裁在**同一个 room lock** 内。
 
@@ -810,8 +801,6 @@ class CloseIntentService:
             wp_id=scope.wp_id,
             entry_id=scope.entry_id,
             room_id=room_id,
-            adapter_build_digest=adapter_build_digest,
-            contributor_snapshot_digest=contributor_snapshot_digest,
         )
         assert_leader_matches_prediction(
             prediction=prediction,

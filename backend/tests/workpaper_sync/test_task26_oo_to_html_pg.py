@@ -415,7 +415,6 @@ async def _collect() -> dict[str, Any]:  # noqa: C901, PLR0912, PLR0915 - 一次
         CloseIntentState,
         ParticipantMode,
         RequestKind,
-        compute_contributor_snapshot_digest,
     )
     from app.services.workpaper_sync.repository import WorkpaperSyncRepository
     from app.services.workpaper_sync.request_application import RequestApplicationService
@@ -2108,9 +2107,6 @@ async def _collect() -> dict[str, Any]:  # noqa: C901, PLR0912, PLR0915 - 一次
                 tag, {PERIOD: "2024", TOTAL: Decimal("100")}
             )
             env = await _build_room(entry)
-            expected_contributors = compute_contributor_snapshot_digest(
-                room_id=env["room"], generation=1, contributor_user_ids=[str(user_a)]
-            )
             async with Session() as s:
                 repo = WorkpaperSyncRepository(s)
                 intent = await repo.create_close_intent(
@@ -2121,8 +2117,6 @@ async def _collect() -> dict[str, Any]:  # noqa: C901, PLR0912, PLR0915 - 一次
                 reconciled = await repo.reconcile_close_intents(
                     project_id=project, wp_id=entry["wp"], entry_id=ENTRY,
                     room_id=env["room"],
-                    adapter_build_digest=_d("task26-adapter"),
-                    contributor_snapshot_digest=expected_contributors,
                 )
                 await s.commit()
             if reconciled.promoted_request_id is None:

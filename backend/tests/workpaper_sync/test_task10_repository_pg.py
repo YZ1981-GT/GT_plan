@@ -1347,8 +1347,6 @@ async def _collect() -> dict[str, Any]:  # noqa: C901 - 单次采集覆盖全部
                 wp_id=wp,
                 entry_id=ENTRY,
                 room_id=room_id,
-                adapter_build_digest=adapter_digest,
-                contributor_snapshot_digest=contrib_digest,
             )
 
         async def _single_close(s, repo, ctx):

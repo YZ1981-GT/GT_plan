@@ -982,6 +982,10 @@ async def _attach_launch_urls(
             ),
         ),
         secret=secret,
+        # 同一个 target_sheet 走两条腿：签进 contents token（DS 下载时的 activeTab 字节）
+        # 与进 config 的 actionLink（客户端每次打开都执行的定位）。DS 命中缓存时只有后者
+        # 还在起作用 —— 两条腿缺一，「复用 generation 再打开」就会停在上一张 sheet。
+        target_sheet=target_sheet,
     )
     return out
 
@@ -1398,8 +1402,11 @@ async def create_close_intent(
             participant_id=participant_id,
             idempotency_key=str(idempotency_key),
             client_edit_epoch=int(payload.get("client_edit_epoch") or 0),
-            adapter_build_digest=str(payload.get("adapter_build_digest") or ""),
-            contributor_snapshot_digest=str(payload.get("contributor_snapshot_digest") or ""),
+            # 🔴 **不从 body 取** adapter_build_digest / contributor_snapshot_digest：
+            # 两者都是服务端事实（representation 的代码身份、room 的 contributor 快照），
+            # 客户端拿不到 —— 曾经的 `str(payload.get(...) or "")` 让每一次真实 clean close
+            # 都带着空 digest 进 fingerprint，稳定 422 `invalid_identity`。派生点在
+            # `reconcile_close_intents()` 的 room lock 内。
             contributor_user_ids=tuple(payload.get("contributor_user_ids") or ()),
             expected_write_fence_epoch=_int_or_none(payload.get("expected_write_fence_epoch")),
             created_by=scope.user_id,

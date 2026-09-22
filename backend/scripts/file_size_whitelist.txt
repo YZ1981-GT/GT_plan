@@ -246,7 +246,15 @@ backend/app/services/workpaper_sync/projection_provisioning.py  1249
 #     +14 行（collect_workbook_structure 的 fingerprint/sync_pairs 共享：1 次预读 + 透传 + 根因注释），
 #     用于消除「每 anchor 重算全簿指纹」致 D4 entry materialize 138.7s 超 120s 生产软上限。→ 1426。
 backend/app/services/workpaper_sync/published_identity_observer.py  1500
-backend/app/services/workpaper_sync/repository.py  3124
+#   repository.py —— 基线 3124 早已 stale（本次改动前 HEAD 实测 3264，那 140 行欠账**非本次
+#     造成**）。2026-09-22 spec oo-single-pass-materialize-and-room-leave 的前置修复 +45 行：
+#     `_frozen_base_adapter_build_digest()`（close-capture 的代码身份从 leader confirmation 的
+#     representation 派生）+ contributor 空集口径的两条理由注释。修的是「close-intent 端点把
+#     两个服务端 digest 从请求体读 ⇒ 每次真实 clean close 都 422 invalid_identity」。
+#     → 3309。**拆分方向**：`reconcile_close_intents()` 那一段（close barrier 仲裁，约 300 行）
+#     与 forcesave/application 的原子写无共享状态，可整段搬去 `close_barrier_repository.py`；
+#     搬之前需先把 `_OPEN_CAPTURE_STATES` 与 V151 partial unique 的双向锁死判据一起带走。
+backend/app/services/workpaper_sync/repository.py  3309
 backend/app/services/workpaper_sync/request_application.py  1181
 backend/app/services/workpaper_sync/rooms.py  2119
 backend/app/services/workpaper_sync/timeline.py  911

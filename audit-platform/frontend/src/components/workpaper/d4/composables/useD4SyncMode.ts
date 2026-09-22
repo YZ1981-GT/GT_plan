@@ -206,6 +206,14 @@ export function useD4SyncMode(options: UseD4SyncModeOptions) {
       syncSwitching.value = true
       try {
         if (String(syncBridge.state.value) === 'applied') await syncBridge.reloadAfterApplied()
+        // 🔴 一个字都没改就点「结构化视图」⇒ clean close 直接回表单，**不**发强制保存。
+        //    改这一处之前，这条最常见的路径必然走到：冻结 forcesave → Command Service
+        //    返回码 4（无改动）→ `forcesave_frozen` → 界面一条红字「文档没有检测到改动…」，
+        //    而人还留在 OO 里（真栈实测形态）。那不是错误，是「未改动直接返回」这条路
+        //    以前不存在。
+        //    `dirty` 为真时**不走**这条：桥里 `leaveWithoutSaving()` 会 refuse，
+        //    这里也显式留给下面的 `switchToHtml()` 真保存 —— 绝不静默丢弃编辑。
+        else if (!syncBridge.dirty.value) await syncBridge.leaveWithoutSaving()
         else await syncBridge.switchToHtml()
       } catch { /* 已记入 lastError，见上 switchToOnlyOffice 分支同款说明 */ }
       finally { syncSwitching.value = false }

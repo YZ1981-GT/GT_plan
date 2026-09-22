@@ -159,3 +159,86 @@ def test_digest_is_stable_across_repeated_calls() -> None:
     first = _digest(1234.5)
     for _ in range(5):
         assert _digest(1234.5) == first
+
+
+# ═══ 4. 全 value_type 必须能走完整条 canonical 路径（2026-09-22 真栈 500） ═══
+#
+# 上面三节只喂了 amount / integer / text / boolean —— 于是 `value_type=json` 这一支
+# 从未被驱动，而它的比较键是 `canonical_json_bytes({"v": value})`（**bytes**）。
+# 把比较键当 payload 值放进去，`_projection_payload()` 的产物整份过
+# `canonical_json_bytes()` 时抛 `TypeError: Object of type bytes is not JSON
+# serializable` ⇒ `POST …/pending-mutations` **500**，D4 连「在线编辑」都进不去
+# （真栈：2026-09-22 restart 后首次真实 flush 即崩，而单测全绿）。
+#
+# 判据按**枚举全集**写而不是补一个 json 用例：ValueType 将来加成员时，漏测的那一支
+# 会立刻在这里红，而不是等一次真实 flush 500。
+
+
+@pytest.mark.parametrize(
+    "value_type,value",
+    [
+        (ValueType.amount, 12.5),
+        (ValueType.integer, 7),
+        (ValueType.text, "文本"),
+        (ValueType.boolean, True),
+        (ValueType.date, "2026-09-22"),
+        (ValueType.datetime, "2026-09-22T10:11:12"),
+        (ValueType.enum, "option_a"),
+        (ValueType.json, {"b": 2, "a": [1, {"c": 3}]}),
+        (ValueType.rate, "0.0325"),
+        (ValueType.ratio, "0.6180"),
+    ],
+    ids=lambda v: getattr(v, "value", str(v))[:18],
+)
+def test_every_value_type_survives_the_full_canonical_path(
+    value_type: ValueType, value: object
+) -> None:
+    """每一种 value_type 都必须能被 `canonical_json_bytes` 序列化，且两次同字节。"""
+    payload = _projection_payload(_projection(value, value_type))
+    first = canonical_json_bytes(payload)
+    assert isinstance(first, bytes) and first
+    assert first == canonical_json_bytes(
+        _projection_payload(_projection(value, value_type))
+    ), f"{value_type.value} 的 canonical 字节不稳定 —— 幂等复用会随机失效"
+
+
+def test_no_value_type_is_left_untested_by_the_full_path_matrix() -> None:
+    """反向自检：上面的矩阵必须覆盖 `ValueType` 的**全部**成员。
+
+    没有这条，新增一个 value_type 时矩阵会静默漏掉它 —— 而漏掉的那一支正是本节在修的
+    那种「单测全绿、真实 flush 500」。
+    """
+    covered = {
+        ValueType.amount,
+        ValueType.integer,
+        ValueType.text,
+        ValueType.boolean,
+        ValueType.date,
+        ValueType.datetime,
+        ValueType.enum,
+        ValueType.json,
+        ValueType.rate,
+        ValueType.ratio,
+    }
+    missing = sorted(m.value for m in ValueType if m not in covered)
+    assert missing == [], f"这些 value_type 没进 canonical 路径矩阵：{missing}"
+
+
+def test_canonical_value_for_digest_never_returns_bytes() -> None:
+    """单点判据：任何 value_type 都不得让**比较键**（bytes）泄进 payload。
+
+    与上面的端到端矩阵不重复：那条测「整份能序列化」，这条钉住「泄漏形态」本身，
+    于是错误信息直接指向 `canonical_value_for_digest` 而不是一句 json.dumps 的 TypeError。
+    """
+    for value_type, value in (
+        (ValueType.json, {"a": 1}),
+        (ValueType.json, [1, 2, 3]),
+        (ValueType.json, "already-a-string"),
+        (ValueType.text, "文本"),
+        (ValueType.amount, "1.50"),
+    ):
+        got = canonical_value_for_digest(_field(value, value_type))
+        assert not isinstance(got, (bytes, bytearray)), (
+            f"{value_type.value} 的规范表示是 {type(got).__name__} —— "
+            "比较键不是 payload 值（见 projection_digest_value 模块 docstring）"
+        )

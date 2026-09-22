@@ -1131,8 +1131,6 @@ async def _collect() -> dict[str, Any]:  # noqa: C901, PLR0912, PLR0915 - 一次
                     participant_id=ctx["participants"][user],
                     idempotency_key=f"close-{tag}-{user}",
                     client_edit_epoch=3,
-                    adapter_build_digest=adapter_digest,
-                    contributor_snapshot_digest=contrib_digest,
                     contributor_user_ids=[ids[user]],
                     created_by=ids[user],
                     actor_id=ids[user],
@@ -1155,12 +1153,7 @@ async def _collect() -> dict[str, Any]:  # noqa: C901, PLR0912, PLR0915 - 一次
         async def _reconcile(ctx: dict[str, Any]) -> dict[str, Any]:
             async with Session() as s:
                 _r, _rm, _ras, svc = _wire(s)
-                out = await svc.reconcile(
-                    scope,
-                    room_id=ctx["room_id"],
-                    adapter_build_digest=adapter_digest,
-                    contributor_snapshot_digest=contrib_digest,
-                )
+                out = await svc.reconcile(scope, room_id=ctx["room_id"])
                 rec = {
                     "leader_intent_id": _opt(out.leader_intent_id),
                     "capture_created": bool(out.capture_created),

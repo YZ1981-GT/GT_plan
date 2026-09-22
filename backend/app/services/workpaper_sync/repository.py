@@ -107,6 +107,7 @@ from app.services.workpaper_sync.models import (
     assert_transition,
     classify_operation_shape,
     compute_application_key,
+    compute_contributor_snapshot_digest,
     compute_eligibility_digest,
     compute_frozen_request_fingerprint,
     fold_effective_sequence,
@@ -2586,6 +2587,36 @@ class WorkpaperSyncRepository:
         )
         return intent
 
+    async def _frozen_base_adapter_build_digest(
+        self, confirmation: WorkpaperOoClientConfirmation
+    ) -> str:
+        """close-capture 冻结的代码身份 = 它冻结为 base 的那份 representation 的 adapter build。
+
+        与 `RoomService.build_request_freeze` / `_frozen_adapter_of_confirmation`（recovery
+        claim 侧）是**同一条规则**：base 是谁，代码身份就是谁的。这里的 base 就是下面
+        `compute_frozen_request_fingerprint(client_base_representation_id=...)` 用的那一行，
+        故两者恒自洽。取不到 / 非法一律显式抛 —— 填 `""` 或全零等于把「身份未知」伪装成
+        合法身份，而 fingerprint 是 idempotency cache hit 的唯一判据（Requirement 2.3）。
+        """
+        digest = (
+            await self._session.execute(
+                sa.select(WorkpaperContentRepresentation.adapter_build_digest).where(
+                    WorkpaperContentRepresentation.id == confirmation.representation_id
+                )
+            )
+        ).scalar_one_or_none()
+        if digest is None:
+            raise IdentityError(
+                "close-capture 无法冻结代码身份：client confirmation 的 representation "
+                f"{confirmation.representation_id} 不存在"
+            )
+        if not is_digest(str(digest)):
+            raise IdentityError(
+                "close-capture 无法冻结代码身份：representation "
+                f"{confirmation.representation_id} 的 adapter_build_digest 非法，实得 {digest!r}"
+            )
+        return str(digest).strip()
+
     async def reconcile_close_intents(
         self,
         *,
@@ -2593,10 +2624,19 @@ class WorkpaperSyncRepository:
         wp_id: uuid.UUID,
         entry_id: str,
         room_id: uuid.UUID,
-        adapter_build_digest: str,
-        contributor_snapshot_digest: str,
     ) -> CloseReconcileOutcome:
         """幂等 reconciler：在 room lock 下决定 leader / successor / no-successor 终态。
+
+        🔴 **不收** `adapter_build_digest` / `contributor_snapshot_digest`：promotion 冻结的
+        是服务端事实，客户端无从得知（confirm-descriptor 的响应里就没有 adapter build
+        digest），于是「让调用方传」在真实链路上只有一个结果 —— HTTP 层把缺失补成 `""`，
+        `compute_frozen_request_fingerprint()` 拒绝空 digest，**每一次真实 clean close 都
+        422 `invalid_identity`**。两项都由本方法在锁内派生：
+
+        * `adapter_build_digest` ← 本次冻结为 base 的那一份 representation
+          （与 :meth:`RoomService.build_request_freeze` 同一条规则：base 是谁，代码身份就是谁的）；
+        * `contributor_snapshot_digest` ← 空 contributor 集合（见 promotion 处的注释：
+          幂等键要求它只由 `(room, generation)` 决定）。
 
         规则（Requirement 4.10 / Property 63）：
 
@@ -2844,6 +2884,26 @@ class WorkpaperSyncRepository:
         ).scalar_one()
         bundle = await self.assert_bundle_usable(confirmation.definition_bundle_id)
         participant = participants[leader.participant_id]
+        adapter_build_digest = await self._frozen_base_adapter_build_digest(confirmation)
+        contributor_snapshot_digest = compute_contributor_snapshot_digest(
+            room_id=room_id,
+            generation=int(room.generation),
+            # 🔴 close-capture 的 contributor set 取**空集**，且不得来自任何调用方。两条理由：
+            #
+            # 1. **幂等**：promotion 的幂等键是 `close-capture:{room}:{gen}:{epoch}`，cache hit
+            #    要求 fingerprint 逐项等值。contributor 集合随调用方变化（两个用户先后关闭各带
+            #    自己的 ids）⇒ 同一把幂等键两个 fingerprint ⇒ 重入的 reconcile 必然 409。
+            #    空集是唯一「只由 (room, generation) 决定」的取值。
+            # 2. **最终 fence 等值**：`_recompute_contributor_digest()`（AC 10.10 第 8 条）拿
+            #    `working_paper_sync_operation_contributor` 的 live 行重算并与冻结值比对。那批行
+            #    由 `record_contributor_snapshot()` 写，而它在生产链路上**零调用方** ⇒ 观测侧恒
+            #    为空集 digest；普通 forcesave 同理（前端不送 contributor ids）。
+            #
+            # ⚠️ 改成「room 现存 edit participant 集合」前必须先接上
+            # `record_contributor_snapshot()`：否则冻结非空、观测为空，每次 clean close 都会在
+            # 最终 fence 被拒 —— 比这条 422 更晚、更难查。
+            contributor_user_ids=(),
+        )
         fingerprint = compute_frozen_request_fingerprint(
             client_confirmation_id=confirmation.id,
             client_base_version_id=confirmation.content_version_id,

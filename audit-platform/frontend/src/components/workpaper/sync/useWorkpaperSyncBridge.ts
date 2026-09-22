@@ -317,6 +317,8 @@ export interface WorkpaperSyncApiSurface {
   materialize: typeof syncApi.materialize
   confirmDescriptor: typeof syncApi.confirmDescriptor
   requestForcesave: typeof syncApi.requestForcesave
+  /** clean close（未改动直接离开 OO）的唯一入口。见 `leaveWithoutSaving()`。 */
+  createCloseIntent: typeof syncApi.createCloseIntent
   getOperation: typeof syncApi.getOperation
   getOperationConflicts: typeof syncApi.getOperationConflicts
   getOperationTimeline: typeof syncApi.getOperationTimeline
@@ -335,6 +337,7 @@ const DEFAULT_API: WorkpaperSyncApiSurface = {
   materialize: syncApi.materialize,
   confirmDescriptor: syncApi.confirmDescriptor,
   requestForcesave: syncApi.requestForcesave,
+  createCloseIntent: syncApi.createCloseIntent,
   getOperation: syncApi.getOperation,
   getOperationConflicts: syncApi.getOperationConflicts,
   getOperationTimeline: syncApi.getOperationTimeline,
@@ -1335,6 +1338,34 @@ export function useWorkpaperSyncBridge(options: WorkpaperSyncBridgeOptions) {
     },
   )
 
+  /**
+   * 未改动时离开 OnlyOffice，**不**走强制保存（用户点「结构化视图」的常态路径）。
+   *
+   * 三条安全前提（`dirty` 硬门 / in-flight 一律 refuse / 本地转换不发 HTTP）与它们各自的
+   * 真栈证据，写在 `workpaperSyncBridgeMachine.ts` 的 `clean_close_completed` 边上 ——
+   * 那里是这条边语义的单源；另见 `__tests__/cleanCloseWithoutSaving.spec.ts` 文件头。
+   */
+  async function leaveWithoutSaving(): Promise<void> {
+    if (mode.value !== 'oo') return
+    // 🔴 **一道门**：`canLeave` 已含 dirty 与 in-flight 两种阻断（`leaveBlockReason` 是这两条
+    // 理由的单源）。首版在它前面另写了一次 `if (dirty)`，变异检验实测那是冗余（去掉照样绿）。
+    // 两个 error_code 仍可分辨，前端据此决定提示「先保存」还是「稍等」。
+    if (!canLeave.value) {
+      refuse(
+        dirty.value
+          ? 'bridge_clean_close_with_dirty_editor'
+          : 'bridge_clean_close_while_in_flight',
+        `${leaveBlockReason.value} —— clean close 不得丢弃编辑或打断进行中的同步`,
+      )
+    }
+    apply('clean_close_completed')
+    descriptor.value = null
+    confirmation.value = null
+    requestedOperationId.value = null
+    pendingMutationToken.value = null
+    dirty.value = false
+  }
+
   function reset(): void {
     apply('reset')
     lastError.value = null
@@ -1415,6 +1446,7 @@ export function useWorkpaperSyncBridge(options: WorkpaperSyncBridgeOptions) {
     canForcesave,
     canLeave,
     leaveBlockReason,
+    leaveWithoutSaving,
     feedback,
     modeStorageKey,
     beforeUnloadInstalled: readonly(beforeUnloadInstalled),

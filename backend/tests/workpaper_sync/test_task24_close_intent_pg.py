@@ -285,7 +285,6 @@ async def _collect() -> dict[str, Any]:  # noqa: C901 - 单次采集覆盖全部
         scope = RoomScope(project_id=project_id, wp_id=wp_id, entry_id=ENTRY)
         base_path = f"storage/{project_id}/workpapers"
         adapter_digest = _d("adapter-build-task24")
-        contrib_digest = _d("contributors-task24")
 
         # ═══ 世界：definitions / bundle / representation（一次）═════════════
         async def _build_world(repo: WorkpaperSyncRepository) -> dict[str, Any]:
@@ -551,8 +550,6 @@ async def _collect() -> dict[str, Any]:  # noqa: C901 - 单次采集覆盖全部
                     participant_id=ctx["participants"][user],
                     idempotency_key=f"close-{tag}-{user}",
                     client_edit_epoch=3,
-                    adapter_build_digest=adapter_digest,
-                    contributor_snapshot_digest=contrib_digest,
                     contributor_user_ids=[ids[user]],
                     created_by=ids[user],
                     actor_id=ids[user],
@@ -599,12 +596,7 @@ async def _collect() -> dict[str, Any]:  # noqa: C901 - 单次采集覆盖全部
         async def _do_reconcile(ctx: dict[str, Any]) -> dict[str, Any]:
             async with Session() as s:
                 _repo, _rooms, svc = _wire(s)
-                out = await svc.reconcile(
-                    scope,
-                    room_id=ctx["room_id"],
-                    adapter_build_digest=adapter_digest,
-                    contributor_snapshot_digest=contrib_digest,
-                )
+                out = await svc.reconcile(scope, room_id=ctx["room_id"])
                 rec = {
                     "leader_intent_id": out.leader_intent_id,
                     "capture_created": out.capture_created,
@@ -1325,8 +1317,6 @@ async def _collect() -> dict[str, Any]:  # noqa: C901 - 单次采集覆盖全部
                             participant_id=race_ctx["participants"][user],
                             idempotency_key=f"race-{user}",
                             client_edit_epoch=3,
-                            adapter_build_digest=adapter_digest,
-                            contributor_snapshot_digest=contrib_digest,
                             contributor_user_ids=[ids[user]],
                             created_by=ids[user],
                             actor_id=ids[user],

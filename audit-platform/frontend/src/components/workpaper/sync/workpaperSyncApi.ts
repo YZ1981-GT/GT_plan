@@ -471,14 +471,21 @@ export interface CreateCloseIntentInput {
   readonly roomId: string
   readonly participantId: string
   readonly clientEditEpoch?: number
-  readonly adapterBuildDigest?: string
-  readonly contributorSnapshotDigest?: string
   readonly contributorUserIds?: readonly string[]
   readonly expectedWriteFenceEpoch?: number
   readonly idempotencyKey?: string
 }
 
-/** clean close 的唯一入口；leader 仲裁与 exactly-one close-capture 在服务端。 */
+/**
+ * clean close 的唯一入口；leader 仲裁与 exactly-one close-capture 在服务端。
+ *
+ * 🔴 刻意**不带** `adapter_build_digest` / `contributor_snapshot_digest`：它们是服务端
+ * 事实（representation 的代码身份、room 的 contributor 快照），`confirm-descriptor` 的
+ * 响应里根本没有 adapter build digest，客户端无从得知。曾经这两个键以 `?? ''` 兜底送出，
+ * 服务端把空串塞进 frozen fingerprint ⇒ 每一次真实 clean close 都 422 `invalid_identity`
+ * （红字「adapter_build_digest 必须是非空 64 位小写 hex 且非全零 digest，实得 ''」）。
+ * 把它们留在入参里等于留一个「填了也只能填错」的洞。
+ */
 export async function createCloseIntent(
   scope: WorkpaperSyncEntryScope,
   input: CreateCloseIntentInput,
@@ -491,8 +498,6 @@ export async function createCloseIntent(
     body: {
       participant_id: input.participantId,
       client_edit_epoch: input.clientEditEpoch ?? 0,
-      adapter_build_digest: input.adapterBuildDigest ?? '',
-      contributor_snapshot_digest: input.contributorSnapshotDigest ?? '',
       contributor_user_ids: [...(input.contributorUserIds ?? [])],
       expected_write_fence_epoch: input.expectedWriteFenceEpoch ?? null,
     },

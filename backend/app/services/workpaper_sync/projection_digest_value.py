@@ -62,6 +62,17 @@ def canonical_value_for_digest(field: Any) -> Any:
         return json_safe(field.value)
     if normalized is MISSING:
         return json_safe(field.value)
+    if isinstance(normalized, bytes):
+        # 🔴 `value_type=json` 的比较键是 `canonical_json_bytes({"v": value})` —— **字节**。
+        # 它是 merge 用来判等的键，不是可以放进 payload 的值：`_projection_payload()` 的
+        # 产物整份要过 `canonical_json_bytes()`，里面出现 bytes 会
+        # `TypeError: Object of type bytes is not JSON serializable`，于是**整条 flush
+        # 500**（真栈：`POST …/pending-mutations` 500，D4 连「在线编辑」都进不去）。
+        #
+        # 回退原值即已足够：json 族本来就不存在本模块要修的那个毛病（`0` vs `0.0`），
+        # 而 `json_safe` 对 Mapping 递归按键排序、`canonical_json_bytes` 再 `sort_keys`，
+        # 同一份 json 值两次序列化本来就同字节。
+        return json_safe(field.value)
     if isinstance(normalized, Decimal):
         if normalized == 0:
             # `Decimal('-0')` / `Decimal('0E+1')` 也要归一到同一个零。
