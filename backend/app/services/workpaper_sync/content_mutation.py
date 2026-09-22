@@ -1582,17 +1582,23 @@ class ContentMutationService:
         # 纯 CPU 段卸载到工作线程：事件循环可继续服务其他请求（Requirement 2.1）。
         # fence / artifact publish 仍留在事件循环侧（可能碰 DB / async IO）。
         started = time.perf_counter()
-        materialized, extracted, unmanaged, _cpu_structure_hash = await asyncio.to_thread(
+        # 🔴 2026-09-22：这一段此前把 structure_hash **算了两遍** —— 线程内算完返回，
+        # 调用侧解包成 `_cpu_structure_hash` 后从未使用，又在**事件循环上**对同一份
+        # output 重算一次。两遍都是整簿解析（D4 实测单次约 1.4s），而且事件循环上那一遍
+        # 恰好违背 spec workpaper-sync-materialize-large-table-performance Task 5 的
+        # 卸载意图（该任务明文把 `_projection_structure_hash` 划进 CPU 段）。
+        #
+        # 现在只保留线程内那一份：它在 CPU 段**末尾**计算，此时 `adapter.materialize`
+        # 已完成全部写入（含转置 sheet 覆盖），读的就是最终 output 字节 ——
+        # 「提交值必须来自最终 output」这条约束一字未松，只是不再白算第二遍。
+        # （published structure_hash 与 artifact 的一致性由
+        #  `test_g1_publish_structure_hash.py` 独立守护。）
+        materialized, extracted, unmanaged, structure_hash = await asyncio.to_thread(
             self._stage_cpu_segment,
             plan=plan,
             projection=projection,
             adapter=adapter,
             output=output,
-        )
-        # 在编排入口显式调用统一发布时刻公式；CPU 段的预计算仅用于线程内校验，
-        # 提交值必须来自最终 output，避免 BP-30 接线退化成间接死代码。
-        structure_hash = self._projection_structure_hash(
-            plan=plan, output=output, materialized=materialized
         )
         elapsed = time.perf_counter() - started
         soft_limit = float(load_limits().materialize_soft_limit_seconds)
@@ -1659,7 +1665,28 @@ class ContentMutationService:
 
         🔴 **不得**持有或操作 DB 会话（Property 4 / Requirement 2.2）：本方法跑在
         ``asyncio.to_thread`` 工作线程里，任何会话绑定都是隔离破坏。
+
+        🔴 三个阶段共用**一个** workbook 读作用域：materialize 读 substrate 链、
+        extract 读 output、verify 读 before+after，其中 substrate 与 output 会被反复
+        解析。D4-营业收入实测 `openpyxl.load_workbook` 90 次累计 40.3s。作用域让同一
+        文件（按 mtime/size 定身份）只解析一次，退出时关闭全部句柄。
         """
+        from app.services.workpaper_sync.excel_extract import workbook_read_scope
+
+        with workbook_read_scope():
+            return self._stage_cpu_segment_scoped(
+                plan=plan, projection=projection, adapter=adapter, output=output
+            )
+
+    def _stage_cpu_segment_scoped(
+        self,
+        *,
+        plan: ContentCommitPlan,
+        projection: Projection,
+        adapter: Any,
+        output: Path,
+    ) -> tuple[Any, Any, Any, str]:
+        """:meth:`_stage_cpu_segment` 的本体（拆出只为让作用域包住整段，判据不变）。"""
         materialized = adapter.materialize(
             substrate=plan.substrate_path,
             projection=projection,
@@ -2187,6 +2214,10 @@ class ContentMutationService:
 #: 因此既有 projection artifact / event payload 的 digest 一个都不变。
 _json_safe = json_safe
 
+from app.services.workpaper_sync.projection_digest_value import (  # noqa: E402
+    canonical_value_for_digest,
+)
+
 
 def projection_canonical_digest(projection: Projection) -> str:
     """projection 的 canonical digest —— 与落盘 projection artifact **同一口径**。
@@ -2196,7 +2227,6 @@ def projection_canonical_digest(projection: Projection) -> str:
     的 sha256，而 `working_paper_content_application.merged_projection_sha256` 必须与它
     逐字节相同（AC 8.12 要求 applied content version 同时绑定 merged projection hash 与
     result representation identity；两个 hash 出自两套序列化就等于没绑定）。
-
     因此本函数**只是**把那条链路的前两步提出来复用，绝不新写一份 payload 形态。
     PG 守卫 `test_application_merged_digest_equals_published_projection_artifact`
     正面比对这两个值。
@@ -2220,7 +2250,9 @@ def _projection_payload(projection: Projection) -> dict[str, Any]:
         "document_type": projection.document_type,
         "values": {
             key: {
-                "value": _json_safe(value.value),
+                # 值表示口径住 `projection_digest_value`（与 canonical_json_bytes 同层）：
+                # 裸 int/float 不归一会让「内容未改」判不出来 ⇒ AC 3.6 幂等复用失效。
+                "value": canonical_value_for_digest(value),
                 "value_type": value.value_type.value,
                 "mode": value.mode.value,
                 "row_key": value.row_key,

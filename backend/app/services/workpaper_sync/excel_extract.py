@@ -229,6 +229,7 @@ __all__ = [
     "assert_engine_entry_definitions",
     "extract_projection",
     "workbook_read_scope",
+    "release_scoped_workbooks",
     "write_projection_sidecar",
     "read_projection_sidecar",
     # verifier
@@ -3030,6 +3031,31 @@ def workbook_read_scope() -> Iterator[None]:
                 workbook.close()
             except Exception:  # noqa: BLE001 - 关闭失败不得掩盖作用域内的真实异常
                 pass
+
+
+def release_scoped_workbooks(path: Path) -> None:
+    """关闭并移出作用域内针对 ``path`` 的全部缓存 workbook。**删该文件之前必须调。**
+
+    🔴 materialize 会造一串临时文件（多趟写的链式中间产物 / `repaired` /
+    `g7-noif`），写完就 ``unlink``。这些文件在趟与趟之间会被读（因此会进作用域缓存），
+    而缓存持有打开的 zip 句柄 ⇒ Windows 上 ``unlink`` 抛 PermissionError。
+    所以「谁删文件，谁先释放句柄」是这条优化的**前置条件**，不是可选的清理动作。
+
+    作用域外调用是安全的空操作（那时本就即用即关）。
+    """
+    cache = _workbook_scope.get()
+    if not cache:
+        return
+    try:
+        target = str(path.resolve())
+    except OSError:
+        return
+    for key in [k for k in cache if isinstance(k[0], tuple) and k[0][0] == target]:
+        workbook = cache.pop(key)
+        try:
+            workbook.close()
+        except Exception:  # noqa: BLE001 - 关闭失败不得阻塞删除
+            pass
 
 
 @contextlib.contextmanager

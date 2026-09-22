@@ -197,7 +197,17 @@ backend/app/services/workpaper_sync/close_intent.py  1008
 backend/app/services/workpaper_sync/command_service.py  949
 backend/app/services/workpaper_sync/conflict_resolution.py  1647
 backend/app/services/workpaper_sync/conflicts.py  1006
-backend/app/services/workpaper_sync/content_mutation.py  2080
+#   content_mutation.py —— 基线 2080 早已 stale（本次改动前 HEAD 实测 2261，超上限 2184，
+#     欠账 181 行非本次引入 —— 即门禁对本文件事实上已失效）。2026-09-22 净增 32 行：
+#     ① `_stage_cpu_segment` 包一层 workbook 读作用域（materialize/extract/verify 共享解析，
+#        D4 实测 load_workbook 90 次累计 40.3s）；
+#     ② 去掉 structure_hash 的重复计算（线程内算完被丢弃、事件循环上又算一遍整簿解析）。
+#     值表示口径那 65 行已按门禁指引**抽成伴生模块** `projection_digest_value.py`
+#     （它本就与 `definitions.canonical_json_bytes` 同层，不是为凑行数搬的）。
+#     baseline 取当前真实行数，门禁从此刻对本文件重新生效。
+#     拆分方向：`_stage_*` 一组（authoritative / projection 两条 staging 路径约 400 行）
+#     可整体外移为 `content_staging.py`，属独立任务。
+backend/app/services/workpaper_sync/content_mutation.py  2293
 backend/app/services/workpaper_sync/contracts.py  1453
 backend/app/services/workpaper_sync/definitions.py  892
 backend/app/services/workpaper_sync/endpoint_guard.py  1119

@@ -322,6 +322,36 @@ RETIRED_DEFERRALS: Final[tuple[Mapping[str, Any], ...]] = (
         ),
     },
     {
+        "capability": "normalize_value（projection digest 的值表示口径）",
+        "intended_status": "retired",
+        # Task 15 拥有 canonical projection payload（`_projection_payload` / 落盘口径），
+        # 本条登记是 2026-09-22 对它的修补：值表示未归一导致 AC 3.6 幂等复用恒不命中。
+        "retired_by_task": "15",
+        "consumer": (
+            "projection_digest_value.canonical_value_for_digest(...) —— "
+            "`_projection_payload` 序列化每个字段值前，先过 merge 的**比较键**口径"
+        ),
+        "expected_consumer_module": (
+            "app/services/workpaper_sync/projection_digest_value.py"
+        ),
+        # 🔴 无 `commits_through`：本模块是一个**纯函数**（bytes/值 → 规范表示），
+        #    不 import content_mutation、不碰会话、不 stage、不发布、零写入面。
+        #    与 `excel_extract` / `word_sdt_engine` 同类：只借 merge 的值规范化口径。
+        "commits_through": None,
+        "reason": (
+            "AC 3.6 的幂等复用比的是 `projection_sha256`，而 `_projection_payload` 原先只做 "
+            "`json_safe(value.value)` —— 它规范了 Decimal/date，却让裸 int/float 原样透出。"
+            "真栈实测（wp b3ab3c46 / entry xlsx/gt-d4-operating-revenue / revision 120）："
+            "已提交 projection 与当次 flush 的 projection **899 个键逐键相等**，但 canonical "
+            "字节 121485 vs 121487、digest 不同，首个差异是 period_total 的 `0`（int）vs "
+            "`0.0`（float）。后果是「内容一字未改」永远判不出来，幂等复用成了死代码，"
+            "每次点『在线编辑』都全量重物化（D4 换页签实测 31.5s）。"
+            "修法必须复用 merge 的 `normalize_value`（它就是『把值规范化成比较键』的单源）——"
+            "另写一套阈值/口径就会出现第二真源，而两套口径分叉的表现恰恰就是本缺陷。"
+            "少了这条登记，Task 14 的双向等值判据会把它误报成『绕过唯一 commit 入口』。"
+        ),
+    },
+    {
         "capability": "WordInstanceObservation / Word 侧 StructuralAnomaly 输入形态",
         "intended_status": "retired",
         "retired_by_task": "59",

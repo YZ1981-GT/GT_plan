@@ -58,6 +58,7 @@ from app.services.workpaper_sync.excel_extract import (
     ExcelIdentityBinding,
     assert_engine_entry_definitions,
     extract_projection,
+    release_scoped_workbooks,
     resolve_managed_region,
     verify_unmanaged_regions,
     workbook_read_scope,
@@ -266,6 +267,38 @@ class ExcelSyncAdapter:
         repaired: Path | None = None
         substrate_for_write = substrate
         g7_sanitized: Path | None = None
+        # 🔴 多 binding 底稿的写盘路径里也有「同一个文件被解析多遍」：每趟
+        # `materialize_projection` 内部要反读**同一个**输入文件的两个视图
+        # （data_only True/False）。D4-营业收入实测 39 趟 ⇒ `openpyxl.load_workbook`
+        # 90 次、累计 40.3s，占 `adapter.materialize` 42.8s 的绝大部分。
+        # 作用域让每趟的两个视图共享一次解析（78 → 39 次真实解析）。
+        # 趟与趟之间**不共享**：链式中间产物各是不同文件（缓存键含 mtime/size），
+        # 因此不存在「读到上一趟旧字节」的可能。
+        # 🔴 下面每一处 `unlink` 之前都必须 `release_scoped_workbooks`，否则缓存里的
+        # zip 句柄会让 Windows 删不掉临时文件。
+        with workbook_read_scope():
+            return self._materialize_within_scope(
+                substrate=substrate,
+                projection=projection,
+                output=output,
+                contract=contract,
+                repaired=repaired,
+                substrate_for_write=substrate_for_write,
+                g7_sanitized=g7_sanitized,
+            )
+
+    def _materialize_within_scope(
+        self,
+        *,
+        substrate: Path,
+        projection: Projection,
+        output: Path,
+        contract: SyncContract,
+        repaired: Path | None,
+        substrate_for_write: Path,
+        g7_sanitized: Path | None,
+    ) -> MaterializeResult:
+        """:meth:`materialize` 的本体。拆出来只为让作用域包住整趟，不改任何判据。"""
         try:
             # OO→HTML：OnlyOffice 可能保留 `_GT_SYNC` 清册却掏空 sheetData。从冻结的
             # base representation 重注到临时 xlsx；durable incoming 本体一字不动（AC 8.10）。
@@ -413,6 +446,8 @@ class ExcelSyncAdapter:
                     current = target
             finally:
                 for path in tmp_paths:
+                    # 先释放作用域内可能持有的 zip 句柄，再删（Windows 上顺序反了就删不掉）。
+                    release_scoped_workbooks(path)
                     path.unlink(missing_ok=True)
             assert last_result is not None
             assert primary_result is not None
@@ -449,8 +484,10 @@ class ExcelSyncAdapter:
             )
         finally:
             if repaired is not None:
+                release_scoped_workbooks(repaired)
                 repaired.unlink(missing_ok=True)
             if g7_sanitized is not None:
+                release_scoped_workbooks(g7_sanitized)
                 g7_sanitized.unlink(missing_ok=True)
 
     def extract(self, *, artifact: Path, contract: SyncContract) -> Projection:
