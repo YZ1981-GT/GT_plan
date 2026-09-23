@@ -2,7 +2,7 @@
 
 ## Overview
 
-本计划共 74 个任务、8 个 Wave。Task 1/2 的 `[x]` 只表示 discovery/characterization 已完成，不表示 adapter、DOM 或真实 OnlyOffice 闭环完成；Task 20 的 `[x]` 同型 —— 它表示「门可信 + 当期红基线冻结」，14 条准则的归零动作分别归属 Task 74 与 Task 71。当前暂停生产开发，先按修订后的 DAG 从 Wave 0 Task 3 继续。
+本计划共 77 个主/全任务、9 个 Wave（本 spec 无 optional `*` 任务，两口径同值）。Task 1/2/20/60/62/64 为 `[~]`：标题承诺生产迁移，正文只交付调查、门或裁决 —— Task 1/2 的 `[~]` 只表示 discovery/characterization 已完成，不表示 adapter、DOM 或真实 OnlyOffice 闭环完成；Task 20 的 `[~]` 同型 —— 它表示「门可信 + 当期红基线冻结」，14 条准则的归零动作分别归属 Task 74 与 Task 71。当前暂停生产开发，先按修订后的 DAG 从 Wave 0 Task 3 继续。
 
 实施顺序遵循四个硬约束：
 
@@ -71,9 +71,16 @@
     {
       "wave": 7,
       "name": "独立验证、逐 entry evidence、全局 legacy 删除与归档",
-      "tasks": ["68", "69", "70", "71", "72", "74"],
+      "tasks": ["68", "69", "70", "71", "74"],
       "depends_on": [6],
       "rationale": "最后一波才允许真删：先独立回归、再逐 entry 取证据、再按 Wave 6 的清单精确删除、删后全场景重验。Task 74（writer/version domain 归零）压在此处，因为它的 14 条准则要在全部迁移落地后才可能同时为零"
+    },
+    {
+      "wave": 8,
+      "name": "全局 legacy 删除与归档",
+      "tasks": ["72"],
+      "depends_on": [7],
+      "rationale": "archive 必须晚于 writer debt 归零。Task 72 消费 Task 74 的 14 条 writer gate 全零结果，而依赖必须指向更早 Wave 或同 Wave 更小任务号 —— 72 < 74 同在 Wave 7 时该规则无法满足，故 Task 72 独立成 Wave 8（G0-3 无例外裁决，generator 对 8 个 spec 统一校验，不保留特例）"
     }
   ],
   "dependencies": {
@@ -112,7 +119,7 @@
     "68": ["30", "37", "38", "59", "67"], "69": ["33", "34", "35", "66", "67"],
     "70": ["44", "61", "67", "68", "69", "75"], "71": ["7", "8", "30", "44", "61", "68", "69", "70"],
     "74": ["20", "71"],
-    "72": ["67", "68", "69", "70", "71"]
+    "72": ["67", "68", "69", "70", "71", "74"]
   },
   "gates": {
     "excel_engine": ["5"],
@@ -135,14 +142,14 @@
 
 ### Wave 0：事实清册、writer inventory 与真实技术探针
 
-- [x] 1. 生成全量入口 manifest 与独立入口归一化清册
+- [~] 1. 生成全量入口 manifest 与独立入口归一化清册
   - 保持 source-backed AST 发现、reviewed overlay、前端 generated 投影与 source digest fail-closed；逐 entry 机器字段至少包含 `editable`、`room_model`、`scenario_profile`，并由宿主、descriptor 与 room 事实生成，禁止自由文本或手填布尔降级。
   - 当前事实由生成器输出，禁止在生产代码复制 185/276/186 等数字。
   - 本任务 `[x]` 只代表 discovery/characterization 已完成，不代表 profile、adapter、DOM、真实 OO 或回写闭环已验收；父组件重复 entry 只指向独立 entry，Task 67 必须按最终源码重新生成并核对 manifest/profile。
   - 验证 Property 1、Property 2。
   - _Requirements: 1.1, 1.2, 1.3, 1.6, 1.8, 12.14_
 
-- [x] 2. 建假双向红基线与能力态守卫
+- [~] 2. 建假双向红基线与能力态守卫
   - 保持逐 entry template-only/reload-only/no-forcesave/no-ack/no-adapter characterization 与默认阻断 closure guard。
   - single 模式仍显示切换、unreachable 桩或 bidirectional 无 adapter 时保持红，不允许改成豁免即绿。
   - 验证 Property 3。
@@ -285,7 +292,7 @@
   - 验证 Property 50、Property 61。
   - _Requirements: 2.2, 2.11, 9.11, 12.6, 12.7_
 
-- [x] 20. 关闭 writer/version domain gate
+- [~] 20. 关闭 writer/version domain gate
   - 重新生成 writer matrix，并把 writer/version domain 收进一道**不可 fail-open** 的统一 revision 门（`backend/scripts/check/check_workpaper_writer_revision_gate.py`，14 条准则）：verdict 全部由 AST 派生、无豁免列、`source_digest`/`inventory_digest`/retired ledger/upgrade lane 四重新鲜度 fail-closed、三处空分母一律 `raise WriterGateError` 而非报 0、retired writer 走正向判定、characterization 证据必须解析到调用点（实测揪出 2 处误记）。**本任务的完成语义 = 「门可信 + 当期红基线冻结」，不等于「债已清零」** —— 与 AC 12.14 同型：Task 1/2 的早期 `[x]` 同样只表示 discovery/characterization 已完成，不代表闭环已验收。
   - **当期红基线（冻结）**；生产写路径未裁决=0、绕过统一 commit=303、resolver 未裁决=0、写 legacy 版本字段=5、自有直接 commit=124、只有非 canonical resolver=76、writer 无 characterization 测试=239、多 resolver writer=3、bidirectional projection-only/双 revision=0、after-save 增 revision=0、representation upgrade 增 business revision=0、artifact-snapshot writer 不可验证=0、retired writer 不可验证=0、缺必需 domain=0；合计 750 条 blocking facts。这 14 个数字**不是手抄常量**：`test_task20_writer_gate.py::test_the_frozen_red_baseline_is_derived_from_the_live_gate` 现场解析本行、经「标签 → issue key」表映射后与 `evaluate_gate()` 的实测计数逐条比对 —— 数字写错打红，源码变了没同步更新本行也打红。**2026-09-02 更新**：Task 74 的第一半（逐 domain 裁决）把「生产写路径未裁决 236 → 0」「resolver 未裁决 34 → 0」，合计 916 → 646；其余 12 条一条未动（裁决只写 lane 标签，13 条 blocking verdict 全部由源码派生）。第二半（逐 writer 迁 `ContentMutationService`）未做，故 264/105/208/72/5 如实留红。**2026-09-04 更新**：Task 74 的探测器盲区修复（_record_ad_hoc_path 现能解析模块级路径常量，如 TEMPLATES_DIR = BACKEND_DIR / "wp_templates"）把分母从 319 行补回 327 行 —— d1262c80 的文件拆分曾把 8 个真实 resolver/export writer 移到常量旁边而使其静默离开分母（其中 2 个的 overlay 裁决行因此报「no longer exist in source」，门直接崩在 ssert_inventory_is_current）。**这是补分母不是缩分母**：8 行已逐条裁决（export_storage_resolver 5 条 / 	emplate_provisioning 3 条，全部零 version 写、零 SQL、零 commit、无 content store），故两条「未裁决」仍为 0；绕过统一 commit 261 → 264、只有非 canonical resolver 63 → 72、合计 646 → 658 是新可见行如实计入的结果。**2026-09-20 更新（修 gate 崩溃，非推绿）**：D2/D4 迁移把 `d4_import_data` 从 direct content writer 改成**委派** writer（其 own 写路径已走 `ContentMutationService`），使调用它的 `_d4_import` 从单跳传播里掉出发现面 —— overlay 仍裁决着它，门于是崩在 `assert_inventory_is_current`（`WriterInventoryError: writers ... no longer exist in source`）而**不再是红基线**。修法是把 `_propagate_content_writers` 从**单跳**改为对 **writer 图的有界闭包**（fixpoint 只在 writer 集合上迭代，非 writer 叶子永不入集，故不会退化成 349 行的全调用图闭包），保守边解析规则不变；这补回 33 个真实多跳 writer 入口（bulk import / D2·D4 adapter / custom 建表 / prefill/chain orchestrator / OO→HTML coordinator 等），其中 `update_custom_cells` 因此从 `retired_adjudications` 移回 active（它 own 写已走统一 commit，但仍委派 `refresh_custom_projection → write_projection_to_parsed_data` 刷 `parsed_data`，是真实 content 委派入口，退役是单跳模型的盲区）。分母 327 → 371（writers 269 → 312、resolvers 71 → 84、retired 3 → 2）。补回的 38 个新可见 writer/resolver 已在 `workpaper_writer_domain_overlay.json` 逐条**裁决**（各按其委派目标所属 lane：checklist_response_store / custom / dedicated_router / template_provisioning / oo_callback / export_storage_resolver），故 `unadjudicated_writer` 与 `unadjudicated_resolver` 仍为 0（裁决不是豁免：这些行的 `bypasses_unified_commit` / `writer_without_characterization_test` 仍由源码派生并如实留红）。故本行数字随之现算刷新：绕过统一 commit 264 → 303、自有直接 commit 105 → 124、只有非 canonical resolver 72 → 76、writer 无 characterization 测试 208 → 239、多 resolver writer 4 → 3（`get_whole_excel_grid` 的第二 resolver 因 override-layer 接线并入单一模板解析入口，详见 Task 71）、合计 658 → 750 —— 全是补回真实写入口如实计入的结果，无一条准则被放宽或缩小分母。门仍 `[BLOCKED]`、退出码 1，本任务「门可信 + 红基线冻结」语义不变。
   - **14 条准则的归属**（门的 `has_debt` 就是这 14 条的 `any()`；一条准则从报告里消失与它归零逐字相同，故守卫双向校验：门里有的 key 必须在本行有归属、本行点名的 key 必须在门里有实现）。归属 Task 20：`keeps_legacy_write_path_beside_unified_commit`、`after_save_still_increments_revision`、`representation_upgrade_increments_business_revision`、`artifact_snapshot_writer_not_verifiable`、`retired_writer_not_verifiable`、`missing_required_domain`；归属 Task 74：`unadjudicated_writer`、`bypasses_unified_commit`、`unadjudicated_resolver`、`writes_legacy_version_field`、`owns_direct_commit`、`non_canonical_resolver_only`、`writer_without_characterization_test`；归属 Task 71：`multi_resolver`。
@@ -674,7 +681,7 @@
   - 验证 Property 28、Property 30、Property 31、Property 32、Property 34、Property 65、Property 67、Property 71。
   - _Requirements: 2.3, 6.10, 6.18, 7.1, 7.2, 7.3, 7.4, 7.5, 7.8, 7.9, 7.10, 8.10, 8.11, 9.1, 9.8, 9.9, 9.10, 14.16_
 
-- [x] 60. 把 F2-22/F2-23 迁成统一 Word adapter并 finalize published representation
+- [~] 60. 把 F2-22/F2-23 迁成统一 Word adapter并 finalize published representation
   - 为 F2-22/F2-23 各自建立逐字段 source_ref/tagged-SDT contract，发布 approved authority model、per-entry contract与 non-null bundle；按 Task 59 candidate compatibility/Word-only等值报告调用 Task 15 finalize为各自 published representation后，才注册 adapter、接 descriptor/bridge/冲突与 recovery UI。
   - candidate、unapproved/missing-contract bundle不得进入 F2 resolver/room/current/evidence；历史 operation只读 frozen bundle。现有 to/from OO endpoint先委派统一 coordinator，Task 61全场景通过后才删除第二流程。
   - HTML materialize 仅更新结构化岛，不覆盖 Word-only正文；每个 F2 entry保存自身 bundle digest与scenario evidence，不交叉复用。
@@ -705,7 +712,7 @@
 
 ### Wave 6：Word 全量、custom、legacy 删前隔离与 pre-reconcile
 
-- [x] 62. 逐一迁移 18 个 generic DOCX entry
+- [~] 62. 逐一迁移 18 个 generic DOCX entry
   - 每份读真实模板并为该 entry发布自己的 approved authority model、tagged-SDT per-entry contract与 non-null bundle；经 Task 59 candidate的 tag/Word-only等值校验并由 Task 15 finalize为 published representation后，才注册 adapter/接宿主/标 bidirectional。不得跨 entry复用 bundle/candidate/evidence。
   - 多 token、跨 run、重复实例逐项处理；candidate/unapproved/missing-contract bundle不可 resolver/room/current/evidence，缺真实 OO required scenarios保持 UNVERIFIABLE。
   - **裁决实证脚注（本任务不发布 per-entry 契约，理由如下）**：18 份权威模板逐份 zipfile + python-docx 现读后，**18/18 全部 blocked**，`entries_with_instrumentable_verdict = 0`。verdict 由事实派生、封闭词表、五档分布：`blocked_non_discriminating_literal_anchor` **10**（B5-1/2/3/4/6/7/8-1/8-2/9-1/9-2）· `no_managed_field_candidate` **3**（A26-2 / A8-2 / B1-7）· `blocked_nested_literal_anchor` **2**（B5-5 / S12A）· `blocked_partial_field_fragment_anchor` **2**（A26-1 / A26-4）· `blocked_literal_anchor_split_across_runs` **1**（A26-3）。🔴 **不发契约的理由不是「零 `${}` token 所以造不出锚点」**（与 Task 64 脚注逐字对齐）—— 该说法已由本任务的 impl 真跑证伪：`WordFieldInjection(literal_anchor=True)` 可构造，记录内的 `mechanism_probe` 对 A26-1 / A26-4 真跑了 `instrument_docx_bytes` → `verify_docx_visible_equivalence` → `read_back_word_tags` 并逐条通过（`equivalent=true`、`outside_sdt_text` 覆盖 123 / 61 字符非空转、`untouched_parts=21`、非 document part 逐字节相同、tag 反读 1 tag/1 instance/0 untagged）⇒ 机制在 F2 之外的真实 generic 模板上确实可用。真实理由是五条各自独立现算的结构性障碍：①**锚点不具区分度** —— 一个 literal token 只能绑一个 stable key 且全部出现处注入同一 tag，而 `××` 在单份约定书里最多出现 **22** 次、语义各不相同；②**候选 span 互相嵌套/重合**（实测 2 identical + 6 contained，典型 = `202X年` 落在 `202X年12月31日` 内，`_LEGACY_PATTERNS` 自身互相重叠所致）⇒ 两者同时注入 SDT 结构上不可能；③**锚点被 run 边界切断** —— 本轮新发现：`instrument_docx_bytes._token_paragraphs` 要求 token **verbatim 出现在原始 `word/document.xml`**，而 python-docx 会把跨 run 的 `w:t` 拼起来，A26-3 的 `202X年` 在原始 XML 里连 `202X` 都搜不到（6 个 entry 至少一个 literal 命中此类，已由「真喂进注入引擎必抛 `WordTokenAnchorError`」实证）；④**锚点只是更大人类占位的片段**（`截至202X年X月X日` / `202X年第YY次`），注入后旁边的 `X月X日` / `第YY次` 仍是死文本，17/18 个 entry 存在 parser 不认的占位形态；⑤**字段身份不稳定** —— HTML 对端（`_word_template.py` + `GtWordTemplateStructuredView.vue`，持久化 `checklist_responses.item_id = wt-{wp_code}-{field_id}`，DB 实测 `wt-%` **0 行**）的字段由 `wp_docx_template_parser._LEGACY_PATTERNS` 中文标记正则现算（Requirement 7.1 逐字禁止中文正则作回写协议），136 个候选里 **115** 个 field_id 带 `_dedupe_field_id` 的文档扫描顺序序号后缀、全部只有「审计年度 / 待填内容 / 报告日期」3 种 label，而 design 对 `stable_field_key` 的定义是「adapter 全局稳定键」；另实测 `parse_template` 的表格循环 `for cell in row.cells` 会把横向合并单元格按跨列数重复扫描（A26-1 的 4 个 `audit_year` 实为 1 个合并单元格）。把这批候选写成 `review_status="reviewed"` 契约会让机器侧全绿（`assert_projection_supply_authentic` 只查 `review_status` 字面），实质是伪造供给。产物：生成器 `backend/scripts/gen/generate_task62_generic_docx_adjudication.py`（`--check`/`--write` 互斥必选，三边锁 = Task 58 清册 ↔ `backend/wp_templates/` 磁盘真读 ↔ impl 现读 `_LEGACY_COMPILED`/`_NEW_PLACEHOLDER_RE`/`WordSdtCarrierGate.load()`/`PENDING_ENGINE_ADAPTERS`/AC 7.7 声明数，`--check` 与磁盘逐字节比对）+ 裁决记录 `backend/data/workpaper_sync_task62_generic_docx_adjudication.json`（204 KB，逐 entry 模板身份/结构事实/候选清册含 context/两视图计数/verdict/blocking_reasons/evidence=UNVERIFIABLE，counters 全现算）+ 守卫 `backend/tests/workpaper_sync/test_task62_generic_docx_entries.py`（**53 passed**，10 个测试类）+ 变异脚本 `backend/scripts/diagnose/mutate_task62_generic_docx_guards.py`（19 条，`--run all` **19/19 全 RED**，`--check-anchors` 19/19 OK 且目标文件 md5 未变）。新登记 **BP-62-1 / BP-62-2 / BP-62-3**：🔴 **id 刻意用 task-scoped 前缀而非全局 `BP-NN`** —— 实测 Tasks 63 与 64 的裁决记录**各自**登记了 `BP-16`~`BP-20`（Task 64 到 `BP-22`）、同号不同义，全局单调编号在多会话并发下已被双重占用，接回去只会制造第三份冲突（守卫用 `re.fullmatch(r"BP-62-\d+")` 锁死）。BP-62-1 = `word-template` HTML 业务模型没有稳定字段身份（解除动作跨 `word-template-dual-mode` feature 与运行时权威模板库，需自己的 spec 三件套，**明确不属 Task 62 权限**；记录内 `same_root_cause_as` 指向 Task 64 的 BP-17 与 Task 63 的 `field_identity_admissible_entries: []`，并写明三条独立取样路径复现同一根因：本任务 18/18 模板 `declared_dollar_token_count=0`、Task 63 记录 `dollar_token_total=0`、Task 64 记录 A16 链 HTML 字段面为 0）· BP-62-2 = Word adapter 仍被 `PENDING_ENGINE_ADAPTERS` 禁止落地（owner = Task 61）· BP-62-3 = Word lane 的 published representation 供给为 0（`working_paper_content_version` / `..._representation_upgrade_candidate` / `..._content_representation` / `..._sync_entry_state` 实测 0 行，唯一 bundle 属 `b60.hour_budget` Excel pilot）。未越 Task 61 的 `word_bulk` 门：未建 `adapters/word.py`、未往 `DELIVERED_PER_ENTRY_CONTRACTS` / `_ALLOWED_PROVIDER_MODULES` 加行、未改 manifest、未改 `backend/wp_templates/` 与 `wp_docx_template_parser.py` 任何字节、未往 `workpaper_sync_word_contracts/` 写一份文件（守卫断言该目录内容**恰等于** F2 发布记录登记的两份）、未碰 DB（守卫用 **AST** 断言生成器无 DB import、无发布链调用、`write_text` 只对 `OUTPUT_PATH`）、未宣称任何真实 OO probe 通过。本任务 `[x]` 与 Task 1/2/20/60/64 同型 —— 只表示上述裁决与守卫已交付，**不**代表 adapter 已注册或 published representation 已 finalize。🔴 **两条通用教训**：①**M15 首轮判 GREEN，追因确认是「等价变异」而非守卫缺陷** —— 两个探针 entry 上 `raw_xml_verbatim_counts` 与 `literal_anchor_multiplicity` 恰好都等于 1（该 literal 没落在合并单元格里），任何**数值**断言都测不出差别；修法不是删变异，而是把**取值来源**做成 AST 结构判据（`occurrences` 的下标必须是 `raw_xml_verbatim_counts`、不得是 `literal_anchor_multiplicity`）⇒ 转 RED。②**守卫读源码判「有没有调用某函数」必须走 AST，不能走子串** —— BP-62-3 的 evidence 文案里就写着 `WordEntryFinalizeGate.finalize_candidate`，首版子串判据被这句**说明文字**打成假红。辐射面回归（按引用关系反查，不跑全量）：`test_task58/60/77` + `test_task57/56/52` 共 **601 passed / 5 xfailed / 1 failed**，另跑并发方的 `test_task63/64` **61 passed / 7 xfailed**（我的新文件不破坏它们）。唯一那条 failed = `test_task60_f2_word_adapter.py::TestNothingUnapprovedReachesTheRuntime::test_the_lane_writers_still_declare_the_pre_task60_authority_model`，**归因为并发 Task 65 会话**而非本任务：`_f2_stocktake_{plan,summary}_sync.py` 两个 tracked 文件的 mtime 为 **08-31 23:53:42/43**（早于本会话首次写盘），`git diff` 里新增注释逐字写着「Task 65：authority model 由 lane 登记决定（`f2_stocktake_plan` → `opaque_single_onlyoffice`），不再由调用点传一个可漏可错的身份参数」—— 该 writer 把字面量搬进 lane 登记后，Task 60 那条「源码里必须出现 `opaque_single_onlyoffice` 字面量」的判据随之失守，属 Task 60/65 两方的接口，本任务未改这两个文件一个字节。**产物入库状态：4 个产物在 git 里全是 `??` 未跟踪**，需与并发方一并入库（干净 checkout 下守卫必挂）。
@@ -731,7 +738,7 @@
   - 验证 Property 40、Property 41、Property 69、Property 70。
   - _Requirements: 7.7, 9.4, 9.5, 12.5, 12.8, 12.10, 12.11, 12.12_
 
-- [x] 64. 迁移 A16/A17 专用 Word 链与全部 Word editor 宿主
+- [~] 64. 迁移 A16/A17 专用 Word 链与全部 Word editor 宿主
   - 为每个保留的 A16/A17/Word editor独立 entry读真实模板，发布 approved authority model、tagged-SDT per-entry contract与 non-null bundle；Task 59 candidate通过后 finalize published representation，才统一 room/forcesave/callback/merge并接宿主，不以 structuredFlush/load或 candidate冒充闭环。
   - 每个 `WorkpaperWordEditor`/`OnlyOfficeWordDialog` 宿主有自身 DOM、recovery/operation、published artifact与 bundle digest evidence；不得跨 entry复用 contract/bundle/scenario。
   - **裁决实证脚注（本任务不发布 per-entry 契约，理由如下）**：逐 entry 现算后，四条 docx entry 无一条同时满足「保留」与「projection 有对端」两个前提，故按 Task 63 同款条款「无合法模板/HTML 对端则裁决 single/missing，不为满足数字伪造 contract/bundle/finalize」交付**裁决 + 如实登记**。四条裁决各自独立推导：`docx/gt-a16-bundle` = `opaque_ooxml_authority`（mount 真实可达、承载 A16-1..A16-7 七个真实 DOCX，但生产 HTML 侧字段面实测 **0** —— `_word_template.py` 经 `wp_docx_template_parser.parse_template` 对七份模板全返 0 个 placeholder，审计师在 Word 里写整篇声明书 ⇒ docx 本体即业务权威）；`docx/gt-a17-bundle` = `unreachable_stub`（`WorkpaperWordEditor` 挂载点外层门控是 `v-else-if="tab.kind === 'word'"`，而静态 TABS 十条无一条 `kind: 'word'`，该 kind 只存在于 TabDef 类型联合里 ⇒ 运行时恒假，Requirement 1.7）；`docx/workpaper-word-editor` = `parent_duplicate_follows_parent`（manifest `independent_entry=false`）；`docx/wp-popup-docx-editor` = `shared_room_opaque_multiplexer`（一条 entry 复用给 97 个 popup 配置，而 `SyncContract.template` 是单个 `TemplateRef`）。🔴 不发契约的理由**不是**「零 `${}` token 所以造不出锚点」—— 该说法已由 impl 真跑证伪（`WordFieldInjection(literal_anchor=True)` 可构造、Task 6 对 B30-11-2 用的就是字面标题；`WordRowInjection` 支持一次性单元格坐标；15/15 模板都有 `w:tbl`），真实理由是**投影无对端**：给没有消费方的投影建 SDT/契约即 additive 死代码（假绿第①源），且 `registry.assert_authority_model_contract_pairing` 对非 projection 传 `SyncContract` 直接抛 `AuthorityModelMismatchError`。产物：生成器 `backend/scripts/gen/generate_task64_dedicated_word_chain.py`（`--check`/`--write` 幂等）+ 裁决记录 `backend/data/workpaper_sync_a16_a17_word_chain_adjudication.json`（内嵌逐 entry evidence、模板 zip 级事实、HTML 投影字段面、mount 门控链、五条 impl 真跑反证、counters 与 property 分母）+ 守卫 `backend/tests/workpaper_sync/test_task64_dedicated_word_chain.py` + 变异脚本 `backend/scripts/diagnose/mutate_task64_dedicated_word_chain_guards.py`。新登记 **BP-16 ~ BP-22**（续接 Task 60 的 BP-15）：BP-16 A16 链 HTML 字段面为 0 · BP-17 生产定位仍靠 legacy 中文正则 + `paragraph_index` 绝对索引 + 序号后缀 field_id（14 处占位符 100% 命中 Task 77 三条禁令）· BP-18 manifest 的 `mounts[].condition` 缺外层 kind 门控致死代码不可见 · BP-19 两个 Word 宿主均非 descriptor consumer 且 `WorkpaperWordEditor` inbound 跨 Task 62/64 · BP-20 opaque authority 通道归 Task 65 且需 DB 侧 definition 行 · BP-21 单 `TemplateRef` 无法表达一对多 popup · BP-22 A17 七个 docx 子码有 HTML 对端与自有 DOCX 载体（清册裁 `resolved_docx`）但 manifest entry 全是 `document_type=xlsx`。未越 Task 61 的 `word_bulk` 门：未建 `adapters/word.py`、未往 `DELIVERED_PER_ENTRY_CONTRACTS` / `_ALLOWED_PROVIDER_MODULES` 加行、未改 manifest、未改 `backend/wp_templates/` 任何字节、未改 capability、未宣称任何真实 OO probe 通过。本任务 `[x]` 与 Task 1/2/20/60 同型 —— 只表示上述裁决与守卫已交付，**不**代表 adapter 已注册或 published representation 已 finalize。变异检验 **17/17 全 RED**（0 GREEN / 0 ANCHOR-MISS / 0 WRONG-TEST），覆盖数据侧 M01–M10、真源码侧 M11–M14、反向变异 M15–M16（把 BP-17/BP-19 的缺陷「修好」时对应 `xfail(strict)` 解除探测 XPASS ⇒ 必红，杜绝「代码改好而记录仍挂 open」）、观测值口径 M17；守卫 28 passed / 7 xfailed（7 条 BP 解除探测各一条）。🔴 **M13 首轮判 WRONG-TEST 并因此抓出一个真实的守卫缺陷**：把 `PENDING_ENGINE_ADAPTERS` 的被禁路径从 `adapters/word.py` 改名成 `adapters/word_DISABLED.py`（等于把 Task 61 的门挪开、Word adapter 换个文件名即可落地）时，原守卫「清单非空 + 逐条不存在」两条**仍然满足**故全绿；已补「清单必须**包含**真实 `app/services/workpaper_sync/adapters/word.py`」一条后转 RED —— 这条教训通用：**禁令清单类判据必须断言「包含那个真实目标」，只断言「非空 + 逐项成立」会被改名绕过**。六条真源码变异跑完已逐条核验干净还原（变异文本零残留、原文在位）。**产物入库状态：5 个产物（生成器 / 裁决记录 / 守卫 / 变异脚本 / 本 tasks.md）在 git 里全是 `??` 未跟踪**，且实测 `backend/app/services/workpaper_sync/adapters/registry.py` 本身也未被 git 跟踪（Task 13 产物从未提交）⇒ 干净 checkout 下守卫必挂，需各推进方尽快入库。

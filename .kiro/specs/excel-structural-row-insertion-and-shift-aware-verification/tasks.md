@@ -2,7 +2,7 @@
 
 ## Overview
 
-实现语言 **Python 3.12**。共 22 个任务、6 个 Wave。**不新增数据库迁移**（磁盘最高 V153，本 spec 不加）。
+实现语言 **Python 3.12**。共 22 个主任务 / 27 个全任务、6 个 Wave。**不新增数据库迁移**（磁盘最高 V153，本 spec 不加）。
 
 交付顺序遵循 design.md §Rollout 的一条硬约束：**先补检查，再动结构**。`dimension`/`hyperlinks`/`autoFilter`/`rowBreaks` 今天不在任何 aspect 里，先动它们等于"改了没人看"（假绿）。
 

@@ -604,7 +604,7 @@
         "producer": "workpaper-page-formula-toolbar-closure:13"
       }
     ],
-    "internal_edge_count": 447,
+    "internal_edge_count": 448,
     "node_count": 263
   },
   "database_probe_digest": "fac2c53b411d784ea21690d2a2077a7d9610fef9127682b9cec9b12d4391f405",
@@ -648,13 +648,6 @@
   "definition_digest": "45eb2ebb9f8a2565f2b44dd93a4b1364a6f685a9ad7e29aadc03d611d769868c",
   "diagnostics": [
     {
-      "code": "archive_bypasses_writer_debt",
-      "missing_dependency": "74",
-      "severity": "blocker",
-      "spec": "workpaper-html-onlyoffice-bidirectional-writeback-closure",
-      "task": "72"
-    },
-    {
       "code": "natural_language_producer_placeholder",
       "consumer_spec": "custom-workpaper-template-ingestion-and-sync-closure",
       "milestone": "SYNC-DURABLE-APPLICATION",
@@ -694,44 +687,44 @@
     ".kiro/specs/custom-workpaper-template-ingestion-and-sync-closure/evidence/X-HANDOFF-CONFORMANCE.json": "7a7d1aeabdffb4b8f98be9c23295e06f3ae040171c563962e9904bfef19d9572",
     ".kiro/specs/custom-workpaper-template-ingestion-and-sync-closure/evidence/X-RUNTIME-EVIDENCE.json": "040178ea6965d9e439b1781a619b317bf7ccb09496889c407c628c21fa2ef6ad",
     ".kiro/specs/custom-workpaper-template-ingestion-and-sync-closure/tasks.md": "14667887885e14609f1dee4234e461ff4188b7d835b71950d3dff93ed8914d6f",
-    ".kiro/specs/excel-structural-row-insertion-and-shift-aware-verification/tasks.md": "09716fb4554ef0a3e198f8faa1c932dd7d88286c273535a23c8d7fbe1d307f7a",
-    ".kiro/specs/excel-template-override-layer-and-onlyoffice-template-editor/tasks.md": "74731ec935858de1a2896deb11c571e5d3659933d25c349fb2b982fa6e306385",
-    ".kiro/specs/excel-workbook-wide-row-change-propagation/tasks.md": "b66c3053db14394b4f9258ef66a5b3c9a130f0c33a913273f5bb694dde6f41a2",
-    ".kiro/specs/published-representation-production-path-and-lane-adjudication/tasks.md": "65fe38160a0953114e9f91852bdea7dc04c95d0c8d282aad1d6dbe496cb978a1",
+    ".kiro/specs/excel-structural-row-insertion-and-shift-aware-verification/tasks.md": "375fe2d447034b1d800985bb42401e45c03df97879398fd379833982245726f0",
+    ".kiro/specs/excel-template-override-layer-and-onlyoffice-template-editor/tasks.md": "df4f22b723518213aeafc5cd71bc596624979335564be4ccee9bcd84a420711e",
+    ".kiro/specs/excel-workbook-wide-row-change-propagation/tasks.md": "9d1c409290748214a6fb0045f0258c80bf90784b4a3525a2bdcb96ce2cb214ad",
+    ".kiro/specs/published-representation-production-path-and-lane-adjudication/tasks.md": "b70d0edfed081db9d49bd2c2ec8de9bdbb7aae8dbbc8bb24a008fdc7795d6c3c",
     ".kiro/specs/workpaper-guidance-content-closure/evidence/G-RAIL/adapter-behavior.json": "b348c78115547daf03f95fab19b4f99b070387cdcf4ddaa978de5bbaf8382b0d",
     ".kiro/specs/workpaper-guidance-content-closure/tasks.md": "6efe62f28c8d8099e3e89a0ae955423967905a3da5c0603e89833a5f099b8f8b",
     ".kiro/specs/workpaper-html-onlyoffice-bidirectional-writeback-closure/evidence/g0-4-host-consumes-unified-path/d2-2/database-snapshot.json": "e377f25d0616b255e84823a77ac48186ac824d1a6906ab578031233653841074",
     ".kiro/specs/workpaper-html-onlyoffice-bidirectional-writeback-closure/evidence/g0-4-host-consumes-unified-path/d2-2/editor-config.json": "f6e25b28107f6ca0a2dfbcadeb0c5a0ac34f508dfbbeb5efbd372100459ac4ec",
     ".kiro/specs/workpaper-html-onlyoffice-bidirectional-writeback-closure/evidence/g0-4-host-consumes-unified-path/d2-2/network.json": "7fa6e924d5c26e572494674ea630918b9599b5766f23028ff459fb55cba2d9d2",
     ".kiro/specs/workpaper-html-onlyoffice-bidirectional-writeback-closure/evidence/g0-4-host-consumes-unified-path/index.json": "c8647445f75a1a0ab25da38352082e28c273e4bbce560f9f9c0978c1d42a6848",
-    ".kiro/specs/workpaper-html-onlyoffice-bidirectional-writeback-closure/tasks.md": "83d8a8eba2feafded6830db449603986e109d2e50a04e1c0bd510ef6738c6184",
+    ".kiro/specs/workpaper-html-onlyoffice-bidirectional-writeback-closure/tasks.md": "d622ba9c5e5cd89cfe128a2d975c784bf2b41d6cb1e6629591743c86a7c95214",
     ".kiro/specs/workpaper-page-formula-toolbar-closure/evidence/F-SHELL/contract.json": "d8b83a7d686f2b76140a0e8d77d8d9057a231c0eb09493270659c7e642952ae5",
-    ".kiro/specs/workpaper-page-formula-toolbar-closure/evidence/F-SHELL/envelope.json": "c583911ac9d92a540ecaf491ed401c7bf43c0a3b98d9b21df5c7aef0188a3201",
+    ".kiro/specs/workpaper-page-formula-toolbar-closure/evidence/F-SHELL/envelope.json": "1923b8d31d64d575b027a54f0d5345ce06b897e8b1641eba7314562169309811",
     ".kiro/specs/workpaper-page-formula-toolbar-closure/tasks.md": "c897e9d906f61460a701048be54ad1a5f69bbd3754841996a2496e0907151090",
-    "audit-platform/frontend/scripts/discover-workpaper-sync-mounts.mjs": "ef6ca74479786413309f8151965d42e27e1bf68cfaef89948922ee10192d7319",
-    "audit-platform/frontend/src/components/workpaper/GtD2AccountsReceivable.vue": "7b89e2063b6b740a1833aaa6f8475b0235a28d501d0b9f3559dd09ea0930a62c",
+    "audit-platform/frontend/scripts/discover-workpaper-sync-mounts.mjs": "8e58c36fba72047ad29be7a2dc2f17d3e82b6ec5bd95a00eb05d5b2af05a296f",
+    "audit-platform/frontend/src/components/workpaper/GtD2AccountsReceivable.vue": "10fe40412102356c9f4961c148ed399abce10cfaac3f7fc3ba7ce4b3838e7b40",
     "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue": "93cb759a0b0db3bd9328efef8c4a0c1b263f4ee77b2184b9e168f3630663ae0a",
     "audit-platform/frontend/src/components/workpaper/sync/useD2SyncBridge.ts": "daeb9de542e37913473b8aa3909ff4170557449983eec05b33c5ba9b267795a9",
     "backend/app/models/workpaper_sync_models.py": "451a4b2ed6f6898ac2192936e19d91157bab270c69ae69e005748ade5c1a425d",
     "backend/app/routers/d2_sync_router.py": "d4cbec9721fba0937965350fb17bfec84972dbb4b9256cd70938297cf4e54ba5",
-    "backend/app/routers/wp_onlyoffice_router.py": "f284846bdc719e36d404a242c45cd5921cbd4761768ff924aaf74317cf2e7ed6",
-    "backend/app/routers/wp_sync_router.py": "c7e2a76ffb62d5a2a90f9a3d5ae2db7a3c0b37795cdf5365aaa6be6dca307300",
+    "backend/app/routers/wp_onlyoffice_router.py": "964176aa8b28f77f9672713479cf0ccf3ed034bca8b3b6437e3c92ca2c32ecf4",
+    "backend/app/routers/wp_sync_router.py": "3c903cf519a55b53cf39652a8aa645e390857fab9912af8426e8913b27a42625",
     "backend/app/services/guidance_gid.py": "37588e060ad59dc10c4b4ef60eb7192a10cead7adad1bc307d7acd23a3ceeaa9",
     "backend/app/services/guidance_handoff_consumer_service.py": "9bea922d1d854a881f86e47a2c0e866b40c5b3af761dbcf8c856cb41cc890b44",
-    "backend/app/services/workpaper_sync/adapters/registry.py": "0e896fb13ea54bd3bcac6b19d804acac32ea93e42b1a6d98588c80d567e89daf",
-    "backend/app/services/workpaper_sync/callback_delivery.py": "3931a3dd661786a1952680fc1bf824202144b5607dea7bf24225d7b5b5dd0e46",
-    "backend/app/services/workpaper_sync/callback_route.py": "68ce8610854b0c8711ec4bb455e45b02f9d3de021c16ced562d563f0f12dc5ea",
+    "backend/app/services/workpaper_sync/adapters/registry.py": "56da019e2b0c429738aa045d799b1951fa0ad522fb55f16686b202b00b707219",
+    "backend/app/services/workpaper_sync/callback_delivery.py": "48343521e688e2c164698ea71857425d643362171b39ac097037a1ed0fa295cf",
+    "backend/app/services/workpaper_sync/callback_route.py": "dae71f4718bafd4b688a99cb2f07325ccc36c18f4238ced004d624aadfaf2e5a",
     "backend/app/services/workpaper_sync/command_service.py": "4619b4b60ee4fae18e541d725516341df5fedd7c02053881522fea67887c19ef",
     "backend/app/services/workpaper_sync/excel_row_shift.py": "58b7eca93291c641b9cade673e7ecf90702988a9cf1f8bc1e6713a3589a035a4",
-    "backend/app/services/workpaper_sync/excel_workbook_row_change.py": "2bc420df9a646776406fece7ba2708bb18f833cab3b6c3afad666fb74bfa7a12",
-    "backend/app/services/workpaper_sync/materialize_coordinator.py": "cbb04f2399de8afd8c077c0e669fe6bd43968f84a21c1385bfc02adc5de42f00",
+    "backend/app/services/workpaper_sync/excel_workbook_row_change.py": "3b9a1c11878e7f51bc9d6c04b6ec06b8a35f4c6649c671aee24b215240bd2c76",
+    "backend/app/services/workpaper_sync/materialize_coordinator.py": "ec93aa798ea827ed269b0896211d2a52aea3ceecd101ec5243092aeb99c4c084",
     "backend/app/services/workpaper_sync/models.py": "b9c30bbf679a8d14df280d6c44ba7c9a1df2fea17242a927eee3c62d45bf2ea8",
-    "backend/app/services/workpaper_sync/oo_to_html.py": "c52e2e6276e2d1bed41befe114a9b65e389478868044640ebdd49d5012f29f83",
-    "backend/app/services/workpaper_sync/published_identity_observer.py": "259bc0b7d0f4c5fde03ddee8ec955ab6a54b8ef447852074ecdd15eafc408c17",
-    "backend/app/services/workpaper_sync/request_application.py": "8d81904ebf9c302713c63d31eb0763863777cb70037490faa031bba67d180e12",
+    "backend/app/services/workpaper_sync/oo_to_html.py": "406b0cce3ab41c483ce6ce92af86e3e97a3c5b373209d7078dce891019b5b41d",
+    "backend/app/services/workpaper_sync/published_identity_observer.py": "b0073059e02890a40539718ff7c8a6e6529b0fb69683fe7e05d2ecf988444b5b",
+    "backend/app/services/workpaper_sync/request_application.py": "27e14baeb74564cd4bf2fb45a903b7a8142f926e6a1419b03d8a001bbb80e0f4",
     "backend/app/services/workpaper_sync/resolution.py": "b092ae848a144f3dc9eef33a678ea5bd4eeb5dc64ba3cfd4b12a355d2a8d5f0e",
     "backend/app/services/workpaper_sync/retention.py": "21a78d4b14e41816250bf4e79c933720607541e27333542c63eb553fda6812d2",
-    "backend/app/services/workpaper_sync/rooms.py": "e1080e81aba0e2fe174434249e5086dbf468452f0b03319fb53c3239d10b6b0d",
+    "backend/app/services/workpaper_sync/rooms.py": "0ba511f8a8836dd5dc4dcdfc98bfaf0fb9c7cffe96317cf524ecea8dd6022b21",
     "backend/data/guidance/contracts/gc0/compatibility_matrix.json": "46eea1e94469f018b9efdbbc44623fa514a487a5b3510e91649171597c429598",
     "backend/data/guidance/contracts/gc0/evidence/gc0_evidence.json": "80e4c7582c8ebd46ee9a11f2e8a284660245c4cdaa795f7cba3bb47495309a64",
     "backend/data/guidance/contracts/gc0/fixtures/ack_accepted.json": "e75ce5ddef931dfb8030deeb775bafca377d1ddfe949fad3a4d688278c34ee15",
@@ -747,25 +740,25 @@
     "backend/data/guidance/contracts/gc0/schema.json": "fc413f6151519b80b5f8b9b2d2fefbd993066d115c54761967db77aa93199d99",
     "backend/data/guidance/contracts/ghandoff/evidence/ghandoff_consumer_evidence.json": "8a867bb3ed73235dd06a14950c9c2adf67cbf28f7470575b210dd9594dd75c21",
     "backend/data/guidance/contracts/gid/evidence/gid_evidence.json": "b0e380d86fb22e9377fc4b4517ec9a7c33a80514293a84e3f77502d624c8865a",
-    "backend/data/workpaper_sync_entry_manifest.json": "cad42b621be62ed91415705567f39e4c1219e037330ed8e44a4e3e6f37968ada",
-    "backend/data/workpaper_sync_entry_overlay.json": "cad8e564309f9ce21dabedb7fdd45fd9d43e263fb42c3913a884a99896a7a767",
+    "backend/data/workpaper_sync_entry_manifest.json": "53292ce85bcace7d1a6d64c75ea5a18d10acefa319b7831912311bdcf2f0d2e2",
+    "backend/data/workpaper_sync_entry_overlay.json": "0d5da71737795c0aeab617b4451ceb2af4074cd9dec60c41f542f39bc04c45b3",
     "backend/data/workpaper_sync_program_milestone_definitions.json": "c6838d56d6316a9f6801c4e65531955289f4c11602c50a4f6f8b2f3cc1d11967",
-    "backend/data/workpaper_writer_inventory.json": "b945f471cebfe10c63fc676c6f3ca695bdac3d44883fd5ab074d9d54c0b3efd9",
+    "backend/data/workpaper_writer_inventory.json": "a8a77cb0686aa386600ab7f71c7bbd93eea7e5f212019f3589be7ed7e89c6ead",
     "backend/scripts/check/check_workpaper_writer_revision_gate.py": "ae004ee46002a5253f2ca3c4c448c72d1ae01b6ca9357144b44dc5f5d1bfaf48",
     "backend/scripts/gen/generate_workpaper_sync_manifest.py": "3520003a927776af8ee54bc820a677747ee850ed508ac2c62dc88353c715c793",
     "docs/operations/workpaper-html-onlyoffice-bidirectional-writeback-master-control.md": "185752bd3d3a8abe7c893da0982cb8f2e49995e9c70429e6d0e7db74aebed921"
   },
-  "manifest_digest": "87602a8b5cbf7dca925bfa0af2e0fe8cf487d6b958b997df0643ed8238d48cf7",
+  "manifest_digest": "afdffafdba8861d9522c9387394f9f9378e27b7ab78706fbc6228d812e7edc60",
   "manifest_facts": {
     "capability_counts": {
       "bidirectional": 4,
       "single_html": 5,
-      "single_onlyoffice": 175,
+      "single_onlyoffice": 145,
       "unreachable": 1
     },
-    "entry_count": 185,
+    "entry_count": 155,
     "independent_entry_count": 142,
-    "manifest_digest": "87602a8b5cbf7dca925bfa0af2e0fe8cf487d6b958b997df0643ed8238d48cf7",
+    "manifest_digest": "afdffafdba8861d9522c9387394f9f9378e27b7ab78706fbc6228d812e7edc60",
     "profile_consistent": true,
     "reviewed_entries": {
       "xlsx/b60/gt-b60-bundle": {
@@ -895,7 +888,7 @@
             },
             {
               "path": ".kiro/specs/workpaper-page-formula-toolbar-closure/evidence/F-SHELL/envelope.json",
-              "sha256": "c583911ac9d92a540ecaf491ed401c7bf43c0a3b98d9b21df5c7aef0188a3201"
+              "sha256": "1923b8d31d64d575b027a54f0d5345ce06b897e8b1641eba7314562169309811"
             }
           ]
         }
@@ -1414,6 +1407,7 @@
                     "artifact_digest_mismatch:network",
                     "database:source_digest_mismatch:backend/app/models/workpaper_sync_models.py",
                     "database:source_digest_mismatch:backend/app/services/workpaper_sync/models.py",
+                    "editor_config:source_digest_mismatch:backend/app/routers/wp_onlyoffice_router.py",
                     "editor_config:source_digest_mismatch:backend/app/services/workpaper_sync/callback_route.py",
                     "index_denominator_mismatch",
                     "index_entry_denominator_mismatch",
@@ -1446,7 +1440,7 @@
                   },
                   {
                     "path": "audit-platform/frontend/src/components/workpaper/GtD2AccountsReceivable.vue",
-                    "sha256": "7b89e2063b6b740a1833aaa6f8475b0235a28d501d0b9f3559dd09ea0930a62c"
+                    "sha256": "10fe40412102356c9f4961c148ed399abce10cfaac3f7fc3ba7ce4b3838e7b40"
                   },
                   {
                     "path": "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue",
@@ -1466,15 +1460,15 @@
                   },
                   {
                     "path": "backend/app/routers/wp_onlyoffice_router.py",
-                    "sha256": "f284846bdc719e36d404a242c45cd5921cbd4761768ff924aaf74317cf2e7ed6"
+                    "sha256": "964176aa8b28f77f9672713479cf0ccf3ed034bca8b3b6437e3c92ca2c32ecf4"
                   },
                   {
                     "path": "backend/app/routers/wp_sync_router.py",
-                    "sha256": "c7e2a76ffb62d5a2a90f9a3d5ae2db7a3c0b37795cdf5365aaa6be6dca307300"
+                    "sha256": "3c903cf519a55b53cf39652a8aa645e390857fab9912af8426e8913b27a42625"
                   },
                   {
                     "path": "backend/app/services/workpaper_sync/callback_route.py",
-                    "sha256": "68ce8610854b0c8711ec4bb455e45b02f9d3de021c16ced562d563f0f12dc5ea"
+                    "sha256": "dae71f4718bafd4b688a99cb2f07325ccc36c18f4238ced004d624aadfaf2e5a"
                   },
                   {
                     "path": "backend/app/services/workpaper_sync/models.py",
@@ -1494,6 +1488,7 @@
                     "artifact_digest_mismatch:network",
                     "database:source_digest_mismatch:backend/app/models/workpaper_sync_models.py",
                     "database:source_digest_mismatch:backend/app/services/workpaper_sync/models.py",
+                    "editor_config:source_digest_mismatch:backend/app/routers/wp_onlyoffice_router.py",
                     "editor_config:source_digest_mismatch:backend/app/services/workpaper_sync/callback_route.py",
                     "index_denominator_mismatch",
                     "index_entry_denominator_mismatch",
@@ -1526,7 +1521,7 @@
                   },
                   {
                     "path": "audit-platform/frontend/src/components/workpaper/GtD2AccountsReceivable.vue",
-                    "sha256": "7b89e2063b6b740a1833aaa6f8475b0235a28d501d0b9f3559dd09ea0930a62c"
+                    "sha256": "10fe40412102356c9f4961c148ed399abce10cfaac3f7fc3ba7ce4b3838e7b40"
                   },
                   {
                     "path": "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue",
@@ -1546,15 +1541,15 @@
                   },
                   {
                     "path": "backend/app/routers/wp_onlyoffice_router.py",
-                    "sha256": "f284846bdc719e36d404a242c45cd5921cbd4761768ff924aaf74317cf2e7ed6"
+                    "sha256": "964176aa8b28f77f9672713479cf0ccf3ed034bca8b3b6437e3c92ca2c32ecf4"
                   },
                   {
                     "path": "backend/app/routers/wp_sync_router.py",
-                    "sha256": "c7e2a76ffb62d5a2a90f9a3d5ae2db7a3c0b37795cdf5365aaa6be6dca307300"
+                    "sha256": "3c903cf519a55b53cf39652a8aa645e390857fab9912af8426e8913b27a42625"
                   },
                   {
                     "path": "backend/app/services/workpaper_sync/callback_route.py",
-                    "sha256": "68ce8610854b0c8711ec4bb455e45b02f9d3de021c16ced562d563f0f12dc5ea"
+                    "sha256": "dae71f4718bafd4b688a99cb2f07325ccc36c18f4238ced004d624aadfaf2e5a"
                   },
                   {
                     "path": "backend/app/services/workpaper_sync/models.py",
@@ -1574,6 +1569,7 @@
                     "artifact_digest_mismatch:network",
                     "database:source_digest_mismatch:backend/app/models/workpaper_sync_models.py",
                     "database:source_digest_mismatch:backend/app/services/workpaper_sync/models.py",
+                    "editor_config:source_digest_mismatch:backend/app/routers/wp_onlyoffice_router.py",
                     "editor_config:source_digest_mismatch:backend/app/services/workpaper_sync/callback_route.py",
                     "index_denominator_mismatch",
                     "index_entry_denominator_mismatch",
@@ -1606,7 +1602,7 @@
                   },
                   {
                     "path": "audit-platform/frontend/src/components/workpaper/GtD2AccountsReceivable.vue",
-                    "sha256": "7b89e2063b6b740a1833aaa6f8475b0235a28d501d0b9f3559dd09ea0930a62c"
+                    "sha256": "10fe40412102356c9f4961c148ed399abce10cfaac3f7fc3ba7ce4b3838e7b40"
                   },
                   {
                     "path": "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue",
@@ -1626,15 +1622,15 @@
                   },
                   {
                     "path": "backend/app/routers/wp_onlyoffice_router.py",
-                    "sha256": "f284846bdc719e36d404a242c45cd5921cbd4761768ff924aaf74317cf2e7ed6"
+                    "sha256": "964176aa8b28f77f9672713479cf0ccf3ed034bca8b3b6437e3c92ca2c32ecf4"
                   },
                   {
                     "path": "backend/app/routers/wp_sync_router.py",
-                    "sha256": "c7e2a76ffb62d5a2a90f9a3d5ae2db7a3c0b37795cdf5365aaa6be6dca307300"
+                    "sha256": "3c903cf519a55b53cf39652a8aa645e390857fab9912af8426e8913b27a42625"
                   },
                   {
                     "path": "backend/app/services/workpaper_sync/callback_route.py",
-                    "sha256": "68ce8610854b0c8711ec4bb455e45b02f9d3de021c16ced562d563f0f12dc5ea"
+                    "sha256": "dae71f4718bafd4b688a99cb2f07325ccc36c18f4238ced004d624aadfaf2e5a"
                   },
                   {
                     "path": "backend/app/services/workpaper_sync/models.py",
@@ -1654,6 +1650,7 @@
                     "artifact_digest_mismatch:network",
                     "database:source_digest_mismatch:backend/app/models/workpaper_sync_models.py",
                     "database:source_digest_mismatch:backend/app/services/workpaper_sync/models.py",
+                    "editor_config:source_digest_mismatch:backend/app/routers/wp_onlyoffice_router.py",
                     "editor_config:source_digest_mismatch:backend/app/services/workpaper_sync/callback_route.py",
                     "index_denominator_mismatch",
                     "index_entry_denominator_mismatch",
@@ -1686,7 +1683,7 @@
                   },
                   {
                     "path": "audit-platform/frontend/src/components/workpaper/GtD2AccountsReceivable.vue",
-                    "sha256": "7b89e2063b6b740a1833aaa6f8475b0235a28d501d0b9f3559dd09ea0930a62c"
+                    "sha256": "10fe40412102356c9f4961c148ed399abce10cfaac3f7fc3ba7ce4b3838e7b40"
                   },
                   {
                     "path": "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue",
@@ -1706,15 +1703,15 @@
                   },
                   {
                     "path": "backend/app/routers/wp_onlyoffice_router.py",
-                    "sha256": "f284846bdc719e36d404a242c45cd5921cbd4761768ff924aaf74317cf2e7ed6"
+                    "sha256": "964176aa8b28f77f9672713479cf0ccf3ed034bca8b3b6437e3c92ca2c32ecf4"
                   },
                   {
                     "path": "backend/app/routers/wp_sync_router.py",
-                    "sha256": "c7e2a76ffb62d5a2a90f9a3d5ae2db7a3c0b37795cdf5365aaa6be6dca307300"
+                    "sha256": "3c903cf519a55b53cf39652a8aa645e390857fab9912af8426e8913b27a42625"
                   },
                   {
                     "path": "backend/app/services/workpaper_sync/callback_route.py",
-                    "sha256": "68ce8610854b0c8711ec4bb455e45b02f9d3de021c16ced562d563f0f12dc5ea"
+                    "sha256": "dae71f4718bafd4b688a99cb2f07325ccc36c18f4238ced004d624aadfaf2e5a"
                   },
                   {
                     "path": "backend/app/services/workpaper_sync/models.py",
@@ -1734,6 +1731,7 @@
                     "artifact_digest_mismatch:network",
                     "database:source_digest_mismatch:backend/app/models/workpaper_sync_models.py",
                     "database:source_digest_mismatch:backend/app/services/workpaper_sync/models.py",
+                    "editor_config:source_digest_mismatch:backend/app/routers/wp_onlyoffice_router.py",
                     "editor_config:source_digest_mismatch:backend/app/services/workpaper_sync/callback_route.py",
                     "index_denominator_mismatch",
                     "index_entry_denominator_mismatch",
@@ -1766,7 +1764,7 @@
                   },
                   {
                     "path": "audit-platform/frontend/src/components/workpaper/GtD2AccountsReceivable.vue",
-                    "sha256": "7b89e2063b6b740a1833aaa6f8475b0235a28d501d0b9f3559dd09ea0930a62c"
+                    "sha256": "10fe40412102356c9f4961c148ed399abce10cfaac3f7fc3ba7ce4b3838e7b40"
                   },
                   {
                     "path": "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue",
@@ -1786,15 +1784,15 @@
                   },
                   {
                     "path": "backend/app/routers/wp_onlyoffice_router.py",
-                    "sha256": "f284846bdc719e36d404a242c45cd5921cbd4761768ff924aaf74317cf2e7ed6"
+                    "sha256": "964176aa8b28f77f9672713479cf0ccf3ed034bca8b3b6437e3c92ca2c32ecf4"
                   },
                   {
                     "path": "backend/app/routers/wp_sync_router.py",
-                    "sha256": "c7e2a76ffb62d5a2a90f9a3d5ae2db7a3c0b37795cdf5365aaa6be6dca307300"
+                    "sha256": "3c903cf519a55b53cf39652a8aa645e390857fab9912af8426e8913b27a42625"
                   },
                   {
                     "path": "backend/app/services/workpaper_sync/callback_route.py",
-                    "sha256": "68ce8610854b0c8711ec4bb455e45b02f9d3de021c16ced562d563f0f12dc5ea"
+                    "sha256": "dae71f4718bafd4b688a99cb2f07325ccc36c18f4238ced004d624aadfaf2e5a"
                   },
                   {
                     "path": "backend/app/services/workpaper_sync/models.py",
@@ -1814,6 +1812,7 @@
                     "artifact_digest_mismatch:network",
                     "database:source_digest_mismatch:backend/app/models/workpaper_sync_models.py",
                     "database:source_digest_mismatch:backend/app/services/workpaper_sync/models.py",
+                    "editor_config:source_digest_mismatch:backend/app/routers/wp_onlyoffice_router.py",
                     "editor_config:source_digest_mismatch:backend/app/services/workpaper_sync/callback_route.py",
                     "index_denominator_mismatch",
                     "index_entry_denominator_mismatch",
@@ -1846,7 +1845,7 @@
                   },
                   {
                     "path": "audit-platform/frontend/src/components/workpaper/GtD2AccountsReceivable.vue",
-                    "sha256": "7b89e2063b6b740a1833aaa6f8475b0235a28d501d0b9f3559dd09ea0930a62c"
+                    "sha256": "10fe40412102356c9f4961c148ed399abce10cfaac3f7fc3ba7ce4b3838e7b40"
                   },
                   {
                     "path": "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue",
@@ -1866,15 +1865,15 @@
                   },
                   {
                     "path": "backend/app/routers/wp_onlyoffice_router.py",
-                    "sha256": "f284846bdc719e36d404a242c45cd5921cbd4761768ff924aaf74317cf2e7ed6"
+                    "sha256": "964176aa8b28f77f9672713479cf0ccf3ed034bca8b3b6437e3c92ca2c32ecf4"
                   },
                   {
                     "path": "backend/app/routers/wp_sync_router.py",
-                    "sha256": "c7e2a76ffb62d5a2a90f9a3d5ae2db7a3c0b37795cdf5365aaa6be6dca307300"
+                    "sha256": "3c903cf519a55b53cf39652a8aa645e390857fab9912af8426e8913b27a42625"
                   },
                   {
                     "path": "backend/app/services/workpaper_sync/callback_route.py",
-                    "sha256": "68ce8610854b0c8711ec4bb455e45b02f9d3de021c16ced562d563f0f12dc5ea"
+                    "sha256": "dae71f4718bafd4b688a99cb2f07325ccc36c18f4238ced004d624aadfaf2e5a"
                   },
                   {
                     "path": "backend/app/services/workpaper_sync/models.py",
@@ -1894,6 +1893,7 @@
                     "artifact_digest_mismatch:network",
                     "database:source_digest_mismatch:backend/app/models/workpaper_sync_models.py",
                     "database:source_digest_mismatch:backend/app/services/workpaper_sync/models.py",
+                    "editor_config:source_digest_mismatch:backend/app/routers/wp_onlyoffice_router.py",
                     "editor_config:source_digest_mismatch:backend/app/services/workpaper_sync/callback_route.py",
                     "index_denominator_mismatch",
                     "index_entry_denominator_mismatch",
@@ -1926,7 +1926,7 @@
                   },
                   {
                     "path": "audit-platform/frontend/src/components/workpaper/GtD2AccountsReceivable.vue",
-                    "sha256": "7b89e2063b6b740a1833aaa6f8475b0235a28d501d0b9f3559dd09ea0930a62c"
+                    "sha256": "10fe40412102356c9f4961c148ed399abce10cfaac3f7fc3ba7ce4b3838e7b40"
                   },
                   {
                     "path": "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue",
@@ -1946,15 +1946,15 @@
                   },
                   {
                     "path": "backend/app/routers/wp_onlyoffice_router.py",
-                    "sha256": "f284846bdc719e36d404a242c45cd5921cbd4761768ff924aaf74317cf2e7ed6"
+                    "sha256": "964176aa8b28f77f9672713479cf0ccf3ed034bca8b3b6437e3c92ca2c32ecf4"
                   },
                   {
                     "path": "backend/app/routers/wp_sync_router.py",
-                    "sha256": "c7e2a76ffb62d5a2a90f9a3d5ae2db7a3c0b37795cdf5365aaa6be6dca307300"
+                    "sha256": "3c903cf519a55b53cf39652a8aa645e390857fab9912af8426e8913b27a42625"
                   },
                   {
                     "path": "backend/app/services/workpaper_sync/callback_route.py",
-                    "sha256": "68ce8610854b0c8711ec4bb455e45b02f9d3de021c16ced562d563f0f12dc5ea"
+                    "sha256": "dae71f4718bafd4b688a99cb2f07325ccc36c18f4238ced004d624aadfaf2e5a"
                   },
                   {
                     "path": "backend/app/services/workpaper_sync/models.py",
@@ -1974,6 +1974,7 @@
                     "artifact_digest_mismatch:network",
                     "database:source_digest_mismatch:backend/app/models/workpaper_sync_models.py",
                     "database:source_digest_mismatch:backend/app/services/workpaper_sync/models.py",
+                    "editor_config:source_digest_mismatch:backend/app/routers/wp_onlyoffice_router.py",
                     "editor_config:source_digest_mismatch:backend/app/services/workpaper_sync/callback_route.py",
                     "index_denominator_mismatch",
                     "index_entry_denominator_mismatch",
@@ -2006,7 +2007,7 @@
                   },
                   {
                     "path": "audit-platform/frontend/src/components/workpaper/GtD2AccountsReceivable.vue",
-                    "sha256": "7b89e2063b6b740a1833aaa6f8475b0235a28d501d0b9f3559dd09ea0930a62c"
+                    "sha256": "10fe40412102356c9f4961c148ed399abce10cfaac3f7fc3ba7ce4b3838e7b40"
                   },
                   {
                     "path": "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue",
@@ -2026,15 +2027,15 @@
                   },
                   {
                     "path": "backend/app/routers/wp_onlyoffice_router.py",
-                    "sha256": "f284846bdc719e36d404a242c45cd5921cbd4761768ff924aaf74317cf2e7ed6"
+                    "sha256": "964176aa8b28f77f9672713479cf0ccf3ed034bca8b3b6437e3c92ca2c32ecf4"
                   },
                   {
                     "path": "backend/app/routers/wp_sync_router.py",
-                    "sha256": "c7e2a76ffb62d5a2a90f9a3d5ae2db7a3c0b37795cdf5365aaa6be6dca307300"
+                    "sha256": "3c903cf519a55b53cf39652a8aa645e390857fab9912af8426e8913b27a42625"
                   },
                   {
                     "path": "backend/app/services/workpaper_sync/callback_route.py",
-                    "sha256": "68ce8610854b0c8711ec4bb455e45b02f9d3de021c16ced562d563f0f12dc5ea"
+                    "sha256": "dae71f4718bafd4b688a99cb2f07325ccc36c18f4238ced004d624aadfaf2e5a"
                   },
                   {
                     "path": "backend/app/services/workpaper_sync/models.py",
@@ -2153,11 +2154,11 @@
                   },
                   {
                     "path": "backend/app/routers/wp_sync_router.py",
-                    "sha256": "c7e2a76ffb62d5a2a90f9a3d5ae2db7a3c0b37795cdf5365aaa6be6dca307300"
+                    "sha256": "3c903cf519a55b53cf39652a8aa645e390857fab9912af8426e8913b27a42625"
                   },
                   {
                     "path": "backend/app/services/workpaper_sync/callback_route.py",
-                    "sha256": "68ce8610854b0c8711ec4bb455e45b02f9d3de021c16ced562d563f0f12dc5ea"
+                    "sha256": "dae71f4718bafd4b688a99cb2f07325ccc36c18f4238ced004d624aadfaf2e5a"
                   },
                   {
                     "path": "backend/app/services/workpaper_sync/models.py",
@@ -2202,11 +2203,11 @@
                   },
                   {
                     "path": "backend/app/routers/wp_sync_router.py",
-                    "sha256": "c7e2a76ffb62d5a2a90f9a3d5ae2db7a3c0b37795cdf5365aaa6be6dca307300"
+                    "sha256": "3c903cf519a55b53cf39652a8aa645e390857fab9912af8426e8913b27a42625"
                   },
                   {
                     "path": "backend/app/services/workpaper_sync/callback_route.py",
-                    "sha256": "68ce8610854b0c8711ec4bb455e45b02f9d3de021c16ced562d563f0f12dc5ea"
+                    "sha256": "dae71f4718bafd4b688a99cb2f07325ccc36c18f4238ced004d624aadfaf2e5a"
                   },
                   {
                     "path": "backend/app/services/workpaper_sync/models.py",
@@ -2251,11 +2252,11 @@
                   },
                   {
                     "path": "backend/app/routers/wp_sync_router.py",
-                    "sha256": "c7e2a76ffb62d5a2a90f9a3d5ae2db7a3c0b37795cdf5365aaa6be6dca307300"
+                    "sha256": "3c903cf519a55b53cf39652a8aa645e390857fab9912af8426e8913b27a42625"
                   },
                   {
                     "path": "backend/app/services/workpaper_sync/callback_route.py",
-                    "sha256": "68ce8610854b0c8711ec4bb455e45b02f9d3de021c16ced562d563f0f12dc5ea"
+                    "sha256": "dae71f4718bafd4b688a99cb2f07325ccc36c18f4238ced004d624aadfaf2e5a"
                   },
                   {
                     "path": "backend/app/services/workpaper_sync/models.py",
@@ -2300,11 +2301,11 @@
                   },
                   {
                     "path": "backend/app/routers/wp_sync_router.py",
-                    "sha256": "c7e2a76ffb62d5a2a90f9a3d5ae2db7a3c0b37795cdf5365aaa6be6dca307300"
+                    "sha256": "3c903cf519a55b53cf39652a8aa645e390857fab9912af8426e8913b27a42625"
                   },
                   {
                     "path": "backend/app/services/workpaper_sync/callback_route.py",
-                    "sha256": "68ce8610854b0c8711ec4bb455e45b02f9d3de021c16ced562d563f0f12dc5ea"
+                    "sha256": "dae71f4718bafd4b688a99cb2f07325ccc36c18f4238ced004d624aadfaf2e5a"
                   },
                   {
                     "path": "backend/app/services/workpaper_sync/models.py",
@@ -2349,11 +2350,11 @@
                   },
                   {
                     "path": "backend/app/routers/wp_sync_router.py",
-                    "sha256": "c7e2a76ffb62d5a2a90f9a3d5ae2db7a3c0b37795cdf5365aaa6be6dca307300"
+                    "sha256": "3c903cf519a55b53cf39652a8aa645e390857fab9912af8426e8913b27a42625"
                   },
                   {
                     "path": "backend/app/services/workpaper_sync/callback_route.py",
-                    "sha256": "68ce8610854b0c8711ec4bb455e45b02f9d3de021c16ced562d563f0f12dc5ea"
+                    "sha256": "dae71f4718bafd4b688a99cb2f07325ccc36c18f4238ced004d624aadfaf2e5a"
                   },
                   {
                     "path": "backend/app/services/workpaper_sync/models.py",
@@ -2398,11 +2399,11 @@
                   },
                   {
                     "path": "backend/app/routers/wp_sync_router.py",
-                    "sha256": "c7e2a76ffb62d5a2a90f9a3d5ae2db7a3c0b37795cdf5365aaa6be6dca307300"
+                    "sha256": "3c903cf519a55b53cf39652a8aa645e390857fab9912af8426e8913b27a42625"
                   },
                   {
                     "path": "backend/app/services/workpaper_sync/callback_route.py",
-                    "sha256": "68ce8610854b0c8711ec4bb455e45b02f9d3de021c16ced562d563f0f12dc5ea"
+                    "sha256": "dae71f4718bafd4b688a99cb2f07325ccc36c18f4238ced004d624aadfaf2e5a"
                   },
                   {
                     "path": "backend/app/services/workpaper_sync/models.py",
@@ -2447,11 +2448,11 @@
                   },
                   {
                     "path": "backend/app/routers/wp_sync_router.py",
-                    "sha256": "c7e2a76ffb62d5a2a90f9a3d5ae2db7a3c0b37795cdf5365aaa6be6dca307300"
+                    "sha256": "3c903cf519a55b53cf39652a8aa645e390857fab9912af8426e8913b27a42625"
                   },
                   {
                     "path": "backend/app/services/workpaper_sync/callback_route.py",
-                    "sha256": "68ce8610854b0c8711ec4bb455e45b02f9d3de021c16ced562d563f0f12dc5ea"
+                    "sha256": "dae71f4718bafd4b688a99cb2f07325ccc36c18f4238ced004d624aadfaf2e5a"
                   },
                   {
                     "path": "backend/app/services/workpaper_sync/models.py",
@@ -2496,11 +2497,11 @@
                   },
                   {
                     "path": "backend/app/routers/wp_sync_router.py",
-                    "sha256": "c7e2a76ffb62d5a2a90f9a3d5ae2db7a3c0b37795cdf5365aaa6be6dca307300"
+                    "sha256": "3c903cf519a55b53cf39652a8aa645e390857fab9912af8426e8913b27a42625"
                   },
                   {
                     "path": "backend/app/services/workpaper_sync/callback_route.py",
-                    "sha256": "68ce8610854b0c8711ec4bb455e45b02f9d3de021c16ced562d563f0f12dc5ea"
+                    "sha256": "dae71f4718bafd4b688a99cb2f07325ccc36c18f4238ced004d624aadfaf2e5a"
                   },
                   {
                     "path": "backend/app/services/workpaper_sync/models.py",
@@ -2609,11 +2610,11 @@
                   },
                   {
                     "path": "backend/app/routers/wp_sync_router.py",
-                    "sha256": "c7e2a76ffb62d5a2a90f9a3d5ae2db7a3c0b37795cdf5365aaa6be6dca307300"
+                    "sha256": "3c903cf519a55b53cf39652a8aa645e390857fab9912af8426e8913b27a42625"
                   },
                   {
                     "path": "backend/app/services/workpaper_sync/callback_route.py",
-                    "sha256": "68ce8610854b0c8711ec4bb455e45b02f9d3de021c16ced562d563f0f12dc5ea"
+                    "sha256": "dae71f4718bafd4b688a99cb2f07325ccc36c18f4238ced004d624aadfaf2e5a"
                   },
                   {
                     "path": "backend/app/services/workpaper_sync/models.py",
@@ -2658,11 +2659,11 @@
                   },
                   {
                     "path": "backend/app/routers/wp_sync_router.py",
-                    "sha256": "c7e2a76ffb62d5a2a90f9a3d5ae2db7a3c0b37795cdf5365aaa6be6dca307300"
+                    "sha256": "3c903cf519a55b53cf39652a8aa645e390857fab9912af8426e8913b27a42625"
                   },
                   {
                     "path": "backend/app/services/workpaper_sync/callback_route.py",
-                    "sha256": "68ce8610854b0c8711ec4bb455e45b02f9d3de021c16ced562d563f0f12dc5ea"
+                    "sha256": "dae71f4718bafd4b688a99cb2f07325ccc36c18f4238ced004d624aadfaf2e5a"
                   },
                   {
                     "path": "backend/app/services/workpaper_sync/models.py",
@@ -2707,11 +2708,11 @@
                   },
                   {
                     "path": "backend/app/routers/wp_sync_router.py",
-                    "sha256": "c7e2a76ffb62d5a2a90f9a3d5ae2db7a3c0b37795cdf5365aaa6be6dca307300"
+                    "sha256": "3c903cf519a55b53cf39652a8aa645e390857fab9912af8426e8913b27a42625"
                   },
                   {
                     "path": "backend/app/services/workpaper_sync/callback_route.py",
-                    "sha256": "68ce8610854b0c8711ec4bb455e45b02f9d3de021c16ced562d563f0f12dc5ea"
+                    "sha256": "dae71f4718bafd4b688a99cb2f07325ccc36c18f4238ced004d624aadfaf2e5a"
                   },
                   {
                     "path": "backend/app/services/workpaper_sync/models.py",
@@ -2756,11 +2757,11 @@
                   },
                   {
                     "path": "backend/app/routers/wp_sync_router.py",
-                    "sha256": "c7e2a76ffb62d5a2a90f9a3d5ae2db7a3c0b37795cdf5365aaa6be6dca307300"
+                    "sha256": "3c903cf519a55b53cf39652a8aa645e390857fab9912af8426e8913b27a42625"
                   },
                   {
                     "path": "backend/app/services/workpaper_sync/callback_route.py",
-                    "sha256": "68ce8610854b0c8711ec4bb455e45b02f9d3de021c16ced562d563f0f12dc5ea"
+                    "sha256": "dae71f4718bafd4b688a99cb2f07325ccc36c18f4238ced004d624aadfaf2e5a"
                   },
                   {
                     "path": "backend/app/services/workpaper_sync/models.py",
@@ -2805,11 +2806,11 @@
                   },
                   {
                     "path": "backend/app/routers/wp_sync_router.py",
-                    "sha256": "c7e2a76ffb62d5a2a90f9a3d5ae2db7a3c0b37795cdf5365aaa6be6dca307300"
+                    "sha256": "3c903cf519a55b53cf39652a8aa645e390857fab9912af8426e8913b27a42625"
                   },
                   {
                     "path": "backend/app/services/workpaper_sync/callback_route.py",
-                    "sha256": "68ce8610854b0c8711ec4bb455e45b02f9d3de021c16ced562d563f0f12dc5ea"
+                    "sha256": "dae71f4718bafd4b688a99cb2f07325ccc36c18f4238ced004d624aadfaf2e5a"
                   },
                   {
                     "path": "backend/app/services/workpaper_sync/models.py",
@@ -2854,11 +2855,11 @@
                   },
                   {
                     "path": "backend/app/routers/wp_sync_router.py",
-                    "sha256": "c7e2a76ffb62d5a2a90f9a3d5ae2db7a3c0b37795cdf5365aaa6be6dca307300"
+                    "sha256": "3c903cf519a55b53cf39652a8aa645e390857fab9912af8426e8913b27a42625"
                   },
                   {
                     "path": "backend/app/services/workpaper_sync/callback_route.py",
-                    "sha256": "68ce8610854b0c8711ec4bb455e45b02f9d3de021c16ced562d563f0f12dc5ea"
+                    "sha256": "dae71f4718bafd4b688a99cb2f07325ccc36c18f4238ced004d624aadfaf2e5a"
                   },
                   {
                     "path": "backend/app/services/workpaper_sync/models.py",
@@ -2903,11 +2904,11 @@
                   },
                   {
                     "path": "backend/app/routers/wp_sync_router.py",
-                    "sha256": "c7e2a76ffb62d5a2a90f9a3d5ae2db7a3c0b37795cdf5365aaa6be6dca307300"
+                    "sha256": "3c903cf519a55b53cf39652a8aa645e390857fab9912af8426e8913b27a42625"
                   },
                   {
                     "path": "backend/app/services/workpaper_sync/callback_route.py",
-                    "sha256": "68ce8610854b0c8711ec4bb455e45b02f9d3de021c16ced562d563f0f12dc5ea"
+                    "sha256": "dae71f4718bafd4b688a99cb2f07325ccc36c18f4238ced004d624aadfaf2e5a"
                   },
                   {
                     "path": "backend/app/services/workpaper_sync/models.py",
@@ -2952,11 +2953,11 @@
                   },
                   {
                     "path": "backend/app/routers/wp_sync_router.py",
-                    "sha256": "c7e2a76ffb62d5a2a90f9a3d5ae2db7a3c0b37795cdf5365aaa6be6dca307300"
+                    "sha256": "3c903cf519a55b53cf39652a8aa645e390857fab9912af8426e8913b27a42625"
                   },
                   {
                     "path": "backend/app/services/workpaper_sync/callback_route.py",
-                    "sha256": "68ce8610854b0c8711ec4bb455e45b02f9d3de021c16ced562d563f0f12dc5ea"
+                    "sha256": "dae71f4718bafd4b688a99cb2f07325ccc36c18f4238ced004d624aadfaf2e5a"
                   },
                   {
                     "path": "backend/app/services/workpaper_sync/models.py",
@@ -3064,11 +3065,11 @@
                   },
                   {
                     "path": "backend/app/routers/wp_sync_router.py",
-                    "sha256": "c7e2a76ffb62d5a2a90f9a3d5ae2db7a3c0b37795cdf5365aaa6be6dca307300"
+                    "sha256": "3c903cf519a55b53cf39652a8aa645e390857fab9912af8426e8913b27a42625"
                   },
                   {
                     "path": "backend/app/services/workpaper_sync/callback_route.py",
-                    "sha256": "68ce8610854b0c8711ec4bb455e45b02f9d3de021c16ced562d563f0f12dc5ea"
+                    "sha256": "dae71f4718bafd4b688a99cb2f07325ccc36c18f4238ced004d624aadfaf2e5a"
                   },
                   {
                     "path": "backend/app/services/workpaper_sync/models.py",
@@ -3112,11 +3113,11 @@
                   },
                   {
                     "path": "backend/app/routers/wp_sync_router.py",
-                    "sha256": "c7e2a76ffb62d5a2a90f9a3d5ae2db7a3c0b37795cdf5365aaa6be6dca307300"
+                    "sha256": "3c903cf519a55b53cf39652a8aa645e390857fab9912af8426e8913b27a42625"
                   },
                   {
                     "path": "backend/app/services/workpaper_sync/callback_route.py",
-                    "sha256": "68ce8610854b0c8711ec4bb455e45b02f9d3de021c16ced562d563f0f12dc5ea"
+                    "sha256": "dae71f4718bafd4b688a99cb2f07325ccc36c18f4238ced004d624aadfaf2e5a"
                   },
                   {
                     "path": "backend/app/services/workpaper_sync/models.py",
@@ -3160,11 +3161,11 @@
                   },
                   {
                     "path": "backend/app/routers/wp_sync_router.py",
-                    "sha256": "c7e2a76ffb62d5a2a90f9a3d5ae2db7a3c0b37795cdf5365aaa6be6dca307300"
+                    "sha256": "3c903cf519a55b53cf39652a8aa645e390857fab9912af8426e8913b27a42625"
                   },
                   {
                     "path": "backend/app/services/workpaper_sync/callback_route.py",
-                    "sha256": "68ce8610854b0c8711ec4bb455e45b02f9d3de021c16ced562d563f0f12dc5ea"
+                    "sha256": "dae71f4718bafd4b688a99cb2f07325ccc36c18f4238ced004d624aadfaf2e5a"
                   },
                   {
                     "path": "backend/app/services/workpaper_sync/models.py",
@@ -3208,11 +3209,11 @@
                   },
                   {
                     "path": "backend/app/routers/wp_sync_router.py",
-                    "sha256": "c7e2a76ffb62d5a2a90f9a3d5ae2db7a3c0b37795cdf5365aaa6be6dca307300"
+                    "sha256": "3c903cf519a55b53cf39652a8aa645e390857fab9912af8426e8913b27a42625"
                   },
                   {
                     "path": "backend/app/services/workpaper_sync/callback_route.py",
-                    "sha256": "68ce8610854b0c8711ec4bb455e45b02f9d3de021c16ced562d563f0f12dc5ea"
+                    "sha256": "dae71f4718bafd4b688a99cb2f07325ccc36c18f4238ced004d624aadfaf2e5a"
                   },
                   {
                     "path": "backend/app/services/workpaper_sync/models.py",
@@ -3256,11 +3257,11 @@
                   },
                   {
                     "path": "backend/app/routers/wp_sync_router.py",
-                    "sha256": "c7e2a76ffb62d5a2a90f9a3d5ae2db7a3c0b37795cdf5365aaa6be6dca307300"
+                    "sha256": "3c903cf519a55b53cf39652a8aa645e390857fab9912af8426e8913b27a42625"
                   },
                   {
                     "path": "backend/app/services/workpaper_sync/callback_route.py",
-                    "sha256": "68ce8610854b0c8711ec4bb455e45b02f9d3de021c16ced562d563f0f12dc5ea"
+                    "sha256": "dae71f4718bafd4b688a99cb2f07325ccc36c18f4238ced004d624aadfaf2e5a"
                   },
                   {
                     "path": "backend/app/services/workpaper_sync/models.py",
@@ -3304,11 +3305,11 @@
                   },
                   {
                     "path": "backend/app/routers/wp_sync_router.py",
-                    "sha256": "c7e2a76ffb62d5a2a90f9a3d5ae2db7a3c0b37795cdf5365aaa6be6dca307300"
+                    "sha256": "3c903cf519a55b53cf39652a8aa645e390857fab9912af8426e8913b27a42625"
                   },
                   {
                     "path": "backend/app/services/workpaper_sync/callback_route.py",
-                    "sha256": "68ce8610854b0c8711ec4bb455e45b02f9d3de021c16ced562d563f0f12dc5ea"
+                    "sha256": "dae71f4718bafd4b688a99cb2f07325ccc36c18f4238ced004d624aadfaf2e5a"
                   },
                   {
                     "path": "backend/app/services/workpaper_sync/models.py",
@@ -3352,11 +3353,11 @@
                   },
                   {
                     "path": "backend/app/routers/wp_sync_router.py",
-                    "sha256": "c7e2a76ffb62d5a2a90f9a3d5ae2db7a3c0b37795cdf5365aaa6be6dca307300"
+                    "sha256": "3c903cf519a55b53cf39652a8aa645e390857fab9912af8426e8913b27a42625"
                   },
                   {
                     "path": "backend/app/services/workpaper_sync/callback_route.py",
-                    "sha256": "68ce8610854b0c8711ec4bb455e45b02f9d3de021c16ced562d563f0f12dc5ea"
+                    "sha256": "dae71f4718bafd4b688a99cb2f07325ccc36c18f4238ced004d624aadfaf2e5a"
                   },
                   {
                     "path": "backend/app/services/workpaper_sync/models.py",
@@ -3400,11 +3401,11 @@
                   },
                   {
                     "path": "backend/app/routers/wp_sync_router.py",
-                    "sha256": "c7e2a76ffb62d5a2a90f9a3d5ae2db7a3c0b37795cdf5365aaa6be6dca307300"
+                    "sha256": "3c903cf519a55b53cf39652a8aa645e390857fab9912af8426e8913b27a42625"
                   },
                   {
                     "path": "backend/app/services/workpaper_sync/callback_route.py",
-                    "sha256": "68ce8610854b0c8711ec4bb455e45b02f9d3de021c16ced562d563f0f12dc5ea"
+                    "sha256": "dae71f4718bafd4b688a99cb2f07325ccc36c18f4238ced004d624aadfaf2e5a"
                   },
                   {
                     "path": "backend/app/services/workpaper_sync/models.py",
@@ -3495,7 +3496,7 @@
               },
               {
                 "path": "audit-platform/frontend/src/components/workpaper/GtD2AccountsReceivable.vue",
-                "sha256": "7b89e2063b6b740a1833aaa6f8475b0235a28d501d0b9f3559dd09ea0930a62c"
+                "sha256": "10fe40412102356c9f4961c148ed399abce10cfaac3f7fc3ba7ce4b3838e7b40"
               },
               {
                 "path": "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue",
@@ -3515,15 +3516,15 @@
               },
               {
                 "path": "backend/app/routers/wp_onlyoffice_router.py",
-                "sha256": "f284846bdc719e36d404a242c45cd5921cbd4761768ff924aaf74317cf2e7ed6"
+                "sha256": "964176aa8b28f77f9672713479cf0ccf3ed034bca8b3b6437e3c92ca2c32ecf4"
               },
               {
                 "path": "backend/app/routers/wp_sync_router.py",
-                "sha256": "c7e2a76ffb62d5a2a90f9a3d5ae2db7a3c0b37795cdf5365aaa6be6dca307300"
+                "sha256": "3c903cf519a55b53cf39652a8aa645e390857fab9912af8426e8913b27a42625"
               },
               {
                 "path": "backend/app/services/workpaper_sync/callback_route.py",
-                "sha256": "68ce8610854b0c8711ec4bb455e45b02f9d3de021c16ced562d563f0f12dc5ea"
+                "sha256": "dae71f4718bafd4b688a99cb2f07325ccc36c18f4238ced004d624aadfaf2e5a"
               },
               {
                 "path": "backend/app/services/workpaper_sync/models.py",
@@ -3583,7 +3584,7 @@
               },
               {
                 "path": "audit-platform/frontend/src/components/workpaper/GtD2AccountsReceivable.vue",
-                "sha256": "7b89e2063b6b740a1833aaa6f8475b0235a28d501d0b9f3559dd09ea0930a62c"
+                "sha256": "10fe40412102356c9f4961c148ed399abce10cfaac3f7fc3ba7ce4b3838e7b40"
               },
               {
                 "path": "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue",
@@ -3603,15 +3604,15 @@
               },
               {
                 "path": "backend/app/routers/wp_onlyoffice_router.py",
-                "sha256": "f284846bdc719e36d404a242c45cd5921cbd4761768ff924aaf74317cf2e7ed6"
+                "sha256": "964176aa8b28f77f9672713479cf0ccf3ed034bca8b3b6437e3c92ca2c32ecf4"
               },
               {
                 "path": "backend/app/routers/wp_sync_router.py",
-                "sha256": "c7e2a76ffb62d5a2a90f9a3d5ae2db7a3c0b37795cdf5365aaa6be6dca307300"
+                "sha256": "3c903cf519a55b53cf39652a8aa645e390857fab9912af8426e8913b27a42625"
               },
               {
                 "path": "backend/app/services/workpaper_sync/callback_route.py",
-                "sha256": "68ce8610854b0c8711ec4bb455e45b02f9d3de021c16ced562d563f0f12dc5ea"
+                "sha256": "dae71f4718bafd4b688a99cb2f07325ccc36c18f4238ced004d624aadfaf2e5a"
               },
               {
                 "path": "backend/app/services/workpaper_sync/models.py",
@@ -3671,7 +3672,7 @@
               },
               {
                 "path": "audit-platform/frontend/src/components/workpaper/GtD2AccountsReceivable.vue",
-                "sha256": "7b89e2063b6b740a1833aaa6f8475b0235a28d501d0b9f3559dd09ea0930a62c"
+                "sha256": "10fe40412102356c9f4961c148ed399abce10cfaac3f7fc3ba7ce4b3838e7b40"
               },
               {
                 "path": "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue",
@@ -3691,15 +3692,15 @@
               },
               {
                 "path": "backend/app/routers/wp_onlyoffice_router.py",
-                "sha256": "f284846bdc719e36d404a242c45cd5921cbd4761768ff924aaf74317cf2e7ed6"
+                "sha256": "964176aa8b28f77f9672713479cf0ccf3ed034bca8b3b6437e3c92ca2c32ecf4"
               },
               {
                 "path": "backend/app/routers/wp_sync_router.py",
-                "sha256": "c7e2a76ffb62d5a2a90f9a3d5ae2db7a3c0b37795cdf5365aaa6be6dca307300"
+                "sha256": "3c903cf519a55b53cf39652a8aa645e390857fab9912af8426e8913b27a42625"
               },
               {
                 "path": "backend/app/services/workpaper_sync/callback_route.py",
-                "sha256": "68ce8610854b0c8711ec4bb455e45b02f9d3de021c16ced562d563f0f12dc5ea"
+                "sha256": "dae71f4718bafd4b688a99cb2f07325ccc36c18f4238ced004d624aadfaf2e5a"
               },
               {
                 "path": "backend/app/services/workpaper_sync/models.py",
@@ -3759,7 +3760,7 @@
               },
               {
                 "path": "audit-platform/frontend/src/components/workpaper/GtD2AccountsReceivable.vue",
-                "sha256": "7b89e2063b6b740a1833aaa6f8475b0235a28d501d0b9f3559dd09ea0930a62c"
+                "sha256": "10fe40412102356c9f4961c148ed399abce10cfaac3f7fc3ba7ce4b3838e7b40"
               },
               {
                 "path": "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue",
@@ -3779,15 +3780,15 @@
               },
               {
                 "path": "backend/app/routers/wp_onlyoffice_router.py",
-                "sha256": "f284846bdc719e36d404a242c45cd5921cbd4761768ff924aaf74317cf2e7ed6"
+                "sha256": "964176aa8b28f77f9672713479cf0ccf3ed034bca8b3b6437e3c92ca2c32ecf4"
               },
               {
                 "path": "backend/app/routers/wp_sync_router.py",
-                "sha256": "c7e2a76ffb62d5a2a90f9a3d5ae2db7a3c0b37795cdf5365aaa6be6dca307300"
+                "sha256": "3c903cf519a55b53cf39652a8aa645e390857fab9912af8426e8913b27a42625"
               },
               {
                 "path": "backend/app/services/workpaper_sync/callback_route.py",
-                "sha256": "68ce8610854b0c8711ec4bb455e45b02f9d3de021c16ced562d563f0f12dc5ea"
+                "sha256": "dae71f4718bafd4b688a99cb2f07325ccc36c18f4238ced004d624aadfaf2e5a"
               },
               {
                 "path": "backend/app/services/workpaper_sync/models.py",
@@ -3847,7 +3848,7 @@
               },
               {
                 "path": "audit-platform/frontend/src/components/workpaper/GtD2AccountsReceivable.vue",
-                "sha256": "7b89e2063b6b740a1833aaa6f8475b0235a28d501d0b9f3559dd09ea0930a62c"
+                "sha256": "10fe40412102356c9f4961c148ed399abce10cfaac3f7fc3ba7ce4b3838e7b40"
               },
               {
                 "path": "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue",
@@ -3867,15 +3868,15 @@
               },
               {
                 "path": "backend/app/routers/wp_onlyoffice_router.py",
-                "sha256": "f284846bdc719e36d404a242c45cd5921cbd4761768ff924aaf74317cf2e7ed6"
+                "sha256": "964176aa8b28f77f9672713479cf0ccf3ed034bca8b3b6437e3c92ca2c32ecf4"
               },
               {
                 "path": "backend/app/routers/wp_sync_router.py",
-                "sha256": "c7e2a76ffb62d5a2a90f9a3d5ae2db7a3c0b37795cdf5365aaa6be6dca307300"
+                "sha256": "3c903cf519a55b53cf39652a8aa645e390857fab9912af8426e8913b27a42625"
               },
               {
                 "path": "backend/app/services/workpaper_sync/callback_route.py",
-                "sha256": "68ce8610854b0c8711ec4bb455e45b02f9d3de021c16ced562d563f0f12dc5ea"
+                "sha256": "dae71f4718bafd4b688a99cb2f07325ccc36c18f4238ced004d624aadfaf2e5a"
               },
               {
                 "path": "backend/app/services/workpaper_sync/models.py",
@@ -3935,7 +3936,7 @@
               },
               {
                 "path": "audit-platform/frontend/src/components/workpaper/GtD2AccountsReceivable.vue",
-                "sha256": "7b89e2063b6b740a1833aaa6f8475b0235a28d501d0b9f3559dd09ea0930a62c"
+                "sha256": "10fe40412102356c9f4961c148ed399abce10cfaac3f7fc3ba7ce4b3838e7b40"
               },
               {
                 "path": "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue",
@@ -3955,15 +3956,15 @@
               },
               {
                 "path": "backend/app/routers/wp_onlyoffice_router.py",
-                "sha256": "f284846bdc719e36d404a242c45cd5921cbd4761768ff924aaf74317cf2e7ed6"
+                "sha256": "964176aa8b28f77f9672713479cf0ccf3ed034bca8b3b6437e3c92ca2c32ecf4"
               },
               {
                 "path": "backend/app/routers/wp_sync_router.py",
-                "sha256": "c7e2a76ffb62d5a2a90f9a3d5ae2db7a3c0b37795cdf5365aaa6be6dca307300"
+                "sha256": "3c903cf519a55b53cf39652a8aa645e390857fab9912af8426e8913b27a42625"
               },
               {
                 "path": "backend/app/services/workpaper_sync/callback_route.py",
-                "sha256": "68ce8610854b0c8711ec4bb455e45b02f9d3de021c16ced562d563f0f12dc5ea"
+                "sha256": "dae71f4718bafd4b688a99cb2f07325ccc36c18f4238ced004d624aadfaf2e5a"
               },
               {
                 "path": "backend/app/services/workpaper_sync/models.py",
@@ -4023,7 +4024,7 @@
               },
               {
                 "path": "audit-platform/frontend/src/components/workpaper/GtD2AccountsReceivable.vue",
-                "sha256": "7b89e2063b6b740a1833aaa6f8475b0235a28d501d0b9f3559dd09ea0930a62c"
+                "sha256": "10fe40412102356c9f4961c148ed399abce10cfaac3f7fc3ba7ce4b3838e7b40"
               },
               {
                 "path": "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue",
@@ -4043,15 +4044,15 @@
               },
               {
                 "path": "backend/app/routers/wp_onlyoffice_router.py",
-                "sha256": "f284846bdc719e36d404a242c45cd5921cbd4761768ff924aaf74317cf2e7ed6"
+                "sha256": "964176aa8b28f77f9672713479cf0ccf3ed034bca8b3b6437e3c92ca2c32ecf4"
               },
               {
                 "path": "backend/app/routers/wp_sync_router.py",
-                "sha256": "c7e2a76ffb62d5a2a90f9a3d5ae2db7a3c0b37795cdf5365aaa6be6dca307300"
+                "sha256": "3c903cf519a55b53cf39652a8aa645e390857fab9912af8426e8913b27a42625"
               },
               {
                 "path": "backend/app/services/workpaper_sync/callback_route.py",
-                "sha256": "68ce8610854b0c8711ec4bb455e45b02f9d3de021c16ced562d563f0f12dc5ea"
+                "sha256": "dae71f4718bafd4b688a99cb2f07325ccc36c18f4238ced004d624aadfaf2e5a"
               },
               {
                 "path": "backend/app/services/workpaper_sync/models.py",
@@ -4111,7 +4112,7 @@
               },
               {
                 "path": "audit-platform/frontend/src/components/workpaper/GtD2AccountsReceivable.vue",
-                "sha256": "7b89e2063b6b740a1833aaa6f8475b0235a28d501d0b9f3559dd09ea0930a62c"
+                "sha256": "10fe40412102356c9f4961c148ed399abce10cfaac3f7fc3ba7ce4b3838e7b40"
               },
               {
                 "path": "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue",
@@ -4131,15 +4132,15 @@
               },
               {
                 "path": "backend/app/routers/wp_onlyoffice_router.py",
-                "sha256": "f284846bdc719e36d404a242c45cd5921cbd4761768ff924aaf74317cf2e7ed6"
+                "sha256": "964176aa8b28f77f9672713479cf0ccf3ed034bca8b3b6437e3c92ca2c32ecf4"
               },
               {
                 "path": "backend/app/routers/wp_sync_router.py",
-                "sha256": "c7e2a76ffb62d5a2a90f9a3d5ae2db7a3c0b37795cdf5365aaa6be6dca307300"
+                "sha256": "3c903cf519a55b53cf39652a8aa645e390857fab9912af8426e8913b27a42625"
               },
               {
                 "path": "backend/app/services/workpaper_sync/callback_route.py",
-                "sha256": "68ce8610854b0c8711ec4bb455e45b02f9d3de021c16ced562d563f0f12dc5ea"
+                "sha256": "dae71f4718bafd4b688a99cb2f07325ccc36c18f4238ced004d624aadfaf2e5a"
               },
               {
                 "path": "backend/app/services/workpaper_sync/models.py",
@@ -4180,7 +4181,7 @@
           "source_refs": [
             {
               "path": ".kiro/specs/workpaper-html-onlyoffice-bidirectional-writeback-closure/tasks.md",
-              "sha256": "83d8a8eba2feafded6830db449603986e109d2e50a04e1c0bd510ef6738c6184"
+              "sha256": "d622ba9c5e5cd89cfe128a2d975c784bf2b41d6cb1e6629591743c86a7c95214"
             }
           ]
         },
@@ -4195,6 +4196,7 @@
                     "artifact_digest_mismatch:network",
                     "database:source_digest_mismatch:backend/app/models/workpaper_sync_models.py",
                     "database:source_digest_mismatch:backend/app/services/workpaper_sync/models.py",
+                    "editor_config:source_digest_mismatch:backend/app/routers/wp_onlyoffice_router.py",
                     "editor_config:source_digest_mismatch:backend/app/services/workpaper_sync/callback_route.py",
                     "index_denominator_mismatch",
                     "index_entry_denominator_mismatch",
@@ -4228,7 +4230,7 @@
                   },
                   {
                     "path": "audit-platform/frontend/src/components/workpaper/GtD2AccountsReceivable.vue",
-                    "sha256": "7b89e2063b6b740a1833aaa6f8475b0235a28d501d0b9f3559dd09ea0930a62c"
+                    "sha256": "10fe40412102356c9f4961c148ed399abce10cfaac3f7fc3ba7ce4b3838e7b40"
                   },
                   {
                     "path": "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue",
@@ -4248,15 +4250,15 @@
                   },
                   {
                     "path": "backend/app/routers/wp_onlyoffice_router.py",
-                    "sha256": "f284846bdc719e36d404a242c45cd5921cbd4761768ff924aaf74317cf2e7ed6"
+                    "sha256": "964176aa8b28f77f9672713479cf0ccf3ed034bca8b3b6437e3c92ca2c32ecf4"
                   },
                   {
                     "path": "backend/app/routers/wp_sync_router.py",
-                    "sha256": "c7e2a76ffb62d5a2a90f9a3d5ae2db7a3c0b37795cdf5365aaa6be6dca307300"
+                    "sha256": "3c903cf519a55b53cf39652a8aa645e390857fab9912af8426e8913b27a42625"
                   },
                   {
                     "path": "backend/app/services/workpaper_sync/callback_route.py",
-                    "sha256": "68ce8610854b0c8711ec4bb455e45b02f9d3de021c16ced562d563f0f12dc5ea"
+                    "sha256": "dae71f4718bafd4b688a99cb2f07325ccc36c18f4238ced004d624aadfaf2e5a"
                   },
                   {
                     "path": "backend/app/services/workpaper_sync/models.py",
@@ -4302,11 +4304,11 @@
                   },
                   {
                     "path": "backend/app/routers/wp_sync_router.py",
-                    "sha256": "c7e2a76ffb62d5a2a90f9a3d5ae2db7a3c0b37795cdf5365aaa6be6dca307300"
+                    "sha256": "3c903cf519a55b53cf39652a8aa645e390857fab9912af8426e8913b27a42625"
                   },
                   {
                     "path": "backend/app/services/workpaper_sync/callback_route.py",
-                    "sha256": "68ce8610854b0c8711ec4bb455e45b02f9d3de021c16ced562d563f0f12dc5ea"
+                    "sha256": "dae71f4718bafd4b688a99cb2f07325ccc36c18f4238ced004d624aadfaf2e5a"
                   },
                   {
                     "path": "backend/app/services/workpaper_sync/models.py",
@@ -4352,11 +4354,11 @@
                   },
                   {
                     "path": "backend/app/routers/wp_sync_router.py",
-                    "sha256": "c7e2a76ffb62d5a2a90f9a3d5ae2db7a3c0b37795cdf5365aaa6be6dca307300"
+                    "sha256": "3c903cf519a55b53cf39652a8aa645e390857fab9912af8426e8913b27a42625"
                   },
                   {
                     "path": "backend/app/services/workpaper_sync/callback_route.py",
-                    "sha256": "68ce8610854b0c8711ec4bb455e45b02f9d3de021c16ced562d563f0f12dc5ea"
+                    "sha256": "dae71f4718bafd4b688a99cb2f07325ccc36c18f4238ced004d624aadfaf2e5a"
                   },
                   {
                     "path": "backend/app/services/workpaper_sync/models.py",
@@ -4401,11 +4403,11 @@
                   },
                   {
                     "path": "backend/app/routers/wp_sync_router.py",
-                    "sha256": "c7e2a76ffb62d5a2a90f9a3d5ae2db7a3c0b37795cdf5365aaa6be6dca307300"
+                    "sha256": "3c903cf519a55b53cf39652a8aa645e390857fab9912af8426e8913b27a42625"
                   },
                   {
                     "path": "backend/app/services/workpaper_sync/callback_route.py",
-                    "sha256": "68ce8610854b0c8711ec4bb455e45b02f9d3de021c16ced562d563f0f12dc5ea"
+                    "sha256": "dae71f4718bafd4b688a99cb2f07325ccc36c18f4238ced004d624aadfaf2e5a"
                   },
                   {
                     "path": "backend/app/services/workpaper_sync/models.py",
@@ -4442,7 +4444,7 @@
             },
             {
               "path": "audit-platform/frontend/src/components/workpaper/GtD2AccountsReceivable.vue",
-              "sha256": "7b89e2063b6b740a1833aaa6f8475b0235a28d501d0b9f3559dd09ea0930a62c"
+              "sha256": "10fe40412102356c9f4961c148ed399abce10cfaac3f7fc3ba7ce4b3838e7b40"
             },
             {
               "path": "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue",
@@ -4462,15 +4464,15 @@
             },
             {
               "path": "backend/app/routers/wp_onlyoffice_router.py",
-              "sha256": "f284846bdc719e36d404a242c45cd5921cbd4761768ff924aaf74317cf2e7ed6"
+              "sha256": "964176aa8b28f77f9672713479cf0ccf3ed034bca8b3b6437e3c92ca2c32ecf4"
             },
             {
               "path": "backend/app/routers/wp_sync_router.py",
-              "sha256": "c7e2a76ffb62d5a2a90f9a3d5ae2db7a3c0b37795cdf5365aaa6be6dca307300"
+              "sha256": "3c903cf519a55b53cf39652a8aa645e390857fab9912af8426e8913b27a42625"
             },
             {
               "path": "backend/app/services/workpaper_sync/callback_route.py",
-              "sha256": "68ce8610854b0c8711ec4bb455e45b02f9d3de021c16ced562d563f0f12dc5ea"
+              "sha256": "dae71f4718bafd4b688a99cb2f07325ccc36c18f4238ced004d624aadfaf2e5a"
             },
             {
               "path": "backend/app/services/workpaper_sync/models.py",
@@ -4493,6 +4495,7 @@
                     "artifact_digest_mismatch:network",
                     "database:source_digest_mismatch:backend/app/models/workpaper_sync_models.py",
                     "database:source_digest_mismatch:backend/app/services/workpaper_sync/models.py",
+                    "editor_config:source_digest_mismatch:backend/app/routers/wp_onlyoffice_router.py",
                     "editor_config:source_digest_mismatch:backend/app/services/workpaper_sync/callback_route.py",
                     "index_denominator_mismatch",
                     "index_entry_denominator_mismatch",
@@ -4526,7 +4529,7 @@
                   },
                   {
                     "path": "audit-platform/frontend/src/components/workpaper/GtD2AccountsReceivable.vue",
-                    "sha256": "7b89e2063b6b740a1833aaa6f8475b0235a28d501d0b9f3559dd09ea0930a62c"
+                    "sha256": "10fe40412102356c9f4961c148ed399abce10cfaac3f7fc3ba7ce4b3838e7b40"
                   },
                   {
                     "path": "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue",
@@ -4546,15 +4549,15 @@
                   },
                   {
                     "path": "backend/app/routers/wp_onlyoffice_router.py",
-                    "sha256": "f284846bdc719e36d404a242c45cd5921cbd4761768ff924aaf74317cf2e7ed6"
+                    "sha256": "964176aa8b28f77f9672713479cf0ccf3ed034bca8b3b6437e3c92ca2c32ecf4"
                   },
                   {
                     "path": "backend/app/routers/wp_sync_router.py",
-                    "sha256": "c7e2a76ffb62d5a2a90f9a3d5ae2db7a3c0b37795cdf5365aaa6be6dca307300"
+                    "sha256": "3c903cf519a55b53cf39652a8aa645e390857fab9912af8426e8913b27a42625"
                   },
                   {
                     "path": "backend/app/services/workpaper_sync/callback_route.py",
-                    "sha256": "68ce8610854b0c8711ec4bb455e45b02f9d3de021c16ced562d563f0f12dc5ea"
+                    "sha256": "dae71f4718bafd4b688a99cb2f07325ccc36c18f4238ced004d624aadfaf2e5a"
                   },
                   {
                     "path": "backend/app/services/workpaper_sync/models.py",
@@ -4600,11 +4603,11 @@
                   },
                   {
                     "path": "backend/app/routers/wp_sync_router.py",
-                    "sha256": "c7e2a76ffb62d5a2a90f9a3d5ae2db7a3c0b37795cdf5365aaa6be6dca307300"
+                    "sha256": "3c903cf519a55b53cf39652a8aa645e390857fab9912af8426e8913b27a42625"
                   },
                   {
                     "path": "backend/app/services/workpaper_sync/callback_route.py",
-                    "sha256": "68ce8610854b0c8711ec4bb455e45b02f9d3de021c16ced562d563f0f12dc5ea"
+                    "sha256": "dae71f4718bafd4b688a99cb2f07325ccc36c18f4238ced004d624aadfaf2e5a"
                   },
                   {
                     "path": "backend/app/services/workpaper_sync/models.py",
@@ -4650,11 +4653,11 @@
                   },
                   {
                     "path": "backend/app/routers/wp_sync_router.py",
-                    "sha256": "c7e2a76ffb62d5a2a90f9a3d5ae2db7a3c0b37795cdf5365aaa6be6dca307300"
+                    "sha256": "3c903cf519a55b53cf39652a8aa645e390857fab9912af8426e8913b27a42625"
                   },
                   {
                     "path": "backend/app/services/workpaper_sync/callback_route.py",
-                    "sha256": "68ce8610854b0c8711ec4bb455e45b02f9d3de021c16ced562d563f0f12dc5ea"
+                    "sha256": "dae71f4718bafd4b688a99cb2f07325ccc36c18f4238ced004d624aadfaf2e5a"
                   },
                   {
                     "path": "backend/app/services/workpaper_sync/models.py",
@@ -4699,11 +4702,11 @@
                   },
                   {
                     "path": "backend/app/routers/wp_sync_router.py",
-                    "sha256": "c7e2a76ffb62d5a2a90f9a3d5ae2db7a3c0b37795cdf5365aaa6be6dca307300"
+                    "sha256": "3c903cf519a55b53cf39652a8aa645e390857fab9912af8426e8913b27a42625"
                   },
                   {
                     "path": "backend/app/services/workpaper_sync/callback_route.py",
-                    "sha256": "68ce8610854b0c8711ec4bb455e45b02f9d3de021c16ced562d563f0f12dc5ea"
+                    "sha256": "dae71f4718bafd4b688a99cb2f07325ccc36c18f4238ced004d624aadfaf2e5a"
                   },
                   {
                     "path": "backend/app/services/workpaper_sync/models.py",
@@ -4740,7 +4743,7 @@
             },
             {
               "path": "audit-platform/frontend/src/components/workpaper/GtD2AccountsReceivable.vue",
-              "sha256": "7b89e2063b6b740a1833aaa6f8475b0235a28d501d0b9f3559dd09ea0930a62c"
+              "sha256": "10fe40412102356c9f4961c148ed399abce10cfaac3f7fc3ba7ce4b3838e7b40"
             },
             {
               "path": "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue",
@@ -4760,15 +4763,15 @@
             },
             {
               "path": "backend/app/routers/wp_onlyoffice_router.py",
-              "sha256": "f284846bdc719e36d404a242c45cd5921cbd4761768ff924aaf74317cf2e7ed6"
+              "sha256": "964176aa8b28f77f9672713479cf0ccf3ed034bca8b3b6437e3c92ca2c32ecf4"
             },
             {
               "path": "backend/app/routers/wp_sync_router.py",
-              "sha256": "c7e2a76ffb62d5a2a90f9a3d5ae2db7a3c0b37795cdf5365aaa6be6dca307300"
+              "sha256": "3c903cf519a55b53cf39652a8aa645e390857fab9912af8426e8913b27a42625"
             },
             {
               "path": "backend/app/services/workpaper_sync/callback_route.py",
-              "sha256": "68ce8610854b0c8711ec4bb455e45b02f9d3de021c16ced562d563f0f12dc5ea"
+              "sha256": "dae71f4718bafd4b688a99cb2f07325ccc36c18f4238ced004d624aadfaf2e5a"
             },
             {
               "path": "backend/app/services/workpaper_sync/models.py",
@@ -4791,6 +4794,7 @@
                     "artifact_digest_mismatch:network",
                     "database:source_digest_mismatch:backend/app/models/workpaper_sync_models.py",
                     "database:source_digest_mismatch:backend/app/services/workpaper_sync/models.py",
+                    "editor_config:source_digest_mismatch:backend/app/routers/wp_onlyoffice_router.py",
                     "editor_config:source_digest_mismatch:backend/app/services/workpaper_sync/callback_route.py",
                     "index_denominator_mismatch",
                     "index_entry_denominator_mismatch",
@@ -4824,7 +4828,7 @@
                   },
                   {
                     "path": "audit-platform/frontend/src/components/workpaper/GtD2AccountsReceivable.vue",
-                    "sha256": "7b89e2063b6b740a1833aaa6f8475b0235a28d501d0b9f3559dd09ea0930a62c"
+                    "sha256": "10fe40412102356c9f4961c148ed399abce10cfaac3f7fc3ba7ce4b3838e7b40"
                   },
                   {
                     "path": "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue",
@@ -4844,15 +4848,15 @@
                   },
                   {
                     "path": "backend/app/routers/wp_onlyoffice_router.py",
-                    "sha256": "f284846bdc719e36d404a242c45cd5921cbd4761768ff924aaf74317cf2e7ed6"
+                    "sha256": "964176aa8b28f77f9672713479cf0ccf3ed034bca8b3b6437e3c92ca2c32ecf4"
                   },
                   {
                     "path": "backend/app/routers/wp_sync_router.py",
-                    "sha256": "c7e2a76ffb62d5a2a90f9a3d5ae2db7a3c0b37795cdf5365aaa6be6dca307300"
+                    "sha256": "3c903cf519a55b53cf39652a8aa645e390857fab9912af8426e8913b27a42625"
                   },
                   {
                     "path": "backend/app/services/workpaper_sync/callback_route.py",
-                    "sha256": "68ce8610854b0c8711ec4bb455e45b02f9d3de021c16ced562d563f0f12dc5ea"
+                    "sha256": "dae71f4718bafd4b688a99cb2f07325ccc36c18f4238ced004d624aadfaf2e5a"
                   },
                   {
                     "path": "backend/app/services/workpaper_sync/models.py",
@@ -4898,11 +4902,11 @@
                   },
                   {
                     "path": "backend/app/routers/wp_sync_router.py",
-                    "sha256": "c7e2a76ffb62d5a2a90f9a3d5ae2db7a3c0b37795cdf5365aaa6be6dca307300"
+                    "sha256": "3c903cf519a55b53cf39652a8aa645e390857fab9912af8426e8913b27a42625"
                   },
                   {
                     "path": "backend/app/services/workpaper_sync/callback_route.py",
-                    "sha256": "68ce8610854b0c8711ec4bb455e45b02f9d3de021c16ced562d563f0f12dc5ea"
+                    "sha256": "dae71f4718bafd4b688a99cb2f07325ccc36c18f4238ced004d624aadfaf2e5a"
                   },
                   {
                     "path": "backend/app/services/workpaper_sync/models.py",
@@ -4948,11 +4952,11 @@
                   },
                   {
                     "path": "backend/app/routers/wp_sync_router.py",
-                    "sha256": "c7e2a76ffb62d5a2a90f9a3d5ae2db7a3c0b37795cdf5365aaa6be6dca307300"
+                    "sha256": "3c903cf519a55b53cf39652a8aa645e390857fab9912af8426e8913b27a42625"
                   },
                   {
                     "path": "backend/app/services/workpaper_sync/callback_route.py",
-                    "sha256": "68ce8610854b0c8711ec4bb455e45b02f9d3de021c16ced562d563f0f12dc5ea"
+                    "sha256": "dae71f4718bafd4b688a99cb2f07325ccc36c18f4238ced004d624aadfaf2e5a"
                   },
                   {
                     "path": "backend/app/services/workpaper_sync/models.py",
@@ -4997,11 +5001,11 @@
                   },
                   {
                     "path": "backend/app/routers/wp_sync_router.py",
-                    "sha256": "c7e2a76ffb62d5a2a90f9a3d5ae2db7a3c0b37795cdf5365aaa6be6dca307300"
+                    "sha256": "3c903cf519a55b53cf39652a8aa645e390857fab9912af8426e8913b27a42625"
                   },
                   {
                     "path": "backend/app/services/workpaper_sync/callback_route.py",
-                    "sha256": "68ce8610854b0c8711ec4bb455e45b02f9d3de021c16ced562d563f0f12dc5ea"
+                    "sha256": "dae71f4718bafd4b688a99cb2f07325ccc36c18f4238ced004d624aadfaf2e5a"
                   },
                   {
                     "path": "backend/app/services/workpaper_sync/models.py",
@@ -5038,7 +5042,7 @@
             },
             {
               "path": "audit-platform/frontend/src/components/workpaper/GtD2AccountsReceivable.vue",
-              "sha256": "7b89e2063b6b740a1833aaa6f8475b0235a28d501d0b9f3559dd09ea0930a62c"
+              "sha256": "10fe40412102356c9f4961c148ed399abce10cfaac3f7fc3ba7ce4b3838e7b40"
             },
             {
               "path": "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue",
@@ -5058,15 +5062,15 @@
             },
             {
               "path": "backend/app/routers/wp_onlyoffice_router.py",
-              "sha256": "f284846bdc719e36d404a242c45cd5921cbd4761768ff924aaf74317cf2e7ed6"
+              "sha256": "964176aa8b28f77f9672713479cf0ccf3ed034bca8b3b6437e3c92ca2c32ecf4"
             },
             {
               "path": "backend/app/routers/wp_sync_router.py",
-              "sha256": "c7e2a76ffb62d5a2a90f9a3d5ae2db7a3c0b37795cdf5365aaa6be6dca307300"
+              "sha256": "3c903cf519a55b53cf39652a8aa645e390857fab9912af8426e8913b27a42625"
             },
             {
               "path": "backend/app/services/workpaper_sync/callback_route.py",
-              "sha256": "68ce8610854b0c8711ec4bb455e45b02f9d3de021c16ced562d563f0f12dc5ea"
+              "sha256": "dae71f4718bafd4b688a99cb2f07325ccc36c18f4238ced004d624aadfaf2e5a"
             },
             {
               "path": "backend/app/services/workpaper_sync/models.py",
@@ -5089,6 +5093,7 @@
                     "artifact_digest_mismatch:network",
                     "database:source_digest_mismatch:backend/app/models/workpaper_sync_models.py",
                     "database:source_digest_mismatch:backend/app/services/workpaper_sync/models.py",
+                    "editor_config:source_digest_mismatch:backend/app/routers/wp_onlyoffice_router.py",
                     "editor_config:source_digest_mismatch:backend/app/services/workpaper_sync/callback_route.py",
                     "index_denominator_mismatch",
                     "index_entry_denominator_mismatch",
@@ -5122,7 +5127,7 @@
                   },
                   {
                     "path": "audit-platform/frontend/src/components/workpaper/GtD2AccountsReceivable.vue",
-                    "sha256": "7b89e2063b6b740a1833aaa6f8475b0235a28d501d0b9f3559dd09ea0930a62c"
+                    "sha256": "10fe40412102356c9f4961c148ed399abce10cfaac3f7fc3ba7ce4b3838e7b40"
                   },
                   {
                     "path": "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue",
@@ -5142,15 +5147,15 @@
                   },
                   {
                     "path": "backend/app/routers/wp_onlyoffice_router.py",
-                    "sha256": "f284846bdc719e36d404a242c45cd5921cbd4761768ff924aaf74317cf2e7ed6"
+                    "sha256": "964176aa8b28f77f9672713479cf0ccf3ed034bca8b3b6437e3c92ca2c32ecf4"
                   },
                   {
                     "path": "backend/app/routers/wp_sync_router.py",
-                    "sha256": "c7e2a76ffb62d5a2a90f9a3d5ae2db7a3c0b37795cdf5365aaa6be6dca307300"
+                    "sha256": "3c903cf519a55b53cf39652a8aa645e390857fab9912af8426e8913b27a42625"
                   },
                   {
                     "path": "backend/app/services/workpaper_sync/callback_route.py",
-                    "sha256": "68ce8610854b0c8711ec4bb455e45b02f9d3de021c16ced562d563f0f12dc5ea"
+                    "sha256": "dae71f4718bafd4b688a99cb2f07325ccc36c18f4238ced004d624aadfaf2e5a"
                   },
                   {
                     "path": "backend/app/services/workpaper_sync/models.py",
@@ -5196,11 +5201,11 @@
                   },
                   {
                     "path": "backend/app/routers/wp_sync_router.py",
-                    "sha256": "c7e2a76ffb62d5a2a90f9a3d5ae2db7a3c0b37795cdf5365aaa6be6dca307300"
+                    "sha256": "3c903cf519a55b53cf39652a8aa645e390857fab9912af8426e8913b27a42625"
                   },
                   {
                     "path": "backend/app/services/workpaper_sync/callback_route.py",
-                    "sha256": "68ce8610854b0c8711ec4bb455e45b02f9d3de021c16ced562d563f0f12dc5ea"
+                    "sha256": "dae71f4718bafd4b688a99cb2f07325ccc36c18f4238ced004d624aadfaf2e5a"
                   },
                   {
                     "path": "backend/app/services/workpaper_sync/models.py",
@@ -5246,11 +5251,11 @@
                   },
                   {
                     "path": "backend/app/routers/wp_sync_router.py",
-                    "sha256": "c7e2a76ffb62d5a2a90f9a3d5ae2db7a3c0b37795cdf5365aaa6be6dca307300"
+                    "sha256": "3c903cf519a55b53cf39652a8aa645e390857fab9912af8426e8913b27a42625"
                   },
                   {
                     "path": "backend/app/services/workpaper_sync/callback_route.py",
-                    "sha256": "68ce8610854b0c8711ec4bb455e45b02f9d3de021c16ced562d563f0f12dc5ea"
+                    "sha256": "dae71f4718bafd4b688a99cb2f07325ccc36c18f4238ced004d624aadfaf2e5a"
                   },
                   {
                     "path": "backend/app/services/workpaper_sync/models.py",
@@ -5295,11 +5300,11 @@
                   },
                   {
                     "path": "backend/app/routers/wp_sync_router.py",
-                    "sha256": "c7e2a76ffb62d5a2a90f9a3d5ae2db7a3c0b37795cdf5365aaa6be6dca307300"
+                    "sha256": "3c903cf519a55b53cf39652a8aa645e390857fab9912af8426e8913b27a42625"
                   },
                   {
                     "path": "backend/app/services/workpaper_sync/callback_route.py",
-                    "sha256": "68ce8610854b0c8711ec4bb455e45b02f9d3de021c16ced562d563f0f12dc5ea"
+                    "sha256": "dae71f4718bafd4b688a99cb2f07325ccc36c18f4238ced004d624aadfaf2e5a"
                   },
                   {
                     "path": "backend/app/services/workpaper_sync/models.py",
@@ -5336,7 +5341,7 @@
             },
             {
               "path": "audit-platform/frontend/src/components/workpaper/GtD2AccountsReceivable.vue",
-              "sha256": "7b89e2063b6b740a1833aaa6f8475b0235a28d501d0b9f3559dd09ea0930a62c"
+              "sha256": "10fe40412102356c9f4961c148ed399abce10cfaac3f7fc3ba7ce4b3838e7b40"
             },
             {
               "path": "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue",
@@ -5356,15 +5361,15 @@
             },
             {
               "path": "backend/app/routers/wp_onlyoffice_router.py",
-              "sha256": "f284846bdc719e36d404a242c45cd5921cbd4761768ff924aaf74317cf2e7ed6"
+              "sha256": "964176aa8b28f77f9672713479cf0ccf3ed034bca8b3b6437e3c92ca2c32ecf4"
             },
             {
               "path": "backend/app/routers/wp_sync_router.py",
-              "sha256": "c7e2a76ffb62d5a2a90f9a3d5ae2db7a3c0b37795cdf5365aaa6be6dca307300"
+              "sha256": "3c903cf519a55b53cf39652a8aa645e390857fab9912af8426e8913b27a42625"
             },
             {
               "path": "backend/app/services/workpaper_sync/callback_route.py",
-              "sha256": "68ce8610854b0c8711ec4bb455e45b02f9d3de021c16ced562d563f0f12dc5ea"
+              "sha256": "dae71f4718bafd4b688a99cb2f07325ccc36c18f4238ced004d624aadfaf2e5a"
             },
             {
               "path": "backend/app/services/workpaper_sync/models.py",
@@ -5387,6 +5392,7 @@
                     "artifact_digest_mismatch:network",
                     "database:source_digest_mismatch:backend/app/models/workpaper_sync_models.py",
                     "database:source_digest_mismatch:backend/app/services/workpaper_sync/models.py",
+                    "editor_config:source_digest_mismatch:backend/app/routers/wp_onlyoffice_router.py",
                     "editor_config:source_digest_mismatch:backend/app/services/workpaper_sync/callback_route.py",
                     "index_denominator_mismatch",
                     "index_entry_denominator_mismatch",
@@ -5420,7 +5426,7 @@
                   },
                   {
                     "path": "audit-platform/frontend/src/components/workpaper/GtD2AccountsReceivable.vue",
-                    "sha256": "7b89e2063b6b740a1833aaa6f8475b0235a28d501d0b9f3559dd09ea0930a62c"
+                    "sha256": "10fe40412102356c9f4961c148ed399abce10cfaac3f7fc3ba7ce4b3838e7b40"
                   },
                   {
                     "path": "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue",
@@ -5440,15 +5446,15 @@
                   },
                   {
                     "path": "backend/app/routers/wp_onlyoffice_router.py",
-                    "sha256": "f284846bdc719e36d404a242c45cd5921cbd4761768ff924aaf74317cf2e7ed6"
+                    "sha256": "964176aa8b28f77f9672713479cf0ccf3ed034bca8b3b6437e3c92ca2c32ecf4"
                   },
                   {
                     "path": "backend/app/routers/wp_sync_router.py",
-                    "sha256": "c7e2a76ffb62d5a2a90f9a3d5ae2db7a3c0b37795cdf5365aaa6be6dca307300"
+                    "sha256": "3c903cf519a55b53cf39652a8aa645e390857fab9912af8426e8913b27a42625"
                   },
                   {
                     "path": "backend/app/services/workpaper_sync/callback_route.py",
-                    "sha256": "68ce8610854b0c8711ec4bb455e45b02f9d3de021c16ced562d563f0f12dc5ea"
+                    "sha256": "dae71f4718bafd4b688a99cb2f07325ccc36c18f4238ced004d624aadfaf2e5a"
                   },
                   {
                     "path": "backend/app/services/workpaper_sync/models.py",
@@ -5494,11 +5500,11 @@
                   },
                   {
                     "path": "backend/app/routers/wp_sync_router.py",
-                    "sha256": "c7e2a76ffb62d5a2a90f9a3d5ae2db7a3c0b37795cdf5365aaa6be6dca307300"
+                    "sha256": "3c903cf519a55b53cf39652a8aa645e390857fab9912af8426e8913b27a42625"
                   },
                   {
                     "path": "backend/app/services/workpaper_sync/callback_route.py",
-                    "sha256": "68ce8610854b0c8711ec4bb455e45b02f9d3de021c16ced562d563f0f12dc5ea"
+                    "sha256": "dae71f4718bafd4b688a99cb2f07325ccc36c18f4238ced004d624aadfaf2e5a"
                   },
                   {
                     "path": "backend/app/services/workpaper_sync/models.py",
@@ -5544,11 +5550,11 @@
                   },
                   {
                     "path": "backend/app/routers/wp_sync_router.py",
-                    "sha256": "c7e2a76ffb62d5a2a90f9a3d5ae2db7a3c0b37795cdf5365aaa6be6dca307300"
+                    "sha256": "3c903cf519a55b53cf39652a8aa645e390857fab9912af8426e8913b27a42625"
                   },
                   {
                     "path": "backend/app/services/workpaper_sync/callback_route.py",
-                    "sha256": "68ce8610854b0c8711ec4bb455e45b02f9d3de021c16ced562d563f0f12dc5ea"
+                    "sha256": "dae71f4718bafd4b688a99cb2f07325ccc36c18f4238ced004d624aadfaf2e5a"
                   },
                   {
                     "path": "backend/app/services/workpaper_sync/models.py",
@@ -5593,11 +5599,11 @@
                   },
                   {
                     "path": "backend/app/routers/wp_sync_router.py",
-                    "sha256": "c7e2a76ffb62d5a2a90f9a3d5ae2db7a3c0b37795cdf5365aaa6be6dca307300"
+                    "sha256": "3c903cf519a55b53cf39652a8aa645e390857fab9912af8426e8913b27a42625"
                   },
                   {
                     "path": "backend/app/services/workpaper_sync/callback_route.py",
-                    "sha256": "68ce8610854b0c8711ec4bb455e45b02f9d3de021c16ced562d563f0f12dc5ea"
+                    "sha256": "dae71f4718bafd4b688a99cb2f07325ccc36c18f4238ced004d624aadfaf2e5a"
                   },
                   {
                     "path": "backend/app/services/workpaper_sync/models.py",
@@ -5634,7 +5640,7 @@
             },
             {
               "path": "audit-platform/frontend/src/components/workpaper/GtD2AccountsReceivable.vue",
-              "sha256": "7b89e2063b6b740a1833aaa6f8475b0235a28d501d0b9f3559dd09ea0930a62c"
+              "sha256": "10fe40412102356c9f4961c148ed399abce10cfaac3f7fc3ba7ce4b3838e7b40"
             },
             {
               "path": "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue",
@@ -5654,15 +5660,15 @@
             },
             {
               "path": "backend/app/routers/wp_onlyoffice_router.py",
-              "sha256": "f284846bdc719e36d404a242c45cd5921cbd4761768ff924aaf74317cf2e7ed6"
+              "sha256": "964176aa8b28f77f9672713479cf0ccf3ed034bca8b3b6437e3c92ca2c32ecf4"
             },
             {
               "path": "backend/app/routers/wp_sync_router.py",
-              "sha256": "c7e2a76ffb62d5a2a90f9a3d5ae2db7a3c0b37795cdf5365aaa6be6dca307300"
+              "sha256": "3c903cf519a55b53cf39652a8aa645e390857fab9912af8426e8913b27a42625"
             },
             {
               "path": "backend/app/services/workpaper_sync/callback_route.py",
-              "sha256": "68ce8610854b0c8711ec4bb455e45b02f9d3de021c16ced562d563f0f12dc5ea"
+              "sha256": "dae71f4718bafd4b688a99cb2f07325ccc36c18f4238ced004d624aadfaf2e5a"
             },
             {
               "path": "backend/app/services/workpaper_sync/models.py",
@@ -5685,6 +5691,7 @@
                     "artifact_digest_mismatch:network",
                     "database:source_digest_mismatch:backend/app/models/workpaper_sync_models.py",
                     "database:source_digest_mismatch:backend/app/services/workpaper_sync/models.py",
+                    "editor_config:source_digest_mismatch:backend/app/routers/wp_onlyoffice_router.py",
                     "editor_config:source_digest_mismatch:backend/app/services/workpaper_sync/callback_route.py",
                     "index_denominator_mismatch",
                     "index_entry_denominator_mismatch",
@@ -5718,7 +5725,7 @@
                   },
                   {
                     "path": "audit-platform/frontend/src/components/workpaper/GtD2AccountsReceivable.vue",
-                    "sha256": "7b89e2063b6b740a1833aaa6f8475b0235a28d501d0b9f3559dd09ea0930a62c"
+                    "sha256": "10fe40412102356c9f4961c148ed399abce10cfaac3f7fc3ba7ce4b3838e7b40"
                   },
                   {
                     "path": "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue",
@@ -5738,15 +5745,15 @@
                   },
                   {
                     "path": "backend/app/routers/wp_onlyoffice_router.py",
-                    "sha256": "f284846bdc719e36d404a242c45cd5921cbd4761768ff924aaf74317cf2e7ed6"
+                    "sha256": "964176aa8b28f77f9672713479cf0ccf3ed034bca8b3b6437e3c92ca2c32ecf4"
                   },
                   {
                     "path": "backend/app/routers/wp_sync_router.py",
-                    "sha256": "c7e2a76ffb62d5a2a90f9a3d5ae2db7a3c0b37795cdf5365aaa6be6dca307300"
+                    "sha256": "3c903cf519a55b53cf39652a8aa645e390857fab9912af8426e8913b27a42625"
                   },
                   {
                     "path": "backend/app/services/workpaper_sync/callback_route.py",
-                    "sha256": "68ce8610854b0c8711ec4bb455e45b02f9d3de021c16ced562d563f0f12dc5ea"
+                    "sha256": "dae71f4718bafd4b688a99cb2f07325ccc36c18f4238ced004d624aadfaf2e5a"
                   },
                   {
                     "path": "backend/app/services/workpaper_sync/models.py",
@@ -5792,11 +5799,11 @@
                   },
                   {
                     "path": "backend/app/routers/wp_sync_router.py",
-                    "sha256": "c7e2a76ffb62d5a2a90f9a3d5ae2db7a3c0b37795cdf5365aaa6be6dca307300"
+                    "sha256": "3c903cf519a55b53cf39652a8aa645e390857fab9912af8426e8913b27a42625"
                   },
                   {
                     "path": "backend/app/services/workpaper_sync/callback_route.py",
-                    "sha256": "68ce8610854b0c8711ec4bb455e45b02f9d3de021c16ced562d563f0f12dc5ea"
+                    "sha256": "dae71f4718bafd4b688a99cb2f07325ccc36c18f4238ced004d624aadfaf2e5a"
                   },
                   {
                     "path": "backend/app/services/workpaper_sync/models.py",
@@ -5842,11 +5849,11 @@
                   },
                   {
                     "path": "backend/app/routers/wp_sync_router.py",
-                    "sha256": "c7e2a76ffb62d5a2a90f9a3d5ae2db7a3c0b37795cdf5365aaa6be6dca307300"
+                    "sha256": "3c903cf519a55b53cf39652a8aa645e390857fab9912af8426e8913b27a42625"
                   },
                   {
                     "path": "backend/app/services/workpaper_sync/callback_route.py",
-                    "sha256": "68ce8610854b0c8711ec4bb455e45b02f9d3de021c16ced562d563f0f12dc5ea"
+                    "sha256": "dae71f4718bafd4b688a99cb2f07325ccc36c18f4238ced004d624aadfaf2e5a"
                   },
                   {
                     "path": "backend/app/services/workpaper_sync/models.py",
@@ -5891,11 +5898,11 @@
                   },
                   {
                     "path": "backend/app/routers/wp_sync_router.py",
-                    "sha256": "c7e2a76ffb62d5a2a90f9a3d5ae2db7a3c0b37795cdf5365aaa6be6dca307300"
+                    "sha256": "3c903cf519a55b53cf39652a8aa645e390857fab9912af8426e8913b27a42625"
                   },
                   {
                     "path": "backend/app/services/workpaper_sync/callback_route.py",
-                    "sha256": "68ce8610854b0c8711ec4bb455e45b02f9d3de021c16ced562d563f0f12dc5ea"
+                    "sha256": "dae71f4718bafd4b688a99cb2f07325ccc36c18f4238ced004d624aadfaf2e5a"
                   },
                   {
                     "path": "backend/app/services/workpaper_sync/models.py",
@@ -5932,7 +5939,7 @@
             },
             {
               "path": "audit-platform/frontend/src/components/workpaper/GtD2AccountsReceivable.vue",
-              "sha256": "7b89e2063b6b740a1833aaa6f8475b0235a28d501d0b9f3559dd09ea0930a62c"
+              "sha256": "10fe40412102356c9f4961c148ed399abce10cfaac3f7fc3ba7ce4b3838e7b40"
             },
             {
               "path": "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue",
@@ -5952,15 +5959,15 @@
             },
             {
               "path": "backend/app/routers/wp_onlyoffice_router.py",
-              "sha256": "f284846bdc719e36d404a242c45cd5921cbd4761768ff924aaf74317cf2e7ed6"
+              "sha256": "964176aa8b28f77f9672713479cf0ccf3ed034bca8b3b6437e3c92ca2c32ecf4"
             },
             {
               "path": "backend/app/routers/wp_sync_router.py",
-              "sha256": "c7e2a76ffb62d5a2a90f9a3d5ae2db7a3c0b37795cdf5365aaa6be6dca307300"
+              "sha256": "3c903cf519a55b53cf39652a8aa645e390857fab9912af8426e8913b27a42625"
             },
             {
               "path": "backend/app/services/workpaper_sync/callback_route.py",
-              "sha256": "68ce8610854b0c8711ec4bb455e45b02f9d3de021c16ced562d563f0f12dc5ea"
+              "sha256": "dae71f4718bafd4b688a99cb2f07325ccc36c18f4238ced004d624aadfaf2e5a"
             },
             {
               "path": "backend/app/services/workpaper_sync/models.py",
@@ -5983,6 +5990,7 @@
                     "artifact_digest_mismatch:network",
                     "database:source_digest_mismatch:backend/app/models/workpaper_sync_models.py",
                     "database:source_digest_mismatch:backend/app/services/workpaper_sync/models.py",
+                    "editor_config:source_digest_mismatch:backend/app/routers/wp_onlyoffice_router.py",
                     "editor_config:source_digest_mismatch:backend/app/services/workpaper_sync/callback_route.py",
                     "index_denominator_mismatch",
                     "index_entry_denominator_mismatch",
@@ -6016,7 +6024,7 @@
                   },
                   {
                     "path": "audit-platform/frontend/src/components/workpaper/GtD2AccountsReceivable.vue",
-                    "sha256": "7b89e2063b6b740a1833aaa6f8475b0235a28d501d0b9f3559dd09ea0930a62c"
+                    "sha256": "10fe40412102356c9f4961c148ed399abce10cfaac3f7fc3ba7ce4b3838e7b40"
                   },
                   {
                     "path": "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue",
@@ -6036,15 +6044,15 @@
                   },
                   {
                     "path": "backend/app/routers/wp_onlyoffice_router.py",
-                    "sha256": "f284846bdc719e36d404a242c45cd5921cbd4761768ff924aaf74317cf2e7ed6"
+                    "sha256": "964176aa8b28f77f9672713479cf0ccf3ed034bca8b3b6437e3c92ca2c32ecf4"
                   },
                   {
                     "path": "backend/app/routers/wp_sync_router.py",
-                    "sha256": "c7e2a76ffb62d5a2a90f9a3d5ae2db7a3c0b37795cdf5365aaa6be6dca307300"
+                    "sha256": "3c903cf519a55b53cf39652a8aa645e390857fab9912af8426e8913b27a42625"
                   },
                   {
                     "path": "backend/app/services/workpaper_sync/callback_route.py",
-                    "sha256": "68ce8610854b0c8711ec4bb455e45b02f9d3de021c16ced562d563f0f12dc5ea"
+                    "sha256": "dae71f4718bafd4b688a99cb2f07325ccc36c18f4238ced004d624aadfaf2e5a"
                   },
                   {
                     "path": "backend/app/services/workpaper_sync/models.py",
@@ -6090,11 +6098,11 @@
                   },
                   {
                     "path": "backend/app/routers/wp_sync_router.py",
-                    "sha256": "c7e2a76ffb62d5a2a90f9a3d5ae2db7a3c0b37795cdf5365aaa6be6dca307300"
+                    "sha256": "3c903cf519a55b53cf39652a8aa645e390857fab9912af8426e8913b27a42625"
                   },
                   {
                     "path": "backend/app/services/workpaper_sync/callback_route.py",
-                    "sha256": "68ce8610854b0c8711ec4bb455e45b02f9d3de021c16ced562d563f0f12dc5ea"
+                    "sha256": "dae71f4718bafd4b688a99cb2f07325ccc36c18f4238ced004d624aadfaf2e5a"
                   },
                   {
                     "path": "backend/app/services/workpaper_sync/models.py",
@@ -6140,11 +6148,11 @@
                   },
                   {
                     "path": "backend/app/routers/wp_sync_router.py",
-                    "sha256": "c7e2a76ffb62d5a2a90f9a3d5ae2db7a3c0b37795cdf5365aaa6be6dca307300"
+                    "sha256": "3c903cf519a55b53cf39652a8aa645e390857fab9912af8426e8913b27a42625"
                   },
                   {
                     "path": "backend/app/services/workpaper_sync/callback_route.py",
-                    "sha256": "68ce8610854b0c8711ec4bb455e45b02f9d3de021c16ced562d563f0f12dc5ea"
+                    "sha256": "dae71f4718bafd4b688a99cb2f07325ccc36c18f4238ced004d624aadfaf2e5a"
                   },
                   {
                     "path": "backend/app/services/workpaper_sync/models.py",
@@ -6189,11 +6197,11 @@
                   },
                   {
                     "path": "backend/app/routers/wp_sync_router.py",
-                    "sha256": "c7e2a76ffb62d5a2a90f9a3d5ae2db7a3c0b37795cdf5365aaa6be6dca307300"
+                    "sha256": "3c903cf519a55b53cf39652a8aa645e390857fab9912af8426e8913b27a42625"
                   },
                   {
                     "path": "backend/app/services/workpaper_sync/callback_route.py",
-                    "sha256": "68ce8610854b0c8711ec4bb455e45b02f9d3de021c16ced562d563f0f12dc5ea"
+                    "sha256": "dae71f4718bafd4b688a99cb2f07325ccc36c18f4238ced004d624aadfaf2e5a"
                   },
                   {
                     "path": "backend/app/services/workpaper_sync/models.py",
@@ -6230,7 +6238,7 @@
             },
             {
               "path": "audit-platform/frontend/src/components/workpaper/GtD2AccountsReceivable.vue",
-              "sha256": "7b89e2063b6b740a1833aaa6f8475b0235a28d501d0b9f3559dd09ea0930a62c"
+              "sha256": "10fe40412102356c9f4961c148ed399abce10cfaac3f7fc3ba7ce4b3838e7b40"
             },
             {
               "path": "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue",
@@ -6250,15 +6258,15 @@
             },
             {
               "path": "backend/app/routers/wp_onlyoffice_router.py",
-              "sha256": "f284846bdc719e36d404a242c45cd5921cbd4761768ff924aaf74317cf2e7ed6"
+              "sha256": "964176aa8b28f77f9672713479cf0ccf3ed034bca8b3b6437e3c92ca2c32ecf4"
             },
             {
               "path": "backend/app/routers/wp_sync_router.py",
-              "sha256": "c7e2a76ffb62d5a2a90f9a3d5ae2db7a3c0b37795cdf5365aaa6be6dca307300"
+              "sha256": "3c903cf519a55b53cf39652a8aa645e390857fab9912af8426e8913b27a42625"
             },
             {
               "path": "backend/app/services/workpaper_sync/callback_route.py",
-              "sha256": "68ce8610854b0c8711ec4bb455e45b02f9d3de021c16ced562d563f0f12dc5ea"
+              "sha256": "dae71f4718bafd4b688a99cb2f07325ccc36c18f4238ced004d624aadfaf2e5a"
             },
             {
               "path": "backend/app/services/workpaper_sync/models.py",
@@ -6281,6 +6289,7 @@
                     "artifact_digest_mismatch:network",
                     "database:source_digest_mismatch:backend/app/models/workpaper_sync_models.py",
                     "database:source_digest_mismatch:backend/app/services/workpaper_sync/models.py",
+                    "editor_config:source_digest_mismatch:backend/app/routers/wp_onlyoffice_router.py",
                     "editor_config:source_digest_mismatch:backend/app/services/workpaper_sync/callback_route.py",
                     "index_denominator_mismatch",
                     "index_entry_denominator_mismatch",
@@ -6314,7 +6323,7 @@
                   },
                   {
                     "path": "audit-platform/frontend/src/components/workpaper/GtD2AccountsReceivable.vue",
-                    "sha256": "7b89e2063b6b740a1833aaa6f8475b0235a28d501d0b9f3559dd09ea0930a62c"
+                    "sha256": "10fe40412102356c9f4961c148ed399abce10cfaac3f7fc3ba7ce4b3838e7b40"
                   },
                   {
                     "path": "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue",
@@ -6334,15 +6343,15 @@
                   },
                   {
                     "path": "backend/app/routers/wp_onlyoffice_router.py",
-                    "sha256": "f284846bdc719e36d404a242c45cd5921cbd4761768ff924aaf74317cf2e7ed6"
+                    "sha256": "964176aa8b28f77f9672713479cf0ccf3ed034bca8b3b6437e3c92ca2c32ecf4"
                   },
                   {
                     "path": "backend/app/routers/wp_sync_router.py",
-                    "sha256": "c7e2a76ffb62d5a2a90f9a3d5ae2db7a3c0b37795cdf5365aaa6be6dca307300"
+                    "sha256": "3c903cf519a55b53cf39652a8aa645e390857fab9912af8426e8913b27a42625"
                   },
                   {
                     "path": "backend/app/services/workpaper_sync/callback_route.py",
-                    "sha256": "68ce8610854b0c8711ec4bb455e45b02f9d3de021c16ced562d563f0f12dc5ea"
+                    "sha256": "dae71f4718bafd4b688a99cb2f07325ccc36c18f4238ced004d624aadfaf2e5a"
                   },
                   {
                     "path": "backend/app/services/workpaper_sync/models.py",
@@ -6388,11 +6397,11 @@
                   },
                   {
                     "path": "backend/app/routers/wp_sync_router.py",
-                    "sha256": "c7e2a76ffb62d5a2a90f9a3d5ae2db7a3c0b37795cdf5365aaa6be6dca307300"
+                    "sha256": "3c903cf519a55b53cf39652a8aa645e390857fab9912af8426e8913b27a42625"
                   },
                   {
                     "path": "backend/app/services/workpaper_sync/callback_route.py",
-                    "sha256": "68ce8610854b0c8711ec4bb455e45b02f9d3de021c16ced562d563f0f12dc5ea"
+                    "sha256": "dae71f4718bafd4b688a99cb2f07325ccc36c18f4238ced004d624aadfaf2e5a"
                   },
                   {
                     "path": "backend/app/services/workpaper_sync/models.py",
@@ -6438,11 +6447,11 @@
                   },
                   {
                     "path": "backend/app/routers/wp_sync_router.py",
-                    "sha256": "c7e2a76ffb62d5a2a90f9a3d5ae2db7a3c0b37795cdf5365aaa6be6dca307300"
+                    "sha256": "3c903cf519a55b53cf39652a8aa645e390857fab9912af8426e8913b27a42625"
                   },
                   {
                     "path": "backend/app/services/workpaper_sync/callback_route.py",
-                    "sha256": "68ce8610854b0c8711ec4bb455e45b02f9d3de021c16ced562d563f0f12dc5ea"
+                    "sha256": "dae71f4718bafd4b688a99cb2f07325ccc36c18f4238ced004d624aadfaf2e5a"
                   },
                   {
                     "path": "backend/app/services/workpaper_sync/models.py",
@@ -6487,11 +6496,11 @@
                   },
                   {
                     "path": "backend/app/routers/wp_sync_router.py",
-                    "sha256": "c7e2a76ffb62d5a2a90f9a3d5ae2db7a3c0b37795cdf5365aaa6be6dca307300"
+                    "sha256": "3c903cf519a55b53cf39652a8aa645e390857fab9912af8426e8913b27a42625"
                   },
                   {
                     "path": "backend/app/services/workpaper_sync/callback_route.py",
-                    "sha256": "68ce8610854b0c8711ec4bb455e45b02f9d3de021c16ced562d563f0f12dc5ea"
+                    "sha256": "dae71f4718bafd4b688a99cb2f07325ccc36c18f4238ced004d624aadfaf2e5a"
                   },
                   {
                     "path": "backend/app/services/workpaper_sync/models.py",
@@ -6528,7 +6537,7 @@
             },
             {
               "path": "audit-platform/frontend/src/components/workpaper/GtD2AccountsReceivable.vue",
-              "sha256": "7b89e2063b6b740a1833aaa6f8475b0235a28d501d0b9f3559dd09ea0930a62c"
+              "sha256": "10fe40412102356c9f4961c148ed399abce10cfaac3f7fc3ba7ce4b3838e7b40"
             },
             {
               "path": "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue",
@@ -6548,15 +6557,15 @@
             },
             {
               "path": "backend/app/routers/wp_onlyoffice_router.py",
-              "sha256": "f284846bdc719e36d404a242c45cd5921cbd4761768ff924aaf74317cf2e7ed6"
+              "sha256": "964176aa8b28f77f9672713479cf0ccf3ed034bca8b3b6437e3c92ca2c32ecf4"
             },
             {
               "path": "backend/app/routers/wp_sync_router.py",
-              "sha256": "c7e2a76ffb62d5a2a90f9a3d5ae2db7a3c0b37795cdf5365aaa6be6dca307300"
+              "sha256": "3c903cf519a55b53cf39652a8aa645e390857fab9912af8426e8913b27a42625"
             },
             {
               "path": "backend/app/services/workpaper_sync/callback_route.py",
-              "sha256": "68ce8610854b0c8711ec4bb455e45b02f9d3de021c16ced562d563f0f12dc5ea"
+              "sha256": "dae71f4718bafd4b688a99cb2f07325ccc36c18f4238ced004d624aadfaf2e5a"
             },
             {
               "path": "backend/app/services/workpaper_sync/models.py",
@@ -6630,6 +6639,7 @@
                         "artifact_digest_mismatch:network",
                         "database:source_digest_mismatch:backend/app/models/workpaper_sync_models.py",
                         "database:source_digest_mismatch:backend/app/services/workpaper_sync/models.py",
+                        "editor_config:source_digest_mismatch:backend/app/routers/wp_onlyoffice_router.py",
                         "editor_config:source_digest_mismatch:backend/app/services/workpaper_sync/callback_route.py",
                         "index_denominator_mismatch",
                         "index_entry_denominator_mismatch",
@@ -6662,7 +6672,7 @@
                       },
                       {
                         "path": "audit-platform/frontend/src/components/workpaper/GtD2AccountsReceivable.vue",
-                        "sha256": "7b89e2063b6b740a1833aaa6f8475b0235a28d501d0b9f3559dd09ea0930a62c"
+                        "sha256": "10fe40412102356c9f4961c148ed399abce10cfaac3f7fc3ba7ce4b3838e7b40"
                       },
                       {
                         "path": "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue",
@@ -6682,15 +6692,15 @@
                       },
                       {
                         "path": "backend/app/routers/wp_onlyoffice_router.py",
-                        "sha256": "f284846bdc719e36d404a242c45cd5921cbd4761768ff924aaf74317cf2e7ed6"
+                        "sha256": "964176aa8b28f77f9672713479cf0ccf3ed034bca8b3b6437e3c92ca2c32ecf4"
                       },
                       {
                         "path": "backend/app/routers/wp_sync_router.py",
-                        "sha256": "c7e2a76ffb62d5a2a90f9a3d5ae2db7a3c0b37795cdf5365aaa6be6dca307300"
+                        "sha256": "3c903cf519a55b53cf39652a8aa645e390857fab9912af8426e8913b27a42625"
                       },
                       {
                         "path": "backend/app/services/workpaper_sync/callback_route.py",
-                        "sha256": "68ce8610854b0c8711ec4bb455e45b02f9d3de021c16ced562d563f0f12dc5ea"
+                        "sha256": "dae71f4718bafd4b688a99cb2f07325ccc36c18f4238ced004d624aadfaf2e5a"
                       },
                       {
                         "path": "backend/app/services/workpaper_sync/models.py",
@@ -6710,6 +6720,7 @@
                         "artifact_digest_mismatch:network",
                         "database:source_digest_mismatch:backend/app/models/workpaper_sync_models.py",
                         "database:source_digest_mismatch:backend/app/services/workpaper_sync/models.py",
+                        "editor_config:source_digest_mismatch:backend/app/routers/wp_onlyoffice_router.py",
                         "editor_config:source_digest_mismatch:backend/app/services/workpaper_sync/callback_route.py",
                         "index_denominator_mismatch",
                         "index_entry_denominator_mismatch",
@@ -6742,7 +6753,7 @@
                       },
                       {
                         "path": "audit-platform/frontend/src/components/workpaper/GtD2AccountsReceivable.vue",
-                        "sha256": "7b89e2063b6b740a1833aaa6f8475b0235a28d501d0b9f3559dd09ea0930a62c"
+                        "sha256": "10fe40412102356c9f4961c148ed399abce10cfaac3f7fc3ba7ce4b3838e7b40"
                       },
                       {
                         "path": "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue",
@@ -6762,15 +6773,15 @@
                       },
                       {
                         "path": "backend/app/routers/wp_onlyoffice_router.py",
-                        "sha256": "f284846bdc719e36d404a242c45cd5921cbd4761768ff924aaf74317cf2e7ed6"
+                        "sha256": "964176aa8b28f77f9672713479cf0ccf3ed034bca8b3b6437e3c92ca2c32ecf4"
                       },
                       {
                         "path": "backend/app/routers/wp_sync_router.py",
-                        "sha256": "c7e2a76ffb62d5a2a90f9a3d5ae2db7a3c0b37795cdf5365aaa6be6dca307300"
+                        "sha256": "3c903cf519a55b53cf39652a8aa645e390857fab9912af8426e8913b27a42625"
                       },
                       {
                         "path": "backend/app/services/workpaper_sync/callback_route.py",
-                        "sha256": "68ce8610854b0c8711ec4bb455e45b02f9d3de021c16ced562d563f0f12dc5ea"
+                        "sha256": "dae71f4718bafd4b688a99cb2f07325ccc36c18f4238ced004d624aadfaf2e5a"
                       },
                       {
                         "path": "backend/app/services/workpaper_sync/models.py",
@@ -6790,6 +6801,7 @@
                         "artifact_digest_mismatch:network",
                         "database:source_digest_mismatch:backend/app/models/workpaper_sync_models.py",
                         "database:source_digest_mismatch:backend/app/services/workpaper_sync/models.py",
+                        "editor_config:source_digest_mismatch:backend/app/routers/wp_onlyoffice_router.py",
                         "editor_config:source_digest_mismatch:backend/app/services/workpaper_sync/callback_route.py",
                         "index_denominator_mismatch",
                         "index_entry_denominator_mismatch",
@@ -6822,7 +6834,7 @@
                       },
                       {
                         "path": "audit-platform/frontend/src/components/workpaper/GtD2AccountsReceivable.vue",
-                        "sha256": "7b89e2063b6b740a1833aaa6f8475b0235a28d501d0b9f3559dd09ea0930a62c"
+                        "sha256": "10fe40412102356c9f4961c148ed399abce10cfaac3f7fc3ba7ce4b3838e7b40"
                       },
                       {
                         "path": "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue",
@@ -6842,15 +6854,15 @@
                       },
                       {
                         "path": "backend/app/routers/wp_onlyoffice_router.py",
-                        "sha256": "f284846bdc719e36d404a242c45cd5921cbd4761768ff924aaf74317cf2e7ed6"
+                        "sha256": "964176aa8b28f77f9672713479cf0ccf3ed034bca8b3b6437e3c92ca2c32ecf4"
                       },
                       {
                         "path": "backend/app/routers/wp_sync_router.py",
-                        "sha256": "c7e2a76ffb62d5a2a90f9a3d5ae2db7a3c0b37795cdf5365aaa6be6dca307300"
+                        "sha256": "3c903cf519a55b53cf39652a8aa645e390857fab9912af8426e8913b27a42625"
                       },
                       {
                         "path": "backend/app/services/workpaper_sync/callback_route.py",
-                        "sha256": "68ce8610854b0c8711ec4bb455e45b02f9d3de021c16ced562d563f0f12dc5ea"
+                        "sha256": "dae71f4718bafd4b688a99cb2f07325ccc36c18f4238ced004d624aadfaf2e5a"
                       },
                       {
                         "path": "backend/app/services/workpaper_sync/models.py",
@@ -6870,6 +6882,7 @@
                         "artifact_digest_mismatch:network",
                         "database:source_digest_mismatch:backend/app/models/workpaper_sync_models.py",
                         "database:source_digest_mismatch:backend/app/services/workpaper_sync/models.py",
+                        "editor_config:source_digest_mismatch:backend/app/routers/wp_onlyoffice_router.py",
                         "editor_config:source_digest_mismatch:backend/app/services/workpaper_sync/callback_route.py",
                         "index_denominator_mismatch",
                         "index_entry_denominator_mismatch",
@@ -6902,7 +6915,7 @@
                       },
                       {
                         "path": "audit-platform/frontend/src/components/workpaper/GtD2AccountsReceivable.vue",
-                        "sha256": "7b89e2063b6b740a1833aaa6f8475b0235a28d501d0b9f3559dd09ea0930a62c"
+                        "sha256": "10fe40412102356c9f4961c148ed399abce10cfaac3f7fc3ba7ce4b3838e7b40"
                       },
                       {
                         "path": "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue",
@@ -6922,15 +6935,15 @@
                       },
                       {
                         "path": "backend/app/routers/wp_onlyoffice_router.py",
-                        "sha256": "f284846bdc719e36d404a242c45cd5921cbd4761768ff924aaf74317cf2e7ed6"
+                        "sha256": "964176aa8b28f77f9672713479cf0ccf3ed034bca8b3b6437e3c92ca2c32ecf4"
                       },
                       {
                         "path": "backend/app/routers/wp_sync_router.py",
-                        "sha256": "c7e2a76ffb62d5a2a90f9a3d5ae2db7a3c0b37795cdf5365aaa6be6dca307300"
+                        "sha256": "3c903cf519a55b53cf39652a8aa645e390857fab9912af8426e8913b27a42625"
                       },
                       {
                         "path": "backend/app/services/workpaper_sync/callback_route.py",
-                        "sha256": "68ce8610854b0c8711ec4bb455e45b02f9d3de021c16ced562d563f0f12dc5ea"
+                        "sha256": "dae71f4718bafd4b688a99cb2f07325ccc36c18f4238ced004d624aadfaf2e5a"
                       },
                       {
                         "path": "backend/app/services/workpaper_sync/models.py",
@@ -6950,6 +6963,7 @@
                         "artifact_digest_mismatch:network",
                         "database:source_digest_mismatch:backend/app/models/workpaper_sync_models.py",
                         "database:source_digest_mismatch:backend/app/services/workpaper_sync/models.py",
+                        "editor_config:source_digest_mismatch:backend/app/routers/wp_onlyoffice_router.py",
                         "editor_config:source_digest_mismatch:backend/app/services/workpaper_sync/callback_route.py",
                         "index_denominator_mismatch",
                         "index_entry_denominator_mismatch",
@@ -6982,7 +6996,7 @@
                       },
                       {
                         "path": "audit-platform/frontend/src/components/workpaper/GtD2AccountsReceivable.vue",
-                        "sha256": "7b89e2063b6b740a1833aaa6f8475b0235a28d501d0b9f3559dd09ea0930a62c"
+                        "sha256": "10fe40412102356c9f4961c148ed399abce10cfaac3f7fc3ba7ce4b3838e7b40"
                       },
                       {
                         "path": "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue",
@@ -7002,15 +7016,15 @@
                       },
                       {
                         "path": "backend/app/routers/wp_onlyoffice_router.py",
-                        "sha256": "f284846bdc719e36d404a242c45cd5921cbd4761768ff924aaf74317cf2e7ed6"
+                        "sha256": "964176aa8b28f77f9672713479cf0ccf3ed034bca8b3b6437e3c92ca2c32ecf4"
                       },
                       {
                         "path": "backend/app/routers/wp_sync_router.py",
-                        "sha256": "c7e2a76ffb62d5a2a90f9a3d5ae2db7a3c0b37795cdf5365aaa6be6dca307300"
+                        "sha256": "3c903cf519a55b53cf39652a8aa645e390857fab9912af8426e8913b27a42625"
                       },
                       {
                         "path": "backend/app/services/workpaper_sync/callback_route.py",
-                        "sha256": "68ce8610854b0c8711ec4bb455e45b02f9d3de021c16ced562d563f0f12dc5ea"
+                        "sha256": "dae71f4718bafd4b688a99cb2f07325ccc36c18f4238ced004d624aadfaf2e5a"
                       },
                       {
                         "path": "backend/app/services/workpaper_sync/models.py",
@@ -7030,6 +7044,7 @@
                         "artifact_digest_mismatch:network",
                         "database:source_digest_mismatch:backend/app/models/workpaper_sync_models.py",
                         "database:source_digest_mismatch:backend/app/services/workpaper_sync/models.py",
+                        "editor_config:source_digest_mismatch:backend/app/routers/wp_onlyoffice_router.py",
                         "editor_config:source_digest_mismatch:backend/app/services/workpaper_sync/callback_route.py",
                         "index_denominator_mismatch",
                         "index_entry_denominator_mismatch",
@@ -7062,7 +7077,7 @@
                       },
                       {
                         "path": "audit-platform/frontend/src/components/workpaper/GtD2AccountsReceivable.vue",
-                        "sha256": "7b89e2063b6b740a1833aaa6f8475b0235a28d501d0b9f3559dd09ea0930a62c"
+                        "sha256": "10fe40412102356c9f4961c148ed399abce10cfaac3f7fc3ba7ce4b3838e7b40"
                       },
                       {
                         "path": "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue",
@@ -7082,15 +7097,15 @@
                       },
                       {
                         "path": "backend/app/routers/wp_onlyoffice_router.py",
-                        "sha256": "f284846bdc719e36d404a242c45cd5921cbd4761768ff924aaf74317cf2e7ed6"
+                        "sha256": "964176aa8b28f77f9672713479cf0ccf3ed034bca8b3b6437e3c92ca2c32ecf4"
                       },
                       {
                         "path": "backend/app/routers/wp_sync_router.py",
-                        "sha256": "c7e2a76ffb62d5a2a90f9a3d5ae2db7a3c0b37795cdf5365aaa6be6dca307300"
+                        "sha256": "3c903cf519a55b53cf39652a8aa645e390857fab9912af8426e8913b27a42625"
                       },
                       {
                         "path": "backend/app/services/workpaper_sync/callback_route.py",
-                        "sha256": "68ce8610854b0c8711ec4bb455e45b02f9d3de021c16ced562d563f0f12dc5ea"
+                        "sha256": "dae71f4718bafd4b688a99cb2f07325ccc36c18f4238ced004d624aadfaf2e5a"
                       },
                       {
                         "path": "backend/app/services/workpaper_sync/models.py",
@@ -7110,6 +7125,7 @@
                         "artifact_digest_mismatch:network",
                         "database:source_digest_mismatch:backend/app/models/workpaper_sync_models.py",
                         "database:source_digest_mismatch:backend/app/services/workpaper_sync/models.py",
+                        "editor_config:source_digest_mismatch:backend/app/routers/wp_onlyoffice_router.py",
                         "editor_config:source_digest_mismatch:backend/app/services/workpaper_sync/callback_route.py",
                         "index_denominator_mismatch",
                         "index_entry_denominator_mismatch",
@@ -7142,7 +7158,7 @@
                       },
                       {
                         "path": "audit-platform/frontend/src/components/workpaper/GtD2AccountsReceivable.vue",
-                        "sha256": "7b89e2063b6b740a1833aaa6f8475b0235a28d501d0b9f3559dd09ea0930a62c"
+                        "sha256": "10fe40412102356c9f4961c148ed399abce10cfaac3f7fc3ba7ce4b3838e7b40"
                       },
                       {
                         "path": "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue",
@@ -7162,15 +7178,15 @@
                       },
                       {
                         "path": "backend/app/routers/wp_onlyoffice_router.py",
-                        "sha256": "f284846bdc719e36d404a242c45cd5921cbd4761768ff924aaf74317cf2e7ed6"
+                        "sha256": "964176aa8b28f77f9672713479cf0ccf3ed034bca8b3b6437e3c92ca2c32ecf4"
                       },
                       {
                         "path": "backend/app/routers/wp_sync_router.py",
-                        "sha256": "c7e2a76ffb62d5a2a90f9a3d5ae2db7a3c0b37795cdf5365aaa6be6dca307300"
+                        "sha256": "3c903cf519a55b53cf39652a8aa645e390857fab9912af8426e8913b27a42625"
                       },
                       {
                         "path": "backend/app/services/workpaper_sync/callback_route.py",
-                        "sha256": "68ce8610854b0c8711ec4bb455e45b02f9d3de021c16ced562d563f0f12dc5ea"
+                        "sha256": "dae71f4718bafd4b688a99cb2f07325ccc36c18f4238ced004d624aadfaf2e5a"
                       },
                       {
                         "path": "backend/app/services/workpaper_sync/models.py",
@@ -7190,6 +7206,7 @@
                         "artifact_digest_mismatch:network",
                         "database:source_digest_mismatch:backend/app/models/workpaper_sync_models.py",
                         "database:source_digest_mismatch:backend/app/services/workpaper_sync/models.py",
+                        "editor_config:source_digest_mismatch:backend/app/routers/wp_onlyoffice_router.py",
                         "editor_config:source_digest_mismatch:backend/app/services/workpaper_sync/callback_route.py",
                         "index_denominator_mismatch",
                         "index_entry_denominator_mismatch",
@@ -7222,7 +7239,7 @@
                       },
                       {
                         "path": "audit-platform/frontend/src/components/workpaper/GtD2AccountsReceivable.vue",
-                        "sha256": "7b89e2063b6b740a1833aaa6f8475b0235a28d501d0b9f3559dd09ea0930a62c"
+                        "sha256": "10fe40412102356c9f4961c148ed399abce10cfaac3f7fc3ba7ce4b3838e7b40"
                       },
                       {
                         "path": "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue",
@@ -7242,15 +7259,15 @@
                       },
                       {
                         "path": "backend/app/routers/wp_onlyoffice_router.py",
-                        "sha256": "f284846bdc719e36d404a242c45cd5921cbd4761768ff924aaf74317cf2e7ed6"
+                        "sha256": "964176aa8b28f77f9672713479cf0ccf3ed034bca8b3b6437e3c92ca2c32ecf4"
                       },
                       {
                         "path": "backend/app/routers/wp_sync_router.py",
-                        "sha256": "c7e2a76ffb62d5a2a90f9a3d5ae2db7a3c0b37795cdf5365aaa6be6dca307300"
+                        "sha256": "3c903cf519a55b53cf39652a8aa645e390857fab9912af8426e8913b27a42625"
                       },
                       {
                         "path": "backend/app/services/workpaper_sync/callback_route.py",
-                        "sha256": "68ce8610854b0c8711ec4bb455e45b02f9d3de021c16ced562d563f0f12dc5ea"
+                        "sha256": "dae71f4718bafd4b688a99cb2f07325ccc36c18f4238ced004d624aadfaf2e5a"
                       },
                       {
                         "path": "backend/app/services/workpaper_sync/models.py",
@@ -7369,11 +7386,11 @@
                       },
                       {
                         "path": "backend/app/routers/wp_sync_router.py",
-                        "sha256": "c7e2a76ffb62d5a2a90f9a3d5ae2db7a3c0b37795cdf5365aaa6be6dca307300"
+                        "sha256": "3c903cf519a55b53cf39652a8aa645e390857fab9912af8426e8913b27a42625"
                       },
                       {
                         "path": "backend/app/services/workpaper_sync/callback_route.py",
-                        "sha256": "68ce8610854b0c8711ec4bb455e45b02f9d3de021c16ced562d563f0f12dc5ea"
+                        "sha256": "dae71f4718bafd4b688a99cb2f07325ccc36c18f4238ced004d624aadfaf2e5a"
                       },
                       {
                         "path": "backend/app/services/workpaper_sync/models.py",
@@ -7418,11 +7435,11 @@
                       },
                       {
                         "path": "backend/app/routers/wp_sync_router.py",
-                        "sha256": "c7e2a76ffb62d5a2a90f9a3d5ae2db7a3c0b37795cdf5365aaa6be6dca307300"
+                        "sha256": "3c903cf519a55b53cf39652a8aa645e390857fab9912af8426e8913b27a42625"
                       },
                       {
                         "path": "backend/app/services/workpaper_sync/callback_route.py",
-                        "sha256": "68ce8610854b0c8711ec4bb455e45b02f9d3de021c16ced562d563f0f12dc5ea"
+                        "sha256": "dae71f4718bafd4b688a99cb2f07325ccc36c18f4238ced004d624aadfaf2e5a"
                       },
                       {
                         "path": "backend/app/services/workpaper_sync/models.py",
@@ -7467,11 +7484,11 @@
                       },
                       {
                         "path": "backend/app/routers/wp_sync_router.py",
-                        "sha256": "c7e2a76ffb62d5a2a90f9a3d5ae2db7a3c0b37795cdf5365aaa6be6dca307300"
+                        "sha256": "3c903cf519a55b53cf39652a8aa645e390857fab9912af8426e8913b27a42625"
                       },
                       {
                         "path": "backend/app/services/workpaper_sync/callback_route.py",
-                        "sha256": "68ce8610854b0c8711ec4bb455e45b02f9d3de021c16ced562d563f0f12dc5ea"
+                        "sha256": "dae71f4718bafd4b688a99cb2f07325ccc36c18f4238ced004d624aadfaf2e5a"
                       },
                       {
                         "path": "backend/app/services/workpaper_sync/models.py",
@@ -7516,11 +7533,11 @@
                       },
                       {
                         "path": "backend/app/routers/wp_sync_router.py",
-                        "sha256": "c7e2a76ffb62d5a2a90f9a3d5ae2db7a3c0b37795cdf5365aaa6be6dca307300"
+                        "sha256": "3c903cf519a55b53cf39652a8aa645e390857fab9912af8426e8913b27a42625"
                       },
                       {
                         "path": "backend/app/services/workpaper_sync/callback_route.py",
-                        "sha256": "68ce8610854b0c8711ec4bb455e45b02f9d3de021c16ced562d563f0f12dc5ea"
+                        "sha256": "dae71f4718bafd4b688a99cb2f07325ccc36c18f4238ced004d624aadfaf2e5a"
                       },
                       {
                         "path": "backend/app/services/workpaper_sync/models.py",
@@ -7565,11 +7582,11 @@
                       },
                       {
                         "path": "backend/app/routers/wp_sync_router.py",
-                        "sha256": "c7e2a76ffb62d5a2a90f9a3d5ae2db7a3c0b37795cdf5365aaa6be6dca307300"
+                        "sha256": "3c903cf519a55b53cf39652a8aa645e390857fab9912af8426e8913b27a42625"
                       },
                       {
                         "path": "backend/app/services/workpaper_sync/callback_route.py",
-                        "sha256": "68ce8610854b0c8711ec4bb455e45b02f9d3de021c16ced562d563f0f12dc5ea"
+                        "sha256": "dae71f4718bafd4b688a99cb2f07325ccc36c18f4238ced004d624aadfaf2e5a"
                       },
                       {
                         "path": "backend/app/services/workpaper_sync/models.py",
@@ -7614,11 +7631,11 @@
                       },
                       {
                         "path": "backend/app/routers/wp_sync_router.py",
-                        "sha256": "c7e2a76ffb62d5a2a90f9a3d5ae2db7a3c0b37795cdf5365aaa6be6dca307300"
+                        "sha256": "3c903cf519a55b53cf39652a8aa645e390857fab9912af8426e8913b27a42625"
                       },
                       {
                         "path": "backend/app/services/workpaper_sync/callback_route.py",
-                        "sha256": "68ce8610854b0c8711ec4bb455e45b02f9d3de021c16ced562d563f0f12dc5ea"
+                        "sha256": "dae71f4718bafd4b688a99cb2f07325ccc36c18f4238ced004d624aadfaf2e5a"
                       },
                       {
                         "path": "backend/app/services/workpaper_sync/models.py",
@@ -7663,11 +7680,11 @@
                       },
                       {
                         "path": "backend/app/routers/wp_sync_router.py",
-                        "sha256": "c7e2a76ffb62d5a2a90f9a3d5ae2db7a3c0b37795cdf5365aaa6be6dca307300"
+                        "sha256": "3c903cf519a55b53cf39652a8aa645e390857fab9912af8426e8913b27a42625"
                       },
                       {
                         "path": "backend/app/services/workpaper_sync/callback_route.py",
-                        "sha256": "68ce8610854b0c8711ec4bb455e45b02f9d3de021c16ced562d563f0f12dc5ea"
+                        "sha256": "dae71f4718bafd4b688a99cb2f07325ccc36c18f4238ced004d624aadfaf2e5a"
                       },
                       {
                         "path": "backend/app/services/workpaper_sync/models.py",
@@ -7712,11 +7729,11 @@
                       },
                       {
                         "path": "backend/app/routers/wp_sync_router.py",
-                        "sha256": "c7e2a76ffb62d5a2a90f9a3d5ae2db7a3c0b37795cdf5365aaa6be6dca307300"
+                        "sha256": "3c903cf519a55b53cf39652a8aa645e390857fab9912af8426e8913b27a42625"
                       },
                       {
                         "path": "backend/app/services/workpaper_sync/callback_route.py",
-                        "sha256": "68ce8610854b0c8711ec4bb455e45b02f9d3de021c16ced562d563f0f12dc5ea"
+                        "sha256": "dae71f4718bafd4b688a99cb2f07325ccc36c18f4238ced004d624aadfaf2e5a"
                       },
                       {
                         "path": "backend/app/services/workpaper_sync/models.py",
@@ -7825,11 +7842,11 @@
                       },
                       {
                         "path": "backend/app/routers/wp_sync_router.py",
-                        "sha256": "c7e2a76ffb62d5a2a90f9a3d5ae2db7a3c0b37795cdf5365aaa6be6dca307300"
+                        "sha256": "3c903cf519a55b53cf39652a8aa645e390857fab9912af8426e8913b27a42625"
                       },
                       {
                         "path": "backend/app/services/workpaper_sync/callback_route.py",
-                        "sha256": "68ce8610854b0c8711ec4bb455e45b02f9d3de021c16ced562d563f0f12dc5ea"
+                        "sha256": "dae71f4718bafd4b688a99cb2f07325ccc36c18f4238ced004d624aadfaf2e5a"
                       },
                       {
                         "path": "backend/app/services/workpaper_sync/models.py",
@@ -7874,11 +7891,11 @@
                       },
                       {
                         "path": "backend/app/routers/wp_sync_router.py",
-                        "sha256": "c7e2a76ffb62d5a2a90f9a3d5ae2db7a3c0b37795cdf5365aaa6be6dca307300"
+                        "sha256": "3c903cf519a55b53cf39652a8aa645e390857fab9912af8426e8913b27a42625"
                       },
                       {
                         "path": "backend/app/services/workpaper_sync/callback_route.py",
-                        "sha256": "68ce8610854b0c8711ec4bb455e45b02f9d3de021c16ced562d563f0f12dc5ea"
+                        "sha256": "dae71f4718bafd4b688a99cb2f07325ccc36c18f4238ced004d624aadfaf2e5a"
                       },
                       {
                         "path": "backend/app/services/workpaper_sync/models.py",
@@ -7923,11 +7940,11 @@
                       },
                       {
                         "path": "backend/app/routers/wp_sync_router.py",
-                        "sha256": "c7e2a76ffb62d5a2a90f9a3d5ae2db7a3c0b37795cdf5365aaa6be6dca307300"
+                        "sha256": "3c903cf519a55b53cf39652a8aa645e390857fab9912af8426e8913b27a42625"
                       },
                       {
                         "path": "backend/app/services/workpaper_sync/callback_route.py",
-                        "sha256": "68ce8610854b0c8711ec4bb455e45b02f9d3de021c16ced562d563f0f12dc5ea"
+                        "sha256": "dae71f4718bafd4b688a99cb2f07325ccc36c18f4238ced004d624aadfaf2e5a"
                       },
                       {
                         "path": "backend/app/services/workpaper_sync/models.py",
@@ -7972,11 +7989,11 @@
                       },
                       {
                         "path": "backend/app/routers/wp_sync_router.py",
-                        "sha256": "c7e2a76ffb62d5a2a90f9a3d5ae2db7a3c0b37795cdf5365aaa6be6dca307300"
+                        "sha256": "3c903cf519a55b53cf39652a8aa645e390857fab9912af8426e8913b27a42625"
                       },
                       {
                         "path": "backend/app/services/workpaper_sync/callback_route.py",
-                        "sha256": "68ce8610854b0c8711ec4bb455e45b02f9d3de021c16ced562d563f0f12dc5ea"
+                        "sha256": "dae71f4718bafd4b688a99cb2f07325ccc36c18f4238ced004d624aadfaf2e5a"
                       },
                       {
                         "path": "backend/app/services/workpaper_sync/models.py",
@@ -8021,11 +8038,11 @@
                       },
                       {
                         "path": "backend/app/routers/wp_sync_router.py",
-                        "sha256": "c7e2a76ffb62d5a2a90f9a3d5ae2db7a3c0b37795cdf5365aaa6be6dca307300"
+                        "sha256": "3c903cf519a55b53cf39652a8aa645e390857fab9912af8426e8913b27a42625"
                       },
                       {
                         "path": "backend/app/services/workpaper_sync/callback_route.py",
-                        "sha256": "68ce8610854b0c8711ec4bb455e45b02f9d3de021c16ced562d563f0f12dc5ea"
+                        "sha256": "dae71f4718bafd4b688a99cb2f07325ccc36c18f4238ced004d624aadfaf2e5a"
                       },
                       {
                         "path": "backend/app/services/workpaper_sync/models.py",
@@ -8070,11 +8087,11 @@
                       },
                       {
                         "path": "backend/app/routers/wp_sync_router.py",
-                        "sha256": "c7e2a76ffb62d5a2a90f9a3d5ae2db7a3c0b37795cdf5365aaa6be6dca307300"
+                        "sha256": "3c903cf519a55b53cf39652a8aa645e390857fab9912af8426e8913b27a42625"
                       },
                       {
                         "path": "backend/app/services/workpaper_sync/callback_route.py",
-                        "sha256": "68ce8610854b0c8711ec4bb455e45b02f9d3de021c16ced562d563f0f12dc5ea"
+                        "sha256": "dae71f4718bafd4b688a99cb2f07325ccc36c18f4238ced004d624aadfaf2e5a"
                       },
                       {
                         "path": "backend/app/services/workpaper_sync/models.py",
@@ -8119,11 +8136,11 @@
                       },
                       {
                         "path": "backend/app/routers/wp_sync_router.py",
-                        "sha256": "c7e2a76ffb62d5a2a90f9a3d5ae2db7a3c0b37795cdf5365aaa6be6dca307300"
+                        "sha256": "3c903cf519a55b53cf39652a8aa645e390857fab9912af8426e8913b27a42625"
                       },
                       {
                         "path": "backend/app/services/workpaper_sync/callback_route.py",
-                        "sha256": "68ce8610854b0c8711ec4bb455e45b02f9d3de021c16ced562d563f0f12dc5ea"
+                        "sha256": "dae71f4718bafd4b688a99cb2f07325ccc36c18f4238ced004d624aadfaf2e5a"
                       },
                       {
                         "path": "backend/app/services/workpaper_sync/models.py",
@@ -8168,11 +8185,11 @@
                       },
                       {
                         "path": "backend/app/routers/wp_sync_router.py",
-                        "sha256": "c7e2a76ffb62d5a2a90f9a3d5ae2db7a3c0b37795cdf5365aaa6be6dca307300"
+                        "sha256": "3c903cf519a55b53cf39652a8aa645e390857fab9912af8426e8913b27a42625"
                       },
                       {
                         "path": "backend/app/services/workpaper_sync/callback_route.py",
-                        "sha256": "68ce8610854b0c8711ec4bb455e45b02f9d3de021c16ced562d563f0f12dc5ea"
+                        "sha256": "dae71f4718bafd4b688a99cb2f07325ccc36c18f4238ced004d624aadfaf2e5a"
                       },
                       {
                         "path": "backend/app/services/workpaper_sync/models.py",
@@ -8280,11 +8297,11 @@
                       },
                       {
                         "path": "backend/app/routers/wp_sync_router.py",
-                        "sha256": "c7e2a76ffb62d5a2a90f9a3d5ae2db7a3c0b37795cdf5365aaa6be6dca307300"
+                        "sha256": "3c903cf519a55b53cf39652a8aa645e390857fab9912af8426e8913b27a42625"
                       },
                       {
                         "path": "backend/app/services/workpaper_sync/callback_route.py",
-                        "sha256": "68ce8610854b0c8711ec4bb455e45b02f9d3de021c16ced562d563f0f12dc5ea"
+                        "sha256": "dae71f4718bafd4b688a99cb2f07325ccc36c18f4238ced004d624aadfaf2e5a"
                       },
                       {
                         "path": "backend/app/services/workpaper_sync/models.py",
@@ -8328,11 +8345,11 @@
                       },
                       {
                         "path": "backend/app/routers/wp_sync_router.py",
-                        "sha256": "c7e2a76ffb62d5a2a90f9a3d5ae2db7a3c0b37795cdf5365aaa6be6dca307300"
+                        "sha256": "3c903cf519a55b53cf39652a8aa645e390857fab9912af8426e8913b27a42625"
                       },
                       {
                         "path": "backend/app/services/workpaper_sync/callback_route.py",
-                        "sha256": "68ce8610854b0c8711ec4bb455e45b02f9d3de021c16ced562d563f0f12dc5ea"
+                        "sha256": "dae71f4718bafd4b688a99cb2f07325ccc36c18f4238ced004d624aadfaf2e5a"
                       },
                       {
                         "path": "backend/app/services/workpaper_sync/models.py",
@@ -8376,11 +8393,11 @@
                       },
                       {
                         "path": "backend/app/routers/wp_sync_router.py",
-                        "sha256": "c7e2a76ffb62d5a2a90f9a3d5ae2db7a3c0b37795cdf5365aaa6be6dca307300"
+                        "sha256": "3c903cf519a55b53cf39652a8aa645e390857fab9912af8426e8913b27a42625"
                       },
                       {
                         "path": "backend/app/services/workpaper_sync/callback_route.py",
-                        "sha256": "68ce8610854b0c8711ec4bb455e45b02f9d3de021c16ced562d563f0f12dc5ea"
+                        "sha256": "dae71f4718bafd4b688a99cb2f07325ccc36c18f4238ced004d624aadfaf2e5a"
                       },
                       {
                         "path": "backend/app/services/workpaper_sync/models.py",
@@ -8424,11 +8441,11 @@
                       },
                       {
                         "path": "backend/app/routers/wp_sync_router.py",
-                        "sha256": "c7e2a76ffb62d5a2a90f9a3d5ae2db7a3c0b37795cdf5365aaa6be6dca307300"
+                        "sha256": "3c903cf519a55b53cf39652a8aa645e390857fab9912af8426e8913b27a42625"
                       },
                       {
                         "path": "backend/app/services/workpaper_sync/callback_route.py",
-                        "sha256": "68ce8610854b0c8711ec4bb455e45b02f9d3de021c16ced562d563f0f12dc5ea"
+                        "sha256": "dae71f4718bafd4b688a99cb2f07325ccc36c18f4238ced004d624aadfaf2e5a"
                       },
                       {
                         "path": "backend/app/services/workpaper_sync/models.py",
@@ -8472,11 +8489,11 @@
                       },
                       {
                         "path": "backend/app/routers/wp_sync_router.py",
-                        "sha256": "c7e2a76ffb62d5a2a90f9a3d5ae2db7a3c0b37795cdf5365aaa6be6dca307300"
+                        "sha256": "3c903cf519a55b53cf39652a8aa645e390857fab9912af8426e8913b27a42625"
                       },
                       {
                         "path": "backend/app/services/workpaper_sync/callback_route.py",
-                        "sha256": "68ce8610854b0c8711ec4bb455e45b02f9d3de021c16ced562d563f0f12dc5ea"
+                        "sha256": "dae71f4718bafd4b688a99cb2f07325ccc36c18f4238ced004d624aadfaf2e5a"
                       },
                       {
                         "path": "backend/app/services/workpaper_sync/models.py",
@@ -8520,11 +8537,11 @@
                       },
                       {
                         "path": "backend/app/routers/wp_sync_router.py",
-                        "sha256": "c7e2a76ffb62d5a2a90f9a3d5ae2db7a3c0b37795cdf5365aaa6be6dca307300"
+                        "sha256": "3c903cf519a55b53cf39652a8aa645e390857fab9912af8426e8913b27a42625"
                       },
                       {
                         "path": "backend/app/services/workpaper_sync/callback_route.py",
-                        "sha256": "68ce8610854b0c8711ec4bb455e45b02f9d3de021c16ced562d563f0f12dc5ea"
+                        "sha256": "dae71f4718bafd4b688a99cb2f07325ccc36c18f4238ced004d624aadfaf2e5a"
                       },
                       {
                         "path": "backend/app/services/workpaper_sync/models.py",
@@ -8568,11 +8585,11 @@
                       },
                       {
                         "path": "backend/app/routers/wp_sync_router.py",
-                        "sha256": "c7e2a76ffb62d5a2a90f9a3d5ae2db7a3c0b37795cdf5365aaa6be6dca307300"
+                        "sha256": "3c903cf519a55b53cf39652a8aa645e390857fab9912af8426e8913b27a42625"
                       },
                       {
                         "path": "backend/app/services/workpaper_sync/callback_route.py",
-                        "sha256": "68ce8610854b0c8711ec4bb455e45b02f9d3de021c16ced562d563f0f12dc5ea"
+                        "sha256": "dae71f4718bafd4b688a99cb2f07325ccc36c18f4238ced004d624aadfaf2e5a"
                       },
                       {
                         "path": "backend/app/services/workpaper_sync/models.py",
@@ -8616,11 +8633,11 @@
                       },
                       {
                         "path": "backend/app/routers/wp_sync_router.py",
-                        "sha256": "c7e2a76ffb62d5a2a90f9a3d5ae2db7a3c0b37795cdf5365aaa6be6dca307300"
+                        "sha256": "3c903cf519a55b53cf39652a8aa645e390857fab9912af8426e8913b27a42625"
                       },
                       {
                         "path": "backend/app/services/workpaper_sync/callback_route.py",
-                        "sha256": "68ce8610854b0c8711ec4bb455e45b02f9d3de021c16ced562d563f0f12dc5ea"
+                        "sha256": "dae71f4718bafd4b688a99cb2f07325ccc36c18f4238ced004d624aadfaf2e5a"
                       },
                       {
                         "path": "backend/app/services/workpaper_sync/models.py",
@@ -8711,7 +8728,7 @@
                   },
                   {
                     "path": "audit-platform/frontend/src/components/workpaper/GtD2AccountsReceivable.vue",
-                    "sha256": "7b89e2063b6b740a1833aaa6f8475b0235a28d501d0b9f3559dd09ea0930a62c"
+                    "sha256": "10fe40412102356c9f4961c148ed399abce10cfaac3f7fc3ba7ce4b3838e7b40"
                   },
                   {
                     "path": "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue",
@@ -8731,15 +8748,15 @@
                   },
                   {
                     "path": "backend/app/routers/wp_onlyoffice_router.py",
-                    "sha256": "f284846bdc719e36d404a242c45cd5921cbd4761768ff924aaf74317cf2e7ed6"
+                    "sha256": "964176aa8b28f77f9672713479cf0ccf3ed034bca8b3b6437e3c92ca2c32ecf4"
                   },
                   {
                     "path": "backend/app/routers/wp_sync_router.py",
-                    "sha256": "c7e2a76ffb62d5a2a90f9a3d5ae2db7a3c0b37795cdf5365aaa6be6dca307300"
+                    "sha256": "3c903cf519a55b53cf39652a8aa645e390857fab9912af8426e8913b27a42625"
                   },
                   {
                     "path": "backend/app/services/workpaper_sync/callback_route.py",
-                    "sha256": "68ce8610854b0c8711ec4bb455e45b02f9d3de021c16ced562d563f0f12dc5ea"
+                    "sha256": "dae71f4718bafd4b688a99cb2f07325ccc36c18f4238ced004d624aadfaf2e5a"
                   },
                   {
                     "path": "backend/app/services/workpaper_sync/models.py",
@@ -8799,7 +8816,7 @@
                   },
                   {
                     "path": "audit-platform/frontend/src/components/workpaper/GtD2AccountsReceivable.vue",
-                    "sha256": "7b89e2063b6b740a1833aaa6f8475b0235a28d501d0b9f3559dd09ea0930a62c"
+                    "sha256": "10fe40412102356c9f4961c148ed399abce10cfaac3f7fc3ba7ce4b3838e7b40"
                   },
                   {
                     "path": "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue",
@@ -8819,15 +8836,15 @@
                   },
                   {
                     "path": "backend/app/routers/wp_onlyoffice_router.py",
-                    "sha256": "f284846bdc719e36d404a242c45cd5921cbd4761768ff924aaf74317cf2e7ed6"
+                    "sha256": "964176aa8b28f77f9672713479cf0ccf3ed034bca8b3b6437e3c92ca2c32ecf4"
                   },
                   {
                     "path": "backend/app/routers/wp_sync_router.py",
-                    "sha256": "c7e2a76ffb62d5a2a90f9a3d5ae2db7a3c0b37795cdf5365aaa6be6dca307300"
+                    "sha256": "3c903cf519a55b53cf39652a8aa645e390857fab9912af8426e8913b27a42625"
                   },
                   {
                     "path": "backend/app/services/workpaper_sync/callback_route.py",
-                    "sha256": "68ce8610854b0c8711ec4bb455e45b02f9d3de021c16ced562d563f0f12dc5ea"
+                    "sha256": "dae71f4718bafd4b688a99cb2f07325ccc36c18f4238ced004d624aadfaf2e5a"
                   },
                   {
                     "path": "backend/app/services/workpaper_sync/models.py",
@@ -8887,7 +8904,7 @@
                   },
                   {
                     "path": "audit-platform/frontend/src/components/workpaper/GtD2AccountsReceivable.vue",
-                    "sha256": "7b89e2063b6b740a1833aaa6f8475b0235a28d501d0b9f3559dd09ea0930a62c"
+                    "sha256": "10fe40412102356c9f4961c148ed399abce10cfaac3f7fc3ba7ce4b3838e7b40"
                   },
                   {
                     "path": "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue",
@@ -8907,15 +8924,15 @@
                   },
                   {
                     "path": "backend/app/routers/wp_onlyoffice_router.py",
-                    "sha256": "f284846bdc719e36d404a242c45cd5921cbd4761768ff924aaf74317cf2e7ed6"
+                    "sha256": "964176aa8b28f77f9672713479cf0ccf3ed034bca8b3b6437e3c92ca2c32ecf4"
                   },
                   {
                     "path": "backend/app/routers/wp_sync_router.py",
-                    "sha256": "c7e2a76ffb62d5a2a90f9a3d5ae2db7a3c0b37795cdf5365aaa6be6dca307300"
+                    "sha256": "3c903cf519a55b53cf39652a8aa645e390857fab9912af8426e8913b27a42625"
                   },
                   {
                     "path": "backend/app/services/workpaper_sync/callback_route.py",
-                    "sha256": "68ce8610854b0c8711ec4bb455e45b02f9d3de021c16ced562d563f0f12dc5ea"
+                    "sha256": "dae71f4718bafd4b688a99cb2f07325ccc36c18f4238ced004d624aadfaf2e5a"
                   },
                   {
                     "path": "backend/app/services/workpaper_sync/models.py",
@@ -8975,7 +8992,7 @@
                   },
                   {
                     "path": "audit-platform/frontend/src/components/workpaper/GtD2AccountsReceivable.vue",
-                    "sha256": "7b89e2063b6b740a1833aaa6f8475b0235a28d501d0b9f3559dd09ea0930a62c"
+                    "sha256": "10fe40412102356c9f4961c148ed399abce10cfaac3f7fc3ba7ce4b3838e7b40"
                   },
                   {
                     "path": "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue",
@@ -8995,15 +9012,15 @@
                   },
                   {
                     "path": "backend/app/routers/wp_onlyoffice_router.py",
-                    "sha256": "f284846bdc719e36d404a242c45cd5921cbd4761768ff924aaf74317cf2e7ed6"
+                    "sha256": "964176aa8b28f77f9672713479cf0ccf3ed034bca8b3b6437e3c92ca2c32ecf4"
                   },
                   {
                     "path": "backend/app/routers/wp_sync_router.py",
-                    "sha256": "c7e2a76ffb62d5a2a90f9a3d5ae2db7a3c0b37795cdf5365aaa6be6dca307300"
+                    "sha256": "3c903cf519a55b53cf39652a8aa645e390857fab9912af8426e8913b27a42625"
                   },
                   {
                     "path": "backend/app/services/workpaper_sync/callback_route.py",
-                    "sha256": "68ce8610854b0c8711ec4bb455e45b02f9d3de021c16ced562d563f0f12dc5ea"
+                    "sha256": "dae71f4718bafd4b688a99cb2f07325ccc36c18f4238ced004d624aadfaf2e5a"
                   },
                   {
                     "path": "backend/app/services/workpaper_sync/models.py",
@@ -9063,7 +9080,7 @@
                   },
                   {
                     "path": "audit-platform/frontend/src/components/workpaper/GtD2AccountsReceivable.vue",
-                    "sha256": "7b89e2063b6b740a1833aaa6f8475b0235a28d501d0b9f3559dd09ea0930a62c"
+                    "sha256": "10fe40412102356c9f4961c148ed399abce10cfaac3f7fc3ba7ce4b3838e7b40"
                   },
                   {
                     "path": "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue",
@@ -9083,15 +9100,15 @@
                   },
                   {
                     "path": "backend/app/routers/wp_onlyoffice_router.py",
-                    "sha256": "f284846bdc719e36d404a242c45cd5921cbd4761768ff924aaf74317cf2e7ed6"
+                    "sha256": "964176aa8b28f77f9672713479cf0ccf3ed034bca8b3b6437e3c92ca2c32ecf4"
                   },
                   {
                     "path": "backend/app/routers/wp_sync_router.py",
-                    "sha256": "c7e2a76ffb62d5a2a90f9a3d5ae2db7a3c0b37795cdf5365aaa6be6dca307300"
+                    "sha256": "3c903cf519a55b53cf39652a8aa645e390857fab9912af8426e8913b27a42625"
                   },
                   {
                     "path": "backend/app/services/workpaper_sync/callback_route.py",
-                    "sha256": "68ce8610854b0c8711ec4bb455e45b02f9d3de021c16ced562d563f0f12dc5ea"
+                    "sha256": "dae71f4718bafd4b688a99cb2f07325ccc36c18f4238ced004d624aadfaf2e5a"
                   },
                   {
                     "path": "backend/app/services/workpaper_sync/models.py",
@@ -9151,7 +9168,7 @@
                   },
                   {
                     "path": "audit-platform/frontend/src/components/workpaper/GtD2AccountsReceivable.vue",
-                    "sha256": "7b89e2063b6b740a1833aaa6f8475b0235a28d501d0b9f3559dd09ea0930a62c"
+                    "sha256": "10fe40412102356c9f4961c148ed399abce10cfaac3f7fc3ba7ce4b3838e7b40"
                   },
                   {
                     "path": "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue",
@@ -9171,15 +9188,15 @@
                   },
                   {
                     "path": "backend/app/routers/wp_onlyoffice_router.py",
-                    "sha256": "f284846bdc719e36d404a242c45cd5921cbd4761768ff924aaf74317cf2e7ed6"
+                    "sha256": "964176aa8b28f77f9672713479cf0ccf3ed034bca8b3b6437e3c92ca2c32ecf4"
                   },
                   {
                     "path": "backend/app/routers/wp_sync_router.py",
-                    "sha256": "c7e2a76ffb62d5a2a90f9a3d5ae2db7a3c0b37795cdf5365aaa6be6dca307300"
+                    "sha256": "3c903cf519a55b53cf39652a8aa645e390857fab9912af8426e8913b27a42625"
                   },
                   {
                     "path": "backend/app/services/workpaper_sync/callback_route.py",
-                    "sha256": "68ce8610854b0c8711ec4bb455e45b02f9d3de021c16ced562d563f0f12dc5ea"
+                    "sha256": "dae71f4718bafd4b688a99cb2f07325ccc36c18f4238ced004d624aadfaf2e5a"
                   },
                   {
                     "path": "backend/app/services/workpaper_sync/models.py",
@@ -9239,7 +9256,7 @@
                   },
                   {
                     "path": "audit-platform/frontend/src/components/workpaper/GtD2AccountsReceivable.vue",
-                    "sha256": "7b89e2063b6b740a1833aaa6f8475b0235a28d501d0b9f3559dd09ea0930a62c"
+                    "sha256": "10fe40412102356c9f4961c148ed399abce10cfaac3f7fc3ba7ce4b3838e7b40"
                   },
                   {
                     "path": "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue",
@@ -9259,15 +9276,15 @@
                   },
                   {
                     "path": "backend/app/routers/wp_onlyoffice_router.py",
-                    "sha256": "f284846bdc719e36d404a242c45cd5921cbd4761768ff924aaf74317cf2e7ed6"
+                    "sha256": "964176aa8b28f77f9672713479cf0ccf3ed034bca8b3b6437e3c92ca2c32ecf4"
                   },
                   {
                     "path": "backend/app/routers/wp_sync_router.py",
-                    "sha256": "c7e2a76ffb62d5a2a90f9a3d5ae2db7a3c0b37795cdf5365aaa6be6dca307300"
+                    "sha256": "3c903cf519a55b53cf39652a8aa645e390857fab9912af8426e8913b27a42625"
                   },
                   {
                     "path": "backend/app/services/workpaper_sync/callback_route.py",
-                    "sha256": "68ce8610854b0c8711ec4bb455e45b02f9d3de021c16ced562d563f0f12dc5ea"
+                    "sha256": "dae71f4718bafd4b688a99cb2f07325ccc36c18f4238ced004d624aadfaf2e5a"
                   },
                   {
                     "path": "backend/app/services/workpaper_sync/models.py",
@@ -9327,7 +9344,7 @@
                   },
                   {
                     "path": "audit-platform/frontend/src/components/workpaper/GtD2AccountsReceivable.vue",
-                    "sha256": "7b89e2063b6b740a1833aaa6f8475b0235a28d501d0b9f3559dd09ea0930a62c"
+                    "sha256": "10fe40412102356c9f4961c148ed399abce10cfaac3f7fc3ba7ce4b3838e7b40"
                   },
                   {
                     "path": "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue",
@@ -9347,15 +9364,15 @@
                   },
                   {
                     "path": "backend/app/routers/wp_onlyoffice_router.py",
-                    "sha256": "f284846bdc719e36d404a242c45cd5921cbd4761768ff924aaf74317cf2e7ed6"
+                    "sha256": "964176aa8b28f77f9672713479cf0ccf3ed034bca8b3b6437e3c92ca2c32ecf4"
                   },
                   {
                     "path": "backend/app/routers/wp_sync_router.py",
-                    "sha256": "c7e2a76ffb62d5a2a90f9a3d5ae2db7a3c0b37795cdf5365aaa6be6dca307300"
+                    "sha256": "3c903cf519a55b53cf39652a8aa645e390857fab9912af8426e8913b27a42625"
                   },
                   {
                     "path": "backend/app/services/workpaper_sync/callback_route.py",
-                    "sha256": "68ce8610854b0c8711ec4bb455e45b02f9d3de021c16ced562d563f0f12dc5ea"
+                    "sha256": "dae71f4718bafd4b688a99cb2f07325ccc36c18f4238ced004d624aadfaf2e5a"
                   },
                   {
                     "path": "backend/app/services/workpaper_sync/models.py",
@@ -9431,11 +9448,11 @@
           "source_refs": [
             {
               "path": ".kiro/specs/published-representation-production-path-and-lane-adjudication/tasks.md",
-              "sha256": "65fe38160a0953114e9f91852bdea7dc04c95d0c8d282aad1d6dbe496cb978a1"
+              "sha256": "b70d0edfed081db9d49bd2c2ec8de9bdbb7aae8dbbc8bb24a008fdc7795d6c3c"
             },
             {
               "path": ".kiro/specs/workpaper-html-onlyoffice-bidirectional-writeback-closure/tasks.md",
-              "sha256": "83d8a8eba2feafded6830db449603986e109d2e50a04e1c0bd510ef6738c6184"
+              "sha256": "d622ba9c5e5cd89cfe128a2d975c784bf2b41d6cb1e6629591743c86a7c95214"
             }
           ]
         },
@@ -9444,12 +9461,12 @@
             "capability_counts": {
               "bidirectional": 4,
               "single_html": 5,
-              "single_onlyoffice": 175,
+              "single_onlyoffice": 145,
               "unreachable": 1
             },
-            "entry_count": 185,
+            "entry_count": 155,
             "independent_entry_count": 142,
-            "manifest_digest": "87602a8b5cbf7dca925bfa0af2e0fe8cf487d6b958b997df0643ed8238d48cf7",
+            "manifest_digest": "afdffafdba8861d9522c9387394f9f9378e27b7ab78706fbc6228d812e7edc60",
             "profile_consistent": true,
             "reviewed_entries": {
               "xlsx/b60/gt-b60-bundle": {
@@ -9511,7 +9528,7 @@
           "source_refs": [
             {
               "path": "backend/data/workpaper_sync_entry_manifest.json",
-              "sha256": "cad42b621be62ed91415705567f39e4c1219e037330ed8e44a4e3e6f37968ada"
+              "sha256": "53292ce85bcace7d1a6d64c75ea5a18d10acefa319b7831912311bdcf2f0d2e2"
             }
           ]
         },
@@ -9525,11 +9542,11 @@
           "source_refs": [
             {
               "path": "backend/app/services/workpaper_sync/published_identity_observer.py",
-              "sha256": "259bc0b7d0f4c5fde03ddee8ec955ab6a54b8ef447852074ecdd15eafc408c17"
+              "sha256": "b0073059e02890a40539718ff7c8a6e6529b0fb69683fe7e05d2ecf988444b5b"
             },
             {
               "path": "backend/app/services/workpaper_sync/adapters/registry.py",
-              "sha256": "0e896fb13ea54bd3bcac6b19d804acac32ea93e42b1a6d98588c80d567e89daf"
+              "sha256": "56da019e2b0c429738aa045d799b1951fa0ad522fb55f16686b202b00b707219"
             }
           ]
         },
@@ -9604,7 +9621,7 @@
           "source_refs": [
             {
               "path": ".kiro/specs/excel-structural-row-insertion-and-shift-aware-verification/tasks.md",
-              "sha256": "09716fb4554ef0a3e198f8faa1c932dd7d88286c273535a23c8d7fbe1d307f7a"
+              "sha256": "375fe2d447034b1d800985bb42401e45c03df97879398fd379833982245726f0"
             }
           ]
         },
@@ -9669,7 +9686,7 @@
           "source_refs": [
             {
               "path": ".kiro/specs/workpaper-html-onlyoffice-bidirectional-writeback-closure/tasks.md",
-              "sha256": "83d8a8eba2feafded6830db449603986e109d2e50a04e1c0bd510ef6738c6184"
+              "sha256": "d622ba9c5e5cd89cfe128a2d975c784bf2b41d6cb1e6629591743c86a7c95214"
             }
           ]
         },
@@ -9683,15 +9700,15 @@
           "source_refs": [
             {
               "path": "backend/app/services/workpaper_sync/callback_delivery.py",
-              "sha256": "3931a3dd661786a1952680fc1bf824202144b5607dea7bf24225d7b5b5dd0e46"
+              "sha256": "48343521e688e2c164698ea71857425d643362171b39ac097037a1ed0fa295cf"
             },
             {
               "path": "backend/app/services/workpaper_sync/request_application.py",
-              "sha256": "8d81904ebf9c302713c63d31eb0763863777cb70037490faa031bba67d180e12"
+              "sha256": "27e14baeb74564cd4bf2fb45a903b7a8142f926e6a1419b03d8a001bbb80e0f4"
             },
             {
               "path": "backend/app/services/workpaper_sync/oo_to_html.py",
-              "sha256": "c52e2e6276e2d1bed41befe114a9b65e389478868044640ebdd49d5012f29f83"
+              "sha256": "406b0cce3ab41c483ce6ce92af86e3e97a3c5b373209d7078dce891019b5b41d"
             }
           ]
         },
@@ -9769,6 +9786,11 @@
             "incomplete": [
               {
                 "spec": "workpaper-html-onlyoffice-bidirectional-writeback-closure",
+                "state": "~",
+                "task": "1"
+              },
+              {
+                "spec": "workpaper-html-onlyoffice-bidirectional-writeback-closure",
                 "state": "-",
                 "task": "75"
               }
@@ -9781,7 +9803,7 @@
           "source_refs": [
             {
               "path": ".kiro/specs/workpaper-html-onlyoffice-bidirectional-writeback-closure/tasks.md",
-              "sha256": "83d8a8eba2feafded6830db449603986e109d2e50a04e1c0bd510ef6738c6184"
+              "sha256": "d622ba9c5e5cd89cfe128a2d975c784bf2b41d6cb1e6629591743c86a7c95214"
             }
           ]
         },
@@ -9790,12 +9812,12 @@
             "capability_counts": {
               "bidirectional": 4,
               "single_html": 5,
-              "single_onlyoffice": 175,
+              "single_onlyoffice": 145,
               "unreachable": 1
             },
-            "entry_count": 185,
+            "entry_count": 155,
             "independent_entry_count": 142,
-            "manifest_digest": "87602a8b5cbf7dca925bfa0af2e0fe8cf487d6b958b997df0643ed8238d48cf7",
+            "manifest_digest": "afdffafdba8861d9522c9387394f9f9378e27b7ab78706fbc6228d812e7edc60",
             "profile_consistent": true,
             "reviewed_entries": {
               "xlsx/b60/gt-b60-bundle": {
@@ -9857,7 +9879,7 @@
           "source_refs": [
             {
               "path": "backend/data/workpaper_sync_entry_manifest.json",
-              "sha256": "cad42b621be62ed91415705567f39e4c1219e037330ed8e44a4e3e6f37968ada"
+              "sha256": "53292ce85bcace7d1a6d64c75ea5a18d10acefa319b7831912311bdcf2f0d2e2"
             }
           ]
         },
@@ -9871,7 +9893,7 @@
           "source_refs": [
             {
               "path": "backend/app/services/workpaper_sync/adapters/registry.py",
-              "sha256": "0e896fb13ea54bd3bcac6b19d804acac32ea93e42b1a6d98588c80d567e89daf"
+              "sha256": "56da019e2b0c429738aa045d799b1951fa0ad522fb55f16686b202b00b707219"
             }
           ]
         },
@@ -9907,8 +9929,8 @@
         },
         {
           "predicate_id": "multi-resolver.writer-gate-zero",
-          "reason_code": "writer_inventory_source_check_failed:WriterGateError",
-          "result": "stale"
+          "reason_code": "writer_gate_multi_resolver_nonzero",
+          "result": "blocked"
         }
       ],
       "consumers": [
@@ -9946,29 +9968,28 @@
           "source_refs": [
             {
               "path": ".kiro/specs/workpaper-html-onlyoffice-bidirectional-writeback-closure/tasks.md",
-              "sha256": "83d8a8eba2feafded6830db449603986e109d2e50a04e1c0bd510ef6738c6184"
+              "sha256": "d622ba9c5e5cd89cfe128a2d975c784bf2b41d6cb1e6629591743c86a7c95214"
             }
           ]
         },
         {
           "details": {
-            "count": 4,
-            "inventory_digest": "13ace16e509497785cfce3092de1910b35f2b790a02818e53301c514947e65e3",
+            "count": 3,
+            "inventory_digest": "6ed7718885b9391a238853cce715bb00244da2c24e2c436f6114a7748276495e",
             "issue": "multi_resolver",
             "sample": [
               "app.routers.wp_onlyoffice_router::get_sheet_onlyoffice_config",
               "app.routers.wp_onlyoffice_router::get_sheet_wopi_contents",
-              "app.routers.wp_onlyoffice_router::get_whole_excel_grid",
               "app.routers.wp_onlyoffice_router::post_sheet_onlyoffice_callback"
             ]
           },
           "id": "multi-resolver.writer-gate-zero",
-          "reason_code": "writer_inventory_source_check_failed:WriterGateError",
-          "result": "stale",
+          "reason_code": "writer_gate_multi_resolver_nonzero",
+          "result": "blocked",
           "source_refs": [
             {
               "path": "backend/data/workpaper_writer_inventory.json",
-              "sha256": "b945f471cebfe10c63fc676c6f3ca695bdac3d44883fd5ab074d9d54c0b3efd9"
+              "sha256": "a8a77cb0686aa386600ab7f71c7bbd93eea7e5f212019f3589be7ed7e89c6ead"
             }
           ]
         },
@@ -9999,7 +10020,7 @@
         }
       ],
       "scope": "global",
-      "state": "STALE"
+      "state": "BLOCKED"
     },
     {
       "blockers": [
@@ -10032,7 +10053,7 @@
           "source_refs": [
             {
               "path": ".kiro/specs/workpaper-html-onlyoffice-bidirectional-writeback-closure/tasks.md",
-              "sha256": "83d8a8eba2feafded6830db449603986e109d2e50a04e1c0bd510ef6738c6184"
+              "sha256": "d622ba9c5e5cd89cfe128a2d975c784bf2b41d6cb1e6629591743c86a7c95214"
             }
           ]
         },
@@ -10046,7 +10067,7 @@
           "source_refs": [
             {
               "path": "backend/app/services/workpaper_sync/rooms.py",
-              "sha256": "e1080e81aba0e2fe174434249e5086dbf468452f0b03319fb53c3239d10b6b0d"
+              "sha256": "0ba511f8a8836dd5dc4dcdfc98bfaf0fb9c7cffe96317cf524ecea8dd6022b21"
             },
             {
               "path": "backend/app/services/workpaper_sync/command_service.py",
@@ -10054,7 +10075,7 @@
             },
             {
               "path": "backend/app/services/workpaper_sync/materialize_coordinator.py",
-              "sha256": "cbb04f2399de8afd8c077c0e669fe6bd43968f84a21c1385bfc02adc5de42f00"
+              "sha256": "ec93aa798ea827ed269b0896211d2a52aea3ceecd101ec5243092aeb99c4c084"
             }
           ]
         },
@@ -10136,7 +10157,7 @@
           "source_refs": [
             {
               "path": ".kiro/specs/excel-template-override-layer-and-onlyoffice-template-editor/tasks.md",
-              "sha256": "74731ec935858de1a2896deb11c571e5d3659933d25c349fb2b982fa6e306385"
+              "sha256": "df4f22b723518213aeafc5cd71bc596624979335564be4ccee9bcd84a420711e"
             }
           ]
         },
@@ -10202,7 +10223,7 @@
           "source_refs": [
             {
               "path": ".kiro/specs/excel-workbook-wide-row-change-propagation/tasks.md",
-              "sha256": "b66c3053db14394b4f9258ef66a5b3c9a130f0c33a913273f5bb694dde6f41a2"
+              "sha256": "9d1c409290748214a6fb0045f0258c80bf90784b4a3525a2bdcb96ce2cb214ad"
             }
           ]
         },
@@ -10216,7 +10237,7 @@
           "source_refs": [
             {
               "path": "backend/app/services/workpaper_sync/excel_workbook_row_change.py",
-              "sha256": "2bc420df9a646776406fece7ba2708bb18f833cab3b6c3afad666fb74bfa7a12"
+              "sha256": "3b9a1c11878e7f51bc9d6c04b6ec06b8a35f4c6649c671aee24b215240bd2c76"
             }
           ]
         },
@@ -10407,12 +10428,12 @@
       "state": "BLOCKED"
     }
   ],
-  "program_digest": "cd2e914b63d6e8939330dc1a708221ed0d1e2977a68b5bc322bbf3f81ff71beb",
+  "program_digest": "96afe85f6a14ab0fec85a84ce2aa1482ffd16fd58b9969a6f4720d7fd4868210",
   "program_id": "workpaper-html-onlyoffice-bidirectional-writeback",
   "program_state": "STALE",
   "schema_version": "workpaper-sync-program-milestones/v1",
   "source_commit": null,
-  "source_digest": "e9d4be0efdb1ef55a7f077a2bc97b9b51769f03c7a8bc34a37334c183106f297",
+  "source_digest": "2bc8b5f80310253c5f52acf6947caa8a9bb21d6368e1f3f568babdd35abc0c83",
   "source_state": "digest_bound_without_common_commit",
   "specs": {
     "custom-workpaper-template-ingestion-and-sync-closure": {
@@ -10630,7 +10651,7 @@
         ]
       },
       "path": ".kiro/specs/excel-structural-row-insertion-and-shift-aware-verification/tasks.md",
-      "source_digest": "09716fb4554ef0a3e198f8faa1c932dd7d88286c273535a23c8d7fbe1d307f7a",
+      "source_digest": "375fe2d447034b1d800985bb42401e45c03df97879398fd379833982245726f0",
       "state_counts": {
         "blocked": 0,
         "completed": 26,
@@ -10699,7 +10720,7 @@
         "9": []
       },
       "path": ".kiro/specs/excel-template-override-layer-and-onlyoffice-template-editor/tasks.md",
-      "source_digest": "74731ec935858de1a2896deb11c571e5d3659933d25c349fb2b982fa6e306385",
+      "source_digest": "df4f22b723518213aeafc5cd71bc596624979335564be4ccee9bcd84a420711e",
       "state_counts": {
         "blocked": 2,
         "completed": 25,
@@ -10771,7 +10792,7 @@
         "9": []
       },
       "path": ".kiro/specs/excel-workbook-wide-row-change-propagation/tasks.md",
-      "source_digest": "b66c3053db14394b4f9258ef66a5b3c9a130f0c33a913273f5bb694dde6f41a2",
+      "source_digest": "9d1c409290748214a6fb0045f0258c80bf90784b4a3525a2bdcb96ce2cb214ad",
       "state_counts": {
         "blocked": 0,
         "completed": 30,
@@ -10859,7 +10880,7 @@
         "9.6": []
       },
       "path": ".kiro/specs/published-representation-production-path-and-lane-adjudication/tasks.md",
-      "source_digest": "65fe38160a0953114e9f91852bdea7dc04c95d0c8d282aad1d6dbe496cb978a1",
+      "source_digest": "b70d0edfed081db9d49bd2c2ec8de9bdbb7aae8dbbc8bb24a008fdc7795d6c3c",
       "state_counts": {
         "blocked": 0,
         "completed": 43,
@@ -11430,7 +11451,8 @@
           "68",
           "69",
           "70",
-          "71"
+          "71",
+          "74"
         ],
         "73": [
           "1",
@@ -11473,16 +11495,16 @@
         ]
       },
       "path": ".kiro/specs/workpaper-html-onlyoffice-bidirectional-writeback-closure/tasks.md",
-      "source_digest": "83d8a8eba2feafded6830db449603986e109d2e50a04e1c0bd510ef6738c6184",
+      "source_digest": "d622ba9c5e5cd89cfe128a2d975c784bf2b41d6cb1e6629591743c86a7c95214",
       "state_counts": {
         "blocked": 5,
-        "completed": 72,
-        "partial": 0,
+        "completed": 66,
+        "partial": 6,
         "pending": 0
       },
       "task_count": 77,
       "task_states": {
-        "1": "x",
+        "1": "~",
         "10": "x",
         "11": "x",
         "12": "x",
@@ -11493,8 +11515,8 @@
         "17": "x",
         "18": "x",
         "19": "x",
-        "2": "x",
-        "20": "x",
+        "2": "~",
+        "20": "~",
         "21": "x",
         "22": "x",
         "23": "x",
@@ -11538,11 +11560,11 @@
         "58": "x",
         "59": "x",
         "6": "x",
-        "60": "x",
+        "60": "~",
         "61": "-",
-        "62": "x",
+        "62": "~",
         "63": "x",
-        "64": "x",
+        "64": "~",
         "65": "x",
         "66": "x",
         "67": "x",
@@ -11667,23 +11689,23 @@
     }
   },
   "stats": {
-    "blocking_diagnostic_count": 6,
-    "diagnostic_count": 6,
+    "blocking_diagnostic_count": 5,
+    "diagnostic_count": 5,
     "milestone_count": 16,
     "milestone_state_counts": {
-      "BLOCKED": 5,
+      "BLOCKED": 6,
       "CLOSED": 0,
       "IMPLEMENTED": 3,
       "ONLYOFFICE_VERIFIED": 0,
       "REQUEST_PATH_VERIFIED": 0,
-      "STALE": 8
+      "STALE": 7
     },
     "spec_count": 8,
     "task_count": 263,
     "task_state_counts": {
       "blocked": 7,
-      "completed": 246,
-      "partial": 9,
+      "completed": 240,
+      "partial": 15,
       "pending": 1
     }
   },
@@ -11725,35 +11747,34 @@
     ]
   },
   "writer_gate_facts": {
-    "inventory_digest": "13ace16e509497785cfce3092de1910b35f2b790a02818e53301c514947e65e3",
+    "inventory_digest": "6ed7718885b9391a238853cce715bb00244da2c24e2c436f6114a7748276495e",
     "issue_counts": {
       "after_save_still_increments_revision": 0,
       "artifact_snapshot_writer_not_verifiable": 0,
-      "bypasses_unified_commit": 267,
+      "bypasses_unified_commit": 303,
       "keeps_legacy_write_path_beside_unified_commit": 0,
       "missing_required_domain": 0,
-      "multi_resolver": 4,
-      "non_canonical_resolver_only": 74,
-      "owns_direct_commit": 107,
+      "multi_resolver": 3,
+      "non_canonical_resolver_only": 76,
+      "owns_direct_commit": 124,
       "representation_upgrade_increments_business_revision": 0,
       "retired_writer_not_verifiable": 0,
       "unadjudicated_resolver": 0,
       "unadjudicated_writer": 0,
-      "writer_without_characterization_test": 210,
+      "writer_without_characterization_test": 239,
       "writes_legacy_version_field": 5
     },
     "issue_samples": {
       "bypasses_unified_commit": [
         "app.routers.a171_ai_generate::a171_sync_from_docx",
         "app.routers.a176_docx_sync::a176_sync_from_docx",
+        "app.routers.a177_ai_generate::a177_sync_from_docx",
         "app.routers.a17_summary::independence_import_b3_periods",
-        "app.routers.a21_review::review_sign",
-        "app.routers.a21_review::review_unlock"
+        "app.routers.a21_review::review_sign"
       ],
       "multi_resolver": [
         "app.routers.wp_onlyoffice_router::get_sheet_onlyoffice_config",
         "app.routers.wp_onlyoffice_router::get_sheet_wopi_contents",
-        "app.routers.wp_onlyoffice_router::get_whole_excel_grid",
         "app.routers.wp_onlyoffice_router::post_sheet_onlyoffice_callback"
       ],
       "non_canonical_resolver_only": [
@@ -11768,14 +11789,14 @@
         "app.routers.a21_review::review_sign",
         "app.routers.a21_review::review_unlock",
         "app.routers.audit_check::report_audit_checks",
-        "app.routers.checklist_responses::batch_save_checklist_responses"
+        "app.routers.b60_plan::post_b60_plan_update"
       ],
       "writer_without_characterization_test": [
         "app.routers.a171_ai_generate::a171_sync_from_docx",
         "app.routers.a176_docx_sync::a176_sync_from_docx",
+        "app.routers.a177_ai_generate::a177_sync_from_docx",
         "app.routers.a17_summary::independence_import_b3_periods",
-        "app.routers.a21_review::review_sign",
-        "app.routers.a21_review::review_unlock"
+        "app.routers.a21_review::review_sign"
       ],
       "writes_legacy_version_field": [
         "app.routers.wp_editor_router::save_univer_data",
@@ -11785,8 +11806,8 @@
         "app.services.working_paper_service::WorkingPaperService.upload_offline_edit"
       ]
     },
-    "source_current": false,
-    "source_digest": "5e1912cf102e07d8cc67e5228d862f54cfc0c97d51b2904b200cb4e1884271bc",
-    "source_reason": "writer_inventory_source_check_failed:WriterGateError"
+    "source_current": true,
+    "source_digest": "a84c5dba4f26740632815e3476eb1942a2e04c2e7c724b88c7ff3008ecf9447a",
+    "source_reason": null
   }
 }
