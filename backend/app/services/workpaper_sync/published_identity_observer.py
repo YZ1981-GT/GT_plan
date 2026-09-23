@@ -1443,8 +1443,18 @@ def collect_workbook_structure(*, data, contract, sheet_anchors, context=None):
                 )
                 if declaration is None:
                     continue
-                _, ws = _transposed_resolve(data, spec=spec)
-                _transposed_extract(data, spec=spec)
+                # 🔴 `share_parse=True`（spec oo-single-pass-materialize-and-room-leave
+                #    需求 2.1）：`data` 在本调用内字节不变，且与 adapter 的 extract /
+                #    verify 读的是**同一份产物字节** ⇒ 全簿解析在 `workbook_read_scope()`
+                #    里共用一次，而不是每个 anchor 各解析两遍（D4 实测 4 次 → 0 次新解析）。
+                #    能这么共享的前提是 `extract_transposed_workbook` 现在是**纯读**的
+                #    （走 `_cell_ro`，不惰性新建空格）—— 下面那句
+                #    `(row, first_col_idx) not in ws._cells` 才仍然反映**文件里的**格子
+                #    存在性。这条不变量由 `test_single_pass_parse_reuse.py` 的
+                #    `_cells` 键集合判据守护；`shared_workbook_from_bytes` 的 docstring
+                #    也写明了「调用方不得改它」。
+                _, ws = _transposed_resolve(data, spec=spec, share_parse=False)
+                _transposed_extract(data, spec=spec, share_parse=False)
                 physical[key] = ws.title
                 first_col_letter = spec.first_entity_column
                 first_col_idx = _col_idx(first_col_letter)

@@ -135,7 +135,17 @@ const aiNoteLoading = ref(false); const aiConclusionLoading = ref(false)
 async function genNote() { if (props.isReadonly || !aiAvailable.value) return; aiNoteLoading.value = true; try { const totalRows = groups.value.reduce((s, g) => s + g.rows.length, 0); const anomalyCount = groups.value.reduce((s, g) => s + g.rows.filter(r => r.hasAnomaly === '是').length, 0); const res = await http.post(`/api/workpapers/${props.wpId}/d4/ai-generate`, { section: 'analysis-note', existingContent: auditNote.value, relatedContext: { task: '基于资金流水检查(D4-32)结果生成审计说明', totalRows, anomalyCount } }, { _silent: true } as any); const t = res.data?.data?.content ?? res.data?.content ?? ''; if (!t) { ElMessage.warning('AI 未生成内容'); return }; await ElMessageBox.confirm(t, 'AI 生成', { confirmButtonText: '填入', cancelButtonText: '取消', type: 'info', customStyle: { maxWidth: '600px' } }); updateAuditNote(t) } catch (e: any) { if (e !== 'cancel') ElMessage.warning('AI 生成失败') } finally { aiNoteLoading.value = false } }
 async function genConclusion() { if (props.isReadonly || !aiAvailable.value) return; aiConclusionLoading.value = true; try { const res = await http.post(`/api/workpapers/${props.wpId}/d4/ai-generate`, { section: 'adj-conclusion', existingContent: auditConclusion.value, relatedContext: { task: '基于资金流水检查结果生成审计结论', noteText: auditNote.value } }, { _silent: true } as any); const t = res.data?.data?.content ?? res.data?.content ?? ''; if (!t) { ElMessage.warning('AI 未生成内容'); return }; await ElMessageBox.confirm(t, 'AI 生成', { confirmButtonText: '填入', cancelButtonText: '取消', type: 'info', customStyle: { maxWidth: '600px' } }); updateAuditConclusion(t) } catch (e: any) { if (e !== 'cancel') ElMessage.warning('AI 生成失败') } finally { aiConclusionLoading.value = false } }
 
-const { exportTemplate, exportData, importData, importing } = useD4ImportExport({ wpId: computed(() => props.wpId), projectId: computed(() => props.projectId) })
+const { exportTemplate, exportData, importData, importing } = useD4ImportExport({ wpId: computed(()
+
+// ─── expose 给 GtWpRenderer 工具栏委托 ────────────────────────────────
+function handleExportTemplate() { exportTemplate('D4-32') }
+function handleExportData() { exportData('D4-32') }
+async function handleImportClick() {
+  const input = document.createElement('input')
+  input.type = 'file'; input.accept = '.xlsx'
+  input.onchange = async () => { const f = input.files?.[0]; if (f) await importData('D4-32', f) }
+  input.click()
+} => props.wpId), projectId: computed(() => props.projectId) })
 async function handleImportFile(f: any) { const r = await importData('D4-32', f.raw || f); if (r) await reloadWorkpaperData?.() }
 
 // Stats
@@ -157,11 +167,13 @@ const riskFindings = computed<D4IpoFinding[]>(() => {
   }
   return out
 })
+
+defineExpose({ handleExportTemplate, handleExportData, handleImportClick })
 </script>
 
 <template>
 <div class="d4-fund-flow">
-  <div class="toolbar"><div class="toolbar-left"><el-segmented v-model="editorMode" :options="modeOptions" size="small" /></div><div class="toolbar-right"><el-dropdown trigger="click" size="small"><el-button size="small">导入导出 ▾</el-button><template #dropdown><el-dropdown-menu><el-dropdown-item @click="exportTemplate('D4-32')">导出模板</el-dropdown-item><el-dropdown-item @click="exportData('D4-32')">导出数据</el-dropdown-item><el-dropdown-item><el-upload :show-file-list="false" accept=".xlsx" :auto-upload="false" :disabled="isReadonly||importing" @change="handleImportFile"><span>导入数据</span></el-upload></el-dropdown-item></el-dropdown-menu></template></el-dropdown><D4IpoFindingWriteback wp-code="D4-32" :all-responses="allResponses" :is-readonly="isReadonly" :findings="riskFindings" /><GtIndexChip value="wp:E1-31" :context-project-id="projectId" /><el-button v-if="openReviewDialog" size="small" @click="openReviewDialog('D4-32-fund')">💬 复核</el-button></div></div>
+  <div class="toolbar"><div class="toolbar-left"><el-segmented v-model="editorMode" :options="modeOptions" size="small" /></div><div class="toolbar-right"><D4IpoFindingWriteback wp-code="D4-32" :all-responses="allResponses" :is-readonly="isReadonly" :findings="riskFindings" /><GtIndexChip value="wp:E1-31" :context-project-id="projectId" /><el-button v-if="openReviewDialog" size="small" @click="openReviewDialog('D4-32-fund')">💬 复核</el-button></div></div>
 
   <!-- R5.3：保存/桥接失败可见提示，旧数据已保留在本地未清空 -->
   <el-alert v-if="saveError" type="error" :closable="false" show-icon class="d4-save-error" title="保存失败，修改已保留在本地未覆盖">

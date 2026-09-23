@@ -1,24 +1,30 @@
 {
   "schema_version": 2,
   "wp_code": "D4-13",
-  "title": "销售与收款循环 — D4-13 底稿编制说明",
+  "title": "D4-13 营业收入账面金额与 ERP 系统核对记录 编制说明",
   "sections": [
     {
       "key": "purpose",
       "title": "一、编制目的",
-      "content": "记录销售与收款循环相关审计程序的执行结果和发现。",
+      "content": "将营业收入的财务账面记录金额与 ERP/业务系统记录金额进行核对，验证账面与业务系统的一致性，佐证收入的完整性与准确性认定。对于交易量大的互联网、零售等业务，此核对是识别系统与账面脱节、体外循环收入的关键程序。",
       "source_refs": []
     },
     {
       "key": "steps",
       "title": "二、编制步骤",
-      "content": "1. 从序时账/明细账获取相关科目数据\n2. 执行实质性程序并记录结果\n3. 将重要发现记录在底稿中\n4. 确保与审定表和程序表结论一致",
+      "content": "本表为叙述式底稿，分两段记录：\n\n（一）核对过程：说明 ERP/业务系统名称及版本、核对范围（如全年 1-12 月、主营收入科目 6001）、核对方式（按月汇总核对 / 逐笔核对 / 双方导出后交叉比对）、数据获取途径与比对结果。\n\n（二）核对结论：说明核对是否一致；若存在差异，列明差异金额、差异原因、是否已通过调整分录更正、对审计结论的影响。\n\n本表无自动计算，差异金额由审计师依据核对结果手工填写。",
+      "source_refs": []
+    },
+    {
+      "key": "judgments",
+      "title": "三、审计关注点",
+      "content": "1. 账面 < 系统：可能存在收入未完整入账（完整性风险），需查明是跨期、退款冲减还是遗漏。\n2. 账面 > 系统：可能存在无真实业务支撑的账面收入（虚增收入风险）。\n3. 数据量大的被审计单位应结合 IT 审计（系统权限、数据完整性、日志）完成核对，不能仅依赖管理层提供的汇总表。\n4. 核对口径须与被审计单位确认（含税/不含税、确认时点、退款处理）。",
       "source_refs": []
     },
     {
       "key": "common_errors",
-      "title": "三、注意事项",
-      "content": "• 确保数据来源可追溯\n• 关联底稿通过索引号链接\n• 异常项目须详细说明原因",
+      "title": "四、联动与注意事项",
+      "content": "• 核对存在差异时，点「推送差异至 A13」将差异金额（保留符号）推送至 A13 未更正错报汇总，并同步至 D4-1 审计说明；差异为 0 时不推送。\n• 差异金额须为纯数字（可带负号），推送前应完成人工认定。\n• 本表结论与 D4-1 审定表、D4-5 会计政策相互关联，出现矛盾须查明。",
       "source_refs": []
     }
   ],
@@ -26,10 +32,10 @@
   "migration": {
     "kind": "legacy_structure_preserved",
     "version": 2,
-    "legacy_content_digest": "6dc1b62866a7e59ab3ca4ef591adf79c6b0909aa6114751b71a30c5de9a50df0",
-    "legacy_section_count": 3,
-    "canonical_section_count": 3,
+    "legacy_content_digest": "5953ce26d890f24111ff7d73b419edaed8881361f97f9523e07cf0071cfc1cfc",
+    "legacy_section_count": 4,
+    "canonical_section_count": 4,
     "unmapped_section_count": 0,
-    "canonical_body_digest": "33a51bb9ddd893f4fcdf923392b7571b2c67e004354ca6dbff77b520443267dd"
+    "canonical_body_digest": "18b2c49b10e7ab7952f9659c210a9552a2ece65146de0e68dbe000948bff2d35"
   }
 }

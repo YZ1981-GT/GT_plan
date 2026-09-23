@@ -26,6 +26,7 @@ import { readStoreProjection } from '../../sync/workpaperSyncApi'
 import WorkpaperSyncEditorHost from '../../sync/WorkpaperSyncEditorHost.vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import http from '@/utils/http'
+import { useAutoColumnWidth } from '@/composables/useAutoColumnWidth'
 
 const props = defineProps<{
   wpId: string
@@ -46,19 +47,39 @@ const { exportTemplate, exportData, importData, importing } = useD4ImportExport(
   projectId: projectIdRef,
 })
 
-async function onExportTemplate(): Promise<void> {
-  await exportTemplate('D4-1')
+// ─── 导入导出（expose 给 GtWpRenderer 工具栏委托）─────────────────────
+function handleExportTemplate(): void { exportTemplate('D4-1') }
+function handleExportData(): void { exportData('D4-1') }
+async function handleImportClick(): Promise<void> {
+  // 触发隐藏的 file-input（工具栏不带 el-upload，需要自行打开）
+  const input = document.createElement('input')
+  input.type = 'file'
+  input.accept = '.xlsx'
+  input.onchange = async () => {
+    const file = input.files?.[0]
+    if (!file) return
+    const result = await importData('D4-1', file)
+    if (result && reloadWorkpaperData) await reloadWorkpaperData()
+  }
+  input.click()
 }
 
-async function onExportData(): Promise<void> {
-  await exportData('D4-1')
+// ─── 行名对齐刷新（供 GtWpRenderer「刷新取数」按钮消费） ────────────────
+function getRowNameAlignmentRows() {
+  const out: { row_key: string; row_label: string; account_prefixes: string[] }[] = []
+  for (const sec of sections.value) {
+    const prefixes = sec.sectionKey === 'main-revenue'
+      ? [D4_MAIN_REVENUE_STANDARD]
+      : [D4_OTHER_REVENUE_STANDARD]
+    for (const r of sec.rows) {
+      if (r.isFixed || !r.label) continue
+      out.push({ row_key: r.rowKey, row_label: r.label, account_prefixes: prefixes })
+    }
+  }
+  return out
 }
 
-async function onImportFile(file: File): Promise<boolean> {
-  const result = await importData('D4-1', file)
-  if (result && reloadWorkpaperData) await reloadWorkpaperData()
-  return false
-}
+defineExpose({ handleExportTemplate, handleExportData, handleImportClick, getRowNameAlignmentRows })
 
 // ─── 金额格式化 ───────────────────────────────────────────────────────
 function fmtAmount(v: number): string {
@@ -71,6 +92,30 @@ function fmtRate(rate: number | '' | 'N/A'): string {
   if (rate === '' || rate === 'N/A') return rate === '' ? '-' : 'N/A'
   return (rate * 100).toFixed(1) + '%'
 }
+
+// ─── 动态列宽：根据实际数据内容自动计算（复用全局 composable） ────────
+const allAdjRows = computed(() => {
+  const out: Record<string, any>[] = []
+  for (const sec of sections.value) {
+    out.push(...sec.rows, sec.subtotalRow)
+  }
+  if (grandTotalRow.value) out.push(grandTotalRow.value)
+  return out
+})
+const { colWidth } = useAutoColumnWidth({
+  rows: allAdjRows,
+  columns: [
+    { field: 'currentUnadjusted', header: '未审数' },
+    { field: 'currentAje',        header: '账项调整' },
+    { field: 'currentRje',        header: '重分类调整' },
+    { field: 'currentAudited',    header: '审定数' },
+    { field: 'priorUnadjusted',   header: '未审数' },
+    { field: 'priorAje',          header: '账项调整' },
+    { field: 'priorRje',          header: '重分类调整' },
+    { field: 'priorAudited',      header: '审定数' },
+  ],
+  formatter: fmtAmount,
+})
 
 // ─── 四表取数溯源 + 预填 ─────────────────────────────────────────────
 // 🔴 经单一真源 `pickDTbSourceCodes` 取（顶层 + project_context 两层都读）——
@@ -264,27 +309,6 @@ const aiTip = computed(() => aiAvailable.value ? 'AI 辅助生成' : 'AI 服务�
 
     <!-- ═══ 表格视图（结构化）═══ -->
     <template v-if="editorMode !== '在线编辑'">
-    <div class="import-export-bar">
-      <el-button
-        size="small"
-        type="success"
-        plain
-        :disabled="isReadonly || !hasPrefillData"
-        @click="previewSeedFromPrefill"
-      >
-        <el-icon><Refresh /></el-icon>从四表库带入未审数
-      </el-button>
-      <el-button size="small" type="primary" plain :loading="adjPull.loading.value" @click="openBringInAdjustment">
-        <el-icon><Download /></el-icon>带入调整
-      </el-button>
-      <el-button-group size="small">
-        <el-button @click="onExportTemplate">导出模板</el-button>
-        <el-button @click="onExportData">导出数据</el-button>
-        <el-upload :show-file-list="false" accept=".xlsx" :before-upload="onImportFile">
-          <el-button :disabled="isReadonly || importing">导入数据</el-button>
-        </el-upload>
-      </el-button-group>
-    </div>
 
     <!-- 四表库取数溯源面板（消 dead output：消费 project_context.tb_source_codes） -->
     <WpFourTableSourcePanel
@@ -321,16 +345,6 @@ const aiTip = computed(() => aiAvailable.value ? 'AI 辅助生成' : 'AI 服务�
       class="cross-alert"
     >
       {{ otherCrossValidation }}
-    </el-alert>
-
-    <!-- 差异警告 -->
-    <el-alert
-      v-if="hasDifference"
-      type="error"
-      :closable="false"
-      class="cross-alert"
-    >
-      审定合计与试算平衡表差异：{{ fmtAmount(differenceRow) }}元
     </el-alert>
 
     <!-- 区块标题 + 操作 -->
@@ -381,7 +395,7 @@ const aiTip = computed(() => aiAvailable.value ? 'AI 辅助生成' : 'AI 服务�
 
         <!-- 本期 -->
         <el-table-column label="本期" align="center">
-          <el-table-column label="未审数" min-width="100" align="right">
+          <el-table-column label="未审数" :width="colWidth('currentUnadjusted')" align="right">
             <template #default="{ row }">
               <el-input-number
                 v-if="row.isEditable && !row.isFixed && !isReadonly && !row.isFromCrossSheet"
@@ -394,7 +408,7 @@ const aiTip = computed(() => aiAvailable.value ? 'AI 辅助生成' : 'AI 服务�
               <span v-else :class="getCellClass(row, 'currentUnadjusted')">{{ fmtAmount(row.currentUnadjusted) }}</span>
             </template>
           </el-table-column>
-          <el-table-column label="账项调整" min-width="100" align="right">
+          <el-table-column label="账项调整" :width="colWidth('currentAje')" align="right">
             <template #default="{ row }">
               <el-input-number
                 v-if="row.isEditable && !row.isFixed && !isReadonly && !row.isFromCrossSheet"
@@ -407,7 +421,7 @@ const aiTip = computed(() => aiAvailable.value ? 'AI 辅助生成' : 'AI 服务�
               <span v-else :class="getCellClass(row, 'currentAje')">{{ fmtAmount(row.currentAje) }}</span>
             </template>
           </el-table-column>
-          <el-table-column label="重分类调整" min-width="100" align="right">
+          <el-table-column label="重分类调整" :width="colWidth('currentRje')" align="right">
             <template #default="{ row }">
               <el-input-number
                 v-if="row.isEditable && !row.isFixed && !isReadonly && !row.isFromCrossSheet"
@@ -420,7 +434,7 @@ const aiTip = computed(() => aiAvailable.value ? 'AI 辅助生成' : 'AI 服务�
               <span v-else :class="getCellClass(row, 'currentRje')">{{ fmtAmount(row.currentRje) }}</span>
             </template>
           </el-table-column>
-          <el-table-column label="审定数" min-width="110" align="right">
+          <el-table-column label="审定数" :width="colWidth('currentAudited')" align="right">
             <template #default="{ row }">
               <span class="audited-cell">{{ fmtAmount(row.currentAudited) }}</span>
             </template>
@@ -429,7 +443,7 @@ const aiTip = computed(() => aiAvailable.value ? 'AI 辅助生成' : 'AI 服务�
 
         <!-- 上期 -->
         <el-table-column label="上期" align="center">
-          <el-table-column label="未审数" min-width="100" align="right">
+          <el-table-column label="未审数" :width="colWidth('priorUnadjusted')" align="right">
             <template #default="{ row }">
               <el-input-number
                 v-if="row.isEditable && !row.isFixed && !isReadonly"
@@ -442,7 +456,7 @@ const aiTip = computed(() => aiAvailable.value ? 'AI 辅助生成' : 'AI 服务�
               <span v-else>{{ fmtAmount(row.priorUnadjusted) }}</span>
             </template>
           </el-table-column>
-          <el-table-column label="账项调整" min-width="100" align="right">
+          <el-table-column label="账项调整" :width="colWidth('priorAje')" align="right">
             <template #default="{ row }">
               <el-input-number
                 v-if="row.isEditable && !row.isFixed && !isReadonly"
@@ -455,7 +469,7 @@ const aiTip = computed(() => aiAvailable.value ? 'AI 辅助生成' : 'AI 服务�
               <span v-else>{{ fmtAmount(row.priorAje) }}</span>
             </template>
           </el-table-column>
-          <el-table-column label="重分类调整" min-width="100" align="right">
+          <el-table-column label="重分类调整" :width="colWidth('priorRje')" align="right">
             <template #default="{ row }">
               <el-input-number
                 v-if="row.isEditable && !row.isFixed && !isReadonly"
@@ -468,7 +482,7 @@ const aiTip = computed(() => aiAvailable.value ? 'AI 辅助生成' : 'AI 服务�
               <span v-else>{{ fmtAmount(row.priorRje) }}</span>
             </template>
           </el-table-column>
-          <el-table-column label="审定数" min-width="110" align="right">
+          <el-table-column label="审定数" :width="colWidth('priorAudited')" align="right">
             <template #default="{ row }">
               <span class="audited-cell">{{ fmtAmount(row.priorAudited) }}</span>
             </template>
@@ -497,28 +511,28 @@ const aiTip = computed(() => aiAvailable.value ? 'AI 辅助生成' : 'AI 服务�
           <span class="font-bold">营业收入合计</span>
         </template>
       </el-table-column>
-      <el-table-column min-width="100" align="right">
+      <el-table-column :width="colWidth('currentUnadjusted')" align="right">
         <template #default="{ row }"><span>{{ fmtAmount(row.currentUnadjusted) }}</span></template>
       </el-table-column>
-      <el-table-column min-width="100" align="right">
+      <el-table-column :width="colWidth('currentAje')" align="right">
         <template #default="{ row }"><span>{{ fmtAmount(row.currentAje) }}</span></template>
       </el-table-column>
-      <el-table-column min-width="100" align="right">
+      <el-table-column :width="colWidth('currentRje')" align="right">
         <template #default="{ row }"><span>{{ fmtAmount(row.currentRje) }}</span></template>
       </el-table-column>
-      <el-table-column min-width="110" align="right">
+      <el-table-column :width="colWidth('currentAudited')" align="right">
         <template #default="{ row }"><span class="audited-cell">{{ fmtAmount(row.currentAudited) }}</span></template>
       </el-table-column>
-      <el-table-column min-width="100" align="right">
+      <el-table-column :width="colWidth('priorUnadjusted')" align="right">
         <template #default="{ row }"><span>{{ fmtAmount(row.priorUnadjusted) }}</span></template>
       </el-table-column>
-      <el-table-column min-width="100" align="right">
+      <el-table-column :width="colWidth('priorAje')" align="right">
         <template #default="{ row }"><span>{{ fmtAmount(row.priorAje) }}</span></template>
       </el-table-column>
-      <el-table-column min-width="100" align="right">
+      <el-table-column :width="colWidth('priorRje')" align="right">
         <template #default="{ row }"><span>{{ fmtAmount(row.priorRje) }}</span></template>
       </el-table-column>
-      <el-table-column min-width="110" align="right">
+      <el-table-column :width="colWidth('priorAudited')" align="right">
         <template #default="{ row }"><span class="audited-cell">{{ fmtAmount(row.priorAudited) }}</span></template>
       </el-table-column>
       <el-table-column min-width="90" align="right">
@@ -633,13 +647,15 @@ const aiTip = computed(() => aiAvailable.value ? 'AI 辅助生成' : 'AI 服务�
    只给 min-height 时编辑区仍会被压到接近下限，OnlyOffice 在页面上只剩一条（2026-09-22 实测）。 */
 .oo-container { min-height: 600px; height: calc(100vh - 280px); overflow: hidden; border-radius: 8px; }
 .oo-loading { padding: 40px; text-align: center; color: #909399; font-size: var(--wp-font-size, 13px); }
-.import-export-bar { display: flex; justify-content: flex-end; margin-bottom: 12px; }
 .d4-tab-adjudication :deep(.el-table) {
-  --el-table-font-size: var(--wp-font-size, 13px);
-  font-size: var(--wp-font-size, 13px);
+  --el-table-font-size: 12px;
+  font-size: 12px;
 }
 .d4-tab-adjudication :deep(.el-table .cell) {
-  font-size: var(--wp-font-size, 13px) !important;
+  font-size: 12px !important;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+  padding: 0 4px !important;
 }
 .guidance-details {
   margin-bottom: 12px;

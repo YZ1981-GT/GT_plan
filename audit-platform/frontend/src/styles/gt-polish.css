@@ -66,6 +66,34 @@
   box-shadow: none !important;
   border: none !important;
 }
+/* success 的 text/link 变体：对齐上方 danger/primary 的处理，恢复无背景的文字按钮语义
+   （否则会被 .el-button--success 的 !important 渐变填成实心绿，而 EP 给 text 按钮的
+   文字色仍是 success 绿 ⇒ 绿底绿字不可读） */
+.el-button--success.is-text,
+.el-button--success.is-link {
+  background: transparent !important;
+  box-shadow: none !important;
+  border: none !important;
+  color: var(--el-color-success) !important;
+}
+
+/* ── 实心/plain 变体统一白字 ──────────────────────────────
+   上方 .el-button--primary / .el-button--success 的渐变背景带 !important，
+   未排除 .is-plain，因此 plain 按钮同样是深紫/深绿实心底；而 Element Plus 给
+   plain 的文字色是主题色本身 ⇒ 紫底紫字 / 绿底绿字不可读（D4-1「带入调整」
+   「从四表库带入未审数」即此现象）。这里统一兜白字。
+   text/link 变体已在上方恢复透明背景，故排除，避免白字白底。 */
+.el-button--primary:not(.is-text):not(.is-link),
+.el-button--success:not(.is-text):not(.is-link) {
+  color: #fff !important;
+}
+/* 禁用态：渐变背景被 !important 接管（EP 的 background-image:none 失效），
+   靠透明度保留「不可点」的视觉线索 */
+.el-button--primary.is-disabled:not(.is-text):not(.is-link),
+.el-button--success.is-disabled:not(.is-text):not(.is-link),
+.el-button--warning.is-disabled:not(.is-text):not(.is-link) {
+  opacity: 0.55 !important;
+}
 
 /* 默认按钮 — 更精致的边框 */
 .el-button--default {

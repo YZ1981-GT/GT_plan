@@ -1213,8 +1213,8 @@ onBeforeUnmount(() => {
 /* Column widths */
 .col-name { min-width: 140px; white-space: normal; }
 .col-row-num { width: 50px; text-align: center; }
-.col-amount { width: 120px; text-align: right; font-variant-numeric: tabular-nums; }
-.col-pct { width: 70px; text-align: right; font-variant-numeric: tabular-nums; }
+.col-amount { min-width: 60px; text-align: right; font-variant-numeric: tabular-nums; font-family: 'Arial Narrow', Arial, sans-serif; white-space: nowrap; }
+.col-pct { min-width: 56px; text-align: right; font-variant-numeric: tabular-nums; font-family: 'Arial Narrow', Arial, sans-serif; white-space: nowrap; }
 .col-status { width: 60px; text-align: center; }
 .col-reason { min-width: 180px; }
 
@@ -1222,7 +1222,7 @@ onBeforeUnmount(() => {
 .col-seq { width: 40px; text-align: center; }
 .col-ratio-name { min-width: 120px; }
 .col-formula { min-width: 200px; font-size: 11px; color: var(--gt-color-text-secondary); white-space: normal; }
-.col-ratio-val { width: 80px; text-align: right; font-variant-numeric: tabular-nums; }
+.col-ratio-val { min-width: 56px; text-align: right; font-variant-numeric: tabular-nums; font-family: 'Arial Narrow', Arial, sans-serif; white-space: nowrap; }
 .col-direction { width: 50px; text-align: center; }
 
 /* ─── Row status colors ─── */

@@ -9,7 +9,7 @@
  * spec: workpaper-html-onlyoffice-bidirectional-writeback-closure · Wave 3 Task 31
  */
 
-export const WP_SYNC_CONTRACT_DIGEST = "b2edf09ebd0b36c82f9b3e4fa07c25275fba090c3776aa38f4d25d12792af421"
+export const WP_SYNC_CONTRACT_DIGEST = "9773d57611c62b4ec6ff37153305da07b57877f1c5f3daae72570a7845daa875"
 
 /**
  * 用户端统一前缀模板。`{entry_id}` 是**多段**值（186 条 entry_id 全部含 `/`，最深四段），
@@ -79,6 +79,12 @@ export const WP_SYNC_ROUTES = [
     "idempotencyKey": "absent",
     "method": "GET",
     "suffix": "/recovery-cases/{case_id}/timeline"
+  },
+  {
+    "endpoint": "leave_room",
+    "idempotencyKey": "absent",
+    "method": "POST",
+    "suffix": "/rooms/{room_id}/participants/{participant_id}/leave"
   },
   {
     "endpoint": "list_recovery_cases",

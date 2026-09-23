@@ -739,6 +739,32 @@ async def _collect() -> dict[str, Any]:  # noqa: C901, PLR0912, PLR0915 - 一次
         snap["world"] = {k: str(v) for k, v in world.items()}
 
         # ── 工具 ─────────────────────────────────────────────────────────
+        def _projection_raw(period: str, total: Any) -> Projection:
+            """`total` 按**给定的 Python 形态**放进 projection（不强转 `Decimal`）。
+
+            spec: oo-single-pass-materialize-and-room-leave · requirements 3.2（任务 10）
+
+            存在的理由就是 requirements 3.2 点名的那个判据缺口：真栈那个缺陷发生在两条
+            **派生路径**之间（已提交那侧是 `Decimal`/int，当次 flush 那侧是 float），
+            而本文件原有的 `_projection()` 两侧都强转 `Decimal(total)` ⇒ digest 必然相等 ⇒
+            「同内容两次 flush」这条链在表示层面是**同一批对象**，口径分叉照样全绿。
+            """
+            return Projection(
+                contract_id=contract.contract_id,
+                semantic_version=contract.semantic_version,
+                document_type=contract.document_type,
+                values={
+                    PERIOD: FieldValue(
+                        stable_key=PERIOD, value=period,
+                        value_type=C.ValueType.text, mode=C.FieldMode.editable,
+                    ),
+                    TOTAL: FieldValue(
+                        stable_key=TOTAL, value=total,
+                        value_type=C.ValueType.amount, mode=C.FieldMode.editable,
+                    ),
+                },
+            )
+
         def _projection(period: str, total: str) -> Projection:
             from decimal import Decimal
 
@@ -1439,6 +1465,7 @@ async def _collect() -> dict[str, Any]:  # noqa: C901, PLR0912, PLR0915 - 一次
                 "representation_id": str(replay_outcome.representation_id),
                 "rooms_opened": replay_outcome.rooms_opened,
                 "commits_invoked": commits_after_replay,
+                "reuse_verdict": replay_outcome.reuse_verdict.as_dict(),
             }
 
 
@@ -1469,6 +1496,7 @@ async def _collect() -> dict[str, Any]:  # noqa: C901, PLR0912, PLR0915 - 一次
                 ),
                 "rooms_opened": reuse_outcome.rooms_opened,
                 "descriptor_present": reuse_outcome.descriptor is not None,
+                "reuse_verdict": reuse_outcome.reuse_verdict.as_dict(),
             }
 
             # 8c. 不同 token、**不同**业务内容 ⇒ 必须新 revision（反向自检）
@@ -1498,6 +1526,7 @@ async def _collect() -> dict[str, Any]:  # noqa: C901, PLR0912, PLR0915 - 一次
                     str(new_outcome.content_version_id)
                     != (snap["descriptor"] or {}).get("content_version_id")
                 ),
+                "reuse_verdict": new_outcome.reuse_verdict.as_dict(),
             }
             # 8d. 世界已经前进之后再拿老 token 重放 ⇒ 不得下发陈旧 descriptor
             before = await _pointers()
@@ -1532,6 +1561,53 @@ async def _collect() -> dict[str, Any]:  # noqa: C901, PLR0912, PLR0915 - 一次
                 "marker": "" if stale_replay is None else str(stale_replay)[:40],
             }
 
+            revision_latest = after["revision"]
+
+            # 8e. 🔴 spec oo-single-pass-materialize-and-room-leave · requirements 3.2
+            #     （任务 10）：**同内容、不同 Python 表示**的第二次 materialize 必须命中复用。
+            #
+            #     8b 已经测了「不同 token、相同业务身份 ⇒ 复用」，但它两侧都用
+            #     `_projection(..., "1234.50")` ⇒ 都强转成同一个 `Decimal` ⇒ digest 必然相等。
+            #     真栈那个缺陷恰恰活在 8b 的盲区里：已提交那侧与当次 flush 那侧是同一份内容的
+            #     **两次独立派生**（HTML store 走 JSON ⇒ 裸 int/float；Excel extract 走 openpyxl；
+            #     merge/审定回写 ⇒ Decimal），表示不同而业务相同。本 leg 把那个不对称补上：
+            #     当前已提交的是 8c 的 `Decimal("8888.00")`，这次 flush 送 float `8888.0`。
+            #     口径正确 ⇒ 复用命中、零 revision；口径退回裸 json_safe ⇒ 立刻变成一次全量提交。
+            before = await _pointers()
+            drift_key = "idem-representation-drift"
+            drift_projection = _projection_raw("2025年度", 8888.0)
+            drift_flush = await _flush(drift_key, drift_projection, revision_latest)
+            async with Session() as s:
+                coordinator = _coordinator(s)
+                request = _request(
+                    token=drift_flush["token"], key=drift_key,
+                    revision=revision_latest, projection=drift_projection,
+                    adapter=_JsonCarrierAdapter(),
+                )
+                authorized = await coordinator.authorize(request)
+                drift_outcome = await coordinator.materialize(authorized)
+                drift_commits = coordinator.commits_invoked
+            after = await _pointers()
+            snap["idempotency"]["representation_drift_reuse"] = {
+                "business_identity_reused": drift_outcome.business_identity_reused,
+                "reuse_verdict": drift_outcome.reuse_verdict.as_dict(),
+                "commit_count": drift_outcome.commit_count,
+                "commits_invoked": drift_commits,
+                "revision_delta": after["revision"] - before["revision"],
+                "content_version_id": str(drift_outcome.content_version_id),
+                "matches_new_content_version": (
+                    str(drift_outcome.content_version_id)
+                    == snap["idempotency"]
+                    .get("new_content", {})
+                    .get("content_version_id")
+                ),
+                # 反空转：两侧的 Python 表示**必须**不同，否则本 leg 退化成 8b。
+                "flushed_value_repr": repr(drift_projection.values[TOTAL].value),
+                "committed_value_repr": repr(
+                    _projection("2025年度", "8888.00").values[TOTAL].value
+                ),
+                "payload_sha256": drift_flush["payload_sha256"],
+            }
             revision_latest = after["revision"]
         except Exception as exc:  # noqa: BLE001
             _phase_failed("idempotency", exc)
@@ -1998,7 +2074,10 @@ def test_every_scenario_produced_a_measurement(snap: dict[str, Any]) -> None:
     assert set(snap["injection"]) == set(_INJECTION_CASES)
     assert set(snap["tamper"]) == set(_TAMPER_CASES)
     assert set(snap["idempotency"]) == {
-        "token_replay", "business_identity_reuse", "new_content", "stale_replay"
+        "token_replay", "business_identity_reuse", "new_content", "stale_replay",
+        # spec oo-single-pass-materialize-and-room-leave · requirements 3.2（任务 10）：
+        # 同内容、不同 Python 表示的第二次 materialize（8e）。
+        "representation_drift_reuse",
     }
     assert snap["commit"] and snap["descriptor"] and snap["confirm"]
     assert snap["stale_fence"]
@@ -2304,6 +2383,74 @@ def test_same_business_identity_with_a_new_token_reuses_the_existing_version(
         "复用必须命中**既有**那个 content version，而不是新建一个"
     )
     assert row["descriptor_present"] is True, "复用路径同样要返回可挂载 descriptor"
+
+
+def test_the_reuse_verdict_labels_each_idempotency_path_distinctly(
+    snap: dict[str, Any],
+) -> None:
+    """spec oo-single-pass-materialize-and-room-leave · requirements 3.1（任务 10）。
+
+    三条路径在**机器可读判词**上必须落三个不同的桶：同 token 重放 `replayed`、
+    业务身份复用 `hit`、内容真变了 `miss_content_changed`。
+
+    为什么重放与复用不能共用一个值：两者的触发条件不同（一个靠 pending mutation 的
+    `state=committed`，一个靠三元组身份），压成一个桶会让「复用命中率」被重放次数注水 ——
+    而那个命中率正是 requirements 3.1「一眼看出这次是复用还是全量」要看的数。
+    """
+    replay = snap["idempotency"]["token_replay"]["reuse_verdict"]
+    reuse = snap["idempotency"]["business_identity_reuse"]["reuse_verdict"]
+    fresh = snap["idempotency"]["new_content"]["reuse_verdict"]
+    assert replay["metric_result"] == "replayed", replay
+    assert reuse["metric_result"] == "hit", reuse
+    assert fresh["metric_result"] == "miss_content_changed", fresh
+    assert len({replay["metric_result"], reuse["metric_result"], fresh["metric_result"]}) == 3
+    # 命中/重放不带原因；未命中必须带，且不得是缺陷类（内容真变了是正常回落）。
+    assert replay["miss_reason"] is None and reuse["miss_reason"] is None
+    assert fresh["miss_reason"] == "content_changed"
+    assert [replay["is_defect"], reuse["is_defect"], fresh["is_defect"]] == [
+        False, False, False,
+    ]
+    # 归因不是空集合恒等：真的比过字段（本 harness 的 contract 有 2 个受管字段）。
+    assert fresh["compared_field_count"] == 2, fresh
+    assert fresh["differences"], "未命中却给不出差异清单 —— 归因是空的"
+
+
+def test_the_same_content_in_a_different_python_representation_still_reuses(
+    snap: dict[str, Any],
+) -> None:
+    """spec oo-single-pass-materialize-and-room-leave · requirements 3.2（任务 10）。
+
+    ═══ 这条补的正是 requirements 3.2 点名的判据缺口 ═══
+
+    原文：「这条正是上一轮那个『digest 口径不一致 ⇒ 复用恒不命中』缺陷的**判据缺口**：
+    当时 `_find_business_identity_reuse` 的单测全绿，因为没有人把『两次同内容』跑成一条链。」
+
+    上面那条 `..._reuses_the_existing_version` 已经把「两次同内容」跑成一条真链了，但它
+    两侧都经 `_projection(..., "8888.00")` 强转成同一个 `Decimal` ⇒ digest 必然相等。
+    真栈那个缺陷活在两条**派生路径**的表示差异上（`"value":0` int vs `"value":0.0` float），
+    所以本条让当次 flush 送 float `8888.0`、而已提交那侧是 `Decimal("8888.00")`：
+    业务上是同一个金额，Python 表示与落盘字节都不同。
+
+    口径正确 ⇒ 复用命中、零 commit、零 revision；把 `canonical_value_for_digest` 退回裸
+    `json_safe` ⇒ 这条立刻变成一次全量提交（revision_delta=1、commit_count=1）。
+    """
+    row = snap["idempotency"]["representation_drift_reuse"]
+    # 反空转：两侧表示确实不同（否则本条退化成上面那条）。
+    assert row["flushed_value_repr"] == "8888.0", row
+    assert row["committed_value_repr"] == "Decimal('8888.00')", row
+    assert row["flushed_value_repr"] != row["committed_value_repr"]
+
+    assert row["business_identity_reused"] is True, (
+        f"同一个金额的两种表示没能命中复用：{row} —— "
+        "这就是 digest 口径分叉的表现，每次切「在线编辑」都会全量重物化"
+    )
+    assert row["reuse_verdict"]["metric_result"] == "hit", row["reuse_verdict"]
+    assert row["commit_count"] == 0
+    assert row["commits_invoked"] == 0, "复用路径**不得**进 commit()"
+    assert row["revision_delta"] == 0
+    assert row["matches_new_content_version"] is True, (
+        "复用必须命中 8c 提交的那个 content version，而不是新建一个"
+    )
 
 
 def test_replay_after_the_world_moved_on_refuses_to_hand_out_a_stale_descriptor(

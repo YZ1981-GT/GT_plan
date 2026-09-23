@@ -34,6 +34,8 @@
     :snapshot="shellCapabilitySnapshot"
     :location="shellLocation"
     :guidance-controller="shellGuidanceController"
+    :open-review="onShellOpenReview"
+    :close-review="onShellCloseReview"
     :shell-error="shellError"
     :open-dsh="openShellDsh"
     :close-dsh="closeShellDsh"
@@ -298,7 +300,23 @@
         :context-revision="activeSheetContext.contextRevision ?? 0"
       />
     </template>
+
+    <!-- 底稿复核：Shell trigger 仅开关 GtReviewDialog drawer，panel slot 留空不占位 -->
+    <template #review-panel>
+      <span />
+    </template>
   </WorkpaperCapabilityShell>
+
+  <!-- 底稿复核对话 Drawer（由 useReviewDialogProvider 驱动，子组件 inject 触发） -->
+  <GtReviewDialogLazy
+    v-if="reviewPanelOpen && reviewActivation"
+    :wp-id="reviewActivation.wpId || wpId"
+    :section-id="reviewActivation.sectionId"
+    :section-label="reviewActivation.sectionLabel"
+    :current-user="reviewActivation.currentUser"
+    :related-data="reviewActivation.relatedData"
+    @closed="onShellCloseReview"
+  />
 
   <!-- 弹窗/抽屉（条件渲染，不占主布局） -->
   <CycleDialogHost
@@ -384,7 +402,7 @@
  *
  * @see .kiro/specs/workpaper-editor-shrink-phase2/design.md §4.2
  */
-import { ref, computed, provide, onMounted, onUnmounted, nextTick, watch, inject } from 'vue'
+import { ref, computed, provide, onMounted, onUnmounted, nextTick, watch, inject, defineAsyncComponent } from 'vue'
 import { useProjectStore } from '@/stores/project'
 import { usePermissionMatrix } from '@/composables/usePermissionMatrix'
 import { useRoute, useRouter, onBeforeRouteLeave } from 'vue-router'
@@ -414,6 +432,7 @@ import { useStaleImpact, type StaleAffectedItem } from '@/composables/useStaleIm
 import { usePrerequisiteStatus } from '@/composables/usePrerequisiteStatus'
 import { useWorkpaperRefresh } from '@/composables/useWorkpaperRefresh'
 import { useWorkpaperReviewMarkers, type ReviewMarkerTicket } from '@/composables/useWorkpaperReviewMarkers'
+import { useReviewDialogProvider } from '@/composables/useReviewDialogProvider'
 import { EDITOR_CONTEXT_KEY, type EditorContextData } from '@/composables/useEditorContext'
 import { getWorkpaper, type WorkpaperDetail } from '@/services/workpaperApi'
 import { api as httpApi } from '@/services/apiProxy'
@@ -434,6 +453,7 @@ import ReviewMarkDialog from './workpaper-editor/ReviewMarkDialog.vue'
 import WpExportButton from '@/components/workpaper/WpExportButton.vue'
 import WpImportDialog from '@/components/workpaper/WpImportDialog.vue'
 import WpGuidancePanel from '@/components/workpaper/WpGuidancePanel.vue'
+const GtReviewDialogLazy = defineAsyncComponent(() => import('@/components/collaboration/GtReviewDialog.vue'))
 import GtWpVersionTrail from '@/components/workpaper/version-trail/GtWpVersionTrail.vue'
 import WorkpaperCapabilityShell from '@/shell/formula/WorkpaperCapabilityShell.vue'
 import { GC0_CONTRACT_VERSION, type CanonicalWorkpaperLocation } from '@/shared/contracts/gc0'
@@ -451,6 +471,25 @@ import { Clock } from '@element-plus/icons-vue'
 const route = useRoute()
 const router = useRouter()
 const { canEdit } = useAuditContext()
+
+// ─── 全局复核对话 provider（驱动右侧面板 + GtWpReviewRail + 子组件 inject） ──
+const { isOpen: reviewPanelOpen, activationParams: reviewActivation, openReviewDialog: openReview, closeReviewDialog: closeReview } = useReviewDialogProvider()
+
+/** Shell 右侧 rail trigger 点击时触发复核对话 Drawer */
+function onShellOpenReview(): void {
+  openReview({
+    wpId: wpId.value,
+    sectionId: 'general',
+    sectionLabel: wpDetail.value?.wp_name || '底稿复核',
+    currentUser: { id: '', name: 'admin', role: '审计助理' },
+    relatedData: { wpCode: wpDetail.value?.wp_code, projectId: projectId.value },
+  })
+}
+
+/** Shell / GtReviewDialog 关闭时同步清理 */
+function onShellCloseReview(): void {
+  closeReview()
+}
 const projectId = computed(() => route.params.projectId as string)
 const wpId = computed(() => route.params.wpId as string)
 const { renderConfig } = useWpRenderer(wpId)
@@ -1333,7 +1372,8 @@ function onBeforeUnload(e: BeforeUnloadEvent) {
   display: flex;
   flex: 1;
   min-height: 0;
-  overflow: hidden;
+  overflow-x: hidden;
+  overflow-y: auto;
 }
 .gt-wp-editor-main {
   flex: 1;

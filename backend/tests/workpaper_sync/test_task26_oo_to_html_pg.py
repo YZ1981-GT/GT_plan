@@ -117,13 +117,59 @@ class _HarnessError(RuntimeError):
     """采集自身失败（禁 fail-open：让守卫红，而不是降级成『无数据』）。"""
 
 
+#: BP-30 之后 commit 路径经 `compute_structure_hash_from_artifact` →
+#: `collect_workbook_structure` → `published_identity_observer`，它按**冻结
+#: instrumentation definition payload** 的四个锚点从「要发布的 xlsx 字节」实测受管结构。
+#: 因此载体不能再是 `<root/>` 空壳 workbook.xml —— openpyxl 读不出 Table/uuid 列/元数据
+#: 表，反读必然为空即抛。改用 G1 的真实 instrumented 夹具（真 Excel Table + 隐藏 uuid
+#: 列 N + veryHidden `_GT_SYNC` 表），受管部件仍以 zip 条目追加，故 Task 26 原有的
+#: 「真写真读 roundtrip」与「未管理区域比对」判据一字未改。
+from tests.workpaper_sync.g1_structure_fixture import workbook_fixture  # noqa: E402
+
+_FIXTURE_BYTES, _FIXTURE_ANCHORS = workbook_fixture(sheet_key="d2-detail")
+
+#: 未管理区域的合成部件放在 `_gt_sync/` 而非 `xl/`：`[Content_Types].xml` 不声明它，
+#: 摆进 `xl/` 会让「包内有未声明部件」这件事去赌 openpyxl 的容忍度。
+_UNMANAGED_PART = "_gt_sync/unmanaged.xml"
+
+
+def _instrumentation_payload() -> dict[str, Any]:
+    """冻结 instrumentation definition 的 canonical payload。
+
+    形态镜像 `published_identity_observer._frozen_sheet_anchors` 的读法，四个值全部取自
+    `_FIXTURE_ANCHORS` ⇒ 与 `_ooxml()` 产出的真实结构一致。它的 canonical digest 同时是
+    instr definition 行冻结的 `sha256` 与契约的 `instrumentation_definition_sha256`（否则
+    `_read_definition_payload` 的 digest 复核 / 三向锁其中之一必抛）。
+    """
+    return {
+        "managed_sheets": [
+            {
+                "sheet_key": _FIXTURE_ANCHORS["sheet_key"],
+                "region_boundary_locator": {"table_key": _FIXTURE_ANCHORS["table_name"]},
+                "tables": [
+                    {"row_uuid_column_letter": _FIXTURE_ANCHORS["uuid_column_letter"]}
+                ],
+            }
+        ],
+        "hidden_metadata_sheet": {"sheet_name": _FIXTURE_ANCHORS["metadata_sheet"]},
+    }
+
+
+def _instrumentation_digest() -> str:
+    from app.services.workpaper_sync import definitions as D
+
+    return D.canonical_digest(_instrumentation_payload())
+
+
 def _ooxml(*, projection_values: dict[str, Any], unmanaged: bytes = b"<formulas/>") -> bytes:
-    """真 OOXML zip 容器 + `_gt_sync/projection.json` 受管部件。"""
+    """真实 instrumented xlsx + `_gt_sync/projection.json` 受管部件。"""
     buf = io.BytesIO()
-    with zipfile.ZipFile(buf, "w", compression=zipfile.ZIP_DEFLATED) as zf:
-        zf.writestr("[Content_Types].xml", _CONTENT_TYPES)
-        zf.writestr("xl/workbook.xml", b'<?xml version="1.0"?><root/>')
-        zf.writestr("xl/unmanaged.xml", unmanaged)
+    with zipfile.ZipFile(io.BytesIO(_FIXTURE_BYTES)) as src, zipfile.ZipFile(
+        buf, "w", compression=zipfile.ZIP_DEFLATED
+    ) as zf:
+        for item in src.infolist():
+            zf.writestr(item, src.read(item.filename))
+        zf.writestr(_UNMANAGED_PART, unmanaged)
         zf.writestr(
             "_gt_sync/projection.json",
             json.dumps(
@@ -167,7 +213,10 @@ def _contract_payload() -> dict[str, Any]:
         "review_status": "reviewed",
         "document_type": "xlsx",
         "template_definition_sha256": _d("task26-template"),
-        "instrumentation_definition_sha256": _d("task26-instrumentation"),
+        # 三向锁（`SyncContext.assert_frozen_identity_consistent`）：契约声明的这个 digest
+        # 必须与 bundle 的 instrumentation slot digest 一致，而后者冻结的是**真实
+        # instrumentation payload** 的 canonical digest ⇒ 此处同源取值，不再写死标签哈希。
+        "instrumentation_definition_sha256": _instrumentation_digest(),
         "template": {
             "relative_path": "D/D2 应收账款.xlsx",
             "template_sha256": _d("task26-template-blob"),
@@ -330,11 +379,11 @@ class _JsonCarrierAdapter:
 
         self.calls.append("verify_unmanaged_regions")
         with zipfile.ZipFile(before) as zb, zipfile.ZipFile(after) as za:
-            same = zb.read("xl/unmanaged.xml") == za.read("xl/unmanaged.xml")
+            same = zb.read(_UNMANAGED_PART) == za.read(_UNMANAGED_PART)
         return UnmanagedRegionReport(
             equivalent=same,
             inspected_aspects=("formula", "style", "drawing", "chart"),
-            first_difference=None if same else "xl/unmanaged.xml",
+            first_difference=None if same else _UNMANAGED_PART,
         )
 
 
@@ -514,12 +563,20 @@ async def _collect() -> dict[str, Any]:  # noqa: C901, PLR0912, PLR0915 - 一次
                 f"('{defs_wp}', '{project}')"
             )
 
+        # instrumentation 的 blob 必须是**真实冻结 payload 的 canonical 字节**：观测器
+        # 会读它反出四个结构锚点，且拿它重算 digest 与 definition 行复核。其余 slot 在
+        # 本任务里不被反读，保持占位字节即可。
+        def _def_payload(name: str) -> bytes:
+            if name == "instr":
+                return D.canonical_json_bytes(_instrumentation_payload())
+            return json.dumps({"k": name}, sort_keys=True).encode()
+
         blobs = {
             name: artifacts.publish_definition_blob(
                 project_id=project,
                 wp_id=defs_wp,
                 definition_kind=kind,
-                payload=json.dumps({"k": name}, sort_keys=True).encode(),
+                payload=_def_payload(name),
             )
             for name, kind in {
                 "tpl": "template",
@@ -556,7 +613,11 @@ async def _collect() -> dict[str, Any]:  # noqa: C901, PLR0912, PLR0915 - 一次
             )
             instr = await repo.create_definition_artifact(
                 kind="instrumentation", logical_id="task26.instr", semantic_version="1.0.0",
-                blob_artifact_id=art["instr"].id, sha256=_d("task26-instrumentation"),
+                blob_artifact_id=art["instr"].id,
+                # 冻结 sha256 必须等于 blob（真实 instrumentation payload）的 canonical
+                # digest：`_read_definition_payload` 读回字节后逐位复核，不一致即
+                # `FrozenChildUnusableError`（approved definition 不可被改写）。
+                sha256=_instrumentation_digest(),
                 structure_hash=_d("task26-instr-structure"), source_commit="task26",
             )
             contract_def = await repo.create_definition_artifact(

@@ -146,7 +146,17 @@ const aiNoteLoading = ref(false); const aiConclusionLoading = ref(false)
 async function genNote() { if (props.isReadonly || !aiAvailable.value) return; aiNoteLoading.value = true; try { const res = await http.post(`/api/workpapers/${props.wpId}/d4/ai-generate`, { section: 'analysis-note', existingContent: auditNote.value, relatedContext: { task: '基于客户访谈汇总(D4-30)结果生成审计说明', customerCount: customers.value.length } }, { _silent: true } as any); const t = res.data?.data?.content ?? res.data?.content ?? ''; if (!t) { ElMessage.warning('AI 未生成内容'); return }; await ElMessageBox.confirm(t, 'AI 生成', { confirmButtonText: '填入', cancelButtonText: '取消', type: 'info' }); updateAuditNote(t) } catch (e: any) { if (e !== 'cancel') ElMessage.warning('AI 生成失败') } finally { aiNoteLoading.value = false } }
 async function genConclusion() { if (props.isReadonly || !aiAvailable.value) return; aiConclusionLoading.value = true; try { const res = await http.post(`/api/workpapers/${props.wpId}/d4/ai-generate`, { section: 'adj-conclusion', existingContent: auditConclusion.value, relatedContext: { task: '基于访谈汇总结果生成审计结论', noteText: auditNote.value, customerCount: customers.value.length } }, { _silent: true } as any); const t = res.data?.data?.content ?? res.data?.content ?? ''; if (!t) { ElMessage.warning('AI 未生成内容'); return }; await ElMessageBox.confirm(t, 'AI 生成', { confirmButtonText: '填入', cancelButtonText: '取消', type: 'info' }); updateAuditConclusion(t) } catch (e: any) { if (e !== 'cancel') ElMessage.warning('AI 生成失败') } finally { aiConclusionLoading.value = false } }
 
-const { exportTemplate, exportData, importData, importing } = useD4ImportExport({ wpId: computed(() => props.wpId), projectId: computed(() => props.projectId) })
+const { exportTemplate, exportData, importData, importing } = useD4ImportExport({ wpId: computed(()
+
+// ─── expose 给 GtWpRenderer 工具栏委托 ────────────────────────────────
+function handleExportTemplate() { exportTemplate('D4-30') }
+function handleExportData() { exportData('D4-30') }
+async function handleImportClick() {
+  const input = document.createElement('input')
+  input.type = 'file'; input.accept = '.xlsx'
+  input.onchange = async () => { const f = input.files?.[0]; if (f) await importData('D4-30', f) }
+  input.click()
+} => props.wpId), projectId: computed(() => props.projectId) })
 async function handleImportFile(f: any) { const r = await importData('D4-30', f.raw || f); if (r) await reloadWorkpaperData?.() }
 
 // 访谈红旗发现：仅由「核对不一致/异常」明确标记生成（空/含「一致」/「是」不算，不由 reason 单独判）
@@ -171,11 +181,13 @@ const riskFindings = computed<D4IpoFinding[]>(() => {
   }
   return out
 })
+
+defineExpose({ handleExportTemplate, handleExportData, handleImportClick })
 </script>
 
 <template>
 <div class="d4-interview-summary">
-  <div class="toolbar"><div class="toolbar-left"><el-segmented v-model="editorMode" :options="modeOptions" size="small" /></div><div class="toolbar-right"><el-dropdown trigger="click" size="small"><el-button size="small">导入导出 ▾</el-button><template #dropdown><el-dropdown-menu><el-dropdown-item @click="exportTemplate('D4-30')">导出模板</el-dropdown-item><el-dropdown-item @click="exportData('D4-30')">导出数据</el-dropdown-item><el-dropdown-item><el-upload :show-file-list="false" accept=".xlsx" :auto-upload="false" :disabled="isReadonly||importing" @change="handleImportFile"><span>导入数据</span></el-upload></el-dropdown-item></el-dropdown-menu></template></el-dropdown><D4IpoFindingWriteback wp-code="D4-30" :all-responses="allResponses" :is-readonly="isReadonly" :findings="riskFindings" /><GtIndexChip value="wp:D4-31" :context-project-id="projectId" /><el-button v-if="openReviewDialog" size="small" @click="openReviewDialog('D4-30-interview')">💬 复核</el-button></div></div>
+  <div class="toolbar"><div class="toolbar-left"><el-segmented v-model="editorMode" :options="modeOptions" size="small" /></div><div class="toolbar-right"><D4IpoFindingWriteback wp-code="D4-30" :all-responses="allResponses" :is-readonly="isReadonly" :findings="riskFindings" /><GtIndexChip value="wp:D4-31" :context-project-id="projectId" /><el-button v-if="openReviewDialog" size="small" @click="openReviewDialog('D4-30-interview')">💬 复核</el-button></div></div>
 
   <!-- 仪表板 -->
   <div class="stats-dashboard">

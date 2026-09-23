@@ -112,6 +112,7 @@ from app.services.workpaper_sync.materialize_coordinator import (
 )
 from app.services.workpaper_sync.models import (
     OperationShape,
+    ParticipantState,
     RequestKind,
     ScopeResourceKind,
     SyncDomainError,
@@ -120,6 +121,11 @@ from app.services.workpaper_sync.models import (
 from app.services.workpaper_sync.oo_to_html import (
     OoToHtmlCoordinator,
     OoToHtmlResult,
+)
+from app.services.workpaper_sync.materialize_reuse_verdict import (
+    REUSE_METRIC,
+    SINGLE_PASS_DECLINE_METRIC,
+    single_pass_decline_scope,
 )
 from app.services.workpaper_sync.metrics import sync_metrics
 from app.services.workpaper_sync.repository import WorkpaperSyncRepository
@@ -320,6 +326,11 @@ _WRITE_ACTIONS: frozenset[str] = frozenset(
         "confirm_descriptor",
         "forcesave",
         "close_intent",
+        # spec oo-single-pass-materialize-and-room-leave Requirement 4：
+        # 「participant 主动离开」是**写** action（它改 participant 状态），所以在
+        # `workflow_locked`（归档 / 复核通过）下与 forcesave 一样被拒 —— 归档底稿上根本
+        # 不会有活着的 room，放它进只读名单只会多一条永不被走到的放行路径。
+        "leave_room",
         "claim_recovery_case",
         "download_only",
         "resolve_conflicts",
@@ -858,9 +869,46 @@ async def materialize(
 
     try:
         authorized = await coordinator.authorize(mat_request)
-        outcome = await coordinator.materialize(authorized)
+        # requirements 3.3：单趟写入的回落原因要能统计。engine 层拿不到 scope，所以它只
+        # **登记分型**（`record_single_pass_decline`），归因与 emit 在这里 —— 这是本请求
+        # 唯一同时握有 project_id/wp_id/entry_id 与「物化真的跑过」这两件事的地方。
+        with single_pass_decline_scope() as declines:
+            outcome = await coordinator.materialize(authorized)
     except SyncDomainError as exc:
         raise _domain_error(exc, status=classify_materialize_rejection(exc)) from exc
+
+    # requirements 3.1：复用判定必须落进既有 metrics 而不是只写日志。
+    # `result` 从 `outcome.reuse_verdict` **显式**取（`metric_result` 是封闭域的唯一构造处）——
+    # 不用 `getattr(..., default)`：默认值会把「字段名写错」变成「永远记成命中」，而四层静态
+    # 检查全绿（本 spec 反复踩过的形态）。
+    sync_metrics.record_outcome(
+        REUSE_METRIC,
+        result=outcome.reuse_verdict.metric_result,
+        landed=True,
+        project_id=project_id,
+        wp_id=wp_id,
+        entry_id=scope.entry_id,
+    )
+    if outcome.reuse_verdict.is_defect:
+        # 缺陷类**不**在这里抛：物化已经成功，用户该拿到 descriptor（正确性没问题，
+        # 只是白付了一趟全量）。可见性由日志 + 指标 + CI 门三层承担，CI 门见
+        # scripts/check/check_materialize_reuse_digest_caliber.py。
+        logger.error(
+            "[reuse_verdict] 🔴 缺陷类未命中 %s（wp=%s entry=%s）：%s",
+            outcome.reuse_verdict.metric_result,
+            wp_id,
+            scope.entry_id,
+            " ｜ ".join(outcome.reuse_verdict.differences),
+        )
+    for decline_class in declines:
+        sync_metrics.record_outcome(
+            SINGLE_PASS_DECLINE_METRIC,
+            result=decline_class.value,
+            landed=True,
+            project_id=project_id,
+            wp_id=wp_id,
+            entry_id=scope.entry_id,
+        )
     if outcome.descriptor is None:
         raise HTTPException(
             status_code=422,
@@ -1439,6 +1487,84 @@ async def create_close_intent(
         # exactly-one close-capture 的可观测事实（`>1` 由 Task 24 在锁内即抛）。
         "open_capture_count": int(opened.reconcile.open_capture_count),
         "live_intent_count": int(opened.reconcile.live_intent_count),
+    }
+
+
+@router.post(
+    USER_SYNC_PREFIX + "/rooms/{room_id}/participants/{participant_id}/leave"
+)
+async def leave_room(
+    project_id: uuid.UUID,
+    wp_id: uuid.UUID,
+    entry_id: str,
+    room_id: uuid.UUID,
+    participant_id: uuid.UUID,
+    payload: Mapping[str, Any] = Body(default={}),
+    svc: _SyncServices = Depends(_services),
+) -> dict[str, Any]:
+    """participant **主动离开**：只释放这一条 lease（`active/closing → left`）。
+
+    spec: oo-single-pass-materialize-and-room-leave · Requirement 4.1~4.5
+
+    🔴 **不是** `close-intents` 的同义词，两条路径必须分开（AC 4.1）。close-intent 是
+    close barrier 仲裁：推 `closing`、选 leader、提升一条 `kind=close_capture` 写请求。
+    对**未改动**的文档那条 capture 永远等不到 OO 回调 —— 真栈实测 room
+    `03bbcad8-70ef-4462-8a37-68af4fc0d1fa` 停在 `state=close_barrier` / participant
+    `closing` / capture `state=frozen`，该 room 此后**再也进不去**（下次打开
+    confirm-descriptor 仍 200，紧接着「同步失败，请重试」）。前端的「未改动点结构化视图」
+    正是这条路，所以它需要的是本端点而不是那一条。
+
+    刻意**没有** `Idempotency-Key`：本端点的幂等不来自键，而来自**终态**
+    （`ParticipantState.left` 是 `PARTICIPANT_EDGES` 的终态，重复离开由 service 的显式
+    状态分支返回同一结果）。声明一个没人用它去合并请求的必填 header 只会让调用方以为
+    「换个 key 就能再离开一次」。
+
+    刻意**没有** 202：它不派发任何出站命令，返回时状态迁移已经落库（router 这一次
+    `commit`）—— 202 会让前端以为还要轮询。
+    """
+    scope = await _guard(
+        svc,
+        project_id=project_id,
+        wp_id=wp_id,
+        entry_id=entry_id,
+        action="leave_room",
+        # 🔴 **两个** ref 都声明：room 与 participant 各自过一遍 scope index 的
+        # 「同 project/wp/entry」交叉比对（阶段 ③）。只声明 room 时，「拿别处的
+        # participant_id 配上自己可见的 room」会一路走到 service —— 那时唯一的防线是
+        # service 的归属判据，而 404 oracle 就只剩一条腿。
+        refs=declared_refs(
+            (
+                (ScopeResourceKind.room, room_id),
+                (ScopeResourceKind.participant, participant_id),
+            )
+        ),
+    )
+    try:
+        outcome = await svc.rooms.leave_participant(
+            room_id=room_id,
+            participant_id=participant_id,
+            # 归属判据的另一半 —— scope index 里没有「这条 lease 属于谁」这个事实。
+            actor_user_id=scope.user_id,
+            # 🔴 客户端**自报**的 dirty（服务端无从独立核实 OO 编辑器的内存态）。
+            # 取值刻意是「缺省即 False」而不是必填：前端在 dirty 时压根不会发出这个请求
+            # （`canLeave` 硬门），必填只会把一个正确的调用变成 422。说谎的客户端由
+            # in-flight 门与 close barrier 各自的判据承担。
+            client_reports_dirty=bool(payload.get("dirty") or False),
+        )
+        # service 只 flush；事务边界由 router 持有（本域惯例）。
+        await svc.session.commit()
+    except SyncDomainError as exc:
+        await svc.session.rollback()
+        raise _sync_http(exc) from exc
+    return {
+        "participant_id": str(outcome.participant_id),
+        "state": ParticipantState.left.value,
+        # 幂等重放（本次零写入）。前端照样返回表单，不当成失败。
+        "replayed": bool(outcome.already_left),
+        "left_at": outcome.left_at.isoformat(),
+        # AC 4.3 的可观测面：仍有其他 active editor 时 room 必须**保持** active。
+        "remaining_active_editors": int(outcome.remaining_active_editors),
+        "room_state": str(outcome.room_state),
     }
 
 
@@ -2839,20 +2965,33 @@ def _build_error_code_status(
         OperationScopeNotVisibleError,
         ScopeAuthorizationDeniedError,
     )
+    from app.services.workpaper_sync.rooms import (
+        ParticipantDirtyLeaveError,
+        ParticipantLeaveInFlightError,
+        ParticipantScopeNotVisibleError,
+    )
 
     production_spec: tuple[tuple[int, tuple[type, ...]], ...] = (
         # 404 —— 统一 oracle（`_sync_http` 把它们全部换成 `_not_found()`）。
+        #
+        # `ParticipantScopeNotVisibleError` 在内：「拿别人的 participant_id 去 leave」
+        # 与「那条 lease 不存在」必须逐字节同响应，否则 409/422 与 404 的差异就是一个
+        # 存在性预言机（Property 45）。
         (404, (ContentVersionNotFoundError, OperationScopeNotVisibleError,
-               MaterializeScopeNotVisibleError)),
+               MaterializeScopeNotVisibleError, ParticipantScopeNotVisibleError)),
         # 403 —— scope 可见但当前授权/工作流不允许。
         (403, (ScopeAuthorizationDeniedError, MaterializeAuthorizationError,
                ResolveAuthorizationStaleError, FinalFenceError)),
         # 409 —— 乐观锁/身份陈旧/幂等冲突/状态机不允许。
+        #
+        # 两条 leave 拒绝在内且**各有独立 code**：前端据 code 决定提示「先保存」还是
+        # 「稍等」。压成一个 code 会让 UI 只能说一句笼统的话，而这两件事的补救动作不同。
         (409, (IdempotencyConflictError, RevisionConflictError,
                DescriptorStaleIdentityError, DescriptorSubstrateStaleError,
                ResolveFenceRejectedError, ResolveSupersededError,
                ResolveRebaseRequiredError, StateTransitionError,
-               ReapplyForbiddenError, RollbackRevisionRewindError)),
+               ReapplyForbiddenError, RollbackRevisionRewindError,
+               ParticipantDirtyLeaveError, ParticipantLeaveInFlightError)),
         # 422 —— 请求本身不适配（客户端可读的拒绝）。
         (422, (QuarantinedIncomingError, QuarantinedOperationForbiddenError,
                RecoveryCaseRetryForbiddenError, ResolveWithoutConflictError,

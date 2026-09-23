@@ -70,6 +70,10 @@ from app.services.workpaper_sync.excel_materialize import (
 from app.services.workpaper_sync.limits import SyncLimits, load_limits
 from app.services.workpaper_sync.models import ArtifactKind, ArtifactState
 
+import logging
+
+logger = logging.getLogger(__name__)
+
 __all__ = [
     "ExcelAdapterIdentityError",
     "ExcelSyncAdapter",
@@ -392,6 +396,30 @@ class ExcelSyncAdapter:
                 merge_workbook_row_change_propagations,
             )
 
+            # 🔴 单趟写入优先（spec oo-single-pass-materialize-and-room-leave）：全部 binding
+            #    的计划只解析一次 substrate、写入合成一趟。它在「任一 binding 需插行 / 用
+            #    openpyxl 全量重写 / 两 binding 写同一格**且 payload 不同**」时**显式 decline**，
+            #    回落下面的逐趟链式路径（语义与改动前逐字相同，只是慢）。
+            #    ⚠️ 第三条不是「同 sheet」也不是「坐标相交」：同格但 payload 逐字段相同是恒等
+            #    覆盖（D4 的 sheet14 C24/E24/C38/E38 四格），按坐标 decline 会把 D4 挡在单趟
+            #    之外 —— 而 D4 正是需求 1.5 指名的 entry。判据见
+            #    `excel_materialize._cross_binding_payload_conflicts`。
+            #    decline 而非静默回落：真库上要能统计回落比例（Requirement 3）。
+            #    🔴 下面那条逐趟链式路径**不是死代码**：它是 decline 三条（插行 / openpyxl
+            #    全量重写 / payload 冲突）的正式回落路径，被 `single_pass is None` 真实到达。
+            single_pass = self._try_single_pass_materialize(
+                bindings=bindings,
+                substrate_for_write=substrate_for_write,
+                projection=projection,
+                output=output,
+                contract=contract,
+                role=role,
+                kind=kind,
+                state=state,
+            )
+            if single_pass is not None:
+                return single_pass
+
             current = substrate_for_write
             primary_result: MaterializeResult | None = None
             last_result: MaterializeResult | None = None
@@ -489,6 +517,107 @@ class ExcelSyncAdapter:
             if g7_sanitized is not None:
                 release_scoped_workbooks(g7_sanitized)
                 g7_sanitized.unlink(missing_ok=True)
+
+    def _try_single_pass_materialize(
+        self,
+        *,
+        bindings: tuple[ExcelIdentityBinding, ...],
+        substrate_for_write: Path,
+        projection: Projection,
+        output: Path,
+        contract: SyncContract,
+        role: SubstrateRole,
+        kind: ArtifactKind,
+        state: ArtifactState,
+    ) -> "MaterializeResult | None":
+        """尝试单趟物化；不适用返回 `None`（调用方回落逐趟链式路径）。
+
+        spec: oo-single-pass-materialize-and-room-leave · Requirement 1 / 2
+
+        产出的 `MaterializeResult` 与逐趟路径的返回**逐字段同构**：主 binding 的完整
+        result + 全部 binding 的字段数累加 + 全部趟 workbook 位移声明并集。`per_table_shift`
+        在单趟路径恒为 `None`（单趟在任一 binding 需插行时就已 decline）。
+        """
+        import dataclasses
+        import hashlib
+
+        from app.services.workpaper_sync.excel_materialize import (
+            SinglePassDeclined,
+            materialize_projection_single_pass,
+        )
+        from app.services.workpaper_sync.excel_workbook_row_change import (
+            merge_workbook_row_change_propagations,
+        )
+
+        try:
+            outcome = materialize_projection_single_pass(
+                substrate=substrate_for_write,
+                projection=projection,
+                output=output,
+                definitions=self.definitions,
+                bindings=bindings,
+                primary_table_key=self.binding.table_key,
+                substrate_role=role,
+                substrate_kind=kind,
+                substrate_state=state,
+                capability=self.capability,
+                limits=self._limits,
+            )
+        except SinglePassDeclined as exc:
+            # 🔴 仍然**不在这里** emit metrics：metrics 是注册制契约（`METRICS_BY_NAME` +
+            #    归因维度 + 治理 gate），且 platform 级指标必须带 project_id/wp_id ——
+            #    engine 层是纯计算、拿不到 scope，编一个 scope 就是假归因。
+            #    Task 10（requirements 3.3「回落原因统计」）的做法是**登记分型**：engine 只说
+            #    「发生了哪一类回落」，emit 与归因由持有 scope 的 router 完成。作用域之外
+            #    `record_single_pass_decline` 是安全空操作，所以这行不会让任何既有调用路径变化。
+            from app.services.workpaper_sync.materialize_reuse_verdict import (
+                record_single_pass_decline,
+            )
+
+            decline_class = record_single_pass_decline(exc.reason)
+            logger.info(
+                "[single_pass] 回落逐趟链式（entry=%s，class=%s）：%s",
+                self.adapter_id,
+                decline_class.value,
+                exc.reason,
+            )
+            return None
+
+        logger.info(
+            "[single_pass] 单趟物化命中（entry=%s，binding=%d）",
+            self.adapter_id,
+            len(bindings),
+        )
+        result = outcome.primary.result
+        from app.services.workpaper_sync.phase5_transposed_sheet import (
+            materialize_file as _transposed_materialize_file,
+        )
+        from app.services.workpaper_sync.transposed_registry import (
+            resolve_transposed_specs,
+        )
+
+        specs = resolve_transposed_specs(contract)
+        if specs:
+            # 转置写盘后只刷新 artifact 字节摘要；structure_hash 由
+            # ContentMutationService._projection_structure_hash（与观测器同构）覆盖。
+            for spec in specs:
+                _transposed_materialize_file(output, projection, spec=spec)
+            result = dataclasses.replace(
+                result,
+                artifact_sha256=hashlib.sha256(output.read_bytes()).hexdigest(),
+            )
+
+        merged_change = merge_workbook_row_change_propagations(
+            list(outcome.workbook_row_changes)
+        )
+        return dataclasses.replace(
+            result,
+            managed_field_count=int(result.managed_field_count),
+            output_path=output,
+            workbook_row_change=merged_change,
+            # 单趟在任一 binding 需插行时就 decline ⇒ 到这里必然全无插行。
+            per_table_shift=None,
+        )
 
     def extract(self, *, artifact: Path, contract: SyncContract) -> Projection:
         """反读受管 projection。
@@ -634,7 +763,11 @@ class ExcelSyncAdapter:
                 after_bytes = after.read_bytes()
                 any_projected = False
                 for spec in specs:
-                    after_rows = _transposed_extract(after_bytes, spec=spec)
+                    # `share_parse=True`：after 字节与 `extract` / `structure_hash` 读的是
+                    # 同一份产物 ⇒ 全簿解析在 `workbook_read_scope()` 里共用一次（需求 2.1）。
+                    # 复用的只是**解析结果**：下面的中性化、逐 binding digest 比对、
+                    # `assert_equivalent` 一条都没省（需求 2.3）。
+                    after_rows = _transposed_extract(after_bytes, spec=spec, share_parse=True)
                     # 🔴 空转置表跳过中性化（否则假 drift）：`materialize_transposed_workbook`
                     #    经 openpyxl `wb.save()` 重序列化目标 sheet part，即便**零实体**也会
                     #    产出字节不同的 XML。而 materialize 侧对空转置表是 no-op

@@ -180,28 +180,28 @@
       </el-table-column>
 
       <!-- 期初未审（只读，TB；合计行汇总） -->
-      <el-table-column v-if="!isDynamicColumns" label="期初未审" width="120" align="right">
+      <el-table-column v-if="!isDynamicColumns" label="期初未审" :width="gasColWidth('opening_unadjusted')" align="right">
         <template #default="{ row }">
           <span v-if="!row.isSection" class="gas-readonly-cell">{{ fmtNum(displayOpeningUnadjusted(row)) }}</span>
         </template>
       </el-table-column>
 
       <!-- 期初审定（只读，computed = 期初未审 ?? 0） -->
-      <el-table-column v-if="!isDynamicColumns" label="期初审定" width="120" align="right">
+      <el-table-column v-if="!isDynamicColumns" label="期初审定" :width="gasColWidth('opening_audited')" align="right">
         <template #default="{ row }">
           <span v-if="!row.isSection" class="gas-readonly-cell">{{ fmtNum(openingAudited(row)) }}</span>
         </template>
       </el-table-column>
 
       <!-- 本期未审（只读，TB；合计行汇总） -->
-      <el-table-column v-if="!isDynamicColumns" label="本期未审" width="120" align="right">
+      <el-table-column v-if="!isDynamicColumns" label="本期未审" :width="gasColWidth('current_unadjusted')" align="right">
         <template #default="{ row }">
           <span v-if="!row.isSection" class="gas-readonly-cell">{{ fmtNum(displayCurrentUnadjusted(row)) }}</span>
         </template>
       </el-table-column>
 
       <!-- 账项调整（可编辑；合计行汇总只读） -->
-      <el-table-column v-if="!isDynamicColumns" label="账项调整" width="130" align="right">
+      <el-table-column v-if="!isDynamicColumns" label="账项调整" :width="gasColWidth('adj_amount')" align="right">
         <template #default="{ row }">
           <WpAmountInput
             v-if="isEditableRow(row)"
@@ -217,7 +217,7 @@
       </el-table-column>
 
       <!-- 重分类（可编辑；合计行汇总只读） -->
-      <el-table-column v-if="!isDynamicColumns" label="重分类" width="130" align="right">
+      <el-table-column v-if="!isDynamicColumns" label="重分类" :width="gasColWidth('reclass_amount')" align="right">
         <template #default="{ row }">
           <el-input-number
             v-if="isEditableRow(row)"
@@ -235,14 +235,14 @@
       </el-table-column>
 
       <!-- 审定数（自动计算，紫色） -->
-      <el-table-column v-if="!isDynamicColumns" label="审定数" width="120" align="right">
+      <el-table-column v-if="!isDynamicColumns" label="审定数" :width="gasColWidth('audited')" align="right">
         <template #default="{ row }">
           <span v-if="!row.isSection" class="gas-auto-cell">{{ fmtNum(auditedAmount(row)) }}</span>
         </template>
       </el-table-column>
 
       <!-- 变动额（自动计算，紫色） -->
-      <el-table-column v-if="!isDynamicColumns" label="变动额" width="120" align="right">
+      <el-table-column v-if="!isDynamicColumns" label="变动额" :width="gasColWidth('change_amount')" align="right">
         <template #default="{ row }">
           <span v-if="!row.isSection" class="gas-auto-cell">{{ fmtNum(changeAmount(row)) }}</span>
         </template>
@@ -467,13 +467,14 @@
 
 <script setup lang="ts">
 import WpAmountInput from './shared/WpAmountInput.vue'
-import { ref, watch } from 'vue'
+import { ref, watch, computed } from 'vue'
 import { ElMessage } from 'element-plus'
 import { confirmDangerous } from '@/utils/confirm'
 import { useFullscreen } from '@/composables/useFullscreen'
 import { useAuditSheetColumns } from '@/composables/useAuditSheetColumns'
 import { useAuditSheetSections } from '@/composables/useAuditSheetSections'
 import { useAuditSheetTable } from '@/composables/useAuditSheetTable'
+import { useAutoColumnWidth } from '@/composables/useAutoColumnWidth'
 import type {
   AuditSheetSchema,
   AuditSheetRow,
@@ -598,6 +599,34 @@ const {
 // ─── 初始构建 + htmlData 变化时重建（行为不变：构建表 + 重建说明结论区）───
 buildTableData()
 watch(() => props.htmlData, () => { buildTableData(); buildSections() }, { deep: true })
+
+// ─── 自适应列宽：将各列显示值投影为 composable 可消费的平铺行 ────────────
+const gasDisplayRows = computed(() =>
+  tableData.value
+    .filter((r: any) => !r.isSection)
+    .map((r: any) => ({
+      opening_unadjusted: displayOpeningUnadjusted(r),
+      opening_audited: openingAudited(r),
+      current_unadjusted: displayCurrentUnadjusted(r),
+      adj_amount: displayAdj(r),
+      reclass_amount: displayReclass(r),
+      audited: auditedAmount(r),
+      change_amount: changeAmount(r),
+    })),
+)
+const { colWidth: gasColWidth } = useAutoColumnWidth({
+  rows: gasDisplayRows,
+  columns: [
+    { field: 'opening_unadjusted', header: '期初未审' },
+    { field: 'opening_audited',    header: '期初审定' },
+    { field: 'current_unadjusted', header: '本期未审' },
+    { field: 'adj_amount',         header: '账项调整' },
+    { field: 'reclass_amount',     header: '重分类' },
+    { field: 'audited',            header: '审定数' },
+    { field: 'change_amount',      header: '变动额' },
+  ],
+  formatter: fmtNum,
+})
 
 // ─── 工具栏：公式 / 还原 ───
 /**
@@ -775,6 +804,7 @@ defineExpose({
   padding: 0 4px;
   color: var(--gt-color-text-regular);
   font-variant-numeric: tabular-nums;
+  font-family: 'Arial Narrow', Arial, sans-serif;
 }
 
 /* 自动计算列（GT 紫，与 NetAssetSheet ws-auto-cell 一致） */
@@ -786,6 +816,7 @@ defineExpose({
   font-weight: 500;
   font-size: var(--gt-font-size-xs);
   font-variant-numeric: tabular-nums;
+  font-family: 'Arial Narrow', Arial, sans-serif;
 }
 
 /* 可编辑单元格内的数字右对齐 */

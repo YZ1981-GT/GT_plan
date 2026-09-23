@@ -15,6 +15,7 @@ import { useAdjustmentCentralSync, CENTRAL_STATUS_LABELS } from '../../composabl
 import { useAuditContext } from '@/composables/useAuditContext'
 import GtIndexChip from '../../GtIndexChip.vue'
 import http from '@/utils/http'
+import WpAmountInput from '@/components/workpaper/shared/WpAmountInput.vue'
 
 const props = defineProps<{
   wpId: string
@@ -57,10 +58,16 @@ const { exportTemplate, exportData, importData, importing } = useD4ImportExport(
   projectId: toRef(props, 'projectId') as Ref<string>,
 })
 
-function handleImportUpload(file: File): boolean {
-  importData('D4-4', file)
-  return false
+// expose 给 GtWpRenderer 工具栏委托
+function handleExportTemplate() { exportTemplate('D4-4') }
+function handleExportData() { exportData('D4-4') }
+async function handleImportClick() {
+  const input = document.createElement('input')
+  input.type = 'file'; input.accept = '.xlsx'
+  input.onchange = async () => { const f = input.files?.[0]; if (f) await importData('D4-4', f) }
+  input.click()
 }
+defineExpose({ handleExportTemplate, handleExportData, handleImportClick })
 
 // ─── 选中行（用于推送A13） ─────────────────────────────────────────────
 const selectedRows = ref<D4AdjustmentRow[]>([])
@@ -200,25 +207,6 @@ const aiTip = computed(() => aiAvailable.value ? 'AI 辅助生成' : 'AI 服务�
         </el-button>
       </div>
       <div class="toolbar-right">
-        <el-dropdown size="small" trigger="click" :disabled="isReadonly">
-          <el-button size="small">导入导出 ▾</el-button>
-          <template #dropdown>
-            <el-dropdown-menu>
-              <el-dropdown-item @click="exportTemplate('D4-4')">导出模板</el-dropdown-item>
-              <el-dropdown-item @click="exportData('D4-4')">导出数据</el-dropdown-item>
-              <el-dropdown-item>
-                <el-upload
-                  :show-file-list="false"
-                  accept=".xlsx,.xls"
-                  :before-upload="handleImportUpload"
-                  :disabled="importing"
-                >
-                  <span>导入数据</span>
-                </el-upload>
-              </el-dropdown-item>
-            </el-dropdown-menu>
-          </template>
-        </el-dropdown>
         <el-button
           size="small"
           type="success"
@@ -352,12 +340,12 @@ const aiTip = computed(() => aiAvailable.value ? 'AI 辅助生成' : 'AI 服务�
       <!-- 6. 借方金额 -->
       <el-table-column label="借方" width="120" align="right">
         <template #default="{ row }">
-          <el-input
+          <WpAmountInput
             v-if="!isReadonly"
             :model-value="row.debitAmount"
             size="small"
-            type="number"
-            @change="(v: string) => updateCell(row.rowId, 'debitAmount', v)"
+            style="width: 100%"
+            @change="(v: number) => updateCell(row.rowId, 'debitAmount', v)"
           />
           <span v-else>{{ fmtAmount(row.debitAmount) }}</span>
         </template>
@@ -366,12 +354,12 @@ const aiTip = computed(() => aiAvailable.value ? 'AI 辅助生成' : 'AI 服务�
       <!-- 7. 贷方金额 -->
       <el-table-column label="贷方" width="120" align="right">
         <template #default="{ row }">
-          <el-input
+          <WpAmountInput
             v-if="!isReadonly"
             :model-value="row.creditAmount"
             size="small"
-            type="number"
-            @change="(v: string) => updateCell(row.rowId, 'creditAmount', v)"
+            style="width: 100%"
+            @change="(v: number) => updateCell(row.rowId, 'creditAmount', v)"
           />
           <span v-else>{{ fmtAmount(row.creditAmount) }}</span>
         </template>

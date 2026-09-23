@@ -250,21 +250,33 @@ class _JsonCarrierAdapter:
             for key, value in projection.values.items()
             if key not in self.drop_keys
         }
-        blob = _ooxml(
-            projection.document_type,
-            extra={
-                "_gt_sync/projection.json": json.dumps(
-                    {"contract_id": projection.contract_id, "values": values},
-                    sort_keys=True,
-                    ensure_ascii=False,
-                ).encode("utf-8")
-            },
-        )
+        payload = json.dumps(
+            {"contract_id": projection.contract_id, "values": values},
+            sort_keys=True,
+            ensure_ascii=False,
+        ).encode("utf-8")
+        if projection.document_type == "xlsx":
+            # 🔴 xlsx projection commit 的 structure_hash 由 BP-30 改成**发布时刻按字节反读**
+            # （`_projection_structure_hash` → `compute_structure_hash_from_artifact`）：
+            # 空壳 zip 反读不出受管结构会抛。写盘因此必须带真实受管结构（Excel Table +
+            # 隐藏 UUID 列 + `_GT_SYNC` sheet），projection JSON 注进同一个 zip 让 extract
+            # 仍能真读回投影 —— 与已全绿的非 PG 兄弟件 `test_task15_content_mutation.py`
+            # 同一套 `g1_structure_fixture` 字节，plan 必须传同一组 `_FIXTURE_ANCHORS`。
+            base, _anchors = _workbook_fixture(sheet_key=_FIXTURE_ANCHORS["sheet_key"])
+            blob, digest = _attach_projection_json(
+                base, contract_id=projection.contract_id, values=values
+            )
+        else:
+            blob = _ooxml(
+                projection.document_type,
+                extra={"_gt_sync/projection.json": payload},
+            )
+            digest = hashlib.sha256(blob).hexdigest()
         Path(output).write_bytes(blob)
         return MaterializeResult(
             output_path=Path(output),
             document_type=projection.document_type,
-            artifact_sha256=hashlib.sha256(blob).hexdigest(),
+            artifact_sha256=digest,
             structure_hash=_d("task15-structure"),
             identity_inventory_sha256=_d("task15-identity"),
             managed_field_count=len(values),
@@ -292,7 +304,22 @@ class _JsonCarrierAdapter:
             },
         )
 
-    def verify_unmanaged_regions(self, *, before, after, contract):
+    def verify_unmanaged_regions(
+        self,
+        *,
+        before,
+        after,
+        contract,
+        # 🔴 位移感知形参，与 `WorkpaperSyncAdapter.verify_unmanaged_regions` 及
+        # `ExcelSyncAdapter` 逐一对齐（默认值也对齐）。编排方 `_stage_cpu_segment_scoped`
+        # **无条件**递这四个 keyword，少一个就是 `TypeError`。JSON 载体没有行位移概念，
+        # 接住后忽略即可 —— 但必须显式列出来，这样下次编排方再加参数时
+        # `test_stub_mirrors_the_orchestrator_call_surface` 会**在替身这里**打红。
+        row_shift=None,
+        total_formula_rows=(),
+        propagation=None,
+        per_table_shift=None,
+    ):
         from app.services.workpaper_sync.adapters.base import UnmanagedRegionReport
 
         return UnmanagedRegionReport(
@@ -1626,6 +1653,59 @@ class TestHarness:
     def test_scratch_schema_is_isolated(self, snap: dict[str, Any]) -> None:
         assert snap["schema"].startswith(_SCHEMA_PREFIX)
         assert "tmp_task15_store_" in snap["base_root"]
+
+    def test_stub_mirrors_the_orchestrator_call_surface(self) -> None:
+        """🔴 替身的参数面必须跟得上编排方**实际传的** keyword，漂移在这里打红。
+
+        本文件 46 条判据曾因一个 `TypeError` 全红：编排方
+        `ContentMutationService._stage_cpu_segment_scoped` 已经无条件多传
+        `row_shift` / `total_formula_rows` / `propagation` / `per_table_shift`，
+        而 `_JsonCarrierAdapter.verify_unmanaged_regions` 只写了 `before/after/contract`。
+        一次采集全场景的 harness 在第一个场景就抛，后面 45 条读不到自己那段快照。
+
+        判据不抄参数名 —— 从**生产调用点的 AST** 里取实际传的 keyword，再要求替身与
+        Protocol 两侧都接得住。这样下次编排方再加一个参数，红的是这一条（带明确原因），
+        而不是 46 条 `KeyError`。
+        """
+        import ast
+        import inspect
+        import textwrap
+
+        from app.services.workpaper_sync.adapters.base import WorkpaperSyncAdapter
+        from app.services.workpaper_sync.content_mutation import ContentMutationService
+
+        tree = ast.parse(
+            textwrap.dedent(
+                inspect.getsource(ContentMutationService._stage_cpu_segment_scoped)
+            )
+        )
+        passed: set[str] = set()
+        for node in ast.walk(tree):
+            if (
+                isinstance(node, ast.Call)
+                and isinstance(node.func, ast.Attribute)
+                and node.func.attr == "verify_unmanaged_regions"
+            ):
+                passed |= {kw.arg for kw in node.keywords if kw.arg is not None}
+        assert passed >= {"before", "after", "contract"}, (
+            "没能在生产 CPU 段里定位到 `adapter.verify_unmanaged_regions(...)` 调用 —— "
+            f"AST 只取到 {sorted(passed)}，本条判据已失效，需重新对齐调用点"
+        )
+
+        for owner, label in (
+            (_JsonCarrierAdapter, "测试替身 _JsonCarrierAdapter"),
+            (WorkpaperSyncAdapter, "契约 WorkpaperSyncAdapter"),
+        ):
+            accepted = set(
+                inspect.signature(owner.verify_unmanaged_regions).parameters
+            )
+            missing = passed - accepted
+            assert not missing, (
+                f"{label}.verify_unmanaged_regions 接不住编排方实际传的 keyword "
+                f"{sorted(missing)} ⇒ 真实 commit 会 TypeError。"
+                "编排方是唯一驱动方，参数面以它为准：替身与 Protocol 都要补上"
+                "（不会位移的载体接住后忽略即可）"
+            )
 
 
 class TestSingleTransactionAtomicity:

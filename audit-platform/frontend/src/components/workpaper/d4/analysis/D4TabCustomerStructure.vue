@@ -256,6 +256,12 @@ async function generateConclusion() {
 const { exportTemplate, exportData, importData, importing } = useD4ImportExport({ wpId: toRef(props, 'wpId') as Ref<string>, projectId: toRef(props, 'projectId') as Ref<string> })
 function handleExportTemplate() { exportTemplate('D4-9' as any) }
 function handleExportData() { exportData('D4-9' as any) }
+async function handleImportClick() {
+  const input = document.createElement('input')
+  input.type = 'file'; input.accept = '.xlsx'
+  input.onchange = async () => { const f = input.files?.[0]; if (f) await importData('D4-9' as any, f) }
+  input.click()
+}
 function handleImportUpload(file: File): boolean { importData('D4-9' as any, file).then(r => { if (r && r.rowCount > 0) loadData() }); return false }
 
 // ─── 持久化 ──────────────────────────────────────────────────────────
@@ -264,6 +270,8 @@ function persist(itemId: string, value: string) { props.allResponses.set(itemId,
 function debounceSave() { if (debounceTimer) clearTimeout(debounceTimer); debounceTimer = setTimeout(() => { debounceTimer = null; flushSave() }, 2000) }
 function flushSave() { const keys = ['D4-9-audit-process', 'D4-9-data', 'D4-9-note', 'D4-9-conclusion']; const items = keys.map(k => props.allResponses.get(k)).filter(Boolean); window.dispatchEvent(new CustomEvent('d4:save-items', { detail: { items } })) }
 onBeforeUnmount(() => { if (debounceTimer) { clearTimeout(debounceTimer); flushSave() } })
+
+defineExpose({ handleExportTemplate, handleExportData, handleImportClick })
 </script>
 
 
@@ -307,16 +315,7 @@ onBeforeUnmount(() => { if (debounceTimer) { clearTimeout(debounceTimer); flushS
       <div class="sec-header">
         <h4 class="sec-title">本期：</h4>
         <div class="sec-actions">
-          <el-dropdown size="small" trigger="click" :disabled="isReadonly">
-            <el-button size="small">导入导出 ▾</el-button>
-            <template #dropdown>
-              <el-dropdown-menu>
-                <el-dropdown-item @click="handleExportTemplate">导出模板</el-dropdown-item>
-                <el-dropdown-item @click="handleExportData">导出数据</el-dropdown-item>
-                <el-dropdown-item><el-upload :show-file-list="false" accept=".xlsx,.xls" :before-upload="handleImportUpload" :disabled="importing"><span>{{ importing ? '导入中...' : '导入数据' }}</span></el-upload></el-dropdown-item>
-              </el-dropdown-menu>
-            </template>
-          </el-dropdown>
+          
           <el-tooltip content="批量数据建议：先导出模板在Excel中填写后导入" placement="top" :show-after="300">
             <el-button size="small" :disabled="isReadonly" @click="addRow('current')">+ 增行</el-button>
           </el-tooltip>

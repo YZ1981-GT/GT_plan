@@ -317,8 +317,17 @@ export interface WorkpaperSyncApiSurface {
   materialize: typeof syncApi.materialize
   confirmDescriptor: typeof syncApi.confirmDescriptor
   requestForcesave: typeof syncApi.requestForcesave
-  /** clean close（未改动直接离开 OO）的唯一入口。见 `leaveWithoutSaving()`。 */
+  /**
+   * close **barrier 仲裁**（多人协同的收尾）。
+   *
+   * 🔴 **不是**「我走了」—— 它会把 participant 推成 `closing` 并提升一条 `close_capture`
+   * 写请求。未改动离开走 `leaveRoom`，见 `leaveWithoutSaving()`。桥当前没有调用它的
+   * 路径（clean close 已改走 leave），保留在这个面上是因为它仍是 close 仲裁的唯一入口，
+   * 且 `cleanCloseWithoutSaving.spec.ts` 的「零次 close-intent」判据要能看见它。
+   */
   createCloseIntent: typeof syncApi.createCloseIntent
+  /** participant 主动离开（未改动直接返回表单）。见 `leaveWithoutSaving()`。 */
+  leaveRoom: typeof syncApi.leaveRoom
   getOperation: typeof syncApi.getOperation
   getOperationConflicts: typeof syncApi.getOperationConflicts
   getOperationTimeline: typeof syncApi.getOperationTimeline
@@ -338,6 +347,7 @@ const DEFAULT_API: WorkpaperSyncApiSurface = {
   confirmDescriptor: syncApi.confirmDescriptor,
   requestForcesave: syncApi.requestForcesave,
   createCloseIntent: syncApi.createCloseIntent,
+  leaveRoom: syncApi.leaveRoom,
   getOperation: syncApi.getOperation,
   getOperationConflicts: syncApi.getOperationConflicts,
   getOperationTimeline: syncApi.getOperationTimeline,
@@ -389,6 +399,15 @@ export function useWorkpaperSyncBridge(options: WorkpaperSyncBridgeOptions) {
   const applicationEffectiveSequence = ref<number | null>(null)
   const mountCallCount = ref(0)
   const forcesaveCallCount = ref(0)
+  /**
+   * `leaveRoom` 的调用次数。
+   *
+   * 🔴 存在的理由是判据可观测性：`leaveWithoutSaving()` 刻意**吞掉** leave 的失败（见那里
+   * 的说明），于是「有没有真的发出过那一次 leave」不能从 `lastError` 看出来。有这个计数
+   * 之后，「恰一次 leave」与「零次 forcesave / 零次 close-intent」是同一份判据里三个
+   * 同等可测的数（AC 4.5）。
+   */
+  const leaveCallCount = ref(0)
   /**
    * 后端 forcesave 202 给的轮询节奏（`poll_after_ms`，当前 500）。
    *
@@ -1341,9 +1360,15 @@ export function useWorkpaperSyncBridge(options: WorkpaperSyncBridgeOptions) {
   /**
    * 未改动时离开 OnlyOffice，**不**走强制保存（用户点「结构化视图」的常态路径）。
    *
-   * 三条安全前提（`dirty` 硬门 / in-flight 一律 refuse / 本地转换不发 HTTP）与它们各自的
-   * 真栈证据，写在 `workpaperSyncBridgeMachine.ts` 的 `clean_close_completed` 边上 ——
-   * 那里是这条边语义的单源；另见 `__tests__/cleanCloseWithoutSaving.spec.ts` 文件头。
+   * 三条安全前提（`dirty` 硬门 / in-flight 一律 refuse / 不发 forcesave 也不发
+   * close-intent）与它们各自的真栈证据，写在 `workpaperSyncBridgeMachine.ts` 的
+   * `clean_close_completed` 边上 —— 那里是这条边语义的单源；另见
+   * `__tests__/cleanCloseWithoutSaving.spec.ts` 文件头。
+   *
+   * 🔴 2026-09-22 起它**恰发一个请求**：`leaveRoom`（服务端 `active/closing → left`）。
+   * 在那条端点存在之前这里是纯本地转换，lease 只能等 `expires_at` 自然过期
+   * （spec `oo-single-pass-materialize-and-room-leave` Requirement 4.5 的切换点）。
+   * 判据面因此从「零请求」变成「**恰一次 leave、零次 forcesave、零次 close-intent**」。
    */
   async function leaveWithoutSaving(): Promise<void> {
     if (mode.value !== 'oo') return
@@ -1357,6 +1382,27 @@ export function useWorkpaperSyncBridge(options: WorkpaperSyncBridgeOptions) {
           : 'bridge_clean_close_while_in_flight',
         `${leaveBlockReason.value} —— clean close 不得丢弃编辑或打断进行中的同步`,
       )
+    }
+    const current = descriptor.value
+    if (current) {
+      try {
+        leaveCallCount.value += 1
+        await api.leaveRoom(scope(), {
+          roomId: current.roomId,
+          participantId: current.participantId,
+          // 走到这里 `canLeave` 必为真 ⇒ `dirty` 必为假。仍然**显式**把它送出去，而不是
+          // 写死 `false`：服务端那道 dirty 门与本地这道同源（AC 4.4），传一个常量等于
+          // 让服务端永远收不到会触发它的输入，那道门就变成了死代码。
+          dirty: dirty.value,
+        })
+      } catch {
+        // 🔴 leave 失败**不阻断**返回表单，也不记 `lastError`。
+        //
+        // 它是一次 lease 释放，不是内容操作：失败的唯一后果是这条 lease 退回到端点存在
+        // 之前的形态 —— 按 `expires_at` 自然过期。拿它去挡用户返回结构化视图，会把一个
+        // 「什么都没改」的常态路径变成红字（那正是本 spec Requirement 4 的起因形态）。
+        // 判据 `网络整体不可用时仍能回表单` 两头锁住这一条。
+      }
     }
     apply('clean_close_completed')
     descriptor.value = null
@@ -1440,6 +1486,7 @@ export function useWorkpaperSyncBridge(options: WorkpaperSyncBridgeOptions) {
     applicationEffectiveSequence: readonly(applicationEffectiveSequence),
     mountCallCount: readonly(mountCallCount),
     forcesaveCallCount: readonly(forcesaveCallCount),
+    leaveCallCount: readonly(leaveCallCount),
     pollAfterMs: readonly(pollAfterMs),
     /** 当前 entry scope（宿主的 operation 推进器要用它构造 tracker）。 */
     scope,

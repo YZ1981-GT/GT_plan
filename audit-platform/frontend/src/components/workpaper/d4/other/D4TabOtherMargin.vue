@@ -16,6 +16,7 @@ import { Plus } from '@element-plus/icons-vue'
 import { useD4InspectionWriteback } from '../../composables/useD4InspectionWriteback'
 import { d4_33Candidates, D4_OTHER_ACCOUNT_CODE, D4_OTHER_ACCOUNT_NAME } from '../../composables/d4OtherGroupPushPredicates'
 import { eventBus } from '@/utils/eventBus'
+import WpAmountInput from '@/components/workpaper/shared/WpAmountInput.vue'
 // D4-33 双向回写：统一走 useD4SyncMode（dedicated sync sheet，sheetKey=d433-managed，
 // 同 entry gt-d4-operating-revenue；后端 phase5_d4_other_margin_sheet 作为**静态受管区** sibling
 // sheet 并入 phase5_d4_revenue_detail，adapter d4.revenue_detail）——引擎静态 cell 路径
@@ -153,7 +154,17 @@ const aiNoteLoading = ref(false); const aiConclusionLoading = ref(false)
 async function genNote() { if (props.isReadonly || !aiAvailable.value) return; aiNoteLoading.value = true; try { const res = await http.post(`/api/workpapers/${props.wpId}/d4/ai-generate`, { section: 'analysis-note', existingContent: auditNote.value, relatedContext: { task: '基于其他业务毛利率分析(D4-33)生成审计说明', bizTypeCount: store.value.bizTypes.length } }, { _silent: true } as any); const t = res.data?.data?.content ?? res.data?.content ?? ''; if (!t) { ElMessage.warning('AI 未生成内容'); return }; await ElMessageBox.confirm(t, 'AI 生成', { confirmButtonText: '填入', cancelButtonText: '取消', type: 'info' }); updateAuditNote(t) } catch (e: any) { if (e !== 'cancel') ElMessage.warning('AI 生成失败') } finally { aiNoteLoading.value = false } }
 async function genConclusion() { if (props.isReadonly || !aiAvailable.value) return; aiConclusionLoading.value = true; try { const res = await http.post(`/api/workpapers/${props.wpId}/d4/ai-generate`, { section: 'adj-conclusion', existingContent: auditConclusion.value, relatedContext: { task: '基于毛利率分析结果生成审计结论', noteText: auditNote.value } }, { _silent: true } as any); const t = res.data?.data?.content ?? res.data?.content ?? ''; if (!t) { ElMessage.warning('AI 未生成内容'); return }; await ElMessageBox.confirm(t, 'AI 生成', { confirmButtonText: '填入', cancelButtonText: '取消', type: 'info' }); updateAuditConclusion(t) } catch (e: any) { if (e !== 'cancel') ElMessage.warning('AI 生成失败') } finally { aiConclusionLoading.value = false } }
 
-const { exportTemplate, exportData, importData, importing } = useD4ImportExport({ wpId: computed(() => props.wpId), projectId: computed(() => props.projectId) })
+const { exportTemplate, exportData, importData, importing } = useD4ImportExport({ wpId: computed(()
+
+// ─── expose 给 GtWpRenderer 工具栏委托 ────────────────────────────────
+function handleExportTemplate() { exportTemplate('D4-33') }
+function handleExportData() { exportData('D4-33') }
+async function handleImportClick() {
+  const input = document.createElement('input')
+  input.type = 'file'; input.accept = '.xlsx'
+  input.onchange = async () => { const f = input.files?.[0]; if (f) await importData('D4-33', f) }
+  input.click()
+} => props.wpId), projectId: computed(() => props.projectId) })
 
 // ─── A13 错报推送（科目 6051；毛利率分析=定性项，金额与方向由人工认定，不推 0）──────
 const { pushToA13 } = useD4InspectionWriteback({
@@ -191,11 +202,13 @@ async function pushMarginAnomaliesToA13() {
   if (!items.length) { ElMessage.info('未认定任何金额，已取消推送'); return }
   pushToA13(items, D4_OTHER_ACCOUNT_CODE, D4_OTHER_ACCOUNT_NAME)
 }
+
+defineExpose({ handleExportTemplate, handleExportData, handleImportClick })
 </script>
 
 <template>
 <div class="d4-other-margin">
-  <div class="toolbar"><div class="toolbar-left"><el-segmented v-model="editorMode" :options="modeOptions" size="small" /></div><div class="toolbar-right"><el-button size="small" type="warning" plain :disabled="isReadonly||pushableCount===0" @click="pushMarginAnomaliesToA13" title="把毛利率异常推送到 A13（定性项，金额由人工逐条认定）">推送异常至 A13{{ pushableCount ? `（${pushableCount}）` : '' }}</el-button><el-button size="small" @click="openFormulaManager" title="打开平台公式管理中心（唯一一套公式，支持跨底稿取数联动与表内校对）">ƒx 公式管理</el-button><el-dropdown trigger="click" size="small"><el-button size="small">导入导出 ▾</el-button><template #dropdown><el-dropdown-menu><el-dropdown-item @click="exportTemplate('D4-33')">导出模板</el-dropdown-item><el-dropdown-item @click="exportData('D4-33')">导出数据</el-dropdown-item><el-dropdown-item><el-upload :show-file-list="false" accept=".xlsx" :auto-upload="false" :disabled="isReadonly||importing" @change="(f:any)=>importData('D4-33',f.raw||f)"><span>导入数据</span></el-upload></el-dropdown-item></el-dropdown-menu></template></el-dropdown><GtIndexChip value="wp:D4-3" :context-project-id="projectId" /><el-tag :type="syncStateTag.type" size="small" class="sync-state-tag">{{ syncStateTag.text }}</el-tag><el-button v-if="openReviewDialog" size="small" @click="openReviewDialog('D4-33-margin')">💬 复核</el-button></div></div>
+  <div class="toolbar"><div class="toolbar-left"><el-segmented v-model="editorMode" :options="modeOptions" size="small" /></div><div class="toolbar-right"><el-button size="small" type="warning" plain :disabled="isReadonly||pushableCount===0" @click="pushMarginAnomaliesToA13" title="把毛利率异常推送到 A13（定性项，金额由人工逐条认定）">推送异常至 A13{{ pushableCount ? `（${pushableCount}）` : '' }}</el-button><el-button size="small" @click="openFormulaManager" title="打开平台公式管理中心（唯一一套公式，支持跨底稿取数联动与表内校对）">ƒx 公式管理</el-button><GtIndexChip value="wp:D4-3" :context-project-id="projectId" /><el-tag :type="syncStateTag.type" size="small" class="sync-state-tag">{{ syncStateTag.text }}</el-tag><el-button v-if="openReviewDialog" size="small" @click="openReviewDialog('D4-33-margin')">💬 复核</el-button></div></div>
 
   <template v-if="editorMode !== '在线编辑'">
     <!-- 业务类型管理 -->
@@ -229,8 +242,8 @@ async function pushMarginAnomaliesToA13() {
             <td class="auto-cell margin-cell">{{ fmtMargin(store.bizTypes.reduce((s, b) => s + pn(getMonth(b.id, mIdx).revenue), 0), store.bizTypes.reduce((s, b) => s + pn(getMonth(b.id, mIdx).cost), 0)) }}</td>
             <!-- 各业务类型 -->
             <template v-for="biz in store.bizTypes" :key="biz.id+mIdx">
-              <td><input type="number" :value="getMonth(biz.id, mIdx).revenue || ''" :disabled="isReadonly" @change="(e: any) => updateMonth(biz.id, mIdx, 'revenue', e.target.value)" /></td>
-              <td><input type="number" :value="getMonth(biz.id, mIdx).cost || ''" :disabled="isReadonly" @change="(e: any) => updateMonth(biz.id, mIdx, 'cost', e.target.value)" /></td>
+              <td><WpAmountInput :model-value="pn(getMonth(biz.id, mIdx).revenue)" size="small" :disabled="isReadonly" style="width: 100%" @change="(v: number) => updateMonth(biz.id, mIdx, 'revenue', v)" /></td>
+              <td><WpAmountInput :model-value="pn(getMonth(biz.id, mIdx).cost)" size="small" :disabled="isReadonly" style="width: 100%" @change="(v: number) => updateMonth(biz.id, mIdx, 'cost', v)" /></td>
               <td class="auto-cell margin-cell">{{ fmtMargin(pn(getMonth(biz.id, mIdx).revenue), pn(getMonth(biz.id, mIdx).cost)) }}</td>
             </template>
           </tr>
@@ -253,8 +266,8 @@ async function pushMarginAnomaliesToA13() {
             <td class="auto-cell">{{ fmtAmt(store.bizTypes.reduce((s, b) => s + pn(getPrior(b.id).cost), 0)) }}</td>
             <td class="auto-cell margin-cell">{{ fmtMargin(store.bizTypes.reduce((s, b) => s + pn(getPrior(b.id).revenue), 0), store.bizTypes.reduce((s, b) => s + pn(getPrior(b.id).cost), 0)) }}</td>
             <template v-for="biz in store.bizTypes" :key="biz.id+'p'">
-              <td><input type="number" :value="getPrior(biz.id).revenue || ''" :disabled="isReadonly" @change="(e: any) => updatePrior(biz.id, 'revenue', e.target.value)" /></td>
-              <td><input type="number" :value="getPrior(biz.id).cost || ''" :disabled="isReadonly" @change="(e: any) => updatePrior(biz.id, 'cost', e.target.value)" /></td>
+              <td><WpAmountInput :model-value="pn(getPrior(biz.id).revenue)" size="small" :disabled="isReadonly" style="width: 100%" @change="(v: number) => updatePrior(biz.id, 'revenue', v)" /></td>
+              <td><WpAmountInput :model-value="pn(getPrior(biz.id).cost)" size="small" :disabled="isReadonly" style="width: 100%" @change="(v: number) => updatePrior(biz.id, 'cost', v)" /></td>
               <td class="auto-cell margin-cell">{{ fmtMargin(pn(getPrior(biz.id).revenue), pn(getPrior(biz.id).cost)) }}</td>
             </template>
           </tr>

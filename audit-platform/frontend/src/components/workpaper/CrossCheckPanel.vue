@@ -230,6 +230,7 @@ function getRuleDescription(ruleId: string): string {
   font-size: var(--gt-font-size-md);
   font-weight: 700;
   font-variant-numeric: tabular-nums;
+  font-family: 'Arial Narrow', Arial, sans-serif;
 }
 
 .summary-num.success { color: var(--gt-color-success); }
@@ -304,6 +305,7 @@ function getRuleDescription(ruleId: string): string {
   font-size: var(--gt-font-size-xs);
   color: var(--gt-color-coral);
   font-variant-numeric: tabular-nums;
+  font-family: 'Arial Narrow', Arial, sans-serif;
 }
 
 .expand-icon {
@@ -343,6 +345,7 @@ function getRuleDescription(ruleId: string): string {
   font-size: var(--gt-font-size-sm);
   color: var(--gt-color-text-primary);
   font-variant-numeric: tabular-nums;
+  font-family: 'Arial Narrow', Arial, sans-serif;
 }
 
 .text-danger {

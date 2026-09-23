@@ -772,10 +772,18 @@ body {
 .el-table td.is-right .cell {
   white-space: nowrap;
   font-variant-numeric: tabular-nums;
+  font-family: 'Arial Narrow', Arial, sans-serif;
+  overflow: visible;
+  text-overflow: unset;
 }
+/* 数值列 td padding 压缩：全局 gt-polish 的 10px 14px 太大，金额容易截断。
+   只压右对齐列（数值），左对齐（文本）不动。特异性 (0,3,1) 压过 gt-polish (0,2,1)。 */
+.el-table td.el-table__cell.is-right { padding: 4px 2px !important; }
+.el-table th.el-table__cell.is-right { padding: 4px 2px !important; }
 /* 数值列内的输入框（el-input-number）同样单行 + 等宽数字 */
 .el-table td.is-right .cell .el-input__inner {
   font-variant-numeric: tabular-nums;
+  font-family: 'Arial Narrow', Arial, sans-serif;
 }
 
 /* ═══════════════════════════════════════════════════════════════

@@ -39,13 +39,48 @@ adapter.materialize 42.8s / extract 6.0s / verify 6.9s，其中 39 趟链式写�
 
 ### 验收标准
 
-1.1. 对同一个 entry 的一次物化，`openpyxl.load_workbook` 与 `Workbook.save` 的调用次数
-     SHALL 各为 **1**（当前实测各 39 次），且该次数 SHALL 由测试按**实际调用计数**断言，
-     不得只断言耗时（耗时判据在不同机器上必然漂移）。
+1.1. 对**无跨 binding 坐标碰撞**的多 binding entry，一次物化对 **substrate** 的
+     `openpyxl.load_workbook` 次数 SHALL 与 binding 数**解耦**（`≤ 2`：`data_only=True/False`
+     两个视图各一次，由全部 binding 共享），而不是随 binding 数线性增长（改动前
+     `binding 数 × 2`，D4 实测 78）。该次数 SHALL 由测试按**实际调用计数**断言，不得只断言
+     耗时（耗时判据在不同机器上必然漂移）。
 
-1.2. 单趟写入的**产物字节**与改动前逐 binding 链式写盘的产物 SHALL 在「反读等值」口径下
-     一致：同一份 projection 走新旧两条路径，`extract` 出来的字段集合与值 SHALL 逐项相等。
+     ⚠️ 存在跨 binding **坐标碰撞且写入 payload 冲突**的 entry SHALL 显式回落逐趟链式，
+     此时解析次数回到 binding 数级别 —— 那是正确的保守（同格两个写入不同 ⇒ 结果取决于谁
+     最后写，链式顺序在单趟里无法复现），不算违反本条。payload 比较面为
+     `(kind, value, stable_field_key, mode, formula_text)`：全等即恒等覆盖，SHALL 合并；
+     任一项不同即 decline。
+
+     🔴 本条的 ⚠️ 段原写「存在跨 binding 坐标碰撞的 entry（实测 D4 的 C38）」，已按任务 2
+     的真库实测**收紧**（2026-09-22 拍板，见 design 附录 A.3 / A.6 / A.7）：D4 的碰撞是
+     `sheet14.xml` 的 `C24`/`E24`/`C38`/`E38` **4 格**（不是 1 格），且两方 payload 逐字段
+     相同、两种写入顺序产物逐字节相同 ⇒ 合并**不丢任何东西**。按旧措辞 D4 必须回落，而回落
+     让本需求 1.5 的「≤10s」对 D4 **永远达不到** —— D4 正是 1.5 指名的那个 entry。
+
+     decline 原因 SHALL 是确定的、完整的：按 `(sheet_part, 行, 列)` 排序后报**全部**冲突格，
+     不得抽样报一格（原实现按 `set(plan.coords)` 抽样，真库上同一批碰撞报出 `C38` 与 `E38`
+     两种，且余下碰撞不可见 ⇒ 需求 3.3 的回落原因统计无从做起）。
+
+1.2. 单趟写入的**产物字节**与改动前逐 binding 链式写盘的产物 SHALL 在**两个**口径下同时
+     一致：
+
+     (a) **反读等值**：同一份 projection 走新旧两条路径，`extract` 出来的字段集合与值
+         SHALL 逐项相等（含「缺字段 / 多字段 / 值或类型变」三类，不得只比 key 集合）；
+     (b) **逐 zip entry 字节等值**（忽略 `date_time`）：两份产物的 zip 条目集合 SHALL 相同，
+         且每个同名条目的**内容字节** SHALL 相同。
+
      这条是本需求的安全底线 —— 提速不得以「少写了某些 binding」为代价。
+
+     🔴 (b) 原不在本条里，按任务 4 的真库实测**补入**（2026-09-22 拍板，见 design 附录 B.4
+     / F.2）：反读等值对一整类漏写**天生是盲的**。实测漏写 `d4_10_rows` 的 **49 处写入**
+     （28 处 inline string + 21 处数字字面量）之后，218 个反读字段**逐字段全等**（0 缺 0 多
+     0 改），而 `xl/sheet15.xml` 真的少了 95 字节 —— 因为那些写入只改变单元格的**表示形态**
+     （inline string vs shared string、数字格式），不改变反读出来的值。⇒ 字节判据是本条的
+     **必需项**，不是加强项；只写 (a) 的验收标准挡不住这类回归。
+
+     `date_time` 显式分流的理由（不是放宽）：任务 1 实测同一 projection 连续两次物化的 142
+     个 entry 内容字节全同、142 个时间戳全不同 ⇒ 不摘掉它这条判据永远红；摘掉之后剩下的
+     每一个字节差异都是真差异。整份文件的 sha256 **不**作为判据（同因）。
 
 1.3. 任一 binding 写入失败时 SHALL 整趟失败并保持磁盘上**零残留**（不得留下写了一半的
      临时文件，也不得把半成品当 staged artifact 发布）。当前链式实现天然具有「前 N 个
@@ -65,11 +100,37 @@ adapter.materialize 42.8s / extract 6.0s / verify 6.9s，其中 39 趟链式写�
 
 ### 验收标准
 
-2.1. 一次 materialize 全流程（materialize → extract → verify）对同一份产物字节的
-     workbook 解析次数 SHALL 为 **1**（当前 extract 6.0s + verify 6.9s 里各含一次全量解析）。
+2.1. 一次 materialize 全流程（materialize → extract → verify → structure_hash）对同一份
+     字节的解析次数 SHALL **与消费方个数解耦**：每个**解析视图**各 **1** 次，其中「解析
+     视图」= `(字节身份, read_only, data_only)`。该次数 SHALL 由测试按**实际调用计数**断言。
+
+     本条同时覆盖**非 openpyxl** 的重复解析（需求 2 的用户故事原话是「我不希望『读同一个
+     文件三次』这种成本被当成固有成本接受」，它不限于 `load_workbook`）：同一份字节的
+     `xl/workbook.xml` + rels、Excel Table 清册（要读全部 sheet part）、
+     `xl/sharedStrings.xml` 前缀 digest，SHALL 各只解析一次。
+
+     🔴 本条原写「解析次数 SHALL 为 **1**」，已按任务 7/8 的真库实测**收紧措辞**
+     （2026-09-22 拍板，处理方式同 1.1 的 A.7，见 design 附录 F.1）：原措辞与需求 2.2
+     **自相矛盾** —— 2.2 明说 `data_only=True/False` 是两个不可互相冒充的解析结果、作用域
+     键里必须保留它，那么只要两个视图都被用到，「1」就不可达。真库 D4 实测产物字节上被用到
+     的视图恰好 3 个（`read_only=True` 的 `data_only` 两视图 + 完整 DOM 一视图，后者因为
+     `read_only` 的 worksheet 没有 `ws._cells` / `row_dimensions`，两者不可互换）。
+
+     收紧后的口径**不比原措辞弱**：它把判据从一个数字换成「与消费方个数解耦」这个结构
+     事实，并要求**每个例外逐一列名**。真库 D4 实测「不可共享」的完整 DOM 消费方恰 2 个
+     （整簿指纹 `_structure_fingerprint_uncached` 与隐藏 metadata sheet 读取
+     `_read_gt_sync_pairs`）—— 它们用 openpyxl 的**批量成格**读法（`ws.iter_rows()` 会把
+     包围盒内每个坐标惰性新建成 Cell），共享给它们会污染 `ws._cells`，而发布时刻的
+     `collect_workbook_structure` 正是按 `ws._cells` 的成员关系判「这个转置字段格在文件里
+     存不存在」⇒ 共享会**改变 structure_hash**。这两个例外 SHALL 在判据里列名并说明理由，
+     不得从「解析次数」里抹掉；新增第三个例外 SHALL 让判据打红。
 
 2.2. 复用 SHALL 通过既有 `workbook_read_scope()` 完成，不得新引入第二套 workbook 缓存
      （模块级长存缓存已被明确拒绝：它会让 Windows 删不掉临时文件）。
+
+     被共享的解析结果 SHALL 是**只读**的：任何要就地改动 workbook 的消费方
+     （`materialize_transposed_workbook` 就地写格 + `wb.save()`）SHALL 自己解析一份私有
+     副本。「只读」SHALL 由判据实测，而不是靠注释声明。
 
 2.3. `verify` 的判据 SHALL 一字不放宽：复用解析结果不等于复用**结论**，反读等值仍须逐
      字段比对。测试 SHALL 包含一条变异反证 —— 故意让产物少一个字段，verify 必须红。
@@ -87,8 +148,34 @@ adapter.materialize 42.8s / extract 6.0s / verify 6.9s，其中 39 趟链式写�
      这条正是上一轮那个「digest 口径不一致 ⇒ 复用恒不命中」缺陷的**判据缺口**：当时
      `_find_business_identity_reuse` 的单测全绿，因为没有人把「两次同内容」跑成一条链。
 
+     🔴 「同一 projection」SHALL 读作「同一份业务内容的**两次独立派生**」，**不是**同一批
+     Python 对象。按任务 10 的实测**收紧**（2026-09-22 拍板，处理方式同 1.1 的 A.7 /
+     2.1 的 F.1，见 design 附录 H.1）：真栈那个缺陷发生在两条派生路径**之间**（HTML store
+     走 JSON ⇒ 裸 int/float；Excel extract 走 openpyxl ⇒ int/float/bool；merge 与审定回写
+     ⇒ `Decimal`），两侧若喂同一批对象，digest 必然相等、缺陷必然看不见。
+
+     按原措辞，既有的 `test_task25_materialize_coordinator_pg.py` 阶段 8b 已经是一条「两次
+     同内容」的真链且**一直全绿**（两侧都经 `_projection(..., "1234.50")` 强转成同一个
+     `Decimal`）—— 也就是说原措辞**已经被满足过，而缺陷仍然存活**。这正是本条要堵的那个洞，
+     所以措辞里必须把「两次独立派生」写明。
+
+     判据 SHALL 显式断言两侧的派生互不相同（例如 substrate 字节不同、或落盘表示不同），
+     否则守卫在「同一对象」这条退化输入上恒真。
+
 3.3. 复用未命中原因 SHALL 可区分至少三类：内容真变了 / 契约或 bundle 变了 / digest 口径
      不一致（后者属于缺陷，应当在 CI 里直接判红而不是默默走全量）。
+
+     🔴 「在 CI 里直接判红而不是默默走全量」的两半各自落点（任务 10 实测后的澄清，
+     **不是**放宽，见 design 附录 H.6）：**生产**仍然走全量物化 —— 因内部 digest 缺陷去 fail
+     一次用户请求比多花一趟更坏；被禁止的是「**默默**」，所以生产侧 SHALL 把它记成一个
+     **独立**的指标桶 + 一条 ERROR 日志。**CI** 侧 SHALL 有一个自己就能红的门
+     （`backend/scripts/check/check_materialize_reuse_digest_caliber.py`）：
+     `tests/workpaper_sync/` 有约 291 条与本 spec 无关的既存失败（design 附录 F.9 的 A/B
+     差分实测），在那个分母上「pytest 红了」不是可归因信号。
+
+     未命中原因的封闭域 SHALL 另含第四格「无从比较」（基线侧没有可读的 projection 载荷）：
+     首代 representation 与 `projection_artifact_id IS NULL` 的历史行本来就无从比较，
+     把它并进上面任何一类都是说谎 —— 尤其不得并进缺陷类。
 
 ## 需求 4：participant 主动离开（clean close 的正解）
 

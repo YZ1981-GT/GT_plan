@@ -16,6 +16,7 @@ import { isChangeRateExceeding } from '../../composables/useD4FormulaEngine'
 import { useD4ImportExport } from '../../composables/useD4ImportExport'
 import { useWorkpaperBrowseMode } from '../../composables/useWorkpaperBrowseMode'
 import { virtualTextCol, virtualNumCol } from '../../composables/virtualColumnHelpers'
+import WpAmountInput from '@/components/workpaper/shared/WpAmountInput.vue'
 import type { VirtualColumn } from '@/composables/useVirtualTable'
 import GtIndexChip from '../../GtIndexChip.vue'
 import http from '@/utils/http'
@@ -76,6 +77,17 @@ function handleImportUpload(file: File): boolean {
   importData('D4-2', file)
   return false // 阻止 el-upload 自动上传
 }
+
+// ─── expose 给 GtWpRenderer 工具栏委托 ────────────────────────────────
+function handleExportTemplate() { exportTemplate('D4-2') }
+function handleExportData() { exportData('D4-2') }
+async function handleImportClick() {
+  const input = document.createElement('input')
+  input.type = 'file'; input.accept = '.xlsx,.xls'
+  input.onchange = async () => { const f = input.files?.[0]; if (f) await importData('D4-2', f) }
+  input.click()
+}
+defineExpose({ handleExportTemplate, handleExportData, handleImportClick })
 
 // ─── 虚拟滚动 / browseMode ───────────────────────────────────────────
 const browseRows = filteredRows
@@ -223,25 +235,6 @@ const aiTip = computed(() => aiAvailable.value ? 'AI 辅助生成' : 'AI 服务�
         </el-tooltip>
       </div>
       <div class="toolbar-right">
-        <el-dropdown size="small" trigger="click" :disabled="isReadonly">
-          <el-button size="small">导入导出 ▾</el-button>
-          <template #dropdown>
-            <el-dropdown-menu>
-              <el-dropdown-item @click="exportTemplate('D4-2')">导出模板</el-dropdown-item>
-              <el-dropdown-item @click="exportData('D4-2')">导出数据</el-dropdown-item>
-              <el-dropdown-item>
-                <el-upload
-                  :show-file-list="false"
-                  accept=".xlsx,.xls"
-                  :before-upload="handleImportUpload"
-                  :disabled="importing"
-                >
-                  <span>导入数据</span>
-                </el-upload>
-              </el-dropdown-item>
-            </el-dropdown-menu>
-          </template>
-        </el-dropdown>
         <span class="chip-wrap"><GtIndexChip value="wp:D4-8" :context-project-id="projectId" /></span>
         <el-tag size="small" type="info">共 {{ rows.length }} 行</el-tag>
       </div>
@@ -319,7 +312,7 @@ const aiTip = computed(() => aiAvailable.value ? 'AI 辅助生成' : 'AI 服务�
           v-for="(label, mIdx) in monthLabels"
           :key="mIdx"
           :label="label"
-          width="95"
+          min-width="95"
           align="right"
         >
           <template #default="{ row }">
@@ -327,13 +320,12 @@ const aiTip = computed(() => aiAvailable.value ? 'AI 辅助生成' : 'AI 服务�
               <span class="font-bold">{{ fmtAmount(row.months[mIdx]) }}</span>
             </template>
             <template v-else>
-              <el-input
+              <WpAmountInput
                 v-if="!isReadonly"
                 :model-value="row.months[mIdx]"
                 size="small"
-                type="number"
-                style="text-align: right"
-                @change="(v: string) => updateCell(row.rowId, `month-${mIdx}`, v)"
+                style="width: 100%"
+                @change="(v: number) => updateCell(row.rowId, `month-${mIdx}`, v)"
               />
               <span v-else>{{ fmtAmount(row.months[mIdx]) }}</span>
             </template>
@@ -341,25 +333,25 @@ const aiTip = computed(() => aiAvailable.value ? 'AI 辅助生成' : 'AI 服务�
         </el-table-column>
 
         <!-- N: 本期未审合计（自动计算，灰底） -->
-        <el-table-column label="未审合计" width="120" align="right" class-name="auto-calc-col">
+        <el-table-column label="未审合计" min-width="110" align="right" class-name="auto-calc-col">
           <template #default="{ row }">
             <span class="auto-calc-value">{{ fmtAmount(row.periodTotal) }}</span>
           </template>
         </el-table-column>
 
         <!-- O: 本期审计调整 -->
-        <el-table-column label="审计调整" width="110" align="right">
+        <el-table-column label="审计调整" min-width="100" align="right">
           <template #default="{ row }">
             <template v-if="row.rowId === 'subtotal'">
               <span class="font-bold">{{ fmtAmount(row.auditAdjustment) }}</span>
             </template>
             <template v-else>
-              <el-input
+              <WpAmountInput
                 v-if="!isReadonly"
                 :model-value="row.auditAdjustment"
                 size="small"
-                type="number"
-                @change="(v: string) => updateCell(row.rowId, 'auditAdjustment', v)"
+                style="width: 100%"
+                @change="(v: number) => updateCell(row.rowId, 'auditAdjustment', v)"
               />
               <span v-else>{{ fmtAmount(row.auditAdjustment) }}</span>
             </template>
@@ -367,25 +359,25 @@ const aiTip = computed(() => aiAvailable.value ? 'AI 辅助生成' : 'AI 服务�
         </el-table-column>
 
         <!-- P: 本期审定数（自动，灰底） -->
-        <el-table-column label="本期审定" width="120" align="right" class-name="auto-calc-col">
+        <el-table-column label="本期审定" min-width="110" align="right" class-name="auto-calc-col">
           <template #default="{ row }">
             <span class="audited-cell auto-calc-value">{{ fmtAmount(row.audited) }}</span>
           </template>
         </el-table-column>
 
         <!-- Q: 上期未审数 -->
-        <el-table-column label="上期未审" width="110" align="right">
+        <el-table-column label="上期未审" min-width="100" align="right">
           <template #default="{ row }">
             <template v-if="row.rowId === 'subtotal'">
               <span class="font-bold">{{ fmtAmount(row.priorUnadjusted) }}</span>
             </template>
             <template v-else>
-              <el-input
+              <WpAmountInput
                 v-if="!isReadonly"
                 :model-value="row.priorUnadjusted"
                 size="small"
-                type="number"
-                @change="(v: string) => updateCell(row.rowId, 'priorUnadjusted', v)"
+                style="width: 100%"
+                @change="(v: number) => updateCell(row.rowId, 'priorUnadjusted', v)"
               />
               <span v-else>{{ fmtAmount(row.priorUnadjusted) }}</span>
             </template>
@@ -393,18 +385,18 @@ const aiTip = computed(() => aiAvailable.value ? 'AI 辅助生成' : 'AI 服务�
         </el-table-column>
 
         <!-- R: 上期审计调整 -->
-        <el-table-column label="上期调整" width="110" align="right">
+        <el-table-column label="上期调整" min-width="100" align="right">
           <template #default="{ row }">
             <template v-if="row.rowId === 'subtotal'">
               <span class="font-bold">{{ fmtAmount(row.priorAdjustment) }}</span>
             </template>
             <template v-else>
-              <el-input
+              <WpAmountInput
                 v-if="!isReadonly"
                 :model-value="row.priorAdjustment"
                 size="small"
-                type="number"
-                @change="(v: string) => updateCell(row.rowId, 'priorAdjustment', v)"
+                style="width: 100%"
+                @change="(v: number) => updateCell(row.rowId, 'priorAdjustment', v)"
               />
               <span v-else>{{ fmtAmount(row.priorAdjustment) }}</span>
             </template>
@@ -412,14 +404,14 @@ const aiTip = computed(() => aiAvailable.value ? 'AI 辅助生成' : 'AI 服务�
         </el-table-column>
 
         <!-- S: 上期审定数（自动，灰底） -->
-        <el-table-column label="上期审定" width="120" align="right" class-name="auto-calc-col">
+        <el-table-column label="上期审定" min-width="110" align="right" class-name="auto-calc-col">
           <template #default="{ row }">
             <span class="auto-calc-value">{{ fmtAmount(row.priorAudited) }}</span>
           </template>
         </el-table-column>
 
         <!-- T: 未审变动率（自动，灰底） -->
-        <el-table-column label="未审变动" width="95" align="right" class-name="auto-calc-col">
+        <el-table-column label="未审变动" min-width="85" align="right" class-name="auto-calc-col">
           <template #default="{ row }">
             <span :class="getRateCellClass(row.unadjustedChangeRate)">
               {{ fmtRate(row.unadjustedChangeRate) }}
@@ -428,7 +420,7 @@ const aiTip = computed(() => aiAvailable.value ? 'AI 辅助生成' : 'AI 服务�
         </el-table-column>
 
         <!-- U: 审定变动率（自动，灰底） -->
-        <el-table-column label="审定变动" width="95" align="right" class-name="auto-calc-col">
+        <el-table-column label="审定变动" min-width="85" align="right" class-name="auto-calc-col">
           <template #default="{ row }">
             <span :class="getRateCellClass(row.auditedChangeRate)">
               {{ fmtRate(row.auditedChangeRate) }}

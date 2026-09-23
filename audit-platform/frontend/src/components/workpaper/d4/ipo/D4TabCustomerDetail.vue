@@ -104,12 +104,14 @@ const riskFindings = computed<D4IpoFinding[]>(() => {
   }
   return out
 })
+
+defineExpose({ handleExportTemplate, handleExportData, handleImportClick })
 </script>
 
 <template>
 <div class="d4-customer-detail">
   <!-- 工具条 -->
-  <div class="toolbar"><div class="toolbar-left"><el-segmented v-model="d429Mode" :options="modeOptions" size="small" :disabled="d429SyncBusy" /></div><div class="toolbar-right"><el-dropdown trigger="click" size="small"><el-button size="small">导入导出 ▾</el-button><template #dropdown><el-dropdown-menu><el-dropdown-item @click="handleExportTemplate">导出模板</el-dropdown-item><el-dropdown-item @click="handleExportData">导出数据</el-dropdown-item><el-dropdown-item><el-upload :show-file-list="false" accept=".xlsx" :auto-upload="false" :disabled="isReadonly||importing" @change="handleImportFile"><span>导入数据</span></el-upload></el-dropdown-item></el-dropdown-menu></template></el-dropdown><D4IpoFindingWriteback wp-code="D4-29" :all-responses="allResponses" :is-readonly="isReadonly" :findings="riskFindings" /><GtIndexChip value="wp:D4-28" :context-project-id="projectId" /><el-button v-if="openReviewDialog" size="small" @click="openReviewDialog('D4-29-detail')">💬 复核</el-button></div></div>
+  <div class="toolbar"><div class="toolbar-left"><el-segmented v-model="d429Mode" :options="modeOptions" size="small" :disabled="d429SyncBusy" /></div><div class="toolbar-right"><D4IpoFindingWriteback wp-code="D4-29" :all-responses="allResponses" :is-readonly="isReadonly" :findings="riskFindings" /><GtIndexChip value="wp:D4-28" :context-project-id="projectId" /><el-button v-if="openReviewDialog" size="small" @click="openReviewDialog('D4-29-detail')">💬 复核</el-button></div></div>
 
   <!-- 仪表板 -->
   <div v-if="d429Bridge.lastError.value" role="alert">{{ d429Bridge.lastError.value.message }}</div>

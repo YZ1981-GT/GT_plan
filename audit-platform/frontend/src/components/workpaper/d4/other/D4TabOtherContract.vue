@@ -99,7 +99,17 @@ const aiNoteLoading = ref(false); const aiConclusionLoading = ref(false)
 async function genNote() { if (props.isReadonly || !aiAvailable.value) return; aiNoteLoading.value = true; try { const res = await http.post(`/api/workpapers/${props.wpId}/d4/ai-generate`, { section: 'analysis-note', existingContent: auditNote.value, relatedContext: { task: '基于其他业务收入合同测算(D4-34)结果生成审计说明', rentalCount: rentals.value.length, consultCount: consults.value.length } }, { _silent: true } as any); const t = res.data?.data?.content ?? res.data?.content ?? ''; if (!t) { ElMessage.warning('AI 未生成内容'); return }; await ElMessageBox.confirm(t, 'AI 生成', { confirmButtonText: '填入', cancelButtonText: '取消', type: 'info' }); updateAuditNote(t) } catch (e: any) { if (e !== 'cancel') ElMessage.warning('AI 生成失败') } finally { aiNoteLoading.value = false } }
 async function genConclusion() { if (props.isReadonly || !aiAvailable.value) return; aiConclusionLoading.value = true; try { const res = await http.post(`/api/workpapers/${props.wpId}/d4/ai-generate`, { section: 'adj-conclusion', existingContent: auditConclusion.value, relatedContext: { task: '基于合同测算结果生成审计结论', noteText: auditNote.value } }, { _silent: true } as any); const t = res.data?.data?.content ?? res.data?.content ?? ''; if (!t) { ElMessage.warning('AI 未生成内容'); return }; await ElMessageBox.confirm(t, 'AI 生成', { confirmButtonText: '填入', cancelButtonText: '取消', type: 'info' }); updateAuditConclusion(t) } catch (e: any) { if (e !== 'cancel') ElMessage.warning('AI 生成失败') } finally { aiConclusionLoading.value = false } }
 
-const { exportTemplate, exportData, importData, importing } = useD4ImportExport({ wpId: computed(() => props.wpId), projectId: computed(() => props.projectId) })
+const { exportTemplate, exportData, importData, importing } = useD4ImportExport({ wpId: computed(()
+
+// ─── expose 给 GtWpRenderer 工具栏委托 ────────────────────────────────
+function handleExportTemplate() { exportTemplate('D4-34-rental' as any) }
+function handleExportData() { exportData('D4-34-rental' as any) }
+async function handleImportClick() {
+  const input = document.createElement('input')
+  input.type = 'file'; input.accept = '.xlsx'
+  input.onchange = async () => { const f = input.files?.[0]; if (f) await importData('D4-34', f) }
+  input.click()
+} => props.wpId), projectId: computed(() => props.projectId) })
 function fmtAmt(v: number): string { return v ? v.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '—' }
 function rowClass({ row }: { row: any }) { return row.diff !== 0 && row.diff ? 'row-diff' : '' }
 
@@ -162,20 +172,13 @@ async function handleOcrUpload(type: 'rental' | 'consult', rowId: string, file: 
     ElMessage.success('OCR结果已填入')
   } catch { ElMessage.warning('OCR识别失败') }
 }
+
+defineExpose({ handleExportTemplate, handleExportData, handleImportClick })
 </script>
 
 <template>
 <div class="d4-other-contract">
-  <div class="toolbar"><div class="toolbar-left"><el-segmented v-model="editorMode" :options="modeOptions" size="small" /></div><div class="toolbar-right"><el-button size="small" type="warning" plain :disabled="isReadonly||pushableCount===0" @click="pushDiffsToA13" title="把合同测算差异推送到 A13 未更正错报汇总（差异保留符号，人工认定）">推送差异至 A13{{ pushableCount ? `（${pushableCount}）` : '' }}</el-button><el-button size="small" @click="openFormulaManager" title="打开平台公式管理中心（唯一一套公式，支持跨底稿取数联动与表内校对）">ƒx 公式管理</el-button><el-dropdown trigger="click" size="small"><el-button size="small">导入导出 ▾</el-button><template #dropdown><el-dropdown-menu>
-    <el-dropdown-item disabled class="dropdown-group-label">— 房屋租赁业务 —</el-dropdown-item>
-    <el-dropdown-item @click="exportTemplate('D4-34-rental')">导出模板</el-dropdown-item>
-    <el-dropdown-item @click="exportData('D4-34-rental')">导出数据</el-dropdown-item>
-    <el-dropdown-item><el-upload :show-file-list="false" accept=".xlsx" :auto-upload="false" :disabled="isReadonly||importing" @change="(f:any)=>importData('D4-34-rental',f.raw||f)"><span>导入数据</span></el-upload></el-dropdown-item>
-    <el-dropdown-item disabled class="dropdown-group-label">— 咨询业务 —</el-dropdown-item>
-    <el-dropdown-item @click="exportTemplate('D4-34-consult')">导出模板</el-dropdown-item>
-    <el-dropdown-item @click="exportData('D4-34-consult')">导出数据</el-dropdown-item>
-    <el-dropdown-item><el-upload :show-file-list="false" accept=".xlsx" :auto-upload="false" :disabled="isReadonly||importing" @change="(f:any)=>importData('D4-34-consult',f.raw||f)"><span>导入数据</span></el-upload></el-dropdown-item>
-  </el-dropdown-menu></template></el-dropdown><GtIndexChip value="wp:D4-34" :context-project-id="projectId" /><el-tag :type="syncStateTag.type" size="small" class="sync-state-tag">{{ syncStateTag.text }}</el-tag><GtEntrySyncCapabilityNotice entry-id="xlsx/gt-d4-operating-revenue" /><el-button v-if="openReviewDialog" size="small" @click="openReviewDialog('D4-34-contract')">💬 复核</el-button></div></div>
+  <div class="toolbar"><div class="toolbar-left"><el-segmented v-model="editorMode" :options="modeOptions" size="small" /></div><div class="toolbar-right"><el-button size="small" type="warning" plain :disabled="isReadonly||pushableCount===0" @click="pushDiffsToA13" title="把合同测算差异推送到 A13 未更正错报汇总（差异保留符号，人工认定）">推送差异至 A13{{ pushableCount ? `（${pushableCount}）` : '' }}</el-button><el-button size="small" @click="openFormulaManager" title="打开平台公式管理中心（唯一一套公式，支持跨底稿取数联动与表内校对）">ƒx 公式管理</el-button><GtIndexChip value="wp:D4-34" :context-project-id="projectId" /><el-tag :type="syncStateTag.type" size="small" class="sync-state-tag">{{ syncStateTag.text }}</el-tag><GtEntrySyncCapabilityNotice entry-id="xlsx/gt-d4-operating-revenue" /><el-button v-if="openReviewDialog" size="small" @click="openReviewDialog('D4-34-contract')">💬 复核</el-button></div></div>
 
   <template v-if="editorMode !== '在线编辑'">
     <!-- 方法论折叠（审计目标+审计过程） -->

@@ -839,6 +839,71 @@ class WorkpaperSyncRepository:
         )
         return p
 
+    async def mark_participant_left(
+        self,
+        *,
+        room_id: uuid.UUID,
+        participant_id: uuid.UUID,
+    ) -> tuple[WorkpaperOoParticipant, bool]:
+        """participant 主动离开：`active/closing → left`，**只动 participant 这一行**。
+
+        spec: oo-single-pass-materialize-and-room-leave · Requirement 4.1 / 4.2 / 4.3
+        Properties: **P7**（只改该 participant）/ **P9**（幂等不产生第二条事件）
+
+        返回 ``(participant, already_left)``。``already_left=True`` 表示这次调用什么都
+        没写（幂等重放）。
+
+        ═══ 与 :meth:`create_close_intent` 的**本质**差别 ═══
+
+        close intent 是 **close barrier 仲裁**：它推 `close_barrier_epoch`、把 room 推成
+        `close_barrier`、建 intent 行、注册 scope、写 timeline，最终由
+        :meth:`reconcile_close_intents` CAS 提升一条 `kind=close_capture` 写请求。对**未
+        改动**的文档那条 capture 永远等不到 OO 回调 —— 真栈实测 room
+        ``03bbcad8-70ef-4462-8a37-68af4fc0d1fa`` 因此停在 `state=close_barrier` /
+        participant `closing` / capture `state=frozen`，该 room 此后**再也进不去**
+        （下次打开 confirm-descriptor 仍 200，紧接着「同步失败，请重试」）。
+
+        本方法是「我走了」：它**一个字节都不写到 room 行上**，不建任何 request、不推
+        barrier、不旋转 generation、不注册新 scope、不写 timeline。room 行只被
+        ``SELECT … FOR UPDATE`` **锁住**（与并发的 close intent / revoke 串行化），
+        锁不是写 —— P7 的判据逐列比 room 行的前后快照。
+
+        ═══ 为什么幂等分支必须**显式**先判当前状态 ═══
+
+        ``PARTICIPANT_EDGES[left]`` 是**空集**（`left` 是终态）。靠 `assert_transition`
+        抛异常再捕获来做幂等，等于把「重复离开」与「从 revoked/expired 非法起点离开」
+        压成同一个异常 —— 前者必须返回同一结果（AC 4.2），后者必须拒绝。所以这里先按
+        当前状态显式分支，`assert_transition` 只留给**真的**要迁移的那条路径。
+
+        ``uq_wpoop_active_lease`` 是 ``WHERE state IN ('active','closing')`` 的 partial
+        unique：把 lease 转出这两态即释放槽位，无需撤销、无需动 fence。
+        """
+        # room row lock：与 close intent / revoke 串行化。**只锁不写** —— 返回值刻意不
+        # 赋给变量，避免下游有人「顺手」在它上面改一笔（P7 的反证正是「让 leave 顺手改
+        # room.state ⇒ 红」）。
+        await self.lock_room(room_id)
+        participant = (
+            await self._session.execute(
+                sa.select(WorkpaperOoParticipant)
+                .where(WorkpaperOoParticipant.id == participant_id)
+                .with_for_update()
+            )
+        ).scalar_one_or_none()
+        if participant is None or participant.room_id != room_id:
+            # 跨 room 使用同一 participant id：与「不存在」同样处理，不泄露对象归属
+            # （与 `rooms._load_participant` 同一纪律）。
+            raise ScopeIntegrityError(f"participant 不存在: {participant_id}")
+        if ParticipantState(participant.state) is ParticipantState.left:
+            # 幂等重放：零写入。`left_at` 是这条状态迁移的**唯一**时间戳事实，
+            # 重写它就等于产生了第二条审计事件（AC 4.2 明令禁止）。
+            return participant, True
+        assert_transition("participant", participant.state, ParticipantState.left)
+        participant.state = ParticipantState.left.value
+        participant.left_at = _now()
+        participant.updated_at = _now()
+        await self._flush()
+        return participant, False
+
     async def create_client_confirmation(
         self,
         *,

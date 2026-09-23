@@ -504,6 +504,45 @@ export async function createCloseIntent(
   })
 }
 
+export interface LeaveRoomInput {
+  readonly roomId: string
+  readonly participantId: string
+  /** 客户端自报的 dirty。服务端据它拒绝（AC 4.4），所以**必填**、不给默认值。 */
+  readonly dirty: boolean
+}
+
+/**
+ * participant **主动离开**：只释放这一条 lease（`active/closing → left`）。
+ *
+ * spec: oo-single-pass-materialize-and-room-leave · Requirement 4.1~4.5
+ *
+ * 🔴 与 `createCloseIntent()` **不是**同一件事，不得互相替代。close-intent 是 close
+ * barrier 仲裁：它把 participant 推成 `closing`、选 leader、提升一条 `close_capture`
+ * 写请求。对**未改动**的文档那条 capture 永远等不到 OO 回调 —— 真栈实测 room
+ * `03bbcad8-70ef-4462-8a37-68af4fc0d1fa` 停在 `state=close_barrier` / participant
+ * `closing` / capture `state=frozen`，该 room 此后**再也进不去**。
+ *
+ * 🔴 `dirty` 声明成**必填**（不是 `dirty?: boolean`）：漏传时 TS 就报错，而不是静默送出
+ * 一个 `false` 把服务端那道数据安全门绕开。桥在 `canLeave` 为假时压根不会走到这里，
+ * 所以正确调用永远送 `false`；这个参数的意义是让「送 true」这条路径在类型上存在，
+ * 从而两侧的门可以被同一份判据两头锁死。
+ *
+ * 🔴 刻意**不带** `Idempotency-Key`：幂等来自**终态**（`left` 是 participant 状态机的
+ * 终态，重复离开由服务端的显式状态分支返回同一结果），不来自键。生成的路由表里这条
+ * 端点的 `idempotencyKey` 就是 `absent`，`request()` 因此不会强制它。
+ */
+export async function leaveRoom(
+  scope: WorkpaperSyncEntryScope,
+  input: LeaveRoomInput,
+): Promise<Record<string, unknown>> {
+  return request({
+    endpoint: 'leave_room',
+    scope,
+    params: { room_id: input.roomId, participant_id: input.participantId },
+    body: { dirty: input.dirty === true },
+  })
+}
+
 /** 按**调用方给的** operation id 查（服务端先授权再 canonicalize）。 */
 export async function getOperation(
   scope: WorkpaperSyncEntryScope,
@@ -824,6 +863,7 @@ export const WORKPAPER_SYNC_CLIENT_ENDPOINTS = Object.freeze({
   confirmDescriptor: 'confirm_descriptor',
   requestForcesave: 'request_forcesave',
   createCloseIntent: 'create_close_intent',
+  leaveRoom: 'leave_room',
   getOperation: 'get_operation',
   getOperationConflicts: 'get_operation_conflicts',
   getOperationTimeline: 'get_operation_timeline',

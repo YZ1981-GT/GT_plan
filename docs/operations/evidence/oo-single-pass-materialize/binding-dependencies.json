@@ -1,0 +1,871 @@
+{
+  "label": "binding-dependencies",
+  "captured_at": "2026-09-22T22:56:24.159Z",
+  "spec": "oo-single-pass-materialize-and-room-leave",
+  "requirements": [
+    "1.2"
+  ],
+  "task": "2 · binding 顺序依赖调查",
+  "scope": {
+    "entry_id": "xlsx/gt-d4-operating-revenue",
+    "binding_count": 39,
+    "primary_table_key": "revenue_detail_rows",
+    "substrate_bytes": 236694,
+    "projection_field_count": 218,
+    "projection_source": "substrate 自身反读（覆盖每个 binding 的受管区）"
+  },
+  "bindings": [
+    {
+      "index": 0,
+      "table_key": "revenue_detail_rows",
+      "table_name": "GT_D42_ROWS",
+      "sheet_part": "xl/worksheets/sheet6.xml",
+      "sheet_name": "主营业务收入明细表D4-2",
+      "write_count": 12,
+      "field_write_count": 12,
+      "identity_write_count": 0,
+      "preserved_formula_count": 12,
+      "footer_marker_row": 24,
+      "row_shift": null,
+      "strategy": "zip_patch"
+    },
+    {
+      "index": 1,
+      "table_key": "other_revenue_detail_rows",
+      "table_name": "GT_D43_ROWS",
+      "sheet_part": "xl/worksheets/sheet7.xml",
+      "sheet_name": "其他业务收入明细表D4-3",
+      "write_count": 6,
+      "field_write_count": 6,
+      "identity_write_count": 0,
+      "preserved_formula_count": 0,
+      "footer_marker_row": 20,
+      "row_shift": null,
+      "strategy": "zip_patch"
+    },
+    {
+      "index": 2,
+      "table_key": "d45_policy_groups",
+      "table_name": "GT_D45_GROUPS",
+      "sheet_part": "xl/worksheets/sheet9.xml",
+      "sheet_name": "营业收入会计政策检查D4-5",
+      "write_count": 2,
+      "field_write_count": 2,
+      "identity_write_count": 0,
+      "preserved_formula_count": 0,
+      "footer_marker_row": 47,
+      "row_shift": null,
+      "strategy": "zip_patch"
+    },
+    {
+      "index": 3,
+      "table_key": "related_party_price_rows",
+      "table_name": "GT_D421_ROWS",
+      "sheet_part": "xl/worksheets/sheet27.xml",
+      "sheet_name": "关联方销售情况及价格分析D4-21",
+      "write_count": 0,
+      "field_write_count": 0,
+      "identity_write_count": 0,
+      "preserved_formula_count": 0,
+      "footer_marker_row": 31,
+      "row_shift": null,
+      "strategy": "zip_patch"
+    },
+    {
+      "index": 4,
+      "table_key": "key_indicator_rows",
+      "table_name": "GT_D422_ROWS",
+      "sheet_part": "xl/worksheets/sheet30.xml",
+      "sheet_name": "重要指标分析表D4-22",
+      "write_count": 12,
+      "field_write_count": 12,
+      "identity_write_count": 0,
+      "preserved_formula_count": 0,
+      "footer_marker_row": 24,
+      "row_shift": null,
+      "strategy": "zip_patch"
+    },
+    {
+      "index": 5,
+      "table_key": "invoice_compare_rows",
+      "table_name": "GT_D423_ROWS",
+      "sheet_part": "xl/worksheets/sheet31.xml",
+      "sheet_name": "收入与开具发票金额比较分析D4-23",
+      "write_count": 12,
+      "field_write_count": 12,
+      "identity_write_count": 0,
+      "preserved_formula_count": 0,
+      "footer_marker_row": 24,
+      "row_shift": null,
+      "strategy": "zip_patch"
+    },
+    {
+      "index": 6,
+      "table_key": "third_party_receipt_rows",
+      "table_name": "GT_D424_ROWS",
+      "sheet_part": "xl/worksheets/sheet32.xml",
+      "sheet_name": "第三方回款检查D4-24",
+      "write_count": 0,
+      "field_write_count": 0,
+      "identity_write_count": 0,
+      "preserved_formula_count": 0,
+      "footer_marker_row": 23,
+      "row_shift": null,
+      "strategy": "zip_patch"
+    },
+    {
+      "index": 7,
+      "table_key": "other_revenue_check_rows",
+      "table_name": "GT_D435_ROWS",
+      "sheet_part": "xl/worksheets/sheet45.xml",
+      "sheet_name": "其他业务收入检查表D4-35",
+      "write_count": 0,
+      "field_write_count": 0,
+      "identity_write_count": 0,
+      "preserved_formula_count": 0,
+      "footer_marker_row": 26,
+      "row_shift": null,
+      "strategy": "zip_patch"
+    },
+    {
+      "index": 8,
+      "table_key": "dealer_check_rows",
+      "table_name": "GT_D425_ROWS",
+      "sheet_part": "xl/worksheets/sheet33.xml",
+      "sheet_name": "经销商检查D4-25",
+      "write_count": 10,
+      "field_write_count": 10,
+      "identity_write_count": 0,
+      "preserved_formula_count": 0,
+      "footer_marker_row": 23,
+      "row_shift": null,
+      "strategy": "zip_patch"
+    },
+    {
+      "index": 9,
+      "table_key": "overseas_sales_rows",
+      "table_name": "GT_D426_ROWS",
+      "sheet_part": "xl/worksheets/sheet34.xml",
+      "sheet_name": "境外销售收入检查D4-26",
+      "write_count": 0,
+      "field_write_count": 0,
+      "identity_write_count": 0,
+      "preserved_formula_count": 0,
+      "footer_marker_row": 30,
+      "row_shift": null,
+      "strategy": "zip_patch"
+    },
+    {
+      "index": 10,
+      "table_key": "undisclosed_rp_rows",
+      "table_name": "GT_D427_ROWS",
+      "sheet_part": "xl/worksheets/sheet35.xml",
+      "sheet_name": "识别未披露的关联方D4-27",
+      "write_count": 23,
+      "field_write_count": 23,
+      "identity_write_count": 0,
+      "preserved_formula_count": 0,
+      "footer_marker_row": 27,
+      "row_shift": null,
+      "strategy": "zip_patch"
+    },
+    {
+      "index": 11,
+      "table_key": "customer_checklist_rows",
+      "table_name": "GT_D428_ROWS",
+      "sheet_part": "xl/worksheets/sheet36.xml",
+      "sheet_name": "客户信息核查清单D4-28",
+      "write_count": 6,
+      "field_write_count": 6,
+      "identity_write_count": 0,
+      "preserved_formula_count": 0,
+      "footer_marker_row": 25,
+      "row_shift": null,
+      "strategy": "zip_patch"
+    },
+    {
+      "index": 12,
+      "table_key": "completeness_check_rows",
+      "table_name": "GT_D415_ROWS",
+      "sheet_part": "xl/worksheets/sheet21.xml",
+      "sheet_name": "营业收入完整性检查表D4-15",
+      "write_count": 0,
+      "field_write_count": 0,
+      "identity_write_count": 0,
+      "preserved_formula_count": 0,
+      "footer_marker_row": 26,
+      "row_shift": null,
+      "strategy": "zip_patch"
+    },
+    {
+      "index": 13,
+      "table_key": "export_customs_check_rows",
+      "table_name": "GT_D416_ROWS",
+      "sheet_part": "xl/worksheets/sheet22.xml",
+      "sheet_name": "出口收入电子口岸系统核对D4-16",
+      "write_count": 0,
+      "field_write_count": 0,
+      "identity_write_count": 0,
+      "preserved_formula_count": 0,
+      "footer_marker_row": 16,
+      "row_shift": null,
+      "strategy": "zip_patch"
+    },
+    {
+      "index": 14,
+      "table_key": "d4_30_customers",
+      "table_name": "GT_D430_ROWS",
+      "sheet_part": "xl/worksheets/sheet38.xml",
+      "sheet_name": "客户访谈记录汇总表D4-30",
+      "write_count": 4,
+      "field_write_count": 4,
+      "identity_write_count": 0,
+      "preserved_formula_count": 0,
+      "footer_marker_row": 22,
+      "row_shift": null,
+      "strategy": "zip_patch"
+    },
+    {
+      "index": 15,
+      "table_key": "d4_31_interview",
+      "table_name": "GT_D431_ROWS",
+      "sheet_part": "xl/worksheets/sheet39.xml",
+      "sheet_name": "客户访谈记录 D4-31",
+      "write_count": 4,
+      "field_write_count": 4,
+      "identity_write_count": 0,
+      "preserved_formula_count": 0,
+      "footer_marker_row": 63,
+      "row_shift": null,
+      "strategy": "zip_patch"
+    },
+    {
+      "index": 16,
+      "table_key": "d4_32_groups",
+      "table_name": "GT_D432_ROWS",
+      "sheet_part": "xl/worksheets/sheet41.xml",
+      "sheet_name": "客户、供应商等资金流水检查D4-32",
+      "write_count": 34,
+      "field_write_count": 34,
+      "identity_write_count": 0,
+      "preserved_formula_count": 0,
+      "footer_marker_row": 48,
+      "row_shift": null,
+      "strategy": "zip_patch"
+    },
+    {
+      "index": 17,
+      "table_key": "d4_6_indicators",
+      "table_name": "GT_D46_ROWS",
+      "sheet_part": "xl/worksheets/sheet11.xml",
+      "sheet_name": "重要指标分析D4-6",
+      "write_count": 0,
+      "field_write_count": 0,
+      "identity_write_count": 0,
+      "preserved_formula_count": 0,
+      "footer_marker_row": 25,
+      "row_shift": null,
+      "strategy": "zip_patch"
+    },
+    {
+      "index": 18,
+      "table_key": "d4_17_rows",
+      "table_name": "GT_D417_ROWS",
+      "sheet_part": "xl/worksheets/sheet23.xml",
+      "sheet_name": "营业收入截止测试（账到单据）D4-17",
+      "write_count": 0,
+      "field_write_count": 0,
+      "identity_write_count": 0,
+      "preserved_formula_count": 0,
+      "footer_marker_row": 36,
+      "row_shift": null,
+      "strategy": "zip_patch"
+    },
+    {
+      "index": 19,
+      "table_key": "d4_18_rows",
+      "table_name": "GT_D418_ROWS",
+      "sheet_part": "xl/worksheets/sheet24.xml",
+      "sheet_name": "营业收入截止测试（单据到账）D4-18",
+      "write_count": 0,
+      "field_write_count": 0,
+      "identity_write_count": 0,
+      "preserved_formula_count": 0,
+      "footer_marker_row": 36,
+      "row_shift": null,
+      "strategy": "zip_patch"
+    },
+    {
+      "index": 20,
+      "table_key": "d4_19_rows",
+      "table_name": "GT_D419_ROWS",
+      "sheet_part": "xl/worksheets/sheet25.xml",
+      "sheet_name": "销售折扣与折让检查D4-19",
+      "write_count": 0,
+      "field_write_count": 0,
+      "identity_write_count": 0,
+      "preserved_formula_count": 0,
+      "footer_marker_row": 24,
+      "row_shift": null,
+      "strategy": "zip_patch"
+    },
+    {
+      "index": 21,
+      "table_key": "d4_11_rows",
+      "table_name": "GT_D411_ROWS",
+      "sheet_part": "xl/worksheets/sheet16.xml",
+      "sheet_name": "产品销售价格分析D4-11",
+      "write_count": 0,
+      "field_write_count": 0,
+      "identity_write_count": 0,
+      "preserved_formula_count": 0,
+      "footer_marker_row": 22,
+      "row_shift": null,
+      "strategy": "zip_patch"
+    },
+    {
+      "index": 22,
+      "table_key": "d4_10_rows",
+      "table_name": "GT_D410_ROWS",
+      "sheet_part": "xl/worksheets/sheet15.xml",
+      "sheet_name": "重要客户销售价格分析D4-10",
+      "write_count": 49,
+      "field_write_count": 49,
+      "identity_write_count": 0,
+      "preserved_formula_count": 0,
+      "footer_marker_row": 34,
+      "row_shift": null,
+      "strategy": "zip_patch"
+    },
+    {
+      "index": 23,
+      "table_key": "d4_20_provision",
+      "table_name": "GT_D420PROV_ROWS",
+      "sheet_part": "xl/worksheets/sheet26.xml",
+      "sheet_name": "销售退货检查表 D4-20",
+      "write_count": 0,
+      "field_write_count": 0,
+      "identity_write_count": 0,
+      "preserved_formula_count": 0,
+      "footer_marker_row": 31,
+      "row_shift": null,
+      "strategy": "zip_patch"
+    },
+    {
+      "index": 24,
+      "table_key": "d4_20_current_returns",
+      "table_name": "GT_D420CUR_ROWS",
+      "sheet_part": "xl/worksheets/sheet26.xml",
+      "sheet_name": "销售退货检查表 D4-20",
+      "write_count": 0,
+      "field_write_count": 0,
+      "identity_write_count": 0,
+      "preserved_formula_count": 0,
+      "footer_marker_row": 37,
+      "row_shift": null,
+      "strategy": "zip_patch"
+    },
+    {
+      "index": 25,
+      "table_key": "d4_20_post_returns",
+      "table_name": "GT_D420POST_ROWS",
+      "sheet_part": "xl/worksheets/sheet26.xml",
+      "sheet_name": "销售退货检查表 D4-20",
+      "write_count": 0,
+      "field_write_count": 0,
+      "identity_write_count": 0,
+      "preserved_formula_count": 0,
+      "footer_marker_row": 43,
+      "row_shift": null,
+      "strategy": "zip_patch"
+    },
+    {
+      "index": 26,
+      "table_key": "d4_34_rentals",
+      "table_name": "GT_D434RENT_ROWS",
+      "sheet_part": "xl/worksheets/sheet44.xml",
+      "sheet_name": "其他业务收入合同测算表D4-34",
+      "write_count": 0,
+      "field_write_count": 0,
+      "identity_write_count": 0,
+      "preserved_formula_count": 0,
+      "footer_marker_row": 18,
+      "row_shift": null,
+      "strategy": "zip_patch"
+    },
+    {
+      "index": 27,
+      "table_key": "d4_34_consults",
+      "table_name": "GT_D434CONS_ROWS",
+      "sheet_part": "xl/worksheets/sheet44.xml",
+      "sheet_name": "其他业务收入合同测算表D4-34",
+      "write_count": 0,
+      "field_write_count": 0,
+      "identity_write_count": 0,
+      "preserved_formula_count": 0,
+      "footer_marker_row": 25,
+      "row_shift": null,
+      "strategy": "zip_patch"
+    },
+    {
+      "index": 28,
+      "table_key": "d4_36_forward",
+      "table_name": "GT_D436FWD_ROWS",
+      "sheet_part": "xl/worksheets/sheet46.xml",
+      "sheet_name": "其他业务收入截止性测试D4-36",
+      "write_count": 0,
+      "field_write_count": 0,
+      "identity_write_count": 0,
+      "preserved_formula_count": 0,
+      "footer_marker_row": 24,
+      "row_shift": null,
+      "strategy": "zip_patch"
+    },
+    {
+      "index": 29,
+      "table_key": "d4_36_backward",
+      "table_name": "GT_D436BWD_ROWS",
+      "sheet_part": "xl/worksheets/sheet46.xml",
+      "sheet_name": "其他业务收入截止性测试D4-36",
+      "write_count": 0,
+      "field_write_count": 0,
+      "identity_write_count": 0,
+      "preserved_formula_count": 0,
+      "footer_marker_row": 44,
+      "row_shift": null,
+      "strategy": "zip_patch"
+    },
+    {
+      "index": 30,
+      "table_key": "d4_7_products",
+      "table_name": "GT_D47PROD_ROWS",
+      "sheet_part": "xl/worksheets/sheet12.xml",
+      "sheet_name": "毛利率分析表D4-7",
+      "write_count": 0,
+      "field_write_count": 0,
+      "identity_write_count": 0,
+      "preserved_formula_count": 0,
+      "footer_marker_row": 26,
+      "row_shift": null,
+      "strategy": "zip_patch"
+    },
+    {
+      "index": 31,
+      "table_key": "walkthrough_transactions",
+      "table_name": "GT_D414_ROWS",
+      "sheet_part": "xl/worksheets/sheet20.xml",
+      "sheet_name": "营业收入发生检查表D4-14",
+      "write_count": 0,
+      "field_write_count": 0,
+      "identity_write_count": 0,
+      "preserved_formula_count": 0,
+      "footer_marker_row": 37,
+      "row_shift": null,
+      "strategy": "zip_patch"
+    },
+    {
+      "index": 32,
+      "table_key": "adjudication_main_rows",
+      "table_name": "GT_D41_MAIN_ROWS",
+      "sheet_part": "xl/worksheets/sheet3.xml",
+      "sheet_name": "营业收入审定表D4-1",
+      "write_count": 0,
+      "field_write_count": 0,
+      "identity_write_count": 0,
+      "preserved_formula_count": 0,
+      "footer_marker_row": 12,
+      "row_shift": null,
+      "strategy": "zip_patch"
+    },
+    {
+      "index": 33,
+      "table_key": "adjudication_other_rows",
+      "table_name": "GT_D41_OTHER_ROWS",
+      "sheet_part": "xl/worksheets/sheet3.xml",
+      "sheet_name": "营业收入审定表D4-1",
+      "write_count": 0,
+      "field_write_count": 0,
+      "identity_write_count": 0,
+      "preserved_formula_count": 0,
+      "footer_marker_row": 18,
+      "row_shift": null,
+      "strategy": "zip_patch"
+    },
+    {
+      "index": 34,
+      "table_key": "customer_current_rows",
+      "table_name": "GT_D49C_ROWS",
+      "sheet_part": "xl/worksheets/sheet14.xml",
+      "sheet_name": "重要客户结构分析D4-9",
+      "write_count": 24,
+      "field_write_count": 24,
+      "identity_write_count": 0,
+      "preserved_formula_count": 20,
+      "footer_marker_row": 23,
+      "row_shift": null,
+      "strategy": "zip_patch"
+    },
+    {
+      "index": 35,
+      "table_key": "customer_prior_rows",
+      "table_name": "GT_D49P_ROWS",
+      "sheet_part": "xl/worksheets/sheet14.xml",
+      "sheet_name": "重要客户结构分析D4-9",
+      "write_count": 24,
+      "field_write_count": 24,
+      "identity_write_count": 0,
+      "preserved_formula_count": 20,
+      "footer_marker_row": 37,
+      "row_shift": null,
+      "strategy": "zip_patch"
+    },
+    {
+      "index": 36,
+      "table_key": "d4_33_matrix",
+      "table_name": "",
+      "sheet_part": "xl/worksheets/sheet43.xml",
+      "sheet_name": "其他业务毛利率分析表D4-33",
+      "write_count": 0,
+      "field_write_count": 0,
+      "identity_write_count": 0,
+      "preserved_formula_count": 0,
+      "footer_marker_row": null,
+      "row_shift": null,
+      "strategy": "zip_patch"
+    },
+    {
+      "index": 37,
+      "table_key": "d4_8_matrix",
+      "table_name": "",
+      "sheet_part": "xl/worksheets/sheet13.xml",
+      "sheet_name": "重要产品毛利分析D4-8",
+      "write_count": 0,
+      "field_write_count": 0,
+      "identity_write_count": 0,
+      "preserved_formula_count": 0,
+      "footer_marker_row": null,
+      "row_shift": null,
+      "strategy": "zip_patch"
+    },
+    {
+      "index": 38,
+      "table_key": "d413_erp_check_fixed",
+      "table_name": "",
+      "sheet_part": "xl/worksheets/sheet19.xml",
+      "sheet_name": "营业收入账面金额与ERP系统核对记录D4-13",
+      "write_count": 0,
+      "field_write_count": 0,
+      "identity_write_count": 0,
+      "preserved_formula_count": 0,
+      "footer_marker_row": null,
+      "row_shift": null,
+      "strategy": "zip_patch"
+    }
+  ],
+  "sheet_part_multiplicity": {
+    "xl/worksheets/sheet14.xml": [
+      "customer_current_rows",
+      "customer_prior_rows"
+    ],
+    "xl/worksheets/sheet26.xml": [
+      "d4_20_provision",
+      "d4_20_current_returns",
+      "d4_20_post_returns"
+    ],
+    "xl/worksheets/sheet3.xml": [
+      "adjudication_main_rows",
+      "adjudication_other_rows"
+    ],
+    "xl/worksheets/sheet44.xml": [
+      "d4_34_rentals",
+      "d4_34_consults"
+    ],
+    "xl/worksheets/sheet46.xml": [
+      "d4_36_forward",
+      "d4_36_backward"
+    ]
+  },
+  "classes": {
+    "D1_same_cell_write": {
+      "colliding_cell_count": 4,
+      "value_sensitive_cell_count": 0,
+      "payload_identical_cell_count": 4,
+      "colliding_cells": [
+        {
+          "cell": "xl/worksheets/sheet14.xml!C24",
+          "part": "xl/worksheets/sheet14.xml",
+          "coord": "C24",
+          "row": 24,
+          "column": "C",
+          "writers": [
+            "customer_current_rows",
+            "customer_prior_rows"
+          ],
+          "per_writer": {
+            "customer_current_rows": {
+              "coord": "C24",
+              "kind": "number_literal",
+              "value_repr": "Decimal('0')",
+              "field_key": "customer_totals/current_total_amount",
+              "row_key": "",
+              "mode": "FieldMode.editable",
+              "formula_text": ""
+            },
+            "customer_prior_rows": {
+              "coord": "C24",
+              "kind": "number_literal",
+              "value_repr": "Decimal('0')",
+              "field_key": "customer_totals/current_total_amount",
+              "row_key": "",
+              "mode": "FieldMode.editable",
+              "formula_text": ""
+            }
+          },
+          "value_sensitive": false,
+          "payload_identical": true,
+          "distinct_field_keys": [
+            "customer_totals/current_total_amount"
+          ]
+        },
+        {
+          "cell": "xl/worksheets/sheet14.xml!E24",
+          "part": "xl/worksheets/sheet14.xml",
+          "coord": "E24",
+          "row": 24,
+          "column": "E",
+          "writers": [
+            "customer_current_rows",
+            "customer_prior_rows"
+          ],
+          "per_writer": {
+            "customer_current_rows": {
+              "coord": "E24",
+              "kind": "number_literal",
+              "value_repr": "Decimal('0')",
+              "field_key": "customer_totals/current_total_quantity",
+              "row_key": "",
+              "mode": "FieldMode.editable",
+              "formula_text": ""
+            },
+            "customer_prior_rows": {
+              "coord": "E24",
+              "kind": "number_literal",
+              "value_repr": "Decimal('0')",
+              "field_key": "customer_totals/current_total_quantity",
+              "row_key": "",
+              "mode": "FieldMode.editable",
+              "formula_text": ""
+            }
+          },
+          "value_sensitive": false,
+          "payload_identical": true,
+          "distinct_field_keys": [
+            "customer_totals/current_total_quantity"
+          ]
+        },
+        {
+          "cell": "xl/worksheets/sheet14.xml!C38",
+          "part": "xl/worksheets/sheet14.xml",
+          "coord": "C38",
+          "row": 38,
+          "column": "C",
+          "writers": [
+            "customer_current_rows",
+            "customer_prior_rows"
+          ],
+          "per_writer": {
+            "customer_current_rows": {
+              "coord": "C38",
+              "kind": "number_literal",
+              "value_repr": "Decimal('0')",
+              "field_key": "customer_totals/prior_total_amount",
+              "row_key": "",
+              "mode": "FieldMode.editable",
+              "formula_text": ""
+            },
+            "customer_prior_rows": {
+              "coord": "C38",
+              "kind": "number_literal",
+              "value_repr": "Decimal('0')",
+              "field_key": "customer_totals/prior_total_amount",
+              "row_key": "",
+              "mode": "FieldMode.editable",
+              "formula_text": ""
+            }
+          },
+          "value_sensitive": false,
+          "payload_identical": true,
+          "distinct_field_keys": [
+            "customer_totals/prior_total_amount"
+          ]
+        },
+        {
+          "cell": "xl/worksheets/sheet14.xml!E38",
+          "part": "xl/worksheets/sheet14.xml",
+          "coord": "E38",
+          "row": 38,
+          "column": "E",
+          "writers": [
+            "customer_current_rows",
+            "customer_prior_rows"
+          ],
+          "per_writer": {
+            "customer_current_rows": {
+              "coord": "E38",
+              "kind": "number_literal",
+              "value_repr": "Decimal('0')",
+              "field_key": "customer_totals/prior_total_quantity",
+              "row_key": "",
+              "mode": "FieldMode.editable",
+              "formula_text": ""
+            },
+            "customer_prior_rows": {
+              "coord": "E38",
+              "kind": "number_literal",
+              "value_repr": "Decimal('0')",
+              "field_key": "customer_totals/prior_total_quantity",
+              "row_key": "",
+              "mode": "FieldMode.editable",
+              "formula_text": ""
+            }
+          },
+          "value_sensitive": false,
+          "payload_identical": true,
+          "distinct_field_keys": [
+            "customer_totals/prior_total_quantity"
+          ]
+        }
+      ],
+      "colliding_pairs": [
+        {
+          "bindings": [
+            "customer_current_rows",
+            "customer_prior_rows"
+          ],
+          "cell_count": 4,
+          "cells": [
+            "xl/worksheets/sheet14.xml!C24",
+            "xl/worksheets/sheet14.xml!E24",
+            "xl/worksheets/sheet14.xml!C38",
+            "xl/worksheets/sheet14.xml!E38"
+          ]
+        }
+      ],
+      "method": "逐对求 (sheet_part, coord) 交集后排序；不是 set 抽样"
+    },
+    "D1b_order_probe": {
+      "performed": true,
+      "cell": "xl/worksheets/sheet14.xml!C24",
+      "part": "xl/worksheets/sheet14.xml",
+      "order_forward": [
+        "customer_current_rows",
+        "customer_prior_rows"
+      ],
+      "order_backward": [
+        "customer_prior_rows",
+        "customer_current_rows"
+      ],
+      "cell_body_forward": "<v>0</v>",
+      "cell_body_backward": "<v>0</v>",
+      "sheet_part_bytes_equal_across_orders": true,
+      "order_matters": false,
+      "shared_field_tracking": {
+        "performed": true,
+        "field_key": "customer_totals/current_total_amount",
+        "projection_value_before": "0",
+        "projection_value_probe": "111111",
+        "planned_write_value_baseline": {
+          "customer_current_rows": "Decimal('0')",
+          "customer_prior_rows": "Decimal('0')"
+        },
+        "planned_write_value_by_binding": {
+          "customer_current_rows": "Decimal('111111')",
+          "customer_prior_rows": "Decimal('111111')"
+        },
+        "both_bindings_agree": true,
+        "changed_with_shared_field": true,
+        "both_track_shared_field": true
+      }
+    },
+    "D2_plan_position_independence": {
+      "compared_bindings": 39,
+      "drifted_bindings": [],
+      "independent": true,
+      "method": "同一 binding 的计划分别算在「原始 substrate 字节」与「前 k-1 个 binding 写入后的字节」上，逐字段比签名（含 writes/preserved_formulas/region/runtime_binding/row_shift/workbook_row_change/strategy）"
+    },
+    "D3_formula_into_cell": {
+      "touched_parts": [
+        "xl/worksheets/sheet11.xml",
+        "xl/worksheets/sheet12.xml",
+        "xl/worksheets/sheet13.xml",
+        "xl/worksheets/sheet14.xml",
+        "xl/worksheets/sheet15.xml",
+        "xl/worksheets/sheet16.xml",
+        "xl/worksheets/sheet19.xml",
+        "xl/worksheets/sheet20.xml",
+        "xl/worksheets/sheet21.xml",
+        "xl/worksheets/sheet22.xml",
+        "xl/worksheets/sheet23.xml",
+        "xl/worksheets/sheet24.xml",
+        "xl/worksheets/sheet25.xml",
+        "xl/worksheets/sheet26.xml",
+        "xl/worksheets/sheet27.xml",
+        "xl/worksheets/sheet3.xml",
+        "xl/worksheets/sheet30.xml",
+        "xl/worksheets/sheet31.xml",
+        "xl/worksheets/sheet32.xml",
+        "xl/worksheets/sheet33.xml",
+        "xl/worksheets/sheet34.xml",
+        "xl/worksheets/sheet35.xml",
+        "xl/worksheets/sheet36.xml",
+        "xl/worksheets/sheet38.xml",
+        "xl/worksheets/sheet39.xml",
+        "xl/worksheets/sheet41.xml",
+        "xl/worksheets/sheet43.xml",
+        "xl/worksheets/sheet44.xml",
+        "xl/worksheets/sheet45.xml",
+        "xl/worksheets/sheet46.xml",
+        "xl/worksheets/sheet6.xml",
+        "xl/worksheets/sheet7.xml",
+        "xl/worksheets/sheet9.xml"
+      ],
+      "touched_part_count": 33,
+      "gt_sync_part": "xl/worksheets/sheetGtSync.xml",
+      "gt_sync_written": false,
+      "workbook_xml_written": false,
+      "row_shift_bindings": [],
+      "workbook_row_change_bindings": [],
+      "write_kind_counts": {
+        "boolean_literal": 4,
+        "cached_value_only": 52,
+        "inline_text": 113,
+        "number_literal": 53
+      },
+      "cached_value_only_count": 52,
+      "preserved_formula_total": 52,
+      "formula_text_rewrites": []
+    },
+    "D4_cross_sheet_reference": {
+      "scanned_sheet_part_count": 47,
+      "scanned_formula_count": 168,
+      "managed_sheet_count": 33,
+      "reference_hit_count": 0,
+      "hits_from_unmanaged_sheets": 0,
+      "unique_edges": [],
+      "samples": [],
+      "note": "命中 = 某 sheet 的公式引用了另一 binding 写入面里的格（源扫全部 worksheet，不限受管）。materialize 对受管公式格只写缓存值（cached_value_only）不重算 ⇒ 这类引用在链式与单趟两条路径上表现相同，不构成写入顺序依赖。"
+    },
+    "D5_named_range": {
+      "workbook_xml_written": false,
+      "gt_sync_written": false,
+      "gt_sync_part": "xl/worksheets/sheetGtSync.xml",
+      "row_shift_bindings": [],
+      "note": "definedName（workbook.xml）与 _GT_SYNC runtime binding 只在 row_shift is not None 时被改写（_apply_workbook_propagation / _refresh_gt_sync_runtime_binding 都挂在该分支下）。row_shift_bindings 为空 ⇒ 整趟里这两处逐字节不变 ⇒ 计划期读到的命名区域不可能是别人写的结果。"
+    }
+  },
+  "environment": {
+    "python": "3.12.8",
+    "platform": "Windows-10-10.0.19045-SP0",
+    "openpyxl": "3.1.5"
+  }
+}

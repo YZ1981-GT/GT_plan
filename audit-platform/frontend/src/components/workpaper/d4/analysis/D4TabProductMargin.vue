@@ -366,6 +366,12 @@ const { exportTemplate, exportData, importData, importing } = useD4ImportExport(
 })
 function handleExportTemplate() { exportTemplate('D4-8' as any) }
 function handleExportData() { exportData('D4-8' as any) }
+async function handleImportClick() {
+  const input = document.createElement('input')
+  input.type = 'file'; input.accept = '.xlsx'
+  input.onchange = async () => { const f = input.files?.[0]; if (f) await importData('D4-8' as any, f) }
+  input.click()
+}
 function handleImportUpload(file: File): boolean {
   importData('D4-8' as any, file).then((result) => {
     if (result && result.rowCount > 0) loadProducts()
@@ -412,6 +418,8 @@ const { syncBridge, descriptor: syncOoDescriptor, editorMode, modeOptions, syncS
   },
   reloadHtml: async () => { if (reloadWorkpaperData) await reloadWorkpaperData() },
 })
+
+defineExpose({ handleExportTemplate, handleExportData, handleImportClick })
 </script>
 
 
@@ -457,20 +465,7 @@ const { syncBridge, descriptor: syncOoDescriptor, editorMode, modeOptions, syncS
       <div class="sec-header">
         <h4 class="sec-title">重要产品/服务毛利率分析</h4>
         <div class="sec-actions">
-          <el-dropdown size="small" trigger="click" :disabled="isReadonly">
-            <el-button size="small">导入导出 ▾</el-button>
-            <template #dropdown>
-              <el-dropdown-menu>
-                <el-dropdown-item @click="handleExportTemplate">导出模板</el-dropdown-item>
-                <el-dropdown-item @click="handleExportData">导出数据</el-dropdown-item>
-                <el-dropdown-item>
-                  <el-upload :show-file-list="false" accept=".xlsx,.xls" :before-upload="handleImportUpload" :disabled="importing">
-                    <span>{{ importing ? '导入中...' : '导入数据' }}</span>
-                  </el-upload>
-                </el-dropdown-item>
-              </el-dropdown-menu>
-            </template>
-          </el-dropdown>
+          
           <GtIndexChip value="wp:D4-7" :context-project-id="projectId" />
           <GtIndexChip value="wp:D4-2" :context-project-id="projectId" />
         </div>
@@ -484,7 +479,7 @@ const { syncBridge, descriptor: syncOoDescriptor, editorMode, modeOptions, syncS
         </el-select>
         <el-input v-model="activeProduct.name" size="small" placeholder="产品名称"
           style="width: 160px" :disabled="isReadonly" @input="updateProduct" />
-        <el-tooltip content="批量数据建议：先点「导入导出 ▾ → 导出模板」，在Excel中填写后导入更快" placement="top" :show-after="300">
+        <el-tooltip content="批量数据建议：先用顶部「导出模板」按钮导出空表，在Excel中填写后再用「导入」按钮导入更快" placement="top" :show-after="300">
           <el-button size="small" :disabled="isReadonly" @click="addProduct">+ 增行</el-button>
         </el-tooltip>
         <el-button size="small" type="danger" plain :disabled="isReadonly || products.length <= 1"

@@ -12,6 +12,7 @@ import { computed, inject, toRef, type Ref } from 'vue'
 import { useD4OtherRevenue, type OtherRevenueRow } from '../../composables/useD4OtherRevenue'
 import { isChangeRateExceeding } from '../../composables/useD4FormulaEngine'
 import { useD4ImportExport } from '../../composables/useD4ImportExport'
+import WpAmountInput from '@/components/workpaper/shared/WpAmountInput.vue'
 
 const props = defineProps<{
   wpId: string
@@ -54,7 +55,7 @@ const {
   isReadonly: toRef(props, 'isReadonly') as Ref<boolean>,
 })
 
-defineExpose({ flushPendingSave })
+defineExpose({ flushPendingSave, handleExportTemplate, handleExportData, handleImportClick })
 
 // ─── 导入导出 ─────────────────────────────────────────────────────────
 const { exportTemplate, exportData, importData, importing } = useD4ImportExport({
@@ -62,9 +63,13 @@ const { exportTemplate, exportData, importData, importing } = useD4ImportExport(
   projectId: toRef(props, 'projectId') as Ref<string>,
 })
 
-function handleImportUpload(file: File): boolean {
-  importData('D4-3', file)
-  return false
+function handleExportTemplate() { exportTemplate('D4-3') }
+function handleExportData() { exportData('D4-3') }
+async function handleImportClick() {
+  const input = document.createElement('input')
+  input.type = 'file'; input.accept = '.xlsx,.xls'
+  input.onchange = async () => { const f = input.files?.[0]; if (f) await importData('D4-3', f) }
+  input.click()
 }
 
 // ─── 样式判断 ─────────────────────────────────────────────────────────
@@ -123,25 +128,6 @@ const auditConclusion = computed({
         </el-tooltip>
       </div>
       <div class="toolbar-right">
-        <el-dropdown size="small" trigger="click" :disabled="isReadonly">
-          <el-button size="small">导入导出 ▾</el-button>
-          <template #dropdown>
-            <el-dropdown-menu>
-              <el-dropdown-item @click="exportTemplate('D4-3')">导出模板</el-dropdown-item>
-              <el-dropdown-item @click="exportData('D4-3')">导出数据</el-dropdown-item>
-              <el-dropdown-item>
-                <el-upload
-                  :show-file-list="false"
-                  accept=".xlsx,.xls"
-                  :before-upload="handleImportUpload"
-                  :disabled="importing"
-                >
-                  <span>导入数据</span>
-                </el-upload>
-              </el-dropdown-item>
-            </el-dropdown-menu>
-          </template>
-        </el-dropdown>
         <el-tag size="small" type="info">共 {{ rows.length }} 行</el-tag>
       </div>
     </div>
@@ -175,46 +161,46 @@ const auditConclusion = computed({
 
       <!-- 本期 -->
       <el-table-column label="本期" align="center">
-        <el-table-column label="未审数" width="120" align="right">
+        <el-table-column label="未审数" min-width="120" align="right">
           <template #default="{ row }">
             <template v-if="row.rowId === 'subtotal'">
               <span class="font-bold">{{ fmtAmount(row.currentUnadjusted) }}</span>
             </template>
             <template v-else>
-              <el-input
+              <WpAmountInput
                 v-if="!isReadonly"
                 :model-value="row.currentUnadjusted"
                 size="small"
-                type="number"
-                @change="(v: string) => updateCell(row.rowId, 'currentUnadjusted', v)"
+                style="width: 100%"
+                @change="(v: number) => updateCell(row.rowId, 'currentUnadjusted', v)"
               />
               <span v-else>{{ fmtAmount(row.currentUnadjusted) }}</span>
             </template>
           </template>
         </el-table-column>
-        <el-table-column label="审计调整" width="110" align="right">
+        <el-table-column label="审计调整" min-width="110" align="right">
           <template #default="{ row }">
             <template v-if="row.rowId === 'subtotal'">
               <span class="font-bold">{{ fmtAmount(row.currentAdjustment) }}</span>
             </template>
             <template v-else>
-              <el-input
+              <WpAmountInput
                 v-if="!isReadonly"
                 :model-value="row.currentAdjustment"
                 size="small"
-                type="number"
-                @change="(v: string) => updateCell(row.rowId, 'currentAdjustment', v)"
+                style="width: 100%"
+                @change="(v: number) => updateCell(row.rowId, 'currentAdjustment', v)"
               />
               <span v-else>{{ fmtAmount(row.currentAdjustment) }}</span>
             </template>
           </template>
         </el-table-column>
-        <el-table-column label="审定数" width="120" align="right" class-name="auto-calc-col">
+        <el-table-column label="审定数" min-width="120" align="right" class-name="auto-calc-col">
           <template #default="{ row }">
             <span class="audited-cell">{{ fmtAmount(row.currentAudited) }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="占比" width="80" align="right" class-name="auto-calc-col">
+        <el-table-column label="占比" min-width="80" align="right" class-name="auto-calc-col">
           <template #default="{ row }">
             <span>{{ fmtPercent(row.currentProportion) }}</span>
           </template>
@@ -223,46 +209,46 @@ const auditConclusion = computed({
 
       <!-- 上期 -->
       <el-table-column label="上期" align="center">
-        <el-table-column label="未审数" width="120" align="right">
+        <el-table-column label="未审数" min-width="120" align="right">
           <template #default="{ row }">
             <template v-if="row.rowId === 'subtotal'">
               <span class="font-bold">{{ fmtAmount(row.priorUnadjusted) }}</span>
             </template>
             <template v-else>
-              <el-input
+              <WpAmountInput
                 v-if="!isReadonly"
                 :model-value="row.priorUnadjusted"
                 size="small"
-                type="number"
-                @change="(v: string) => updateCell(row.rowId, 'priorUnadjusted', v)"
+                style="width: 100%"
+                @change="(v: number) => updateCell(row.rowId, 'priorUnadjusted', v)"
               />
               <span v-else>{{ fmtAmount(row.priorUnadjusted) }}</span>
             </template>
           </template>
         </el-table-column>
-        <el-table-column label="审计调整" width="110" align="right">
+        <el-table-column label="审计调整" min-width="110" align="right">
           <template #default="{ row }">
             <template v-if="row.rowId === 'subtotal'">
               <span class="font-bold">{{ fmtAmount(row.priorAdjustment) }}</span>
             </template>
             <template v-else>
-              <el-input
+              <WpAmountInput
                 v-if="!isReadonly"
                 :model-value="row.priorAdjustment"
                 size="small"
-                type="number"
-                @change="(v: string) => updateCell(row.rowId, 'priorAdjustment', v)"
+                style="width: 100%"
+                @change="(v: number) => updateCell(row.rowId, 'priorAdjustment', v)"
               />
               <span v-else>{{ fmtAmount(row.priorAdjustment) }}</span>
             </template>
           </template>
         </el-table-column>
-        <el-table-column label="审定数" width="120" align="right" class-name="auto-calc-col">
+        <el-table-column label="审定数" min-width="120" align="right" class-name="auto-calc-col">
           <template #default="{ row }">
             <span>{{ fmtAmount(row.priorAudited) }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="占比" width="80" align="right" class-name="auto-calc-col">
+        <el-table-column label="占比" min-width="80" align="right" class-name="auto-calc-col">
           <template #default="{ row }">
             <span>{{ fmtPercent(row.priorProportion) }}</span>
           </template>
@@ -270,12 +256,12 @@ const auditConclusion = computed({
       </el-table-column>
 
       <!-- 变动 -->
-      <el-table-column label="变动额" width="120" align="right" class-name="auto-calc-col">
+      <el-table-column label="变动额" min-width="120" align="right" class-name="auto-calc-col">
         <template #default="{ row }">
           <span>{{ fmtAmount(row.changeAmount) }}</span>
         </template>
       </el-table-column>
-      <el-table-column label="变动率" width="95" align="right" class-name="auto-calc-col">
+      <el-table-column label="变动率" min-width="95" align="right" class-name="auto-calc-col">
         <template #default="{ row }">
           <span :class="getRateCellClass(row.changeRate)">{{ fmtRate(row.changeRate) }}</span>
         </template>

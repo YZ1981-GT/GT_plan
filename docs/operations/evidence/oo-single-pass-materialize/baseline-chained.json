@@ -1,0 +1,55 @@
+{
+  "label": "baseline-chained",
+  "captured_at": "2026-09-22T22:55:49.301Z",
+  "spec": "oo-single-pass-materialize-and-room-leave",
+  "requirements": [
+    "1.1",
+    "1.5"
+  ],
+  "scope": {
+    "entry_id": "xlsx/gt-d4-operating-revenue",
+    "path_mode": "chained",
+    "binding_count": 39,
+    "substrate_bytes": 236694,
+    "projection_field_count": 218
+  },
+  "timing": {
+    "materialize_wall_seconds": 16.682,
+    "harness_prepare_seconds": 4.07,
+    "measured_without_tracemalloc": true
+  },
+  "memory": {
+    "tracemalloc_peak_bytes": 123819231,
+    "tracemalloc_peak_mib": 118.1,
+    "process_peak_rss_bytes": 270131200,
+    "process_peak_rss_mib": 257.6,
+    "process_peak_rss_before_bytes": 150212608,
+    "process_peak_rss_note": "peak_wset 是进程生命周期峰值，含 harness 铺 world（instrument 真模板）"
+  },
+  "calls": {
+    "load_workbook": 83,
+    "load_workbook_on_files": 78,
+    "load_workbook_in_memory": 5,
+    "workbook_save": 2,
+    "materialize_trips": 39,
+    "single_pass_trips": 0,
+    "load_workbook_by_site": {
+      "excel_extract.py:3087 _acquire_read_only_workbook": 78,
+      "phase5_transposed_sheet.py:357 resolve_managed_sheet": 4,
+      "excel_structure_fingerprint.py:523 _structure_fingerprint_uncached": 1
+    },
+    "workbook_save_by_site": {
+      "phase5_transposed_sheet.py:423 materialize_transposed_workbook": 2
+    }
+  },
+  "single_pass_log": [],
+  "artifact": {
+    "bytes": 246110,
+    "sha256": "494730242a61f85b3a5463612f0793e0a453d65e14d41bc498d37b632833b95f"
+  },
+  "environment": {
+    "python": "3.12.8",
+    "platform": "Windows-10-10.0.19045-SP0",
+    "openpyxl": "3.1.5"
+  }
+}

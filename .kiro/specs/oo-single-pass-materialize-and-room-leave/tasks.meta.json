@@ -1,0 +1,187 @@
+{
+  "pbtResults": {},
+  "executionHistory": {
+    "1. 把「39 趟」钉成测试判据": [
+      {
+        "executionId": "8dd20b50-4496-4dea-a8f5-a2eec8a7cccd",
+        "chatSessionId": "sess_e423b6a8-c29a-4b21-b8f3-7d63a2f66603",
+        "timestamp": 1790089554155
+      },
+      {
+        "executionId": "8dd20b50-4496-4dea-a8f5-a2eec8a7cccd",
+        "chatSessionId": "sess_e423b6a8-c29a-4b21-b8f3-7d63a2f66603",
+        "timestamp": 1790089567291
+      },
+      {
+        "executionId": "8dd20b50-4496-4dea-a8f5-a2eec8a7cccd",
+        "chatSessionId": "sess_e423b6a8-c29a-4b21-b8f3-7d63a2f66603",
+        "timestamp": 1790092079571
+      }
+    ],
+    "2. binding 顺序依赖调查（**结论进 design.md 附录，不写代码**）": [
+      {
+        "executionId": "8dd20b50-4496-4dea-a8f5-a2eec8a7cccd",
+        "chatSessionId": "sess_e423b6a8-c29a-4b21-b8f3-7d63a2f66603",
+        "timestamp": 1790089554225
+      },
+      {
+        "executionId": "8dd20b50-4496-4dea-a8f5-a2eec8a7cccd",
+        "chatSessionId": "sess_e423b6a8-c29a-4b21-b8f3-7d63a2f66603",
+        "timestamp": 1790092085011
+      },
+      {
+        "executionId": "8dd20b50-4496-4dea-a8f5-a2eec8a7cccd",
+        "chatSessionId": "sess_e423b6a8-c29a-4b21-b8f3-7d63a2f66603",
+        "timestamp": 1790116528551
+      }
+    ],
+    "3. 实现单趟写入路径（一次 load → 全部 binding → 一次 save）": [
+      {
+        "executionId": "8dd20b50-4496-4dea-a8f5-a2eec8a7cccd",
+        "chatSessionId": "sess_e423b6a8-c29a-4b21-b8f3-7d63a2f66603",
+        "timestamp": 1790089554258
+      },
+      {
+        "executionId": "8dd20b50-4496-4dea-a8f5-a2eec8a7cccd",
+        "chatSessionId": "sess_e423b6a8-c29a-4b21-b8f3-7d63a2f66603",
+        "timestamp": 1790116536501
+      },
+      {
+        "executionId": "8dd20b50-4496-4dea-a8f5-a2eec8a7cccd",
+        "chatSessionId": "sess_e423b6a8-c29a-4b21-b8f3-7d63a2f66603",
+        "timestamp": 1790120852397
+      }
+    ],
+    "4. 新旧产物等值判据（P2）": [
+      {
+        "executionId": "8dd20b50-4496-4dea-a8f5-a2eec8a7cccd",
+        "chatSessionId": "sess_e423b6a8-c29a-4b21-b8f3-7d63a2f66603",
+        "timestamp": 1790089554291
+      },
+      {
+        "executionId": "8dd20b50-4496-4dea-a8f5-a2eec8a7cccd",
+        "chatSessionId": "sess_e423b6a8-c29a-4b21-b8f3-7d63a2f66603",
+        "timestamp": 1790120860881
+      },
+      {
+        "executionId": "8dd20b50-4496-4dea-a8f5-a2eec8a7cccd",
+        "chatSessionId": "sess_e423b6a8-c29a-4b21-b8f3-7d63a2f66603",
+        "timestamp": 1790122369137
+      }
+    ],
+    "5. 失败原子性（P3）": [
+      {
+        "executionId": "8dd20b50-4496-4dea-a8f5-a2eec8a7cccd",
+        "chatSessionId": "sess_e423b6a8-c29a-4b21-b8f3-7d63a2f66603",
+        "timestamp": 1790089554317
+      },
+      {
+        "executionId": "8dd20b50-4496-4dea-a8f5-a2eec8a7cccd",
+        "chatSessionId": "sess_e423b6a8-c29a-4b21-b8f3-7d63a2f66603",
+        "timestamp": 1790122381670
+      },
+      {
+        "executionId": "8dd20b50-4496-4dea-a8f5-a2eec8a7cccd",
+        "chatSessionId": "sess_e423b6a8-c29a-4b21-b8f3-7d63a2f66603",
+        "timestamp": 1790125084466
+      }
+    ],
+    "6. 句柄释放（Windows）": [
+      {
+        "executionId": "8dd20b50-4496-4dea-a8f5-a2eec8a7cccd",
+        "chatSessionId": "sess_e423b6a8-c29a-4b21-b8f3-7d63a2f66603",
+        "timestamp": 1790089554361
+      },
+      {
+        "executionId": "8dd20b50-4496-4dea-a8f5-a2eec8a7cccd",
+        "chatSessionId": "sess_e423b6a8-c29a-4b21-b8f3-7d63a2f66603",
+        "timestamp": 1790125100791
+      },
+      {
+        "executionId": "8dd20b50-4496-4dea-a8f5-a2eec8a7cccd",
+        "chatSessionId": "sess_e423b6a8-c29a-4b21-b8f3-7d63a2f66603",
+        "timestamp": 1790126610399
+      }
+    ],
+    "7. 真库前后对照计时证据": [
+      {
+        "executionId": "8dd20b50-4496-4dea-a8f5-a2eec8a7cccd",
+        "chatSessionId": "sess_e423b6a8-c29a-4b21-b8f3-7d63a2f66603",
+        "timestamp": 1790089554389
+      },
+      {
+        "executionId": "8dd20b50-4496-4dea-a8f5-a2eec8a7cccd",
+        "chatSessionId": "sess_e423b6a8-c29a-4b21-b8f3-7d63a2f66603",
+        "timestamp": 1790126623518
+      },
+      {
+        "executionId": "8dd20b50-4496-4dea-a8f5-a2eec8a7cccd",
+        "chatSessionId": "sess_e423b6a8-c29a-4b21-b8f3-7d63a2f66603",
+        "timestamp": 1790128081771
+      }
+    ],
+    "8. materialize / extract / verify 共用一个 `workbook_read_scope()`（P4）": [
+      {
+        "executionId": "8dd20b50-4496-4dea-a8f5-a2eec8a7cccd",
+        "chatSessionId": "sess_e423b6a8-c29a-4b21-b8f3-7d63a2f66603",
+        "timestamp": 1790089554419
+      },
+      {
+        "executionId": "8dd20b50-4496-4dea-a8f5-a2eec8a7cccd",
+        "chatSessionId": "sess_e423b6a8-c29a-4b21-b8f3-7d63a2f66603",
+        "timestamp": 1790128100507
+      },
+      {
+        "executionId": "8dd20b50-4496-4dea-a8f5-a2eec8a7cccd",
+        "chatSessionId": "sess_e423b6a8-c29a-4b21-b8f3-7d63a2f66603",
+        "timestamp": 1790138126450
+      }
+    ],
+    "9. verify 判据不放宽（P5）": [
+      {
+        "executionId": "8dd20b50-4496-4dea-a8f5-a2eec8a7cccd",
+        "chatSessionId": "sess_e423b6a8-c29a-4b21-b8f3-7d63a2f66603",
+        "timestamp": 1790089554450
+      },
+      {
+        "executionId": "8dd20b50-4496-4dea-a8f5-a2eec8a7cccd",
+        "chatSessionId": "sess_e423b6a8-c29a-4b21-b8f3-7d63a2f66603",
+        "timestamp": 1790138144887
+      },
+      {
+        "executionId": "8dd20b50-4496-4dea-a8f5-a2eec8a7cccd",
+        "chatSessionId": "sess_e423b6a8-c29a-4b21-b8f3-7d63a2f66603",
+        "timestamp": 1790141173159
+      }
+    ],
+    "10. 复用命中/未命中进 metrics + 「连续两次必命中」守卫（P6）": [
+      {
+        "executionId": "8dd20b50-4496-4dea-a8f5-a2eec8a7cccd",
+        "chatSessionId": "sess_e423b6a8-c29a-4b21-b8f3-7d63a2f66603",
+        "timestamp": 1790089554480
+      },
+      {
+        "executionId": "8dd20b50-4496-4dea-a8f5-a2eec8a7cccd",
+        "chatSessionId": "sess_e423b6a8-c29a-4b21-b8f3-7d63a2f66603",
+        "timestamp": 1790141197134
+      },
+      {
+        "executionId": "8dd20b50-4496-4dea-a8f5-a2eec8a7cccd",
+        "chatSessionId": "sess_e423b6a8-c29a-4b21-b8f3-7d63a2f66603",
+        "timestamp": 1790149772652
+      }
+    ],
+    "11. leave 路径（repository + service + 端点 + 前端接线）": [
+      {
+        "executionId": "8dd20b50-4496-4dea-a8f5-a2eec8a7cccd",
+        "chatSessionId": "sess_e423b6a8-c29a-4b21-b8f3-7d63a2f66603",
+        "timestamp": 1790089554511
+      },
+      {
+        "executionId": "8dd20b50-4496-4dea-a8f5-a2eec8a7cccd",
+        "chatSessionId": "sess_e423b6a8-c29a-4b21-b8f3-7d63a2f66603",
+        "timestamp": 1790149808584
+      }
+    ]
+  }
+}

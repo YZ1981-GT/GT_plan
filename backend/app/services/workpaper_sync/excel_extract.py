@@ -87,6 +87,7 @@ import contextlib
 import contextvars
 import gzip
 import hashlib
+import io
 import json
 import re
 import sys
@@ -230,6 +231,7 @@ __all__ = [
     "extract_projection",
     "workbook_read_scope",
     "release_scoped_workbooks",
+    "shared_workbook_from_bytes",
     "write_projection_sidecar",
     "read_projection_sidecar",
     # verifier
@@ -728,8 +730,30 @@ def _sheet_part_map(zf: zipfile.ZipFile) -> tuple[list[dict[str, Any]], list[dic
 
     不用 openpyxl：这里只要磁盘上的原始 sheet/rel/definedName 事实，openpyxl 会丢属性。
     也不在本模块抄一份 XML 解析 —— 抄一份就是第二真源。
+
+    结果在 :func:`workbook_read_scope` 内按文件身份记忆化：真库 D4 一次 extract 有 78 个
+    binding 各调一次 `resolve_managed_region`，每次都重解一遍 `xl/workbook.xml` + rels
+    （需求 2.1 说的「同一份字节读一遍就够」）。
     """
-    return parse_workbook_xml(zf)
+    return scoped_parse_memo(
+        "workbook_xml", _zip_identity(zf), lambda: parse_workbook_xml(zf)
+    )
+
+
+def _tables_of(zf: zipfile.ZipFile) -> list[dict[str, Any]]:
+    """Excel Table 清册 —— 与 :func:`_sheet_part_map` 同一条记忆化理由，量更大。
+
+    `parse_tables` 要把**每一张** sheet part 都读出来找 `<tableParts>`（D4 有 46 张），
+    单次 ~30ms；78 个 binding 各调一次 = 实测 cProfile 累计 2.2s。字节不变 ⇒ 结果不变。
+
+    `sheets` 刻意**不**作参数：记忆化键只含 zip 身份，若允许调用方另外递一份 `sheets`
+    进来，两个不同的 `sheets` 就会命中同一个缓存项（拿到别人那份的结果）。这里自己从
+    :func:`_sheet_part_map` 取（它本身也记忆化 ⇒ 不多付一次解析），把那种误用变成不可能。
+    """
+    sheets, _ = _sheet_part_map(zf)
+    return scoped_parse_memo(
+        "tables", _zip_identity(zf), lambda: parse_tables(zf, sheets)
+    )
 
 
 def resolve_managed_region(
@@ -748,7 +772,7 @@ def resolve_managed_region(
     if is_static_region(binding):
         return _resolve_static_region(zf, contract=contract, binding=binding)
     sheets, _ = _sheet_part_map(zf)
-    tables = parse_tables(zf, sheets)
+    tables = _tables_of(zf)
     matched = [
         t
         for t in tables
@@ -1822,7 +1846,23 @@ def _shared_strings_prefix_digest(
 
     追加新字符串（materialize 写入新文本时必然发生）不算未管理区域异动；改动**已有**条目
     会让既有单元格的显示值变化 ⇒ 必须打红。`limit_count=None` 表示取全部（before 侧）。
+
+    结果在作用域内按 `(文件身份, limit_count)` 记忆化：真库 D4 的 unmanaged 比对逐 binding
+    各算一遍，实测 117 次、cProfile 累计 1.5s，而入参字节与 `limit_count` 全同 ⇒ 同一个
+    digest 算了 117 遍（需求 2.1）。
     """
+    identity = _zip_identity(zf)
+    return scoped_parse_memo(
+        "shared_strings",
+        None if identity is None else (*identity, limit_count),
+        lambda: _shared_strings_prefix_digest_uncached(zf, limit_count=limit_count),
+    )
+
+
+def _shared_strings_prefix_digest_uncached(
+    zf: zipfile.ZipFile, *, limit_count: int | None
+) -> tuple[str, int]:
+    """:func:`_shared_strings_prefix_digest` 的本体（无记忆化）。"""
     name = "xl/sharedStrings.xml"
     if name not in zf.namelist():
         return (canonical_digest({"shared_strings": None}), 0)
@@ -3026,11 +3066,25 @@ def workbook_read_scope() -> Iterator[None]:
         yield
     finally:
         _workbook_scope.reset(token)
-        for workbook in cache.values():
-            try:
-                workbook.close()
-            except Exception:  # noqa: BLE001 - 关闭失败不得掩盖作用域内的真实异常
-                pass
+        for value in cache.values():
+            _close_if_closeable(value)
+
+
+def _close_if_closeable(value: Any) -> None:
+    """关掉持句柄的条目；纯解析结果（:func:`scoped_parse_memo` 的条目）跳过。
+
+    作用域里现在放两类东西：**workbook 对象**（持打开的 zip 句柄，Windows 上不关就删不掉
+    文件）与**纯解析结果**（`sheets` / `tables` / digest 元组 —— 没有句柄，也没有 `close`）。
+    显式按「有没有 close」分流，而不是靠 `except Exception: pass` 把 `AttributeError`
+    一起吞掉：吞掉的话哪天真的关闭失败也看不见。
+    """
+    closer = getattr(value, "close", None)
+    if closer is None:
+        return
+    try:
+        closer()
+    except Exception:  # noqa: BLE001 - 关闭失败不得掩盖作用域内的真实异常
+        pass
 
 
 def release_scoped_workbooks(path: Path) -> None:
@@ -3052,10 +3106,7 @@ def release_scoped_workbooks(path: Path) -> None:
         return
     for key in [k for k in cache if isinstance(k[0], tuple) and k[0][0] == target]:
         workbook = cache.pop(key)
-        try:
-            workbook.close()
-        except Exception:  # noqa: BLE001 - 关闭失败不得阻塞删除
-            pass
+        _close_if_closeable(workbook)
 
 
 @contextlib.contextmanager
@@ -3088,6 +3139,121 @@ def _acquire_read_only_workbook(path: Path, *, data_only: bool) -> Iterator[Any]
         cache[key] = hit
     # 作用域持有者负责 close，这里**不**关。
     yield hit
+
+
+#: 字节身份的作用域键前缀。刻意不是一个路径形态的字符串：
+#: :func:`release_scoped_workbooks` 按 ``k[0][0] == str(path.resolve())`` 匹配，
+#: 而 `resolve()` 出来的永远是绝对路径 ⇒ 这个 tag 不可能与任何路径相撞，
+#: 字节条目因此**不会**被按路径释放误清（也不会反过来遮住某个路径条目）。
+_BYTES_SCOPE_TAG: Final[str] = "bytes:sha256"
+
+
+def _bytes_scope_key(
+    data: bytes, *, data_only: bool, read_only: bool
+) -> tuple[tuple[Any, ...], bool]:
+    """字节身份 + 解析形态 → 作用域键。
+
+    形态（``read_only``）进键而不是被抹掉：``read_only=True`` 的 workbook 不提供
+    ``ws._cells`` / ``row_dimensions`` 这些完整 DOM 才有的面，两种解析结果**不可**
+    互相冒充（与 ``data_only`` 同一条纪律，design 三点名的那条）。
+    """
+    identity = (_BYTES_SCOPE_TAG, hashlib.sha256(data).hexdigest(), len(data), read_only)
+    return (identity, bool(data_only))
+
+
+def shared_workbook_from_bytes(
+    data: bytes, *, data_only: bool = False, read_only: bool = False
+) -> Any:
+    """作用域内同一份**字节**的 workbook 只解析一次，返回**共享**对象。
+
+    与 :func:`_acquire_read_only_workbook` 的差别只有「身份怎么算」：那边的输入是
+    路径（身份 = 路径 + mtime + size），这边的输入是内存里的字节（身份 = sha256 +
+    长度）。缓存**还是同一个** :func:`workbook_read_scope` 的 dict —— 需求 2.2 明令
+    不得新引入第二套 workbook 缓存（模块级长存缓存会让 Windows 删不掉临时文件，
+    任务 6 已实测：把 `release_scoped_workbooks` 换 no-op 即刻 WinError 32）。
+
+    🔴 **调用方不得改这个 workbook。** 它是完整 DOM（``read_only=False``），因此是可写
+    对象，而它被本作用域内后续全部同字节消费方共享：任何就地改动都会串到别人身上。
+    需要改的路径（``materialize_transposed_workbook``）必须自己 ``load_workbook``
+    一份私有副本 —— 那正是它今天的做法，本函数不给它用。
+
+    「不得改」在实现上不只是口头约定：
+    * ``extract_transposed_workbook`` 读格子走 :func:`_cell_ro` 形态的非惰性读取，
+      不会往 ``ws._cells`` 里新建空格（openpyxl 的 ``ws.cell()`` 会）；
+    * 判据 `test_single_pass_parse_reuse.py` 逐消费方比对共享对象的 ``_cells`` 键集合，
+      有人开始就地改就打红。
+
+    作用域之外（cache 为 None）退化成即用即弃的一次性解析 —— 与优化前逐字节相同。
+    """
+    import openpyxl
+
+    cache = _workbook_scope.get()
+    if cache is None:
+        return openpyxl.load_workbook(
+            io.BytesIO(data), data_only=data_only, read_only=read_only
+        )
+    key = _bytes_scope_key(data, data_only=data_only, read_only=read_only)
+    hit = cache.get(key)
+    if hit is None:
+        hit = openpyxl.load_workbook(
+            io.BytesIO(data), data_only=data_only, read_only=read_only
+        )
+        cache[key] = hit
+    return hit
+
+
+#: 纯解析结果记忆化条目的键前缀。键形如 `(("parse-memo", kind, identity),)` —— 一元组，
+#: 且 `[0][0]` 是这个 tag（不可能等于 `Path.resolve()` 出来的绝对路径）⇒ 与 workbook 条目、
+#: 与 `release_scoped_workbooks` 的按路径匹配都不会撞。
+_PARSE_MEMO_TAG: Final[str] = "parse-memo"
+
+
+def _zip_identity(zf: zipfile.ZipFile) -> tuple[str, int, int] | None:
+    """一个打开的 ZipFile 的文件身份（路径 + mtime + size），与 workbook 缓存同一口径。
+
+    `BytesIO` 上打开的 zip 没有 `filename` ⇒ 返回 `None`，调用方退化成不记忆化
+    （宁可多解析一次，也不拿一个可能撞车的身份去命中缓存）。
+    """
+    name = getattr(zf, "filename", None)
+    if not isinstance(name, str) or not name:
+        return None
+    return _file_cache_key(Path(name))
+
+
+def scoped_parse_memo(
+    kind: str, identity: tuple[Any, ...] | None, compute: "Any"
+) -> Any:
+    """作用域内按 ``(kind, identity)`` 记忆化一个**纯解析结果**。
+
+    需求 2 的用户故事原话是「我不希望『读同一个文件三次』这种成本被当成固有成本接受」——
+    它不只指 `openpyxl.load_workbook`。真库 D4 的 CPU 段实测同一份产物字节上还有两处
+    「每消费方一次」的重复解析：
+
+    * `xl/workbook.xml` + 全部 46 张 sheet 的 `<tableParts>` → `xl/tables/*.xml`
+      （`_sheet_part_map` / `parse_tables`）被 78 个 binding 各解析一遍；
+    * `xl/sharedStrings.xml` 的前缀 digest 被 117 次 unmanaged 比对各算一遍。
+
+    两者都是**字节的纯函数**（同一份字节 ⇒ 同一个结果），因此可以按文件身份记忆化。
+
+    🔴 **不是第二套缓存**（需求 2.2）：条目挂在**同一个** :func:`workbook_read_scope`
+    的 dict 上，作用域退出即全没；这些条目不持任何句柄，因此也不会重演任务 6 那个
+    「Windows 删不掉临时文件」的问题。
+
+    ⚠️ 返回的是**共享对象**（list/dict/tuple）。调用方不得就地改它 —— 现有四个消费方
+    全是只读（列表推导 / `next(...)` / 取下标），由 `test_single_pass_parse_reuse.py` 的
+    「段末重解析一次必须与记忆化的内容相等」判据守着。
+    """
+    if identity is None:
+        return compute()
+    cache = _workbook_scope.get()
+    if cache is None:
+        return compute()
+    key = ((_PARSE_MEMO_TAG, kind, identity),)
+    if key in cache:
+        return cache[key]
+    value = compute()
+    cache[key] = value
+    return value
 
 
 def _collect_fields(

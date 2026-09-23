@@ -176,6 +176,8 @@ const exampleTradeItems = [
   { seq: 19, item: '其他资金往来', info: '无', source: '' },
   { seq: 20, item: '是否涉知', info: '否', source: '' },
 ]
+
+defineExpose({ handleExportTemplate, handleExportData, handleImportClick })
 </script>
 
 <template>
@@ -184,7 +186,7 @@ const exampleTradeItems = [
     <div class="toolbar-left"><el-segmented v-model="editorMode" :options="modeOptions" size="small" /></div>
     <div class="toolbar-right">
       <el-button size="small" type="warning" plain @click="showExample = true">📖 查看访谈案例</el-button>
-      <el-dropdown trigger="click" size="small"><el-button size="small">导入导出 ▾</el-button><template #dropdown><el-dropdown-menu><el-dropdown-item @click="exportTemplate('D4-31')">导出模板</el-dropdown-item><el-dropdown-item @click="exportData('D4-31')">导出数据</el-dropdown-item><el-dropdown-item><el-upload :show-file-list="false" accept=".xlsx" :auto-upload="false" :disabled="isReadonly||importing" @change="handleImportFile"><span>导入数据</span></el-upload></el-dropdown-item></el-dropdown-menu></template></el-dropdown>
+      
       <D4IpoFindingWriteback wp-code="D4-31" :all-responses="allResponses" :is-readonly="isReadonly" :findings="riskFindings" />
       <GtIndexChip value="wp:D4-30" :context-project-id="projectId" />
       <el-button v-if="openReviewDialog" size="small" @click="openReviewDialog('D4-31-detail')">💬 复核</el-button>

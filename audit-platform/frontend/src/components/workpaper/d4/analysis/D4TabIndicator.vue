@@ -297,6 +297,8 @@ function flushSave() {
   window.dispatchEvent(new CustomEvent('d4:save-items', { detail: { items } }))
 }
 onBeforeUnmount(() => { if (debounceTimer) { clearTimeout(debounceTimer); flushSave() } })
+
+defineExpose({ handleExportTemplate, handleExportData, handleImportClick })
 </script>
 
 
@@ -342,25 +344,7 @@ onBeforeUnmount(() => { if (debounceTimer) { clearTimeout(debounceTimer); flushS
       <!-- 工具栏（与D4-3一致：下拉导入导出 + AI一键填充） -->
       <div class="table-toolbar">
         <div class="toolbar-left">
-          <el-dropdown size="small" trigger="click" :disabled="isReadonly">
-            <el-button size="small">导入导出 ▾</el-button>
-            <template #dropdown>
-              <el-dropdown-menu>
-                <el-dropdown-item @click="handleExportTemplate">导出模板</el-dropdown-item>
-                <el-dropdown-item @click="handleExportData">导出数据</el-dropdown-item>
-                <el-dropdown-item>
-                  <el-upload
-                    :show-file-list="false"
-                    accept=".xlsx,.xls"
-                    :before-upload="handleImportUpload"
-                    :disabled="importing"
-                  >
-                    <span>{{ importing ? '导入中...' : '导入数据' }}</span>
-                  </el-upload>
-                </el-dropdown-item>
-              </el-dropdown-menu>
-            </template>
-          </el-dropdown>
+          
           <el-tag size="small" type="info">共 {{ indicators.length }} 项指标</el-tag>
         </div>
         <div class="toolbar-right">

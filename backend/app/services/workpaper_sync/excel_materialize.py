@@ -2917,6 +2917,108 @@ class ExcelMaterializeOutcome:
         }
 
 
+@dataclass(frozen=True)
+class MaterializePlanStep:
+    """一个 binding 的**写入计划**（还没碰盘）。
+
+    spec: oo-single-pass-materialize-and-room-leave · Requirement 1
+
+    做成显式对象是为了让「算计划」与「落盘」之间有一条缝：多 binding 底稿原先逐 binding
+    各跑一次完整的 `materialize_projection`，把上一趟的产物当下一趟的输入 ⇒ 同一本工作簿
+    被全量解析 `N × 2` 次（`data_only=True/False` 两个视图各一次；D4 实测 39 binding /
+    substrate 链上 **78 次** `openpyxl.load_workbook`，另有 5 次固定开销落在 BytesIO 上 ⇒
+    合计 83）。有了这条缝，`materialize_projection_single_pass` 才能「全部计划只解析一次
+    substrate、全部写入合成一趟」—— 落地后同一 entry 的 substrate 解析 78 → **2**。
+    """
+
+    binding: ExcelIdentityBinding
+    plan: MaterializePlan
+    strategy: WriteStrategyDecision
+    substrate_view: Any
+    runtime_binding: Mapping[str, Any]
+
+
+def _plan_materialize_step(
+    *,
+    substrate: Path,
+    projection: Projection,
+    definitions: FrozenEntryDefinitions,
+    binding: ExcelIdentityBinding,
+    substrate_role: SubstrateRole | str,
+    substrate_kind: ArtifactKind | str,
+    substrate_state: ArtifactState | str,
+    source_bytes: bytes,
+    capability: ExcelWriteCapability | None,
+    intended_formulas: Mapping[str, str] | None,
+    limits: SyncLimits,
+    retain_identity_inventory: bool,
+) -> MaterializePlanStep:
+    """`materialize_projection` 的第 4~6 步（读 substrate identity → 裁决策略 → 算计划）。
+
+    **唯一实现**：单趟路径与逐趟路径都走它，避免「两条路径各算一份计划」那种最难查的漂移。
+    """
+    substrate_view = extract_projection(
+        artifact=substrate,
+        definitions=definitions,
+        binding=binding,
+        substrate_role=substrate_role,
+        artifact_kind=substrate_kind,
+        artifact_state=substrate_state,
+        limits=limits,
+        retain_identity_inventory=retain_identity_inventory,
+    )
+    entries = _read_entries(source_bytes)
+    # 同一份 substrate 字节：entries + runtime binding 共用一次 zip 打开，不再
+    # `ZipFile(substrate)` 二次读盘（Wave 2 / Requirement 1.4）。
+    with zipfile.ZipFile(io.BytesIO(source_bytes)) as zf:
+        runtime_binding = read_runtime_binding_pairs(
+            zf, metadata_sheet=binding.metadata_sheet
+        )
+    strategy = select_write_strategy(artifact=substrate, capability=capability)
+    plan = plan_managed_writes(
+        projection=projection,
+        contract=definitions.contract,
+        binding=binding,
+        region=substrate_view.region,
+        scan=substrate_view.scan,
+        substrate_entries=entries,
+        substrate_formulas=substrate_view.formula_inventory,
+        runtime_binding=runtime_binding,
+        intended_formulas=intended_formulas,
+    )
+    return MaterializePlanStep(
+        binding=binding,
+        plan=plan,
+        strategy=strategy,
+        substrate_view=substrate_view,
+        runtime_binding=runtime_binding,
+    )
+
+
+def _apply_step_to_bytes(
+    *,
+    source_bytes: bytes,
+    step: MaterializePlanStep,
+    definitions: FrozenEntryDefinitions,
+) -> tuple[bytes, ShiftReport | None]:
+    """把一个计划应用到**字节**上（zip 级定点改写），含位移后 footer 门。
+
+    位移门刻意在返回前跑：调用方尚未落盘，门不过就零产物（Property 9 的文件侧）。
+    """
+    staged, shift_report = apply_plan_zip_with_report(source_bytes, step.plan)
+    if step.plan.row_shift is not None:
+        # 🔴 apply 后的**位移后**相：这才是 Requirement 7.1「实测 == 冻结 + 预期位移」与
+        #    7.4「用位移后区间求值」真正成立的地方。
+        assert_shifted_footer_gates(
+            staged_bytes=staged,
+            plan=step.plan,
+            contract=definitions.contract,
+            region=step.substrate_view.region,
+            runtime_binding=step.runtime_binding,
+        )
+    return staged, shift_report
+
+
 def materialize_projection(
     *,
     substrate: Path,
@@ -2958,36 +3060,24 @@ def materialize_projection(
     )
     assert_output_outside_template_library(output)
 
-    substrate_view = extract_projection(
-        artifact=substrate,
+    source_bytes = substrate.read_bytes()
+    step = _plan_materialize_step(
+        substrate=substrate,
+        projection=projection,
         definitions=definitions,
         binding=binding,
         substrate_role=substrate_role,
-        artifact_kind=substrate_kind,
-        artifact_state=substrate_state,
+        substrate_kind=substrate_kind,
+        substrate_state=substrate_state,
+        source_bytes=source_bytes,
+        capability=capability,
+        intended_formulas=intended_formulas,
         limits=lim,
         retain_identity_inventory=retain_identity_inventory,
     )
-    source_bytes = substrate.read_bytes()
-    entries = _read_entries(source_bytes)
-    # 同一份 substrate 字节：entries + runtime binding 共用一次 zip 打开，不再
-    # `ZipFile(substrate)` 二次读盘（Wave 2 / Requirement 1.4）。
-    with zipfile.ZipFile(io.BytesIO(source_bytes)) as zf:
-        runtime_binding = read_runtime_binding_pairs(
-            zf, metadata_sheet=binding.metadata_sheet
-        )
-    strategy = select_write_strategy(artifact=substrate, capability=capability)
-    plan = plan_managed_writes(
-        projection=projection,
-        contract=definitions.contract,
-        binding=binding,
-        region=substrate_view.region,
-        scan=substrate_view.scan,
-        substrate_entries=entries,
-        substrate_formulas=substrate_view.formula_inventory,
-        runtime_binding=runtime_binding,
-        intended_formulas=intended_formulas,
-    )
+    substrate_view = step.substrate_view
+    strategy = step.strategy
+    plan = step.plan
 
     tmp = output.with_name(output.name + ".materializing")
     output.parent.mkdir(parents=True, exist_ok=True)
@@ -3006,18 +3096,10 @@ def materialize_projection(
                 )
             apply_plan_openpyxl(substrate, plan, tmp, decision=strategy)
         else:
-            staged, shift_report = apply_plan_zip_with_report(source_bytes, plan)
-            if plan.row_shift is not None:
-                # 🔴 apply 后的**位移后**相：这才是 Requirement 7.1「实测 == 冻结 + 预期
-                #    位移」与 7.4「用位移后区间求值」真正成立的地方。
-                #    放在 `os.replace` **之前** ⇒ 判据不过就零产物（Property 9）。
-                assert_shifted_footer_gates(
-                    staged_bytes=staged,
-                    plan=plan,
-                    contract=definitions.contract,
-                    region=substrate_view.region,
-                    runtime_binding=runtime_binding,
-                )
+            # 位移后 footer 门在 `_apply_step_to_bytes` 内、落盘之前跑（Property 9 文件侧）。
+            staged, shift_report = _apply_step_to_bytes(
+                source_bytes=source_bytes, step=step, definitions=definitions
+            )
             tmp.write_bytes(staged)
         os.replace(tmp, output)
     finally:
@@ -3066,6 +3148,339 @@ def materialize_projection(
         staged_identity_inventory=staged_inventory,
         intended_formulas=dict(sorted(plan.preserved_formulas.items())),
         shift_report=shift_report,
+    )
+
+
+@dataclass(frozen=True)
+class SinglePassMaterializeOutcome:
+    """单趟物化的产物。
+
+    只带调用方**真会消费**的三样：主 binding 的完整 outcome（含真实 identity 清册）、
+    各 binding 的 workbook 位移声明（要合并成一份给 verify）、各 binding 的受管字段数
+    （要累加成 `managed_field_count`）。不给 sibling 编一份假清册 —— `ExcelMaterializeOutcome`
+    的 `staged_identity_inventory` 不是可空字段，塞 `None` 或塞产物摘要都是伪造身份。
+    """
+
+    primary: ExcelMaterializeOutcome
+    workbook_row_changes: tuple[Any, ...]
+    per_binding_field_counts: Mapping[str, int]
+
+
+class SinglePassDeclined(Exception):
+    """单趟写入不适用于本次输入 —— 调用方必须回落逐趟链式路径。
+
+    刻意用异常而不是返回 `None`：`None` 在调用点极易被当成「成功但没产物」，而这里的语义
+    是「我什么都没做，你去走另一条路」。异常带上原因，便于在真库上统计回落比例。
+    """
+
+    def __init__(self, reason: str) -> None:
+        super().__init__(reason)
+        self.reason = reason
+
+
+#: 跨 binding 同格写入的**冲突判据面**（design 附录 A.6 第 1 条 / requirements 1.1，
+#: 2026-09-22 拍板：decline 条件从「坐标碰撞」收紧为「坐标碰撞**且** payload 冲突」）。
+#:
+#: 刻意**不含** `coord`（它是分组键，同格才比）也**不含** `row_key`：`row_key` 是行身份
+#: 元数据，不进落盘字节 —— 两方 row_key 不同而其余全同时，写出的 XML 逐字节相同，仍是恒等
+#: 覆盖。把它塞进判据面会让 D4 那 4 格良性重叠重新被误判成冲突。
+_WRITE_PAYLOAD_FIELDS: Final[tuple[str, ...]] = (
+    "kind",
+    "value",
+    "stable_field_key",
+    "mode",
+    "formula_text",
+)
+
+#: `C38` / `$C$38` → 行列。只用于把碰撞清单排成确定序（先行后列）。
+_A1_COORD: Final[re.Pattern[str]] = re.compile(r"^\$?([A-Z]{1,3})\$?(\d+)$")
+
+
+def coord_sort_key(coord: str) -> tuple[int, str, str]:
+    """`C38` → `(38, 'C', 'C38')`：先行后列的**确定性**排序键。
+
+    非 A1 形态退化成 `(0, "", coord)` —— 仍然确定，且不会与真坐标混序。
+
+    🔴 它是「碰撞清单确定性」的唯一实现：`analyze_d4_binding_dependencies.py` 的 D1 报告
+    与本模块的 decline 原因必须同一个排序口径，否则同一批碰撞在审计证据里与生产日志里
+    顺序不同，对不上账。
+    """
+    found = _A1_COORD.match(coord)
+    if found is None:
+        return (0, "", coord)
+    return (int(found.group(2)), found.group(1), coord)
+
+
+def _write_payload(write: CellWrite) -> tuple[str, ...]:
+    """一处写入在**冲突判据**下的 payload（与 :data:`_WRITE_PAYLOAD_FIELDS` 同序）。
+
+    `value` 取 `repr` 而不是值本身：`0` / `0.0` / `Decimal('0')` 在 `==` 下相等，落盘字节
+    却不同 —— 用 `==` 比会把两个**不同**的写入判成恒等覆盖，单趟就会悄悄改变产物。
+    这与 `analyze_d4_binding_dependencies._write_signature` 的 `value_repr` 同口径。
+    """
+    return (
+        write.kind.value,
+        repr(write.value),
+        write.stable_field_key,
+        "" if write.mode is None else str(write.mode),
+        write.formula_text,
+    )
+
+
+def _cross_binding_payload_conflicts(
+    steps: Sequence[MaterializePlanStep],
+) -> tuple[str, ...]:
+    """跨 binding 同坐标写入里 **payload 不同**的那些格 —— 排序后的**完整**清单。
+
+    spec: oo-single-pass-materialize-and-room-leave · design 附录 A.3 / A.6
+
+    ═══ 为什么判据是「payload 不同」而不是「坐标相交」═══
+
+    同一个 sheet part 上有多个受管区是常态；同一格被两个 binding 各写一遍也是常态 ——
+    `managed_tables_of` 对**静态表**的归属规则是「静态表没有行身份，同 sheet 的每个 binding
+    都把它纳入自己的受管坐标」（有意的安全方向：静态格被每个 binding 都当受管 ⇒ 没有任何
+    一趟会把它误判成 unmanaged drift）。D4-9 的表级标量表 `customer_totals` 因此被
+    `customer_current_rows` / `customer_prior_rows` 两个 binding 各写一遍，落在
+    `sheet14.xml` 的 `C24`/`E24`/`C38`/`E38` 共 4 格（真库实测，见附录 A.3）。
+
+    这 4 格两方写入的 payload **逐字段相同**、两种顺序 apply 后 sheet part **逐字节相同**
+    ⇒ 「谁最后写」是恒等操作。按旧的「坐标相交即 decline」判据，D4 这个**需求 1.5 指名的
+    entry** 会被整体挡在单趟之外，单趟优化对它一点都吃不到。收紧后 D4 可以合并。
+
+    真正不能合并的是「同坐标 + payload 不同」：那时结果取决于谁最后写，而链式顺序在单趟里
+    无法复现。这一条按**运行时可判**的形态写（逐对求交 + payload 比对），不是「D4 没问题所以
+    都没问题」—— 别的 entry 完全可能出现两个不同 `stable_field_key` 争同一格。
+
+    ═══ 为什么必须排序 + 完整 ═══
+
+    旧实现按 `for coord in set(plan.coords)` 遍历、命中第一处即抛 ⇒ 报的列号随进程 str hash
+    种子变（真库上见过 `C38` 与 `E38` 两种），而且抛第一处之后剩下的碰撞看不见。真库要能统计
+    回落比例与回落**原因**（需求 3.3），原因就必须是确定的、完整的。
+    """
+    # part → coord → table_key → payload。同一 binding 在同一格写多次 ⇒ 取**最后一次**，
+    # 与 apply 的 last-writer-wins 同相：那是它自己覆盖自己，链式路径也是这个结果。
+    index: dict[str, dict[str, dict[str, tuple[str, ...]]]] = {}
+    for step in steps:
+        part = str(step.plan.sheet_part)
+        table_key = str(step.binding.table_key)
+        for write in step.plan.writes:
+            index.setdefault(part, {}).setdefault(write.coord, {})[table_key] = (
+                _write_payload(write)
+            )
+
+    conflicts: list[str] = []
+    for part in sorted(index):
+        for coord in sorted(index[part], key=coord_sort_key):
+            writers = index[part][coord]
+            if len(writers) < 2:
+                continue
+            payloads = {key: writers[key] for key in sorted(writers)}
+            if len(set(payloads.values())) == 1:
+                # 恒等覆盖：两方写的是同一份字节 ⇒ 顺序无关 ⇒ 可合并，不是冲突。
+                continue
+            # 差异字段按 `_WRITE_PAYLOAD_FIELDS` 的**声明序**列出（已是固定序，无需再排）。
+            differing = [
+                name
+                for offset, name in enumerate(_WRITE_PAYLOAD_FIELDS)
+                if len({payload[offset] for payload in payloads.values()}) > 1
+            ]
+            per_writer = "，".join(
+                f"{key}[" + " ".join(
+                    f"{name}={payloads[key][offset]}"
+                    for offset, name in enumerate(_WRITE_PAYLOAD_FIELDS)
+                    if name in differing
+                ) + "]"
+                for key in payloads
+            )
+            conflicts.append(
+                f"{part}!{coord} 被 {list(payloads)} 写且 payload 不同"
+                f"（差异字段 {differing}）：{per_writer}"
+            )
+    return tuple(conflicts)
+
+
+def _payload_conflict_decline_reason(conflicts: Sequence[str]) -> str:
+    """把完整碰撞清单拼成 `SinglePassDeclined.reason`。
+
+    拆成独立函数只为让判据测试断言**生产那一份**字符串，而不是在测试里再抄一遍格式 ——
+    抄一遍的话「原因里漏了一格」这种缺陷两边会一起错。
+    """
+    return (
+        f"跨 binding 同坐标写入 payload 冲突 {len(conflicts)} 格"
+        f"（完整清单，按 part+行列排序）：" + " ｜ ".join(conflicts)
+    )
+
+
+def materialize_projection_single_pass(
+    *,
+    substrate: Path,
+    projection: Projection,
+    output: Path,
+    definitions: FrozenEntryDefinitions,
+    bindings: Sequence[ExcelIdentityBinding],
+    primary_table_key: str,
+    substrate_role: SubstrateRole | str,
+    substrate_kind: ArtifactKind | str,
+    substrate_state: ArtifactState | str,
+    capability: ExcelWriteCapability | None = None,
+    limits: SyncLimits | None = None,
+) -> SinglePassMaterializeOutcome:
+    """多 binding 底稿的**单趟**物化：全部计划只解析一次 substrate，全部写入合成一趟。
+
+    spec: oo-single-pass-materialize-and-room-leave · Requirement 1 / 2
+
+    ═══ 它替掉了什么 ═══
+
+    逐趟链式路径（`ExcelSyncAdapter` 的多 binding 循环）把上一趟的产物写成临时文件、当下一趟
+    的输入，于是同一本工作簿被全量解析 `N × 2` 次（两个视图 `data_only=True/False` 是两个缓存
+    键）。D4 营业收入实测 **39 binding / 79 次 `openpyxl.load_workbook`**，`adapter.materialize`
+    42.8s 的绝大部分就在这里。单趟路径让 39 份计划共用同一份 substrate 字节 ⇒ 解析 1 次。
+
+    ═══ 什么时候**不**适用（显式 decline，不硬撑）═══
+
+    1. **openpyxl 全量重写策略**：它按文件改写（`apply_plan_openpyxl(substrate, ...)`），
+       不吃字节流；而且它与结构性插行本就互斥。
+    2. **任一计划需要结构性插行**（`plan.row_shift is not None`）：插行会位移**其它** sheet 的
+       definedName 与引用侧公式（`merge_workbook_row_change_propagations` 合并的正是这些
+       传播）。逐趟路径里后一趟是在「已位移」的字节上算计划的；单趟路径全部计划都算在
+       原始字节上 ⇒ 位移一旦发生，后面的计划坐标就是陈旧的。这条不是保守，是正确性。
+    3. **两个 binding 写同一格、且写入 payload 不同**（`kind`/`value`/`stable_field_key`/
+       `mode`/`formula_text` 任一项不同）：那时结果取决于谁最后写，而链式顺序在单趟里无法
+       复现。⚠️ 判据**不是**「坐标相交」—— 同格但 payload 逐字段相同是恒等覆盖（真库 D4 的
+       `sheet14.xml!C24/E24/C38/E38` 共 4 格正是这种，源于静态表被同 sheet 两个 binding
+       共同持有），按坐标相交 decline 会把需求 1.5 指名的 D4 整体挡在单趟之外。完整论证见
+       :func:`_cross_binding_payload_conflicts`（design 附录 A.3 / A.6）。
+
+    decline 时抛 :class:`SinglePassDeclined`，调用方回落逐趟路径 —— 慢但语义与改动前逐字相同。
+    原因串是**确定的、完整的**（碰撞集合排序后全量入册）：真库要能统计回落比例与原因
+    （需求 3.3），抽样报一格既不可复现也统计不出来。
+
+    ═══ 写入顺序 ═══
+
+    单趟内按 `bindings` 的**契约声明序**写（`steps` 与 `bindings` 同序，全程不经 `set`/`dict`
+    的偶然序）。附录 A.4 实测「本契约下任何顺序都得同一份字节」，但声明序仍是唯一可复现的
+    顺序 —— 依赖「顺序无所谓」去用偶然序，等于把一条会被契约变更打破的假设写进实现。
+
+    返回**逐 binding** 的 outcome（顺序与 `bindings` 一致）：调用方要按 binding 取
+    `row_shift` / `workbook_row_change` / `managed_field_count`，把它们压成一个会丢信息。
+    """
+    lim = limits or load_limits()
+    assert_engine_entry_definitions(definitions)
+    assert_substrate_usable(
+        role=substrate_role, artifact_kind=substrate_kind, artifact_state=substrate_state
+    )
+    assert_output_outside_template_library(output)
+    if not bindings:
+        raise SinglePassDeclined("binding 集合为空")
+
+    source_bytes = substrate.read_bytes()
+    steps: list[MaterializePlanStep] = []
+    for binding in bindings:
+        step = _plan_materialize_step(
+            substrate=substrate,
+            projection=projection,
+            definitions=definitions,
+            binding=binding,
+            substrate_role=substrate_role,
+            substrate_kind=substrate_kind,
+            substrate_state=substrate_state,
+            source_bytes=source_bytes,
+            capability=capability,
+            intended_formulas=None,
+            limits=lim,
+            retain_identity_inventory=(binding.table_key == primary_table_key),
+        )
+        if step.strategy.strategy is ExcelWriteStrategy.openpyxl_roundtrip:
+            raise SinglePassDeclined(
+                f"binding {binding.table_key} 的写入策略是 openpyxl 全量重写（按文件改写）"
+            )
+        if step.plan.row_shift is not None:
+            raise SinglePassDeclined(
+                f"binding {binding.table_key} 需要结构性插行（row_shift）—— "
+                "插行会位移其它 sheet 的 definedName/引用公式，后续计划必须在位移后的字节上算"
+            )
+        steps.append(step)
+
+    # 🔴 同一个 sheet part 上有**多个**受管区是常态（D4-20 的 current_returns + provision
+    #    都在 sheet26），同一**格**被两个 binding 各写一遍也是常态（静态表按 `managed_tables_of`
+    #    的归属规则被同 sheet 的每个 binding 共同持有）。两者都能合并 —— 逐 step 在前一 step
+    #    产出的字节上应用（`staged` 串联）就是正确顺序。真正不能合并的只有「同格 + 写入
+    #    payload 不同」：那时结果取决于谁最后写，链式顺序在单趟里无法复现。判据的完整理由、
+    #    为什么不是「坐标相交」、为什么必须排序报完整集合，见
+    #    `_cross_binding_payload_conflicts` 的 docstring（design 附录 A.3 / A.6）。
+    conflicts = _cross_binding_payload_conflicts(steps)
+    if conflicts:
+        raise SinglePassDeclined(_payload_conflict_decline_reason(conflicts))
+
+    tmp = output.with_name(output.name + ".materializing")
+    output.parent.mkdir(parents=True, exist_ok=True)
+    staged = source_bytes
+    reports: list[ShiftReport | None] = []
+    try:
+        for step in steps:
+            staged, report = _apply_step_to_bytes(
+                source_bytes=staged, step=step, definitions=definitions
+            )
+            reports.append(report)
+        tmp.write_bytes(staged)
+        os.replace(tmp, output)
+    finally:
+        # 门失败 / 写失败 ⇒ 盘上不留半成品（Property 9 的文件侧；`output` 本就没被创建）。
+        if tmp.exists():
+            tmp.unlink()
+
+    staged_bytes = output.read_bytes()
+    primary_step = next(
+        (step for step in steps if step.binding.table_key == primary_table_key), None
+    )
+    if primary_step is None:
+        raise SinglePassDeclined(
+            f"binding 集合里没有主表 {primary_table_key} —— 主 binding 的 identity 清册"
+            "是下游观测器唯一认的那一份，缺它不能落盘"
+        )
+    # identity 清册只反读主 binding：observer/_frozen_anchors 只锚主表，sibling 的 digest 会
+    # 写成另一张表的清册并与观测器重算结果漂移（D4 rematerialize 实测 169→253）。
+    inventory = _staged_identity_inventory(
+        staged_bytes=staged_bytes,
+        output=output,
+        definitions=definitions,
+        binding=primary_step.binding,
+        limits=lim,
+    )
+    primary = ExcelMaterializeOutcome(
+        result=MaterializeResult(
+            output_path=output,
+            document_type=definitions.contract.document_type,
+            artifact_sha256=hashlib.sha256(staged_bytes).hexdigest(),
+            # structure_hash 是 workbook 级；单趟只有一份产物 ⇒ 只算一次（逐趟路径里非终趟
+            # 那 34 次整簿指纹早已被证明是死算，见 ROI-2 注释）。
+            structure_hash=normalized_structure_hash(staged_bytes),
+            identity_inventory_sha256=inventory.inventory_digest,
+            managed_field_count=sum(len(step.plan.field_writes) for step in steps),
+            # 单趟路径在任一 binding 需要插行时就已 decline ⇒ 这三项恒为「无位移」。
+            # 照实填 `plan` 里的值而不是写死 None：万一 decline 判据被改松，这里会立刻
+            # 把真实位移声明带出去，而不是静默丢掉它。
+            row_shift=primary_step.plan.row_shift,
+            total_formula_rows=primary_step.plan.total_formula_rows,
+            workbook_row_change=primary_step.plan.workbook_row_change,
+        ),
+        plan=primary_step.plan,
+        strategy=primary_step.strategy,
+        substrate_view=primary_step.substrate_view,
+        staged_identity_inventory=inventory,
+        intended_formulas=dict(sorted(primary_step.plan.preserved_formulas.items())),
+        shift_report=next((r for r in reports if r is not None), None),
+    )
+    return SinglePassMaterializeOutcome(
+        primary=primary,
+        workbook_row_changes=tuple(
+            step.plan.workbook_row_change
+            for step in steps
+            if step.plan.workbook_row_change is not None
+        ),
+        per_binding_field_counts={
+            step.binding.table_key: len(step.plan.field_writes) for step in steps
+        },
     )
 
 

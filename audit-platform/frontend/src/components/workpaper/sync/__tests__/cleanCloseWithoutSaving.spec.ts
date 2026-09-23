@@ -12,8 +12,9 @@
  * 登记的 clean close 唯一入口）在全仓**零调用方**。
  *
  * 本文件锁三条：
- * 1. 未改动 ⇒ 走 clean close，**零次网络调用**，状态回 html_idle；
- * 2. 有改动 ⇒ 一律 refuse，绝不静默丢弃编辑（这条是数据安全，不是体验）；
+ * 1. 未改动 ⇒ 走 clean close，**恰一次 `leaveRoom`、零次 forcesave、零次 close-intent**，
+ *    状态回 html_idle；
+ * 2. 有改动 ⇒ 一律 refuse，绝不静默丢弃编辑（这条是数据安全，不是体验），且**一个请求都不发**；
  * 3. clean close **不得**发 `close-intents`。
  *
  * 第 3 条是被真库实测改过来的（本文件首版恰恰要求「必须发 close-intent」）：服务端的
@@ -21,10 +22,19 @@
  * `closing` 并提升一条 `kind=close_capture` 写请求，而未改动的文档永远等不到 OO 回调。
  * 实测 room `03bbcad8` 因此停在 `state=close_barrier` / participant `closing` /
  * capture `state=frozen`，该 room 此后再也进不去（确认成功后立刻「同步失败，请重试」）。
- * 而「留活 lease」并不是本改动引入的：真保存后返回 HTML 的现有成功路径同样不释放
- * participant（实测 `ee4021f6` / `3fc2be85` / `7c235d1a` 全是 room active + participant
- * active）。真正缺的「participant 主动离开」端点见 spec
- * `oo-single-pass-materialize-and-room-leave` Requirement 4。
+ *
+ * 🔴 第 1 条在 2026-09-22 之后从**零请求**改成**恰一次 leave**（spec
+ * `oo-single-pass-materialize-and-room-leave` AC 4.5 明文要求的判据更新）。原因不是
+ * 「留活 lease」这个担心 —— 那个担心本身站不住：真保存后返回 HTML 的现有成功路径同样
+ * 不释放 participant（实测 `ee4021f6` / `3fc2be85` / `7c235d1a` 全是 room active +
+ * participant active）。原因是那条「participant 主动离开」的服务端路径此前**根本不存在**
+ * （`ParticipantState.left` 在 `PARTICIPANT_EDGES` 里是合法终态，却全仓没有任何
+ * service/端点会写它），现在它存在了：`POST …/rooms/{id}/participants/{id}/leave`，
+ * 只把这一条 lease 落 `left`，不建 request、不推 barrier、不旋转 generation（AC 4.1 / P7）。
+ *
+ * 判据方向**没有被放宽**：本文件把三个数一起钉住（leave=1 / forcesave=0 / close-intent=0），
+ * 比原来的「所有 api 成员调用次数都不变」更强 —— 原判据只要求「什么都别做」，改完之后
+ * 它还得证明「做了对的那一件」。「换个端点凑数」仍被逐成员比次数挡着。
  */
 import { describe, expect, it, vi } from 'vitest'
 
@@ -135,6 +145,14 @@ function makeBridge(overrides: Record<string, unknown> = {}) {
       dispatchError: null,
     })),
     createCloseIntent: vi.fn(async () => ({ intent_id: UUID(31), kind: 'clean_close' })),
+    leaveRoom: vi.fn(async () => ({
+      participant_id: UUID(22),
+      state: 'left',
+      replayed: false,
+      left_at: '2026-09-22T10:00:00+00:00',
+      remaining_active_editors: 0,
+      room_state: 'active',
+    })),
     getOperation: vi.fn(async () => ({})),
     ...overrides,
   }
@@ -165,7 +183,7 @@ async function toOoEditing(h: ReturnType<typeof makeBridge>) {
 }
 
 describe('clean close：行为', () => {
-  it('未改动 ⇒ 回 html_idle，且**一个请求都不发**', async () => {
+  it('未改动 ⇒ 回 html_idle，且**恰一次 leave / 零次 forcesave / 零次 close-intent**', async () => {
     const h = makeBridge()
     await toOoEditing(h)
     expect(h.bridge.dirty.value).toBe(false)
@@ -177,21 +195,34 @@ describe('clean close：行为', () => {
 
     expect(h.bridge.state.value).toBe('html_idle')
     expect(h.bridge.mode.value).toBe('html')
+    // ① 恰一次 leave，且身份逐项来自 descriptor、`dirty` 显式送 false。
+    expect(h.api.leaveRoom, 'clean close 必须真的释放这条 lease').toHaveBeenCalledTimes(1)
+    expect(h.bridge.leaveCallCount.value).toBe(1)
+    expect((h.api.leaveRoom as unknown as { mock: { calls: unknown[][] } }).mock.calls[0][1]).toEqual({
+      roomId: UUID(21),
+      participantId: UUID(22),
+      dirty: false,
+    })
+    // ② 零次 forcesave。
     expect(
       h.api.requestForcesave,
       '未改动却发了强制保存 —— 那正是 Command Service 返回码 4、界面弹红字的来源',
     ).not.toHaveBeenCalled()
+    expect(h.bridge.forcesaveCallCount.value).toBe(0)
+    // ③ 零次 close-intent。
     expect(
       h.api.createCloseIntent,
       'close-intent 是 close barrier 仲裁（提升 close_capture）—— 对未改动文档发它会把 '
         + 'room 锁在 close_barrier，实测该 room 此后再也进不去',
     ).not.toHaveBeenCalled()
-    // 逐个 api 成员比调用次数：只断言这两个方法会漏掉「换个端点凑数」的实现。
+    // 逐个 api 成员比调用次数：只断言上面三个方法会漏掉「换个端点凑数」的实现。
+    // `leaveRoom` 是唯一允许 +1 的成员，其余必须逐项不变。
     for (const [name, fn] of Object.entries(h.api)) {
+      const expected = callsBefore[name] + (name === 'leaveRoom' ? 1 : 0)
       expect(
         (fn as { mock: { calls: unknown[] } }).mock.calls.length,
-        `clean close 期间调了 ${name} —— 这条路径必须是纯本地转换`,
-      ).toBe(callsBefore[name])
+        `clean close 期间 ${name} 的调用次数不对 —— 这条路径只许发一次 leave`,
+      ).toBe(expected)
     }
   })
 
@@ -203,16 +234,23 @@ describe('clean close：行为', () => {
 
     await expect(h.bridge.leaveWithoutSaving()).rejects.toThrow(WorkpaperSyncContractError)
     expect(h.api.createCloseIntent).not.toHaveBeenCalled()
+    expect(
+      h.api.leaveRoom,
+      '🔴 dirty 时**连 leave 都不许发**：前端这道门与服务端的 dirty 门同源（AC 4.4），'
+        + '任一侧放宽都会让未落盘的编辑随 lease 一起被释放',
+    ).not.toHaveBeenCalled()
+    expect(h.bridge.leaveCallCount.value).toBe(0)
     expect(h.bridge.state.value, '拒绝之后必须仍在 OO 里（编辑还在编辑器中）').toBe(
       'oo_editing',
     )
   })
 
-  it('网络整体不可用时仍能回表单（这条路径不依赖任何服务端应答）', async () => {
+  it('leave 端点整体失败时仍能回表单（返回表单不依赖服务端应答）', async () => {
     const boom = async () => {
       throw new Error('network down')
     }
     const h = makeBridge({
+      leaveRoom: vi.fn(boom),
       createCloseIntent: vi.fn(boom),
       requestForcesave: vi.fn(boom),
       getOperation: vi.fn(boom),
@@ -222,7 +260,12 @@ describe('clean close：行为', () => {
     await h.bridge.leaveWithoutSaving()
 
     expect(h.bridge.state.value, '未改动返回表单不该被任何服务端故障挡住').toBe('html_idle')
-    expect(h.bridge.lastError.value, '纯本地转换不该凭空记一条失败').toBeNull()
+    expect(
+      h.bridge.lastError.value,
+      'leave 失败只意味着这条 lease 退回「等 expires_at 自然过期」那个旧形态 —— '
+        + '不是内容丢失，不得记成一条失败糊在页面上（那正是本 spec 起因的那种红字）',
+    ).toBeNull()
+    expect(h.bridge.leaveCallCount.value, '失败也要算「发过一次」').toBe(1)
   })
 
   it('离开后 descriptor 被清掉（不得留一个指向已离开 room 的 descriptor）', async () => {
@@ -241,6 +284,24 @@ describe('clean close：行为', () => {
     expect(h.bridge.mode.value).toBe('html')
     await h.bridge.leaveWithoutSaving()
     expect(h.api.createCloseIntent).not.toHaveBeenCalled()
+    expect(
+      h.api.leaveRoom,
+      'HTML 模式下没有 room/participant 可离开 —— 发出去只会拿一个 404',
+    ).not.toHaveBeenCalled()
     expect(h.bridge.state.value).toBe('html_idle')
+  })
+
+  it('🔴 恰一次：重复点「结构化视图」不会发第二次 leave（第二次是 HTML 模式空操作）', async () => {
+    const h = makeBridge()
+    await toOoEditing(h)
+
+    await h.bridge.leaveWithoutSaving()
+    await h.bridge.leaveWithoutSaving()
+
+    expect(
+      h.api.leaveRoom,
+      '第二次调用时 mode 已是 html、descriptor 已清空 —— 再发一次就是拿陈旧身份打端点',
+    ).toHaveBeenCalledTimes(1)
+    expect(h.bridge.leaveCallCount.value).toBe(1)
   })
 })

@@ -335,8 +335,45 @@ def _value_type_of(key: str, *, spec: TransposedSheetSpec) -> str:
 # ═══════════════════════════════════════════════════════════════════════
 
 
-def resolve_managed_sheet(workbook_bytes, *, spec: TransposedSheetSpec):
-    """校验 raw name list（在 openpyxl 折叠重复名之前），返回 (wb, ws)。"""
+class _AbsentCell:
+    """缺失单元格的**只读替身**。
+
+    openpyxl 的 ``ws.cell(row, col)`` 在格子不存在时会**新建**一个空 Cell 并塞进
+    ``ws._cells`` —— 那是就地改动。只读消费方（:func:`extract_transposed_workbook`）
+    因此不能用它：`published_identity_observer.collect_workbook_structure` 正是按
+    ``(row, col) not in ws._cells`` 判「这个转置字段格在文件里存不存在」，被惰性新建
+    污染过的对象会让它多报字段 ⇒ structure_hash 变值。
+
+    本替身与「openpyxl 刚新建的空 Cell」**观测等价**（``value is None`` /
+    ``data_type == "n"``），所以换成非惰性读取不改任何判据的答案，只是不再留下痕迹。
+    """
+
+    __slots__ = ()
+
+    value = None
+    data_type = "n"
+
+
+_ABSENT_CELL = _AbsentCell()
+
+
+def _cell_ro(ws, row: int, col: int):
+    """读一个单元格而**不**惰性新建（缺失返回 :data:`_ABSENT_CELL`）。"""
+    return ws._cells.get((row, col), _ABSENT_CELL)
+
+
+def resolve_managed_sheet(workbook_bytes, *, spec: TransposedSheetSpec, share_parse: bool = False):
+    """校验 raw name list（在 openpyxl 折叠重复名之前），返回 (wb, ws)。
+
+    ``share_parse=True``：全簿解析走 `excel_extract.shared_workbook_from_bytes`，即
+    **同一个 workbook 读作用域内同一份字节只解析一次**（需求 2.1）。校验一步不省 ——
+    definedName 唯一性 / workbook-scope / RANGE / 几何漂移 / 受管区范围逐次重跑，
+    复用的是**解析结果**而不是**结论**（需求 2.3）。
+
+    🔴 只有**不改** workbook 的消费方可以开它：返回的对象被本作用域内后续同字节消费方
+    共享。:func:`materialize_transposed_workbook` 就地写格 + ``wb.save()``，必须保持
+    默认 ``False`` 拿私有副本。
+    """
     import zipfile
     from xml.etree import ElementTree as ET
 
@@ -354,7 +391,12 @@ def resolve_managed_sheet(workbook_bytes, *, spec: TransposedSheetSpec):
     destinations = list(name.destinations)
     if len(destinations) != 1 or destinations[0][1] != spec.managed_ref:
         raise ValueError(f"{label} managed region geometry drift")
-    wb = load_workbook(io.BytesIO(workbook_bytes), data_only=False)
+    if share_parse:
+        from app.services.workpaper_sync.excel_extract import shared_workbook_from_bytes
+
+        wb = shared_workbook_from_bytes(workbook_bytes, data_only=False)
+    else:
+        wb = load_workbook(io.BytesIO(workbook_bytes), data_only=False)
     title = destinations[0][0].replace("''", "'")
     if title not in wb.sheetnames:
         raise ValueError(f"{label} managed region sheet missing")
@@ -455,20 +497,44 @@ def materialize_file(output, projection, *, spec: TransposedSheetSpec) -> None:
     """
     if spec.table_key not in projection.row_keys:
         return
+    # 🔴 这两次解析**刻意不进作用域共享**：
+    #   1. 它们读的是「本 spec 写入之前」的中间字节，每张转置 sheet 各不相同，且写完就
+    #      再也没人读 ⇒ 缓存进去只会白占内存（作用域到退出才关），一次都命中不了；
+    #   2. `materialize_transposed_workbook` 就地改格 + `wb.save()` ⇒ 它**必须**拿私有
+    #      副本，共享对象会把改动串给 verify / structure_hash（需求 2.3 的底线）。
     current = extract_transposed_workbook(output.read_bytes(), spec=spec)
     rows, _, _, _ = merge_projection_into_store(projection=projection, base_payload=current, spec=spec)
     output.write_bytes(materialize_transposed_workbook(output.read_bytes(), rows, spec=spec))
 
 
 def extract_file(artifact, contract, *, spec: TransposedSheetSpec):
-    """反读本转置表并构造 store projection（adapter 逐 spec 调用）。"""
+    """反读本转置表并构造 store projection（adapter 逐 spec 调用）。
+
+    纯读路径 ⇒ 无条件开 ``share_parse``：同一个 workbook 读作用域里，多张转置 sheet 与
+    后续 verify / structure_hash 读的是**同一份产物字节**，共用一次全簿解析（需求 2.1）。
+    作用域之外退化成即用即弃的一次性解析，与优化前逐字节相同。
+    """
     return build_store_projection(
-        extract_transposed_workbook(artifact.read_bytes(), spec=spec), contract=contract, spec=spec
+        extract_transposed_workbook(artifact.read_bytes(), spec=spec, share_parse=True),
+        contract=contract,
+        spec=spec,
     )
 
 
-def extract_transposed_workbook(workbook_bytes: bytes, *, spec: TransposedSheetSpec):
-    _, ws = resolve_managed_sheet(workbook_bytes, spec=spec)
+def extract_transposed_workbook(
+    workbook_bytes: bytes, *, spec: TransposedSheetSpec, share_parse: bool = False
+):
+    """反读本转置表（**纯读**：不改 workbook，不往 ``ws._cells`` 里新建空格）。
+
+    格子一律经 :func:`_cell_ro` 读 —— 详见它的 docstring：``ws.cell()`` 的惰性新建是
+    就地改动，会污染 `collect_workbook_structure` 的 ``_cells`` 存在性判据。``_cell_ro``
+    与惰性新建的空 Cell 观测等价，所以答案一字不变；``ws.max_column`` 也因此保持文件
+    原样（今天的实现里它同样不受影响：``range(...)`` 只求值一次，新建的格全在既有
+    包围盒内）。
+
+    ``share_parse`` 透传给 :func:`resolve_managed_sheet`（需求 2.1 的解析复用）。
+    """
+    _, ws = resolve_managed_sheet(workbook_bytes, spec=spec, share_parse=share_parse)
     label, noun = _label(spec), spec.entity_noun
     if not ws.row_dimensions[spec.identity_carrier_row].hidden:
         raise ValueError(f"{label} {noun} identity row must be hidden")
@@ -476,15 +542,15 @@ def extract_transposed_workbook(workbook_bytes: bytes, *, spec: TransposedSheetS
     field_rows = tuple(spec.field_rows.values())
     header_is_field = spec.header_field_key is not None
     for col in range(column_index_from_string(spec.first_entity_column), ws.max_column + 1):
-        carrier = ws.cell(spec.identity_carrier_row, col)
+        carrier = _cell_ro(ws, spec.identity_carrier_row, col)
         raw = carrier.value
         if raw is None or raw == "":
             # 空实体列 = 模板预画的占位槽（非业务列）。校验其无遗留业务数据后跳过。
             if header_is_field:
                 # D4-29 复刻：business = 字段行（排除 header，header 单独判 placeholder），
                 # header 存的是 name，可能是占位 `客户NXXX`。
-                business_values = [ws.cell(r, col).value for r in field_rows]
-                header_value = ws.cell(spec.header_row, col).value
+                business_values = [_cell_ro(ws, r, col).value for r in field_rows]
+                header_value = _cell_ro(ws, spec.header_row, col).value
                 placeholder_header = (
                     header_value in (None, "", "……")
                     or bool(re.fullmatch(r"客户\d+XXX", str(header_value)))
@@ -492,7 +558,7 @@ def extract_transposed_workbook(workbook_bytes: bytes, *, spec: TransposedSheetS
             else:
                 # D4-12：header 是模板预画索引号（D4-12-N），非业务字段。business = 全部字段行；
                 # header 行不算业务数据（其占位标签始终存在，不参与空槽判定）。
-                business_values = [ws.cell(r, col).value for r in field_rows]
+                business_values = [_cell_ro(ws, r, col).value for r in field_rows]
                 placeholder_header = True
             if any(v not in (None, "") for v in business_values) or not placeholder_header:
                 raise ValueError(f"{label} missing {noun} identity carrier for populated column")
@@ -502,7 +568,7 @@ def extract_transposed_workbook(workbook_bytes: bytes, *, spec: TransposedSheetS
             raise ValueError(f"{label} invalid {noun} identity carrier")
 
         def value(row):
-            cell = ws.cell(row, col)
+            cell = _cell_ro(ws, row, col)
             if cell.data_type == "f":
                 raise ValueError(f"{label} text field cannot contain a formula")
             return "" if cell.value is None else cell.value

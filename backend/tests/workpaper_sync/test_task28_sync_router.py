@@ -839,6 +839,10 @@ class TestRouterShape:
             ("POST", f"/rooms/{room}/confirm-descriptor"),
             ("POST", f"/rooms/{room}/forcesave"),
             ("POST", f"/rooms/{room}/close-intents"),
+            # spec oo-single-pass-materialize-and-room-leave Requirement 4 追加：
+            # participant 主动离开（`active/closing → left`）。**不是** close-intent 的
+            # 同义词 —— 后者是 close barrier 仲裁，会提升一条永远等不到回调的 close_capture。
+            ("POST", f"/rooms/{room}/participants/{uuid.uuid4()}/leave"),
             ("GET", "/recovery-cases"),
             ("POST", f"/recovery-cases/{case}/claim"),
             ("POST", f"/recovery-cases/{case}/download-only"),
@@ -1005,11 +1009,13 @@ class TestGuardIsTheFirstAwaitInEveryHandler:
                 "authorization-before-resource/cache 要求 guard 先跑完"
             )
             checked += 1
-        # `+3` = `_REQUIRED_ENDPOINTS` 之外的三个端点：
+        # `+4` = `_REQUIRED_ENDPOINTS` 之外的四个端点：
         # `GET …/recovery-cases/{case_id}/download`（Task 28）、
         # `POST …/operations/{operation_id}/retry`（Task 28）、
-        # `GET …/recovery-cases/{case_id}/timeline`（Task 29 追加）。
-        assert checked == len(_REQUIRED_ENDPOINTS) + 3, (
+        # `GET …/recovery-cases/{case_id}/timeline`（Task 29 追加）、
+        # `POST …/rooms/{room_id}/participants/{participant_id}/leave`
+        # （spec oo-single-pass-materialize-and-room-leave Requirement 4 追加）。
+        assert checked == len(_REQUIRED_ENDPOINTS) + 4, (
             f"只核对了 {checked} 个 handler —— 端点数变化时本判据的分母必须同步"
         )
 

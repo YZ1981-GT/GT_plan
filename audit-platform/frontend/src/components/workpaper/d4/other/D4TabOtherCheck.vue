@@ -131,7 +131,17 @@ const aiNoteLoading = ref(false); const aiConclusionLoading = ref(false)
 async function genNote() { if (props.isReadonly || !aiAvailable.value) return; aiNoteLoading.value = true; try { const res = await http.post(`/api/workpapers/${props.wpId}/d4/ai-generate`, { section: 'analysis-note', existingContent: auditNote.value, relatedContext: { task: '基于其他业务收入检查表(D4-35)抽凭结果生成审计说明', rowCount: rows.value.length, totalChecked: totalChecked.value, checkRatio: checkRatio.value, anomalyCount: anomalyCount.value } }, { _silent: true } as any); const t = res.data?.data?.content ?? res.data?.content ?? ''; if (!t) { ElMessage.warning('AI 未生成内容'); return }; await ElMessageBox.confirm(t, 'AI 生成', { confirmButtonText: '填入', cancelButtonText: '取消', type: 'info' }); updateAuditNote(t) } catch (e: any) { if (e !== 'cancel') ElMessage.warning('AI 生成失败') } finally { aiNoteLoading.value = false } }
 async function genConclusion() { if (props.isReadonly || !aiAvailable.value) return; aiConclusionLoading.value = true; try { const res = await http.post(`/api/workpapers/${props.wpId}/d4/ai-generate`, { section: 'adj-conclusion', existingContent: auditConclusion.value, relatedContext: { task: '基于抽凭检查结果生成审计结论', noteText: auditNote.value, anomalyCount: anomalyCount.value } }, { _silent: true } as any); const t = res.data?.data?.content ?? res.data?.content ?? ''; if (!t) { ElMessage.warning('AI 未生成内容'); return }; await ElMessageBox.confirm(t, 'AI 生成', { confirmButtonText: '填入', cancelButtonText: '取消', type: 'info' }); updateAuditConclusion(t) } catch (e: any) { if (e !== 'cancel') ElMessage.warning('AI 生成失败') } finally { aiConclusionLoading.value = false } }
 
-const { exportTemplate, exportData, importData, importing } = useD4ImportExport({ wpId: computed(() => props.wpId), projectId: computed(() => props.projectId) })
+const { exportTemplate, exportData, importData, importing } = useD4ImportExport({ wpId: computed(()
+
+// ─── expose 给 GtWpRenderer 工具栏委托 ────────────────────────────────
+function handleExportTemplate() { exportTemplate('D4-35') }
+function handleExportData() { exportData('D4-35') }
+async function handleImportClick() {
+  const input = document.createElement('input')
+  input.type = 'file'; input.accept = '.xlsx'
+  input.onchange = async () => { const f = input.files?.[0]; if (f) await importData('D4-35', f) }
+  input.click()
+} => props.wpId), projectId: computed(() => props.projectId) })
 function fmtAmt(v: number): string { return v ? v.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '—' }
 function rowClassName({ row }: { row: CheckRow }) { return row.isAnomalous === '是' ? 'row-anomaly' : '' }
 
@@ -162,11 +172,13 @@ function pushAnomaliesToA13() {
 function openFormulaManager() {
   eventBus.emit('open-formula-manager', { nodeKey: 'wp_d4_35' })
 }
+
+defineExpose({ handleExportTemplate, handleExportData, handleImportClick })
 </script>
 
 <template>
 <div class="d4-other-check">
-  <div class="toolbar"><div class="toolbar-left"><el-segmented v-model="editorMode" :options="modeOptions" size="small" /><el-tag :type="syncStateTag.type" size="small" effect="light" style="margin-left:8px">{{ syncStateTag.text }}</el-tag></div><div class="toolbar-right"><el-button size="small" type="warning" plain :disabled="isReadonly||pushableCount===0" @click="pushAnomaliesToA13" title="把抽凭异常推送到 A13 未更正错报汇总（金额与方向由人工认定）">推送异常至 A13{{ pushableCount ? `（${pushableCount}）` : '' }}</el-button><el-button size="small" :disabled="isReadonly||d435SyncBusy||editorMode==='在线编辑'" @click="switchD435Mode('在线编辑')" title="把当前 html 数据推送到在线编辑（人工触发）">同步到在线编辑</el-button><el-button size="small" @click="openFormulaManager" title="打开平台公式管理中心（唯一一套公式，支持跨底稿取数联动与表内校对）">ƒx 公式管理</el-button><el-dropdown trigger="click" size="small"><el-button size="small">导入导出 ▾</el-button><template #dropdown><el-dropdown-menu><el-dropdown-item @click="exportTemplate('D4-35')">导出模板</el-dropdown-item><el-dropdown-item @click="exportData('D4-35')">导出数据</el-dropdown-item><el-dropdown-item><el-upload :show-file-list="false" accept=".xlsx" :auto-upload="false" :disabled="isReadonly||importing" @change="(f:any)=>importData('D4-35',f.raw||f)"><span>导入数据</span></el-upload></el-dropdown-item></el-dropdown-menu></template></el-dropdown><GtIndexChip value="wp:D4-34" :context-project-id="projectId" /><el-button v-if="openReviewDialog" size="small" @click="openReviewDialog('D4-35-check')">💬 复核</el-button></div></div>
+  <div class="toolbar"><div class="toolbar-left"><el-segmented v-model="editorMode" :options="modeOptions" size="small" /><el-tag :type="syncStateTag.type" size="small" effect="light" style="margin-left:8px">{{ syncStateTag.text }}</el-tag></div><div class="toolbar-right"><el-button size="small" type="warning" plain :disabled="isReadonly||pushableCount===0" @click="pushAnomaliesToA13" title="把抽凭异常推送到 A13 未更正错报汇总（金额与方向由人工认定）">推送异常至 A13{{ pushableCount ? `（${pushableCount}）` : '' }}</el-button><el-button size="small" :disabled="isReadonly||d435SyncBusy||editorMode==='在线编辑'" @click="switchD435Mode('在线编辑')" title="把当前 html 数据推送到在线编辑（人工触发）">同步到在线编辑</el-button><el-button size="small" @click="openFormulaManager" title="打开平台公式管理中心（唯一一套公式，支持跨底稿取数联动与表内校对）">ƒx 公式管理</el-button><GtIndexChip value="wp:D4-34" :context-project-id="projectId" /><el-button v-if="openReviewDialog" size="small" @click="openReviewDialog('D4-35-check')">💬 复核</el-button></div></div>
 
   <template v-if="editorMode !== '在线编辑'">
     <!-- 审计目标 -->

@@ -88,6 +88,7 @@ declare module 'vue' {
     BatchImportDialog: typeof import('./components/wizard/BatchImportDialog.vue')['default']
     BatchOperationsPanel: typeof import('./components/workpaper/BatchOperationsPanel.vue')['default']
     BatchQueryToolbar: typeof import('./components/query/BatchQueryToolbar.vue')['default']
+    BatchRefreshDialog: typeof import('./components/workpaper/shared/BatchRefreshDialog.vue')['default']
     BatchTrimSelector: typeof import('./components/workpaper/BatchTrimSelector.vue')['default']
     BatchUploadResultDialog: typeof import('./components/attachment/BatchUploadResultDialog.vue')['default']
     BCheckListDialog: typeof import('./components/workpaper/dialogs/BCheckListDialog.vue')['default']

@@ -57,7 +57,7 @@
         :is-readonly="isReadonly"
       />
       <!-- D4-1 审定表 -->
-      <D4TabAdjudication v-else-if="currentSheet === 'D4-1'" :wp-id="props.wpId" :project-id="props.projectId" :all-responses="allResponses" :is-readonly="isReadonly" :html-data="props.htmlData" />
+      <D4TabAdjudication ref="d4AdjRef" v-else-if="currentSheet === 'D4-1'" :wp-id="props.wpId" :project-id="props.projectId" :all-responses="allResponses" :is-readonly="isReadonly" :html-data="props.htmlData" />
       <!-- D4-2 主营明细 -->
       <D4TabRevenueDetail v-else-if="currentSheet === 'D4-2'" :wp-id="props.wpId" :project-id="props.projectId" :all-responses="allResponses" :is-readonly="isReadonly" />
       <!-- D4-3 其他明细 -->
@@ -149,6 +149,7 @@
  */
 import { ref, computed, onMounted, onBeforeUnmount, provide, toRef, inject, defineAsyncComponent } from 'vue'
 import { useD4FormData, type ChecklistResponse } from './composables/useD4FormData'
+import { useD4ImportExport, type D4ImportableSheet } from './composables/useD4ImportExport'
 // 注：D4_MAIN_REVENUE_STANDARD / D4_OTHER_REVENUE_STANDARD 原仅用于已移除的
 //     handleD4Writeback 孤儿监听器（spec tb-writeback-explicit-publish-gate Task 17 批C），一并移除 import。
 import { useD4CrossSheet } from './composables/useD4CrossSheet'
@@ -299,6 +300,7 @@ const scheduleAutoSnapshot = runtime?.version.scheduleAutoSnapshot ?? (() => und
 // ─── State ───────────────────────────────────────────────────────────────────
 
 const isLoading = ref(true)
+const d4AdjRef = ref<any>(null)
 
 /**
  * 当前激活的 sheet（由外层 GtWpRenderer 通过 sheetName prop 控制）。
@@ -605,6 +607,62 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
   window.removeEventListener('d4:save-items', handleD4SaveItems)
+})
+
+// ─── 导入导出委托（GtWpRenderer 工具栏 → 包装组件 → D4 专用 API）───────
+// 包装组件直接用 useD4ImportExport + currentSheet，省去逐子组件 ref 转发。
+// 多子类型 sheet（D4-20/D4-34/D4-36）后端不支持裸编号，需映射到默认子类型。
+const d4Io = useD4ImportExport({
+  wpId: toRef(props, 'wpId'),
+  projectId: toRef(props, 'projectId'),
+})
+
+/** 后端不支持导出的 sheet（问答/程序表/模板/附注等非数据表类型） */
+const EXPORT_UNSUPPORTED_SHEETS = new Set(['D4', 'D4A', 'D4-5', 'D4-22A', 'D4-31T', 'skip', '附注上市', '附注国企'])
+
+/** 多子类型 sheet → 后端接受的默认子类型映射 */
+const SHEET_DEFAULT_SUBTYPE: Record<string, string> = {
+  'D4-20': 'D4-20-provision',   // 销售退货：默认导出重新测算表
+  'D4-34': 'D4-34-rental',      // 合同测算：默认导出房屋租赁
+  'D4-36': 'D4-36-forward',     // 截止性测试：默认导出账到单据
+}
+
+/** 将 currentSheet 解析为后端接受的 sheet ID */
+function resolveExportSheet(): D4ImportableSheet | null {
+  const raw = currentSheet.value
+  if (!raw || EXPORT_UNSUPPORTED_SHEETS.has(raw)) return null
+  return (SHEET_DEFAULT_SUBTYPE[raw] ?? raw) as D4ImportableSheet
+}
+
+function handleExportTemplate() {
+  const sheet = resolveExportSheet()
+  if (sheet) d4Io.exportTemplate(sheet)
+}
+function handleExportData() {
+  const sheet = resolveExportSheet()
+  if (sheet) d4Io.exportData(sheet)
+}
+async function handleImportClick() {
+  const sheet = resolveExportSheet()
+  if (!sheet) return
+  const input = document.createElement('input')
+  input.type = 'file'; input.accept = '.xlsx'
+  input.onchange = async () => {
+    const f = input.files?.[0]
+    if (f) {
+      await d4Io.importData(sheet, f)
+      formData.loadAll()
+    }
+  }
+  input.click()
+}
+
+defineExpose({
+  handleExportTemplate,
+  handleExportData,
+  handleImportClick,
+  /** 透传当前活跃子组件的行名对齐行（D4-1 审定表暴露） */
+  getRowNameAlignmentRows: () => d4AdjRef.value?.getRowNameAlignmentRows?.() ?? null,
 })
 </script>
 

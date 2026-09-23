@@ -121,7 +121,17 @@ const aiNoteLoading = ref(false); const aiConclusionLoading = ref(false)
 async function genNote() { if (props.isReadonly || !aiAvailable.value) return; aiNoteLoading.value = true; try { const res = await http.post(`/api/workpapers/${props.wpId}/d4/ai-generate`, { section: 'analysis-note', existingContent: auditNote.value, relatedContext: { task: '基于其他业务收入截止性测试(D4-36)结果生成审计说明', forwardCount: forwardRows.value.length, backwardCount: backwardRows.value.length, forwardCrossing: forwardCrossingCount.value, backwardCrossing: backwardCrossingCount.value } }, { _silent: true } as any); const t = res.data?.data?.content ?? res.data?.content ?? ''; if (!t) { ElMessage.warning('AI 未生成内容'); return }; await ElMessageBox.confirm(t, 'AI 生成', { confirmButtonText: '填入', cancelButtonText: '取消', type: 'info' }); updateAuditNote(t) } catch (e: any) { if (e !== 'cancel') ElMessage.warning('AI 生成失败') } finally { aiNoteLoading.value = false } }
 async function genConclusion() { if (props.isReadonly || !aiAvailable.value) return; aiConclusionLoading.value = true; try { const res = await http.post(`/api/workpapers/${props.wpId}/d4/ai-generate`, { section: 'adj-conclusion', existingContent: auditConclusion.value, relatedContext: { task: '基于截止性测试结果生成审计结论', noteText: auditNote.value, forwardCrossing: forwardCrossingCount.value, backwardCrossing: backwardCrossingCount.value } }, { _silent: true } as any); const t = res.data?.data?.content ?? res.data?.content ?? ''; if (!t) { ElMessage.warning('AI 未生成内容'); return }; await ElMessageBox.confirm(t, 'AI 生成', { confirmButtonText: '填入', cancelButtonText: '取消', type: 'info' }); updateAuditConclusion(t) } catch (e: any) { if (e !== 'cancel') ElMessage.warning('AI 生成失败') } finally { aiConclusionLoading.value = false } }
 
-const { exportTemplate, exportData, importData, importing } = useD4ImportExport({ wpId: computed(() => props.wpId), projectId: computed(() => props.projectId) })
+const { exportTemplate, exportData, importData, importing } = useD4ImportExport({ wpId: computed(()
+
+// ─── expose 给 GtWpRenderer 工具栏委托 ────────────────────────────────
+function handleExportTemplate() { exportTemplate('D4-36-forward' as any) }
+function handleExportData() { exportData('D4-36-forward' as any) }
+async function handleImportClick() {
+  const input = document.createElement('input')
+  input.type = 'file'; input.accept = '.xlsx'
+  input.onchange = async () => { const f = input.files?.[0]; if (f) await importData('D4-36', f) }
+  input.click()
+} => props.wpId), projectId: computed(() => props.projectId) })
 function rowClass({ row }: { row: CutoffRow }) { return row.isCrossing === '×' ? 'row-crossing' : '' }
 
 // ─── A13 错报推送（科目 6051；forward 取 docAmount / backward 取 voucherAmount；带方向+跨期天数）──
@@ -160,20 +170,13 @@ function pushCrossPeriodToA13() {
 function openFormulaManager() {
   eventBus.emit('open-formula-manager', { nodeKey: 'wp_d4_36' })
 }
+
+defineExpose({ handleExportTemplate, handleExportData, handleImportClick })
 </script>
 
 <template>
 <div class="d4-other-cutoff">
-  <div class="toolbar"><div class="toolbar-left"><el-segmented v-model="editorMode" :options="modeOptions" size="small" /></div><div class="toolbar-right"><el-button size="small" type="warning" plain :disabled="isReadonly||pushableCount===0" @click="pushCrossPeriodToA13" title="把跨期疑点推送到 A13 未更正错报汇总（方向+跨期天数，人工认定金额）">推送跨期至 A13{{ pushableCount ? `（${pushableCount}）` : '' }}</el-button><el-button size="small" @click="openFormulaManager" title="打开平台公式管理中心（唯一一套公式，支持跨底稿取数联动与表内校对）">ƒx 公式管理</el-button><el-dropdown trigger="click" size="small"><el-button size="small">导入导出 ▾</el-button><template #dropdown><el-dropdown-menu>
-    <el-dropdown-item disabled class="dropdown-group-label">— (一)账到单据 —</el-dropdown-item>
-    <el-dropdown-item @click="exportTemplate('D4-36-forward')">导出模板</el-dropdown-item>
-    <el-dropdown-item @click="exportData('D4-36-forward')">导出数据</el-dropdown-item>
-    <el-dropdown-item><el-upload :show-file-list="false" accept=".xlsx" :auto-upload="false" :disabled="isReadonly||importing" @change="(f:any)=>importData('D4-36-forward',f.raw||f)"><span>导入数据</span></el-upload></el-dropdown-item>
-    <el-dropdown-item disabled class="dropdown-group-label">— (二)单据到账 —</el-dropdown-item>
-    <el-dropdown-item @click="exportTemplate('D4-36-backward')">导出模板</el-dropdown-item>
-    <el-dropdown-item @click="exportData('D4-36-backward')">导出数据</el-dropdown-item>
-    <el-dropdown-item><el-upload :show-file-list="false" accept=".xlsx" :auto-upload="false" :disabled="isReadonly||importing" @change="(f:any)=>importData('D4-36-backward',f.raw||f)"><span>导入数据</span></el-upload></el-dropdown-item>
-  </el-dropdown-menu></template></el-dropdown><GtIndexChip value="wp:D4-36" :context-project-id="projectId" /><el-tag :type="syncStateTag.type" size="small" class="sync-state-tag">{{ syncStateTag.text }}</el-tag><GtEntrySyncCapabilityNotice entry-id="xlsx/gt-d4-operating-revenue" /><el-button v-if="openReviewDialog" size="small" @click="openReviewDialog('D4-36-cutoff')">💬 复核</el-button></div></div>
+  <div class="toolbar"><div class="toolbar-left"><el-segmented v-model="editorMode" :options="modeOptions" size="small" /></div><div class="toolbar-right"><el-button size="small" type="warning" plain :disabled="isReadonly||pushableCount===0" @click="pushCrossPeriodToA13" title="把跨期疑点推送到 A13 未更正错报汇总（方向+跨期天数，人工认定金额）">推送跨期至 A13{{ pushableCount ? `（${pushableCount}）` : '' }}</el-button><el-button size="small" @click="openFormulaManager" title="打开平台公式管理中心（唯一一套公式，支持跨底稿取数联动与表内校对）">ƒx 公式管理</el-button><GtIndexChip value="wp:D4-36" :context-project-id="projectId" /><el-tag :type="syncStateTag.type" size="small" class="sync-state-tag">{{ syncStateTag.text }}</el-tag><GtEntrySyncCapabilityNotice entry-id="xlsx/gt-d4-operating-revenue" /><el-button v-if="openReviewDialog" size="small" @click="openReviewDialog('D4-36-cutoff')">💬 复核</el-button></div></div>
 
   <template v-if="editorMode !== '在线编辑'">
     <!-- 截止日期配置 + 抽样参数 -->

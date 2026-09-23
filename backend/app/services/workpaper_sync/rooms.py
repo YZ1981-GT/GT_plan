@@ -249,6 +249,54 @@ class CanonicalFenceError(RoomPolicyError):
     error_code = "canonical_fence_violation"
 
 
+class ParticipantScopeNotVisibleError(RoomPolicyError):
+    """participant 不存在 / 跨 room / **不属于调用者** —— 统一 404 语义。
+
+    spec: oo-single-pass-materialize-and-room-leave · Requirement 4.2
+
+    🔴 与 :class:`ParticipantNotWritableError` 分型，理由是**存在性泄露**而不是洁癖：
+    `participant_not_writable` 落 422 并带人话诊断（「lease 已过期于 …」），那是给
+    **自己**那条 lease 的持有者看的。如果「拿别人的 participant_id 去 leave」也落 422，
+    响应就把「这个 id 存在、只是不是你的」告诉了调用方 —— 而本域的 404 oracle
+    （Property 45）要求不存在 / 已 retire / 跨 scope / 无 visibility 四种原因在响应上
+    逐字节不可区分。本类在 router 的映射表里登记为 **404**，`_sync_http` 因此把它换成
+    与 guard 完全同一份 `_not_found()`。
+    """
+
+    error_code = "participant_scope_not_found"
+
+
+class ParticipantDirtyLeaveError(RoomPolicyError):
+    """客户端自报有未同步改动却要求「离开」⇒ 拒绝，必须走真保存路径。
+
+    spec: oo-single-pass-materialize-and-room-leave · Requirement 4.4 · Property **P8**
+
+    与前端 `leaveWithoutSaving()` 的 `canLeave` 硬门**同源**（同一个 `dirty` 信号），
+    两侧都不得放宽：前端在发出前就 refuse（`bridge_clean_close_with_dirty_editor`），
+    服务端在这里再拒一次。两道门不是冗余 —— 前端那道保护「误点」，这道保护「绕过前端
+    直接打端点」：lease 一释放，另一个写会话就可能进来，而这个客户端内存里还压着没有
+    落盘的编辑。
+    """
+
+    error_code = "participant_leave_refused_dirty"
+
+
+class ParticipantLeaveInFlightError(RoomPolicyError):
+    """该 participant 在本代际还有未终结的写请求 ⇒ 拒绝「离开」，让它先结束。
+
+    spec: oo-single-pass-materialize-and-room-leave · Requirement 4.4 · Property **P8**
+
+    这是前端 `leaveBlockReason` 两条阻断里的**第二条**（in-flight）在服务端的对应物，
+    且与 dirty 那条**分型**：前端据 `error_code` 决定提示「先保存」还是「稍等」，压成
+    一个 code 会让 UI 只能说一句笼统的话。
+
+    🔴 与 dirty 那条不同，这一条是**服务端自己可验证**的事实（读 request 行状态），
+    不依赖客户端自报 —— 这也是为什么两条必须分开：一条能被端点独立证伪，另一条不能。
+    """
+
+    error_code = "participant_leave_refused_in_flight"
+
+
 def revocation_policy() -> RevocationPolicy:
     """participant 撤销裁决的**唯一**读取点 —— 只从 Task 4 契约读，代码里不写死分支。
 
@@ -687,6 +735,31 @@ class RevokeOutcome:
 
 
 @dataclass(frozen=True)
+class LeaveOutcome:
+    """:meth:`RoomService.leave_participant` 的结果（Requirement 4.1~4.4 / P7 / P9）。
+
+    字段刻意只有这五个 —— 它们合起来就是「这条路径做了什么、没做什么」的可观测面：
+
+    * ``already_left`` —— 幂等重放（本次零写入）。前端据此仍然返回表单，不当成失败。
+    * ``left_at`` —— 状态迁移的**唯一**时间戳事实。重放时它是**第一次**那个值，
+      逐字相同 ⇒ 「没有第二条审计事件」在响应上就能看见（AC 4.2）。
+    * ``remaining_active_editors`` —— 离开**之后**仍在 `active` 的 participant 数。
+      它是 AC 4.3 的可观测面：>0 时 room 必须仍是 `active`。
+    * ``room_state`` —— 离开后 room 的状态。本方法从不改它，所以这个字段的用途是
+      **反证**：让「leave 顺手改了 room 状态」这类回归在响应上直接可见（P7 的反证）。
+
+    刻意**没有** ``request_id`` / ``intent_id`` / ``generation_rotated`` ——
+    本路径不产生这些东西，留一个恒为 None 的字段等于给下游一个「也许会有」的暗示。
+    """
+
+    participant_id: uuid.UUID
+    already_left: bool
+    left_at: datetime
+    remaining_active_editors: int
+    room_state: str
+
+
+@dataclass(frozen=True)
 class ContributorRecord:
     """contributor set 的一行（`working_paper_sync_operation_contributor`）。"""
 
@@ -750,6 +823,21 @@ _REQUEST_ALLOWED_ROOM_STATES: Final[frozenset[RoomState]] = frozenset(
 #: 把自己那份编辑落盘。
 _REQUEST_ALLOWED_PARTICIPANT_STATES: Final[frozenset[ParticipantState]] = frozenset(
     {ParticipantState.active, ParticipantState.closing}
+)
+
+#: 「未终结」request 的状态 —— 还可能收到 callback 的四态。
+#:
+#: `correlated` 也在内：incoming 已 durable 但内容尚未应用（AC 4.7）。
+#:
+#: 🔴 **单源**：撤销时要取消它们（:meth:`RoomService._cancel_outstanding_requests_locked`），
+#: participant 主动离开时要据它拒绝（:meth:`RoomService._outstanding_request_ids_of`）。
+#: 两处各写一份的后果不是「不一致」，而是新增一个中间态时只有一处跟上 —— 于是一个仍可能
+#: 收到 callback 的 request 会被当成已终结，lease 被释放，callback 回来时没有归属。
+_OPEN_REQUEST_STATES: Final[tuple[str, ...]] = (
+    RequestState.frozen.value,
+    RequestState.pending.value,
+    RequestState.accepted.value,
+    RequestState.correlated.value,
 )
 
 #: 复用「从未接管内容」的 room 时给它续的使用窗口（与 `repository.create_room` 的默认 room
@@ -1903,6 +1991,175 @@ class RoomService:
         )
         return True
 
+    # ─────────────────────────────────────────────────────────────────
+    # 3.5.b participant 主动离开（Requirement 4 / P7 / P8 / P9）
+    # ─────────────────────────────────────────────────────────────────
+
+    async def leave_participant(
+        self,
+        *,
+        room_id: uuid.UUID,
+        participant_id: uuid.UUID,
+        actor_user_id: uuid.UUID,
+        client_reports_dirty: bool,
+    ) -> LeaveOutcome:
+        """「我走了」：只释放这一条 lease（`active/closing → left`）。
+
+        spec: oo-single-pass-materialize-and-room-leave · Requirement 4.1~4.4
+        Properties: **P7**（只改该 participant）/ **P8**（dirty 拒绝）/ **P9**（幂等）
+
+        ═══ 它**不是** close intent（这条路径存在的全部理由）═══
+
+        `POST …/rooms/{id}/close-intents` 不是「我走了」，而是 **close barrier 仲裁**：
+        推 participant 到 `closing`、选 leader、提升一条 `kind=close_capture` 写请求。
+        对**未改动**的文档那条 capture 永远等不到 OO 回调 —— 真栈实测 room
+        ``03bbcad8-70ef-4462-8a37-68af4fc0d1fa`` 停在 `state=close_barrier` / participant
+        `closing` / capture `state=frozen`，该 room 此后**再也进不去**。而
+        `ParticipantState.left` 在 ``PARTICIPANT_EDGES`` 里本来就是合法终态
+        （`active → left`、`closing → left`），却**全仓没有任何 service/端点会写它** ——
+        本方法就是当初设计好、缺了接线的那一环。
+
+        本方法**不做**的事，逐条对应 close intent 在做的事（AC 4.1）：不建任何 request
+        （forcesave / close_capture 都不建）、不选 leader、不推 `close_barrier_epoch`、
+        不改 room 状态、不旋转 generation、不动 write fence、不注册新 scope、不写
+        timeline。room 行只被 ``SELECT … FOR UPDATE`` 锁住以便与并发的 close
+        intent / revoke 串行化。
+
+        ═══ 判据顺序刻意固定（每一条都独立可变异）═══
+
+        1. **归属**（404 oracle）—— participant 必须存在、属于该 room、且 ``user_id``
+           就是调用者。不是本人时抛 :class:`ParticipantScopeNotVisibleError`，router 把它
+           换成与 guard 逐字节相同的 404。放在**最前**是刻意的：它若排在 dirty/in-flight
+           之后，「拿别人的 participant_id 探测存在性」就能从 409 与 404 的差异里读出答案。
+        2. **dirty**（AC 4.4）—— 客户端自报有未同步改动 ⇒ 拒绝。
+        3. **in-flight**（AC 4.4）—— 该 participant 在本代际还有未终结的写请求 ⇒ 拒绝。
+        4. **幂等或迁移**（AC 4.2）—— 已 `left` 则零写入返回同一结果；否则
+           `active/closing → left`。显式分支的理由见
+           :meth:`WorkpaperSyncRepository.mark_participant_left`。
+
+        🔴 ②③ 排在幂等分支**之前**，不是笔误：dirty 是数据安全门，不得被「反正已经
+        left 了」这个短路遮蔽。代价是「已 left 的客户端带着 dirty=True 重放」会拿到 409
+        而不是幂等成功 —— 那是一个自相矛盾的客户端（前端在 dirty 时压根不会发出请求），
+        对它取**更严**的那一侧。AC 4.2 的幂等保证因此读作「**同一请求**重复发送返回同一
+        结果」，实测由 PG 判据的 `already_left` + `left_at` 逐字相同锁住。
+
+        Args:
+            room_id: room 行 id（已由 guard 的 scope index 确认可见）。
+            participant_id: 要离开的 lease（同上）。
+            actor_user_id: 调用者 —— 归属判据的另一半，scope index 里没有这个事实。
+            client_reports_dirty: 客户端自报的 dirty。**服务端无从独立核实**
+                （OO 编辑器的内存态只有客户端知道，靠 `onDocumentStateChange` 观测），
+                所以这是一条「自报即拒」的门：能挡住「明知有未落盘编辑还去释放 lease」，
+                挡不住「说谎的客户端」—— 后者由 in-flight 门与 close barrier 各自的判据
+                承担，本门不冒充完整性保证。
+        """
+        # ① 归属（404 oracle）—— 先行，且在任何写入之前。
+        participant = (
+            await self._session.execute(
+                sa.select(WorkpaperOoParticipant).where(
+                    WorkpaperOoParticipant.id == participant_id
+                )
+            )
+        ).scalar_one_or_none()
+        if (
+            participant is None
+            or participant.room_id != room_id
+            or participant.user_id != actor_user_id
+        ):
+            raise ParticipantScopeNotVisibleError(
+                f"participant 不可见: {participant_id}"
+            )
+
+        # ② dirty（AC 4.4，与前端 `canLeave` 同源）
+        if client_reports_dirty:
+            raise ParticipantDirtyLeaveError(
+                "编辑器仍有未保存的修改 —— 「离开」不得丢弃编辑，请先走强制保存路径"
+                "（前端 `leaveWithoutSaving()` 的 `canLeave` 硬门同源）"
+            )
+
+        # ③ in-flight（AC 4.4 的第二半，服务端可独立验证）
+        outstanding = await self._outstanding_request_ids_of(
+            room_id=room_id, participant_id=participant_id
+        )
+        if outstanding:
+            raise ParticipantLeaveInFlightError(
+                f"该 participant 还有 {len(outstanding)} 个未终结的写请求 —— "
+                "同步进行中离开会让 UI 与服务端脱钩，请等它结束"
+            )
+
+        # ④ 幂等或迁移（原子写在 repository，`assert_transition` 走 PARTICIPANT_EDGES）
+        participant, already_left = await self._repo.mark_participant_left(
+            room_id=room_id, participant_id=participant_id
+        )
+        room = await self._repo.lock_room(room_id)
+        remaining = await self.count_active_editors(room_id)
+        logger.info(
+            "room %s（generation %s, state=%s）：participant %s %s ⇒ 仍有 %d 个 active "
+            "editor；不建 request、不推 barrier、不旋转 generation",
+            room_id,
+            room.generation,
+            room.state,
+            participant_id,
+            "已是 left（幂等重放，零写入）" if already_left else "落 left 并释放 lease",
+            remaining,
+        )
+        return LeaveOutcome(
+            participant_id=participant_id,
+            already_left=already_left,
+            left_at=participant.left_at,
+            remaining_active_editors=remaining,
+            room_state=str(room.state),
+        )
+
+    async def _outstanding_request_ids_of(
+        self, *, room_id: uuid.UUID, participant_id: uuid.UUID
+    ) -> tuple[uuid.UUID, ...]:
+        """该 participant 在 room **当前 generation** 里未终结的 request。
+
+        「未终结」= 还可能收到 callback 的四态，与
+        :meth:`_cancel_outstanding_requests_locked` 用的是**同一份**名单（那里是撤销时
+        取消它们，这里是据它拒绝离开）。两处若各写一份，新增一个中间态时只会有一处跟上。
+        """
+        room = await self._repo.lock_room(room_id)
+        rows = (
+            (
+                await self._session.execute(
+                    sa.select(WorkpaperForcesaveRequest.id).where(
+                        WorkpaperForcesaveRequest.room_id == room_id,
+                        WorkpaperForcesaveRequest.generation == room.generation,
+                        WorkpaperForcesaveRequest.initiated_by_participant_id
+                        == participant_id,
+                        WorkpaperForcesaveRequest.state.in_(_OPEN_REQUEST_STATES),
+                    )
+                )
+            )
+            .scalars()
+            .all()
+        )
+        return tuple(rows)
+
+    async def count_active_editors(self, room_id: uuid.UUID) -> int:
+        """仍在 `active` 的 participant 数。`closing` **不计入**（AC 4.10 的口径）。
+
+        🔴 本方法是这个口径的**唯一**实现：`CloseIntentService` 用它判「还有没有别人在
+        编辑，需不需要先出一个普通 forcesave predecessor」，`leave_participant` 用它交出
+        AC 4.3 的可观测面。两处各写一份 `count(*)` 的后果不是「重复」，而是「`closing`
+        算不算 active」这条口径可以在一处被改掉而另一处不知道 —— 而那正好决定 close
+        barrier 会不会等一个永远不来的 predecessor。
+        """
+        return int(
+            (
+                await self._session.execute(
+                    sa.select(sa.func.count())
+                    .select_from(WorkpaperOoParticipant)
+                    .where(
+                        WorkpaperOoParticipant.room_id == room_id,
+                        WorkpaperOoParticipant.state == ParticipantState.active.value,
+                    )
+                )
+            ).scalar_one()
+        )
+
     async def supersede_room(
         self, *, room_id: uuid.UUID, reason: str
     ) -> WorkpaperOoRoom:
@@ -1990,14 +2247,9 @@ class RoomService:
         self, room: WorkpaperOoRoom
     ) -> tuple[uuid.UUID, ...]:
         """把该 generation 内尚未终结的 request 落 `superseded`（AC 4.7）。"""
-        # 未终结 = 还可能收到 callback 的四态。`correlated` 也在内：incoming 已 durable
-        # 但内容尚未应用，撤销后必须阻止它继续走 apply（AC 4.7），保留 incoming 供 recovery。
-        open_states = [
-            RequestState.frozen.value,
-            RequestState.pending.value,
-            RequestState.accepted.value,
-            RequestState.correlated.value,
-        ]
+        # 未终结名单是模块级单源 :data:`_OPEN_REQUEST_STATES`（撤销取消它们 / 主动离开据它
+        # 拒绝，两处同一份），保留 incoming 供 recovery。
+        open_states = list(_OPEN_REQUEST_STATES)
         rows = (
             (
                 await self._session.execute(
@@ -2096,6 +2348,9 @@ __all__ = [
     "RouteCredentialError",
     "ContributorSnapshotError",
     "CanonicalFenceError",
+    "ParticipantScopeNotVisibleError",
+    "ParticipantDirtyLeaveError",
+    "ParticipantLeaveInFlightError",
     "revocation_policy",
     "derive_doc_key",
     "parse_doc_key",
@@ -2112,6 +2367,7 @@ __all__ = [
     "BaselineSettlement",
     "room_never_took_custody",
     "RevokeOutcome",
+    "LeaveOutcome",
     "ContributorRecord",
     "ContributorSnapshot",
     "CanonicalFenceAdvance",

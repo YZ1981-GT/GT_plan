@@ -164,6 +164,12 @@ from app.services.workpaper_sync.content_mutation import (
 from app.services.workpaper_sync.contracts import SyncContract
 from app.services.workpaper_sync.definitions import canonical_digest
 from app.services.workpaper_sync.entry_profile import Capability
+from app.services.workpaper_sync.materialize_reuse_verdict import (
+    HIT as REUSE_HIT,
+    REPLAYED as REUSE_REPLAYED,
+    ReuseVerdict,
+    verdict_for_miss,
+)
 from app.services.workpaper_sync.models import (
     ActorType,
     ArtifactKind,
@@ -1229,6 +1235,12 @@ class MaterializeOutcome:
     rooms_opened: int
     revision_delta: int
     receipt: ContentCommitReceipt | None
+    #: 机器可读的复用判词（requirements 3.1）。**无默认值**是刻意的：
+    #: 三条终结路径各自知道自己是 hit / replayed / 哪一类 miss，给默认值等于允许某条路径
+    #: 悄悄记成别的桶 —— 而那正是上一轮那个「未命中与真改动长得一样」的缺陷形态。
+    #: `business_identity_reused` 留着不动（它是 AC 3.6 的 revision 记账口径，
+    #: `assert_revision_delta` 在用），本字段是它的**归因**面而不是替代。
+    reuse_verdict: ReuseVerdict
 
     def as_dict(self) -> dict[str, Any]:
         return {
@@ -1243,6 +1255,7 @@ class MaterializeOutcome:
             "commit_count": int(self.commit_count),
             "rooms_opened": int(self.rooms_opened),
             "revision_delta": int(self.revision_delta),
+            "reuse_verdict": self.reuse_verdict.as_dict(),
         }
 
 
@@ -1792,6 +1805,16 @@ class MaterializeCoordinator:
             reuse = await self._find_business_identity_reuse(
                 request=request, pre=pre, payload_sha256=token.payload_sha256
             )
+            # 未命中要**当场**归因（requirements 3.3）：此刻还没开 operation、没写任何东西，
+            # 两条腿的库状态与上面那次探测逐字相同 ⇒ 归因是确定的。放到 commit 之后再算就
+            # 只能看到「已经变了的世界」，分不出「内容真变了」与「digest 口径分叉」。
+            verdict = (
+                REUSE_HIT
+                if reuse is not None
+                else await self._classify_reuse_miss(
+                    request=request, pre=pre, payload_sha256=token.payload_sha256
+                )
+            )
             operation = await self._open_operation(request=request, pre=pre)
             if reuse is not None:
                 outcome = await self._settle_reuse(
@@ -1804,7 +1827,11 @@ class MaterializeCoordinator:
                 )
             else:
                 outcome = await self._commit_and_settle(
-                    checked, pending=pending, pre=pre, operation_id=operation.id
+                    checked,
+                    pending=pending,
+                    pre=pre,
+                    operation_id=operation.id,
+                    reuse_verdict=verdict,
                 )
 
         revision_after = await self._read_content_revision(request.wp_id)
@@ -1829,6 +1856,7 @@ class MaterializeCoordinator:
             rooms_opened=max(0, rooms_after - rooms_before),
             revision_delta=delta,
             receipt=outcome.receipt,
+            reuse_verdict=outcome.reuse_verdict,
         )
 
     # ─────────────────────────────────────────────────────────────────
@@ -1842,8 +1870,14 @@ class MaterializeCoordinator:
         pending: WorkpaperPendingMutation,
         pre: MaterializePreflight,
         operation_id: uuid.UUID,
+        reuse_verdict: ReuseVerdict,
     ) -> MaterializeOutcome:
-        """事务 B + C：唯一业务 commit，然后 room/participant/descriptor。"""
+        """事务 B + C：唯一业务 commit，然后 room/participant/descriptor。
+
+        `reuse_verdict` 由调用方在**开 operation 之前**算好并透传（requirements 3.1）：
+        本方法走到这里说明复用未命中，判词里带的是「为什么未命中」。不在这里重算 ——
+        commit 之后世界已经前进，那时算出来的归因必然失真。
+        """
         request = authorized.request
         # 与 OO→HTML rematerialize 同构：Excel projection commit 必须带冻结
         # structure_anchors，否则 content_mutation 会 content_commit_failed。
@@ -1931,6 +1965,7 @@ class MaterializeCoordinator:
             rooms_opened=0,  # 由 materialize() 用真实行数差覆盖
             revision_delta=0,
             receipt=receipt,
+            reuse_verdict=reuse_verdict,
         )
 
     async def _replay_committed(
@@ -2002,6 +2037,7 @@ class MaterializeCoordinator:
             rooms_opened=0,
             revision_delta=0,
             receipt=None,
+            reuse_verdict=REUSE_REPLAYED,
         )
 
     async def _settle_reuse(
@@ -2064,6 +2100,7 @@ class MaterializeCoordinator:
             rooms_opened=0,
             revision_delta=0,
             receipt=None,
+            reuse_verdict=REUSE_HIT,
         )
 
     # ─────────────────────────────────────────────────────────────────
@@ -2930,6 +2967,101 @@ class MaterializeCoordinator:
         if representation is None:
             return None
         return version, representation
+
+    async def _classify_reuse_miss(
+        self,
+        *,
+        request: MaterializeRequest,
+        pre: MaterializePreflight,
+        payload_sha256: str,
+    ) -> ReuseVerdict:
+        """未命中归因（requirements 3.3，判词形态见 `materialize_reuse_verdict`）。
+
+        只在 :meth:`_find_business_identity_reuse` 返回 `None` 之后调用，且在**开 operation
+        之前** —— 同一个 session、其间零写入 ⇒ 两条腿复查的结果与那次探测逐字相同。
+
+        ═══ 为什么只复查 version 那条腿就够 ═══
+
+        `_find_business_identity_reuse` 的两条查询是串联的：version 命中才查
+        representation。所以未命中只有两种来源，而 version 腿的真假就把它们分开了：
+
+        * version 腿**没**命中 ⇒ `projection_sha256` 不等 ⇒ 用业务比较面归因
+          （内容真变了 / 契约变了 / 🔴 digest 口径分叉）；
+        * version 腿命中了 ⇒ 未命中必来自 substrate + bundle 腿。
+
+        ⚠️ 这里多付**一次** projection 载荷读盘（~120KB JSON）。它只发生在未命中路径上，
+        而那条路径紧接着就是整趟物化（真库 D4 实测 CPU 段 7.5s）⇒ 相对成本可忽略。
+        命中路径一个字节都不多读。
+        """
+        version_matched = (
+            await self._session.execute(
+                sa.select(sa.func.count())
+                .select_from(WorkpaperContentVersion)
+                .where(
+                    WorkpaperContentVersion.id == pre.base_content_version_id,
+                    WorkpaperContentVersion.wp_id == request.wp_id,
+                    WorkpaperContentVersion.projection_sha256 == payload_sha256,
+                )
+            )
+        ).scalar_one() > 0
+        base_payload = (
+            None
+            if version_matched
+            else await self._read_base_projection_payload(request=request, pre=pre)
+        )
+        return verdict_for_miss(
+            base_payload=base_payload,
+            incoming_payload=_projection_payload(request.projection),
+            base_version_matched=version_matched,
+        )
+
+    async def _read_base_projection_payload(
+        self, *, request: MaterializeRequest, pre: MaterializePreflight
+    ) -> Mapping[str, Any] | None:
+        """读回基线 content version 落盘的那份 canonical projection 载荷。
+
+        读**落盘字节**而不是从别处重算：digest 就是对这份字节算的，拿它当比较的一侧才能
+        回答「digest 说不一样，业务内容到底一样不一样」。从内存里另算一份就把待查的那条
+        口径又用了一遍。
+
+        返回 `None` 的三种情形都归 `no_base_projection`（合法「无从比较」，不是缺陷）：
+        历史行没有 `projection_artifact_id`、artifact 行/文件缺失、载荷不是 JSON 对象
+        （早期 representation 的 projection 位可能是占位字节）。
+        **不抛** —— 归因失败不该把一次正常的全量物化搞失败。
+        """
+        version = (
+            await self._session.execute(
+                sa.select(WorkpaperContentVersion).where(
+                    WorkpaperContentVersion.id == pre.base_content_version_id
+                )
+            )
+        ).scalar_one_or_none()
+        artifact_id = None if version is None else version.projection_artifact_id
+        if artifact_id is None:
+            return None
+        artifact = (
+            await self._session.execute(
+                sa.select(WorkpaperArtifact).where(WorkpaperArtifact.id == artifact_id)
+            )
+        ).scalar_one_or_none()
+        if artifact is None:
+            return None
+        try:
+            path = self._artifacts.resolve_published_artifact(
+                project_id=request.project_id,
+                kind=artifact.kind,
+                state=artifact.state,
+                relative_path=artifact.relative_path,
+            )
+            payload = json.loads(path.read_bytes().decode("utf-8"))
+        except Exception:  # noqa: BLE001 - 见 docstring：归因不得升级成物化失败
+            logger.info(
+                "[reuse_verdict] 基线 projection 载荷不可读（artifact=%s）⇒ 归因 "
+                "no_base_projection",
+                artifact_id,
+            )
+            return None
+        return payload if isinstance(payload, dict) else None
 
     async def _latest_representation(
         self, *, wp_id: uuid.UUID, entry_id: str, version_id: uuid.UUID
