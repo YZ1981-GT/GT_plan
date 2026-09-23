@@ -226,9 +226,11 @@ payload、不自己算 digest、不自己校验 bundle slot（复制一份的后
 from __future__ import annotations
 
 import hashlib
+import io
 import json
 import re
 import uuid
+import zipfile
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Final, Iterator, Mapping, Sequence
@@ -359,6 +361,7 @@ __all__ = [
     "manifest_capability_enabled",
     "matrix_column_letter_for_seq",
     "metric_row_for",
+    "neutralize_oo_crash_if_formulas",
     "publish_pilot_definitions",
     "read_authoritative_template",
     "register_pilot_adapter",
@@ -2473,3 +2476,23 @@ def assert_manifest_capability_enabled(
 def _unused_instrumentation_error_guard() -> tuple[type[InstrumentationError], type[FieldSpec]]:
     """保留 `InstrumentationError` / `FieldSpec` 的显式引用（本模块 payload 构建的类型）。"""
     return InstrumentationError, FieldSpec
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# OO 9.4 `editor_error_-82`：裸 IF() 中性化（zip 级）
+# ═══════════════════════════════════════════════════════════════════════════
+#
+# 实现已外抽到伴生模块 `g7_oo_crash_if_neutralize`（仓库文件行数门禁：本文件曾达 2662 行，
+# 超基线 2450 +5%；门禁要求「优先拆分或抽伴生模块，确有必要再更新 whitelist 基线」）。
+# 这里 re-export，使 `adapters/excel.py` 两处 `from …pilot_g7_two_level_dynamic import
+# neutralize_oo_crash_if_formulas` 的延迟 import 形态一字不改仍可解析；定义只有一份。
+# `_BARE_IF_CALL` / `_F_ELEMENT` / `_strip_bare_if_cells` 供判据按同一路径导入。
+from app.services.workpaper_sync.g7_oo_crash_if_neutralize import (  # noqa: E402,F401
+    _BARE_IF_CALL,
+    _CELL_ELEMENT,
+    _F_ELEMENT,
+    _R_ATTR,
+    _SI_ATTR,
+    _strip_bare_if_cells,
+    neutralize_oo_crash_if_formulas,
+)
