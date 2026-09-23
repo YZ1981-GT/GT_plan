@@ -205,6 +205,61 @@ def test_entry_id_source_drift_fails_closed() -> None:
     assert "custom_cells" in message and "wp_code" in message
 
 
+def test_non_writer_exemption_must_be_earned() -> None:
+    """只读豁免不是「名单上有名字就放行」：三个方向各自可被单点 falsify。
+
+    `NON_WRITER_ENTRY_ID_SITES` 给只读探测（`legacy_opaque_ids_for_wp`：同一个 wp 调两次
+    `opaque_entry_id` 只为**展示**分裂口径）开了一条不进 lane 分母的路。若它退化成一张
+    纯名单，那「把 `commit_bytes(...)` 加进被豁免的函数」就能拿到一条无 authority model
+    真源的写入路径 —— 判据必须打开那个函数的 AST 自证它确实写不出去。
+    """
+    real = OG.assert_non_writer_sites_are_read_only()
+    assert real, "豁免表不该是空的（当前恰有只读探测一条）"
+
+    # 方向②：豁免指向一个**真 writer**（函数体里有 `commit_bytes`）⇒ 豁免自失效。
+    forged = [
+        OG.NonWriterEntryIdSite(
+            module="app.routers.custom_workpaper_cells",
+            qualname="update_custom_cells",
+            call_count=1,
+            reason="变异检验：把真写入路径伪装成只读探测",
+            adjudication_owner_task="65",
+        )
+    ]
+    with pytest.raises(OG.OpaqueLaneRegistryDriftError) as exc:
+        OG.assert_non_writer_sites_are_read_only(forged)
+    assert "权威写入标记" in str(exc.value)
+
+    # 方向①：登记指向不存在的函数（探测被删/改名）⇒ 打红。
+    gone = [replace(OG.NON_WRITER_ENTRY_ID_SITES[0], qualname="function_that_vanished")]
+    with pytest.raises(OG.OpaqueLaneRegistryDriftError) as exc:
+        OG.assert_non_writer_sites_are_read_only(gone)
+    assert "不存在的函数" in str(exc.value)
+
+    # 方向③：在已豁免的函数里悄悄多加一处调用（条数与登记不等）⇒ 打红。
+    miscounted = [replace(OG.NON_WRITER_ENTRY_ID_SITES[0], call_count=99)]
+    with pytest.raises(OG.OpaqueLaneRegistryDriftError) as exc:
+        OG.assert_non_writer_sites_are_read_only(miscounted)
+    assert "调用条数不等" in str(exc.value)
+
+
+def test_exempt_site_still_accounted_in_coverage() -> None:
+    """豁免也要**记账**：被豁免的调用点在这批 sites 里消失 ⇒ 打红（stale 豁免）。
+
+    没有这条时，「删掉只读探测」与「把某条写入路径改名成只读探测的名字」都是静默通过的。
+    """
+    without_probe = [
+        site
+        for site in OG.discover_opaque_entry_id_call_sites()
+        if not site.module.endswith("namespace_migration")
+    ]
+    with pytest.raises(OG.OpaqueLaneRegistryDriftError) as exc:
+        OG.assert_lane_registry_covers_source(without_probe)
+    message = str(exc.value)
+    assert "只读豁免记账不符" in message
+    assert "legacy_opaque_ids_for_wp" in message
+
+
 def test_wrong_lane_id_argument_fails_closed() -> None:
     """把 custom 的 `lane_id="custom_cells"` 改成另一条 lane ⇒ 打红。
 
