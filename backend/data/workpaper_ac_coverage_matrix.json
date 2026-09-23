@@ -5,7 +5,7 @@
       "covering_task_waves": {
         "1": 0,
         "67": 6,
-        "72": 7
+        "72": 8
       },
       "covering_tasks": [
         "1",
@@ -44,7 +44,7 @@
       "oracle_family_row_digest": "31b8f81d75379396c482a72e3a26e5ba3b7ca736a0dc23594a548ba196e9ccec",
       "requirement": 1,
       "requirement_title": "全量入口清册与诚实能力标识",
-      "requirements_line": 57,
+      "requirements_line": 62,
       "text_digest": "ae3d47e3de49dc8497a01eb09628c3088d75bcd838474916f2c3c4ec7ea3d750"
     },
     {
@@ -91,7 +91,7 @@
       "oracle_family_row_digest": "31b8f81d75379396c482a72e3a26e5ba3b7ca736a0dc23594a548ba196e9ccec",
       "requirement": 1,
       "requirement_title": "全量入口清册与诚实能力标识",
-      "requirements_line": 58,
+      "requirements_line": 63,
       "text_digest": "0e7b987ed3fadee0f5e7f8f125ed04a6f6fbaf7feea0b18fcf688ad3b1273a29"
     },
     {
@@ -99,7 +99,7 @@
       "covering_task_waves": {
         "1": 0,
         "67": 6,
-        "72": 7,
+        "72": 8,
         "73": 1
       },
       "covering_tasks": [
@@ -153,7 +153,7 @@
       "oracle_family_row_digest": "31b8f81d75379396c482a72e3a26e5ba3b7ca736a0dc23594a548ba196e9ccec",
       "requirement": 1,
       "requirement_title": "全量入口清册与诚实能力标识",
-      "requirements_line": 59,
+      "requirements_line": 64,
       "text_digest": "de821c9fce118b659bbbe4d71e2978648b9800cda5eb8918215eca6b1e54672c"
     },
     {
@@ -166,8 +166,9 @@
         "57": 5,
         "66": 6,
         "67": 6,
-        "72": 7,
-        "73": 1
+        "72": 8,
+        "73": 1,
+        "75": 4
       },
       "covering_tasks": [
         "2",
@@ -178,7 +179,8 @@
         "66",
         "67",
         "72",
-        "73"
+        "73",
+        "75"
       ],
       "defects": [],
       "design_oracle_properties": [
@@ -256,6 +258,10 @@
           "66"
         ],
         [
+          "75",
+          "66"
+        ],
+        [
           "2",
           "67"
         ],
@@ -281,6 +287,10 @@
         ],
         [
           "73",
+          "67"
+        ],
+        [
+          "75",
           "67"
         ],
         [
@@ -316,12 +326,28 @@
           "72"
         ],
         [
+          "75",
+          "72"
+        ],
+        [
           "2",
           "73"
         ],
         [
           "13",
           "73"
+        ],
+        [
+          "2",
+          "75"
+        ],
+        [
+          "13",
+          "75"
+        ],
+        [
+          "73",
+          "75"
         ]
       ],
       "independent_verification_tasks": [
@@ -332,13 +358,14 @@
         "66",
         "67",
         "72",
-        "73"
+        "73",
+        "75"
       ],
       "oracle_family": "ManifestCoverageOracle",
       "oracle_family_row_digest": "31b8f81d75379396c482a72e3a26e5ba3b7ca736a0dc23594a548ba196e9ccec",
       "requirement": 1,
       "requirement_title": "全量入口清册与诚实能力标识",
-      "requirements_line": 60,
+      "requirements_line": 65,
       "text_digest": "953af04e72458db8e05ecd0858d82895718101147c1bbfdf1dd2dd4937d86c8b"
     },
     {
@@ -348,7 +375,7 @@
         "52": 5,
         "66": 6,
         "67": 6,
-        "72": 7,
+        "72": 8,
         "73": 1
       },
       "covering_tasks": [
@@ -442,7 +469,7 @@
       "oracle_family_row_digest": "31b8f81d75379396c482a72e3a26e5ba3b7ca736a0dc23594a548ba196e9ccec",
       "requirement": 1,
       "requirement_title": "全量入口清册与诚实能力标识",
-      "requirements_line": 61,
+      "requirements_line": 66,
       "text_digest": "6e2fe03d33a70c1211701d8c4ec0ff2127de5999ef1da5c2f5829b5259a4708e"
     },
     {
@@ -504,7 +531,7 @@
       "oracle_family_row_digest": "31b8f81d75379396c482a72e3a26e5ba3b7ca736a0dc23594a548ba196e9ccec",
       "requirement": 1,
       "requirement_title": "全量入口清册与诚实能力标识",
-      "requirements_line": 62,
+      "requirements_line": 67,
       "text_digest": "be7627c3450a0fe2f9405eceee347e64245dac453f4d4e6af44598d7e2a3d19e"
     },
     {
@@ -513,7 +540,7 @@
         "2": 0,
         "66": 6,
         "67": 6,
-        "72": 7,
+        "72": 8,
         "73": 1
       },
       "covering_tasks": [
@@ -585,7 +612,7 @@
       "oracle_family_row_digest": "31b8f81d75379396c482a72e3a26e5ba3b7ca736a0dc23594a548ba196e9ccec",
       "requirement": 1,
       "requirement_title": "全量入口清册与诚实能力标识",
-      "requirements_line": 63,
+      "requirements_line": 68,
       "text_digest": "8441743f6d3765e9510e76d887a20b298089d3fa57d4370d810b6060b0e62654"
     },
     {
@@ -647,7 +674,7 @@
       "oracle_family_row_digest": "31b8f81d75379396c482a72e3a26e5ba3b7ca736a0dc23594a548ba196e9ccec",
       "requirement": 1,
       "requirement_title": "全量入口清册与诚实能力标识",
-      "requirements_line": 64,
+      "requirements_line": 69,
       "text_digest": "5875908042cf578e8d02e86ad1ec09a77414e22c39269133caa577535d1e74e7"
     },
     {
@@ -662,6 +689,8 @@
         "67": 6,
         "68": 7,
         "71": 7,
+        "74": 7,
+        "76": 4,
         "9": 1
       },
       "covering_tasks": [
@@ -674,7 +703,9 @@
         "20",
         "67",
         "68",
-        "71"
+        "71",
+        "74",
+        "76"
       ],
       "defects": [],
       "design_oracle_properties": [
@@ -792,6 +823,10 @@
           "67"
         ],
         [
+          "76",
+          "67"
+        ],
+        [
           "3",
           "68"
         ],
@@ -821,6 +856,10 @@
         ],
         [
           "67",
+          "68"
+        ],
+        [
+          "76",
           "68"
         ],
         [
@@ -858,6 +897,82 @@
         [
           "68",
           "71"
+        ],
+        [
+          "76",
+          "71"
+        ],
+        [
+          "3",
+          "74"
+        ],
+        [
+          "9",
+          "74"
+        ],
+        [
+          "10",
+          "74"
+        ],
+        [
+          "15",
+          "74"
+        ],
+        [
+          "17",
+          "74"
+        ],
+        [
+          "18",
+          "74"
+        ],
+        [
+          "20",
+          "74"
+        ],
+        [
+          "67",
+          "74"
+        ],
+        [
+          "68",
+          "74"
+        ],
+        [
+          "71",
+          "74"
+        ],
+        [
+          "76",
+          "74"
+        ],
+        [
+          "3",
+          "76"
+        ],
+        [
+          "9",
+          "76"
+        ],
+        [
+          "10",
+          "76"
+        ],
+        [
+          "15",
+          "76"
+        ],
+        [
+          "17",
+          "76"
+        ],
+        [
+          "18",
+          "76"
+        ],
+        [
+          "20",
+          "76"
         ]
       ],
       "independent_verification_tasks": [
@@ -869,13 +984,15 @@
         "20",
         "67",
         "68",
-        "71"
+        "71",
+        "74",
+        "76"
       ],
       "oracle_family": "ContentRevisionOracle",
       "oracle_family_row_digest": "4692706d4bea556e262ac46734dd966eea970b73338783a05034b755dda2f88e",
       "requirement": 2,
       "requirement_title": "统一内容版本域、共享 OO room 与单一 canonical 指针",
-      "requirements_line": 72,
+      "requirements_line": 77,
       "text_digest": "18f21636e3992ffe329f497e9c920ffa35f89e0215d959a97daedfd57fdf6b59"
     },
     {
@@ -887,7 +1004,8 @@
         "20": 1,
         "3": 0,
         "68": 7,
-        "71": 7
+        "71": 7,
+        "74": 7
       },
       "covering_tasks": [
         "3",
@@ -896,7 +1014,8 @@
         "19",
         "20",
         "68",
-        "71"
+        "71",
+        "74"
       ],
       "defects": [],
       "design_oracle_properties": [
@@ -992,6 +1111,34 @@
         [
           "68",
           "71"
+        ],
+        [
+          "3",
+          "74"
+        ],
+        [
+          "15",
+          "74"
+        ],
+        [
+          "18",
+          "74"
+        ],
+        [
+          "19",
+          "74"
+        ],
+        [
+          "20",
+          "74"
+        ],
+        [
+          "68",
+          "74"
+        ],
+        [
+          "71",
+          "74"
         ]
       ],
       "independent_verification_tasks": [
@@ -1000,13 +1147,14 @@
         "19",
         "20",
         "68",
-        "71"
+        "71",
+        "74"
       ],
       "oracle_family": "ContentRevisionOracle",
       "oracle_family_row_digest": "4692706d4bea556e262ac46734dd966eea970b73338783a05034b755dda2f88e",
       "requirement": 2,
       "requirement_title": "统一内容版本域、共享 OO room 与单一 canonical 指针",
-      "requirements_line": 73,
+      "requirements_line": 78,
       "text_digest": "a5bc5a1fe7d4f29e0c4d69de1693e03b2d96447a1ffbb67e0a89cc7201df8382"
     },
     {
@@ -1017,6 +1165,7 @@
         "17": 1,
         "59": 5,
         "68": 7,
+        "76": 4,
         "9": 1
       },
       "covering_tasks": [
@@ -1025,7 +1174,8 @@
         "15",
         "17",
         "59",
-        "68"
+        "68",
+        "76"
       ],
       "defects": [
         "no_property_oracle"
@@ -1093,6 +1243,26 @@
         [
           "59",
           "68"
+        ],
+        [
+          "76",
+          "68"
+        ],
+        [
+          "9",
+          "76"
+        ],
+        [
+          "12",
+          "76"
+        ],
+        [
+          "15",
+          "76"
+        ],
+        [
+          "17",
+          "76"
         ]
       ],
       "independent_verification_tasks": [
@@ -1100,13 +1270,14 @@
         "15",
         "17",
         "59",
-        "68"
+        "68",
+        "76"
       ],
       "oracle_family": "ContentRevisionOracle",
       "oracle_family_row_digest": "4692706d4bea556e262ac46734dd966eea970b73338783a05034b755dda2f88e",
       "requirement": 2,
       "requirement_title": "统一内容版本域、共享 OO room 与单一 canonical 指针",
-      "requirements_line": 74,
+      "requirements_line": 79,
       "text_digest": "faaf26fd07a81983679dcf309043aec4330fd7dce887f751e01a6f0620943af7"
     },
     {
@@ -1118,6 +1289,7 @@
         "68": 7,
         "7": 0,
         "71": 7,
+        "76": 4,
         "9": 1
       },
       "covering_tasks": [
@@ -1127,7 +1299,8 @@
         "11",
         "15",
         "68",
-        "71"
+        "71",
+        "76"
       ],
       "defects": [],
       "design_oracle_properties": [
@@ -1201,6 +1374,10 @@
           "68"
         ],
         [
+          "76",
+          "68"
+        ],
+        [
           "7",
           "71"
         ],
@@ -1223,6 +1400,30 @@
         [
           "68",
           "71"
+        ],
+        [
+          "76",
+          "71"
+        ],
+        [
+          "7",
+          "76"
+        ],
+        [
+          "9",
+          "76"
+        ],
+        [
+          "10",
+          "76"
+        ],
+        [
+          "11",
+          "76"
+        ],
+        [
+          "15",
+          "76"
         ]
       ],
       "independent_verification_tasks": [
@@ -1231,13 +1432,14 @@
         "11",
         "15",
         "68",
-        "71"
+        "71",
+        "76"
       ],
       "oracle_family": "ContentRevisionOracle",
       "oracle_family_row_digest": "4692706d4bea556e262ac46734dd966eea970b73338783a05034b755dda2f88e",
       "requirement": 2,
       "requirement_title": "统一内容版本域、共享 OO room 与单一 canonical 指针",
-      "requirements_line": 75,
+      "requirements_line": 80,
       "text_digest": "e8d93b3f42764427febc589a6daeaccb42b8f5c34140f14160c546f85292d689"
     },
     {
@@ -1284,7 +1486,7 @@
       "oracle_family_row_digest": "4692706d4bea556e262ac46734dd966eea970b73338783a05034b755dda2f88e",
       "requirement": 2,
       "requirement_title": "统一内容版本域、共享 OO room 与单一 canonical 指针",
-      "requirements_line": 76,
+      "requirements_line": 81,
       "text_digest": "095c5f51dec1b3efa1b8bea38db74692f385d0fb3c2363e58a8584914030ce52"
     },
     {
@@ -1320,7 +1522,7 @@
       "oracle_family_row_digest": "4692706d4bea556e262ac46734dd966eea970b73338783a05034b755dda2f88e",
       "requirement": 2,
       "requirement_title": "统一内容版本域、共享 OO room 与单一 canonical 指针",
-      "requirements_line": 77,
+      "requirements_line": 82,
       "text_digest": "36bbb12752878da3a7de28efe787a2267360cd5008930bc93c5736e14506b6a7"
     },
     {
@@ -1356,7 +1558,7 @@
       "oracle_family_row_digest": "4692706d4bea556e262ac46734dd966eea970b73338783a05034b755dda2f88e",
       "requirement": 2,
       "requirement_title": "统一内容版本域、共享 OO room 与单一 canonical 指针",
-      "requirements_line": 78,
+      "requirements_line": 83,
       "text_digest": "c7fa881e1f4fe55829d5d561000dbf2dff114aa1a8906d1fdfc2f8e754b04515"
     },
     {
@@ -1384,7 +1586,7 @@
       "oracle_family_row_digest": "4692706d4bea556e262ac46734dd966eea970b73338783a05034b755dda2f88e",
       "requirement": 2,
       "requirement_title": "统一内容版本域、共享 OO room 与单一 canonical 指针",
-      "requirements_line": 79,
+      "requirements_line": 84,
       "text_digest": "fda1bedb9035d5ebf23e8957566085a8d524ea6e64dd4f5b5f049b0246378024"
     },
     {
@@ -1465,18 +1667,20 @@
       "oracle_family_row_digest": "4692706d4bea556e262ac46734dd966eea970b73338783a05034b755dda2f88e",
       "requirement": 2,
       "requirement_title": "统一内容版本域、共享 OO room 与单一 canonical 指针",
-      "requirements_line": 80,
+      "requirements_line": 85,
       "text_digest": "9c1e6f2c6fe45d6676aeb1930279cd253602607811ff74fac0ca766e06617bcf"
     },
     {
       "ac_id": "2.10",
       "covering_task_waves": {
         "12": 1,
-        "68": 7
+        "68": 7,
+        "75": 4
       },
       "covering_tasks": [
         "12",
-        "68"
+        "68",
+        "75"
       ],
       "defects": [],
       "design_oracle_properties": [
@@ -1492,27 +1696,38 @@
         [
           "12",
           "68"
+        ],
+        [
+          "75",
+          "68"
+        ],
+        [
+          "12",
+          "75"
         ]
       ],
       "independent_verification_tasks": [
-        "68"
+        "68",
+        "75"
       ],
       "oracle_family": "ContentRevisionOracle",
       "oracle_family_row_digest": "4692706d4bea556e262ac46734dd966eea970b73338783a05034b755dda2f88e",
       "requirement": 2,
       "requirement_title": "统一内容版本域、共享 OO room 与单一 canonical 指针",
-      "requirements_line": 81,
+      "requirements_line": 86,
       "text_digest": "b0b7aaf21a70c88613bbe8d99f3c7d397f38e138ae065c2b789ff3b62bcaecce"
     },
     {
       "ac_id": "2.11",
       "covering_task_waves": {
         "19": 1,
-        "65": 6
+        "65": 6,
+        "74": 7
       },
       "covering_tasks": [
         "19",
-        "65"
+        "65",
+        "74"
       ],
       "defects": [
         "no_property_oracle"
@@ -1528,16 +1743,25 @@
         [
           "19",
           "65"
+        ],
+        [
+          "19",
+          "74"
+        ],
+        [
+          "65",
+          "74"
         ]
       ],
       "independent_verification_tasks": [
-        "65"
+        "65",
+        "74"
       ],
       "oracle_family": "ContentRevisionOracle",
       "oracle_family_row_digest": "4692706d4bea556e262ac46734dd966eea970b73338783a05034b755dda2f88e",
       "requirement": 2,
       "requirement_title": "统一内容版本域、共享 OO room 与单一 canonical 指针",
-      "requirements_line": 82,
+      "requirements_line": 87,
       "text_digest": "625cbe6b52e6643ef1d666ceb767b88b2588dd3876d4dc7f7093ecb3e6087e9f"
     },
     {
@@ -1546,13 +1770,15 @@
         "16": 1,
         "18": 1,
         "20": 1,
-        "3": 0
+        "3": 0,
+        "74": 7
       },
       "covering_tasks": [
         "3",
         "16",
         "18",
-        "20"
+        "20",
+        "74"
       ],
       "defects": [
         "no_property_oracle"
@@ -1588,18 +1814,35 @@
         [
           "18",
           "20"
+        ],
+        [
+          "3",
+          "74"
+        ],
+        [
+          "16",
+          "74"
+        ],
+        [
+          "18",
+          "74"
+        ],
+        [
+          "20",
+          "74"
         ]
       ],
       "independent_verification_tasks": [
         "16",
         "18",
-        "20"
+        "20",
+        "74"
       ],
       "oracle_family": "ContentRevisionOracle",
       "oracle_family_row_digest": "4692706d4bea556e262ac46734dd966eea970b73338783a05034b755dda2f88e",
       "requirement": 2,
       "requirement_title": "统一内容版本域、共享 OO room 与单一 canonical 指针",
-      "requirements_line": 83,
+      "requirements_line": 88,
       "text_digest": "881f90a0a7673bfb7de51346cd2abdc856c5d50e43fae9a2e2e58eeb2d07233b"
     },
     {
@@ -1730,7 +1973,7 @@
       "oracle_family_row_digest": "406e519de18875d67e66754f31ac9ded8e920fd657d288876f81b904edc46d95",
       "requirement": 3,
       "requirement_title": "HTML → OO 的阻断式 materialize 协议",
-      "requirements_line": 91,
+      "requirements_line": 96,
       "text_digest": "3bb28ce538393af5785c1be4e5b0d87c894c22a380188d92678eaf7e1bb99369"
     },
     {
@@ -1766,20 +2009,23 @@
       "oracle_family_row_digest": "406e519de18875d67e66754f31ac9ded8e920fd657d288876f81b904edc46d95",
       "requirement": 3,
       "requirement_title": "HTML → OO 的阻断式 materialize 协议",
-      "requirements_line": 92,
+      "requirements_line": 97,
       "text_digest": "73773611e243ce20f2c39097ea60392b1e673d9cc14278576e893be6d7cec8b2"
     },
     {
       "ac_id": "3.3",
       "covering_task_waves": {
-        "25": 2
+        "25": 2,
+        "75": 4,
+        "76": 4
       },
       "covering_tasks": [
-        "25"
+        "25",
+        "75",
+        "76"
       ],
       "defects": [
-        "no_property_oracle",
-        "self_certified_single_task"
+        "no_property_oracle"
       ],
       "design_oracle_properties": [],
       "earliest_wave": 2,
@@ -1788,13 +2034,29 @@
         "db_integration",
         "filesystem_artifact"
       ],
-      "implementation_verification_pairs": [],
-      "independent_verification_tasks": [],
+      "implementation_verification_pairs": [
+        [
+          "25",
+          "75"
+        ],
+        [
+          "25",
+          "76"
+        ],
+        [
+          "75",
+          "76"
+        ]
+      ],
+      "independent_verification_tasks": [
+        "75",
+        "76"
+      ],
       "oracle_family": "HtmlToOoProtocolOracle",
       "oracle_family_row_digest": "406e519de18875d67e66754f31ac9ded8e920fd657d288876f81b904edc46d95",
       "requirement": 3,
       "requirement_title": "HTML → OO 的阻断式 materialize 协议",
-      "requirements_line": 93,
+      "requirements_line": 98,
       "text_digest": "29ef9a13e884070a4eca9afa5a0911922df1aedac8363813a023dddc1e58986d"
     },
     {
@@ -1804,14 +2066,16 @@
         "25": 2,
         "38": 3,
         "68": 7,
-        "7": 0
+        "7": 0,
+        "76": 4
       },
       "covering_tasks": [
         "7",
         "11",
         "25",
         "38",
-        "68"
+        "68",
+        "76"
       ],
       "defects": [],
       "design_oracle_properties": [
@@ -1863,19 +2127,40 @@
         [
           "38",
           "68"
+        ],
+        [
+          "76",
+          "68"
+        ],
+        [
+          "7",
+          "76"
+        ],
+        [
+          "11",
+          "76"
+        ],
+        [
+          "25",
+          "76"
+        ],
+        [
+          "38",
+          "76"
         ]
       ],
       "independent_verification_tasks": [
         "11",
         "25",
         "38",
-        "68"
+        "68",
+        "76"
       ],
       "oracle_family": "HtmlToOoProtocolOracle",
       "oracle_family_row_digest": "406e519de18875d67e66754f31ac9ded8e920fd657d288876f81b904edc46d95",
       "requirement": 3,
       "requirement_title": "HTML → OO 的阻断式 materialize 协议",
-      "requirements_line": 94,
+      "requirements_line": 99,
       "text_digest": "209d98c8bac464ef8fb877ca223b20a1edbb82e3e03f0bf2d4085bc252a8f099"
     },
     {
@@ -1911,7 +2196,7 @@
       "oracle_family_row_digest": "406e519de18875d67e66754f31ac9ded8e920fd657d288876f81b904edc46d95",
       "requirement": 3,
       "requirement_title": "HTML → OO 的阻断式 materialize 协议",
-      "requirements_line": 95,
+      "requirements_line": 100,
       "text_digest": "f9bec559545bc45b81278582a26ea0fb0bf28c5ac2ef6a862558f7c0110f7662"
     },
     {
@@ -1923,6 +2208,7 @@
         "31": 3,
         "32": 3,
         "68": 7,
+        "76": 4,
         "9": 1
       },
       "covering_tasks": [
@@ -1932,7 +2218,8 @@
         "28",
         "31",
         "32",
-        "68"
+        "68",
+        "76"
       ],
       "defects": [],
       "design_oracle_properties": [
@@ -2028,6 +2315,34 @@
         [
           "32",
           "68"
+        ],
+        [
+          "76",
+          "68"
+        ],
+        [
+          "9",
+          "76"
+        ],
+        [
+          "15",
+          "76"
+        ],
+        [
+          "25",
+          "76"
+        ],
+        [
+          "28",
+          "76"
+        ],
+        [
+          "31",
+          "76"
+        ],
+        [
+          "32",
+          "76"
         ]
       ],
       "independent_verification_tasks": [
@@ -2036,13 +2351,14 @@
         "28",
         "31",
         "32",
-        "68"
+        "68",
+        "76"
       ],
       "oracle_family": "HtmlToOoProtocolOracle",
       "oracle_family_row_digest": "406e519de18875d67e66754f31ac9ded8e920fd657d288876f81b904edc46d95",
       "requirement": 3,
       "requirement_title": "HTML → OO 的阻断式 materialize 协议",
-      "requirements_line": 96,
+      "requirements_line": 101,
       "text_digest": "96c346976b189391b479a5a6049d55e73b183310d05eaf4936c3102442b40974"
     },
     {
@@ -2204,7 +2520,7 @@
       "oracle_family_row_digest": "406e519de18875d67e66754f31ac9ded8e920fd657d288876f81b904edc46d95",
       "requirement": 3,
       "requirement_title": "HTML → OO 的阻断式 materialize 协议",
-      "requirements_line": 97,
+      "requirements_line": 102,
       "text_digest": "c1e33e216c3d3e44ade2696dd6e8494c711f82928a10ef3273957695472d502b"
     },
     {
@@ -2232,7 +2548,7 @@
       "oracle_family_row_digest": "406e519de18875d67e66754f31ac9ded8e920fd657d288876f81b904edc46d95",
       "requirement": 3,
       "requirement_title": "HTML → OO 的阻断式 materialize 协议",
-      "requirements_line": 98,
+      "requirements_line": 103,
       "text_digest": "07835dccd92e77e8d79baea889b996ee0ec5ae0e12b3d6e1fa65404d2739e19b"
     },
     {
@@ -2268,7 +2584,7 @@
       "oracle_family_row_digest": "406e519de18875d67e66754f31ac9ded8e920fd657d288876f81b904edc46d95",
       "requirement": 3,
       "requirement_title": "HTML → OO 的阻断式 materialize 协议",
-      "requirements_line": 99,
+      "requirements_line": 104,
       "text_digest": "0af03962d85448e6ee432bc3c3c2cd41b7932ce1fd7e2fb5bd5e896971a4d64f"
     },
     {
@@ -2395,7 +2711,7 @@
       "oracle_family_row_digest": "027208445e36f09a15f0e121d3183549667e519811425afe14e7ad7c4270ee0c",
       "requirement": 4,
       "requirement_title": "OO → HTML 的 forcesave、callback 生命周期与 durable ack",
-      "requirements_line": 107,
+      "requirements_line": 112,
       "text_digest": "67e7823f78fd1a4f4d0a0f1d9e78b96c64d9edd23f6427d2a1efac3e3b8b270e"
     },
     {
@@ -2431,7 +2747,7 @@
       "oracle_family_row_digest": "027208445e36f09a15f0e121d3183549667e519811425afe14e7ad7c4270ee0c",
       "requirement": 4,
       "requirement_title": "OO → HTML 的 forcesave、callback 生命周期与 durable ack",
-      "requirements_line": 108,
+      "requirements_line": 113,
       "text_digest": "e91d7f66067f5baa69ebea2f29df651f85e90528e852a4b39ca1e60b582651be"
     },
     {
@@ -2562,7 +2878,7 @@
       "oracle_family_row_digest": "027208445e36f09a15f0e121d3183549667e519811425afe14e7ad7c4270ee0c",
       "requirement": 4,
       "requirement_title": "OO → HTML 的 forcesave、callback 生命周期与 durable ack",
-      "requirements_line": 109,
+      "requirements_line": 114,
       "text_digest": "de201545b2373c14361f602e08a462b6ac9e2aa5daef2aa2ed556a3faed596fd"
     },
     {
@@ -2609,7 +2925,7 @@
       "oracle_family_row_digest": "027208445e36f09a15f0e121d3183549667e519811425afe14e7ad7c4270ee0c",
       "requirement": 4,
       "requirement_title": "OO → HTML 的 forcesave、callback 生命周期与 durable ack",
-      "requirements_line": 110,
+      "requirements_line": 115,
       "text_digest": "49f82c6f58e97cc5c0baeafb63984e8501234bca950194ac57a1757e79a5c547"
     },
     {
@@ -2656,7 +2972,7 @@
       "oracle_family_row_digest": "027208445e36f09a15f0e121d3183549667e519811425afe14e7ad7c4270ee0c",
       "requirement": 4,
       "requirement_title": "OO → HTML 的 forcesave、callback 生命周期与 durable ack",
-      "requirements_line": 111,
+      "requirements_line": 116,
       "text_digest": "8bacf92abc067401b8892b2cb4f07a5af2ac839370bf82ddc2cd3a41b27a9096"
     },
     {
@@ -2692,7 +3008,7 @@
       "oracle_family_row_digest": "027208445e36f09a15f0e121d3183549667e519811425afe14e7ad7c4270ee0c",
       "requirement": 4,
       "requirement_title": "OO → HTML 的 forcesave、callback 生命周期与 durable ack",
-      "requirements_line": 112,
+      "requirements_line": 117,
       "text_digest": "7b508dc5af36aab9ada725374ec04c962c7d230df8ccd2072d4d11cea1e6c623"
     },
     {
@@ -2754,7 +3070,7 @@
       "oracle_family_row_digest": "027208445e36f09a15f0e121d3183549667e519811425afe14e7ad7c4270ee0c",
       "requirement": 4,
       "requirement_title": "OO → HTML 的 forcesave、callback 生命周期与 durable ack",
-      "requirements_line": 113,
+      "requirements_line": 118,
       "text_digest": "62987b615748e7299c250e82f569784e9edee5fb4ae8a5d4e4b0a1b0561a2ccf"
     },
     {
@@ -2790,7 +3106,7 @@
       "oracle_family_row_digest": "027208445e36f09a15f0e121d3183549667e519811425afe14e7ad7c4270ee0c",
       "requirement": 4,
       "requirement_title": "OO → HTML 的 forcesave、callback 生命周期与 durable ack",
-      "requirements_line": 114,
+      "requirements_line": 119,
       "text_digest": "93af2de981556aba9f5a7e91f51fc45b7668e0e8a0245457bf25606e6c04e872"
     },
     {
@@ -2837,7 +3153,7 @@
       "oracle_family_row_digest": "027208445e36f09a15f0e121d3183549667e519811425afe14e7ad7c4270ee0c",
       "requirement": 4,
       "requirement_title": "OO → HTML 的 forcesave、callback 生命周期与 durable ack",
-      "requirements_line": 115,
+      "requirements_line": 120,
       "text_digest": "1a1cbbdd8b4509ce29884cc809841b3bae61b83b56a3438f990b74ca57c87b2e"
     },
     {
@@ -2999,7 +3315,7 @@
       "oracle_family_row_digest": "027208445e36f09a15f0e121d3183549667e519811425afe14e7ad7c4270ee0c",
       "requirement": 4,
       "requirement_title": "OO → HTML 的 forcesave、callback 生命周期与 durable ack",
-      "requirements_line": 116,
+      "requirements_line": 121,
       "text_digest": "678ff84e63a572319201ebce5d95a27b8bde4e1aa26259bff4916b2decb060c7"
     },
     {
@@ -3146,6 +3462,14 @@
           "61"
         ],
         [
+          "40",
+          "61"
+        ],
+        [
+          "44",
+          "61"
+        ],
+        [
           "9",
           "68"
         ],
@@ -3270,7 +3594,7 @@
       "oracle_family_row_digest": "027208445e36f09a15f0e121d3183549667e519811425afe14e7ad7c4270ee0c",
       "requirement": 4,
       "requirement_title": "OO → HTML 的 forcesave、callback 生命周期与 durable ack",
-      "requirements_line": 117,
+      "requirements_line": 122,
       "text_digest": "1db0025a4367429239c49e05cda9f33733f64d07b46684d76340482aaa1f685f"
     },
     {
@@ -3298,7 +3622,7 @@
       "oracle_family_row_digest": "027208445e36f09a15f0e121d3183549667e519811425afe14e7ad7c4270ee0c",
       "requirement": 4,
       "requirement_title": "OO → HTML 的 forcesave、callback 生命周期与 durable ack",
-      "requirements_line": 118,
+      "requirements_line": 123,
       "text_digest": "f9dfad011a9c592340919a1ffe7d7b5d97ab6f3ba178234c54a6db2c599421a6"
     },
     {
@@ -3345,7 +3669,7 @@
       "oracle_family_row_digest": "cd47e31de4da426048d0b1c49f185577a3223f980b646ed55212ab1675bbc873",
       "requirement": 5,
       "requirement_title": "callback 安全、双层幂等与失败语义",
-      "requirements_line": 126,
+      "requirements_line": 131,
       "text_digest": "1daa10a343121521840857f50dda4c3d3c9f1986dcad6dfe5a11dae6ac263998"
     },
     {
@@ -3407,7 +3731,7 @@
       "oracle_family_row_digest": "cd47e31de4da426048d0b1c49f185577a3223f980b646ed55212ab1675bbc873",
       "requirement": 5,
       "requirement_title": "callback 安全、双层幂等与失败语义",
-      "requirements_line": 127,
+      "requirements_line": 132,
       "text_digest": "4f02a757bd92fac4f979acd0efaba31318515fdbcc66f1470957a87a463e7a47"
     },
     {
@@ -3454,7 +3778,7 @@
       "oracle_family_row_digest": "cd47e31de4da426048d0b1c49f185577a3223f980b646ed55212ab1675bbc873",
       "requirement": 5,
       "requirement_title": "callback 安全、双层幂等与失败语义",
-      "requirements_line": 128,
+      "requirements_line": 133,
       "text_digest": "b24baa4c69d8b4ea2a1563644eb5fe93d1dca95e25723374bcebaa830fd01021"
     },
     {
@@ -3558,7 +3882,7 @@
       "oracle_family_row_digest": "cd47e31de4da426048d0b1c49f185577a3223f980b646ed55212ab1675bbc873",
       "requirement": 5,
       "requirement_title": "callback 安全、双层幂等与失败语义",
-      "requirements_line": 129,
+      "requirements_line": 134,
       "text_digest": "012dc9166386e549871bdefc2554c8fb672e4406cc22249aa09ce74143936e38"
     },
     {
@@ -3834,7 +4158,7 @@
       "oracle_family_row_digest": "cd47e31de4da426048d0b1c49f185577a3223f980b646ed55212ab1675bbc873",
       "requirement": 5,
       "requirement_title": "callback 安全、双层幂等与失败语义",
-      "requirements_line": 130,
+      "requirements_line": 135,
       "text_digest": "fbdfe0981670774cf0a14eb5080aa7b328c782f3a6a78a50683a5b4b5742f2bd"
     },
     {
@@ -3938,7 +4262,7 @@
       "oracle_family_row_digest": "cd47e31de4da426048d0b1c49f185577a3223f980b646ed55212ab1675bbc873",
       "requirement": 5,
       "requirement_title": "callback 安全、双层幂等与失败语义",
-      "requirements_line": 131,
+      "requirements_line": 136,
       "text_digest": "45b7e6cfec81e9985697368b770aca77bec7dbec967798e77797a3afa41f0b59"
     },
     {
@@ -3985,7 +4309,7 @@
       "oracle_family_row_digest": "cd47e31de4da426048d0b1c49f185577a3223f980b646ed55212ab1675bbc873",
       "requirement": 5,
       "requirement_title": "callback 安全、双层幂等与失败语义",
-      "requirements_line": 132,
+      "requirements_line": 137,
       "text_digest": "381c92e3efedd2cfc76d8a6eec306c13aae6842dbcdc6e50aba727df456349cb"
     },
     {
@@ -4354,7 +4678,7 @@
       "oracle_family_row_digest": "cd47e31de4da426048d0b1c49f185577a3223f980b646ed55212ab1675bbc873",
       "requirement": 5,
       "requirement_title": "callback 安全、双层幂等与失败语义",
-      "requirements_line": 133,
+      "requirements_line": 138,
       "text_digest": "f58c3f5ad5f7e3bd0409e7851b46e1bdd185c696fceb9387b92f3c2ae19cf643"
     },
     {
@@ -4401,7 +4725,7 @@
       "oracle_family_row_digest": "cd47e31de4da426048d0b1c49f185577a3223f980b646ed55212ab1675bbc873",
       "requirement": 5,
       "requirement_title": "callback 安全、双层幂等与失败语义",
-      "requirements_line": 134,
+      "requirements_line": 139,
       "text_digest": "da2e6bf43991a54bec6e135d4b1604b53180eeb15bcd20356091ee22a543879f"
     },
     {
@@ -4505,7 +4829,7 @@
       "oracle_family_row_digest": "cd47e31de4da426048d0b1c49f185577a3223f980b646ed55212ab1675bbc873",
       "requirement": 5,
       "requirement_title": "callback 安全、双层幂等与失败语义",
-      "requirements_line": 135,
+      "requirements_line": 140,
       "text_digest": "4be26da02593d10f935e93033345f84c5e45e183fc257f17931259be32958bcd"
     },
     {
@@ -4586,7 +4910,7 @@
       "oracle_family_row_digest": "cd47e31de4da426048d0b1c49f185577a3223f980b646ed55212ab1675bbc873",
       "requirement": 5,
       "requirement_title": "callback 安全、双层幂等与失败语义",
-      "requirements_line": 136,
+      "requirements_line": 141,
       "text_digest": "a2f99c6f0fd791bf51187fece35b78ca12527872e1b27bbb6dd0aea454237e61"
     },
     {
@@ -4594,12 +4918,14 @@
       "covering_task_waves": {
         "22": 2,
         "30": 2,
+        "75": 4,
         "8": 0
       },
       "covering_tasks": [
         "8",
         "22",
-        "30"
+        "30",
+        "75"
       ],
       "defects": [
         "no_property_oracle"
@@ -4623,17 +4949,30 @@
         [
           "22",
           "30"
+        ],
+        [
+          "8",
+          "75"
+        ],
+        [
+          "22",
+          "75"
+        ],
+        [
+          "30",
+          "75"
         ]
       ],
       "independent_verification_tasks": [
         "22",
-        "30"
+        "30",
+        "75"
       ],
       "oracle_family": "CallbackSafetyOracle",
       "oracle_family_row_digest": "cd47e31de4da426048d0b1c49f185577a3223f980b646ed55212ab1675bbc873",
       "requirement": 5,
       "requirement_title": "callback 安全、双层幂等与失败语义",
-      "requirements_line": 137,
+      "requirements_line": 142,
       "text_digest": "e7264ffaa1c618a3459dbbfad81f24d7ae5b4b01254106f28ff9d4096f80ac5f"
     },
     {
@@ -4648,7 +4987,8 @@
         "53": 5,
         "54": 5,
         "68": 7,
-        "70": 7
+        "70": 7,
+        "75": 4
       },
       "covering_tasks": [
         "13",
@@ -4660,7 +5000,8 @@
         "53",
         "54",
         "68",
-        "70"
+        "70",
+        "75"
       ],
       "defects": [],
       "design_oracle_properties": [
@@ -4758,6 +5099,10 @@
           "68"
         ],
         [
+          "75",
+          "68"
+        ],
+        [
           "13",
           "70"
         ],
@@ -4792,6 +5137,18 @@
         [
           "68",
           "70"
+        ],
+        [
+          "75",
+          "70"
+        ],
+        [
+          "13",
+          "75"
+        ],
+        [
+          "36",
+          "75"
         ]
       ],
       "independent_verification_tasks": [
@@ -4803,13 +5160,14 @@
         "53",
         "54",
         "68",
-        "70"
+        "70",
+        "75"
       ],
       "oracle_family": "ExcelContractIdentityOracle",
       "oracle_family_row_digest": "b4b762c4bcf3a0266c0e6dda3a05de985503af5038e39fb861d36a3465e2549f",
       "requirement": 6,
       "requirement_title": "Excel 显式契约、模板增强与字段级三方合并",
-      "requirements_line": 145,
+      "requirements_line": 150,
       "text_digest": "92db097ee98f52a2bea221daf87515f94b43926953bc47be81695104d9779a0b"
     },
     {
@@ -4825,7 +5183,8 @@
         "53": 5,
         "54": 5,
         "68": 7,
-        "70": 7
+        "70": 7,
+        "76": 4
       },
       "covering_tasks": [
         "12",
@@ -4838,7 +5197,8 @@
         "53",
         "54",
         "68",
-        "70"
+        "70",
+        "76"
       ],
       "defects": [],
       "design_oracle_properties": [
@@ -4972,6 +5332,10 @@
           "68"
         ],
         [
+          "76",
+          "68"
+        ],
+        [
           "12",
           "70"
         ],
@@ -5010,6 +5374,22 @@
         [
           "68",
           "70"
+        ],
+        [
+          "76",
+          "70"
+        ],
+        [
+          "12",
+          "76"
+        ],
+        [
+          "13",
+          "76"
+        ],
+        [
+          "36",
+          "76"
         ]
       ],
       "independent_verification_tasks": [
@@ -5022,13 +5402,14 @@
         "53",
         "54",
         "68",
-        "70"
+        "70",
+        "76"
       ],
       "oracle_family": "ExcelContractIdentityOracle",
       "oracle_family_row_digest": "b4b762c4bcf3a0266c0e6dda3a05de985503af5038e39fb861d36a3465e2549f",
       "requirement": 6,
       "requirement_title": "Excel 显式契约、模板增强与字段级三方合并",
-      "requirements_line": 146,
+      "requirements_line": 151,
       "text_digest": "2b64df3c952f1f43ce7ac953325b65fd17c2f83e558e422cc91f495013276249"
     },
     {
@@ -5105,7 +5486,7 @@
       "oracle_family_row_digest": "b4b762c4bcf3a0266c0e6dda3a05de985503af5038e39fb861d36a3465e2549f",
       "requirement": 6,
       "requirement_title": "Excel 显式契约、模板增强与字段级三方合并",
-      "requirements_line": 147,
+      "requirements_line": 152,
       "text_digest": "7a6f87931bde59aebf4cf801c5bd1f2c0adab64e5e3bf27447925d23fdc9cf3b"
     },
     {
@@ -5259,7 +5640,7 @@
       "oracle_family_row_digest": "b4b762c4bcf3a0266c0e6dda3a05de985503af5038e39fb861d36a3465e2549f",
       "requirement": 6,
       "requirement_title": "Excel 显式契约、模板增强与字段级三方合并",
-      "requirements_line": 148,
+      "requirements_line": 153,
       "text_digest": "f66659bdee591144180fb7cebdfa8534b54a9343d324d83ce6ad4c2a859a44cc"
     },
     {
@@ -5444,7 +5825,7 @@
       "oracle_family_row_digest": "b4b762c4bcf3a0266c0e6dda3a05de985503af5038e39fb861d36a3465e2549f",
       "requirement": 6,
       "requirement_title": "Excel 显式契约、模板增强与字段级三方合并",
-      "requirements_line": 149,
+      "requirements_line": 154,
       "text_digest": "f5479a34d3cf2202eed80498a8fdd7b8e407eaef645ed013dbefe5d15f3b4fb3"
     },
     {
@@ -5544,7 +5925,7 @@
       "oracle_family_row_digest": "b4b762c4bcf3a0266c0e6dda3a05de985503af5038e39fb861d36a3465e2549f",
       "requirement": 6,
       "requirement_title": "Excel 显式契约、模板增强与字段级三方合并",
-      "requirements_line": 150,
+      "requirements_line": 155,
       "text_digest": "afa752ade88d2868c333fb07913c43a6d3cf9966339f6f5042502fee41d5516e"
     },
     {
@@ -5580,7 +5961,7 @@
       "oracle_family_row_digest": "b4b762c4bcf3a0266c0e6dda3a05de985503af5038e39fb861d36a3465e2549f",
       "requirement": 6,
       "requirement_title": "Excel 显式契约、模板增强与字段级三方合并",
-      "requirements_line": 151,
+      "requirements_line": 156,
       "text_digest": "aeddd9459d626915352c71686de22bb36936f7a5587b40914ad06f2a0c20d087"
     },
     {
@@ -5743,7 +6124,7 @@
       "oracle_family_row_digest": "b4b762c4bcf3a0266c0e6dda3a05de985503af5038e39fb861d36a3465e2549f",
       "requirement": 6,
       "requirement_title": "Excel 显式契约、模板增强与字段级三方合并",
-      "requirements_line": 152,
+      "requirements_line": 157,
       "text_digest": "673a28b46e520bd380d05fca96a221b379c94833cea104cfbc18bd9e8437dd5a"
     },
     {
@@ -5870,7 +6251,7 @@
       "oracle_family_row_digest": "b4b762c4bcf3a0266c0e6dda3a05de985503af5038e39fb861d36a3465e2549f",
       "requirement": 6,
       "requirement_title": "Excel 显式契约、模板增强与字段级三方合并",
-      "requirements_line": 153,
+      "requirements_line": 158,
       "text_digest": "901f12d0fd825730e68fb0dbf057b63b0539a6f835b1b40d202287ffab1225b7"
     },
     {
@@ -5891,7 +6272,10 @@
         "67": 6,
         "68": 7,
         "70": 7,
-        "71": 7
+        "71": 7,
+        "75": 4,
+        "76": 4,
+        "77": 4
       },
       "covering_tasks": [
         "12",
@@ -5909,7 +6293,10 @@
         "67",
         "68",
         "70",
-        "71"
+        "71",
+        "75",
+        "76",
+        "77"
       ],
       "defects": [],
       "design_oracle_properties": [
@@ -6139,6 +6526,18 @@
           "67"
         ],
         [
+          "75",
+          "67"
+        ],
+        [
+          "76",
+          "67"
+        ],
+        [
+          "77",
+          "67"
+        ],
+        [
           "12",
           "68"
         ],
@@ -6188,6 +6587,18 @@
         ],
         [
           "67",
+          "68"
+        ],
+        [
+          "75",
+          "68"
+        ],
+        [
+          "76",
+          "68"
+        ],
+        [
+          "77",
           "68"
         ],
         [
@@ -6244,6 +6655,18 @@
         ],
         [
           "68",
+          "70"
+        ],
+        [
+          "75",
+          "70"
+        ],
+        [
+          "76",
+          "70"
+        ],
+        [
+          "77",
           "70"
         ],
         [
@@ -6305,6 +6728,90 @@
         [
           "70",
           "71"
+        ],
+        [
+          "75",
+          "71"
+        ],
+        [
+          "76",
+          "71"
+        ],
+        [
+          "77",
+          "71"
+        ],
+        [
+          "12",
+          "75"
+        ],
+        [
+          "13",
+          "75"
+        ],
+        [
+          "17",
+          "75"
+        ],
+        [
+          "36",
+          "75"
+        ],
+        [
+          "43",
+          "75"
+        ],
+        [
+          "12",
+          "76"
+        ],
+        [
+          "13",
+          "76"
+        ],
+        [
+          "17",
+          "76"
+        ],
+        [
+          "36",
+          "76"
+        ],
+        [
+          "43",
+          "76"
+        ],
+        [
+          "75",
+          "76"
+        ],
+        [
+          "12",
+          "77"
+        ],
+        [
+          "13",
+          "77"
+        ],
+        [
+          "17",
+          "77"
+        ],
+        [
+          "36",
+          "77"
+        ],
+        [
+          "43",
+          "77"
+        ],
+        [
+          "75",
+          "77"
+        ],
+        [
+          "76",
+          "77"
         ]
       ],
       "independent_verification_tasks": [
@@ -6322,13 +6829,16 @@
         "67",
         "68",
         "70",
-        "71"
+        "71",
+        "75",
+        "76",
+        "77"
       ],
       "oracle_family": "ExcelContractIdentityOracle",
       "oracle_family_row_digest": "b4b762c4bcf3a0266c0e6dda3a05de985503af5038e39fb861d36a3465e2549f",
       "requirement": 6,
       "requirement_title": "Excel 显式契约、模板增强与字段级三方合并",
-      "requirements_line": 154,
+      "requirements_line": 159,
       "text_digest": "e0c5a986ec4adf71b1a730b92d77e6ecbd1aa59b3ac02a11c3acae8065ad81e9"
     },
     {
@@ -6455,7 +6965,7 @@
       "oracle_family_row_digest": "b4b762c4bcf3a0266c0e6dda3a05de985503af5038e39fb861d36a3465e2549f",
       "requirement": 6,
       "requirement_title": "Excel 显式契约、模板增强与字段级三方合并",
-      "requirements_line": 155,
+      "requirements_line": 160,
       "text_digest": "0fb1d46789705f1afb304c8da24da7e49bc41a389df6e4792ee500c95d5e3c90"
     },
     {
@@ -6491,7 +7001,7 @@
       "oracle_family_row_digest": "b4b762c4bcf3a0266c0e6dda3a05de985503af5038e39fb861d36a3465e2549f",
       "requirement": 6,
       "requirement_title": "Excel 显式契约、模板增强与字段级三方合并",
-      "requirements_line": 156,
+      "requirements_line": 161,
       "text_digest": "9295814993fd54b5e2486624e03a9f329d5dcfd9c2a775802f8ebbcbbe34fbb7"
     },
     {
@@ -6538,7 +7048,7 @@
       "oracle_family_row_digest": "b4b762c4bcf3a0266c0e6dda3a05de985503af5038e39fb861d36a3465e2549f",
       "requirement": 6,
       "requirement_title": "Excel 显式契约、模板增强与字段级三方合并",
-      "requirements_line": 157,
+      "requirements_line": 162,
       "text_digest": "baca385394fcdfabe7c44b7db709912e82c52f836bdeea7d1d86e1942b75458a"
     },
     {
@@ -6595,7 +7105,7 @@
       "oracle_family_row_digest": "b4b762c4bcf3a0266c0e6dda3a05de985503af5038e39fb861d36a3465e2549f",
       "requirement": 6,
       "requirement_title": "Excel 显式契约、模板增强与字段级三方合并",
-      "requirements_line": 158,
+      "requirements_line": 163,
       "text_digest": "efd96ec4616840d7ea0cc891bbaa62bfaaee7204e8023fd46ceabb736bf214ab"
     },
     {
@@ -6676,7 +7186,7 @@
       "oracle_family_row_digest": "b4b762c4bcf3a0266c0e6dda3a05de985503af5038e39fb861d36a3465e2549f",
       "requirement": 6,
       "requirement_title": "Excel 显式契约、模板增强与字段级三方合并",
-      "requirements_line": 159,
+      "requirements_line": 164,
       "text_digest": "436d76f1f4b12fa08b3426f82c6b71f54d333544fca173c4e08408cf11640ba1"
     },
     {
@@ -6869,7 +7379,7 @@
       "oracle_family_row_digest": "b4b762c4bcf3a0266c0e6dda3a05de985503af5038e39fb861d36a3465e2549f",
       "requirement": 6,
       "requirement_title": "Excel 显式契约、模板增强与字段级三方合并",
-      "requirements_line": 160,
+      "requirements_line": 165,
       "text_digest": "7229d01cad1d45d92c1c991586781b43eb1c1b16bd377b138bf1ba277a558045"
     },
     {
@@ -6931,7 +7441,7 @@
       "oracle_family_row_digest": "b4b762c4bcf3a0266c0e6dda3a05de985503af5038e39fb861d36a3465e2549f",
       "requirement": 6,
       "requirement_title": "Excel 显式契约、模板增强与字段级三方合并",
-      "requirements_line": 161,
+      "requirements_line": 166,
       "text_digest": "0ebfff65b13589c28f4f33e85195a87acd7a187470111a8ee47c71eba514a446"
     },
     {
@@ -6947,7 +7457,10 @@
         "67": 6,
         "68": 7,
         "70": 7,
-        "71": 7
+        "71": 7,
+        "75": 4,
+        "76": 4,
+        "77": 4
       },
       "covering_tasks": [
         "15",
@@ -6960,7 +7473,10 @@
         "67",
         "68",
         "70",
-        "71"
+        "71",
+        "75",
+        "76",
+        "77"
       ],
       "defects": [],
       "design_oracle_properties": [
@@ -7062,6 +7578,18 @@
           "67"
         ],
         [
+          "75",
+          "67"
+        ],
+        [
+          "76",
+          "67"
+        ],
+        [
+          "77",
+          "67"
+        ],
+        [
           "15",
           "68"
         ],
@@ -7091,6 +7619,18 @@
         ],
         [
           "67",
+          "68"
+        ],
+        [
+          "75",
+          "68"
+        ],
+        [
+          "76",
+          "68"
+        ],
+        [
+          "77",
           "68"
         ],
         [
@@ -7127,6 +7667,18 @@
         ],
         [
           "68",
+          "70"
+        ],
+        [
+          "75",
+          "70"
+        ],
+        [
+          "76",
+          "70"
+        ],
+        [
+          "77",
           "70"
         ],
         [
@@ -7168,6 +7720,102 @@
         [
           "70",
           "71"
+        ],
+        [
+          "75",
+          "71"
+        ],
+        [
+          "76",
+          "71"
+        ],
+        [
+          "77",
+          "71"
+        ],
+        [
+          "15",
+          "75"
+        ],
+        [
+          "17",
+          "75"
+        ],
+        [
+          "25",
+          "75"
+        ],
+        [
+          "27",
+          "75"
+        ],
+        [
+          "36",
+          "75"
+        ],
+        [
+          "38",
+          "75"
+        ],
+        [
+          "15",
+          "76"
+        ],
+        [
+          "17",
+          "76"
+        ],
+        [
+          "25",
+          "76"
+        ],
+        [
+          "27",
+          "76"
+        ],
+        [
+          "36",
+          "76"
+        ],
+        [
+          "38",
+          "76"
+        ],
+        [
+          "75",
+          "76"
+        ],
+        [
+          "15",
+          "77"
+        ],
+        [
+          "17",
+          "77"
+        ],
+        [
+          "25",
+          "77"
+        ],
+        [
+          "27",
+          "77"
+        ],
+        [
+          "36",
+          "77"
+        ],
+        [
+          "38",
+          "77"
+        ],
+        [
+          "75",
+          "77"
+        ],
+        [
+          "76",
+          "77"
         ]
       ],
       "independent_verification_tasks": [
@@ -7180,13 +7828,16 @@
         "67",
         "68",
         "70",
-        "71"
+        "71",
+        "75",
+        "76",
+        "77"
       ],
       "oracle_family": "ExcelContractIdentityOracle",
       "oracle_family_row_digest": "b4b762c4bcf3a0266c0e6dda3a05de985503af5038e39fb861d36a3465e2549f",
       "requirement": 6,
       "requirement_title": "Excel 显式契约、模板增强与字段级三方合并",
-      "requirements_line": 162,
+      "requirements_line": 167,
       "text_digest": "b03e68e8df240ae009c108c19531fa016d2e9427c131e57f0968b7540ac78ffd"
     },
     {
@@ -7222,7 +7873,7 @@
       "oracle_family_row_digest": "b4b762c4bcf3a0266c0e6dda3a05de985503af5038e39fb861d36a3465e2549f",
       "requirement": 6,
       "requirement_title": "Excel 显式契约、模板增强与字段级三方合并",
-      "requirements_line": 163,
+      "requirements_line": 168,
       "text_digest": "95ef3c528608f899a0cdb753cdfbed1aa3331636a7206abb42ce10e9f3cb2873"
     },
     {
@@ -7230,12 +7881,14 @@
       "covering_task_waves": {
         "13": 1,
         "36": 3,
-        "37": 3
+        "37": 3,
+        "75": 4
       },
       "covering_tasks": [
         "13",
         "36",
-        "37"
+        "37",
+        "75"
       ],
       "defects": [
         "no_property_oracle"
@@ -7259,17 +7912,30 @@
         [
           "36",
           "37"
+        ],
+        [
+          "13",
+          "75"
+        ],
+        [
+          "36",
+          "75"
+        ],
+        [
+          "37",
+          "75"
         ]
       ],
       "independent_verification_tasks": [
         "36",
-        "37"
+        "37",
+        "75"
       ],
       "oracle_family": "ExcelContractIdentityOracle",
       "oracle_family_row_digest": "b4b762c4bcf3a0266c0e6dda3a05de985503af5038e39fb861d36a3465e2549f",
       "requirement": 6,
       "requirement_title": "Excel 显式契约、模板增强与字段级三方合并",
-      "requirements_line": 164,
+      "requirements_line": 169,
       "text_digest": "3c7be20568ff925c4d1a4f33fe46c199d7683b2a419f3f9260b79dfd170295e0"
     },
     {
@@ -7280,7 +7946,8 @@
         "62": 6,
         "64": 6,
         "68": 7,
-        "70": 7
+        "70": 7,
+        "77": 4
       },
       "covering_tasks": [
         "59",
@@ -7288,13 +7955,14 @@
         "62",
         "64",
         "68",
-        "70"
+        "70",
+        "77"
       ],
       "defects": [],
       "design_oracle_properties": [
         30
       ],
-      "earliest_wave": 5,
+      "earliest_wave": 4,
       "evidence_classes": [
         "contract_interlock",
         "filesystem_artifact",
@@ -7306,11 +7974,19 @@
           "61"
         ],
         [
+          "77",
+          "61"
+        ],
+        [
           "59",
           "62"
         ],
         [
           "61",
+          "62"
+        ],
+        [
+          "77",
           "62"
         ],
         [
@@ -7319,6 +7995,10 @@
         ],
         [
           "61",
+          "64"
+        ],
+        [
+          "77",
           "64"
         ],
         [
@@ -7335,6 +8015,10 @@
         ],
         [
           "64",
+          "68"
+        ],
+        [
+          "77",
           "68"
         ],
         [
@@ -7356,6 +8040,10 @@
         [
           "68",
           "70"
+        ],
+        [
+          "77",
+          "70"
         ]
       ],
       "independent_verification_tasks": [
@@ -7369,18 +8057,20 @@
       "oracle_family_row_digest": "10d1ba5014fc34ea3d29f2903d00a54c54b24ed90a2a014722788e81d3c89d13",
       "requirement": 7,
       "requirement_title": "Word SDT 结构化岛与自由正文隔离",
-      "requirements_line": 172,
+      "requirements_line": 177,
       "text_digest": "cec20f8c5efc4611ae145798521369ef0ab1f31d70334d5e6e9403ad7b2ebaf3"
     },
     {
       "ac_id": "7.2",
       "covering_task_waves": {
         "59": 5,
-        "6": 0
+        "6": 0,
+        "77": 4
       },
       "covering_tasks": [
         "6",
-        "59"
+        "59",
+        "77"
       ],
       "defects": [
         "no_property_oracle"
@@ -7396,16 +8086,21 @@
         [
           "6",
           "59"
+        ],
+        [
+          "6",
+          "77"
         ]
       ],
       "independent_verification_tasks": [
-        "59"
+        "59",
+        "77"
       ],
       "oracle_family": "WordSdtOracle",
       "oracle_family_row_digest": "10d1ba5014fc34ea3d29f2903d00a54c54b24ed90a2a014722788e81d3c89d13",
       "requirement": 7,
       "requirement_title": "Word SDT 结构化岛与自由正文隔离",
-      "requirements_line": 173,
+      "requirements_line": 178,
       "text_digest": "34fd516bf669131cf74e9b5ee97b01c36eaeedf47d91a57ab6a289fcba847c83"
     },
     {
@@ -7417,7 +8112,8 @@
         "62": 6,
         "64": 6,
         "68": 7,
-        "70": 7
+        "70": 7,
+        "77": 4
       },
       "covering_tasks": [
         "59",
@@ -7426,13 +8122,14 @@
         "62",
         "64",
         "68",
-        "70"
+        "70",
+        "77"
       ],
       "defects": [],
       "design_oracle_properties": [
         31
       ],
-      "earliest_wave": 5,
+      "earliest_wave": 4,
       "evidence_classes": [
         "contract_interlock",
         "filesystem_artifact",
@@ -7452,6 +8149,10 @@
           "61"
         ],
         [
+          "77",
+          "61"
+        ],
+        [
           "59",
           "62"
         ],
@@ -7464,6 +8165,10 @@
           "62"
         ],
         [
+          "77",
+          "62"
+        ],
+        [
           "59",
           "64"
         ],
@@ -7473,6 +8178,10 @@
         ],
         [
           "61",
+          "64"
+        ],
+        [
+          "77",
           "64"
         ],
         [
@@ -7493,6 +8202,10 @@
         ],
         [
           "64",
+          "68"
+        ],
+        [
+          "77",
           "68"
         ],
         [
@@ -7518,6 +8231,10 @@
         [
           "68",
           "70"
+        ],
+        [
+          "77",
+          "70"
         ]
       ],
       "independent_verification_tasks": [
@@ -7532,7 +8249,7 @@
       "oracle_family_row_digest": "10d1ba5014fc34ea3d29f2903d00a54c54b24ed90a2a014722788e81d3c89d13",
       "requirement": 7,
       "requirement_title": "Word SDT 结构化岛与自由正文隔离",
-      "requirements_line": 174,
+      "requirements_line": 179,
       "text_digest": "14ee92c2cfb88085f5cbc8e934c41df8d4b809c814a7f42ddc842c83ab37864d"
     },
     {
@@ -7544,7 +8261,8 @@
         "61": 5,
         "62": 6,
         "68": 7,
-        "70": 7
+        "70": 7,
+        "77": 4
       },
       "covering_tasks": [
         "14",
@@ -7553,7 +8271,8 @@
         "61",
         "62",
         "68",
-        "70"
+        "70",
+        "77"
       ],
       "defects": [],
       "design_oracle_properties": [
@@ -7591,6 +8310,10 @@
           "61"
         ],
         [
+          "77",
+          "61"
+        ],
+        [
           "14",
           "62"
         ],
@@ -7604,6 +8327,10 @@
         ],
         [
           "61",
+          "62"
+        ],
+        [
+          "77",
           "62"
         ],
         [
@@ -7624,6 +8351,10 @@
         ],
         [
           "62",
+          "68"
+        ],
+        [
+          "77",
           "68"
         ],
         [
@@ -7649,6 +8380,14 @@
         [
           "68",
           "70"
+        ],
+        [
+          "77",
+          "70"
+        ],
+        [
+          "14",
+          "77"
         ]
       ],
       "independent_verification_tasks": [
@@ -7657,13 +8396,14 @@
         "61",
         "62",
         "68",
-        "70"
+        "70",
+        "77"
       ],
       "oracle_family": "WordSdtOracle",
       "oracle_family_row_digest": "10d1ba5014fc34ea3d29f2903d00a54c54b24ed90a2a014722788e81d3c89d13",
       "requirement": 7,
       "requirement_title": "Word SDT 结构化岛与自由正文隔离",
-      "requirements_line": 175,
+      "requirements_line": 180,
       "text_digest": "07def1b2621a8611d9a3138fcb5a434dfec72f11331d01703f648f24a69b97c7"
     },
     {
@@ -7671,12 +8411,14 @@
       "covering_task_waves": {
         "59": 5,
         "6": 0,
-        "62": 6
+        "62": 6,
+        "77": 4
       },
       "covering_tasks": [
         "6",
         "59",
-        "62"
+        "62",
+        "77"
       ],
       "defects": [
         "no_property_oracle"
@@ -7700,17 +8442,26 @@
         [
           "59",
           "62"
+        ],
+        [
+          "77",
+          "62"
+        ],
+        [
+          "6",
+          "77"
         ]
       ],
       "independent_verification_tasks": [
         "59",
-        "62"
+        "62",
+        "77"
       ],
       "oracle_family": "WordSdtOracle",
       "oracle_family_row_digest": "10d1ba5014fc34ea3d29f2903d00a54c54b24ed90a2a014722788e81d3c89d13",
       "requirement": 7,
       "requirement_title": "Word SDT 结构化岛与自由正文隔离",
-      "requirements_line": 176,
+      "requirements_line": 181,
       "text_digest": "738016b5b32db3cb809a3a24a39f63fb1bae92cbae15dee4bff1dd051b35d840"
     },
     {
@@ -7772,7 +8523,7 @@
       "oracle_family_row_digest": "10d1ba5014fc34ea3d29f2903d00a54c54b24ed90a2a014722788e81d3c89d13",
       "requirement": 7,
       "requirement_title": "Word SDT 结构化岛与自由正文隔离",
-      "requirements_line": 177,
+      "requirements_line": 182,
       "text_digest": "a7a7ac3ed6d7cfc9e88bea07dca44eaa0eb30dd4ec4cb3bf0b08449e25e6b62b"
     },
     {
@@ -7808,7 +8559,7 @@
       "oracle_family_row_digest": "10d1ba5014fc34ea3d29f2903d00a54c54b24ed90a2a014722788e81d3c89d13",
       "requirement": 7,
       "requirement_title": "Word SDT 结构化岛与自由正文隔离",
-      "requirements_line": 178,
+      "requirements_line": 183,
       "text_digest": "79996680ee3d7a367db1e54d0583b1e6ef30de27afefdb652f461e651a81dc20"
     },
     {
@@ -7817,19 +8568,21 @@
         "59": 5,
         "61": 5,
         "62": 6,
-        "70": 7
+        "70": 7,
+        "77": 4
       },
       "covering_tasks": [
         "59",
         "61",
         "62",
-        "70"
+        "70",
+        "77"
       ],
       "defects": [],
       "design_oracle_properties": [
         34
       ],
-      "earliest_wave": 5,
+      "earliest_wave": 4,
       "evidence_classes": [
         "contract_interlock",
         "filesystem_artifact",
@@ -7841,11 +8594,19 @@
           "61"
         ],
         [
+          "77",
+          "61"
+        ],
+        [
           "59",
           "62"
         ],
         [
           "61",
+          "62"
+        ],
+        [
+          "77",
           "62"
         ],
         [
@@ -7859,6 +8620,10 @@
         [
           "62",
           "70"
+        ],
+        [
+          "77",
+          "70"
         ]
       ],
       "independent_verification_tasks": [
@@ -7870,7 +8635,7 @@
       "oracle_family_row_digest": "10d1ba5014fc34ea3d29f2903d00a54c54b24ed90a2a014722788e81d3c89d13",
       "requirement": 7,
       "requirement_title": "Word SDT 结构化岛与自由正文隔离",
-      "requirements_line": 179,
+      "requirements_line": 184,
       "text_digest": "ab6a756af7cf6c3ca6e9726cc6ae0cd432922f7d5fd9c3178f8e26f679eef2fb"
     },
     {
@@ -7906,23 +8671,25 @@
       "oracle_family_row_digest": "10d1ba5014fc34ea3d29f2903d00a54c54b24ed90a2a014722788e81d3c89d13",
       "requirement": 7,
       "requirement_title": "Word SDT 结构化岛与自由正文隔离",
-      "requirements_line": 180,
+      "requirements_line": 185,
       "text_digest": "08331b2ce45a29648e9fb6d7e45a250cddbb44ca047403f925cd4bc397bb4823"
     },
     {
       "ac_id": "7.10",
       "covering_task_waves": {
-        "59": 5
+        "59": 5,
+        "77": 4
       },
       "covering_tasks": [
-        "59"
+        "59",
+        "77"
       ],
       "defects": [
         "no_property_oracle",
-        "self_certified_single_task"
+        "no_dependency_edge"
       ],
       "design_oracle_properties": [],
-      "earliest_wave": 5,
+      "earliest_wave": 4,
       "evidence_classes": [
         "contract_interlock",
         "filesystem_artifact",
@@ -7934,7 +8701,7 @@
       "oracle_family_row_digest": "10d1ba5014fc34ea3d29f2903d00a54c54b24ed90a2a014722788e81d3c89d13",
       "requirement": 7,
       "requirement_title": "Word SDT 结构化岛与自由正文隔离",
-      "requirements_line": 181,
+      "requirements_line": 186,
       "text_digest": "e860189e18bab66d631b72e9bf9cb0e0f3051a266032e30d8971e9630fbe3ea2"
     },
     {
@@ -8014,7 +8781,7 @@
       "oracle_family_row_digest": "7e4650dc96e9b3ca2cab84982d6d6749ed7c3c677d881f9e50f62333aa04c51e",
       "requirement": 8,
       "requirement_title": "冲突预览、人工裁决与可回滚",
-      "requirements_line": 189,
+      "requirements_line": 194,
       "text_digest": "3bb0eb5020971b08d97cc5f96fdb040d39ea0bdf19d025cfac74dff3199ba8ba"
     },
     {
@@ -8049,7 +8816,7 @@
       "oracle_family_row_digest": "7e4650dc96e9b3ca2cab84982d6d6749ed7c3c677d881f9e50f62333aa04c51e",
       "requirement": 8,
       "requirement_title": "冲突预览、人工裁决与可回滚",
-      "requirements_line": 190,
+      "requirements_line": 195,
       "text_digest": "70b3337f51f966d59e9e93a4e3ceabe017dd7a198883fc2fac697a585b43b832"
     },
     {
@@ -8084,7 +8851,7 @@
       "oracle_family_row_digest": "7e4650dc96e9b3ca2cab84982d6d6749ed7c3c677d881f9e50f62333aa04c51e",
       "requirement": 8,
       "requirement_title": "冲突预览、人工裁决与可回滚",
-      "requirements_line": 191,
+      "requirements_line": 196,
       "text_digest": "016f52a89a8b1d59e985c4446000eabc2ac619553e011034b9b836ec00c629c8"
     },
     {
@@ -8119,7 +8886,7 @@
       "oracle_family_row_digest": "7e4650dc96e9b3ca2cab84982d6d6749ed7c3c677d881f9e50f62333aa04c51e",
       "requirement": 8,
       "requirement_title": "冲突预览、人工裁决与可回滚",
-      "requirements_line": 192,
+      "requirements_line": 197,
       "text_digest": "71d098ab4ca2be91d740bd40ac9feb7b9b9e53942f49a5215a99668c7ab30a44"
     },
     {
@@ -8249,7 +9016,7 @@
       "oracle_family_row_digest": "7e4650dc96e9b3ca2cab84982d6d6749ed7c3c677d881f9e50f62333aa04c51e",
       "requirement": 8,
       "requirement_title": "冲突预览、人工裁决与可回滚",
-      "requirements_line": 193,
+      "requirements_line": 198,
       "text_digest": "c3747f4985e116178284e32702035dce04154eac4a7addf5cfd5db956a40c2e5"
     },
     {
@@ -8276,7 +9043,7 @@
       "oracle_family_row_digest": "7e4650dc96e9b3ca2cab84982d6d6749ed7c3c677d881f9e50f62333aa04c51e",
       "requirement": 8,
       "requirement_title": "冲突预览、人工裁决与可回滚",
-      "requirements_line": 194,
+      "requirements_line": 199,
       "text_digest": "1870cf323f395480701528492708f8df85f7dd8332cb255b1270f31e5f95a19c"
     },
     {
@@ -8311,7 +9078,7 @@
       "oracle_family_row_digest": "7e4650dc96e9b3ca2cab84982d6d6749ed7c3c677d881f9e50f62333aa04c51e",
       "requirement": 8,
       "requirement_title": "冲突预览、人工裁决与可回滚",
-      "requirements_line": 195,
+      "requirements_line": 200,
       "text_digest": "865c36d7d1ae41f3039ba5546e0c2a1d82ed1e5b66c7fed3b18d4b2bfe5a9bdf"
     },
     {
@@ -8338,7 +9105,7 @@
       "oracle_family_row_digest": "7e4650dc96e9b3ca2cab84982d6d6749ed7c3c677d881f9e50f62333aa04c51e",
       "requirement": 8,
       "requirement_title": "冲突预览、人工裁决与可回滚",
-      "requirements_line": 196,
+      "requirements_line": 201,
       "text_digest": "74025eb1896ea6316f8fe56f65226d591da4e6f0ce5a7888bab34474095a8442"
     },
     {
@@ -8384,7 +9151,7 @@
       "oracle_family_row_digest": "7e4650dc96e9b3ca2cab84982d6d6749ed7c3c677d881f9e50f62333aa04c51e",
       "requirement": 8,
       "requirement_title": "冲突预览、人工裁决与可回滚",
-      "requirements_line": 197,
+      "requirements_line": 202,
       "text_digest": "f344af7d1320ea6986fa5c0398a8750a1f4ccfd7ddc4f51e7001bac80db5f13f"
     },
     {
@@ -8520,6 +9287,10 @@
           "61"
         ],
         [
+          "44",
+          "61"
+        ],
+        [
           "59",
           "61"
         ],
@@ -8607,7 +9378,7 @@
       "oracle_family_row_digest": "7e4650dc96e9b3ca2cab84982d6d6749ed7c3c677d881f9e50f62333aa04c51e",
       "requirement": 8,
       "requirement_title": "冲突预览、人工裁决与可回滚",
-      "requirements_line": 198,
+      "requirements_line": 203,
       "text_digest": "e96600a0520f82e83537c25f8eb80eed51a21c9b47f24ca343926c8e3b501efe"
     },
     {
@@ -8679,7 +9450,7 @@
       "oracle_family_row_digest": "7e4650dc96e9b3ca2cab84982d6d6749ed7c3c677d881f9e50f62333aa04c51e",
       "requirement": 8,
       "requirement_title": "冲突预览、人工裁决与可回滚",
-      "requirements_line": 199,
+      "requirements_line": 204,
       "text_digest": "a467c62d8b1ad6bf981d8259a089d55ce6dfa7e9899bb0829b6abede5711dfbc"
     },
     {
@@ -8740,7 +9511,7 @@
       "oracle_family_row_digest": "7e4650dc96e9b3ca2cab84982d6d6749ed7c3c677d881f9e50f62333aa04c51e",
       "requirement": 8,
       "requirement_title": "冲突预览、人工裁决与可回滚",
-      "requirements_line": 200,
+      "requirements_line": 205,
       "text_digest": "62ac0a8604778af7a51da49611d53b81ede94aa894a74df658daad4ef6c05f89"
     },
     {
@@ -8816,7 +9587,7 @@
       "oracle_family_row_digest": "b05a051e7db7e9d388956ee7e906a6c79437cf18d3b275bf6d8cfd8bfc53cb7d",
       "requirement": 9,
       "requirement_title": "模板解析、canonical resolver 与版本化迁移统一",
-      "requirements_line": 208,
+      "requirements_line": 213,
       "text_digest": "1f1ae781f40b7ef307947167103d39d460c237e93555f89d9ed009f07acde947"
     },
     {
@@ -8852,7 +9623,7 @@
       "oracle_family_row_digest": "b05a051e7db7e9d388956ee7e906a6c79437cf18d3b275bf6d8cfd8bfc53cb7d",
       "requirement": 9,
       "requirement_title": "模板解析、canonical resolver 与版本化迁移统一",
-      "requirements_line": 209,
+      "requirements_line": 214,
       "text_digest": "007c9325636a4722e06e47dd935dd37c3673e10723b1e488545232b13c7ecb88"
     },
     {
@@ -8914,7 +9685,7 @@
       "oracle_family_row_digest": "b05a051e7db7e9d388956ee7e906a6c79437cf18d3b275bf6d8cfd8bfc53cb7d",
       "requirement": 9,
       "requirement_title": "模板解析、canonical resolver 与版本化迁移统一",
-      "requirements_line": 210,
+      "requirements_line": 215,
       "text_digest": "ff4e8b9d39e9a89837e7a396d03dab869b79255e351e0b2e3541b6a30b2f3dac"
     },
     {
@@ -8995,7 +9766,7 @@
       "oracle_family_row_digest": "b05a051e7db7e9d388956ee7e906a6c79437cf18d3b275bf6d8cfd8bfc53cb7d",
       "requirement": 9,
       "requirement_title": "模板解析、canonical resolver 与版本化迁移统一",
-      "requirements_line": 211,
+      "requirements_line": 216,
       "text_digest": "9529dcab27f63287ffdcc697507e151ce87e987d95a47caa051096186c4dde28"
     },
     {
@@ -9076,7 +9847,7 @@
       "oracle_family_row_digest": "b05a051e7db7e9d388956ee7e906a6c79437cf18d3b275bf6d8cfd8bfc53cb7d",
       "requirement": 9,
       "requirement_title": "模板解析、canonical resolver 与版本化迁移统一",
-      "requirements_line": 212,
+      "requirements_line": 217,
       "text_digest": "6dd5d01734e39dede81d1dad418434e9b844bbea33aebb01c91e6e6e3fa55ca1"
     },
     {
@@ -9180,7 +9951,7 @@
       "oracle_family_row_digest": "b05a051e7db7e9d388956ee7e906a6c79437cf18d3b275bf6d8cfd8bfc53cb7d",
       "requirement": 9,
       "requirement_title": "模板解析、canonical resolver 与版本化迁移统一",
-      "requirements_line": 213,
+      "requirements_line": 218,
       "text_digest": "0f0b2421564cd738e154fbdf17054542d662a48411513ca7e13d25d8c64a469b"
     },
     {
@@ -9216,7 +9987,7 @@
       "oracle_family_row_digest": "b05a051e7db7e9d388956ee7e906a6c79437cf18d3b275bf6d8cfd8bfc53cb7d",
       "requirement": 9,
       "requirement_title": "模板解析、canonical resolver 与版本化迁移统一",
-      "requirements_line": 214,
+      "requirements_line": 219,
       "text_digest": "b2fac72a39f4a6e3ee022fc94febb6115ca4c61c407d4a3d026df4969d5fc02f"
     },
     {
@@ -9316,7 +10087,7 @@
       "oracle_family_row_digest": "b05a051e7db7e9d388956ee7e906a6c79437cf18d3b275bf6d8cfd8bfc53cb7d",
       "requirement": 9,
       "requirement_title": "模板解析、canonical resolver 与版本化迁移统一",
-      "requirements_line": 215,
+      "requirements_line": 220,
       "text_digest": "e88fa6b7a15d9d014014f345b48e1eb0cd83696205a3872fc157e8ac304c8ae0"
     },
     {
@@ -9358,7 +10129,7 @@
       "oracle_family_row_digest": "b05a051e7db7e9d388956ee7e906a6c79437cf18d3b275bf6d8cfd8bfc53cb7d",
       "requirement": 9,
       "requirement_title": "模板解析、canonical resolver 与版本化迁移统一",
-      "requirements_line": 216,
+      "requirements_line": 221,
       "text_digest": "07a7c0e423c99dc5f7008f9efb03422d6454adb257af0bb0c38c32aa80e162f2"
     },
     {
@@ -9400,7 +10171,7 @@
       "oracle_family_row_digest": "b05a051e7db7e9d388956ee7e906a6c79437cf18d3b275bf6d8cfd8bfc53cb7d",
       "requirement": 9,
       "requirement_title": "模板解析、canonical resolver 与版本化迁移统一",
-      "requirements_line": 217,
+      "requirements_line": 222,
       "text_digest": "68230160e6338a8f82c5f01099a2169f5cd18576167aede6b6e5e785978795f0"
     },
     {
@@ -9410,14 +10181,16 @@
         "19": 1,
         "20": 1,
         "3": 0,
-        "58": 5
+        "58": 5,
+        "74": 7
       },
       "covering_tasks": [
         "3",
         "12",
         "19",
         "20",
-        "58"
+        "58",
+        "74"
       ],
       "defects": [
         "no_property_oracle"
@@ -9469,19 +10242,40 @@
         [
           "20",
           "58"
+        ],
+        [
+          "3",
+          "74"
+        ],
+        [
+          "12",
+          "74"
+        ],
+        [
+          "19",
+          "74"
+        ],
+        [
+          "20",
+          "74"
+        ],
+        [
+          "58",
+          "74"
         ]
       ],
       "independent_verification_tasks": [
         "12",
         "19",
         "20",
-        "58"
+        "58",
+        "74"
       ],
       "oracle_family": "TemplateResolverOracle",
       "oracle_family_row_digest": "b05a051e7db7e9d388956ee7e906a6c79437cf18d3b275bf6d8cfd8bfc53cb7d",
       "requirement": 9,
       "requirement_title": "模板解析、canonical resolver 与版本化迁移统一",
-      "requirements_line": 218,
+      "requirements_line": 223,
       "text_digest": "6b4ee04723919a5afbe1a65fc4aee9ec9b1f53ba0e01645ae961f0bf779cb4fb"
     },
     {
@@ -9517,7 +10311,7 @@
       "oracle_family_row_digest": "b05a051e7db7e9d388956ee7e906a6c79437cf18d3b275bf6d8cfd8bfc53cb7d",
       "requirement": 9,
       "requirement_title": "模板解析、canonical resolver 与版本化迁移统一",
-      "requirements_line": 219,
+      "requirements_line": 224,
       "text_digest": "da79f02108f6faa6e389c7dd33aa6dd62214b149d39455c06171f37a92626502"
     },
     {
@@ -9552,7 +10346,7 @@
       "oracle_family_row_digest": "7c96b6ae75c31f9ad2d153f9d434105224f5ef909f794ce831a011bd96e8e036",
       "requirement": 10,
       "requirement_title": "权限、并发、room participant 与会话撤销",
-      "requirements_line": 227,
+      "requirements_line": 232,
       "text_digest": "c67e8992bd08d5ae7ae5ac6dac0c0d6e29599e474f154d054dff551da72e47c7"
     },
     {
@@ -9655,7 +10449,7 @@
       "oracle_family_row_digest": "7c96b6ae75c31f9ad2d153f9d434105224f5ef909f794ce831a011bd96e8e036",
       "requirement": 10,
       "requirement_title": "权限、并发、room participant 与会话撤销",
-      "requirements_line": 228,
+      "requirements_line": 233,
       "text_digest": "a1c9e060c6b0a58699527b0e044abeffa90aa1c103edb95010bdd9519d505de2"
     },
     {
@@ -9785,7 +10579,7 @@
       "oracle_family_row_digest": "7c96b6ae75c31f9ad2d153f9d434105224f5ef909f794ce831a011bd96e8e036",
       "requirement": 10,
       "requirement_title": "权限、并发、room participant 与会话撤销",
-      "requirements_line": 229,
+      "requirements_line": 234,
       "text_digest": "d9b33699168a58f45fe82f840fa1548bb51d40db7ab42518ab49c7b44eb5d0b7"
     },
     {
@@ -9888,7 +10682,7 @@
       "oracle_family_row_digest": "7c96b6ae75c31f9ad2d153f9d434105224f5ef909f794ce831a011bd96e8e036",
       "requirement": 10,
       "requirement_title": "权限、并发、room participant 与会话撤销",
-      "requirements_line": 230,
+      "requirements_line": 235,
       "text_digest": "05ba71c1c45451327e42660e3a4aec24b6956db46e74099611789ed7c5884592"
     },
     {
@@ -9949,7 +10743,7 @@
       "oracle_family_row_digest": "7c96b6ae75c31f9ad2d153f9d434105224f5ef909f794ce831a011bd96e8e036",
       "requirement": 10,
       "requirement_title": "权限、并发、room participant 与会话撤销",
-      "requirements_line": 231,
+      "requirements_line": 236,
       "text_digest": "ed59008484390e9833d8331f3ad071e9389cc815ee9004fd901253302c43aaf6"
     },
     {
@@ -10010,7 +10804,7 @@
       "oracle_family_row_digest": "7c96b6ae75c31f9ad2d153f9d434105224f5ef909f794ce831a011bd96e8e036",
       "requirement": 10,
       "requirement_title": "权限、并发、room participant 与会话撤销",
-      "requirements_line": 232,
+      "requirements_line": 237,
       "text_digest": "45775a7494ad0c7562ec7159cf337369d3aaade7eccfd614a3a3e054bd533035"
     },
     {
@@ -10113,7 +10907,7 @@
       "oracle_family_row_digest": "7c96b6ae75c31f9ad2d153f9d434105224f5ef909f794ce831a011bd96e8e036",
       "requirement": 10,
       "requirement_title": "权限、并发、room participant 与会话撤销",
-      "requirements_line": 233,
+      "requirements_line": 238,
       "text_digest": "b5309187ba81061e813eb9c53f1e24d66991c7b1ae0655acf707cd813e336cb3"
     },
     {
@@ -10174,7 +10968,7 @@
       "oracle_family_row_digest": "7c96b6ae75c31f9ad2d153f9d434105224f5ef909f794ce831a011bd96e8e036",
       "requirement": 10,
       "requirement_title": "权限、并发、room participant 与会话撤销",
-      "requirements_line": 234,
+      "requirements_line": 239,
       "text_digest": "105ef0768f5436ba36593f563590f3e994b8c5f5483223200b5239259b370099"
     },
     {
@@ -10370,7 +11164,7 @@
       "oracle_family_row_digest": "7c96b6ae75c31f9ad2d153f9d434105224f5ef909f794ce831a011bd96e8e036",
       "requirement": 10,
       "requirement_title": "权限、并发、room participant 与会话撤销",
-      "requirements_line": 235,
+      "requirements_line": 240,
       "text_digest": "48a0fc9e6f7c7cd7e5b63b8818a5299f5199a389511daa4d70c7ead6cf29bfe0"
     },
     {
@@ -10558,7 +11352,7 @@
       "oracle_family_row_digest": "7c96b6ae75c31f9ad2d153f9d434105224f5ef909f794ce831a011bd96e8e036",
       "requirement": 10,
       "requirement_title": "权限、并发、room participant 与会话撤销",
-      "requirements_line": 236,
+      "requirements_line": 241,
       "text_digest": "34681fc02797a3e5e1c396558ac5b696219d75d351fe6fe8c60bd4c406520174"
     },
     {
@@ -10619,19 +11413,21 @@
       "oracle_family_row_digest": "7c96b6ae75c31f9ad2d153f9d434105224f5ef909f794ce831a011bd96e8e036",
       "requirement": 10,
       "requirement_title": "权限、并发、room participant 与会话撤销",
-      "requirements_line": 237,
+      "requirements_line": 242,
       "text_digest": "325871484c0ea7b64626eec46f976a9331575babfb7b39406c7a85b90a6c8537"
     },
     {
       "ac_id": "11.1",
       "covering_task_waves": {
         "32": 3,
+        "41": 4,
         "45": 4,
         "66": 6,
-        "72": 7
+        "72": 8
       },
       "covering_tasks": [
         "32",
+        "41",
         "45",
         "66",
         "72"
@@ -10648,10 +11444,22 @@
       "implementation_verification_pairs": [
         [
           "32",
+          "41"
+        ],
+        [
+          "32",
+          "45"
+        ],
+        [
+          "41",
           "45"
         ],
         [
           "32",
+          "66"
+        ],
+        [
+          "41",
           "66"
         ],
         [
@@ -10660,6 +11468,10 @@
         ],
         [
           "32",
+          "72"
+        ],
+        [
+          "41",
           "72"
         ],
         [
@@ -10672,6 +11484,7 @@
         ]
       ],
       "independent_verification_tasks": [
+        "41",
         "45",
         "66",
         "72"
@@ -10680,7 +11493,7 @@
       "oracle_family_row_digest": "7d4043bfce3d401bfc790eb19291ea54837b0489b8d8b11b9ab930e42984fcef",
       "requirement": 11,
       "requirement_title": "统一前端 launch descriptor、bridge 与可见状态机",
-      "requirements_line": 245,
+      "requirements_line": 250,
       "text_digest": "f028fca26b40dd8377242455b7a171c3bc79d5da4215c17dd2f33851b376d642"
     },
     {
@@ -10691,7 +11504,7 @@
         "34": 3,
         "66": 6,
         "69": 7,
-        "72": 7
+        "72": 8
       },
       "covering_tasks": [
         "31",
@@ -10783,18 +11596,20 @@
       "oracle_family_row_digest": "7d4043bfce3d401bfc790eb19291ea54837b0489b8d8b11b9ab930e42984fcef",
       "requirement": 11,
       "requirement_title": "统一前端 launch descriptor、bridge 与可见状态机",
-      "requirements_line": 246,
+      "requirements_line": 251,
       "text_digest": "98135dde4780e839619d15a024562ee268038b5b171862c432c7de06bc682f5c"
     },
     {
       "ac_id": "11.3",
       "covering_task_waves": {
         "32": 3,
-        "34": 3
+        "34": 3,
+        "41": 4
       },
       "covering_tasks": [
         "32",
-        "34"
+        "34",
+        "41"
       ],
       "defects": [
         "no_property_oracle"
@@ -10809,16 +11624,25 @@
         [
           "32",
           "34"
+        ],
+        [
+          "32",
+          "41"
+        ],
+        [
+          "34",
+          "41"
         ]
       ],
       "independent_verification_tasks": [
-        "34"
+        "34",
+        "41"
       ],
       "oracle_family": "FrontendBridgeOracle",
       "oracle_family_row_digest": "7d4043bfce3d401bfc790eb19291ea54837b0489b8d8b11b9ab930e42984fcef",
       "requirement": 11,
       "requirement_title": "统一前端 launch descriptor、bridge 与可见状态机",
-      "requirements_line": 247,
+      "requirements_line": 252,
       "text_digest": "814f5463ca0708a29a55293d3a333725fbce2ad777d53a95cb4f22f236e69492"
     },
     {
@@ -10898,7 +11722,7 @@
       "oracle_family_row_digest": "7d4043bfce3d401bfc790eb19291ea54837b0489b8d8b11b9ab930e42984fcef",
       "requirement": 11,
       "requirement_title": "统一前端 launch descriptor、bridge 与可见状态机",
-      "requirements_line": 248,
+      "requirements_line": 253,
       "text_digest": "a4ce35961fd3fc15445f3002b4f1c5266066b839720bd07d706d226469cd3d2c"
     },
     {
@@ -10907,17 +11731,19 @@
         "31": 3,
         "33": 3,
         "34": 3,
+        "41": 4,
         "45": 4,
         "60": 5,
         "64": 6,
         "66": 6,
         "69": 7,
-        "72": 7
+        "72": 8
       },
       "covering_tasks": [
         "31",
         "33",
         "34",
+        "41",
         "45",
         "60",
         "64",
@@ -10945,6 +11771,18 @@
         ],
         [
           "31",
+          "41"
+        ],
+        [
+          "33",
+          "41"
+        ],
+        [
+          "34",
+          "41"
+        ],
+        [
+          "31",
           "45"
         ],
         [
@@ -10953,6 +11791,10 @@
         ],
         [
           "34",
+          "45"
+        ],
+        [
+          "41",
           "45"
         ],
         [
@@ -10977,6 +11819,10 @@
         ],
         [
           "34",
+          "64"
+        ],
+        [
+          "41",
           "64"
         ],
         [
@@ -10993,6 +11839,10 @@
         ],
         [
           "34",
+          "66"
+        ],
+        [
+          "41",
           "66"
         ],
         [
@@ -11017,6 +11867,10 @@
         ],
         [
           "34",
+          "69"
+        ],
+        [
+          "41",
           "69"
         ],
         [
@@ -11045,6 +11899,10 @@
         ],
         [
           "34",
+          "72"
+        ],
+        [
+          "41",
           "72"
         ],
         [
@@ -11071,6 +11929,7 @@
       "independent_verification_tasks": [
         "33",
         "34",
+        "41",
         "45",
         "60",
         "64",
@@ -11082,7 +11941,7 @@
       "oracle_family_row_digest": "7d4043bfce3d401bfc790eb19291ea54837b0489b8d8b11b9ab930e42984fcef",
       "requirement": 11,
       "requirement_title": "统一前端 launch descriptor、bridge 与可见状态机",
-      "requirements_line": 249,
+      "requirements_line": 254,
       "text_digest": "e35b33502009c1d6da378b82cc0256f21319790f5d50e02ae795504bca36d949"
     },
     {
@@ -11158,7 +12017,7 @@
       "oracle_family_row_digest": "7d4043bfce3d401bfc790eb19291ea54837b0489b8d8b11b9ab930e42984fcef",
       "requirement": 11,
       "requirement_title": "统一前端 launch descriptor、bridge 与可见状态机",
-      "requirements_line": 250,
+      "requirements_line": 255,
       "text_digest": "be08880676ed2eec8f50279a1126e392324f3208f16622a44b2d1385c3ac3b00"
     },
     {
@@ -11185,7 +12044,7 @@
       "oracle_family_row_digest": "7d4043bfce3d401bfc790eb19291ea54837b0489b8d8b11b9ab930e42984fcef",
       "requirement": 11,
       "requirement_title": "统一前端 launch descriptor、bridge 与可见状态机",
-      "requirements_line": 251,
+      "requirements_line": 256,
       "text_digest": "c318b018714c2332e8c2e3238e0acaddadb761fb1928647da0c3e7e80926c97c"
     },
     {
@@ -11194,7 +12053,7 @@
         "32": 3,
         "45": 4,
         "66": 6,
-        "72": 7
+        "72": 8
       },
       "covering_tasks": [
         "32",
@@ -11246,7 +12105,7 @@
       "oracle_family_row_digest": "7d4043bfce3d401bfc790eb19291ea54837b0489b8d8b11b9ab930e42984fcef",
       "requirement": 11,
       "requirement_title": "统一前端 launch descriptor、bridge 与可见状态机",
-      "requirements_line": 252,
+      "requirements_line": 257,
       "text_digest": "bbb64f15c05a3e357310ed377be336aa0fd2a671e13e13adcd55f1c80ac0fdee"
     },
     {
@@ -11281,7 +12140,7 @@
       "oracle_family_row_digest": "7d4043bfce3d401bfc790eb19291ea54837b0489b8d8b11b9ab930e42984fcef",
       "requirement": 11,
       "requirement_title": "统一前端 launch descriptor、bridge 与可见状态机",
-      "requirements_line": 253,
+      "requirements_line": 258,
       "text_digest": "d0687d49d6a0d2c2223f604f854836a5954745294188932791132f80a0e2f9e2"
     },
     {
@@ -11293,7 +12152,7 @@
         "45": 4,
         "66": 6,
         "69": 7,
-        "72": 7
+        "72": 8
       },
       "covering_tasks": [
         "32",
@@ -11407,7 +12266,7 @@
       "oracle_family_row_digest": "7d4043bfce3d401bfc790eb19291ea54837b0489b8d8b11b9ab930e42984fcef",
       "requirement": 11,
       "requirement_title": "统一前端 launch descriptor、bridge 与可见状态机",
-      "requirements_line": 254,
+      "requirements_line": 259,
       "text_digest": "550865838bd77afb5c8b9993f716762e72db1685e74a77cab83e48208a53f442"
     },
     {
@@ -11453,7 +12312,7 @@
       "oracle_family_row_digest": "7d4043bfce3d401bfc790eb19291ea54837b0489b8d8b11b9ab930e42984fcef",
       "requirement": 11,
       "requirement_title": "统一前端 launch descriptor、bridge 与可见状态机",
-      "requirements_line": 255,
+      "requirements_line": 260,
       "text_digest": "b1159552c2072b3a82d02a5830184c6ace1f0f562185b82bc7599becc8d83b9c"
     },
     {
@@ -11510,7 +12369,7 @@
       "oracle_family_row_digest": "7d4043bfce3d401bfc790eb19291ea54837b0489b8d8b11b9ab930e42984fcef",
       "requirement": 11,
       "requirement_title": "统一前端 launch descriptor、bridge 与可见状态机",
-      "requirements_line": 256,
+      "requirements_line": 261,
       "text_digest": "7f4aa2618fb1cba2992552c55ae62360e7c544e4de4cefab5e191f0979b267f7"
     },
     {
@@ -11534,7 +12393,9 @@
         "56": 5,
         "57": 5,
         "62": 6,
-        "64": 6
+        "64": 6,
+        "75": 4,
+        "76": 4
       },
       "covering_tasks": [
         "13",
@@ -11555,7 +12416,9 @@
         "56",
         "57",
         "62",
-        "64"
+        "64",
+        "75",
+        "76"
       ],
       "defects": [
         "no_property_oracle"
@@ -11829,8 +12692,100 @@
           "62"
         ],
         [
+          "40",
+          "62"
+        ],
+        [
+          "41",
+          "62"
+        ],
+        [
+          "42",
+          "62"
+        ],
+        [
+          "43",
+          "62"
+        ],
+        [
+          "75",
+          "62"
+        ],
+        [
+          "76",
+          "62"
+        ],
+        [
           "13",
           "64"
+        ],
+        [
+          "40",
+          "64"
+        ],
+        [
+          "41",
+          "64"
+        ],
+        [
+          "42",
+          "64"
+        ],
+        [
+          "43",
+          "64"
+        ],
+        [
+          "75",
+          "64"
+        ],
+        [
+          "76",
+          "64"
+        ],
+        [
+          "13",
+          "75"
+        ],
+        [
+          "40",
+          "75"
+        ],
+        [
+          "41",
+          "75"
+        ],
+        [
+          "42",
+          "75"
+        ],
+        [
+          "43",
+          "75"
+        ],
+        [
+          "13",
+          "76"
+        ],
+        [
+          "40",
+          "76"
+        ],
+        [
+          "41",
+          "76"
+        ],
+        [
+          "42",
+          "76"
+        ],
+        [
+          "43",
+          "76"
+        ],
+        [
+          "75",
+          "76"
         ]
       ],
       "independent_verification_tasks": [
@@ -11851,13 +12806,15 @@
         "56",
         "57",
         "62",
-        "64"
+        "64",
+        "75",
+        "76"
       ],
       "oracle_family": "EntryEvidenceOracle",
       "oracle_family_row_digest": "951257433e2682b0b2f897cf9e13590a225ff20e16daa63f04418f31ed183067",
       "requirement": 12,
       "requirement_title": "adapter 分波迁移、模板改造与逐 entry 证据收口",
-      "requirements_line": 264,
+      "requirements_line": 269,
       "text_digest": "223b14b292fa1d88379ea213216a32e269120715105af312105f641fe05de2f4"
     },
     {
@@ -11869,7 +12826,8 @@
         "42": 4,
         "43": 4,
         "44": 4,
-        "70": 7
+        "70": 7,
+        "75": 4
       },
       "covering_tasks": [
         "39",
@@ -11878,7 +12836,8 @@
         "42",
         "43",
         "44",
-        "70"
+        "70",
+        "75"
       ],
       "defects": [],
       "design_oracle_properties": [
@@ -11950,6 +12909,34 @@
         [
           "44",
           "70"
+        ],
+        [
+          "75",
+          "70"
+        ],
+        [
+          "39",
+          "75"
+        ],
+        [
+          "40",
+          "75"
+        ],
+        [
+          "41",
+          "75"
+        ],
+        [
+          "42",
+          "75"
+        ],
+        [
+          "43",
+          "75"
+        ],
+        [
+          "44",
+          "75"
         ]
       ],
       "independent_verification_tasks": [
@@ -11958,13 +12945,14 @@
         "42",
         "43",
         "44",
-        "70"
+        "70",
+        "75"
       ],
       "oracle_family": "EntryEvidenceOracle",
       "oracle_family_row_digest": "951257433e2682b0b2f897cf9e13590a225ff20e16daa63f04418f31ed183067",
       "requirement": 12,
       "requirement_title": "adapter 分波迁移、模板改造与逐 entry 证据收口",
-      "requirements_line": 265,
+      "requirements_line": 270,
       "text_digest": "ea0ce3dcc032fe3398d066a7594df89803708048b9813f18da0d3d2803d71d20"
     },
     {
@@ -12000,7 +12988,7 @@
       "oracle_family_row_digest": "951257433e2682b0b2f897cf9e13590a225ff20e16daa63f04418f31ed183067",
       "requirement": 12,
       "requirement_title": "adapter 分波迁移、模板改造与逐 entry 证据收口",
-      "requirements_line": 266,
+      "requirements_line": 271,
       "text_digest": "47c27f92c0faae7b279fe60e07f9e6e7a952e0f68dd9af7f338ed2e76ab03425"
     },
     {
@@ -12050,7 +13038,7 @@
       "oracle_family_row_digest": "951257433e2682b0b2f897cf9e13590a225ff20e16daa63f04418f31ed183067",
       "requirement": 12,
       "requirement_title": "adapter 分波迁移、模板改造与逐 entry 证据收口",
-      "requirements_line": 267,
+      "requirements_line": 272,
       "text_digest": "52e8b4f80e9440270bff531a3c60645de2331aae443a59ce94434673ae7dbc06"
     },
     {
@@ -12059,19 +13047,21 @@
         "58": 5,
         "62": 6,
         "63": 6,
-        "64": 6
+        "64": 6,
+        "77": 4
       },
       "covering_tasks": [
         "58",
         "62",
         "63",
-        "64"
+        "64",
+        "77"
       ],
       "defects": [
         "no_property_oracle"
       ],
       "design_oracle_properties": [],
-      "earliest_wave": 5,
+      "earliest_wave": 4,
       "evidence_classes": [
         "contract_interlock",
         "db_integration",
@@ -12083,11 +13073,23 @@
           "62"
         ],
         [
+          "77",
+          "62"
+        ],
+        [
           "58",
           "63"
         ],
         [
+          "77",
+          "63"
+        ],
+        [
           "58",
+          "64"
+        ],
+        [
+          "77",
           "64"
         ]
       ],
@@ -12100,7 +13102,7 @@
       "oracle_family_row_digest": "951257433e2682b0b2f897cf9e13590a225ff20e16daa63f04418f31ed183067",
       "requirement": 12,
       "requirement_title": "adapter 分波迁移、模板改造与逐 entry 证据收口",
-      "requirements_line": 268,
+      "requirements_line": 273,
       "text_digest": "f088a453bb510af505ee14b041fde5881f44cbc9d15ae7a90723e62d13125232"
     },
     {
@@ -12109,13 +13111,15 @@
         "19": 1,
         "65": 6,
         "68": 7,
-        "70": 7
+        "70": 7,
+        "74": 7
       },
       "covering_tasks": [
         "19",
         "65",
         "68",
-        "70"
+        "70",
+        "74"
       ],
       "defects": [],
       "design_oracle_properties": [
@@ -12151,18 +13155,35 @@
         [
           "68",
           "70"
+        ],
+        [
+          "19",
+          "74"
+        ],
+        [
+          "65",
+          "74"
+        ],
+        [
+          "68",
+          "74"
+        ],
+        [
+          "70",
+          "74"
         ]
       ],
       "independent_verification_tasks": [
         "65",
         "68",
-        "70"
+        "70",
+        "74"
       ],
       "oracle_family": "EntryEvidenceOracle",
       "oracle_family_row_digest": "951257433e2682b0b2f897cf9e13590a225ff20e16daa63f04418f31ed183067",
       "requirement": 12,
       "requirement_title": "adapter 分波迁移、模板改造与逐 entry 证据收口",
-      "requirements_line": 269,
+      "requirements_line": 274,
       "text_digest": "b4ae9fe914693dacdabd56c6bed7a47cb9f1c84c5aacdaafb2ad9ef2752d77af"
     },
     {
@@ -12171,13 +13192,15 @@
         "19": 1,
         "60": 5,
         "66": 6,
-        "72": 7
+        "72": 8,
+        "74": 7
       },
       "covering_tasks": [
         "19",
         "60",
         "66",
-        "72"
+        "72",
+        "74"
       ],
       "defects": [
         "no_property_oracle"
@@ -12213,18 +13236,35 @@
         [
           "66",
           "72"
+        ],
+        [
+          "74",
+          "72"
+        ],
+        [
+          "19",
+          "74"
+        ],
+        [
+          "60",
+          "74"
+        ],
+        [
+          "66",
+          "74"
         ]
       ],
       "independent_verification_tasks": [
         "60",
         "66",
-        "72"
+        "72",
+        "74"
       ],
       "oracle_family": "EntryEvidenceOracle",
       "oracle_family_row_digest": "951257433e2682b0b2f897cf9e13590a225ff20e16daa63f04418f31ed183067",
       "requirement": 12,
       "requirement_title": "adapter 分波迁移、模板改造与逐 entry 证据收口",
-      "requirements_line": 270,
+      "requirements_line": 275,
       "text_digest": "2ea85944f9806dcc75ba4d00c2d0ff229a8b41a6999a66ef4c09db47f4e998b3"
     },
     {
@@ -12236,7 +13276,7 @@
         "57": 5,
         "63": 6,
         "66": 6,
-        "72": 7
+        "72": 8
       },
       "covering_tasks": [
         "2",
@@ -12331,7 +13371,7 @@
       "oracle_family_row_digest": "951257433e2682b0b2f897cf9e13590a225ff20e16daa63f04418f31ed183067",
       "requirement": 12,
       "requirement_title": "adapter 分波迁移、模板改造与逐 entry 证据收口",
-      "requirements_line": 271,
+      "requirements_line": 276,
       "text_digest": "899ddece52bdf81bf84cdcf66106f95f6eec875f8c6afcd21c5377db355c6bfc"
     },
     {
@@ -12340,7 +13380,7 @@
         "2": 0,
         "57": 5,
         "66": 6,
-        "72": 7
+        "72": 8
       },
       "covering_tasks": [
         "2",
@@ -12393,7 +13433,7 @@
       "oracle_family_row_digest": "951257433e2682b0b2f897cf9e13590a225ff20e16daa63f04418f31ed183067",
       "requirement": 12,
       "requirement_title": "adapter 分波迁移、模板改造与逐 entry 证据收口",
-      "requirements_line": 272,
+      "requirements_line": 277,
       "text_digest": "4d13091ee47abcf25874d7b0e25a09a76895997dc85a93b663f978ee53e6755b"
     },
     {
@@ -12429,7 +13469,7 @@
         "68": 7,
         "70": 7,
         "71": 7,
-        "72": 7,
+        "72": 8,
         "9": 1
       },
       "covering_tasks": [
@@ -13054,6 +14094,26 @@
           "61"
         ],
         [
+          "40",
+          "61"
+        ],
+        [
+          "41",
+          "61"
+        ],
+        [
+          "42",
+          "61"
+        ],
+        [
+          "43",
+          "61"
+        ],
+        [
+          "44",
+          "61"
+        ],
+        [
           "60",
           "61"
         ],
@@ -13070,6 +14130,26 @@
           "62"
         ],
         [
+          "40",
+          "62"
+        ],
+        [
+          "41",
+          "62"
+        ],
+        [
+          "42",
+          "62"
+        ],
+        [
+          "43",
+          "62"
+        ],
+        [
+          "44",
+          "62"
+        ],
+        [
           "60",
           "62"
         ],
@@ -13090,6 +14170,26 @@
           "63"
         ],
         [
+          "40",
+          "63"
+        ],
+        [
+          "41",
+          "63"
+        ],
+        [
+          "42",
+          "63"
+        ],
+        [
+          "43",
+          "63"
+        ],
+        [
+          "44",
+          "63"
+        ],
+        [
           "60",
           "63"
         ],
@@ -13107,6 +14207,26 @@
         ],
         [
           "39",
+          "64"
+        ],
+        [
+          "40",
+          "64"
+        ],
+        [
+          "41",
+          "64"
+        ],
+        [
+          "42",
+          "64"
+        ],
+        [
+          "43",
+          "64"
+        ],
+        [
+          "44",
           "64"
         ],
         [
@@ -13747,7 +14867,7 @@
       "oracle_family_row_digest": "951257433e2682b0b2f897cf9e13590a225ff20e16daa63f04418f31ed183067",
       "requirement": 12,
       "requirement_title": "adapter 分波迁移、模板改造与逐 entry 证据收口",
-      "requirements_line": 273,
+      "requirements_line": 278,
       "text_digest": "0592b81288f77a4d46ae9930ca5aa219adeefd0b1bd98b75101a04a563cae31a"
     },
     {
@@ -14173,7 +15293,7 @@
       "oracle_family_row_digest": "951257433e2682b0b2f897cf9e13590a225ff20e16daa63f04418f31ed183067",
       "requirement": 12,
       "requirement_title": "adapter 分波迁移、模板改造与逐 entry 证据收口",
-      "requirements_line": 274,
+      "requirements_line": 279,
       "text_digest": "10ff6e5d93caa1ebd978d25d11a331086d1dd0b3c5468fe8488e23c393b3f12f"
     },
     {
@@ -14201,7 +15321,7 @@
         "68": 7,
         "70": 7,
         "71": 7,
-        "72": 7,
+        "72": 8,
         "73": 1
       },
       "covering_tasks": [
@@ -14466,6 +15586,10 @@
           "62"
         ],
         [
+          "40",
+          "62"
+        ],
+        [
           "73",
           "62"
         ],
@@ -14478,6 +15602,10 @@
           "63"
         ],
         [
+          "40",
+          "63"
+        ],
+        [
           "73",
           "63"
         ],
@@ -14487,6 +15615,10 @@
         ],
         [
           "39",
+          "64"
+        ],
+        [
+          "40",
           "64"
         ],
         [
@@ -14943,7 +16075,7 @@
       "oracle_family_row_digest": "951257433e2682b0b2f897cf9e13590a225ff20e16daa63f04418f31ed183067",
       "requirement": 12,
       "requirement_title": "adapter 分波迁移、模板改造与逐 entry 证据收口",
-      "requirements_line": 275,
+      "requirements_line": 280,
       "text_digest": "50b9658260af6e85082bee0369b577a5ea907cec0250610cf1a06872c0abfb78"
     },
     {
@@ -14953,7 +16085,7 @@
         "66": 6,
         "67": 6,
         "70": 7,
-        "72": 7
+        "72": 8
       },
       "covering_tasks": [
         "45",
@@ -15024,7 +16156,7 @@
       "oracle_family_row_digest": "951257433e2682b0b2f897cf9e13590a225ff20e16daa63f04418f31ed183067",
       "requirement": 12,
       "requirement_title": "adapter 分波迁移、模板改造与逐 entry 证据收口",
-      "requirements_line": 276,
+      "requirements_line": 281,
       "text_digest": "5ddd04b25d585d968b2fccd163dcf58f67db278175b9267b267a299f801c67dd"
     },
     {
@@ -15034,7 +16166,7 @@
         "2": 0,
         "45": 4,
         "66": 6,
-        "72": 7,
+        "72": 8,
         "73": 1
       },
       "covering_tasks": [
@@ -15128,7 +16260,7 @@
       "oracle_family_row_digest": "951257433e2682b0b2f897cf9e13590a225ff20e16daa63f04418f31ed183067",
       "requirement": 12,
       "requirement_title": "adapter 分波迁移、模板改造与逐 entry 证据收口",
-      "requirements_line": 277,
+      "requirements_line": 282,
       "text_digest": "a68903bc1ed5bfdee20e6e5db30adaa404502b6c629c9b3e777996fbfaee7106"
     },
     {
@@ -15204,7 +16336,7 @@
       "oracle_family_row_digest": "3b5319b63b57c163985c9c09d4e48337e8af7294bbb6c3bfa883bd972e4f6769",
       "requirement": 13,
       "requirement_title": "事务后事件、append-only timeline 与运维可见性",
-      "requirements_line": 285,
+      "requirements_line": 290,
       "text_digest": "984fc6f0ac3aa73d75e0c290ca0679baa23562e5f19638dc3959bd8072bf730e"
     },
     {
@@ -15261,7 +16393,7 @@
       "oracle_family_row_digest": "3b5319b63b57c163985c9c09d4e48337e8af7294bbb6c3bfa883bd972e4f6769",
       "requirement": 13,
       "requirement_title": "事务后事件、append-only timeline 与运维可见性",
-      "requirements_line": 286,
+      "requirements_line": 291,
       "text_digest": "060c0bcc1627784070418f6e9a9dd8e8c0e29d3621ce89313421105fa6f7f7d1"
     },
     {
@@ -15296,7 +16428,7 @@
       "oracle_family_row_digest": "3b5319b63b57c163985c9c09d4e48337e8af7294bbb6c3bfa883bd972e4f6769",
       "requirement": 13,
       "requirement_title": "事务后事件、append-only timeline 与运维可见性",
-      "requirements_line": 287,
+      "requirements_line": 292,
       "text_digest": "c0f16655ac01faa61c26a6e4083e25c740acd1e8ae7a0d59ab2e815a0811c678"
     },
     {
@@ -15307,7 +16439,8 @@
         "29": 2,
         "3": 0,
         "35": 3,
-        "68": 7
+        "68": 7,
+        "74": 7
       },
       "covering_tasks": [
         "3",
@@ -15315,7 +16448,8 @@
         "18",
         "29",
         "35",
-        "68"
+        "68",
+        "74"
       ],
       "defects": [],
       "design_oracle_properties": [
@@ -15382,6 +16516,30 @@
         [
           "29",
           "68"
+        ],
+        [
+          "3",
+          "74"
+        ],
+        [
+          "16",
+          "74"
+        ],
+        [
+          "18",
+          "74"
+        ],
+        [
+          "29",
+          "74"
+        ],
+        [
+          "35",
+          "74"
+        ],
+        [
+          "68",
+          "74"
         ]
       ],
       "independent_verification_tasks": [
@@ -15389,13 +16547,14 @@
         "18",
         "29",
         "35",
-        "68"
+        "68",
+        "74"
       ],
       "oracle_family": "TimelineOutboxOracle",
       "oracle_family_row_digest": "3b5319b63b57c163985c9c09d4e48337e8af7294bbb6c3bfa883bd972e4f6769",
       "requirement": 13,
       "requirement_title": "事务后事件、append-only timeline 与运维可见性",
-      "requirements_line": 288,
+      "requirements_line": 293,
       "text_digest": "e3cd251fb9ea9b90aa5b2bf65dff1537ae67ef0e7567f026fdf47b11879ae6ce"
     },
     {
@@ -15498,7 +16657,7 @@
       "oracle_family_row_digest": "3b5319b63b57c163985c9c09d4e48337e8af7294bbb6c3bfa883bd972e4f6769",
       "requirement": 13,
       "requirement_title": "事务后事件、append-only timeline 与运维可见性",
-      "requirements_line": 289,
+      "requirements_line": 294,
       "text_digest": "f99aaaab7c36f987556ae7c7b442986c4b3c66092779cd3b39edc89a675079fd"
     },
     {
@@ -15533,7 +16692,7 @@
       "oracle_family_row_digest": "3b5319b63b57c163985c9c09d4e48337e8af7294bbb6c3bfa883bd972e4f6769",
       "requirement": 13,
       "requirement_title": "事务后事件、append-only timeline 与运维可见性",
-      "requirements_line": 290,
+      "requirements_line": 295,
       "text_digest": "c010ceece0b0ff83f39257aafaf9dba7cf293fb4c0d6aee15408bfa44238fc14"
     },
     {
@@ -15568,7 +16727,7 @@
       "oracle_family_row_digest": "3b5319b63b57c163985c9c09d4e48337e8af7294bbb6c3bfa883bd972e4f6769",
       "requirement": 13,
       "requirement_title": "事务后事件、append-only timeline 与运维可见性",
-      "requirements_line": 291,
+      "requirements_line": 296,
       "text_digest": "1308c7580b2a25674d134bd145db47e3aa91662ef986d22beb4dafb52e61cd75"
     },
     {
@@ -15603,7 +16762,7 @@
       "oracle_family_row_digest": "3b5319b63b57c163985c9c09d4e48337e8af7294bbb6c3bfa883bd972e4f6769",
       "requirement": 13,
       "requirement_title": "事务后事件、append-only timeline 与运维可见性",
-      "requirements_line": 292,
+      "requirements_line": 297,
       "text_digest": "9f05a2e5ba28632ee94b772ebd9c781af8ad0a74274aea8183a66282e95cf402"
     },
     {
@@ -15638,7 +16797,7 @@
       "oracle_family_row_digest": "3b5319b63b57c163985c9c09d4e48337e8af7294bbb6c3bfa883bd972e4f6769",
       "requirement": 13,
       "requirement_title": "事务后事件、append-only timeline 与运维可见性",
-      "requirements_line": 293,
+      "requirements_line": 298,
       "text_digest": "f5598a22d03e6fb5617b592514750069fc7e7a2f30f8c2ee6ba80148c52b3257"
     },
     {
@@ -15673,7 +16832,7 @@
       "oracle_family_row_digest": "3b5319b63b57c163985c9c09d4e48337e8af7294bbb6c3bfa883bd972e4f6769",
       "requirement": 13,
       "requirement_title": "事务后事件、append-only timeline 与运维可见性",
-      "requirements_line": 294,
+      "requirements_line": 299,
       "text_digest": "e14693d171fe20e8b8bc236710f6b8a1ccf1360a47c85b4b21ba292b5b4baaba"
     },
     {
@@ -16168,7 +17327,7 @@
       "oracle_family_row_digest": "c75affe6de02227d7a7fa7d5bf0da323ebb872338305cc865de1c5a3698f6635",
       "requirement": 14,
       "requirement_title": "测试、变异、真实 OO 验收、证据与性能边界",
-      "requirements_line": 302,
+      "requirements_line": 307,
       "text_digest": "6e4b84debcced9ed21aa6c8d4b08f57a69bf51091d508de4f938d65d9dc1d567"
     },
     {
@@ -16203,6 +17362,14 @@
         ],
         [
           "40",
+          "61"
+        ],
+        [
+          "44",
+          "61"
+        ],
+        [
+          "40",
           "70"
         ],
         [
@@ -16216,13 +17383,14 @@
       ],
       "independent_verification_tasks": [
         "44",
+        "61",
         "70"
       ],
       "oracle_family": "VerificationCapacityOracle",
       "oracle_family_row_digest": "c75affe6de02227d7a7fa7d5bf0da323ebb872338305cc865de1c5a3698f6635",
       "requirement": 14,
       "requirement_title": "测试、变异、真实 OO 验收、证据与性能边界",
-      "requirements_line": 303,
+      "requirements_line": 308,
       "text_digest": "e5dfca1915976d4fd8e66c8da8cc2b8d845ae5c5ed6ab91ebb93b6610d373e45"
     },
     {
@@ -16259,6 +17427,10 @@
         ],
         [
           "23",
+          "61"
+        ],
+        [
+          "44",
           "61"
         ],
         [
@@ -16300,7 +17472,7 @@
       "oracle_family_row_digest": "c75affe6de02227d7a7fa7d5bf0da323ebb872338305cc865de1c5a3698f6635",
       "requirement": 14,
       "requirement_title": "测试、变异、真实 OO 验收、证据与性能边界",
-      "requirements_line": 304,
+      "requirements_line": 309,
       "text_digest": "e9298a5b2034ab26c8c84f798b9d285b2876822fb85dea8430545bee1877dbcb"
     },
     {
@@ -16348,7 +17520,7 @@
       "oracle_family_row_digest": "c75affe6de02227d7a7fa7d5bf0da323ebb872338305cc865de1c5a3698f6635",
       "requirement": 14,
       "requirement_title": "测试、变异、真实 OO 验收、证据与性能边界",
-      "requirements_line": 305,
+      "requirements_line": 310,
       "text_digest": "e9698a5d4d6d33392ec5b4db45d62a2fe9d58d6f151a64ddcd2db1b1fd05310b"
     },
     {
@@ -16396,7 +17568,7 @@
       "oracle_family_row_digest": "c75affe6de02227d7a7fa7d5bf0da323ebb872338305cc865de1c5a3698f6635",
       "requirement": 14,
       "requirement_title": "测试、变异、真实 OO 验收、证据与性能边界",
-      "requirements_line": 306,
+      "requirements_line": 311,
       "text_digest": "e890ee3123243bc778f3491a53a84105a8d0c2223f660266fec65eda2358d8c6"
     },
     {
@@ -16433,6 +17605,10 @@
         ],
         [
           "7",
+          "61"
+        ],
+        [
+          "44",
           "61"
         ],
         [
@@ -16474,7 +17650,7 @@
       "oracle_family_row_digest": "c75affe6de02227d7a7fa7d5bf0da323ebb872338305cc865de1c5a3698f6635",
       "requirement": 14,
       "requirement_title": "测试、变异、真实 OO 验收、证据与性能边界",
-      "requirements_line": 307,
+      "requirements_line": 312,
       "text_digest": "55e15d7e758f1cc916e7807483595086dd763c0b89d5eff2c8ecc5c1c2839612"
     },
     {
@@ -16484,7 +17660,7 @@
         "61": 5,
         "69": 7,
         "71": 7,
-        "72": 7,
+        "72": 8,
         "8": 0
       },
       "covering_tasks": [
@@ -16513,6 +17689,10 @@
         ],
         [
           "8",
+          "61"
+        ],
+        [
+          "44",
           "61"
         ],
         [
@@ -16575,7 +17755,7 @@
       "oracle_family_row_digest": "c75affe6de02227d7a7fa7d5bf0da323ebb872338305cc865de1c5a3698f6635",
       "requirement": 14,
       "requirement_title": "测试、变异、真实 OO 验收、证据与性能边界",
-      "requirements_line": 308,
+      "requirements_line": 313,
       "text_digest": "3c314fee316e4178f14443d69019986eaa1078ed9d2bf09dc321fce14cf8444e"
     },
     {
@@ -16612,6 +17792,10 @@
         ],
         [
           "32",
+          "61"
+        ],
+        [
+          "44",
           "61"
         ],
         [
@@ -16653,7 +17837,7 @@
       "oracle_family_row_digest": "c75affe6de02227d7a7fa7d5bf0da323ebb872338305cc865de1c5a3698f6635",
       "requirement": 14,
       "requirement_title": "测试、变异、真实 OO 验收、证据与性能边界",
-      "requirements_line": 309,
+      "requirements_line": 314,
       "text_digest": "af9912365bd4ccf54f96cf58852b68c8b7261c2dbdead2e5f7d8eec6c7e13480"
     },
     {
@@ -16684,6 +17868,10 @@
       "implementation_verification_pairs": [
         [
           "44",
+          "61"
+        ],
+        [
+          "44",
           "70"
         ],
         [
@@ -16704,6 +17892,7 @@
         ]
       ],
       "independent_verification_tasks": [
+        "61",
         "70",
         "71"
       ],
@@ -16711,7 +17900,7 @@
       "oracle_family_row_digest": "c75affe6de02227d7a7fa7d5bf0da323ebb872338305cc865de1c5a3698f6635",
       "requirement": 14,
       "requirement_title": "测试、变异、真实 OO 验收、证据与性能边界",
-      "requirements_line": 310,
+      "requirements_line": 315,
       "text_digest": "e38dea2a3c0869913ab335c8a3874639df83ff7de796b4185df60b827f2b3d4f"
     },
     {
@@ -16721,7 +17910,7 @@
         "39": 3,
         "68": 7,
         "71": 7,
-        "72": 7
+        "72": 8
       },
       "covering_tasks": [
         "10",
@@ -16794,7 +17983,7 @@
       "oracle_family_row_digest": "c75affe6de02227d7a7fa7d5bf0da323ebb872338305cc865de1c5a3698f6635",
       "requirement": 14,
       "requirement_title": "测试、变异、真实 OO 验收、证据与性能边界",
-      "requirements_line": 311,
+      "requirements_line": 316,
       "text_digest": "8e1a9ac868ce4d457fd98f1252ae3285290bb74efa8bc7bb27233288a545c14b"
     },
     {
@@ -16876,7 +18065,7 @@
       "oracle_family_row_digest": "c75affe6de02227d7a7fa7d5bf0da323ebb872338305cc865de1c5a3698f6635",
       "requirement": 14,
       "requirement_title": "测试、变异、真实 OO 验收、证据与性能边界",
-      "requirements_line": 312,
+      "requirements_line": 317,
       "text_digest": "3383383034d7dc8f87a26b004e4ab061dca56dad4b570b2d5e834b05ed7fc617"
     },
     {
@@ -16913,7 +18102,7 @@
       "oracle_family_row_digest": "c75affe6de02227d7a7fa7d5bf0da323ebb872338305cc865de1c5a3698f6635",
       "requirement": 14,
       "requirement_title": "测试、变异、真实 OO 验收、证据与性能边界",
-      "requirements_line": 313,
+      "requirements_line": 318,
       "text_digest": "1c89240d35aaaf8bbe0ecb773a344366886ebb7b66ef5aed1a679e7c89f8bafb"
     },
     {
@@ -16921,7 +18110,7 @@
       "covering_task_waves": {
         "68": 7,
         "69": 7,
-        "72": 7,
+        "72": 8,
         "8": 0
       },
       "covering_tasks": [
@@ -16972,7 +18161,7 @@
       "oracle_family_row_digest": "c75affe6de02227d7a7fa7d5bf0da323ebb872338305cc865de1c5a3698f6635",
       "requirement": 14,
       "requirement_title": "测试、变异、真实 OO 验收、证据与性能边界",
-      "requirements_line": 314,
+      "requirements_line": 319,
       "text_digest": "eda926005bb21cdc52c4c2c43de3247d680e57a733dc60832f3805e688a454ba"
     },
     {
@@ -16982,7 +18171,7 @@
         "68": 7,
         "70": 7,
         "71": 7,
-        "72": 7
+        "72": 8
       },
       "covering_tasks": [
         "39",
@@ -17054,13 +18243,13 @@
       "oracle_family_row_digest": "c75affe6de02227d7a7fa7d5bf0da323ebb872338305cc865de1c5a3698f6635",
       "requirement": 14,
       "requirement_title": "测试、变异、真实 OO 验收、证据与性能边界",
-      "requirements_line": 315,
+      "requirements_line": 320,
       "text_digest": "9862b1cfee784d63b84371452d706a1314f37800e69ac777009272457c3f5c6a"
     },
     {
       "ac_id": "14.15",
       "covering_task_waves": {
-        "72": 7,
+        "72": 8,
         "8": 0
       },
       "covering_tasks": [
@@ -17091,7 +18280,7 @@
       "oracle_family_row_digest": "c75affe6de02227d7a7fa7d5bf0da323ebb872338305cc865de1c5a3698f6635",
       "requirement": 14,
       "requirement_title": "测试、变异、真实 OO 验收、证据与性能边界",
-      "requirements_line": 316,
+      "requirements_line": 321,
       "text_digest": "7539c856fea66db0a45dc4f34663ea0408d10a8d067a3c5cc79dd446ad7a102a"
     },
     {
@@ -17110,7 +18299,7 @@
         "68": 7,
         "70": 7,
         "71": 7,
-        "72": 7
+        "72": 8
       },
       "covering_tasks": [
         "5",
@@ -17221,6 +18410,10 @@
           "61"
         ],
         [
+          "44",
+          "61"
+        ],
+        [
           "59",
           "61"
         ],
@@ -17462,7 +18655,7 @@
       "oracle_family_row_digest": "c75affe6de02227d7a7fa7d5bf0da323ebb872338305cc865de1c5a3698f6635",
       "requirement": 14,
       "requirement_title": "测试、变异、真实 OO 验收、证据与性能边界",
-      "requirements_line": 317,
+      "requirements_line": 322,
       "text_digest": "afcaf41a71362db60a0f884a902875f11cd00700e7bd02460bed35b47943ded5"
     }
   ],
@@ -17487,9 +18680,9 @@
     "security_trace",
     "source_ast_inventory"
   ],
-  "facts_digest": "2dc8bbef9f0d586fabbad201e4dfcf32100d907166c48a7b9726d94ee4dcb632",
+  "facts_digest": "a42eeabd70fa53c207da42a2ca3cc6cdde9f80abcb3c24e55ac50fd9716fe8e6",
   "generated_by": "backend/scripts/gen/generate_workpaper_ac_coverage_matrix.py",
-  "matrix_digest": "7d2b2b81837a63befcc98b629002e0d52e80204bb476665a84e6fb12a52d8c4a",
+  "matrix_digest": "93939935e32f372f1be300f6e3735a05b648754fb72da7f6e35da648aa82b352",
   "oracle_families": [
     {
       "ac_ids": [
@@ -17503,7 +18696,7 @@
         "1.8"
       ],
       "ac_range": "1.1-1.8",
-      "design_line": 1880,
+      "design_line": 1885,
       "evidence_classes": [
         "contract_interlock",
         "dom_projection",
@@ -17529,7 +18722,7 @@
         "2.12"
       ],
       "ac_range": "2.1-2.12",
-      "design_line": 1881,
+      "design_line": 1886,
       "evidence_classes": [
         "contract_interlock",
         "db_integration",
@@ -17552,7 +18745,7 @@
         "3.9"
       ],
       "ac_range": "3.1-3.9",
-      "design_line": 1882,
+      "design_line": 1887,
       "evidence_classes": [
         "contract_interlock",
         "db_integration",
@@ -17578,7 +18771,7 @@
         "4.12"
       ],
       "ac_range": "4.1-4.12",
-      "design_line": 1883,
+      "design_line": 1888,
       "evidence_classes": [
         "capacity_fault",
         "db_integration",
@@ -17604,7 +18797,7 @@
         "5.12"
       ],
       "ac_range": "5.1-5.12",
-      "design_line": 1884,
+      "design_line": 1889,
       "evidence_classes": [
         "db_integration",
         "filesystem_artifact",
@@ -17638,7 +18831,7 @@
         "6.20"
       ],
       "ac_range": "6.1-6.20",
-      "design_line": 1885,
+      "design_line": 1890,
       "evidence_classes": [
         "contract_interlock",
         "filesystem_artifact",
@@ -17662,7 +18855,7 @@
         "7.10"
       ],
       "ac_range": "7.1-7.10",
-      "design_line": 1886,
+      "design_line": 1891,
       "evidence_classes": [
         "contract_interlock",
         "filesystem_artifact",
@@ -17688,7 +18881,7 @@
         "8.12"
       ],
       "ac_range": "8.1-8.12",
-      "design_line": 1887,
+      "design_line": 1892,
       "evidence_classes": [
         "db_integration",
         "filesystem_artifact"
@@ -17713,7 +18906,7 @@
         "9.12"
       ],
       "ac_range": "9.1-9.12",
-      "design_line": 1888,
+      "design_line": 1893,
       "evidence_classes": [
         "contract_interlock",
         "filesystem_artifact",
@@ -17738,7 +18931,7 @@
         "10.11"
       ],
       "ac_range": "10.1-10.11",
-      "design_line": 1889,
+      "design_line": 1894,
       "evidence_classes": [
         "db_integration",
         "security_trace"
@@ -17763,7 +18956,7 @@
         "11.12"
       ],
       "ac_range": "11.1-11.12",
-      "design_line": 1890,
+      "design_line": 1895,
       "evidence_classes": [
         "dom_projection",
         "real_onlyoffice_browser"
@@ -17790,7 +18983,7 @@
         "12.14"
       ],
       "ac_range": "12.1-12.14",
-      "design_line": 1891,
+      "design_line": 1896,
       "evidence_classes": [
         "contract_interlock",
         "db_integration",
@@ -17814,7 +19007,7 @@
         "13.10"
       ],
       "ac_range": "13.1-13.10",
-      "design_line": 1892,
+      "design_line": 1897,
       "evidence_classes": [
         "capacity_fault",
         "db_integration"
@@ -17843,7 +19036,7 @@
         "14.16"
       ],
       "ac_range": "14.1-14.16",
-      "design_line": 1893,
+      "design_line": 1898,
       "evidence_classes": [
         "capacity_fault",
         "db_integration",
@@ -17859,7 +19052,7 @@
   "properties": [
     {
       "defects": [],
-      "design_line": 1442,
+      "design_line": 1447,
       "property": 1,
       "title": "入口清册覆盖源码挂载点",
       "validates": [
@@ -17873,7 +19066,7 @@
     },
     {
       "defects": [],
-      "design_line": 1448,
+      "design_line": 1453,
       "property": 2,
       "title": "能力态取值封闭",
       "validates": [
@@ -17887,7 +19080,7 @@
     },
     {
       "defects": [],
-      "design_line": 1454,
+      "design_line": 1459,
       "property": 3,
       "title": "未注册 adapter 不得宣称双向",
       "validates": [
@@ -17902,12 +19095,13 @@
         "66",
         "67",
         "72",
-        "73"
+        "73",
+        "75"
       ]
     },
     {
       "defects": [],
-      "design_line": 1460,
+      "design_line": 1465,
       "property": 4,
       "title": "业务内容版本与 representation generation 正交",
       "validates": [
@@ -17921,12 +19115,14 @@
         "18",
         "20",
         "68",
-        "71"
+        "71",
+        "74",
+        "76"
       ]
     },
     {
       "defects": [],
-      "design_line": 1466,
+      "design_line": 1471,
       "property": 5,
       "title": "staged artifact 与 DB pointer 不产生悬空可见态",
       "validates": [
@@ -17939,12 +19135,13 @@
         "11",
         "15",
         "68",
-        "71"
+        "71",
+        "76"
       ]
     },
     {
       "defects": [],
-      "design_line": 1472,
+      "design_line": 1477,
       "property": 6,
       "title": "doc_key 与 mtime 解耦",
       "validates": [
@@ -17958,7 +19155,7 @@
     },
     {
       "defects": [],
-      "design_line": 1478,
+      "design_line": 1483,
       "property": 7,
       "title": "全链统一 canonical resolver",
       "validates": [
@@ -17966,12 +19163,13 @@
       ],
       "verifying_tasks": [
         "12",
-        "68"
+        "68",
+        "75"
       ]
     },
     {
       "defects": [],
-      "design_line": 1484,
+      "design_line": 1489,
       "property": 8,
       "title": "HTML flush 失败阻断 OO",
       "validates": [
@@ -17984,7 +19182,7 @@
     },
     {
       "defects": [],
-      "design_line": 1490,
+      "design_line": 1495,
       "property": 9,
       "title": "materialize 使用临时校验与原子发布",
       "validates": [
@@ -17999,7 +19197,7 @@
     },
     {
       "defects": [],
-      "design_line": 1496,
+      "design_line": 1501,
       "property": 10,
       "title": "单次业务 commit 与 representation 幂等",
       "validates": [
@@ -18012,12 +19210,13 @@
         "28",
         "31",
         "32",
-        "68"
+        "68",
+        "76"
       ]
     },
     {
       "defects": [],
-      "design_line": 1502,
+      "design_line": 1507,
       "property": 11,
       "title": "OO 打开前具备唯一 descriptor 且 ready 后服务端确认",
       "validates": [
@@ -18036,7 +19235,7 @@
     },
     {
       "defects": [],
-      "design_line": 1508,
+      "design_line": 1513,
       "property": 12,
       "title": "forcesave request/命令不是完成凭证",
       "validates": [
@@ -18050,7 +19249,7 @@
     },
     {
       "defects": [],
-      "design_line": 1514,
+      "design_line": 1519,
       "property": 13,
       "title": "callback 超时保持 OO",
       "validates": [
@@ -18064,7 +19263,7 @@
     },
     {
       "defects": [],
-      "design_line": 1520,
+      "design_line": 1525,
       "property": 14,
       "title": "applied 后加载精确 revision",
       "validates": [
@@ -18078,7 +19277,7 @@
     },
     {
       "defects": [],
-      "design_line": 1526,
+      "design_line": 1531,
       "property": 15,
       "title": "superseded/refresh-required room 或失效 lease 不能 forcesave",
       "validates": [
@@ -18093,7 +19292,7 @@
     },
     {
       "defects": [],
-      "design_line": 1532,
+      "design_line": 1537,
       "property": 16,
       "title": "callback claim version 真校验",
       "validates": [
@@ -18108,7 +19307,7 @@
     },
     {
       "defects": [],
-      "design_line": 1538,
+      "design_line": 1543,
       "property": 17,
       "title": "callback 文件先隔离校验",
       "validates": [
@@ -18125,7 +19324,7 @@
     },
     {
       "defects": [],
-      "design_line": 1544,
+      "design_line": 1549,
       "property": 18,
       "title": "delivery 可多次、frozen application 恰好一次",
       "validates": [
@@ -18144,7 +19343,7 @@
     },
     {
       "defects": [],
-      "design_line": 1550,
+      "design_line": 1555,
       "property": 19,
       "title": "耐久后处理失败向 OO ack",
       "validates": [
@@ -18160,7 +19359,7 @@
     },
     {
       "defects": [],
-      "design_line": 1556,
+      "design_line": 1561,
       "property": 20,
       "title": "generated col 占位不可注册生产 adapter",
       "validates": [
@@ -18181,7 +19380,7 @@
     },
     {
       "defects": [],
-      "design_line": 1562,
+      "design_line": 1567,
       "property": 21,
       "title": "contract 字段完整",
       "validates": [
@@ -18198,7 +19397,7 @@
     },
     {
       "defects": [],
-      "design_line": 1568,
+      "design_line": 1573,
       "property": 22,
       "title": "动态列 key 与 label 解耦",
       "validates": [
@@ -18217,7 +19416,7 @@
     },
     {
       "defects": [],
-      "design_line": 1574,
+      "design_line": 1579,
       "property": 23,
       "title": "动态行身份不使用下标",
       "validates": [
@@ -18237,7 +19436,7 @@
     },
     {
       "defects": [],
-      "design_line": 1580,
+      "design_line": 1585,
       "property": 24,
       "title": "保护字段修改形成冲突",
       "validates": [
@@ -18254,7 +19453,7 @@
     },
     {
       "defects": [],
-      "design_line": 1586,
+      "design_line": 1591,
       "property": 25,
       "title": "不同字段自动三方合并",
       "validates": [
@@ -18272,7 +19471,7 @@
     },
     {
       "defects": [],
-      "design_line": 1592,
+      "design_line": 1597,
       "property": 26,
       "title": "同字段异值必冲突",
       "validates": [
@@ -18290,7 +19489,7 @@
     },
     {
       "defects": [],
-      "design_line": 1598,
+      "design_line": 1603,
       "property": 27,
       "title": "delete/update 冲突不整表覆盖",
       "validates": [
@@ -18307,7 +19506,7 @@
     },
     {
       "defects": [],
-      "design_line": 1604,
+      "design_line": 1609,
       "property": 28,
       "title": "immutable definition 漂移 fail closed",
       "validates": [
@@ -18329,12 +19528,15 @@
         "67",
         "68",
         "70",
-        "71"
+        "71",
+        "75",
+        "76",
+        "77"
       ]
     },
     {
       "defects": [],
-      "design_line": 1610,
+      "design_line": 1615,
       "property": 29,
       "title": "materialize/extract roundtrip",
       "validates": [
@@ -18352,7 +19554,7 @@
     },
     {
       "defects": [],
-      "design_line": 1616,
+      "design_line": 1621,
       "property": 30,
       "title": "Word 只认 tagged SDT",
       "validates": [
@@ -18364,12 +19566,13 @@
         "62",
         "64",
         "68",
-        "70"
+        "70",
+        "77"
       ]
     },
     {
       "defects": [],
-      "design_line": 1622,
+      "design_line": 1627,
       "property": 31,
       "title": "Word-only 正文保留",
       "validates": [
@@ -18382,12 +19585,13 @@
         "62",
         "64",
         "68",
-        "70"
+        "70",
+        "77"
       ]
     },
     {
       "defects": [],
-      "design_line": 1628,
+      "design_line": 1633,
       "property": 32,
       "title": "Word 多实例异值冲突",
       "validates": [
@@ -18400,12 +19604,13 @@
         "61",
         "62",
         "68",
-        "70"
+        "70",
+        "77"
       ]
     },
     {
       "defects": [],
-      "design_line": 1634,
+      "design_line": 1639,
       "property": 33,
       "title": "Word pilot tag 往返保留",
       "validates": [
@@ -18420,7 +19625,7 @@
     },
     {
       "defects": [],
-      "design_line": 1640,
+      "design_line": 1645,
       "property": 34,
       "title": "SDT 丢失不降级",
       "validates": [
@@ -18430,12 +19635,13 @@
         "59",
         "61",
         "62",
-        "70"
+        "70",
+        "77"
       ]
     },
     {
       "defects": [],
-      "design_line": 1646,
+      "design_line": 1651,
       "property": 35,
       "title": "冲突记录双侧可追溯",
       "validates": [
@@ -18450,7 +19656,7 @@
     },
     {
       "defects": [],
-      "design_line": 1652,
+      "design_line": 1657,
       "property": 36,
       "title": "裁决 revision + incoming sequence 双 fence",
       "validates": [
@@ -18467,7 +19673,7 @@
     },
     {
       "defects": [],
-      "design_line": 1658,
+      "design_line": 1663,
       "property": 37,
       "title": "回滚创建新版本",
       "validates": [
@@ -18480,7 +19686,7 @@
     },
     {
       "defects": [],
-      "design_line": 1664,
+      "design_line": 1669,
       "property": 38,
       "title": "durable incoming 可无 forcesave 重试",
       "validates": [
@@ -18494,7 +19700,7 @@
     },
     {
       "defects": [],
-      "design_line": 1670,
+      "design_line": 1675,
       "property": 39,
       "title": "config/callback Word 路径一致",
       "validates": [
@@ -18509,7 +19715,7 @@
     },
     {
       "defects": [],
-      "design_line": 1676,
+      "design_line": 1681,
       "property": 40,
       "title": "子码模板最具体匹配",
       "validates": [
@@ -18525,7 +19731,7 @@
     },
     {
       "defects": [],
-      "design_line": 1682,
+      "design_line": 1687,
       "property": 41,
       "title": "模板缺失不异类型回退",
       "validates": [
@@ -18541,7 +19747,7 @@
     },
     {
       "defects": [],
-      "design_line": 1688,
+      "design_line": 1693,
       "property": 42,
       "title": "路径安全",
       "validates": [
@@ -18558,7 +19764,7 @@
     },
     {
       "defects": [],
-      "design_line": 1694,
+      "design_line": 1699,
       "property": 43,
       "title": "最终 commit 重验权限与 generation write fence",
       "validates": [
@@ -18578,7 +19784,7 @@
     },
     {
       "defects": [],
-      "design_line": 1700,
+      "design_line": 1705,
       "property": 44,
       "title": "只读/被撤销 contributor 零内容版本",
       "validates": [
@@ -18595,7 +19801,7 @@
     },
     {
       "defects": [],
-      "design_line": 1706,
+      "design_line": 1711,
       "property": 45,
       "title": "横向越权与撤权后幂等重放被拒",
       "validates": [
@@ -18610,7 +19816,7 @@
     },
     {
       "defects": [],
-      "design_line": 1712,
+      "design_line": 1717,
       "property": 46,
       "title": "bridge 状态转换封闭",
       "validates": [
@@ -18626,7 +19832,7 @@
     },
     {
       "defects": [],
-      "design_line": 1718,
+      "design_line": 1723,
       "property": 47,
       "title": "编辑器只消费 descriptor 并暴露 durable API",
       "validates": [
@@ -18646,7 +19852,7 @@
     },
     {
       "defects": [],
-      "design_line": 1724,
+      "design_line": 1729,
       "property": 48,
       "title": "同步失败不被成功文案覆盖",
       "validates": [
@@ -18664,7 +19870,7 @@
     },
     {
       "defects": [],
-      "design_line": 1730,
+      "design_line": 1735,
       "property": 49,
       "title": "pilot 四类 Excel 均覆盖",
       "validates": [
@@ -18677,12 +19883,13 @@
         "42",
         "43",
         "44",
-        "70"
+        "70",
+        "75"
       ]
     },
     {
       "defects": [],
-      "design_line": 1736,
+      "design_line": 1741,
       "property": 50,
       "title": "custom 保持 xlsx 权威且进入统一 representation 协议",
       "validates": [
@@ -18697,7 +19904,7 @@
     },
     {
       "defects": [],
-      "design_line": 1742,
+      "design_line": 1747,
       "property": 51,
       "title": "manifest/evidence 收口五个零",
       "validates": [
@@ -18712,7 +19919,7 @@
     },
     {
       "defects": [],
-      "design_line": 1748,
+      "design_line": 1753,
       "property": 52,
       "title": "outbox 仅 commit 后发布",
       "validates": [
@@ -18727,7 +19934,7 @@
     },
     {
       "defects": [],
-      "design_line": 1754,
+      "design_line": 1759,
       "property": 53,
       "title": "replay 保留完整 payload",
       "validates": [
@@ -18742,7 +19949,7 @@
     },
     {
       "defects": [],
-      "design_line": 1760,
+      "design_line": 1765,
       "property": 54,
       "title": "after-save 失败可重试",
       "validates": [
@@ -18758,7 +19965,7 @@
     },
     {
       "defects": [],
-      "design_line": 1766,
+      "design_line": 1771,
       "property": 55,
       "title": "真浏览器双向闭环",
       "validates": [
@@ -18773,7 +19980,7 @@
     },
     {
       "defects": [],
-      "design_line": 1772,
+      "design_line": 1777,
       "property": 56,
       "title": "重复 callback 零多版本",
       "validates": [
@@ -18788,7 +19995,7 @@
     },
     {
       "defects": [],
-      "design_line": 1778,
+      "design_line": 1783,
       "property": 57,
       "title": "变异四态准确",
       "validates": [
@@ -18802,7 +20009,7 @@
     },
     {
       "defects": [],
-      "design_line": 1784,
+      "design_line": 1789,
       "property": 58,
       "title": "客户端与服务端联合时序",
       "validates": [
@@ -18818,7 +20025,7 @@
     },
     {
       "defects": [],
-      "design_line": 1790,
+      "design_line": 1795,
       "property": 59,
       "title": "同 wp 串行跨 wp 并行",
       "validates": [
@@ -18832,7 +20039,7 @@
     },
     {
       "defects": [],
-      "design_line": 1796,
+      "design_line": 1801,
       "property": 60,
       "title": "大文件预算 fail visible",
       "validates": [
@@ -18848,7 +20055,7 @@
     },
     {
       "defects": [],
-      "design_line": 1802,
+      "design_line": 1807,
       "property": 61,
       "title": "所有 writer 进入唯一 revision 域",
       "validates": [
@@ -18861,12 +20068,13 @@
         "19",
         "20",
         "68",
-        "71"
+        "71",
+        "74"
       ]
     },
     {
       "defects": [],
-      "design_line": 1808,
+      "design_line": 1813,
       "property": 62,
       "title": "server last-applied 与 client-confirmed base 不混同",
       "validates": [
@@ -18888,7 +20096,7 @@
     },
     {
       "defects": [],
-      "design_line": 1814,
+      "design_line": 1819,
       "property": 63,
       "title": "shared room 聚合 callback 与 participant 撤销安全",
       "validates": [
@@ -18908,7 +20116,7 @@
     },
     {
       "defects": [],
-      "design_line": 1820,
+      "design_line": 1825,
       "property": 64,
       "title": "application identity 使用 frozen bundle 且不含 status",
       "validates": [
@@ -18930,7 +20138,7 @@
     },
     {
       "defects": [],
-      "design_line": 1826,
+      "design_line": 1831,
       "property": 65,
       "title": "business projection 与同 revision representation 等值",
       "validates": [
@@ -18951,7 +20159,7 @@
     },
     {
       "defects": [],
-      "design_line": 1832,
+      "design_line": 1837,
       "property": 66,
       "title": "Excel identity 经真实 OO 往返保留",
       "validates": [
@@ -18971,7 +20179,7 @@
     },
     {
       "defects": [],
-      "design_line": 1838,
+      "design_line": 1843,
       "property": 67,
       "title": "template upgrader 先 candidate、approved bundle 后 finalize",
       "validates": [
@@ -18988,12 +20196,15 @@
         "67",
         "68",
         "70",
-        "71"
+        "71",
+        "75",
+        "76",
+        "77"
       ]
     },
     {
       "defects": [],
-      "design_line": 1844,
+      "design_line": 1849,
       "property": 68,
       "title": "operation/recovery timeline 完整单调",
       "validates": [
@@ -19010,7 +20221,7 @@
     },
     {
       "defects": [],
-      "design_line": 1850,
+      "design_line": 1855,
       "property": 69,
       "title": "evidence 由逐 scenario 实体与服务端重算闭合",
       "validates": [
@@ -19053,7 +20264,7 @@
     },
     {
       "defects": [],
-      "design_line": 1856,
+      "design_line": 1861,
       "property": 70,
       "title": "scenario/evidence 不得跨 entry 或跨场景复用",
       "validates": [
@@ -19086,7 +20297,7 @@
     },
     {
       "defects": [],
-      "design_line": 1862,
+      "design_line": 1867,
       "property": 71,
       "title": "evidence 随环境、runner 与 immutable definition bundle 变化失效",
       "validates": [
@@ -19108,7 +20319,7 @@
     },
     {
       "defects": [],
-      "design_line": 1868,
+      "design_line": 1873,
       "property": 72,
       "title": "量化容量模型可重复",
       "validates": [
@@ -19124,19 +20335,19 @@
   "schema_version": 1,
   "sources": {
     ".kiro/specs/workpaper-html-onlyoffice-bidirectional-writeback-closure/design.md": {
-      "bytes": 186536,
-      "lines": 1989,
-      "sha256": "6d7ab5ca05acc71d5a4855552c5cfec5e49ebad04f77454672c354c8a2258fb4"
+      "bytes": 189241,
+      "lines": 1994,
+      "sha256": "dfb2ca8607594ab01b4976c4c4c1b3f77538f5b52162c3b65c684d4ff0c81056"
     },
     ".kiro/specs/workpaper-html-onlyoffice-bidirectional-writeback-closure/requirements.md": {
-      "bytes": 76678,
-      "lines": 318,
-      "sha256": "b9dfd7ef491df356be0ca1055c18fc8b8b637955415186d90cc859a5edb56773"
+      "bytes": 83056,
+      "lines": 392,
+      "sha256": "45f57b7b8f8948bf8e4b7acaba861a8850c934d39c41f2b692e983c28fbc5209"
     },
     ".kiro/specs/workpaper-html-onlyoffice-bidirectional-writeback-closure/tasks.md": {
-      "bytes": 116317,
-      "lines": 644,
-      "sha256": "9dbd832654448423dac7252130d755e1afe91faad515729bf2397aec7a3210d8"
+      "bytes": 216843,
+      "lines": 921,
+      "sha256": "d622ba9c5e5cd89cfe128a2d975c784bf2b41d6cb1e6629591743c86a7c95214"
     }
   },
   "spec": "workpaper-html-onlyoffice-bidirectional-writeback-closure",
@@ -19151,9 +20362,9 @@
     "ac_with_defects": 101,
     "clean_ac_count": 69,
     "defect_counts": {
-      "no_dependency_edge": 1,
+      "no_dependency_edge": 2,
       "no_property_oracle": 101,
-      "self_certified_single_task": 8
+      "self_certified_single_task": 6
     },
     "defects_by_earliest_wave": {
       "0": {
@@ -19164,25 +20375,25 @@
       },
       "2": {
         "no_property_oracle": 21,
-        "self_certified_single_task": 6
+        "self_certified_single_task": 5
       },
       "3": {
         "no_property_oracle": 13,
         "self_certified_single_task": 1
       },
       "4": {
-        "no_property_oracle": 1
+        "no_dependency_edge": 1,
+        "no_property_oracle": 3
       },
       "5": {
         "no_dependency_edge": 1,
-        "no_property_oracle": 6,
-        "self_certified_single_task": 1
+        "no_property_oracle": 4
       }
     },
     "oracle_family_count": 14,
     "property_count": 72,
     "stale_reference_count": 0,
-    "task_count": 73
+    "task_count": 77
   },
   "task": "Wave 0 Task 8",
   "tasks": [
@@ -19196,9 +20407,9 @@
         "12.14"
       ],
       "depends_on": [],
-      "state": "x",
+      "state": "~",
       "task": "1",
-      "tasks_line": 85,
+      "tasks_line": 145,
       "title": "生成全量入口 manifest 与独立入口归一化清册",
       "verifies_properties": [
         1,
@@ -19218,9 +20429,9 @@
       "depends_on": [
         "1"
       ],
-      "state": "x",
+      "state": "~",
       "task": "2",
-      "tasks_line": 92,
+      "tasks_line": 152,
       "title": "建假双向红基线与能力态守卫",
       "verifies_properties": [
         3
@@ -19241,7 +20452,7 @@
       ],
       "state": "x",
       "task": "3",
-      "tasks_line": 98,
+      "tasks_line": 158,
       "title": "生成 writer/resolver/version domain 迁移清册",
       "verifies_properties": [
         4,
@@ -19270,7 +20481,7 @@
       ],
       "state": "x",
       "task": "4",
-      "tasks_line": 105,
+      "tasks_line": 165,
       "title": "固化 callback/Command Service 生命周期、JWT、下载安全与真实多人语义真值表",
       "verifies_properties": [
         16,
@@ -19295,7 +20506,7 @@
       ],
       "state": "x",
       "task": "5",
-      "tasks_line": 113,
+      "tasks_line": 173,
       "title": "真实 OnlyOffice 9.4 Excel identity instrumentation 黑盒 probe",
       "verifies_properties": [
         66
@@ -19316,7 +20527,7 @@
       ],
       "state": "x",
       "task": "6",
-      "tasks_line": 121,
+      "tasks_line": 181,
       "title": "真实 OnlyOffice 9.4 Word tagged SDT 载体黑盒 probe",
       "verifies_properties": [
         33
@@ -19337,7 +20548,7 @@
       ],
       "state": "x",
       "task": "7",
-      "tasks_line": 129,
+      "tasks_line": 189,
       "title": "验证 Windows staged artifact、DB rollback 与 orphan GC 边界",
       "verifies_properties": [
         5,
@@ -19361,7 +20572,7 @@
       ],
       "state": "x",
       "task": "8",
-      "tasks_line": 136,
+      "tasks_line": 196,
       "title": "建三件套覆盖矩阵、变异骨架与 migration 只读基线",
       "verifies_properties": [
         57
@@ -19396,7 +20607,7 @@
       ],
       "state": "x",
       "task": "9",
-      "tasks_line": 145,
+      "tasks_line": 205,
       "title": "新增 content/representation/application/definition bundle、candidate、room/request/recovery、scope index 与 evidence 迁移",
       "verifies_properties": [
         4,
@@ -19434,7 +20645,7 @@
       ],
       "state": "x",
       "task": "10",
-      "tasks_line": 155,
+      "tasks_line": 215,
       "title": "建 ORM、repository、允许状态边与数据库并发/不可变约束",
       "verifies_properties": [
         4,
@@ -19471,7 +20682,7 @@
       ],
       "state": "x",
       "task": "11",
-      "tasks_line": 165,
+      "tasks_line": 225,
       "title": "建 CanonicalArtifactRepository、安全校验、candidate 隔离、RetentionPolicy 与 orphan reconciliation",
       "verifies_properties": [
         5,
@@ -19503,7 +20714,7 @@
       ],
       "state": "x",
       "task": "12",
-      "tasks_line": 173,
+      "tasks_line": 233,
       "title": "统一 canonical resolver、immutable definition/bundle store 与 writer/resolver 迁移矩阵",
       "verifies_properties": [
         7,
@@ -19533,7 +20744,7 @@
       ],
       "state": "x",
       "task": "13",
-      "tasks_line": 181,
+      "tasks_line": 241,
       "title": "建通用 adapter protocol、canonical contract/bundle schema 与 fail-closed registry",
       "verifies_properties": [
         3,
@@ -19559,7 +20770,7 @@
       ],
       "state": "x",
       "task": "14",
-      "tasks_line": 190,
+      "tasks_line": 250,
       "title": "建 stable-field 三方 merge 与冲突 domain",
       "verifies_properties": [
         24,
@@ -19594,7 +20805,7 @@
       ],
       "state": "x",
       "task": "15",
-      "tasks_line": 197,
+      "tasks_line": 257,
       "title": "建唯一 `ContentMutationService.commit(...)` 与独立 `RepresentationService`",
       "verifies_properties": [
         4,
@@ -19621,7 +20832,7 @@
       ],
       "state": "x",
       "task": "16",
-      "tasks_line": 205,
+      "tasks_line": 265,
       "title": "复用 durable outbox 并把 after-save 改成可重放副作用",
       "verifies_properties": [
         52,
@@ -19657,7 +20868,7 @@
       ],
       "state": "x",
       "task": "17",
-      "tasks_line": 212,
+      "tasks_line": 272,
       "title": "建 Excel instrumentation definition 与 non-current upgrade candidate 生成器",
       "verifies_properties": [
         28,
@@ -19681,7 +20892,7 @@
       ],
       "state": "x",
       "task": "18",
-      "tasks_line": 221,
+      "tasks_line": 281,
       "title": "迁移普通 HTML save 与 orchestrator 到统一 revision",
       "verifies_properties": [
         4,
@@ -19705,7 +20916,7 @@
       ],
       "state": "x",
       "task": "19",
-      "tasks_line": 228,
+      "tasks_line": 288,
       "title": "迁移上传、WOPI、custom、F2、rollback 与历史恢复 writer",
       "verifies_properties": [
         50,
@@ -19725,9 +20936,9 @@
         "18",
         "19"
       ],
-      "state": " ",
+      "state": "~",
       "task": "20",
-      "tasks_line": 235,
+      "tasks_line": 295,
       "title": "关闭 writer/version domain gate",
       "verifies_properties": [
         4,
@@ -19753,7 +20964,7 @@
       ],
       "state": "x",
       "task": "73",
-      "tasks_line": 243,
+      "tasks_line": 306,
       "title": "收口 Task 1 的 source-backed entry profile 三字段欠账",
       "verifies_properties": [
         3,
@@ -19784,7 +20995,7 @@
       ],
       "state": "x",
       "task": "21",
-      "tasks_line": 254,
+      "tasks_line": 317,
       "title": "建 shared room、participant lease、frozen bundle 双基线与 generation write fence",
       "verifies_properties": [
         6,
@@ -19827,7 +21038,7 @@
       ],
       "state": "x",
       "task": "22",
-      "tasks_line": 262,
+      "tasks_line": 325,
       "title": "建 room callback claim、流式下载、delivery 去重、request-first correlation 与 recovery case",
       "verifies_properties": [
         16,
@@ -19865,7 +21076,7 @@
       ],
       "state": "x",
       "task": "23",
-      "tasks_line": 271,
+      "tasks_line": 334,
       "title": "建 frozen forcesave/close/recovery request、content application 去重与 sequence 收敛",
       "verifies_properties": [
         18,
@@ -19892,7 +21103,7 @@
       ],
       "state": "x",
       "task": "24",
-      "tasks_line": 279,
+      "tasks_line": 342,
       "title": "建 OnlyOffice Command Service forcesave 与 close-intent exactly-one client",
       "verifies_properties": [
         12,
@@ -19924,7 +21135,7 @@
       ],
       "state": "x",
       "task": "25",
-      "tasks_line": 288,
+      "tasks_line": 351,
       "title": "建 HTML→OO coordinator 与唯一 launch descriptor",
       "verifies_properties": [
         8,
@@ -19965,7 +21176,7 @@
       ],
       "state": "x",
       "task": "26",
-      "tasks_line": 296,
+      "tasks_line": 359,
       "title": "建 OO→HTML coordinator、最终授权 fence 与 canonical rematerialization",
       "verifies_properties": [
         14,
@@ -20005,7 +21216,7 @@
       ],
       "state": "x",
       "task": "27",
-      "tasks_line": 304,
+      "tasks_line": 367,
       "title": "建冲突预览 API、canonical-application/effective-sequence resolve fence、recovery-aware retry 与 opaque-version rollback",
       "verifies_properties": [
         35,
@@ -20040,7 +21251,7 @@
       ],
       "state": "x",
       "task": "28",
-      "tasks_line": 312,
+      "tasks_line": 375,
       "title": "建完整显式 scope sync router、兼容委派与 authorization-before-resource/cache 端点门",
       "verifies_properties": [
         10,
@@ -20078,7 +21289,7 @@
       ],
       "state": "x",
       "task": "29",
-      "tasks_line": 320,
+      "tasks_line": 383,
       "title": "建 append-only timeline、source-profile-derived test-run/scenario evidence、脱敏与告警",
       "verifies_properties": [
         52,
@@ -20139,7 +21350,7 @@
       ],
       "state": "x",
       "task": "30",
-      "tasks_line": 329,
+      "tasks_line": 392,
       "title": "关闭 durable protocol、application/scope、close exactly-one 与 recovery 生命周期 gate",
       "verifies_properties": [
         16,
@@ -20176,7 +21387,7 @@
       ],
       "state": "x",
       "task": "31",
-      "tasks_line": 343,
+      "tasks_line": 406,
       "title": "建前端 DTO/API、generated manifest、recovery client 与 `EditorLaunchDescriptor`",
       "verifies_properties": [
         10,
@@ -20211,7 +21422,7 @@
       ],
       "state": "x",
       "task": "32",
-      "tasks_line": 351,
+      "tasks_line": 414,
       "title": "建统一 `useWorkpaperSyncBridge` 与 recovery 状态机",
       "verifies_properties": [
         10,
@@ -20243,7 +21454,7 @@
       ],
       "state": "x",
       "task": "33",
-      "tasks_line": 359,
+      "tasks_line": 422,
       "title": "升级 Excel/Word editor 为 descriptor consumer 与可 await/recovery-aware bridge",
       "verifies_properties": [
         11,
@@ -20273,7 +21484,7 @@
       ],
       "state": "x",
       "task": "34",
-      "tasks_line": 366,
+      "tasks_line": 429,
       "title": "建状态条、冲突对话框、recovery panel 与详情 timeline",
       "verifies_properties": [
         35,
@@ -20297,7 +21508,7 @@
       ],
       "state": "x",
       "task": "35",
-      "tasks_line": 374,
+      "tasks_line": 437,
       "title": "接通 commit 后 content event 与前端刷新",
       "verifies_properties": [
         52,
@@ -20330,7 +21541,7 @@
       ],
       "state": "x",
       "task": "36",
-      "tasks_line": 380,
+      "tasks_line": 443,
       "title": "建 Excel per-entry contract/bundle loader 与 candidate finalize gate",
       "verifies_properties": [
         20,
@@ -20368,7 +21579,7 @@
       ],
       "state": "x",
       "task": "37",
-      "tasks_line": 388,
+      "tasks_line": 451,
       "title": "建 Excel identity-aware extractor 与 shared roundtrip/unmanaged verifier",
       "verifies_properties": [
         23,
@@ -20404,7 +21615,7 @@
       ],
       "state": "x",
       "task": "38",
-      "tasks_line": 395,
+      "tasks_line": 458,
       "title": "建 Excel identity-aware materializer/rematerializer",
       "verifies_properties": [
         9,
@@ -20442,7 +21653,7 @@
       ],
       "state": "x",
       "task": "39",
-      "tasks_line": 402,
+      "tasks_line": 465,
       "title": "建 pilot harness、source-profile-derived sync test-run/逐 scenario evidence 与 freshness guard",
       "verifies_properties": [
         25,
@@ -20473,7 +21684,7 @@
       ],
       "state": "x",
       "task": "40",
-      "tasks_line": 413,
+      "tasks_line": 476,
       "title": "简单 checklist Excel pilot",
       "verifies_properties": [
         11,
@@ -20492,6 +21703,9 @@
         "6.9",
         "6.11",
         "6.12",
+        "11.1",
+        "11.3",
+        "11.5",
         "12.1",
         "12.2",
         "12.10",
@@ -20503,7 +21717,7 @@
       ],
       "state": "x",
       "task": "41",
-      "tasks_line": 420,
+      "tasks_line": 483,
       "title": "D2 大 JSON 子表 Excel pilot",
       "verifies_properties": [
         27,
@@ -20531,7 +21745,7 @@
       ],
       "state": "x",
       "task": "42",
-      "tasks_line": 427,
+      "tasks_line": 503,
       "title": "H1 分组/动态结构 Excel pilot",
       "verifies_properties": [
         22,
@@ -20559,7 +21773,7 @@
       ],
       "state": "x",
       "task": "43",
-      "tasks_line": 434,
+      "tasks_line": 510,
       "title": "G7 两级动态表 Excel pilot",
       "verifies_properties": [
         22,
@@ -20601,9 +21815,9 @@
         "42",
         "43"
       ],
-      "state": " ",
+      "state": "x",
       "task": "44",
-      "tasks_line": 441,
+      "tasks_line": 517,
       "title": "真实 OnlyOffice 9.4 Excel pilot gate",
       "verifies_properties": [
         18,
@@ -20640,9 +21854,9 @@
       "depends_on": [
         "44"
       ],
-      "state": " ",
+      "state": "x",
       "task": "45",
-      "tasks_line": 449,
+      "tasks_line": 525,
       "title": "删除四个 pilot 宿主 legacy，执行 post-delete 全场景重验并冻结迁移范式",
       "verifies_properties": [
         47,
@@ -20650,6 +21864,105 @@
         51,
         69,
         71
+      ],
+      "wave": 4
+    },
+    {
+      "ac_ids": [
+        "1.4",
+        "2.10",
+        "3.3",
+        "5.12",
+        "6.1",
+        "6.10",
+        "6.18",
+        "6.20",
+        "12.1",
+        "12.2"
+      ],
+      "depends_on": [
+        "13",
+        "15",
+        "36",
+        "44"
+      ],
+      "state": "-",
+      "task": "75",
+      "tasks_line": 532,
+      "title": "建 published-representation → frozen entry definitions 公共观测器并按 manifest 真实注册 adapter",
+      "verifies_properties": [
+        3,
+        7,
+        28,
+        49,
+        67
+      ],
+      "wave": 4
+    },
+    {
+      "ac_ids": [
+        "2.1",
+        "2.3",
+        "2.4",
+        "3.3",
+        "3.4",
+        "3.6",
+        "6.2",
+        "6.10",
+        "6.18",
+        "12.1"
+      ],
+      "depends_on": [
+        "12",
+        "13",
+        "15",
+        "36",
+        "75"
+      ],
+      "state": "x",
+      "task": "76",
+      "tasks_line": 572,
+      "title": "建生产侧 `projection_contract` definition 链 provisioner 与 candidate bundle 受控 attach 入口",
+      "verifies_properties": [
+        4,
+        5,
+        10,
+        28,
+        67
+      ],
+      "wave": 4
+    },
+    {
+      "ac_ids": [
+        "6.10",
+        "6.18",
+        "7.1",
+        "7.2",
+        "7.3",
+        "7.4",
+        "7.5",
+        "7.8",
+        "7.10",
+        "12.5"
+      ],
+      "depends_on": [
+        "6",
+        "13",
+        "36",
+        "75",
+        "76"
+      ],
+      "state": "x",
+      "task": "77",
+      "tasks_line": 591,
+      "title": "建 Word per-entry entry gate 与 candidate finalize gate",
+      "verifies_properties": [
+        28,
+        30,
+        31,
+        32,
+        34,
+        67
       ],
       "wave": 4
     },
@@ -20669,9 +21982,9 @@
       "depends_on": [
         "45"
       ],
-      "state": " ",
+      "state": "x",
       "task": "46",
-      "tasks_line": 460,
+      "tasks_line": 605,
       "title": "逐一迁移 D 循环 Excel 独立 entry",
       "verifies_properties": [
         20,
@@ -20695,9 +22008,9 @@
       "depends_on": [
         "45"
       ],
-      "state": " ",
+      "state": "x",
       "task": "47",
-      "tasks_line": 466,
+      "tasks_line": 611,
       "title": "逐一迁移 E 循环 Excel 独立 entry",
       "verifies_properties": [
         23,
@@ -20720,9 +22033,9 @@
       "depends_on": [
         "45"
       ],
-      "state": " ",
+      "state": "x",
       "task": "48",
-      "tasks_line": 472,
+      "tasks_line": 617,
       "title": "逐一迁移 F 循环 Excel 独立 entry",
       "verifies_properties": [
         21,
@@ -20748,9 +22061,9 @@
       "depends_on": [
         "45"
       ],
-      "state": " ",
+      "state": "x",
       "task": "49",
-      "tasks_line": 477,
+      "tasks_line": 622,
       "title": "逐一迁移 G 循环除 G7 外 Excel 独立 entry",
       "verifies_properties": [
         20,
@@ -20774,9 +22087,9 @@
       "depends_on": [
         "45"
       ],
-      "state": " ",
+      "state": "x",
       "task": "50",
-      "tasks_line": 483,
+      "tasks_line": 628,
       "title": "逐一迁移 H 循环除 H1 外 Excel 独立 entry",
       "verifies_properties": [
         22,
@@ -20801,9 +22114,9 @@
       "depends_on": [
         "45"
       ],
-      "state": " ",
+      "state": "x",
       "task": "51",
-      "tasks_line": 488,
+      "tasks_line": 633,
       "title": "逐一迁移 I 循环 Excel 独立 entry",
       "verifies_properties": [
         20,
@@ -20829,9 +22142,9 @@
       "depends_on": [
         "45"
       ],
-      "state": " ",
+      "state": "x",
       "task": "52",
-      "tasks_line": 493,
+      "tasks_line": 638,
       "title": "逐一迁移 J 循环 Excel 独立 entry",
       "verifies_properties": [
         3,
@@ -20856,9 +22169,9 @@
       "depends_on": [
         "45"
       ],
-      "state": " ",
+      "state": "x",
       "task": "53",
-      "tasks_line": 498,
+      "tasks_line": 643,
       "title": "逐一迁移 K 循环 Excel 独立 entry",
       "verifies_properties": [
         20,
@@ -20883,9 +22196,9 @@
       "depends_on": [
         "45"
       ],
-      "state": " ",
+      "state": "x",
       "task": "54",
-      "tasks_line": 503,
+      "tasks_line": 648,
       "title": "逐一迁移 L 循环 Excel 独立 entry",
       "verifies_properties": [
         20,
@@ -20909,9 +22222,9 @@
       "depends_on": [
         "45"
       ],
-      "state": " ",
+      "state": "x",
       "task": "55",
-      "tasks_line": 508,
+      "tasks_line": 653,
       "title": "逐一迁移 M 循环 Excel 独立 entry",
       "verifies_properties": [
         24,
@@ -20936,9 +22249,9 @@
       "depends_on": [
         "45"
       ],
-      "state": " ",
+      "state": "x",
       "task": "56",
-      "tasks_line": 513,
+      "tasks_line": 658,
       "title": "逐一迁移 N 循环 Excel 独立 entry",
       "verifies_properties": [
         3,
@@ -20965,9 +22278,9 @@
       "depends_on": [
         "45"
       ],
-      "state": " ",
+      "state": "x",
       "task": "57",
-      "tasks_line": 518,
+      "tasks_line": 663,
       "title": "逐一迁移 A/B/C/S 与跨循环共享 Excel entry",
       "verifies_properties": [
         3,
@@ -20999,7 +22312,7 @@
       ],
       "state": "x",
       "task": "58",
-      "tasks_line": 524,
+      "tasks_line": 669,
       "title": "统一 Word canonical resolver 与完整模板裁决清册",
       "verifies_properties": [
         39,
@@ -21040,7 +22353,7 @@
       ],
       "state": "x",
       "task": "59",
-      "tasks_line": 531,
+      "tasks_line": 676,
       "title": "建 Word definition/instrumentation candidate upgrader 与 tagged-SDT engine",
       "verifies_properties": [
         28,
@@ -21072,9 +22385,9 @@
         "58",
         "59"
       ],
-      "state": " ",
+      "state": "~",
       "task": "60",
-      "tasks_line": 539,
+      "tasks_line": 684,
       "title": "把 F2-22/F2-23 迁成统一 Word adapter并 finalize published representation",
       "verifies_properties": [
         31,
@@ -21105,11 +22418,14 @@
         "14.16"
       ],
       "depends_on": [
-        "60"
+        "60",
+        "75",
+        "76",
+        "77"
       ],
-      "state": " ",
+      "state": "-",
       "task": "61",
-      "tasks_line": 546,
+      "tasks_line": 692,
       "title": "真实 OnlyOffice 9.4 F2 Word gate",
       "verifies_properties": [
         30,
@@ -21144,11 +22460,12 @@
       "depends_on": [
         "58",
         "59",
-        "61"
+        "61",
+        "77"
       ],
-      "state": " ",
+      "state": "~",
       "task": "62",
-      "tasks_line": 556,
+      "tasks_line": 715,
       "title": "逐一迁移 18 个 generic DOCX entry",
       "verifies_properties": [
         30,
@@ -21175,11 +22492,12 @@
       "depends_on": [
         "58",
         "59",
-        "61"
+        "61",
+        "77"
       ],
-      "state": " ",
+      "state": "x",
       "task": "63",
-      "tasks_line": 562,
+      "tasks_line": 722,
       "title": "逐一处理 9 个 B 子码错型与 `S33-REV`",
       "verifies_properties": [
         40,
@@ -21205,11 +22523,12 @@
       "depends_on": [
         "58",
         "59",
-        "61"
+        "61",
+        "77"
       ],
-      "state": " ",
+      "state": "~",
       "task": "64",
-      "tasks_line": 568,
+      "tasks_line": 741,
       "title": "迁移 A16/A17 专用 Word 链与全部 Word editor 宿主",
       "verifies_properties": [
         30,
@@ -21235,9 +22554,9 @@
         "33",
         "39"
       ],
-      "state": " ",
+      "state": "x",
       "task": "65",
-      "tasks_line": 574,
+      "tasks_line": 748,
       "title": "收敛 custom/user-upload xlsx 单一权威 bundle 协议",
       "verifies_properties": [
         50,
@@ -21282,9 +22601,9 @@
         "64",
         "65"
       ],
-      "state": " ",
+      "state": "x",
       "task": "66",
-      "tasks_line": 581,
+      "tasks_line": 755,
       "title": "建 legacy 删前清册、逐 entry replacement map 与 rollback 隔离门（只生成计划，不改源码）",
       "verifies_properties": [
         3,
@@ -21338,9 +22657,9 @@
         "66",
         "73"
       ],
-      "state": " ",
+      "state": "x",
       "task": "67",
-      "tasks_line": 588,
+      "tasks_line": 762,
       "title": "structural pre-reconcile manifest/registry/definition/bundle/candidate/deletion-plan",
       "verifies_properties": [
         1,
@@ -21418,9 +22737,9 @@
         "59",
         "67"
       ],
-      "state": " ",
+      "state": "x",
       "task": "68",
-      "tasks_line": 598,
+      "tasks_line": 772,
       "title": "后端全链、bundle/candidate/recovery 与辐射面独立回归",
       "verifies_properties": [
         4,
@@ -21503,9 +22822,9 @@
         "66",
         "67"
       ],
-      "state": " ",
+      "state": "x",
       "task": "69",
-      "tasks_line": 608,
+      "tasks_line": 782,
       "title": "前端状态机、recovery、descriptor、宿主与 DOM 独立回归",
       "verifies_properties": [
         8,
@@ -21569,11 +22888,12 @@
         "61",
         "67",
         "68",
-        "69"
+        "69",
+        "75"
       ],
-      "state": " ",
+      "state": "x",
       "task": "70",
-      "tasks_line": 615,
+      "tasks_line": 789,
       "title": "在 Task 67 structural report 后按 source profile 运行真实 OO 9.4 全 entry required scenarios并刷新 evidence",
       "verifies_properties": [
         20,
@@ -21657,9 +22977,9 @@
         "69",
         "70"
       ],
-      "state": " ",
+      "state": "-",
       "task": "71",
-      "tasks_line": 624,
+      "tasks_line": 798,
       "title": "变异、容量、故障恢复、retention/脱敏/告警与数据复原验收",
       "verifies_properties": [
         4,
@@ -21720,11 +23040,12 @@
         "68",
         "69",
         "70",
-        "71"
+        "71",
+        "74"
       ],
-      "state": " ",
+      "state": "-",
       "task": "72",
-      "tasks_line": 637,
+      "tasks_line": 811,
       "title": "执行真正 pre-delete eligibility、删除全局 legacy、post-delete 全场景重验与归档",
       "verifies_properties": [
         1,
@@ -21739,6 +23060,31 @@
         70,
         71,
         72
+      ],
+      "wave": 8
+    },
+    {
+      "ac_ids": [
+        "2.1",
+        "2.2",
+        "2.11",
+        "2.12",
+        "9.11",
+        "12.6",
+        "12.7",
+        "13.4"
+      ],
+      "depends_on": [
+        "20",
+        "71"
+      ],
+      "state": "-",
+      "task": "74",
+      "tasks_line": 819,
+      "title": "清零 writer/version domain 归属本任务的七条准则（未裁决两条已归零，余五条留红；计数一律由门现算，见正文）",
+      "verifies_properties": [
+        4,
+        61
       ],
       "wave": 7
     }
