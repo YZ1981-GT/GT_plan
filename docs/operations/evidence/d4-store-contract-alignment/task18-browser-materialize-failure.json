@@ -1,0 +1,48 @@
+{
+  "captured_at": "2026-09-23T23:27:47.930Z",
+  "hits": [
+    {
+      "url": "http://localhost:3030/api/projects/0ec33ac9-3de5-4e65-b3bf-f9dccd7b2a49/workpapers/b3ab3c46-828f-4f48-950e-aee9bbdc923f/sync/entries/xlsx/gt-d4-operating-revenue/store-projection",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:3030/api/projects/0ec33ac9-3de5-4e65-b3bf-f9dccd7b2a49/workpapers/b3ab3c46-828f-4f48-950e-aee9bbdc923f/sync/entries/xlsx/gt-d4-operating-revenue/pending-mutations",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:3030/api/projects/0ec33ac9-3de5-4e65-b3bf-f9dccd7b2a49/workpapers/b3ab3c46-828f-4f48-950e-aee9bbdc923f/sync/entries/xlsx/gt-d4-operating-revenue/materialize",
+      "status": 500
+    },
+    {
+      "url": "http://localhost:3030/api/projects/0ec33ac9-3de5-4e65-b3bf-f9dccd7b2a49/workpapers/b3ab3c46-828f-4f48-950e-aee9bbdc923f/sync/entries/xlsx/gt-d4-operating-revenue/materialize",
+      "status": 500
+    },
+    {
+      "url": "http://localhost:3030/api/projects/0ec33ac9-3de5-4e65-b3bf-f9dccd7b2a49/workpapers/b3ab3c46-828f-4f48-950e-aee9bbdc923f/sync/entries/xlsx/gt-d4-operating-revenue/materialize",
+      "status": 500
+    }
+  ],
+  "syncErrors": [
+    {
+      "path": "/api/projects/0ec33ac9-3de5-4e65-b3bf-f9dccd7b2a49/workpapers/b3ab3c46-828f-4f48-950e-aee9bbdc923f/sync/entries/xlsx/gt-d4-operating-revenue/materialize",
+      "status": 500,
+      "body": "{\"code\":500,\"message\":{\"error_code\":\"adapter_unmanaged_region_drift\",\"message\":\"未管理区域在 roundtrip 后发生变化，首个差异: workbook_and_styles: ebabb59d4445… → 2b324e4b4d02…（before 覆盖 4 项，after 覆盖 4 项） （已检查 ['managed_sheet_unmanaged_cells', 'managed_sheet_structure', 'other_sheet_parts', 'protected_parts', 'shared_strings_prefix', 'workbook_and_styles', 'relationships', 'other_parts']）\"}}"
+    },
+    {
+      "path": "/api/projects/0ec33ac9-3de5-4e65-b3bf-f9dccd7b2a49/workpapers/b3ab3c46-828f-4f48-950e-aee9bbdc923f/sync/entries/xlsx/gt-d4-operating-revenue/materialize",
+      "status": 500,
+      "body": "{\"code\":500,\"message\":{\"error_code\":\"adapter_unmanaged_region_drift\",\"message\":\"未管理区域在 roundtrip 后发生变化，首个差异: workbook_and_styles: ebabb59d4445… → 2b324e4b4d02…（before 覆盖 4 项，after 覆盖 4 项） （已检查 ['managed_sheet_unmanaged_cells', 'managed_sheet_structure', 'other_sheet_parts', 'protected_parts', 'shared_strings_prefix', 'workbook_and_styles', 'relationships', 'other_parts']）\"}}"
+    },
+    {
+      "path": "/api/projects/0ec33ac9-3de5-4e65-b3bf-f9dccd7b2a49/workpapers/b3ab3c46-828f-4f48-950e-aee9bbdc923f/sync/entries/xlsx/gt-d4-operating-revenue/materialize",
+      "status": 500,
+      "body": "{\"code\":500,\"message\":{\"error_code\":\"adapter_unmanaged_region_drift\",\"message\":\"未管理区域在 roundtrip 后发生变化，首个差异: workbook_and_styles: ebabb59d4445… → 2b324e4b4d02…（before 覆盖 4 项，after 覆盖 4 项） （已检查 ['managed_sheet_unmanaged_cells', 'managed_sheet_structure', 'other_sheet_parts', 'protected_parts', 'shared_strings_prefix', 'workbook_and_styles', 'relationships', 'other_parts']）\"}}"
+    }
+  ],
+  "consoleErrors": [
+    "Failed to load resource: the server responded with a status of 500 (Internal Server Error)",
+    "Failed to load resource: the server responded with a status of 500 (Internal Server Error)",
+    "Failed to load resource: the server responded with a status of 500 (Internal Server Error)",
+    "Failed to load resource: the server responded with a status of 404 (Not Found)"
+  ]
+}

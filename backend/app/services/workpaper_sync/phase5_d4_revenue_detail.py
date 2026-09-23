@@ -2269,6 +2269,52 @@ def merge_d413_fixed_from_projection(
 #: D4-35 store item（dict 形态 {rows, sampling, periodAmount}，非行数组，不进 STORE_ITEM_IDS）。
 STORE_ITEM_ID_D435_DICT: Final[str] = STORE_ITEM_ID_D435
 
+
+def all_store_item_ids() -> tuple[str, ...]:
+    """本 entry **全部**需要喂 payload 的 store item —— 出/回两方向的**唯一**权威口径。
+
+    spec: d4-html-to-oo-store-contract-alignment · Task 4 · Requirement 3.1
+
+    🔴 存在的理由（真栈实证）：`store_projection_response.py` 出方向装配 payload 时只遍历
+    ``STORE_ITEM_IDS`` + ``STORE_ITEM_IDS_D45_FIXED`` 两个来源，于是**漏掉**了 provider
+    另外声明的两批 item ——
+
+      * ``STORE_ITEM_ID_D435_DICT``（``D4-35-data``，dict 形态，注释明写"不进 STORE_ITEM_IDS"）；
+      * ``STORE_ITEM_IDS_D413_FIXED``（``D4-13-process`` / ``-conclusion``，纯文本固定项）。
+
+    结果：D4-35 切 OO 恒空、D4-13 两段正文恒写不进 OO（探针实证 D4-35 字段数 0 vs 对照 32、
+    D4-13 两键值 ``''`` vs 正文）。而回方向 ``oo_to_html.py`` 三批清单都消费了 ⇒ 两侧真源不一致。
+
+    本函数把「本 entry 有哪些 store item」收敛成一个口径，两方向都从它取（不得各自维护并集）。
+    条件常量（``STORE_ITEM_IDS_D47_DEDICATED`` 仅 ``_INCLUDE_D47_MARGIN_SHEET`` 开时定义）
+    一律 ``getattr`` 兜底，保持与各 ``_INCLUDE_*`` 门控一致。去重但**保序**（首见优先），
+    便于判据与日志稳定比对。
+
+    ⚠️ per-item 的缺省值规则（list ``[]`` / dict/singleton ``{}`` / 纯文本 fixed ``""``）
+    **不在**本函数职责内 —— 那是各调用点按 provider 单源规则处理，本函数只回答"有哪些 item"。
+    """
+    import sys as _sys
+
+    _module = _sys.modules[__name__]
+    ordered: list[str] = []
+    seen: set[str] = set()
+
+    def _add(item_id: str) -> None:
+        if item_id and item_id not in seen:
+            seen.add(item_id)
+            ordered.append(item_id)
+
+    for group in (
+        tuple(STORE_ITEM_IDS),
+        tuple(getattr(_module, "STORE_ITEM_IDS_D45_FIXED", ()) or ()),
+        tuple(getattr(_module, "STORE_ITEM_IDS_D413_FIXED", ()) or ()),
+        (STORE_ITEM_ID_D435_DICT,),
+        tuple(getattr(_module, "STORE_ITEM_IDS_D47_DEDICATED", ()) or ()),
+    ):
+        for item_id in group:
+            _add(str(item_id))
+    return tuple(ordered)
+
 #: D4-9 store item（dict 形态 {current,prior}+totals，嵌套非行数组）。**在** STORE_ITEM_IDS 里
 #: （combined projection / 单 item flush 需要），但 oo_to_html 镜像走专用 dict 块（不进 rows 循环）。
 STORE_ITEM_ID_D49_DICT: Final[str] = STORE_ITEM_ID_D49

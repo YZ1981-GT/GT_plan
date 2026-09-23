@@ -37,6 +37,7 @@ import {
   normalizeLabel,
   readNum,
   readRaw,
+  readRowFieldWithFallback,
   renameRowLabel,
   resolveInitialRows,
   rowFieldItemId,
@@ -223,7 +224,11 @@ export function useK2Adjudication(
   // ─── Row Builder ───────────────────────────────────────────────────────────
 
   function buildRow(def: DynamicAdjRow): K2AdjRow {
-    const at = (field: string) => readNum(allResponses.value, rowFieldItemId(SPEC, def.rowId, field))
+    // 🔴 单源读（Task 9）：行对象顶层值优先、缺则回落 per-field item（需求 4.1 —— K2 与 D4-1
+    //    共用同一套读实现）。K2 当前不写行对象金额，故实际全走 per-field 回落、行为不变；
+    //    将来 K2 若接双向回写也自动继承正确的读侧优先级。
+    const at = (field: string) =>
+      readRowFieldWithFallback(def, allResponses.value, SPEC, field)
     const begin = at('begin')
     const debit = at('debit')
     const credit = at('credit')

@@ -43,6 +43,9 @@ import {
   rowFieldItemId,
   readNum,
   readRaw,
+  readRowFieldWithFallback,
+  resolveCellState,
+  displayValueForCellState,
   normalizeLabel,
   labelKey,
 } from './shared/dynamicAdjudicationRows'
@@ -83,6 +86,15 @@ export interface AdjudicationRow {
   isEditable: boolean
   /** 动态行对象（仅内部使用） */
   _dynamicRow?: DynamicAdjRow
+  /**
+   * 选项 b 逐格覆盖态（Task 14）：仅派生行（isFromCrossSheet）有值。key = 6 金额字段名，
+   * value = 该格四态 + 三值（供 UI 标「已人工覆盖」/S4 冲突呈现/恢复取数）。
+   * 无覆盖（全 S1）时为 undefined，普通行不产生。
+   */
+  cellOverrides?: Record<
+    string,
+    { state: 'S1' | 'S2' | 'S3' | 'S4'; stored: number; snap: number; derived: number }
+  >
 }
 
 export interface AdjudicationSection {
@@ -253,9 +265,45 @@ export function useD4Adjudication(options: UseD4AdjudicationOptions) {
 
   // ─── Persist helpers ─────────────────────────────────────────────────
 
+  /** 派生快照的 per-field item 键（选项 b 覆盖状态机的 `snap`，Task 12 写入 / 本处读出）。 */
+  function snapItemId(rowId: string, field: string): string {
+    return `${rowFieldItemId(D4_ADJ_ROWS_SPEC, rowId, field)}-snap`
+  }
+
+  /**
+   * 序列化 D4-1-rows 用的读取器（Task 8/10 双写）：
+   * - `readField`：读**该字段的 per-field item 当前值**（不走 getRowFieldValue，避免与
+   *   「行对象值优先」的读侧循环依赖 —— 行对象金额本就是 per-field 的同步快照）；
+   * - `readDerivedSnapshot`：读派生行的 `snap`（Task 12 落在 `{rowId}-{field}-snap`），
+   *   缺则不落 derivedSnapshot 键。
+   */
+  const rowListReader = {
+    readField: (rowId: string, field: string): number | null => {
+      const raw = readRaw(allResponses.value as Map<string, unknown>, rowFieldItemId(D4_ADJ_ROWS_SPEC, rowId, field))
+      if (raw === '') return null
+      const n = Number(raw)
+      return Number.isFinite(n) ? n : null
+    },
+    readDerivedSnapshot: (rowId: string): Record<string, number | null> | null => {
+      const snap: Record<string, number | null> = {}
+      let has = false
+      for (const field of D4_ADJ_ROWS_SPEC.valueFields) {
+        const raw = readRaw(allResponses.value as Map<string, unknown>, snapItemId(rowId, field))
+        if (raw === '') continue
+        const n = Number(raw)
+        snap[field] = Number.isFinite(n) ? n : null
+        has = true
+      }
+      return has ? snap : null
+    },
+  }
+
   function persistRowList(rows: DynamicAdjRow[]): void {
     const itemId = rowsItemId(D4_ADJ_ROWS_SPEC)
-    const json = serializeRows(rows)
+    // 🔴 双写（Task 10 / 裁决 D3）：行清单同时携带金额（行对象顶层）+ 派生行的 derivedSnapshot。
+    //    行对象金额是 per-field item 的同步快照——读侧（getRowFieldValue）行对象优先、缺则
+    //    回落 per-field，故双写期任一路径都读得到正确值；回滚只需改读侧优先级、无需回填数据。
+    const json = serializeRows(rows, { spec: D4_ADJ_ROWS_SPEC, reader: rowListReader })
     allResponses.value.set(itemId, { item_id: itemId, conclusion: null, remark: json } as any)
     debounceSave()
   }
@@ -264,14 +312,26 @@ export function useD4Adjudication(options: UseD4AdjudicationOptions) {
     const itemId = rowFieldItemId(D4_ADJ_ROWS_SPEC, rowId, field)
     const strVal = String(value ?? 0)
     allResponses.value.set(itemId, { item_id: itemId, conclusion: null, remark: strVal } as any)
+    // 🔴 per-field 落库后**同步重写行清单**，把新值刷进行对象顶层（双写）。否则行对象金额
+    //    停在旧快照、而读侧行对象优先 ⇒ 用户改的数被自己的旧行对象值盖住。
+    persistRowList(dynamicRows.value)
     debounceSave()
   }
 
   // ─── Read field value from responses ─────────────────────────────────
 
   function getRowFieldValue(rowId: string, field: string): number {
-    const itemId = rowFieldItemId(D4_ADJ_ROWS_SPEC, rowId, field)
-    return readNum(allResponses.value as Map<string, unknown>, itemId)
+    // 🔴 单源读（Task 9）：行对象顶层值优先、缺则回落 per-field item。
+    //    D4-1-rows 的行对象自 Task 8 起可携带金额（也是 OO 回写的落点），必须优先于旧
+    //    per-field 值，否则 OO 侧改的数会被旧 per-field 盖住（缺陷 A2 反向翻版）。
+    //    旧项目金额仍只在 per-field，由 readRowFieldWithFallback 回落，不归零（需求 4.2）。
+    const row = dynamicRows.value.find((r) => r.rowId === rowId) ?? null
+    return readRowFieldWithFallback(
+      row,
+      allResponses.value as Map<string, unknown>,
+      D4_ADJ_ROWS_SPEC,
+      field,
+    )
   }
 
   // ─── Seed from prefill (Req 3.5) ────────────────────────────────────
@@ -427,8 +487,9 @@ export function useD4Adjudication(options: UseD4AdjudicationOptions) {
     // 撞名检查
     if (findDuplicateLabel(dynamicRows.value, normalized)) return null
 
-    const { rows, row } = appendManualRow(dynamicRows.value)
-    // 设置行标签
+    // appendManualRow 需要 label（既有调用漏传，wave 3 收紧 DynamicAdjRow 类型后暴露）。
+    // 直接传 normalized（一步到位）；下面的 map 保留作幂等兜底，行为不变。
+    const { rows, row } = appendManualRow(dynamicRows.value, normalized)
     const updatedRows = rows.map(r => r.rowId === row.rowId ? { ...r, label: normalized } : r)
     dynamicRows.value = updatedRows
     persistRowList(updatedRows)
@@ -545,26 +606,71 @@ export function useD4Adjudication(options: UseD4AdjudicationOptions) {
    * D4-4 调整分录 → adjustmentTotals → 小计 AJE/RJE 列（非逐行手填）。
    * rowKey 用稳定归一键（不用 label 防撞键；同名产品折叠为一行）。
    */
+  /**
+   * 派生格逐格覆盖解析（Task 14 / 选项 b）：给定派生行 rowId + 字段 + 派生值，读 store 的
+   * stored/snap，按四态返回**显示值** + 覆盖元信息。S1/S3 显示派生值（跟随上游），
+   * S2/S4 显示 stored（人工覆盖值）。无覆盖（S1/S3）不产生 cellOverrides 条目。
+   */
+  function _resolveDerivedCell(
+    rowId: string,
+    field: string,
+    derivedValue: number,
+  ): { display: number; override?: { state: 'S1' | 'S2' | 'S3' | 'S4'; stored: number; snap: number; derived: number } } {
+    const storedRaw = readRaw(allResponses.value as Map<string, unknown>, rowFieldItemId(D4_ADJ_ROWS_SPEC, rowId, field))
+    const snapRaw = readRaw(allResponses.value as Map<string, unknown>, snapItemId(rowId, field))
+    const stored = storedRaw === '' ? null : Number(storedRaw)
+    const snap = snapRaw === '' ? null : Number(snapRaw)
+    const state = resolveCellState(stored, snap, derivedValue)
+    const display = displayValueForCellState(state, stored, derivedValue)
+    if (state === 'S2' || state === 'S4') {
+      return {
+        display,
+        override: { state, stored: stored ?? 0, snap: snap ?? 0, derived: derivedValue },
+      }
+    }
+    return { display }
+  }
+
   function buildCrossSheetRow(
     section: 'main' | 'other',
     label: string,
     agg: { current: number; prior: number },
   ): AdjudicationRow {
     const rowKey = `xsheet-${section}-${labelKey(label)}`
+    // 🔴 逐格覆盖（Task 14）：currentUnadjusted / priorUnadjusted 两个派生字段按四态定显示值——
+    //    S1/S3 用上游派生值，S2/S4 用 OO 侧人工覆盖值（选项 b）。AJE/RJE 派生恒 0（Task 16 处理）。
+    const curCell = _resolveDerivedCell(rowKey, 'currentUnadjusted', agg.current)
+    const priorCell = _resolveDerivedCell(rowKey, 'priorUnadjusted', agg.prior)
+    const cellOverrides: Record<
+      string,
+      { state: 'S1' | 'S2' | 'S3' | 'S4'; stored: number; snap: number; derived: number }
+    > = {}
+    if (curCell.override) cellOverrides.currentUnadjusted = curCell.override
+    if (priorCell.override) cellOverrides.priorUnadjusted = priorCell.override
+    const hasOverride = Object.keys(cellOverrides).length > 0
+    // 🔴 Task 16 清死代码：派生行 AJE/RJE 此前硬编码 0，而上方注释声称「仍从 per-field 键读
+    //    ⇒ 审计师对派生行填的调整不丢」——注释描述的行为并不存在。改为走单源读
+    //    （getRowFieldValue：行对象优先、缺回落 per-field），使注释成真：派生行的未审数来自
+    //    上游聚合（curCell/priorCell），而 AJE/RJE 若审计师在 OO/D4-1 填过则读回、不被抹 0。
+    const currentAje = getRowFieldValue(rowKey, 'currentAje')
+    const currentRje = getRowFieldValue(rowKey, 'currentRje')
+    const priorAje = getRowFieldValue(rowKey, 'priorAje')
+    const priorRje = getRowFieldValue(rowKey, 'priorRje')
     return {
       rowKey,
       label,
       isFixed: false,
-      currentUnadjusted: agg.current,
-      currentAje: 0,
-      currentRje: 0,
-      currentAudited: calcAuditedAmount(agg.current, 0, 0),
-      priorUnadjusted: agg.prior,
-      priorAje: 0,
-      priorRje: 0,
-      priorAudited: calcAuditedAmount(agg.prior, 0, 0),
+      currentUnadjusted: curCell.display,
+      currentAje,
+      currentRje,
+      currentAudited: calcAuditedAmount(curCell.display, currentAje, currentRje),
+      priorUnadjusted: priorCell.display,
+      priorAje,
+      priorRje,
+      priorAudited: calcAuditedAmount(priorCell.display, priorAje, priorRje),
       isFromCrossSheet: true,
-      isEditable: false, // 派生行金额/调整均只读（审计调整走 D4-4）
+      isEditable: false, // 未审数只读（来自上游聚合）；AJE/RJE 由 OO/D4-4 调整，读回不抹 0
+      ...(hasOverride ? { cellOverrides } : {}),
     }
   }
 
@@ -580,11 +686,182 @@ export function useD4Adjudication(options: UseD4AdjudicationOptions) {
     ),
   )
 
+  // ─── 派生行落库（Task 12：缺陷 B —— 派生行不进 store ⇒ 切 OO 恒空）─────────────
+  //
+  // 缺陷 B：主营/其他两区显示的行主体是 crossSheet 派生行（computed，从不进 dynamicRows、
+  // 从不落 D4-1-rows）⇒ store-projection 两区贡献 0 行、overlay 退回模板占位空行 ⇒ OO 空表。
+  // 本函数把派生行 upsert 进 store（source='tb'），并写 derivedSnapshot（选项 b 状态机的 snap）。
+  //
+  // 🔴 不放在 flushHtml 里：flushHtml 是「切 OO」路径，在那里第一次落库会让"切一次 OO 就改
+  //    一次内容版本"、把只读浏览变成写操作、并让复用命中类判据失稳（design 裁决 D4）。
+  //    改为 watch 派生源变化时同步：幂等（值未变不写）、source 恒 'tb'、带 sectionKey。
+  //
+  // snap 写在 per-field item `{rowId}-{field}-snap`（rowListReader.readDerivedSnapshot 读它，
+  // 序列化时落进行对象 derivedSnapshot）。stored（per-field 主值）也同步写成派生值——
+  // 纯派生态 S1 下 stored==snap==derived，Task 13 据此判 S1。
+
+  const SECTION_ACCOUNT_CODE = {
+    main: D4_MAIN_REVENUE_STANDARD,
+    other: D4_OTHER_REVENUE_STANDARD,
+  } as const
+
+  function _writeIfChanged(itemId: string, value: number): boolean {
+    const cur = readRaw(allResponses.value as Map<string, unknown>, itemId)
+    const next = String(value)
+    if (cur === next) return false // 幂等：值未变不写
+    allResponses.value.set(itemId, { item_id: itemId, conclusion: null, remark: next } as any)
+    return true
+  }
+
+  /**
+   * 派生行某格的**纯派生值**（上游现算聚合值），**不是**显示值。
+   *
+   * 🔴 `row[field]` 是 `_resolveDerivedCell` 算出的**显示值**，覆盖态（S2/S4）下它等于
+   *    `stored`。两处调用方各有各的理由必须区分二者：
+   *
+   *    * `restoreDerivedValue`（可达分支）：恢复取数要把该格写回**派生值**。若取显示值，
+   *      写回去的就是覆盖值本身 —— 恢复变成空操作，store 里当场留着错值（此刻若发生
+   *      flushSave / 切 OO，错值直接落库）。判据 P15「当场写对，不靠下一 tick 自愈」。
+   *    * `syncDerivedRowsIntoStore`（当前恒走 else 分支）：那里只在 `!overridden` 时写，
+   *      而 `overridden ⟺ stored≠snap ⟺ S2/S4 ⟺ cellOverrides 有条目`，故该处 `cell`
+   *      恒为 undefined。保留这层区分是为了不把「写回 store 的值必须是派生值」这条约束
+   *      交给调用点的时序去保证 —— 那条约束一旦被时序兜住，改动顺序就会静默破坏它。
+   */
+  function _pureDerived(
+    row: AdjudicationRow,
+    field: 'currentUnadjusted' | 'priorUnadjusted',
+  ): number {
+    const cell = row.cellOverrides?.[field]
+    return cell ? cell.derived : row[field]
+  }
+
+  /** 该 store 行是否被人工覆盖过（任一派生字段 stored ≠ snap）——覆盖过的派生行不作孤儿清理。 */
+  function _derivedRowHasOverride(rid: string): boolean {
+    for (const field of D4_ADJ_ROWS_SPEC.valueFields) {
+      const storedRaw = readRaw(allResponses.value as Map<string, unknown>, rowFieldItemId(D4_ADJ_ROWS_SPEC, rid, field))
+      const snapRaw = readRaw(allResponses.value as Map<string, unknown>, snapItemId(rid, field))
+      if (storedRaw === '' || snapRaw === '') continue
+      if (Math.abs(Number(storedRaw) - Number(snapRaw)) > BALANCE_TOLERANCE) return true
+    }
+    return false
+  }
+
+  function syncDerivedRowsIntoStore(): void {
+    if (readonly.value) return
+    const derived: Array<{ section: 'main' | 'other'; row: AdjudicationRow }> = [
+      ...crossSheetMainRows.value.map((row) => ({ section: 'main' as const, row })),
+      ...crossSheetOtherRows.value.map((row) => ({ section: 'other' as const, row })),
+    ]
+    let rowListDirty = false
+    let anyWrite = false
+
+    // 🔴 孤儿派生行清理（Task 12 回归修复）：上游 D4-2/D4-3 删产品后，之前 upsert 进 store 的
+    //    派生行成了孤儿——它以 source='tb'/isFromCrossSheet 混进 sections（重复行）。
+    //    规则：当前派生集里不存在、且 source==='tb' 的 store 行，若**无人工覆盖**（stored==snap）
+    //    则删除（跟随上游消失）；若被人工覆盖过则**保留**（用户改过的数不静默丢，选项 b 语义）。
+    const liveDerivedIds = new Set(derived.map((d) => d.row.rowKey))
+    const orphans = dynamicRows.value.filter(
+      (d) => d.source === 'tb' && !liveDerivedIds.has(d.rowId) && !_derivedRowHasOverride(d.rowId),
+    )
+    if (orphans.length > 0) {
+      const orphanIds = new Set(orphans.map((o) => o.rowId))
+      dynamicRows.value = dynamicRows.value.filter((d) => !orphanIds.has(d.rowId))
+      // 清掉孤儿的 per-field(stored) + snap item（避免残留脏值）。
+      for (const o of orphans) {
+        for (const field of D4_ADJ_ROWS_SPEC.valueFields) {
+          allResponses.value.delete(rowFieldItemId(D4_ADJ_ROWS_SPEC, o.rowId, field))
+          allResponses.value.delete(snapItemId(o.rowId, field))
+        }
+      }
+      rowListDirty = true
+    }
+
+    for (const { section, row } of derived) {
+      const rid = row.rowKey // 派生 rowKey = xsheet-{section}-{labelKey}，直接作 store rowId
+      // 1) upsert 行清单：不存在则加一条 source='tb' 派生行（带 sectionKey + accountCode）。
+      let def = dynamicRows.value.find((d) => d.rowId === rid)
+      if (!def) {
+        def = {
+          rowId: rid,
+          label: row.label,
+          source: 'tb',
+          accountCode: SECTION_ACCOUNT_CODE[section],
+        }
+        ;(def as any).sectionKey = section === 'main' ? 'main-revenue' : 'other-revenue'
+        dynamicRows.value = [...dynamicRows.value, def]
+        rowListDirty = true
+      } else if (def.label !== row.label || def.source !== 'tb') {
+        // 派生 label 变了（上游改名）或 source 漂移 → 校正（仍是派生行）。
+        def.label = row.label
+        def.source = 'tb'
+        rowListDirty = true
+      }
+      // 2) 幂等写派生的两个金额（currentUnadjusted / priorUnadjusted）到 per-field(stored) + snap。
+      //    AJE/RJE 派生恒 0，不主动写（避免把用户在 OO 侧填的 AJE/RJE 覆盖成 0；Task 16 收口）。
+      const derivedPairs: Array<['currentUnadjusted' | 'priorUnadjusted', number]> = [
+        ['currentUnadjusted', _pureDerived(row, 'currentUnadjusted')],
+        ['priorUnadjusted', _pureDerived(row, 'priorUnadjusted')],
+      ]
+      for (const [field, value] of derivedPairs) {
+        // 判定是否已被人工覆盖：stored ≠ snap（选项 b 状态机，见 Task 13）。
+        const storedRaw = readRaw(allResponses.value as Map<string, unknown>, rowFieldItemId(D4_ADJ_ROWS_SPEC, rid, field))
+        const snapRaw = readRaw(allResponses.value as Map<string, unknown>, snapItemId(rid, field))
+        const stored = storedRaw === '' ? null : Number(storedRaw)
+        const snap = snapRaw === '' ? null : Number(snapRaw)
+        const overridden =
+          stored != null && snap != null && Math.abs(stored - snap) > BALANCE_TOLERANCE
+        // 🔴 snap 与 stored 都**只在未被人工覆盖时**跟随派生值（S1 纯派生 / S3 自动跟随）。
+        //    snap 若无条件跟随，被覆盖的格在上游一变时 snap 立刻追上 derived ⇒ `snap ≠ derived`
+        //    永不成立 ⇒ **S4 不可达**，需求 6.4 要求的「同时呈现覆盖值 / 原派生值 / 现派生值」
+        //    就丢了中间那一个（被覆盖时的原派生值）。覆盖态下 snap 必须冻结在覆盖发生时的
+        //    派生值上，它正是 S4 要展示的「原派生值」。判据 P14（snap 冻结那条）。
+        if (!overridden) {
+          if (_writeIfChanged(snapItemId(rid, field), value)) anyWrite = true
+          if (_writeIfChanged(rowFieldItemId(D4_ADJ_ROWS_SPEC, rid, field), value)) anyWrite = true
+        }
+      }
+    }
+
+    if (rowListDirty || anyWrite) {
+      // 行清单重写（会把 stored + derivedSnapshot 一并刷进行对象，见 persistRowList/rowListReader）。
+      persistRowList(dynamicRows.value)
+    }
+  }
+
+  /**
+   * 恢复取数（Task 15 / 需求 6.5）：把某派生格从覆盖态退回 S1（纯派生）。
+   * 只影响被点的那一格：stored ← derived、snap ← derived（用当前派生值）。下次物化
+   * （syncDerivedRowsIntoStore 幂等）会保持它跟随上游，等价"写回派生值"。
+   */
+  function restoreDerivedValue(rowId: string, field: string): void {
+    if (readonly.value) return
+    // 当前派生值 = crossSheet computed 里该行该字段的聚合值。
+    const derivedRow =
+      crossSheetMainRows.value.find((r) => r.rowKey === rowId) ??
+      crossSheetOtherRows.value.find((r) => r.rowKey === rowId)
+    if (!derivedRow) return
+    // 🔴 必须取**纯派生值**：`derivedRow[field]` 是显示值，覆盖态下等于 stored ——
+    //    用它"恢复"等于把覆盖值又写回去一遍（恢复取数变成空操作）。见 `_pureDerived` 注释。
+    const derivedVal =
+      field === 'currentUnadjusted' || field === 'priorUnadjusted'
+        ? _pureDerived(derivedRow, field)
+        : 0
+    _writeIfChanged(rowFieldItemId(D4_ADJ_ROWS_SPEC, rowId, field), derivedVal)
+    _writeIfChanged(snapItemId(rowId, field), derivedVal)
+    persistRowList(dynamicRows.value)
+  }
+
+  // watch 派生源：D4-2/D4-3 变化 → 派生行重算 → 同步进 store。immediate 让首次挂载即落库。
+  watch(
+    [crossSheetMainRows, crossSheetOtherRows],
+    () => { syncDerivedRowsIntoStore() },
+    { immediate: true, deep: true },
+  )
+
   // ─── Sections computed (combining crossSheet 派生行 + dynamic 手工行) ─────────
 
   const sections: ComputedRef<AdjudicationSection[]> = computed(() => {
     const rows = dynamicRows.value
-    const adjTotals = adjustmentTotals.value
 
     // 1) 先放上游派生行（isFromCrossSheet），并登记已占用的 labelKey（派生优先，Req 1.6）
     const mainRows: AdjudicationRow[] = [...crossSheetMainRows.value]
@@ -592,8 +869,13 @@ export function useD4Adjudication(options: UseD4AdjudicationOptions) {
     const mainSeen = new Set(mainRows.map(r => labelKey(r.label)))
     const otherSeen = new Set(otherRows.map(r => labelKey(r.label)))
 
-    // 2) 再放手工/历史动态行，与派生行同名则去重（跳过，派生行金额为准）
+    // 2) 再放手工/历史动态行。
+    // 🔴 跳过 source==='tb' 行：派生行的**显示**权威是 crossSheet computed（实时随上游增减），
+    //    dynamicRows 里的 tb 副本仅为**落库**（Task 12 syncDerivedRowsIntoStore 写入，供出方向
+    //    projection）。若把 tb 副本也渲染，上游删产品后 watch 异步清理孤儿前会短暂重复
+    //    （d4AdjudicationRowLinkage 实测）。覆盖态的显示由 Task 14 在 crossSheet 行上逐格合并。
     for (const r of rows) {
+      if (r.source === 'tb') continue
       const code = r.accountCode || ''
       const isOther = isOtherRevenueCode(code)
       const lk = labelKey(r.label)
@@ -618,8 +900,9 @@ export function useD4Adjudication(options: UseD4AdjudicationOptions) {
         priorAje,
         priorRje,
         priorAudited: calcAuditedAmount(priorUnadj, priorAje, priorRje),
-        isFromCrossSheet: r.source === 'tb',
-        isEditable: r.source !== 'tb' || true, // 所有行可编辑 AJE/RJE
+        // 此处只剩 manual/legacy 手工行（source==='tb' 已在上面 continue 跳过，显示走 crossSheet）。
+        isFromCrossSheet: false,
+        isEditable: true,
         _dynamicRow: r,
       }
 
@@ -633,8 +916,8 @@ export function useD4Adjudication(options: UseD4AdjudicationOptions) {
       }
     }
 
-    const mainSubtotal: AdjudicationRow = buildSubtotalRow('main-subtotal', '主营业务收入小计', mainRows, adjTotals.mainAje, adjTotals.mainRje)
-    const otherSubtotal: AdjudicationRow = buildSubtotalRow('other-subtotal', '其他业务收入小计', otherRows, adjTotals.otherAje, adjTotals.otherRje)
+    const mainSubtotal: AdjudicationRow = buildSubtotalRow('main-subtotal', '主营业务收入小计', mainRows)
+    const otherSubtotal: AdjudicationRow = buildSubtotalRow('other-subtotal', '其他业务收入小计', otherRows)
 
     return [
       {
@@ -656,27 +939,29 @@ export function useD4Adjudication(options: UseD4AdjudicationOptions) {
     rowKey: string,
     label: string,
     rows: AdjudicationRow[],
-    sectionAje: number,
-    sectionRje: number,
   ): AdjudicationRow {
+    // 🔴 Task 16：本期 AJE/RJE 小计改**逐行汇总**（与模板 C12=SUM(C8:C11) / D12=SUM 同口径，
+    //    也与上期 AJE/RJE 小计的逐行汇总口径一致）。此前本期取 D4-4 汇总额（adjTotals），与
+    //    Excel 公式口径不同 ⇒ 两侧小计可能不等且无告警。逐行 vs D4-4 的差异改由 crossValidation
+    //    显式告警（不静默盖掉任一侧，D4-4 仍是调整分录权威源）。
     const currentUnadj = calcSubtotal(rows.map(r => r.currentUnadjusted))
     const priorUnadj = calcSubtotal(rows.map(r => r.priorUnadjusted))
+    const currentAje = calcSubtotal(rows.map(r => r.currentAje))
+    const currentRje = calcSubtotal(rows.map(r => r.currentRje))
+    const priorAje = calcSubtotal(rows.map(r => r.priorAje))
+    const priorRje = calcSubtotal(rows.map(r => r.priorRje))
     return {
       rowKey,
       label,
       isFixed: true,
       currentUnadjusted: currentUnadj,
-      currentAje: sectionAje,
-      currentRje: sectionRje,
-      currentAudited: calcAuditedAmount(currentUnadj, sectionAje, sectionRje),
+      currentAje,
+      currentRje,
+      currentAudited: calcAuditedAmount(currentUnadj, currentAje, currentRje),
       priorUnadjusted: priorUnadj,
-      priorAje: calcSubtotal(rows.map(r => r.priorAje)),
-      priorRje: calcSubtotal(rows.map(r => r.priorRje)),
-      priorAudited: calcAuditedAmount(
-        priorUnadj,
-        calcSubtotal(rows.map(r => r.priorAje)),
-        calcSubtotal(rows.map(r => r.priorRje)),
-      ),
+      priorAje,
+      priorRje,
+      priorAudited: calcAuditedAmount(priorUnadj, priorAje, priorRje),
       isFromCrossSheet: false,
       isEditable: false,
     }
@@ -771,6 +1056,38 @@ export function useD4Adjudication(options: UseD4AdjudicationOptions) {
       return `D4-1其他小计(${otherSubtotal.currentAudited.toFixed(2)}) 与 D4-3合计(${d4_3_total.toFixed(2)}) 差异${diff.toFixed(2)}`
     }
     return null
+  })
+
+  // ─── D4-4 校验告警（Task 16 / 需求 7.2）───────────────────────────────
+  //
+  // 🔴 与 mainCrossValidation/otherCrossValidation **同构范式**（computed 返回提示串、超容差
+  //    才亮、指明差异、不改任一侧、不阻塞），不另造校验机制。小计本期 AJE/RJE 现改为**逐行汇总**
+  //    （与模板 C12=SUM 同口径），而 D4-4 是调整分录权威源；两者不等本身是审计师需要知道的事实
+  //    （由他调平），不由系统盖掉。「D4-1 小计恒等于 D4-4」若为审计要求，由审计师依本告警调平。
+  const adjustmentTotalsValidation: ComputedRef<string | null> = computed(() => {
+    const secs = sections.value
+    const mainSub = secs[0]?.subtotalRow
+    const otherSub = secs[1]?.subtotalRow
+    if (!mainSub || !otherSub) return null
+    const t = adjustmentTotals.value
+    const msgs: string[] = []
+    const rowSumMainAdj = mainSub.currentAje + mainSub.currentRje
+    const d44MainAdj = t.mainAje + t.mainRje
+    if (Math.abs(rowSumMainAdj - d44MainAdj) > BALANCE_TOLERANCE) {
+      msgs.push(
+        `主营逐行调整合计(${rowSumMainAdj.toFixed(2)}) 与 D4-4调整分录(${d44MainAdj.toFixed(2)}) ` +
+        `差异${(rowSumMainAdj - d44MainAdj).toFixed(2)}`,
+      )
+    }
+    const rowSumOtherAdj = otherSub.currentAje + otherSub.currentRje
+    const d44OtherAdj = t.otherAje + t.otherRje
+    if (Math.abs(rowSumOtherAdj - d44OtherAdj) > BALANCE_TOLERANCE) {
+      msgs.push(
+        `其他逐行调整合计(${rowSumOtherAdj.toFixed(2)}) 与 D4-4调整分录(${d44OtherAdj.toFixed(2)}) ` +
+        `差异${(rowSumOtherAdj - d44OtherAdj).toFixed(2)}`,
+      )
+    }
+    return msgs.length > 0 ? msgs.join('；') : null
   })
 
   // ─── Cell update ─────────────────────────────────────────────────────
@@ -992,6 +1309,7 @@ export function useD4Adjudication(options: UseD4AdjudicationOptions) {
     // Cross validation
     mainCrossValidation,
     otherCrossValidation,
+    adjustmentTotalsValidation,
 
     // Audit note
     auditNote,
@@ -999,6 +1317,7 @@ export function useD4Adjudication(options: UseD4AdjudicationOptions) {
 
     // Operations
     updateCell,
+    restoreDerivedValue,
     publishAdjudicated,
     publishing,
 

@@ -136,9 +136,11 @@ const {
   differenceRow,
   mainCrossValidation,
   otherCrossValidation,
+  adjustmentTotalsValidation,
   auditNote,
   auditConclusion,
   updateCell,
+  restoreDerivedValue,
   addProductRow,
   removeProductRow,
   publishAdjudicated,
@@ -346,6 +348,16 @@ const aiTip = computed(() => aiAvailable.value ? 'AI 辅助生成' : 'AI 服务�
     >
       {{ otherCrossValidation }}
     </el-alert>
+    <!-- Task 16：本期逐行 AJE/RJE 汇总 ≠ D4-4 调整分录汇总额（不阻塞，供审计师调平） -->
+    <el-alert
+      v-if="adjustmentTotalsValidation"
+      type="warning"
+      :closable="false"
+      class="cross-alert"
+      title="调整分录小计与 D4-4 不一致"
+    >
+      {{ adjustmentTotalsValidation }}
+    </el-alert>
 
     <!-- 区块标题 + 操作 -->
     <div class="section-toolbar">
@@ -405,7 +417,35 @@ const aiTip = computed(() => aiAvailable.value ? 'AI 辅助生成' : 'AI 服务�
                 style="width:100%"
                 @change="(val: number) => updateCell(row.rowKey, 'currentUnadjusted', val ?? 0)"
               />
-              <span v-else :class="getCellClass(row, 'currentUnadjusted')">{{ fmtAmount(row.currentUnadjusted) }}</span>
+              <template v-else>
+                <span :class="getCellClass(row, 'currentUnadjusted')">{{ fmtAmount(row.currentUnadjusted) }}</span>
+                <!-- 选项 b 覆盖标记（Task 15）：S2/S4 格显示「已人工覆盖」+ 冲突三值 + 恢复取数 -->
+                <el-tooltip
+                  v-if="row.cellOverrides && row.cellOverrides.currentUnadjusted"
+                  placement="top"
+                  effect="light"
+                >
+                  <template #content>
+                    <div class="override-tip">
+                      <div>该格已在 Excel 中人工覆盖</div>
+                      <div>覆盖值：{{ fmtAmount(row.cellOverrides.currentUnadjusted.stored) }}</div>
+                      <template v-if="row.cellOverrides.currentUnadjusted.state === 'S4'">
+                        <div>原派生值：{{ fmtAmount(row.cellOverrides.currentUnadjusted.snap) }}</div>
+                        <div class="override-tip__conflict">现派生值：{{ fmtAmount(row.cellOverrides.currentUnadjusted.derived) }}（上游已变）</div>
+                      </template>
+                    </div>
+                  </template>
+                  <el-tag
+                    :type="row.cellOverrides.currentUnadjusted.state === 'S4' ? 'danger' : 'warning'"
+                    size="small" effect="plain" class="override-tag"
+                  >{{ row.cellOverrides.currentUnadjusted.state === 'S4' ? '覆盖·上游已变' : '已人工覆盖' }}</el-tag>
+                </el-tooltip>
+                <el-button
+                  v-if="row.cellOverrides && row.cellOverrides.currentUnadjusted && !isReadonly"
+                  link type="primary" size="small" class="override-restore"
+                  @click="restoreDerivedValue(row.rowKey, 'currentUnadjusted')"
+                >恢复取数</el-button>
+              </template>
             </template>
           </el-table-column>
           <el-table-column label="账项调整" :width="colWidth('currentAje')" align="right">
@@ -453,7 +493,34 @@ const aiTip = computed(() => aiAvailable.value ? 'AI 辅助生成' : 'AI 服务�
                 style="width:100%"
                 @change="(val: number) => updateCell(row.rowKey, 'priorUnadjusted', val ?? 0)"
               />
-              <span v-else>{{ fmtAmount(row.priorUnadjusted) }}</span>
+              <template v-else>
+                <span>{{ fmtAmount(row.priorUnadjusted) }}</span>
+                <el-tooltip
+                  v-if="row.cellOverrides && row.cellOverrides.priorUnadjusted"
+                  placement="top"
+                  effect="light"
+                >
+                  <template #content>
+                    <div class="override-tip">
+                      <div>该格已在 Excel 中人工覆盖</div>
+                      <div>覆盖值：{{ fmtAmount(row.cellOverrides.priorUnadjusted.stored) }}</div>
+                      <template v-if="row.cellOverrides.priorUnadjusted.state === 'S4'">
+                        <div>原派生值：{{ fmtAmount(row.cellOverrides.priorUnadjusted.snap) }}</div>
+                        <div class="override-tip__conflict">现派生值：{{ fmtAmount(row.cellOverrides.priorUnadjusted.derived) }}（上游已变）</div>
+                      </template>
+                    </div>
+                  </template>
+                  <el-tag
+                    :type="row.cellOverrides.priorUnadjusted.state === 'S4' ? 'danger' : 'warning'"
+                    size="small" effect="plain" class="override-tag"
+                  >{{ row.cellOverrides.priorUnadjusted.state === 'S4' ? '覆盖·上游已变' : '已人工覆盖' }}</el-tag>
+                </el-tooltip>
+                <el-button
+                  v-if="row.cellOverrides && row.cellOverrides.priorUnadjusted && !isReadonly"
+                  link type="primary" size="small" class="override-restore"
+                  @click="restoreDerivedValue(row.rowKey, 'priorUnadjusted')"
+                >恢复取数</el-button>
+              </template>
             </template>
           </el-table-column>
           <el-table-column label="账项调整" :width="colWidth('priorAje')" align="right">
@@ -713,6 +780,10 @@ const aiTip = computed(() => aiAvailable.value ? 'AI 辅助生成' : 'AI 服务�
   font-size: 14px;
   color: #303133;
 }
+.override-tag { margin-left: 4px; cursor: help; }
+.override-restore { margin-left: 4px; padding: 0; height: auto; }
+.override-tip { line-height: 1.6; }
+.override-tip__conflict { color: #f56c6c; font-weight: 600; }
 .cross-sheet-cell {
   background-color: #e6f7ff;
   padding: 2px 4px;
