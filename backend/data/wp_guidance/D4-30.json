@@ -1,0 +1,35 @@
+{
+  "schema_version": 2,
+  "wp_code": "D4-30",
+  "title": "D4-30 客户访谈记录汇总表 编制说明",
+  "sections": [
+    {
+      "key": "purpose",
+      "title": "一、编制目的",
+      "content": "汇总所有客户访谈记录的关键信息，便于审阅、交叉比对和形成访谈结论，是走访/访谈程序的汇总索引。",
+      "source_refs": []
+    },
+    {
+      "key": "materials",
+      "title": "二、资料准备",
+      "content": "一客户一行，记录访谈时间、原因、方式（实地走访/视频/电话）、被访谈公司地址、访谈人员及身份、参与审计人员、是否现场函证、访谈关注要点、合同执行与交易/往来余额核对是否一致、访谈结论及访谈表索引。",
+      "source_refs": []
+    },
+    {
+      "key": "judgments",
+      "title": "三、审计关注点",
+      "content": "1. 访谈方式为电话/视频的：核实被访谈人身份真实性，防止串通。\n2. 交易金额或往来余额核对不一致：重大预警，须追查。\n3. 每份访谈记录（D4-31）应与本表逐一对应，访谈结论须明确是否发现异常。\n4. 无法访谈或拒绝访谈的大客户：收入真实性存疑。",
+      "source_refs": []
+    }
+  ],
+  "source": "static_json",
+  "migration": {
+    "kind": "legacy_structure_preserved",
+    "version": 2,
+    "legacy_content_digest": "56c1ffda26668c266543ce4eaee0853945c38e5a1229fcd228726b7e1004c7d7",
+    "legacy_section_count": 3,
+    "canonical_section_count": 3,
+    "unmapped_section_count": 0,
+    "canonical_body_digest": "b1331b722e8e9559ecd27b93601c46a69488b7887e833a0ec90f2a7bc25fd3b7"
+  }
+}

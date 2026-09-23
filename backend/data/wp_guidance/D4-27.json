@@ -1,0 +1,35 @@
+{
+  "schema_version": 2,
+  "wp_code": "D4-27",
+  "title": "D4-27 识别未披露的关联方 编制说明",
+  "sections": [
+    {
+      "key": "purpose",
+      "title": "一、编制目的",
+      "content": "将客户信息与被审计单位股东、董监高及其近亲属、员工信息交叉比对，识别未披露的关联方，防止关联方伪装成第三方客户虚构或美化交易。",
+      "source_refs": []
+    },
+    {
+      "key": "materials",
+      "title": "二、资料准备",
+      "content": "对每个核查对象（姓名）标注其身份维度（个人客户/客户法人/合同签订人/高管亲属/各部门人员等），统计命中维度总计，并标注是否重名、是否为公司股东高管亲属员工、年度销售额。",
+      "source_refs": []
+    },
+    {
+      "key": "judgments",
+      "title": "三、审计关注点",
+      "content": "1. 重名客户须进一步查验是否为同一人（身份证/工商信息）。\n2. 命中多个身份维度的客户：高度疑似未披露关联方。\n3. 识别出的关联方须补充至关联方清单和附注披露，并纳入 D4-21 关联方价格分析。\n4. 与员工/高管同名的大额客户是收入舞弊的典型信号。",
+      "source_refs": []
+    }
+  ],
+  "source": "static_json",
+  "migration": {
+    "kind": "legacy_structure_preserved",
+    "version": 2,
+    "legacy_content_digest": "80be74ced310417f18336e922eff08d6e4f276197f1bd6c70b37ed6ba3ba8921",
+    "legacy_section_count": 3,
+    "canonical_section_count": 3,
+    "unmapped_section_count": 0,
+    "canonical_body_digest": "c7f8d511286bb1b2adc8881f6164a72b1179e34d8dbf6844cc22865b5fbb0123"
+  }
+}

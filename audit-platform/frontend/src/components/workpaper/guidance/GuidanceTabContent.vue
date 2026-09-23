@@ -82,11 +82,32 @@ const SECTION_LABELS: Record<string, string> = {
 
 const sourceLabel = computed(() => SOURCE_LABELS[props.guidanceData.source])
 const sourceTagType = computed(() => SOURCE_TAG_TYPES[props.guidanceData.source])
-const statusLabel = computed(() => STATUS_LABELS[props.guidanceData.resolution_status])
-const statusTagType = computed(() => STATUS_TAG_TYPES[props.guidanceData.resolution_status])
+const statusLabel = computed(() => (
+  hasCuratedStatic.value && props.guidanceData.resolution_status === 'missing'
+    ? '编制说明'
+    : STATUS_LABELS[props.guidanceData.resolution_status]
+))
+const statusTagType = computed(() => (
+  hasCuratedStatic.value && props.guidanceData.resolution_status === 'missing'
+    ? 'warning'
+    : STATUS_TAG_TYPES[props.guidanceData.resolution_status]
+))
 const isFallback = computed(() => props.guidanceData.resolution_status !== 'exact')
-const missingSections = computed(() => props.guidanceData.missing_sections || [])
+const rawMissingSections = computed(() => props.guidanceData.missing_sections || [])
 const wholeWorkbook = computed(() => Boolean(guidanceStore.wpContext?.wholeWorkbook))
+
+// 已人工精编的静态说明：source=static_json 且含 ≥3 段有实质正文。
+// 此类说明虽未达到"九段+来源引用"的内容闭环 exact 标准，但已是可直接参考的
+// 专业编制说明，不应以"尚未达标/待补齐"的负面横幅与红色标签干扰阅读。
+const hasCuratedStatic = computed(() => {
+  if (props.guidanceData.source !== 'static_json') return false
+  const secs = props.guidanceData.guidance?.sections || []
+  const filled = secs.filter((s) => (s.items || []).join('').trim().length >= 20)
+  return filled.length >= 3
+})
+
+// 对已精编静态说明隐藏"待补齐"红标签（避免负面观感）。
+const missingSections = computed(() => (hasCuratedStatic.value ? [] : rawMissingSections.value))
 
 const completionStatus = computed(() => props.guidanceData.completion_status || null)
 const completionLabel = computed(() => (
@@ -133,6 +154,9 @@ const contextNotice = computed(() => {
     return `当前 sheet 暂无完整专属说明，沿用 ${data.resolved_wp_code} 编制说明。`
   }
   if (data.resolution_status === 'missing') {
+    if (hasCuratedStatic.value) {
+      return '以下为本底稿编制说明，供编制时参考。'
+    }
     return '当前说明尚未达到九段与来源引用完整标准，仅供参考，不能计入内容闭环。'
   }
   if (data.resolution_status === 'typed_fallback') {

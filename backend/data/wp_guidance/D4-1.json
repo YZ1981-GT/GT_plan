@@ -1,0 +1,41 @@
+{
+  "schema_version": 2,
+  "wp_code": "D4-1",
+  "title": "D4-1 营业收入审定表 编制说明",
+  "sections": [
+    {
+      "key": "purpose",
+      "title": "一、编制目的",
+      "content": "汇总营业收入各科目（主营6001+其他6051）的未审数、审计调整与审定数，形成营业收入的审定金额。本表是 D4 循环的核心汇总表，向上对接报表与附注，向下由 D4-2/D4-3 明细表和 D4-4 调整分录支撑。",
+      "source_refs": []
+    },
+    {
+      "key": "data_sources",
+      "title": "二、数据来源",
+      "content": "「本期未审」取自试算平衡表（trial_balance）对应科目发生额；「本期AJE/RJE」取自 D4-4 调整分录汇总表中涉及 6001/6051 的调整；「上期未审/AJE/RJE」取上年同期数据供对比。收入类取发生额而非余额。",
+      "source_refs": []
+    },
+    {
+      "key": "formulas",
+      "title": "三、计算公式",
+      "content": "审定数 = 未审数 + AJE + RJE（本表自动计算，导入时忽略审定列）。\nAJE = 账项调整分录，RJE = 重分类调整分录。\n主营/其他分区的审定合计应分别与 D4-2、D4-3 明细表合计一致，总合计与试算表 6001+6051 核对。",
+      "source_refs": []
+    },
+    {
+      "key": "judgments",
+      "title": "四、审计关注点",
+      "content": "1. 审定合计与试算平衡表数应核对一致，出现差异须在 D4-4 中查明并调整。\n2. 变动率异常的产品/项目须追溯到 D4-2/D4-3 明细，结合 D4-6 指标分析说明原因。\n3. 编制完成后点「确认审定」将审定数回写试算表，此操作经二次确认，须确保调整已全部录入。",
+      "source_refs": []
+    }
+  ],
+  "source": "static_json",
+  "migration": {
+    "kind": "legacy_structure_preserved",
+    "version": 2,
+    "legacy_content_digest": "7aebb83c4f5d9ad92dd740cdff8905a266a2b1a320b48c94bad59883a09a229a",
+    "legacy_section_count": 4,
+    "canonical_section_count": 4,
+    "unmapped_section_count": 0,
+    "canonical_body_digest": "78e0ab491b3c255a3f4c79d5fc7af161d4514aae34c4c9d6a6fed31c6332baf2"
+  }
+}

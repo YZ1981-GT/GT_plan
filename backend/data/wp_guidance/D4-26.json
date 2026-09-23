@@ -1,0 +1,41 @@
+{
+  "schema_version": 2,
+  "wp_code": "D4-26",
+  "title": "D4-26 境外销售收入检查 编制说明",
+  "sections": [
+    {
+      "key": "purpose",
+      "title": "一、编制目的",
+      "content": "对境外销售收入的真实性和完整性进行专项核查。境外收入因函证难、监管远，是舞弊高发领域，须执行强化的外部核查程序。",
+      "source_refs": []
+    },
+    {
+      "key": "materials",
+      "title": "二、资料准备",
+      "content": "逐客户填写所在国家地区、产品种类、业务模式、销售金额、占比、贸易模式、贸易条款、结算模式、是否第三方回款，以及核查程序确认金额、差异，并标注已执行的核查手段（实地走访/交易函证/海关函证/核对报关单/电子口岸查询）。",
+      "source_refs": []
+    },
+    {
+      "key": "formulas",
+      "title": "三、差异分析",
+      "content": "差异 = 账面销售金额 − 核查程序确认金额，差异须逐项分析原因。",
+      "source_refs": []
+    },
+    {
+      "key": "judgments",
+      "title": "四、审计关注点",
+      "content": "1. 贸易模式（自营/转口/委托代理）影响收入确认时点与总额/净额法。\n2. 至少执行一项外部核查程序（函证/海关/口岸），仅凭内部单据不足。\n3. 存在第三方回款、离岸公司结算：高度关注资金真实性。",
+      "source_refs": []
+    }
+  ],
+  "source": "static_json",
+  "migration": {
+    "kind": "legacy_structure_preserved",
+    "version": 2,
+    "legacy_content_digest": "b3ae42670d73d4744036808c963fa148f6104a2a283161acff5a2d0fa9f5f37d",
+    "legacy_section_count": 4,
+    "canonical_section_count": 4,
+    "unmapped_section_count": 0,
+    "canonical_body_digest": "2e856c16e109381d425e56b94a4642bea4c4e2008a0b7a9b248dfb111a6385f7"
+  }
+}

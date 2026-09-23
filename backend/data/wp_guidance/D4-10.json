@@ -1,0 +1,41 @@
+{
+  "schema_version": 2,
+  "wp_code": "D4-10",
+  "title": "D4-10 重要客户销售价格分析 编制说明",
+  "sections": [
+    {
+      "key": "purpose",
+      "title": "一、编制目的",
+      "content": "对重要客户的销售价格与年度均价、市场价格对比，识别定价异常，评估收入计价的公允性与合理性。",
+      "source_refs": []
+    },
+    {
+      "key": "data_sources",
+      "title": "二、数据来源",
+      "content": "重要客户可从 D4-9 客户结构自动导入，再补充产品种类、销售单价、年度均价、市场价格等价格维度。本期销售总额取自 D4-2 主营本期未审合计。",
+      "source_refs": []
+    },
+    {
+      "key": "formulas",
+      "title": "三、计算公式与阈值",
+      "content": "销售单价 = 销售金额 / 销售数量\n与均价差异 = (销售单价 − 年度均价) / 年度均价\n与市场差异 = (销售单价 − 市场价格) / 市场价格\n差异绝对值 >20% 标记为价格异常，须在差异原因列解释。",
+      "source_refs": []
+    },
+    {
+      "key": "judgments",
+      "title": "四、审计关注点",
+      "content": "1. 与均价/市价差异 >20% 须逐客户解释原因（批量折扣、区域差异、产品档次等）。\n2. 对同一客户价格畸低或畸高：关注是否存在利益输送或虚构交易。\n3. 市场价格须标注来源（行业报告/公开报价）。",
+      "source_refs": []
+    }
+  ],
+  "source": "static_json",
+  "migration": {
+    "kind": "legacy_structure_preserved",
+    "version": 2,
+    "legacy_content_digest": "15f10f01caaef5618cc5c4fda41f84ec1c39409fe70e667c62c9dc8962106159",
+    "legacy_section_count": 4,
+    "canonical_section_count": 4,
+    "unmapped_section_count": 0,
+    "canonical_body_digest": "5d6503c92808aaeabe560e14837b6c38d4f18f47d717cc683c95e2a427c0a0e4"
+  }
+}

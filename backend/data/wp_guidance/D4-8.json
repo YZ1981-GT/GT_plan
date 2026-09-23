@@ -1,0 +1,41 @@
+{
+  "schema_version": 2,
+  "wp_code": "D4-8",
+  "title": "D4-8 重要产品毛利分析 编制说明",
+  "sections": [
+    {
+      "key": "purpose",
+      "title": "一、编制目的",
+      "content": "对重要产品按月分析销量、单价、收入、单位成本与成本的本期/上期变动，识别单个产品在月度维度上的毛利异常，是 D4-7 毛利率分析的下钻明细。",
+      "source_refs": []
+    },
+    {
+      "key": "data_sources",
+      "title": "二、数据来源",
+      "content": "每行为一个「产品+月份」组合，销量与金额从 ERP 导出或从 D4-2 月度数据派生，成本从成本核算系统按产品按月取得。",
+      "source_refs": []
+    },
+    {
+      "key": "formulas",
+      "title": "三、计算公式",
+      "content": "月度毛利 = 本期收入金额 − 本期成本金额\n月度毛利率 = 毛利 / 收入\n单价 = 收入金额 / 销量；单位成本 = 成本金额 / 成本销量\n与上期同产品同口径对比识别变动。",
+      "source_refs": []
+    },
+    {
+      "key": "judgments",
+      "title": "四、审计关注点",
+      "content": "1. 某月毛利率大幅偏离其他月份：关注成本归集是否准确、是否存在跨期。\n2. 销量与成本销量不匹配：关注库存与收入成本配比。\n3. 关注是否存在联产品/副产品需同时分析毛利变化。",
+      "source_refs": []
+    }
+  ],
+  "source": "static_json",
+  "migration": {
+    "kind": "legacy_structure_preserved",
+    "version": 2,
+    "legacy_content_digest": "5cf50298ce5998d10f0f1b85e807abaef1239370332d0c1e6aade00f4108baf7",
+    "legacy_section_count": 4,
+    "canonical_section_count": 4,
+    "unmapped_section_count": 0,
+    "canonical_body_digest": "cc4792776bd020b2e69a169517ef409134c67ce19377d6c85c685254aa9a0e38"
+  }
+}

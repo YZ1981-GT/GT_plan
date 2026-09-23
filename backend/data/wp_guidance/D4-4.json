@@ -1,0 +1,35 @@
+{
+  "schema_version": 2,
+  "wp_code": "D4-4",
+  "title": "D4-4 营业收入调整分录汇总表 编制说明",
+  "sections": [
+    {
+      "key": "purpose",
+      "title": "一、编制目的",
+      "content": "汇总记录 D4 营业收入循环审计中发现的所有需要调整的会计分录（AJE/RJE），是 D4-1 审定表审定数的调整依据。本表与平台调整分录模块双向联动，涉及科目6001/6051的调整自动同步。",
+      "source_refs": []
+    },
+    {
+      "key": "steps",
+      "title": "二、编制步骤",
+      "content": "1. 「摘要」列：简要描述调整原因。\n2. 「分类」列：选择账项调整(AJE)/报表调整(RJE)/其他。\n3. 「会计科目」列：填写完整科目编码+名称，如 6001-主营业务收入。\n4. 「借方」「贷方」列：填写调整金额，每笔分录借贷必须平衡。\n5. 「索引号」列：填写关联底稿索引（如 D4-2、D4-14）。",
+      "source_refs": []
+    },
+    {
+      "key": "judgments",
+      "title": "三、审计关注点与联动",
+      "content": "1. 每笔调整须有底稿证据支撑，索引号可追溯。\n2. 确认后自动更新 D4-1 审定表的 AJE/RJE 列；可推送至 A13 未更正错报汇总。\n3. 与调整分录模块在科目6001/6051范围内双向同步，避免重复或遗漏。",
+      "source_refs": []
+    }
+  ],
+  "source": "static_json",
+  "migration": {
+    "kind": "legacy_structure_preserved",
+    "version": 2,
+    "legacy_content_digest": "f333cf87d1cc2e2925bb8d0b26253e91929d066487fbc0a952d571684e2282ec",
+    "legacy_section_count": 3,
+    "canonical_section_count": 3,
+    "unmapped_section_count": 0,
+    "canonical_body_digest": "95d1093f1214b4e0311e7c22101d2550c326af6774be7f27a21ec365d0152cfa"
+  }
+}

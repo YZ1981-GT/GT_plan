@@ -172,4 +172,36 @@ describe('GuidanceTabContent — 状态、来源与 XSS fail-closed', () => {
     expect(wrapper.text()).not.toContain('当前为整册编辑')
     expect(wrapper.text()).not.toContain('沿用 D0 编制说明')
   })
+
+  it('已精编静态说明(missing)显示中性提示，不显示负面横幅与待补齐红标', () => {
+    setActivePinia(createPinia())
+    const wrapper = mount(GuidanceTabContent, {
+      props: {
+        guidanceData: guidance({
+          resolved_wp_code: 'D4-7',
+          resolution_status: 'missing',
+          source: 'static_json',
+          missing_sections: ['materials', 'evidence', 'completion', 'steps', 'common_errors'],
+          guidance: {
+            sections: [
+              { key: 'purpose', title: '一、编制目的', items: ['按产品分析主营业务收入的结构、单价、单位成本与毛利率的本期/上期变动。'], source_refs: [] },
+              { key: 'data_sources', title: '二、数据来源', items: ['从 D4-2 主营明细按产品汇总收入，从对应成本科目汇总成本。'], source_refs: [] },
+              { key: 'formulas', title: '三、计算公式', items: ['毛利率 = 毛利 / 收入（收入为0返0）。'], source_refs: [] },
+              { key: 'judgments', title: '四、审计关注点', items: ['毛利率变动超过5个百分点的产品须重点分析原因。'], source_refs: [] },
+            ],
+            raw_text: '按产品分析',
+          },
+        }),
+      },
+      global: { plugins: [createPinia()], stubs },
+    })
+    // 中性提示，且不出现负面横幅
+    expect(wrapper.text()).toContain('以下为本底稿编制说明，供编制时参考')
+    expect(wrapper.text()).not.toContain('尚未达到九段与来源引用完整标准')
+    expect(wrapper.text()).not.toContain('待补齐')
+    // 状态标签改为中性"编制说明"，不显示红色"内容待补齐"
+    expect(wrapper.text()).not.toContain('内容待补齐')
+    // 正文内容正常渲染
+    expect(wrapper.text()).toContain('毛利率')
+  })
 })

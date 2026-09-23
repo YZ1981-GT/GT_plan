@@ -1,0 +1,35 @@
+{
+  "schema_version": 2,
+  "wp_code": "D4-29",
+  "title": "D4-29 客户信息检查表 编制说明",
+  "sections": [
+    {
+      "key": "purpose",
+      "title": "一、编制目的",
+      "content": "详细记录每个核查客户的工商、股权、经营信息，评估交易对手方资质与真实经营能力，识别空壳公司、关联方、异常客户。",
+      "source_refs": []
+    },
+    {
+      "key": "data_sources",
+      "title": "二、数据来源",
+      "content": "从国家企业信用信息公示系统、天眼查/企查查、信用中国等渠道查询，填写统一社会信用代码、注册/办公地址、网站及IP、成立时间、注册资本、经营范围、人员规模、法定代表人、股东及持股、实际控制人、经营状态、是否失信等。",
+      "source_refs": []
+    },
+    {
+      "key": "judgments",
+      "title": "三、审计关注点",
+      "content": "1. 成立时间近（<2年）+ 注册资本小 + 人员少（社保人数少）→ 空壳公司风险。\n2. 经营状态异常（吊销/注销/经营异常）的客户交易须重点核查真实性。\n3. 客户与被审计单位地址/IP/邮箱/股东重合：疑似关联方（联查 D4-27）。\n4. 经营范围与采购产品不符：关注交易商业实质。",
+      "source_refs": []
+    }
+  ],
+  "source": "static_json",
+  "migration": {
+    "kind": "legacy_structure_preserved",
+    "version": 2,
+    "legacy_content_digest": "7731e5cc8ab5f8fb2567fcff6c37e2ddcf06648d6b7ccc967b4be4b2003d75f6",
+    "legacy_section_count": 3,
+    "canonical_section_count": 3,
+    "unmapped_section_count": 0,
+    "canonical_body_digest": "a171a9fd6263d0ce80fdec2a9666c5156992ca2da454af7ac7fa7459c5f64cb8"
+  }
+}

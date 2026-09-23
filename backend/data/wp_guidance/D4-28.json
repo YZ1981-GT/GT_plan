@@ -1,0 +1,35 @@
+{
+  "schema_version": 2,
+  "wp_code": "D4-28",
+  "title": "D4-28 客户信息核查清单 编制说明",
+  "sections": [
+    {
+      "key": "purpose",
+      "title": "一、编制目的",
+      "content": "对选取的重要客户执行多维度背景核查，评估客户真实性，是客户尽职调查的执行记录表（记录每种核查手段是否执行）。",
+      "source_refs": []
+    },
+    {
+      "key": "materials",
+      "title": "二、资料准备",
+      "content": "对每个核查客户填写选取原因、销售金额及占比、应收/合同负债期末余额及占比，并标注各核查手段执行情况：工商资料查询、互联网信息查询、函证、视频/电话访谈、实地走访。",
+      "source_refs": []
+    },
+    {
+      "key": "judgments",
+      "title": "三、审计关注点",
+      "content": "1. 选取原因须明确（金额前N大/新增客户/异常波动/关联疑点）。\n2. 至少对前5大客户执行工商资料查询；高风险客户应叠加多种核查手段。\n3. 核查详情记录在 D4-29，本表是核查手段的覆盖清单。\n4. 无法完成任何外部核查的大额客户：收入真实性存疑。",
+      "source_refs": []
+    }
+  ],
+  "source": "static_json",
+  "migration": {
+    "kind": "legacy_structure_preserved",
+    "version": 2,
+    "legacy_content_digest": "9b7b77d7d980bca4c1b1224e29dbc03a47adf4511f97679e200c9df26dcfc458",
+    "legacy_section_count": 3,
+    "canonical_section_count": 3,
+    "unmapped_section_count": 0,
+    "canonical_body_digest": "6840bb0842ce33f8970aaa7b425955e756dceca162fca86e2fbc8df7f69ad417"
+  }
+}

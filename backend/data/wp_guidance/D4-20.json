@@ -1,0 +1,41 @@
+{
+  "schema_version": 2,
+  "wp_code": "D4-20",
+  "title": "D4-20 销售退货检查表 编制说明",
+  "sections": [
+    {
+      "key": "purpose",
+      "title": "一、编制目的",
+      "content": "检查销售退货的真实性与会计处理，测算退货准备金的合理性，评估期后退货对报告期收入的影响。本表含三个子区：重新测算表、本期退货明细、期后退货明细。",
+      "source_refs": []
+    },
+    {
+      "key": "materials",
+      "title": "二、三个子区结构",
+      "content": "（一）退货准备金重新测算：按产品填写计提基数、计提比例、应计提金额、账面已计提金额、差异。\n（二）本期退货明细：逐笔记录本期退货交易（凭证、客户、产品、退货数量金额、原因、是否涉及诉讼、是否异常）。\n（三）期后退货明细：记录资产负债表日后至审计报告日的退货。",
+      "source_refs": []
+    },
+    {
+      "key": "formulas",
+      "title": "三、计算公式",
+      "content": "应计提金额 = 计提基数 × 计提比例（计提基数为该产品本期销售收入，比例参照历史退货率）\n差异金额 = 应计提金额 − 账面已计提金额",
+      "source_refs": []
+    },
+    {
+      "key": "judgments",
+      "title": "四、审计关注点",
+      "content": "1. 标记「是否异常=是」的退货将推送至 A13 未更正错报汇总。\n2. 期后大额退货：关注是否属于资产负债表日后调整事项，是否需追溯调整报告期收入。\n3. 退货准备金差异重大：关注计提是否充分。\n4. 退货原因须具体（质量/客户取消/物流损坏），异常集中退货警惕虚假销售冲回。",
+      "source_refs": []
+    }
+  ],
+  "source": "static_json",
+  "migration": {
+    "kind": "legacy_structure_preserved",
+    "version": 2,
+    "legacy_content_digest": "bbcc7bf5d51f7ababcebb19d668ebfcd3a14a012c16f507272a4b7c073d32301",
+    "legacy_section_count": 4,
+    "canonical_section_count": 4,
+    "unmapped_section_count": 0,
+    "canonical_body_digest": "1ef59284847528c8a5afac2c15a0d15f1b6469a54a7762e6c1e4b5540e763542"
+  }
+}

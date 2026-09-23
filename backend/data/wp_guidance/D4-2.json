@@ -1,0 +1,41 @@
+{
+  "schema_version": 2,
+  "wp_code": "D4-2",
+  "title": "D4-2 主营业务收入明细表 编制说明",
+  "sections": [
+    {
+      "key": "purpose",
+      "title": "一、编制目的",
+      "content": "按产品/服务类别列示各月主营业务收入（科目6001），反映收入的季节性分布与波动趋势，为 D4-1 审定表主营收入行提供明细支撑，并为分析程序（D4-6/D4-7）提供基础数据。",
+      "source_refs": []
+    },
+    {
+      "key": "data_sources",
+      "title": "二、数据来源",
+      "content": "从序时账（tb_ledger）按科目6001+产品/服务辅助维度、按月汇总导入，或从 ERP 销售明细导出后按本模板整理。「产品/服务」列须与 D4-1 审定表口径对应；各月金额含税/不含税须与公司口径一致。",
+      "source_refs": []
+    },
+    {
+      "key": "formulas",
+      "title": "三、计算公式（灰底列自动计算）",
+      "content": "未审合计 = SUM(1月~12月)\n本期审定 = 未审合计 + 审计调整\n上期审定 = 上期未审 + 上期调整\n未审变动率 = (未审合计 − 上期未审) / 上期未审 × 100%\n审定变动率 = (本期审定 − 上期审定) / 上期审定 × 100%\n灰底列为自动计算，导入时忽略。",
+      "source_refs": []
+    },
+    {
+      "key": "judgments",
+      "title": "四、审计关注点",
+      "content": "1. 各月收入波动是否合理，有无年末突击确认收入迹象（联查 D4-17/D4-18 截止测试）。\n2. 变动率超过30%的产品须在审计说明中解释原因。\n3. 本表合计应与 D4-1 审定表「主营业务收入」行一致。",
+      "source_refs": []
+    }
+  ],
+  "source": "static_json",
+  "migration": {
+    "kind": "legacy_structure_preserved",
+    "version": 2,
+    "legacy_content_digest": "38560911acd5ea72d2636417fe1ac021a9e9842e3c762f0730d208e17eba1afa",
+    "legacy_section_count": 4,
+    "canonical_section_count": 4,
+    "unmapped_section_count": 0,
+    "canonical_body_digest": "02ae0c32c9c1e18caf34c7e720c45ff1439a5fac4f49306f5a772cc85c085afc"
+  }
+}

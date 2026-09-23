@@ -373,9 +373,10 @@
   <!-- R7-S3-05 Task 25：底稿右栏面板（抽屉模式）— 提到 HTML/Univer 共用，供 AttachmentTabPanel → Drawer_Host -->
   <el-drawer
     v-model="showSidePanel"
+    title="底稿面板"
     direction="rtl"
     size="400px"
-    :with-header="false"
+    :with-header="true"
     :modal="false"
     append-to-body
   >

@@ -661,8 +661,20 @@ defineExpose({
   handleExportTemplate,
   handleExportData,
   handleImportClick,
-  /** 透传当前活跃子组件的行名对齐行（D4-1 审定表暴露） */
-  getRowNameAlignmentRows: () => d4AdjRef.value?.getRowNameAlignmentRows?.() ?? null,
+  /**
+   * 行名对齐行：所有 D4 sheet 统一返回当前 sheet 标识。
+   * 后端 _resolve_account_prefixes(wp_code, sheet_code) 按 sheet_code 自动查科目前缀。
+   * D4-1 审定表有专门的逐行对齐（d4AdjRef），其余 sheet 走通用模式。
+   */
+  getRowNameAlignmentRows: () => {
+    // D4-1 审定表：逐行对齐（有产品行细粒度）
+    const adjRows = d4AdjRef.value?.getRowNameAlignmentRows?.()
+    if (adjRows && adjRows.length > 0) return adjRows
+    // 其余 sheet：返回当前 sheet 作为一个整体对齐行，后端按 sheet_code 查科目前缀
+    const sheet = currentSheet.value
+    if (!sheet || sheet === 'D4' || sheet === 'skip') return null
+    return [{ row_key: sheet, row_label: sheet, account_prefixes: [] }]
+  },
 })
 </script>
 

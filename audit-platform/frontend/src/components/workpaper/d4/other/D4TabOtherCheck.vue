@@ -131,7 +131,7 @@ const aiNoteLoading = ref(false); const aiConclusionLoading = ref(false)
 async function genNote() { if (props.isReadonly || !aiAvailable.value) return; aiNoteLoading.value = true; try { const res = await http.post(`/api/workpapers/${props.wpId}/d4/ai-generate`, { section: 'analysis-note', existingContent: auditNote.value, relatedContext: { task: '基于其他业务收入检查表(D4-35)抽凭结果生成审计说明', rowCount: rows.value.length, totalChecked: totalChecked.value, checkRatio: checkRatio.value, anomalyCount: anomalyCount.value } }, { _silent: true } as any); const t = res.data?.data?.content ?? res.data?.content ?? ''; if (!t) { ElMessage.warning('AI 未生成内容'); return }; await ElMessageBox.confirm(t, 'AI 生成', { confirmButtonText: '填入', cancelButtonText: '取消', type: 'info' }); updateAuditNote(t) } catch (e: any) { if (e !== 'cancel') ElMessage.warning('AI 生成失败') } finally { aiNoteLoading.value = false } }
 async function genConclusion() { if (props.isReadonly || !aiAvailable.value) return; aiConclusionLoading.value = true; try { const res = await http.post(`/api/workpapers/${props.wpId}/d4/ai-generate`, { section: 'adj-conclusion', existingContent: auditConclusion.value, relatedContext: { task: '基于抽凭检查结果生成审计结论', noteText: auditNote.value, anomalyCount: anomalyCount.value } }, { _silent: true } as any); const t = res.data?.data?.content ?? res.data?.content ?? ''; if (!t) { ElMessage.warning('AI 未生成内容'); return }; await ElMessageBox.confirm(t, 'AI 生成', { confirmButtonText: '填入', cancelButtonText: '取消', type: 'info' }); updateAuditConclusion(t) } catch (e: any) { if (e !== 'cancel') ElMessage.warning('AI 生成失败') } finally { aiConclusionLoading.value = false } }
 
-const { exportTemplate, exportData, importData, importing } = useD4ImportExport({ wpId: computed(()
+const { exportTemplate, exportData, importData, importing } = useD4ImportExport({ wpId: computed(() => props.wpId), projectId: computed(() => props.projectId) })
 
 // ─── expose 给 GtWpRenderer 工具栏委托 ────────────────────────────────
 function handleExportTemplate() { exportTemplate('D4-35') }
@@ -141,7 +141,7 @@ async function handleImportClick() {
   input.type = 'file'; input.accept = '.xlsx'
   input.onchange = async () => { const f = input.files?.[0]; if (f) await importData('D4-35', f) }
   input.click()
-} => props.wpId), projectId: computed(() => props.projectId) })
+}
 function fmtAmt(v: number): string { return v ? v.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '—' }
 function rowClassName({ row }: { row: CheckRow }) { return row.isAnomalous === '是' ? 'row-anomaly' : '' }
 

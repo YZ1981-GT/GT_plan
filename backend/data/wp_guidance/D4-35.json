@@ -1,0 +1,35 @@
+{
+  "schema_version": 2,
+  "wp_code": "D4-35",
+  "title": "D4-35 其他业务收入检查表 编制说明",
+  "sections": [
+    {
+      "key": "purpose",
+      "title": "一、编制目的",
+      "content": "对其他业务收入逐笔抽查，核对业务内容、对方科目、金额与支持性文件，验证其他业务收入的真实性与准确性。",
+      "source_refs": []
+    },
+    {
+      "key": "materials",
+      "title": "二、资料准备",
+      "content": "逐笔填写日期、凭证编号、业务内容、对方科目、明细科目、金额，并对多项支持性文件（核对1~6）逐项核对，标注是否异常。",
+      "source_refs": []
+    },
+    {
+      "key": "judgments",
+      "title": "三、审计关注点",
+      "content": "1. 支持性文件缺失或核对不符：关注业务真实性。\n2. 对方科目异常（如挂往来、冲成本）：关注是否为收入错分类或调节利润。\n3. 标注异常的项目须在备注详细说明并评估是否调整。",
+      "source_refs": []
+    }
+  ],
+  "source": "static_json",
+  "migration": {
+    "kind": "legacy_structure_preserved",
+    "version": 2,
+    "legacy_content_digest": "a856966b32f1716c6ba512118dd52ce4dec00bae42d876b98a9c153647b960fb",
+    "legacy_section_count": 3,
+    "canonical_section_count": 3,
+    "unmapped_section_count": 0,
+    "canonical_body_digest": "166ace0e4bd4ee601c4b47852789aca3cc959fc431399c7df56b343bf18e3625"
+  }
+}

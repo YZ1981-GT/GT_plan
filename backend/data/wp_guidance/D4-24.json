@@ -1,0 +1,35 @@
+{
+  "schema_version": 2,
+  "wp_code": "D4-24",
+  "title": "D4-24 第三方回款检查 编制说明",
+  "sections": [
+    {
+      "key": "purpose",
+      "title": "一、编制目的",
+      "content": "检查客户通过第三方回款的情况，评估收入的真实性风险。第三方回款是收入舞弊（资金体外循环、虚构交易配合回款）的重要识别信号。",
+      "source_refs": []
+    },
+    {
+      "key": "materials",
+      "title": "二、资料准备",
+      "content": "对存在第三方回款的客户逐笔填写：本年度销售金额、期末应收余额、第三方回款金额、第三方回款方名称、回款原因、第三方与客户关系、第三方与被审计单位关系、是否有代付协议、是否函证。",
+      "source_refs": []
+    },
+    {
+      "key": "judgments",
+      "title": "三、审计关注点",
+      "content": "1. 所有第三方回款均须取得代付协议或合理商业解释，否则存疑。\n2. 第三方与被审计单位存在关联关系：高度关注是否自我循环回款、虚构收入。\n3. 大额第三方回款建议函证第三方确认。\n4. 无合理理由的第三方回款是收入真实性的重大预警。",
+      "source_refs": []
+    }
+  ],
+  "source": "static_json",
+  "migration": {
+    "kind": "legacy_structure_preserved",
+    "version": 2,
+    "legacy_content_digest": "a7ab2f445d6ede0b9f3482acb40ef49c7a75ee9e50443305e960a7905a4fb552",
+    "legacy_section_count": 3,
+    "canonical_section_count": 3,
+    "unmapped_section_count": 0,
+    "canonical_body_digest": "0f5643da4f2dbc50cf924eebe1b1f0bc6c040461c664fe0e093dabb973c3a74b"
+  }
+}

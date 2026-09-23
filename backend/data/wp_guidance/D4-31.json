@@ -1,0 +1,35 @@
+{
+  "schema_version": 2,
+  "wp_code": "D4-31",
+  "title": "D4-31 客户访谈记录 编制说明",
+  "sections": [
+    {
+      "key": "purpose",
+      "title": "一、编制目的",
+      "content": "记录单份客户访谈的详细问答内容，是 D4-30 汇总表每一行对应的原始访谈底稿，为收入真实性提供第一手外部证据。",
+      "source_refs": []
+    },
+    {
+      "key": "steps",
+      "title": "二、编制方式",
+      "content": "采用「字段/值」键值对形式逐项记录（如：被访谈人姓名=张三、职务=采购经理、访谈时间=…、交易确认情况=…）。通过「访谈表索引」与 D4-30 汇总表关联。导入时按字段名匹配，不按行号。",
+      "source_refs": []
+    },
+    {
+      "key": "judgments",
+      "title": "三、审计关注点",
+      "content": "1. 关键要素须齐全：被访谈人身份、交易金额确认、合同执行情况、往来余额确认。\n2. 被访谈人对交易细节答非所问或回避：关注交易真实性。\n3. 访谈内容与账面记录矛盾：重大异常，须追加程序。",
+      "source_refs": []
+    }
+  ],
+  "source": "static_json",
+  "migration": {
+    "kind": "legacy_structure_preserved",
+    "version": 2,
+    "legacy_content_digest": "126866db160ae77ee489d82c9199d6dd249c26f09092f6cc7d18ec5cdf45a233",
+    "legacy_section_count": 3,
+    "canonical_section_count": 3,
+    "unmapped_section_count": 0,
+    "canonical_body_digest": "bb629b9abad14b438b481c5343b350f1ecdfa7ef97dbdd93b88d4cf3d4ad9146"
+  }
+}
