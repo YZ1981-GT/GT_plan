@@ -10,7 +10,7 @@
     "A16",
     "A17"
   ],
-  "ledger_digest": "cfc0c9d528ba98b255ea57b3071816d9883f942d49c4c5b20b4c031be4f76ce4",
+  "ledger_digest": "d9ce8789d3da6468b651d2bd2bf180c06718e95f1853fecb9e6fbb8b308eb4cc",
   "owner_task": {
     "dedicated_chain_child_docx": "64",
     "dedicated_chain_workbook_only": "64",
@@ -954,8 +954,8 @@
       "is_sub_code": false,
       "ledger_class": "generic_word_template",
       "legacy_bridge_takes_over": true,
-      "legacy_relative_path": null,
-      "legacy_verdict": "none",
+      "legacy_relative_path": "S/S12 利用专家（注册会计师的专家）的工作.xlsx",
+      "legacy_verdict": "parent_workbook",
       "own_docx_carriers": [
         "S/S12A 评估专家工作报告（或评估专家工作总结）.docx"
       ],
@@ -1699,7 +1699,7 @@
       "B5-1",
       "B5-2"
     ],
-    "carrier_count": 473,
+    "carrier_count": 474,
     "generic_docx_direct": 18,
     "legacy_bridge_takeover_rows": [
       "A16-1",
