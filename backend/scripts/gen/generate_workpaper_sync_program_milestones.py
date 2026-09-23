@@ -1083,47 +1083,59 @@ async def _collect_database_catalog() -> dict[str, Any]:
     try:
         import sqlalchemy as sa
 
-        from app.core.database import async_session
+        from app.core.database import async_session, engine
 
         relations: set[str] = set()
         columns: dict[str, set[str]] = defaultdict(set)
         constraints: dict[str, set[str]] = defaultdict(set)
-        async with async_session() as session:
-            phase = "connect"
-            await session.connection()
+        # collect_database_probe_facts 每次调用都 asyncio.run（自建并关闭事件循环），
+        # 但 app.core.database.engine 是模块级常驻连接池，asyncpg 连接绑定在创建它的
+        # 循环上。若不在同一循环内 dispose，下一次探测会取到上一循环的连接，在
+        # phase="connect" 抛 RuntimeError('Event loop is closed')，表现为「隔次失败」
+        # → 同一棵树两次运行给出两份不同 projection。谁开循环谁清池。
+        try:
+            async with async_session() as session:
+                phase = "connect"
+                await session.connection()
+                try:
+                    phase = "set_read_only"
+                    await session.execute(sa.text(_DATABASE_CONTROL_SQL["set_read_only"]))
+                    phase = "verify_read_only"
+                    read_only = (
+                        await session.execute(sa.text(_DATABASE_CONTROL_SQL["verify_read_only"]))
+                    ).scalar_one()
+                    if str(read_only).strip().lower() not in {"on", "true", "1"}:
+                        raise RuntimeError("transaction_read_only_not_enabled")
+
+                    phase = "query:relations"
+                    rows = (
+                        await session.execute(sa.text(_DATABASE_FACT_SQL["relations"]))
+                    ).mappings().all()
+                    relations = {str(row["table_name"]) for row in rows}
+
+                    phase = "query:columns"
+                    rows = (
+                        await session.execute(sa.text(_DATABASE_FACT_SQL["columns"]))
+                    ).mappings().all()
+                    for row in rows:
+                        columns[str(row["table_name"])].add(str(row["column_name"]))
+
+                    phase = "query:constraints"
+                    rows = (
+                        await session.execute(sa.text(_DATABASE_FACT_SQL["constraints"]))
+                    ).mappings().all()
+                    for row in rows:
+                        constraints[str(row["table_name"])].add(
+                            str(row["constraint_name"])
+                        )
+                finally:
+                    await session.rollback()
+        finally:
             try:
-                phase = "set_read_only"
-                await session.execute(sa.text(_DATABASE_CONTROL_SQL["set_read_only"]))
-                phase = "verify_read_only"
-                read_only = (
-                    await session.execute(sa.text(_DATABASE_CONTROL_SQL["verify_read_only"]))
-                ).scalar_one()
-                if str(read_only).strip().lower() not in {"on", "true", "1"}:
-                    raise RuntimeError("transaction_read_only_not_enabled")
-
-                phase = "query:relations"
-                rows = (
-                    await session.execute(sa.text(_DATABASE_FACT_SQL["relations"]))
-                ).mappings().all()
-                relations = {str(row["table_name"]) for row in rows}
-
-                phase = "query:columns"
-                rows = (
-                    await session.execute(sa.text(_DATABASE_FACT_SQL["columns"]))
-                ).mappings().all()
-                for row in rows:
-                    columns[str(row["table_name"])].add(str(row["column_name"]))
-
-                phase = "query:constraints"
-                rows = (
-                    await session.execute(sa.text(_DATABASE_FACT_SQL["constraints"]))
-                ).mappings().all()
-                for row in rows:
-                    constraints[str(row["table_name"])].add(
-                        str(row["constraint_name"])
-                    )
-            finally:
-                await session.rollback()
+                await engine.dispose()
+            except Exception:
+                phase = "dispose"
+                raise
     except Exception as exc:
         status = "database_unavailable" if phase == "connect" else "query_failed"
         raise DatabaseProbeReadError(status, phase, type(exc).__name__) from exc

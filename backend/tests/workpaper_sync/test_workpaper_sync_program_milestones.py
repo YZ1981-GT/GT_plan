@@ -632,6 +632,31 @@ def test_database_probe_is_live_read_only_and_complete(source: dict[str, Any]) -
     assert all(probe["result"] == "pass" for probe in facts["probes"].values())
 
 
+def test_repeated_in_process_database_probe_is_deterministic(
+    source: dict[str, Any],
+) -> None:
+    """同一棵树、同一进程内多次探测必须给出同一 projection。
+
+    collect_database_probe_facts 每次调用都 asyncio.run（自建并关闭事件循环），而
+    app.core.database.engine 是模块级常驻连接池，asyncpg 连接绑定在创建它的循环上。
+    早前未在同一循环内 dispose，导致第 2/4/6... 次探测取到上一循环的连接，在
+    phase="connect" 抛 RuntimeError('Event loop is closed') → status 隔次翻成
+    database_unavailable，两个 milestone 随之 IMPLEMENTED→BLOCKED 抖动。
+    module 级 source fixture 已跑过一次探测，故本测试的首个调用即处在当年的失败位。
+    """
+    generator = source["generator"]
+    definitions = source["definitions"]
+
+    first = generator.collect_database_probe_facts(definitions)
+    second = generator.collect_database_probe_facts(definitions)
+
+    assert first["probe_digest"] == second["probe_digest"]
+    assert first == second
+    registry_facts = source["registry"]["database_probe_facts"]
+    assert first["status"] == registry_facts["status"]
+    assert first["failure"] == registry_facts["failure"]
+
+
 def test_database_unavailable_query_failure_and_empty_catalog_fail_closed(
     source: dict[str, Any],
 ) -> None:
