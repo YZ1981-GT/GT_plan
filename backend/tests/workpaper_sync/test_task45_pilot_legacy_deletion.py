@@ -118,13 +118,48 @@ class TestProperty47LegacyDeleted:
                 f"{host.name} 仍然 import {deleted} —— 必须改用 usePilotBridgeAdapter"
             )
 
+    @staticmethod
+    def _code_only(source: str) -> str:
+        """去掉 HTML 注释、块注释与行注释。散文提及不算接线。"""
+        source = re.sub(r"<!--.*?-->", "", source, flags=re.DOTALL)
+        source = re.sub(r"/\*.*?\*/", "", source, flags=re.DOTALL)
+        return re.sub(r"^\s*//.*$", "", source, flags=re.MULTILINE)
+
     @pytest.mark.parametrize("host", PILOT_HOSTS, ids=lambda p: p.name)
-    def test_host_imports_bridge_adapter(self, host: pathlib.Path) -> None:
-        """宿主必须 import usePilotBridgeAdapter。"""
-        source = host.read_text(encoding="utf-8")
-        assert "usePilotBridgeAdapter" in source, (
-            f"{host.name} 未 import usePilotBridgeAdapter —— "
-            "删除 legacy 后宿主必须使用 bridge adapter"
+    def test_host_is_on_the_unified_sync_path(self, host: pathlib.Path) -> None:
+        """宿主必须在统一 sync 路径上：过渡态 adapter **或**终态 editor host + bridge。
+
+        🔴 本条原文是「必须 import `usePilotBridgeAdapter`」，那把 Task 45 的**过渡态**
+        写成了永久不变量。`usePilotBridgeAdapter.ts` 自己的 docstring 写明：
+
+            「这不是长期方案 —— Wave 5 的每个 entry 迁移时宿主会直接用
+              `WorkpaperSyncEditorHost` 并彻底删除 adapter-shaped wiring。」
+            「删除条件：当四个 pilot 宿主全部改为直接渲染 `WorkpaperSyncEditorHost` 时，
+              本文件删除。」
+
+        也就是说**每个宿主完成 Wave 5 迁移都会把这条判据打红**，而红的那一刻它恰恰是
+        更靠近目标的形态（D2 已于 `42d2f6e6f` 走完，故只有 D2 红）。照原样留着，
+        唯一的"修法"是把宿主退回 adapter —— 让判据逼着生产代码倒退。
+
+        Task 45 真正要守的是 AC 11.1「不存在与 sync bridge 并行的第二条路径」。它由两条
+        判据共同承担：`test_host_does_not_import_deleted_composable` 断死 legacy 侧，
+        本条断活统一侧。故本条按「在统一路径上」表达，两种合法形态都接受：
+
+        * 过渡态：`usePilotBridgeAdapter`（G7 / H1 / B60×2 现状）
+        * 终态：渲染 `WorkpaperSyncEditorHost` **且** 调 `useWorkpaperSyncBridge`（D2 现状）
+
+        终态要求**两者同时在场**，比原判据更严：只写组件名不接 bridge 不算。两形态皆无
+        即红 —— 宿主掉出统一路径这件事仍然打红，判据的力度没有降。
+        散文不算数：先剥注释再判，否则 D2 那句「`useD2SyncBridge` 仍保留至
+        ONLYOFFICE_VERIFIED」之类的说明会把门喂饱。
+        """
+        code = self._code_only(host.read_text(encoding="utf-8"))
+        transitional = "usePilotBridgeAdapter" in code
+        terminal = "WorkpaperSyncEditorHost" in code and "useWorkpaperSyncBridge" in code
+        assert transitional or terminal, (
+            f"{host.name} 既未用过渡态 usePilotBridgeAdapter，也未走终态 "
+            "WorkpaperSyncEditorHost + useWorkpaperSyncBridge —— "
+            "删除 legacy 后宿主必须留在统一 sync 路径上（AC 11.1）"
         )
 
 
