@@ -1766,6 +1766,13 @@ def _single_onlyoffice_params() -> list:
                         f"解除条件：{release}"
                         " 本条由 D 循环整改与 E 循环回填任务兑现；strict=True ⇒ 欠账清掉后"
                         " XPASS 会打红，逼作者回来删标记。禁止改用 skip（skip 记为通过 = fail-open）。"
+                        " 🔴 分母现状（2026-06-01 实测）：inventory 登记 8 条，但本参数化只收"
+                        " `capability == single_onlyoffice` 的 entry，而 D 循环那 7 条已改裁成"
+                        " `capability: null` ⇒ **实际挂得上标记的只剩 E 循环这 1 条**。"
+                        " 那 7 条因此成了无承载者的哑登记，由"
+                        " `test_slice_schema_validator_coverage.py::"
+                        "test_every_registered_debt_entry_still_has_a_carrier` 单独盯着；"
+                        " 所以「全部 8 条兑现」这句解除条件**不能**只靠本条 XPASS 来证明。"
                     ),
                 )
             params.append(

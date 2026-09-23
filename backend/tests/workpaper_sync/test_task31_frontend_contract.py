@@ -137,6 +137,33 @@ def _ts_array(text: str, const_name: str) -> Any:
     raise AssertionError(f"{const_name} 的字面量没有闭合")
 
 
+def _shape_entry_ids() -> tuple[str, ...]:
+    """三格路由形态（2 段 xlsx / 4 段 xlsx / docx）—— 从**活 manifest** 现挑。
+
+    🔴 不写死 entry_id。上一版把「四段」那一格写成
+    `xlsx/d4/analysis/d4-tab-customer-price`，而 commit `cd9592ff5` + `ebc6e1b92`
+    把 D4 各 tab 迁到 `useD4SyncMode` 之后，21 条 `xlsx/d4/**` entry 从 manifest 退网
+    （条数实测 186 → 176 → 155，`xlsx/d4/` 前缀现算 0 条）。本判据只要「真实存在的
+    多段 entry_id」来证明 `:path` 转换器不吞后缀，不在乎是哪一条 ⇒ 约束照写、取值现算。
+    """
+    from app.services.workpaper_sync.entry_profile import load_entry_manifest
+
+    ids = sorted(str(e["entry_id"]) for e in load_entry_manifest()["entries"])
+    picked: list[str] = []
+    for label, pred in (
+        ("2 段 xlsx", lambda i: i.startswith("xlsx/") and len(i.split("/")) == 2),
+        ("4 段 xlsx", lambda i: i.startswith("xlsx/") and len(i.split("/")) == 4),
+        ("docx", lambda i: i.startswith("docx/")),
+    ):
+        hits = [i for i in ids if pred(i)]
+        assert hits, (
+            f"活 manifest（{len(ids)} 条）里没有「{label}」形态的 entry ⇒ "
+            "这一格形态在真源里已不存在，判据要重挑形态而不是改字面量"
+        )
+        picked.append(hits[0])
+    return tuple(picked)
+
+
 def _ts_string(text: str, const_name: str) -> str:
     match = re.search(rf'^export const {re.escape(const_name)} = "([^"]*)"', text, re.M)
     assert match, f"生成物里找不到字符串常量 `{const_name}`"
@@ -223,17 +250,19 @@ def test_a_real_slashed_entry_id_still_routes_through_the_generated_template() -
 
     这是**行为侧**判据：模板字符串「长得对」在两种转换器下都成立，只有真跑一次路由匹配
     才能证明多段 entry_id 不会被吞掉后缀。
+
+    三格形态由 `_shape_entry_ids()` 从活 manifest 现挑（见该函数注释里的 D4 退网沿革）。
     """
     import uuid
 
     template = _ts_string(_TARGET.read_text(encoding="utf-8"), "WP_SYNC_USER_PREFIX_TEMPLATE")
     project, wp = uuid.uuid4(), uuid.uuid4()
-    room, op, case, version = (uuid.uuid4() for _ in range(4))
-    for entry in (
-        "xlsx/gt-d2-accounts-receivable",
-        "xlsx/d4/analysis/d4-tab-customer-price",
-        "docx/gt-a10-bundle",
-    ):
+    room, op, case, version, participant = (uuid.uuid4() for _ in range(5))
+    entries = _shape_entry_ids()
+    assert any(e.count("/") >= 3 for e in entries), (
+        f"挑出的三格 {entries} 里没有四段 id ⇒ 「不吞后缀」这条最关键的形态没被覆盖"
+    )
+    for entry in entries:
         base = (
             template.replace("{project_id}", str(project))
             .replace("{wp_id}", str(wp))
@@ -246,7 +275,11 @@ def test_a_real_slashed_entry_id_still_routes_through_the_generated_template() -
                 .replace("{operation_id}", str(op))
                 .replace("{case_id}", str(case))
                 .replace("{version_id}", str(version))
+                # `/rooms/{room_id}/participants/{participant_id}/leave`（room-leave 端点）
+                .replace("{participant_id}", str(participant))
             )
+            # 🔴 fail-closed 闸：任何**没被替换**的占位都在这里红。所以后端再加一个新
+            #    路径参数时本判据必然失败（而不是静默拿字面量 `{x}` 去匹配路由）。
             assert "{" not in suffix, suffix
             scope = {
                 "type": "http",
@@ -306,10 +339,27 @@ def test_the_callback_route_is_never_projected_to_the_frontend(
     前端一旦拿到这个路径，就可能去拼一个「自己造 callback」的调用，而它的响应体是顶层
     `{"error": N}`（不是平台 envelope）—— 解包层套上去必然错一层。
     """
-    assert SR.public_router.routes, "反向自检：callback 路由本身必须存在"
-    callback_path = SR.public_router.routes[0].path
-    assert "onlyoffice-callback" in callback_path
+    # 🔴 **按路径谓词**选，不按下标。`public_router` 上现有 2 条路由（`get_room_contents`
+    #    的 `/contents` 声明在 callback 之前），原先的 `routes[0]` 让反向自检先崩 ——
+    #    于是下面那条真正的安全断言**一次都没执行**。位置假设把「不变量成立」和
+    #    「不变量没被验证」混成同一种绿/红。
+    public_paths = [route.path for route in SR.public_router.routes]
+    callback_paths = [p for p in public_paths if "onlyoffice-callback" in p]
+    assert len(callback_paths) == 1, (
+        f"反向自检：callback 路由必须存在且唯一，实测 public_router={public_paths}"
+    )
     assert "onlyoffice-callback" not in generated_text
+
+    # public_router 整体都是服务凭证面（不发用户 Bearer）⇒ **一条都不该**进前端生成物。
+    # 比只盯 callback 严：`/contents` 这类后加的 DocServer 消费面同样被盯住。
+    for path in public_paths:
+        for segment in path.strip("/").split("/"):
+            if segment.startswith("{") or segment in ("api", "workpaper-sync", "rooms"):
+                continue  # 通用前缀段，用户面也合法出现
+            assert segment not in generated_text, (
+                f"public_router 路径 {path} 的判别段 {segment!r} 进了前端生成物 —— "
+                "服务凭证面不得投影给浏览器"
+            )
 
     # 反向自检：剥注释器真的在剥（否则下面的循环退化成恒真）。
     probe = "// onlyoffice-callback\nconst kept = '/api/x'\n/* onlyoffice-callback */"

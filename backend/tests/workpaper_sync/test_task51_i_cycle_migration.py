@@ -70,6 +70,7 @@ tasks.md 的 Task 51 正文写的是「分类/行模型由源 xlsx 真源派生�
 """
 from __future__ import annotations
 
+import functools
 import hashlib
 import json
 import pathlib
@@ -252,6 +253,33 @@ def _resolve_repo(rel: str) -> pathlib.Path:
     """把 slice 里登记的仓库相对路径（可带 `#Lxx` 或 `!sheet!cell`）解析成绝对路径。"""
     head = rel.split("#")[0].split("!")[0]
     return ROOT / head
+
+
+@functools.lru_cache(maxsize=None)
+def _line_total_of(rel: str) -> int | None:
+    """给 slice 里的引用（可能是仓库相对路径，也可能是**裸文件名**）算真实行数。
+
+    返回 `None` 表示定位不到文件 —— 路径归属由 `test_source_refs_point_at_real_paths`
+    管，本函数只负责「能定位的都要给出行数」。
+
+    🔴 裸名必须能解析：slice 的叙述性文字里写的是 `i1CategoryScope.ts#L111` /
+    `useI4Detail.ts#L180` 这种裸名，它们散在 `composables/` `i3/impairment/` 等多级目录
+    下。只试一两层固定前缀会让「定位不到 ⇒ 静默跳过」吃掉整类腐化（2026-06-01 变异检验
+    MI-1 实测判绿）。故按 basename 在前端 + 后端树里唯一定位。
+    """
+    direct = _resolve_repo(rel)
+    if direct.is_file():
+        return len(direct.read_text(encoding="utf-8", errors="replace").splitlines())
+    name = pathlib.Path(rel.split("#")[0].split("!")[0]).name
+    hits = [
+        p
+        for root in (FRONTEND, BACKEND / "app", BACKEND / "scripts")
+        for p in root.rglob(name)
+        if p.is_file()
+    ]
+    if len(hits) != 1:
+        return None
+    return len(hits[0].read_text(encoding="utf-8", errors="replace").splitlines())
 
 
 def _array_literal_body(source: str, symbol: str) -> str:
@@ -964,6 +992,55 @@ class TestHtmlCounterpartIsSourceBacked:
         for entry in manifest_slice["independent_entries"]:
             for ref in entry["html_counterpart_source_refs"]:
                 assert _resolve_repo(ref).exists(), f"{entry['entry_id']}: 不存在的 source_ref {ref}"
+
+    def test_every_frozen_line_number_in_the_slice_is_still_in_range(self) -> None:
+        """整份 slice 里**每一个** `#Lxx` 行号都必须落在文件真实行数内。
+
+        🔴 补的是一个真实缺口：本文件原有的 ref 判据只查**路径存在**
+        （`_resolve_repo(ref).exists()`），行号一律不查。2026-06-01 实扫抓到
+        `i1CategoryScope.ts#L136` 三处指向 EOF 之后（该文件只有 132 行，
+        `exploration: 'mining_right'` 那一行现在是 L111）—— 冻结行号会随源码增删静默腐化，
+        而复核人拿着它去对代码时看到的是**另一段**或者根本翻不到。H / L / M / N 各 slice
+        的同型腐化已被逐一修过，本条把「不再复发」变成判据。
+
+        判据落在整份 JSON 的**全部**字符串上（不限于某几个字段），因为行号散落在
+        `source_refs` / `blocking_preconditions` / 叙述性文字里。
+
+        🔴 两处刻意做厚（2026-06-01 变异检验实测暴露的假绿）：
+        ① **区间的右端也要查**。只查 `#L314` 而放过 `-355`，把 `#L314-4315` 这种
+           «起点对、终点飞出天外» 的引用判绿（MI-2 实测 GREEN）。
+        ② **裸文件名要能解析到真目录**。slice 的叙述性文字里大量写裸名
+           （`i1CategoryScope.ts#L111`），只试 `workpaper/` 一层会解析不到
+           `composables/`，于是整条被当「路径未知」跳过（MI-1 实测 GREEN）。
+           这里按 basename 在前端树里唯一定位。
+        """
+        ref_re = re.compile(
+            r"([A-Za-z0-9_./\-]+\.(?:py|ts|vue|js|json|sql|md))#L(\d+)(?:\s*-\s*L?(\d+))?"
+        )
+        raw = MANIFEST_SLICE_PATH.read_text(encoding="utf-8")
+        cache: dict[str, int | None] = {}
+        offenders: list[str] = []
+        checked = 0
+        skipped: set[str] = set()
+        for rel, start, end in ref_re.findall(raw):
+            if rel not in cache:
+                cache[rel] = _line_total_of(rel)
+            total = cache[rel]
+            if total is None:
+                skipped.add(rel)  # 路径归属由上面那条判据管，这里只管行号
+                continue
+            checked += 1
+            worst = max(int(start), int(end or start))
+            if worst > total:
+                offenders.append(f"{rel}#L{start}-{end or start}（文件共 {total} 行）")
+        assert checked >= 100, f"只核到 {checked} 个带行号的 ref ⇒ 分母可疑，正则没咬住"
+        assert not skipped, (
+            f"有 {len(skipped)} 个引用连文件都定位不到，行号无从校验（裸名解析器要跟上）："
+            + "; ".join(sorted(skipped))
+        )
+        assert not offenders, "冻结行号越界（源码已挪动，引用必须跟着改）：" + "; ".join(
+            sorted(set(offenders))
+        )
 
     def test_html_store_endpoint_exists_in_the_router(self, manifest_slice: dict) -> None:
         router = CHECKLIST_ROUTER.read_text(encoding="utf-8")

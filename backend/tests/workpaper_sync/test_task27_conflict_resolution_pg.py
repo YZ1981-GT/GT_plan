@@ -78,12 +78,26 @@ ENTRY = "xlsx/gt-d2-accounts-receivable"
 PERIOD = "header_block/period_label"
 TOTAL = "header_block/total_amount"
 ROWS = "ar_rows/{row_uuid}/amount"
-_CONTENT_TYPES = (
-    b'<?xml version="1.0"?><Types xmlns="http://schemas.openxmlformats.org/package/'
-    b'2006/content-types"><Default Extension="xml" ContentType="application/xml"/>'
-    b'<Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats'
-    b'-officedocument.spreadsheetml.sheet.main+xml"/></Types>'
-)
+
+#: 🔴 BP-30 迁移（2026-09-14）：载体不能再是 `<root/>` 空壳 workbook.xml。
+#:
+#: `post_durable` 阶段的 `published_identity_observer.collect_workbook_structure` 会按
+#: **冻结 instrumentation definition payload** 的四个锚点，从「要发布的 xlsx 字节」实测
+#: 受管结构（Excel Table / 隐藏 uuid 列 / veryHidden 元数据表）。空壳 workbook.xml 上
+#: openpyxl 什么都反读不出 ⇒ `FrozenChildUnusableError`
+#: (`published_identity_frozen_child_unusable`)，`resolve_ok` / `resolve_via_duplicate`
+#: 两个采集阶段整段崩，`rollback` 随后拿不到新内容版本连带崩。
+#:
+#: 改用 G1 的真实 instrumented 夹具（与 Task 26 PG 守卫同一份）。受管部件仍以 zip 条目
+#: 追加 ⇒ Task 27 原有的「真写真读 roundtrip」「未管理区域比对」「同内容同字节」判据
+#: 一字未改。
+from tests.workpaper_sync.g1_structure_fixture import workbook_fixture  # noqa: E402
+
+_FIXTURE_BYTES, _FIXTURE_ANCHORS = workbook_fixture(sheet_key="d2-detail")
+
+#: 未管理区域的合成部件放在 `_gt_sync/` 而非 `xl/`：夹具自带的 `[Content_Types].xml`
+#: 不声明它，摆进 `xl/` 会让「包内有未声明部件」这件事去赌 openpyxl 的容忍度。
+_UNMANAGED_PART = "_gt_sync/unmanaged.xml"
 
 
 def _d(label: str) -> str:
@@ -130,12 +144,52 @@ def _zip_entry(name: str) -> zipfile.ZipInfo:
     return info
 
 
+def _instrumentation_payload() -> dict[str, Any]:
+    """冻结 instrumentation definition 的 canonical payload。
+
+    形态镜像 `published_identity_observer._frozen_sheet_anchors` 的读法，四个值全部取自
+    `_FIXTURE_ANCHORS` ⇒ 与 `_ooxml()` 产出的真实结构一致。它的 canonical digest 同时是
+    instr definition 行冻结的 `sha256` 与契约的 `instrumentation_definition_sha256`（否则
+    `_read_definition_payload` 的 digest 复核 / 三向锁其中之一必抛）—— 三处**同源**，
+    不再是 `_d("task27-instrumentation")` 那种三处各自捏一遍的字面量。
+    """
+    return {
+        "managed_sheets": [
+            {
+                "sheet_key": _FIXTURE_ANCHORS["sheet_key"],
+                "region_boundary_locator": {"table_key": _FIXTURE_ANCHORS["table_name"]},
+                "tables": [
+                    {"row_uuid_column_letter": _FIXTURE_ANCHORS["uuid_column_letter"]}
+                ],
+            }
+        ],
+        "hidden_metadata_sheet": {"sheet_name": _FIXTURE_ANCHORS["metadata_sheet"]},
+    }
+
+
+def _instrumentation_digest() -> str:
+    from app.services.workpaper_sync import definitions as D
+
+    return D.canonical_digest(_instrumentation_payload())
+
+
 def _ooxml(*, projection_values: dict[str, Any], unmanaged: bytes = b"<formulas/>") -> bytes:
+    """真实 instrumented xlsx + `_gt_sync/projection.json` 受管部件。
+
+    🔴 夹具原有条目**重新按 `_ZIP_EPOCH` 盖章**（不是原样拷 `ZipInfo`）：openpyxl 的
+    `wb.save()` 用 `time.localtime()` 写条目头，原样拷会把现场时钟带进载体 ⇒ 违反
+    `test_the_carrier_payload_is_byte_deterministic`，而 `resolve_via_duplicate`
+    （同 payload 第二个 delivery 须命中同一 application key）与 `rollback`（重新
+    materialize 须与历史那一份**逐字节相同**才走内容寻址幂等分支）两条判据正依赖它。
+    盖章只改容器条目头，不动任何部件字节 ⇒ 结构/受管内容一字不变。
+    """
     buf = io.BytesIO()
-    with zipfile.ZipFile(buf, "w", compression=zipfile.ZIP_DEFLATED) as zf:
-        zf.writestr(_zip_entry("[Content_Types].xml"), _CONTENT_TYPES)
-        zf.writestr(_zip_entry("xl/workbook.xml"), b'<?xml version="1.0"?><root/>')
-        zf.writestr(_zip_entry("xl/unmanaged.xml"), unmanaged)
+    with zipfile.ZipFile(io.BytesIO(_FIXTURE_BYTES)) as src, zipfile.ZipFile(
+        buf, "w", compression=zipfile.ZIP_DEFLATED
+    ) as zf:
+        for item in src.infolist():
+            zf.writestr(_zip_entry(item.filename), src.read(item.filename))
+        zf.writestr(_zip_entry(_UNMANAGED_PART), unmanaged)
         zf.writestr(
             _zip_entry("_gt_sync/projection.json"),
             json.dumps(
@@ -176,7 +230,8 @@ def _contract_payload(*, contract_id: str = ENTRY) -> dict[str, Any]:
         "review_status": "reviewed",
         "document_type": "xlsx",
         "template_definition_sha256": _d("task27-template"),
-        "instrumentation_definition_sha256": _d("task27-instrumentation"),
+        # BP-30：与 instr definition 行的 `sha256`、instr blob 字节**同源**（三向锁）。
+        "instrumentation_definition_sha256": _instrumentation_digest(),
         "template": {
             "relative_path": "D/D2 应收账款.xlsx",
             "template_sha256": _d("task27-template-blob"),
@@ -313,16 +368,30 @@ class _JsonCarrierAdapter:
             row_keys={k: tuple(v) for k, v in row_keys.items()},
         )
 
-    def verify_unmanaged_regions(self, *, before, after, contract):
+    def verify_unmanaged_regions(
+        self,
+        *,
+        before,
+        after,
+        contract,
+        # 🔴 `adapters.base.SyncAdapter` protocol 声明的位移感知形参：编排方
+        # （`ContentMutationService._stage_cpu_segment_scoped`）**无条件**把 materialize
+        # 冻结的位移声明一并递过来，只照 `before/after/contract` 写的桩会在第一次真实
+        # commit 上 `TypeError`。JSON 载体不会位移 ⇒ 接住后忽略（语义等于 `None`）。
+        row_shift=None,
+        total_formula_rows=(),
+        propagation=None,
+        per_table_shift=None,
+    ):
         from app.services.workpaper_sync.adapters.base import UnmanagedRegionReport
 
         self.calls.append("verify_unmanaged_regions")
         with zipfile.ZipFile(before) as zb, zipfile.ZipFile(after) as za:
-            same = zb.read("xl/unmanaged.xml") == za.read("xl/unmanaged.xml")
+            same = zb.read(_UNMANAGED_PART) == za.read(_UNMANAGED_PART)
         return UnmanagedRegionReport(
             equivalent=same,
             inspected_aspects=("formula", "style", "drawing", "chart"),
-            first_difference=None if same else "xl/unmanaged.xml",
+            first_difference=None if same else _UNMANAGED_PART,
         )
 
 
@@ -468,12 +537,20 @@ async def _collect() -> dict[str, Any]:  # noqa: C901, PLR0912, PLR0915 - 一次
                 f"('{defs_wp}', '{project}')"
             )
 
+        # instrumentation 的 blob 必须是**真实冻结 payload 的 canonical 字节**：观测器会
+        # 读它反出四个结构锚点，且拿它重算 digest 与 definition 行复核。其余 slot 在本任务
+        # 里不被反读，保持占位字节即可。
+        def _def_payload(name: str) -> bytes:
+            if name == "instr":
+                return D.canonical_json_bytes(_instrumentation_payload())
+            return json.dumps({"k": name}, sort_keys=True).encode()
+
         blobs = {
             name: artifacts.publish_definition_blob(
                 project_id=project,
                 wp_id=defs_wp,
                 definition_kind=kind,
-                payload=json.dumps({"k": name}, sort_keys=True).encode(),
+                payload=_def_payload(name),
             )
             for name, kind in {
                 "tpl": "template",
@@ -509,7 +586,7 @@ async def _collect() -> dict[str, Any]:  # noqa: C901, PLR0912, PLR0915 - 一次
             instr = await repo.create_definition_artifact(
                 kind="instrumentation", logical_id="task27.instr",
                 semantic_version="1.0.0", blob_artifact_id=art["instr"].id,
-                sha256=_d("task27-instrumentation"),
+                sha256=_instrumentation_digest(),
                 structure_hash=_d("task27-instr-structure"), source_commit="task27",
             )
             contract_def = await repo.create_definition_artifact(

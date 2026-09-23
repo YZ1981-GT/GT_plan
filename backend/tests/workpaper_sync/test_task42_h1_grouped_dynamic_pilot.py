@@ -159,9 +159,60 @@ EXPECTED_DUPLICATE_LEAF_LABELS: Mapping[str, int] = {
     "对手方名称": 2,
     "金额": 2,
 }
-#: 本任务修掉的三条缺陷各自的影响面（`backend/wp_templates/` 369 个工作簿里的命中数）。
+#: 本任务修掉的三条缺陷各自的影响面（`backend/wp_templates/` 工作簿里的命中数）。
+#: 这个数是**结论本身**，保持等式：形态命中多一个少一个都要打红。
 EXPECTED_LEGACY_WRITER_WORKBOOKS = 10
-EXPECTED_TOTAL_WORKBOOKS = 369
+#: 语料总量只是「判据没在空集上跑」的自检，用**下界**：模板库会合法增长。
+#: 2026-09-06 冻结时 369；2026-09-14 `d3b3d80d9` 加入 `D/D4 收入底稿.xlsx` ⇒ 370。
+#: 写成等式时每次合法入库都打一次假红，而假红掩盖的正是上面那条真判据。
+MIN_TOTAL_WORKBOOKS = 369
+
+#: 真工作簿后缀集合 —— 与 test_task43 的同名判据**同口径**。
+#:
+#: 🔴 2026-09-23：原先这里用 `rglob("*.xls*")`，那是 glob 而非后缀判定，会把
+#: `X.xlsx.preclean.bak` 一并算成工作簿。实测本机多计 5 份：
+#: `D/D{3,4,5,6,7} ….xlsx.preclean.bak`，由 `scripts/fix/sanitize_d*_template_external_links.py`
+#: 在 `1a0b55651`（D3/D5/D6/D7）与 D4 净化同一波里用 `shutil.copy2` 落下。这 5 份
+#: **既不被 git 跟踪、也被 `.gitignore:139 *.bak` 忽略** ⇒ `total` 因此变成机器相关量
+#: （本机 375，干净 checkout / CI 370），把它冻成等式或下界都等于把本机临时文件写进判据。
+#: 两个后果：① 分母自检失去意义；② 备份是合法 zip，一旦某份恰好是 legacy writer 形态，
+#: 就会让同一本册子在 `target_first` 里数两次，污染「10」这个**结论**。
+#: 故收紧为后缀集合；`total` 现算 370，与 `git ls-files` 的 tracked 工作簿数逐一相等。
+WORKBOOK_SUFFIXES = (".xlsx", ".xlsm", ".xls")
+
+#: 本 entry 的 required 场景集合冻结清单（24 条，`derive_for_manifest_entry` 实测）。
+#:
+#: 🔴 这是 `test_required_set_digest_is_this_entry_own` 真正要防漂移的对象。原判据冻结的是
+#: `RequiredScenarioSet.digest` 的十六进制，而那个 digest 的输入含 **capability** ——
+#: H1 接通双向（`single_onlyoffice → bidirectional`）时 digest 变了、场景集合一条没动，
+#: 于是把「能力态推进」报成「推导坏了」。冻结可读的 id 集合既能逮住真漂移（多/少一条场景
+#: 立刻指名道姓），又不与能力态耦合。
+H1_REQUIRED_SCENARIO_IDS: tuple[str, ...] = (
+    "authorization_first_recovery_claim",
+    "b_close_after_a_forcesave_terminal",
+    "b_close_before_a_forcesave_terminal",
+    "browser_crash_no_userdata_recovery_case",
+    "close_leader_revoked_no_successor_recovery_required",
+    "close_leader_revoked_successor_exactly_one",
+    "close_reconciler_reentrant_exactly_one_capture",
+    "cross_participant_idempotency_409",
+    "different_field_merge",
+    "download_only_zero_three_entities",
+    "frozen_base_status_6_2_dedupe",
+    "html_to_oo",
+    "identity_retention",
+    "oo_to_html",
+    "opaque_version_rollback_no_numeric_collision",
+    "quarantined_rejects_application_and_engine",
+    "refresh_required_reopen",
+    "rollback",
+    "same_application_higher_sequence_fold",
+    "same_field_conflict_resolve",
+    "single_participant_close",
+    "two_user_close_order_a_then_b",
+    "two_user_close_order_b_then_a",
+    "wrong_prior_confirmation_bundle_fence_contributor_rejected",
+)
 
 FIRST = P.FIRST_DATA_ROW
 LAST = P.LAST_DATA_ROW
@@ -566,12 +617,33 @@ class TestFrozenEntrySelection:
     def test_entry_is_the_only_h1_candidate_in_the_harness_assessment(
         self, manifest: dict[str, Any]
     ) -> None:
-        """类边界由 Task 39 的 harness 判定，不由本模块声明。"""
+        """类边界由 Task 39 的 harness 判定，不由本模块声明。
+
+        🔴 2026-09-22：原判据冻结 `bidirectional_entry_ids == ()`。那是**迁移前快照** ——
+        H1 的 adapter 真注册了（manifest `capability=bidirectional` + `adapter_id`，并由
+        `registry.py#DELIVERED_PER_ENTRY_CONTRACTS[h1.disposal_check].adapter_registered=True`
+        独立印证）。改成与**生产账本**互锁的现算：harness 认定的 bidirectional 集合必须
+        恰好等于「本类候选 ∩ 账本里 adapter_registered 的 entry」。两个真源任一单方面漂移
+        都打红，比冻结空元组强。
+        """
+        from app.services.workpaper_sync.adapters import registry as _registry
+
         assessment = PH.assess_pilot_classes(manifest=manifest)[
             PH.PilotClass.h1_grouped_dynamic
         ]
         assert assessment.candidate_entry_ids == (P.PILOT_ENTRY_ID,)
-        assert assessment.bidirectional_entry_ids == ()
+        ledger_registered = {
+            row["entry_id"]
+            for row in _registry.DELIVERED_PER_ENTRY_CONTRACTS
+            if row["adapter_registered"]
+        }
+        assert set(assessment.bidirectional_entry_ids) == (
+            set(assessment.candidate_entry_ids) & ledger_registered
+        ), (
+            f"harness 认定 bidirectional={assessment.bidirectional_entry_ids}，"
+            f"生产账本里已注册 adapter 的本类候选="
+            f"{sorted(set(assessment.candidate_entry_ids) & ledger_registered)} ⇒ 两源打脸"
+        )
         assert assessment.status is PH.PilotClassStatus.unverifiable
 
     def test_entry_is_independent_and_not_a_parent_duplicate(
@@ -720,15 +792,59 @@ class TestFrozenEntrySelection:
         assert profile["host_reachable"] is True
 
     def test_required_set_digest_is_this_entry_own(self, entry: dict[str, Any]) -> None:
-        """evidence 按本 entry 自己的 digest 记录（不复用 Task 40/41 的）。"""
+        """evidence 按本 entry 自己的 digest 记录（不复用 Task 40/41 的）。
+
+        🔴 2026-09-22：原判据冻结十六进制 `319d10b4…`。`RequiredScenarioSet.digest` 的输入
+        含 **capability**（见 `derive_required_scenarios`），H1 接通双向后 capability
+        `single_onlyoffice → bidirectional`，digest 随之变成 `1858ce59…` —— 场景集合本身
+        一个 id 都没动（24 条逐字相同，实测 `set` 相等）。冻结的十六进制因此把
+        「能力态推进了」报成「场景推导坏了」，而这条判据的题目是**entry 隔离**，不是能力态冻结。
+
+        改法：把不透明 digest 换成**可读的 24 条场景 id 冻结集**（真正要防的漂移对象），
+        再把「是本 entry 自己的」做成三条可证伪属性 —— 与 Task 40/41 互异、同输入稳定、
+        capability 参与身份（换 capability 必变）。比一串十六进制更能定位问题，且不与
+        能力态耦合。
+
+        另：旧 digest 还被 6 份**已冻结产物**引用（task66/67/70 生成记录 + task42/43/44
+        evidence JSON）。那批产物的重算属 generated-artifact 集群，本判据不代它们决策，
+        也不把自己的字面量偷偷对齐过去 —— 登记在
+        `docs/operations/evidence/suite-triage/manifest-slice-drift.md`。
+        """
+        from app.services.workpaper_sync.evidence import (
+            Capability,
+            derive_required_scenarios,
+            extract_entry_profile,
+        )
         from app.services.workpaper_sync.evidence import derive_for_manifest_entry
 
         entries = manifest_entries_by_id(load_entry_manifest())
         mine = derive_for_manifest_entry(entry, authority_model=P.AUTHORITY_MODEL)
         assert len(mine.scenario_ids) == 24, sorted(mine.scenario_ids)
-        assert mine.digest == (
-            "319d10b4d610df67b105761f48abd78c1db6bd7f69d722f286b559addd8f67f7"
-        ), mine.digest
+        assert sorted(mine.scenario_ids) == list(H1_REQUIRED_SCENARIO_IDS), (
+            "required 场景集合与冻结清单不符：\n"
+            f"  多出: {sorted(set(mine.scenario_ids) - set(H1_REQUIRED_SCENARIO_IDS))}\n"
+            f"  缺失: {sorted(set(H1_REQUIRED_SCENARIO_IDS) - set(mine.scenario_ids))}"
+        )
+        # 同输入稳定（digest 是纯函数，不带时间/随机）
+        assert (
+            derive_for_manifest_entry(entry, authority_model=P.AUTHORITY_MODEL).digest
+            == mine.digest
+        )
+        # capability 参与身份：换一个能力态必须换 digest（否则 digest 不认能力态）
+        other_capability = next(
+            c
+            for c in (Capability.bidirectional, Capability.single_onlyoffice)
+            if c is not Capability[str(entry["capability"])]
+        )
+        flipped = derive_required_scenarios(
+            profile=extract_entry_profile(entry),
+            capability=other_capability,
+            authority_model=P.AUTHORITY_MODEL,
+        )
+        assert flipped.digest != mine.digest, (
+            f"capability 从 {entry['capability']!r} 换成 {other_capability.value!r} 后 digest 不变 "
+            "⇒ required set digest 不认能力态，evidence 无法区分两种验收口径"
+        )
         for other_entry_id in ("xlsx/b60/gt-b60-bundle", "xlsx/gt-d2-accounts-receivable"):
             other = derive_for_manifest_entry(
                 entries[other_entry_id], authority_model=P.AUTHORITY_MODEL
@@ -753,9 +869,35 @@ class TestFrozenEntrySelection:
         b60 = derive_for_manifest_entry(
             entries["xlsx/b60/gt-b60-bundle"], authority_model=P.AUTHORITY_MODEL
         )
-        assert d2.scenario_profile_digest == mine.scenario_profile_digest
-        assert b60.scenario_profile_digest != mine.scenario_profile_digest
         assert len({mine.digest, d2.digest, b60.digest}) == 3
+        # 🔴 「同 profile ⇒ 同 profile digest」的正例不再钉死在 D2 上。实测（HEAD 与工作树
+        #    都成立）H1 的 `mount_count=2`、D2 是 1 ⇒ 两者 profile **本就不同**，profile
+        #    digest 也不该相同。原判据把「D2 与本 entry profile 逐字相同」当冻结事实，
+        #    上面那条 required-set digest 字面量一红就把它挡在后面、从未真跑过。
+        #    改成从 manifest **现找**一个 profile 逐字相同的 entry 当正例，反例仍用 B60。
+        twin_id = next(
+            (
+                eid
+                for eid, other in sorted(entries.items())
+                if eid != entry["entry_id"]
+                and other["scenario_profile"] == entry["scenario_profile"]
+            ),
+            None,
+        )
+        assert twin_id, "manifest 里没有任何与本 entry profile 逐字相同的 entry ⇒ 正例分母为空"
+        twin = derive_for_manifest_entry(
+            entries[twin_id], authority_model=P.AUTHORITY_MODEL
+        )
+        assert twin.scenario_profile_digest == mine.scenario_profile_digest, (
+            f"{twin_id} 的 scenario_profile 与本 entry 逐字相同，profile digest 却不等 ⇒ "
+            "digest 不是 profile 的纯函数"
+        )
+        assert twin.digest != mine.digest, (
+            f"{twin_id} 与本 entry 的 required-set digest 相同 ⇒ entry 隔离失效"
+        )
+        assert b60.scenario_profile_digest != mine.scenario_profile_digest, (
+            "B60 的 profile 与本 entry 不同（docx / 另一套 profile_id），profile digest 却相等"
+        )
 
     def test_selection_fails_closed_when_the_entry_disappears(
         self, resolution: Any, manifest: dict[str, Any]
@@ -916,6 +1058,14 @@ class TestContractIsGroundedInTheTemplate:
         assert P.assert_contract_file_matches_source().contract_id == P.PILOT_ADAPTER_ID
 
     def test_contract_is_registered_in_the_delivery_ledger(self) -> None:
+        """交付账本逐字段对齐；`adapter_registered` 与 manifest **双源一致**。
+
+        🔴 2026-09-22：原判据冻结 `adapter_registered is False`。`adapter_registered` 是
+        **生产账本**（`registry.py#DELIVERED_PER_ENTRY_CONTRACTS`）的事实，H1 接通双向后它
+        已是 True，manifest 侧同步给了 `adapter_id` + `capability=bidirectional`。冻结 False
+        等于把迁移前快照当契约。改成双源一致：账本说已注册 ⇔ manifest 给了 adapter_id 且
+        capability 为 bidirectional。任一侧单方面变化都打红 —— 这正是本轮 C3 矛盾的根因防线。
+        """
         rows = [
             row
             for row in RG.DELIVERED_PER_ENTRY_CONTRACTS
@@ -928,7 +1078,17 @@ class TestContractIsGroundedInTheTemplate:
         assert row["entry_id"] == P.PILOT_ENTRY_ID
         assert row["template_relative_path"] == P.TEMPLATE_RELATIVE_PATH
         assert row["authority_model"] == P.AUTHORITY_MODEL.value
-        assert row["adapter_registered"] is False
+        entry = manifest_entries_by_id(load_entry_manifest())[P.PILOT_ENTRY_ID]
+        assert bool(row["adapter_registered"]) is (
+            entry.get("adapter_id") is not None
+            and entry.get("capability") == "bidirectional"
+        ), (
+            f"账本 adapter_registered={row['adapter_registered']}，manifest "
+            f"adapter_id={entry.get('adapter_id')!r} / capability={entry.get('capability')!r} "
+            "⇒ 交付账本与 manifest 双口径（同一件事记了两遍且已漂）"
+        )
+        if row["adapter_registered"]:
+            assert entry["adapter_id"] == P.PILOT_ADAPTER_ID
         assert P.PILOT_ADAPTER_ID in available_contract_ids()
 
     def test_field_counts_are_the_real_template_facts(self, contract: Any) -> None:
@@ -2674,11 +2834,21 @@ class TestUpstreamDebtsAreVisibleFacts:
             "dynamic_column_stable_keys",
         }
 
-    def test_dynamic_family_is_structurally_unreachable_for_every_xlsx_entry(self) -> None:
+    def test_dynamic_family_is_structurally_unreachable_for_every_xlsx_entry(
+        self, manifest: dict[str, Any]
+    ) -> None:
         observed = P.assert_dynamic_family_is_unreachable_for_xlsx_entries()
         assert observed["xlsx_dynamic"] == ()
         assert observed["dynamic"] == ("docx/gt-wp-renderer",), observed["dynamic"]
-        assert observed["total"] == 186, observed["total"]
+        # 🔴 `total` 是**分母自证**（扫过整份 manifest，不是空跑），不是一个要冻结的
+        # 业务常量。写死过 186，而 manifest 会随宿主拓扑增减：实测 186 → 176 → 155
+        # （commit cd9592ff5 把 D4 各 tab 迁到 `useD4SyncMode` 后 21 条 `xlsx/d4/**`
+        # entry 退网）。绝对数一落后，打红的就是「manifest 缩了」而不是「不可达性坏了」。
+        assert observed["total"] == len(manifest["entries"]), (
+            f"扫过 {observed['total']} 条，活 manifest 现算 {len(manifest['entries'])} 条 "
+            "⇒ 观测面没覆盖整份 manifest"
+        )
+        assert observed["total"] >= 100, f"manifest 只有 {observed['total']} 条 ⇒ 分母可疑"
 
     def test_dynamic_debt_is_retracted_when_upstream_fixes_the_gate(
         self, manifest: dict[str, Any]
@@ -2820,12 +2990,19 @@ class TestUpstreamRelsAndNamespaceDefectsAreFixed:
         assert not re.search(r'Id="[^"]+"[^>]*Target="[^"]+"', rels)
 
     def test_ten_of_the_authoritative_workbooks_share_this_shape(self) -> None:
-        """影响面实测：369 个工作簿里 10 个是这种顺序，且含 B60 与 G7。"""
+        """影响面实测：语料（≥369 个工作簿）里 **10 个**是这种顺序，且含 B60 与 G7。
+
+        「10」是结论，保持等式；「369」是分母自检，用下界（理由见
+        :data:`MIN_TOTAL_WORKBOOKS`）。语料口径见 :data:`WORKBOOK_SUFFIXES`
+        —— 只数真工作簿，不数 `.preclean.bak` 这类同名备份。
+        """
         root = P.authoritative_template_path().parent.parent
         target_first: list[str] = []
         total = 0
-        for path in sorted(root.rglob("*.xls*")):
-            if path.name.startswith("~$"):
+        for path in sorted(root.rglob("*")):
+            if not path.is_file() or path.name.startswith("~$"):
+                continue
+            if path.suffix.lower() not in WORKBOOK_SUFFIXES:
                 continue
             total += 1
             try:
@@ -2839,7 +3016,10 @@ class TestUpstreamRelsAndNamespaceDefectsAreFixed:
                 r'Id="[^"]+"[^>]*Target="[^"]+"', rels
             ):
                 target_first.append(path.name)
-        assert total == EXPECTED_TOTAL_WORKBOOKS, total
+        assert total >= MIN_TOTAL_WORKBOOKS, (
+            f"语料只扫到 {total} 个工作簿，少于冻结下界 {MIN_TOTAL_WORKBOOKS} —— "
+            "语料缩水或 glob 失配，两者都会让下面那条影响面判据在残缺集合上跑"
+        )
         assert len(target_first) == EXPECTED_LEGACY_WRITER_WORKBOOKS, target_first
         assert P.authoritative_template_path().name in target_first
         assert "B60-1 审计项目工时预算与控制表.xlsx" in target_first
@@ -2992,21 +3172,59 @@ def _room_facts() -> Any:
     return facts.observe_room_facts(entry)
 
 
+def _manifest_before_enablement() -> dict[str, Any]:
+    """把本 pilot 的 entry 退回 **finalize 之前**的 manifest 形态（capability 未启用）。
+
+    🔴 这是「顺序不可交换」这条属性的**取证输入**，不是对 manifest 的改写：真源文件一个
+    字节都不动，只在内存深拷贝上把本 entry 的 `capability` / `adapter_id` 退回 reviewed
+    overlay 裁决**之前**的取值。2026-09-07 起活体 manifest 已是 `bidirectional` +
+    `adapter_id=h1.disposal_check`（Task 36 finalize 之后的 overlay 动作），所以
+    「finalize 之前必须被拒」这条属性只能拿这份退回形态取证。
+    """
+    payload = json.loads(json.dumps(load_entry_manifest()))
+    for item in payload["entries"]:
+        if item["entry_id"] == P.PILOT_ENTRY_ID:
+            item["capability"] = "single_onlyoffice"
+            item["adapter_id"] = None
+    return payload
+
+
 class TestOrderingGate:
     """**Validates: Requirements 6.18 / 12.1**"""
 
     def test_capability_is_not_enabled_before_finalize(self, entry: dict[str, Any]) -> None:
-        """顺序门今天必然抛：finalize 被 published-identity-observer 缺口挡住。"""
-        assert capability_of(entry) is Capability.single_onlyoffice
-        assert entry["adapter_id"] is None
+        """顺序门的**后置条件**：capability 只能在 finalize 之后启用。
+
+        🔴 判据已反转（2026-09-07）：本条原先记录的是「今天还没启用」这个**临时前置
+        条件**。那个前置条件今天真被满足了 —— Task 36 / Task 77 的 finalize gate 产出
+        published representation 之后，reviewed overlay 才把本 entry 裁决为
+        `bidirectional` 并同步写回 `adapter_id`（`migration_state=adapter_registered`）。
+
+        反转成后置条件的同时**保留否证臂**：把 manifest 退回 finalize 之前的形态，顺序门
+        必须照旧抛。少了否证臂，本条就退化成「读一句 manifest 说已启用」。
+        """
+        # ① 后置条件：已启用，且 adapter_id / migration_state 同步写回
+        assert capability_of(entry) is Capability.bidirectional
+        assert entry["adapter_id"] == P.PILOT_ADAPTER_ID
+        assert str(entry.get("migration_state") or "") == "adapter_registered"
+        P.assert_manifest_capability_enabled()  # 不抛即放行
+        # ② 顺序门仍可打红：退回 finalize 之前的形态 ⇒ 必须照旧拒绝
         with pytest.raises(P.PilotSelectionError, match="manifest capability"):
-            P.assert_manifest_capability_enabled()
+            P.assert_manifest_capability_enabled(manifest=_manifest_before_enablement())
 
     def test_capability_predicate_agrees_with_the_ordering_gate(
         self, manifest: dict[str, Any]
     ) -> None:
-        """`manifest_capability_enabled` 委派给顺序门，只把异常翻成布尔。"""
-        assert P.manifest_capability_enabled() is False
+        """`manifest_capability_enabled` 委派给顺序门，只把异常翻成布尔。
+
+        🔴 两臂互换（2026-09-07）：活体已是 bidirectional，所以「谓词为真」这一臂改由
+        活体承担，「谓词为假」那一臂改用退回 finalize 之前的形态。下面的 AST 判据
+        （委派唯一、窄 except、全模块无宽 except）与 adapter_id 参与判定这两条**一字未动**。
+        """
+        assert P.manifest_capability_enabled() is True
+        P.assert_manifest_capability_enabled()
+        # 退回 finalize 之前 ⇒ 谓词为假（同一套判据的另一侧）
+        assert P.manifest_capability_enabled(manifest=_manifest_before_enablement()) is False
         # 🔴 AST 判据而不是词面：docstring 里刻意写着「宽 `except Exception` 会…」这段
         #    **说明**，纯字符串判据会把说明本身判成违规（首轮实测的假红）。
         tree = ast.parse(Path(P.__file__).read_text(encoding="utf-8"))
@@ -3036,26 +3254,27 @@ class TestOrderingGate:
             )
         ]
         assert wide == [], [ast.dump(item)[:80] for item in wide]
-        # 反向自检：manifest 一旦裁决为 bidirectional + 正确 adapter_id ⇒ 谓词为真。
+        # adapter_id 不符仍为假（两个字段都进判据）—— 活体已启用，只需改 adapter_id。
         patched = json.loads(json.dumps(manifest))
         for item in patched["entries"]:
             if item["entry_id"] == P.PILOT_ENTRY_ID:
                 item["capability"] = "bidirectional"
-                item["adapter_id"] = P.PILOT_ADAPTER_ID
-        assert P.manifest_capability_enabled(manifest=patched) is True
-        P.assert_manifest_capability_enabled(manifest=patched)
-        # adapter_id 不符仍为假（两个字段都进判据）。
-        for item in patched["entries"]:
-            if item["entry_id"] == P.PILOT_ENTRY_ID:
                 item["adapter_id"] = "b60.hour_budget"
         assert P.manifest_capability_enabled(manifest=patched) is False
 
-    def test_attach_is_a_no_op_before_enablement_and_never_raises(self) -> None:
+    def test_attach_is_a_no_op_before_enablement_and_never_raises(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         """未启用时返回空元组、**一次库都不读**（session 传 None 也不炸）。
 
         🔴 Task 41 实测过 raise 的后果：它一抛就让 `_registration` /
         `_apply_durable_incoming` 对**所有** entry 都 500 —— 一个尚未启用的 pilot 把整条
         sync 路由拖下水（Task 28 的路由守卫 8 例打红）。
+
+        🔴 取证输入换了（2026-09-07），属性没换：capability 启用之后，活体 attach 会正常
+        走到读库那一步（`session=None` ⇒ AttributeError），那是**正确行为**。要测的属性
+        始终是「未启用时短路」，所以把 pilot 模块里的 `load_entry_manifest` 换成退回
+        finalize 之前的 manifest —— 判据链路全程仍是生产的。
         """
         import asyncio
 
@@ -3063,24 +3282,34 @@ class TestOrderingGate:
             WorkpaperSyncAdapterRegistry,
         )
 
-        registry = WorkpaperSyncAdapterRegistry()
+        before = _manifest_before_enablement()
+        monkeypatch.setattr(P, "load_entry_manifest", lambda *a, **k: before)
+        registry = WorkpaperSyncAdapterRegistry(manifest=before)
         assert asyncio.run(P.attach_pilot_adapters(registry, session=None)) == ()
         assert registry.registrations() == ()
 
     def test_ledger_records_adapter_not_registered_yet(self) -> None:
+        """交付登记表对「adapter 是否已注册」必须如实记账，且不得自我授权。
+
+        🔴 判据已反转（2026-09-07）：本条原先钉 `adapter_registered is False`（Task 42
+        交付当时的临时前置条件）。今天该行已是 `True` —— 2026-09-07 实测真库
+        `register_from_manifest()` 已注册本 adapter。反转成后置条件的同时把「顺序没被
+        绕过」一并钉住：`reason` 必须写明 capability 裁决发生在 finalize **之后**，并且
+        manifest 侧必须真的写回了 `adapter_id`。
+        """
         row = next(
             row
             for row in RG.DELIVERED_PER_ENTRY_CONTRACTS
             if row["contract_id"] == P.PILOT_ADAPTER_ID
         )
-        assert row["adapter_registered"] is False
-        assert "顺序" in row["reason"]
-        assert "Task 75" in row["reason"], (
-            "reason 仍指向已删除的欠账常量 ⇒ 登记表与现实脱钩"
-        )
-        assert "Task 76" in row["reason"], (
-            "reason 没说清今天挡住注册的是供给（approved bundle / published representation 两表 0 行）"
-        )
+        assert row["adapter_registered"] is True
+        reason = str(row["reason"])
+        assert "顺序门仍然成立且未被绕过" in reason, reason
+        assert "finalize" in reason, reason
+        # 🔴 双源交叉：登记表说已注册 ⇒ manifest 必须同步是 bidirectional + adapter_id 写回
+        entry = manifest_entries_by_id(load_entry_manifest())[str(row["entry_id"])]
+        assert capability_of(entry) is Capability.bidirectional, entry
+        assert entry["adapter_id"] == P.PILOT_ADAPTER_ID, entry
 
     def test_contract_orphan_is_visible_in_the_registry_report(self) -> None:
         """契约孤儿必须是**可见欠账**，不是静默缺失。"""

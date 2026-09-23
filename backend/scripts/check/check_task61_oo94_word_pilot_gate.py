@@ -2475,6 +2475,45 @@ BINDING_CONSTRAINTS: Final[tuple[Mapping[str, Any], ...]] = (
                 "（该 entry 的 plan item 的 `blocked_reason` 实测已变 None）"
             ),
         },
+        #: 🔴 **append-only** 行数读数序列，与上面那个**带日期命名**的完整快照分工明确：
+        #:
+        #:   * `measured_2026_09_04` = 那一次**更正事件**的完整证据（供给/capability/注册
+        #:     三侧俱全）。它的键名就是事件日期 ⇒ **不得原地改数**，否则「2026-09-04 当天
+        #:     读到 2 行」这条已发生的事实会被今天的数字冒名顶替，而它正是「原文『全表 0
+        #:     行』是假话」这个判断错误的唯一证据。
+        #:   * 本序列 = 同一口径行数**随时点**的读数，逐次追加。真库行数天天涨，只有序列
+        #:     形态才能既与真库现查对齐、又不牺牲历史（与
+        #:     `opaque_entry_gate.ENTRY_ID_NAMESPACE_SPLIT_NOTE["measured_migration_cost"]`
+        #:     同一套约定）。
+        #:
+        #: 首条与 `measured_2026_09_04` 的同名三项**必须逐字相等**（有守卫钉住），
+        #: 因此这不是第二个真源，而是同一事实的时序展开。
+        #:
+        #: 🔴 本序列只登记**行数**。「capability 是否已翻转、BP-61-1 是否已解除」不在此处
+        #: 裁决 —— 2026-09-23 实测 `registered_adapter_ids` 已非空、manifest 里
+        #: `bidirectional` 已有 4 条，与上面快照的「仍为空 / 0 条」相反，那是一次**状态翻转**，
+        #: 归 `owner_task` 登记的解除方裁决，不由本序列顺手宣布。
+        "measured_readings": (
+            {
+                "measured_at": "2026-09-04",
+                "working_paper_sync_entry_state_rows_total": 2,
+                "of_which_opaque_namespace": 1,
+                "of_which_manifest_entry": 1,
+                "note": "更正事件当天的读数；完整快照见 `measured_2026_09_04`",
+            },
+            {
+                "measured_at": "2026-09-23",
+                "working_paper_sync_entry_state_rows_total": 12,
+                "of_which_opaque_namespace": 1,
+                "of_which_manifest_entry": 11,
+                "note": (
+                    "静默库实测（两次独立连接相隔 112 秒读数逐项相同、三表 30 分钟内无"
+                    "写入、无写意图锁、本库无 active backend）。manifest entry 侧 1→11 行，"
+                    "`opaque-` 侧仍是唯一那 1 行 ⇒ 「数全表行数」这个判据比 2026-09-04 时"
+                    "更失真，按 manifest entry_id 集合过滤这条结论进一步被实测支持。"
+                ),
+            },
+        ),
     },
     {
         "id": "BP-61-2",

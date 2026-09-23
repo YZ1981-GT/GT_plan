@@ -74,6 +74,28 @@ const pendingMap = new Map<string, AbortController>()
 // POST/PUT/PATCH 防重复提交的自动清理定时器（防止超时/取消时 key 泄漏）
 const pendingTimers = new Map<string, ReturnType<typeof setTimeout>>()
 
+/**
+ * `addPending` 算出的去重键**钉在 config 上**，`removePending` 只读它、绝不重算。
+ *
+ * 🔴 为什么必须钉住（2026-09-23 真栈实测的根因）：`getRequestKey` 对 POST 会把 body
+ * 指纹并进键，而 body 在两个时刻的**类型不同** —— `addPending` 跑在请求拦截器里，
+ * 此时 `config.data` 还是对象（axios 的 `transformRequest` 在 `dispatchRequest` 里、
+ * 晚于请求拦截器才把它变成 JSON 字符串）；`removePending` 跑在响应拦截器里，
+ * `response.config.data` 已经是**字符串**，于是 `typeof config.data === 'object'`
+ * 为假 → 算出一把**不带 body 指纹**的键。插入用 A 键、删除删 B 键 ⇒ 成功的 POST 把
+ * 自己的 A 键永久留在 `pendingMap` 里（只能等 5 分钟兜底定时器）。此后 5 分钟内任何
+ * **同 body** 的 POST 都会被「防重复提交」分支当成在飞请求、在发出之前就 abort。
+ *
+ * 实测形态：D4-1「表格视图 ↔ 在线编辑」反复切换。`POST …/pending-mutations` 的 body
+ * 在内容未改时**逐字节相同**（实测 81244 字节全等）⇒ 第 2 次切换被静默 abort，用户看到
+ * 开关自己弹回「表格视图」且没有任何报错（桥把 canceled 当「被后发请求作废」处理，
+ * 刻意不记 lastError）。时间线：11:53:58 成功（键泄漏）→ 11:59:05 成功（恰好 5 分 7 秒，
+ * 兜底定时器刚清掉）→ 11:59:35 **失败**（键还在）→ 12:04:27 成功（上一次 abort 走错误
+ * 路径反而删对了键）。
+ */
+const DEDUPE_KEY = Symbol('gtDedupeKey')
+const DEDUPE_OWNER = Symbol('gtDedupeOwner')
+
 function getRequestKey(config: InternalAxiosRequestConfig): string {
   const base = `${config.method}:${config.url}:${JSON.stringify(config.params || '')}`
   // POST/PUT/PATCH 请求：对 body 做轻量 hash（取前100字符+总长度），避免大 body 时 JSON.stringify 性能差
@@ -109,6 +131,11 @@ function addPending(config: InternalAxiosRequestConfig) {
   const controller = new AbortController()
   config.signal = controller.signal
   pendingMap.set(key, controller)
+  // 🔴 只有**真正把 key 放进 pendingMap 的这一发请求**才被授予删除权：键与 controller
+  //    一起钉在 config 上。上面「防重复提交」早退分支刻意不钉 —— 那一发没占用任何条目，
+  //    它的错误路径若去删这把键，就会在先发请求还在飞的时候把闸门打开。
+  ;(config as any)[DEDUPE_KEY] = key
+  ;(config as any)[DEDUPE_OWNER] = controller
   // POST/PUT/PATCH 设置 5 分钟自动清理，防止超时/取消时 key 泄漏导致后续请求永久被拒
   if (method === 'POST' || method === 'PUT' || method === 'PATCH') {
     const existingTimer = pendingTimers.get(key)
@@ -122,7 +149,16 @@ function addPending(config: InternalAxiosRequestConfig) {
 }
 
 function removePending(config: InternalAxiosRequestConfig) {
-  const key = getRequestKey(config)
+  // 🔴 读 `addPending` 钉下的那把键，**不得重算**（重算会因 body 已被 transformRequest
+  //    变成字符串而得到另一把键，见 DEDUPE_KEY 的说明）。没有钉记 = 本请求从未占用
+  //    pendingMap（`_dedupe:false` / FormData / 被防重复提交早退的那一发）⇒ 无事可做。
+  const key = (config as any)?.[DEDUPE_KEY] as string | undefined
+  if (!key) return
+  // GET 去重会 abort 先发请求并让后发请求**接管**同一把键。先发请求的 rejection 是在
+  // 后发请求 addPending 之后才派发的微任务，此时条目里已是后发者的 controller ——
+  // 按 owner 比对，避免先发者把后发者还在飞的闸门删掉。
+  const owner = (config as any)[DEDUPE_OWNER] as AbortController | undefined
+  if (owner && pendingMap.get(key) !== owner) return
   pendingMap.delete(key)
   // 清除对应的自动清理定时器
   const timer = pendingTimers.get(key)

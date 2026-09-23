@@ -766,6 +766,68 @@ def _assign_store_value(target: dict[str, Any], field_id: str, value: Any) -> bo
     return assign_store_value(target, store_key, value)
 
 
+def merge_projection_into_store_rows(
+    *,
+    projection: Any,
+    base_rows: list[Mapping[str, Any]],
+) -> tuple[list[dict[str, Any]], int, int, set[str]]:
+    """把已 extract 的 projection 按行身份合进 D2 HTML store 行（**不读盘**）。
+
+    以 **Excel 侧为准**覆盖受管字段；`base_rows` 提供行顺序与非受管字段
+    （如前端自用的展示态），因此不会因为一次回写丢掉 store 里的额外键。
+
+    🔴 本函数是统一路径（`oo_to_html`）与 legacy 路径（:func:`pull_excel_to_html`）
+    **共用**的那一份合并实现，签名与其余 pilot/canary 桥
+    （`pilot_h1_grouped_dynamic` / `phase5_d1_notes_receivable` …）逐字一致。
+    它原先内联在 `pull_excel_to_html` 的函数体里，而 `oo_to_html` 的
+    `d2.receivable_detail` 分支早已按 `bridge.merge_projection_into_store_rows`
+    这个名字取它 —— 属性不存在，于是 D2 的 OO 回写在统一路径上必抛
+    `AttributeError`。抽出来而不是在 `oo_to_html` 里另写一份，理由与
+    `_same_store_value` 只做转发别名相同：两份判据必然漂移。
+
+    🔴 `applied` 与 `visited` 是**两个**数：前者只数真变化（委派
+    `d2_store_value_equivalence.assign_store_value`），后者数遍历到的可回写格。
+    压成一个就会重演 2026-09-06 那次「1260 行全量成功」的假回写。
+
+    🔴 D2 **不做**幽灵行剔除（D1/D3/D5/D6/D7 做）：D2 的受管区没有「该行业务名称」
+    这种可当命名字段的契约首列，Excel 侧新增行必须原样进 store，否则结构化视图
+    永远看不到新增。见 `test_d2_store_value_equivalence` 第三条判据。
+
+    :returns: (合并后的 store 行, 真变化字段数, 遍历字段数, 被改动的行身份集合)
+    """
+    by_id: dict[str, dict[str, Any]] = {}
+    order: list[str] = []
+    for row in base_rows:
+        rid = str(row.get(P.ROW_IDENTITY_STORE_KEY) or "").strip()
+        if not rid:
+            continue
+        by_id[rid] = dict(row)
+        order.append(rid)
+
+    applied = 0  # 真发生变化的字段数
+    visited = 0  # 遍历到的可回写字段数（用于区分「没变」与「没读到」）
+    touched_rows: set[str] = set()
+    for key in projection.stable_keys():
+        fv = projection.get(key)
+        if fv is None or fv.is_protected:
+            continue  # 公式/自动取数列不回写 store
+        rid = fv.row_key
+        if not rid:
+            continue
+        target = by_id.get(rid)
+        if target is None:
+            target = {P.ROW_IDENTITY_STORE_KEY: rid}
+            by_id[rid] = target
+            order.append(rid)
+        field_id = key.rsplit("/", 1)[-1]
+        visited += 1
+        if _assign_store_value(target, field_id, fv.value):
+            applied += 1
+            touched_rows.add(rid)
+
+    return [by_id[rid] for rid in order], applied, visited, touched_rows
+
+
 def pull_excel_to_html(
     *, artifact: Path, base_rows: list[Mapping[str, Any]]
 ) -> tuple[list[dict[str, Any]], D2SyncReport]:
@@ -809,37 +871,11 @@ def pull_excel_to_html(
     if projection is None:
         raise D2BridgeError("extract_projection 未返回 projection")
 
-    by_id: dict[str, dict[str, Any]] = {}
-    order: list[str] = []
-    for row in base_rows:
-        rid = str(row.get(P.ROW_IDENTITY_STORE_KEY) or "").strip()
-        if not rid:
-            continue
-        by_id[rid] = dict(row)
-        order.append(rid)
-
-    applied = 0  # 真发生变化的字段数
-    visited = 0  # 遍历到的可回写字段数（用于区分「没变」与「没读到」）
-    touched_rows: set[str] = set()
-    for key in projection.stable_keys():
-        fv = projection.get(key)
-        if fv is None or fv.is_protected:
-            continue  # 公式/自动取数列不回写 store
-        rid = fv.row_key
-        if not rid:
-            continue
-        target = by_id.get(rid)
-        if target is None:
-            target = {P.ROW_IDENTITY_STORE_KEY: rid}
-            by_id[rid] = target
-            order.append(rid)
-        field_id = key.rsplit("/", 1)[-1]
-        visited += 1
-        if _assign_store_value(target, field_id, fv.value):
-            applied += 1
-            touched_rows.add(rid)
-
-    merged = [by_id[rid] for rid in order]
+    # 合并逻辑与统一路径（`oo_to_html`）共用同一份实现，见
+    # :func:`merge_projection_into_store_rows` 的 docstring。
+    merged, applied, visited, touched_rows = merge_projection_into_store_rows(
+        projection=projection, base_rows=base_rows
+    )
 
     # ── 叙述块（审计说明 / 审计结论）也要读回 ─────────────────────────
     # 表头**不读**：真源是 Project / working_paper，从 Excel 回写会越权改主数据

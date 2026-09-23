@@ -7,8 +7,8 @@ Properties: **P16** / **P17** / **P18** / **P19** / **P20**
 
 ═══ 本文件的核心一条 ═══
 
-`test_scanner_agrees_with_rewriter_on_whole_corpus` —— 扫描器与改写器在**全库 351 份**上
-必须同口径。这条是其余判据的地基：扫描算出声明传播量、改写器实际执行，两者口径不一致时
+`test_scanner_agrees_with_rewriter_on_whole_corpus` —— 扫描器与改写器在**全库**（2026-09-23
+实测 352 份）上必须同口径。这条是其余判据的地基：扫描算出声明传播量、改写器实际执行，两者口径不一致时
 **要么**假红（与计划一致的传播被判漂移），**要么**漏扫一类载体让那类引用静默指向错行。
 
 🔴 它实测抓到过一次真问题：首版按「去重行号数」对账，在 `'表'!E10:F10`（两个端点都是
@@ -87,21 +87,41 @@ EXPECTED: dict[str, int] = {
     #:   ⇒ `&#24213;&#31295;&#30446;&#24405;!A2`（= `底稿目录!A2`）压根不被识别成引用。
     #:   改用 `html.unescape` 后被正确识别。逐类归因实测确认 **+749 全部**来自含数字
     #:   字符引用的公式（2,941 条）⇒ 是「先前没看见」而不是「先前分错类」。
+    #: **③ 语料本体变动**（2026-09-06 冻结 → 2026-09-23 复核，两笔具名变更，残差 0）
+    #:
+    #:   ① `d3b3d80d9`（2026-09-14）新增 `D/D4 收入底稿.xlsx`
+    #:      ⇒ 模板 351 → 352 / 公式 +168 / definedName `builtin_self_scope` +48、
+    #:        `user_self_scope` +6；该册**无任何**限定引用，故四类 ref 计数 +0。
+    #:   ② `1a0b55651`（2026-09-12「D 循环 5 个 canary 做实到 bidirectional_verified」）
+    #:      改写 `D/D7 合同负债.xlsx` ⇒ 公式 206 → 200（**-6**）、external 6 → 0（**-6**）。
+    #:      消失的 6 条全是指向外部工作簿的**死链**（`[21]底稿目录!A3..A7` /
+    #:      `[22]审定表D7!A8`，`[21]`/`[22]` 是保存时残留的外部簿索引），做实双向时清掉。
+    #:      同一份的 `sheet` 类引用 105 处**一条没动** ⇒ 不是分词能力退化（能力退化会表现为
+    #:      sheet↔external 之间搬家，或 sheet 侧同步掉数）。
+    #:
+    #:   逐数对平：公式 126,565 +168 −6 = 126,727 ✅；external 3,883 −6 = 3,877 ✅；
+    #:   sheet / three_d / no_target 三类**一分未动** ✅。8 个变动量全部落到两个具名 commit
+    #:   的两份具名模板上，**零残差** ⇒ 是语料真变了，不是识别口径漂了。
     "corpus_sheet_refs": 144904,
-    "corpus_external_refs": 3883,
+    "corpus_external_refs": 3877,
     "corpus_three_d_refs": 0,
     "corpus_no_target_refs": 179,
-    "corpus_formulas": 126565,
-    "corpus_templates": 351,
+    #: 🔴 这两个是**随语料合法增长**的量，用下界而不是等式（其余 ref 分类量仍用等式 ——
+    #: 它们是识别能力的信号，任何变化都必须像上面 ①②③ 那样逐条归因后才准动）。
+    #: 等式写法的后果：每入库一份模板就打一次假红，而假红掩盖的正是扫描器↔改写器对账。
+    "min_corpus_formulas": 126727,
+    "min_corpus_templates": 352,
     #: chart 有真实样本（8 个部件 / `C24 会计分录 - 细节测试.xlsx`）；pivot 全库为 0。
     "corpus_chart_parts": 8,
     "corpus_pivot_parts": 0,
     #: definedNames 分类的**现口径**分母。与清册那组数的差异归因见
     #: `TestDefinedNameClassification.test_defined_name_five_way_classification`。
+    #: 🔴 2026-09-14 `d3b3d80d9` 加入 `D/D4 收入底稿.xlsx` ⇒ 前两项各 +48 / +6（该册单份
+    #: 实测贡献，逐份归因确认其余四项 +0）。见上方 ③。
     "defined_name_classes": {
-        "builtin_self_scope": 2465,
+        "builtin_self_scope": 2513,
         "builtin_cross_sheet": 0,
-        "user_self_scope": 267,
+        "user_self_scope": 273,
         "user_cross_sheet": 4,
         "global_scope": 197,
         "target_not_in_workbook": 6,
@@ -140,7 +160,7 @@ class TestScannerRewriterAgreement:
     """🔴 扫描与改写必须同口径，否则其余判据全部立不住。"""
 
     def test_scanner_agrees_with_rewriter_on_whole_corpus(self) -> None:
-        """全库 351 份逐条公式：扫描器预期改动的 A1 片段数 == 改写器实际改动数。
+        """全库逐条公式：扫描器预期改动的 A1 片段数 == 改写器实际改动数。
 
         ═══ 这条抓到过什么 ═══
 
@@ -166,8 +186,13 @@ class TestScannerRewriterAgreement:
         files = sorted(
             p for p in TEMPLATE_ROOT.rglob("*.xlsx") if not p.name.startswith("~$")
         )
-        assert len(files) == EXPECTED["corpus_templates"], (
-            f"语料规模变了：{len(files)} 份，冻结值 {EXPECTED['corpus_templates']}"
+        #: 🔴 下界而非等式，且必须在对账**之前**只做「语料够大」的自检 —— 2026-09-23
+        #: 复核时这里曾是 `== 351`，语料合法长到 352 后它先打红，把其后整段
+        #: 扫描器↔改写器对账挡在门外（对账实测 0 例不吻合 / 72,637 条，两侧都没问题）。
+        #: 这正是「绝对计数腐烂」把真判据变成不可达代码的样子。
+        assert len(files) >= EXPECTED["min_corpus_templates"], (
+            f"语料缩水：{len(files)} 份，冻结下界 {EXPECTED['min_corpus_templates']} —— "
+            "缩水或 glob 失配会让下面的全库对账在残缺集合上跑"
         )
 
         for path in files:
@@ -224,8 +249,8 @@ class TestScannerRewriterAgreement:
             "更糟的是漏扫一类载体 ⇒ 那类引用静默指向错行"
         )
         assert compared > 70_000, f"实际比对的公式条数过少（{compared}），判据可能空转"
-        assert total_formulas == EXPECTED["corpus_formulas"], (
-            f"公式总数变了：{total_formulas}，冻结值 {EXPECTED['corpus_formulas']}"
+        assert total_formulas >= EXPECTED["min_corpus_formulas"], (
+            f"公式总数缩水：{total_formulas}，冻结下界 {EXPECTED['min_corpus_formulas']}"
         )
         for kind, frozen_key in (
             ("sheet", "corpus_sheet_refs"),
@@ -602,7 +627,7 @@ class TestCarrierBoundaries:
     def test_prompt_and_error_attributes_are_not_scanned(self) -> None:
         """🔴 `prompt=` / `error=` 属性里的文本**不得**被扫。
 
-        实测事实（全库 351 份）：`error=` 48 处、`prompt=` 14 处含中文，其中被分词器判成
+        实测事实（2026-09-06 全库 351 份时）：`error=` 48 处、`prompt=` 14 处含中文，其中被分词器判成
         限定引用的是 **0 处** —— `prompt=` 里确有「根据D2-2 审计调整前的账龄数据填写」这种
         含 sheet 名的提示，但其后没有 `!` 所以 `_QUALIFIED_PREFIX_RE` 不命中。
 

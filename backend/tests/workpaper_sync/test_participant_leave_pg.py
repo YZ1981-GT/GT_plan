@@ -623,7 +623,10 @@ async def _collect() -> dict[str, Any]:  # noqa: C901 - 单次采集覆盖全部
                 env = await _room_with(repo, world, generation=4, users=(user_a,))
                 room_id, (pa_id,) = env["room_id"], env["participant_ids"]
                 await s.commit()
-                refused: dict[str, Any] = {}
+                # 🔴 缺省形态是「没抛」而不是空 dict：dirty 门被放宽时这里必须落成一条
+                # **有名字**的判据失败（`type is None`），而不是让断言撞 `KeyError: 'type'`
+                # —— 后者同样红，但读的人看不出红在哪条语义上。写法与场景 F/G 的探针一致。
+                refused: dict[str, Any] = {"type": None, "error_code": None, "message": ""}
                 witness.reset()
                 witness.enabled = True
                 try:
@@ -688,7 +691,8 @@ async def _collect() -> dict[str, Any]:  # noqa: C901 - 单次采集覆盖全部
                 )
                 s.add(req)
                 await s.commit()
-                blocked: dict[str, Any] = {}
+                # 同场景 D：缺省「没抛」形态，让 in-flight 门被放宽时红在一条有名字的判据上。
+                blocked: dict[str, Any] = {"type": None, "error_code": None, "message": ""}
                 try:
                     await rooms.leave_participant(
                         room_id=room_id, participant_id=pa_id,
@@ -722,6 +726,12 @@ async def _collect() -> dict[str, Any]:  # noqa: C901 - 单次采集覆盖全部
                 await s.commit()
                 snap["in_flight"] = {
                     "blocked": blocked,
+                    # 🔴 观测者反证（见 `test_the_side_effect_counter_can_actually_see_a_request_row`）：
+                    # 本场景是全采集里**唯一**真的存在一条 request 行的 room，所以它是
+                    # `_side_effect_counts` 的正对照。没有它时，AC 4.1 的三条「== 0」在一个
+                    # 看不见任何行的观测者下恒真（实测：把 room_id 过滤换成随机 UUID，
+                    # 23 条 PG 判据**全绿**）。
+                    "side_effects": await _side_effect_counts(s, room_id),
                     "other_participant_left_anyway": (
                         (await _participant_row(s, pb_id))["state"]
                     ),
@@ -960,12 +970,43 @@ def test_ac_4_3_the_room_stays_active_when_another_editor_remains(
 
 
 def test_ac_4_1_no_request_no_close_intent_of_any_kind(snap: dict[str, Any]) -> None:
-    """AC 4.1：不建 forcesave、不建 close_capture、不建 close intent —— 三张表全数为 0。"""
+    """AC 4.1：不建 forcesave、不建 close_capture、不建 close intent —— 三张表全数为 0。
+
+    本条的非空转前提是下一条（`test_the_side_effect_counter_can_actually_see_a_request_row`）
+    —— 三个「== 0」在一个看不见任何行的观测者下恒真，所以观测者自己必须先被反证。
+    """
     for label in ("happy", "idempotent"):
         counts = snap[label]["side_effects"]
         assert counts["forcesave_requests"] == 0, (label, counts)
         assert counts["close_capture_requests"] == 0, (label, counts)
         assert counts["close_intents"] == 0, (label, counts)
+
+
+def test_the_side_effect_counter_can_actually_see_a_request_row(
+    snap: dict[str, Any],
+) -> None:
+    """观测者反证：`_side_effect_counts` 在**真的有一条 request 行**的 room 上必须看到它。
+
+    没有这一条时，上面 AC 4.1 的三个「== 0」是**空转**的：2026-09-22 实测把
+    `_side_effect_counts` 里的 `room_id` 过滤换成一个随机 UUID（一个永远看不见任何行的
+    观测者），本文件 23 条判据**全部保持绿**。判据面因此与 `_StatementWitness` 同构 ——
+    观测者先证明自己能看见，「零条」这个结论才有分量。
+
+    场景 E 是全采集里唯一插入了真 `WorkpaperForcesaveRequest`（`kind=forcesave`）的 room：
+
+    * `forcesave_requests == 1` ⇒ 基础计数与 `room_id` 过滤真的会命中；
+    * `close_capture_requests == 0` ⇒ `kind` 过滤会**分型**，不把 forcesave 行冒充成
+      close_capture（否则 AC 4.1 的「不建 close_capture」会被一条正常 forcesave 行顶掉）。
+    """
+    counts = snap["in_flight"]["side_effects"]
+    assert counts["forcesave_requests"] == 1, (
+        "场景 E 明明插了一条 forcesave request，观测者却没看到 —— "
+        f"那么 AC 4.1 的三个「== 0」全是空转: {counts}"
+    )
+    assert counts["close_capture_requests"] == 0, (
+        f"kind 过滤没分型：一条 kind=forcesave 的行被当成 close_capture 计了: {counts}"
+    )
+    assert counts["close_intents"] == 0, counts
 
 
 # ═══════════════════════════════════════════════════════════════════════════

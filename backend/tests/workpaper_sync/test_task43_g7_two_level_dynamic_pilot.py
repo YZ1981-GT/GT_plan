@@ -655,7 +655,25 @@ class TestFrozenEntrySelection:
         assert set(assessment.candidate_entry_ids) == {P.PILOT_ENTRY_ID} | set(
             P.SIBLING_G7_CANDIDATES
         )
-        assert assessment.bidirectional_entry_ids == ()
+        # 🔴 2026-09-22：原判据冻结 `bidirectional_entry_ids == ()`（迁移前快照）。G7 的
+        # adapter 真注册了（manifest capability=bidirectional + adapter_id，并由
+        # registry.py#DELIVERED_PER_ENTRY_CONTRACTS[g7.soe_subsidiary_disclosure]
+        # .adapter_registered=True 独立印证）。改成与生产账本互锁的现算：harness 认定的
+        # bidirectional 集合必须恰好等于「本类候选 ∩ 账本已注册」。两源任一漂移即红。
+        from app.services.workpaper_sync.adapters import registry as _registry
+
+        ledger_registered = {
+            row["entry_id"]
+            for row in _registry.DELIVERED_PER_ENTRY_CONTRACTS
+            if row["adapter_registered"]
+        }
+        assert set(assessment.bidirectional_entry_ids) == (
+            set(assessment.candidate_entry_ids) & ledger_registered
+        ), (
+            f"harness 认定 bidirectional={assessment.bidirectional_entry_ids}，"
+            f"生产账本里已注册 adapter 的本类候选="
+            f"{sorted(set(assessment.candidate_entry_ids) & ledger_registered)} ⇒ 两源打脸"
+        )
 
     def test_entry_is_independent_and_not_a_parent_duplicate(
         self, entry: dict[str, Any]
@@ -1142,6 +1160,12 @@ class TestContractIsGroundedInTheTemplate:
         assert P.assert_contract_file_matches_source() is not None
 
     def test_contract_is_registered_in_the_delivery_ledger(self) -> None:
+        """交付账本逐字段对齐；`adapter_registered` 与 manifest **双源一致**。
+
+        🔴 2026-09-22：原判据冻结 `adapter_registered is False`（迁移前快照）。G7 接通双向后
+        账本已是 True，manifest 侧同步给了 `adapter_id` + `capability=bidirectional`。改成双源
+        一致：账本说已注册 ⇔ manifest 给了 adapter_id 且 capability 为 bidirectional。
+        """
         rows = [
             row
             for row in RG.DELIVERED_PER_ENTRY_CONTRACTS
@@ -1153,7 +1177,17 @@ class TestContractIsGroundedInTheTemplate:
         assert row["pilot_class"] == P.PILOT_CLASS
         assert row["entry_id"] == P.PILOT_ENTRY_ID
         assert row["template_relative_path"] == P.TEMPLATE_RELATIVE_PATH
-        assert row["adapter_registered"] is False
+        entry = manifest_entries_by_id(load_entry_manifest())[P.PILOT_ENTRY_ID]
+        assert bool(row["adapter_registered"]) is (
+            entry.get("adapter_id") is not None
+            and entry.get("capability") == "bidirectional"
+        ), (
+            f"账本 adapter_registered={row['adapter_registered']}，manifest "
+            f"adapter_id={entry.get('adapter_id')!r} / capability={entry.get('capability')!r} "
+            "⇒ 交付账本与 manifest 双口径（同一件事记了两遍且已漂）"
+        )
+        if row["adapter_registered"]:
+            assert entry["adapter_id"] == P.PILOT_ADAPTER_ID
         assert set(available_contract_ids()) == {
             str(item["contract_id"]) for item in RG.DELIVERED_PER_ENTRY_CONTRACTS
         }
@@ -2892,11 +2926,21 @@ class TestUpstreamDebtsAreVisibleFacts:
             "dynamic_column_stable_keys",
         }
 
-    def test_dynamic_family_is_structurally_unreachable_for_every_xlsx_entry(self) -> None:
+    def test_dynamic_family_is_structurally_unreachable_for_every_xlsx_entry(
+        self, manifest: dict[str, Any]
+    ) -> None:
         observed = P.assert_dynamic_family_is_unreachable_for_xlsx_entries()
         assert observed["xlsx_dynamic"] == ()
         assert observed["dynamic"] == ("docx/gt-wp-renderer",), observed["dynamic"]
-        assert observed["total"] == 186, observed["total"]
+        # 🔴 `total` 是**分母自证**（扫过整份 manifest，不是空跑），不是一个要冻结的
+        # 业务常量。写死过 186，而 manifest 会随宿主拓扑增减：实测 186 → 176 → 155
+        # （commit cd9592ff5 把 D4 各 tab 迁到 `useD4SyncMode` 后 21 条 `xlsx/d4/**`
+        # entry 退网）。绝对数一落后，打红的就是「manifest 缩了」而不是「不可达性坏了」。
+        assert observed["total"] == len(manifest["entries"]), (
+            f"扫过 {observed['total']} 条，活 manifest 现算 {len(manifest['entries'])} 条 "
+            "⇒ 观测面没覆盖整份 manifest"
+        )
+        assert observed["total"] >= 100, f"manifest 只有 {observed['total']} 条 ⇒ 分母可疑"
 
     def test_dynamic_debt_is_retracted_when_upstream_fixes_the_gate(
         self, manifest: dict[str, Any]
@@ -3160,7 +3204,20 @@ class TestUpstreamRelsAndNamespaceShapesStillHold:
         assert X._xml_unescape("&#21512;&#35745;") == "&#21512;&#35745;"
 
     def test_ten_authoritative_workbooks_share_this_shape(self) -> None:
-        """本模板不是孤例：`backend/wp_templates/` 下同形态的工作簿实测 10 个。"""
+        """本模板不是孤例：`backend/wp_templates/` 下同形态的工作簿实测 10 个。
+
+        ═══ 为什么语料清册是**下界**而不是等式 ═══
+
+        本条要锁的是「legacy writer 这个形态不是孤例」，分母是 `legacy_writer`。语料**总量**
+        只是「判据没在空集上跑」的自检，它会随模板合法入库而增长：
+
+        * 2026-09-06（本判据冻结时）实测 `.xlsx 351 / .xlsm 17 / .xls 1`，合计 369；
+        * 2026-09-14 `d3b3d80d9` 加入 `D/D4 收入底稿.xlsx` ⇒ `.xlsx` 352，合计 370。
+
+        写成等式的后果是每次合法入库都打一次假红，而假红掩盖的恰恰是 `legacy_writer`
+        这条真判据。所以总量用下界 + 扩展名集合用等式（新出现第四种扩展名仍要打红），
+        `legacy_writer` 保持**等式**—— 它是本条的结论本身，实测仍为 10，一份不多一份不少。
+        """
         root = _BACKEND / "wp_templates"
         by_extension: dict[str, int] = {}
         legacy_writer = 0
@@ -3180,8 +3237,17 @@ class TestUpstreamRelsAndNamespaceShapesStillHold:
             if first and "Id=" in first.group(0) and "Target=" in first.group(0):
                 if first.group(0).index("Target=") < first.group(0).index("Id="):
                     legacy_writer += 1
-        assert by_extension == {".xlsx": 351, ".xlsm": 17, ".xls": 1}, by_extension
-        assert sum(by_extension.values()) == 369
+        #: 冻结时点（2026-09-06）实测下界；新增模板只会让这些数变大。
+        frozen_floor = {".xlsx": 351, ".xlsm": 17, ".xls": 1}
+        assert set(by_extension) == set(frozen_floor), (
+            f"出现了未登记的工作簿扩展名：{by_extension}（冻结集合 {sorted(frozen_floor)}）"
+        )
+        for suffix, floor in frozen_floor.items():
+            assert by_extension[suffix] >= floor, (
+                f"{suffix} 少于冻结下界 {floor}（实测 {by_extension[suffix]}）—— "
+                "语料缩水或 glob 失配，两者都会让下面那条判据在残缺集合上跑"
+            )
+        assert sum(by_extension.values()) >= sum(frozen_floor.values())
         assert legacy_writer == 10, legacy_writer
 
 
@@ -3204,69 +3270,116 @@ def _room_facts() -> Any:
     return facts.observe_room_facts(entry)
 
 
+def _manifest_before_enablement() -> dict[str, Any]:
+    """把本 pilot 的 entry 退回 **finalize 之前**的 manifest 形态（capability 未启用）。
+
+    🔴 这是「顺序不可交换」这条属性的**取证输入**，不是对 manifest 的改写：真源文件一个
+    字节都不动，只在内存深拷贝上把本 entry 的 `capability` / `adapter_id` 退回 reviewed
+    overlay 裁决**之前**的取值。2026-09-07 起活体 manifest 已是 `bidirectional` +
+    `adapter_id=g7.soe_subsidiary_disclosure`（Task 36 finalize 之后的 overlay 动作），
+    所以「finalize 之前必须被拒」这条属性只能拿这份退回形态取证。
+    """
+    payload = json.loads(json.dumps(load_entry_manifest()))
+    for item in payload["entries"]:
+        if item["entry_id"] == P.PILOT_ENTRY_ID:
+            item["capability"] = "single_onlyoffice"
+            item["adapter_id"] = None
+    return payload
+
+
 class TestOrderingGate:
     """**Validates: Requirements 12.1 / 12.2**（capability 只能在 finalize 之后启用）"""
 
     def test_capability_is_not_enabled_before_finalize(self, entry: dict[str, Any]) -> None:
-        assert capability_of(entry) is Capability.single_onlyoffice
-        assert entry["adapter_id"] is None
+        """顺序门的**后置条件**：capability 只能在 finalize 之后启用。
+
+        🔴 判据已反转（2026-09-07）：原文记录的是「今天还没启用」这个**临时前置条件**，
+        而它今天真被满足了 —— Task 36 / Task 77 的 finalize gate 产出 published
+        representation 之后，reviewed overlay 才把本 entry 裁决为 `bidirectional` 并同步
+        写回 `adapter_id`。反转成后置条件的同时**保留否证臂**（退回 finalize 之前的形态
+        ⇒ 顺序门必须照旧抛），否则本条就退化成「读一句 manifest 说已启用」。
+        """
+        assert capability_of(entry) is Capability.bidirectional
+        assert entry["adapter_id"] == P.PILOT_ADAPTER_ID
+        assert str(entry.get("migration_state") or "") == "adapter_registered"
+        P.assert_manifest_capability_enabled()  # 不抛即放行
         with pytest.raises(P.PilotSelectionError, match="manifest capability"):
-            P.assert_manifest_capability_enabled()
+            P.assert_manifest_capability_enabled(manifest=_manifest_before_enablement())
 
     def test_capability_predicate_agrees_with_the_ordering_gate(
         self, manifest: dict[str, Any]
     ) -> None:
-        """布尔谓词**委派**顺序门；两侧不得各写一套。"""
-        assert P.manifest_capability_enabled() is False
-        assert P.manifest_capability_enabled(manifest=manifest) is False
+        """布尔谓词**委派**顺序门；两侧不得各写一套。
+
+        🔴 两臂互换（2026-09-07）：活体已是 bidirectional，于是「谓词为真」由活体承担、
+        「谓词为假」改用退回 finalize 之前的形态。源码委派判据与 adapter_id 独立成条
+        这两项**一字未动**。
+        """
+        before = _manifest_before_enablement()
+        assert P.manifest_capability_enabled(manifest=before) is False
         body = function_body_code(Path(P.__file__), "manifest_capability_enabled")
         assert "assert_manifest_capability_enabled" in body
         assert "except PilotSelectionError" in body
         assert "except Exception" not in body
-        # 启用之后两侧必须同时变真（谓词不是恒 False）。
-        enabled = json.loads(json.dumps(manifest))
-        for item in enabled["entries"]:
-            if item["entry_id"] == P.PILOT_ENTRY_ID:
-                item["capability"] = "bidirectional"
-                item["adapter_id"] = P.PILOT_ADAPTER_ID
-        P.assert_manifest_capability_enabled(manifest=enabled)
-        assert P.manifest_capability_enabled(manifest=enabled) is True
+        # 已启用侧：活体与显式传入的活 manifest 必须同时为真（谓词不是恒 False）。
+        P.assert_manifest_capability_enabled()
+        assert P.manifest_capability_enabled() is True
+        assert P.manifest_capability_enabled(manifest=manifest) is True
         # adapter_id 不符时仍必须打红（顺序门有两条独立判据）。
-        wrong = json.loads(json.dumps(enabled))
+        wrong = json.loads(json.dumps(manifest))
         for item in wrong["entries"]:
             if item["entry_id"] == P.PILOT_ENTRY_ID:
+                item["capability"] = "bidirectional"
                 item["adapter_id"] = "h1.disposal_check"
         with pytest.raises(P.PilotSelectionError, match="adapter_id"):
             P.assert_manifest_capability_enabled(manifest=wrong)
 
-    def test_attach_is_a_no_op_before_enablement_and_never_raises(self) -> None:
-        """🔴 未启用时必须 `return ()` 且**一次库都不读** —— 抛会让整条 sync 路由 500。"""
+    def test_attach_is_a_no_op_before_enablement_and_never_raises(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """🔴 未启用时必须 `return ()` 且**一次库都不读** —— 抛会让整条 sync 路由 500。
+
+        🔴 取证输入换了（2026-09-07），属性没换：capability 启用之后活体 attach 会正常
+        读库（`ExplodingSession` 会如实炸），那是**正确行为**。要测的属性始终是「未启用
+        时短路」，所以把 pilot 模块的 `load_entry_manifest` 换成退回 finalize 之前的
+        manifest；`ExplodingSession` 这条「不得读库」的哨兵因此重新生效。
+        """
         import asyncio
 
         class ExplodingSession:
             async def execute(self, *args: Any, **kwargs: Any) -> Any:
                 raise AssertionError("capability 未启用时不得读库")
 
-        registry = RG.WorkpaperSyncAdapterRegistry(manifest=load_entry_manifest())
+        before = _manifest_before_enablement()
+        monkeypatch.setattr(P, "load_entry_manifest", lambda *a, **k: before)
+        registry = RG.WorkpaperSyncAdapterRegistry(manifest=before)
         assert (
             asyncio.run(P.attach_pilot_adapters(registry, session=ExplodingSession())) == ()
         )
+        assert registry.registrations() == ()
 
     def test_ledger_records_adapter_not_registered_yet(self) -> None:
+        """交付登记表对「adapter 是否已注册」必须如实记账，且不得自我授权。
+
+        🔴 判据已反转（2026-09-07）：原文钉 `adapter_registered is False`（Task 43 交付
+        当时的临时前置条件）。今天该行已是 `True` —— 2026-09-07 实测真库
+        `register_from_manifest()` 已注册本 adapter。反转成后置条件的同时把「顺序没被
+        绕过」一并钉住，并交叉核对 manifest 真的写回了 `adapter_id`。
+        """
         row = next(
             item
             for item in RG.DELIVERED_PER_ENTRY_CONTRACTS
             if item["contract_id"] == P.PILOT_ADAPTER_ID
         )
-        assert row["adapter_registered"] is False
-        assert "Task 36" in row["reason"]
-        assert "matcher" in row["reason"]
-        assert "Task 75" in row["reason"], (
-            "reason 仍指向已删除的欠账常量 ⇒ 登记表与现实脱钩"
-        )
-        assert "Task 76" in row["reason"], (
-            "reason 没说清今天挡住注册的是供给（approved bundle / published representation 两表 0 行）"
-        )
+        assert row["adapter_registered"] is True
+        reason = str(row["reason"])
+        assert "顺序门仍然成立且未被绕过" in reason, reason
+        assert "Task 36" in reason
+        assert "matcher" in reason
+        # 🔴 双源交叉：登记表说已注册 ⇒ manifest 必须同步是 bidirectional + adapter_id 写回
+        entry = manifest_entries_by_id(load_entry_manifest())[str(row["entry_id"])]
+        assert capability_of(entry) is Capability.bidirectional, entry
+        assert entry["adapter_id"] == P.PILOT_ADAPTER_ID, entry
 
     def test_contract_orphan_is_visible_in_the_registry_report(self) -> None:
         """契约孤儿是**可见的欠账**：磁盘上有契约、registry 里没有 adapter。"""

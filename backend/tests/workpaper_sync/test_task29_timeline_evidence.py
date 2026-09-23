@@ -1584,7 +1584,10 @@ class TestRequiredSetDigest:
 
 
 class TestDerivationOverTheRealManifest:
-    """跑真实 186 条 manifest：推导必须对生产数据可用且确定。"""
+    """跑真实 manifest 全量：推导必须对生产数据可用且确定。
+
+    条数不写进判据也不写进本 docstring —— 宿主上线/退网都会改它（实测 186 → 176 → 155）。
+    """
 
     @pytest.fixture(scope="class")
     def entries(self) -> list[dict[str, Any]]:
@@ -1604,7 +1607,13 @@ class TestDerivationOverTheRealManifest:
             except EntryProfileError:
                 drifted.append(str(entry["entry_id"]))
         assert derived + len(drifted) == len(entries)
-        assert derived >= 175, f"只有 {derived} 条能推导出 required set"
+        # 🔴 下限必须**相对 manifest 现有条数**算，不能写绝对条数。写死过 175，而 manifest
+        # 会随宿主拓扑增减（实测 186 → 176 → 155：commit cd9592ff5 把 D4 各 tab 迁到
+        # `useD4SyncMode` 后 21 条 `xlsx/d4/**` entry 退网）—— 绝对下限一旦落后于真实条数，
+        # 打红的就是「manifest 缩了」而不是「推导坏了」，判据指错人。
+        assert derived >= len(entries) * 9 // 10, (
+            f"{len(entries)} 条 manifest 里只有 {derived} 条能推导出 required set"
+        )
         # 🔴 不断言 drifted 的具体条数：那会把「manifest 当前的欠账」锁成基线。
         # 判据是「漂移的都能被指名」，欠账 owner 是 Task 1/67。
         assert all("/" in item for item in drifted), drifted

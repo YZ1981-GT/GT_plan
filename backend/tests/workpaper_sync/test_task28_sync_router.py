@@ -778,6 +778,30 @@ _REQUIRED_ENDPOINTS: tuple[tuple[str, str], ...] = (
 )
 
 
+def _shape_entry_id(*, prefix: str, segments: int | None = None) -> str:
+    """从**活 manifest** 里现挑一条满足形态约束的已登记 entry_id（排序后第一条）。
+
+    🔴 不写死 entry_id。上一版把「四段」那一格写成
+    `xlsx/d4/analysis/d4-tab-customer-price`，而 commit `cd9592ff5` + `ebc6e1b92`
+    把 D4 各 tab 迁到 `useD4SyncMode` 之后，21 条 `xlsx/d4/**` entry 从 manifest 退网
+    （实测条数 186 → 176 → 155，`xlsx/d4/` 前缀现算 0 条）。本判据要的是**形态**
+    （前缀 + 段数），不是某一条具体 entry ⇒ 约束照写、取值现算。
+    """
+    from app.services.workpaper_sync.entry_profile import load_entry_manifest
+
+    ids = sorted(str(e["entry_id"]) for e in load_entry_manifest()["entries"])
+    hits = [
+        i
+        for i in ids
+        if i.startswith(prefix) and (segments is None or len(i.split("/")) == segments)
+    ]
+    assert hits, (
+        f"活 manifest（{len(ids)} 条）里没有 prefix={prefix!r} / segments={segments} 的 "
+        "entry ⇒ 这一格形态在真源里已不存在，判据要重挑形态而不是改数字"
+    )
+    return hits[0]
+
+
 def _user_routes() -> list[tuple[frozenset[str], str]]:
     return [(frozenset(r.methods), r.path) for r in SR.router.routes]
 
@@ -807,28 +831,32 @@ class TestRouterShape:
         )
 
     @pytest.mark.parametrize(
-        "entry",
+        "shape",
         [
-            "xlsx/gt-d2-accounts-receivable",
-            "xlsx/d4/analysis/d4-tab-customer-price",
-            "docx/gt-a10-bundle",
+            dict(prefix="xlsx/", segments=2),
+            dict(prefix="xlsx/", segments=4),
+            dict(prefix="docx/", segments=None),
         ],
         ids=["two-segment", "four-segment", "docx"],
     )
-    def test_a_real_slashed_entry_id_routes(self, entry: str) -> None:
+    def test_a_real_slashed_entry_id_routes(self, shape: dict[str, Any]) -> None:
         """**行为侧**：真实（含斜杠的）entry_id 必须唯一命中每条路由并解出原值。
 
         🔴 这条判据的由来是一个**真实缺陷**：第一版把 entry 段写成 `{entry_id}`
-        （默认转换器 `[^/]+`），而
-        `backend/data/workpaper_sync_entry_manifest.json` 的 **186 条 entry_id 全部含
-        `/`**，最深四段。后果是**每一个**端点在生产上恒 404 —— 而且是 Starlette 自己的
-        `{"detail":"Not Found"}`，连 guard 都进不去。真库实测时 13 个场景全部拿到那个
-        404，而所有「路径模板长得对」的形态判据全绿：
+        （默认转换器 `[^/]+`），而 `backend/data/workpaper_sync_entry_manifest.json`
+        的 entry_id **全部含 `/`**，最深四段（当时 186 条，现算 155 条 —— 条数会变，
+        「全部含斜杠」这个形态不会）。后果是**每一个**端点在生产上恒 404 —— 而且是
+        Starlette 自己的 `{"detail":"Not Found"}`，连 guard 都进不去。真库实测时 13 个
+        场景全部拿到那个 404，而所有「路径模板长得对」的形态判据全绿：
         `path.startswith(USER_SYNC_PREFIX)` 在两种转换器下都成立。
 
         所以判据必须落到**路由匹配**上，且要断言解出的 `entry_id` 逐字等于原值
         （贪婪 `.*` 若把后缀吞掉，`entry_id` 会变成 `xxx/materialize`）。
+
+        三格形态（2 段 xlsx / 4 段 xlsx / docx）由 `_shape_entry_id` 从活 manifest 现挑，
+        不写死具体 id —— 写死的那一版在 D4 退网后就成了指向不存在 entry 的死引用。
         """
+        entry = _shape_entry_id(**shape)
         project, wp = uuid.uuid4(), uuid.uuid4()
         base = f"/api/projects/{project}/workpapers/{wp}/sync/entries/{entry}"
         room, op, case, version = (uuid.uuid4() for _ in range(4))

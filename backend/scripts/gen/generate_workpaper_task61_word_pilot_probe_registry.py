@@ -56,6 +56,11 @@ def load_gate() -> ModuleType:
     return module
 
 
+def _normalize_eol(raw: bytes) -> bytes:
+    """行尾归一（CRLF/CR → LF），供 `--check` 做平台无关的字节比对。"""
+    return raw.replace(b"\r\n", b"\n").replace(b"\r", b"\n")
+
+
 def build_payload() -> tuple[Path, bytes]:
     gate = load_gate()
     payload = gate.probe_registry_payload()
@@ -101,7 +106,16 @@ def main(argv: list[str] | None = None) -> int:
     if not path.exists():
         print(f"[FAIL] 数据文件不存在：{path.relative_to(_REPO)}")
         return 1
-    if path.read_bytes() != data:
+    # 🔴 比对前把两侧行尾归一：本仓库 `core.autocrlf=true`，而 `backend/data/*.json` 没有
+    # `eol=lf` 属性 —— checkout 后这份产物在 Windows 工作树是 CRLF，本脚本 `--apply` 写的
+    # 却永远是 LF。不归一的话 `--check` 在任何一次 checkout 之后必红，而重跑 `--apply`
+    # 只是把本机行尾焊回去，下次 checkout 又红。
+    #
+    # 与 Task 44 孪生脚本（`generate_workpaper_task44_pilot_probe_registry.py`）保持同形 ——
+    # 那份产物实测 1022 处 CRLF、裸字节比对必红，正是归一在撑着它绿。本产物当前恰好是
+    # LF（0 处 CRLF）所以裸比对"碰巧"过，但一次重新 checkout 就会复现同一个红。
+    # 行尾不是"probe 分母"这个事实的一部分；分母漂移仍然照抓（比的是归一后的完整序列化字节）。
+    if _normalize_eol(path.read_bytes()) != _normalize_eol(data):
         print(f"[FAIL] {path.relative_to(_REPO)} 与重算不一致（probe 分母已漂移）")
         return 1
     print(f"[OK] {summary}")

@@ -17,15 +17,15 @@
   "slice_scope": {
     "cycle": "D",
     "document_type": "xlsx",
-    "selection_rule": "source_manifest 的 entries 中同时满足三条的：① document_type == 'xlsx' ② wp_match.wp_code_patterns 任一以 'D' 开头 ③ independent_entry is True。实算：命中 wp_code 前缀 D 的共 38 条，其中 independent 7 条、parent_duplicate 31 条。",
+    "selection_rule": "source_manifest 的 entries 中同时满足三条的：① document_type == 'xlsx' ② wp_match.wp_code_patterns 任一以 'D' 开头 ③ independent_entry is True。实算（对 155 条实况 manifest）：命中 wp_code 前缀 D 的共 7 条，其中 independent 7 条、parent_duplicate 0 条。",
     "independent_entry_count": 7,
-    "parent_duplicate_count": 31,
-    "parent_duplicate_note": "31 条是 D4 的 sub-tab entry（xlsx/d4/... ，migration_state == 'parent_duplicate'、independent_entry == false），全部指向 xlsx/gt-d4-operating-revenue。按 AC 1.6 不得被重复计为已迁移 adapter，也不各自建 contract/evidence。",
+    "parent_duplicate_count": 0,
+    "parent_duplicate_note": "🔴 2026-09-22 回填：本 slice 冻结时 D4 有 31 条 sub-tab entry（xlsx/d4/...，migration_state == 'parent_duplicate'），AC 1.6 要求它们不得被重复计为已迁移 adapter。D4 改走统一路径（useD4SyncMode）后这 31 条 sub-tab entry 已随之退役，实况 manifest 里 xlsx/d4/** 现算 0 条、D 前缀 parent_duplicate 现算 0 条。AC 1.6 的约束本身不变（父组件重复入口不得独立计数），只是 D 循环当下没有分母；全局 parent_duplicate 仍有 12 条（H4/H8/J1/N1/b60 等），由各自 slice 承载。",
     "excluded_from_slice": [
       {
         "what": "confirmation/d0-* 函证组件族（D0 收入循环函证）",
         "template_ref": "D/D0 收入循环函证.xlsx",
-        "reason": "D0 函证是跨循环共享模块（D0 的 9 个 confirmation-* 组件被 E0/F0/G0/H0/K0/L0 复用），纯 HTML 无 GtOnlyOfficeSheet 挂载点 ⇒ 不在 source manifest 的 186 条 entry 里，归 Task 57。本 slice 不为它伪造 entry。"
+        "reason": "D0 函证是跨循环共享模块（D0 的 9 个 confirmation-* 组件被 E0/F0/G0/H0/K0/L0 复用），纯 HTML 无 GtOnlyOfficeSheet 挂载点 ⇒ 不在 source manifest 的 155 条 entry 里，归 Task 57。本 slice 不为它伪造 entry。"
       },
       {
         "what": "D 循环各 sub-tab 的 dual-mode composable（useD1DualMode / useD3DualMode / useD4DualMode）",
@@ -45,7 +45,6 @@
       "capability_target": "bidirectional",
       "capability_target_blocked_by": [
         "BP-1",
-        "BP-2",
         "BP-3",
         "BP-4",
         "BP-5"
@@ -114,7 +113,7 @@
           "no_durable_forcesave_ack",
           "missing_adapter"
         ],
-        "divergence_from_slice": "capability / html_store 两项与本 slice 不一致，见 BP-6"
+        "divergence_from_slice": "capability / html_store 两项与本 slice 不一致：manifest 侧仍是 overlay 的组件级默认值（GtOnlyOfficeSheet ⇒ single_onlyoffice / unresolved），本 slice 按 AC 12.8 实测有 HTML 对端故记 null（未裁决）。见 BP-6"
       },
       "adjudication": {
         "honest_capability": null,
@@ -136,6 +135,16 @@
           "no_registered_sync_adapter",
           "no_real_onlyoffice_94_probe_run_for_this_entry"
         ]
+      },
+      "per_entry_contract": {
+        "path": "backend/data/workpaper_sync_contracts/d1.notes_receivable_detail.json",
+        "contract_id": "d1.notes_receivable_detail",
+        "review_status": "reviewed",
+        "delivered_by_task": "G5-1",
+        "pilot_class": "phase5_notes_receivable",
+        "provider_module": "app.services.workpaper_sync.phase5_d1_notes_receivable",
+        "adapter_registered": false,
+        "adapter_registered_source": "backend/app/services/workpaper_sync/adapters/registry.py#DELIVERED_PER_ENTRY_CONTRACTS[d1.notes_receivable_detail].adapter_registered"
       }
     },
     {
@@ -145,28 +154,27 @@
       "host": "GtD2AccountsReceivable.vue",
       "host_path": "audit-platform/frontend/src/components/workpaper/GtD2AccountsReceivable.vue",
       "capability": null,
-      "capability_verdict_stage": "pipeline_entry_pending_definition_delivery",
+      "capability_verdict_stage": "adapter_registered_in_manifest_pending_ac_12_1_closure",
       "capability_target": "bidirectional",
       "capability_target_blocked_by": [
         "BP-1",
-        "BP-2",
         "BP-3",
         "BP-4",
         "BP-5"
       ],
       "capability_enum_note": "AC 1.3 的四个枚举值当下没有一个成立（见 adjudication.reason）⇒ 不填枚举值而记 null + `capability_verdict_stage`，并在 slice_counters.unadjudicated 如实计数。填 single_onlyoffice 会违反 AC 12.8（有 HTML 对端），填 bidirectional 会违反 AC 12.1 与 slice_schema 的 SR-6（五个身份字段全为 null）。",
-      "migration_state": "legacy_fake_bidirectional",
-      "adapter_id": null,
+      "migration_state": "adapter_registered",
+      "adapter_id": "d2.receivable_detail",
       "authority_model": null,
       "definition_bundle": null,
       "instrumentation_candidate": null,
       "published_representation": null,
       "template_ref": "D/D2-1至D2-4  应收账款- 审定表明细表（Leap-常规程序）.xlsx",
-      "mount_count": 2,
+      "mount_count": 1,
       "scenario_profile_id": "xlsx.editable.shared.single.room_service_wired.v1",
       "editability": "editable",
       "room_model": "shared",
-      "canonical_resolver": "legacy_sheet_onlyoffice_router",
+      "canonical_resolver": "workpaper_sync_published_representation",
       "html_counterpart_verdict": "exists",
       "html_counterpart": {
         "store": "checklist_responses",
@@ -211,14 +219,10 @@
         "backend/wp_templates/D/D2-1至D2-4  应收账款- 审定表明细表（Leap-常规程序）.xlsx!明细表D2-2!B11 = '客户名称'"
       ],
       "manifest_mirror": {
-        "capability": "single_onlyoffice",
-        "html_store": "unresolved",
-        "legacy_reasons": [
-          "template_only_open",
-          "no_durable_forcesave_ack",
-          "missing_adapter"
-        ],
-        "divergence_from_slice": "capability / html_store 两项与本 slice 不一致，见 BP-6"
+        "capability": "bidirectional",
+        "html_store": "checklist_responses_d2_detail_rows",
+        "legacy_reasons": [],
+        "divergence_from_slice": "方向已反转：manifest 侧本 entry 已是 capability='bidirectional' + migration_state='adapter_registered' + adapter_id='d2.receivable_detail'（overlay 的 per-entry override，review_status=published_representation_verified，并由 registry.py#DELIVERED_PER_ENTRY_CONTRACTS 的 adapter_registered=True 独立印证），本 slice 的 capability 仍记 null。分歧的是**裁决闸门**而非事实：AC 12.1 的六件前置尚未逐条交付（见 BP-1 / BP-3 / BP-4），故本 slice 不把 bidirectional 写成已裁决。见 BP-6。"
       },
       "adjudication": {
         "honest_capability": null,
@@ -247,7 +251,9 @@
         "contract_id": "d2.receivable_detail",
         "review_status": "reviewed",
         "delivered_by_task": "41",
-        "adapter_registered": false,
+        "pilot_class": "d2_large_json",
+        "provider_module": "app.services.workpaper_sync.pilot_d2_large_json",
+        "adapter_registered": true,
         "adapter_registered_source": "backend/app/services/workpaper_sync/adapters/registry.py#DELIVERED_PER_ENTRY_CONTRACTS[d2.receivable_detail].adapter_registered",
         "why_this_is_the_decisive_counterexample": "该契约的 `review.html_store` 逐字记着 HTML 对端（table=checklist_responses / item_id=D2-detail-rows / shape=json_array_of_row_objects / row_identity_key=rowId），`workpaper_sync_migration_paradigm.json#pilot_classes_validated` 也把 `d2_large_json (D2)` 标为已验证 ⇒ D2 有 HTML 对端这件事在 Task 46 首轮裁决之前就已落盘。首轮仍裁 single_onlyoffice，理由写「D2 is already a pilot… No bidirectional adapter yet」，正是 AP-1 circular_justification。",
         "digests_recomputable": true,
@@ -265,7 +271,6 @@
       "capability_target": "bidirectional",
       "capability_target_blocked_by": [
         "BP-1",
-        "BP-2",
         "BP-3",
         "BP-4",
         "BP-5"
@@ -334,7 +339,7 @@
           "no_durable_forcesave_ack",
           "missing_adapter"
         ],
-        "divergence_from_slice": "capability / html_store 两项与本 slice 不一致，见 BP-6"
+        "divergence_from_slice": "capability / html_store 两项与本 slice 不一致：manifest 侧仍是 overlay 的组件级默认值（GtOnlyOfficeSheet ⇒ single_onlyoffice / unresolved），本 slice 按 AC 12.8 实测有 HTML 对端故记 null（未裁决）。见 BP-6"
       },
       "adjudication": {
         "honest_capability": null,
@@ -356,6 +361,16 @@
           "no_registered_sync_adapter",
           "no_real_onlyoffice_94_probe_run_for_this_entry"
         ]
+      },
+      "per_entry_contract": {
+        "path": "backend/data/workpaper_sync_contracts/d3.prepaid_receipts_detail.json",
+        "contract_id": "d3.prepaid_receipts_detail",
+        "review_status": "reviewed",
+        "delivered_by_task": "G5-1",
+        "pilot_class": "phase5_prepaid_receipts",
+        "provider_module": "app.services.workpaper_sync.phase5_d3_prepaid_receipts",
+        "adapter_registered": false,
+        "adapter_registered_source": "backend/app/services/workpaper_sync/adapters/registry.py#DELIVERED_PER_ENTRY_CONTRACTS[d3.prepaid_receipts_detail].adapter_registered"
       }
     },
     {
@@ -365,18 +380,17 @@
       "host": "GtD4OperatingRevenue.vue",
       "host_path": "audit-platform/frontend/src/components/workpaper/GtD4OperatingRevenue.vue",
       "capability": null,
-      "capability_verdict_stage": "pipeline_entry_pending_definition_delivery",
+      "capability_verdict_stage": "adapter_registered_in_manifest_pending_ac_12_1_closure",
       "capability_target": "bidirectional",
       "capability_target_blocked_by": [
         "BP-1",
-        "BP-2",
         "BP-3",
         "BP-4",
         "BP-5"
       ],
       "capability_enum_note": "AC 1.3 的四个枚举值当下没有一个成立（见 adjudication.reason）⇒ 不填枚举值而记 null + `capability_verdict_stage`，并在 slice_counters.unadjudicated 如实计数。填 single_onlyoffice 会违反 AC 12.8（有 HTML 对端），填 bidirectional 会违反 AC 12.1 与 slice_schema 的 SR-6（五个身份字段全为 null）。",
-      "migration_state": "legacy_fake_bidirectional",
-      "adapter_id": null,
+      "migration_state": "adapter_registered",
+      "adapter_id": "d4.revenue_detail",
       "authority_model": null,
       "definition_bundle": null,
       "instrumentation_candidate": null,
@@ -386,7 +400,7 @@
       "scenario_profile_id": "xlsx.editable.shared.single.room_service_wired.v1",
       "editability": "editable",
       "room_model": "shared",
-      "canonical_resolver": "legacy_sheet_onlyoffice_router",
+      "canonical_resolver": "workpaper_sync_published_representation",
       "html_counterpart_verdict": "exists",
       "html_counterpart": {
         "store": "checklist_responses",
@@ -431,14 +445,10 @@
         "backend/wp_templates/D/D4-1至D4-4 营业收入 - 审定表明细表（Leap-常规程序）.xlsx!营业收入调整分录汇总D4-4!A5 = '调整事项说明'"
       ],
       "manifest_mirror": {
-        "capability": "single_onlyoffice",
-        "html_store": "unresolved",
-        "legacy_reasons": [
-          "template_only_open",
-          "no_durable_forcesave_ack",
-          "missing_adapter"
-        ],
-        "divergence_from_slice": "capability / html_store 两项与本 slice 不一致，见 BP-6"
+        "capability": "bidirectional",
+        "html_store": "checklist_responses_d4_revenue_detail_rows",
+        "legacy_reasons": [],
+        "divergence_from_slice": "方向已反转：manifest 侧本 entry 已是 capability='bidirectional' + migration_state='adapter_registered' + adapter_id='d4.revenue_detail'（overlay 的 per-entry override，review_status=published_representation_verified，并由 registry.py#DELIVERED_PER_ENTRY_CONTRACTS 的 adapter_registered=True 独立印证），本 slice 的 capability 仍记 null。分歧的是**裁决闸门**而非事实：AC 12.1 的六件前置尚未逐条交付（见 BP-1 / BP-3 / BP-4），故本 slice 不把 bidirectional 写成已裁决。见 BP-6。"
       },
       "adjudication": {
         "honest_capability": null,
@@ -461,7 +471,17 @@
           "no_real_onlyoffice_94_probe_run_for_this_entry"
         ]
       },
-      "parent_duplicate_count": 31
+      "parent_duplicate_count": 0,
+      "per_entry_contract": {
+        "path": "backend/data/workpaper_sync_contracts/d4.revenue_detail.json",
+        "contract_id": "d4.revenue_detail",
+        "review_status": "reviewed",
+        "delivered_by_task": "G5-1",
+        "pilot_class": "phase5_revenue_detail",
+        "provider_module": "app.services.workpaper_sync.phase5_d4_revenue_detail",
+        "adapter_registered": true,
+        "adapter_registered_source": "backend/app/services/workpaper_sync/adapters/registry.py#DELIVERED_PER_ENTRY_CONTRACTS[d4.revenue_detail].adapter_registered"
+      }
     },
     {
       "entry_id": "xlsx/gt-d5-receivables-financing",
@@ -474,7 +494,6 @@
       "capability_target": "bidirectional",
       "capability_target_blocked_by": [
         "BP-1",
-        "BP-2",
         "BP-3",
         "BP-4",
         "BP-5"
@@ -543,7 +562,7 @@
           "no_durable_forcesave_ack",
           "missing_adapter"
         ],
-        "divergence_from_slice": "capability / html_store 两项与本 slice 不一致，见 BP-6"
+        "divergence_from_slice": "capability / html_store 两项与本 slice 不一致：manifest 侧仍是 overlay 的组件级默认值（GtOnlyOfficeSheet ⇒ single_onlyoffice / unresolved），本 slice 按 AC 12.8 实测有 HTML 对端故记 null（未裁决）。见 BP-6"
       },
       "adjudication": {
         "honest_capability": null,
@@ -565,6 +584,16 @@
           "no_registered_sync_adapter",
           "no_real_onlyoffice_94_probe_run_for_this_entry"
         ]
+      },
+      "per_entry_contract": {
+        "path": "backend/data/workpaper_sync_contracts/d5.receivables_financing_detail.json",
+        "contract_id": "d5.receivables_financing_detail",
+        "review_status": "reviewed",
+        "delivered_by_task": "G5-1",
+        "pilot_class": "phase5_receivables_financing",
+        "provider_module": "app.services.workpaper_sync.phase5_d5_receivables_financing",
+        "adapter_registered": false,
+        "adapter_registered_source": "backend/app/services/workpaper_sync/adapters/registry.py#DELIVERED_PER_ENTRY_CONTRACTS[d5.receivables_financing_detail].adapter_registered"
       }
     },
     {
@@ -578,7 +607,6 @@
       "capability_target": "bidirectional",
       "capability_target_blocked_by": [
         "BP-1",
-        "BP-2",
         "BP-3",
         "BP-4",
         "BP-5"
@@ -647,7 +675,7 @@
           "no_durable_forcesave_ack",
           "missing_adapter"
         ],
-        "divergence_from_slice": "capability / html_store 两项与本 slice 不一致，见 BP-6"
+        "divergence_from_slice": "capability / html_store 两项与本 slice 不一致：manifest 侧仍是 overlay 的组件级默认值（GtOnlyOfficeSheet ⇒ single_onlyoffice / unresolved），本 slice 按 AC 12.8 实测有 HTML 对端故记 null（未裁决）。见 BP-6"
       },
       "adjudication": {
         "honest_capability": null,
@@ -669,6 +697,16 @@
           "no_registered_sync_adapter",
           "no_real_onlyoffice_94_probe_run_for_this_entry"
         ]
+      },
+      "per_entry_contract": {
+        "path": "backend/data/workpaper_sync_contracts/d6.contract_assets_detail.json",
+        "contract_id": "d6.contract_assets_detail",
+        "review_status": "reviewed",
+        "delivered_by_task": "G5-1",
+        "pilot_class": "phase5_contract_assets",
+        "provider_module": "app.services.workpaper_sync.phase5_d6_contract_assets",
+        "adapter_registered": false,
+        "adapter_registered_source": "backend/app/services/workpaper_sync/adapters/registry.py#DELIVERED_PER_ENTRY_CONTRACTS[d6.contract_assets_detail].adapter_registered"
       }
     },
     {
@@ -682,7 +720,6 @@
       "capability_target": "bidirectional",
       "capability_target_blocked_by": [
         "BP-1",
-        "BP-2",
         "BP-3",
         "BP-4",
         "BP-5"
@@ -751,7 +788,7 @@
           "no_durable_forcesave_ack",
           "missing_adapter"
         ],
-        "divergence_from_slice": "capability / html_store 两项与本 slice 不一致，见 BP-6"
+        "divergence_from_slice": "capability / html_store 两项与本 slice 不一致：manifest 侧仍是 overlay 的组件级默认值（GtOnlyOfficeSheet ⇒ single_onlyoffice / unresolved），本 slice 按 AC 12.8 实测有 HTML 对端故记 null（未裁决）。见 BP-6"
       },
       "adjudication": {
         "honest_capability": null,
@@ -773,6 +810,16 @@
           "no_registered_sync_adapter",
           "no_real_onlyoffice_94_probe_run_for_this_entry"
         ]
+      },
+      "per_entry_contract": {
+        "path": "backend/data/workpaper_sync_contracts/d7.contract_liabilities_detail.json",
+        "contract_id": "d7.contract_liabilities_detail",
+        "review_status": "reviewed",
+        "delivered_by_task": "G5-1",
+        "pilot_class": "phase5_contract_liabilities",
+        "provider_module": "app.services.workpaper_sync.phase5_d7_contract_liabilities",
+        "adapter_registered": false,
+        "adapter_registered_source": "backend/app/services/workpaper_sync/adapters/registry.py#DELIVERED_PER_ENTRY_CONTRACTS[d7.contract_liabilities_detail].adapter_registered"
       }
     }
   ],
@@ -930,14 +977,29 @@
     {
       "id": "BP-2",
       "blocks": "bidirectional",
-      "what": "6 个 entry（D1/D3/D4/D5/D6/D7）没有人工审核的 per-entry contract；workpaper_sync_contracts/ 下只有 d2.receivable_detail.json 一条 D 契约",
+      "what": "（已解除）冻结时 6 个 entry（D1/D3/D4/D5/D6/D7）没有人工审核的 per-entry contract，workpaper_sync_contracts/ 下只有 d2.receivable_detail.json 一条 D 契约。2026-09-22 复核：7 条 D entry 各有独立 reviewed 契约（d1.notes_receivable_detail, d2.receivable_detail, d3.prepaid_receipts_detail, d4.revenue_detail, d5.receivables_financing_detail, d6.contract_assets_detail, d7.contract_liabilities_detail），并逐条登记在 registry.py#DELIVERED_PER_ENTRY_CONTRACTS，无跨 entry 复用。",
       "consequence": "projection_contract bundle 的 contract slot 必须是 approved definition，缺失即 PerEntryContractUnapprovedError；typed null marker 不得冒充",
-      "status": "REGISTERED_NOT_FIXED",
-      "must_fix_before": "把这 6 个 entry 标 bidirectional 之前",
+      "status": "FIXED_CONTRACTS_DELIVERED",
+      "must_fix_before": "已解除 —— 保留登记以便追溯；后续任何新增 D entry 标 bidirectional 之前仍需先交付其独立契约",
       "owner_task": "Task 46 后续（step 6，逐 entry 人工审核发布，禁止跨 entry 复用 D2 契约）",
       "source_refs": [
+        "backend/data/workpaper_sync_contracts/d1.notes_receivable_detail.json",
         "backend/data/workpaper_sync_contracts/d2.receivable_detail.json",
-        "backend/app/services/workpaper_sync/contracts.py"
+        "backend/data/workpaper_sync_contracts/d3.prepaid_receipts_detail.json",
+        "backend/data/workpaper_sync_contracts/d4.revenue_detail.json",
+        "backend/data/workpaper_sync_contracts/d5.receivables_financing_detail.json",
+        "backend/data/workpaper_sync_contracts/d6.contract_assets_detail.json",
+        "backend/data/workpaper_sync_contracts/d7.contract_liabilities_detail.json",
+        "backend/app/services/workpaper_sync/adapters/registry.py"
+      ],
+      "fixed_evidence": [
+        "backend/data/workpaper_sync_contracts/d1.notes_receivable_detail.json",
+        "backend/data/workpaper_sync_contracts/d2.receivable_detail.json",
+        "backend/data/workpaper_sync_contracts/d3.prepaid_receipts_detail.json",
+        "backend/data/workpaper_sync_contracts/d4.revenue_detail.json",
+        "backend/data/workpaper_sync_contracts/d5.receivables_financing_detail.json",
+        "backend/data/workpaper_sync_contracts/d6.contract_assets_detail.json",
+        "backend/data/workpaper_sync_contracts/d7.contract_liabilities_detail.json"
       ]
     },
     {
@@ -986,14 +1048,15 @@
     {
       "id": "BP-6",
       "blocks": "slice 与 source manifest 的一致性",
-      "what": "source manifest 里 7 条 D entry 的 `capability` 仍是 'single_onlyoffice'、`html_store` 仍是 'unresolved'，与本 slice 重裁后的结论不一致。这两个值不是逐 entry 裁决，而是 `workpaper_sync_entry_overlay.json` 的 `defaults_by_component.GtOnlyOfficeSheet` **组件级默认值**（全 186 条里 180 条 html_store 都是 'unresolved'）。",
-      "consequence": "manifest 的 capability 统计当前反映的是 overlay 默认值而非裁决结果；本 slice 的守卫因此断言「两者**必须**不一致且该不一致已登记」，而不是断言相等 —— 后者会把 overlay 默认值当成裁决真源",
-      "status": "REGISTERED_NOT_FIXED",
-      "why_not_fixed_here": "改 overlay 的 `defaults_by_component` 会同时翻掉 180 条 GtOnlyOfficeSheet entry 的 capability（远超 D 循环），还要改 `approved_source_digest` 并重生成 manifest —— manifest_digest 变化会波及 Task 73 / closure check / legacy baseline 等多个并发在途的判据。正确做法是 overlay 支持 per-entry override 后由回填任务统一切换。",
+      "what": "slice 与 source manifest 的 capability / html_store 分歧，现在**两个方向都有**：① D1/D3/D5/D6/D7 —— manifest 仍是 overlay 的 `defaults_by_component.GtOnlyOfficeSheet` 组件级默认值（single_onlyoffice / unresolved），本 slice 按 AC 12.8 实测有 HTML 对端故记 null；② D2/D4 —— manifest 已有 per-entry override（capability=bidirectional、adapter_id 非空、canonical_resolver=workpaper_sync_published_representation），本 slice 因 AC 12.1 六件前置未逐条交付仍记 null。当前 adapter 已注册的 D entry：xlsx/gt-d2-accounts-receivable, xlsx/gt-d4-operating-revenue。",
+      "consequence": "manifest 的 capability 统计对未 override 的 entry 反映的是 overlay 默认值、对已 override 的 entry 反映的是已注册 adapter；两者都不等于本 slice 的裁决。因此本 slice 的守卫断言「manifest_mirror 必须逐字等于 manifest 实况」+「mirror 与 slice 裁决不等时必须写明 divergence_from_slice 并引用阻断项」，而不是断言 slice.capability == manifest.capability —— 后者会把 overlay 值当裁决真源。",
+      "status": "PARTIALLY_FIXED_PER_ENTRY_OVERRIDE_LANDED",
+      "why_not_fixed_here": "BP-6 原文指出的正解「overlay 支持 per-entry override 后由回填任务统一切换」已对 D2/D4 落地（overrides 段各一条，review_status=published_representation_verified）。余下 5 条仍吃组件级默认值：改 defaults_by_component 会同时翻掉 145 条 GtOnlyOfficeSheet entry 的 capability（远超 D 循环），还要改 approved_source_digest 并重生成 manifest。正确做法是继续按 entry 逐条 override，不动组件默认值。",
       "must_fix_before": "Task 67 的 structural pre-reconcile 消费 manifest capability 统计之前",
       "owner_task": "待立项（overlay per-entry override + 重生成 manifest）",
       "source_refs": [
         "backend/data/workpaper_sync_entry_overlay.json#defaults_by_component.GtOnlyOfficeSheet",
+        "backend/data/workpaper_sync_entry_overlay.json#overrides",
         "backend/scripts/gen/generate_workpaper_sync_manifest.py"
       ]
     },
@@ -1016,9 +1079,9 @@
     "rule": "不得跨 entry 复用 contract / bundle / candidate / evidence / scenario（Property 70）",
     "assertions": [
       "本 slice 的 7 条 entry 与 E slice 的 xlsx/gt-e1-monetary-fund 无交集",
-      "D2 的 per-entry contract（d2.receivable_detail）只登记在 D2 名下，D1/D3~D7 的 per_entry_contract 字段不存在",
-      "D1/D3/D4/D5/D6/D7 在 workpaper_sync_contracts/ 下没有任何文件 —— 未交付 contract 的 entry 不伪造 contract",
-      "31 条 D4 parent_duplicate 不进 independent_entries，也不各自建 adapter/contract/evidence",
+      "7 条 entry 各挂**自己**的 per-entry contract，contract_id 两两互异（d1.notes_receivable_detail / d2.receivable_detail / d3.prepaid_receipts_detail / d4.revenue_detail / d5.receivables_financing_detail / d6.contract_assets_detail / d7.contract_liabilities_detail）—— 没有任何 entry 借用 D2 的 d2.receivable_detail",
+      "每条 per_entry_contract 的 path 都在 workpaper_sync_contracts/ 下真实存在，且其 review.entry_id 回指同一 entry；未交付 contract 的 entry 不伪造 contract",
+      "D4 parent_duplicate sub-tab（xlsx/d4/**）不进 independent_entries，也不各自建 adapter/contract/evidence；实况 manifest 里现算 0 条",
       "7 条 entry 的 evidence.contract_test 都指向本 Task 46 的守卫文件，不引用任何 pilot 的 scenario 实体或 evidence id"
     ]
   },

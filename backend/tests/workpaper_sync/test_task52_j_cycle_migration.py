@@ -141,6 +141,8 @@ HTML_COUNTERPART_VERDICTS = ("none", "exists")
 NOTICE_MODULE = SYNC_DIR / "workpaperEntrySyncNotice.ts"
 NOTICE_COMPONENT = SYNC_DIR / "GtEntrySyncCapabilityNotice.vue"
 NOTICE_COMPONENT_NAME = "GtEntrySyncCapabilityNotice"
+#: `SYNC_ADAPTER_REGISTERED_ENTRY_IDS` 现算形态所依赖的 generated manifest（真源之真源）。
+SYNC_MANIFEST_TS = SYNC_DIR / "workpaperSyncManifest.generated.ts"
 
 #: 四个 pilot 的 contract 文件 → 它应属的 entry_id（Property 70 的归属判据，逐文件读 review.entry_id）。
 #: 🔴 实值逐文件读出，**不按文件名猜**：b60 是三段式 `xlsx/b60/gt-b60-bundle`，
@@ -418,6 +420,68 @@ def _build_import_index() -> dict[pathlib.Path, list[str]]:
 def _statement_edges_to(target: pathlib.Path) -> list[str]:
     """指向 `target` 的 **statement-position** import 边（`path#Lnn` 列表，含测试）。"""
     return sorted(set(_build_import_index().get(target.resolve(), [])))
+
+
+def _initializer_of(source: str, const_name: str) -> str:
+    """取 `const_name = ...` 的**完整初始化表达式**（括号配平，跨行）。
+
+    🔴 不能用 `=\\s*\\[` 这种「假定字面量」的正则：真源可以是字面量数组，也可以是现算表达式，
+    形态一变正则就 `None`，判据报的是「读不出集合」—— 把「形态变了」误报成「东西没了」。
+    """
+    anchor = re.search(re.escape(const_name) + r"\b[^=\n]*=", source)
+    if not anchor:
+        return ""
+    depth = 0
+    taken: list[str] = []
+    for ch in source[anchor.end():]:
+        if ch in "([{":
+            depth += 1
+        elif ch in ")]}":
+            depth -= 1
+        elif ch == "\n" and depth <= 0 and taken and taken[-1].strip():
+            break
+        taken.append(ch)
+    return "".join(taken)
+
+
+def _registered_entry_ids() -> list[str]:
+    """解析 AC 1.4 的「已注册 adapter」集合 —— 真源可以是字面量数组，也可以是 manifest 现算。
+
+    2026-09-22 真源从手写数组改成
+    `WORKPAPER_SYNC_MANIFEST.filter((e) => e.capability === 'bidirectional').map(e => e.entryId)`：
+    手写数组本身是**第二真源**，D4/G7/H1 接通双向后没人补行，真双向底稿上继续显示
+    「两侧数据未互通」（把真能力说成假的，同样是 AC 1.4 禁止的失真披露）。
+
+    判据跟着真源走但**不退化成「存在即通过」**：声明整体缺失 ⇒ 断言失败；字面量 ⇒ 取引号里的
+    id；现算 ⇒ 按同一 filter 谓词在 generated manifest 上复算。两条路径都给出**具体 id 列表**，
+    下游「非空 / 形如 entry_id」逐条判据一条都不放宽。
+    """
+    init = _initializer_of(
+        NOTICE_MODULE.read_text(encoding="utf-8"), "SYNC_ADAPTER_REGISTERED_ENTRY_IDS"
+    )
+    assert init.strip(), "读不出已注册 entry 集合"
+    if "WORKPAPER_SYNC_MANIFEST" in init:
+        predicate = re.search(
+            r"WORKPAPER_SYNC_MANIFEST\s*\.filter\(\s*\(?\s*(\w+)\s*\)?\s*=>"
+            r"\s*\1\.capability\s*===\s*['\"]([^'\"]+)['\"]",
+            init,
+        )
+        assert predicate, f"现算形态的 filter 谓词无法识别：{init.strip()[:200]!r}"
+        assert re.search(r"\.map\(\s*\n?\s*\(?\s*(\w+)\s*\)?\s*=>\s*\1\.entryId", init), (
+            f"现算形态没有 map 到 entryId：{init.strip()[:200]!r}"
+        )
+        block = re.search(
+            r"WORKPAPER_SYNC_MANIFEST\s*(?::[^=]*)?=\s*(\[[\s\S]*?\n\])\s*as const",
+            SYNC_MANIFEST_TS.read_text(encoding="utf-8"),
+        )
+        assert block, "读不出 WORKPAPER_SYNC_MANIFEST 数组 ⇒ 现算形态无从复算"
+        wanted = predicate.group(2)
+        return sorted(
+            {e["entryId"] for e in json.loads(block.group(1)) if e["capability"] == wanted}
+        )
+    literal = re.search(r"\[([\s\S]*)\]", init)
+    assert literal, f"既不是现算也不是字面量数组：{init.strip()[:200]!r}"
+    return sorted(set(re.findall(r"['\"]([^'\"]+)['\"]", literal.group(1))))
 
 
 def _wide_scope_edge_files(stem: str) -> set[str]:
@@ -2282,15 +2346,11 @@ class TestProperty3And20:
         assert "ENTRY_SYNC_NOTICE_SUMMARY" in module, "缺常显摘要常量"
         assert "ENTRY_SYNC_NOTICE_REASON" in module, "缺可操作原因常量"
         assert "SYNC_ADAPTER_REGISTERED_ENTRY_IDS" in module
-        registered = re.search(
-            r"SYNC_ADAPTER_REGISTERED_ENTRY_IDS[^=]*=\s*\[([^\]]*)\]", module
-        )
-        assert registered, "读不出已注册 entry 集合"
         # 🔴 迁移推进后此集合已非空（d2 等 entry 真注册了 adapter）。原判据冻结「集合必须为空」
         # 是迁移前快照 —— 现在它非空恰恰让 AC 1.4 的两个分支**都有真实分母**（已注册分支有 d2
         # 这类真样本、未注册分支有 J1）。改为断言集合是良构的非空 entry_id 列表（每项形如
         # 'xlsx/...'），证明「已注册 ⇒ null」分支不是空跑；两分支逻辑完整性仍逐条校验。不弱化。
-        registered_ids = re.findall(r"'([^']+)'", registered.group(1))
+        registered_ids = _registered_entry_ids()
         assert registered_ids, (
             "已注册 entry 集合为空 ⇒ AC 1.4 的「已注册 ⇒ 无通知」分支没有真实分母"
         )

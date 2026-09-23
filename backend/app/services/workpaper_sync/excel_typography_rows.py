@@ -137,16 +137,56 @@ _ASCII_DOT_RUN: Final[re.Pattern[str]] = re.compile(r"\.{3,}")
 #:
 #: **必须加进门的条件**：K11（或任何用 ASCII 点写法的模板）拿到 per-entry 契约。那时
 #: 它就在发布路径上了，代价与收益关系反转。
+#: ═══ 分母更正（2026-06-01）═══════════════════════════════════════════════
+#:
+#: 🔴 首版登记的 `xlsx_scanned=351 / sheets_scanned=2722` 是一次**磁盘遍历**的分母，
+#:    而同一个 commit（`eed3a34ff`）里落地的 `scan()` 读的是
+#:    `backend/wp_templates/_index.json`（**349** 份 xlsx / 2602 张 sheet）。两个分母
+#:    从第一天起就不是同一个总体，于是守卫自诞生即红 —— 不是行为回归。
+#:
+#: 差额已逐份对上，恰好两份「在磁盘上但不在索引里」的工作簿：
+#:
+#: ===============================  ======  ======  ======
+#: 工作簿                            sheet   窄格数   紧跟合计行
+#: ===============================  ======  ======  ======
+#: `F/F2存货.xlsx`（2026-07-16 入库）     74      23      11
+#: `D/D4收入底稿.xlsx`（2026-07-16）      46      14       1
+#: ===============================  ======  ======  ======
+#:
+#:   349 + 2 = 351；2602 + 74 + 46 = 2722；842 + 23 + 14 = 879；
+#:   170 + 11 + 1 = 182；37 + 2 = 39 —— 五个数逐个闭合。
+#:
+#: **为什么以索引分母为准而不是把索引补全**：`_index.json` 是 `wp_template_finder` 的
+#: **运行时权威**，不在索引里的文件任何 wp_code 都永不解析到它（`test_task46_d_cycle_migration`
+#: 已就 `D/D4收入底稿.xlsx` 这一份单独裁决并立了门）。本清册要证的是「窄判据对**发布路径**
+#: 是充分的」，而发布路径只能触达索引内的模板 ⇒ 磁盘遍历那 2 份属于超额计数。把它们补进
+#: 索引会改变 D4/F2 码族的运行时模板解析，那是另一件事，不能借这条守卫顺手做。
+#:
+#: 窄/宽对照表（上文 879/905/…）是那次磁盘遍历的读数，原样保留在
+#: `superseded_disk_walk_2026_09_05` 里以便追溯；`only_wide_instances` 的裁决不受影响 ——
+#: K11 本身在索引内，缩小分母只会减少实例不会新增。
 ASCII_DOT_PLACEHOLDER_CENSUS: Final[Mapping[str, object]] = {
-    "measured_at": "2026-09-05",
-    "xlsx_scanned": 351,
-    "sheets_scanned": 2722,
-    "narrow_cells": 879,
-    "wide_cells": 905,
-    "narrow_rows_before_footer": 182,
-    "wide_rows_before_footer": 183,
-    "narrow_templates": 39,
-    "wide_templates": 40,
+    "measured_at": "2026-06-01",
+    "denominator": "backend/wp_templates/_index.json（运行时权威，非磁盘遍历）",
+    "xlsx_scanned": 349,
+    "sheets_scanned": 2602,
+    "narrow_cells": 842,
+    "narrow_rows_before_footer": 170,
+    "narrow_templates": 37,
+    "superseded_disk_walk_2026_09_05": {
+        "why": (
+            "首版分母是磁盘遍历（351 份），与 scan() 实际读的索引（349 份）不是同一总体；"
+            "差额 = F/F2存货.xlsx + D/D4收入底稿.xlsx 两份未入索引的工作簿，逐份对账闭合。"
+        ),
+        "xlsx_scanned": 351,
+        "sheets_scanned": 2722,
+        "narrow_cells": 879,
+        "wide_cells": 905,
+        "narrow_rows_before_footer": 182,
+        "wide_rows_before_footer": 183,
+        "narrow_templates": 39,
+        "wide_templates": 40,
+    },
     "only_wide_instances": (
         "K/K11 资产减值损失.xlsx::审定表K11-1!A25",
     ),

@@ -875,6 +875,18 @@ class TestOoScopeBoundaryIsExplicit:
             "entries[].host_dom_landing",
             "entries[].descriptor_room_config",
         ]
-        assert denominator["entry_total"] >= 186
+        # 🔴 下限必须**相对活 manifest 现有条数**算，不能写绝对条数。写死过 186，而
+        # manifest 会随宿主拓扑增减（实测 186 → 176 → 155：commit cd9592ff5 把 D4 各 tab
+        # 迁到 `useD4SyncMode` 后 21 条 `xlsx/d4/**` entry 退网）。这里的上游是 Task 67
+        # 的 structural 报告（**冻结产物**，当前还留着 186），所以两个方向都要站得住：
+        # 上游重算成 155 时不能红，上游真的塌成空集时必须红。9/10 的相对下限满足两者。
+        from app.services.workpaper_sync.entry_profile import load_entry_manifest
+
+        live_total = len(load_entry_manifest()["entries"])
+        assert live_total >= 100, f"活 manifest 只有 {live_total} 条 ⇒ 相对下限本身失去意义"
+        assert denominator["entry_total"] >= live_total * 9 // 10, (
+            f"上游 structural 报告的 entry 分母 {denominator['entry_total']} 条，"
+            f"活 manifest 现算 {live_total} 条 ⇒ 分母塌了，本闸在空集上恒真"
+        )
         assert denominator["mount_total"] > denominator["entry_total"]
         assert denominator["how_this_gate_uses_it"].strip() != ""

@@ -91,6 +91,8 @@ HTML_COUNTERPART_VERDICTS = ("none", "exists")
 NOTICE_MODULE = SYNC_DIR / "workpaperEntrySyncNotice.ts"
 NOTICE_COMPONENT = SYNC_DIR / "GtEntrySyncCapabilityNotice.vue"
 NOTICE_COMPONENT_NAME = "GtEntrySyncCapabilityNotice"
+#: `SYNC_ADAPTER_REGISTERED_ENTRY_IDS` 现算形态所依赖的 generated manifest（真源之真源）。
+SYNC_MANIFEST_TS = SYNC_DIR / "workpaperSyncManifest.generated.ts"
 
 # Legacy composable paths（待 Task 66/72 删除；本任务只断言现状一致）
 D_CYCLE_ENTRY_COMPOSABLES = {
@@ -122,6 +124,38 @@ def _sha256_of(path: pathlib.Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
+def _assert_contract_fields_are_complete(contract: dict, *, entry_id: str) -> int:
+    """逐字段判据：stable_field_key / json_pointer / mode / value_type / source_ref 全齐。
+
+    已注册 adapter 的 entry 必须在本文件真验字段级完整性（Property 20/21），
+    不能再以「判据由 pilot 承载」外包 —— 那是分母为 0 时的权宜。
+    """
+    placeholder = re.compile(r"^col_[a-z]+$")
+    fields = [
+        field
+        for sheet in contract["sheets"]
+        for table in sheet["tables"]
+        for field in table["fields"]
+    ]
+    assert fields, f"{entry_id} 的契约一个字段都没有 ⇒ 字段级判据空跑"
+    for field in fields:
+        for key in ("stable_field_key", "json_pointer", "mode", "value_type", "source_ref"):
+            assert field.get(key), (
+                f"{entry_id} 契约字段 {field.get('column_key')!r} 缺 {key}"
+            )
+        assert field["mode"] in ("editable", "formula", "readonly", "auto_source"), (
+            f"{entry_id} 契约字段 {field.get('column_key')!r} 的 mode={field['mode']!r} 非法"
+        )
+        column_key = str(field.get("column_key", ""))
+        assert not placeholder.match(column_key), (
+            f"{entry_id} 契约出现 generated col 占位: {column_key}"
+        )
+        assert "col_" not in str(field.get("stable_field_key", "")), (
+            f"{entry_id} 契约的 stable_field_key 含 col_ 占位: {field['stable_field_key']}"
+        )
+    return len(fields)
+
+
 def _strip_ts_comments(source: str) -> str:
     """剥掉 TS/Vue 注释 —— 说明文字不得充当判据证据。
 
@@ -132,6 +166,76 @@ def _strip_ts_comments(source: str) -> str:
     source = re.sub(r"(?m)//[^\n\"'`]*$", "", source)
     source = re.sub(r"<!--[\s\S]*?-->", "", source)
     return source
+
+
+def _initializer_of(source: str, const_name: str) -> str:
+    """取 `const_name = ...` 的**完整初始化表达式**（括号配平，跨行）。
+
+    🔴 不能用 `=\\s*\\[` 这种「假定字面量」的正则：真源可以是字面量数组，也可以是现算表达式，
+    形态一变正则就 `None`，判据报的是「找不到声明」—— 把「形态变了」误报成「东西没了」，
+    正是它该区分的两件事。这里先无偏取出表达式，再由调用方按形态解析。
+    """
+    anchor = re.search(re.escape(const_name) + r"\b[^=\n]*=", source)
+    if not anchor:
+        return ""
+    depth = 0
+    taken: list[str] = []
+    for ch in source[anchor.end():]:
+        if ch in "([{":
+            depth += 1
+        elif ch in ")]}":
+            depth -= 1
+        elif ch == "\n" and depth <= 0 and taken and taken[-1].strip():
+            break
+        taken.append(ch)
+    return "".join(taken)
+
+
+def _generated_manifest_entries(source: str) -> list[dict]:
+    """从 `workpaperSyncManifest.generated.ts` 取出 entry 数组（它是合法 JSON 字面量）。"""
+    block = re.search(
+        r"WORKPAPER_SYNC_MANIFEST\s*(?::[^=]*)?=\s*(\[[\s\S]*?\n\])\s*as const", source
+    )
+    assert block, "读不出 WORKPAPER_SYNC_MANIFEST 数组 ⇒ 现算形态无从复算"
+    return json.loads(block.group(1))
+
+
+def _registered_entry_ids() -> list[str]:
+    """解析 AC 1.4 的「已注册 adapter」集合 —— 真源可以是字面量数组，也可以是 manifest 现算。
+
+    2026-09-22 真源从手写数组改成
+    `WORKPAPER_SYNC_MANIFEST.filter((e) => e.capability === 'bidirectional').map(e => e.entryId)`：
+    手写数组本身是**第二真源**，D4/G7/H1 接通双向后没人往数组里补行，于是真双向底稿上继续
+    显示「两侧数据未互通」（把真能力说成假的，同样是 AC 1.4 禁止的失真披露）。
+
+    判据跟着真源走，但**不退化成「存在即通过」**：
+      · 声明整体缺失 ⇒ 断言失败（通知真被删就打红）；
+      · 字面量形态 ⇒ 取引号里的 id；
+      · 现算形态 ⇒ 按同一 filter 谓词在 generated manifest 上复算，拿到同一具体集合。
+    两条路径都返回**具体 id 列表**，下游「非空 / 形如 entry_id / 与 slice 互锁」逐条判据
+    一条都不放宽。
+    """
+    init = _initializer_of(
+        _strip_ts_comments(NOTICE_MODULE.read_text(encoding="utf-8")),
+        "SYNC_ADAPTER_REGISTERED_ENTRY_IDS",
+    )
+    assert init.strip(), "找不到 SYNC_ADAPTER_REGISTERED_ENTRY_IDS 的声明"
+    if "WORKPAPER_SYNC_MANIFEST" in init:
+        predicate = re.search(
+            r"WORKPAPER_SYNC_MANIFEST\s*\.filter\(\s*\(?\s*(\w+)\s*\)?\s*=>"
+            r"\s*\1\.capability\s*===\s*['\"]([^'\"]+)['\"]",
+            init,
+        )
+        assert predicate, f"现算形态的 filter 谓词无法识别：{init.strip()[:200]!r}"
+        assert re.search(r"\.map\(\s*\n?\s*\(?\s*(\w+)\s*\)?\s*=>\s*\1\.entryId", init), (
+            f"现算形态没有 map 到 entryId：{init.strip()[:200]!r}"
+        )
+        wanted = predicate.group(2)
+        entries = _generated_manifest_entries(SYNC_MANIFEST_TS.read_text(encoding="utf-8"))
+        return sorted({e["entryId"] for e in entries if e["capability"] == wanted})
+    literal = re.search(r"\[([\s\S]*)\]", init)
+    assert literal, f"既不是现算也不是字面量数组：{init.strip()[:200]!r}"
+    return sorted(set(re.findall(r"['\"]([^'\"]+)['\"]", literal.group(1))))
 
 
 def _vue_template(source: str) -> str:
@@ -146,6 +250,70 @@ def _vue_template(source: str) -> str:
     head = source[:marker]
     assert "<template>" in head, "SFC 头部没有 <template>"
     return head
+
+
+def _mode_toolbar_block(template: str) -> str | None:
+    """取模式切换工具栏区块 —— `<div>` 真配平，且容复合 `v-if`。
+
+    🔴 两处不能偷懒：
+      1. 条件写成 `v-if="showModeToolbar && !isD4DedicatedSyncSheet"` 是**正确**的
+         （D4 的 dedicated sheet 由子页签自管工具栏），判据不能把它当「没有工具栏」；
+      2. `[\\s\\S]*?</div>` 非贪婪会在**第一个**内层 `</div>` 截断 ⇒ 工具栏里嵌了 div
+         的宿主会被误判成「通知不在工具栏里」。
+    """
+    opening = re.search(r'<div v-if="[^"]*\bshowModeToolbar\b[^"]*"', template)
+    if not opening:
+        return None
+    depth = 0
+    i = opening.start()
+    while i < len(template):
+        if template.startswith("<div", i) and not template[i + 4:i + 5].isalnum():
+            end = template.find(">", i)
+            if end == -1:
+                return None
+            if template[end - 1] != "/":
+                depth += 1
+            i = end + 1
+        elif template.startswith("</div>", i):
+            depth -= 1
+            i += len("</div>")
+            if depth == 0:
+                return template[opening.start():i]
+        else:
+            i += 1
+    return None
+
+
+#: HTML/Vue 里不需要闭合标签的元素（tag 栈解析时不入栈）。
+_VOID_TAGS = {"br", "hr", "img", "input", "meta", "link", "source", "col", "area"}
+#: 一个标签（属性值里的 `>` 已由引号分支吃掉，不会提前截断）。
+_TAG_RX = re.compile(r"<(/?)([A-Za-z][\w.-]*)((?:\"[^\"]*\"|'[^']*'|[^>\"'])*?)(/?)>")
+
+
+def _ancestor_open_tags(template: str, needle: str) -> list[list[str]]:
+    """每处 `needle` 文本所在位置的祖先开标签链（最内层在前）。
+
+    🔴 用 tag 栈真解析，不用就近 `rfind("<")`：D2 的「已同步」写在 `<el-tag>` 的文本里，
+    门控条件挂在**父** `<el-tooltip v-else-if="syncFeedbackOk">` 上 —— 只看自身开标签会把
+    被真实运行时状态门控的结果标签误判成裸挂的常驻宣称。
+    """
+    stack: list[str] = []
+    chains: list[list[str]] = []
+    pos = 0
+    for tag in _TAG_RX.finditer(template):
+        segment = template[pos:tag.start()]
+        chains.extend([list(reversed(stack))] * segment.count(needle))
+        pos = tag.end()
+        closing, name, _attrs, self_close = tag.groups()
+        if closing:
+            for i in range(len(stack) - 1, -1, -1):
+                if re.match(r"<" + re.escape(name) + r"\b", stack[i]):
+                    del stack[i:]
+                    break
+        elif not self_close and name.lower() not in _VOID_TAGS:
+            stack.append(tag.group(0))
+    chains.extend([list(reversed(stack))] * template[pos:].count(needle))
+    return chains
 
 
 def _cell_value(path: pathlib.Path, sheet: str, cell: str) -> Any:
@@ -342,8 +510,28 @@ class TestAdjudicationLegality:
                         f"{entry['entry_id']} 标 bidirectional 但 {key} 为空"
                     )
 
-    def test_single_or_pending_entries_carry_no_identity(self, manifest_slice: dict) -> None:
-        """SR-5 / AP-5：裁 single 或终态未定的 entry 不得挂身份字段（不伪造凑数）。"""
+    def test_single_or_pending_entries_carry_no_identity(
+        self, manifest_slice: dict, full_manifest: dict
+    ) -> None:
+        """SR-5 / AP-5：不得**伪造**身份字段凑数。
+
+        🔴 2026-09-22 与范式对齐。范式 `slice_schema.behavioral_rules[SR-5]` 的原文是
+        「capability 以 `single_` 开头**或为 unreachable** ⇒ 五个身份字段全为 null」——
+        它没有管 `capability is null`（待裁决态由 SR-3 右支 + SR-9 管）。本判据原来把
+        SR-5 外推到了待裁决态，于是「同一条 SR-5 有两个判官，严格的那个不是范式校验器」，
+        正是范式自己在 G1 缺口里点名要消灭的形态。
+
+        后果是实打实的：D2/D4 真注册了 adapter（manifest + `registry.py` 交付账本双源印证），
+        外推版判据却要求 slice 把 `adapter_id` 记成 null —— 逼 slice 说假话才能变绿。
+
+        所以分两支：
+        * `single_*` / `unreachable` —— 照 SR-5 原文，五个字段全为 null；
+        * 待裁决（null）—— 非 null 的身份字段必须**有据**（adapter_id 逐字等于 manifest
+          实况且与生产账本的 `adapter_registered` 同向），其余四个仍必须为 null。
+          这比「一律 null」更强：凭空写一个 adapter_id 会因为对不上两个真源而打红。
+        """
+        from app.services.workpaper_sync.adapters import registry as _registry
+
         keys = (
             "adapter_id",
             "authority_model",
@@ -351,14 +539,42 @@ class TestAdjudicationLegality:
             "instrumentation_candidate",
             "published_representation",
         )
+        by_id = {e["entry_id"]: e for e in full_manifest["entries"]}
+        ledger = {
+            row["entry_id"]: row for row in _registry.DELIVERED_PER_ENTRY_CONTRACTS
+        }
         for entry in manifest_slice["independent_entries"]:
             capability = entry.get("capability")
             if capability == "bidirectional":
                 continue
+            if isinstance(capability, str):
+                # SR-5 原文分支
+                for key in keys:
+                    assert entry.get(key) is None, (
+                        f"{entry['entry_id']} capability={capability!r} 却挂了 {key}={entry[key]!r}"
+                    )
+                continue
+            # 待裁决分支：非 null 的身份字段必须逐项有据
             for key in keys:
+                if key == "adapter_id":
+                    continue
                 assert entry.get(key) is None, (
-                    f"{entry['entry_id']} capability={capability!r} 却挂了 {key}={entry[key]!r}"
+                    f"{entry['entry_id']} 终态未定却挂了 {key}={entry[key]!r} —— "
+                    "这四项没有任何生产侧真源可核，非 null 即伪造"
                 )
+            adapter_id = entry.get("adapter_id")
+            if adapter_id is None:
+                continue
+            src = by_id[entry["entry_id"]]
+            assert adapter_id == src.get("adapter_id"), (
+                f"{entry['entry_id']} 的 adapter_id={adapter_id!r} 对不上 manifest "
+                f"{src.get('adapter_id')!r} ⇒ 无据的身份字段"
+            )
+            row = ledger.get(entry["entry_id"])
+            assert row is not None and bool(row["adapter_registered"]), (
+                f"{entry['entry_id']} 挂了 adapter_id={adapter_id!r}，但生产账本 "
+                "DELIVERED_PER_ENTRY_CONTRACTS 里它并非 adapter_registered=True"
+            )
 
     def test_adjudication_carries_both_negative_reasons(self, manifest_slice: dict) -> None:
         """step 4 要求：not_single_html_because 与 not_bidirectional_because 都要写。"""
@@ -525,22 +741,71 @@ class TestProperty20And21ContractAndAdapter:
     def test_no_d_entry_has_a_registered_adapter_and_pilot_evidence_exists(
         self, manifest_slice: dict, full_manifest: dict
     ) -> None:
-        """分母为 0 这件事本身要被证实，并指向承载判据的 pilot（不是「所以通过」）。"""
+        """有/无 adapter 两条分支各自现算分母（不再冻结「D 循环一条 adapter 都没有」）。
+
+        🔴 2026-09-22：原判据写 `assert entry["adapter_id"] is None` —— 那是**迁移前快照**。
+        D2（Task 41）与 D4（G5-1）之后真注册了 adapter，实况 manifest 与生产账本
+        `registry.py#DELIVERED_PER_ENTRY_CONTRACTS` 两侧一致地说 `adapter_registered=True`。
+        继续冻结「分母为 0」只会把「迁移推进了」报成「判据坏了」，而它自己的失败消息早写明
+        「前提不再成立 ⇒ 必须在此补齐字段级判据」。
+
+        现在两条分支都有真分母，逐条现算：
+
+        * **无 adapter 的 entry** —— 字段级 col 占位与 contract 完整性判据由 Task 41 pilot +
+          Task 13 registry 承载，本文件只断言承载物真存在（不宣称通过）。
+        * **有 adapter 的 entry** —— 必须在此补齐字段级判据：slice 的 adapter_id 与 manifest
+          相等、与生产账本的 `adapter_registered` 同向、契约文件真存在且逐字段完整
+          （complete/source-backed 由 `_assert_contract_fields_are_complete` 逐 entry 跑）。
+        """
+        from app.services.workpaper_sync.adapters import registry as _registry
+
+        ledger = {
+            row["entry_id"]: row for row in _registry.DELIVERED_PER_ENTRY_CONTRACTS
+        }
+        by_id = {e["entry_id"]: e for e in full_manifest["entries"]}
+
+        with_adapter: list[str] = []
+        without_adapter: list[str] = []
         for entry in manifest_slice["independent_entries"]:
-            assert entry["adapter_id"] is None, (
-                f"{entry['entry_id']} 出现了 adapter_id={entry['adapter_id']!r}，"
-                "本 slice 的「无已注册 adapter」前提不再成立 ⇒ 必须在此补齐字段级判据"
+            entry_id = entry["entry_id"]
+            src = by_id[entry_id]
+            # 双向锁：slice 抄的 adapter_id 必须等于 manifest 实况
+            assert entry["adapter_id"] == src.get("adapter_id"), (
+                f"{entry_id} 的 slice adapter_id={entry['adapter_id']!r} 与 manifest "
+                f"{src.get('adapter_id')!r} 不符 ⇒ 两份记录又漂了"
             )
-        d_ids = {e["entry_id"] for e in manifest_slice["independent_entries"]}
-        for entry in full_manifest["entries"]:
-            if entry["entry_id"] in d_ids:
-                assert entry.get("adapter_id") is None
+            # 三向锁：生产账本的 adapter_registered 必须与 manifest 的 adapter_id 同向
+            row = ledger.get(entry_id)
+            assert row is not None, f"{entry_id} 不在生产交付账本里 ⇒ 无据可查"
+            assert bool(row["adapter_registered"]) is (src.get("adapter_id") is not None), (
+                f"{entry_id}：账本 adapter_registered={row['adapter_registered']}，"
+                f"manifest adapter_id={src.get('adapter_id')!r} ⇒ 两个真源互相打脸"
+            )
+            (with_adapter if entry["adapter_id"] else without_adapter).append(entry_id)
+
+        # 两条分支都必须有真分母，否则其中一条是空跑
+        assert with_adapter, "没有任何 D entry 注册了 adapter ⇒ 「已注册」分支无分母"
+        assert without_adapter, "全部 D entry 都注册了 adapter ⇒ 「未注册」分支无分母"
 
         # pilot 承载物必须真存在 —— 否则「判据由 pilot 承载」是空头承诺
         pilot_guard = BACKEND / "tests" / "workpaper_sync" / "test_task41_d2_large_json_pilot.py"
         registry_guard = BACKEND / "tests" / "workpaper_sync" / "test_task13_contract_registry.py"
         assert pilot_guard.is_file(), f"{pilot_guard} 不存在 —— 承载 Property 20/21 的 pilot 判据缺失"
         assert registry_guard.is_file(), f"{registry_guard} 不存在"
+
+        # 有 adapter 的 entry：字段级判据在此补齐（不再外包给 pilot）
+        for entry_id in with_adapter:
+            entry = next(
+                e for e in manifest_slice["independent_entries"] if e["entry_id"] == entry_id
+            )
+            declared = entry["per_entry_contract"]
+            assert declared["contract_id"] == entry["adapter_id"], (
+                f"{entry_id} 的 adapter_id={entry['adapter_id']!r} 与登记契约 "
+                f"{declared['contract_id']!r} 不是同一个 id"
+            )
+            path = CONTRACT_DIR / f"{declared['contract_id']}.json"
+            assert path.is_file(), f"{entry_id} 声称已注册 adapter 却没有契约文件 {path}"
+            _assert_contract_fields_are_complete(_load(path), entry_id=entry_id)
 
     def test_d2_contract_fields_are_complete_and_source_backed(
         self, d2_contract: dict
@@ -606,21 +871,45 @@ class TestProperty20And21ContractAndAdapter:
                 )
 
     def test_entries_without_contract_have_no_contract_file(self, manifest_slice: dict) -> None:
-        """反向：slice 里没登记 per_entry_contract 的 entry，契约目录里也不许有它的文件。"""
+        """双向锁：slice 登记的契约集合 ⇔ 契约目录里归属 D entry 的文件集合，**现算相等**。
+
+        🔴 2026-09-22：原判据写 `assert declared == {D2_ENTRY_ID}` —— 冻结「D 循环只有 D2
+        有契约」。G5-1 之后 7 条 D entry 各有独立 reviewed 契约（磁盘有文件、
+        `registry.py#DELIVERED_PER_ENTRY_CONTRACTS` 有行），冻结值把「契约交付了」报成
+        「slice 集合异常」。改成集合等式后两个方向都仍打红：slice 漏登记已交付的契约 ⇒ 红；
+        slice 登记了磁盘上不存在的契约 ⇒ 红。比原来的字面量更强，不是放宽。
+        """
         declared = {
             entry["entry_id"]
             for entry in manifest_slice["independent_entries"]
             if entry.get("per_entry_contract")
         }
-        assert declared == {D2_ENTRY_ID}, f"slice 登记的 D 契约集合异常: {declared}"
+        on_disk: dict[str, str] = {}
         for path in sorted(CONTRACT_DIR.glob("*.json")):
             if path.name.startswith("_"):
                 continue
             entry_id = _load(path).get("review", {}).get("entry_id")
-            if entry_id and entry_id.startswith("xlsx/gt-d") and entry_id not in declared:
-                pytest.fail(
-                    f"契约文件 {path.name} 归属 {entry_id}，但 slice 未登记它的 per_entry_contract"
-                )
+            if entry_id and entry_id.startswith("xlsx/gt-d"):
+                on_disk[entry_id] = path.name
+        assert on_disk, "契约目录里一条 D 契约都没有 ⇒ 本判据空跑"
+        assert declared == set(on_disk), (
+            "slice 登记的 D 契约集合与契约目录实况不等：\n"
+            f"  只在 slice 里: {sorted(declared - set(on_disk))}\n"
+            f"  只在磁盘上: {sorted({on_disk[e] for e in set(on_disk) - declared})}"
+        )
+        # 逐条回指：slice 登记的 path/contract_id 必须与磁盘文件对得上
+        for entry in manifest_slice["independent_entries"]:
+            contract = entry.get("per_entry_contract")
+            if not contract:
+                continue
+            path = ROOT / contract["path"]
+            assert path.is_file(), f"{entry['entry_id']} 登记的契约文件不存在: {contract['path']}"
+            payload = _load(path)
+            assert payload["contract_id"] == contract["contract_id"]
+            assert payload["review"]["entry_id"] == entry["entry_id"], (
+                f"{entry['entry_id']} 登记的契约 {contract['contract_id']} 的 review.entry_id "
+                f"回指 {payload['review']['entry_id']} ⇒ 跨 entry 复用"
+            )
 
     def test_d2_contract_records_the_html_counterpart(
         self, d2_contract: dict, manifest_slice: dict
@@ -976,14 +1265,27 @@ class TestProperty70NoCrossEntryReuse:
         assert not (d_ids & e_ids), f"D/E slice entry 相交: {sorted(d_ids & e_ids)}"
 
     def test_only_d2_carries_a_contract(self, manifest_slice: dict) -> None:
-        """D2 的契约不得被其余 6 条借用（cross_entry_rule）。"""
+        """每条 entry 只挂**自己**的契约，contract_id 两两互异（cross_entry_rule）。
+
+        🔴 2026-09-22：原判据写「除 D2 外一律不得有 per_entry_contract」。那在「只有 D2
+        交付了契约」时等价于反复用判据；G5-1 给 7 条 D entry 各发了独立契约后，它就变成
+        「禁止登记已交付的事实」。反复用的真判据是**互异 + 回指**，与契约条数无关。
+        """
+        seen: dict[str, str] = {}
+        d2 = next(
+            e for e in manifest_slice["independent_entries"] if e["entry_id"] == D2_ENTRY_ID
+        )
+        assert d2["per_entry_contract"]["contract_id"] == "d2.receivable_detail"
         for entry in manifest_slice["independent_entries"]:
-            if entry["entry_id"] == D2_ENTRY_ID:
-                assert entry["per_entry_contract"]["contract_id"] == "d2.receivable_detail"
-            else:
-                assert "per_entry_contract" not in entry, (
-                    f"{entry['entry_id']} 挂了 per_entry_contract —— 不得跨 entry 复用 D2 契约"
-                )
+            contract = entry.get("per_entry_contract")
+            assert contract, f"{entry['entry_id']} 没登记 per_entry_contract"
+            contract_id = contract["contract_id"]
+            assert contract_id not in seen, (
+                f"{entry['entry_id']} 与 {seen[contract_id]} 共用 contract_id={contract_id} "
+                "—— 不得跨 entry 复用契约"
+            )
+            seen[contract_id] = entry["entry_id"]
+        assert len(seen) == len(manifest_slice["independent_entries"])
 
     def test_deletion_plan_entries_are_distinct(self, deletion_plan: dict) -> None:
         ids = [e["entry_id"] for e in deletion_plan["entries"]]
@@ -1019,21 +1321,44 @@ class TestProperty70NoCrossEntryReuse:
     def test_parent_duplicates_not_counted_as_independent(
         self, manifest_slice: dict, full_manifest: dict
     ) -> None:
-        """AC 1.6：31 条 D4 sub-tab 不得进 independent_entries。"""
+        """AC 1.6：D4 sub-tab 不得进 independent_entries，条数由 manifest **现算**。
+
+        🔴 2026-09-22：原判据冻结 `len(d4_subs) == 31`。D4 改走统一路径后这 31 条 sub-tab
+        entry 已退役，实况 manifest 里 `xlsx/d4/**` 现算 0 条 —— 冻结值把「legacy 入口清掉了」
+        报成「manifest 坏了」。AC 1.6 的约束与条数无关：不管几条，父组件重复入口都不得被
+        重复计为独立 entry，且 slice 登记的条数必须与 manifest 现算相等。
+        """
         d4_subs = {
             e["entry_id"]
             for e in full_manifest["entries"]
             if e["entry_id"].startswith("xlsx/d4/")
         }
-        assert len(d4_subs) == 31, f"全量 manifest 里 D4 sub-tab 实为 {len(d4_subs)} 条"
         slice_ids = {e["entry_id"] for e in manifest_slice["independent_entries"]}
-        assert not (d4_subs & slice_ids)
+        assert not (d4_subs & slice_ids), sorted(d4_subs & slice_ids)
         d4 = next(
             e
             for e in manifest_slice["independent_entries"]
             if e["entry_id"] == "xlsx/gt-d4-operating-revenue"
         )
-        assert d4["parent_duplicate_count"] == len(d4_subs)
+        assert d4["parent_duplicate_count"] == len(d4_subs), (
+            f"slice 写 {d4['parent_duplicate_count']}，manifest 现算 {len(d4_subs)}"
+        )
+        # sub-tab 若存在，必须逐条真被标成 parent_duplicate 且回指 D4（AC 1.6 的实质）
+        for entry in full_manifest["entries"]:
+            if entry["entry_id"].startswith("xlsx/d4/"):
+                assert entry["migration_state"] == "parent_duplicate"
+                assert entry["independent_entry"] is False
+                assert entry["parent_entry_id"] == "xlsx/gt-d4-operating-revenue"
+        # 全局分母不得同时归零 —— 否则 AC 1.6 整条判据没有任何实测对象
+        global_duplicates = [
+            e["entry_id"]
+            for e in full_manifest["entries"]
+            if e.get("migration_state") == "parent_duplicate"
+        ]
+        assert global_duplicates, (
+            "全量 manifest 里一条 parent_duplicate 都没有 ⇒ AC 1.6 失去实测对象，"
+            "需确认是真的全部退役还是 parent_rules 失效"
+        )
 
     def test_d4_sub_tabs_not_in_deletion_plan(self, deletion_plan: dict) -> None:
         for entry in deletion_plan["entries"]:
@@ -1099,40 +1424,53 @@ class TestAc14HonestModeVisibility:
             assert f"<{NOTICE_COMPONENT_NAME}" in template, (
                 f"{host.name} 的模板里没有挂 <{NOTICE_COMPONENT_NAME}> ⇒ 结构性死代码"
             )
-            mount_pattern = re.compile(
-                r"<" + NOTICE_COMPONENT_NAME + r"\s+entry-id=\"([^\"]+)\"\s*/?>"
+            # 🔴 属性顺序自由：`v-if="!isD4DedicatedSyncSheet"` 挡在 entry-id 前面是**正确**的
+            #    （dedicated sheet 由子页签自管工具栏并各自挂通知）。判据只管「entry-id 传了
+            #    且传的是自己」，不管它排第几 —— 原正则把 entry-id 钉死在紧邻组件名的位置，
+            #    于是把「多了一个合法属性」误报成「没传 entry-id」。
+            mount = re.search(
+                r"<" + NOTICE_COMPONENT_NAME + r"\b((?:\"[^\"]*\"|'[^']*'|[^>\"'])*)/?>",
+                template,
             )
-            found = mount_pattern.search(template)
+            assert mount, f"{host.name} 的模板里没有完整的 <{NOTICE_COMPONENT_NAME}> 标签"
+            found = re.search(r"entry-id=\"([^\"]+)\"", mount.group(1))
             assert found, f"{host.name} 挂了组件但没传 entry-id"
             assert found.group(1) == entry["entry_id"], (
                 f"{host.name} 传的 entry-id={found.group(1)!r}，应为 {entry['entry_id']!r}"
             )
             checked += 1
-        assert checked == 7, f"只校验到 {checked} 个宿主，应为 7 —— 分母缩水"
+        # 🔴 分母**现算**：上面按 `adapter_id is not None` 跳过已注册 adapter 的 entry
+        # （它们由真实 bridge 状态表达，不该再挂「两侧未互通」）。原来紧跟着冻结
+        # `checked == 7` 与这条跳过逻辑自相矛盾 —— D2/D4 真注册 adapter 后必红，
+        # 而那是迁移推进而非分母缩水。
+        pending = [
+            e for e in manifest_slice["independent_entries"] if e.get("adapter_id") is None
+        ]
+        assert pending, "全部 D entry 都已注册 adapter ⇒ AC 1.4 的「未注册」分支没有分母了"
+        assert checked == len(pending), (
+            f"只校验到 {checked} 个宿主，未注册 adapter 的 entry 现算 {len(pending)} 个 —— 分母缩水"
+        )
 
     def test_notice_mount_sits_inside_the_mode_toolbar(self, manifest_slice: dict) -> None:
         """通知必须挂在模式切换工具栏内 —— 挂在别处等于用户看不见它跟切换有关。"""
+        checked = 0
         for entry in manifest_slice["independent_entries"]:
             host = ROOT / entry["host_path"]
             source = _strip_ts_comments(host.read_text(encoding="utf-8"))
             template = _vue_template(source)
-            toolbar = re.search(
-                r'<div v-if="showModeToolbar"[\s\S]*?</div>', template
-            )
+            toolbar = _mode_toolbar_block(template)
             assert toolbar, f"{host.name} 找不到 showModeToolbar 工具栏区块"
-            assert f"<{NOTICE_COMPONENT_NAME}" in toolbar.group(0), (
+            assert f"<{NOTICE_COMPONENT_NAME}" in toolbar, (
                 f"{host.name} 的通知没挂在模式工具栏里"
             )
+            checked += 1
+        assert checked == 7, f"只校验到 {checked} 个宿主，应为 7 —— 分母缩水"
 
     def test_registered_entry_ids_agree_with_the_slice(self, manifest_slice: dict) -> None:
         """双向锁：slice 的 adapter_id 与前端登记表必须互相印证。"""
-        source = _strip_ts_comments(NOTICE_MODULE.read_text(encoding="utf-8"))
-        block = re.search(
-            r"SYNC_ADAPTER_REGISTERED_ENTRY_IDS:\s*readonly\s+string\[\]\s*=\s*\[([\s\S]*?)\]",
-            source,
-        )
-        assert block, "找不到 SYNC_ADAPTER_REGISTERED_ENTRY_IDS 的声明"
-        registered = set(re.findall(r"['\"]([^'\"]+)['\"]", block.group(1)))
+        registered = set(_registered_entry_ids())
+        assert registered, "已注册集合为空 ⇒ 「已注册 ⇒ 不挂通知」分支没有真实分母"
+        assert all("/" in rid for rid in registered), f"集合里有不像 entry_id 的项：{registered}"
         for entry in manifest_slice["independent_entries"]:
             if entry.get("adapter_id") is None:
                 assert entry["entry_id"] not in registered, (
@@ -1146,15 +1484,41 @@ class TestAc14HonestModeVisibility:
                 )
 
     def test_hosts_do_not_claim_bidirectional_writeback(self, manifest_slice: dict) -> None:
-        """AC 1.4 前半句：宿主不得出现「可双向回写」「同步成功」之类的成功态宣称。"""
-        forbidden = ("可双向回写", "双向同步", "同步成功", "已同步")
+        """AC 1.4 前半句：宿主不得出现「可双向回写」「同步成功」之类的成功态宣称。
+
+        🔴 必须分两类词，否则判据会把 AC 11.3 明确**要求**的「运行时逐操作结果」一并打红：
+
+        * **能力宣称**（「可双向回写」「双向同步」）—— 说的是「本底稿具备双向能力」。常驻
+          语义，模板里任何位置都不允许。
+        * **运行时结果**（「同步成功」「已同步」）—— 说的是「刚才那次操作成功了」。只有在被
+          **同步态**条件门控时才合法：D2 写的是
+          `<el-tooltip v-else-if="syncFeedbackOk"><el-tag>已同步</el-tag></el-tooltip>`，
+          它跟「命令已接受 / 文件已耐久 / 冲突」三兄弟并列，正是 AC 11.3 要的分状态文案。
+          裸挂（无门控或门控与同步无关）= 常驻宣称 ⇒ 红。
+
+        判据只看 **template**：`<script>` 里的标识符/注释不进 DOM，不构成对用户的宣称。
+        """
+        capability_claims = ("可双向回写", "双向同步")
+        runtime_results = ("同步成功", "已同步")
+        checked = 0
         for entry in manifest_slice["independent_entries"]:
             host = ROOT / entry["host_path"]
-            source = _strip_ts_comments(host.read_text(encoding="utf-8"))
-            for word in forbidden:
-                assert word not in source, (
-                    f"{host.name} 出现 {word!r} —— 未注册 adapter 的入口不得宣称双向/同步成功"
+            template = _vue_template(_strip_ts_comments(host.read_text(encoding="utf-8")))
+            for word in capability_claims:
+                assert word not in template, (
+                    f"{host.name} 出现能力宣称 {word!r} —— 入口不得宣称自己可双向回写"
                 )
+            for word in runtime_results:
+                for chain in _ancestor_open_tags(template, word):
+                    assert any(
+                        re.search(r'\sv-(?:else-)?if="[^"]*sync', tag, re.IGNORECASE)
+                        for tag in chain
+                    ), (
+                        f"{host.name} 的 {word!r} 没有任何同步态 v-if/v-else-if 门控 ⇒ "
+                        f"它是常驻成功态宣称，不是逐操作结果；祖先链={chain}"
+                    )
+            checked += 1
+        assert checked == 7, f"只校验到 {checked} 个宿主，应为 7 —— 分母缩水"
 
 
 # ════════════════════════════════════════════════════════════════════════════
@@ -1292,29 +1656,73 @@ class TestSourceCodeStructure:
             )
 
     def test_hosts_exist_and_import_legacy_composable(self, manifest_slice: dict) -> None:
-        """宿主存在且仍引用 legacy composable（BP-7 登记的未删状态）。"""
-        pattern_by_host = {
+        """宿主存在，且各自**真实的**双模式载体还在（BP-7 登记的未删状态）。
+
+        🔴 D2 不走 `useD2EntryDualMode`：那个 composable 已随本 spec 的交付
+        （commit `42d2f6e6f`）一并删除 —— D2 是 Task 41 的 pilot，整体迁到统一路径
+        `useWorkpaperSyncBridge` + `WorkpaperSyncEditorHost`，D1/D3~D7 宿主的注释里
+        逐字写着「与 GtD2AccountsReceivable 同构」正是指它。原判据对 D2 期望一个
+        **盘上不存在**的模块名，属陈旧判据。
+
+        判据不弱化 —— 两侧都钉住：
+        * D1/D3~D7：legacy composable 必须仍在盘上**且**被宿主引用（删除动作归 Task 66/72，
+          此刻提前消失就该红）；
+        * D2：`useD2EntryDualMode.ts` 必须**确已不在盘上**（若它回来了说明 pilot 被回退，
+          而本判据原本会毫不知情），同时统一路径的两个锚点必须在宿主里。
+        """
+        legacy_by_host = {
             "GtD1NotesReceivable.vue": "useD1EntryDualMode",
-            "GtD2AccountsReceivable.vue": "useD2EntryDualMode",
             "GtD3PrepaidAccounts.vue": "useD3EntryDualMode",
             "GtD4OperatingRevenue.vue": "useD4EntryDualMode",
             "GtD5ReceivablesFinancing.vue": "useD5EntryDualMode",
             "GtD6ContractAssets.vue": "useD6EntryDualMode",
             "GtD7ContractLiabilities.vue": "useD7EntryDualMode",
         }
+        #: pilot：legacy 已删，宿主走统一双向路径。值是 import spec ——
+        #: 🔴 按 spec 解析到**盘上真实模块**，不按裸子串。变异实测：把 import 改成
+        #: `'./sync/useWorkpaperSyncBridgeXX'` 时裸子串判据全绿（`useWorkpaperSyncBridge`
+        #: 仍是 `...XX` 的前缀，且注释里另有同名词），属等价变异。
+        migrated_by_host = {
+            "GtD2AccountsReceivable.vue": (
+                "./sync/useWorkpaperSyncBridge",
+                "./sync/WorkpaperSyncEditorHost.vue",
+            ),
+        }
         hosts = {
             (ROOT / e["host_path"]).name for e in manifest_slice["independent_entries"]
         }
-        assert hosts == set(pattern_by_host), (
+        assert hosts == set(legacy_by_host) | set(migrated_by_host), (
             f"slice 的宿主集合与预期不符: {sorted(hosts)}"
         )
         for entry in manifest_slice["independent_entries"]:
             host = ROOT / entry["host_path"]
             assert host.is_file()
             content = host.read_text(encoding="utf-8")
-            assert pattern_by_host[host.name] in content, (
-                f"{host.name} 应仍引用 {pattern_by_host[host.name]}"
+            if host.name in legacy_by_host:
+                legacy = legacy_by_host[host.name]
+                module = WP_COMPONENTS / "composables" / f"{legacy}.ts"
+                assert module.is_file(), (
+                    f"{legacy}.ts 已从盘上消失 —— 删除动作归 Task 66/72，deletion plan 已过期"
+                )
+                assert legacy in content, f"{host.name} 应仍引用 {legacy}"
+                continue
+            legacy_gone = WP_COMPONENTS / "composables" / "useD2EntryDualMode.ts"
+            assert not legacy_gone.is_file(), (
+                "useD2EntryDualMode.ts 又回到盘上了 —— D2 pilot 被回退，"
+                "本判据与 migration_state 的登记都需重裁"
             )
+            specs = set(re.findall(r"""from\s*['"]([^'"\n]+)['"]""", content))
+            for anchor in migrated_by_host[host.name]:
+                assert anchor in specs, (
+                    f"{host.name} 是已迁 pilot，必须从 {anchor!r} import 统一路径锚点"
+                    f"（实测 import spec：{sorted(s for s in specs if 'sync' in s)}）"
+                )
+                target = (host.parent / anchor).resolve()
+                if target.suffix != ".vue":
+                    target = target.with_suffix(".ts")
+                assert target.is_file(), (
+                    f"{host.name} 的统一路径锚点 {anchor!r} 解析到不存在的模块 {target}"
+                )
 
     def test_preserved_composables_exist(self) -> None:
         for path in PRESERVED_COMPOSABLES:
@@ -1411,10 +1819,27 @@ class TestManifestAlignment:
                 ), (
                     f"{entry['entry_id']} 的分歧说明里没有引用任何 blocking_precondition id"
                 )
-        assert divergent == 7, (
-            f"预期 7 条 entry 与 manifest 分歧（overlay 默认值仍是 single_onlyoffice），实测 {divergent}。"
-            "若 manifest 已重生成，请同步更新 BP-6 与本判据"
+        # 🔴 2026-09-22：分歧条数改**现算**。原判据冻结 `divergent == 7` 并自带指示
+        # 「若 manifest 已重生成，请同步更新 BP-6 与本判据」—— manifest 确实重生成了
+        # （D2/D4 拿到 overlay per-entry override ⇒ capability=bidirectional），BP-6 已按
+        # 双向分歧扩写。冻结条数会在下一条 entry 被 override 时再红一次，而那不是缺陷。
+        # 现算形态仍 fail-closed：分歧存在却没登记 ⇒ 上面逐条 assert 打红；分歧全消失
+        # （slice 与 manifest 真对齐）⇒ 下面这条要求把 BP-6 一并关掉，不许留空登记。
+        expected_divergent = sum(
+            1
+            for entry in manifest_slice["independent_entries"]
+            if by_id[entry["entry_id"]]["capability"] != entry.get("capability")
         )
+        assert divergent == expected_divergent
+        if divergent == 0:
+            assert not any(
+                bp["id"] == "BP-6" and str(bp.get("status", "")).startswith("REGISTERED")
+                for bp in manifest_slice["blocking_preconditions"]
+            ), "所有分歧都已消解，BP-6 却仍登记为未修复 ⇒ 阻断项与实况脱节"
+        else:
+            assert any(bp["id"] == "BP-6" for bp in manifest_slice["blocking_preconditions"]), (
+                f"现算 {divergent} 条 entry 与 manifest 分歧，却没有 BP-6 登记这件事"
+            )
 
     def test_overlay_default_is_the_real_source_of_the_manifest_capability(self) -> None:
         """证实 BP-6 的根因：manifest 的 capability/html_store 来自 overlay 组件级默认值。"""

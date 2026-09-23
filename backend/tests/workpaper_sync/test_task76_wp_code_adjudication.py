@@ -108,14 +108,32 @@ class TestHostResolutionNoLongerTrustsTheHeuristic:
         )
 
     def test_loader_is_fail_closed_when_the_table_is_missing(self, tmp_path: Path) -> None:
-        '''缺裁决表必须抛，不得静默回落到启发式（回落＝把「无人裁决」伪装成「已裁决」）。'''
-        saved = T76M.WP_CODE_ADJUDICATION
+        '''缺裁决表必须抛，不得静默回落到启发式（回落＝把「无人裁决」伪装成「已裁决」）。
+
+        🔴 patch 点必须是**真实读盘路径**。BP-24 之后 `T76M.WP_CODE_ADJUDICATION` 只是
+        `_TARGET_RESOLUTION.WP_CODE_ADJUDICATION` 的转引别名，读盘发生在生产模块里 ——
+        原先 patch 这个别名等于没 patch：真表还在盘上，loader 正常返回，`pytest.raises`
+        DID NOT RAISE。那时红的不是「fail-open 回归了」，而是「这条守卫已经无法发现回归」。
+        '''
+        from app.services.workpaper_sync import projection_target_resolution as PTR
+
+        # 别名同一性：BP-24 若被回退成「宿主自留第二份实现」，这里先红。
+        assert T76M.WP_CODE_ADJUDICATION == PTR.WP_CODE_ADJUDICATION, (
+            "T76 宿主的 WP_CODE_ADJUDICATION 不再转引生产常量 —— 第二份实现会各自漂移"
+        )
+
+        saved = PTR.WP_CODE_ADJUDICATION
+        missing = tmp_path / "definitely_missing.json"
+        assert not missing.exists(), "反向自检：合成的缺失路径竟然存在"
         try:
-            T76M.WP_CODE_ADJUDICATION = tmp_path / "definitely_missing.json"
+            PTR.WP_CODE_ADJUDICATION = missing
+            # 生产侧抛域异常；T76 宿主把它转成 SystemExit。两层都必须 fail closed。
+            with pytest.raises(PTR.ProjectionTargetResolutionError):
+                PTR.load_wp_code_adjudication()
             with pytest.raises(SystemExit):
                 T76M.load_wp_code_adjudication()
         finally:
-            T76M.WP_CODE_ADJUDICATION = saved
+            PTR.WP_CODE_ADJUDICATION = saved
         assert T76M.load_wp_code_adjudication(), "复原后仍读不到裁决表 —— fixture 泄漏"
 
     def test_basis_checker_really_fires_on_a_bogus_template_path(self) -> None:

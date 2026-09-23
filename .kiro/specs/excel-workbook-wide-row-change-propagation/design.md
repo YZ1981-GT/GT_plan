@@ -218,6 +218,26 @@ def _rewrite_formula_refs(
    - **首要载体 = D2**（`D/D2-1至D2-4 应收账款….xlsx`，受管 sheet `明细表D2-2` anchor A11，
      被 4 张 sheet 的 **52 处**公式引用，被引用行 13 / 25 / 26）—— 它是今天**唯一**既有已审核
      契约、又有真实跨 sheet 引用的 entry，即唯一可端到端执行的样本。
+
+     🔄 **2026-xx 更正（决策包 2）**：上一句的「唯一」**已不成立**，不要照它规划迁移。
+     phase5 交付 6 份 D 循环契约后，有真实传播需求的 entry 是 **5 个**：
+     `d2=52 / d3=51 / d5=24 / d6=3 / d7=3` 处。**D2 仍是首要载体**，但支撑它的判据
+     从「唯一有需求」换成**引用侧 sheet 张数（fan-in）严格唯一最大**：
+
+     | entry | demand 处数 | 引用侧 sheet 张数 | 被引用的不同行数 |
+     |---|---:|---:|---:|
+     | `d2.receivable_detail` | 52 | **4** | 3 |
+     | `d3.prepaid_receipts_detail` | 51 | 2 | 3 |
+     | `d5.receivables_financing_detail` | 24 | 1 | 2 |
+     | `d6.contract_assets_detail` | 3 | 1 | 1 |
+     | `d7.contract_liabilities_detail` | 3 | 1 | 1 |
+
+     🔴 **为什么不能再用「处数最多」当判据**：D2 对 D3 只领先 **1 处**（52 vs 51，1.9%），
+     且 D2 只占全部需求的 39.1%。任何对 `D3 预收账款.xlsx` 的琐碎改动都会翻转排名，
+     而那与"谁适合当载体"无关 —— 按处数设的守卫会在无意义的时刻打红，最终被人放宽掉。
+     fan-in 才是"难"的来源：一次插行必须在**多张**引用侧 sheet 上被一致反映，这才是会坏的场景；
+     d5 那种 24 处集中在**单张** sheet 的是重复样本而非广样本。守卫落在
+     `test_d2_remains_the_sole_maximal_propagation_carrier`。
    - **结构载体 = K11**（受管 sheet `审定表K11-1` 被 2 张 sheet 的 **114 处**引用，行号 7~25
      落在受管区 `A7:N25` 内，19/19 全被引用）—— 它**没有** per-entry 契约，是规模与
      100% 阻断形态的结构样本，不是可执行样本。
@@ -240,9 +260,30 @@ def _rewrite_formula_refs(
 `test_workbook_row_change_reachability.py` **解析本表**逐键比对（不把数字硬编码进守卫）。
 ⇒ 改本表不改代码、或改代码不改本表，都会打红。
 
+🔄 **2026-xx 复算更新（决策包 2 落地）**：下表 10 个值随两件**已 push** 的上游事实演进而更新，
+原 Wave 0（2026-09-04）值一并列出以便审计。**没有任何一个分母是被"抬宽"的**，
+全部是重跑 `generate_row_change_reachability.py --apply` 的现算值：
+
+| key | Wave 0 | 现算 | 归因 |
+|---|---:|---:|---|
+| `xlsx_total` | 351 | **352** | 新增权威工作簿 `D/D4 收入底稿.xlsx`（commit `d3b3d80d9`） |
+| `delivered_contract_entries` | 4 | **10** | phase5 D 循环交付 6 份 per-entry 契约（d1/d3/d4/d5/d6/d7）并注册 adapter |
+| `external_sites` | 2908 | **2902** | D3/D5/D6/D7 模板净化丢弃 `externalReference` 部件（commit `1a0b55651`） |
+| `max_host_name_collisions` | 39 | **40** | `附注披露信息（国企）` 多出一份同名 sheet 宿主（新 D4 工作簿） |
+| `defined_name_cross` | 5002 | **5004** | 新 D4 工作簿的 definedNames；四分类之和仍恰为总数 |
+| `defined_name_builtin_self_scope` | 2457 | **2505** | 同上 + 净化后外链目标回到本工作簿内 |
+| `defined_name_target_not_in_workbook` | 2001 | **1949** | 同上（净化去外链 ⇒ 这一类减少 52） |
+| `defined_name_user_self_scope` | 292 | **298** | 新 D4 工作簿 |
+| `hyperlink_location_cross` | 3480 | **3553** | 新 D4 工作簿的 `hyperlink@location`；`same_sheet` 仍为 21 |
+| `hyperlink_location_in_workbook` | 3138 | **3211** | 同上（`not_in_workbook` 321 不变） |
+
+其余 20+ 个分母（含 `templates_with_cross_sheet` 182 / `cross_sheet_sites` 144154 /
+`affected_templates` 136 / `extreme_max_sites` 63240）**逐字未变** ⇒ 新 D4 工作簿不含跨 sheet
+限定引用，净化也没碰任何被引用关系。占位标记表 12 键无增删，5 项计数随多扫一份工作簿位移。
+
 | key | 分母 | 值 | 定义（判据必须按此口径复算） |
 |---|---|---:|---|
-| `xlsx_total` | xlsx 模板总数 | **351** | `backend/wp_templates/**/*.xlsx`，排除 `~$` 锁文件 |
+| `xlsx_total` | xlsx 模板总数 | **352** | `backend/wp_templates/**/*.xlsx`，排除 `~$` 锁文件 |
 | `templates_with_cross_sheet` | 含跨 sheet 引用的模板 | **182** | 存在指向**另一个名字**的限定引用（排除自限定、3D、外部工作簿）。**不要求目标 sheet 真实存在** |
 | `cross_sheet_sites` | 跨 sheet 引用处数 | **144154** | 每个「限定前缀 + 目标 token」算一处；分词器同生产 |
 | `cross_sheet_formulas` | 含跨 sheet 引用的 `<f>` 数 | **72825** | 同一 `<f>` 内多处引用只算一条 |
@@ -252,29 +293,29 @@ def _rewrite_formula_refs(
 | `unresolvable_cross_sheet_sites` | 指向**本工作簿里不存在**的 sheet 的引用处数 | **3428** | = 144154 − 140726。权威模板里**已坏**的引用，登记不传播 |
 | `templates_with_unresolvable_targets` | 含上述坏引用的模板 | **18** | |
 | `sheet_name_looks_like_a1_sites` | 表名含 A1 形态子串的引用处数 | **18491** | 误命中类 1 的实测规模。按**全部限定引用**计（不过滤目标存在性）—— 该防护对目标是否存在一视同仁 |
-| `external_sites` | 外部工作簿引用处数 | **2908** | `[n]Sheet!A1`；登记不传播 |
+| `external_sites` | 外部工作簿引用处数 | **2902** | `[n]Sheet!A1`；登记不传播 |
 | `three_d_sites` | 3D 引用处数 | **0** | `Sheet1:Sheet3!A1`；全库空集 ⇒ 判据须用注入变体 |
 | `affected_templates` | 受影响模板（被引用 sheet 含动态行占位） | **136** | 占位标记集见下 |
-| `delivered_contract_entries` | 有已审核 per-entry 契约的 entry | **4** | `DELIVERED_PER_ENTRY_CONTRACTS` 现读 |
+| `delivered_contract_entries` | 有已审核 per-entry 契约的 entry | **10** | `DELIVERED_PER_ENTRY_CONTRACTS` 现读 |
 | `d2_managed_sheet_sites` | D2 受管 sheet 被引用处数 | **52** | 首要判据载体 |
 | `k11_managed_sheet_sites` | K11 受管 sheet 被引用处数 | **114** | 结构判据载体 |
 | `k11_managed_sheet_rows` | K11 受管 sheet 被引用的不同行数 | **19** | 受管区 `A7:N25` 共 19 行 ⇒ 100% 被引用 |
 | `extreme_combinations` | 引用处数 > 1,000 的组合 | **10** | 最大 **63240**（`C24` 的 `2025假期清单`） |
 | `extreme_max_sites` | 最极端组合的引用处数 | **63240** | `C/C24 会计分录 - 细节测试.xlsx` 的 `2025假期清单` |
-| `defined_name_cross` | definedNames 含 sheet 限定引用 | **5002** | 四分类见下四行，和恰为 5002 |
-| `defined_name_builtin_self_scope` | └ 自指的 Print_Area / Print_Titles | **2457** | 传播（打印区域随插行长大） |
-| `defined_name_target_not_in_workbook` | └ 目标不在本工作簿（含 builtin） | **2001** | 登记不传播 |
-| `defined_name_user_self_scope` | └ 自指的用户定义名 | **292** | 传播 |
+| `defined_name_cross` | definedNames 含 sheet 限定引用 | **5004** | 四分类见下四行，和恰为 5004 |
+| `defined_name_builtin_self_scope` | └ 自指的 Print_Area / Print_Titles | **2505** | 传播（打印区域随插行长大） |
+| `defined_name_target_not_in_workbook` | └ 目标不在本工作簿（含 builtin） | **1949** | 登记不传播 |
+| `defined_name_user_self_scope` | └ 自指的用户定义名 | **298** | 传播 |
 | `defined_name_user_cross_sheet` | └ 真跨 sheet 的用户定义名 | **252** | 传播（R4.1 真正的对象） |
-| `hyperlink_location_cross` | `hyperlink@location` 含跨 sheet | **3480** | 三分类见下两行 + `same_sheet` 21 |
-| `hyperlink_location_in_workbook` | └ 工作簿内跨 sheet | **3138** | 传播 |
+| `hyperlink_location_cross` | `hyperlink@location` 含跨 sheet | **3553** | 三分类见下两行 + `same_sheet` 21 |
+| `hyperlink_location_in_workbook` | └ 工作簿内跨 sheet | **3211** | 传播 |
 | `hyperlink_location_not_in_workbook` | └ 目标不在本工作簿 | **321** | 登记不传播 |
 | `dv_formula_cross` | `dataValidation/formula1\|2` 含跨 sheet | **8** | 4 份模板 |
 | `cf_formula_cross` | `conditionalFormatting/formula` 含跨 sheet | **6** | 1 份模板 |
 | `sqref_ref_cross` | `sqref` / `ref` 四类属性含跨 sheet | **0** | 结构性不可能，判据形态见 AC 4.2 |
 | `chart_parts` | `xl/charts/**` 部件 | **8** | 1 份模板；可用真实样本 |
 | `pivot_parts` | `xl/pivot*/**` 部件 | **0** | 空集 ⇒ 判据须用注入变体 |
-| `max_host_name_collisions` | 契约声明的受管 sheet 名在全库最多出现在几份模板里 | **39** | AC 6.5 的反证：> 1 即按 sheet 名定位宿主必然歧义 |
+| `max_host_name_collisions` | 契约声明的受管 sheet 名在全库最多出现在几份模板里 | **40** | AC 6.5 的反证：> 1 即按 sheet 名定位宿主必然歧义 |
 
 ### D2 首要判据载体的引用形态实测（2026-09-05）
 
@@ -316,20 +357,20 @@ def _rewrite_formula_refs(
 
 | key | 标记 | 命中 sheet | 命中模板 |
 |---|---|---:|---:|
-| `ellipsis_single` | `…`（单省略号） | 730 | 163 |
-| `ellipsis_double` | `……`（双省略号） | 625 | 140 |
-| `xx_placeholder` | `××` / `XX`（连续 2+ 个） | 465 | 150 |
+| `ellipsis_single` | `…`（单省略号） | 763 | 164 |
+| `ellipsis_double` | `……`（双省略号） | 657 | 141 |
+| `xx_placeholder` | `××` / `XX`（连续 2+ 个） | 476 | 151 |
 | `self_fill` | `自行` | 56 | 37 |
 | `add_row` | `增行` / `加行` | 54 | 16 |
-| `item_n` | `项目N`（`项目` + 数字/N） | 40 | 24 |
-| `dots_ascii` | `...`（半角三点） | 38 | 28 |
+| `item_n` | `项目N`（`项目` + 数字/N） | 41 | 25 |
+| `dots_ascii` | `...`（半角三点） | 39 | 29 |
 | `insert_row` | `插入行` | 18 | 4 |
 | `fillable` | `可填` | 3 | 3 |
 | `reserved` | `预留` | 2 | 2 |
 | `continued` | `续表` | 1 | 1 |
 | `renameable` | 🔴 `可改名` | **0** | **0** |
 
-⚠ `可改名` 在 requirements.md 里被列为占位标记，但**全库 351 份 xlsx 里命中 0 次**
+⚠ `可改名` 在 requirements.md 里被列为占位标记，但**全库 352 份 xlsx 里命中 0 次**
 （它只出现在 docx / md 侧）。只用 requirements 列的六个标记算出的受影响模板是
 **101 份**，用上表全部标记算出 **136 份** ≈ 原登记的 137。
 
@@ -710,6 +751,14 @@ Excel Table —— Table 是 `excel_instrumentation` **注入**的，不是模�
    预先算好，将来给它发契约时传播需求已是已知量。
 3. 🔴 **今天唯一有真实传播需求的 entry 是 D2**（52 处）。**D2 因此升为本 spec 的首要判据载体**，
    K11 降为**结构判据载体**。
+
+   🔄 **2026-xx 更正（决策包 2）**：Gate 1 的**裁决不变**（覆盖面 = 有契约的 entry 集合，
+   其余 `no_projection_contract`），但本条的两个数都已演进：契约 entry **4 → 10**，
+   有传播需求的 entry **1 → 5**（`d2=52 / d3=51 / d5=24 / d6=3 / d7=3`）。
+   **D2 仍是首要判据载体**，改由「引用侧 sheet 张数严格唯一最大（4，次席 2）」支撑，
+   详见 §「判据分层」第 2 条下的更正表。上表那 4 行是 Wave 0 的原始普查记录，
+   保留不改（审计轨迹）；现算的 10 行以清册
+   `backend/data/workpaper_row_change_reachability.json` 的 `contracted_entries` 为准。
 4. 🔴 **sheet 名不是全库唯一**，禁止按 sheet 名定位宿主模板。实测 `附注披露信息（国企）`
    在 **39 份**模板里都存在，且同名 sheet 在不同模板里被引用情况完全不同（`G7 长期股权投资.xlsx`
    里 0 处，`L/L5 长期应付款.xlsx` 里有 5 个被引用行）。宿主必须由

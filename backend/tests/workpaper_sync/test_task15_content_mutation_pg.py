@@ -75,6 +75,20 @@ if str(_BACKEND) not in sys.path:  # pragma: no cover - import 环境自举
     sys.path.insert(0, str(_BACKEND))
 os.environ.setdefault("DB_DISABLE_SSL", "True")
 
+from tests.workpaper_sync.g1_structure_fixture import (  # noqa: E402
+    attach_projection_json as _attach_projection_json,
+)
+from tests.workpaper_sync.g1_structure_fixture import (  # noqa: E402
+    workbook_fixture as _workbook_fixture,
+)
+
+#: `_workbook_fixture()` 的受管结构锚点。xlsx projection commit 的 structure_hash 是
+#: **发布时刻按字节反读**的（BP-30：`_projection_structure_hash` →
+#: `compute_structure_hash_from_artifact`），plan 的 `structure_anchors` 必须与替身写盘
+#: 字节同源，否则受管结构反读为空即抛。与已全绿的非 PG 兄弟件
+#: `test_task15_content_mutation.py` 用的是同一个 fixture。
+_, _FIXTURE_ANCHORS = _workbook_fixture()
+
 _SCHEMA_PREFIX = "tmp_task15_cm_"
 ENTRY = "g7.disclosure.listed"
 OTHER_WP_ENTRY = "g7.disclosure.soe"
@@ -250,11 +264,6 @@ class _JsonCarrierAdapter:
             for key, value in projection.values.items()
             if key not in self.drop_keys
         }
-        payload = json.dumps(
-            {"contract_id": projection.contract_id, "values": values},
-            sort_keys=True,
-            ensure_ascii=False,
-        ).encode("utf-8")
         if projection.document_type == "xlsx":
             # 🔴 xlsx projection commit 的 structure_hash 由 BP-30 改成**发布时刻按字节反读**
             # （`_projection_structure_hash` → `compute_structure_hash_from_artifact`）：
@@ -269,7 +278,13 @@ class _JsonCarrierAdapter:
         else:
             blob = _ooxml(
                 projection.document_type,
-                extra={"_gt_sync/projection.json": payload},
+                extra={
+                    "_gt_sync/projection.json": json.dumps(
+                        {"contract_id": projection.contract_id, "values": values},
+                        sort_keys=True,
+                        ensure_ascii=False,
+                    ).encode("utf-8")
+                },
             )
             digest = hashlib.sha256(blob).hexdigest()
         Path(output).write_bytes(blob)
@@ -829,6 +844,9 @@ async def _collect() -> dict[str, Any]:  # noqa: C901, PLR0912, PLR0915 - 一次
                     substrate_state=ArtifactState.published,
                     actor_id=user, operation_id=world["op"],
                     parent_version_id=world["cv0"], contract=contract,
+                    # 🔴 xlsx projection commit 必须带冻结受管结构锚点，否则
+                    # `_projection_structure_hash` fail-closed（BP-30）。与替身写盘字节同源。
+                    structure_anchors=dict(_FIXTURE_ANCHORS),
                 )
                 receipt = await mutation_svc.commit(
                     plan=plan,
@@ -953,6 +971,7 @@ async def _collect() -> dict[str, Any]:  # noqa: C901, PLR0912, PLR0915 - 一次
                     substrate_state=ArtifactState.published,
                     actor_id=user, operation_id=world["op"],
                     parent_version_id=world["cv1"], contract=contract,
+                    structure_anchors=dict(_FIXTURE_ANCHORS),
                 )
                 await mutation_svc.commit(
                     plan=stale_plan,
@@ -1001,6 +1020,7 @@ async def _collect() -> dict[str, Any]:  # noqa: C901, PLR0912, PLR0915 - 一次
                     substrate_state=ArtifactState.published,
                     actor_id=user, operation_id=world["op"],
                     parent_version_id=world["cv1"], contract=contract,
+                    structure_anchors=dict(_FIXTURE_ANCHORS),
                 )
                 receipt2 = await mutation_svc.commit(
                     plan=plan_again,
@@ -1157,6 +1177,7 @@ async def _collect() -> dict[str, Any]:  # noqa: C901, PLR0912, PLR0915 - 一次
                 substrate_state=ArtifactState.published,
                 actor_id=user, operation_id=world["op"],
                 parent_version_id=world["cv2"], contract=contract,
+                structure_anchors=dict(_FIXTURE_ANCHORS),
                 pending_mutation_id=token_id, idempotency_key="task15-idem-1",
             )
 
@@ -1548,6 +1569,7 @@ async def _collect() -> dict[str, Any]:  # noqa: C901, PLR0912, PLR0915 - 一次
                     substrate_state=ArtifactState.published,
                     actor_id=user, operation_id=world["op"],
                     parent_version_id=world["cv3"], contract=contract,
+                    structure_anchors=dict(_FIXTURE_ANCHORS),
                     room_id=world["room"],
                 )
                 room_receipt = await mutation_svc.commit(

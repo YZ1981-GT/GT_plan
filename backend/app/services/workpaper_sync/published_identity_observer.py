@@ -1453,8 +1453,8 @@ def collect_workbook_structure(*, data, contract, sheet_anchors, context=None):
                 #    存在性。这条不变量由 `test_single_pass_parse_reuse.py` 的
                 #    `_cells` 键集合判据守护；`shared_workbook_from_bytes` 的 docstring
                 #    也写明了「调用方不得改它」。
-                _, ws = _transposed_resolve(data, spec=spec, share_parse=False)
-                _transposed_extract(data, spec=spec, share_parse=False)
+                _, ws = _transposed_resolve(data, spec=spec, share_parse=True)
+                _transposed_extract(data, spec=spec, share_parse=True)
                 physical[key] = ws.title
                 first_col_letter = spec.first_entity_column
                 first_col_idx = _col_idx(first_col_letter)

@@ -2749,9 +2749,22 @@ class OoToHtmlCoordinator:
         }
         # D4-7 两 item（products / monthly）也走专用块，从 rows 循环 base 构造中排除
         _dict_store_items |= {str(s) for s in getattr(bridge, "STORE_ITEM_IDS_D47_DEDICATED", ()) or ()}
+        # 🔴 纯文本固定项（D4-5 业务场景 / D4-13 核对过程·结论）与 D4-35 dict-store 也各走专用块
+        #    （见下方 merge_d45_fixed / merge_d413_fixed / merge_d435 分支），从 rows 循环 base
+        #    构造中排除——否则它们会被当成行数组 base，与专用块重复处理。
+        _dict_store_items |= {str(s) for s in getattr(bridge, "STORE_ITEM_IDS_D45_FIXED", ()) or ()}
+        _dict_store_items |= {str(s) for s in getattr(bridge, "STORE_ITEM_IDS_D413_FIXED", ()) or ()}
+        _dict_store_items.add(str(getattr(bridge, "STORE_ITEM_ID_D435_DICT", "") or ""))
         _dict_store_items.discard("")
+        # 🔴 rows 循环的**基础集合**取 provider 单一口径 `all_store_item_ids()`（与出方向
+        #    store_projection_response 同源，Requirement 3.1「两方向不得各自维护并集」），
+        #    再显式减去上面所有走专用块的 item。老 provider 无该函数则回退 STORE_ITEM_IDS。
+        _all_ids_fn = getattr(bridge, "all_store_item_ids", None)
+        _rows_loop_item_ids = (
+            tuple(_all_ids_fn()) if callable(_all_ids_fn) else tuple(bridge.STORE_ITEM_IDS)
+        )
         base_by_item: dict[str, Any] = {}
-        for item_id in bridge.STORE_ITEM_IDS:
+        for item_id in _rows_loop_item_ids:
             if item_id in _dict_store_items:
                 continue
             raw = (

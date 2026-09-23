@@ -63,6 +63,7 @@ from app.services.workpaper_sync.entry_profile import (  # noqa: E402
     EntryProfile,
     RoomModel,
     ScenarioProfile,
+    capability_of,
     load_entry_manifest,
     manifest_entries_by_id,
 )
@@ -1775,11 +1776,32 @@ class TestPilotClassCoverage:
             )
 
     def test_no_class_is_verified_today_because_there_is_no_bidirectional_entry(self) -> None:
-        """今天的事实：0 个 bidirectional entry ⇒ 四类全 UNVERIFIABLE。"""
+        """今天的事实：**没有任何 entry 通过服务端 evidence 重算** ⇒ 四类全 UNVERIFIABLE。
+
+        🔴 判据已换（2026-09-07）：原文钉的是「0 个 bidirectional entry」。那个
+        population 已经过期 —— reviewed overlay 已把 `xlsx/gt-d2-accounts-receivable` /
+        `xlsx/gt-h1-fixed-assets` / `xlsx/gt-g7-long-term-equity-main` 裁决为
+        bidirectional（manifest 实测 4 条 bidirectional）。
+
+        **不变量一个字都没变**：`capability=bidirectional` 这个旗标本身**不产生**
+        verified —— 只有 `verified_entry_ids` 非空（= 服务端 evidence 重算真通过）才算。
+        因此 bidirectional 集合改成**活体双源派生**（测试侧直接用 `capability_of` 现读
+        manifest，与生产的 `assess_pilot_classes` 互为对照），牙齿落在
+        `verified_entry_ids == ()` 这条真正的判据上：谁把 `status` 接到 capability 旗标
+        上，这条立刻打红。
+        """
+        entries = manifest_entries_by_id(load_entry_manifest())
         assessments = PH.assess_pilot_classes()
         for pilot_class, assessment in sorted(assessments.items(), key=lambda kv: kv[0].value):
             assert assessment.status is PH.PilotClassStatus.unverifiable, pilot_class
-            assert assessment.bidirectional_entry_ids == (), assessment
+            # 活体派生（不是冻结 population）：bidirectional 子集必须**就是** manifest 现说的那些
+            assert assessment.bidirectional_entry_ids == tuple(
+                eid
+                for eid in assessment.candidate_entry_ids
+                if capability_of(entries[eid]) is Capability.bidirectional
+            ), assessment
+            # 🔴 真正的牙齿：一条都没通过服务端重算 ⇒ 四类必须全 UNVERIFIABLE
+            assert assessment.verified_entry_ids == (), assessment
             assert assessment.reasons, f"{pilot_class.value}: UNVERIFIABLE 却没给理由"
         assert PH.pilot_coverage_summary(assessments)["all_verified"] is False
 

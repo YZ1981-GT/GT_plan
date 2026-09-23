@@ -63,6 +63,22 @@
         "working_paper_sync_entry_state_rows_total": 2
       },
       "measured_by": "gate.binding_constraint_is_measured / arm_a + arm_b",
+      "measured_readings": [
+        {
+          "measured_at": "2026-09-04",
+          "note": "更正事件当天的读数；完整快照见 `measured_2026_09_04`",
+          "of_which_manifest_entry": 1,
+          "of_which_opaque_namespace": 1,
+          "working_paper_sync_entry_state_rows_total": 2
+        },
+        {
+          "measured_at": "2026-09-23",
+          "note": "静默库实测（两次独立连接相隔 112 秒读数逐项相同、三表 30 分钟内无写入、无写意图锁、本库无 active backend）。manifest entry 侧 1→11 行，`opaque-` 侧仍是唯一那 1 行 ⇒ 「数全表行数」这个判据比 2026-09-04 时更失真，按 manifest entry_id 集合过滤这条结论进一步被实测支持。",
+          "of_which_manifest_entry": 11,
+          "of_which_opaque_namespace": 1,
+          "working_paper_sync_entry_state_rows_total": 12
+        }
+      ],
       "owner_task": "供给侧 = published-representation-production-path-and-lane-adjudication spec（首版发布宿主）；capability 翻转侧 = manifest 重生成 + `approved_source_digest` 人工复核（Task 67 登记的复核方）—— 均不属 Task 61",
       "scope": "platform_wide_not_f2_specific",
       "unblocks": "Task 61 正文第一句的准入条件（resolver 返回 published representation）",
@@ -847,7 +863,7 @@
     "P69": "evidence 由逐 scenario 实体与服务端重算闭合",
     "P71": "evidence 随环境、runner 与 immutable definition bundle 变化失效"
   },
-  "registry_digest": "90ba362301656a13dda3c97064d3011d38a02fe8e85ba841e06e6696c37ad36b",
+  "registry_digest": "0039669c9869975b5eb15229a1f010482defeef69dbf379ab1bd3da2a424efbb",
   "requirements_claimed_but_not_declared": [],
   "requirements_without_probe": [],
   "scenario_denominator": {

@@ -129,11 +129,24 @@ def matrix() -> dict[str, Any]:
     return json.loads(_MATRIX_PATH.read_text(encoding="utf-8"))
 
 
+def _tasks_md_text() -> str:
+    """tasks.md 文本，**换行符归一化**后返回。
+
+    🔴 不能用 `read_bytes().decode("utf-8")`：`.gitattributes` 没有对 `*.md` 强制
+    `eol=lf`，所以 Windows 工作树里 tasks.md 是 **CRLF**。裸 decode 会把 `\\r` 留在
+    行尾，于是 `re.M` 下的 `^…$` 锚点全部失配 —— `## Task Dependency Graph` 明明在
+    文件里（第 17 行），判据却报「找不到 json 块」，把一个**解析缺陷**伪装成
+    「文档缺章节」。同 spec 的 `generate_workpaper_sync_program_milestones.py` 一直用
+    `read_text()`（universal newlines）读同一个文件，本处与之对齐。
+    """
+    return _TASKS_MD.read_text(encoding="utf-8").replace("\r\n", "\n").replace("\r", "\n")
+
+
 def _task_bodies() -> dict[str, list[str]]:
     """tasks.md → {任务号: 正文行}。行首锚定，不用字符窗口。"""
     bodies: dict[str, list[str]] = {}
     current: list[str] | None = None
-    for line in _TASKS_MD.read_bytes().decode("utf-8").split("\n"):
+    for line in _tasks_md_text().split("\n"):
         head = _TASK_HEAD_RE.match(line)
         if head:
             current = bodies.setdefault(head.group(1), [])
@@ -207,7 +220,7 @@ def _dependency_graph() -> dict[str, Any]:
 
     行首锚定 + 结构断言，不用字符窗口（本 spec 三个文档都在被并发会话改）。
     """
-    text = _TASKS_MD.read_bytes().decode("utf-8")
+    text = _tasks_md_text()
     block = re.search(
         r"^## Task Dependency Graph$\n\n^```json$\n(.*?)^```$", text, re.M | re.S
     )

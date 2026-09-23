@@ -1056,9 +1056,22 @@ class TestBlockingPreconditions:
 
 
 class TestGeneratorIsIdempotentAndCheckIsStrict:
-    def test_build_record_is_byte_stable(self, record: dict[str, Any]) -> None:
+    def test_build_record_is_byte_stable(self) -> None:
+        """两次 `build_record()` 必须逐字节一致（真·确定性自检）。
+
+        🔴 不要把 `record` fixture 加回来：那个 fixture 读的是**磁盘上的产物**，
+        拿它和一次 `build_record()` 比，断言的是「现算 == 磁盘」——那是下面
+        `test_check_matches_the_file_on_disk` 的判据，和本测试同名不同义。
+        历史上本测试就是那么写的，于是①确定性其实**从未被测**（唯一的现算调用
+        只有一次，没有第二次可比）②它和下一条断言同一个事实，一处上游漂移打红两条
+        ③失败信息写"时间戳/集合序"，把诊断引向"生成器非确定性"，而 2026-06-01
+        实测生成器连跑 3 次 0 diff，真因是行尾（CRLF vs LF）——详见
+        docs/operations/evidence/suite-triage/generated-artifact-drift.md §EOL 根因修复。
+        现在只比两次现算，名字/断言/失败信息三者一致。
+        """
+        first = GEN.build_record()
         again = GEN.build_record()
-        assert GEN._canonical_text(again) == GEN._canonical_text(record), (
+        assert GEN._canonical_text(again) == GEN._canonical_text(first), (
             "两次 build_record() 结果不一致 —— 记录含非确定性内容（时间戳/集合序），"
             "`--check` 会变成随机红"
         )

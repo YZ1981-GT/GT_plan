@@ -821,7 +821,7 @@
     "ellipsis_single",
     "xx_placeholder"
    ],
-   "reason": "no_projection_contract",
+   "reason": "implemented",
    "referencing_sheets": [
     "关联方关系及交易检查表D1-11",
     "原值明细表（按客户）D1-3",
@@ -845,7 +845,7 @@
    ],
    "referencing_sites": 155,
    "rel_path": "D/D1 应收票据.xlsx",
-   "state": "blocked"
+   "state": "propagated"
   },
   {
    "managed_sheet_candidates": [
@@ -914,7 +914,7 @@
     "ellipsis_single",
     "xx_placeholder"
    ],
-   "reason": "no_projection_contract",
+   "reason": "implemented",
    "referencing_sheets": [
     "关联关系及交易检查表D3-6",
     "审定表D3-1",
@@ -929,7 +929,7 @@
    ],
    "referencing_sites": 135,
    "rel_path": "D/D3 预收账款.xlsx",
-   "state": "blocked"
+   "state": "propagated"
   },
   {
    "managed_sheet_candidates": [
@@ -1060,7 +1060,7 @@
     "ellipsis_double",
     "ellipsis_single"
    ],
-   "reason": "no_projection_contract",
+   "reason": "implemented",
    "referencing_sheets": [
     "审定表D5",
     "应收款项融资公允价值测算表D5-4",
@@ -1072,7 +1072,7 @@
    ],
    "referencing_sites": 66,
    "rel_path": "D/D5 应收款项融资.xlsx",
-   "state": "blocked"
+   "state": "propagated"
   },
   {
    "managed_sheet_candidates": [
@@ -1083,7 +1083,7 @@
     "ellipsis_single",
     "xx_placeholder"
    ],
-   "reason": "no_projection_contract",
+   "reason": "implemented",
    "referencing_sheets": [
     "关联关系及交易检查D6-5",
     "减值准备测算D6-8",
@@ -1100,7 +1100,7 @@
    ],
    "referencing_sites": 76,
    "rel_path": "D/D6 合同资产.xlsx",
-   "state": "blocked"
+   "state": "propagated"
   },
   {
    "managed_sheet_candidates": [
@@ -1111,7 +1111,7 @@
     "ellipsis_single",
     "xx_placeholder"
    ],
-   "reason": "no_projection_contract",
+   "reason": "implemented",
    "referencing_sheets": [
     "关联方关系及交易检查表D7-6",
     "合同负债分析表D7-4",
@@ -1126,7 +1126,7 @@
    ],
    "referencing_sites": 67,
    "rel_path": "D/D7 合同负债.xlsx",
-   "state": "blocked"
+   "state": "propagated"
   },
   {
    "managed_sheet_candidates": [
@@ -3545,6 +3545,28 @@
    "template_sha256_matches": true
   },
   {
+   "contract_id": "d1.notes_receivable_detail",
+   "entry_id": "xlsx/gt-d1-notes-receivable",
+   "managed_sheets": [
+    {
+     "anchors": [
+      "A10"
+     ],
+     "excel_name": "原值明细表（按客户）D1-3",
+     "has_dynamic_rows": true,
+     "referenced_rows": [],
+     "referencing_sheets": [],
+     "referencing_sites": 0
+    }
+   ],
+   "propagation_demand_sites": 0,
+   "reason": "no_propagation_demand",
+   "state": "out_of_scope",
+   "template_present": true,
+   "template_relative_path": "D/D1 应收票据.xlsx",
+   "template_sha256_matches": true
+  },
+  {
    "contract_id": "d2.receivable_detail",
    "entry_id": "xlsx/gt-d2-accounts-receivable",
    "managed_sheets": [
@@ -3573,6 +3595,486 @@
    "state": "propagated",
    "template_present": true,
    "template_relative_path": "D/D2-1至D2-4  应收账款- 审定表明细表（Leap-常规程序）.xlsx",
+   "template_sha256_matches": true
+  },
+  {
+   "contract_id": "d3.prepaid_receipts_detail",
+   "entry_id": "xlsx/gt-d3-prepaid-accounts",
+   "managed_sheets": [
+    {
+     "anchors": [
+      "A10"
+     ],
+     "excel_name": "预收账款明细表D3-2",
+     "has_dynamic_rows": true,
+     "referenced_rows": [
+      12,
+      22,
+      24
+     ],
+     "referencing_sheets": [
+      "审定表D3-1",
+      "预收账款检查表D3-7"
+     ],
+     "referencing_sites": 51
+    }
+   ],
+   "propagation_demand_sites": 51,
+   "reason": "implemented",
+   "state": "propagated",
+   "template_present": true,
+   "template_relative_path": "D/D3 预收账款.xlsx",
+   "template_sha256_matches": true
+  },
+  {
+   "contract_id": "d4.revenue_detail",
+   "entry_id": "xlsx/gt-d4-operating-revenue",
+   "managed_sheets": [
+    {
+     "anchors": [
+      "A11"
+     ],
+     "excel_name": "主营业务收入明细表D4-2",
+     "has_dynamic_rows": true,
+     "referenced_rows": [],
+     "referencing_sheets": [],
+     "referencing_sites": 0
+    },
+    {
+     "anchors": [
+      "A11"
+     ],
+     "excel_name": "其他业务收入明细表D4-3",
+     "has_dynamic_rows": true,
+     "referenced_rows": [],
+     "referencing_sheets": [],
+     "referencing_sites": 0
+    },
+    {
+     "anchors": [
+      "A17",
+      "B11"
+     ],
+     "excel_name": "营业收入会计政策检查D4-5",
+     "has_dynamic_rows": true,
+     "referenced_rows": [],
+     "referencing_sheets": [],
+     "referencing_sites": 0
+    },
+    {
+     "anchors": [
+      "A5"
+     ],
+     "excel_name": "营业收入账面金额与ERP系统核对记录D4-13",
+     "has_dynamic_rows": false,
+     "referenced_rows": [],
+     "referencing_sheets": [],
+     "referencing_sites": 0
+    },
+    {
+     "anchors": [
+      "A15"
+     ],
+     "excel_name": "关联方销售情况及价格分析D4-21",
+     "has_dynamic_rows": true,
+     "referenced_rows": [],
+     "referencing_sheets": [],
+     "referencing_sites": 0
+    },
+    {
+     "anchors": [
+      "A11"
+     ],
+     "excel_name": "重要指标分析表D4-22",
+     "has_dynamic_rows": true,
+     "referenced_rows": [],
+     "referencing_sheets": [],
+     "referencing_sites": 0
+    },
+    {
+     "anchors": [
+      "A10"
+     ],
+     "excel_name": "收入与开具发票金额比较分析D4-23",
+     "has_dynamic_rows": true,
+     "referenced_rows": [],
+     "referencing_sheets": [],
+     "referencing_sites": 0
+    },
+    {
+     "anchors": [
+      "A14"
+     ],
+     "excel_name": "第三方回款检查D4-24",
+     "has_dynamic_rows": true,
+     "referenced_rows": [],
+     "referencing_sheets": [],
+     "referencing_sites": 0
+    },
+    {
+     "anchors": [
+      "A13"
+     ],
+     "excel_name": "其他业务收入检查表D4-35",
+     "has_dynamic_rows": true,
+     "referenced_rows": [],
+     "referencing_sheets": [],
+     "referencing_sites": 0
+    },
+    {
+     "anchors": [
+      "A13",
+      "A7"
+     ],
+     "excel_name": "营业收入审定表D4-1",
+     "has_dynamic_rows": true,
+     "referenced_rows": [],
+     "referencing_sheets": [],
+     "referencing_sites": 0
+    },
+    {
+     "anchors": [
+      "A12",
+      "A24",
+      "A26"
+     ],
+     "excel_name": "重要客户结构分析D4-9",
+     "has_dynamic_rows": true,
+     "referenced_rows": [],
+     "referencing_sheets": [],
+     "referencing_sites": 0
+    },
+    {
+     "anchors": [
+      "C10"
+     ],
+     "excel_name": "客户信息检查表D4-29",
+     "has_dynamic_rows": true,
+     "referenced_rows": [],
+     "referencing_sheets": [],
+     "referencing_sites": 0
+    },
+    {
+     "anchors": [
+      "B10"
+     ],
+     "excel_name": "合同检查表D4-12",
+     "has_dynamic_rows": true,
+     "referenced_rows": [],
+     "referencing_sheets": [],
+     "referencing_sites": 0
+    },
+    {
+     "anchors": [
+      "A11"
+     ],
+     "excel_name": "经销商检查D4-25",
+     "has_dynamic_rows": true,
+     "referenced_rows": [],
+     "referencing_sheets": [],
+     "referencing_sites": 0
+    },
+    {
+     "anchors": [
+      "A11"
+     ],
+     "excel_name": "境外销售收入检查D4-26",
+     "has_dynamic_rows": true,
+     "referenced_rows": [],
+     "referencing_sheets": [],
+     "referencing_sites": 0
+    },
+    {
+     "anchors": [
+      "A14"
+     ],
+     "excel_name": "识别未披露的关联方D4-27",
+     "has_dynamic_rows": true,
+     "referenced_rows": [],
+     "referencing_sheets": [],
+     "referencing_sites": 0
+    },
+    {
+     "anchors": [
+      "A12"
+     ],
+     "excel_name": "客户信息核查清单D4-28",
+     "has_dynamic_rows": true,
+     "referenced_rows": [],
+     "referencing_sheets": [],
+     "referencing_sites": 0
+    },
+    {
+     "anchors": [
+      "A11"
+     ],
+     "excel_name": "营业收入完整性检查表D4-15",
+     "has_dynamic_rows": true,
+     "referenced_rows": [],
+     "referencing_sheets": [],
+     "referencing_sites": 0
+    },
+    {
+     "anchors": [
+      "A11"
+     ],
+     "excel_name": "出口收入电子口岸系统核对D4-16",
+     "has_dynamic_rows": true,
+     "referenced_rows": [],
+     "referencing_sheets": [],
+     "referencing_sites": 0
+    },
+    {
+     "anchors": [
+      "A5"
+     ],
+     "excel_name": "客户访谈记录汇总表D4-30",
+     "has_dynamic_rows": true,
+     "referenced_rows": [],
+     "referencing_sheets": [],
+     "referencing_sites": 0
+    },
+    {
+     "anchors": [
+      "A4"
+     ],
+     "excel_name": "客户访谈记录 D4-31",
+     "has_dynamic_rows": true,
+     "referenced_rows": [],
+     "referencing_sheets": [],
+     "referencing_sites": 0
+    },
+    {
+     "anchors": [
+      "A12"
+     ],
+     "excel_name": "客户、供应商等资金流水检查D4-32",
+     "has_dynamic_rows": true,
+     "referenced_rows": [],
+     "referencing_sheets": [],
+     "referencing_sites": 0
+    },
+    {
+     "anchors": [
+      "A12"
+     ],
+     "excel_name": "重要指标分析D4-6",
+     "has_dynamic_rows": true,
+     "referenced_rows": [],
+     "referencing_sheets": [],
+     "referencing_sites": 0
+    },
+    {
+     "anchors": [
+      "A12"
+     ],
+     "excel_name": "营业收入截止测试（账到单据）D4-17",
+     "has_dynamic_rows": true,
+     "referenced_rows": [],
+     "referencing_sheets": [],
+     "referencing_sites": 0
+    },
+    {
+     "anchors": [
+      "A12"
+     ],
+     "excel_name": "营业收入截止测试（单据到账）D4-18",
+     "has_dynamic_rows": true,
+     "referenced_rows": [],
+     "referencing_sheets": [],
+     "referencing_sites": 0
+    },
+    {
+     "anchors": [
+      "A12"
+     ],
+     "excel_name": "销售折扣与折让检查D4-19",
+     "has_dynamic_rows": true,
+     "referenced_rows": [],
+     "referencing_sheets": [],
+     "referencing_sites": 0
+    },
+    {
+     "anchors": [
+      "A11"
+     ],
+     "excel_name": "产品销售价格分析D4-11",
+     "has_dynamic_rows": true,
+     "referenced_rows": [],
+     "referencing_sheets": [],
+     "referencing_sites": 0
+    },
+    {
+     "anchors": [
+      "A12"
+     ],
+     "excel_name": "重要客户销售价格分析D4-10",
+     "has_dynamic_rows": true,
+     "referenced_rows": [],
+     "referencing_sheets": [],
+     "referencing_sites": 0
+    },
+    {
+     "anchors": [
+      "A13",
+      "A24",
+      "A33",
+      "A39"
+     ],
+     "excel_name": "销售退货检查表 D4-20",
+     "has_dynamic_rows": true,
+     "referenced_rows": [],
+     "referencing_sheets": [],
+     "referencing_sites": 0
+    },
+    {
+     "anchors": [
+      "A11"
+     ],
+     "excel_name": "其他业务毛利率分析表D4-33",
+     "has_dynamic_rows": false,
+     "referenced_rows": [],
+     "referencing_sheets": [],
+     "referencing_sites": 0
+    },
+    {
+     "anchors": [
+      "A13"
+     ],
+     "excel_name": "重要产品毛利分析D4-8",
+     "has_dynamic_rows": false,
+     "referenced_rows": [],
+     "referencing_sheets": [],
+     "referencing_sites": 0
+    },
+    {
+     "anchors": [
+      "A12",
+      "A19"
+     ],
+     "excel_name": "其他业务收入合同测算表D4-34",
+     "has_dynamic_rows": true,
+     "referenced_rows": [],
+     "referencing_sheets": [],
+     "referencing_sites": 0
+    },
+    {
+     "anchors": [
+      "A15",
+      "A35"
+     ],
+     "excel_name": "其他业务收入截止性测试D4-36",
+     "has_dynamic_rows": true,
+     "referenced_rows": [],
+     "referencing_sheets": [],
+     "referencing_sites": 0
+    },
+    {
+     "anchors": [
+      "A11",
+      "A19"
+     ],
+     "excel_name": "毛利率分析表D4-7",
+     "has_dynamic_rows": true,
+     "referenced_rows": [],
+     "referencing_sheets": [],
+     "referencing_sites": 0
+    },
+    {
+     "anchors": [
+      "A13"
+     ],
+     "excel_name": "营业收入发生检查表D4-14",
+     "has_dynamic_rows": true,
+     "referenced_rows": [],
+     "referencing_sheets": [],
+     "referencing_sites": 0
+    }
+   ],
+   "propagation_demand_sites": 0,
+   "reason": "no_propagation_demand",
+   "state": "out_of_scope",
+   "template_present": true,
+   "template_relative_path": "D/D4 收入底稿.xlsx",
+   "template_sha256_matches": true
+  },
+  {
+   "contract_id": "d5.receivables_financing_detail",
+   "entry_id": "xlsx/gt-d5-receivables-financing",
+   "managed_sheets": [
+    {
+     "anchors": [
+      "A10"
+     ],
+     "excel_name": "应收款项融资明细表D5-2",
+     "has_dynamic_rows": true,
+     "referenced_rows": [
+      12,
+      16
+     ],
+     "referencing_sheets": [
+      "审定表D5"
+     ],
+     "referencing_sites": 24
+    }
+   ],
+   "propagation_demand_sites": 24,
+   "reason": "implemented",
+   "state": "propagated",
+   "template_present": true,
+   "template_relative_path": "D/D5 应收款项融资.xlsx",
+   "template_sha256_matches": true
+  },
+  {
+   "contract_id": "d6.contract_assets_detail",
+   "entry_id": "xlsx/gt-d6-contract-assets",
+   "managed_sheets": [
+    {
+     "anchors": [
+      "A12"
+     ],
+     "excel_name": "明细表D6-2",
+     "has_dynamic_rows": true,
+     "referenced_rows": [
+      26
+     ],
+     "referencing_sheets": [
+      "合同资产检查表D6-6"
+     ],
+     "referencing_sites": 3
+    }
+   ],
+   "propagation_demand_sites": 3,
+   "reason": "implemented",
+   "state": "propagated",
+   "template_present": true,
+   "template_relative_path": "D/D6 合同资产.xlsx",
+   "template_sha256_matches": true
+  },
+  {
+   "contract_id": "d7.contract_liabilities_detail",
+   "entry_id": "xlsx/gt-d7-contract-liabilities",
+   "managed_sheets": [
+    {
+     "anchors": [
+      "A8"
+     ],
+     "excel_name": "明细表D7-2",
+     "has_dynamic_rows": true,
+     "referenced_rows": [
+      23
+     ],
+     "referencing_sheets": [
+      "合同负债检查表D7-7"
+     ],
+     "referencing_sites": 3
+    }
+   ],
+   "propagation_demand_sites": 3,
+   "reason": "implemented",
+   "state": "propagated",
+   "template_present": true,
+   "template_relative_path": "D/D7 合同负债.xlsx",
    "template_sha256_matches": true
   },
   {
@@ -3628,22 +4130,22 @@
   "cross_sheet_formulas": 72825,
   "cross_sheet_sites": 144154,
   "d2_managed_sheet_sites": 52,
-  "defined_name_builtin_self_scope": 2457,
-  "defined_name_cross": 5002,
-  "defined_name_target_not_in_workbook": 2001,
+  "defined_name_builtin_self_scope": 2505,
+  "defined_name_cross": 5004,
+  "defined_name_target_not_in_workbook": 1949,
   "defined_name_user_cross_sheet": 252,
-  "defined_name_user_self_scope": 292,
-  "delivered_contract_entries": 4,
+  "defined_name_user_self_scope": 298,
+  "delivered_contract_entries": 10,
   "dv_formula_cross": 8,
-  "external_sites": 2908,
+  "external_sites": 2902,
   "extreme_combinations": 10,
   "extreme_max_sites": 63240,
-  "hyperlink_location_cross": 3480,
-  "hyperlink_location_in_workbook": 3138,
+  "hyperlink_location_cross": 3553,
+  "hyperlink_location_in_workbook": 3211,
   "hyperlink_location_not_in_workbook": 321,
   "k11_managed_sheet_rows": 19,
   "k11_managed_sheet_sites": 114,
-  "max_host_name_collisions": 39,
+  "max_host_name_collisions": 40,
   "pivot_parts": 0,
   "resolvable_cross_sheet_formulas": 70117,
   "resolvable_cross_sheet_sites": 140726,
@@ -3654,7 +4156,7 @@
   "templates_with_unresolvable_targets": 18,
   "three_d_sites": 0,
   "unresolvable_cross_sheet_sites": 3428,
-  "xlsx_total": 351
+  "xlsx_total": 352
  },
  "extremes": [
   {
@@ -3735,11 +4237,176 @@
    "other_hosts_sample": [],
    "templates_containing": 1
   },
+  "主营业务收入明细表D4-2": {
+   "bound_host": "D/D4 收入底稿.xlsx",
+   "bound_host_is_among_them": true,
+   "other_hosts_sample": [
+    "D/D4-1至D4-4 营业收入 - 审定表明细表（Leap-常规程序）.xlsx",
+    "D/D4收入底稿.xlsx"
+   ],
+   "templates_containing": 3
+  },
+  "产品销售价格分析D4-11": {
+   "bound_host": "D/D4 收入底稿.xlsx",
+   "bound_host_is_among_them": true,
+   "other_hosts_sample": [
+    "D/D4-6至D4-11营业收入 - 分析程序（Leap应对措施-分析程序）.xlsx",
+    "D/D4收入底稿.xlsx"
+   ],
+   "templates_containing": 3
+  },
+  "关联方销售情况及价格分析D4-21": {
+   "bound_host": "D/D4 收入底稿.xlsx",
+   "bound_host_is_among_them": true,
+   "other_hosts_sample": [
+    "D/D4-21营业收入-关联方检查（Leap-常规程序）.xlsx",
+    "D/D4收入底稿.xlsx"
+   ],
+   "templates_containing": 3
+  },
+  "其他业务收入合同测算表D4-34": {
+   "bound_host": "D/D4 收入底稿.xlsx",
+   "bound_host_is_among_them": true,
+   "other_hosts_sample": [
+    "D/D4-33至D4-36 其他业务收入.xlsx",
+    "D/D4收入底稿.xlsx"
+   ],
+   "templates_containing": 3
+  },
+  "其他业务收入截止性测试D4-36": {
+   "bound_host": "D/D4 收入底稿.xlsx",
+   "bound_host_is_among_them": true,
+   "other_hosts_sample": [
+    "D/D4-33至D4-36 其他业务收入.xlsx",
+    "D/D4收入底稿.xlsx"
+   ],
+   "templates_containing": 3
+  },
+  "其他业务收入明细表D4-3": {
+   "bound_host": "D/D4 收入底稿.xlsx",
+   "bound_host_is_among_them": true,
+   "other_hosts_sample": [
+    "D/D4-1至D4-4 营业收入 - 审定表明细表（Leap-常规程序）.xlsx",
+    "D/D4收入底稿.xlsx"
+   ],
+   "templates_containing": 3
+  },
+  "其他业务收入检查表D4-35": {
+   "bound_host": "D/D4 收入底稿.xlsx",
+   "bound_host_is_among_them": true,
+   "other_hosts_sample": [
+    "D/D4-33至D4-36 其他业务收入.xlsx",
+    "D/D4收入底稿.xlsx"
+   ],
+   "templates_containing": 3
+  },
+  "其他业务毛利率分析表D4-33": {
+   "bound_host": "D/D4 收入底稿.xlsx",
+   "bound_host_is_among_them": true,
+   "other_hosts_sample": [
+    "D/D4-33至D4-36 其他业务收入.xlsx",
+    "D/D4收入底稿.xlsx"
+   ],
+   "templates_containing": 3
+  },
   "减少检查表H1-8": {
    "bound_host": "H/H1 固定资产.xlsx",
    "bound_host_is_among_them": true,
    "other_hosts_sample": [],
    "templates_containing": 1
+  },
+  "出口收入电子口岸系统核对D4-16": {
+   "bound_host": "D/D4 收入底稿.xlsx",
+   "bound_host_is_among_them": true,
+   "other_hosts_sample": [
+    "D/D4-13至D4-20主营业务收入-检查（Leap应对措施-检查）.xlsx",
+    "D/D4收入底稿.xlsx"
+   ],
+   "templates_containing": 3
+  },
+  "原值明细表（按客户）D1-3": {
+   "bound_host": "D/D1 应收票据.xlsx",
+   "bound_host_is_among_them": true,
+   "other_hosts_sample": [],
+   "templates_containing": 1
+  },
+  "合同检查表D4-12": {
+   "bound_host": "D/D4 收入底稿.xlsx",
+   "bound_host_is_among_them": true,
+   "other_hosts_sample": [
+    "D/D4-12 营业收入-合同检查（Leap-常规程序）.xlsx",
+    "D/D4收入底稿.xlsx"
+   ],
+   "templates_containing": 3
+  },
+  "境外销售收入检查D4-26": {
+   "bound_host": "D/D4 收入底稿.xlsx",
+   "bound_host_is_among_them": true,
+   "other_hosts_sample": [
+    "D/D4-22至D4-32营业收入-IPO 上市 新三板 重组 舞弊应对.xlsx",
+    "D/D4收入底稿.xlsx"
+   ],
+   "templates_containing": 3
+  },
+  "客户、供应商等资金流水检查D4-32": {
+   "bound_host": "D/D4 收入底稿.xlsx",
+   "bound_host_is_among_them": true,
+   "other_hosts_sample": [
+    "D/D4-22至D4-32营业收入-IPO 上市 新三板 重组 舞弊应对.xlsx",
+    "D/D4收入底稿.xlsx"
+   ],
+   "templates_containing": 3
+  },
+  "客户信息核查清单D4-28": {
+   "bound_host": "D/D4 收入底稿.xlsx",
+   "bound_host_is_among_them": true,
+   "other_hosts_sample": [
+    "D/D4-22至D4-32营业收入-IPO 上市 新三板 重组 舞弊应对.xlsx",
+    "D/D4收入底稿.xlsx"
+   ],
+   "templates_containing": 3
+  },
+  "客户信息检查表D4-29": {
+   "bound_host": "D/D4 收入底稿.xlsx",
+   "bound_host_is_among_them": true,
+   "other_hosts_sample": [
+    "D/D4-22至D4-32营业收入-IPO 上市 新三板 重组 舞弊应对.xlsx",
+    "D/D4收入底稿.xlsx"
+   ],
+   "templates_containing": 3
+  },
+  "客户访谈记录 D4-31": {
+   "bound_host": "D/D4 收入底稿.xlsx",
+   "bound_host_is_among_them": true,
+   "other_hosts_sample": [
+    "D/D4-22至D4-32营业收入-IPO 上市 新三板 重组 舞弊应对.xlsx",
+    "D/D4收入底稿.xlsx"
+   ],
+   "templates_containing": 3
+  },
+  "客户访谈记录汇总表D4-30": {
+   "bound_host": "D/D4 收入底稿.xlsx",
+   "bound_host_is_among_them": true,
+   "other_hosts_sample": [
+    "D/D4-22至D4-32营业收入-IPO 上市 新三板 重组 舞弊应对.xlsx",
+    "D/D4收入底稿.xlsx"
+   ],
+   "templates_containing": 3
+  },
+  "应收款项融资明细表D5-2": {
+   "bound_host": "D/D5 应收款项融资.xlsx",
+   "bound_host_is_among_them": true,
+   "other_hosts_sample": [],
+   "templates_containing": 1
+  },
+  "收入与开具发票金额比较分析D4-23": {
+   "bound_host": "D/D4 收入底稿.xlsx",
+   "bound_host_is_among_them": true,
+   "other_hosts_sample": [
+    "D/D4-22至D4-32营业收入-IPO 上市 新三板 重组 舞弊应对.xlsx",
+    "D/D4收入底稿.xlsx"
+   ],
+   "templates_containing": 3
   },
   "明细表D2-2": {
    "bound_host": "D/D2-1至D2-4  应收账款- 审定表明细表（Leap-常规程序）.xlsx",
@@ -3747,17 +4414,197 @@
    "other_hosts_sample": [],
    "templates_containing": 1
   },
+  "明细表D6-2": {
+   "bound_host": "D/D6 合同资产.xlsx",
+   "bound_host_is_among_them": true,
+   "other_hosts_sample": [],
+   "templates_containing": 1
+  },
+  "明细表D7-2": {
+   "bound_host": "D/D7 合同负债.xlsx",
+   "bound_host_is_among_them": true,
+   "other_hosts_sample": [],
+   "templates_containing": 1
+  },
+  "毛利率分析表D4-7": {
+   "bound_host": "D/D4 收入底稿.xlsx",
+   "bound_host_is_among_them": true,
+   "other_hosts_sample": [
+    "D/D4-6至D4-11营业收入 - 分析程序（Leap应对措施-分析程序）.xlsx",
+    "D/D4收入底稿.xlsx"
+   ],
+   "templates_containing": 3
+  },
+  "第三方回款检查D4-24": {
+   "bound_host": "D/D4 收入底稿.xlsx",
+   "bound_host_is_among_them": true,
+   "other_hosts_sample": [
+    "D/D4-22至D4-32营业收入-IPO 上市 新三板 重组 舞弊应对.xlsx",
+    "D/D4收入底稿.xlsx"
+   ],
+   "templates_containing": 3
+  },
+  "经销商检查D4-25": {
+   "bound_host": "D/D4 收入底稿.xlsx",
+   "bound_host_is_among_them": true,
+   "other_hosts_sample": [
+    "D/D4-22至D4-32营业收入-IPO 上市 新三板 重组 舞弊应对.xlsx",
+    "D/D4收入底稿.xlsx"
+   ],
+   "templates_containing": 3
+  },
+  "营业收入会计政策检查D4-5": {
+   "bound_host": "D/D4 收入底稿.xlsx",
+   "bound_host_is_among_them": true,
+   "other_hosts_sample": [
+    "D/D4-5 营业收入-会计政策（Leap-常规程序）.xlsx",
+    "D/D4收入底稿.xlsx"
+   ],
+   "templates_containing": 3
+  },
+  "营业收入发生检查表D4-14": {
+   "bound_host": "D/D4 收入底稿.xlsx",
+   "bound_host_is_among_them": true,
+   "other_hosts_sample": [
+    "D/D4-13至D4-20主营业务收入-检查（Leap应对措施-检查）.xlsx",
+    "D/D4收入底稿.xlsx"
+   ],
+   "templates_containing": 3
+  },
+  "营业收入完整性检查表D4-15": {
+   "bound_host": "D/D4 收入底稿.xlsx",
+   "bound_host_is_among_them": true,
+   "other_hosts_sample": [
+    "D/D4-13至D4-20主营业务收入-检查（Leap应对措施-检查）.xlsx",
+    "D/D4收入底稿.xlsx"
+   ],
+   "templates_containing": 3
+  },
+  "营业收入审定表D4-1": {
+   "bound_host": "D/D4 收入底稿.xlsx",
+   "bound_host_is_among_them": true,
+   "other_hosts_sample": [
+    "D/D4-1至D4-4 营业收入 - 审定表明细表（Leap-常规程序）.xlsx",
+    "D/D4收入底稿.xlsx"
+   ],
+   "templates_containing": 3
+  },
+  "营业收入截止测试（单据到账）D4-18": {
+   "bound_host": "D/D4 收入底稿.xlsx",
+   "bound_host_is_among_them": true,
+   "other_hosts_sample": [
+    "D/D4-13至D4-20主营业务收入-检查（Leap应对措施-检查）.xlsx",
+    "D/D4收入底稿.xlsx"
+   ],
+   "templates_containing": 3
+  },
+  "营业收入截止测试（账到单据）D4-17": {
+   "bound_host": "D/D4 收入底稿.xlsx",
+   "bound_host_is_among_them": true,
+   "other_hosts_sample": [
+    "D/D4-13至D4-20主营业务收入-检查（Leap应对措施-检查）.xlsx",
+    "D/D4收入底稿.xlsx"
+   ],
+   "templates_containing": 3
+  },
+  "营业收入账面金额与ERP系统核对记录D4-13": {
+   "bound_host": "D/D4 收入底稿.xlsx",
+   "bound_host_is_among_them": true,
+   "other_hosts_sample": [
+    "D/D4-13至D4-20主营业务收入-检查（Leap应对措施-检查）.xlsx",
+    "D/D4收入底稿.xlsx"
+   ],
+   "templates_containing": 3
+  },
+  "识别未披露的关联方D4-27": {
+   "bound_host": "D/D4 收入底稿.xlsx",
+   "bound_host_is_among_them": true,
+   "other_hosts_sample": [
+    "D/D4-22至D4-32营业收入-IPO 上市 新三板 重组 舞弊应对.xlsx",
+    "D/D4收入底稿.xlsx"
+   ],
+   "templates_containing": 3
+  },
+  "重要产品毛利分析D4-8": {
+   "bound_host": "D/D4 收入底稿.xlsx",
+   "bound_host_is_among_them": true,
+   "other_hosts_sample": [
+    "D/D4-6至D4-11营业收入 - 分析程序（Leap应对措施-分析程序）.xlsx",
+    "D/D4收入底稿.xlsx"
+   ],
+   "templates_containing": 3
+  },
+  "重要客户结构分析D4-9": {
+   "bound_host": "D/D4 收入底稿.xlsx",
+   "bound_host_is_among_them": true,
+   "other_hosts_sample": [
+    "D/D4-6至D4-11营业收入 - 分析程序（Leap应对措施-分析程序）.xlsx",
+    "D/D4收入底稿.xlsx"
+   ],
+   "templates_containing": 3
+  },
+  "重要客户销售价格分析D4-10": {
+   "bound_host": "D/D4 收入底稿.xlsx",
+   "bound_host_is_among_them": true,
+   "other_hosts_sample": [
+    "D/D4-6至D4-11营业收入 - 分析程序（Leap应对措施-分析程序）.xlsx",
+    "D/D4收入底稿.xlsx"
+   ],
+   "templates_containing": 3
+  },
+  "重要指标分析D4-6": {
+   "bound_host": "D/D4 收入底稿.xlsx",
+   "bound_host_is_among_them": true,
+   "other_hosts_sample": [
+    "D/D4-6至D4-11营业收入 - 分析程序（Leap应对措施-分析程序）.xlsx",
+    "D/D4收入底稿.xlsx"
+   ],
+   "templates_containing": 3
+  },
+  "重要指标分析表D4-22": {
+   "bound_host": "D/D4 收入底稿.xlsx",
+   "bound_host_is_among_them": true,
+   "other_hosts_sample": [
+    "D/D4-22至D4-32营业收入-IPO 上市 新三板 重组 舞弊应对.xlsx",
+    "D/D4收入底稿.xlsx"
+   ],
+   "templates_containing": 3
+  },
+  "销售折扣与折让检查D4-19": {
+   "bound_host": "D/D4 收入底稿.xlsx",
+   "bound_host_is_among_them": true,
+   "other_hosts_sample": [
+    "D/D4-13至D4-20主营业务收入-检查（Leap应对措施-检查）.xlsx",
+    "D/D4收入底稿.xlsx"
+   ],
+   "templates_containing": 3
+  },
+  "销售退货检查表 D4-20": {
+   "bound_host": "D/D4 收入底稿.xlsx",
+   "bound_host_is_among_them": true,
+   "other_hosts_sample": [
+    "D/D4-13至D4-20主营业务收入-检查（Leap应对措施-检查）.xlsx",
+    "D/D4收入底稿.xlsx"
+   ],
+   "templates_containing": 3
+  },
   "附注披露信息（国企）": {
    "bound_host": "G/G7 长期股权投资.xlsx",
    "bound_host_is_among_them": true,
    "other_hosts_sample": [
     "D/D1 应收票据.xlsx",
+    "D/D4 收入底稿.xlsx",
     "D/D4-1至D4-4 营业收入 - 审定表明细表（Leap-常规程序）.xlsx",
     "D/D4收入底稿.xlsx",
-    "D/D5 应收款项融资.xlsx",
-    "D/D6 合同资产.xlsx"
+    "D/D5 应收款项融资.xlsx"
    ],
-   "templates_containing": 39
+   "templates_containing": 40
+  },
+  "预收账款明细表D3-2": {
+   "bound_host": "D/D3 预收账款.xlsx",
+   "bound_host_is_among_them": true,
+   "other_hosts_sample": [],
+   "templates_containing": 1
   }
  },
  "host_resolution": "contract.template.relative_path + template_sha256（内容寻址）—— 禁止按 sheet 名或 manifest 的 wp_code_patterns 定位（AC 6.5）",
@@ -3771,16 +4618,16 @@
    "templates": 1
   },
   "dots_ascii": {
-   "sheets": 38,
-   "templates": 28
+   "sheets": 39,
+   "templates": 29
   },
   "ellipsis_double": {
-   "sheets": 625,
-   "templates": 140
+   "sheets": 657,
+   "templates": 141
   },
   "ellipsis_single": {
-   "sheets": 730,
-   "templates": 163
+   "sheets": 763,
+   "templates": 164
   },
   "fillable": {
    "sheets": 3,
@@ -3791,8 +4638,8 @@
    "templates": 4
   },
   "item_n": {
-   "sheets": 40,
-   "templates": 24
+   "sheets": 41,
+   "templates": 25
   },
   "renameable": {
    "sheets": 0,
@@ -3807,8 +4654,8 @@
    "templates": 37
   },
   "xx_placeholder": {
-   "sheets": 465,
-   "templates": 150
+   "sheets": 476,
+   "templates": 151
   }
  },
  "reasons": [

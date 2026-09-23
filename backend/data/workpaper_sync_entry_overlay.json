@@ -1,8 +1,8 @@
 {
   "schema_version": 1,
   "review_status": "reviewed",
-  "approved_source_digest": "cc0af3f8756e8946403c68a606be0c72dd530afb8e6ebe34bd6a59d2773d74c0",
-  "review_basis": "2026-09-14 mount diff 复核：sourceDigest 由 65e7c371… → cc0af3f8…。归因两处均属良性预期拓扑变化：①commit 82f58ea44（D4-IPO/价格分析/四表取数综合交付）扩容/接线了 D4 analysis·ipo·inspection·other 目录约 20 个 GtOnlyOfficeSheet 宿主（sheet 扩容），②同 commit 把 htmlRendererRegistry.ts 的集中式 defineAsyncComponent 注册拆分到 registry/entries/*.ts 子模块，word-template（WorkpaperWordEditor）改为在 core.ts 内联注册 —— discoverer 的 registryWordMount 相应改为遍历 registry/entries/*.ts 定位（三重校验不弱化：word-template 条目存在 / 绑定 WorkpaperWordEditor.vue lazy import / GtWpRenderer 动态挂载），word dispatcher 的 registryEvidence.file 由主 registry 改指 registry/entries/core.ts#L87。mount 统计 hosts=175 mounts=265（GtOnlyOfficeSheet 259 / OnlyOfficeWordDialog 2 / WorkpaperWordEditor 4），无意外丢失宿主。前一版基线：2026-09-13 mount diff 复核（D4-5 双向收口前置，d9fddb64… → 65e7c371…）。",
+  "approved_source_digest": "b6291b9fd3f2ee78718c8edaaafef0cb792c5a0e2e2b54470cd4a2116d790034",
+  "review_basis": "2026-09-23 mount diff 复核：sourceDigest 由 cc0af3f8… → b6291b9f…（mounts 266→244 / hosts 175→154 / component 3→3 无增无减 / 0 个新增宿主 / 0 个新增 (file,component) 对 / 0 个对的挂载数变化）。归因两条，均非能力损失：①**21 个 `d4/**` tab 宿主退网**（每个 1 条 GtOnlyOfficeSheet 挂载）来自已提交的 commit cd9592ff5「feat(d4-sync): D4 全量迁移至 useD4SyncMode」+ ebc6e1b92 —— D4 各 tab 不再各自挂 GtOnlyOfficeSheet 而走 useD4SyncMode 统一通道，属有意迁移的既成事实；随之 parent_rules 的 `audit-platform/frontend/src/components/workpaper/d4/**/*.vue` 规则再无匹配对象，而 generator 对 0 匹配规则 fail closed（抛 `stale overlay parent_rules`，令其永久不可运行）⇒ 本次一并删除该已死规则（D4 根 entry `xlsx/gt-d4-operating-revenue` 仍在，未受影响；h4/h8/n1/j1/b60 等其余 parent_rules 均仍有匹配，不动）。②`GtWpRenderer.vue [WorkpaperWordEditor]` 在 diff 里显示为退网，**实为度量口径差、不是语义变化**：discoverer 的 registryWordMount 把 word dispatcher 产出到 `dispatchers` 数组，而 diff 的 current 侧只数 `mounts` 数组（approved 侧数的是 manifest entries[].mounts[]，已折入 dispatcher），故被误计入 retired。现算实证：live `dispatchers` 仍含该 fact，且 `mountId = mount_d4b8a91cbb8386a448b3` 与 approved manifest 里那条 `sourceKind=registry_ast` 挂载**逐字一致**（host 仍 GtWpRenderer.vue，registryEvidence 仍指 registry/entries/core.ts#L87 的 word-template 条目）—— 既没搬家也没 re-hash；Word 编辑能力零损失（live byComponent `WorkpaperWordEditor=4`，A10/A12/A16/A17 bundle 四条 template_ast 挂载俱在，registry `word-template` → WorkpaperWordEditor.vue 绑定仍在）⇒ overrides 里 GtWpRenderer×WorkpaperWordEditor 的 `registry_dispatch_reviewed` 规则保留不动。7 条纯 re-hash（D2/D3/D4/D5/D6/D7 + GtWpRenderer 的 GtOnlyOfficeSheet）为行号位移，mount 数未变。前一版基线：2026-09-14 mount diff 复核（registry/entries 拆分跟进，65e7c371… → cc0af3f8…）。该版归因原文：归因两处均属良性预期拓扑变化：①commit 82f58ea44（D4-IPO/价格分析/四表取数综合交付）扩容/接线了 D4 analysis·ipo·inspection·other 目录约 20 个 GtOnlyOfficeSheet 宿主（sheet 扩容），②同 commit 把 htmlRendererRegistry.ts 的集中式 defineAsyncComponent 注册拆分到 registry/entries/*.ts 子模块，word-template（WorkpaperWordEditor）改为在 core.ts 内联注册 —— discoverer 的 registryWordMount 相应改为遍历 registry/entries/*.ts 定位（三重校验不弱化：word-template 条目存在 / 绑定 WorkpaperWordEditor.vue lazy import / GtWpRenderer 动态挂载），word dispatcher 的 registryEvidence.file 由主 registry 改指 registry/entries/core.ts#L87。mount 统计 hosts=175 mounts=265（GtOnlyOfficeSheet 259 / OnlyOfficeWordDialog 2 / WorkpaperWordEditor 4），无意外丢失宿主。前一版基线：2026-09-13 mount diff 复核（D4-5 双向收口前置，d9fddb64… → 65e7c371…）。",
   "entry_id_strategy": "document_type_plus_semantic_source_path_v1",
   "wp_match_strategy": "source_sheet_literals_and_component_code_v1",
   "defaults_by_component": {
@@ -85,12 +85,6 @@
     }
   },
   "parent_rules": [
-    {
-      "file_glob": "audit-platform/frontend/src/components/workpaper/d4/**/*.vue",
-      "component": "GtOnlyOfficeSheet",
-      "parent_entry_id": "xlsx/gt-d4-operating-revenue",
-      "reason": "D4 tab hosts are rendered inside the D4 root entry and must not be counted as independent adapters"
-    },
     {
       "file_glob": "audit-platform/frontend/src/components/workpaper/h4/**/*.vue",
       "component": "GtOnlyOfficeSheet",

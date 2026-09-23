@@ -333,7 +333,7 @@ backend/tests/test_wp_onlyoffice_router.py  2198
 backend/tests/workpaper_sync/test_downstream_base_reliability_gate.py  1112
 backend/tests/workpaper_sync/test_migration_paradigm_contract.py  2217
 backend/tests/workpaper_sync/test_projection_first_publication_pg.py  2666
-backend/tests/workpaper_sync/test_task10_orm_repository_contract.py  866
+backend/tests/workpaper_sync/test_task10_orm_repository_contract.py  963
 backend/tests/workpaper_sync/test_task10_repository_pg.py  2470
 backend/tests/workpaper_sync/test_task11_artifact_repository.py  1263
 backend/tests/workpaper_sync/test_task11_retention_orphan_pg.py  1082
@@ -357,12 +357,12 @@ backend/tests/workpaper_sync/test_task23_request_application_pg.py  2774
 backend/tests/workpaper_sync/test_task24_close_intent.py  1305
 backend/tests/workpaper_sync/test_task24_close_intent_pg.py  1890
 backend/tests/workpaper_sync/test_task25_materialize_coordinator.py  1210
-backend/tests/workpaper_sync/test_task26_oo_to_html.py  2196
+backend/tests/workpaper_sync/test_task26_oo_to_html.py  2347
 backend/tests/workpaper_sync/test_task26_oo_to_html_pg.py  3493
 backend/tests/workpaper_sync/test_task27_conflict_resolution.py  1039
 backend/tests/workpaper_sync/test_task27_conflict_resolution_pg.py  2767
-backend/tests/workpaper_sync/test_task28_sync_router.py  1788
-backend/tests/workpaper_sync/test_task28_sync_router_pg.py  1506
+backend/tests/workpaper_sync/test_task28_sync_router.py  1911
+backend/tests/workpaper_sync/test_task28_sync_router_pg.py  1635
 backend/tests/workpaper_sync/test_task29_timeline_evidence.py  1888
 backend/tests/workpaper_sync/test_task29_timeline_evidence_pg.py  1565
 backend/tests/workpaper_sync/test_task30_closure_gate_pg.py  2146
@@ -375,13 +375,13 @@ backend/tests/workpaper_sync/test_task39_pilot_harness_pg.py  1035
 backend/tests/workpaper_sync/test_task40_simple_checklist_pilot.py  976
 backend/tests/workpaper_sync/test_task40_simple_checklist_pilot_pg.py  1017
 backend/tests/workpaper_sync/test_task41_d2_large_json_pilot.py  2233
-backend/tests/workpaper_sync/test_task41_d2_large_json_pilot_pg.py  1483
-backend/tests/workpaper_sync/test_task42_h1_grouped_dynamic_pilot.py  3074
+backend/tests/workpaper_sync/test_task41_d2_large_json_pilot_pg.py  1628
+backend/tests/workpaper_sync/test_task42_h1_grouped_dynamic_pilot.py  3503
 backend/tests/workpaper_sync/test_task42_h1_grouped_dynamic_pilot_pg.py  1350
 backend/tests/workpaper_sync/test_task43_g7_two_level_dynamic_pilot.py  3549
 backend/tests/workpaper_sync/test_task43_g7_two_level_dynamic_pilot_pg.py  1265
-backend/tests/workpaper_sync/test_task44_oo94_excel_pilot_gate.py  1373
-backend/tests/workpaper_sync/test_task46_d_cycle_migration.py  1424
+backend/tests/workpaper_sync/test_task44_oo94_excel_pilot_gate.py  1741
+backend/tests/workpaper_sync/test_task46_d_cycle_migration.py  1849
 backend/tests/workpaper_sync/test_task47_e_cycle_migration.py  930
 backend/tests/workpaper_sync/test_task48_f_cycle_migration.py  2282
 backend/tests/workpaper_sync/test_task49_g_cycle_migration.py  3142
@@ -407,7 +407,7 @@ backend/tests/workpaper_sync/test_task73_entry_profile_manifest.py  1203
 #     向后兼容 / byte_sha256 纯投影 fail visible / 共享vs重算产出等价 / structure_hash 逐字符不变）
 #     + module fixture。新增判据必然增行，属健康增长。→ 2470。
 backend/tests/workpaper_sync/test_task75_published_identity_observer.py  2470
-backend/tests/workpaper_sync/test_task76_projection_definition_provisioner.py  1020
+backend/tests/workpaper_sync/test_task76_projection_definition_provisioner.py  1136
 backend/tests/workpaper_sync/test_task76_projection_definition_provisioner_pg.py  1383
 backend/tests/workpaper_sync/test_task77_word_entry_gate.py  2134
 backend/tests/workpaper_sync/test_task77_word_entry_gate_pg.py  1208
@@ -808,3 +808,21 @@ backend/tests/workpaper_sync/test_task25_materialize_coordinator_pg.py  2682
 #     公式 CRUD + 预设 + 依赖图 + 批量重算的聚合体，宜按「CRUD / preset / graph」拆三个
 #     router 模块，属独立打磨任务。
 backend/app/routers/wp_formula.py  895
+
+#   workpaper_sync 判据文件（2026-09-24 suite triage）—— 13 份，基线一律取当前真实行数。
+#     增量的来源是**加判据**，不是加实现：这一轮把套件从 283 failed / 16 errors 打到
+#     67 failed / 0 errors，逐簇的定位与变异检验都要在判据文件里落成可复跑的断言
+#     （每条的取证见 docs/operations/evidence/suite-triage/ 下对应文件）。9 份原已在册、
+#     基线上调 +97 ~ +429；4 份原未在册（test_excel_shift_aware_verification /
+#     test_participant_leave_pg / test_projection_lane_regression_gate /
+#     test_workbook_row_change_carriers），本次首登。
+#     🔴 判据文件不宜按行数拆：同一簇的「正向断言 + 反向自检 + 变异对照臂」必须同文件，
+#     拆开会让「哪条变异杀死了哪条判据」跨文件失联 —— 而那正是本轮反复用到的推理链
+#     （参见本表 check_x3_deviation_registry / mutate_ie_lifecycle_guards 两条同理由）。
+#     可行的拆分方向是按**关注点**而非行数切（如 test_task44 的 pilot 分母 vs OO94 探针
+#     两组可各自成文件），属独立任务。
+#     门禁继续拦膨胀 >5%：下次再涨必须先回答「又加了哪些判据」。
+backend/tests/workpaper_sync/test_excel_shift_aware_verification.py  1955
+backend/tests/workpaper_sync/test_participant_leave_pg.py  1188
+backend/tests/workpaper_sync/test_projection_lane_regression_gate.py  1176
+backend/tests/workpaper_sync/test_workbook_row_change_carriers.py  830

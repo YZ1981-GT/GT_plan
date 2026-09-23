@@ -861,11 +861,18 @@ class TestSliceScopeIsRecomputable:
         global_children = sum(
             1 for e in full_manifest["entries"] if e.get("migration_state") == "parent_duplicate")
         assert manifest_slice["slice_scope"]["global_parent_duplicate_count"] == global_children
-        # 🔴 AC 1.6 原文写「43 个父组件重复入口」；随前端/manifest 演进(L/M/N 循环 composable
-        # 重构),parent_duplicate 状态的 entry 现算为 33。这是真实事实漂移,更新冻结登记(仍现算比对,
-        # 不弱化——slice.global_parent_duplicate_count 也同步为 33)。
-        assert global_children == 33, (
-            f"parent_duplicate 现算 {global_children}(AC 1.6 原文 43,已随迁移演进)⇒ 事实漂移需更新登记"
+        # 🔴 AC 1.6 原文写「43 个父组件重复入口」；随迁移推进这个数一路在掉：43 → 33 →
+        # （D4 改走统一路径、21 条 xlsx/d4/** 退役后）现算 12。冻结具体数字每退役一批
+        # legacy 入口就假红一次，而假红掩盖的正是上面那条真判据（slice 登记 == manifest 现算）。
+        # 改成**现算 + 单调下界**：不许凭空长回去（长回去说明 legacy 入口又被造出来了），
+        # 也不许归零（归零说明 parent_rules 失效，AC 1.6 会整条空跑）。
+        assert global_children > 0, (
+            "全量 manifest 里一条 parent_duplicate 都没有 ⇒ AC 1.6 失去实测对象，"
+            "需确认是真的全部退役还是 overlay 的 parent_rules 失效"
+        )
+        assert global_children <= 43, (
+            f"parent_duplicate 现算 {global_children} > AC 1.6 原文的 43 ⇒ 父组件重复入口在"
+            "**增加**，迁移方向反了"
         )
 
     def test_untriggered_conditional_sections_are_absent(self, manifest_slice: dict, paradigm: dict) -> None:

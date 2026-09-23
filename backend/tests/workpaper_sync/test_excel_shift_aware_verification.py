@@ -807,7 +807,13 @@ class TestNormalizationTablesAreDerivedNotHandwritten:
             + len(result["text_tags"])
             + len(result["delegated"])
         )
-        assert total == len(RS.ROW_BEARING_STRUCTURES) == 15, (total, result)
+        # 16 项（曾 15）：第 16 项是 `("sqref", "text-a1-ranges")` —— `<x14:dataValidation>`
+        # 的扩展子元素 `<xm:sqref>`，内容是 A1 范围文本（D2-2 模板实测 AN65539:AN65553），
+        # 与 `formula1` 同性质，行位移必须一并位移，否则数据验证继续指向旧行。它在
+        # `excel_row_shift` 里已同批落三处（清单 + `_handled` 登记 + `_shift_element_text`
+        # 容忍命名空间前缀），`test_excel_row_shift.py` 也锁 16。这里是第二处计数锚点，
+        # 一并对齐；下面的 `text_tags` 桶同步加 `sqref`（判据仍是全等，不是放宽）。
+        assert total == len(RS.ROW_BEARING_STRUCTURES) == 16, (total, result)
         assert set(result["a1_attrs"]) == {
             "autoFilter@ref",
             "conditionalFormatting@sqref",
@@ -817,9 +823,12 @@ class TestNormalizationTablesAreDerivedNotHandwritten:
             "mergeCell@ref",
         }, sorted(result["a1_attrs"])
         assert set(result["bare_row_attrs"]) == {"brk@id"}, result["bare_row_attrs"]
-        assert set(result["text_tags"]) == {"formula", "formula1", "formula2"}, result[
-            "text_tags"
-        ]
+        assert set(result["text_tags"]) == {
+            "formula",
+            "formula1",
+            "formula2",
+            "sqref",
+        }, result["text_tags"]
 
     def test_an_unbucketed_structure_fails_closed(self) -> None:
         """反向自检：往清单里加一项而不给它归一化桶 ⇒ 派生自检必须打红。"""

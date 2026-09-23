@@ -58,6 +58,9 @@ from typing import Any, Callable
 
 import pytest
 
+#: AC 1.4 通知真源的**单一解析器**（真源可为字面量数组或 manifest 现算，见该模块 docstring）。
+from tests.workpaper_sync.entry_sync_notice_source import registered_entry_ids
+
 # ────────────────────────────────────────────────────────────────────────────
 # Paths
 # ────────────────────────────────────────────────────────────────────────────
@@ -2834,14 +2837,16 @@ class TestAc14HonestModeVisibility:
             )
 
     def test_registered_entry_ids_agree_with_the_slice(self, manifest_slice: dict) -> None:
-        """双向锁：slice 的 adapter_id 与前端登记表必须互相印证。"""
-        source = _strip_ts_comments(NOTICE_MODULE.read_text(encoding="utf-8"))
-        block = re.search(
-            r"SYNC_ADAPTER_REGISTERED_ENTRY_IDS:\s*readonly\s+string\[\]\s*=\s*\[([\s\S]*?)\]",
-            source,
-        )
-        assert block, "找不到 SYNC_ADAPTER_REGISTERED_ENTRY_IDS 的声明"
-        registered = set(re.findall(r"['\"]([^'\"]+)['\"]", block.group(1)))
+        """双向锁：slice 的 adapter_id 与前端登记表必须互相印证。
+
+        🔴 2026-09-22 修检测器方向。原实现用 `=\\s*\\[` 假定真源是字面量数组，真源改成
+        `WORKPAPER_SYNC_MANIFEST.filter(...).map(...)` 现算之后正则恒 `None`，于是报
+        「找不到 SYNC_ADAPTER_REGISTERED_ENTRY_IDS 的声明」—— 把「形态变了」误报成
+        「东西没了」。解析逻辑收敛到 `entry_sync_notice_source`（一份），仍 fail closed。
+        """
+        registered = set(registered_entry_ids())
+        assert registered, "已注册集合为空 ⇒ 「已注册 ⇒ 不挂通知」分支没有真实分母"
+        assert all("/" in rid for rid in registered), f"集合里有不像 entry_id 的项：{registered}"
         for entry in manifest_slice["independent_entries"]:
             if entry.get("adapter_id") is None:
                 assert entry["entry_id"] not in registered, (

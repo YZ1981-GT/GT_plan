@@ -61,7 +61,7 @@
 
 ## 阶段 5：participant 主动离开
 
-- [-] 11. leave 路径（repository + service + 端点 + 前端接线）
+- [x] 11. leave 路径（repository + service + 端点 + 前端接线）
   - `active/closing → left`，不建 request、不推 barrier、不旋转 generation（P7）
   - 幂等显式分支（P9）、dirty 拒绝（P8）、authorization-first 同 404 oracle
   - 前端 `leaveWithoutSaving()` 改为调用它，并把「零请求」判据更新为「恰一次 leave、

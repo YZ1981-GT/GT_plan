@@ -53,6 +53,30 @@ LEAVE_HANDLER = "leave_room"
 LEAVE_ACTION = "leave_room"
 
 
+def _deep_registered_entry_id(min_segments: int = 4) -> str:
+    """从**活 manifest** 里现挑一条「已登记 + 至少 `min_segments` 段」的 entry_id。
+
+    🔴 不写死 entry_id。上一版写死的是 `xlsx/d4/analysis/d4-tab-customer-price`，而
+    commit `cd9592ff5` + `ebc6e1b92`（D4 各 tab 迁至 `useD4SyncMode`）之后 21 条
+    `xlsx/d4/**` entry 从 manifest 退网 —— manifest 实测 186 → 176 → 155，现在
+    `xlsx/d4/` 前缀在 manifest 里 0 条。
+
+    本判据**不关心是哪一条 entry**，它只要「真实存在的多段 entry_id」来证明
+    `{entry_id:path}` 转换器真的吃斜杠（默认 `[^/]+` 下端点在生产上恒 404，
+    Task 28 的 B01 变异已证）。所以约束就是判据本身要的两条：已登记 + 段数够。
+    取排序后第一条，保证确定性。
+    """
+    from app.services.workpaper_sync.entry_profile import load_entry_manifest
+
+    ids = sorted(str(e["entry_id"]) for e in load_entry_manifest()["entries"])
+    deep = [i for i in ids if len(i.split("/")) >= min_segments]
+    assert deep, (
+        f"活 manifest（{len(ids)} 条）里没有任何 >= {min_segments} 段的 entry_id ⇒ "
+        "本判据无从构造多段路径，分母失效（不是写死的数字过期，是真源变形了）"
+    )
+    return deep[0]
+
+
 def _tree(path: Path) -> ast.Module:
     return ast.parse(path.read_text(encoding="utf-8"))
 
@@ -178,7 +202,8 @@ class TestRouteShape:
         """
         project, wp = uuid.uuid4(), uuid.uuid4()
         room, participant = uuid.uuid4(), uuid.uuid4()
-        entry = "xlsx/d4/analysis/d4-tab-customer-price"
+        entry = _deep_registered_entry_id(min_segments=4)
+        assert entry.count("/") >= 2, f"{entry} 不是多段 id ⇒ 无法证明转换器吃斜杠"
         path = (
             f"/api/projects/{project}/workpapers/{wp}/sync/entries/{entry}"
             f"/rooms/{room}/participants/{participant}/leave"

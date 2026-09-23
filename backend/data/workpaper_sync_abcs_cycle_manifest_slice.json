@@ -38,7 +38,7 @@
   "covered_by_d_to_n_slices": 85,
   "excluded_pilot_entry_count": 1,
   "in_scope_parent_duplicate_count": 0,
-  "global_parent_duplicate_count": 33,
+  "global_parent_duplicate_count": 12,
   "excluded_from_slice": [
    {
     "what": "pilot entry `xlsx/b60/gt-b60-bundle`（B60 总体审计策略）",
@@ -70,7 +70,8 @@
     "reason": "被 26 条生产边使用（其中本 slice 只贡献 **5 条**，全在 B 类），`shared_base_preserved` 约束不删。🔴 M 那轮同口径冻结 29、N 那轮现算 27（26 生产 + 1 测试）—— 平台边集会漂移，**必须每轮现算**，禁照抄。",
     "verified_how": "statement-position import 路径字面量现算（`from '…'` 可独占一行；排除双引号字符串内的匹配），实得 26 生产 + 1 测试，in-scope 5 条。"
    }
-  ]
+  ],
+  "global_parent_duplicate_note": "AC 1.6 原文 43；随迁移推进逐批下降（43 → 33 → 现算 12 —— D4 改走统一路径后 21 条 xlsx/d4/** 退役）。本字段由 source_manifest 现算，不手填：守卫 test_task57_abcs_and_shared_migration.py::TestSliceScopeIsRecomputable::test_parent_duplicate_section_is_absent_because_in_scope_count_is_zero 逐轮比对本登记值与 manifest 现算值，并只卡「大于 0 且不超过 AC 1.6 原文的 43」（退役是合法进展，增加才是方向反了）。in_scope 侧仍为 0（本 slice 的 entry 一个子入口都没有），故条件节 parent_duplicate_summary 继续缺席。"
  },
  "entry_groups": {
   "why_this_key_exists": "tasks.md 的 Task 57 正文点名「**按 componentType/持久化通道分组**，跨循环函证复用 adapter，不复制合同」。前十一轮都是「按 wp_code 前缀逐条列」——本轮必须先分组再逐 entry，且分组键**可复算**。",
@@ -12162,9 +12163,10 @@
    "vue": "audit-platform/frontend/src/components/workpaper/sync/GtEntrySyncCapabilityNotice.vue",
    "ts_exists": true,
    "vue_exists": true,
-   "out_of_scope_consumer_count": 42,
+   "out_of_scope_consumer_count": 46,
    "in_scope_consumer_count": 0,
-   "why_non_vacuous": "承载者存在且被 41 个**非本 slice**宿主（D/F/G/H 循环）真实挂载 ⇒ 「本 slice 0 挂载」是真实缺口而不是「组件不存在」。只放 `el-tooltip` 不算满足 AC 1.4（EP teleport + 仅 hover 才进 DOM）。"
+   "why_non_vacuous": "承载者存在且被 41 个**非本 slice**宿主（D/F/G/H 循环）真实挂载 ⇒ 「本 slice 0 挂载」是真实缺口而不是「组件不存在」。只放 `el-tooltip` 不算满足 AC 1.4（EP teleport + 仅 hover 才进 DOM）。",
+   "out_of_scope_consumer_breakdown": "41 个循环入口宿主（D/F/G/H）+ 4 个 D4 子页签自管工具栏（D4-9/D4-10/D4-34/D4-36 属 isD4DedicatedSyncSheet，宿主工具栏不渲染，子页签的挂载是这些 sheet 唯一的 AC 1.4 披露点）+ 1 条 components.d.ts 全局组件类型声明 = 46 条 statement-position 生产边。原登记 42 少算了那 4 个子页签（同时与本节旧文案「41 个」互不自洽：41/42/46 三个数并存）。"
   }
  },
  "blocking_preconditions": [

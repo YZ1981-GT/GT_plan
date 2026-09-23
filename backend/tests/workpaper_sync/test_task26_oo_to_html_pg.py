@@ -374,7 +374,21 @@ class _JsonCarrierAdapter:
             row_keys={k: tuple(v) for k, v in row_keys.items()},
         )
 
-    def verify_unmanaged_regions(self, *, before, after, contract):
+    def verify_unmanaged_regions(
+        self,
+        *,
+        before,
+        after,
+        contract,
+        # 🔴 位移感知形参：`WorkpaperSyncAdapter` protocol 声明它们**必须**接得住 ——
+        # `ContentMutationService._stage_and_verify` 无条件递过来。JSON 载体不位移，
+        # 接住后忽略即可（语义等于 `None` = 位移就是漂移）。少声明会在第一次真实
+        # commit 上 `TypeError`，而 `runtime_checkable` 只查属性存在性、查不出来。
+        row_shift=None,
+        total_formula_rows=(),
+        propagation=None,
+        per_table_shift=None,
+    ):
         from app.services.workpaper_sync.adapters.base import UnmanagedRegionReport
 
         self.calls.append("verify_unmanaged_regions")
@@ -2195,18 +2209,23 @@ async def _collect() -> dict[str, Any]:  # noqa: C901, PLR0912, PLR0915 - 一次
                         {"r": reconciled.promoted_request_id},
                     )
                 ).scalar_one()
-                repo = WorkpaperSyncRepository(s)
-                rooms = RoomService(repo)
                 cred = mint_route_credential(
                     room_id=env["room"], generation=1, doc_key=env["doc_key"]
                 )
-                await rooms.record_contributor_snapshot(
-                    operation_id=op_id,
-                    room_id=env["room"],
-                    initiator_participant_id=env["participant"],
-                    route_credential=cred,
-                )
                 await s.commit()
+            # 🔴 close-capture **刻意不记** contributor snapshot：冻结侧由
+            # `reconcile_close_intents` 在锁内派生，取的是**空集** digest —— 幂等键
+            # `close-capture:{room}:{gen}:{epoch}` 要求 fingerprint 只由 (room, generation)
+            # 决定，contributor 集合随调用方变化会让重入的 reconcile 必然 409（repository.py
+            # 那段注释原文如此，并明写「改成 room 现存 edit participant 集合前必须先接上
+            # record_contributor_snapshot()，否则冻结非空、观测为空，每次 clean close 都会
+            # 在最终 fence 被拒」）。
+            #
+            # 观测侧 `_recompute_contributor_digest` 数的是
+            # `working_paper_sync_operation_contributor` 的 live 行。这里补记一行就等于
+            # 「冻结空集、观测非空」—— 方向与那条警告相反，同样撞 fence：S17/S18 会全部停在
+            # `final_fence_contributor_snapshot_drift`，eligibility epoch 判据一条也跑不到。
+            # 普通 forcesave 仍在 `_build_room` 侧记录（冻结值同源），故两条路径都自洽。
             req = {
                 "request": reconciled.promoted_request_id,
                 "operation": op_id,

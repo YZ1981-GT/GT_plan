@@ -37,6 +37,7 @@ import shutil
 import sys
 import tempfile
 import uuid
+from collections.abc import Mapping
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
@@ -73,8 +74,39 @@ CREATE TABLE working_paper (
 #: 取 source-backed profile，编一个不存在的 entry 会走「未登记入口」分支而不是本判据。
 ENTRY = "xlsx/gt-d2-accounts-receivable"
 OTHER_ENTRY = "xlsx/cash-flow-verification"
-#: 第三个 entry：只用来证明「一个 entry 一次 run 都没有」也是 unverified（不是崩）。
-ENTRY_WITHOUT_RUN = "xlsx/d4/analysis/d4-tab-indicator"
+
+
+def _pick_entry_without_run(entries_by_id: Mapping[str, Mapping[str, Any]]) -> str:
+    """第三个 entry：只用来证明「一个 entry 一次 run 都没有」也是 unverified（不是崩）。
+
+    🔴 这里**不写死 entry_id**。上一版写死的是 `xlsx/d4/analysis/d4-tab-indicator`，
+    而 D4 各 tab 在 commit cd9592ff5（D4 全量迁移至 `useD4SyncMode`）之后不再各自挂
+    `GtOnlyOfficeSheet`，21 条 `xlsx/d4/**` entry 随之从 manifest 退网 —— recomputer
+    对未登记入口 fail closed（`EvidenceError`），采集阶段一崩，本文件 41 条断言全部连坐。
+    判据本身**不关心是哪个 entry**，只要求「已登记 + 本 harness 没给它写过 run」，所以
+    从真实 manifest 现算：宿主拓扑再变也不会把它锁死成又一个会烂的常量。
+
+    三个约束：①在 manifest 里（否则走「未登记入口」分支，不是本判据）；②不是 harness
+    唯二写过 run 的 `ENTRY` / `OTHER_ENTRY`；③profile 能干净推导出 required set —— 否则
+    落进 `profile_cross_rule_drift` 分支，测的就不是「没有 run」了。排序取首条保证确定性。
+    """
+    from app.services.workpaper_sync.entry_profile import EntryProfileError
+    from app.services.workpaper_sync.models import AuthorityModel
+
+    for entry_id, entry in sorted(entries_by_id.items()):
+        if entry_id in (ENTRY, OTHER_ENTRY):
+            continue
+        try:
+            EV.derive_for_manifest_entry(
+                entry, authority_model=AuthorityModel.projection_contract
+            )
+        except EntryProfileError:
+            continue
+        return entry_id
+    raise _HarnessError(
+        "manifest 里找不到「已登记且 profile 可推导」的第三个 entry —— "
+        "无法构造「一个 run 都没有」的判据"
+    )
 
 
 def _d(label: str) -> str:
@@ -1171,10 +1203,12 @@ async def _collect() -> dict[str, Any]:  # noqa: C901, PLR0912, PLR0915 - 一次
         evidence["cross_entry_reuse_main"] = await _verdict(clean_run)
 
         # 没有任何 run 的 entry
+        entry_without_run = _pick_entry_without_run(entries_by_id)
+        evidence["entry_without_run_id"] = entry_without_run
         async with Session() as s:
             recomputer = EV.EvidenceRecomputer(s)
             no_run = await recomputer.recompute(
-                entry_id=ENTRY_WITHOUT_RUN,
+                entry_id=entry_without_run,
                 authority_model=AuthorityModel.projection_contract,
                 environment=environment,
             )
@@ -1475,9 +1509,19 @@ class TestEvidenceRecomputation:
 
     def test_an_entry_without_any_run_is_unverified(self, snap: dict[str, Any]) -> None:
         verdict = snap["scenarios"]["evidence"]["no_run"]
+        chosen = snap["scenarios"]["evidence"]["entry_without_run_id"]
+        assert chosen not in (ENTRY, OTHER_ENTRY), (
+            f"现算出来的第三个 entry 撞上了本 harness 写过 run 的 entry：{chosen}"
+        )
         assert verdict["run_id"] is None
         assert verdict["result"] == "unverified"
         assert verdict["notes"], "没有 run 时必须说明原因"
+        # 「没有 run」与「profile 漂移」两条分支的 result 同为 unverified —— 不把它们区分开，
+        # 本判据会被漂移分支冒名顶替（写死 entry_id 的旧版正是看不见这个区别）。
+        assert verdict["defects"] == [], verdict
+        assert verdict["required_scenario_ids"], (
+            f"{chosen} 推不出 required set ⇒ 落进了 drift 分支，测的不是「没有 run」"
+        )
 
     def test_a_contradictory_profile_reports_drift_instead_of_crashing(
         self, snap: dict[str, Any]

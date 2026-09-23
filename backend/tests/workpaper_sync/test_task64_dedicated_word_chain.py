@@ -466,7 +466,19 @@ class TestBlockingPreconditions:
 # ═══════════════════════════════════════════════════════════════════════════
 # 8. 每条 BP 的解除探测（xfail strict —— 真解除时 XPASS 必红）
 # ═══════════════════════════════════════════════════════════════════════════
-@pytest.mark.xfail(strict=True, reason="BP-16 未解除：A16 链 HTML 字段面仍为 0")
+@pytest.mark.xfail(
+    strict=True,
+    reason=(
+        "BP-16 未解除：A16-1..A16-7 七份权威 DOCX 的字段面实测为 0。"
+        "**解除条件**：这七份模板获得真实字段面（`${field}` 声明式 token 或 tagged SDT，"
+        "由 Task 61 的 SDT 注入兑现）且存在消费方 ⇒ 本条转 XPASS，届时删除本标记。"
+        " 🔴 已实证**不是 parser bug**（2026-06-01 三重核对）：`parse_template` 对这七份"
+        " 各返回 70~125 段落 / 3~19 表格，段落与表格单元格两条路径都走了 "
+        "`_extract_placeholders_from_text`；把 `_LEGACY_COMPILED` 与 `_NEW_PLACEHOLDER_RE`"
+        " 直接喂 `paragraph.text + cell.text` 拼串命中 0，再解包 docx 对 `word/*.xml` 原始"
+        " 字节复扫仍命中 0 ⇒ 模板里确实一个标记都没有。故本条**不得**靠改 parser 转绿。"
+    ),
+)
 def test_bp16_a16_chain_gains_html_field_surface() -> None:
     from app.services.wp_docx_template_parser import parse_template
 
@@ -478,33 +490,110 @@ def test_bp16_a16_chain_gains_html_field_surface() -> None:
     assert totals > 0
 
 
-@pytest.mark.xfail(strict=True, reason="BP-17 未解除：生产字段定位仍靠 legacy 中文正则")
+@pytest.mark.xfail(
+    strict=True,
+    reason=(
+        "BP-17 未解除：生产字段定位仍靠 Task 77 明禁的三种锚点 —— legacy 中文正则 14 处、"
+        "`paragraph_index` 绝对索引 14 处、按出现顺序追加 `_2`/`_3` 的 field_id 9 处；"
+        "可用的 `${}` 声明式 token 共 0 个（Requirement 7.1 明禁中文 label 作定位/身份）。"
+        "**解除条件**：Task 61 用 tagged SDT / `${}` token 取代这三种锚点**并**迁移现有"
+        " 模板，`_LEGACY_PATTERNS` 随之清空 ⇒ 本条转 XPASS，届时删除本标记。"
+        " 🔴 **不得**为转绿单独删 `_LEGACY_PATTERNS`：它是 25 个 word-template wp_code 当前"
+        "唯一的字段识别通道（见 `wp_docx_template_parser` 模块 docstring），先删即让生产"
+        "识别能力归零 —— 那是把判据做绿而不是让契约成立。"
+        " ⚠️ 本条只盯三种锚点里的**中文正则**一种；另两种（`paragraph_index` / 顺序编号）"
+        "没有独立探测器，BP-17 转 XPASS 不等于三种锚点全清，删标记时须回 BP-17 登记复核。"
+    ),
+)
 def test_bp17_production_locator_no_longer_uses_cjk_regex() -> None:
     from app.services.wp_docx_template_parser import _LEGACY_PATTERNS
 
     assert not _LEGACY_PATTERNS
 
 
-@pytest.mark.xfail(strict=True, reason="BP-18 未解除：A17 word 分支仍不可达")
+@pytest.mark.xfail(
+    strict=True,
+    reason=(
+        "BP-18 未解除：`GtA17Bundle.vue` 的 `WorkpaperWordEditor` 挂载点外层门控是 "
+        "`v-else-if=\"tab.kind === 'word'\"`，而静态 TABS 无任何 `kind: 'word'` ⇒ 运行时"
+        "恒假、mount 永不渲染（unreachable stub，Requirement 1.7）。"
+        "**解除条件（两条任一）**：① 删除 —— Task 66 删除计划 + Task 72 Stage B 摘掉该挂载点"
+        "（BP-18 登记的处置方向就是这条）；② 启用 —— 某个 TAB 真的裁成 `kind: 'word'` 让分支"
+        "可达。任一兑现 ⇒ 本条转 XPASS(strict) 打红，届时删除本标记。"
+    ),
+)
 def test_bp18_a17_word_kind_is_now_used() -> None:
+    """BP-18 的解除探测：不可达桩被**处置**（删掉或启用）时必须 XPASS 打红。
+
+    🔴 判据为什么是「或」而不是只判「kind 被启用」（2026-06-01 盘点修正，class C）：
+    BP-18 登记的处置方向是**删除**（`observable_consequences` 末条：「删除动作归 Task 66
+    计划 + Task 72 Stage B」）。原判据只断言 `kind: 'word'` 出现在 TABS 里 —— 一旦 Task 72
+    按计划把挂载点删掉，`kind: 'word'` 依然不会出现，本条便永远停在 XFAIL，`strict=True`
+    再也不可能打红。那等于探测器对**计划内的那条解除路径完全失明**：债还完了也没人被提醒
+    回来删标记，与「这个标记不存在」逐字相同。
+
+    所以两条解除路径都要判：挂载点消失 **或** kind 被启用。两者都不成立（= 今天：桩还在
+    且 kind 仍未使用）时才 XFAIL。判据没有被放宽 —— 分母从「启用」一条扩成登记在案的两条，
+    XFAIL 的条件反而更严。
+    """
     text = A17_BUNDLE_VUE.read_text(encoding="utf-8")
-    assert "word" in set(re.findall(r"kind:\s*'([^']+)'", text))
+    kind_is_used = "word" in set(re.findall(r"kind:\s*'([^']+)'", text))
+    mount_is_gone = "<WorkpaperWordEditor" not in text
+    assert kind_is_used or mount_is_gone, (
+        "A17 的 word 分支仍是不可达桩：挂载点 `<WorkpaperWordEditor` 还在，而静态 TABS "
+        "里仍无 `kind: 'word'` ⇒ 既没按 Task 66/72 删掉，也没被启用"
+    )
 
 
-@pytest.mark.xfail(strict=True, reason="BP-19 未解除：Word 宿主仍非 descriptor consumer")
+@pytest.mark.xfail(
+    strict=True,
+    reason=(
+        "BP-19 未解除：`WorkpaperWordEditor.vue` 与 `OnlyOfficeWordDialog.vue` 都不是 "
+        "descriptor consumer（无 `descriptor` prop、无 `defineExpose`、不 import `sync/*`）"
+        "⇒ AC 11.5 要求的「可 await 的 `forceSave()` + durable ack」在这两个宿主上无承载者。"
+        "**解除条件**：Task 61 把这两个 Word 宿主改成消费 descriptor 并 `defineExpose` "
+        "durable API ⇒ 本条转 XPASS，届时删除本标记。"
+        " 反向守卫：`TestPropertiesAreNotOverclaimed::test_property_47_denominator_is_not_zero`"
+        "（非 xfail）断言这两个宿主**尚未**出现 `defineExpose`/`descriptor`，任一宿主先行"
+        "改造会让那条先打红 ⇒ 本条不会静默失效。"
+    ),
+)
 def test_bp19_word_hosts_become_descriptor_consumers() -> None:
     for vue in (WORD_EDITOR_VUE, OO_WORD_DIALOG_VUE):
         text = vue.read_text(encoding="utf-8")
         assert "defineExpose" in text and re.search(r"\bdescriptor\b", text)
 
 
-@pytest.mark.xfail(strict=True, reason="BP-20 未解除：opaque authority 通道未落库")
+@pytest.mark.xfail(
+    strict=True,
+    reason=(
+        "BP-20 未解除：`opaque_single_onlyoffice` authority model 只能经 "
+        "`writer_migration.OpaqueAuthorityProvisioner` 落库，该通道的收敛归 **Task 65**；"
+        "且 approved bundle 需要 DB 侧 definition 行（typed slot 的 slot_ref 形如 "
+        "`definition:<uuid>`），离线产不出 ⇒ 本记录的 `definition_bundle` 恒 null。"
+        "**解除条件**：Task 65 交付 opaque bundle 协议**并**由 Task 15/36 发布 definition 行，"
+        "本记录重生成后至少一条 entry 的 `definition_bundle` 非 null ⇒ 本条转 XPASS，"
+        "届时删除本标记。🔴 绝不为凑 non-null 造假 uuid（同 Task 60 BP-11 的禁令）。"
+    ),
+)
 def test_bp20_authority_model_published_to_db() -> None:
     record = json.loads(RECORD_PATH.read_text(encoding="utf-8"))
     assert any(e["definition_bundle"] is not None for e in record["entries"])
 
 
-@pytest.mark.xfail(strict=True, reason="BP-21 未解除：SyncContract.template 仍是单 TemplateRef")
+@pytest.mark.xfail(
+    strict=True,
+    reason=(
+        "BP-21 未解除：`docx/wp-popup-docx-editor` 一条 entry 复用给 97 个 popup 配置，而 "
+        "`SyncContract.template` 是**单个** `TemplateRef`（实测 `contracts.py` 该字段类型仍为 "
+        "`TemplateRef`，全仓无 `template_refs`/`templates: tuple` 之类的多模板承载者），"
+        "`load_projection_supply` 又要求「一个独立 entry 唯一 per-entry 契约」⇒ 一对多在契约"
+        "模型里无法表达。**解除条件**：契约模型获得多模板表达力（`template` 改成 "
+        "`tuple[TemplateRef, ...]`，或新增列表型 template 字段）⇒ 本条转 XPASS，届时删除本标记。"
+        " ⚠️ 本条只探测「契约模型变宽」这一条解除路径；若改走「把 97 个 popup 拆成多条 entry」"
+        "则本条不会 XPASS，删标记前须回 BP-21 登记复核实际处置方向。"
+    ),
+)
 def test_bp21_contract_can_express_multiple_templates() -> None:
     from app.services.workpaper_sync.contracts import SyncContract
 
@@ -513,7 +602,19 @@ def test_bp21_contract_can_express_multiple_templates() -> None:
                for k, v in ann.items() if "template" in k.lower())
 
 
-@pytest.mark.xfail(strict=True, reason="BP-22 未解除：A17 子码 entry 仍是 document_type=xlsx")
+@pytest.mark.xfail(
+    strict=True,
+    reason=(
+        "BP-22 未解除：A17 七个 docx 子码在 Task 58 清册里裁 `resolved_docx`，但它们在 "
+        "`workpaper_sync_entry_manifest.json` 里的独立 entry 全是 `document_type=xlsx`"
+        "（`canonical_resolver=legacy_sheet_onlyoffice_router`，走父级 A17 程序表 XLSX）⇒ "
+        "同一 wp_code 在两个坐标系里类型相反，按 manifest 迁移会漏掉整条 A17 Word 链。"
+        "**解除条件**：**Task 67** structural pre-reconcile 把这四条 entry 的 document_type "
+        "改成 docx（`本任务无权改写 manifest`，见 BP-22 登记末条）⇒ 本条转 XPASS，届时删除本标记。"
+        " 🔴 这是一条**真实的数据不一致**，不是「功能没做」；但改 manifest 会与 Task 57 的 "
+        "Excel entry 撞车，故必须由 Task 67 统一 reconcile，不得在本文件侧改数据转绿。"
+    ),
+)
 def test_bp22_a17_subcode_entries_become_docx() -> None:
     manifest = json.loads(
         (_BACKEND / "data" / "workpaper_sync_entry_manifest.json").read_text(encoding="utf-8")

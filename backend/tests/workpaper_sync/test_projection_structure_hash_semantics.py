@@ -101,6 +101,74 @@ def _function_node(source: str, name: str) -> ast.AST:
     raise AssertionError(f"源码里没有名为 {name} 的函数")
 
 
+def _class_methods(source: str, method: str) -> dict[str, ast.AST]:
+    """取「定义了 `method` 的那个类」的全部方法，按名索引（跨类同名不会串）。"""
+    for cls in (n for n in ast.walk(ast.parse(source)) if isinstance(n, ast.ClassDef)):
+        methods: dict[str, ast.AST] = {
+            m.name: m
+            for m in cls.body
+            if isinstance(m, (ast.FunctionDef, ast.AsyncFunctionDef))
+        }
+        if method in methods:
+            return methods
+    raise AssertionError(f"源码里没有哪个类定义了方法 {method}")
+
+
+def _self_refs(node: ast.AST) -> set[str]:
+    """体内出现的全部 `self.<name>`。
+
+    🔴 直接调用（``self.f(...)``）**与**把绑定方法当实参递出去
+    （``asyncio.to_thread(self.f, ...)``）都算 —— 后者是本仓 CPU 段卸载的真实形态，
+    只认前者会把「卸到工作线程里跑」误判成「没接线」。
+    """
+    return {
+        sub.attr
+        for sub in ast.walk(node)
+        if isinstance(sub, ast.Attribute)
+        and isinstance(sub.value, ast.Name)
+        and sub.value.id == "self"
+    }
+
+
+def _reachable_from(source: str, entry: str) -> set[str]:
+    """`entry` 沿 `self.*` 能**传递**到达的同类方法名闭包（含间接层）。"""
+    methods = _class_methods(source, entry)
+    seen: set[str] = set()
+    queue = [entry]
+    while queue:
+        current = methods.get(queue.pop())
+        if current is None:
+            continue
+        for name in _self_refs(current):
+            # 只收**方法**：`self._artifacts` / `self._session` 这类属性不是调用边。
+            if name in methods and name not in seen:
+                seen.add(name)
+                queue.append(name)
+    return seen
+
+
+def _value_leaves_the_method(node: ast.AST, callee: str) -> bool:
+    """`self.<callee>(...)` 的返回值是否被绑名、且那个名字出现在某个 `return` 里。
+
+    「调了」不等于「用了」：算完即丢、转头返回旧值，同样是死代码。
+    """
+    bound: set[str] = set()
+    for stmt in ast.walk(node):
+        if (
+            isinstance(stmt, ast.Assign)
+            and isinstance(stmt.value, ast.Call)
+            and getattr(stmt.value.func, "attr", "") == callee
+        ):
+            bound.update(t.id for t in stmt.targets if isinstance(t, ast.Name))
+    returned: set[str] = set()
+    for stmt in ast.walk(node):
+        if isinstance(stmt, ast.Return) and stmt.value is not None:
+            returned.update(
+                sub.id for sub in ast.walk(stmt.value) if isinstance(sub, ast.Name)
+            )
+    return bool(bound & returned)
+
+
 # ═══════════════════════════════════════════════════════════════════════════
 # 1. 两条锚点来源必须同值（本修复的核心正确性前提）
 # ═══════════════════════════════════════════════════════════════════════════
@@ -302,10 +370,35 @@ class TestBp30IsActuallyWired:
         assert "compute_structure_hash_from_artifact" in text, (
             "`_projection_structure_hash` 没有调用发布时刻的新公式"
         )
-        stage = ast.unparse(_function_node(stripped, "_stage_and_verify"))
-        assert "_projection_structure_hash" in stage, (
-            "`_stage_and_verify` 没有调用 `_projection_structure_hash` —— "
-            "新方法成了死代码（假绿第①源）"
+        # 🔴 「有真实消费方」按**调用闭包**判，不按「同一个函数体里出现过这个名字」判。
+        # CPU 段（materialize→extract→unmanaged→structure_hash）已被 spec
+        # workpaper-sync-materialize-large-table-performance Task 5 卸进
+        # `asyncio.to_thread(self._stage_cpu_segment, ...)`，宿主体内只剩方法**引用**；
+        # 2026-09-22 又删掉了事件循环侧那遍重复计算，于是宿主体内连名字都不剩。
+        # 同名文本判据会在这种合法搬迁上假红 —— 但闭包判据在「把调用删掉／改回旧口径」
+        # 时仍然判红（本轮已变异检验，见 docs/operations/evidence/suite-triage/）。
+        methods = _class_methods(stripped, "_stage_and_verify")
+        reachable = _reachable_from(stripped, "_stage_and_verify")
+        assert "_projection_structure_hash" in reachable, (
+            "`_stage_and_verify` 沿 `self.*` 调用链到不了 `_projection_structure_hash` —— "
+            "新方法成了死代码（假绿第①源）。"
+            f"实测可达闭包: {sorted(reachable)}"
+        )
+        holders = [
+            name
+            for name in reachable
+            if "_projection_structure_hash" in _self_refs(methods[name])
+        ]
+        assert holders, (
+            "闭包可达却找不到哪个方法真的写了 `self._projection_structure_hash` —— "
+            "判据分母不成立（形态变了，需人工复核）"
+        )
+        assert any(
+            _value_leaves_the_method(methods[name], "_projection_structure_hash")
+            for name in holders
+        ), (
+            f"{holders} 里没有一处把 `_projection_structure_hash(...)` 的返回值绑名并 return"
+            " —— 算完即丢等于死代码，宿主 fence/落库拿到的仍是别的量"
         )
 
     def test_fence_and_representation_get_the_same_value(self) -> None:

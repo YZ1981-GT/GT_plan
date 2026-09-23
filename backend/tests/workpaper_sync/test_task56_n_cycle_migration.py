@@ -98,6 +98,8 @@ SHARED_BASE = WP_COMPOSABLES / "useWorkpaperEntryDualMode.ts"
 SHARED_ROUTER = WP_COMPOSABLES / "shared" / "cycleSheetRouting.ts"
 AC14_NOTICE_TS = WP_COMPONENTS / "sync" / "workpaperEntrySyncNotice.ts"
 AC14_NOTICE_VUE = WP_COMPONENTS / "sync" / "GtEntrySyncCapabilityNotice.vue"
+#: `SYNC_ADAPTER_REGISTERED_ENTRY_IDS` 现算形态所依赖的 generated manifest（真源之真源）。
+SYNC_MANIFEST_TS = WP_COMPONENTS / "sync" / "workpaperSyncManifest.generated.ts"
 
 N_CODES = ("N1", "N2", "N3", "N4", "N5")
 HTML_COUNTERPART_VERDICTS = ("none", "exists")
@@ -225,6 +227,67 @@ def _statement_edges_to(target: pathlib.Path) -> tuple[list[str], list[str]]:
                         ref = f"{f.relative_to(ROOT).as_posix()}#L{i}"
                         (test if _is_test_path(f) else prod).append(ref)
     return sorted(set(prod)), sorted(set(test))
+
+
+def _initializer_of(source: str, const_name: str) -> str:
+    """取 `const_name = ...` 的**完整初始化表达式**（括号配平，跨行）。
+
+    🔴 不能用 `=\\s*(\\[[^\\]]*\\])` 这种「假定字面量」的正则：真源可以是字面量数组，也可以是
+    现算表达式，形态一变正则就 `None`，判据报的是「找不到声明」—— 把「形态变了」误报成
+    「东西没了」，正是它该区分的两件事。
+    """
+    anchor = re.search(re.escape(const_name) + r"\b[^=\n]*=", source)
+    if not anchor:
+        return ""
+    depth = 0
+    taken: list[str] = []
+    for ch in source[anchor.end():]:
+        if ch in "([{":
+            depth += 1
+        elif ch in ")]}":
+            depth -= 1
+        elif ch == "\n" and depth <= 0 and taken and taken[-1].strip():
+            break
+        taken.append(ch)
+    return "".join(taken)
+
+
+def _registered_entry_ids(notice_ts: str) -> list[str]:
+    """解析 AC 1.4 的「已注册 adapter」集合 —— 真源可以是字面量数组，也可以是 manifest 现算。
+
+    2026-09-22 真源从手写数组改成
+    `WORKPAPER_SYNC_MANIFEST.filter((e) => e.capability === 'bidirectional').map(e => e.entryId)`：
+    手写数组本身是**第二真源**，D4/G7/H1 接通双向后没人补行，真双向底稿上继续显示
+    「两侧数据未互通」（把真能力说成假的，同样是 AC 1.4 禁止的失真披露）。
+
+    判据跟着真源走但**不退化成「存在即通过」**：声明整体缺失 ⇒ 断言失败；字面量 ⇒ 取引号里的
+    id；现算 ⇒ 按同一 filter 谓词在 generated manifest 上复算。两条路径都给出**具体 id 列表**，
+    下游「非空 / 形如 entry_id / 有消费方」逐条判据一条都不放宽。
+    """
+    init = _initializer_of(notice_ts, "SYNC_ADAPTER_REGISTERED_ENTRY_IDS")
+    assert init.strip(), "找不到 SYNC_ADAPTER_REGISTERED_ENTRY_IDS 的声明"
+    if "WORKPAPER_SYNC_MANIFEST" in init:
+        predicate = re.search(
+            r"WORKPAPER_SYNC_MANIFEST\s*\.filter\(\s*\(?\s*(\w+)\s*\)?\s*=>"
+            r"\s*\1\.capability\s*===\s*['\"]([^'\"]+)['\"]",
+            init,
+        )
+        assert predicate, f"现算形态的 filter 谓词无法识别：{init.strip()[:200]!r}"
+        assert re.search(r"\.map\(\s*\n?\s*\(?\s*(\w+)\s*\)?\s*=>\s*\1\.entryId", init), (
+            f"现算形态没有 map 到 entryId：{init.strip()[:200]!r}"
+        )
+        block = re.search(
+            r"WORKPAPER_SYNC_MANIFEST\s*(?::[^=]*)?=\s*(\[[\s\S]*?\n\])\s*as const",
+            _cached_text(SYNC_MANIFEST_TS),
+        )
+        assert block, "读不出 WORKPAPER_SYNC_MANIFEST 数组 ⇒ 现算形态无从复算"
+        wanted = predicate.group(2)
+        return sorted(
+            {e["entryId"] for e in json.loads(block.group(1)) if e["capability"] == wanted}
+        )
+    literal = re.search(r"\[([\s\S]*)\]", init)
+    assert literal, f"既不是现算也不是字面量数组：{init.strip()[:200]!r}"
+    return sorted(set(re.findall(r"['\"]([^'\"]+)['\"]", literal.group(1))))
 
 
 def _n_cycle_files() -> list[pathlib.Path]:
@@ -908,21 +971,23 @@ class TestAdjudicationLegality:
         """
         ts = _cached_text(AC14_NOTICE_TS)
         assert "SYNC_ADAPTER_REGISTERED_ENTRY_IDS" in ts
-        m = re.search(
-            r"SYNC_ADAPTER_REGISTERED_ENTRY_IDS[^=]*=\s*(\[[^\]]*\])", ts)
-        assert m, "找不到 SYNC_ADAPTER_REGISTERED_ENTRY_IDS 的声明"
         # 🔴 迁移推进后此集合已非空（d2 等 entry 真注册了 adapter）。原判据冻结「必须为空」是迁移
         # 前快照 —— 现在非空恰让 AC 1.4 的两个分支都有真实分母（已注册分支有 d2 类真样本、未注册
         # 分支有本 slice 的 N entry）。改为断言集合是良构的非空 entry_id 列表；两分支的消费方逻辑
         # 完整性仍逐条校验。不弱化。
-        registered_ids = re.findall(r"'([^']+)'", m.group(1))
+        registered_ids = _registered_entry_ids(ts)
         assert registered_ids, (
             f"已注册 adapter 的 entry 清单为空 ⇒ AC 1.4 的「已注册 ⇒ 无提示」分支没有真实分母"
         )
         assert all("/" in rid for rid in registered_ids), (
             f"已注册集合里有不像 entry_id 的项：{registered_ids}"
         )
-        body_after = ts[m.end():]
+        # 🔴 「声明之后仍被引用」必须从**初始化表达式结束处**往后看，不能从常量名首次出现处
+        #    （首次出现在模块 docstring 的 `{@link ...}` 里，从那儿切会把声明自己算成消费方 ⇒
+        #    死常量检测恒真）。
+        anchor = re.search(r"SYNC_ADAPTER_REGISTERED_ENTRY_IDS\b[^=\n]*=", ts)
+        assert anchor, "找不到 SYNC_ADAPTER_REGISTERED_ENTRY_IDS 的声明"
+        body_after = ts[anchor.end() + len(_initializer_of(ts, "SYNC_ADAPTER_REGISTERED_ENTRY_IDS")):]
         assert "SYNC_ADAPTER_REGISTERED_ENTRY_IDS" in body_after, (
             "该常量在声明之后没有任何消费方 ⇒ 是死常量，AC 1.4 的门控形同虚设"
         )

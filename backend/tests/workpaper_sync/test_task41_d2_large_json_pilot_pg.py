@@ -71,10 +71,49 @@ _SCHEMA_PREFIX = "tmp_task41_pilot_"
 D2_WP_ID = "e2c95d10-181d-4549-8910-d5ab5bc5edd1"
 
 #: 与离线守卫的字面量互锁（两侧任一漂移都打红）。
-EXPECTED_PAYLOAD_BYTES = 906_239
+#:
+#: ═══ 🔴 为什么尺寸类判据不是等式 ═══
+#:
+#: `EXPECTED_PAYLOAD_BYTES = 906_239` 原本是等式。它锁的是**真库里一行用户可编辑的
+#: 数据**的字节数 ⇒ 任何一次真实录入、任何一次写入方换排版风格，都会让它打红，而打红的
+#: 内容与「本 pilot 是否跑在真实大载荷上」毫无关系。2026-09-23 复核实测：
+#:
+#:   stored 906,239 -> 1,009,966（+103,727 / +11.4%）
+#:   但 row_count 1260 不变、distinct rowId 1260 不变、keys_per_row 25 不变、
+#:   键集合/类型逐项不变、aging 三组 22,680 个叶子**全为 0**（一个都没被填）。
+#:
+#: 归因：库里这一行现在的文本用 Python `json.dumps` **默认分隔符**（`", "` / `": "`）
+#: 序列化 —— 按该风格重新序列化实测**恰好** 1,009,966 字节，逐字节吻合；按紧凑分隔符
+#: 序列化则是 905,387。也就是说 **+104,579 字节全是排版空白，零信息增量**。
+#: `checklist_responses` 里这种带空格风格自 2026-06-29 起共 68 行，是后端 Python
+#: 写入方一贯的形态，不是新回归。
+#:
+#: 🔴 2026-09-23 更正：原文把剩下的 **−852** 字节归给「一次真实编辑（`debitOccurrence`
+#: 非空数 1093 -> 1092）」。那一笔编辑是真的（falsy 行 167 -> 168，多出来那格现值 `0`），
+#: 但它**解释不了 852 字节** —— `debitOccurrence` 的单值紧凑序列化长度实测 min=2 / max=18，
+#: 一格变成 `0` 最多省 **17** 字节，差了 50 倍。逐键 truthy 计数对账（与 evidence
+#: `real_payload_facts.json` 同谓词）显示**只有这一个键的计数变了**，其余 10 个键逐项相等
+#: ⇒ 余下的差额来自**计数不变但值变短**（如 `1234567.89` -> `1234567.9`），truthy 谓词
+#: 抓不到这一类。能证到的边界是：结构字节（25 键 × 1260 行，逐行恒定）实测 496,441，
+#: 值字节 408,946，合计 905,387 与实测逐字节相等 ⇒ **−852 全部落在值字节里**，
+#: 与排版无关、与形态无关。再往下逐键分解**做不到**：2026-09-06 的 evidence 只记了
+#: 「计数 + 类型」而没记逐键字节，旧字节已被 2026-09-10 那次保存覆盖。
+#: ⇒ 为不让下一次再查不动，:func:`_real_payload_phases` 现在把逐键值字节
+#:   （`payload_value_bytes_by_key`）连同结构/值字节一起落进快照（见
+#:   `test_size_delta_is_attributable_to_value_bytes`）。
+#:
+#: ⇒ 处置：**不**把 906,239 重冻成 1,009,966（那会把排版膨胀洗成"载荷长大了"）。
+#:   改为对**信息量**下界断言 + 显式给排版开销设上限，让膨胀继续可见、继续可打红。
+#: 形态类（行数 / 每行字段数）保持等式 —— 那才是本 pilot 依赖的不变量。
+MIN_PAYLOAD_BYTES = 800 * 1024  # 「大 JSON」这个前提本身：< 800KiB 就不是本 pilot 的对象
+#: 紧凑口径（排版无关）的信息量下界。2026-09-06 实测 906,239 / 2026-09-23 实测 905,387。
+MIN_PAYLOAD_COMPACT_BYTES = 900_000
+#: 排版空白上限：现状 104,579（约 11.6%）。再涨就要查是谁又换了写入风格。
+MAX_PAYLOAD_WHITESPACE_BYTES = 110_000
 EXPECTED_PAYLOAD_ROWS = 1_260
-EXPECTED_D2_ITEM_COUNT = 24
-EXPECTED_TOTAL_REMARK_BYTES = 915_155
+#: 同一份底稿的 D2-* item 数用**下界**：用户每打开一个新分区就会多一条空 item。
+#: 2026-09-06 实测 24；2026-09-10 11:30 新增 `D2-entry-rows`（内容 `[]`，2 字节）⇒ 25。
+MIN_D2_ITEM_COUNT = 24
 EXPECTED_FIELDS_PER_ROW = 39
 #: 被删/被改的那一行在载荷里的序位（**只用于选样本**，不参与任何身份构造）。
 VICTIM_ORDINAL = 7
@@ -231,6 +270,41 @@ def _real_payload_phases(items: dict[str, str]) -> dict[str, Any]:  # noqa: C901
         "payload_bytes": len(blob),
         "payload_sha256": hashlib.sha256(blob).hexdigest(),
     }
+    # 🔴 **与排版无关**的信息量度量：库里这一行的 JSON 排版风格是写入方的自由
+    #    （`json.dumps` 默认带空格 vs `JSON.stringify` 紧凑），它不改变一个字节的信息，
+    #    却能让 `payload_bytes` 浮动 10% 以上。所以「载荷有多大」必须有一个不受排版
+    #    影响的口径，否则尺寸判据实际上在测「上次是谁写的」。详见
+    #    `test_real_store_payload_is_the_frozen_866kb_shape` 的归因。
+    _parsed = json.loads(raw)
+
+    def _compact(value: Any) -> bytes:
+        return json.dumps(value, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
+
+    snap["payload_compact_bytes"] = len(_compact(_parsed))
+    snap["payload_whitespace_bytes"] = len(blob) - snap["payload_compact_bytes"]
+
+    # 🔴 逐键值字节 + 结构字节：让**下一次**尺寸变动可以逐键归因。
+    #    2026-09-23 复核时 906,239 -> 905,387 那 −852 字节查不到底，正是因为旧 evidence
+    #    只记了「非空计数 + 类型」—— 而计数不变、值变短的编辑（`1234567.89` ->
+    #    `1234567.9`）它一格都抓不到。结构字节由键集合推导（逐行恒定），所以两者一相加
+    #    等于 compact 就证明了「差额只能落在值字节里」这条推理链，而不是靠估。
+    _value_bytes: dict[str, int] = {}
+    for _row in _parsed:
+        for _key, _value in _row.items():
+            _value_bytes[_key] = _value_bytes.get(_key, 0) + len(_compact(_value))
+    snap["payload_value_bytes_by_key"] = _value_bytes
+    snap["payload_value_bytes"] = sum(_value_bytes.values())
+    _keysets = {tuple(sorted(row.keys())) for row in _parsed}
+    snap["payload_distinct_keysets"] = len(_keysets)
+    if len(_keysets) == 1 and _parsed:
+        _keys = list(_parsed[0].keys())
+        # 每行：`"key":` × n + 逗号 ×(n−1) + `{` `}`；整表再加行间逗号与 `[` `]`
+        _per_row = sum(len(_compact(key)) + 1 for key in _keys) + (len(_keys) - 1) + 2
+        snap["payload_struct_bytes"] = (
+            _per_row * len(_parsed) + (len(_parsed) - 1) + 2
+        )
+    else:  # pragma: no cover - 键集合一漂，结构字节就不是常量了
+        snap["payload_struct_bytes"] = None
 
     # ── 拆分（流式，tracemalloc 观测峰值）───────────────────────────────
     tracemalloc.start()
@@ -1067,15 +1141,72 @@ def test_no_phase_crashed_during_collection(snap: dict[str, Any]) -> None:
 
 
 def test_real_store_payload_is_the_frozen_866kb_shape(real: dict[str, Any]) -> None:
-    """从库里重取一次，与离线守卫的字面量逐条互锁。"""
+    """从库里重取一次：**形态**逐条等式互锁，**尺寸**按信息量下界 + 排版开销上限。
+
+    两类断言分开的理由见 :data:`MIN_PAYLOAD_BYTES` 上方的归因段 —— 尺寸等式锁的是
+    「这一行数据没被人动过」，那不是被测系统的性质；形态等式锁的才是本 pilot 依赖的
+    不变量（1260 行 × 39 字段的 stable field 拆分）。
+    """
     from app.services.workpaper_sync import pilot_d2_large_json as P
 
-    assert real["payload_bytes"] == EXPECTED_PAYLOAD_BYTES == 906_239
+    # ── 形态：等式 ──────────────────────────────────────────────────────
     assert real["row_count"] == EXPECTED_PAYLOAD_ROWS == 1_260
-    assert real["item_count"] == EXPECTED_D2_ITEM_COUNT == 24
-    assert real["total_remark_bytes"] == EXPECTED_TOTAL_REMARK_BYTES
-    assert real["payload_bytes"] / 1024 == pytest.approx(885.0, abs=0.1)
     assert P.STORE_ITEM_ID in real["item_ids"]
+
+    # ── 尺寸：信息量下界（排版无关）+ 「大 JSON」前提 ────────────────────
+    assert real["payload_compact_bytes"] >= MIN_PAYLOAD_COMPACT_BYTES, (
+        f"紧凑口径只剩 {real['payload_compact_bytes']} 字节（下界 "
+        f"{MIN_PAYLOAD_COMPACT_BYTES}）—— 载荷真的变小了，不是排版变化"
+    )
+    assert real["payload_bytes"] >= MIN_PAYLOAD_BYTES, (
+        f"载荷 {real['payload_bytes']} 字节，不足 {MIN_PAYLOAD_BYTES} ⇒ "
+        "「真实大 JSON」这个前提没了，本 pilot 失去取证对象"
+    )
+
+    # ── 🔴 排版膨胀：设上限而不是重冻，膨胀必须一直可见 ──────────────────
+    assert real["payload_whitespace_bytes"] <= MAX_PAYLOAD_WHITESPACE_BYTES, (
+        f"排版空白涨到 {real['payload_whitespace_bytes']} 字节"
+        f"（上限 {MAX_PAYLOAD_WHITESPACE_BYTES}，占载荷 "
+        f"{100 * real['payload_whitespace_bytes'] / real['payload_bytes']:.1f}%）—— "
+        "又有写入方换了 JSON 排版风格。这是零信息增量的纯存储膨胀，查写入方，"
+        "不要抬这个上限"
+    )
+
+    # 其余 item 的总量必须至少覆盖本载荷（口径自检，防止 item 被整体换掉）
+    assert real["total_remark_bytes"] >= real["payload_bytes"]
+    assert real["item_count"] >= MIN_D2_ITEM_COUNT
+
+
+def test_size_delta_is_attributable_to_value_bytes(real: dict[str, Any]) -> None:
+    """🔴 尺寸变动必须**可归因**：结构字节 + 值字节 ≡ 紧凑字节，逐字节。
+
+    这条不冻结任何尺寸数字，它锁的是**分解恒等式**本身：键集合只有 1 种 ⇒ 结构字节是
+    「25 键 × 1260 行」的常量 ⇒ 任何尺寸变动只能落在值字节里。有了它 +
+    :data:`payload_value_bytes_by_key`，下一次载荷变大变小都能逐键说出是哪个键动的。
+
+    2026-09-23 复核时 906,239 -> 905,387 的 −852 字节查不到底（旧 evidence 只记了
+    非空计数与类型，计数不变而值变短的编辑一格都抓不到），这条就是那次的补课。
+    """
+    assert real["payload_distinct_keysets"] == 1, (
+        f"每行键集合出现 {real['payload_distinct_keysets']} 种 ⇒ 结构字节不再是常量，"
+        "「尺寸差额只能落在值字节里」这条推理失效，尺寸归因要重做"
+    )
+    assert real["payload_struct_bytes"] is not None
+    assert (
+        real["payload_struct_bytes"] + real["payload_value_bytes"]
+        == real["payload_compact_bytes"]
+    ), (
+        f"分解不闭合：结构 {real['payload_struct_bytes']} + 值 "
+        f"{real['payload_value_bytes']} != 紧凑 {real['payload_compact_bytes']}"
+    )
+    # 逐键覆盖 25 个键，且 aging 三组是全零常量（各 63 字节 × 1260 行）
+    by_key = real["payload_value_bytes_by_key"]
+    assert len(by_key) == 25, sorted(by_key)
+    for group in ("agingAudited", "agingCurrent", "agingPrior"):
+        assert by_key[group] == 63 * EXPECTED_PAYLOAD_ROWS, (
+            f"{group} 值字节 {by_key[group]} != 63×1260 ⇒ aging 不再是全零常量形态，"
+            "22,680 个叶子里有人填了数 —— 这是真实录入，去核对形态而不是改这个数"
+        )
 
 
 def test_whole_json_is_split_into_one_field_per_column_per_row(real: dict[str, Any]) -> None:
@@ -1131,9 +1262,21 @@ def test_reorder_and_insert_are_not_whole_table_overwrites(real: dict[str, Any])
 
 
 def test_no_other_store_item_is_touched(real: dict[str, Any]) -> None:
-    """「不覆盖其他 item/section」的**非空**判据：同一份底稿另有 23 条 item。"""
+    """「不覆盖其他 item/section」的**非空**判据：同一份底稿另有 ≥23 条 item。
+
+    这条要的是**分母非空**（真有别的 item 在旁边，所以「没被碰」不是空集恒真）加上
+    **没泄漏**（`leaked_into_contract == []`）。item 条数本身是用户行为的函数 ——
+    打开一个新分区就多一条空 item（2026-09-10 新增 `D2-entry-rows`，内容 `[]`）——
+    所以用下界；「没泄漏」那两条保持等式，它们才是本判据的结论。
+    """
     other = real["other_items"]
-    assert other["count"] == EXPECTED_D2_ITEM_COUNT - 1 == 23
+    assert other["count"] >= MIN_D2_ITEM_COUNT - 1, (
+        f"旁边只剩 {other['count']} 条 item（下界 {MIN_D2_ITEM_COUNT - 1}）⇒ "
+        "分母缩水，「其他 item 没被碰」有退化成空集恒真的风险"
+    )
+    assert other["count"] == real["item_count"] - 1, (
+        "「其他 item」数必须恰好是总数减本 item —— 对不上说明分流口径漂了"
+    )
     assert other["leaked_into_contract"] == [], other["leaked_into_contract"]
     assert other["merged_key_prefixes"] == ["receivable_detail_rows"]
     assert other["merged_row_keys_are_payload_rows"] is True
@@ -1192,8 +1335,10 @@ def test_sidecar_streams_the_real_projection(real: dict[str, Any]) -> None:
 def test_sidecar_never_holds_the_whole_projection_in_one_buffer(real: dict[str, Any]) -> None:
     sidecar = real["sidecar"]
     assert 0 < sidecar["peak_bytes"] < sidecar["peak_budget"], sidecar
-    # gzip 之后的体积必须显著小于原始 906KB 载荷（证明真的压缩流式写出）。
-    assert sidecar["bytes"] < EXPECTED_PAYLOAD_BYTES
+    # gzip 之后的体积必须显著小于原始载荷（证明真的压缩流式写出）。
+    # 🔴 比的是**现取**的 payload_bytes 而不是冻结字面量：这条要的是「压过」这个关系，
+    #    拿字面量当分母会让它随真库排版/录入变化而漂。
+    assert sidecar["bytes"] < real["payload_bytes"]
 
 
 def test_chunk_size_is_derived_from_limits_not_hardcoded(real: dict[str, Any]) -> None:

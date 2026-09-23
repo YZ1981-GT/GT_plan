@@ -56,6 +56,9 @@ from typing import Any, Callable
 
 import pytest
 
+#: AC 1.4 通知真源的**单一解析器**（真源可为字面量数组或 manifest 现算，见该模块 docstring）。
+from tests.workpaper_sync.entry_sync_notice_source import registered_entry_ids
+
 # ────────────────────────────────────────────────────────────────────────────
 # Paths
 # ────────────────────────────────────────────────────────────────────────────
@@ -2030,12 +2033,16 @@ class TestAc14HonestModeVisibility:
             assert f'entry-id="{entry["entry_id"]}"' in block
 
     def test_registered_entry_ids_agree_with_the_slice(self, manifest_slice: dict) -> None:
-        source = NOTICE_MODULE.read_text(encoding="utf-8")
-        match = re.search(
-            r"SYNC_ADAPTER_REGISTERED_ENTRY_IDS:\s*readonly string\[\]\s*=\s*\[([\s\S]*?)\]", source
-        )
-        assert match, "找不到 SYNC_ADAPTER_REGISTERED_ENTRY_IDS 声明"
-        registered = set(re.findall(r"['\"]([^'\"]+)['\"]", match.group(1)))
+        """双向锁：slice 的 adapter_id 与前端登记表必须互相印证。
+
+        🔴 2026-09-22 修检测器方向。原实现用 `=\\s*\\[` 假定真源是字面量数组，真源改成
+        `WORKPAPER_SYNC_MANIFEST.filter(...).map(...)` 现算之后正则恒 `None`，于是报
+        「找不到 SYNC_ADAPTER_REGISTERED_ENTRY_IDS 声明」—— 把「形态变了」误报成
+        「东西没了」。解析逻辑收敛到 `entry_sync_notice_source`（一份），仍 fail closed。
+        """
+        registered = set(registered_entry_ids())
+        assert registered, "已注册集合为空 ⇒ 「已注册 ⇒ 不挂通知」分支没有真实分母"
+        assert all("/" in rid for rid in registered), f"集合里有不像 entry_id 的项：{registered}"
         for entry in manifest_slice["independent_entries"]:
             has_adapter = entry["adapter_id"] is not None
             assert (entry["entry_id"] in registered) == has_adapter, (
@@ -2178,17 +2185,52 @@ class TestSourceCodeStructure:
     def test_hosts_exist_and_are_reachable_from_the_renderer_registry(
         self, manifest_slice: dict
     ) -> None:
-        registry = HTML_RENDERER_REGISTRY.read_text(encoding="utf-8")
+        """可达性判据落在 registry 的**模块边 + component 绑定**上，不按符号名 grep。
+
+        🔴 registry 已被拆包（`htmlRendererRegistry.ts` 现在只 re-export
+        `registry/entries/{core,forms,programs,confirmations,reports,specialized}.ts`，
+        聚合器里只剩 1 处 `defineAsyncComponent`）。原判据写死两个形态：
+        `const GtX = defineAsyncComponent(() => import('./GtX.vue'))` 两步式、以及
+        `'./'` 相对前缀 —— 拆包后真实形态是子文件里 `component:` 位上的内联
+        `defineAsyncComponent(() => import('../../GtX.vue'))`，于是**每一条** H entry 都假红。
+        与 test_task54 的 `test_host_module_edges_in_the_renderer_registry_are_real`
+        取同一口径：遍历聚合器 + 每个 entries 子文件，import spec 以各自文件为基准解析。
+
+        判据**不弱化**：仍要求 (1) 宿主真在某条 registry 模块边上、(2) 那条边真的坐在
+        `component:` 位上（不是随手 import 了个没注册的组件）。
+        """
+        reg_files = [HTML_RENDERER_REGISTRY]
+        entries_dir = HTML_RENDERER_REGISTRY.parent / "registry" / "entries"
+        if entries_dir.is_dir():
+            reg_files += sorted(entries_dir.glob("*.ts"))
+        assert len(reg_files) >= 2, (
+            f"只找到 {len(reg_files)} 个 registry 文件 —— 判据的分母不对（拆包目录消失？）"
+        )
+
+        # host 绝对路径 -> 它是否坐在 component: 位上
+        module_edges: dict[pathlib.Path, bool] = {}
+        for reg_file in reg_files:
+            code = _strip_ts_comments(reg_file.read_text(encoding="utf-8"))
+            for m in re.finditer(
+                r"""(component\s*:\s*)?defineAsyncComponent\(\s*\(\)\s*=>\s*import\(\s*['"]([^'"]+)['"]""",
+                code,
+            ):
+                spec = m.group(2)
+                if not spec.startswith("."):
+                    continue
+                resolved = (reg_file.parent / spec).resolve()
+                module_edges[resolved] = module_edges.get(resolved, False) or bool(m.group(1))
+
         for entry in manifest_slice["independent_entries"]:
             host = _resolve_repo(entry["host_path"])
             assert host.exists(), f"{entry['entry_id']}: 宿主不存在"
-            component = host.stem
-            assert re.search(
-                rf"const {re.escape(component)} = defineAsyncComponent\(\(\) => import\('\./{re.escape(component)}\.vue'\)\)",
-                registry,
-            ), f"{entry['entry_id']}: htmlRendererRegistry 里没有 {component} 的 import 边"
-            assert re.search(rf"component:\s*{re.escape(component)}\b", registry), (
-                f"{entry['entry_id']}: htmlRendererRegistry 里没有 {component} 的 component 绑定"
+            resolved_host = host.resolve()
+            assert resolved_host in module_edges, (
+                f"{entry['entry_id']}: registry（聚合器 + entries/*.ts）里没有 "
+                f"{host.stem} 的 import 边"
+            )
+            assert module_edges[resolved_host], (
+                f"{entry['entry_id']}: {host.stem} 有 import 边但不在 `component:` 位上"
                 " ⇒ 不可达（那就该裁 unreachable 而不是待裁决）"
             )
 

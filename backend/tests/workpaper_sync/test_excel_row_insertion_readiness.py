@@ -369,14 +369,34 @@ class TestRequiredCoverage:
         # D2 的 HTML store 实测 1260 行，远超骨架 ⇒ 它必然需要插行
         assert d2["skeleton_rows"] < 1260, d2["skeleton_rows"]
 
-    def test_all_four_published_contracts_are_assessed(self, report: dict[str, Any]) -> None:
+    def test_every_published_contract_is_assessed(self, report: dict[str, Any]) -> None:
+        """每个已发布契约都必须拿到一格结论 —— 一个都不许悄悄掉进 `errors`。
+
+        🔴 分母**现读契约注册表**，不再手抄一串 id。手抄的那份在 D 循环迁移
+        （`phase5_d1/d3/d4/d5/d6/d7`，commit cd9592ff5）把 4 个契约变成 10 个之后
+        就成了过期普查数，而它打红的方式是「多出 6 个」—— 那恰恰是**好事**被判成
+        故障。现读之后，新发布一个 entry 不会误红，而真正该红的情形反而抓得住：
+        `build_report` 对现算失败的 entry 是记进 `report["errors"]`、**不**进
+        `entries`，所以「某个已发布契约算炸了因此没有结论」在这条判据下必红。
+
+        同时保留 AC 10.5 点名的四个载体作**下限**：否则注册表若被清空，
+        「相等」会退化成 `set() == set()` 恒真。
+        """
+        from app.services.workpaper_sync.contracts import available_contract_ids
+
+        published = set(available_contract_ids())
         ids = {e["adapter_id"] for e in report["entries"]}
-        assert ids == {
+        assert ids == published, (
+            f"未拿到结论的已发布契约: {sorted(published - ids)}；"
+            f"清册里却有注册表外的 id: {sorted(ids - published)}；"
+            f"errors={report['errors']}"
+        )
+        assert {
             "b60.hour_budget",
             "d2.receivable_detail",
             "g7.soe_subsidiary_disclosure",
             "h1.disposal_check",
-        }, sorted(ids)
+        } <= ids, f"AC 10.5 点名的载体缺失: {sorted(ids)}"
 
     def test_store_rows_absent_means_structural_only_conclusions(
         self, report: dict[str, Any]
