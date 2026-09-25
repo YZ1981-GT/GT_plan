@@ -221,9 +221,15 @@ backend/app/services/workpaper_sync/endpoint_guard.py  1119
 backend/app/services/workpaper_sync/entry_source_facts.py  1096
 backend/app/services/workpaper_sync/evidence.py  1252
 backend/app/services/workpaper_sync/excel_entry_gate.py  1317
-backend/app/services/workpaper_sync/excel_extract.py  3900
+#   excel_extract.py —— 基线 3900 → 4159（+259）。D4 同 sheet 多区累积归一化几轮修复累积
+#     （unextend_total_formula_chain 接线等）。拆分方向见本表顶部第 1 条。
+#     spec: workpaper-html-onlyoffice-bidirectional-writeback-closure（同 sheet 多区）
+backend/app/services/workpaper_sync/excel_extract.py  4159
 backend/app/services/workpaper_sync/excel_instrumentation.py  2200
-backend/app/services/workpaper_sync/excel_materialize.py  3120
+#   excel_materialize.py —— 基线 3120 → 3660（+540）。D4 同 sheet 多区兄弟 Table ref 位移
+#     （_sheet_table_parts / _shift_sibling_table_refs / footer 同 sheet 放行）+ _GT_SYNC
+#     重冻结几轮修复累积。spec: workpaper-html-onlyoffice-bidirectional-writeback-closure
+backend/app/services/workpaper_sync/excel_materialize.py  3660
 #   materialize_coordinator.py —— 基线 2936 早已 stale（本次改动前 HEAD 实测 3017）。
 #     2026-09-22 僵死 lease 的治本分流（+134 行）：按「这一代是否**真正接管过内容**」分两支 ——
 #     ① 从未接管（room 停在 opening / descriptor 确认从未到达 / 序列为 0 / 无 application）
@@ -492,7 +498,9 @@ backend/app/services/workpaper_sync/d2_bidirectional_bridge.py  1115
 #     该文件确需按「计划 / 阶段 A 受管区重编号 / 阶段 C-D 受管区外 / 验证器」拆分，
 #     属独立打磨任务，不在本次缺陷修复范围。
 #     spec: workpaper-html-onlyoffice-bidirectional-writeback-closure（2026-09-07 D2-2 实测条目）
-backend/app/services/workpaper_sync/excel_row_shift.py  2041
+#   （2026-09 续）基线 2041 → 2175（+134）。D4 同 sheet 多区 CompositeRowShift 累积归一化
+#     （链式 unshift/shift/inserted_rows + unextend_total_formula_chain）。
+backend/app/services/workpaper_sync/excel_row_shift.py  2175
 
 #   test_excel_row_shift.py —— **改动前即 951 行已超限**（HEAD 现状）。本次净增 47 行，
 #     是上面那个缺陷的守卫：`TestProperty9` 下新增 `test_xm_sqref_text_moves_alongside_the_attribute`
@@ -848,3 +856,16 @@ backend/tests/workpaper_sync/test_workbook_row_change_carriers.py  830
 #     baseline 取真实行数 1559。拆分方向: 把状态机转换表与 DTO 构造抽伴生模块, 属独立任务。
 #     spec: d4-html-to-oo-store-contract-alignment（错误信封 normalize）
 audit-platform/frontend/src/components/workpaper/sync/useWorkpaperSyncBridge.ts  1559
+
+#   adapters/excel.py —— **改动前即 >800 上限、从未登记**。D4 同 sheet 多区累积归一化
+#     （_sheet_cumulative_shift + sheet_of_table 映射）几轮修复堆积至 1027 行。首次入册,
+#     baseline 取真实行数。拆分方向: verify 侧 unmanaged 区域归一化(约 250 行)抽伴生模块。
+#     spec: workpaper-html-onlyoffice-bidirectional-writeback-closure（同 sheet 多区）
+backend/app/services/workpaper_sync/adapters/excel.py  1027
+
+#   test_sibling_table_ref_row_shift.py —— 同 sheet 多区兄弟 Table ref 位移判据宿主
+#     （15 passed: 5 张同 sheet 多区参数化 + 单区纯增量纪律 + CompositeRowShift 累积归一化）。
+#     判据清单从 instrumentation_specs() 动态算(新增受管区自动覆盖), 条目本身是数据;
+#     拆分会让「多区清单 ↔ 位移断言」跨文件。baseline 取真实行数。
+#     spec: workpaper-html-onlyoffice-bidirectional-writeback-closure（同 sheet 多区）
+backend/tests/workpaper_sync/test_sibling_table_ref_row_shift.py  885

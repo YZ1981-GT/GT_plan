@@ -2505,6 +2505,102 @@ def assert_shifted_footer_gates(
     return footer_row
 
 
+def _sheet_table_parts(entries: Mapping[str, bytes], *, sheet_part: str) -> tuple[str, ...]:
+    """该 sheet 关联的**全部** Excel Table part（走 worksheet rels，OOXML 标准关联）。
+
+    用 rels 而不是「扫 `xl/tables/*.xml` 再比 sheet 名」：Table part 里没有所属 sheet 的
+    信息，sheet→table 的唯一权威关联就是 worksheet 的 `<tableParts>` / rels。
+    """
+    import posixpath
+
+    rels = (
+        f"{posixpath.dirname(sheet_part)}/_rels/{posixpath.basename(sheet_part)}.rels"
+    )
+    raw = entries.get(rels)
+    if raw is None:
+        return ()
+    xml = raw.decode("utf-8", errors="replace")
+    out: list[str] = []
+    for match in re.finditer(r"<Relationship\b[^>]*/?>", xml):
+        tag = match.group(0)
+        type_attr = re.search(r'\bType="([^"]*)"', tag)
+        target_attr = re.search(r'\bTarget="([^"]*)"', tag)
+        if type_attr is None or target_attr is None:
+            continue
+        if not type_attr.group(1).rstrip("/").endswith("/table"):
+            continue
+        part = posixpath.normpath(
+            posixpath.join(posixpath.dirname(sheet_part), target_attr.group(1))
+        )
+        out.append(part.lstrip("/"))
+    return tuple(out)
+
+
+def _shift_sibling_table_refs(
+    entries: dict[str, bytes], *, plan: MaterializePlan, own_part: str
+) -> tuple[dict[str, bytes], int]:
+    """把**同 sheet 其它** Excel Table 的 `ref` 按插行位移。
+
+    ═══ 为什么必须做（真栈实测的 500）═══
+
+    D4-1 审定表在**同一张 sheet** 上有两个受管区：主营 `GT_D41_MAIN_ROWS`（W 列，
+    `A7:W11`）/ 其他 `GT_D41_OTHER_ROWS`（X 列，`A14:X17`）。主营段派生行多于模板占位时
+    要插行；「任一 binding 需插行」会让单趟写入 decline，回落**逐趟链式**路径
+    （`adapters/excel.py`：上一趟产物当下一趟 substrate）。
+
+    此前本模块只更新 `plan.table_part`（**本 binding** 那一个 Table part），于是主营那趟
+    插完行后，其他区的数据行下移了而它的 `ref` 逐字不动 ⇒ 其他区那趟按旧 `ref` 读 14..17，
+    那里已经是主营区的新行、X 列无 UUID ⇒ `resolved_sheet_by=None` ⇒
+    `IdentityCarrierMissingError`（且文案误报契约首张表 `d42-managed`，现场像是 D4-2 坏了）。
+
+    ⚠️ 兄弟表的末行边界是 `>= insert_at`，**不是**本 binding 的 `>= insert_at - 1`：
+    后者表达「追加插行紧贴本表末行 ⇒ 本表要把新行包进来」，那是本 binding 独有的语义。
+    对兄弟表，`tail_row == insert_at - 1` 意味着它末行正好在插入点上方一行，新行不属于它，
+    **不得**扩张。`shift.shift()` 天然给出这个边界（`row < insert_at` 原样返回），
+    所以首末行各调一次即可同时覆盖三种情形：整体下移 / 跨插入点扩张 / 完全在上方不动。
+
+    判据：`tests/workpaper_sync/test_sibling_table_ref_row_shift.py`
+    """
+    shift = plan.row_shift
+    assert shift is not None, "调用方保证"
+    siblings = [
+        p
+        for p in _sheet_table_parts(entries, sheet_part=plan.sheet_part)
+        if p != own_part and p in entries
+    ]
+    total = 0
+    for part in siblings:
+        xml = entries[part].decode("utf-8")
+        changed = 0
+
+        def _one(match: re.Match[str]) -> str:
+            nonlocal changed
+            head, tail = match.group("ref").split(":", 1)
+            head_col = re.sub(r"\d", "", head)
+            tail_col = re.sub(r"\d", "", tail)
+            head_row = int(re.sub(r"\D", "", head) or 0)
+            tail_row = int(re.sub(r"\D", "", tail) or 0)
+            new_head_row = shift.shift(head_row)
+            new_tail_row = shift.shift(tail_row)
+            if (new_head_row, new_tail_row) == (head_row, tail_row):
+                return match.group(0)
+            changed += 1
+            return (
+                f'{match.group("prefix")}{head_col}{new_head_row}:'
+                f'{tail_col}{new_tail_row}"'
+            )
+
+        xml_new = re.sub(
+            r'(?P<prefix>\bref=")(?P<ref>[A-Z]{1,3}\d+:[A-Z]{1,3}\d+)"', _one, xml
+        )
+        if changed:
+            entries[part] = xml_new.encode("utf-8")
+            total += changed
+    # 🔴 **不**断言 total > 0：兄弟表完全位于插入点**上方**时一处都不该动，那是正确行为
+    #    （与本 binding 的 `table_ref_not_grown` 判据不同 —— 那里 0 处改动确实是缺陷）。
+    return entries, total
+
+
 def _grow_managed_table_ref(
     entries: dict[str, bytes], *, plan: MaterializePlan
 ) -> dict[str, bytes]:
@@ -2516,6 +2612,10 @@ def _grow_managed_table_ref(
 
     Table part 在计划期就已定位（`_plan_row_shift` → `_managed_table_part`），
     这里不再现搜 —— 现搜等于把「定位失败」推到写盘期，而那时已经有字节落地了。
+
+    🔴 本 binding 的 Table 之外，**同 sheet 的兄弟 Table** 也必须位移，否则同 sheet 多受管区
+    底稿（D4-1 主营/其他、D4-9 本期/上期、D4-20 三区、D4-34、D4-36）在上区插行后会让下区
+    的 `ref` 与实际数据错位 —— 见 :func:`_shift_sibling_table_refs` 的完整根因说明。
     """
     shift = plan.row_shift
     assert shift is not None, "调用方保证"
@@ -2565,6 +2665,10 @@ def _grow_managed_table_ref(
             "反读时静默丢数据"
         )
     entries[part] = xml_new.encode("utf-8")
+    # 同 sheet 的兄弟 Table（下方的整体下移 / 跨插入点的扩张 / 上方的不动）。
+    entries, _sibling_changes = _shift_sibling_table_refs(
+        entries, plan=plan, own_part=part
+    )
     return entries
 
 
@@ -2679,6 +2783,30 @@ def _refresh_gt_sync_runtime_binding(
             if managed_sheet_key
             else None
         )
+    # 🔴 **同 sheet 兄弟区的 footer 也必须移位**：插行是物理的，同一张 sheet 上位于插入点
+    #    下方的一切都会下移，兄弟区的 footer 不例外。
+    #    此前这里只放行 `GT_FOOTER_ROW_{managed_tid}`，注释写「D4-1 主营插行只移位
+    #    `_D41MAIN`，不误动 `_D41OTHER`」—— 那句话把「同 sheet 兄弟」和「不同 sheet」
+    #    混成一类了。不同 sheet（D42 插行 vs D43）确实不该动，同 sheet 却必须动，
+    #    否则其他区那一趟会撞 `FooterAnchorDriftError`（实测：D4-1 主营插 7 行后
+    #    其他区 footer 物理在 25 行，而冻结值仍是 18）。
+    #    同 sheet 的判定不靠 sheet_key 猜，走 worksheet rels → 兄弟 Table displayName →
+    #    `GT_MANAGED_TABLES`/`GT_TEMPLATE_IDS` 平行清册这条已有的权威桥梁。
+    same_sheet_tids: set[str] = {managed_tid} if managed_tid else set()
+    for sib_part in _sheet_table_parts(entries, sheet_part=plan.sheet_part):
+        raw_sib = entries.get(sib_part)
+        if raw_sib is None:
+            continue
+        sib_xml = raw_sib.decode("utf-8", errors="replace")
+        sib_name = None
+        for attr in ("displayName", "name"):
+            found = _re.search(rf'\b{attr}="([^"]*)"', sib_xml)
+            if found is not None:
+                sib_name = found.group(1)
+                break
+        sib_tid = _template_id_for_table_name(pair_map, sib_name)
+        if sib_tid:
+            same_sheet_tids.add(sib_tid)
 
     new_pairs: list[tuple[str, str]] = []
     seen: set[str] = set()
@@ -2701,8 +2829,11 @@ def _refresh_gt_sync_runtime_binding(
             else:
                 new_value = value
         elif key.startswith("GT_FOOTER_ROW_") and managed_tid is not None:
-            # 只重冻结本趟 sheet 的 per-template footer 键（D42 插行不得动 D43）。
-            if key == f"GT_FOOTER_ROW_{managed_tid}":
+            # 只重冻结**本 sheet**（含同 sheet 兄弟区）的 per-template footer 键
+            # —— D42 插行不得动 D43（不同 sheet），但 D41MAIN 插行必须动 D41OTHER（同 sheet）。
+            # 各键实际移不移由 `shift.shift` 按它自己的行号与插入点的关系决定：
+            # 插入点上方的兄弟 footer 原样返回，下方的 +count。
+            if key.removeprefix("GT_FOOTER_ROW_") in same_sheet_tids:
                 old_keyed = _to_int(value, what=key, required=False)
                 new_value = (
                     str(shift.shift(old_keyed)) if old_keyed is not None else value

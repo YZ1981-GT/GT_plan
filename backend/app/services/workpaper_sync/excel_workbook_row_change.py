@@ -2041,8 +2041,37 @@ def normalise_propagated_part(
     def _apos(s: str) -> str:
         return s.replace("'", "&apos;")
 
-    # 长的先替换：短的 ref_after 可能是长的子串（`!A2` ⊂ `!A25`），先替短的会切坏长的
-    for after, before in sorted(pairs, key=lambda kv: len(kv[0]), reverse=True):
+    # 🔴 **链式声明必须从链尾往前还原**（同 sheet 多趟插行才会出现）。
+    #
+    # 同一处引用被**多趟**各改一次时，合并后的声明是一条链：
+    #   主营那趟：`…!$A$18` → `…!$A$25`（+7）
+    #   其他那趟：`…!$A$25` → `…!$A$31`（+6）
+    # 产物里是 `$A$31`。逆替换必须先用后发生的那条（`$A$31`→`$A$25`），再用前一条
+    # （`$A$25`→`$A$18`）。若顺序反了：先试 `$A$25`→`$A$18` 在产物里找不到（产物是
+    # `$A$31`）⇒ 跳过；再把 `$A$31` 还原成 `$A$25` ⇒ **停在中间态**，与 before 的
+    # `$A$18` 不等 ⇒ `workbook_and_styles` 被误判 `adapter_unmanaged_region_drift`
+    # （D4-1 主营 7 行 + 其他 6 行真栈复现）。
+    #
+    # 链深度 = 沿「本条的 ref_before 正是另一条的 ref_after」往前能走的步数；深度大的
+    # （越靠链尾、越晚发生）先还原。无链时全部深度 0 ⇒ 退化成原来的「长的先替换」，
+    # 单趟 / 单 sheet 路径逐字节行为不变。
+    by_after: dict[str, str] = {after: before for after, before in pairs}
+
+    def _chain_depth(after: str) -> int:
+        depth = 0
+        cursor = by_after.get(after)
+        seen = {after}
+        while cursor is not None and cursor in by_after and cursor not in seen:
+            seen.add(cursor)
+            depth += 1
+            cursor = by_after.get(cursor)
+        return depth
+
+    # 次级键仍是「长的先替换」：短的 ref_after 可能是长的子串（`!A2` ⊂ `!A25`），
+    # 先替短的会切坏长的。
+    for after, before in sorted(
+        pairs, key=lambda kv: (_chain_depth(kv[0]), len(kv[0])), reverse=True
+    ):
         # 各文本形态各试一次：产物里可能是转义后的、保留原始实体写法、或单引号 &apos; 形态
         for candidate_after, candidate_before in (
             (_apos(_escape(after)), _apos(_escape(before))),

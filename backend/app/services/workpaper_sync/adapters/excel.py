@@ -91,6 +91,64 @@ class ExcelAdapterIdentityError(AdapterProtocolError):
     error_code = "excel_adapter_contract_identity_mismatch"
 
 
+def _sheet_cumulative_shift(
+    per_table_shift: Mapping[str, tuple[Any, Any]],
+    *,
+    sheet_of_table: Mapping[str, str],
+    sheet_part: str,
+) -> tuple[Any, tuple[int, ...]]:
+    """某张 sheet 上**全部趟**的累积位移声明 + 合并后的合计行集合。
+
+    ═══ 为什么不能按 `region.table_key` 取单趟 ═══
+
+    同 sheet 多受管区（D4-1 主营/其他、D4-9 本期/上期、D4-20 三区、D4-34、D4-36）在
+    **逐趟链式** materialize 下会让**同一个 sheet part 被插多次行**（D4-1 实测：主营 7 行 +
+    其他 2 行）。verify 的归一化是「把 after 行号反向映射回 before」，而两次插行的复合映射
+    **不是**单个 `(insert_at, count)` 能表达的 ⇒ 原先按 `per_table_shift.get(table_key)`
+    取单趟，归一化后两侧仍不等 ⇒ 与计划一致的插行被判 `adapter_unmanaged_region_drift`
+    （实测 `managed_sheet_unmanaged_cells` 280 → 340）。
+
+    **顺序即正确性**：`per_table_shift` 是 dict，键序 = `_materialize_within_scope` 里
+    `for index, binding in enumerate(bindings)` 的**逐趟顺序**（Python 3.7+ 保序）。
+    `CompositeRowShift` 依赖这个顺序做链式 unshift（逆序还原），故本函数按 `per_table_shift`
+    的原生迭代序收集，**不**排序。
+
+    单趟时返回**原 `RowShiftPlan`**（不包 composite）⇒ 单 sheet / Word / 旧调用方逐字节
+    行为不变（纯增量纪律）。
+    """
+    from app.services.workpaper_sync.excel_row_shift import CompositeRowShift
+
+    plans: list[Any] = []
+    totals: list[int] = []
+    seen_totals: set[int] = set()
+    for table_key, entry in per_table_shift.items():
+        if sheet_of_table.get(table_key) != sheet_part:
+            continue
+        shift, table_totals = entry
+        # 🔴 **每趟的 `total_formula_rows` 是「它自己那趟的位移前」口径，不是最初 before**。
+        #    第 2 趟看到的 substrate 已经被第 1 趟插过行：D4-1 其他区合计行在最初模板是 18，
+        #    但其他区那趟声明的是 **25**（= 18 + 主营插的 7）。而 verify 的
+        #    `_is_total_row` 拿的是**完全归一化回最初 before** 的坐标 ⇒ 用 25 去比永远不中
+        #    ⇒ 其他区合计公式的扩张不被还原 ⇒ `managed_sheet_unmanaged_cells` 仍判 drift
+        #    （项数已对齐、只有内容不等，正是这个形态）。
+        #    故把本趟 totals 经**已收集的前序趟** unshift 逆序映射回最初 before 口径。
+        prior = tuple(plans)
+        for row in table_totals or ():
+            normalised = int(row)
+            for plan in reversed(prior):
+                normalised = plan.unshift(normalised)
+            if normalised not in seen_totals:
+                seen_totals.add(normalised)
+                totals.append(normalised)
+        if shift is not None:
+            plans.append(shift)
+    if not plans:
+        return None, ()
+    if len(plans) == 1:
+        return plans[0], tuple(totals)
+    return CompositeRowShift(plans=tuple(plans)), tuple(totals)
+
+
 @dataclass(frozen=True)
 class ExcelSyncAdapter:
     """一个 operation 的 Excel adapter。**冻结身份 + 无写入面**。
@@ -812,6 +870,13 @@ class ExcelSyncAdapter:
             all_managed_parts = frozenset(
                 region.sheet_part for _binding, region in regions_by_binding
             )
+            #: `table_key → sheet_part` —— 判定「哪些趟落在同一张 sheet」的唯一依据。
+            #  不按 sheet_key 猜（同 sheet 双区共享一个 sheet_key，但那是契约概念；
+            #  物理归组必须用 region 解析出的真实 part）。
+            sheet_of_table: dict[str, str] = {
+                region.table_key: region.sheet_part
+                for _binding, region in regions_by_binding
+            }
             # 🔴 转置 sheet（D4-29 customer_detail / D4-12 contract_inspection）是**受管
             #    sheet**，但走 carrier-row 身份机制、**没有 ExcelIdentityBinding**（不在
             #    instrumentation_specs 的受管表清单里）。若不显式登记，它们的 sheet part 不在
@@ -838,8 +903,33 @@ class ExcelSyncAdapter:
                 )
                 all_managed_parts = all_managed_parts | transposed_parts
             last_report: UnmanagedRegionReport | None = None
+            # 同 sheet 多受管区：每个 binding 的受管坐标先算好，校验时把**同 sheet 兄弟区**
+            # 的坐标并进 extra_managed_coords。否则 OO→HTML rematerialize 改写兄弟区格
+            # （sharedString→inlineStr / 浮点规整）会被本 binding 当成 unmanaged drift。
+            from app.services.workpaper_sync.excel_extract import _managed_coordinates
+
+            coords_by_table: dict[str, frozenset[str]] = {
+                binding.table_key: _managed_coordinates(
+                    contract=self.definitions.contract,
+                    region=region,
+                    binding=binding,
+                    scan=None,
+                )
+                for binding, region in regions_by_binding
+            }
             for binding, region in regions_by_binding:
                 extra = all_managed_parts - {region.sheet_part}
+                sibling_coord_sets = [
+                    coords_by_table[other.table_key]
+                    for other, other_region in regions_by_binding
+                    if other_region.sheet_part == region.sheet_part
+                    and other.table_key != binding.table_key
+                ]
+                sibling_coords = (
+                    frozenset().union(*sibling_coord_sets)
+                    if sibling_coord_sets
+                    else frozenset()
+                )
                 # 🔴 每张 sheet 的 shift-aware 归一化必须用**它自己那趟**的 row_shift /
                 #    total_formula_rows。多 sheet 场景里主 binding 不一定是插行的 sheet
                 #    （真实：D4-2 未插、D4-22/D4-23 插）——只按 "是否主 binding" 分派会把
@@ -847,8 +937,17 @@ class ExcelSyncAdapter:
                 #    per_table_shift 给了就按 region.table_key 取本表声明；没给（Word/单 sheet
                 #    /旧调用方）则回退旧口径（主 binding 标量 + sibling None），纯增量。
                 if per_table_shift is not None:
-                    this_shift, this_total = per_table_shift.get(
-                        region.table_key, (None, ())
+                    # 🔴 **同 sheet 多趟插行必须按累积位移归一化**（D4-1 主营 7 行 + 其他
+                    #    2 行落在同一张 sheet）。逐趟链式路径下同一个 sheet part 会被插多次，
+                    #    而单趟 `row_shift` 表达不了累积映射 ⇒ 与计划一致的插行仍被判
+                    #    `adapter_unmanaged_region_drift`（实测 managed_sheet_unmanaged_cells
+                    #    280 → 340）。合成 `CompositeRowShift`（链式 unshift / inserted_rows
+                    #    并集 / 合计扩张逐趟精确还原），单趟时**仍传原 plan** ⇒ 单 sheet 与
+                    #    Word 路径逐字节行为不变。
+                    this_shift, this_total = _sheet_cumulative_shift(
+                        per_table_shift,
+                        sheet_of_table=sheet_of_table,
+                        sheet_part=region.sheet_part,
                     )
                 else:
                     is_primary = binding.table_key == self.binding.table_key
@@ -867,6 +966,7 @@ class ExcelSyncAdapter:
                     total_formula_rows=this_total,
                     propagation=propagation,
                     extra_managed_sheet_parts=extra,
+                    extra_managed_coords=sibling_coords,
                 )
                 last_report.assert_equivalent()
             assert last_report is not None

@@ -65,6 +65,9 @@ __all__ = [
     "assert_shift_handlers_cover_structures",
     "translate_formula_rows",
     "shift_sheet_rows",
+    # ── 同 sheet 多趟插行的累积位移（verifier 归一化用）──────────────
+    "CompositeRowShift",
+    "unextend_total_formula_chain",
     # ── 供 verifier 侧做 shift-aware 归一化（只读比对，不写盘）──────
     "remap_a1_rows",
     "unextend_total_formula",
@@ -1099,6 +1102,117 @@ def _shift_sqref(value: str, plan: RowShiftPlan) -> str:
     parts = [p for p in value.split() if p]
     shifted = [_shift_a1_rows_in_text(part, plan=plan)[0] for part in parts]
     return " ".join(shifted)
+
+
+@dataclass(frozen=True)
+class CompositeRowShift:
+    """**同一张 sheet 上多趟插行**的累积位移声明（verifier 归一化用，零写入面）。
+
+    ═══ 为什么需要它 ═══
+
+    同 sheet 多受管区（D4-1 主营/其他、D4-9 本期/上期、D4-20 三区…）在**逐趟链式**
+    materialize 下会让**同一个 sheet part 被插多次行**（D4-1 实测：主营 7 行 + 其他 2 行）。
+    而 `verify_unmanaged_regions` 的归一化原本按 `region.table_key` 取**单趟**
+    :class:`RowShiftPlan` 反向映射 —— 累积映射表达不了，于是与计划一致的插行仍被判
+    `adapter_unmanaged_region_drift`（实测 `managed_sheet_unmanaged_cells` 280 → 340）。
+
+    累积映射**不是**单个 `(insert_at, count)` 能表示的。以 D4-1 为例（主营 insert_at=12
+    count=7，其他 insert_at=21 count=2）：
+
+    ```
+    after  <12      → before 同值          after 12..18 → 新行（第一趟插的）
+    after 19..20    → before 12..13        after 21..22 → 新行（第二趟插的）
+    after >=23      → before row-9
+    ```
+
+    ⇒ 本类持有**有序** plan 列表（顺序 = materialize 逐趟顺序），把三个派生量做成链式：
+
+    * :meth:`unshift`  —— **逆序**依次 unshift（先反最后一趟，再反前一趟）；
+    * :meth:`shift`    —— 正序依次 shift；
+    * :attr:`inserted_rows` —— 每趟的新行各自再经**其后**各趟的 shift 映射到 after 口径后取并集。
+
+    🔴 **合计区间扩张不在本类里合成**，仍逐 plan 调 :func:`unextend_total_formula`：
+    它的还原是「末行**恰好** == `insert_at - 1 + count` 才 `-count`」的**精确逆运算**，
+    逐趟各自精确匹配才正确；若合成一个等效 plan 再还原，两趟的匹配条件会互相污染。
+    调用方据 :attr:`plans` 逆序逐个还原（见 `excel_extract._sheet_unmanaged_digest`）。
+
+    🔴 与 `RowShiftPlan` 保持**鸭子兼容**（同名 `shift`/`unshift`/`inserted_rows`），
+    使 verifier 里只消费这三者的归一化函数（`_normalise_cell_ref` /
+    `_normalise_structure_element` / `_is_total_row`）**一行都不必改**。
+    """
+
+    plans: tuple[RowShiftPlan, ...]
+
+    def __post_init__(self) -> None:
+        from app.services.workpaper_sync.content_mutation import (
+            assert_no_mutation_surface,
+        )
+
+        assert_no_mutation_surface(self, label="CompositeRowShift")
+        if not self.plans:
+            raise RowShiftPlanCountError(
+                "CompositeRowShift.plans 不得为空 —— 「没有位移」应表达为 `None`，"
+                "空序列会让归一化静默变成恒等映射而看不出来"
+            )
+
+    # ── 与 RowShiftPlan 鸭子兼容的派生量 ────────────────────────────
+
+    @property
+    def inserted_rows(self) -> frozenset[int]:
+        """全部新行的 **after 口径**行号（调用方只做 `row in inserted` 判断）。"""
+        rows: set[int] = set()
+        for index, plan in enumerate(self.plans):
+            for row in plan.inserted_rows:
+                for later in self.plans[index + 1:]:
+                    row = later.shift(row)
+                rows.add(row)
+        return frozenset(rows)
+
+    def shift(self, row: int) -> int:
+        """位移前行号 → 全部趟位移后的行号。"""
+        for plan in self.plans:
+            row = plan.shift(row)
+        return row
+
+    def unshift(self, row: int) -> int:
+        """位移后行号 → 位移前行号（**逆序**还原）。"""
+        for plan in reversed(self.plans):
+            row = plan.unshift(row)
+        return row
+
+    #: 供 `unextend_total_formula` 之外的少数消费方取「代表趟」——
+    #: 语义上取**第一趟**（最早发生的那次插行），仅用于日志/诊断，不参与归一化算术。
+    @property
+    def insert_at(self) -> int:
+        return self.plans[0].insert_at
+
+    @property
+    def count(self) -> int:
+        """全部趟插入行数之和（诊断用；归一化不走它，走 `unshift`）。"""
+        return sum(p.count for p in self.plans)
+
+    def as_dict(self) -> dict[str, Any]:
+        return {
+            "composite": True,
+            "trips": [p.as_dict() for p in self.plans],
+            "total_count": self.count,
+        }
+
+
+def unextend_total_formula_chain(
+    text: str, *, shift: RowShiftPlan | CompositeRowShift
+) -> str:
+    """合计区间扩张的还原 —— 单趟走 :func:`unextend_total_formula`，多趟**逆序**逐趟还原。
+
+    逆序的理由与 :meth:`CompositeRowShift.unshift` 相同：最后发生的那趟要先被还原，
+    否则前一趟的行号口径对不上。每趟仍用各自的精确末行匹配（见 `CompositeRowShift`
+    类注释里「不在本类里合成」那条）。
+    """
+    if isinstance(shift, CompositeRowShift):
+        for plan in reversed(shift.plans):
+            text = unextend_total_formula(text, plan=plan)
+        return text
+    return unextend_total_formula(text, plan=shift)
 
 
 def unextend_total_formula(text: str, *, plan: RowShiftPlan) -> str:

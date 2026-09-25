@@ -162,9 +162,10 @@ from app.services.workpaper_sync.excel_row_shift import (
     STRUCTURE_BARE_ROW_ATTRS,
     STRUCTURE_ROW_BEARING_ATTRS,
     STRUCTURE_ROW_BEARING_TEXT_TAGS,
+    CompositeRowShift,
     RowShiftPlan,
     remap_a1_rows,
-    unextend_total_formula,
+    unextend_total_formula_chain,
 )
 from app.services.workpaper_sync.limits import SyncLimits, load_limits
 from app.services.workpaper_sync.merge import (
@@ -1249,11 +1250,22 @@ def assert_identity_carriers_usable(
         if table.has_dynamic_rows
     ]
     if dynamic_tables and inventory.resolved_sheet_by is None:
-        first_sheet, first_table = dynamic_tables[0]
+        # 🔴 **报当前 binding 的真实身份，不报「契约首张表」**。
+        #    判定量是本次 `inventory`（单个 binding 的反读结果）；此前这里打印的是
+        #    `dynamic_tables[0]` —— D4 契约的第 0 项恒为 `d42-managed/revenue_detail_rows`，
+        #    于是**无论哪个 binding 失败，文案都指向 D4-2**。真栈上真正失败的是 D4-1 其他区
+        #    （`table_ref='A14:X17' uuid_col='X'`），排查因此先绕去查 D4-2 的 identity 列
+        #    （查完是好的），白走一圈。错误信息指错对象，比信息少更贵。
         raise IdentityCarrierMissingError(
-            f"{where}: 契约声明动态行的首张表 sheet={first_sheet!r} table={first_table!r} "
-            "一个 row identity 都没反读到 —— 对应 Requirement 6.15 的「用户删除 identity "
-            "列」形态，contract 处置为拒绝，不得按中文表头或位置猜（Requirement 6.20）"
+            f"{where}: 受管区 sheet={inventory.table_sheet!r} "
+            f"table_ref={inventory.table_ref!r} uuid_col={inventory.uuid_column!r} "
+            f"在 Table ref 覆盖的行区间内一个 row identity 都没反读到"
+            f"（空 UUID 行 {len(inventory.empty_row_uuids)} 个）—— 对应 Requirement 6.15 的"
+            "「用户删除 identity 列」形态，contract 处置为拒绝，不得按中文表头或位置猜"
+            "（Requirement 6.20）。"
+            "⚠️ 也可能是 **Table ref 与实际数据行错位**（同 sheet 多受管区时上区插行后未同步"
+            "维护下区 ref），那时 identity 列本身是好的 —— 排查请先比对 ref 区间与真实 UUID 行号，"
+            f"不要只看列是否存在。契约声明动态行的表共 {len(dynamic_tables)} 张。"
         )
     if (
         inventory.resolved_sheet_by is not None
@@ -1680,7 +1692,9 @@ _CELL_COORD_RE: Final[re.Pattern[str]] = re.compile(r"^(?P<col>[A-Z]{1,3})(?P<ro
 
 
 def _is_total_row(
-    normalised_ref: str, row_shift: RowShiftPlan, total_rows: frozenset[int]
+    normalised_ref: str,
+    row_shift: RowShiftPlan | CompositeRowShift,
+    total_rows: frozenset[int],
 ) -> bool:
     """该格（**已归一化**的坐标）是否落在契约声明「携带合计公式」的行上。
 
@@ -1693,7 +1707,10 @@ def _is_total_row(
 
 
 def _normalise_cell_ref(
-    ref: str, *, row_shift: RowShiftPlan, inserted: frozenset[int]
+    ref: str,
+    *,
+    row_shift: RowShiftPlan | CompositeRowShift,
+    inserted: frozenset[int] | range,
 ) -> str:
     """after 侧格坐标 → before 侧口径。新插入行返回空串（= 调用方跳过它）。"""
     found = _CELL_COORD_RE.match(ref)
@@ -1705,7 +1722,9 @@ def _normalise_cell_ref(
     return f"{found.group('col')}{row_shift.unshift(row)}"
 
 
-def _normalise_structure_element(element: Any, *, row_shift: RowShiftPlan) -> None:
+def _normalise_structure_element(
+    element: Any, *, row_shift: RowShiftPlan | CompositeRowShift
+) -> None:
     """把一个结构块元素（含后代）里携带行号的属性/文本**就地**归一化回位移前口径。
 
     🔴 就地改的是 `ET.iterparse` 产出的**内存中**元素，随后只用于算 digest；
@@ -1738,7 +1757,7 @@ def _managed_sheet_cell_digest(
     part: str,
     *,
     managed: frozenset[str],
-    row_shift: RowShiftPlan | None = None,
+    row_shift: RowShiftPlan | CompositeRowShift | None = None,
     total_formula_rows: Sequence[int] = (),
 ) -> tuple[str, int]:
     """受管 sheet 上**非受管**单元格的 digest（流式 iterparse，逐格喂 hash）。
@@ -1786,7 +1805,10 @@ def _managed_sheet_cell_digest(
                 if formula and row_shift is not None and _is_total_row(ref, row_shift, total_rows):
                     # 🔴 契约授权扩张的合计行：先还原扩张，再按 unshift 归一化行号。
                     #    只 unshift 还原不了扩张 —— 那正是扩张的语义（区间真的变大了）。
-                    formula = unextend_total_formula(formula, plan=row_shift)
+                    #    同 sheet 多趟插行（`CompositeRowShift`）时**逆序逐趟**还原：
+                    #    每趟的还原是「末行恰好 == insert_at-1+count」的精确逆运算，
+                    #    合成一个等效 plan 会让两趟的匹配条件互相污染。
+                    formula = unextend_total_formula_chain(formula, shift=row_shift)
                 elif formula and row_shift is not None:
                     # 🔴 公式文本里的 A1 **行号**同样要归一化（Requirement 6.2 说的是
                     #    「行号」，不是「`r` 属性」）。位移会把非受管格的公式一起带走 ——
@@ -1815,7 +1837,10 @@ def _managed_sheet_cell_digest(
 
 
 def _sheet_structure_digest(
-    zf: zipfile.ZipFile, part: str, *, row_shift: RowShiftPlan | None = None
+    zf: zipfile.ZipFile,
+    part: str,
+    *,
+    row_shift: RowShiftPlan | CompositeRowShift | None = None,
 ) -> tuple[str, int]:
     """受管 sheet 的结构块（merge / cols / 数据验证 / 条件格式 / 保护 / …）digest。
 
@@ -1946,10 +1971,11 @@ def unmanaged_region_digest(
     scan: RowIdentityScan | None = None,
     limits: SyncLimits | None = None,
     shared_strings_limit: int | None = None,
-    row_shift: RowShiftPlan | None = None,
+    row_shift: RowShiftPlan | CompositeRowShift | None = None,
     total_formula_rows: Sequence[int] = (),
     propagation: Any | None = None,
     extra_managed_sheet_parts: frozenset[str] | set[str] = frozenset(),
+    extra_managed_coords: frozenset[str] | set[str] = frozenset(),
 ) -> UnmanagedRegionDigest:
     """算一份 artifact 的未管理区域 digest（供 rematerialize 前后比对）。
 
@@ -1967,11 +1993,20 @@ def unmanaged_region_digest(
     🔴 没有这个参数时，工作簿级传播会让引用侧 sheet 的字节变化被判成漂移 —— 那不是
     「安全的保守」，而是让传播功能**永远无法通过验证**。而归一化必须按**声明**做，
     不能按观测：见 `normalise_propagated_part` 的 docstring。
+
+    ``extra_managed_coords``：同 sheet **其它受管区**的坐标并集（D4-1 主营/其他、
+    D4-9/20/34/36 同形）。逐 binding 校验时本区以外的受管格默认会落进
+    ``managed_sheet_unmanaged_cells``；OO→HTML rematerialize 会把那些格从 OO 的
+    sharedString / IEEE 浮点口径改回 materialize 的 inlineStr / 规整小数，于是
+    **项数对齐但内容不等** 的假漂移（真栈 `adapter_unmanaged_region_drift`，
+    coverage 403/403）。并进来后它们按受管格排除，真正的未管理格仍逐字比对。
     """
     lim = limits or load_limits()
     managed_coords = _managed_coordinates(
         contract=contract, region=region, binding=binding, scan=scan
     )
+    if extra_managed_coords:
+        managed_coords = frozenset(managed_coords | set(extra_managed_coords))
     with zipfile.ZipFile(path) as zf:
         buckets = _classify_parts(
             zf,
@@ -2067,10 +2102,11 @@ def verify_unmanaged_regions(
     binding: ExcelIdentityBinding,
     scan: RowIdentityScan | None = None,
     limits: SyncLimits | None = None,
-    row_shift: RowShiftPlan | None = None,
+    row_shift: RowShiftPlan | CompositeRowShift | None = None,
     total_formula_rows: Sequence[int] = (),
     propagation: Any | None = None,
     extra_managed_sheet_parts: frozenset[str] | set[str] = frozenset(),
+    extra_managed_coords: frozenset[str] | set[str] = frozenset(),
 ) -> UnmanagedRegionReport:
     """Task 38 的 `verify_unmanaged_regions` 的**共用实现**。
 
@@ -2101,6 +2137,9 @@ def verify_unmanaged_regions(
     from app.services.workpaper_sync.parse_cache import BEFORE_DIGEST_CACHE
 
     before_sha = _file_sha256_cached(before, limits=lim)
+    # extra_managed_coords 必须进缓存键：同 sheet 兄弟区并集变了就不能复用旧 digest，
+    # 否则会把「兄弟受管格」误当成未管理（或反过来）而放行/误杀。
+    extra_coords_key = ",".join(sorted(str(c) for c in extra_managed_coords))
     before_key = "|".join(
         (
             before_sha,
@@ -2108,6 +2147,7 @@ def verify_unmanaged_regions(
             str(region.sheet_part),
             str(binding.table_key),
             ",".join(sorted(str(p) for p in extra_managed_sheet_parts)),
+            extra_coords_key,
         )
     )
     base = BEFORE_DIGEST_CACHE.get(before_key)
@@ -2120,6 +2160,7 @@ def verify_unmanaged_regions(
             scan=scan,
             limits=lim,
             extra_managed_sheet_parts=extra_managed_sheet_parts,
+            extra_managed_coords=extra_managed_coords,
         )
         BEFORE_DIGEST_CACHE.put(before_key, base)
     target = unmanaged_region_digest(
@@ -2137,6 +2178,7 @@ def verify_unmanaged_regions(
         # 工作簿级传播的**声明**条目 —— 同上，只给 after 侧。
         propagation=propagation,
         extra_managed_sheet_parts=extra_managed_sheet_parts,
+        extra_managed_coords=extra_managed_coords,
     )
     for aspect in UNMANAGED_ASPECTS:
         if base.aspects[aspect] != target.aspects[aspect]:
