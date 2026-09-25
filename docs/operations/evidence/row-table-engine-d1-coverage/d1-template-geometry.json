@@ -1,0 +1,1167 @@
+{
+  "template": "backend\\wp_templates\\D\\D1 应收票据.xlsx",
+  "sheet_count": 21,
+  "probed": 21,
+  "sheets": [
+    {
+      "sheet": "底稿目录",
+      "dims": "A1:H29",
+      "max_row": 29,
+      "max_column": 8,
+      "header_row": 3,
+      "header_texts": {
+        "A": "截止日：202X年12月31日",
+        "D": "序号",
+        "E": "内容",
+        "F": "索引号"
+      },
+      "first_data_row": 4,
+      "last_data_row": null,
+      "footer_row": null,
+      "footer_marker": null,
+      "footer_formulas": {},
+      "formula_columns": [],
+      "formula_templates": {},
+      "managed_last_col": "G"
+    },
+    {
+      "sheet": "应收票据审计程序表D1A",
+      "dims": "A1:N35",
+      "max_row": 35,
+      "max_column": 14,
+      "header_row": 3,
+      "header_texts": {
+        "A": "=底稿目录!A2",
+        "C": "=底稿目录!A4",
+        "F": "=底稿目录!A5",
+        "H": "索引号：",
+        "I": "D1A"
+      },
+      "first_data_row": 4,
+      "last_data_row": null,
+      "footer_row": null,
+      "footer_marker": null,
+      "footer_formulas": {},
+      "formula_columns": [],
+      "formula_templates": {},
+      "managed_last_col": "J"
+    },
+    {
+      "sheet": "审定表D1-1",
+      "dims": "A1:O35",
+      "max_row": 35,
+      "max_column": 15,
+      "header_row": 3,
+      "header_texts": {
+        "A": "=底稿目录!A2",
+        "E": "=底稿目录!A4",
+        "H": "=底稿目录!A5",
+        "K": "索引号：",
+        "L": "D1-1"
+      },
+      "first_data_row": 4,
+      "last_data_row": 17,
+      "footer_row": 18,
+      "footer_marker": "合计",
+      "footer_formulas": {
+        "B": "=SUM(B16:B17)",
+        "C": "=SUM(C16:C17)",
+        "D": "=SUM(D16:D17)",
+        "E": "=SUM(E16:E17)",
+        "F": "=SUM(F16:F17)",
+        "G": "=SUM(G16:G17)",
+        "H": "=SUM(H16:H17)",
+        "I": "=SUM(I16:I17)",
+        "J": "=I18-E18",
+        "K": "=IF(AND(E18=0,I18=0),\"\",IF(AND(E18=0,I18>0),1,J18/E18))"
+      },
+      "formula_columns": [
+        "A",
+        "B",
+        "C",
+        "D",
+        "E",
+        "F",
+        "G",
+        "H",
+        "I",
+        "J",
+        "K"
+      ],
+      "formula_templates": {
+        "A": [
+          "=底稿目录!A3"
+        ],
+        "B": [
+          "='原值明细表（按类别）D1-2'!B13",
+          "='原值明细表（按类别）D1-2'!B14",
+          "='坏账准备明细表D1-4'!B23",
+          "='坏账准备明细表D1-4'!B24",
+          "=B8-B12",
+          "=B9-B13",
+          "=SUM(B12:B13)",
+          "=SUM(B8:B9)"
+        ],
+        "C": [
+          "='原值明细表（按类别）D1-2'!C13",
+          "='原值明细表（按类别）D1-2'!C14",
+          "='坏账准备明细表D1-4'!C23",
+          "='坏账准备明细表D1-4'!C24",
+          "=C8-C12",
+          "=C9-C13",
+          "=SUM(C12:C13)",
+          "=SUM(C8:C9)"
+        ],
+        "D": [
+          "='原值明细表（按类别）D1-2'!D13",
+          "='原值明细表（按类别）D1-2'!D14",
+          "=D8-D12",
+          "=D9-D13",
+          "=SUM(D12:D13)",
+          "=SUM(D8:D9)"
+        ],
+        "E": [
+          "=B{r}+C{r}+D{r}",
+          "=SUM(E12:E13)",
+          "=SUM(E8:E9)",
+          "=底稿目录!A6"
+        ],
+        "F": [
+          "='原值明细表（按类别）D1-2'!H11",
+          "='原值明细表（按类别）D1-2'!H13",
+          "='坏账准备明细表D1-4'!K23",
+          "='坏账准备明细表D1-4'!K24",
+          "=F8-F12",
+          "=F9-F13",
+          "=SUM(F12:F13)",
+          "=SUM(F8:F9)"
+        ],
+        "G": [
+          "='原值明细表（按类别）D1-2'!I11",
+          "='原值明细表（按类别）D1-2'!I13",
+          "='坏账准备明细表D1-4'!L23",
+          "='坏账准备明细表D1-4'!L24",
+          "=G8-G12",
+          "=G9-G13",
+          "=SUM(G12:G13)",
+          "=SUM(G8:G9)"
+        ],
+        "H": [
+          "='原值明细表（按类别）D1-2'!J11",
+          "='原值明细表（按类别）D1-2'!J13",
+          "=H8-H12",
+          "=H9-H13",
+          "=SUM(H12:H13)",
+          "=SUM(H8:H9)",
+          "=底稿目录!A7"
+        ],
+        "I": [
+          "=F{r}+G{r}+H{r}",
+          "=SUM(I12:I13)",
+          "=SUM(I8:I9)"
+        ],
+        "J": [
+          "=I{r}-E{r}"
+        ],
+        "K": [
+          "=IF(AND(E{r}=0,I{r}=0),\"\",IF(AND(E{r}=0,I{r}>0),1,J{r}/E{r}))"
+        ]
+      },
+      "managed_last_col": "L"
+    },
+    {
+      "sheet": "附注披露信息（上市公司）",
+      "dims": "A1:N119",
+      "max_row": 119,
+      "max_column": 14,
+      "header_row": 3,
+      "header_texts": {
+        "A": "=底稿目录!A2",
+        "C": "=底稿目录!A4",
+        "E": "=底稿目录!A5",
+        "G": "索引号：D1-1"
+      },
+      "first_data_row": 4,
+      "last_data_row": 114,
+      "footer_row": 115,
+      "footer_marker": "合  计",
+      "footer_formulas": {
+        "C": "=SUM(C112:C114)"
+      },
+      "formula_columns": [
+        "A",
+        "B",
+        "C",
+        "D",
+        "E",
+        "F",
+        "G"
+      ],
+      "formula_templates": {
+        "A": [
+          "=底稿目录!A3"
+        ],
+        "B": [
+          "='审定表D1-1'!I8",
+          "='审定表D1-1'!I9",
+          "=B40+B45",
+          "=B47+B48",
+          "=B53+B58",
+          "=B59+B61",
+          "=B94+B95-B96-B97-B98-B99",
+          "=SUM(B16:B18)",
+          "=SUM(B22:B24)",
+          "=SUM(B33:B35)",
+          "=SUM(B41:B44)",
+          "=SUM(B54:B57)",
+          "=SUM(B66:B67)",
+          "=SUM(B72:B73)",
+          "=SUM(B79:B81)",
+          "=SUM(B86:B88)",
+          "=SUM(B9:B10)"
+        ],
+        "C": [
+          "='审定表D1-1'!I12",
+          "='审定表D1-1'!I13",
+          "=IFERROR(B{r}/$B$47,0)",
+          "=IFERROR(B{r}/$B$49,0)",
+          "=IFERROR(B{r}/$B$62,0)",
+          "=SUM(C22:C24)",
+          "=SUM(C66:C67)",
+          "=SUM(C72:C73)",
+          "=SUM(C79:C81)",
+          "=SUM(C86:C88)",
+          "=SUM(C9:C10)",
+          "=底稿目录!A6"
+        ],
+        "D": [
+          "=B{r}-C{r}",
+          "=D40+D45",
+          "=D47+D48",
+          "=D53+D58",
+          "=D59+D61",
+          "=IFERROR(C{r}/B{r},0)",
+          "=SUM(D41:D44)",
+          "=SUM(D54:D57)",
+          "=SUM(D9:D10)"
+        ],
+        "E": [
+          "='审定表D1-1'!E8",
+          "='审定表D1-1'!E9",
+          "=IF(B{r}=0,,D{r}/B{r})",
+          "=IFERROR(D{r}/B{r},0)",
+          "=SUM(E103:E105)",
+          "=SUM(E79:E81)",
+          "=SUM(E86:E88)",
+          "=SUM(E9:E10)",
+          "=底稿目录!A7"
+        ],
+        "F": [
+          "='审定表D1-1'!E12",
+          "='审定表D1-1'!E13",
+          "=B{r}-D{r}",
+          "=F40+F45",
+          "=F53+F58",
+          "=SUM(F79:F81)",
+          "=SUM(F86:F88)",
+          "=SUM(F9:F10)"
+        ],
+        "G": [
+          "=E{r}-F{r}",
+          "=IFERROR(F{r}/E{r},0)",
+          "=SUM(G9:G10)"
+        ]
+      },
+      "managed_last_col": "G"
+    },
+    {
+      "sheet": "附注披露信息（国企）",
+      "dims": "A1:P89",
+      "max_row": 89,
+      "max_column": 16,
+      "header_row": 3,
+      "header_texts": {
+        "A": "=底稿目录!A2",
+        "C": "=底稿目录!A4",
+        "E": "=底稿目录!A5",
+        "H": "索引号：D1-1"
+      },
+      "first_data_row": 4,
+      "last_data_row": 87,
+      "footer_row": 88,
+      "footer_marker": "合  计",
+      "footer_formulas": {
+        "C": "=SUM(C85:C87)"
+      },
+      "formula_columns": [
+        "A",
+        "B",
+        "C",
+        "D",
+        "E",
+        "F",
+        "G"
+      ],
+      "formula_templates": {
+        "A": [
+          "=底稿目录!A3"
+        ],
+        "B": [
+          "='审定表D1-1'!I{r}",
+          "=B23+B24",
+          "=B36+B39",
+          "=B48+B49",
+          "=SUM(B16:B17)",
+          "=SUM(B29:B31)",
+          "=SUM(B37:B38)",
+          "=SUM(B40:B41)",
+          "=SUM(B50:B51)",
+          "=SUM(B55:B58)",
+          "=SUM(B62:B64)",
+          "=SUM(B68:B70)",
+          "=SUM(B76:B78)",
+          "=SUM(B8:B9)"
+        ],
+        "C": [
+          "='审定表D1-1'!I12",
+          "='审定表D1-1'!I13",
+          "=C36+C39",
+          "=C48+C49",
+          "=IFERROR(B{r}/$B$15*100,0)",
+          "=IFERROR(B{r}/$B$22*100,0)",
+          "=IFERROR(B{r}/$B$57*100,0)",
+          "=SUM(C29:C31)",
+          "=SUM(C37:C38)",
+          "=SUM(C40:C41)",
+          "=SUM(C50:C51)",
+          "=SUM(C55:C58)",
+          "=SUM(C68:C70)",
+          "=SUM(C8:C9)",
+          "=底稿目录!A6"
+        ],
+        "D": [
+          "=B{r}-C{r}",
+          "=D48+D49",
+          "=IFERROR(C{r}/B{r}*100,0)",
+          "=SUM(D16:D17)",
+          "=SUM(D23:D24)",
+          "=SUM(D50:D51)",
+          "=SUM(D8:D9)"
+        ],
+        "E": [
+          "='审定表D1-1'!E{r}",
+          "=E48+E49",
+          "=IFERROR(D{r}/B{r}*100,0)",
+          "=SUM(E50:E51)",
+          "=SUM(E8:E9)",
+          "=底稿目录!A7"
+        ],
+        "F": [
+          "='审定表D1-1'!E12",
+          "='审定表D1-1'!E13",
+          "=B{r}-D{r}",
+          "=F48+F49",
+          "=SUM(F50:F51)",
+          "=SUM(F8:F9)"
+        ],
+        "G": [
+          "=B{r}+C{r}-D{r}-E{r}-F{r}",
+          "=E{r}-F{r}",
+          "=SUM(G8:G9)"
+        ]
+      },
+      "managed_last_col": "H"
+    },
+    {
+      "sheet": "原值明细表（按类别）D1-2",
+      "dims": "A1:K36",
+      "max_row": 36,
+      "max_column": 11,
+      "header_row": 3,
+      "header_texts": {
+        "A": "=底稿目录!A2",
+        "D": "=底稿目录!A4",
+        "G": "=底稿目录!A5",
+        "J": "索引号：",
+        "K": "D1-2"
+      },
+      "first_data_row": 4,
+      "last_data_row": 13,
+      "footer_row": 14,
+      "footer_marker": "合计",
+      "footer_formulas": {
+        "B": "=SUM(B11:B13)",
+        "C": "=SUM(C11:C13)",
+        "D": "=SUM(D11:D13)",
+        "E": "=SUM(E11:E13)",
+        "F": "=SUM(F11:F13)",
+        "G": "=SUM(G11:G13)",
+        "H": "=SUM(H11:H13)",
+        "I": "=SUM(I11:I13)",
+        "J": "=SUM(J11:J13)",
+        "K": "=SUM(K11:K13)"
+      },
+      "formula_columns": [
+        "A",
+        "D",
+        "E",
+        "G",
+        "H",
+        "K"
+      ],
+      "formula_templates": {
+        "A": [
+          "=底稿目录!A3"
+        ],
+        "D": [
+          "=底稿目录!A6"
+        ],
+        "E": [
+          "=B{r}+C{r}+D{r}"
+        ],
+        "G": [
+          "=底稿目录!A7"
+        ],
+        "H": [
+          "=B{r}+F{r}-G{r}"
+        ],
+        "K": [
+          "=H{r}+I{r}+J{r}"
+        ]
+      },
+      "managed_last_col": "K"
+    },
+    {
+      "sheet": "原值明细表（按客户）D1-3",
+      "dims": "A1:P44",
+      "max_row": 44,
+      "max_column": 16,
+      "header_row": 3,
+      "header_texts": {
+        "A": "=底稿目录!A2",
+        "F": "=底稿目录!A4",
+        "I": "=底稿目录!A5",
+        "N": "索引号：",
+        "O": "D1-3"
+      },
+      "first_data_row": 4,
+      "last_data_row": 20,
+      "footer_row": 21,
+      "footer_marker": "合计",
+      "footer_formulas": {
+        "D": "=SUM(D11:D20)",
+        "E": "=SUM(E11:E20)",
+        "F": "=SUM(F11:F20)",
+        "G": "=SUM(G11:G20)",
+        "H": "=SUM(H11:H20)",
+        "I": "=SUM(I11:I20)",
+        "J": "=SUM(J11:J20)",
+        "L": "=SUM(L11:L20)",
+        "M": "=SUM(M11:M20)",
+        "N": "=SUM(N11:N20)",
+        "O": "=SUM(O11:O20)"
+      },
+      "formula_columns": [
+        "A",
+        "F",
+        "G",
+        "I",
+        "J",
+        "L",
+        "O"
+      ],
+      "formula_templates": {
+        "A": [
+          "=底稿目录!A3"
+        ],
+        "F": [
+          "=底稿目录!A6"
+        ],
+        "G": [
+          "=D{r}+E{r}+F{r}"
+        ],
+        "I": [
+          "=底稿目录!A7"
+        ],
+        "J": [
+          "=D{r}+H{r}-I{r}"
+        ],
+        "L": [
+          "=J{r}+K{r}"
+        ],
+        "O": [
+          "=L{r}+M{r}+N{r}"
+        ]
+      },
+      "managed_last_col": "P"
+    },
+    {
+      "sheet": "坏账准备明细表D1-4",
+      "dims": "A1:N30",
+      "max_row": 30,
+      "max_column": 14,
+      "header_row": 3,
+      "header_texts": {
+        "A": "=底稿目录!A2",
+        "E": "=底稿目录!A4",
+        "I": "=底稿目录!A5",
+        "M": "索引号：",
+        "N": "D1-4"
+      },
+      "first_data_row": 4,
+      "last_data_row": 21,
+      "footer_row": 22,
+      "footer_marker": "合计 ",
+      "footer_formulas": {
+        "B": "=B12+B17",
+        "C": "=C12+C17",
+        "D": "=D12+D17",
+        "E": "=E12+E17",
+        "F": "=F12+F17",
+        "G": "=G12+G17",
+        "H": "=H12+H17",
+        "I": "=I12+I17",
+        "J": "=J12+J17",
+        "K": "=K12+K17",
+        "L": "=L12+L17",
+        "M": "=M12+M17",
+        "N": "=N12+N17"
+      },
+      "formula_columns": [
+        "A",
+        "B",
+        "C",
+        "D",
+        "E",
+        "F",
+        "G",
+        "H",
+        "I",
+        "J",
+        "K",
+        "L",
+        "M",
+        "N"
+      ],
+      "formula_templates": {
+        "A": [
+          "=底稿目录!A3"
+        ],
+        "B": [
+          "=SUM(B13:B16)",
+          "=SUM(B18:B21)"
+        ],
+        "C": [
+          "=SUM(C13:C16)",
+          "=SUM(C18:C21)"
+        ],
+        "D": [
+          "=SUM(D13:D16)",
+          "=SUM(D18:D21)"
+        ],
+        "E": [
+          "=B{r}+C{r}+D{r}",
+          "=SUM(E13:E16)",
+          "=SUM(E18:E21)",
+          "=底稿目录!A6"
+        ],
+        "F": [
+          "=SUM(F13:F16)",
+          "=SUM(F18:F21)"
+        ],
+        "G": [
+          "=SUM(G13:G16)",
+          "=SUM(G18:G21)"
+        ],
+        "H": [
+          "=SUM(H13:H16)",
+          "=SUM(H18:H21)"
+        ],
+        "I": [
+          "=SUM(I13:I16)",
+          "=SUM(I18:I21)",
+          "=底稿目录!A7"
+        ],
+        "J": [
+          "=SUM(J13:J16)",
+          "=SUM(J18:J21)"
+        ],
+        "K": [
+          "=B{r}+SUM(F{r}:G{r})-SUM(H{r}:J{r})"
+        ],
+        "L": [
+          "=SUM(L13:L16)",
+          "=SUM(L18:L21)"
+        ],
+        "M": [
+          "=SUM(M13:M16)",
+          "=SUM(M18:M21)"
+        ],
+        "N": [
+          "=K{r}+L{r}+M{r}",
+          "=SUM(N13:N16)",
+          "=SUM(N18:N21)"
+        ]
+      },
+      "managed_last_col": "N"
+    },
+    {
+      "sheet": "调整分录汇总表D1-5",
+      "dims": "A1:J25",
+      "max_row": 25,
+      "max_column": 10,
+      "header_row": 3,
+      "header_texts": {
+        "A": "=底稿目录!A2",
+        "D": "=底稿目录!A4",
+        "G": "=底稿目录!A5",
+        "I": "索引号：",
+        "J": "D1-5"
+      },
+      "first_data_row": 4,
+      "last_data_row": null,
+      "footer_row": null,
+      "footer_marker": null,
+      "footer_formulas": {},
+      "formula_columns": [],
+      "formula_templates": {},
+      "managed_last_col": "J"
+    },
+    {
+      "sheet": "应收票据业务模式分析D1-6",
+      "dims": "A1:L44",
+      "max_row": 44,
+      "max_column": 12,
+      "header_row": 3,
+      "header_texts": {
+        "A": "=底稿目录!A2",
+        "B": "=底稿目录!A4",
+        "C": "=底稿目录!A5",
+        "D": "索引号：",
+        "E": "D1-6"
+      },
+      "first_data_row": 4,
+      "last_data_row": null,
+      "footer_row": null,
+      "footer_marker": null,
+      "footer_formulas": {},
+      "formula_columns": [],
+      "formula_templates": {},
+      "managed_last_col": "E"
+    },
+    {
+      "sheet": "应收票据备查簿核对D1-7",
+      "dims": "A1:AE45",
+      "max_row": 45,
+      "max_column": 31,
+      "header_row": 3,
+      "header_texts": {
+        "A": "=底稿目录!A2",
+        "E": "=底稿目录!A4",
+        "I": "=底稿目录!A5",
+        "O": "索引号：",
+        "P": "D1-7",
+        "Q": "=底稿目录!A2",
+        "V": "=底稿目录!A4",
+        "Z": "=底稿目录!A5",
+        "AC": "索引号：",
+        "AD": "D1-7"
+      },
+      "first_data_row": 4,
+      "last_data_row": 24,
+      "footer_row": 25,
+      "footer_marker": "合计",
+      "footer_formulas": {
+        "N": "=SUM(N13:N24)",
+        "Q": "=Q24+Q18",
+        "R": "=R24+R18",
+        "S": "=S24+S18",
+        "T": "=T24+T18",
+        "U": "=U24+U18",
+        "V": "=V24+V18",
+        "W": "=W24+W18"
+      },
+      "formula_columns": [
+        "A",
+        "E",
+        "I",
+        "Q",
+        "R",
+        "S",
+        "T",
+        "U",
+        "V",
+        "W",
+        "Z"
+      ],
+      "formula_templates": {
+        "A": [
+          "=底稿目录!A3"
+        ],
+        "E": [
+          "=底稿目录!A6"
+        ],
+        "I": [
+          "=底稿目录!A7"
+        ],
+        "Q": [
+          "=IF(YEAR(A{r})=YEAR($B$10)-1,H{r},0)",
+          "=IF(YEAR(C{r})=YEAR($B$10)-1,H{r},0)",
+          "=SUM(Q13:Q17)",
+          "=SUM(Q19:Q23)",
+          "=底稿目录!A3"
+        ],
+        "R": [
+          "=H{r}-Q{r}",
+          "=SUM(R13:R17)",
+          "=SUM(R19:R23)"
+        ],
+        "S": [
+          "=IF(K{r}=\"背书\",H{r},0)",
+          "=SUM(S13:S17)",
+          "=SUM(S19:S23)"
+        ],
+        "T": [
+          "=IF(K{r}=\"到期承兑\",H{r},0)",
+          "=SUM(T13:T17)",
+          "=SUM(T19:T23)"
+        ],
+        "U": [
+          "=IF(K{r}=\"贴现\",H{r},0)",
+          "=SUM(U13:U17)",
+          "=SUM(U19:U23)"
+        ],
+        "V": [
+          "=Q{r}+R{r}-S{r}-T{r}-U{r}",
+          "=SUM(V13:V17)",
+          "=SUM(V19:V23)",
+          "=底稿目录!A6"
+        ],
+        "W": [
+          "=IF(I{r}<$B$10,0,IF(J{r}<I{r},S{r}+U{r},0))",
+          "=SUM(W13:W17)",
+          "=SUM(W19:W23)"
+        ],
+        "Z": [
+          "=底稿目录!A7"
+        ]
+      },
+      "managed_last_col": "AE"
+    },
+    {
+      "sheet": "应收票据贴现、票据已背书未到期明细表D1-8",
+      "dims": "A1:AD38",
+      "max_row": 38,
+      "max_column": 30,
+      "header_row": 3,
+      "header_texts": {
+        "A": "=底稿目录!A2",
+        "E": "=底稿目录!A4",
+        "I": "=底稿目录!A5",
+        "O": "索引号：",
+        "P": "=底稿目录!F14"
+      },
+      "first_data_row": 4,
+      "last_data_row": 33,
+      "footer_row": 34,
+      "footer_marker": "合计",
+      "footer_formulas": {
+        "E": "=SUM(E26:E33)"
+      },
+      "formula_columns": [
+        "A",
+        "E",
+        "F",
+        "I",
+        "L",
+        "M"
+      ],
+      "formula_templates": {
+        "A": [
+          "=底稿目录!A3"
+        ],
+        "E": [
+          "=SUM(E14:E21)",
+          "=底稿目录!A6"
+        ],
+        "F": [
+          "=SUM(F14:F21)"
+        ],
+        "I": [
+          "=底稿目录!A7"
+        ],
+        "L": [
+          "=SUM(L14:L21)"
+        ],
+        "M": [
+          "=SUM(M14:M21)"
+        ]
+      },
+      "managed_last_col": "P"
+    },
+    {
+      "sheet": "应收票据贴息检查表D1-9",
+      "dims": "A1:M35",
+      "max_row": 35,
+      "max_column": 13,
+      "header_row": 3,
+      "header_texts": {
+        "A": "=底稿目录!A2",
+        "D": "=底稿目录!A4",
+        "H": "=底稿目录!A5",
+        "L": "索引号：",
+        "M": "=底稿目录!F15"
+      },
+      "first_data_row": 4,
+      "last_data_row": 17,
+      "footer_row": 18,
+      "footer_marker": "合计",
+      "footer_formulas": {
+        "B": "=SUM(B11:B17)",
+        "J": "=SUM(J11:J17)",
+        "K": "=SUM(K11:K17)",
+        "L": "=SUM(L11:L17)"
+      },
+      "formula_columns": [
+        "A",
+        "D",
+        "H",
+        "J",
+        "L"
+      ],
+      "formula_templates": {
+        "A": [
+          "=底稿目录!A3"
+        ],
+        "D": [
+          "=底稿目录!A6"
+        ],
+        "H": [
+          "=E{r}-G{r}",
+          "=底稿目录!A7"
+        ],
+        "J": [
+          "=I{r}/365*H{r}*B{r}"
+        ],
+        "L": [
+          "=J{r}-K{r}"
+        ]
+      },
+      "managed_last_col": "M"
+    },
+    {
+      "sheet": "应收票据监盘D1-10",
+      "dims": "A1:O35",
+      "max_row": 35,
+      "max_column": 15,
+      "header_row": 3,
+      "header_texts": {
+        "A": "=底稿目录!A2",
+        "F": "=底稿目录!A4",
+        "J": "=底稿目录!A5",
+        "N": "索引号：",
+        "O": "=底稿目录!F16"
+      },
+      "first_data_row": 4,
+      "last_data_row": 20,
+      "footer_row": 21,
+      "footer_marker": "合计",
+      "footer_formulas": {
+        "H": "=SUM(H14:H20)"
+      },
+      "formula_columns": [
+        "A",
+        "F",
+        "J"
+      ],
+      "formula_templates": {
+        "A": [
+          "=底稿目录!A3"
+        ],
+        "F": [
+          "=底稿目录!A6"
+        ],
+        "J": [
+          "=底稿目录!A7"
+        ]
+      },
+      "managed_last_col": "O"
+    },
+    {
+      "sheet": "关联方关系及交易检查表D1-11",
+      "dims": "A1:P32",
+      "max_row": 32,
+      "max_column": 16,
+      "header_row": 3,
+      "header_texts": {
+        "A": "=底稿目录!A2",
+        "E": "=底稿目录!A4",
+        "I": "=底稿目录!A5",
+        "L": "索引号：",
+        "M": "=底稿目录!F17"
+      },
+      "first_data_row": 4,
+      "last_data_row": 13,
+      "footer_row": 14,
+      "footer_marker": "合计",
+      "footer_formulas": {
+        "C": "=SUM(C11:C13)",
+        "D": "=SUM(D11:D13)",
+        "E": "=SUM(E11:E13)",
+        "F": "=SUM(F11:F13)",
+        "G": "=SUM(G11:G13)",
+        "H": "=SUM(H11:H13)",
+        "K": "=SUM(K11:K13)"
+      },
+      "formula_columns": [
+        "A",
+        "E",
+        "F",
+        "H",
+        "I"
+      ],
+      "formula_templates": {
+        "A": [
+          "=底稿目录!A3"
+        ],
+        "E": [
+          "=底稿目录!A6"
+        ],
+        "F": [
+          "=C{r}+D{r}-E{r}"
+        ],
+        "H": [
+          "=F{r}-G{r}"
+        ],
+        "I": [
+          "=底稿目录!A7"
+        ]
+      },
+      "managed_last_col": "M"
+    },
+    {
+      "sheet": "应收票据质押检查表D1-12",
+      "dims": "A1:P24",
+      "max_row": 24,
+      "max_column": 16,
+      "header_row": 3,
+      "header_texts": {
+        "A": "=底稿目录!A2",
+        "F": "=底稿目录!A4",
+        "J": "=底稿目录!A5",
+        "O": "索引号：",
+        "P": "=底稿目录!F18"
+      },
+      "first_data_row": 4,
+      "last_data_row": 17,
+      "footer_row": 18,
+      "footer_marker": "合计",
+      "footer_formulas": {
+        "H": "=SUM(H12:H17)",
+        "J": "=SUM(J12:J17)"
+      },
+      "formula_columns": [
+        "A",
+        "F",
+        "J"
+      ],
+      "formula_templates": {
+        "A": [
+          "=底稿目录!A3"
+        ],
+        "F": [
+          "=底稿目录!A6"
+        ],
+        "J": [
+          "=底稿目录!A7"
+        ]
+      },
+      "managed_last_col": "P"
+    },
+    {
+      "sheet": "应收票据检查表D1-13",
+      "dims": "A1:Q54",
+      "max_row": 54,
+      "max_column": 17,
+      "header_row": 3,
+      "header_texts": {
+        "A": "=底稿目录!A2",
+        "F": "=底稿目录!A4",
+        "I": "=底稿目录!A5",
+        "P": "索引号：",
+        "Q": "=底稿目录!F26"
+      },
+      "first_data_row": 4,
+      "last_data_row": 44,
+      "footer_row": 45,
+      "footer_marker": "合计",
+      "footer_formulas": {
+        "G": "=SUM(G37:G44)"
+      },
+      "formula_columns": [
+        "A",
+        "F",
+        "G",
+        "H",
+        "I"
+      ],
+      "formula_templates": {
+        "A": [
+          "=底稿目录!A3"
+        ],
+        "F": [
+          "=底稿目录!A6"
+        ],
+        "G": [
+          "=SUM(G16:G31)"
+        ],
+        "H": [
+          "=SUM(H16:H31)"
+        ],
+        "I": [
+          "=底稿目录!A7"
+        ]
+      },
+      "managed_last_col": "Q"
+    },
+    {
+      "sheet": "应收票据坏账准备会计政策检查D1-14",
+      "dims": "A1:S42",
+      "max_row": 42,
+      "max_column": 19,
+      "header_row": 3,
+      "header_texts": {
+        "A": "=底稿目录!A2",
+        "D": "=底稿目录!A4",
+        "F": "=底稿目录!A5",
+        "H": "索引号：",
+        "I": "=底稿目录!F27"
+      },
+      "first_data_row": 4,
+      "last_data_row": null,
+      "footer_row": null,
+      "footer_marker": null,
+      "footer_formulas": {},
+      "formula_columns": [],
+      "formula_templates": {},
+      "managed_last_col": "I"
+    },
+    {
+      "sheet": "应收票据坏账准备测试表D1-15",
+      "dims": "A1:K33",
+      "max_row": 33,
+      "max_column": 11,
+      "header_row": 3,
+      "header_texts": {
+        "A": "=底稿目录!A2",
+        "C": "=底稿目录!A4",
+        "E": "=底稿目录!A5",
+        "G": "索引号：",
+        "H": "=底稿目录!F28"
+      },
+      "first_data_row": 4,
+      "last_data_row": 24,
+      "footer_row": 25,
+      "footer_marker": "小计",
+      "footer_formulas": {
+        "B": "=SUM(B22:B24)",
+        "D": "=SUM(D22:D24)",
+        "E": "=SUM(E22:E24)",
+        "F": "=SUM(F22:F24)",
+        "H": "=SUM(H22:H24)"
+      },
+      "formula_columns": [
+        "A",
+        "B",
+        "C",
+        "D",
+        "E",
+        "F"
+      ],
+      "formula_templates": {
+        "A": [
+          "=底稿目录!A3"
+        ],
+        "B": [
+          "=SUM(B14:B17)"
+        ],
+        "C": [
+          "=底稿目录!A6"
+        ],
+        "D": [
+          "=B{r}*C{r}",
+          "=SUM(D14:D17)"
+        ],
+        "E": [
+          "=B{r}-D{r}",
+          "=SUM(E14:E17)",
+          "=底稿目录!A7"
+        ],
+        "F": [
+          "=D{r}-E{r}",
+          "=SUM(F14:F17)"
+        ]
+      },
+      "managed_last_col": "H"
+    },
+    {
+      "sheet": "坏账准备转回、核销检查表D1-16",
+      "dims": "A1:H28",
+      "max_row": 28,
+      "max_column": 8,
+      "header_row": 3,
+      "header_texts": {
+        "A": "=底稿目录!A2",
+        "C": "=底稿目录!A4",
+        "E": "=底稿目录!A5",
+        "G": "索引号：",
+        "H": "=底稿目录!F29"
+      },
+      "first_data_row": 4,
+      "last_data_row": 20,
+      "footer_row": 21,
+      "footer_marker": "合计",
+      "footer_formulas": {
+        "C": "=SUM(C18:C20)"
+      },
+      "formula_columns": [
+        "A",
+        "C",
+        "E",
+        "F"
+      ],
+      "formula_templates": {
+        "A": [
+          "=底稿目录!A3"
+        ],
+        "C": [
+          "=底稿目录!A6"
+        ],
+        "E": [
+          "=SUM(E12:E14)",
+          "=底稿目录!A7"
+        ],
+        "F": [
+          "=SUM(F12:F14)"
+        ]
+      },
+      "managed_last_col": "H"
+    },
+    {
+      "sheet": "应收票据业务模式分析提示",
+      "dims": "A1:G31",
+      "max_row": 31,
+      "max_column": 7,
+      "header_row": null,
+      "header_texts": {},
+      "first_data_row": null,
+      "last_data_row": null,
+      "footer_row": null,
+      "footer_marker": null,
+      "footer_formulas": {},
+      "formula_columns": [],
+      "formula_templates": {},
+      "managed_last_col": "A"
+    }
+  ]
+}

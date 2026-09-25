@@ -1,0 +1,47 @@
+{
+  "spec": "d1-sync-row-table-engine-and-d1-coverage",
+  "task": "25（接入 D1-2 原值明细表（按类别））",
+  "probed_at": "2026-09-26",
+  "method": "openpyxl 逐格直读权威模板 backend/wp_templates/D/D1 应收票据.xlsx（data_only=False）",
+  "sheet": "原值明细表（按类别）D1-2",
+  "dims": "A1:K36",
+  "header": {
+    "row": 10,
+    "levels": 1,
+    "texts": {
+      "A": "票据种类", "B": "期初未审数", "C": "账项调整", "D": "重分类调整",
+      "E": "期初审定数", "F": "本期增加", "G": "本期减少", "H": "期末未审数",
+      "I": "账项调整", "J": "重分类调整", "K": "期末审定数"
+    },
+    "note": "单级表头（与 D1-3 同构、与 D1-4 的两级表头不同构）；11 列 A..K"
+  },
+  "data_region": {
+    "first_data_row": 11,
+    "last_data_row": 13,
+    "row_labels": { "11": "银行承兑汇票", "12": "财务公司承兑汇票", "13": "商业承兑汇票" }
+  },
+  "footer": {
+    "row": 14,
+    "marker_raw": "合计",
+    "formula_sample": "=SUM(B11:B13)",
+    "note": "marker 为纯「合计」两字无空格（与 D1-4 的「合计  」带两全角空格不同）"
+  },
+  "formula_columns_in_data_rows": ["E", "H", "K"],
+  "formula_templates": {
+    "E": "=B{r}+C{r}+D{r}",
+    "H": "=B{r}+F{r}-G{r}",
+    "K": "=H{r}+I{r}+J{r}"
+  },
+  "managed_last_col": "K",
+  "uuid_col": "L",
+  "row_identity_verdict": {
+    "kind": "stable_key_fixed_rows",
+    "row_identity_key": "key",
+    "binding_kind": "excel_table",
+    "injects_uuid_column": true,
+    "rationale": "🔴 **推翻 spec 首版假设**：批次表写 D1-2 是「固定 2 + 动态行」混合身份，实测模板只画了**3 个固定票据种类行**（R11 银行承兑 / R12 财务公司承兑 / R13 商业承兑），footer R14 紧接其后，**无动态行区域**。⇒ 应按 D4-6 范式判「稳定 key 固定行」：row_identity_key='key'（不是 rowId）、行不增删、但**仍是 excel_table binding 且仍注入 UUID 列**（判据是「有没有行维度」而非「行会不会变」，见 spec design §附表二）。稳定 key 取前端票据种类键（fixed-bank / fixed-finance / fixed-commercial 形态）。",
+    "spec_correction": "requirements.md 批次表「固定 2 + 动态行」→ 实测「3 固定行、零动态」；design §附对本 spec 批次表的影响一节亦须据此更新"
+  },
+  "store_item_id": "D1-cat-rows",
+  "derived_column_note": "spec Task 25 说的派生列 currentUnadjusted = priorAudited + increase − decrease 对应 **H 列**（=B+F-G，即期末未审 = 期初未审 + 本期增加 − 本期减少）。🔴 注意 xlsx 用 B（期初**未审**）而非 E（期初**审定**）作被加数 —— 前端若用 priorAudited 则与 xlsx 公式文本不同，按 D1-3 已立纪律**以 xlsx 为准**，H 声明为 formula、materialize 不覆盖、由 OO 重算"
+}
