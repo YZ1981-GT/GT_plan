@@ -228,14 +228,137 @@
     未同步维护」属 materialize 行位移层，归 `excel-structural-row-insertion-and-shift-aware-verification`
     / `excel-workbook-wide-row-change-propagation` 两 spec。本 spec requirements 未覆盖 Table ref
     维护 ⇒ 本轮**不擅自修**，但按「**本 spec 触发的阻塞**」登记，不再说成「别人的 bug」。
-  - 🔴 **顺带发现一条独立的可见性缺陷**：`excel_extract_identity_carrier_missing` 是
+  - ✅ **2026-09-24 后续：应用户要求已动手修，两层修掉、第三层立项（证据文档 §八）**。
+    上面「机制（未逐行验证位移算术）」那条已被逐层实证并修复：
+    * ✅ **①同 sheet 兄弟 Table ref 不位移** —— `excel_materialize._grow_managed_table_ref`
+      只更新 `plan.table_part`（本 binding 那一个 Table part）。实测修复前其他区
+      `A14:X17 → A14:X17`（主营插 7 行，应为 `A21:X24`）。**已修**：新增
+      `_shift_sibling_table_refs`，走 worksheet rels 找同 sheet 全部 Table part，
+      对首末行各调一次 `shift.shift()`（天然覆盖 整体下移 / 跨插入点扩张 / 上方不动）。
+      ⚠️ 兄弟表末行边界是 `>= insert_at`，**不是**本 binding 的 `>= insert_at - 1`
+      —— 后者是「追加插行紧贴本表末行」的本表专属语义，对兄弟表用它会错误扩张。
+    * ✅ **②`_GT_SYNC` 兄弟区 footer 坐标不重冻结** —— 修①后露出
+      `FooterAnchorDriftError`（其他区 footer 物理在 25 行、冻结值仍 18）。
+      `_refresh_gt_sync_runtime_binding` 原只放行 `GT_FOOTER_ROW_{managed_tid}`，
+      其注释「D4-1 主营插行只移位 `_D41MAIN`，不误动 `_D41OTHER`」**把「同 sheet 兄弟」
+      与「不同 sheet」混成一类**：不同 sheet（D42 vs D43）确实不该动，同 sheet 必须动。
+      **已修**：按 worksheet rels → 兄弟 Table displayName → `GT_MANAGED_TABLES`/
+      `GT_TEMPLATE_IDS` 平行清册算出**同 sheet 全部 template_id** 再放行。
+    * ✅ **③verify 归一化表达不了「同 sheet 多趟累积插行」—— 已修（2026-09-24，用户要求
+      「把 D4 所有底稿问题都修复好」后继续动手）**。原以为须独立立项，实测改动面可控且
+      对单区路径纯增量，故一并修完。三处缺一不可：
+      * ③-1 `excel_row_shift.CompositeRowShift`（新增）+ `unextend_total_formula_chain`：
+        链式 `unshift`（**逆序**还原）/ 正序 `shift` / `inserted_rows`（每趟新行经其后各趟
+        `shift` 映射到 after 口径后取并集）。**单趟仍传原 `RowShiftPlan`** ⇒ 单区 / Word
+        路径逐字节不变。累积映射不是单个 `(insert_at,count)` 能表达的（实测 D4-1：
+        `after 12..18`=新行 / `19..20`→`before 12..13` / `21..22`=新行 / `≥23`→`row-9`）。
+      * ③-2 `excel_workbook_row_change.normalise_propagated_part`：逆替换改为**从链尾往前**。
+        同一处引用被两趟各改一次时声明成链（`$A$18→$A$25`、`$A$25→$A$31`），产物里是
+        `$A$31`；顺序反了会先试 `$A$25→$A$18`（不命中）再把 `$A$31` 还成 `$A$25` ⇒
+        **停在中间态** ⇒ `workbook_and_styles` 误判 drift。新增 `_chain_depth` 排序键
+        （depth 降序 + len 降序），无链时退化为原「长的先替换」。
+      * ③-3 `adapters/excel._sheet_cumulative_shift`（新增）+ verify 里 `sheet_of_table`：
+        按 `sheet_part` 分组合成 composite；**合并 `total_formula_rows` 时把每趟的中间口径
+        映射回最初 before** —— 其他区合计行在模板是 18，而其他区那趟声明的是 **25**
+        （= 18 + 主营插的 7），verify 的 `_is_total_row` 用最初 before 坐标比对，拿 25 永远
+        不中 ⇒ 合计扩张不被还原 ⇒ 项数已对齐（292/292）但内容不等。
+    * **错误码演进（逐层剥开的完整轨迹）**：
+      `identity_carrier_missing` → `footer_anchor_drift` → `workbook_and_styles` drift(3/3)
+      → `managed_sheet_unmanaged_cells` 280→340 → 292/292 内容不等 → ✅ 全绿
+    * 判据：`backend/tests/workpaper_sync/test_sibling_table_ref_row_shift.py` —— **14 passed**
+      （1 前提 / 2 兄弟 ref 位移 / 3 双区 materialize+extract / 4 兄弟区坐标声明同源 /
+      5 **verify 通过**（xfail 已摘）/ 6 ×5 **参数化覆盖全部 5 张同 sheet 多区底稿** /
+      7 ×3 **单区纯增量纪律**）。变异 **3/3 KILLED**（去兄弟 ref 位移 ⇒ 8 条红含全部 5 张
+      参数化；footer 放行改回单 tid ⇒ 2 条红；`_writeIfChanged` 去幂等 ⇒ 9 条红）。
+      零回归 `-k "d4 or D4 or materialize or shift or verify or propagat or unmanaged"`
+      ⇒ **1032 passed / 0 failed**；位移专项 5 文件 190 passed；diagnostics 0。
+    * ✅ **影响面不止 D4-1**：从 `instrumentation_specs()` 动态统计，D4 共 30 个受管 sheet，
+      其中 **5 张同 sheet 多受管区**全部适用本修复 —— D4-20（**三区**：PROV/CUR/POST）、
+      D4-34（RENT/CONS）、D4-36（FWD/BWD）、D4-1（MAIN/OTHER）、D4-9（本期/上期）。
+      判据 6 参数化逐张覆盖，清单动态算 ⇒ 新增受管区不会漏。
+  - 📌 **方法论教训（证据文档 §八 已固化）**：判据 3（`materialize` + `extract` 全绿）曾与生产
+    500 并存 —— 因为它只覆盖 adapter 两个方法，而生产路径在它们**之后**还有
+    `verify_unmanaged_regions`。「判据绿而生产红」不是玄学，是判据没覆盖真实路径；
+    判据 5 正是为补这一段而加，也正是它把第三层缺陷逼出来的。
+  - ✅ **顺带修掉「错误信息指错对象」**（2026-09-24）：`assert_identity_carriers_usable` 原本
+    打印 `dynamic_tables[0]`（D4 契约第 0 项恒为 `d42-managed/revenue_detail_rows`）⇒ 无论哪个
+    binding 失败文案都指向 D4-2，本次排查因此白绕一圈去核对 D4-2 的 identity 列（结果是好的）。
+    **错误信息指错对象比信息少更贵。** 已改为打印当前 binding 的真实身份
+    （`table_sheet`/`table_ref`/`uuid_column`/空 UUID 行数）+ 显式提示第二种可能
+    「Table ref 与实际数据行错位（同 sheet 多区上区插行后未维护下区 ref），那时 identity 列
+    本身是好的」。回归 `-k "identity_carrier or carrier_missing or identity or extract"`
+    ⇒ **729 passed / 0 failed**。
+  - 🔴 **仍未修的同类问题（如实登记）**：`excel_extract_identity_carrier_missing` 是
     domain error 却以 **500** 返回。`wp_sync_router.py` 自己的注释明写这类必须翻成
-    fail-visible 4xx（否则「一路冒泡成 opaque 500…看不到中文根因」）。现状正是它警告的形态：
-    中文根因在响应体里，但 HTTP 语义是 500 ⇒ 前端按"服务器内部错误"处理并重试 3 次。
-  - ⛔ **真栈②（覆盖往返，需求 5.3）被阻塞**：OO 改派生行金额 → forcesave → 切回表格视图带
-    「已人工覆盖」→ 再改 D4-2 进 S4 两值可见 —— 卡在上面的 materialize 500，**Table ref 维护
-    修好后**才可跑（骨架可照 `e2e/g5-1-d4-unified-path.spec.ts` 的
-    `asc_findCell`/`asc_insertInCell` + `[data-testid="wp-sync-host-forcesave"]` 范式）
+    fail-visible 4xx（否则「一路冒泡成 opaque 500…看不到中文根因」）。现状导致前端按
+    "服务器内部错误"处理并自动重试 3 次。属 router 错误分类范围，不在本次改动面。
+  - ✅ **真栈①（HTML→OO，报障方向）已闭环**（2026-09-24，证据文档 §九）：
+    `e2e/d4-1-adjudication-oo-visibility.spec.ts --workers=1` ⇒ **1 passed (1.1m)**。
+    OO canvas 实读（`activeSheet=营业收入审定表D4-1`）：
+
+    ```
+    B8..B11 = ''              ← 模板 4 个占位行（projection 不含它们，保持空）
+    B12 = '153431246.06'      ← 7 个主营派生行金额，与 projection 逐值相等
+    B13 = '1528820416.32'   B14 = '89847600.46'   B15 = '16389521.26'
+    B16 = '175221.24'       B17 = '1100917.44'    B18 = '1844830.88'
+    B19 = '=SUM(B8:B18)'      ← 合计公式已正确扩张把新行包进来
+    console_errors = []
+    ```
+
+    **对照报障原文**「切在线编辑后 OO 里是空的」（真栈形态：OO 里 R8:R11 全空、小计 0）
+    ⇒ 现在那 7 行金额在 OO 里逐值可见、合计公式正确。**报障闭环**。
+  - ✅ **覆盖面论证（证据文档 §十）**：materialize 是**整册**的 ——
+    `_materialize_within_scope` 对 36 个 binding 逐趟跑，`verify_unmanaged_regions` 逐 binding
+    全跑并各自 `assert_equivalent()`。⇒ 拿到 `materialize` **200** 这一件事本身就意味着
+    36 个 binding 的 plan→位移→Table ref 增长→`_GT_SYNC` 重冻结→workbook 传播→verify
+    **全部通过**，含那 5 张同 sheet 多区底稿。任一 binding 失败都会让整册 500（修复前正是如此）。
+  - ✅ **真栈②（覆盖往返，需求 5.3）已闭环（2026-09-25，证据文档 §十三/§十四/§十五）**：
+    `e2e/d4-1-override-roundtrip.spec.ts` ⇒ **1 passed**。在 OO 里改派生行金额 → forcesave →
+    callback → extract → merge → rematerialize → **applied**，切回表格视图显示改后值 + S2 标记。
+    实测（`task18-override-roundtrip.json`，captured 2026-09-25T13:04）：`B12` old=153480628.74 →
+    new=153492974.41，`oo_cell_text_after_typing="153492974.41"`，forcesave `cs_error=0 accepted`，
+    operation trail `created → application_bound → rematerializing → applied`，
+    **`store_value_after=153492974.41`（新值真的落库）**，HTML `table_has_new_value=true` + 「已人工覆盖」标记。
+    - 三条被推翻的旧归因（见 §十三）：① callback 一直是到的（原判据用 `page.on('response')` 判它，
+      而 OO 容器**直接** POST 后端不经浏览器）② `host_dirty=False` 是无关变量（forcesave 照样
+      202 accepted，OO 真执行了保存）③「拿不到 callback」实为 merge 层 `protected` 挡在 store 外。
+    - 🐛 **真正的根因（已修）**：`merge.py::_FieldLocatorTable._protection` 用
+      `column_in_ranges(spec.cell.column, formula_mask)` **只比列不比行**。D4-1 的 mask 是
+      **逐格 48 格**（数据行 E/I + 小计/合计/差异行 12/18/19/21 的 B–I），数据区之外那几行把
+      B–I 八列整列带进列跨度 ⇒ 全仓盘点实证 **311 个声明 `editable` 的字段被误判只读**
+      （其中静态格 286 个「其实不在 mask 里」、动态行 25 个同列 mask 落在数据区外）。
+    - ✅ **修法（本轮实施）**：新增 `contracts.cell_in_ranges(column, row, ranges)`（格级：同时看列+行），
+      `_protection` 第三类判定改为——
+      * **静态格**（`row_from='static'`，带 `static_row`）：精确 `cell_in_ranges` 判定；
+      * **动态行**（`row_from='row_identity'`）：仅当 `_mask_spans_data_column`（存在同列 mask
+        **多行区间**且**覆盖首数据行** = `anchor 行 + header_rows`）为真才保护 —— 这精确区分
+        「mask 声明整个数据区列」（如 G7 `K8:K200`，该保护）与「mask 针对模板固定行」
+        （如 D4-1 `B12` 小计行坐标，materialize 插行后失效，不该保护）。
+      `column_in_ranges` 保留给 CS-13 声明完备性校验（列级足够）。
+    - ✅ **零影响面已实证**：全仓 10 个 entry 盘点，**9 个非 D4 entry 误伤=0**（mask 均 `{col}{F}:{col}{L}`
+      恰覆盖数据区，列判定等价格判定），改动只解开 D4 那 311 个真误伤。判据
+      `test_masked_cell_protection_is_cell_level.py` **33 passed**（含 D4-1 六字段可写 / 9 非 D4 entry
+      不变式 / 全仓收口 / cell_in_ranges 单元 / 静态格真在 mask 内仍只读 / 动态行整列 mask 仍保护）；
+      变异 **3/3 KILLED**（回退列级 / 丢行判定 / 恒放行）；`test_task14_merge_conflicts` 的
+      `masked_note`（G7 `K8:K200` 整列 mask 动态行）仍判 protected，未回归。
+      源码文本判据 `test_task55...three_readonly_sources` 同步为断言 `cell_in_ranges`。
+    - 📌 另两个独立问题仍待立项（§十三 末，非本 spec）：① 同一 representation generation 内重复
+      materialize 会让 OO 按 doc_key 缓存的文档与磁盘 staged xlsx 分叉（OO 日志
+      `UpdateVersion expired`；`docker restart audit-onlyoffice` 可临时解）② 多个历史 generation 的
+      room 仍 `state='active'`（g96/g97/g99/g100/g101 并存），AC 2.8 的显式 supersede 未全程生效。
+  - ✅ **D4-35 / D4-13 浏览器层已补齐（2026-09-24，证据文档 §十二）**：
+    `e2e/d4-35-d4-13-oo-visibility.spec.ts` ⇒ **1 passed**（两次干净 run 复验）。
+    先澄清一个结构事实：D4-35 / D4-13 与 D4-1 **同属一个 entry** 的同一份 `store-projection`
+    （一次响应 27 个 table_key），所以画布层就是同一次切 OO 后多切两个 sheet 读格。
+    实测：D4-35 两个 store 行的 content/amount/voucher_no 三列**分别整齐落在第 26 / 27 行**
+    （同行、相邻、`missing=[]`）；D4-13 两段正文**精确命中 A6 / A16**（`stray_hits=[]`）；
+    `console_errors=[]`。证据 `task18-browser-d435-d413-visibility.json`。
+    判据除「逐值可见」外另加两条几何断言：同一 store 行各列必须落同一 Excel 行（抓列错位）、
+    不同 store 行必须占不同 Excel 行（抓互相覆盖）。
+    顺带钉住 materialize 几何语义：**保留模板占位行、真实派生行追加在占位区之后**
+    （D4-35 占位 15..25 ⇒ 真实行落 26/27；D4-1 首数据行 8 + 4 行占位 ⇒ `insert_at=12`，同规律）。
+    首版判据扫描窗口设 3..26 把第二行切在窗外、误判 `missing` 并 FAIL ⇒ 这次误报正好是该判据
+    「不是永绿且能精确定位到行/字段」的**自然变异证据**；窗口已改 3..45。
 
   - ── **2026-09-24 第三轮复核（全栈在跑）** —— 证据文档新增 §八，append-only 不改 §一~§七 ──
   - ✅ **已声明产物核对属实**（不直接采信本文件的声称）：证据文档存在且含变异检验 + 端点层两轮
