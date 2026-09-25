@@ -195,7 +195,6 @@ export function useD2CrossSheet(options: UseD2CrossSheetOptions) {
   // 每个 computed 仅依赖自己需要的特定 key 的 remark 值。
   // 当其他 key 变化时（如 D2-adj-* 更新），明细/坏账/ECL 的 computed 不重算。
   const detailRowsJson = computed(() => getVal('D2-detail-rows').remark)
-  const detailCount = computed(() => getVal('D2-detail-count').remark)
   const bdIndividualJson = computed(() => getVal('D2-bd-individual-rows').remark)
   const bdAgingJson = computed(() => getVal('D2-bd-aging-rows').remark)
   const bdCustomerJson = computed(() => getVal('D2-bd-customer-rows').remark)
@@ -212,27 +211,13 @@ export function useD2CrossSheet(options: UseD2CrossSheetOptions) {
         if (Array.isArray(parsed)) {
           return parsed.map((row: Record<string, unknown>) => mapDetailRow(row))
         }
-      } catch { /* fall through */ }
+      } catch { /* 主路径解析失败 → 返回空，不再退回死降级路径 */ }
     }
 
-    const count = parseNum(detailCount.value)
-    if (count <= 0) return []
-
-    const rows: DetailRow[] = []
-    for (let i = 1; i <= count; i++) {
-      rows.push(mapDetailRow({
-        rowId: `detail-${i}`,
-        creditRiskClassification:
-          getVal(`D2-detail-${i}-creditRiskClassification`).remark
-          || getVal(`D2-detail-${i}-AI`).remark
-          || '',
-        currentUnadjusted: getVal(`D2-detail-${i}-currentUnadjusted`).remark,
-        currentAje: getVal(`D2-detail-${i}-currentAje`).remark,
-        currentRje: getVal(`D2-detail-${i}-currentRje`).remark,
-        priorAudited: getVal(`D2-detail-${i}-priorAudited`).remark,
-      }))
-    }
-    return rows
+    // 🔴 spec d2-sync-coverage Task 15（触类旁通）：删死降级路径（同 useD2Adjudication）。
+    // useD2Detail 只写 D2-detail-rows（JSON 数组），D2-detail-count + D2-detail-{i}-{field}
+    // 全仓零写入方、恒返 0，是从未生效的死代码。主路径（读 D2-detail-rows JSON）是唯一权威。
+    return []
   })
 
   // ─── D2-2 → D2-1 SUMIF 聚合 ────────────────────────────────────────────

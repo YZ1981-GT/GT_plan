@@ -699,14 +699,27 @@ class TestAuthoritativeTemplate:
         # 正向：权威根确实出现在代码字面量里（否则上面这条是空集恒真）。
         assert any("wp_templates" in text for text in literals)
 
-    def test_managed_sheet_is_one_of_eleven_and_only_it_is_declared(
+    def test_managed_sheets_are_d22_and_d23_after_expansion(
         self, workbook: Any, contract: Any
     ) -> None:
-        """工作簿 11 张 sheet，契约只声明受管的那一张（`managed_tables_of` 会 fail closed）。"""
+        """扩容后契约声明 D2-2 + D2-3 两张受管 sheet（spec d2-sync-coverage Task 8，1→3 区）。
+
+        旧断言「契约只声明 D2-2 一张」按新形态改写 + 反向断言：D2-2 仍在且仍单 table（Q1 零回归）。
+        """
+        from app.services.workpaper_sync import phase5_d2_03_bad_debt as BD
+
         assert len(workbook.sheetnames) == 11, workbook.sheetnames
-        assert P.MANAGED_SHEET in workbook.sheetnames
-        assert [sheet.excel_name for sheet in contract.sheets] == [P.MANAGED_SHEET]
-        assert len(contract.sheets[0].tables) == 1
+        assert BD.MANAGED_SHEET_D23 in workbook.sheetnames
+        excel_names = [sheet.excel_name for sheet in contract.sheets]
+        assert excel_names == [P.MANAGED_SHEET, BD.MANAGED_SHEET_D23], excel_names
+        by_key = {s.sheet_key: s for s in contract.sheets}
+        assert P.SHEET_KEY in by_key, "D2-2 明细表不得因扩容 D2-3 而消失"
+        assert len(by_key[P.SHEET_KEY].tables) == 1
+        assert by_key[P.SHEET_KEY].tables[0].table_key == P.ROWS_TABLE_KEY
+        assert [t.table_key for t in by_key[BD.SHEET_KEY_D23].tables] == [
+            BD.ROWS_TABLE_KEY_INDIVIDUAL, BD.ROWS_TABLE_KEY_COMBINED,
+        ]
+        assert sum(len(s.tables) for s in contract.sheets) == 3, "受管区应 1→3"
 
     def test_template_sentinel_rejects_a_mutated_workbook(
         self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
@@ -742,13 +755,17 @@ class TestContractIsGroundedInTheTemplate:
         assert P.PILOT_ADAPTER_ID in available_contract_ids()
 
     def test_field_counts_are_the_real_template_facts(self, contract: Any) -> None:
-        """覆盖计数硬判据（空集恒等价不算通过）。"""
-        assert len(contract.all_fields()) == EXPECTED_FIELD_COUNT == 39
+        """覆盖计数硬判据（按 D2-2 sheet 作用域，扩容 D2-3 后 all_fields 是全 entry 67 字段）。"""
+        d22_sheet = {s.sheet_key: s for s in contract.sheets}[P.SHEET_KEY]
+        d22_fields = [f for t in d22_sheet.tables for f in t.fields]
+        assert len(d22_fields) == EXPECTED_FIELD_COUNT == 39
         assert len(P.MANAGED_FIELD_SPECS) == EXPECTED_FIELD_COUNT
         assert len(P.SCALAR_FIELD_SPECS) == 21
         assert len(P.AGING_GROUPS) * len(P.AGING_SEGMENTS) == 18
-        assert len(contract.protected_field_keys()) == EXPECTED_PROTECTED_COUNT == 3
-        assert len(contract.editable_field_keys()) == 36
+        d22_protected = [f for f in d22_fields if f.mode.value == "formula"]
+        assert len(d22_protected) == EXPECTED_PROTECTED_COUNT == 3
+        d22_editable = [f for f in d22_fields if f.mode.value == "editable"]
+        assert len(d22_editable) == 36
 
     def test_column_letters_cover_a_to_am_without_gap(self, worksheet: Any) -> None:
         """39 列必须**连续**覆盖 A..AM，且与 sheet 的 `max_column` 一致。"""
@@ -763,11 +780,11 @@ class TestContractIsGroundedInTheTemplate:
     def test_every_managed_header_matches_the_real_cell_text(
         self, contract: Any, worksheet: Any
     ) -> None:
-        """39 次比对：每个字段的 `header_source_ref` 指向的格文本 == 登记文本。"""
+        """39 次比对：header_source_ref 指向的格文本 == 登记文本（限 D2-2 sheet，D2-3 有同名列）。"""
+        d22_sheet = {s.sheet_key: s for s in contract.sheets}[P.SHEET_KEY]
         by_key = {
             spec.column_key: spec
-            for sheet in contract.sheets
-            for table in sheet.tables
+            for table in d22_sheet.tables
             for spec in table.fields
         }
         compared = 0
@@ -2317,14 +2334,16 @@ class TestRealPayloadFactsAreFrozen:
         assert 866_000 <= REAL_PAYLOAD_BYTES
         assert REAL_PAYLOAD_BYTES / 1024 == pytest.approx(885.0, abs=0.1)
 
-    def test_store_item_id_is_the_only_item_the_contract_claims(self, contract: Any) -> None:
-        """契约只声明 `D2-detail-rows` 一条 item ⇒ 回写不会碰其他 23 条。"""
-        blob = json.dumps(contract.canonical_payload, ensure_ascii=False)
-        assert blob.count(f'"{P.STORE_ITEM_ID}"') >= 1
-        others = re.findall(r'"(D2-(?!detail-rows)[a-z0-9-]+)"', blob)
-        assert others == [], others
+    def test_d22_sheet_only_claims_detail_rows_item(self, contract: Any) -> None:
+        """D2-2 sheet 只声明 D2-detail-rows（旧「整契约只有它」按新形态改写 + 反向断言不引 D2-3 键）。"""
+        d22_payload = next(
+            s for s in contract.canonical_payload["sheets"] if s["sheet_key"] == P.SHEET_KEY
+        )
         declared = {
             item["store_item_id"]
-            for item in contract.canonical_payload["sheets"][0]["tables"][0]["fields"]
+            for table in d22_payload["tables"]
+            for item in table["fields"]
         }
-        assert declared == {P.STORE_ITEM_ID}
+        assert declared == {P.STORE_ITEM_ID}, declared
+        # 反向断言：D2-2 sheet 绝不引用 D2-3 的坏账 store 键。
+        assert not any(str(s).startswith("D2-bd-") for s in declared), declared

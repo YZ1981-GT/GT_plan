@@ -396,3 +396,40 @@ D2A 程序表与四张附注披露 sheet；旧套 store 键物理删除；性能
    须确认该正则的分派不受影响。
 3. **每册都有 `GT_Custom` sheet**（8 行 × 2 列，0 公式）—— 平台注入区，不接但须确认
    instrumentation 不误把它算进受管清单。
+
+## 上游锚定（2026-09-25 第三轮复盘补：首版缺这一节）
+
+🔴 **本 spec 是 umbrella spec `workpaper-html-onlyoffice-bidirectional-writeback-closure` 的
+Task 46「逐一迁移 D 循环 Excel 独立 entry」的下游 lane spec**，与 D4 lane 同型。首版零引用该
+umbrella 与其已冻结的 D 循环 slice，属 spec 卫生缺陷。
+
+| 产物 | 位置 | 已冻结内容 |
+|---|---|---|
+| D 循环 manifest slice | `backend/data/workpaper_sync_d_cycle_manifest_slice.json`（1137 行） | Task 46 冻结的 7 个 D 循环独立 entry 逐项裁决 |
+| umbrella Property 面 | umbrella design.md（1993 行） | Property 1–71；Task 46 声明验证 Property 20 / 21 / 28 / 69 / 70 |
+
+### ✅ slice 实测支持本 spec 的前提：D2 是 7 家里唯一另一个已注册 adapter 的
+
+```
+xlsx/gt-d2-accounts-receivable    adapter_registered   adapter=d2.receivable_detail   mount_count=1
+xlsx/gt-d4-operating-revenue      adapter_registered   adapter=d4.revenue_detail
+其余五家（D1/D3/D5/D6/D7）        legacy_fake_bidirectional   adapter=None
+```
+
+⇒ **D2 与 D4 是 7 家里唯一两个 adapter 真注册的循环** ⇒ 本 spec 是少数「真栈判据能跑起来」的
+D 类 spec，D1/D3/D5/D6/D7 那四个 spec 的真栈判据都卡在 `no_registered_sync_adapter`。
+这一事实提升本 spec 的优先级：**它能提供 D 类唯一可跑通的扩容样本**（D4 已有 30 受管 sheet，
+但 D4 走 bugfix spec 不是扩容 spec）。
+
+⚠️ 但 slice 的 `adapter_registered` 与 umbrella 的 **BP-61-1** 并不矛盾：BP-61-1 说的是
+**published representation 供给平台级为 0**（186 个 planned entry 一个都注册不上）。二者口径不同
+—— slice 记的是 manifest 侧的 `migration_state`/`adapter_id` 声明，BP-61-1 记的是库里
+`working_paper_content_representation` 的真实行数。⇒ 本 spec 真栈段开工前须**实测确认** D2 的
+`register_from_manifest()` 当前是否真注册成功（D3 spec 裁决 F5 实测「只注册 `{d2,d4,g7,h1}`」
+支持 slice 口径），**不得只读 slice 就宣称可跑**。
+
+### Property 编号必须 spec-scoped
+
+umbrella 自己踩过同号不同义的坑（Task 61 附注：全局 `BP-16`~`BP-22` 被 Tasks 60/63/64 重复占用，
+修法是 task-scoped 前缀 `BP-61-x` + `re.fullmatch` 锁死）。⇒ 本 spec 的 `Property N` /
+`Q{N}` 一律读作 **`D2-P{N}`**，引用上游须写全 `umbrella Property N`。

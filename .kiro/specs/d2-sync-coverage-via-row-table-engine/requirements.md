@@ -3,10 +3,18 @@
 ## Introduction
 
 本 spec 把 **D2 应收账款**的受管覆盖从 **1 张 sheet / 1 个受管区**扩到
-**4 张 sheet / 6 个受管区**（`明细表D2-2` ① 已接 + `坏账准备明细表D2-3` **③** +
-`调整分录汇总表D2-4` ① + `审定表D2-1` ①），并清理 D2 遗留的两处死代码。它**消费**
-`workpaper-sync-row-table-engine-and-d1-coverage` 交付的框架层行表引擎与
-`AdjudicationSheetSpec`，**不重造**任何引擎件。
+**3 张 sheet / 5 个受管区**（`明细表D2-2` ① 已接 + `坏账准备明细表D2-3` **③** +
+`审定表D2-1` ①），对 `调整分录汇总表D2-4` 只做**可行性核 + 裁决**（默认倾向 `single_html`，
+见需求 2），并清理 D2 遗留的两处死代码。
+
+它**消费**两个上游 spec，**不重造**任何引擎件、**不另起**平行裁决：
+- `d1-sync-row-table-engine-and-d1-coverage` —— 框架层行表引擎 + `AdjudicationSheetSpec`
+- 🔴 **`d-cycle-sheet-bidirectional-expansion`（9/9 全绿）** —— D 循环 sheet 级扩容的裁决与分波
+  真源。其分波表 **Wave 4 = D2-3 坏账准备**即本 spec 的主体；其四条纪律本 spec 全部继承：
+  ①「一 entry 一 adapter」不变，多 sheet 只扩契约 `sheets[]` ②诚实边界：不是每张 sheet 都双向，
+  程序/附注/网格不对齐者判 `single_html`（另有第五形态 `paragraph_block_bidirectional`）
+  ③可行性核硬门（`blocking.8`）：有行身份列 + 无专用同步链冲突，否则不得扩 `sheets[]`
+  ④D4-4 调整分录汇总已判 `single_html` —— 本 spec 据同判据把 D2-4 从接入改为可行性核。
 
 用户裁决（2026-09-25）：**D1 / D2 / D4 各自独立成套**，顺序 **先 D1 再 D2**。⇒ 本 spec 的
 阶段 0 有一条硬前置：D1 spec 的框架层必须已交付（需求 7）。
@@ -54,7 +62,7 @@ mode storage key / room key 全用它）。
 |---|---|---|
 | `D2-detail-rows` 真库体量 | **4 行 / 3,061,466 字节**（平均 765KB/行） | PG 直查 |
 | D2-2 模板数据区 | 模板 **35 行**，真库 **1260 行** ⇒ materialize 需插 **1200+ 行** | 模板 + 契约 |
-| D2-2 离线剖析 | 10 行 6.7s / 50 行 8.8s / 200 行 15.9s / **729 行 59.3s**（超线性），走统一 materialize 曾 HTTP **>300s 超时** | `workpaper-sync-materialize-large-table-performance` |
+| D2-2 离线剖析 | 10 行 6.7s / 50 行 8.8s / 200 行 15.9s / **729 行 59.3s**（超线性），走统一 materialize 曾 HTTP **>300s 超时** | `workpaper-sync-materialize-large-table-performance`（已归档 `_archive/15-workpaper-sync-engine-hardening/`） |
 | `useD2VoucherCheck`（旧套） | **全仓零消费方**（只有自身定义 + `export default`），**死模块 310 行** | grep |
 | 前端实际挂载 | `D2TabVoucherCheck.vue` import `useD2VoucherCheckEnhanced` | grep |
 | 旧套 store 数据 | `D2-voucher-params` 1 行 87B = `{"method":"随机","populationSize":0,"sampleSize":0,…}`；`D2-voucher-samples` 1 行 332B = 1 条全空骨架行；同一 wp `e2c95d10` | PG 直查 |
@@ -82,9 +90,28 @@ mode storage key / room key 全用它）。
 8. **D2A 程序表与 4 张披露 sheet 不接**。程序表是步骤清单（同 D1A）；披露是 102~181 行巨表
    且行模型（`kind`/`key`）与平台 `rowType`/`rowId` 不同构。
 
+## Glossary
+
+| 术语 | 含义 |
+|------|------|
+| 受管区 / binding | 契约声明的一个 `(sheet, table)` 受管数据区。一张 sheet 可含多个（D1-4 三区 / D2-3 三区 / D4-20 三区） |
+| `RowTableSheetSpec` | 行表型受管 sheet 的声明数据类（几何 + 字段 + store 形态），框架层定义、sheet 层实例化 |
+| `AdjudicationSheetSpec` | 审定表型声明数据类，以 `sections` + `row_mode` 参数表达各循环审定表的形态差异 |
+| `StoreItemSpec` | store item 形态声明（`rows` / `dict` / `fixed_text` / `dedicated`）+ per-item 缺省值 |
+| store 键 / store item | `checklist_responses.item_id`，一条 store 载荷的标识（如 `D1-cust-rows`） |
+| `bidirectional` | 该 sheet 走真双向回写（HTML ↔ OO 单元格级合并） |
+| `single_html` | 诚实裁决：该 sheet 不做单元格双向（无行身份列 / 有专用同步链冲突 / 与网格不对齐） |
+| `paragraph_block_bidirectional` | 第五形态：段落块 + 分组紧凑表双向（D4-5 会计政策检查） |
+| 可行性核硬门 | 上游 spec `d-cycle-sheet-bidirectional-expansion` 的 `blocking.8`：「有行身份列 + 无专用同步链冲突」两条同时成立才可扩 `sheets[]` |
+| hub store | 被多条专用链共同占用的 store 键（如 `D*-entry-rows` 被借贷平衡 + 中央登记 + cross-sheet 联动占用） |
+| golden digest | 零回归门的度量：`build_contract_payload` / `build_store_projection` / `instrumentation_spec(s)` 的 canonical JSON sha256 |
+| 四态覆盖状态机 | `resolveCellState(stored, snap, derived)` 穷举 S1 纯派生 / S2 人工覆盖 / S3 自动跟随 / S4 覆盖且上游也变 |
+| `formula_mask` | 模板公式格区间，materialize 不覆盖、由 OO 重算 |
+| 整册 materialize | `_materialize_within_scope` 对该 entry 全部 binding 逐趟跑 + `verify_unmanaged_regions` 逐 binding 全跑，任一失败整册 500 |
+
 ## Requirements
 
-### Requirement 1：D2-3 坏账准备明细表接入（首张新增，行表引擎验证样本）
+### Requirement 1: D2-3 坏账准备明细表接入（首张新增，行表引擎验证样本）
 
 **User Story:** 作为审计助理，我希望 D2-3 坏账准备明细表能切「在线编辑」并把 OO 里的改动写回结构化视图。
 
@@ -115,21 +142,30 @@ mode storage key / room key 全用它）。
    `useD2DisclosureNote.badDebtSummary`(:481) 与 `importIndividualFromBadDebt`(:971) /
    `useD2CrossSheet`(:199-201)。判据 SHALL 覆盖它们，不得只验 D2-3 自身读回等值。
 
-### Requirement 2：D2-4 调整分录汇总表接入
+### Requirement 2: D2-4 调整分录汇总表 —— 先可行性核再裁决（**不直接接入**）
 
-**User Story:** 作为审计助理，我希望 D2-4 调整分录也能在 Excel 里编辑并回写。
+**User Story:** 作为维护者，我不希望把一张已被专用同步链占用的 hub store 强行接成单元格双向，
+让借贷平衡与中央登记被 OO 覆盖破坏。
 
 #### Acceptance Criteria
 
-1. WHEN 声明 D2-4 THEN 它 SHALL 用 `RowTableSheetSpec`（25 行 × 10 列 / 仅 6 个公式 ⇒ 最简形态），
-   store 键 `D2-entry-rows`。
-2. WHEN 行含 `isPushedToAdjTable`（是否已推送到调整分录模块）THEN 该字段 SHALL 为 store-only，
-   **不入**受管格 —— 它是平台流程状态，不是 Excel 上的业务列。
-3. WHEN 借贷金额回写 THEN 既有借贷平衡校验（`BALANCE_TOLERANCE = 0.005`）SHALL 继续以合并后的
-   值参与，容差口径不变。
-4. WHEN 接入完成 THEN binding 数增至 3，门同需求 1.5。
+1. WHEN D2-4 进入评估 THEN 它 SHALL 先过上游 spec `d-cycle-sheet-bidirectional-expansion` 的
+   **可行性核硬门**（`blocking.8`）：「有行身份列」+「无专用同步链冲突」两条同时成立才可扩
+   `sheets[]`。
+2. WHERE D2-4 与该 spec 已判 `single_html` 的 D4-4 同型 THE 默认倾向 `single_html`。已实证的
+   三条同型事实：①`D2TabAdjustment.vue` **接了 `useAdjustmentCentralSync`**（2 处引用）⇒
+   经后端 `AdjustmentSyncService` 中央登记 ②`useD2Adjustment` 有借贷平衡容差
+   `BALANCE_TOLERANCE = 0.005` 且**仅 HTML 侧强制**、Excel 不校验 ③`D2-entry-rows` 是 hub store。
+   待核第四条：模板 `调整分录汇总表D2-4`（25 行 ×10 列 / 6 公式）有无行身份列。
+3. WHEN 裁决产出 THEN SHALL 落证据 JSON（照 `T08-d44-single-html-adjudication.json` 范式），
+   记录四条依据的逐条实测结论，**不改任何生产代码**（上游 spec 的诚实边界红线）。
+4. IF 核出「有行身份列 + 无同步链冲突」THEN 才可改判 `bidirectional` 并另起接入任务；
+   此时 `isPushedToAdjTable` SHALL 为 store-only 不入受管格（先例：D5 的
+   `postRealized`/`eclStage`），借贷平衡校验以合并后值参与、容差口径不变。
+5. 🔴 **本需求是 2026-09-25 复盘修正项**：首版写成「D2-4 接入」并排在阶段 2，与上游 spec 对
+   D4-4 的裁决直接冲突。
 
-### Requirement 3：D2-1 审定表接入（消费 `AdjudicationSheetSpec`）
+### Requirement 3: D2-1 审定表接入（消费 `AdjudicationSheetSpec`）
 
 **User Story:** 作为审计助理，我希望 D2-1 审定表的 SUMIF 取数与我的人工覆盖不互相吞掉。
 
@@ -151,7 +187,7 @@ mode storage key / room key 全用它）。
 7. WHERE D2-1 与 D1-1 的行模型不同（写死 4 行 vs 动态票据种类）THE `AdjudicationSheetSpec`
    SHALL 以参数表达该差异，**不得**在引擎里加 `if is_d1` / `if is_d2` 分支。
 
-### Requirement 4：两处死代码清理
+### Requirement 4: 两处死代码清理
 
 **User Story:** 作为维护者，我不希望接 sync 时把死路径一起接进去，让「哪套是权威」变得更不清楚。
 
@@ -169,7 +205,7 @@ mode storage key / room key 全用它）。
 5. WHEN 清理完成 THEN 全仓 grep `D2-voucher-params|D2-voucher-samples|D2-detail-\{` SHALL 只在
    读兼容路径与本 spec 判据中出现。
 
-### Requirement 5：性能硬门（本 spec 的一等约束）
+### Requirement 5: 性能硬门（本 spec 的一等约束）
 
 **User Story:** 作为多人平台，我不接受 D2 受管 sheet 翻倍后 materialize 变成不可用。
 
@@ -187,7 +223,7 @@ mode storage key / room key 全用它）。
 5. WHERE `lock_room_oo_apply` 是 per-room 会话级锁横跨整个 CPU 段 THE 本 spec SHALL 登记
    「D2 多人同编同底稿会串行排队」这一既有事实，**不在本 spec 解决**（归性能 spec 的 ROI-6）。
 
-### Requirement 6：零回归 —— 已接的 D2-2 与其余 7 个 contract 不变
+### Requirement 6: 零回归 —— 已接的 D2-2 与其余 7 个 contract 不变
 
 **User Story:** 作为质控，我要求扩 D2 不动已经能用的 D2-2 和其他循环。
 
@@ -205,13 +241,13 @@ mode storage key / room key 全用它）。
 5. WHERE D2 非受管 sheet 现状是**直接禁用**在线编辑 THE 扩容后未接的 sheet SHALL 保持禁用 +
    显式中文原因，**不得**退化成静默无反应或落 legacy 假双向。
 
-### Requirement 7：前置依赖
+### Requirement 7: 前置依赖
 
 **User Story:** 作为维护者，我不希望本 spec 建立在尚未交付或未入库的前提上。
 
 #### Acceptance Criteria
 
-1. WHEN 本 spec 开工前 THEN `workpaper-sync-row-table-engine-and-d1-coverage` 的框架层
+1. WHEN 本 spec 开工前 THEN `d1-sync-row-table-engine-and-d1-coverage` 的框架层
    （`RowTableSheetSpec` / `StoreItemSpec` 注册表 / `attach_sibling_bindings(provider=…)`）
    SHALL 已交付并入库；需求 1/2 依赖它。
 2. WHEN 需求 3（D2-1 审定表）开工前 THEN 两件 SHALL 已在 HEAD：①D1 spec 的
@@ -222,7 +258,7 @@ mode storage key / room key 全用它）。
    可照常推进（D2-3/D2-4 的 mask 是列向、行范围恰等数据区 ⇒ 只比列与格级判定等价）。
 4. WHEN 登记任一「已存在/已修复」前提 THEN SHALL 标注其入库状态，不得笼统表述。
 
-### Requirement 8：变异检验与证据
+### Requirement 8: 变异检验与证据
 
 #### Acceptance Criteria
 
@@ -249,6 +285,33 @@ mode storage key / room key 全用它）。
   `rowType`/`rowId` 不同构）。
 - **旧套 store 键物理删除**（本 spec 只删代码模块 + 保留读兼容）。
 - **性能根因优化**（归 `oo-html-writeback-performance` 与
-  `workpaper-sync-materialize-large-table-performance`）。本 spec 只立硬门、不优化。
+  `workpaper-sync-materialize-large-table-performance`（已归档 `_archive/15-workpaper-sync-engine-hardening/`））。本 spec 只立硬门、不优化。
 - **`entry_id` 派生规则改造**（持久化键，风险高于收益）。
 - **权威模板合册**（审计方法论产物 + `template_sha256` 已冻结）。
+
+### Requirement 9: 消费 D4 已验证的形态谱系（**复盘补**）
+
+**User Story:** 作为维护者，我不希望把纯静态 cell 的区域硬塞进行表引擎 —— 引擎已有
+`static_region` 路径，D4 已用它交付三张。
+
+#### Acceptance Criteria
+
+1. WHEN 判定形态 THEN 本 spec SHALL 消费上游 D1 spec 需求 11 定义的三维谱系
+   （`binding_kind` 二分 / `row_identity_key` 三形态 / HTML-only item 子集），**不新造**。
+   详见上游 design §附：D4 已验证的形态谱系。
+2. 🔴 WHERE **D2-1 审定表的 4 行是写死的**（`individual`/`aging`/`customer-type`/`total`）
+   THE 它 SHALL 按 **D4-6「稳定 key 固定行」范式**声明 —— `row_identity_key='key'`（四个 rowKey
+   本身已是稳定键）、行不增删、但**仍是 `excel_table` binding 且仍注入 UUID 列**。
+   首版只写 `row_mode='fixed_rows'` 未声明行身份键与是否注入 UUID 列，实施时会卡在
+   「固定行要不要 identity 列」这个已被 D4-6 解答过的问题上。
+3. WHERE D2-1 的 `total` 行是 `rowType='summary'`（computed 不落库）THE 它 SHALL **不进**受管区
+   —— 与 D4 现行 `buildSubtotalRow` 走 computed 一致。
+4. WHEN D2-3 / D2-4 / D2-2 的 note / conclusion / procedures 类 item 落在 footer 之下 THEN 它们
+   SHALL 逐项核是否命中「footer 下 `static_row` 与插行 fail-closed 冲突」（先例
+   `HTML_ONLY_ITEM_IDS_D45`），命中则登记进 HTML-only 子集而非强行受管。
+5. WHEN 前端宿主接线 THEN SHALL 覆盖**两套 gating** —— D4 实测 `isD4DetailSheet`（主 detail 链）
+   与 `isD4DedicatedSyncSheet`（专用同步 sheet 链）并存，**漏登记后者会工具条叠加冲突**
+   （D4-35 / D4-13 均踩过）。D2 若让审定表 D2-1 走独立宿主（其 sheetKey 与 detail 链不同），
+   SHALL 同时登记两套。首版需求 6.4 只提了 `isD2DetailSheet` 一套。
+6. WHERE D2 的四张附注披露与 D2A 程序表已判不接 THE 本需求不改变该裁决 —— 形态谱系只影响
+   **已决定接入**的那几张怎么声明，不扩大范围。

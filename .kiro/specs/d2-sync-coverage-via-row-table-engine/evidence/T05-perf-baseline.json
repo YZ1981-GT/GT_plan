@@ -1,0 +1,36 @@
+{
+  "task": "T05 perf baseline (offline)",
+  "d23_projection": {
+    "10x3keys": {
+      "rows_per_key": 10,
+      "total_persisted_rows": 30,
+      "stable_fields": 420,
+      "elapsed_ms": 0.66
+    },
+    "50x3keys": {
+      "rows_per_key": 50,
+      "total_persisted_rows": 150,
+      "stable_fields": 2100,
+      "elapsed_ms": 2.13
+    },
+    "200x3keys": {
+      "rows_per_key": 200,
+      "total_persisted_rows": 600,
+      "stable_fields": 8400,
+      "elapsed_ms": 8.64
+    },
+    "500x3keys": {
+      "rows_per_key": 500,
+      "total_persisted_rows": 1500,
+      "stable_fields": 21000,
+      "elapsed_ms": 22.32
+    }
+  },
+  "notes": {
+    "d22_denominator": "D2-detail-rows 真库 4 行 / 3.06MB（PG 直查），模板数据区 35 行、真库 1260 行",
+    "d22_offline_profile_historical": "10行6.7s / 50行8.8s / 200行15.9s / 729行59.3s（超线性，push_html_to_excel）",
+    "d23_real_lib_rows": "D2-bd-*-rows 真库 0 行（前端未录入过坏账明细）",
+    "whole_book_materialize_realstack": "整册 materialize 需 sibling 注入编排（instrumentation_specs 复数 + _align_specs_to_sibling_tables）。D2 父模块当前只有单数 instrumentation_spec()，无 sibling 编排内核（D4 有而 D2 无）。D2-3 声明层/投影/合并/判据已交付且离线全绿，真栈整册 materialize e2e 待 sibling 编排内核引入 D2 父模块（照 D4-1/D4-9 落地路径：provider 独立可校验，真向注入 e2e 待内核）。软上限硬门：立门不优化。",
+    "cache_semantics": "BASELINE_EXTRACT_CACHE 键 {contract_id}:{artifact_sha256} 内容寻址天然失效，受管 sheet 增加不改变该键语义（Property 13）。"
+  }
+}

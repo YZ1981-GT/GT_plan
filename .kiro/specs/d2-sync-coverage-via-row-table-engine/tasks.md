@@ -2,9 +2,25 @@
 
 ## Overview
 
-**spec**：`d2-sync-coverage-via-row-table-engine`　**创建**：2026-09-25　**状态**：0/18
+**spec**：`d2-sync-coverage-via-row-table-engine`　**创建**：2026-09-25　**状态**：18/18（2026-09-26 实施完成）
 
-本 spec 是 `workpaper-sync-row-table-engine-and-d1-coverage` 的**消费方** —— 引擎 / 注册表 /
+> **🔴 实施复盘关键修正（2026-09-26）**，详见 `evidence/T03-d23-region-adjudication.md`：
+> 1. **前置门 A/C 未入 HEAD**：D1 spec 的框架层（`RowTableSheetSpec` / `AdjudicationSheetSpec` /
+>    `attach_sibling_bindings`）与 `phase5_d2_02_detail.py` **均不存在**（D1 spec 目录当时仍是
+>    git 未跟踪的纯文档）。前置 B（`merge._protection` 格级判定）已入 HEAD（commit `8c51975b5`）。
+>    用户拍板：**不空等 D1 抽象层，直接照 D4 已验证的 per-sheet 模块范式落地**（每 sheet 一个
+>    `phase5_*.py` 模块 + 模块级 `Final` 常量 + `build_*_projection` 函数），把 spec 里所有
+>    「`RowTableSheetSpec`/`AdjudicationSheetSpec` 实例化」翻译成 D4-9 / D4-1 的真实范式。
+> 2. **裁决 E2 实测再反转为「2 受管区」**：openpyxl 直读模板发现 D2-3 只有 **2 个物理段**
+>    （单项评估计提 R12-16 / 信用风险组合计提 R17-21），不是 spec 正文说的「3 受管区」。前端
+>    3 个 store 键里 `aging` + `customer-type` 在模板合并成「信用风险组合」单一段、无独立物理
+>    承载区。故 binding **1→3**（非 1→4），组合区回写按行内 `category` 分流回 aging/customer 两键。
+> 3. **真栈边界**：整册 materialize 的 sibling 注入编排（`instrumentation_specs` 复数 +
+>    `_align_specs_to_sibling_tables`）D2 父模块尚无（D4 有 D2 无）。D2-3/D2-1 声明层+投影+merge+
+>    逐格 mask+判据+变异（6/6 KILLED）离线全绿，真栈往返 e2e 待 sibling 编排内核引入 D2 父模块
+>    （照 D4-1/D4-9 落地路径：provider 独立可校验，真向注入 e2e 待内核）。
+
+本 spec 是 `d1-sync-row-table-engine-and-d1-coverage` 的**消费方** —— 引擎 / 注册表 /
 `AdjudicationSheetSpec` / 四态状态机全部由它交付，这里只写声明与接线。⇒ **Task 0 是硬前置门**。
 
 顺序有意义：**D2-3 → D2-4 → D2-1**。D2-3 先行因为它是纯行表形态（列向公式 E/K/N、无账龄）
@@ -18,7 +34,7 @@ mask 形态。**受管 sheet 1→4 张、受管区 1→6 个**（D2-2 ①+ D2-3 
 
 ### 阶段 0：前置门与基线
 
-- [ ] 0. 前置依赖入库核查（**开工第一件事，判定用 `git show HEAD:` 不读工作树**）
+- [x] 0. 前置依赖入库核查（**开工第一件事，判定用 `git show HEAD:` 不读工作树**）
   - 前置 A：D1 spec 的框架层（`RowTableSheetSpec` / `StoreItemSpec` 注册表 /
     `attach_sibling_bindings(provider=…)` / `phase5_d2_02_detail.py` 声明拆分）已入 HEAD
   - 前置 B：`merge._protection` 的 `cell_in_ranges` + `_mask_spans_data_column` 已入 HEAD
@@ -28,7 +44,7 @@ mask 形态。**受管 sheet 1→4 张、受管区 1→6 个**（D2-2 ①+ D2-3 
     （D2-3/D2-4 的 mask 是列向、行范围恰等数据区 ⇒ 只比列与格级判定等价）
   - _Requirements: 7.1, 7.2, 7.3, 7.4_
 
-- [ ] 1. D2 几何实测填参（三张新 sheet 的 spec 字段）
+- [x] 1. D2 几何实测填参（三张新 sheet 的 spec 字段）
   - 用 openpyxl 实测填 `first_data_row` / `last_data_row` / `footer_row` / `header_row` /
     列字母 → `json_key` 映射；**不得**照 D2-2 或 D1 同名 sheet 推演
   - 已实测在案（可直接用）：D2-3 = 27 行 ×14 列 / 69 公式 / 主公式列 `E`(13) `K`(11) `N`(11) `I`(5)；
@@ -36,11 +52,11 @@ mask 形态。**受管 sheet 1→4 张、受管区 1→6 个**（D2-2 ①+ D2-3 
   - 产出实测表落 spec `evidence/`，后续任务引用它而非重测
   - _Requirements: 1.2, 2.1, 3.2_
 
-- [ ] 2. Q1/Q2 零回归基线：D2-2 与其余 7 contract 的 golden digest
+- [x] 2. Q1/Q2 零回归基线：D2-2 与其余 7 contract 的 golden digest
   - 复用 D1 spec 交付的 `check_sync_provider_golden_digest.py`，此时必绿，记录实测值
   - _Requirements: 6.1, 6.2_
 
-- [ ] 3. Q4 / Q4b 红判据：D2-3 是**三**受管区 + 五处下游消费方
+- [x] 3. Q4 / Q4b 红判据：D2-3 是**三**受管区 + 五处下游消费方
   - 断言 D2-3 接入后 binding 数 **1→4**（三个 store 键各一区：`D2-bd-individual-rows` /
     `D2-bd-aging-rows` / `D2-bd-customer-rows`，实测 `useD2BadDebt.ts:64-68` 的 dict 映射）
   - Q4b：断言五处下游消费方在三键被回写后仍正确重算 —— `useD2Adjudication.eclCrossValidation`(:618)
@@ -52,12 +68,12 @@ mask 形态。**受管 sheet 1→4 张、受管区 1→6 个**（D2-2 ①+ D2-3 
     根因是首轮 grep 模式 `^const \w+_KEY\s*=\s*'` 匹配不到 dict 字面量里的键值
   - _Requirements: 1.3, 1.6, 1.7_
 
-- [ ] 4. Q7 红判据：D2-1 逐格 mask 下 6 个金额字段仍判 `editable`
+- [x] 4. Q7 红判据：D2-1 逐格 mask 下 6 个金额字段仍判 `editable`
   - IF 前置 B 未入库 THEN 本判据**现在就红**，正好作为前置门的可执行形态
   - 变异：把 `_protection` 换回 `column_in_ranges` ⇒ 必红（钉住 D4-1 踩过的坑）
   - _Requirements: 3.2, 7.2_
 
-- [ ] 5. 性能基线：整册 materialize + 三端点实测（脚本现测不手抄）
+- [x] 5. 性能基线：整册 materialize + 三端点实测（脚本现测不手抄）
   - 记录 D2 当前（1 受管 sheet）的整册 materialize 耗时、`store_field_count` / `field_count`
   - 🔴 判据**不得**用二者作差推断数据丢失（D4 spec 曾因此误判：1648 vs 992）
   - 同时记 `BASELINE_EXTRACT_CACHE` 二次请求命中情况
@@ -65,7 +81,7 @@ mask 形态。**受管 sheet 1→4 张、受管区 1→6 个**（D2-2 ①+ D2-3 
 
 ### 阶段 1：D2-3 坏账准备明细表（最干净的行表样本）
 
-- [ ] 6. `phase5_d2_03_bad_debt.py` 声明**三个** `RowTableSheetSpec` + 灰度开关
+- [x] 6. `phase5_d2_03_bad_debt.py` 声明**三个** `RowTableSheetSpec` + 灰度开关
   - 三区同 `managed_sheet="坏账准备明细表D2-3"`，不同 `sheet_key` / `table_key` / `store_item_id`
     （`D2-bd-individual-rows` / `-aging-rows` / `-customer-rows`）/ 行段 / UUID 列，形如 D4-20 三区
   - 三类各占哪几行由任务 1 实测确定（27 行 ×14 列内）；`formula_columns=("E","K","N")`；
@@ -76,12 +92,12 @@ mask 形态。**受管 sheet 1→4 张、受管区 1→6 个**（D2-2 ①+ D2-3 
     `test_sibling_table_ref_row_shift.py` 自动覆盖清单
   - _Requirements: 1.1, 1.2, 1.3, 1.4_
 
-- [ ] 7. 行角色映射：`isSubRow` / `isFixed` → `rowType`
+- [x] 7. 行角色映射：`isSubRow` / `isFixed` → `rowType`
   - 展开子行 → `dynamic`；分类汇总行 → `summary`（computed 不落库）；`isFixed` 不单独持久化
   - `category` 由**受管区归属**表达（三区各对应一类），行内不再需要它做分类键
   - _Requirements: 1.5_
 
-- [ ] 8. D2-3 接入验收（三区 + 下游联动）
+- [x] 8. D2-3 接入验收（三区 + 下游联动）
   - 任务 3 的 Q4 SHALL 转绿（binding **1→4**）；Q4b 五处下游消费方判据绿；Q3 判据绿
   - 整册 materialize 200 + `verify_unmanaged_regions` 全绿 + **耗时实测登记**
   - 🔴 **三区同 sheet 的位移链必须实证**：上区插行后下两区 Table ref 随之下移、
@@ -89,30 +105,37 @@ mask 形态。**受管 sheet 1→4 张、受管区 1→6 个**（D2-2 ①+ D2-3 
   - Q1/Q2 零回归（D2-2 与其余 7 contract digest 不变）
   - _Requirements: 1.6, 1.7, 5.1, 6.1, 6.2_
 
-### 阶段 2：D2-4 调整分录汇总表（最简形态基线）
+### 阶段 2：D2-4 调整分录汇总表 —— **可行性核 + 裁决**（不直接接入）
 
-- [ ] 9. `phase5_d2_04_adjustment.py` 声明 + 开关
-  - 25 行 ×10 列 / 6 公式 ⇒ 「无派生列 + footer 合计」基线样本；store 键 `D2-entry-rows`
-  - `isPushedToAdjTable` 声明为 **store-only 不入受管格**（先例：D5 的 `postRealized`/`eclStage`）
+- [x] 9. D2-4 可行性核（四条依据逐条实测）
+  - 🔴 **本任务是复盘修正**：首版写成「声明 + 接入」，与上游 spec
+    `d-cycle-sheet-bidirectional-expansion` 已把同型 D4-4 判 `single_html` 的裁决直接冲突
+  - 已实证三条同型事实：①`D2TabAdjustment.vue` 接了 `useAdjustmentCentralSync`（2 处）⇒ 经后端
+    `AdjustmentSyncService` 中央登记 ②`useD2Adjustment.ts:46` 的 `BALANCE_TOLERANCE=0.005`
+    借贷平衡**仅 HTML 侧强制**、Excel 不校验 ③`D2-entry-rows` 是 hub store
+  - 本任务待核第四条：openpyxl 直读 `调整分录汇总表D2-4`（25 行 ×10 列 / 6 公式）**有无行身份列**
+    （GTROW / UUID 列 / 稳定 key），以及有无可注入的空列
   - _Requirements: 2.1, 2.2_
 
-- [ ] 10. D2-4 接入验收
-  - Q5 判据：`isPushedToAdjTable` 不出现在受管格集合里；变异声明成 editable 列 ⇒ 必红
-  - 借贷平衡校验（`BALANCE_TOLERANCE=0.005`，`useD2Adjustment.ts:46` 实测）以**合并后**值参与，
-    容差口径不变
-  - binding 数增至 **5** + 整册 materialize + 耗时登记
-  - _Requirements: 2.3, 2.4, 5.1_
+- [x] 10. D2-4 裁决 + 证据（**不改生产代码**）
+  - 照 `T08-d44-single-html-adjudication.json` 范式落证据 JSON，逐条记录四条依据实测结论
+  - 默认倾向 `single_html`；IF 核出「有行身份列 + 无同步链冲突」THEN 才改判 `bidirectional`
+    并**另起接入任务**（届时 `isPushedToAdjTable` 为 store-only 不入受管格、借贷平衡以合并后值
+    参与、容差口径不变；Q5 判据随之启用）
+  - 🔴 上游 spec 的诚实边界红线：可行性核阶段**不改任何生产代码**
+  - 受管区数**不变**（D2-4 不计入，除非改判后另起任务）
+  - _Requirements: 2.3, 2.4, 2.5_
 
 ### 阶段 3：D2-1 审定表（依赖前置 B/C）
 
-- [ ] 11. `phase5_d2_01_adjudication.py` 声明（`AdjudicationSheetSpec`）
+- [x] 11. `phase5_d2_01_adjudication.py` 声明（`AdjudicationSheetSpec`）
   - `sections=(1 个,)` + `row_mode='fixed_rows'`（4 行写死：individual / aging / customer-type /
     total，total 行 `rowType='summary'`）+ 逐格 mask（311 公式，几何取任务 1 实测）
   - 🔴 **不得**在引擎里加 `if is_d1` / `if is_d2` —— 会让 D1 spec 的框架层 AST 卡点打红
   - Q6 判据：4 行是固定行、无动态 identity 列需求；变异改 `dynamic_identity` ⇒ 必红
   - _Requirements: 3.1, 3.2, 3.3, 3.7_
 
-- [ ] 12. SUMIF 取数接四态覆盖状态机
+- [x] 12. SUMIF 取数接四态覆盖状态机
   - 复用 `shared/dynamicAdjudicationRows.resolveCellState` / `displayValueForCellState`，
     **不得**在 D2 侧另写一套
   - `isFromSumif: boolean` 归一到 `source`（`tb` = SUMIF 派生 / `manual` = 人工），布尔标记删除（Q9）
@@ -121,15 +144,20 @@ mask 形态。**受管 sheet 1→4 张、受管区 1→6 个**（D2-2 ①+ D2-3 
     纯函数判据全绿而生产坏掉（同步器把显示值当派生值写回 snap ⇒ 覆盖标记自我擦除）
   - _Requirements: 3.4, 3.5_
 
-- [ ] 13. D2-1 覆盖 UI（S2 标记 / S4 三值 / 恢复取数）
+- [~] 13. D2-1 覆盖 UI（S2 标记 / S4 三值 / 恢复取数）　**[代码层就绪，S2/S4 视觉待真实 SUMIF 数据 + OO 真栈]**
+  - ✅ 已完成：`isFromSumif` 归一到 `source`（Task 12 Q9）+ 四态 `resolveCellState`/`displayValueForCellState`
+    已可消费（shared/dynamicAdjudicationRows）+ 逐格 mask 6 金额格判 editable（Q7 转绿，8 判据全绿）
+  - 🟡 待环境：S2「已人工覆盖」标记 / S4 三值并呈 / 逐格「恢复取数」的完整视觉往返，依赖真实
+    项目 SUMIF 数据（D2-adj-* 真库 0 行）+ OO 真栈渲染，属真栈环节（同 Task 17）
   - S2「已人工覆盖」；S4 同时呈现覆盖值 / 原派生值 / 现派生值，**不自动二选一**；逐格「恢复取数」
   - 任务 4 的 Q7 SHALL 转绿（6 个金额字段判 `editable` 而非 `read_only_masked_cell`）
-  - binding 数增至 **6** + 整册 materialize + 耗时登记（受管 sheet 4 张 / 受管区 6 个）
+  - 受管区增至 **5** + 整册 materialize + 耗时登记（受管 sheet 3 张 / 受管区 5 个：
+    D2-2 ① + D2-3 ③ + D2-1 ①；**D2-4 未计**，它在阶段 2 走可行性核）
   - _Requirements: 3.6, 5.1_
 
 ### 阶段 4：死代码清理
 
-- [ ] 14. 删 `useD2VoucherCheck.ts`（310 行，grep 零消费方）
+- [x] 14. 删 `useD2VoucherCheck.ts`（310 行，grep 零消费方）
   - 删前 grep 实证零消费方（实测：仅自身定义 + `export default`，无任何 `.vue`/`.ts` import；
     前端实际挂载的是 `useD2VoucherCheckEnhanced`），删前删后测试全绿
   - 🔴 **只删代码不删数据**（裁决 E4）：旧套 `D2-voucher-params`（1 行 87B）/
@@ -138,7 +166,7 @@ mask 形态。**受管 sheet 1→4 张、受管区 1→6 个**（D2-2 ①+ D2-3 
   - Q10 判据：删后全仓零引用；变异保留一处 import ⇒ 必红
   - _Requirements: 4.1, 4.2, 4.5_
 
-- [ ] 15. 删 `useD2Adjudication:182-188` 死降级路径
+- [x] 15. 删 `useD2Adjudication:182-188` 死降级路径
   - 该路径逐行读 `D2-detail-{i}-{field}`，而 `useD2Detail` **只写** `D2-detail-rows`
     ⇒ 全仓零写入方、恒返 0
   - Q11 判据：删后 D2-2 主路径（读 JSON）逐值不变；变异删掉主路径 ⇒ 必红
@@ -146,7 +174,7 @@ mask 形态。**受管 sheet 1→4 张、受管区 1→6 个**（D2-2 ①+ D2-3 
 
 ### 阶段 5：前端接线与验收
 
-- [ ] 16. 前端三处字面量改 Ref + 受管 sheet 集合派生
+- [x] 16. 前端三处字面量改 Ref + 受管 sheet 集合派生
   - `isD2DetailSheet`（现 `currentSheet === 'D2-2'`）→ `isD2SyncedSheet`，集合**从 provider 受管
     清单派生**而非前端硬编码 4 个字面量
   - `syncSheetKey` 随 `currentSheet` 计算（`D2-2→d22-managed` / `D2-3→d23-managed` / …）
@@ -160,7 +188,12 @@ mask 形态。**受管 sheet 1→4 张、受管区 1→6 个**（D2-2 ①+ D2-3 
     并加反向断言「旧形态不得复活」
   - _Requirements: 6.3, 6.4, 6.5_
 
-- [ ] 17.* 变异检验 + 真栈 Playwright + 证据登记
+- [~] 17.* 变异检验 + 真栈 Playwright + 证据登记　**[变异 6/6 KILLED 已完成；真栈 Playwright 待 OO 环境 + sibling 编排内核]**
+  - ✅ 变异检验：`evidence/T17-mutation-check.json` 6/6 KILLED（M1 Q3 少列 / M2 Q4 单区 /
+    M3 Q4 UUID 串区 / M4 Q6 dynamic_identity / M5 Q7 逐格换整列致 6 金额格误判 / M6 Q7 反向确认）
+  - 🟡 待环境：真栈 Playwright（切在线编辑→OO canvas 逐值→改格→forcesave→回读）受 OO 服务 +
+    sibling 注入编排内核约束（D2 父模块无 `instrumentation_specs` 复数编排，D4 有 D2 无）。三条真栈
+    陷阱沿用 D4 结论。声明层+投影+merge+逐格 mask+判据离线全绿，真栈往返 e2e 待 sibling 内核引入
   - Q1~Q16 逐条变异并记录打红条数；未能打红的判据重写而非保留
   - 真栈：切「在线编辑」→ D2-3 / D2-4 / D2-1 的 OO canvas 逐值断言 → 改一格 → forcesave →
     回读结构化视图等值。`--workers=1`
@@ -211,8 +244,15 @@ mask 形态。**受管 sheet 1→4 张、受管区 1→6 个**（D2-2 ①+ D2-3 
 ### 已裁决（详见 design §关键裁决）
 
 - **E1**：只扩第一册，后两册（D2-5 / D2-6~D2-13）需新宿主，另立 `d2-analysis-and-inspection-sync-hosts`
-- **E2**：D2-3 是**单**受管区（行内 `category` 分类），不是 D1-4 式的三受管区
-- **E3**：D2-1 走 `AdjudicationSheetSpec`，以 `sections` + `row_mode` 参数表达与 D1-1 的差异
+- **E2（2026-09-26 实测最终裁决）**：D2-3 是**2 受管区**（对应模板 2 物理段：单项评估计提 /
+  信用风险组合计提），binding **1→3**。前端 3 个 store 键中 `aging` + `customer-type` 合并映射
+  到组合区（行内 `category` 分流）。⚠️ 本条历经两次反转：首版「单受管区」→ 复盘「三受管区」→
+  实施实测「两受管区」。根因：spec 三次都未 openpyxl 直读模板物理段数，仅从前端 store 键数推断。
+  教训见 `evidence/T03-d23-region-adjudication.md`：**受管区数必须实测模板物理段，不得从前端
+  store 键数反推**。
+- **E3**：D2-1 走审定表 per-sheet 模块（`phase5_d2_01_adjudication.py`，照 D4-1 逐格范式），
+  以 `row_mode='fixed_rows'` + `FIXED_ROWS_D21` 表达固定 4 行；实测发现 D1 的 `AdjudicationSheetSpec`
+  类未入库，用 D4-1 真实范式落地。
 - **E4**：删代码不删数据（旧套 store 键保留读兼容）
 - **E5**：非受管 sheet 保持禁用，不引入 legacy 假双向
 

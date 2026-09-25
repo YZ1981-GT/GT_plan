@@ -1,0 +1,52 @@
+{
+  "measured_at": "2026-09-26",
+  "spec": "d2-sync-coverage-via-row-table-engine",
+  "task": "9/10 — D2-4 单元格双向可行性核 + 裁决",
+  "decision": "single_html",
+  "verdict": "D2-4「应收账款调整分录汇总表」判为 single_html，不做 OO 单元格双向回写。与上游 spec d-cycle-sheet-bidirectional-expansion 对同型 D4-4 的裁决一致。",
+  "authority": {
+    "template_path": "backend/wp_templates/D/D2-1至D2-4  应收账款- 审定表明细表（Leap-常规程序）.xlsx",
+    "template_sha256": "31e7992ba1e83952620e1777d108b46f7e7817dcdc9484c07f079f1dd3af0afa",
+    "method": "openpyxl 直读真实 tab 名与几何（evidence/T01-d2-geometry-probe.json）",
+    "real_tab_name": "调整分录汇总表D2-4",
+    "geometry": "A1:J25；标题区 A1-A4；表头行 5（10 字段键列 A-J）；数据区 6-22（空模板带）；行23 使用提示",
+    "formula_count": 6,
+    "formula_note": "6 公式全是行3/4 的 =底稿目录!Ax 表头引用，数据区零业务公式",
+    "header_A_to_J": [
+      "调整事项说明",
+      "类别（报表调整/账项调整/其他）",
+      "报表项目",
+      "科目名称",
+      "附注项目",
+      "……",
+      "借方调整金额",
+      "贷方调整金额",
+      "索引",
+      "备注"
+    ]
+  },
+  "feasibility_gate_blocking_8": {
+    "requires": "有行身份列 + 无专用同步链冲突 两条同时成立才可扩 sheets[]",
+    "row_identity_column": "ABSENT",
+    "specialized_sync_chain_conflict": "PRESENT",
+    "verdict": "两条硬门均未通过 ⇒ 不得扩 sheets[]"
+  },
+  "why_single_html": [
+    "① 无行身份列（实测 T01）：openpyxl 全表扫 A-J 无 GTROW/_GT UUID 列，A 列是「调整事项说明」自由文本非稳定 key（K 列起为空可注入但模板本身无身份锚）。单元格双向回写按行 UUID 定位，缺锚即无法稳定回写。与 D4-4 同（identity_column=ABSENT）。",
+    "② 已有专用同步链，OO 回写会争同一 store：D2-entry-rows 由 useD2Adjustment 拥有（STORAGE_KEY='D2-entry-rows'，双列借贷 debitTotal/creditTotal + isBalanced 平衡校验），且 D2TabAdjustment.vue 接 useAdjustmentCentralSync（2 处引用）→ 后端 AdjustmentSyncService 中央登记。OO 单元格覆盖 D2-entry-rows 会绕过借贷平衡校验并可能破坏中央登记联动。",
+    "③ 借贷平衡不变式仅 HTML 侧强制：useD2Adjustment.ts:46 BALANCE_TOLERANCE=0.005，isBalanced(:143)=Math.abs(debit-credit)<0.005 仅 HTML 侧计算，Excel 模板不校验 debit===credit ⇒ OO 侧编辑可轻易产生不平衡分录。",
+    "④ D2-entry-rows 是 hub store：被借贷平衡校验 + 中央调整登记（useAdjustmentCentralSync）+ D2TabIndex 完整性检查（D2TabIndex.vue:162 hasJsonRows 判 applicable）共同占用。"
+  ],
+  "measured_evidence": {
+    "D2TabAdjustment_central_sync_refs": 2,
+    "useD2Adjustment_balance_tolerance": "0.005 (useD2Adjustment.ts:46)",
+    "useD2Adjustment_isBalanced_line": 143,
+    "D2_entry_rows_storage_key_line": "useD2Adjustment.ts:44",
+    "D2_entry_rows_consumers": ["useD2Adjustment.ts", "D2TabAdjustment.vue:70", "D2TabIndex.vue:162"]
+  },
+  "expansion_spec_red_line": "上游 spec d-cycle-sheet-bidirectional-expansion 诚实边界：调整分录汇总属已有专用同步链的 hub 表，同 D4-4 归 single_html 侧（不是网格明细）。可行性核阶段不改任何生产代码。",
+  "same_type_as": "D4-4（营业收入调整分录汇总，已判 single_html，见 d-cycle-sheet-bidirectional-expansion/evidence/T08-d44-single-html-adjudication.json）",
+  "if_reversed": "IF 将来核出「有行身份列 + 无同步链冲突」THEN 才可改判 bidirectional 并另起接入任务；届时 isPushedToAdjTable 为 store-only 不入受管格（先例 D5 postRealized/eclStage），借贷平衡以合并后值参与、容差口径不变。",
+  "binding_count_unchanged": "D2-4 不计入受管区（受管区仍为 3：D2-2 ① + D2-3 ②）。",
+  "no_code_changed": true
+}

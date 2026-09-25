@@ -158,7 +158,7 @@ function mapGrossRows(): SectionRow[] {
     currentAudited: r.currentAudited,
     change: r.change,
     changeRate: r.changeRate,
-    isFromCrossSheet: r.isFromSumif,
+    isFromCrossSheet: r.source === 'tb',
     isEditable: r.isEditable,
   }))
 }
@@ -408,7 +408,7 @@ function getCellClass(row: SectionRow | AdjudicationRow, field: string): string 
   if ('isFromCrossSheet' in row && row.isFromCrossSheet && field === 'currentAudited') {
     classes.push('sumif-cell')
   }
-  if ('isFromSumif' in row && row.isFromSumif && field === 'currentAudited') {
+  if ('source' in row && row.source === 'tb' && field === 'currentAudited') {
     classes.push('sumif-cell')
   }
   if (field === 'changeRate' && isChangeRateWarning(row.changeRate as number | '')) {

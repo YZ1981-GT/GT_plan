@@ -677,6 +677,511 @@
           "table_key": "receivable_detail_rows"
         }
       ]
+    },
+    {
+      "excel_name": "坏账准备明细表D2-3",
+      "locator": {
+        "anchor": "excel_table_sheet_association"
+      },
+      "sheet_key": "d23-managed",
+      "tables": [
+        {
+          "anchor": "A10",
+          "delete_policy": "tombstone",
+          "fields": [
+            {
+              "cell": {
+                "column": "A",
+                "row_from": "row_identity"
+              },
+              "column_key": "label",
+              "header_source_ref": "源xlsx!坏账准备明细表D2-3!A11",
+              "header_text": "项目",
+              "json_pointer": "/rows/{row_uuid}/label",
+              "mode": "editable",
+              "source_ref": "源xlsx!坏账准备明细表D2-3!A13",
+              "stable_field_key": "bad_debt_individual_rows/{row_uuid}/label",
+              "store_item_id": "D2-bd-individual-rows",
+              "store_key": "label",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "B",
+                "row_from": "row_identity"
+              },
+              "column_key": "prior_unadjusted",
+              "header_source_ref": "源xlsx!坏账准备明细表D2-3!B11",
+              "header_text": "期初未审数",
+              "json_pointer": "/rows/{row_uuid}/priorUnadjusted",
+              "mode": "editable",
+              "source_ref": "源xlsx!坏账准备明细表D2-3!B13",
+              "stable_field_key": "bad_debt_individual_rows/{row_uuid}/prior_unadjusted",
+              "store_item_id": "D2-bd-individual-rows",
+              "store_key": "priorUnadjusted",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "C",
+                "row_from": "row_identity"
+              },
+              "column_key": "prior_aje",
+              "header_source_ref": "源xlsx!坏账准备明细表D2-3!C11",
+              "header_text": "期初账项调整",
+              "json_pointer": "/rows/{row_uuid}/priorAje",
+              "mode": "editable",
+              "source_ref": "源xlsx!坏账准备明细表D2-3!C13",
+              "stable_field_key": "bad_debt_individual_rows/{row_uuid}/prior_aje",
+              "store_item_id": "D2-bd-individual-rows",
+              "store_key": "priorAje",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "D",
+                "row_from": "row_identity"
+              },
+              "column_key": "prior_rje",
+              "header_source_ref": "源xlsx!坏账准备明细表D2-3!D11",
+              "header_text": "重分类调整",
+              "json_pointer": "/rows/{row_uuid}/priorRje",
+              "mode": "editable",
+              "source_ref": "源xlsx!坏账准备明细表D2-3!D13",
+              "stable_field_key": "bad_debt_individual_rows/{row_uuid}/prior_rje",
+              "store_item_id": "D2-bd-individual-rows",
+              "store_key": "priorRje",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "E",
+                "row_from": "row_identity"
+              },
+              "column_key": "prior_audited",
+              "header_source_ref": "源xlsx!坏账准备明细表D2-3!E11",
+              "header_text": "期初审定数",
+              "json_pointer": "/rows/{row_uuid}/priorAudited",
+              "mode": "formula",
+              "source_ref": "源xlsx!坏账准备明细表D2-3!E13",
+              "stable_field_key": "bad_debt_individual_rows/{row_uuid}/prior_audited",
+              "store_item_id": "D2-bd-individual-rows",
+              "store_key": "priorAudited",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "F",
+                "row_from": "row_identity"
+              },
+              "column_key": "current_provision",
+              "header_source_ref": "源xlsx!坏账准备明细表D2-3!F11",
+              "header_text": "计提",
+              "json_pointer": "/rows/{row_uuid}/currentProvision",
+              "mode": "editable",
+              "source_ref": "源xlsx!坏账准备明细表D2-3!F13",
+              "stable_field_key": "bad_debt_individual_rows/{row_uuid}/current_provision",
+              "store_item_id": "D2-bd-individual-rows",
+              "store_key": "currentProvision",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "G",
+                "row_from": "row_identity"
+              },
+              "column_key": "current_other_increase",
+              "header_source_ref": "源xlsx!坏账准备明细表D2-3!G11",
+              "header_text": "其他增加",
+              "json_pointer": "/rows/{row_uuid}/currentOtherIncrease",
+              "mode": "editable",
+              "source_ref": "源xlsx!坏账准备明细表D2-3!G13",
+              "stable_field_key": "bad_debt_individual_rows/{row_uuid}/current_other_increase",
+              "store_item_id": "D2-bd-individual-rows",
+              "store_key": "currentOtherIncrease",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "H",
+                "row_from": "row_identity"
+              },
+              "column_key": "current_reversal",
+              "header_source_ref": "源xlsx!坏账准备明细表D2-3!H11",
+              "header_text": "转回",
+              "json_pointer": "/rows/{row_uuid}/currentReversal",
+              "mode": "editable",
+              "source_ref": "源xlsx!坏账准备明细表D2-3!H13",
+              "stable_field_key": "bad_debt_individual_rows/{row_uuid}/current_reversal",
+              "store_item_id": "D2-bd-individual-rows",
+              "store_key": "currentReversal",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "I",
+                "row_from": "row_identity"
+              },
+              "column_key": "current_write_off",
+              "header_source_ref": "源xlsx!坏账准备明细表D2-3!I11",
+              "header_text": "核销",
+              "json_pointer": "/rows/{row_uuid}/currentWriteOff",
+              "mode": "editable",
+              "source_ref": "源xlsx!坏账准备明细表D2-3!I13",
+              "stable_field_key": "bad_debt_individual_rows/{row_uuid}/current_write_off",
+              "store_item_id": "D2-bd-individual-rows",
+              "store_key": "currentWriteOff",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "J",
+                "row_from": "row_identity"
+              },
+              "column_key": "current_other_decrease",
+              "header_source_ref": "源xlsx!坏账准备明细表D2-3!J11",
+              "header_text": "其他减少",
+              "json_pointer": "/rows/{row_uuid}/currentOtherDecrease",
+              "mode": "editable",
+              "source_ref": "源xlsx!坏账准备明细表D2-3!J13",
+              "stable_field_key": "bad_debt_individual_rows/{row_uuid}/current_other_decrease",
+              "store_item_id": "D2-bd-individual-rows",
+              "store_key": "currentOtherDecrease",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "K",
+                "row_from": "row_identity"
+              },
+              "column_key": "current_unadjusted",
+              "header_source_ref": "源xlsx!坏账准备明细表D2-3!K11",
+              "header_text": "期末未审数",
+              "json_pointer": "/rows/{row_uuid}/currentUnadjusted",
+              "mode": "formula",
+              "source_ref": "源xlsx!坏账准备明细表D2-3!K13",
+              "stable_field_key": "bad_debt_individual_rows/{row_uuid}/current_unadjusted",
+              "store_item_id": "D2-bd-individual-rows",
+              "store_key": "currentUnadjusted",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "L",
+                "row_from": "row_identity"
+              },
+              "column_key": "current_aje",
+              "header_source_ref": "源xlsx!坏账准备明细表D2-3!L11",
+              "header_text": "期末账项调整",
+              "json_pointer": "/rows/{row_uuid}/currentAje",
+              "mode": "editable",
+              "source_ref": "源xlsx!坏账准备明细表D2-3!L13",
+              "stable_field_key": "bad_debt_individual_rows/{row_uuid}/current_aje",
+              "store_item_id": "D2-bd-individual-rows",
+              "store_key": "currentAje",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "M",
+                "row_from": "row_identity"
+              },
+              "column_key": "current_rje",
+              "header_source_ref": "源xlsx!坏账准备明细表D2-3!M11",
+              "header_text": "重分类调整",
+              "json_pointer": "/rows/{row_uuid}/currentRje",
+              "mode": "editable",
+              "source_ref": "源xlsx!坏账准备明细表D2-3!M13",
+              "stable_field_key": "bad_debt_individual_rows/{row_uuid}/current_rje",
+              "store_item_id": "D2-bd-individual-rows",
+              "store_key": "currentRje",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "N",
+                "row_from": "row_identity"
+              },
+              "column_key": "current_audited",
+              "header_source_ref": "源xlsx!坏账准备明细表D2-3!N11",
+              "header_text": "期末审定数",
+              "json_pointer": "/rows/{row_uuid}/currentAudited",
+              "mode": "formula",
+              "source_ref": "源xlsx!坏账准备明细表D2-3!N13",
+              "stable_field_key": "bad_debt_individual_rows/{row_uuid}/current_audited",
+              "store_item_id": "D2-bd-individual-rows",
+              "store_key": "currentAudited",
+              "value_type": "amount"
+            }
+          ],
+          "footer_anchor": {
+            "carries_total_formula": true,
+            "marker": "合计",
+            "note": "小计行 R12（=SUM 派生），数据区 13..16，隐藏 UUID 列 O。E/K/N 三列 + 小计行入 formula_mask，普通值投影不覆盖。",
+            "search_column": "A"
+          },
+          "formula_mask": [
+            "E12:E16",
+            "K12:K16",
+            "N12:N16"
+          ],
+          "header_rows": 2,
+          "row_identity": {
+            "json_pointer": "/rows/*/rowId",
+            "kind": "field"
+          },
+          "table_key": "bad_debt_individual_rows",
+          "uuid_col": "O"
+        },
+        {
+          "anchor": "A10",
+          "delete_policy": "tombstone",
+          "fields": [
+            {
+              "cell": {
+                "column": "A",
+                "row_from": "row_identity"
+              },
+              "column_key": "label",
+              "header_source_ref": "源xlsx!坏账准备明细表D2-3!A11",
+              "header_text": "项目",
+              "json_pointer": "/rows/{row_uuid}/label",
+              "mode": "editable",
+              "source_ref": "源xlsx!坏账准备明细表D2-3!A18",
+              "stable_field_key": "bad_debt_combined_rows/{row_uuid}/label",
+              "store_item_id": "D2-bd-aging-rows",
+              "store_key": "label",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "B",
+                "row_from": "row_identity"
+              },
+              "column_key": "prior_unadjusted",
+              "header_source_ref": "源xlsx!坏账准备明细表D2-3!B11",
+              "header_text": "期初未审数",
+              "json_pointer": "/rows/{row_uuid}/priorUnadjusted",
+              "mode": "editable",
+              "source_ref": "源xlsx!坏账准备明细表D2-3!B18",
+              "stable_field_key": "bad_debt_combined_rows/{row_uuid}/prior_unadjusted",
+              "store_item_id": "D2-bd-aging-rows",
+              "store_key": "priorUnadjusted",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "C",
+                "row_from": "row_identity"
+              },
+              "column_key": "prior_aje",
+              "header_source_ref": "源xlsx!坏账准备明细表D2-3!C11",
+              "header_text": "期初账项调整",
+              "json_pointer": "/rows/{row_uuid}/priorAje",
+              "mode": "editable",
+              "source_ref": "源xlsx!坏账准备明细表D2-3!C18",
+              "stable_field_key": "bad_debt_combined_rows/{row_uuid}/prior_aje",
+              "store_item_id": "D2-bd-aging-rows",
+              "store_key": "priorAje",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "D",
+                "row_from": "row_identity"
+              },
+              "column_key": "prior_rje",
+              "header_source_ref": "源xlsx!坏账准备明细表D2-3!D11",
+              "header_text": "重分类调整",
+              "json_pointer": "/rows/{row_uuid}/priorRje",
+              "mode": "editable",
+              "source_ref": "源xlsx!坏账准备明细表D2-3!D18",
+              "stable_field_key": "bad_debt_combined_rows/{row_uuid}/prior_rje",
+              "store_item_id": "D2-bd-aging-rows",
+              "store_key": "priorRje",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "E",
+                "row_from": "row_identity"
+              },
+              "column_key": "prior_audited",
+              "header_source_ref": "源xlsx!坏账准备明细表D2-3!E11",
+              "header_text": "期初审定数",
+              "json_pointer": "/rows/{row_uuid}/priorAudited",
+              "mode": "formula",
+              "source_ref": "源xlsx!坏账准备明细表D2-3!E18",
+              "stable_field_key": "bad_debt_combined_rows/{row_uuid}/prior_audited",
+              "store_item_id": "D2-bd-aging-rows",
+              "store_key": "priorAudited",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "F",
+                "row_from": "row_identity"
+              },
+              "column_key": "current_provision",
+              "header_source_ref": "源xlsx!坏账准备明细表D2-3!F11",
+              "header_text": "计提",
+              "json_pointer": "/rows/{row_uuid}/currentProvision",
+              "mode": "editable",
+              "source_ref": "源xlsx!坏账准备明细表D2-3!F18",
+              "stable_field_key": "bad_debt_combined_rows/{row_uuid}/current_provision",
+              "store_item_id": "D2-bd-aging-rows",
+              "store_key": "currentProvision",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "G",
+                "row_from": "row_identity"
+              },
+              "column_key": "current_other_increase",
+              "header_source_ref": "源xlsx!坏账准备明细表D2-3!G11",
+              "header_text": "其他增加",
+              "json_pointer": "/rows/{row_uuid}/currentOtherIncrease",
+              "mode": "editable",
+              "source_ref": "源xlsx!坏账准备明细表D2-3!G18",
+              "stable_field_key": "bad_debt_combined_rows/{row_uuid}/current_other_increase",
+              "store_item_id": "D2-bd-aging-rows",
+              "store_key": "currentOtherIncrease",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "H",
+                "row_from": "row_identity"
+              },
+              "column_key": "current_reversal",
+              "header_source_ref": "源xlsx!坏账准备明细表D2-3!H11",
+              "header_text": "转回",
+              "json_pointer": "/rows/{row_uuid}/currentReversal",
+              "mode": "editable",
+              "source_ref": "源xlsx!坏账准备明细表D2-3!H18",
+              "stable_field_key": "bad_debt_combined_rows/{row_uuid}/current_reversal",
+              "store_item_id": "D2-bd-aging-rows",
+              "store_key": "currentReversal",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "I",
+                "row_from": "row_identity"
+              },
+              "column_key": "current_write_off",
+              "header_source_ref": "源xlsx!坏账准备明细表D2-3!I11",
+              "header_text": "核销",
+              "json_pointer": "/rows/{row_uuid}/currentWriteOff",
+              "mode": "editable",
+              "source_ref": "源xlsx!坏账准备明细表D2-3!I18",
+              "stable_field_key": "bad_debt_combined_rows/{row_uuid}/current_write_off",
+              "store_item_id": "D2-bd-aging-rows",
+              "store_key": "currentWriteOff",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "J",
+                "row_from": "row_identity"
+              },
+              "column_key": "current_other_decrease",
+              "header_source_ref": "源xlsx!坏账准备明细表D2-3!J11",
+              "header_text": "其他减少",
+              "json_pointer": "/rows/{row_uuid}/currentOtherDecrease",
+              "mode": "editable",
+              "source_ref": "源xlsx!坏账准备明细表D2-3!J18",
+              "stable_field_key": "bad_debt_combined_rows/{row_uuid}/current_other_decrease",
+              "store_item_id": "D2-bd-aging-rows",
+              "store_key": "currentOtherDecrease",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "K",
+                "row_from": "row_identity"
+              },
+              "column_key": "current_unadjusted",
+              "header_source_ref": "源xlsx!坏账准备明细表D2-3!K11",
+              "header_text": "期末未审数",
+              "json_pointer": "/rows/{row_uuid}/currentUnadjusted",
+              "mode": "formula",
+              "source_ref": "源xlsx!坏账准备明细表D2-3!K18",
+              "stable_field_key": "bad_debt_combined_rows/{row_uuid}/current_unadjusted",
+              "store_item_id": "D2-bd-aging-rows",
+              "store_key": "currentUnadjusted",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "L",
+                "row_from": "row_identity"
+              },
+              "column_key": "current_aje",
+              "header_source_ref": "源xlsx!坏账准备明细表D2-3!L11",
+              "header_text": "期末账项调整",
+              "json_pointer": "/rows/{row_uuid}/currentAje",
+              "mode": "editable",
+              "source_ref": "源xlsx!坏账准备明细表D2-3!L18",
+              "stable_field_key": "bad_debt_combined_rows/{row_uuid}/current_aje",
+              "store_item_id": "D2-bd-aging-rows",
+              "store_key": "currentAje",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "M",
+                "row_from": "row_identity"
+              },
+              "column_key": "current_rje",
+              "header_source_ref": "源xlsx!坏账准备明细表D2-3!M11",
+              "header_text": "重分类调整",
+              "json_pointer": "/rows/{row_uuid}/currentRje",
+              "mode": "editable",
+              "source_ref": "源xlsx!坏账准备明细表D2-3!M18",
+              "stable_field_key": "bad_debt_combined_rows/{row_uuid}/current_rje",
+              "store_item_id": "D2-bd-aging-rows",
+              "store_key": "currentRje",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "N",
+                "row_from": "row_identity"
+              },
+              "column_key": "current_audited",
+              "header_source_ref": "源xlsx!坏账准备明细表D2-3!N11",
+              "header_text": "期末审定数",
+              "json_pointer": "/rows/{row_uuid}/currentAudited",
+              "mode": "formula",
+              "source_ref": "源xlsx!坏账准备明细表D2-3!N18",
+              "stable_field_key": "bad_debt_combined_rows/{row_uuid}/current_audited",
+              "store_item_id": "D2-bd-aging-rows",
+              "store_key": "currentAudited",
+              "value_type": "amount"
+            }
+          ],
+          "footer_anchor": {
+            "carries_total_formula": true,
+            "marker": "合计",
+            "note": "小计行 R17（=SUM 派生），数据区 18..21，隐藏 UUID 列 P。E/K/N 三列 + 小计行入 formula_mask，普通值投影不覆盖。",
+            "search_column": "A"
+          },
+          "formula_mask": [
+            "E17:E21",
+            "K17:K21",
+            "N17:N21"
+          ],
+          "header_rows": 2,
+          "row_identity": {
+            "json_pointer": "/rows/*/rowId",
+            "kind": "field"
+          },
+          "table_key": "bad_debt_combined_rows",
+          "uuid_col": "P"
+        }
+      ]
     }
   ],
   "template": {

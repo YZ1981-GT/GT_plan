@@ -1,0 +1,44 @@
+{
+  "task": "T17 mutation check (offline)",
+  "killed": 6,
+  "total": 6,
+  "mutations": [
+    {
+      "mutation": "M1",
+      "desc": "Q3 formula_columns 少一列 N",
+      "killed": true,
+      "detail": "mask=['E12:E16', 'K12:K16']"
+    },
+    {
+      "mutation": "M2",
+      "desc": "Q4 D2-3 声明单受管区",
+      "killed": true,
+      "detail": "real=2 mutated=1"
+    },
+    {
+      "mutation": "M3",
+      "desc": "Q4 两区 UUID 列相同",
+      "killed": true,
+      "detail": "assert 抛"
+    },
+    {
+      "mutation": "M4",
+      "desc": "Q6 D2-1 改 dynamic_identity",
+      "killed": true,
+      "detail": "requires_dynamic=True"
+    },
+    {
+      "mutation": "M5",
+      "desc": "Q7 逐格 mask 换整列(column_in_ranges 错法)",
+      "killed": true,
+      "detail": "misjudged=['B10', 'C10', 'D10', 'B11', 'C11', 'D11']"
+    },
+    {
+      "mutation": "M6",
+      "desc": "Q7 正确逐格 mask 下 6 金额格 editable(反向确认)",
+      "killed": true,
+      "detail": "misjudged=[]"
+    }
+  ],
+  "realstack_note": "真栈 Playwright（切在线编辑→OO canvas 逐值→改格→forcesave→回读）受 OO 服务 + sibling 注入编排内核约束（D2 父模块无 instrumentation_specs 复数编排，D4 有 D2 无）。三条真栈陷阱沿用 D4 结论：不用 page.on('response')判 callback / 不用 asc_* API 写格 / 模式切换条选择器须实测。D2-3/D2-1 声明层+投影+merge+逐格mask+判据离线全绿，真栈往返 e2e 待 sibling 编排内核引入 D2 父模块（照 D4-1/D4-9 落地路径）。"
+}
