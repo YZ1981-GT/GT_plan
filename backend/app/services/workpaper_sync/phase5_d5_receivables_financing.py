@@ -147,20 +147,53 @@ MANAGED_FIELD_SPECS: Final[tuple[tuple[str, str, str, str, str, str, str], ...]]
 )
 
 
-def _col_index(letters: str) -> int:
-    idx = 0
-    for ch in letters:
-        idx = idx * 26 + (ord(ch) - 64)
-    return idx
+#: 🔴 Task 17 声明化：D5 原自带的 `_col_index` 函数体已删（Task 5 当时未覆盖 D5，本次一并
+#: 收敛）。它唯一的调用方是本文件已删除的 `_aging_field_specs` 等引擎函数，收敛后本文件
+#: 不再需要该别名（D5 无账龄组，`managed_field_specs()` 内部用框架层 `col_index`）。
 
+# ═══════════════════════════════════════════════════════════════════════════
+# Task 17 声明化（spec: d1-sync-row-table-engine-and-d1-coverage）：SPEC_D52 是本 entry
+# 唯一权威声明。🔴 D5 原本就是内联 7 元组的来源家（design 裁决 3 的零改动对照）+ 无账龄组
+# （引擎「无分组」路径基准样本，`aging_layout=None`）—— 若它的 digest 变了说明引擎理解错了。
+# ═══════════════════════════════════════════════════════════════════════════
+
+from app.services.workpaper_sync.phase5_row_table_sheet import (  # noqa: E402
+    RowTableSheetSpec,
+    StoreKind,
+)
+from app.services.workpaper_sync.phase5_row_table_sheet import (  # noqa: E402
+    managed_field_specs as _engine_managed_field_specs,
+)
+
+SPEC_D52: Final[RowTableSheetSpec] = RowTableSheetSpec(
+    managed_sheet=MANAGED_SHEET,
+    sheet_key=SHEET_KEY,
+    table_key=ROWS_TABLE_KEY,
+    template_id=TEMPLATE_ID,
+    table_name=TABLE_NAME,
+    uuid_col=UUID_COL,
+    first_data_row=FIRST_DATA_ROW,
+    last_data_row=LAST_DATA_ROW,
+    footer_row=FOOTER_ROW,
+    header_group_row=HEADER_GROUP_ROW,
+    header_leaf_row=HEADER_LEAF_ROW,
+    store_item_id=STORE_ITEM_ID,
+    empty_payload=EMPTY_STORE_PAYLOAD,
+    row_identity_key=ROW_IDENTITY_STORE_KEY,
+    store_kind=StoreKind.rows,
+    field_specs=MANAGED_FIELD_SPECS,  # 已是 7 元组，零改动对照，直接引用
+    formula_columns=("F", "J", "L", "O"),
+    aging_layout=None,  # D5 无账龄组：引擎「无分组」路径基准样本
+    footer_marker=FOOTER_MARKER,
+    error_label="D5-2 明细表",
+    #: 🔴 D5 首列 `category` 是枚举（非空字符串占位符合法但语义上不是"名称"），幽灵行防护
+    #: 改用第 1 位 `item_name`（原实现即 `MANAGED_FIELD_SPECS[1]`，与 D6 同款例外）。
+    ghost_row_anchor_index=1,
+)
 
 #: 四个公式列的只读区域（F/J/L/O）。
-FORMULA_MASK: Final[tuple[str, ...]] = (
-    f"F{FIRST_DATA_ROW}:F{LAST_DATA_ROW}",
-    f"J{FIRST_DATA_ROW}:J{LAST_DATA_ROW}",
-    f"L{FIRST_DATA_ROW}:L{LAST_DATA_ROW}",
-    f"O{FIRST_DATA_ROW}:O{LAST_DATA_ROW}",
-)
+#: 🔴 本值现由框架层 `SPEC_D52.formula_mask` property 现算，provider 不再手写字面量。
+FORMULA_MASK: Final[tuple[str, ...]] = SPEC_D52.formula_mask
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -324,7 +357,12 @@ def _src(cell: str) -> str:
 
 
 def stable_key_for(column_key: str, row_identity: str = "{row_uuid}") -> str:
-    return f"{ROWS_TABLE_KEY}/{row_identity}/{column_key}"
+    """薄转发框架层同名函数（Task 17 声明化，逐字节等价）。"""
+    from app.services.workpaper_sync.phase5_row_table_sheet import (
+        stable_key_for as _engine_stable_key_for,
+    )
+
+    return _engine_stable_key_for(SPEC_D52, column_key, row_identity)
 
 
 def _rows_table_payload() -> dict[str, Any]:
@@ -456,61 +494,9 @@ def assert_contract_file_matches_source() -> SyncContract:
 # ═══════════════════════════════════════════════════════════════════════════
 
 
-def store_row_identity(row: Mapping[str, Any], *, ordinal: int) -> str:
-    raw = row.get(ROW_IDENTITY_STORE_KEY)
-    if not isinstance(raw, str) or not raw.strip():
-        raise StorePayloadError(
-            f"{STORE_ITEM_ID} 第 {ordinal} 行缺少稳定行身份 {ROW_IDENTITY_STORE_KEY!r}"
-            f"（实得 {raw!r}）—— 不得退回数组下标作身份（Requirement 6.5 / Property 23）"
-        )
-    return raw.strip()
-
-
-def iter_store_rows(
-    payload: str | bytes | Sequence[Any],
-) -> Iterator[tuple[str, Mapping[str, Any]]]:
-    if isinstance(payload, (str, bytes, bytearray)):
-        text = payload.decode("utf-8") if isinstance(payload, (bytes, bytearray)) else payload
-        try:
-            rows: Any = json.loads(text)
-        except ValueError as exc:
-            raise StorePayloadError(f"{STORE_ITEM_ID} 的 remark 不是合法 JSON: {exc}") from exc
-    else:
-        rows = payload
-    if not isinstance(rows, list):
-        raise StorePayloadError(
-            f"{STORE_ITEM_ID} 的载荷必须是行对象数组，实得 {type(rows).__name__} —— 必须 fail closed"
-        )
-    seen: set[str] = set()
-    for ordinal, row in enumerate(rows):
-        if not isinstance(row, Mapping):
-            raise StorePayloadError(
-                f"{STORE_ITEM_ID} 第 {ordinal} 项不是对象，实得 {type(row).__name__}"
-            )
-        identity = store_row_identity(row, ordinal=ordinal)
-        if identity in seen:
-            raise StorePayloadError(
-                f"{STORE_ITEM_ID} 出现重复行身份 {identity!r}（第 {ordinal} 项）—— 不得静默合并"
-            )
-        seen.add(identity)
-        yield identity, row
-
-
-def _resolve_json_path(row: Mapping[str, Any], json_path: str) -> Any:
-    cursor: Any = row
-    for segment in json_path.split("/"):
-        if not isinstance(cursor, Mapping):
-            return None
-        cursor = cursor.get(segment)
-    return cursor
-
-
-def split_store_row(
-    row: Mapping[str, Any], *, row_identity: str, contract: SyncContract
-) -> Iterator[tuple[str, Any, FieldSpec]]:
-    for column_key, _column, _mode, _vt, json_path, _leaf, _grp in MANAGED_FIELD_SPECS:
-        spec = contract.field_by_stable_key(stable_key_for(column_key))
-        yield stable_key_for(column_key, row_identity), _resolve_json_path(row, json_path), spec
+#: 🔴 Task 17 声明化：`store_row_identity` / `iter_store_rows` / `_resolve_json_path` /
+#: `split_store_row` 四个内部 helper 已收敛进框架层 `phase5_row_table_sheet`。
+#: `build_store_projection` 保留同名薄转发。
 
 
 def build_store_projection(
@@ -519,51 +505,12 @@ def build_store_projection(
     contract: SyncContract,
     limits: Any | None = None,
 ) -> Any:
-    from app.services.workpaper_sync.adapters.base import FieldValue, Projection
-    from app.services.workpaper_sync.excel_extract import StreamingProjectionBudget
-    from app.services.workpaper_sync.limits import load_limits
-
-    lim = limits or load_limits()
-    budget = StreamingProjectionBudget(lim)
-    values: dict[str, FieldValue] = {}
-    row_keys: list[str] = []
-    for identity, row in iter_store_rows(payload):
-        budget.add_row(ROWS_TABLE_KEY)
-        row_keys.append(identity)
-        for stable_key, value, spec in split_store_row(
-            row, row_identity=identity, contract=contract
-        ):
-            budget.add_field()
-            values[stable_key] = FieldValue(
-                stable_key=stable_key,
-                value=value,
-                value_type=spec.value_type,
-                mode=spec.mode,
-                row_key=identity,
-            )
-    return Projection(
-        contract_id=contract.contract_id,
-        semantic_version=contract.semantic_version,
-        document_type=contract.document_type,
-        values=values,
-        row_keys={ROWS_TABLE_KEY: tuple(row_keys)},
+    """薄转发框架层 `build_store_projection(SPEC_D52, ...)`（逐字节等价）。"""
+    from app.services.workpaper_sync.phase5_row_table_sheet import (
+        build_store_projection as _engine_build_store_projection,
     )
 
-
-def _set_json_path(row: dict[str, Any], json_path: str, value: Any) -> bool:
-    parts = json_path.split("/")
-    cursor: dict[str, Any] = row
-    for seg in parts[:-1]:
-        nxt = cursor.get(seg)
-        if not isinstance(nxt, dict):
-            nxt = {}
-            cursor[seg] = nxt
-        cursor = nxt
-    leaf = parts[-1]
-    if cursor.get(leaf) != value:
-        cursor[leaf] = value
-        return True
-    return False
+    return _engine_build_store_projection(SPEC_D52, payload, contract=contract, limits=limits)
 
 
 def merge_projection_into_store_rows(
@@ -571,66 +518,18 @@ def merge_projection_into_store_rows(
     projection: Any,
     base_rows: list[Mapping[str, Any]],
 ) -> tuple[list[dict[str, Any]], int, int, set[str]]:
-    """把已 extract 的 projection 合进 D5-2-rows HTML store 行（不读盘）。
+    """薄转发框架层 `merge_projection_into_store_rows(SPEC_D52, ...)`（逐字节等价）。
 
-    🔴 幽灵行防护（D4-2 同源缺陷，2026-09-22 用户实测）：Excel Table 边界被扩展时，
-    若新行只有一个杂散的 editable 格非空（公式列已由 is_protected 挡掉），这一个
-    字段就会让 identity 通过 shell 创建关卡，而 item_name（该行的业务名称）因从未
-    在 Excel 里写入内容、根本不产出 FieldValue，永久停在空值。只对**本次新增**的
-    identity 加这道门：已存在的行永不受影响（清空是合法编辑）。
-
-    🔴 名称字段取 ``MANAGED_FIELD_SPECS[1]``（``item_name``），不是 ``[0]``
-    （``category``）—— D5 首列是枚举类别，不是自由文本名称，用它做门槛判不准
-    「用户到底填了没」。
+    🔴 幽灵行防护锚点取 `SPEC_D52.ghost_row_anchor_index=1`（`item_name`，不是 `[0]` 的
+    `category`）—— D5 首列是枚举类别不是自由文本名称，用它做门槛判不准"用户到底填了没"；
+    这条差异化已通过框架层 `ghost_row_anchor_index` 参数表达（与 D6 同款例外）。
+    `_set_json_path` 已收敛进框架层 `set_json_path`。
     """
-    field_to_path = {spec[0]: spec[4] for spec in MANAGED_FIELD_SPECS}
-    name_json_path = MANAGED_FIELD_SPECS[1][4]
-    by_id: dict[str, dict[str, Any]] = {}
-    order: list[str] = []
-    for row in base_rows:
-        rid = str(row.get(ROW_IDENTITY_STORE_KEY) or "").strip()
-        if not rid:
-            continue
-        by_id[rid] = dict(row)
-        order.append(rid)
+    from app.services.workpaper_sync.phase5_row_table_sheet import (
+        merge_projection_into_store_rows as _engine_merge,
+    )
 
-    pre_existing_ids = set(by_id)
-    applied = 0
-    visited = 0
-    touched_rows: set[str] = set()
-    for key in projection.stable_keys():
-        fv = projection.get(key)
-        if fv is None or getattr(fv, "is_protected", False):
-            continue
-        rid = getattr(fv, "row_key", None)
-        if not rid:
-            continue
-        target = by_id.get(str(rid))
-        if target is None:
-            target = {ROW_IDENTITY_STORE_KEY: str(rid)}
-            by_id[str(rid)] = target
-            order.append(str(rid))
-        field_id = str(key).rsplit("/", 1)[-1]
-        json_path = field_to_path.get(field_id)
-        if not json_path:
-            continue
-        visited += 1
-        new_val = getattr(fv, "value", None)
-        if _set_json_path(target, json_path, new_val):
-            applied += 1
-            touched_rows.add(str(rid))
-
-    ghost_ids = {
-        rid
-        for rid in order
-        if rid not in pre_existing_ids
-        and not str(_resolve_json_path(by_id[rid], name_json_path) or "").strip()
-    }
-    if ghost_ids:
-        order = [rid for rid in order if rid not in ghost_ids]
-        touched_rows -= ghost_ids
-
-    return [by_id[rid] for rid in order], applied, visited, touched_rows
+    return _engine_merge(SPEC_D52, projection=projection, base_rows=base_rows)
 
 
 # ═══════════════════════════════════════════════════════════════════════════

@@ -213,7 +213,17 @@ D1-10 三项共 **28 个标量**的形态待实测（`static_region` vs HTML-onl
   - D3/D7 nested、D6 flat —— 这三家同批是为了让 P4 的两分支在同一 commit 内对照
   - _Requirements: 2.1, 2.2, 4.2_
 
-- [ ] 17. D5 声明化（7 元组的来源家，group_header 内联口径的基准）
+- [ ]* 17. D5 声明化（7 元组的来源家，group_header 内联口径的基准）（**引擎函数层已完成，
+  ≤150 行上限未达成**）✅ 2026-09-26：新增 `SPEC_D52` 唯一权威声明（`field_specs` 直接引用
+  原 `MANAGED_FIELD_SPECS`，无账龄 `aging_layout=None`）；删 6 个引擎函数改薄转发；补齐
+  D5 原自带的 `_col_index`（Task 5 当时未覆盖 D5，本次一并收敛，死别名已清理）。
+  **零改动对照验证通过**：`managed_field_specs(SPEC_D52) == MANAGED_FIELD_SPECS` 逐字节相等
+  （design 明文"若它的 digest 变了说明引擎理解错了"）。golden digest 零回归（26 个）+ 既存
+  `test_ghost_row_defense.py` 2 用例零回归 + 新增 3 条判据 + 变异反证（少一列 formula_columns
+  ⇒ 契约装配层一致性校验 fail-closed，"formula 字段必须被只读区域覆盖"）。
+  🔴 **复盘确认**：D5 与 D6 同款幽灵行防护例外（`[0]`=`category` 枚举，`[1]`=`item_name`
+  才是真名称），复用 Task 16 新增的 `ghost_row_anchor_index=1`。
+  🔴 **未完成**：`_rows_table_payload`/发布编排代码仍在（911→810 行，同 D3/D6/D7 幅度）
   - D5 原本就是内联 7 元组 ⇒ 它是裁决 3 的**零改动对照**，若它 digest 变了说明引擎理解错了
   - _Requirements: 2.1, 2.2, 4.2_
 

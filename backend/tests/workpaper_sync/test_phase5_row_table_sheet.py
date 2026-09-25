@@ -554,3 +554,70 @@ class TestGhostRowAnchorIndex:
             table_name="x", uuid_col="x", first_data_row=1, last_data_row=2, footer_row=3,
         )
         assert spec.ghost_row_anchor_index == 0
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# D5 零改动对照（Task 17 声明化，design 裁决 3 的验证点）
+# ═══════════════════════════════════════════════════════════════════════════
+
+
+class TestD5ZeroChangeAdjudication:
+    """D5 是内联 7 元组的来源家 + 无账龄组（引擎"无分组"路径基准样本）。design 明文：
+    "若它的 digest 变了说明引擎理解错了"——本类钉住这条零改动对照，跑真实生产模块
+    （不是合成数据），确保 `managed_field_specs(SPEC_D52)` 逐字节等于 provider 原
+    `MANAGED_FIELD_SPECS` 常量。
+    """
+
+    def test_engine_output_equals_original_constant_verbatim(self) -> None:
+        import os
+        import sys
+
+        os.environ.setdefault("DB_DISABLE_SSL", "True")
+        backend_root = str(
+            __import__("pathlib").Path(__file__).resolve().parents[2]
+        )
+        if backend_root not in sys.path:
+            sys.path.insert(0, backend_root)
+
+        from app.services.workpaper_sync import phase5_d5_receivables_financing as d5
+        from app.services.workpaper_sync.phase5_row_table_sheet import (
+            managed_field_specs,
+        )
+
+        engine_output = managed_field_specs(d5.SPEC_D52)
+        assert engine_output == d5.MANAGED_FIELD_SPECS, (
+            "D5 是零改动对照家：引擎输出与 provider 原常量必须逐字节相等，"
+            "否则说明引擎理解错了（design 裁决 3）"
+        )
+
+    def test_ghost_row_anchor_is_item_name_not_category(self) -> None:
+        import os
+        import sys
+
+        os.environ.setdefault("DB_DISABLE_SSL", "True")
+        backend_root = str(
+            __import__("pathlib").Path(__file__).resolve().parents[2]
+        )
+        if backend_root not in sys.path:
+            sys.path.insert(0, backend_root)
+
+        from app.services.workpaper_sync import phase5_d5_receivables_financing as d5
+
+        assert d5.SPEC_D52.ghost_row_anchor_index == 1
+        assert d5.SPEC_D52.field_specs[1][0] == "item_name"
+        assert d5.SPEC_D52.field_specs[0][0] == "category"
+
+    def test_no_aging_layout(self) -> None:
+        import os
+        import sys
+
+        os.environ.setdefault("DB_DISABLE_SSL", "True")
+        backend_root = str(
+            __import__("pathlib").Path(__file__).resolve().parents[2]
+        )
+        if backend_root not in sys.path:
+            sys.path.insert(0, backend_root)
+
+        from app.services.workpaper_sync import phase5_d5_receivables_financing as d5
+
+        assert d5.SPEC_D52.aging_layout is None
