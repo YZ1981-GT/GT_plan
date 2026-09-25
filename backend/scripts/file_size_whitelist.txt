@@ -328,7 +328,12 @@ backend/scripts/check/check_task44_oo94_excel_pilot_gate.py  2467
 backend/scripts/check/check_task61_oo94_word_pilot_gate.py  3048
 backend/scripts/check/check_task68_backend_chain_independent_regression.py  5742
 backend/scripts/check/check_task69_frontend_independent_regression.py  2754
-backend/scripts/check/check_task70_oo94_full_entry_scenario_gate.py  2971
+#   check_task70_oo94_full_entry_scenario_gate.py —— 基线 2971 已 stale（本次改动前实测
+#     3116，那 145 行欠账非本次造成）。2026-09-25 Task 32 debt 迁移 +10 行：正向重算 F4
+#     期望档位 upstream_gap→executed + 反事实 A4 residual 文案更新（两条 Task 32 欠账已
+#     补齐并解除 debt）。抬到实测值让门从此刻重新生效；条目即数据、拆分收益为负，理由同
+#     本表顶部第 2 条（门与生成器）。
+backend/scripts/check/check_task70_oo94_full_entry_scenario_gate.py  3126
 backend/scripts/check/check_task71_mutation_capacity_recovery_gate.py  4778
 backend/scripts/check/check_task72_pre_delete_eligibility_gate.py  2690
 backend/scripts/check/mutate_task34_sync_ui_guards.py  933
@@ -886,11 +891,15 @@ audit-platform/frontend/src/components/workpaper/sync/useWorkpaperSyncBridge.ts 
 backend/app/services/workpaper_sync/adapters/excel.py  1027
 
 #   test_sibling_table_ref_row_shift.py —— 同 sheet 多区兄弟 Table ref 位移判据宿主
-#     （15 passed: 5 张同 sheet 多区参数化 + 单区纯增量纪律 + CompositeRowShift 累积归一化）。
-#     判据清单从 instrumentation_specs() 动态算(新增受管区自动覆盖), 条目本身是数据;
+#     （16 passed: 5 张同 sheet 多区参数化 + 单区纯增量纪律 + CompositeRowShift 累积归一化 +
+#     变异反证）。判据清单从原「只硬编码 D4」改为按 provider 参数化（2026-09-26，
+#     d1-sync-row-table-engine-and-d1-coverage Task 24 · Req 5.4），复用 golden digest
+#     `PROVIDERS` 权威登记逐 provider 取全量 spec + 重建对应模板的 instrumented workbook,
+#     新增受管区(D1-4 等)灰度开启后自动进入覆盖(已用变异反证验证)。条目本身是数据;
 #     拆分会让「多区清单 ↔ 位移断言」跨文件。baseline 取真实行数。
-#     spec: workpaper-html-onlyoffice-bidirectional-writeback-closure（同 sheet 多区）
-backend/tests/workpaper_sync/test_sibling_table_ref_row_shift.py  885
+#     spec: workpaper-html-onlyoffice-bidirectional-writeback-closure（同 sheet 多区）+
+#     d1-sync-row-table-engine-and-d1-coverage（参数化改造）
+backend/tests/workpaper_sync/test_sibling_table_ref_row_shift.py  1022
 
 #   wp_render_config.py —— **改动前 HEAD 即 824 行已超 800 上限、从未登记**（render-config
 #     单文件承载 sheet 分类/override/dedicated memo/auto-fill/word-template/准则下发七段管线）。

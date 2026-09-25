@@ -33,6 +33,7 @@ D4-1（主营/其他）、D4-9（本期/上期）、D4-20（三区）、D4-34（
 from __future__ import annotations
 
 import hashlib
+import importlib
 import io
 import os
 import sys
@@ -644,18 +645,97 @@ def test_same_sheet_sibling_coords_exclude_peer_rewrites_from_unmanaged_digest(
 
 
 # ═══════════════════════════════════════════════════════════════════════════
-# 判据 6（参数化）：D4 **全部**同 sheet 多受管区底稿，上区插行后下方兄弟区 ref 必须位移
+# 判据 6（参数化）：**全部 provider** 同 sheet 多受管区底稿，上区插行后下方兄弟区 ref 必须位移
 #
-# 不只盯 D4-1：从 provider 的 `instrumentation_specs()` **动态**算出「同一 managed_sheet
-# 有 ≥2 个受管区」的组（实测 30 个受管 sheet 里有 5 张），逐张验证。硬编码清单会在新增
-# 受管区时静默漏掉 —— 而漏掉的那张就是下一个线上 500。
+# spec: d1-sync-row-table-engine-and-d1-coverage · Task 24 · Requirement 5.4
+#
+# 🔴 从「只认 D4」改为「按 provider 参数化」：硬编码清单在新增受管区时会静默漏掉——漏掉的
+# 那张就是下一个线上 500（同 D4-1 事故成因）。D1-4（三区）等新接入 sheet 此前不会自动进入
+# 本判据覆盖（design.md Task 24 登记的缺口）。
+#
+# provider 来源不新造自动发现机制，直接复用 golden digest 门禁脚本的 `PROVIDERS` 权威登记
+# （9 家已交付 contract，逐条已标注单/复数），它有独立测试守护、是全平台最稳定的分母。
 # ═══════════════════════════════════════════════════════════════════════════
+
+#: 已知导出复数 `instrumentation_specs()` 的"伴生扩容模块"（entry 自身仍是单数，见
+#: golden digest `PROVIDERS` 第 5 列）。D4/E1 复数即是 entry 自身，已被该列覆盖不重复枚举。
+_COMPANION_EXPANSION_MODULES: dict[str, str] = {
+    "phase5_d1_notes_receivable": "phase5_d1_expansion",
+    "phase5_d3_prepaid_receipts": "phase5_d3_expansion",
+}
+
+
+def _provider_module_names() -> tuple[str, ...]:
+    """从 golden digest 门禁的权威登记取 provider 模块名清单（唯一来源，不重复维护）。"""
+    sys.path.insert(0, str(_REPO / "backend" / "scripts" / "check"))
+    try:
+        from check_sync_provider_golden_digest import PROVIDERS as _GOLDEN_PROVIDERS
+    finally:
+        sys.path.remove(str(_REPO / "backend" / "scripts" / "check"))
+    return tuple(entry[1] for entry in _GOLDEN_PROVIDERS)
+
+
+def _provider_all_specs(module_name: str) -> tuple[Any, ...]:
+    """给定 entry 模块名，取该 provider **完整**受管 sheet 清单。
+
+    🔴 伴生扩容模块的复数 `instrumentation_specs()` 是**完整超集**（`phase5_d1_expansion`
+    docstring 明文"D1-3 恒在；其余按开关加入"），不是"entry 之外的增量"——若同时取 entry
+    单数与伴生复数会重复计入（实测踩过：D1-3 被误判成跟自己形成同 sheet 多区）。规则：
+    有伴生模块 ⇒ 只取伴生复数；无伴生模块 ⇒ 退回 entry 自身单/复数（D4/E1 无伴生模块）。
+    """
+    companion_name = _COMPANION_EXPANSION_MODULES.get(module_name)
+    if companion_name:
+        try:
+            companion = importlib.import_module(
+                f"app.services.workpaper_sync.{companion_name}"
+            )
+        except ImportError:  # pragma: no cover — 防御：清单漂移不炸判据本身
+            return ()
+        if hasattr(companion, "instrumentation_specs"):
+            return tuple(companion.instrumentation_specs())
+        return ()
+    try:
+        mod = importlib.import_module(f"app.services.workpaper_sync.{module_name}")
+    except ImportError:  # pragma: no cover
+        return ()
+    if hasattr(mod, "instrumentation_specs"):
+        return tuple(mod.instrumentation_specs())
+    if hasattr(mod, "instrumentation_spec"):
+        return (mod.instrumentation_spec(),)
+    return ()
+
+
+def _all_managed_sheet_specs() -> list[tuple[str, Any]]:
+    """`(provider_module_name, spec)` 列表：遍历全部已登记 provider 聚合受管 sheet spec
+
+    （`_multi_region_sheets` 的分组来源，保留 provider 名供后续重建 instrumented workbook）。
+    """
+    return [
+        (module_name, spec)
+        for module_name in _provider_module_names()
+        for spec in _provider_all_specs(module_name)
+    ]
+
+
+def _provider_of_sheet(sheet_name: str) -> str:
+    """`managed_sheet` 字面值 → 所属 provider 模块名（同一字面值只属于一个 provider，
+
+    与 `_multi_region_sheets` 的分组假设一致）。
+    """
+    for module_name, spec in _all_managed_sheet_specs():
+        if str(spec.managed_sheet) == sheet_name:
+            return module_name
+    raise AssertionError(f"managed_sheet={sheet_name!r} 未匹配到任何已登记 provider")
 
 
 def _multi_region_sheets() -> dict[str, list[Any]]:
-    """`managed_sheet → [spec, …]`，只保留同 sheet ≥2 个受管区的组（按首数据行升序）。"""
+    """`managed_sheet → [spec, …]`，只保留同 sheet ≥2 个受管区的组（按首数据行升序）。
+
+    🔴 按字面 `managed_sheet` 值分组（不保证跨 provider 唯一，但 9 家实测值均带循环前缀
+    天然不冲突）——与位移验证语义一致："同 sheet"就是按这个字面值判定的。
+    """
     by_sheet: dict[str, list[Any]] = {}
-    for spec in D4.instrumentation_specs():
+    for _label, spec in _all_managed_sheet_specs():
         if not (getattr(spec, "table_name", None) and getattr(spec, "uuid_col", None)):
             continue
         by_sheet.setdefault(str(spec.managed_sheet), []).append(spec)
@@ -681,14 +761,70 @@ def test_premise_multi_region_sheets_discovered() -> None:
                   f"{ {s: len(v) for s, v in _MULTI.items()} }"
 
 
+def test_mutation_hardcoded_d4_only_would_miss_newly_gated_d1_sheet() -> None:
+    """变异反证（Requirement 5.4）：改回硬编码单一 D4 provider ⇒ 必漏 D1 新接入区。
+
+    钉住"参数化本身没有退化"——不靠人工承诺，靠这条测试：`_multi_region_sheets()` 若被
+    改回旧写法（硬编码单一 `D4.instrumentation_specs()`），本测试必红。
+    """
+    from app.services.workpaper_sync import phase5_d1_expansion as D1E
+
+    from app.services.workpaper_sync.phase5_d1_04_bad_debt import MANAGED_SHEET_D104
+
+    original_flag = D1E._INCLUDE_D104_BAD_DEBT
+    try:
+        # 模拟"D1-4 前两区已灰度开启"（真实开关翻转前置于本 spec 任务 26，此处只验证
+        # 判据本身的自动发现能力，不代表本任务开启了该灰度）。
+        D1E._INCLUDE_D104_BAD_DEBT = True
+        parametrized = _multi_region_sheets()
+        assert MANAGED_SHEET_D104 in parametrized, (
+            f"参数化判据未能自动发现开关翻转后的 D1-4 —— 实得 {sorted(parametrized)}；"
+            "若这条断言红了，先检查 `_multi_region_sheets()` 是否被人改回硬编码单一 provider"
+        )
+
+        # 反证：硬编码写法（旧实现，本判据要防止的退化）在同一开关状态下**看不到** D1-4。
+        by_sheet_d4_only: dict[str, list[Any]] = {}
+        for spec in D4.instrumentation_specs():
+            if not (
+                getattr(spec, "table_name", None) and getattr(spec, "uuid_col", None)
+            ):
+                continue
+            by_sheet_d4_only.setdefault(str(spec.managed_sheet), []).append(spec)
+        hardcoded_multi = {
+            sheet: specs for sheet, specs in by_sheet_d4_only.items() if len(specs) >= 2
+        }
+        assert MANAGED_SHEET_D104 not in hardcoded_multi, (
+            "硬编码单一 D4 provider 的写法不该看到 D1 的 sheet —— 若看到了，说明反证前提本身"
+            "不成立（D4 模块被意外污染了 D1 的 spec），需要重新检查该反证的构造方式"
+        )
+    finally:
+        D1E._INCLUDE_D104_BAD_DEBT = original_flag
+
+
+def _instrumented_bytes_for_provider(module_name: str) -> bytes:
+    """按 provider 模块名重建 instrumented workbook 字节（源模板/spec 全量取该 provider
+
+    自己的，不是硬编码 D4）。全部 provider 的模板/gate 存取函数签名与 D4 逐字相同
+    （`read_authoritative_template()` / `excel_carrier_gate()`，均零参，已用 grep 核实）。
+    """
+    mod = importlib.import_module(f"app.services.workpaper_sync.{module_name}")
+    all_specs = _provider_all_specs(module_name)
+    return EI.instrument_workbook_bytes_multi(
+        mod.read_authoritative_template(), all_specs, gate=mod.excel_carrier_gate()
+    ).instrumented_bytes
+
+
 @pytest.mark.parametrize("sheet_name", sorted(_MULTI))
 def test_all_multi_region_sheets_shift_sibling_table_refs(
-    sheet_name: str, instrumented: EI.InstrumentedWorkbook, tmp_path: Path
+    sheet_name: str, tmp_path: Path
 ) -> None:
     """对每张同 sheet 多区底稿：最上区插 N 行 ⇒ 其下方**每个**兄弟区 ref 整体下移 N。
 
     走 `excel_materialize._grow_managed_table_ref` 这一真实入口（它内部会调
     `_shift_sibling_table_refs`），plan 用鸭子对象只喂它读的三个字段。
+
+    🔴 不复用模块级 `instrumented` fixture（固定 D4 模板）——须按 `sheet_name` 反查所属
+    provider 再重建对应模板字节（见 `_instrumented_bytes_for_provider`）。
     """
     import zipfile
     from types import SimpleNamespace
@@ -703,7 +839,7 @@ def test_all_multi_region_sheets_shift_sibling_table_refs(
     upper = specs[0]
     lowers = specs[1:]
 
-    data = instrumented.instrumented_bytes
+    data = _instrumented_bytes_for_provider(_provider_of_sheet(sheet_name))
     entries: dict[str, bytes] = {}
     with zipfile.ZipFile(io.BytesIO(data)) as zf:
         for name in zf.namelist():

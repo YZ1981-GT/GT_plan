@@ -24,9 +24,14 @@
 > ghost_row_anchor_index`（D5/D6 幽灵行防护锚点非默认第 0 位）。golden digest 零回归（26 个）+
 > 141 个判据全绿。`≤150 行`上限**未达成**（三家仍 869~878 行，只收敛了引擎函数层，契约装配/
 > 发布编排代码尚未拆分）。
-> **尚未开工**：Task 15/16 本体的完整 provider 收敛、Task 17~22（D5/D2/B60/D4 声明化 + CI
-> 门禁接入 governance-checks.yml）、Task 24（位移判据参数化）、Task 27~34（D1 批次 2~6
-> 灰度开启 + 真实接入 + 审定表迁移 + 验收）。下方复选框为唯一进度真源，本节仅摘要。
+> ✅ **Task 20~22（CI 门禁接入）+ Task 24（位移判据参数化）已完成**（2026-09-26）：两个
+> CI job（`row-table-engine-and-registry-guards`/`e1-sync-coverage-guards`）已入
+> `governance-checks.yml` 并逐条本地复测通过；`test_sibling_table_ref_row_shift.py` 的
+> 判据 6 从硬编码 D4 改为按 provider 参数化（实施中抓到并修复一处真实的 spec 聚合重复计入
+> bug），变异反证证明其确能自动覆盖 D1-4 等尚在灰度中的新多区 sheet。
+> **尚未开工**：Task 15/16/17/18 本体的完整 provider 收敛（≤150/300 行上限）、Task 19
+> （B60/D4 真栈过门）、Task 27~34（D1 批次 2~6 灰度开启 + 真实接入 + 审定表迁移 + 验收）。
+> 下方复选框为唯一进度真源，本节仅摘要。
 
 顺序有意义：**阶段 0 是红判据与基线先行** —— 24 个 golden digest 此时必绿（它是基线不是判据），
 P9/P10 此时必红（框架层现有 89 处 D4 提及、注册表尚不存在）。没有这两侧，后面"修好了"与
@@ -279,9 +284,24 @@ D1-10 三项共 **28 个标量**的形态待实测（`static_region` vs HTML-onl
     （D4-35 事故：specs 7 vs sheets 8 打挂整个 entry）
   - _Requirements: 5.3, 5.2_
 
-- [ ] 24. `test_sibling_table_ref_row_shift.py` 的参数化判据改按 provider 取清单
-  - 现状 `_multi_region_sheets()` 只从 D4 取 ⇒ 扩成 provider 参数化
-  - P12 判据：D1 的多区 sheet 接入后**自动**进入覆盖清单；变异改回硬编码 D4 ⇒ 必红
+- [x] 24. `test_sibling_table_ref_row_shift.py` 的参数化判据改按 provider 取清单 ✅ 2026-09-26：
+  `_multi_region_sheets()` 从硬编码 `D4.instrumentation_specs()` 改为遍历 golden digest
+  `PROVIDERS` 权威登记（单一来源，不新建注册表）+ 已知伴生扩容模块清单（D1/D3），逐 provider
+  重建对应模板的 instrumented workbook（新增 `_instrumented_bytes_for_provider`，不再复用
+  D4 专属的模块级 `instrumented` fixture）。判据 7（单区代表性断言）**刻意不参数化**
+  ——需求 5.4 原文只要求判据 6（多区位移）自动覆盖新 provider，判据 7 只需一张 D4 代表即可
+  证明"未受影响 sheet 不回归"，扩大它反而稀释了"D4 多数是单区"这条结构性事实的原意。
+  🔴 **实施中抓到一个真实聚合 bug**：起初同时取 entry 自身单数声明 + 伴生扩容模块复数声明并
+  concat，导致 D1-3 被计入两次、误判成"跟自己形成同 sheet 双区"（`GT_D13_ROWS` vs 自己）。
+  根因是 `phase5_d1_expansion.instrumentation_specs()` 文档已明确它是**完整超集**（"D1-3
+  恒在（已交付）；其余按开关加入"），不是"entry 自身之外的增量"——改为有伴生模块时**只取**
+  伴生模块复数（不再叠加 entry 单数），零回归后确认。
+  **变异反证已验证**（新增 `test_mutation_hardcoded_d4_only_would_miss_newly_gated_d1_sheet`）：
+  运行时翻转 `phase5_d1_expansion._INCLUDE_D104_BAD_DEBT=True`（不改磁盘文件）后，参数化函数
+  自动发现 `坏账准备明细表D1-4` 进入 `_MULTI`（2 区），而模拟的旧硬编码单一 D4 写法在同一
+  开关状态下看不到它——证明本次改动真实解除了"D1-4 三区接入后位移判据不自动覆盖"的缺口
+  （D1 spec Task 26 的前置依赖）。16 用例全绿（原 15 + 新增变异反证 1）+ golden digest 26 个
+  零回归 + P9/P10/O(1) 三门禁复测全绿。
   - _Requirements: 5.4_
 
 - [ ]* 25. 接入 D1-2 `原值明细表（按类别）D1-2`（**声明已交付，灰度未开**：`phase5_d1_02_category.py`
