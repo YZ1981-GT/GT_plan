@@ -1,0 +1,318 @@
+{
+  "captured_at": "2026-09-24T22:48:59.636Z",
+  "n_cases": 35,
+  "n_planned": 11,
+  "n_skipped": 24,
+  "plans": [
+    {
+      "code": "D4-1",
+      "table_key": "adjudication_main_rows",
+      "edit_key": "current_unadjusted",
+      "edit_vt": "amount",
+      "target_ref": "B12",
+      "old_value": 153455937.4,
+      "new_value": 153468283.07,
+      "hit_kind": "prefer_value",
+      "sample_field": "adjudication_main_rows/xsheet-main-营业收入_批发_分销/current_unadjusted"
+    },
+    {
+      "code": "D4-2",
+      "table_key": "revenue_detail_rows",
+      "edit_key": "prior_unadjusted",
+      "edit_vt": "amount",
+      "target_ref": "B24",
+      "old_value": 6337159.68,
+      "new_value": 6349505.35,
+      "hit_kind": "prefer_value",
+      "sample_field": "revenue_detail_rows/d4r-mtl69x8j-v9xhgtr/month_01"
+    },
+    {
+      "code": "D4-5",
+      "table_key": "d45_policy_groups",
+      "edit_key": "revenue_policy",
+      "edit_vt": "text",
+      "target_ref": "A18",
+      "old_value": "销售商品收入",
+      "new_value": "L2MARK-D4-5-33a6",
+      "hit_kind": "prefer_text",
+      "sample_field": "d45_policy_groups/GTROW-D45-0018/biz_name"
+    },
+    {
+      "code": "D4-25",
+      "table_key": "dealer_check_rows",
+      "edit_key": "sales_qty",
+      "edit_vt": "amount",
+      "target_ref": "A12",
+      "old_value": 1,
+      "new_value": 12346.67,
+      "hit_kind": "prefer_value",
+      "sample_field": "dealer_check_rows/GTROW-D425-0012/seq"
+    },
+    {
+      "code": "D4-27",
+      "table_key": "undisclosed_rp_rows",
+      "edit_key": "annual_sales",
+      "edit_vt": "amount",
+      "target_ref": "P15",
+      "old_value": 942.91,
+      "new_value": 13288.58,
+      "hit_kind": "prefer_value",
+      "sample_field": "undisclosed_rp_rows/GTROW-D427-0015/annual_sales"
+    },
+    {
+      "code": "D4-28",
+      "table_key": "customer_checklist_rows",
+      "edit_key": "sales_amount",
+      "edit_vt": "amount",
+      "target_ref": "D14",
+      "old_value": 76613350.78,
+      "new_value": 76625696.45,
+      "hit_kind": "prefer_value",
+      "sample_field": "customer_checklist_rows/GTROW-D428-0014/sales_amount"
+    },
+    {
+      "code": "D4-29",
+      "table_key": "customer_detail_transposed",
+      "edit_key": null,
+      "edit_vt": "text",
+      "target_ref": "C10",
+      "old_value": "回写闭环客户PROBE-1789361019",
+      "new_value": "L2MARK-D4-29-3c1b",
+      "hit_kind": "prefer_text",
+      "sample_field": "customer_detail_transposed/cust-mu0j7ovb-1v1v/name"
+    },
+    {
+      "code": "D4-30",
+      "table_key": "d4_30_customers",
+      "edit_key": "amount_match",
+      "edit_vt": "text",
+      "target_ref": "B7",
+      "old_value": "发行人第X大客户/本期新增客户/采购价格异常客户/……",
+      "new_value": "L2MARK-D4-30-3e10",
+      "hit_kind": "prefer_text",
+      "sample_field": "d4_30_customers/GTROW-D430-0007/name"
+    },
+    {
+      "code": "D4-31",
+      "table_key": "d4_31_interview",
+      "edit_key": "q3d_return_amount",
+      "edit_vt": "text",
+      "target_ref": "A5",
+      "old_value": "访谈对象：",
+      "new_value": "L2MARK-D4-31-3fz7",
+      "hit_kind": "prefer_text",
+      "sample_field": "d4_31_interview/GTROW-D431-0005/target"
+    },
+    {
+      "code": "D4-32",
+      "table_key": "d4_32_groups",
+      "edit_key": "amount",
+      "edit_vt": "amount",
+      "target_ref": "A13",
+      "old_value": 1,
+      "new_value": 12346.67,
+      "hit_kind": "prefer_value",
+      "sample_field": "d4_32_groups/GTROW-D432-0013/group_label"
+    },
+    {
+      "code": "D4-35",
+      "table_key": "other_revenue_check_rows",
+      "edit_key": "amount",
+      "edit_vt": "amount",
+      "target_ref": "F26",
+      "old_value": 50000,
+      "new_value": 62345.67,
+      "hit_kind": "prefer_value",
+      "sample_field": "other_revenue_check_rows/GTROW-D435-9001/amount"
+    }
+  ],
+  "skipped": [
+    {
+      "code": "D4-3",
+      "reason": "no_safe_cell:none"
+    },
+    {
+      "code": "D4-6",
+      "reason": "no_safe_cell:none"
+    },
+    {
+      "code": "D4-7",
+      "reason": "no_safe_cell:none"
+    },
+    {
+      "code": "D4-8",
+      "reason": "no_safe_cell:none"
+    },
+    {
+      "code": "D4-9",
+      "reason": "no_safe_cell:none"
+    },
+    {
+      "code": "D4-10",
+      "reason": "no_safe_cell:none"
+    },
+    {
+      "code": "D4-11",
+      "reason": "no_safe_cell:none"
+    },
+    {
+      "code": "D4-12",
+      "reason": "no_safe_cell:none"
+    },
+    {
+      "code": "D4-13",
+      "reason": "no_safe_cell:none"
+    },
+    {
+      "code": "D4-14",
+      "reason": "no_safe_cell:none"
+    },
+    {
+      "code": "D4-15",
+      "reason": "no_safe_cell:none"
+    },
+    {
+      "code": "D4-16",
+      "reason": "no_safe_cell:none"
+    },
+    {
+      "code": "D4-17",
+      "reason": "no_safe_cell:none"
+    },
+    {
+      "code": "D4-18",
+      "reason": "no_safe_cell:none"
+    },
+    {
+      "code": "D4-19",
+      "reason": "no_safe_cell:none"
+    },
+    {
+      "code": "D4-20",
+      "reason": "no_safe_cell:none"
+    },
+    {
+      "code": "D4-21",
+      "reason": "no_safe_cell:none"
+    },
+    {
+      "code": "D4-22",
+      "reason": "no_safe_cell:none"
+    },
+    {
+      "code": "D4-23",
+      "reason": "no_safe_cell:none"
+    },
+    {
+      "code": "D4-24",
+      "reason": "no_safe_cell:none"
+    },
+    {
+      "code": "D4-26",
+      "reason": "no_safe_cell:none"
+    },
+    {
+      "code": "D4-33",
+      "reason": "no_safe_cell:none"
+    },
+    {
+      "code": "D4-34",
+      "reason": "no_safe_cell:none"
+    },
+    {
+      "code": "D4-36",
+      "reason": "no_safe_cell:none"
+    }
+  ],
+  "forcesave": {
+    "forcesave_request_id": "9584adf4-7b16-4c7a-9057-df78bf4187a8",
+    "operation_id": "94d292ae-a943-4545-b4cb-4375877d5a18",
+    "request_sequence": 1,
+    "state": "accepted",
+    "poll_after_ms": 500,
+    "replayed": false,
+    "dispatch_error": null,
+    "cs_error": 0,
+    "cs_outcome": "accepted",
+    "callback_expected": true
+  },
+  "operation_id": "94d292ae-a943-4545-b4cb-4375877d5a18",
+  "operation_state_trail": [
+    "created",
+    "application_bound",
+    "conflict"
+  ],
+  "operation_final_state": "conflict",
+  "application_error_code": null,
+  "application_error_message": null,
+  "store_checks": [
+    {
+      "code": "D4-1",
+      "ok": false,
+      "got": null,
+      "want": 153468283.07
+    },
+    {
+      "code": "D4-2",
+      "ok": false,
+      "got": null,
+      "want": 6349505.35
+    },
+    {
+      "code": "D4-5",
+      "ok": false,
+      "got": null,
+      "want": "L2MARK-D4-5-33a6"
+    },
+    {
+      "code": "D4-25",
+      "ok": false,
+      "got": null,
+      "want": 12346.67
+    },
+    {
+      "code": "D4-27",
+      "ok": false,
+      "got": null,
+      "want": 13288.58
+    },
+    {
+      "code": "D4-28",
+      "ok": false,
+      "got": null,
+      "want": 76625696.45
+    },
+    {
+      "code": "D4-29",
+      "ok": false,
+      "got": null,
+      "want": "L2MARK-D4-29-3c1b"
+    },
+    {
+      "code": "D4-30",
+      "ok": false,
+      "got": null,
+      "want": "L2MARK-D4-30-3e10"
+    },
+    {
+      "code": "D4-31",
+      "ok": false,
+      "got": null,
+      "want": "L2MARK-D4-31-3fz7"
+    },
+    {
+      "code": "D4-32",
+      "ok": false,
+      "got": null,
+      "want": 12346.67
+    },
+    {
+      "code": "D4-35",
+      "ok": false,
+      "got": null,
+      "want": 62345.67
+    }
+  ],
+  "store_ok_count": 0,
+  "sync_errors": []
+}

@@ -1,0 +1,10 @@
+{
+  "updated_at": "2026-09-25T01:20:23.514Z",
+  "results": [
+    {
+      "code": "D4-6",
+      "status": "enter_fail",
+      "error_message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBeTruthy\u001b[2m()\u001b[22m\n\nReceived: \u001b[31mfalse\u001b[39m\n\nCall Log:\n- Timeout 300000ms exceeded while waiting on the predicate"
+    }
+  ]
+}

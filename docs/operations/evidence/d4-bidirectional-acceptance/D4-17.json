@@ -1,7 +1,8 @@
 {
   "sheet": "D4-17",
-  "sheet_name": "D4-17",
-  "captured_at": "2026-09-22T03:54:29.176Z",
+  "sheet_name": "💹营业收入截止测试（账到单据）D4-17",
+  "sheet_name_expected": "营业收入截止测试（账到单据）D4-17",
+  "captured_at": "2026-09-25T00:17:41.701Z",
   "scope": {
     "project_id": "0ec33ac9-3de5-4e65-b3bf-f9dccd7b2a49",
     "wp_id": "b3ab3c46-828f-4f48-950e-aee9bbdc923f",
@@ -39,6 +40,10 @@
     "oo_iframe_count": 1,
     "doc_editor_called": false,
     "http_errors": [],
-    "console_errors": []
+    "console_errors": [
+      "Failed to load resource: the server responded with a status of 500 (Internal Server Error)",
+      "Failed to load resource: the server responded with a status of 500 (Internal Server Error)",
+      "Failed to load resource: the server responded with a status of 500 (Internal Server Error)"
+    ]
   }
 }

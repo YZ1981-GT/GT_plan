@@ -1,7 +1,8 @@
 {
   "sheet": "D4-27",
-  "sheet_name": "D4-27",
-  "captured_at": "2026-09-22T03:55:39.495Z",
+  "sheet_name": "💹识别未披露的关联方D4-27",
+  "sheet_name_expected": "识别未披露的关联方D4-27",
+  "captured_at": "2026-09-25T00:16:42.994Z",
   "scope": {
     "project_id": "0ec33ac9-3de5-4e65-b3bf-f9dccd7b2a49",
     "wp_id": "b3ab3c46-828f-4f48-950e-aee9bbdc923f",
@@ -39,10 +40,6 @@
     "oo_iframe_count": 1,
     "doc_editor_called": false,
     "http_errors": [],
-    "console_errors": [
-      "Failed to load resource: the server responded with a status of 500 (Internal Server Error)",
-      "Failed to load resource: the server responded with a status of 500 (Internal Server Error)",
-      "Failed to load resource: the server responded with a status of 500 (Internal Server Error)"
-    ]
+    "console_errors": []
   }
 }
