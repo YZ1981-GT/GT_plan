@@ -1205,6 +1205,57 @@ async def _collect() -> dict[str, Any]:  # noqa: C901 - 单次采集覆盖全部
                 snap["supersede"]["reopen_after_new_generation_error"] = _err(exc)
             await s.rollback()
 
+        # ═══ ⑨a 复用一间 live 状态但 lease 已过期的 room ⇒ 必须续租使用窗口 ═══
+        #
+        # 治本回归守卫（2026-09-25 真栈根因）：`open_or_reuse_room` 的复用分支原来只查
+        # `state` 与 `refresh_required_at`，**漏查 `expires_at`**。于是一间 `active` 但
+        # 使用窗口已过期的 room 会被原样返回：materialize / confirm-descriptor 都能过，
+        # 唯独 forcesave 被 `assert_can_initiate_request` 的「room 已过期」门拒
+        # （HTTP 422 `room_not_writable`）—— 用户「进得去、存不了」的死路。真栈实测：
+        # D2 pilot room 停在 active 但 expires_at 早于当日 8 天，forcesave 恒 422；
+        # 续租后同一 room 的 forcesave 走到 202 + durable，request/durable 序列推进。
+        #
+        # 复用间接续租与 ⑨b 的 `release_stale_lease_on_pristine_room` 同语义（重新接纳
+        # 编辑者即重启使用窗口），但触发点不同：这里是 room **自身**窗口过期而非 lease。
+        async with Session() as s:
+            await s.execute(
+                sa.text(
+                    "UPDATE working_paper_oo_room "
+                    "SET expires_at = now() - interval '2 hours' WHERE id = :r"
+                ),
+                {"r": room2_id},
+            )
+            await s.commit()
+        async with Session() as s:
+            repo = WorkpaperSyncRepository(s)
+            svc = RoomService(repo)
+            try:
+                renewed, _ = await svc.open_or_reuse_room(
+                    scope, representation=rep2, opened_base_version_id=cv_id
+                )
+                snap["supersede"]["expired_reuse_same_room"] = (
+                    str(renewed.id) == str(room2_id)
+                )
+                await s.commit()
+                # `expires_at > now()` 是「窗口已续租」的判据（与 ⑨b 的 window_renewed 同款，
+                # 走 SQL 侧 now() 比较，与本文件既有做法一致）。
+                window_renewed = (
+                    await s.execute(
+                        sa.text(
+                            "SELECT expires_at > now() FROM working_paper_oo_room "
+                            "WHERE id = :r"
+                        ),
+                        {"r": room2_id},
+                    )
+                ).scalar_one()
+                snap["supersede"]["expired_reuse_window_renewed"] = bool(window_renewed)
+                snap["supersede"]["expired_reuse_error"] = None
+            except Exception as exc:  # noqa: BLE001 - 复用过期 room 若抛错说明续租没生效
+                snap["supersede"]["expired_reuse_same_room"] = False
+                snap["supersede"]["expired_reuse_window_renewed"] = False
+                snap["supersede"]["expired_reuse_error"] = _err(exc)
+                await s.rollback()
+
         # ═══ ⑨b 僵死 lease × 「从未接管内容」的 room ⇒ 轻量释放 + 同代复用 ═══
         #
         # 治本回归守卫（2026-09-22 真栈根因）：`materialize` 旧代码把**所有**僵死
@@ -2491,6 +2542,27 @@ def test_ac_2_8_same_generation_reuses_room_instead_of_creating_second(
     )
     assert s["reused_is_room2"] is True, (
         f"同 generation 第二次 open 必须返回既有 room，实得 {s['reuse_same_generation_room_id']}"
+    )
+
+
+def test_expired_but_live_room_is_renewed_on_reuse(snap: dict[str, Any]) -> None:
+    """复用一间 live 状态但 lease 已过期的 room 必须续租使用窗口（2026-09-25 真栈根因）。
+
+    根因：`open_or_reuse_room` 复用分支原只查 state + refresh_required_at，漏查
+    expires_at ⇒ 过期 room 被原样返回，materialize/confirm 都能过、唯独 forcesave 被
+    `assert_can_initiate_request` 的「room 已过期」门拒（422 room_not_writable），
+    表现为「进得去、存不了」的死路。修复后复用即续租 expires_at。
+    """
+    s = snap["supersede"]
+    assert s["expired_reuse_error"] is None, (
+        "复用一间过期但 live 的 room 抛异常 —— 续租没生效："
+        f"{s['expired_reuse_error']}"
+    )
+    assert s["expired_reuse_same_room"] is True, (
+        "过期 room 复用必须返回同一间（同代际唯一约束），不得新建"
+    )
+    assert s["expired_reuse_window_renewed"] is True, (
+        "复用过期 room 必须把 expires_at 续到未来，否则 forcesave 仍会被过期门拒 422"
     )
 
 

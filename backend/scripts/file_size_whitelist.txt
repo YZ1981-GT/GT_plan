@@ -294,7 +294,14 @@ backend/app/services/workpaper_sync/published_identity_observer.py  1500
 #     搬之前需先把 `_OPEN_CAPTURE_STATES` 与 V151 partial unique 的双向锁死判据一起带走。
 backend/app/services/workpaper_sync/repository.py  3309
 backend/app/services/workpaper_sync/request_application.py  1181
-backend/app/services/workpaper_sync/rooms.py  2119
+#   rooms.py —— 基线 2119 早已 stale（check_file_size.py 的 splitlines 口径实测 HEAD 前即 2375，
+#     那 256 行欠账**非本次造成**，是此前 room/close-barrier 几轮修复累积未同步本条）。
+#     2026-09-25 spec workpaper-html-onlyoffice-bidirectional-writeback-closure：
+#     `open_or_reuse_room` 复用分支补「过期即续租 expires_at」+17 行（真栈根因：过期但 live
+#     的 room 被原样复用 ⇒ forcesave 恒 422 room_not_writable，进得去存不了）。→ 2392。
+#     baseline 取当前真实行数让门禁从此刻重新生效；拆分方向见本表顶部第 1 条
+#     （reconcile_close_intents / 准入门 一组约 300 行可抽伴生模块），属独立任务。
+backend/app/services/workpaper_sync/rooms.py  2392
 backend/app/services/workpaper_sync/timeline.py  911
 backend/app/services/workpaper_sync/word_entry_gate.py  1856
 backend/app/services/workpaper_sync/word_instrumentation.py  1797

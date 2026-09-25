@@ -1082,6 +1082,23 @@ class RoomService:
                     f"generation {generation} 的 room 处于 refresh-required"
                     f"（reason={existing.refresh_reason!r}），必须旋转 generation 后重开"
                 )
+            # 🔴 复用一间仍处于 live 状态（opening/active/close_barrier）但 lease 已过期的 room：
+            #    重新接纳编辑者等于重启这间房的可用窗口，必须续租 `expires_at`，否则
+            #    materialize/confirm-descriptor 都能过、唯独 forcesave 被
+            #    `assert_can_initiate_request` 的「room 已过期」门拒（room_not_writable），
+            #    表现为「进得去、存不了」的死路。与 re-admit participant（`_PRISTINE_ROOM_RENEW_TTL`）
+            #    同一语义：doc_key 按 generation 确定性派生，同代际复用是唯一约束下的既定事实。
+            if existing.expires_at is not None and existing.expires_at <= _now():
+                renew_ttl = ttl if ttl is not None else _PRISTINE_ROOM_RENEW_TTL
+                existing.expires_at = _now() + renew_ttl
+                existing.updated_at = _now()
+                await self._session.flush()
+                logger.info(
+                    "复用过期 room 并续租：room=%s generation=%s new_expires_at=%s",
+                    existing.id,
+                    generation,
+                    existing.expires_at.isoformat(),
+                )
             return existing, bundle
         doc_key = derive_doc_key(
             wp_id=scope.wp_id, entry_id=scope.entry_id, generation=generation
