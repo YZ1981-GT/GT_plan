@@ -280,7 +280,7 @@ backend/app/services/workpaper_sync/oo_to_html.py  3860
 backend/app/services/workpaper_sync/opaque_entry_gate.py  1538
 backend/app/services/workpaper_sync/pilot_d2_large_json.py  1513
 backend/app/services/workpaper_sync/pilot_g7_two_level_dynamic.py  2450
-backend/app/services/workpaper_sync/pilot_h1_grouped_dynamic.py  1868
+backend/app/services/workpaper_sync/pilot_h1_grouped_dynamic.py  1965
 backend/app/services/workpaper_sync/pilot_harness.py  1887
 backend/app/services/workpaper_sync/pilot_simple_checklist.py  980
 backend/app/services/workpaper_sync/projection_provisioning.py  1249

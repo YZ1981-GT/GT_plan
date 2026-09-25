@@ -1946,6 +1946,12 @@ def build_store_projection(
     )
 
 
+#: 回方向合并门面在伴生模块 pilot_g7_store_merge（重导出使调用方零改动）。
+from app.services.workpaper_sync.pilot_g7_store_merge import (  # noqa: E402
+    merge_projection_into_store_state,
+)
+
+
 # ═══════════════════════════════════════════════════════════════════════════
 # 8. 发布（顺序由 Task 12 的 publisher 强制）
 # ═══════════════════════════════════════════════════════════════════════════

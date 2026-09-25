@@ -319,6 +319,7 @@ __all__ = [
     "render_schema_template_path",
     "resolve_published_frozen_definitions",
     "skeleton_row_count",
+    "merge_projection_into_store_rows",
     "split_store_row",
     "stable_key_for",
     "store_row_identity",
@@ -1489,6 +1490,12 @@ def build_store_projection(
         values=values,
         row_keys={ROWS_TABLE_KEY: tuple(row_keys)},
     )
+
+
+#: 回方向合并门面在伴生模块 pilot_h1_store_merge（重导出使调用方零改动）。
+from app.services.workpaper_sync.pilot_h1_store_merge import (  # noqa: E402
+    merge_projection_into_store_rows,
+)
 
 
 # ═══════════════════════════════════════════════════════════════════════════

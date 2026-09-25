@@ -1,0 +1,439 @@
+{
+  "contract_id": "e1.monetary_fund_detail",
+  "document_type": "xlsx",
+  "identity_carriers": [
+    "hidden_sheet",
+    "defined_name",
+    "excel_table",
+    "hidden_uuid_column"
+  ],
+  "instrumentation_definition_sha256": "678709de8c0ece5b3ce313349cd3cba86792b2d17b0d22db5642cb13e4b9b270",
+  "review": {
+    "authority_root": "backend/wp_templates",
+    "cross_volume_keys": {
+      "E1-accrued-interest-rows": "属第 3 册（E1-18至E1-23 检查册）；E1-1 审定表读它做应计利息槽位。本 entry 只覆盖第一册 ⇒ 该键在本 entry 内**永远读不到** ⇒ 对应审定格必须显式标记为「上游未受管」而非空/0，否则审计师会以为该项真为零"
+    },
+    "entry_id": "xlsx/gt-e1-monetary-fund",
+    "html_store": {
+      "item_ids": [
+        "E1-cash-detail-rows",
+        "E1-digital-rows"
+      ],
+      "note": "E1 第一册的受管 sheet 各自一条 checklist_responses item。🔴 行身份键是 `id`（**不是** D 循环惯用的 `rowId`）—— useE1CashDetail/useE1Digital 的行对象字段名实测为 `id`，照抄 D 类会让 store-projection fail-closed 抛「缺稳定行身份」把整个 entry 打挂。E1-2 另有不可删除的固定行 `fixed-rmb`（对应模板 R15 人民币），与动态行 `cash-<uuid>` 同在 `id` 字段 ⇒ 混合身份无需拆区",
+      "shape": "json_array_of_row_objects",
+      "table": "checklist_responses"
+    },
+    "pilot_class": "phase5_monetary_fund",
+    "reviewed_basis": "openpyxl 逐格直读权威模板 E/E1-1至E1-11 货币资金- 审定表明细表（Leap-常规程序）.xlsx（第一册，16 sheet，sha256 8317e2ba）。受管 sheet 的几何全部逐格实测：现金明细表E1-2 两级表头 R13/R14、数据区 R15-21（R15-19 预填币种 人民币/美元/日元/澳元/欧元、R20-21 空白待扩）、footer R22「合计」=SUM(15:21)、公式列 E=B+C-D / G=E*F（乘法）/ I=G+H*F（乘加混合）、R23「其中：存放在境外的款项总额」在 footer 之下故登记 HTML-only；数字货币明细表E1-4 单级表头 R9、数据区 R10-16（预填序号 1-7）、footer R17、公式列 H=E+F-G / I=H*D / K=H+J / L=K*D。形态判定用**前端三元组**（store 键按值 grep / addRow-removeRow 信号 / composable 归属）而非模板公式数 —— E1-9/E1-10/E1-11 各只 7 公式，按公式数阈值会把三张全判 static_region，实证只有 E1-11 成立（零 -rows 键、无 composable、承诺函段落表单）"
+  },
+  "review_status": "reviewed",
+  "schema_version": "contract-definition:v1",
+  "semantic_version": "1.0.0",
+  "sheets": [
+    {
+      "excel_name": "现金明细表E1-2",
+      "locator": {
+        "anchor": "excel_table_sheet_association"
+      },
+      "sheet_key": "e12-managed",
+      "tables": [
+        {
+          "anchor": "A13",
+          "delete_policy": "tombstone",
+          "fields": [
+            {
+              "cell": {
+                "column": "A",
+                "row_from": "row_identity"
+              },
+              "column_key": "currency",
+              "header_source_ref": "源xlsx!现金明细表E1-2!A13",
+              "header_text": "币种",
+              "json_pointer": "/rows/{row_uuid}/currency",
+              "mode": "editable",
+              "source_ref": "源xlsx!现金明细表E1-2!A15",
+              "stable_field_key": "cash_detail_rows/{row_uuid}/currency",
+              "store_item_id": "E1-cash-detail-rows",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "B",
+                "row_from": "row_identity"
+              },
+              "column_key": "opening",
+              "group_source_ref": "源xlsx!现金明细表E1-2!B13",
+              "header_source_ref": "源xlsx!现金明细表E1-2!B14",
+              "header_text": "期初余额",
+              "json_pointer": "/rows/{row_uuid}/opening",
+              "mode": "editable",
+              "source_ref": "源xlsx!现金明细表E1-2!B15",
+              "stable_field_key": "cash_detail_rows/{row_uuid}/opening",
+              "store_item_id": "E1-cash-detail-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "C",
+                "row_from": "row_identity"
+              },
+              "column_key": "increase",
+              "group_source_ref": "源xlsx!现金明细表E1-2!B13",
+              "header_source_ref": "源xlsx!现金明细表E1-2!C14",
+              "header_text": "本期增加",
+              "json_pointer": "/rows/{row_uuid}/increase",
+              "mode": "editable",
+              "source_ref": "源xlsx!现金明细表E1-2!C15",
+              "stable_field_key": "cash_detail_rows/{row_uuid}/increase",
+              "store_item_id": "E1-cash-detail-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "D",
+                "row_from": "row_identity"
+              },
+              "column_key": "decrease",
+              "group_source_ref": "源xlsx!现金明细表E1-2!B13",
+              "header_source_ref": "源xlsx!现金明细表E1-2!D14",
+              "header_text": "本期减少",
+              "json_pointer": "/rows/{row_uuid}/decrease",
+              "mode": "editable",
+              "source_ref": "源xlsx!现金明细表E1-2!D15",
+              "stable_field_key": "cash_detail_rows/{row_uuid}/decrease",
+              "store_item_id": "E1-cash-detail-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "E",
+                "row_from": "row_identity"
+              },
+              "column_key": "closing_original",
+              "group_source_ref": "源xlsx!现金明细表E1-2!B13",
+              "header_source_ref": "源xlsx!现金明细表E1-2!E14",
+              "header_text": "期末余额（原币）",
+              "json_pointer": "/rows/{row_uuid}/closingOriginal",
+              "mode": "formula",
+              "source_ref": "源xlsx!现金明细表E1-2!E15",
+              "stable_field_key": "cash_detail_rows/{row_uuid}/closing_original",
+              "store_item_id": "E1-cash-detail-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "F",
+                "row_from": "row_identity"
+              },
+              "column_key": "fx_rate",
+              "group_source_ref": "源xlsx!现金明细表E1-2!B13",
+              "header_source_ref": "源xlsx!现金明细表E1-2!F14",
+              "header_text": "期末折算汇率",
+              "json_pointer": "/rows/{row_uuid}/fxRate",
+              "mode": "editable",
+              "source_ref": "源xlsx!现金明细表E1-2!F15",
+              "stable_field_key": "cash_detail_rows/{row_uuid}/fx_rate",
+              "store_item_id": "E1-cash-detail-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "G",
+                "row_from": "row_identity"
+              },
+              "column_key": "closing_rmb",
+              "group_source_ref": "源xlsx!现金明细表E1-2!B13",
+              "header_source_ref": "源xlsx!现金明细表E1-2!G14",
+              "header_text": "期末折算人民币金额",
+              "json_pointer": "/rows/{row_uuid}/closingRmb",
+              "mode": "formula",
+              "source_ref": "源xlsx!现金明细表E1-2!G15",
+              "stable_field_key": "cash_detail_rows/{row_uuid}/closing_rmb",
+              "store_item_id": "E1-cash-detail-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "H",
+                "row_from": "row_identity"
+              },
+              "column_key": "adjustment_original",
+              "header_source_ref": "源xlsx!现金明细表E1-2!H13",
+              "header_text": "审计调整-原币（调减为负数）",
+              "json_pointer": "/rows/{row_uuid}/adjustmentOriginal",
+              "mode": "editable",
+              "source_ref": "源xlsx!现金明细表E1-2!H15",
+              "stable_field_key": "cash_detail_rows/{row_uuid}/adjustment_original",
+              "store_item_id": "E1-cash-detail-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "I",
+                "row_from": "row_identity"
+              },
+              "column_key": "closing_audited",
+              "header_source_ref": "源xlsx!现金明细表E1-2!I13",
+              "header_text": "期末审定数（人民币金额）",
+              "json_pointer": "/rows/{row_uuid}/closingAudited",
+              "mode": "formula",
+              "source_ref": "源xlsx!现金明细表E1-2!I15",
+              "stable_field_key": "cash_detail_rows/{row_uuid}/closing_audited",
+              "store_item_id": "E1-cash-detail-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "J",
+                "row_from": "row_identity"
+              },
+              "column_key": "remark",
+              "header_source_ref": "源xlsx!现金明细表E1-2!J13",
+              "header_text": "备注",
+              "json_pointer": "/rows/{row_uuid}/remark",
+              "mode": "editable",
+              "source_ref": "源xlsx!现金明细表E1-2!J15",
+              "stable_field_key": "cash_detail_rows/{row_uuid}/remark",
+              "store_item_id": "E1-cash-detail-rows",
+              "value_type": "text"
+            }
+          ],
+          "footer_anchor": {
+            "carries_total_formula": true,
+            "marker": "合计",
+            "search_column": "A"
+          },
+          "formula_mask": [
+            "E15:E21",
+            "G15:G21",
+            "I15:I21"
+          ],
+          "header_rows": 2,
+          "row_identity": {
+            "json_pointer": "/rows/*/id",
+            "kind": "field"
+          },
+          "table_key": "cash_detail_rows"
+        }
+      ]
+    },
+    {
+      "excel_name": "数字货币明细表E1-4",
+      "locator": {
+        "anchor": "excel_table_sheet_association"
+      },
+      "sheet_key": "e14-managed",
+      "tables": [
+        {
+          "anchor": "A9",
+          "delete_policy": "tombstone",
+          "fields": [
+            {
+              "cell": {
+                "column": "A",
+                "row_from": "row_identity"
+              },
+              "column_key": "seq_no",
+              "header_source_ref": "源xlsx!数字货币明细表E1-4!A9",
+              "header_text": "序号",
+              "json_pointer": "/rows/{row_uuid}/seqNo",
+              "mode": "editable",
+              "source_ref": "源xlsx!数字货币明细表E1-4!A10",
+              "stable_field_key": "digital_currency_rows/{row_uuid}/seq_no",
+              "store_item_id": "E1-digital-rows",
+              "value_type": "integer"
+            },
+            {
+              "cell": {
+                "column": "B",
+                "row_from": "row_identity"
+              },
+              "column_key": "bank",
+              "header_source_ref": "源xlsx!数字货币明细表E1-4!B9",
+              "header_text": "开户银行",
+              "json_pointer": "/rows/{row_uuid}/bank",
+              "mode": "editable",
+              "source_ref": "源xlsx!数字货币明细表E1-4!B10",
+              "stable_field_key": "digital_currency_rows/{row_uuid}/bank",
+              "store_item_id": "E1-digital-rows",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "C",
+                "row_from": "row_identity"
+              },
+              "column_key": "currency",
+              "header_source_ref": "源xlsx!数字货币明细表E1-4!C9",
+              "header_text": "币种",
+              "json_pointer": "/rows/{row_uuid}/currency",
+              "mode": "editable",
+              "source_ref": "源xlsx!数字货币明细表E1-4!C10",
+              "stable_field_key": "digital_currency_rows/{row_uuid}/currency",
+              "store_item_id": "E1-digital-rows",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "D",
+                "row_from": "row_identity"
+              },
+              "column_key": "fx_rate",
+              "header_source_ref": "源xlsx!数字货币明细表E1-4!D9",
+              "header_text": "汇率",
+              "json_pointer": "/rows/{row_uuid}/fxRate",
+              "mode": "editable",
+              "source_ref": "源xlsx!数字货币明细表E1-4!D10",
+              "stable_field_key": "digital_currency_rows/{row_uuid}/fx_rate",
+              "store_item_id": "E1-digital-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "E",
+                "row_from": "row_identity"
+              },
+              "column_key": "opening_original",
+              "header_source_ref": "源xlsx!数字货币明细表E1-4!E9",
+              "header_text": "期初余额(原币)",
+              "json_pointer": "/rows/{row_uuid}/openingOriginal",
+              "mode": "editable",
+              "source_ref": "源xlsx!数字货币明细表E1-4!E10",
+              "stable_field_key": "digital_currency_rows/{row_uuid}/opening_original",
+              "store_item_id": "E1-digital-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "F",
+                "row_from": "row_identity"
+              },
+              "column_key": "increase_original",
+              "header_source_ref": "源xlsx!数字货币明细表E1-4!F9",
+              "header_text": "本期增加(原币)",
+              "json_pointer": "/rows/{row_uuid}/increaseOriginal",
+              "mode": "editable",
+              "source_ref": "源xlsx!数字货币明细表E1-4!F10",
+              "stable_field_key": "digital_currency_rows/{row_uuid}/increase_original",
+              "store_item_id": "E1-digital-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "G",
+                "row_from": "row_identity"
+              },
+              "column_key": "decrease_original",
+              "header_source_ref": "源xlsx!数字货币明细表E1-4!G9",
+              "header_text": "本期减少(原币)",
+              "json_pointer": "/rows/{row_uuid}/decreaseOriginal",
+              "mode": "editable",
+              "source_ref": "源xlsx!数字货币明细表E1-4!G10",
+              "stable_field_key": "digital_currency_rows/{row_uuid}/decrease_original",
+              "store_item_id": "E1-digital-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "H",
+                "row_from": "row_identity"
+              },
+              "column_key": "closing_original",
+              "header_source_ref": "源xlsx!数字货币明细表E1-4!H9",
+              "header_text": "期末余额(原币)",
+              "json_pointer": "/rows/{row_uuid}/closingOriginal",
+              "mode": "formula",
+              "source_ref": "源xlsx!数字货币明细表E1-4!H10",
+              "stable_field_key": "digital_currency_rows/{row_uuid}/closing_original",
+              "store_item_id": "E1-digital-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "I",
+                "row_from": "row_identity"
+              },
+              "column_key": "closing_local",
+              "header_source_ref": "源xlsx!数字货币明细表E1-4!I9",
+              "header_text": "期末余额(本币)",
+              "json_pointer": "/rows/{row_uuid}/closingLocal",
+              "mode": "formula",
+              "source_ref": "源xlsx!数字货币明细表E1-4!I10",
+              "stable_field_key": "digital_currency_rows/{row_uuid}/closing_local",
+              "store_item_id": "E1-digital-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "J",
+                "row_from": "row_identity"
+              },
+              "column_key": "adjustment_original",
+              "header_source_ref": "源xlsx!数字货币明细表E1-4!J9",
+              "header_text": "审计调整(原币)",
+              "json_pointer": "/rows/{row_uuid}/adjustmentOriginal",
+              "mode": "editable",
+              "source_ref": "源xlsx!数字货币明细表E1-4!J10",
+              "stable_field_key": "digital_currency_rows/{row_uuid}/adjustment_original",
+              "store_item_id": "E1-digital-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "K",
+                "row_from": "row_identity"
+              },
+              "column_key": "audited_original",
+              "header_source_ref": "源xlsx!数字货币明细表E1-4!K9",
+              "header_text": "审定后余额(原币)",
+              "json_pointer": "/rows/{row_uuid}/auditedOriginal",
+              "mode": "formula",
+              "source_ref": "源xlsx!数字货币明细表E1-4!K10",
+              "stable_field_key": "digital_currency_rows/{row_uuid}/audited_original",
+              "store_item_id": "E1-digital-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "L",
+                "row_from": "row_identity"
+              },
+              "column_key": "audited_local",
+              "header_source_ref": "源xlsx!数字货币明细表E1-4!L9",
+              "header_text": "审定后余额(本币)",
+              "json_pointer": "/rows/{row_uuid}/auditedLocal",
+              "mode": "formula",
+              "source_ref": "源xlsx!数字货币明细表E1-4!L10",
+              "stable_field_key": "digital_currency_rows/{row_uuid}/audited_local",
+              "store_item_id": "E1-digital-rows",
+              "value_type": "amount"
+            }
+          ],
+          "footer_anchor": {
+            "carries_total_formula": true,
+            "marker": "合计",
+            "search_column": "A"
+          },
+          "formula_mask": [
+            "H10:H16",
+            "I10:I16",
+            "K10:K16",
+            "L10:L16"
+          ],
+          "header_rows": 1,
+          "row_identity": {
+            "json_pointer": "/rows/*/id",
+            "kind": "field"
+          },
+          "table_key": "digital_currency_rows"
+        }
+      ]
+    }
+  ],
+  "template": {
+    "normalized_structure_hash": "2ee9ab841be7b377213d3ae0c7f04a7c36a5a8a8ee1ee06f00bf3c04d55155b6",
+    "relative_path": "E/E1-1至E1-11 货币资金- 审定表明细表（Leap-常规程序）.xlsx",
+    "template_sha256": "8317e2bac2e57a70778755923332450bd07634e1ff68eb8c14e74d259e58a9ea"
+  },
+  "template_definition_sha256": "120df8453ffda5b8f44b15698f85359f42e8d4b95547a1058d40e9a0cd5e2928"
+}
