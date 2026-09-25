@@ -1691,9 +1691,11 @@ def build_counterfactual_arms(
             "baseline_today": today,
             "conclusion_changes": tier_counts(oo_ok=True, browser_ok=True, chain_ok=True) != today,
             "residual_after_all_removed": (
-                "仍有 schema 欠账（quarantined，owner 任务 9）与上游实现缺口（wrong prior "
-                "confirmation / same-app fold，owner 任务 32）两类不会变绿 —— 它们是**实现/schema** "
-                "缺失，不是环境缺失。"
+                "🔴 2026-09-25：Task 32 的两条上游实现缺口（wrong prior confirmation / "
+                "same-app fold，原 owner 任务 32）**已补齐并解除 debt** ⇒ 三条前提全解除后"
+                "它们变绿。residual 现只剩 schema 欠账（quarantined，owner 任务 9，"
+                "SCHEMA_UNREPRESENTABLE）这一类不会变绿 —— 它是 V151 schema 无法以 passed "
+                "表达，不是环境缺失。"
             ),
         },
         {
@@ -1800,8 +1802,14 @@ def build_forward_recompute() -> dict[str, Any]:
             "case": "F4",
             "scenario_id": "same_application_higher_sequence_fold",
             "inputs": {"oo": True, "browser": True, "chain": True},
-            "expected_tier": TIER_UPSTREAM_GAP,
-            "why": "它带 upstream_debt ⇒ 即使三条前提全齐也**不得**变绿（owner 任务 32）",
+            "expected_tier": TIER_EXECUTED,
+            "why": (
+                "🔴 2026-09-25 Task 32 欠账②补齐后 debt 已解除（读侧 "
+                "`get_operation` 的 `_fold_observability_facts` 暴露 room latest-durable "
+                "指针 + application origin/effective sequence，fold 结果现可观测）。"
+                "它 requires db_entities + server_timeline、非黑盒 ⇒ application 链齐备时"
+                "必须可跑，不再是 upstream_gap。"
+            ),
         },
         {
             "case": "F5",

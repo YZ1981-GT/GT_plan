@@ -735,16 +735,40 @@ class TestClassificationOrderIsNotCommutable:
         本条会在 `oo_available=False` 下拿到 `real_onlyoffice_not_executed`，于是补上 OO
         之后它就变绿 —— 而它其实永远不会通过。
         """
-        for oo_ok in (False, True):
-            row = gate.classify_scenario_execution(
-                scenario_id="same_application_higher_sequence_fold",
-                oo_available=oo_ok,
-                browser_available=oo_ok,
-                application_chain_available=oo_ok,
-            )
-            assert row["execution_tier"] == gate.TIER_UPSTREAM_GAP
-            assert row["blocked_by"] == "upstream_gap"
-            assert row["blocked_owner_task"] == "32"
+        # 🔴 2026-09-25：Task 32 两条真实 debt 已补齐并解除，生产上**已无**带 debt 的场景。
+        # 「debt 判定排在黑盒之前」这条排序不变量本身仍必须成立，故改用**合成 debt**
+        # （monkeypatch 给一个需黑盒的 oracle 挂 debt）来验，不再依赖生产上真的存在欠账
+        # —— 与 Task 44 gate 的 synthetic-debt 排序测同范式。
+        # 🔴 生产模块必须经 `gate._production()` 取：本守卫文件里出现生产模块的**字面量
+        # 路径**会命中任务 68 的辐射面 pattern、顶掉它的 digest（BP-70-8，
+        # 见 test_guard_file_avoids_upstream_surface_patterns）。
+        import dataclasses
+
+        ph = gate._production()["harness"]
+
+        scenario_id = "oo_to_html"  # 需 onlyoffice_forcesave ⇒ 能验「debt 先于黑盒」
+        oracle = ph.SCENARIO_ORACLES[scenario_id]
+        assert oracle.needs_black_box is True
+        assert oracle.upstream_debt is None, "生产上不应再有 debt（Task 32 已补齐）"
+        patched = dict(ph.SCENARIO_ORACLES)
+        patched[scenario_id] = dataclasses.replace(
+            oracle, upstream_debt="合成欠账（仅测判定顺序）：实现缺失"
+        )
+        original = ph.SCENARIO_ORACLES
+        try:
+            ph.SCENARIO_ORACLES = patched  # type: ignore[misc]
+            for oo_ok in (False, True):
+                row = gate.classify_scenario_execution(
+                    scenario_id=scenario_id,
+                    oo_available=oo_ok,
+                    browser_available=oo_ok,
+                    application_chain_available=oo_ok,
+                )
+                # debt 排在黑盒之前 ⇒ 即使 OO 不可用也先落 upstream_gap（不被黑盒吞掉）
+                assert row["execution_tier"] == gate.TIER_UPSTREAM_GAP, (oo_ok, row)
+                assert row["blocked_by"] == "upstream_gap", (oo_ok, row)
+        finally:
+            ph.SCENARIO_ORACLES = original  # type: ignore[misc]
 
     def test_black_box_wins_over_application_chain(self, gate: Any) -> None:
         """黑盒缺失排第三：OO 缺失时错误码必须是 OO 的那一条，而不是 application 链。"""
@@ -1110,12 +1134,33 @@ class TestCounterfactualAndForwardRecompute:
         recorded = next(a for a in report["counterfactual_arms"]["arms"] if a["arm"] == "A3")
         assert recorded["conclusion_changes"] is True
 
-    def test_arm_a4_leaves_a_named_residual(self, report: Mapping[str, Any]) -> None:
-        """A4：三条阻塞全解除后仍有 schema/实现缺口，且各自点名 owner。"""
-        arm = next(a for a in report["counterfactual_arms"]["arms"] if a["arm"] == "A4")
+    def test_arm_a4_leaves_a_named_residual(
+        self, gate: Any, report: Mapping[str, Any]
+    ) -> None:
+        """A4：三条阻塞全解除后仍有 schema 欠账（owner 任务 9），且点名 owner。
+
+        🔴 2026-09-25：Task 32 两条实现缺口（原 owner 任务 32）已补齐并解除 debt ⇒ 三条
+        前提全解除后它们变绿，**不再是 residual**。residual 现只剩 schema 欠账
+        （quarantined，任务 9）。
+
+        🔴 判据走 **live 现算**（`gate.build_counterfactual_arms`）而不是磁盘报告：磁盘
+        JSON 的重生成当前被并发会话的 D2-1 契约新增导致的 live representation drift 挡住
+        （`register_from_manifest` 抛 ContractDriftError），只读磁盘会拿到旧文案而假红。
+        现算与 A3 测同款范式。
+        """
+        live = gate.build_counterfactual_arms(
+            supply=report["supply_chain_walk"],
+            oo=report["oo_probe"],
+            frontend=report["frontend_probe"],
+            denominator=report["scenario_denominator"],
+        )
+        arm = next(a for a in live["arms"] if a["arm"] == "A4")
         assert arm["conclusion_changes"] is True
         residual = arm["residual_after_all_removed"]
-        assert "任务 9" in residual and "任务 32" in residual
+        assert "任务 9" in residual, residual
+        assert "任务 32" not in residual.replace("原 owner 任务 32", ""), (
+            "Task 32 两条欠账已补齐，不应再把它们列为 A4 residual：" + residual
+        )
 
     def test_forward_recompute_has_a_positive_case(
         self, gate: Any, report: Mapping[str, Any]
@@ -1140,10 +1185,19 @@ class TestCounterfactualAndForwardRecompute:
     def test_forward_recompute_covers_all_four_tiers(
         self, gate: Any, report: Mapping[str, Any]
     ) -> None:
-        tiers = {row["expected_tier"] for row in report["forward_recompute"]["rows"]}
+        # 🔴 走 live 现算：磁盘 JSON 重生成当前被 D2-1 契约新增导致的 representation drift
+        # 挡住（见 test_arm_a4_leaves_a_named_residual 的说明），只读磁盘会拿旧档位而假红。
+        tiers = {row["expected_tier"] for row in gate.build_forward_recompute()["rows"]}
         assert gate.TIER_EXECUTED in tiers
         assert gate.TIER_UNRUNNABLE in tiers
-        assert gate.TIER_UPSTREAM_GAP in tiers
+        # 🔴 2026-09-25：Task 32 两条 debt 补齐解除后，生产 scenario 已无 upstream_debt ⇒
+        # 正向重算（用真实 scenario_id）自然不再产出 upstream_gap 档。该档位仍由
+        # `classify_scenario_execution` 支持，其可达性由
+        # `test_upstream_gap_wins_over_black_box` 的**合成 debt** 证明。
+        assert gate.TIER_UPSTREAM_GAP not in tiers, (
+            "生产 scenario 已无 upstream_debt，正向重算不应再出现 upstream_gap 档；"
+            "该档由合成 debt 的排序测覆盖"
+        )
 
     def test_arms_alone_are_declared_insufficient(self, report: Mapping[str, Any]) -> None:
         """报告必须自己写明「多臂抓不到恒真」，并配正向重算。"""
