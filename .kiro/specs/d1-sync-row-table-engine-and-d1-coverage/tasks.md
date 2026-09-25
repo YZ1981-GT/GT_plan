@@ -212,16 +212,31 @@ D1-10 三项共 **28 个标量**的形态待实测（`static_region` vs HTML-onl
 
 ### 阶段 4：CI 门禁
 
-- [ ] 20. `check_framework_layer_has_no_wp_code_branch.py`
+- [x] 20. `check_framework_layer_has_no_wp_code_branch.py` ✅ 2026-09-26：**P9 完全转绿**
+  （先打红 17 处 → 现 0 处，扫 6 个框架层模块）。自测 6 用例全绿，含注入变异反证
+  （构造含 `adapter_id == 'd1.…'` 与 `hasattr(…, "STORE_ITEM_ID_*_DICT")` 的样例源 ⇒ 必被检出）
   - 任务 2 的 P9 SHALL 转绿；白名单（注册表模块本身 / 错误消息文案）显式登记
   - 变异：在框架层加一个 `if adapter_id == "d1.…"` ⇒ 必红
+  - 🔴 **逐项核实过「不是假绿」**：`hasattr(bridge` 在 oo_to_html 仍有 3 处，但它们是
+    `hasattr(bridge, "merge_d45_fixed_from_projection")` 式**函数存在性探测**（provider 可能
+    不提供某专用门面，属合理防御），不是需求 3.2 要消除的 `STORE_ITEM_ID_*_DICT` per-adapter
+    试探。自测另立一条**反面钉子**断言函数探测**应当**存在，防止将来有人把判据「加严」到
+    连它也报、误红后被整体关掉
   - _Requirements: 7.1, 7.4_
 
-- [ ] 21. `check_sheet_specs_fully_registered.py`
+- [x] 21. `check_sheet_specs_fully_registered.py` ✅ 2026-09-26：**P10 完全转绿**
+  （`registry_module_missing` → 11 个 adapter 已注册，含 E1）。自测 6 用例含变异反证
+  （剔掉 d1 ⇒ 必报漏项）+ per-item default 规则断言（rows→`[]` / dict→`{}` / fixed_text→`''`）
+  + 未命中抛错含已注册清单 + dedicated 缺 merge_fn 必抛
   - 任务 3 的 P10 SHALL 转绿；新声明一个 SPEC 不接注册表 ⇒ 必红并精确报漏项
   - _Requirements: 7.2, 7.4_
 
-- [ ] 22. 两方向 store item 集合相等卡点 + 接入 `governance-checks.yml`
+- [x] 22. 两方向 store item 集合相等卡点 + 接入 `governance-checks.yml` ✅ 2026-09-26：
+  新增两个 CI job（YAML 已 `yaml.safe_load` 验证，全库 177 job）：
+  * **`row-table-engine-and-registry-guards`**（10 steps）—— 四道卡点 + 四道自测（含变异反证）
+    + 引擎/声明层等价判据 6 个测试文件
+  * **`e1-sync-coverage-guards`**（5 steps）—— E1 canary 声明层三个测试文件
+  两个 job 都**不**依赖 `tests/workpaper_sync/` 既存失败分母（脚本 stdlib-only、可独立归因）
   - 三个卡点（20/21/22）全部进 CI，**不**依赖 `tests/workpaper_sync/` 既存失败分母
   - _Requirements: 7.3, 7.5_
 

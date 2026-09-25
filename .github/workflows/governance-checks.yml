@@ -6032,3 +6032,117 @@ jobs:
           backend/tests/workpaper_sync/test_materialize_reuse_observability.py
           backend/tests/workpaper_sync/test_projection_digest_is_representation_stable.py
           -q
+
+
+  row-table-engine-and-registry-guards:
+    # 行表引擎 + store 形态注册表四道卡点
+    # （spec d1-sync-row-table-engine-and-d1-coverage Tasks 20/21/22 · Requirements 7.1~7.5）
+    #
+    # 🔴 为什么四道都进 CI 而不只放 pytest：`tests/workpaper_sync/` 有大量与本 spec 无关的
+    #    既存失败（另有 tests/scripts 10 项已 stash 验证与本 spec 零交集），在那个分母上
+    #    「pytest 红了」不是可归因信号。四个脚本均 stdlib-only、可独立红、可独立归因
+    #    （照 `check_store_item_ids_fully_wired.py` 已验证的口径）。
+    #
+    # 四道各自守的不变量：
+    # 1. **golden digest 零回归**（Req 4.1/4.2）—— 8 个已交付 contract 的
+    #    `build_contract_payload` / `build_store_projection`（合成 payload 驱动，Req 4.5
+    #    要求 D3/D5/D6 真库 0 行也不得跳过）/ `instrumentation_spec(s)` 三段 canonical JSON
+    #    sha256 共 **23 个**（B60 是 simple_checklist 无 store_projection 路径 ⇒ 实为 23 不是 24，
+    #    脚本按能力自适应并如实记 null，不假造 digest）。引擎抽取前后逐个不变。
+    # 2. **框架层零 per-adapter 分支**（Req 7.1）—— AST 扫 6 个框架层模块，断言无
+    #    `adapter_id == "d4.revenue_detail"` 式字面量比较、无 `hasattr(bridge,
+    #    "STORE_ITEM_ID_D4xx_DICT")` 式 per-adapter 试探。先打红 17 处（9 elif 链 +
+    #    6 dict hasattr + 2 g7），收敛后归零。白名单只两类且显式登记：注册表模块本身、
+    #    错误消息文案。
+    # 3. **spec 声明全部接注册表**（Req 7.2）—— 8 家已交付 adapter 必须逐个在
+    #    `STORE_MERGE_REGISTRY` 里。漏接的后果有事故背书：D4-35 切 OO 恒空、
+    #    D4-13 两段正文写不进 OO。
+    # 4. **注册表查表 O(1)**（Req 3.5/8.2）—— 以规模递增（10/100/1000/10000）的合成注册表
+    #    断言 dict.get 均摊耗时不随规模上升，并用线性试探作**反证**（实测 600+ 倍）。
+    #    防的是退化成 `for spec in REGISTRY: if spec.matches()`（`field_by_stable_key`
+    #    O(n²) 的同款错误）。
+    #
+    # 每道都带**变异反证**自测（Req 7.4「卡点自身可能永绿」）：故意去掉一项 ⇒ 卡点必红。
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install dependencies (uv accelerated)
+        run: |
+          pip install "uv>=0.7"
+          uv pip install --system -r backend/requirements.txt || pip install -r backend/requirements.txt
+      - name: Gate 1 — sync provider golden digest zero-regression (23 digests)
+        run: python backend/scripts/check/check_sync_provider_golden_digest.py
+      - name: Gate 2 — framework layer has no wp_code/adapter_id branch
+        run: python backend/scripts/check/check_framework_layer_has_no_wp_code_branch.py
+      - name: Gate 3 — sheet specs fully registered in STORE_MERGE_REGISTRY
+        run: python backend/scripts/check/check_sheet_specs_fully_registered.py
+      - name: Gate 4 — registry lookup is O(1) dict (linear probe counter-proof)
+        run: python backend/scripts/check/check_sync_registry_lookup_is_o1.py
+      # 卡点自身的变异反证自测（stdlib + pytest，不依赖 tests/workpaper_sync 既存失败分母）
+      - name: Install guard self-test dependency
+        run: python -m pip install pytest==8.4.2
+      - name: Run the four guards' self-tests (with mutation counter-proofs)
+        run: >-
+          python -m pytest
+          backend/tests/scripts/test_check_sync_provider_golden_digest.py
+          backend/tests/scripts/test_check_framework_layer_has_no_wp_code_branch.py
+          backend/tests/scripts/test_check_sheet_specs_fully_registered.py
+          backend/tests/scripts/test_check_sync_registry_lookup_is_o1.py
+          -q
+      # 引擎与声明层等价判据（框架层 ≡ 七家 provider 原实现，逐元组/逐字段）
+      - name: Run row-table engine equivalence & declaration guards
+        run: >-
+          python -m pytest
+          backend/tests/workpaper_sync/test_sheet_geometry.py
+          backend/tests/workpaper_sync/test_row_table_engine_equivalence.py
+          backend/tests/workpaper_sync/test_row_table_engine_core_equivalence.py
+          backend/tests/workpaper_sync/test_adjudication_sheet_spec.py
+          backend/tests/workpaper_sync/test_d1_sheet_specs.py
+          backend/tests/workpaper_sync/test_d1_instrumentation_specs_expansion.py
+          -q
+
+  e1-sync-coverage-guards:
+    # E1 货币资金 canary 声明层守卫
+    # （spec e1-sync-coverage-and-first-canary Tasks 2/3/7/8/13/14）
+    #
+    # 🔴 E1 与 D 循环的唯一结构差异是**provider 文件存在与否**；其后的契约发布链五环 +
+    #    adapter 注册是六个循环共同的平台级缺口（umbrella BP-61-1：三表近空、186 个
+    #    planned entry 一个都注册不上）⇒ 真栈段如实标 upstream_gap，本 job 只守声明层。
+    #
+    # 守的不变量（全部按**实测**而非推演，裁决 H8「禁推演」从键名扩展到形态）：
+    # 1. **store 键逐字等于前端**（E1-P2）—— E1 有四种以上命名风格（语义 / 编号嵌套 /
+    #    模板化拼接 `` `E1-cash-count-${variant}-rows` `` / pack），且同张 sheet 上并存
+    #    `E1-cash-count-fx-rows` 与 `E1-cashcount-fx-summary-fx`（**一个连字符之差**，
+    #    六次事故背书）⇒ 键名必须按值 grep 实证，模板化键按前缀查。
+    # 2. **binding_kind 用前端三元组判**（E1-P3）—— (store 键是否存在, addRow/removeRow
+    #    信号数, composable 归属)。含**自省变异**：判据把「公式数 < 10 ⇒ static_region」
+    #    这条首版错法复现出来并打红（E1-9/10/11 各只 7 公式，阈值会把三张全判静态，
+    #    实证只有 E1-11 成立）—— 判据必须能打红自己的历史错误，否则下一轮原样复发。
+    # 3. **声明 ≡ 模板逐格实测几何** —— 两级表头 / 数据区 / footer marker（按 codepoint）/
+    #    公式模板（行号归一为 {r} 后逐字比对）。
+    # 4. **E1-P1 红判据**（Task 3）—— slice 现状仍 `legacy_fake_bidirectional` +
+    #    `adapter_id=None`；若已转 `adapter_registered` 则本判据会红并提示更新 spec 状态。
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install dependencies (uv accelerated)
+        run: |
+          pip install "uv>=0.7"
+          uv pip install --system -r backend/requirements.txt || pip install -r backend/requirements.txt
+      - name: Install test dependency
+        run: python -m pip install pytest==8.4.2
+      - name: Run E1 canary & static_region declaration guards
+        run: >-
+          python -m pytest
+          backend/tests/workpaper_sync/test_e1_02_cash_detail_spec.py
+          backend/tests/workpaper_sync/test_e1_04_e1_11_specs.py
+          backend/tests/workpaper_sync/test_e1_provider_and_expansion.py
+          -q
