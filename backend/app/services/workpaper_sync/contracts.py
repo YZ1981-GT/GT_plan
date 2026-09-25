@@ -561,12 +561,53 @@ def _column_index(column: str) -> int:
 
 
 def column_in_ranges(column: str, ranges: Sequence[str]) -> bool:
-    """列是否落在任一 A1 区域的列跨度内（CS-13 用）。"""
+    """列是否落在任一 A1 区域的列跨度内（**CS-13 声明完备性校验**专用）。
+
+    🔴 这是一个**只看列**的粗判定，刻意保留给 CS-13：那条校验问的是「`mode=formula` 的字段
+    有没有被 mask 声明覆盖」，属于声明完备性，列级足够（行号由 provider 自己按数据区生成）。
+
+    **不要**拿它判「某个格是不是受保护单元格」——那需要 :func:`cell_in_ranges`。
+    两者混用过一次，代价是 D4-1 六个声明 `editable` 的金额字段被整列 mask 判成只读，
+    需求 1.5 的「OO 改动生效」在后端整条不可达（详见 `cell_in_ranges` 的 docstring）。
+    """
     target = _column_index(column)
     for raw in ranges:
         c1, _r1, c2, _r2 = parse_a1_range(raw, location="formula_mask")
         low, high = sorted((_column_index(c1), _column_index(c2)))
         if low <= target <= high:
+            return True
+    return False
+
+
+def cell_in_ranges(column: str, row: int, ranges: Sequence[str]) -> bool:
+    """某个**格**（列 + 行）是否落在任一 A1 区域内。
+
+    与 :func:`column_in_ranges` 的区别就是它**同时看行**，这正是「受保护单元格」判定需要的。
+
+    ═══ 为什么必须有这个函数 ═══
+
+    `formula_mask` 有两种声明风格：
+
+    * **区间式**（多数底稿）：``Q13:Q25`` —— 恰好覆盖整个数据区，此时列判定与格判定等价；
+    * **逐格式**（如 D4-1 的 48 格）：``E8, I8, …, B12, C12, …, I12`` —— 除了数据行的
+      审定数列，还含**数据区之外**的小计 / 合计 / 差异行整行 B–I。
+
+    对第二种，只看列会把 B…I 八列整列判成只读。D4-1 因此六个声明 `editable` 的金额字段
+    （B/C/D/F/G/H）全部被判 ``read_only_masked_cell``：OO 侧改动落到 merge 就成了
+    ``conflict_kind='protected'`` + ``suggested_action=keep_current``，``stored`` 永不改变
+    （真栈实测 2026-09-24）。
+
+    Args:
+        column: 列标，支持多字母（``AF``）。
+        row: 1 基行号。
+        ranges: A1 区域串序列（单格如 ``B12`` 也合法，等价于 ``B12:B12``）。
+    """
+    target_col = _column_index(column)
+    for raw in ranges:
+        c1, r1, c2, r2 = parse_a1_range(raw, location="formula_mask")
+        col_low, col_high = sorted((_column_index(c1), _column_index(c2)))
+        row_low, row_high = sorted((r1, r2))
+        if col_low <= target_col <= col_high and row_low <= row <= row_high:
             return True
     return False
 

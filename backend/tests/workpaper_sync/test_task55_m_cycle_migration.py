@@ -1983,7 +1983,10 @@ class TestProperty24ProtectedFormulaAndSummary:
         src = (ROOT / declared["file"]).read_text(encoding="utf-8")
         for member in ("read_only_formula", "read_only_auto_source", "read_only_masked_cell"):
             assert f"ProtectionPolicy.{member}" in src, member
-        assert "column_in_ranges" in src and "formula_mask" in src
+        # `read_only_masked_cell` 现在走**格级**判定 `cell_in_ranges`（列+行），
+        # 不再是只看列的 `column_in_ranges` —— 后者会把逐格式 mask 的数据区外行整列
+        # 误判成只读（d4-html-to-oo-store-contract-alignment 真栈②实测修复）。
+        assert "cell_in_ranges" in src and "formula_mask" in src
         assert "FieldMode.formula" in src and "FieldMode.auto_source" in src
 
     def test_conflict_emitter_really_wraps_the_task37_function(self, manifest_slice: dict) -> None:
