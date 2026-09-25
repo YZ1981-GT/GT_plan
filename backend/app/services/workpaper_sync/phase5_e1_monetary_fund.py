@@ -209,10 +209,13 @@ def assert_entry_selectable(
 # ═══════════════════════════════════════════════════════════════════════════
 
 #: canary：E1-2 现金明细（零 OCR / 零跨 sheet / 键独立，第一册失败面最小的行表）。
-_INCLUDE_E102_CASH_DETAIL: Final[bool] = False
+#: ✅ 2026-09-26 开启：声明层判据齐全（15 用例）+ 契约已生成并双向锁死。
+#: ⚠️ 真栈 materialize / §9.6 三谓词仍卡 adapter 未注册（umbrella BP-61-1 平台级缺口）。
+_INCLUDE_E102_CASH_DETAIL: Final[bool] = True
 
 #: 第二张：E1-4 数字货币（验证「复用框架层零改动」）。
-_INCLUDE_E104_DIGITAL: Final[bool] = False
+#: ✅ 2026-09-26 开启：与 canary 同批，用于证明「第二张接入无需改框架层」。
+_INCLUDE_E104_DIGITAL: Final[bool] = True
 
 #: 唯一 static_region：E1-11 银行账户情况承诺（绕开整条位移链）。
 _INCLUDE_E111_COMMITMENT_STATIC: Final[bool] = False
@@ -305,6 +308,18 @@ def instrumentation_specs() -> tuple[ExcelInstrumentationSpec, ...]:
     return tuple(dynamic)
 
 
+#: 🔴 `oo_to_html` 的 rows 分支读的单数常量（**canary 的键**）。
+#:
+#:    E1 是多 store item 形态，但回方向的 rows 分支一次只镜像一条 item ⇒ 这里指向 canary
+#:    `E1-cash-detail-rows`。其余 item 由 `all_store_item_ids()` 供出方向使用；
+#:    将来多 item 一次性镜像时改走 `dual_store_fn` 门面（D4 的 `_mirror_d4_dual_stores` 同型），
+#:    归 spec Task 10（宿主接桥）。
+#:
+#:    ⚠️ 为什么不留空/不省略：`oo_to_html` 用 `bridge.STORE_ITEM_ID` 取值，缺它就是
+#:    AttributeError → opaque 500（g7/h1 刚因同款问题被修）。
+STORE_ITEM_ID: Final[str] = "E1-cash-detail-rows"
+
+
 def all_store_item_ids() -> tuple[str, ...]:
     """本 entry 的全部 store item（**单一口径**，出/回两方向都从它取，需求 3.3）。"""
     items: list[str] = []
@@ -318,3 +333,338 @@ def all_store_item_ids() -> tuple[str, ...]:
             if item not in items:
                 items.append(item)
     return tuple(items)
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# 5. instrumentation / definition payloads
+# ═══════════════════════════════════════════════════════════════════════════
+
+
+def instrumentation_spec() -> ExcelInstrumentationSpec:
+    """单数入口（与 D1/D3 等同名函数同口径）：取受管清单的**第一个**动态 spec。
+
+    🔴 受管清单为空（三个开关全 False）时抛而非返回 None —— 「没有受管 sheet 却在问
+    instrumentation」是调用方逻辑错误，静默返回 None 会让下游在 `None.template_id` 处
+    炸出无来源的 AttributeError。
+    """
+    specs = instrumentation_specs()
+    if not specs:
+        raise EntrySelectionError(
+            "E1 当前无受管 sheet（三个 _INCLUDE_* 开关全 False）—— "
+            "instrumentation_spec() 无可返回项；请先打开至少一个灰度开关"
+        )
+    return specs[0]
+
+
+def template_definition_payload() -> dict[str, Any]:
+    """template definition 的 canonical payload（发布 DAG 第一段）。"""
+    from app.services.workpaper_sync.excel_instrumentation import (
+        build_template_payload,
+        normalized_structure_hash,
+    )
+
+    data = read_authoritative_template()
+    return build_template_payload(
+        spec=instrumentation_spec(),
+        template_sha256=TEMPLATE_SHA256,
+        structure_hash=normalized_structure_hash(data),
+    )
+
+
+def instrumentation_definition_payload() -> dict[str, Any]:
+    """instrumentation definition 的 canonical payload（单向引用 template digest）。"""
+    from app.services.workpaper_sync.definitions import canonical_digest
+    from app.services.workpaper_sync.excel_instrumentation import (
+        build_instrumentation_payload,
+    )
+
+    return build_instrumentation_payload(
+        spec=instrumentation_spec(),
+        template_definition_sha256=canonical_digest(template_definition_payload()),
+        template_sha256=TEMPLATE_SHA256,
+        gate=excel_carrier_gate(),
+    )
+
+
+def authority_model_payload() -> dict[str, Any]:
+    """authoritative model definition 的 canonical payload（独立批准）。"""
+    from app.services.workpaper_sync.models import BundleSlot
+
+    return {
+        "schema_version": "authority-model-definition:v1",
+        "authority_model": AUTHORITY_MODEL.value,
+        "content_authority": "structured_projection",
+        "merge_model": "stable_field_three_way",
+        "required_slots": [
+            BundleSlot.template.value,
+            BundleSlot.instrumentation.value,
+            BundleSlot.contract.value,
+        ],
+        "entry_id": ENTRY_ID,
+        "pilot_class": PHASE5_WAVE,
+    }
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# 6. per-entry contract（与磁盘契约双向锁死）
+#
+# 🔴 契约由**框架层引擎**从受管 spec 装配（`phase5_row_table_sheet` 的 7 元组 +
+#    `managed_field_specs` 排序），本模块不再手写 field 循环 —— 那正是本 spec 要消除的
+#    「每家 provider 复制一份契约装配算法」。
+# ═══════════════════════════════════════════════════════════════════════════
+
+
+def _src(sheet: str, cell: str) -> str:
+    """`source_ref` 的统一形态：权威源 xlsx 的 `sheet!单元格`。"""
+    return f"源xlsx!{sheet}!{cell}"
+
+
+def stable_key_for(spec: Any, column_key: str, row_identity: str = "{row_uuid}") -> str:
+    """`{table_key}/{row_identity}/{column_key}`（转发框架层，唯一拼装处）。"""
+    from app.services.workpaper_sync.phase5_row_table_sheet import (
+        stable_key_for as _framework_stable_key_for,
+    )
+
+    return _framework_stable_key_for(spec, column_key, row_identity)
+
+
+def _rows_table_payload(spec: Any) -> dict[str, Any]:
+    """一个受管行表区的契约 table payload（字段序由引擎按列序给出）。"""
+    from app.services.workpaper_sync.phase5_row_table_sheet import managed_field_specs
+
+    header_row = spec.header_leaf_row or spec.header_row or spec.header_group_row
+    anchor_row = spec.header_group_row or spec.header_row or header_row
+    fields: list[dict[str, Any]] = []
+    for (
+        column_key,
+        column,
+        mode,
+        value_type,
+        json_path,
+        header_text,
+        group_cell,
+    ) in managed_field_specs(spec):
+        field: dict[str, Any] = {
+            "stable_field_key": stable_key_for(spec, column_key),
+            "json_pointer": f"/rows/{{row_uuid}}/{json_path}",
+            "column_key": column_key,
+            "cell": {"column": column, "row_from": "row_identity"},
+            "mode": mode,
+            "value_type": value_type,
+            "source_ref": _src(spec.managed_sheet, f"{column}{spec.first_data_row}"),
+            "header_source_ref": _src(
+                spec.managed_sheet,
+                f"{column}{spec.header_leaf_row if group_cell else (spec.header_row or anchor_row)}",
+            ),
+            "store_item_id": spec.store_item_id,
+            "header_text": header_text,
+        }
+        if group_cell:
+            field["group_source_ref"] = _src(spec.managed_sheet, group_cell)
+        fields.append(field)
+    return {
+        "table_key": spec.table_key,
+        "anchor": f"A{anchor_row}",
+        "header_rows": 2 if spec.header_group_row and spec.header_leaf_row else 1,
+        "row_identity": {
+            "kind": "field",
+            "json_pointer": f"/rows/*/{spec.row_identity_key}",
+        },
+        "delete_policy": "tombstone",
+        "footer_anchor": {
+            "marker": spec.footer_marker,
+            "search_column": "A",
+            "carries_total_formula": True,
+        },
+        "formula_mask": list(spec.formula_mask),
+        "fields": fields,
+    }
+
+
+def build_contract_payload() -> dict[str, Any]:
+    """本 entry 的 per-entry contract canonical payload（两个 digest 现算，单向引用）。
+
+    🔴 受管清单为空时抛：空契约（`sheets: []`）会让 `parse_contract` 与 attach 侧的对齐
+    计数守卫都拿不到锚点，且一旦被发布就固化成「这个 entry 什么都不受管」的假身份。
+    """
+    from app.services.workpaper_sync.contracts import CONTRACT_SCHEMA_VERSION
+    from app.services.workpaper_sync.definitions import canonical_digest
+    from app.services.workpaper_sync.excel_extract import TABLE_SHEET_ANCHOR
+
+    row_specs = managed_row_table_specs()
+    if not row_specs:
+        raise EntrySelectionError(
+            "E1 当前无受管行表 sheet（三个 _INCLUDE_* 开关全 False）—— "
+            "不得发布空契约（sheets: [] 会固化成「什么都不受管」的假身份）"
+        )
+
+    template_payload = template_definition_payload()
+
+    # 同一 sheet 的多个受管区合并进一个 sheet 条目（一 sheet 多 table）
+    sheets: list[dict[str, Any]] = []
+    by_sheet_key: dict[str, dict[str, Any]] = {}
+    for spec in row_specs:
+        entry = by_sheet_key.get(spec.sheet_key)
+        if entry is None:
+            entry = {
+                "sheet_key": spec.sheet_key,
+                "excel_name": spec.managed_sheet,
+                "locator": {"anchor": TABLE_SHEET_ANCHOR},
+                "tables": [],
+            }
+            by_sheet_key[spec.sheet_key] = entry
+            sheets.append(entry)
+        entry["tables"].append(_rows_table_payload(spec))
+
+    return {
+        "schema_version": CONTRACT_SCHEMA_VERSION,
+        "contract_id": ADAPTER_ID,
+        "semantic_version": "1.0.0",
+        "review_status": "reviewed",
+        "document_type": "xlsx",
+        "template_definition_sha256": canonical_digest(template_payload),
+        "instrumentation_definition_sha256": canonical_digest(
+            instrumentation_definition_payload()
+        ),
+        "template": {
+            "relative_path": TEMPLATE_RELATIVE_PATH,
+            "template_sha256": TEMPLATE_SHA256,
+            "normalized_structure_hash": template_payload["normalized_structure_hash"],
+        },
+        "identity_carriers": [
+            "hidden_sheet",
+            "defined_name",
+            "excel_table",
+            "hidden_uuid_column",
+        ],
+        "sheets": sheets,
+        "review": {
+            "entry_id": ENTRY_ID,
+            "pilot_class": PHASE5_WAVE,
+            "authority_root": "backend/wp_templates",
+            "html_store": {
+                "table": "checklist_responses",
+                "item_ids": list(all_store_item_ids()),
+                "shape": "json_array_of_row_objects",
+                "note": _HTML_STORE_NOTE,
+            },
+            "reviewed_basis": _REVIEWED_BASIS,
+            "cross_volume_keys": dict(CROSS_VOLUME_KEYS),
+        },
+    }
+
+
+#: 契约 `review.html_store.note` 的冻结文本。
+_HTML_STORE_NOTE: Final[str] = (
+    "E1 第一册的受管 sheet 各自一条 checklist_responses item。🔴 行身份键是 `id`"
+    "（**不是** D 循环惯用的 `rowId`）—— useE1CashDetail/useE1Digital 的行对象字段名实测为 "
+    "`id`，照抄 D 类会让 store-projection fail-closed 抛「缺稳定行身份」把整个 entry 打挂。"
+    "E1-2 另有不可删除的固定行 `fixed-rmb`（对应模板 R15 人民币），与动态行 `cash-<uuid>` "
+    "同在 `id` 字段 ⇒ 混合身份无需拆区"
+)
+
+#: 契约 `review.reviewed_basis` 的冻结文本。
+_REVIEWED_BASIS: Final[str] = (
+    "openpyxl 逐格直读权威模板 E/E1-1至E1-11 货币资金- 审定表明细表（Leap-常规程序）.xlsx"
+    "（第一册，16 sheet，sha256 8317e2ba）。受管 sheet 的几何全部逐格实测："
+    "现金明细表E1-2 两级表头 R13/R14、数据区 R15-21（R15-19 预填币种 人民币/美元/日元/澳元/欧元、"
+    "R20-21 空白待扩）、footer R22「合计」=SUM(15:21)、公式列 E=B+C-D / G=E*F（乘法）/ "
+    "I=G+H*F（乘加混合）、R23「其中：存放在境外的款项总额」在 footer 之下故登记 HTML-only；"
+    "数字货币明细表E1-4 单级表头 R9、数据区 R10-16（预填序号 1-7）、footer R17、"
+    "公式列 H=E+F-G / I=H*D / K=H+J / L=K*D。"
+    "形态判定用**前端三元组**（store 键按值 grep / addRow-removeRow 信号 / composable 归属）"
+    "而非模板公式数 —— E1-9/E1-10/E1-11 各只 7 公式，按公式数阈值会把三张全判 static_region，"
+    "实证只有 E1-11 成立（零 -rows 键、无 composable、承诺函段落表单）"
+)
+
+
+def contract_file_path() -> Path:
+    """磁盘契约路径（`contracts.contract_path_for` 是唯一拼路径处）。"""
+    from app.services.workpaper_sync.contracts import contract_path_for
+
+    return contract_path_for(ADAPTER_ID)
+
+
+def load_contract_from_disk():
+    """从磁盘加载并强校验本 entry 的生产契约。"""
+    from app.services.workpaper_sync.contracts import load_contract
+
+    return load_contract(ADAPTER_ID)
+
+
+def assert_contract_file_matches_source():
+    """磁盘契约 ↔ 本模块现算 payload **双向**锁死。"""
+    from app.services.workpaper_sync.contracts import parse_contract
+    from app.services.workpaper_sync.definitions import canonical_digest
+
+    expected = build_contract_payload()
+    on_disk = load_contract_from_disk()
+    if canonical_digest(on_disk.canonical_payload) != canonical_digest(expected):
+        raise EntrySelectionError(
+            "磁盘 per-entry contract 与本模块现算 payload 不一致 —— "
+            f"disk={canonical_digest(on_disk.canonical_payload)} "
+            f"source={canonical_digest(expected)}；"
+            "请用 `& d:/GT_plan/.venv/Scripts/python.exe "
+            "backend/scripts/gen/generate_phase5_e1_contract.py --apply` 重生成"
+        )
+    parse_contract(expected, adapter_id=ADAPTER_ID)
+    return on_disk
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# 7. store 投影与合并（**薄转发框架层引擎**，本模块零算法）
+#
+# 🔴 这是本 spec 三层架构的收益兑现点：D1/D3/D5/D6/D7 五家各自复制了约 200 行
+#    投影 + 合并代码，而 E1 作为「引擎落地后新建的第一个 entry」只需转发 —— 每个函数 ≤3 行。
+#    若这里需要写算法，说明框架层抽象不足，应回上游
+#    `d1-sync-row-table-engine-and-d1-coverage` 修而不是在此特化。
+# ═══════════════════════════════════════════════════════════════════════════
+
+
+def _spec_of_store_item(store_item_id: str) -> Any:
+    """store item → 受管 spec。未登记即抛（**不静默跳过** —— 那是 D4-35 恒空的根因形态）。"""
+    for spec in (*managed_row_table_specs(), *static_region_specs()):
+        if spec.store_item_id == store_item_id:
+            return spec
+    raise EntrySelectionError(
+        f"store item {store_item_id!r} 不在 E1 当前受管清单里；"
+        f"已受管：{sorted(all_store_item_ids())} —— "
+        "灰度开关未开或键名写错时必须显式失败，不得静默当成零行"
+    )
+
+
+def build_store_projection(
+    payload: Any, *, contract: Any, limits: Any | None = None, store_item_id: str | None = None
+) -> Any:
+    """HTML store 载荷 → `Projection`（薄转发框架层引擎）。
+
+    :param store_item_id: 指定按哪个受管区投影；缺省用 canary（:data:`STORE_ITEM_ID`）。
+    """
+    from app.services.workpaper_sync.phase5_row_table_sheet import (
+        build_store_projection as _engine_build,
+    )
+
+    spec = _spec_of_store_item(store_item_id or STORE_ITEM_ID)
+    return _engine_build(spec, payload, contract=contract, limits=limits)
+
+
+def merge_projection_into_store_rows(
+    *, projection: Any, base_rows: list, store_item_id: str | None = None
+) -> tuple[list[dict[str, Any]], int, int, set[str]]:
+    """projection → HTML store 行（薄转发框架层引擎，含幽灵行防护）。"""
+    from app.services.workpaper_sync.phase5_row_table_sheet import (
+        merge_projection_into_store_rows as _engine_merge,
+    )
+
+    spec = _spec_of_store_item(store_item_id or STORE_ITEM_ID)
+    return _engine_merge(spec, projection=projection, base_rows=base_rows)
+
+
+def iter_store_rows(payload: Any, *, store_item_id: str | None = None):
+    """流式 `(row_identity, row)`（薄转发框架层引擎）。"""
+    from app.services.workpaper_sync.phase5_row_table_sheet import (
+        iter_store_rows as _engine_iter,
+    )
+
+    spec = _spec_of_store_item(store_item_id or STORE_ITEM_ID)
+    return _engine_iter(spec, payload)

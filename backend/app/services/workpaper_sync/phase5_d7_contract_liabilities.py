@@ -173,49 +173,87 @@ _snake = snake
 _col_index = col_index
 
 
-def _aging_field_specs() -> tuple[tuple[str, str, str, str, str, str], ...]:
-    """两个账龄组展开成 8 条 spec（形态同 SCALAR_FIELD_SPECS，json 键为 nested 路径）。"""
-    out: list[tuple[str, str, str, str, str, str]] = []
-    for json_prefix, _group_cell, columns in AGING_GROUPS:
-        if len(columns) != len(AGING_SEGMENTS):
-            raise EntrySelectionError(
-                f"账龄组 {json_prefix} 声明了 {len(columns)} 列，段清单有 "
-                f"{len(AGING_SEGMENTS)} 段 —— 列与段必须一一对应"
-            )
-        prefix_key = _snake(json_prefix)
-        for column, (seg_key, leaf_label) in zip(columns, AGING_SEGMENTS):
-            out.append(
-                (
-                    f"{prefix_key}_{seg_key.lower()}",
-                    column,
-                    "editable",
-                    "amount",
-                    f"{json_prefix}/{seg_key}",
-                    leaf_label,
-                )
-            )
-    return tuple(out)
-
-
-#: 27 个受管字段 = 19 标量 + 8 账龄，按 Excel 列序（A→AA）排列。
-MANAGED_FIELD_SPECS: Final[tuple[tuple[str, str, str, str, str, str], ...]] = tuple(
-    sorted(SCALAR_FIELD_SPECS + _aging_field_specs(), key=lambda row: _col_index(row[1]))
-)
-
 #: column_key → 账龄组标题单元格（只有账龄列有）。
+#: 🔴 保留独立 mapping 供既有调用方（如有）；权威来源已内联进 `SPEC_D72.field_specs` 第 7 位
+#: （design 裁决 3：group_header_cell 统一为内联第 7 位）。
 GROUP_HEADER_CELLS: Final[Mapping[str, str]] = {
     f"{_snake(json_prefix)}_{seg_key.lower()}": group_cell
     for json_prefix, group_cell, _cols in AGING_GROUPS
     for seg_key, _leaf in AGING_SEGMENTS
 }
 
-#: 四个公式列的只读区域。
-FORMULA_MASK: Final[tuple[str, ...]] = (
-    f"I{FIRST_DATA_ROW}:I{LAST_DATA_ROW}",
-    f"P{FIRST_DATA_ROW}:P{LAST_DATA_ROW}",
-    f"R{FIRST_DATA_ROW}:R{LAST_DATA_ROW}",
-    f"U{FIRST_DATA_ROW}:U{LAST_DATA_ROW}",
+# ═══════════════════════════════════════════════════════════════════════════
+# Task 16 声明化（spec: d1-sync-row-table-engine-and-d1-coverage）：SPEC_D72 是本 entry
+# 唯一权威声明，MANAGED_FIELD_SPECS / FORMULA_MASK 两个既有常量名从它派生（保留名字与值
+# 不变，供既有调用方与零回归门核对；不删除是因为 `pilot_` 别名同款裁决 —— 改名收益低于
+# 全仓 grep 调用方的风险）。
+# ═══════════════════════════════════════════════════════════════════════════
+
+from app.services.workpaper_sync.phase5_row_table_sheet import (  # noqa: E402
+    AgingGroupSpec,
+    AgingLayout,
+    RowTableSheetSpec,
+    StoreKind,
 )
+from app.services.workpaper_sync.phase5_row_table_sheet import (  # noqa: E402
+    managed_field_specs as _engine_managed_field_specs,
+)
+
+#: SCALAR_FIELD_SPECS 是 6 元组（无 group_header_cell 独立位），补空第 7 位内联（裁决 3）。
+_SCALAR_FIELD_SPECS_7TUPLE: Final[tuple[tuple[str, str, str, str, str, str, str], ...]] = tuple(
+    (*row, "") for row in SCALAR_FIELD_SPECS
+)
+
+#: nested 账龄两组，翻成框架层 `AgingGroupSpec`（`segments` 二元 `(seg_key, column)` +
+#: 独立 `leaf_labels`，与 D7 原 `AGING_SEGMENTS` 的 `(seg_key, leaf_label)` 一一对应）。
+_AGING_GROUP_SPECS_D72: Final[tuple[AgingGroupSpec, ...]] = tuple(
+    AgingGroupSpec(
+        json_prefix=json_prefix,
+        group_header_cell=group_cell,
+        segments=tuple(
+            (seg_key, column) for column, (seg_key, _leaf) in zip(columns, AGING_SEGMENTS)
+        ),
+        leaf_labels=tuple(leaf for _seg, leaf in AGING_SEGMENTS),
+    )
+    for json_prefix, group_cell, columns in AGING_GROUPS
+)
+
+SPEC_D72: Final[RowTableSheetSpec] = RowTableSheetSpec(
+    managed_sheet=MANAGED_SHEET,
+    sheet_key=SHEET_KEY,
+    table_key=ROWS_TABLE_KEY,
+    template_id=TEMPLATE_ID,
+    table_name=TABLE_NAME,
+    uuid_col=UUID_COL,
+    first_data_row=FIRST_DATA_ROW,
+    last_data_row=LAST_DATA_ROW,
+    footer_row=FOOTER_ROW,
+    header_group_row=HEADER_GROUP_ROW,
+    header_leaf_row=HEADER_LEAF_ROW,
+    store_item_id=STORE_ITEM_ID,
+    empty_payload=EMPTY_STORE_PAYLOAD,
+    row_identity_key=ROW_IDENTITY_STORE_KEY,
+    store_kind=StoreKind.rows,
+    field_specs=_SCALAR_FIELD_SPECS_7TUPLE,
+    formula_columns=("I", "P", "R", "U"),
+    aging_layout=AgingLayout.nested,
+    aging_groups=_AGING_GROUP_SPECS_D72,
+    footer_marker=FOOTER_MARKER,
+    error_label="D7-2 明细表",
+)
+
+#: 27 个受管字段 = 19 标量 + 8 账龄，按 Excel 列序（A→AA）排列。
+#: 🔴 本值现由框架层 `managed_field_specs(SPEC_D72)` 现算（去掉引擎输出第 7 位
+#: group_header_cell，还原成本 entry 原 6 元组形态）；`_aging_field_specs()` 函数体
+#: 已删（改用框架层 `expand_aging_fields`，逐字节等价见 Property 3 判据）。
+MANAGED_FIELD_SPECS: Final[tuple[tuple[str, str, str, str, str, str], ...]] = tuple(
+    row[:6] for row in _engine_managed_field_specs(SPEC_D72)
+)
+
+#: 四个公式列的只读区域。
+#: 🔴 本值现由框架层 `SPEC_D72.formula_mask` property 现算（Requirement 1.2），
+#: provider 不再手写字面量。
+FORMULA_MASK: Final[tuple[str, ...]] = SPEC_D72.formula_mask
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -379,7 +417,13 @@ def _src(cell: str) -> str:
 
 
 def stable_key_for(column_key: str, row_identity: str = "{row_uuid}") -> str:
-    return f"{ROWS_TABLE_KEY}/{row_identity}/{column_key}"
+    """薄转发框架层同名函数（Task 16 声明化，逐字节等价：两者都是
+    `f"{table_key}/{row_identity}/{column_key}"`）。"""
+    from app.services.workpaper_sync.phase5_row_table_sheet import (
+        stable_key_for as _engine_stable_key_for,
+    )
+
+    return _engine_stable_key_for(SPEC_D72, column_key, row_identity)
 
 
 def _rows_table_payload() -> dict[str, Any]:
@@ -515,62 +559,11 @@ def assert_contract_file_matches_source() -> SyncContract:
 # ═══════════════════════════════════════════════════════════════════════════
 
 
-def store_row_identity(row: Mapping[str, Any], *, ordinal: int) -> str:
-    raw = row.get(ROW_IDENTITY_STORE_KEY)
-    if not isinstance(raw, str) or not raw.strip():
-        raise StorePayloadError(
-            f"{STORE_ITEM_ID} 第 {ordinal} 行缺少稳定行身份 {ROW_IDENTITY_STORE_KEY!r}"
-            f"（实得 {raw!r}）—— 不得退回数组下标作身份（Requirement 6.5 / Property 23）"
-        )
-    return raw.strip()
-
-
-def iter_store_rows(
-    payload: str | bytes | Sequence[Any],
-) -> Iterator[tuple[str, Mapping[str, Any]]]:
-    if isinstance(payload, (str, bytes, bytearray)):
-        text = payload.decode("utf-8") if isinstance(payload, (bytes, bytearray)) else payload
-        try:
-            rows: Any = json.loads(text)
-        except ValueError as exc:
-            raise StorePayloadError(f"{STORE_ITEM_ID} 的 remark 不是合法 JSON: {exc}") from exc
-    else:
-        rows = payload
-    if not isinstance(rows, list):
-        raise StorePayloadError(
-            f"{STORE_ITEM_ID} 的载荷必须是行对象数组，实得 {type(rows).__name__} —— 必须 fail closed"
-        )
-    seen: set[str] = set()
-    for ordinal, row in enumerate(rows):
-        if not isinstance(row, Mapping):
-            raise StorePayloadError(
-                f"{STORE_ITEM_ID} 第 {ordinal} 项不是对象，实得 {type(row).__name__}"
-            )
-        identity = store_row_identity(row, ordinal=ordinal)
-        if identity in seen:
-            raise StorePayloadError(
-                f"{STORE_ITEM_ID} 出现重复行身份 {identity!r}（第 {ordinal} 项）—— 不得静默合并"
-            )
-        seen.add(identity)
-        yield identity, row
-
-
-def _resolve_json_path(row: Mapping[str, Any], json_path: str) -> Any:
-    """按 `agingPrior/within1` 这类路径取值；缺失返回 None（不猜、不造）。"""
-    cursor: Any = row
-    for segment in json_path.split("/"):
-        if not isinstance(cursor, Mapping):
-            return None
-        cursor = cursor.get(segment)
-    return cursor
-
-
-def split_store_row(
-    row: Mapping[str, Any], *, row_identity: str, contract: SyncContract
-) -> Iterator[tuple[str, Any, FieldSpec]]:
-    for column_key, _column, _mode, _vt, json_path, _label in MANAGED_FIELD_SPECS:
-        spec = contract.field_by_stable_key(stable_key_for(column_key))
-        yield stable_key_for(column_key, row_identity), _resolve_json_path(row, json_path), spec
+#: 🔴 Task 16 声明化：`store_row_identity` / `iter_store_rows` / `_resolve_json_path` /
+#: `split_store_row` / `build_store_projection` 五个函数已收敛进框架层
+#: `phase5_row_table_sheet`（逐字节等价，Task 1 的 golden digest 门钉住零回归）。
+#: 本模块保留 `build_store_projection` 同名薄转发（既有调用方零改动），其余四个内部
+#: helper 不再需要独立名字（框架层内部消费，provider 不再各自复制）。
 
 
 def build_store_projection(
@@ -579,52 +572,12 @@ def build_store_projection(
     contract: SyncContract,
     limits: Any | None = None,
 ) -> Any:
-    from app.services.workpaper_sync.adapters.base import FieldValue, Projection
-    from app.services.workpaper_sync.excel_extract import StreamingProjectionBudget
-    from app.services.workpaper_sync.limits import load_limits
-
-    lim = limits or load_limits()
-    budget = StreamingProjectionBudget(lim)
-    values: dict[str, FieldValue] = {}
-    row_keys: list[str] = []
-    for identity, row in iter_store_rows(payload):
-        budget.add_row(ROWS_TABLE_KEY)
-        row_keys.append(identity)
-        for stable_key, value, spec in split_store_row(
-            row, row_identity=identity, contract=contract
-        ):
-            budget.add_field()
-            values[stable_key] = FieldValue(
-                stable_key=stable_key,
-                value=value,
-                value_type=spec.value_type,
-                mode=spec.mode,
-                row_key=identity,
-            )
-    return Projection(
-        contract_id=contract.contract_id,
-        semantic_version=contract.semantic_version,
-        document_type=contract.document_type,
-        values=values,
-        row_keys={ROWS_TABLE_KEY: tuple(row_keys)},
+    """薄转发框架层 `build_store_projection(SPEC_D72, ...)`（逐字节等价）。"""
+    from app.services.workpaper_sync.phase5_row_table_sheet import (
+        build_store_projection as _engine_build_store_projection,
     )
 
-
-def _set_json_path(row: dict[str, Any], json_path: str, value: Any) -> bool:
-    """按 `agingPrior/within1` 写值，逐级建 dict；返回是否真的改了值。"""
-    parts = json_path.split("/")
-    cursor: dict[str, Any] = row
-    for seg in parts[:-1]:
-        nxt = cursor.get(seg)
-        if not isinstance(nxt, dict):
-            nxt = {}
-            cursor[seg] = nxt
-        cursor = nxt
-    leaf = parts[-1]
-    if cursor.get(leaf) != value:
-        cursor[leaf] = value
-        return True
-    return False
+    return _engine_build_store_projection(SPEC_D72, payload, contract=contract, limits=limits)
 
 
 def merge_projection_into_store_rows(
@@ -632,65 +585,15 @@ def merge_projection_into_store_rows(
     projection: Any,
     base_rows: list[Mapping[str, Any]],
 ) -> tuple[list[dict[str, Any]], int, int, set[str]]:
-    """把已 extract 的 projection 合进 D7-2-rows HTML store 行（不读盘）。
+    """薄转发框架层 `merge_projection_into_store_rows(SPEC_D72, ...)`（逐字节等价，含幽灵行防护）。
 
-    🔴 field_id（snake column_key）→ store json 路径（含 nested 账龄 agingPrior/within1）
-    的映射由 MANAGED_FIELD_SPECS 的第 0/4 列给出，两侧不可能各写一份而脱钩。
-
-    🔴 幽灵行防护（D4-2 同源缺陷，2026-09-22 用户实测）：Excel Table 边界被扩展时，
-    若新行只有一个杂散的 editable 格非空（公式列已由 is_protected 挡掉），这一个
-    字段就会让 identity 通过 shell 创建关卡，而 contract_name（该行的业务名称，
-    契约首列）因从未在 Excel 里写入内容、根本不产出 FieldValue，永久停在空值。
-    只对**本次新增**的 identity 加这道门：已存在的行永不受影响（清空是合法编辑）。
+    🔴 Task 16 声明化：`_set_json_path` 已收敛进框架层 `set_json_path`（provider 不再复制）。
     """
-    field_to_path = {spec[0]: spec[4] for spec in MANAGED_FIELD_SPECS}
-    name_json_path = MANAGED_FIELD_SPECS[0][4]
-    by_id: dict[str, dict[str, Any]] = {}
-    order: list[str] = []
-    for row in base_rows:
-        rid = str(row.get(ROW_IDENTITY_STORE_KEY) or "").strip()
-        if not rid:
-            continue
-        by_id[rid] = dict(row)
-        order.append(rid)
+    from app.services.workpaper_sync.phase5_row_table_sheet import (
+        merge_projection_into_store_rows as _engine_merge,
+    )
 
-    pre_existing_ids = set(by_id)
-    applied = 0
-    visited = 0
-    touched_rows: set[str] = set()
-    for key in projection.stable_keys():
-        fv = projection.get(key)
-        if fv is None or getattr(fv, "is_protected", False):
-            continue
-        rid = getattr(fv, "row_key", None)
-        if not rid:
-            continue
-        target = by_id.get(str(rid))
-        if target is None:
-            target = {ROW_IDENTITY_STORE_KEY: str(rid)}
-            by_id[str(rid)] = target
-            order.append(str(rid))
-        field_id = str(key).rsplit("/", 1)[-1]
-        json_path = field_to_path.get(field_id)
-        if not json_path:
-            continue
-        visited += 1
-        new_val = getattr(fv, "value", None)
-        if _set_json_path(target, json_path, new_val):
-            applied += 1
-            touched_rows.add(str(rid))
-
-    ghost_ids = {
-        rid
-        for rid in order
-        if rid not in pre_existing_ids
-        and not str(_resolve_json_path(by_id[rid], name_json_path) or "").strip()
-    }
-    if ghost_ids:
-        order = [rid for rid in order if rid not in ghost_ids]
-        touched_rows -= ghost_ids
-
-    return [by_id[rid] for rid in order], applied, visited, touched_rows
+    return _engine_merge(SPEC_D72, projection=projection, base_rows=base_rows)
 
 
 # ═══════════════════════════════════════════════════════════════════════════

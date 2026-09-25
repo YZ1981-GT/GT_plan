@@ -94,16 +94,48 @@ def test_e1p1_current_state_is_red_legacy_fake_bidirectional() -> None:
 # ═══════════════════════════════════════════════════════════════════════════
 
 
-def test_switches_off_equals_zero_managed_regions() -> None:
-    assert E._INCLUDE_E102_CASH_DETAIL is False
-    assert E._INCLUDE_E104_DIGITAL is False
-    assert E._INCLUDE_E111_COMMITMENT_STATIC is False
+def test_current_switch_state_matches_contract() -> None:
+    """🔴 2026-09-26：canary(E1-2) 与第二张(E1-4) 的灰度开关**已开启**，static(E1-11) 仍关。
+
+    开关状态必须与磁盘契约一致 —— 契约由 `build_contract_payload()` 按受管清单现算，
+    两者一旦脱钩，`assert_contract_file_matches_source()` 会打红（双向锁死的设计意图）。
+    """
+    assert E._INCLUDE_E102_CASH_DETAIL is True
+    assert E._INCLUDE_E104_DIGITAL is True
+    assert E._INCLUDE_E111_COMMITMENT_STATIC is False, (
+        "E1-11 静态区尚未开启（它的验收段卡 upstream_gap：OCR 禁用需真栈验证）"
+    )
+    specs = E.instrumentation_specs()
+    assert {s.resolved_sheet_key for s in specs} == {
+        E102.SHEET_KEY_E102, E104.SHEET_KEY_E104
+    }
+    assert set(E.all_store_item_ids()) == {
+        E102.STORE_ITEM_ID_E102, E104.STORE_ITEM_ID_E104
+    }
+
+
+def test_contract_is_locked_to_source() -> None:
+    """磁盘契约 ↔ provider 现算 payload 双向锁死（开关改动后必须重跑生成器）。"""
+    contract = E.assert_contract_file_matches_source()
+    assert contract.contract_id == E.ADAPTER_ID
+    assert len(contract.sheets) == 2
+
+
+def test_switching_all_off_yields_zero_regions(monkeypatch: pytest.MonkeyPatch) -> None:
+    """全关 ⇒ 零受管区，且**拒绝发布空契约**（sheets: [] 会固化成假身份）。"""
+    monkeypatch.setattr(E, "_INCLUDE_E102_CASH_DETAIL", False)
+    monkeypatch.setattr(E, "_INCLUDE_E104_DIGITAL", False)
+    monkeypatch.setattr(E, "_INCLUDE_E111_COMMITMENT_STATIC", False)
     assert E.instrumentation_specs() == ()
     assert E.all_store_item_ids() == ()
+    with pytest.raises(E.EntrySelectionError, match="不得发布空契约"):
+        E.build_contract_payload()
+    with pytest.raises(E.EntrySelectionError, match="无可返回项|无受管 sheet"):
+        E.instrumentation_spec()
 
 
-def test_enabling_canary_adds_one_region(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(E, "_INCLUDE_E102_CASH_DETAIL", True)
+def test_enabling_canary_only_adds_one_region(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(E, "_INCLUDE_E104_DIGITAL", False)
     specs = E.instrumentation_specs()
     assert len(specs) == 1
     assert specs[0].resolved_sheet_key == E102.SHEET_KEY_E102
@@ -126,6 +158,7 @@ def test_enabling_second_sheet_adds_another_region(monkeypatch: pytest.MonkeyPat
 def test_enabling_static_region_parasites_on_primary(monkeypatch: pytest.MonkeyPatch) -> None:
     """Task 14：static_region 寄生在首个动态 spec 的 static_sheets 上（不单独成 spec）。"""
     monkeypatch.setattr(E, "_INCLUDE_E102_CASH_DETAIL", True)
+    monkeypatch.setattr(E, "_INCLUDE_E104_DIGITAL", False)  # 只留 canary 一个动态区便于断言
     monkeypatch.setattr(E, "_INCLUDE_E111_COMMITMENT_STATIC", True)
     specs = E.instrumentation_specs()
     assert len(specs) == 1, "静态区不占一个 instrumentation spec（它寄生在动态 spec 上）"
@@ -146,6 +179,8 @@ def test_static_region_alone_yields_no_instrumentation_spec(
     这不是 bug 而是 `static_sheets` 的寄生机制决定的：它是挂在动态 primary spec 上的字段。
     ⇒ 接入顺序必须**先 canary（动态）再 static_region**，spec Task 14 排在 Task 8 之后正是此因。
     """
+    monkeypatch.setattr(E, "_INCLUDE_E102_CASH_DETAIL", False)
+    monkeypatch.setattr(E, "_INCLUDE_E104_DIGITAL", False)
     monkeypatch.setattr(E, "_INCLUDE_E111_COMMITMENT_STATIC", True)
     assert E.instrumentation_specs() == (), (
         "无动态 spec 时静态区无处寄生 —— 接入顺序须先动态后静态"

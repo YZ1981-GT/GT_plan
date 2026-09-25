@@ -19,9 +19,14 @@
 > `phase5_d1_expansion.py` 扩容骨架（Task 23，`instrumentation_specs()` 复数 + 对齐守卫）。
 > 🔴 **Task 15 本体（entry 模块瘦身到 ≤150 行）未完成**：`phase5_d1_notes_receivable.py` 仍
 > 1059 行，远超设计要求的 ≤150 行上限——现状是"扩容骨架已就位"而非"循环层已收敛"。
-> **尚未开工**：Task 16~22（D3/D5/D6/D7/D2/B60/D4 声明化 + CI 门禁接入 governance-checks.yml）、
-> Task 24（位移判据参数化）、Task 27~34（D1 批次 2~6 灰度开启 + 真实接入 + 审定表迁移 + 验收）。
-> 下方复选框为唯一进度真源，本节仅摘要。
+> ✅ **Task 16 引擎函数层部分完成**（2026-09-26）：D3/D6/D7 三家新增 `SPEC_D{32,62,72}` 唯一
+> 权威声明，9 个引擎函数改薄转发框架层；发现并修复框架层缺口 `RowTableSheetSpec.
+> ghost_row_anchor_index`（D5/D6 幽灵行防护锚点非默认第 0 位）。golden digest 零回归（26 个）+
+> 141 个判据全绿。`≤150 行`上限**未达成**（三家仍 869~878 行，只收敛了引擎函数层，契约装配/
+> 发布编排代码尚未拆分）。
+> **尚未开工**：Task 15/16 本体的完整 provider 收敛、Task 17~22（D5/D2/B60/D4 声明化 + CI
+> 门禁接入 governance-checks.yml）、Task 24（位移判据参数化）、Task 27~34（D1 批次 2~6
+> 灰度开启 + 真实接入 + 审定表迁移 + 验收）。下方复选框为唯一进度真源，本节仅摘要。
 
 顺序有意义：**阶段 0 是红判据与基线先行** —— 24 个 golden digest 此时必绿（它是基线不是判据），
 P9/P10 此时必红（框架层现有 89 处 D4 提及、注册表尚不存在）。没有这两侧，后面"修好了"与
@@ -190,9 +195,22 @@ D1-10 三项共 **28 个标量**的形态待实测（`static_region` vs HTML-onl
   - 门：24 digest 零变化 + D1 真 materialize/extract 往返 `managed_field_count` 不变
   - _Requirements: 2.1, 2.2, 2.3, 4.2, 4.3_
 
-- [ ] 16. D3 / D6 / D7 声明化（三家同批，nested + flat 两形态各有代表）
+- [ ]* 16. D3 / D6 / D7 声明化（三家同批，nested + flat 两形态各有代表）（**引擎函数层已完成，
+  ≤150 行上限未达成**）✅ 2026-09-26：三家各新增 `SPEC_D{32,62,72}` 唯一权威声明；删 9 个
+  引擎函数（`_aging_field_specs`/`stable_key_for`/`store_row_identity`/`iter_store_rows`/
+  `_resolve_json_path`/`split_store_row`/`build_store_projection`/`_set_json_path`/
+  `merge_projection_into_store_rows`）改薄转发框架层同名函数；`MANAGED_FIELD_SPECS`/
+  `FORMULA_MASK` 值从 spec 派生、常量名不变。golden digest 零回归（26 个，含并发新增 E1）+
+  既存 `test_ghost_row_defense.py` 16 用例零回归 + 4 条新判据 + Property 4 变异反证
+  （aging_layout 错配 fail-closed）。
+  🔴 **复盘补**：D5/D6 幽灵行防护锚点非默认第 0 位（D6=`seq_no` 整数 0 是合法值，D5=`category`
+  枚举），框架层原硬编码 `specs[0][4]` 无法表达 ⇒ 新增 `RowTableSheetSpec.ghost_row_anchor_index`
+  参数（默认 0 向后兼容，D6 声明 1）。详见 `docs/operations/evidence/d567-sync-coverage/
+  retrospective-2026-09-26-part3.md`。
+  🔴 **未完成**：三家仍 869~878 行（原 973/975/971，各减约 100 行），远超 ≤150 上限——本轮只
+  收敛引擎函数层，`_rows_table_payload`（契约装配）/ `publish_definitions` / `attach_adapters`
+  等发布编排代码尚未拆分/精简，真正达标需求 2.1 的完整收敛留后续
   - D3/D7 nested、D6 flat —— 这三家同批是为了让 P4 的两分支在同一 commit 内对照
-  - 每家 ≤150 行；门同任务 15
   - _Requirements: 2.1, 2.2, 4.2_
 
 - [ ] 17. D5 声明化（7 元组的来源家，group_header 内联口径的基准）

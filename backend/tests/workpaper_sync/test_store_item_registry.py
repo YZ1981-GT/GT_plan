@@ -88,16 +88,60 @@ class TestProperty6ExplicitErrorNotSilentReturn:
         with pytest.raises(StoreMergePlanNotRegisteredError):
             resolve_store_merge_plan("nonexistent.adapter")
 
-    def test_mirror_unavailable_reason_also_raises_not_silently_succeeds(self) -> None:
-        """b60/g7/h1 三家 provider 缺 merge 门面（HEAD 实测）；命中但不可用 ⇒ 同样显式抛错，
-        不是返回一个"看起来正常"的 plan 让调用方在属性访问处才炸出无来源的 AttributeError。
+    def test_mirror_unavailable_reason_also_raises_not_silently_succeeds(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """命中但标了 `mirror_unavailable_reason` ⇒ 同样显式抛错，不返回一个"看起来正常"的
+        plan 让调用方在属性访问处才炸出无来源的 AttributeError。
+
+        🔴 **判据改法**（2026-09-26）：原判据用 b60/g7/h1 三家**恰好坏着**作样本。
+        g7/h1 的 merge 门面已于本轮补齐、b60 已正确归类为 `NON_STORE_BACKED_ADAPTERS`
+        （契约无 html_store ⇒ 纯 Excel entry，不是缺陷）⇒ 样本消失，原判据必然假红。
+
+        改为**合成 plan** 驱动：机制有效性不该依赖「今天生产代码里恰好还有几家坏着」——
+        那正是「判据数的是会被改动的那一侧」这条反复付学费的错法。
         """
+        import app.services.workpaper_sync.store_item_registry as REG
+
+        synthetic = dict(REG.STORE_MERGE_REGISTRY)
+        synthetic["zz.synthetic_broken"] = StoreMergePlan(
+            adapter_id="zz.synthetic_broken",
+            provider_module="phase5_d1_notes_receivable",
+            mirror_unavailable_reason="合成样本：provider 未提供 merge 门面",
+        )
+        monkeypatch.setattr(REG, "STORE_MERGE_REGISTRY", synthetic)
+
         with pytest.raises(StoreMergePlanNotRegisteredError, match="镜像门面不可用"):
-            resolve_store_merge_plan("b60.hour_budget")
-        with pytest.raises(StoreMergePlanNotRegisteredError, match="镜像门面不可用"):
-            resolve_store_merge_plan("g7.soe_subsidiary_disclosure")
-        with pytest.raises(StoreMergePlanNotRegisteredError, match="镜像门面不可用"):
-            resolve_store_merge_plan("h1.disposal_check")
+            REG.resolve_store_merge_plan("zz.synthetic_broken")
+        # 三态入口同样必须抛（不得因为「像 adapter_id」就放行一个坏 plan）
+        with pytest.raises(StoreMergePlanNotRegisteredError):
+            REG.store_merge_plan_or_skip("zz.synthetic_broken")
+
+    def test_g7_h1_gateways_are_now_available(self) -> None:
+        """正向断言本轮修复：g7/h1 的 merge 门面已补齐 ⇒ 能正常 resolve 且 provider 真有该符号。"""
+        import importlib
+
+        for adapter_id, attr in (
+            ("g7.soe_subsidiary_disclosure", "merge_state_fn"),
+            ("h1.disposal_check", "merge_rows_fn"),
+        ):
+            plan = resolve_store_merge_plan(adapter_id)
+            assert not plan.mirror_unavailable_reason
+            bridge = importlib.import_module(
+                f"app.services.workpaper_sync.{plan.provider_module}"
+            )
+            fn_name = getattr(plan, attr)
+            assert fn_name and hasattr(bridge, fn_name), f"{plan.provider_module} 缺 {fn_name}"
+
+    def test_b60_is_non_store_backed_not_broken(self) -> None:
+        """b60 是**形态不同**（纯 Excel entry，契约无 html_store）而非缺陷 ⇒ 走跳过而非抛错。"""
+        from app.services.workpaper_sync.store_item_registry import (
+            NON_STORE_BACKED_ADAPTERS,
+            store_merge_plan_or_skip,
+        )
+
+        assert "b60.hour_budget" in NON_STORE_BACKED_ADAPTERS
+        assert store_merge_plan_or_skip("b60.hour_budget") is None
 
     def test_the_eight_delivered_adapters_are_all_registered(self) -> None:
         """8 个已交付 contract 里，除三家 mirror 不可用外，其余 5 家（d1/d3/d4/d5/d6/d7 + d2）

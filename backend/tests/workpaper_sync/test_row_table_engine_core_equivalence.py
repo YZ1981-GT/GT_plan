@@ -125,28 +125,36 @@ def test_merge_projection_into_store_rows_equals_provider(provider, spec_fn) -> 
 
 @pytest.mark.parametrize("provider,spec_fn", [(D1, _spec_d1), (D3, _spec_d3)], ids=["d1", "d3"])
 def test_fail_closed_behaviours_match(provider, spec_fn) -> None:
-    """三条 fail-closed 行为等价：非数组 / 缺行身份 / 重复行身份 —— 两侧都必须抛。"""
+    """三条 fail-closed 行为等价：非数组 / 缺行身份 / 重复行身份 —— 两侧都必须抛。
+
+    🔴 **锚点自适应**（2026-09-26）：已声明化的 provider（如 D3，Task 16 已交付）不再导出
+    私有 `iter_store_rows` —— 它改调引擎。故 provider 侧只在该符号仍存在时对照；
+    引擎侧**始终**断言。这样判据既覆盖未收敛的家（真对照），也不会在收敛后假红。
+    """
     spec = spec_fn()
     idk = provider.ROW_IDENTITY_STORE_KEY
+    provider_iter = getattr(provider, "iter_store_rows", None)
+    provider_err = getattr(provider, "StorePayloadError", None)
+    has_own_iter = callable(provider_iter) and provider_err is not None
 
-    # 非数组
-    with pytest.raises(provider.StorePayloadError):
-        list(provider.iter_store_rows('{"a":1}'))
-    with pytest.raises(ENGINE.RowTableStorePayloadError):
-        list(ENGINE.iter_store_rows(spec, '{"a":1}'))
+    cases: list = [
+        '{"a":1}',                          # 非数组
+        [{"x": 1}],                         # 缺行身份
+        [{idk: "same"}, {idk: "same"}],     # 重复行身份
+    ]
+    for payload in cases:
+        # 引擎侧：始终 fail closed
+        with pytest.raises(ENGINE.RowTableStorePayloadError):
+            list(ENGINE.iter_store_rows(spec, payload))
+        # provider 侧：仅在它仍有自己的实现时对照（收敛后它就是引擎本身）
+        if has_own_iter:
+            with pytest.raises(provider_err):
+                list(provider_iter(payload))
 
-    # 缺行身份
-    with pytest.raises(provider.StorePayloadError):
-        list(provider.iter_store_rows([{"x": 1}]))
-    with pytest.raises(ENGINE.RowTableStorePayloadError):
-        list(ENGINE.iter_store_rows(spec, [{"x": 1}]))
-
-    # 重复行身份
-    dup = [{idk: "same"}, {idk: "same"}]
-    with pytest.raises(provider.StorePayloadError):
-        list(provider.iter_store_rows(dup))
-    with pytest.raises(ENGINE.RowTableStorePayloadError):
-        list(ENGINE.iter_store_rows(spec, dup))
+    # 至少要有一家仍在对照（否则本判据退化成只测引擎）
+    assert callable(getattr(D1, "iter_store_rows", None)), (
+        "D1 尚未声明化，应仍导出 iter_store_rows —— 若它也收敛了，本判据需改为纯引擎断言"
+    )
 
 
 def test_static_region_spec_rejects_row_projection() -> None:

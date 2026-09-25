@@ -147,6 +147,15 @@ class RowTableSheetSpec:
     #: HTML-only item 子集（受管 sheet ≠ 全部 item 受管；D4-5 范式）。
     html_only_item_ids: tuple[str, ...] = ()
 
+    #: 幽灵行防护用哪个字段的 json_path 判定「新增行是否只有杂散字段」（Requirement 参见
+    #: `merge_projection_into_store_rows` docstring）。默认第 0 位（D1/D2/D3/D4/D7 现状——
+    #: 首个字段恰是真正业务名称）。🔴 D5/D6 是例外：D5 的 `[0]`=`category`（枚举）/
+    #: D6 的 `[0]`=`seq_no`（整数序号，`0` 是合法真值不是"空"信号），二者原实现均改用
+    #: `[1]` 作锚点（`item_name`/`contract_name`）。声明时若字段顺序里首位不适合当锚点，
+    #: 显式传 `ghost_row_anchor_index=1`，**不得**为了适配框架层默认值而调整字段声明顺序
+    #: （那会改变 `managed_field_specs()` 的输出顺序，破坏零回归门）。
+    ghost_row_anchor_index: int = 0
+
     @property
     def formula_mask(self) -> tuple[str, ...]:
         """七家实测形态：全为列向区间 `{COL}{FIRST}:{COL}{LAST}`。取代 provider 侧手写 mask 字面量。
@@ -459,7 +468,7 @@ def merge_projection_into_store_rows(
     """
     specs = managed_field_specs(spec)
     field_to_path = {row[0]: row[4] for row in specs}
-    name_json_path = specs[0][4] if specs else ""
+    name_json_path = specs[spec.ghost_row_anchor_index][4] if specs else ""
     identity_key = spec.row_identity_key
 
     by_id: dict[str, dict] = {}

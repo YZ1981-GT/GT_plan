@@ -178,19 +178,17 @@ class StoreMergePlan:
 # ═══════════════════════════════════════════════════════════════════════════
 
 STORE_MERGE_REGISTRY: Final[Mapping[str, StoreMergePlan]] = {
-    # 🔴 b60 / g7 / h1 三家：**provider 未提供 merge 门面**（2026-09-26 实测）。
-    #    原 `oo_to_html` 的 elif 链对它们写了 `bridge.STORE_ITEM_ID` /
-    #    `bridge.merge_projection_into_store_rows` / `…_store_state`，而这三个 provider 里
-    #    **这些符号都不存在**（`git show HEAD:` 逐个实测确认，非本次改动引入）⇒ 那三个分支
-    #    一旦被执行就是 AttributeError → opaque 500。注册表把这个隐藏缺陷显式化：
-    #    `mirror_unavailable_reason` 非空 ⇒ `resolve_store_merge_plan` 抛可归因的 domain 错误，
-    #    而不是等运行时炸在属性访问上。修它们归各自 provider 的 spec（本 spec 只暴露不掩盖）。
+    # 🔴 b60 保留一条 plan 仅为「已登记」可查（`check_sheet_specs_fully_registered` 的分母是
+    #    8 家已交付 contract）。它的**实际路径**走 `NON_STORE_BACKED_ADAPTERS` 直接跳过 ——
+    #    契约无 html_store 段、15 字段 store_item_id 全 None ⇒ 纯 Excel entry，不做 store 镜像。
     "b60.hour_budget": StoreMergePlan(
         adapter_id="b60.hour_budget",
         provider_module="pilot_simple_checklist",
         mirror_unavailable_reason=(
-            "pilot_simple_checklist 未提供 STORE_ITEM_ID 与 merge_projection_into_store_rows"
-            "（HEAD 实测缺失）—— B60 是 simple_checklist 形态，store 镜像门面从未实现"
+            "B60 是纯 Excel entry：契约 review 段无 html_store、15 个字段 store_item_id 全为 "
+            "None（2026-09-26 契约逐项实测）⇒ 它的 HTML 宿主不读 checklist store，"
+            "本来就不需要镜像。实际路径由 NON_STORE_BACKED_ADAPTERS 提前跳过，"
+            "本 reason 只在有人绕过该集合直接 resolve 时兜底报错"
         ),
     ),
     "d1.notes_receivable_detail": StoreMergePlan(
@@ -265,33 +263,40 @@ STORE_MERGE_REGISTRY: Final[Mapping[str, StoreMergePlan]] = {
     #    adapter 尚未注册（平台级供给缺口 umbrella BP-61-1）⇒ 此处先登记 plan，使
     #    「adapter 一注册即可用」；store item 清单取 provider 的 all_store_item_ids() 单一口径
     #    （随灰度开关增长，需求 3.3）。
+    # 🔴 E1（spec e1-sync-coverage-and-first-canary）：2026-09-26 起 **provider 侧就绪** ——
+    #    契约已生成并双向锁死（`e1.monetary_fund_detail.json`，digest 7fa51f14）、
+    #    `STORE_ITEM_ID` 单数常量指向 canary、投影/合并门面**薄转发框架层引擎**（每个 ≤3 行，
+    #    这是三层架构的收益兑现点：新 entry 无需复制 200 行投影合并代码）。
+    #    store item 清单取 provider 的 `all_store_item_ids()` 单一口径（随灰度开关增长，需求 3.3）。
+    #    ⚠️ adapter 注册本身仍卡 umbrella BP-61-1 平台级缺口（三表近空），与 D1/D3/D5/D6/D7 同。
     "e1.monetary_fund_detail": StoreMergePlan(
         adapter_id="e1.monetary_fund_detail",
         provider_module="phase5_e1_monetary_fund",
-        mirror_unavailable_reason=(
-            "E1 是多 store item 形态（canary E1-2 + E1-4 + E1-11 三条 fixed_text），"
-            "尚未提供 STORE_ITEM_ID 单数常量与 merge 门面 —— 归 spec "
-            "e1-sync-coverage-and-first-canary Task 10（宿主接桥）。"
-            "在那之前显式打红而非等运行时 AttributeError"
+        items=(
+            StoreItemSpec(item_id="E1-cash-detail-rows", kind=StoreKind.rows),
+            StoreItemSpec(item_id="E1-digital-rows", kind=StoreKind.rows),
         ),
     ),
     "g7.soe_subsidiary_disclosure": StoreMergePlan(
         adapter_id="g7.soe_subsidiary_disclosure",
         provider_module="pilot_g7_two_level_dynamic",
         merge_state_fn="merge_projection_into_store_state",
-        mirror_unavailable_reason=(
-            "pilot_g7_two_level_dynamic 有 STORE_ITEM_ID 但无 merge_projection_into_store_state"
-            "（HEAD 实测缺失）—— state 形态的合并门面从未实现"
+        # 🔴 该门面**已于 2026-09-26 补齐**（此前 HEAD 实测缺失 ⇒ AttributeError → opaque 500）：
+        #    state 形态走矩阵格级合并，保留 version / entitySlots / 其他 table，且**不新建**
+        #    metric 行与实体列（契约外的 metric、实体清单外的列一律 fail-closed 跳过 ——
+        #    凭空造结构会重演 legacy 列键搁浅：改造前的 `c{n}Current` 至今读不到）。
+        items=(
+            StoreItemSpec(item_id="G7-main-disclosure-soe-v2", kind=StoreKind.dict),
         ),
         oo_crash_neutralization_fn="neutralize_oo_crash_if_formulas",
     ),
     "h1.disposal_check": StoreMergePlan(
         adapter_id="h1.disposal_check",
         provider_module="pilot_h1_grouped_dynamic",
-        mirror_unavailable_reason=(
-            "pilot_h1_grouped_dynamic 有 STORE_ITEM_ID 但无 merge_projection_into_store_rows"
-            "（HEAD 实测缺失）—— rows 形态的合并门面从未实现"
-        ),
+        # 🔴 该门面**已于 2026-09-26 补齐**（此前 HEAD 实测缺失）：rows 形态，复用框架层
+        #    `set_json_path` / `resolve_json_path`；幽灵行判据用业务名称列 `asset_name`
+        #    而非首列 `seq` —— 后者是 `auto_source` 序号，用它会把「只填了序号的空行」当真行留下。
+        items=(StoreItemSpec(item_id="H1-8-rows", kind=StoreKind.rows),),
     ),
 }
 
@@ -303,9 +308,18 @@ STORE_MERGE_REGISTRY: Final[Mapping[str, StoreMergePlan]] = {
 #:    一模一样 —— 那正是 D4-35 恒空 / D4-13 写不进 OO 两个 bug 能活下来的原因。登记在此
 #:    集合里的是后者；前者会在 `resolve_store_merge_plan` 显式打红。
 #:
-#: 当前为空：现有 10 个 store-backed adapter 全部有 plan。新增非 store-backed adapter 时
-#: 在此登记并写明理由。
-NON_STORE_BACKED_ADAPTERS: Final[frozenset[str]] = frozenset()
+#: 🔴 **b60 实测属此类**（2026-09-26 契约逐项核实）：`b60.hour_budget.json` 的 `review` 段
+#:    **无 `html_store`**（只有 authority_root / entry_id / pilot_class / reviewed_basis），
+#:    且 15 个字段的 `store_item_id` **全为 None** ⇒ B60 是**纯 Excel entry**，
+#:    它的 HTML 宿主不读 checklist store，本来就不需要镜像。
+#:
+#:    ⚠️ 本条修正了一次**我方误判**：首版把 b60 与 g7/h1 一起标成
+#:    「provider 缺 merge 门面」。实际三家情况不同 —— g7/h1 有完整 store 声明与投影链、
+#:    确实只缺 merge（已于本轮补齐），而 b60 **压根没有 store** ⇒ 它不是缺陷，
+#:    是形态不同。判据 `test_b60_has_no_html_store_by_design` 钉住这条事实。
+NON_STORE_BACKED_ADAPTERS: Final[frozenset[str]] = frozenset({
+    "b60.hour_budget",
+})
 
 
 #: 真实 adapter_id 的形态（== contract_id == 契约文件名，如 `d4.revenue_detail` /

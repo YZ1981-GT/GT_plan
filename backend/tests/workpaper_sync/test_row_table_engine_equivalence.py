@@ -39,6 +39,7 @@ from app.services.workpaper_sync.phase5_row_table_sheet import (
     expand_aging_fields,
     managed_field_specs,
 )
+from app.services.workpaper_sync.sheet_geometry import col_index
 
 
 def _spec_d1() -> RowTableSheetSpec:
@@ -212,18 +213,39 @@ def test_p3_mutation_aging_order_scrambled_breaks_equality() -> None:
 # ═══════════════════════════════════════════════════════════════════════════
 
 
+def _aging_rows_of(provider) -> tuple[tuple, ...]:
+    """从 provider 的 `MANAGED_FIELD_SPECS` 里筛出账龄字段（= 非标量字段）。
+
+    🔴 **锚点迁移**（2026-09-26）：原判据锚在 provider 的私有 `_aging_field_specs()` 上，
+    而 D3 已按 Task 16 声明化（该私有函数被引擎取代后消失）⇒ 判据必须锚在**不随收敛消失**
+    的那一侧。`MANAGED_FIELD_SPECS` 与 `SCALAR_FIELD_SPECS` 都是 provider 的公开常量、
+    收敛前后都在，差集即账龄展开结果 —— 这才是"数不变量"。
+    """
+    scalar_keys = {row[0] for row in provider.SCALAR_FIELD_SPECS}
+    return tuple(
+        row for row in provider.MANAGED_FIELD_SPECS if row[0] not in scalar_keys
+    )
+
+
 def test_p4_nested_key_derivation_equals_original() -> None:
     """nested（D3）：key = snake(json_prefix)_seg.lower()，json_key = prefix/seg。"""
     engine = expand_aging_fields(_spec_d3())
-    original = D3._aging_field_specs()
-    assert tuple(row[:6] for row in engine) == tuple(original)
+    original = _aging_rows_of(D3)
+    assert original, "D3 应有账龄字段（否则本判据空转）"
+    # 引擎输出按列序、provider 常量按列序（两侧都经 sorted(col_index)）⇒ 可直接逐元组比
+    assert tuple(row[:6] for row in engine) == tuple(
+        sorted(original, key=lambda r: col_index(r[1]))
+    )
 
 
 def test_p4_flat_key_derivation_equals_original() -> None:
     """flat（D6）：key = snake(flat_key)，json_key = flat_key 本身（无 nested `/`）。"""
     engine = expand_aging_fields(_spec_d6())
-    original = D6._aging_field_specs()
-    assert tuple(row[:6] for row in engine) == tuple(original)
+    original = _aging_rows_of(D6)
+    assert original, "D6 应有账龄字段（否则本判据空转）"
+    assert tuple(row[:6] for row in engine) == tuple(
+        sorted(original, key=lambda r: col_index(r[1]))
+    )
 
 
 def test_p4_mutation_flat_via_nested_derivation_breaks_d6() -> None:

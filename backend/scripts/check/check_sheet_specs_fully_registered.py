@@ -50,6 +50,11 @@ EXPECTED_ADAPTER_IDS: tuple[str, ...] = (
     "d5.receivables_financing_detail",
     "d6.contract_assets_detail",
     "d7.contract_liabilities_detail",
+    # 🔴 2026-09-26 纳入：E1 是第 9 家已交付 contract
+    #    （`e1.monetary_fund_detail.json` 已生成并与 provider 双向锁死）。
+    #    adapter 注册本身仍卡 umbrella BP-61-1 平台级缺口，但**契约与 plan 已就绪** ——
+    #    本卡点守的正是「声明了却忘接注册表」，与 adapter 是否注册是两件事。
+    "e1.monetary_fund_detail",
 )
 
 

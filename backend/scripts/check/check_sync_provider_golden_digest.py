@@ -70,6 +70,11 @@ PROVIDERS: tuple[tuple[str, str, str, bool, bool], ...] = (
     ("d5", "phase5_d5_receivables_financing", "ADAPTER_ID", True, False),
     ("d6", "phase5_d6_contract_assets", "ADAPTER_ID", True, False),
     ("d7", "phase5_d7_contract_liabilities", "ADAPTER_ID", True, False),
+    # 🔴 E1（2026-09-26 纳入）：spec e1-sync-coverage-and-first-canary 交付的第 9 个 contract。
+    #    它是**引擎落地后新建的第一个 entry** ⇒ 把它纳入零回归门，可在后续引擎改动时立刻发现
+    #    「薄转发层」是否被破坏（它的投影/合并全是 ≤3 行转发，任何 digest 漂移都来自引擎本身）。
+    #    instrumentation 取复数（两个受管 sheet：e12-managed / e14-managed）。
+    ("e1", "phase5_e1_monetary_fund", "ADAPTER_ID", True, True),
 )
 
 
@@ -95,14 +100,50 @@ def _import_provider(module_name: str) -> Any:
     return importlib.import_module(module)
 
 
-def _synthetic_rows(mod: Any) -> list[dict[str, Any]]:
-    """按 provider 的 MANAGED_FIELD_SPECS 现造两行合成载荷（不手抄，字段全填占位值）。
+def _field_specs_and_row_key(mod: Any) -> tuple[tuple, str]:
+    """取该 provider 的字段清单与行身份键，**兼容两种形态**。
 
-    field_specs 第 4 列是 store json 键/路径（camelCase 或 nested `a/b`）。account/text/enum
-    填字符串占位，amount 填数值占位；nested 路径逐级建 dict。每行带稳定 rowId。
+    * **未声明化 / 部分声明化的家**（D1/D2/D5/D6/D7/D4）：模块级 `MANAGED_FIELD_SPECS`
+      （6 或 7 元组）+ `ROW_IDENTITY_STORE_KEY`。
+    * **引擎落地后新建的家**（E1）：没有那两个模块级常量 —— 字段在 `RowTableSheetSpec` 上。
+      从 `managed_row_table_specs()` 取第一个受管 spec（= `STORE_ITEM_ID` 对应的 canary），
+      用引擎的 `managed_field_specs()` 展开。
+
+    🔴 不用 `hasattr` 试探链而是**按形态二分**：前者有 MANAGED_FIELD_SPECS 就一定是前者，
+       没有就必须能给出 spec —— 两者都拿不到时显式抛，不静默返回空清单（空清单会让合成
+       payload 变成「只有 rowId 的行」，digest 照样算得出来却什么都没覆盖到）。
     """
-    specs = getattr(mod, "MANAGED_FIELD_SPECS", ())
-    row_key = getattr(mod, "ROW_IDENTITY_STORE_KEY", "rowId")
+    specs = getattr(mod, "MANAGED_FIELD_SPECS", None)
+    if specs:
+        return tuple(specs), getattr(mod, "ROW_IDENTITY_STORE_KEY", "rowId")
+
+    get_specs = getattr(mod, "managed_row_table_specs", None)
+    if callable(get_specs):
+        row_specs = get_specs()
+        if row_specs:
+            from app.services.workpaper_sync.phase5_row_table_sheet import (
+                managed_field_specs,
+            )
+
+            target_item = getattr(mod, "STORE_ITEM_ID", None)
+            spec = next(
+                (s for s in row_specs if s.store_item_id == target_item), row_specs[0]
+            )
+            return managed_field_specs(spec), spec.row_identity_key
+
+    raise RuntimeError(
+        f"{mod.__name__} 既无 MANAGED_FIELD_SPECS 也无 managed_row_table_specs() 受管清单 —— "
+        "无法造合成 payload；空清单会让 digest 算得出来却什么都没覆盖到（假绿）"
+    )
+
+
+def _synthetic_rows(mod: Any) -> list[dict[str, Any]]:
+    """按 provider 的字段清单现造两行合成载荷（不手抄，字段全填占位值）。
+
+    field_specs 第 4 列是 store json 键/路径（camelCase 或 nested `a/b`）。text/enum
+    填字符串占位，amount/integer 填数值占位；nested 路径逐级建 dict。每行带稳定行身份。
+    """
+    specs, row_key = _field_specs_and_row_key(mod)
     rows: list[dict[str, Any]] = []
     for i in range(2):
         row: dict[str, Any] = {row_key: f"synthetic-{i}"}
@@ -110,7 +151,7 @@ def _synthetic_rows(mod: Any) -> list[dict[str, Any]]:
             # spec: (column_key, column, mode, value_type, json_key/path, header_text[, group])
             value_type = spec[3]
             json_path = spec[4]
-            val: Any = (i + 1) * 100 if value_type == "amount" else f"v{i}"
+            val: Any = (i + 1) * 100 if value_type in {"amount", "integer"} else f"v{i}"
             parts = str(json_path).split("/")
             cursor = row
             for seg in parts[:-1]:
@@ -129,9 +170,16 @@ def _digests_for(label: str, module_name: str, adapter_const: str,
     mod = _import_provider(module_name)
     adapter_id = getattr(mod, adapter_const)
 
-    # 1. contract payload
+    # 1. contract payload（整体 digest + 🔴 per-sheet 粒度 digest）
     contract_payload = mod.build_contract_payload()
     contract_digest = _canonical_sha256(contract_payload)
+    # 🔴 P1-4 复盘修复：sheet 粒度 digest —— 扩容一张 sheet 只应改动那一张的 digest，
+    # 其余 sheet（如 D2-2）逐字节不变才是 Q1 的干净证明。整体 digest 无法区分「扩容
+    # 新 sheet」与「改动已有 sheet」，sheet 粒度才能。
+    sheet_digests = {
+        str(s.get("sheet_key") or s.get("excel_name") or i): _canonical_sha256(s)
+        for i, s in enumerate(contract_payload.get("sheets") or [])
+    }
 
     # 2. store projection（合成 payload 驱动；B60 无该路径 ⇒ null）
     if has_projection:
@@ -176,6 +224,7 @@ def _digests_for(label: str, module_name: str, adapter_const: str,
         "label": label,
         "adapter_id": adapter_id,
         "contract_payload_sha256": contract_digest,
+        "sheet_digests": sheet_digests,
         "store_projection_sha256": projection_digest,
         "instrumentation_sha256": instr_digest,
     }
@@ -225,7 +274,7 @@ def _compare(current: dict[str, Any], baseline: dict[str, Any]) -> list[dict[str
         if base is None:
             drift.append({"label": cur["label"], "field": "*", "disk": "<缺基线>", "source": "<新增>"})
             continue
-        for field in ("contract_payload_sha256", "store_projection_sha256", "instrumentation_sha256"):
+        for field in ("store_projection_sha256", "instrumentation_sha256"):
             if cur.get(field) != base.get(field):
                 drift.append({
                     "label": cur["label"],
@@ -233,6 +282,16 @@ def _compare(current: dict[str, Any], baseline: dict[str, Any]) -> list[dict[str
                     "disk": str(base.get(field)),
                     "source": str(cur.get(field)),
                 })
+        # 🔴 P1-4：contract 整体 digest 变化时，用 sheet 粒度定位 —— 只对**已有 sheet 被改动**
+        # 报 drift；新增 sheet（base 无该 key）是 additive，不算回归（扩容的预期形态）。
+        base_sheets = base.get("sheet_digests") or {}
+        cur_sheets = cur.get("sheet_digests") or {}
+        for sk, base_sd in base_sheets.items():
+            cur_sd = cur_sheets.get(sk)
+            if cur_sd is None:
+                drift.append({"label": cur["label"], "field": f"sheet[{sk}]", "disk": str(base_sd), "source": "<被删>"})
+            elif cur_sd != base_sd:
+                drift.append({"label": cur["label"], "field": f"sheet[{sk}]", "disk": str(base_sd), "source": str(cur_sd)})
     return drift
 
 
@@ -269,11 +328,17 @@ def main() -> int:
         print(f"✅ golden digest 零回归：{current['digest_count']} 个 digest 逐个不变")
         return 0
 
-    print("❌ golden digest 发生漂移（引擎抽取改变了已交付 contract 的行为）：")
+    print("❌ golden digest 发生漂移（引擎抽取改变了已交付 contract 的行为，"
+          "或基线取样时间点落后于并发改动 —— 两种情况都要先排查是哪个）：")
     for d in drift:
         print(f"   [{d['label']}] {d['field']}: 基线={d['disk'][:16]} 现算={d['source'][:16]}")
-    print("\n请落全量 diff 排查：对比抽取前后的 build_contract_payload/build_store_projection/"
-          "instrumentation_spec 输出（Requirement 4.2）。")
+    print("\n排查顺序：")
+    print("  1. `git status --porcelain -- app/services/workpaper_sync/<该 provider 模块>.py`")
+    print("     —— 若该文件有非你本次改动的未提交改动（并发会话），基线本身已过期，")
+    print("        应先 `--update` 重取真实当前基线，再验证你自己的改动是否零回归。")
+    print("  2. 若该 provider 正是你本次改动的对象，落全量 diff 排查：对比抽取前后的")
+    print("     build_contract_payload/build_store_projection/instrumentation_spec 输出")
+    print("     （Requirement 4.2）—— 这才是真实回归。")
     return 1
 
 

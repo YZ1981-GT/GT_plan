@@ -427,3 +427,130 @@ class TestStableKeyFor:
         assert stable_key_for(spec, "prior_audited", "abc-123") == (
             "receivables_financing_detail_rows/abc-123/prior_audited"
         )
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# ghost_row_anchor_index（Task 16 复盘补）：D5/D6 的幽灵行防护锚点不是默认第 0 位
+# ═══════════════════════════════════════════════════════════════════════════
+
+
+class TestGhostRowAnchorIndex:
+    """`merge_projection_into_store_rows` 的幽灵行防护锚点可参数化（默认 0，D5/D6 用 1）。
+
+    背景：D6 首列是 `seq_no`（整数序号，`0` 是合法真值不是"空"信号），D5 首列是
+    `category`（枚举）。二者原实现（改造前）均硬编码 `MANAGED_FIELD_SPECS[1]` 而非 `[0]`。
+    框架层原实现硬编码 `specs[0][4]` 无法表达这条差异，本参数补上这个缺口。
+    """
+
+    def _spec(self, *, anchor_index: int) -> RowTableSheetSpec:
+        # 字段 0 = seq_no（整数，0 合法）；字段 1 = contract_name（真正业务名称锚点）。
+        field_specs = (
+            ("seq_no", "A", "editable", "integer", "seqNo", "序号", ""),
+            ("contract_name", "B", "editable", "text", "contractName", "合同名称", ""),
+        )
+        return RowTableSheetSpec(
+            managed_sheet="x", sheet_key="x", table_key="tbl", template_id="x",
+            table_name="x", uuid_col="x", first_data_row=1, last_data_row=5, footer_row=6,
+            field_specs=field_specs, ghost_row_anchor_index=anchor_index,
+        )
+
+    def _projection_with_only_seq_no(self, rid: str):
+        """构造一个只有 seq_no 字段非空的合成 projection（模拟幽灵行：Table 边界扩展出的
+        杂散新行，只有一个字段有值）。"""
+
+        class _FV:
+            def __init__(self, value, row_key):
+                self.value = value
+                self.row_key = row_key
+                self.is_protected = False
+
+        class _Proj:
+            def __init__(self, values):
+                self._values = values
+
+            def stable_keys(self):
+                return list(self._values)
+
+            def get(self, key):
+                return self._values.get(key)
+
+        key = f"tbl/{rid}/seq_no"
+        return _Proj({key: _FV(0, rid)})
+
+    def test_default_anchor_index_0_treats_seq_no_zero_as_ghost(self) -> None:
+        """默认锚点（index=0）：只有 seq_no=0 的新行被幽灵行防护剔除（因为 seq_no 恰是
+        锚点字段，值为 0 → strip 后为空字符串 → 判定为幽灵行 —— 这正是 D6 原来会踩的坑，
+        用它证明"不参数化就会误剔除合法新行"这个问题真实存在）。
+        """
+        from app.services.workpaper_sync.phase5_row_table_sheet import (
+            merge_projection_into_store_rows,
+        )
+
+        spec = self._spec(anchor_index=0)
+        projection = self._projection_with_only_seq_no("new-row-1")
+        merged, applied, visited, touched = merge_projection_into_store_rows(
+            spec, projection=projection, base_rows=[]
+        )
+        assert merged == [], "锚点=0 时，只有 seq_no 的新行应被判为幽灵行剔除"
+
+    def test_anchor_index_1_keeps_the_row_because_name_field_is_not_the_anchor(self) -> None:
+        """🔴 核心判据：锚点改成 1（contract_name）后，只有 seq_no 的新行**仍会被剔除**——
+        因为幽灵行判定看的是「锚点字段（此处 contract_name）是否为空」，而这行的
+        contract_name 确实为空（只填了 seq_no）。这正确反映 D6 的真实语义：
+        只填序号没填名字的行，本来就该被当成幽灵行——D6 的例外只在于"锚点不能选 seq_no
+        自身"，不是"seq_no 有值就该被保留"。
+        """
+        from app.services.workpaper_sync.phase5_row_table_sheet import (
+            merge_projection_into_store_rows,
+        )
+
+        spec = self._spec(anchor_index=1)
+        projection = self._projection_with_only_seq_no("new-row-1")
+        merged, applied, visited, touched = merge_projection_into_store_rows(
+            spec, projection=projection, base_rows=[]
+        )
+        assert merged == [], "contract_name 为空 ⇒ 即使锚点已改成 1，这行仍应判为幽灵行"
+
+    def test_anchor_index_1_keeps_row_when_name_field_has_value(self) -> None:
+        """对照：锚点=1 时，若 contract_name 字段有值（即便 seq_no 也有值），行应被保留——
+        这才是 D6 真实场景：用户填了序号 0 和合同名称，行是合法新增。
+        """
+        from app.services.workpaper_sync.phase5_row_table_sheet import (
+            merge_projection_into_store_rows,
+        )
+
+        class _FV:
+            def __init__(self, value, row_key):
+                self.value = value
+                self.row_key = row_key
+                self.is_protected = False
+
+        class _Proj:
+            def __init__(self, values):
+                self._values = values
+
+            def stable_keys(self):
+                return list(self._values)
+
+            def get(self, key):
+                return self._values.get(key)
+
+        spec = self._spec(anchor_index=1)
+        rid = "new-row-2"
+        projection = _Proj({
+            f"tbl/{rid}/seq_no": _FV(0, rid),
+            f"tbl/{rid}/contract_name": _FV("测试合同", rid),
+        })
+        merged, applied, visited, touched = merge_projection_into_store_rows(
+            spec, projection=projection, base_rows=[]
+        )
+        assert len(merged) == 1, "seq_no=0 且 contract_name 有值 ⇒ 合法新行，不应被剔除"
+        assert merged[0]["contractName"] == "测试合同"
+
+    def test_default_anchor_index_is_zero(self) -> None:
+        """向后兼容：不传 `ghost_row_anchor_index` 时默认 0（D1/D2/D3/D4/D7 现状零改动）。"""
+        spec = RowTableSheetSpec(
+            managed_sheet="x", sheet_key="x", table_key="x", template_id="x",
+            table_name="x", uuid_col="x", first_data_row=1, last_data_row=2, footer_row=3,
+        )
+        assert spec.ghost_row_anchor_index == 0
