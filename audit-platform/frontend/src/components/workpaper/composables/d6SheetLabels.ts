@@ -71,3 +71,54 @@ export function resolveD6SheetLabel(
   }
   return D6_SHEET_LABEL_MAP[code] ?? code
 }
+
+// ─── 底稿目录完成度判定（d567 spec Task 1：聚合键缺陷修复）──────────────
+//
+// 提取为纯函数供 D6TabIndex.vue 调用，并让判据可直接驱动真实生产逻辑
+// （不镜像键名 —— D1 那次「单测镜像错误锚点、恒绿而生产恒死」是同源事故）。
+//
+// 🔴 D6-6 / D6-8 必须读**真实写入方**的分区键，旧聚合键 'D6-6-rows' / 'D6-8-rows'
+// 全仓零写入点，读它们完成度恒「未填」。
+
+type RemarkEntry = { remark?: string } | undefined
+
+/** remark 存 JSON 行数组且非空 ⇒ 该 store 键有行 */
+export function hasJsonRows(m: Map<string, RemarkEntry>, key: string): boolean {
+  const raw = m.get(key)?.remark
+  if (!raw) return false
+  try {
+    const parsed = JSON.parse(raw)
+    return Array.isArray(parsed) && parsed.length > 0
+  } catch {
+    return false
+  }
+}
+
+/** 判定某编码的 D6 底稿是否已编制 */
+export function isD6SheetComplete(code: string, m: Map<string, RemarkEntry>): boolean {
+  switch (code) {
+    case 'D6A':
+      return [...m.keys()].some(k => k.startsWith('D6-proc-'))
+    case 'D6-1':
+      return [...m.keys()].some(k => k.startsWith('D6-1-adj-'))
+    case 'D6-2':
+      return hasJsonRows(m, 'D6-2-rows')
+    case 'D6-3':
+      return hasJsonRows(m, 'D6-3-rows')
+    case 'D6-4':
+      return hasJsonRows(m, 'D6-4-rows')
+    case 'D6-5':
+      return hasJsonRows(m, 'D6-5-rows')
+    case 'D6-6':
+      // 双受管区：block1/block2 任一有行即算已填（真实写入方 useD6Inspection）
+      return hasJsonRows(m, 'D6-6-block1-rows') || hasJsonRows(m, 'D6-6-block2-rows')
+    case 'D6-8':
+      // 真实写入方 useD6EclCalculation 用 'D6-8-single-rows'
+      return hasJsonRows(m, 'D6-8-single-rows')
+    case 'D6-附注上市':
+    case 'D6-附注国企':
+      return [...m.keys()].some(k => k.startsWith('D6-note-'))
+    default:
+      return false
+  }
+}
