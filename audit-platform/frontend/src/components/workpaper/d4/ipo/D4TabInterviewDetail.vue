@@ -38,7 +38,20 @@ const { syncBridge: d4SyncBridge, descriptor: d4SyncDescriptor, editorMode, mode
   reloadHtml: async () => { await reloadWorkpaperData?.() },
 })
 
+const { exportTemplate, exportData, importData } = useD4ImportExport({
+  wpId: computed(() => props.wpId),
+  projectId: computed(() => props.projectId),
+})
+function handleExportTemplate() { exportTemplate('D4-31') }
+function handleExportData() { exportData('D4-31') }
 async function handleImportFile(f: any) { const r = await importData('D4-31', f.raw || f); if (r) await reloadWorkpaperData?.() }
+async function handleImportClick() {
+  const input = document.createElement('input')
+  input.type = 'file'
+  input.accept = '.xlsx,.xls'
+  input.onchange = async () => { const f = input.files?.[0]; if (f) await handleImportFile(f) }
+  input.click()
+}
 
 // ─── 问卷数据模型 ─────────────────────────────────────────────────────
 interface InterviewData {

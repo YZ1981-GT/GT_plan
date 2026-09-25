@@ -188,6 +188,13 @@ async function handleImportFile(uploadFile: any) {
   const res = await importData('D4-13', file)
   if (res) await reloadWorkpaperData?.()
 }
+async function handleImportClick() {
+  const input = document.createElement('input')
+  input.type = 'file'
+  input.accept = '.xlsx,.xls'
+  input.onchange = async () => { const f = input.files?.[0]; if (f) await handleImportFile(f) }
+  input.click()
+}
 
 // ─── 双向回写：ERP 核对差异 → A13 错报 + D4-1 审计说明 ─────────────────
 // 叙述式底稿无结构化差异数据，由审计师填差异金额后推送（结论文本作描述）。

@@ -82,6 +82,13 @@ async function handleAddCustomer() { if (props.isReadonly) return; try { const {
 function handleExportTemplate() { exportTemplate('D4-29') }
 function handleExportData() { exportData('D4-29') }
 async function handleImportFile(f: any) { const r = await importData('D4-29', f.raw || f); if (r) await reloadD429Data() }
+async function handleImportClick() {
+  const input = document.createElement('input')
+  input.type = 'file'
+  input.accept = '.xlsx,.xls'
+  input.onchange = async () => { const f = input.files?.[0]; if (f) await handleImportFile(f) }
+  input.click()
+}
 
 // 当前卡片客户
 const activeCustomer = computed(() => customers.value[activeCustomerIdx.value] || null)

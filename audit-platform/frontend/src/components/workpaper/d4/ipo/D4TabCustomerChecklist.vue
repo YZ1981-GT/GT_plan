@@ -133,6 +133,13 @@ async function handleImportFile(f: any) {
   await reloadHost()
   emit('imported')
 }
+async function handleImportClick() {
+  const input = document.createElement('input')
+  input.type = 'file'
+  input.accept = '.xlsx,.xls'
+  input.onchange = async () => { const f = input.files?.[0]; if (f) await handleImportFile(f) }
+  input.click()
+}
 
 function alignOf(col: ChecklistColumnSpec) {
   if (col.type === 'amount' || col.type === 'number' || col.type === 'percent') return 'right'

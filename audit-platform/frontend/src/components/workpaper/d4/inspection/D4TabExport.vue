@@ -204,6 +204,13 @@ const { exportTemplate, exportData, importData, importing } = useD4ImportExport(
 function handleExportTemplate() { exportTemplate('D4-16') }
 function handleExportData() { exportData('D4-16') }
 async function handleImportFile(uploadFile: any) { await importData('D4-16', uploadFile.raw || uploadFile) }
+async function handleImportClick() {
+  const input = document.createElement('input')
+  input.type = 'file'
+  input.accept = '.xlsx,.xls'
+  input.onchange = async () => { const f = input.files?.[0]; if (f) await handleImportFile(f) }
+  input.click()
+}
 
 const aiNoteLoading = ref(false)
 const aiConclusionLoading = ref(false)

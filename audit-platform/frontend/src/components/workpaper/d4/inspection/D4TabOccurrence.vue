@@ -417,6 +417,13 @@ async function handleImportFile(uploadFile: any) {
   const file = uploadFile.raw || uploadFile
   await importData('D4-14', file)
 }
+async function handleImportClick() {
+  const input = document.createElement('input')
+  input.type = 'file'
+  input.accept = '.xlsx,.xls'
+  input.onchange = async () => { const f = input.files?.[0]; if (f) await handleImportFile(f) }
+  input.click()
+}
 
 // ─── Lifecycle ───────────────────────────────────────────────────────
 ensureActiveTab()

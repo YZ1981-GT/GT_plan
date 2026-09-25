@@ -112,6 +112,13 @@ function handleImportUpload(file: File): boolean {
   importData('D4-12', file)
   return false
 }
+async function handleImportClick() {
+  const input = document.createElement('input')
+  input.type = 'file'
+  input.accept = '.xlsx,.xls'
+  input.onchange = async () => { const f = input.files?.[0]; if (f) handleImportUpload(f) }
+  input.click()
+}
 
 // ─── Tab 管理 ────────────────────────────────────────────────────────
 const activeTab = ref('')

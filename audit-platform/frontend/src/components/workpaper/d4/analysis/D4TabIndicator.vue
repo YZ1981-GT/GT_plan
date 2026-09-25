@@ -276,6 +276,13 @@ function handleImportUpload(file: File): boolean {
   })
   return false
 }
+async function handleImportClick() {
+  const input = document.createElement('input')
+  input.type = 'file'
+  input.accept = '.xlsx,.xls'
+  input.onchange = async () => { const f = input.files?.[0]; if (f) handleImportUpload(f) }
+  input.click()
+}
 
 // ─── 持久化 ──────────────────────────────────────────────────────────
 let debounceTimer: ReturnType<typeof setTimeout> | null = null

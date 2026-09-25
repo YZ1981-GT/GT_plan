@@ -164,6 +164,13 @@ const aiTip = computed(() => aiAvailable.value ? 'AI 辅助生成' : 'AI 服务�
 // ─── Import/Export ───────────────────────────────────────────────────
 function handleExportTemplate() { exportTemplate('D4-15') }
 function handleExportData() { exportData('D4-15') }
+async function handleImportClick() {
+  const input = document.createElement('input')
+  input.type = 'file'
+  input.accept = '.xlsx,.xls'
+  input.onchange = async () => { const f = input.files?.[0]; if (f) await handleImportFile(f) }
+  input.click()
+}
 async function handleImportFile(uploadFile: any) {
   const file = uploadFile.raw || uploadFile
   await importData('D4-15', file)
