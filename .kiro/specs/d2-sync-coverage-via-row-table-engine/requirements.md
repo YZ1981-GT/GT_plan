@@ -2,9 +2,11 @@
 
 ## Introduction
 
-本 spec 把 **D2 应收账款**的受管覆盖从 1 张（`明细表D2-2`）扩到**第一册模板内可表达的全部 sheet**，
-并清理 D2 遗留的两处死代码。它**消费** `workpaper-sync-row-table-engine-and-d1-coverage` 交付的
-框架层行表引擎与 `AdjudicationSheetSpec`，**不重造**任何引擎件。
+本 spec 把 **D2 应收账款**的受管覆盖从 **1 张 sheet / 1 个受管区**扩到
+**4 张 sheet / 6 个受管区**（`明细表D2-2` ① 已接 + `坏账准备明细表D2-3` **③** +
+`调整分录汇总表D2-4` ① + `审定表D2-1` ①），并清理 D2 遗留的两处死代码。它**消费**
+`workpaper-sync-row-table-engine-and-d1-coverage` 交付的框架层行表引擎与
+`AdjudicationSheetSpec`，**不重造**任何引擎件。
 
 用户裁决（2026-09-25）：**D1 / D2 / D4 各自独立成套**，顺序 **先 D1 再 D2**。⇒ 本 spec 的
 阶段 0 有一条硬前置：D1 spec 的框架层必须已交付（需求 7）。
@@ -176,8 +178,9 @@ mode storage key / room key 全用它）。
 1. WHEN 每接入一张 sheet THEN SHALL 实测一次整册 materialize 耗时并登记（脚本现测，不手抄）。
 2. IF 整册 materialize 耗时超过配置软上限 THEN 接入 SHALL 停止并转性能 spec，**不得**带着退化
    继续铺量 —— D2-2 模板 35 行 vs 真库 1260 行 ⇒ 单张就要插 1200+ 行，实测 729 行已 59.3s。
-3. WHEN 受管 sheet 从 1 增至 4 THEN SHALL 断言 `BASELINE_EXTRACT_CACHE` 命中语义不变
-   （键 `{contract_id}:{artifact_sha256}`，同 substrate 二次请求命中）。
+3. WHEN 受管 sheet 从 1 增至 4 张（受管区从 1 增至 **6** 个）THEN SHALL 断言
+   `BASELINE_EXTRACT_CACHE` 命中语义不变（键 `{contract_id}:{artifact_sha256}`，同 substrate
+   二次请求命中）。
 4. WHEN store-projection 被请求 THEN 其 `store_field_count` 与 `field_count` SHALL 记录实测值；
    🔴 判据**不得**用二者作差推断数据丢失（D4 spec 已因此误判一次：1648 vs 992 的差值 ≠
    store 被吞了多少业务值）。
