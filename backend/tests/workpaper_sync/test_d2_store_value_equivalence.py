@@ -216,6 +216,12 @@ def test_unified_oo_to_html_really_wires_the_merge_function() -> None:
       ① 存在把 `*.merge_projection_into_store_rows` 绑到本地名的赋值（绑定在）；
       ② 那个本地名真的被当函数调用过（不是绑了没人用）。
     删掉任一半都会打红，这正是「additive 注入即死代码」的反向锁。
+
+    🔴 **锚点随注册表化迁移**（spec d1-sync-row-table-engine-and-d1-coverage Task 13）：
+    原实现是 9 分支 `elif adapter_id == …` 链里逐家写
+    ``merge_rows_fn = bridge.merge_projection_into_store_rows``；现改为注册表查表 +
+    ``getattr(bridge, plan.merge_rows_fn)``。判据**意图不变**（绑定在 + 真被调用），
+    只把「绑定」的形态从 Attribute 访问扩展到 `getattr(bridge, plan.merge_rows_fn)`。
     """
     import ast
 
@@ -225,14 +231,27 @@ def test_unified_oo_to_html_really_wires_the_merge_function() -> None:
         if not isinstance(node, ast.Assign):
             continue
         value = node.value
+        # 形态 ①（历史）：bridge.merge_projection_into_store_rows
         if isinstance(value, ast.Attribute) and value.attr == "merge_projection_into_store_rows":
             for target in node.targets:
                 if isinstance(target, ast.Name):
                     bound_names.add(target.id)
+        # 形态 ②（注册表化后）：getattr(bridge, plan.merge_rows_fn)
+        if (
+            isinstance(value, ast.Call)
+            and isinstance(value.func, ast.Name)
+            and value.func.id == "getattr"
+            and len(value.args) >= 2
+            and isinstance(value.args[1], ast.Attribute)
+            and value.args[1].attr in {"merge_rows_fn", "merge_state_fn"}
+        ):
+            for target in node.targets:
+                if isinstance(target, ast.Name):
+                    bound_names.add(target.id)
     assert bound_names, (
-        "统一 oo_to_html 里没有把 merge_projection_into_store_rows 绑成可调用值 —— "
-        "OO 编辑只会推进 content_version 而 checklist store 仍是旧值，"
-        "§9.6 的 store_mirrored / marker_visible 会静默回归"
+        "统一 oo_to_html 里没有把 merge 函数绑成可调用值（既无 bridge.merge_projection_into_store_rows "
+        "也无 getattr(bridge, plan.merge_rows_fn)）—— OO 编辑只会推进 content_version 而 checklist "
+        "store 仍是旧值，§9.6 的 store_mirrored / marker_visible 会静默回归"
     )
     invoked = {
         node.func.id
@@ -240,32 +259,42 @@ def test_unified_oo_to_html_really_wires_the_merge_function() -> None:
         if isinstance(node, ast.Call) and isinstance(node.func, ast.Name)
     }
     assert bound_names & invoked, (
-        f"merge_projection_into_store_rows 被绑到 {sorted(bound_names)} 但没有任何一个被调用 —— "
-        "绑了没人用等于死代码"
+        f"merge 函数被绑到 {sorted(bound_names)} 但没有任何一个被调用 —— 绑了没人用等于死代码"
     )
 
 
 def test_d2_branch_of_the_store_mirror_binds_this_bridge() -> None:
-    """`d2.receivable_detail` 分支必须绑**本**桥，不得错绑成别的 pilot 的同名函数。
+    """`d2.receivable_detail` 必须绑**本**桥，不得错绑成别的 pilot 的同名函数。
 
     四个 pilot（d2 / h1 / g7 / b60）的桥都有同名 `merge_projection_into_store_rows`，
-    只判「有人绑了同名函数」会被别的分支顶替 —— 那正是本 spec 反复踩到的
+    只判「有人绑了同名函数」会被别家顶替 —— 那正是本 spec 反复踩到的
     「判据数的是不变量而不是会被改动的那一侧」。
-    """
-    import ast
 
-    tree = _oo_to_html_tree()
-    branches = [
-        node
-        for node in ast.walk(tree)
-        if isinstance(node, ast.If)
-        and any(
-            isinstance(cmp_, ast.Constant) and cmp_.value == "d2.receivable_detail"
-            for cmp_ in getattr(node.test, "comparators", [])
-        )
-    ]
-    assert branches, "oo_to_html 里没有 `adapter_id == 'd2.receivable_detail'` 分支"
-    body_src = "\n".join(ast.dump(stmt) for branch in branches for stmt in branch.body)
-    assert "d2_bidirectional_bridge" in body_src, "D2 分支没有导入本桥"
-    assert "merge_projection_into_store_rows" in body_src, "D2 分支没有绑定本桥的合并函数"
-    assert "STORE_ITEM_ID" in body_src, "D2 分支没有取本桥的 store_item_id"
+    🔴 **锚点随注册表化迁移**（spec d1-sync-row-table-engine-and-d1-coverage Task 13）：
+    原实现在 `oo_to_html` 里有 `elif adapter_id == "d2.receivable_detail"` 分支；现改为
+    `store_item_registry.STORE_MERGE_REGISTRY` 查表。判据意图不变（D2 必须绑到
+    `d2_bidirectional_bridge`、取本桥的 store item 与合并函数），锚点换成注册表 —— 那才是
+    现在「会被改动的那一侧」。
+    """
+    import importlib
+
+    from app.services.workpaper_sync.store_item_registry import (
+        STORE_MERGE_REGISTRY,
+        store_merge_plan_or_skip,
+    )
+
+    plan = STORE_MERGE_REGISTRY.get("d2.receivable_detail")
+    assert plan is not None, "注册表里没有 `d2.receivable_detail` 的 store merge plan"
+    assert plan.provider_module == "d2_bidirectional_bridge", (
+        f"D2 绑到了 {plan.provider_module!r} 而不是本桥 d2_bidirectional_bridge —— "
+        "四家同名函数，错绑不会报错但会写错 store"
+    )
+    # 三态入口必须真能解析出它（不被 looks_like_adapter_id 或 unavailable 挡掉）
+    resolved = store_merge_plan_or_skip("d2.receivable_detail")
+    assert resolved is plan, "store_merge_plan_or_skip 未能解析出 D2 的 plan"
+
+    # 本桥必须真的提供 plan 声明的那两个符号（防「注册表写了名、provider 没这个符号」）
+    bridge = importlib.import_module(f"app.services.workpaper_sync.{plan.provider_module}")
+    assert hasattr(bridge, "STORE_ITEM_ID"), "本桥缺 STORE_ITEM_ID"
+    assert hasattr(bridge, plan.merge_rows_fn), f"本桥缺 {plan.merge_rows_fn}"
+    assert bridge.STORE_ITEM_ID == "D2-detail-rows"

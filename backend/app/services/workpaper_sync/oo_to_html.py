@@ -2576,83 +2576,38 @@ class OoToHtmlCoordinator:
         统一路径只提交 content_version；D2/H1 宿主 ``reloadHtml`` 仍读 checklist。
         不镜像则 OO 受管格回写对结构化视图不可见（§9.6）。
         """
+        # 🔴 注册表查表取代原 9 分支 `elif adapter_id == "…"` 链（spec
+        #    d1-sync-row-table-engine-and-d1-coverage Task 13 / 需求 3.1）。
+        #    原链「未命中 ⇒ 静默 return」正是 D4-35 恒空 / D4-13 正文写不进 OO 两个已修 bug 的
+        #    根因形态；改为 O(1) dict 查表 + 未命中显式抛错（含已注册清单，需求 3.4）。
+        #    非 store-backed adapter 须在注册表的 NON_STORE_BACKED_ADAPTERS 里**显式登记**，
+        #    不得靠「查不到就跳过」蒙混过关。
+        import importlib
+
+        from app.services.workpaper_sync.store_item_registry import store_merge_plan_or_skip
+
         adapter_id = str(state.frozen.adapter_id)
-        if adapter_id == "d2.receivable_detail":
-            from app.services.workpaper_sync import d2_bidirectional_bridge as bridge
-
-            store_item_id = bridge.STORE_ITEM_ID
-            merge_kind = "rows"
-            merge_rows_fn = bridge.merge_projection_into_store_rows
-        elif adapter_id == "h1.disposal_check":
-            from app.services.workpaper_sync import pilot_h1_grouped_dynamic as bridge
-
-            store_item_id = bridge.STORE_ITEM_ID
-            merge_kind = "rows"
-            merge_rows_fn = bridge.merge_projection_into_store_rows
-        elif adapter_id == "g7.soe_subsidiary_disclosure":
-            from app.services.workpaper_sync import pilot_g7_two_level_dynamic as bridge
-
-            store_item_id = bridge.STORE_ITEM_ID
-            merge_kind = "state"
-            merge_state_fn = bridge.merge_projection_into_store_state
-        elif adapter_id == "b60.hour_budget":
-            from app.services.workpaper_sync import pilot_simple_checklist as bridge
-
-            store_item_id = bridge.STORE_ITEM_ID
-            merge_kind = "rows"
-            merge_rows_fn = bridge.merge_projection_into_store_rows
-        elif adapter_id == "d1.notes_receivable_detail":
-            # G5-1 Phase 5 首个非 pilot canary：行数组 store，与 B60/H1 同型（merge_kind=rows）。
-            from app.services.workpaper_sync import phase5_d1_notes_receivable as bridge
-
-            store_item_id = bridge.STORE_ITEM_ID
-            merge_kind = "rows"
-            merge_rows_fn = bridge.merge_projection_into_store_rows
-        elif adapter_id == "d7.contract_liabilities_detail":
-            # G5-1 Phase 5 第二个 canary：行数组 store（merge_kind=rows），但含 nested 账龄
-            # （agingPrior/agingAudited），merge_projection_into_store_rows 内部用 _set_json_path
-            # 写 nested 路径，宿主侧 rows 合并逻辑不变。
-            from app.services.workpaper_sync import phase5_d7_contract_liabilities as bridge
-
-            store_item_id = bridge.STORE_ITEM_ID
-            merge_kind = "rows"
-            merge_rows_fn = bridge.merge_projection_into_store_rows
-        elif adapter_id == "d3.prepaid_receipts_detail":
-            # G5-1 Phase 5 第三个 canary：行数组 store（merge_kind=rows），含 nested 账龄
-            # （agingPrior/agingAudited），与 D7 同型；merge_projection_into_store_rows 内部
-            # 用 _set_json_path 写 nested 路径。store item = D3-det-rows。
-            from app.services.workpaper_sync import phase5_d3_prepaid_receipts as bridge
-
-            store_item_id = bridge.STORE_ITEM_ID
-            merge_kind = "rows"
-            merge_rows_fn = bridge.merge_projection_into_store_rows
-        elif adapter_id == "d6.contract_assets_detail":
-            # G5-1 Phase 5 第四个 canary：行数组 store（merge_kind=rows）。🔴 账龄是 FLAT top-level
-            # 键（agePrior1y/ageEnd1y ...），非 nested；merge_projection_into_store_rows 用
-            # _set_json_path 写单段键。store item = D6-2-rows。
-            from app.services.workpaper_sync import phase5_d6_contract_assets as bridge
-
-            store_item_id = bridge.STORE_ITEM_ID
-            merge_kind = "rows"
-            merge_rows_fn = bridge.merge_projection_into_store_rows
-        elif adapter_id == "d5.receivables_financing_detail":
-            # G5-1 Phase 5 第五个 canary：行数组 store（merge_kind=rows）。FVOCI 无账龄组、无 nested，
-            # 17 列全平铺。store item = D5-2-rows。
-            from app.services.workpaper_sync import phase5_d5_receivables_financing as bridge
-
-            store_item_id = bridge.STORE_ITEM_ID
-            merge_kind = "rows"
-            merge_rows_fn = bridge.merge_projection_into_store_rows
-        elif adapter_id == "d4.revenue_detail":
-            # G5-1 Phase 5 第六个 canary：D4-2 months[] + D4-3 扁平行，双 store item。
-            from app.services.workpaper_sync import phase5_d4_revenue_detail as bridge
-
+        # 三态：plan / None（不是 adapter_id ⇒ 本就无 store 计划，跳过）/ 抛错（像 adapter_id
+        # 却未注册 ⇒ 真漏接，D4-35 恒空的根因形态，必须显式打红）。
+        plan = store_merge_plan_or_skip(adapter_id)
+        if plan is None:
+            return
+        bridge = importlib.import_module(
+            f"app.services.workpaper_sync.{plan.provider_module}"
+        )
+        if plan.dual_store_fn:
+            # 多 store item 的整体镜像走 provider 专用门面（D4 的 _mirror_d4_dual_stores 同型）。
             await self._mirror_d4_dual_stores(
                 state, merged_projection=merged_projection, bridge=bridge
             )
             return
+        store_item_id = bridge.STORE_ITEM_ID
+        if plan.merge_state_fn:
+            merge_kind = "state"
+            merge_state_fn = getattr(bridge, plan.merge_state_fn)
         else:
-            return
+            merge_kind = "rows"
+            merge_rows_fn = getattr(bridge, plan.merge_rows_fn)
 
         import json
 

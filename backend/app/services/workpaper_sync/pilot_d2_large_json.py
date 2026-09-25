@@ -195,6 +195,7 @@ from app.services.workpaper_sync.models import (
     DefinitionKind,
     SyncDomainError,
 )
+from app.services.workpaper_sync.sheet_geometry import col_index, snake
 
 __all__ = [
     "AGING_GROUPS",
@@ -284,6 +285,23 @@ class StorePayloadError(SyncDomainError):
 # ═══════════════════════════════════════════════════════════════════════════
 # 1. 冻结的身份常量
 # ═══════════════════════════════════════════════════════════════════════════
+
+#: 🔴 D2-3 坏账准备明细表 sibling sheet 接入开关（spec d2-sync-coverage Task 6/8）。
+#: True ⇒ build_contract_payload 的 sheets[] 追加 d23-managed（单 sheet 双区）。
+#: 契约声明 + parse_contract + projection/merge 恒接；真栈同 sheet 双区注入 e2e 待环境。
+_INCLUDE_D203_BAD_DEBT: Final[bool] = True
+
+
+def _sheet_payload_d23() -> dict[str, Any]:
+    """D2-3 契约 sheet payload（懒导入 sibling provider，避免顶层循环导入）。"""
+    from app.services.workpaper_sync.phase5_d2_03_bad_debt import (
+        assert_mapping_digest_d23,
+        sheet_payload_d23,
+    )
+
+    assert_mapping_digest_d23()
+    return sheet_payload_d23()
+
 
 #: 本 pilot 覆盖的 AC 12.2 四类之一（与 `pilot_harness.PilotClass` 同域）。
 PILOT_CLASS: Final[str] = "d2_large_json"
@@ -483,23 +501,9 @@ SCALAR_FIELD_SPECS: Final[tuple[tuple[str, str, str, str, str, str], ...]] = (
 )
 
 
-def _col_index(letters: str) -> int:
-    """A1 列标 → 1-based 列序号（`AM` → 39）。"""
-    index = 0
-    for char in letters:
-        index = index * 26 + (ord(char) - 64)
-    return index
-
-
-def _snake(camel: str) -> str:
-    out: list[str] = []
-    for char in camel:
-        if char.isupper():
-            out.append("_")
-            out.append(char.lower())
-        else:
-            out.append(char)
-    return "".join(out)
+#: 几何纯函数收敛进框架层 sheet_geometry（Task 5，逐字节等价）；保留原名薄别名。
+_col_index = col_index
+_snake = snake
 
 
 def _aging_field_specs() -> tuple[tuple[str, str, str, str, str, str], ...]:
@@ -948,7 +952,15 @@ def build_contract_payload() -> dict[str, Any]:
                 "excel_name": MANAGED_SHEET,
                 "locator": {"anchor": TABLE_SHEET_ANCHOR},
                 "tables": [_rows_table_payload()],
-            }
+            },
+            # D2-3 坏账准备明细表：单 sheet 双区（单项段 R13-16 / 组合段 R18-21），
+            # sibling sheet 并入本 entry（sheet_key=d23-managed）。灰度开关见
+            # _INCLUDE_D203_BAD_DEBT。spec: d2-sync-coverage-via-row-table-engine Task 6/8。
+            *(
+                (_sheet_payload_d23(),)
+                if _INCLUDE_D203_BAD_DEBT
+                else ()
+            ),
         ],
         "review": {
             "entry_id": PILOT_ENTRY_ID,

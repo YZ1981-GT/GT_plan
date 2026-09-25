@@ -67,6 +67,7 @@ from app.services.workpaper_sync.models import (
     DefinitionKind,
     SyncDomainError,
 )
+from app.services.workpaper_sync.sheet_geometry import col_index, snake
 
 
 class EntrySelectionError(SyncDomainError):
@@ -167,22 +168,9 @@ SCALAR_FIELD_SPECS: Final[tuple[tuple[str, str, str, str, str, str], ...]] = (
 )
 
 
-def _snake(camel: str) -> str:
-    out: list[str] = []
-    for ch in camel:
-        if ch.isupper():
-            out.append("_")
-            out.append(ch.lower())
-        else:
-            out.append(ch)
-    return "".join(out)
-
-
-def _col_index(letters: str) -> int:
-    idx = 0
-    for ch in letters:
-        idx = idx * 26 + (ord(ch) - 64)
-    return idx
+#: 几何纯函数收敛进框架层 sheet_geometry（Task 5，逐字节等价）；保留原名薄别名。
+_snake = snake
+_col_index = col_index
 
 
 def _aging_field_specs() -> tuple[tuple[str, str, str, str, str, str], ...]:
