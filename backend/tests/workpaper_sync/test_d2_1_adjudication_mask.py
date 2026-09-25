@@ -76,3 +76,39 @@ def test_editable_cells_on_same_column_as_masked_still_editable() -> None:
 
 def test_mapping_digest_stable() -> None:
     assert m.assert_mapping_digest_d21() == m.EXPECTED_MAPPING_DIGEST_D21
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# 父契约接入（P0-1 复盘修复：D2-1 不再是孤立模块，真进父契约 sheets[]）
+# ═══════════════════════════════════════════════════════════════════════════
+def test_d21_is_attached_to_parent_contract() -> None:
+    """D2-1 sheet 真进父契约 sheets[]（d21-managed），parse_contract 强校验通过。
+
+    🔴 P0-1 复盘修复：此前 D2-1 provider 只被判据 import、未接入父契约（孤立声明）。
+    现照 D4-9 totals 静态字段范式接入：6 个 editable 金额格 + 逐格 formula_mask + 无 row_identity。
+    """
+    from app.services.workpaper_sync import pilot_d2_large_json as parent
+    from app.services.workpaper_sync.contracts import parse_contract
+
+    contract = parse_contract(parent.build_contract_payload(), adapter_id=parent.PILOT_ADAPTER_ID)
+    by_key = {s.sheet_key: s for s in contract.sheets}
+    assert m.SHEET_KEY_D21 in by_key, "D2-1 审定表未接入父契约 sheets[]"
+    d21 = by_key[m.SHEET_KEY_D21]
+    # 单 table（静态 cell 型），6 个 editable 金额字段，无 row_identity（固定行不注入 UUID）。
+    assert len(d21.tables) == 1
+    assert len(d21.tables[0].fields) == 6, "D2-1 应声明 6 个 editable 金额格"
+    assert d21.tables[0].row_identity is None, "静态 cell 型不应有 row_identity"
+    # 逐格 mask 进契约（SUMIF + 派生 + 小计/合计）。
+    assert len(d21.tables[0].formula_mask) == len(m.FORMULA_MASK)
+    # 受管区总数：D2-2 ① + D2-3 ② + D2-1 ① = 4（D2-4 判 single_html 不计）。
+    assert sum(len(s.tables) for s in contract.sheets) == 4
+
+
+def test_d21_editable_cells_map_to_percell_store_keys() -> None:
+    """6 个 editable 金额格的 store_item_id 与前端 per-cell 锚点逐字对齐。"""
+    store_ids = {sid for _c, _col, _r, _rk, sid, _vt, _h in m.EDITABLE_CELL_SPECS}
+    assert store_ids == {
+        "D2-adj-aging-prior-unadjusted", "D2-adj-aging-prior-aje", "D2-adj-aging-prior-rje",
+        "D2-adj-customer-type-prior-unadjusted", "D2-adj-customer-type-prior-aje",
+        "D2-adj-customer-type-prior-rje",
+    }, store_ids

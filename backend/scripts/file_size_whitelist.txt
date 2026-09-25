@@ -13,6 +13,16 @@
 #   mutate_ie_lifecycle_guards.py —— 变异检验清单（54 条 Mutation 声明式常量 + 四态判读引擎），
 #     条目本身是数据不是逻辑；拆分后「守卫清单 ↔ 变异覆盖率」的分母核对会跨文件。
 #     spec: workpaper-import-export-lifecycle-closure Task 21 + x3 任务 14.1
+#   pilot_d2_large_json.py —— D2 主 pilot（D2-2 866KB 载荷拆分 + D2-3/D2-1 sibling sheet
+#     接入，spec d2-sync-coverage-via-row-table-engine）。随受管 sheet 数增长是预期形态
+#     （1→3 张），拆分应按「D2-2 本体 / sibling 编排」切，暂不做（跨 D 循环范式收敛未定，见
+#     evidence/T98-dual-impl-convergence-adr.md）。
+#   test_task41_d2_large_json_pilot.py —— Task 41 umbrella spec 的 D2-2 pilot 全部离线守卫
+#     （866KB 载荷拆分 / 39 列契约接地 / 选型必要条件 / 预算三侧样本 / pg 半守卫的离线镶边）。
+#     spec d2-sync-coverage-via-row-table-engine（2026-09-26 复盘 P2-5）改写了 3-5 处断言以
+#     容纳 D2-3/D2-1 扩容，净增有限（本 spec 不拆分——该文件属 Task 41 umbrella spec 所有，
+#     拆分决策应由其 owner 按关注点分（契约接地/载荷拆分/选型/预算）四份而非本 spec 代做）。
+#     登记为待办：若后续再有 spec 往 D2 扩容需碰这个文件，应先拆分再改，不再滚雪球加基线。
 backend/app/services/workpaper_sync/projection_first_publication.py  1362
 backend/scripts/check/check_x3_deviation_registry.py  2474
 backend/scripts/diagnose/mutate_ie_lifecycle_guards.py  1290
@@ -278,7 +288,7 @@ backend/app/services/workpaper_sync/oo_to_html.py  3860
 #     四个工具，约 166 行，对父模块零依赖）抽成 `opaque_lane_ast_scan.py` —— 单向无环，
 #     但会动到多处按源码断言函数位置的判据，属独立任务。
 backend/app/services/workpaper_sync/opaque_entry_gate.py  1538
-backend/app/services/workpaper_sync/pilot_d2_large_json.py  1513
+backend/app/services/workpaper_sync/pilot_d2_large_json.py  1613
 backend/app/services/workpaper_sync/pilot_g7_two_level_dynamic.py  2450
 backend/app/services/workpaper_sync/pilot_h1_grouped_dynamic.py  1965
 backend/app/services/workpaper_sync/pilot_harness.py  1887
@@ -407,7 +417,7 @@ backend/tests/workpaper_sync/test_task39_pilot_harness.py  1951
 backend/tests/workpaper_sync/test_task39_pilot_harness_pg.py  1035
 backend/tests/workpaper_sync/test_task40_simple_checklist_pilot.py  976
 backend/tests/workpaper_sync/test_task40_simple_checklist_pilot_pg.py  1017
-backend/tests/workpaper_sync/test_task41_d2_large_json_pilot.py  2349
+backend/tests/workpaper_sync/test_task41_d2_large_json_pilot.py  2354
 backend/tests/workpaper_sync/test_task41_d2_large_json_pilot_pg.py  1628
 backend/tests/workpaper_sync/test_task42_h1_grouped_dynamic_pilot.py  3503
 backend/tests/workpaper_sync/test_task42_h1_grouped_dynamic_pilot_pg.py  1350

@@ -534,13 +534,26 @@ def _build_region_values(
     store_ids: tuple[str, ...],
     contract: SyncContract,
     budget: Any,
-) -> tuple[dict[str, Any], list[str]]:
+) -> tuple[dict[str, Any], list[str], dict[str, str]]:
+    """构建某区投影 values + row_keys + **rowId→category** 映射。
+
+    🔴 P1-3 复盘修复：组合区（aging + customer-type 共用物理段）必须把每行的 `category`
+    随投影带出，回写才能按 category 分流回正确 store 键，而非「默认 aging」静默猜测。
+    category 取自 store 行的 `category` 字段（前端 useD2BadDebt 写入），非 Excel 列。
+    """
     from app.services.workpaper_sync.adapters.base import FieldValue
 
     values: dict[str, FieldValue] = {}
     row_keys: list[str] = []
+    row_category: dict[str, str] = {}
     seen: set[str] = set()
     for store_id in store_ids:
+        # store_id → 该键的默认 category（individual 键→individual；组合区两键各自）。
+        default_cat = {
+            STORE_ITEM_ID_INDIVIDUAL: "individual",
+            STORE_ITEM_ID_AGING: "aging",
+            STORE_ITEM_ID_CUSTOMER: "customer-type",
+        }.get(store_id, "")
         for rid, row in _iter_persisted_rows(payloads.get(store_id, "[]"), store_item_id=store_id):
             if rid in seen:
                 raise StorePayloadError(
@@ -549,6 +562,8 @@ def _build_region_values(
             seen.add(rid)
             budget.add_row(table_key)
             row_keys.append(rid)
+            # 行内 category 优先，缺则用该 store 键的默认 category（身份来源已确定归属）。
+            row_category[rid] = str(row.get("category") or default_cat)
             for column_key, _col, _mode, _vt, store_key, _hdr in MANAGED_FIELD_SPECS:
                 spec = contract.field_by_stable_key(_stable_key_for(table_key, column_key))
                 stable_key = _stable_key_for(table_key, column_key, rid)
@@ -560,7 +575,7 @@ def _build_region_values(
                     mode=spec.mode,
                     row_key=rid,
                 )
-    return values, row_keys
+    return values, row_keys, row_category
 
 
 def build_d23_store_projection(
@@ -579,18 +594,18 @@ def build_d23_store_projection(
 
     lim = limits or load_limits()
     budget = StreamingProjectionBudget(lim)
-    ind_values, ind_rows = _build_region_values(
+    ind_values, ind_rows, _ind_cat = _build_region_values(
         payloads, table_key=ROWS_TABLE_KEY_INDIVIDUAL,
         store_ids=(STORE_ITEM_ID_INDIVIDUAL,), contract=contract, budget=budget,
     )
-    cmb_values, cmb_rows = _build_region_values(
+    cmb_values, cmb_rows, cmb_cat = _build_region_values(
         payloads, table_key=ROWS_TABLE_KEY_COMBINED,
         store_ids=(STORE_ITEM_ID_AGING, STORE_ITEM_ID_CUSTOMER),
         contract=contract, budget=budget,
     )
     values = dict(ind_values)
     values.update(cmb_values)
-    return Projection(
+    proj = Projection(
         contract_id=contract.contract_id,
         semantic_version=contract.semantic_version,
         document_type=contract.document_type,
@@ -600,6 +615,13 @@ def build_d23_store_projection(
             ROWS_TABLE_KEY_COMBINED: tuple(cmb_rows),
         },
     )
+    # 🔴 P1-3：把组合区 rowId→category 附在投影上，供 merge 按 category 分流回 aging/customer。
+    # 用 object.__setattr__ 以兼容 frozen Projection（若非 frozen 则等价普通赋值）。
+    try:
+        object.__setattr__(proj, "_d23_combined_category", dict(cmb_cat))
+    except Exception:  # pragma: no cover - Projection 允许普通赋值时
+        proj._d23_combined_category = dict(cmb_cat)  # type: ignore[attr-defined]
+    return proj
 
 
 def merge_projection_into_d23_stores(
@@ -664,6 +686,30 @@ def merge_projection_into_d23_stores(
     ind_prefix = f"{ROWS_TABLE_KEY_INDIVIDUAL}/"
     cmb_prefix = f"{ROWS_TABLE_KEY_COMBINED}/"
 
+    # 🔴 P1-3：category → store 键（组合区分流权威）。
+    _CAT_TO_STORE = {"aging": STORE_ITEM_ID_AGING, "customer-type": STORE_ITEM_ID_CUSTOMER}
+    # 投影带出的 rowId→category（build_d23_store_projection 附加），供新行分流。
+    proj_category: dict[str, str] = dict(getattr(projection, "_d23_combined_category", {}) or {})
+    # base 行的 rowId→category（存在行的归属权威，比 rid_to_store 更细，含 category 字段）。
+    base_category: dict[str, str] = {}
+    for store_id in (STORE_ITEM_ID_AGING, STORE_ITEM_ID_CUSTOMER):
+        for row in _base_rows(store_id):
+            rid0 = str(row.get(ROW_IDENTITY_STORE_KEY_D23) or "").strip()
+            if rid0:
+                base_category[rid0] = str(row.get("category") or "")
+
+    def _combined_target(rid: str) -> str:
+        """组合区回写归属：base 归属键 → base category → 投影 category → 兜底 aging。
+
+        去掉了原「默认 aging 静默猜测」：优先用 base 已确定的归属键（rid_to_store），
+        再用 base/投影带出的 category 字段，只有三者都缺时才兜底 aging（真正的 OO 新增行
+        且前端未标 category 的极端情形，前端下次编辑会以正确 category 覆盖）。
+        """
+        if rid in rid_to_store and rid_to_store[rid] in _CAT_TO_STORE.values():
+            return rid_to_store[rid]
+        cat = base_category.get(rid) or proj_category.get(rid) or ""
+        return _CAT_TO_STORE.get(cat, STORE_ITEM_ID_AGING)
+
     for key in projection.stable_keys():
         sk = str(key)
         fv = projection.get(key)
@@ -680,15 +726,21 @@ def merge_projection_into_d23_stores(
         if sk.startswith(ind_prefix):
             target_store = STORE_ITEM_ID_INDIVIDUAL
         elif sk.startswith(cmb_prefix):
-            # 组合区：按 base 归属键回写；新行默认 aging。
-            target_store = rid_to_store.get(rid, STORE_ITEM_ID_AGING)
-            if target_store not in (STORE_ITEM_ID_AGING, STORE_ITEM_ID_CUSTOMER):
-                target_store = STORE_ITEM_ID_AGING
+            target_store = _combined_target(rid)
         else:
             continue
         target = by_id[target_store].get(rid)
         if target is None:
-            target = {ROW_IDENTITY_STORE_KEY_D23: rid, "isSubRow": True, "isFixed": False}
+            # 新行携带其归属 category（组合区两键各自 category；individual 键为 individual）。
+            new_cat = {
+                STORE_ITEM_ID_INDIVIDUAL: "individual",
+                STORE_ITEM_ID_AGING: "aging",
+                STORE_ITEM_ID_CUSTOMER: "customer-type",
+            }.get(target_store, "")
+            target = {
+                ROW_IDENTITY_STORE_KEY_D23: rid, "isSubRow": True, "isFixed": False,
+                "category": new_cat,
+            }
             by_id[target_store][rid] = target
             order[target_store].append(rid)
         visited += 1

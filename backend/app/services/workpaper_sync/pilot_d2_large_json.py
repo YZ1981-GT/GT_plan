@@ -303,6 +303,24 @@ def _sheet_payload_d23() -> dict[str, Any]:
     return sheet_payload_d23()
 
 
+#: 🔴 D2-1 审定表 sibling sheet 接入开关（spec d2-sync-coverage Task 11）。
+#: True ⇒ build_contract_payload 的 sheets[] 追加 d21-managed（静态 cell 型，6 editable 金额格）。
+#: D2-1 store 是 per-cell 锚点（D2-adj-{rowKey}-{field}），走静态字段形态（照 D4-9 totals）。
+#: 逐格 mask + 固定 4 行；四态覆盖 UI 在前端 useD2Adjudication（真栈往返待 sibling 编排内核）。
+_INCLUDE_D201_ADJUDICATION: Final[bool] = True
+
+
+def _sheet_payload_d21() -> dict[str, Any]:
+    """D2-1 契约 sheet payload（懒导入 sibling provider）。"""
+    from app.services.workpaper_sync.phase5_d2_01_adjudication import (
+        assert_mapping_digest_d21,
+        sheet_payload_d21,
+    )
+
+    assert_mapping_digest_d21()
+    return sheet_payload_d21()
+
+
 #: 本 pilot 覆盖的 AC 12.2 四类之一（与 `pilot_harness.PilotClass` 同域）。
 PILOT_CLASS: Final[str] = "d2_large_json"
 
@@ -959,6 +977,14 @@ def build_contract_payload() -> dict[str, Any]:
             *(
                 (_sheet_payload_d23(),)
                 if _INCLUDE_D203_BAD_DEBT
+                else ()
+            ),
+            # D2-1 审定表：静态 cell 型（6 个人工 editable 金额格 + 逐格 formula_mask），
+            # sibling sheet 并入本 entry（sheet_key=d21-managed）。灰度开关见
+            # _INCLUDE_D201_ADJUDICATION。spec: d2-sync-coverage-via-row-table-engine Task 11。
+            *(
+                (_sheet_payload_d21(),)
+                if _INCLUDE_D201_ADJUDICATION
                 else ()
             ),
         ],

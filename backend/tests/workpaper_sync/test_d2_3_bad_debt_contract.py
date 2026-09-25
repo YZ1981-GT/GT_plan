@@ -51,10 +51,16 @@ def test_d23_sheet_has_exactly_two_regions(sheet) -> None:
     ], f"D2-3 必须是 2 受管区（实测模板 2 物理段），实得 {keys}"
 
 
-def test_total_binding_count_is_three(contract) -> None:
-    """全 entry 受管区数 = D2-2 ① + D2-3 ② = 3（binding 1→3）。"""
+def test_d23_contributes_two_bindings(contract, sheet) -> None:
+    """D2-3 自身贡献 **2** 个受管区（单项 + 组合）。
+
+    全 entry 受管区随后续 sheet 接入变化（D2-2 ① + D2-3 ② + D2-1 ① = 4），此判据只钉
+    D2-3 的贡献，不与其他 sheet 的接入耦合（避免每接一张就得改这条）。
+    """
+    assert len(sheet.tables) == 2, f"D2-3 应贡献 2 受管区，实得 {len(sheet.tables)}"
+    # 全局总数作为参考断言（D2-2 ① + D2-3 ② + D2-1 ①）。
     total = sum(len(s.tables) for s in contract.sheets)
-    assert total == 3, f"扩容后受管区数应为 3（1→3），实得 {total}"
+    assert total >= 3, f"全 entry 受管区应 ≥3（含 D2-2 ① + D2-3 ②），实得 {total}"
 
 
 def test_two_regions_use_distinct_uuid_columns() -> None:
@@ -192,6 +198,31 @@ def test_roundtrip_three_keys_each_read_back_equal(contract) -> None:
 # ═══════════════════════════════════════════════════════════════════════════
 # mapping_digest + 契约双向锁
 # ═══════════════════════════════════════════════════════════════════════════
+def test_new_combined_row_routes_by_category_not_default_aging(contract) -> None:
+    """P1-3 复盘修复：组合区**新行**（base 无记录）按投影带出的 category 分流，非「默认 aging」。
+
+    构造一个只在 customer-type 键里的新行（base_states 为空），断言回写落 customer-type
+    而非 aging。变异（去掉 category 分流回退默认 aging）⇒ 落错键 ⇒ 判据红。
+    """
+    payloads = _stores(
+        [],
+        [],
+        [_sub("newc", "customer-type", priorUnadjusted=500)],  # 只在 customer-type
+    )
+    proj = m.build_d23_store_projection(payloads, contract=contract)
+    # base_states 为空 ⇒ 新行的归属只能靠投影带出的 category
+    merged, _applied, _visited, _touched = m.merge_projection_into_d23_stores(
+        projection=proj, base_states={},
+    )
+    aging_ids = [r["rowId"] for r in merged[m.STORE_ITEM_ID_AGING]]
+    cust_ids = [r["rowId"] for r in merged[m.STORE_ITEM_ID_CUSTOMER]]
+    assert "newc" in cust_ids, f"customer-type 新行应回 customer 键，实得 aging={aging_ids} cust={cust_ids}"
+    assert "newc" not in aging_ids, "customer-type 新行不得落 aging（去掉默认 aging 静默猜测）"
+    # 回写的行携带 category
+    newc_row = next(r for r in merged[m.STORE_ITEM_ID_CUSTOMER] if r["rowId"] == "newc")
+    assert newc_row.get("category") == "customer-type"
+
+
 def test_mapping_digest_stable() -> None:
     assert m.assert_mapping_digest_d23() == m.EXPECTED_MAPPING_DIGEST_D23
 

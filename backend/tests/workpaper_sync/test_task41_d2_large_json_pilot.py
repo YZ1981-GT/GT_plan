@@ -706,20 +706,24 @@ class TestAuthoritativeTemplate:
 
         旧断言「契约只声明 D2-2 一张」按新形态改写 + 反向断言：D2-2 仍在且仍单 table（Q1 零回归）。
         """
+        from app.services.workpaper_sync import phase5_d2_01_adjudication as ADJ
         from app.services.workpaper_sync import phase5_d2_03_bad_debt as BD
 
         assert len(workbook.sheetnames) == 11, workbook.sheetnames
         assert BD.MANAGED_SHEET_D23 in workbook.sheetnames
+        assert ADJ.MANAGED_SHEET_D21 in workbook.sheetnames
         excel_names = [sheet.excel_name for sheet in contract.sheets]
-        assert excel_names == [P.MANAGED_SHEET, BD.MANAGED_SHEET_D23], excel_names
+        # 扩容后 3 张受管 sheet：D2-2 明细 + D2-3 坏账 + D2-1 审定（D2-4 判 single_html 不接）。
+        assert excel_names == [P.MANAGED_SHEET, BD.MANAGED_SHEET_D23, ADJ.MANAGED_SHEET_D21], excel_names
         by_key = {s.sheet_key: s for s in contract.sheets}
-        assert P.SHEET_KEY in by_key, "D2-2 明细表不得因扩容 D2-3 而消失"
+        assert P.SHEET_KEY in by_key, "D2-2 明细表不得因扩容而消失"
         assert len(by_key[P.SHEET_KEY].tables) == 1
         assert by_key[P.SHEET_KEY].tables[0].table_key == P.ROWS_TABLE_KEY
         assert [t.table_key for t in by_key[BD.SHEET_KEY_D23].tables] == [
             BD.ROWS_TABLE_KEY_INDIVIDUAL, BD.ROWS_TABLE_KEY_COMBINED,
         ]
-        assert sum(len(s.tables) for s in contract.sheets) == 3, "受管区应 1→3"
+        # 受管区：D2-2 ① + D2-3 ② + D2-1 ① = 4（D2-4 不计）。
+        assert sum(len(s.tables) for s in contract.sheets) == 4, "受管区应 1→4"
 
     def test_template_sentinel_rejects_a_mutated_workbook(
         self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
@@ -912,7 +916,8 @@ class TestContractIsGroundedInTheTemplate:
         assert table.delete_policy is not None
         assert table.delete_policy.value == "tombstone"
         # 39 个 stable key 全部带 `{row_uuid}` 占位，且没有任何数组下标形态。
-        keys = [spec.stable_field_key for spec in contract.all_fields()]
+        # 🔴 限 D2-2 sheet：D2-1（静态 cell）/ D2-3 有各自身份判据，不在此 all_fields 混判。
+        keys = [spec.stable_field_key for t in contract.sheets[0].tables for spec in t.fields]
         assert all("{row_uuid}" in key for key in keys), keys[:3]
         assert not any(re.search(r"/\d+/", key) for key in keys)
 

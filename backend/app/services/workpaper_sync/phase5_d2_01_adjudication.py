@@ -147,6 +147,20 @@ EDITABLE_AMOUNT_CELLS: Final[tuple[str, ...]] = (
     "B11", "C11", "D11",   # 客户类型组合行人工录入期初
 )
 
+#: 6 个 editable 金额格的完整声明：`(cell, 列标, 静态行号, rowKey, store 键, value_type, 表头)`。
+#: 🔴 D2-1 store 是 **per-cell 锚点**（`D2-adj-{rowKey}-{field}`，非行数组），故进父契约走
+#: **静态字段**形态（`cell.row_from=静态行号` / `row_scoped=False` / 无 row_identity），
+#: 照 D4-9 `totals_table_payload` 范式。store 键与前端 useD2Adjudication.getSumifOrManual
+#: 的 manualItemId 逐字对齐（`D2-adj-{rowKey}-prior-{unadjusted|aje|rje}`）。
+EDITABLE_CELL_SPECS: Final[tuple[tuple[str, str, int, str, str, str, str], ...]] = (
+    ("B10", "B", 10, "aging", "D2-adj-aging-prior-unadjusted", "amount", "期初未审数"),
+    ("C10", "C", 10, "aging", "D2-adj-aging-prior-aje", "amount", "期初账项调整"),
+    ("D10", "D", 10, "aging", "D2-adj-aging-prior-rje", "amount", "期初重分类调整"),
+    ("B11", "B", 11, "customer-type", "D2-adj-customer-type-prior-unadjusted", "amount", "期初未审数"),
+    ("C11", "C", 11, "customer-type", "D2-adj-customer-type-prior-aje", "amount", "期初账项调整"),
+    ("D11", "D", 11, "customer-type", "D2-adj-customer-type-prior-rje", "amount", "期初重分类调整"),
+)
+
 
 # ═══════════════════════════════════════════════════════════════════════════
 # 3. mapping_digest（锁死逐格映射 + 固定 4 行 + 无动态 identity）
@@ -171,6 +185,10 @@ def mapping_digest_payload() -> dict[str, Any]:
         "managed_editable_columns": list(MANAGED_EDITABLE_COLUMNS),
         "formula_mask": list(FORMULA_MASK),
         "editable_amount_cells": list(EDITABLE_AMOUNT_CELLS),
+        "editable_cell_fields": [
+            {"cell": c, "col": col, "static_row": row, "row_key": rk, "store_item_id": sid, "value_type": vt}
+            for c, col, row, rk, sid, vt, _hdr in EDITABLE_CELL_SPECS
+        ],
     }
 
 
@@ -253,3 +271,64 @@ def editable_amount_cells_are_not_masked() -> list[str]:
     误判 masked ⇒ 本函数返回非空 ⇒ 判据必红（钉住 D4-1 六字段被整列挡的坑）。
     """
     return [cell for cell in EDITABLE_AMOUNT_CELLS if cell_is_masked(cell)]
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# 5. 契约 sheet payload（静态 cell 型：6 editable 金额格 + 逐格 formula_mask）
+# ═══════════════════════════════════════════════════════════════════════════
+
+#: D2-1 受管 table_key（单 table，静态 cell，无 row_identity —— 照 D4-9 totals 范式）。
+TABLE_KEY_D21: Final[str] = "adjudication_cells"
+
+
+def stable_key_for_cell(column_key: str) -> str:
+    """`adjudication_cells/{column_key}` 的唯一拼装处（column_key 已小写，如 aging_b）。"""
+    return f"{TABLE_KEY_D21}/{column_key}"
+
+
+def sheet_payload_d21() -> dict[str, Any]:
+    """D2-1 契约 sheet：静态 cell 型单 table（6 个人工 editable 金额格 + 逐格 formula_mask）。
+
+    🔴 D2-1 store 是 per-cell 锚点（`D2-adj-{rowKey}-{field}`，非行数组），故走**静态字段**形态
+    （`cell.row_from=静态行号` / `row_scoped=False` / 无 row_identity / 无 delete_policy），
+    与 D4-9 `totals_table_payload` 同型。SUMIF 派生格 + 派生列 + 小计/合计行落 formula_mask，
+    普通值投影不覆盖。fixed 4 行的 rowKey 是稳定键（D4-6 范式），不注入 UUID 列。
+    """
+    from app.services.workpaper_sync.excel_extract import TABLE_SHEET_ANCHOR
+
+    def _src(cell: str) -> str:
+        return f"源xlsx!{MANAGED_SHEET_D21}!{cell}"
+
+    fields: list[dict[str, Any]] = []
+    for cell, column, static_row, row_key, store_item_id, value_type, header_text in EDITABLE_CELL_SPECS:
+        column_key = f"{row_key.replace('-', '_')}_{column.lower()}"
+        fields.append(
+            {
+                "stable_field_key": stable_key_for_cell(column_key),
+                "json_pointer": f"/{store_item_id}",
+                "column_key": column_key,
+                "cell": {"column": column, "row_from": static_row},
+                "mode": "editable",
+                "value_type": value_type,
+                "source_ref": _src(cell),
+                "store_item_id": store_item_id,
+                "row_key": row_key,
+                "header_text": header_text,
+            }
+        )
+    # sheet 级逐格 formula_mask（SUMIF + 派生 + 小计/合计，OO 重算不覆盖）。
+    all_mask = list(FORMULA_MASK)
+    return {
+        "sheet_key": SHEET_KEY_D21,
+        "excel_name": MANAGED_SHEET_D21,
+        "locator": {"anchor": TABLE_SHEET_ANCHOR},
+        "tables": [
+            {
+                "table_key": TABLE_KEY_D21,
+                "anchor": f"A{HEADER_ROWS_D21[0]}",
+                "header_rows": 2,
+                "formula_mask": all_mask,
+                "fields": fields,
+            }
+        ],
+    }

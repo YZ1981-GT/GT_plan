@@ -1182,6 +1182,159 @@
           "uuid_col": "P"
         }
       ]
+    },
+    {
+      "excel_name": "审定表D2-1",
+      "locator": {
+        "anchor": "excel_table_sheet_association"
+      },
+      "sheet_key": "d21-managed",
+      "tables": [
+        {
+          "anchor": "A5",
+          "fields": [
+            {
+              "cell": {
+                "column": "B",
+                "row_from": 10
+              },
+              "column_key": "aging_b",
+              "header_text": "期初未审数",
+              "json_pointer": "/D2-adj-aging-prior-unadjusted",
+              "mode": "editable",
+              "row_key": "aging",
+              "source_ref": "源xlsx!审定表D2-1!B10",
+              "stable_field_key": "adjudication_cells/aging_b",
+              "store_item_id": "D2-adj-aging-prior-unadjusted",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "C",
+                "row_from": 10
+              },
+              "column_key": "aging_c",
+              "header_text": "期初账项调整",
+              "json_pointer": "/D2-adj-aging-prior-aje",
+              "mode": "editable",
+              "row_key": "aging",
+              "source_ref": "源xlsx!审定表D2-1!C10",
+              "stable_field_key": "adjudication_cells/aging_c",
+              "store_item_id": "D2-adj-aging-prior-aje",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "D",
+                "row_from": 10
+              },
+              "column_key": "aging_d",
+              "header_text": "期初重分类调整",
+              "json_pointer": "/D2-adj-aging-prior-rje",
+              "mode": "editable",
+              "row_key": "aging",
+              "source_ref": "源xlsx!审定表D2-1!D10",
+              "stable_field_key": "adjudication_cells/aging_d",
+              "store_item_id": "D2-adj-aging-prior-rje",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "B",
+                "row_from": 11
+              },
+              "column_key": "customer_type_b",
+              "header_text": "期初未审数",
+              "json_pointer": "/D2-adj-customer-type-prior-unadjusted",
+              "mode": "editable",
+              "row_key": "customer-type",
+              "source_ref": "源xlsx!审定表D2-1!B11",
+              "stable_field_key": "adjudication_cells/customer_type_b",
+              "store_item_id": "D2-adj-customer-type-prior-unadjusted",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "C",
+                "row_from": 11
+              },
+              "column_key": "customer_type_c",
+              "header_text": "期初账项调整",
+              "json_pointer": "/D2-adj-customer-type-prior-aje",
+              "mode": "editable",
+              "row_key": "customer-type",
+              "source_ref": "源xlsx!审定表D2-1!C11",
+              "stable_field_key": "adjudication_cells/customer_type_c",
+              "store_item_id": "D2-adj-customer-type-prior-aje",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "D",
+                "row_from": 11
+              },
+              "column_key": "customer_type_d",
+              "header_text": "期初重分类调整",
+              "json_pointer": "/D2-adj-customer-type-prior-rje",
+              "mode": "editable",
+              "row_key": "customer-type",
+              "source_ref": "源xlsx!审定表D2-1!D11",
+              "stable_field_key": "adjudication_cells/customer_type_d",
+              "store_item_id": "D2-adj-customer-type-prior-rje",
+              "value_type": "amount"
+            }
+          ],
+          "formula_mask": [
+            "E8",
+            "F8",
+            "G8",
+            "H8",
+            "I8",
+            "J8",
+            "K8",
+            "E10",
+            "F10",
+            "G10",
+            "H10",
+            "I10",
+            "J10",
+            "K10",
+            "E11",
+            "F11",
+            "G11",
+            "H11",
+            "I11",
+            "J11",
+            "K11",
+            "B9",
+            "C9",
+            "D9",
+            "E9",
+            "F9",
+            "G9",
+            "H9",
+            "I9",
+            "J9",
+            "K9",
+            "B13",
+            "C13",
+            "D13",
+            "E13",
+            "F13",
+            "G13",
+            "H13",
+            "I13",
+            "J13",
+            "K13",
+            "E12",
+            "I12",
+            "J12",
+            "K12"
+          ],
+          "header_rows": 2,
+          "table_key": "adjudication_cells"
+        }
+      ]
     }
   ],
   "template": {
