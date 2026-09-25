@@ -223,19 +223,37 @@ describe('P14：S4（覆盖 且 上游已变）三值同时可见', () => {
     }
   })
 
-  it('反证：未被覆盖的格上游变化后仍自动跟随、不产生覆盖标记（P12 的运行时面）', async () => {
-    const { responses } = buildResponses([['D4-2-rows', [monthRow(PRODUCT, 100)]]])
+  it('OO 覆盖经 D4-1-rows 行对象回写（生产 mirror 路径）⇒ S2 标记 + 显示覆盖值', async () => {
+    // 生产路径：merge_projection_into_d41_rows 只改行对象顶层 + 保留 derivedSnapshot，
+    // **不**写 per-field。本条钉死读侧必须认行对象，否则 applied 后切回表格无标记。
+    const derived0 = 153431246.06
+    const overrideValue = derived0 + 12345.67
+    const rid = derivedRowId('营业收入_批发_分销')
+    const { responses } = buildResponses([
+      ['D4-2-rows', [monthRow('营业收入_批发_分销', derived0 / 12)]],
+      [
+        'D4-1-rows',
+        [
+          {
+            rowId: rid,
+            label: '营业收入_批发_分销',
+            source: 'tb',
+            accountCode: '6001',
+            sectionKey: 'main-revenue',
+            currentUnadjusted: overrideValue,
+            priorUnadjusted: 0,
+            derivedSnapshot: { currentUnadjusted: derived0, priorUnadjusted: 0 },
+          },
+        ],
+      ],
+    ])
     const { api, dispose } = run(responses)
     try {
       await nextTick()
-      responses.value.set('D4-2-rows', {
-        item_id: 'D4-2-rows',
-        conclusion: null,
-        remark: JSON.stringify([monthRow(PRODUCT, 777)]),
-      })
-      await nextTick()
-      const row = mainRow(api, PRODUCT)!
-      expect(row.cellOverrides, '纯派生格被误标成人工覆盖').toBeUndefined()
+      const row = mainRow(api, '营业收入_批发_分销')!
+      expect(row.cellOverrides?.currentUnadjusted?.state).toBe('S2')
+      expect(row.currentUnadjusted).toBe(overrideValue)
+      expect(row.cellOverrides!.currentUnadjusted!.snap).toBe(derived0)
     } finally {
       dispose()
     }

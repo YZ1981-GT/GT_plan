@@ -270,21 +270,75 @@ export function useD4Adjudication(options: UseD4AdjudicationOptions) {
     return `${rowFieldItemId(D4_ADJ_ROWS_SPEC, rowId, field)}-snap`
   }
 
+  function _rowDef(rowId: string): DynamicAdjRow | undefined {
+    return dynamicRows.value.find((d) => d.rowId === rowId)
+  }
+
+  /**
+   * 覆盖状态机的 stored：行对象顶层优先，缺则回落 per-field。
+   *
+   * 🔴 OO→HTML mirror（`merge_projection_into_d41_rows`）**只写** `D4-1-rows` 行对象；
+   * 若这里只读 per-field，会把镜像后的覆盖值当成「无覆盖」→ `syncDerivedRowsIntoStore`
+   * 用派生值冲掉行对象（真栈：operation applied、store-projection 已是新值，切回表格却
+   * 仍显示旧派生、无「已人工覆盖」）。
+   */
+  function _readStoredAmount(rowId: string, field: string): number | null {
+    const def = _rowDef(rowId)
+    if (def) {
+      const direct = (def as Record<string, unknown>)[field]
+      if (direct != null) {
+        const n = Number(direct)
+        if (Number.isFinite(n)) return n
+      }
+    }
+    const raw = readRaw(
+      allResponses.value as Map<string, unknown>,
+      rowFieldItemId(D4_ADJ_ROWS_SPEC, rowId, field),
+    )
+    if (raw === '') return null
+    const n = Number(raw)
+    return Number.isFinite(n) ? n : null
+  }
+
+  /**
+   * 覆盖状态机的 snap：行对象 `derivedSnapshot[field]` 优先，缺则回落 `{field}-snap` per-field。
+   * merge 保留 HTML-only 的 derivedSnapshot；与 stored 同源优先级才能认出 S2/S4。
+   */
+  function _readSnapAmount(rowId: string, field: string): number | null {
+    const def = _rowDef(rowId)
+    const fromRow = def?.derivedSnapshot?.[field]
+    if (fromRow != null) {
+      const n = Number(fromRow)
+      if (Number.isFinite(n)) return n
+    }
+    const raw = readRaw(allResponses.value as Map<string, unknown>, snapItemId(rowId, field))
+    if (raw === '') return null
+    const n = Number(raw)
+    return Number.isFinite(n) ? n : null
+  }
+
   /**
    * 序列化 D4-1-rows 用的读取器（Task 8/10 双写）：
-   * - `readField`：读**该字段的 per-field item 当前值**（不走 getRowFieldValue，避免与
-   *   「行对象值优先」的读侧循环依赖 —— 行对象金额本就是 per-field 的同步快照）；
-   * - `readDerivedSnapshot`：读派生行的 `snap`（Task 12 落在 `{rowId}-{field}-snap`），
-   *   缺则不落 derivedSnapshot 键。
+   * - `readField`：**行对象优先**（OO mirror 落点），缺则回落 per-field —— 不得只读
+   *   per-field，否则 persistRowList 会用旧 per-field 盖掉镜像覆盖值；
+   * - `readDerivedSnapshot`：行对象 derivedSnapshot 优先，缺则拼 per-field `-snap`。
    */
   const rowListReader = {
-    readField: (rowId: string, field: string): number | null => {
-      const raw = readRaw(allResponses.value as Map<string, unknown>, rowFieldItemId(D4_ADJ_ROWS_SPEC, rowId, field))
-      if (raw === '') return null
-      const n = Number(raw)
-      return Number.isFinite(n) ? n : null
-    },
+    readField: (rowId: string, field: string): number | null => _readStoredAmount(rowId, field),
     readDerivedSnapshot: (rowId: string): Record<string, number | null> | null => {
+      const def = _rowDef(rowId)
+      if (def?.derivedSnapshot) {
+        const clean: Record<string, number | null> = {}
+        let has = false
+        for (const [k, v] of Object.entries(def.derivedSnapshot)) {
+          if (v == null) continue
+          const n = Number(v)
+          if (!Number.isFinite(n)) continue
+          clean[k] = n
+          has = true
+        }
+        if (has) return clean
+      }
       const snap: Record<string, number | null> = {}
       let has = false
       for (const field of D4_ADJ_ROWS_SPEC.valueFields) {
@@ -616,10 +670,8 @@ export function useD4Adjudication(options: UseD4AdjudicationOptions) {
     field: string,
     derivedValue: number,
   ): { display: number; override?: { state: 'S1' | 'S2' | 'S3' | 'S4'; stored: number; snap: number; derived: number } } {
-    const storedRaw = readRaw(allResponses.value as Map<string, unknown>, rowFieldItemId(D4_ADJ_ROWS_SPEC, rowId, field))
-    const snapRaw = readRaw(allResponses.value as Map<string, unknown>, snapItemId(rowId, field))
-    const stored = storedRaw === '' ? null : Number(storedRaw)
-    const snap = snapRaw === '' ? null : Number(snapRaw)
+    const stored = _readStoredAmount(rowId, field)
+    const snap = _readSnapAmount(rowId, field)
     const state = resolveCellState(stored, snap, derivedValue)
     const display = displayValueForCellState(state, stored, derivedValue)
     if (state === 'S2' || state === 'S4') {
@@ -738,10 +790,10 @@ export function useD4Adjudication(options: UseD4AdjudicationOptions) {
   /** 该 store 行是否被人工覆盖过（任一派生字段 stored ≠ snap）——覆盖过的派生行不作孤儿清理。 */
   function _derivedRowHasOverride(rid: string): boolean {
     for (const field of D4_ADJ_ROWS_SPEC.valueFields) {
-      const storedRaw = readRaw(allResponses.value as Map<string, unknown>, rowFieldItemId(D4_ADJ_ROWS_SPEC, rid, field))
-      const snapRaw = readRaw(allResponses.value as Map<string, unknown>, snapItemId(rid, field))
-      if (storedRaw === '' || snapRaw === '') continue
-      if (Math.abs(Number(storedRaw) - Number(snapRaw)) > BALANCE_TOLERANCE) return true
+      const stored = _readStoredAmount(rid, field)
+      const snap = _readSnapAmount(rid, field)
+      if (stored == null || snap == null) continue
+      if (Math.abs(stored - snap) > BALANCE_TOLERANCE) return true
     }
     return false
   }
@@ -804,10 +856,10 @@ export function useD4Adjudication(options: UseD4AdjudicationOptions) {
       ]
       for (const [field, value] of derivedPairs) {
         // 判定是否已被人工覆盖：stored ≠ snap（选项 b 状态机，见 Task 13）。
-        const storedRaw = readRaw(allResponses.value as Map<string, unknown>, rowFieldItemId(D4_ADJ_ROWS_SPEC, rid, field))
-        const snapRaw = readRaw(allResponses.value as Map<string, unknown>, snapItemId(rid, field))
-        const stored = storedRaw === '' ? null : Number(storedRaw)
-        const snap = snapRaw === '' ? null : Number(snapRaw)
+        // 🔴 必须与 `_resolveDerivedCell` 同口径（行对象 / derivedSnapshot 优先）——
+        //    OO mirror 只写行对象；只读 per-field 会把已覆盖格判成未覆盖，再用派生值冲掉。
+        const stored = _readStoredAmount(rid, field)
+        const snap = _readSnapAmount(rid, field)
         const overridden =
           stored != null && snap != null && Math.abs(stored - snap) > BALANCE_TOLERANCE
         // 🔴 snap 与 stored 都**只在未被人工覆盖时**跟随派生值（S1 纯派生 / S3 自动跟随）。

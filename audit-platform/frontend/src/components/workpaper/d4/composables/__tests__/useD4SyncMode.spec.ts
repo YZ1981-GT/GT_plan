@@ -34,18 +34,25 @@ vi.mock('@/utils/http', () => ({
 // 桥 mock：只暴露 switchToOnlyOffice/switchToHtml + 状态 ref，记录调用
 const switchToOnlyOffice = vi.fn(() => Promise.resolve({} as any))
 const switchToHtml = vi.fn(() => Promise.resolve())
+const reloadAfterApplied = vi.fn(() => Promise.resolve())
+const leaveWithoutSaving = vi.fn(() => Promise.resolve())
+const bridgeMode = ref<'html' | 'oo'>('html')
+const bridgeState = ref('html_idle')
+const bridgeDirty = ref(false)
 vi.mock('../../../sync/useWorkpaperSyncBridge', () => ({
-  WP_BRIDGE_IN_FLIGHT_STATES: ['materializing', 'oo_loading'],
+  // 含 applied：与生产 WP_BRIDGE_IN_FLIGHT_STATES 同形，才能测「applied 锁死切回」缺口
+  WP_BRIDGE_IN_FLIGHT_STATES: ['materializing', 'oo_loading', 'applied'],
   useWorkpaperSyncBridge: () => ({
-    mode: ref<'html' | 'oo'>('html'),
-    state: ref('html_idle'),
+    mode: bridgeMode,
+    state: bridgeState,
     descriptor: ref(null),
     feedback: ref({ message: '' }),
-    dirty: ref(false),
+    dirty: bridgeDirty,
     lastError: ref(''),
     switchToOnlyOffice,
     switchToHtml,
-    reloadAfterApplied: vi.fn(() => Promise.resolve()),
+    reloadAfterApplied,
+    leaveWithoutSaving,
   }),
 }))
 vi.mock('../../../sync/workpaperSyncApi', () => ({}))
@@ -72,6 +79,11 @@ describe('useD4SyncMode 统一接桥守卫', () => {
     getCalls.length = 0
     switchToOnlyOffice.mockClear()
     switchToHtml.mockClear()
+    reloadAfterApplied.mockClear()
+    leaveWithoutSaving.mockClear()
+    bridgeMode.value = 'html'
+    bridgeState.value = 'html_idle'
+    bridgeDirty.value = false
     // 🔴 2026-09-22：健康检查现有模块级 TTL 缓存 + in-flight 去重（见 useD4SyncMode.ts
     // 顶部 fetchOnlyOfficeHealthy 注释）。各用例各自控制 healthResolver 决定这次请求的
     // 结果/时机，若不清空会被前一用例遗留的缓存值或悬挂 promise 污染。
@@ -95,6 +107,39 @@ describe('useD4SyncMode 统一接桥守卫', () => {
       expect(m.ooHealthy.value).toBe(false)
       const online = m.modeOptions.value.find(o => o.value === '在线编辑')!
       expect(online.disabled).toBe(false)
+    })
+    scope.stop()
+  })
+
+  it('⑤ applied 时「表格视图」可点，并触发 reloadAfterApplied（不得被 busy 锁死）', async () => {
+    const scope = effectScope()
+    await scope.run(async () => {
+      const m = makeMode()
+      bridgeMode.value = 'oo'
+      bridgeState.value = 'applied'
+      await nextTick()
+      expect(m.busy.value).toBe(true)
+      const html = m.modeOptions.value.find(o => o.value === '表格视图')!
+      const online = m.modeOptions.value.find(o => o.value === '在线编辑')!
+      expect(html.disabled).toBe(false)
+      expect(online.disabled).toBe(true)
+      m.editorMode.value = '表格视图'
+      await flushPromises()
+      expect(reloadAfterApplied).toHaveBeenCalledTimes(1)
+      expect(switchToHtml).not.toHaveBeenCalled()
+      expect(leaveWithoutSaving).not.toHaveBeenCalled()
+    })
+    scope.stop()
+  })
+
+  it('⑤b rematerializing 等非 applied 的 in-flight 仍锁死表格视图', async () => {
+    const scope = effectScope()
+    scope.run(() => {
+      const m = makeMode()
+      bridgeMode.value = 'oo'
+      bridgeState.value = 'materializing'
+      const html = m.modeOptions.value.find(o => o.value === '表格视图')!
+      expect(html.disabled).toBe(true)
     })
     scope.stop()
   })

@@ -160,6 +160,20 @@ export function useD4SyncMode(options: UseD4SyncModeOptions) {
       || (WP_BRIDGE_IN_FLIGHT_STATES as readonly string[]).includes(String(syncBridge.state.value)),
   )
 
+  /**
+   * `applied` 在 in-flight 集合里是为了拦离开/刷新（HTML 还没按 result revision 重载）。
+   * 但切回表格视图**正是**完成那次重载的路径（`reloadAfterApplied`）。若 busy 连这项
+   * 一起锁死，用户永远点不回表单 —— 真栈 D4-1 override：operation 已 `applied`、
+   * store 已是新值，分段器「表格视图」却是 `is-disabled`，e2e 卡死到超时。
+   */
+  function isAppliedHtmlReturn(target: string): boolean {
+    return (
+      views.includes(target)
+      && syncBridge.mode.value === 'oo'
+      && String(syncBridge.state.value) === 'applied'
+    )
+  }
+
   const htmlView = ref(views[0])
 
   const editorMode = computed<string>({
@@ -174,12 +188,15 @@ export function useD4SyncMode(options: UseD4SyncModeOptions) {
     [...views, D4_ONLINE_EDIT_LABEL].map(value => ({
       label: value,
       value,
-      disabled: busy.value || (value === D4_ONLINE_EDIT_LABEL && options.isReadonly.value),
+      disabled:
+        (busy.value && !isAppliedHtmlReturn(value))
+        || (value === D4_ONLINE_EDIT_LABEL && options.isReadonly.value),
     })),
   )
 
   async function switchMode(target: string): Promise<void> {
-    if (busy.value) return
+    // applied→HTML 是完成重载的合法出口，不得被 busy 短路（见 isAppliedHtmlReturn）。
+    if (busy.value && !isAppliedHtmlReturn(target)) return
     if (target === D4_ONLINE_EDIT_LABEL) {
       if (options.isReadonly.value) return
       if (syncBridge.mode.value === 'oo') return
