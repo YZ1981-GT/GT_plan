@@ -1,0 +1,85 @@
+{
+  "spec": "e1-sync-coverage-and-first-canary",
+  "tasks": ["0（前置核查）", "1（slice 核对）", "2（形态判定三元组实证）"],
+  "probed_at": "2026-09-26",
+  "method": "git show HEAD 判定前置 + slice 逐项核对 + 前端 composable 按值 grep（禁推演，裁决 H8）",
+
+  "task_0_prerequisites": {
+    "verdict": "全部满足（前置 A/B/C 均已入 HEAD）",
+    "gate_A_framework_layer_and_form_taxonomy": {
+      "in_head": true,
+      "artifacts": [
+        "backend/app/services/workpaper_sync/phase5_row_table_sheet.py（RowTableSheetSpec + binding_kind + row_identity_key 三形态 + html_only_item_ids）",
+        "backend/app/services/workpaper_sync/store_item_registry.py（StoreItemSpec 四形态 + STORE_MERGE_REGISTRY O(1)）",
+        "backend/app/services/workpaper_sync/sheet_geometry.py"
+      ],
+      "commit": "fbb55eead"
+    },
+    "gate_B_adjudication_sheet_spec": {
+      "in_head": true,
+      "artifact": "backend/app/services/workpaper_sync/phase5_adjudication_sheet.py（AdjudicationSheetSpec + row_mode 三形态含 slot_driven + AdjudicationValueSource 含 cross_volume 跨册）",
+      "commit": "f1ec1c67d",
+      "note": "slot_driven + cross_volume 两个成员正是为 E1-1 的槽位驱动与跨册（第 3 册 E1-accrued-interest-rows）预留的"
+    },
+    "gate_C_cell_level_protection": {
+      "in_head": true,
+      "artifacts": [
+        "merge.py 的 _mask_spans_data_column（格级判定）",
+        "backend/tests/workpaper_sync/test_masked_cell_protection_is_cell_level.py（已被 git 跟踪）"
+      ],
+      "note": "E1-1 密度 41% / 193 公式，比 D4-1 的 48 格 mask 风险更大 ⇒ 此前置对 E1 阶段 6 是硬依赖"
+    },
+    "gate_D": "🔴 E1 无前置 D：与 D3/D567 的「有 provider 缺发布链」不同，E1 连 provider 都没有 ⇒ 需求 1 的 canary 链路本身就是在解除这个前置"
+  },
+
+  "task_1_slice_reconciliation": {
+    "source": "backend/data/workpaper_sync_e_cycle_manifest_slice.json",
+    "entry_id": "xlsx/gt-e1-monetary-fund",
+    "migration_state": "legacy_fake_bidirectional",
+    "adapter_id": null,
+    "scenario_profile_id": "xlsx.editable.shared.single.room_service_wired.v1",
+    "verdict": "slice 仍与现状一致（未过期）：migration_state / adapter_id=None / profile 三项逐字吻合；profile 与 D1/D2/D3 同型 ⇒ required scenario set 是 shared+editable 标准集",
+    "note": "slice 的 independent_entries 条目未含 parent_duplicate_count / verification_state / unverifiable_reasons 字段（E1 spec 正文引用的那些值来自 umbrella 的 D 循环 slice 对照，非 E 循环 slice 自身）⇒ parent_duplicate 路线裁决仍需按 E1 spec Task 1 的路线 α 执行，但其依据应改述为「E 循环 slice 未登记 parent_duplicate ⇒ 无 per-sheet manifest 条目」"
+  },
+
+  "task_2_form_verdicts": {
+    "method_note": "🔴 binding_kind 判据是**前端三元组**（store 键是否存在 / addRow-removeRow 信号数 / composable 归属），不是模板公式数。E1 spec 首版按「各只 7 公式」把 E1-9/10/11 三张全判 static_region 已被推翻（裁决 H8）",
+    "e1_2_cash_detail": {
+      "sheet_code": "E1-2",
+      "composable": "audit-platform/frontend/src/components/workpaper/composables/useE1CashDetail.ts",
+      "store_item_id": "E1-cash-detail-rows",
+      "store_key_naming_style": "语义（style ①）",
+      "add_remove_signals": ["addRow()", "removeRow(rowId)", "updateCell(rowId, field, value)"],
+      "binding_kind_verdict": "excel_table（动态行表）",
+      "binding_kind_rationale": "三元组全部命中：①store 键存在且为 -rows ②addRow/removeRow 双信号齐备 ③归属 useE1CashDetail 专属 composable",
+      "row_identity_key_verdict": "id",
+      "row_identity_rationale": "🔴 **实测推翻 spec 的隐含假设**：行身份字段名是 `id`（不是 D 类惯用的 `rowId`）。generateRowId() 产 `cash-<uuid>`，但序列化字段是 `r.id`（useE1CashDetail.ts:104/144/285）。若照 D 类写 rowId，store-projection 会 fail-closed 抛「缺稳定行身份」把整个 entry 打挂（D4-1 曾因 rowKey/rowId 之误踩过同款）",
+      "mixed_identity_finding": "🔴 **另一个 spec 未预料的事实**：E1-2 有一个**不可删除的固定行** `fixed-rmb`（useE1CashDetail.ts:284 `if (rowId === 'fixed-rmb') return`）⇒ 本张是「固定行 + 动态行」**混合身份**：固定部分用稳定 key `fixed-rmb`，动态部分用 `cash-<uuid>`，两者同在 `id` 字段。声明时 row_identity_key='id' 可同时容纳，无需拆区",
+      "canary_suitability": "spec 选它作 canary 的三条理由经实测成立：零 OCR（本 composable 无 OcrConfirmDialog 引用）、零跨 sheet 取数（loadFromResponses 只读自身 STORAGE_KEY）、键独立"
+    },
+    "e1_3_bank_detail_variant_risk": {
+      "sheet_code": "E1-3",
+      "store_item_id": "E1-bank-detail-rows",
+      "risk": "数据损坏级（spec 裁决 H4）",
+      "cross_sheet_readers": ["useE1Reconciliation.reconciliationCrossCheck(:371) 读 E1-bank-detail-rows"],
+      "note": "本轮仅确认跨 sheet 读取方存在（useE1Reconciliation 只读不写 ⇒ 与 D1-4 的第三写入方形态不同）。两 variant 列集差异的完整裁决归 spec Task 18"
+    },
+    "naming_style_census": {
+      "note": "🔴 实测确认 E1 有四种以上命名风格，spec 的警告成立",
+      "styles": {
+        "semantic": ["E1-cash-detail-rows", "E1-reconciliation-rows", "E1-bank-detail-rows", "E1-cutoff-bank-rows", "E1-cutoff-other-rows"],
+        "numbered_nested": ["E1-ipo-E1-26-rows", "E1-ipo-E1-28-rows", "E1-ipo-E1-30-rows", "E1-ipo-E1-32-rows"],
+        "templated": ["`E1-ipo-${sheetCode}-rows`（useE1IpoSpecial.getStorageKey:157）"],
+        "pack": ["E1-largecheck-pack", "E1-cashcheck-pack", "E1-keyperson-flow-pack", "E1-deposit-daily-pack", "E1-cash-txn-analysis-pack", "E1-bank-flow-pack"],
+        "legacy_fallback": ["E1-ipo-audit-note-E1-32", "E1-ipo-audit-conclusion-E1-30", "E1-interest-monthly-rows-summary"]
+      },
+      "lesson": "🔴 模板化键（style ③）按字面量 grep `-rows` **查不到**，必须按前缀 + 拼接形态查。pack 形态（style ④）说明「不是每张受管 sheet 的 store 都是 -rows」—— 按 `-rows` 枚举受管候选会漏掉全部 pack 型 sheet"
+    }
+  },
+
+  "blocking_upstream_gap": {
+    "reason": "no_registered_sync_adapter（平台级，umbrella BP-61-1）",
+    "detail": "working_paper_sync_entry_state / working_paper_content_version / working_paper_content_representation 三表近空，186 个 planned entry 一个都注册不上；生产者是 ContentMutationService.commit(...) 与 umbrella Tasks 36/77 的 finalize gate",
+    "consequence": "E1 与 D1/D3/D5/D6/D7 六个循环卡在同一供给缺口 ⇒ 本 spec 的 provider 侧声明与判据照常推进，但契约发布链五环的第③环（published representation）、真栈整册 materialize、§9.6 三谓词、Playwright 全盘**在 adapter 注册前跑不起来**，如实标 [ ]* 不得以合成测试冒充真栈（spec Task 9 明令）"
+  }
+}
