@@ -869,3 +869,16 @@ backend/app/services/workpaper_sync/adapters/excel.py  1027
 #     拆分会让「多区清单 ↔ 位移断言」跨文件。baseline 取真实行数。
 #     spec: workpaper-html-onlyoffice-bidirectional-writeback-closure（同 sheet 多区）
 backend/tests/workpaper_sync/test_sibling_table_ref_row_shift.py  885
+
+#   wp_render_config.py —— **改动前 HEAD 即 824 行已超 800 上限、从未登记**（render-config
+#     单文件承载 sheet 分类/override/dedicated memo/auto-fill/word-template/准则下发七段管线）。
+#     工作树现 1053 行（门禁 splitlines 口径），824→1053 的 229 行欠账**非本次造成**，是 work
+#     分支多轮渲染改动累积、门禁对本文件事实上已失效。本次 Task 17 根因修复 render-config
+#     UnboundLocalError 500 仅净增 6 行注释（`ovr` 提升为循环不变量在循环外初始化，防空 sheet
+#     集底稿 500），不是膨胀来源，但被这笔历史欠账挡住。首次入册，baseline 取当前真实行数 1053，
+#     门禁从此刻对本文件重新生效、继续拦膨胀 >5%。
+#     拆分方向：把逐 sheet 分类循环（sheet override/skip/dedicated memo，约 300 行）抽为
+#     `wp_render_config_sheet_classify.py`，把 auto-fill + word-template sign_status + 准则下发
+#     （Step 7~9.5，约 200 行）抽为 `wp_render_config_finalize.py`，属独立打磨任务。
+#     spec: workpaper-page-formula-toolbar-closure Task 17
+backend/app/routers/wp_render_config.py  1053

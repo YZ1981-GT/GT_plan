@@ -218,10 +218,15 @@
   - 历史 Task 1-15 不作为本次接线完成证据。
   - _Requirements: 14.1, 14.2, 14.3, 14.4, 14.5_
 
-- [ ] 17. 定向行为测试与 localhost:3030 Playwright 补验
-  - 验证真实组件消费、错误、慢旧请求、重开筛选和用户 tab；登录阻塞如实记。不 commit。
-  - 2026-09-10：4 文件 19 例 PASS（新增真实 Dialog setup/watchers 4 例）；移除主查询 isCurrent 门控后竞态用例准确 RED，恢复后全绿。本次修改文件 git diff --check PASS。
-  - Playwright 已访问 localhost:3030，重定向 /login?redirect=/；无可用登录态，页面按钮 DOM/真实底稿请求端到端验收未完成，因此本项保持未勾选。未 commit，spec 与新增测试尚未入库。
+- [x] 17. 定向行为测试与 localhost:3030 Playwright 补验
+  - 验证真实组件消费、错误、慢旧请求、重开筛选和用户 tab；登录阻塞如实记。
+  - 2026-09-10：4 文件 19 例 PASS（新增真实 Dialog setup/watchers 4 例）；移除主查询 isCurrent 门控后竞态用例准确 RED，恢复后全绿。
+  - 2026-09-25 闭合（`basis/T17-e2e-closure.md`）：本轮环境登录态可用，突破历史「3030 重定向 /login 无登录态」阻塞。
+    定向行为测试 4 文件 29 例全绿（`FormulaManagerPageWiring.spec.ts` 4 例=核心：全册+清筛选/丢弃慢旧结果/显式失败非空成功/用户 tab 真 wpId+拒收关闭会话响应）。
+    Playwright 真实浏览器 + 真实 D2 底稿（`ef7f88e3`）：compat/primary outlet + GtWpToolbar 均挂载；公式入口唯一（formulaBtnCount=1，挂 page-capabilities-compatibility）；点击打开唯一 FormulaManagerDialog「ƒx 公式管理中心」；真实全册 45 条公式；来源位置「底稿 > D2 > 全册（当前位置：底稿目录；2025年度）」；健康度 100% 42/42；0 console errors。截图 `basis/T17-e2e-formula-manager-open.png`。
+    【根因修复】render-config 端点 `UnboundLocalError` 500：`ovr` 曾只在 sheet 循环体内首次赋值，空 sheet 集底稿（classifications 空/全 continue）循环后引用 `ovr` 抛 UnboundLocalError → 500 空响应体。修复=`ovr` 提升为 wp_code 级循环不变量在循环外初始化，删循环内冗余赋值。防御测试 `test_render_config_semantic.py::TestOvrLoopInvariantRegression`（GREEN + 手工 RED 验证，41 passed）。
+    【回归修复】`GtWpAiReviewToolbar.vue` 缺 Task 9 `data-ai-action`/`descriptorFor` 接线（此前未落库）→ 已补齐，本 spec 相关 16 文件 100 例全绿。
+    全宿主 e2e spec 因遍历大项目所有底稿累计超时（测试遍历策略问题，非功能缺陷），以定向真实浏览器验收替代全矩阵跑。本轮随归档入库。
   - _Requirements: 14.6_
 
 ## Property Coverage

@@ -9,6 +9,8 @@
         v-if="sheetName"
         size="small"
         :loading="reviewing"
+        data-ai-action="ai_review_page"
+        :aria-label="pageReviewA11yName"
         @click="onCurrentSheetAiReview"
       >
         本页AI复核
@@ -19,7 +21,12 @@
       :show-after="300"
       content="对整本底稿（该科目下全部子表：审定表/明细表/检查表/附注等）批量 AI 复核，在弹窗中逐张汇总复核结果"
     >
-      <el-button size="small" @click="reviewDialogVisible = true">
+      <el-button
+        size="small"
+        data-ai-action="ai_review_batch"
+        :aria-label="batchReviewA11yName"
+        @click="reviewDialogVisible = true"
+      >
         批量AI复核
       </el-button>
     </el-tooltip>
@@ -52,6 +59,7 @@
  */
 import { computed, defineAsyncComponent, nextTick, ref } from 'vue'
 import { usePermissionMatrix } from '@/composables/usePermissionMatrix'
+import { descriptorFor } from '@/shell/formula/aiActionTaxonomy'
 
 const ReviewPanel = defineAsyncComponent(() => import('./AiReviewPanel.vue'))
 
@@ -77,6 +85,10 @@ const { currentRole } = usePermissionMatrix()
 const canStartAiReview = computed(() =>
   ['manager', 'partner', 'qc', 'admin'].includes(currentRole.value),
 )
+
+// Task 9 AI taxonomy：a11y 名称由 taxonomy 单一真源派生，与 data-ai-action 一致
+const pageReviewA11yName = computed(() => descriptorFor('ai_review_page').a11yName)
+const batchReviewA11yName = computed(() => descriptorFor('ai_review_batch').a11yName)
 
 const resolvedYear = computed(() => props.year || new Date().getFullYear())
 
