@@ -3,11 +3,20 @@
   "spec": "custom-workpaper-template-ingestion-and-sync-closure",
   "task": 19,
   "recorded_at": "2026-09-09",
+  "reverified_at": "2026-09-25",
   "verdict": "PARTIAL",
   "notes": [
     "finalize_saga + G-HANDOFF-CONSUMER 消费已落地（Task 11）",
-    "SYNC-ENTRY-NAMESPACE / SYNC-MULTI-RESOLVER 仍 BLOCKED，整册 runtime 端到端未宣称 PASS"
+    "SYNC-ENTRY-NAMESPACE / SYNC-MULTI-RESOLVER 仍 BLOCKED，整册 runtime 端到端未宣称 PASS",
+    "2026-09-25 live 复测 probe_all_sync_gates().all_clear=False，multi_resolver_count=4，四 gate 全 BLOCKED，PARTIAL verdict 不变"
   ],
+  "reverification": {
+    "method": "probe_all_sync_gates() + probe_namespace_gates() live 探测（不写盘）",
+    "all_clear": false,
+    "multi_resolver_count": 4,
+    "candidate_not_confirmed_guard": "test_finalize_saga.py PASS",
+    "custom_ingestion_suite": "298 passed"
+  },
   "artifacts": [
     "backend/app/services/custom_template_ingestion/finalize_saga.py",
     "backend/tests/custom_template_ingestion/test_finalize_saga.py"

@@ -418,3 +418,23 @@ Task 4 的**服务内核 + HTTP 路由**已交付且全绿（见上）。2026-09
 1. PG enum `userrole` 缺 `template_admin` —— 组织级发布发起路径在迁移落地前结构性不可达；
 2. 无 Organization 实体、`tenant_id` 恒 `'default'` —— 真多租户隔离需平台级落地。
 两条已在 `test_authorization.py` 中用测试锁死事实，防止误以为权限就绪。
+
+## 归档复测（2026-09-25，live 探测非推测）
+
+本次归档前对四道 SYNC gate 做 live 复测，确认 Task 10/14/18/19 的 `[~]` 仍是**诚实锁死**而非可勾选的假绿：
+
+| 判据 | live 实测值 | 结论 |
+|---|---|---|
+| `probe_all_sync_gates().all_clear` | `False` | 四 gate 未齐，不得接线 OO→durable→HTML |
+| `SYNC-MULTI-RESOLVER` | `multi_resolver_count=4`（owner=上游 Task 36 逐 entry 供给） | BLOCKED |
+| `SYNC-ENTRY-NAMESPACE` | opaque wp_code/wp_id split 仍登记 | BLOCKED |
+| `SYNC-UNIFIED-ROOM` | eligibility artifact 未标 cleared | BLOCKED |
+| `SYNC-DURABLE-APPLICATION` | eligibility artifact 未标 cleared | BLOCKED |
+| 环境前置 | 3030 未监听、无 OO 活动编辑会话、evidence 五表 0 行 | Playwright 端到端无从供给 |
+
+**本 spec 自有边界已全部交付并复测**：
+* `backend/tests/custom_template_ingestion/` → **298 passed**（0 回归）；
+* Task 10 域模型守卫 `test_workbook_instance.py` → 8 passed；`test_sync_gates.py` / `test_namespace_gates_currently_blocked` 显式锁死 BLOCKED 态；
+* Task 18 模块变异 `mutate_custom_ingestion_task18.py --run` → 基线 GREEN，**5/5 RED**，锚点 5/5 OK 0 MISS（报告 `basis/T18-mutation-report.json` 刷新）。
+
+**归档裁决**：Task 1–9、11–13、15–17 交付完成；Task 10/14/18/19 停在 `[~]`，剩余全部为上游 `workpaper-sync-version-kernel` 平台级职责（gate 归零）+ 真 OO/Playwright 环境，非本 spec 可解。X evidence（`evidence/X-HANDOFF-CONFORMANCE.json`、`evidence/X-RUNTIME-EVIDENCE.json`）以 `verdict=PARTIAL` 单向发布，带 2026-09-25 复测戳；**不等待** guidance C2。SYNC 四 gate 归零后可另起续作接线 Task 14 并解锁 18/19 的 Playwright 端到端。

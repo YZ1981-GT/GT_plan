@@ -3,16 +3,29 @@
   "spec": "custom-workpaper-template-ingestion-and-sync-closure",
   "task": 19,
   "recorded_at": "2026-09-09",
+  "reverified_at": "2026-09-25",
   "verdict": "PARTIAL",
   "notes": [
     "ProjectWorkbookInstance + staging CAS + F-SHELL wizard 已落地",
     "四 SYNC gate 未归零：不得宣称 editable_grid 双向全通过",
-    "C2_REEVALUATION_REQUESTED 待 guidance G23 消费本 partial evidence"
+    "C2_REEVALUATION_REQUESTED 待 guidance G23 消费本 partial evidence",
+    "2026-09-25 live 复测四 gate 仍全 BLOCKED（multi_resolver_count=4，entry namespace 仍分裂，room/durable 未清）"
   ],
   "sync_gates": {
     "SYNC-MULTI-RESOLVER": "BLOCKED",
     "SYNC-ENTRY-NAMESPACE": "BLOCKED",
     "SYNC-UNIFIED-ROOM": "BLOCKED",
     "SYNC-DURABLE-APPLICATION": "BLOCKED"
+  },
+  "reverification": {
+    "method": "probe_all_sync_gates() + probe_namespace_gates() live 探测（不写盘）",
+    "multi_resolver_count": 4,
+    "entry_namespace_unified": false,
+    "unified_room_cleared": false,
+    "durable_application_cleared": false,
+    "eligibility_artifact": "backend/data/workpaper_sync_task72_pre_delete_eligibility.json",
+    "upstream_owner": "workpaper-sync-version-kernel (Task 36 逐 entry 供给)",
+    "workbook_instance_guards": "test_workbook_instance.py 8 passed",
+    "task18_module_mutations": "5/5 RED（M_PWI_NO_SHEET_COPY / M_NS_GATE / M_SAGA_ACTIVE / M_CAS_BASE / M_NO_LWW），基线 GREEN，锚点 5/5 OK 0 MISS"
   }
 }
