@@ -184,8 +184,27 @@ P9/P10 此时必红（框架层现有 89 处 D4 提及、注册表尚不存在�
   - 三个 spec：`D1-bd-individual-rows` / `-portfolio-rows` / `-notetype-rows`
   - 第三区（按票据种类小计 R23/R24）是专门喂 D1-1 坏账区块的，与前两区是**不同维度**
     （前两区按计提方法、第三区按票据种类），不得合并
+  - 🔴 **三键有下游消费方，零回归必须覆盖**（复盘补）：`useD1EclCalc.d1_4DataAvailable`(:475) 与
+    `parseD1_4Rows`(:497/:499) / `useD1Adjudication` 坏账区（`d1AdjudicationModel.readD1BadDebtByNoteType`）
+    / `D1TabIndex.vue:49` 的 `progressKeys`。只验 D1-4 自身读回等值会放过「下游看不到回写」
+  - 🔴 **D1-4 接 sync 后会有第三个写入方**（复盘补，P17）：除 HTML 保存与 OO 回写之外，
+    `useD1WriteoffCheck.syncReversalToD14` 会**回写** `D1-bd-portfolio-rows` 的「按组合计提」
+    父行（其注释写明「D1-4 的期末未审随之重算，并沿 D1-4 → D1-1 → 披露 → 附注 逐级联动」）。
+    三方写同一 store 键必须定序，见任务 26b
   - 门：P11（整册 materialize 200 + verify 全绿）+ P12（自动进位移判据清单）+ 耗时登记
-  - _Requirements: 5.1, 5.4, 5.5_
+  - _Requirements: 5.1, 5.4, 5.5, 5.7_
+
+- [ ] 26b. 第三写入方定序：跨 sheet 回写 vs OO 回写
+  - 实测冲突面：`syncReversalToD14` 在 OO 模式下若被触发，会绕过 sync 的 CAS 直接改 store ⇒
+    与 materialize 产物分叉（下次 extract 反读到非预期值 ⇒ roundtrip 门红或静默覆盖 OO 改动）
+  - 裁决方向（任务内定，需实测确认）：OO 模式期间**禁用**跨 sheet 回写入口并给中文原因，
+    或把回写改走 sync 的 pending-mutations 通道。**不得**两条路同时直写
+  - P17 判据：OO 模式下触发 `syncReversalToD14` ⇒ 要么被拒绝且有可见原因，要么经 sync 通道
+    落地；**不得**静默直写 store
+  - 🔴 触类旁通已 grep：D2 侧同型 —— `useD2WriteoffCheck.reversalConsistencyWarning`(:135-137)
+    只**读** D2-3 三键不回写（仅告警），故 D2 无此冲突；D1 是唯一有跨 sheet 回写的。
+    该结论登记在 D2 spec 需求 1.7
+  - _Requirements: 5.7_
 
 ### 阶段 6：D1 批次 2~3
 
