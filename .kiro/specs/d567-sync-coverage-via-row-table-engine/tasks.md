@@ -2,17 +2,31 @@
 
 ## Overview
 
-**spec**：`d567-sync-coverage-via-row-table-engine`　**创建**：2026-09-25　**状态**：2/22（Task 0/1 完成，其余阻塞）
+**spec**：`d567-sync-coverage-via-row-table-engine`　**创建**：2026-09-25　**状态**：2/22（Task 0/1 完成；**前置门已解除**，Task 2~22 可解冻推进）
 
-> 🔴 **2026-09-26 Task 0 前置门核查结论（证据 `docs/operations/evidence/d567-sync-coverage/task0-preflight-gate.md`）**：
-> 上游 `d1-sync-row-table-engine-and-d1-coverage` 框架层**真 0% 未入 HEAD** ——
-> `row_table_engine.py` / `adjudication_sheet_spec.py` / `row_table_registry.py` 三文件
-> `git show HEAD:` 全 Exit 1（不存在）；全仓 grep `RowTableSheetSpec` / `AdjudicationSheetSpec` /
-> `aging_layout` 仅命中 `.kiro/specs/*` 文档，零生产代码；D5 provider 仍是老写法（无 `MANAGED_FIELD_SPECS`）。
-> ⇒ 前置 A/B/C/D 全未满足、前置 E 三家 `adapter_registered` 全 False。
-> **按 blocking 规则「IF A 未满足 THEN 全部阻塞」**：除 Task 1（需求 5，不受任何前置阻塞）外
-> 全部任务阻塞。Task 2~22 的声明层代码在框架层落地前 import 不到 `RowTableSheetSpec`/
-> `AdjudicationSheetSpec`，本轮**不铺量**（避免造依赖不存在符号的假绿声明），等上游框架层入 HEAD 后解冻。
+> ✅ **2026-09-26 前置门解除**（证据 `docs/operations/evidence/d567-sync-coverage/task0-preflight-gate.md`
+> + 本次更新）：上游 `d1-sync-row-table-engine-and-d1-coverage` 框架层已完整交付并入 HEAD：
+> - `phase5_row_table_sheet.py`：`RowTableSheetSpec` / `AgingLayout` / `AgingGroupSpec` / `StoreKind` /
+>   `managed_field_specs()` / `build_store_projection` / `merge_projection_into_store_rows` /
+>   `attach_sibling_bindings` 全部落地（Task 6~10），`git show HEAD:` 可读，119 用例全绿。
+> - `phase5_adjudication_sheet.py`：`AdjudicationSheetSpec`（Task 31）已交付并 `git show HEAD:` 可读
+>   （commit `f1ec1c67d`，提交信息明写 `unblocks: e1-sync-coverage-and-first-canary 前置 B`，
+>   本次同样验证解除 d567 前置 B）；24 用例全绿（含变异反证）。
+> - `store_item_registry.py`：`StoreItemSpec` / `StoreMergePlan` / `STORE_MERGE_REGISTRY`（Task 11/12）
+>   已交付，10 个 adapter 全注册；`oo_to_html.py` 的 9 elif 链 + 6 hasattr 试探、`adapters/excel.py`
+>   的 2 处 g7 字面量分支均已改注册表分派（Task 13/14）。
+> - **四门禁全绿**：golden digest 零回归（23 个）/ P9 框架层零 wp_code 分支 / P10 全注册 /
+>   O(1) 查表验证成立。
+> - **决定性验证**：直接用 `RowTableSheetSpec`/`AdjudicationSheetSpec` 构造 D5-4/审定表D5
+>   的最小声明实例，import 与实例化均成功（见本次会话验证记录）。
+> > **`aging_layout` 参数化**（nested/flat 两路径，本 spec 依赖比 D3 更重的那部分）已用 D6/D7
+> 真实原始数据驱动判据验证：`TestProperty3ManagedFieldSpecsD7Nested`（nested，19标量+8账龄=27
+> 字段逐元组匹配 provider 原 `sorted()` 表达式）与 `TestProperty3ManagedFieldSpecsD6Flat`
+> （flat，json_path 无 `/` 分隔符）均全绿，且 `TestProperty4AgingLayoutIsolation` 的变异反证
+> （把 D6 flat 数据塞进 nested 分支）确认引擎会 fail-closed 拒绝混用，不静默产出错误路径。
+> ⇒ **前置 A/B/C 均已满足**。前置 D（上游位移判据按 provider 参数化，Task 24）与前置 E（三家
+> `adapter_registered`）**尚未验证**，仍按裁决 G6 处置：四组双区（Task 4/16/17）与真栈判据
+> 如实标 `[ ]*`，其余 Task 2~22 声明层现在**可以解冻推进**（不再是"依赖不存在符号"的假绿风险）。
 
 三循环合一（用户 B 方案裁决），纯**声明层** + 一处跨循环 bugfix。消费两个上游：
 `d1-sync-row-table-engine-and-d1-coverage`（引擎 / `aging_layout` 参数化 /

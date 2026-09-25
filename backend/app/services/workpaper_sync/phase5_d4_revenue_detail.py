@@ -2669,52 +2669,25 @@ def _attach_sibling_bindings(
     contract: Any,
     dynamic_bindings: Mapping[str, Any],
 ) -> tuple[Any, ...]:
-    """Attach 时补 sibling binding（与 publish 的 `_sibling_identity_bindings` 同规则）。
+    """Attach 时补 sibling binding —— 薄转发框架层 `attach_sibling_bindings`（Task 10 泛化）。
 
     🔴 对齐规则与 publish 路径共享同一内核 `_align_specs_to_sibling_tables`：按
     managed sheet 归组、同 sheet 双区靠 UUID 列一一配对、计数守卫数行 table 不数
     sheet。两路径必须使用同一规则，否则 publish 与 attach 的 sibling binding 会漂移。
+
+    函数体已收敛进框架层 `phase5_row_table_sheet.attach_sibling_bindings`（逐字节等价，
+    Property 8 判据钉住），本模块只把 `provider=本模块` 传入 —— 取代原硬编码
+    `import app.services.workpaper_sync.phase5_d4_revenue_detail as _provider`。
     """
-    from app.services.excel_structure_fingerprint import GT_SYNC_SHEET_NAME
-    from app.services.workpaper_sync.excel_extract import ExcelIdentityBinding
-    from app.services.workpaper_sync.projection_first_publication import (
-        _align_specs_to_sibling_tables,
+    import app.services.workpaper_sync.phase5_d4_revenue_detail as _self
+    from app.services.workpaper_sync.phase5_row_table_sheet import (
+        attach_sibling_bindings,
     )
 
-    # attach 路径以本模块为 provider（暴露 instrumentation_specs）。
-    import app.services.workpaper_sync.phase5_d4_revenue_detail as _provider
-
-    pairs = _align_specs_to_sibling_tables(
-        provider=_provider, contract=contract, primary=primary
+    return attach_sibling_bindings(
+        provider=_self, primary=primary, contract=contract,
+        dynamic_bindings=dynamic_bindings,
     )
-    siblings: list[Any] = []
-    for spec, dynamic in pairs:
-        binding = ExcelIdentityBinding(
-            table_name=str(spec.table_name),
-            uuid_column=str(spec.uuid_col),
-            table_key=str(dynamic.table_key),
-            metadata_sheet=GT_SYNC_SHEET_NAME,
-            defined_name_prefix=str(
-                getattr(spec, "defined_name_prefix", None) or "GT_"
-            ),
-            tombstoned_row_keys=(),
-            dynamic_column_columns={
-                str(table_key): dict(mapping)
-                for table_key, mapping in (dynamic_bindings or {}).items()
-                if isinstance(mapping, Mapping)
-            },
-        )
-        siblings.append(binding)
-    # 静态受管区 binding（引擎静态路径；无动态行，不经 _align_specs_to_sibling_tables）。
-    # 复用 publish 侧同一通用生成器，两路径 binding 不漂移。
-    from app.services.workpaper_sync.projection_first_publication import (
-        _static_region_bindings,
-    )
-
-    siblings.extend(
-        _static_region_bindings(provider=_provider, metadata_sheet=GT_SYNC_SHEET_NAME)
-    )
-    return tuple(siblings)
 
 
 def manifest_capability_enabled(*, manifest: Mapping[str, Any] | None = None) -> bool:

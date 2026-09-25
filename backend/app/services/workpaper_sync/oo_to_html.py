@@ -2680,6 +2680,89 @@ class OoToHtmlCoordinator:
             )
         await self._session.commit()
 
+    async def _mirror_dedicated_dict_stores(
+        self, state: _ApplyState, *, merged_projection: Any
+    ) -> None:
+        """按注册表 `dedicated_items` 清单逐条镜像 dict/list store（Task 13 收敛）。
+
+        取代原 6 段几乎逐字重复的 `hasattr(bridge, ...)` 试探代码。每条的行为与原对应段
+        逐字节一致：同一条 SELECT/UPDATE/INSERT SQL、同一个「applied<=0 且已有基线则跳过
+        写库」判断（dict 基线用 `is not None`、list 基线用真值判断——D4-8 是全仓唯一 list
+        基线，空列表 `[]` 也应触发跳过，这条差异原样保留，不强行统一）、同一个 per-item commit。
+        """
+        from app.services.workpaper_sync.store_item_registry import STORE_MERGE_REGISTRY
+
+        plan = STORE_MERGE_REGISTRY.get(state.frozen.adapter_id)
+        if plan is None or not plan.dedicated_items:
+            return
+
+        import importlib
+
+        for dedicated in plan.dedicated_items:
+            module = importlib.import_module(
+                f"app.services.workpaper_sync.{dedicated.provider_module}"
+            )
+            if not (hasattr(module, dedicated.merge_fn) and hasattr(module, dedicated.item_id_const)):
+                # 与原 hasattr 试探等价的兜底：provider 未提供该门面则跳过（不是"漏注册"，
+                # 是"注册表登记了但 provider 侧尚未实现"——两者观测面不同，保持跳过而非报错，
+                # 因为原代码本就是 hasattr 试探式的软跳过，不是这次改动引入的新语义）。
+                continue
+            item_id = getattr(module, dedicated.item_id_const)
+            merge_fn = getattr(module, dedicated.merge_fn)
+            raw = (
+                await self._session.execute(
+                    sa.text(
+                        "SELECT remark FROM checklist_responses "
+                        "WHERE wp_id = :wp AND item_id = :item"
+                    ),
+                    {"wp": str(state.frozen.wp_id), "item": item_id},
+                )
+            ).scalar_one_or_none()
+            base_state: dict | list | None = None
+            if raw:
+                try:
+                    parsed = json.loads(raw)
+                    if dedicated.base_kind == "dict" and isinstance(parsed, dict):
+                        base_state = parsed
+                    elif dedicated.base_kind == "list" and isinstance(parsed, list):
+                        base_state = parsed
+                except (TypeError, ValueError):
+                    base_state = None
+            merged_payload, applied, _visited = merge_fn(
+                projection=merged_projection, base_state=base_state
+            )
+            if dedicated.base_kind == "list":
+                skip = applied <= 0 and base_state  # 原 D4-8 段：真值判断（空列表也跳过）
+            else:
+                skip = applied <= 0 and base_state is not None  # 原其余 5 段：is not None
+            if skip:
+                continue
+            payload = json.dumps(merged_payload, ensure_ascii=False)
+            updated = (
+                await self._session.execute(
+                    sa.text(
+                        "UPDATE checklist_responses SET remark = :val, updated_at = now() "
+                        "WHERE wp_id = :wp AND item_id = :item"
+                    ),
+                    {"val": payload, "wp": str(state.frozen.wp_id), "item": item_id},
+                )
+            ).rowcount
+            if not updated:
+                await self._session.execute(
+                    sa.text(
+                        "INSERT INTO checklist_responses "
+                        "(id, project_id, wp_id, item_id, remark, created_at, updated_at) "
+                        "VALUES (gen_random_uuid(), :pid, :wp, :item, :val, now(), now())"
+                    ),
+                    {
+                        "pid": str(state.frozen.project_id),
+                        "wp": str(state.frozen.wp_id),
+                        "item": item_id,
+                        "val": payload,
+                    },
+                )
+            await self._session.commit()
+
     async def _mirror_d4_dual_stores(
         self, state: _ApplyState, *, merged_projection: Any, bridge: Any
     ) -> None:
@@ -2887,323 +2970,14 @@ class OoToHtmlCoordinator:
                 await self._session.commit()
 
         # D4-35 dict store（{rows, sampling, periodAmount}）：只 merge rows，保留 sampling/periodAmount
-        if hasattr(bridge, "merge_d435_from_projection") and hasattr(
-            bridge, "STORE_ITEM_ID_D435_DICT"
-        ):
-            item_id = bridge.STORE_ITEM_ID_D435_DICT
-            raw = (
-                await self._session.execute(
-                    sa.text(
-                        "SELECT remark FROM checklist_responses "
-                        "WHERE wp_id = :wp AND item_id = :item"
-                    ),
-                    {"wp": str(state.frozen.wp_id), "item": item_id},
-                )
-            ).scalar_one_or_none()
-            base_state: dict | None = None
-            if raw:
-                try:
-                    parsed = json.loads(raw)
-                    if isinstance(parsed, dict):
-                        base_state = parsed
-                except (TypeError, ValueError):
-                    base_state = None
-            merged_dict, applied, _visited = bridge.merge_d435_from_projection(
-                projection=merged_projection, base_state=base_state
-            )
-            # 无实际写入且已有基线时不覆盖（避免把 sampling 写空）
-            if not (applied <= 0 and base_state is not None):
-                payload = json.dumps(merged_dict, ensure_ascii=False)
-                updated = (
-                    await self._session.execute(
-                        sa.text(
-                            "UPDATE checklist_responses SET remark = :val, updated_at = now() "
-                            "WHERE wp_id = :wp AND item_id = :item"
-                        ),
-                        {"val": payload, "wp": str(state.frozen.wp_id), "item": item_id},
-                    )
-                ).rowcount
-                if not updated:
-                    await self._session.execute(
-                        sa.text(
-                            "INSERT INTO checklist_responses "
-                            "(id, project_id, wp_id, item_id, remark, created_at, updated_at) "
-                            "VALUES (gen_random_uuid(), :pid, :wp, :item, :val, now(), now())"
-                        ),
-                        {
-                            "pid": str(state.frozen.project_id),
-                            "wp": str(state.frozen.wp_id),
-                            "item": item_id,
-                            "val": payload,
-                        },
-                    )
-                await self._session.commit()
-
-        # D4-9 dict store（{current,prior}+totals）：三 table 分流回嵌套 dict，
-        # formula_mask（D/F 占比 + 合计）不回写；保留未受管的顶层键。
-        if hasattr(bridge, "merge_d49_from_projection") and hasattr(
-            bridge, "STORE_ITEM_ID_D49_DICT"
-        ):
-            item_id = bridge.STORE_ITEM_ID_D49_DICT
-            raw = (
-                await self._session.execute(
-                    sa.text(
-                        "SELECT remark FROM checklist_responses "
-                        "WHERE wp_id = :wp AND item_id = :item"
-                    ),
-                    {"wp": str(state.frozen.wp_id), "item": item_id},
-                )
-            ).scalar_one_or_none()
-            base_state_d49: dict | None = None
-            if raw:
-                try:
-                    parsed = json.loads(raw)
-                    if isinstance(parsed, dict):
-                        base_state_d49 = parsed
-                except (TypeError, ValueError):
-                    base_state_d49 = None
-            merged_dict, applied, _visited = bridge.merge_d49_from_projection(
-                projection=merged_projection, base_state=base_state_d49
-            )
-            if not (applied <= 0 and base_state_d49 is not None):
-                payload = json.dumps(merged_dict, ensure_ascii=False)
-                updated = (
-                    await self._session.execute(
-                        sa.text(
-                            "UPDATE checklist_responses SET remark = :val, updated_at = now() "
-                            "WHERE wp_id = :wp AND item_id = :item"
-                        ),
-                        {"val": payload, "wp": str(state.frozen.wp_id), "item": item_id},
-                    )
-                ).rowcount
-                if not updated:
-                    await self._session.execute(
-                        sa.text(
-                            "INSERT INTO checklist_responses "
-                            "(id, project_id, wp_id, item_id, remark, created_at, updated_at) "
-                            "VALUES (gen_random_uuid(), :pid, :wp, :item, :val, now(), now())"
-                        ),
-                        {
-                            "pid": str(state.frozen.project_id),
-                            "wp": str(state.frozen.wp_id),
-                            "item": item_id,
-                            "val": payload,
-                        },
-                    )
-                await self._session.commit()
-
-        # D4-8 list store（ProductData[]，静态块矩阵）：只回写第 1 个产品（slot0）的 180 static
-        # cell（月度/上期/同行业），保留第 2+ 产品；公式列走 formula_mask 不回写。base 是 list
-        # （非 dict），parse 保留 list 形态。
-        if hasattr(bridge, "merge_d48_from_projection") and hasattr(
-            bridge, "STORE_ITEM_ID_D48_DICT"
-        ):
-            item_id = bridge.STORE_ITEM_ID_D48_DICT
-            raw = (
-                await self._session.execute(
-                    sa.text(
-                        "SELECT remark FROM checklist_responses "
-                        "WHERE wp_id = :wp AND item_id = :item"
-                    ),
-                    {"wp": str(state.frozen.wp_id), "item": item_id},
-                )
-            ).scalar_one_or_none()
-            base_state_d48: list | None = None
-            if raw:
-                try:
-                    parsed = json.loads(raw)
-                    if isinstance(parsed, list):
-                        base_state_d48 = parsed
-                except (TypeError, ValueError):
-                    base_state_d48 = None
-            merged_list, applied, _visited = bridge.merge_d48_from_projection(
-                projection=merged_projection, base_state=base_state_d48
-            )
-            if not (applied <= 0 and base_state_d48):
-                payload = json.dumps(merged_list, ensure_ascii=False)
-                updated = (
-                    await self._session.execute(
-                        sa.text(
-                            "UPDATE checklist_responses SET remark = :val, updated_at = now() "
-                            "WHERE wp_id = :wp AND item_id = :item"
-                        ),
-                        {"val": payload, "wp": str(state.frozen.wp_id), "item": item_id},
-                    )
-                ).rowcount
-                if not updated:
-                    await self._session.execute(
-                        sa.text(
-                            "INSERT INTO checklist_responses "
-                            "(id, project_id, wp_id, item_id, remark, created_at, updated_at) "
-                            "VALUES (gen_random_uuid(), :pid, :wp, :item, :val, now(), now())"
-                        ),
-                        {
-                            "pid": str(state.frozen.project_id),
-                            "wp": str(state.frozen.wp_id),
-                            "item": item_id,
-                            "val": payload,
-                        },
-                    )
-                await self._session.commit()
-
-        # D4-33 dict store（{bizTypes,months,priorYear}）：前 3 业务类型 × 12 月 × 收入/成本
-        # 按 slot 位置回写；毛利率/合计/上年/变动 formula_mask 不回写；保留 priorYear 与第 4+ 业务类型。
-        if hasattr(bridge, "merge_d433_from_projection") and hasattr(
-            bridge, "STORE_ITEM_ID_D433_DICT"
-        ):
-            item_id = bridge.STORE_ITEM_ID_D433_DICT
-            raw = (
-                await self._session.execute(
-                    sa.text(
-                        "SELECT remark FROM checklist_responses "
-                        "WHERE wp_id = :wp AND item_id = :item"
-                    ),
-                    {"wp": str(state.frozen.wp_id), "item": item_id},
-                )
-            ).scalar_one_or_none()
-            base_state_d433: dict | None = None
-            if raw:
-                try:
-                    parsed = json.loads(raw)
-                    if isinstance(parsed, dict):
-                        base_state_d433 = parsed
-                except (TypeError, ValueError):
-                    base_state_d433 = None
-            merged_dict, applied, _visited = bridge.merge_d433_from_projection(
-                projection=merged_projection, base_state=base_state_d433
-            )
-            if not (applied <= 0 and base_state_d433 is not None):
-                payload = json.dumps(merged_dict, ensure_ascii=False)
-                updated = (
-                    await self._session.execute(
-                        sa.text(
-                            "UPDATE checklist_responses SET remark = :val, updated_at = now() "
-                            "WHERE wp_id = :wp AND item_id = :item"
-                        ),
-                        {"val": payload, "wp": str(state.frozen.wp_id), "item": item_id},
-                    )
-                ).rowcount
-                if not updated:
-                    await self._session.execute(
-                        sa.text(
-                            "INSERT INTO checklist_responses "
-                            "(id, project_id, wp_id, item_id, remark, created_at, updated_at) "
-                            "VALUES (gen_random_uuid(), :pid, :wp, :item, :val, now(), now())"
-                        ),
-                        {
-                            "pid": str(state.frozen.project_id),
-                            "wp": str(state.frozen.wp_id),
-                            "item": item_id,
-                            "val": payload,
-                        },
-                    )
-                await self._session.commit()
-
-        # D4-34 dict store（{rentals[],consults[]}）：双区动态行按 table_key 分流回两数组；
-        # J 差异 formula_mask 不回写；保留 id/diff/未受管字段与其它顶层键。
-        if hasattr(bridge, "merge_d434_from_projection") and hasattr(
-            bridge, "STORE_ITEM_ID_D434_DICT"
-        ):
-            item_id = bridge.STORE_ITEM_ID_D434_DICT
-            raw = (
-                await self._session.execute(
-                    sa.text(
-                        "SELECT remark FROM checklist_responses "
-                        "WHERE wp_id = :wp AND item_id = :item"
-                    ),
-                    {"wp": str(state.frozen.wp_id), "item": item_id},
-                )
-            ).scalar_one_or_none()
-            base_state_d434: dict | None = None
-            if raw:
-                try:
-                    parsed = json.loads(raw)
-                    if isinstance(parsed, dict):
-                        base_state_d434 = parsed
-                except (TypeError, ValueError):
-                    base_state_d434 = None
-            merged_dict, applied, _visited = bridge.merge_d434_from_projection(
-                projection=merged_projection, base_state=base_state_d434
-            )
-            if not (applied <= 0 and base_state_d434 is not None):
-                payload = json.dumps(merged_dict, ensure_ascii=False)
-                updated = (
-                    await self._session.execute(
-                        sa.text(
-                            "UPDATE checklist_responses SET remark = :val, updated_at = now() "
-                            "WHERE wp_id = :wp AND item_id = :item"
-                        ),
-                        {"val": payload, "wp": str(state.frozen.wp_id), "item": item_id},
-                    )
-                ).rowcount
-                if not updated:
-                    await self._session.execute(
-                        sa.text(
-                            "INSERT INTO checklist_responses "
-                            "(id, project_id, wp_id, item_id, remark, created_at, updated_at) "
-                            "VALUES (gen_random_uuid(), :pid, :wp, :item, :val, now(), now())"
-                        ),
-                        {
-                            "pid": str(state.frozen.project_id),
-                            "wp": str(state.frozen.wp_id),
-                            "item": item_id,
-                            "val": payload,
-                        },
-                    )
-                await self._session.commit()
-
-        # D4-36 dict store（{forward,backward,...params}）：双区动态行按 table_key 分流回两数组；
-        # 参数标量（cutoffDate/days*/amountThreshold）不受管保留；K 跨期为手工标记随行回写。
-        if hasattr(bridge, "merge_d436_from_projection") and hasattr(
-            bridge, "STORE_ITEM_ID_D436_DICT"
-        ):
-            item_id = bridge.STORE_ITEM_ID_D436_DICT
-            raw = (
-                await self._session.execute(
-                    sa.text(
-                        "SELECT remark FROM checklist_responses "
-                        "WHERE wp_id = :wp AND item_id = :item"
-                    ),
-                    {"wp": str(state.frozen.wp_id), "item": item_id},
-                )
-            ).scalar_one_or_none()
-            base_state_d436: dict | None = None
-            if raw:
-                try:
-                    parsed = json.loads(raw)
-                    if isinstance(parsed, dict):
-                        base_state_d436 = parsed
-                except (TypeError, ValueError):
-                    base_state_d436 = None
-            merged_dict, applied, _visited = bridge.merge_d436_from_projection(
-                projection=merged_projection, base_state=base_state_d436
-            )
-            if not (applied <= 0 and base_state_d436 is not None):
-                payload = json.dumps(merged_dict, ensure_ascii=False)
-                updated = (
-                    await self._session.execute(
-                        sa.text(
-                            "UPDATE checklist_responses SET remark = :val, updated_at = now() "
-                            "WHERE wp_id = :wp AND item_id = :item"
-                        ),
-                        {"val": payload, "wp": str(state.frozen.wp_id), "item": item_id},
-                    )
-                ).rowcount
-                if not updated:
-                    await self._session.execute(
-                        sa.text(
-                            "INSERT INTO checklist_responses "
-                            "(id, project_id, wp_id, item_id, remark, created_at, updated_at) "
-                            "VALUES (gen_random_uuid(), :pid, :wp, :item, :val, now(), now())"
-                        ),
-                        {
-                            "pid": str(state.frozen.project_id),
-                            "wp": str(state.frozen.wp_id),
-                            "item": item_id,
-                            "val": payload,
-                        },
-                    )
-                await self._session.commit()
+        # 🔴 原 6 段几乎逐字重复的 hasattr 试探代码（D4-35/D4-9/D4-8/D4-33/D4-34/D4-36）已收敛
+        # 为注册表驱动的统一循环（Task 13 / 需求 3.1 / 3.2）：`hasattr(bridge, "merge_d*")
+        # and hasattr(bridge, "STORE_ITEM_ID_D*_DICT")` 式试探改成显式声明
+        # `STORE_MERGE_REGISTRY["d4.revenue_detail"].dedicated_items`，未声明的 item 不会被
+        # 静默尝试（原判据本就是"存在就跑"，收敛后行为等价：注册表里的清单与原 hasattr 目标
+        # 逐个对应，零增减）。逐条 SQL 语句与提交时机保持逐字节不变，只把判断入口从运行时
+        # hasattr 探测改成注册表登记。
+        await self._mirror_dedicated_dict_stores(state, merged_projection=merged_projection)
 
         # D4-7 两 store item（D4-7-products 行数组 + D4-7-monthly 标量对象）：同 sheet 1 dynamic + 1 static，
         # 由专用块同时处理两 item（不进 rows 4-tuple 循环）。§一月度静态 cell 随 §二产品 binding 一起被

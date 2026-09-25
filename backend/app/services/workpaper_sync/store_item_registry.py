@@ -35,6 +35,7 @@ from app.services.workpaper_sync.phase5_row_table_sheet import StoreKind
 __all__ = [
     "StoreKind",
     "StoreItemSpec",
+    "DedicatedStoreItem",
     "StoreMergePlan",
     "StoreMergePlanNotRegisteredError",
     "STORE_MERGE_REGISTRY",
@@ -99,6 +100,35 @@ class StoreItemSpec:
 
 
 @dataclass(frozen=True)
+class DedicatedStoreItem:
+    """一个 `dedicated` 形态 store item 的分派声明（Task 13 收敛，取代 `hasattr` 试探）。
+
+    原 `oo_to_html._mirror_store_backed_if_needed` 对 D4 的 6 个 dict/list store item 各写一段
+    `hasattr(bridge, merge_fn) and hasattr(bridge, item_id_const)` 判断，本类把它显式化为声明：
+    「该 item 是否存在」由**注册表登记**表达，不再靠运行时 `hasattr` 猜。
+
+    :param item_id_const: provider 模块里该 item 的 `STORE_ITEM_ID_*` 常量名（框架按名取值，
+        不硬编码具体 item_id 字符串——item_id 由各家 provider 自己定义）。
+    :param merge_fn: provider 模块里的 merge 函数名，签名统一为
+        `(*, projection, base_state) -> tuple[merged, applied, visited]`。
+    :param base_kind: 该 item 的载荷是 `"dict"` 还是 `"list"`（D4-8 是 list，其余 5 个是 dict）——
+        决定读库后 `json.loads` 的形态校验分支，**不得**混用（D4-8 混进 dict 分支会让
+        `isinstance(parsed, dict)` 恒假，静默丢弹回退成 `None` 基线）。
+    :param provider_module: 该 item 归属的 D4 per-sheet 模块名（6 个 item 分布在 4 个不同模块，
+        不是全部都在 `phase5_d4_revenue_detail` 里）。
+    """
+
+    item_id_const: str
+    merge_fn: str
+    base_kind: str  # "dict" | "list"
+    provider_module: str
+
+    def __post_init__(self) -> None:
+        if self.base_kind not in ("dict", "list"):
+            raise ValueError(f"DedicatedStoreItem.base_kind 只能是 dict/list，实得 {self.base_kind!r}")
+
+
+@dataclass(frozen=True)
 class StoreMergePlan:
     """一个 adapter 的 store 合并计划（回方向 `oo_to_html` 按它分派，不再 elif 链）。
 
@@ -109,6 +139,7 @@ class StoreMergePlan:
         `merge_projection_into_store_rows`）。
     :param merge_state_fn: state 形态（G7）的合并函数名；仅 state 形态 adapter 给。
     :param dual_store_fn: 多 store item 的整体镜像函数名（D4 的 `_mirror_d4_dual_stores` 同型）。
+    :param dedicated_items: `dedicated` 形态 store item 清单（D4 的 6 个 dict/list block）。
     """
 
     adapter_id: str
@@ -117,9 +148,15 @@ class StoreMergePlan:
     merge_rows_fn: str = "merge_projection_into_store_rows"
     merge_state_fn: str | None = None
     dual_store_fn: str | None = None
+    dedicated_items: tuple[DedicatedStoreItem, ...] = ()
     #: 非空 ⇒ 该 adapter 的 provider **未提供** store 镜像门面（实测缺符号）。
     #: `resolve_store_merge_plan` 会抛可归因的 domain 错误，取代原先运行时 AttributeError。
     mirror_unavailable_reason: str = ""
+    #: 非空 ⇒ provider 模块导出的一个函数名，`adapters/excel.py` 在 materialize 前后
+    #: 对 substrate 副本调用它做「OO 加载期公式崩溃」中性化（G7 的 IF() tocBool 崩溃 workaround）。
+    #: 取代原 `adapters/excel.py` 两处 `if self.adapter_id == "g7.soe_subsidiary_disclosure"`
+    #: 字面量分支（Task 13 收敛，需求 3.1 / 7.1；requirements.md 现状红基线「adapters/excel 2 处」）。
+    oo_crash_neutralization_fn: str | None = None
 
     @property
     def item_ids(self) -> tuple[str, ...]:
@@ -177,6 +214,37 @@ STORE_MERGE_REGISTRY: Final[Mapping[str, StoreMergePlan]] = {
         # D4 有 46 个 store item，清单单源在 provider.all_store_item_ids()（需求 3.3）；
         # 它的多 item 镜像走专用门面。
         dual_store_fn="_mirror_d4_dual_stores",
+        # 🔴 6 个 dedicated dict/list store item（Task 13 收敛，取代 6×2=12 处 hasattr 试探）：
+        # 原 `oo_to_html._mirror_store_backed_if_needed` 对每个都写 `hasattr(bridge, "merge_d*")
+        # and hasattr(bridge, "STORE_ITEM_ID_D*_DICT")` 判断是否走它。改为显式声明 + 统一分派
+        # 循环（_mirror_dedicated_dict_stores），逐段行为不变（同一 SQL / 同一 merge 函数 /
+        # 同一 applied<=0 跳过写库判断），只收敛判断入口。
+        dedicated_items=(
+            DedicatedStoreItem(
+                item_id_const="STORE_ITEM_ID_D435_DICT", merge_fn="merge_d435_from_projection",
+                base_kind="dict", provider_module="phase5_d4_revenue_detail",
+            ),
+            DedicatedStoreItem(
+                item_id_const="STORE_ITEM_ID_D49_DICT", merge_fn="merge_d49_from_projection",
+                base_kind="dict", provider_module="phase5_d4_revenue_detail",
+            ),
+            DedicatedStoreItem(
+                item_id_const="STORE_ITEM_ID_D48_DICT", merge_fn="merge_d48_from_projection",
+                base_kind="list", provider_module="phase5_d4_product_margin_sheet",
+            ),
+            DedicatedStoreItem(
+                item_id_const="STORE_ITEM_ID_D433_DICT", merge_fn="merge_d433_from_projection",
+                base_kind="dict", provider_module="phase5_d4_other_margin_sheet",
+            ),
+            DedicatedStoreItem(
+                item_id_const="STORE_ITEM_ID_D434_DICT", merge_fn="merge_d434_from_projection",
+                base_kind="dict", provider_module="phase5_d4_other_contract_sheet",
+            ),
+            DedicatedStoreItem(
+                item_id_const="STORE_ITEM_ID_D436_DICT", merge_fn="merge_d436_from_projection",
+                base_kind="dict", provider_module="phase5_d4_other_cutoff_sheet",
+            ),
+        ),
     ),
     "d5.receivables_financing_detail": StoreMergePlan(
         adapter_id="d5.receivables_financing_detail",
@@ -193,6 +261,20 @@ STORE_MERGE_REGISTRY: Final[Mapping[str, StoreMergePlan]] = {
         provider_module="phase5_d7_contract_liabilities",
         items=(StoreItemSpec(item_id="D7-2-rows", kind=StoreKind.rows),),
     ),
+    # 🔴 E1（spec e1-sync-coverage-and-first-canary）：provider 已建、声明层已就绪，但
+    #    adapter 尚未注册（平台级供给缺口 umbrella BP-61-1）⇒ 此处先登记 plan，使
+    #    「adapter 一注册即可用」；store item 清单取 provider 的 all_store_item_ids() 单一口径
+    #    （随灰度开关增长，需求 3.3）。
+    "e1.monetary_fund_detail": StoreMergePlan(
+        adapter_id="e1.monetary_fund_detail",
+        provider_module="phase5_e1_monetary_fund",
+        mirror_unavailable_reason=(
+            "E1 是多 store item 形态（canary E1-2 + E1-4 + E1-11 三条 fixed_text），"
+            "尚未提供 STORE_ITEM_ID 单数常量与 merge 门面 —— 归 spec "
+            "e1-sync-coverage-and-first-canary Task 10（宿主接桥）。"
+            "在那之前显式打红而非等运行时 AttributeError"
+        ),
+    ),
     "g7.soe_subsidiary_disclosure": StoreMergePlan(
         adapter_id="g7.soe_subsidiary_disclosure",
         provider_module="pilot_g7_two_level_dynamic",
@@ -201,6 +283,7 @@ STORE_MERGE_REGISTRY: Final[Mapping[str, StoreMergePlan]] = {
             "pilot_g7_two_level_dynamic 有 STORE_ITEM_ID 但无 merge_projection_into_store_state"
             "（HEAD 实测缺失）—— state 形态的合并门面从未实现"
         ),
+        oo_crash_neutralization_fn="neutralize_oo_crash_if_formulas",
     ),
     "h1.disposal_check": StoreMergePlan(
         adapter_id="h1.disposal_check",

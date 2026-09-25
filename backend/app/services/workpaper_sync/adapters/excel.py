@@ -91,6 +91,26 @@ class ExcelAdapterIdentityError(AdapterProtocolError):
     error_code = "excel_adapter_contract_identity_mismatch"
 
 
+def _resolve_oo_crash_neutralization_fn(adapter_id: str):
+    """按注册表声明取该 adapter 的 OO 崩溃中性化函数（取代硬编码 adapter_id 字面量分支）。
+
+    spec: d1-sync-row-table-engine-and-d1-coverage · Task 13 · Requirements 3.1 / 7.1
+
+    未注册、或注册了但未声明 `oo_crash_neutralization_fn`、或声明的 provider 模块未真正
+    导出该函数名，一律返回 `None`（保持原字面量分支等价的软跳过语义——这不是新增校验，
+    原代码本就只对唯一一家 adapter 生效，其余家从不进这段逻辑）。
+    """
+    import importlib
+
+    from app.services.workpaper_sync.store_item_registry import STORE_MERGE_REGISTRY
+
+    plan = STORE_MERGE_REGISTRY.get(adapter_id)
+    if plan is None or not plan.oo_crash_neutralization_fn:
+        return None
+    module = importlib.import_module(f"app.services.workpaper_sync.{plan.provider_module}")
+    return getattr(module, plan.oo_crash_neutralization_fn, None)
+
+
 def _sheet_cumulative_shift(
     per_table_shift: Mapping[str, tuple[Any, Any]],
     *,
@@ -382,20 +402,21 @@ class ExcelSyncAdapter:
                 )
                 if repaired is not None:
                     substrate_for_write = repaired
-            # G7：OnlyOffice 对部分 IF() 在加载期 tocBool 崩溃（error -82）。在 substrate
+            # OO 加载期公式崩溃中性化（如 G7 的 IF() tocBool 崩溃 error -82）：在 substrate
             # 副本上中性化后再 materialize，使 before/after 公式集一致、哈希自洽。
-            if self.adapter_id == "g7.soe_subsidiary_disclosure":
+            # 🔴 Task 13 收敛（需求 3.1/7.1）：原字面量分支 `if self.adapter_id ==
+            # "g7.soe_subsidiary_disclosure"` 改走注册表声明 `oo_crash_neutralization_fn`
+            # （requirements.md 现状红基线「adapters/excel 2 处」）。哪家需要这个 workaround
+            # 由 provider 侧在注册表里显式登记，框架层不再认识具体 adapter_id 字符串。
+            _neutralize_fn = _resolve_oo_crash_neutralization_fn(self.adapter_id)
+            if _neutralize_fn is not None:
                 import shutil
-
-                from app.services.workpaper_sync.pilot_g7_two_level_dynamic import (
-                    neutralize_oo_crash_if_formulas,
-                )
 
                 g7_sanitized = substrate_for_write.with_name(
                     substrate_for_write.name + ".g7-noif.xlsx"
                 )
                 shutil.copy2(substrate_for_write, g7_sanitized)
-                neutralize_oo_crash_if_formulas(g7_sanitized)
+                _neutralize_fn(g7_sanitized)
                 substrate_for_write = g7_sanitized
 
             bindings = self._all_bindings()
@@ -841,18 +862,16 @@ class ExcelSyncAdapter:
                 if any_projected:
                     d429_before.write_bytes(projected)
                     before_for_compare = d429_before
-            if self.adapter_id == "g7.soe_subsidiary_disclosure":
+            # 同上：注册表声明取代字面量分支（Task 13 收敛）。
+            _neutralize_fn_before = _resolve_oo_crash_neutralization_fn(self.adapter_id)
+            if _neutralize_fn_before is not None:
                 import shutil
-
-                from app.services.workpaper_sync.pilot_g7_two_level_dynamic import (
-                    neutralize_oo_crash_if_formulas,
-                )
 
                 g7_before_sanitized = before.with_name(
                     before.name + ".g7-noif-before.xlsx"
                 )
                 shutil.copy2(before, g7_before_sanitized)
-                neutralize_oo_crash_if_formulas(g7_before_sanitized)
+                _neutralize_fn_before(g7_before_sanitized)
                 before_for_compare = g7_before_sanitized
             with zipfile.ZipFile(after) as zf:
                 regions_by_binding: list[tuple[ExcelIdentityBinding, Any]] = []

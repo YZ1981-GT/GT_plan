@@ -63,21 +63,33 @@ def test_oo_to_html_elif_chain_is_gone() -> None:
 
 
 def test_remaining_hits_are_declared_scope() -> None:
-    """剩余命中如实登记（不掩盖、不假绿）：只应是 adapters/excel 的 g7 + D4 dict hasattr。"""
+    """P9 现已全部转绿（Task 13 完整收敛）：`adapters/excel.py` 的 2 个 g7 分支已改注册表声明
+    `oo_crash_neutralization_fn`；`oo_to_html` 的 6 个 D4 dict hasattr 试探已改注册表声明
+    `dedicated_items`。命中集合现应为空 —— 任何新出现的命中都是回归，必须打红。
+    """
     report = _load_module().run()
-    for h in report["hits"]:
-        in_scope = (
-            (h["module"] == "adapters/excel.py" and h["kind"] == "literal_branch")
-            or (h["module"] == "oo_to_html.py" and h["kind"] == "hasattr_probe")
-        )
-        assert in_scope, f"出现未登记的框架层污染：{h} —— 新增 per-adapter 分支必须打红"
+    assert report["hits"] == [], f"框架层出现新的 per-adapter 分支/hasattr 试探：{report['hits']}"
 
 
-def test_detector_covers_both_kinds() -> None:
-    """检测器两类形态都有效（用剩余命中证明，非空转）。"""
-    report = _load_module().run()
-    kinds = {h["kind"] for h in report["hits"]}
-    assert "hasattr_probe" in kinds, "hasattr 检测失效"
+def test_detector_covers_both_kinds(tmp_path: Path) -> None:
+    """检测器两类形态都有效。
+
+    🔴 2026-09-26 改法变更：原判据靠「生产代码现状恰好留有 hasattr 命中」证明检测器有效
+    ——这条证据来源随 Task 13 收敛（`oo_to_html` 6 处 hasattr 试探已改注册表分派）而消失，
+    但检测器本身的能力没有变化。改为独立样例源码驱动，不再依赖生产代码现状：
+    检测器有效性的证明应该独立于「今天生产代码里恰好还留了几个 bug」这件事，
+    否则每修一个就要重新构造"证据"，这正是本次教训要修的耦合。
+    """
+    mod = _load_module()
+    sample = tmp_path / "sample_with_hasattr_probe.py"
+    sample.write_text(
+        'if hasattr(bridge, "STORE_ITEM_ID_D999_DICT"):\n'
+        "    pass\n",
+        encoding="utf-8",
+    )
+    hits = mod._scan_module(sample)
+    kinds = {h["kind"] for h in hits}
+    assert "hasattr_probe" in kinds, "hasattr 检测失效（用独立样例源码驱动，不依赖生产代码现状）"
     # literal_branch 检测有效性由 test_mutation_injected_branch_is_detected 的注入变异证明
 
 

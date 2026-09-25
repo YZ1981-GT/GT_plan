@@ -57,13 +57,56 @@ def _bare_if_formula_count(data: bytes) -> int:
 
 
 class TestCallerImportIsSatisfied:
-    """两处生产调用点必须真的能 import 到它（这正是 task75 红的那条）。"""
+    """两处生产调用点必须真的能解析到它（这正是 task75 红的那条）。
 
-    def test_both_call_sites_still_reference_this_symbol(self) -> None:
-        source = ADAPTER_SOURCE.read_text(encoding="utf-8")
-        assert source.count("neutralize_oo_crash_if_formulas") == 4, (
-            "adapters/excel.py 的调用点数量变了 —— 若是刻意改接线，本判据要一起改"
+    🔴 2026-09-26 接线方式变更（d1-sync-row-table-engine-and-d1-coverage Task 13，
+    需求 3.1/7.1）：原两处 `if self.adapter_id == "g7.soe_subsidiary_disclosure"` 字面量分支
+    +「函数内延迟 import」改为注册表声明驱动 —— `adapters/excel.py` 不再静态/延迟 import
+    `neutralize_oo_crash_if_formulas` 这个具体符号名，而是通过
+    `StoreMergePlan.oo_crash_neutralization_fn` 声明 + `getattr(provider_module, fn_name)`
+    动态解析（框架层零 wp_code/adapter_id 分支是 P9 判据的硬要求）。
+    原「字符串出现 4 次」的检测法与新接线方式不兼容（符号名不再在 excel.py 源码里以字面量
+    出现），改为验证「新接线方式产出的可调用对象与原符号是同一个函数」这个更强的等价保证。
+    """
+
+    def test_new_wiring_resolves_to_the_same_function_object(self) -> None:
+        """`_resolve_oo_crash_neutralization_fn` 解析出的可调用对象 ≡ 原符号本身（同一对象）。"""
+        from app.services.workpaper_sync.adapters.excel import (
+            _resolve_oo_crash_neutralization_fn,
         )
+        from app.services.workpaper_sync.pilot_g7_two_level_dynamic import (
+            neutralize_oo_crash_if_formulas as _original,
+        )
+
+        resolved = _resolve_oo_crash_neutralization_fn("g7.soe_subsidiary_disclosure")
+        assert resolved is _original, (
+            "注册表驱动的解析必须拿到与原符号完全相同的函数对象，不能是同名但不同实现的替身"
+        )
+
+    def test_both_call_sites_use_the_registry_resolver_not_a_literal_branch(self) -> None:
+        """两处调用点都已改走 `_resolve_oo_crash_neutralization_fn`，不再是字面量分支
+        （这条钉住 P9 判据要求的「框架层零 wp_code/adapter_id 分支」，变异反证：
+        改回 `if self.adapter_id == "g7...."` 字面量比较会让 P9 打红）。
+        """
+        source = ADAPTER_SOURCE.read_text(encoding="utf-8")
+        assert source.count("_resolve_oo_crash_neutralization_fn") >= 3, (
+            "两处调用点 + 一处定义，至少 3 次引用 —— 调用点数量变了应一并更新本判据"
+        )
+        assert 'adapter_id == "g7.soe_subsidiary_disclosure"' not in source, (
+            "不得回退成字面量分支 —— 会让 P9 框架层零 wp_code 分支判据打红"
+        )
+
+    def test_unregistered_adapter_gets_none_not_import_error(self) -> None:
+        """🔴 变异反证 / 回归防护：非 G7 的 adapter 走同一解析函数必须拿到 None（软跳过），
+        不是 AttributeError/ImportError —— 这是本次改动相对原「函数内 import」更安全的地方：
+        原实现只对 g7 这一家执行 import，本次改动后 `getattr` 对不存在的属性天然返回 None。
+        """
+        from app.services.workpaper_sync.adapters.excel import (
+            _resolve_oo_crash_neutralization_fn,
+        )
+
+        assert _resolve_oo_crash_neutralization_fn("d1.notes_receivable_detail") is None
+        assert _resolve_oo_crash_neutralization_fn("nonexistent.adapter") is None
 
     def test_the_import_the_adapter_performs_resolves(self) -> None:
         # 逐字复刻 adapters/excel.py 的 import 形态（函数内延迟 import）。
