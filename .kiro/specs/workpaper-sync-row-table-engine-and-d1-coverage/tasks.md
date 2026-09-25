@@ -12,7 +12,11 @@ P9/P10 此时必红（框架层现有 89 处 D4 提及、注册表尚不存在�
 门恒绿），切换时一家一个 commit、一家过一次门。任一家切崩只回滚那一家。
 
 **阶段 5 之后每批次都有一条整册 materialize 实测**（需求 8.3）：耗时超软上限就停下转性能 spec，
-不带着退化继续铺量。下方复选框为唯一进度真源。
+不带着退化继续铺量。
+
+**受管区增长路线**（2026-09-25 复盘按值 grep 重算，首版按「一 sheet 一区」估的数字全部偏低）：
+`1 → 2(D1-2) → 5(D1-4 三区) → 10(批次2) → 16(批次3，含 D1-15 双区) → 19(批次4，含 D1-13 双区)
+→ 20~21(批次5) → 23~24(批次6 D1-1 三区)`。下方复选框为唯一进度真源。
 
 ## Tasks
 
@@ -177,7 +181,7 @@ P9/P10 此时必红（框架层现有 89 处 D4 提及、注册表尚不存在�
     `currentUnadjusted = priorAudited + increase − decrease`）
   - 🔴 派生列声明 `mode=formula`，公式文本以 xlsx 为准、materialize 不覆盖公式格由 OO 重算
     （D1-3 契约已立此纪律：前端算式与 xlsx 公式数值等价但**以 xlsx 为准**）
-  - 门：整册 materialize 200 + verify 全绿 + binding 数 1→2 + 实测耗时登记
+  - 门：整册 materialize 200 + verify 全绿 + **受管区 1→2** + 实测耗时登记
   - _Requirements: 5.1, 5.2, 5.5_
 
 - [ ] 26. 接入 D1-4 `坏账准备明细表D1-4`（**三区**，D1 首次同 sheet 多区）
@@ -191,43 +195,49 @@ P9/P10 此时必红（框架层现有 89 处 D4 提及、注册表尚不存在�
     `useD1WriteoffCheck.syncReversalToD14` 会**回写** `D1-bd-portfolio-rows` 的「按组合计提」
     父行（其注释写明「D1-4 的期末未审随之重算，并沿 D1-4 → D1-1 → 披露 → 附注 逐级联动」）。
     三方写同一 store 键必须定序，见任务 26b
-  - 门：P11（整册 materialize 200 + verify 全绿）+ P12（自动进位移判据清单）+ 耗时登记
-  - _Requirements: 5.1, 5.4, 5.5, 5.7_
-
-- [ ] 26b. 第三写入方定序：跨 sheet 回写 vs OO 回写
-  - 实测冲突面：`syncReversalToD14` 在 OO 模式下若被触发，会绕过 sync 的 CAS 直接改 store ⇒
-    与 materialize 产物分叉（下次 extract 反读到非预期值 ⇒ roundtrip 门红或静默覆盖 OO 改动）
-  - 裁决方向（任务内定，需实测确认）：OO 模式期间**禁用**跨 sheet 回写入口并给中文原因，
-    或把回写改走 sync 的 pending-mutations 通道。**不得**两条路同时直写
-  - P17 判据：OO 模式下触发 `syncReversalToD14` ⇒ 要么被拒绝且有可见原因，要么经 sync 通道
-    落地；**不得**静默直写 store
-  - 🔴 触类旁通已 grep：D2 侧同型 —— `useD2WriteoffCheck.reversalConsistencyWarning`(:135-137)
-    只**读** D2-3 三键不回写（仅告警），故 D2 无此冲突；D1 是唯一有跨 sheet 回写的。
-    该结论登记在 D2 spec 需求 1.7
-  - _Requirements: 5.7_
+  - **本任务含两个必须一起过的子目标**（复盘拆出，不单列任务以免全量重编号）：
+    * ① 三区接入本体（三个 spec 声明 + 同 sheet 位移链实证 + 下游 computed 零回归）
+    * ② **第三写入方定序**：`syncReversalToD14` 在 OO 模式下若被触发会绕过 sync 的 CAS 直接改
+      store ⇒ 与 materialize 产物分叉（下次 extract 反读到非预期值 ⇒ roundtrip 门红或静默覆盖
+      OO 改动）。裁决方向（任务内定，需实测确认）：OO 模式期间**禁用**该入口并给中文原因，
+      或把回写改走 sync 的 pending-mutations 通道 —— **不得**两条路同时直写。
+      P17 判据：OO 模式下触发它 ⇒ 要么被拒绝且有可见原因，要么经 sync 通道落地，不得静默直写
+  - 🔴 触类旁通已 grep：D2 侧同型但**无此冲突** ——
+    `useD2WriteoffCheck.reversalConsistencyWarning`(:135-137) 只**读** D2-3 三键不回写（仅告警）
+    ⇒ D1-4 是全仓唯一「接 sync 的 store 键同时被另一 sheet 回写」的情形。该结论登记在
+    D2 spec 需求 1.7
+  - 门：P11（整册 materialize 200 + verify 全绿）+ P12（自动进位移判据清单）+ P17 + P18 +
+    **受管区 2→5** + 耗时登记
+  - _Requirements: 5.1, 5.4, 5.5, 5.7, 5.8_
 
 ### 阶段 6：D1 批次 2~3
 
 - [ ] 27. 接入 D1-8（双区）+ D1-16（双区）+ D1-5
   - D1-8：`D1-endorse-discount-rows` / `-transfer-rows`；D1-16：`-reversal-rows` / `-writeoff-rows`
   - D1-5 调整分录单区，含 `isPushedToAdjTable` 推送状态（store-only，不入受管格）
-  - 门：整册 materialize + verify + 耗时登记（binding 数 4→9）
+  - 门：整册 materialize + verify + 耗时登记（**受管区 5→10**：D1-8 +2 / D1-16 +2 / D1-5 +1）
   - _Requirements: 5.1, 5.4, 5.5_
 
 - [ ] 28. 接入 D1-9 / D1-10 / D1-11 / D1-12 / D1-15
   - D1-10 带 3 个 recon 标量伴生（`StoreKind.fixed_text`）
+  - 🔴 **D1-15 是双区**（复盘修正）：`D1-ecl-individual-rows` / `D1-ecl-portfolio-rows`
+    （实测 `useD1EclCalc.ts:208-209` 的 dict 形式），首版按单区写 ⇒ 另一键的数据在 OO 里会
+    不可见、回写丢失
   - D1-15 派生列是**乘法**（`shouldProvision = 余额 × 损失率`）与 `difference = E − D` ——
     引擎首次遇到非加减派生，确认 `mode=formula` 路径不依赖算式形态
-  - D1-15 的 `autoPulled: boolean` 归一到 `source='tb'`（P16）
-  - 门：同上（binding 数 9→14）
-  - _Requirements: 5.1, 5.5, 6.5_
+  - D1-15 的 `autoPulled: boolean` 归一到 `source='tb'`（P16）；其取数源是 D1-4 ⇒ P18 的下游
+    联动判据须覆盖「D1-4 三区被 OO 回写后 D1-15 的 `parseD1_4Rows` 仍正确重算」
+  - 门：同上（**受管区 10→16**：D1-9/10/11/12 各 +1，D1-15 **+2**）
+  - _Requirements: 5.1, 5.5, 5.8, 6.5_
 
 ### 阶段 7：D1 批次 4~5
 
-- [ ] 29. 接入 D1-7（嵌套 dict）+ D1-14（纯标量）+ D1-13（标量 + 2 行表）
+- [ ] 29. 接入 D1-7（嵌套 dict）+ D1-14（纯标量）+ D1-13（**双区** + 标量）
   - D1-7 是一个 item 装两数组 `{bankRows, commercialRows}` ⇒ `StoreKind.dict` 首次用于 D1
-  - D1-14 十个标量 / D1-13 十五个标量 ⇒ `StoreKind.fixed_text`
-  - 门：同上（binding 数 14→17 左右，按实际受管区计）
+  - D1-14 十个标量 ⇒ `StoreKind.fixed_text`，**无行受管区**
+  - 🔴 **D1-13 是双区**（复盘补键名）：`D1-sampling-vouching-rows` /
+    `D1-sampling-specific-samples`，外加 15 个标量走 `fixed_text`
+  - 门：同上（**受管区 16→19**：D1-7 +1 / D1-14 +0 / D1-13 **+2**）
   - _Requirements: 5.1, 5.5_
 
 - [ ] 30.* 评估 D1-6 能否用 `TransposedSheetSpec` 表达
@@ -293,7 +303,7 @@ P9/P10 此时必红（框架层现有 89 处 D4 提及、注册表尚不存在�
     { "wave": 10, "tasks": ["20", "21", "22"], "rationale": "CI 卡点要在框架层与注册表都成形后才有稳定形态可断言，否则守卫自身会红" },
     { "wave": 11, "tasks": ["23", "24"], "rationale": "多 sheet 骨架与位移判据参数化是 D1 铺量的共同前置" },
     { "wave": 12, "tasks": ["25"], "rationale": "D1-2 单区先行 —— 证明一 entry 多受管 sheet 在 D1 成立，失败面最小" },
-    { "wave": 13, "tasks": ["26"], "rationale": "D1-4 三区依赖 25 已证多 sheet 通路；三区是 D1 首次同 sheet 多区" },
+    { "wave": 13, "tasks": ["26"], "rationale": "D1-4 三区依赖 25 已证多 sheet 通路；三区是 D1 首次同 sheet 多区。本条含两个子目标（三区接入 + 第三写入方定序）—— 定序必须与接入同波交付：在接入之前该冲突不存在，在接入之后若不定序则跨 sheet 回写会与 materialize 产物分叉" },
     { "wave": 14, "tasks": ["27", "28"], "rationale": "批次 2/3 结构同型，可并行；每条各自跑整册 materialize 与耗时登记" },
     { "wave": 15, "tasks": ["29", "30"], "rationale": "dict/fixed_text 形态与 D1-6 评估互不依赖；30 是评估任务可能产出「表达不了」结论" },
     { "wave": 16, "tasks": ["31"], "rationale": "AdjudicationSheetSpec 独立于行表引擎，但需 D1-2/D1-4 已接（它的行来源是这两张）" },
@@ -313,6 +323,7 @@ P9/P10 此时必红（框架层现有 89 处 D4 提及、注册表尚不存在�
     "12": "注册表未落 ⇒ 任务 13 无查表入口，只能保留 elif 链",
     "23": "instrumentation_specs() 与对齐计数守卫未落 ⇒ 任务 25 起每张接入都可能重演 D4-35 的 specs/sheets 不对齐打挂整个 entry",
     "24": "位移判据未参数化 ⇒ 任务 26 的三区 sheet 不被自动覆盖，回到「硬编码清单漏掉的那张就是下一个线上 500」",
+    "26": "D1-4 是 D1 首次同 sheet 多区，且其三键有下游消费方（P18）与第三写入方（P17）⇒ 两个子目标必须同波交付；不先接它，批次 2 的双区 sheet 也缺通路验证",
     "32": "双读单写未落 ⇒ 任务 33 的四态状态机读不到 stored，只能退回被需求 6.3 禁止的「cross-sheet 无条件覆盖」"
   }
 }

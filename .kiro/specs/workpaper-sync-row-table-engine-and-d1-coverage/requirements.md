@@ -156,27 +156,34 @@
 1. WHEN 列出 D1 接入清单 THEN 它 SHALL 从模板 `D/D1 应收票据.xlsx` 的 **21 张实测 sheet**
    推出，按下表分批（`*` 为本 spec 范围外）：
 
-   | 批次 | sheet | 形态 | 存储键 |
-   |---|---|---|---|
-   | 已接 | `原值明细表（按客户）D1-3` | 动态行 15 列 | `D1-cust-rows` |
-   | **1** | `原值明细表（按类别）D1-2` | 固定 2 + 动态行 | `D1-cat-rows` |
-   | **1** | `坏账准备明细表D1-4` | **三区** | `D1-bd-individual-rows` / `-portfolio-rows` / `-notetype-rows` |
-   | **2** | `应收票据贴现、票据已背书未到期明细表D1-8` | 双区 | `D1-endorse-discount-rows` / `-transfer-rows` |
-   | **2** | `坏账准备转回、核销检查表D1-16` | 双区 | `D1-writeoff-reversal-rows` / `-writeoff-rows` |
-   | **2** | `调整分录汇总表D1-5` | 动态行 | `D1-entry-rows` |
-   | **3** | `应收票据贴息检查表D1-9` | 动态行 | `D1-interest-rows` |
-   | **3** | `应收票据监盘D1-10` | 动态行 + 3 标量 | `D1-inventory-rows` + recon 标量 |
-   | **3** | `关联方关系及交易检查表D1-11` | 动态行 | `D1-rp-rows` |
-   | **3** | `应收票据质押检查表D1-12` | 动态行 | `D1-pledge-rows` |
-   | **3** | `应收票据坏账准备测试表D1-15` | 动态行 + 2 派生列 | ECL rows |
-   | **4** | `应收票据备查簿核对D1-7` | 嵌套 dict | `D1-memo-rows` = `{bankRows,commercialRows}` |
-   | **4** | `应收票据坏账准备会计政策检查D1-14` | 纯标量 10 项 | `D1-policy-*` |
-   | **4** | `应收票据检查表D1-13` | 标量 15 项 + 2 行表 | `D1-sampling-*` |
-   | **5** | `应收票据业务模式分析D1-6` | 行表 + **真二维矩阵** | `D1-bm-basis-rows` + `D1-bm-qa-matrix` |
-   | **6** | `审定表D1-1` | **per-cell 锚点 3 区** | `D1-adj-{section}-{slug}-{field}` |
-   | `*` | `应收票据审计程序表D1A` | 步骤清单 | 程序 item |
-   | `*` | `附注披露信息（上市公司）` / `（国企）` | 10 行接口多区块 | 披露键 |
-   | `*` | `底稿目录` / `应收票据业务模式分析提示` | 导航 / 提示页 | 无 |
+   | 批次 | sheet | 形态 | 存储键（**按值 grep 实测**） | 受管区 | 累计 |
+   |---|---|---|---|---|---|
+   | 已接 | `原值明细表（按客户）D1-3` | 动态行 15 列 | `D1-cust-rows` | 1 | 1 |
+   | **1** | `原值明细表（按类别）D1-2` | 固定 2 + 动态行 | `D1-cat-rows` | 1 | 2 |
+   | **1** | `坏账准备明细表D1-4` | **三区** | `D1-bd-individual-rows` / `-portfolio-rows` / `-notetype-rows` | **3** | 5 |
+   | **2** | `应收票据贴现、票据已背书未到期明细表D1-8` | 双区 | `D1-endorse-discount-rows` / `-transfer-rows` | 2 | 7 |
+   | **2** | `坏账准备转回、核销检查表D1-16` | 双区 | `D1-writeoff-reversal-rows` / `-writeoff-rows` | 2 | 9 |
+   | **2** | `调整分录汇总表D1-5` | 动态行 | `D1-entry-rows` | 1 | 10 |
+   | **3** | `应收票据贴息检查表D1-9` | 动态行 | `D1-interest-rows` | 1 | 11 |
+   | **3** | `应收票据监盘D1-10` | 动态行 + 3 标量 | `D1-inventory-rows` + recon 标量 | 1 | 12 |
+   | **3** | `关联方关系及交易检查表D1-11` | 动态行 | `D1-rp-rows` | 1 | 13 |
+   | **3** | `应收票据质押检查表D1-12` | 动态行 | `D1-pledge-rows` | 1 | 14 |
+   | **3** | `应收票据坏账准备测试表D1-15` | **双区** + 2 派生列（乘法）| `D1-ecl-individual-rows` / `D1-ecl-portfolio-rows` | **2** | 16 |
+   | **4** | `应收票据备查簿核对D1-7` | 嵌套 dict | `D1-memo-rows` = `{bankRows,commercialRows}` | 1 | 17 |
+   | **4** | `应收票据坏账准备会计政策检查D1-14` | 纯标量 10 项 | `D1-policy-*` | 0（无行区）| 17 |
+   | **4** | `应收票据检查表D1-13` | **双区** + 15 标量 | `D1-sampling-vouching-rows` / `D1-sampling-specific-samples` | **2** | 19 |
+   | **5** | `应收票据业务模式分析D1-6` | 行表 + **真二维矩阵** | `D1-bm-basis-rows` + `D1-bm-qa-matrix` | 1 + 矩阵待评估 | 20~21 |
+   | **6** | `审定表D1-1` | **per-cell 锚点 3 区** | `D1-adj-{section}-{slug}-{field}` | 3 | 23~24 |
+   | `*` | `应收票据审计程序表D1A` | 步骤清单 | 程序 item | — | — |
+   | `*` | `附注披露信息（上市公司）` / `（国企）` | 10 行接口多区块 | 披露键 | — | — |
+   | `*` | `底稿目录` / `应收票据业务模式分析提示` | 导航 / 提示页 | 无 | — | — |
+
+   🔴 **本表的「存储键」与「受管区」两列是 2026-09-25 复盘按值 grep（`'D1-[A-Za-z0-9_-]+'`）
+   重测后补正的**。首版把 D1-15 写成占位「ECL rows」（实测是**双键双区**
+   `D1-ecl-individual-rows`/`D1-ecl-portfolio-rows`，dict 字面量形式 `portfolioRows: '…'`），
+   D1-13 只写「2 行表」未列键名。⇒ **受管区总数首版从未算过**，tasks 里的 binding 增长数是按
+   「一 sheet 一区」估的、全部偏低。教训与 D2-3 同源：**store 键 grep 必须按值匹配**，
+   `^const \w+_KEY\s*=\s*'` 这类按声明匹配的模式会漏掉 dict 字面量里的键。
 
 2. WHEN 每张 sheet 接入 THEN 它 SHALL 有独立的 `phase5_d1_*.py` 声明模块 + 独立
    `_INCLUDE_*` 灰度开关，可单独关闭而不影响其他张。
@@ -192,6 +199,18 @@
 6. WHERE 一张 sheet 的形态无法用 `RowTableSheetSpec` 或 `TransposedSheetSpec` 表达
    （如 D1-6 的 `cells: QACell[][]` 真二维）THE 该张 SHALL 显式登记为「引擎表达不了」
    并给出原因，**不得**为它在框架层开特例分支。
+7. WHEN 一张接入的 sheet 的 store 键**已有其他 sheet 在回写它** THEN 本 spec SHALL 为该键定序，
+   使同一时刻只有一条权威写路径。
+   🔴 实测唯一命中：`useD1WriteoffCheck.syncReversalToD14` **回写** `D1-bd-portfolio-rows` 的
+   「按组合计提」父行（注释：「D1-4 的期末未审随之重算，并沿 D1-4 → D1-1 → 披露 → 附注
+   逐级联动」）⇒ D1-4 接 sync 后该键有**三个写入方**（HTML 保存 / OO 回写 / 跨 sheet 回写）。
+   裁决方向：OO 模式期间禁用跨 sheet 回写入口并给中文原因，或把它改走 sync 的
+   pending-mutations 通道；**不得**两条路同时直写 store（会与 materialize 产物分叉，
+   下次 extract 反读到非预期值 ⇒ roundtrip 门红或静默覆盖 OO 改动）。
+8. WHEN 一张接入的 sheet 的 store 键有**下游 computed 消费方** THEN 零回归判据 SHALL 覆盖它们，
+   不得只验该 sheet 自身读回等值。实测 D1-4 三键的下游：`useD1EclCalc.d1_4DataAvailable`(:475)
+   与 `parseD1_4Rows`(:497/:499) / `useD1Adjudication` 坏账区 / `D1TabIndex.vue:49` 的
+   `progressKeys`。
 
 ### Requirement 6：D1-1 审定表迁移（批次 6，存量数据不可丢）
 

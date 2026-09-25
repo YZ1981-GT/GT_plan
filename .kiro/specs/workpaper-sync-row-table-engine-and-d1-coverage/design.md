@@ -410,6 +410,21 @@ D4-13 正文写不进 OO 两个已修 bug 的根因形态。
 **Validates: Requirements 6.5**　现状「上游变了、手工调过的值会怎样」是未定义行为。
 变异：保留布尔标记。
 
+### Property 17: 有第三写入方的 store 键必须定序，不得两条路同时直写
+
+**Validates: Requirements 5.7**　实测唯一命中 `D1-bd-portfolio-rows`：除 HTML 保存与 OO 回写外，
+`useD1WriteoffCheck.syncReversalToD14` 还会回写它的「按组合计提」父行。判据：OO 模式下触发该
+回写 ⇒ 要么被拒绝且有可见中文原因，要么经 sync 的 pending-mutations 通道落地；**不得**静默
+直写 store。变异：让它在 OO 模式下直写 ⇒ 与 materialize 产物分叉，下次 extract 反读到非预期值
+⇒ roundtrip 门必红。
+
+### Property 18: 接入 sheet 的 store 键的下游 computed 在 OO 回写后仍正确重算
+
+**Validates: Requirements 5.8**　D1-4 三键下游：`useD1EclCalc.d1_4DataAvailable`(:475) +
+`parseD1_4Rows`(:497/:499) / `useD1Adjudication` 坏账区 / `D1TabIndex.vue:49` `progressKeys`。
+变异：OO 回写只更新三键中的一个 ⇒ 下游汇总缺一类，必红。🔴 只验该 sheet 自身读回等值会放过
+「下游看不到回写」这类缺陷。
+
 ## Testing Strategy
 
 **红判据先行。** 批次 0 先取 24 个 golden digest（此时必绿，是**基线**不是判据）+ 打红 P9/P10
