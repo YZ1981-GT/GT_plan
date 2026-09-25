@@ -168,6 +168,35 @@ function removePending(config: InternalAxiosRequestConfig) {
   }
 }
 
+/**
+ * 把后端错误信封 normalize 成前端统一约定的 `detail` 形状。
+ *
+ * 后端**两种错误形状并存**（真栈实测 2026-09-23，`/api/projects/{不存在的id}`）：
+ * - 业务 `HTTPException`（router `raise`）走平台全局 `http_exception_handler`
+ *   （`backend/app/middleware/error_handler.py`），把 `exc.detail` 放进 **`message`**：
+ *   `{"code":404,"message":"项目不存在"}` —— **没有 `detail` 键**；
+ * - starlette 原生 404/405 与 `RequestValidationError` 走 FastAPI 默认处理器，
+ *   输出的才是 `{"detail": ...}`。
+ *
+ * 下游消费者普遍只读 `detail`（`handleApiError`、各视图的 `e.response.data.detail`、
+ * sync 桥的 `readWireError`），于是在生产上对**所有业务 HTTPException 恒取不到值**：
+ * 409/400/503 的后端中文根因退化成兜底文案，422 的 `error_code` 特化分派从未生效。
+ *
+ * 在拦截器一处补齐 `detail`（与成功路径「统一解包 ApiResponse」对称），让「后端把错误
+ * 详情放在哪个字段」这一知识只存在于此处，不再散落到每个调用点。`exc.detail` 是原样
+ * 透出的，所以 dict 形态（`{error_code, message, ...}`）也能被恢复成对象而非字符串。
+ *
+ * 只在 `detail` 缺失时回填：starlette 原生 404 与 422 的 `detail`（字段级错误数组）
+ * 必须保持原值，不能被 `message` 覆盖。
+ */
+export function normaliseErrorEnvelope(response: { data?: unknown } | undefined): void {
+  const data = response?.data
+  if (!data || typeof data !== 'object') return
+  if (Array.isArray(data) || data instanceof Blob) return
+  const d = data as Record<string, unknown>
+  if (d.detail === undefined && d.message !== undefined) d.detail = d.message
+}
+
 async function extractErrorDetail(responseData: unknown): Promise<string> {
   if (responseData instanceof Blob) {
     try {
@@ -291,6 +320,8 @@ http.interceptors.response.use(
   },
   async (error: AxiosError) => {
     if (error.config) removePending(error.config as InternalAxiosRequestConfig)
+    // 信封适配：必须在任何 return/reject 之前，保证每条错误出口的 data 形状一致
+    normaliseErrorEnvelope(error.response)
     // R7-S2-11: 存储 trace id（错误响应）
     _lastTraceId = (error.response?.headers as any)?.['x-request-id'] || ''
     // R10 Spec C: 5xx 环形缓冲区记录错误响应

@@ -841,3 +841,10 @@ backend/tests/workpaper_sync/test_excel_shift_aware_verification.py  1955
 backend/tests/workpaper_sync/test_participant_leave_pg.py  1188
 backend/tests/workpaper_sync/test_projection_lane_regression_gate.py  1176
 backend/tests/workpaper_sync/test_workbook_row_change_carriers.py  830
+
+#   useWorkpaperSyncBridge.ts —— **改动前即 >1500 上限、从未登记**（D4 双向回写桥的状态机
+#     + HTTP 上报口 + recovery/timeline 文案几轮累积至 1559 行）。本次错误信封 normalize
+#     仅让 readWireError 兼容 message(+1~2 行)，非膨胀来源，但被这笔历史欠账挡住。首次入册,
+#     baseline 取真实行数 1559。拆分方向: 把状态机转换表与 DTO 构造抽伴生模块, 属独立任务。
+#     spec: d4-html-to-oo-store-contract-alignment（错误信封 normalize）
+audit-platform/frontend/src/components/workpaper/sync/useWorkpaperSyncBridge.ts  1559

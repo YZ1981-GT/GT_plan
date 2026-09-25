@@ -140,8 +140,26 @@ function readWireError(error: unknown): {
   const shape = (error ?? {}) as WireErrorShape
   const rawStatus = shape.response?.status
   const status = typeof rawStatus === 'number' && Number.isInteger(rawStatus) ? rawStatus : null
-  const data = shape.response?.data as { detail?: unknown } | undefined
-  const detail = data?.detail
+  const data = shape.response?.data as { detail?: unknown; message?: unknown } | undefined
+  // 🔴 **平台真实响应信封是 `{code, message}`，不是 FastAPI 原生的 `{detail}`**。
+  //
+  // `backend/app/middleware/error_handler.http_exception_handler` 是全局注册的：
+  //     content={"code": exc.status_code, "message": exc.detail}
+  // ⇒ router 用 `HTTPException(detail={"error_code":…, "message":…})` 抛的 domain error，
+  //   到前端是 **`data.message`** 里的对象，**根本没有 `data.detail` 键**。
+  //   真栈实测原文：{"code":500,"message":{"error_code":"excel_extract_identity_carrier_missing",
+  //                                       "message":"entry xlsx/gt-d4-operating-revenue: …"}}
+  //
+  // 此前这里只读 `data.detail` ⇒ `errorCode` 恒空 ⇒ **所有** sync domain error 都落第三桶
+  // （`WP_BRIDGE_LOCAL_FAILURE_CODE` + `unregistered`），于是 `classifySyncFailure` 的全部
+  // 分派（stale identity 三门 / 可重试 / 409·422·403 区分）在生产上从未生效，后端写的中文
+  // 根因整段丢失（用户只看到 axios 的 `Request failed with status code 500`），且 500 被判
+  // 可重试 ⇒ 对确定性失败无意义重试 3 次（真栈实测 materialize 500 ×3）。
+  //
+  // `detail` 仍优先：它更贴近 FastAPI 语义，也覆盖「绕过全局 handler 直接返回原生形状」的场景。
+  // 判据：`__tests__/bridgeFailureRealEnvelope.spec.ts`（既有 22+ 条判据一律 mock `detail`，
+  // 是个生产上不存在的形状 —— 全绿而生产失效，本仓库反复登记的「假绿第①源」）。
+  const detail = data?.detail !== undefined ? data.detail : data?.message
   let errorCode = ''
   let message = typeof shape.message === 'string' ? shape.message : ''
   if (detail !== null && typeof detail === 'object' && !Array.isArray(detail)) {
