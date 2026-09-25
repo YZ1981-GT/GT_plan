@@ -2343,6 +2343,9 @@ class WorkpaperSyncRepository:
         adapter_id: str,
         adapter_build_digest: str,
         contributor_snapshot_digest: str,
+        expected_generation: int | None = None,
+        expected_write_fence: int | None = None,
+        expected_definition_bundle_sha256: str | None = None,
         actor_id: uuid.UUID | None = None,
     ) -> RecoveryClaimOutcome:
         """authorization-first claim：一个事务内创建唯一 request + shell，并 create-or-hit application。
@@ -2427,6 +2430,34 @@ class WorkpaperSyncRepository:
         if int(confirmation.write_fence_epoch) != int(room.write_fence_epoch):
             raise ScopeIntegrityError(
                 "prior confirmation 的 write fence 已陈旧（generation/fence 不合法不得产生三实体）"
+            )
+
+        # 🔴 客户端提交的 expected_* 逐项核对冻结真源（Task 32 欠账修复）。
+        # 前端 `buildClaimRequestBody` 一直在发 expected_generation / expected_write_fence /
+        # expected_definition_bundle_sha256，但此前服务端从不校验它们 —— 于是「错误 bundle/
+        # fence/generation 的 claim」被静默接受（服务端只用 confirmation 自身派生值），
+        # 「错误 prior confirmation/bundle/fence/contributor 拒绝」在生产路径上不可达。
+        # 这里在**创建任何 request/application/operation 之前** fail-closed：不符即抛
+        # ScopeIntegrityError，与上面三条 prior-confirmation 拒绝同型（三实体保持为 0）。
+        # 全部 None（旧调用方/无 expected 值）时跳过 —— 校验只增强、不改变既有正确路径。
+        if expected_generation is not None and int(expected_generation) != int(case.generation):
+            raise ScopeIntegrityError(
+                f"claim 的 expected_generation={expected_generation} 与 case generation="
+                f"{case.generation} 不符（错误 generation 不得产生三实体）"
+            )
+        if expected_write_fence is not None and int(expected_write_fence) != int(
+            room.write_fence_epoch
+        ):
+            raise ScopeIntegrityError(
+                f"claim 的 expected_write_fence={expected_write_fence} 与 room 当前 fence="
+                f"{room.write_fence_epoch} 不符（错误 fence 不得产生三实体）"
+            )
+        if expected_definition_bundle_sha256 is not None and str(
+            expected_definition_bundle_sha256
+        ) != str(confirmation.definition_bundle_sha256):
+            raise ScopeIntegrityError(
+                "claim 的 expected_definition_bundle_sha256 与 prior confirmation 冻结的 "
+                "bundle digest 不符（错误 bundle 不得产生三实体）"
             )
 
         case.state = RecoveryCaseState.claiming.value

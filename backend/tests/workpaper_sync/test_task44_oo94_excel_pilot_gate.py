@@ -736,21 +736,27 @@ class TestOrderingIsNotCommutable:
             }, row
             assert row["notes"], row
 
-    def test_counterfactual_without_debt_changes_the_verdict(
+    def test_no_real_upstream_debt_remains_after_task32_fixes(
         self, facts_by_class: dict[str, Any]
     ) -> None:
-        """行为侧证据：清空 `upstream_debt` 后同一条 probe 的判定必须不同。"""
+        """Task 32 两条欠账已补（2026-09-25）⇒ 生产 oracle 已无任何真实 upstream_debt。
+
+        历史：这里曾断言反事实集合恰是
+        `{same_application_higher_sequence_fold, wrong_prior_confirmation_…}` 两条 ——
+        它们各带一条 debt。实现补齐后 debt 移除，`upstream_gap_counterfactual` 只迭代
+        「仍带 debt 的 oracle」，因此现在必然为空集。
+
+        「debt → failed 且判定早于黑盒」这条**行为不变量**改由下一条
+        `test_crossing_shape_debt_and_black_box_together_still_lands_on_upstream_gap`
+        用**合成 debt**（monkeypatch）证明 —— 不再依赖生产上真的存在欠账。
+        """
         env = G.default_environment()
         for pilot_class, facts in facts_by_class.items():
             counterfactual = G.upstream_gap_counterfactual(facts, env)
-            assert set(counterfactual) == {
-                "scenario.same_application_higher_sequence_fold",
-                "scenario.wrong_prior_confirmation_bundle_fence_contributor_rejected",
-            }, pilot_class
-            for probe_id, data in counterfactual.items():
-                assert data["with_debt"] == {"result": "failed", "error_code": "upstream_gap"}
-                assert data["without_debt"]["result"] != "failed", probe_id
-                assert data["differs"] is True
+            assert counterfactual == {}, (
+                f"{pilot_class}: Task 32 两条欠账已补，不应再有带 debt 的 oracle："
+                f"{sorted(counterfactual)}"
+            )
 
     def test_crossing_shape_debt_and_black_box_together_still_lands_on_upstream_gap(
         self, facts_by_class: dict[str, Any]
@@ -1489,13 +1495,17 @@ class TestReportIsClosedAndMeasured:
     def test_production_oracle_echo_reproduces_the_task43_baseline(
         self, report: dict[str, Any]
     ) -> None:
-        """交叉校验：本门对 24 条 required scenario 的生产 oracle 回声必须等于
-        Task 43 evidence 里实测的分布（2 upstream_gap / 10 real_oo / 11 input / 1 schema）。
+        """交叉校验：本门对 24 条 required scenario 的生产 oracle 回声分布。
+
+        🔴 2026-09-25 Task 32 两条欠账补齐后基线更新：`failed/upstream_gap` 从 2 → 0
+        （same_application_higher_sequence_fold + wrong_prior_confirmation… 的 debt 已
+        解除），这两条在空输入回声下落到 `evidence_input_missing`（11 → 13）。real_oo=10
+        与 schema=1 不变，总数仍 24。这**不是** pilot 变绿——它们只是从「实现缺失的
+        failed」变成「缺具体证据的 unverifiable」，真实 OO 未执行前仍不 passed。
         """
         expected = {
-            "failed/upstream_gap": 2,
             "unverifiable/real_onlyoffice_not_executed": 10,
-            "unverifiable/evidence_input_missing": 11,
+            "unverifiable/evidence_input_missing": 13,
             "unverifiable/scenario_kind_unrepresentable": 1,
         }
         for entry_id, data in report["pilots"].items():

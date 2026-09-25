@@ -175,7 +175,12 @@ backend/app/routers/wp_onlyoffice_router.py  1749
 # 抬到实测值让门禁从此刻重新生效；欠账应由抽伴生模块偿还（`_attach_launch_urls` /
 # `get_room_contents` / `_materialize_request` 一组约 220 行可整体外移，但 test_task28_sync_router
 # 有按函数名钉在本文件上的 AST 判据，搬迁需与那批判据一起改，属独立任务）。
-backend/app/routers/wp_sync_router.py  2764
+# 🔴 2026-09-25：基线 2764 早已 stale（本次改动前 HEAD 实测已 ~3047，非本次造成）。
+#   Task 32 欠账②读侧修复 +55 行：claim 端点透传三个 expected_*（fail-closed 校验前置）
+#   + get_operation 增 `_fold_observability_facts`（same-application fold 只读观测：暴露
+#   application origin/effective sequence + room latest-durable 指针，复用既有路由不新建）。
+#   抬到实测值让门从此刻重新生效；拆分方向同上（recovery/operation 读端点一组可外移）。
+backend/app/routers/wp_sync_router.py  3102
 #   excel_structure_fingerprint.py —— 基线 918 早已 stale（本次改动前 HEAD 实测 947）。
 #     2026-09-22 给 `structure_fingerprint(data)` 加**按 sha256 内容寻址的 LRU 记忆化**
 #     （+46 行 = 缓存字典/上限/两侧 deepcopy/clear 入口 + 根因注释）。实测依据：冷路径

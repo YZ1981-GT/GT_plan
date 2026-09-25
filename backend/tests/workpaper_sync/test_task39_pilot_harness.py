@@ -1188,32 +1188,47 @@ class TestNoRealOnlyOfficeMeansUnverifiable:
         for scenario_id in EV.FIELD_LEVEL_SCENARIOS:
             assert not PH.SCENARIO_ORACLES[scenario_id].needs_black_box, scenario_id
 
-    def test_upstream_gap_scenarios_are_failed_not_unverifiable(
-        self, contract: C.SyncContract
-    ) -> None:
-        """🔴 上游实现缺口判 `failed`，**不是** `unverifiable`。
+    def test_no_scenario_carries_an_unfilled_upstream_debt(self) -> None:
+        """🔴 Task 32 两条欠账已补 ⇒ 现在**不得**再有任何 oracle 带 upstream_debt。
 
-        判定顺序不可交换：若黑盒判定排在缺口判定之前，这两条会在没有 OO 的环境里显示成
-        `unverifiable`，于是"接了 OO 就会自动变绿"—— 而它们其实永远不会通过（生产上根本
-        没有那道校验）。
+        历史：`same_application_higher_sequence_fold` 与
+        `wrong_prior_confirmation_bundle_fence_contributor_rejected` 曾各带一条
+        `debt=UPSTREAM_DEBT_*`，让它们 fail closed。2026-09-25 两条实现补齐
+        （claim expected_* 校验 + fold 读侧 _fold_observability_facts）后 debt 移除。
+
+        本守卫**反向**锁死：任何人再给 oracle 加 `debt=` 而不补实现，这条立刻红 ——
+        「登记欠账让场景 fail closed」是允许的，但登记完必须真的补，不能长期挂着。
+        谁要重新登记欠账，应在这里显式列出并说明缘由（而不是让它悄悄回来）。
         """
         gaps = [sid for sid, o in PH.SCENARIO_ORACLES.items() if o.upstream_debt]
-        assert sorted(gaps) == [
+        assert gaps == [], (
+            f"以下 oracle 仍挂 upstream_debt（Task 32 两条已补，不应再有）：{sorted(gaps)}"
+        )
+
+    def test_formerly_debted_scenarios_are_now_evaluatable(
+        self, contract: C.SyncContract
+    ) -> None:
+        """曾经 fail-closed 的两条场景，去 debt 后必须变成**可评估**（不再恒 failed/upstream_gap）。
+
+        「可评估」= 喂全 observation 后 oracle 不再走 `upstream_gap` 分支。它此刻可能是
+        passed 或因缺某类具体证据而 unverifiable，但**绝不能**再是「实现缺失」的 failed ——
+        那正是 debt 被真实解除的判据。
+        """
+        for scenario_id in (
             "same_application_higher_sequence_fold",
             "wrong_prior_confirmation_bundle_fence_contributor_rejected",
-        ], gaps
-        for scenario_id in gaps:
+        ):
+            oracle = PH.SCENARIO_ORACLES[scenario_id]
+            assert oracle.upstream_debt is None, scenario_id
             scenario = {s.scenario_id: s for s in PH.all_declared_scenarios()}[scenario_id]
             verdict = PH.run_scenario_oracle(
                 scenario=scenario,
-                oracle=PH.SCENARIO_ORACLES[scenario_id],
+                oracle=oracle,
                 observation=_full_obs(scenario_id, contract=contract),
                 onlyoffice_build="OnlyOffice 9.4.0.42",
                 browser_build="Chrome/131.0.0.0",
             )
-            assert verdict.outcome is PH.OracleOutcome.failed, verdict
-            assert verdict.error_code == "upstream_gap", verdict
-            assert "Task 32" in "".join(verdict.notes)
+            assert verdict.error_code != "upstream_gap", (scenario_id, verdict)
 
     def test_schema_debt_scenario_is_unverifiable_and_still_required(
         self, contract: C.SyncContract

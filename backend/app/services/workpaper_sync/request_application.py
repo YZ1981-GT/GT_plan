@@ -1103,6 +1103,9 @@ class RequestApplicationService:
         adapter_build_digest: str,
         contributor_snapshot_digest: str,
         current_revision: int,
+        expected_generation: int | None = None,
+        expected_write_fence: int | None = None,
+        expected_definition_bundle_sha256: str | None = None,
         actor_id: uuid.UUID | None = None,
     ) -> RecoveryClaimOutcome:
         """recovery claim：一个事务内建 request + shell + application，commit 前定形。
@@ -1122,6 +1125,9 @@ class RequestApplicationService:
             adapter_build_digest=adapter_build_digest,
             contributor_snapshot_digest=contributor_snapshot_digest,
             current_revision=current_revision,
+            expected_generation=expected_generation,
+            expected_write_fence=expected_write_fence,
+            expected_definition_bundle_sha256=expected_definition_bundle_sha256,
             actor_id=actor_id,
         )
         shape = classify_operation_shape(

@@ -289,20 +289,14 @@ def _o(
 _I = EvidenceInput
 _SYNC = "app.services.workpaper_sync"
 
-#: 🔴 **Task 32 域的上游缺口**（本任务无法在不动 router/claim 的前提下接上，
-#: 逐条登记并让对应场景 fail closed）。文案进 `error_code` 的 notes，因此它们不是
-#: 注释而是**运行时可见的欠账**。
-UPSTREAM_DEBT_CLAIM_PRECONDITIONS: Final[str] = (
-    "Task 32 欠账：`recovery.claim_recovery_case()` 从不校验 expected_generation / "
-    "expected_write_fence / expected_definition_bundle_sha256 ⇒ 「错误 prior "
-    "confirmation/bundle/fence/contributor 拒绝」在生产路径上不可达。本场景因此只能落 "
-    "failed（不是 unverifiable：缺口是**实现缺失**而不是环境缺失）"
-)
-UPSTREAM_DEBT_ROOM_FENCE_READ: Final[str] = (
-    "Task 32 欠账：`room_latest_durable_application_id/_sequence` 无读路由 ⇒ "
-    "「same-application higher-sequence fold 不 self-stale」的结果无从观测。"
-    "写侧已由 Task 23 实现，缺的是可观测的读路由"
-)
+# 🔴 **Task 32 域的两条上游缺口已于 2026-09-25 补齐**（曾用
+#    `UPSTREAM_DEBT_CLAIM_PRECONDITIONS` / `UPSTREAM_DEBT_ROOM_FENCE_READ` 让两条场景
+#    fail closed）：
+#    ① claim_recovery_case 现校验客户端 expected_generation/write_fence/bundle_sha256
+#       （错误值 fail-closed 拒绝、三实体保持 0）—— wrong_prior_confirmation… 可达；
+#    ② get_operation 读侧 _fold_observability_facts 暴露 room latest-durable 指针 +
+#       application origin/effective sequence —— same_application_higher_sequence_fold 可观测。
+#    两条 oracle 的 `debt=` 已移除；常量随之删除（无外部引用）。
 
 #: scenario_id → oracle。与 :mod:`evidence` 的场景声明**双向锁死**。
 SCENARIO_ORACLES: Final[Mapping[str, ScenarioOracle]] = {
@@ -388,8 +382,11 @@ SCENARIO_ORACLES: Final[Mapping[str, ScenarioOracle]] = {
                 f"{_SYNC}.request_application:RequestApplicationService",
                 f"{_SYNC}.request_application:assert_correlation_convergence",
             ],
-            "同 canonical application 的更高 sequence 只 fold、不 self-stale、origin 不改写",
-            debt=UPSTREAM_DEBT_ROOM_FENCE_READ,
+            # Task 32 欠账已补：读侧 `get_operation` 的 _fold_observability_facts 暴露
+            # room latest-durable 指针 + application origin/effective sequence，fold 结果
+            # 现可观测（旧 debt=UPSTREAM_DEBT_ROOM_FENCE_READ 已解除）。
+            "同 canonical application 的更高 sequence 只 fold、不 self-stale、origin 不改写："
+            "room latest-durable 指针仍指向本 application、effective 单调不回退",
         ),
         _o(
             "cross_participant_idempotency_409",
@@ -440,8 +437,10 @@ SCENARIO_ORACLES: Final[Mapping[str, ScenarioOracle]] = {
             "wrong_prior_confirmation_bundle_fence_contributor_rejected",
             [_I.recovery_lifecycle, _I.db_entities],
             [f"{_SYNC}.callback_delivery:CallbackDeliveryService"],
+            # Task 32 欠账已补：claim_recovery_case 现校验客户端 expected_generation /
+            # expected_write_fence / expected_definition_bundle_sha256，错误值 fail-closed
+            # 拒绝且三实体保持 0（旧 debt=UPSTREAM_DEBT_CLAIM_PRECONDITIONS 已解除）。
             "错误 prior confirmation / bundle / fence / contributor 一律拒绝且不产生 operation",
-            debt=UPSTREAM_DEBT_CLAIM_PRECONDITIONS,
         ),
         _o(
             "download_only_zero_three_entities",
@@ -1844,8 +1843,6 @@ __all__ = [
     "PILOT_CLASS_PATTERNS",
     "RECOVERY_TIMELINE_ORDER",
     "SCENARIO_ORACLES",
-    "UPSTREAM_DEBT_CLAIM_PRECONDITIONS",
-    "UPSTREAM_DEBT_ROOM_FENCE_READ",
     "BundleIdentity",
     "EvidenceInput",
     "HarnessError",

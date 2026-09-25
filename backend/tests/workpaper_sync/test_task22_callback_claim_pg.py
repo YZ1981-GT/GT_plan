@@ -1217,6 +1217,52 @@ async def _collect() -> dict[str, Any]:  # noqa: C901 - 单次采集覆盖全部
                     "operation": _opt(case_after_view[3]),
                 }
 
+                # 🔴 Task 32 欠账修复守卫：客户端提交**错误**的 expected_* 必须被拒，
+                # 且三实体保持为 0（错误 bundle/fence/generation 不得产生 operation）。
+                # 三个错误值各测一次，都用 savepoint 回滚，不污染随后的合法 claim。
+                before["wrong_expected"] = {}
+                for _label, _kwargs in (
+                    ("wrong_generation", {"expected_generation": 999999}),
+                    ("wrong_write_fence", {"expected_write_fence": 999999}),
+                    (
+                        "wrong_bundle",
+                        {"expected_definition_bundle_sha256": _d("wrong-bundle-digest")},
+                    ),
+                ):
+                    sp2 = await s.begin_nested()
+                    try:
+                        await svc.claim_recovery_case(
+                            case_id=case.id,
+                            claiming_participant_id=part_a_id,
+                            prior_confirmation_id=conf_a_id,
+                            idempotency_key=f"claim-{_label}",
+                            adapter_id="excel.d2.v1",
+                            adapter_build_digest=world["adapter_build_digest"],
+                            contributor_snapshot_digest=_d("contrib-claim"),
+                            **_kwargs,
+                        )
+                        before["wrong_expected"][_label] = {"error": None}
+                        await sp2.rollback()
+                    except SyncDomainError as exc:
+                        _case_row = (
+                            await s.execute(
+                                sa.text(
+                                    "SELECT recovery_request_id, application_id, operation_id"
+                                    " FROM working_paper_callback_recovery_case"
+                                    " WHERE id = CAST(:cid AS uuid)"
+                                ).bindparams(cid=str(case.id))
+                            )
+                        ).first()
+                        before["wrong_expected"][_label] = {
+                            "error": type(exc).__name__,
+                            "three_entities_absent": (
+                                _case_row[0] is None
+                                and _case_row[1] is None
+                                and _case_row[2] is None
+                            ),
+                        }
+                        await sp2.rollback()
+
                 # 合法 claim：一个事务内 request + shell + application
                 claimed = await svc.claim_recovery_case(
                     case_id=case.id,
@@ -1999,6 +2045,29 @@ def test_unauthorized_claim_leaves_all_three_entities_absent(snap: dict[str, Any
     assert after["state"] == "unclaimed"
     assert after["request"] is None and after["application"] is None
     assert after["operation"] is None
+
+
+def test_wrong_expected_bundle_fence_generation_rejected_zero_entities(
+    snap: dict[str, Any],
+) -> None:
+    """Task 32 欠账修复：claim 携带错误 expected_generation/write_fence/bundle 一律被拒，
+    且三实体保持为 0（错误 bundle/fence/generation 不得产生 operation）。
+
+    此前服务端从不校验客户端提交的 expected_*，「错误 prior confirmation/bundle/fence/
+    contributor 拒绝」这一 required scenario 在生产路径上不可达 ⇒ 只能落 failed。
+    修复后三条错误值各自被 fail-closed 拒绝，本守卫锁死「拒绝 + 三实体空」两件事
+    （只断言抛错不够：抛错后若已写 request 才是真缺陷；只断言三实体空也不够：什么都
+    没发生时恒真）。
+    """
+    we = snap["recovery"]["before_claim"]["wrong_expected"]
+    assert set(we) == {"wrong_generation", "wrong_write_fence", "wrong_bundle"}
+    for label, detail in we.items():
+        assert detail["error"] is not None, f"{label}: 错误 expected 值竟被接受"
+        assert detail["error"] == "ScopeIntegrityError", f"{label}: {detail}"
+        assert detail["three_entities_absent"] is True, (
+            f"{label}: 被拒后 case 上仍残留 request/application/operation —— "
+            "错误 claim 不得产生任何实体"
+        )
 
 
 def test_authorized_claim_creates_request_shell_and_application_atomically(

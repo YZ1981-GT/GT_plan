@@ -1451,6 +1451,9 @@ class CallbackDeliveryService:
         adapter_id: str,
         adapter_build_digest: str,
         contributor_snapshot_digest: str,
+        expected_generation: int | None = None,
+        expected_write_fence: int | None = None,
+        expected_definition_bundle_sha256: str | None = None,
         actor_id: uuid.UUID | None = None,
     ) -> Any:
         """authorization-first claim：先校验当前授权，再做任何业务写。
@@ -1483,6 +1486,9 @@ class CallbackDeliveryService:
             adapter_id=adapter_id,
             adapter_build_digest=adapter_build_digest,
             contributor_snapshot_digest=contributor_snapshot_digest,
+            expected_generation=expected_generation,
+            expected_write_fence=expected_write_fence,
+            expected_definition_bundle_sha256=expected_definition_bundle_sha256,
             actor_id=actor_id,
         )
 

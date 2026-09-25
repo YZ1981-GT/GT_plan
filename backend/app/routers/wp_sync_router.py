@@ -1814,6 +1814,11 @@ async def claim_recovery_case(
         svc, room_id=indexed_room, generation=scope.generation_of(case_ref)
     )
     try:
+        # 🔴 客户端提交的 expected_* 透传给服务端逐项核对（Task 32 欠账修复）。
+        # 前端 `buildClaimRequestBody` 一直在发这三项，此前服务端丢弃不校验 ⇒「错误
+        # bundle/fence/generation 的 claim」被静默接受。透传后由 repository 在建三实体
+        # 之前 fail-closed 拒绝。给出即校验、缺省（None）即跳过，不改既有正确路径。
+        _expected_bundle = payload.get("expected_definition_bundle_sha256")
         outcome = await svc.requests.claim_recovery(
             case_id=case_id,
             claiming_participant_id=_uuid_field(payload, "participant_id"),
@@ -1823,6 +1828,11 @@ async def claim_recovery_case(
             adapter_build_digest=adapter_build_digest,
             contributor_snapshot_digest=contributor_digest,
             current_revision=int(payload.get("expected_current_revision") or 0),
+            expected_generation=_int_or_none(payload.get("expected_generation")),
+            expected_write_fence=_int_or_none(payload.get("expected_write_fence")),
+            expected_definition_bundle_sha256=(
+                str(_expected_bundle) if _expected_bundle not in (None, "") else None
+            ),
             actor_id=scope.user_id,
         )
         await svc.session.commit()
@@ -2108,6 +2118,63 @@ async def _application_failure_facts(
     }
 
 
+async def _fold_observability_facts(
+    svc: _SyncServices,
+    *,
+    application: Any,
+    room_id: uuid.UUID | None,
+) -> dict[str, Any]:
+    """same-application higher-sequence fold 的只读投影（Task 32 欠账修复）。
+
+    暴露三组事实，让 `same_application_higher_sequence_fold` 场景可观测：
+      · application 的 `origin_request_sequence`（不可变身份成分）与
+        `effective_request_sequence`（只 GREATEST 单调提升）；
+      · room 的 `latest_durable_application_id` / `latest_durable_sequence`
+        （canonical fence 指针）；
+      · 派生 `same_application_fold`：room 的 canonical 指针**仍指向本 application**
+        （`origin` 未被改写、没有 self-supersede）。
+
+    纯读、不改任何领域状态。room_id 为空（未绑定 room 的 operation）时三组均 None。
+    """
+    origin_seq = int(application.origin_request_sequence)
+    effective_seq = int(application.effective_request_sequence)
+    facts: dict[str, Any] = {
+        "origin_request_sequence": origin_seq,
+        "effective_request_sequence": effective_seq,
+        # effective 单调 ≥ origin 是 fold 的不变量（GREATEST，从不回退）。
+        "effective_ge_origin": effective_seq >= origin_seq,
+        "room_latest_durable_application_id": None,
+        "room_latest_durable_sequence": None,
+        "same_application_fold": None,
+    }
+    if room_id is None:
+        return facts
+    from app.models.workpaper_sync_models import WorkpaperOoRoom
+
+    room_row = (
+        await svc.session.execute(
+            sa.select(
+                WorkpaperOoRoom.latest_durable_application_id,
+                WorkpaperOoRoom.latest_durable_sequence,
+            ).where(WorkpaperOoRoom.id == room_id)
+        )
+    ).first()
+    if room_row is None:
+        return facts
+    latest_app_id, latest_seq = room_row[0], room_row[1]
+    facts["room_latest_durable_application_id"] = (
+        None if latest_app_id is None else str(latest_app_id)
+    )
+    facts["room_latest_durable_sequence"] = (
+        None if latest_seq is None else int(latest_seq)
+    )
+    # canonical fence 仍指向本 application ⇒ 更高 sequence 只 fold、未 self-stale。
+    facts["same_application_fold"] = (
+        latest_app_id is not None and str(latest_app_id) == str(application.id)
+    )
+    return facts
+
+
 @router.get(USER_SYNC_PREFIX + "/operations/{operation_id}")
 async def get_operation(
     project_id: uuid.UUID,
@@ -2192,6 +2259,17 @@ async def get_operation(
                 "durable_at": row.durable_at.isoformat() if row.durable_at else None,
                 "finished_at": row.finished_at.isoformat() if row.finished_at else None,
                 **await _application_failure_facts(svc, application_id=row.id),
+                # 🔴 same-application higher-sequence fold 的**可观测读侧**（Task 32 欠账修复）。
+                # 写侧（Task 23 的 advance_room_durable_fence）一直在维护 application 的
+                # origin/effective sequence 与 room 的 latest-durable application/sequence，
+                # 但此前**无任何读路由暴露它们** ⇒「same-application fold 不 self-stale、
+                # origin 不改写」的结果无从观测（same_application_higher_sequence_fold 场景
+                # 因此只能落 failed）。这里在既有 get_operation 响应上补投影（不新建路由、
+                # 不改 generated contract）：读 application 的两条 sequence + room 的
+                # latest-durable 指针，并派生 `same_application_fold` 观测。
+                **await _fold_observability_facts(
+                    svc, application=row, room_id=op.room_id
+                ),
             }
     return {
         "requested_operation_id": str(canonical.requested_operation.id),

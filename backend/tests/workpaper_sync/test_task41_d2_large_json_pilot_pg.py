@@ -1509,17 +1509,20 @@ def test_black_box_scenarios_are_unverifiable(snap: dict[str, Any]) -> None:
         assert PH.SCENARIO_ORACLES[scenario_id].needs_black_box
 
 
-def test_upstream_gap_scenarios_are_failed_not_unverifiable(snap: dict[str, Any]) -> None:
-    """Task 32 的两条上游缺口 ⇒ `failed`（缺的是实现不是环境；顺序不可交换）。"""
+def test_task32_debts_cleared_scenarios_no_longer_upstream_gap(snap: dict[str, Any]) -> None:
+    """Task 32 两条欠账已补（2026-09-25）⇒ plan.upstream_debt 清空，两条不再 `upstream_gap`。
+
+    实现补齐（claim expected_* 校验 + fold 读侧观测）后，这两条从「实现缺失的 failed」
+    变为可评估；真实 OO 未执行前仍多为 unverifiable，本守卫只锁「不再 upstream_gap」。
+    """
     debts = set(snap["phases"]["plan"]["upstream_debt"])
-    assert debts == {
+    assert debts == set(), f"Task 32 两条欠账已补，不应再有 upstream_debt：{sorted(debts)}"
+    for scenario_id in (
         "same_application_higher_sequence_fold",
         "wrong_prior_confirmation_bundle_fence_contributor_rejected",
-    }, sorted(debts)
-    for scenario_id in sorted(debts):
+    ):
         row = snap["phases"]["scenarios"][scenario_id]
-        assert row["result"] == "failed", (scenario_id, row)
-        assert row["error_code"], row
+        assert row["error_code"] != "upstream_gap", (scenario_id, row)
 
 
 def test_run_is_not_verified_without_real_onlyoffice(snap: dict[str, Any]) -> None:

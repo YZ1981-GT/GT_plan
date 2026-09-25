@@ -1245,25 +1245,30 @@ def test_black_box_scenarios_are_unverifiable(snap: dict[str, Any]) -> None:
     assert "identity_retention" in plan["black_box"], plan["black_box"]
 
 
-def test_upstream_gap_scenarios_are_failed_not_unverifiable(
+def test_task32_debts_cleared_scenarios_no_longer_upstream_gap(
     snap: dict[str, Any]
 ) -> None:
-    """Task 32 登记的两条缺口是**实现缺失**而不是环境缺失 ⇒ 必须 `failed`。
+    """Task 32 两条欠账已补（2026-09-25）⇒ `upstream_debt` 清空，两条场景不再 `upstream_gap`。
 
-    判定顺序不可交换：「上游缺口 → failed」在「黑盒环境缺失 → unverifiable」**之前**，
-    否则接了真实 OO 之后它们会自动变绿，而它们其实永远不会通过。
+    历史：`same_application_higher_sequence_fold` /
+    `wrong_prior_confirmation_bundle_fence_contributor_rejected` 曾各带一条 debt 让它们
+    恒 `failed`/`upstream_gap`。实现补齐后（claim expected_* 校验 + fold 读侧观测），
+    plan 不应再有任何 upstream_debt，两条场景也不得再落 `upstream_gap`。
+
+    注意：去 debt **不等于** 它们此刻 passed —— 它们仍是黑盒/证据依赖的场景，真实 OO
+    未执行前多为 `unverifiable`。本守卫只锁「不再是实现缺失的 failed」。
     """
     plan = snap["phases"]["plan"]
     scenarios = snap["phases"]["scenarios"]
-    assert plan["upstream_debt"], plan
-    for scenario_id in plan["upstream_debt"]:
-        row = scenarios[scenario_id]
-        assert row["result"] == "failed", (scenario_id, row)
-        assert row["error_code"] == "upstream_gap", (scenario_id, row)
-    assert set(plan["upstream_debt"]) == {
+    assert plan["upstream_debt"] == [], (
+        f"Task 32 两条欠账已补，plan 不应再有 upstream_debt：{plan['upstream_debt']}"
+    )
+    for scenario_id in (
         "same_application_higher_sequence_fold",
         "wrong_prior_confirmation_bundle_fence_contributor_rejected",
-    }, plan["upstream_debt"]
+    ):
+        row = scenarios[scenario_id]
+        assert row["error_code"] != "upstream_gap", (scenario_id, row)
 
 
 def test_run_is_not_verified_without_real_onlyoffice(snap: dict[str, Any]) -> None:
