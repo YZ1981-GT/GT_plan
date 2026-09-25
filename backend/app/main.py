@@ -298,11 +298,15 @@ async def _warm_workpaper_sync_registry() -> None:
             registered_at - started,
         )
         # 第二段：可切 OO 的 entry 的基线 extract（首请求实测仍要 8.2s，暖后 0.13s）。
-        warmed, skipped = await prewarm_sync_baseline_projections()
+        # 🔴 「不适用」与「失败」分开报：前者是设计内分流（capability 非 bidirectional），
+        # 数字大是正常的；后者是真故障。合成一个「跳过 N 个」会让故障长得和健康一模一样。
+        outcome = await prewarm_sync_baseline_projections()
         log.warning(
-            "[启动] workpaper-sync 基线 projection 预热完成：暖 %d 个 / 跳过 %d 个，耗时 %.1fs",
-            warmed,
-            skipped,
+            "[启动] workpaper-sync 基线 projection 预热完成："
+            "暖 %d 个 / 不适用 %d 个 / 失败 %d 个，耗时 %.1fs",
+            outcome.warmed,
+            outcome.not_eligible,
+            outcome.failed,
             _sync_warm_time.perf_counter() - registered_at,
         )
     except asyncio.CancelledError:  # 关闭阶段取消，不当成失败

@@ -77,8 +77,9 @@ MUTATIONS: list[tuple[str, Path, str, str]] = [
     (
         "启动只跑注册预热，不跑 projection 预热",
         MAIN,
-        "        warmed, skipped = await prewarm_sync_baseline_projections()",
-        "        warmed, skipped = (0, 0)  # MUTATED: 不跑第二段",
+        "        outcome = await prewarm_sync_baseline_projections()",
+        "        outcome = type('O', (), {'warmed': 0, 'not_eligible': 0, 'failed': 0})()"
+        "  # MUTATED: 不跑第二段（刻意保持字段齐全，让守卫靠「没调用」而不是 NameError 抓）",
     ),
     # 🔴 本轮真栈漏网的形态：延迟 import 写错模块 => 每次启动抛
     # `cannot import name 'WorkingPaper'` 被「失败不阻塞启动」吞成 WARNING，
@@ -90,14 +91,28 @@ MUTATIONS: list[tuple[str, Path, str, str]] = [
         "    from app.models.core import WorkingPaper",
     ),
     (
-        "第二段不再按 bidirectional 分流（失败也算暖）",
+        "第二段不再按 bidirectional 分流（不适用也算暖）",
         PREWARM,
-        "            except Exception:  # noqa: BLE001 - 非 bidirectional / 未注册：本就不预热\n"
-        "                skipped += 1\n"
-        "                continue",
-        "            except Exception:  # noqa: BLE001\n"
-        "                warmed += 1\n"
-        "                continue",
+        "            except Exception as exc:  # noqa: BLE001 - 非 bidirectional / 未注册：本就不预热\n"
+        "                not_eligible += 1",
+        "            except Exception as exc:  # noqa: BLE001\n"
+        "                warmed += 1",
+    ),
+    # 🔴 本次修复的形态：失败被并回「不适用」这一个数 ⇒ 生产日志里故障与健康同形。
+    (
+        "projection 失败并回「不适用」（故障与健康同形）",
+        PREWARM,
+        "                failed += 1",
+        "                not_eligible += 1  # MUTATED: 失败混进不适用",
+    ),
+    # 🔴 失败详情降回 info ⇒ log_level=WARNING 下预热失败完全静默（修复前的原状）。
+    (
+        "失败详情降回 info（生产被 log_level 过滤掉）",
+        PREWARM,
+        "                logger.warning(\n"
+        "                    \"[预热] entry %s 基线 projection 预热失败",
+        "                logger.info(\n"
+        "                    \"[预热] entry %s 基线 projection 预热失败",
     ),
 ]
 

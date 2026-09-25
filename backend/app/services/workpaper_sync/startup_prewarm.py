@@ -32,6 +32,7 @@ spec: workpaper-html-onlyoffice-bidirectional-writeback-closure / oo-html-writeb
 from __future__ import annotations
 
 import logging
+from dataclasses import dataclass
 from typing import Any
 
 import sqlalchemy as sa
@@ -40,9 +41,31 @@ logger = logging.getLogger(__name__)
 
 __all__ = [
     "PREWARM_PROJECTION_MAX_ENTRIES",
+    "PrewarmProjectionOutcome",
     "prewarm_sync_baseline_projections",
     "prewarm_sync_registration_cache",
 ]
+
+
+@dataclass(frozen=True)
+class PrewarmProjectionOutcome:
+    """第二段预热的分项结果。
+
+    🔴 ``not_eligible`` 与 ``failed`` **必须**是两个数，不能合并成一个 ``skipped``。
+    二者都让 entry 没被暖到，但语义相反：
+
+    * ``not_eligible`` —— 这条 entry 本就不该预热（capability 非 bidirectional、
+      或不在 source-backed manifest）。这是设计内的正常分流，数字大是正常的。
+    * ``failed`` —— 这条 entry 应该能暖，但 projection 算炸了。这是**真故障**。
+
+    合并的后果（本次修复的起因）：生产 ``log_level=WARNING`` 下「暖 5 / 跳过 7」与
+    「暖 4 / 跳过 8（其中 1 个是异常）」长相完全一样，而失败详情当时只记 ``info``
+    ⇒ 预热失败静默，运维手上没有任何可察觉的信号。
+    """
+
+    warmed: int = 0
+    not_eligible: int = 0
+    failed: int = 0
 
 #: 预热基线 projection 的 entry 上限。
 #
@@ -72,15 +95,16 @@ async def prewarm_sync_registration_cache() -> tuple[str, ...]:
         return await _attach_pilot_adapters(context)
 
 
-async def prewarm_sync_baseline_projections() -> tuple[int, int]:
+async def prewarm_sync_baseline_projections() -> PrewarmProjectionOutcome:
     """第二段：把**可切 OO 的 entry** 的基线 extract 结果算好。
 
     只预热 ``assert_bidirectional_ready`` 通过的 entry：那正是用户会点「在线编辑」的
     那批，其余 entry 预热了也没人会走 OO 往返。逐个**顺序**做（不并发）—— 这些解析是
     CPU 密集且持 GIL，并发只会和前台请求互抢。
 
-    返回 ``(成功数, 跳过/失败数)``。单个 entry 失败只跳过：一个坏底稿不得让整段预热
-    （以及后面的 entry）全丢。
+    返回 :class:`PrewarmProjectionOutcome`（暖 / 不适用 / 失败 三个分项，理由见该类）。
+    单个 entry 失败只跳过：一个坏底稿不得让整段预热（以及后面的 entry）全丢 —— 但
+    「跳过」必须留下 WARNING，否则等于没发生。
     """
     from app.core.database import async_session
     from app.models.workpaper_models import WorkingPaper
@@ -98,7 +122,8 @@ async def prewarm_sync_baseline_projections() -> tuple[int, int]:
     )
 
     warmed = 0
-    skipped = 0
+    not_eligible = 0
+    failed = 0
     async with async_session() as session:
         registry = build_production_registry()
         await _attach_pilot_adapters(
@@ -124,8 +149,15 @@ async def prewarm_sync_baseline_projections() -> tuple[int, int]:
         for wp_id, entry_id, project_id in rows:
             try:
                 registration = registry.assert_bidirectional_ready(str(entry_id))
-            except Exception:  # noqa: BLE001 - 非 bidirectional / 未注册：本就不预热
-                skipped += 1
+            except Exception as exc:  # noqa: BLE001 - 非 bidirectional / 未注册：本就不预热
+                not_eligible += 1
+                # info 足够：这是设计内的正常分流，不是故障。
+                logger.info(
+                    "[预热] entry %s 不适用基线 projection 预热（%s）：%s",
+                    entry_id,
+                    type(exc).__name__,
+                    exc,
+                )
                 continue
             try:
                 await compute_store_projection_response(
@@ -138,11 +170,16 @@ async def prewarm_sync_baseline_projections() -> tuple[int, int]:
                 )
                 warmed += 1
             except Exception as exc:  # noqa: BLE001 - 单 entry 失败只跳过
-                skipped += 1
-                logger.info(
-                    "[预热] entry %s 基线 projection 预热跳过：%s: %s",
+                failed += 1
+                # 🔴 必须 WARNING 而不是 INFO：生产 log_level=WARNING，info 一律不输出。
+                # 这条 entry 是 bidirectional-ready 的（用户会点「在线编辑」），它的基线
+                # 算不出来意味着首请求要自己付整册反读的代价，甚至根本打不开 —— 属真故障。
+                logger.warning(
+                    "[预热] entry %s 基线 projection 预热失败（该 entry 可切 OO，首请求将付冷成本）：%s: %s",
                     entry_id,
                     type(exc).__name__,
                     exc,
                 )
-    return warmed, skipped
+    return PrewarmProjectionOutcome(
+        warmed=warmed, not_eligible=not_eligible, failed=failed
+    )

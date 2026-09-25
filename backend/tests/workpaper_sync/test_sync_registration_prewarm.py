@@ -292,12 +292,31 @@ def test_baseline_projection_prewarm_skips_a_failing_entry_instead_of_aborting(
 ) -> None:
     """单 entry 失败只跳过：一个坏底稿不得让整段预热（以及后面的 entry）全丢。"""
     source = inspect.getsource(prewarm_mod.prewarm_sync_baseline_projections)
-    # 两处 except 分别对应「非 bidirectional」与「projection 算不出来」，都必须 continue/跳过
-    assert source.count("skipped += 1") >= 2, (
-        "失败路径没有逐 entry 跳过 —— 一个 entry 抛错会让后面的 entry 全部不预热"
+    # 两处 except 分别对应「非 bidirectional」与「projection 算不出来」，都必须 continue/跳过。
+    # 🔴 必须是**两个不同**的计数器：合并成一个 `skipped` 时，「暖 5 / 跳过 7」与
+    # 「暖 4 / 跳过 8（含 1 个异常）」在日志里长相一致 ⇒ 故障与健康不可区分。
+    assert "not_eligible += 1" in source, (
+        "非 bidirectional 分流没有独立计数 —— 与真失败混在一个数里就分不出故障"
+    )
+    assert "failed += 1" in source, (
+        "projection 抛错没有独立计数 —— 真故障会被当成正常跳过"
     )
     assert "raise" not in source.split('"""')[-1], (
         "预热里出现 raise —— 会把失败冒泡成启动告警/任务崩溃"
+    )
+
+
+def test_baseline_projection_failure_is_logged_above_info() -> None:
+    """🔴 失败详情必须 WARNING 起步：生产 log_level=WARNING，info 一律不输出。
+
+    这正是本次修复的起因 —— 失败分支原本只 `logger.info`，于是「预热失败」在生产上
+    既不体现在汇总数字里（被并进 skipped），也不体现在日志里（info 被过滤），
+    完全静默。判据盯的是失败分支本身，不是整个函数里出现过 warning 就算过。
+    """
+    source = inspect.getsource(prewarm_mod.prewarm_sync_baseline_projections)
+    failure_branch = source.split("failed += 1", 1)[-1]
+    assert "logger.warning" in failure_branch, (
+        "failed 分支没有 logger.warning —— log_level=WARNING 下预热失败完全静默"
     )
 
 
@@ -396,14 +415,22 @@ async def test_baseline_projection_prewarm_really_runs_and_splits_warmed_from_sk
         raising=True,
     )
 
-    warmed, skipped = await prewarm_mod.prewarm_sync_baseline_projections()
+    outcome = await prewarm_mod.prewarm_sync_baseline_projections()
 
     assert projected == [
         "xlsx/gt-d4-operating-revenue",
         "xlsx/gt-g7-long-term-equity-main",
     ], f"非 bidirectional 的 entry 不该被投影，实际投影了 {projected}"
-    assert warmed == 1, f"成功数应为 1（只有 D4 算成功），实际 {warmed}"
-    assert skipped == 2, f"跳过数应为 2（D3 非双向 + G7 抛错），实际 {skipped}"
+    assert outcome.warmed == 1, f"成功数应为 1（只有 D4 算成功），实际 {outcome.warmed}"
+    # 🔴 D3（非双向，设计内分流）与 G7（projection 抛错，真故障）必须落在**不同**的数上：
+    # 这两件事都让 entry 没暖到，但只有后者需要有人去看。
+    assert outcome.not_eligible == 1, (
+        f"不适用数应为 1（D3 非双向），实际 {outcome.not_eligible}"
+    )
+    assert outcome.failed == 1, (
+        f"失败数应为 1（G7 抛错），实际 {outcome.failed} —— "
+        "真故障被并进「不适用」就等于没被报告"
+    )
 
 
 # ═══ 3. 启动接线 ═══
@@ -439,3 +466,24 @@ def test_startup_schedules_the_prewarm_in_the_background() -> None:
             f"启动预热没有调用 {required}（实际 {sorted(warm_calls)}）—— "
             "少一段就有一段成本留在用户的首次点击里"
         )
+
+
+def test_startup_log_reports_projection_failures_as_their_own_number() -> None:
+    """启动汇总行必须把「失败」单独报出来，而不是并进「跳过」。
+
+    预热失败**按设计**不阻塞启动，那么这条汇总行就是运维唯一的信号面：它若把
+    「本就不该预热」与「该预热但炸了」印成同一个数，「有故障」与「一切正常」在
+    日志里就是同一个样子，于是「失败不阻塞启动」退化成「失败不被知道」。
+    """
+    from app import main as main_mod
+
+    warm_source = inspect.getsource(main_mod._warm_workpaper_sync_registry)
+    assert "outcome.failed" in warm_source, (
+        "汇总日志没有单独打印失败数 —— 故障与健康在日志里长得一样"
+    )
+    assert "outcome.not_eligible" in warm_source, (
+        "汇总日志没有单独打印不适用数 —— 与失败混在一个数里就分不出哪种"
+    )
+    assert "跳过 %d 个" not in warm_source, (
+        "仍在用合并的「跳过」口径 —— 本次修复正是要拆掉它"
+    )
