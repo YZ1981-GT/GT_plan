@@ -656,22 +656,17 @@ MUTATIONS: list[SpanMutation] = [
     ),
     SpanMutation(
         id="R56", path=EV,
-        anchor="    standard = \"standard\"\n"
-               "    download_only = \"download_only\"\n"
-               "    recovery_reject = \"recovery_reject\"\n"
-               "    recovery_claim = \"recovery_claim\"\n"
-               "    close_capture = \"close_capture\"",
-        new="    standard = \"standard\"\n"
-            "    download_only = \"download_only\"\n"
-            "    recovery_reject = \"recovery_reject\"\n"
-            "    recovery_claim = \"recovery_claim\"\n"
-            "    close_capture = \"close_capture\"\n"
-            "    authorization_reject = \"authorization_reject\"",
+        # 🔴 2026-09-26：`authorization_reject` 已由 V165 **合法**加入 DDL 域与枚举 ⇒ 原变异
+        # （「加一个 authorization_reject」）不再是缺陷形态，且 anchor 已不存在。改为追加一个
+        # 任何迁移都没有的值，保持同一意图：枚举多出 DDL 外的值必须被守卫抓到。
+        anchor="    close_capture = \"close_capture\"\n",
+        new="    close_capture = \"close_capture\"\n"
+            "    not_in_any_migration = \"not_in_any_migration\"\n",
         want=_off("TestScenarioKindIsLockedToV151::"
                   "test_the_enum_matches_the_v151_check_exactly"),
-        why="回归变异：给 `ScenarioKind` 加一个 V151 CHECK 里没有的值。这正是**真实缺陷**的"
-            "形态 —— 第一版枚举整套都不在 DDL 域里，真库插入全炸而离线守卫全绿。判据必须"
-            "从迁移文本反向解析取值域做双向等值",
+        why="回归变异：给 `ScenarioKind` 加一个生效 CHECK（V151 经 V165）里没有的值。这正是"
+            "**真实缺陷**的形态 —— 第一版枚举整套都不在 DDL 域里，真库插入全炸而离线守卫"
+            "全绿。判据必须从迁移文本反向解析**生效**取值域做双向等值",
     ),
     SpanMutation(
         id="R57", path=EV,
@@ -768,8 +763,11 @@ MUTATIONS: list[SpanMutation] = [
         id="R65", path=EV,
         anchor="            (unrepresentable if sid in SCHEMA_UNREPRESENTABLE_SCENARIOS else failed).append(sid)",
         new="            failed.append(sid)",
+        # 🔴 2026-09-26：V165 清空了生产登记表 ⇒ clean run 不再走到该分支，原 want
+        # （test_a_clean_run_has_exactly_one_known_and_attributed_defect）对本变异**永久 GREEN**。
+        # 改指向用**合成登记**显式驱动该分支的守卫。
         want=_pg("TestEvidenceRecomputation::"
-                 "test_a_clean_run_has_exactly_one_known_and_attributed_defect"),
+                 "test_a_registered_schema_gap_gets_its_own_defect_code"),
         why="已登记的 schema 欠账与真实失败被合成一个码 ⇒ 每次重算都要重新排查那条已知"
             "欠账，而真实失败会被它淹掉。两类必须各有独立缺陷码",
     ),

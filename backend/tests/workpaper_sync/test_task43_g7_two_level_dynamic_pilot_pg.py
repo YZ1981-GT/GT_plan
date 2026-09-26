@@ -347,6 +347,14 @@ async def _collect() -> dict[str, Any]:  # noqa: C901, PLR0912, PLR0915 - 一次
         raise _HarnessError(f"缺少迁移文件: {_MIGRATION}")
 
     forward = MigrationRunner._split_sql_statements(_MIGRATION.read_text(encoding="utf-8"))
+    # 🔴 生产按 V151 → V165 顺序 apply。V165 给 evidence `scenario_kind` 扩了
+    # `authorization_reject`（quarantined 场景的 kind）；只 apply V151 会让该场景的行撞
+    # V151 旧域 `ck_wpees_scenario_kind`（2026-09-26 实测 CheckViolationError）。
+    forward += MigrationRunner._split_sql_statements(
+        (_BACKEND / "migrations" / "V165__wpees_authorization_reject_kind.sql").read_text(
+            encoding="utf-8"
+        )
+    )
     schema = f"{_SCHEMA_PREFIX}{uuid.uuid4().hex[:12]}"
     ssl_off = {"ssl": False} if getattr(settings, "DB_DISABLE_SSL", False) else {}
     base_root = Path(tempfile.mkdtemp(prefix="tmp_task43_store_"))

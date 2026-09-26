@@ -1230,12 +1230,20 @@ class TestNoRealOnlyOfficeMeansUnverifiable:
             )
             assert verdict.error_code != "upstream_gap", (scenario_id, verdict)
 
-    def test_schema_debt_scenario_is_unverifiable_and_still_required(
+    def test_formerly_schema_debted_scenario_now_really_passes(
         self, contract: C.SyncContract
     ) -> None:
-        """已登记的 schema 欠账场景：`unverifiable` + 仍在 required set 里。"""
-        scenario_id, = EV.SCHEMA_UNREPRESENTABLE_SCENARIOS
+        """V165 解除 schema 欠账后，quarantined 场景必须能**真的** passed，且仍在 required set。
+
+        🔴 断言 `passed` 而不只是「不再是 schema 码」：它 requires 只有 `db_entities`、无黑盒、
+        无 timeline/merge/close ⇒ 证据齐全时 oracle 必须走到末尾的「结构判据全部满足」。若它
+        卡在别的码上，说明 V165 只是把欠账换了个名字，而没有真的让它可被验收。
+        """
+        scenario_id = "quarantined_rejects_application_and_engine"
+        assert EV.SCHEMA_UNREPRESENTABLE_SCENARIOS == {}, "V165 应已清空 schema 欠账表"
         scenario = {s.scenario_id: s for s in PH.all_declared_scenarios()}[scenario_id]
+        assert scenario.kind is EV.ScenarioKind.authorization_reject
+        assert scenario.schema_representable_as_passed is True
         verdict = PH.run_scenario_oracle(
             scenario=scenario,
             oracle=PH.SCENARIO_ORACLES[scenario_id],
@@ -1243,9 +1251,38 @@ class TestNoRealOnlyOfficeMeansUnverifiable:
             onlyoffice_build="OnlyOffice 9.4.0.42",
             browser_build="Chrome/131.0.0.0",
         )
-        assert verdict.outcome is PH.OracleOutcome.unverifiable
-        assert verdict.error_code == "scenario_kind_unrepresentable"
+        assert verdict.outcome is PH.OracleOutcome.passed, verdict
+        assert verdict.error_code is None, verdict
+        # 登记欠账从来不等于移出必需集合 —— 解除后同样不得被摘走
         assert scenario_id in {s.scenario_id for s in EV.PROJECTION_BASE_SCENARIOS}
+
+    def test_schema_debt_is_still_decided_first_when_registered(
+        self, contract: C.SyncContract, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """排序不变量：**若**某场景登记为 schema 欠账，它必须先于一切落 `unverifiable`。
+
+        生产上该表已空（V165），故用**合成登记**验判定顺序 —— 与 upstream_debt 的
+        synthetic-debt 排序测同范式。选一个需黑盒的场景 + 喂全证据 + 真实 OO build：若
+        schema 判据不是第一条，它会被后面的分支吞掉而落别的码。
+        """
+        scenario_id = "oo_to_html"
+        oracle = PH.SCENARIO_ORACLES[scenario_id]
+        assert oracle.needs_black_box is True
+        monkeypatch.setattr(
+            PH,
+            "SCHEMA_UNREPRESENTABLE_SCENARIOS",
+            {scenario_id: "合成 schema 欠账（仅测判定顺序）"},
+        )
+        scenario = {s.scenario_id: s for s in PH.all_declared_scenarios()}[scenario_id]
+        verdict = PH.run_scenario_oracle(
+            scenario=scenario,
+            oracle=oracle,
+            observation=_full_obs(scenario_id, contract=contract),
+            onlyoffice_build="OnlyOffice 9.4.0.42",
+            browser_build="Chrome/131.0.0.0",
+        )
+        assert verdict.outcome is PH.OracleOutcome.unverifiable, verdict
+        assert verdict.error_code == "scenario_kind_unrepresentable", verdict
 
     def test_a_merge_scenario_without_three_way_input_is_unverifiable(self) -> None:
         """字段级场景缺三方 projection ⇒ `unverifiable` + `merge_evidence_missing`。

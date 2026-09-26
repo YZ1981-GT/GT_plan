@@ -806,15 +806,57 @@ class TestOrderingIsNotCommutable:
         assert row.result == "unverifiable"
         assert row.error_code == "real_onlyoffice_not_executed"
 
-    def test_schema_unrepresentable_is_decided_first(self, report: dict[str, Any]) -> None:
+    def test_schema_unrepresentable_is_decided_first(
+        self, facts_by_class: dict[str, Any], monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """排序不变量：**若**某场景登记为 schema 欠账，它必须先于一切落 `scenario_kind_unrepresentable`。
+
+        🔴 2026-09-26 V165 清空了生产登记表 ⇒ 改用**合成登记**（monkeypatch 生产模块的
+        `SCHEMA_UNREPRESENTABLE_SCENARIOS`），与上面 synthetic-debt 的交叉形态测同范式。
+        选一个**同时**需要真实黑盒的场景：若 schema 判据不是第一条，它会被黑盒 / debt /
+        admission 分支吞掉而落别的码。测试名保留（与 `test_upstream_gap_is_failed_not_
+        unverifiable` 互为双锁，docstring 里点名引用它）。
+        """
+        from app.services.workpaper_sync import evidence as ev
+
+        facts = facts_by_class["h1_grouped_dynamic"]
+        spec = next(s for s in G._SCENARIO_PROBES if s.scenario_id == "identity_retention")
+        monkeypatch.setattr(
+            ev,
+            "SCHEMA_UNREPRESENTABLE_SCENARIOS",
+            {"identity_retention": "合成 schema 欠账（仅测判定顺序）"},
+        )
+        row = G.evaluate_probe(
+            spec,
+            facts,
+            environment=G.default_environment(),
+            record=None,
+            supplied_inputs=frozenset(),
+        )
+        assert row.result == "unverifiable", row
+        assert row.error_code == "scenario_kind_unrepresentable", row
+        assert "schema_unrepresentable" in row.blocking_conditions, row
+
+    def test_quarantined_scenario_is_no_longer_schema_blocked(
+        self, report: dict[str, Any]
+    ) -> None:
+        """V165 还债后，quarantined 行不再是 schema 码 —— 但也**不许**因此变绿。
+
+        实测（2026-09-26）它落到下一道真实闸门 `pilot_not_admitted`（四个 pilot 均未准入）。
+        这正是「还债」与「刷绿」的区别：摘掉一个阻塞只会暴露下一个阻塞，而不是直接 passed。
+        """
         rows = [
             row
             for row in report["probe_rows"]
             if row["scenario_id"] == "quarantined_rejects_application_and_engine"
         ]
         assert len(rows) == 4
-        assert {row["result"] for row in rows} == {"unverifiable"}
-        assert {row["error_code"] for row in rows} == {"scenario_kind_unrepresentable"}
+        assert {row["error_code"] for row in rows}.isdisjoint(
+            {"scenario_kind_unrepresentable"}
+        ), rows
+        assert "passed" not in {row["result"] for row in rows}, rows
+        for row in rows:
+            assert "schema_unrepresentable" not in row["blocking_conditions"], row
 
 
 def _ready_signals() -> Any:
@@ -1502,11 +1544,14 @@ class TestReportIsClosedAndMeasured:
         解除），这两条在空输入回声下落到 `evidence_input_missing`（11 → 13）。real_oo=10
         与 schema=1 不变，总数仍 24。这**不是** pilot 变绿——它们只是从「实现缺失的
         failed」变成「缺具体证据的 unverifiable」，真实 OO 未执行前仍不 passed。
+
+        🔴 2026-09-26 V165 还清 schema 欠账后再更新：`scenario_kind_unrepresentable` 1 → 0，
+        quarantined 那条在空输入回声下同样落到 `evidence_input_missing`（13 → 14）。
+        real_oo=10 不变，总数仍 24（实测四个 pilot 逐一相同）。同理**不是**变绿。
         """
         expected = {
             "unverifiable/real_onlyoffice_not_executed": 10,
-            "unverifiable/evidence_input_missing": 13,
-            "unverifiable/scenario_kind_unrepresentable": 1,
+            "unverifiable/evidence_input_missing": 14,
         }
         for entry_id, data in report["pilots"].items():
             assert data["production_oracle_echo_distribution"] == expected, entry_id

@@ -1692,10 +1692,12 @@ def build_counterfactual_arms(
             "conclusion_changes": tier_counts(oo_ok=True, browser_ok=True, chain_ok=True) != today,
             "residual_after_all_removed": (
                 "🔴 2026-09-25：Task 32 的两条上游实现缺口（wrong prior confirmation / "
-                "same-app fold，原 owner 任务 32）**已补齐并解除 debt** ⇒ 三条前提全解除后"
-                "它们变绿。residual 现只剩 schema 欠账（quarantined，owner 任务 9，"
-                "SCHEMA_UNREPRESENTABLE）这一类不会变绿 —— 它是 V151 schema 无法以 passed "
-                "表达，不是环境缺失。"
+                "same-app fold，原 owner 任务 32）**已补齐并解除 debt**。"
+                "🔴 2026-09-26：schema 欠账（quarantined，原 owner 任务 9，"
+                "SCHEMA_UNREPRESENTABLE）由 V165 的 `authorization_reject` kind 还清 ⇒ "
+                "**三条前提全解除后不再有任何结构性 residual**：剩下的只是环境/执行缺口"
+                "（真 OO、真浏览器、真 application 链与真实跑一遍），不是实现或 schema 欠账。"
+                "这不等于任何场景已通过 —— 本 arm 是反事实，今天真实执行数仍为 0。"
             ),
         },
         {
@@ -1815,8 +1817,13 @@ def build_forward_recompute() -> dict[str, Any]:
             "case": "F5",
             "scenario_id": "quarantined_rejects_application_and_engine",
             "inputs": {"oo": True, "browser": True, "chain": True},
-            "expected_tier": TIER_UNRUNNABLE,
-            "why": "它在 SCHEMA_UNREPRESENTABLE_SCENARIOS 里 ⇒ 当前 V151 无法以 passed 表达（owner 任务 9）",
+            "expected_tier": TIER_EXECUTED,
+            "why": (
+                "🔴 2026-09-26 V165 新增 `authorization_reject` kind 后已不在 "
+                "SCHEMA_UNREPRESENTABLE_SCENARIOS（原 owner 任务 9）。它只 requires db_entities、"
+                "非黑盒、`expects_application=False` ⇒ 三条前提齐备时必须可跑。这条是「还债」的"
+                "正面判据：若它仍落 unrunnable，说明债只是换了个名字"
+            ),
         },
         {
             "case": "F6",
@@ -2020,8 +2027,10 @@ _PROPERTY_LANDINGS: Final[Mapping[int, Mapping[str, str]]] = {
     39: {
         "tier": "structural_side_only",
         "landed_on": "scenario_execution.quarantined_rejects_application_and_engine",
-        "why": "schema 侧已由任务 68 验；本门这条被 V151 的 entity CHECK 挡在 passed 之外",
-        "owner_if_unverified": "9",
+        "why": "schema 侧已由任务 68 验。🔴 2026-09-26 V165 新增 `authorization_reject` kind，"
+               "解除了 V151 entity CHECK 把本场景挡在 passed 之外的 schema 欠账（原 owner 任务 9）；"
+               "现在剩下的是与其余结构性场景相同的真实执行缺口：需一次真实 quarantined incoming",
+        "owner_if_unverified": "70",
     },
     40: {
         "tier": "structural_side_only",

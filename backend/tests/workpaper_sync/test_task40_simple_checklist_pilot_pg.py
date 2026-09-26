@@ -202,6 +202,14 @@ async def _collect() -> dict[str, Any]:  # noqa: C901, PLR0912, PLR0915 - 一次
         raise _HarnessError(f"缺少迁移文件: {_MIGRATION}")
 
     forward = MigrationRunner._split_sql_statements(_MIGRATION.read_text(encoding="utf-8"))
+    # 🔴 生产按 V151 → V165 顺序 apply。V165 给 evidence `scenario_kind` 扩了
+    # `authorization_reject`（quarantined 场景的 kind）；只 apply V151 会让该场景的行撞
+    # V151 旧域 `ck_wpees_scenario_kind`（2026-09-26 实测 CheckViolationError）。
+    forward += MigrationRunner._split_sql_statements(
+        (_BACKEND / "migrations" / "V165__wpees_authorization_reject_kind.sql").read_text(
+            encoding="utf-8"
+        )
+    )
     schema = f"{_SCHEMA_PREFIX}{uuid.uuid4().hex[:12]}"
     ssl_off = {"ssl": False} if getattr(settings, "DB_DISABLE_SSL", False) else {}
     base_root = Path(tempfile.mkdtemp(prefix="tmp_task40_store_"))
@@ -919,16 +927,27 @@ def test_black_box_scenarios_are_unverifiable(snap: dict[str, Any]) -> None:
         assert PH.SCENARIO_ORACLES[scenario_id].needs_black_box, scenario_id
 
 
-def test_upstream_gap_scenarios_are_failed_not_unverifiable(
-    snap: dict[str, Any]
-) -> None:
-    """Task 32 的两条上游缺口是**实现**缺失 ⇒ 必须 failed（接了 OO 也不会自动变绿）。"""
-    debts = snap["phases"]["plan"]["upstream_debt"]
-    assert debts, "上游缺口集合为空会让本判据空转"
-    for scenario_id in debts:
-        row = snap["phases"]["scenarios"][scenario_id]
-        assert row["result"] == "failed", (scenario_id, row)
-        assert row["error_code"] == "upstream_gap", (scenario_id, row)
+def test_task32_debts_cleared_scenarios_no_longer_upstream_gap(snap: dict[str, Any]) -> None:
+    """Task 32 两条欠账已补（2026-09-25）⇒ plan.upstream_debt 清空，两条不再 `upstream_gap`。
+
+    原测试 `test_upstream_gap_scenarios_are_failed_not_unverifiable` 断言「debt 集合非空且
+    逐条 failed/upstream_gap」。实现补齐（claim expected_* 校验 + fold 读侧观测）后两条
+    变为可评估 —— 该断言失效。本条与 task41/42/43 的同名迁移**同范式**（2026-09-25 那轮
+    漏掉了 task40，本轮 2026-09-26 补齐）。真实 OO 未执行前它们多为 unverifiable，
+    这里只锁「不再 upstream_gap」。
+    """
+    debts = set(snap["phases"]["plan"]["upstream_debt"])
+    assert debts == set(), f"Task 32 两条欠账已补，不应再有 upstream_debt：{sorted(debts)}"
+    for scenario_id in (
+        "same_application_higher_sequence_fold",
+        "wrong_prior_confirmation_bundle_fence_contributor_rejected",
+    ):
+        row = snap["phases"]["scenarios"].get(scenario_id)
+        if row is None:
+            # 简单清单 entry 的 required set 未必含这两条（它们属 shared room 家族）——
+            # 不在集合里 ⇒ 更谈不上 upstream_gap，跳过而不是假设它存在
+            continue
+        assert row["error_code"] != "upstream_gap", (scenario_id, row)
 
 
 def test_run_is_not_verified_without_real_onlyoffice(snap: dict[str, Any]) -> None:

@@ -918,3 +918,60 @@ domain 七条准则归零）· Task 75（published-representation → frozen ent
 `entries_with_published_representation=0` / `content_representation_rows=1` /
 `capability_counts` 无 `bidirectional` 键等读数**已被 D2/D4/G7/H1 的后续推进作废**；
 Task 72 Stage A 消费该报告前必须重新生成，不得读这份旧的。
+
+## 2026-09-26 V165：还清 quarantined 场景的 evidence schema 欠账（append-only；上方复选框一律不动）
+
+### 做了什么
+
+V151 的 `ck_wpees_standard_requires_entities` 要求 standard/recovery_claim/close_capture 的 passed 行
+`operation_ids>=1 AND application_ids>=1`，而 AC 5.6 规定 quarantined incoming **永不**创建 application
+⇒ `quarantined_rejects_application_and_engine` 的 passed 行在库层物理写不进去，登记在
+`evidence.SCHEMA_UNREPRESENTABLE_SCENARIOS`（owner 任务 9）。后果：**所有 projection 类 entry 永远不能
+verified**，Task 72 的 `named_required_scenarios_really_executed` 判据恒 false（环境给满也是 5/6）。
+
+按该欠账自己开的方子修复：新增迁移 `V165__wpees_authorization_reject_kind.sql`（+ `R165`）：
+
+- `ck_wpees_scenario_kind` 扩域 `authorization_reject`；
+- `ck_wpees_standard_requires_entities` 豁免新 kind（其余逐字同 V151）；
+- **另配** `ck_wpees_authorization_reject_zero_entities`：operation/application/recovery case 全为 0（只豁免不配零约束 = 允许伪造实体记 passed）；刻意**不**混进 download_only 约束（那条还要求 case ≥ 1）。
+- R165 在仍有该 kind 行时 RAISE 拒绝回滚（evidence 是审计轨迹，不静默删除）。
+- V151 历史字节未动（`test_task30_closure_gate` 现场解析锁死）。
+
+代码侧：`ScenarioKind.authorization_reject`；kind 推导在 recovery 三分支之后、close 之前加
+`not expects_application` 分支（实测只有 quarantined 改 kind，其余 4 条 `expects_application=False`
+走前序分支不变）；`SCHEMA_UNREPRESENTABLE_SCENARIOS` 清空（机制保留作反向锁）；
+`pilot_harness.assert_entity_shape` 对新 kind 用**独立**拒绝码 `application_forbidden_for_scenario`（一码一因）。
+
+### 实测证据
+
+- 真 PG（scratch schema 真 apply V151→V165）：`test_v165_authorization_reject_pg.py` 15 passed ——
+  零实体 passed 行**可写入**；带 operation/application/case 被 `ck_wpees_authorization_reject_zero_entities` 拒；
+  standard 通用规则未放松；R165 拒绝/允许/还原三态。
+- 纯判据：`test_evidence_schema_representability.py` 22 passed（Python 枚举 ↔ V165 SQL 取值域逐值等）。
+- 天花板重测（`classify_scenario_execution` + Task 72 `family_execution_state` 现算）：
+  **V165 前 5/6 → V165 后 6/6**。
+- 正面控制：Task 29 PG 的「逐场景造齐实体、环境对齐」clean run 现在**真 verified**（零缺陷；此前恒有一条
+  `scenario_kind_unrepresentable`）。
+- 变异：R56 / R65 / M09 / Task 70 M12 全 RED 且 md5/sha256 还原校验通过。
+
+### 🔴 没有做到的（不推绿）
+
+1. **天花板 6/6 ≠ 已执行**。今天现算 **0/6**（`application_chain_unavailable`）；`working_paper_entry_evidence_scenario`
+   live 0 行。`named_required_scenarios_really_executed` 仍为 false，Task 72 Stage A 仍红。V165 只是把一个
+   **结构上不可能**变成**环境上可能**。
+2. **live PG 未应用 V165**（`schema_version` 最高 164）：MigrationRunner 在后端启动时应用，需重启后端生效。
+   evidence 表 0 行，应用无数据风险。
+3. Task 70 gate 的逐字节锁 JSON 未重生成（仍被 D2-1 契约 vs 2026-09-06 representation 漂移挡住，属 D2 owner）。
+4. Task 70 复选框为 `[x]`，但其正文要求的真实 OO 全 entry required scenario 刷新未发生（逐字节锁报告
+   `verdict=unverifiable`、真实执行 0 条）。本段**不改**该复选框，只登记此不一致供裁决。
+
+### 期望态迁移（同批）
+
+`test_task29_timeline_evidence{,_pg}` / `test_task30_closure_gate` / `test_task39_pilot_harness{,_pg}` /
+`test_task40~43_*_pilot_pg`（脚手架补 apply V165；task40 顺带补 2026-09-25 漏迁的 Task 32 debt 测）/
+`test_task44_oo94_excel_pilot_gate`（oracle 回声 schema 1→0、evidence_input_missing 13→14，四 pilot 实测一致）/
+`check_task70_oo94_full_entry_scenario_gate`（F5 期望 executed、P39 owner 9→70、A4「无结构性 residual」）。
+排序不变量（「schema 欠账先于一切」）在生产登记表清空后改由**合成登记**守卫，避免变异永久 GREEN。
+
+环境性失败（stash 对照证明与本改动无关）：Task 70 gate 8 条（JSON byte-lock / D2 drift / evidence 表）、
+Task 30 的 6 个 ERROR（writer inventory source digest stale）、Task 67 的 9 条、Task 41/42 的 3 条真实数据 tripwire。

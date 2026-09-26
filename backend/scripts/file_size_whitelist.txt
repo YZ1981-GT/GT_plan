@@ -412,7 +412,12 @@ backend/tests/workpaper_sync/test_task27_conflict_resolution_pg.py  2767
 backend/tests/workpaper_sync/test_task28_sync_router.py  1911
 backend/tests/workpaper_sync/test_task28_sync_router_pg.py  1635
 backend/tests/workpaper_sync/test_task29_timeline_evidence.py  1888
-backend/tests/workpaper_sync/test_task29_timeline_evidence_pg.py  1565
+#   test_task29_timeline_evidence_pg.py —— 基线 1565 已 stale（本次改动前实测 1609，
+#     那 44 行欠账非本次造成）。2026-09-26 V165（authorization_reject kind）迁移 +56 行：
+#     正面控制改为真 verified、合成 schema 欠账登记相位 + 两条守卫（缺陷码分类 / 合成登记
+#     不泄漏）—— 生产登记表清空后变异 R65 否则永久 GREEN。采集是单次 asyncio.run 的
+#     module 快照，拆文件会拆散同一次采集（每测各开 async 会污染连接池，Task 21~29 实测）。
+backend/tests/workpaper_sync/test_task29_timeline_evidence_pg.py  1665
 backend/tests/workpaper_sync/test_task30_closure_gate_pg.py  2146
 backend/tests/workpaper_sync/test_task35_content_event_refresh.py  824
 backend/tests/workpaper_sync/test_task36_excel_entry_gate.py  1810
@@ -462,7 +467,11 @@ backend/tests/workpaper_sync/test_task77_word_entry_gate_pg.py  1208
 backend/tests/workpaper_sync/test_v151_schema_contract.py  2101
 backend/tests/workpaper_sync_chaos/test_task71_chaos_gate.py  2224
 backend/tests/workpaper_sync_frontend/test_task69_frontend_regression.py  880
-backend/tests/workpaper_sync_oo/test_task70_oo_scenario_gate.py  1567
+#   test_task70_oo_scenario_gate.py —— 基线 1567 已 stale（本次改动前实测 1642）。
+#     2026-09-26 V165 迁移 +52 行：schema 欠账排序测改合成登记 + quarantined 还债正面
+#     判据 + A4 residual 改「无结构性 residual」并现算复核。守卫与门逐条一一对应，
+#     拆分会让「门的判据 ↔ 守卫」对照跨文件，理由同本表顶部第 2 条（门与生成器）。
+backend/tests/workpaper_sync_oo/test_task70_oo_scenario_gate.py  1694
 backend/tests/workpaper_sync_predelete/test_task72_pre_delete_eligibility.py  1072
 
 # ── 前端 ────────────────────────────────────────────────────────────

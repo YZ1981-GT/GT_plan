@@ -186,6 +186,14 @@ async def _collect() -> dict[str, Any]:  # noqa: C901, PLR0912, PLR0915 - 一次
         raise _HarnessError(f"缺少迁移文件: {_MIGRATION}")
 
     forward = MigrationRunner._split_sql_statements(_MIGRATION.read_text(encoding="utf-8"))
+    # 🔴 生产按 V151 → V165 顺序 apply。V165 给 evidence `scenario_kind` 扩了
+    # `authorization_reject`（quarantined 场景的 kind）；只 apply V151 会让该场景的行撞
+    # V151 旧域 `ck_wpees_scenario_kind`（2026-09-26 实测 CheckViolationError）。
+    forward += MigrationRunner._split_sql_statements(
+        (_BACKEND / "migrations" / "V165__wpees_authorization_reject_kind.sql").read_text(
+            encoding="utf-8"
+        )
+    )
     schema = f"{_SCHEMA_PREFIX}{uuid.uuid4().hex[:12]}"
     ssl_off = {"ssl": False} if getattr(settings, "DB_DISABLE_SSL", False) else {}
     base_root = Path(tempfile.mkdtemp(prefix="tmp_task29_store_"))
@@ -863,7 +871,12 @@ async def _collect() -> dict[str, Any]:  # noqa: C901, PLR0912, PLR0915 - 一次
                 # entity 形态按 V151 的三条 kind 约束分支填（与
                 # `RequiredScenario.kind` 的推导同一顺序），实体逐场景独占。
                 owned = pool.get(scenario.scenario_id) or {}
-                if scenario.kind in (
+                if scenario.kind is EV.ScenarioKind.authorization_reject:
+                    # V165：授权层直接拒绝 ⇒ operation/application/recovery case 三者全为 0
+                    # （`ck_wpees_authorization_reject_zero_entities`）。body 默认值即全空，
+                    # 这里显式留空分支，防止它掉进下面 `expects_application` 以外的兜底。
+                    pass
+                elif scenario.kind in (
                     EV.ScenarioKind.download_only,
                     EV.ScenarioKind.recovery_reject,
                 ):
@@ -885,10 +898,10 @@ async def _collect() -> dict[str, Any]:  # noqa: C901, PLR0912, PLR0915 - 一次
                         scenario_id=scenario.scenario_id,
                         ordinal=ordinal,
                         scenario_kind=scenario.kind.value,
-                        # 一条场景在当前 schema 下无法记成 passed（AC 5.6 的零 application
-                        # 与 `ck_wpees_standard_requires_entities` 冲突），已登记在
-                        # `SCHEMA_UNREPRESENTABLE_SCENARIOS`。harness 如实落
-                        # `unverifiable`，recomputer 会把它记成可归因的独立缺陷。
+                        # 登记在 `SCHEMA_UNREPRESENTABLE_SCENARIOS` 的场景如实落
+                        # `unverifiable`，recomputer 把它记成可归因的独立缺陷。V165 之后该表
+                        # 为空（quarantined 场景改 kind=authorization_reject 可记 passed），
+                        # 分支保留：它是反向锁的另一半 —— 谁再登记新欠账，这里自动生效。
                         result=(
                             "unverifiable"
                             if scenario.scenario_id in EV.SCHEMA_UNREPRESENTABLE_SCENARIOS
@@ -1083,6 +1096,23 @@ async def _collect() -> dict[str, Any]:  # noqa: C901, PLR0912, PLR0915 - 一次
             entry_id=ENTRY, required_set=required, skip={"rollback"}
         )
         evidence["missing_scenario"] = await _verdict(missing_run)
+
+        # 🔴 合成 schema 欠账登记（V165 之后生产登记表为空）。
+        #
+        # 锁的性质：「已登记的 schema 欠账」与「真实失败」必须各有独立缺陷码
+        # （`scenario_kind_unrepresentable` vs `scenario_not_passed`）。生产表为空时 clean run
+        # 根本走不到该分支 ⇒ 变异 R65（把两类合成一码）会**永久 GREEN**。守卫必须自己造一条
+        # 登记：`_write_run` 与 recomputer 读的是同一个模块属性，临时替换即同时生效，
+        # `finally` 无条件还原，不泄漏到其它相位。
+        _real_registry = EV.SCHEMA_UNREPRESENTABLE_SCENARIOS
+        EV.SCHEMA_UNREPRESENTABLE_SCENARIOS = {
+            "rollback": "合成 schema 欠账（仅测缺陷码分类，非生产登记）"
+        }
+        try:
+            synthetic_run = await _write_run(entry_id=ENTRY, required_set=required)
+            evidence["synthetic_schema_gap"] = await _verdict(synthetic_run)
+        finally:
+            EV.SCHEMA_UNREPRESENTABLE_SCENARIOS = _real_registry
 
         # download-only 出现三实体：**存储层**就拒（`ck_wpees_download_only_zero_entities`）。
         _, download_refusal = await _write_run_or_refusal(
@@ -1404,34 +1434,40 @@ class TestEvidenceRecomputation:
     def test_a_clean_run_has_exactly_one_known_and_attributed_defect(
         self, snap: dict[str, Any]
     ) -> None:
-        """正面控制。
+        """正面控制：逐场景造齐实体、环境完全对齐的 run 必须**真的 verified**。
 
-        🔴 断言的是**精确集合**而不是「非空」：一个逐场景造齐实体、环境完全对齐的 run
-        只应剩下唯一一条**已登记且可归因**的缺陷 —— `scenario_kind_unrepresentable`
-        （AC 5.6 的「quarantined 永不创建 application」与 V151 的
-        `ck_wpees_standard_requires_entities` 当前不可同时满足，见
-        `evidence.SCHEMA_UNREPRESENTABLE_SCENARIOS`）。
+        🔴 断言的是**精确集合**而不是「非空」：零缺陷、零 stale、`verified`。
 
-        这条**不是**放宽：entry 因此保持未验收。精确集合让任何其他检查误报（多一个码）
-        或漏报（少这个码）都打红，正面控制的区分度反而比「== []」更高。
+        历史（append-only）：V165 之前本条断言 `defects == ["scenario_kind_unrepresentable"]`
+        且 `result == "unverified"` —— AC 5.6 的「quarantined 永不创建 application」与 V151 的
+        `ck_wpees_standard_requires_entities` 不可同时满足，于是**完全干净的 run 也永远不能
+        verified**（D2 类 entry 的结构性天花板）。2026-09-26 V165 新增 `authorization_reject`
+        kind 解除该冲突；本条随之改为锁「正面控制确实能到达 verified」。
+
+        这条比旧版**更严**：旧版允许一条已知缺陷，新版零容忍 —— 任何检查误报一个码都打红。
+        测试名保留（变异 R65 的 want 指向它；「one known defect」字面已过时，见本段）。
         """
         clean = snap["scenarios"]["evidence"]["clean"]
-        assert clean["defects"] == ["scenario_kind_unrepresentable"], clean["defects"]
+        assert clean["defects"] == [], clean["defects"]
         assert clean["stale_reasons"] == [], clean["stale_reasons"]
-        assert clean["result"] == "unverified", clean
-        assert any("quarantined" in note for note in clean["notes"]), clean["notes"]
+        assert clean["result"] == "verified", clean
 
     def test_that_defect_is_the_declared_schema_gap_and_only_that(self) -> None:
-        """反向锁死上一条：登记表恰有一条，且理由指名 V151 的约束。"""
-        assert len(EV.SCHEMA_UNREPRESENTABLE_SCENARIOS) == 1, (
-            f"schema 欠账登记表变成 {len(EV.SCHEMA_UNREPRESENTABLE_SCENARIOS)} 条 —— "
-            "它是可归因的**单点**欠账，不是可以随手加项的豁免名单"
+        """反向锁死上一条：schema 欠账登记表**已清空**，且被还债的场景仍在 required set 里。
+
+        测试名保留（历史：它曾锁「登记表恰有一条且理由指名 V151 约束」）。V165 之后锁的是
+        还债事实本身：表为空、该场景改 kind 且可记 passed、未被移出必需集合。
+        """
+        assert dict(EV.SCHEMA_UNREPRESENTABLE_SCENARIOS) == {}, (
+            f"schema 欠账登记表应已清空（V165），实得 "
+            f"{sorted(EV.SCHEMA_UNREPRESENTABLE_SCENARIOS)} —— 新增登记须说明 schema 为何无法"
+            "表达，并按 V165 范式补 kind + 零约束，而不是让 entry 永久未验收"
         )
-        (sid, reason), = EV.SCHEMA_UNREPRESENTABLE_SCENARIOS.items()
-        assert sid == "quarantined_rejects_application_and_engine"
-        assert "ck_wpees_standard_requires_entities" in reason
-        assert "owner" in reason
-        # 该场景必须仍在 required set 里 —— 登记欠账不等于把它移出必需集合。
+        sid = "quarantined_rejects_application_and_engine"
+        scenario = {s.scenario_id: s for s in EV.PROJECTION_BASE_SCENARIOS}[sid]
+        assert scenario.kind is EV.ScenarioKind.authorization_reject, scenario.kind
+        assert scenario.schema_representable_as_passed is True
+        # 还债不等于把场景移出必需集合
         assert sid in {s.scenario_id for s in EV.PROJECTION_BASE_SCENARIOS}
 
     def test_every_scenario_owns_its_own_application(self, snap: dict[str, Any]) -> None:
@@ -1449,6 +1485,26 @@ class TestEvidenceRecomputation:
         assert evidence["required_scenario_count"] >= 24, evidence
         assert len(evidence["clean"]["required_scenario_ids"]) == (
             evidence["required_scenario_count"]
+        )
+
+    def test_a_registered_schema_gap_gets_its_own_defect_code(
+        self, snap: dict[str, Any]
+    ) -> None:
+        """「schema 欠账」与「真实失败」各有独立缺陷码（合成登记，见采集相位注释）。
+
+        合成一码会让已知欠账把真实失败淹掉，反之则每次重算都要重新排查那条欠账。
+        V165 之前该性质由真实登记（quarantined）顺带锁住；登记表清空后必须显式造一条，
+        否则变异 R65 永久 GREEN。
+        """
+        verdict = snap["scenarios"]["evidence"]["synthetic_schema_gap"]
+        assert verdict["defects"] == ["scenario_kind_unrepresentable"], verdict["defects"]
+        assert verdict["result"] == "unverified", verdict
+        assert any("rollback" in note for note in verdict["notes"]), verdict["notes"]
+
+    def test_synthetic_registration_did_not_leak(self) -> None:
+        """合成登记必须已被 `finally` 还原 —— 否则后续相位/其它测试会读到假欠账。"""
+        assert dict(EV.SCHEMA_UNREPRESENTABLE_SCENARIOS) == {}, (
+            EV.SCHEMA_UNREPRESENTABLE_SCENARIOS
         )
 
     def test_a_missing_scenario_is_unverified(self, snap: dict[str, Any]) -> None:

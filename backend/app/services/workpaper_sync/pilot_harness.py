@@ -162,11 +162,15 @@ class HarnessRejection(str, Enum):
     authority_model_not_enumerated = "authority_model_not_enumerated"
     #: download-only / recovery-reject 场景带了 operation/application。
     download_only_has_entities = "download_only_has_entities"
-    #: 场景声明「永不创建 application」（如 quarantined incoming，AC 5.6）却给了 application。
-    #: 与上一码分开：上一码对应 V151 的 `ck_wpees_download_only_zero_entities`（按 kind 分支），
-    #: 这一码覆盖 `scenario_kind='standard'` 但 `expects_application=False` 的场景 ——
-    #: 库层对它**完全不管**（`ck_wpees_standard_requires_entities` 只在 passed 时生效），
-    #: 于是"写成 unverifiable 再塞一个 application 进去"在库层合法。判据只能在写入侧。
+    #: 场景声明「永不创建 application」（如 quarantined incoming，AC 5.6）却给了实体。
+    #: 与上一码分开：上一码对应 V151 的 `ck_wpees_download_only_zero_entities`
+    #: （download_only / recovery_reject，要求 case ≥ 1），这一码对应 V165 的
+    #: `ck_wpees_authorization_reject_zero_entities`（authorization_reject，要求
+    #: operation/application/case **全为 0**）。两条库层约束不同 ⇒ 一码一因必须分码。
+    #:
+    #: 历史：V165 之前该场景落 `standard` kind，库层对它**完全不管**（standard 约束只在
+    #: passed 时生效），"写成 unverifiable 再塞 application"在库层合法，判据只能在写入侧；
+    #: V165 之后库层与写入侧同严，写入侧只是更早拦。
     application_forbidden_for_scenario = "application_forbidden_for_scenario"
     #: 该场景必须有 recovery case 但没给。
     missing_recovery_case = "missing_recovery_case"
@@ -1235,18 +1239,26 @@ def assert_entity_shape(
     与 V151 的三条 entity CHECK 同向但**更早也更严**：库层只在 `result='passed'` 时才管
     「必须有实体」，于是「写成 unverifiable 就能塞任意实体」在库层完全合法。
 
-    🔴 **判定顺序不可交换**，四条规则按 V151 的分支顺序：
+    🔴 **判定顺序不可交换**，四条规则按 V151/V165 的分支顺序：
 
     1. `kind ∈ (download_only, recovery_reject)` ⇒ operation/application 恒为 0
        （对应 `ck_wpees_download_only_zero_entities`，插库前就拦住，否则真库
        `CheckViolationError` —— 本任务首轮实测踩过）；
-    2. 其余场景若声明 `expects_application=False`（如 quarantined incoming，AC 5.6
-       「永不创建 application」）⇒ application 必须为 0，**库层对此完全不管**；
+    2. `kind = authorization_reject`（V165；即声明 `expects_application=False` 且不涉及
+       recovery case 的场景，如 quarantined incoming，AC 5.6）⇒ operation / application /
+       recovery case **三者全为 0**，对应 V165 的
+       `ck_wpees_authorization_reject_zero_entities`。🔴 与第 1 条**分码**
+       （`application_forbidden_for_scenario`）：「一码一因」—— 两类 kind 的库层约束不同
+       （第 1 条还要求 case ≥ 1，本条要求 case = 0），合成一码会让其中一条判据永久不可达
+       （本轮实测 `test_rejection_kinds_are_reachable_and_mutually_distinct` 当场打红）；
     3. 声明需要 recovery case 的必须给；
     4. 声明需要 application 的必须同时给 operation + application。
+
+    V165 之后「`expects_application=False` 却落在 standard 类」的组合已不存在（
+    :attr:`RequiredScenario.kind` 的推导把它们全部送进上面两类），故原先那条「库层完全
+    不管、只能写入侧拦」的独立分支并入第 2 条 —— 现在库层与写入侧**同严**，写入侧只是更早。
     """
-    zero_entity_kinds = (ScenarioKind.download_only, ScenarioKind.recovery_reject)
-    if scenario.kind in zero_entity_kinds:
+    if scenario.kind in (ScenarioKind.download_only, ScenarioKind.recovery_reject):
         if observation.operation_ids or observation.application_ids:
             raise HarnessRejected(
                 HarnessRejection.download_only_has_entities,
@@ -1255,12 +1267,19 @@ def assert_entity_shape(
                 f"{len(observation.operation_ids)}/{len(observation.application_ids)} —— "
                 "download-only 只终结 case 并授权下载，recovery reject 更不得产生 operation",
             )
-    elif not scenario.expects_application and observation.application_ids:
+    elif scenario.kind is ScenarioKind.authorization_reject and (
+        observation.operation_ids
+        or observation.application_ids
+        or observation.recovery_case_ids
+    ):
         raise HarnessRejected(
             HarnessRejection.application_forbidden_for_scenario,
-            f"{scenario.scenario_id}: 该场景声明永不创建 application（AC 5.6），实得 "
-            f"{len(observation.application_ids)} 个 —— quarantined incoming 只允许 "
-            "download-only/expire/retention，永不进入 engine",
+            f"{scenario.scenario_id}（kind=authorization_reject）: 该场景声明永不创建 "
+            "application（AC 5.6），operation/application/recovery_case 必须全为 0，实得 "
+            f"{len(observation.operation_ids)}/{len(observation.application_ids)}/"
+            f"{len(observation.recovery_case_ids)} —— quarantined incoming 在 sealing 阶段"
+            "即被拒，只允许 download-only/expire/retention，永不进入 engine"
+            "（V165 `ck_wpees_authorization_reject_zero_entities`）",
         )
     if scenario.expects_recovery_case and not observation.recovery_case_ids:
         raise HarnessRejected(

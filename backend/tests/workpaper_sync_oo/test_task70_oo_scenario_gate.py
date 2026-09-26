@@ -716,17 +716,46 @@ class TestScenarioExecutionRows:
 
 
 class TestClassificationOrderIsNotCommutable:
-    def test_schema_gap_wins_over_black_box(self, gate: Any) -> None:
-        """schema 欠账排第一：三条前提全齐时它仍必须是 unrunnable + schema 码。"""
+    def test_schema_gap_wins_over_black_box(
+        self, gate: Any, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """schema 欠账排第一：三条前提全齐时它仍必须是 unrunnable + schema 码。
+
+        🔴 2026-09-26 V165 清空了生产登记表（quarantined 改 kind=authorization_reject）⇒
+        改用**合成登记**验排序不变量，与下一条 `test_upstream_gap_wins_over_black_box` 的
+        合成 debt 同范式。选 `oo_to_html`：它需要黑盒 ⇒ 若 schema 判据不在第一位，会被
+        黑盒分支吞掉而落 `real_onlyoffice_not_executed`。生产模块经 `gate._production()`
+        取（不写字面量模块路径，否则命中任务 68 辐射面 pattern / BP-70-8）。
+        """
+        evidence = gate._production()["evidence"]
+        monkeypatch.setattr(
+            evidence,
+            "SCHEMA_UNREPRESENTABLE_SCENARIOS",
+            {"oo_to_html": "合成 schema 欠账（仅测判定顺序）"},
+        )
+        row = gate.classify_scenario_execution(
+            scenario_id="oo_to_html",
+            oo_available=False,
+            browser_available=False,
+            application_chain_available=True,
+        )
+        assert row["execution_tier"] == gate.TIER_UNRUNNABLE
+        assert row["blocked_by"] == "scenario_kind_unrepresentable"
+        assert row["blocked_owner_task"] == "9"
+
+    def test_quarantined_is_executable_once_prerequisites_hold(self, gate: Any) -> None:
+        """还债的正面判据：V165 之后 quarantined 在三条前提齐备时落 executed。
+
+        若它仍是 unrunnable（无论什么码），说明 schema 欠账只是换了个名字而没有真的解除。
+        """
         row = gate.classify_scenario_execution(
             scenario_id="quarantined_rejects_application_and_engine",
             oo_available=True,
             browser_available=True,
             application_chain_available=True,
         )
-        assert row["execution_tier"] == gate.TIER_UNRUNNABLE
-        assert row["blocked_by"] == "scenario_kind_unrepresentable"
-        assert row["blocked_owner_task"] == "9"
+        assert row["execution_tier"] == gate.TIER_EXECUTED, row
+        assert row["blocked_by"] is None, row
 
     def test_upstream_gap_wins_over_black_box(self, gate: Any) -> None:
         """上游实现缺口排第二：接上 OO/浏览器也**不得**变绿。
@@ -1137,16 +1166,21 @@ class TestCounterfactualAndForwardRecompute:
     def test_arm_a4_leaves_a_named_residual(
         self, gate: Any, report: Mapping[str, Any]
     ) -> None:
-        """A4：三条阻塞全解除后仍有 schema 欠账（owner 任务 9），且点名 owner。
+        """A4：三条阻塞全解除后**不再有结构性 residual**，且文案如实说明原因。
 
-        🔴 2026-09-25：Task 32 两条实现缺口（原 owner 任务 32）已补齐并解除 debt ⇒ 三条
-        前提全解除后它们变绿，**不再是 residual**。residual 现只剩 schema 欠账
-        （quarantined，任务 9）。
+        测试名保留（变异脚本可能点名它；历史：它锁「A4 仍有点名 owner 的 residual」）。
+
+        🔴 2026-09-25：Task 32 两条实现缺口（原 owner 任务 32）已补齐并解除 debt。
+        🔴 2026-09-26：schema 欠账（quarantined，原 owner 任务 9）由 V165 还清 ⇒ A4 的
+        residual 文案必须说「不再有任何结构性 residual」，且**不得**再把任务 9/32 列为
+        仍在的 owner。同时锁「这不等于已通过」—— A4 是反事实，今天真实执行数仍为 0。
+
+        再用**现算档位**独立复核文案（不只信文字）：A4 条件下任何 named scenario 都不得
+        落在 schema/upstream 两个结构性码上。
 
         🔴 判据走 **live 现算**（`gate.build_counterfactual_arms`）而不是磁盘报告：磁盘
         JSON 的重生成当前被并发会话的 D2-1 契约新增导致的 live representation drift 挡住
         （`register_from_manifest` 抛 ContractDriftError），只读磁盘会拿到旧文案而假红。
-        现算与 A3 测同款范式。
         """
         live = gate.build_counterfactual_arms(
             supply=report["supply_chain_walk"],
@@ -1157,10 +1191,28 @@ class TestCounterfactualAndForwardRecompute:
         arm = next(a for a in live["arms"] if a["arm"] == "A4")
         assert arm["conclusion_changes"] is True
         residual = arm["residual_after_all_removed"]
-        assert "任务 9" in residual, residual
-        assert "任务 32" not in residual.replace("原 owner 任务 32", ""), (
-            "Task 32 两条欠账已补齐，不应再把它们列为 A4 residual：" + residual
+        assert "不再有任何结构性 residual" in residual, residual
+        stripped = residual.replace("原 owner 任务 32", "").replace("原 owner 任务 9", "")
+        assert "任务 9" not in stripped and "任务 32" not in stripped, (
+            "schema/实现两类欠账均已还清，不应再把任务 9/32 列为 A4 residual：" + residual
         )
+        assert "今天真实执行数仍为 0" in residual, (
+            "A4 是反事实 —— 文案必须写明它不等于已通过：" + residual
+        )
+
+        # 分母取本门自有的「正文 ↔ 生产」桥（每个右侧 id 都由 build_scenario_denominator
+        # 逐条断言在 SCENARIO_ORACLES 里），覆盖 Task 72 点名的六条并且更宽。
+        for scenario_id in sorted(set(gate.TASK_TEXT_SCENARIO_CLAUSES.values())):
+            row = gate.classify_scenario_execution(
+                scenario_id=scenario_id,
+                oo_available=True,
+                browser_available=True,
+                application_chain_available=True,
+            )
+            assert row["blocked_by"] not in {"scenario_kind_unrepresentable", "upstream_gap"}, (
+                scenario_id,
+                row,
+            )
 
     def test_forward_recompute_has_a_positive_case(
         self, gate: Any, report: Mapping[str, Any]

@@ -1403,24 +1403,52 @@ class TestScenarioKindIsLockedToV151:
     _MIGRATION = (
         _BACKEND / "migrations" / "V151__workpaper_sync_content_application_bundle_scope.sql"
     )
+    _MIGRATIONS_DIR = _BACKEND / "migrations"
 
     def _ddl_domain(self) -> set[str]:
-        """从迁移文本反向解析 `ck_wpees_scenario_kind` 的取值域（独立分母）。"""
+        """从迁移文本反向解析 `ck_wpees_scenario_kind` 的**生效**取值域（独立分母）。
+
+        🔴 2026-09-26：该约束先由 V151 建表时定义，后被 **V165** DROP + ADD 扩域
+        （`authorization_reject`）。生产按版本号顺序 apply，**最后一个**定义它的迁移即
+        生效定义 —— 只读 V151 会把「已被覆盖的旧域」当真，于是 Python 枚举与真库一致时
+        反而打红。这里按版本号数字排序，取最后一个出现该约束名的 `V*.sql`。
+        """
         import re
 
-        sql = self._MIGRATION.read_text(encoding="utf-8")
-        anchor = sql.find("ck_wpees_scenario_kind")
-        assert anchor > 0, "V151 里找不到 ck_wpees_scenario_kind"
-        window = sql[anchor : anchor + 400]
-        return set(re.findall(r"'([a-z_]+)'", window))
+        def _version(path: Path) -> int:
+            m = re.match(r"V(\d+)__", path.name)
+            return int(m.group(1)) if m else -1
+
+        candidates = sorted(
+            (
+                p
+                for p in self._MIGRATIONS_DIR.glob("V*.sql")
+                if "ck_wpees_scenario_kind" in p.read_text(encoding="utf-8")
+            ),
+            key=_version,
+        )
+        assert candidates, "没有任何迁移定义 ck_wpees_scenario_kind"
+        sql = candidates[-1].read_text(encoding="utf-8")
+        # 取**最后一个** CHECK 定义（DROP 语句里也会出现约束名，但它后面没有 IN 列表）
+        blocks = re.findall(
+            r"ck_wpees_scenario_kind CHECK \(scenario_kind IN \((.*?)\)\)", sql, re.S
+        )
+        assert blocks, f"{candidates[-1].name} 里找不到 ck_wpees_scenario_kind 的 CHECK 定义"
+        return set(re.findall(r"'([a-z_]+)'", blocks[-1]))
 
     def test_the_enum_matches_the_v151_check_exactly(self) -> None:
+        """测试名保留（变异脚本 R56 的 want 指向它）；比对对象为 V151 经 V165 的生效域。"""
         ddl = self._ddl_domain()
         enum_values = {kind.value for kind in EV.ScenarioKind}
         assert enum_values == ddl, (
-            f"ScenarioKind 与 V151 的 CHECK 不等值：多 {sorted(enum_values - ddl)}，"
+            f"ScenarioKind 与生效 CHECK 不等值：多 {sorted(enum_values - ddl)}，"
             f"少 {sorted(ddl - enum_values)}"
         )
+
+    def test_the_effective_domain_is_defined_by_v165(self) -> None:
+        """锁住「生效定义来自 V165」这一事实，防 `_ddl_domain` 静默退回读 V151。"""
+        ddl = self._ddl_domain()
+        assert "authorization_reject" in ddl, ddl
 
     def test_the_semantic_family_is_a_separate_enum(self) -> None:
         """语义分组不得混进入库取值域（混进去就会被 CHECK 拒）。"""
@@ -1439,8 +1467,13 @@ class TestScenarioKindIsLockedToV151:
             ("browser_crash_no_userdata_recovery_case", "recovery_reject"),
             ("authorization_first_recovery_claim", "recovery_claim"),
             ("single_participant_close", "close_capture"),
+            # V165：零 application、无 recovery case ⇒ authorization_reject
+            ("quarantined_rejects_application_and_engine", "authorization_reject"),
         ],
-        ids=["standard", "download-only", "recovery-reject", "recovery-claim", "close"],
+        ids=[
+            "standard", "download-only", "recovery-reject", "recovery-claim", "close",
+            "authorization-reject",
+        ],
     )
     def test_kind_is_derived_from_the_entity_shape(
         self, scenario_id: str, expected_kind: str
