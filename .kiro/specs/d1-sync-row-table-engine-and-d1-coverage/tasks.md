@@ -372,6 +372,25 @@ D1-10 三项共 **28 个标量**的形态待实测（`static_region` vs HTML-onl
 ### 阶段 6：D1 批次 2~3
 
 - [ ] 27. 接入 D1-8（双区）+ D1-16（双区）；**D1-5 先做可行性核再裁决**
+  ✅ **D1-5 可行性核子目标已完成**（2026-09-26）：裁决 **`single_html`**，维持默认倾向，
+  四条判据逐条独立实证（未偷懒类推 D4-4）。openpyxl 直读 `调整分录汇总表D1-5`（A1:J25，
+  表头行 5 十列 A-J，数据区 6-20 **逐格实测零内容零公式**，行 21 使用提示）：
+  ① **零行身份列**（全表扫 GTROW/_GT/UUID 零命中）+ **零 definedName**（连 static_region
+  锚点也没有）；② `D1-entry-rows` 是 hub —— `useD1Adjustment` 拥有，`D1TabAdjustment.vue`
+  接 `useAdjustmentCentralSync` 2 个接线点（`wpCode:'D1'`/`itemId:'D1-entry-rows'` →
+  后端幂等 by `source_ref={wpId}:{itemId}`），`D1TabIndex.vue:50` progressKeys 也读它；
+  ③ 借贷平衡 `BALANCE_TOLERANCE=0.005` + 「同步到集中登记」按钮以 `!isBalanced` 为门，
+  **仅 HTML 侧强制**（Excel 数据区零公式）；④ 列 F『……』是排版占位。
+  🔴 **实测发现 D1-5 与已判 single_html 的 D4-4 是同一套模板范式**（十列表头与
+  `T08-d44-single-html-adjudication.json` 的 `header_A_to_J` **逐字完全相同**，同为表头行 5
+  + 数据区 6-20 空带 + 行 21 提示，仅整表行数 25 vs 23 不同）。
+  🔴 **改判条件两条都不成立**（tasks.md 定的是「有行身份列 **且** 无同步链冲突」）⇒ 不改判、
+  不另起接入任务；受管区计数不变（门已写明 D1-5 不计）。
+  裁决证据：`evidence/task27-d1-5-single-html-adjudication.json`；防腐判据：
+  `backend/tests/workpaper_sync/test_d1_05_single_html_adjudication.py`（10 用例，把四条依据
+  钉成测试，含 D1-3 有 `uuid_col` 的反面对照证明身份列扫描真能区分）。
+  🔴 **本子目标不等于 Task 27 完成**：同任务的 D1-8（双区）/ D1-16（双区）**接入本体未做**
+  （需灰度开关 + 整册 materialize/verify 门 + 受管区 5→9），复选框保持未勾。
   - D1-8：`D1-endorse-discount-rows` / `-transfer-rows`；D1-16：`-reversal-rows` / `-writeoff-rows`
   - 🔴 **D1-5 从接入改为可行性核**（复盘修正，首版误排直接接入）：它与上游 spec
     `d-cycle-sheet-bidirectional-expansion` 已判 `single_html` 的 D4-4 同型 —— 实证
