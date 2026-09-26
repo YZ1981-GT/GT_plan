@@ -35,9 +35,14 @@
 > `backend/scripts/e2e/verify_d4_full_book_real_stack.py` 可重跑；Task 30 判定 D1-6 的 4×3
 > QA 矩阵**两条路径都表达不了**（`static_region` 卡在 `contracts.py:_parse_field` 的
 > `row_from` 只收单行号这条 schema 硬约束），按需求 5.6 登记 `NOT_EXPRESSIBLE`。
-> **尚未开工**：Task 15/16/17/18 本体的完整 provider 收敛（≤150/300 行上限；其中 **Task 18
-> D2 已独立立项** `d2-sync-coverage-via-row-table-engine` 并由并发会话推进中，本 spec 不重复
-> 介入）、Task 27~29/31~34（D1 批次 2~6 灰度开启 + 真实接入 + 审定表迁移 + 验收）。
+> ✅ **D1 全 21 张 sheet 声明层/评估全部封顶**（2026-09-26）：
+> **16 张有声明**（D1-1 AdjudicationSheetSpec / D1-2/3/4 此前 / D1-7 dict+专用merge /
+> D1-8/9/10/11/12/13/15/16 本轮 RowTableSheetSpec）+ **5 张裁决/评估**
+> （D1-5 single_html / D1-6/D1-14/附注×2 NOT_EXPRESSIBLE）+ D1A 不需双向回写。
+> 自查修了 Task 16/17 遗留的 **4xx→500 回归**（D5/D6/D7 错误转译，D3 strict xfail 待修）。
+> **尚未开工**：Task 15/16/17 本体的 ≤150 行收敛（剩余是发布编排需先补判据）、Task 18
+> D2 由并发 d2 spec 推进、Task 25-29 灰度接入（卡 adapter 注册平台级缺口）、
+> Task 32/33（审定表存量迁移+四态状态机，卡真库 per-cell 数据）、Task 34（验收）。
 > 下方复选框为唯一进度真源，本节仅摘要。
 
 顺序有意义：**阶段 0 是红判据与基线先行** —— 24 个 golden digest 此时必绿（它是基线不是判据），
@@ -481,17 +486,20 @@ D1-10 三项共 **28 个标量**的形态待实测（`static_region` vs HTML-onl
 ### 阶段 7：D1 批次 4~5
 
 - [ ] 29. 接入 D1-7（嵌套 dict）+ D1-14（**static_region 候选**）+ D1-13（双区 + 标量）
-  - D1-7 是一个 item 装两数组 `{bankRows, commercialRows}` ⇒ `StoreKind.dict` 首次用于 D1
-  - 🔴 **D1-14 的 10 个标量不是「0 受管区」**（复盘修正）：首版据 `StoreKind.fixed_text` 直接判
-    无受管区，那是把 store 形态与 Excel 侧几何混为一谈。按 D4-13 先例，纯标量应走
-    **`static_region`**（definedName 锚点、各占一个受管区、绕开整条位移链）。
-    本任务须先实测（有无可注入 definedName 锚点、是否落在 footer 之下 ⇒ 是否命中
-    `HTML_ONLY_ITEM_IDS` 那条 fail-closed 冲突），再定 `static_region` 还是 HTML-only
-  - 🔴 **D1-13 是双区**（复盘补键名）：`D1-sampling-vouching-rows` /
-    `D1-sampling-specific-samples`；其 15 个标量同 D1-14 按 `static_region` vs HTML-only 逐项实测
-  - 🔴 **D1-10 的 3 个 recon 标量同此处置**（任务 28 已接的那张，此处回补判定）
-  - 门：**受管区终值待实测重算** —— 首版 `15→18` 是按「标量 = 0 受管区」算的，
-    若 D1-14 十项 + D1-13 十五项 + D1-10 三项均走 `static_region`，终值会显著更高
+  ✅ **声明层全部交付**（2026-09-26）：
+  - `phase5_d1_07_memo.py`：**D1 唯一 `StoreKind.dict` 形态**（`{bankRows, commercialRows}` 嵌套
+    双数组），双区银行承兑 R13-17 / 商业承兑 R19-23，31 列宽表，UUID=Y/Z，provider 专用
+    `build_d17_store_projection`/`merge_projection_into_d17_store` + `DedicatedStoreItem` 注册
+    在 `STORE_MERGE_REGISTRY["d1.notes_receivable_detail"]`（参照 D4-9 已验证路径）。框架层
+    通用 `build_store_projection`/`merge_projection_into_store_rows` 严格要求顶层 list，dict
+    载荷直接抛 `RowTableStorePayloadError` ⇒ 必须 provider 专用路径。
+  - `phase5_d1_13_sampling.py`：双区增减变动 R16-31（16 行）+ 期后检查 R37-44（8 行），17 列
+    宽表 A-Q，UUID=R/S，两级表头。模板5列"核对内容1-5"vs前端3个语义字段按模板实际声明。
+  - `phase5_d1_14_policy.py`：`NOT_EXPRESSIBLE`——openpyxl 实测确认是**纯文本段落**（无表头/
+    无数据区/无 footer/无绝对坐标标量格），tasks.md 原描述「10 个标量 static_region 候选」
+    **不准确**（static_region 要求绝对坐标锚点，D1-14 连映射目标格都没有）。现状维持 HTML-only。
+  - 🔴 **D1-14 实测纠正了设计阶段的误判**：不是"10 个标量该走 static_region 还是 HTML-only"
+    的问题，而是"它根本不是标量"——它是无结构的纯文本段落区，Excel 侧无几何可表达。
   - _Requirements: 5.1, 5.5, 11.4, 11.5, 11.6_
 
 - [x] 30.* 评估 D1-6 能否用 `TransposedSheetSpec` 表达 ✅ 2026-09-26：**两条路径都表达不了**
@@ -519,13 +527,22 @@ D1-10 三项共 **28 个标量**的形态待实测（`static_region` vs HTML-onl
 
 ### 阶段 8：D1 批次 6 —— 审定表 D1-1 迁移
 
-- [ ]* 31. `AdjudicationSheetSpec` + D1-1 逐格 mask 声明（**框架层类型已交付**：
-  `phase5_adjudication_sheet.py` 含三形态 row_mode + 五值来源 + 逐格 mask + `assert_data_cells_not_masked`
-  fail-closed 自检，24 用例判据全绿含变异反证；D1-1 具体审定表实例声明未做，见任务 32/33）
-  - 审定表**不进**行表引擎（裁决 D3：三循环审定表形态互不相同，差异大于共性）
-  - D1-1 三区（gross/bd/net）+ 逐格 mask（含小计/合计/差异行）
-  - 依赖已修的 `merge._protection` 格级判定 + `_mask_spans_data_column`（本 spec 不重复处理）
-  - _Requirements: 5.1_
+- [x]* 31. `AdjudicationSheetSpec` + D1-1 逐格 mask 声明 ✅ 2026-09-26：框架层类型（此前交付）
+  + **D1-1 具体实例声明已交付**（`phase5_d1_01_adjudication.py`）。
+  三区（gross R8-9 / bd R12-13 / net R16-17）+ `row_mode=fixed_rows`（银行承兑/商业承兑固定行）。
+  88 个逐格 mask（审定列 E/I 全数据行 + 小计/footer 行全列 + 跨 sheet 公式格 + 净值区全格）。
+  B-K 列全声明 `formula`（几乎每格都是公式或跨 sheet 引用），仅 A（项目名）/L（原因分析）
+  为 `editable`。`assert_data_cells_not_masked` 自检通过（零 editable 数据格入 mask）。
+  `value_sources` 声明每列来源：B-H 大部分 `cross_sheet`，D/H 坏账区 `manual`（重分类调整
+  是唯一可手工编辑的金额字段），E/I/J/K `computed`。
+  🔴 **附注披露（上市/国企）也一并评估**：`phase5_d1_disclosure.py` 登记
+  `DISCLOSURE_MIXED_LAYOUT_NOT_EXPRESSIBLE`——混合布局（多个独立小表各有不同列数 + 提示文字
+  交错），现有三种框架类型都无法整张覆盖，接入路径需先模板改造（为每个可编辑小表建
+  Excel Table），属模板侧工作不在本 spec 范围。
+  🔴 **D1A 程序表确认不需双向回写**（用户 2026-09-26 明确）。
+  🔴 **至此 D1 全 21 张 sheet 声明层/评估全部封顶**（16 声明 + 5 裁决/评估：D1-5 single_html /
+  D1-6 NOT_EXPRESSIBLE / D1-14 NOT_EXPRESSIBLE / 附注×2 NOT_EXPRESSIBLE）。
+  🔴 Task 32（存量迁移）和 Task 33（四态状态机）仍是后续依赖任务。
 
 - [ ] 32. D1-1 存量迁移：per-cell 锚点 → 行数组（双读单写）
   - 读侧行对象优先、缺则回落 `D1-adj-{section}-{slug}-{field}`；写侧只写新形态
